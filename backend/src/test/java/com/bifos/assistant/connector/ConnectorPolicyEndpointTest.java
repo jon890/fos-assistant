@@ -127,7 +127,7 @@ class ConnectorPolicyEndpointTest {
         ConnectorPolicyTestDoubles.expireCatalog();
         when(connector.readCatalog()).thenReturn(List.of(DECLARING));
 
-        owner = users.save(AppUser.of("policy-owner@example.com", "주인", 1L, UserRole.MEMBER));
+        owner = users.save(AppUser.of("policy-owner@example.com", "주인", 1L, UserRole.MEMBER, Instant.now()));
         agent = Agent.of(
                 "policy-" + UUID.randomUUID(),
                 "검사용 메모",
@@ -136,7 +136,7 @@ class ConnectorPolicyEndpointTest {
                 CostMode.SUBSCRIPTION,
                 CredentialScope.SHARED_HOUSEHOLD,
                 AgentVisibility.PRIVATE,
-                owner.id());
+                owner.id(), Instant.now());
         agent.markConnectorManaged();
         agent = agents.save(agent);
         token = tokens.issue(PROFILE, "owner").rawToken();
@@ -545,7 +545,7 @@ class ConnectorPolicyEndpointTest {
     @Test
     @DisplayName("연결의 주인이 실행의 사용자와 다르면 block 이고 줄을 남기지 않는다")
     void connectionOfAnotherUserIsBlockedWithoutRow() throws Exception {
-        AppUser other = users.save(AppUser.of("policy-other@example.com", "다른 사람", 1L, UserRole.MEMBER));
+        AppUser other = users.save(AppUser.of("policy-other@example.com", "다른 사람", 1L, UserRole.MEMBER, Instant.now()));
         ConnectorConnection connection = ConnectorConnection.pending(other.id(), DEMO, agent, NOW);
         connection.ready(NOW);
         connections.save(connection);

@@ -192,7 +192,7 @@ public final class McpCallSigner {
                         CostMode.SUBSCRIPTION,
                         CredentialScope.SHARED_HOUSEHOLD,
                         AgentVisibility.GROUP,
-                        null)));
+                        null, Instant.now())));
     }
 
     public static AgentExecution save(

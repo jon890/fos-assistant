@@ -327,6 +327,6 @@ class UsageBreakdownTest {
                         CostMode.SUBSCRIPTION,
                         CredentialScope.SHARED_HOUSEHOLD,
                         AgentVisibility.PRIVATE,
-                        USER_ID)));
+                        USER_ID, Instant.now())));
     }
 }

@@ -77,8 +77,8 @@ class AttachmentUploadLimitTest {
         // 이 서버는 따로 뜬 메모리 데이터베이스를 써서 번호가 1부터 다시 시작한다. 앞선 실행이 남긴 파일과
         // 겹치지 않게 비운다.
         deleteTree(Path.of(properties.root()).toAbsolutePath());
-        user = users.findByEmail(EMAIL).orElseGet(() -> users.save(AppUser.of(EMAIL, "올리는 사람", 1L, UserRole.MEMBER)));
-        Conversation conversation = conversations.save(Conversation.startedBy(user.id(), "사진 대화", null));
+        user = users.findByEmail(EMAIL).orElseGet(() -> users.save(AppUser.of(EMAIL, "올리는 사람", 1L, UserRole.MEMBER, Instant.now())));
+        Conversation conversation = conversations.save(Conversation.startedBy(user.id(), "사진 대화", null, Instant.now()));
         conversationId = conversation.id();
         conversationPublicId = conversation.publicId();
     }

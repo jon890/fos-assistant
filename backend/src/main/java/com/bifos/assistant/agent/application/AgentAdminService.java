@@ -7,6 +7,7 @@ import com.bifos.assistant.orchestration.application.FlowRegistry;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.user.infra.AppUserRepository;
+import java.time.Clock;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -25,6 +26,7 @@ public class AgentAdminService {
     private final AgentLifecycleService lifecycle;
     private final AgentEndpointProbe endpointProbe;
     private final FlowRegistry flows;
+    private final Clock clock;
 
     @Transactional
     public Agent create(AgentCreateCommand command) {
@@ -45,7 +47,8 @@ public class AgentAdminService {
                 command.costMode(),
                 command.credentialScope(),
                 command.visibility(),
-                ownerId);
+                ownerId,
+                clock.instant());
         agent.assignFlow(requireKnownFlow(command.flow()));
         return agents.save(agent);
     }

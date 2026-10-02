@@ -130,6 +130,6 @@ class AgentMemoryCollectionServiceTest {
                 CostMode.API,
                 CredentialScope.DEDICATED,
                 AgentVisibility.GROUP,
-                null);
+                null, Instant.now());
     }
 }

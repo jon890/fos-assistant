@@ -28,6 +28,7 @@ import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.shared.error.GlobalExceptionHandler;
 import com.bifos.assistant.user.domain.UserRole;
+import java.time.Instant;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -185,6 +186,6 @@ class AgentControllerLifecycleTest {
                 CostMode.SUBSCRIPTION,
                 CredentialScope.SHARED_HOUSEHOLD,
                 visibility,
-                ownerUserId);
+                ownerUserId, Instant.now());
     }
 }

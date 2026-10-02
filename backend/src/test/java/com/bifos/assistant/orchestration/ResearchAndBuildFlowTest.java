@@ -194,7 +194,7 @@ class ResearchAndBuildFlowTest {
 
     /** 흐름이 붙은 에이전트 하나를 가진 사용자를 만든다. */
     private CurrentUser member(String email, String agentCode, String flow) {
-        AppUser user = users.save(AppUser.of(email, email, 1L, UserRole.MEMBER));
+        AppUser user = users.save(AppUser.of(email, email, 1L, UserRole.MEMBER, Instant.now()));
         Agent agent = Agent.of(
                 agentCode,
                 agentCode,
@@ -203,7 +203,7 @@ class ResearchAndBuildFlowTest {
                 CostMode.API,
                 CredentialScope.SHARED_HOUSEHOLD,
                 AgentVisibility.PRIVATE,
-                user.id());
+                user.id(), Instant.now());
         agent.assignFlow(flow);
         agents.save(agent);
         return new CurrentUser(user.id(), user.email(), user.displayName(), user.groupId(), user.role());

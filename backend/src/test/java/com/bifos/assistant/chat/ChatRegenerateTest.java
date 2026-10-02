@@ -181,7 +181,7 @@ class ChatRegenerateTest {
     void emptyConversationHasNoReplyToRegenerate() {
         CurrentUser dad = member("dad@example.com", "dad");
         Agent agent = agents.findByCode("dad").orElseThrow();
-        Conversation conversation = conversations.save(Conversation.startedBy(dad.id(), "", agent.id()));
+        Conversation conversation = conversations.save(Conversation.startedBy(dad.id(), "", agent.id(), Instant.now()));
 
         assertThatThrownBy(() -> chat.regenerate(dad, conversation.id(), event -> {}))
                 .isInstanceOf(ApiException.class)
@@ -390,7 +390,7 @@ class ChatRegenerateTest {
                 "image.png",
                 "image/png",
                 1,
-                Instant.now().plus(Duration.ofDays(1))));
+                Instant.now().plus(Duration.ofDays(1)), Instant.now()));
         attachment.nameStoredFile(attachment.id() + ".png");
         attachmentRows.save(attachment);
         attachments.attach(question.id(), conversationId, List.of(attachment.id()));
@@ -432,7 +432,7 @@ class ChatRegenerateTest {
     }
 
     private CurrentUser member(String email, String profileName) {
-        AppUser user = users.save(AppUser.of(email, email, 1L, UserRole.MEMBER));
+        AppUser user = users.save(AppUser.of(email, email, 1L, UserRole.MEMBER, Instant.now()));
         agents.save(Agent.of(
                 profileName,
                 profileName,
@@ -441,7 +441,7 @@ class ChatRegenerateTest {
                 CostMode.SUBSCRIPTION,
                 CredentialScope.SHARED_HOUSEHOLD,
                 AgentVisibility.PRIVATE,
-                user.id()));
+                user.id(), Instant.now()));
         return new CurrentUser(user.id(), user.email(), user.displayName(), user.groupId(), user.role());
     }
 

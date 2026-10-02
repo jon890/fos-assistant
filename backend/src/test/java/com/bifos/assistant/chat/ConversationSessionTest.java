@@ -37,8 +37,8 @@ class ConversationSessionTest {
     /** 다른 검사 클래스와 겹치지 않도록 매번 새 사용자로 대화를 만든다. */
     private Conversation newConversation() {
         String email = "session-" + System.nanoTime() + "@example.com";
-        AppUser user = users.save(AppUser.of(email, email, 1L, UserRole.MEMBER));
-        return conversations.save(Conversation.startedBy(user.id(), "제목", null));
+        AppUser user = users.save(AppUser.of(email, email, 1L, UserRole.MEMBER, Instant.now()));
+        return conversations.save(Conversation.startedBy(user.id(), "제목", null, Instant.now()));
     }
 
     private Conversation reload(Conversation conversation) {

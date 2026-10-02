@@ -66,7 +66,7 @@ class AttachmentCleanerTest {
         root = Path.of(properties.root()).toAbsolutePath();
         deleteTree(root);
         conversationId =
-                conversations.save(Conversation.startedBy(9201L, "정리 대화", null)).id();
+                conversations.save(Conversation.startedBy(9201L, "정리 대화", null, Instant.now())).id();
     }
 
     @Test
@@ -148,7 +148,7 @@ class AttachmentCleanerTest {
 
     private ChatAttachment stored(Instant expiresAt) {
         ChatAttachment attachment =
-                attachments.save(ChatAttachment.of(conversationId, 9201L, "photo.png", "image/png", 3, expiresAt));
+                attachments.save(ChatAttachment.of(conversationId, 9201L, "photo.png", "image/png", 3, expiresAt, Instant.now()));
         attachment.nameStoredFile(AttachmentStore.storedName(attachment.id(), "png"));
         attachments.save(attachment);
         store.save(conversationId, attachment.id(), "png", new ByteArrayInputStream(new byte[] {1, 2, 3}));

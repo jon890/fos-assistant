@@ -105,7 +105,7 @@ class ChatStopTest {
     }
 
     private CurrentUser member(String email, String profileName) {
-        AppUser user = users.save(AppUser.of(email, email, 1L, UserRole.MEMBER));
+        AppUser user = users.save(AppUser.of(email, email, 1L, UserRole.MEMBER, Instant.now()));
         agents.save(Agent.of(
                 profileName,
                 profileName,
@@ -114,7 +114,7 @@ class ChatStopTest {
                 CostMode.SUBSCRIPTION,
                 CredentialScope.SHARED_HOUSEHOLD,
                 AgentVisibility.PRIVATE,
-                user.id()));
+                user.id(), Instant.now()));
         return new CurrentUser(user.id(), user.email(), user.displayName(), user.groupId(), user.role());
     }
 

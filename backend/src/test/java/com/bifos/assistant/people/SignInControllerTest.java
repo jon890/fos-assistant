@@ -54,7 +54,7 @@ class SignInControllerTest {
     void setUp() {
         people.deleteAll();
         users.deleteAll();
-        people.save(AllowedPerson.of("mom@example.com", "엄마", "mom"));
+        people.save(AllowedPerson.of("mom@example.com", "엄마", "mom", Instant.now()));
     }
 
     @Test

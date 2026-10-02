@@ -22,6 +22,7 @@ import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.skill.infra.SkillStore;
 import com.bifos.assistant.user.domain.UserRole;
+import java.time.Instant;
 import java.util.List;
 import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
@@ -45,7 +46,7 @@ class AgentToolServiceTest {
             CostMode.SUBSCRIPTION,
             CredentialScope.SHARED_HOUSEHOLD,
             AgentVisibility.PRIVATE,
-            1L);
+            1L, Instant.now());
 
     @BeforeEach
     void setUp() {
@@ -91,7 +92,7 @@ class AgentToolServiceTest {
                 CostMode.SUBSCRIPTION,
                 CredentialScope.SHARED_HOUSEHOLD,
                 AgentVisibility.GROUP,
-                null);
+                null, Instant.now());
         CurrentUser reader = new CurrentUser(2L, "reader@example.com", "읽는 사람", 1L, UserRole.MEMBER);
 
         assertThatThrownBy(() -> isolatedService.write(reader, groupAgent, List.of()))
@@ -116,7 +117,7 @@ class AgentToolServiceTest {
                 CostMode.SUBSCRIPTION,
                 CredentialScope.SHARED_HOUSEHOLD,
                 AgentVisibility.GROUP,
-                null);
+                null, Instant.now());
         CurrentUser reader = new CurrentUser(2L, "reader@example.com", "읽는 사람", 1L, UserRole.MEMBER);
 
         assertThatThrownBy(() -> isolatedService.read(reader, groupAgent))

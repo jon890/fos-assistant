@@ -63,8 +63,8 @@ class DelegationParentResolverTest {
             jdbc.update("DELETE FROM agent_execution WHERE profile_name = ?", profile);
         }
         MY_EMAILS.forEach(email -> users.findByEmail(email).ifPresent(users::delete));
-        dad = users.save(AppUser.of(MY_EMAILS.get(0), "아빠", 1L, UserRole.MEMBER));
-        kid = users.save(AppUser.of(MY_EMAILS.get(1), "아이", 1L, UserRole.MEMBER));
+        dad = users.save(AppUser.of(MY_EMAILS.get(0), "아빠", 1L, UserRole.MEMBER, Instant.now()));
+        kid = users.save(AppUser.of(MY_EMAILS.get(1), "아이", 1L, UserRole.MEMBER, Instant.now()));
         root = "fos-" + UUID.randomUUID();
     }
 

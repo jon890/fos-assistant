@@ -164,8 +164,8 @@ class McpAgentToolsTest {
         CODES.forEach(code -> agents.findByCode(code).ifPresent(agents::delete));
         tokenRepository.deleteAll();
         users.deleteAll();
-        userA = users.save(AppUser.of("tools-a@example.com", "가", 1L, UserRole.MEMBER));
-        userB = users.save(AppUser.of("tools-b@example.com", "나", 1L, UserRole.MEMBER));
+        userA = users.save(AppUser.of("tools-a@example.com", "가", 1L, UserRole.MEMBER, Instant.now()));
+        userB = users.save(AppUser.of("tools-b@example.com", "나", 1L, UserRole.MEMBER, Instant.now()));
         sharedToken = tokens.issue(SHARED, "shared").rawToken();
         privateAToken = tokens.issue(PRIVATE_A, "private").rawToken();
         agents.save(agent(GROUP_CODE, "함께 쓰는 조사원", AgentVisibility.GROUP, userA.id()));
@@ -1231,7 +1231,7 @@ class McpAgentToolsTest {
     /** 대화 줄 하나와 그 대화에서 루트 session {@code root} 로 도는 turn 실행을 만든다. */
     private AgentExecution turn(AppUser user, String root) {
         Long agentId = agents.findByCode(GROUP_CODE).orElseThrow().id();
-        Conversation conversation = conversations.save(Conversation.startedBy(user.id(), "맡기기", agentId));
+        Conversation conversation = conversations.save(Conversation.startedBy(user.id(), "맡기기", agentId, Instant.now()));
         return McpCallSigner.running(executions, user.id(), conversation.id(), SHARED, root);
     }
 
@@ -1338,7 +1338,7 @@ class McpAgentToolsTest {
                 CostMode.API,
                 CredentialScope.DEDICATED,
                 visibility,
-                ownerUserId);
+                ownerUserId, Instant.now());
     }
 
     private static String profileOf(String code) {

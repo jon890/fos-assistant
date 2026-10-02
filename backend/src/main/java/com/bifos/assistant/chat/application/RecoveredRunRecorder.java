@@ -22,6 +22,7 @@ import com.bifos.assistant.usage.domain.ExecutionStatus;
 import com.bifos.assistant.usage.infra.AgentExecutionRepository;
 import com.bifos.assistant.usage.infra.ExecutionEventRepository;
 import java.time.Clock;
+import java.time.Instant;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -299,9 +300,10 @@ public class RecoveredRunRecorder {
         Long conversationId = row.conversationId();
         List<ChatMessage> active = activeMessages(conversationId);
         ChatMessage last = active.isEmpty() ? null : active.getLast();
+        Instant now = clock.instant();
         ChatMessage message = last != null && last.role() == MessageRole.ASSISTANT
-                ? ChatMessage.regeneratedAnswer(conversationId, answer, row.id(), last.id())
-                : ChatMessage.fromAssistant(conversationId, answer, row.id());
+                ? ChatMessage.regeneratedAnswer(conversationId, answer, row.id(), last.id(), now)
+                : ChatMessage.fromAssistant(conversationId, answer, row.id(), now);
         return messages.save(message).id();
     }
 

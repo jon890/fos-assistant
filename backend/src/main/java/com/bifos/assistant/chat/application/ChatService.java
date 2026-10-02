@@ -666,7 +666,7 @@ public class ChatService {
         SkillCommand command = commandOf(agent, flow, text);
         Conversation conversation = existing != null
                 ? existing
-                : conversations.save(Conversation.startedBy(user.id(), titleFrom(text), agent.id()));
+                : conversations.save(Conversation.startedBy(user.id(), titleFrom(text), agent.id(), clock.instant()));
         List<ChatAttachment> attached = attachments.requireAttachable(conversation.id(), attachmentIds);
         return new Routed(conversation, agent, flow, attached, command, requestReceivedAt);
     }
@@ -813,11 +813,12 @@ public class ChatService {
     }
 
     private ChatTurn finish(PendingTurn pending, HermesRunResult result, ModelChoice requested) {
-        pending.conversation().rememberSession(result.sessionId());
+        Instant now = clock.instant();
+        pending.conversation().rememberSession(result.sessionId(), now);
         conversationWriter.touchSession(
                 pending.conversation().id(),
                 result.sessionId() == null || result.sessionId().isBlank() ? null : result.sessionId(),
-                clock.instant());
+                now);
 
         AgentExecution execution = executions.complete(pending.execution(), pending.agent(), result, requested);
         append(pending, ExecutionEventType.RUN_COMPLETED, null);
@@ -848,8 +849,9 @@ public class ChatService {
         }
         ChatMessage message = answer.isBlank() ? null : messages.save(answerMessage(pending, answer, execution.id()));
         if (result != null && result.sessionId() != null && !result.sessionId().isBlank()) {
-            pending.conversation().rememberSession(result.sessionId());
-            conversationWriter.touchSession(pending.conversation().id(), result.sessionId(), clock.instant());
+            Instant now = clock.instant();
+            pending.conversation().rememberSession(result.sessionId(), now);
+            conversationWriter.touchSession(pending.conversation().id(), result.sessionId(), now);
         }
         return new ChatTurn(
                 pending.conversation().id(),
@@ -957,10 +959,10 @@ public class ChatService {
             // 알림 줄이 곧 전했다는 표시다. 알림 줄, 전했다는 표시, 자동 turn 수가 함께 남거나 함께 빠진다.
             // 제목은 채우지 않는다.
             List<ChatMessage> saved = transactions.execute(status -> {
-                List<ChatMessage> lines = results.notices().stream()
-                        .map(notice -> messages.save(ChatMessage.fromSystem(conversation.id(), notice)))
-                        .toList();
                 Instant deliveredAt = Instant.now(clock);
+                List<ChatMessage> lines = results.notices().stream()
+                        .map(notice -> messages.save(ChatMessage.fromSystem(conversation.id(), notice, deliveredAt)))
+                        .toList();
                 results.executionIds().forEach(id -> deliveryWriter.markResultDelivered(id, deliveredAt));
                 results.deliveries().forEach(delivery -> delivery.source().markDelivered(delivery.keys(), deliveredAt));
                 conversationWriter.incrementAutoTurns(conversation.id());
@@ -975,7 +977,7 @@ public class ChatService {
         List<Long> pendingIds = fresh.pendingIds();
         ChatMessage question = transactions.execute(status -> {
             fillBlankTitle(conversation, text);
-            ChatMessage saved = messages.save(ChatMessage.fromUser(conversation.id(), user.id(), text));
+            ChatMessage saved = messages.save(ChatMessage.fromUser(conversation.id(), user.id(), text, clock.instant()));
             attachments.attach(saved.id(), conversation.id(), attachmentIds);
             // 사람이 질문했으니 사용자의 질문 없이 연 turn 의 수를 새로 센다.
             conversationWriter.resetAutoTurns(conversation.id());
@@ -992,15 +994,16 @@ public class ChatService {
         }
     }
 
-    private static ChatMessage answerMessage(PendingTurn pending, String answer, Long executionId) {
+    private ChatMessage answerMessage(PendingTurn pending, String answer, Long executionId) {
         if (pending.intent() instanceof TurnIntent.Regenerate regenerate && regenerate.previousAnswer() != null) {
             return ChatMessage.regeneratedAnswer(
                     pending.conversation().id(),
                     answer,
                     executionId,
-                    regenerate.previousAnswer().id());
+                    regenerate.previousAnswer().id(),
+                    clock.instant());
         }
-        return ChatMessage.fromAssistant(pending.conversation().id(), answer, executionId);
+        return ChatMessage.fromAssistant(pending.conversation().id(), answer, executionId, clock.instant());
     }
 
     public void stop(CurrentUser user, Long executionId) {
@@ -1346,7 +1349,7 @@ public class ChatService {
      */
     public Conversation startEmpty(CurrentUser user, String agentCode) {
         Agent agent = agents.requireStartable(user, agentCode);
-        return conversations.save(Conversation.startedBy(user.id(), "", agent.id()));
+        return conversations.save(Conversation.startedBy(user.id(), "", agent.id(), clock.instant()));
     }
 
     private static String titleFrom(String text) {

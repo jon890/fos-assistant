@@ -134,7 +134,8 @@ public class AgentLifecycleService {
                     peopleProperties.defaultCostMode(),
                     CredentialScope.SHARED_HOUSEHOLD,
                     effectiveVisibility,
-                    user.id());
+                    user.id(),
+                    clock.instant());
             agent.markManagedProfile();
             if (connectorManaged) {
                 agent.markConnectorManaged();

@@ -45,6 +45,7 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -813,7 +814,7 @@ class SkillServiceTest {
                 CostMode.SUBSCRIPTION,
                 CredentialScope.SHARED_HOUSEHOLD,
                 visibility,
-                ownerId);
+                ownerId, Instant.now());
     }
 
     private static List<String> versionDirs(String profile) {

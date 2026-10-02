@@ -10,6 +10,7 @@ import com.bifos.assistant.shared.auth.UserAccessRevoked;
 import com.bifos.assistant.user.domain.AppUser;
 import com.bifos.assistant.user.domain.UserRole;
 import com.bifos.assistant.user.infra.AppUserRepository;
+import java.time.Instant;
 import java.util.concurrent.atomic.AtomicBoolean;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
@@ -66,8 +67,8 @@ class PersonAccessRollbackTest {
     @Test
     @DisplayName("폐기가 실패하면 끄는 저장도 롤백된다")
     void disableRollsBackWhenRevokeFails() {
-        AllowedPerson person = people.save(AllowedPerson.of(EMAIL, "x", "rollback-person"));
-        users.save(AppUser.of(EMAIL, "x", 1L, UserRole.MEMBER));
+        AllowedPerson person = people.save(AllowedPerson.of(EMAIL, "x", "rollback-person", Instant.now()));
+        users.save(AppUser.of(EMAIL, "x", 1L, UserRole.MEMBER, Instant.now()));
         FAIL.set(true);
 
         assertThatThrownBy(() -> access.setEnabled(person.id(), false)).isInstanceOf(IllegalStateException.class);

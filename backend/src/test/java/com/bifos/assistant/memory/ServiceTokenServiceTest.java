@@ -97,11 +97,11 @@ class ServiceTokenServiceTest {
     @BeforeEach
     void setUp() {
         clean();
-        AppUser saved = users.save(AppUser.of(DAD_EMAIL, "dad", 1L, UserRole.ADMIN));
-        people.save(AllowedPerson.of(DAD_EMAIL, "dad", "svc-token-dad"));
+        AppUser saved = users.save(AppUser.of(DAD_EMAIL, "dad", 1L, UserRole.ADMIN, Instant.now()));
+        people.save(AllowedPerson.of(DAD_EMAIL, "dad", "svc-token-dad", Instant.now()));
         dad = new CurrentUser(saved.id(), DAD_EMAIL, "dad", 1L, UserRole.ADMIN);
-        AppUser savedKid = users.save(AppUser.of(KID_EMAIL, "kid", 1L, UserRole.MEMBER));
-        people.save(AllowedPerson.of(KID_EMAIL, "kid", "svc-token-kid"));
+        AppUser savedKid = users.save(AppUser.of(KID_EMAIL, "kid", 1L, UserRole.MEMBER, Instant.now()));
+        people.save(AllowedPerson.of(KID_EMAIL, "kid", "svc-token-kid", Instant.now()));
         kid = new CurrentUser(savedKid.id(), KID_EMAIL, "kid", 1L, UserRole.MEMBER);
     }
 
@@ -245,8 +245,8 @@ class ServiceTokenServiceTest {
     @Test
     @DisplayName("허용 목록에서 사용자를 끄면 토큰이 폐기되고 다시 켜도 되살아나지 않는다")
     void disablingPersonRevokesAndEnablingDoesNotRestore() {
-        AppUser dad = users.save(AppUser.of("dad-person@example.com", "dad", 1L, UserRole.ADMIN));
-        AllowedPerson person = people.save(AllowedPerson.of("dad-person@example.com", "dad", "dad"));
+        AppUser dad = users.save(AppUser.of("dad-person@example.com", "dad", 1L, UserRole.ADMIN, Instant.now()));
+        AllowedPerson person = people.save(AllowedPerson.of("dad-person@example.com", "dad", "dad", Instant.now()));
         CurrentUser owner = new CurrentUser(dad.id(), dad.email(), "dad", 1L, UserRole.ADMIN);
         CurrentUserProvider provider = mock(CurrentUserProvider.class);
         when(provider.require()).thenReturn(owner);
@@ -264,7 +264,7 @@ class ServiceTokenServiceTest {
     @Test
     @DisplayName("app_user 가 없는 사람을 꺼도 예외가 없다")
     void disablingPersonWithoutUserIsHarmless() {
-        AllowedPerson person = people.save(AllowedPerson.of("never-signed-in@example.com", "x", "x"));
+        AllowedPerson person = people.save(AllowedPerson.of("never-signed-in@example.com", "x", "x", Instant.now()));
         CurrentUserProvider provider = mock(CurrentUserProvider.class);
         PeopleAdminController admin = new PeopleAdminController(registrar, provider, personAccess);
 
@@ -276,8 +276,8 @@ class ServiceTokenServiceTest {
     @Test
     @DisplayName("허용 목록에서 꺼진 사용자는 살아 있는 세션으로도 토큰을 발급받지 못한다")
     void disabledOwnerCannotIssue() {
-        AppUser user = users.save(AppUser.of("dad-person@example.com", "dad", 1L, UserRole.MEMBER));
-        AllowedPerson person = people.save(AllowedPerson.of("dad-person@example.com", "dad", "dad"));
+        AppUser user = users.save(AppUser.of("dad-person@example.com", "dad", 1L, UserRole.MEMBER, Instant.now()));
+        AllowedPerson person = people.save(AllowedPerson.of("dad-person@example.com", "dad", "dad", Instant.now()));
         CurrentUser owner = new CurrentUser(user.id(), user.email(), "dad", 1L, UserRole.MEMBER);
         personAccess.setEnabled(person.id(), false);
 
@@ -290,7 +290,7 @@ class ServiceTokenServiceTest {
     @Test
     @DisplayName("허용 목록 줄이 없는 사용자는 토큰을 발급받지 못한다")
     void ownerWithoutAllowListRowCannotIssue() {
-        AppUser user = users.save(AppUser.of("never-signed-in@example.com", "x", 1L, UserRole.MEMBER));
+        AppUser user = users.save(AppUser.of("never-signed-in@example.com", "x", 1L, UserRole.MEMBER, Instant.now()));
         CurrentUser owner = new CurrentUser(user.id(), user.email(), "x", 1L, UserRole.MEMBER);
 
         assertCode(() -> service.issue(owner, "a", 90, IDENTITY), ErrorCode.FORBIDDEN);
@@ -299,8 +299,8 @@ class ServiceTokenServiceTest {
     @Test
     @DisplayName("app_user 의 메일 주소가 원문(대소문자 다름)이어도 끄면 토큰이 폐기된다")
     void disablingMatchesUserWithDifferentCase() {
-        AppUser user = users.save(AppUser.of("Dad-Person@Example.com", "dad", 1L, UserRole.MEMBER));
-        AllowedPerson person = people.save(AllowedPerson.of("dad-person@example.com", "dad", "dad"));
+        AppUser user = users.save(AppUser.of("Dad-Person@Example.com", "dad", 1L, UserRole.MEMBER, Instant.now()));
+        AllowedPerson person = people.save(AllowedPerson.of("dad-person@example.com", "dad", "dad", Instant.now()));
         CurrentUser owner = new CurrentUser(user.id(), user.email(), "dad", 1L, UserRole.MEMBER);
         Long id = service.issue(owner, "a", 90, IDENTITY).snapshot().token().id();
 

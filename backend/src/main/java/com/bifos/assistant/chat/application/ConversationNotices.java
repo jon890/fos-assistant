@@ -3,6 +3,7 @@ package com.bifos.assistant.chat.application;
 import com.bifos.assistant.chat.domain.ChatMessage;
 import com.bifos.assistant.chat.infra.ChatMessageRepository;
 import com.bifos.assistant.chat.infra.ConversationRepository;
+import java.time.Clock;
 import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -21,6 +22,7 @@ public class ConversationNotices {
     private final ConversationRepository conversations;
     private final ChatMessageRepository messages;
     private final ConversationEventHub hub;
+    private final Clock clock;
 
     /** 알림 줄을 저장하고 열린 화면에 알린다. 대화가 없거나 지워졌으면 아무것도 하지 않는다. */
     public void post(Long conversationId, String text) {
@@ -28,7 +30,7 @@ public class ConversationNotices {
                 .findById(conversationId)
                 .filter(conversation -> conversation.deletedAt() == null)
                 .ifPresent(conversation -> {
-                    ChatMessage saved = messages.save(ChatMessage.fromSystem(conversation.id(), text));
+                    ChatMessage saved = messages.save(ChatMessage.fromSystem(conversation.id(), text, clock.instant()));
                     hub.publish(conversation.id(), ChatEvent.system(conversation.publicId(), saved.id(), text));
                 });
     }

@@ -68,10 +68,10 @@ class AttachmentServiceTest {
         root = Path.of(properties.root()).toAbsolutePath();
         deleteTree(root);
         mine = conversations
-                .save(Conversation.startedBy(OWNER.id(), "내 대화", null))
+                .save(Conversation.startedBy(OWNER.id(), "내 대화", null, Instant.now()))
                 .id();
         theirs = conversations
-                .save(Conversation.startedBy(STRANGER.id(), "남의 대화", null))
+                .save(Conversation.startedBy(STRANGER.id(), "남의 대화", null, Instant.now()))
                 .id();
     }
 

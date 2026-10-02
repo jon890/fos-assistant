@@ -10,6 +10,7 @@ import com.bifos.assistant.people.domain.AllowedPerson;
 import com.bifos.assistant.user.domain.AppUser;
 import com.bifos.assistant.user.domain.UserRole;
 import com.bifos.assistant.user.infra.AppUserRepository;
+import java.time.Clock;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -36,6 +37,7 @@ public class UserProvisioningService {
     private final AgentRepository agents;
     private final HermesProperties hermesProperties;
     private final PeopleProperties peopleProperties;
+    private final Clock clock;
 
     /**
      * 그 메일 주소의 사용자를 찾고, 없으면 만든다.
@@ -54,7 +56,7 @@ public class UserProvisioningService {
     }
 
     private AppUser createUser(String email, String displayName) {
-        AppUser created = users.save(AppUser.of(email, displayName, DEFAULT_GROUP_ID, firstUserRole()));
+        AppUser created = users.save(AppUser.of(email, displayName, DEFAULT_GROUP_ID, firstUserRole(), clock.instant()));
         signInPolicy.admit(email).ifPresent(person -> createFirstAgent(created, person));
         return created;
     }
@@ -74,7 +76,8 @@ public class UserProvisioningService {
                 peopleProperties.defaultCostMode(),
                 peopleProperties.defaultCredentialScope(),
                 AgentVisibility.PRIVATE,
-                owner.id()));
+                owner.id(),
+                clock.instant()));
     }
 
     private UserRole firstUserRole() {

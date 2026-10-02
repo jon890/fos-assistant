@@ -209,13 +209,13 @@ class AgentRunnerConnectorContextTest {
                 CostMode.API,
                 CredentialScope.DEDICATED,
                 AgentVisibility.PRIVATE,
-                1L);
+                1L, Instant.now());
     }
 
     private AgentRunner.Run run(Agent agent, String instructionAddition, DelegationKey delegationKey) {
         return runner.run(
                 user,
-                Conversation.startedBy(user.id(), "대화", 2L),
+                Conversation.startedBy(user.id(), "대화", 2L, Instant.now()),
                 agent,
                 "일",
                 null,

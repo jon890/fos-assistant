@@ -125,9 +125,9 @@ class MemoryDocumentServiceApiTest {
         cleanUp();
         String suffix = UUID.randomUUID().toString().substring(0, 8);
         dadEmail = "svc-dad-" + suffix + "@example.com";
-        dadPerson = people.save(AllowedPerson.of(dadEmail, "dad", "svc-dad-" + suffix));
+        dadPerson = people.save(AllowedPerson.of(dadEmail, "dad", "svc-dad-" + suffix, Instant.now()));
         dad = saveUser(dadEmail, "dad", UserRole.ADMIN);
-        people.save(AllowedPerson.of("svc-kid-" + suffix + "@example.com", "kid", "svc-kid-" + suffix));
+        people.save(AllowedPerson.of("svc-kid-" + suffix + "@example.com", "kid", "svc-kid-" + suffix, Instant.now()));
         kid = saveUser("svc-kid-" + suffix + "@example.com", "kid", UserRole.MEMBER);
 
         memories.createDocument(dad, "identity", NAME, "지원서 공통 프로필", MARK, MemorySensitivity.SENSITIVE);
@@ -148,7 +148,7 @@ class MemoryDocumentServiceApiTest {
     }
 
     private CurrentUser saveUser(String email, String name, UserRole role) {
-        AppUser saved = users.save(AppUser.of(email, name, 1L, role));
+        AppUser saved = users.save(AppUser.of(email, name, 1L, role, Instant.now()));
         return new CurrentUser(saved.id(), saved.email(), saved.displayName(), saved.groupId(), role);
     }
 
@@ -314,7 +314,7 @@ class MemoryDocumentServiceApiTest {
     @DisplayName("허용 목록에 줄이 없는 사용자의 토큰은 401 이다")
     void ownerWithoutAllowListRowIsRejected() throws Exception {
         String email = "svc-stranger-" + UUID.randomUUID() + "@example.com";
-        AllowedPerson row = people.save(AllowedPerson.of(email, "x", "svc-stranger-" + UUID.randomUUID()));
+        AllowedPerson row = people.save(AllowedPerson.of(email, "x", "svc-stranger-" + UUID.randomUUID(), Instant.now()));
         CurrentUser stranger = saveUser(email, "x", UserRole.MEMBER);
         String token = issue(stranger, 90, IDENTITY);
         // 발급은 허용된 사용자만 받는다. 허용 목록에서 줄이 사라진 뒤에도 그 토큰이 통하지 않아야 한다

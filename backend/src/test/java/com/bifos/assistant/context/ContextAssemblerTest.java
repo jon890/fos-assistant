@@ -15,6 +15,7 @@ import com.bifos.assistant.memory.domain.type.MemorySensitivity;
 import com.bifos.assistant.memory.infra.MemoryRepository;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.user.domain.UserRole;
+import java.time.Instant;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -63,7 +64,7 @@ class ContextAssemblerTest {
                         CostMode.API,
                         CredentialScope.DEDICATED,
                         AgentVisibility.GROUP,
-                        null)))
+                        null, Instant.now())))
                 .id();
     }
 
@@ -251,7 +252,7 @@ class ContextAssemblerTest {
                 CostMode.API,
                 CredentialScope.DEDICATED,
                 AgentVisibility.PRIVATE,
-                ADMIN.id());
+                ADMIN.id(), Instant.now());
         connector.markConnectorManaged();
         Long connectorId = agents.save(connector).id();
 

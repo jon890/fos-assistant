@@ -24,6 +24,7 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -110,14 +111,14 @@ class McpPrincipalTest {
         memoryRepository.deleteAll();
         tokenRepository.deleteAll();
         users.deleteAll();
-        userA = users.save(AppUser.of("principal-a@example.com", "가", 1L, UserRole.MEMBER));
-        userB = users.save(AppUser.of("principal-b@example.com", "나", 1L, UserRole.MEMBER));
+        userA = users.save(AppUser.of("principal-a@example.com", "가", 1L, UserRole.MEMBER, Instant.now()));
+        userB = users.save(AppUser.of("principal-b@example.com", "나", 1L, UserRole.MEMBER, Instant.now()));
         sharedToken = tokens.issue(SHARED, "shared").rawToken();
         privateAToken = tokens.issue(PRIVATE_A, "private").rawToken();
         memoryA = memories.create(current(userA), MemoryScope.USER, "색인 가", "가의 본문", false);
         memoryB = memories.create(current(userB), MemoryScope.USER, "색인 나", "나의 본문", false);
-        conversationA = conversations.save(Conversation.startedBy(userA.id(), "", null));
-        conversationB = conversations.save(Conversation.startedBy(userB.id(), "", null));
+        conversationA = conversations.save(Conversation.startedBy(userA.id(), "", null, Instant.now()));
+        conversationB = conversations.save(Conversation.startedBy(userB.id(), "", null, Instant.now()));
     }
 
     @Test
@@ -237,7 +238,7 @@ class McpPrincipalTest {
     void cannotWriteToOthersConversationButWritesToOwnOtherConversation() throws Exception {
         String rootA = McpCallSigner.newRoot();
         McpCallSigner.running(executions, agents, userA.id(), conversationA.id(), SHARED, rootA);
-        Conversation otherOfA = conversations.save(Conversation.startedBy(userA.id(), "", null));
+        Conversation otherOfA = conversations.save(Conversation.startedBy(userA.id(), "", null, Instant.now()));
 
         String forbiddenPath = uniquePath("b");
         String otherPath = uniquePath("other");

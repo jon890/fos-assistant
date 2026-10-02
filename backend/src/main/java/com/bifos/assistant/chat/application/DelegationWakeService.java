@@ -238,7 +238,7 @@ public class DelegationWakeService {
                 return;
             }
         }
-        ChatMessage saved = messages.save(ChatMessage.fromSystem(conversation.id(), LIMIT_NOTICE));
+        ChatMessage saved = messages.save(ChatMessage.fromSystem(conversation.id(), LIMIT_NOTICE, clock.instant()));
         hub.publish(conversation.id(), ChatEvent.system(conversation.publicId(), saved.id(), LIMIT_NOTICE));
     }
 }

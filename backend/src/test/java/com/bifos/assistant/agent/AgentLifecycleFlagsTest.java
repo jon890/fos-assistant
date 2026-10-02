@@ -165,7 +165,7 @@ class AgentLifecycleFlagsTest {
         String helper = randomCode("helper");
         agents.save(privateAgentOf(helper, owner));
         Conversation conversation = chat.startEmpty(owner, helper);
-        messages.save(ChatMessage.fromUser(conversation.id(), owner.id(), "오늘 숙제가 뭐였지?"));
+        messages.save(ChatMessage.fromUser(conversation.id(), owner.id(), "오늘 숙제가 뭐였지?", Instant.now()));
         Agent agent = agents.findByCode(helper).orElseThrow();
         agent.markDeleted(DELETED_AT);
         agents.save(agent);
@@ -263,7 +263,7 @@ class AgentLifecycleFlagsTest {
 
     private CurrentUser user(UserRole role) {
         String email = randomEmail();
-        AppUser saved = users.save(AppUser.of(email, email, 1L, role));
+        AppUser saved = users.save(AppUser.of(email, email, 1L, role, Instant.now()));
         return new CurrentUser(saved.id(), saved.email(), saved.displayName(), saved.groupId(), saved.role());
     }
 
@@ -285,7 +285,7 @@ class AgentLifecycleFlagsTest {
                 CostMode.SUBSCRIPTION,
                 CredentialScope.SHARED_HOUSEHOLD,
                 AgentVisibility.PRIVATE,
-                owner.id());
+                owner.id(), Instant.now());
     }
 
     private static void signIn(CurrentUser user) {

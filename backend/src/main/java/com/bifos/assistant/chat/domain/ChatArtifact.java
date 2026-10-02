@@ -58,16 +58,16 @@ public class ChatArtifact {
     @Getter
     private Instant deletedAt;
 
-    private ChatArtifact(Long conversationId, Long messageId, String path, long byteSize) {
+    private ChatArtifact(Long conversationId, Long messageId, String path, long byteSize, Instant now) {
         this.conversationId = conversationId;
         this.messageId = messageId;
         this.path = path;
         this.byteSize = byteSize;
-        this.createdAt = Instant.now();
+        this.createdAt = now;
     }
 
-    public static ChatArtifact of(Long conversationId, Long messageId, String path, long byteSize) {
-        return new ChatArtifact(conversationId, messageId, path, byteSize);
+    public static ChatArtifact of(Long conversationId, Long messageId, String path, long byteSize, Instant now) {
+        return new ChatArtifact(conversationId, messageId, path, byteSize, now);
     }
 
     public boolean isDeleted() {

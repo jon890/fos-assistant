@@ -79,14 +79,15 @@ public class ChatAttachment {
             String originalName,
             String contentType,
             long byteSize,
-            Instant expiresAt) {
+            Instant expiresAt,
+            Instant now) {
         this.conversationId = conversationId;
         this.uploadedByUserId = uploadedByUserId;
         this.originalName = originalName;
         this.contentType = contentType;
         this.byteSize = byteSize;
         this.expiresAt = expiresAt;
-        this.createdAt = Instant.now();
+        this.createdAt = now;
     }
 
     /** 아직 메시지에 묶이지 않은 첨부를 만든다. 디스크 이름은 번호를 받은 뒤 채운다. */
@@ -96,8 +97,10 @@ public class ChatAttachment {
             String originalName,
             String contentType,
             long byteSize,
-            Instant expiresAt) {
-        return new ChatAttachment(conversationId, uploadedByUserId, originalName, contentType, byteSize, expiresAt);
+            Instant expiresAt,
+            Instant now) {
+        return new ChatAttachment(
+                conversationId, uploadedByUserId, originalName, contentType, byteSize, expiresAt, now);
     }
 
     public void nameStoredFile(String storedName) {

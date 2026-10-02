@@ -80,7 +80,8 @@ public class AttachmentService {
                 displayName(originalName),
                 normalizedType,
                 byteSize,
-                now.plus(Duration.ofDays(properties.retentionDays()))));
+                now.plus(Duration.ofDays(properties.retentionDays())),
+                now));
         attachment.nameStoredFile(AttachmentStore.storedName(attachment.id(), extension));
 
         try (InputStream in = body.getInputStream()) {

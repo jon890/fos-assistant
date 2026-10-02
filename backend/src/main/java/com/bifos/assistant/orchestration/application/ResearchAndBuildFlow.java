@@ -22,6 +22,7 @@ import com.bifos.assistant.usage.domain.AgentExecution;
 import com.bifos.assistant.usage.domain.ExecutionEventType;
 import com.bifos.assistant.usage.infra.ExecutionEventRepository;
 import java.time.Clock;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
@@ -108,7 +109,7 @@ public class ResearchAndBuildFlow implements Flow {
             Consumer<AgentExecution> onRootStarted,
             Consumer<ChatEvent> onEvent) {
         if (intent instanceof TurnIntent.Fresh) {
-            messages.save(ChatMessage.fromUser(conversation.id(), user.id(), text));
+            messages.save(ChatMessage.fromUser(conversation.id(), user.id(), text, clock.instant()));
         }
 
         onEvent.accept(ChatEvent.step(CHIEF, STARTED));
@@ -143,11 +144,12 @@ public class ResearchAndBuildFlow implements Flow {
             onEvent.accept(ChatEvent.step(CHIEF, FAILED));
             throw new ApiException(ErrorCode.HERMES_RUN_FAILED, "the flow could not start");
         }
-        conversation.rememberSession(chief.sessionId());
+        Instant now = clock.instant();
+        conversation.rememberSession(chief.sessionId(), now);
         conversationWriter.touchSession(
                 conversation.id(),
                 chief.sessionId() == null || chief.sessionId().isBlank() ? null : chief.sessionId(),
-                clock.instant());
+                now);
         onEvent.accept(ChatEvent.step(CHIEF, COMPLETED));
 
         Split split = split(root, chief.result().output(), onEvent);
@@ -310,14 +312,16 @@ public class ResearchAndBuildFlow implements Flow {
      */
     private ChatTurn answer(Conversation conversation, AgentExecution root, String output, TurnIntent intent) {
         String text = output == null ? "" : output;
+        Instant now = clock.instant();
         ChatMessage saved = messages.save(
                 intent instanceof TurnIntent.Regenerate regenerate && regenerate.previousAnswer() != null
                         ? ChatMessage.regeneratedAnswer(
                                 conversation.id(),
                                 text,
                                 root.id(),
-                                regenerate.previousAnswer().id())
-                        : ChatMessage.fromAssistant(conversation.id(), text, root.id()));
+                                regenerate.previousAnswer().id(),
+                                now)
+                        : ChatMessage.fromAssistant(conversation.id(), text, root.id(), now));
         return new ChatTurn(conversation.id(), conversation.publicId(), root.id(), text, saved.id(), false);
     }
 
@@ -339,8 +343,9 @@ public class ResearchAndBuildFlow implements Flow {
             log.warn("취소 실행 사건을 남기지 못했다 executionId={}", root.id(), ex);
         }
         if (sessionId != null && !sessionId.isBlank()) {
-            conversation.rememberSession(sessionId);
-            conversationWriter.touchSession(conversation.id(), sessionId, clock.instant());
+            Instant now = clock.instant();
+            conversation.rememberSession(sessionId, now);
+            conversationWriter.touchSession(conversation.id(), sessionId, now);
         }
         return new ChatTurn(conversation.id(), conversation.publicId(), root.id(), "", null, true);
     }

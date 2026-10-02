@@ -146,7 +146,7 @@ class PendingMessageServiceTest {
 
         dad = signedUp("dad@example.com", "dad");
         chief = agents.save(agent("dad", "비서", dad.id()));
-        conversation = conversations.save(Conversation.startedBy(dad.id(), "대화", chief.id()));
+        conversation = conversations.save(Conversation.startedBy(dad.id(), "대화", chief.id(), Instant.now()));
         stub().willReturn(result("run", "답"));
     }
 
@@ -482,7 +482,7 @@ class PendingMessageServiceTest {
         Agent flowAgent = agent("flowed", "흐름", dad.id());
         flowAgent.assignFlow(ResearchAndBuildFlow.NAME);
         Conversation flowed = conversations.save(
-                Conversation.startedBy(dad.id(), "흐름 대화", agents.save(flowAgent).id()));
+                Conversation.startedBy(dad.id(), "흐름 대화", agents.save(flowAgent).id(), Instant.now()));
 
         assertThatCode(() -> pending.enqueue(dad, flowed.id(), "글"), ErrorCode.CONVERSATION_BUSY);
 
@@ -503,7 +503,7 @@ class PendingMessageServiceTest {
     @Test
     @DisplayName("기동 확인은 멈추지 않은 대기 메시지를 보내고 멈춘 대기 줄은 그대로 둔다")
     void startupDispatchSendsReadyQueueAndLeavesHeldQueue() {
-        Conversation heldConversation = conversations.save(Conversation.startedBy(dad.id(), "멈춘 대화", chief.id()));
+        Conversation heldConversation = conversations.save(Conversation.startedBy(dad.id(), "멈춘 대화", chief.id(), Instant.now()));
         pendingRows.save(ChatPendingMessage.queued(conversation.id(), dad.id(), "기동 뒤에 갈 글", false, QUEUED_AT));
         pendingRows.save(ChatPendingMessage.queued(heldConversation.id(), dad.id(), "멈춘 글", true, QUEUED_AT));
 
@@ -524,7 +524,7 @@ class PendingMessageServiceTest {
     @Test
     @DisplayName("대화를 지우면 그 대화의 대기 행도 지운다")
     void deletesQueuedRowsWithConversation() {
-        Conversation other = conversations.save(Conversation.startedBy(dad.id(), "다른 대화", chief.id()));
+        Conversation other = conversations.save(Conversation.startedBy(dad.id(), "다른 대화", chief.id(), Instant.now()));
         pendingRows.save(ChatPendingMessage.queued(conversation.id(), dad.id(), "지워질 글", true, QUEUED_AT));
         pendingRows.save(ChatPendingMessage.queued(other.id(), dad.id(), "남을 글", true, QUEUED_AT));
 
@@ -591,7 +591,7 @@ class PendingMessageServiceTest {
     }
 
     private CurrentUser signedUp(String email, String name) {
-        AppUser user = users.save(AppUser.of(email, name, 1L, UserRole.MEMBER));
+        AppUser user = users.save(AppUser.of(email, name, 1L, UserRole.MEMBER, Instant.now()));
         return new CurrentUser(user.id(), user.email(), user.displayName(), user.groupId(), user.role());
     }
 
@@ -604,7 +604,7 @@ class PendingMessageServiceTest {
                 CostMode.SUBSCRIPTION,
                 CredentialScope.SHARED_HOUSEHOLD,
                 AgentVisibility.PRIVATE,
-                ownerId);
+                ownerId, Instant.now());
     }
 
     private static HermesRunResult result(String runId, String output) {

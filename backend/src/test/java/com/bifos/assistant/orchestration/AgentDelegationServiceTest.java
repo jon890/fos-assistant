@@ -137,7 +137,7 @@ class AgentDelegationServiceTest {
         agents.findByCode(WORKER).ifPresent(agents::delete);
         users.findByEmail(EMAIL).ifPresent(users::delete);
         users.findByEmail(OTHER_EMAIL).ifPresent(users::delete);
-        AppUser saved = users.save(AppUser.of(EMAIL, "가", 1L, UserRole.MEMBER));
+        AppUser saved = users.save(AppUser.of(EMAIL, "가", 1L, UserRole.MEMBER, Instant.now()));
         user = new CurrentUser(saved.id(), saved.email(), saved.displayName(), saved.groupId(), saved.role());
         Agent worker = agents.save(Agent.of(
                 WORKER,
@@ -147,8 +147,8 @@ class AgentDelegationServiceTest {
                 CostMode.API,
                 CredentialScope.DEDICATED,
                 AgentVisibility.PRIVATE,
-                saved.id()));
-        conversation = conversations.save(Conversation.startedBy(saved.id(), "맡기기", worker.id()));
+                saved.id(), Instant.now()));
+        conversation = conversations.save(Conversation.startedBy(saved.id(), "맡기기", worker.id(), Instant.now()));
         root = "fos-" + UUID.randomUUID();
         origin = turn(root);
     }
@@ -455,7 +455,7 @@ class AgentDelegationServiceTest {
         turns.rekey(ended, origin.id());
         turns.close(ended);
         Conversation otherConversation =
-                conversations.save(Conversation.startedBy(user.id(), "다른 대화", conversation.agentId()));
+                conversations.save(Conversation.startedBy(user.id(), "다른 대화", conversation.agentId(), Instant.now()));
         AgentExecution otherTurn = executions.save(AgentExecution.builder()
                 .userId(user.id())
                 .conversationId(otherConversation.id())
@@ -500,11 +500,11 @@ class AgentDelegationServiceTest {
         holdUntilStopped();
         DelegationResult started = delegate("남이 멈추려는 일");
         AppUser other = users.findByEmail(OTHER_EMAIL)
-                .orElseGet(() -> users.save(AppUser.of(OTHER_EMAIL, "나", 1L, UserRole.MEMBER)));
+                .orElseGet(() -> users.save(AppUser.of(OTHER_EMAIL, "나", 1L, UserRole.MEMBER, Instant.now())));
         CurrentUser otherUser =
                 new CurrentUser(other.id(), other.email(), other.displayName(), other.groupId(), other.role());
         Conversation otherConversation =
-                conversations.save(Conversation.startedBy(user.id(), "다른 대화", conversation.agentId()));
+                conversations.save(Conversation.startedBy(user.id(), "다른 대화", conversation.agentId(), Instant.now()));
         AgentExecution otherConversationTurn = executions.save(AgentExecution.builder()
                 .userId(user.id())
                 .conversationId(otherConversation.id())

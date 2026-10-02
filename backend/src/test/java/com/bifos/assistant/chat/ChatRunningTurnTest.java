@@ -32,6 +32,7 @@ import com.bifos.assistant.usage.infra.ExecutionEventRepository;
 import com.bifos.assistant.user.domain.AppUser;
 import com.bifos.assistant.user.domain.UserRole;
 import com.bifos.assistant.user.infra.AppUserRepository;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
@@ -111,7 +112,7 @@ class ChatRunningTurnTest {
     }
 
     private CurrentUser member(String name, String flow) {
-        AppUser user = users.save(AppUser.of(name + "@example.com", name, 1L, UserRole.MEMBER));
+        AppUser user = users.save(AppUser.of(name + "@example.com", name, 1L, UserRole.MEMBER, Instant.now()));
         Agent agent = Agent.of(
                 name,
                 name,
@@ -120,7 +121,7 @@ class ChatRunningTurnTest {
                 CostMode.SUBSCRIPTION,
                 CredentialScope.SHARED_HOUSEHOLD,
                 AgentVisibility.PRIVATE,
-                user.id());
+                user.id(), Instant.now());
         if (flow != null) {
             agent.assignFlow(flow);
         }

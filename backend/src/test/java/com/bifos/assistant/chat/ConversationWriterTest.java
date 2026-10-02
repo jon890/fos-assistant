@@ -9,6 +9,7 @@ import com.bifos.assistant.chat.infra.ConversationRepository;
 import com.bifos.assistant.user.domain.AppUser;
 import com.bifos.assistant.user.domain.UserRole;
 import com.bifos.assistant.user.infra.AppUserRepository;
+import java.time.Instant;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -37,8 +38,8 @@ class ConversationWriterTest {
     /** 다른 검사 클래스와 겹치지 않도록 매번 새 사용자로 제목이 빈 대화를 만든다. */
     private Conversation newUntitledConversation() {
         String email = "writer-" + System.nanoTime() + "@example.com";
-        AppUser user = users.save(AppUser.of(email, email, 1L, UserRole.MEMBER));
-        return conversations.save(Conversation.startedBy(user.id(), "", null));
+        AppUser user = users.save(AppUser.of(email, email, 1L, UserRole.MEMBER, Instant.now()));
+        return conversations.save(Conversation.startedBy(user.id(), "", null, Instant.now()));
     }
 
     private String storedTitle(Conversation conversation) {
