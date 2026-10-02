@@ -14,10 +14,11 @@ Control Plane 만 다시 띄웠을 때 Hermes 에서 계속 돈 실행의 답과
 - e2e 는 `node test/e2e/run.ts` 로 돈다. 가짜 Hermes(`test/e2e/fake-hermes.ts`)와 Control Plane 을 띄우고 `SCENARIOS` 를 차례로 돌린다. 시나리오는 앞의 것이 만든 상태 위에서 이어진다
 - Control Plane 을 내렸다 다시 띄우는 것은 `Context.restartControlPlane()` 이다(`test/e2e/run.ts`). 선례는 `test/e2e/scenarios/chat-queue.ts` 의 `chatQueueRestartScenario` 다. 그 파일의 `holdTurn`, `enqueue`, `awaitMessages`, `messagesOf`, `pendingOf` 를 읽고 필요한 것은 내보내 함께 쓴다
 - 가짜 Hermes 는 `runs`(`Map<string, Run>`)에 실행을 둔다. `Run.status` 가 조회 응답의 `status` 다. 다음 실행을 붙잡는 `holdNextRun()` 과 놓는 `releaseHeldRun()` 이 있고, 놓으면 그 run 이 `completed` 가 된다. 중지 경로는 `run.status = "cancelled"` 로 바꾼다
-- **지금 `chatQueueRestartScenario` 는 「재시작 뒤 쌓인 글이 곧바로 간다」 를 단언한다.** 붙잡힌 turn 이 `ORPHANED` 로 끝난다는 전제였다. 이제 그 turn 은 Hermes 에서 아직 도는 것으로 읽혀 다시 붙고, 쌓인 글은 그 turn 이 끝난 뒤에 간다. 그 시나리오는 재시작 뒤 `context.hermes.releaseHeldRun()` 을 부르도록 고친다. 중지로 멈춘 대기 줄이 그대로 멈춰 있다는 단언은 그대로다
+- `chatQueueRestartScenario` 는 앞 phase 가 지금 동작에 맞췄다. 재시작 뒤 `context.hermes.releaseHeldRun()` 으로 붙잡은 run 을 놓는다
 - 실행 상태는 `GET /api/v1/usage/...` 나 시나리오가 이미 쓰는 실행 조회 경로로 읽는다. `test/e2e/scenarios/usage-cost.ts` 와 `test/e2e/scenarios/stop.ts` 가 실행 줄의 `status`, `errorCode`, 토큰을 읽는 방식을 따른다
 - 도는 turn 을 묻는 경로는 `GET /api/v1/chat/conversations/{conversationId}/running` 이다(`ChatService.running`). 응답은 `running`, `executionId`, `startedAt` 이다
-- 사용량 화면의 상태 문구는 `web/src/components/usage/execution-list.tsx` 의 `executionStatusLabel` 이다. `ORPHANED` 를 「중간에 중단됨」 으로 보인다. 단위 검사는 `test/unit/execution-status.test.ts` 다
+- 사용량 화면의 상태 문구는 `web/src/components/usage/execution-list.tsx` 의 `executionStatusLabel` 이다. `ORPHANED` 를 「중간에 중단됨」 으로 보인다. 그 파일은 `@/` 별칭과 컴포넌트를 import 해 `node --test` 로 읽을 수 없다
+- 단위 검사 `test/unit/execution-status.test.ts` 는 `web/src/lib/execution-status.ts` 의 `executionStatusVariant` 를 가져온다. 그 파일은 다른 모듈을 런타임에 import 하지 않는다고 주석에 적혀 있다
 - e2e 와 문서에 홈서버의 값을 적지 않는다(`AGENTS.md` 의 「공개 저장소」)
 
 **근거 문서**: `docs/hermes/runs-api.md` 의 「실행 조회가 답하는 기간」, `docs/backend/turn-control.md` 의 「기동할 때 남은 실행 정리」 의 「갈리는 지점」, `docs/backend/schema/execution.md` 의 「끝나지 않은 실행」
@@ -32,10 +33,10 @@ Control Plane 만 다시 띄웠을 때 Hermes 에서 계속 돈 실행의 답과
 
 ### 1. `test/e2e/fake-hermes.ts`
 
-- `GET /p/{profile}/v1/runs/{runId}` 가 모르는 run 에 404 와 `{"error": {"code": "run_not_found", ...}}` 를 주는지 확인하고, 아니면 맞춘다. 실제 Hermes 의 모양은 `docs/hermes/runs-api.md` 가 갖는다
-- 붙잡힌 run 의 조회가 종료 상태가 아닌 `status`(`running`)를 주는지 확인한다. 지금 `queued` 같은 값을 주면 그대로 둬도 된다. Control Plane 은 종료 상태가 아닌 값을 모두 도는 중으로 읽는다
+- 모르는 run 의 조회와 중지가 주는 404 본문을 실제 Hermes 의 모양으로 바꾼다. 지금은 `{ error: "no such run" }` 이다. `{ "error": { "message": "Run not found: <run_id>", "type": "invalid_request_error", "code": "run_not_found" } }` 로 둔다
+- 붙잡힌 run 의 조회는 이미 `status: "running"` 을 준다. 고치지 않는다
 - `FakeHermes` 에 `forgetRun(runId: string): void` 를 더한다. 그 run 을 `runs` 에서 지운다. 그 뒤 조회와 중지는 404 다
-- `FakeHermes` 에 `lastSubmittedRunId(profile?: string): string | undefined` 같은 읽기가 이미 있으면 그것을 쓰고, 없으면 시나리오가 run 번호를 알 방법을 하나 더한다(붙잡힌 run 의 번호를 돌려주는 읽기)
+- 붙잡힌 run 의 번호는 이미 있는 `heldRun()` 으로 읽는다. 읽기를 새로 만들지 않는다
 
 ### 2. `test/e2e/scenarios/restart-reconcile.ts` (신규)
 
@@ -61,22 +62,22 @@ Control Plane 만 다시 띄웠을 때 Hermes 에서 계속 돈 실행의 답과
 4. 그 실행 줄이 `FAILED`, `errorCode` 가 `REMOTE_RUN_LOST` 가 될 때까지 기다린다
 5. `GET .../running` 이 `running: false` 다. 그 대화에 다시 보내면 답이 온다
 
-**다. 위임 실행이 도는 중에 다시 뜬다** (`test/e2e/scenarios/delegation.ts` 와 `test/e2e/delegation-support.ts` 의 방식으로 위임 자식을 붙잡을 수 있을 때)
+`forgetRun` 뒤에도 가짜 Hermes 의 붙잡힌 상태는 남는다. 이 절은 `try` 로 감싸고 `finally` 에서 `context.hermes.releaseHeldRun()` 을 부른다. 놓지 않으면 뒤의 실행이 붙잡힌다.
 
-1. 위임 자식의 run 을 붙잡은 채 부모 turn 을 끝낸다
-2. `context.restartControlPlane()` 뒤 붙잡은 run 을 놓는다
-3. 자식 줄이 `SUCCEEDED` 이고 부모 대화에 그 결과를 전하는 자동 turn 이 **한 번** 열린다
+위임 실행이 도는 중에 다시 뜨는 경우는 e2e 에 두지 않는다. backend 의 `RestartReconcilerTest` 가 검사한다. 가짜 Hermes 는 한 번에 run 하나만 붙잡아 부모 turn 을 끝내면서 자식만 붙잡을 수 없다.
 
-가짜 Hermes 로 위임 자식만 붙잡기가 이 phase 의 크기를 넘으면 「다」 를 빼고, phase 03 의 backend 테스트가 그 경우를 검사한다는 것을 커밋 메시지에 적는다.
+### 3. `web/src/lib/execution-status.ts`, `web/src/components/usage/execution-list.tsx`, `test/unit/execution-status.test.ts`
 
-### 3. `test/e2e/scenarios/chat-queue.ts`
+`web/src/lib/execution-status.ts` 에 더한다. 다른 모듈을 import 하지 않는다.
 
-`chatQueueRestartScenario` 의 「Control Plane 을 강제로 내리고 다시 띄운다」 뒤에 `context.hermes.releaseHeldRun()` 을 넣고 step 글을 지금 동작에 맞게 고친다. 붙잡힌 turn 의 답이 먼저 오고 그 뒤에 쌓인 글이 간다.
+```ts
+/** 기동 정리가 실패로 적을 때 쓰는 오류 코드인가. 사용량 화면이 「중간에 중단됨」 으로 보인다. */
+export function isInterruptedByRestart(errorCode: string | null | undefined): boolean
+```
 
-### 4. `web/src/components/usage/execution-list.tsx` 와 `test/unit/execution-status.test.ts`
-
-`executionStatusLabel` 이 `REMOTE_RUN_LOST`, `RECONCILE_TIMEOUT`, `RECONCILE_UNREACHABLE` 도 「중간에 중단됨」 으로 보인다. `ORPHANED` 와 같은 줄에서 판정한다.
-`test/unit/execution-status.test.ts` 가 `executionStatusLabel` 을 검사하면 세 코드의 기대를 더한다. 검사하지 않으면 그 파일에 `executionStatusLabel` 검사를 더한다(import 방식은 그 파일이 `executionStatusVariant` 를 가져오는 방식과 같다).
+`ORPHANED`, `REMOTE_RUN_LOST`, `RECONCILE_TIMEOUT`, `RECONCILE_UNREACHABLE` 에 참이다.
+`execution-list.tsx` 의 `executionStatusLabel` 은 `execution.errorCode === "ORPHANED"` 대신 이 함수를 쓴다.
+`test/unit/execution-status.test.ts` 에 네 코드가 참이고 `null`, `undefined`, `HERMES_BUSY` 가 거짓인 검사를 더한다.
 
 ## 검증
 
@@ -96,7 +97,7 @@ scripts/check-public-safe.sh
 |---|---|
 | `test/e2e/fake-hermes.ts` | 수정 |
 | `test/e2e/scenarios/restart-reconcile.ts` | 신규 |
-| `test/e2e/scenarios/chat-queue.ts` | 수정 |
 | `test/e2e/run.ts` | 수정 |
+| `web/src/lib/execution-status.ts` | 수정 |
 | `web/src/components/usage/execution-list.tsx` | 수정 |
 | `test/unit/execution-status.test.ts` | 수정 |

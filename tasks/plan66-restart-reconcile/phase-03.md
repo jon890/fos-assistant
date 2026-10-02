@@ -7,12 +7,12 @@
 Control Plane 이 뜰 때 `RUNNING` 으로 남은 실행을 Hermes 에 물어 정하는 `RestartReconciler` 를 만들고, 모두 실패로 바꾸던 `OrphanedExecutionSweeper` 를 지운다.
 아직 도는 대화 turn 과 위임 실행에는 다시 붙고, 정하는 동안 그 대화에 새 turn 이 열리지 않게 한다.
 
-**범위 외**: e2e 와 가짜 Hermes, 화면 문구(phase 04).
+**범위 외**: 가짜 Hermes 와 새 e2e 시나리오, 화면 문구(phase 04). 이 phase 는 이미 있는 e2e 시나리오 하나만 지금 동작에 맞춘다.
 
 ## 컨텍스트
 
 - phase 01 이 `HermesRunsClient.lookupRun(String apiBaseUrl, String profileName, String runId)` 와 `HermesRunLookup`(`State.RUNNING`, `FINISHED`, `NOT_FOUND`)을 만들었다. 닿지 못하면 `ApiException` 이다
-- phase 02 가 `chat.application.RecoveredRunRecorder` 를 만들었다. `settle(Long executionId, HermesRunResult result)`, `failWithout(Long executionId, String errorCode)`, `kindOf(AgentExecution row)` 이고, 이미 끝난 줄이면 거짓을 돌려준다. `RecoveredRunKind` 는 `CHAT_TURN`, `DELEGATION`, `FLOW`, `AUXILIARY` 다
+- phase 02 가 `chat.application.RecoveredRunRecorder` 를 만들었다. `settle(Long executionId, HermesRunResult result)`, `failWithout(Long executionId, String errorCode)`, `kindOf(AgentExecution row)` 이고, 이미 끝난 줄이면 거짓을 돌려준다. `chat.application.model.RecoveredRunKind` 는 `CHAT_TURN`, `DELEGATION`, `FLOW`, `AUXILIARY` 다
 - 지울 것: `backend/src/main/java/com/bifos/assistant/usage/application/OrphanedExecutionSweeper.java` 와 `backend/src/test/java/com/bifos/assistant/usage/OrphanedExecutionSweeperTest.java`
 - turn 잠금은 `backend/src/main/java/com/bifos/assistant/chat/application/TurnCancellation.java` 다
   - `open(Long userId, Long conversationId)`: 잠금을 잡고 `TurnHandle` 을 준다. 이미 잡혀 있으면 `ApiException(CONVERSATION_BUSY)`
@@ -26,6 +26,9 @@ Control Plane 이 뜰 때 `RUNNING` 으로 남은 실행을 Hermes 에 물어 �
 - 설정 클래스는 `@ConfigurationProperties` record 로 두면 `AssistantApplication` 의 `@ConfigurationPropertiesScan` 이 읽는다. 선례는 `chat.application.DelegationWakeProperties` 다. `hermes.poll-interval` 과 `hermes.run-timeout` 은 `HermesProperties.pollInterval()`, `runTimeout()` 이다
 - 웹 서버를 여는 lifecycle 의 phase 는 `org.springframework.boot.web.server.context.WebServerApplicationContext.START_STOP_LIFECYCLE_PHASE` 다(Spring Boot 4.1). `SmartLifecycle` 은 phase 가 작은 것부터 시작한다
 - 테스트 profile(`backend/src/test/resources/application-test.yml`)은 `hermes.poll-interval: 10ms`, `hermes.run-timeout: 1s` 다
+- 보통 turn 은 결과를 적기 전에 `turns.untrackRun(executionId, runId)` 으로 끝난 run 을 표시에서 뗀다(`ChatService.runTurn` 의 `finally`)
+- 테스트 profile 은 `assistant.delegation-wake.enabled: false` 다. 위임 결과가 부모 대화에 전해지는 것을 보려면 `backend/src/test/java/com/bifos/assistant/chat/DelegationWakeServiceTest.java` 처럼 `@SpringBootTest(properties = "assistant.delegation-wake.enabled=true")` 를 준다. Awaitility 는 의존에 없다
+- e2e 의 `test/e2e/scenarios/chat-queue.ts` 에 있는 `chatQueueRestartScenario` 는 turn 을 붙잡은 채(`holdTurn`) Control Plane 을 다시 띄우고, 쌓인 글이 곧바로 간다고 단언한다. 붙잡힌 turn 이 `ORPHANED` 로 끝난다는 전제다. 가짜 Hermes(`test/e2e/fake-hermes.ts`)는 붙잡힌 run 의 조회에 `running` 을 주므로, 이 phase 뒤에는 그 turn 에 다시 붙고 쌓인 글은 그 turn 이 끝난 뒤에 간다. 붙잡은 run 은 `context.hermes.releaseHeldRun()` 으로 놓는다
 - 가상 스레드를 띄우는 선례는 `NextTurnDispatcher.tryPending` 의 `Thread.ofVirtual().name(...).start(...)` 다
 
 **근거 문서**: `docs/backend/turn-control.md` 의 「기동할 때 남은 실행 정리」 전체, `docs/adr/ADR-059-재기동-때-남은-실행은-hermes-에-물어-정하고-도는-실행에는-다시-붙는다.md`
@@ -69,11 +72,11 @@ public record RestartReconcileProperties(@DefaultValue("true") boolean enabled, 
 `@Component`, `SmartLifecycle` 을 구현한다.
 
 - `getPhase()`: `WebServerApplicationContext.START_STOP_LIFECYCLE_PHASE - 1`
-- `start()`: `properties.enabled()` 면 `claim()`. 예외가 나도 기동을 막지 않고 오류 로그를 남긴다. 그 뒤 `isRunning()` 이 참이다
+- `start()`: 「내려가는 중」 표시를 지운다. `properties.enabled()` 면 `claim()`. 예외가 나도 기동을 막지 않고 오류 로그를 남긴다. 그 뒤 `isRunning()` 이 참이다
 - `stop()`: 내려가는 중이라고 표시한다. 묻던 스레드가 다음 바퀴에서 줄을 적지 않고 끝난다. 자고 있는 스레드는 깨운다(interrupt)
 - `@EventListener(ApplicationReadyEvent.class) @Order(0) void onReady()`: `properties.enabled()` 면 `reconcile()`
 
-공개 메서드 둘은 테스트가 직접 부른다.
+공개 메서드 `claim()` 과 `reconcile()` 은 테스트가 직접 부른다. 상한을 인자로 받는 `void reconcile(Duration maxWait)` 을 package-private 으로 두고 `reconcile()` 이 설정값으로 그것을 부른다. 테스트는 같은 패키지에 두어 이 메서드를 쓴다.
 
 **`public void claim()`**
 
@@ -94,24 +97,33 @@ public record RestartReconcileProperties(@DefaultValue("true") boolean enabled, 
 **줄 하나를 정하는 바퀴**
 
 ```
-상한 = 지금 + (properties.maxWait() 또는 hermes.runTimeout())
+상한 = 지금 + maxWait
 닿았다 = 거짓, 중지보냄 = 거짓, 간격 = hermes.pollInterval()
-되풀이:
-  내려가는 중이면 끝낸다 (줄을 적지 않는다. 잠금도 풀지 않는다)
-  lookupRun(agent.apiBaseUrl(), row.profileName(), row.hermesRunId())
-    FINISHED  -> recorder.settle(row.id(), result) 뒤 끝
-    NOT_FOUND -> recorder.failWithout(row.id(), "REMOTE_RUN_LOST") 뒤 끝
-    RUNNING   -> 닿았다 = 참, 간격 = pollInterval
-                 종류가 FLOW 이고 아직 중지를 보내지 않았으면 hermes.stop(...) 을 보낸다(실패해도 경고 로그만, 다음 바퀴에 다시 보낸다)
-    ApiException -> 간격 = min(간격 * 2, 5초)
-  지금이 상한을 넘었으면:
-    hermes.stop(...) 을 한 번 보낸다(실패해도 경고 로그만)
-    recorder.failWithout(row.id(), 닿았다 ? "RECONCILE_TIMEOUT" : "RECONCILE_UNREACHABLE") 뒤 끝
-  간격만큼 잔다
-끝나면: 잡은 잠금을 푼다
+try:
+  되풀이:
+    내려가는 중이면 끝낸다
+    try:
+      lookupRun(agent.apiBaseUrl(), row.profileName(), row.hermesRunId())
+        FINISHED  -> turns.untrackRun(뿌리 실행 번호, runId) 뒤 recorder.settle(row.id(), result). 적었으면 끝
+        NOT_FOUND -> turns.untrackRun(...) 뒤 recorder.failWithout(row.id(), "REMOTE_RUN_LOST"). 끝
+        RUNNING   -> 닿았다 = 참, 간격 = pollInterval
+                     종류가 FLOW 이고 아직 중지를 보내지 않았으면 hermes.stop(...) 을 보낸다(실패해도 경고 로그만, 다음 바퀴에 다시 보낸다)
+    catch RuntimeException:
+      내려가는 중이면 끝낸다
+      경고 로그를 남기고 간격 = min(간격 * 2, 5초). 다음 바퀴에 다시 묻는다
+    지금이 상한을 넘었으면:
+      hermes.stop(...) 을 한 번 보낸다(실패해도 경고 로그만)
+      recorder.failWithout(row.id(), 닿았다 ? "RECONCILE_TIMEOUT" : "RECONCILE_UNREACHABLE") 뒤 끝
+    간격만큼 잔다. 자다 깨워지면(InterruptedException) 끝낸다
+finally:
+  내려가는 중이 아니면 잡은 잠금을 푼다
 ```
 
-- `ApiException` 이 아닌 예상하지 못한 예외는 오류 로그를 남기고 `recorder.failWithout(row.id(), "ORPHANED")` 로 적은 뒤 잠금을 푼다. 줄이 `RUNNING` 으로, 대화가 잠긴 채로 남지 않게 한다
+- **내려가는 중이면 줄을 적지 않고 잠금도 풀지 않는다.** `stop()` 이 건 interrupt 로 `settle` 의 DB 호출이 예외를 던져도 그 줄을 실패로 적지 않는다. 줄이 `RUNNING` 으로 남아 다음 기동이 다시 정한다
+- **`lookupRun` 의 `ApiException` 과 `settle`, `failWithout` 이 던진 예외를 같게 다룬다.** 다음 바퀴에 다시 묻는다. Hermes 는 끝난 답을 1시간 동안 갖고 있으므로 일시적 DB 오류 뒤에도 같은 답을 다시 받는다. 상한이 끝을 보장한다
+- 상한을 넘겨 적는 `failWithout` 까지 예외를 던지면 오류 로그를 남기고 끝낸다. 잠금은 `finally` 가 푼다. 그 줄은 `RUNNING` 으로 남아 다음 기동이 다시 정한다
+- `settle` 이 거짓을 돌려주면(다른 쪽이 이미 적었다) 그대로 끝낸다
+- `untrackRun` 의 첫 인자는 표시가 붙은 뿌리 실행 번호다. 잠금을 잡지 않은 줄(위임, 그 밖의 실행)은 `row.treeRootId()` 를 준다. 표시가 없으면 아무 일도 없다
 - 오류 코드 넷(`ORPHANED`, `REMOTE_RUN_LOST`, `RECONCILE_TIMEOUT`, `RECONCILE_UNREACHABLE`)은 이 클래스의 상수로 둔다. `ErrorCode` enum 에 더하지 않는다. HTTP 응답으로 나가지 않는 값이고 `ORPHANED` 도 그렇게 있었다
 
 **잠금을 푼다**
@@ -128,23 +140,29 @@ public record RestartReconcileProperties(@DefaultValue("true") boolean enabled, 
 - `OrphanedExecutionSweeper.java` 와 `OrphanedExecutionSweeperTest.java` 를 지운다
 - `NextTurnDispatcher.dispatchAfterStartup` 의 Javadoc 「기동 정리가 끊긴 위임 실행을 FAILED 로 적은 뒤에 돈다」 를 지금 동작으로 고친다. `RestartReconciler` 가 잠금을 잡은 대화는 건너뛰고 그 잠금이 풀릴 때 다시 온다는 것, run 번호가 없어 실패로 적힌 위임 결과는 이 깨우기가 전한다는 것
 - `AgentDelegationService.stop` 의 Javadoc 마지막 문단을 고친다. 이 프로세스에 중지 표시가 없는 도는 실행은 기동 정리가 다시 붙어 있는 실행이고, 중지를 보내면 그 실행이 `CANCELLED` 로 적힌다는 것
-- `git grep -n "OrphanedExecutionSweeper\|기동 정리" backend/src` 로 남은 언급을 찾아 지금 동작과 다른 주석을 고친다. 고친 파일은 「변경 파일」 에 더한다
+- `git grep -n "OrphanedExecutionSweeper\|기동 정리" -- backend/src/main/java backend/src/test/java` 로 남은 언급을 찾아 지금 동작과 다른 주석을 고친다. 고친 파일은 「변경 파일」 에 더한다
+- **마이그레이션 파일(`backend/src/main/resources/db/migration/`)은 주석도 고치지 않는다.** 적용된 파일의 checksum 이 바뀌면 운영 기동이 실패한다
+- `ConnectorActionService`, `DelegationWakeService`, `ConnectorActionServiceTest` 의 「기동 정리」 는 `ConnectorActionSweeper` 를 가리킨다. 그대로 둔다
 
-### 4. `backend/src/test/java/com/bifos/assistant/chat/RestartReconcilerTest.java` (신규)
+### 4. `backend/src/test/java/com/bifos/assistant/chat/application/RestartReconcilerTest.java` (신규)
 
-`@SpringBootTest`, `@ActiveProfiles("test")`, `@Import(ChatServiceTest.StubRuntime.class)`. Hermes 는 `StubHermesRunsClient` 의 `willLookup`, `willFailLookup`, `lookups()`, `stopped()` 로 다룬다. 실행 줄은 저장소로 직접 `RUNNING` 으로 만든다. 묻기는 가상 스레드에서 돌므로 결과는 기다려 읽는다(Awaitility 가 이미 의존에 있으면 그것을, 없으면 `ChatStopTest` 가 쓰는 기다림 방식을 쓴다). `@AfterEach` 에서 대역을 `reset()` 하고 남은 잠금이 없는지 본다.
+패키지는 `com.bifos.assistant.chat.application` 이다(같은 디렉터리에 `TurnCancellationTest.java` 가 있다). `@SpringBootTest(properties = "assistant.delegation-wake.enabled=true")`, `@ActiveProfiles("test")`, `@Import(ChatServiceTest.StubRuntime.class)`. Hermes 는 `StubHermesRunsClient` 의 `willLookup`, `willFailLookup`, `lookups()`, `stopped()` 로 다룬다. 실행 줄은 저장소로 직접 `RUNNING` 으로 만든다. 묻기는 가상 스레드에서 돌므로 결과는 기다려 읽는다. Awaitility 는 의존에 없으므로 `ChatStopTest` 가 쓰는 기다림 방식을 쓴다. `@AfterEach` 에서 대역을 `reset()` 하고 남은 잠금이 없는지 본다.
 
-상한을 줄여야 하는 경우는 그 테스트 메서드가 든 클래스에 `@TestPropertySource(properties = "assistant.restart-reconcile.max-wait=300ms")` 를 주거나, 상한을 인자로 받는 package-private `reconcile(Duration maxWait)` 을 두어 부른다.
+**상한은 `reconcile(Duration maxWait)` 으로 준다.** 상한을 검사하는 두 경우만 300ms 를 주고, 나머지는 30초를 준다. 테스트 profile 의 `hermes.run-timeout` 이 1초라 `reconcile()` 을 그대로 부르면 느린 머신에서 「도는 중」 경우가 `RECONCILE_TIMEOUT` 으로 끝난다.
+
+**「아직 돈다」 와 「닿지 못한다」 를 지나가는 답으로 두지 않는다.** `poll-interval` 이 10ms 라 `running(), running(), finished(...)` 처럼 주면 20ms 안에 끝나 그 사이의 단언이 흔들린다. `willLookup(run, running())` 하나만 주어 되풀이하게 하고, `RUNNING` 과 잠금을 단언한 뒤 `willLookup(run, finished(...))` 을 다시 불러 끝낸다. 닿지 못하는 경우도 `willFailLookup(run, failure, Integer.MAX_VALUE)` 로 두고 단언한 뒤 `willLookup` 과 `willFailLookup(run, failure, 0)` 으로 푼다(대역이 그렇게 풀리지 않으면 phase 01 의 대역에 푸는 메서드를 더하고 그 파일을 「변경 파일」 에 더한다).
+
+**`stop()` 을 부른 테스트는 끝에서 `start()` 를 부른다.** 이 빈은 캐시된 Spring context 가 함께 쓴다. 「내려가는 중」 표시가 남으면 뒤 테스트의 `reconcile()` 이 아무것도 적지 않는다. 테스트 profile 은 `enabled: false` 라 `start()` 가 `claim()` 을 부르지 않는다.
 
 이슈 #98 의 완료 조건이 요구하는 여섯 경우를 모두 둔다.
 
 | 경우 | 준비 | 기대 |
 | --- | --- | --- |
 | 원격 성공 | 대화 turn 줄, `willLookup(run, finished(completed, 답, usage))` | 줄 `SUCCEEDED`, 토큰과 비용, `ASSISTANT` 메시지 하나, 잠금이 풀렸다(`turns.markOf(conversationId).running()` 이 거짓) |
-| 원격 실행 중 | `willLookup(run, running(), running(), finished(completed...))` | 처음에는 줄이 `RUNNING` 이고 `turns.markOf(conversationId)` 가 `running=true`, `executionId=그 줄` 이다. 그 사이 `chat.send(...)` 는 `CONVERSATION_BUSY`. 끝나면 `SUCCEEDED` 와 메시지, 잠금 해제. `stub.stopped()` 가 비어 있다 |
+| 원격 실행 중 | `willLookup(run, running())`. 단언 뒤 `willLookup(run, finished(completed...))` | 처음에는 줄이 `RUNNING` 이고 `turns.markOf(conversationId)` 가 `running=true`, `executionId=그 줄` 이다. 그 사이 `chat.send(...)` 는 `CONVERSATION_BUSY`. 끝나면 `SUCCEEDED` 와 메시지, 잠금 해제. `stub.stopped()` 가 비어 있다 |
 | 원격 실패 | `finished(failed, usage)` | `FAILED`, `errorCode` 가 `FAILED`, 토큰이 남았다, 메시지 없음 |
 | 404 | `willLookup` 을 주지 않는다 | `FAILED`, `REMOTE_RUN_LOST`. `lookups()` 에 그 run 이 한 번 |
-| 일시적 연결 실패 | `willFailLookup(run, new ApiException(HERMES_UNAVAILABLE, ...), 3)` 뒤 `finished(completed...)` | 실패하는 동안 줄이 `RUNNING` 이고 잠금이 잡혀 있다. 그 뒤 `SUCCEEDED` |
+| 일시적 연결 실패 | 조회가 계속 `ApiException(HERMES_UNAVAILABLE)` 을 던지게 둔다. 단언 뒤 `finished(completed...)` 로 푼다 | 실패하는 동안 줄이 `RUNNING` 이고 잠금이 잡혀 있다. 그 뒤 `SUCCEEDED` |
 | run 번호 미저장 | `hermesRunId` 없는 `RUNNING` 줄 | `FAILED`, `ORPHANED`. `lookups()` 가 비어 있다 |
 
 여기에 더한다.
@@ -158,20 +176,27 @@ public record RestartReconcileProperties(@DefaultValue("true") boolean enabled, 
 | 흐름 에이전트의 뿌리 줄이 아직 돈다 | `stub.stopped()` 에 그 run. `onStop` 으로 다음 조회를 `finished(cancelled)` 로 바꾸면 줄이 `CANCELLED`. 메시지 없음 |
 | 다시 붙은 대화 turn 을 `chat.stop(user, executionId)` 으로 멈춘다 | `stub.stopped()` 에 그 run. 조회가 `finished(cancelled, 일부 답)` 을 주면 줄 `CANCELLED`, 그 대화의 대기 행이 `held` |
 | 정하는 동안 쌓인 대기 메시지 | 잠금이 잡힌 동안 `PendingMessageService` 로 더한 글이 남아 있다가, 잠금이 풀린 뒤 `USER` 메시지로 저장되고 새 실행이 제출된다(`stub.received()`) |
-| `stop()` 뒤 | 묻던 줄이 `RUNNING` 으로 남는다 |
+| `stop()` 뒤 | `running()` 을 되풀이하는 줄이 `RUNNING` 으로 남고 `stub.stopped()` 가 비어 있다. 그 뒤 조회를 `finished(completed)` 로 바꿔도 줄이 바뀌지 않는다. 테스트 끝에서 `start()` 를 부른다 |
+| `settle` 이 한 번 예외를 던진 뒤 | 다음 바퀴에 다시 물어 `SUCCEEDED` 로 적힌다. 줄이 `ORPHANED` 가 아니다(`@MockitoSpyBean` 이나 그 저장소가 이미 쓰는 대역 방식으로 `RecoveredRunRecorder.settle` 의 첫 호출만 실패시킨다) |
 | `getPhase()` | `WebServerApplicationContext.START_STOP_LIFECYCLE_PHASE` 보다 작다 |
 
 `backend/src/test/java/com/bifos/assistant/orchestration/AgentDelegationServiceTest.java` 와 `backend/src/test/java/com/bifos/assistant/mcp/McpAgentToolsTest.java` 에 「기동 정리가 끝낸다」 를 전제로 한 단언이 있으면 지금 동작에 맞게 고치고 「변경 파일」 에 더한다.
+
+### 5. `test/e2e/scenarios/chat-queue.ts`
+
+`chatQueueRestartScenario` 의 「Control Plane 을 강제로 내리고 다시 띄운다」 뒤에 `context.hermes.releaseHeldRun()` 을 넣고 step 글을 지금 동작에 맞게 고친다. 붙잡힌 turn 의 답이 먼저 오고 그 뒤에 쌓인 글이 간다. 중지로 멈춘 대기 줄이 그대로 멈춰 있다는 단언은 그대로 둔다. 그 시나리오의 `finally` 가 붙잡은 run 을 놓는 방식도 읽고 겹치지 않게 한다.
 
 ## 검증
 
 ```bash
 # cwd: 저장소 root
-cd backend && ./gradlew test --tests 'com.bifos.assistant.chat.RestartReconcilerTest' --tests 'com.bifos.assistant.chat.*' --tests 'com.bifos.assistant.orchestration.*' --tests 'com.bifos.assistant.usage.*' --tests 'com.bifos.assistant.architecture.*'
+cd backend && ./gradlew test --tests 'com.bifos.assistant.chat.application.RestartReconcilerTest' --tests 'com.bifos.assistant.chat.*' --tests 'com.bifos.assistant.orchestration.*' --tests 'com.bifos.assistant.usage.*' --tests 'com.bifos.assistant.architecture.*'
+cd backend && ./gradlew checkstyleMain checkstyleTest spotlessCheck
+node test/e2e/run.ts
 ! git grep -n "OrphanedExecutionSweeper" -- backend/src/main docs
 ```
 
-첫 명령은 종료 코드 0, 둘째는 일치하는 줄이 없어야 한다.
+앞의 셋은 종료 코드 0 이고 e2e 의 마지막 줄이 `모두 통과했다` 다. 마지막 명령은 일치하는 줄이 없어야 한다.
 
 ## 변경 파일
 
@@ -179,10 +204,11 @@ cd backend && ./gradlew test --tests 'com.bifos.assistant.chat.RestartReconciler
 |---|---|
 | `backend/src/main/java/com/bifos/assistant/chat/application/RestartReconcileProperties.java` | 신규 |
 | `backend/src/main/java/com/bifos/assistant/chat/application/RestartReconciler.java` | 신규 |
-| `backend/src/test/java/com/bifos/assistant/chat/RestartReconcilerTest.java` | 신규 |
+| `backend/src/test/java/com/bifos/assistant/chat/application/RestartReconcilerTest.java` | 신규 |
 | `backend/src/main/resources/application.yml` | 수정 |
 | `backend/src/test/resources/application-test.yml` | 수정 |
 | `backend/src/main/java/com/bifos/assistant/usage/application/OrphanedExecutionSweeper.java` | 삭제 |
 | `backend/src/test/java/com/bifos/assistant/usage/OrphanedExecutionSweeperTest.java` | 삭제 |
 | `backend/src/main/java/com/bifos/assistant/chat/application/NextTurnDispatcher.java` | 수정 |
 | `backend/src/main/java/com/bifos/assistant/orchestration/application/AgentDelegationService.java` | 수정 |
+| `test/e2e/scenarios/chat-queue.ts` | 수정 |

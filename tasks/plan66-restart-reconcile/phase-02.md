@@ -15,19 +15,20 @@
   - `complete(AgentExecution, Agent, HermesRunResult, ModelChoice requested)` 와 답을 같은 저장에서 적는 `complete(..., String outputText)`
   - `cancel(AgentExecution, Agent, HermesRunResult, ModelChoice requested)` 와 `cancel(..., String outputText)`
   - `fail(AgentExecution, String errorCode)`. 사용량을 적지 않는다
-- **사용량을 남기는 실패 기록은 PR #107 이 더한다.** `ExecutionRecorder.fail(AgentExecution execution, Agent agent, HermesRunResult result, ModelChoice requested, String errorCode)` 와 `AgentExecution.markFailed(String provider, String model, TokenUsage usage, ExecutionCost cost, String errorCode, Instant finishedAt)` 다. 이 phase 를 시작할 때 `git fetch origin && git merge origin/main` 을 하고, 그 뒤에도 두 메서드가 없으면 아래 「작업 항목 1」 의 본문 그대로 더한다. 같은 본문이라야 #107 과 합칠 때 충돌이 나지 않는다
-- 대화 turn 이 성공으로 끝날 때 하는 일은 `backend/src/main/java/com/bifos/assistant/chat/application/ChatService.java` 의 `finish(PendingTurn, HermesRunResult, ModelChoice)` 에, 취소로 끝날 때 하는 일은 `cancel(PendingTurn, HermesRunResult, ModelChoice)` 에 있다. 실패는 `runTurn` 끝의 `executions.fail(...)` 과 `append(pending, ExecutionEventType.RUN_FAILED, ...)` 다. 오류 코드는 `result.providerBlocked()` 면 `ErrorCode.PROVIDER_BLOCKED.name()`, 아니면 `ChatService.hermesStatus(result)` 와 같은 값(`status` 가 null 이면 `UNKNOWN`, 아니면 대문자)이다
+  - `fail(AgentExecution execution, Agent agent, HermesRunResult result, ModelChoice requested, String errorCode)`. 실패 응답의 사용량과 실제 모델을 남긴다. `result` 가 null 이면 위의 `fail` 과 같다
+- 대화 turn 이 성공으로 끝날 때 하는 일은 `backend/src/main/java/com/bifos/assistant/chat/application/ChatService.java` 의 `finish(PendingTurn, HermesRunResult, ModelChoice)` 에, 취소로 끝날 때 하는 일은 `cancel(PendingTurn, HermesRunResult, ModelChoice)` 에 있다. 실패는 `runTurn` 끝의 `executions.fail(...)` 과 `append(pending, ExecutionEventType.RUN_FAILED, ...)` 다. 그 자리의 `fail` 호출이 몇 인자 판인지 직접 읽는다. 오류 코드는 `result.providerBlocked()` 면 `ErrorCode.PROVIDER_BLOCKED.name()`, 아니면 `ChatService.hermesStatus(result)` 와 같은 값(`status` 가 null 이면 `UNKNOWN`, 아니면 대문자)이다
 - 위임 실행이 끝날 때 하는 일은 `backend/src/main/java/com/bifos/assistant/orchestration/application/AgentRunner.java` 의 `run(...)` 끝에 있다. 답은 `private String clip(String)` 과 `private String partialOutput(String)` 으로 `DelegationProperties.outputMaxChars()` 까지 자른다
 - 위임이 끝났다는 알림은 `orchestration.application.DelegationFinished(Long conversationId, Long executionId)` 다. `ApplicationEventPublisher` 로 내면 `chat.application.NextTurnDispatcher.onDelegationFinished` 가 받는다
 - 실행 줄을 잠그는 조회는 `AgentExecutionRepository.lockById(Long id)`(`PESSIMISTIC_WRITE`)다. 트랜잭션 안에서만 쓴다. 트랜잭션은 `TransactionTemplate` 으로 연다(`ChatService` 가 `transactions` 로 쓴다)
 - 실행 사건은 `ExecutionEventRecorder.record(AgentExecution, ExecutionEventType, String detail, int sequence)` 로 만들고 `ExecutionEventRepository.save` 로 저장한다. 그 실행의 마지막 순번은 `ExecutionEventRepository.lastSequence(Long id)` 다(없으면 0)
 - 메시지는 `ChatMessage.fromAssistant(Long conversationId, String content, Long executionId)` 와 `ChatMessage.regeneratedAnswer(Long conversationId, String content, Long executionId, Long replacesMessageId)` 로 만든다. `ChatMessageRepository` 에는 `findByConversationIdOrderByIdAsc(Long)` 가 있다. `ChatService.regenerate` 가 마지막 유효 메시지를 고르는 방식(`activeMessages`)을 읽고 같은 기준을 쓴다
+- 보통 turn 은 답을 저장한 뒤 그 turn 이 대화 폴더에 만든 HTML 을 답에 묶는다. `ChatService.recorded` 가 `artifacts.recordTurn(Long conversationId, Long messageId, Instant turnStartedAt)`(`chat.application.ArtifactService`)을 부른다. `messageId` 가 null 이면 아무것도 하지 않고, 실패해도 예외를 올리지 않는다
 - 대화의 session 은 `ConversationRepository.touchSession(Long id, String sessionId, Instant now)` 로 적는다
 - 화면 알림은 `ConversationEventHub.publish(Long conversationId, ChatEvent)` 다. `ChatEvent.done(UUID conversationId, Long messageId, Long executionId)`, `ChatEvent.stopped(UUID, Long, Long)`, `ChatEvent.error(String code, String message)` 를 쓴다. `Conversation.publicId()` 가 UUID 다
 - 에이전트는 `AgentService.findById(Long)`(`Optional<Agent>`)로 읽는다. 지운 에이전트도 행은 남는다. 흐름은 `FlowRegistry.find(agent.flow())` 가 null 이 아니면 붙어 있다
 - 요청한 모델 선택은 실행 줄에서 되살린다. `ModelChoice.stored(row.provider(), row.model(), row.reasoningEffort())`. 실행 줄은 시작할 때 요청 값을 적어 두기 때문이다. `ModelChoice.stored` 의 정의를 읽고 null 을 받는지 확인한다
 - 패키지 방향 규칙은 `backend/src/test/java/com/bifos/assistant/architecture/ArchitectureRules.java` 가 검사한다. `chat` 은 이미 `usage`, `orchestration`, `hermes`, `agent` 를 쓴다
-- `application` 은 타입 하나에 파일 하나다(`backend/AGENTS.md`)
+- `application` 은 타입 하나에 파일 하나다. 저장되지 않는 enum 은 `<기능>.application.model` 에 둔다(`backend/AGENTS.md`). `chat/application/model` 이 이미 있다
 
 **근거 문서**: `docs/backend/turn-control.md` 의 「기동할 때 남은 실행 정리」(「실행의 종류마다 적는 것이 다르다」 표와 「갈리는 지점」 표), `docs/adr/ADR-059-재기동-때-남은-실행은-hermes-에-물어-정하고-도는-실행에는-다시-붙는다.md`
 
@@ -42,58 +43,7 @@
 
 ## 작업 항목
 
-### 1. (없을 때만) 사용량을 남기는 실패 기록
-
-`origin/main` 을 합친 뒤에도 없으면 PR #107 과 같은 본문으로 더한다.
-
-`AgentExecution`:
-
-```java
-/** 실패 응답에 포함된 모델과 토큰과 금액을 보존하고 FAILED 로 옮긴다. */
-public void markFailed(
-        String provider, String model, TokenUsage usage, ExecutionCost cost, String errorCode, Instant finishedAt) {
-    this.provider = provider;
-    this.model = model;
-    this.inputTokens = usage.inputTokens();
-    this.cachedInputTokens = usage.cachedInputTokens();
-    this.outputTokens = usage.outputTokens();
-    this.totalTokens = usage.totalTokens();
-    this.estimatedCostMicros = cost.estimatedMicros();
-    this.actualCostMicros = cost.actualMicros();
-    this.costCurrency = cost.currency();
-    this.pricingVersion = cost.pricingVersion();
-    markFailed(errorCode, finishedAt);
-}
-```
-
-`ExecutionRecorder`:
-
-```java
-/** 최종 실패 결과의 사용량과 실제 모델을 보존하며 FAILED 와 오류 코드를 함께 남긴다. */
-public AgentExecution fail(
-        AgentExecution execution, Agent agent, HermesRunResult result, ModelChoice requested, String errorCode) {
-    if (result == null) {
-        return fail(execution, errorCode);
-    }
-    TokenUsage usage = result.usage() == null ? TokenUsage.empty() : result.usage();
-    SessionRuntime served = served(agent, result, requested);
-    String provider = served.provider();
-    String model = served.model();
-    execution.attachRunId(result.runId());
-    execution.markFailed(
-            provider,
-            model,
-            usage,
-            costs.estimate(provider, model, usage, agent.costMode()),
-            errorCode,
-            clock.instant());
-    return executions.save(execution);
-}
-```
-
-더했으면 「변경 파일」 의 두 파일이 이 커밋에 들어간다. 이미 있으면 두 파일은 바뀌지 않는다.
-
-### 2. `backend/src/main/java/com/bifos/assistant/orchestration/application/DelegationOutput.java` (신규)
+### 1. `backend/src/main/java/com/bifos/assistant/orchestration/application/DelegationOutput.java` (신규)
 
 `AgentRunner` 의 `clip`, `partialOutput`, `TRUNCATED_NOTICE` 를 옮긴 `@Component`. `DelegationProperties` 를 받는다.
 
@@ -104,11 +54,11 @@ public String partial(String output)   // 비었으면 null, 아니면 clip
 
 `AgentRunner` 는 이것을 주입받아 쓰고 자기 사본을 지운다. `TRUNCATED_NOTICE` 를 가리키는 기존 테스트가 있으면(`git grep TRUNCATED_NOTICE backend/src/test`) 새 위치를 가리키게 고치고 「변경 파일」 에 더한다.
 
-### 3. `backend/src/main/java/com/bifos/assistant/chat/infra/ChatMessageRepository.java`
+### 2. `backend/src/main/java/com/bifos/assistant/chat/infra/ChatMessageRepository.java`
 
 `boolean existsByExecutionId(Long executionId);` 를 더한다. 그 실행의 메시지가 이미 있는지 본다.
 
-### 4. `backend/src/main/java/com/bifos/assistant/chat/application/RecoveredRunKind.java` (신규)
+### 3. `backend/src/main/java/com/bifos/assistant/chat/application/model/RecoveredRunKind.java` (신규)
 
 ```java
 /** 기동 때 남은 실행의 종류다. 종류마다 적는 것과 아직 돌 때 하는 일이 다르다. */
@@ -126,7 +76,7 @@ public enum RecoveredRunKind { CHAT_TURN, DELEGATION, FLOW, AUXILIARY }
 
 뿌리 줄이나 그 에이전트를 읽지 못하면 2 를 건너뛴다. `AgentExecution.treeRootId()` 의 정의를 읽고 뿌리 자신일 때 무엇을 주는지 확인한다.
 
-### 5. `backend/src/main/java/com/bifos/assistant/chat/application/RecoveredRunRecorder.java` (신규)
+### 4. `backend/src/main/java/com/bifos/assistant/chat/application/RecoveredRunRecorder.java` (신규)
 
 `@Service`. 공개 메서드는 셋이다.
 
@@ -154,6 +104,7 @@ public RecoveredRunKind kindOf(AgentExecution row)
 - `CHAT_TURN` 의 메시지: `messages.existsByExecutionId(row.id())` 가 참이면 저장하지 않는다. 그 대화의 마지막 유효 메시지가 `ASSISTANT` 이면 `ChatMessage.regeneratedAnswer(conversationId, answer, row.id(), last.id())`, 아니면 `ChatMessage.fromAssistant(conversationId, answer, row.id())`. 성공의 `answer` 는 `result.output()`(null 이면 `""`)
 - 끝 사건의 순번은 `executionEvents.lastSequence(row.id()) + 1`. 사건 저장이 실패해도 실행 줄과 메시지는 남긴다(`ChatService.store` 와 `AgentRunner.append` 가 같은 판단을 한다). 그래서 사건은 트랜잭션이 끝난 뒤 따로 저장하고 예외는 경고 로그로만 남긴다
 - 대화가 지워졌거나 없으면(`CHAT_TURN`) 실행 줄만 적고 메시지와 알림은 건너뛴다
+- `CHAT_TURN` 의 성공과 취소에서 메시지를 저장했으면, 트랜잭션이 끝난 뒤 `artifacts.recordTurn(conversationId, messageId, row.startedAt())` 을 부른다. 보통 turn 이 폴더를 만들기 직전 시각을 쓰는 것과 달리 실행 줄의 시작 시각을 쓴다. 실행 줄은 폴더를 만든 뒤에 생기므로 그 시각 뒤에 바뀐 HTML 은 모두 이 turn 의 것이다
 
 트랜잭션이 끝난 뒤, 실제로 적었을 때만 한다.
 
@@ -168,7 +119,7 @@ public RecoveredRunKind kindOf(AgentExecution row)
 
 `failWithout` 은 같은 잠금과 `RUNNING` 확인 뒤 `executions.fail(row, errorCode)` 로 적는다. 알림은 위 표의 실패 줄과 같다(`CHAT_TURN` 은 `error`, `DELEGATION` 은 `DelegationFinished`). 사건은 남기지 않는다.
 
-### 6. `backend/src/test/java/com/bifos/assistant/chat/RecoveredRunRecorderTest.java` (신규)
+### 5. `backend/src/test/java/com/bifos/assistant/chat/RecoveredRunRecorderTest.java` (신규)
 
 `@SpringBootTest`, `@ActiveProfiles("test")`, `@Import(ChatServiceTest.StubRuntime.class)`. 준비 방식은 `backend/src/test/java/com/bifos/assistant/chat/ChatStopTest.java` 와 `backend/src/test/java/com/bifos/assistant/chat/DelegationWakeServiceTest.java` 를 따른다. 실행 줄은 저장소로 직접 `RUNNING` 과 `hermesRunId` 를 가진 채 만든다.
 
@@ -178,6 +129,7 @@ public RecoveredRunKind kindOf(AgentExecution row)
 | 같은 `settle` 을 한 번 더 | 거짓. 메시지는 여전히 하나, 사건도 늘지 않는다, 줄의 `finishedAt` 이 바뀌지 않는다 |
 | 대화 turn, `failed` 와 usage | 줄이 `FAILED`, `errorCode` 가 `FAILED`, 토큰이 적혔다. 메시지가 없다. hub 가 `error` 를 받았다 |
 | 대화 turn, `cancelled` 와 일부 답 | 줄이 `CANCELLED`, 메시지가 하나 |
+| 대화 turn 이 `completed` 이고 그 대화 폴더에 실행 시작 뒤 만든 HTML 이 있다 | 그 결과물이 새 답 메시지에 묶였다. 준비와 단언은 `backend/src/test/java/com/bifos/assistant/chat/ArtifactTest.java` 의 방식을 따른다 |
 | 마지막 메시지가 `ASSISTANT` 인 대화의 turn 이 `completed` | 새 메시지가 그 답을 다시 생성한 것으로 저장된다(`ChatRegenerateTest` 가 읽는 칸과 같은 칸) |
 | 위임 실행, `completed` | 줄이 `SUCCEEDED`, `outputText` 가 답. `DelegationFinished` 가 났다(`@RecordApplicationEvents` 또는 테스트 리스너). `AgentExecutionRepository.findUndeliveredResults(conversationId)` 에 그 줄이 있다 |
 | 위임 실행, 답이 `output-max-chars` 보다 길다 | `outputText` 가 잘렸고 잘렸다는 줄로 끝난다 |
@@ -190,9 +142,10 @@ public RecoveredRunKind kindOf(AgentExecution row)
 ```bash
 # cwd: 저장소 root
 cd backend && ./gradlew test --tests 'com.bifos.assistant.chat.RecoveredRunRecorderTest' --tests 'com.bifos.assistant.orchestration.*' --tests 'com.bifos.assistant.usage.*' --tests 'com.bifos.assistant.architecture.*'
+cd backend && ./gradlew checkstyleMain checkstyleTest spotlessCheck
 ```
 
-종료 코드 0. `orchestration` 테스트는 `DelegationOutput` 으로 옮긴 자르기가 그대로인지, `architecture` 는 패키지 방향을 본다.
+둘 다 종료 코드 0. `orchestration` 테스트는 `DelegationOutput` 으로 옮긴 자르기가 그대로인지, `architecture` 는 패키지 방향을 본다.
 
 ## 변경 파일
 
@@ -201,8 +154,6 @@ cd backend && ./gradlew test --tests 'com.bifos.assistant.chat.RecoveredRunRecor
 | `backend/src/main/java/com/bifos/assistant/orchestration/application/DelegationOutput.java` | 신규 |
 | `backend/src/main/java/com/bifos/assistant/orchestration/application/AgentRunner.java` | 수정 |
 | `backend/src/main/java/com/bifos/assistant/chat/infra/ChatMessageRepository.java` | 수정 |
-| `backend/src/main/java/com/bifos/assistant/chat/application/RecoveredRunKind.java` | 신규 |
+| `backend/src/main/java/com/bifos/assistant/chat/application/model/RecoveredRunKind.java` | 신규 |
 | `backend/src/main/java/com/bifos/assistant/chat/application/RecoveredRunRecorder.java` | 신규 |
 | `backend/src/test/java/com/bifos/assistant/chat/RecoveredRunRecorderTest.java` | 신규 |
-| `backend/src/main/java/com/bifos/assistant/usage/application/ExecutionRecorder.java` | 수정 |
-| `backend/src/main/java/com/bifos/assistant/usage/domain/AgentExecution.java` | 수정 |

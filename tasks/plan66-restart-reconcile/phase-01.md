@@ -63,7 +63,7 @@ HermesRunLookup lookupRun(String apiBaseUrl, String profileName, String runId);
 
 ### 4. `StubHermesRunsClient`
 
-- `public void willLookup(String runId, HermesRunLookup... lookups)`: 그 run 을 물을 때 차례로 돌려줄 답. 마지막 답은 되풀이한다
+- `public void willLookup(String runId, HermesRunLookup... lookups)`: 그 run 을 물을 때 차례로 돌려줄 답. 마지막 답은 되풀이한다. 같은 run 에 다시 부르면 앞에 정한 답을 버리고 새 답으로 바꾼다. 테스트가 「아직 돈다」 를 되풀이하게 해 두고 단언한 뒤 끝난 답으로 바꾸는 데 쓴다
 - `public void willFailLookup(String runId, ApiException failure, int times)`: 처음 `times` 번은 예외를 던지고 그 뒤에는 `willLookup` 의 답을 준다
 - `public List<String> lookups()`: 물은 run 번호를 순서대로
 - 정해 두지 않은 run 은 `HermesRunLookup.notFound()` 다
@@ -91,7 +91,7 @@ HermesRunLookup lookupRun(String apiBaseUrl, String profileName, String runId);
 ```bash
 # cwd: 저장소 root
 cd backend && ./gradlew test --tests 'com.bifos.assistant.hermes.HermesRunLookupTest' --tests 'com.bifos.assistant.hermes.*'
-cd backend && ./gradlew compileTestJava
+cd backend && ./gradlew compileTestJava checkstyleMain checkstyleTest spotlessCheck
 ```
 
 둘 다 종료 코드 0. `StubHermesRunsClient` 를 쓰는 기존 테스트가 그대로 컴파일돼야 한다.
