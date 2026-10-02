@@ -38,7 +38,7 @@ test("관리자 에이전트 목록에서 등록한 에이전트가 보인다", 
     await route.continue();
   });
 
-  await page.goto("/agents");
+  await page.goto("/admin/agents");
   await expect(page.getByRole("heading", { name: "에이전트 등록" })).toBeVisible();
   const form = page.getByRole("heading", { name: "에이전트 등록" }).locator("xpath=ancestor::form");
   await form.getByLabel("코드").fill(registered.code);
@@ -66,7 +66,7 @@ test("관리자 목록은 다른 사람의 비공개 에이전트와 꺼진 에�
   });
   expect(changed.ok()).toBeTruthy();
   try {
-    await page.goto("/agents");
+    await page.goto("/admin/agents");
     const card = browserCard(page);
     await expect(card.getByText("다른 사람 것", { exact: true })).toBeVisible();
     await expect(card.getByText("꺼짐", { exact: true })).toBeVisible();
@@ -206,7 +206,7 @@ test("Hermes 주소를 고쳐 저장하면 화면에 새 값이 보인다", asyn
   // 같은 가짜 Hermes 를 가리키면서 글자는 다른 주소다. 확인이 지나가면서 값이 바뀌는 것을 본다.
   const moved = `${original.replace("127.0.0.1", "localhost")}/`;
 
-  await page.goto("/agents/browser");
+  await page.goto("/admin/agents/browser");
   const address = adminSection(page).getByLabel("브라우저 비서 에이전트 연결 주소");
   await expect(address).toHaveValue(original);
 
@@ -223,7 +223,7 @@ test("Hermes 주소를 고쳐 저장하면 화면에 새 값이 보인다", asyn
 test("닿지 않는 주소를 저장하려 하면 실패 이유가 그 자리에 보인다", async ({ page }) => {
   const original = `${await hermesBaseUrl()}/p/browser`;
 
-  await page.goto("/agents/browser");
+  await page.goto("/admin/agents/browser");
   const section = adminSection(page);
   await section.getByLabel("브라우저 비서 에이전트 연결 주소").fill("http://127.0.0.1:1/p/browser");
   await section.getByRole("button", { name: "주소 저장" }).click();
@@ -231,13 +231,13 @@ test("닿지 않는 주소를 저장하려 하면 실패 이유가 그 자리에
   await expect(section.getByRole("alert")).toContainText("could not reach");
 
   // 저장되지 않았으므로 다시 열면 지금 값이 그대로다.
-  await page.goto("/agents/browser");
+  await page.goto("/admin/agents/browser");
   await expect(adminSection(page).getByLabel("브라우저 비서 에이전트 연결 주소")).toHaveValue(original);
 });
 
 test("상세 관리 절에서 사용 여부를 바꾼다", async ({ page }) => {
   try {
-    await page.goto("/agents/browser");
+    await page.goto("/admin/agents/browser");
     const section = adminSection(page);
 
     await section.getByRole("button", { name: "사용 중지" }).click();
@@ -275,7 +275,7 @@ test("다른 사람의 비공개 에이전트도 관리하고 수정 뒤 주인�
     }
   });
   try {
-    await page.goto("/agents/browser");
+    await page.goto("/admin/agents/browser");
     const section = adminSection(page);
     await expect(page.getByText("이 에이전트의 성격은 주인만 볼 수 있어요.")).toBeVisible();
     await expect(page.getByRole("textbox", { name: "브라우저 비서 성격" })).toHaveCount(0);

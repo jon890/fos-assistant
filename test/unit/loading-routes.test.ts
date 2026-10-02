@@ -17,6 +17,8 @@ const ROUTE_FRAMES: Record<string, string> = {
   agents: "app/agents/page.tsx",
   "agents/[code]": "components/agent/persona-editor.tsx",
   "agents/[code]/skills/[name]": "components/agent/skill-editor.tsx",
+  "admin/agents": "components/agent/agent-admin-panel.tsx",
+  "admin/agents/[code]": "components/agent/persona-editor.tsx",
   memory: "components/memory/memory-list.tsx",
   usage: "app/usage/page.tsx",
   "executions/[id]": "app/executions/[id]/page.tsx",
@@ -67,7 +69,6 @@ test("callControlPlane 을 부르는 page.tsx 마다 같은 자리에 loading.ts
 
 test("경로마다 loading.tsx 의 width 가 그 화면의 바깥 틀 폭과 같다", async () => {
   for (const [route, frameFile] of Object.entries(ROUTE_FRAMES)) {
-    if (route === "agents") continue;
     const expectedWidth = frameWidth(await readFile(join(SRC_ROOT, frameFile), "utf-8"));
     assert.ok(expectedWidth, `${frameFile} 에서 mx-auto 와 max-w-* 가 있는 바깥 틀을 찾지 못했다`);
     const content = await readFile(join(APP_ROOT, route, "loading.tsx"), "utf-8");
@@ -77,19 +78,16 @@ test("경로마다 loading.tsx 의 width 가 그 화면의 바깥 틀 폭과 같
   }
 });
 
-test("에이전트 목록 뼈대는 레이아웃 역할로 관리자와 일반 사용자 크기를 고른다", async () => {
-  const content = await readFile(join(APP_ROOT, "agents/loading.tsx"), "utf-8");
-  const adminFrame = await readFile(join(SRC_ROOT, "components/agent/agent-admin-panel.tsx"), "utf-8");
+test("에이전트 목록 뼈대는 일반 화면과 관리자 영역이 각자 크기를 가진다", async () => {
+  const member = await readFile(join(APP_ROOT, "agents/loading.tsx"), "utf-8");
+  const admin = await readFile(join(APP_ROOT, "admin/agents/loading.tsx"), "utf-8");
   const memberFrame = await readFile(join(APP_ROOT, "agents/page.tsx"), "utf-8");
-  const shell = await readFile(join(SRC_ROOT, "components/shell/app-shell.tsx"), "utf-8");
-  assert.equal(frameWidth(adminFrame), "4xl");
+  const adminFrame = await readFile(join(SRC_ROOT, "components/agent/agent-admin-panel.tsx"), "utf-8");
   assert.equal(frameWidth(memberFrame), "2xl");
-  assert.match(content, /function Loading\(\)/);
-  assert.match(content, /useShellIsAdmin\(\)/);
-  assert.doesNotMatch(content, /readMe|await/);
-  assert.match(content, /isAdmin[\s\S]*?width="4xl" title description="agent" form="agent"/);
-  assert.match(content, /width="2xl" title/);
-  assert.match(shell, /AdminContext\.Provider value=\{knownRole === "ADMIN"\}/);
+  assert.equal(frameWidth(adminFrame), "4xl");
+  assert.doesNotMatch(member, /useShellIsAdmin|readMe|await/);
+  assert.match(member, /width="2xl" title/);
+  assert.match(admin, /width="4xl" title description="agent" form="agent"/);
 });
 
 test("loading.tsx 는 뼈대를 두기로 한 경로에만 있다", async () => {

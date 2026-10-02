@@ -109,3 +109,50 @@ test("대화를 연 적이 없으면 사용 화면으로 돌아가기는 홈으�
   await expect(page).toHaveURL(/\/$/);
   await expect(page.getByRole("textbox", { name: "메시지" })).toBeVisible();
 });
+
+test("일반 화면의 에이전트 목록에는 관리 양식이 없고 ADMIN 도 새 에이전트를 만든다", async ({ page }) => {
+  await page.goto("/agents");
+  await expect(page.getByRole("heading", { name: "에이전트", exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "새 에이전트" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "에이전트 등록" })).toHaveCount(0);
+});
+
+test("관리자 영역의 에이전트 목록은 등록 양식을 갖고 상세 보기는 관리자 영역으로 간다", async ({ page }) => {
+  await page.goto("/admin/agents");
+  await expect(page.getByRole("heading", { name: "에이전트 등록" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "새 에이전트" })).toHaveCount(0);
+
+  const card = page
+    .getByRole("region", { name: "등록된 에이전트" })
+    .locator("article")
+    .filter({ hasText: "브라우저 비서" });
+  await card.getByRole("link", { name: "상세 보기" }).click();
+  await expect(page).toHaveURL(/\/admin\/agents\/browser$/);
+  await expect(page.getByRole("region", { name: "관리" })).toBeVisible();
+  await expect(page.getByTestId("agent-model-section")).toBeVisible();
+});
+
+test("일반 화면의 에이전트 상세에는 관리 절과 모델 절이 없다", async ({ page }) => {
+  await page.goto("/agents/browser");
+  await expect(page.getByRole("heading", { name: "브라우저 비서" })).toBeVisible();
+  await expect(page.getByRole("region", { name: "관리" })).toHaveCount(0);
+  await expect(page.getByTestId("agent-model-section")).toHaveCount(0);
+});
+
+test("연결 반영 확인은 관리자 영역에 있고 일반 연결 화면에는 없다", async ({ page }) => {
+  await page.goto("/admin/connections");
+  await expect(page.getByRole("heading", { name: "커넥터", exact: true })).toBeVisible();
+  await expect(page.getByTestId("connector-admin-panel")).toBeVisible();
+
+  await page.goto("/connections");
+  await expect(page.getByRole("heading", { name: "연결", exact: true })).toBeVisible();
+  await expect(page.getByTestId("connector-admin-panel")).toHaveCount(0);
+});
+
+test("MEMBER 역할이 관리자 영역의 에이전트 주소를 열면 홈으로 넘어간다", async ({ context, page }) => {
+  await setSession(context, { email: "member@example.com", name: "가족 사용자" });
+  await page.goto("/admin/agents");
+  await expect(page).toHaveURL(/\/$/);
+  await page.goto("/admin/agents/browser");
+  await expect(page).toHaveURL(/\/$/);
+});
