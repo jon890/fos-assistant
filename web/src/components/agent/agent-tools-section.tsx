@@ -20,6 +20,7 @@ import {
   type AgentToolsView,
   type ToolsetView,
 } from "@/lib/agent";
+import { fetchAgentTools, saveAgentTools } from "@/lib/agent-api";
 import { toolsetText } from "@/lib/toolset-label";
 
 type ErrorPayload = {
@@ -34,12 +35,6 @@ type Props = {
   admin: boolean;
   visibility: AdminAgent["visibility"] | undefined;
 };
-
-function toolsPath(code: string, admin: boolean): string {
-  return admin
-    ? `/api/admin/agents/${code}/tools`
-    : `/api/agents/${code}/tools`;
-}
 
 /** 관리자 도구를 켤 때 그 도구가 실제로 닿는 대상을 짧게 알린다. */
 function confirmationDescription(name: string): string {
@@ -89,9 +84,7 @@ export function AgentToolsSection({
 
   async function reload(): Promise<AgentToolsView | null> {
     try {
-      const response = await fetch(toolsPath(code, admin), {
-        cache: "no-store",
-      });
+      const response = await fetchAgentTools(code, admin);
       if (!response.ok) return null;
       const fresh = (await response.json()) as AgentToolsView;
       setTools(fresh.toolsets);
@@ -107,13 +100,11 @@ export function AgentToolsSection({
     setError(null);
     setMissing([]);
     try {
-      const response = await fetch(toolsPath(code, admin), {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          enabled: next.filter((tool) => tool.enabled).map((tool) => tool.name),
-        }),
-      });
+      const response = await saveAgentTools(
+        code,
+        admin,
+        next.filter((tool) => tool.enabled).map((tool) => tool.name),
+      );
       if (response.ok) {
         const saved = (await response.json()) as AgentToolsView;
         setTools(saved.toolsets);

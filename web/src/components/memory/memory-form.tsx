@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { NativeSelect } from "@/components/ui/native-select";
 import { Textarea } from "@/components/ui/textarea";
+import { createMemory } from "@/lib/memory-api";
 
 export function MemoryForm({ isAdmin, onCreated }: { isAdmin: boolean; onCreated(): Promise<void> }) {
   const [scope, setScope] = useState("");
@@ -19,7 +20,7 @@ export function MemoryForm({ isAdmin, onCreated }: { isAdmin: boolean; onCreated
     const form = new FormData(element);
     setBusy(true); setError("");
     try {
-      const response = await fetch("/api/memories", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ scope, title: form.get("title"), content: form.get("content"), alwaysInject: form.get("alwaysInject") === "on" }) });
+      const response = await createMemory({ scope, title: form.get("title"), content: form.get("content"), alwaysInject: form.get("alwaysInject") === "on" });
       if (!response.ok) setError((await response.json()).message ?? "기억을 저장하지 못했어요.");
       else { element.reset(); setScope(""); await onCreated(); }
     } catch {

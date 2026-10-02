@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useExit } from "@/components/ui/use-exit";
 import { cn } from "cn";
+import { deleteMemory, updateMemory } from "@/lib/memory-api";
 import type { Memory } from "./memory-list";
 
 export function MemoryItem({
@@ -34,13 +35,9 @@ export function MemoryItem({
     setError(undefined);
     let response: Response;
     try {
-      response = await fetch(`/api/memories/${memory.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          content: form.get("content"),
-          alwaysInject: form.get("alwaysInject") === "on",
-        }),
+      response = await updateMemory(memory.id, {
+        content: form.get("content"),
+        alwaysInject: form.get("alwaysInject") === "on",
       });
     } catch {
       setError("기억을 고치지 못했어요.");
@@ -60,9 +57,7 @@ export function MemoryItem({
     setError(undefined);
     let response: Response;
     try {
-      response = await fetch(`/api/memories/${memory.id}`, {
-        method: "DELETE",
-      });
+      response = await deleteMemory(memory.id);
     } catch {
       setError("기억을 지우지 못했어요.");
       return;

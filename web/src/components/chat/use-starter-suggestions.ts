@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { StartersView } from "@/lib/agent";
+import { fetchAgentStarters } from "@/lib/chat-api";
 
 /** 추천을 만드는 중이면 다시 읽는 간격이다 */
 const RETRY_INTERVAL_MS = 2000;
@@ -35,7 +36,7 @@ export function useStarterSuggestions(code: string | null): StarterSuggestions {
     async function load(retries: number): Promise<void> {
       let view: StartersView | null = null;
       try {
-        const response = await fetch(`/api/agents/${agentCode}/starters`, { cache: "no-store" });
+        const response = await fetchAgentStarters(agentCode);
         if (response.ok) view = (await response.json()) as StartersView;
       } catch {
         // 추천은 없어도 대화를 시작할 수 있다. 읽지 못하면 자리를 비워 둔다.

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
+import { decideMemoryProposal } from "@/lib/memory-api";
 import type { Memory } from "./memory-list";
 
 export function MemoryProposal({ memory, onChanged }: { memory: Memory; onChanged(): Promise<void> }) {
@@ -12,7 +13,7 @@ export function MemoryProposal({ memory, onChanged }: { memory: Memory; onChange
     setPending(action); setError(undefined);
     let response: Response;
     try {
-      response = await fetch(`/api/memories/${memory.id}/${action}`, { method: "POST" });
+      response = await decideMemoryProposal(memory.id, action);
     } catch {
       setError("제안을 처리하지 못했어요."); return;
     } finally { setPending(null); }

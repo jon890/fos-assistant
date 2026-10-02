@@ -16,6 +16,11 @@ import { Button } from "@/components/ui/button";
 import { Notice } from "@/components/ui/notice";
 import { Switch } from "@/components/ui/switch";
 import { describeError, describeFailure } from "@/components/error-message";
+import {
+  deleteSkill,
+  fetchAgentSkills,
+  setSkillEnabled,
+} from "@/lib/agent-api";
 import { formatWhen } from "@/lib/format";
 import type { SkillItemView, SkillListView } from "@/lib/skill";
 
@@ -108,9 +113,7 @@ export function AgentSkillsSection({ code, initialSkills }: Props) {
 
   async function reload(): Promise<string | null> {
     try {
-      const response = await fetch(`/api/agents/${code}/skills`, {
-        cache: "no-store",
-      });
+      const response = await fetchAgentSkills(code);
       if (!response.ok) return await describeFailure(response, SKILL_FAILURES);
       setList((await response.json()) as SkillListView);
       return null;
@@ -123,14 +126,7 @@ export function AgentSkillsSection({ code, initialSkills }: Props) {
     setPendingName(skill.name);
     setError(null);
     try {
-      const response = await fetch(
-        `/api/agents/${code}/skills/${skill.name}/enabled`,
-        {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ enabled: !skill.enabled }),
-        },
-      );
+      const response = await setSkillEnabled(code, skill.name, !skill.enabled);
       setError(
         response.ok
           ? await reload()
@@ -147,9 +143,7 @@ export function AgentSkillsSection({ code, initialSkills }: Props) {
     setPendingName(name);
     setDeleteError(null);
     try {
-      const response = await fetch(`/api/agents/${code}/skills/${name}`, {
-        method: "DELETE",
-      });
+      const response = await deleteSkill(code, name);
       if (!response.ok) {
         setDeleteError(await describeFailure(response, SKILL_FAILURES));
         return;

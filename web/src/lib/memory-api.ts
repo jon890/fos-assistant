@@ -40,3 +40,44 @@ export async function memoryRequest<T>(
     return { ok: false, message: fallback, code: null };
   }
 }
+
+/** 기억 화면이 부르는 요청이다. 응답을 읽고 오류를 보이는 일은 화면이 맡는다. */
+
+export function fetchMemories(): Promise<Response> {
+  return fetch("/api/memories", { cache: "no-store" });
+}
+
+export function createMemory(input: {
+  scope: string;
+  title: FormDataEntryValue | null;
+  content: FormDataEntryValue | null;
+  alwaysInject: boolean;
+}): Promise<Response> {
+  return fetch("/api/memories", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+}
+
+export function updateMemory(
+  id: number,
+  input: { content: FormDataEntryValue | null; alwaysInject: boolean },
+): Promise<Response> {
+  return fetch(`/api/memories/${id}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+}
+
+export function deleteMemory(id: number): Promise<Response> {
+  return fetch(`/api/memories/${id}`, { method: "DELETE" });
+}
+
+export function decideMemoryProposal(
+  id: number,
+  action: "accept" | "reject",
+): Promise<Response> {
+  return fetch(`/api/memories/${id}/${action}`, { method: "POST" });
+}

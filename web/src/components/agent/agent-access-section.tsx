@@ -21,6 +21,7 @@ import {
   PRIVATE_VISIBILITY,
   type AdminAgent,
 } from "@/lib/agent";
+import { changeAgentVisibility, deleteAgent } from "@/lib/agent-api";
 
 type Visibility = AdminAgent["visibility"];
 
@@ -130,11 +131,7 @@ export function AgentAccessSection({
     setPending(action);
     setError(null);
     try {
-      const response = await fetch(`/api/agents/${code}/visibility`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ visibility: next }),
-      });
+      const response = await changeAgentVisibility(code, next);
       if (!response.ok) {
         setError(await describeFailure(response, ACCESS_FAILURES));
         return false;
@@ -158,7 +155,7 @@ export function AgentAccessSection({
     setPending("delete");
     setError(null);
     try {
-      const response = await fetch(`/api/agents/${code}`, { method: "DELETE" });
+      const response = await deleteAgent(code);
       if (!response.ok) {
         setError(await describeFailure(response, DELETE_FAILURES));
         setPending(null);

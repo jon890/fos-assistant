@@ -5,6 +5,7 @@ import { ChevronRight, CircleAlert, CircleCheck, Square } from "lucide-react";
 import { cn } from "cn";
 import type { ActivitySummary } from "@/lib/chat-event";
 import { formatElapsed, formatSeconds } from "@/lib/format";
+import { fetchExecutionTree } from "@/lib/usage-api";
 import type { ExecutionTreeResponse } from "@/components/execution/execution-tree";
 import { ActivityTimeline } from "./activity-timeline";
 import {
@@ -89,7 +90,7 @@ export function ActivityBlock(props: Props) {
   useEffect(() => {
     if (!expanded || executionId === null || savedItems !== null) return;
     let active = true;
-    fetch(`/api/usage/executions/${executionId}/tree`, { cache: "no-store" })
+    fetchExecutionTree(executionId)
       .then((response) => {
         if (!response.ok) throw new Error("작업 과정을 불러오지 못했어요");
         return response.json() as Promise<ExecutionTreeResponse>;

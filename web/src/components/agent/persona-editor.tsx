@@ -6,6 +6,7 @@ import { Notice } from "@/components/ui/notice";
 import { Textarea } from "@/components/ui/textarea";
 import { describeError } from "@/components/error-message";
 import type { PersonaView } from "@/lib/agent";
+import { fetchPersona, savePersona } from "@/lib/agent-api";
 import { PersonaConfirm } from "./persona-confirm";
 
 type Props = {
@@ -20,9 +21,7 @@ type ErrorPayload = { code: string; message: string };
 type SaveState = "idle" | "saving" | "saved";
 
 async function readPersona(code: string): Promise<PersonaView | null> {
-  const response = await fetch(`/api/agents/${code}/persona`, {
-    cache: "no-store",
-  });
+  const response = await fetchPersona(code);
   if (!response.ok) return null;
   return (await response.json()) as PersonaView;
 }
@@ -56,11 +55,7 @@ export function PersonaEditor({ code, name, initialPersona }: Props) {
     setError(null);
     setServerBody(null);
     try {
-      const response = await fetch(`/api/agents/${code}/persona`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ body, baseHash: bodyHash }),
-      });
+      const response = await savePersona(code, { body, baseHash: bodyHash });
       if (!response.ok) {
         const failure = (await response.json()) as ErrorPayload;
         if (failure.code === "PERSONA_STALE") {

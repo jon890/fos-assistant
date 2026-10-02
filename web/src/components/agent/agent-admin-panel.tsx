@@ -5,6 +5,7 @@ import { AgentForm } from "@/components/admin/agent-form";
 import { AgentList } from "@/components/admin/agent-list";
 import { describeAdminError } from "@/components/error-message";
 import { Notice } from "@/components/ui/notice";
+import { createAdminAgent, fetchAdminAgents } from "@/lib/agent-api";
 import { PRIVATE_VISIBILITY, type AdminAgent } from "@/lib/agent";
 
 export type { AdminAgent } from "@/lib/agent";
@@ -29,7 +30,7 @@ export function AgentAdminPanel({
   const [creating, setCreating] = useState(false);
 
   async function reload() {
-    const response = await fetch("/api/admin/agents");
+    const response = await fetchAdminAgents();
     if (!response.ok)
       throw await payload<{ code: string; message: string }>(response);
     setAgents(await payload<AdminAgent[]>(response));
@@ -43,20 +44,16 @@ export function AgentAdminPanel({
     try {
       const form = new FormData(formElement);
       const visibility = String(form.get("visibility"));
-      const response = await fetch("/api/admin/agents", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          code: form.get("code"),
-          name: form.get("name"),
-          hermesProfile: form.get("hermesProfile"),
-          apiBaseUrl: form.get("apiBaseUrl"),
-          costMode: form.get("costMode"),
-          credentialScope: form.get("credentialScope"),
-          visibility,
-          ownerEmail:
-            visibility === PRIVATE_VISIBILITY ? form.get("ownerEmail") : null,
-        }),
+      const response = await createAdminAgent({
+        code: form.get("code"),
+        name: form.get("name"),
+        hermesProfile: form.get("hermesProfile"),
+        apiBaseUrl: form.get("apiBaseUrl"),
+        costMode: form.get("costMode"),
+        credentialScope: form.get("credentialScope"),
+        visibility,
+        ownerEmail:
+          visibility === PRIVATE_VISIBILITY ? form.get("ownerEmail") : null,
       });
       if (response.ok) {
         formElement.reset();

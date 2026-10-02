@@ -17,23 +17,42 @@ type Props = {
 };
 
 /** 부르는 쪽이 확인할 때만 그리므로 언제나 열린 채로 그린다. `Esc` 와 「취소」 는 모두 `onCancel` 로 간다. */
-export function PersonaConfirm({ agentName, busy, onCancel, onConfirm }: Props) {
+export function PersonaConfirm({
+  agentName,
+  busy,
+  onCancel,
+  onConfirm,
+}: Props) {
   return (
-    <AlertDialog open onOpenChange={(open) => { if (!open && !busy) onCancel(); }}>
-      <AlertDialogContent onEscapeKeyDown={(event) => { if (busy) event.preventDefault(); }}>
+    <AlertDialog
+      open
+      onOpenChange={(open) => {
+        if (!open && !busy) onCancel();
+      }}
+    >
+      <AlertDialogContent
+        onEscapeKeyDown={(event) => {
+          if (busy) event.preventDefault();
+        }}
+      >
         <AlertDialogHeader>
           <AlertDialogTitle>{agentName}의 성격을 저장할까요?</AlertDialogTitle>
           <AlertDialogDescription>
-            저장하면 기존 본문을 되돌릴 수 없어요. 이후 시작하는 대화에는 새 성격이 적용돼요.
+            저장하면 기존 본문을 되돌릴 수 없어요. 이후 시작하는 대화에는 새
+            성격이 적용돼요.
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
           {/* AlertDialogCancel 로 두어야 Radix 가 창을 열 때 「취소」 에 초점을 준다. */}
           <AlertDialogCancel asChild>
-            <Button variant="outline" disabled={busy}>취소</Button>
+            <Button variant="outline" disabled={busy}>
+              취소
+            </Button>
           </AlertDialogCancel>
           {/* AlertDialogAction 은 누르는 즉시 창을 닫고 loading 을 받지 못해 일반 Button 으로 둔다. */}
-          <Button loading={busy} loadingText="저장 중" onClick={onConfirm}>저장</Button>
+          <Button loading={busy} loadingText="저장 중" onClick={onConfirm}>
+            저장
+          </Button>
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
