@@ -26,8 +26,7 @@ class TopLevelPackageOrderTest {
     @Test
     @DisplayName("순서에 없는 패키지는 순서에 없다는 한 줄만 낸다")
     void reportsPackageMissingFromOrder() {
-        assertThat(TopLevelPackageOrder.violations("billing", List.of("user")))
-                .containsExactly("billing 는 층 순서에 없다");
+        assertThat(TopLevelPackageOrder.violations("billing", List.of("user"))).containsExactly("billing 는 층 순서에 없다");
     }
 
     @Test
