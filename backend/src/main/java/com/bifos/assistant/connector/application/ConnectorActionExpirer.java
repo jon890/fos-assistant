@@ -7,7 +7,10 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
-/** 답이 없는 승인 요청을 만료로 바꾸고 오래 남은 실행 줄을 정리하는 일정이다(ADR-050). 무엇을 바꾸는지는 {@link ConnectorActionService#expire} 가 갖는다. */
+/**
+ * 답이 없는 승인 요청을 만료로 바꾸고 오래 남은 실행 줄을 정리하며, 선언이 닫은 도구의 상시 허락을 거두는 일정이다(ADR-050,
+ * ADR-065). 무엇을 바꾸는지는 {@link ConnectorActionService} 가 갖는다.
+ */
 @Component
 @RequiredArgsConstructor
 public class ConnectorActionExpirer {
@@ -23,5 +26,6 @@ public class ConnectorActionExpirer {
         Instant now = Instant.now(clock);
         actions.expire(now);
         actions.markStale(now.minus(STALE_EXECUTION), now);
+        actions.revokeClosedGrants(now);
     }
 }
