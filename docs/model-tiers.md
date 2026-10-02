@@ -9,47 +9,99 @@ provider와 모델 이름은 평소 입력창 옆에 표시하지 않는다.
 ## 모델 선택
 
 대화 선택은 `DEFAULT`, `TIER`, `CUSTOM` 세 모드다.
-새 대화는 선택이 없는 상태이며 사용자 기본 단계, 그룹 기본 단계, profile 기본값 순서로 정한다.
+새 대화는 선택이 없는 상태이며 사용자 기본 단계, 그룹 기본 단계, 에이전트 기본 모델 순서로 정한다.
+에이전트 기본 모델도 없으면 요청에 모델을 싣지 않아 Hermes profile 의 값으로 돈다.
 사용자가 기본값으로 돌아가기를 고르면 `DEFAULT`로 고정해 사용자와 그룹 설정을 건너뛴다.
 `TIER`는 대화가 고른 단계를 쓰고 `CUSTOM`은 기존 provider, 모델, effort를 쓴다.
+모델을 비운 `CUSTOM` 대화는 에이전트 기본 모델로 돌고 effort 는 대화가 고른 값이 먼저다.
 기존 선택이 있는 대화는 `CUSTOM`, 없는 대화는 선택 없는 상태로 이관한다.
+근거는 [ADR-054](adr/ADR-054-에이전트-기본-모델과-모델-숨김은-control-plane-db-가-갖는다.md) 에 있다.
+
+선택 없는 대화의 단계 단추는 지금 적용되는 기본 단계에 「기본」 을 붙여 보인다.
+기본 단계는 대화에 적지 않고 실행할 때마다 읽으므로, 표시가 없으면 저장되지 않은 것처럼 보인다.
 
 그룹 관리자만 그룹 단계 정의와 그룹 기본값을 저장한다.
 사용자는 자기 기본 단계만 바꿀 수 있다.
 기본 단계가 없다는 값은 `null`이다.
-초기 단계의 mapping은 운영 설정에서 받으며 제품 코드와 마이그레이션에 모델 이름을 넣지 않는다.
-설정이 없으면 세 단계의 mapping은 모두 비어 있고, 해당 단계를 골라도 profile 기본값으로 실행한다.
-이때 고른 단계는 실행 기록에 남기지만 provider, 모델, 강도를 요청에 덧붙이지 않는다.
+단계 정의는 DB 의 행만 읽으며 제품 코드와 마이그레이션에 모델 이름을 넣지 않는다.
+정의 행이 없는 그룹은 세 단계의 mapping 이 모두 비어 있고, 해당 단계를 골라도 에이전트 기본 모델로 실행한다.
+이때 고른 단계는 실행 기록에 남긴다.
 관리자는 설정에서 「단계 설정이 필요해요」 안내를 보고 그룹 단계를 정할 수 있다.
-초기 설정의 provider가 비면 요청자의 에이전트가 알려 준 기본 provider로 해석한다.
+정의의 provider가 비면 요청자의 에이전트의 기본 provider로 해석한다. 에이전트 기본 모델이 있으면 그 provider 이고 없으면 profile 의 provider 다.
 관리자가 정의를 저장하면 명시한 provider를 쓴다.
 정의 저장 전에 provider와 모델의 앞뒤 공백을 없애고 빈 provider는 에이전트 기본 provider로 해석한다.
 선택한 단계 검증에 필요한 목록 조회가 실패하면 Hermes에 제출하지 않고 `FAILED` 실행 기록과 오류 코드를 남긴다.
-설정이 비어 profile 기본값을 쓰는 단계는 목록을 조회하지 않는다.
-그룹 정의 저장은 형식만 검사한다. 선택과 실행 시작 때 요청 에이전트의 catalog로 provider와 모델을 검사한다.
+mapping 이 비어 에이전트 기본 모델을 쓰는 단계는 목록을 조회하지 않는다.
+그룹 정의 저장은 형식과 숨김만 검사한다. 선택과 실행 시작 때 요청 에이전트의 catalog로 provider와 모델을 검사한다.
 지원하지 않는 정의는 Hermes 제출 전에 거절하며 다른 모델로 임의로 바꾸지 않는다.
 화면의 명시적 `DEFAULT` 선택은 「에이전트 기본값」으로 표시한다.
 
-| 단계 | 코드 | 초기 설정 접두사 |
-| --- | --- | --- |
-| 빠르게 | `FAST` | `assistant.model-tiers.fast` |
-| 균형 | `BALANCED` | `assistant.model-tiers.balanced` |
-| 깊게 | `DEEP` | `assistant.model-tiers.deep` |
+| 단계 | 코드 |
+| --- | --- |
+| 빠르게 | `FAST` |
+| 균형 | `BALANCED` |
+| 깊게 | `DEEP` |
 
-각 접두사 아래에 `provider`, `model`, `reasoning-effort`를 설정한다.
-환경 변수는 `ASSISTANT_MODEL_TIERS_FAST_PROVIDER`, `ASSISTANT_MODEL_TIERS_FAST_MODEL`,
-`ASSISTANT_MODEL_TIERS_FAST_REASONING_EFFORT` 형식이며 `BALANCED`, `DEEP`에도 같은 세 키를 쓴다.
-운영 값은 비공개 infra 저장소가 배포할 때 제공한다.
-설정된 mapping은 그룹이 저장한 정의가 없을 때만 쓴다.
-관리자가 저장한 정의는 비어 있는 mapping도 그대로 우선해 profile 기본값으로 실행한다.
-미설정 mapping의 세 값은 모두 `null`이다. mapping을 넣을 때는 모델과 유효한 강도가 필요하며 provider는 비울 수 있다.
-provider나 강도만 있는 부분 설정은 거절한다.
+### 환경 변수 초기값을 DB 로 옮긴다
+
+예전 배포는 단계 초기값을 `assistant.model-tiers.<fast|balanced|deep>` 아래의 `provider`, `model`, `reasoning-effort` 로 주었다.
+환경 변수 이름은 `ASSISTANT_MODEL_TIERS_FAST_MODEL` 형식이다.
+이 값은 실행할 때 읽지 않는다.
+`ModelTierSeedImporter` 가 기동할 때 정의 행이 하나도 없는 그룹에 세 단계를 한 번 저장한다.
+관리자가 저장한 정의가 있는 그룹은 건드리지 않으므로 여러 번 기동해도 결과가 같다.
+세 단계 모두 모델이 비어 있으면 아무것도 하지 않는다.
+옮긴 뒤에는 운영 설정에서 이 값을 지운다. 그 뒤 PR 에서 속성과 옮기는 코드를 지운다.
+mapping 을 넣을 때는 모델과 유효한 강도가 필요하며 provider는 비울 수 있다.
+provider나 강도만 있는 부분 설정은 기동에서 거절한다.
 
 단계 정의를 바꾸면 다음 실행부터 적용한다.
 이미 시작한 실행은 단계와 provider, 모델, effort를 복사해 두므로 바뀌지 않는다.
 Hermes가 실제로 쓴 provider와 모델은 실행 완료 시 결과로 갱신한다.
 단계 이름은 사용자가 고른 값이며 실제 모델이 넘어가도 그대로 남는다.
 직접 대화, Flow의 뿌리와 자식, Control Plane 위임 실행은 같은 단계 해석을 쓴다.
+
+## 에이전트 기본 모델
+
+`agent` 표가 기본 provider, 모델, effort 를 갖는다. 세 값이 모두 비면 profile 의 값으로 돈다.
+모델 없이 effort 만 둘 수 있다. 이때 모델은 profile 의 값이고 effort 만 명시해 보낸다.
+관리자가 에이전트 상세 화면의 「모델」 절에서 정한다.
+
+- 저장할 때 그 에이전트의 목록에 있고 숨기지 않은 모델인지 검사한다. 이미 저장된 모델을 그대로 두고 effort 만 바꾸는 저장은 목록과 견주지 않는다
+- Hermes 가 목록을 답하지 못해도 관리 화면은 저장된 기본값과 숨김 목록을 보인다. 그때는 기본 모델을 비우거나 숨김을 푸는 것만 할 수 있다
+- 대화가 모델을 직접 고르고 effort 를 비웠으면 에이전트 기본 effort 를 얹지 않는다. 그 effort 는 에이전트 기본 모델에 맞춘 값이다
+- 대화 없이 도는 추천 질문 실행도 에이전트 기본 모델을 싣는다. 이 실행은 숨김 판정을 지나지 않는다
+- Memory 제안 실행은 원래 실행이 해석한 값을 그대로 쓴다
+- 실행할 때는 목록을 다시 읽지 않고 저장된 값을 그대로 보낸다. 목록 조회가 실패해도 모델을 고르지 않은 대화가 돈다
+- 저장한 뒤 목록에서 빠진 모델은 바꾸지 않는다. Hermes 가 그 실행을 거절하고 관리 화면이 목록에 없다고 알린다
+- `GET /api/v1/chat/model-options` 의 기본 provider 와 기본 모델은 에이전트 기본값이 있으면 그 값이다. 모델 선택 창의 「기본 (모델명)」 이 실제로 도는 모델과 같다
+
+기본 profile 의 값을 DB 로 자동으로 복사하지 않는다.
+관리자가 화면에서 정하기 전까지 그 에이전트는 이 결정 앞과 똑같이 돈다.
+
+## 모델 숨김
+
+그룹이 숨긴 provider 와 모델은 `model_hidden` 표에 있다. 숨긴 것만 적는다.
+provider 전체를 숨기거나 provider 의 모델 하나를 숨긴다.
+적히지 않은 provider 와 모델은 새로 생긴 것까지 모두 보인다.
+
+같은 규칙이 다섯 곳에 걸린다.
+
+| 어디 | 동작 |
+| --- | --- |
+| `GET /api/v1/chat/model-options` | 숨긴 provider 와 모델을 뺀다. 모델이 하나도 남지 않은 provider 도 뺀다 |
+| 대화의 직접 선택 저장 | 숨긴 모델이면 `MODEL_HIDDEN` 으로 거절한다 |
+| 그룹 단계 정의 저장 | provider 를 명시한 정의가 숨긴 모델이면 `MODEL_HIDDEN` 으로 거절한다 |
+| 에이전트 기본 모델 저장 | 숨긴 모델이면 `MODEL_HIDDEN` 으로 거절한다 |
+| 실행 직전 | 해석한 값이 숨긴 모델이면 Hermes 에 제출하지 않고 `FAILED` 실행 기록과 `MODEL_HIDDEN` 을 남긴다 |
+
+**이미 숨긴 모델을 가리키는 대화와 정의를 다른 모델로 바꾸지 않는다.**
+사용자는 「이 모델은 지금 쓸 수 없어요」 안내를 받고 다른 모델을 고른다.
+모델 선택 창은 대화에 적힌 모델이 목록에 없으면 그 사실을 알린다.
+
+에이전트 기본값을 정하지 않은 에이전트는 요청에 모델을 싣지 않는다.
+그래서 profile 의 값이 숨긴 모델이어도 실행 직전의 판정이 잡지 못한다.
+이때 `model-options` 의 `defaultAvailable` 이 거짓이고 모델 선택 창이 기본 모델을 쓸 수 없다고 알린다.
+관리자가 그 에이전트의 기본 모델을 정하면 해소된다.
 
 ## API 계약
 
@@ -63,7 +115,11 @@ Hermes가 실제로 쓴 provider와 모델은 실행 완료 시 결과로 갱신
 | `PUT /api/v1/chat/model-tiers/default` | 본문 `tier`: 단계 코드 또는 `null`. 내 기본값을 저장한다 |
 | `PUT /api/v1/chat/model-tiers/group` | 관리자 전용. `tiers` 세 정의와 `defaultTier`를 한 트랜잭션으로 저장한다 |
 | `PUT /api/v1/chat/conversations/{id}/model-tier` | `mode`와 `tier`. `DEFAULT`면 tier는 비고 `TIER`면 유효한 코드가 필요하다 |
-| 기존 대화 모델 선택 경로 | provider, 모델, effort를 저장하면서 `CUSTOM`으로 전환한다 |
+| 기존 대화 모델 선택 경로 | provider, 모델, effort를 저장하면서 `CUSTOM`으로 전환한다. 숨긴 모델이면 `MODEL_HIDDEN` 이다 |
+| `GET /api/v1/admin/agents/{code}/model-settings` | 관리자 전용. `agentDefault`(저장된 기본값), `catalog`(숨김을 적용하지 않은 목록과 profile 의 기본값), `hidden`(그룹의 숨김 목록) |
+| `PUT /api/v1/admin/agents/{code}/model-default` | 관리자 전용. 본문 `provider`, `model`, `reasoningEffort`. 모두 비우면 profile 의 값으로 돌아간다 |
+| `GET /api/v1/admin/model-hidden` | 관리자 전용. `entries` 배열(`provider`, `model`). `model` 이 `null` 이면 그 provider 전체다 |
+| `PUT /api/v1/admin/model-hidden` | 관리자 전용. `entries` 로 숨김 목록을 통째로 바꾼다. 형식만 검사해 아직 목록에 없는 모델도 미리 숨길 수 있다 |
 
 ## profile 기본 강도
 
@@ -74,7 +130,9 @@ profile은 서버가 확인한 바인딩에서 고른다.
 조회 결과는 profile별로 짧게 캐시하며 일반 대화 응답을 기다리게 하지 않는다.
 기본 profile도 이 읽기 전용 경로에서 조회할 수 있다. 쓰기 경로의 기존 제한은 유지한다.
 실행 기록의 요청 강도가 비면 완료 후 기본값을 보완한다.
-출처는 `REQUESTED`, `PROFILE_DEFAULT`, `UNKNOWN`으로 구분한다.
+출처는 `REQUESTED`, `AGENT_DEFAULT`, `PROFILE_DEFAULT`, `UNKNOWN`으로 구분한다.
+대화도 단계도 effort 를 정하지 않아 에이전트 기본 effort 를 보낸 실행이 `AGENT_DEFAULT` 다.
+단계를 거친 실행은 그 단계의 mapping 이 비어 에이전트 기본값으로 돌았어도 `REQUESTED` 로 적는다.
 정상 조회에서 기본 강도가 없어도 확인 시각을 남겨 그 실행을 다시 조회하지 않는다.
 조회 실패만 재시도하며 이후 새 설정을 이미 확인한 과거 실행에 붙이지 않는다.
 이 값은 설정값이며 provider가 실제로 강도를 조정했는지 확인하는 값은 아니다.

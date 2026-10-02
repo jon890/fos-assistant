@@ -6,8 +6,13 @@ import java.util.List;
 /**
  * 한 에이전트의 profile 로 대화가 고를 수 있는 모델이다.
  *
- * @param defaultProvider 그 profile 의 기본 provider. Hermes 가 주지 않으면 null
- * @param defaultModel 그 profile 의 기본 모델. Hermes 가 주지 않으면 null
+ * @param defaultProvider 대화가 고르지 않았을 때 도는 provider. 에이전트 기본값이 있으면 그 값이고, 없으면
+ *     profile 의 값이다. Hermes 가 주지 않으면 null
+ * @param defaultModel 대화가 고르지 않았을 때 도는 모델. 정하는 차례는 {@code defaultProvider} 와 같다
+ * @param defaultReasoningEffort 에이전트 기본 effort. 정하지 않았으면 null 이고 profile 의 값으로 돈다
+ * @param defaultFromAgent 기본 모델을 에이전트 기본값이 정했는가. 거짓이면 profile 의 값이다
+ * @param defaultAvailable 기본 모델이 {@code providers} 에 있는가. 숨겼거나 목록에서 빠졌으면 거짓이다.
+ *     기본 모델을 모르면 참으로 본다
  * @param providers 고를 수 있는 provider. 기본 provider 가 있으면 맨 앞이고, 나머지는 Hermes 가 준 차례다.
  *     각 provider 의 reasoning 표는 그 provider 의 모델을 모두 담고, Hermes 가 밝히지 않은 모델은 참이다
  * @param reasoningEfforts 고를 수 있는 effort. 낮은 것부터 적는다
@@ -15,6 +20,24 @@ import java.util.List;
 public record ModelOptions(
         String defaultProvider,
         String defaultModel,
+        String defaultReasoningEffort,
+        boolean defaultFromAgent,
+        boolean defaultAvailable,
         List<HermesModelCatalog.Provider> providers,
         List<String> reasoningEfforts) {
+
+    /** profile 의 값만으로 만든다. 에이전트 기본값이 없는 목록이다. */
+    public ModelOptions(
+            String defaultProvider,
+            String defaultModel,
+            List<HermesModelCatalog.Provider> providers,
+            List<String> reasoningEfforts) {
+        this(defaultProvider, defaultModel, null, false, true, providers, reasoningEfforts);
+    }
+
+    /** 그 provider 의 그 모델을 고를 수 있는가. */
+    public boolean offers(String provider, String model) {
+        return providers.stream()
+                .anyMatch(row -> row.slug().equals(provider) && row.models().contains(model));
+    }
 }

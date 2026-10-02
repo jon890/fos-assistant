@@ -15,6 +15,8 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 @RequiredArgsConstructor
@@ -31,8 +33,7 @@ public class AgentService {
 
     /** 요청자가 읽을 수 있는 에이전트다. 지운 에이전트는 없는 에이전트와 같게 {@code AGENT_NOT_FOUND} 다. */
     public Agent requireReadable(CurrentUser user, String code) {
-        Agent agent = agents.findByCode(code)
-                .orElseThrow(() -> notFound());
+        Agent agent = agents.findByCode(code).orElseThrow(() -> notFound());
         if (agent.isDeleted() || !agent.isReadableBy(user.id())) {
             throw notFound();
         }
@@ -58,8 +59,50 @@ public class AgentService {
      */
     public Agent requireReadableForUpdate(CurrentUser user, String code) {
         Agent locked = agents.findByCodeForUpdate(code).orElseThrow(() -> notFound());
-        if (locked.isDeleted() || !locked.isReadableBy(user.id())) throw notFound();
+        if (locked.isDeleted() || !locked.isReadableBy(user.id())) {
+            throw notFound();
+        }
         return locked;
+    }
+
+    /**
+     * 관리자가 고칠 에이전트를 읽는다. 다른 사람의 비공개 에이전트도 읽는다. 지운 에이전트는 없는 것과 같다.
+     *
+     * @throws ApiException {@code FORBIDDEN}. 요청자가 {@code ADMIN} 이 아닐 때
+     */
+    public Agent requireForAdmin(CurrentUser user, String code) {
+        requireAdmin(user);
+        Agent agent = agents.findByCode(code).orElseThrow(() -> notFound());
+        if (agent.isDeleted()) {
+            throw notFound();
+        }
+        return agent;
+    }
+
+    /**
+     * 관리자가 에이전트의 기본 모델과 effort 를 바꾼다. 값의 검증은 부르는 쪽이 끝낸다.
+     *
+     * <p>행 잠금을 잡은 뒤 지웠는지 다시 본다. 이 트랜잭션에서 그 에이전트를 처음 읽는 것이 잠금 읽기여야
+     * 한다. 먼저 읽은 것이 있으면 잠금 읽기가 그 옛 값을 돌려줘, 그 사이의 삭제와 공개 범위 변경을 되돌린다.
+     * 그래서 부르는 쪽의 트랜잭션에 끼지 않고 새 트랜잭션에서 돈다. 모두 null 이면 profile 의 값으로
+     * 돌아간다(ADR-054).
+     */
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public Agent changeDefaultModel(
+            CurrentUser user, String code, String provider, String model, String reasoningEffort) {
+        requireAdmin(user);
+        Agent locked = agents.findByCodeForUpdate(code).orElseThrow(() -> notFound());
+        if (locked.isDeleted()) {
+            throw notFound();
+        }
+        locked.changeDefaultModel(provider, model, reasoningEffort);
+        return agents.save(locked);
+    }
+
+    private static void requireAdmin(CurrentUser user) {
+        if (!user.isAdmin()) {
+            throw new ApiException(ErrorCode.FORBIDDEN, "this action is limited to the group admin");
+        }
     }
 
     /**
@@ -71,7 +114,9 @@ public class AgentService {
      */
     public Agent lockForUpdate(CurrentUser user, Agent agent) {
         Agent locked = agents.findByIdForUpdate(agent.id()).orElseThrow(() -> notFound());
-        if (locked.isDeleted() || !locked.isReadableBy(user.id())) throw notFound();
+        if (locked.isDeleted() || !locked.isReadableBy(user.id())) {
+            throw notFound();
+        }
         return locked;
     }
 

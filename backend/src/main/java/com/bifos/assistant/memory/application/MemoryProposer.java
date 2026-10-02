@@ -7,6 +7,7 @@ import com.bifos.assistant.hermes.HermesRunsClient;
 import com.bifos.assistant.hermes.dto.HermesRunCommand;
 import com.bifos.assistant.hermes.dto.HermesRunResult;
 import com.bifos.assistant.shared.auth.CurrentUser;
+import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.usage.application.ExecutionContextSnapshot;
 import com.bifos.assistant.usage.application.ExecutionEventRecorder;
@@ -15,19 +16,18 @@ import com.bifos.assistant.usage.domain.AgentExecution;
 import com.bifos.assistant.usage.domain.ExecutionEvent;
 import com.bifos.assistant.usage.domain.ExecutionEventType;
 import com.bifos.assistant.usage.infra.ExecutionEventRepository;
+import java.util.Optional;
 import lombok.RequiredArgsConstructor;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
 /** 실행이 끝난 답에서 남길 사실을 제안한다. */
 @Service
+@Slf4j
 @RequiredArgsConstructor
 public class MemoryProposer {
-
-    private static final Logger log = LoggerFactory.getLogger(MemoryProposer.class);
     private static final int TITLE_LIMIT = 200;
 
     private final MemoryProposalProperties properties;
@@ -42,20 +42,43 @@ public class MemoryProposer {
      * 제안을 만들지 못하면 아무것도 만들지 않는다. 원래 대화 실행은 실패시키지 않는다.
      *
      * <p>제안 실행은 원래 실행의 agent와 대화를 이어 받아 같은 실행 기록 계통에 남긴다. 모델과 effort 도
-     * 그 대화가 고른 값을 쓴다.
+     * 원래 실행이 해석한 값을 쓴다. 대화에 적힌 값을 다시 읽으면 단계와 에이전트 기본 모델이 빠진다.
+     *
+     * @param requested 원래 실행이 Hermes 에 보낸 provider, 모델, effort
      */
-    public void proposeFrom(CurrentUser user, Conversation conversation, Agent agent,
-            AgentExecution parentExecution, String answer) {
-        if (!properties.enabled()) return;
+    public void proposeFrom(
+            CurrentUser user,
+            Conversation conversation,
+            Agent agent,
+            AgentExecution parentExecution,
+            String answer,
+            ModelChoice requested) {
+        if (!properties.enabled()) {
+            return;
+        }
 
         AgentExecution proposalExecution = null;
         try {
-            ModelChoice choice = conversation.modelChoice();
-            proposalExecution = executions.start(user, conversation, agent,
-                    parentExecution.id(), parentExecution.id(),
-                    ExecutionContextSnapshot.ofChars(0L), choice, null, null);
-            HermesRunCommand command = new HermesRunCommand(agent.hermesProfile(), agent.apiBaseUrl(),
-                    prompt(answer), null, null, choice.provider(), choice.model(), choice.reasoningEffort());
+            ModelChoice choice = requested == null ? ModelChoice.defaults() : requested;
+            proposalExecution = executions.start(
+                    user,
+                    conversation,
+                    agent,
+                    parentExecution.id(),
+                    parentExecution.id(),
+                    ExecutionContextSnapshot.ofChars(0L),
+                    choice,
+                    null,
+                    null);
+            HermesRunCommand command = new HermesRunCommand(
+                    agent.hermesProfile(),
+                    agent.apiBaseUrl(),
+                    prompt(answer),
+                    null,
+                    null,
+                    choice.provider(),
+                    choice.model(),
+                    choice.reasoningEffort());
             String runId = hermes.submit(command);
             executions.attachRunId(proposalExecution, runId);
             HermesRunResult result = hermes.awaitCompletion(command, runId);
@@ -70,8 +93,9 @@ public class MemoryProposer {
                 return;
             }
             AgentExecution completed = executions.complete(proposalExecution, agent, result, choice);
-            proposalOf(result.output()).ifPresent(proposal ->
-                    memories.proposeUser(user, proposal.title(), proposal.content(), completed.id()));
+            proposalOf(result.output())
+                    .ifPresent(proposal ->
+                            memories.proposeUser(user, proposal.title(), proposal.content(), completed.id()));
         } catch (Exception ex) {
             if (proposalExecution != null) {
                 executions.fail(proposalExecution, errorCode(ex));
@@ -94,20 +118,22 @@ public class MemoryProposer {
         }
     }
 
-    private java.util.Optional<Proposal> proposalOf(String output) {
-        if (output == null || output.isBlank() || "NONE".equals(output.strip())) return java.util.Optional.empty();
+    private Optional<Proposal> proposalOf(String output) {
+        if (output == null || output.isBlank() || "NONE".equals(output.strip())) {
+            return Optional.empty();
+        }
         try {
             JsonNode json = objectMapper.readTree(output);
             String title = json.path("title").asString("").strip();
             String content = json.path("content").asString("").strip();
             if (title.isEmpty() || content.isEmpty() || title.length() > TITLE_LIMIT) {
                 log.warn("Memory 제안 응답의 필수 값 또는 제목 길이가 올바르지 않습니다.");
-                return java.util.Optional.empty();
+                return Optional.empty();
             }
-            return java.util.Optional.of(new Proposal(title, content));
+            return Optional.of(new Proposal(title, content));
         } catch (Exception ex) {
             log.warn("Memory 제안 응답이 JSON 형식이 아닙니다.");
-            return java.util.Optional.empty();
+            return Optional.empty();
         }
     }
 
@@ -130,10 +156,8 @@ public class MemoryProposer {
     }
 
     private static String errorCode(Exception exception) {
-        return exception instanceof com.bifos.assistant.shared.error.ApiException api
-                ? api.code().name() : "MEMORY_PROPOSAL_FAILED";
+        return exception instanceof ApiException api ? api.code().name() : "MEMORY_PROPOSAL_FAILED";
     }
 
-    private record Proposal(String title, String content) {
-    }
+    private record Proposal(String title, String content) {}
 }

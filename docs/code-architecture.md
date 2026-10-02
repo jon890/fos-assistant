@@ -2,7 +2,8 @@
 
 ## 모델 단계와 실행 정보 보완
 
-`chat`이 그룹 단계 정의, 사용자와 그룹 기본값, 대화의 선택을 소유한다.
+`chat`이 그룹 단계 정의, 사용자와 그룹 기본값, 대화의 선택, 그룹의 모델 숨김을 소유한다.
+에이전트 기본 모델의 값은 `agent` 표에 있고, 그 검증과 해석은 `chat` 이 한다.
 실행을 시작할 때 선택을 해석하고 `usage`에 선택 스냅샷을 넘긴다.
 `usage`는 부모 종료 뒤 자식 session의 최종 사용량을 별도 작업으로 보완한다.
 `hermes`는 session 조회와 최소한의 profile 기본값 조회를 소유한다.
@@ -135,7 +136,7 @@ plugin 파일, 주소를 채운 `default-config.yaml.template`, 틀의 `plugins.
 4. `ExecutionRecorder` 가 `RUNNING` 상태로 실행 한 줄을 먼저 만든다.
    조립한 글자 수를 `context_chars` 에, 대화에서 고른 effort 를 `reasoning_effort` 에 적는다.
 5. `HermesProfileKeyStore` 가 그 profile 이름의 key 파일을 읽는다. 없으면 거기서 끝난다.
-6. `HttpHermesRunsClient` 가 실행을 제출한다. 대화에서 고른 모델과 effort 가 있으면 싣고, 없으면 빼서 profile 의 기본값으로 돌게 한다. 받은 `run_id` 를 그 자리에서 실행 줄에 적는다.
+6. `HttpHermesRunsClient` 가 실행을 제출한다. 대화에서 고른 모델과 effort 가 있으면 싣고, 없으면 에이전트 기본 모델을 싣는다. 그것도 없으면 빼서 profile 의 값으로 돌게 한다. 받은 `run_id` 를 그 자리에서 실행 줄에 적는다.
 7. 스트림으로 오는 사건을 화면으로 중계하면서 `execution_event` 로도 옮겨 적는다.
 8. 실행이 끝나면 `CostEstimator` 가 토큰을 models.dev 가격표로 환산한다.
 9. `ExecutionRecorder` 가 4번에서 만든 줄을 `SUCCEEDED` 로 갱신한다.
@@ -872,8 +873,11 @@ Hermes 가 Control Plane MCP 의 `agent_*` 도구로 다른 에이전트를 부�
 
 | 칸 | 뜻 |
 | --- | --- |
-| `defaultProvider`, `defaultModel` | 그 profile 의 기본값. Hermes 가 주지 않으면 null |
-| `providers[]` | `{ "provider", "name", "models": [...], "reasoningCapable": {...} }`. Hermes 가 `authenticated` 를 참으로 준 provider 만 남긴다. 기본 provider 가 맨 앞에 오고, 모델은 Hermes 가 준 차례 그대로다 |
+| `defaultProvider`, `defaultModel` | 고르지 않았을 때 도는 값. 에이전트 기본 모델이 있으면 그 값이고 없으면 그 profile 의 값이다. Hermes 가 주지 않으면 null |
+| `defaultReasoningEffort` | 에이전트 기본 effort. 정하지 않았으면 null |
+| `defaultFromAgent` | 기본 모델을 에이전트 기본값이 정했으면 참 |
+| `defaultAvailable` | 기본 모델이 `providers[]` 에 있으면 참. 그룹이 숨겼거나 목록에서 빠졌으면 거짓이고, 화면이 다른 모델을 고르라고 알린다 |
+| `providers[]` | `{ "provider", "name", "models": [...], "reasoningCapable": {...} }`. Hermes 가 `authenticated` 를 참으로 준 provider 만 남기고, 그룹이 숨긴 provider 와 모델을 뺀다. 기본 provider 가 맨 앞에 오고, 모델은 Hermes 가 준 차례 그대로다 |
 | `providers[].reasoningCapable` | 모델 이름을 열쇠로 한 참거짓 표. Hermes 의 `capabilities.<모델>.reasoning` 이다. 값이 없는 모델은 참으로 본다. 화면은 거짓인 모델에서 effort 를 고르지 못하게 한다 |
 | `reasoningEfforts` | `["low", "medium", "high", "xhigh", "max"]`. 고정이다 |
 
@@ -886,11 +890,16 @@ web 은 입력창 아래의 `chat/model-picker.tsx` 로 고른다.
 **저장보다 먼저 나간 목록 다시 읽기의 응답은 버린다.** 새 대화에서 고르면 빈 대화를 만들며 목록을 다시 읽는 요청과 저장이 함께 나가, 늦게 온 목록이 저장한 값을 덮을 수 있기 때문이다.
 `replace` 는 한 줄만 바꾸므로, 버린 응답이 있으면 목록을 한 번 더 읽어 다른 줄의 제목과 순서를 맞춘다.
 기존 대화는 목록에 그 줄이 오기 전까지 단추를 막는다(`Composer` 의 `modelChoiceUnknown`). 적힌 모델을 모르는 채 저장하면 그 모델을 지우기 때문이다.
-목록을 저장하지 않는 까닭과 기본값을 Hermes 에 두는 까닭은
+목록을 저장하지 않는 까닭은
 [ADR-030](adr/ADR-030-모델과-effort-는-대화가-고르고-기본값은-hermes-profile-이-갖는다.md) 에 있다.
+기본 모델과 숨김을 DB 에 두는 까닭은
+[ADR-054](adr/ADR-054-에이전트-기본-모델과-모델-숨김은-control-plane-db-가-갖는다.md) 에 있다.
 
-실행을 보낼 때 `chat/domain/ModelChoice` 가 대화에 적힌 세 값을 싣는다. 비어 있으면 `/v1/runs` 에 `provider`, `model` 을 빼고,
-effort 가 비어 있으면 `model_options` 를 뺀다. 보내기, 다시 생성, Memory 제안, 흐름의 하위 실행이 모두 같은 값을 쓴다.
+실행을 보낼 때 `chat/application/ModelTierService` 가 대화의 선택, 단계, 에이전트 기본 모델 차례로 세 값을 정하고 `chat/domain/ModelChoice` 에 담는다.
+모델이 비어 있으면 `/v1/runs` 에 `provider`, `model` 을 빼고,
+effort 가 비어 있으면 `model_options` 를 뺀다. 정한 모델이 숨긴 모델이면 제출하지 않고 `MODEL_HIDDEN` 으로 실패시킨다.
+Memory 제안은 원래 실행이 해석한 값을 받아 쓰고, 추천 질문은 대화가 없어 에이전트 기본 모델을 싣는다.
+보내기, 다시 생성, 흐름의 하위 실행이 모두 같은 해석을 쓴다.
 
 **대화 경로의 `{id}` 는 대화의 공개 식별자(UUID)다.** 대화 표의 번호가 아니다.
 응답에서 대화를 가리키는 칸도 모두 공개 식별자다. 대화 목록의 `id`, 보내기 응답과 사건의 `conversationId`,

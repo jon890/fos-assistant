@@ -15,8 +15,10 @@ import com.bifos.assistant.agent.domain.AgentVisibility;
 import com.bifos.assistant.agent.domain.CostMode;
 import com.bifos.assistant.agent.domain.CredentialScope;
 import com.bifos.assistant.agent.infra.AgentRepository;
+import com.bifos.assistant.chat.application.HiddenModels;
 import com.bifos.assistant.chat.application.ModelOptions;
 import com.bifos.assistant.chat.application.ModelOptionsService;
+import com.bifos.assistant.chat.application.ModelVisibilityService;
 import com.bifos.assistant.chat.domain.ModelChoice;
 import com.bifos.assistant.hermes.HermesModelClient;
 import com.bifos.assistant.hermes.dto.HermesModelCatalog;
@@ -50,13 +52,15 @@ class ModelOptionsServiceTest {
     private final CurrentUser dad = new CurrentUser(1L, "dad@example.com", "아빠", 1L, UserRole.MEMBER);
     private final HermesModelClient hermes = mock(HermesModelClient.class);
     private final AgentRepository agentRepository = mock(AgentRepository.class);
+    private final ModelVisibilityService visibility = mock(ModelVisibilityService.class);
     private final MutableClock clock = new MutableClock(Instant.parse("2026-01-01T00:00:00Z"));
 
     private ModelOptionsService service;
 
     @BeforeEach
     void setUp() {
-        service = new ModelOptionsService(new AgentService(agentRepository), hermes, TTL, clock);
+        when(visibility.hiddenFor(1L)).thenReturn(HiddenModels.none());
+        service = new ModelOptionsService(new AgentService(agentRepository), hermes, visibility, TTL, clock);
         agentOf("dad", "dad-profile", true);
         agentOf("kid", "kid-profile", true);
     }

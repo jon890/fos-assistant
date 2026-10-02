@@ -57,6 +57,8 @@ function effortSourceLabel(node: ExecutionTreeNode): string {
     return "미확인";
   if (node.reasoningEffortSource === "PROFILE_DEFAULT")
     return `기본값 ${node.reasoningEffort}`;
+  if (node.reasoningEffortSource === "AGENT_DEFAULT")
+    return `에이전트 기본값 ${node.reasoningEffort}`;
   if (node.reasoningEffortSource === "UNKNOWN") return "미확인";
   return `선택한 값 ${node.reasoningEffort}`;
 }

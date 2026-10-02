@@ -25,8 +25,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 import java.util.function.Predicate;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
@@ -45,6 +44,7 @@ import tools.jackson.databind.ObjectMapper;
  * 입력에 싣기 때문에 여기서 따로 읽어 넣지 않는다.
  */
 @Service
+@Slf4j
 public class StarterSuggestionService {
 
     /** 추천을 만드는 입력의 첫 줄. 가짜 Hermes 가 이 표지를 보고 답을 고른다. */
@@ -62,8 +62,6 @@ public class StarterSuggestionService {
     private static final String INVALID_OUTPUT = "STARTER_OUTPUT_INVALID";
     private static final String GENERATION_FAILED = "STARTER_GENERATION_FAILED";
 
-    private static final Logger log = LoggerFactory.getLogger(StarterSuggestionService.class);
-
     private final StarterProperties properties;
     private final AgentService agents;
     private final ConversationRepository conversations;
@@ -79,12 +77,10 @@ public class StarterSuggestionService {
     private final Map<Key, Instant> lastFailures = new ConcurrentHashMap<>();
 
     /** 캐시 키. 사용자마다 그 에이전트로 하는 일이 달라 둘을 함께 쓴다. */
-    private record Key(Long userId, Long agentId) {
-    }
+    private record Key(Long userId, Long agentId) {}
 
     /** 만든 추천과 만든 시각. */
-    private record Entry(List<String> prompts, Instant generatedAt) {
-    }
+    private record Entry(List<String> prompts, Instant generatedAt) {}
 
     @Autowired
     public StarterSuggestionService(
@@ -95,8 +91,16 @@ public class StarterSuggestionService {
             HermesRunsClient hermes,
             ExecutionRecorder executions,
             ObjectMapper objectMapper) {
-        this(properties, agents, conversations, messages, hermes, executions, objectMapper,
-                Clock.systemUTC(), Executors.newVirtualThreadPerTaskExecutor());
+        this(
+                properties,
+                agents,
+                conversations,
+                messages,
+                hermes,
+                executions,
+                objectMapper,
+                Clock.systemUTC(),
+                Executors.newVirtualThreadPerTaskExecutor());
     }
 
     /** 시각과 실행기를 바꿔 끼운다. 테스트가 시간을 옮기고 만들기가 끝나기를 기다릴 때 쓴다. */
@@ -204,14 +208,22 @@ public class StarterSuggestionService {
         try {
             String input = prompt(firstQuestions(user, agent));
             execution = executions.startDetached(user, agent);
-            HermesRunCommand command =
-                    new HermesRunCommand(agent.hermesProfile(), agent.apiBaseUrl(), input, null, null, null, null, null);
+            // 대화가 없는 실행이라 에이전트 기본 모델로 돈다. 비어 있으면 profile 의 값이다(ADR-054).
+            HermesRunCommand command = new HermesRunCommand(
+                    agent.hermesProfile(),
+                    agent.apiBaseUrl(),
+                    input,
+                    null,
+                    null,
+                    agent.defaultModelProvider(),
+                    agent.defaultModel(),
+                    agent.defaultReasoningEffort());
             String runId = hermes.submit(command);
             executions.attachRunId(execution, runId);
             HermesRunResult result = hermes.awaitCompletion(command, runId);
             if (!result.succeeded()) {
-                executions.fail(execution, result.providerBlocked()
-                        ? ErrorCode.PROVIDER_BLOCKED.name() : statusOf(result));
+                executions.fail(
+                        execution, result.providerBlocked() ? ErrorCode.PROVIDER_BLOCKED.name() : statusOf(result));
                 lastFailures.put(key, clock.instant());
                 return;
             }
@@ -261,8 +273,7 @@ public class StarterSuggestionService {
         if (questions.isEmpty()) {
             input.append("너의 성격과 쓸 수 있는 도구와 스킬로 이 사용자가 처음 해 볼 만한 요청 넷을 만든다.\n");
         } else {
-            input.append("사용자가 이 에이전트에게 최근에 처음 꺼낸 말들이다. ")
-                    .append("자주 하는 일을 묶어 다음에 바로 보낼 만한 요청 넷을 만든다.\n");
+            input.append("사용자가 이 에이전트에게 최근에 처음 꺼낸 말들이다. ").append("자주 하는 일을 묶어 다음에 바로 보낼 만한 요청 넷을 만든다.\n");
             for (String question : questions) {
                 input.append("- ").append(question).append('\n');
             }

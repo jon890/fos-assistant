@@ -31,7 +31,7 @@
 | [ADR-027](ADR-027-에이전트가-만든-html-은-대화별-폴더에-두고-스크립트-없이-보인다.md) | 에이전트가 만든 HTML 은 대화별 폴더에 두고 스크립트 없이 보인다 | Accepted |
 | [ADR-028](ADR-028-결과물은-사용자의-대화-폴더에-mcp-도구로-쓴다.md) | 결과물은 사용자의 대화 폴더에 MCP 도구로 쓴다 | Accepted |
 | [ADR-029](ADR-029-에이전트-도구는-control-plane-이-등급으로-판정하고-hermes-설정-api-로-쓴다.md) | 에이전트 도구는 Control Plane 이 등급으로 판정하고 Hermes 설정 API 로 쓴다 | Accepted. ADR-007 에 더한다 |
-| [ADR-030](ADR-030-모델과-effort-는-대화가-고르고-기본값은-hermes-profile-이-갖는다.md) | 모델과 effort 는 대화가 고르고 기본값은 Hermes profile 이 갖는다 | Accepted. ADR-007 의 모델 부분을 대체한다 |
+| [ADR-030](ADR-030-모델과-effort-는-대화가-고르고-기본값은-hermes-profile-이-갖는다.md) | 모델과 effort 는 대화가 고르고 기본값은 Hermes profile 이 갖는다 | Accepted. ADR-007 의 모델 부분을 대체한다. 기본값을 profile 에 두는 부분은 ADR-054 가 대체한다 |
 | [ADR-031](ADR-031-mcp-호출의-부모-실행은-profile-플러그인이-서명한-뿌리-session-으로-잇는다.md) | MCP 호출의 부모 실행은 profile 플러그인이 서명한 뿌리 session 으로 잇는다 | Accepted. ADR-017 의 부모 잇기를 정한다 |
 | [ADR-032](ADR-032-mcp-토큰은-profile-을-증명하고-실제-사용자는-부모-실행에서-정한다.md) | MCP 토큰은 profile 을 증명하고 실제 사용자는 부모 실행에서 정한다 | Accepted. ADR-003, ADR-017, ADR-028 의 요청자 판정과 ADR-031 의 일부를 대체한다 |
 | [ADR-033](ADR-033-사용자가-에이전트를-만들고-공개해도-만든-사람이-관리한다.md) | 사용자가 에이전트를 만들고, 공개해도 만든 사람이 관리한다 | Accepted |
@@ -55,3 +55,4 @@
 | [ADR-051](ADR-051-화면-색은-새벽-보라로-바꾸고-강조-색은-누를-것과-고른-것과-초점에만-쓴다.md) | 화면 색은 새벽 보라로 바꾸고 강조 색은 누를 것과 고른 것과 초점에만 쓴다 | Accepted. ADR-023 의 색 값 부분을 대체한다 |
 | [ADR-052](ADR-052-memory-는-collection-종류-꺼내는-방식-민감도-판-출처를-가진다.md) | Memory 는 collection, 종류, 꺼내는 방식, 민감도, 판, 출처를 가진다 | Accepted. ADR-015 의 `always_inject` 를 `retrieval` 로 넓힌다 |
 | [ADR-053](ADR-053-에이전트는-허용된-collection-의-memory-만-받는다.md) | 에이전트는 허용된 collection 의 Memory 만 받는다 | Accepted. ADR-012 가 기각한 에이전트별 구분을 뒤집는다 |
+| [ADR-054](ADR-054-에이전트-기본-모델과-모델-숨김은-control-plane-db-가-갖는다.md) | 에이전트 기본 모델과 모델 숨김은 Control Plane DB 가 갖는다 | Accepted. ADR-030 의 「기본값은 Hermes profile 이 갖는다」 를 대체한다 |

@@ -135,6 +135,12 @@ public enum ErrorCode {
      */
     SKILL_COMMAND_UNKNOWN(HttpStatus.BAD_REQUEST),
     VALIDATION_FAILED(HttpStatus.BAD_REQUEST),
+    /**
+     * 그룹이 숨긴 provider 나 모델을 고르거나 그것으로 실행하려 했다. 다른 모델로 바꾸지 않는다(ADR-054).
+     *
+     * <p>실행 줄에 남는 이름이기도 하다.
+     */
+    MODEL_HIDDEN(HttpStatus.CONFLICT),
     /** 커넥터의 확인 도구가 입력한 값을 거절했다. 공통 어휘 {@code credential_rejected} 다(ADR-043). */
     CONNECTOR_CREDENTIAL_REJECTED(HttpStatus.BAD_REQUEST),
     /** 입력한 값으로는 그 대상에 접근할 수 없다. 공통 어휘 {@code forbidden} 이다. */
