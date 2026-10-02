@@ -10,7 +10,7 @@ import org.springframework.validation.annotation.Validated;
 /**
  * 민감 Memory 본문을 암호화하는 key 설정이다(ADR-055).
  *
- * <p>둘 다 비우면 암호화가 꺼진다. 기동은 되고 민감 항목의 저장과 읽기만 거절한다.
+ * <p>둘 다 비우면 암호화가 꺼진다. 기동은 되고 민감 항목의 저장과 수정, 암호화한 줄의 읽기만 거절한다.
  * 한쪽만 비었거나 모양이 틀리면 기동에서 멈춘다. 예외 메시지에 key 값을 넣지 않는다.
  *
  * @param activeKeyId 새로 쓸 때 쓰는 key 의 id

@@ -37,26 +37,34 @@ public class MemoryContentBackfill implements ApplicationRunner {
     /** @return 암호화한 줄 수. key 가 없으면 0 이다 */
     @Transactional
     public int sealPlaintext() {
-        List<Memory> memoryRows = memories.findBySensitivityAndContentKeyIdIsNull(MemorySensitivity.SENSITIVE);
+        List<Long> memoryIds = memories.findIdsBySensitivityAndContentKeyIdIsNull(MemorySensitivity.SENSITIVE);
         List<MemoryRevision> revisionRows =
                 revisions.findBySensitivityAndContentKeyIdIsNull(MemorySensitivity.SENSITIVE);
         if (!cipher.enabled()) {
-            if (!memoryRows.isEmpty() || !revisionRows.isEmpty()) {
-                log.warn("평문으로 남은 민감 줄이 있다 memory={} revision={}", memoryRows.size(), revisionRows.size());
+            if (!memoryIds.isEmpty() || !revisionRows.isEmpty()) {
+                log.warn("평문으로 남은 민감 줄이 있다 memory={} revision={}", memoryIds.size(), revisionRows.size());
             }
             return 0;
         }
-        for (Memory row : memoryRows) {
+        int sealedMemories = 0;
+        for (Long id : memoryIds) {
+            // 번호를 읽은 뒤 사용자가 고쳤거나 다른 곳이 먼저 암호화했을 수 있어 잠가 다시 읽고 확인한다
+            Memory row = memories.findByIdForUpdate(id).orElse(null);
+            if (row == null || row.sensitivity() != MemorySensitivity.SENSITIVE || row.sealed()) {
+                continue;
+            }
             row.sealInPlace(cipher.seal(row.content(), row.contentBinding()));
             memories.save(row);
+            sealedMemories++;
         }
+        // memory_revision 은 판을 남긴 뒤 고치는 길이 없어 잠그지 않는다. 쓰는 곳은 이 보정뿐이다
         for (MemoryRevision row : revisionRows) {
             row.sealInPlace(cipher.seal(row.content(), row.contentBinding()));
             revisions.save(row);
         }
-        int sealed = memoryRows.size() + revisionRows.size();
+        int sealed = sealedMemories + revisionRows.size();
         if (sealed > 0) {
-            log.info("평문으로 남은 민감 줄을 암호화했다 memory={} revision={}", memoryRows.size(), revisionRows.size());
+            log.info("평문으로 남은 민감 줄을 암호화했다 memory={} revision={}", sealedMemories, revisionRows.size());
         }
         return sealed;
     }
