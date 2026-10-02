@@ -11,7 +11,7 @@ import com.bifos.assistant.agent.domain.type.CredentialScope;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
-import com.bifos.assistant.user.domain.type.UserRole;
+import com.bifos.assistant.shared.domain.type.UserRole;
 import java.time.Instant;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;

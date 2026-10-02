@@ -48,7 +48,7 @@ import com.bifos.assistant.usage.infra.AgentExecutionRepository;
 import com.bifos.assistant.usage.infra.ExecutionEventRepository;
 import com.bifos.assistant.user.application.UserDisplayNameService;
 import com.bifos.assistant.user.domain.AppUser;
-import com.bifos.assistant.user.domain.type.UserRole;
+import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.user.infra.AppUserRepository;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;

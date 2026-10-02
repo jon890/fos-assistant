@@ -36,7 +36,7 @@ import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.user.domain.AppUser;
-import com.bifos.assistant.user.domain.type.UserRole;
+import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.user.infra.AppUserRepository;
 import java.util.List;
 import java.util.Map;

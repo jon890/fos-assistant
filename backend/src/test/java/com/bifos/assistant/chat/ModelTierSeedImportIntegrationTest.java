@@ -7,7 +7,7 @@ import com.bifos.assistant.chat.domain.ModelTierDefinition;
 import com.bifos.assistant.chat.domain.type.ModelTier;
 import com.bifos.assistant.chat.infra.ModelTierDefinitionRepository;
 import com.bifos.assistant.user.domain.AppUser;
-import com.bifos.assistant.user.domain.type.UserRole;
+import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.user.infra.AppUserRepository;
 import java.time.Instant;
 import java.util.List;

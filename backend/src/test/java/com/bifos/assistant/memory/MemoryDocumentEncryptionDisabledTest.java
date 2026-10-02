@@ -11,7 +11,7 @@ import com.bifos.assistant.memory.infra.MemoryRevisionRepository;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
-import com.bifos.assistant.user.domain.type.UserRole;
+import com.bifos.assistant.shared.domain.type.UserRole;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;

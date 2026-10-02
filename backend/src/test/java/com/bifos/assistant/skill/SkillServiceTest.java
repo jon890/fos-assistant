@@ -40,7 +40,7 @@ import com.bifos.assistant.skill.application.SkillsChanged;
 import com.bifos.assistant.skill.domain.SkillBundle;
 import com.bifos.assistant.skill.domain.SkillFile;
 import com.bifos.assistant.skill.infra.SkillStore;
-import com.bifos.assistant.user.domain.type.UserRole;
+import com.bifos.assistant.shared.domain.type.UserRole;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;

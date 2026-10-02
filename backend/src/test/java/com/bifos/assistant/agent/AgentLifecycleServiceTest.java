@@ -30,7 +30,7 @@ import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.skill.domain.SkillBundle;
 import com.bifos.assistant.skill.infra.SkillStore;
 import com.bifos.assistant.user.domain.AppUser;
-import com.bifos.assistant.user.domain.type.UserRole;
+import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.user.infra.AppUserRepository;
 import java.nio.file.Path;
 import java.time.Instant;

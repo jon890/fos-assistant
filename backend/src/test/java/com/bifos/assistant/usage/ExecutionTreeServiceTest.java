@@ -29,7 +29,7 @@ import com.bifos.assistant.usage.domain.type.ExecutionStatus;
 import com.bifos.assistant.usage.domain.type.ReasoningEffortSource;
 import com.bifos.assistant.usage.infra.AgentExecutionRepository;
 import com.bifos.assistant.usage.infra.ExecutionEventRepository;
-import com.bifos.assistant.user.domain.type.UserRole;
+import com.bifos.assistant.shared.domain.type.UserRole;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;

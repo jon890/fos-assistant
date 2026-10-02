@@ -9,7 +9,7 @@ import com.bifos.assistant.chat.domain.type.MessageRole;
 import com.bifos.assistant.skill.domain.type.SkillUseSource;
 import com.bifos.assistant.usage.domain.type.ExecutionEventType;
 import com.bifos.assistant.usage.domain.type.ExecutionStatus;
-import com.bifos.assistant.user.domain.type.UserRole;
+import com.bifos.assistant.shared.domain.type.UserRole;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;

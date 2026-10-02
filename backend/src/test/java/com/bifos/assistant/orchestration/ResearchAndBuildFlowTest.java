@@ -42,7 +42,7 @@ import com.bifos.assistant.usage.infra.ExecutionEventRepository;
 import com.bifos.assistant.usage.presentation.UsageController;
 import com.bifos.assistant.usage.presentation.UsageDtos.ExecutionView;
 import com.bifos.assistant.user.domain.AppUser;
-import com.bifos.assistant.user.domain.type.UserRole;
+import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.user.infra.AppUserRepository;
 import java.net.URISyntaxException;
 import java.nio.file.Path;

@@ -77,6 +77,8 @@ backend 와 web 을 함께 검사하려면 저장소 root 에서 `scripts/qualit
 앞의 둘 가운데 저장되는 쪽만 `ENUMERATED_FIELDS_USE_DOMAIN_TYPE` 이 검사한다.
 저장되지 않는 enum 과 `ErrorCode` 는 규칙으로 검사하지 않는다. 리뷰에서 본다.
 
+`UserRole` 은 `shared.domain.type` 에 둔다. `shared.auth.CurrentUser` 가 읽는 값이라 `user` 에 두면 `shared` 가 `user` 를 쓰게 된다(ADR-068).
+
 ### 기준 파일
 
 기준 파일을 갱신하거나 규칙을 뺄 때는 [`../docs/backend/quality.md`](../docs/backend/quality.md) 를 읽는다.

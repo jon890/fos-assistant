@@ -21,7 +21,7 @@ import com.bifos.assistant.usage.domain.MonthlyCost;
 import com.bifos.assistant.usage.domain.MonthlyCostDetail;
 import com.bifos.assistant.usage.domain.type.ExecutionStatus;
 import com.bifos.assistant.usage.infra.AgentExecutionRepository;
-import com.bifos.assistant.user.domain.type.UserRole;
+import com.bifos.assistant.shared.domain.type.UserRole;
 import java.io.IOException;
 import java.net.URISyntaxException;
 import java.nio.file.Files;
