@@ -7,8 +7,11 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
+import lombok.AccessLevel;
+import lombok.NoArgsConstructor;
 
 /** 에이전트가 쓸 수 있는 toolset과 변경 권한을 한곳에서 판정한다. */
+@NoArgsConstructor(access = AccessLevel.PRIVATE)
 public final class AgentToolPolicy {
 
     public static final String MEMORY = "memory";
@@ -47,8 +50,6 @@ public final class AgentToolPolicy {
         names.addAll(ADMIN_TOOLSETS);
         CONFIGURABLE_TOOLSETS = Set.copyOf(names);
     }
-
-    private AgentToolPolicy() {}
 
     public enum Tier {
         OWNER,

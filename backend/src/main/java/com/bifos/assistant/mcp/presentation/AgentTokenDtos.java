@@ -5,10 +5,11 @@ import com.bifos.assistant.mcp.domain.AgentToken;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 import java.time.Instant;
+import lombok.AccessLevel;
+import lombok.NoArgsConstructor;
 
+@NoArgsConstructor(access = AccessLevel.PRIVATE)
 public final class AgentTokenDtos {
-    private AgentTokenDtos() {}
-
     /** 토큰은 profile 로만 발급한다. 사용자로 발급하는 길은 없다(ADR-032). */
     public record IssueRequest(
             @NotBlank @Size(max = 64) String profileName,

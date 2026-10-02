@@ -1,11 +1,12 @@
 package com.bifos.assistant.mcp.presentation;
 
+import lombok.AccessLevel;
+import lombok.NoArgsConstructor;
 import tools.jackson.databind.JsonNode;
 
 /** MCP 도구가 받는 JSON 인자 모양과 하위 에이전트 session 등록의 응답 모양을 한곳에 둔다. */
+@NoArgsConstructor(access = AccessLevel.PRIVATE)
 public final class McpDtos {
-    private McpDtos() {}
-
     public record MemoryReadArguments(Long id) {}
 
     public record ArtifactWriteArguments(String conversationId, String path, String content, String sourceUrl) {

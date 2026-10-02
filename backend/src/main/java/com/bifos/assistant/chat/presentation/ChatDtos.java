@@ -24,10 +24,11 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import lombok.AccessLevel;
+import lombok.NoArgsConstructor;
 
+@NoArgsConstructor(access = AccessLevel.PRIVATE)
 public final class ChatDtos {
-
-    private ChatDtos() {}
 
     /**
      * @param conversationId 이어 쓸 대화의 공개 식별자. 없으면 새 대화를 만든다
