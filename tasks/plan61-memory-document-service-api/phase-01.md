@@ -11,7 +11,7 @@
 
 ## Blocked 조건
 
-- `backend/src/main/java/com/bifos/assistant/memory/application/MemoryContentCipher.java` 가 없다 → `PHASE_BLOCKED: plan60 이 머지되지 않았다` 출력 후 종료
+- `backend/src/main/java/com/bifos/assistant/memory/application/MemoryContentCipher.java` 가 없다 → `PHASE_BLOCKED: 민감 본문 암호화가 없다` 출력 후 종료
 
 ## 컨텍스트
 
@@ -84,12 +84,13 @@ Optional<Memory> findByScopeAndOwnerUserIdAndCollectionAndDocumentKey(
 1. `documentKey` 가 `[a-z0-9][a-z0-9-]{0,127}` 이 아니면 `VALIDATION_FAILED`
 2. `collection` 이 `collectionsFor(user)` 의 key 에 없으면 `VALIDATION_FAILED`
 3. `findByScopeAndOwnerUserIdAndCollectionAndDocumentKey(USER, user.id(), collection, documentKey)` 가 있으면 `MEMORY_DOCUMENT_EXISTS`
-4. 본문을 plan60 의 private `stored(content, sensitivity, "USER:" + user.id())` 로 바꾼다. key 가 없고 민감 문서면 여기서 `MEMORY_ENCRYPTION_UNAVAILABLE` 이 난다
+4. 본문을 private `stored(content, sensitivity, "USER:" + user.id())` 로 바꾼다. key 가 없고 민감 문서면 여기서 `MEMORY_ENCRYPTION_UNAVAILABLE` 이 난다
 5. `memories.saveAndFlush(Memory.document(...))`. `DataIntegrityViolationException` 이 나면 `MEMORY_DOCUMENT_EXISTS` 로 바꿔 던진다. 두 요청이 3번을 함께 지난 경우다
 
 기존 메서드를 고친다.
 
 - `readableBy(user)`: 종류가 `MEMORY` 인 줄만 낸다. `MemoryQueries` 에 `listedFor(Long userId, Long groupId)` 를 더해 `readable(...)` 조건에 `entryType == MemoryEntryType.MEMORY` 를 `and` 로 묶고, `readableBy` 가 그것을 쓴다. Javadoc 을 「문서는 문서 API 가 따로 낸다(ADR-057)」 로 고친다
+- `update(user, id, content, boolean alwaysInject)` 는 민감 항목을 이미 `MEMORY_SENSITIVE_NOT_EDITABLE` 로 거절한다(ADR-055). 문서 검사를 그 앞에 둔다. 민감 문서도 이 경로에서는 `MEMORY_NOT_FOUND` 다
 - `accept`, `reject`, `update(user, id, content, boolean alwaysInject)`, `update(user, id, content, retrieval, sensitivity)` 넷: `requireWritableForUpdate` 로 잠근 항목의 종류가 `MEMORY` 가 아니면 `notFound()`. 넷이 함께 쓰는 private 메서드 하나로 둔다. 막지 않으면 주인이 `POST /api/v1/memories/{id}/reject` 로 문서를 `REJECTED` 로 만들 수 있다
 - `delete` 는 그대로 둔다. 문서도 이 경로로 지운다
 
@@ -149,7 +150,7 @@ public record CollectionView(String key, String displayName) {}
 | `documentKey` 가 `Application_Profile` | `VALIDATION_FAILED` |
 | `collection` 이 `no-such-area` | `VALIDATION_FAILED` |
 | 문서를 만든 뒤 `MemoryController.readable()` | 그 문서가 없다 |
-| 문서 번호로 `MemoryService.update(dad, id, "x", true)` | `MEMORY_NOT_FOUND`. 문서의 `retrieval` 이 `SEARCH` 그대로다 |
+| 문서 번호로 `MemoryService.update(dad, id, "x", true)` | `MEMORY_NOT_FOUND`. 문서의 `retrieval` 이 `SEARCH` 그대로다. 민감 문서와 일반 문서 둘 다 본다 |
 | 문서 번호로 `MemoryService.reject(dad, id)` 와 `accept(dad, id)` | 둘 다 `MEMORY_NOT_FOUND`. 문서의 `status` 가 `ACCEPTED` 그대로다 |
 | 문서를 `MemoryService.delete` 로 지운 뒤 같은 이름으로 다시 만든다 | 된다. 지운 문서의 `DELETED` 판 `content` 가 표식을 담지 않는다 |
 | `GET /api/v1/memory-collections` 에 해당하는 메서드 | `identity` 가 들어 있다 |

@@ -20,6 +20,7 @@ import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.user.domain.UserRole;
 import java.util.List;
+import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -115,7 +116,9 @@ class MemoryEncryptionDisabledTest {
     @Test
     @DisplayName("일반 항목을 민감으로 고치려 하면 거절되고 본문과 민감도와 판이 그대로다")
     void normalToSensitiveIsRejected() {
-        Memory memory = memories.create(ADMIN, MemoryScope.USER, "일반", PLAIN, false);
+        Memory memory = memories.create(ADMIN, MemoryScope.USER, "일반", "처음 글", false);
+        // 평문 판 1 을 먼저 둔다. 거절된 수정이 앞선 판도 건드리지 않는지 본다
+        memories.update(ADMIN, memory.id(), PLAIN, false);
 
         assertUnavailable(
                 () -> memories.update(ADMIN, memory.id(), PLAIN, MemoryRetrieval.SEARCH, MemorySensitivity.SENSITIVE));
@@ -123,8 +126,13 @@ class MemoryEncryptionDisabledTest {
         Memory current = repository.findById(memory.id()).orElseThrow();
         assertThat(current.content()).isEqualTo(PLAIN);
         assertThat(current.sensitivity()).isEqualTo(MemorySensitivity.NORMAL);
-        assertThat(current.revision()).isEqualTo(1);
-        assertThat(count("memory_revision")).isZero();
+        assertThat(current.revision()).isEqualTo(2);
+        assertThat(count("memory_revision")).isEqualTo(1);
+        Map<String, Object> revision = jdbc.queryForMap(
+                "SELECT content, content_key_id FROM memory_revision WHERE memory_id = ? AND revision = 1",
+                memory.id());
+        assertThat(revision.get("CONTENT")).isEqualTo("처음 글");
+        assertThat(revision.get("CONTENT_KEY_ID")).isNull();
     }
 
     @Test

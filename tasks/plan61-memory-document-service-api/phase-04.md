@@ -13,7 +13,8 @@
 
 - e2e 는 `test/e2e/run.ts` 가 backend 를 띄우고 `test/e2e/scenarios/` 의 시나리오를 차례로 돌린다. backend 의 환경 변수는 `run.ts` 의 `env: { ...process.env, ... ASSISTANT_JWT_SECRET: JWT_SECRET, ... }` 블록에서 준다. **지금은 암호화 key 를 주지 않는다.** 민감 문서를 만들려면 더해야 한다
 - 시나리오의 선례는 `test/e2e/scenarios/memory.ts` 다. `import { call, expect, expectStatus, step, type Scenario } from "../harness.ts";` 를 쓴다. `call(context, path, { method, token, body })` 는 `${context.api}${path}` 를 부르고 `token` 을 `Authorization: Bearer` 로 싣는다. `context.api` 가 어디까지인지는 `test/e2e/harness.ts` 를 읽어 확인한다. `memory.ts` 는 `/memories` 로 부른다
-- 사용자 토큰은 `context.tokens.dad` 와 `context.tokens.kid` 다
+- 사용자 토큰은 `context.tokens.dad`, `context.tokens.kid`, `context.tokens.aunt` 다. dad 와 kid 는 허용 목록에 없이 토큰만 만들어 들어온다. **aunt 는 `test/e2e/scenarios/people.ts` 가 허용 목록에 더한 사용자다.** 서비스 토큰은 주인이 허용 목록에 켜져 있어야 통하므로(ADR-056) 이 시나리오의 문서와 토큰의 주인은 aunt 다
+- `people.ts` 는 aunt 를 껐다가 다시 켠 채로 끝난다. 사람의 번호는 `GET /admin/people` 을 dad 의 토큰으로 불러 `NEW_PERSON.email` 로 찾는다. `NEW_PERSON` 은 `people.ts` 가 내보낸다
 - 시나리오는 `run.ts` 의 `SCENARIOS` 배열에 넣은 순서로 돈다. 뒤 시나리오가 앞 시나리오의 데이터에 걸리므로 넣는 자리를 고른다
 - phase 01~03 이 만든 경로
   - `POST /api/v1/memory-documents`, `GET /api/v1/memory-documents`, `GET /api/v1/memory-documents/{id}`, `PUT /api/v1/memory-documents/{id}`, `GET /api/v1/memory-collections`
@@ -55,25 +56,29 @@ backend 를 띄우는 `env` 블록의 `ASSISTANT_JWT_SECRET` 아래에 더한다
 
 | step | 하는 일 | 기대 |
 | --- | --- | --- |
-| collection 목록에 `identity` 가 있다 | dad 가 `/memory-collections` | 200. key 에 `identity` 가 있다 |
-| 민감 문서를 만든다 | dad 가 `/memory-documents` 에 `{collection: "identity", documentKey, title: "지원서 공통 프로필", content: "평문-표식-7391", sensitive: true}` | 200. `revision` 이 1, `sensitive` 가 참 |
+| collection 목록에 `identity` 가 있다 | aunt 가 `/memory-collections` | 200. key 에 `identity` 가 있다 |
+| 민감 문서를 만든다 | aunt 가 `/memory-documents` 에 `{collection: "identity", documentKey, title: "지원서 공통 프로필", content: "평문-표식-7391", sensitive: true}` | 200. `revision` 이 1, `sensitive` 가 참 |
 | 같은 이름으로 다시 만들지 못한다 | 같은 요청 | 409, 코드 `MEMORY_DOCUMENT_EXISTS` |
-| 문서는 Memory 목록에 없다 | dad 가 `/memories` | 그 문서의 `id` 가 없다 |
+| 문서는 Memory 목록에 없다 | aunt 가 `/memories` | 그 문서의 `id` 가 없다 |
 | 다른 사용자는 읽지 못한다 | kid 가 `/memory-documents/{id}` | 404 |
-| 토큰을 발급한다 | dad 가 `/service-tokens` 에 `{label: "e2e", expiresInDays: 90, collections: [{collection: "identity", allowSensitive: true}]}` | 200. `token` 이 `fos_svc_` 로 시작한다. `info.expiresAt` 이 있다 |
-| 토큰 목록에 원문이 없다 | dad 가 `/service-tokens` | 응답 본문이 원문을 담지 않는다 |
+| 만료 없이는 발급하지 못한다 | aunt 가 `/service-tokens` 에 `expiresInDays` 없이 보낸다 | 400, 코드 `VALIDATION_FAILED` |
+| 토큰을 발급한다 | aunt 가 `/service-tokens` 에 `{label: "e2e", expiresInDays: 90, collections: [{collection: "identity", allowSensitive: true}]}` | 200. `token` 이 `fos_svc_` 로 시작한다. `info.expiresAt` 이 있다 |
+| 토큰 목록에 원문이 없다 | aunt 가 `/service-tokens` | 응답 본문이 원문을 담지 않는다 |
 | 토큰으로 읽는다 | 서비스 토큰으로 `/service/memory-documents/identity/{documentKey}` | 200. `content` 가 `평문-표식-7391`, `revision` 이 1 |
-| 고친 뒤 판 번호가 오른다 | dad 가 `PUT /memory-documents/{id}` 에 `{content: "평문-표식-8802", sensitive: true, expectedRevision: 1}` 뒤 서비스 토큰으로 다시 읽는다 | `revision` 이 2, `content` 가 `평문-표식-8802` |
-| 낡은 판 번호는 거절한다 | dad 가 `expectedRevision: 1` 로 한 번 더 고친다 | 409, 코드 `MEMORY_REVISION_CONFLICT` |
-| 민감 허용이 없는 토큰은 읽지 못한다 | dad 가 `allowSensitive: false` 로 발급한 토큰으로 읽는다 | 404 |
+| 고친 뒤 판 번호가 오른다 | aunt 가 `PUT /memory-documents/{id}` 에 `{content: "평문-표식-8802", sensitive: true, expectedRevision: 1}` 뒤 서비스 토큰으로 다시 읽는다 | `revision` 이 2, `content` 가 `평문-표식-8802` |
+| 낡은 판 번호는 거절한다 | aunt 가 `expectedRevision: 1` 로 한 번 더 고친다 | 409, 코드 `MEMORY_REVISION_CONFLICT` |
+| 민감 허용이 없는 토큰은 읽지 못한다 | aunt 가 `allowSensitive: false` 로 발급한 토큰으로 읽는다 | 404 |
 | 토큰 없이는 읽지 못한다 | `token` 없이 부른다 | 401 |
 | 서비스 토큰은 사용자 API 를 열지 못한다 | 서비스 토큰으로 `/memories` | 403. `test/e2e/scenarios/auth.ts` 가 서명이 틀린 토큰에 기대하는 값과 같다 |
-| 폐기한 토큰은 읽지 못한다 | dad 가 `DELETE /service-tokens/{id}` 뒤 그 토큰으로 읽는다 | 401 |
-| 뒤 시나리오에 남기지 않는다 | dad 가 `DELETE /memories/{id}` 로 문서를 지운다 | 200 |
+| 폐기한 토큰은 읽지 못한다 | aunt 가 `DELETE /service-tokens/{id}` 뒤 그 토큰으로 읽는다 | 401 |
+| 허용 목록에 없는 사용자의 토큰은 읽지 못한다 | dad 가 자기 문서를 만들고 토큰을 발급해 읽는다 | 발급은 200 이고 읽기는 401 이다 |
+| 사용자를 끄면 그 토큰이 죽는다 | aunt 가 토큰을 새로 발급해 200 을 본 뒤, dad 가 `PATCH /admin/people/{id}` 에 `{enabled: false}` 를 보내고 그 토큰으로 읽는다 | 401 이고 본문이 없다 |
+| 다시 켜도 되살아나지 않는다 | dad 가 `{enabled: true}` 를 보낸 뒤 같은 토큰으로 읽는다. aunt 가 `/service-tokens` 를 본다 | 401. 목록의 그 토큰에 `revokedAt` 이 있다 |
+| 뒤 시나리오에 남기지 않는다 | aunt 와 dad 가 `DELETE /memories/{id}` 로 문서를 지운다. aunt 는 켜진 채로 둔다 | 200 |
 
 ### 3. `test/e2e/run.ts` 에 등록
 
-`memoryDocumentScenario` 를 import 하고 `SCENARIOS` 의 `memoryScenario` 바로 뒤에 넣는다.
+`memoryDocumentScenario` 를 import 하고 `SCENARIOS` 의 `peopleScenario` 뒤에 넣는다. aunt 가 허용 목록에 들어온 뒤라야 한다.
 이 시나리오는 대화 turn 을 돌리지 않고 에이전트를 만들지 않는다. 문서를 지우고 끝나므로 Memory 주입과 사용량을 세는 뒤 시나리오에 걸리지 않는다.
 돌려 보아 뒤 시나리오가 실패하면, 실패한 단언이 무엇을 세는지 읽고 자리를 옮긴다. 옮긴 까닭을 배열의 주석으로 남긴다.
 
@@ -82,6 +87,7 @@ backend 를 띄우는 `env` 블록의 `ASSISTANT_JWT_SECRET` 아래에 더한다
 - 패키지 표의 `memory` 줄에 「문서 쓰기와 고치기, 서비스 토큰, 다른 서비스의 문서 읽기」 를 더한다
 - 「Memory」 절에 아래 뜻을 더한다. 문장은 그 절의 문체에 맞춘다
   - 문서(`DOCUMENT`)는 사용자가 직접 쓰고 고친다. 곧 `ACCEPTED` 이고 꺼내는 방식은 `SEARCH` 다. Memory 목록과 `PATCH /api/v1/memories/{id}` 는 문서를 다루지 않는다
+  - 서비스 토큰은 만료가 필수이고(1일에서 365일), 주인이 허용 목록에 켜져 있을 때만 통한다. 인증마다 `shared.auth.UserAccessPolicy` 로 묻고 `people.application.AllowedUserAccessPolicy` 가 로그인 판정과 같은 답을 낸다. 관리자가 사용자를 끄면 `PeopleAdminController` 가 `shared.auth.UserAccessRevoked` 를 내고 `ServiceTokenService` 가 그 사용자의 토큰을 모두 폐기한다. `memory` 가 `people` 을 import 하지 않게 하려고 두 타입을 `shared.auth` 에 둔다
   - 다른 서비스는 서비스 토큰으로 `GET /api/v1/service/memory-documents/{collection}/{documentKey}` 를 부른다. 요청자는 토큰이 묶인 사용자이고, 판정은 「에이전트의 실행에 보이는 항목」 의 세 조건과 같다. collection 과 민감 허용은 `service_token_collection` 이 정한다
   - 이 경로의 인증은 `memory.presentation.ServiceTokenInterceptor` 가 한다. `SecurityConfig` 는 그 경로를 `permitAll` 로 열고 `ControlPlaneJwtFilter` 는 건너뛴다. `shared` 가 `memory` 를 쓰지 않게 하기 위해서다
 - 클래스 표에 `memory.application.ServiceTokenService`, `memory.presentation.ServiceTokenInterceptor`, `memory.presentation.MemoryDocumentController`, `memory.presentation.MemoryDocumentServiceController` 를 더한다
@@ -95,14 +101,16 @@ backend 를 띄우는 `env` 블록의 `ASSISTANT_JWT_SECRET` 아래에 더한다
 - 「agent_token」 절 다음에 「service_token」 과 「service_token_collection」 절을 더한다. 칸 표는 `V54__service_token.sql` 과 같게 적는다. 아래 뜻을 담는다
   - 원문은 발급 응답에서 한 번만 내고 해시만 저장한다
   - **`agent_token` 과 달리 사용자 한 사람에 묶인다.** 그 사용자 본인만 발급하고 폐기한다
-  - `expires_at` 이 비어 있으면 만료가 없다. 폐기는 줄을 지우지 않는다
+  - `expires_at` 은 늘 있다. 발급할 때 1일에서 365일 사이로 정한다. 폐기는 줄을 지우지 않는다
+  - 허용 목록에서 사용자를 끄면 그 사용자의 토큰에 모두 `revoked_at` 을 적는다. 다시 켜도 지우지 않는다
   - 근거는 ADR-056 다
-- 「지울 때」 에 한 문장을 더한다: 서비스 토큰은 폐기해도 줄이 남는다
+- 「지울 때」 에 한 문장을 더한다: 서비스 토큰은 폐기해도 줄이 남는다. 같은 절의 「허용 목록에서 빼는 것도 지우지 않고 `enabled` 를 내린다」 뒤에 「그 사람의 서비스 토큰은 모두 폐기한다」 를 더한다
 
 ### 6. `docs/flow.md`
 
-- 「두 방향과 두 토큰」 의 토큰 표에 줄을 더한다: ④ | 다른 서비스 → Control Plane | 서비스 토큰 | 이 요청이 어느 사용자의 문서를 읽을 수 있다. 그 아래 「①은 사용자를 정하고 ③은 profile 만 정한다」 뒤에 「④는 사용자 한 사람과 받는 collection 을 정한다. 실행 없이 읽는 유일한 길이다」 를 더한다. 그 절의 mermaid 그림에는 손대지 않는다
-- 「Memory 본문을 읽는 길」 의 「이 왕복은 비싸다」 앞에 「### 다른 서비스가 문서를 읽을 때」 를 더한다. mermaid `sequenceDiagram` 하나(참가자: 다른 서비스, Control Plane, 데이터베이스. 토큰 인증, 문서 조회와 세 조건 판정, 민감 문서 복호화, 본문과 판 번호 응답)와 「갈리는 지점」 표를 둔다. 표의 줄은 ADR-056 의 「적용 범위」 첫 표와 같게 한다
+- 「두 방향과 두 토큰」 의 토큰 표에 줄을 더한다: ④ | 다른 서비스 → Control Plane | 서비스 토큰 | 이 요청이 어느 사용자의 문서를 읽을 수 있다. 그 아래 「①은 사용자를 정하고 ③은 profile 만 정한다」 뒤에 「④는 사용자 한 사람과 받는 collection 을 정한다. 실행 없이 읽는 유일한 길이다. 그 사용자가 허용 목록에서 꺼지면 통하지 않는다」 를 더한다. 그 절의 mermaid 그림에는 손대지 않는다
+- 「Memory 본문을 읽는 길」 의 「이 왕복은 비싸다」 앞에 「### 다른 서비스가 문서를 읽을 때」 를 더한다. mermaid `sequenceDiagram` 하나(참가자: 다른 서비스, Control Plane, 데이터베이스. 토큰 인증, 주인의 허용 여부 확인, 문서 조회와 세 조건 판정, 민감 문서 복호화, 본문과 판 번호 응답)와 「갈리는 지점」 표를 둔다. 표의 줄은 ADR-056 의 「적용 범위」 첫 표와 같게 한다
+- 「다른 서비스가 문서를 읽을 때」 의 「갈리는 지점」 표 아래에 「관리자가 허용 목록에서 사용자를 끄면 그 사람의 서비스 토큰을 모두 폐기한다. 다시 켜도 되살아나지 않는다(ADR-056)」 를 적는다. 「사람을 더할 때」 절은 사용자를 끄는 흐름을 다루지 않으므로 고치지 않는다
 
 ### 7. 루트 `AGENTS.md`
 
