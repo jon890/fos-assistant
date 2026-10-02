@@ -150,12 +150,11 @@ public class ChatController {
     /** 대화 목록을 최근에 바뀐 것부터 한 쪽 돌려준다. 다음 쪽은 {@code nextCursor} 를 {@code cursor} 로 넘겨 읽는다. */
     @GetMapping("/conversations")
     public ConversationPageView conversations(
-            @RequestParam(required = false) String cursor,
-            @RequestParam(defaultValue = "30") int limit) {
+            @RequestParam(required = false) String cursor, @RequestParam(defaultValue = "30") int limit) {
         ConversationPage page = chat.conversationsOf(currentUser.require(), cursor, limit);
         // 목록은 에이전트를 줄마다 읽지 않고 한 번에 읽는다. 행이 없는 줄은 에이전트 칸만 비운다.
-        Map<Long, Agent> byId = agents.byIds(
-                page.items().stream().map(Conversation::agentId).toList());
+        Map<Long, Agent> byId =
+                agents.byIds(page.items().stream().map(Conversation::agentId).toList());
         return new ConversationPageView(
                 page.items().stream()
                         .map(conversation -> viewOf(conversation, byId.get(conversation.agentId())))

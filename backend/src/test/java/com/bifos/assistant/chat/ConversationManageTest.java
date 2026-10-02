@@ -234,8 +234,8 @@ class ConversationManageTest {
                 "example-model-large",
                 "anthropic",
                 TokenUsage.empty()));
-        stub().beforeAwait(() ->
-                chat.rename(dad, chat.conversationsOf(dad, null, 100).items().getFirst().id(), "바뀐 이름"));
+        stub().beforeAwait(() -> chat.rename(
+                dad, chat.conversationsOf(dad, null, 100).items().getFirst().id(), "바뀐 이름"));
         Long renamedId = chat.send(dad, null, "다른 질문", "manage-dad").conversationId();
         assertThat(conversations.findById(renamedId).orElseThrow().title()).isEqualTo("바뀐 이름");
         assertThat(conversations.findById(renamedId).orElseThrow().hermesSessionId())

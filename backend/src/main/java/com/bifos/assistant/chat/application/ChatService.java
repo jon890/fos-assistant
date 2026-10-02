@@ -1212,7 +1212,8 @@ public class ChatService {
             return new ConversationPage(rows, null);
         }
         List<Conversation> items = rows.subList(0, size);
-        return new ConversationPage(items, ConversationCursor.of(items.getLast()).encode());
+        return new ConversationPage(
+                items, ConversationCursor.of(items.getLast()).encode());
     }
 
     /** 사용자의 대화 한 줄을 읽는다. 없거나 남의 것이면 같은 응답으로 숨긴다. */

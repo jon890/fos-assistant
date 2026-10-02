@@ -128,8 +128,7 @@ class EmptyConversationTest {
                 () -> chat.startEmpty(dad, "kid"), () -> chat.send(dad, null, "안녕", "kid"), ErrorCode.AGENT_NOT_FOUND);
         assertSameCode(
                 () -> chat.startEmpty(dad, "off"), () -> chat.send(dad, null, "안녕", "off"), ErrorCode.AGENT_DISABLED);
-        assertThat(chat.conversationsOf(dad, null, 100).items())
-                .isEmpty();
+        assertThat(chat.conversationsOf(dad, null, 100).items()).isEmpty();
     }
 
     @Test
@@ -142,12 +141,10 @@ class EmptyConversationTest {
 
         chat.startEmpty(dad, "flowed");
 
-        assertThat(chat.conversationsOf(dad, null, 100).items())
-                .singleElement()
-                .satisfies(it -> {
-                    assertThat(it.agentId()).isEqualTo(flowAgent.id());
-                    assertThat(it.title()).isEmpty();
-                });
+        assertThat(chat.conversationsOf(dad, null, 100).items()).singleElement().satisfies(it -> {
+            assertThat(it.agentId()).isEqualTo(flowAgent.id());
+            assertThat(it.title()).isEmpty();
+        });
     }
 
     private CurrentUser member(String email) {
