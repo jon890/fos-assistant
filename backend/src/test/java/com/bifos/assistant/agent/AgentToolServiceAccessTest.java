@@ -7,8 +7,8 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import com.bifos.assistant.agent.application.AgentToolService;
-import com.bifos.assistant.agent.application.AgentToolService.ToolView;
-import com.bifos.assistant.agent.application.AgentToolService.ToolsetsView;
+import com.bifos.assistant.agent.application.AgentToolView;
+import com.bifos.assistant.agent.application.AgentToolsetsView;
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.agent.domain.AgentToolPolicy;
 import com.bifos.assistant.agent.domain.type.AgentVisibility;
@@ -126,11 +126,11 @@ class AgentToolServiceAccessTest {
         Agent agent = saved(privateAgentOf(owner));
         stubHermesApplying(agent, "web");
 
-        ToolsetsView view = agentTools.writeReadable(owner, agent.code(), List.of("web"));
+        AgentToolsetsView view = agentTools.writeReadable(owner, agent.code(), List.of("web"));
 
         assertThat(view.toolsets())
-                .filteredOn(ToolView::enabled)
-                .extracting(ToolView::name)
+                .filteredOn(AgentToolView::enabled)
+                .extracting(AgentToolView::name)
                 .containsExactly("web");
         verify(hermesToolsets).writeApiServer(agent.hermesProfile(), List.of("web", AgentToolPolicy.CONTROL_PLANE_MCP));
     }
@@ -141,11 +141,11 @@ class AgentToolServiceAccessTest {
         Agent agent = saved(privateAgentOf(owner));
         stubHermesApplying(agent, "web");
 
-        ToolsetsView view = agentTools.writeAsAdmin(administrator, agent.code(), List.of("web"));
+        AgentToolsetsView view = agentTools.writeAsAdmin(administrator, agent.code(), List.of("web"));
 
         assertThat(view.toolsets())
-                .filteredOn(ToolView::enabled)
-                .extracting(ToolView::name)
+                .filteredOn(AgentToolView::enabled)
+                .extracting(AgentToolView::name)
                 .containsExactly("web");
         verify(hermesToolsets).writeApiServer(agent.hermesProfile(), List.of("web", AgentToolPolicy.CONTROL_PLANE_MCP));
     }

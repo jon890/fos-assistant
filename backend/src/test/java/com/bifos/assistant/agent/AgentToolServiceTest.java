@@ -10,6 +10,8 @@ import static org.mockito.Mockito.when;
 
 import com.bifos.assistant.agent.application.AgentService;
 import com.bifos.assistant.agent.application.AgentToolService;
+import com.bifos.assistant.agent.application.AgentToolView;
+import com.bifos.assistant.agent.application.AgentToolsetsView;
 import com.bifos.assistant.agent.application.ProfileSkillFiles;
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.agent.domain.type.AgentVisibility;
@@ -138,10 +140,10 @@ class AgentToolServiceTest {
         when(toolsets.readEnabled(agent.apiBaseUrl(), agent.hermesProfile()))
                 .thenReturn(List.of("web", "connections", "memory"));
 
-        AgentToolService.ToolsetsView result = service.read(owner, agent);
+        AgentToolsetsView result = service.read(owner, agent);
 
         Assertions.assertThat(result.toolsets())
-                .extracting(AgentToolService.ToolView::name)
+                .extracting(AgentToolView::name)
                 .containsExactly("web");
         Assertions.assertThat(result.unclassifiedEnabled()).containsExactly("connections");
     }
@@ -152,7 +154,7 @@ class AgentToolServiceTest {
         when(toolsets.readEnabled(agent.apiBaseUrl(), agent.hermesProfile()))
                 .thenReturn(List.of(), List.of("web", "connections"));
 
-        AgentToolService.ToolsetsView result = service.write(owner, agent, List.of("web"));
+        AgentToolsetsView result = service.write(owner, agent, List.of("web"));
 
         assertThat(result.unclassifiedEnabled()).containsExactly("connections");
         verify(toolsets).writeApiServer(agent.hermesProfile(), List.of("web", "fos-assistant"));
@@ -194,10 +196,10 @@ class AgentToolServiceTest {
         when(toolsets.readEnabled(agent.apiBaseUrl(), agent.hermesProfile()))
                 .thenReturn(List.of("skills"), List.of("web", "skills"));
 
-        AgentToolService.ToolsetsView result = service.write(owner, agent, List.of("web", "skills"));
+        AgentToolsetsView result = service.write(owner, agent, List.of("web", "skills"));
 
         assertThat(result.toolsets())
-                .extracting(AgentToolService.ToolView::name)
+                .extracting(AgentToolView::name)
                 .containsExactly("web", "skills");
         verify(toolsets).writeApiServer(agent.hermesProfile(), List.of("web", "skills", "fos-assistant"));
     }

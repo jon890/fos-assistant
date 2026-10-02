@@ -1,6 +1,6 @@
 package com.bifos.assistant.agent.presentation;
 
-import com.bifos.assistant.agent.application.AgentToolService;
+import com.bifos.assistant.agent.application.AgentToolView;
 import com.bifos.assistant.agent.application.PersonaSnapshot;
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.agent.domain.type.AgentVisibility;
@@ -132,7 +132,7 @@ public final class AgentDtos {
             boolean enabled,
             boolean editable,
             boolean requiresPrivate) {
-        static ToolsetView from(AgentToolService.ToolView source) {
+        static ToolsetView from(AgentToolView source) {
             return new ToolsetView(
                     source.name(),
                     source.label(),

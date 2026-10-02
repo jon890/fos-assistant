@@ -22,29 +22,18 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class AgentToolService {
 
-    public record ToolView(
-            String name,
-            String label,
-            String description,
-            AgentToolPolicy.Tier tier,
-            boolean enabled,
-            boolean editable,
-            boolean requiresPrivate) {}
-
-    public record ToolsetsView(List<ToolView> toolsets, List<String> unclassifiedEnabled) {}
-
     private final HermesToolsetClient toolsets;
     private final ProfileSkillFiles skillFiles;
     private final AgentService agents;
     private final AgentRepository agentRepository;
 
-    public ToolsetsView read(CurrentUser user, Agent agent) {
+    public AgentToolsetsView read(CurrentUser user, Agent agent) {
         requireOwnerOrAdmin(user, agent);
         List<String> enabled = toolsets.readEnabled(agent.apiBaseUrl(), agent.hermesProfile());
         return response(user, agent, toolsets.readCatalog(), enabled);
     }
 
-    public ToolsetsView write(CurrentUser user, Agent agent, List<String> requested) {
+    public AgentToolsetsView write(CurrentUser user, Agent agent, List<String> requested) {
         requireOwnerOrAdmin(user, agent);
         // 올린 스킬은 skills toolset 으로만 읽힌다. 스킬을 둔 채 끄면 화면에 보이는 스킬이 돌지 않는다(ADR-034).
         if ((requested == null || !requested.contains(AgentToolPolicy.SKILLS))
@@ -78,7 +67,7 @@ public class AgentToolService {
     }
 
     /** 관리자가 다른 사람의 에이전트까지 도구 목록을 읽는다. 관리자인지는 부르는 쪽이 먼저 확인한다. */
-    public ToolsetsView readAsAdmin(CurrentUser user, String code) {
+    public AgentToolsetsView readAsAdmin(CurrentUser user, String code) {
         return read(user, requireAgent(code));
     }
 
@@ -88,7 +77,7 @@ public class AgentToolService {
      * <p>잠금 조회와 Hermes 설정 반영이 한 트랜잭션 안에서 돈다. 잠금은 트랜잭션이 끝날 때 풀린다.
      */
     @Transactional
-    public ToolsetsView writeReadable(CurrentUser user, String code, List<String> enabled) {
+    public AgentToolsetsView writeReadable(CurrentUser user, String code, List<String> enabled) {
         return write(user, agents.requireReadableForUpdate(user, code), enabled);
     }
 
@@ -98,7 +87,7 @@ public class AgentToolService {
      * <p>잠금 조회와 Hermes 설정 반영이 한 트랜잭션 안에서 돈다.
      */
     @Transactional
-    public ToolsetsView writeAsAdmin(CurrentUser user, String code, List<String> enabled) {
+    public AgentToolsetsView writeAsAdmin(CurrentUser user, String code, List<String> enabled) {
         return write(user, requireAgentForUpdate(code), enabled);
     }
 
@@ -128,11 +117,11 @@ public class AgentToolService {
         return agent;
     }
 
-    private static List<ToolView> views(
+    private static List<AgentToolView> views(
             CurrentUser user, Agent agent, List<ToolsetCatalogEntry> catalog, List<String> enabled) {
         return catalog.stream()
                 .filter(entry -> AgentToolPolicy.isKnown(entry.name()))
-                .map(entry -> new ToolView(
+                .map(entry -> new AgentToolView(
                         entry.name(),
                         entry.label(),
                         entry.description(),
@@ -143,14 +132,14 @@ public class AgentToolService {
                 .toList();
     }
 
-    private static ToolsetsView response(
+    private static AgentToolsetsView response(
             CurrentUser user, Agent agent, List<ToolsetCatalogEntry> catalog, List<String> enabled) {
         List<String> unclassified = enabled.stream()
                 .filter(name -> !AgentToolPolicy.isKnown(name))
                 .filter(name -> !AgentToolPolicy.MEMORY.equals(name))
                 .filter(name -> !AgentToolPolicy.CONTROL_PLANE_MCP.equals(name))
                 .toList();
-        return new ToolsetsView(views(user, agent, catalog, enabled), unclassified);
+        return new AgentToolsetsView(views(user, agent, catalog, enabled), unclassified);
     }
 
     private static Map<String, ToolsetCatalogEntry> catalogByName(List<ToolsetCatalogEntry> catalog) {

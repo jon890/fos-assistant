@@ -2,6 +2,7 @@ package com.bifos.assistant.agent.presentation;
 
 import com.bifos.assistant.agent.application.AgentService;
 import com.bifos.assistant.agent.application.AgentToolService;
+import com.bifos.assistant.agent.application.AgentToolsetsView;
 import com.bifos.assistant.agent.presentation.AgentDtos.ToolsetView;
 import com.bifos.assistant.agent.presentation.AgentDtos.UpdateToolsetsRequest;
 import com.bifos.assistant.shared.auth.CurrentUser;
@@ -50,7 +51,7 @@ public class AgentToolController {
         return view(tools.writeAsAdmin(user, code, request.enabled()));
     }
 
-    private static AgentDtos.ToolsetsView view(AgentToolService.ToolsetsView source) {
+    private static AgentDtos.ToolsetsView view(AgentToolsetsView source) {
         return new AgentDtos.ToolsetsView(
                 source.toolsets().stream().map(ToolsetView::from).toList(), source.unclassifiedEnabled());
     }
