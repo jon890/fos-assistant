@@ -103,4 +103,6 @@ node test/e2e/run.ts
 | `backend/src/main/java/com/bifos/assistant/usage/presentation/UsageController.java` | 수정 |
 | `backend/src/test/java/com/bifos/assistant/usage/RootExecutionQueryTest.java` | 신규 |
 | `backend/src/test/java/com/bifos/assistant/usage/UsageControllerTest.java` | 수정 |
+| `backend/src/test/java/com/bifos/assistant/usage/UsageBreakdownTest.java` | 수정 |
+| `backend/src/test/java/com/bifos/assistant/skill/SkillUsageQueryTest.java` | 수정 |
 | `backend/config/archunit/store/2790ecd4-faaa-4952-b703-a028b68814d5` | 수정 |
