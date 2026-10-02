@@ -525,11 +525,12 @@ public class ChatService {
                 return recorded(completed, startedAt);
             }
             if (result.providerBlocked()) {
-                executions.fail(pending.execution(), ErrorCode.PROVIDER_BLOCKED.name());
+                executions.fail(
+                        pending.execution(), pending.agent(), result, choice, ErrorCode.PROVIDER_BLOCKED.name());
                 append(pending, ExecutionEventType.RUN_FAILED, ErrorCode.PROVIDER_BLOCKED.name());
                 throw new ApiException(ErrorCode.PROVIDER_BLOCKED, "every account of the chosen provider is blocked");
             }
-            executions.fail(pending.execution(), hermesStatus(result));
+            executions.fail(pending.execution(), pending.agent(), result, choice, hermesStatus(result));
             append(pending, ExecutionEventType.RUN_FAILED, hermesStatus(result));
             throw new ApiException(ErrorCode.HERMES_RUN_FAILED, "the agent run did not complete");
         } finally {

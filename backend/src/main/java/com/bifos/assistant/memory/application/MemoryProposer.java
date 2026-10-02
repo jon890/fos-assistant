@@ -74,12 +74,13 @@ public class MemoryProposer {
             HermesRunResult result = hermes.awaitCompletion(command, runId);
             if (result.providerBlocked()) {
                 // 고른 모델의 provider 가 막힌 것은 대화 실행과 같은 코드로 남긴다. 다른 모델로 넘기지 않는다.
-                AgentExecution failed = executions.fail(proposalExecution, ErrorCode.PROVIDER_BLOCKED.name());
+                AgentExecution failed =
+                        executions.fail(proposalExecution, agent, result, choice, ErrorCode.PROVIDER_BLOCKED.name());
                 appendFailed(failed, ErrorCode.PROVIDER_BLOCKED.name());
                 return;
             }
             if (!result.succeeded()) {
-                executions.fail(proposalExecution, statusOf(result));
+                executions.fail(proposalExecution, agent, result, choice, statusOf(result));
                 return;
             }
             AgentExecution completed = executions.complete(proposalExecution, agent, result, choice);

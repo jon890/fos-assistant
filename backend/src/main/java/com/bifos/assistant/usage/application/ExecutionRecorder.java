@@ -342,9 +342,30 @@ public class ExecutionRecorder {
         return executions.findParentIdsHavingChildren(executionIds);
     }
 
-    /** 끝난 실행을 FAILED 로 갱신한다. */
+    /** 최종 결과를 받지 못한 실행을 FAILED 로 갱신한다. 이미 적힌 사용량은 보존한다. */
     public AgentExecution fail(AgentExecution execution, String errorCode) {
         execution.markFailed(errorCode, Instant.now());
+        return executions.save(execution);
+    }
+
+    /** 최종 실패 결과의 사용량과 실제 모델을 보존하며 FAILED 와 오류 코드를 함께 남긴다. */
+    public AgentExecution fail(
+            AgentExecution execution, Agent agent, HermesRunResult result, ModelChoice requested, String errorCode) {
+        if (result == null) {
+            return fail(execution, errorCode);
+        }
+        TokenUsage usage = result.usage() == null ? TokenUsage.empty() : result.usage();
+        SessionRuntime served = served(agent, result, requested);
+        String provider = served.provider();
+        String model = served.model();
+        execution.attachRunId(result.runId());
+        execution.markFailed(
+                provider,
+                model,
+                usage,
+                costs.estimate(provider, model, usage, agent.costMode()),
+                errorCode,
+                clock.instant());
         return executions.save(execution);
     }
 

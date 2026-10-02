@@ -28,21 +28,27 @@ import com.bifos.assistant.hermes.HermesRunsClient;
 import com.bifos.assistant.hermes.StubHermesRunsClient;
 import com.bifos.assistant.hermes.dto.HermesRunCommand;
 import com.bifos.assistant.hermes.dto.HermesRunResult;
+import com.bifos.assistant.hermes.dto.SessionRuntime;
 import com.bifos.assistant.hermes.dto.TokenUsage;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.usage.application.ExecutionRecorder;
+import com.bifos.assistant.usage.domain.CatalogPrice;
 import com.bifos.assistant.usage.domain.ExecutionStatus;
+import com.bifos.assistant.usage.domain.ModelPrice;
+import com.bifos.assistant.usage.domain.PriceCatalog;
 import com.bifos.assistant.usage.domain.type.ReasoningEffortSource;
 import com.bifos.assistant.usage.infra.AgentExecutionRepository;
 import com.bifos.assistant.user.domain.UserRole;
+import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
@@ -51,6 +57,8 @@ import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.TestConfiguration;
@@ -58,6 +66,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
 import org.springframework.context.annotation.Primary;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import tools.jackson.databind.ObjectMapper;
 
 /**
@@ -118,6 +127,9 @@ class StarterSuggestionServiceTest {
 
     @Autowired
     ObjectMapper objectMapper;
+
+    @MockitoBean
+    PriceCatalog prices;
 
     private final MutableClock clock = new MutableClock(Instant.parse("2026-01-01T00:00:00Z"));
     private final TrackingExecutor executor = new TrackingExecutor();
@@ -424,6 +436,56 @@ class StarterSuggestionServiceTest {
         assertThat(executionRows.findAll())
                 .extracting(row -> row.status())
                 .containsExactlyInAnyOrder(ExecutionStatus.SUCCEEDED, ExecutionStatus.FAILED);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"FAILED", "PROVIDER_BLOCKED", "STARTER_OUTPUT_INVALID"})
+    @DisplayName("추천 실패와 잘못된 답은 사용량과 실제 모델 비용을 보존하고 재시도 시간 동안 NONE 을 준다")
+    void preservesUsageAndCostForFailedResultAndInvalidOutput(String errorCode) {
+        when(prices.find("served-provider", "served-model"))
+                .thenReturn(Optional.of(new CatalogPrice(
+                        new ModelPrice(new BigDecimal("5"), new BigDecimal("30"), new BigDecimal("0.5"), List.of()),
+                        "test-pricing@2026-10-01")));
+        boolean invalidOutput = "STARTER_OUTPUT_INVALID".equals(errorCode);
+        String error = "PROVIDER_BLOCKED".equals(errorCode)
+                ? HermesRunResult.PROVIDER_AUTH_FAILED_PREFIX + " every account is blocked"
+                : null;
+        stub().willReturn(new HermesRunResult(
+                "starter-run",
+                "starter-session",
+                invalidOutput ? "completed" : "failed",
+                invalidOutput ? "추천을 만들 수 없습니다" : json(FOUR),
+                "echoed-model",
+                "echoed-provider",
+                error,
+                new TokenUsage(1_000L, 800L, 500L, 1_500L),
+                new SessionRuntime("served-model", "served-provider")));
+
+        assertThat(service.read(DAD, "starter-family").status()).isEqualTo(StarterStatus.GENERATING);
+        executor.awaitAll();
+
+        assertThat(service.read(DAD, "starter-family"))
+                .isEqualTo(new StarterSuggestions(List.of(), StarterStatus.NONE));
+        clock.advance(Duration.ofMinutes(9));
+        assertThat(service.read(DAD, "starter-family").status()).isEqualTo(StarterStatus.NONE);
+        assertThat(stub().received()).hasSize(1);
+        assertThat(executionRows.findAll()).singleElement().satisfies(row -> {
+            assertThat(row.status()).isEqualTo(ExecutionStatus.FAILED);
+            assertThat(row.errorCode()).isEqualTo(errorCode);
+            assertThat(row.hermesRunId()).isEqualTo("starter-run");
+            assertThat(row.conversationId()).isNull();
+            assertThat(row.provider()).isEqualTo("served-provider");
+            assertThat(row.model()).isEqualTo("served-model");
+            assertThat(row.inputTokens()).isEqualTo(1_000L);
+            assertThat(row.cachedInputTokens()).isEqualTo(800L);
+            assertThat(row.outputTokens()).isEqualTo(500L);
+            assertThat(row.totalTokens()).isEqualTo(1_500L);
+            assertThat(row.estimatedCostMicros()).isEqualTo(16_400L);
+            assertThat(row.actualCostMicros()).isEqualTo(16_400L);
+            assertThat(row.costCurrency()).isEqualTo("USD");
+            assertThat(row.pricingVersion()).isEqualTo("test-pricing@2026-10-01");
+            assertThat(row.finishedAt()).isNotNull();
+        });
     }
 
     @Test
