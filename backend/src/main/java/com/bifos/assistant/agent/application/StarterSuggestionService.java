@@ -233,13 +233,17 @@ public class StarterSuggestionService {
             HermesRunResult result = hermes.awaitCompletion(command, runId);
             if (!result.succeeded()) {
                 executions.fail(
-                        execution, result.providerBlocked() ? ErrorCode.PROVIDER_BLOCKED.name() : statusOf(result));
+                        execution,
+                        agent,
+                        result,
+                        null,
+                        result.providerBlocked() ? ErrorCode.PROVIDER_BLOCKED.name() : statusOf(result));
                 lastFailures.put(key, clock.instant());
                 return;
             }
             Optional<List<String>> prompts = promptsOf(result.output());
             if (prompts.isEmpty()) {
-                executions.fail(execution, INVALID_OUTPUT);
+                executions.fail(execution, agent, result, null, INVALID_OUTPUT);
                 lastFailures.put(key, clock.instant());
                 return;
             }

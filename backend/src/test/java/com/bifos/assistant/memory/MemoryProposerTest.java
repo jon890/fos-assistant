@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.agent.domain.AgentVisibility;
@@ -18,6 +19,7 @@ import com.bifos.assistant.chat.infra.ConversationRepository;
 import com.bifos.assistant.hermes.HermesRunsClient;
 import com.bifos.assistant.hermes.StubHermesRunsClient;
 import com.bifos.assistant.hermes.dto.HermesRunResult;
+import com.bifos.assistant.hermes.dto.SessionRuntime;
 import com.bifos.assistant.hermes.dto.TokenUsage;
 import com.bifos.assistant.memory.application.MemoryProposalProperties;
 import com.bifos.assistant.memory.application.MemoryProposer;
@@ -30,16 +32,23 @@ import com.bifos.assistant.usage.application.ExecutionContextSnapshot;
 import com.bifos.assistant.usage.application.ExecutionEventRecorder;
 import com.bifos.assistant.usage.application.ExecutionRecorder;
 import com.bifos.assistant.usage.domain.AgentExecution;
+import com.bifos.assistant.usage.domain.CatalogPrice;
 import com.bifos.assistant.usage.domain.ExecutionEventType;
 import com.bifos.assistant.usage.domain.ExecutionStatus;
+import com.bifos.assistant.usage.domain.ModelPrice;
+import com.bifos.assistant.usage.domain.PriceCatalog;
 import com.bifos.assistant.usage.domain.type.ReasoningEffortSource;
 import com.bifos.assistant.usage.infra.AgentExecutionRepository;
 import com.bifos.assistant.usage.infra.ExecutionEventRepository;
 import com.bifos.assistant.user.domain.UserRole;
+import java.math.BigDecimal;
 import java.util.List;
+import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentMatchers;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -48,6 +57,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
 import org.springframework.context.annotation.Primary;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.transaction.support.TransactionTemplate;
 import tools.jackson.databind.ObjectMapper;
 
@@ -90,6 +100,9 @@ class MemoryProposerTest {
 
     @Autowired
     HermesRunsClient hermes;
+
+    @MockitoBean
+    PriceCatalog prices;
 
     @Autowired
     TransactionTemplate transaction;
@@ -338,6 +351,59 @@ class MemoryProposerTest {
                                 assertThat(event.detail()).isEqualTo(ErrorCode.PROVIDER_BLOCKED.name());
                             });
                 });
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"FAILED", "PROVIDER_BLOCKED"})
+    @DisplayName("실패한 Memory 제안도 사용량과 실제 모델 비용을 보존하고 원래 대화에는 오류를 전하지 않는다")
+    void preservesUsageAndCostWithoutThrowingWhenProposalReturnsFailure(String errorCode) {
+        AgentExecution parent = recorder.start(USER, conversation, agent, null, null, 0L);
+        when(prices.find("served-provider", "served-model"))
+                .thenReturn(Optional.of(new CatalogPrice(
+                        new ModelPrice(new BigDecimal("5"), new BigDecimal("30"), new BigDecimal("0.5"), List.of()),
+                        "test-pricing@2026-10-01")));
+        String error = "PROVIDER_BLOCKED".equals(errorCode)
+                ? HermesRunResult.PROVIDER_AUTH_FAILED_PREFIX + " every account is blocked"
+                : "provider stopped after generating tokens";
+        ((StubHermesRunsClient) hermes)
+                .willReturn(new HermesRunResult(
+                        "proposal",
+                        "new",
+                        "failed",
+                        "{\"title\":\"선호\",\"content\":\"저장하면 안 되는 답\"}",
+                        "echoed-model",
+                        "echoed-provider",
+                        error,
+                        new TokenUsage(1_000L, 800L, 500L, 1_500L),
+                        new SessionRuntime("served-model", "served-provider")));
+
+        assertThatCode(() -> proposer.proposeFrom(USER, conversation, agent, parent, "답", RESOLVED))
+                .doesNotThrowAnyException();
+
+        assertThat(memories.findAll()).isEmpty();
+        assertThat(((StubHermesRunsClient) hermes).received()).hasSize(1);
+        assertThat(executions.findAll())
+                .filteredOn(execution -> !execution.id().equals(parent.id()))
+                .singleElement()
+                .satisfies(child -> {
+                    assertThat(child.status()).isEqualTo(ExecutionStatus.FAILED);
+                    assertThat(child.errorCode()).isEqualTo(errorCode);
+                    assertThat(child.hermesRunId()).isEqualTo("proposal");
+                    assertThat(child.parentExecutionId()).isEqualTo(parent.id());
+                    assertThat(child.rootExecutionId()).isEqualTo(parent.id());
+                    assertThat(child.provider()).isEqualTo("served-provider");
+                    assertThat(child.model()).isEqualTo("served-model");
+                    assertThat(child.inputTokens()).isEqualTo(1_000L);
+                    assertThat(child.cachedInputTokens()).isEqualTo(800L);
+                    assertThat(child.outputTokens()).isEqualTo(500L);
+                    assertThat(child.totalTokens()).isEqualTo(1_500L);
+                    assertThat(child.estimatedCostMicros()).isEqualTo(16_400L);
+                    assertThat(child.actualCostMicros()).isEqualTo(16_400L);
+                    assertThat(child.costCurrency()).isEqualTo("USD");
+                    assertThat(child.pricingVersion()).isEqualTo("test-pricing@2026-10-01");
+                    assertThat(child.finishedAt()).isNotNull();
+                });
+        assertThat(executions.findById(parent.id()).orElseThrow().status()).isEqualTo(ExecutionStatus.RUNNING);
     }
 
     @Test
