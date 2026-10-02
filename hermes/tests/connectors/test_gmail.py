@@ -787,15 +787,16 @@ class WriteTest(GmailCase):
                 self.assertEqual(parsed["In-Reply-To"], in_reply_to)
                 self.assertEqual(parsed["References"], expected_references)
 
-    def test_quoted_display_name_with_a_comma_is_one_recipient(self):
+    def test_two_plain_addresses_are_both_recipients(self):
         self.fake.on("POST", "/gmail/messages/send", 200, {"id": "sent-1", "threadId": "thread-2"})
 
-        self.ok("send_message", to='"Kim, A" <a@example.com>, 홍길동 <b@example.com>', subject="s", body="b")
+        self.ok("send_message", to="a@example.com, b@example.net", subject="s", body="b")
 
         [request] = self.fake.seen("POST", "/gmail/messages/send")
         _, parsed = self.sent_mail(request)
         self.assertEqual([(address.display_name, address.addr_spec) for address in parsed["To"].addresses],
-                         [("Kim, A", "a@example.com"), ("홍길동", "b@example.com")])
+                         [("", "a@example.com"), ("", "b@example.net")])
+        self.assertEqual(parsed.get_all("To"), ["a@example.com, b@example.net"])
 
     def test_invalid_mail_arguments_are_rejected_before_any_request(self):
         good = {"to": "a@example.com", "subject": "s", "body": "b"}
@@ -808,7 +809,7 @@ class WriteTest(GmailCase):
         ]
         # 줄바꿈으로 읽힐 수 있는 제어 문자다. 받는 사람과 제목 어디에 있어도 거절한다.
         for character in ("\x0b", "\x0c", "\x00", "\x85", "\u2028", "\u2029", "\x7f", "\x1f", "\t"):
-            bad += [{"to": "a@example.com" + character}, {"to": "Name" + character + " <a@example.com>"},
+            bad += [{"to": "a@example.com" + character}, {"to": "a" + character + "b@example.com"},
                     {"cc": "c" + character + "@example.com"}, {"subject": "s" + character + "t"}]
         for change in bad:
             for tool, extra in (("send_message", {}), ("create_draft", {}), ("reply_to_message", {"message_id": "m1"})):
@@ -822,67 +823,161 @@ class WriteTest(GmailCase):
 
 
 class RecipientDisguiseTest(GmailCase):
-    """승인 카드에 보이는 글과 실제 받는 주소가 다르게 읽히는 모양을 받지 않는다."""
+    """받는 사람은 주소만 받는다. 승인 카드에 보이는 글과 실제 받는 주소가 다르게 읽히는 모양을 받지 않는다."""
 
     GOOD = {"to": "a@example.com", "subject": "s", "body": "b"}
     TOOLS = (("send_message", {}), ("create_draft", {}), ("reply_to_message", {"message_id": "m1"}))
+    # 표시 이름 자리의 인코딩된 낱말이다. 풀면 `c@evil.example,` 이라 받는 사람이 하나 더 생긴다.
+    HIDDEN_RECIPIENT = "=?utf-8?b?%s?= <a@example.com>" % base64.b64encode(b"c@evil.example,").decode("ascii")
 
-    def test_disguised_recipients_and_subjects_are_rejected_before_any_request(self):
-        bad = [
-            # 표시 이름에 주소가 있다.
-            {"to": '"boss@example.com" <other@example.net>'}, {"cc": 'boss@example.com <other@example.net>'},
-            {"to": "a@example.com, \"b@example.com\" <c@example.net>"},
-            # 괄호 주석이 있다.
-            {"to": "a@example.com (b)"}, {"to": "(boss) <a@example.com>"}, {"cc": "Kim (Boss) <c@example.com>"},
-            {"to": "a@example.com )"},
-            # 화면에 보이지 않거나 방향을 바꾸는 문자가 있다.
-            {"to": "a@example.com\u202e"}, {"to": "Kim\u200b <a@example.com>"}, {"to": "a\u200b@example.com"},
-            {"cc": "c@example.com\u202e"}, {"subject": "s\u202et"}, {"subject": "s\u200bt"},
-            {"subject": "\ufeffs"}, {"to": "a@exam\u00adple.com"},
-            # 주소에 ASCII 밖의 글자가 있다. 키릴 문자 `а` 와 `е` 는 라틴 문자와 똑같이 보인다.
-            {"to": "a@\u0435xample.com"}, {"to": "\u0430@example.com"}, {"to": "Kim <a@ex\u0430mple.com>"},
-            {"cc": "c@예시.example"},
-        ]
-        for change in bad:
+    def rejected_everywhere(self, changes):
+        for change in changes:
             for tool, extra in self.TOOLS:
                 with self.subTest(tool=tool, change=change):
                     self.fails("GMAIL_INVALID_INPUT", tool, **{**self.GOOD, **change, **extra})
+
+    def test_anything_but_a_bare_address_is_rejected_before_any_request(self):
+        self.rejected_everywhere([
+            # 표시 이름이 있다. 이름이 평범해도 받지 않는다.
+            {"to": "Kim A <a@example.com>"}, {"to": "김철수 <a@example.com>"}, {"to": '"Kim, A" <a@example.com>'},
+            {"to": '"Kim (A)" <a@example.com>'}, {"to": '"boss@example.com" <other@example.net>'},
+            {"cc": "boss@example.com <other@example.net>"}, {"to": "<a@example.com>"},
+            {"to": "a@example.com, 홍길동 <b@example.com>"},
+            # 표시 이름의 인코딩된 낱말이다.
+            {"to": self.HIDDEN_RECIPIENT}, {"cc": self.HIDDEN_RECIPIENT},
+            {"to": "=?utf-8?q?boss?= <a@example.com>"},
+            # 따옴표로 쓴 이름 부분, 경로, 그룹 문법이다.
+            {"to": '"friend@example.com"@evil.example'}, {"to": "<@x.example:attacker@evil.example>"},
+            {"to": "@x.example:attacker@evil.example"}, {"to": "friends: attacker@evil.example;"},
+            {"cc": "friends:;"}, {"to": "a@example.com;b@example.com"},
+            # 주소처럼 보이는 글자가 든 이름이다. 전각 `＠` 와 빈칸처럼 보이는 U+3164 다.
+            {"to": "boss＠example.com <a@example.com>"}, {"to": "ㅤ <a@example.com>"},
+            {"to": "a＠example.com"}, {"to": "ㅤa@example.com"},
+            # 괄호 주석이 있다.
+            {"to": "a@example.com (b)"}, {"to": "(boss) <a@example.com>"}, {"to": "a@example.com )"},
+            # 화면에 보이지 않거나 방향을 바꾸는 문자가 있다.
+            {"to": "a@example.com‮"}, {"to": "a​@example.com"}, {"cc": "c@example.com‮"},
+            {"to": "a@exam­ple.com"},
+            # 주소에 ASCII 밖의 글자가 있다. 키릴 문자 `а` 와 `е` 는 라틴 문자와 똑같이 보인다.
+            {"to": "a@еxample.com"}, {"to": "а@example.com"}, {"cc": "c@예시.example"},
+            # 주소의 모양이 아니다.
+            {"to": "a@example"}, {"to": "a@@example.com"}, {"to": "a b@example.com"}, {"to": "a@example..com"},
+            {"to": "a`b@example.com"}, {"to": "a@example.com."}, {"to": "@example.com"},
+            # 빈 항목이 있다.
+            {"to": "a@example.com,"}, {"to": ",a@example.com"}, {"to": "a@example.com,,b@example.com"},
+            {"cc": ","}, {"cc": "c@example.com, "},
+        ])
+        self.fails("GMAIL_INVALID_INPUT", "send_message", **self.GOOD, bcc=self.HIDDEN_RECIPIENT)
         self.fails("GMAIL_INVALID_INPUT", "send_message", **self.GOOD, bcc="x@example.com (y)")
-        self.fails("GMAIL_INVALID_INPUT", "send_message", **self.GOOD, bcc="x\u202e@example.com")
-        self.fails("GMAIL_INVALID_INPUT", "create_draft", **self.GOOD, bcc='"y@example.com" <x@example.net>')
+        self.fails("GMAIL_INVALID_INPUT", "create_draft", **self.GOOD, bcc="Kim <x@example.net>")
 
         self.assertEqual(self.fake.seen(), [])
 
-    def test_plain_names_reach_the_header_with_the_same_address(self):
+    def test_disguised_subjects_are_rejected_before_any_request(self):
+        self.rejected_everywhere([
+            {"subject": "=?utf-8?q?Wire_money?= =?utf-8?q?_now?="}, {"subject": "=?utf-8?b?4oCu?="},
+            {"subject": "Re: =?UTF-8?B?4oCu?= hello"}, {"subject": "=?us-ascii?Q?x?="}, {"subject": "=??b?eA==?="},
+            # 닫지 않은 낱말은 다시 읽어도 같은 글이다. 느슨하게 푸는 메일 프로그램이 있어 모양만으로 거절한다.
+            {"subject": "=?utf-8?b?eA=="}, {"subject": "hello =?utf-8?q?x"},
+            {"subject": "s‮t"}, {"subject": "s​t"}, {"subject": "﻿s"}, {"subject": "s‍t"},
+        ])
+
+        self.assertEqual(self.fake.seen(), [])
+
+    def test_invisible_characters_in_the_body_are_rejected_before_any_request(self):
+        self.rejected_everywhere([
+            {"body": "hello ‮ dlrow"}, {"body": "hello\U000e0041"}, {"body": "a​b"}, {"body": "﻿b"},
+            {"body": "a­b"}, {"body": "a⁦b⁩"},
+        ])
+
+        self.assertEqual(self.fake.seen(), [])
+
+    def test_allowed_address_characters_and_spacing_reach_the_header(self):
         self.fake.on("POST", "/gmail/messages/send", 200, {"id": "sent-1", "threadId": "thread-2"})
         cases = {
-            "a@example.com": [("", "a@example.com")],
-            "Kim A <a@example.com>": [("Kim A", "a@example.com")],
-            "김철수 <a@example.com>": [("김철수", "a@example.com")],
-            # 따옴표 안의 괄호는 주석이 아니라 이름의 글자다.
-            '"Kim (A)" <a@example.com>': [("Kim (A)", "a@example.com")],
+            "a@example.com": ["a@example.com"],
+            "  a@example.com ,b@example.net  ": ["a@example.com", "b@example.net"],
+            "first.last+tag@sub-1.example.co.kr": ["first.last+tag@sub-1.example.co.kr"],
+            "a!#$%&'*+/=?^_{|}~-z@example.com": ["a!#$%&'*+/=?^_{|}~-z@example.com"],
+            # 길어서 머리가 여러 줄로 접혀도 차례와 주소가 그대로다.
+            ", ".join("user%02d@example.com" % index for index in range(30)):
+                ["user%02d@example.com" % index for index in range(30)],
         }
         for to, expected in cases.items():
             with self.subTest(to=to):
                 self.fake.requests.clear()
 
-                self.ok("send_message", to=to, subject="s", body="b")
+                self.ok("send_message", to=to, cc="c@example.com", bcc="d@example.com, e@example.com",
+                        subject="s", body="b")
 
                 [request] = self.fake.seen("POST", "/gmail/messages/send")
                 _, parsed = self.sent_mail(request)
-                self.assertEqual([(address.display_name, address.addr_spec) for address in parsed["To"].addresses],
-                                 expected)
+                self.assertEqual([(a.display_name, a.addr_spec) for a in parsed["To"].addresses],
+                                 [("", address) for address in expected])
+                self.assertEqual([a.addr_spec for a in parsed["Cc"].addresses], ["c@example.com"])
+                self.assertEqual([a.addr_spec for a in parsed["Bcc"].addresses], ["d@example.com", "e@example.com"])
 
-    def test_invisible_characters_in_the_body_are_sent(self):
+    def test_subjects_that_only_look_unusual_are_sent_as_given(self):
         self.fake.on("POST", "/gmail/messages/send", 200, {"id": "sent-1", "threadId": "thread-2"})
-        # 가족 그림 글자는 폭 없는 이음 문자(U+200D)로 잇는다. 본문에서는 거절하지 않는다.
-        text = "가족 \U0001F468\u200d\U0001F469 입니다."
+        for subject in ("1+1=?", "a =? b ?= c", "회의 " * 60 + "안내", "long subject " * 20 + "end", "  앞뒤 공백  "):
+            with self.subTest(subject=subject):
+                self.fake.requests.clear()
+
+                self.ok("send_message", to="a@example.com", subject=subject, body="b")
+
+                [request] = self.fake.seen("POST", "/gmail/messages/send")
+                _, parsed = self.sent_mail(request)
+                self.assertEqual(str(parsed["Subject"]).strip(), subject.strip())
+
+    def test_emoji_joiners_in_the_body_are_sent(self):
+        self.fake.on("POST", "/gmail/messages/send", 200, {"id": "sent-1", "threadId": "thread-2"})
+        # 가족 그림 글자는 폭 없는 이음 문자(U+200D)로 잇는다. U+200C 도 일부 글자에서 낱자를 나누는 데 쓴다.
+        text = "가족 \U0001F468‍\U0001F469‍\U0001F467 입니다. می‌خ"
 
         self.ok("send_message", to="a@example.com", subject="s", body=text)
 
         [request] = self.fake.seen("POST", "/gmail/messages/send")
         _, parsed = self.sent_mail(request)
         self.assertEqual(parsed.get_content().strip(), text)
+
+    def test_reread_of_the_composed_mail_catches_a_recipient_the_argument_did_not_name(self):
+        # 주소 모양 확인이 뚫렸다고 치고 그 확인만 느슨하게 한다. 조립한 메일을 다시 읽는 확인이 혼자 막아야 한다.
+        with mock.patch.object(self.module, "_address", lambda item: item):
+            for tool, extra in self.TOOLS:
+                for key in ("to", "cc"):
+                    with self.subTest(tool=tool, key=key):
+                        self.fails("GMAIL_INVALID_INPUT", tool,
+                                   **{**self.GOOD, key: self.HIDDEN_RECIPIENT, **extra})
+            self.fails("GMAIL_INVALID_INPUT", "send_message", **self.GOOD, bcc=self.HIDDEN_RECIPIENT)
+            self.fails("GMAIL_INVALID_INPUT", "send_message", **{**self.GOOD, "to": "Kim <a@example.com>, b"})
+
+        self.assertEqual(self.fake.seen(), [])
+
+    def test_reread_compares_the_recipients_in_order_and_per_header(self):
+        def raw(to, cc=None):
+            lines = ["To: " + to] + (["Cc: " + cc] if cc else []) + ["Subject: s", "", "b", ""]
+            return "\r\n".join(lines).encode("ascii")
+
+        same = {"To": ["a@example.com", "b@example.net"], "Cc": [], "Bcc": []}
+        self.module._confirm(raw("a@example.com, b@example.net"), "s", same)
+        for label, mail_bytes, recipients in (
+            ("other order", raw("b@example.net, a@example.com"), same),
+            ("one more", raw("a@example.com, b@example.net, c@example.org"), same),
+            ("one fewer", raw("a@example.com"), same),
+            ("moved to cc", raw("a@example.com", "b@example.net"), same),
+            ("unexpected cc", raw("a@example.com, b@example.net", "c@example.org"), same),
+        ):
+            with self.subTest(label):
+                with self.assertRaises(self.module.GmailError) as raised:
+                    self.module._confirm(mail_bytes, "s", recipients)
+                self.assertEqual(raised.exception.code, "GMAIL_INVALID_INPUT")
+
+    def test_reread_of_the_composed_mail_catches_a_subject_that_reads_differently(self):
+        # 제목의 모양 확인만 느슨하게 한다. 인코딩된 낱말은 다시 읽으면 다른 글이 된다.
+        with mock.patch.object(self.module, "ENCODED_WORD_RE", re.compile(r"(?!)")):
+            self.rejected_everywhere([{"subject": "=?utf-8?q?Wire_money?= =?utf-8?q?_now?="}])
+
+        self.assertEqual(self.fake.seen(), [])
 
 
 class SendOutcomeTest(GmailCase):

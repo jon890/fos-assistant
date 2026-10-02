@@ -55,13 +55,10 @@ MCP 서버 이름은 `gmail` 이다. 인자는 `search_messages` 의 `max_result
 | `send_message` | `to`, `subject`, `body`, `cc`, `bcc` | `{id, thread_id}` |
 | `reply_to_message` | `message_id`, `to`, `subject`, `body`, `cc` | `{id, thread_id}` |
 
-- 받는 사람(`to`, `cc`, `bcc`)은 쉼표로 나눈 주소 글이다. 받는 사람과 제목에 줄바꿈 같은 제어 문자가 있으면 거절한다.
-- **받는 사람은 카드에 보이는 글과 실제 받는 주소가 다르게 읽히지 않는 모양만 받는다.** 아래는 Gmail 을 부르지 않고 `GMAIL_INVALID_INPUT` 으로 거절한다
-  - 표시 이름에 `@` 가 있다. `"boss@example.com" <other@example.net>` 이 그 예다
-  - 괄호 주석이 있다. `a@example.com (b)` 가 그 예다
-  - 주소(addr-spec)에 ASCII 밖의 글자가 있다
-  - 받는 사람이나 제목에 화면에 보이지 않거나 글의 방향을 바꾸는 문자(Unicode 범주 Cf)가 있다. 방향 덮어쓰기 U+202E 와 폭 없는 공백 U+200B 가 그 예다
-- 승인 카드는 받는 사람을 인자의 글 그대로 보인다. 서버가 읽은 주소 목록으로 바꿔 보이지는 않는다. Control Plane 은 인자의 뜻을 모르기 때문이다(ADR-043). 위 거절로 글과 실제 주소가 갈리는 모양을 닫는다
+- **받는 사람(`to`, `cc`, `bcc`)은 쉼표로 나눈 주소만 받는다. 표시 이름을 받지 않는다.** `a@example.com, b@example.net` 모양이다. 카드에 보이는 글과 실제 받는 주소가 다르게 읽힐 길을 없앤다. 주소 하나는 ASCII 영문자, 숫자, `.!#$%&'*+/=?^_{|}~-` 로 된 이름과 `@` 와 점으로 이은 도메인이다. 그 밖의 모양은 Gmail 을 부르지 않고 `GMAIL_INVALID_INPUT` 으로 거절한다. `이름 <주소>`, 따옴표, 괄호 주석, 꺾쇠, `:` 와 `;` 가 든 그룹 문법, ASCII 밖 글자, 인코딩된 낱말(`=?utf-8?b?...?=`)이 모두 여기 든다
+- 서버는 조립한 메일을 다시 읽어 `To`, `Cc`, `Bcc` 의 주소 목록이 인자의 주소 목록과 같은지 확인한다. 다르면 보내지 않고 `GMAIL_INVALID_INPUT` 이다
+- 제목에 줄바꿈 같은 제어 문자, 화면에 보이지 않거나 글의 방향을 바꾸는 문자(Unicode 범주 Cf), 인코딩된 낱말(`=?...?=`)이 있으면 거절한다. 본문도 Cf 문자를 거절하되 그림 글자를 잇는 U+200C 와 U+200D 는 받는다
+- 승인 카드는 받는 사람을 인자의 글 그대로 보인다. 주소만 받으므로 카드의 글이 곧 받는 주소다
 - `to`, `subject`, `body` 는 비울 수 없다
 - `add_labels` 와 `remove_labels` 는 쉼표로 나눈 라벨 이름이다. 시스템 라벨은 `INBOX`, `UNREAD`, `STARRED`, `IMPORTANT` 처럼 그 이름을 쓰고 사용자 라벨은 화면에 보이는 이름을 쓴다. 서버가 이름을 라벨 번호로 바꾼다. 모르는 이름은 `GMAIL_INVALID_INPUT` 이다. 보관은 `remove_labels: "INBOX"` 다
 - **`add_labels` 나 `remove_labels` 에 `TRASH` 나 `SPAM` 이 있으면 Gmail 을 부르지 않고 `GMAIL_INVALID_INPUT` 으로 거절한다.** 휴지통과 스팸에 넣는 것도 꺼내는 것도 하지 않는다. 대소문자를 구분하지 않고, 이름이 그 라벨 번호로 바뀐 경우도 거절한다

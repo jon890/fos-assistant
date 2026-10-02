@@ -7,12 +7,11 @@
 
 import base64
 import binascii
+import email
 import email.errors
 import email.header
-import email.headerregistry
 import email.message
 import email.policy
-import email.utils
 import html.parser
 import http.client
 import json
@@ -64,6 +63,12 @@ ID_RE = re.compile(r"[A-Za-z0-9_-]{1,64}")
 CONTROL_RE = re.compile("[\x00-\x1f\x7f\x85\u2028\u2029]")
 # 답장 머리에 옮겨도 되는 글자다. 접힌 줄의 공백과 눈에 보이는 ASCII 뿐이다.
 REPLY_HEADER_UNSAFE_RE = re.compile(r"[^\t\r\n\x20-\x7e]")
+# 받는 사람 항목 하나의 모양이다. 주소뿐이고 ASCII 뿐이다. `docs/connectors/gmail.md` 의 글자 집합과 같다.
+ADDRESS_RE = re.compile(r"[A-Za-z0-9.!#$%&'*+/=?^_{|}~-]+@[A-Za-z0-9-]+(\.[A-Za-z0-9-]+)+")
+# RFC 2047 의 인코딩된 낱말이 시작하는 모양이다.
+ENCODED_WORD_RE = re.compile(r"=\?[^?\s]*\?[bBqQ]\?")
+# 본문에서 받는 Cf 문자다. 그림 글자와 일부 글자를 잇는 U+200C 와 U+200D 다.
+BODY_JOINERS = "\u200c\u200d"
 REJECTING_TOKEN_ERRORS = frozenset({"invalid_grant", "invalid_client"})
 READ = ToolAnnotations(read_only_hint=True)
 WRITE = ToolAnnotations(read_only_hint=False)
@@ -372,79 +377,79 @@ def _names(value: str) -> list:
     return [name.strip() for name in value.split(",") if name.strip()]
 
 
-def _invisible(value: str) -> bool:
-    """화면에 보이지 않거나 글의 방향을 바꾸는 문자(Unicode 범주 Cf)가 있는지 본다."""
-    return any(unicodedata.category(character) == "Cf" for character in value)
+def _invisible(value: str, allowed: str = "") -> bool:
+    """화면에 보이지 않거나 글의 방향을 바꾸는 문자(Unicode 범주 Cf)가 있는지 본다. `allowed` 의 글자는 받는다."""
+    return any(unicodedata.category(character) == "Cf" and character not in allowed for character in value)
 
 
-def _has_comment(value: str) -> bool:
-    """따옴표 밖에 괄호가 있는지 본다. 괄호 주석은 카드에 보이지만 받는 주소에는 들지 않는다."""
-    quoted, escaped = False, False
-    for character in value:
-        if escaped:
-            escaped = False
-        elif quoted and character == "\\":
-            escaped = True
-        elif character == '"':
-            quoted = not quoted
-        elif not quoted and character in "()":
-            return True
-    return False
+def _address(item: str) -> str:
+    """받는 사람 항목 하나가 주소뿐인지 확인해 그 주소를 낸다. 표시 이름과 그 밖의 모양은 거절한다."""
+    if not ADDRESS_RE.fullmatch(item):
+        raise GmailError(INVALID_INPUT)
+    return item
 
 
-def _recipients(value: str) -> tuple:
-    """받는 사람 글을 주소 목록으로 바꾼다. 제어 문자가 있거나 주소가 비었거나 `@` 가 없는 항목이 있으면 거절한다.
+def _recipients(value: str) -> list:
+    """받는 사람 글을 주소 목록으로 바꾼다. 쉼표로 나눈 항목마다 주소만 받는다. 빈 글은 빈 목록이다.
 
-    쉼표로 직접 나누지 않는다. 따옴표 안에 쉼표가 든 이름(`"Kim, A" <a@example.com>`)이 한 사람으로 읽혀야 한다.
-    승인 카드는 이 글을 그대로 보인다. 글과 실제 받는 주소가 다르게 읽히는 모양은 받지 않는다.
+    승인 카드는 이 글을 그대로 보인다. 주소만 받으므로 카드의 글이 곧 받는 주소다.
+    표준 라이브러리의 주소 문법으로 읽지 않는다. 표시 이름, 따옴표, 주석, 그룹, 인코딩된 낱말이 그 문법에서
+    카드의 글과 다른 주소로 읽힌다. 끝의 쉼표처럼 빈 항목이 있으면 거절한다.
     """
-    if not isinstance(value, str) or CONTROL_RE.search(value) or _invisible(value) or _has_comment(value):
+    if not isinstance(value, str) or CONTROL_RE.search(value):
         raise GmailError(INVALID_INPUT)
     if not value.strip():
-        return ()
-    addresses = []
-    for name, address in email.utils.getaddresses([value]):
-        if not address or "@" not in address:
+        return []
+    return [_address(item.strip()) for item in value.split(",")]
+
+
+def _confirm(raw: bytes, subject: str, recipients: dict) -> None:
+    """조립한 메일을 다시 읽어 받는 주소와 제목이 인자와 같은지 확인한다. 다르면 거절한다.
+
+    머리를 쓰는 쪽과 읽는 쪽이 글을 다르게 읽으면 승인한 것과 다른 주소로 나간다. 그 차이를 보내기 전에 잡는다.
+    """
+    parsed = email.message_from_bytes(raw, policy=email.policy.SMTP)
+    for name, expected in recipients.items():
+        headers = parsed.get_all(name) or []
+        found = [address.addr_spec for header in headers for address in header.addresses]
+        if len(headers) > 1 or found != expected:
             raise GmailError(INVALID_INPUT)
-        # 이름에 든 주소는 받는 사람처럼 읽힌다. ASCII 밖의 글자는 다른 글자와 똑같이 보이는 주소를 만든다.
-        if "@" in name or not address.isascii():
-            raise GmailError(INVALID_INPUT)
-        try:
-            addresses.append(email.headerregistry.Address(display_name=name, addr_spec=address))
-        except (ValueError, TypeError, IndexError, email.errors.MessageError):
-            raise GmailError(INVALID_INPUT) from None
-    if not addresses:
+    subjects = parsed.get_all("Subject") or []
+    if len(subjects) != 1 or str(subjects[0]).strip() != subject.strip():
         raise GmailError(INVALID_INPUT)
-    return tuple(addresses)
 
 
 def _compose(to: str, subject: str, body: str, cc: str, bcc: str, reply: dict | None = None) -> str:
     """인자 그대로 RFC 2822 메일을 만들어 base64url 로 낸다. 본문은 `text/plain` 뿐이다.
 
     제어 문자가 든 머리 값을 거절한다. 받는 사람이나 제목에 줄을 끼워 다른 머리를 넣지 못하게 한다.
-    제목의 보이지 않는 문자도 거절한다. 본문은 거절하지 않는다.
+    제목의 보이지 않는 문자와 인코딩된 낱말을 거절한다. 본문의 보이지 않는 문자도 거절하되 그림 글자를 잇는 문자는 받는다.
     """
     if not isinstance(subject, str) or not isinstance(body, str):
         raise GmailError(INVALID_INPUT)
     if CONTROL_RE.search(subject) or _invisible(subject) or not subject.strip() or not body.strip():
         raise GmailError(INVALID_INPUT)
-    to_list, cc_list, bcc_list = _recipients(to), _recipients(cc), _recipients(bcc)
-    if not to_list:
+    # 받는 쪽 프로그램이 인코딩된 낱말을 풀어 보이면 카드에서 읽은 제목과 다른 제목이 된다.
+    if ENCODED_WORD_RE.search(subject):
+        raise GmailError(INVALID_INPUT)
+    if _invisible(body, BODY_JOINERS):
+        raise GmailError(INVALID_INPUT)
+    recipients = {"To": _recipients(to), "Cc": _recipients(cc), "Bcc": _recipients(bcc)}
+    if not recipients["To"]:
         raise GmailError(INVALID_INPUT)
     message = email.message.EmailMessage(policy=email.policy.SMTP)
     try:
-        message["To"] = to_list
-        if cc_list:
-            message["Cc"] = cc_list
-        if bcc_list:
-            message["Bcc"] = bcc_list
+        for name, addresses in recipients.items():
+            if addresses:
+                message[name] = ", ".join(addresses)
         message["Subject"] = subject
         if reply and reply["message_id"]:
             message["In-Reply-To"] = reply["message_id"]
             message["References"] = (reply["references"] + " " + reply["message_id"]).strip()
         message.set_content(body, charset="utf-8")
         raw = message.as_bytes()
-    except (ValueError, TypeError, LookupError, IndexError, email.errors.MessageError):
+        _confirm(raw, subject, recipients)
+    except (ValueError, TypeError, LookupError, IndexError, AttributeError, email.errors.MessageError):
         raise GmailError(INVALID_INPUT) from None
     return base64.urlsafe_b64encode(raw).decode("ascii")
 
@@ -670,7 +675,7 @@ async def create_draft(to: str = "", subject: str = "", body: str = "", cc: str 
                        reply_to_message_id: str = "") -> CallToolResult:
     """초안함에 초안을 만든다. 보내지 않는다. 승인이 필요하다. 부르면 사용자에게 승인 요청이 간다.
 
-    `to`, `cc`, `bcc` 는 쉼표로 나눈 주소다. `to`, `subject`, `body` 는 비울 수 없다. `body` 는 글로만 쓴다.
+    `to`, `cc`, `bcc` 는 주소만 쉼표로 나눠 쓴다. 이름을 붙이지 않는다(`a@example.com, b@example.net`). `to`, `subject`, `body` 는 비울 수 없다. `body` 는 글로만 쓴다.
     `reply_to_message_id` 를 주면 그 메일의 스레드에 답장 초안을 만든다.
     """
     return await _answer(_create_draft(to, subject, body, cc, bcc, reply_to_message_id))
@@ -692,7 +697,7 @@ async def send_message(to: str = "", subject: str = "", body: str = "", cc: str 
                        bcc: str = "") -> CallToolResult:
     """새 메일을 보낸다. 승인이 필요하다. 부르면 사용자에게 승인 요청이 간다.
 
-    `to`, `cc`, `bcc` 는 쉼표로 나눈 주소다. `to`, `subject`, `body` 는 비울 수 없다. `body` 는 글로만 쓴다.
+    `to`, `cc`, `bcc` 는 주소만 쉼표로 나눠 쓴다. 이름을 붙이지 않는다(`a@example.com, b@example.net`). `to`, `subject`, `body` 는 비울 수 없다. `body` 는 글로만 쓴다.
     결과를 모른다고 나오면 다시 보내지 말고 사용자에게 보낸편지함을 확인해 달라고 한다.
     """
     return await _answer(_send_message(to, subject, body, cc, bcc))
@@ -704,7 +709,8 @@ async def reply_to_message(message_id: str = "", to: str = "", subject: str = ""
     """받은 메일의 스레드에 답장을 보낸다. 승인이 필요하다. 부르면 사용자에게 승인 요청이 간다.
 
     `message_id` 는 답장할 메일의 `id` 다. 받는 사람과 제목을 원래 메일에서 채우지 않는다.
-    `to` 에 받는 사람을, `subject` 에 제목(`Re: ...`)을 직접 넣는다. `cc` 는 쉼표로 나눈 주소다.
+    `to` 에 받는 사람을, `subject` 에 제목(`Re: ...`)을 직접 넣는다.
+    `to` 와 `cc` 는 주소만 쉼표로 나눠 쓴다. 이름을 붙이지 않는다.
     결과를 모른다고 나오면 다시 보내지 말고 사용자에게 보낸편지함을 확인해 달라고 한다.
     """
     return await _answer(_reply_to_message(message_id, to, subject, body, cc))
