@@ -888,20 +888,23 @@ class RecipientDisguiseTest(GmailCase):
 
         self.assertEqual(self.fake.seen(), [])
 
-    def test_combining_marks_in_the_subject_are_rejected_before_any_request(self):
+    def test_marks_that_draw_nothing_in_the_subject_are_rejected_before_any_request(self):
         self.rejected_everywhere([
             # 앞 글자에 붙어 아무것도 그리지 않는 결합 문자(범주 Mn)다. 글자 결합 문자와 변이 선택자다.
             {"subject": "s\u034ft"}, {"subject": "Hi\ufe0f"}, {"subject": "a\ufe00b"},
-            {"subject": "a\U000e0100b"}, {"subject": "a\u180bb"}, {"subject": "e\u0301"},
-            # 이모지 뒤여도 U+FE0F 를 겹쳐 쓰면 받지 않는다. 기호 바로 뒤의 하나만 받는다.
+            {"subject": "a\U000e0100b"}, {"subject": "a\u180bb"},
+            # 이모지 뒤여도 U+FE0F 를 겹쳐 쓰면 받지 않는다. 글자가 아닌 글자 바로 뒤의 하나만 받는다.
             {"subject": "\u2764\ufe0f\ufe0f"}, {"subject": "\ufe0f"}, {"subject": "가\ufe0f"},
         ])
 
         self.assertEqual(self.fake.seen(), [])
 
-    def test_emoji_presentation_selector_after_a_symbol_in_the_subject_is_sent(self):
+    def test_visible_marks_and_emoji_selectors_in_the_subject_are_sent(self):
         self.fake.on("POST", "/gmail/messages/send", 200, {"id": "sent-1", "threadId": "thread-2"})
-        for subject in ("생일 축하 \u2764\ufe0f", "\u263a\ufe0f 안녕", "Hello \u00e9 \ud55c\uae00"):
+        subjects = ("생일 축하 \u2764\ufe0f", "\u263a\ufe0f 안녕", "Hello \u00e9 \ud55c\uae00", "e\u0301",
+                    "\u0e2a\u0e27\u0e31\u0e2a\u0e14\u0e35\u0e04\u0e23\u0e31\u0e1a", "\u0928\u092e\u0938\u094d\u0924\u0947",
+                    "1\ufe0f\u20e3", "\u203c\ufe0f", "\u2194\ufe0f")
+        for subject in subjects:
             with self.subTest(subject=subject):
                 self.fake.requests.clear()
 

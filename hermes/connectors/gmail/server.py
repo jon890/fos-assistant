@@ -71,8 +71,12 @@ ENCODED_WORD_RE = re.compile(r"=\?[^?\s]*\?[bBqQ]\?")
 BLANK_LOOKING = frozenset("\u3164\u115f\u1160\uffa0\u2800")
 # 답장 머리에 옮길 원래 메일의 번호 하나의 모양이다. `<...>` 안에 꺾쇠와 공백이 없다.
 MESSAGE_ID_RE = re.compile(r"<[^<>\s]{1,250}>")
-# 제목에서 받는 결합 문자(범주 Mn)다. 이모지에 붙는 U+FE0F 뿐이고, 기호(범주 So 와 Sk) 바로 뒤에서만 받는다.
-SUBJECT_EMOJI_SELECTOR = "\ufe0f"
+# 앞 글자에 붙어 그 자체로는 아무것도 그리지 않는 결합 문자(범주 Mn)다. U+034F, 변이 선택자, 몽골어 자유 변이 선택자다.
+INVISIBLE_MARKS = frozenset("\u034f\u180b\u180c\u180d\u180f") | frozenset(map(chr, range(0xFE00, 0xFE10))) | frozenset(
+    map(chr, range(0xE0100, 0xE01F0)))
+# 이모지 표현을 고르는 U+FE0F 다. 글자가 아닌 글자(범주 So, Sk, Sm, Po, Nd) 바로 뒤에서만 받는다.
+EMOJI_SELECTOR = "\ufe0f"
+EMOJI_BASE_CATEGORIES = frozenset({"So", "Sk", "Sm", "Po", "Nd"})
 # 본문에서 받는 Cf 문자다. 그림 글자와 일부 글자를 잇는 U+200C 와 U+200D 다.
 BODY_JOINERS = "\u200c\u200d"
 REJECTING_TOKEN_ERRORS = frozenset({"invalid_grant", "invalid_client"})
@@ -393,18 +397,19 @@ def _invisible(value: str, allowed: str = "") -> bool:
 
 
 def _invisible_subject(value: str) -> bool:
-    """제목에 `_invisible` 이 잡는 글자나 결합 문자(범주 Mn)가 있는지 본다.
+    """제목에 `_invisible` 이 잡는 글자나 그 자체로는 그려지지 않는 결합 문자(`INVISIBLE_MARKS`)가 있는지 본다.
 
     U+034F 와 변이 선택자는 앞 글자에 붙어 아무것도 그리지 않는다. 카드에서 읽은 제목과 같게 보이면서 다른 글이 된다.
-    결합 문자는 모두 거절한다. 다만 이모지에 붙는 U+FE0F 는 기호 바로 뒤에서만 받는다.
-    결합 문자가 든 글자(분해한 `é` 등)는 한 글자로 합쳐 쓴다.
+    태국어 모음이나 분해한 `é` 처럼 눈에 보이게 그려지는 결합 문자는 받는다.
+    이모지에 붙는 U+FE0F 는 글자가 아닌 글자 바로 뒤에서만 받는다. 글자 뒤나 겹쳐 쓴 U+FE0F 는 거절한다.
     """
     if _invisible(value):
         return True
     for index, character in enumerate(value):
-        if unicodedata.category(character) != "Mn":
+        if character not in INVISIBLE_MARKS:
             continue
-        if character == SUBJECT_EMOJI_SELECTOR and index > 0 and unicodedata.category(value[index - 1]) in ("So", "Sk"):
+        if (character == EMOJI_SELECTOR and index > 0
+                and unicodedata.category(value[index - 1]) in EMOJI_BASE_CATEGORIES):
             continue
         return True
     return False
@@ -452,7 +457,7 @@ def _compose(to: str, subject: str, body: str, cc: str, bcc: str, reply: dict | 
     """인자 그대로 RFC 2822 메일을 만들어 base64url 로 낸다. 본문은 `text/plain` 뿐이다.
 
     제어 문자가 든 머리 값을 거절한다. 받는 사람이나 제목에 줄을 끼워 다른 머리를 넣지 못하게 한다.
-    제목의 보이지 않는 문자와 결합 문자, 인코딩된 낱말을 거절한다. 본문의 보이지 않는 문자도 거절하되 그림 글자를 잇는 문자는 받는다.
+    제목의 보이지 않는 문자와 그려지지 않는 결합 문자, 인코딩된 낱말을 거절한다. 본문의 보이지 않는 문자도 거절하되 그림 글자를 잇는 문자는 받는다.
     """
     if not isinstance(subject, str) or not isinstance(body, str):
         raise GmailError(INVALID_INPUT)
