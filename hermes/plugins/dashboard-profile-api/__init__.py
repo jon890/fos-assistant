@@ -39,7 +39,7 @@ Hermes core 는 고치지 않는다.
 
 사람의 쿠키 요청은 기존 Hermes 처리기가 맡는다. 검사하지 않는다.
 
-커넥터 경로의 계약은 `docs/connectors.md` 의 「대시보드 plugin 계약」 이 소유한다(ADR-043).
+커넥터 경로의 계약은 `docs/backend/connector-install.md` 의 「대시보드 plugin 계약」 이 소유한다(ADR-043).
 이 plugin 은 커넥터의 이름을 코드에 두지 않는다. 운영 목록의 plugin 디렉터리마다 `connector.json` 을 읽는다.
 
 ## 만든 자리에서 설정 틀을 쓴다
@@ -221,7 +221,7 @@ ERROR_WORDS = frozenset({"credential_rejected", "forbidden", "invalid_input", "u
 # 셸, 파일, 기억, 스킬, 위임 도구는 manifest 로 열리지 않는다.
 CONNECTOR_TOOLSETS = frozenset({"vision"})
 # `connector.json` 의 `schema: 2` 가 도구마다 선언하는 위험도와 승인 방식이다(ADR-049).
-# 표는 `docs/connectors.md` 의 「도구 정책」 과 같다.
+# 표는 `docs/backend/connector-tool-policy.md` 의 「도구 정책」 과 같다.
 TOOL_RISKS = ("READ", "SENSITIVE", "WRITE", "DESTRUCTIVE", "FINANCIAL")
 # 느슨한 것에서 엄격한 것의 순서다. 하한 비교가 이 순서의 자리를 쓴다.
 TOOL_APPROVALS = ("none", "required", "always")
@@ -905,7 +905,7 @@ def _connector_server(manifest: dict) -> dict:
 
 
 def _connector_tool_map(state: dict) -> dict:
-    """소유 기록의 커넥터로 만든 이름 대응이다. 형식은 `docs/connectors.md` 의 「이름 대응」 이 갖는다.
+    """소유 기록의 커넥터로 만든 이름 대응이다. 형식은 `docs/backend/connector-tool-policy.md` 의 「이름 대응」 이 갖는다.
 
     운영 목록에서 빠졌거나 manifest 를 읽을 수 없는 커넥터는 싣지 않는다. 대응이 없는 도구는 hook 이 막는다.
     """
@@ -1193,7 +1193,7 @@ def _connector_config(profile_dir: pathlib.Path, plugin: str, enabled: bool) -> 
 def _policy_hook_active(profile_dir: pathlib.Path, config: dict, state: dict) -> bool:
     """그 profile 에서 커넥터 도구 호출이 정책 hook 을 거치는지 본다. 읽다가 예외가 나면 거짓이다.
 
-    조건은 `docs/connectors.md` 의 「hook 이 켜져 있는지」 가 갖는다. 확인한 시점의 파일만 본다.
+    조건은 `docs/backend/connector-tool-policy.md` 의 「hook 이 켜져 있는지」 가 갖는다. 확인한 시점의 파일만 본다.
     """
     try:
         plugins = config["plugins"]

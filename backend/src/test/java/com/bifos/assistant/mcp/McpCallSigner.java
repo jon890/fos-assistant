@@ -25,7 +25,7 @@ import tools.jackson.databind.node.ObjectNode;
  * MCP 검사가 profile 플러그인처럼 {@code _fos_ctx} 와 하위 에이전트 등록 본문을 서명하고, 부모가 될 실행 줄을 준비하는
  * 도우미다.
  *
- * <p>서명은 운영 코드를 부르지 않고 {@code docs/hermes/delegation.md} 의 「{@code _fos_ctx} 계약」 대로 따로
+ * <p>서명은 운영 코드를 부르지 않고 {@code docs/hermes/fos-ctx.md} 의 「{@code _fos_ctx} 계약」 대로 따로
  * 계산한다. key 는 토큰 원문을 SHA-256 한 소문자 16진수 문자열의 UTF-8 바이트이고, 서명할 글은
  * {@code v1\n<tool>\n<root>\n<session>\n<tool_call_id>} 다. 운영 코드로 서명하면 구현과 함께 틀려도 통과한다.
  */
@@ -60,7 +60,7 @@ public final class McpCallSigner {
     /**
      * 플러그인이 {@code subagent_start} hook 에서 보내는 하위 에이전트 session 등록 본문이다.
      *
-     * <p>{@code docs/hermes/delegation.md} 의 「하위 에이전트 session 등록 계약」 대로 서명할 글은
+     * <p>{@code docs/hermes/fos-ctx.md} 의 「하위 에이전트 session 등록 계약」 대로 서명할 글은
      * {@code v1-subagent\n<parent_root>\n<parent>\n<child>} 다. 서명하지 않는 두 칸은 hook 이 받은 모양대로 채운다.
      */
     static ObjectNode subagentBody(
@@ -81,7 +81,7 @@ public final class McpCallSigner {
     /**
      * 플러그인이 커넥터 도구 호출 전에 보내는 판정 요청 본문이다.
      *
-     * <p>{@code docs/connectors.md} 의 「도구 호출 판정」 대로 서명할 글은
+     * <p>{@code docs/backend/connector-tool-policy.md} 의 「도구 호출 판정」 대로 서명할 글은
      * {@code v1-connector-policy\n<hermes_tool>\n<root>\n<session>\n<tool_call_id>\n<args_json 의 SHA-256 16진수>} 다.
      * {@code tool} 은 서명하지 않는다. null 이면 JSON null 로 싣는다.
      */

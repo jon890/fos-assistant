@@ -11,7 +11,7 @@ import tools.jackson.databind.JsonNode;
 /**
  * profile 플러그인이 {@code subagent_start} hook 에서 보낸 하위 에이전트 session 등록 본문에서 서명을 확인한 값이다.
  *
- * <p>계약은 ADR-037 과 {@code docs/hermes/delegation.md} 의 「하위 에이전트 session 등록 계약」 이 갖는다. 서명은
+ * <p>계약은 ADR-037 과 {@code docs/hermes/fos-ctx.md} 의 「하위 에이전트 session 등록 계약」 이 갖는다. 서명은
  * {@link McpCallContext} 와 같은 HMAC-SHA256 이고 key 도 같다. 서명할 글만 다르다. {@code v1-subagent},
  * {@code parent_root_session_id}, {@code parent_session_id}, {@code child_session_id} 를 이 순서로 {@code \n}
  * 하나로 이은 UTF-8 이다. 첫 줄이 {@code _fos_ctx} 의 도구 이름 자리와 달라 두 서명은 서로 쓰이지 않는다.

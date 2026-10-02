@@ -12,6 +12,7 @@ import {
   formatTokens,
   formatWhen,
 } from "@/lib/format";
+import { providerLabel } from "@/lib/provider-label";
 import { executionStatusVariant } from "@/lib/execution-status";
 import {
   ExecutionTree,
@@ -165,7 +166,7 @@ export function ExecutionDetail({ executionId }: { executionId: number }) {
             <div>
               <dt className="text-muted-foreground">모델</dt>
               <dd className="truncate">
-                {[summary.provider, summary.model]
+                {[providerLabel(summary.provider), summary.model]
                   .filter(Boolean)
                   .join(" · ") || "-"}
               </dd>

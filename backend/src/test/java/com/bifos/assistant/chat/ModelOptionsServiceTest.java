@@ -121,8 +121,8 @@ class ModelOptionsServiceTest {
     }
 
     @Test
-    @DisplayName("다시 읽다 Hermes 가 실패하면 들고 있던 목록을 돌려주고 다음에 다시 읽는다")
-    void returnsHeldListAndRereadsNextTimeWhenRereadFailsWithHermes() {
+    @DisplayName("다시 읽다 Hermes 가 실패하면 들고 있던 목록을 돌려주고 1분 동안은 Hermes 를 부르지 않다가 1분이 지나면 다시 읽는다")
+    void returnsHeldListWithoutCallingHermesForOneMinuteAfterFailedRereadThenRereads() {
         when(hermes.readCatalog(anyString(), anyString()))
                 .thenReturn(catalog("openai-codex", provider("openai-codex", "old")))
                 .thenThrow(new ApiException(ErrorCode.HERMES_UNAVAILABLE, "down"))
@@ -131,11 +131,60 @@ class ModelOptionsServiceTest {
 
         clock.advance(TTL);
         ModelOptions stale = service.optionsFor(dad, "dad");
-        ModelOptions recovered = service.optionsFor(dad, "dad");
+        clock.advance(Duration.ofSeconds(59));
+        ModelOptions withinDelay = service.optionsFor(dad, "dad");
 
         assertThat(stale.providers().get(0).models()).containsExactly("old");
+        assertThat(withinDelay.providers().get(0).models()).containsExactly("old");
+        verify(hermes, times(2)).readCatalog(anyString(), anyString());
+
+        clock.advance(Duration.ofSeconds(1));
+        ModelOptions recovered = service.optionsFor(dad, "dad");
+
         assertThat(recovered.providers().get(0).models()).containsExactly("new");
         verify(hermes, times(3)).readCatalog(anyString(), anyString());
+    }
+
+    @Test
+    @DisplayName("profile 기본값은 들고 있는 목록에서 읽어 Hermes 를 다시 부르지 않는다")
+    void readsProfileDefaultFromHeldCatalog() {
+        when(hermes.readCatalog(anyString(), anyString()))
+                .thenReturn(catalog("openai-codex", provider("openai-codex", "a")));
+        Agent agent = agentRepository.findByCode("dad").orElseThrow();
+        service.optionsFor(dad, "dad");
+
+        ModelChoice profileDefault = service.profileDefaultOf(agent);
+
+        assertThat(profileDefault).isEqualTo(ModelChoice.stored("openai-codex", "example-model", null));
+        verify(hermes, times(1)).readCatalog(anyString(), anyString());
+    }
+
+    @Test
+    @DisplayName("profile 기본값을 다시 읽다 Hermes 가 실패하면 들고 있던 값을 돌려준다")
+    void returnsHeldProfileDefaultWhenRereadFails() {
+        when(hermes.readCatalog(anyString(), anyString()))
+                .thenReturn(catalog("openai-codex", provider("openai-codex", "a")))
+                .thenThrow(new ApiException(ErrorCode.HERMES_UNAVAILABLE, "down"));
+        Agent agent = agentRepository.findByCode("dad").orElseThrow();
+        service.profileDefaultOf(agent);
+
+        clock.advance(TTL);
+
+        assertThat(service.profileDefaultOf(agent))
+                .isEqualTo(ModelChoice.stored("openai-codex", "example-model", null));
+        verify(hermes, times(2)).readCatalog(anyString(), anyString());
+    }
+
+    @Test
+    @DisplayName("profile 기본값을 한 번도 읽지 못했으면 HERMES UNAVAILABLE 을 삼키지 않는다")
+    void profileDefaultThrowsHermesUnavailableWhenNeverRead() {
+        when(hermes.readCatalog(anyString(), anyString()))
+                .thenThrow(new ApiException(ErrorCode.HERMES_UNAVAILABLE, "down"));
+        Agent agent = agentRepository.findByCode("dad").orElseThrow();
+
+        assertThatThrownBy(() -> service.profileDefaultOf(agent))
+                .isInstanceOfSatisfying(
+                        ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.HERMES_UNAVAILABLE));
     }
 
     @Test
@@ -152,14 +201,24 @@ class ModelOptionsServiceTest {
     }
 
     @Test
-    @DisplayName("다시 읽다 key 가 없어져도 그 예외를 올린다")
-    void rethrowsWhenKeyDisappearsDuringReread() {
+    @DisplayName("다시 읽다 Hermes 가 답하지 않는 것과 다른 까닭으로 실패해도 들고 있던 목록을 돌려준다")
+    void returnsHeldListWhenRereadFailsWithOtherErrorCode() {
         when(hermes.readCatalog(anyString(), anyString()))
                 .thenReturn(catalog("openai-codex", provider("openai-codex", "a")))
                 .thenThrow(new ApiException(ErrorCode.HERMES_PROFILE_KEY_MISSING, "no key"));
         service.optionsFor(dad, "dad");
 
         clock.advance(TTL);
+
+        assertThat(service.optionsFor(dad, "dad").providers().get(0).models()).containsExactly("a");
+        verify(hermes, times(2)).readCatalog(anyString(), anyString());
+    }
+
+    @Test
+    @DisplayName("한 번도 읽지 못한 profile 은 Hermes 가 답하지 않는 것과 다른 까닭의 예외도 그대로 올린다")
+    void rethrowsOtherErrorCodeWhenNeverRead() {
+        when(hermes.readCatalog(anyString(), anyString()))
+                .thenThrow(new ApiException(ErrorCode.HERMES_PROFILE_KEY_MISSING, "no key"));
 
         assertThatThrownBy(() -> service.optionsFor(dad, "dad"))
                 .isInstanceOfSatisfying(

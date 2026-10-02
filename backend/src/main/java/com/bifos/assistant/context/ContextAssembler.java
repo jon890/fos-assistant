@@ -96,8 +96,22 @@ public class ContextAssembler {
     private static void appendAlways(ContextBuilder builder, String header, List<Memory> memories, MemoryScope scope) {
         memories.stream()
                 .filter(memory -> memory.scope() == scope)
+                .filter(ContextAssembler::plainOrSkipped)
                 .sorted(Comparator.comparing(Memory::id))
                 .forEach(memory -> builder.append(memory.id(), header, "- " + memory.content()));
+    }
+
+    /**
+     * 본문을 풀지 않는다. 암호문인 줄은 싣지 않는다(ADR-055).
+     *
+     * <p>민감 항목은 항상 층에 오지 못하므로 여기 암호문이 있으면 데이터가 어긋난 것이다. 번호만 경고로 남긴다.
+     */
+    private static boolean plainOrSkipped(Memory memory) {
+        if (memory.sealed()) {
+            log.warn("memory context skipped a sealed always item memoryId={}", memory.id());
+            return false;
+        }
+        return true;
     }
 
     private static void appendIndex(ContextBuilder builder, List<Memory> memories) {

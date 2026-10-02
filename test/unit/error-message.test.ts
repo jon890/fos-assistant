@@ -14,6 +14,11 @@ test("다시 생성한 스킬 커맨드가 거절되면 영어 원문 대신 해
     "이 스킬을 이 에이전트에서 쓸 수 없어요. 스킬이 꺼졌거나 지워졌는지 확인해 주세요.");
 });
 
+test("민감 항목을 목록에서 고치려다 거절되면 여기서 고칠 수 없다고 알린다", () => {
+  assert.equal(describeError("MEMORY_SENSITIVE_NOT_EDITABLE", "a sensitive memory cannot be edited from the list"),
+    "민감한 항목은 여기서 고칠 수 없어요.");
+});
+
 test("관리 화면에는 profile과 연결 실패 원인을 구분해 알린다", () => {
   assert.match(describeAdminError("PERSON_PROFILE_TAKEN", "원본 오류"), /profile 이름/);
   assert.match(describeAdminError("HERMES_PROFILE_EXISTS", "원본 오류"), /Hermes profile/);

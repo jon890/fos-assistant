@@ -4,6 +4,7 @@ import { cn } from "cn";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { agentLabel, formatCost, formatTokens, formatWhen } from "@/lib/format";
+import { providerLabel } from "@/lib/provider-label";
 import { executionStatusVariant } from "@/lib/execution-status";
 import {
   actualCostLabel,
@@ -76,7 +77,8 @@ export function ExecutionCard({
         {isAdmin ? (
           <>
             <p className="mt-3 truncate text-sm text-muted-foreground">
-              {execution.provider ?? "-"} / {execution.model ?? "-"}
+              {providerLabel(execution.provider) ?? "-"} /{" "}
+              {execution.model ?? "-"}
             </p>
             {/* 표처럼 모델 옆에 붙이지 않고 다음 줄에 따로 둔다. 까닭은 `reasoningEffortLabel` 에 있고, 붙이면 긴 모델 이름과 함께 잘린다. */}
             <p className="text-xs text-muted-foreground">

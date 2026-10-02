@@ -23,6 +23,11 @@ public enum ErrorCode {
     MEMORY_SENSITIVE_ALWAYS(HttpStatus.BAD_REQUEST),
     /** 민감 본문을 암호화하거나 풀 key 가 없다. 평문으로 내려 저장하지 않는다(ADR-055). */
     MEMORY_ENCRYPTION_UNAVAILABLE(HttpStatus.CONFLICT),
+    /**
+     * 민감 항목은 Memory 목록의 수정 경로로 고치지 못한다. 목록이 본문을 싣지 않아 그 요청이 본문을 읽지 않은 채
+     * 덮어쓴다(ADR-055).
+     */
+    MEMORY_SENSITIVE_NOT_EDITABLE(HttpStatus.CONFLICT),
     AGENT_DISABLED(HttpStatus.CONFLICT),
     /** 다른 요청이 같은 에이전트 설정을 바꾸고 있어 잠금 대기 시간이 지났다. */
     AGENT_BUSY(HttpStatus.CONFLICT),

@@ -2,6 +2,8 @@ package com.bifos.assistant.chat;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.when;
 
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.agent.domain.AgentVisibility;
@@ -13,11 +15,15 @@ import com.bifos.assistant.chat.application.ChatService;
 import com.bifos.assistant.chat.application.ChatTurn;
 import com.bifos.assistant.chat.domain.Conversation;
 import com.bifos.assistant.chat.domain.ModelChoice;
+import com.bifos.assistant.chat.domain.ModelHidden;
 import com.bifos.assistant.chat.infra.ChatMessageRepository;
 import com.bifos.assistant.chat.infra.ConversationRepository;
+import com.bifos.assistant.chat.infra.ModelHiddenRepository;
+import com.bifos.assistant.hermes.HermesModelClient;
 import com.bifos.assistant.hermes.HermesRunEventStream;
 import com.bifos.assistant.hermes.HermesRunsClient;
 import com.bifos.assistant.hermes.StubHermesRunsClient;
+import com.bifos.assistant.hermes.dto.HermesModelCatalog;
 import com.bifos.assistant.hermes.dto.HermesRunResult;
 import com.bifos.assistant.hermes.dto.SessionRuntime;
 import com.bifos.assistant.hermes.dto.TokenUsage;
@@ -37,6 +43,7 @@ import java.net.URISyntaxException;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -93,6 +100,13 @@ class ModelSelectionTest {
         }
     }
 
+    /** Hermes 가 늘 답하는 목록이다. profile 의 기본 모델이 {@code example-provider} 의 {@code example-model} 이다. */
+    private static final HermesModelCatalog PROFILE_CATALOG = new HermesModelCatalog(
+            "example-provider",
+            "example-model",
+            List.of(new HermesModelCatalog.Provider(
+                    "example-provider", "example-provider", List.of("example-model"), Map.of())));
+
     /** 가격표에 있는 모델로 돌았다면 금액이 나오는 사용량이다. */
     private static final TokenUsage PRICED_USAGE = new TokenUsage(1_000L, 0L, 500L, 1_500L);
 
@@ -120,8 +134,20 @@ class ModelSelectionTest {
     @Autowired
     HermesRunsClient hermes;
 
+    @Autowired
+    ModelHiddenRepository hiddenModels;
+
     @MockitoBean
     HermesRunEventStream eventStream;
+
+    /**
+     * profile 의 기본 모델을 읽는 길이다. 숨김이 있는 그룹의 기본값 실행만 이 목록을 읽는다.
+     *
+     * <p>읽은 목록은 Spring context 가 사는 동안 메모리에 남는다. 그래서 검사마다 다른 목록을 주지 않고 늘 같은
+     * 목록을 답하게 한다. 어느 검사가 먼저 읽어도 결과가 같다.
+     */
+    @MockitoBean
+    HermesModelClient modelClient;
 
     private CurrentUser user;
 
@@ -132,6 +158,7 @@ class ModelSelectionTest {
     @BeforeEach
     void setUp() {
         stub().reset();
+        when(modelClient.readCatalog(anyString(), anyString())).thenReturn(PROFILE_CATALOG);
         executionEvents.deleteAll();
         executions.deleteAll();
         messages.deleteAll();
@@ -336,6 +363,40 @@ class ModelSelectionTest {
             assertThat(command.provider()).isEqualTo("openai-codex");
             assertThat(command.model()).isEqualTo("example-model");
             assertThat(command.reasoningEffort()).isEqualTo("low");
+        });
+    }
+
+    @Test
+    @DisplayName("profile 의 기본 모델을 숨기면 모델을 싣지 않는 실행을 제출하지 않고 MODEL HIDDEN 으로 남기며 숨김을 비우면 다시 돈다")
+    void rejectsDefaultRunWhileProfileDefaultModelIsHiddenAndRunsAgainAfterUnhiding() {
+        Long conversationId = chat.startEmpty(user, AGENT_CODE).id();
+        stub().willReturn(succeeded("run-1", "sess-1"));
+        hiddenModels.save(ModelHidden.of(user.groupId(), "example-provider", "example-model"));
+        try {
+            assertThatThrownBy(() -> chat.send(user, conversationId, "안녕", null))
+                    .isInstanceOf(ApiException.class)
+                    .extracting(ex -> ((ApiException) ex).code())
+                    .isEqualTo(ErrorCode.MODEL_HIDDEN);
+
+            assertThat(stub().received()).as("숨긴 동안 Hermes 에 제출한 수").isEmpty();
+            assertThat(executions.findByUserIdOrderByIdDesc(user.id(), PageRequest.of(0, 10)))
+                    .singleElement()
+                    .satisfies(failed -> {
+                        assertThat(failed.status()).isEqualTo(ExecutionStatus.FAILED);
+                        assertThat(failed.errorCode()).isEqualTo(ErrorCode.MODEL_HIDDEN.name());
+                    });
+        } finally {
+            // 이 그룹은 다른 검사도 쓴다. 숨김이 남으면 그 검사들의 기본값 실행이 막힌다.
+            hiddenModels.deleteAll(hiddenModels.findByGroupIdOrderByProviderAscModelAsc(user.groupId()));
+        }
+
+        ChatTurn turn = chat.send(user, conversationId, "안녕", null);
+
+        assertThat(executions.findById(turn.executionId()).orElseThrow().status())
+                .isEqualTo(ExecutionStatus.SUCCEEDED);
+        assertThat(stub().received()).singleElement().satisfies(command -> {
+            assertThat(command.provider()).as("provider").isNull();
+            assertThat(command.model()).as("model").isNull();
         });
     }
 

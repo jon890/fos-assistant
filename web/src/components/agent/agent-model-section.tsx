@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { Notice } from "@/components/ui/notice";
 import {
   getAgentModelSettings,
+  hidesProfileDefault,
   type AgentModelSettings,
 } from "@/lib/model-settings";
 import { AgentModelDefaultForm } from "./agent-model-default-form";
@@ -65,6 +66,17 @@ export function AgentModelSection({ code }: Props) {
             >
               모델 목록을 불러오지 못했어요. 지금은 저장된 기본 모델을 비우거나
               숨김을 푸는 것만 할 수 있어요.
+            </Notice>
+          ) : null}
+          {hidesProfileDefault(state.settings) ? (
+            <Notice
+              variant="warning"
+              className="mt-3"
+              data-testid="agent-model-profile-default-hidden"
+            >
+              이 에이전트는 기본 모델을 정하지 않았는데 profile 의 기본 모델이
+              숨겨져 있어요. 기본 모델을 정하거나 숨김을 풀기 전에는 모델을
+              고르지 않은 대화가 실패해요.
             </Notice>
           ) : null}
           <AgentModelDefaultForm

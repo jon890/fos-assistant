@@ -6,13 +6,14 @@
 - `docs/adr/ADR-057-문서는-사람이-화면에서-직접-쓰고-고친다.md`
 - `docs/adr/ADR-056-다른-서비스는-사용자에-묶인-서비스-토큰으로-문서를-읽기만-한다.md`
 
-세 plan 가운데 셋째다. **plan61-memory-document-service-api 가 main 에 머지된 뒤에 시작한다.**
+**plan61-memory-document-service-api 가 main 에 머지된 뒤에 시작한다.**
 `backend/src/main/java/com/bifos/assistant/memory/presentation/MemoryDocumentController.java` 와 `ServiceTokenController.java` 가 없으면 `PHASE_BLOCKED: plan61 이 머지되지 않았다` 를 출력하고 멈춘다.
 
 ## PR 과 계획서 삭제
 
 - plan 하나를 PR 하나로 올린다. 그 plan 의 계획서 디렉터리는 그 PR 의 마감 단계에서 지운다. phase 는 `tasks/` 를 바꾸지 않는다
-- 세 plan 의 계획서와 ADR-055, ADR-056, ADR-057 초안은 한 브랜치에서 함께 썼다. 먼저 올리는 PR 에 뒤 plan 의 계획서와 아직 구현하지 않은 ADR 이 함께 실린다. 그 ADR 의 `status` 와 `docs/adr/INDEX.md` 는 「아직 구현 전이다」 로 적혀 있고, 구현한 plan 의 마지막 phase 가 그 글을 지운다
+- 이 계획서와 ADR-056, ADR-057, ADR-058 은 구현보다 먼저 main 에 들어와 있다. 서로 기대는 구현 PR 이 여럿이라 공통 계약을 먼저 정했다(루트 `AGENTS.md` 의 「머지는 PR 로 한다」 가 그 예외를 정한다). 그 ADR 의 `status` 와 `docs/adr/INDEX.md` 는 「아직 구현 전이다」 로 적혀 있고, 구현한 plan 의 마지막 phase 가 그 글을 지운다
+- 순서는 문서 API 와 서비스 토큰(plan61), 화면(plan62), 기존 지식 이관(plan63)이다. 앞의 것이 main 에 머지된 뒤에 다음 것을 시작한다
 
 ## 모든 phase 에 걸리는 규칙
 
@@ -32,7 +33,7 @@
 | `DOCUMENT` | 문서 |
 | collection | 영역. 이름은 `displayName` 을 보인다 |
 | `documentKey` | 문서 이름 |
-| `SENSITIVE` | 민감한 내용 |
+| `SENSITIVE` | 배지는 「민감」, 체크박스 문구는 「민감한 내용이에요」 |
 | `revision` | N번째 판 |
 | 서비스 토큰 | 외부 서비스 연결 토큰. 절 제목은 「외부 서비스 연결」 |
 
@@ -41,3 +42,6 @@
 - collection 탭, 판 이력 화면, 출처 표시
 - 그룹 공용 문서, 제목 고치기
 - 관리자가 에이전트의 collection 과 민감 허용을 고치는 화면
+- 기존 지식 저장소의 묶음을 올리는 「가져오기」 절. plan63 이 만든다(ADR-058)
+- 만료 없는 토큰. 만들지 못한다(ADR-056)
+- 민감한 `MEMORY` 항목을 「나에 대해 아는 것」 절에서 고치는 일. backend 가 `MEMORY_SENSITIVE_NOT_EDITABLE` 로 거절한다(ADR-055). 화면은 그 문구를 보이는 것으로 충분하다

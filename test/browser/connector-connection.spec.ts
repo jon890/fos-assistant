@@ -540,6 +540,74 @@ test("연결을 해제하면 허락 목록을 다시 읽어 거둔 허락이 사
   await expect(page.getByTestId("connector-grants")).toHaveCount(0);
 });
 
+test("연결 해제 뒤 허락을 다시 읽지 못하면 옛 허락을 지우고 읽지 못했다고 알린다", async ({
+  page,
+}) => {
+  let disconnectedNow = false;
+  let grantsReply: "ok" | "fail" | "empty" = "ok";
+  const revokeRequests: string[] = [];
+  await page.route(`**/api/connections/${DEMO_ID}`, (route) => {
+    if (route.request().method() === "DELETE") {
+      disconnectedNow = true;
+      grantsReply = "fail";
+      return route.fulfill({ json: disconnected });
+    }
+    return route.fulfill({ json: disconnectedNow ? disconnected : ready });
+  });
+  await page.route("**/api/connector-grants", (route) => {
+    if (grantsReply === "fail") {
+      return route.fulfill({
+        status: 500,
+        json: { code: "INTERNAL_ERROR" },
+      });
+    }
+    return route.fulfill({
+      json:
+        grantsReply === "empty"
+          ? []
+          : [
+              {
+                grantId: 31,
+                connectorId: DEMO_ID,
+                toolName: "write_note",
+                title: "메모 쓰기",
+                expiresAt: "2026-10-30T12:00:00Z",
+              },
+            ],
+    });
+  });
+  await page.route("**/api/connector-grants/*", (route) => {
+    revokeRequests.push(`${route.request().method()} ${route.request().url()}`);
+    return route.fulfill({ status: 204 });
+  });
+  await page.goto(`/connections/${DEMO_ID}`);
+  await expect(page.getByTestId("connector-grant")).toHaveCount(1);
+
+  await page.getByRole("button", { name: "연결 해제" }).click();
+  await expect(page.getByTestId("connection-status")).toHaveText("연결 안 됨");
+  await expect(page.getByTestId("connector-grant")).toHaveCount(0);
+  await expect(page.getByTestId("connector-grants-unavailable")).toHaveText(
+    "허락 상태를 확인하지 못했어요.",
+  );
+
+  grantsReply = "empty";
+  await page.getByTestId("connector-grants-retry").click();
+  await expect(page.getByTestId("connector-grants")).toHaveCount(0);
+  expect(revokeRequests).toEqual([]);
+});
+
+test("허락을 처음 읽지 못해도 읽지 못했다고 알린다", async ({ page }) => {
+  await page.route(`**/api/connections/${DEMO_ID}`, (route) =>
+    route.fulfill({ json: ready }),
+  );
+  await page.route("**/api/connector-grants", (route) =>
+    route.fulfill({ status: 500, json: { code: "INTERNAL_ERROR" } }),
+  );
+  await page.goto(`/connections/${DEMO_ID}`);
+  await expect(page.getByTestId("connector-grants-unavailable")).toBeVisible();
+  await expect(page.getByTestId("connector-grant")).toHaveCount(0);
+});
+
 test("허락한 동작이 없으면 그 제목을 보이지 않는다", async ({ page }) => {
   await page.route(`**/api/connections/${DEMO_ID}`, (route) =>
     route.fulfill({ json: ready }),

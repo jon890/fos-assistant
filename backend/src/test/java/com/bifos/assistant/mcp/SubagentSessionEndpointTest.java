@@ -42,7 +42,7 @@ import tools.jackson.databind.node.ObjectNode;
 /**
  * 실제 HTTP 경계에서 하위 에이전트 session 등록 경로의 인증과 응답 계약을 확인한다(ADR-037).
  *
- * <p>계약은 {@code docs/hermes/delegation.md} 의 「하위 에이전트 session 등록 계약」 이다. 본문 서명은 운영 코드가
+ * <p>계약은 {@code docs/hermes/fos-ctx.md} 의 「하위 에이전트 session 등록 계약」 이다. 본문 서명은 운영 코드가
  * 아니라 {@link McpCallSigner} 가 따로 계산한다. 토큰 없이 부른 요청이 Spring Security 의 기본 거절이 아니라
  * {@code 401} 로 끝나는 것과 정상 등록이 {@code 201} 인 것으로 MCP 토큰 필터가 이 경로를 거르는 것을 본다.
  *

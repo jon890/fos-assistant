@@ -9,7 +9,6 @@ import com.bifos.assistant.hermes.dto.HermesRunResult;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
-import com.bifos.assistant.usage.application.ExecutionContextSnapshot;
 import com.bifos.assistant.usage.application.ExecutionEventRecorder;
 import com.bifos.assistant.usage.application.ExecutionRecorder;
 import com.bifos.assistant.usage.domain.AgentExecution;
@@ -60,16 +59,7 @@ public class MemoryProposer {
         AgentExecution proposalExecution = null;
         try {
             ModelChoice choice = requested == null ? ModelChoice.defaults() : requested;
-            proposalExecution = executions.start(
-                    user,
-                    conversation,
-                    agent,
-                    parentExecution.id(),
-                    parentExecution.id(),
-                    ExecutionContextSnapshot.ofChars(0L),
-                    choice,
-                    null,
-                    null);
+            proposalExecution = executions.startInheriting(user, conversation, agent, parentExecution, choice);
             HermesRunCommand command = new HermesRunCommand(
                     agent.hermesProfile(),
                     agent.apiBaseUrl(),

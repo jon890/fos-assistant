@@ -6,6 +6,7 @@ import {
   formatDurationFor,
   formatTokens,
 } from "@/lib/format";
+import { providerLabel } from "@/lib/provider-label";
 
 /**
  * 서버가 여덟에서 자르지만(`ExecutionTreeService.MAX_DEPTH`), 화면도 스스로 멈춘다.
@@ -134,8 +135,9 @@ export function ExecutionNode({
               className="truncate text-xs text-muted-foreground"
               data-testid="execution-node-runtime"
             >
-              {[node.provider, node.model].filter(Boolean).join(" · ") ||
-                "모델 정보 없음"}
+              {[providerLabel(node.provider), node.model]
+                .filter(Boolean)
+                .join(" · ") || "모델 정보 없음"}
               {node.modelTier ? ` · ${tierLabel(node.modelTier)}` : ""}
               {node.reasoningEffort
                 ? ` · ${effortLabel(node.reasoningEffort, node.reasoningEffortSource)}`

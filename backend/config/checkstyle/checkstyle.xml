@@ -4,7 +4,7 @@
     "https://checkstyle.org/dtds/configuration_1_3.dtd">
 <!--
   백엔드 코드 규칙이다. Gradle 의 checkstyleMain, checkstyleTest 가 읽는다.
-  넣은 규칙과 뺀 규칙의 까닭, 기준 파일 갱신 방법은 backend/AGENTS.md 의 「코드 규칙」 절에 있다.
+  넣은 규칙의 까닭은 이 파일의 주석이 갖는다. 뺀 규칙의 까닭과 기준 파일 갱신 방법은 docs/backend/quality.md 에 있다.
 
   파일 셋
   - checkstyle.xml  이 파일. 규칙을 둔다
@@ -42,14 +42,14 @@
     <property name="message" value="[privateEmptyConstructor] 빈 private 생성자를 직접 쓰지 말고 @NoArgsConstructor(access = AccessLevel.PRIVATE) 로 쓴다"/>
   </module>
 
-  <!-- 엔티티 접근자는 @Getter 와 @Accessors(fluent = true) 로 만든다. 파일마다 한 번만 잡는다 -->
+  <!-- @Entity 가 있는 파일에서 필드를 그대로 돌려주는 인자 없는 public 메서드를 잡는다. 엔티티 접근자는 @Getter 와 @Accessors(fluent = true) 로 code() 모양을 만든다. 값을 꺼내는 메서드가 두 벌이 되지 않게 하고 record 와 같은 호출 모양을 지킨다. 파일마다 한 번만 잡는다 -->
   <module name="RegexpMultiline">
     <property name="id" value="entityHandwrittenAccessor"/>
     <property name="format" value="\A(?=[\s\S]*@Entity\b)(?=[\s\S]*public\s+[\w&lt;&gt;\[\], ?.]+\s+\w+\s*\(\s*\)\s*\{\s*return\s+(?:this\s*\.\s*)?\w+\s*;\s*\})[\s\S]"/>
     <property name="message" value="[entityHandwrittenAccessor] 엔티티의 접근자를 손으로 쓰지 말고 @Getter 와 @Accessors(fluent = true) 로 만든다"/>
   </module>
 
-  <!-- 생성자 주입은 @RequiredArgsConstructor 가 기본이다. 까닭이 있는 예외가 섞여 있어 목록으로만 보인다 -->
+  <!-- 생성자 주입은 @RequiredArgsConstructor 가 기본이다. @Service, @Component, @Repository, @RestController, @Controller, @Configuration 이 붙고 @RequiredArgsConstructor 가 없는 파일에서 인자가 있는 생성자를 잡는다. 테스트 전용 생성자, 설정값 가공처럼 까닭이 있는 예외가 섞여 있어 목록으로만 보이고 자동으로 고치지 않는다 -->
   <module name="RegexpMultiline">
     <property name="id" value="requiredArgsConstructor"/>
     <property name="severity" value="warning"/>
@@ -65,7 +65,7 @@
       <property name="influenceFormat" value="0"/>
     </module>
 
-    <!-- import -->
+    <!-- import. 읽는 사람이 실제 의존을 import 줄에서 바로 본다 -->
     <module name="UnusedImports"/>
     <module name="AvoidStarImport"/>
     <module name="RedundantImport"/>
@@ -79,7 +79,7 @@
       <property name="message" value="[fullyQualifiedName] 전체 이름을 쓰지 말고 import 한다. 같은 이름의 두 타입 때문에 어려우면 그 줄에 '// 전체 이름 허용: 까닭' 을 단다"/>
     </module>
 
-    <!-- 로거는 Lombok @Slf4j 로 둔다. 바이트코드로는 구별되지 않아 소스에서 본다 -->
+    <!-- 로거는 Lombok @Slf4j 로 둔다. 바이트코드로는 구별되지 않아 소스에서 본다. Logger x = LoggerFactory.getLogger(...) 형태의 선언을 잡고, 시험이 로그를 붙잡으려고 (Logger) LoggerFactory.getLogger(...) 로 꺼내는 것은 잡지 않는다 -->
     <module name="RegexpSinglelineJava">
       <property name="id" value="lombokLogger"/>
       <property name="format" value="^\s*(?:(?:private|protected|public|static|final)\s+)*(?:org\.slf4j\.)?Logger\s+\w+\s*=\s*(?:org\.slf4j\.)?LoggerFactory\s*\.\s*getLogger"/>
@@ -125,10 +125,12 @@
     </module>
 
     <!-- 서식 -->
+    <!-- 메서드와 생성자 사이에 빈 줄이 한 줄 이상 있어야 읽는 단위가 보인다. 인터페이스의 추상 메서드 선언 사이도 잡는다 -->
     <module name="EmptyLineSeparator">
       <property name="tokens" value="METHOD_DEF, CTOR_DEF"/>
       <property name="allowMultipleEmptyLines" value="true"/>
     </module>
+    <!-- 한 줄에 한 문장 -->
     <module name="OneStatementPerLine"/>
     <!-- 한 줄 람다 본문 '-> { throw ...; }' 은 시험 대역에서 흔한 모양이라 LAMBDA 는 대상에서 뺀다 -->
     <module name="LeftCurly">
@@ -150,6 +152,7 @@
       <property name="option" value="same"/>
       <property name="tokens" value="LITERAL_TRY, LITERAL_CATCH, LITERAL_FINALLY, LITERAL_IF, LITERAL_ELSE, LITERAL_DO"/>
     </module>
+    <!-- 제어문은 한 문장이어도 중괄호를 쓴다 -->
     <module name="NeedBraces"/>
 
     <!-- 쪼갤 후보 목록이다. 빈 줄과 한 줄 주석은 세지 않는다 -->
