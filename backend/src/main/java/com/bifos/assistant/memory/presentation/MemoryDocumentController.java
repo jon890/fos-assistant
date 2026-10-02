@@ -78,7 +78,7 @@ public class MemoryDocumentController {
                 .toList();
     }
 
-    private static MemorySensitivity sensitivity(boolean sensitive) {
+    private static MemorySensitivity sensitivity(Boolean sensitive) {
         return sensitive ? MemorySensitivity.SENSITIVE : MemorySensitivity.NORMAL;
     }
 }

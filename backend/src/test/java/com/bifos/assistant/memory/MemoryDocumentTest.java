@@ -25,6 +25,8 @@ import com.bifos.assistant.shared.auth.CurrentUserProvider;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.user.domain.UserRole;
+import jakarta.validation.Validation;
+import jakarta.validation.Validator;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
@@ -175,6 +177,18 @@ class MemoryDocumentTest {
         assertCode(
                 () -> controller.create(new CreateDocumentRequest("no-such-area", NAME, "t", "c", false)),
                 ErrorCode.VALIDATION_FAILED);
+    }
+
+    @Test
+    @DisplayName("만드는 요청에 민감 표시가 빠지면 검증이 실패한다")
+    void createRequestRequiresSensitive() {
+        Validator validator = Validation.buildDefaultValidatorFactory().getValidator();
+
+        assertThat(validator.validate(new CreateDocumentRequest("identity", NAME, "t", "c", null)))
+                .extracting(violation -> violation.getPropertyPath().toString())
+                .containsExactly("sensitive");
+        assertThat(validator.validate(new CreateDocumentRequest("identity", NAME, "t", "c", false)))
+                .isEmpty();
     }
 
     @Test

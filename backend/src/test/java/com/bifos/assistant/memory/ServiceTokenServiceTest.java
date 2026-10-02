@@ -15,7 +15,9 @@ import com.bifos.assistant.memory.presentation.MemoryDtos.IssueServiceTokenReque
 import com.bifos.assistant.memory.presentation.MemoryDtos.ServiceTokenGrantBody;
 import com.bifos.assistant.memory.presentation.MemoryDtos.ServiceTokenView;
 import com.bifos.assistant.memory.presentation.ServiceTokenController;
+import com.bifos.assistant.people.application.PersonAccessService;
 import com.bifos.assistant.people.application.PersonRegistrar;
+import com.bifos.assistant.people.application.model.PersonAccess;
 import com.bifos.assistant.people.domain.AllowedPerson;
 import com.bifos.assistant.people.infra.AllowedPersonRepository;
 import com.bifos.assistant.people.presentation.PeopleAdminController;
@@ -53,8 +55,8 @@ import tools.jackson.databind.json.JsonMapper;
 @ActiveProfiles("test")
 class ServiceTokenServiceTest {
 
-    private static final CurrentUser DAD = new CurrentUser(1L, "dad@example.com", "dad", 1L, UserRole.ADMIN);
-    private static final CurrentUser KID = new CurrentUser(2L, "kid@example.com", "kid", 1L, UserRole.MEMBER);
+    private static final String DAD_EMAIL = "svc-token-dad@example.com";
+    private static final String KID_EMAIL = "svc-token-kid@example.com";
     private static final List<ServiceTokenGrant> IDENTITY = List.of(new ServiceTokenGrant("identity", true));
 
     @Autowired
@@ -68,6 +70,9 @@ class ServiceTokenServiceTest {
 
     @Autowired
     ApplicationEventPublisher events;
+
+    @Autowired
+    PersonAccessService personAccess;
 
     @Autowired
     JdbcTemplate jdbc;
@@ -84,13 +89,28 @@ class ServiceTokenServiceTest {
     @Autowired
     PersonRegistrar registrar;
 
+    /** 허용 목록에 켜져 있는 사용자다. 발급은 주인이 켜져 있을 때만 받는다. */
+    private CurrentUser dad;
+
+    private CurrentUser kid;
+
     @BeforeEach
+    void setUp() {
+        clean();
+        AppUser saved = users.save(AppUser.of(DAD_EMAIL, "dad", 1L, UserRole.ADMIN));
+        people.save(AllowedPerson.of(DAD_EMAIL, "dad", "svc-token-dad"));
+        dad = new CurrentUser(saved.id(), DAD_EMAIL, "dad", 1L, UserRole.ADMIN);
+        AppUser savedKid = users.save(AppUser.of(KID_EMAIL, "kid", 1L, UserRole.MEMBER));
+        people.save(AllowedPerson.of(KID_EMAIL, "kid", "svc-token-kid"));
+        kid = new CurrentUser(savedKid.id(), KID_EMAIL, "kid", 1L, UserRole.MEMBER);
+    }
+
     @AfterEach
     void clean() {
         collectionRepository.deleteAll();
         repository.deleteAll();
         // 사용자를 끄는 검사가 넣은 줄이 다른 검사의 허용 목록에 남지 않게 한다
-        for (String email : List.of("dad-person@example.com", "never-signed-in@example.com")) {
+        for (String email : List.of(DAD_EMAIL, KID_EMAIL, "dad-person@example.com", "never-signed-in@example.com")) {
             people.findAll().stream()
                     .filter(person -> person.email().equals(email))
                     .forEach(people::delete);
@@ -111,7 +131,7 @@ class ServiceTokenServiceTest {
     @Test
     @DisplayName("발급하면 원문은 접두사를 갖고 해시만 저장하며 만료와 collection 이 남는다")
     void issuesAndStoresOnlyHash() {
-        IssuedServiceToken issued = service.issue(DAD, "career-os", 90, IDENTITY);
+        IssuedServiceToken issued = service.issue(dad, "career-os", 90, IDENTITY);
 
         assertThat(issued.rawToken()).startsWith("fos_svc_");
         ServiceToken stored = reload(issued.snapshot().token().id());
@@ -147,44 +167,44 @@ class ServiceTokenServiceTest {
     @Test
     @DisplayName("서비스는 만료 일수가 범위 밖이면 거절한다")
     void serviceRejectsOutOfRangeExpiry() {
-        assertCode(() -> service.issue(DAD, "x", 0, IDENTITY), ErrorCode.VALIDATION_FAILED);
-        assertCode(() -> service.issue(DAD, "x", 366, IDENTITY), ErrorCode.VALIDATION_FAILED);
+        assertCode(() -> service.issue(dad, "x", 0, IDENTITY), ErrorCode.VALIDATION_FAILED);
+        assertCode(() -> service.issue(dad, "x", 366, IDENTITY), ErrorCode.VALIDATION_FAILED);
     }
 
     @Test
     @DisplayName("두 번 발급한 원문은 서로 다르다")
     void rawTokensDiffer() {
-        assertThat(service.issue(DAD, "a", 90, IDENTITY).rawToken())
-                .isNotEqualTo(service.issue(DAD, "b", 90, IDENTITY).rawToken());
+        assertThat(service.issue(dad, "a", 90, IDENTITY).rawToken())
+                .isNotEqualTo(service.issue(dad, "b", 90, IDENTITY).rawToken());
     }
 
     @Test
     @DisplayName("목록은 요청자의 토큰만 낸다")
     void listsOnlyOwn() {
-        service.issue(DAD, "a", 90, IDENTITY);
+        service.issue(dad, "a", 90, IDENTITY);
 
-        assertThat(service.listOf(DAD)).hasSize(1);
-        assertThat(service.listOf(KID)).isEmpty();
+        assertThat(service.listOf(dad)).hasSize(1);
+        assertThat(service.listOf(kid)).isEmpty();
     }
 
     @Test
     @DisplayName("남의 토큰과 없는 토큰의 폐기는 같은 오류이고 남의 토큰은 그대로다")
     void revokeHidesOthersAndMissing() {
-        Long id = service.issue(DAD, "a", 90, IDENTITY).snapshot().token().id();
+        Long id = service.issue(dad, "a", 90, IDENTITY).snapshot().token().id();
 
-        assertCode(() -> service.revoke(KID, id), ErrorCode.SERVICE_TOKEN_NOT_FOUND);
-        assertCode(() -> service.revoke(KID, 9_999L), ErrorCode.SERVICE_TOKEN_NOT_FOUND);
+        assertCode(() -> service.revoke(kid, id), ErrorCode.SERVICE_TOKEN_NOT_FOUND);
+        assertCode(() -> service.revoke(kid, 9_999L), ErrorCode.SERVICE_TOKEN_NOT_FOUND);
         assertThat(reload(id).revokedAt()).isNull();
     }
 
     @Test
     @DisplayName("두 번 폐기해도 처음 폐기 시각이 그대로다")
     void revokeIsIdempotent() {
-        Long id = service.issue(DAD, "a", 90, IDENTITY).snapshot().token().id();
+        Long id = service.issue(dad, "a", 90, IDENTITY).snapshot().token().id();
 
-        service.revoke(DAD, id);
+        service.revoke(dad, id);
         Instant first = reload(id).revokedAt();
-        service.revoke(DAD, id);
+        service.revoke(dad, id);
 
         assertThat(first).isNotNull();
         assertThat(reload(id).revokedAt()).isEqualTo(first);
@@ -193,13 +213,13 @@ class ServiceTokenServiceTest {
     @Test
     @DisplayName("collection 이 비었거나 없거나 겹치면 거절한다")
     void rejectsBadCollections() {
-        assertCode(() -> service.issue(DAD, "x", 90, List.of()), ErrorCode.VALIDATION_FAILED);
+        assertCode(() -> service.issue(dad, "x", 90, List.of()), ErrorCode.VALIDATION_FAILED);
         assertCode(
-                () -> service.issue(DAD, "x", 90, List.of(new ServiceTokenGrant("no-such-area", false))),
+                () -> service.issue(dad, "x", 90, List.of(new ServiceTokenGrant("no-such-area", false))),
                 ErrorCode.VALIDATION_FAILED);
         assertCode(
                 () -> service.issue(
-                        DAD,
+                        dad,
                         "x",
                         90,
                         List.of(new ServiceTokenGrant("identity", false), new ServiceTokenGrant("identity", true))),
@@ -209,13 +229,13 @@ class ServiceTokenServiceTest {
     @Test
     @DisplayName("사용자를 끈 사건은 그 사용자의 남은 토큰만 폐기한다")
     void accessRevokedRevokesOnlyOwnLiveTokens() {
-        Long first = service.issue(DAD, "a", 90, IDENTITY).snapshot().token().id();
-        Long second = service.issue(DAD, "b", 90, IDENTITY).snapshot().token().id();
-        Long kids = service.issue(KID, "c", 90, IDENTITY).snapshot().token().id();
-        service.revoke(DAD, first);
+        Long first = service.issue(dad, "a", 90, IDENTITY).snapshot().token().id();
+        Long second = service.issue(dad, "b", 90, IDENTITY).snapshot().token().id();
+        Long kids = service.issue(kid, "c", 90, IDENTITY).snapshot().token().id();
+        service.revoke(dad, first);
         Instant firstRevokedAt = reload(first).revokedAt();
 
-        events.publishEvent(new UserAccessRevoked(1L));
+        events.publishEvent(new UserAccessRevoked(dad.id()));
 
         assertThat(reload(second).revokedAt()).isNotNull();
         assertThat(reload(first).revokedAt()).isEqualTo(firstRevokedAt);
@@ -230,7 +250,7 @@ class ServiceTokenServiceTest {
         CurrentUser owner = new CurrentUser(dad.id(), dad.email(), "dad", 1L, UserRole.ADMIN);
         CurrentUserProvider provider = mock(CurrentUserProvider.class);
         when(provider.require()).thenReturn(owner);
-        PeopleAdminController admin = new PeopleAdminController(people, users, registrar, provider, events);
+        PeopleAdminController admin = new PeopleAdminController(registrar, provider, personAccess);
         Long id = service.issue(owner, "a", 90, IDENTITY).snapshot().token().id();
 
         admin.update(person.id(), new UpdatePersonRequest(false));
@@ -246,7 +266,7 @@ class ServiceTokenServiceTest {
     void disablingPersonWithoutUserIsHarmless() {
         AllowedPerson person = people.save(AllowedPerson.of("never-signed-in@example.com", "x", "x"));
         CurrentUserProvider provider = mock(CurrentUserProvider.class);
-        PeopleAdminController admin = new PeopleAdminController(people, users, registrar, provider, events);
+        PeopleAdminController admin = new PeopleAdminController(registrar, provider, personAccess);
 
         admin.update(person.id(), new UpdatePersonRequest(false));
 
@@ -254,9 +274,46 @@ class ServiceTokenServiceTest {
     }
 
     @Test
+    @DisplayName("허용 목록에서 꺼진 사용자는 살아 있는 세션으로도 토큰을 발급받지 못한다")
+    void disabledOwnerCannotIssue() {
+        AppUser user = users.save(AppUser.of("dad-person@example.com", "dad", 1L, UserRole.MEMBER));
+        AllowedPerson person = people.save(AllowedPerson.of("dad-person@example.com", "dad", "dad"));
+        CurrentUser owner = new CurrentUser(user.id(), user.email(), "dad", 1L, UserRole.MEMBER);
+        personAccess.setEnabled(person.id(), false);
+
+        assertCode(() -> service.issue(owner, "a", 90, IDENTITY), ErrorCode.FORBIDDEN);
+        personAccess.setEnabled(person.id(), true);
+
+        assertThat(repository.findByUserIdOrderByIdDesc(user.id())).isEmpty();
+    }
+
+    @Test
+    @DisplayName("허용 목록 줄이 없는 사용자는 토큰을 발급받지 못한다")
+    void ownerWithoutAllowListRowCannotIssue() {
+        AppUser user = users.save(AppUser.of("never-signed-in@example.com", "x", 1L, UserRole.MEMBER));
+        CurrentUser owner = new CurrentUser(user.id(), user.email(), "x", 1L, UserRole.MEMBER);
+
+        assertCode(() -> service.issue(owner, "a", 90, IDENTITY), ErrorCode.FORBIDDEN);
+    }
+
+    @Test
+    @DisplayName("app_user 의 메일 주소가 원문(대소문자 다름)이어도 끄면 토큰이 폐기된다")
+    void disablingMatchesUserWithDifferentCase() {
+        AppUser user = users.save(AppUser.of("Dad-Person@Example.com", "dad", 1L, UserRole.MEMBER));
+        AllowedPerson person = people.save(AllowedPerson.of("dad-person@example.com", "dad", "dad"));
+        CurrentUser owner = new CurrentUser(user.id(), user.email(), "dad", 1L, UserRole.MEMBER);
+        Long id = service.issue(owner, "a", 90, IDENTITY).snapshot().token().id();
+
+        PersonAccess result = personAccess.setEnabled(person.id(), false);
+
+        assertThat(result.joined()).isTrue();
+        assertThat(reload(id).revokedAt()).isNotNull();
+    }
+
+    @Test
     @DisplayName("인증이 토큰을 읽은 뒤 폐기가 먼저 커밋돼도 사용 시각을 적는 갱신이 폐기를 되돌리지 않는다")
     void markUsedDoesNotUndoConcurrentRevoke() {
-        Long id = service.issue(DAD, "a", 90, IDENTITY).snapshot().token().id();
+        Long id = service.issue(dad, "a", 90, IDENTITY).snapshot().token().id();
         TransactionTemplate outer = new TransactionTemplate(transactionManager);
         TransactionTemplate inner = new TransactionTemplate(transactionManager);
         inner.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
@@ -264,7 +321,7 @@ class ServiceTokenServiceTest {
         outer.executeWithoutResult(status -> {
             // 인증이 토큰을 읽어 영속성 컨텍스트에 올린 상태다
             repository.findById(id).orElseThrow();
-            inner.executeWithoutResult(other -> service.revoke(DAD, id));
+            inner.executeWithoutResult(other -> service.revoke(dad, id));
             repository.markUsed(id, Instant.now());
         });
 
@@ -275,9 +332,9 @@ class ServiceTokenServiceTest {
     @Test
     @DisplayName("목록 응답을 JSON 으로 바꾼 글에 원문과 해시가 없다")
     void listResponseHasNoRawTokenOrHash() throws Exception {
-        IssuedServiceToken issued = service.issue(DAD, "a", 90, IDENTITY);
+        IssuedServiceToken issued = service.issue(dad, "a", 90, IDENTITY);
         CurrentUserProvider provider = mock(CurrentUserProvider.class);
-        when(provider.require()).thenReturn(DAD);
+        when(provider.require()).thenReturn(dad);
         List<ServiceTokenView> views = new ServiceTokenController(service, provider).list();
 
         String json = new JsonMapper().writeValueAsString(views);

@@ -82,6 +82,17 @@ export const memoryDocumentScenario: Scenario = {
     ).json<DocumentView>();
     expect(created.revision === 1 && created.sensitive, `만든 문서의 판이나 민감 표시가 다르다: ${JSON.stringify(created)}`);
 
+    step("민감 표시가 빠진 요청은 거절한다");
+    expectStatus(
+      await call(context, "/memory-documents", {
+        method: "POST",
+        token: aunt,
+        body: { collection: "identity", documentKey: "no-sensitive-flag", title: "t", content: FIRST },
+      }),
+      400,
+      "민감 표시가 없는 문서 만들기",
+    );
+
     step("같은 이름으로 다시 만들지 못한다");
     const duplicate = expectStatus(
       await call(context, "/memory-documents", {
@@ -183,18 +194,16 @@ export const memoryDocumentScenario: Scenario = {
     );
     expectStatus(await readAs(revocable.token), 401, "폐기한 토큰 읽기");
 
-    step("허용 목록에 없는 사용자의 토큰은 읽지 못한다");
-    const dadDocument = expectStatus(
-      await call(context, "/memory-documents", {
+    step("허용 목록에 없는 사용자는 토큰을 발급받지 못한다");
+    expectStatus(
+      await call(context, "/service-tokens", {
         method: "POST",
         token: dad,
-        body: { collection: "identity", documentKey, title: "t", content: FIRST, sensitive: true },
+        body: { label: "e2e", expiresInDays: 90, collections: [{ collection: "identity", allowSensitive: true }] },
       }),
-      200,
-      "허용 목록에 없는 사용자의 문서",
-    ).json<DocumentView>();
-    const dadToken = await issue(dad, true);
-    expectStatus(await readAs(dadToken.token), 401, "허용 목록에 없는 사용자의 읽기");
+      403,
+      "허용 목록에 없는 사용자의 발급",
+    );
 
     step("사용자를 끄면 그 토큰이 죽는다");
     const live = await issue(aunt, true);
@@ -216,6 +225,21 @@ export const memoryDocumentScenario: Scenario = {
     const off = expectStatus(await readAs(live.token), 401, "끈 뒤 읽기");
     expect(off.body.length === 0, `끈 뒤 401 에 본문이 있다: ${off.body}`);
 
+    step("끈 사용자는 살아 있는 세션으로도 새 토큰을 받지 못한다");
+    const revokedIssue = expectStatus(
+      await call(context, "/service-tokens", {
+        method: "POST",
+        token: aunt,
+        body: { label: "e2e", expiresInDays: 90, collections: [{ collection: "identity", allowSensitive: true }] },
+      }),
+      401,
+      "끈 사용자의 발급",
+    );
+    expect(
+      revokedIssue.json<{ code: string }>().code === "ACCESS_REVOKED",
+      `끈 사용자의 발급이 ACCESS_REVOKED 가 아니다: ${revokedIssue.body}`,
+    );
+
     step("다시 켜도 되살아나지 않는다");
     expectStatus(
       await call(context, `/admin/people/${person!.id}`, {
@@ -235,6 +259,5 @@ export const memoryDocumentScenario: Scenario = {
 
     step("뒤 시나리오에 남기지 않는다");
     expectStatus(await call(context, `/memories/${created.id}`, { method: "DELETE", token: aunt }), 200, "문서 지우기");
-    expectStatus(await call(context, `/memories/${dadDocument.id}`, { method: "DELETE", token: dad }), 200, "문서 지우기");
   },
 };

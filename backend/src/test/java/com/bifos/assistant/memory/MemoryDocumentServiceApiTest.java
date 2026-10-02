@@ -15,6 +15,7 @@ import com.bifos.assistant.memory.infra.MemoryRepository;
 import com.bifos.assistant.memory.infra.MemoryRevisionRepository;
 import com.bifos.assistant.memory.infra.ServiceTokenCollectionRepository;
 import com.bifos.assistant.memory.infra.ServiceTokenRepository;
+import com.bifos.assistant.people.application.PersonAccessService;
 import com.bifos.assistant.people.application.PersonRegistrar;
 import com.bifos.assistant.people.domain.AllowedPerson;
 import com.bifos.assistant.people.infra.AllowedPersonRepository;
@@ -105,6 +106,9 @@ class MemoryDocumentServiceApiTest {
 
     @Autowired
     ApplicationEventPublisher events;
+
+    @Autowired
+    PersonAccessService personAccess;
 
     @Autowired
     JdbcTemplate jdbc;
@@ -296,7 +300,7 @@ class MemoryDocumentServiceApiTest {
         String token = issue(dad, 90, IDENTITY);
         CurrentUserProvider provider = mock(CurrentUserProvider.class);
         when(provider.require()).thenReturn(dad);
-        PeopleAdminController admin = new PeopleAdminController(people, users, registrar, provider, events);
+        PeopleAdminController admin = new PeopleAdminController(registrar, provider, personAccess);
 
         admin.update(dadPerson.id(), new UpdatePersonRequest(false));
         admin.update(dadPerson.id(), new UpdatePersonRequest(true));
@@ -309,9 +313,14 @@ class MemoryDocumentServiceApiTest {
     @Test
     @DisplayName("허용 목록에 줄이 없는 사용자의 토큰은 401 이다")
     void ownerWithoutAllowListRowIsRejected() throws Exception {
-        CurrentUser stranger = saveUser("svc-stranger-" + UUID.randomUUID() + "@example.com", "x", UserRole.MEMBER);
+        String email = "svc-stranger-" + UUID.randomUUID() + "@example.com";
+        AllowedPerson row = people.save(AllowedPerson.of(email, "x", "svc-stranger-" + UUID.randomUUID()));
+        CurrentUser stranger = saveUser(email, "x", UserRole.MEMBER);
+        String token = issue(stranger, 90, IDENTITY);
+        // 발급은 허용된 사용자만 받는다. 허용 목록에서 줄이 사라진 뒤에도 그 토큰이 통하지 않아야 한다
+        people.delete(row);
 
-        assertSameAsWrongToken(read(issue(stranger, 90, IDENTITY), "identity", NAME));
+        assertSameAsWrongToken(read(token, "identity", NAME));
     }
 
     @Test
