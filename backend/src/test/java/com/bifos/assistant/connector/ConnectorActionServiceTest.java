@@ -71,10 +71,14 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.stream.Stream;
 import org.assertj.core.api.ThrowableAssert.ThrowingCallable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
@@ -103,6 +107,9 @@ class ConnectorActionServiceTest {
     private static final String MAIL = "mail_note";
     private static final String ARGS = "{\"text\":\"안녕\",  \"count\":2}";
     private static final long CONVERSATION = 7L;
+
+    /** 화면에서 가려지는 32자 넘는 base64 모양 글이다. */
+    private static final String HIDDEN_TOKEN = "QUJDREVGR0hJSktMTU5PUFFSU1RVVldYWVowMTIzNDU2Nzg5";
 
     /** 승인 방식이 셋 다 있고 상시 허락을 닫은 도구가 하나 있는 커넥터다. MCP 서버 이름이 {@code demo} 라 등록 이름은 {@code mcp__demo__<도구>} 다. */
     private static final ConnectorManifest DECLARING = manifest(List.of(
@@ -585,6 +592,128 @@ class ConnectorActionServiceTest {
         assertThat(approved.grantAllowed()).isFalse();
         assertThat(grants.findAll()).isEmpty();
         assertThat(ask(MAIL, "{\"text\":\"다음 글\"}").allowed()).isFalse();
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("argumentsWithHiddenText")
+    @DisplayName("상시 허락을 닫은 도구의 인자에 가려지는 글이 있으면 hiddenArgs 가 참이고 승인해도 실행하지 않고 REJECTED 와 hidden_args 로 끝낸다")
+    void closedGrantToolWithHiddenArgumentsIsNotExecuted(String name, String args, GrantPeriod grant) {
+        UUID actionId = ask(MAIL, args).actionId();
+        recorder.seen.clear();
+
+        assertThat(service.listForConversation(me, CONVERSATION))
+                .extracting(ConnectorActionView::actionId, ConnectorActionView::hiddenArgs)
+                .containsExactly(tuple(actionId, true));
+        ConnectorActionView closed = service.approve(me, actionId, grant);
+
+        assertThat(closed.status()).isEqualTo(ActionStatus.REJECTED);
+        assertThat(closed.errorCode()).isEqualTo(ConnectorAction.HIDDEN_ARGS);
+        assertThat(closed.hiddenArgs()).as("끝난 줄").isFalse();
+        ConnectorAction row = onlyAction();
+        assertThat(row.status()).isEqualTo(ActionStatus.REJECTED);
+        assertThat(row.errorCode()).isEqualTo("hidden_args");
+        assertThat(grants.findAll()).isEmpty();
+        verify(connector, never()).execute(anyString(), anyString(), anyString(), anyString());
+        assertThat(recorder.seen).containsExactly(new Seen(new ConnectorActionChanged(CONVERSATION, actionId), false));
+    }
+
+    static Stream<Arguments> argumentsWithHiddenText() {
+        return Stream.of(
+                Arguments.of(
+                        "본문 끝의 base64 모양 글",
+                        "{\"body\":\"회의록입니다\\n" + HIDDEN_TOKEN + "\",\"to\":\"friend@example.com\"}",
+                        null),
+                Arguments.of(
+                        "기간을 실은 승인",
+                        "{\"body\":\"회의록입니다\\n" + HIDDEN_TOKEN + "\",\"to\":\"friend@example.com\"}",
+                        GrantPeriod.HOUR),
+                Arguments.of(
+                        "local part 가 긴 주소", "{\"body\":\"안녕하세요\",\"to\":\"" + HIDDEN_TOKEN + "@example.com\"}", null),
+                Arguments.of(
+                        "password= 모양",
+                        "{\"body\":\"접속할 때 password=hunter2 를 쓰세요\",\"to\":\"friend@example.com\"}",
+                        null));
+    }
+
+    @Test
+    @DisplayName("상시 허락을 닫은 도구라도 가려지는 글이 없는 한글 본문은 hiddenArgs 가 거짓이고 승인하면 저장한 인자로 실행한다")
+    void closedGrantToolWithoutHiddenArgumentsIsExecuted() {
+        String args = "{\"body\":\"안녕하세요.\\n\\\"내일\\\" 7시에 봬요 😀\\t끝\",  \"subject\":\"저녁 약속 🍜\","
+                + "\"to\":\"friend@example.com\"}";
+        UUID actionId = ask(MAIL, args).actionId();
+
+        assertThat(service.listForConversation(me, CONVERSATION))
+                .extracting(ConnectorActionView::actionId, ConnectorActionView::hiddenArgs)
+                .containsExactly(tuple(actionId, false));
+        ConnectorActionView approved = service.approve(me, actionId, null);
+
+        assertThat(approved.status()).isEqualTo(ActionStatus.SUCCEEDED);
+        verify(connector, times(1)).execute(PROFILE, DEMO, "mcp__demo__mail_note", args);
+    }
+
+    @Test
+    @DisplayName("상시 허락을 줄 수 있는 도구는 인자에 가려지는 글이 있어도 hiddenArgs 가 거짓이고 승인하면 실행한다")
+    void grantableToolWithHiddenArgumentsIsStillApproved() {
+        String args = "{\"text\":\"회의록입니다\\n" + HIDDEN_TOKEN + "\"}";
+        UUID actionId = ask(WRITE, args).actionId();
+
+        ConnectorActionView listed =
+                service.listForConversation(me, CONVERSATION).getFirst();
+        assertThat(listed.hiddenArgs()).isFalse();
+        assertThat(listed.argsJson()).as("화면에 내는 글은 그대로 가린다").doesNotContain(HIDDEN_TOKEN);
+        ConnectorActionView approved = service.approve(me, actionId, null);
+
+        assertThat(approved.status()).isEqualTo(ActionStatus.SUCCEEDED);
+        verify(connector, times(1)).execute(PROFILE, DEMO, "mcp__demo__write_note", args);
+    }
+
+    @Test
+    @DisplayName("도구를 선언하지 않는 판의 선언 없는 도구는 인자에 가려지는 글이 있어도 hiddenArgs 가 거짓이다")
+    void undeclaredToolOfLegacySchemaHasNoHiddenArgs() {
+        catalogBecomes(legacyManifest());
+        ask(WRITE, "{\"text\":\"" + HIDDEN_TOKEN + "\"}");
+
+        assertThat(service.listForConversation(me, CONVERSATION))
+                .extracting(ConnectorActionView::hiddenArgs)
+                .containsExactly(false);
+    }
+
+    @Test
+    @DisplayName("카탈로그를 읽지 못하면 가려지는 글이 있는 줄은 hiddenArgs 가 참이고 승인해도 hidden_args 로 끝나며, 가려지는 글이 없는 줄은 거짓이다")
+    void unreadableCatalogTreatsToolAsClosed() {
+        UUID hidden = ask(WRITE, "{\"text\":\"" + HIDDEN_TOKEN + "\"}").actionId();
+        UUID plain = ask(WRITE, ARGS).actionId();
+        ConnectorPolicyTestDoubles.expireCatalog();
+        when(connector.readCatalog()).thenThrow(new IllegalStateException());
+
+        assertThat(service.listForConversation(me, CONVERSATION))
+                .extracting(ConnectorActionView::actionId, ConnectorActionView::hiddenArgs)
+                .containsExactly(tuple(hidden, true), tuple(plain, false));
+        ConnectorActionView closed = service.approve(me, hidden, null);
+
+        assertThat(closed.status()).isEqualTo(ActionStatus.REJECTED);
+        assertThat(closed.errorCode()).isEqualTo(ConnectorAction.HIDDEN_ARGS);
+        verify(connector, never()).execute(anyString(), anyString(), anyString(), anyString());
+    }
+
+    @Test
+    @DisplayName("상시 허락 목록은 지금 선언이 상시 허락을 닫은 도구의 옛 허락 줄을 빼고, 카탈로그를 읽지 못하면 낸다")
+    void grantsOmitToolsWhoseDeclarationClosedTheGrant() {
+        service.approve(me, ask(WRITE, ARGS).actionId(), GrantPeriod.DAYS_30);
+        assertThat(service.grants(me)).extracting(ConnectorGrantView::toolName).containsExactly(WRITE);
+
+        catalogBecomes(manifest(List.of(
+                new ConnectorTool("list_scopes", "READ", "none", null, null),
+                new ConnectorTool(WRITE, "WRITE", "required", "메모 쓰기", Boolean.FALSE))));
+        assertThat(service.grants(me)).as("선언이 상시 허락을 닫았다").isEmpty();
+        assertThat(grants.findAll()).as("줄은 지우지 않는다").hasSize(1);
+
+        ConnectorPolicyTestDoubles.expireCatalog();
+        when(connector.readCatalog()).thenThrow(new IllegalStateException());
+        assertThat(service.grants(me))
+                .as("카탈로그를 읽지 못했다")
+                .extracting(ConnectorGrantView::toolName)
+                .containsExactly(WRITE);
     }
 
     @Test

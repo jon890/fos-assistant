@@ -64,6 +64,8 @@ export function ApprovalCard({
   }
 
   const args = readableArgs(action.argsJson);
+  // 사람이 다 읽지 못한 인자로는 승인을 받지 않는다. 서버도 이런 줄의 승인을 실행하지 않고 끝낸다.
+  const blocked = action.status === "PENDING" && action.hiddenArgs;
 
   return (
     <section
@@ -105,17 +107,29 @@ export function ApprovalCard({
           {action.argsJson}
         </p>
       ) : null}
+      {blocked ? (
+        <Notice
+          variant="warning"
+          role="status"
+          data-testid="approval-hidden-args"
+        >
+          가려진 내용이 있어 승인할 수 없어요. 에이전트에게 그 부분을 빼거나
+          다시 쓰게 해 주세요.
+        </Notice>
+      ) : null}
       {action.status === "PENDING" ? (
         <div className="flex flex-wrap items-center gap-2">
-          <Button
-            size="sm"
-            data-testid="approval-approve"
-            disabled={busy}
-            loading={sending === "approve"}
-            onClick={() => void send("approve", null)}
-          >
-            승인
-          </Button>
+          {blocked ? null : (
+            <Button
+              size="sm"
+              data-testid="approval-approve"
+              disabled={busy}
+              loading={sending === "approve"}
+              onClick={() => void send("approve", null)}
+            >
+              승인
+            </Button>
+          )}
           <Button
             size="sm"
             variant="outline"
@@ -126,7 +140,7 @@ export function ApprovalCard({
           >
             거절
           </Button>
-          {action.grantAllowed ? (
+          {action.grantAllowed && !blocked ? (
             // 모달로 두면 열린 동안 메뉴 바깥을 누른 첫 클릭이 그 자리에 닿지 않는다.
             <DropdownMenu modal={false}>
               <DropdownMenuTrigger asChild>

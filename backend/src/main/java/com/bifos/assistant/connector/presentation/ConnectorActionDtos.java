@@ -30,7 +30,8 @@ public final class ConnectorActionDtos {
             String errorCode,
             Instant createdAt,
             Instant expiresAt,
-            boolean grantAllowed) {
+            boolean grantAllowed,
+            boolean hiddenArgs) {
 
         public static ActionView from(ConnectorActionView action) {
             return new ActionView(
@@ -45,7 +46,8 @@ public final class ConnectorActionDtos {
                     action.errorCode(),
                     action.createdAt(),
                     action.expiresAt(),
-                    action.grantAllowed());
+                    action.grantAllowed(),
+                    action.hiddenArgs());
         }
     }
 

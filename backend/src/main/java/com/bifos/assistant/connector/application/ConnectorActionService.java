@@ -19,6 +19,7 @@ import com.bifos.assistant.connector.infra.ConnectorConnectionRepository;
 import com.bifos.assistant.connector.infra.ConnectorToolGrantRepository;
 import com.bifos.assistant.hermes.ConnectorExecutionUnknown;
 import com.bifos.assistant.hermes.HermesConnectorClient;
+import com.bifos.assistant.hermes.ToolDetailRedactor;
 import com.bifos.assistant.hermes.dto.CallResult;
 import com.bifos.assistant.hermes.dto.ConnectorManifest;
 import com.bifos.assistant.orchestration.application.DelegationProperties;
@@ -269,19 +270,27 @@ public class ConnectorActionService {
                 .toList();
     }
 
-    /** 내 상시 허락 가운데 유효한 것이다. */
+    /**
+     * 내 상시 허락 가운데 유효한 것이다.
+     *
+     * <p>지금 선언이 상시 허락을 닫은 도구의 줄은 내지 않는다(ADR-063). 판정이 그 줄을 보지 않아 효력이 없다.
+     * 카탈로그를 읽지 못했으면 낸다.
+     */
     @Transactional(readOnly = true)
     public List<ConnectorGrantView> grants(CurrentUser user) {
         Map<String, Optional<ConnectorManifest>> manifests = new HashMap<>();
-        return grants.findActiveByUserId(user.id(), now()).stream()
-                .map(grant -> ConnectorGrantView.from(
-                        grant,
-                        manifests
-                                .computeIfAbsent(grant.connectorId(), this::readManifest)
-                                .flatMap(manifest -> ConnectorToolPolicies.find(manifest, grant.toolName()))
-                                .map(ToolPolicy::title)
-                                .orElse(null)))
-                .toList();
+        List<ConnectorGrantView> views = new ArrayList<>();
+        for (ConnectorToolGrant grant : grants.findActiveByUserId(user.id(), now())) {
+            Optional<ToolPolicy> declared = manifests
+                    .computeIfAbsent(grant.connectorId(), this::readManifest)
+                    .flatMap(manifest -> ConnectorToolPolicies.find(manifest, grant.toolName()));
+            if (declared.isPresent() && !declared.get().grantable()) {
+                continue;
+            }
+            views.add(ConnectorGrantView.from(
+                    grant, declared.map(ToolPolicy::title).orElse(null)));
+        }
+        return views;
     }
 
     /** 허락을 거둔다. 남의 허락은 없는 것과 같은 응답이다. 있는지를 알리지 않는다. */
@@ -432,6 +441,12 @@ public class ConnectorActionService {
             return Approval.refused(actions.save(action));
         }
         Optional<ConnectorManifest> manifest = readManifest(action.connectorId());
+        // 승인 줄이 `hiddenArgs` 로 낸 것과 같은 조건이다. 사람이 다 읽지 못한 인자로는 실행하지 않는다. 기간을 실은
+        // 승인도 같으므로 허락을 볼 것보다 먼저 본다.
+        if (hiddenArgs(manifest, action)) {
+            action.refuse(ConnectorAction.HIDDEN_ARGS, now);
+            return Approval.refused(actions.save(action));
+        }
         // 승인 줄이 `grantAllowed` 로 낸 것과 같은 조건이다. 카탈로그를 읽지 못했으면 허락을 줄 수 없다.
         if (grant != null && !(action.grantAllowed() && grantable(manifest, action))) {
             throw grantNotAllowed();
@@ -527,7 +542,8 @@ public class ConnectorActionService {
         return ConnectorActionView.from(
                 action,
                 manifest.flatMap(found -> ConnectorToolPolicies.find(found, action.toolName())),
-                grantable(manifest, action));
+                grantable(manifest, action),
+                hiddenArgs(manifest, action));
     }
 
     /**
@@ -546,6 +562,33 @@ public class ConnectorActionService {
         return ConnectorToolPolicies.find(manifest.get(), action.toolName())
                 .map(ToolPolicy::grantable)
                 .orElse(manifest.get().schema() == SCHEMA_WITHOUT_TOOLS);
+    }
+
+    /**
+     * 지금 카탈로그로 볼 때 그 줄의 도구가 상시 허락을 닫은 도구인가(ADR-063).
+     *
+     * <p>승인을 받는 도구이고 선언이 상시 허락을 닫았을 때다. 밖으로 나가는 호출이라 사람이 인자를 다 읽어야 한다.
+     * 카탈로그를 읽지 못했으면 닫은 것으로 본다. 선언 없는 도구와 상시 허락을 줄 수 있는 도구는 아니다.
+     *
+     * @param manifest 그 줄의 커넥터 manifest. 읽지 못했으면 빈 값
+     */
+    private static boolean grantClosed(Optional<ConnectorManifest> manifest, ConnectorAction action) {
+        if (manifest.isEmpty()) {
+            return true;
+        }
+        return ConnectorToolPolicies.find(manifest.get(), action.toolName())
+                .filter(declared -> declared.approval() == ToolApproval.REQUIRED && !declared.grantable())
+                .isPresent();
+    }
+
+    /**
+     * 답을 기다리는 줄인데 사람이 인자를 다 읽을 수 없는가. 상시 허락을 닫은 도구의 인자에 화면에서 가려지는 글이
+     * 있을 때다. 이런 줄은 승인할 수 없다.
+     */
+    private static boolean hiddenArgs(Optional<ConnectorManifest> manifest, ConnectorAction action) {
+        return action.status() == ActionStatus.PENDING
+                && grantClosed(manifest, action)
+                && ToolDetailRedactor.hidesArguments(action.argsJson());
     }
 
     /** 읽지 못했거나 카탈로그에 없으면 빈 값이다. 예외 메시지에는 원격 응답이 섞일 수 있어 종류만 남긴다. */

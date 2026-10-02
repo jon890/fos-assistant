@@ -23,6 +23,7 @@ function action(overrides: Record<string, unknown> = {}): Action {
     createdAt: "2026-09-30T12:00:00Z",
     expiresAt: "2026-10-01T12:00:00Z",
     grantAllowed: true,
+    hiddenArgs: false,
     ...overrides,
   };
 }
@@ -209,6 +210,37 @@ test("허락을 줄 수 없는 동작에는 묻지 않기 단추가 없다", asy
 
   await expect(page.getByTestId("approval-approve")).toBeVisible();
   await expect(page.getByTestId("approval-grant")).toHaveCount(0);
+});
+
+test("가려진 내용이 있는 줄은 경고를 보이고 승인 단추 없이 거절만 남긴다", async ({
+  page,
+}) => {
+  await openWith(
+    page,
+    "가려진 인자 검사",
+    action({
+      grantAllowed: true,
+      hiddenArgs: true,
+      argsJson: JSON.stringify({ body: "회의록입니다 [가림]" }),
+    }),
+  );
+
+  const card = page.getByTestId("approval-card");
+  await expect(card.getByTestId("approval-hidden-args")).toHaveText(
+    "가려진 내용이 있어 승인할 수 없어요. 에이전트에게 그 부분을 빼거나 다시 쓰게 해 주세요.",
+  );
+  await expect(card.getByTestId("approval-approve")).toHaveCount(0);
+  await expect(card.getByTestId("approval-grant")).toHaveCount(0);
+  await expect(card.getByTestId("approval-reject")).toBeEnabled();
+});
+
+test("가려진 내용이 없는 줄에는 경고가 없고 승인 단추가 있다", async ({
+  page,
+}) => {
+  await openWith(page, "가려지지 않은 인자 검사", action({ hiddenArgs: false }));
+
+  await expect(page.getByTestId("approval-approve")).toBeVisible();
+  await expect(page.getByTestId("approval-hidden-args")).toHaveCount(0);
 });
 
 test("거절을 누르면 거절 요청이 가고 카드가 사라진다", async ({ page }) => {

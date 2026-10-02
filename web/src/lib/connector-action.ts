@@ -41,6 +41,8 @@ export type ConnectorAction = {
   createdAt: string;
   expiresAt: string | null;
   grantAllowed: boolean;
+  /** 가려진 내용이 있어 승인할 수 없는 줄인가. 참이면 승인 단추를 그리지 않는다. */
+  hiddenArgs: boolean;
 };
 
 /** 묻지 않고 실행하게 허락한 도구 한 개다. 화면에는 `title` 을 보인다. */

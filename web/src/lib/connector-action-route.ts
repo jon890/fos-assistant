@@ -134,6 +134,7 @@ function safeAction(value: unknown): ConnectorAction {
     createdAt: text(item.createdAt),
     expiresAt: nullableText(item.expiresAt),
     grantAllowed: item.grantAllowed === true,
+    hiddenArgs: item.hiddenArgs === true,
   };
 }
 

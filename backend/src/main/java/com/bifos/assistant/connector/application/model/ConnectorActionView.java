@@ -19,6 +19,8 @@ import java.util.UUID;
  * @param argsJson 승인할 인자. 비밀처럼 보이는 값과 식별자는 가린 글이다. 실행은 저장한 원문으로 한다
  * @param grantAllowed 승인하면서 상시 허락을 줄 수 있는 도구인가. 승인 줄에 저장하지 않고 줄을 읽을 때의 카탈로그로
  *     본다(ADR-063)
+ * @param hiddenArgs 답을 기다리는 줄이고, 상시 허락을 닫은 도구이며, {@code argsJson} 에 가려진 글이 있는가. 참이면
+ *     승인할 수 없다(ADR-063)
  */
 public record ConnectorActionView(
         UUID actionId,
@@ -32,7 +34,8 @@ public record ConnectorActionView(
         String errorCode,
         Instant createdAt,
         Instant expiresAt,
-        boolean grantAllowed) {
+        boolean grantAllowed,
+        boolean hiddenArgs) {
 
     /** 선언한 이름이 없는 도구를 사용자에게 부르는 말이다. */
     public static final String UNNAMED_TITLE = "이름 없는 동작";
@@ -40,8 +43,10 @@ public record ConnectorActionView(
     /**
      * @param declared 카탈로그가 선언한 그 도구의 정책. 선언이 없거나 카탈로그를 읽지 못했으면 빈 값
      * @param grantable 지금 카탈로그로 볼 때 그 도구에 상시 허락을 줄 수 있는가
+     * @param hiddenArgs 가려진 글이 있어 승인할 수 없는 줄인가
      */
-    public static ConnectorActionView from(ConnectorAction action, Optional<ToolPolicy> declared, boolean grantable) {
+    public static ConnectorActionView from(
+            ConnectorAction action, Optional<ToolPolicy> declared, boolean grantable, boolean hiddenArgs) {
         String title = declared.map(ToolPolicy::title)
                 .filter(declaredTitle -> !declaredTitle.isBlank())
                 .orElse(UNNAMED_TITLE);
@@ -57,6 +62,7 @@ public record ConnectorActionView(
                 action.errorCode(),
                 action.createdAt(),
                 action.expiresAt(),
-                action.grantAllowed() && grantable);
+                action.grantAllowed() && grantable,
+                hiddenArgs);
     }
 }
