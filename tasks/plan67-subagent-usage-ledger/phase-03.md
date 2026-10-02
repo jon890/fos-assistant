@@ -67,7 +67,7 @@ export function subagentGapDetail(gap: SubagentGap): string
 
 - `test/unit/subagent-gap.test.ts`(신규): 셋 다 0 이면 합계 0 과 빈 문자열, 하나만 0 이 아니면 그 하나만, 셋 다 있으면 순서대로 쉼표로 이어진 문구
 - `test/browser/usage.spec.ts`: 「자식 완료 사건 없음 검사」 를 보낸 뒤 `/usage` 를 다시 열어 가며(30초 기한) 「금액을 확인하지 못한 하위 에이전트」 가 보이는지 본다. 기존 `MEMBER` 검사(「실행 기록과 요약과 대화의 작업 과정에 내부 값이 없다」)에서도 「자식 완료 사건 없음 검사」 를 먼저 보내고 그 문구가 없는지 본다. 부모가 끝나면 그 자식은 바로 `pendingSubagents` 로 세어지므로, 자식 없이 문구가 없는 것과 구분된다
-- `test/browser/usage-breakdown.spec.ts`: 「자식 완료 사건 없음 검사」 를 보낸 뒤 에이전트 축을 다시 열어 가며(30초 기한) 「하위 에이전트 1건」 이 보이는지 보는 검사를 더한다. 토큰이 적힌 줄만 세므로 재조회 한 주기를 기다려야 한다. 이름이 겹치지 않게 그 spec 의 기존 검사가 쓰는 에이전트와 project 구분 방식을 따른다
+- `test/browser/usage-breakdown.spec.ts`: 먼저 그 spec 의 `replaceExecutions(page, [])` 로 실행을 비운 뒤 `agentCode: "browser"` 로 「자식 완료 사건 없음 검사」 를 보내고, 에이전트 축을 다시 열어 가며(30초 기한) 「하위 에이전트 1건」 이 보이는지 보는 검사를 더한다. 토큰이 적힌 줄만 세므로 재조회 한 주기를 기다려야 한다. 실행을 지우면 앞 검사의 자식 줄은 부모 실행과 이어지지 않아 세어지지 않는다
 
 ## 검증
 

@@ -48,7 +48,7 @@ public record SubagentLedgerRow(
 
 - `SubagentUsageJobRepository.findLedgerRows(Long userId, Instant from, Instant to)`: `SubagentUsageJob j` 와 `AgentExecution e` 를 `e.id = j.executionId` 로 잇고 `e.userId = :userId and e.startedAt >= :from and e.startedAt < :to and e.status <> RUNNING` 으로 거른다. `select new ...SubagentLedgerRow(e.agentId, e.startedAt, e.runtimeFingerprint, j.status, j.provider, j.model, j.inputTokens, j.cacheReadTokens, j.cacheWriteTokens, j.outputTokens, j.estimatedCostMicros, j.actualCostMicros)`
 - `ExecutionEventRepository.countSessionlessChildren(userId, from, to)`: 같은 실행 조건에서 `eventType = 'SUBAGENT_STARTED' and hermesSessionId is null` 인 사건 수
-- `ExecutionEventRepository.countUnscheduledChildren(userId, from, to, finishedFrom, finishedBefore)`: 같은 실행 조건에서 `eventType = 'SUBAGENT_STARTED' and hermesSessionId is not null` 이고 같은 `profileName` 과 session 의 작업 줄이 없으며 부모의 `finishedAt >= :finishedFrom and finishedAt < :finishedBefore` 인 자식 수. `count(distinct event.hermesSessionId)` 로 중복 시작 사건을 한 번만 센다. 서비스가 이것을 두 번 부른다. 부모가 끝난 지 24시간 안이면 `discover` 가 곧 줄을 만들 자식이고, 24시간이 지났으면 `discover` 가 더는 찾지 않는 자식이다
+- `ExecutionEventRepository.countUnscheduledChildren(userId, from, to, finishedFrom, finishedBefore)`: 같은 실행 조건에서 `eventType = 'SUBAGENT_STARTED' and hermesSessionId is not null` 이고 같은 `profileName` 과 session 의 작업 줄이 없으며 부모의 `finishedAt >= :finishedFrom and finishedAt < :finishedBefore` 인 자식 수. `count(distinct event.hermesSessionId)` 로 중복 시작 사건을 한 번만 센다. 서비스가 이것을 두 번 부른다. 24시간 안은 `[now - 24h, from 과 to 보다 먼 미래)`, 지난 것은 `[Instant.EPOCH, now - 24h)` 로 넘긴다. 부모가 끝난 지 24시간 안이면 `discover` 가 곧 줄을 만들 자식이고, 24시간이 지났으면 `discover` 가 더는 찾지 않는 자식이다
 
 ### 3. `usage/application` 의 합계 서비스(신규 셋)
 
