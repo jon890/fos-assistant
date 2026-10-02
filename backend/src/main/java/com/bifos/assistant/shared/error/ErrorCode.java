@@ -21,6 +21,8 @@ public enum ErrorCode {
     MEMORY_SCOPE_REQUIRED(HttpStatus.BAD_REQUEST),
     /** 민감 항목을 항상 싣게 하려 했다. 조립 판정이 틀려도 민감 본문이 나가지 않게 저장할 때 막는다. */
     MEMORY_SENSITIVE_ALWAYS(HttpStatus.BAD_REQUEST),
+    /** 민감 본문을 암호화하거나 풀 key 가 없다. 평문으로 내려 저장하지 않는다(ADR-055). */
+    MEMORY_ENCRYPTION_UNAVAILABLE(HttpStatus.CONFLICT),
     AGENT_DISABLED(HttpStatus.CONFLICT),
     /** 다른 요청이 같은 에이전트 설정을 바꾸고 있어 잠금 대기 시간이 지났다. */
     AGENT_BUSY(HttpStatus.CONFLICT),

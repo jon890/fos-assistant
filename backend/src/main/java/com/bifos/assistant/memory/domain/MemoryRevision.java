@@ -73,6 +73,10 @@ public class MemoryRevision implements Persistable<MemoryRevisionId> {
     @Column(nullable = false, columnDefinition = "TEXT")
     private String content;
 
+    /** 본문을 암호화한 key 의 id 다. 비어 있으면 {@code content} 는 평문이다. */
+    @Column(name = "content_key_id", length = 32)
+    private String contentKeyId;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     private MemoryRetrieval retrieval;
@@ -114,12 +118,31 @@ public class MemoryRevision implements Persistable<MemoryRevisionId> {
         revision.status = memory.status();
         revision.title = memory.title();
         revision.content = memory.content();
+        revision.contentKeyId = memory.contentKeyId();
         revision.retrieval = memory.retrieval();
         revision.sensitivity = memory.sensitivity();
         revision.changedByUserId = changedByUserId;
         revision.reason = reason;
         revision.changedAt = at;
         return revision;
+    }
+
+    /** 암호문이 누구의 것인지 적은 글이다. {@link Memory#contentBinding()} 과 같은 규칙이다. */
+    public String contentBinding() {
+        return scope == MemoryScope.USER ? "USER:" + ownerUserId : "GROUP:" + groupId;
+    }
+
+    /**
+     * 남긴 판의 뜻은 바뀌지 않는다. 평문으로 남은 민감 판의 저장 모양만 바꾼다(ADR-055).
+     *
+     * @throws IllegalStateException 이미 암호문일 때
+     */
+    public void sealInPlace(StoredContent body) {
+        if (contentKeyId != null) {
+            throw new IllegalStateException("memory revision content is already sealed");
+        }
+        this.content = body.content();
+        this.contentKeyId = body.keyId();
     }
 
     /** Spring Data 의 {@link Persistable} 이 요구하는 이름이다. 값은 Lombok 이 만든 {@link #id()} 와 같다. */
