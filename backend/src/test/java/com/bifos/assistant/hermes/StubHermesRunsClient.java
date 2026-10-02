@@ -1,6 +1,7 @@
 package com.bifos.assistant.hermes;
 
 import com.bifos.assistant.hermes.dto.HermesRunCommand;
+import com.bifos.assistant.hermes.dto.HermesRunLookup;
 import com.bifos.assistant.hermes.dto.HermesRunResult;
 import com.bifos.assistant.hermes.dto.SessionRuntime;
 import com.bifos.assistant.shared.error.ApiException;
@@ -14,6 +15,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
 import java.util.function.Consumer;
 
@@ -44,6 +46,12 @@ public class StubHermesRunsClient implements HermesRunsClient {
     /** 세션 조회가 답할 값이다. 비어 있으면 읽지 못한 것으로 본다. */
     private volatile SessionRuntime sessionRuntime;
     private final List<String> sessionLookups = new CopyOnWriteArrayList<>();
+
+    private final Map<String, Deque<HermesRunLookup>> lookupAnswers = new ConcurrentHashMap<>();
+    private final Map<String, HermesRunLookup> lastLookupAnswers = new ConcurrentHashMap<>();
+    private final Map<String, ApiException> lookupFailures = new ConcurrentHashMap<>();
+    private final Map<String, AtomicInteger> lookupFailuresLeft = new ConcurrentHashMap<>();
+    private final List<String> lookups = new CopyOnWriteArrayList<>();
 
     public void willReturn(HermesRunResult result) {
         this.nextResult = result;
@@ -78,6 +86,28 @@ public class StubHermesRunsClient implements HermesRunsClient {
     /** 세션 조회를 부른 session 번호들. */
     public List<String> sessionLookups() {
         return sessionLookups;
+    }
+
+    /**
+     * 그 run 을 물을 때 차례로 돌려줄 답이다. 마지막 답은 되풀이한다.
+     * 같은 run 에 다시 부르면 앞에 정한 답을 버리고 새 답으로 바꾼다.
+     */
+    public void willLookup(String runId, HermesRunLookup... answers) {
+        Deque<HermesRunLookup> queue = new ArrayDeque<>();
+        Collections.addAll(queue, answers);
+        lastLookupAnswers.remove(runId);
+        lookupAnswers.put(runId, queue);
+    }
+
+    /** 처음 {@code times} 번은 예외를 던지고 그 뒤에는 {@link #willLookup} 의 답을 준다. 다시 부르면 남은 횟수를 바꾼다. */
+    public void willFailLookup(String runId, ApiException failure, int times) {
+        lookupFailures.put(runId, failure);
+        lookupFailuresLeft.put(runId, new AtomicInteger(times));
+    }
+
+    /** 물은 run 번호를 순서대로. */
+    public List<String> lookups() {
+        return lookups;
     }
 
     public void willFail(ApiException failure) {
@@ -130,6 +160,11 @@ public class StubHermesRunsClient implements HermesRunsClient {
         sessionLookups.clear();
         stopped.clear();
         onStop = runId -> {};
+        lookupAnswers.clear();
+        lastLookupAnswers.clear();
+        lookupFailures.clear();
+        lookupFailuresLeft.clear();
+        lookups.clear();
         releaseSubmits();
     }
 
@@ -161,6 +196,28 @@ public class StubHermesRunsClient implements HermesRunsClient {
     public void stop(String apiBaseUrl, String profileName, String runId) {
         stopped.add(runId);
         onStop.accept(runId);
+    }
+
+    @Override
+    public HermesRunLookup lookupRun(String apiBaseUrl, String profileName, String runId) {
+        lookups.add(runId);
+        AtomicInteger left = lookupFailuresLeft.get(runId);
+        ApiException failure = lookupFailures.get(runId);
+        if (left != null && failure != null && left.getAndUpdate(n -> n > 0 ? n - 1 : 0) > 0) {
+            throw failure;
+        }
+        Deque<HermesRunLookup> queue = lookupAnswers.get(runId);
+        if (queue == null) {
+            return HermesRunLookup.notFound();
+        }
+        synchronized (queue) {
+            HermesRunLookup next = queue.pollFirst();
+            if (next != null) {
+                lastLookupAnswers.put(runId, next);
+                return next;
+            }
+        }
+        return lastLookupAnswers.getOrDefault(runId, HermesRunLookup.notFound());
     }
 
     @Override
