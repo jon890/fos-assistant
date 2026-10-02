@@ -42,7 +42,7 @@
 | 다시 올리면 중복이다 | 같은 묶음을 한 번 더 보낸다 | 200. `duplicateCount` 가 2, `newCount` 가 0 |
 | 다른 사용자는 따로 들인다 | kid 가 같은 묶음을 미리보기 | `newCount` 가 2. 저장하지는 않는다 |
 | 신원 항목은 거절한다 | dad 가 `identity` 의 민감 문서를 보낸다 | 200. 그 항목이 `REJECTED`, `IDENTITY_HELD` |
-| 서비스 토큰과 토큰 없는 요청은 들이지 못한다 | `token` 없이 `/memory-imports` 를 부른다 | 403. `test/e2e/scenarios/auth.ts` 가 인증하지 못한 사용자 API 요청에 기대하는 값과 같다 |
+| 서비스 토큰과 토큰 없는 요청은 들이지 못한다 | `token` 없이 `/memory-imports` 를 부른다. aunt 가 `/service-tokens` 로 발급한 서비스 토큰을 `token` 에 넣어 한 번 더 부르고, 그 토큰을 폐기한다 | 둘 다 403 이고 저장된 줄이 없다. `test/e2e/scenarios/auth.ts` 가 인증하지 못한 사용자 API 요청에 기대하는 값과 같다 |
 | 뒤 시나리오에 남기지 않는다 | dad 가 `DELETE /memories/{id}` 로 두 항목을 지운다 | 200 |
 
 `test/e2e/run.ts` 에 import 하고 `SCENARIOS` 의 `memoryDocumentScenario` 바로 뒤에 넣는다. 대화 turn 을 돌리지 않고 항목을 지우고 끝나므로 뒤 시나리오의 Memory 주입과 사용량에 걸리지 않는다. 돌려 보아 뒤 시나리오가 실패하면, 실패한 단언이 무엇을 세는지 읽고 자리를 옮긴 뒤 까닭을 배열의 주석으로 남긴다.

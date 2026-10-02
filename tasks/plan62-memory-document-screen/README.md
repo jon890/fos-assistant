@@ -33,7 +33,7 @@
 | `DOCUMENT` | 문서 |
 | collection | 영역. 이름은 `displayName` 을 보인다 |
 | `documentKey` | 문서 이름 |
-| `SENSITIVE` | 민감한 내용 |
+| `SENSITIVE` | 배지는 「민감」, 체크박스 문구는 「민감한 내용이에요」 |
 | `revision` | N번째 판 |
 | 서비스 토큰 | 외부 서비스 연결 토큰. 절 제목은 「외부 서비스 연결」 |
 

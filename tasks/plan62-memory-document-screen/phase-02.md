@@ -132,7 +132,7 @@ export function serviceTokenStatus(
 
 - `docs/code-architecture.md` 의 화면 표에서 `/memory` 줄을 「개인과 그룹 공용 Memory, 개인 문서, 서비스 토큰」 으로 고친다
 - 같은 문서의 「Memory」 「다음」 목록에서 문서 편집 화면을 적은 줄을 「collection 탭, 문서의 판 이력 화면, 출처 표시」 로 고친다
-- `web/AGENTS.md` 의 「화면 문구」 표에 줄을 더한다: `DOCUMENT` | 문서. collection 은 「영역」, 민감 항목은 「민감」, 판은 「N번째 판」. 서비스 토큰 | 외부 서비스 연결 토큰. 절 제목은 「외부 서비스 연결」
+- `web/AGENTS.md` 의 「화면 문구」 표에 줄을 더한다: `DOCUMENT` | 문서. collection 은 「영역」, 민감 항목은 배지 「민감」 과 체크박스 문구 「민감한 내용이에요」, 판은 「N번째 판」. 서비스 토큰 | 외부 서비스 연결 토큰. 절 제목은 「외부 서비스 연결」
 - `docs/adr/ADR-057-문서는-사람이-화면에서-직접-쓰고-고친다.md` 의 `status` 줄을 `` `accepted` `` 만 남기고 고친다
 - `docs/adr/INDEX.md` 의 ADR-057 줄에서 「화면은 아직 구현 전이다」 를 지운다
 

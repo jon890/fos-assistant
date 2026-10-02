@@ -81,7 +81,7 @@ class MemoryContentBackfillTest {
                 """, memoryId, revision, content, contentKeyId);
     }
 
-    /** 다른 쪽이 먼저 암호화한 것처럼 줄을 고친다. 테스트에 트랜잭션이 없어 바로 커밋된다. */
+    /** 대상을 찾은 뒤 잠가 읽기 전에 다른 쪽이 먼저 암호화한 상황을 만든다. */
     private void sealBehindBack(long id) {
         jdbc.update(
                 "UPDATE memory SET content = ?, content_key_id = 'test-1', revision = 9 WHERE id = ?",
