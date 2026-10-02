@@ -12,13 +12,7 @@ const LINKS = [
   { href: "/usage", label: "사용량" },
 ] as const;
 
-export function MainNav({
-  isAdmin,
-  onNavigate,
-}: {
-  isAdmin: boolean;
-  onNavigate(href: string): void;
-}) {
+export function MainNav({ onNavigate }: { onNavigate(href: string): void }) {
   const pathname = usePathname();
   const [proposalCount, setProposalCount] = useState(0);
   useEffect(() => {
@@ -38,12 +32,9 @@ export function MainNav({
     return () => window.removeEventListener("memory-proposal-count", update);
   }, []);
 
-  const links = isAdmin
-    ? [...LINKS, { href: "/admin/people", label: "사용자 관리" }]
-    : LINKS;
   return (
     <nav aria-label="주요 화면" className="flex flex-col gap-1">
-      {links.map((link) => (
+      {LINKS.map((link) => (
         <Link
           key={link.href}
           href={link.href}

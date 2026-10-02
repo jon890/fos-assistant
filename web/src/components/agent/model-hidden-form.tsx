@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { cn } from "cn";
 import { Button } from "@/components/ui/button";
 import { Notice } from "@/components/ui/notice";
 import {
@@ -15,6 +16,8 @@ import { knownProviderLabel } from "@/lib/provider-label";
 type Props = {
   settings: AgentModelSettings;
   onSaved(entries: HiddenModelEntry[]): void;
+  /** 제목 「모델 숨김」 을 그릴지다. 부모가 같은 제목을 이미 그렸으면 거짓을 준다 */
+  showTitle?: boolean;
 };
 
 /** 한 제공사의 모델이 이보다 많으면 숨김 목록을 접어 둔다 */
@@ -108,7 +111,11 @@ function ProviderHiddenFields({
  * <p>이 에이전트의 목록에 없는 숨김 항목도 따로 보인다. 저장은 목록을 통째로 바꾸므로, 보이지 않는 항목을
  * 그대로 두지 않으면 다른 에이전트의 목록에만 있는 숨김이 지워진다.
  */
-export function ModelHiddenForm({ settings, onSaved }: Props) {
+export function ModelHiddenForm({
+  settings,
+  onSaved,
+  showTitle = true,
+}: Props) {
   const saved = settings.hidden.entries;
   const providers = settings.catalog.providers;
   const [draft, setDraft] = useState<HiddenModelEntry[]>(saved);
@@ -148,9 +155,9 @@ export function ModelHiddenForm({ settings, onSaved }: Props) {
   }
 
   return (
-    <div className="mt-6 grid gap-3">
+    <div className={cn("grid gap-3", showTitle && "mt-6")}>
       <div>
-        <h3 className="text-sm font-medium">모델 숨김</h3>
+        {showTitle ? <h3 className="text-sm font-medium">모델 숨김</h3> : null}
         <p className="mt-1 text-sm text-muted-foreground">
           표시한 모델 제공사와 모델은 그룹의 모든 사용자와 에이전트에서 고를 수
           없어요. 새로 생긴 모델은 숨기기 전까지 보여요.

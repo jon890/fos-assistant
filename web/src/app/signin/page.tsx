@@ -1,8 +1,13 @@
+import { connection } from "next/server";
 import { signIn } from "@/auth";
+import { appName } from "@/lib/app-name";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 
-export default function SignInPage() {
+export default async function SignInPage() {
+  // 앱 이름은 실행할 때의 환경에서 읽는다. 빌드할 때 굳지 않게 요청마다 그린다.
+  await connection();
+  const name = appName();
   return (
     <section className="grid min-h-full place-items-center">
       <Card className="w-full max-w-sm items-center gap-0 bg-card p-6 text-center shadow-sm sm:p-8">
@@ -11,9 +16,9 @@ export default function SignInPage() {
           // 한 번만 쓰는 머리글자 표시다. 흐린 바탕의 원 안에 글자를 가운데 두는 배치라 부품으로 모으지 않는다.
           className="flex h-12 w-12 items-center justify-center rounded-full bg-muted text-lg font-semibold text-foreground"
         >
-          우
+          {Array.from(name)[0]?.toUpperCase()}
         </span>
-        <h1 className="mt-4 text-2xl font-semibold">우리집 비서</h1>
+        <h1 className="mt-4 text-2xl font-semibold">{name}</h1>
         <p className="mt-2 leading-6 text-muted-foreground">
           등록된 Google 계정으로 로그인해 주세요.
         </p>

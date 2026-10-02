@@ -21,11 +21,9 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { NativeSelect } from "@/components/ui/native-select";
-import { Input } from "@/components/ui/input";
 import {
   getModelTiers,
   saveDefaultTier,
-  saveGroupTiers,
   type ModelSelectionMode,
   type ModelTier,
   type ModelTierCode,
@@ -484,14 +482,7 @@ export function ModelTierPicker({
   const [saving, setSaving] = useState(false);
   const [failed, setFailed] = useState(false);
   const [defaultsOpen, setDefaultsOpen] = useState(false);
-  const [groupOpen, setGroupOpen] = useState(false);
   const [ownDefaultSaveFailed, setOwnDefaultSaveFailed] = useState(false);
-  const [groupSaveFailed, setGroupSaveFailed] = useState(false);
-  const [draftTiers, setDraftTiers] = useState<ModelTier[]>(FALLBACK_TIERS);
-  const [groupDefaultTier, setGroupDefaultTier] =
-    useState<ModelTierCode | null>(null);
-  /** 단계마다 「모델 제공사」 도움말의 id 를 만드는 앞머리다 */
-  const providerHelpId = useId();
 
   useEffect(() => {
     let active = true;
@@ -499,8 +490,6 @@ export function ModelTierPicker({
       if (!active) return;
       if (result.ok) {
         setState({ loading: false, data: result.data });
-        setDraftTiers(result.data.tiers);
-        setGroupDefaultTier(result.data.groupDefaultTier);
       } else {
         setState({ loading: false, data: null });
       }
@@ -521,17 +510,6 @@ export function ModelTierPicker({
   const groupDefaultTierLabel =
     tiers.find((item) => item.tier === state.data?.groupDefaultTier)?.label ??
     null;
-  const needsTierSetup =
-    state.data?.admin === true &&
-    state.data.tiers.some((item) => item.model === null);
-  const hasIncompleteTierMapping = draftTiers.some((item) => {
-    const hasModel = item.model !== null;
-    const hasReasoningEffort = item.reasoningEffort !== null;
-    return (
-      hasModel !== hasReasoningEffort || (!hasModel && item.provider !== null)
-    );
-  });
-
   async function choose(nextTier: ModelTierCode) {
     setSaving(true);
     setFailed(false);
@@ -563,36 +541,6 @@ export function ModelTierPicker({
       setDefaultsOpen(false);
     } else {
       setOwnDefaultSaveFailed(true);
-    }
-  }
-
-  function updateDraft(
-    tierCode: ModelTierCode,
-    field: keyof Pick<ModelTier, "provider" | "model" | "reasoningEffort">,
-    value: string,
-  ) {
-    setDraftTiers((current) =>
-      current.map((item) =>
-        item.tier === tierCode ? { ...item, [field]: value || null } : item,
-      ),
-    );
-  }
-
-  async function saveGroup() {
-    setGroupSaveFailed(false);
-    const result = await saveGroupTiers(draftTiers, groupDefaultTier);
-    if (result.ok) {
-      setState((current) =>
-        current.data === null
-          ? current
-          : {
-              ...current,
-              data: { ...current.data, tiers: draftTiers, groupDefaultTier },
-            },
-      );
-      setGroupOpen(false);
-    } else {
-      setGroupSaveFailed(true);
     }
   }
 
@@ -727,156 +675,6 @@ export function ModelTierPicker({
               </div>
             </DialogContent>
           </Dialog>
-          {state.data?.admin ? (
-            <Dialog open={groupOpen} onOpenChange={setGroupOpen}>
-              {needsTierSetup ? (
-                <p className="text-sm text-muted-foreground">
-                  단계별 모델을 아직 정하지 않았어요. 그룹 모델 설정에서 모델과
-                  강도를 정해 주세요.
-                </p>
-              ) : null}
-              <DialogTrigger asChild>
-                <Button type="button" variant="outline">
-                  그룹 모델 설정
-                </Button>
-              </DialogTrigger>
-              <DialogContent
-                closeLabel="그룹 모델 설정 닫기"
-                className="max-h-[calc(100vh-2rem)] overflow-y-auto sm:max-w-lg"
-              >
-                <form
-                  onSubmit={(event) => {
-                    event.preventDefault();
-                    void saveGroup();
-                  }}
-                  className="grid gap-4"
-                >
-                  <DialogHeader>
-                    <DialogTitle>그룹 모델 설정</DialogTitle>
-                    <DialogDescription>
-                      이 그룹 사용자가 어느 단계로 시작하는지와 각 단계가 어떤
-                      모델로 도는지 정해요. 저장하면 다음 실행부터 적용돼요.
-                    </DialogDescription>
-                  </DialogHeader>
-                  {needsTierSetup ? (
-                    <p className="text-sm text-muted-foreground">
-                      단계별 모델을 아직 정하지 않았어요. 비워 두면 에이전트
-                      기본 모델로 돌아요.
-                    </p>
-                  ) : null}
-                  <section className="grid gap-2">
-                    <h3 className="text-sm font-medium">그룹 기본 단계</h3>
-                    <p className="text-xs text-muted-foreground">
-                      따로 고르지 않은 사용자는 이 단계로 돌아요. 각자 「내
-                      기본값」 을 정하면 그것이 먼저예요.
-                    </p>
-                    <label className="grid gap-1 text-sm">
-                      그룹 기본 단계
-                      <NativeSelect
-                        value={groupDefaultTier ?? ""}
-                        onChange={(event) =>
-                          setGroupDefaultTier(
-                            (event.target.value ||
-                              null) as ModelTierCode | null,
-                          )
-                        }
-                      >
-                        <option value="">
-                          없음 (에이전트 기본 모델로 돌아요)
-                        </option>
-                        {draftTiers.map((item) => (
-                          <option key={item.tier} value={item.tier}>
-                            {item.label}
-                          </option>
-                        ))}
-                      </NativeSelect>
-                    </label>
-                  </section>
-                  <section className="grid gap-2">
-                    <h3 className="text-sm font-medium">단계별 모델</h3>
-                    <p className="text-xs text-muted-foreground">
-                      빠르게, 균형, 깊게를 골랐을 때 실제로 도는 모델과
-                      강도예요. 비워 둔 단계는 에이전트 기본 모델로 돌아요.
-                    </p>
-                    {draftTiers.map((item) => (
-                      <fieldset
-                        key={item.tier}
-                        className="grid gap-2 rounded-md border border-border p-3"
-                      >
-                        <legend className="px-1 text-sm font-medium">
-                          {item.label}
-                        </legend>
-                        <div className="grid gap-1">
-                          <label className="grid gap-1 text-sm">
-                            모델 제공사
-                            <Input
-                              value={item.provider ?? ""}
-                              aria-describedby={`${providerHelpId}-${item.tier}`}
-                              onChange={(event) =>
-                                updateDraft(
-                                  item.tier,
-                                  "provider",
-                                  event.target.value,
-                                )
-                              }
-                            />
-                          </label>
-                          <p
-                            id={`${providerHelpId}-${item.tier}`}
-                            className="text-xs text-muted-foreground"
-                          >
-                            비워 두면 에이전트의 기본 모델 제공사를 써요.
-                          </p>
-                        </div>
-                        <label className="grid gap-1 text-sm">
-                          모델
-                          <Input
-                            value={item.model ?? ""}
-                            onChange={(event) =>
-                              updateDraft(
-                                item.tier,
-                                "model",
-                                event.target.value,
-                              )
-                            }
-                          />
-                        </label>
-                        <label className="grid gap-1 text-sm">
-                          강도
-                          <Input
-                            value={item.reasoningEffort ?? ""}
-                            onChange={(event) =>
-                              updateDraft(
-                                item.tier,
-                                "reasoningEffort",
-                                event.target.value,
-                              )
-                            }
-                          />
-                        </label>
-                      </fieldset>
-                    ))}
-                  </section>
-                  {hasIncompleteTierMapping ? (
-                    <p role="alert" className="text-sm text-destructive">
-                      모델과 강도는 함께 입력해 주세요.
-                    </p>
-                  ) : null}
-                  {groupSaveFailed ? (
-                    <p role="alert" className="text-sm text-destructive">
-                      그룹 모델 설정을 저장하지 못했어요. 잠시 뒤 다시 시도해
-                      주세요.
-                    </p>
-                  ) : null}
-                  <DialogFooter>
-                    <Button type="submit" disabled={hasIncompleteTierMapping}>
-                      저장
-                    </Button>
-                  </DialogFooter>
-                </form>
-              </DialogContent>
-            </Dialog>
-          ) : null}
           <section className="grid gap-2">
             <h3 className="text-sm font-medium">고급 직접 선택</h3>
             {advancedPicker}

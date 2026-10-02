@@ -1,4 +1,4 @@
-"""Gmail 커넥터의 MCP 서버와 설정 스크립트를 검사한다(ADR-065).
+"""Gmail 커넥터의 MCP 서버와 설정 스크립트를 검사한다(ADR-066).
 
 실제 Google 에 닿지 않는다. 토큰 endpoint 와 Gmail API 를 흉내 내는 로컬 대역을 띄우고
 서버 모듈의 `TOKEN_URL` 과 `API_BASE` 를 그 주소로 바꾼 뒤 MCP 서버를 거쳐 도구를 부른다.

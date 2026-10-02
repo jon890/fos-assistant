@@ -32,11 +32,7 @@ import {
 } from "./shell/conversations-provider";
 import { escapeOnlyClosedTooltip } from "./ui/tooltip-button";
 import { Notice } from "./ui/notice";
-import {
-  useShellDisplayName,
-  useShellIsAdmin,
-  useShellTitle,
-} from "./shell/app-shell";
+import { useShellDisplayName, useShellTitle } from "./shell/app-shell";
 import { readEventStream } from "@/lib/stream";
 import { agentLabel } from "@/lib/format";
 import type { ChatEvent } from "@/lib/chat-event";
@@ -227,7 +223,6 @@ export function ChatPanel({
   const pathname = usePathname();
   const { refresh, replace, newConversationVersion } = useConversations();
   const displayName = useShellDisplayName();
-  const isAdmin = useShellIsAdmin();
   const [turns, setTurns] = useState<Turn[]>([]);
   const [conversationId, setConversationId] = useState<string | null>(
     initialConversationId,
@@ -949,7 +944,7 @@ export function ChatPanel({
     } else if (event.type === "reset") {
       callbacks.onReset?.();
       setActivity((previous) => previous && applyChatEvent(previous, event));
-    } else if (["tool", "subagent", "step", "switched"].includes(event.type)) {
+    } else if (["tool", "subagent", "step"].includes(event.type)) {
       setActivity((previous) => previous && applyChatEvent(previous, event));
     } else if (
       (event.type === "done" || event.type === "stopped") &&
@@ -1890,7 +1885,6 @@ export function ChatPanel({
         {startScreen ? null : (
           <MessageList
             turns={turns}
-            isAdmin={isAdmin}
             loading={messagesLoading}
             sending={sending}
             activity={activity}

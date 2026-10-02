@@ -3,6 +3,7 @@ package com.bifos.assistant.usage.presentation;
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.skill.application.UserSkillUsage;
 import com.bifos.assistant.usage.application.BreakdownLine;
+import com.bifos.assistant.usage.application.MonthlyUsageSummary;
 import com.bifos.assistant.usage.domain.AgentExecution;
 import com.bifos.assistant.usage.domain.CostByAgent;
 import com.bifos.assistant.usage.domain.CostByDay;
@@ -39,6 +40,7 @@ public final class UsageDtos {
      * @param pendingSubagents 사용량을 아직 확인하는 중인 native 자식 수
      * @param unconfirmedSubagents 사용량을 끝내 확인하지 못한 native 자식 수
      * @param unpricedSubagents 사용량은 적었지만 금액을 내지 못한 native 자식 수
+     * @param totalExecutions 그 달 실행 건수. 가격을 찾은 것과 찾지 못한 것의 합이고 모두에게 싣는다
      */
     public record MonthlyCostView(
             String month,
@@ -51,7 +53,34 @@ public final class UsageDtos {
             Long pricedSubagents,
             Long pendingSubagents,
             Long unconfirmedSubagents,
-            Long unpricedSubagents) {}
+            Long unpricedSubagents,
+            long totalExecutions) {
+
+        /**
+         * 한 달치 합계를 보는 사람에 맞춰 옮긴다.
+         *
+         * <p>{@code internal} 이 거짓이면 통화와 금액과 건수 구분, native 자식 수를 비우고 달과 실행 건수만 싣는다.
+         */
+        static MonthlyCostView from(String month, MonthlyUsageSummary cost, boolean internal) {
+            long total = cost.pricedExecutions() + cost.unpricedExecutions();
+            if (!internal) {
+                return new MonthlyCostView(month, null, null, null, null, null, null, null, null, null, null, total);
+            }
+            return new MonthlyCostView(
+                    month,
+                    "USD",
+                    cost.estimatedMicros(),
+                    cost.pricedExecutions(),
+                    cost.unpricedExecutions(),
+                    cost.actualMicros(),
+                    cost.subscriptionExecutions(),
+                    cost.pricedSubagents(),
+                    cost.pendingSubagents(),
+                    cost.unconfirmedSubagents(),
+                    cost.unpricedSubagents(),
+                    total);
+        }
+    }
 
     /**
      * 축 하나로 묶어 본 한 달치다.
@@ -164,6 +193,7 @@ public final class UsageDtos {
     /**
      * 로그인한 사용자 자신이 부른 스킬의 합계 한 줄이다.
      *
+     * @param agentCode 에이전트 코드. 내부 값을 받지 않는 요청자에게는 null
      * @param lastConversationId 마지막 호출이 속한 대화의 공개 식별자. 그 대화를 지웠으면 null
      */
     public record MySkillUsageView(
@@ -174,9 +204,9 @@ public final class UsageDtos {
             Instant lastInvokedAt,
             UUID lastConversationId) {
 
-        static MySkillUsageView from(UserSkillUsage usage) {
+        static MySkillUsageView from(UserSkillUsage usage, boolean internal) {
             return new MySkillUsageView(
-                    usage.agentCode(),
+                    internal ? usage.agentCode() : null,
                     usage.agentName(),
                     usage.skillName(),
                     usage.count(),
@@ -229,37 +259,41 @@ public final class UsageDtos {
          * 있는 실행이 목록에 표시 없이 보이고, 컴파일은 통과한다. 부르는 쪽이 자식을 셀지 정하게 한다.
          *
          * <p>{@code agent} 는 행이 없으면 null 이다. 그 줄은 에이전트 코드와 이름만 비운다.
+         *
+         * <p>{@code internal} 이 거짓이면 에이전트 코드, 모델, 토큰, 금액, 문맥 크기, 설정 구분값을 비운다.
+         * 오류 코드와 걸린 시간과 스킬 이름은 그대로 싣는다.
          */
         static ExecutionView from(
                 AgentExecution execution,
                 Agent agent,
                 UUID conversationPublicId,
                 boolean hasChildren,
-                List<String> skillNames) {
+                List<String> skillNames,
+                boolean internal) {
             return new ExecutionView(
                     execution.id(),
                     conversationPublicId,
-                    agent == null ? null : agent.code(),
+                    !internal || agent == null ? null : agent.code(),
                     agent == null ? null : agent.name(),
-                    execution.provider(),
-                    execution.model(),
-                    execution.reasoningEffort(),
-                    execution.costMode().name(),
+                    internal ? execution.provider() : null,
+                    internal ? execution.model() : null,
+                    internal ? execution.reasoningEffort() : null,
+                    internal ? execution.costMode().name() : null,
                     execution.status().name(),
                     execution.errorCode(),
-                    execution.inputTokens(),
-                    execution.cachedInputTokens(),
-                    execution.outputTokens(),
-                    execution.totalTokens(),
+                    internal ? execution.inputTokens() : null,
+                    internal ? execution.cachedInputTokens() : null,
+                    internal ? execution.outputTokens() : null,
+                    internal ? execution.totalTokens() : null,
                     execution.latencyMs(),
-                    execution.contextChars(),
-                    execution.contextOmittedItems(),
-                    execution.runtimeFingerprint(),
-                    execution.instructionsHash(),
-                    execution.estimatedCostMicros(),
-                    execution.actualCostMicros(),
-                    execution.costCurrency(),
-                    execution.pricingVersion(),
+                    internal ? execution.contextChars() : null,
+                    internal ? execution.contextOmittedItems() : null,
+                    internal ? execution.runtimeFingerprint() : null,
+                    internal ? execution.instructionsHash() : null,
+                    internal ? execution.estimatedCostMicros() : null,
+                    internal ? execution.actualCostMicros() : null,
+                    internal ? execution.costCurrency() : null,
+                    internal ? execution.pricingVersion() : null,
                     execution.startedAt(),
                     hasChildren,
                     execution.retryOfExecutionId(),

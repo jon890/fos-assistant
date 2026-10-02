@@ -153,15 +153,12 @@ function ArtifactList({
 /** 비서 얼굴과 이름을 먼저 그리고, 그 아래 칸에 기다림 점이나 작업 과정이나 답을 받는다. */
 export function AssistantRow({
   header,
-  above,
   children,
   className,
   ...props
 }: React.ComponentProps<"li"> & {
   /** 이름 옆에 두는 것이다. 보낸 시각이 여기 온다 */
   header?: React.ReactNode;
-  /** 이름 줄 위에 두는 알림 줄이다 */
-  above?: React.ReactNode;
 }) {
   return (
     <li
@@ -175,7 +172,6 @@ export function AssistantRow({
         비
       </span>
       <div className="min-w-0">
-        {above}
         <div className="mb-1 flex min-h-8 items-center gap-2">
           <span className="text-sm font-medium">비서</span>
           {header}
@@ -188,7 +184,6 @@ export function AssistantRow({
 
 export function MessageBubble({
   turn,
-  isAdmin,
   conversationId,
   onOpenSaved,
   initialActivityExpanded,
@@ -206,8 +201,6 @@ export function MessageBubble({
   liveActivity,
 }: {
   turn: Turn;
-  /** 모델 제공사와 모델 전환 안내는 관리자만 본다. */
-  isAdmin: boolean;
   conversationId: string | null;
   onOpenSaved(executionId: number): void;
   initialActivityExpanded: boolean;
@@ -313,16 +306,6 @@ export function MessageBubble({
       data-testid="assistant-message"
       className="focus-visible:outline-2 focus-visible:outline-ring"
       tabIndex={0}
-      above={
-        isAdmin && turn.switchedTo ? (
-          <p
-            className="mb-1 text-xs text-muted-foreground"
-            data-testid="provider-switched"
-          >
-            여기부터 {turn.switchedTo}로 실행해요
-          </p>
-        ) : null
-      }
       header={
         sentAt ? (
           <time dateTime={turn.createdAt} className={revealedTime()}>

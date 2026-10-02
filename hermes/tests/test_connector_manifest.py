@@ -481,7 +481,7 @@ class ConnectorToolPolicyTest(ConnectorGateCase):
         self.assertEqual(self.catalog(), [])
 
     def test_closed_grant_keeps_the_tool_visible_to_the_model(self):
-        """`"grant": false` 인 도구는 `grant` 만 거짓으로 나오고 서버 정의의 `tools.exclude` 에 들지 않는다(ADR-064)."""
+        """`"grant": false` 인 도구는 `grant` 만 거짓으로 나오고 서버 정의의 `tools.exclude` 에 들지 않는다(ADR-065)."""
         self.declare(lambda tools: tools.update(send_note={"risk": "WRITE", "grant": False}))
         tools = self.catalog()[0]["tools"]
         self.assertEqual(tools["send_note"],

@@ -26,6 +26,8 @@ const BUILD_PLACEHOLDER_ENV = {
   CONTROL_PLANE_BASE_URL: "http://build-time-placeholder",
   AUTH_GOOGLE_ID: "build-time-placeholder",
   AUTH_GOOGLE_SECRET: "build-time-placeholder",
+  // 실행할 때 주는 이름과 다르게 둔다. 이 값이 화면에 보이면 이름이 빌드에 굳은 것이다.
+  APP_NAME: "build-time-name",
 };
 
 const mode = process.env.BROWSER_WEB_SERVER ?? "build";

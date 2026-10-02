@@ -11,6 +11,7 @@ import {
   contextCharsLabel,
   contextOmittedLabel,
   durationLabel,
+  executionPath,
   executionStatusLabel,
   isRunning,
   reasoningEffortLabel,
@@ -35,7 +36,7 @@ export function ExecutionCard({
       <Card className={cn("relative gap-0 px-4", failed && "ring-destructive")}>
         <Link
           prefetch={false}
-          href={`/executions/${execution.id}`}
+          href={executionPath(execution.id, isAdmin)}
           // Card 가 overflow-hidden 이라 바깥으로 그린 초점 테두리가 잘린다. 브라우저의 초점 테두리를 안쪽으로 들인다.
           className="absolute inset-0 rounded-md -outline-offset-2"
           aria-label={`${agentLabel(execution.agentName)} 실행 상세 보기 (${execution.id}번)${

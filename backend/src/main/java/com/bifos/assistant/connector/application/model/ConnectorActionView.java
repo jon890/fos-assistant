@@ -18,9 +18,9 @@ import java.util.UUID;
  *     이름은 내부 값이라 여기 싣지 않는다
  * @param argsJson 승인할 인자. 비밀처럼 보이는 값과 식별자는 가린 글이다. 실행은 저장한 원문으로 한다
  * @param grantAllowed 승인하면서 상시 허락을 줄 수 있는 도구인가. 승인 줄에 저장하지 않고 줄을 읽을 때의 카탈로그로
- *     본다(ADR-064)
+ *     본다(ADR-065)
  * @param hiddenArgs 답을 기다리는 줄이고, 상시 허락을 닫은 도구이며, {@code argsJson} 에 가려진 글이 있는가. 참이면
- *     승인할 수 없다(ADR-064)
+ *     승인할 수 없다(ADR-065)
  */
 public record ConnectorActionView(
         UUID actionId,
