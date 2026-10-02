@@ -48,7 +48,7 @@
 - `web/src/components/usage/execution-list.tsx`, `execution-table.tsx`, `execution-card.tsx`: `isAdmin` 이 참이면 실행 링크가 `/admin/executions/{id}`, 아니면 `/executions/{id}` 다
 - `web/src/components/execution/execution-detail.tsx`: `useAdminView()` 를 쓴다. 없는 실행이면 관리자 영역에서는 `/admin/usage`, 아니면 `/usage` 로 간다
 - `web/src/components/chat-panel.tsx`, `web/src/components/chat/activity/activity-panel.tsx`, `web/src/components/chat/activity/activity-timeline.tsx`: `useAdminView()` 로 바꾼다
-- 모델이 바뀌었다는 줄: `activity-state.ts` 의 줄을 만드는 함수가 `showSwitched: boolean` 을 받아 거짓이면 그 줄을 만들지 않는다. 부르는 쪽(`chat-panel.tsx` 와 작업 과정 패널)이 `useAdminView()` 의 값을 넘긴다. 실행 상세(`/admin/executions/{id}`)의 `PROVIDER_SWITCHED` 줄은 그대로 그린다
+- 모델이 바뀌었다는 줄: `activity-state.ts` 의 `applyChatEvent` 와 `fromTree` 가 `showSwitched: boolean` 을 받아 거짓이면 그 줄을 만들지 않는다. `fromTree` 는 안에서 `applyChatEvent` 를 부르므로 그대로 넘긴다. 부르는 쪽은 `chat-panel.tsx`(`fromTree`, `applyChatEvent`)와 `web/src/components/chat/activity/activity-block.tsx`(`fromTree`) 둘이고 `useAdminView()` 의 값을 넘긴다. 실행 상세(`/admin/executions/{id}`)의 `PROVIDER_SWITCHED` 줄은 그대로 그린다
 - `test/unit/activity-state.test.ts`: `showSwitched` 가 거짓이면 전환 사건이 줄을 만들지 않고, 참이면 만든다
 - `test/unit/loading-routes.test.ts`: `ROUTE_FRAMES` 의 `usage` 를 `"components/usage/usage-screen.tsx"` 로 바꾸고 `"admin/usage": "components/usage/usage-screen.tsx"`, `"admin/executions/[id]": "app/admin/executions/[id]/page.tsx"` 를 더한다
 - `web/src/components/shell/app-shell.tsx`: `useShellIsAdmin` 을 지운다. 아래가 아무것도 내지 않아야 한다
@@ -103,6 +103,7 @@ scripts/check-public-safe.sh
 | `web/src/components/chat/activity/activity-timeline.tsx` | 수정 |
 | `web/src/components/shell/app-shell.tsx` | 수정 |
 | `web/src/components/chat/activity/activity-state.ts` | 수정 |
+| `web/src/components/chat/activity/activity-block.tsx` | 수정 |
 | `test/unit/activity-state.test.ts` | 수정 |
 | `test/unit/loading-routes.test.ts` | 수정 |
 | `test/browser/admin-area.spec.ts` | 수정 |
