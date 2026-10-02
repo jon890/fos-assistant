@@ -160,7 +160,7 @@ test("공개 요청이 실패하면 창이 남고 실패 까닭이 보인다", a
   await expect(dialog.getByText("공개 범위를 바꾸지 못했다", { exact: true })).toBeVisible();
   await expect(dialog).toBeVisible();
   await expect(dialog.getByRole("button", { name: "그룹 공개" })).toBeEnabled();
-  // 창이 열린 동안에는 Radix 가 바깥을 접근성 나무에서 가리므로, 닫은 뒤에 카드를 본다.
+  // 창이 열린 동안에는 Radix 가 바깥을 접근성 트리에서 가리므로, 닫은 뒤에 카드를 본다.
   await dialog.getByRole("button", { name: "취소" }).click();
   await expect(dialog).toBeHidden();
   await expect(accessSection(page).getByText("나만", { exact: true })).toBeVisible();

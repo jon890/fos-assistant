@@ -26,9 +26,9 @@ async function lastExecutionId(
 }
 
 /**
- * 깊이 `depth` 짜리 가짜 나무를 만든다.
+ * 깊이 `depth` 짜리 가짜 트리를 만든다.
  *
- * <p>가짜 Hermes 로는 깊은 나무를 만들 수 없어 서버 응답을 가로채 만든다. 도구 이름은 화면에서 사람 말로
+ * <p>가짜 Hermes 로는 깊은 트리를 만들 수 없어 서버 응답을 가로채 만든다. 도구 이름은 화면에서 사람 말로
  * 바뀌므로, 긴 글자는 상세에 넣어 좁은 화면에서 가로로 미는지 본다. 상세를 줄에 그리는 도구는 검색과
  * 사진 보기뿐이라 검색 도구로 만든다.
  */
@@ -82,10 +82,10 @@ function deepTreeFixture(depth: number) {
 }
 
 /**
- * 자식 노드가 있는 실행에 `SUBAGENT_STARTED` 사건도 함께 담은 나무다.
+ * 자식 노드가 있는 실행에 `SUBAGENT_STARTED` 사건도 함께 담은 트리다.
  *
  * <p>자식은 Memory 제안 실행처럼 하위 에이전트와 무관하게 달릴 수 있다. 그런 자식이 있어도
- * `SUBAGENT_STARTED` 줄이 사라지면 안 된다는 것을 이 나무로 확인한다.
+ * `SUBAGENT_STARTED` 줄이 사라지면 안 된다는 것을 이 트리로 확인한다.
  */
 function treeWithChildAndSubagentFixture(
   usageStatus: "WAITING" | "RECORDED" | "UNCONFIRMED" | null = null,
@@ -268,7 +268,7 @@ test("도구 사건 둘과 하위 에이전트 사건이 각각 한 줄로 보�
   page,
 }) => {
   const response = await page.request.post("/api/chat/stream", {
-    data: { text: "실행 나무 검사", agentCode: "browser" },
+    data: { text: "실행 트리 검사", agentCode: "browser" },
   });
   expect(response.ok()).toBeTruthy();
   const id = await lastExecutionId(page);
@@ -289,7 +289,7 @@ test("사건이 없는 실행을 열면 기록된 작업이 없어요고 보이�
   page,
 }) => {
   const response = await page.request.post("/api/chat", {
-    data: { text: "실행 나무 빈 사건 검사", agentCode: "browser" },
+    data: { text: "실행 트리 빈 사건 검사", agentCode: "browser" },
   });
   expect(response.ok()).toBeTruthy();
   const id = await lastExecutionId(page);
@@ -301,7 +301,7 @@ test("사건이 없는 실행을 열면 기록된 작업이 없어요고 보이�
   await expect(page.getByText("성공", { exact: true })).toBeVisible();
 });
 
-test("깊은 나무를 열어도 좁은 화면과 넓은 화면 모두 가로로 넘치지 않는다", async ({
+test("깊은 트리를 열어도 좁은 화면과 넓은 화면 모두 가로로 넘치지 않는다", async ({
   page,
 }) => {
   await page.route("**/api/usage/executions/*/tree", async (route) => {
@@ -321,8 +321,8 @@ test("깊은 나무를 열어도 좁은 화면과 넓은 화면 모두 가로로
 });
 
 /**
- * 노드 하나짜리 나무다. `treeTruncated` 와 `nodeTruncated` 를 따로 받아
- * 나무 전체가 잘린 것과 그 노드 아래가 잘린 것을 가르는 화면 판정을 확인하는 데 쓴다.
+ * 노드 하나짜리 트리다. `treeTruncated` 와 `nodeTruncated` 를 따로 받아
+ * 트리 전체가 잘린 것과 그 노드 아래가 잘린 것을 가르는 화면 판정을 확인하는 데 쓴다.
  */
 function singleNodeTreeFixture({
   treeTruncated,
@@ -370,7 +370,7 @@ function singleNodeTreeFixture({
   };
 }
 
-test("나무가 위쪽에서 잘렸으면 뿌리 위에 안내가 보인다", async ({ page }) => {
+test("트리가 위쪽에서 잘렸으면 루트 위에 안내가 보인다", async ({ page }) => {
   await page.route("**/api/usage/executions/*/tree", async (route) => {
     await route.fulfill({
       json: singleNodeTreeFixture({
@@ -412,7 +412,7 @@ test("노드 아래가 잘린 것이면 위쪽 안내를 따로 그리지 않아
 const RAW_COMMAND = "ls-원본-명령";
 const RAW_RESULT = '{"output":"terminal-raw-result-아주-길게-적어-좁은-화면에서-가로로-넘치는지-확인하는-자리-0123456789-0123456789-0123456789"}';
 
-/** `terminal` 도구를 쓴 실행 하나짜리 나무다. 명령과 결과는 사람 말이 아니라 줄에 그리지 않는 원본이다. */
+/** `terminal` 도구를 쓴 실행 하나짜리 트리다. 명령과 결과는 사람 말이 아니라 줄에 그리지 않는 원본이다. */
 function terminalTreeFixture() {
   const event = (sequence: number, eventType: string, detail: string) => ({
     sequence, eventType, toolName: "terminal", subagentName: null, hermesSessionId: null, detail, model: null,
@@ -434,7 +434,7 @@ test("관리자는 붐벼서 실패한 실행의 상세에서 안내 문구와 �
   await hermes.busy();
   try {
     const response = await page.request.post("/api/chat", {
-      data: { text: "실행 나무 붐빔 검사", agentCode: "browser" },
+      data: { text: "실행 트리 붐빔 검사", agentCode: "browser" },
     });
     expect(response.status()).toBe(429);
   } finally {
@@ -552,7 +552,7 @@ test.describe("MEMBER 역할 사용자의 실행 상세", () => {
     // 에이전트 코드와 모델은 응답에 있어도 그리지 않는다.
     await expect(page.getByRole("main")).not.toContainText("terminal-agent-code");
     await expect(page.getByRole("main")).not.toContainText("example-model");
-    // 나무가 준 걸린 시간 2.5초는 초 단위로만 보인다.
+    // 트리가 준 걸린 시간 2.5초는 초 단위로만 보인다.
     await expect(page.getByRole("main").locator("dl")).not.toContainText("ms");
     await expect(page.getByRole("main").locator("dl dd").last()).toHaveText("2초");
   });

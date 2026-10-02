@@ -1,8 +1,8 @@
 /**
  * 도는 대화 turn 에서 MCP `agent_*` 도구로 다른 에이전트에게 일을 맡기고, 상태를 읽고, 멈추는 것을 한 번에 본다.
  *
- * <p>시나리오가 profile 플러그인 역할을 한다. 붙잡아 둔 turn 의 run 이 받은 session 을 뿌리로 `_fos_ctx` 를 계약대로
- * 서명해 `/mcp` 를 직접 부른다. 맡긴 실행은 뿌리 turn 의 자식으로 실행 나무에 남고, 사용자가 turn 을 멈추면 그 turn 이
+ * <p>시나리오가 profile 플러그인 역할을 한다. 붙잡아 둔 turn 의 run 이 받은 session 을 루트로 `_fos_ctx` 를 계약대로
+ * 서명해 `/mcp` 를 직접 부른다. 맡긴 실행은 루트 turn 의 자식으로 실행 트리에 남고, 사용자가 turn 을 멈추면 그 turn 이
  * 도는 동안 맡긴 실행도 함께 멈춘다(ADR-017).
  */
 import { randomUUID } from "node:crypto";
@@ -71,15 +71,15 @@ export const delegationScenario: Scenario = {
       issuedIds.push(otherIssued.id);
       const token = issued.token;
 
-      step("대화 turn 하나를 붙잡아 도는 뿌리 실행과 그 session 을 만든다");
+      step("대화 turn 하나를 붙잡아 도는 루트 실행과 그 session 을 만든다");
       context.hermes.holdNextRun();
       const turn = await openStream(context, "위임 검사 turn");
-      await within(context.hermes.waitForHeldRun(), 5_000, "가짜 Hermes 가 뿌리 turn 의 실행을 받지 않았다");
-      rootExecutionId = await within(turn.executionId, 5_000, "뿌리 turn 의 started 사건을 받지 못했다");
+      await within(context.hermes.waitForHeldRun(), 5_000, "가짜 Hermes 가 루트 turn 의 실행을 받지 않았다");
+      rootExecutionId = await within(turn.executionId, 5_000, "루트 turn 의 started 사건을 받지 못했다");
       const rootRun = context.hermes.heldRun();
-      if (rootRun === undefined) fail("붙잡은 뿌리 turn 의 run 이 없다");
+      if (rootRun === undefined) fail("붙잡은 루트 turn 의 run 이 없다");
       const rootSession = rootRun.sessionId;
-      expect(rootSession.startsWith("fos-"), `뿌리 turn 의 session 이 fos- 로 시작하지 않는다: ${rootSession}`);
+      expect(rootSession.startsWith("fos-"), `루트 turn 의 session 이 fos- 로 시작하지 않는다: ${rootSession}`);
 
       const status = async (executionId: number): Promise<Status> =>
         parsed<Status>(
@@ -110,7 +110,7 @@ export const delegationScenario: Scenario = {
       const first = parsed<Status>(await delegate("첫째 맡긴 일", firstCallId), "첫째 agent_delegate");
       expect(first.status === "RUNNING", `첫째 위임의 상태가 RUNNING 이 아니다: ${JSON.stringify(first)}`);
       await within(context.hermes.waitForHeldRun(), 5_000, "가짜 Hermes 가 첫째 자식의 실행을 받지 않았다");
-      expect(context.hermes.heldRun()?.sessionId !== rootSession, "자식이 뿌리 turn 의 session 으로 돈다");
+      expect(context.hermes.heldRun()?.sessionId !== rootSession, "자식이 루트 turn 의 session 으로 돈다");
       const firstStatus = await status(first.execution_id);
       expect(firstStatus.status === "RUNNING", `붙잡은 자식의 상태가 RUNNING 이 아니다: ${JSON.stringify(firstStatus)}`);
 
@@ -167,14 +167,14 @@ export const delegationScenario: Scenario = {
       const again = parsed<Status>(await delegate("첫째 맡긴 일", firstCallId), "같은 호출의 agent_delegate");
       expect(again.execution_id === first.execution_id, `같은 호출에 다른 번호가 왔다: ${again.execution_id} != ${first.execution_id}`);
 
-      step("실행 나무에 자식 둘이 뿌리 아래로 보이고 각자 토큰과 모델이 적혀 있다");
+      step("실행 트리에 자식 둘이 루트 아래로 보이고 각자 토큰과 모델이 적혀 있다");
       const grown = await tree(context, rootExecutionId);
-      expect(grown.root.executionId === rootExecutionId, `나무의 뿌리가 turn 이 아니다: ${grown.root.executionId}`);
+      expect(grown.root.executionId === rootExecutionId, `트리의 루트가 turn 이 아니다: ${grown.root.executionId}`);
       const childIds = grown.root.children.map((child) => child.executionId).sort((a, b) => a - b);
       const expectedIds = [first.execution_id, second.execution_id].sort((a, b) => a - b);
       expect(
         JSON.stringify(childIds) === JSON.stringify(expectedIds),
-        `뿌리 아래 자식이 맡긴 둘과 다르다: ${JSON.stringify(childIds)} != ${JSON.stringify(expectedIds)}`,
+        `루트 아래 자식이 맡긴 둘과 다르다: ${JSON.stringify(childIds)} != ${JSON.stringify(expectedIds)}`,
       );
       for (const child of grown.root.children) {
         expect(
@@ -195,7 +195,7 @@ export const delegationScenario: Scenario = {
         "위임 검사 turn 중지",
       );
       turnStopped = true;
-      await within(turn.completed, 10_000, "중지 뒤 뿌리 turn 의 스트림이 끝나지 않았다");
+      await within(turn.completed, 10_000, "중지 뒤 루트 turn 의 스트림이 끝나지 않았다");
       expect(context.hermes.stoppedRuns().includes(thirdRun.runId), "turn 을 멈췄는데 셋째 자식의 run 에 중지가 가지 않았다");
       const deadline = Date.now() + 10_000;
       let last: Tree = await tree(context, rootExecutionId);
@@ -205,7 +205,7 @@ export const delegationScenario: Scenario = {
       }
       const thirdNode = last.root.children.find((child) => child.executionId === third.execution_id);
       expect(thirdNode?.status === "CANCELLED", `turn 과 함께 멈춘 자식이 CANCELLED 가 아니다: ${JSON.stringify(thirdNode)}`);
-      expect(last.root.status === "CANCELLED", `멈춘 뿌리 turn 이 CANCELLED 가 아니다: ${last.root.status}`);
+      expect(last.root.status === "CANCELLED", `멈춘 루트 turn 이 CANCELLED 가 아니다: ${last.root.status}`);
     } catch (error) {
       failed = true;
       throw error;

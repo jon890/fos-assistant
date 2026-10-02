@@ -40,7 +40,7 @@ public interface ConversationRepository extends JpaRepository<Conversation, Long
     List<Conversation> findByUserIdAndAgentIdAndDeletedAtIsNullOrderByUpdatedAtDesc(
             Long userId, Long agentId, Pageable pageable);
 
-    /** 어느 대화가 그 값을 보낼 session 이나 뿌리 session 으로 쓰는지. 지운 대화도 센다. */
+    /** 어느 대화가 그 값을 보낼 session 이나 루트 session 으로 쓰는지. 지운 대화도 센다. */
     boolean existsByHermesSessionIdOrHermesRootSessionId(String hermesSessionId, String hermesRootSessionId);
 
     @Modifying
@@ -50,7 +50,7 @@ public interface ConversationRepository extends JpaRepository<Conversation, Long
     int touchSession(@Param("id") Long id, @Param("sessionId") String sessionId, @Param("now") Instant now);
 
     /**
-     * session 이 비어 있을 때만 보낼 session 과 뿌리 session 을 같은 값으로 채운다. 채웠으면 1 이다.
+     * session 이 비어 있을 때만 보낼 session 과 루트 session 을 같은 값으로 채운다. 채웠으면 1 이다.
      *
      * <p>turn 을 시작할 때 쓰므로 {@code updatedAt} 을 바꾸지 않는다. 바꾸면 실패한 turn 도 대화를 목록 맨
      * 위로 올린다. 같은 새 대화에 두 turn 이 함께 와도 조건 때문에 한쪽만 채운다.

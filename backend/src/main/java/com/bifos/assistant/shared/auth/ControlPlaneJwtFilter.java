@@ -18,8 +18,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import javax.crypto.SecretKey;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.MediaType;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
@@ -40,9 +39,8 @@ import tools.jackson.databind.ObjectMapper;
  * {@code ACCESS_REVOKED} 를 이 필터가 직접 쓴다. 서명이 틀린 토큰은 전과 같이 인증 없이 지나간다.
  */
 @Component
+@Slf4j
 public class ControlPlaneJwtFilter extends OncePerRequestFilter {
-
-    private static final Logger log = LoggerFactory.getLogger(ControlPlaneJwtFilter.class);
     private static final String BEARER = "Bearer ";
     private static final String SERVICE_API_PREFIX = "/api/v1/service/";
 

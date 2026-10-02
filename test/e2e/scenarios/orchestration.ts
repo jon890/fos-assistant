@@ -1,4 +1,4 @@
-/** 흐름이 붙은 에이전트 하나가 실행 넷을 남기고 나무로 조회되는지 본다. */
+/** 흐름이 붙은 에이전트 하나가 실행 넷을 남기고 트리로 조회되는지 본다. */
 import { call, expect, expectStatus, step, type Response, type Scenario } from "../harness.ts";
 import { readEventStream } from "../../../web/src/lib/stream.ts";
 
@@ -117,15 +117,15 @@ export const orchestrationScenario: Scenario = {
     const done = received.at(-1);
     expect(done?.type === "done", `마지막 사건이 done 이 아니다: ${JSON.stringify(done)}`);
 
-    step("실행 넷이 남고 나무로 조회된다");
+    step("실행 넷이 남고 트리로 조회된다");
     const tree = expectStatus(
       await call(context, `/usage/executions/${done!.executionId}/tree`, {
         token: context.tokens.dad,
       }),
       200,
-      "흐름 실행 나무 조회",
+      "흐름 실행 트리 조회",
     ).json<ExecutionTree>();
-    expect(tree.root.executionId === done!.executionId, "답에 붙은 실행이 뿌리가 아니다");
+    expect(tree.root.executionId === done!.executionId, "답에 붙은 실행이 루트가 아니다");
     expect(tree.root.children.length === 3, `자식이 셋이 아니다: ${tree.root.children.length}`);
     expect(
       tree.root.children.every((child) => child.children.length === 0),
@@ -144,7 +144,7 @@ export const orchestrationScenario: Scenario = {
       expect(node.firstDeltaAt === null, "SSE를 읽지 않는 Flow에 첫 delta 시각을 만들었다");
     }
 
-    step("사용량 목록에는 뿌리만 나온다");
+    step("사용량 목록에는 루트만 나온다");
     const listed = expectStatus(
       await call(context, "/usage/executions?limit=50", { token: context.tokens.dad }),
       200,
@@ -153,7 +153,7 @@ export const orchestrationScenario: Scenario = {
     const childIds = tree.root.children.map((child) => child.executionId);
     expect(
       listed.some((execution) => execution.id === done!.executionId),
-      "뿌리가 목록에 없다",
+      "루트가 목록에 없다",
     );
     expect(
       listed.every((execution) => !childIds.includes(execution.id)),
@@ -211,7 +211,7 @@ export const orchestrationScenario: Scenario = {
         token: context.tokens.dad,
       }),
       200,
-      "흐름 없는 실행 나무",
+      "흐름 없는 실행 트리",
     ).json<ExecutionTree>();
     expect(plainTree.root.children.length === 0, "흐름이 아닌 대화에 자식이 생겼다");
   },

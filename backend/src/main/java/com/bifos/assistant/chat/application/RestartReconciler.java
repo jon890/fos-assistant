@@ -38,7 +38,7 @@ import org.springframework.transaction.support.TransactionTemplate;
  * 기동할 때 {@code RUNNING} 으로 남은 실행을 Hermes 에 물어 정한다(ADR-061).
  *
  * <p>두 단계로 돈다. <b>잡기</b>({@link #claim})는 웹 서버가 요청을 받기 전에 끝난다. 남은 줄을 읽고 대화 turn 의
- * 뿌리 줄, 흐름 turn 의 뿌리 줄과 그 자식 줄마다 그 대화의 turn 잠금을 잡는다. Hermes 를 부르지 않는다.
+ * 루트 줄, 흐름 turn 의 루트 줄과 그 자식 줄마다 그 대화의 turn 잠금을 잡는다. Hermes 를 부르지 않는다.
  * <b>묻기</b>({@link #reconcile})는
  * 애플리케이션이 다 뜬 뒤에 돈다. 줄을 적거나 잠금을 풀면 {@link NextTurnDispatcher} 가 turn 을 여는데, 그것은 다 뜬
  * 뒤여야 하기 때문이다.
@@ -289,7 +289,7 @@ public class RestartReconciler implements SmartLifecycle {
                 log.warn("다른 turn 이 잠금을 쥐고 있어 잡지 못했다 conversationId={} executionId={}", row.conversationId(), row.id());
                 return null;
             }
-            // 흐름 turn 의 자식 줄이면 뿌리 실행 번호를 붙인다. 사용자의 중지와 running 경로가 뿌리 번호로 찾는다.
+            // 흐름 turn 의 자식 줄이면 루트 실행 번호를 붙인다. 사용자의 중지와 running 경로가 루트 번호로 찾는다.
             lock = new ConversationLock(row.conversationId(), row.treeRootId(), handle);
         }
         Long markedExecutionId = lock.executionId;
@@ -321,9 +321,9 @@ public class RestartReconciler implements SmartLifecycle {
     }
 
     /**
-     * 그 대화의 Hermes session 으로 도는 줄인지 본다. 대화 turn 의 뿌리 줄, 흐름 turn 의 뿌리 줄과 그 자식 줄이다.
+     * 그 대화의 Hermes session 으로 도는 줄인지 본다. 대화 turn 의 루트 줄, 흐름 turn 의 루트 줄과 그 자식 줄이다.
      *
-     * <p>흐름 turn 은 뿌리 줄이 끝난 뒤에도 자식이 돈다. 그 자식이 정해지기 전에 새 turn 이 열리면 안 된다. 위임
+     * <p>흐름 turn 은 루트 줄이 끝난 뒤에도 자식이 돈다. 그 자식이 정해지기 전에 새 turn 이 열리면 안 된다. 위임
      * 실행은 자기 session 으로 돌아 잠금을 잡지 않는다.
      */
     private boolean holdsConversation(AgentExecution row) {
@@ -384,7 +384,7 @@ public class RestartReconciler implements SmartLifecycle {
     private void settleByAsking(Claimed item, Agent agent, Duration maxWait, int epoch) {
         AgentExecution row = item.row();
         String runId = row.hermesRunId();
-        // 중지 표시가 붙은 뿌리 실행 번호다. 잠금을 잡지 않은 줄은 표시가 없어 아무 일도 없다.
+        // 중지 표시가 붙은 루트 실행 번호다. 잠금을 잡지 않은 줄은 표시가 없어 아무 일도 없다.
         Long markedExecutionId = item.lock() == null ? row.treeRootId() : item.lock().executionId;
         long deadline = System.nanoTime() + maxWait.toNanos();
         boolean reached = false;
@@ -496,7 +496,7 @@ public class RestartReconciler implements SmartLifecycle {
      * 나서 멈추면 그 사이 닫기 리스너가 아직 멈추지 않은 행으로 turn 을 연다. 대기 줄이 멈췄다는 알림은 닫기
      * 리스너가 낸다.
      *
-     * <p>뿌리 줄이 이미 끝나고 자식만 돌던 흐름 turn 이면 여기서 화면에 끝났음을 알린다. 뿌리 줄을 함께 정했으면
+     * <p>루트 줄이 이미 끝나고 자식만 돌던 흐름 turn 이면 여기서 화면에 끝났음을 알린다. 루트 줄을 함께 정했으면
      * {@link RecoveredRunRecorder} 가 이미 알렸으므로 내지 않는다.
      */
     private void release(ConversationLock lock) {
@@ -582,7 +582,7 @@ public class RestartReconciler implements SmartLifecycle {
     private static final class ConversationLock {
         private final Long conversationId;
 
-        /** 중지 표시에 붙인 실행 번호다. 그 대화에서 먼저 잡은 줄의 뿌리 실행이다. */
+        /** 중지 표시에 붙인 실행 번호다. 그 대화에서 먼저 잡은 줄의 루트 실행이다. */
         private final Long executionId;
 
         private final TurnCancellation.TurnHandle handle;
@@ -593,7 +593,7 @@ public class RestartReconciler implements SmartLifecycle {
         /** 이 잠금을 함께 쓰는 줄의 실행 번호다. 풀 때 취소로 끝난 줄이 있는지 본다. */
         private final List<Long> executionIds = new ArrayList<>();
 
-        /** 뿌리 줄도 이 잠금으로 정한다. 거짓이면 뿌리가 이미 끝나고 자식만 돌던 흐름 turn 이다. */
+        /** 루트 줄도 이 잠금으로 정한다. 거짓이면 루트가 이미 끝나고 자식만 돌던 흐름 turn 이다. */
         private boolean rootClaimed;
 
         private ConversationLock(Long conversationId, Long executionId, TurnCancellation.TurnHandle handle) {

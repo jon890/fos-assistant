@@ -61,7 +61,7 @@ import tools.jackson.databind.json.JsonMapper;
 /**
  * 실제 HTTP 경계에서 MCP 인증과 JSON-RPC 계약을 확인한다.
  *
- * <p>토큰은 이 검사의 profile 에 묶이고, 도구 호출은 그 profile 로 도는 아빠의 실행 뿌리로 서명한다(ADR-032).
+ * <p>토큰은 이 검사의 profile 에 묶이고, 도구 호출은 그 profile 로 도는 아빠의 실행 루트로 서명한다(ADR-032).
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @ActiveProfiles("test")
@@ -301,7 +301,7 @@ class McpMemoryToolTest {
         String registered = "하위-" + UUID.randomUUID();
         registrar.register(PROFILE, dadRoot, dadRoot, registered);
         String unregistered = "하위-" + UUID.randomUUID();
-        // 뿌리의 실행이 도는 중이어도 등록이 없는 하위 session 은 그 실행으로 되돌아가지 않는다.
+        // 루트의 실행이 도는 중이어도 등록이 없는 하위 session 은 그 실행으로 되돌아가지 않는다.
         JsonNode rejectedWhileRunning = body(subagentRead(unregistered, indexed.id()));
         jdbc.update(
                 "UPDATE agent_execution SET status = ? WHERE id = ?", ExecutionStatus.SUCCEEDED.name(), dadRun.id());
@@ -486,7 +486,7 @@ class McpMemoryToolTest {
                 .isEqualTo(401);
     }
 
-    /** 아빠의 뿌리 아래 하위 에이전트 session 에서 부른 것처럼 서명한 {@code memory_read} 를 보낸다. */
+    /** 아빠의 루트 아래 하위 에이전트 session 에서 부른 것처럼 서명한 {@code memory_read} 를 보낸다. */
     private HttpResponse<String> subagentRead(String sessionId, Long id) throws Exception {
         String fosCtx = McpCallSigner.context(dadToken, "memory_read", dadRoot, sessionId, "call_" + UUID.randomUUID())
                 .toString();
@@ -503,7 +503,8 @@ class McpMemoryToolTest {
                 "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/call\",\"params\":{\"name\":\"memory_read\",\"arguments\":{\"id\":"
                         + id + (ignoredUserId == null ? "" : ",\"user_id\":" + ignoredUserId) + "}}}");
     }
-    /** 도구 호출이면 아빠의 도는 실행 뿌리로 서명한 {@code _fos_ctx} 를 붙여 보낸다. */
+
+    /** 도구 호출이면 아빠의 도는 실행 루트로 서명한 {@code _fos_ctx} 를 붙여 보낸다. */
     private HttpResponse<String> mcp(String token, String request) throws Exception {
         return mcp(token, request, false);
     }
@@ -511,13 +512,18 @@ class McpMemoryToolTest {
     private HttpResponse<String> mcp(String token, String request, boolean origin) throws Exception {
         return send(token, token == null ? request : McpCallSigner.withContext(request, token, dadRoot), origin);
     }
+
     /** 본문을 그대로 보낸다. */
     private HttpResponse<String> send(String token, String request, boolean origin) throws Exception {
         HttpRequest.Builder builder = HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/mcp"))
                 .header("Content-Type", "application/json")
                 .POST(HttpRequest.BodyPublishers.ofString(request));
-        if (token != null) builder.header("Authorization", "Bearer " + token);
-        if (origin) builder.header("Origin", "http://browser.example");
+        if (token != null) {
+            builder.header("Authorization", "Bearer " + token);
+        }
+        if (origin) {
+            builder.header("Origin", "http://browser.example");
+        }
         return client.send(builder.build(), HttpResponse.BodyHandlers.ofString());
     }
 

@@ -376,7 +376,7 @@ class RecoveredRunRecorderTest {
     }
 
     @Test
-    @DisplayName("흐름 turn 의 뿌리 줄은 성공으로 끝났어도 ORPHANED 로 적고 사용량을 남긴다")
+    @DisplayName("흐름 turn 의 루트 줄은 성공으로 끝났어도 ORPHANED 로 적고 사용량을 남긴다")
     void flowRootIsRecordedAsOrphanedWithUsageEvenWhenCompleted() {
         Agent flowed = agent("flowed", "흐름");
         flowed.assignFlow(ResearchAndBuildFlow.NAME);
@@ -402,7 +402,7 @@ class RecoveredRunRecorderTest {
         assertThat(messages.findByConversationIdOrderByIdAsc(flowConversation.id()))
                 .isEmpty();
         assertThat(eventsOf(row))
-                .as("흐름 뿌리의 끝 사건")
+                .as("흐름 루트의 끝 사건")
                 .extracting(ExecutionEvent::eventType, ExecutionEvent::detail)
                 .containsExactly(tuple(ExecutionEventType.RUN_FAILED, "ORPHANED"));
         assertThat(flowEvents)
@@ -412,7 +412,7 @@ class RecoveredRunRecorderTest {
     }
 
     @Test
-    @DisplayName("흐름 turn 의 뿌리 줄이 취소나 실패로 끝나면 메시지 없이 stopped 나 error 를 낸다")
+    @DisplayName("흐름 turn 의 루트 줄이 취소나 실패로 끝나면 메시지 없이 stopped 나 error 를 낸다")
     void flowRootPublishesStoppedOrErrorWithoutMessage() {
         Agent flowed = agent("flowed", "흐름");
         flowed.assignFlow(ResearchAndBuildFlow.NAME);
@@ -439,7 +439,7 @@ class RecoveredRunRecorderTest {
                 .extracting(ChatEvent::type, ChatEvent::messageId, ChatEvent::executionId)
                 .containsExactly(tuple("stopped", null, cancelled.id()));
         assertThat(messages.findByConversationIdOrderByIdAsc(cancelledConversation.id()))
-                .as("흐름 뿌리의 답은 대화에 쓰지 않는다")
+                .as("흐름 루트의 답은 대화에 쓰지 않는다")
                 .isEmpty();
         assertThat(executions.findById(failed.id()).orElseThrow().status()).isEqualTo(ExecutionStatus.FAILED);
         assertThat(failedEvents)
@@ -568,7 +568,7 @@ class RecoveredRunRecorderTest {
                 .containsExactly(tuple(ExecutionEventType.RUN_FAILED, "ORPHANED"));
     }
 
-    /** 이전 프로세스가 돌리던 대화 turn 의 뿌리 줄이다. 실행은 1분 전에 시작했다. */
+    /** 이전 프로세스가 돌리던 대화 turn 의 루트 줄이다. 실행은 1분 전에 시작했다. */
     private AgentExecution chatTurn(Conversation owner, Agent agent) {
         return executions.save(AgentExecution.builder()
                 .userId(dad.id())

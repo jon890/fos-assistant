@@ -18,7 +18,7 @@ import java.util.TreeSet;
  * 최상위 패키지 사이의 간선 가운데 순환에 속한 것을 위반으로 낸다.
  *
  * <p>최상위 패키지는 {@code com.bifos.assistant.<이름>} 의 {@code <이름>} 이다.
- * 패키지 뿌리에 바로 있는 클래스, {@code com.bifos.assistant} 밖의 클래스, {@code shared} 는 그래프에 넣지 않는다.
+ * 패키지 루트에 바로 있는 클래스, {@code com.bifos.assistant} 밖의 클래스, {@code shared} 는 그래프에 넣지 않는다.
  * {@code shared} 는 모든 도메인이 쓰는 기반 패키지로 보고, {@code shared} 에서 나가는 의존은
  * {@code ArchitectureRules.SHARED_DOES_NOT_DEPEND_ON_DOMAINS} 가 따로 막는다.
  *

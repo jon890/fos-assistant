@@ -47,7 +47,7 @@ import org.springframework.test.context.ActiveProfiles;
 /**
  * 같은 대화를 연 다른 창이 도는 turn 을 알아보는 조회를 본다.
  *
- * <p>도는지는 실행 줄의 상태가 아니라 메모리 표시로 판정해야 한다. 흐름은 뿌리 줄이 끝난 뒤에도 자식이
+ * <p>도는지는 실행 줄의 상태가 아니라 메모리 표시로 판정해야 한다. 흐름은 루트 줄이 끝난 뒤에도 자식이
  * 돌기 때문이다. 가짜 Hermes 가 결과를 돌려주기 전에 조회해 turn 이 도는 순간을 붙잡는다.
  */
 @SpringBootTest
@@ -121,7 +121,9 @@ class ChatRunningTurnTest {
                 CredentialScope.SHARED_HOUSEHOLD,
                 AgentVisibility.PRIVATE,
                 user.id());
-        if (flow != null) agent.assignFlow(flow);
+        if (flow != null) {
+            agent.assignFlow(flow);
+        }
         agents.save(agent);
         return new CurrentUser(user.id(), user.email(), user.displayName(), user.groupId(), user.role());
     }
@@ -153,7 +155,7 @@ class ChatRunningTurnTest {
     }
 
     @Test
-    @DisplayName("도는 turn이 있으면 뿌리 실행 번호와 시작 시각을 답하고 끝나면 돌지 않는다고 답한다")
+    @DisplayName("도는 turn이 있으면 루트 실행 번호와 시작 시각을 답하고 끝나면 돌지 않는다고 답한다")
     void runningTurnReportsRootRunIdAndStartTimeThenNotRunningAfterEnd() {
         CurrentUser dad = member("dad");
         stub().willReturn(completed("run-held", "답"));
@@ -189,7 +191,7 @@ class ChatRunningTurnTest {
     }
 
     @Test
-    @DisplayName("흐름에서 Chief가 끝나 뿌리 줄이 SUCCEEDED여도 자식이 도는 동안은 뿌리 번호로 돈다고 답한다")
+    @DisplayName("흐름에서 Chief가 끝나 루트 줄이 SUCCEEDED여도 자식이 도는 동안은 루트 번호로 돈다고 답한다")
     void reportsRunningWithRootIdWhileChildRunsEvenIfRootRowSucceeded() {
         CurrentUser dad = member("flow-dad", ResearchAndBuildFlow.NAME);
         AtomicReference<RunningTurn> whileChildRuns = new AtomicReference<>();
@@ -197,7 +199,9 @@ class ChatRunningTurnTest {
         AtomicReference<Throwable> failure = new AtomicReference<>();
         stub().willAnswer(command -> {
             String input = command.input();
-            if (input.contains(CHIEF_MARK)) return completed("run-chief", SPLIT_JSON);
+            if (input.contains(CHIEF_MARK)) {
+                return completed("run-chief", SPLIT_JSON);
+            }
             if (input.contains("조사해")) {
                 // 자식 단계는 다른 스레드에서 돈다. 여기서 난 실패는 따로 담아 본 스레드에서 단언한다.
                 try {
@@ -213,7 +217,9 @@ class ChatRunningTurnTest {
                 }
                 return completed("run-researcher", "조사한 것");
             }
-            if (input.contains("만든다")) return completed("run-engineer", "만든 것");
+            if (input.contains("만든다")) {
+                return completed("run-engineer", "만든 것");
+            }
             return completed("run-synthesizer", "합친 답");
         });
 

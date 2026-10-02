@@ -135,7 +135,7 @@ class MemoryProposerTest {
     private static final ModelChoice RESOLVED = ModelChoice.stored("example-provider", "example-agent", "low");
 
     @Test
-    @DisplayName("제안을 만들면 부모와 뿌리 실행을 기록하고 PROPOSED로 저장한다")
+    @DisplayName("제안을 만들면 부모와 루트 실행을 기록하고 PROPOSED로 저장한다")
     void proposalRecordsParentAndRootRunAndSavesAsProposed() {
         AgentExecution parent = recorder.start(USER, conversation, agent, null, null, 0L);
         ((StubHermesRunsClient) hermes)

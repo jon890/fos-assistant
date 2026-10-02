@@ -1,7 +1,7 @@
 /**
  * 도는 turn 의 run 이 받은 session 으로 MCP `agent_*` 도구를 부르는 시나리오들이 함께 쓰는 도우미다.
  *
- * <p>시나리오가 profile 플러그인 역할을 한다. 붙잡아 둔 turn 의 session 을 뿌리로 `_fos_ctx` 를 계약대로 서명해 `/mcp` 를 직접 부른다.
+ * <p>시나리오가 profile 플러그인 역할을 한다. 붙잡아 둔 turn 의 session 을 루트로 `_fos_ctx` 를 계약대로 서명해 `/mcp` 를 직접 부른다.
  */
 import { randomUUID } from "node:crypto";
 import { call, expect, expectStatus, fail, type Context } from "./harness.ts";
@@ -94,7 +94,7 @@ export async function callTool(
   return { isError: body.result?.isError === true, text };
 }
 
-/** 뿌리 session 에서 부른 것처럼 서명한다. 도구 호출 id 를 주지 않으면 새로 만든다. */
+/** 루트 session 에서 부른 것처럼 서명한다. 도구 호출 id 를 주지 않으면 새로 만든다. */
 export function contextFor(token: string, name: string, rootSession: string, toolCallId = `call_${randomUUID()}`): FosCallContext {
   return signedCallContext(token, name, rootSession, rootSession, toolCallId);
 }
@@ -124,6 +124,6 @@ export async function tree(context: Context, rootExecutionId: number): Promise<T
   return expectStatus(
     await call(context, `/usage/executions/${rootExecutionId}/tree`, { token: context.tokens.dad }),
     200,
-    "위임 검사 실행 나무",
+    "위임 검사 실행 트리",
   ).json<Tree>();
 }

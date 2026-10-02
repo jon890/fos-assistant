@@ -137,7 +137,7 @@ class McpPrincipalTest {
     }
 
     @Test
-    @DisplayName("공유 profile 토큰은 뿌리 session 의 실행 사용자로 돈다")
+    @DisplayName("공유 profile 토큰은 루트 session 의 실행 사용자로 돈다")
     void sharedProfileTokenRunsAsRootSessionRunUser() throws Exception {
         String rootA = McpCallSigner.newRoot();
         String rootB = McpCallSigner.newRoot();
@@ -184,7 +184,9 @@ class McpPrincipalTest {
         Map<String, Long> memoryOf = Map.of(rootA, memoryA.id(), rootB, memoryB.id());
         Map<String, String> expected = Map.of(rootA, "가의 본문", rootB, "나의 본문");
         List<String> order = new ArrayList<>();
-        for (int i = 0; i < 20; i++) order.add(i % 2 == 0 ? rootA : rootB);
+        for (int i = 0; i < 20; i++) {
+            order.add(i % 2 == 0 ? rootA : rootB);
+        }
         Map<Integer, Future<HttpResponse<String>>> futures = new LinkedHashMap<>();
         try (ExecutorService pool = Executors.newVirtualThreadPerTaskExecutor()) {
             for (int i = 0; i < order.size(); i++) {
@@ -199,7 +201,7 @@ class McpPrincipalTest {
     }
 
     @Test
-    @DisplayName("다른 profile 의 실행 뿌리로 서명하면 호출 맥락 오류다")
+    @DisplayName("다른 profile 의 실행 루트로 서명하면 호출 맥락 오류다")
     void signingWithRootOfOtherProfileRunIsCallContextError() throws Exception {
         String sharedRoot = McpCallSigner.newRoot();
         String privateRoot = McpCallSigner.newRoot();
@@ -214,7 +216,7 @@ class McpPrincipalTest {
     }
 
     @Test
-    @DisplayName("남의 뿌리로 남의 Memory 를 읽으면 없는 항목과 같은 응답이다")
+    @DisplayName("남의 루트로 남의 Memory 를 읽으면 없는 항목과 같은 응답이다")
     void readingOthersMemoryWithOthersRootGivesSameResponseAsMissingItem() throws Exception {
         String rootA = McpCallSigner.newRoot();
         String rootB = McpCallSigner.newRoot();
@@ -254,7 +256,7 @@ class McpPrincipalTest {
     }
 
     @Test
-    @DisplayName("뿌리 칸이 빈 옛 대화의 session 으로 서명해도 그 실행의 사용자로 돈다")
+    @DisplayName("루트 칸이 빈 옛 대화의 session 으로 서명해도 그 실행의 사용자로 돈다")
     void runsAsRunUserEvenIfSignedWithSessionOfOldConversationWithBlankRoot() throws Exception {
         McpCallSigner.running(executions, agents, userB.id(), conversationB.id(), SHARED, "legacy-session");
 
@@ -347,7 +349,7 @@ class McpPrincipalTest {
                 "등록 없는 하위 session",
                 readMemory(sharedToken, rootA, newSubagent(), memoryA.id()).body());
         rejections.put(
-                "등록과 다른 뿌리",
+                "등록과 다른 루트",
                 readMemory(sharedToken, rootB, registered, memoryA.id()).body());
 
         String first = rejections.values().iterator().next();
@@ -398,7 +400,7 @@ class McpPrincipalTest {
         return send(token, readMemoryRequest(token, root, memoryId));
     }
 
-    /** 뿌리 {@code root} 아래 하위 에이전트 session {@code session} 에서 부른 것처럼 서명해 읽는다. */
+    /** 루트 {@code root} 아래 하위 에이전트 session {@code session} 에서 부른 것처럼 서명해 읽는다. */
     private HttpResponse<String> readMemory(String token, String root, String session, Long memoryId) throws Exception {
         return send(
                 token,
@@ -423,7 +425,9 @@ class McpPrincipalTest {
     private String memoryReadRequest(Long memoryId, ObjectNode fosCtx) {
         ObjectNode arguments = json.createObjectNode();
         arguments.put("id", memoryId);
-        if (fosCtx != null) arguments.set("_fos_ctx", fosCtx);
+        if (fosCtx != null) {
+            arguments.set("_fos_ctx", fosCtx);
+        }
         return toolCall("memory_read", arguments);
     }
 
@@ -454,7 +458,9 @@ class McpPrincipalTest {
         HttpRequest.Builder builder = HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/mcp"))
                 .header("Content-Type", "application/json")
                 .POST(HttpRequest.BodyPublishers.ofString(request));
-        if (token != null) builder.header("Authorization", "Bearer " + token);
+        if (token != null) {
+            builder.header("Authorization", "Bearer " + token);
+        }
         return client.send(builder.build(), HttpResponse.BodyHandlers.ofString());
     }
 

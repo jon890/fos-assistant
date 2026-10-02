@@ -17,12 +17,12 @@
 | `conversation_id` | BIGINT NULL | 비어 있으면 대화 밖에서 돈 실행이다. 지금은 추천 질문을 만드는 실행뿐이다 |
 | `agent_id` | BIGINT | 어느 에이전트의 실행이었는가 |
 | `parent_execution_id` | BIGINT NULL | 이 실행을 부른 실행. 사용자가 부른 것이면 비어 있다 |
-| `root_execution_id` | BIGINT NULL | 이 실행이 속한 나무의 뿌리. 뿌리 자신은 비어 있다 |
+| `root_execution_id` | BIGINT NULL | 이 실행이 속한 트리의 루트. 루트 자신은 비어 있다 |
 | `retry_of_execution_id` | BIGINT NULL | 같은 turn 을 다른 모델로 다시 시도한 실행이 가리키는 직전 실행. 지금은 채우는 경로가 없어 새 실행은 늘 비어 있다 |
 | `profile_name` | VARCHAR(64) | |
 | `hermes_run_id` | VARCHAR(128) NULL | 실행을 제출한 직후에 적는다 |
-| `hermes_session_id` | VARCHAR(128) NULL | 이 실행이 속한 Hermes session. 대화 turn 은 그 대화의 뿌리 session 이고, 뿌리가 없는 옛 대화는 보낸 session 이다. 압축 교체 뒤에는 보낸 session 과 다를 수 있다. 흐름의 하위 실행과 위임한 자식은 Control Plane 이 정한 `fos-<uuid>` 다. 제출하기 전에 적는다. 최상위 session 의 MCP 호출과 최상위 자식의 등록이 서명한 뿌리 session 과 `profile_name` 으로 도는 실행을 찾을 때 쓴다([ADR-032](../../adr/ADR-032-mcp-토큰은-profile-을-증명하고-실제-사용자는-부모-실행에서-정한다.md)). 하위 에이전트 session 은 이 칸이 아니라 `hermes_session_binding` 으로 찾는다. 이 칸이 생기기 전의 실행과 Memory 제안, 추천 질문을 만드는 실행은 비어 있다 |
-| `delegation_key` | VARCHAR(64) NULL, 유일 | `agent_delegate` 로 만든 실행만 채운다. `v1`, 부모 실행의 `profile_name`, 뿌리 session, 그 호출의 session, `tool_call_id` 를 줄바꿈으로 이은 글의 SHA-256 소문자 16진수다. 같은 호출이 다시 와도 실행을 하나만 만든다. `agent_status` 와 `agent_stop` 은 이 칸이 있는 실행만 답한다. 정의는 [ADR-032](../../adr/ADR-032-mcp-토큰은-profile-을-증명하고-실제-사용자는-부모-실행에서-정한다.md) 에 있다 |
+| `hermes_session_id` | VARCHAR(128) NULL | 이 실행이 속한 Hermes session. 대화 turn 은 그 대화의 루트 session 이고, 루트가 없는 옛 대화는 보낸 session 이다. 압축 교체 뒤에는 보낸 session 과 다를 수 있다. 흐름의 하위 실행과 위임한 자식은 Control Plane 이 정한 `fos-<uuid>` 다. 제출하기 전에 적는다. 최상위 session 의 MCP 호출과 최상위 자식의 등록이 서명한 루트 session 과 `profile_name` 으로 도는 실행을 찾을 때 쓴다([ADR-032](../../adr/ADR-032-mcp-토큰은-profile-을-증명하고-실제-사용자는-부모-실행에서-정한다.md)). 하위 에이전트 session 은 이 칸이 아니라 `hermes_session_binding` 으로 찾는다. 이 칸이 생기기 전의 실행과 Memory 제안, 추천 질문을 만드는 실행은 비어 있다 |
+| `delegation_key` | VARCHAR(64) NULL, 유일 | `agent_delegate` 로 만든 실행만 채운다. `v1`, 부모 실행의 `profile_name`, 루트 session, 그 호출의 session, `tool_call_id` 를 줄바꿈으로 이은 글의 SHA-256 소문자 16진수다. 같은 호출이 다시 와도 실행을 하나만 만든다. `agent_status` 와 `agent_stop` 은 이 칸이 있는 실행만 답한다. 정의는 [ADR-032](../../adr/ADR-032-mcp-토큰은-profile-을-증명하고-실제-사용자는-부모-실행에서-정한다.md) 에 있다 |
 | `output_text` | MEDIUMTEXT NULL | `agent_delegate` 로 만든 실행이 끝났을 때의 답. `agent_status` 와 `agent_stop` 이 `SUCCEEDED` 와 `CANCELLED` 에서 돌려준다. 끝난 상태와 같은 저장에서 적는다. `assistant.delegation.output-max-chars`(기본 100,000자)를 넘으면 자르고 잘렸다는 한 줄을 붙인다. 다른 실행은 채우지 않는다(대화 답은 `chat_message` 가 갖는다) |
 | `result_delivered_at` | DATETIME(6) NULL | 위임 실행의 끝난 결과를 부모에게 전한 시각. 부모가 `agent_status` 나 `agent_stop` 으로 끝난 상태를 받았거나, Control Plane 이 부모 대화를 깨운 turn 에 넣었을 때 적는다. `agent_delegate` 가 줄을 만든 뒤 제출 전에 끝나 `SUBMIT_FAILED` 를 돌려줄 때도 적는다. 부모가 번호를 모르는 결과를 다시 전하지 않기 위해서다. 이 칸이 생기기 전에 끝난 위임 실행은 마이그레이션이 `finished_at`(없으면 그때 시각)으로 채워 깨우지 않는다. 그때 `RUNNING` 이던 줄은 비워 두며, 기동 정리가 끝난 상태로 적은 뒤 전한다([`turn-control.md`](../turn-control.md) 의 「기동할 때 남은 실행 정리」). 비어 있고 `SUCCEEDED` 나 `FAILED` 인 위임 실행이 깨울 대상이다([ADR-040](../../adr/ADR-040-위임-결과는-control-plane-이-부모-대화의-다음-turn-을-열어-전한다.md)) |
 | `provider`, `model` | VARCHAR | 실제로 돈 provider 와 모델. Hermes 의 session 이 답한 값이고, 읽지 못하면 요청한 값이다. 기본값으로 보냈고 둘 다 읽지 못하면 비어 있다 |
@@ -52,13 +52,13 @@
 
 자식 실행의 토큰은 부모의 합계에 들어 있지 않다.
 근거는 [`hermes/delegation.md`](../../hermes/delegation.md) 의 「자식 session 으로 결과와 토큰을 보완한다」 절에 있다.
-그래서 부모와 자식을 더한 합계는 실행 나무의 줄을 더해서 만든다.
+그래서 부모와 자식을 더한 합계는 실행 트리의 줄을 더해서 만든다.
 실행 줄이 없는 native 자식은 `subagent_usage_job` 줄을 더한다.
 어느 줄도 두 번 세지 않는다.
 
 `CANCELLED` 는 중지한 turn 과 `agent_stop` 으로 멈춘 위임 실행에 쓴다.
 
-`hermes_session_id` 와 `status` 에 함께 색인을 둔다. 최상위 session 의 MCP 호출과 최상위 자식의 등록마다 서명한 뿌리 session 으로 도는 실행을 찾기 때문이다.
+`hermes_session_id` 와 `status` 에 함께 색인을 둔다. 최상위 session 의 MCP 호출과 최상위 자식의 등록마다 서명한 루트 session 으로 도는 실행을 찾기 때문이다.
 그 session 을 가진 도는 실행이 둘 이상이면 어느 쪽도 부모로 쓰지 않고 거절한다. 대화 하나에는 도는 turn 이 하나뿐이라 보통 생기지 않는다.
 
 금액을 0 으로 채우지 않는다.
@@ -80,7 +80,7 @@
 
 | `error_code` | 뜻 |
 | --- | --- |
-| `ORPHANED` | run 번호가 없어 묻지 못했다. 흐름 turn 의 뿌리도 이 값이다 |
+| `ORPHANED` | run 번호가 없어 묻지 못했다. 흐름 turn 의 루트도 이 값이다 |
 | `REMOTE_RUN_LOST` | Hermes 가 그 run 을 모른다(404) |
 | `RECONCILE_TIMEOUT` | 상한까지 끝나지 않아 중지를 보냈다 |
 | `RECONCILE_UNREACHABLE` | 상한까지 Hermes 에 한 번도 닿지 못했다 |
@@ -218,8 +218,8 @@ profile 플러그인이 `subagent_start` hook 에서 등록한다. 근거는 [AD
 | `profile_name` | VARCHAR(64) | 등록한 토큰이 증명한 profile |
 | `session_id` | VARCHAR(128) | 하위 에이전트 session. Hermes 가 정한 값이다 |
 | `user_id` | BIGINT | origin 실행의 `user_id`. MCP 호출의 요청자다 |
-| `origin_execution_id` | BIGINT | 이 session 을 낳은 FOS 실행. 끝난 실행이어도 된다. 이 실행이나 그 뿌리 실행이 `CANCELLED` 면 MCP 호출을 거절한다 |
-| `root_session_id` | VARCHAR(128) | 서명한 `parent_root_session_id`. MCP 호출의 서명한 뿌리와 다르면 거절한다 |
+| `origin_execution_id` | BIGINT | 이 session 을 낳은 FOS 실행. 끝난 실행이어도 된다. 이 실행이나 그 루트 실행이 `CANCELLED` 면 MCP 호출을 거절한다 |
+| `root_session_id` | VARCHAR(128) | 서명한 `parent_root_session_id`. MCP 호출의 서명한 루트와 다르면 거절한다 |
 | `parent_session_id` | VARCHAR(128) | 이 session 을 만든 session. 최상위 session 이거나 다른 하위 에이전트 session 이다 |
 | `created_at` | DATETIME(6) | 등록 시각 |
 
@@ -229,7 +229,7 @@ profile 플러그인이 `subagent_start` hook 에서 등록한다. 근거는 [AD
 
 외래 키는 두지 않는다. `agent_execution` 도 사용자와 대화에 외래 키를 두지 않고, 실행 줄과 사용자는 지우지 않는다. 등록은 서버가 방금 읽은 실행에서 origin 과 사용자를 옮겨 적으므로 없는 실행을 가리키지 않는다.
 
-같은 `(profile_name, session_id)` 가 같은 부모와 뿌리로, 또는 같은 origin 으로 다시 오면 새 줄을 만들지 않고 성공으로 답한다.
+같은 `(profile_name, session_id)` 가 같은 부모와 루트로, 또는 같은 origin 으로 다시 오면 새 줄을 만들지 않고 성공으로 답한다.
 다른 origin 이면 거절하고 덮어쓰지 않는다. 동시에 두 요청이 와서 유일 제약에 걸리면 먼저 저장된 줄을 다시 읽어 같은 규칙으로 판정한다.
 
 하위 에이전트의 하위 에이전트는 부모 등록의 `origin_execution_id` 와 `user_id` 를 그대로 잇는다. 하위 에이전트 몫의 `agent_execution` 줄은 만들지 않는다. 하위 에이전트는 지금처럼 `execution_event` 의 `SUBAGENT_STARTED`, `SUBAGENT_COMPLETED` 로 보인다.

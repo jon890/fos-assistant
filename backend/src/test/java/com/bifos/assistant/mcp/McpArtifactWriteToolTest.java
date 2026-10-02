@@ -42,7 +42,7 @@ import tools.jackson.databind.json.JsonMapper;
 /**
  * 실제 HTTP 경계에서 결과물 쓰기 도구의 인자와 소유권을 확인한다.
  *
- * <p>토큰은 이 검사의 profile 에 묶이고, 도구 호출은 그 profile 로 도는 아빠의 실행 뿌리로 서명한다(ADR-032).
+ * <p>토큰은 이 검사의 profile 에 묶이고, 도구 호출은 그 profile 로 도는 아빠의 실행 루트로 서명한다(ADR-032).
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @ActiveProfiles("test")
@@ -305,7 +305,7 @@ class McpArtifactWriteToolTest {
                 "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/call\",\"params\":{\"name\":\"artifact_write\",\"arguments\":{\"conversation_id\":\""
                         + conversation.publicId() + "\",\"path\":\"a.html\"";
 
-        for (String suffix : java.util.List.of(
+        for (String suffix : List.of(
                 "}}}",
                 ",\"content\":null}}}",
                 ",\"content\":1}}}",
@@ -477,7 +477,7 @@ class McpArtifactWriteToolTest {
                         + conversationId + "\",\"path\":\"" + path + "\",\"content\":\"" + content + "\"}}}");
     }
 
-    /** 아빠의 뿌리 아래 하위 에이전트 session 에서 부른 것처럼 서명한 {@code artifact_write} 를 보낸다. */
+    /** 아빠의 루트 아래 하위 에이전트 session 에서 부른 것처럼 서명한 {@code artifact_write} 를 보낸다. */
     private HttpResponse<String> subagentWrite(String sessionId, Conversation conversation, String path)
             throws Exception {
         String fosCtx = McpCallSigner.context(
@@ -490,7 +490,7 @@ class McpArtifactWriteToolTest {
                         + "\",\"content\":\"<p>x</p>\"}}}");
     }
 
-    /** 도구 호출의 인자에 {@code _fos_ctx} 가 없으면 아빠의 도는 실행 뿌리로 서명해 붙인다. */
+    /** 도구 호출의 인자에 {@code _fos_ctx} 가 없으면 아빠의 도는 실행 루트로 서명해 붙인다. */
     private HttpResponse<String> raw(String token, String request) throws Exception {
         String signed = McpCallSigner.withContext(request, token, dadRoot);
         return client.send(

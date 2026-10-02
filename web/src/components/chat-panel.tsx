@@ -158,7 +158,7 @@ function savedIdsOf(turns: Turn[]): Set<Turn["id"]> {
  */
 const SLOW_FLOW_MS = 120_000;
 
-/** 다른 창에서 도는 turn 과 그 실행 나무를 다시 묻는 주기다. */
+/** 다른 창에서 도는 turn 과 그 실행 트리를 다시 묻는 주기다. */
 const OBSERVE_INTERVAL_MS = 3_000;
 
 /** 도는 turn 조회가 이만큼 이어 실패하면 기다리는 표시를 거두고 이력을 다시 읽는다. */
@@ -456,7 +456,7 @@ export function ChatPanel({
     };
 
     const finish = async () => {
-      // 이력을 먼저 읽어 끝난 답의 실행 번호로 작업 과정 패널을 저장된 나무로 바꾼다.
+      // 이력을 먼저 읽어 끝난 답의 실행 번호로 작업 과정 패널을 저장된 트리로 바꾼다.
       let loaded: Turn[] | null = null;
       try {
         loaded = await refreshMessages(id, version);
@@ -726,7 +726,7 @@ export function ChatPanel({
   /**
    * 도는 turn 을 보기 시작한다. 보낸 창과 같은 상태를 채워 기다리는 표시와 중지가 같이 동작한다.
    *
-   * <p>스트림이 끊겨 넘어온 창은 이미 받은 작업 과정을 그대로 두고, 다음 나무 조회가 그것을 덮는다.
+   * <p>스트림이 끊겨 넘어온 창은 이미 받은 작업 과정을 그대로 두고, 다음 트리 조회가 그것을 덮는다.
    */
   function beginObserving(
     id: string,
@@ -844,7 +844,7 @@ export function ChatPanel({
 
   /**
    * 끝난 turn 의 작업 과정을 저장된 답으로 넘긴다. 펼쳐 둔 상태를 저장된 블록이 이어받고, live 패널은 저장된
-   * 나무로 바뀐다. 답의 실행 번호가 없으면 보일 것이 없어 live 패널을 닫는다.
+   * 트리로 바뀐다. 답의 실행 번호가 없으면 보일 것이 없어 live 패널을 닫는다.
    */
   function settleFinishedActivity(finishedExecutionId: number | null) {
     if (finishedExecutionId !== null) {

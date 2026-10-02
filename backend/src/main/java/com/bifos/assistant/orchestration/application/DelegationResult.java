@@ -18,7 +18,7 @@ public record DelegationResult(Long executionId, ExecutionStatus status, Failure
         AGENT_UNAVAILABLE,
         AGENT_DISABLED,
         DEPTH_EXCEEDED,
-        /** 한 뿌리 아래 도는 위임 자식이 한도에 닿았다 */
+        /** 한 루트 아래 도는 위임 자식이 한도에 닿았다 */
         TOO_MANY_CHILDREN,
         /** 서버 전체의 동시 위임이 한도에 닿았다 */
         BUSY,

@@ -13,7 +13,7 @@
 | `user_id` | BIGINT | 이 대화의 주인. 다른 사용자는 읽지 못한다 |
 | `agent_id` | BIGINT | 대화를 만들 때 정한다. 뒤에 바뀌지 않는다 |
 | `hermes_session_id` | VARCHAR(128) NULL | 다음 turn 에 보낼 Hermes session. 새 대화는 첫 turn 을 보내기 전에 Control Plane 이 `fos-<uuid>` 로 정해 적는다. 그 전의 대화는 첫 실행이 돌려준 값이다. 압축 교체로 Hermes 가 다른 session 을 돌려주면 그 값으로 바뀐다. 특정 profile 안의 값이다 |
-| `hermes_root_session_id` | VARCHAR(128) NULL | 그 대화의 뿌리 session. 새 대화는 첫 turn 을 보내기 전에 `hermes_session_id` 와 같은 `fos-<uuid>` 를 적고, 압축 교체에도 바뀌지 않는다. MCP `agent_*` 호출이 들고 오는 서명한 뿌리 session 이 이 값이다. 이 칸이 생기기 전의 대화는 비어 있다 |
+| `hermes_root_session_id` | VARCHAR(128) NULL | 그 대화의 루트 session. 새 대화는 첫 turn 을 보내기 전에 `hermes_session_id` 와 같은 `fos-<uuid>` 를 적고, 압축 교체에도 바뀌지 않는다. MCP `agent_*` 호출이 들고 오는 서명한 루트 session 이 이 값이다. 이 칸이 생기기 전의 대화는 비어 있다 |
 | `title` | VARCHAR(200) | 첫 메시지의 앞부분. 사진을 먼저 올리려고 만든 대화는 첫 메시지 전까지 비어 있다 |
 | `model_provider` | VARCHAR(64) NULL | 이 대화에서 고른 provider. `model` 과 함께 채우거나 함께 비운다 |
 | `model` | VARCHAR(128) NULL | 이 대화에서 직접 고른 모델. 비면 어느 모델로 도는지는 [모델 단계와 실행 기록](../../model-tiers.md) 의 「모델 선택」 이 정한다 |

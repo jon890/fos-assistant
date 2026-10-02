@@ -311,7 +311,7 @@ test("스킬을 부른 적이 없으면 스킬 탭이 빈 상태를 보인다", 
 const RAW_COMMAND = "ls-원본-명령";
 const RAW_RESULT = '{"output":"terminal-raw-result"}';
 
-/** `terminal` 도구를 쓴 실행 하나짜리 나무다. 명령과 결과는 사람 말이 아니라 줄에 그리지 않는 원본이다. */
+/** `terminal` 도구를 쓴 실행 하나짜리 트리다. 명령과 결과는 사람 말이 아니라 줄에 그리지 않는 원본이다. */
 function terminalTreeFixture() {
   const event = (sequence: number, eventType: string, detail: string) => ({
     sequence, eventType, toolName: "terminal", subagentName: null, hermesSessionId: null, detail, model: null,
@@ -376,7 +376,7 @@ test.describe("MEMBER 역할 사용자의 사용량 화면", () => {
     const block = page.locator('[data-testid="activity-block"][data-mode="saved"]').last();
     await expect(block).toBeVisible({ timeout: 30_000 });
     // 가짜 도구는 줄에 그릴 원본이 없어 관리자에게도 원본 자리가 생기지 않는다.
-    // 원본이 있는 `terminal` 도구의 나무로 바꿔야 역할에 따라 가리는지 드러난다.
+    // 원본이 있는 `terminal` 도구의 트리로 바꿔야 역할에 따라 가리는지 드러난다.
     await page.route("**/api/usage/executions/*/tree", (route) => route.fulfill({ json: terminalTreeFixture() }));
     await block.getByTestId("activity-toggle").click();
     // 도구 줄은 보이지만 도구 결과의 원본을 펼치는 자리는 없다.

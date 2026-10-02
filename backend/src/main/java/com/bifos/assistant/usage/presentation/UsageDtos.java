@@ -219,7 +219,7 @@ public final class UsageDtos {
      * 사용량 목록의 한 줄.
      *
      * @param conversationId 이 실행이 속한 대화의 공개 식별자. 대화 없이 돈 실행이면 null
-     * @param hasChildren 이 실행이 부른 실행이 있는가. 화면이 나무로 들어갈 곳을 고를 때 쓴다
+     * @param hasChildren 이 실행이 부른 실행이 있는가. 화면이 트리로 들어갈 곳을 고를 때 쓴다
      * @param retryOfExecutionId 막혀서 넘어오며 이 실행이 대신한 직전 실행. 첫 시도면 null
      * @param skillNames 이 실행에서 쓴 스킬 이름. 없으면 빈 목록
      */

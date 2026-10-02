@@ -23,7 +23,7 @@ public interface Flow {
     /**
      * 요청 하나를 끝까지 돌린다.
      *
-     * @param onRootStarted 뿌리 실행 줄을 만든 직후 받는다. 대화 turn 과 실행 번호를 연결한다
+     * @param onRootStarted 루트 실행 줄을 만든 직후 받는다. 대화 turn 과 실행 번호를 연결한다
      * @param onEvent 단계가 시작하고 끝날 때마다 받는다. 한 번에 받는 경로에서는 아무것도 하지 않는다
      */
     ChatTurn run(

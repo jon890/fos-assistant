@@ -66,8 +66,8 @@ public class UsageController {
     /**
      * 로그인한 사용자 자신의 실행만 준다. 여러 사용자를 가로질러 보는 것은 admin 화면이 맡는다.
      *
-     * <p>뿌리만 낸다. 흐름 하나가 실행 넷을 남기므로 전부 내면 목록이 중간 산출물로 찬다. 자식은 실행
-     * 나무 화면에서 본다.
+     * <p>루트만 낸다. 흐름 하나가 실행 넷을 남기므로 전부 내면 목록이 중간 산출물로 찬다. 자식은 실행
+     * 트리 화면에서 본다.
      *
      * <p>{@code MEMBER} 역할에게는 내부 값을 비워 보낸다(ADR-063).
      */
@@ -144,9 +144,9 @@ public class UsageController {
     }
 
     /**
-     * 그 실행이 속한 나무를 낸다.
+     * 그 실행이 속한 트리를 낸다.
      *
-     * <p>자식 실행의 번호로 물어도 뿌리부터 낸다. 없는 실행과 남의 실행은 같은 응답으로 숨긴다.
+     * <p>자식 실행의 번호로 물어도 루트부터 낸다. 없는 실행과 남의 실행은 같은 응답으로 숨긴다.
      */
     @GetMapping("/executions/{id}/tree")
     public ExecutionTree executionTree(@PathVariable Long id) {

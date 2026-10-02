@@ -11,8 +11,7 @@ import com.bifos.assistant.shared.error.ErrorCode;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.MediaType;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
@@ -28,9 +27,8 @@ import tools.jackson.databind.JsonNode;
  * 여기 있는 어느 것도 Hermes 안을 고치지 않는다.
  */
 @Component
+@Slf4j
 public class HttpHermesRunsClient implements HermesRunsClient {
-
-    private static final Logger log = LoggerFactory.getLogger(HttpHermesRunsClient.class);
     /**
      * 더 기다리지 않는 상태다. {@code interrupted} 는 v0.21.5 에서 생겼다. gateway 가 멈추거나 실행이 중간에
      * 끊기면 그 상태로 끝나는데, 여기 없으면 실행 시간 한도까지 조회만 되풀이한다.
@@ -81,7 +79,7 @@ public class HttpHermesRunsClient implements HermesRunsClient {
                     .header("Authorization", "Bearer " + keyStore.resolve(profileName))
                     .retrieve()
                     .toBodilessEntity();
-        } catch (org.springframework.web.client.HttpClientErrorException.NotFound ex) {
+        } catch (HttpClientErrorException.NotFound ex) {
             log.info("이미 끝난 Hermes 실행을 멈추지 못했다 profile={} runId={}", profileName, runId);
         } catch (RestClientException ex) {
             throw HermesCallFailure.of(ex, "could not stop the Hermes run");

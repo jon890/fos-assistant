@@ -41,6 +41,7 @@ import com.bifos.assistant.skill.application.SkillUsageSummary;
 import com.bifos.assistant.skill.application.SkillsChanged;
 import com.bifos.assistant.skill.infra.SkillStore;
 import com.bifos.assistant.user.domain.UserRole;
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -60,6 +61,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.mockito.Mockito;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.HttpStatus;
@@ -91,7 +93,7 @@ class SkillServiceTest {
     private static final CurrentUser OWNER = new CurrentUser(81L, "dad@example.com", "아빠", 1L, UserRole.MEMBER);
     private static final CurrentUser MEMBER = new CurrentUser(82L, "kid@example.com", "아이", 1L, UserRole.MEMBER);
 
-    /** {@code application-test.yml} 의 스킬 뿌리다. 두 뿌리가 같아 게시된 경로를 그대로 열 수 있다. */
+    /** {@code application-test.yml} 의 스킬 루트다. 두 루트가 같아 게시된 경로를 그대로 열 수 있다. */
     private static final Path SKILL_ROOT = Path.of("build/test-skills");
 
     private static final List<String> WITHOUT_SKILLS = List.of("web", "fos-assistant");
@@ -586,7 +588,7 @@ class SkillServiceTest {
                     pool.submit(() -> skills.save(OWNER, OWNED, "shopping", skillMd("shopping"), List.of()));
             // 둘째가 잠금에 걸려 있는 동안에는 게시가 한 번뿐이다.
             Thread.sleep(300);
-            verify(skillClient, org.mockito.Mockito.times(1)).publish(anyString(), anyList(), any());
+            verify(skillClient, Mockito.times(1)).publish(anyString(), anyList(), any());
             assertThat(second.isDone()).as("둘째 저장은 첫째가 끝날 때까지 기다린다").isFalse();
 
             releaseFirstPublish.countDown();
@@ -597,7 +599,7 @@ class SkillServiceTest {
         }
 
         assertThat(store.readCurrent(OWNED_PROFILE)).containsOnlyKeys("shopping", "weekly-plan");
-        verify(skillClient, org.mockito.Mockito.times(2)).publish(eq(OWNED_PROFILE), anyList(), any());
+        verify(skillClient, Mockito.times(2)).publish(eq(OWNED_PROFILE), anyList(), any());
     }
 
     @Test
@@ -819,7 +821,7 @@ class SkillServiceTest {
             return stream.map(path -> path.getFileName().toString())
                     .filter(name -> name.startsWith("v"))
                     .toList();
-        } catch (java.io.IOException ex) {
+        } catch (IOException ex) {
             throw new IllegalStateException(ex);
         }
     }

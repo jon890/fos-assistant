@@ -35,7 +35,7 @@ import org.springframework.stereotype.Service;
 /**
  * 에이전트 하나를 한 번 돌리고 실행 한 줄을 남긴다.
  *
- * <p>흐름의 첫 단계와 그 아래 단계가 같은 경로를 쓰게 하려고 여기 모았다. 부모와 뿌리를 정하는 것은
+ * <p>흐름의 첫 단계와 그 아래 단계가 같은 경로를 쓰게 하려고 여기 모았다. 부모와 루트를 정하는 것은
  * 부르는 쪽이고, 이 클래스는 받은 번호를 그대로 적는다. 요청자를 확인하고 에이전트를 고르는 것도
  * 부르는 쪽이 한다. 경계를 지키는 규칙은 {@link ChildExecutionRunner} 가 갖는다.
  *
@@ -74,10 +74,10 @@ public class AgentRunner {
      * @param conversation 이 실행이 속한 대화
      * @param agent 실행할 에이전트. 요청자가 쓸 수 있는 것만 여기 들어온다
      * @param task 이 실행에만 주는 지시
-     * @param parentExecutionId 이 실행을 부른 실행. 뿌리이면 null
-     * @param rootExecutionId 이 실행이 속한 나무의 뿌리. 뿌리 자신이면 null
+     * @param parentExecutionId 이 실행을 부른 실행. 루트이면 null
+     * @param rootExecutionId 이 실행이 속한 트리의 루트. 루트 자신이면 null
      * @param session Hermes 에 보낼 session 과 실행 줄에 제출하기 전에 적을 session. 대화의 첫 단계는 압축 교체 뒤에
-     *     보내는 session 이 바뀌어도 그 대화의 뿌리 session 을 적어야 하고(ADR-031), 하위 실행은 새
+     *     보내는 session 이 바뀌어도 그 대화의 루트 session 을 적어야 하고(ADR-031), 하위 실행은 새
      *     {@code fos-<uuid>} 를 보내고 적는다
      * @param onStarted 실행 줄이 생긴 직후 호출한다
      * @param onSubmitted 실행 줄과 Hermes run 번호가 모두 생긴 직후 호출한다

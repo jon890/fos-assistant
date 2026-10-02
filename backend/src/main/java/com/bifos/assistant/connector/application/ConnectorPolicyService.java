@@ -118,7 +118,7 @@ public class ConnectorPolicyService {
 
     /**
      * @param profileName 토큰이 증명한 profile
-     * @param rootSessionId 서명을 확인한 뿌리 session
+     * @param rootSessionId 서명을 확인한 루트 session
      * @param sessionId 서명을 확인한, 도구를 부른 session
      * @param toolCallId 서명을 확인한 도구 호출 id
      * @param hermesTool 서명을 확인한 등록 이름

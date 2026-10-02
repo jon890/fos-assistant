@@ -27,7 +27,7 @@ function node(executionId: number, status: string, events: ExecutionEventView[],
   };
 }
 
-/** 뿌리는 끝났고 자식 노드와 그 안의 도구는 아직 돈다. */
+/** 루트는 끝났고 자식 노드와 그 안의 도구는 아직 돈다. */
 function treeWithRunningChild(): ExecutionTreeResponse {
   return {
     truncated: false,
@@ -123,7 +123,7 @@ test("이름이 없으면 긴 목표나 preview를 줄인다", () => {
   assert.ok(item.name.length <= 80);
 });
 
-test("도는 나무로 읽으면 도는 자식 노드와 도구를 그대로 둔다", () => {
+test("도는 트리로 읽으면 도는 자식 노드와 도구를 그대로 둔다", () => {
   assert.deepEqual(states(fromTree(treeWithRunningChild(), { running: true })), [
     "tool:검색:running",
     "subagent:에이전트 2:running",
@@ -131,7 +131,7 @@ test("도는 나무로 읽으면 도는 자식 노드와 도구를 그대로 둔
   ]);
 });
 
-test("도는 나무로 읽어도 끝난 자식 노드는 끝난 상태로 보인다", () => {
+test("도는 트리로 읽어도 끝난 자식 노드는 끝난 상태로 보인다", () => {
   const tree: ExecutionTreeResponse = {
     truncated: false,
     root: node(1, "RUNNING", [], [

@@ -36,12 +36,12 @@ public final class McpCallSigner {
 
     private McpCallSigner() {}
 
-    /** 새 뿌리 session 이다. 검사마다 새로 만들어 다른 검사가 남긴 줄과 겹치지 않게 한다. */
+    /** 새 루트 session 이다. 검사마다 새로 만들어 다른 검사가 남긴 줄과 겹치지 않게 한다. */
     static String newRoot() {
         return "fos-" + UUID.randomUUID();
     }
 
-    /** 뿌리 session 과 같은 session 에서 부른 호출의 {@code _fos_ctx} 다. {@code tool_call_id} 는 호출마다 새 값이다. */
+    /** 루트 session 과 같은 session 에서 부른 호출의 {@code _fos_ctx} 다. {@code tool_call_id} 는 호출마다 새 값이다. */
     public static ObjectNode context(String rawToken, String toolName, String rootSessionId) {
         return context(rawToken, toolName, rootSessionId, rootSessionId, "call_" + UUID.randomUUID());
     }
@@ -127,15 +127,23 @@ public final class McpCallSigner {
      */
     static String withContext(String request, String rawToken, String rootSessionId) {
         ObjectNode body = (ObjectNode) JSON.readTree(request);
-        if (!"tools/call".equals(body.path("method").asString())) return request;
-        if (!(body.path("params") instanceof ObjectNode params)) return request;
-        if (!(params.get("arguments") instanceof ObjectNode arguments) || arguments.has("_fos_ctx")) return request;
-        if (!params.path("name").isString()) return request;
+        if (!"tools/call".equals(body.path("method").asString())) {
+            return request;
+        }
+        if (!(body.path("params") instanceof ObjectNode params)) {
+            return request;
+        }
+        if (!(params.get("arguments") instanceof ObjectNode arguments) || arguments.has("_fos_ctx")) {
+            return request;
+        }
+        if (!params.path("name").isString()) {
+            return request;
+        }
         arguments.set("_fos_ctx", context(rawToken, params.path("name").asString(), rootSessionId));
         return JSON.writeValueAsString(body);
     }
 
-    /** 그 profile 로 뿌리 session 에서 도는 실행 줄을 만든다. */
+    /** 그 profile 로 루트 session 에서 도는 실행 줄을 만든다. */
     public static AgentExecution running(
             AgentExecutionRepository executions,
             Long userId,
@@ -146,7 +154,7 @@ public final class McpCallSigner {
     }
 
     /**
-     * 그 profile 의 에이전트로 뿌리 session 에서 도는 실행 줄을 만든다.
+     * 그 profile 의 에이전트로 루트 session 에서 도는 실행 줄을 만든다.
      *
      * <p>{@code memory_read} 는 origin 실행의 에이전트가 받는 collection 만 읽는다(ADR-053). 에이전트가 없는 실행은
      * 아무것도 읽지 못하므로, Memory 를 읽는 검사는 이 메서드로 실행을 만든다.

@@ -631,7 +631,7 @@ class ConnectorPolicyEndpointTest {
         connections.save(connection);
     }
 
-    /** 뿌리 session 에서 부른 새 호출 하나를 주인의 토큰으로 서명해 보낸다. */
+    /** 루트 session 에서 부른 새 호출 하나를 주인의 토큰으로 서명해 보낸다. */
     private HttpResponse<String> ask(String hermesTool, String tool) throws Exception {
         return send(token, body(token, hermesTool, tool, root, newCall(), ARGS));
     }

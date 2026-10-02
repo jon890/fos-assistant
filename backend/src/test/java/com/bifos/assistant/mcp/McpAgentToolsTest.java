@@ -69,7 +69,7 @@ import tools.jackson.databind.node.ObjectNode;
  * {@code /mcp} 경계에서 고정한다(ADR-017, ADR-032, ADR-037).
  *
  * <p>같은 GROUP profile 을 사용자 A 와 B 가 함께 써도 각자의 목록과 각자의 위임 실행만 받는다.
- * {@code conversationId} 없이 만든 origin 은 대화가 없을 때의 대체 규칙인 실행 나무로 판정된다.
+ * {@code conversationId} 없이 만든 origin 은 대화가 없을 때의 대체 규칙인 실행 트리로 판정된다.
  * 대화 규칙은 origin 과 위임 실행에 대화 번호를 준 검사가 고정한다. {@code conversation_id} 에는 외래 키가 없어
  * 대화 줄을 만들지 않고 번호만 준다.
  *
@@ -265,7 +265,7 @@ class McpAgentToolsTest {
     }
 
     @Test
-    @DisplayName("대화 없는 origin 의 agent status 는 같은 나무의 위임 실행을 상태별로 답한다")
+    @DisplayName("대화 없는 origin 의 agent status 는 같은 트리의 위임 실행을 상태별로 답한다")
     void agentStatusWithoutConversationAnswersSameTreeRunsByState() throws Exception {
         String root = McpCallSigner.newRoot();
         AgentExecution parent = McpCallSigner.running(executions, userA.id(), null, SHARED, root);
@@ -418,7 +418,7 @@ class McpAgentToolsTest {
     }
 
     @Test
-    @DisplayName("대화 없는 origin 에서 남의 실행과 다른 나무와 위임이 아닌 실행과 없는 번호는 모두 같은 응답이다")
+    @DisplayName("대화 없는 origin 에서 남의 실행과 다른 트리와 위임이 아닌 실행과 없는 번호는 모두 같은 응답이다")
     void originWithoutConversationGivesSameResponseForOthersAndMissingRuns() throws Exception {
         String rootA = McpCallSigner.newRoot();
         AgentExecution parentA = McpCallSigner.running(executions, userA.id(), null, SHARED, rootA);
@@ -426,22 +426,22 @@ class McpAgentToolsTest {
         AgentExecution parentB = McpCallSigner.running(executions, userB.id(), null, SHARED, rootB);
         AgentExecution otherTreeRoot = McpCallSigner.save(
                 executions, userA.id(), null, SHARED, McpCallSigner.newRoot(), ExecutionStatus.SUCCEEDED);
-        // 나무와 위임 여부는 맞고 사용자만 다르다.
+        // 트리와 위임 여부는 맞고 사용자만 다르다.
         AgentExecution otherUserInTree = delegated(userB.id(), parentA, ExecutionStatus.SUCCEEDED, "나의 답", null);
         AgentExecution otherUsersOwn = delegated(userB.id(), parentB, ExecutionStatus.SUCCEEDED, "나의 답", null);
-        AgentExecution otherTree = delegated(userA.id(), otherTreeRoot, ExecutionStatus.SUCCEEDED, "다른 나무의 답", null);
+        AgentExecution otherTree = delegated(userA.id(), otherTreeRoot, ExecutionStatus.SUCCEEDED, "다른 트리의 답", null);
         AgentExecution proposal = child(userA.id(), parentA, ExecutionStatus.SUCCEEDED);
 
         JsonNode missing = body(agentStatus(sharedToken, rootA, 999_999_999L)).path("result");
         Map<String, JsonNode> hidden = new LinkedHashMap<>();
         hidden.put(
-                "같은 나무의 다른 사용자 실행",
+                "같은 트리의 다른 사용자 실행",
                 body(agentStatus(sharedToken, rootA, otherUserInTree.id())).path("result"));
         hidden.put(
-                "다른 사용자 나무의 실행",
+                "다른 사용자 트리의 실행",
                 body(agentStatus(sharedToken, rootA, otherUsersOwn.id())).path("result"));
         hidden.put(
-                "다른 나무의 실행",
+                "다른 트리의 실행",
                 body(agentStatus(sharedToken, rootA, otherTree.id())).path("result"));
         hidden.put(
                 "위임이 아닌 자식",
@@ -469,7 +469,7 @@ class McpAgentToolsTest {
         String root = McpCallSigner.newRoot();
         AgentExecution nextTurn = McpCallSigner.running(executions, userA.id(), CONVERSATION, SHARED, root);
 
-        assertThat(nextTurn.treeRootId()).as("다음 turn 은 뿌리가 다르다").isNotEqualTo(earlier.treeRootId());
+        assertThat(nextTurn.treeRootId()).as("다음 turn 은 루트가 다르다").isNotEqualTo(earlier.treeRootId());
         assertStatus(
                 agentStatus(sharedToken, root, earlier.id()),
                 "{\"execution_id\":" + earlier.id() + ",\"status\":\"SUCCEEDED\",\"output\":\"앞 turn 에서 맡긴 답\"}");
@@ -514,7 +514,7 @@ class McpAgentToolsTest {
     }
 
     @Test
-    @DisplayName("부모가 끝난 뒤 하위 에이전트가 물어도 origin 실행의 나무로 판정한다")
+    @DisplayName("부모가 끝난 뒤 하위 에이전트가 물어도 origin 실행의 트리로 판정한다")
     void judgesByOriginRunTreeWhenSubagentAsksAfterParentEnded() throws Exception {
         String root = McpCallSigner.newRoot();
         AgentExecution parent = McpCallSigner.running(executions, userA.id(), null, SHARED, root);
@@ -543,7 +543,7 @@ class McpAgentToolsTest {
     }
 
     @Test
-    @DisplayName("뿌리가 중지된 하위 에이전트의 물음은 호출 맥락 오류다")
+    @DisplayName("루트가 중지된 하위 에이전트의 물음은 호출 맥락 오류다")
     void questionFromSubagentWhoseRootStoppedIsCallContextError() throws Exception {
         String root = McpCallSigner.newRoot();
         AgentExecution parent = McpCallSigner.running(executions, userA.id(), null, SHARED, root);
@@ -586,7 +586,7 @@ class McpAgentToolsTest {
         rejections.add(send(sharedToken, statusRequest(succeeded.id(), wrongSig)));
         rejections.add(send(sharedToken, statusRequest(succeeded.id(), forged)));
         rejections.add(send(sharedToken, statusRequest(succeeded.id(), otherTool)));
-        // 다른 profile 의 토큰은 그 profile 의 실행 뿌리로 서명해도 이 profile 의 실행을 origin 으로 쓰지 못한다.
+        // 다른 profile 의 토큰은 그 profile 의 실행 루트로 서명해도 이 profile 의 실행을 origin 으로 쓰지 못한다.
         rejections.add(agentStatus(privateAToken, rootA, succeeded.id()));
         rejections.add(agentListCall(sharedToken, privateRoot));
 
@@ -659,7 +659,9 @@ class McpAgentToolsTest {
                 .path("tools");
         JsonNode delegate = null;
         for (JsonNode tool : listed) {
-            if ("agent_delegate".equals(tool.path("name").asString())) delegate = tool;
+            if ("agent_delegate".equals(tool.path("name").asString())) {
+                delegate = tool;
+            }
         }
 
         assertThat(delegate).as("도구 목록: %s", listed).isNotNull();
@@ -706,7 +708,7 @@ class McpAgentToolsTest {
                 agentStatus(sharedToken, root, child.id()),
                 "{\"execution_id\":" + child.id() + ",\"status\":\"SUCCEEDED\",\"output\":\"맡은 일의 답: 자료를 찾아 줘\"}");
 
-        // 같은 대화의 다음 turn 은 뿌리가 다르지만 앞 turn 에서 맡긴 실행을 묻는다.
+        // 같은 대화의 다음 turn 은 루트가 다르지만 앞 turn 에서 맡긴 실행을 묻는다.
         setStatus(parent, ExecutionStatus.SUCCEEDED);
         String nextRoot = McpCallSigner.newRoot();
         McpCallSigner.running(executions, userA.id(), parent.conversationId(), SHARED, nextRoot);
@@ -841,7 +843,7 @@ class McpAgentToolsTest {
     }
 
     @Test
-    @DisplayName("같은 뿌리에서 위임 넷이 돌면 다섯째는 TOO MANY CHILDREN 이고 위임이 아닌 자식은 세지 않는다")
+    @DisplayName("같은 루트에서 위임 넷이 돌면 다섯째는 TOO MANY CHILDREN 이고 위임이 아닌 자식은 세지 않는다")
     void fifthDelegationUnderSameRootIsTooManyChildren() throws Exception {
         stub().willAnswer(McpAgentToolsTest::completed);
         String root = McpCallSigner.newRoot();
@@ -950,7 +952,9 @@ class McpAgentToolsTest {
                 .path("tools");
         JsonNode stop = null;
         for (JsonNode tool : listed) {
-            if ("agent_stop".equals(tool.path("name").asString())) stop = tool;
+            if ("agent_stop".equals(tool.path("name").asString())) {
+                stop = tool;
+            }
         }
 
         assertThat(stop).as("도구 목록: %s", listed).isNotNull();
@@ -1224,14 +1228,14 @@ class McpAgentToolsTest {
         return new CurrentUser(user.id(), user.email(), user.displayName(), user.groupId(), user.role());
     }
 
-    /** 대화 줄 하나와 그 대화에서 뿌리 session {@code root} 로 도는 turn 실행을 만든다. */
+    /** 대화 줄 하나와 그 대화에서 루트 session {@code root} 로 도는 turn 실행을 만든다. */
     private AgentExecution turn(AppUser user, String root) {
         Long agentId = agents.findByCode(GROUP_CODE).orElseThrow().id();
         Conversation conversation = conversations.save(Conversation.startedBy(user.id(), "맡기기", agentId));
         return McpCallSigner.running(executions, user.id(), conversation.id(), SHARED, root);
     }
 
-    /** {@code parent} 아래에서 뿌리 session {@code session} 으로 도는 실행이다. 깊이를 만들 때 쓴다. */
+    /** {@code parent} 아래에서 루트 session {@code session} 으로 도는 실행이다. 깊이를 만들 때 쓴다. */
     private AgentExecution running(AgentExecution parent, String session) {
         return executions.save(AgentExecution.builder()
                 .userId(parent.userId())
@@ -1250,7 +1254,7 @@ class McpAgentToolsTest {
         return json.createObjectNode().put("agent_code", agentCode).put("task", task);
     }
 
-    /** 뿌리 session 에서 새 {@code tool_call_id} 로 부른다. */
+    /** 루트 session 에서 새 {@code tool_call_id} 로 부른다. */
     private HttpResponse<String> delegate(String token, String root, String agentCode, String task) throws Exception {
         return delegateCall(token, root, root, "call_" + UUID.randomUUID(), delegateArguments(agentCode, task));
     }
@@ -1291,7 +1295,9 @@ class McpAgentToolsTest {
             boolean ended =
                     executionEvents.findByExecutionIdInOrderByExecutionIdAscSequenceAsc(List.of(executionId)).stream()
                             .anyMatch(event -> event.eventType() != ExecutionEventType.RUN_STARTED);
-            if (execution.status() != ExecutionStatus.RUNNING && ended) return execution;
+            if (execution.status() != ExecutionStatus.RUNNING && ended) {
+                return execution;
+            }
             if (System.nanoTime() > deadline) {
                 throw new AssertionError("실행 " + executionId + " 이 10초 안에 끝나지 않았다. 상태: " + execution.status());
             }
@@ -1300,7 +1306,7 @@ class McpAgentToolsTest {
     }
 
     /**
-     * origin 에이전트를 만들고 그 profile 로 도는 실행 줄을 남긴 뒤 뿌리 session 을 돌려준다.
+     * origin 에이전트를 만들고 그 profile 로 도는 실행 줄을 남긴 뒤 루트 session 을 돌려준다.
      *
      * <p>연결용인지만 다르고 나머지 준비는 같다. 거절이 준비 탓이 아니라 연결용이어서 난 것임을 대조군이 보인다.
      */
@@ -1406,7 +1412,7 @@ class McpAgentToolsTest {
         return send(token, statusRequest(executionId, McpCallSigner.context(token, "agent_status", root)));
     }
 
-    /** 뿌리 {@code root} 아래 하위 에이전트 session {@code session} 에서 부른 것처럼 서명해 묻는다. */
+    /** 루트 {@code root} 아래 하위 에이전트 session {@code session} 에서 부른 것처럼 서명해 묻는다. */
     private HttpResponse<String> agentStatus(String token, String root, String session, Long executionId)
             throws Exception {
         return send(
@@ -1423,7 +1429,9 @@ class McpAgentToolsTest {
     }
 
     private static ObjectNode withContext(ObjectNode arguments, ObjectNode fosCtx) {
-        if (fosCtx != null) arguments.set("_fos_ctx", fosCtx);
+        if (fosCtx != null) {
+            arguments.set("_fos_ctx", fosCtx);
+        }
         return arguments;
     }
 
@@ -1458,7 +1466,9 @@ class McpAgentToolsTest {
 
     private static JsonNode find(JsonNode listed, String code) {
         for (JsonNode item : listed) {
-            if (code.equals(item.path("code").asString())) return item;
+            if (code.equals(item.path("code").asString())) {
+                return item;
+            }
         }
         throw new AssertionError("목록에 " + code + " 가 없다: " + listed);
     }

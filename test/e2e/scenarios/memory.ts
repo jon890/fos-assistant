@@ -323,8 +323,8 @@ export const memoryScenario: Scenario = {
       200,
       "MCP 본인 Memory 생성",
     ).json<MemoryView>();
-    // 토큰은 profile 만 증명한다. 요청자는 서명한 뿌리 session 으로 찾은 도는 실행의 사용자라,
-    // 서명이 없거나 도는 실행이 없는 뿌리로 서명한 호출은 누구의 권한으로도 돌지 않는다.
+    // 토큰은 profile 만 증명한다. 요청자는 서명한 루트 session 으로 찾은 도는 실행의 사용자라,
+    // 서명이 없거나 도는 실행이 없는 루트로 서명한 호출은 누구의 권한으로도 돌지 않는다.
     for (const [who, profileName] of [["아이", AGENT_TOOLS_PROFILE], ["아빠", DAD_BINDING.profileName]] as const) {
       const issued = expectStatus(
         await call(context, "/admin/agent-tokens", {
@@ -339,7 +339,7 @@ export const memoryScenario: Scenario = {
         const idleRoot = `fos-${randomUUID()}`;
         const attempts = [
           ["서명 없음", undefined],
-          ["도는 실행이 없는 뿌리", signedCallContext(issued.token, "memory_read", idleRoot, idleRoot, `call_${randomUUID()}`)],
+          ["도는 실행이 없는 루트", signedCallContext(issued.token, "memory_read", idleRoot, idleRoot, `call_${randomUUID()}`)],
         ] as const;
         for (const [attempt, _fos_ctx] of attempts) {
           for (const memory of [dadOnly, kidOwn]) {

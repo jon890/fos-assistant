@@ -247,7 +247,7 @@ export function ModelPicker({
 
   async function apply(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    // 창은 body 로 옮겨 그리지만 React 의 사건은 부품 나무를 따라 올라간다. 막지 않으면 입력창의 form 이
+    // 창은 body 로 옮겨 그리지만 React 의 사건은 부품 트리를 따라 올라간다. 막지 않으면 입력창의 form 이
     // 이 제출을 받아 메시지를 보낸다.
     event.stopPropagation();
     const next: ModelChoice = {

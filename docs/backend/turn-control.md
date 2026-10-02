@@ -63,7 +63,7 @@ turn 이 도는지 먼저 보고 저장할지 정하면, 보는 순간과 저장
 
 ## 중지
 
-`chat/application` 의 `TurnCancellation` 이 도는 turn 마다 중지 표시를 하나 갖는다. 뿌리 실행 번호가 열쇠다.
+`chat/application` 의 `TurnCancellation` 이 도는 turn 마다 중지 표시를 하나 갖는다. 루트 실행 번호가 열쇠다.
 `ChatService` 가 turn 을 시작할 때 등록하고 끝날 때 지운다.
 실행 줄을 만들면 열쇠를 그 실행 번호로 옮긴다.
 중지 경로가 그 표시를 세우고, 흐름은 자식을 시작하기 전과 합치기 전에 그것을 본다.
@@ -84,20 +84,20 @@ turn 이 도는지 먼저 보고 저장할지 정하면, 보는 순간과 저장
 | 중지를 보낸 뒤 스트림이 10초 안에 끝나지 않으면 중계 쪽이 스트림을 닫고 상태 조회로 넘어간다 | 취소된 run 의 스트림이 닫히는지 실제 Hermes 로 확인하지 못했다 |
 
 Hermes 에 중지를 보내는 것은 `hermes` 가, 누구의 무엇을 멈출지 정하는 것은 `chat` 이 한다.
-뿌리 아래에서 도는 실행은 `root_execution_id` 로 찾는다.
-그 자식의 에이전트 행이 없으면 그 자식은 로그만 남기고 건너뛰고, 뿌리의 중지는 계속한다([`agent.md`](agent.md) 의 「에이전트 만들기와 지우기」 절).
-`agent_delegate` 로 맡긴 자식도 run 번호가 붙을 때 `AgentDelegationService` 가 뿌리 turn 의 표시에 그 run 을 붙인다.
+루트 아래에서 도는 실행은 `root_execution_id` 로 찾는다.
+그 자식의 에이전트 행이 없으면 그 자식은 로그만 남기고 건너뛰고, 루트의 중지는 계속한다([`agent.md`](agent.md) 의 「에이전트 만들기와 지우기」 절).
+`agent_delegate` 로 맡긴 자식도 run 번호가 붙을 때 `AgentDelegationService` 가 루트 turn 의 표시에 그 run 을 붙인다.
 turn 이 끝난 뒤에 맡긴 자식은 붙일 표시가 없어 `agent_stop` 으로만 멈춘다.
 
 **중지할 수 있는지를 실행 줄의 상태로 판정하지 않는다.**
-흐름으로 도는 turn 은 Chief 가 끝나면 뿌리 줄이 `SUCCEEDED` 가 되고 그 뒤에 자식이 돈다.
+흐름으로 도는 turn 은 Chief 가 끝나면 루트 줄이 `SUCCEEDED` 가 되고 그 뒤에 자식이 돈다.
 줄 상태로 보면 자식이 도는 동안 중지를 거절하게 된다.
-그래서 이 프로세스에 등록된 도는 turn 이 그 번호를 뿌리로 갖는지로 본다.
-멈춘 turn 의 뿌리 줄은 이미 `SUCCEEDED` 였어도 `CANCELLED` 로 덮어쓴다. 토큰과 비용은 그대로 둔다.
+그래서 이 프로세스에 등록된 도는 turn 이 그 번호를 루트로 갖는지로 본다.
+멈춘 turn 의 루트 줄은 이미 `SUCCEEDED` 였어도 `CANCELLED` 로 덮어쓴다. 토큰과 비용은 그대로 둔다.
 
 **다른 창이 도는 turn 을 물을 때도 이 표시를 본다.** 실행 줄의 상태로 보지 않는다.
 줄 상태로 보면 자식이 도는 동안 「돌지 않는다」고 답하게 된다. 중지 판정과 같은 까닭이다.
-`running` 경로는 대화의 표시가 가진 뿌리 실행 번호를 돌려주고, `startedAt` 은 그 실행 줄에서 읽는다.
+`running` 경로는 대화의 표시가 가진 루트 실행 번호를 돌려주고, `startedAt` 은 그 실행 줄에서 읽는다.
 표시가 있는데 실행 번호가 아직 붙지 않았으면 `running` 은 true 이고 `executionId` 와 `startedAt` 은 null 이다.
 
 **표시는 한 프로세스의 메모리에 있다.** Control Plane 이 하나라서 그것으로 된다.
@@ -118,7 +118,7 @@ Hermes 의 실행 조회가 무엇을 얼마 동안 답하는지는 [`hermes/run
 
 두 단계로 돈다.
 
-1. **잡기.** 웹 서버가 요청을 받기 전에 돈다. `RUNNING` 줄을 읽고, run 번호가 있는 대화 turn 의 뿌리 줄과 흐름 turn 의 줄마다 그 대화의 turn 잠금을 잡는다.
+1. **잡기.** 웹 서버가 요청을 받기 전에 돈다. `RUNNING` 줄을 읽고, run 번호가 있는 대화 turn 의 루트 줄과 흐름 turn 의 줄마다 그 대화의 turn 잠금을 잡는다.
    그 실행 번호와 run 을 표시에 붙인다. Hermes 를 부르지 않고 실행 줄도 고치지 않는다.
 2. **묻기.** `ApplicationReadyEvent` 에서 시작한다. `NextTurnDispatcher` 의 기동 뒤 깨우기보다 먼저다.
    run 번호가 없는 줄을 `FAILED`(`ORPHANED`) 로 적고, 나머지는 실행마다 가상 스레드 하나가 Hermes 에 묻고 끝날 때까지 다시 묻는다. 줄을 적은 뒤 잡은 잠금을 푼다.
@@ -131,7 +131,7 @@ Control Plane 이 내려갈 때 묻던 스레드는 줄을 적지 않고 끝난�
 flowchart TD
     A[기동: RUNNING 실행 조회] --> B{run 번호가 있는가}
     B -- 없다 --> O[FAILED, ORPHANED]
-    B -- 있다 --> C[대화 turn 의 뿌리나 흐름 turn 의 줄이면 그 대화의 turn 잠금을 잡는다]
+    B -- 있다 --> C[대화 turn 의 루트나 흐름 turn 의 줄이면 그 대화의 turn 잠금을 잡는다]
     C --> D[Hermes 에 실행 상태를 묻는다]
     D -- 끝났다 --> E[상태와 답과 사용량을 적는다]
     D -- 404 --> L[FAILED, REMOTE_RUN_LOST]
@@ -154,7 +154,7 @@ flowchart TD
 | --- | --- | --- | --- |
 | 대화 turn | 부모가 없고 대화가 있다. 그 에이전트에 흐름이 없다 | 실행 줄, `ASSISTANT` 메시지, 대화의 session. 그 실행이 시작한 뒤 대화 폴더에 생긴 HTML 을 답에 묶는다. 대화 단위 SSE 로 `done`, `stopped`, `error` 가운데 하나를 낸다 | 다시 붙는다. 그 대화의 turn 잠금을 쥔다 |
 | 위임 실행 | `delegation_key` 가 있다 | 실행 줄과 `output_text` 와 끝 사건. `DelegationFinished` 를 낸다 | 다시 붙는다. 잠금은 잡지 않는다 |
-| 흐름 turn 과 그 자식 | 뿌리 실행의 에이전트에 흐름이 있다 | 실행 줄과 끝 사건. 뿌리는 성공으로 끝났어도 `FAILED`(`ORPHANED`) 로 적고 사용량은 남긴다. 뿌리가 끝나면 대화 단위 SSE 로 `error` 나 `stopped` 를 낸다. 자식만 돌던 turn 은 잠금을 풀 때 한 번 낸다 | 중지를 보내고 끝난 상태를 기다린다. 그 대화의 turn 잠금을 쥔다. 뿌리 줄이 이미 끝나고 자식만 도는 때에도 쥔다 |
+| 흐름 turn 과 그 자식 | 루트 실행의 에이전트에 흐름이 있다 | 실행 줄과 끝 사건. 루트는 성공으로 끝났어도 `FAILED`(`ORPHANED`) 로 적고 사용량은 남긴다. 루트가 끝나면 대화 단위 SSE 로 `error` 나 `stopped` 를 낸다. 자식만 돌던 turn 은 잠금을 풀 때 한 번 낸다 | 중지를 보내고 끝난 상태를 기다린다. 그 대화의 turn 잠금을 쥔다. 루트 줄이 이미 끝나고 자식만 도는 때에도 쥔다 |
 | 그 밖의 실행(Memory 제안, 추천 질문) | 위 셋이 아니다 | 실행 줄과 끝 사건만 적는다. 답은 쓰지 않는다 | 다시 붙는다. 잠금은 잡지 않는다 |
 
 끝 사건, 결과물 묶기, 알림은 실행 줄을 적은 트랜잭션이 끝난 뒤에 한 번 한다. 그 사이에 프로세스가 죽으면 다시 하지 않는다. 위임 결과는 기동 뒤 깨우기가 전한다.
@@ -290,10 +290,10 @@ sequenceDiagram
     Note over B,C: started 사건으로 실행 번호를 이미 받았다
     B->>W: 중지
     W->>C: POST /api/v1/chat/executions/{id}/stop
-    C->>C: 요청자의 실행이고 그 뿌리로 도는 turn 이 있는지 본다
-    C->>C: 그 뿌리에 중지 표시를 남긴다. 흐름은 다음 자식을 시작하지 않는다
+    C->>C: 요청자의 실행이고 그 루트로 도는 turn 이 있는지 본다
+    C->>C: 그 루트에 중지 표시를 남긴다. 흐름은 다음 자식을 시작하지 않는다
     C->>H: POST {profile}/v1/runs/{run_id}/stop
-    loop 그 뿌리 아래 RUNNING 인 실행마다
+    loop 그 루트 아래 RUNNING 인 실행마다
         C->>H: POST {자식 profile}/v1/runs/{run_id}/stop
     end
     C-->>B: 202 stopping

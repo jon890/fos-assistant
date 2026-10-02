@@ -18,8 +18,8 @@ import java.nio.file.SecureDirectoryStream;
 import java.nio.file.SimpleFileVisitor;
 import java.nio.file.StandardCopyOption;
 import java.nio.file.StandardOpenOption;
-import java.nio.file.attribute.BasicFileAttributes;
 import java.nio.file.attribute.BasicFileAttributeView;
+import java.nio.file.attribute.BasicFileAttributes;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.EnumSet;
@@ -33,8 +33,7 @@ import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 import java.util.stream.StreamSupport;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
@@ -46,9 +45,8 @@ import org.springframework.stereotype.Component;
  * 근거는 ADR-027 에 있다.
  */
 @Component
+@Slf4j
 public class ArtifactStore {
-
-    private static final Logger log = LoggerFactory.getLogger(ArtifactStore.class);
 
     private static final String HTML = "html";
     private static final AtomicBoolean UNSUPPORTED_SECURE_DIRECTORY_WARNING_LOGGED = new AtomicBoolean();
@@ -59,13 +57,20 @@ public class ArtifactStore {
      * <p>SVG 는 스크립트를 품을 수 있어 받지 않는다.
      */
     private static final Map<String, String> CONTENT_TYPES = Map.of(
-            HTML, "text/html; charset=utf-8",
-            "css", "text/css; charset=utf-8",
-            "png", "image/png",
-            "jpg", "image/jpeg",
-            "jpeg", "image/jpeg",
-            "gif", "image/gif",
-            "webp", "image/webp");
+            HTML,
+            "text/html; charset=utf-8",
+            "css",
+            "text/css; charset=utf-8",
+            "png",
+            "image/png",
+            "jpg",
+            "image/jpeg",
+            "jpeg",
+            "image/jpeg",
+            "gif",
+            "image/gif",
+            "webp",
+            "image/webp");
 
     private final Path root;
     private final String agentRoot;
@@ -96,8 +101,7 @@ public class ArtifactStore {
      * @param path 대화 폴더 안의 상대 경로. {@code /} 로 나눈다
      * @param byteSize 찾았을 때의 크기
      */
-    public record FoundFile(String path, long byteSize) {
-    }
+    public record FoundFile(String path, long byteSize) {}
 
     /**
      * 보관 기간이 지나 지운 파일 하나다.
@@ -165,7 +169,9 @@ public class ArtifactStore {
      * 링크가 폴더 안의 SVG 를 가리키게 만들 수 있기 때문이다.
      */
     public Optional<Path> resolveInside(Long conversationId, String relativePath) {
-        if (relativePath == null || relativePath.isBlank() || contentTypeOf(relativePath).isEmpty()) {
+        if (relativePath == null
+                || relativePath.isBlank()
+                || contentTypeOf(relativePath).isEmpty()) {
             return Optional.empty();
         }
         try {
@@ -261,7 +267,7 @@ public class ArtifactStore {
     }
 
     /**
-     * 뿌리 아래를 걸어 마지막으로 바뀐 때가 {@code cutoff} 보다 앞선 파일을 지운다.
+     * 루트 아래를 걸어 마지막으로 바뀐 때가 {@code cutoff} 보다 앞선 파일을 지운다.
      *
      * <p>대화 번호 이름의 폴더 안에 있는 파일만 지운다. 한 파일이 실패해도 나머지를 계속한다. 하나 때문에 그날
      * 치가 통째로 멈추면 디스크가 계속 찬다. 빈 폴더는 남긴다.
@@ -285,9 +291,11 @@ public class ArtifactStore {
             if (conversationId == null) {
                 continue;
             }
-            filesByConversation.computeIfAbsent(conversationId, id -> new ArrayList<>()).add(walked.path());
-            latestByConversation.merge(conversationId, walked.modified(),
-                    (left, right) -> left.isAfter(right) ? left : right);
+            filesByConversation
+                    .computeIfAbsent(conversationId, id -> new ArrayList<>())
+                    .add(walked.path());
+            latestByConversation.merge(
+                    conversationId, walked.modified(), (left, right) -> left.isAfter(right) ? left : right);
         }
         List<Removed> removed = new ArrayList<>();
         for (Map.Entry<Long, List<Path>> entry : filesByConversation.entrySet()) {
@@ -309,8 +317,7 @@ public class ArtifactStore {
     }
 
     /** 걸음에서 만난 일반 파일 하나와 그때 읽은 속성이다. */
-    private record WalkedFile(Path path, Instant modified, long byteSize) {
-    }
+    private record WalkedFile(Path path, Instant modified, long byteSize) {}
 
     /**
      * {@code start} 아래의 일반 파일을 하위 폴더까지 모은다. 심볼릭 링크는 따라가지 않는다.
@@ -324,7 +331,8 @@ public class ArtifactStore {
                 @Override
                 public FileVisitResult visitFile(Path file, BasicFileAttributes attributes) {
                     if (attributes.isRegularFile()) {
-                        files.add(new WalkedFile(file, attributes.lastModifiedTime().toInstant(), attributes.size()));
+                        files.add(new WalkedFile(
+                                file, attributes.lastModifiedTime().toInstant(), attributes.size()));
                     }
                     return FileVisitResult.CONTINUE;
                 }
@@ -374,8 +382,11 @@ public class ArtifactStore {
     }
 
     private static List<String> writableParts(String relativePath) {
-        if (relativePath == null || relativePath.isBlank() || relativePath.length() > 500
-                || relativePath.indexOf('\\') >= 0 || relativePath.indexOf('\0') >= 0
+        if (relativePath == null
+                || relativePath.isBlank()
+                || relativePath.length() > 500
+                || relativePath.indexOf('\\') >= 0
+                || relativePath.indexOf('\0') >= 0
                 || relativePath.matches("^[A-Za-z]:.*")) {
             throw validation("artifact path is invalid");
         }
@@ -434,13 +445,13 @@ public class ArtifactStore {
         }
     }
 
-    private static void writeWithSecureDirectory(
-            SecureDirectoryStream<Path> directory, Path targetName, byte[] content) throws IOException {
+    private static void writeWithSecureDirectory(SecureDirectoryStream<Path> directory, Path targetName, byte[] content)
+            throws IOException {
         Path temporaryName = Path.of(".artifact-" + UUID.randomUUID() + ".tmp");
         boolean temporaryCreated = false;
         try {
-            Set<OpenOption> options = Set.of(StandardOpenOption.CREATE_NEW, StandardOpenOption.WRITE,
-                    LinkOption.NOFOLLOW_LINKS);
+            Set<OpenOption> options =
+                    Set.of(StandardOpenOption.CREATE_NEW, StandardOpenOption.WRITE, LinkOption.NOFOLLOW_LINKS);
             try (SeekableByteChannel channel = directory.newByteChannel(temporaryName, options)) {
                 temporaryCreated = true;
                 writeFully(channel, content);
@@ -460,8 +471,8 @@ public class ArtifactStore {
         Path temporary = null;
         try {
             temporary = Files.createTempFile(parent, ".artifact-", ".tmp");
-            try (SeekableByteChannel channel = Files.newByteChannel(temporary,
-                    EnumSet.of(StandardOpenOption.WRITE, StandardOpenOption.TRUNCATE_EXISTING))) {
+            try (SeekableByteChannel channel = Files.newByteChannel(
+                    temporary, EnumSet.of(StandardOpenOption.WRITE, StandardOpenOption.TRUNCATE_EXISTING))) {
                 writeFully(channel, content);
             }
             verifyParent(parent, folder);
@@ -483,8 +494,8 @@ public class ArtifactStore {
 
     private static void requireOrdinaryTargetInDirectory(SecureDirectoryStream<Path> directory, Path target)
             throws IOException {
-        BasicFileAttributeView view = directory.getFileAttributeView(target, BasicFileAttributeView.class,
-                LinkOption.NOFOLLOW_LINKS);
+        BasicFileAttributeView view =
+                directory.getFileAttributeView(target, BasicFileAttributeView.class, LinkOption.NOFOLLOW_LINKS);
         if (view == null) {
             throw new IOException("could not inspect artifact target");
         }

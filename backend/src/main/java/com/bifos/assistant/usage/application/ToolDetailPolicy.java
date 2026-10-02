@@ -12,15 +12,14 @@ import java.util.Set;
  * <p>숨길 도구가 아니라 보일 도구를 적는다. 새 도구가 생기면 기본으로 숨게 하기 위해서다. 도구 이름은
  * 전체로 비교한다. 다른 MCP 서버가 같은 이름을 붙인 도구는 공개하지 않는다.
  *
- * <p>대화 스트림과 실행 나무 조회가 이 판정을 함께 쓴다. 저장은 바꾸지 않고 응답을 만들 때만 뺀다.
+ * <p>대화 스트림과 실행 트리 조회가 이 판정을 함께 쓴다. 저장은 바꾸지 않고 응답을 만들 때만 뺀다.
  */
 public final class ToolDetailPolicy {
 
     /** {@code MEMBER} 역할에게도 {@code detail} 을 싣는 도구다. */
     static final Set<String> PUBLIC_TOOLS = Set.of("web_search", "vision_analyze");
 
-    private ToolDetailPolicy() {
-    }
+    private ToolDetailPolicy() {}
 
     /** 이 사람에게 이 도구의 {@code detail} 을 실어도 되는가. 도구 이름이 없으면 싣지 않는다. */
     public static boolean visibleTo(CurrentUser viewer, String toolName) {

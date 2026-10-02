@@ -623,9 +623,9 @@ export type FakeHermes = {
   setMemoryReadMcp(endpoint: string, token: string): void;
   /** 하위 에이전트 검사 입력으로 등록한 자식 session 과 그 응답 상태다. 등록이 거절돼도 run 은 실패하지 않고 여기에만 남는다. */
   subagentRegistrations(): readonly { childSessionId: string; rootSessionId: string; status: number }[];
-  /** 등록한 자식 session 이 부모의 뿌리로 서명해 `memory_read` 를 부르고 도구 결과의 text 를 돌려준다. */
+  /** 등록한 자식 session 이 부모의 루트로 서명해 `memory_read` 를 부르고 도구 결과의 text 를 돌려준다. */
   readMemoryAsSubagent(childSessionId: string, memoryId: number): Promise<string>;
-  /** 등록하지 않은 자식 session 으로 그 뿌리에 서명해 `memory_read` 를 부른다. */
+  /** 등록하지 않은 자식 session 으로 그 루트에 서명해 `memory_read` 를 부른다. */
   readMemoryAsUnregisteredSubagent(rootSessionId: string, memoryId: number): Promise<string>;
 };
 
@@ -635,8 +635,8 @@ export type FakeHermes = {
  * @param profileKeys profile 이름과 그 profile 의 API server key
  * @param label 이 대역을 다른 대역과 구분하는 이름. 실행의 답에 그대로 실린다. 주소를 옮기는 검사가
  *     답이 어느 대역에서 왔는지 보는 데 쓴다
- * @param skillRoot Control Plane 이 스킬 버전 디렉터리를 쓰는 뿌리. 주면 그 아래 경로만 게시로 받는다.
- *     Hermes 쪽 뿌리와 같은 경로여야 대역이 게시된 `SKILL.md` 를 읽을 수 있다
+ * @param skillRoot Control Plane 이 스킬 버전 디렉터리를 쓰는 루트. 주면 그 아래 경로만 게시로 받는다.
+ *     Hermes 쪽 루트와 같은 경로여야 대역이 게시된 `SKILL.md` 를 읽을 수 있다
  */
 export function startFakeHermes(
   profileKeys: Record<string, string>,
@@ -723,7 +723,7 @@ export function startFakeHermes(
   /**
    * profile 플러그인의 `pre_tool_call` hook 처럼 커넥터 도구 호출마다 Control Plane 에 판정을 묻는다.
    *
-   * <p>토큰은 그 profile 의 `.env` 에 든 MCP 토큰이고, 제출받은 run 의 session 이 곧 뿌리 session 이다.
+   * <p>토큰은 그 profile 의 `.env` 에 든 MCP 토큰이고, 제출받은 run 의 session 이 곧 루트 session 이다.
    * 실제 hook 과 같이 주소나 토큰이 없거나 답이 200 의 `allow` 가 아니면 막는다. `block` 에 글이 없어도 막는다.
    * 인자는 입력의 글을 그대로 보낸다. 실제 hook 은 키를 정렬해 직렬화하지만 서버는 받은 글을 그대로 해시한다.
    */
@@ -774,8 +774,8 @@ export function startFakeHermes(
   /**
    * profile 플러그인처럼 서명한 `_fos_ctx` 를 붙여 `memory_read` 를 부르고 도구 결과의 text 를 돌려준다.
    *
-   * <p>제출받은 run 의 session 이 곧 뿌리 session 이다. run 마다 자기 session 으로 서명하므로, 나란히 도는 두 run 이
-   * 서로의 session 을 쓰면 요청자가 뒤섞여 검사가 실패한다. 하위 에이전트는 뿌리와 자기 session 을 따로 준다.
+   * <p>제출받은 run 의 session 이 곧 루트 session 이다. run 마다 자기 session 으로 서명하므로, 나란히 도는 두 run 이
+   * 서로의 session 을 쓰면 요청자가 뒤섞여 검사가 실패한다. 하위 에이전트는 루트와 자기 session 을 따로 준다.
    */
   const readMemoryViaMcp = async (
     memoryId: number,
@@ -800,7 +800,7 @@ export function startFakeHermes(
   };
 
   /**
-   * profile 플러그인의 `subagent_start` hook 처럼 자식 session 을 부모의 뿌리 아래 등록한다.
+   * profile 플러그인의 `subagent_start` hook 처럼 자식 session 을 부모의 루트 아래 등록한다.
    *
    * <p>실제 hook 은 예외를 삼키므로 응답이 2xx 가 아니어도 던지지 않고 상태만 남긴다. 시나리오가 그 기록으로 실패를 안다.
    * 등록 경로는 `/mcp` 와 같은 서버에 있어 MCP 주소에서 `/mcp` 를 떼어 만든다.
@@ -822,7 +822,7 @@ export function startFakeHermes(
   /**
    * profile 플러그인처럼 도구 인자에 서명한 `_fos_ctx` 를 붙여 `artifact_write` 를 부른다.
    *
-   * <p>제출받은 run 의 session 이 곧 뿌리 session 이다. 하위 에이전트가 아니므로 session 과 뿌리가 같다.
+   * <p>제출받은 run 의 session 이 곧 루트 session 이다. 하위 에이전트가 아니므로 session 과 루트가 같다.
    */
   const writeArtifactViaMcp = async (conversationId: string, sessionId: string | undefined): Promise<void> => {
     if (artifactWriteMcp === undefined) throw new Error("artifact_write MCP runtime is not configured");

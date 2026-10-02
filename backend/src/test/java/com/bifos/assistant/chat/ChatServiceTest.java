@@ -457,7 +457,7 @@ class ChatServiceTest {
     /**
      * 압축 교체로 Hermes 가 보낸 것과 다른 session 을 돌려준 경우다.
      *
-     * <p>다음 turn 은 돌려받은 session 을 보내지만, 대화의 뿌리와 실행 줄에는 처음 정한 session 이 남는다.
+     * <p>다음 turn 은 돌려받은 session 을 보내지만, 대화의 루트와 실행 줄에는 처음 정한 session 이 남는다.
      */
     @Test
     @DisplayName("continues the same hermes session on the next turn")
@@ -474,7 +474,7 @@ class ChatServiceTest {
         assertThat(stub().received().get(1).sessionId()).isEqualTo("sess-1");
         var conversation = conversations.findById(first.conversationId()).orElseThrow();
         assertThat(conversation.hermesSessionId()).as("다음에 보낼 session").isEqualTo("sess-1");
-        assertThat(conversation.hermesRootSessionId()).as("뿌리 session").isEqualTo(root);
+        assertThat(conversation.hermesRootSessionId()).as("루트 session").isEqualTo(root);
         assertThat(executions.findById(second.executionId()).orElseThrow().hermesSessionId())
                 .as("둘째 실행 줄의 session")
                 .isEqualTo(root);
@@ -553,7 +553,7 @@ class ChatServiceTest {
     }
 
     @Test
-    @DisplayName("뿌리가 없는 옛 대화는 Hermes가 정한 session을 보내고 실행 줄에도 그 값을 적는다")
+    @DisplayName("루트가 없는 옛 대화는 Hermes가 정한 session을 보내고 실행 줄에도 그 값을 적는다")
     void oldConversationWithoutRootSendsSessionChosenByHermesAndRecordsIt() {
         CurrentUser dad = member("dad@example.com", "dad");
         Long agentId = agents.findByCode("dad").orElseThrow().id();

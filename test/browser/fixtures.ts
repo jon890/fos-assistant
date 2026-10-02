@@ -56,7 +56,7 @@ export const PERSONA_AGENT_CODE = "browserpersona";
  *
  * <p>씨 뿌릴 때는 다른 에이전트와 같이 `PRIVATE` 이고 주인이 `TEST_EMAIL` 이다. 그 검사가
  * `setAgentVisibility` 로 `GROUP` 으로 바꿔 `MEMBER` 세션에서 읽기 전용으로 열고, 끝나면 되돌린다.
- * 여기서 바로 `GROUP` 으로 씨 뿌리면 관리 화면에 그룹 공개 에이전트가 하나 늘어, 정확히 하나만
+ * 여기서 바로 `GROUP` 으로 씨 루트면 관리 화면에 그룹 공개 에이전트가 하나 늘어, 정확히 하나만
  * 있다고 가정하는 `identity.spec.ts` 가 어긋난다.
  */
 export const PERSONA_GROUP_AGENT_CODE = "browserpersonagroup";
@@ -327,7 +327,7 @@ async function waitForHealth(
 }
 
 /**
- * 결과물 폴더의 뿌리를 실행마다 만든다.
+ * 결과물 폴더의 루트를 실행마다 만든다.
  *
  * <p>Control Plane 이 보는 경로와 에이전트가 보는 경로가 같은 기계의 같은 디렉터리다. 대역이 입력에 적힌 폴더에 곧바로 쓴다.
  */
@@ -337,7 +337,7 @@ async function makeArtifactRoot(work: string): Promise<string> {
   return artifactRoot;
 }
 
-/** 스킬 버전 디렉터리의 뿌리다. 결과물 폴더와 같이 두 뿌리에 같은 경로를 준다. */
+/** 스킬 버전 디렉터리의 루트다. 결과물 폴더와 같이 두 루트에 같은 경로를 준다. */
 async function makeSkillRoot(work: string): Promise<string> {
   const skillRoot = join(work, "skills");
   await mkdir(skillRoot, { recursive: true });
@@ -396,7 +396,7 @@ async function seedAgents(hermesBaseUrl: string): Promise<void> {
       visibility: "PRIVATE" as const,
     },
     // 그룹에 공개할 에이전트다. 검사가 실행 중에만 GROUP 으로 바꿨다 되돌린다. 여기서 바로 GROUP 으로
-    // 씨 뿌리면 관리 화면에 "그룹 공개로 변경"/"나만으로 변경" 단추가 하나 더 생겨, 정확히 하나만
+    // 씨 루트면 관리 화면에 "그룹 공개로 변경"/"나만으로 변경" 단추가 하나 더 생겨, 정확히 하나만
     // 있다고 가정하는 identity.spec.ts 가 어긋난다.
     {
       code: PERSONA_GROUP_AGENT_CODE,
@@ -536,10 +536,10 @@ function startControlPlane(
       ASSISTANT_ATTACHMENT_ROOT: attachmentRoot,
       // 에이전트 쪽에서 보는 경로다. 검사는 그 경로를 열지 않고 입력에 적힌 글자만 본다.
       ASSISTANT_ATTACHMENT_AGENT_ROOT: "/agent-side/attachments",
-      // 결과물 폴더는 두 뿌리에 같은 경로를 준다. 대역이 같은 기계에서 입력에 적힌 폴더에 파일을 쓴다.
+      // 결과물 폴더는 두 루트에 같은 경로를 준다. 대역이 같은 기계에서 입력에 적힌 폴더에 파일을 쓴다.
       ASSISTANT_ARTIFACT_ROOT: artifactRoot,
       ASSISTANT_ARTIFACT_AGENT_ROOT: artifactRoot,
-      // 스킬 디렉터리도 두 뿌리에 같은 경로를 준다. 대역이 게시된 경로의 SKILL.md 를 같은 기계에서 읽는다.
+      // 스킬 디렉터리도 두 루트에 같은 경로를 준다. 대역이 게시된 경로의 SKILL.md 를 같은 기계에서 읽는다.
       ASSISTANT_SKILL_ROOT: skillRoot,
       ASSISTANT_SKILL_AGENT_ROOT: skillRoot,
       HERMES_DASHBOARD_BASE_URL: dashboardBaseUrl,

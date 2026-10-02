@@ -298,12 +298,12 @@ Hermes 는 한 번도 개입하지 않았다.
 
 Hermes 는 그 도구가 자기를 다시 부른다는 것을 알지 못한다.
 도구 호출은 그저 외부 HTTP 호출이다.
-**멈추는 자리를 Control Plane 이 가져야 한다.** 실행 나무의 깊이를 우리가 세고 우리가 거절한다.
+**멈추는 자리를 Control Plane 이 가져야 한다.** 실행 트리의 깊이를 우리가 세고 우리가 거절한다.
 
 ### 기다리는 도구는 실제로 끊긴다
 
-위 재귀 측정에서 제한 시간을 120초로 두었는데, 뿌리 실행의 도구 호출이 그 시간에 걸렸다.
-아래가 뿌리 실행의 대화에 남은 도구 결과다.
+위 재귀 측정에서 제한 시간을 120초로 두었는데, 루트 실행의 도구 호출이 그 시간에 걸렸다.
+아래가 루트 실행의 대화에 남은 도구 결과다.
 
 ```text
 {"error": "MCP call failed: TimeoutError: MCP call timed out after 120.0s ..."}
@@ -312,7 +312,7 @@ Hermes 는 그 도구가 자기를 다시 부른다는 것을 알지 못한다.
 **끊긴 뒤에도 그 아래 실행들은 계속 돌았다.** 깊이 2와 3과 4가 모두 완료로 끝났다.
 도구 호출이 끊기는 것과 그 도구가 시작한 실행이 멈추는 것은 별개다.
 
-뿌리 실행은 그 뒤 `Service temporarily overloaded` 로 실패했다.
+루트 실행은 그 뒤 `Service temporarily overloaded` 로 실패했다.
 겹쳐 도는 실행이 쌓여 한 gateway 와 provider 에 몰린 결과다.
 `gateway.api_server.max_concurrent_runs` 의 기본값이 10 이고 넘으면 429 를 준다.
 
@@ -325,7 +325,7 @@ Hermes 는 그 도구가 자기를 다시 부른다는 것을 알지 못한다.
 `{"status": "stopping"}` 을 주고 잠시 뒤 조회하면 `cancelled` 다.
 
 **그러나 그 실행의 도구가 시작한 실행은 멈추지 않는다.**
-뿌리 실행을 취소한 뒤에도 그 도구가 만든 아래 실행이 완료로 끝나고
+루트 실행을 취소한 뒤에도 그 도구가 만든 아래 실행이 완료로 끝나고
 다시 그 아래를 시작하는 것을 실측했다.
 취소를 아래로 전파하는 것도 Control Plane 의 몫이다.
 
@@ -364,7 +364,7 @@ gateway 의 `/stop` 과 같은 함수이고, 부모 session 이 정확히 같은
 
 | 무엇 | 지금 |
 | --- | --- |
-| 자식의 Control Plane MCP 호출(`memory_read`, `artifact_write`, `agent_list`, `agent_delegate`, `agent_status`, `agent_stop`) | origin 실행이나 그 뿌리 실행이 `CANCELLED` 면 거절한다([ADR-037](../adr/ADR-037-hermes-하위-에이전트-session-의-주인은-만들-때-등록한-줄로-정한다.md)). 다른 거절과 같은 도구 결과다 |
+| 자식의 Control Plane MCP 호출(`memory_read`, `artifact_write`, `agent_list`, `agent_delegate`, `agent_status`, `agent_stop`) | origin 실행이나 그 루트 실행이 `CANCELLED` 면 거절한다([ADR-037](../adr/ADR-037-hermes-하위-에이전트-session-의-주인은-만들-때-등록한-줄로-정한다.md)). 다른 거절과 같은 도구 결과다 |
 | 자식의 Hermes 자체 도구(웹 검색, 터미널 등) | 막지 못한다 |
 | 자식 run 자체 | 멈추지 못한다. 동기 위임 자식만 부모 run 의 중지와 함께 멈춘다. background 자식을 멈추는 길은 위 「native 하위 에이전트를 멈추는 길」 에 있고 구현하지 않았다 |
 
@@ -387,7 +387,7 @@ v0.21.5 의 중단·미완료 응답 차이는 [「Runs 응답과 사건의 버�
 **API server 의 session 은 그 대화 첫 실행의 `run_id` 와 같다.** 뒤의 turn 은 같은 값을 이어 쓴다.
 중지한 turn 뒤에도 그 값이 그대로여서, 다음 turn 이 중지 전의 맥락을 기억했다.
 첫 turn 을 중지한 대화는 그 중지한 실행의 `run_id` 가 곧 session 이다.
-이 세 문장은 Hermes 가 session 을 정하는 대화의 측정이다. 이제 새 대화는 Control Plane 이 첫 turn 전에 정한 `fos-<uuid>` 가 session 이고, 첫 turn 을 중지해도 그 값이 그대로다([ADR-031](../adr/ADR-031-mcp-호출의-부모-실행은-profile-플러그인이-서명한-뿌리-session-으로-잇는다.md)).
+이 세 문장은 Hermes 가 session 을 정하는 대화의 측정이다. 이제 새 대화는 Control Plane 이 첫 turn 전에 정한 `fos-<uuid>` 가 session 이고, 첫 turn 을 중지해도 그 값이 그대로다([ADR-031](../adr/ADR-031-mcp-호출의-부모-실행은-profile-플러그인이-서명한-루트-session-으로-잇는다.md)).
 
 중지한 실행은 그 session 으로 실제로 돈 모델을 읽지 못했다. Control Plane 은 그때 요청에 보낸 모델을 적는다.
 

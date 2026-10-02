@@ -438,7 +438,7 @@ class RestartReconcilerTest {
     }
 
     @Test
-    @DisplayName("아직 도는 흐름 turn 의 뿌리 줄에는 중지를 보내고 취소로 끝난 상태를 적는다")
+    @DisplayName("아직 도는 흐름 turn 의 루트 줄에는 중지를 보내고 취소로 끝난 상태를 적는다")
     void stopsRunningFlowRootAndRecordsCancelled() {
         Agent flowed = agent("flowed", "흐름");
         flowed.assignFlow(ResearchAndBuildFlow.NAME);
@@ -633,7 +633,7 @@ class RestartReconcilerTest {
     }
 
     @Test
-    @DisplayName("뿌리 줄이 끝나고 자식만 도는 흐름 turn 도 대화를 잠그고, 자식을 멈춘 뒤에 푼다")
+    @DisplayName("루트 줄이 끝나고 자식만 도는 흐름 turn 도 대화를 잠그고, 자식을 멈춘 뒤에 푼다")
     void locksConversationForRunningFlowChildUntilItIsStopped() {
         Agent flowed = agent("flowed", "흐름");
         flowed.assignFlow(ResearchAndBuildFlow.NAME);
@@ -669,7 +669,7 @@ class RestartReconcilerTest {
         reconciler.claim();
 
         assertThat(turns.markOf(flowConversation.id()))
-                .as("표시에는 뿌리 실행 번호가 붙는다")
+                .as("표시에는 루트 실행 번호가 붙는다")
                 .isEqualTo(new TurnMark(true, root.id()));
         assertThatThrownBy(() -> chat.send(dad, flowConversation.id(), "그 사이 보낸 글", "flowed"))
                 .isInstanceOfSatisfying(
@@ -680,7 +680,7 @@ class RestartReconcilerTest {
         awaitStatus(child, ExecutionStatus.CANCELLED);
         awaitIdle(flowConversation.id());
         assertThat(stub.stopped()).containsExactly(child.hermesRunId());
-        assertThat(statusOf(root)).as("끝난 뿌리 줄은 그대로다").isEqualTo(ExecutionStatus.SUCCEEDED);
+        assertThat(statusOf(root)).as("끝난 루트 줄은 그대로다").isEqualTo(ExecutionStatus.SUCCEEDED);
     }
 
     @Test
@@ -785,7 +785,7 @@ class RestartReconcilerTest {
         return conversations.save(Conversation.startedBy(dad.id(), "흐름 대화", flowed.id()));
     }
 
-    /** 뿌리 줄은 이미 성공으로 끝났고 자식만 아직 도는 흐름 turn 의 자식 줄이다. */
+    /** 루트 줄은 이미 성공으로 끝났고 자식만 아직 도는 흐름 turn 의 자식 줄이다. */
     private AgentExecution runningFlowChild(Conversation flowConversation) {
         AgentExecution root = executions.save(AgentExecution.builder()
                 .userId(dad.id())
@@ -813,7 +813,7 @@ class RestartReconcilerTest {
                 .build());
     }
 
-    /** 이전 프로세스가 돌리던 대화 turn 의 뿌리 줄이다. */
+    /** 이전 프로세스가 돌리던 대화 turn 의 루트 줄이다. */
     private AgentExecution chatTurn(Conversation owner, Agent agent) {
         return executions.save(
                 running(owner, agent).hermesRunId("run-" + UUID.randomUUID()).build());

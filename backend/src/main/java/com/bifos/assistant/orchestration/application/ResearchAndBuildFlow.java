@@ -5,8 +5,8 @@ import com.bifos.assistant.chat.application.ArtifactService;
 import com.bifos.assistant.chat.application.ChatEvent;
 import com.bifos.assistant.chat.application.ChatTurn;
 import com.bifos.assistant.chat.application.ConversationSessions;
-import com.bifos.assistant.chat.application.TurnIntent;
 import com.bifos.assistant.chat.application.TurnCancellation;
+import com.bifos.assistant.chat.application.TurnIntent;
 import com.bifos.assistant.chat.domain.ChatMessage;
 import com.bifos.assistant.chat.domain.Conversation;
 import com.bifos.assistant.chat.infra.ChatMessageRepository;
@@ -16,13 +16,13 @@ import com.bifos.assistant.orchestration.domain.RunSession;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
-import com.bifos.assistant.usage.application.ExecutionRecorder;
 import com.bifos.assistant.usage.application.ExecutionEventRecorder;
+import com.bifos.assistant.usage.application.ExecutionRecorder;
 import com.bifos.assistant.usage.domain.AgentExecution;
 import com.bifos.assistant.usage.domain.ExecutionEventType;
 import com.bifos.assistant.usage.infra.ExecutionEventRepository;
-import java.util.ArrayList;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
@@ -30,8 +30,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import lombok.RequiredArgsConstructor;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
@@ -56,7 +55,7 @@ import tools.jackson.databind.ObjectMapper;
  * 사용자 요청 → Chief → Researcher 와 Engineer 를 나란히 → Synthesizer → 최종 답
  * </pre>
  *
- * <p>Chief 가 뿌리이고 나머지 셋은 Chief 의 자식이다. 에이전트를 새로 만들지 않고 같은 에이전트를
+ * <p>Chief 가 루트이고 나머지 셋은 Chief 의 자식이다. 에이전트를 새로 만들지 않고 같은 에이전트를
  * 다른 지시로 부른다. 어느 에이전트가 어느 단계를 맡을지는 Control Plane 이 정하고, 모델이 정하지
  * 못한다.
  *
@@ -64,10 +63,9 @@ import tools.jackson.databind.ObjectMapper;
  * 풀지 않는다.
  */
 @Service
+@Slf4j
 @RequiredArgsConstructor
 public class ResearchAndBuildFlow implements Flow {
-
-    private static final Logger log = LoggerFactory.getLogger(ResearchAndBuildFlow.class);
 
     /** {@code agent.flow} 에 적는 이름이다. */
     public static final String NAME = "research-and-build";
@@ -114,21 +112,27 @@ public class ResearchAndBuildFlow implements Flow {
 
         onEvent.accept(ChatEvent.step(CHIEF, STARTED));
         AtomicReference<Long> rootExecutionId = new AtomicReference<>();
-        // Chief 는 대화의 turn 이다. 보낼 session 과 실행 줄에 적을 뿌리 session 을 RunSession 으로 함께 넘긴다.
+        // Chief 는 대화의 turn 이다. 보낼 session 과 실행 줄에 적을 루트 session 을 RunSession 으로 함께 넘긴다.
         RunSession session = sessions.ensure(conversation);
         AgentRunner.Run chief = runner.run(
-                user, conversation, agent, chiefPrompt(input), null, null,
+                user,
+                conversation,
+                agent,
+                chiefPrompt(input),
+                null,
+                null,
                 session,
                 execution -> {
                     rootExecutionId.set(execution.id());
                     onRootStarted.accept(execution);
                 },
-                (execution, runId) -> cancellation.trackRun(
-                        execution.id(), agent.apiBaseUrl(), agent.hermesProfile(), runId),
+                (execution, runId) ->
+                        cancellation.trackRun(execution.id(), agent.apiBaseUrl(), agent.hermesProfile(), runId),
                 () -> {
                     Long executionId = rootExecutionId.get();
                     return executionId != null && shouldStop(executionId);
-                }, TurnIntent.instructionFor(intent));
+                },
+                TurnIntent.instructionFor(intent));
         AgentExecution root = chief.execution();
         cancellation.untrackRun(root.id(), root.hermesRunId());
         if (shouldStop(root.id())) {
@@ -139,8 +143,10 @@ public class ResearchAndBuildFlow implements Flow {
             throw new ApiException(ErrorCode.HERMES_RUN_FAILED, "the flow could not start");
         }
         conversation.rememberSession(chief.sessionId());
-        conversations.touchSession(conversation.id(),
-                chief.sessionId() == null || chief.sessionId().isBlank() ? null : chief.sessionId(), Instant.now());
+        conversations.touchSession(
+                conversation.id(),
+                chief.sessionId() == null || chief.sessionId().isBlank() ? null : chief.sessionId(),
+                Instant.now());
         onEvent.accept(ChatEvent.step(CHIEF, COMPLETED));
 
         Split split = split(root, chief.result().output(), onEvent);
@@ -162,8 +168,7 @@ public class ResearchAndBuildFlow implements Flow {
         }
         for (int index = 0; index < planned.size(); index++) {
             ChildResult result = done.get(index);
-            onEvent.accept(
-                    ChatEvent.step(planned.get(index).name(), result.succeeded() ? COMPLETED : FAILED));
+            onEvent.accept(ChatEvent.step(planned.get(index).name(), result.succeeded() ? COMPLETED : FAILED));
         }
         ChildResult firstFailure =
                 done.stream().filter(result -> !result.succeeded()).findFirst().orElse(null);
@@ -179,8 +184,7 @@ public class ResearchAndBuildFlow implements Flow {
         }
 
         onEvent.accept(ChatEvent.step(SYNTHESIZER, STARTED));
-        ChildResult synthesis = runChild(
-                user, conversation, root, agent, synthesizerPrompt(text, done), intent);
+        ChildResult synthesis = runChild(user, conversation, root, agent, synthesizerPrompt(text, done), intent);
         if (shouldStop(root.id())) {
             return cancelled(conversation, root, null);
         }
@@ -242,11 +246,20 @@ public class ResearchAndBuildFlow implements Flow {
      * <p>지시 맨 앞에 결과물 폴더 단락을 붙인다. 파일을 실제로 만드는 쪽은 하위 실행이고 폴더는 대화마다 하나라
      * Chief 와 같은 폴더를 알린다. Chief 는 요청 본문 안에서 이미 이 단락을 받는다.
      */
-    private ChildResult runChild(CurrentUser user, Conversation conversation,
-            AgentExecution root, Agent agent, String task, TurnIntent intent) {
+    private ChildResult runChild(
+            CurrentUser user,
+            Conversation conversation,
+            AgentExecution root,
+            Agent agent,
+            String task,
+            TurnIntent intent) {
         AtomicReference<String> submittedRunId = new AtomicReference<>();
         try {
-            return children.run(user, conversation, root, agent.code(),
+            return children.run(
+                    user,
+                    conversation,
+                    root,
+                    agent.code(),
                     artifacts.agentPreamble(conversation) + task,
                     (execution, runId) -> {
                         submittedRunId.set(runId);
@@ -273,12 +286,12 @@ public class ResearchAndBuildFlow implements Flow {
         try {
             JsonNode json = objectMapper.readTree(unwrap(output));
             return new Split(
-                    json.path("research").asString("").strip(), json.path("build").asString("").strip());
+                    json.path("research").asString("").strip(),
+                    json.path("build").asString("").strip());
         } catch (RuntimeException ex) {
             onEvent.accept(ChatEvent.step(CHIEF, FAILED));
             executions.fail(root, ErrorCode.ORCHESTRATION_CONTRACT_BROKEN.name());
-            throw new ApiException(
-                    ErrorCode.ORCHESTRATION_CONTRACT_BROKEN, "the first step did not answer with JSON");
+            throw new ApiException(ErrorCode.ORCHESTRATION_CONTRACT_BROKEN, "the first step did not answer with JSON");
         }
     }
 
@@ -291,17 +304,19 @@ public class ResearchAndBuildFlow implements Flow {
     /**
      * 최종 답을 대화 이력에 남긴다.
      *
-     * <p>이력에 붙이는 실행 번호는 뿌리다. 그 번호로 실행 나무를 열면 네 단계를 모두 볼 수 있다.
+     * <p>이력에 붙이는 실행 번호는 루트다. 그 번호로 실행 트리를 열면 네 단계를 모두 볼 수 있다.
      * 마지막 단계를 붙이면 잎 하나만 보인다.
      */
-    private ChatTurn answer(
-            Conversation conversation, AgentExecution root, String output, TurnIntent intent) {
+    private ChatTurn answer(Conversation conversation, AgentExecution root, String output, TurnIntent intent) {
         String text = output == null ? "" : output;
-        ChatMessage saved = messages.save(intent instanceof TurnIntent.Regenerate regenerate
-                        && regenerate.previousAnswer() != null
-                ? ChatMessage.regeneratedAnswer(
-                        conversation.id(), text, root.id(), regenerate.previousAnswer().id())
-                : ChatMessage.fromAssistant(conversation.id(), text, root.id()));
+        ChatMessage saved = messages.save(
+                intent instanceof TurnIntent.Regenerate regenerate && regenerate.previousAnswer() != null
+                        ? ChatMessage.regeneratedAnswer(
+                                conversation.id(),
+                                text,
+                                root.id(),
+                                regenerate.previousAnswer().id())
+                        : ChatMessage.fromAssistant(conversation.id(), text, root.id()));
         return new ChatTurn(conversation.id(), conversation.publicId(), root.id(), text, saved.id(), false);
     }
 
@@ -309,12 +324,14 @@ public class ResearchAndBuildFlow implements Flow {
     private ChatTurn cancelled(Conversation conversation, AgentExecution root, String sessionId) {
         executions.cancel(root);
         try {
-            boolean alreadyRecorded = executionEvents
-                    .findByExecutionIdInOrderByExecutionIdAscSequenceAsc(List.of(root.id()))
-                    .stream().anyMatch(event -> event.eventType() == ExecutionEventType.RUN_CANCELLED);
+            boolean alreadyRecorded =
+                    executionEvents.findByExecutionIdInOrderByExecutionIdAscSequenceAsc(List.of(root.id())).stream()
+                            .anyMatch(event -> event.eventType() == ExecutionEventType.RUN_CANCELLED);
             if (!alreadyRecorded) {
                 var event = eventRecorder.record(root, ExecutionEventType.RUN_CANCELLED, null, 99);
-                if (event != null) executionEvents.save(event);
+                if (event != null) {
+                    executionEvents.save(event);
+                }
             }
         } catch (RuntimeException ex) {
             // 사건 기록 실패가 중지를 실패로 바꾸면 안 된다.
@@ -397,6 +414,5 @@ public class ResearchAndBuildFlow implements Flow {
     }
 
     /** 나란히 띄울 단계 하나다. 화면에 보일 이름과 그 단계에만 주는 지시를 갖는다. */
-    private record Step(String name, String task) {
-    }
+    private record Step(String name, String task) {}
 }

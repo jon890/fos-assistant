@@ -100,7 +100,7 @@ public class RecoveredRunRecorder {
      * 남은 실행의 종류를 정한다.
      *
      * <p>위임 실행을 먼저 본다. 흐름 turn 아래에서 맡긴 위임도 위임 실행으로 적어야 부모 대화에 결과가 전해진다.
-     * 뿌리 줄이나 그 에이전트를 읽지 못하면 흐름인지 알 수 없으므로 흐름 판정을 건너뛴다.
+     * 루트 줄이나 그 에이전트를 읽지 못하면 흐름인지 알 수 없으므로 흐름 판정을 건너뛴다.
      */
     public RecoveredRunKind kindOf(AgentExecution row) {
         if (row.delegationKey() != null) {
@@ -161,7 +161,7 @@ public class RecoveredRunRecorder {
             return settleDelegation(row, agent, result, requested);
         }
         if (result.succeeded()) {
-            // 흐름의 단계 순서와 합치기는 내려간 프로세스의 메모리에만 있었다. 뿌리는 성공으로 끝났어도 답을
+            // 흐름의 단계 순서와 합치기는 내려간 프로세스의 메모리에만 있었다. 루트는 성공으로 끝났어도 답을
             // 합쳐 줄 곳이 없어 실패로 적고 사용량만 남긴다.
             if (isFlowRoot(row, kind)) {
                 AgentExecution saved = executions.fail(row, agent, result, requested, ORPHANED);
@@ -186,7 +186,7 @@ public class RecoveredRunRecorder {
     }
 
     /**
-     * 흐름 turn 의 뿌리 줄이 끝났을 때 그 대화의 화면에 낼 사건이다. 뿌리 줄이 아니거나 대화가 없으면 null 이다.
+     * 흐름 turn 의 루트 줄이 끝났을 때 그 대화의 화면에 낼 사건이다. 루트 줄이 아니거나 대화가 없으면 null 이다.
      *
      * <p>화면은 이 사건을 받고 「답을 만드는 중」 을 내린다. 흐름은 이어 가지 못하므로 답 없이 끝난다.
      */
@@ -288,7 +288,7 @@ public class RecoveredRunRecorder {
      * 않기 때문이다. 그때는 앞 답을 대신한 것으로 적는다.
      *
      * <p>다시 생성인지는 저장된 값이 아니라 마지막 유효 메시지로 미루어 정한다. 그래서 한 대화에 {@code RUNNING}
-     * 뿌리 줄이 둘이면 뒤에 적는 답이 앞에 적은 답을 대신한 것으로 저장된다. 대화 하나에는 도는 turn 이 하나뿐이라
+     * 루트 줄이 둘이면 뒤에 적는 답이 앞에 적은 답을 대신한 것으로 저장된다. 대화 하나에는 도는 turn 이 하나뿐이라
      * 보통 생기지 않는다.
      */
     private Long saveAnswer(AgentExecution row, String answer) {

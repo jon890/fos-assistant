@@ -12,7 +12,7 @@ import { providerLabel } from "@/lib/provider-label";
  * 서버가 여덟에서 자르지만(`ExecutionTreeService.MAX_DEPTH`), 화면도 스스로 멈춘다.
  *
  * <p>**서버의 값과 같아야 한다.** 서버가 더 깊이 내려 보내면 화면이 그리지 않는 깊이에
- * `truncated` 가 실려, 위쪽 안내도 아래쪽 줄도 없이 조용히 잘린 나무가 된다.
+ * `truncated` 가 실려, 위쪽 안내도 아래쪽 줄도 없이 조용히 잘린 트리가 된다.
  * 한쪽을 바꾸면 다른 쪽도 바꾼다.
  */
 const MAX_DEPTH = 8;

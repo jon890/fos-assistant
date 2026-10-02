@@ -9,7 +9,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  * 않은 채 배포해도 기동이 성공하고, Control Plane 이 쓴 스킬을 Hermes 가 보지 못한다. 근거는 ADR-034
  * 에 있다.
  *
- * @param root 스킬 버전 디렉터리의 뿌리. Control Plane 컨테이너에서 보이는 경로다. 비어 있으면 기동을
+ * @param root 스킬 버전 디렉터리의 루트. Control Plane 컨테이너에서 보이는 경로다. 비어 있으면 기동을
  *     멈춘다
  * @param agentRoot 같은 디렉터리를 Hermes 컨테이너에서 보는 경로. {@code skills.external_dirs} 에 이것을
  *     적는다. 비어 있으면 기동을 멈춘다

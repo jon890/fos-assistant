@@ -86,7 +86,7 @@ class SubagentSessionRegistrarTest {
     }
 
     @Test
-    @DisplayName("뿌리에서 도는 실행 아래 하위 에이전트는 그 실행을 origin 으로 등록한다")
+    @DisplayName("루트에서 도는 실행 아래 하위 에이전트는 그 실행을 origin 으로 등록한다")
     void registersRunUnderRootAsOriginOfSubagent() {
         String s1 = newChild();
 
@@ -95,7 +95,7 @@ class SubagentSessionRegistrarTest {
         HermesSessionBinding row = binding(PROFILE_A, s1);
         assertThat(row.originExecutionId()).as("origin 실행").isEqualTo(dadRun.id());
         assertThat(row.userId()).as("사용자").isEqualTo(dad.id());
-        assertThat(row.rootSessionId()).as("뿌리").isEqualTo(root);
+        assertThat(row.rootSessionId()).as("루트").isEqualTo(root);
         assertThat(row.parentSessionId()).as("부모").isEqualTo(root);
         assertThat(row.createdAt()).isNotNull();
     }
@@ -231,7 +231,7 @@ class SubagentSessionRegistrarTest {
     }
 
     @Test
-    @DisplayName("대화가 보낼 session 이나 뿌리 session 으로 쓰는 값은 하위 에이전트로 등록하지 못한다")
+    @DisplayName("대화가 보낼 session 이나 루트 session 으로 쓰는 값은 하위 에이전트로 등록하지 못한다")
     void cannotRegisterValueUsedAsConversationSendOrRootSessionAsSubagent() {
         String compacted = newRoot();
         String conversationRoot = newRoot();
@@ -248,7 +248,7 @@ class SubagentSessionRegistrarTest {
     }
 
     @Test
-    @DisplayName("압축 교체된 최상위 session 이 만든 하위 에이전트는 뿌리에서 도는 실행으로 풀린다")
+    @DisplayName("압축 교체된 최상위 session 이 만든 하위 에이전트는 루트에서 도는 실행으로 풀린다")
     void subagentOfCompactedTopSessionResolvesToRunRunningOnRoot() {
         String compacted = newRoot();
         String child = newChild();
@@ -275,7 +275,7 @@ class SubagentSessionRegistrarTest {
     }
 
     @Test
-    @DisplayName("부모 등록이 없고 뿌리에서 도는 실행도 없으면 거절한다")
+    @DisplayName("부모 등록이 없고 루트에서 도는 실행도 없으면 거절한다")
     void rejectsWhenNoParentRegistrationAndNoRunRunningOnRoot() {
         setStatus(dadRun, ExecutionStatus.SUCCEEDED);
         String child = newChild();
@@ -286,7 +286,7 @@ class SubagentSessionRegistrarTest {
     }
 
     @Test
-    @DisplayName("부모 등록의 뿌리가 서명한 뿌리와 다르면 거절한다")
+    @DisplayName("부모 등록의 루트가 서명한 루트와 다르면 거절한다")
     void rejectsWhenParentRegistrationRootDiffersFromSignedRoot() {
         String s1 = newChild();
         registrar.register(PROFILE_A, root, root, s1);

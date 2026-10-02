@@ -13,7 +13,7 @@
   session 조회는 일반 입력, cache read, cache write 를 따로 준다.
   v0.21.5 의 session 응답에는 provider 칸이 없다([`hermes/runs-api.md`](../hermes/runs-api.md)).
 - **대안 기각**:
-  - native 자식마다 `agent_execution` 줄을 만든다. 실행 목록, 실행 나무, `activity` 요약, 위임 한도 질의가 모두 그 줄을 걸러야 한다.
+  - native 자식마다 `agent_execution` 줄을 만든다. 실행 목록, 실행 트리, `activity` 요약, 위임 한도 질의가 모두 그 줄을 걸러야 한다.
     `agent_delegate` 로 만든 자식은 이미 자기 실행 줄이 있어, 같은 표에 두 종류의 자식이 섞인다.
   - `execution_event` 의 완료 사건에 금액 칸을 둔다. 두 길의 중복을 사건 쪽에서 다시 막아야 하고,
     아직 끝나지 않았거나 만료된 자식은 사건이 없어 완전성을 세려면 결국 재조회 작업 표를 함께 읽는다.

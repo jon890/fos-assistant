@@ -60,7 +60,7 @@ public class Conversation {
     /**
      * 이 대화의 첫 Hermes session. 한 번 정하면 바뀌지 않는다.
      *
-     * <p>MCP {@code agent_*} 호출이 들고 오는 서명한 뿌리 session 이 이 값이다(ADR-031). 이 칸이 생기기
+     * <p>MCP {@code agent_*} 호출이 들고 오는 서명한 루트 session 이 이 값이다(ADR-031). 이 칸이 생기기
      * 전에 Hermes 가 session 을 정한 대화는 비어 있다.
      */
     @Column(name = "hermes_root_session_id", length = 128)
@@ -191,7 +191,7 @@ public class Conversation {
     }
 
     /**
-     * Control Plane 이 정한 새 session 을 보낼 session 과 뿌리 session 에 함께 적는다.
+     * Control Plane 이 정한 새 session 을 보낼 session 과 루트 session 에 함께 적는다.
      *
      * <p>{@code updatedAt} 은 바꾸지 않는다. turn 을 시작할 때 부르므로, 바꾸면 실패한 turn 도 대화를
      * 목록 맨 위로 올린다.

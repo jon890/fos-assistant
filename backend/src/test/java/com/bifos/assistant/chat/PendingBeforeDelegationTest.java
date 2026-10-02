@@ -339,7 +339,7 @@ class PendingBeforeDelegationTest {
         ChatEvent last = relayed.getLast();
         assertThat(last.type()).as("받은 사건: %s", relayed).isEqualTo("stopped");
         assertThat(executions.findById(last.executionId()).orElseThrow().status())
-                .as("중지한 흐름 turn 의 뿌리 실행 줄")
+                .as("중지한 흐름 turn 의 루트 실행 줄")
                 .isEqualTo(ExecutionStatus.CANCELLED);
         assertLockReleased();
     }

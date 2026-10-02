@@ -24,7 +24,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 
-/** 토큰의 profile 과 서명한 뿌리 session 으로 도는 부모 실행을 정확히 하나만 고르는 것을 고정한다. */
+/** 토큰의 profile 과 서명한 루트 session 으로 도는 부모 실행을 정확히 하나만 고르는 것을 고정한다. */
 @SpringBootTest
 @ActiveProfiles("test")
 class DelegationParentResolverTest {
@@ -96,7 +96,7 @@ class DelegationParentResolverTest {
     }
 
     @Test
-    @DisplayName("같은 profile 에서 사용자가 다른 실행 둘은 뿌리가 다르면 각자 찾는다")
+    @DisplayName("같은 profile 에서 사용자가 다른 실행 둘은 루트가 다르면 각자 찾는다")
     void twoRunsOfDifferentUsersInSameProfileFindEachWhenRootsDiffer() {
         String kidRoot = "fos-" + UUID.randomUUID();
         AgentExecution dadRun = save(dad, PROFILE, root, ExecutionStatus.RUNNING);
@@ -121,7 +121,7 @@ class DelegationParentResolverTest {
     }
 
     @Test
-    @DisplayName("비어 있는 뿌리 session 이나 profile 은 session 이 없는 줄을 고르지 않는다")
+    @DisplayName("비어 있는 루트 session 이나 profile 은 session 이 없는 줄을 고르지 않는다")
     void doesNotPickRowWithoutSessionForBlankRootSessionOrProfile() {
         save(dad, PROFILE, null, ExecutionStatus.RUNNING);
 
