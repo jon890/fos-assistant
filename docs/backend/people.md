@@ -32,7 +32,7 @@ Control Plane 이 Hermes 를 고치는 호출을 하게 된 근거는
 `hermes` 는 부르는 방법만 알고 순서를 모른다.
 검사: `ArchitectureRules.HERMES_DOES_NOT_DEPEND_ON_PEOPLE`
 
-## 첫 에이전트의 과금 설정은 `people` 이 갖는다
+## 첫 에이전트의 과금 설정
 
 첫 로그인에 만드는 에이전트의 `cost_mode` 와 `credential_scope` 를 설정에서 읽는다.
 
@@ -41,7 +41,10 @@ Control Plane 이 Hermes 를 고치는 호출을 하게 된 근거는
 | `assistant.people.default-cost-mode` | `SUBSCRIPTION` |
 | `assistant.people.default-credential-scope` | `SHARED_HOUSEHOLD` |
 
-`people` 패키지가 갖는다. Hermes 를 부르는 값이 아니라 `hermes` 쪽에 두지 않는다.
+설정 이름은 `assistant.people.*` 그대로이고, 값을 읽는 `PeopleProperties` 는 `agent.application` 이 갖는다.
+`people` 의 `FirstAgentCreator` 와 `agent` 의 `AgentLifecycleService` 가 읽는다.
+`agent` 가 `people` 을 import 하지 않게 하려고 `agent` 로 옮겼다(ADR-068).
+Hermes 를 부르는 값이 아니라 `hermes` 쪽에 두지 않는다.
 
 두 값이 사람마다 다르지 않은 근거는
 [`adr/ADR-002-profile은-나누고-ai-계정은-가족이-함께-쓴다.md`](../adr/ADR-002-profile은-나누고-ai-계정은-가족이-함께-쓴다.md) 에 있다.
