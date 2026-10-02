@@ -8,7 +8,7 @@ import {
 test("아는 provider id 는 표시 이름으로 바뀐다", () => {
   assert.equal(providerLabel("openai-codex"), "ChatGPT 구독");
   assert.equal(providerLabel("anthropic"), "Anthropic");
-  assert.equal(providerLabel("gemini"), "Google");
+  assert.equal(providerLabel("gemini"), "Google Gemini");
   assert.equal(providerLabel(" openai "), "OpenAI");
 });
 

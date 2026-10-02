@@ -9,7 +9,7 @@ const PROVIDER_LABELS: Record<string, string> = {
   openrouter: "OpenRouter",
   nvidia: "NVIDIA",
   google: "Google",
-  gemini: "Google",
+  gemini: "Google Gemini",
 };
 
 /**
