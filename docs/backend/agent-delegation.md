@@ -4,7 +4,7 @@ Hermes 가 Control Plane MCP 의 `agent_list`, `agent_delegate`, `agent_status`,
 이 파일은 그 네 도구의 계약과 위임 실행의 시작과 조회와 중지, 끝난 결과가 부모 대화에 도착하는 흐름을 갖는다.
 요청자를 정하는 앞부분과 하위 에이전트 session 등록은 [`mcp-caller.md`](mcp-caller.md) 가 갖는다.
 하위 에이전트가 `agent_delegate` 를 부르면 새 FOS 자식의 `parent_execution_id` 는 그 하위 에이전트의 origin 실행이다. 하위 에이전트 몫의 실행 줄은 만들지 않는다.
-결정은 [ADR-017](../adr/ADR-017-무엇을-할지는-hermes-가-정하고-control-plane-은-경계만-갖는다.md), [ADR-031](../adr/ADR-031-mcp-호출의-부모-실행은-profile-플러그인이-서명한-뿌리-session-으로-잇는다.md), [ADR-032](../adr/ADR-032-mcp-토큰은-profile-을-증명하고-실제-사용자는-부모-실행에서-정한다.md) 에 있다.
+결정은 [ADR-017](../adr/ADR-017-무엇을-할지는-hermes-가-정하고-control-plane-은-경계만-갖는다.md), [ADR-031](../adr/ADR-031-mcp-호출의-부모-실행은-profile-플러그인이-서명한-루트-session-으로-잇는다.md), [ADR-032](../adr/ADR-032-mcp-토큰은-profile-을-증명하고-실제-사용자는-부모-실행에서-정한다.md) 에 있다.
 
 ## 도구 계약
 
@@ -23,10 +23,10 @@ Hermes 가 Control Plane MCP 의 `agent_list`, `agent_delegate`, `agent_status`,
 | --- | --- |
 | `mcp.presentation.McpController` | 도구 이름과 인자 모양만 본다. 요청자는 [`mcp-caller.md`](mcp-caller.md) 의 `McpCallerResolver` 가 정한다 |
 | `mcp.application.McpToolService` | 도구 결과를 MCP 모양으로 만든다. 예외 문구를 그대로 내보내지 않는다 |
-| `orchestration.application.AgentDelegationService` | `McpToolService` 가 `McpCaller` 에서 풀어 넘긴 요청자와 origin 실행을 받는다. `list`(요청자의 `AgentService.readableBy`), `status`, `delegate`, `stop` 이 있다. 조회와 중지의 권한 판정은 private 메서드 `canQuery` 한 곳에 있다. 결과는 `DelegationResult` 와, 실행 줄과 실제로 중지를 요청했는지를 담은 `DelegationStop` 이다. 상태는 실행을 돌리는 가상 스레드만 적는다. 위임 자식의 run 번호가 붙으면 뿌리 turn 에 붙인다(`TurnCancellation.trackRun`). 요청 스레드와 실행 스레드가 주고받는 상태는 `Handoff`(포기와 줄 생성 중 먼저 온 쪽), 도는 실행의 중지 표시와 run 번호는 `RunningDelegation` 이 갖는다. 판정 순서와 분기는 아래 「다른 에이전트에게 맡길 때」 가 갖는다 |
+| `orchestration.application.AgentDelegationService` | `McpToolService` 가 `McpCaller` 에서 풀어 넘긴 요청자와 origin 실행을 받는다. `list`(요청자의 `AgentService.readableBy`), `status`, `delegate`, `stop` 이 있다. 조회와 중지의 권한 판정은 private 메서드 `canQuery` 한 곳에 있다. 결과는 `DelegationResult` 와, 실행 줄과 실제로 중지를 요청했는지를 담은 `DelegationStop` 이다. 상태는 실행을 돌리는 가상 스레드만 적는다. 위임 자식의 run 번호가 붙으면 루트 turn 에 붙인다(`TurnCancellation.trackRun`). 요청 스레드와 실행 스레드가 주고받는 상태는 `Handoff`(포기와 줄 생성 중 먼저 온 쪽), 도는 실행의 중지 표시와 run 번호는 `RunningDelegation` 이 갖는다. 판정 순서와 분기는 아래 「다른 에이전트에게 맡길 때」 가 갖는다 |
 | `usage.domain.DelegationKey` | 같은 위임을 두 번 만들지 않는 키. `agent_execution.delegation_key` 칸의 값이라 `usage` 에 둔다. 문자열이 아니라 record 라 다른 문자열 인자와 자리를 바꿔 넘기지 못한다. 정의는 ADR-032 의 「`delegation_key`」 |
-| `orchestration.application.DelegationProperties` | `assistant.delegation` 설정. 깊이, 뿌리당 동시 자식, 전체 동시 위임, 제출 대기 시간, 실행 줄에 적는 답의 길이 상한(`outputMaxChars`). 값이 1 미만이거나 `submitTimeout` 이 비었거나 0 이하면 기동에서 멈춘다 |
-| `orchestration.application.ChildExecutionRunner` | 자식 실행을 여는 유일한 자리. 에이전트 확인과 부모, 뿌리 번호를 정하고 `RunSession.fresh()` 로 새 session 을 정한다. 뿌리 번호는 `AgentExecution.treeRootId()` 로 정한다. `agent_status` 는 대화로 견주고, origin 실행에 대화가 없을 때만 같은 메서드로 나무를 견준다 |
+| `orchestration.application.DelegationProperties` | `assistant.delegation` 설정. 깊이, 루트당 동시 자식, 전체 동시 위임, 제출 대기 시간, 실행 줄에 적는 답의 길이 상한(`outputMaxChars`). 값이 1 미만이거나 `submitTimeout` 이 비었거나 0 이하면 기동에서 멈춘다 |
+| `orchestration.application.ChildExecutionRunner` | 자식 실행을 여는 유일한 자리. 에이전트 확인과 부모, 루트 번호를 정하고 `RunSession.fresh()` 로 새 session 을 정한다. 루트 번호는 `AgentExecution.treeRootId()` 로 정한다. `agent_status` 는 대화로 견주고, origin 실행에 대화가 없을 때만 같은 메서드로 트리를 견준다 |
 | `orchestration.application.AgentRunner` | Memory 다시 조립, 모델 선택, 실행 줄, 제출, 완료 기록. 흐름과 위임이 함께 쓴다 |
 
 **MCP 쪽은 Hermes 를 부르지 않는다.** 실행을 시작하고 멈추는 것은 `orchestration` 이 기존 `AgentRunner` 와 `HermesRunsClient` 로 한다.
@@ -36,7 +36,7 @@ Hermes 가 Control Plane MCP 의 `agent_list`, `agent_delegate`, `agent_status`,
 
 `agent_delegate` 는 제출까지만 기다리고 실행 번호를 돌려준다.
 실행은 가상 스레드 하나에서 `AgentRunner.run` 으로 끝까지 돌고, 끝나면 답을 그 실행 줄의 `output_text` 에 적는다.
-동시에 도는 위임은 뿌리당 한도와 전체 한도로 묶는다. 트랜잭션 안에서 Hermes 를 부르지 않는다.
+동시에 도는 위임은 루트당 한도와 전체 한도로 묶는다. 트랜잭션 안에서 Hermes 를 부르지 않는다.
 
 ## 위임 결과로 부모 대화를 깨우기
 
@@ -74,9 +74,9 @@ Hermes 가 Control Plane MCP 의 `agent_list`, `agent_delegate`, `agent_status`,
 
 깊이는 부모의 `parent_execution_id` 를 따라 올라가 센다. 사용자가 부른 실행이 0 이다.
 흐름은 깊이 1 그대로이고 위임만 이 설정값을 쓴다.
-뿌리당 동시 자식은 같은 `root_execution_id` 아래 `delegation_key` 가 있는 도는 실행의 수로 센다. Memory 제안처럼 위임이 아닌 자식은 세지 않는다.
+루트당 동시 자식은 같은 `root_execution_id` 아래 `delegation_key` 가 있는 도는 실행의 수로 센다. Memory 제안처럼 위임이 아닌 자식은 세지 않는다.
 
-**서버 한 대를 전제로 한다.** 같은 호출 확인부터 실행 줄 저장까지는 뿌리별 JVM 잠금으로 묶고, 전체 한도는 프로세스 안의 세마포어로 센다.
+**서버 한 대를 전제로 한다.** 같은 호출 확인부터 실행 줄 저장까지는 루트별 JVM 잠금으로 묶고, 전체 한도는 프로세스 안의 세마포어로 센다.
 서버를 여러 대로 늘리면 둘을 데이터베이스 잠금으로 옮긴다.
 
 ## `ResearchAndBuildFlow`
@@ -96,7 +96,7 @@ sequenceDiagram
     participant H as 다른 profile (Hermes)
 
     C->>P: agent_list 또는 agent_delegate(agent_code, task)
-    P->>P: 뿌리 session 을 찾고 MCP 토큰으로 서명한다
+    P->>P: 루트 session 을 찾고 MCP 토큰으로 서명한다
     P->>M: tools/call + _fos_ctx
     M->>M: 토큰으로 profile 을 정한다
     M->>D: 서명 확인, 「MCP 호출의 요청자를 정할 때」 의 origin 실행을 부모로, 그 실행의 사용자가 요청자
@@ -119,30 +119,30 @@ sequenceDiagram
 
 ### 위임이 갈리는 지점
 
-`agent_delegate` 는 대화, 깊이, 에이전트, 같은 호출, 뿌리당 동시 한도, 전체 한도 순서로 보고 가상 스레드에서 실행을 시작한 뒤 제출까지만 기다린다.
+`agent_delegate` 는 대화, 깊이, 에이전트, 같은 호출, 루트당 동시 한도, 전체 한도 순서로 보고 가상 스레드에서 실행을 시작한 뒤 제출까지만 기다린다.
 표에서 「요청자 판정의 거절」 은 [`mcp-caller.md`](mcp-caller.md#mcp-호출의-요청자를-정할-때) 의 「MCP 호출의 요청자를 정할 때」 의 거절을 가리킨다.
 
 | 경우 | 결과 |
 | --- | --- |
 | `_fos_ctx` 가 없거나 서명이 틀리다 | 요청자 판정의 거절과 같은 도구 결과(`McpToolService.invalidContext()`, `isError: true`)다. 플러그인이 빠진 profile 이거나 모델이 흉내 낸 것이다 |
-| origin 실행을 정하지 못했다 | 요청자 판정의 거절과 같은 도구 결과(`McpToolService.invalidContext()`, `isError: true`)다. 부모를 추측하지 않는다. 하위 에이전트는 origin 실행이 끝났어도 그 실행 아래 붙고, origin 이나 그 뿌리가 `CANCELLED` 면 거절된다 |
+| origin 실행을 정하지 못했다 | 요청자 판정의 거절과 같은 도구 결과(`McpToolService.invalidContext()`, `isError: true`)다. 부모를 추측하지 않는다. 하위 에이전트는 origin 실행이 끝났어도 그 실행 아래 붙고, origin 이나 그 루트가 `CANCELLED` 면 거절된다 |
 | 그 실행의 profile 이 토큰의 profile 과 다르다 | 거절한다. 사용자는 토큰이 아니라 그 실행이 정한다 |
 | 없는 에이전트, 쓸 수 없는 에이전트 | 같은 `AGENT_UNAVAILABLE` 로 거절한다. 있는지 없는지 알리지 않는다 |
 | 꺼진 에이전트 | `AGENT_DISABLED` 로 거절한다 |
 | 깊이가 한도(기본 2)를 넘는다 | `DEPTH_EXCEEDED` 로 거절한다. Hermes 는 재귀를 막지 않는다 |
-| 한 뿌리 아래 도는 위임 자식이 한도(기본 4)에 닿았다 | `TOO_MANY_CHILDREN` 으로 거절한다. Chief 가 앞의 것을 기다리거나 멈춘 뒤 다시 부른다 |
-| 같은 호출이 다시 온다(Hermes 재시도). profile, 뿌리 session, 그 호출의 session, `tool_call_id` 가 모두 같다 | 새로 만들지 않고 처음 만든 실행을 돌려준다 |
+| 한 루트 아래 도는 위임 자식이 한도(기본 4)에 닿았다 | `TOO_MANY_CHILDREN` 으로 거절한다. Chief 가 앞의 것을 기다리거나 멈춘 뒤 다시 부른다 |
+| 같은 호출이 다시 온다(Hermes 재시도). profile, 루트 session, 그 호출의 session, `tool_call_id` 가 모두 같다 | 새로 만들지 않고 처음 만든 실행을 돌려준다 |
 | 다른 session 에서 같은 `tool_call_id` 가 온다 | 다른 호출이다. 따로 만든다 |
 | `task` 가 비었거나 공백뿐이거나 8,000자를 넘는다. `agent_code` 와 `task` 밖의 인자가 온다 | 인자 오류(`-32602`)다. profile 이나 사용자를 인자로 정하지 못한다 |
 | 부모 실행에 대화가 없다 | 실행 줄을 만들지 않고 `SUBMIT_FAILED` 로 거절한다. 운영에서는 생기지 않는 방어다 |
 | 서버 전체에서 도는 위임이 한도(기본 16)에 닿았다 | `BUSY` 로 거절한다. 기다리지 않는다 |
 | 실행 줄은 만들었는데 제출이 실패한다 | 그 줄을 `FAILED` 로 적고 도구는 `SUBMIT_FAILED` 를 돌려준다. 제출은 됐는데 그 뒤의 기록(run 번호, 시작 사건)이 실패하면 그 run 에 중지를 한 번 보내고 `FAILED` 로 적는다. 흐름의 하위 실행도 같다. 줄을 만든 뒤 제출 전에 끝나 `SUBMIT_FAILED` 를 돌려줄 때는 그 줄에 `result_delivered_at` 을 적어, 부모가 번호를 모르는 결과로 다시 깨우지 않는다 |
-| 제출이 한도 시간(기본 30초, `assistant.delegation.submit-timeout`) 안에 끝나지 않는다 | 실행 줄이 생겼으면 번호와 `RUNNING` 을 돌려주고, 뒤따르는 결과는 그 줄에 적는다. 줄도 생기지 않았으면 `SUBMIT_FAILED` 이고, 뒤늦게 줄이 생겨도 제출하지 않고 `CANCELLED` 로 끝낸다. 뿌리별 잠금도 그 시간 안에서만 기다린다. 잡지 못하거나 잡은 뒤 남은 시간이 없으면 실행 줄을 만들지 않고 `SUBMIT_FAILED` 다. 줄이 없으므로 같은 호출을 다시 보내면 새로 시작한다 |
+| 제출이 한도 시간(기본 30초, `assistant.delegation.submit-timeout`) 안에 끝나지 않는다 | 실행 줄이 생겼으면 번호와 `RUNNING` 을 돌려주고, 뒤따르는 결과는 그 줄에 적는다. 줄도 생기지 않았으면 `SUBMIT_FAILED` 이고, 뒤늦게 줄이 생겨도 제출하지 않고 `CANCELLED` 로 끝낸다. 루트별 잠금도 그 시간 안에서만 기다린다. 잡지 못하거나 잡은 뒤 남은 시간이 없으면 실행 줄을 만들지 않고 `SUBMIT_FAILED` 다. 줄이 없으므로 같은 호출을 다시 보내면 새로 시작한다 |
 | 위임 실행이 끝난다 | 답을 `SUCCEEDED` 와 같은 저장에서 그 줄의 `output_text` 에 적는다. 100,000자를 넘으면 자르고 잘렸다는 한 줄을 붙인다. `chat_message` 에는 넣지 않는다. 대화 turn 이 직접 맡긴 실행이면 「위임 결과가 도착했을 때」 로 부모 대화를 깨운다 |
 | `agent_list` 를 부른다 | 요청자가 쓸 수 있고 켜진 에이전트의 `code` 와 `name` 만 JSON 배열로 준다. 같은 profile 을 여럿이 써도 요청자마다 다르다 |
 | `agent_status` 로 남의 실행, 다른 대화의 실행, 위임이 아닌 실행(대화 turn, Memory 제안), 없는 번호를 묻는다 | 모두 `{"code":"NOT_FOUND","message":"실행을 찾을 수 없습니다."}` 하나로 답한다. 기준은 부르는 쪽 origin 실행의 대화다. 같은 사용자의 다른 대화여도 찾지 못한다. origin 실행이 끝났어도 같다 |
-| `agent_status` 로 같은 대화의 앞 turn 에서 맡긴 실행을 묻는다 | 답한다. turn 마다 뿌리 실행이 달라도 대화가 같으면 된다. 기다리지 않는 위임의 결과를 뒤 turn 에서 가져오는 길이다 |
-| `agent_status` 를 부른 origin 실행에 대화가 없다 | 같은 실행 나무(같은 뿌리)의 위임 실행만 답한다 |
+| `agent_status` 로 같은 대화의 앞 turn 에서 맡긴 실행을 묻는다 | 답한다. turn 마다 루트 실행이 달라도 대화가 같으면 된다. 기다리지 않는 위임의 결과를 뒤 turn 에서 가져오는 길이다 |
+| `agent_status` 를 부른 origin 실행에 대화가 없다 | 같은 실행 트리(같은 루트)의 위임 실행만 답한다 |
 | `agent_status` 가 물을 수 있는 실행이다 | `execution_id` 와 `status` 를 준다. `SUCCEEDED` 는 `output`, `FAILED` 는 `error_code`, `CANCELLED` 는 답이 있으면 `output` 을 더한다. run 번호, profile, 토큰 수, 금액은 싣지 않는다. 끝난 상태를 돌려주면 그 실행의 `result_delivered_at` 을 적어 부모를 다시 깨우지 않는다. `agent_stop` 도 같다 |
 | `agent_stop` 으로 물을 수 없는 실행을 멈추려 한다 | `agent_status` 와 같은 판정이다. 남의 실행, 다른 대화의 실행, 위임이 아닌 실행, 없는 번호는 모두 `NOT_FOUND` 하나로 답하고 멈추지 않는다 |
 | `agent_stop` 이 도는 실행에 온다 | 그 실행의 중지 표시를 켜고, run 번호가 있으면 Hermes 에 중지를 보낸다. 번호가 붙기 전이면 붙는 자리에서 보낸다. `CANCELLED` 가 적히기를 5초까지 기다려 `CANCELLED` 를 주고, 그 안에 적히지 않으면 `RUNNING` 과 `stop_requested: true` 를 준다 |
@@ -155,7 +155,7 @@ sequenceDiagram
 | 사용자가 그 turn 을 중지한다 | turn 이 도는 동안 맡긴 위임 자식은 run 번호가 붙을 때 그 turn 에 붙어 함께 멈춘다. 중지가 확정된 뒤 제출 전이면 제출하지 않고 `CANCELLED` 로 끝나고, 확정 전에 제출됐으면 run 번호가 붙는 자리에서 곧바로 멈춘다. turn 이 끝난 뒤에 맡긴 자식은 `agent_stop` 으로만 멈춘다. 자식은 Hermes 가 turn 의 중지를 받아 확정된 뒤에만 `CANCELLED` 로 적힌다. 중지를 보내지 못해 turn 이 되돌아가면 그 사이에 끝난 자식은 `SUCCEEDED` 로 남는다 |
 | 서버가 다시 뜬다 | 도는 위임 실행은 기동 정리가 `FAILED`(`ORPHANED`) 로 적는다 |
 
-**자식의 답은 대화 이력에 넣지 않는다.** Chief 는 결과를 기다리지 않고 turn 을 마치며, 끝난 결과는 Control Plane 이 다음 turn 에 넣어 준다. 자식 실행은 자기 줄에 사용량과 비용이 따로 남고 작업 과정과 실행 나무에 보인다.
+**자식의 답은 대화 이력에 넣지 않는다.** Chief 는 결과를 기다리지 않고 turn 을 마치며, 끝난 결과는 Control Plane 이 다음 turn 에 넣어 준다. 자식 실행은 자기 줄에 사용량과 비용이 따로 남고 작업 과정과 실행 트리에 보인다.
 
 ## 위임 결과가 도착했을 때
 

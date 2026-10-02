@@ -1,7 +1,7 @@
 # MCP 요청자
 
 Control Plane MCP 의 토큰은 profile 만 증명하고, 사용자가 걸린 도구의 요청자는 서명한 `_fos_ctx` 로 찾은 **origin 실행**의 사용자다.
-origin 실행은 하위 에이전트 session 이면 만들 때 등록한 실행이고, 최상위 session 이면 그 뿌리 session 으로 도는 실행이다.
+origin 실행은 하위 에이전트 session 이면 만들 때 등록한 실행이고, 최상위 session 이면 그 루트 session 으로 도는 실행이다.
 토큰이 요청자를 정하지 못하는 까닭은 GROUP 에이전트에서 여러 사용자가 같은 profile 을 쓰기 때문이다. 요청 본문에 사용자 번호를 넣어도 사용자를 바꿀 수 없다.
 이 파일은 요청자를 정하는 클래스와 흐름, 하위 에이전트 session 등록, Control Plane MCP 서버와 결과물 쓰기 도구의 계약을 갖는다.
 결정은 [ADR-032](../adr/ADR-032-mcp-토큰은-profile-을-증명하고-실제-사용자는-부모-실행에서-정한다.md) 와 [ADR-037](../adr/ADR-037-hermes-하위-에이전트-session-의-주인은-만들-때-등록한-줄로-정한다.md) 에 있다.
@@ -14,12 +14,12 @@ origin 실행은 하위 에이전트 session 이면 만들 때 등록한 실행�
 | `mcp.application.AgentTokenService` | 발급, 목록, 폐기, 인증. 인증은 있고, 폐기되지 않았고, profile 이 묶인 토큰만 통과시킨다. 사용자는 토큰에서 읽지 않는다 |
 | `mcp.application.McpPrincipal` | 인증 결과. 토큰 번호, profile, 토큰 해시. profile 은 늘 있다 |
 | `mcp.application.McpCallerResolver` | `_fos_ctx` 서명 확인, origin 실행 찾기, 그 실행의 사용자 읽기를 차례로 한다. 모든 MCP 도구가 이 한 메서드 `resolve` 를 지난다. 실패는 모두 `MCP_CALL_CONTEXT_INVALID` 다 |
-| `mcp.application.McpCaller` | 판정 결과. 요청자 `user`, origin 실행 `originExecution`, 확인한 `context`. 셋은 늘 있고 생성자가 빈 값을 거절한다. origin 실행은 끝난 실행일 수 있지만 그 실행이나 뿌리 실행이 `CANCELLED` 인 것은 아니다 |
+| `mcp.application.McpCaller` | 판정 결과. 요청자 `user`, origin 실행 `originExecution`, 확인한 `context`. 셋은 늘 있고 생성자가 빈 값을 거절한다. origin 실행은 끝난 실행일 수 있지만 그 실행이나 루트 실행이 `CANCELLED` 인 것은 아니다 |
 | `mcp.application.McpCallContext` | `_fos_ctx` 를 읽고 서명을 확인한다. 모델이 준 다른 인자는 보지 않는다 |
 | `mcp.application.SubagentRegistration` | 등록 본문을 읽고 서명을 확인한다. 서명할 글의 첫 줄이 `v1-subagent` 다 |
 | `mcp.presentation.SubagentSessionController` | `POST /internal/hermes/session-bindings/subagent`. 인증 주체가 `McpPrincipal` 인지 보고 등록을 부른다 |
-| `orchestration.application.SessionOwnerResolver` | profile, 서명한 뿌리 session, 그 호출의 session 으로 origin 실행을 정한다. 등록을 먼저 보고, 없으면 session 이 뿌리와 같을 때만 `DelegationParentResolver` 를 부른다. 등록의 origin 실행이나 그 뿌리 실행이 `CANCELLED` 면 거절한다 |
-| `orchestration.application.DelegationParentResolver` | profile 과 서명한 뿌리 session 으로 도는 실행 하나를 찾는다. 최상위 session 의 판정과 최상위 자식의 등록이 쓴다. 사용자로 먼저 거르지 않는다. 없거나 둘 이상이거나 profile 이 다르면 같은 실패 |
+| `orchestration.application.SessionOwnerResolver` | profile, 서명한 루트 session, 그 호출의 session 으로 origin 실행을 정한다. 등록을 먼저 보고, 없으면 session 이 루트와 같을 때만 `DelegationParentResolver` 를 부른다. 등록의 origin 실행이나 그 루트 실행이 `CANCELLED` 면 거절한다 |
+| `orchestration.application.DelegationParentResolver` | profile 과 서명한 루트 session 으로 도는 실행 하나를 찾는다. 최상위 session 의 판정과 최상위 자식의 등록이 쓴다. 사용자로 먼저 거르지 않는다. 없거나 둘 이상이거나 profile 이 다르면 같은 실패 |
 | `orchestration.application.SubagentSessionRegistrar` | 등록 하나를 적는다. 부모를 풀고, 같은 origin 의 재등록은 그대로 두고, 다른 origin 은 거절한다 |
 | `orchestration.domain.HermesSessionBinding`, `orchestration.infra.HermesSessionBindingRepository` | 하위 에이전트 session 등록 줄과 그 저장소 |
 
@@ -68,7 +68,7 @@ sequenceDiagram
     participant E as agent_execution
 
     H->>P: 도구 호출 (session_id, tool_call_id)
-    P->>P: parent_session_id 사슬로 뿌리 session 을 찾고 그 profile 의 토큰으로 서명
+    P->>P: parent_session_id 사슬로 루트 session 을 찾고 그 profile 의 토큰으로 서명
     P->>F: POST /mcp, Bearer 토큰, 인자에 _fos_ctx
     F->>F: 토큰 해시로 한 줄을 찾는다. 폐기됐거나 profile 이 비었으면 401
     F->>R: McpPrincipal(토큰 번호, profile, 토큰 해시)
@@ -76,11 +76,11 @@ sequenceDiagram
     R->>B: (profile, session_id) 등록을 찾는다
     alt 등록이 있다
         B-->>R: origin 실행
-        R->>R: origin 이나 그 뿌리 실행이 CANCELLED 면 거절. 다른 상태는 끝났어도 된다
-    else 등록이 없고 session_id 가 뿌리와 같다
-        R->>E: profile, 뿌리 session, RUNNING 이 맞는 줄을 둘까지 읽는다
+        R->>R: origin 이나 그 루트 실행이 CANCELLED 면 거절. 다른 상태는 끝났어도 된다
+    else 등록이 없고 session_id 가 루트와 같다
+        R->>E: profile, 루트 session, RUNNING 이 맞는 줄을 둘까지 읽는다
         E-->>R: 정확히 하나
-    else 등록이 없고 session_id 가 뿌리와 다르다
+    else 등록이 없고 session_id 가 루트와 다르다
         R-->>H: 거절
     end
     R->>R: 그 실행의 user_id 로 사용자를 읽는다
@@ -88,12 +88,12 @@ sequenceDiagram
 ```
 
 같은 profile 에서 두 사용자의 실행이 함께 돌아도 섞이지 않는다.
-대화마다 뿌리 session 이 다르고, 호출마다 자기 뿌리 session 에 서명이 붙기 때문이다.
+대화마다 루트 session 이 다르고, 호출마다 자기 루트 session 에 서명이 붙기 때문이다.
 
 ```text
 공유 profile
-  실행 #100  user=A  뿌리 session=fos-A → 서명한 뿌리 fos-A 의 호출은 A 로 돈다
-  실행 #101  user=B  뿌리 session=fos-B → 서명한 뿌리 fos-B 의 호출은 B 로 돈다
+  실행 #100  user=A  루트 session=fos-A → 서명한 루트 fos-A 의 호출은 A 로 돈다
+  실행 #101  user=B  루트 session=fos-B → 서명한 루트 fos-B 의 호출은 B 로 돈다
 ```
 
 토큰이 어느 사용자로 발급됐었는지는 결과를 바꾸지 않는다.
@@ -106,16 +106,16 @@ sequenceDiagram
 | profile 이 빈 토큰이다 | HTTP 401. 옛 토큰을 사용자로 돌리던 경로는 지웠다([ADR-032](../adr/ADR-032-mcp-토큰은-profile-을-증명하고-실제-사용자는-부모-실행에서-정한다.md) 의 「옛 토큰에서 옮겨 가는 길」) |
 | `_fos_ctx` 가 없거나 모양이 틀렸거나 서명이 맞지 않는다 | 거절한다 |
 | 서명이 맞고 그 호출의 session 에 하위 에이전트 등록이 있다 | 등록의 origin 실행의 사용자로 돈다. origin 실행이 `SUCCEEDED` 나 `FAILED` 로 끝났어도, 같은 대화의 다음 turn 이 돌고 있어도 같다 |
-| 등록이 있는데 origin 실행이나 그 실행 나무의 뿌리 실행이 `CANCELLED` 다 | 거절한다. 사용자가 turn 이나 흐름을 중지해도 Hermes 하위 에이전트는 계속 돌 수 있어서다. 흐름을 멈출 때 이미 끝난 자식 실행에서 만든 하위 에이전트도 뿌리가 중지돼 거절된다. Control Plane MCP 도구만 막고, 하위 에이전트의 Hermes 자체 도구와 run 은 멈추지 못한다([ADR-037](../adr/ADR-037-hermes-하위-에이전트-session-의-주인은-만들-때-등록한-줄로-정한다.md)) |
-| 등록의 뿌리 session 이 서명한 뿌리와 다르다 | 거절한다 |
-| 등록이 없고 그 호출의 session 이 뿌리와 다르다 | 거절한다. 등록이 빠진 하위 에이전트와 `compression.in_place: false` 로 교체된 최상위 session 이 여기 온다. 둘을 나눌 수 없어 추측하지 않는다([ADR-037](../adr/ADR-037-hermes-하위-에이전트-session-의-주인은-만들-때-등록한-줄로-정한다.md)) |
-| 등록이 없고 session 이 뿌리와 같지만 그 뿌리 session 으로 도는 실행이 없다 | 거절한다. 끝난 실행, Memory 제안 실행, Control Plane 이 시작하지 않은 run(Hermes cron, 다른 채팅 플랫폼 gateway)이 여기 온다. 요청자를 알 수 없어서다 |
-| 그 뿌리 session 으로 도는 실행이 다른 profile 의 것이다 | 거절한다 |
+| 등록이 있는데 origin 실행이나 그 실행 트리의 루트 실행이 `CANCELLED` 다 | 거절한다. 사용자가 turn 이나 흐름을 중지해도 Hermes 하위 에이전트는 계속 돌 수 있어서다. 흐름을 멈출 때 이미 끝난 자식 실행에서 만든 하위 에이전트도 루트가 중지돼 거절된다. Control Plane MCP 도구만 막고, 하위 에이전트의 Hermes 자체 도구와 run 은 멈추지 못한다([ADR-037](../adr/ADR-037-hermes-하위-에이전트-session-의-주인은-만들-때-등록한-줄로-정한다.md)) |
+| 등록의 루트 session 이 서명한 루트와 다르다 | 거절한다 |
+| 등록이 없고 그 호출의 session 이 루트와 다르다 | 거절한다. 등록이 빠진 하위 에이전트와 `compression.in_place: false` 로 교체된 최상위 session 이 여기 온다. 둘을 나눌 수 없어 추측하지 않는다([ADR-037](../adr/ADR-037-hermes-하위-에이전트-session-의-주인은-만들-때-등록한-줄로-정한다.md)) |
+| 등록이 없고 session 이 루트와 같지만 그 루트 session 으로 도는 실행이 없다 | 거절한다. 끝난 실행, Memory 제안 실행, Control Plane 이 시작하지 않은 run(Hermes cron, 다른 채팅 플랫폼 gateway)이 여기 온다. 요청자를 알 수 없어서다 |
+| 그 루트 session 으로 도는 실행이 다른 profile 의 것이다 | 거절한다 |
 | 도는 실행이 둘 이상이다 | 거절한다. 가장 최근 것을 고르지 않는다 |
 
 거절은 모두 **같은 도구 결과** 하나로 보인다. `isError: true` 와 「호출 맥락을 확인할 수 없습니다. 새 대화에서 다시 시도해 주세요.」 다.
 서명이 틀린 것과 남의 profile 이 도는 것을 밖에서 나누지 못하게 해, 다른 사용자가 지금 실행 중인지 훑어 알아내지 못하게 한다.
-이유는 서버 로그에만 남는다. 뿌리 session 으로 도는 실행이 없을 때는 옛 대화의 압축 교체일 수 있다는 표시(`DELEGATION_CONTEXT_UNAVAILABLE`)를 함께 남긴다. 등록이 없는 하위 에이전트 session 이면 `SUBAGENT_SESSION_UNREGISTERED` 를, 등록의 origin 실행이나 그 뿌리가 중지됐으면 `ORIGIN_CANCELLED` 를 남긴다.
+이유는 서버 로그에만 남는다. 루트 session 으로 도는 실행이 없을 때는 옛 대화의 압축 교체일 수 있다는 표시(`DELEGATION_CONTEXT_UNAVAILABLE`)를 함께 남긴다. 등록이 없는 하위 에이전트 session 이면 `SUBAGENT_SESSION_UNREGISTERED` 를, 등록의 origin 실행이나 그 루트가 중지됐으면 `ORIGIN_CANCELLED` 를 남긴다.
 
 **실행 줄에 session 을 적는 실행만 요청자가 될 수 있다.** 어느 실행이 어떤 session 을 적는지는 위 「실행 줄에 적는 session」 이 갖는다.
 
@@ -143,7 +143,7 @@ sequenceDiagram
         C->>E: profile, parent_root_session_id, RUNNING 인 줄 하나
         E-->>C: origin 실행
     end
-    C->>B: (profile, S1) → origin, 사용자, 뿌리, 부모 session
+    C->>B: (profile, S1) → origin, 사용자, 루트, 부모 session
     C-->>P: 201 또는 200
     P-->>H: hook 이 돌아온다
     H->>H: 자식 S1 이 돌기 시작한다
@@ -162,14 +162,14 @@ FOS 실행 #105 같은 대화의 다음 turn          ← 돌아도 S1 은 #100 
 
 | 경우 | 결과 |
 | --- | --- |
-| 같은 `(profile, child_session_id)` 가 같은 부모와 뿌리로 다시 온다 | `200` 으로 답한다. 부모를 다시 풀지 않아, 그사이 부모 run 이 끝났어도 같다. 줄은 하나다 |
+| 같은 `(profile, child_session_id)` 가 같은 부모와 루트로 다시 온다 | `200` 으로 답한다. 부모를 다시 풀지 않아, 그사이 부모 run 이 끝났어도 같다. 줄은 하나다 |
 | 같은 `(profile, child_session_id)` 가 다른 origin 으로 온다 | `409` 로 거절하고 덮어쓰지 않는다 |
-| 부모 session 에 등록이 없고 뿌리로 도는 실행도 없다 | `403` 으로 거절한다 |
+| 부모 session 에 등록이 없고 루트로 도는 실행도 없다 | `403` 으로 거절한다 |
 | 서명이 틀리거나 토큰의 profile 이 부모의 profile 과 다르다 | `403` 으로 거절한다. 다른 profile 의 등록과 실행은 보이지 않는다 |
-| `child_session_id` 가 뿌리 session 이거나, 그 profile 의 실행 줄이 쓰는 session 이거나, 대화가 적어 둔 session 이다 | `403` 으로 거절한다. 최상위 session 에 등록이 생기면 뒤 turn 이 앞 turn 에 묶인다. 압축 교체된 최상위 session 은 대화에만 남아 있어 대화도 본다 |
+| `child_session_id` 가 루트 session 이거나, 그 profile 의 실행 줄이 쓰는 session 이거나, 대화가 적어 둔 session 이다 | `403` 으로 거절한다. 최상위 session 에 등록이 생기면 뒤 turn 이 앞 turn 에 묶인다. 압축 교체된 최상위 session 은 대화에만 남아 있어 대화도 본다 |
 | session 값이 128자를 넘는다 | `403` 으로 거절한다. 저장 칸의 길이다 |
 | 플러그인이 등록하지 못했다 | Hermes 는 hook 예외를 삼키고 자식을 돌린다. 그 자식의 호출은 위 판정에서 거절된다 |
-| 부모 등록의 origin 실행이나 그 뿌리가 이미 `CANCELLED` 다 | 등록은 받는다. 그 자식의 MCP 호출이 위 판정에서 거절된다 |
+| 부모 등록의 origin 실행이나 그 루트가 이미 `CANCELLED` 다 | 등록은 받는다. 그 자식의 MCP 호출이 위 판정에서 거절된다 |
 | Control Plane 이 다시 떴다 | 등록은 데이터베이스에 있어 그대로 쓴다 |
 | 부모 turn 이 끝난 뒤 하위 에이전트가 결과물을 썼다 | 파일은 대화 폴더에 남지만 어느 답에도 묶이지 않는다. 답에 묶는 것은 turn 이 끝날 때 폴더를 훑는 방식이다 |
 

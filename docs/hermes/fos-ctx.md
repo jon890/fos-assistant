@@ -24,7 +24,7 @@ MCP 규약 헤더뿐이었다. `params._meta` 는 빈 객체였다.
 
 ### 부모 실행을 잇는 방법
 
-2026-09-29 에 v0.21.5(`v2026.9.24`) 격리 환경에서 측정했다. 결정은 [ADR-031](../adr/ADR-031-mcp-호출의-부모-실행은-profile-플러그인이-서명한-뿌리-session-으로-잇는다.md) 에 있다.
+2026-09-29 에 v0.21.5(`v2026.9.24`) 격리 환경에서 측정했다. 결정은 [ADR-031](../adr/ADR-031-mcp-호출의-부모-실행은-profile-플러그인이-서명한-루트-session-으로-잇는다.md) 에 있다.
 
 **MCP 호출에 run 맥락을 실을 수 있는 공개 경로는 profile 플러그인의 `pre_tool_call` hook 하나다.**
 
@@ -49,7 +49,7 @@ MCP 규약 헤더뿐이었다. `params._meta` 는 빈 객체였다.
 | 압축 | 기본값 `compression.in_place: true` 에서는 session 이 바뀌지 않는다. `false` 이면 run 도중 새 session 으로 바뀐다 |
 | `parent_session_id` 사슬을 따라 처음 session 찾기 | 1ms 미만. 하위 에이전트와 압축 교체 모두 처음 session 에 닿는다 |
 
-그래서 hook 이 서명하는 값은 그 호출의 session 이 아니라 **사슬의 처음 session(뿌리 session)** 이다.
+그래서 hook 이 서명하는 값은 그 호출의 session 이 아니라 **사슬의 처음 session(루트 session)** 이다.
 
 **플러그인은 profile 마다 둔다.** profile 디렉터리의 `plugins/` 에 두고 그 profile 설정에서 켜야 그 profile 의 호출에 붙는다. plugin 원본은 이 저장소의 [`hermes/plugins/fos-ctx/`](../../hermes/plugins/fos-ctx/) 에 있고, 대시보드 plugin 이 새 profile 을 만들 때 그 profile 로 복사한다.
 
@@ -105,8 +105,8 @@ hook 은 Control Plane MCP 의 모든 도구 인자에 `_fos_ctx` 를 덮어쓴�
 #### 재시도와 `tool_call_id`
 
 Hermes 는 401 이면 다시 연결해 같은 인자로 한 번 더 보낸다. session 이 만료되면 읽기 전용 도구만 다시 보내고 쓰기 도구는 `outcome_uncertain` 으로 끝낸다.
-hook 이 넣은 `tool_call_id` 는 인자에 들어 있어 다시 보낼 때도 같다. 그래서 **profile, 뿌리 session, 그 호출의 session, `tool_call_id`** 로 같은 위임을 두 번 만들지 않는 키를 계산한다.
-`tool_call_id` 가 뿌리 아래 모든 session 에서 유일하다는 보장은 없다. 하위 에이전트마다 session 이 달라, session 을 빼면 다른 하위 에이전트의 같은 번호가 같은 위임으로 잘못 합쳐진다. 정의는 [ADR-032 의 「`delegation_key`」](../adr/ADR-032-mcp-토큰은-profile-을-증명하고-실제-사용자는-부모-실행에서-정한다.md#delegation_key) 에 있다.
+hook 이 넣은 `tool_call_id` 는 인자에 들어 있어 다시 보낼 때도 같다. 그래서 **profile, 루트 session, 그 호출의 session, `tool_call_id`** 로 같은 위임을 두 번 만들지 않는 키를 계산한다.
+`tool_call_id` 가 루트 아래 모든 session 에서 유일하다는 보장은 없다. 하위 에이전트마다 session 이 달라, session 을 빼면 다른 하위 에이전트의 같은 번호가 같은 위임으로 잘못 합쳐진다. 정의는 [ADR-032 의 「`delegation_key`」](../adr/ADR-032-mcp-토큰은-profile-을-증명하고-실제-사용자는-부모-실행에서-정한다.md#delegation_key) 에 있다.
 JSON-RPC 의 `id` 는 연결마다 새로 매겨져 이 용도로 쓰지 않는다.
 
 #### 공유 profile 에서 두 사용자의 호출을 실제로 확인하는 절차
@@ -128,7 +128,7 @@ JSON-RPC 의 `id` 는 연결마다 새로 매겨져 이 용도로 쓰지 않는�
 | 2 | 같은 두 run 의 `pre_tool_call` 로그를 본다 | 한 run 의 모든 호출에서 `root_session_id` 가 같다. 다른 run 의 값이 섞이지 않는다 |
 | 3 | 두 답을 본다 | A 의 답에는 A 의 본문만, B 의 답에는 B 의 본문만 있다 |
 | 4 | Control Plane 로그의 `memory read` 줄을 본다 | 호출마다 `userId` 가 그 run 의 실행 줄 `user_id` 와 같고 `executionId` 가 그 run 의 실행 줄이다 |
-| 5 | A 가 `delegate_task` 를 쓰게 해 하위 에이전트가 `memory_read` 를 부르게 한다 | 하위 에이전트 호출의 `session_id` 는 부모와 다르고 `root_session_id` 는 A 의 대화 뿌리와 같다. 결과는 A 의 본문이다. 부모 run 이 끝난 뒤에 불러도 같다 |
+| 5 | A 가 `delegate_task` 를 쓰게 해 하위 에이전트가 `memory_read` 를 부르게 한다 | 하위 에이전트 호출의 `session_id` 는 부모와 다르고 `root_session_id` 는 A 의 대화 루트와 같다. 결과는 A 의 본문이다. 부모 run 이 끝난 뒤에 불러도 같다 |
 | 6 | 플러그인을 끈 profile 에서 같은 질문을 한다 | `memory_read` 가 「호출 맥락을 확인할 수 없습니다」 로 끝나고 본문은 오지 않는다 |
 
 1 과 2 가 어긋나면 서버 쪽 판정이 옳아도 사용자가 섞인다. 그때는 배포를 되돌리지 말고 그 profile 의 토큰 묶기를 미루고 원인을 조사한다.
@@ -174,7 +174,7 @@ profile 플러그인이 `subagent_start` hook 에서 부른다. 모델 도구가
 | --- | --- |
 | `v` | JSON 정수 `1` |
 | `parent_session_id` | hook 이 받은 `parent_session_id` |
-| `parent_root_session_id` | `parent_session_id` 사슬의 처음 session. `pre_tool_call` 이 계산하는 뿌리와 같다 |
+| `parent_root_session_id` | `parent_session_id` 사슬의 처음 session. `pre_tool_call` 이 계산하는 루트와 같다 |
 | `child_session_id` | hook 이 받은 `child_session_id` |
 | `child_subagent_id` | hook 이 받은 값. 없으면 `null`. 서명하지 않고 로그에만 쓴다 |
 | `parent_subagent_id` | hook 이 받은 값. 최상위 자식이면 `null`. 서명하지 않고 로그에만 쓴다 |
@@ -197,18 +197,18 @@ profile 플러그인이 `subagent_start` hook 에서 부른다. 모델 도구가
 | 중첩 자식: `child_session_id` | `하위-세션-2` |
 | 중첩 자식의 기대 `sig` | `5479a21f26ddeb337754d4fd86dd3a0e36e0ef1f6ff2cc879c0fd07da5d84485` |
 
-서버는 서명을 확인한 뒤 같은 `child_session_id` 의 줄을 먼저 본다. 있고 뿌리와 부모가 요청과 같으면 부모를 풀지 않고 성공으로 답한다. 첫 응답을 잃고 다시 보내는 사이 부모 run 이 끝날 수 있어서다. 그 밖에는 부모를 푼다.
+서버는 서명을 확인한 뒤 같은 `child_session_id` 의 줄을 먼저 본다. 있고 루트와 부모가 요청과 같으면 부모를 풀지 않고 성공으로 답한다. 첫 응답을 잃고 다시 보내는 사이 부모 run 이 끝날 수 있어서다. 그 밖에는 부모를 푼다.
 
 1. `(토큰의 profile, parent_session_id)` 등록이 있으면 그 origin 을 잇는다. 하위 에이전트의 하위 에이전트다
-2. 없으면 `(토큰의 profile, parent_root_session_id)` 로 도는 실행 하나가 origin 이다. 최상위 session 이 만든 자식이고, 압축 교체된 최상위 session 이 만든 자식도 뿌리가 같아 여기 온다
+2. 없으면 `(토큰의 profile, parent_root_session_id)` 로 도는 실행 하나가 origin 이다. 최상위 session 이 만든 자식이고, 압축 교체된 최상위 session 이 만든 자식도 루트가 같아 여기 온다
 3. 둘 다 없으면 거절한다
 
 | 응답 | 뜻 |
 | --- | --- |
 | `201` `{"result": "created"}` | 새로 등록했다 |
-| `200` `{"result": "exists"}` | 같은 부모와 뿌리로, 또는 같은 origin 으로 이미 등록돼 있다. 다시 보낸 것으로 본다. 앞의 경우 부모를 다시 풀지 않는다 |
+| `200` `{"result": "exists"}` | 같은 부모와 루트로, 또는 같은 origin 으로 이미 등록돼 있다. 다시 보낸 것으로 본다. 앞의 경우 부모를 다시 풀지 않는다 |
 | `401` | 토큰이 없거나 모르는 토큰이거나 폐기됐거나 profile 이 빈 토큰이다. 사용자 JWT 로 불러도 같다. 본문이 없다 |
-| `403` `{"code": "SESSION_BINDING_REJECTED"}` | JSON 이 아니거나 모양이 틀린 본문, 서명, 부모를 풀지 못함, session 값이 128자를 넘음, `child_session_id` 가 부모나 뿌리나 실행 줄이나 대화의 session 과 같음. 이유는 서버 로그에만 남는다 |
+| `403` `{"code": "SESSION_BINDING_REJECTED"}` | JSON 이 아니거나 모양이 틀린 본문, 서명, 부모를 풀지 못함, session 값이 128자를 넘음, `child_session_id` 가 부모나 루트나 실행 줄이나 대화의 session 과 같음. 이유는 서버 로그에만 남는다 |
 | `409` `{"code": "SESSION_BINDING_CONFLICT"}` | 그 `child_session_id` 가 다른 origin 으로 이미 등록돼 있다. 덮어쓰지 않는다 |
 
 플러그인은 2xx 가 아니거나 연결하지 못하면 로그만 남기고 hook 을 돌려준다. 등록이 없는 하위 에이전트의 호출은 서버가 거절하므로 안전한 쪽으로 실패한다.
@@ -233,7 +233,7 @@ profile 플러그인이 `subagent_start` hook 에서 부른다. 모델 도구가
 | 2 | `delegate_task` 를 부르는 최상위 run 을 돌린다 | 부모 run 이 먼저 끝나고 자식은 계속 돈다 |
 | 3 | 등록 응답 시각과 자식의 첫 도구 호출 시각을 로그로 남긴다 | 등록 응답이 먼저다 |
 | 4 | 부모 run 이 끝난 뒤 자식이 `memory_read` 를 부른다 | origin 실행의 사용자의 본문이 온다 |
-| 5 | `compression.in_place: false` 로 교체된 최상위 session 에서 자식을 만든다 | 등록 본문의 `parent_root_session_id` 가 원래 뿌리다 |
+| 5 | `compression.in_place: false` 로 교체된 최상위 session 에서 자식을 만든다 | 등록 본문의 `parent_root_session_id` 가 원래 루트다 |
 | 6 | 플러그인의 등록을 끈 채 자식이 `memory_read` 를 부른다 | 「호출 맥락을 확인할 수 없습니다」 로 끝난다 |
 | 7 | 자식이 도는 동안 사용자가 부모 turn 을 중지하고, 그 뒤 자식이 `memory_read` 를 부른다 | origin 실행이 `CANCELLED` 이고 「호출 맥락을 확인할 수 없습니다」 로 끝난다 |
 

@@ -63,7 +63,7 @@ provider나 강도만 있는 부분 설정은 기동에서 거절한다.
 이미 시작한 실행은 단계와 provider, 모델, effort를 복사해 두므로 바뀌지 않는다.
 Hermes가 실제로 쓴 provider와 모델은 실행 완료 시 결과로 갱신한다.
 단계 이름은 사용자가 고른 값이며 실제 모델이 넘어가도 그대로 남는다.
-직접 대화, Flow의 뿌리와 자식, Control Plane 위임 실행은 같은 단계 해석을 쓴다.
+직접 대화, Flow의 루트와 자식, Control Plane 위임 실행은 같은 단계 해석을 쓴다.
 
 ## 에이전트 기본 모델
 
@@ -202,13 +202,13 @@ SSE 완료 기록이 먼저 생기면 재조회 작업은 완료 처리하고 �
 첫 assistant delta 수신(`first_delta_at`), 완료(`finished_at`) 시각을 남긴다.
 첫 delta 시각은 한 번만 적고 본문은 추가로 저장하지 않는다.
 SSE를 읽지 않는 Flow와 위임 실행은 첫 delta 시각을 비운다.
-Flow 뿌리는 원래 대화 요청 수신 시각을 쓰고, 자식은 실행기 진입 시각을 쓴다.
+Flow 루트는 원래 대화 요청 수신 시각을 쓰고, 자식은 실행기 진입 시각을 쓴다.
 실행 상세는 네 시각으로 구간을 보이되 없는 시각을 추정하지 않는다.
 요청 수신은 ChatService의 보내기, 스트림, 다시 생성 진입점에서 측정한다.
 자동 깨우기는 요청 대신 내부 trigger 시각을 쓴다.
 제출은 Hermes submit 직전이며 첫 delta는 relay에서 최초 message.delta를 받을 때다.
 제출 전 실패나 취소이면 제출 시각은 null이고 SSE가 없으면 첫 delta도 null이다.
-실행 나무 응답은 provider, cachedInputTokens, totalTokens, modelTier, reasoningEffort,
+실행 트리 응답은 provider, cachedInputTokens, totalTokens, modelTier, reasoningEffort,
 reasoningEffortSource와 위 네 시각을 실행 줄에서 반환한다.
 
 실행 상세와 대화 화면의 실제 제공사, 모델, 토큰, 금액은 ADMIN에게만 보인다.
@@ -221,7 +221,7 @@ API 응답은 그대로 두며 화면에서 역할에 따라 표시한다.
 가짜 Hermes는 자식 완료가 부모 완료 뒤에 오거나 오지 않는 순서를 검사한다.
 세션 조회 지연, 끝내 미완료, 중복 SSE, 재기동, 다른 부모 session, 권한과 기본값 우선순위도 검사한다.
 
-실행 나무는 시작 사건에 `subagentUsageStatus`를 합쳐 반환한다.
+실행 트리는 시작 사건에 `subagentUsageStatus`를 합쳐 반환한다.
 완료 사건이 있으면 `RECORDED`, 만료 작업이면 `UNCONFIRMED`, 기다리는 작업이면 `WAITING`이다.
 작업 설명은 상태 안내로 바꾸지 않는다.
 profile에도 강도 설정이 없으면 실제 강도를 모르므로 출처를 `UNKNOWN`으로 둔다.

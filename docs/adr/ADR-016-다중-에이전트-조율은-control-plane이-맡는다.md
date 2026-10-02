@@ -73,7 +73,7 @@ delegation toolset도 비활성 상태라 부모가 `delegate_task`를 사용할
 | 병렬 실행 | 확인: dispatcher가 준비된 profile 작업자를 병렬로 띄운다 | 확인: 같은 dispatcher를 쓸 수 있다 | 판단: 의존 관계가 없는 실행을 정한 상한 안에서 함께 제출한다 |
 | 실패와 재시도 | 확인: `task_runs`에 실패 상태가 있고 Task에 재시도 상한이 있다 | 확인: Kanban 상태를 API로 내보낼 수 있다 | 판단: 실행 상태와 재시도 횟수를 Control Plane이 저장한다 |
 | 결과 합치기 | 확인: `swarm`이 verifier와 synthesizer Task를 만든다 | 확인: 같은 Task를 API로 만들 수 있다 | 판단: Reviewer와 Synthesizer를 의존 Task로 실행한다 |
-| 부모와 뿌리 연결 | 확인: Kanban 안의 Task와 run은 연결되지만 `agent_execution`과는 연결되지 않는다 | 판단: Plugin이 Kanban 식별자와 실행 식별자를 따로 연결해야 한다 | 확인: 기존 `parent_execution_id`와 `root_execution_id`에 직접 기록할 수 있다 |
+| 부모와 루트 연결 | 확인: Kanban 안의 Task와 run은 연결되지만 `agent_execution`과는 연결되지 않는다 | 판단: Plugin이 Kanban 식별자와 실행 식별자를 따로 연결해야 한다 | 확인: 기존 `parent_execution_id`와 `root_execution_id`에 직접 기록할 수 있다 |
 | 사용량과 비용 | 확인: `task_runs`에는 토큰과 비용 칸이 없다 | 판단: Plugin hook으로 실행별 사용량을 따로 모아야 한다 | 확인: 각 Task를 top-level Runs API 실행으로 만들면 기존 실행 기록에 usage를 남길 수 있다 |
 | 사용자, Memory와 credential 경계 | 확인: `tenant`는 문자열이고 assignee profile은 호출자가 정한다 | 판단: Plugin이 Control Plane의 권한 검사를 다시 구현해야 한다 | 확인: 기존 바인딩 확인, Memory 주입과 profile key 조회 경로를 실행마다 그대로 쓸 수 있다 |
 
@@ -135,7 +135,7 @@ Memory도 같은 요청자의 개인 범위와 가족 공용 범위에서 실행
 - **A. Hermes Kanban을 그대로 쓴다.**
   Task 그래프, 병렬 실행, 재시도와 종합자는 이미 있다.
   그러나 현재 Runs API에 Kanban endpoint가 없고,
-  Kanban의 Task와 run이 `agent_execution`의 부모와 뿌리에 연결되지 않는다.
+  Kanban의 Task와 run이 `agent_execution`의 부모와 루트에 연결되지 않는다.
   실행 시도에는 사용량도 없으며 사용자와 Memory 경계도 Control Plane과 연결되지 않는다.
 - **B. Hermes Plugin으로 orchestration API를 노출한다.**
   배포본에는 Kanban dashboard용 HTTP route 소스가 있지만 Runs API endpoint는 아니다.
@@ -153,12 +153,12 @@ Memory도 같은 요청자의 개인 범위와 가족 공용 범위에서 실행
 얻는 것
 
 - Chief, Orchestrator, Specialist, Worker, Reviewer와 Synthesizer를
-  모두 같은 `agent_execution` 나무에서 볼 수 있다.
+  모두 같은 `agent_execution` 트리에서 볼 수 있다.
 - 조사와 구현처럼 의존 관계가 없는 Task를 병렬로 실행하고,
   Reviewer와 Synthesizer는 선행 실행이 끝난 뒤 시작할 수 있다.
 - 모든 실행이 기존 사용자 확인, 에이전트 바인딩, Memory 주입과 credential 조회를 거친다.
 - Task마다 Hermes가 보고한 usage를 한 번만 저장한다.
-  부모와 자식 합계는 Control Plane이 만든 실행 나무의 행을 더하므로 빠지거나 두 번 세지 않는다.
+  부모와 자식 합계는 Control Plane이 만든 실행 트리의 행을 더하므로 빠지거나 두 번 세지 않는다.
 - Hermes core를 고치지 않고 기존 Runs API만 사용한다.
 
 감당할 것

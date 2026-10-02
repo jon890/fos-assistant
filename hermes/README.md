@@ -74,7 +74,7 @@ fos-ctx 를 켠 모든 profile 에 걸린다. 사람이 운영하는 profile 도
 ### 자식 session 을 등록한다
 
 최상위 run 의 `delegate_task` 자식은 부모 run 이 끝난 뒤에도 백그라운드로 돈다.
-Control Plane 은 부모 run 으로 자식의 요청자를 찾지 못하므로, fos-ctx 가 `subagent_start` hook 에서 자식 session 의 부모와 뿌리를 등록한다.
+Control Plane 은 부모 run 으로 자식의 요청자를 찾지 못하므로, fos-ctx 가 `subagent_start` hook 에서 자식 session 의 부모와 루트를 등록한다.
 경로, 본문, 서명, 응답은 [`../docs/hermes/fos-ctx.md`](../docs/hermes/fos-ctx.md) 「하위 에이전트 session 등록 계약」 이 소유한다.
 
 | 항목 | 값 |

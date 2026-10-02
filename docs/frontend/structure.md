@@ -13,7 +13,7 @@
 | `/signin` | 로그인 |
 | `/usage` | 사용량 |
 | `/memory` | 개인과 그룹 공용 Memory |
-| `/executions/{id}` | 실행 하나의 도구와 하위 에이전트 나무 |
+| `/executions/{id}` | 실행 하나의 도구와 하위 에이전트 트리 |
 | `/agents` | 에이전트 목록과 「새 에이전트」. `ADMIN` 에게는 다른 사람의 비공개와 꺼진 에이전트, 운영 profile 등록이 더 보인다 |
 | `/agents/{code}` | 에이전트 하나의 설정. 성격, 도구, 스킬, 주인과 `ADMIN` 에게 공개와 삭제, `ADMIN` 에게만 관리 절 |
 | `/agents/{code}/skills/new` | 새 스킬. 주인과 `ADMIN` |
