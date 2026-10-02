@@ -7,6 +7,7 @@ import static org.assertj.core.api.Assertions.tuple;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
 
+import com.bifos.assistant.agent.application.AgentService;
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.agent.domain.AgentVisibility;
 import com.bifos.assistant.agent.domain.CostMode;
@@ -120,6 +121,10 @@ class RestartReconcilerTest {
     /** 적다가 한 번 실패하는 경우를 만들려고 감싼다. 그 밖의 검사에서는 실제 동작 그대로다. */
     @MockitoSpyBean
     RecoveredRunRecorder recorder;
+
+    /** 잡다가 에이전트 조회가 실패하는 경우를 만들려고 감싼다. 그 밖의 검사에서는 실제 동작 그대로다. */
+    @MockitoSpyBean
+    AgentService agentService;
 
     @Autowired
     RestartReconciler reconciler;
@@ -538,7 +543,7 @@ class RestartReconcilerTest {
 
     @Test
     @DisplayName("내려가기 시작한 뒤에는 줄을 적지 않고 중지도 보내지 않는다")
-    void writesNothingAfterStop() throws InterruptedException {
+    void writesNothingAfterStop() {
         AgentExecution row = chatTurn(conversation, chief);
         stub.willLookup(row.hermesRunId(), HermesRunLookup.running());
         try {
@@ -548,8 +553,8 @@ class RestartReconcilerTest {
 
             reconciler.stop();
             stub.willLookup(row.hermesRunId(), finished(row, "completed", "끝난 답"));
-            // 상한보다 오래 기다려, 묻던 스레드가 살아 있었다면 답을 적거나 상한으로 실패를 적었을 시간을 준다.
-            Thread.sleep(SHORT_WAIT.multipliedBy(2));
+            // 묻던 스레드가 끝난 뒤에 본다. 끝난 뒤에는 줄을 적을 것이 남아 있지 않다.
+            awaitUntil(() -> reconciler.activeThreads() == 0, "묻던 스레드가 끝나지 않았다");
 
             assertThat(reconciler.isRunning()).isFalse();
             assertThat(statusOf(row)).as("다음 기동이 다시 정하도록 남긴다").isEqualTo(ExecutionStatus.RUNNING);
@@ -583,6 +588,97 @@ class RestartReconcilerTest {
         assertThat(messages.findByConversationIdOrderByIdAsc(conversation.id()))
                 .extracting(ChatMessage::content)
                 .containsExactly("끝난 답");
+    }
+
+    @Test
+    @DisplayName("끝난 답을 계속 적지 못해 상한을 넘기면 중지를 보내지 않고 RECONCILE_TIMEOUT 으로 적는다")
+    void recordsTimeoutWithoutStopWhenFinishedAnswerCannotBeWritten() {
+        AgentExecution row = chatTurn(conversation, chief);
+        stub.willLookup(row.hermesRunId(), finished(row, "completed", "끝난 답"));
+        doThrow(new IllegalStateException("계속되는 DB 오류")).when(recorder).settle(any(), any());
+
+        reconciler.claim();
+        reconciler.reconcile(SHORT_WAIT);
+
+        AgentExecution saved = awaitStatus(row, ExecutionStatus.FAILED);
+        assertThat(saved.errorCode())
+                .as("Hermes 의 답은 받았으므로 닿지 못한 것이 아니다")
+                .isEqualTo("RECONCILE_TIMEOUT");
+        awaitIdle(conversation.id());
+        assertThat(stub.stopped()).as("이미 끝난 run 에는 중지를 보내지 않는다").isEmpty();
+    }
+
+    @Test
+    @DisplayName("잡다가 에이전트 조회가 실패한 줄의 대화는 잠긴 채 남지 않고, 다시 잡으면 한 번만 센다")
+    void conversationIsNotLeftLockedWhenClaimFailsAndRetryCountsOnce() {
+        AgentExecution row = chatTurn(conversation, chief);
+        stub.willLookup(row.hermesRunId(), finished(row, "completed", "끝난 답"));
+        doThrow(new IllegalStateException("일시적인 DB 오류"))
+                .doCallRealMethod()
+                .when(agentService)
+                .findById(chief.id());
+
+        assertThatThrownBy(() -> reconciler.claim()).isInstanceOf(IllegalStateException.class);
+        assertThat(turns.markOf(conversation.id()).running())
+                .as("잡다가 실패한 줄의 잠금")
+                .isFalse();
+
+        reconciler.claim();
+        assertThat(turns.markOf(conversation.id())).isEqualTo(new TurnMark(true, row.id()));
+        reconciler.reconcile(LONG_WAIT);
+
+        awaitStatus(row, ExecutionStatus.SUCCEEDED);
+        // 남은 줄 수를 두 번 셌다면 한 줄이 정해져도 잠금이 풀리지 않는다.
+        awaitIdle(conversation.id());
+    }
+
+    @Test
+    @DisplayName("뿌리 줄이 끝나고 자식만 도는 흐름 turn 도 대화를 잠그고, 자식을 멈춘 뒤에 푼다")
+    void locksConversationForRunningFlowChildUntilItIsStopped() {
+        Agent flowed = agent("flowed", "흐름");
+        flowed.assignFlow(ResearchAndBuildFlow.NAME);
+        flowed = agents.save(flowed);
+        Conversation flowConversation = conversations.save(Conversation.startedBy(dad.id(), "흐름 대화", flowed.id()));
+        AgentExecution root = executions.save(AgentExecution.builder()
+                .userId(dad.id())
+                .conversationId(flowConversation.id())
+                .agentId(flowed.id())
+                .profileName(flowed.hermesProfile())
+                .hermesRunId("run-" + UUID.randomUUID())
+                .costMode(CostMode.SUBSCRIPTION)
+                .status(ExecutionStatus.SUCCEEDED)
+                .timing(Instant.now().minus(Duration.ofMinutes(2)), Instant.now().minus(Duration.ofMinutes(1)))
+                .build());
+        AgentExecution child = executions.save(AgentExecution.builder()
+                .userId(dad.id())
+                .conversationId(flowConversation.id())
+                .agentId(worker.id())
+                .parentExecutionId(root.id())
+                .rootExecutionId(root.treeRootId())
+                .profileName("worker")
+                .hermesRunId("run-" + UUID.randomUUID())
+                .costMode(CostMode.SUBSCRIPTION)
+                .status(ExecutionStatus.RUNNING)
+                .startedAt(Instant.now().minus(Duration.ofMinutes(1)))
+                .build());
+        stub.willLookup(child.hermesRunId(), HermesRunLookup.running());
+        stub.onStop(runId -> stub.willLookup(runId, finished(child, "cancelled", "")));
+
+        reconciler.claim();
+
+        assertThat(turns.markOf(flowConversation.id()))
+                .as("표시에는 뿌리 실행 번호가 붙는다")
+                .isEqualTo(new TurnMark(true, root.id()));
+        assertThatThrownBy(() -> chat.send(dad, flowConversation.id(), "그 사이 보낸 글", "flowed"))
+                .isInstanceOfSatisfying(
+                        ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.CONVERSATION_BUSY));
+
+        reconciler.reconcile(LONG_WAIT);
+
+        awaitStatus(child, ExecutionStatus.CANCELLED);
+        awaitIdle(flowConversation.id());
+        assertThat(stub.stopped()).containsExactly(child.hermesRunId());
+        assertThat(statusOf(root)).as("끝난 뿌리 줄은 그대로다").isEqualTo(ExecutionStatus.SUCCEEDED);
     }
 
     @Test

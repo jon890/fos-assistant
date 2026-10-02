@@ -44,6 +44,10 @@ import org.springframework.transaction.support.TransactionTemplate;
  * {@code RUNNING} 이 아니면 아무것도 하지 않는다. 메시지와 session 은 그 트랜잭션 안에서만 적는다. 끝 사건과
  * 결과물 묶기와 알림은 트랜잭션이 끝난 뒤, 실제로 적었을 때만 한다.
  *
+ * <p>끝 사건과 결과물 묶기와 알림은 커밋 뒤에 한 번만 한다. 커밋과 그 일들 사이에 프로세스가 죽으면 다시 하지
+ * 않는다. 줄이 이미 끝난 상태라 다음 기동이 그 줄을 다시 적지 않기 때문이다. 위임 결과만은 전했다는 표시가 실행
+ * 줄에 있어 기동 뒤 깨우기가 전한다.
+ *
  * <p>Hermes 에 묻고 기다리는 것, turn 잠금, 대기 줄을 멈추는 것은 여기서 하지 않는다. 부르는 쪽이 한다. 다시
  * 붙어 끝난 대화 turn 은 Memory 제안과 추천 질문 갱신을 돌리지 않는다.
  */
@@ -159,20 +163,42 @@ public class RecoveredRunRecorder {
         if (result.succeeded()) {
             // 흐름의 단계 순서와 합치기는 내려간 프로세스의 메모리에만 있었다. 뿌리는 성공으로 끝났어도 답을
             // 합쳐 줄 곳이 없어 실패로 적고 사용량만 남긴다.
-            if (kind == RecoveredRunKind.FLOW && row.parentExecutionId() == null) {
+            if (isFlowRoot(row, kind)) {
                 AgentExecution saved = executions.fail(row, agent, result, requested, ORPHANED);
-                return new Written(saved, kind, ExecutionEventType.RUN_FAILED, ORPHANED, null, null);
+                return new Written(
+                        saved, kind, ExecutionEventType.RUN_FAILED, ORPHANED, null, flowRootNotice(saved, kind, false));
             }
             AgentExecution saved = executions.complete(row, agent, result, requested);
             return new Written(saved, kind, ExecutionEventType.RUN_COMPLETED, null, null, null);
         }
         if (isCancelled(result)) {
             AgentExecution saved = executions.cancel(row, agent, result, requested);
-            return new Written(saved, kind, ExecutionEventType.RUN_CANCELLED, null, null, null);
+            return new Written(
+                    saved, kind, ExecutionEventType.RUN_CANCELLED, null, null, flowRootNotice(saved, kind, true));
         }
         String code = errorCodeOf(result);
         AgentExecution saved = executions.fail(row, agent, result, requested, code);
-        return new Written(saved, kind, ExecutionEventType.RUN_FAILED, code, null, null);
+        return new Written(saved, kind, ExecutionEventType.RUN_FAILED, code, null, flowRootNotice(saved, kind, false));
+    }
+
+    private static boolean isFlowRoot(AgentExecution row, RecoveredRunKind kind) {
+        return kind == RecoveredRunKind.FLOW && row.parentExecutionId() == null;
+    }
+
+    /**
+     * 흐름 turn 의 뿌리 줄이 끝났을 때 그 대화의 화면에 낼 사건이다. 뿌리 줄이 아니거나 대화가 없으면 null 이다.
+     *
+     * <p>화면은 이 사건을 받고 「답을 만드는 중」 을 내린다. 흐름은 이어 가지 못하므로 답 없이 끝난다.
+     */
+    private ChatEvent flowRootNotice(AgentExecution row, RecoveredRunKind kind, boolean cancelled) {
+        if (!isFlowRoot(row, kind)) {
+            return null;
+        }
+        Conversation conversation = liveConversation(row);
+        if (conversation == null) {
+            return null;
+        }
+        return cancelled ? ChatEvent.stopped(conversation.publicId(), null, row.id()) : failureNotice(false);
     }
 
     private Written settleChatTurn(AgentExecution row, Agent agent, HermesRunResult result, ModelChoice requested) {
@@ -238,8 +264,8 @@ public class RecoveredRunRecorder {
     /** Hermes 의 결과 없이 실패로 적는다. 사용량을 적지 않는다. */
     private Written failLocked(AgentExecution row, String errorCode) {
         RecoveredRunKind kind = kindOf(row);
-        ChatEvent notice =
-                kind == RecoveredRunKind.CHAT_TURN && liveConversation(row) != null ? failureNotice(false) : null;
+        boolean turnRoot = kind == RecoveredRunKind.CHAT_TURN || isFlowRoot(row, kind);
+        ChatEvent notice = turnRoot && liveConversation(row) != null ? failureNotice(false) : null;
         return new Written(
                 executions.fail(row, errorCode), kind, ExecutionEventType.RUN_FAILED, errorCode, null, notice);
     }
@@ -260,6 +286,10 @@ public class RecoveredRunRecorder {
      *
      * <p>대화의 마지막 유효 메시지가 답이면 그 답을 다시 생성하던 turn 이다. 다시 생성은 질문을 새로 저장하지
      * 않기 때문이다. 그때는 앞 답을 대신한 것으로 적는다.
+     *
+     * <p>다시 생성인지는 저장된 값이 아니라 마지막 유효 메시지로 미루어 정한다. 그래서 한 대화에 {@code RUNNING}
+     * 뿌리 줄이 둘이면 뒤에 적는 답이 앞에 적은 답을 대신한 것으로 저장된다. 대화 하나에는 도는 turn 이 하나뿐이라
+     * 보통 생기지 않는다.
      */
     private Long saveAnswer(AgentExecution row, String answer) {
         if (messages.existsByExecutionId(row.id())) {

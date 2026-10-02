@@ -384,8 +384,15 @@ class RecoveredRunRecorderTest {
         Conversation flowConversation = conversations.save(Conversation.startedBy(dad.id(), "흐름 대화", flowed.id()));
         AgentExecution row = chatTurn(flowConversation, flowed);
         assertThat(recorder.kindOf(row)).isEqualTo(RecoveredRunKind.FLOW);
+        List<ChatEvent> flowEvents = new CopyOnWriteArrayList<>();
+        Runnable stopListening = hub.subscribe(flowConversation.id(), flowEvents::add);
 
-        boolean written = recorder.settle(row.id(), result("completed", "합치지 못한 답"));
+        boolean written;
+        try {
+            written = recorder.settle(row.id(), result("completed", "합치지 못한 답"));
+        } finally {
+            stopListening.run();
+        }
 
         assertThat(written).isTrue();
         AgentExecution saved = executions.findById(row.id()).orElseThrow();
@@ -398,6 +405,46 @@ class RecoveredRunRecorderTest {
                 .as("흐름 뿌리의 끝 사건")
                 .extracting(ExecutionEvent::eventType, ExecutionEvent::detail)
                 .containsExactly(tuple(ExecutionEventType.RUN_FAILED, "ORPHANED"));
+        assertThat(flowEvents)
+                .as("화면이 답을 만드는 중을 내리도록 낸 사건")
+                .extracting(ChatEvent::type, ChatEvent::code)
+                .containsExactly(tuple("error", "HERMES_RUN_FAILED"));
+    }
+
+    @Test
+    @DisplayName("흐름 turn 의 뿌리 줄이 취소나 실패로 끝나면 메시지 없이 stopped 나 error 를 낸다")
+    void flowRootPublishesStoppedOrErrorWithoutMessage() {
+        Agent flowed = agent("flowed", "흐름");
+        flowed.assignFlow(ResearchAndBuildFlow.NAME);
+        flowed = agents.save(flowed);
+        Conversation cancelledConversation = conversations.save(Conversation.startedBy(dad.id(), "취소", flowed.id()));
+        Conversation failedConversation = conversations.save(Conversation.startedBy(dad.id(), "실패", flowed.id()));
+        AgentExecution cancelled = chatTurn(cancelledConversation, flowed);
+        AgentExecution failed = chatTurn(failedConversation, flowed);
+        List<ChatEvent> cancelledEvents = new CopyOnWriteArrayList<>();
+        List<ChatEvent> failedEvents = new CopyOnWriteArrayList<>();
+        Runnable stopCancelled = hub.subscribe(cancelledConversation.id(), cancelledEvents::add);
+        Runnable stopFailed = hub.subscribe(failedConversation.id(), failedEvents::add);
+
+        try {
+            recorder.settle(cancelled.id(), result("cancelled", "일부 답"));
+            recorder.settle(failed.id(), result("failed", null));
+        } finally {
+            stopCancelled.run();
+            stopFailed.run();
+        }
+
+        assertThat(executions.findById(cancelled.id()).orElseThrow().status()).isEqualTo(ExecutionStatus.CANCELLED);
+        assertThat(cancelledEvents)
+                .extracting(ChatEvent::type, ChatEvent::messageId, ChatEvent::executionId)
+                .containsExactly(tuple("stopped", null, cancelled.id()));
+        assertThat(messages.findByConversationIdOrderByIdAsc(cancelledConversation.id()))
+                .as("흐름 뿌리의 답은 대화에 쓰지 않는다")
+                .isEmpty();
+        assertThat(executions.findById(failed.id()).orElseThrow().status()).isEqualTo(ExecutionStatus.FAILED);
+        assertThat(failedEvents)
+                .extracting(ChatEvent::type, ChatEvent::code)
+                .containsExactly(tuple("error", "HERMES_RUN_FAILED"));
     }
 
     @Test

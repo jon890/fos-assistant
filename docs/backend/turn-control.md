@@ -118,12 +118,13 @@ Hermes 의 실행 조회가 무엇을 얼마 동안 답하는지는 [`hermes/run
 
 두 단계로 돈다.
 
-1. **잡기.** 웹 서버가 요청을 받기 전에 돈다. `RUNNING` 줄을 읽고, run 번호가 있는 대화 turn 과 흐름 turn 의 뿌리 줄마다 그 대화의 turn 잠금을 잡는다.
+1. **잡기.** 웹 서버가 요청을 받기 전에 돈다. `RUNNING` 줄을 읽고, run 번호가 있는 대화 turn 의 뿌리 줄과 흐름 turn 의 줄마다 그 대화의 turn 잠금을 잡는다.
    그 실행 번호와 run 을 표시에 붙인다. Hermes 를 부르지 않고 실행 줄도 고치지 않는다.
 2. **묻기.** `ApplicationReadyEvent` 에서 시작한다. `NextTurnDispatcher` 의 기동 뒤 깨우기보다 먼저다.
    run 번호가 없는 줄을 `FAILED`(`ORPHANED`) 로 적고, 나머지는 실행마다 가상 스레드 하나가 Hermes 에 묻고 끝날 때까지 다시 묻는다. 줄을 적은 뒤 잡은 잠금을 푼다.
 
 Control Plane 이 내려갈 때 묻던 스레드는 줄을 적지 않고 끝난다. 줄이 `RUNNING` 으로 남아 다음 기동이 다시 정한다.
+잡기가 실패해도 기동은 이어 간다. 그때는 묻기 단계가 다시 잡되, 기동하기 전에 시작한 줄만 대상으로 삼는다. 웹 서버가 열린 뒤 새로 시작한 turn 의 줄을 건드리지 않기 위해서다.
 `assistant.restart-reconcile.enabled` 를 false 로 두면 기동 때 잡지도 묻지도 않는다. 테스트 profile 이 이렇게 돈다. 운영에서는 끄지 않는다. 끄면 `RUNNING` 줄이 그대로 남는다.
 
 ```mermaid
@@ -152,9 +153,11 @@ flowchart TD
 | 실행 | 판정 | 끝났을 때 적는 것 | 아직 돌 때 |
 | --- | --- | --- | --- |
 | 대화 turn | 부모가 없고 대화가 있다. 그 에이전트에 흐름이 없다 | 실행 줄, `ASSISTANT` 메시지, 대화의 session. 그 실행이 시작한 뒤 대화 폴더에 생긴 HTML 을 답에 묶는다. 대화 단위 SSE 로 `done`, `stopped`, `error` 가운데 하나를 낸다 | 다시 붙는다. 그 대화의 turn 잠금을 쥔다 |
-| 위임 실행 | `delegation_key` 가 있다 | 실행 줄과 `output_text`. `DelegationFinished` 를 낸다 | 다시 붙는다. 잠금은 잡지 않는다 |
-| 흐름 turn 과 그 자식 | 뿌리 실행의 에이전트에 흐름이 있다 | 실행 줄. 뿌리는 성공으로 끝났어도 `FAILED`(`ORPHANED`) 로 적고 사용량은 남긴다 | 중지를 보내고 끝난 상태를 기다린다. 뿌리는 그 대화의 turn 잠금을 쥔다 |
-| 그 밖의 실행(Memory 제안, 추천 질문) | 위 셋이 아니다 | 실행 줄만 적는다. 답은 쓰지 않는다 | 다시 붙는다. 잠금은 잡지 않는다 |
+| 위임 실행 | `delegation_key` 가 있다 | 실행 줄과 `output_text` 와 끝 사건. `DelegationFinished` 를 낸다 | 다시 붙는다. 잠금은 잡지 않는다 |
+| 흐름 turn 과 그 자식 | 뿌리 실행의 에이전트에 흐름이 있다 | 실행 줄과 끝 사건. 뿌리는 성공으로 끝났어도 `FAILED`(`ORPHANED`) 로 적고 사용량은 남긴다. 뿌리가 끝나면 대화 단위 SSE 로 `error` 나 `stopped` 를 낸다 | 중지를 보내고 끝난 상태를 기다린다. 그 대화의 turn 잠금을 쥔다. 뿌리 줄이 이미 끝나고 자식만 도는 때에도 쥔다 |
+| 그 밖의 실행(Memory 제안, 추천 질문) | 위 셋이 아니다 | 실행 줄과 끝 사건만 적는다. 답은 쓰지 않는다 | 다시 붙는다. 잠금은 잡지 않는다 |
+
+끝 사건, 결과물 묶기, 알림은 실행 줄을 적은 트랜잭션이 끝난 뒤에 한 번 한다. 그 사이에 프로세스가 죽으면 다시 하지 않는다. 위임 결과는 기동 뒤 깨우기가 전한다.
 
 실행 줄은 보통 turn 과 같은 기록 경로로 적는다. 성공은 `ExecutionRecorder.complete`, 실패는 사용량을 남기는 `ExecutionRecorder.fail`, 취소는 `ExecutionRecorder.cancel` 이다.
 위임 답은 보통 위임과 같이 `assistant.delegation.output-max-chars` 까지 자른다.
