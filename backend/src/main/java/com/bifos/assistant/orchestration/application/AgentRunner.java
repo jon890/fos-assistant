@@ -234,7 +234,7 @@ public class AgentRunner {
             String code = result.providerBlocked()
                     ? ErrorCode.PROVIDER_BLOCKED.name()
                     : result.status() == null ? "UNKNOWN" : result.status().toUpperCase();
-            AgentExecution failed = executions.fail(execution, code);
+            AgentExecution failed = executions.fail(execution, agent, result, choice, code);
             append(failed, ExecutionEventType.RUN_FAILED, code, 2);
             return new Run(failed, ChildResult.failed(failed.id(), code), null);
         }
