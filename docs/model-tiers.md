@@ -141,7 +141,7 @@ Memory 제안 실행은 방금 판정을 지난 원래 실행의 값을 그대�
 
 | 경로 | 요청 또는 응답 |
 | --- | --- |
-| `GET /api/v1/chat/model-tiers?agentCode=...` | `tiers` 배열(`tier`, `label`, `provider`, `model`, `reasoningEffort`), `userDefaultTier`, `groupDefaultTier`, `admin` |
+| `GET /api/v1/chat/model-tiers?agentCode=...` | `tiers` 배열(`tier`, `label`, `provider`, `model`, `reasoningEffort`), `userDefaultTier`, `groupDefaultTier`, `admin`. `MEMBER` 역할에게는 단계의 `provider`, `model`, `reasoningEffort` 가 `null` 이다 |
 | `PUT /api/v1/chat/model-tiers/default` | 본문 `tier`: 단계 코드 또는 `null`. 내 기본값을 저장한다 |
 | `PUT /api/v1/chat/model-tiers/group` | 관리자 전용. `tiers` 세 정의와 `defaultTier`를 한 트랜잭션으로 저장한다 |
 | `PUT /api/v1/chat/conversations/{id}/model-tier` | `mode`와 `tier`. `DEFAULT`면 tier는 비고 `TIER`면 유효한 코드가 필요하다 |
