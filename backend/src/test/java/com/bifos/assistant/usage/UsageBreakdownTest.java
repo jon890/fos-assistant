@@ -93,8 +93,7 @@ class UsageBreakdownTest {
         executions.deleteAll();
         career = agent(CAREER_CODE, "진로 비서");
         chore = agent(CHORE_CODE, "집안일 비서");
-        controller =
-                new UsageController(rootExecutions, currentUser, agentService, trees, skillUsage, summaries);
+        controller = new UsageController(rootExecutions, currentUser, agentService, trees, skillUsage, summaries);
         when(currentUser.require()).thenReturn(new CurrentUser(USER_ID, "dad@example.com", "dad", 1L, UserRole.ADMIN));
         // 묶음 합계는 관리자만 받는다. 대역이어도 관리자 확인은 실제 판정을 타게 한다.
         doCallRealMethod().when(currentUser).requireAdmin();

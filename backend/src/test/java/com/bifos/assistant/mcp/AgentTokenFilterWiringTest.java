@@ -34,8 +34,9 @@ class AgentTokenFilterWiringTest {
     @Test
     @DisplayName("profile 토큰 필터는 사용자 JWT 필터보다 앞에 한 번만 등록된다")
     void placesAgentTokenFilterOnceBeforeJwtFilter() {
-        List<Class<?>> filterClasses =
-                filterChain.getFilters().stream().<Class<?>>map(Filter::getClass).toList();
+        List<Class<?>> filterClasses = filterChain.getFilters().stream()
+                .<Class<?>>map(Filter::getClass)
+                .toList();
 
         assertThat(filterClasses)
                 .filteredOn(type -> type == AgentTokenAuthenticationFilter.class || type == ControlPlaneJwtFilter.class)

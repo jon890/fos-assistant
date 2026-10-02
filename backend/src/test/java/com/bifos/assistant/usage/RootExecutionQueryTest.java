@@ -73,9 +73,7 @@ class RootExecutionQueryTest {
 
         assertThat(page.executions()).extracting(AgentExecution::id).containsExactly(second.id(), first.id());
         assertThat(page.idsHavingChildren()).containsExactly(first.id());
-        assertThat(page.conversationPublicIds())
-                .hasSize(1)
-                .containsEntry(conversation.id(), conversation.publicId());
+        assertThat(page.conversationPublicIds()).hasSize(1).containsEntry(conversation.id(), conversation.publicId());
     }
 
     @Test

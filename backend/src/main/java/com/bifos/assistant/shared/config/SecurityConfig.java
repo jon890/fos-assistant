@@ -25,16 +25,14 @@ public class SecurityConfig {
     @Bean
     public FilterRegistrationBean<AgentTokenFilter> disableDirectAgentTokenFilterRegistration(
             AgentTokenFilter agentTokenFilter) {
-        FilterRegistrationBean<AgentTokenFilter> registration =
-                new FilterRegistrationBean<>(agentTokenFilter);
+        FilterRegistrationBean<AgentTokenFilter> registration = new FilterRegistrationBean<>(agentTokenFilter);
         registration.setEnabled(false);
         return registration;
     }
 
     @Bean
     public SecurityFilterChain filterChain(
-            HttpSecurity http, ControlPlaneJwtFilter jwtFilter, AgentTokenFilter agentTokenFilter)
-            throws Exception {
+            HttpSecurity http, ControlPlaneJwtFilter jwtFilter, AgentTokenFilter agentTokenFilter) throws Exception {
         return http.csrf(csrf -> csrf.disable())
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth.dispatcherTypeMatchers(DispatcherType.ASYNC)

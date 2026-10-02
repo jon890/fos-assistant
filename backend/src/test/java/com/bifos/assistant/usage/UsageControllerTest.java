@@ -99,8 +99,7 @@ class UsageControllerTest {
                         AgentVisibility.PRIVATE,
                         USER_ID,
                         Instant.now())));
-        controller =
-                new UsageController(rootExecutions, currentUser, agentService, trees, skillUsage, summaries);
+        controller = new UsageController(rootExecutions, currentUser, agentService, trees, skillUsage, summaries);
         // 대역이어도 관리자 확인은 실제 판정을 탄다. 그래야 MEMBER 역할의 거절을 볼 수 있다.
         doCallRealMethod().when(currentUser).requireAdmin();
         signInAs(UserRole.ADMIN);
