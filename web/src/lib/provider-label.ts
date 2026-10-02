@@ -12,13 +12,22 @@ const PROVIDER_LABELS: Record<string, string> = {
   gemini: "Google",
 };
 
-/** provider id 를 화면에 그릴 이름으로 바꾼다. 모르는 id 는 「다른 제공사」 다. 비어 있으면 null 이다. */
-export function providerLabel(
+/**
+ * 표에 있는 provider id 만 화면에 그릴 이름으로 바꾼다. 모르는 id 와 빈 값은 null 이다.
+ * 관리자의 숨김 편집처럼 모르는 id 를 그대로 보여야 하는 자리가 쓴다.
+ */
+export function knownProviderLabel(
   provider: string | null | undefined,
 ): string | null {
   const id = provider?.trim();
   if (!id) return null;
-  return Object.hasOwn(PROVIDER_LABELS, id)
-    ? PROVIDER_LABELS[id]
-    : "다른 제공사";
+  return Object.hasOwn(PROVIDER_LABELS, id) ? PROVIDER_LABELS[id] : null;
+}
+
+/** provider id 를 화면에 그릴 이름으로 바꾼다. 모르는 id 는 「다른 제공사」 다. 비어 있으면 null 이다. */
+export function providerLabel(
+  provider: string | null | undefined,
+): string | null {
+  if (!provider?.trim()) return null;
+  return knownProviderLabel(provider) ?? "다른 제공사";
 }

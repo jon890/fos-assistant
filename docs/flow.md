@@ -892,6 +892,7 @@ sequenceDiagram
 
 모델 목록은 저장하지 않는다. Hermes 가 답한 것을 Control Plane 메모리에 10분 들고 있는다.
 profile 마다 따로 들고 있고, Control Plane 이 다시 뜨면 비어서 시작한다.
+다시 읽기가 실패하면 옛 목록을 쓰고 1분 뒤에 다시 읽는다.
 
 ## 에이전트가 물을 때
 

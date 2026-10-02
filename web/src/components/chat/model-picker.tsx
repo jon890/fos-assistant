@@ -429,6 +429,8 @@ export function ModelTierPicker({
   const [draftTiers, setDraftTiers] = useState<ModelTier[]>(FALLBACK_TIERS);
   const [groupDefaultTier, setGroupDefaultTier] =
     useState<ModelTierCode | null>(null);
+  /** 단계마다 「모델 제공사」 도움말의 id 를 만드는 앞머리다 */
+  const providerHelpId = useId();
 
   useEffect(() => {
     let active = true;
@@ -743,22 +745,28 @@ export function ModelTierPicker({
                         <legend className="px-1 text-sm font-medium">
                           {item.label}
                         </legend>
-                        <label className="grid gap-1 text-sm">
-                          모델 제공사
-                          <Input
-                            value={item.provider ?? ""}
-                            onChange={(event) =>
-                              updateDraft(
-                                item.tier,
-                                "provider",
-                                event.target.value,
-                              )
-                            }
-                          />
-                          <span className="text-xs text-muted-foreground">
+                        <div className="grid gap-1">
+                          <label className="grid gap-1 text-sm">
+                            모델 제공사
+                            <Input
+                              value={item.provider ?? ""}
+                              aria-describedby={`${providerHelpId}-${item.tier}`}
+                              onChange={(event) =>
+                                updateDraft(
+                                  item.tier,
+                                  "provider",
+                                  event.target.value,
+                                )
+                              }
+                            />
+                          </label>
+                          <p
+                            id={`${providerHelpId}-${item.tier}`}
+                            className="text-xs text-muted-foreground"
+                          >
                             비워 두면 에이전트의 기본 모델 제공사를 써요.
-                          </span>
-                        </label>
+                          </p>
+                        </div>
                         <label className="grid gap-1 text-sm">
                           모델
                           <Input

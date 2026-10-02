@@ -1,6 +1,7 @@
 package com.bifos.assistant.chat;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doAnswer;
@@ -652,17 +653,22 @@ class ModelTierServiceTest {
     }
 
     @Test
-    @DisplayName("대화 없는 실행은 같은 숨김 판정을 지나고 에이전트 기본값을 돌려준다")
-    void resolveDetachedReturnsAgentDefaultAfterHiddenCheck() {
+    @DisplayName("대화 없는 실행이 보낼 값은 에이전트 기본값이고 그 값이 같은 숨김 판정을 지난다")
+    void detachedChoiceIsAgentDefaultAndPassesSameHiddenCheck() {
         HiddenFixtures visible = hiddenFixtures(hiding("example-provider", "example-other"));
         agentDefault(visible.agent, "example-provider", "example-agent", "medium");
         HiddenFixtures hiddenDefault = hiddenFixtures(hiding("example-provider", "example-model"));
         when(hiddenDefault.options.profileDefaultOf(hiddenDefault.agent))
                 .thenReturn(ModelChoice.stored("example-provider", "example-model", null));
 
-        assertThat(visible.service.resolveDetached(visible.user, visible.agent))
-                .isEqualTo(ModelChoice.stored("example-provider", "example-agent", "medium"));
-        assertThatThrownBy(() -> hiddenDefault.service.resolveDetached(hiddenDefault.user, hiddenDefault.agent))
+        ModelChoice sent = visible.service.detachedChoice(visible.agent);
+        ModelChoice empty = hiddenDefault.service.detachedChoice(hiddenDefault.agent);
+
+        assertThat(sent).isEqualTo(ModelChoice.stored("example-provider", "example-agent", "medium"));
+        assertThatCode(() -> visible.service.requireRunnable(visible.user, visible.agent, sent))
+                .doesNotThrowAnyException();
+        assertThat(empty.usesDefaultModel()).as("기본값이 빈 에이전트는 모델을 싣지 않는다").isTrue();
+        assertThatThrownBy(() -> hiddenDefault.service.requireRunnable(hiddenDefault.user, hiddenDefault.agent, empty))
                 .isInstanceOf(ApiException.class)
                 .extracting(error -> ((ApiException) error).code())
                 .isEqualTo(ErrorCode.MODEL_HIDDEN);

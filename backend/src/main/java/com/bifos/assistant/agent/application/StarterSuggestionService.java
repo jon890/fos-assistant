@@ -214,11 +214,10 @@ public class StarterSuggestionService {
         AgentExecution execution = null;
         try {
             String input = prompt(firstQuestions(user, agent));
-            ModelChoice choice = ModelChoice.stored(
-                    agent.defaultModelProvider(), agent.defaultModel(), agent.defaultReasoningEffort());
+            ModelChoice choice = modelTiers.detachedChoice(agent);
             execution = executions.startDetached(user, agent, choice);
             // 실행 줄을 먼저 만들고 숨김을 판정한다. 거절해도 그 오류 코드로 실패한 줄이 남는다.
-            modelTiers.resolveDetached(user, agent);
+            modelTiers.requireRunnable(user, agent, choice);
             // 대화가 없는 실행이라 에이전트 기본 모델로 돈다. 비어 있으면 profile 의 값이다(ADR-054).
             HermesRunCommand command = new HermesRunCommand(
                     agent.hermesProfile(),

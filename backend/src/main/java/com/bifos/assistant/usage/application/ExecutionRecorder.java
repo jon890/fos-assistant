@@ -194,12 +194,13 @@ public class ExecutionRecorder {
      * 보완이 그 줄을 찾는다.
      *
      * @param parent 원래 실행. 부모와 뿌리 실행 번호가 모두 이 실행이다
-     * @param requested 원래 실행이 Hermes 에 보낸 provider, 모델, effort
+     * @param requested 원래 실행이 Hermes 에 보낸 provider, 모델, effort. null 이면 기본값으로 본다
      */
     public AgentExecution startInheriting(
             CurrentUser user, Conversation conversation, Agent agent, AgentExecution parent, ModelChoice requested) {
+        ModelChoice sent = requested == null ? ModelChoice.defaults() : requested;
         ReasoningEffortSource source;
-        if (requested.reasoningEffort() == null) {
+        if (sent.reasoningEffort() == null) {
             source = ReasoningEffortSource.UNKNOWN;
         } else if (parent.reasoningEffortSource() == ReasoningEffortSource.AGENT_DEFAULT) {
             source = ReasoningEffortSource.AGENT_DEFAULT;
@@ -213,7 +214,7 @@ public class ExecutionRecorder {
                 parent.id(),
                 parent.id(),
                 ExecutionContextSnapshot.ofChars(0L),
-                requested,
+                sent,
                 null,
                 null,
                 null,

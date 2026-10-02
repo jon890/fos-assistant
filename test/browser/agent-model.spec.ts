@@ -256,6 +256,10 @@ test("숨김이 비어 있으면 profile 기본 모델 경고를 보이지 않�
   await expect(
     section(page).getByRole("combobox", { name: "모델" }),
   ).toBeVisible();
+  // 준비 응답은 Hermes 가 이름을 주지 않아 이름 칸에 id 가 온 모양이다. 아는 id 는 표시 이름으로 그린다.
+  await expect(
+    section(page).getByRole("checkbox", { name: "ChatGPT 구독 전체 숨기기" }),
+  ).toBeVisible();
   await expect(
     section(page).getByTestId("agent-model-profile-default-hidden"),
   ).toHaveCount(0);

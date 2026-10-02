@@ -124,12 +124,20 @@ public class ModelTierService {
         return resolved;
     }
 
-    /** 대화 없이 도는 실행이 보낼 에이전트 기본값이다. 숨김 판정을 지난다. */
+    /** 대화 없이 도는 실행이 보낼 에이전트 기본값이다. 숨김은 판정하지 않는다. */
+    public ModelChoice detachedChoice(Agent agent) {
+        return agentDefault(agent);
+    }
+
+    /**
+     * 보내려는 값이 그룹이 숨긴 모델이면 {@code MODEL_HIDDEN} 으로 거절한다.
+     *
+     * <p>실행 줄을 먼저 만든 뒤 판정하는 실행이 쓴다. 판정하는 값과 실행 줄에 적고 보내는 값이 같은 것이어야
+     * 하므로 값을 인자로 받는다.
+     */
     @Transactional(readOnly = true)
-    public ModelChoice resolveDetached(CurrentUser user, Agent agent) {
-        ModelChoice choice = agentDefault(agent);
+    public void requireRunnable(CurrentUser user, Agent agent, ModelChoice choice) {
         requireRunnable(user.groupId(), agent, choice);
-        return choice;
     }
 
     /** 이 실행이 돌 모델이 그룹이 숨긴 것이면 거절한다. 모델을 싣지 않는 실행은 profile 의 기본 모델로 본다(ADR-054). */

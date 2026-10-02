@@ -38,11 +38,14 @@ export function ConnectorGrants({
   const [unavailable, setUnavailable] = useState(false);
   /** 다시 확인을 누른 횟수다 */
   const [reloads, setReloads] = useState(0);
+  /** 다시 확인을 눌러 읽는 중인지다 */
+  const [reloading, setReloading] = useState(false);
 
   useEffect(() => {
     let stale = false;
     void readConnectorGrants().then((result) => {
       if (stale) return;
+      setReloading(false);
       if (!result.ok) {
         setGrants([]);
         setUnavailable(true);
@@ -84,7 +87,11 @@ export function ConnectorGrants({
             size="sm"
             variant="outline"
             data-testid="connector-grants-retry"
-            onClick={() => setReloads((count) => count + 1)}
+            loading={reloading}
+            onClick={() => {
+              setReloading(true);
+              setReloads((count) => count + 1);
+            }}
           >
             다시 확인
           </Button>

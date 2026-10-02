@@ -203,15 +203,42 @@ class MemoryProposerTest {
     @Test
     @DisplayName("보낸 effort 가 없으면 원래 실행 줄이 이미 보완됐어도 제안 실행의 출처는 UNKNOWN 이다")
     void proposalWithoutSentEffortHasUnknownSourceEvenWhenRunWasBackfilled() {
-        assertProposalInherits(null, false, ModelChoice.stored("example-provider", "example-agent", null));
+        assertProposalInherits(null, false, ModelChoice.stored("example-provider", "example-agent", null), "medium");
+        assertThat(parent.reasoningEffortSource())
+                .as("보완된 원래 실행 줄의 출처")
+                .isEqualTo(ReasoningEffortSource.PROFILE_DEFAULT);
         assertThat(lastProposal()).satisfies(child -> {
             assertThat(child.modelTier()).isNull();
+            assertThat(child.reasoningEffort()).isNull();
             assertThat(child.reasoningEffortSource()).isEqualTo(ReasoningEffortSource.UNKNOWN);
         });
     }
 
-    /** 원래 실행을 만들어 두고 그 실행에서 제안 실행을 돌린다. Hermes 에 보낸 값이 {@code sent} 와 같은지도 본다. */
+    @Test
+    @DisplayName("보낸 값을 받지 못한 이어받는 실행은 세 값을 비우고 출처를 UNKNOWN 으로 남긴다")
+    void inheritingRunWithoutRequestedChoiceLeavesValuesEmptyAndUnknownSource() {
+        parent = recorder.start(USER, conversation, agent, null, null, 0L);
+
+        AgentExecution child = recorder.startInheriting(USER, conversation, agent, parent, null);
+
+        assertThat(child.provider()).isNull();
+        assertThat(child.model()).isNull();
+        assertThat(child.reasoningEffort()).isNull();
+        assertThat(child.reasoningEffortSource()).isEqualTo(ReasoningEffortSource.UNKNOWN);
+        assertThat(child.parentExecutionId()).isEqualTo(parent.id());
+    }
+
     private void assertProposalInherits(ModelTier tier, boolean conversationChoosesEffort, ModelChoice sent) {
+        assertProposalInherits(tier, conversationChoosesEffort, sent, null);
+    }
+
+    /**
+     * 원래 실행을 만들어 두고 그 실행에서 제안 실행을 돌린다. Hermes 에 보낸 값이 {@code sent} 와 같은지도 본다.
+     *
+     * @param backfilledEffort 제안 전에 원래 실행 줄에 보완해 둘 profile 기본 effort. null 이면 보완하지 않는다
+     */
+    private void assertProposalInherits(
+            ModelTier tier, boolean conversationChoosesEffort, ModelChoice sent, String backfilledEffort) {
         Conversation source = conversation;
         if (conversationChoosesEffort) {
             transaction.executeWithoutResult(status -> conversations.chooseModelIfActive(
@@ -236,6 +263,10 @@ class MemoryProposerTest {
                 null,
                 tier,
                 null);
+        if (backfilledEffort != null) {
+            parent.recordProfileReasoningDefault(backfilledEffort);
+            parent = executions.save(parent);
+        }
         ((StubHermesRunsClient) hermes)
                 .willReturn(HermesRunResult.of(
                         "proposal", "new", "completed", "NONE", "model", "provider", TokenUsage.empty()));

@@ -100,6 +100,13 @@ class ModelSelectionTest {
         }
     }
 
+    /** Hermes 가 늘 답하는 목록이다. profile 의 기본 모델이 {@code example-provider} 의 {@code example-model} 이다. */
+    private static final HermesModelCatalog PROFILE_CATALOG = new HermesModelCatalog(
+            "example-provider",
+            "example-model",
+            List.of(new HermesModelCatalog.Provider(
+                    "example-provider", "example-provider", List.of("example-model"), Map.of())));
+
     /** 가격표에 있는 모델로 돌았다면 금액이 나오는 사용량이다. */
     private static final TokenUsage PRICED_USAGE = new TokenUsage(1_000L, 0L, 500L, 1_500L);
 
@@ -133,7 +140,12 @@ class ModelSelectionTest {
     @MockitoBean
     HermesRunEventStream eventStream;
 
-    /** profile 의 기본 모델을 읽는 길이다. 숨김이 있는 그룹의 기본값 실행만 이 목록을 읽는다. */
+    /**
+     * profile 의 기본 모델을 읽는 길이다. 숨김이 있는 그룹의 기본값 실행만 이 목록을 읽는다.
+     *
+     * <p>읽은 목록은 Spring context 가 사는 동안 메모리에 남는다. 그래서 검사마다 다른 목록을 주지 않고 늘 같은
+     * 목록을 답하게 한다. 어느 검사가 먼저 읽어도 결과가 같다.
+     */
     @MockitoBean
     HermesModelClient modelClient;
 
@@ -146,6 +158,7 @@ class ModelSelectionTest {
     @BeforeEach
     void setUp() {
         stub().reset();
+        when(modelClient.readCatalog(anyString(), anyString())).thenReturn(PROFILE_CATALOG);
         executionEvents.deleteAll();
         executions.deleteAll();
         messages.deleteAll();
@@ -356,12 +369,6 @@ class ModelSelectionTest {
     @Test
     @DisplayName("profile 의 기본 모델을 숨기면 모델을 싣지 않는 실행을 제출하지 않고 MODEL HIDDEN 으로 남기며 숨김을 비우면 다시 돈다")
     void rejectsDefaultRunWhileProfileDefaultModelIsHiddenAndRunsAgainAfterUnhiding() {
-        when(modelClient.readCatalog(anyString(), anyString()))
-                .thenReturn(new HermesModelCatalog(
-                        "example-provider",
-                        "example-model",
-                        List.of(new HermesModelCatalog.Provider(
-                                "example-provider", "example-provider", List.of("example-model"), Map.of()))));
         Long conversationId = chat.startEmpty(user, AGENT_CODE).id();
         stub().willReturn(succeeded("run-1", "sess-1"));
         hiddenModels.save(ModelHidden.of(user.groupId(), "example-provider", "example-model"));

@@ -900,7 +900,7 @@ web 은 입력창 아래의 `chat/model-picker.tsx` 로 고른다.
 effort 가 비어 있으면 `model_options` 를 뺀다. 정한 모델이 숨긴 모델이면 제출하지 않고 `MODEL_HIDDEN` 으로 실패시킨다.
 모델이 비어 있고 그룹에 숨김이 있으면 `ModelOptionsService.profileDefaultOf` 가 들고 있는 목록에서 읽은 profile 의 기본 모델로 같은 판정을 한다.
 Memory 제안은 원래 실행이 해석한 값을 받아 쓰고 `ExecutionRecorder.startInheriting` 으로 원래 실행의 단계와 effort 출처를 이어받는다.
-추천 질문은 대화가 없어 `ModelTierService.resolveDetached` 가 준 에이전트 기본 모델을 싣고 `ExecutionRecorder.startDetached` 가 그 값을 실행 줄에 적는다.
+추천 질문은 대화가 없어 `ModelTierService.detachedChoice` 가 준 에이전트 기본 모델을 싣고 `ExecutionRecorder.startDetached` 가 그 값을 실행 줄에 적는다. 같은 값을 `ModelTierService.requireRunnable` 이 숨김과 견준다.
 보내기, 다시 생성, 흐름의 하위 실행이 모두 같은 해석을 쓴다.
 
 **대화 경로의 `{id}` 는 대화의 공개 식별자(UUID)다.** 대화 표의 번호가 아니다.

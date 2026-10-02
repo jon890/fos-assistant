@@ -21,6 +21,7 @@ import com.bifos.assistant.agent.infra.AgentRepository;
 import com.bifos.assistant.chat.application.ModelTierService;
 import com.bifos.assistant.chat.domain.ChatMessage;
 import com.bifos.assistant.chat.domain.Conversation;
+import com.bifos.assistant.chat.domain.ModelChoice;
 import com.bifos.assistant.chat.infra.ChatMessageRepository;
 import com.bifos.assistant.chat.infra.ConversationRepository;
 import com.bifos.assistant.hermes.HermesRunsClient;
@@ -238,7 +239,10 @@ class StarterSuggestionServiceTest {
     @DisplayName("숨김 판정이 거절하면 Hermes 에 제출하지 않고 실행 줄이 FAILED 와 MODEL HIDDEN 으로 남는다")
     void leavesFailedRunRowWithoutSubmittingWhenHiddenCheckRejects() {
         ModelTierService rejecting = mock(ModelTierService.class);
-        when(rejecting.resolveDetached(any(), any())).thenThrow(new ApiException(ErrorCode.MODEL_HIDDEN, "hidden"));
+        when(rejecting.detachedChoice(any())).thenReturn(ModelChoice.defaults());
+        doThrow(new ApiException(ErrorCode.MODEL_HIDDEN, "hidden"))
+                .when(rejecting)
+                .requireRunnable(any(), any(), any());
         service = new StarterSuggestionService(
                 properties,
                 agentService,
