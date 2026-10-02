@@ -132,6 +132,9 @@ public class ConnectorActionListener {
         if (ConnectorAction.NOT_EXECUTABLE.equals(closure.errorCode())) {
             return name + " 요청을 지금은 실행할 수 없어 취소했어요. 연결 화면에서 연결을 확인해 주세요";
         }
+        if (ConnectorAction.HIDDEN_ARGS.equals(closure.errorCode())) {
+            return name + " 요청에 화면에 가려지는 내용이 있어 취소했어요. 에이전트에게 그 부분을 빼거나 다시 쓰게 해 주세요";
+        }
         return name + " 요청을 거절했어요";
     }
 }

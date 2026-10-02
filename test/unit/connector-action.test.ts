@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { MASKED_VALUE, readableArgs } from "../../web/src/lib/connector-action.ts";
+import { readableArgs } from "../../web/src/lib/connector-action.ts";
 
 test("JSON 객체는 최상위 키마다 한 줄로 바뀐다", () => {
   const rows = readableArgs(JSON.stringify({ title: "장보기", count: 3, done: false, note: null }));
@@ -22,20 +22,30 @@ test("객체와 배열은 2칸 들여쓴 JSON 글로 바뀐다", () => {
   ]);
 });
 
-test("키 이름이 비밀처럼 보이면 값을 가린다", () => {
-  const keys = ["token", "Access_Token", "client-secret", "PASSWORD", "passwd", "apiKey", "api_key", "Authorization",
+test("키 이름이 비밀처럼 보여도 값을 가리지 않고 받은 그대로 돌려준다", () => {
+  const keys = ["token", "Access_Token", "client-secret", "PASSWORD", "password_hint", "apiKey", "Authorization",
     "cookie", "credentials"];
   const rows = readableArgs(JSON.stringify(Object.fromEntries(keys.map((key) => [key, "원문"]))));
 
-  assert.deepEqual(rows, keys.map((key) => ({ key, value: MASKED_VALUE })));
+  assert.deepEqual(rows, keys.map((key) => ({ key, value: "원문" })));
 });
 
-test("안쪽 객체에 든 비밀처럼 보이는 키도 가린다", () => {
+test("안쪽 객체에 든 비밀처럼 보이는 키의 값도 그대로 돌려준다", () => {
   const rows = readableArgs(JSON.stringify({ header: { "X-Api-Key": "원문", name: "보임" }, list: [{ token: "원문" }] }));
 
-  assert.equal(rows?.length, 2);
-  assert.equal(rows?.some((row) => row.value.includes("원문")), false, "가리지 않은 값이 남았다");
-  assert.equal(rows?.[0].value.includes("보임"), true);
+  assert.deepEqual(rows, [
+    { key: "header", value: '{\n  "X-Api-Key": "원문",\n  "name": "보임"\n}' },
+    { key: "list", value: '[\n  {\n    "token": "원문"\n  }\n]' },
+  ]);
+});
+
+test("서버가 가려 보낸 글은 그대로 보인다", () => {
+  const rows = readableArgs(JSON.stringify({ api_token: "[가림]", body: "끝에 [가림]" }));
+
+  assert.deepEqual(rows, [
+    { key: "api_token", value: "[가림]" },
+    { key: "body", value: "끝에 [가림]" },
+  ]);
 });
 
 test("마크다운과 HTML 로 보이는 글도 바꾸지 않고 그대로 돌려준다", () => {

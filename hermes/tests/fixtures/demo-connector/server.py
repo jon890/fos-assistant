@@ -35,6 +35,9 @@ async def list_scopes() -> CallToolResult:
         return failure("DEMO_UNAUTHORIZED")
     if token == "demo_odd_0123456789":
         return failure("DEMO_NOT_IN_TABLE")
+    if token == "demo_lost_0123456789":
+        # `errors` 표에서 `outcome_unknown` 에 이은 코드다.
+        return failure("DEMO_UNKNOWN")
     if token == "demo_slow_0123456789":
         await anyio.sleep(SLOW_SECONDS)
     return failure("DEMO_UNAVAILABLE")

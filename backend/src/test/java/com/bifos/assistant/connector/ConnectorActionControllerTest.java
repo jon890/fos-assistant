@@ -53,6 +53,7 @@ class ConnectorActionControllerTest {
             null,
             Instant.parse("2026-10-01T00:00:00Z"),
             Instant.parse("2026-10-02T00:00:00Z"),
+            true,
             true);
 
     private final ConnectorActionService service = mock(ConnectorActionService.class);
@@ -77,7 +78,7 @@ class ConnectorActionControllerTest {
         mvc.perform(get("/api/v1/chat/conversations/{id}/connector-actions", CONVERSATION))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(1))
-                .andExpect(jsonPath("$[0].length()").value(12))
+                .andExpect(jsonPath("$[0].length()").value(13))
                 .andExpect(jsonPath("$[0].actionId").value(ACTION.toString()))
                 .andExpect(jsonPath("$[0].connectorId").value("demo-notes"))
                 .andExpect(jsonPath("$[0].toolName").value("write_note"))
@@ -89,7 +90,8 @@ class ConnectorActionControllerTest {
                 .andExpect(jsonPath("$[0].errorCode").isEmpty())
                 .andExpect(jsonPath("$[0].createdAt").exists())
                 .andExpect(jsonPath("$[0].expiresAt").exists())
-                .andExpect(jsonPath("$[0].grantAllowed").value(true));
+                .andExpect(jsonPath("$[0].grantAllowed").value(true))
+                .andExpect(jsonPath("$[0].hiddenArgs").value(true));
     }
 
     @Test

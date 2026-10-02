@@ -216,7 +216,9 @@ FIELD_KEY_RE = re.compile(r"^[a-z][a-z0-9_]{0,31}$")
 ENV_NAME_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]{0,127}$")
 TOOL_NAME_RE = re.compile(r"^[A-Za-z0-9_.-]{1,128}$")
 SERVER_NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$")
-ERROR_WORDS = frozenset({"credential_rejected", "forbidden", "invalid_input", "unavailable"})
+ERROR_WORDS = frozenset({"credential_rejected", "forbidden", "invalid_input", "unavailable", "outcome_unknown"})
+# 쓰기를 보냈는데 됐는지 모른다는 어휘다. 실행 경로만 504 로 답하고 `call` 은 `unavailable` 로 읽는다.
+OUTCOME_UNKNOWN = "outcome_unknown"
 # `connector.json` 의 `toolsets` 가 열 수 있는 내장 toolset 이다. 읽기 전용 이미지 도구만 둔다(ADR-044).
 # 셸, 파일, 기억, 스킬, 위임 도구는 manifest 로 열리지 않는다.
 CONNECTOR_TOOLSETS = frozenset({"vision"})
@@ -642,16 +644,22 @@ def _hermes_tool_name(server: str, tool: str) -> str:
 
 
 def _connector_tools(declared: dict, verify_tool: str, option_tools: set, mcp_server: str) -> dict:
-    """`connector.json` 의 도구 정책을 검증해 `{도구 이름: {"risk", "approval", "title"}}` 로 낸다. 틀리면 예외다.
+    """`connector.json` 의 도구 정책을 검증해 `{도구 이름: {"risk", "approval", "title", "grant", "outbound"}}` 로 낸다.
+
+    틀리면 예외다.
 
     하한보다 느슨한 선언은 고쳐서 받지 않고 거절한다. 조용히 엄격하게 읽으면 선언이 틀린 것을 만든 사람이 모른다.
     `schema: 1` 은 도구 정책을 선언하지 않는다. 대시보드가 부르는 읽기 전용 도구만 정책으로 낸다.
+    `grant` 는 그 도구에 상시 허락을 줄 수 있는지다(ADR-065). 기본값을 채운 값이고,
+    `approval` 이 `required` 이고 선언이 닫지 않았을 때만 참이다.
+    `outbound` 는 그 도구가 데이터를 계정 밖의 사람에게 보낸다는 선언이다. 참인 도구는 상시 허락이 닫혀 있어야 한다.
     """
     call_tools = {verify_tool} | set(option_tools)
     if declared["schema"] == 1:
         if "tools" in declared or "default_tool_policy" in declared:
             raise ValueError("tools 와 default_tool_policy 는 schema 2 에서만 선언한다")
-        return {name: {"risk": "READ", "approval": "none", "title": None} for name in sorted(call_tools)}
+        return {name: {"risk": "READ", "approval": "none", "title": None, "grant": False, "outbound": False}
+                for name in sorted(call_tools)}
     if declared["schema"] != 2:
         raise ValueError("schema 는 1 이나 2 만 받는다")
 
@@ -664,8 +672,9 @@ def _connector_tools(declared: dict, verify_tool: str, option_tools: set, mcp_se
     for name, declared_tool in tools.items():
         if not isinstance(name, str) or not TOOL_NAME_RE.match(name):
             raise ValueError("tools 의 키는 도구 이름이다")
-        if not isinstance(declared_tool, dict) or set(declared_tool) - {"risk", "approval", "title"}:
-            raise ValueError("tools 의 값은 risk, approval, title 만 갖는 객체다")
+        if not isinstance(declared_tool, dict) or set(declared_tool) - {
+                "risk", "approval", "title", "grant", "outbound"}:
+            raise ValueError("tools 의 값은 risk, approval, title, grant, outbound 만 갖는 객체다")
         risk = declared_tool.get("risk")
         if not isinstance(risk, str) or risk not in TOOL_RISKS:
             raise ValueError("risk 는 정해 둔 위험도 가운데 하나다")
@@ -678,7 +687,20 @@ def _connector_tools(declared: dict, verify_tool: str, option_tools: set, mcp_se
         title = declared_tool.get("title")
         if "title" in declared_tool and (not isinstance(title, str) or not 1 <= len(title) <= TOOL_TITLE_MAX_CHARS):
             raise ValueError("title 은 1자에서 %d자까지의 문자열이다" % TOOL_TITLE_MAX_CHARS)
-        policies[name] = {"risk": risk, "approval": approval, "title": title}
+        if "grant" in declared_tool:
+            # `1` 이나 `0` 을 boolean 으로 받지 않는다.
+            if type(declared_tool["grant"]) is not bool:
+                raise ValueError("grant 는 true 나 false 다")
+            if approval != "required":
+                raise ValueError("grant 는 approval 이 required 인 도구에만 선언한다")
+        grant = approval == "required" and declared_tool.get("grant") is not False
+        outbound = declared_tool.get("outbound", False)
+        if type(outbound) is not bool:
+            raise ValueError("outbound 는 true 나 false 다")
+        # 밖으로 나가는 도구는 호출마다 사람이 본다. 상시 허락이 열려 있으면 고쳐 읽지 않고 거절한다.
+        if outbound and (approval != "required" or grant):
+            raise ValueError("outbound 가 참인 도구는 approval 이 required 이고 grant 가 false 여야 한다")
+        policies[name] = {"risk": risk, "approval": approval, "title": title, "grant": grant, "outbound": outbound}
     for name in call_tools:
         # 대시보드가 승인 없이 부르는 도구다. 읽기 전용이고 승인이 없는 선언만 맞는다.
         if policies.get(name, {}).get("risk") != "READ" or policies[name]["approval"] != "none":
@@ -767,7 +789,7 @@ def _load_connector(connector_id: str, entry: dict) -> dict:
     if not isinstance(errors, dict) or any(
             not isinstance(code, str) or not isinstance(word, str) or word not in ERROR_WORDS
             for code, word in errors.items()):
-        raise ValueError("errors 의 값은 공통 어휘 넷 가운데 하나다")
+        raise ValueError("errors 의 값은 공통 어휘 다섯 가운데 하나다")
     toolsets = declared.get("toolsets", [])
     if (not isinstance(toolsets, list) or any(not isinstance(name, str) for name in toolsets)
             or len(set(toolsets)) != len(toolsets) or set(toolsets) - CONNECTOR_TOOLSETS):
@@ -1429,6 +1451,9 @@ async def _connector_call_request(request, connector_id: str):
         # 시간을 넘기면 취소가 SDK 의 정리 구간을 돌려 자식 프로세스를 끝낸 뒤에 돌아온다.
         result = await asyncio.wait_for(_run_connector_tool(manifest, tool, env), CONNECTOR_CALL_TIMEOUT_SECONDS)
         answer = None if result is None else _connector_call_answer(manifest, result)
+        if answer is not None and answer.get("error") == OUTCOME_UNKNOWN:
+            # 선택지와 확인 도구는 읽기 전용이다. 결과를 모르는 쓰기가 없으므로 `unavailable` 과 같다.
+            answer = {"ok": False, "error": "unavailable"}
     except ImportError:
         logger.warning("dashboard-profile-api: mcp SDK 를 읽어 오지 못해 커넥터 도구를 부르지 못했다")
         return failed("unavailable")
@@ -1491,6 +1516,7 @@ async def _connector_execute_request(request, connector_id: str):
     승인 여부는 다시 확인하지 않는다. 서비스 토큰을 가진 Control Plane 이 승인한 줄로만 부른다.
     인자와 결과를 로그에 싣지 않는다.
     실행되지 않은 것이 분명한 실패는 `{"ok": false}` 로, 실행됐는지 모르는 실패는 504 로 답한다.
+    도구가 `errors` 표에서 `outcome_unknown` 인 코드로 끝난 것도 실행됐는지 모르는 실패다.
     Control Plane 이 앞의 것은 실패로, 뒤의 것은 결과를 모르는 것으로 읽어 다시 돌리지 않는다.
     """
     from starlette.responses import JSONResponse
@@ -1571,6 +1597,11 @@ async def _connector_execute_request(request, connector_id: str):
         _connector_calls -= 1
     if answer is None:
         return _rejected("실행할 수 없는 도구다")
+    if answer.get("error") == OUTCOME_UNKNOWN:
+        # 도구가 쓰기를 보낸 뒤 답을 받지 못했다고 알렸다. 실패로 답하면 이미 나간 쓰기가 실패로 기록된다.
+        logger.warning("dashboard-profile-api: 커넥터 %s 의 도구 %s 가 실행 결과를 모른다고 답했다",
+                       connector_id, hermes_tool)
+        return _rejected("도구가 실행 결과를 모른다고 답했다", 504)
     return JSONResponse(answer, status_code=200)
 
 

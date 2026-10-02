@@ -8,7 +8,7 @@ import { call, expect, expectStatus, step, type Scenario } from "../harness.ts";
 import { DEMO_CONNECTOR, DEMO_TOKEN_BAD, DEMO_TOKEN_OK } from "../fake-hermes.ts";
 
 type FieldView = { key: string; hasOptions: boolean; secret: boolean; required: boolean };
-type ToolView = { name: string; title: string | null; risk: string; approval: string };
+type ToolView = { name: string; title: string | null; risk: string; approval: string; grant: boolean };
 type ConnectorView = {
   id: string; title: string; fields: FieldView[]; tools: ToolView[]; myStatus: string; available: boolean;
 };
@@ -44,8 +44,13 @@ export const connectorScenario: Scenario = {
     const writeNote = demo!.tools.find((tool) => tool.name === "write_note");
     expect(
       writeNote !== undefined && writeNote.risk === "WRITE" && writeNote.approval === "REQUIRED"
-        && writeNote.title === DEMO_CONNECTOR.tools.write_note.title,
+        && writeNote.title === DEMO_CONNECTOR.tools.write_note.title && writeNote.grant === true,
       `write_note 의 도구 정책이 선언과 다르다\n${catalogResponse.body}`,
+    );
+    // 승인이 없거나 늘 승인을 받는 도구에는 상시 허락을 줄 수 없다.
+    expect(
+      demo!.tools.filter((tool) => tool.name !== "write_note").every((tool) => tool.grant === false),
+      `write_note 밖의 도구에 상시 허락을 줄 수 있다고 나왔다\n${catalogResponse.body}`,
     );
     expect(
       demo!.tools.map((tool) => tool.name).join() === Object.keys(DEMO_CONNECTOR.tools).join(),

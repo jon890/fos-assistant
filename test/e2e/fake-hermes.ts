@@ -118,10 +118,12 @@ export const DEMO_CONNECTOR = {
   toolsets: [] as string[],
   attachments: false,
   // 도구마다의 정책이다. 확인 도구이자 선택지 도구인 `list_scopes` 는 읽기 전용이고 승인이 없다.
+  // `grant` 는 대시보드 plugin 이 기본값을 채워 내는 값이다. 승인이 `required` 인 도구만 참이다.
+  // `outbound` 도 기본값을 채워 낸다. 밖으로 나간다고 선언한 도구만 참이다.
   tools: {
-    list_scopes: { risk: "READ", approval: "none" },
-    write_note: { risk: "WRITE", approval: "required", title: "메모 쓰기" },
-    purge_notes: { risk: "DESTRUCTIVE", approval: "always" },
+    list_scopes: { risk: "READ", approval: "none", grant: false, outbound: false },
+    write_note: { risk: "WRITE", approval: "required", title: "메모 쓰기", grant: true, outbound: false },
+    purge_notes: { risk: "DESTRUCTIVE", approval: "always", grant: false, outbound: false },
   },
 };
 /** MCP 서버가 실제로 내는 도구다. `hidden_tool` 은 manifest 가 선언하지 않은 도구다. */

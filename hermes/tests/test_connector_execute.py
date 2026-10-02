@@ -203,6 +203,23 @@ class ConnectorExecuteTest(base.ConnectorGateCase):
                          (200, {"ok": False, "error": "credential_rejected"}))
         self.assertEqual(self.execute("mcp__demo__list_scopes", profile="carol"), UNAVAILABLE)
 
+    def test_outcome_unknown_code_answers_504(self):
+        """도구가 `errors` 표에서 `outcome_unknown` 인 코드로 끝나면 `{ok: false}` 가 아니라 504 다."""
+        self.install("lost", token=call_base.LOST_TOKEN)
+        self.install("slow", token=call_base.SLOW_TOKEN)
+        status, body = self.execute("mcp__demo__list_scopes", profile="lost")
+        self.assertEqual(status, 504, body)
+        # 시간 초과 때와 같은 상태와 모양이다. Control Plane 이 두 경우를 같은 길로 읽는다. 글만 까닭을 따로 말한다.
+        with mock.patch.object(self.plugin, "CONNECTOR_EXECUTE_TIMEOUT_SECONDS", 3):
+            slow_status, slow_body = self.execute("mcp__demo__list_scopes", profile="slow")
+        self.assertEqual((slow_status, set(slow_body)), (status, set(body)))
+        self.assertEqual(set(body), {"detail"})
+        # 다른 코드는 그대로 200 과 공통 어휘다.
+        self.install("bob", token=call_base.BAD_TOKEN)
+        self.assertEqual(self.execute("mcp__demo__list_scopes", profile="bob"),
+                         (200, {"ok": False, "error": "credential_rejected"}))
+        self.assert_no_child_left()
+
     def test_plain_text_result_of_a_finished_write_is_a_success(self):
         """오류 없이 끝난 쓰기가 평문만 돌려주면 200 `ok: true` 이고 그 글을 `text` 로 준다."""
         self.assertEqual(self.execute("mcp__demo__append_line"),
