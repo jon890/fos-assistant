@@ -229,6 +229,40 @@ session 은 cache 를 뺀 `input_tokens` 와 cache read·write 를 따로 누적
 `_session_response`, `_message_response`, `_handle_list_sessions` 와
 `agent/conversation_loop.py`, `agent/turn_finalizer.py` 의 토큰 누적이다.
 
+### 자식 session 의 provider 는 저장소에만 있다
+
+2026-10-02 에 v0.21.5(`v2026.9.24`)의 소스를 읽고, 운영 Hermes 에서 읽기 전용으로 집계해 확인했다.
+
+| 확인한 것 | 근거 |
+| --- | --- |
+| API server 의 session 응답은 정해 둔 칸만 내보내고 그 목록에 provider 가 없다. 단건 조회와 목록이 같은 함수를 쓴다 | [`gateway/platforms/api_server.py`](https://github.com/NousResearch/hermes-agent/blob/v2026.9.24/gateway/platforms/api_server.py) 의 `_session_response` 의 `safe_keys` |
+| session 저장소의 `sessions` 표에 `billing_provider` 칸이 있다. profile 마다 저장소가 따로 있다 | [`hermes_state_common.py`](https://github.com/NousResearch/hermes-agent/blob/v2026.9.24/hermes_state_common.py) 의 `SCHEMA_SQL` |
+| session 을 만들 때 요청한 경로가 먼저 적힌다. 그 경로가 실패하고 fallback 이 성공하면, 처음으로 사용량이 잡힌 호출의 모델과 provider 로 그 줄을 고친다. 그 뒤에는 줄을 바꾸지 않는다 | [`hermes_state_usage.py`](https://github.com/NousResearch/hermes-agent/blob/v2026.9.24/hermes_state_usage.py) 의 `update_token_counts` 의 `first_accounted_route` |
+| 호출마다의 모델과 provider 는 `session_model_usage` 표에 짝으로 쌓인다. 본 대화의 호출은 `task` 가 빈 줄이고, 보조 호출은 `task` 에 이름이 있다 | 같은 파일의 `_record_model_usage` 와 [`hermes_state_sessions.py`](https://github.com/NousResearch/hermes-agent/blob/v2026.9.24/hermes_state_sessions.py) 의 `get_recent_session_model_route` |
+| `subagent_stop` hook 은 부모와 자식의 session 번호, 역할, 요약, 상태, 도구 이력, 소요 시간을 받는다. provider 는 받지 않는다 | [`tools/delegate_tool_results.py`](https://github.com/NousResearch/hermes-agent/blob/v2026.9.24/tools/delegate_tool_results.py) 의 `_fire_subagent_stop_hooks` |
+
+**`sessions` 한 줄은 모델과 provider 의 짝을 하나만 담는다.**
+자식이 도는 중에 모델이나 provider 가 바뀌면 그 줄의 값은 처음 것이고, 바뀐 뒤의 호출은 `session_model_usage` 에만 남는다.
+그래서 한 줄의 값으로 금액을 환산하려면 `session_model_usage` 에서 `task` 가 빈 줄의 짝이 하나뿐인지 함께 본다.
+
+운영 집계의 결과다. 값의 개수만 세었고 본문은 읽지 않았다.
+
+| 항목 | 값 |
+| --- | --- |
+| `source` 가 `subagent` 인 줄 | 115 |
+| 그 가운데 `billing_provider` 가 채워진 줄 | 115 |
+| 호출이 있었고 끝났는데 `billing_provider` 가 빈 줄 | 0 |
+| `task` 가 빈 `session_model_usage` 의 짝이 하나인 줄 | 115 |
+| `sessions` 의 provider 와 `session_model_usage` 의 provider 가 다른 줄 | 0 |
+
+대시보드도 이 저장소를 읽는다. 대시보드는 gateway 와 다른 프로세스이고 profile 마다 저장소 파일을 따로 연다.
+근거는 [`hermes_cli/web_server_sessions.py`](https://github.com/NousResearch/hermes-agent/blob/v2026.9.24/hermes_cli/web_server_sessions.py) 의 `_open_session_db_for_profile` 이다.
+이 함수의 읽기 전용 열기는 저장소가 비었거나 스키마가 낡았으면 쓰기 연결을 한 번 열어 고친다.
+
+Control Plane 은 이 값을 대시보드 plugin 의 읽기 경로로 받는다([ADR-067](../adr/ADR-067-native-하위-에이전트의-provider-는-대시보드-plugin-이-session-저장소에서-읽어-준다.md)).
+plugin 은 Hermes 의 저장소 클래스를 쓰지 않고 SQLite 의 읽기 전용 방식으로 파일을 직접 연다.
+**Hermes 판을 올릴 때 위 표의 표 이름과 칸 이름을 다시 확인한다.**
+
 ### 자식의 모델은 부모의 것이 아니다
 
 부모를 `openai/gpt-oss-20b` 로 돌린 실행에서 자식이 `z-ai/glm-5.2` 로 돌았다.

@@ -70,3 +70,4 @@
 | [ADR-064](ADR-064-범용-커넥터는-이-저장소의-hermes-connectors-에-두고-저장소가-유지보수한다.md) | 범용 커넥터는 이 저장소의 `hermes/connectors/` 에 두고 저장소가 유지보수한다 | hermes | Accepted. ADR-043 의 plugin 가운데 누구나 쓸 수 있는 것의 자리를 정한다 |
 | [ADR-065](ADR-065-외부로-나가는-도구는-상시-허락을-닫는-선언을-둔다.md) | 외부로 나가는 도구는 상시 허락을 닫는 선언을 둔다 | backend, hermes | Accepted. ADR-050 의 상시 허락에 도구별 선언을 더한다 |
 | [ADR-066](ADR-066-gmail-커넥터는-직접-만든-mcp-서버와-gmail-modify-scope-하나로-돌고-휴지통은-서버가-막는다.md) | Gmail 커넥터는 직접 만든 MCP 서버와 `gmail.modify` scope 하나로 돌고 휴지통은 서버가 막는다 | hermes | Accepted. ADR-064 의 첫 커넥터다 |
+| [ADR-067](ADR-067-native-하위-에이전트의-provider-는-대시보드-plugin-이-session-저장소에서-읽어-준다.md) | native 하위 에이전트의 provider 는 대시보드 plugin 이 session 저장소에서 읽어 준다 | backend | Accepted. ADR-062 의 「session 응답이 provider 를 주지 않는 동안 native 자식은 모두 가격 미확인」 을 메운다 |

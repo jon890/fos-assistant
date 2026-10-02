@@ -171,10 +171,35 @@ Control Plane 이 이 경로들을 부르는 순서와 뜻은 부르는 쪽 문�
 | `PUT /api/skills/toggle` | 지정한 profile 의 스킬 하나를 켜고 끈다 | `{profile, name, enabled}` | 200 `{ok, name, enabled}` | 400, 404 |
 | `GET PUT /api/profiles/<이름>/soul` | 그 profile 의 SOUL.md 를 읽고 쓴다 | `PUT` 은 `{content}` | 200 | |
 | `GET /api/profiles/<이름>/model-defaults` | 그 profile 설정의 `provider`, `model`, `reasoningEffort` 세 값만 읽는다. 기본 profile 도 읽는다 | 없음 | 200 `{provider, model, reasoningEffort}`. 없는 값은 `null`. 설정 전체와 비밀값은 반환하지 않는다. [모델 단계와 실행 기록](../docs/model-tiers.md) 의 「profile 기본 강도」 를 따른다 | 400 이름 형식. 404 없는 profile. 503 설정을 읽지 못함 |
+| `GET /api/profiles/<이름>/sessions/<session id>/provider` | 그 profile 의 자식 session 한 줄에서 provider 와 모델만 읽는다. 기본 profile 도 읽는다 | 없음 | 200 `{provider, model}`. 아래 「자식 session 의 provider」 가 칸을 갖는다 | 400 이름이나 session 번호 형식. 404 없는 profile, 없는 session, 자식이 아닌 session. 503 저장소를 읽지 못함 |
 
 표의 「그 profile」 은 있고 `default` 가 아닌 이름이다.
-기본 profile 은 400 이고 없는 profile 은 404 다. `model-defaults` 는 기본 profile 도 받는다.
+기본 profile 은 400 이고 없는 profile 은 404 다. `model-defaults` 와 자식 session 의 provider 경로는 기본 profile 도 받는다.
 본문과 query 에 profile 이 둘 다 있으면 같아야 한다.
+
+### 자식 session 의 provider
+
+API server 의 session 응답은 provider 를 주지 않는다. 그 값은 Hermes 의 session 저장소에만 있다.
+이 경로는 그 값을 Control Plane 에 읽어 준다. 근거는 [ADR-067](../docs/adr/ADR-067-native-하위-에이전트의-provider-는-대시보드-plugin-이-session-저장소에서-읽어-준다.md) 에,
+저장소의 어느 칸이 무엇을 뜻하는지는 [`../docs/hermes/delegation.md`](../docs/hermes/delegation.md) 의 「자식 session 의 provider 는 저장소에만 있다」 에 있다.
+
+| 항목 | 값 |
+| --- | --- |
+| session 번호 | `[A-Za-z0-9_-]` 1자에서 128자. 아니면 400 |
+| 읽는 파일 | 그 profile 디렉터리의 `state.db`. 없으면 404 |
+| 여는 방식 | Python `sqlite3` 의 `mode=ro` URI. Hermes 의 저장소 클래스를 쓰지 않는다. 제한 시간은 2초다 |
+| 대상 | `sessions` 표에서 `id` 가 같고 `source` 가 `subagent` 인 줄. 없으면 404 |
+| `model` | 그 줄의 `model`. 비었으면 `null` |
+| `provider` | 그 줄의 `billing_provider`. 비었으면 `null` |
+| 짝이 둘 이상 | `session_model_usage` 에서 그 session 의 `task` 가 빈 줄을 `(model, billing_provider)` 로 묶어 둘 이상이면 `provider` 를 `null` 로 준다. 한 금액으로 환산할 수 없는 자식이다 |
+| 짝이 하나인데 provider 가 다르다 | 그 짝의 `billing_provider` 가 `sessions` 줄의 값과 다르면 `provider` 를 `null` 로 준다. 어느 쪽이 맞는지 알 수 없다 |
+| 읽기 실패 | 파일을 열지 못했거나 표나 칸이 없으면 503. 까닭을 응답과 로그에 싣지 않는다 |
+
+이 둘 말고는 어느 칸도 내보내지 않는다. 대화 본문, system prompt, 토큰 수, 다른 종류의 session 은 이 경로로 읽지 못한다.
+저장소를 쓰는 연결을 열지 않는다. 그래서 이 경로는 `state.db` 의 내용을 바꾸지 못한다.
+쓰는 연결이 하나도 없을 때 읽으면 SQLite 가 WAL 보조 파일(`state.db-shm`, `state.db-wal`)을 만들 수 있다. 그 디렉터리에 쓸 수 없고 보조 파일도 없으면 열지 못해 503 이다.
+
+**Hermes 판을 올리면 표 이름과 칸 이름을 다시 확인한다.** 이름이 바뀌면 이 경로가 503 으로 답하고 Control Plane 은 그 자식을 가격 미확인으로 남긴다.
 
 **카탈로그 응답.** `fields[]` 는 manifest 의 칸 그대로(`env`, `options` 포함)이고 `verify` 는 `{tool}` 이다.
 `toolsets` 와 `attachments` 는 manifest 에 없으면 빈 목록과 거짓이다. 옛 대시보드 plugin 은 두 칸을 내지 않고, Control Plane 은 없는 칸을 같은 기본값으로 읽는다.

@@ -193,10 +193,10 @@ export const streamingScenario: Scenario = {
         "이름이 없는 자식의 subagent_id를 표시 이름으로 보존하지 못했다");
     }
 
-    step("session 의 provider 와 모델로 자식 금액을 합계에 한 번만 더한다");
+    step("대시보드에서 읽은 provider 와 session 의 모델로 자식 금액을 합계에 한 번만 더한다");
     const unpricedAfter = (await monthlyCost(context)).unpricedSubagents;
     expect(unpricedAfter - unpricedBefore === 3,
-      `provider 를 주지 않은 자식 3건이 가격 미확인으로 세어지지 않았다: ${unpricedBefore} -> ${unpricedAfter}`);
+      `대시보드가 provider 를 주지 않은 자식 3건이 가격 미확인으로 세어지지 않았다: ${unpricedBefore} -> ${unpricedAfter}`);
     const costBefore = await monthlyCost(context);
     const receivedPriced = await events(expectStatus(await call(context, "/chat/messages/stream", {
       method: "POST", token: context.tokens.dad, body: { text: SUBAGENT_PROVIDER_PROBE, agentCode: "dad" },
