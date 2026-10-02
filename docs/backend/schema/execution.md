@@ -53,6 +53,7 @@
 자식 실행의 토큰은 부모의 합계에 들어 있지 않다.
 근거는 [`hermes/delegation.md`](../../hermes/delegation.md) 의 「자식 session 으로 결과와 토큰을 보완한다」 절에 있다.
 그래서 부모와 자식을 더한 합계는 실행 나무의 줄을 더해서 만든다.
+실행 줄이 없는 native 자식은 `subagent_usage_job` 줄을 더한다.
 어느 줄도 두 번 세지 않는다.
 
 `CANCELLED` 는 중지한 turn 과 `agent_stop` 으로 멈춘 위임 실행에 쓴다.
@@ -116,7 +117,7 @@ Hermes 가 보낸 원래 payload 를 통째로 넣지 않는다.
 기존 중복 완료 사건은 최신 한 줄만 키를 채우고 나머지 이력은 보존한다.
 
 이 토큰은 화면이 하위 에이전트가 무엇을 썼는지 보이는 데만 쓴다.
-사용량 합계에 더하지 않는다. 합계는 여전히 `agent_execution` 한 줄씩의 값이다.
+사용량 합계에 더하지 않는다. native 자식의 합계는 아래 `subagent_usage_job` 줄의 값으로 낸다.
 
 | `event_type` | 언제 |
 | --- | --- |
@@ -135,8 +136,10 @@ Hermes 가 보낸 원래 payload 를 통째로 넣지 않는다.
 
 ## subagent_usage_job
 
-부모 실행이 끝난 뒤에도 완료 사건이 오지 않은 자식 session 의 사용량을 다시 조회하는 작업이다.
-재조회 규칙은 [모델 단계와 실행 기록](../../model-tiers.md) 이 정한다.
+native 자식 한 명의 사용량 원장 줄이자, 그 사용량을 session 에서 조회하는 작업이다.
+부모 실행이 끝나면 session 이 있는 시작 사건마다 한 줄이 생긴다.
+재조회 규칙과 합계에 더하는 규칙은 [모델 단계와 실행 기록](../../model-tiers.md) 의 「비동기 자식 사용량」 이 정한다.
+근거는 [ADR-059](../../adr/ADR-059-native-하위-에이전트-사용량은-재조회-작업-줄을-원장으로-넓혀-합계에-더한다.md) 에 있다.
 
 | 칸 | 타입 | 뜻 |
 | --- | --- | --- |
@@ -147,13 +150,29 @@ Hermes 가 보낸 원래 payload 를 통째로 넣지 않는다.
 | `profile_name` | VARCHAR(64) | 부모 실행의 profile |
 | `api_base_url` | VARCHAR(512) | 조회를 보낼 API 주소 |
 | `status` | VARCHAR(16) | `WAITING`, `DONE`, `EXPIRED` |
-| `unconfirmed_reason` | VARCHAR(32) NULL | 확인하지 못하고 끝낸 까닭 |
+| `unconfirmed_reason` | VARCHAR(32) NULL | 사용량이나 금액을 확인하지 못한 까닭. `EXPIRED` 는 `AGENT_MISSING`, `PROFILE_CHANGED`, `DEADLINE`, 금액 없는 `DONE` 은 `PROVIDER_UNKNOWN`, `USAGE_UNKNOWN`, `PRICE_UNKNOWN` |
 | `created_at` | DATETIME(6) | |
 | `next_attempt_at` | DATETIME(6) | 다음 조회 시각 |
 | `expires_at` | DATETIME(6) | 조회 기한. 부모 실행이 끝난 뒤 24시간이다 |
 | `attempts`, `backoff_attempts` | INT | 조회 횟수 |
+| `provider` | VARCHAR(64) NULL | 자식이 돈 provider. session 응답이 주지 않으면 비운다. 부모의 값으로 채우지 않는다 |
+| `model` | VARCHAR(128) NULL | 자식이 돈 모델 |
+| `input_tokens` | BIGINT NULL | cache 를 뺀 일반 입력 토큰 |
+| `cache_read_tokens`, `cache_write_tokens` | BIGINT NULL | cache 에서 읽은 입력과 cache 에 쓴 입력 |
+| `output_tokens` | BIGINT NULL | |
+| `estimated_cost_micros` | BIGINT NULL | 공개 API 가격으로 환산한 금액. 통화 단위의 100만분의 1. 확인하지 못하면 비운다 |
+| `actual_cost_micros` | BIGINT NULL | 부모 실행의 `cost_mode` 가 `API` 일 때만 환산액과 같은 값 |
+| `cost_currency` | CHAR(3) NULL | |
+| `pricing_version` | VARCHAR(32) NULL | 이 금액을 계산한 가격표 |
+| `recorded_at` | DATETIME(6) NULL | 사용량을 적은 시각. `DONE` 으로 바꿀 때 채운다 |
 
 `(execution_id, child_session_id)` 가 유일하다.
+사용자, 에이전트, 달은 부모 실행에서 얻는다. 같은 값을 여기 다시 적지 않는다.
+부모 실행의 토큰 칸과 달리 입력을 셋으로 나눠 적는다. 합계에 더할 때는 셋을 합쳐 부모의 `input_tokens` 와 같은 뜻으로 맞춘다.
+
+사용량 칸이 생기기 전에 끝난 자식은 마이그레이션이 다시 `WAITING` 으로 넣는다.
+이미 `DONE` 이던 줄과, 작업 줄 없이 시작 사건만 남은 자식이 대상이다. 조회 기한은 마이그레이션 시각에서 24시간이다.
+에이전트가 지워졌거나 profile 이 바뀐 부모의 자식은 조회하지 않고 `EXPIRED` 로 넣는다.
 
 ## execution_skill_use
 
