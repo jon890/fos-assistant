@@ -11,6 +11,7 @@ import java.sql.Statement;
 import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.UUID;
 import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.BeforeEach;
@@ -27,25 +28,30 @@ class SubagentUsageLedgerMigrationTest {
     private static final Timestamp OLD_NEXT_ATTEMPT_AT = Timestamp.valueOf("2026-09-01 00:05:00");
     private static final Timestamp OLD_EXPIRES_AT = Timestamp.valueOf("2026-09-02 00:00:00");
 
-    private String url;
+    private Database database;
 
     @BeforeEach
     void setUp() throws SQLException {
-        url = "jdbc:h2:mem:subagent-usage-ledger-" + UUID.randomUUID() + ";MODE=MySQL;DB_CLOSE_DELAY=-1";
+        database = createDatabase();
         migrate("54");
         seed();
         Flyway.configure()
-                .dataSource(url, "sa", "")
+                .dataSource(database.url(), database.username(), database.password())
                 .locations("classpath:db/migration")
                 .load()
                 .migrate();
     }
 
+    /** 같은 검사를 실제 MySQL 에서 돌리는 하위 클래스가 바꿔 끼운다. */
+    Database createDatabase() {
+        return new Database(
+                "jdbc:h2:mem:subagent-usage-ledger-" + UUID.randomUUID() + ";MODE=MySQL;DB_CLOSE_DELAY=-1", "sa", "");
+    }
+
     @Test
     @DisplayName("사용량과 금액을 적는 칸이 모두 비어 있어도 되는 칸으로 생긴다")
     void addsNullableLedgerColumns() throws SQLException {
-        try (Connection connection = DriverManager.getConnection(url, "sa", "")) {
-            DatabaseMetaData meta = connection.getMetaData();
+        try (Connection connection = connect()) {
             for (String name : List.of(
                     "PROVIDER",
                     "MODEL",
@@ -58,7 +64,7 @@ class SubagentUsageLedgerMigrationTest {
                     "COST_CURRENCY",
                     "PRICING_VERSION",
                     "RECORDED_AT")) {
-                try (ResultSet column = meta.getColumns(null, null, "SUBAGENT_USAGE_JOB", name)) {
+                try (ResultSet column = column(connection, name)) {
                     assertThat(column.next())
                             .as("subagent_usage_job.%s 칸", name)
                             .isTrue();
@@ -67,10 +73,10 @@ class SubagentUsageLedgerMigrationTest {
                             .isEqualTo("YES");
                 }
             }
-            assertThat(columnSize(meta, "PROVIDER")).isEqualTo(64);
-            assertThat(columnSize(meta, "MODEL")).isEqualTo(128);
-            assertThat(columnSize(meta, "COST_CURRENCY")).isEqualTo(3);
-            assertThat(columnSize(meta, "PRICING_VERSION")).isEqualTo(32);
+            assertThat(columnSize(connection, "PROVIDER")).isEqualTo(64);
+            assertThat(columnSize(connection, "MODEL")).isEqualTo(128);
+            assertThat(columnSize(connection, "COST_CURRENCY")).isEqualTo(3);
+            assertThat(columnSize(connection, "PRICING_VERSION")).isEqualTo(32);
         }
     }
 
@@ -164,7 +170,7 @@ class SubagentUsageLedgerMigrationTest {
     @DisplayName("끝나지 않은 부모의 자식과 session 이 없는 시작 사건은 넣지 않는다")
     void skipsRunningParentAndSessionlessStart() throws SQLException {
         assertThat(executionsOf("running-child")).isEmpty();
-        try (Connection connection = DriverManager.getConnection(url, "sa", "");
+        try (Connection connection = connect();
                 Statement statement = connection.createStatement();
                 ResultSet row = statement.executeQuery("SELECT COUNT(*) FROM subagent_usage_job")) {
             assertThat(row.next()).isTrue();
@@ -176,7 +182,7 @@ class SubagentUsageLedgerMigrationTest {
 
     private void migrate(String version) {
         Flyway.configure()
-                .dataSource(url, "sa", "")
+                .dataSource(database.url(), database.username(), database.password())
                 .locations("classpath:db/migration")
                 .target(version)
                 .load()
@@ -184,7 +190,7 @@ class SubagentUsageLedgerMigrationTest {
     }
 
     private void seed() throws SQLException {
-        try (Connection connection = DriverManager.getConnection(url, "sa", "");
+        try (Connection connection = connect();
                 Statement statement = connection.createStatement()) {
             statement.executeUpdate("""
                     INSERT INTO agent (id, code, name, hermes_profile, api_base_url, cost_mode,
@@ -250,15 +256,27 @@ class SubagentUsageLedgerMigrationTest {
         }
     }
 
-    private static int columnSize(DatabaseMetaData meta, String name) throws SQLException {
-        try (ResultSet column = meta.getColumns(null, null, "SUBAGENT_USAGE_JOB", name)) {
+    /** H2 는 이름을 대문자로, MySQL 은 적은 그대로 둔다. */
+    private static ResultSet column(Connection connection, String name) throws SQLException {
+        DatabaseMetaData meta = connection.getMetaData();
+        boolean upper = meta.storesUpperCaseIdentifiers();
+        String table = upper ? "SUBAGENT_USAGE_JOB" : "subagent_usage_job";
+        return meta.getColumns(connection.getCatalog(), null, table, upper ? name : name.toLowerCase(Locale.ROOT));
+    }
+
+    private Connection connect() throws SQLException {
+        return DriverManager.getConnection(database.url(), database.username(), database.password());
+    }
+
+    private static int columnSize(Connection connection, String name) throws SQLException {
+        try (ResultSet column = column(connection, name)) {
             assertThat(column.next()).as("subagent_usage_job.%s 칸", name).isTrue();
             return column.getInt("COLUMN_SIZE");
         }
     }
 
     private int jobCount(long executionId, String childSessionId) throws SQLException {
-        try (Connection connection = DriverManager.getConnection(url, "sa", "");
+        try (Connection connection = connect();
                 Statement statement = connection.createStatement();
                 ResultSet row = statement.executeQuery("SELECT COUNT(*) FROM subagent_usage_job WHERE execution_id = "
                         + executionId + " AND child_session_id = '" + childSessionId + "'")) {
@@ -269,7 +287,7 @@ class SubagentUsageLedgerMigrationTest {
 
     private List<Long> executionsOf(String childSessionId) throws SQLException {
         List<Long> result = new ArrayList<>();
-        try (Connection connection = DriverManager.getConnection(url, "sa", "");
+        try (Connection connection = connect();
                 Statement statement = connection.createStatement();
                 ResultSet rows =
                         statement.executeQuery("SELECT execution_id FROM subagent_usage_job WHERE child_session_id = '"
@@ -282,7 +300,7 @@ class SubagentUsageLedgerMigrationTest {
     }
 
     private Job job(long executionId, String childSessionId) throws SQLException {
-        try (Connection connection = DriverManager.getConnection(url, "sa", "");
+        try (Connection connection = connect();
                 Statement statement = connection.createStatement();
                 ResultSet row = statement.executeQuery("""
                         SELECT status, unconfirmed_reason, parent_session_id, profile_name, api_base_url,
@@ -320,4 +338,6 @@ class SubagentUsageLedgerMigrationTest {
             int attempts,
             int backoffAttempts,
             Timestamp recordedAt) {}
+
+    record Database(String url, String username, String password) {}
 }

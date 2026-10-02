@@ -143,6 +143,7 @@ scripts/check-local.sh
 
 ```bash
 cd backend && ./gradlew test
+scripts/check-mysql-migration.sh
 cd web && pnpm typecheck && pnpm build
 cd web && pnpm test:browser
 node test/e2e/run.ts
@@ -177,6 +178,9 @@ PR 실패는 그 PR 에서 고친다. 모인 실패 이슈는 고치거나 까�
 디렉터리마다 걸리는 함정은 [`backend/AGENTS.md`](backend/AGENTS.md) 와
 [`web/AGENTS.md`](web/AGENTS.md) 가 갖는다.
 `gradlew` 의 위치와 `pnpm build` 가 요구하는 환경 변수가 거기 있다.
+
+`scripts/check-mysql-migration.sh` 는 Docker 로 일회용 MySQL 8.4 를 띄워 마이그레이션과 스키마 검증을 실제 MySQL 에서 돌린다.
+CI 에서는 `backend` job 이 함께 돌린다. 까닭은 [`docs/backend/schema/README.md`](docs/backend/schema/README.md) 의 「마이그레이션 작성 규칙」 에 있다.
 
 `test/e2e` 는 Hermes 대역을 같은 프로세스에 띄워 홈서버 없이 전체 흐름을 검사한다.
 시나리오는 `test/e2e/scenarios/` 에 하나씩 나뉘어 있고 `run.ts` 가 차례로 돌린다.

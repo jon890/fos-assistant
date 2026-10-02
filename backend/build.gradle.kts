@@ -56,7 +56,10 @@ dependencies {
 }
 
 tasks.test {
-    useJUnitPlatform()
+    // mysql 태그는 실제 MySQL 서버가 있어야 돈다. mysqlMigrationTest 가 따로 돌린다.
+    useJUnitPlatform {
+        excludeTags("mysql")
+    }
     // 전체 검사가 함께 보존하는 Spring 문맥은 기본 512MB 힙에 들어가지 않는다.
     maxHeapSize = "1g"
 }
@@ -91,6 +94,22 @@ tasks.register<Test>("archTest") {
     useJUnitPlatform {
         includeTags("architecture")
     }
+}
+
+/**
+ * 마이그레이션을 실제 MySQL 에서 검사한다. H2 는 정렬 규칙이 다른 칸의 비교 같은 MySQL 고유의 실패를 내지 않는다.
+ * 서버 접속 값을 환경 변수로 받으므로 직접 부르지 않고 scripts/check-mysql-migration.sh 로 돌린다.
+ */
+tasks.register<Test>("mysqlMigrationTest") {
+    group = "verification"
+    description = "마이그레이션과 스키마 검증을 실제 MySQL 에서 검사한다."
+    testClassesDirs = sourceSets.test.get().output.classesDirs
+    classpath = sourceSets.test.get().runtimeClasspath
+    useJUnitPlatform {
+        includeTags("mysql")
+    }
+    // 결과가 밖의 MySQL 서버에 달려 있어 앞선 결과를 다시 쓰지 않는다.
+    outputs.upToDateWhen { false }
 }
 
 /**
