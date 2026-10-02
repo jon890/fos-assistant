@@ -1,0 +1,51 @@
+# 직접 띄울 때 필요한 것
+
+이 저장소를 받아 자기 환경에 띄우는 사람이 읽는다.
+기술 스택과 Control Plane, Web 이 읽는 환경 변수를 이 문서가 갖는다.
+Hermes 에 설치하는 묶음과 그때 받는 값은 [`hermes/README.md`](../hermes/README.md) 가 갖는다.
+
+## 기술 스택
+
+| 대상 | 선택 |
+| --- | --- |
+| Backend | Spring Boot 4.0.6, Java 21, Gradle Kotlin DSL |
+| DB | MySQL 8.4 (운영), H2 (테스트) |
+| Migration | Flyway |
+| Web | Next.js 16, React 19, TypeScript, Tailwind v4 |
+| 로그인 | NextAuth v5 Google OAuth |
+
+## 개별 실행
+
+전체 검사는 [`AGENTS.md`](../AGENTS.md) 의 「확인」 절이 갖는다.
+한 쪽만 돌릴 때는 아래와 같다.
+
+```bash
+cd backend && ./gradlew test
+cd web && pnpm install && pnpm typecheck && pnpm build
+```
+
+## 환경 변수
+
+Backend 는 `backend/src/main/resources/application.yml`, Web 은 `web/.env.example` 을 본다.
+
+| 이름 | 쓰는 곳 | 설명 |
+| --- | --- | --- |
+| `ASSISTANT_JWT_SECRET` | 양쪽 | 웹이 발급하고 Control Plane 이 검증하는 토큰의 HMAC 비밀값 |
+| `ASSISTANT_MEMORY_ENCRYPTION_ACTIVE_KEY_ID` | Backend | 민감 Memory 본문을 새로 암호화할 때 쓰는 key 의 id. 비우면 민감 항목을 저장하거나 수정하지 못한다 |
+| `ASSISTANT_MEMORY_ENCRYPTION_KEYS` | Backend | `<id>:<base64 32바이트>` 를 쉼표로 이은 목록. 잃으면 민감 본문을 되찾지 못한다 |
+| `HERMES_BASE_URL` | Backend | Hermes API server 주소 |
+| `HERMES_PROFILE_KEY_DIR` | Backend | profile 이름으로 된 key 파일이 들어 있는 디렉터리 |
+| `HERMES_DASHBOARD_BASE_URL` | Backend | profile 을 만드는 Hermes 대시보드 주소 |
+| `HERMES_DASHBOARD_TOKEN` | Backend | 그 대시보드가 기계에게 여는 경로에 보낼 토큰 |
+| `HERMES_SHARED_LISTENER_BASE_URL` | Backend | profile 접두를 붙여 부르는 공유 listener 주소 |
+| `ASSISTANT_PRICING_CATALOG` | Backend | models.dev 가격표를 복사해 둔 파일. 없으면 비용을 비워 둔다 |
+| `ASSISTANT_ATTACHMENT_ROOT` | Backend | 대화에 올린 사진을 두는 디렉터리. Control Plane 이 쓴다. 비면 기동이 실패한다 |
+| `ASSISTANT_ATTACHMENT_AGENT_ROOT` | Backend | 같은 디렉터리를 Hermes 컨테이너에서 보는 경로. 실행 입력에 적는다. 비면 기동이 실패한다 |
+| `ASSISTANT_ARTIFACT_ROOT` | Backend | 에이전트가 만든 결과물 파일을 두는 디렉터리. Control Plane 이 읽고 오래된 것을 지운다. 비면 기동이 실패한다 |
+| `ASSISTANT_ARTIFACT_AGENT_ROOT` | Backend | 같은 디렉터리를 Hermes 컨테이너에서 보는 경로. 실행 입력에 적는다. 비면 기동이 실패한다 |
+| `ASSISTANT_SKILL_ROOT` | Backend | 에이전트에 올린 스킬을 profile 별 버전 디렉터리로 두는 디렉터리. Control Plane 이 쓴다. 비면 기동이 실패한다 |
+| `ASSISTANT_SKILL_AGENT_ROOT` | Backend | 같은 디렉터리를 Hermes 컨테이너에서 읽기 전용으로 보는 경로. `skills.external_dirs` 에 적는다. 비면 기동이 실패한다 |
+| `ASSISTANT_SKILL_MAX_PER_AGENT` | Backend | 에이전트 하나에 올릴 수 있는 스킬 수. 기본 30. 새 스킬을 만들 때만 본다 |
+
+AI credential 은 이 저장소와 데이터베이스 어디에도 두지 않는다.
+각 사용자의 credential 은 그 사람의 Hermes profile `.env` 안에만 있다.
