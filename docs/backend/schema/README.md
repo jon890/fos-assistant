@@ -69,6 +69,7 @@ Docker 로 일회용 MySQL 8.4 를 띄우고 `mysql` 태그가 붙은 검사를 
 | --- | --- |
 | `MysqlMigrationTest` | 빈 데이터베이스에서 Flyway 가 처음부터 끝까지 적용되고 Hibernate 의 `ddl-auto: validate` 가 통과한다. 두 정렬 규칙이 운영처럼 섞여 있다 |
 | `SubagentUsageLedgerMysqlMigrationTest` | 줄이 있는 상태에서 V55 부터 끝까지 적용되고 결과가 H2 와 같다 |
+| `MemorySourceUniqueMysqlMigrationTest` | 줄이 있는 `memory` 표에 V55 의 유일 색인이 만들어지고 결과가 H2 와 같다 |
 
 **줄을 넣거나 고치는 마이그레이션을 쓰면 그 검사를 실제 MySQL 에서도 돌린다.**
 H2 용 `*MigrationTest` 가 데이터베이스를 만드는 메서드를 열어 두고, `mysql` 태그를 단 하위 클래스가 `MysqlTestDatabase` 로 바꿔 끼운다.

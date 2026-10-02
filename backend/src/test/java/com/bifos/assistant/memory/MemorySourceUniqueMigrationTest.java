@@ -23,14 +23,15 @@ class MemorySourceUniqueMigrationTest {
     @Test
     @DisplayName("V55 는 출처가 없는 줄을 그대로 두고 같은 주인의 같은 출처만 막는다")
     void allowsRowsWithoutSourceAndRejectsSameSourceOfSameOwner() throws SQLException {
-        String url = "jdbc:h2:mem:migration-" + UUID.randomUUID() + ";MODE=MySQL;DB_CLOSE_DELAY=-1";
-        migrate(url, "54");
-        try (Connection connection = DriverManager.getConnection(url, "sa", "");
+        Database database = createDatabase();
+        migrate(database, "54");
+        try (Connection connection =
+                        DriverManager.getConnection(database.url(), database.username(), database.password());
                 Statement statement = connection.createStatement()) {
             insert(statement, 1, "첫째", null);
             insert(statement, 1, "둘째", null);
 
-            migrate(url, "55");
+            migrate(database, "55");
 
             try (ResultSet rows = statement.executeQuery("SELECT COUNT(*) FROM memory")) {
                 assertThat(rows.next()).isTrue();
@@ -55,12 +56,19 @@ class MemorySourceUniqueMigrationTest {
                 """.formatted(owner, title, source));
     }
 
-    private static void migrate(String url, String target) {
+    /** 같은 검사를 실제 MySQL 에서 돌리는 하위 클래스가 바꿔 끼운다. */
+    Database createDatabase() {
+        return new Database("jdbc:h2:mem:migration-" + UUID.randomUUID() + ";MODE=MySQL;DB_CLOSE_DELAY=-1", "sa", "");
+    }
+
+    private static void migrate(Database database, String target) {
         Flyway.configure()
-                .dataSource(url, "sa", "")
+                .dataSource(database.url(), database.username(), database.password())
                 .locations("classpath:db/migration")
                 .target(target)
                 .load()
                 .migrate();
     }
+
+    record Database(String url, String username, String password) {}
 }
