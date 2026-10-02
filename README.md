@@ -2,22 +2,24 @@
 
 English | [한국어](README.ko.md)
 
-A self-hosted Control Plane and web app that sit on top of [Hermes Agent](docs/hermes/README.md).
-People who share a purpose form a group (a family, for example), and each of them defines, connects, and runs their own agents, backed by a memory that only keeps what a person has approved.
+A personal AI assistant that belongs to the person using it, not to a model vendor or to any one product.
+It is a self-hosted Control Plane and web app on top of [Hermes Agent](docs/hermes/README.md), where you connect general-purpose connectors and your own agents into an agentic workflow of your own, backed by a memory that only keeps what a person has approved.
+People who share a purpose, a family for example, use it together as a group, each with their own agents.
 
 The product name is not final. For now it is called `fos-assistant`.
 
 ## Why this exists
 
-Most assistants are designed by the service that hosts them.
-This one is meant to be yours.
+We want any individual to be free to have an assistant of their own, without depending on a particular model or product.
+To get there, the goal is to let you connect general-purpose connectors into an agentic workflow that is yours.
 
-- **It is your own.** You decide which tools and memory an agent has and which model a conversation uses.
-- **It is not tied to a model provider.** A conversation picks a tier (fast, balanced, or deep), and the Control Plane database holds the policy that maps a tier to an actual model. Changing providers does not change how you work.
-- **It is the source of truth for long-term knowledge about you.** Agents and outside services read only the part they are allowed to. Service tokens are read-only, and the body of a sensitive entry is encrypted at rest.
+- **Independent of the model.** A conversation picks a tier (fast, balanced, or deep), and the Control Plane database holds the policy that maps a tier to an actual model. The runtime is separate too: Hermes Agent runs the agents, and this repository decides who may use what, draws the screens, and records what was used.
+- **Independent of any product.** A connector is declared by a plugin's `connector.json`, and the Control Plane only has the generic flow. It does not know the name or the address of the service behind a connector, so adding one does not mean changing this repository ([ADR-043](docs/adr/ADR-043-커넥터는-plugin-의-connector-json-으로-선언하고-control-plane-은-범용-흐름만-갖는다.md)).
+- **Your own.** You decide which tools and memory an agent has and which model a conversation uses.
+- **The source of truth for long-term knowledge about you.** Agents and outside services read only the part they are allowed to. Service tokens are read-only, and the body of a sensitive entry is encrypted at rest.
 
-Hermes Agent runs the agents.
-This repository decides who may use what, draws the screens, and records what was used.
+One connector is attached today, a household account book.
+Growing the set of general-purpose connectors is the direction the work is going in, not something that is already done.
 
 ## Principles
 
@@ -31,13 +33,13 @@ Adding a user is a single decision by an administrator, and it must not slow any
 
 ## What it does
 
+- **Connectors with approval.** Register a personal token for an outside service and use an agent dedicated to it. A call that writes to that service runs only after you approve it, once, with exactly the arguments you approved.
+- **Delegation.** One request can fan out to several agents, and the child runs still execute with the requester's permissions only.
 - **Agents you build and share.** Create an agent from the web UI, write its persona, and choose its tools. Publish it to your group and others can talk to it, while each person's memory and conversations stay private.
 - **Skills and `/commands`.** Upload skills to an agent and call one directly by typing `/` in the composer.
 - **Model tiers.** Pick fast, balanced, or deep per conversation, or choose a model directly under advanced options.
 - **Approval-based Memory.** An agent can only propose a memory. Nothing reaches a conversation until a person accepts it. Entries belong to collections, and each agent receives only the collections it is allowed to. Earlier revisions are kept when an entry is edited or deleted.
 - **Run tree and cost.** Every run is recorded, including the ones that fail. Open a run to see its tool calls and child runs as a tree. Runs made on a subscription are also shown converted to API prices, so an administrator can compare settings.
-- **Delegation.** One request can fan out to several agents, and the child runs still execute with the requester's permissions only.
-- **Connectors with approval.** Register a personal token for an outside service and use an agent dedicated to it. A call that writes to that service runs only after you approve it, once, with exactly the arguments you approved.
 - **Photos and HTML results.** Attach photos for an agent to read, and open the HTML pages an agent produces in a side panel. Scripts in those pages do not run.
 - **Read-only access for other services.** A service token bound to a user lets another service read that user's documents and nothing else.
 
