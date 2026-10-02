@@ -13,6 +13,7 @@ import com.bifos.assistant.chat.application.ArtifactWriteService;
 import com.bifos.assistant.chat.application.ConversationAccess;
 import com.bifos.assistant.chat.domain.Conversation;
 import com.bifos.assistant.chat.infra.ArtifactProperties;
+import com.bifos.assistant.chat.infra.ArtifactSourceResponse;
 import com.bifos.assistant.chat.infra.ArtifactSourceFetcher;
 import com.bifos.assistant.chat.infra.ArtifactSourceProperties;
 import com.bifos.assistant.chat.infra.ArtifactStore;
@@ -140,7 +141,7 @@ class ArtifactWriteServiceTest {
         ArtifactSourceFetcher source = new ArtifactSourceFetcher(
                 new ArtifactSourceProperties(List.of("images.example.com"), null, null, null),
                 host -> new InetAddress[] {InetAddress.getByName("8.8.8.8")},
-                (address, host, uri, connect, read, cancellation) -> new ArtifactSourceFetcher.Response(
+                (address, host, uri, connect, read, cancellation) -> new ArtifactSourceResponse(
                         200,
                         Map.of("content-type", "image/png", "content-length", "3"),
                         new ByteArrayInputStream(image)));

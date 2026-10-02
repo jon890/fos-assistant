@@ -3,7 +3,7 @@ package com.bifos.assistant.chat.application;
 import com.bifos.assistant.chat.domain.ChatArtifact;
 import com.bifos.assistant.chat.domain.Conversation;
 import com.bifos.assistant.chat.infra.ArtifactStore;
-import com.bifos.assistant.chat.infra.ArtifactStore.FoundFile;
+import com.bifos.assistant.chat.infra.ArtifactFoundFile;
 import com.bifos.assistant.chat.infra.ChatArtifactRepository;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
@@ -76,7 +76,7 @@ public class ArtifactService {
         if (messageId == null) {
             return;
         }
-        List<FoundFile> found;
+        List<ArtifactFoundFile> found;
         try {
             found = store.changedHtmlSince(conversationId, turnStartedAt);
         } catch (RuntimeException ex) {
@@ -96,7 +96,7 @@ public class ArtifactService {
             log.warn("could not read artifacts of a message messageId={}", messageId, ex);
             return;
         }
-        for (FoundFile file : found) {
+        for (ArtifactFoundFile file : found) {
             if (already.contains(file.path())) {
                 continue;
             }
