@@ -760,7 +760,9 @@ class ConnectorActionServiceTest {
 
         assertThat(service.revokeClosedGrants(now)).isZero();
 
-        assertThat(grants.findAll()).filteredOn(grant -> grant.revokedAt() != null).hasSize(1);
+        assertThat(grants.findAll())
+                .filteredOn(grant -> grant.revokedAt() != null)
+                .hasSize(1);
         assertThat(grants.findAll().get(0).revokedAt()).as("처음 거둔 시각을 그대로 둔다").isEqualTo(earlier);
 
         grants.save(ConnectorToolGrant.of(owner.id(), DEMO, MAIL, now.plus(Duration.ofDays(1)), now));
