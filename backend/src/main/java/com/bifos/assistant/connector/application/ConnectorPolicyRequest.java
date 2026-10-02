@@ -16,7 +16,7 @@ import tools.jackson.databind.json.JsonMapper;
 /**
  * profile 플러그인이 커넥터 도구 호출 전에 보낸 판정 요청 본문에서 서명을 확인한 값이다(ADR-049).
  *
- * <p>계약은 {@code docs/connectors.md} 의 「도구 호출 판정」 이 갖는다. 서명은 {@link McpCallContext} 와 같은
+ * <p>계약은 {@code docs/backend/connector-tool-policy.md} 의 「도구 호출 판정」 이 갖는다. 서명은 {@link McpCallContext} 와 같은
  * HMAC-SHA256 이고 key 도 같다. 서명할 글만 다르다. {@code v1-connector-policy}, {@code hermes_tool},
  * {@code root_session_id}, {@code session_id}, {@code tool_call_id}, {@code args_json} 의 UTF-8 바이트를 SHA-256
  * 한 소문자 16진수를 이 순서로 {@code \n} 하나로 이은 UTF-8 이다. 인자를 글로 받고 그 글을 서명하므로 보내는 쪽과

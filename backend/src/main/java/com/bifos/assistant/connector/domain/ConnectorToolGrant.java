@@ -16,7 +16,7 @@ import lombok.experimental.Accessors;
 /**
  * 사용자가 커넥터 도구 하나에 준 상시 허락이다(ADR-050).
  *
- * <p>칸의 뜻은 {@code docs/data-schema.md} 의 「connector_tool_grant」 가 갖는다. 거두지 않았고 기간이 남은 줄만
+ * <p>칸의 뜻은 {@code docs/backend/schema/connector.md} 의 「connector_tool_grant」 가 갖는다. 거두지 않았고 기간이 남은 줄만
  * 유효하다. 같은 도구에 다시 주면 새 줄을 만든다.
  */
 @Entity

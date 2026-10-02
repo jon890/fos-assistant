@@ -4,13 +4,13 @@
     "https://checkstyle.org/dtds/suppressions_1_2.dtd">
 <!--
   설계상 예외다. 앞으로도 허용하는 것이고, 줄여 갈 목록은 baseline.xml 에 있다.
-  각 줄의 까닭은 backend/AGENTS.md 의 「코드 규칙」 절에 있다.
+  각 줄의 까닭은 그 줄 위의 주석에 있다. 줄의 모양은 docs/backend/quality.md 의 「코드 규칙의 기준 파일」 절에 있다.
 -->
 <suppressions>
   <!-- Flyway 가 V<번호>__<이름> 모양의 클래스 이름을 요구한다 -->
   <suppress checks="(^|\.)TypeName(Check)?$" files="db[\\/]migration[\\/]V\d+__\w+\.java"/>
 
-  <!-- JPQL 의 생성자 식은 문자열 안에 전체 이름을 요구한다 -->
+  <!-- JPQL 의 생성자 식은 문자열 안에 전체 이름을 요구한다. 텍스트 블록은 줄 단위로 읽으면 문자열인지 알 수 없어 규칙 대상에서 빼지 못한다 -->
   <suppress id="fullyQualifiedName" files="src[\\/]main[\\/].*[\\/](AgentExecutionRepository|ExecutionSkillUseRepository)\.java"/>
 
   <!-- 테스트는 시나리오가 길고 생성자 주입 규칙과 관계가 없다 -->

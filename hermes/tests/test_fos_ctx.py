@@ -1,6 +1,6 @@
 """Hermes 설치 없이 fos-ctx plugin 의 모양과 서명 계약, hook 분기를 검사한다.
 
-서명 기대값은 `docs/hermes/delegation.md` 「`_fos_ctx` 계약」 표의 값을 그대로 옮겼다.
+서명 기대값은 `docs/hermes/fos-ctx.md` 「`_fos_ctx` 계약」 표의 값을 그대로 옮겼다.
 서버 쪽 `McpCallContextTest` 도 같은 값을 쓴다. 한쪽 계약이 바뀌면 두 쪽을 함께 고친다.
 자식 session 등록의 서명 기대값은 같은 문서의 「하위 에이전트 session 등록 계약」 확인 값이다.
 """
@@ -39,7 +39,7 @@ VECTOR_TOP_CHILD = "하위-세션-1"
 VECTOR_TOP_SUBAGENT_SIG = "ba540b481d830453accd812c8610be8d9467a532d5ff3db891514dcfe3d0726b"
 VECTOR_CHILD = "하위-세션-2"
 VECTOR_SUBAGENT_SIG = "5479a21f26ddeb337754d4fd86dd3a0e36e0ef1f6ff2cc879c0fd07da5d84485"
-# 커넥터 정책 질의의 서명 확인 값이다. 계약은 `docs/connectors.md` 의 「도구 호출 판정」 이다.
+# 커넥터 정책 질의의 서명 확인 값이다. 계약은 `docs/backend/connector-tool-policy.md` 의 「도구 호출 판정」 이다.
 # 서버 쪽 `backend/src/test/java/com/bifos/assistant/connector/ConnectorPolicyRequestTest.java` 의
 # `VECTOR_*` 와 같은 값이어야 한다. 한쪽을 바꾸면 두 쪽을 함께 고친다.
 POLICY_VECTOR_KEY = "2ce07fe9da9032a6ba2d14ea44adf290f530110a4b5d2ed67bb72384342abf8b"

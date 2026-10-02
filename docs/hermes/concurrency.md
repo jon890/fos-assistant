@@ -1,6 +1,6 @@
 # 동시 실행
 
-### profile 접두
+## profile 접두
 
 아래 설정 우선순위와 허용 목록은 v0.21.0 의 동작이다.
 v0.21.3 은 `gateway.multiplex_profile_allowlist` 를 제거했고,
@@ -41,7 +41,7 @@ profile 별 gateway 도 자기 이름의 접두를 통과시키고 남의 이름
 **listener 를 세우는 것과 밖에서 닿게 하는 것은 다른 일이다.**
 바인딩 주소를 따로 정하지 않으면 컨테이너 안에서만 열린다.
 
-#### credential 을 푸는 규칙이 달라진다
+### credential 을 푸는 규칙이 달라진다
 
 multiplex 를 끄면 profile `.env` 에 없는 credential 을 프로세스 환경에서 찾는다.
 multiplex 를 켜면 profile `.env` 에 없는 credential 을 프로세스 환경으로 내려가 찾지 않는다.
@@ -57,7 +57,7 @@ profile scope 없이 credential 을 읽으려 하면 예외가 난다.
 - 도구 하위 프로세스의 환경은 프로세스 환경을 바탕으로 만들고 provider credential 만 빼낸다.
   도구가 쓰는 일반 환경 변수는 계속 전달된다.
 
-#### 보조 profile 경고와 실행 범위
+### 보조 profile 경고와 실행 범위
 
 이름이 붙은 profile 의 `.env` 에 `API_SERVER_KEY` 가 있으면 Hermes 는 그 profile 의
 API server platform 을 자동으로 켠다.
@@ -95,7 +95,7 @@ multiplex 를 켜면 default profile 만 `desired_state` 에 따라 시작하고
 이름이 붙은 profile 의 자리는 만들기만 한다.
 다만 운영자가 개별 gateway 를 직접 시작하면 공유 listener 와 함께 돌 수 있고 Hermes 가 이를 막지 않는다.
 
-#### 실행 소유자는 profile 과 key 가 함께 정한다
+### 실행 소유자는 profile 과 key 가 함께 정한다
 
 Hermes 는 실행을 만들 때 아래 값을 줄여 소유자 표에 남긴다.
 
@@ -107,7 +107,7 @@ sha256(profile + "\0" + expected_api_key)
 조회, 사건 SSE, 중단, 승인과 steer 가 모두 같은 판정을 쓴다.
 그래서 다른 profile 은 실행 번호를 알아도 그 실행의 존재 여부를 확인할 수 없다.
 
-#### 공유 listener 가 바꾸는 경계
+### 공유 listener 가 바꾸는 경계
 
 | 경계 | 정하는 곳 | 공유 listener 의 영향 |
 | --- | --- | --- |
@@ -122,7 +122,7 @@ sha256(profile + "\0" + expected_api_key)
 요청 본문은 어느 profile 로 실행할지 정하지 못한다.
 Control Plane 이 권한을 확인한 에이전트에서 profile 과 접두와 key 를 꺼내는 규칙은 그대로다.
 
-### 동시 실행 한도는 listener 단위다
+## 동시 실행 한도는 listener 단위다
 
 `gateway.api_server.max_concurrent_runs` 가 동시에 도는 실행을 제한한다.
 그 값은 listener 주인 profile 의 설정에서 한 번 읽고, listener 가 하나면 한도도 하나다.
@@ -136,7 +136,7 @@ Control Plane 이 권한을 확인한 에이전트에서 profile 과 접두와 k
 `gateway.max_concurrent_sessions` 는 다른 것이다.
 그쪽은 platform 대화 turn 을 제한하고 `/v1/runs` 에는 걸리지 않는다.
 
-### 한도 위에 thread pool 이 하나 더 있다
+## 한도 위에 thread pool 이 하나 더 있다
 
 `max_concurrent_runs` 를 통과한 실행은 곧바로 도는 것이 아니라 thread pool 을 한 번 더 지난다.
 
@@ -154,7 +154,7 @@ Hermes 는 그 executor 를 만들지도 크기를 정하지도 않으므로 Pyt
 이 크기는 CPU 를 쓰는 일을 가정한 값이다.
 실행이 자리를 잡고 있는 시간의 대부분은 LLM 응답을 기다리는 시간이고 그동안 CPU 를 쓰지 않는다.
 
-### 한도를 pool 보다 크게 두면 429 가 아니라 기다린다
+## 한도를 pool 보다 크게 두면 429 가 아니라 기다린다
 
 429 판정은 요청을 받는 자리에서 하고, pool 에 넘기는 것은 그보다 뒤다.
 그래서 `max_concurrent_runs` 가 pool 크기보다 크면 넘친 실행도 `202` 로 받아들여지고,
@@ -185,7 +185,7 @@ pool 16, 한도 40 인 gateway 에 실행 24개를 동시에 보내 측정했다
 호출한 쪽은 자기 실행이 시작조차 하지 않았다는 것을 알 수 없고,
 이벤트 스트림에도 그동안 아무것도 오지 않는다.
 
-### pool 은 실행만 쓰는 것이 아니다
+## pool 은 실행만 쓰는 것이 아니다
 
 `asyncio.to_thread` 도 같은 기본 executor 를 쓴다.
 gateway 코드에서 `api_server.py` 가 36곳, `run.py` 가 46곳에서 이것을 부르고,
@@ -206,7 +206,7 @@ pool 16 인 gateway 에 실행 24개를 보내고 그동안 두 경로의 응답
 
 같은 부하를 pool 64 인 gateway 에 보내면 `/api/sessions` 가 12 ms 부터 15 ms 를 유지했다.
 
-### pool 은 plugin 으로 키울 수 있다
+## pool 은 plugin 으로 키울 수 있다
 
 hook 목록에 gateway 가 뜰 때 도는 것은 없다.
 대신 plugin 모듈이 gateway 프로세스 안에서 import 되는 것을 쓴다.
@@ -236,7 +236,7 @@ pool 을 키운 gateway 에서 측정한 값이다. CPU 를 2.0 으로 제한한
 
 **막힌 곳이 pool 뿐이었다는 뜻이다.**
 
-### pool 말고 걸리는 것
+## pool 말고 걸리는 것
 
 | 무엇 | 어느 단위 | 값 | 실행에 걸리는가 |
 | --- | --- | --- | --- |
@@ -253,7 +253,7 @@ httpx 한도는 client 하나를 기준으로 세므로 listener 전체의 한�
 위의 것이 모두 listener 나 프로세스 단위다.
 한 profile 이 자리를 다 쓰면 다른 profile 이 그만큼 못 쓴다.
 
-### 스레드를 늘리는 비용
+## 스레드를 늘리는 비용
 
 스레드 자체는 거의 들지 않는다. 늘어나는 것은 동시에 도는 실행이 쥔 것이다.
 

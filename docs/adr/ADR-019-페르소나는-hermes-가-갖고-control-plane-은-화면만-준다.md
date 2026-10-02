@@ -1,8 +1,6 @@
 # ADR-019. 페르소나는 Hermes 가 갖고 Control Plane 은 화면만 준다
 
-## 상태
-
-Accepted
+- **status**: `accepted`
 
 ## 맥락
 
@@ -41,6 +39,12 @@ Hermes 대시보드에 `SOUL.md` 를 읽는 경로와 쓰는 경로가 모두 �
 | 쓰는 길 | `PUT /api/profiles/{이름}/soul` |
 | 누가 고칠 수 있나 | 그 에이전트의 주인, 그리고 `ADMIN` |
 | 실행이 읽는 것 | 같은 파일. 저장한 것이 곧 다음 실행에 쓰인다 |
+
+### 대체된 부분
+
+plugin 소유는 [ADR-041](ADR-041-hermes-에-설치하는-plugin-과-profile-틀은-이-저장소가-소유한다.md) 이 바꿨다.
+아래 「여는 경로가 이름마다 둘 늘어난다」 가 soul 경로의 등록을 비공개 저장소 `fos-home-infra` 의 plugin 이 소유한다고 적은 부분이다.
+지금 plugin 원본과 단위 검사는 이 저장소의 `hermes/` 가 갖고, 설치와 live 검사만 운영 저장소가 갖는다.
 
 ### 정본이 하나라서 어긋날 것이 없다
 

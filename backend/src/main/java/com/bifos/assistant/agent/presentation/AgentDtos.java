@@ -25,7 +25,7 @@ public final class AgentDtos {
      * 페르소나 본문의 상한이다.
      *
      * <p>매 실행의 고정 프롬프트에 그대로 들어가므로 길이가 곧 비용이다. 근거는 {@code
-     * docs/code-architecture.md} 의 「페르소나」가 갖는다.
+     * docs/backend/agent.md} 의 「페르소나」가 갖는다.
      */
     public static final int PERSONA_MAX_CHARS = 8000;
 

@@ -28,12 +28,11 @@ Hermes 의 MCP 도구 호출에는 제한 시간(기본 300초)이 있고, 기�
 3분 2초가 걸렸고, 부를 때마다 LLM 호출이 한 번씩 들었다.
 도구 호출 자체는 수십 ms 였고 시간과 비용은 모두 모델의 반복 판단에서 나왔다.
 
-Hermes 에는 도는 실행에 메시지를 끼워 넣는 API 가 없다([`hermes/runs-api.md`](../hermes/runs-api.md)).
+Hermes 에는 도는 실행에 지시를 더하는 `POST /v1/runs/{run_id}/steer` 가 있다([`hermes/runs-api.md`](../hermes/runs-api.md) 의 「도는 실행에 지시를 더하는 `steer`」).
+`steer` 는 run 이 `running` 일 때만 받는데, 위임 결과는 대개 부모 turn 이 끝난 뒤에 도착한다. 그때는 넣을 run 이 없다.
 그래서 부모를 깨우는 것은 새 turn 을 여는 것이다.
-
-> **정정(2026-10-01)**: 위 문장은 틀렸다. Hermes 에는 `POST /v1/runs/{run_id}/steer` 가 있다([`hermes/runs-api.md`](../hermes/runs-api.md) 의 「도는 실행에 지시를 더하는 `steer`」).
-> 결정은 그대로 둔다. `steer` 는 run 이 `running` 일 때만 받는데, 위임 결과는 대개 부모 turn 이 끝난 뒤에 도착한다. 그때는 넣을 run 이 없어 새 turn 을 열어야 한다.
-> 부모 turn 이 도는 중에 도착한 결과를 `steer` 로 넣을지는 따로 정한다.
+처음에는 그런 API 가 없다고 적었고 2026-10-01 에 정정했다. 결정은 그대로다.
+부모 turn 이 도는 중에 도착한 결과를 `steer` 로 넣을지는 따로 정한다.
 실행 기록과 대화를 Control Plane 이 이미 가지므로 완료를 알아채고 turn 을 여는 자리도 Control Plane 이다.
 
 ### 대안 기각

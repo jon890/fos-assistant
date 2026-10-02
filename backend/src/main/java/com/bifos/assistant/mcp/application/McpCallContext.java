@@ -16,7 +16,7 @@ import tools.jackson.databind.JsonNode;
 /**
  * profile 플러그인이 MCP 도구 인자에 덮어쓴 {@code _fos_ctx} 에서 서명을 확인한 값이다.
  *
- * <p>계약과 근거는 ADR-031 과 {@code docs/hermes/delegation.md} 의 「{@code _fos_ctx} 계약」 이 갖는다.
+ * <p>계약과 근거는 ADR-031 과 {@code docs/hermes/fos-ctx.md} 의 「{@code _fos_ctx} 계약」 이 갖는다.
  * 서명은 HMAC-SHA256 이고, key 는 그 profile 의 MCP 토큰을 SHA-256 한 소문자 16진수 64자 문자열의
  * UTF-8 바이트다. 16진수를 풀어 낸 32바이트가 아니다. 서명할 글은 {@code v1}, 도구 이름,
  * {@code root_session_id}, {@code session_id}, {@code tool_call_id} 를 이 순서로 {@code \n} 하나로

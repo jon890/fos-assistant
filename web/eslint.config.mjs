@@ -1,4 +1,4 @@
-// web 코드의 lint 규칙이다. 규칙의 까닭과 기준 파일(eslint-suppressions.json)을 갱신하는 방법은 web/AGENTS.md 의 「lint 와 포맷」 절에 있다.
+// web 코드의 lint 규칙이다. 규칙의 까닭은 각 규칙 블록의 주석이 갖고, 기준 파일(eslint-suppressions.json)과 포맷의 판단 규칙은 web/AGENTS.md 의 「lint 와 포맷」 절에 있다.
 import { defineConfig, globalIgnores } from "eslint/config";
 import nextVitals from "eslint-config-next/core-web-vitals";
 import nextTs from "eslint-config-next/typescript";

@@ -75,8 +75,8 @@
 
 - `docs/adr/ADR-058-기존-개인-지식-저장소는-주인이-검토한-묶음을-화면에서-올려-들여온다.md`: `status` 줄을 `` `accepted` `` 만 남기고 고친다. 「항목의 결과」 표의 `REJECTED` 줄에서 「신원 항목인데 아직 열지 않았다」 를 「신원 항목인데 민감 문서가 아니다」 로 고친다
 - `docs/adr/INDEX.md` 의 ADR-058 줄에서 「신원 항목의 들이기는 아직 구현 전이다」 를 지운다
-- `docs/code-architecture.md` 의 「Memory」 「다음」 목록에서 「신원 항목의 들이기. …」 줄을 지우고, 「Memory」 절의 들이기 설명에 「`identity` 의 항목은 민감 문서로만 들인다」 를 더한다
-- `docs/flow.md` 의 「기존 개인 지식을 들일 때」 의 「갈리는 지점」 표에서 신원 항목의 줄을 같은 뜻으로 고친다
+- `docs/code-architecture.md` 의 「Memory 에서 아직 만들지 않은 것」 목록에서 「신원 항목의 들이기. …」 줄을 지우고, `docs/backend/memory.md` 「범위와 조립」 절의 들이기 설명에 「`identity` 의 항목은 민감 문서로만 들인다」 를 더한다
+- `docs/backend/memory.md` 의 「기존 개인 지식을 들일 때」 의 「들이기가 갈리는 지점」 표에서 신원 항목의 줄을 같은 뜻으로 고친다
 
 ## 검증
 
@@ -110,4 +110,4 @@ scripts/quality.sh check
 | `docs/adr/ADR-058-기존-개인-지식-저장소는-주인이-검토한-묶음을-화면에서-올려-들여온다.md` | 수정 |
 | `docs/adr/INDEX.md` | 수정 |
 | `docs/code-architecture.md` | 수정 |
-| `docs/flow.md` | 수정 |
+| `docs/backend/memory.md` | 수정 |

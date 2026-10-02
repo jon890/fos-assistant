@@ -75,7 +75,7 @@ Hermes v0.21.5 에는 `skill_view` 를 두고 `skill_manage` 만 도구 목록�
 `agent.disabled_toolsets` 는 toolset 단위라 `skills` 를 빼면 `skill_view` 와 색인까지 사라진다.
 plugin 이 남의 도구를 등록 해제하려면 운영자의 `allow_tool_override` 가 필요하고, 전역 plugin 의 해제는 같은 프로세스의 모든 profile 에 걸린다.
 `skill_manage` 를 빼도 색인 안내문의 `skill_manage` 문장은 남는다.
-근거는 [`hermes/tools-and-skills.md`](../hermes/tools-and-skills.md) 의 「`skill_manage` 만 빼는 설정」 이다.
+근거는 [`hermes/skills.md`](../hermes/skills.md) 의 「`skill_manage` 만 빼는 설정」 이다.
 
 그래서 두 겹으로 막는다.
 

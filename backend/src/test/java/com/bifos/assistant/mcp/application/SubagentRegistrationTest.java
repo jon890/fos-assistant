@@ -14,7 +14,7 @@ import tools.jackson.databind.node.ObjectNode;
 /**
  * 플러그인과 맞춘 하위 에이전트 session 등록 서명 계약을 고정한다(ADR-037).
  *
- * <p>기대 {@code sig} 는 Python {@code hmac} 으로 따로 계산해 {@code docs/hermes/delegation.md} 의 「하위 에이전트
+ * <p>기대 {@code sig} 는 Python {@code hmac} 으로 따로 계산해 {@code docs/hermes/fos-ctx.md} 의 「하위 에이전트
  * session 등록 계약」 에 적은 값이다. 테스트 안에서 같은 방법으로 만들어 비교하면 구현과 함께 틀려도 통과하므로
  * 문자열로 둔다.
  */
