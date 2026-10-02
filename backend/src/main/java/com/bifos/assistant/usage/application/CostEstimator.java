@@ -56,17 +56,16 @@ public class CostEstimator {
         // 카탈로그에 캐시 단가가 없는 모델은 캐시 읽기를 할인한다는 근거가 없다. 그래서 그 토큰도 입력
         // 단가로 센다. 공짜로 떨어뜨리지 않는다.
         BigDecimal cacheRate =
-                price.cacheReadUsdPerMillion() == null
-                        ? price.inputUsdPerMillion()
-                        : price.cacheReadUsdPerMillion();
+                price.cacheReadUsdPerMillion() == null ? price.inputUsdPerMillion() : price.cacheReadUsdPerMillion();
 
-        BigDecimal micros =
-                ModelPrice.microsFor(uncachedTokens, price.inputUsdPerMillion())
-                        .add(ModelPrice.microsFor(cachedCharged, cacheRate))
-                        .add(ModelPrice.microsFor(outputTokens, price.outputUsdPerMillion()));
+        BigDecimal micros = ModelPrice.microsFor(uncachedTokens, price.inputUsdPerMillion())
+                .add(ModelPrice.microsFor(cachedCharged, cacheRate))
+                .add(ModelPrice.microsFor(outputTokens, price.outputUsdPerMillion()));
 
         return new EstimatedCost(
-                micros.setScale(0, RoundingMode.HALF_UP).longValueExact(), CURRENCY, found.get().version());
+                micros.setScale(0, RoundingMode.HALF_UP).longValueExact(),
+                CURRENCY,
+                found.get().version());
     }
 
     /**

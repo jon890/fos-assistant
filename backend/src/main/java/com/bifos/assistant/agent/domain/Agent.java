@@ -1,8 +1,8 @@
 package com.bifos.assistant.agent.domain;
 
+import com.bifos.assistant.agent.domain.type.AgentVisibility;
 import com.bifos.assistant.agent.domain.type.CostMode;
 import com.bifos.assistant.agent.domain.type.CredentialScope;
-import com.bifos.assistant.agent.domain.type.AgentVisibility;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;

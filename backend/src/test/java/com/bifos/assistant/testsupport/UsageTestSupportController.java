@@ -38,6 +38,7 @@ public class UsageTestSupportController {
      * 같은 줄로 묶인다.
      */
     private static final String DEFAULT_PROVIDER = "openai-codex";
+
     private static final String DEFAULT_MODEL = "example-model";
 
     private final AgentExecutionRepository executions;
@@ -66,13 +67,8 @@ public class UsageTestSupportController {
                     .costMode(agent.costMode())
                     .status(ExecutionStatus.SUCCEEDED)
                     .timing(seed.startedAt(), seed.startedAt().plusMillis(1_200L))
-                    .tokens(
-                            seed.inputTokens(),
-                            null,
-                            seed.outputTokens(),
-                            seed.inputTokens() + seed.outputTokens())
-                    .cost(new ExecutionCost(
-                            seed.estimatedCostMicros(), seed.actualCostMicros(), "USD", "test-support"))
+                    .tokens(seed.inputTokens(), null, seed.outputTokens(), seed.inputTokens() + seed.outputTokens())
+                    .cost(new ExecutionCost(seed.estimatedCostMicros(), seed.actualCostMicros(), "USD", "test-support"))
                     .contextChars(seed.contextChars())
                     .runtimeFingerprint(seed.runtimeFingerprint())
                     .build());
@@ -83,8 +79,8 @@ public class UsageTestSupportController {
     @DeleteMapping("/executions")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void clearExecutions() {
-        executions.deleteAll(executions.findByUserIdOrderByIdDesc(
-                currentUser.require().id(), PageRequest.of(0, CLEARED_AT_ONCE)));
+        executions.deleteAll(
+                executions.findByUserIdOrderByIdDesc(currentUser.require().id(), PageRequest.of(0, CLEARED_AT_ONCE)));
     }
 
     /**
@@ -105,16 +101,13 @@ public class UsageTestSupportController {
             Long outputTokens,
             Long contextChars,
             Long estimatedCostMicros,
-            Long actualCostMicros) {
-    }
+            Long actualCostMicros) {}
 
     /** 가장 최근 실행을 고아 실행으로 표시한다. */
     @PostMapping("/last-execution/orphaned")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void orphanLastExecution() {
-        AgentExecution execution = executions
-                .findAll(PageRequest.of(0, 1, Sort.by(Sort.Direction.DESC, "id")))
-                .stream()
+        AgentExecution execution = executions.findAll(PageRequest.of(0, 1, Sort.by(Sort.Direction.DESC, "id"))).stream()
                 .findFirst()
                 .orElseThrow();
         execution.markFailed("ORPHANED", Instant.now());

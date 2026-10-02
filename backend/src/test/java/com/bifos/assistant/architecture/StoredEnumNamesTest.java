@@ -48,9 +48,8 @@ class StoredEnumNamesTest {
     @DisplayName("저장되는 enum 의 상수 이름이 순서까지 옮기기 전과 같다")
     void constantNamesAreUnchanged() {
         STORED_ENUMS.forEach((type, expected) -> {
-            List<String> actual = Arrays.stream(type.getEnumConstants())
-                    .map(Enum::name)
-                    .toList();
+            List<String> actual =
+                    Arrays.stream(type.getEnumConstants()).map(Enum::name).toList();
             assertThat(actual).as(type.getSimpleName()).containsExactlyElementsOf(expected);
         });
     }
