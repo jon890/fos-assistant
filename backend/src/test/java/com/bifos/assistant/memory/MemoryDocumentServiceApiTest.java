@@ -365,6 +365,41 @@ class MemoryDocumentServiceApiTest {
     }
 
     @Test
+    @DisplayName("서비스 토큰으로는 쓰지 못하고 GROUP 문서는 읽지 못한다")
+    void serviceTokenCannotWriteAndCannotReadGroupDocument() throws Exception {
+        String token = issue(dad, 90, IDENTITY);
+        jdbc.update("""
+                INSERT INTO memory (scope, group_id, collection, entry_type, document_key, title, content,
+                    retrieval, always_inject, sensitivity, revision, status, created_at, updated_at)
+                VALUES ('GROUP', 1, 'identity', 'DOCUMENT', 'group-doc', '그룹 문서', '그룹 본문', 'SEARCH', FALSE,
+                    'NORMAL', 1, 'ACCEPTED', CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6))
+                """);
+
+        assertThat(read(token, "identity", "group-doc").statusCode()).isEqualTo(404);
+
+        for (String method : List.of("POST", "PUT", "PATCH", "DELETE")) {
+            HttpRequest request = HttpRequest.newBuilder(
+                            URI.create("http://localhost:" + port + BASE + "identity/" + NAME))
+                    .header("Authorization", "Bearer " + token)
+                    .header("Content-Type", "application/json")
+                    .method(method, HttpRequest.BodyPublishers.ofString("{\"content\":\"x\"}"))
+                    .build();
+            int status =
+                    client.send(request, HttpResponse.BodyHandlers.ofString()).statusCode();
+            assertThat(status).as(method).isBetween(400, 499);
+        }
+        assertThat(json.readTree(read(token, "identity", NAME).body())
+                        .get("revision")
+                        .asInt())
+                .isEqualTo(1);
+        assertThat(memoryRepository
+                        .findByScopeAndOwnerUserIdAndCollectionAndDocumentKey(
+                                MemoryScope.USER, dad.id(), "identity", NAME)
+                        .isPresent())
+                .isTrue();
+    }
+
+    @Test
     @DisplayName("승인 전인 항목과 문서가 아닌 항목은 서비스가 읽지 못한다")
     void proposedAndNonDocumentEntriesAreHidden() {
         for (String[] row :
