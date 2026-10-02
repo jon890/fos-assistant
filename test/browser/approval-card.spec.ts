@@ -108,18 +108,115 @@ test("기다리는 승인 줄은 제목과 위험도와 인자의 키와 값을 
   await expect(card).not.toContainText(ACTION_ID);
 });
 
-test("비밀처럼 보이는 키의 값은 가려서 보인다", async ({ page }) => {
+test("비밀처럼 보이는 키의 값도 화면이 가리지 않고 서버가 준 그대로 보인다", async ({
+  page,
+}) => {
   await openWith(
     page,
-    "승인 카드 가림 검사",
+    "승인 카드 가림 없음 검사",
     action({
-      argsJson: JSON.stringify({ api_key: "raw-secret-value", name: "x" }),
+      argsJson: JSON.stringify({
+        password_hint: "첫 반려동물 이름",
+        api_token: "[가림]",
+      }),
     }),
   );
 
   const args = page.getByTestId("approval-args");
-  await expect(args.locator("dd")).toHaveText(["가려진 값", "x"]);
-  await expect(args).not.toContainText("raw-secret-value");
+  await expect(args.locator("dd")).toHaveText(["첫 반려동물 이름", "[가림]"]);
+});
+
+test("상시 허락을 줄 수 없는 줄은 긴 본문 뒤의 인자까지 스크롤 영역 없이 모두 펼친다", async ({
+  page,
+}) => {
+  await openWith(
+    page,
+    "승인 카드 펼침 검사",
+    action({
+      grantAllowed: false,
+      argsJson: JSON.stringify({
+        subject: "회의록",
+        body: Array.from({ length: 40 }, (_, index) => `줄 ${index}`).join(
+          "\n",
+        ),
+        to: "friend@example.com",
+        bcc: "other@example.com",
+      }),
+    }),
+  );
+
+  const args = page.getByTestId("approval-args");
+  await expect(args.locator("dt")).toHaveText(["subject", "body", "to", "bcc"]);
+  await expect(args.getByText("friend@example.com")).toBeVisible();
+  await expect(args.getByText("other@example.com")).toBeVisible();
+  // 펼친 카드가 화면보다 길어도 첫 인자와 끝 인자에 모두 닿을 수 있다.
+  for (const reachable of [
+    args.locator("dt").first(),
+    args.getByText("other@example.com"),
+    page.getByTestId("approval-approve"),
+  ]) {
+    await reachable.scrollIntoViewIfNeeded();
+    await expect(reachable).toBeInViewport();
+  }
+  expect(
+    await args.evaluate((element) => ({
+      scrolls: element.scrollHeight > element.clientHeight,
+      overflowY: getComputedStyle(element).overflowY,
+      maxHeight: getComputedStyle(element).maxHeight,
+    })),
+  ).toEqual({ scrolls: false, overflowY: "visible", maxHeight: "none" });
+});
+
+test("상시 허락을 줄 수 없는 줄은 JSON 으로 읽히지 않는 긴 원문도 모두 펼친다", async ({
+  page,
+}) => {
+  const raw = `{"body":"${Array.from({ length: 40 }, (_, index) => `줄 ${index}`).join("\n")}`;
+  await openWith(
+    page,
+    "승인 카드 원문 펼침 검사",
+    action({ grantAllowed: false, argsJson: raw }),
+  );
+
+  const args = page.getByTestId("approval-args");
+  await expect(args).toHaveText(raw);
+  expect(
+    await args.evaluate(
+      (element) => element.scrollHeight === element.clientHeight,
+    ),
+  ).toBe(true);
+});
+
+test("390px 폭에서 펼친 긴 인자도 가로로 넘치지 않는다", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 800 });
+  await openWith(
+    page,
+    "승인 카드 펼침 폭 검사",
+    action({
+      grantAllowed: false,
+      argsJson: JSON.stringify({
+        ["k".repeat(120)]: "a".repeat(600),
+        body: Array.from({ length: 40 }, (_, index) => `줄 ${index}`).join(
+          "\n",
+        ),
+        to: "friend@example.com",
+      }),
+    }),
+  );
+
+  const args = page.getByTestId("approval-args");
+  await expect(args.getByText("friend@example.com")).toBeVisible();
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= window.innerWidth,
+    ),
+  ).toBe(true);
+  expect(
+    await args.evaluate(
+      (element) =>
+        element.scrollWidth <= element.clientWidth &&
+        element.scrollHeight === element.clientHeight,
+    ),
+  ).toBe(true);
 });
 
 test("인자에 든 HTML 과 마크다운은 글자 그대로 보인다", async ({ page }) => {
@@ -237,7 +334,11 @@ test("가려진 내용이 있는 줄은 경고를 보이고 승인 단추 없이
 test("가려진 내용이 없는 줄에는 경고가 없고 승인 단추가 있다", async ({
   page,
 }) => {
-  await openWith(page, "가려지지 않은 인자 검사", action({ hiddenArgs: false }));
+  await openWith(
+    page,
+    "가려지지 않은 인자 검사",
+    action({ hiddenArgs: false }),
+  );
 
   await expect(page.getByTestId("approval-approve")).toBeVisible();
   await expect(page.getByTestId("approval-hidden-args")).toHaveCount(0);
@@ -358,6 +459,7 @@ test("390px 폭에서 긴 인자도 가로로 넘치지 않는다", async ({ pag
     page,
     "승인 카드 폭 검사",
     action({
+      grantAllowed: true,
       title: `메모 쓰기 ${"가".repeat(80)}`,
       argsJson: JSON.stringify({
         ["k".repeat(120)]: "a".repeat(600),
@@ -379,7 +481,7 @@ test("390px 폭에서 긴 인자도 가로로 넘치지 않는다", async ({ pag
       (element) => element.scrollWidth <= element.clientWidth,
     ),
   ).toBe(true);
-  // 길면 카드 안에서 세로로 스크롤한다.
+  // 상시 허락을 줄 수 있는 줄은 길면 카드 안에서 세로로 스크롤한다.
   expect(
     await args.evaluate(
       (element) => element.scrollHeight > element.clientHeight,

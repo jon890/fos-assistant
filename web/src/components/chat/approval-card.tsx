@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { cn } from "cn";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -64,6 +65,8 @@ export function ApprovalCard({
   }
 
   const args = readableArgs(action.argsJson);
+  // 상시 허락을 줄 수 없는 줄은 인자를 모두 펼친다. 스크롤 영역 아래로 밀린 인자를 읽지 않고 승인하지 않게 한다.
+  const argsHeight = action.grantAllowed ? "max-h-48 overflow-y-auto" : null;
   // 사람이 다 읽지 못한 인자로는 승인을 받지 않는다. 서버도 이런 줄의 승인을 실행하지 않고 끝낸다.
   const blocked = action.status === "PENDING" && action.hiddenArgs;
 
@@ -87,7 +90,10 @@ export function ApprovalCard({
       {args && args.length > 0 ? (
         <dl
           data-testid="approval-args"
-          className="flex max-h-48 flex-col gap-2 overflow-y-auto rounded-md bg-muted px-3 py-2 text-sm"
+          className={cn(
+            "flex flex-col gap-2 rounded-md bg-muted px-3 py-2 text-sm",
+            argsHeight,
+          )}
         >
           {args.map((row) => (
             <div key={row.key} className="min-w-0">
@@ -102,7 +108,10 @@ export function ApprovalCard({
       {args === null && action.argsJson ? (
         <p
           data-testid="approval-args"
-          className="max-h-48 overflow-y-auto whitespace-pre-wrap break-all rounded-md bg-muted px-3 py-2 text-sm"
+          className={cn(
+            "whitespace-pre-wrap break-all rounded-md bg-muted px-3 py-2 text-sm",
+            argsHeight,
+          )}
         >
           {action.argsJson}
         </p>
