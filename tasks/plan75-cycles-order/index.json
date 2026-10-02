@@ -1,0 +1,13 @@
+{
+  "name": "plan75-cycles-order",
+  "description": "memory 가 context 를 쓰는 간선과 hermes 가 usage 의 상수를 읽는 참조를 끊어 순환 기준을 0 으로 만들고, 최상위 패키지의 층 순서를 ArchUnit 규칙으로 검사한다 — 순환이 없어진 방향을 새 의존이 다시 흐리지 않게 한다(ADR-068 의 C7)",
+  "status": "pending",
+  "created_at": "2026-10-03",
+  "total_phases": 3,
+  "current_phase": 1,
+  "phases": [
+    { "number": 1, "file": "phase-01.md", "execution_profile": "standard" },
+    { "number": 2, "file": "phase-02.md", "execution_profile": "standard" },
+    { "number": 3, "file": "phase-03.md", "execution_profile": "deep" }
+  ]
+}
