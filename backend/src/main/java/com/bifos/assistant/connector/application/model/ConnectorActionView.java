@@ -1,10 +1,12 @@
 package com.bifos.assistant.connector.application.model;
 
 import com.bifos.assistant.connector.domain.ConnectorAction;
+import com.bifos.assistant.connector.domain.ToolPolicy;
 import com.bifos.assistant.connector.domain.type.ActionStatus;
 import com.bifos.assistant.connector.domain.type.ToolRisk;
 import com.bifos.assistant.hermes.ToolDetailRedactor;
 import java.time.Instant;
+import java.util.Optional;
 import java.util.UUID;
 
 /**
@@ -15,7 +17,10 @@ import java.util.UUID;
  * @param title 사람에게 보일 이름. 카탈로그의 선언에 이름이 없거나 카탈로그를 읽지 못했으면 고정 문구다. 도구의 원래
  *     이름은 내부 값이라 여기 싣지 않는다
  * @param argsJson 승인할 인자. 비밀처럼 보이는 값과 식별자는 가린 글이다. 실행은 저장한 원문으로 한다
- * @param grantAllowed 승인하면서 상시 허락을 줄 수 있는 도구인가
+ * @param grantAllowed 승인하면서 상시 허락을 줄 수 있는 도구인가. 승인 줄에 저장하지 않고 줄을 읽을 때의 카탈로그로
+ *     본다(ADR-065)
+ * @param hiddenArgs 답을 기다리는 줄이고, 상시 허락을 닫은 도구이며, {@code argsJson} 에 가려진 글이 있는가. 참이면
+ *     승인할 수 없다(ADR-065)
  */
 public record ConnectorActionView(
         UUID actionId,
@@ -29,14 +34,22 @@ public record ConnectorActionView(
         String errorCode,
         Instant createdAt,
         Instant expiresAt,
-        boolean grantAllowed) {
+        boolean grantAllowed,
+        boolean hiddenArgs) {
 
     /** 선언한 이름이 없는 도구를 사용자에게 부르는 말이다. */
     public static final String UNNAMED_TITLE = "이름 없는 동작";
 
-    /** @param declaredTitle 카탈로그가 선언한 이름. 없거나 읽지 못했으면 null */
-    public static ConnectorActionView from(ConnectorAction action, String declaredTitle) {
-        String title = declaredTitle == null || declaredTitle.isBlank() ? UNNAMED_TITLE : declaredTitle;
+    /**
+     * @param declared 카탈로그가 선언한 그 도구의 정책. 선언이 없거나 카탈로그를 읽지 못했으면 빈 값
+     * @param grantable 지금 카탈로그로 볼 때 그 도구에 상시 허락을 줄 수 있는가
+     * @param hiddenArgs 가려진 글이 있어 승인할 수 없는 줄인가
+     */
+    public static ConnectorActionView from(
+            ConnectorAction action, Optional<ToolPolicy> declared, boolean grantable, boolean hiddenArgs) {
+        String title = declared.map(ToolPolicy::title)
+                .filter(declaredTitle -> !declaredTitle.isBlank())
+                .orElse(UNNAMED_TITLE);
         return new ConnectorActionView(
                 action.publicId(),
                 action.connectorId(),
@@ -49,6 +62,7 @@ public record ConnectorActionView(
                 action.errorCode(),
                 action.createdAt(),
                 action.expiresAt(),
-                action.grantAllowed());
+                action.grantAllowed() && grantable,
+                hiddenArgs);
     }
 }

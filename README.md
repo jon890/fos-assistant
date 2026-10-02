@@ -58,11 +58,13 @@ We want any individual to be free to have an assistant of their own, without dep
 To get there, the goal is to let you connect general-purpose connectors into an agentic workflow that is yours.
 
 - **Independent of the model.** A conversation picks a tier (fast, balanced, or deep), and the Control Plane database holds the policy that maps a tier to an actual model. The runtime is separate too: Hermes Agent runs the agents, and this repository decides who may use what, provides the web UI, and records what was used.
-- **Independent of any product.** A connector is declared by a plugin's `connector.json`, and the Control Plane only has the generic flow. It does not know the name or the address of the service behind a connector, so adding one means writing a plugin with a `connector.json` and listing it in the Hermes dashboard's connector list, not changing this repository ([ADR-043](docs/adr/ADR-043-커넥터는-plugin-의-connector-json-으로-선언하고-control-plane-은-범용-흐름만-갖는다.md)).
+- **Independent of any product.** A connector is declared by a plugin's `connector.json`, and the Control Plane only has the generic flow. It does not know the name or the address of the service behind a connector, so adding one means writing a plugin with a `connector.json` and listing it in the Hermes dashboard's connector list, not changing the Control Plane or the web app ([ADR-043](docs/adr/ADR-043-커넥터는-plugin-의-connector-json-으로-선언하고-control-plane-은-범용-흐름만-갖는다.md)).
 - **Yours.** You decide which tools and memory an agent has and which model a conversation uses.
 - **It is the source of truth for long-term knowledge about you.** Agents and outside services read only the part they are allowed to. Service tokens are read-only, and the body of a sensitive entry is encrypted at rest.
 
-One connector is attached today, a household account book. It lives in its own repository, and this one ships only a demo connector used by tests.
+General-purpose connectors live in this repository under `hermes/connectors/` and are maintained here ([ADR-064](docs/adr/ADR-064-범용-커넥터는-이-저장소의-hermes-connectors-에-두고-저장소가-유지보수한다.md)).
+The first one is Gmail: it searches and reads your mail without asking, and creates drafts, sends, replies and changes labels only after you approve. It never moves mail to the trash or deletes it.
+A connector for a service that only one household or organization uses, such as the household account book attached today, stays in its own repository.
 Growing the set of general-purpose connectors is where the work is headed. It is not done yet.
 
 ## How it compares
@@ -206,6 +208,19 @@ How this project uses Hermes is described in [`docs/hermes/README.md`](docs/herm
 - [`docs/README.md`](docs/README.md) is the index of all documents.
 - [`docs/adr/INDEX.md`](docs/adr/INDEX.md) lists the decisions that are hard to reverse.
 - `scripts/check-local.sh` runs every check that CI runs. Run it before opening a pull request.
+
+### Contributing a connector
+
+A general-purpose connector is one directory, `hermes/connectors/<id>/`. A pull request that adds one needs the following.
+
+- A `connector.json` with `schema: 2` that declares every tool the MCP server exposes, each with a risk and a reason for it in the connector's document.
+- Calls that write require approval. Tools that send data to people outside the account also declare `"grant": false`, so each call is approved by a person. Tools that delete are not exposed.
+- Secrets come in only through environment variables declared in `fields`, and the smallest OAuth scope or permission that works.
+- An MCP server in Python that depends on nothing beyond the `mcp` SDK, and tests that run against a local fake of the service, never the real one.
+- A setup guide under `docs/connectors/` and an owner line in `.github/CODEOWNERS`.
+
+`hermes/tests/test_connectors_contract.py` checks the contract for every directory under `hermes/connectors/`, so a new connector is checked as soon as it is added.
+The full guide is [`docs/connector-authoring.md`](docs/connector-authoring.md) (Korean), and [`hermes/connectors/gmail/`](hermes/connectors/gmail) is the reference to copy from.
 
 ## License
 

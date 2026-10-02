@@ -78,8 +78,8 @@ class ConnectorCatalogCacheTest {
                 false,
                 2,
                 List.of(
-                        new ConnectorTool("list_scopes", "READ", "none", null),
-                        new ConnectorTool("write_note", "WRITE", "none", null)));
+                        new ConnectorTool("list_scopes", "READ", "none", null, null),
+                        new ConnectorTool("write_note", "WRITE", "none", null, null)));
         when(connector.readCatalog()).thenReturn(List.of(loose));
 
         assertThat(cache.find("demo-notes")).isEmpty();
@@ -128,7 +128,7 @@ class ConnectorCatalogCacheTest {
                 List.of(),
                 false,
                 2,
-                List.of(new ConnectorTool("list_scopes", "READ", "none", null)));
+                List.of(new ConnectorTool("list_scopes", "READ", "none", null, null)));
     }
 
     /** 검사가 시각을 옮기는 시계다. */

@@ -52,14 +52,17 @@ public record ToolPolicyDecision(
             return denied(ActionDenyReason.UNDECLARED, null);
         }
         // 도구를 선언하지 않는 판의 선언 없는 도구는 쓰기로 읽는다. 무엇을 하는지 모르므로 읽기로 풀어 주지 않는다.
-        ToolPolicy policy = declared.orElseGet(() -> new ToolPolicy(ToolRisk.WRITE, ToolApproval.REQUIRED, null));
+        // 그 판은 상시 허락을 닫는 선언을 둘 수 없어 허락을 줄 수 있는 것으로 둔다.
+        ToolPolicy policy = declared.orElseGet(() -> new ToolPolicy(ToolRisk.WRITE, ToolApproval.REQUIRED, null, true));
         if (policy.risk() == ToolRisk.DESTRUCTIVE || policy.risk() == ToolRisk.FINANCIAL) {
             return denied(ActionDenyReason.RISK_NOT_OPEN, policy);
         }
         if (argsBytes > MAX_ARGS_BYTES) {
             return denied(ActionDenyReason.ARGS_TOO_LARGE, policy);
         }
-        if (policy.approval() == ToolApproval.NONE || (policy.approval() == ToolApproval.REQUIRED && granted)) {
+        // 선언이 상시 허락을 닫은 도구는 남은 허락을 보지 않는다(ADR-065).
+        if (policy.approval() == ToolApproval.NONE
+                || (policy.approval() == ToolApproval.REQUIRED && granted && policy.grantable())) {
             return new ToolPolicyDecision(ActionDecision.ALLOWED, null, policy.risk(), policy.approval());
         }
         return new ToolPolicyDecision(ActionDecision.NEEDS_APPROVAL, null, policy.risk(), policy.approval());

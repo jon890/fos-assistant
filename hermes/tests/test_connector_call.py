@@ -23,6 +23,8 @@ OK_TOKEN = "demo_ok_0123456789"
 BAD_TOKEN = "demo_bad_0123456789"
 ODD_TOKEN = "demo_odd_0123456789"
 SLOW_TOKEN = "demo_slow_0123456789"
+# 시험 도구가 `errors` 표에서 `outcome_unknown` 인 코드로 끝나게 하는 토큰이다.
+LOST_TOKEN = "demo_lost_0123456789"
 SCOPES = {"scopes": [{"id": "a", "name": "A"}]}
 UNAVAILABLE = (200, {"ok": False, "error": "unavailable"})
 INVALID = (200, {"ok": False, "error": "invalid_input"})
@@ -93,6 +95,11 @@ class ConnectorCallTest(base.ConnectorGateCase):
         """도구의 오류 코드는 manifest 의 대응 표로 바꾸고, 표에 없는 코드는 unavailable 이다."""
         self.assertEqual(self.call(BAD_TOKEN), (200, {"ok": False, "error": "credential_rejected"}))
         self.assertEqual(self.call(ODD_TOKEN), UNAVAILABLE)
+
+    def test_outcome_unknown_code_is_unavailable_for_the_dashboard_tools(self):
+        """`outcome_unknown` 에 이은 코드는 선택지와 확인 도구의 호출에서 unavailable 로 돌려준다."""
+        self.assertEqual(self.plugin._connector_manifest(base.DEMO)["errors"]["DEMO_UNKNOWN"], "outcome_unknown")
+        self.assertEqual(self.call(LOST_TOKEN), UNAVAILABLE)
 
     def test_only_declared_tools_and_known_connectors_are_called(self):
         """manifest 가 선택지나 확인에 쓰지 않는 도구와 모르는 커넥터는 4xx 이고 자식을 띄우지 않는다."""

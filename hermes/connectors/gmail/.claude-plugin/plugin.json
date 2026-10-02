@@ -1,0 +1,5 @@
+{
+  "name": "gmail",
+  "description": "Gmail 의 메일을 찾고 읽고, 승인한 초안과 메일을 쓰는 커넥터 plugin",
+  "skills": "./skills"
+}

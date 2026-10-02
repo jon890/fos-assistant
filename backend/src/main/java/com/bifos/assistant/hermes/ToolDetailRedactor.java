@@ -86,6 +86,29 @@ public final class ToolDetailRedactor {
         return argsJson == null ? null : redactContent(argsJson, KEEP_IDENTIFIERS);
     }
 
+    /**
+     * {@link #redactArguments} 가 그 인자에서 무엇이든 가리는가.
+     *
+     * <p>가린 글은 JSON 을 다시 직렬화한 것이라 공백과 숫자 표기가 원문과 다를 수 있다. 원문을 같은 방법으로 한 번
+     * 다시 직렬화한 것과 견줘, 가린 것이 없는 인자가 모양 차이만으로 참이 되지 않게 한다. JSON 으로 읽히지 않는
+     * 원문은 통째로 가려지므로 참이다.
+     */
+    public static boolean hidesArguments(String argsJson) {
+        if (argsJson == null) {
+            return false;
+        }
+        String redacted = redactContent(argsJson, KEEP_IDENTIFIERS);
+        String stripped = argsJson.stripLeading();
+        if (!stripped.startsWith("{") && !stripped.startsWith("[")) {
+            return !argsJson.equals(redacted);
+        }
+        try {
+            return !MAPPER.writeValueAsString(MAPPER.readTree(argsJson)).equals(redacted);
+        } catch (JacksonException ex) {
+            return true;
+        }
+    }
+
     private static String redactContent(String detail, Map<String, String> identifiers) {
         String stripped = detail.stripLeading();
         if (stripped.startsWith("{") || stripped.startsWith("[")) {
