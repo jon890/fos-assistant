@@ -12,8 +12,8 @@
 ## 대화
 
 `chat` 패키지가 대화와 메시지를 갖는다.
-한 번의 대화가 지나는 길은 위의 「한 번의 대화가 지나는 길」 절이, 화면 흐름은
-[`frontend/shell.md`](../frontend/shell.md) 의 「대화 이력」 부터 「새 대화 화면」 까지의 절이 갖는다.
+한 번의 대화가 지나는 길은 [`backend/packages.md`](packages.md) 의 「한 번의 대화가 지나는 길」 절이 갖는다.
+화면 흐름은 [`frontend/shell.md`](../frontend/shell.md), [`frontend/chat.md`](../frontend/chat.md), [`frontend/activity.md`](../frontend/activity.md) 가 나눠 갖는다.
 
 ### 경로
 
@@ -89,7 +89,7 @@ UUID 모양이 아닌 `{id}` 는 400 `VALIDATION_FAILED` 다. 「backend 패키�
 근거는 [ADR-025](../adr/ADR-025-대화는-주소에-공개-식별자를-쓰고-번호는-안에만-둔다.md)에 있다.
 
 **turn 이 끝날 때 대화를 통째로 다시 저장하지 않는다.**
-지금은 요청 시작에 읽은 `Conversation` 을 끝에서 `save` 한다. 그 사이에 사용자가 이름을 바꾸거나 지우면
+요청 시작에 읽은 `Conversation` 을 끝에서 통째로 저장하면, 그 사이에 사용자가 이름을 바꾸거나 지웠을 때
 옛 값으로 덮여 지운 대화가 되살아난다.
 turn 이 바꾸는 칸은 `hermes_session_id` 와 `updated_at` 뿐이므로 그 둘만 고치는 질의로 쓴다.
 새 대화의 첫 turn 은 시작할 때 `hermes_session_id` 와 `hermes_root_session_id` 를 비어 있을 때만 채우는 질의로 쓴다. 이 질의는 `updated_at` 을 바꾸지 않는다. 바꾸면 실패한 turn 도 대화를 목록 맨 위로 올린다.

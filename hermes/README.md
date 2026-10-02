@@ -141,6 +141,7 @@ key 는 그 profile `.env` 의 MCP 토큰에서 나오고, terminal 도구는 He
 | `GET /api/skills` | 지정한 profile 의 스킬 목록을 읽는다 |
 | `PUT /api/skills/toggle` | 지정한 profile 의 스킬 하나를 켜고 끈다 |
 | `GET PUT /api/profiles/<이름>/soul` | 그 profile 의 SOUL.md 를 읽고 쓴다 |
+| `GET /api/profiles/<이름>/model-defaults` | 그 profile 설정의 `provider`, `model`, `reasoningEffort` 세 값만 읽는다. 기본 profile 도 읽는다 |
 
 모든 요청에서 기본 profile 은 400 이고 없는 profile 은 404 다.
 본문과 query 에 profile 이 둘 다 있으면 같아야 한다.

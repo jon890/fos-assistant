@@ -2,7 +2,7 @@
 
 - **status**: `accepted`
 - **결정**: Control Plane MCP 의 토큰(`agent_token`)은 **어느 Hermes profile 이 부르는지만** 증명한다. 사용자를 정하지 않는다.
-  사용자가 걸린 도구(`memory_read`, `artifact_write`, 앞으로의 `agent_*`)는 profile 플러그인이 서명한 `_fos_ctx` 로 **도는 부모 실행 하나**를 찾고, 그 실행의 `user_id` 를 요청자로 쓴다.
+  사용자가 걸린 도구(`memory_read`, `artifact_write`, `agent_*`)는 profile 플러그인이 서명한 `_fos_ctx` 로 **도는 부모 실행 하나**를 찾고, 그 실행의 `user_id` 를 요청자로 쓴다.
   부모 실행은 토큰이 증명한 profile 과 서명한 뿌리 session 과 `RUNNING` 이 모두 맞는 줄이어야 한다. profile 이 다르면 거절한다.
   위임을 두 번 만들지 않는 `delegation_key` 는 뿌리 session 에 그 호출의 session 을 더해 계산한다.
 - **대체된 부분**: [ADR-037](ADR-037-hermes-하위-에이전트-session-의-주인은-만들-때-등록한-줄로-정한다.md) 이 하위 에이전트 session 의 요청자를 바꿨다. 하위 에이전트 session 은 도는 부모 실행이 아니라 만들 때 등록한 origin 실행의 사용자로 돈다. origin 실행이 끝났어도 되지만, origin 실행이나 그 뿌리 실행이 `CANCELLED` 면 거절한다. 등록이 없는 하위 에이전트 session 은 거절한다. 최상위 session 은 이 결정 그대로 도는 실행 하나를 찾는다.

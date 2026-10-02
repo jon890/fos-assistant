@@ -224,8 +224,8 @@ profile 을 하나 만들어 `API_SERVER_KEY` 를 넣고,
 접두 라우팅은 adapter 목록이 아니라 profile 디렉터리 목록으로 정하기 때문이다.
 `platforms.api_server.enabled: false` 로 자동 활성화를 막아도 접두 라우팅은 그대로 동작한다.
 profile 을 만드는 쪽이 listener 설정 세 개를 넣지 않는 것은 테스트로 고정돼 있다.
-Control Plane 은 자동 활성화를 막는 설정을 넣지 않으므로, Control Plane 이 만든 profile 은
-기동할 때 이 경고를 남긴다. 접두 라우팅과 key 경계에는 영향이 없다.
+설정 틀 [`config.yaml.template`](../../hermes/profile-template/config.yaml.template) 이 `platforms.api_server.enabled: false` 를 넣는다.
+그래서 Control Plane 이 만든 profile 은 기동할 때 이 경고를 남기지 않는다.
 
 ### 넣은 직후 공유 listener 가 답한다
 
@@ -259,13 +259,17 @@ Hermes 대시보드 앞에는 우리 대시보드 plugin 이 있다. plugin 은 
 
 | 메서드와 경로 | 요청 | 성공 | 실패 |
 | --- | --- | --- | --- |
-| `POST /api/profiles` | `{name, no_skills: true}`. 다른 키는 거절 | 200. 이때 안전한 도구 목록, Control Plane MCP 등록(토큰 값 없음), 서명 plugin 켜짐, **관리 표식**이 모두 있다 | 400 이름 규칙, 이미 있는 이름(Hermes 는 409 가 아니라 400), 허용하지 않는 키. 500 틀 적용 실패(만든 것은 지웠다) |
+| `GET /api/profiles` | 없음 | 200. 이름이 이미 있는지 볼 때 읽는다 | |
+| `POST /api/profiles` | plugin 은 `name`, `no_skills`, `description` 셋을 받고 다른 키는 거절한다. Control Plane 은 `{name, no_skills: true}` 를 보낸다 | 200. 이때 안전한 도구 목록, Control Plane MCP 등록(토큰 값 없음), 서명 plugin 켜짐, **관리 표식**이 모두 있다 | 400 이름 규칙, 이미 있는 이름(Hermes 는 409 가 아니라 400), 허용하지 않는 키. 500 틀 적용 실패(만든 것은 지웠다) |
 | `PUT /api/env` | `{profile, key, value}`. key 는 `API_SERVER_KEY`, `API_SERVER_MODEL_NAME`, `MCP_FOS_ASSISTANT_API_KEY` 와 카탈로그 커넥터의 `fields[].env` 뿐 | 200. 커넥터 key 는 `{profile, key, restart_required}` | 400 다른 key, `default`, 형식. 404 없는 profile |
-| 커넥터 경로 | `GET /api/connectors/catalog`, `POST /api/connectors/{id}/call`, `GET PUT /api/connectors`, `DELETE /api/env`, `POST /api/mcp/servers/{server}/test` | [커넥터 연결](../backend/connector-install.md) 의 「대시보드 plugin 계약」 이 갖는다 | |
+| 커넥터 경로 | `GET /api/connectors/catalog`, `POST /api/connectors/{id}/call`, `POST /api/connectors/{id}/execute`, `GET PUT /api/connectors`, `DELETE /api/env`, `POST /api/mcp/servers/{server}/test` | [커넥터 연결](../backend/connector-install.md) 의 「대시보드 plugin 계약」 이 갖는다 | |
+| `GET /api/tools/toolsets` | 없음 | 200. 도구 이름과 설명 | |
 | `PUT /api/config` (도구) | `{profile, config: {platform_toolsets: {api_server: [...]}}}` | 200 | [ADR-029](../adr/ADR-029-에이전트-도구는-control-plane-이-등급으로-판정하고-hermes-설정-api-로-쓴다.md) 그대로 |
 | `PUT /api/config` (스킬 게시) | `{profile, config: {skills: {external_dirs: [<Hermes 쪽 스킬 루트>/<profile>/<버전>]}}}`. 버전 이름은 `v[0-9]{13}-[a-z0-9]{4}` 다(`v` 뒤에 UTC 밀리초 13자리와 소문자 영숫자 4자). 목록은 0개나 1개. 0개는 게시 해제. 도구 목록을 같은 본문에 둘 수 있다 | 200 | 400 경로 형식, 다른 profile 의 prefix, 둘 이상, 심볼릭 링크, 없는 디렉터리, `skills` 도구가 꺼진 채 게시. 409 운영자가 넣은 다른 외부 경로가 있다. 404 없는 profile |
 | `GET /api/skills?profile=<p>` | query `profile` 하나 | 200 `[{name, description, category, enabled, usage, provenance}]`. `enabled` 는 전역 `skills.disabled` 만 반영 | 400 query 누락, 둘 이상, `default`. 404 |
 | `PUT /api/skills/toggle` | `{profile, name, enabled}` | 200 `{ok, name, enabled}` | 400, 404 |
+| `GET PUT /api/profiles/<p>/soul` | `PUT` 은 `{content}` | 200 | 계약은 [`hermes/README.md`](../../hermes/README.md) 의 「dashboard-profile-api 가 여는 것」 이 갖는다 |
+| `GET /api/profiles/<p>/model-defaults` | 없음. 기본 profile 도 받는다 | 200 `{provider, model, reasoningEffort}`. 없는 값은 `null` | 400 이름 형식. 404 없는 profile. 503 설정을 읽지 못함 |
 | `DELETE /api/profiles/<p>` | 없음 | 200 | 401 관리 표식이 없는 profile. 404 없는 profile. 두 번째 호출의 404 는 「이미 지움」 으로 읽는다 |
 
 **틀이 MCP 와 서명 plugin 을 붙인다.** `POST /api/profiles` 본문의 `mcp_servers` 는 쓰지 않는다. plugin 이 처리 뒤에 설정 틀로 `config.yaml` 전체를 다시 써서, 본문으로 넣은 등록이 사라진다.

@@ -220,6 +220,11 @@ session 은 cache 를 뺀 `input_tokens` 와 cache read·write 를 따로 누적
 부모 usage 에 자식 usage 가 포함되지 않으므로 부모와 각 자식의 기록을 중복 없이 더한다.
 조회하지 못한 사용량은 모르는 값으로 남긴다.
 
+**종료된 자식 session 은 다시 조회해도 값이 같다.**
+2026-10-01 에 종료된 자식 session 5개를 각각 두 번 조회해 토큰과 종료 시각이 모두 같음을 확인했다.
+본문과 답은 읽거나 기록하지 않았다.
+이 검사는 이미 종료된 session 의 반복 조회를 확인한 것이며 실행 중 값의 변화까지 확인한 것은 아니다.
+
 근거는 [v0.21.3 session 직렬화](https://github.com/NousResearch/hermes-agent/blob/v2026.9.14/gateway/platforms/api_server.py) 의
 `_session_response`, `_message_response`, `_handle_list_sessions` 와
 `agent/conversation_loop.py`, `agent/turn_finalizer.py` 의 토큰 누적이다.

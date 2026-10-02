@@ -7,7 +7,7 @@
   등록은 profile 플러그인이 `subagent_start` hook 에서 내부 경로 `POST /internal/hermes/session-bindings/subagent` 로 보낸다. 모델 도구가 아니다.
 - **맥락**:
   - Hermes v0.21.5(`v2026.9.24`)에서 모델이 부르는 최상위 `delegate_task` 는 늘 background 로 요청된다. `/v1/runs` 가 `conversation_history` 와 `previous_response_id` 없이 오면 자식이 부모 run 에서 떨어져 나가 따로 돈다. Control Plane 은 `session_id` 만 보내므로 **자식이 부모 FOS 실행보다 오래 산다.** 근거는 [`hermes/fos-ctx.md`](../hermes/fos-ctx.md#하위-에이전트는-부모-run-보다-오래-산다) 에 있다.
-  - ADR-032 의 판정은 뿌리 session 과 `RUNNING` 으로 부모를 찾는다. 부모 실행이 끝나면 자식의 `memory_read` 가 거절된다. 같은 대화의 다음 turn 이 돌고 있으면 자식 호출이 그 turn 에 붙는다. 사용자는 같지만 부모 실행이 틀린다. 앞으로의 `agent_delegate` 가 이 부모 아래에 자식을 붙이므로 실행 나무가 틀린다.
+  - ADR-032 의 판정은 뿌리 session 과 `RUNNING` 으로 부모를 찾는다. 부모 실행이 끝나면 자식의 `memory_read` 가 거절된다. 같은 대화의 다음 turn 이 돌고 있으면 자식 호출이 그 turn 에 붙는다. 사용자는 같지만 부모 실행이 틀린다. `agent_delegate` 가 이 부모 아래에 자식을 붙이므로 실행 나무가 틀린다.
   - 같은 대화 session 은 여러 turn 이 이어 쓴다. session 하나가 실행 하나라고 볼 수 없다. 반면 하위 에이전트 session 은 한 turn 에서 만들어져 그 turn 에 속한다. 다음 turn 이 시작돼도 바뀌지 않아야 한다.
   - `subagent_start` hook 은 자식을 만드는 `_build_children` 안에서 부모 스레드가 동기로 부른다. 제한 시간 목록에 없어 끝날 때까지 기다린다. 이때 부모 run 은 아직 돌고 있고, 자식은 hook 이 끝난 뒤에 돌기 시작한다. hook 예외는 Hermes 가 삼키고 자식은 그대로 돈다.
   - 압축 교체(`compression.in_place: false`)에는 hook 이 없다. 교체된 session 을 등록할 방법이 없다.
@@ -29,7 +29,7 @@
 - **결과**:
   - 얻는 것:
     - 부모 실행이 끝난 뒤에도 하위 에이전트가 자기 사용자의 권한으로 `memory_read`, `artifact_write` 를 쓴다
-    - 다음 turn 이 시작돼도 하위 에이전트는 처음 origin 실행에 속한다. 앞으로의 `agent_delegate` 가 그 실행 아래 정확히 붙는다
+    - 다음 turn 이 시작돼도 하위 에이전트는 처음 origin 실행에 속한다. `agent_delegate` 가 그 실행 아래 정확히 붙는다
     - 하위 에이전트가 다시 만든 자식도 같은 origin 을 잇는다. 다른 에이전트에게 맡긴 FOS 실행 안의 하위 에이전트는 그 FOS 실행을 origin 으로 갖는다
     - 등록은 데이터베이스에 있어 Control Plane 이 다시 떠도 남는다
   - 감당할 것:

@@ -46,7 +46,7 @@ Control Plane 이 Hermes 를 고치는 호출을 하게 된 근거는
 
 두 값이 사람마다 다르지 않은 근거는
 [`adr/ADR-002-profile은-나누고-ai-계정은-가족이-함께-쓴다.md`](../adr/ADR-002-profile은-나누고-ai-계정은-가족이-함께-쓴다.md) 에 있다.
-profile 은 사람마다 나누고 AI 계정은 가족이 함께 쓴다.
+profile 은 사용자마다 나누고 AI 계정은 그룹이 함께 쓴다.
 
 에이전트는 실행에 쓸 모델을 갖지 않는다.
 첫 로그인에 에이전트를 만들 때도 Hermes 에서 모델을 읽지 않는다.
@@ -56,7 +56,7 @@ profile 은 사람마다 나누고 AI 계정은 가족이 함께 쓴다.
 같은 값을 Hermes 의 `.env` 와 우리 key 디렉터리에 각각 쓴다.
 한쪽만 들어가면 실행할 때 401 이 난다.
 
-`HermesProfileKeyStore` 가 지금 읽기만 한다. 쓰는 경로를 그 옆에 둔다.
+`HermesProfileKeyStore` 가 key 파일의 읽기, 쓰기, 지우기를 모두 갖는다.
 **읽는 규칙과 쓰는 규칙이 같은 파일에 있어야 파일 이름 규칙이 갈리지 않는다.**
 
 ## 사람을 더할 때
@@ -77,7 +77,7 @@ sequenceDiagram
     participant D as Hermes 대시보드
     participant F as key 디렉터리
 
-    A->>C: POST /api/admin/people<br/>이메일, 이름, profile 이름
+    A->>C: POST /api/v1/admin/people<br/>이메일, 이름, profile 이름
     C->>C: 허용 목록에 행을 만든다
     C->>D: POST /api/profiles
     D-->>C: 만들어졌다
@@ -122,7 +122,7 @@ sequenceDiagram
 | 이미 있는 profile 이름 | 거절한다. 우리 표에서도 Hermes 에서도 본다 |
 | profile 은 만들었는데 토큰이나 key 주입이 실패 | **발급한 토큰을 폐기하고 만든 profile 을 지운다.** 아무것도 남기지 않는다 |
 | key 파일 쓰기가 실패 | 같다. profile 을 지우고 허용 목록 행도 되돌린다 |
-| Hermes 가 응답하지 않는다 | 허용 목록 행을 만들기 전이므로 아무것도 남지 않는다 |
+| Hermes 가 응답하지 않는다 | 허용 목록 행을 만든 뒤에 Hermes 를 부르므로 만든 행을 되돌린다. 되돌리기가 실패하면 행이 남고, 원래 오류를 올린 뒤 되돌리기 실패를 로그에 남긴다 |
 | 같은 요청이 두 번 온다 | 뒤의 것이 이메일 유니크 제약에 걸려 거절된다 |
 | 허용 목록에 없는 사람이 로그인 | 지금과 같다. 토큰을 만들지 않는다 |
 | 허용 목록에는 있는데 profile 이 없어졌다 | 실행할 때 key 를 찾지 못해 실패한다. 관리자가 다시 더한다 |

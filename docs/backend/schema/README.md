@@ -1,35 +1,25 @@
 # 저장 모델
 
+색인은 마이그레이션이 갖는다. 이 문서는 표마다 칸과 유일 제약과 FK 만 적는다.
+
 | 파일 | 표 |
 | --- | --- |
-| [`users-agents.md`](users-agents.md) | `app_user`, `allowed_person`, `agent`, `agent_token` |
+| [`users-agents.md`](users-agents.md) | `app_user`, `allowed_person`, `agent`, `model_tier_definition`, `model_tier_group_setting`, `model_hidden`, `agent_token` |
 | [`chat.md`](chat.md) | `conversation`, `chat_message`, `chat_pending_message`, `chat_attachment`, `chat_artifact` |
-| [`execution.md`](execution.md) | `agent_execution`, `execution_event`, `execution_skill_use`, `hermes_session_binding` |
+| [`execution.md`](execution.md) | `agent_execution`, `execution_event`, `subagent_usage_job`, `execution_skill_use`, `hermes_session_binding` |
 | [`memory.md`](memory.md) | `memory`, `memory_revision`, `memory_collection`, `agent_memory_collection` |
 | [`connector.md`](connector.md) | `connector_connection`, `connector_action`, `connector_tool_grant` |
 
 ## 모델 단계와 재조회
 
 선택의 우선순위와 초기값은 [모델 단계와 실행 기록](../../model-tiers.md)이 정한다.
-비밀값은 아래 표에 저장하지 않는다.
+표와 칸은 [`users-agents.md`](users-agents.md), [`chat.md`](chat.md), [`execution.md`](execution.md) 의 각 절에 있다.
+비밀값은 그 표들에 저장하지 않는다.
 
-| 표 | 키 | 저장하는 값 |
-| --- | --- | --- |
-| `model_tier_definition` | `id` BIGINT, `(group_id, tier)` 유일 | 그룹 번호, 단계 코드 VARCHAR(16), provider VARCHAR(64) NULL, model VARCHAR(128) NULL, reasoning_effort VARCHAR(16) NULL |
-| `app_user` | 기존 `id` BIGINT | `model_default_tier` VARCHAR(16) NULL 추가 |
-| `model_tier_group_setting` | `group_id` BIGINT | `default_tier` VARCHAR(16) NULL |
-| `model_hidden` | `id` BIGINT, `(group_id, provider, model)` 유일 | 그룹 번호, provider VARCHAR(64), model VARCHAR(128). `model` 이 빈 문자열이면 그 provider 전체를 숨긴 것이다. NULL 은 유일 제약이 겹침을 막지 못해 쓰지 않는다 |
-| `subagent_usage_job` | `id` BIGINT, `(execution_id, child_session_id)` 유일 | profile, API 주소, 부모 session, 자식 session, 상태, 시작/다음 조회/기한 시각, 조회 횟수 |
-
-`conversation`은 `model_selection_mode` VARCHAR(16) NULL과 `model_tier` VARCHAR(16) NULL을 더한다.
-선택 모드는 `DEFAULT`, `TIER`, `CUSTOM`이며 null은 사용자와 그룹 기본값을 따른다.
-`agent_execution`은 `model_tier` VARCHAR(16) NULL과 `reasoning_effort_source` VARCHAR(20) NULL을 더한다.
-출처는 `REQUESTED`, `AGENT_DEFAULT`, `PROFILE_DEFAULT`, `UNKNOWN` 이다.
-`request_received_at`, `submitted_at`, `first_delta_at`은 DATETIME(6) NULL이며
-기존 `finished_at`과 함께 실행 구간을 표시한다. 끝난 실행의 재조회는 `finished_at` 색인을 쓴다.
-첫 assistant delta 본문은 이 칸들과 함께 저장하지 않는다.
+`conversation.model_selection_mode` 의 null 은 사용자와 그룹 기본값을 따른다는 뜻이다.
 단계와 요청값은 실행 시작 시 복사하고 실제 제공사와 모델은 완료 시 갱신한다.
-이전 실행의 출처는 null로 두고 추정해 채우지 않는다.
+이전 실행의 `reasoning_effort_source` 는 null 로 두고 추정해 채우지 않는다.
+끝난 실행의 재조회는 `finished_at` 색인을 쓴다.
 재조회 작업의 완료 사건은 기존 `(execution_id, sequence)` 유일 제약을 지키며 같은 자식 완료를 중복 저장하지 않는다.
 실행이나 사용자 삭제에 의한 cascade를 추가하지 않는다. 기존 실행 기록과 같은 보존 규칙을 따른다.
 

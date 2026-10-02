@@ -46,8 +46,8 @@ profile 은 그래도 사용자마다 하나씩 둔다.
 
 - `hermes_profile_binding.credential_scope` 에 `SHARED_HOUSEHOLD` 나 `DEDICATED` 를 적는다.
   기본값이 없으므로 바인딩을 만드는 사람이 반드시 고른다.
-- `configure-default-profile.sh verify` 는 profile 에 자기 credential 이 없으면 실패한다.
-  `--allow-shared-credential` 을 줄 때만 넘어간다.
+- 운영 저장소의 검사는 profile 에 자기 credential 이 없으면 실패한다.
+  공유를 명시할 때만 넘어간다.
 
 한 사람이 자기 계정을 쓰기로 하면 그 profile 에만 credential 을 넣고
 `credential_scope` 를 `DEDICATED` 로 적는다.

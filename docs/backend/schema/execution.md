@@ -16,6 +16,7 @@
 | `agent_id` | BIGINT | 어느 에이전트의 실행이었는가 |
 | `parent_execution_id` | BIGINT NULL | 이 실행을 부른 실행. 사용자가 부른 것이면 비어 있다 |
 | `root_execution_id` | BIGINT NULL | 이 실행이 속한 나무의 뿌리. 뿌리 자신은 비어 있다 |
+| `retry_of_execution_id` | BIGINT NULL | 같은 turn 을 다른 모델로 다시 시도한 실행이 가리키는 직전 실행. 지금은 채우는 경로가 없어 새 실행은 늘 비어 있다 |
 | `profile_name` | VARCHAR(64) | |
 | `hermes_run_id` | VARCHAR(128) NULL | 실행을 제출한 직후에 적는다 |
 | `hermes_session_id` | VARCHAR(128) NULL | 이 실행이 속한 Hermes session. 대화 turn 은 그 대화의 뿌리 session 이고, 뿌리가 없는 옛 대화는 보낸 session 이다. 압축 교체 뒤에는 보낸 session 과 다를 수 있다. 흐름의 하위 실행과 위임한 자식은 Control Plane 이 정한 `fos-<uuid>` 다. 제출하기 전에 적는다. 최상위 session 의 MCP 호출과 최상위 자식의 등록이 서명한 뿌리 session 과 `profile_name` 으로 도는 실행을 찾을 때 쓴다([ADR-032](../../adr/ADR-032-mcp-토큰은-profile-을-증명하고-실제-사용자는-부모-실행에서-정한다.md)). 하위 에이전트 session 은 이 칸이 아니라 `hermes_session_binding` 으로 찾는다. 이 칸이 생기기 전의 실행과 Memory 제안, 추천 질문을 만드는 실행은 비어 있다 |
@@ -25,10 +26,14 @@
 | `provider`, `model` | VARCHAR | 실제로 돈 provider 와 모델. Hermes 의 session 이 답한 값이고, 읽지 못하면 요청한 값이다. 기본값으로 보냈고 둘 다 읽지 못하면 비어 있다 |
 | `reasoning_effort` | VARCHAR(16) NULL | 이 실행에 요청한 effort. 기본값으로 보냈으면 비어 있다. 이 칸이 생기기 전의 실행도 비어 있다 |
 | `reasoning_defaults_checked_at` | DATETIME(6) NULL | `reasoning_effort`가 비어 있고 profile 기본값을 정상 응답으로 읽어 확인한 시각. 응답에 effort가 없어도 적어 같은 실행을 다시 조회하지 않는다. 조회 실패면 비워 다시 시도한다 |
+| `reasoning_effort_source` | VARCHAR(20) NULL | `reasoning_effort` 의 출처. `REQUESTED`, `AGENT_DEFAULT`, `PROFILE_DEFAULT`, `UNKNOWN` 이다. 이 칸이 생기기 전의 실행은 비어 있고 추정해 채우지 않는다 |
+| `model_tier` | VARCHAR(16) NULL | 실행을 시작할 때 해석한 모델 단계. 단계 없이 돈 실행은 비어 있다 |
+| `cost_mode` | VARCHAR(20) | 실행 당시 에이전트의 `SUBSCRIPTION` 또는 `API` |
 | `status` | VARCHAR(20) | `RUNNING`, `SUCCEEDED`, `FAILED`, `CANCELLED` |
 | `error_code` | VARCHAR(64) NULL | |
 | `input_tokens`, `cached_input_tokens`, `output_tokens`, `total_tokens` | BIGINT NULL | provider 가 알려준 것만 채운다 |
 | `context_chars` | BIGINT NULL | 이 실행의 공통 답변 지침과 Memory 문맥의 글자 수. Memory가 없어도 공통 지침은 센다. 뒤에 붙는 묻는 형식 안내와 다시 생성 지시는 세지 않는다 |
+| `context_omitted_items` | INT NULL | 자리가 없어 이 실행의 문맥에서 빠진 Memory 항목 수. 이 칸이 생기기 전의 실행과 문맥을 조립하지 않은 실행은 비어 있다 |
 | `runtime_fingerprint` | VARCHAR(64) NULL | 실행 당시 Hermes 의 고정 프롬프트 구성을 가리키는 지문. 그 값을 주는 HTTP 경로가 아직 없어 지금은 항상 비어 있고, 그동안 사용량 화면의 지문 축은 빈 목록을 돌려준다 |
 | `instructions_hash` | VARCHAR(64) NULL | 공통 답변 지침과 Memory 문맥의 SHA-256 앞 16바이트를 16진수로 적은 값. 본문은 개인 Memory를 담을 수 있어 저장하지 않는다. 뒤에 붙는 묻는 형식 안내와 다시 생성 지시는 제외한다. Memory가 없어도 공통 지침의 지문을 기록한다 |
 | `latency_ms` | BIGINT NULL | 끝나지 않은 실행은 비어 있다 |
@@ -38,13 +43,13 @@
 | `pricing_version` | VARCHAR(32) NULL | 이 금액을 계산한 가격표 |
 | `started_at` | DATETIME(6) | |
 | `finished_at` | DATETIME(6) NULL | 끝나지 않은 실행은 비어 있다 |
+| `request_received_at`, `submitted_at`, `first_delta_at` | DATETIME(6) NULL | `finished_at` 과 함께 실행 구간을 표시한다. 첫 assistant delta 의 본문은 저장하지 않는다 |
 
 토큰 수는 실행 한 번의 **합계**다.
 실행 안에서 LLM 호출이 여러 번 일어나고 그 내역은 오지 않는다.
 
 자식 실행의 토큰은 부모의 합계에 들어 있지 않다.
-Hermes Agent v0.21.0 배포본으로 측정했고 근거는
-[ADR-016](../../adr/ADR-016-다중-에이전트-조율은-control-plane이-맡는다.md)의 「자식 토큰 실측」 절에 있다.
+근거는 [`hermes/delegation.md`](../../hermes/delegation.md) 의 「자식 session 으로 결과와 토큰을 보완한다」 절에 있다.
 그래서 부모와 자식을 더한 합계는 실행 나무의 줄을 더해서 만든다.
 어느 줄도 두 번 세지 않는다.
 
@@ -121,9 +126,32 @@ Hermes 가 보낸 원래 payload 를 통째로 넣지 않는다.
 | `TOOL_COMPLETED` | 도구 호출이 끝났다 |
 | `SUBAGENT_STARTED` | 하위 에이전트가 시작됐다 |
 | `SUBAGENT_COMPLETED` | 하위 에이전트가 끝났다 |
+| `PROVIDER_SWITCHED` | 옛 실행에만 남은 값이다. 앞 provider 가 막혀 다음 모델로 다시 시도했다는 뜻이고, 지금은 이 값을 적는 경로가 없다 |
 
 우리가 모르는 사건은 저장하지 않고 버린다. 버렸다는 사실만 로그로 남긴다.
 근거는 [ADR-013](../../adr/ADR-013-실행-사건은-우리-모델로-정규화해-저장한다.md)에 있다.
+
+## subagent_usage_job
+
+부모 실행이 끝난 뒤에도 완료 사건이 오지 않은 자식 session 의 사용량을 다시 조회하는 작업이다.
+재조회 규칙은 [모델 단계와 실행 기록](../../model-tiers.md) 이 정한다.
+
+| 칸 | 타입 | 뜻 |
+| --- | --- | --- |
+| `id` | BIGINT | |
+| `execution_id` | BIGINT | 부모 실행 |
+| `child_session_id` | VARCHAR(128) | 조회할 자식 session |
+| `parent_session_id` | VARCHAR(128) NULL | 부모 실행의 session |
+| `profile_name` | VARCHAR(64) | 부모 실행의 profile |
+| `api_base_url` | VARCHAR(512) | 조회를 보낼 API 주소 |
+| `status` | VARCHAR(16) | `WAITING`, `DONE`, `EXPIRED` |
+| `unconfirmed_reason` | VARCHAR(32) NULL | 확인하지 못하고 끝낸 까닭 |
+| `created_at` | DATETIME(6) | |
+| `next_attempt_at` | DATETIME(6) | 다음 조회 시각 |
+| `expires_at` | DATETIME(6) | 조회 기한. 부모 실행이 끝난 뒤 24시간이다 |
+| `attempts`, `backoff_attempts` | INT | 조회 횟수 |
+
+`(execution_id, child_session_id)` 가 유일하다.
 
 ## execution_skill_use
 

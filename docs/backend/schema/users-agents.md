@@ -11,6 +11,7 @@
 | `display_name` | VARCHAR(100) | 화면에 보일 이름 |
 | `group_id` | BIGINT | 사용자가 속한 그룹. 지금은 그룹이 하나뿐이다 |
 | `role` | VARCHAR(20) | `ADMIN` 또는 `MEMBER`. 첫 사용자가 `ADMIN` 이 된다 |
+| `model_default_tier` | VARCHAR(16) NULL | 사용자의 기본 모델 단계. 비어 있으면 그룹 기본값을 따른다 |
 
 ## allowed_person
 
@@ -63,6 +64,9 @@
 | `enabled` | BOOLEAN | 거짓이면 새 실행을 막는다 |
 | `profile_managed` | BOOLEAN | 참이면 Control Plane 이 이 에이전트의 profile 을 만들었다. 에이전트를 지울 때 profile 까지 지우는 것은 이 값이 참일 때뿐이다. 기본 거짓 |
 | `deleted_at` | DATETIME(6) NULL | 지운 시각. 적히면 목록과 새 대화에서 빠지고 그 에이전트의 대화는 읽기만 된다 |
+| `flow` | VARCHAR(64) NULL | 이 에이전트를 묶어 둔 다중 에이전트 흐름의 이름. 비어 있으면 Hermes 를 한 번 부른다 |
+| `connector_managed` | BOOLEAN | 참이면 커넥터를 연결할 때 만든 연결용 에이전트다. 기본 거짓 |
+| `connector_attachments` | BOOLEAN | 참이면 이 연결용 에이전트가 사진을 받는다. 커넥터가 선언한 toolset 이 실제로 켜진 것을 확인했을 때만 참이다. 기본 거짓 |
 | `default_model_provider` | VARCHAR(64) NULL | 기본 provider. `default_model` 과 함께 채우거나 함께 비운다 |
 | `default_model` | VARCHAR(128) NULL | 기본 모델. 대화가 모델을 고르지 않았을 때 Hermes 에 명시해 보낸다 |
 | `default_reasoning_effort` | VARCHAR(16) NULL | 기본 effort. 모델 없이 이 값만 둘 수 있다 |
@@ -82,6 +86,43 @@ V50 이 세 칸을 더했다. 값은 관리자가 화면에서 정하고 마이�
 한 줄 소개 칸 `tagline` 과 추천 질문 표 `agent_starter_prompt` 는 없앴다.
 추천 질문은 데이터베이스에 두지 않고 backend 메모리에만 둔다.
 근거는 [ADR-036](../../adr/ADR-036-추천-질문은-사용자의-대화-이력으로-모델이-만들고-메모리에만-둔다.md) 에 있다.
+
+## model_tier_definition
+
+그룹이 정한 모델 단계의 mapping 이다. 선택의 우선순위와 초기값은 [모델 단계와 실행 기록](../../model-tiers.md) 이 정한다.
+
+| 칸 | 타입 | 뜻 |
+| --- | --- | --- |
+| `id` | BIGINT | |
+| `group_id` | BIGINT | 그룹 번호 |
+| `tier` | VARCHAR(16) | 단계 코드 |
+| `provider` | VARCHAR(64) NULL | 비어 있으면 요청한 에이전트의 기본 provider 로 해석한다 |
+| `model` | VARCHAR(128) NULL | 비어 있으면 그 단계는 에이전트 기본 모델로 돈다 |
+| `reasoning_effort` | VARCHAR(16) NULL | |
+
+`(group_id, tier)` 가 유일하다.
+
+## model_tier_group_setting
+
+그룹의 기본 모델 단계다.
+
+| 칸 | 타입 | 뜻 |
+| --- | --- | --- |
+| `group_id` | BIGINT | 기본 키 |
+| `default_tier` | VARCHAR(16) NULL | 비어 있으면 그룹 기본 단계가 없다 |
+
+## model_hidden
+
+그룹이 숨긴 provider 와 모델이다. 숨긴 것만 적는다.
+
+| 칸 | 타입 | 뜻 |
+| --- | --- | --- |
+| `id` | BIGINT | |
+| `group_id` | BIGINT | 그룹 번호 |
+| `provider` | VARCHAR(64) | |
+| `model` | VARCHAR(128) | 빈 문자열이면 그 provider 전체를 숨긴 것이다. NULL 은 유일 제약이 겹침을 막지 못해 쓰지 않는다 |
+
+`(group_id, provider, model)` 이 유일하다.
 
 ## agent_token
 

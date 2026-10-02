@@ -12,8 +12,6 @@
 | `POST /v1/runs/{run_id}/stop` | 실행 중단 |
 | `POST /v1/runs/{run_id}/steer` | 도는 실행에 지시를 더한다. 아래 「도는 실행에 지시를 더하는 `steer`」 를 본다. 우리는 아직 부르지 않는다 |
 
-MVP 는 제출과 조회만 쓴다.
-
 **실행을 시작한 뒤 바꿀 수 있는 것은 중단과 `steer` 둘이다.** Control Plane 은 중단만 쓴다.
 끝난 위임 결과는 같은 session 에 새 실행을 제출해 전한다([ADR-040](../adr/ADR-040-위임-결과는-control-plane-이-부모-대화의-다음-turn-을-열어-전한다.md)).
 응답 중에 사용자가 보낸 메시지도 그 turn 이 끝난 뒤 새 실행으로 보낸다([ADR-048](../adr/ADR-048-응답-중에-보낸-메시지는-control-plane-이-쌓아-두고-다음-turn-으로-합쳐-보낸다.md)).
@@ -117,7 +115,8 @@ fallback 으로 넘어간 뒤의 모델까지 그쪽에 들어 있다.
 - `GET /api/sessions/{session_id}` 는 행을 `{"object": "session", "session": {...}}` 로 감싸고, `model` 은 `session` 안에 있다. provider 칸은 응답에 없다. Hermes 저장소에는 `billing_provider` 로 남는다
 - `GET /v1/runs/{run_id}` 는 끝난 실행에 `runtime: {"provider", "model", "route_source"}` 를 싣는다. fallback 으로 넘어간 경우도 실제로 돈 값이다. 근거는 [v0.21.5 `gateway/platforms/api_server_runs.py`](https://github.com/NousResearch/hermes-agent/blob/v2026.9.24/gateway/platforms/api_server_runs.py) 의 `_served_runtime` 과 `api_server.py` 의 `_sanitize_runtime_metadata` 다
 
-그래서 Control Plane 은 실행 기록의 provider 와 모델을 세션 조회, 실행의 `runtime`, 대화가 고른 값 순서로 먼저 있는 것에서 읽는다. provider 는 보통 `runtime` 에서 온다.
+그래서 Control Plane 은 실행의 `runtime` 에 provider 와 모델이 둘 다 있으면 그 짝을 실행 기록에 적는다.
+둘 중 하나라도 없으면 세션 조회, 실행의 `runtime`, 대화가 고른 값 순서로 먼저 있는 것을 칸마다 따로 채운다.
 처음에는 세션 응답을 감싸지 않은 모양으로 읽어, 모델을 보내지 않은 실행의 provider, 모델, 금액이 비었다.
 
 `POST /api/sessions/{id}/chat` 은 응답에 `runtime` 을 담아 요청한 것과 실제로 돈 것을

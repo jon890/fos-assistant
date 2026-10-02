@@ -13,8 +13,10 @@
 | `hermes_root_session_id` | VARCHAR(128) NULL | 그 대화의 뿌리 session. 새 대화는 첫 turn 을 보내기 전에 `hermes_session_id` 와 같은 `fos-<uuid>` 를 적고, 압축 교체에도 바뀌지 않는다. MCP `agent_*` 호출이 들고 오는 서명한 뿌리 session 이 이 값이다. 이 칸이 생기기 전의 대화는 비어 있다 |
 | `title` | VARCHAR(200) | 첫 메시지의 앞부분. 사진을 먼저 올리려고 만든 대화는 첫 메시지 전까지 비어 있다 |
 | `model_provider` | VARCHAR(64) NULL | 이 대화에서 고른 provider. `model` 과 함께 채우거나 함께 비운다 |
-| `model` | VARCHAR(128) NULL | 이 대화에서 고른 모델. 비면 그 profile 의 기본 모델로 돈다 |
-| `reasoning_effort` | VARCHAR(16) NULL | 이 대화에서 고른 effort. `low`, `medium`, `high`, `xhigh`, `max` 중 하나. 비면 그 profile 의 기본값이다 |
+| `model` | VARCHAR(128) NULL | 이 대화에서 직접 고른 모델. 비면 어느 모델로 도는지는 [모델 단계와 실행 기록](../../model-tiers.md) 의 「모델 선택」 이 정한다 |
+| `reasoning_effort` | VARCHAR(16) NULL | 이 대화에서 고른 effort. `low`, `medium`, `high`, `xhigh`, `max` 중 하나. 비면 어느 강도로 도는지는 [모델 단계와 실행 기록](../../model-tiers.md) 의 「모델 선택」 이 정한다 |
+| `model_selection_mode` | VARCHAR(16) NULL | `DEFAULT`, `TIER`, `CUSTOM`. 비어 있으면 사용자와 그룹 기본값을 따른다 |
+| `model_tier` | VARCHAR(16) NULL | 이 대화에서 고른 모델 단계 |
 | `updated_at` | DATETIME(6) | 목록 정렬에 쓴다. 같은 값이면 `id` 가 큰 쪽이 앞이다 |
 | `deleted_at` | DATETIME(6) NULL | 사용자가 지운 시각. 채워지면 목록과 조회와 보내기에서 없는 대화와 같다 |
 | `auto_turn_count` | INT NOT NULL DEFAULT 0 | 마지막 사용자 질문 뒤로 Control Plane 이 위임 결과를 전하려고 연 turn 수. 사용자 질문을 저장할 때 0 으로 돌린다. `assistant.delegation-wake.max-auto-turns`(기본 10)에 닿으면 더 깨우지 않는다 |
