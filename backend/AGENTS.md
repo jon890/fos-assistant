@@ -66,6 +66,9 @@ backend 와 web 을 함께 검사하려면 저장소 root 에서 `scripts/qualit
 `shared` 는 모든 도메인이 쓰는 기반 패키지라 이 그래프에서 빼고, `SHARED_DOES_NOT_DEPEND_ON_DOMAINS` 가 따로 막는다.
 규칙은 컴파일한 클래스를 읽는다. 쓰지 않는 import 는 간선이 되지 않는다.
 
+**층 순서 규칙도 패키지 간선 하나를 위반 하나로 센다.**
+순서는 [`../docs/backend/packages.md`](../docs/backend/packages.md) 의 「최상위 패키지의 층 순서」 가 갖는다.
+
 ### enum 은 저장 여부로 둘 곳을 정한다
 
 | 종류 | 위치 |

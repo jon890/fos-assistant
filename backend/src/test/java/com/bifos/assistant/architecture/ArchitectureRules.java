@@ -61,6 +61,18 @@ public final class ArchitectureRules {
             .as("최상위 패키지 사이의 간선은 순환에 속하지 않는다");
 
     /**
+     * 최상위 패키지는 층 순서에서 자기보다 아래에 있는 패키지만 쓴다. 순서에 없는 최상위 패키지도 위반이다.
+     * {@code shared} 는 그래프에서 뺀다. 순서는 {@code TopLevelPackageOrder.ORDER} 가 갖는다.
+     *
+     * <p>근거: {@code docs/backend/packages.md} 「최상위 패키지의 층 순서」, ADR-068.
+     */
+    public static final ArchRule TOP_LEVEL_PACKAGES_FOLLOW_LAYER_ORDER = classes()
+            .that()
+            .resideInAPackage("com.bifos.assistant..")
+            .should(new TopLevelPackageOrder())
+            .as("최상위 패키지는 층 순서의 아래쪽만 쓴다");
+
+    /**
      * {@code shared} 는 다른 최상위 패키지에 의존하지 않는다.
      *
      * <p>근거: {@code docs/backend/packages.md} 「backend 패키지」 의 {@code shared/auth}, {@code shared/error} 책임.
