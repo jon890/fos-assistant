@@ -43,7 +43,7 @@ profile 이름은 `HermesProfileName` 의 규칙을 따른다. 그 profile 에 �
 
 ## 실행 줄에 적는 session
 
-Hermes 에 보낼 session 과 실행 줄에 적을 session 은 뜻이 다르다. 둘을 `orchestration.domain.RunSession` 하나로 넘긴다.
+Hermes 에 보낼 session 과 실행 줄에 적을 session 은 뜻이 다르다. 둘을 `chat.domain.RunSession` 하나로 넘긴다.
 문자열 둘을 나란히 받으면 순서를 바꿔도 컴파일되기 때문이다.
 
 | 만드는 자리 | `runtimeSessionId`(보낼 session) | `correlationSessionId`(실행 줄에 적을 session) |

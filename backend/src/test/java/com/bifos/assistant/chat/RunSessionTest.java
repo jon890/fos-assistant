@@ -1,8 +1,8 @@
-package com.bifos.assistant.orchestration;
+package com.bifos.assistant.chat;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.bifos.assistant.orchestration.domain.RunSession;
+import com.bifos.assistant.chat.domain.RunSession;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 

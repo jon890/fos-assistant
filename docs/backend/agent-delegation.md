@@ -60,7 +60,7 @@ Hermes 가 Control Plane MCP 의 `agent_list`, `agent_delegate`, `agent_status`,
 | 웹 `app/api/chat/conversations/[conversationId]/events/route.ts` | 대화 단위 SSE 를 그대로 넘긴다 |
 | 웹 `components/chat/conversation-session.tsx` | 대화를 열면 그 SSE 를 구독한다. `system` 사건은 알림 줄로, 자동 turn 의 답 조각은 보통 답과 같이 그린다. 대기 메시지 쪽 사건은 [`turn-control.md`](turn-control.md) 의 「응답 중 대기열」 이 갖는다 |
 
-**`orchestration` 은 깨우기 서비스를 직접 부르지 않고 Spring 사건만 낸다.** 두 패키지는 이미 서로를 import 한다(`TurnCancellation`, `Flow`). 위임 서비스가 `ChatService` 를 부르면 그 얽힘이 turn 실행까지 번진다.
+**`orchestration` 은 깨우기 서비스를 직접 부르지 않고 Spring 사건만 낸다.** 사건 `DelegationFinished` 는 `chat` 이 갖고 `orchestration` 이 낸다. `chat` 은 `orchestration` 을 import 하지 않는다. 위임 서비스가 `ChatService` 를 부르면 위임이 turn 실행에 얽힌다.
 
 깨울지는 대화별 JVM 잠금(`TurnCancellation.open`) 을 잡을 수 있는지로 정한다.
 잡지 못하면 그 turn 이 닫힐 때 다시 확인하므로 결과를 잃지 않는다.

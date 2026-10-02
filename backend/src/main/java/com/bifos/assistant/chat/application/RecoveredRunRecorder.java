@@ -10,9 +10,6 @@ import com.bifos.assistant.chat.infra.ChatMessageRepository;
 import com.bifos.assistant.chat.infra.ConversationRepository;
 import com.bifos.assistant.hermes.dto.HermesRunResult;
 import com.bifos.assistant.model.domain.ModelChoice;
-import com.bifos.assistant.orchestration.application.DelegationFinished;
-import com.bifos.assistant.orchestration.application.DelegationOutput;
-import com.bifos.assistant.orchestration.application.FlowRegistry;
 import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.usage.application.ExecutionEventRecorder;
 import com.bifos.assistant.usage.application.ExecutionRecorder;
@@ -70,7 +67,7 @@ public class RecoveredRunRecorder {
     private final ConversationRepository conversations;
     private final ConversationWriter conversationWriter;
     private final ChatMessageRepository messages;
-    private final DelegationOutput delegationOutput;
+    private final DelegationOutputClip delegationOutput;
     private final ArtifactService artifacts;
     private final ConversationEventHub hub;
     private final ApplicationEventPublisher events;

@@ -2,6 +2,7 @@ package com.bifos.assistant.orchestration.application;
 
 import com.bifos.assistant.agent.application.AgentService;
 import com.bifos.assistant.agent.domain.Agent;
+import com.bifos.assistant.chat.application.DelegationFinished;
 import com.bifos.assistant.chat.application.TurnCancellation;
 import com.bifos.assistant.chat.domain.Conversation;
 import com.bifos.assistant.chat.infra.ConversationRepository;

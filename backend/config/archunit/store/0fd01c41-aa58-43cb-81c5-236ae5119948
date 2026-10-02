@@ -1,4 +1,2 @@
-chat -> orchestration 는 순환에 속한다
 context -> memory 는 순환에 속한다
 memory -> context 는 순환에 속한다
-orchestration -> chat 는 순환에 속한다
