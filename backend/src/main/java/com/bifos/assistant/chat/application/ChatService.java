@@ -38,6 +38,7 @@ import com.bifos.assistant.skill.application.SkillUseRecorder;
 import com.bifos.assistant.usage.application.ExecutionContextSnapshot;
 import com.bifos.assistant.usage.application.ExecutionEventRecorder;
 import com.bifos.assistant.usage.application.ExecutionRecorder;
+import com.bifos.assistant.usage.application.InternalValuePolicy;
 import com.bifos.assistant.usage.domain.AgentExecution;
 import com.bifos.assistant.usage.domain.ExecutionEvent;
 import com.bifos.assistant.usage.domain.ExecutionEventType;
@@ -1086,8 +1087,13 @@ public class ChatService {
      *
      * <p>사건을 실행마다 세지 않고 한 번에 읽는다. 빈 {@code in} 절은 데이터베이스마다 다르게
      * 동작하므로 목록이 비면 부르지 않는다.
+     *
+     * <p>넘어간 곳의 모델은 내부 값이라 {@code ADMIN} 역할이 아니면 빈 묶음을 돌려준다(ADR-063).
      */
-    public Map<Long, String> switchedLabels(List<ChatMessage> history) {
+    public Map<Long, String> switchedLabels(CurrentUser viewer, List<ChatMessage> history) {
+        if (!InternalValuePolicy.visibleTo(viewer)) {
+            return Map.of();
+        }
         List<Long> executionIds = history.stream()
                 .map(ChatMessage::executionId)
                 .filter(Objects::nonNull)
@@ -1267,15 +1273,22 @@ public class ChatService {
     /**
      * 대화에서 쓸 모델과 effort 를 바꾼다. 그 뒤의 실행이 이 값을 쓴다.
      *
-     * <p>고른 모델이 Hermes 목록에 있는지는 보지 않는다. 그룹이 숨긴 모델은 {@code MODEL_HIDDEN} 으로 거절한다. 대화 목록의 순서는 주고받은 시각으로 정하므로
+     * <p>고른 모델이 Hermes 목록에 있는지는 보지 않는다. 그룹이 숨긴 모델은 {@code MODEL_HIDDEN} 으로 거절한다. effort
+     * {@code none} 은 그 에이전트의 목록에서 끄기 지원이 확인된 모델에서만 받고, 아니면 {@code VALIDATION_FAILED} 다. 대화 목록의 순서는 주고받은 시각으로 정하므로
      * {@code updatedAt} 을 건드리지 않는다.
      *
      * @param choice 요청에서 {@link ModelChoice#of} 로 검증해 만든 선택
      */
     @Transactional
     public Conversation chooseModel(CurrentUser user, Long conversationId, ModelChoice choice) {
-        access.requireOwn(user, conversationId);
+        Conversation conversation = access.requireOwn(user, conversationId);
         modelTiers.requireVisible(user, choice);
+        // none 일 때만 에이전트를 얻는다. 꺼진 에이전트나 에이전트가 없는 대화의 다른 effort 저장은 그대로 둔다.
+        if (ModelChoice.EFFORT_NONE.equals(choice.reasoningEffort())) {
+            Agent agent = agents.requireStartable(
+                    user, agents.requireById(conversation.agentId()).code());
+            modelTiers.requireEffortAllowed(user, agent, choice);
+        }
         if (conversations.chooseModelIfActive(
                         conversationId,
                         user.id(),

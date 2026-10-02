@@ -14,7 +14,7 @@
 | [ADR-008](ADR-008-스트리밍은-보여주기용이고-저장은-실행-결과로-한다.md) | 스트리밍은 보여주기용이고 저장은 실행 결과로 한다 | backend | Accepted |
 | [ADR-009](ADR-009-에이전트의-답은-신뢰하지-않는-글로-그린다.md) | 에이전트의 답은 신뢰하지 않는 글로 그린다 | frontend | Accepted |
 | [ADR-010](ADR-010-작업-영역을-제거하고-에이전트가-그-자리를-갖는다.md) | 작업 영역을 제거하고 에이전트가 그 자리를 갖는다 | backend | Accepted |
-| [ADR-011](ADR-011-실행은-시작할-때-기록하고-끝날-때-갱신한다.md) | 실행은 시작할 때 기록하고 끝날 때 갱신한다 | backend | Accepted |
+| [ADR-011](ADR-011-실행은-시작할-때-기록하고-끝날-때-갱신한다.md) | 실행은 시작할 때 기록하고 끝날 때 갱신한다 | backend | Accepted. 기동할 때 남은 줄을 `FAILED` 로 정리한다는 부분은 ADR-061 이 대체한다 |
 | [ADR-012](ADR-012-memory-는-사람이-승인한-것만-남는다.md) | Memory 는 사람이 승인한 것만 남는다 | backend | Accepted. 에이전트별 구분을 기각한 부분은 ADR-053 가 대체한다 |
 | [ADR-013](ADR-013-실행-사건은-우리-모델로-정규화해-저장한다.md) | 실행 사건은 우리 모델로 정규화해 저장한다 | backend | Accepted |
 | [ADR-014](ADR-014-실제-청구액과-환산액을-나눠-적는다.md) | 실제 청구액과 환산액을 나눠 적는다 | backend | Accepted |
@@ -60,5 +60,14 @@
 | [ADR-054](ADR-054-에이전트-기본-모델과-모델-숨김은-control-plane-db-가-갖는다.md) | 에이전트 기본 모델과 모델 숨김은 Control Plane DB 가 갖는다 | backend | Accepted. ADR-030 의 「기본값은 Hermes profile 이 갖는다」 를 대체한다 |
 | [ADR-055](ADR-055-민감-memory-본문은-저장할-때-암호화하고-key-는-환경-변수로-받는다.md) | 민감 Memory 본문은 저장할 때 암호화하고 key 는 환경 변수로 받는다 | backend | Accepted. ADR-052 의 「민감 본문은 평문」 부분을 대체한다 |
 | [ADR-056](ADR-056-다른-서비스는-사용자에-묶인-서비스-토큰으로-문서를-읽기만-한다.md) | 다른 서비스는 사용자에 묶인 서비스 토큰으로 문서를 읽기만 한다 | backend | Accepted. ADR-053 이 미룬 서비스 토큰을 정한다 |
-| [ADR-057](ADR-057-문서는-사람이-화면에서-직접-쓰고-고친다.md) | 문서는 사람이 화면에서 직접 쓰고 고친다 | backend, frontend | Accepted. ADR-012 의 승인 원칙을 문서에 적용한다. 화면은 아직 구현 전이다 |
-| [ADR-058](ADR-058-기존-개인-지식-저장소는-주인이-검토한-묶음을-화면에서-올려-들여온다.md) | 기존 개인 지식 저장소는 주인이 검토한 묶음을 화면에서 올려 들여온다 | backend, frontend | Accepted. ADR-057 의 「옮길 때 사람이 붙여 넣는다」 를 일회성 이관에 한해 넓힌다. 아직 구현 전이다 |
+| [ADR-057](ADR-057-문서는-사람이-화면에서-직접-쓰고-고친다.md) | 문서는 사람이 화면에서 직접 쓰고 고친다 | backend, frontend | Accepted. ADR-012 의 승인 원칙을 문서에 적용한다 |
+| [ADR-058](ADR-058-기존-개인-지식-저장소는-주인이-검토한-묶음을-화면에서-올려-들여온다.md) | 기존 개인 지식 저장소는 주인이 검토한 묶음을 화면에서 올려 들여온다 | backend, frontend | Accepted. ADR-057 의 「옮길 때 사람이 붙여 넣는다」 를 일회성 이관에 한해 넓힌다. 신원 항목의 들이기는 아직 구현 전이다 |
+| [ADR-059](ADR-059-꺼진-사용자는-control-plane-이-요청마다-막고-웹이-세션을-끊는다.md) | 꺼진 사용자는 Control Plane 이 요청마다 막고 웹이 세션을 끊는다 | backend, frontend | Accepted |
+| [ADR-060](ADR-060-reasoning-effort-의-지원은-확인한-것만-보이고-모르면-미확인으로-둔다.md) | reasoning effort 의 지원은 Hermes 가 알린 것만 확인으로 보이고 모르면 미확인으로 둔다 | backend, frontend | Accepted. ADR-030 의 「받지 않는 effort 는 Hermes 가 맞춘다」 는 그대로 두고 지원 표시와 `none` 선택을 더한다 |
+| [ADR-061](ADR-061-재기동-때-남은-실행은-hermes-에-물어-정하고-도는-실행에는-다시-붙는다.md) | 재기동 때 남은 실행은 Hermes 에 물어 정하고 도는 실행에는 다시 붙는다 | backend | Accepted. ADR-011 의 기동 정리 부분을 대체한다 |
+| [ADR-062](ADR-062-native-하위-에이전트-사용량은-재조회-작업-줄을-원장으로-넓혀-합계에-더한다.md) | native 하위 에이전트 사용량은 재조회 작업 줄을 원장으로 넓혀 합계에 더한다 | backend | Accepted. ADR-016 이 「자식 토큰을 잃는다」 고 한 부분을 native 자식에 한해 메운다 |
+| [ADR-063](ADR-063-관리자-전용-표시와-동작은-관리자-영역에만-두고-일반-경로의-응답은-서버가-역할에-따라-줄인다.md) | 관리자 전용 표시와 동작은 관리자 영역에만 두고 일반 경로의 응답은 서버가 역할에 따라 줄인다 | backend, frontend | Accepted. ADR-038 의 「서버가 응답에서 뺀다」 를 금액과 모델과 토큰으로 넓힌다 |
+| [ADR-064](ADR-064-범용-커넥터는-이-저장소의-hermes-connectors-에-두고-저장소가-유지보수한다.md) | 범용 커넥터는 이 저장소의 `hermes/connectors/` 에 두고 저장소가 유지보수한다 | hermes | Accepted. ADR-043 의 plugin 가운데 누구나 쓸 수 있는 것의 자리를 정한다 |
+| [ADR-065](ADR-065-외부로-나가는-도구는-상시-허락을-닫는-선언을-둔다.md) | 외부로 나가는 도구는 상시 허락을 닫는 선언을 둔다 | backend, hermes | Accepted. ADR-050 의 상시 허락에 도구별 선언을 더한다 |
+| [ADR-066](ADR-066-gmail-커넥터는-직접-만든-mcp-서버와-gmail-modify-scope-하나로-돌고-휴지통은-서버가-막는다.md) | Gmail 커넥터는 직접 만든 MCP 서버와 `gmail.modify` scope 하나로 돌고 휴지통은 서버가 막는다 | hermes | Accepted. ADR-064 의 첫 커넥터다 |
+| [ADR-067](ADR-067-native-하위-에이전트의-provider-는-대시보드-plugin-이-session-저장소에서-읽어-준다.md) | native 하위 에이전트의 provider 는 대시보드 plugin 이 session 저장소에서 읽어 준다 | backend | Accepted. ADR-062 의 「session 응답이 provider 를 주지 않는 동안 native 자식은 모두 가격 미확인」 을 메운다 |

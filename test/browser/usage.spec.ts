@@ -20,7 +20,7 @@ test("화면 폭에 맞춰 실행 기록을 카드나 표로 보인다", async (
     data: { text: "사용량 화면 검사", agentCode: "browser" },
   });
   expect(response.ok()).toBeTruthy();
-  await page.goto("/usage?tab=executions");
+  await page.goto("/admin/usage?tab=executions");
 
   const cards = page.getByTestId("execution-cards");
   const table = page.getByTestId("execution-table");
@@ -47,14 +47,27 @@ test("이번 달 합계와 가격을 찾지 못한 실행을 구분한다", asyn
     data: { text: "무료 모델 검사", agentCode: "browser" },
   });
   expect(freeResponse.ok()).toBeTruthy();
-  await page.goto("/usage");
+  await page.goto("/admin/usage");
 
   await expect(page.getByText("API 가격으로 계산한 금액", { exact: true })).toBeVisible();
   await expect(page.getByText("가격을 찾지 못한 실행", { exact: true })).toBeVisible();
-  await page.goto("/usage?tab=executions");
+  await page.goto("/admin/usage?tab=executions");
   const records = page.getByTestId(testInfo.project.name === "mobile" ? "execution-cards" : "execution-table");
   await expect(records.getByText("가격 없음").first()).toBeVisible();
   await expect(records.getByText("0.0000 USD").first()).toBeVisible();
+});
+
+test("금액을 확인하지 못한 도우미 수를 요약에 보인다", async ({ page }) => {
+  test.setTimeout(60_000);
+  const response = await page.request.post("/api/chat/stream", {
+    data: { text: "자식 완료 사건 없음 검사", agentCode: "browser" },
+  });
+  expect(response.ok()).toBeTruthy();
+  // 부모가 끝나면 자식은 금액을 확인하기 전까지 세어진다. 재조회가 끝나기 전에도 건수에는 들어 있다.
+  await expect(async () => {
+    await page.goto("/admin/usage");
+    await expect(page.getByText("금액을 확인하지 못한 도우미", { exact: true })).toBeVisible({ timeout: 2_000 });
+  }).toPass({ timeout: 30_000 });
 });
 
 test("돌고 있는 실행은 시간과 금액 없이 보이고 완료 뒤에 끝난다", async ({ page, hermes }, testInfo) => {
@@ -65,7 +78,7 @@ test("돌고 있는 실행은 시간과 금액 없이 보이고 완료 뒤에 �
   try {
     await hermes.waitForHeldRun();
 
-    await page.goto("/usage?tab=executions");
+    await page.goto("/admin/usage?tab=executions");
     const records = page.getByTestId(testInfo.project.name === "mobile" ? "execution-cards" : "execution-table");
     const running = records.getByText("실행 중", { exact: true });
     await expect(running).toBeVisible();
@@ -198,9 +211,9 @@ test("실행 기록에 요청한 effort 가 보이고 고르지 않으면 기본
   expect(byDefault.ok(), `기본값 보내기가 실패했다: ${byDefault.status()}`).toBeTruthy();
   const byDefaultId = ((await byDefault.json()) as { executionId: number }).executionId;
 
-  await page.goto("/usage?tab=executions");
+  await page.goto("/admin/usage?tab=executions");
   const rowOf = (executionId: number) => {
-    const link = page.locator(`a[href="/executions/${executionId}"]`);
+    const link = page.locator(`a[href="/admin/executions/${executionId}"]`);
     return testInfo.project.name === "mobile"
       ? link.locator("xpath=ancestor::article")
       : link.locator("xpath=ancestor::tr");
@@ -215,25 +228,25 @@ function usageTabs(page: Page) {
   return page.getByRole("navigation", { name: "사용량 탭" });
 }
 
-test("탭 넷이 보이고 주소의 tab 값이 고른 탭이 된다", async ({ page }) => {
-  await page.goto("/usage");
+test("관리자 영역의 사용량에는 탭 넷이 보이고 주소의 tab 값이 고른 탭이 된다", async ({ page }) => {
+  await page.goto("/admin/usage");
   for (const label of TAB_LABELS) {
     await expect(usageTabs(page).getByRole("link", { name: label, exact: true })).toBeVisible();
   }
   await expect(usageTabs(page).getByRole("link", { name: "요약", exact: true })).toHaveAttribute("aria-current", "page");
 
-  await page.goto("/usage?tab=skills");
+  await page.goto("/admin/usage?tab=skills");
   await expect(usageTabs(page).getByRole("link", { name: "스킬", exact: true })).toHaveAttribute("aria-current", "page");
   await expect(usageTabs(page).getByRole("link", { name: "요약", exact: true })).not.toHaveAttribute("aria-current", "page");
 
   // 모르는 값은 요약으로 본다.
-  await page.goto("/usage?tab=nothing");
+  await page.goto("/admin/usage?tab=nothing");
   await expect(usageTabs(page).getByRole("link", { name: "요약", exact: true })).toHaveAttribute("aria-current", "page");
 
   await usageTabs(page).getByRole("link", { name: "실행 기록", exact: true }).click();
   // 탭은 서버 컴포넌트의 Link 라 다음 화면을 서버에서 받은 뒤에 주소가 바뀐다.
   // 다른 검사와 함께 돌아 서버가 바쁘면 기본 5초를 넘겨, 이 단언만 기다리는 시간을 늘린다.
-  await expect(page).toHaveURL(/\/usage\?tab=executions$/, { timeout: 15_000 });
+  await expect(page).toHaveURL(/\/admin\/usage\?tab=executions$/, { timeout: 15_000 });
   await expect(usageTabs(page).getByRole("link", { name: "실행 기록", exact: true })).toHaveAttribute("aria-current", "page");
 });
 
@@ -347,6 +360,14 @@ test.describe("MEMBER 역할 사용자의 사용량 화면", () => {
   test("실행 기록과 요약과 대화의 작업 과정에 내부 값이 없다", async ({ page }, testInfo) => {
     const created = await page.request.post("/api/agents", { data: { name: AGENT_NAME } });
     expect(created.status(), `에이전트를 만들지 못했다: ${created.status()}`).toBe(201);
+    const agentCode = ((await created.json()) as { code: string }).code;
+
+    // 자식이 달린 실행을 먼저 만든다. 부모가 끝나면 그 자식은 바로 확인 중으로 세어지므로,
+    // 아래에서 문구가 없는 것이 자식이 없어서가 아니라 역할 때문임을 구분한다.
+    const withChild = await page.request.post("/api/chat/stream", {
+      data: { text: "자식 완료 사건 없음 검사", agentCode: agentCode },
+    });
+    expect(withChild.ok()).toBeTruthy();
 
     // 대화에서 보내야 도구 사건이 실린 실행이 생긴다.
     await page.goto("/");
@@ -380,6 +401,7 @@ test.describe("MEMBER 역할 사용자의 사용량 화면", () => {
     await page.goto("/usage");
     await expect(page.getByText("이번 달에 비서와 한 일을 모아 보여 드려요.", { exact: true })).toBeVisible();
     await expect(page.getByText("이번 달 실행", { exact: true })).toBeVisible();
+    await expect(page.getByText("금액을 확인하지 못한 도우미")).toHaveCount(0);
     await expect(page.getByText("API 가격")).toHaveCount(0);
     await expect(page.getByRole("main")).not.toContainText("USD");
     await expect(page.getByTestId("breakdown-axis")).toHaveCount(0);

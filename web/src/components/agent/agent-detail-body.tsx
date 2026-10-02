@@ -36,6 +36,8 @@ type Props = {
   adminError: string | null;
   /** 연결 화면이 설정을 소유하는 에이전트면 일반 편집 절을 숨긴다. */
   connectorManaged?: boolean;
+  /** 에이전트를 지운 뒤 돌아갈 목록 주소다. */
+  listHref: string;
 };
 
 type ErrorPayload = { code: string; message: string };
@@ -73,6 +75,7 @@ export function AgentDetailBody({
   canManageAccess,
   adminError,
   connectorManaged = false,
+  listHref,
 }: Props) {
   const [visibility, setVisibility] = useState(initialVisibility);
   const [persona, setPersona] = useState<Loaded<PersonaView> | null>(
@@ -167,6 +170,7 @@ export function AgentDetailBody({
           code={code}
           name={name}
           visibility={visibility}
+          listHref={listHref}
           onVisibilityChange={(next) => void changeVisibility(next)}
         />
       ) : null}

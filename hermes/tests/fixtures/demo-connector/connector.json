@@ -15,5 +15,6 @@
   "operator_env": ["DEMO_BASE"],
   "errors": { "DEMO_UNAUTHORIZED": "credential_rejected",
               "DEMO_FORBIDDEN": "forbidden",
+              "DEMO_UNKNOWN": "outcome_unknown",
               "DEMO_UNAVAILABLE": "unavailable" }
 }

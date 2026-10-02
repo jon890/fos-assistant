@@ -17,7 +17,7 @@ type PendingItem = { id: number; text: string; createdAt: string };
 type PendingQueue = { held: boolean; items: PendingItem[] };
 type TurnStream = Awaited<ReturnType<typeof openStream>>;
 
-async function messagesOf(context: Context, conversationId: string): Promise<Message[]> {
+export async function messagesOf(context: Context, conversationId: string): Promise<Message[]> {
   return expectStatus(
     await call(context, `/chat/conversations/${conversationId}/messages`, { token: context.tokens.dad }),
     200,
@@ -26,7 +26,7 @@ async function messagesOf(context: Context, conversationId: string): Promise<Mes
 }
 
 /** 대화의 메시지 목록을 조건이 참이 될 때까지 다시 읽는다. */
-async function awaitMessages(
+export async function awaitMessages(
   context: Context,
   conversationId: string,
   predicate: (messages: Message[]) => boolean,
@@ -43,7 +43,7 @@ async function awaitMessages(
   fail(`${what}: ${timeoutMs / 1000}초 안에 기대한 메시지가 오지 않았다. 마지막 목록: ${JSON.stringify(last.map((m) => [m.role, m.content]))}`);
 }
 
-async function pendingOf(context: Context, conversationId: string): Promise<PendingQueue> {
+export async function pendingOf(context: Context, conversationId: string): Promise<PendingQueue> {
   return expectStatus(
     await call(context, `/chat/conversations/${conversationId}/pending`, { token: context.tokens.dad }),
     200,
@@ -62,7 +62,7 @@ async function awaitHeld(context: Context, conversationId: string): Promise<Pend
   return fail(`대기 줄이 10초 안에 멈추지 않았다: ${JSON.stringify(last)}`);
 }
 
-async function enqueue(context: Context, conversationId: string, text: string): Promise<PendingQueue> {
+export async function enqueue(context: Context, conversationId: string, text: string): Promise<PendingQueue> {
   return expectStatus(
     await call(context, `/chat/conversations/${conversationId}/pending`, {
       method: "POST",
@@ -86,7 +86,7 @@ async function cancelPending(context: Context, conversationId: string, pendingId
 }
 
 /** 다음 run 을 붙잡고 turn 을 열어 `started` 사건과 run 이 제출된 것까지 기다린다. */
-async function holdTurn(
+export async function holdTurn(
   context: Context,
   text: string,
   agentCode: string,
@@ -362,13 +362,22 @@ export const chatQueueRestartScenario: Scenario = {
       step("Control Plane 을 강제로 내리고 다시 띄운다");
       await context.restartControlPlane();
 
-      step("재시작 뒤 쌓인 글이 USER 로 저장되고 답이 온다");
+      step("붙잡힌 turn 에 다시 붙어 있는 동안에는 쌓인 글이 대기 줄에 남는다");
+      const waiting = await pendingOf(context, sendConversation);
+      expect(waiting.items.length === 1, `다시 붙은 turn 이 끝나기 전에 대기 줄이 달라졌다: ${JSON.stringify(waiting)}`);
+
+      step("붙잡은 turn 을 놓으면 그 답이 먼저 오고, 그 뒤에 쌓인 글이 USER 로 저장되고 답이 온다");
+      context.hermes.releaseHeldRun();
       await awaitMessages(
         context,
         sendConversation,
         (list) => {
           const index = list.findIndex((message) => message.role === "USER" && message.content === "재시작 뒤 보낼 글");
-          return index >= 0 && list.slice(index + 1).some((message) => message.role === "ASSISTANT");
+          return (
+            index >= 0 &&
+            list.slice(0, index).some((message) => message.role === "ASSISTANT") &&
+            list.slice(index + 1).some((message) => message.role === "ASSISTANT")
+          );
         },
         TURN_TIMEOUT_MS,
         "재시작 뒤 보낸 turn",

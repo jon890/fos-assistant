@@ -2,12 +2,12 @@
 
 입력창 옆에서 빠르게, 균형, 깊게를 고른다.
 평소에는 세 단계와 설정 단추만 보인다.
-설정 안에 에이전트 기본값, 내 기본값, 관리자용 그룹 모델 설정과 고급 모델 선택을 둔다.
+설정 안에 에이전트 기본값, 내 기본값, 고급 모델 선택을 둔다. 그룹 모델 설정은 관리자 영역의 「모델」 화면(`/admin/models`)에 있다.
 provider와 모델 이름은 평소 입력창 옆에 표시하지 않는다.
 화면은 provider id 원문을 그리지 않는다. Hermes 목록이 준 표시 이름을 쓰고, 목록이 없는 화면은 `web/src/lib/provider-label.ts` 의 `providerLabel()` 이 준 이름을 쓴다.
 모르는 provider 는 「다른 제공사」 로 보인다. 관리자가 단계별 모델을 편집하는 입력 칸만 id 를 그대로 받는다. 관리자의 숨김 편집은 표에 없는 provider 를 id 로 보인다. 저장 형식과 API 는 id 를 그대로 쓴다.
 
-관리자에게 보이는 「그룹 모델 설정」 은 두 가지를 정한다.
+관리자 영역의 「그룹 모델 설정」 은 두 가지를 정한다.
 「그룹 기본 단계」 는 이 그룹 사용자가 따로 고르지 않았을 때 도는 단계다. 사용자가 「내 기본값」 을 정하면 그것이 먼저다.
 「단계별 모델」 은 빠르게, 균형, 깊게를 골랐을 때 실제로 도는 모델과 강도다. 비워 둔 단계는 에이전트 기본 모델로 돈다.
 
@@ -31,7 +31,7 @@ provider와 모델 이름은 평소 입력창 옆에 표시하지 않는다.
 단계 정의는 DB 의 행만 읽으며 제품 코드와 마이그레이션에 모델 이름을 넣지 않는다.
 정의 행이 없는 그룹은 세 단계의 mapping 이 모두 비어 있고, 해당 단계를 골라도 에이전트 기본 모델로 실행한다.
 이때 고른 단계는 실행 기록에 남긴다.
-관리자는 설정에서 「단계별 모델을 아직 정하지 않았어요」 안내를 보고 그룹 모델 설정에서 정할 수 있다.
+관리자는 관리자 영역의 「모델」 화면에서 「단계별 모델을 아직 정하지 않았어요」 안내를 보고 그룹 모델 설정에서 정한다. 대화 화면의 설정에는 이 안내와 단추를 두지 않는다.
 정의의 provider가 비면 요청자의 에이전트의 기본 provider로 해석한다. 에이전트 기본 모델이 있으면 그 provider 이고 없으면 profile 의 provider 다.
 관리자가 정의를 저장하면 명시한 provider를 쓴다.
 정의 저장 전에 provider와 모델의 앞뒤 공백을 없애고 빈 provider는 에이전트 기본 provider로 해석한다.
@@ -71,6 +71,7 @@ Hermes가 실제로 쓴 provider와 모델은 실행 완료 시 결과로 갱신
 모델 없이 effort 만 둘 수 있다. 이때 모델은 profile 의 값이고 effort 만 명시해 보낸다.
 관리자가 에이전트 상세 화면의 「모델」 절에서 정한다.
 
+- effort 는 `none` 도 둘 수 있다. `none` 은 그 에이전트의 목록에서 모델(비웠으면 profile 의 기본 모델)의 `disable` 이 `SUPPORTED` 이고 `support` 가 `UNSUPPORTED` 가 아닐 때만 저장한다. 모델이 그대로여도 `none` 이면 숨김을 적용하지 않은 목록을 읽어 판정하므로, Hermes 가 목록을 답하지 못하면 `HERMES_UNAVAILABLE` 로 실패한다. 관리 화면의 강도 선택에는 같은 조건에서만 「끄기」 가 보이고, 모델을 바꿔 그 조건이 깨지면 선택을 「profile 값」 으로 비운다. 그룹의 단계 정의는 모델을 가리키는 profile 이 하나가 아니라 `none` 을 받지 않는다([ADR-060](adr/ADR-060-reasoning-effort-의-지원은-확인한-것만-보이고-모르면-미확인으로-둔다.md))
 - 저장할 때 그 에이전트의 목록에 있고 숨기지 않은 모델인지 검사한다. 이미 저장된 모델을 그대로 두고 effort 만 바꾸는 저장은 목록과 견주지 않는다
 - Hermes 가 목록을 답하지 못해도 관리 화면은 저장된 기본값과 숨김 목록을 보인다. 그때는 기본 모델을 비우거나 숨김을 푸는 것만 할 수 있다
 - 대화가 모델을 직접 고르고 effort 를 비웠으면 에이전트 기본 effort 를 얹지 않는다. 그 effort 는 에이전트 기본 모델에 맞춘 값이다
@@ -141,7 +142,8 @@ Memory 제안 실행은 방금 판정을 지난 원래 실행의 값을 그대�
 
 | 경로 | 요청 또는 응답 |
 | --- | --- |
-| `GET /api/v1/chat/model-tiers?agentCode=...` | `tiers` 배열(`tier`, `label`, `provider`, `model`, `reasoningEffort`), `userDefaultTier`, `groupDefaultTier`, `admin` |
+| `GET /api/v1/chat/model-tiers?agentCode=...` | `tiers` 배열(`tier`, `label`, `provider`, `model`, `reasoningEffort`), `userDefaultTier`, `groupDefaultTier`, `admin`. `MEMBER` 역할에게는 단계의 `provider`, `model`, `reasoningEffort` 가 `null` 이다 |
+| `GET /api/v1/admin/model-tiers` | 관리자 전용. 에이전트를 받지 않는다. `tiers` 배열과 `groupDefaultTier`. 저장된 값 그대로이고 provider 를 비운 단계는 `null` 로 온다 |
 | `PUT /api/v1/chat/model-tiers/default` | 본문 `tier`: 단계 코드 또는 `null`. 내 기본값을 저장한다 |
 | `PUT /api/v1/chat/model-tiers/group` | 관리자 전용. `tiers` 세 정의와 `defaultTier`를 한 트랜잭션으로 저장한다 |
 | `PUT /api/v1/chat/conversations/{id}/model-tier` | `mode`와 `tier`. `DEFAULT`면 tier는 비고 `TIER`면 유효한 코드가 필요하다 |
@@ -169,7 +171,9 @@ profile은 서버가 확인한 바인딩에서 고른다.
 
 ## 비동기 자식 사용량
 
-`SUBAGENT_STARTED`가 남았지만 같은 child session의 완료 기록이 없으면 부모 종료 뒤 별도로 조회한다.
+부모 실행이 끝나면 `SUBAGENT_STARTED` 가 남은 child session 마다 재조회 작업 줄을 하나 만들고 session 을 조회한다.
+완료 사건이 부모 스트림으로 이미 왔어도 조회한다. 사건에는 cache 구분과 provider 가 없기 때문이다.
+이 줄이 native 자식 한 명의 사용량 원장이다. 근거는 [ADR-062](adr/ADR-062-native-하위-에이전트-사용량은-재조회-작업-줄을-원장으로-넓혀-합계에-더한다.md) 에 있다.
 재조회 작업은 DB에 저장하고 서버 재기동 뒤에도 이어 간다.
 처음 2분은 5초 간격, 이후 지수로 늘려 최대 5분 간격으로 조회한다.
 24시간 뒤 멈추며 서버 전체 동시 조회 수를 제한한다.
@@ -183,6 +187,7 @@ profile은 서버가 확인한 바인딩에서 고른다.
 서버 한 대가 작업 ID별로 실행 중인 조회를 추적해 같은 작업을 겹쳐 부르지 않는다.
 완료 기록을 넣는 트랜잭션은 실행 줄을 잠그고 다음 sequence를 정한다.
 자식 완료 자연키는 `(execution_id, child_session_id)`이며 기존 완료 중복은 최신 한 줄만 키를 가진다.
+작업 줄도 `(execution_id, child_session_id)` 가 유일하다. 같은 profile 의 같은 child session 줄이 다른 실행 아래 이미 있으면 새 줄을 만들지 않는다.
 자식이 아직 끝나지 않았거나 읽지 못하면 토큰을 0으로 채우지 않는다.
 기간을 넘긴 자식은 사용량 미확인으로 표시한다.
 
@@ -191,8 +196,57 @@ profile은 서버가 확인한 바인딩에서 고른다.
 `ended_at`과 `agent_close`는 성공의 증명이 아니므로 실패 여부는 확인되지 않은 값으로 둔다.
 입력은 일반 입력, cache read, cache write를 합산해 부모 실행의 입력 정의와 맞춘다.
 시간은 `(ended_at - started_at) * 1000`의 밀리초다.
-SSE 완료 기록이 먼저 생기면 재조회 작업은 완료 처리하고 새 사건을 만들지 않는다.
-이 토큰은 자식 표시용이며 기존 월별 사용량 합계에는 추가하지 않는다.
+SSE 완료 기록이 먼저 생겼으면 새 사건을 만들지 않고 작업 줄에만 사용량을 적는다.
+사건의 토큰은 자식 표시용이다. 합계에는 작업 줄의 값만 더한다.
+
+### 원장 줄에 적는 것
+
+종료를 확인한 자식은 작업 줄에 provider, 모델, 일반 입력, cache read, cache write, 출력 토큰을 따로 적고 `DONE` 으로 바꾼다.
+provider 는 session 응답의 `provider`, 없으면 `billing_provider` 에서 읽는다.
+둘 다 없으면 대시보드 plugin 의 `GET /api/profiles/<이름>/sessions/<session id>/provider` 를 부른다([ADR-067](adr/ADR-067-native-하위-에이전트의-provider-는-대시보드-plugin-이-session-저장소에서-읽어-준다.md)).
+경로의 계약은 [`hermes/README.md`](../hermes/README.md) 의 「자식 session 의 provider」 가 갖는다.
+
+| 대시보드의 답 | 원장 줄 |
+| --- | --- |
+| 200 이고 `provider` 가 있고, `model` 이 `null` 이거나 session 응답의 모델과 같다 | 그 provider 로 환산한다 |
+| 200 이고 `provider` 가 `null` 이다 | provider 를 비운다 |
+| 200 이고 `model` 이 session 응답의 모델과 다르다 | provider 를 비운다. 두 조회 사이에 줄이 바뀐 것이다 |
+| 404 | provider 를 비운다 |
+| 400, 401 같은 그 밖의 4xx | provider 를 비우고 경고 로그를 남긴다. 옛 plugin 은 이 경로를 401 로 답한다 |
+| 5xx 이거나 닿지 못했거나 200 의 본문이 JSON 객체가 아니다 | 자식이 끝난 뒤 10분 안이면 줄을 `WAITING` 으로 두고 다음 조회 때 다시 부른다. 10분이 지났으면 provider 를 비운다 |
+
+session 응답에 provider 가 있으면 대시보드를 부르지 않는다.
+부모 실행의 provider 나 자식 모델 이름으로 provider 를 추정하지 않는다.
+금액은 그 provider 와 모델을 가격표에서 찾아 환산하고 가격표 버전을 함께 적는다.
+입력은 일반 입력, cache read, cache write 를 합친 값으로, cache read 는 cache 단가로 환산한다. cache write 는 입력 단가로 센다.
+실제 청구액은 부모 실행의 `cost_mode` 가 `API` 일 때만 환산액과 같은 값으로 적는다.
+금액을 내지 못한 `DONE` 줄은 `unconfirmed_reason` 에 까닭을 적는다.
+
+| `unconfirmed_reason` | 언제 |
+| --- | --- |
+| `PROVIDER_UNKNOWN` | session 응답에 provider 가 없고 대시보드에서도 읽지 못했다 |
+| `USAGE_UNKNOWN` | 입력이나 출력 토큰을 읽지 못했다 |
+| `PRICE_UNKNOWN` | 가격표에 그 provider 와 모델이 없다 |
+
+v0.21.5 의 session 응답은 provider 를 주지 않는다([`hermes/runs-api.md`](hermes/runs-api.md)). 그래서 지금 native 자식의 provider 는 모두 대시보드에서 온다.
+한 번 `PROVIDER_UNKNOWN` 으로 적힌 줄은 다시 조회하지 않는다.
+
+### 합계와 완전성
+
+월 합계와 축별 합계는 `agent_execution` 의 합에 금액이 있는 `DONE` 줄을 더한다.
+부모 실행이 `RUNNING` 이면 그 자식도 뺀다. 작업 줄은 부모가 끝난 뒤에만 생긴다.
+자식은 부모 실행의 사용자, 에이전트, 시작 시각, 지문에 붙고, 모델 축에서는 자식의 provider 와 모델에 붙는다.
+자식은 실행 건수에 세지 않고 `subagents` 로 따로 센다. `agent_delegate` 로 만든 자식은 자기 실행 줄이 있어 이 줄을 만들지 않는다.
+
+금액을 확인하지 못한 자식은 셋으로 나눠 센다.
+
+| 응답 칸 | 세는 것 |
+| --- | --- |
+| `pendingSubagents` | `WAITING` 줄. session 이 있는 시작 사건인데 아직 작업 줄이 없고 부모가 끝난 지 24시간 안인 자식도 여기 센다 |
+| `unconfirmedSubagents` | `EXPIRED` 줄과 session 없이 온 시작 사건. 작업 줄 없이 부모가 끝난 지 24시간이 지난 자식도 여기 센다. 재조회가 그 자식을 더는 찾지 않기 때문이다 |
+| `unpricedSubagents` | 금액이 없는 `DONE` 줄 |
+
+`pricedSubagents` 는 금액이 있는 `DONE` 줄의 수다.
 
 종료된 session 을 다시 조회해도 값이 같다는 실측은 [`hermes/delegation.md`](hermes/delegation.md#자식-session-으로-결과와-토큰을-보완한다) 에 있다.
 
@@ -211,17 +265,18 @@ Flow 루트는 원래 대화 요청 수신 시각을 쓰고, 자식은 실행기
 실행 트리 응답은 provider, cachedInputTokens, totalTokens, modelTier, reasoningEffort,
 reasoningEffortSource와 위 네 시각을 실행 줄에서 반환한다.
 
-실행 상세와 대화 화면의 실제 제공사, 모델, 토큰, 금액은 ADMIN에게만 보인다.
-MEMBER에게는 고른 단계와 걸린 시간만 보인다.
-네 시각과 구간표도 ADMIN에게만 보인다.
+실행 상세의 실제 제공사, 모델, 토큰, 금액은 관리자 영역의 실행 상세(`/admin/executions/{id}`)에만 보인다.
+일반 화면에는 역할과 상관없이 고른 단계와 걸린 시간만 보인다.
+네 시각과 구간표도 관리자 영역에만 보인다.
 대화 안 작업 과정에는 역할과 관계없이 모델 이름과 토큰을 넣지 않는다.
-API 응답은 그대로 두며 화면에서 역할에 따라 표시한다.
+Control Plane 은 `MEMBER` 역할에게 이 값을 응답에서 뺀다. 빼는 값의 표는 [`backend/conversation.md`](backend/conversation.md) 의 「역할에 따라 응답에서 빼는 값」 절이 갖는다.
 하위 에이전트 이름이 비면 `subagent_id`, `goal` 순서로 채우되 preview에서 이름을 추정하지 않는다.
 
 가짜 Hermes는 자식 완료가 부모 완료 뒤에 오거나 오지 않는 순서를 검사한다.
 세션 조회 지연, 끝내 미완료, 중복 SSE, 재기동, 다른 부모 session, 권한과 기본값 우선순위도 검사한다.
+부모와 자식이 다른 provider 와 모델로 돈 경우의 합계와 완전성 건수도 검사한다.
 
 실행 트리는 시작 사건에 `subagentUsageStatus`를 합쳐 반환한다.
-완료 사건이 있으면 `RECORDED`, 만료 작업이면 `UNCONFIRMED`, 기다리는 작업이면 `WAITING`이다.
+완료 사건이 있으면 `RECORDED`, 만료 작업이면 `UNCONFIRMED`, 그 밖의 작업이면 `WAITING`이다.
 작업 설명은 상태 안내로 바꾸지 않는다.
 profile에도 강도 설정이 없으면 실제 강도를 모르므로 출처를 `UNKNOWN`으로 둔다.

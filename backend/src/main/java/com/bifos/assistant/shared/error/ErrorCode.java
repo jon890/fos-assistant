@@ -5,6 +5,8 @@ import org.springframework.http.HttpStatus;
 /** 웹 클라이언트에 돌려주는 고정 오류 코드다. */
 public enum ErrorCode {
     UNAUTHENTICATED(HttpStatus.UNAUTHORIZED),
+    /** 관리자가 허용 목록에서 끈 사용자의 웹 토큰이다. 웹이 이 코드를 받으면 세션을 끊는다(ADR-059). */
+    ACCESS_REVOKED(HttpStatus.UNAUTHORIZED),
     FORBIDDEN(HttpStatus.FORBIDDEN),
     CONVERSATION_NOT_FOUND(HttpStatus.NOT_FOUND),
     AGENT_NOT_FOUND(HttpStatus.NOT_FOUND),
@@ -23,6 +25,8 @@ public enum ErrorCode {
     MEMORY_SENSITIVE_ALWAYS(HttpStatus.BAD_REQUEST),
     /** 민감 본문을 암호화하거나 풀 key 가 없다. 평문으로 내려 저장하지 않는다(ADR-055). */
     MEMORY_ENCRYPTION_UNAVAILABLE(HttpStatus.CONFLICT),
+    /** 들이는 사이에 같은 출처나 같은 이름의 줄이 먼저 들어왔다. 다시 올리면 그 항목이 DUPLICATE 나 CONFLICT 로 나온다(ADR-058). */
+    MEMORY_IMPORT_RETRY(HttpStatus.CONFLICT),
     /** 같은 주인과 collection 에 같은 이름의 문서가 이미 있다(ADR-057). */
     MEMORY_DOCUMENT_EXISTS(HttpStatus.CONFLICT),
     /** 화면이 읽은 판이 지금 판이 아니다. 그 사이에 다른 수정이 있었다(ADR-057). */

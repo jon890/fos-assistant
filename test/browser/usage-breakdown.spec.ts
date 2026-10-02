@@ -67,7 +67,7 @@ test("묶는 기준을 바꾸면 표가 그 축으로 바뀐다", async ({ page 
       actualCostMicros: null,
     },
   ]);
-  await page.goto("/usage");
+  await page.goto("/admin/usage");
 
   const rows = breakdown(page, testInfo.project.name);
   await expect(rows.getByText("브라우저 비서").first()).toBeVisible();
@@ -77,6 +77,22 @@ test("묶는 기준을 바꾸면 표가 그 축으로 바뀐다", async ({ page 
 
   await expect(rows.getByText("gpt-breakdown-big")).toBeVisible();
   await expect(rows.getByText("gpt-breakdown-small")).toBeVisible();
+});
+
+test("하위 에이전트가 있는 묶음은 건수를 따로 보인다", async ({ page }, testInfo) => {
+  test.setTimeout(60_000);
+  // 실행을 비우면 앞 검사의 자식 줄은 부모 실행과 이어지지 않아 세어지지 않는다.
+  await replaceExecutions(page, []);
+  const response = await page.request.post("/api/chat/stream", {
+    data: { text: "자식 완료 사건 없음 검사", agentCode: "browser" },
+  });
+  expect(response.ok()).toBeTruthy();
+
+  // 토큰이 적힌 줄만 세므로 재조회가 한 주기 돌 때까지 다시 열어 본다.
+  await expect(async () => {
+    await page.goto("/admin/usage");
+    await expect(breakdown(page, testInfo.project.name).getByText("도우미 1건")).toBeVisible({ timeout: 2_000 });
+  }).toPass({ timeout: 30_000 });
 });
 
 test("지문이 하나뿐이면 무엇이 달라졌나 절을 그리지 않는다", async ({ page }) => {
@@ -102,10 +118,10 @@ test("지문이 하나뿐이면 무엇이 달라졌나 절을 그리지 않는�
       actualCostMicros: null,
     },
   ]);
-  await page.goto("/usage");
+  await page.goto("/admin/usage");
   await expect(page.getByTestId("breakdown-axis")).toBeVisible();
 
-  await page.goto("/usage?tab=fingerprints");
+  await page.goto("/admin/usage?tab=fingerprints");
   await expect(page.getByRole("navigation", { name: "사용량 탭" })).toBeVisible();
   await expect(page.getByTestId("fingerprint-section")).toHaveCount(0);
 });
@@ -133,7 +149,7 @@ test("지문이 둘이면 구간마다 실행당 평균을 보인다", async ({ 
       actualCostMicros: null,
     },
   ]);
-  await page.goto("/usage?tab=fingerprints");
+  await page.goto("/admin/usage?tab=fingerprints");
 
   const section = page.getByTestId("fingerprint-section");
   await expect(section.getByText("설정 구분값 a3f2bbbb…", { exact: true })).toBeVisible();
@@ -166,7 +182,7 @@ test("두 폭 모두에서 축별 표가 가로로 넘치지 않는다", async (
       actualCostMicros: 23_450_000,
     },
   ]);
-  await page.goto("/usage");
+  await page.goto("/admin/usage");
   await page.getByTestId("breakdown-axis").selectOption("model");
   await expect(breakdown(page, testInfo.project.name).getByText("2,345,678").first()).toBeVisible();
 

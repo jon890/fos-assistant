@@ -6,7 +6,7 @@ import type {
 import { subagentLabel } from "../../../lib/format.ts";
 import { toolLabel } from "../../../lib/tool-label.ts";
 
-export type ActivityItemKind = "tool" | "subagent" | "step" | "switched";
+export type ActivityItemKind = "tool" | "subagent" | "step";
 export type ActivityItemState =
   "running" | "done" | "failed" | "stopped" | "unfinished" | "result-missing";
 
@@ -237,21 +237,7 @@ export function applyChatEvent(
       ),
     };
   }
-  if (event.type === "switched")
-    return {
-      ...state,
-      items: append(items, {
-        kind: "switched",
-        name: `여기부터 ${event.text ?? ""}로 실행해요`,
-        detail: null,
-        model: null,
-        inputTokens: null,
-        outputTokens: null,
-        durationMs: null,
-        state: "done",
-        pairKey: null,
-      }),
-    };
+  // 모델이 바뀐 사건(`switched`)은 대화의 작업 과정에 줄을 만들지 않는다. 관리자 영역의 실행 상세만 보인다.
   return state;
 }
 
@@ -325,12 +311,6 @@ export function fromTree(
             failed: event.failed,
             phase:
               event.eventType === "SUBAGENT_STARTED" ? "started" : "completed",
-          });
-          break;
-        case "PROVIDER_SWITCHED":
-          state = applyChatEvent(state, {
-            type: "switched",
-            text: event.detail,
           });
           break;
       }

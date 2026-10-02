@@ -48,14 +48,19 @@ public final class ConnectionDtos {
         }
     }
 
-    /** 위험도와 승인 방식은 enum 이름 그대로 낸다. */
-    public record ConnectorToolView(String name, String title, String risk, String approval) {
+    /**
+     * 위험도와 승인 방식은 enum 이름 그대로 낸다.
+     *
+     * @param grant 그 도구에 상시 허락을 줄 수 있는가
+     */
+    public record ConnectorToolView(String name, String title, String risk, String approval, boolean grant) {
         static ConnectorToolView from(ConnectorToolSummary value) {
             return new ConnectorToolView(
                     value.name(),
                     value.title(),
                     value.risk().name(),
-                    value.approval().name());
+                    value.approval().name(),
+                    value.grant());
         }
     }
 

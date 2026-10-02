@@ -426,7 +426,8 @@ class ConnectorToolPolicyTest(ConnectorGateCase):
         """`schema: 1` 은 그대로 받고, 대시보드가 부르는 도구만 읽기 전용 정책으로 낸다."""
         entry = self.catalog()[0]
         self.assertEqual(entry["schema"], 1)
-        self.assertEqual(entry["tools"], {"list_scopes": {"risk": "READ", "approval": "none"}})
+        self.assertEqual(entry["tools"], {
+            "list_scopes": {"risk": "READ", "approval": "none", "grant": False, "outbound": False}})
 
     def test_schema_two_fills_the_default_approval(self):
         """`approval` 을 적지 않은 도구는 그 위험도의 기본값으로 채워 낸다. 제목이 없으면 `title` 을 내지 않는다."""
@@ -434,9 +435,9 @@ class ConnectorToolPolicyTest(ConnectorGateCase):
         entry = self.catalog()[0]
         self.assertEqual(entry["schema"], 2)
         self.assertEqual(entry["tools"], {
-            "list_scopes": {"risk": "READ", "approval": "none"},
-            "env_view": {"risk": "READ", "approval": "none"},
-            "write_note": {"risk": "WRITE", "approval": "required"},
+            "list_scopes": {"risk": "READ", "approval": "none", "grant": False, "outbound": False},
+            "env_view": {"risk": "READ", "approval": "none", "grant": False, "outbound": False},
+            "write_note": {"risk": "WRITE", "approval": "required", "grant": True, "outbound": False},
         })
 
     def test_default_approval_of_every_risk(self):
@@ -446,7 +447,9 @@ class ConnectorToolPolicyTest(ConnectorGateCase):
         for risk, approval in expected.items():
             with self.subTest(risk):
                 self.declare(lambda tools: tools.update(probe={"risk": risk}))
-                self.assertEqual(self.catalog()[0]["tools"]["probe"], {"risk": risk, "approval": approval})
+                self.assertEqual(self.catalog()[0]["tools"]["probe"],
+                                 {"risk": risk, "approval": approval, "grant": approval == "required",
+                                  "outbound": False})
 
     def test_stricter_approval_and_title_reach_the_catalog(self):
         """하한보다 엄격한 `approval` 과 사람 말 제목은 선언한 그대로 낸다."""
@@ -454,8 +457,11 @@ class ConnectorToolPolicyTest(ConnectorGateCase):
             write_note={"risk": "WRITE", "approval": "always", "title": "메모 쓰기"},
             env_view={"risk": "READ", "approval": "required"}))
         tools = self.catalog()[0]["tools"]
-        self.assertEqual(tools["write_note"], {"risk": "WRITE", "approval": "always", "title": "메모 쓰기"})
-        self.assertEqual(tools["env_view"], {"risk": "READ", "approval": "required"})
+        self.assertEqual(tools["write_note"],
+                         {"risk": "WRITE", "approval": "always", "title": "메모 쓰기", "grant": False,
+                          "outbound": False})
+        self.assertEqual(tools["env_view"],
+                         {"risk": "READ", "approval": "required", "grant": True, "outbound": False})
 
     def test_title_length_boundary(self):
         """제목은 80자까지 받는다. 81자와 빈 문자열은 받지 않는다."""
@@ -469,9 +475,40 @@ class ConnectorToolPolicyTest(ConnectorGateCase):
     def test_destructive_tool_defaults_to_always(self):
         """`DESTRUCTIVE` 는 받고 `approval` 이 `always` 다. `required` 로 내려 선언하면 빠진다."""
         self.declare(lambda tools: tools.update(purge={"risk": "DESTRUCTIVE"}))
-        self.assertEqual(self.catalog()[0]["tools"]["purge"], {"risk": "DESTRUCTIVE", "approval": "always"})
+        self.assertEqual(self.catalog()[0]["tools"]["purge"],
+                         {"risk": "DESTRUCTIVE", "approval": "always", "grant": False, "outbound": False})
         self.declare(lambda tools: tools.update(purge={"risk": "DESTRUCTIVE", "approval": "required"}))
         self.assertEqual(self.catalog(), [])
+
+    def test_closed_grant_keeps_the_tool_visible_to_the_model(self):
+        """`"grant": false` 인 도구는 `grant` 만 거짓으로 나오고 서버 정의의 `tools.exclude` 에 들지 않는다(ADR-065)."""
+        self.declare(lambda tools: tools.update(send_note={"risk": "WRITE", "grant": False}))
+        tools = self.catalog()[0]["tools"]
+        self.assertEqual(tools["send_note"],
+                         {"risk": "WRITE", "approval": "required", "grant": False, "outbound": False})
+        # 선언하지 않은 쓰기 도구는 상시 허락을 줄 수 있고, 승인이 없는 읽기 도구는 줄 것이 없다.
+        self.assertIs(tools["write_note"]["grant"], True)
+        self.assertIs(tools["env_view"]["grant"], False)
+        self.assertNotIn("tools", self.plugin._connector_manifest(DEMO)["server"])
+
+    def test_explicit_open_grant_is_the_same_as_no_declaration(self):
+        """`"grant": true` 는 선언하지 않은 것과 같은 값을 낸다."""
+        self.declare(lambda tools: tools.update(write_note={"risk": "WRITE", "grant": True}))
+        self.assertEqual(self.catalog()[0]["tools"]["write_note"],
+                         {"risk": "WRITE", "approval": "required", "grant": True, "outbound": False})
+
+    def test_outbound_tool_with_closed_grant_reaches_the_catalog(self):
+        """`"outbound": true` 는 상시 허락을 닫은 도구에서만 받고 카탈로그에 그대로 나온다."""
+        self.declare(lambda tools: tools.update(
+            send_note={"risk": "WRITE", "grant": False, "outbound": True},
+            write_note={"risk": "WRITE", "outbound": False}))
+        tools = self.catalog()[0]["tools"]
+        self.assertEqual(tools["send_note"],
+                         {"risk": "WRITE", "approval": "required", "grant": False, "outbound": True})
+        # 거짓으로 적은 것은 적지 않은 것과 같다. 상시 허락은 그대로 열려 있다.
+        self.assertEqual(tools["write_note"],
+                         {"risk": "WRITE", "approval": "required", "grant": True, "outbound": False})
+        self.assertIs(tools["env_view"]["outbound"], False)
 
     def test_explicit_deny_default_policy_is_accepted(self):
         """`default_tool_policy` 는 `deny` 만 받는다."""
@@ -508,6 +545,26 @@ class ConnectorToolPolicyTest(ConnectorGateCase):
                 lambda tools: tools.update(write_note={"risk": "WRITE", "approval": None}))),
             ("unknown key", lambda: self.declare(
                 lambda tools: tools.update(write_note={"risk": "WRITE", "note": "x"}))),
+            ("grant is a string", lambda: self.declare(
+                lambda tools: tools.update(write_note={"risk": "WRITE", "grant": "false"}))),
+            ("grant is a number", lambda: self.declare(
+                lambda tools: tools.update(write_note={"risk": "WRITE", "grant": 0}))),
+            ("grant on a tool without approval", lambda: self.declare(
+                lambda tools: tools.update(env_view={"risk": "READ", "grant": False}))),
+            ("grant on a tool that always needs approval", lambda: self.declare(
+                lambda tools: tools.update(write_note={"risk": "WRITE", "approval": "always", "grant": True}))),
+            ("outbound is a string", lambda: self.declare(
+                lambda tools: tools.update(write_note={"risk": "WRITE", "grant": False, "outbound": "true"}))),
+            ("outbound is a number", lambda: self.declare(
+                lambda tools: tools.update(write_note={"risk": "WRITE", "grant": False, "outbound": 1}))),
+            ("outbound with the grant left open", lambda: self.declare(
+                lambda tools: tools.update(write_note={"risk": "WRITE", "outbound": True}))),
+            ("outbound with the grant declared open", lambda: self.declare(
+                lambda tools: tools.update(write_note={"risk": "WRITE", "grant": True, "outbound": True}))),
+            ("outbound on a tool without approval", lambda: self.declare(
+                lambda tools: tools.update(env_view={"risk": "READ", "outbound": True}))),
+            ("outbound on a tool that always needs approval", lambda: self.declare(
+                lambda tools: tools.update(write_note={"risk": "WRITE", "approval": "always", "outbound": True}))),
             ("tool value is not an object", lambda: self.declare(lambda tools: tools.update(write_note="WRITE"))),
             ("tool name format", lambda: self.declare(lambda tools: tools.update({"write note": {"risk": "WRITE"}}))),
             ("registered names collide", lambda: self.declare(

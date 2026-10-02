@@ -1,6 +1,7 @@
 package com.bifos.assistant.hermes;
 
 import com.bifos.assistant.hermes.dto.HermesRunCommand;
+import com.bifos.assistant.hermes.dto.HermesRunLookup;
 import com.bifos.assistant.hermes.dto.HermesRunResult;
 import com.bifos.assistant.hermes.dto.SessionRuntime;
 import com.bifos.assistant.hermes.dto.SubagentSessionUsage;
@@ -10,11 +11,11 @@ import com.bifos.assistant.shared.error.ErrorCode;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.MediaType;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
+import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
 import tools.jackson.databind.JsonNode;
@@ -26,9 +27,8 @@ import tools.jackson.databind.JsonNode;
  * 여기 있는 어느 것도 Hermes 안을 고치지 않는다.
  */
 @Component
+@Slf4j
 public class HttpHermesRunsClient implements HermesRunsClient {
-
-    private static final Logger log = LoggerFactory.getLogger(HttpHermesRunsClient.class);
     /**
      * 더 기다리지 않는 상태다. {@code interrupted} 는 v0.21.5 에서 생겼다. gateway 가 멈추거나 실행이 중간에
      * 끊기면 그 상태로 끝나는데, 여기 없으면 실행 시간 한도까지 조회만 되풀이한다.
@@ -79,11 +79,37 @@ public class HttpHermesRunsClient implements HermesRunsClient {
                     .header("Authorization", "Bearer " + keyStore.resolve(profileName))
                     .retrieve()
                     .toBodilessEntity();
-        } catch (org.springframework.web.client.HttpClientErrorException.NotFound ex) {
+        } catch (HttpClientErrorException.NotFound ex) {
             log.info("이미 끝난 Hermes 실행을 멈추지 못했다 profile={} runId={}", profileName, runId);
         } catch (RestClientException ex) {
             throw HermesCallFailure.of(ex, "could not stop the Hermes run");
         }
+    }
+
+    /**
+     * 실행 하나를 한 번 읽는다. 종료 상태가 아닌 {@code status} 는 값이 없거나 모르는 값이어도 도는 것으로 본다.
+     * 모르는 값을 실패로 읽으면 도는 실행을 잃기 때문이다.
+     */
+    @Override
+    public HermesRunLookup lookupRun(String apiBaseUrl, String profileName, String runId) {
+        JsonNode run;
+        try {
+            run = restClient
+                    .get()
+                    .uri(apiBaseUrl + "/v1/runs/{runId}", runId)
+                    .header("Authorization", "Bearer " + keyStore.resolve(profileName))
+                    .retrieve()
+                    .body(JsonNode.class);
+        } catch (HttpClientErrorException.NotFound ex) {
+            return HermesRunLookup.notFound();
+        } catch (RestClientException ex) {
+            throw HermesCallFailure.of(ex, "could not read the run status");
+        }
+        String status = text(run, "status");
+        if (status != null && TERMINAL.contains(status.toLowerCase())) {
+            return HermesRunLookup.finished(toResult(runId, status, run));
+        }
+        return HermesRunLookup.running();
     }
 
     /**
@@ -104,7 +130,7 @@ public class HttpHermesRunsClient implements HermesRunsClient {
                     .header("Authorization", "Bearer " + keyStore.resolve(profileName))
                     .retrieve()
                     .body(JsonNode.class);
-            // v0.21.5 는 `{"object": ..., "session": {...}}` 로 감싸고 provider 를 `billing_provider` 로 둔다.
+            // v0.21.5 는 `{"object": ..., "session": {...}}` 로 감싸고 provider 칸을 주지 않는다. 주는 판을 위해 두 이름을 읽는다.
             JsonNode row = session != null && session.has("session") ? session.get("session") : session;
             String model = text(row, "model");
             String provider = text(row, "provider");
@@ -134,11 +160,16 @@ public class HttpHermesRunsClient implements HermesRunsClient {
             if (row == null || !sessionId.equals(text(row, "id"))) {
                 return null;
             }
+            String provider = text(row, "provider");
+            if (provider == null) {
+                provider = text(row, "billing_provider");
+            }
             return new SubagentSessionUsage(
                     text(row, "id"),
                     text(row, "source"),
                     text(row, "parent_session_id"),
                     text(row, "model"),
+                    provider,
                     decimal(row, "started_at"),
                     decimal(row, "ended_at"),
                     number(row, "input_tokens"),

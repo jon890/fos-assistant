@@ -16,9 +16,9 @@ import org.junit.jupiter.api.Test;
 /** 판정 순서는 {@code docs/backend/connector-tool-policy.md} 의 「도구 호출 판정」 표다. */
 class ToolPolicyDecisionTest {
     private static final Optional<ToolPolicy> READ =
-            Optional.of(new ToolPolicy(ToolRisk.READ, ToolApproval.NONE, null));
+            Optional.of(new ToolPolicy(ToolRisk.READ, ToolApproval.NONE, null, false));
     private static final Optional<ToolPolicy> WRITE =
-            Optional.of(new ToolPolicy(ToolRisk.WRITE, ToolApproval.REQUIRED, null));
+            Optional.of(new ToolPolicy(ToolRisk.WRITE, ToolApproval.REQUIRED, null, true));
 
     @Test
     @DisplayName("manifest 를 읽지 못한 판정은 POLICY_UNAVAILABLE 거절이고 위험도와 승인 방식이 비어 있다")
@@ -70,7 +70,7 @@ class ToolPolicyDecisionTest {
     @DisplayName("위험도가 DESTRUCTIVE 나 FINANCIAL 이면 RISK_NOT_OPEN 으로 거절하고 위험도와 승인 방식을 남긴다")
     void destructiveAndFinancialRiskAreDenied() {
         for (ToolRisk risk : new ToolRisk[] {ToolRisk.DESTRUCTIVE, ToolRisk.FINANCIAL}) {
-            Optional<ToolPolicy> declared = Optional.of(new ToolPolicy(risk, ToolApproval.ALWAYS, null));
+            Optional<ToolPolicy> declared = Optional.of(new ToolPolicy(risk, ToolApproval.ALWAYS, null, false));
 
             assertThat(ToolPolicyDecision.decide(ConnectionStatus.READY, true, 2, declared, true, 2))
                     .as("위험도 %s", risk)
@@ -106,6 +106,23 @@ class ToolPolicyDecisionTest {
     }
 
     @Test
+    @DisplayName("선언이 상시 허락을 닫은 required 도구는 상시 허락이 있어도 승인 필요다")
+    void approvalRequiredWithClosedGrantNeedsApprovalEvenWithGrant() {
+        Optional<ToolPolicy> closed = Optional.of(new ToolPolicy(ToolRisk.WRITE, ToolApproval.REQUIRED, null, false));
+
+        assertThat(ToolPolicyDecision.decide(ConnectionStatus.READY, true, 2, closed, true, 2))
+                .isEqualTo(new ToolPolicyDecision(
+                        ActionDecision.NEEDS_APPROVAL, null, ToolRisk.WRITE, ToolApproval.REQUIRED));
+    }
+
+    @Test
+    @DisplayName("schema 1 에서 선언이 없는 도구는 상시 허락이 있으면 허용이다")
+    void undeclaredToolOfLegacySchemaIsAllowedWithGrant() {
+        assertThat(ToolPolicyDecision.decide(ConnectionStatus.READY, true, 1, Optional.empty(), true, 2))
+                .isEqualTo(new ToolPolicyDecision(ActionDecision.ALLOWED, null, ToolRisk.WRITE, ToolApproval.REQUIRED));
+    }
+
+    @Test
     @DisplayName("승인 방식이 required 이고 상시 허락이 없으면 승인 필요다")
     void approvalRequiredWithoutGrantNeedsApproval() {
         assertThat(ToolPolicyDecision.decide(ConnectionStatus.READY, true, 2, WRITE, false, 2))
@@ -116,7 +133,8 @@ class ToolPolicyDecisionTest {
     @Test
     @DisplayName("승인 방식이 always 이면 상시 허락이 있어도 승인 필요다")
     void approvalAlwaysNeedsApprovalEvenWithGrant() {
-        Optional<ToolPolicy> declared = Optional.of(new ToolPolicy(ToolRisk.SENSITIVE, ToolApproval.ALWAYS, null));
+        Optional<ToolPolicy> declared =
+                Optional.of(new ToolPolicy(ToolRisk.SENSITIVE, ToolApproval.ALWAYS, null, false));
 
         assertThat(ToolPolicyDecision.decide(ConnectionStatus.READY, true, 2, declared, true, 2))
                 .isEqualTo(new ToolPolicyDecision(

@@ -12,4 +12,7 @@ public interface ChatMessageRepository extends JpaRepository<ChatMessage, Long> 
 
     /** 대화에서 그 역할이 처음 남긴 메시지를 읽는다. */
     Optional<ChatMessage> findFirstByConversationIdAndRoleOrderByIdAsc(Long conversationId, MessageRole role);
+
+    /** 그 실행이 남긴 메시지가 이미 있는지 본다. */
+    boolean existsByExecutionId(Long executionId);
 }

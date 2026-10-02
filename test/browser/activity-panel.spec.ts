@@ -379,7 +379,7 @@ test("넓은 폭에서 패널을 Esc 로 닫고 한 번 더 누르면 답이 멈
   await expect(page.getByTestId("no-answer")).toBeVisible({ timeout: 30_000 });
 });
 
-test("관리자가 도구 줄을 펼쳐도 원본은 접혀 있고 원본 보기를 눌러야 보인다", async ({ page }) => {
+test("ADMIN 역할도 대화 화면에서는 도구 줄을 펼쳐도 원본 보기가 없다", async ({ page }) => {
   const raw = '{"output":"terminal-raw-result"}';
   const query = "제주 3월 날씨";
   const event = (sequence: number, eventType: string, toolName: string, detail: string | null) => ({
@@ -410,7 +410,6 @@ test("관리자가 도구 줄을 펼쳐도 원본은 접혀 있고 원본 보기
   const terminal = block.locator('[data-tool="terminal"]');
   await expect(terminal).toContainText("작업을 했어요");
   await expect(terminal).toContainText("2초");
-  await expect(terminal.getByText(raw)).toBeHidden();
   // 검색어는 사람 말이라 줄에 바로 보인다.
   await expect(block.locator('[data-tool="web_search"]').getByText(query)).toBeVisible();
   await expect(block.locator('[data-tool="web_search"]').getByTestId("activity-raw")).toHaveCount(0);
@@ -419,9 +418,9 @@ test("관리자가 도구 줄을 펼쳐도 원본은 접혀 있고 원본 보기
   await expect(connected).toContainText("연결된 서비스를 썼어요");
   await expect(connected.getByText("mcp__ledger__query")).toBeHidden();
 
-  await terminal.getByTestId("activity-raw").getByText("원본 보기").click();
-  await expect(terminal.getByText(raw)).toBeVisible();
-  await expect(terminal.getByTestId("activity-raw")).toContainText("terminal");
+  // 원본은 응답에 와도 대화 화면에는 그리지 않는다. 관리자 영역의 실행 상세에서만 펼친다.
+  await expect(page.getByTestId("activity-raw")).toHaveCount(0);
+  await expect(page.getByText(raw)).toHaveCount(0);
   expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth))
     .toBeLessThanOrEqual(0);
 });

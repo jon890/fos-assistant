@@ -326,9 +326,27 @@ public class HttpHermesConnectorClient implements HermesConnectorClient {
         for (Map.Entry<String, JsonNode> entry : declared.properties()) {
             JsonNode policy = entry.getValue();
             tools.add(new ConnectorTool(
-                    entry.getKey(), text(policy, "risk"), text(policy, "approval"), text(policy, "title")));
+                    entry.getKey(),
+                    text(policy, "risk"),
+                    text(policy, "approval"),
+                    text(policy, "title"),
+                    grant(policy)));
         }
         return List.copyOf(tools);
+    }
+
+    /**
+     * 상시 허락을 줄 수 있는지의 선언이다(ADR-065). 칸이 없으면 null 이고 받는 쪽이 승인 방식으로 정한다.
+     *
+     * <p>boolean 이 아닌 값은 거절하지 않고 거짓으로 읽는다. 형식은 대시보드 plugin 이 검사하고, 여기서는 읽을 수 없는
+     * 선언이 상시 허락을 여는 쪽으로 읽히지 않게만 한다.
+     */
+    private static Boolean grant(JsonNode policy) {
+        JsonNode value = policy == null ? null : policy.get("grant");
+        if (value == null) {
+            return null;
+        }
+        return value.isBoolean() && value.asBoolean();
     }
 
     /** 옛 대시보드 plugin 은 이 칸을 내지 않는다. 없으면 빈 목록이다. */

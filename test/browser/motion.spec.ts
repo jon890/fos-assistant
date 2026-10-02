@@ -317,14 +317,19 @@ test("지우기가 실패하면 줄이 나가는 움직임 없이 남는다", as
   expect(await leavingSeen(page), "실패한 지우기는 나가는 움직임을 시작하지 않는다").toEqual([]);
 });
 
+/** 문서 폼에도 같은 이름의 칸이 있어 기억 폼 안에서만 찾는다. */
+function memoryForm(page: Page) {
+  return page.locator("form").filter({ has: page.getByRole("heading", { name: "새 기억" }) });
+}
+
 test("새 기억은 등장 움직임을 갖고 지운 기억은 나가는 움직임을 거쳐 사라진다", async ({ page }, testInfo) => {
   const title = `움직임 기억 ${testInfo.project.name} ${Date.now()}`;
   await recordLeavingRows(page);
   await page.goto("/memory");
-  await page.getByLabel("범위").selectOption("USER");
-  await page.getByLabel("제목", { exact: true }).fill(title);
-  await page.getByLabel("내용").fill("움직임을 검사하는 기억");
-  await page.getByRole("button", { name: "저장" }).click();
+  await memoryForm(page).getByLabel("범위").selectOption("USER");
+  await memoryForm(page).getByLabel("제목", { exact: true }).fill(title);
+  await memoryForm(page).getByLabel("내용").fill("움직임을 검사하는 기억");
+  await memoryForm(page).getByRole("button", { name: "저장" }).click();
   const item = page.getByRole("heading", { name: title }).locator("xpath=ancestor::article");
   await expect(item).toBeVisible();
   expect(await animationOf(item), "화면을 연 뒤에 생긴 기억").toEqual({ name: "message-assistant", duration: "0.2s" });
@@ -342,10 +347,10 @@ test("기억을 지운 뒤 목록을 다시 읽지 못해도 남은 줄이 투�
   const title = `움직임 다시 읽기 실패 ${testInfo.project.name} ${Date.now()}`;
   await recordLeavingRows(page);
   await page.goto("/memory");
-  await page.getByLabel("범위").selectOption("USER");
-  await page.getByLabel("제목", { exact: true }).fill(title);
-  await page.getByLabel("내용").fill("다시 읽기가 실패하는 기억");
-  await page.getByRole("button", { name: "저장" }).click();
+  await memoryForm(page).getByLabel("범위").selectOption("USER");
+  await memoryForm(page).getByLabel("제목", { exact: true }).fill(title);
+  await memoryForm(page).getByLabel("내용").fill("다시 읽기가 실패하는 기억");
+  await memoryForm(page).getByRole("button", { name: "저장" }).click();
   const item = page.getByRole("heading", { name: title }).locator("xpath=ancestor::article");
   await expect(item).toBeVisible();
 

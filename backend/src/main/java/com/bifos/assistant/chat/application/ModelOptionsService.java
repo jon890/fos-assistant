@@ -5,6 +5,7 @@ import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.chat.domain.ModelChoice;
 import com.bifos.assistant.hermes.HermesModelClient;
 import com.bifos.assistant.hermes.dto.HermesModelCatalog;
+import com.bifos.assistant.hermes.dto.ReasoningCapability;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.error.ApiException;
 import java.time.Clock;
@@ -135,7 +136,7 @@ public class ModelOptionsService {
         for (HermesModelCatalog.Provider provider : catalog.providers()) {
             HermesModelCatalog.Provider visible = withoutHidden(provider, hidden);
             if (visible != null) {
-                providers.add(withEveryModelReasoning(visible));
+                providers.add(visible);
             }
         }
         boolean fromAgent = agent != null && agent.defaultModel() != null;
@@ -172,21 +173,15 @@ public class ModelOptionsService {
         if (models.isEmpty()) {
             return null;
         }
-        return new HermesModelCatalog.Provider(provider.slug(), provider.name(), models, provider.reasoning());
-    }
-
-    /**
-     * reasoning 지원 표에 그 provider 의 모델을 모두 넣는다.
-     *
-     * <p>Hermes 가 밝히지 않은 모델은 참으로 본다. 모르는 모델에서 effort 를 막으면 고를 수 있는 것을 못
-     * 고르게 된다. 화면이 표에 없는 모델을 따로 판단하지 않도록 여기서 채운다.
-     */
-    private static HermesModelCatalog.Provider withEveryModelReasoning(HermesModelCatalog.Provider provider) {
-        Map<String, Boolean> reasoning = new LinkedHashMap<>();
-        for (String model : provider.models()) {
-            reasoning.put(model, provider.reasoning().getOrDefault(model, true));
+        // 숨긴 모델의 항목은 표에서 뺀다. 남은 모델의 항목만 그대로 옮긴다.
+        Map<String, ReasoningCapability> reasoning = new LinkedHashMap<>();
+        for (String model : models) {
+            ReasoningCapability capability = provider.reasoning().get(model);
+            if (capability != null) {
+                reasoning.put(model, capability);
+            }
         }
         return new HermesModelCatalog.Provider(
-                provider.slug(), provider.name(), provider.models(), Collections.unmodifiableMap(reasoning));
+                provider.slug(), provider.name(), models, Collections.unmodifiableMap(reasoning));
     }
 }

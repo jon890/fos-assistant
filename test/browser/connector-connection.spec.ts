@@ -10,18 +10,26 @@ const demoConnector = {
   myStatus: "DISCONNECTED",
   available: true,
   tools: [
-    { name: "list_scopes", title: null, risk: "READ", approval: "NONE" },
+    {
+      name: "list_scopes",
+      title: null,
+      risk: "READ",
+      approval: "NONE",
+      grant: false,
+    },
     {
       name: "write_note",
       title: "메모 쓰기",
       risk: "WRITE",
       approval: "REQUIRED",
+      grant: true,
     },
     {
       name: "purge_notes",
       title: null,
       risk: "DESTRUCTIVE",
       approval: "ALWAYS",
+      grant: false,
     },
   ],
   fields: [
@@ -372,7 +380,7 @@ test("관리자는 반영 대기 연결을 완료로 확인한다", async ({ pag
       },
     });
   });
-  await page.goto("/connections");
+  await page.goto("/admin/connections");
   const panel = page.getByTestId("connector-admin-panel");
   await expect(panel).toContainText("연결 확인 사용자");
   await expect(panel).toContainText("검사용 메모");
@@ -423,6 +431,7 @@ test("쓰기 도구라도 늘 승인을 받게 선언했으면 아직 쓸 수 �
               title: "메모 공유",
               risk: "WRITE",
               approval: "ALWAYS",
+              grant: false,
             },
           ],
         },
@@ -677,7 +686,7 @@ test("관리자 목록은 선언하지 않은 도구가 있는 연결을 단추 
       ],
     }),
   );
-  await page.goto("/connections");
+  await page.goto("/admin/connections");
   const panel = page.getByTestId("connector-admin-panel");
   await expect(panel).toContainText("도구 확인 사용자");
   await expect(panel).toContainText("연결됨");

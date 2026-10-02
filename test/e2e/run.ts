@@ -37,6 +37,7 @@ import { startersScenario } from "./scenarios/starters.ts";
 import { skillsScenario } from "./scenarios/skills.ts";
 import { memoryScenario } from "./scenarios/memory.ts";
 import { memoryDocumentScenario } from "./scenarios/memory-document.ts";
+import { memoryImportScenario } from "./scenarios/memory-import.ts";
 import { chatScenario } from "./scenarios/chat.ts";
 import { conversationHistoryScenario } from "./scenarios/conversation-history.ts";
 import { conversationManageScenario } from "./scenarios/conversation-manage.ts";
@@ -59,6 +60,7 @@ import { connectorScenario } from "./scenarios/connector.ts";
 import { connectorPolicyScenario } from "./scenarios/connector-policy.ts";
 import { connectorDelegationScenario } from "./scenarios/connector-delegation.ts";
 import { CHAT_QUEUE_PROFILE, chatQueueRestartScenario, chatQueueScenario } from "./scenarios/chat-queue.ts";
+import { restartReconcileScenario } from "./scenarios/restart-reconcile.ts";
 import { pickPort } from "../support/pick-port.ts";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
@@ -90,6 +92,8 @@ const SCENARIOS: readonly Scenario[] = [
   // 서비스 토큰은 주인이 허용 목록에 켜져 있어야 통하므로 aunt 가 허용 목록에 들어온 뒤에 둔다.
   // 문서를 지우고 끝나고 대화 turn 과 에이전트를 만들지 않아 뒤 시나리오의 Memory 주입과 사용량 세기에 걸리지 않는다.
   memoryDocumentScenario,
+  // 대화 turn 을 돌리지 않고 들인 항목을 지우고 끝나므로 뒤 시나리오의 Memory 주입과 사용량 세기에 걸리지 않는다.
+  memoryImportScenario,
   meScenario,
   bindingScenario,
   agentsScenario,
@@ -127,6 +131,8 @@ const SCENARIOS: readonly Scenario[] = [
   modelSelectionScenario,
   // Control Plane 을 다시 띄우므로 맨 끝에 둔다. 막힌 provider 를 먼저 푼다.
   chatQueueRestartScenario,
+  // 이것도 Control Plane 을 다시 띄운다. 앞 시나리오가 남긴 상태에 기대지 않는다.
+  restartReconcileScenario,
 ];
 
 async function waitForHealth(url: string, logPath: string): Promise<void> {

@@ -33,7 +33,7 @@
 1. 그 대화에 대기 행이 있고 멈춰 둔 행이 하나도 없으면 turn 잠금을 잡고 새 가상 스레드에서 `ChatService.runPendingMessages` 를 돌린다. 잠금을 잡지 못하면 도는 turn 이 닫힐 때 다시 온다.
 2. 보낼 대기 행이 없으면 `DelegationWakeService.tryWake` 로 넘긴다.
 
-turn 이 닫힐 때, 위임이 끝났을 때, 서버가 뜰 때 모두 이 자리를 지난다. 그래서 사용자의 말이 위임 결과보다 먼저 간다.
+turn 이 닫힐 때, 위임이 끝났을 때, 서버가 뜰 때, 기동 정리가 잠금을 풀 때 모두 이 자리를 지난다. 그래서 사용자의 말이 위임 결과보다 먼저 간다.
 
 turn 이 중지로 끝나면 `ChatService` 가 취소된 turn 을 돌려주는 자리에서 `TurnCancellation.markStopped` 를 적고 그 대화의 대기 행을 모두 멈춰 둔다.
 **잠금을 풀기 전에 멈춘다.** 잠금을 푼 뒤 종료 리스너에서 멈추면 그 사이 다른 스레드의 `tryNext` 가 아직 멈추지 않은 행으로 turn 을 연다.
@@ -105,22 +105,99 @@ turn 이 끝난 뒤에 맡긴 자식은 붙일 표시가 없어 `agent_stop` 으
 
 ## 기동할 때 남은 실행 정리
 
-애플리케이션 준비가 끝나면 이전 프로세스가 남긴 `RUNNING` 실행을 한 번 정리한다.
-Flyway가 끝난 뒤 실행해야 하므로 `ApplicationReadyEvent`에서 시작한다.
+이전 프로세스가 남긴 `RUNNING` 실행을 Hermes 에 물어 정한다.
+결정과 버린 대안은 [ADR-061](../adr/ADR-061-재기동-때-남은-실행은-hermes-에-물어-정하고-도는-실행에는-다시-붙는다.md) 에 있다.
+Hermes 의 실행 조회가 무엇을 얼마 동안 답하는지는 [`hermes/runs-api.md`](../hermes/runs-api.md) 의 「실행 조회가 답하는 기간」 이 갖는다.
+
+| 자리 | 맡는 것 |
+| --- | --- |
+| `chat.application.RestartReconciler` | 기동할 때 남은 실행을 나누고, 대화의 turn 잠금을 잡고, 실행마다 가상 스레드에서 Hermes 에 묻는다 |
+| `chat.application.RecoveredRunRecorder` | Hermes 의 답 하나를 실행 줄과 대화에 적는다. 이미 끝난 줄이면 아무것도 하지 않는다 |
+| `chat.application.RestartReconcileProperties` | `assistant.restart-reconcile.enabled` 와 `max-wait`. `max-wait` 을 비우면 `hermes.run-timeout` 이다 |
+| `hermes.HermesRunsClient.lookupRun` | 실행 하나의 지금 상태를 한 번 읽는다. 끝났다, 돈다, 모른다(404) 가운데 하나다. 닿지 못하면 예외다 |
+
+두 단계로 돈다.
+
+1. **잡기.** 웹 서버가 요청을 받기 전에 돈다. `RUNNING` 줄을 읽고, run 번호가 있는 대화 turn 의 루트 줄과 흐름 turn 의 줄마다 그 대화의 turn 잠금을 잡는다.
+   그 실행 번호와 run 을 표시에 붙인다. Hermes 를 부르지 않고 실행 줄도 고치지 않는다.
+2. **묻기.** `ApplicationReadyEvent` 에서 시작한다. `NextTurnDispatcher` 의 기동 뒤 깨우기보다 먼저다.
+   run 번호가 없는 줄을 `FAILED`(`ORPHANED`) 로 적고, 나머지는 실행마다 가상 스레드 하나가 Hermes 에 묻고 끝날 때까지 다시 묻는다. 줄을 적은 뒤 잡은 잠금을 푼다.
+
+Control Plane 이 내려갈 때 묻던 스레드는 줄을 적지 않고 끝난다. 줄이 `RUNNING` 으로 남아 다음 기동이 다시 정한다.
+잡기가 실패해도 기동은 이어 간다. 그때는 묻기 단계가 다시 잡되, 기동하기 전에 시작한 줄만 대상으로 삼는다. 웹 서버가 열린 뒤 새로 시작한 turn 의 줄을 건드리지 않기 위해서다.
+`assistant.restart-reconcile.enabled` 를 false 로 두면 기동 때 잡지도 묻지도 않는다. 테스트 profile 이 이렇게 돈다. 운영에서는 끄지 않는다. 끄면 `RUNNING` 줄이 그대로 남는다.
 
 ```mermaid
 flowchart TD
-    A[ApplicationReadyEvent] --> B[RUNNING 실행 조회]
-    B --> C{남은 실행이 있는가}
-    C -- 없다 --> H[보낼 대기 메시지나 전하지 못한 위임 결과가 남은 대화를 다시 연다]
-    C -- 있다 --> E[모두 FAILED로 바꾼다]
-    E --> F[error_code를 ORPHANED로 적는다]
-    F --> G[finished_at을 현재 시각으로 적고 정리 건수를 로그에 남긴다]
-    G --> H
+    A[기동: RUNNING 실행 조회] --> B{run 번호가 있는가}
+    B -- 없다 --> O[FAILED, ORPHANED]
+    B -- 있다 --> C[대화 turn 의 루트나 흐름 turn 의 줄이면 그 대화의 turn 잠금을 잡는다]
+    C --> D[Hermes 에 실행 상태를 묻는다]
+    D -- 끝났다 --> E[상태와 답과 사용량을 적는다]
+    D -- 404 --> L[FAILED, REMOTE_RUN_LOST]
+    D -- 닿지 못했다 --> W{상한을 넘었는가}
+    D -- 아직 돈다 --> F{흐름 turn 이거나 그 자식인가}
+    F -- 그렇다 --> S[Hermes 에 중지를 보낸다]
+    F -- 아니다 --> W
+    S --> W
+    W -- 아니다 --> D
+    W -- 넘었다 --> T[Hermes 에 중지를 보내고 FAILED 로 적는다]
+    E --> R[잠금을 푼다. 다음 turn 을 정하는 자리가 이어 간다]
+    L --> R
+    T --> R
+    O --> R
 ```
 
+**실행의 종류마다 적는 것이 다르다.**
+
+| 실행 | 판정 | 끝났을 때 적는 것 | 아직 돌 때 |
+| --- | --- | --- | --- |
+| 대화 turn | 부모가 없고 대화가 있다. 그 에이전트에 흐름이 없다 | 실행 줄, `ASSISTANT` 메시지, 대화의 session. 그 실행이 시작한 뒤 대화 폴더에 생긴 HTML 을 답에 묶는다. 대화 단위 SSE 로 `done`, `stopped`, `error` 가운데 하나를 낸다 | 다시 붙는다. 그 대화의 turn 잠금을 쥔다 |
+| 위임 실행 | `delegation_key` 가 있다 | 실행 줄과 `output_text` 와 끝 사건. `DelegationFinished` 를 낸다 | 다시 붙는다. 잠금은 잡지 않는다 |
+| 흐름 turn 과 그 자식 | 루트 실행의 에이전트에 흐름이 있다 | 실행 줄과 끝 사건. 루트는 성공으로 끝났어도 `FAILED`(`ORPHANED`) 로 적고 사용량은 남긴다. 루트가 끝나면 대화 단위 SSE 로 `error` 나 `stopped` 를 낸다. 자식만 돌던 turn 은 잠금을 풀 때 한 번 낸다 | 중지를 보내고 끝난 상태를 기다린다. 그 대화의 turn 잠금을 쥔다. 루트 줄이 이미 끝나고 자식만 도는 때에도 쥔다 |
+| 그 밖의 실행(Memory 제안, 추천 질문) | 위 셋이 아니다 | 실행 줄과 끝 사건만 적는다. 답은 쓰지 않는다 | 다시 붙는다. 잠금은 잡지 않는다 |
+
+끝 사건, 결과물 묶기, 알림은 실행 줄을 적은 트랜잭션이 끝난 뒤에 한 번 한다. 그 사이에 프로세스가 죽으면 다시 하지 않는다. 위임 결과는 기동 뒤 깨우기가 전한다.
+
+실행 줄은 보통 turn 과 같은 기록 경로로 적는다. 성공은 `ExecutionRecorder.complete`, 실패는 사용량을 남기는 `ExecutionRecorder.fail`, 취소는 `ExecutionRecorder.cancel` 이다.
+위임 답은 보통 위임과 같이 `assistant.delegation.output-max-chars` 까지 자른다.
+대화 turn 의 답은 그 대화의 마지막 메시지가 `ASSISTANT` 이면 그 답을 다시 생성한 것으로 적는다. 다시 생성은 질문을 새로 저장하지 않기 때문이다.
+
+### 기동 정리가 갈리는 지점
+
+| 경우 | 결과 |
+| --- | --- |
+| Hermes 에서 성공으로 끝났다 | `SUCCEEDED`. 답과 토큰과 비용을 적는다. 대화 turn 이면 답이 이력에 남는다 |
+| Hermes 에서 실패로 끝났다(`failed`, `error`, `interrupted`) | `FAILED`. `error_code` 는 보통 turn 과 같다. 받은 사용량을 남긴다 |
+| Hermes 에서 취소로 끝났다 | `CANCELLED`. 멈춘 자리까지의 답과 사용량을 남긴다 |
+| 아직 돈다 | `RUNNING` 으로 두고 `hermes.poll-interval` 마다 다시 묻는다 |
+| 404 다 | `FAILED`(`REMOTE_RUN_LOST`). Hermes 가 그 run 을 모른다. gateway 가 다시 떴거나 종료 뒤 1시간이 지났다 |
+| 닿지 못했다(연결 실패, 5xx, 429) | `RUNNING` 과 잠금을 그대로 두고 다시 묻는다. 간격은 `hermes.poll-interval` 에서 시작해 5초까지 늘린다 |
+| 상한을 넘겼다 | Hermes 에 중지를 보내고 `FAILED` 로 적는다. 한 번이라도 답을 받았으면 `RECONCILE_TIMEOUT`, 한 번도 받지 못했으면 `RECONCILE_UNREACHABLE` 이다 |
+| run 번호가 없다 | 묻지 않고 `FAILED`(`ORPHANED`). 제출 전이었거나 제출 응답을 받기 전에 끊겼다 |
+| 잡을 때 다른 turn 이 이미 그 대화의 잠금을 쥐고 있다 | 경고 로그를 남기고 잠금 없이 정한다. 그 turn 이 닫힐 때 다음 turn 이 정해진다 |
+| 에이전트 행이 없다 | 물을 주소가 없다. `FAILED`(`ORPHANED`) |
+| 다시 정하는 동안 그 대화에 글을 보낸다 | 도는 turn 이 있는 대화와 같다. 보통 보내기는 `CONVERSATION_BUSY` 이고 화면은 대기 메시지로 쌓는다. 잠금이 풀리면 `NextTurnDispatcher` 가 보낸다 |
+| 다시 정하는 동안 그 대화를 연다 | `running` 경로가 그 실행 번호를 돌려준다. 화면은 「답을 만드는 중」 을 보이고 끝나면 이력을 다시 읽는다. 답 조각은 흐르지 않는다 |
+| 다시 붙은 대화 turn 을 사용자가 중지한다 | 보통 중지와 같다. 표시에 붙여 둔 run 에 중지를 보낸다. Hermes 가 취소로 끝내면 `CANCELLED` 로 적고 대기 줄을 멈춘다 |
+| 다시 붙은 위임 실행에 `agent_stop` 이 온다 | Hermes 에 중지를 보낸다. 다시 물을 때 취소로 읽혀 `CANCELLED` 로 적힌다 |
+| 다시 정하는 중에 Control Plane 이 또 내려간다 | 줄이 `RUNNING` 으로 남아 다음 기동이 처음부터 다시 정한다. 상한도 새로 센다 |
+| 적다가 실패했다(일시적인 DB 오류) | 실패로 적지 않고 다시 묻는다. Hermes 가 같은 답을 다시 준다 |
+| 같은 실행을 두 번 적으려 한다 | 실행 줄을 잠그고 `RUNNING` 인지 본 뒤에 적는다. 이미 끝난 줄이면 메시지도 사건도 더하지 않는다 |
+| 끝난 위임 결과 | 부모 대화에는 `result_delivered_at` 이 빈 줄만 전하므로 다시 떠도 한 번만 간다 |
+
+**다음 turn 을 정하는 자리는 그대로 `NextTurnDispatcher.tryNext` 하나다.**
+다시 정하는 쪽은 turn 을 열지 않는다. 잠금을 풀면 닫기 리스너가 `tryNext` 를 부르고, 위임 실행을 적으면 `DelegationFinished` 가 `tryNext` 를 부른다.
+기동 뒤 깨우기(`dispatchAfterStartup`)는 잠금이 잡힌 대화를 건너뛰고, 그 잠금이 풀릴 때 다시 온다.
+
+**잡기는 웹 서버보다 먼저 끝난다.** `RestartReconciler` 는 웹 서버를 여는 lifecycle 보다 앞선 phase 의 `SmartLifecycle` 이다.
+`ApplicationReadyEvent` 에서 잡으면 웹 서버가 이미 요청을 받고 있어, 그 사이 들어온 보내기가 같은 Hermes session 에 turn 을 하나 더 연다.
+Flyway 는 빈을 만들 때 끝나므로 lifecycle 이 시작할 때는 표가 이미 있다.
+
+다시 붙은 실행의 작업 과정에는 끊기기 전의 사건과 끝 사건(`RUN_COMPLETED`, `RUN_FAILED`, `RUN_CANCELLED`)만 남는다. 끝 사건의 순번은 그 실행의 마지막 순번 다음이다.
+
 이 방식은 Control Plane이 한 대만 돈다는 전제를 쓴다.
-여러 대로 늘리면 다른 인스턴스가 처리 중인 실행을 실패로 바꾸지 않도록 정리 방식을 다시 정해야 한다.
+여러 대로 늘리면 다른 인스턴스가 돌리는 실행에 붙지 않도록 정리 방식을 다시 정해야 한다.
 
 ## 응답 중에 보낼 때
 
@@ -189,7 +266,7 @@ sequenceDiagram
 | 사용자 메시지를 저장한 뒤 실행이 실패했다 | 보통 turn 의 실패와 같다. 대기 행은 이미 지워졌고 그 글은 사용자 메시지로 남는다 |
 | 대기 메시지로 연 turn 을 중지한다 | 보통 turn 의 중지와 같다. 그 사이 새로 쌓인 대기 메시지는 멈춰 둔다 |
 | 보낼 대기 메시지와 끝난 위임 결과가 함께 있다 | 대기 메시지를 먼저 보낸다. 그 turn 이 닫힌 뒤 위임 결과를 전한다 |
-| 서버가 다시 뜬다 | 기동 정리 뒤에 멈춰 두지 않은 대기 메시지가 있는 대화를 차례로 보낸다. 멈춰 둔 것은 그대로 둔다 |
+| 서버가 다시 뜬다 | 멈춰 두지 않은 대기 메시지가 있는 대화를 차례로 보낸다. 멈춰 둔 것은 그대로 둔다. 기동 정리가 turn 잠금을 쥔 대화는 그 잠금이 풀린 뒤에 보낸다 |
 | 대화를 지운다 | 그 대화의 대기 행을 함께 지운다 |
 | 다른 창이 같은 대화를 보고 있다 | `pending` 사건을 받으면 대기 줄을 다시 읽는다. 어느 창에서든 취소하고 보낼 수 있다 |
 | 대화 단위 SSE 가 끊겼다가 다시 연결된다 | 대기 줄을 다시 읽는다. 끊긴 사이의 `pending` 사건을 놓쳤을 수 있다 |

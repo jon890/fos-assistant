@@ -2,6 +2,7 @@ package com.bifos.assistant.hermes;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.tuple;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.content;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.header;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.method;
@@ -149,10 +150,43 @@ class HttpHermesConnectorClientTest {
         assertThat(declared.schema()).isEqualTo(2);
         assertThat(declared.tools())
                 .containsExactly(
-                        new ConnectorTool("list_scopes", "READ", "none", null),
-                        new ConnectorTool("write_note", "WRITE", "required", "메모 쓰기"),
+                        new ConnectorTool("list_scopes", "READ", "none", null, null),
+                        new ConnectorTool("write_note", "WRITE", "required", "메모 쓰기", null),
                         // 모르는 위험도와 빠진 승인 방식은 여기서 거르지 않는다. 받는 쪽이 그 커넥터만 뺀다.
-                        new ConnectorTool("odd", "UNKNOWN", null, null));
+                        new ConnectorTool("odd", "UNKNOWN", null, null, null));
+        server.verify();
+    }
+
+    @DisplayName("도구의 grant 는 칸이 없으면 null, boolean 이면 그 값이고 그 밖의 모양은 거짓으로 읽는다")
+    @Test
+    void readsGrantOfToolPolicies() {
+        String tail = "\"mcp_server\":\"demo\"";
+        String required = "{\"risk\":\"WRITE\",\"approval\":\"required\"";
+        server.expect(requestTo(BASE + "/api/connectors/catalog"))
+                .andRespond(withSuccess(
+                        CATALOG.replace(
+                                tail,
+                                tail + ",\"schema\":2,\"tools\":{"
+                                        + "\"absent\":" + required + "},"
+                                        + "\"open\":" + required + ",\"grant\":true},"
+                                        + "\"closed\":" + required + ",\"grant\":false},"
+                                        + "\"word\":" + required + ",\"grant\":\"true\"},"
+                                        + "\"number\":" + required + ",\"grant\":1},"
+                                        + "\"empty\":" + required + ",\"grant\":null}}"),
+                        MediaType.APPLICATION_JSON));
+
+        ConnectorManifest declared = client.readCatalog().get(0);
+
+        assertThat(declared.tools())
+                .extracting(ConnectorTool::name, ConnectorTool::grant)
+                .containsExactly(
+                        tuple("absent", null),
+                        tuple("open", true),
+                        tuple("closed", false),
+                        // 읽을 수 없는 선언은 상시 허락을 여는 쪽으로 읽지 않는다.
+                        tuple("word", false),
+                        tuple("number", false),
+                        tuple("empty", false));
         server.verify();
     }
 
@@ -188,7 +222,8 @@ class HttpHermesConnectorClientTest {
             assertThat(read.get(0).schema()).as("틀린 선언 %s 의 판", broken).isZero();
             assertThat(read.get(0).tools()).as("틀린 선언 %s 의 도구", broken).isEmpty();
             assertThat(read.get(1).schema()).isEqualTo(2);
-            assertThat(read.get(1).tools()).containsExactly(new ConnectorTool("list_scopes", "READ", "none", null));
+            assertThat(read.get(1).tools())
+                    .containsExactly(new ConnectorTool("list_scopes", "READ", "none", null, null));
         }
         server.verify();
     }

@@ -49,6 +49,9 @@ public class ConnectorAction {
     /** 연결을 해제하거나 값을 다시 등록해 끝낸 줄의 {@code errorCode} 다. */
     public static final String CONNECTION_CHANGED = "connection_changed";
 
+    /** 상시 허락을 닫은 도구의 인자에 화면에서 가려지는 글이 있어 실행하지 않고 끝낸 줄의 {@code errorCode} 다(ADR-065). */
+    public static final String HIDDEN_ARGS = "hidden_args";
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -233,7 +236,7 @@ public class ConnectorAction {
     /**
      * 사용자가 거절한 것이 아니라 시스템이 실행하지 않고 끝냈다. 상태는 거절과 같고 까닭을 {@code errorCode} 에 남긴다.
      *
-     * @param reason {@link #NOT_EXECUTABLE} 나 {@link #CONNECTION_CHANGED}
+     * @param reason {@link #NOT_EXECUTABLE}, {@link #CONNECTION_CHANGED}, {@link #HIDDEN_ARGS} 가운데 하나
      */
     public void refuse(String reason, Instant now) {
         reject(now);

@@ -23,6 +23,7 @@ import com.bifos.assistant.chat.application.ChatService;
 import com.bifos.assistant.chat.application.ChatTurn;
 import com.bifos.assistant.chat.application.ConversationAccess;
 import com.bifos.assistant.chat.application.SkillCommand;
+import com.bifos.assistant.chat.domain.ChatMessage;
 import com.bifos.assistant.chat.domain.Conversation;
 import com.bifos.assistant.chat.domain.MessageRole;
 import com.bifos.assistant.chat.domain.ModelTierDefinition;
@@ -73,6 +74,7 @@ import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import org.assertj.core.api.ThrowableAssert.ThrowingCallable;
@@ -823,6 +825,35 @@ class ChatServiceTest {
         List<ExecutionEvent> recorded = eventsOf(turn.executionId());
         assertThat(typesOf(recorded)).containsExactly(ExecutionEventType.RUN_STARTED, ExecutionEventType.RUN_COMPLETED);
         assertThat(recorded).extracting(ExecutionEvent::sequence).containsExactly(1, 2);
+    }
+
+    @Test
+    @DisplayName("넘어간 모델의 라벨은 ADMIN 역할에게만 주고 MEMBER 역할에게는 빈 묶음을 준다")
+    void switchedLabelsGoOnlyToAdmin() {
+        CurrentUser dad = member("dad@example.com", "dad");
+        stub().willReturn(HermesRunResult.of("run-1", "sess-1", "completed", "네", "dad", null, TokenUsage.empty()));
+        ChatTurn turn = chat.send(dad, null, "안녕", "dad");
+        executionEvents.save(ExecutionEvent.builder()
+                .executionId(turn.executionId())
+                .sequence(99)
+                .eventType(ExecutionEventType.PROVIDER_SWITCHED)
+                .detail("example-provider/example-model-small")
+                .occurredAt(Instant.now())
+                .build());
+        List<ChatMessage> history = chat.history(dad, turn.conversationId());
+        CurrentUser asAdmin = new CurrentUser(dad.id(), dad.email(), dad.displayName(), dad.groupId(), UserRole.ADMIN);
+
+        assertThat(chat.switchedLabels(dad, history)).isEmpty();
+        assertThat(chat.switchedLabels(asAdmin, history))
+                .containsExactly(Map.entry(turn.executionId(), "example-provider/example-model-small"));
+    }
+
+    @Test
+    @DisplayName("실행이 없는 대화의 넘어간 모델 라벨은 ADMIN 역할에게도 빈 묶음이다")
+    void switchedLabelsOfHistoryWithoutExecutionsAreEmptyForAdmin() {
+        CurrentUser asAdmin = new CurrentUser(1L, "admin@example.com", "admin", 1L, UserRole.ADMIN);
+
+        assertThat(chat.switchedLabels(asAdmin, List.of())).isEmpty();
     }
 
     @Test

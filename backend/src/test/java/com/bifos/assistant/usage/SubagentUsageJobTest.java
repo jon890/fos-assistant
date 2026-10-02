@@ -3,7 +3,9 @@ package com.bifos.assistant.usage;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.bifos.assistant.agent.domain.CostMode;
+import com.bifos.assistant.hermes.dto.SubagentSessionUsage;
 import com.bifos.assistant.usage.domain.AgentExecution;
+import com.bifos.assistant.usage.domain.ExecutionCost;
 import com.bifos.assistant.usage.domain.ExecutionEvent;
 import com.bifos.assistant.usage.domain.ExecutionEventType;
 import com.bifos.assistant.usage.domain.ExecutionStatus;
@@ -50,6 +52,67 @@ class SubagentUsageJobTest {
 
         job.expire();
         assertThat(job.status()).isEqualTo("EXPIRED");
+    }
+
+    @Test
+    @DisplayName("사용량과 금액을 적으면 칸을 옮기고 DONE 으로 바꾼다")
+    void recordsUsageAndCostThenFinishes() throws ReflectiveOperationException {
+        Instant finishedAt = Instant.parse("2026-10-01T00:00:00Z");
+        SubagentUsageJob job = job(finishedAt);
+        Instant recordedAt = finishedAt.plusSeconds(30);
+
+        job.record(
+                new SubagentSessionUsage(
+                        "child-session",
+                        "subagent",
+                        "parent-session",
+                        "example-fast",
+                        "example-provider",
+                        1.0,
+                        2.0,
+                        10L,
+                        4L,
+                        2L,
+                        3L),
+                new ExecutionCost(186L, 186L, "USD", "test-pricing@2026-10-01"),
+                null,
+                recordedAt);
+
+        assertThat(job.status()).isEqualTo("DONE");
+        assertThat(job.provider()).isEqualTo("example-provider");
+        assertThat(job.model()).isEqualTo("example-fast");
+        assertThat(job.inputTokens()).isEqualTo(10L);
+        assertThat(job.cacheReadTokens()).isEqualTo(2L);
+        assertThat(job.cacheWriteTokens()).isEqualTo(3L);
+        assertThat(job.outputTokens()).isEqualTo(4L);
+        assertThat(job.estimatedCostMicros()).isEqualTo(186L);
+        assertThat(job.actualCostMicros()).isEqualTo(186L);
+        assertThat(job.costCurrency()).isEqualTo("USD");
+        assertThat(job.pricingVersion()).isEqualTo("test-pricing@2026-10-01");
+        assertThat(job.recordedAt()).isEqualTo(recordedAt);
+        assertThat(job.unconfirmedReason()).isNull();
+    }
+
+    @Test
+    @DisplayName("공백 provider 는 비우고 금액 없는 줄에는 미확인 까닭을 적는다")
+    void recordsBlankProviderAsNullWithReason() throws ReflectiveOperationException {
+        Instant finishedAt = Instant.parse("2026-10-01T00:00:00Z");
+        SubagentUsageJob job = job(finishedAt);
+
+        job.record(
+                new SubagentSessionUsage(
+                        "child-session", "subagent", "parent-session", "example-fast", " ", 1.0, 2.0, 10L, 4L, 2L, 3L),
+                ExecutionCost.unknown(),
+                "PROVIDER_UNKNOWN",
+                finishedAt);
+
+        assertThat(job.status()).isEqualTo("DONE");
+        assertThat(job.provider()).isNull();
+        assertThat(job.estimatedCostMicros()).isNull();
+        assertThat(job.actualCostMicros()).isNull();
+        assertThat(job.costCurrency()).isNull();
+        assertThat(job.pricingVersion()).isNull();
+        assertThat(job.unconfirmedReason()).isEqualTo("PROVIDER_UNKNOWN");
     }
 
     private static SubagentUsageJob job(Instant finishedAt) throws ReflectiveOperationException {

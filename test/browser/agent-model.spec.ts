@@ -57,7 +57,7 @@ test("관리자가 에이전트 기본 모델을 저장하면 다시 열어도 �
 }) => {
   await reset(page);
   try {
-    await page.goto(`/agents/${AGENT_CODE}`);
+    await page.goto(`/admin/agents/${AGENT_CODE}`);
     const model = section(page).getByRole("combobox", { name: "모델" });
     await expect(model).toHaveValue("");
     await model.selectOption({ label: DEFAULT_MODEL });
@@ -89,7 +89,7 @@ test("관리자가 모델을 숨기면 고를 수 있는 목록에서 빠지고 
 }) => {
   await reset(page);
   try {
-    await page.goto(`/agents/${AGENT_CODE}`);
+    await page.goto(`/admin/agents/${AGENT_CODE}`);
     const save = section(page).getByRole("button", { name: "숨김 저장" });
     await expect(save).toBeDisabled();
     await section(page)
@@ -127,6 +127,77 @@ test("관리자가 모델을 숨기면 고를 수 있는 목록에서 빠지고 
     await expect(
       section(page).getByRole("checkbox", { name: `${HIDDEN_MODEL} 숨기기` }),
     ).toBeChecked();
+  } finally {
+    await reset(page);
+  }
+});
+
+function effortSelect(page: Page): Locator {
+  return section(page).getByRole("combobox", { name: "강도" });
+}
+
+test("강도의 끄기는 끄기 지원이 확인된 모델에서만 보이고 받지 않는 모델로 바꾸면 profile 값으로 돌아간다", async ({
+  page,
+}) => {
+  await reset(page);
+  try {
+    await page.goto(`/admin/agents/${AGENT_CODE}`);
+    const model = section(page).getByRole("combobox", { name: "모델" });
+    // 비워 둔 모델은 profile 의 기본 모델(example-model)로 본다. 대역은 이 모델의 끄기 지원을 알린다.
+    await expect(model).toHaveValue("");
+    await expect(effortSelect(page).getByRole("option")).toHaveText([
+      "profile 값",
+      "끄기",
+      "low",
+      "medium",
+      "high",
+      "xhigh",
+      "max",
+    ]);
+    await model.selectOption({ label: "example-fast" });
+    await expect(
+      effortSelect(page).getByRole("option", { name: "끄기" }),
+    ).toHaveCount(0);
+    await model.selectOption({ label: HIDDEN_MODEL });
+    await expect(
+      effortSelect(page).getByRole("option", { name: "끄기" }),
+    ).toHaveCount(0);
+
+    await model.selectOption({ label: PROFILE_DEFAULT_MODEL });
+    await effortSelect(page).selectOption({ label: "끄기" });
+    await expect(effortSelect(page)).toHaveValue("none");
+    await model.selectOption({ label: HIDDEN_MODEL });
+    await expect(effortSelect(page)).toHaveValue("");
+    await expect(effortSelect(page).locator("option:checked")).toHaveText(
+      "profile 값",
+    );
+  } finally {
+    await reset(page);
+  }
+});
+
+test("서버가 끄기를 거절하면 저장 실패 알림을 보인다", async ({ page }) => {
+  await reset(page);
+  // 화면은 끄기를 받는다고 읽지만 실제 목록은 그렇지 않은 모델이다. 서버가 저장을 거절한다.
+  await routeSettings(page, [], {
+    [PROFILE_DEFAULT_MODEL]: { support: "SUPPORTED", disable: "SUPPORTED" },
+    [DEFAULT_MODEL]: { support: "SUPPORTED", disable: "SUPPORTED" },
+  });
+  try {
+    await page.goto(`/admin/agents/${AGENT_CODE}`);
+    await section(page)
+      .getByRole("combobox", { name: "모델" })
+      .selectOption({ label: DEFAULT_MODEL });
+    await effortSelect(page).selectOption({ label: "끄기" });
+    const saved = page.waitForResponse(
+      (response) =>
+        new URL(response.url()).pathname ===
+        `/api/admin/agents/${AGENT_CODE}/model-default`,
+    );
+    await section(page).getByRole("button", { name: "기본 모델 저장" }).click();
+    expect((await saved).status(), "끄기를 거절한 저장 응답").toBe(400);
+    await expect(section(page).getByRole("alert")).toBeVisible();
+    await expect(section(page).getByRole("status")).toHaveCount(0);
   } finally {
     await reset(page);
   }
@@ -184,7 +255,7 @@ test("모델 목록을 읽지 못해도 관리자가 숨김을 풀 수 있다", 
           },
         }),
     );
-    await page.goto(`/agents/${AGENT_CODE}`);
+    await page.goto(`/admin/agents/${AGENT_CODE}`);
     await expect(
       section(page).getByTestId("agent-model-catalog-missing"),
     ).toBeVisible();
@@ -209,6 +280,10 @@ test("모델 목록을 읽지 못해도 관리자가 숨김을 풀 수 있다", 
 async function routeSettings(
   page: Page,
   hiddenEntries: { provider: string; model: string | null }[],
+  reasoning: Record<string, { support: string; disable: string }> = {
+    [PROFILE_DEFAULT_MODEL]: { support: "SUPPORTED", disable: "SUPPORTED" },
+    [DEFAULT_MODEL]: { support: "UNSUPPORTED", disable: "UNKNOWN" },
+  },
 ): Promise<void> {
   await page.route(
     (url) => url.pathname === `/api/admin/agents/${AGENT_CODE}/model-settings`,
@@ -224,6 +299,7 @@ async function routeSettings(
                 provider: "openai-codex",
                 name: "openai-codex",
                 models: [PROFILE_DEFAULT_MODEL, DEFAULT_MODEL],
+                reasoning,
               },
             ],
             reasoningEfforts: ["low", "medium", "high", "xhigh", "max"],
@@ -240,7 +316,7 @@ test("기본 모델을 정하지 않은 에이전트의 profile 기본 모델이
   await routeSettings(page, [
     { provider: "openai-codex", model: PROFILE_DEFAULT_MODEL },
   ]);
-  await page.goto(`/agents/${AGENT_CODE}`);
+  await page.goto(`/admin/agents/${AGENT_CODE}`);
   await expect(
     section(page).getByTestId("agent-model-profile-default-hidden"),
   ).toHaveText(
@@ -252,7 +328,7 @@ test("숨김이 비어 있으면 profile 기본 모델 경고를 보이지 않�
   page,
 }) => {
   await routeSettings(page, []);
-  await page.goto(`/agents/${AGENT_CODE}`);
+  await page.goto(`/admin/agents/${AGENT_CODE}`);
   await expect(
     section(page).getByRole("combobox", { name: "모델" }),
   ).toBeVisible();

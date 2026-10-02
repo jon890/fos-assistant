@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { MEMORY_IMPORTED_EVENT } from "@/lib/memory-import";
 import { MemoryForm } from "./memory-form";
 import { MemoryItem } from "./memory-item";
 import { MemoryProposal } from "./memory-proposal";
@@ -35,10 +36,13 @@ export function MemoryList({
   initialMemories,
   isAdmin,
   currentUserId,
+  after,
 }: {
   initialMemories: Memory[];
   isAdmin: boolean;
   currentUserId?: number;
+  /** 기억 절 뒤에 이어 그릴 절이다. 문서와 외부 서비스 연결이 들어온다. */
+  after?: React.ReactNode;
 }) {
   const [memories, setMemories] = useState(initialMemories);
   /** 화면을 처음 그릴 때 있던 기억들이다. 여기 없는 줄만 새 줄로 보고 등장 움직임을 준다 */
@@ -57,6 +61,11 @@ export function MemoryList({
       );
     }
   }
+  // 가져오기 절은 서버가 그린 자식이라 이 목록의 상태를 모른다. 가져오기가 끝났다는 알림을 받아 다시 읽는다.
+  useEffect(() => {
+    window.addEventListener(MEMORY_IMPORTED_EVENT, reload);
+    return () => window.removeEventListener(MEMORY_IMPORTED_EVENT, reload);
+  });
   const proposals = memories.filter((memory) => memory.status === "PROPOSED");
   const group = memories.filter(
     (memory) => memory.status === "ACCEPTED" && memory.scope === "GROUP",
@@ -116,6 +125,7 @@ export function MemoryList({
           </p>
         )}
       </Section>
+      {after}
     </div>
   );
 }

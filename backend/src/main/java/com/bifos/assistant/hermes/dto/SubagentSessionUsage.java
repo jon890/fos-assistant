@@ -6,12 +6,55 @@ public record SubagentSessionUsage(
         String source,
         String parentSessionId,
         String model,
+        String provider,
         Double startedAt,
         Double endedAt,
         Long inputTokens,
         Long outputTokens,
         Long cacheReadTokens,
         Long cacheWriteTokens) {
+
+    /** provider 를 읽지 못한 응답이다. provider 를 비운다. */
+    public SubagentSessionUsage(
+            String id,
+            String source,
+            String parentSessionId,
+            String model,
+            Double startedAt,
+            Double endedAt,
+            Long inputTokens,
+            Long outputTokens,
+            Long cacheReadTokens,
+            Long cacheWriteTokens) {
+        this(
+                id,
+                source,
+                parentSessionId,
+                model,
+                null,
+                startedAt,
+                endedAt,
+                inputTokens,
+                outputTokens,
+                cacheReadTokens,
+                cacheWriteTokens);
+    }
+
+    /** provider 만 바꾼 새 값을 돌려준다. */
+    public SubagentSessionUsage withProvider(String provider) {
+        return new SubagentSessionUsage(
+                id,
+                source,
+                parentSessionId,
+                model,
+                provider,
+                startedAt,
+                endedAt,
+                inputTokens,
+                outputTokens,
+                cacheReadTokens,
+                cacheWriteTokens);
+    }
 
     /** Runs usage와 같이 캐시를 포함한 입력 토큰을 쓴다. 필요한 값을 모르면 비운다. */
     public Long inclusiveInputTokens() {

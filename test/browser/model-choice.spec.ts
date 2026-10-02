@@ -210,6 +210,167 @@ test("고르지 않고 보내면 실행 요청에 provider 와 model 이 빠진�
   await expect(picker(page)).toHaveText("기본");
 });
 
+/** effort 칸의 선택지 글자다. 「끄기」 는 `none` 이다 */
+const EFFORTS_WITH_NONE = [
+  "기본",
+  "끄기",
+  "low",
+  "medium",
+  "high",
+  "xhigh",
+  "max",
+];
+const EFFORTS_WITHOUT_NONE = ["기본", "low", "medium", "high", "xhigh", "max"];
+
+test("끄기는 끄기 지원이 확인된 모델에서만 effort 선택지에 있다", async ({
+  page,
+}) => {
+  await page.goto("/");
+  // 단계 단추 화면과 그 설정 창에는 지원 미확인 문구를 더하지 않는다.
+  await expect(page.getByTestId("model-tier-picker")).toBeVisible();
+  await expect(page.getByTestId("effort-support-unknown")).toHaveCount(0);
+  await openSettings(page);
+  await expect(page.getByTestId("effort-support-unknown")).toHaveCount(0);
+
+  await picker(page).click();
+  await expect(modelSelect(page)).toBeEnabled();
+  // 「기본」 은 대역의 기본 모델(example-model)이고 끄기 지원이 확인된 모델이다.
+  await expect(effortSelect(page).locator("option")).toHaveText(
+    EFFORTS_WITH_NONE,
+  );
+  await modelSelect(page).selectOption({ label: "example-fast" });
+  await expect(effortSelect(page).locator("option")).toHaveText(
+    EFFORTS_WITHOUT_NONE,
+  );
+  await modelSelect(page).selectOption({ label: "example-deep" });
+  await expect(effortSelect(page).locator("option")).toHaveText(
+    EFFORTS_WITHOUT_NONE,
+  );
+  await modelSelect(page).selectOption({ label: "example-model" });
+  await expect(effortSelect(page).locator("option")).toHaveText(
+    EFFORTS_WITH_NONE,
+  );
+  await expect(page.getByTestId("effort-support-unknown")).toHaveCount(0);
+});
+
+test("끄기를 고른 채 끄기를 받지 않는 모델로 바꾸면 effort 가 기본으로 돌아가고 null 로 저장된다", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await openAdvancedPicker(page);
+  await expect(modelSelect(page)).toBeEnabled();
+  await effortSelect(page).selectOption({ label: "끄기" });
+  await expect(effortSelect(page)).toHaveValue("none");
+
+  await modelSelect(page).selectOption({ label: "example-deep" });
+  await expect(effortSelect(page)).toHaveValue("");
+  await expect(effortSelect(page).locator("option:checked")).toHaveText(
+    "기본",
+  );
+  await dialog(page).getByRole("button", { name: "적용" }).click();
+
+  await expect(page).toHaveURL(CONVERSATION_URL);
+  await expectSaved(page);
+  await expect(picker(page)).toHaveText("example-deep");
+  await page.reload();
+  await openSettings(page);
+  await expect(picker(page)).toHaveText("example-deep");
+});
+
+test("지원 미확인 모델은 effort 를 고르게 두고 알리며 지원하지 않는 모델은 막고 알리지 않는다", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await openAdvancedPicker(page);
+  await expect(modelSelect(page)).toBeEnabled();
+
+  await modelSelect(page).selectOption({ label: "example-balanced" });
+  await expect(effortSelect(page)).toBeEnabled();
+  await expect(page.getByTestId("effort-support-unknown")).toHaveText(
+    "이 모델의 effort 지원을 확인하지 못했어요. 골라도 모델이 무시할 수 있어요.",
+  );
+  // 지원 미확인이어도 끄기 지원이 확인되지 않았으니 끄기는 없다.
+  await expect(effortSelect(page).locator("option")).toHaveText(
+    EFFORTS_WITHOUT_NONE,
+  );
+
+  await modelSelect(page).selectOption({ label: "example-model-mini" });
+  await expect(effortSelect(page)).toBeDisabled();
+  await expect(page.getByTestId("effort-support-unknown")).toHaveCount(0);
+});
+
+test("끄기를 적용해 보내면 실행 요청에 none 이 실리고 기본으로 되돌리면 effort 가 빠진다", async ({
+  page,
+  hermes,
+}, testInfo) => {
+  await page.goto("/");
+  await openAdvancedPicker(page);
+  await expect(modelSelect(page)).toBeEnabled();
+  await effortSelect(page).selectOption({ label: "끄기" });
+  await dialog(page).getByRole("button", { name: "적용" }).click();
+  await expect(page).toHaveURL(CONVERSATION_URL);
+  await expectSaved(page);
+  // 단추는 대화에 적힌 값을 그대로 보인다.
+  await expect(picker(page)).toHaveText("기본 · none");
+  await closeSettings(page);
+  await sendAndWait(page, `끄기 검사 ${testInfo.project.name}`);
+  expect(
+    (await hermes.lastSubmittedRuntime()).reasoningEffort,
+    "끄기를 고른 실행의 effort",
+  ).toBe("none");
+
+  await openAdvancedPicker(page);
+  await expect(modelSelect(page)).toBeEnabled();
+  await effortSelect(page).selectOption({ label: "기본" });
+  await dialog(page).getByRole("button", { name: "적용" }).click();
+  await expectSaved(page);
+  await expect(picker(page)).toHaveText("기본");
+  await closeSettings(page);
+  await sendAndWait(page, `기본 effort 검사 ${testInfo.project.name}`);
+  expect(
+    (await hermes.lastSubmittedRuntime()).reasoningEffort,
+    "「기본」 으로 되돌린 실행의 effort",
+  ).toBeUndefined();
+});
+
+test("저장된 끄기가 있는 대화는 선택지에 끄기가 하나만 있고 바꾸지 않고 적용해도 남는다", async ({
+  page,
+}) => {
+  const conversationId = await createConversationWithChoice(page, {
+    provider: "openai-codex",
+    model: "example-model",
+    reasoningEffort: "none",
+  });
+  const saves: string[] = [];
+  page.on("request", (request) => {
+    if (
+      request.method() === "PUT" &&
+      /\/api\/chat\/conversations\/[^/]+\/model$/.test(
+        new URL(request.url()).pathname,
+      )
+    )
+      saves.push(request.url());
+  });
+  await page.goto(`/chat/${conversationId}`);
+  await openSettings(page);
+  await expect(picker(page)).toHaveText("example-model · none");
+
+  await picker(page).click();
+  await expect(modelSelect(page)).toBeEnabled();
+  await expect(effortSelect(page).locator("option")).toHaveText(
+    EFFORTS_WITH_NONE,
+  );
+  await expect(effortSelect(page)).toHaveValue("none");
+  await dialog(page).getByRole("button", { name: "적용" }).click();
+
+  await expectSaved(page);
+  await expect(picker(page)).toHaveText("example-model · none");
+  expect(saves, "바꾸지 않고 적용했을 때 나간 저장 요청").toEqual([]);
+  await page.reload();
+  await openSettings(page);
+  await expect(picker(page)).toHaveText("example-model · none");
+});
+
 test("단계를 고르면 빈 대화에 단계 선택을 저장하고 에이전트 기본값으로 돌아갈 수 있다", async ({
   page,
 }) => {
@@ -284,7 +445,9 @@ test("단계를 고르면 빈 대화에 단계 선택을 저장하고 에이전�
   ]);
 });
 
-test("관리자에게만 그룹 모델 설정을 보인다", async ({ page }) => {
+test("관리자도 대화 화면의 설정 창에서는 그룹 모델 설정을 보지 않는다", async ({
+  page,
+}) => {
   await page.route(
     (url) => url.pathname === "/api/chat/model-tiers",
     (route) =>
@@ -295,28 +458,29 @@ test("관리자에게만 그룹 모델 설정을 보인다", async ({ page }) =>
 
   await page.goto("/");
   await tierSettings(page).click();
+  await expect(picker(page)).toBeVisible();
   await expect(
     page.getByRole("button", { name: "그룹 모델 설정" }),
-  ).toBeVisible();
+  ).toHaveCount(0);
 });
 
-test("그룹 모델 설정 창은 그룹 기본 단계를 단계별 모델보다 위에 보인다", async ({
+test("그룹 모델 설정은 그룹 기본 단계를 단계별 모델보다 위에 보인다", async ({
   page,
 }) => {
   await page.route(
-    (url) => url.pathname === "/api/chat/model-tiers",
+    (url) =>
+      url.pathname === "/api/chat/model-tiers" ||
+      url.pathname === "/api/admin/model-tiers",
     (route) => route.fulfill({ json: { ...TIERS, admin: true } }),
   );
 
-  await page.goto("/");
-  await tierSettings(page).click();
-  await page.getByRole("button", { name: "그룹 모델 설정" }).click();
+  await page.goto("/admin/models");
 
-  const groupDialog = page.getByRole("dialog", { name: "그룹 모델 설정" });
-  const defaultHeading = groupDialog.getByRole("heading", {
+  const groupSection = page.getByRole("region", { name: "그룹 모델 설정" });
+  const defaultHeading = groupSection.getByRole("heading", {
     name: "그룹 기본 단계",
   });
-  const tiersHeading = groupDialog.getByRole("heading", {
+  const tiersHeading = groupSection.getByRole("heading", {
     name: "단계별 모델",
   });
   await expect(defaultHeading).toBeVisible();
@@ -433,7 +597,9 @@ test("그룹 단계 저장이 실패하면 입력값을 유지하고 다시 저�
 }) => {
   let attempts = 0;
   await page.route(
-    (url) => url.pathname === "/api/chat/model-tiers",
+    (url) =>
+      url.pathname === "/api/chat/model-tiers" ||
+      url.pathname === "/api/admin/model-tiers",
     (route) => route.fulfill({ json: { ...TIERS, admin: true } }),
   );
   await page.route(
@@ -444,22 +610,22 @@ test("그룹 단계 저장이 실패하면 입력값을 유지하고 다시 저�
     },
   );
 
-  await page.goto("/");
-  await tierSettings(page).click();
-  await page.getByRole("button", { name: "그룹 모델 설정" }).click();
+  await page.goto("/admin/models");
 
-  const groupDialog = page.getByRole("dialog", { name: "그룹 모델 설정" });
-  const model = groupDialog.getByLabel("모델", { exact: true }).first();
+  const groupSection = page.getByRole("region", { name: "그룹 모델 설정" });
+  const model = groupSection.getByLabel("모델", { exact: true }).first();
   await model.fill("example-retry");
-  await groupDialog.getByRole("button", { name: "저장" }).click();
-  const failedAlert = groupDialog.getByRole("alert");
+  await groupSection.getByRole("button", { name: "저장" }).click();
+  const failedAlert = groupSection.getByRole("alert");
   await expect(failedAlert).toHaveText(
     "그룹 모델 설정을 저장하지 못했어요. 잠시 뒤 다시 시도해 주세요.",
   );
   await expect(model).toHaveValue("example-retry");
 
-  await groupDialog.getByRole("button", { name: "저장" }).click();
-  await expect(groupDialog).toHaveCount(0);
+  await groupSection.getByRole("button", { name: "저장" }).click();
+  await expect(
+    groupSection.getByText("저장했어요", { exact: true }),
+  ).toBeVisible();
   await expect(failedAlert).toHaveCount(0);
 });
 
@@ -468,7 +634,9 @@ test("단계 매핑이 비어 있으면 관리자 설정에서 기본값 실행�
 }) => {
   const savedBodies: unknown[] = [];
   await page.route(
-    (url) => url.pathname === "/api/chat/model-tiers",
+    (url) =>
+      url.pathname === "/api/chat/model-tiers" ||
+      url.pathname === "/api/admin/model-tiers",
     (route) =>
       route.fulfill({
         json: {
@@ -499,25 +667,26 @@ test("단계 매핑이 비어 있으면 관리자 설정에서 기본값 실행�
 
   await tierSettings(page).click();
   const settingsDialog = page.getByRole("dialog", { name: "모델 단계 설정" });
+  await expect(settingsDialog).toBeVisible();
   await expect(
     settingsDialog.getByText("단계별 모델을 아직 정하지 않았어요."),
-  ).toBeVisible();
-  await settingsDialog.getByRole("button", { name: "그룹 모델 설정" }).click();
+  ).toHaveCount(0);
 
-  const groupDialog = page.getByRole("dialog", { name: "그룹 모델 설정" });
+  await page.goto("/admin/models");
+  const groupSection = page.getByRole("region", { name: "그룹 모델 설정" });
   await expect(
-    groupDialog.getByText("단계별 모델을 아직 정하지 않았어요."),
+    groupSection.getByText("단계별 모델을 아직 정하지 않았어요."),
   ).toBeVisible();
   await expect(
-    groupDialog.getByLabel("모델", { exact: true }).first(),
+    groupSection.getByLabel("모델", { exact: true }).first(),
   ).toHaveValue("");
   await expect(
-    groupDialog.getByLabel("강도", { exact: true }).first(),
+    groupSection.getByLabel("강도", { exact: true }).first(),
   ).toHaveValue("");
-  await expect(groupDialog.getByLabel("그룹 기본 단계")).toHaveValue(
+  await expect(groupSection.getByLabel("그룹 기본 단계")).toHaveValue(
     "BALANCED",
   );
-  await groupDialog.getByRole("button", { name: "저장" }).click();
+  await groupSection.getByRole("button", { name: "저장" }).click();
 
   await expect
     .poll(() => savedBodies)
@@ -723,7 +892,9 @@ test("긴 모델 이름을 골라도 가로로 넘치지 않고 입력칸 폭이
               provider: "openai-codex",
               name: "OpenAI Codex",
               models: ["example-model", longModel],
-              reasoningCapable: { "example-model": true },
+              reasoning: {
+                "example-model": { support: "SUPPORTED", disable: "UNKNOWN" },
+              },
             },
           ],
           reasoningEfforts: ["low", "medium", "high", "xhigh", "max"],

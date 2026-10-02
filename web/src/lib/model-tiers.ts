@@ -49,6 +49,24 @@ export async function getModelTiers(
       };
 }
 
+export type GroupModelTiers = {
+  tiers: ModelTier[];
+  groupDefaultTier: ModelTierCode | null;
+};
+
+/** 관리자가 고칠 그룹의 단계 정의다. 에이전트 없이 읽고, provider 를 비운 단계는 비운 채 온다. */
+export async function getGroupModelTiers(): Promise<
+  RequestResult<GroupModelTiers>
+> {
+  const result = await request<GroupModelTiers>("/api/admin/model-tiers");
+  return result.ok && result.data !== null
+    ? { ok: true, data: result.data }
+    : {
+        ok: false,
+        message: result.ok ? "단계를 읽지 못했어요." : result.message,
+      };
+}
+
 export async function saveDefaultTier(
   tier: ModelTierCode | null,
 ): Promise<RequestResult<null>> {

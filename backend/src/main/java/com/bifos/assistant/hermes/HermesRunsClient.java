@@ -1,6 +1,7 @@
 package com.bifos.assistant.hermes;
 
 import com.bifos.assistant.hermes.dto.HermesRunCommand;
+import com.bifos.assistant.hermes.dto.HermesRunLookup;
 import com.bifos.assistant.hermes.dto.HermesRunResult;
 import com.bifos.assistant.hermes.dto.SessionRuntime;
 import com.bifos.assistant.hermes.dto.SubagentSessionUsage;
@@ -19,6 +20,13 @@ public interface HermesRunsClient {
 
     /** 그 실행을 멈추라고 보낸다. */
     void stop(String apiBaseUrl, String profileName, String runId);
+
+    /**
+     * 실행 하나의 지금 상태를 한 번 읽는다. 기다리지 않는다.
+     *
+     * <p>Hermes 가 그 run 을 모르면(404) NOT_FOUND 다. 닿지 못했거나 다른 오류면 ApiException 을 던진다.
+     */
+    HermesRunLookup lookupRun(String apiBaseUrl, String profileName, String runId);
 
     /**
      * 그 세션이 마지막으로 실제로 쓴 provider 와 모델을 읽는다.

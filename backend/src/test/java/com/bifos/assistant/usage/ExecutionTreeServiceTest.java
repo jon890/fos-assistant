@@ -13,6 +13,7 @@ import com.bifos.assistant.agent.domain.AgentVisibility;
 import com.bifos.assistant.agent.domain.CostMode;
 import com.bifos.assistant.agent.domain.CredentialScope;
 import com.bifos.assistant.agent.infra.AgentRepository;
+import com.bifos.assistant.chat.domain.type.ModelTier;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
@@ -21,9 +22,11 @@ import com.bifos.assistant.usage.application.ExecutionNode;
 import com.bifos.assistant.usage.application.ExecutionTree;
 import com.bifos.assistant.usage.application.ExecutionTreeService;
 import com.bifos.assistant.usage.domain.AgentExecution;
+import com.bifos.assistant.usage.domain.ExecutionCost;
 import com.bifos.assistant.usage.domain.ExecutionEvent;
 import com.bifos.assistant.usage.domain.ExecutionEventType;
 import com.bifos.assistant.usage.domain.ExecutionStatus;
+import com.bifos.assistant.usage.domain.type.ReasoningEffortSource;
 import com.bifos.assistant.usage.infra.AgentExecutionRepository;
 import com.bifos.assistant.usage.infra.ExecutionEventRepository;
 import com.bifos.assistant.user.domain.UserRole;
@@ -312,6 +315,154 @@ class ExecutionTreeServiceTest {
         assertThat(tree.root().events())
                 .extracting(ExecutionEventView::detail)
                 .containsExactly("python3 run.py", "제주 날씨", "숙소를 찾는다");
+    }
+
+    @Test
+    @DisplayName("MEMBER 역할의 노드에는 모델과 토큰과 금액과 시각 구간이 비고 걸린 시간과 단계는 남는다")
+    void memberNodeHasNoModelTokensCostOrTimestampsButKeepsLatencyAndTier() {
+        AgentExecution execution = detailedExecution();
+
+        ExecutionNode node = trees.of(ownerAs(UserRole.MEMBER), execution.id()).root();
+
+        assertThat(node.agentCode()).as("agentCode").isNull();
+        assertThat(node.provider()).as("provider").isNull();
+        assertThat(node.model()).as("model").isNull();
+        assertThat(node.reasoningEffort()).as("reasoningEffort").isNull();
+        assertThat(node.reasoningEffortSource()).as("reasoningEffortSource").isNull();
+        assertThat(node.inputTokens()).as("inputTokens").isNull();
+        assertThat(node.cachedInputTokens()).as("cachedInputTokens").isNull();
+        assertThat(node.outputTokens()).as("outputTokens").isNull();
+        assertThat(node.totalTokens()).as("totalTokens").isNull();
+        assertThat(node.estimatedCostMicros()).as("estimatedCostMicros").isNull();
+        assertThat(node.requestReceivedAt()).as("requestReceivedAt").isNull();
+        assertThat(node.submittedAt()).as("submittedAt").isNull();
+        assertThat(node.firstDeltaAt()).as("firstDeltaAt").isNull();
+        assertThat(node.finishedAt()).as("finishedAt").isNull();
+        // MEMBER 역할에게도 보이는 값은 남는다.
+        assertThat(node.agentName()).isEqualTo("트리 아빠");
+        assertThat(node.status()).isEqualTo("FAILED");
+        assertThat(node.modelTier()).isEqualTo("DEEP");
+        assertThat(node.latencyMs()).isEqualTo(1_234L);
+        assertThat(node.startedAt()).isNotNull();
+    }
+
+    @Test
+    @DisplayName("ADMIN 역할의 노드에는 모델과 토큰과 금액과 시각 구간이 그대로 실린다")
+    void adminNodeKeepsModelTokensCostAndTimestamps() {
+        AgentExecution execution = detailedExecution();
+
+        ExecutionNode node = trees.of(ownerAs(UserRole.ADMIN), execution.id()).root();
+
+        assertThat(node.agentCode()).isEqualTo("tree-dad");
+        assertThat(node.provider()).isEqualTo("example-provider");
+        assertThat(node.model()).isEqualTo("example-model-large");
+        assertThat(node.reasoningEffort()).isEqualTo("high");
+        assertThat(node.reasoningEffortSource()).isEqualTo("REQUESTED");
+        assertThat(node.modelTier()).isEqualTo("DEEP");
+        assertThat(node.inputTokens()).isEqualTo(100L);
+        assertThat(node.cachedInputTokens()).isEqualTo(40L);
+        assertThat(node.outputTokens()).isEqualTo(20L);
+        assertThat(node.totalTokens()).isEqualTo(120L);
+        assertThat(node.estimatedCostMicros()).isEqualTo(5_000L);
+        assertThat(node.latencyMs()).isEqualTo(1_234L);
+        assertThat(node.requestReceivedAt()).isEqualTo(STARTED_AT.minusMillis(50));
+        assertThat(node.submittedAt()).isEqualTo(STARTED_AT.plusMillis(10));
+        assertThat(node.firstDeltaAt()).isEqualTo(STARTED_AT.plusMillis(300));
+        assertThat(node.startedAt()).isEqualTo(STARTED_AT);
+        assertThat(node.finishedAt()).isEqualTo(STARTED_AT.plusMillis(1_234));
+    }
+
+    @Test
+    @DisplayName("MEMBER 역할의 사건에는 모델과 토큰이 비고 PROVIDER SWITCHED 사건이 없으며 RUN FAILED 의 detail 은 남는다")
+    void memberEventsHaveNoModelOrTokensAndNoProviderSwitchedButKeepRunFailedDetail() {
+        AgentExecution execution = executionWithSwitchAndFailure();
+
+        ExecutionTree tree = trees.of(ownerAs(UserRole.MEMBER), execution.id());
+
+        assertThat(tree.root().events())
+                .extracting(ExecutionEventView::eventType, ExecutionEventView::detail)
+                .containsExactly(tuple("SUBAGENT_COMPLETED", "숙소를 찾는다"), tuple("RUN_FAILED", "PROVIDER_BLOCKED"));
+        assertThat(tree.root().events().get(0)).satisfies(event -> {
+            assertThat(event.model()).as("model").isNull();
+            assertThat(event.inputTokens()).as("inputTokens").isNull();
+            assertThat(event.outputTokens()).as("outputTokens").isNull();
+            assertThat(event.subagentName()).isEqualTo("researcher");
+            assertThat(event.durationMs()).isEqualTo(900L);
+        });
+        // 응답에서만 빼고 저장한 사건은 그대로 둔다.
+        assertThat(events.findByExecutionIdInOrderByExecutionIdAscSequenceAsc(List.of(execution.id())))
+                .extracting(ExecutionEvent::eventType)
+                .containsExactly(
+                        ExecutionEventType.PROVIDER_SWITCHED,
+                        ExecutionEventType.SUBAGENT_COMPLETED,
+                        ExecutionEventType.RUN_FAILED);
+    }
+
+    @Test
+    @DisplayName("ADMIN 역할의 사건에는 모델과 토큰이 실리고 PROVIDER SWITCHED 사건도 나온다")
+    void adminEventsKeepModelTokensAndProviderSwitched() {
+        AgentExecution execution = executionWithSwitchAndFailure();
+
+        ExecutionTree tree = trees.of(ownerAs(UserRole.ADMIN), execution.id());
+
+        assertThat(tree.root().events())
+                .extracting(ExecutionEventView::eventType, ExecutionEventView::detail)
+                .containsExactly(
+                        tuple("PROVIDER_SWITCHED", "example-provider/example-model-small"),
+                        tuple("SUBAGENT_COMPLETED", "숙소를 찾는다"),
+                        tuple("RUN_FAILED", "PROVIDER_BLOCKED"));
+        assertThat(tree.root().events().get(1)).satisfies(event -> {
+            assertThat(event.model()).isEqualTo("example-model-small");
+            assertThat(event.inputTokens()).isEqualTo(70L);
+            assertThat(event.outputTokens()).isEqualTo(9L);
+        });
+    }
+
+    private static final Instant STARTED_AT = Instant.parse("2026-09-10T01:00:00Z");
+
+    /** 내부 값이 모두 채워진 실패 실행이다. */
+    private AgentExecution detailedExecution() {
+        AgentExecution execution = AgentExecution.builder()
+                .userId(OWNER_ID)
+                .conversationId(7L)
+                .agentId(agent.id())
+                .profileName("dad")
+                .provider("example-provider")
+                .model("example-model-large")
+                .reasoningEffort("high")
+                .reasoningEffortSource(ReasoningEffortSource.REQUESTED)
+                .modelTier(ModelTier.DEEP)
+                .requestReceivedAt(STARTED_AT.minusMillis(50))
+                .costMode(CostMode.SUBSCRIPTION)
+                .status(ExecutionStatus.FAILED)
+                .errorCode("PROVIDER_BLOCKED")
+                .tokens(100L, 40L, 20L, 120L)
+                .cost(new ExecutionCost(5_000L, null, "USD", "2026-09"))
+                .timing(STARTED_AT, STARTED_AT.plusMillis(1_234))
+                .build();
+        execution.markSubmitted(STARTED_AT.plusMillis(10));
+        execution.markFirstDelta(STARTED_AT.plusMillis(300));
+        return executions.save(execution);
+    }
+
+    /** 다른 모델로 넘어간 사건, 모델과 토큰을 가진 하위 에이전트 완료 사건, 실패 사건을 가진 실행이다. */
+    private AgentExecution executionWithSwitchAndFailure() {
+        AgentExecution execution = execution(OWNER_ID, null, null);
+        event(execution, 1, ExecutionEventType.PROVIDER_SWITCHED, null, "example-provider/example-model-small");
+        events.save(ExecutionEvent.builder()
+                .executionId(execution.id())
+                .sequence(2)
+                .eventType(ExecutionEventType.SUBAGENT_COMPLETED)
+                .subagentName("researcher")
+                .durationMs(900L)
+                .detail("숙소를 찾는다")
+                .model("example-model-small")
+                .inputTokens(70L)
+                .outputTokens(9L)
+                .occurredAt(Instant.now())
+                .build());
+        event(execution, 3, ExecutionEventType.RUN_FAILED, null, "PROVIDER_BLOCKED");
+        return execution;
     }
 
     /** 공개하지 않는 도구, 공개하는 도구, 하위 에이전트 사건을 하나씩 가진 실행이다. */

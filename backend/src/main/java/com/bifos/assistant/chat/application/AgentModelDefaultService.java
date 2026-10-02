@@ -46,7 +46,7 @@ public class AgentModelDefaultService {
      *
      * @param choice 요청에서 {@link ModelChoice#of} 로 검증해 만든 선택. 모델 없이 effort 만 둘 수 있다
      * @throws ApiException {@code MODEL_HIDDEN}. 그룹이 숨긴 모델일 때. {@code VALIDATION_FAILED}. 그
-     *     에이전트의 목록에 없는 모델일 때
+     *     에이전트의 목록에 없는 모델이거나, effort 가 {@code none} 인데 그 모델의 끄기 지원이 확인되지 않을 때
      */
     public ModelChoice save(CurrentUser user, String agentCode, ModelChoice choice) {
         Agent agent = agents.requireForAdmin(user, agentCode);
@@ -58,6 +58,13 @@ public class AgentModelDefaultService {
                     && !modelOptions.optionsForAgent(user.groupId(), agent).offers(choice.provider(), choice.model())) {
                 throw new ApiException(ErrorCode.VALIDATION_FAILED, "the selected model is unavailable for this agent");
             }
+        }
+        // none 은 숨김을 적용하지 않은 목록으로 본다. 모델을 비웠으면 그 목록의 기본 모델(profile 의 값)이다.
+        if (ModelChoice.EFFORT_NONE.equals(choice.reasoningEffort())
+                && !modelOptions
+                        .unfilteredForAgent(agent)
+                        .allowsEffort(choice.provider(), choice.model(), ModelChoice.EFFORT_NONE)) {
+            throw new ApiException(ErrorCode.VALIDATION_FAILED, "reasoning cannot be turned off for this model");
         }
         return defaultOf(agents.changeDefaultModel(
                 user, agentCode, choice.provider(), choice.model(), choice.reasoningEffort()));

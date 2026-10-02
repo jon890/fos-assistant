@@ -76,7 +76,8 @@ class ConnectorConnectionControllerTest {
                         List.of(
                                 new ConnectorFieldSummary("token", "토큰", "", true, true, "^demo_.+$", false, false),
                                 new ConnectorFieldSummary("scope", "범위", "", false, false, null, true, true)),
-                        List.of(new ConnectorToolSummary("write_note", "메모 쓰기", ToolRisk.WRITE, ToolApproval.REQUIRED)),
+                        List.of(new ConnectorToolSummary(
+                                "write_note", "메모 쓰기", ToolRisk.WRITE, ToolApproval.REQUIRED, true)),
                         ConnectionStatus.PENDING,
                         true)));
 
@@ -95,6 +96,7 @@ class ConnectorConnectionControllerTest {
                 .andExpect(jsonPath("$[0].tools[0].title").value("메모 쓰기"))
                 .andExpect(jsonPath("$[0].tools[0].risk").value("WRITE"))
                 .andExpect(jsonPath("$[0].tools[0].approval").value("REQUIRED"))
+                .andExpect(jsonPath("$[0].tools[0].grant").value(true))
                 .andExpect(jsonPath("$[0].fields[0].env").doesNotExist())
                 .andExpect(jsonPath("$[0].fields[1].options").doesNotExist())
                 .andReturn();

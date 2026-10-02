@@ -29,6 +29,7 @@ Hermes core 는 고치지 않는다.
 | `PUT /api/config` | 지정한 profile 의 API 도구 목록과 올린 스킬 경로만 쓴다. 켠 도구는 `agent.disabled_toolsets` 에서 뺀다 |
 | `GET /api/skills` | 지정한 profile 의 스킬 목록을 읽는다 |
 | `PUT /api/skills/toggle` | 지정한 profile 의 스킬 하나를 켜고 끈다 |
+| `GET /api/profiles/<이름>/sessions/<session id>/provider` | 그 profile 의 자식 session 한 줄에서 provider 와 모델만 읽는다 |
 
 `PUT /api/profiles/<이름>/soul` 과 `GET /api/tools/toolsets` 를 뺀 요청은 토큰 요청의 본문이나 query 를
 먼저 검사한다. 검사 규칙은 각 `_check_*` 함수가 소유한다. 공통으로 지키는 것은 셋이다.
@@ -136,6 +137,7 @@ import os
 import pathlib
 import re
 import shutil
+import sqlite3
 import tempfile
 import time
 from typing import Optional
@@ -173,6 +175,14 @@ CATALOG_PATH = "/api/connectors/catalog"
 CALL_ROUTE_RE = re.compile(r"^/api/connectors/([^/]+)/call$")
 EXECUTE_ROUTE_RE = re.compile(r"^/api/connectors/([^/]+)/execute$")
 MODEL_DEFAULTS_RE = re.compile(r"^/api/profiles/([^/]+)/model-defaults$")
+# native 하위 에이전트가 쓴 자식 session 의 provider 를 읽는 경로다(ADR-067).
+SESSION_PROVIDER_RE = re.compile(r"^/api/profiles/([^/]+)/sessions/([^/]+)/provider$")
+# 경로에서 온 session id 다. 저장소 조회의 인자로만 쓰고 파일 경로에는 쓰지 않는다.
+SESSION_ID_RE = re.compile(r"^[A-Za-z0-9_-]{1,128}$")
+# profile 디렉터리 아래 Hermes 의 session 저장소 파일이다.
+SESSION_DB_FILE = "state.db"
+# 저장소가 잠겨 있을 때 기다리는 시간이다. 넘으면 503 으로 답한다.
+SESSION_DB_TIMEOUT_SECONDS = 2
 
 PROFILES_PATH = "/api/profiles"
 PROFILE_PREFIX = "/api/profiles/"
@@ -216,7 +226,9 @@ FIELD_KEY_RE = re.compile(r"^[a-z][a-z0-9_]{0,31}$")
 ENV_NAME_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]{0,127}$")
 TOOL_NAME_RE = re.compile(r"^[A-Za-z0-9_.-]{1,128}$")
 SERVER_NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$")
-ERROR_WORDS = frozenset({"credential_rejected", "forbidden", "invalid_input", "unavailable"})
+ERROR_WORDS = frozenset({"credential_rejected", "forbidden", "invalid_input", "unavailable", "outcome_unknown"})
+# 쓰기를 보냈는데 됐는지 모른다는 어휘다. 실행 경로만 504 로 답하고 `call` 은 `unavailable` 로 읽는다.
+OUTCOME_UNKNOWN = "outcome_unknown"
 # `connector.json` 의 `toolsets` 가 열 수 있는 내장 toolset 이다. 읽기 전용 이미지 도구만 둔다(ADR-044).
 # 셸, 파일, 기억, 스킬, 위임 도구는 manifest 로 열리지 않는다.
 CONNECTOR_TOOLSETS = frozenset({"vision"})
@@ -642,16 +654,22 @@ def _hermes_tool_name(server: str, tool: str) -> str:
 
 
 def _connector_tools(declared: dict, verify_tool: str, option_tools: set, mcp_server: str) -> dict:
-    """`connector.json` 의 도구 정책을 검증해 `{도구 이름: {"risk", "approval", "title"}}` 로 낸다. 틀리면 예외다.
+    """`connector.json` 의 도구 정책을 검증해 `{도구 이름: {"risk", "approval", "title", "grant", "outbound"}}` 로 낸다.
+
+    틀리면 예외다.
 
     하한보다 느슨한 선언은 고쳐서 받지 않고 거절한다. 조용히 엄격하게 읽으면 선언이 틀린 것을 만든 사람이 모른다.
     `schema: 1` 은 도구 정책을 선언하지 않는다. 대시보드가 부르는 읽기 전용 도구만 정책으로 낸다.
+    `grant` 는 그 도구에 상시 허락을 줄 수 있는지다(ADR-065). 기본값을 채운 값이고,
+    `approval` 이 `required` 이고 선언이 닫지 않았을 때만 참이다.
+    `outbound` 는 그 도구가 데이터를 계정 밖의 사람에게 보낸다는 선언이다. 참인 도구는 상시 허락이 닫혀 있어야 한다.
     """
     call_tools = {verify_tool} | set(option_tools)
     if declared["schema"] == 1:
         if "tools" in declared or "default_tool_policy" in declared:
             raise ValueError("tools 와 default_tool_policy 는 schema 2 에서만 선언한다")
-        return {name: {"risk": "READ", "approval": "none", "title": None} for name in sorted(call_tools)}
+        return {name: {"risk": "READ", "approval": "none", "title": None, "grant": False, "outbound": False}
+                for name in sorted(call_tools)}
     if declared["schema"] != 2:
         raise ValueError("schema 는 1 이나 2 만 받는다")
 
@@ -664,8 +682,9 @@ def _connector_tools(declared: dict, verify_tool: str, option_tools: set, mcp_se
     for name, declared_tool in tools.items():
         if not isinstance(name, str) or not TOOL_NAME_RE.match(name):
             raise ValueError("tools 의 키는 도구 이름이다")
-        if not isinstance(declared_tool, dict) or set(declared_tool) - {"risk", "approval", "title"}:
-            raise ValueError("tools 의 값은 risk, approval, title 만 갖는 객체다")
+        if not isinstance(declared_tool, dict) or set(declared_tool) - {
+                "risk", "approval", "title", "grant", "outbound"}:
+            raise ValueError("tools 의 값은 risk, approval, title, grant, outbound 만 갖는 객체다")
         risk = declared_tool.get("risk")
         if not isinstance(risk, str) or risk not in TOOL_RISKS:
             raise ValueError("risk 는 정해 둔 위험도 가운데 하나다")
@@ -678,7 +697,20 @@ def _connector_tools(declared: dict, verify_tool: str, option_tools: set, mcp_se
         title = declared_tool.get("title")
         if "title" in declared_tool and (not isinstance(title, str) or not 1 <= len(title) <= TOOL_TITLE_MAX_CHARS):
             raise ValueError("title 은 1자에서 %d자까지의 문자열이다" % TOOL_TITLE_MAX_CHARS)
-        policies[name] = {"risk": risk, "approval": approval, "title": title}
+        if "grant" in declared_tool:
+            # `1` 이나 `0` 을 boolean 으로 받지 않는다.
+            if type(declared_tool["grant"]) is not bool:
+                raise ValueError("grant 는 true 나 false 다")
+            if approval != "required":
+                raise ValueError("grant 는 approval 이 required 인 도구에만 선언한다")
+        grant = approval == "required" and declared_tool.get("grant") is not False
+        outbound = declared_tool.get("outbound", False)
+        if type(outbound) is not bool:
+            raise ValueError("outbound 는 true 나 false 다")
+        # 밖으로 나가는 도구는 호출마다 사람이 본다. 상시 허락이 열려 있으면 고쳐 읽지 않고 거절한다.
+        if outbound and (approval != "required" or grant):
+            raise ValueError("outbound 가 참인 도구는 approval 이 required 이고 grant 가 false 여야 한다")
+        policies[name] = {"risk": risk, "approval": approval, "title": title, "grant": grant, "outbound": outbound}
     for name in call_tools:
         # 대시보드가 승인 없이 부르는 도구다. 읽기 전용이고 승인이 없는 선언만 맞는다.
         if policies.get(name, {}).get("risk") != "READ" or policies[name]["approval"] != "none":
@@ -767,7 +799,7 @@ def _load_connector(connector_id: str, entry: dict) -> dict:
     if not isinstance(errors, dict) or any(
             not isinstance(code, str) or not isinstance(word, str) or word not in ERROR_WORDS
             for code, word in errors.items()):
-        raise ValueError("errors 의 값은 공통 어휘 넷 가운데 하나다")
+        raise ValueError("errors 의 값은 공통 어휘 다섯 가운데 하나다")
     toolsets = declared.get("toolsets", [])
     if (not isinstance(toolsets, list) or any(not isinstance(name, str) for name in toolsets)
             or len(set(toolsets)) != len(toolsets) or set(toolsets) - CONNECTOR_TOOLSETS):
@@ -1429,6 +1461,9 @@ async def _connector_call_request(request, connector_id: str):
         # 시간을 넘기면 취소가 SDK 의 정리 구간을 돌려 자식 프로세스를 끝낸 뒤에 돌아온다.
         result = await asyncio.wait_for(_run_connector_tool(manifest, tool, env), CONNECTOR_CALL_TIMEOUT_SECONDS)
         answer = None if result is None else _connector_call_answer(manifest, result)
+        if answer is not None and answer.get("error") == OUTCOME_UNKNOWN:
+            # 선택지와 확인 도구는 읽기 전용이다. 결과를 모르는 쓰기가 없으므로 `unavailable` 과 같다.
+            answer = {"ok": False, "error": "unavailable"}
     except ImportError:
         logger.warning("dashboard-profile-api: mcp SDK 를 읽어 오지 못해 커넥터 도구를 부르지 못했다")
         return failed("unavailable")
@@ -1491,6 +1526,7 @@ async def _connector_execute_request(request, connector_id: str):
     승인 여부는 다시 확인하지 않는다. 서비스 토큰을 가진 Control Plane 이 승인한 줄로만 부른다.
     인자와 결과를 로그에 싣지 않는다.
     실행되지 않은 것이 분명한 실패는 `{"ok": false}` 로, 실행됐는지 모르는 실패는 504 로 답한다.
+    도구가 `errors` 표에서 `outcome_unknown` 인 코드로 끝난 것도 실행됐는지 모르는 실패다.
     Control Plane 이 앞의 것은 실패로, 뒤의 것은 결과를 모르는 것으로 읽어 다시 돌리지 않는다.
     """
     from starlette.responses import JSONResponse
@@ -1571,6 +1607,11 @@ async def _connector_execute_request(request, connector_id: str):
         _connector_calls -= 1
     if answer is None:
         return _rejected("실행할 수 없는 도구다")
+    if answer.get("error") == OUTCOME_UNKNOWN:
+        # 도구가 쓰기를 보낸 뒤 답을 받지 못했다고 알렸다. 실패로 답하면 이미 나간 쓰기가 실패로 기록된다.
+        logger.warning("dashboard-profile-api: 커넥터 %s 의 도구 %s 가 실행 결과를 모른다고 답했다",
+                       connector_id, hermes_tool)
+        return _rejected("도구가 실행 결과를 모른다고 답했다", 504)
     return JSONResponse(answer, status_code=200)
 
 
@@ -1944,6 +1985,56 @@ def _model_defaults_response(name):
         return _rejected("profile 설정을 읽지 못했다", 503)
 
 
+def _session_provider_response(name, session_id):
+    """자식 session 한 줄에서 provider 와 모델만 돌려준다.
+
+    Hermes 의 session 저장소를 읽기 전용으로 연다. Hermes 의 저장소 모듈은 스키마가 낡았으면
+    쓰기 연결을 열 수 있어 쓰지 않고 표준 `sqlite3` 만 쓴다(ADR-067).
+    주 호출이 쓴 모델과 provider 의 짝이 둘 이상이면 어느 것으로 환산할지 알 수 없어 provider 를 주지 않는다.
+    짝이 하나여도 그 provider 가 session 줄의 값과 다르면 주지 않는다.
+    """
+    if (not isinstance(name, str) or not PROFILE_NAME_RE.fullmatch(name)
+            or not isinstance(session_id, str) or not SESSION_ID_RE.fullmatch(session_id)):
+        return _rejected("profile 이름이나 session id 가 올바르지 않다", 400)
+    try:
+        from hermes_cli.profiles import get_profile_dir, profile_exists
+        from starlette.responses import JSONResponse
+
+        if not profile_exists(name):
+            return _rejected("없는 profile 이다", 404)
+        database = get_profile_dir(name) / SESSION_DB_FILE
+        if not database.is_file():
+            return _rejected("없는 session 이다", 404)
+        connection = sqlite3.connect(database.resolve().as_uri() + "?mode=ro", uri=True,
+                                     timeout=SESSION_DB_TIMEOUT_SECONDS)
+        try:
+            row = connection.execute(
+                "SELECT source, model, billing_provider FROM sessions WHERE id = ?", (session_id,)).fetchone()
+            if row is None or row[0] != "subagent":
+                return _rejected("없는 session 이다", 404)
+            pairs = connection.execute(
+                "SELECT DISTINCT model, billing_provider FROM session_model_usage"
+                " WHERE session_id = ? AND task = ''", (session_id,)).fetchall()
+        finally:
+            connection.close()
+
+        def public_text(value):
+            return value if isinstance(value, str) and value else None
+
+        provider = public_text(row[2])
+        if len(pairs) > 1:
+            provider = None
+        elif pairs:
+            # 짝이 하나여도 그 provider 가 session 줄과 다르면 어느 쪽이 맞는지 알 수 없다.
+            used = public_text(pairs[0][1])
+            if used is not None and used != provider:
+                provider = None
+        return JSONResponse({"provider": provider, "model": public_text(row[1])}, status_code=200)
+    except Exception:
+        logger.warning("dashboard-profile-api: session 저장소를 읽지 못했다")
+        return _rejected("session 저장소를 읽지 못했다", 503)
+
+
 def _install_gate() -> bool:
     """`token_auth_middleware` 를 감싼다. 감싸지 못하면 False 를 돌려준다."""
     try:
@@ -2044,6 +2135,14 @@ def _install_gate() -> bool:
                 return _rejected("Control Plane 토큰이 필요하다", 401)
             return await asyncio.to_thread(_model_defaults_response, defaults_match.group(1))
 
+        provider_match = SESSION_PROVIDER_RE.match(path) if method == "GET" else None
+        if provider_match is not None:
+            principal, _ = seam.authenticate_token(request)
+            if principal is None or getattr(principal, "provider", None) != ProfileApiProvider.name:
+                return _rejected("Control Plane 토큰이 필요하다", 401)
+            return await asyncio.to_thread(
+                _session_provider_response, provider_match.group(1), provider_match.group(2))
+
         call = CALL_ROUTE_RE.match(path) if method == "POST" else None
         execute = EXECUTE_ROUTE_RE.match(path) if method == "POST" else None
         if ((path == CONNECTORS_PATH and method in {"GET", "PUT"})
@@ -2137,6 +2236,7 @@ def register(ctx) -> None:
     opened[CONNECTORS_PATH] = ["GET", "PUT"]
     opened[CATALOG_PATH] = ["GET"]
     opened["/api/profiles/<이름>/model-defaults"] = ["GET"]
+    opened["/api/profiles/<이름>/sessions/<session id>/provider"] = ["GET"]
     logger.info(
         "dashboard-profile-api: %s 를 토큰으로 연다. 스킬 루트는 %s 다",
         ", ".join(

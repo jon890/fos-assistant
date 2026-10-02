@@ -24,8 +24,8 @@ Memory 항목과 그 판, 그룹의 collection 목록, 에이전트가 받는 co
 | `always_inject` | BOOLEAN | `retrieval` 로 옮긴 옛 칸. `retrieval` 이 `ALWAYS` 일 때만 참으로 적는다. 읽지 않는다. 다음 배포에서 지운다 |
 | `sensitivity` | VARCHAR(20) | `NORMAL` 또는 `SENSITIVE`. 기본값은 `NORMAL`. `SENSITIVE` 는 `ALWAYS` 로 둘 수 없다 |
 | `revision` | INT | 지금 값의 판 번호. 1 에서 시작하고 본문이나 `retrieval` 이나 `sensitivity` 를 고칠 때마다 1 씩 는다. 승인과 거절은 올리지 않는다 |
-| `source_type` | VARCHAR(32) NULL | 출처의 종류. 사람이 직접 적었으면 비어 있다 |
-| `source_ref` | VARCHAR(512) NULL | 출처를 가리키는 값. 다른 항목이면 `memory:<번호>` |
+| `source_type` | VARCHAR(32) NULL | 출처의 종류. 사람이 직접 적었으면 비어 있다. 기존 개인 지식에서 들인 줄은 `brain` 이다 |
+| `source_ref` | VARCHAR(512) NULL | 출처를 가리키는 값. 다른 항목이면 `memory:<번호>`. 들인 줄은 `<namespace>/<저장소 안의 경로>` 다 |
 | `source_date` | DATE NULL | 출처의 날짜 |
 | `status` | VARCHAR(20) | `PROPOSED` 또는 `ACCEPTED` 또는 `REJECTED` |
 | `proposed_by_execution_id` | BIGINT NULL | 이 항목을 제안한 실행. 사람이 직접 적었으면 비어 있다 |
@@ -47,6 +47,7 @@ Memory 항목과 그 판, 그룹의 collection 목록, 에이전트가 받는 co
 | `uk_memory_proposal_dedup` | `proposal_dedup_key` | 같은 제안이 동시에 들어와 두 행이 되는 것 |
 | `uk_memory_user_document` | `owner_user_id`, `collection`, `document_key` | 한 사용자의 한 `collection` 에 같은 이름의 문서가 둘 생기는 것 |
 | `uk_memory_group_document` | `group_id`, `collection`, `document_key` | 한 그룹의 한 `collection` 에 같은 이름의 문서가 둘 생기는 것 |
+| `uk_memory_user_source` | `owner_user_id`, `source_type`, `source_ref` | 한 사용자의 같은 출처가 두 줄이 되는 것. 출처가 없는 줄은 `source_ref` 가 비어 걸리지 않는다 |
 
 주인 칸이 범위에 따라 달라 문서 제약을 둘로 둔다. 비어 있는 칸은 유일 검사에 들지 않으므로 `document_key` 가 없는 줄은 걸리지 않는다.
 
@@ -62,7 +63,8 @@ Memory 항목과 그 판, 그룹의 collection 목록, 에이전트가 받는 co
 
 근거는 [ADR-003](../../adr/ADR-003-memory-권한은-주입으로-강제한다.md), [ADR-012](../../adr/ADR-012-memory-는-사람이-승인한-것만-남는다.md),
 [ADR-052](../../adr/ADR-052-memory-는-collection-종류-꺼내는-방식-민감도-판-출처를-가진다.md),
-[ADR-053](../../adr/ADR-053-에이전트는-허용된-collection-의-memory-만-받는다.md) 에 있다.
+[ADR-053](../../adr/ADR-053-에이전트는-허용된-collection-의-memory-만-받는다.md),
+[ADR-058](../../adr/ADR-058-기존-개인-지식-저장소는-주인이-검토한-묶음을-화면에서-올려-들여온다.md) 에 있다.
 
 ## memory_revision
 

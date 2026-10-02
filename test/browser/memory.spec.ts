@@ -1,23 +1,29 @@
+import type { Page } from "../../web/node_modules/@playwright/test/index.js";
 import { expect, setSession, test } from "./fixtures.ts";
+
+/** 문서 폼에도 같은 이름의 칸이 있어 기억 폼 안에서만 찾는다. */
+function memoryForm(page: Page) {
+  return page.locator("form").filter({ has: page.getByRole("heading", { name: "새 기억" }) });
+}
 
 test("Memory 화면에서 개인 항목을 만들고 고치고 지운다", async ({ page }, testInfo) => {
   const title = `${testInfo.project.name} 음식 선호`;
   await page.goto("/memory");
   await expect(page.getByRole("heading", { name: "검토할 기억" })).toHaveCount(0);
   await expect(page.getByRole("heading", { name: "그룹이 함께 아는 것" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "저장" })).toBeDisabled();
+  await expect(memoryForm(page).getByRole("button", { name: "저장" })).toBeDisabled();
 
-  await page.getByLabel("범위").selectOption("USER");
-  await page.getByLabel("제목", { exact: true }).fill(title);
-  await page.getByLabel("내용").fill("국수는 맵지 않게 먹는다");
-  await page.getByLabel("답을 만들 때 항상 함께 넣기").check();
-  await page.getByRole("button", { name: "저장" }).click();
+  await memoryForm(page).getByLabel("범위").selectOption("USER");
+  await memoryForm(page).getByLabel("제목", { exact: true }).fill(title);
+  await memoryForm(page).getByLabel("내용").fill("국수는 맵지 않게 먹는다");
+  await memoryForm(page).getByLabel("답을 만들 때 항상 함께 넣기").check();
+  await memoryForm(page).getByRole("button", { name: "저장" }).click();
   await expect(page.getByText(title, { exact: true })).toBeVisible();
 
   const item = page.getByRole("heading", { name: title }).locator("xpath=ancestor::article");
   await item.getByRole("button", { name: "고치기" }).click();
-  await page.getByRole("textbox").last().fill("국수는 맵지 않게 먹는다.");
-  await page.getByRole("button", { name: "저장" }).last().click();
+  await item.getByRole("textbox").fill("국수는 맵지 않게 먹는다.");
+  await item.getByRole("button", { name: "저장" }).click();
   await expect(page.getByText("국수는 맵지 않게 먹는다.", { exact: true })).toBeVisible();
   await item.getByRole("button", { name: "지우기" }).click();
   await expect(page.getByText(title, { exact: true })).toHaveCount(0);
@@ -35,10 +41,10 @@ test("관리자에게만 그룹 공용 범위를 보인다", async ({ page }) =>
 test("MEMBER 역할은 그룹 공용 Memory의 범위와 편집 제어를 보지 않는다", async ({ context, page }) => {
   const title = "MEMBER 편집 금지";
   await page.goto("/memory");
-  await page.getByLabel("범위").selectOption("GROUP");
-  await page.getByLabel("제목", { exact: true }).fill(title);
-  await page.getByLabel("내용").fill("그룹만 아는 내용");
-  await page.getByRole("button", { name: "저장" }).click();
+  await memoryForm(page).getByLabel("범위").selectOption("GROUP");
+  await memoryForm(page).getByLabel("제목", { exact: true }).fill(title);
+  await memoryForm(page).getByLabel("내용").fill("그룹만 아는 내용");
+  await memoryForm(page).getByRole("button", { name: "저장" }).click();
   await expect(page.getByRole("heading", { name: title })).toBeVisible();
 
   await setSession(context, { email: "member@example.com", name: "가족 사용자" });
@@ -59,10 +65,10 @@ test("제안을 처리하면 목록과 머리의 미처리 수가 함께 갱신�
   await page.route("**/api/memories/910/accept", async (route) => { state = [{ ...proposed[0], status: "ACCEPTED" }]; await route.fulfill({ json: state[0] }); });
   await page.route("**/api/memories/910/reject", async (route) => { state = []; await route.fulfill({ json: proposed[0] }); });
   await page.goto("/memory");
-  await page.getByLabel("범위").selectOption("USER");
-  await page.getByLabel("제목", { exact: true }).fill("새 항목");
-  await page.getByLabel("내용").fill("내용");
-  await page.getByRole("button", { name: "저장" }).click();
+  await memoryForm(page).getByLabel("범위").selectOption("USER");
+  await memoryForm(page).getByLabel("제목", { exact: true }).fill("새 항목");
+  await memoryForm(page).getByLabel("내용").fill("내용");
+  await memoryForm(page).getByRole("button", { name: "저장" }).click();
   await expect(page.getByRole("heading", { name: "검토할 기억" })).toBeVisible();
   await expect(page.getByTestId("memory-proposal-count")).toHaveText("1");
   await page.getByRole("button", { name: "받아들이기" }).click();
@@ -77,10 +83,10 @@ test("제안을 물리면 제안 절과 머리의 미처리 수가 사라진다"
     ? route.fulfill({ json: state }) : route.fulfill({ status: 201, json: proposed[0] }));
   await page.route("**/api/memories/911/reject", async (route) => { state = []; await route.fulfill({ json: proposed[0] }); });
   await page.goto("/memory");
-  await page.getByLabel("범위").selectOption("USER");
-  await page.getByLabel("제목", { exact: true }).fill("새 항목");
-  await page.getByLabel("내용").fill("내용");
-  await page.getByRole("button", { name: "저장" }).click();
+  await memoryForm(page).getByLabel("범위").selectOption("USER");
+  await memoryForm(page).getByLabel("제목", { exact: true }).fill("새 항목");
+  await memoryForm(page).getByLabel("내용").fill("내용");
+  await memoryForm(page).getByRole("button", { name: "저장" }).click();
   await expect(page.getByTestId("memory-proposal-count")).toHaveText("1");
   await page.getByRole("button", { name: "거절" }).click();
   await expect(page.getByRole("heading", { name: "검토할 기억" })).toHaveCount(0);
@@ -91,10 +97,10 @@ test("Memory 변경이 실패하면 성공처럼 닫지 않고 오류를 보인�
   // 두 폭이 같은 제목을 만들고 지우지 않으면 같은 제목의 줄이 둘이 된다.
   const title = `실패 검사 ${testInfo.project.name} ${Date.now()}`;
   await page.goto("/memory");
-  await page.getByLabel("범위").selectOption("USER");
-  await page.getByLabel("제목", { exact: true }).fill(title);
-  await page.getByLabel("내용").fill("원래 내용");
-  await page.getByRole("button", { name: "저장" }).click();
+  await memoryForm(page).getByLabel("범위").selectOption("USER");
+  await memoryForm(page).getByLabel("제목", { exact: true }).fill(title);
+  await memoryForm(page).getByLabel("내용").fill("원래 내용");
+  await memoryForm(page).getByRole("button", { name: "저장" }).click();
   const item = page.getByRole("heading", { name: title, exact: true }).locator("xpath=ancestor::article");
   await page.route("**/api/memories/*", async (route) => route.fulfill({ status: 500 }));
   await item.getByRole("button", { name: "고치기" }).click();
@@ -112,10 +118,10 @@ test("문맥에 실리지 않은 항목에 표시가 보인다", async ({ page }
   await page.route("**/api/memories", async (route) => route.request().method() === "GET"
     ? route.fulfill({ json: list }) : route.fulfill({ status: 201, json: list[0] }));
   await page.goto("/memory");
-  await page.getByLabel("범위").selectOption("USER");
-  await page.getByLabel("제목", { exact: true }).fill("새 항목");
-  await page.getByLabel("내용").fill("내용");
-  await page.getByRole("button", { name: "저장" }).click();
+  await memoryForm(page).getByLabel("범위").selectOption("USER");
+  await memoryForm(page).getByLabel("제목", { exact: true }).fill("새 항목");
+  await memoryForm(page).getByLabel("내용").fill("내용");
+  await memoryForm(page).getByRole("button", { name: "저장" }).click();
 
   const omitted = page.getByRole("heading", { name: "너무 긴 항목" }).locator("xpath=ancestor::article");
   await expect(omitted.getByTestId("memory-omitted")).toHaveText("길어서 답에 포함되지 않음");

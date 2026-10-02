@@ -41,6 +41,8 @@ export type ConnectorAction = {
   createdAt: string;
   expiresAt: string | null;
   grantAllowed: boolean;
+  /** 가려진 내용이 있어 승인할 수 없는 줄인가. 참이면 승인 단추를 그리지 않는다. */
+  hiddenArgs: boolean;
 };
 
 /** 묻지 않고 실행하게 허락한 도구 한 개다. 화면에는 `title` 을 보인다. */
@@ -70,43 +72,20 @@ export function connectorActionErrorMessage(code: string): string {
     : FALLBACK_MESSAGE;
 }
 
-/** 비밀처럼 보이는 키의 값 대신 보이는 글이다. */
-export const MASKED_VALUE = "가려진 값";
-
-const SECRET_KEY_PARTS = [
-  "token",
-  "secret",
-  "password",
-  "passwd",
-  "apikey",
-  "authorization",
-  "cookie",
-  "credential",
-];
-
-/** 키 이름이 비밀처럼 보이면 참이다. 대소문자와 `_`, `-` 를 무시한다. */
-function isSecretKey(key: string): boolean {
-  const normalized = key.toLowerCase().replace(/[_-]/g, "");
-  return SECRET_KEY_PARTS.some((part) => normalized.includes(part));
-}
-
 function readableValue(value: unknown): string {
   if (typeof value === "string") return value;
   if (value === null || typeof value !== "object") return String(value);
-  // 안쪽에 든 비밀처럼 보이는 키도 가린다.
-  return JSON.stringify(
-    value,
-    (key, inner: unknown) => (isSecretKey(key) ? MASKED_VALUE : inner),
-    2,
-  );
+  return JSON.stringify(value, null, 2);
 }
 
 /**
  * 승인 줄의 인자를 사람이 읽을 키와 값으로 바꾼다.
  *
  * <p>JSON 객체로 읽히면 최상위 키마다 한 줄을 준다. 문자열은 그대로, 숫자와 불린은 글로, 객체와 배열은 2칸
- * 들여쓴 JSON 글로 바꾼다. 키 이름이 비밀처럼 보이면 값을 가린다. 객체로 읽히지 않으면 `null` 을 주고, 부른
- * 쪽이 원문을 글 한 덩어리로 보인다. 서버가 길어서 자른 인자가 그렇다.
+ * 들여쓴 JSON 글로 바꾼다. 객체로 읽히지 않으면 `null` 을 주고, 부른 쪽이 원문을 글 한 덩어리로 보인다.
+ *
+ * <p>값을 여기서 가리지 않는다. 가림은 Control Plane 이 응답에서 한 번만 한다. 두 곳의 규칙이 다르면 화면만 가린
+ * 값이 승인될 수 있다.
  */
 export function readableArgs(
   argsJson: string | null,
@@ -122,7 +101,7 @@ export function readableArgs(
     return null;
   return Object.entries(parsed).map(([key, value]) => ({
     key,
-    value: isSecretKey(key) ? MASKED_VALUE : readableValue(value),
+    value: readableValue(value),
   }));
 }
 

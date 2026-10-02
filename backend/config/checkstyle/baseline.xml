@@ -132,7 +132,6 @@
   <suppress id="lombokLogger" files="src[\\/]main[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]usage[\\/]application[\\/]ExecutionEventRecorder\.java$"/>
   <suppress id="lombokLogger" files="src[\\/]main[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]usage[\\/]application[\\/]ExecutionRecorder\.java$"/>
   <suppress id="lombokLogger" files="src[\\/]main[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]usage[\\/]application[\\/]ExecutionTreeService\.java$"/>
-  <suppress id="lombokLogger" files="src[\\/]main[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]usage[\\/]application[\\/]OrphanedExecutionSweeper\.java$"/>
   <suppress id="privateEmptyConstructor" files="src[\\/]main[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]usage[\\/]application[\\/]ToolDetailPolicy\.java$"/>
   <suppress checks="(^|\.)LeftCurly(Check)?$" files="src[\\/]main[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]usage[\\/]domain[\\/]AgentExecution\.java$"/>
   <suppress id="entityHandwrittenAccessor" files="src[\\/]main[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]usage[\\/]domain[\\/]AgentExecution\.java$"/>

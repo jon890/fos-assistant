@@ -29,6 +29,7 @@ import com.bifos.assistant.skill.domain.ExecutionSkillUse;
 import com.bifos.assistant.skill.domain.SkillUseSource;
 import com.bifos.assistant.skill.infra.ExecutionSkillUseRepository;
 import com.bifos.assistant.usage.application.ExecutionTreeService;
+import com.bifos.assistant.usage.application.UsageSummaryService;
 import com.bifos.assistant.usage.domain.AgentExecution;
 import com.bifos.assistant.usage.domain.ExecutionStatus;
 import com.bifos.assistant.usage.infra.AgentExecutionRepository;
@@ -92,6 +93,9 @@ class SkillUsageQueryTest {
     @Autowired
     ExecutionTreeService trees;
 
+    @Autowired
+    UsageSummaryService summaries;
+
     @MockitoBean
     HermesSkillClient skillClient;
 
@@ -131,7 +135,7 @@ class SkillUsageQueryTest {
         use(execution(dad, dadFirst), "shopping", SkillUseSource.MODEL, T1);
         use(execution(dad, dadSecond), "shopping", SkillUseSource.COMMAND, T2);
         use(execution(kid, kidOnly), "shopping", SkillUseSource.MODEL, T3);
-        controller = new UsageController(executions, currentUser, agentService, trees, conversations, query);
+        controller = new UsageController(executions, currentUser, agentService, trees, conversations, query, summaries);
         when(toolsets.readEnabled(anyString(), anyString())).thenReturn(List.of("web", "skills", "fos-assistant"));
         when(skillClient.list(anyString()))
                 .thenReturn(List.of(
@@ -201,12 +205,12 @@ class SkillUsageQueryTest {
         when(currentUser.require()).thenReturn(kid);
         List<UsageDtos.MySkillUsageView> kidView = controller.mySkillUsage();
 
+        // 둘 다 MEMBER 역할이라 에이전트 코드는 비어 온다(ADR-063).
         assertThat(dadView)
                 .containsExactly(
-                        new UsageDtos.MySkillUsageView(AGENT_CODE, "가족 비서", "shopping", 2, T2, dadSecond.publicId()));
+                        new UsageDtos.MySkillUsageView(null, "가족 비서", "shopping", 2, T2, dadSecond.publicId()));
         assertThat(kidView)
-                .containsExactly(
-                        new UsageDtos.MySkillUsageView(AGENT_CODE, "가족 비서", "shopping", 1, T3, kidOnly.publicId()));
+                .containsExactly(new UsageDtos.MySkillUsageView(null, "가족 비서", "shopping", 1, T3, kidOnly.publicId()));
     }
 
     @Test

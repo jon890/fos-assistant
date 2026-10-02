@@ -4,9 +4,13 @@ import com.bifos.assistant.agent.application.AgentService;
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.hermes.HermesRunsClient;
 import com.bifos.assistant.hermes.ProfileModelDefaultsClient;
+import com.bifos.assistant.hermes.SubagentProviderClient;
 import com.bifos.assistant.hermes.dto.ProfileModelDefaults;
+import com.bifos.assistant.hermes.dto.SubagentProviderLookup;
 import com.bifos.assistant.hermes.dto.SubagentSessionUsage;
+import com.bifos.assistant.hermes.dto.TokenUsage;
 import com.bifos.assistant.usage.domain.AgentExecution;
+import com.bifos.assistant.usage.domain.ExecutionCost;
 import com.bifos.assistant.usage.domain.ExecutionEvent;
 import com.bifos.assistant.usage.domain.ExecutionEventType;
 import com.bifos.assistant.usage.domain.SubagentUsageJob;
@@ -28,16 +32,31 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
-/** 대화 응답과 분리해 최종 자식 사용량과 profile 기본 강도를 보완한다. */
+/**
+ * 대화 응답과 분리해 최종 자식 사용량과 profile 기본 강도를 보완한다.
+ *
+ * <p>재조회 작업 줄은 native 자식 한 명의 사용량 원장이다. 종료를 확인한 자식의 provider, 모델, 토큰,
+ * 환산 금액을 그 줄에 한 번만 적고, 합계는 그 줄의 값을 더한다. 완료 사건은 표시용으로만 남긴다.
+ * 근거는 ADR-062 에 있다.
+ *
+ * <p>session 응답에 provider 가 없으면 대시보드 plugin 의 읽기 경로에서 자식의 provider 를 읽어 환산한다(ADR-067).
+ */
 @Service
 @Slf4j
 public class SubagentUsageReconciler {
+    private static final int EVENT_MODEL_LIMIT = 128;
+
+    /** 자식이 끝난 뒤 이 시간 동안만 닿지 않는 대시보드를 기다린다. 지나면 provider 없이 적는다. */
+    private static final Duration PROVIDER_RETRY_WINDOW = Duration.ofMinutes(10);
+
     private final AgentExecutionRepository executions;
     private final ExecutionEventRepository events;
     private final SubagentUsageJobRepository jobs;
     private final AgentService agents;
     private final HermesRunsClient hermes;
     private final ProfileModelDefaultsClient defaults;
+    private final SubagentProviderClient providers;
+    private final CostEstimator estimator;
     private final TransactionTemplate transaction;
     private final Clock clock;
     private final Semaphore slots = new Semaphore(4);
@@ -51,8 +70,10 @@ public class SubagentUsageReconciler {
             AgentService agents,
             HermesRunsClient hermes,
             ProfileModelDefaultsClient defaults,
+            SubagentProviderClient providers,
+            CostEstimator estimator,
             PlatformTransactionManager manager) {
-        this(executions, events, jobs, agents, hermes, defaults, manager, Clock.systemUTC());
+        this(executions, events, jobs, agents, hermes, defaults, providers, estimator, manager, Clock.systemUTC());
     }
 
     SubagentUsageReconciler(
@@ -62,6 +83,8 @@ public class SubagentUsageReconciler {
             AgentService agents,
             HermesRunsClient hermes,
             ProfileModelDefaultsClient defaults,
+            SubagentProviderClient providers,
+            CostEstimator estimator,
             PlatformTransactionManager manager,
             Clock clock) {
         this.executions = executions;
@@ -70,6 +93,8 @@ public class SubagentUsageReconciler {
         this.agents = agents;
         this.hermes = hermes;
         this.defaults = defaults;
+        this.providers = providers;
+        this.estimator = estimator;
         this.transaction = new TransactionTemplate(manager);
         this.clock = clock;
     }
@@ -98,7 +123,7 @@ public class SubagentUsageReconciler {
                 if (parent == null || parent.finishedAt() == null) {
                     return;
                 }
-                if (jobs.existsByExecutionIdAndChildSessionId(parent.id(), start.hermesSessionId())) {
+                if (jobs.existsByProfileNameAndChildSessionId(parent.profileName(), start.hermesSessionId())) {
                     return;
                 }
                 Agent agent = agents.findById(parent.agentId()).orElse(null);
@@ -141,48 +166,117 @@ public class SubagentUsageReconciler {
             return;
         }
         Instant now = clock.instant();
-        SubagentSessionUsage usage = job.expired(now)
+        SubagentSessionUsage read = job.expired(now)
                 ? null
                 : hermes.readSubagentUsage(job.apiBaseUrl(), job.profileName(), job.childSessionId());
+        // 대시보드 조회도 Hermes 조회처럼 트랜잭션 밖에서 한다.
+        ProviderResolution resolution = resolveProvider(job, read, now);
+        SubagentSessionUsage usage = resolution.usage();
         transaction.executeWithoutResult(status -> {
             AgentExecution parent = executions.lockById(job.executionId()).orElse(null);
             SubagentUsageJob current = jobs.findById(jobId).orElse(null);
             if (parent == null || current == null || !"WAITING".equals(current.status())) {
                 return;
             }
-            if (events.existsByExecutionIdAndHermesSessionIdAndEventType(
-                    parent.id(), current.childSessionId(), ExecutionEventType.SUBAGENT_COMPLETED)) {
-                current.done();
+            if (isFinalChild(current, usage) && resolution.waitForProvider()) {
+                // 줄은 한 번만 적으므로, 대시보드가 돌아올 때까지 줄도 완료 사건도 남기지 않는다.
+                current.retry(now);
+            } else if (isFinalChild(current, usage)) {
+                // 완료 사건은 표시용이다. 부모 스트림으로 이미 왔으면 다시 만들지 않는다.
+                if (!events.existsByExecutionIdAndHermesSessionIdAndEventType(
+                        parent.id(), current.childSessionId(), ExecutionEventType.SUBAGENT_COMPLETED)) {
+                    saveCompletion(parent, current, usage, now);
+                }
+                String reason = unpricedReason(usage);
+                ExecutionCost cost = ExecutionCost.unknown();
+                if (reason == null) {
+                    cost = estimator.estimate(
+                            usage.provider(),
+                            usage.model(),
+                            new TokenUsage(
+                                    usage.inclusiveInputTokens(), usage.cacheReadTokens(), usage.outputTokens(), null),
+                            parent.costMode());
+                    if (!cost.isKnown()) {
+                        cost = ExecutionCost.unknown();
+                        reason = "PRICE_UNKNOWN";
+                    }
+                }
+                current.record(usage, cost, reason, now);
             } else if (current.expired(now)) {
                 current.expire();
-            } else if (isFinalChild(current, usage)) {
-                List<ExecutionEvent> starts =
-                        events.findByExecutionIdInOrderByExecutionIdAscSequenceAsc(List.of(parent.id()));
-                ExecutionEvent start = starts.stream()
-                        .filter(event -> event.eventType() == ExecutionEventType.SUBAGENT_STARTED
-                                && current.childSessionId().equals(event.hermesSessionId()))
-                        .findFirst()
-                        .orElse(null);
-                events.save(ExecutionEvent.builder()
-                        .executionId(parent.id())
-                        .sequence(events.lastSequence(parent.id()) + 1)
-                        .eventType(ExecutionEventType.SUBAGENT_COMPLETED)
-                        .subagentName(start == null ? null : start.subagentName())
-                        .hermesSessionId(current.childSessionId())
-                        .model(usage.model())
-                        .inputTokens(usage.inclusiveInputTokens())
-                        .outputTokens(usage.outputTokens())
-                        .durationMs(usage.durationMs())
-                        .failed(null)
-                        .detail(start == null ? null : start.detail())
-                        .occurredAt(now)
-                        .build());
-                current.done();
             } else {
                 current.retry(now);
             }
             jobs.save(current);
         });
+    }
+
+    /** 대시보드 조회를 반영한 자식 사용량과, 대시보드를 더 기다릴지다. */
+    private record ProviderResolution(SubagentSessionUsage usage, boolean waitForProvider) {}
+
+    /**
+     * session 응답에 provider 가 없는 종료 자식의 provider 를 대시보드에서 읽는다.
+     *
+     * <p>부모 실행의 provider 로 채우지 않는다. 대시보드가 답한 모델이 session 의 모델과 다르면 다른 줄을
+     * 읽은 것이라 채우지 않는다. 대시보드에 닿지 못했으면 자식이 끝난 뒤 {@link #PROVIDER_RETRY_WINDOW}
+     * 동안만 기다린다.
+     */
+    private ProviderResolution resolveProvider(SubagentUsageJob job, SubagentSessionUsage usage, Instant now) {
+        if (!isFinalChild(job, usage)
+                || (usage.provider() != null && !usage.provider().isBlank())) {
+            return new ProviderResolution(usage, false);
+        }
+        SubagentProviderLookup lookup = providers.read(job.profileName(), job.childSessionId());
+        if (lookup == null) {
+            return new ProviderResolution(usage, false);
+        }
+        if (lookup.unavailable()) {
+            boolean withinWindow = usage.endedAt() + PROVIDER_RETRY_WINDOW.toSeconds() > now.getEpochSecond();
+            return new ProviderResolution(usage, withinWindow);
+        }
+        boolean hasProvider = lookup.provider() != null && !lookup.provider().isBlank();
+        // 조회의 모델이 null 이면 저장소 줄에 모델이 비었다는 뜻이고 어긋남이 아니다.
+        boolean sameModel = lookup.model() == null || lookup.model().equals(usage.model());
+        return new ProviderResolution(hasProvider && sameModel ? usage.withProvider(lookup.provider()) : usage, false);
+    }
+
+    private void saveCompletion(AgentExecution parent, SubagentUsageJob job, SubagentSessionUsage usage, Instant now) {
+        List<ExecutionEvent> starts = events.findByExecutionIdInOrderByExecutionIdAscSequenceAsc(List.of(parent.id()));
+        ExecutionEvent start = starts.stream()
+                .filter(event -> event.eventType() == ExecutionEventType.SUBAGENT_STARTED
+                        && job.childSessionId().equals(event.hermesSessionId()))
+                .findFirst()
+                .orElse(null);
+        events.save(ExecutionEvent.builder()
+                .executionId(parent.id())
+                .sequence(events.lastSequence(parent.id()) + 1)
+                .eventType(ExecutionEventType.SUBAGENT_COMPLETED)
+                .subagentName(start == null ? null : start.subagentName())
+                .hermesSessionId(job.childSessionId())
+                .model(eventModel(usage.model()))
+                .inputTokens(usage.inclusiveInputTokens())
+                .outputTokens(usage.outputTokens())
+                .durationMs(usage.durationMs())
+                .failed(null)
+                .detail(start == null ? null : start.detail())
+                .occurredAt(now)
+                .build());
+    }
+
+    /** 사건의 모델 칸 길이를 넘는 이름은 잘라 넣는다. 넘는 값은 저장이 실패해 작업 줄까지 되돌린다. */
+    private static String eventModel(String model) {
+        return model == null || model.length() <= EVENT_MODEL_LIMIT ? model : model.substring(0, EVENT_MODEL_LIMIT);
+    }
+
+    /** 환산을 시도하기 전에 알 수 있는 금액 미확인 까닭이다. 환산할 수 있으면 null 이다. */
+    private static String unpricedReason(SubagentSessionUsage usage) {
+        if (usage.provider() == null || usage.provider().isBlank()) {
+            return "PROVIDER_UNKNOWN";
+        }
+        if (usage.inclusiveInputTokens() == null || usage.outputTokens() == null) {
+            return "USAGE_UNKNOWN";
+        }
+        return null;
     }
 
     static boolean isFinalChild(SubagentUsageJob job, SubagentSessionUsage usage) {

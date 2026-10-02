@@ -12,6 +12,7 @@ import com.bifos.assistant.chat.infra.ModelTierGroupSettingRepository;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
+import com.bifos.assistant.usage.application.InternalValuePolicy;
 import com.bifos.assistant.user.infra.AppUserRepository;
 import java.util.Arrays;
 import java.util.List;
@@ -41,15 +42,22 @@ public class ModelTierService {
     private final ModelOptionsService modelOptions;
     private final ModelVisibilityService visibility;
 
+    /**
+     * 요청자가 고를 수 있는 단계와 기본값이다.
+     *
+     * <p>단계가 가리키는 provider 와 모델과 effort 는 내부 값이라 {@code ADMIN} 역할에게만 싣는다(ADR-063).
+     * 그 밖의 요청자는 단계와 이름만 받는다.
+     */
     @Transactional(readOnly = true)
     public ModelTierOptions optionsFor(CurrentUser user, Agent agent) {
         List<ModelTierDefinition> definitions = definitionsFor(user.groupId());
-        String defaultProvider = needsDefaultProvider(definitions)
+        boolean internal = InternalValuePolicy.visibleTo(user);
+        String defaultProvider = internal && needsDefaultProvider(definitions)
                 ? modelOptions.optionsForAgent(user.groupId(), agent).defaultProvider()
                 : null;
         return new ModelTierOptions(
                 definitions.stream()
-                        .map(definition -> view(definition, defaultProvider))
+                        .map(definition -> internal ? view(definition, defaultProvider) : nameOnly(definition))
                         .toList(),
                 users.findById(user.id())
                         .map(it -> tierOf(it.modelDefaultTier()))
@@ -59,6 +67,28 @@ public class ModelTierService {
                         .map(it -> it.defaultTier())
                         .orElse(null),
                 user.isAdmin());
+    }
+
+    /**
+     * 관리자가 고칠 그룹의 단계 정의와 그룹 기본 단계다.
+     *
+     * <p>에이전트를 받지 않는다. 단계 정의는 그룹의 설정이고 특정 에이전트에 매이지 않는다. 에이전트로 읽으면
+     * 관리자가 대화를 시작할 수 없는 에이전트(다른 사용자의 비공개 에이전트)를 고른 화면이 설정을 읽지 못한다.
+     * provider 를 비운 단계는 비운 채 낸다. 에이전트의 기본 provider 로 채워 보이면 저장할 때 그 값으로 굳는다.
+     */
+    @Transactional(readOnly = true)
+    public GroupModelTiers groupTiers(CurrentUser admin) {
+        if (!admin.isAdmin()) {
+            throw new ApiException(ErrorCode.FORBIDDEN, "this action is limited to the group admin");
+        }
+        return new GroupModelTiers(
+                definitionsFor(admin.groupId()).stream()
+                        .map(ModelTierService::stored)
+                        .toList(),
+                groupSettings
+                        .findById(admin.groupId())
+                        .map(it -> it.defaultTier())
+                        .orElse(null));
     }
 
     @Transactional
@@ -110,6 +140,26 @@ public class ModelTierService {
     @Transactional(readOnly = true)
     public void requireVisible(CurrentUser user, ModelChoice choice) {
         visibility.requireVisible(user.groupId(), choice);
+    }
+
+    /**
+     * 대화에 저장하려는 effort 가 그 모델에서 고를 수 있는 값인지 본다.
+     *
+     * <p>{@code none} 만 판정한다. 그 에이전트의 목록(숨김 적용)에서 모델의 끄기 지원이 확인되지 않으면 거절한다.
+     * 모델을 비웠으면 목록의 기본 모델로 본다. 목록 조회 실패({@code HERMES_UNAVAILABLE})는 그대로 올린다.
+     *
+     * @throws ApiException {@code VALIDATION_FAILED}. 그 모델에서 reasoning 을 끌 수 있는지 확인되지 않을 때
+     */
+    @Transactional(readOnly = true)
+    public void requireEffortAllowed(CurrentUser user, Agent agent, ModelChoice choice) {
+        if (!ModelChoice.EFFORT_NONE.equals(choice.reasoningEffort())) {
+            return;
+        }
+        if (!modelOptions
+                .optionsForAgent(user.groupId(), agent)
+                .allowsEffort(choice.provider(), choice.model(), ModelChoice.EFFORT_NONE)) {
+            throw new ApiException(ErrorCode.VALIDATION_FAILED, "reasoning cannot be turned off for this model");
+        }
     }
 
     /**
@@ -235,7 +285,7 @@ public class ModelTierService {
 
     private static ModelTierOptions.Tier view(ModelTierDefinition definition, String defaultProvider) {
         if (isFallback(definition)) {
-            return new ModelTierOptions.Tier(definition.tier(), labelOf(definition.tier()), null, null, null);
+            return nameOnly(definition);
         }
         return new ModelTierOptions.Tier(
                 definition.tier(),
@@ -243,6 +293,21 @@ public class ModelTierService {
                 definition.provider() == null ? defaultProvider : definition.provider(),
                 definition.model(),
                 definition.reasoningEffort());
+    }
+
+    /** 저장된 값 그대로 담는다. 빈 칸을 채우지 않는다. */
+    private static ModelTierOptions.Tier stored(ModelTierDefinition definition) {
+        return new ModelTierOptions.Tier(
+                definition.tier(),
+                labelOf(definition.tier()),
+                definition.provider(),
+                definition.model(),
+                definition.reasoningEffort());
+    }
+
+    /** 단계와 이름만 담는다. 가리키는 모델을 싣지 않는 요청자와 mapping 이 빈 단계가 함께 쓴다. */
+    private static ModelTierOptions.Tier nameOnly(ModelTierDefinition definition) {
+        return new ModelTierOptions.Tier(definition.tier(), labelOf(definition.tier()), null, null, null);
     }
 
     private static ModelTierOptions.Tier normalize(ModelTierOptions.Tier tier) {

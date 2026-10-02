@@ -36,6 +36,7 @@ cd web && pnpm install && pnpm typecheck && pnpm build
 | `DB_URL`, `DB_USERNAME`, `DB_PASSWORD` | Backend | 데이터베이스 접속 값 |
 | `AUTH_GOOGLE_ID`, `AUTH_GOOGLE_SECRET`, `AUTH_SECRET` | Web | Google OAuth 클라이언트와 NextAuth 세션 암호화 key |
 | `CONTROL_PLANE_BASE_URL` | Web | Control Plane 주소 |
+| `APP_NAME` | Web | 사이드바 머리, 로그인 화면, 브라우저 제목에 보일 앱 이름. 웹 서버가 실행할 때 읽으므로 이미지를 다시 빌드하지 않고 바꾼다. 비우면 `fos-assistant` |
 | `ASSISTANT_MEMORY_ENCRYPTION_ACTIVE_KEY_ID` | Backend | 민감 Memory 본문을 새로 암호화할 때 쓰는 key 의 id. 비우면 민감 항목을 저장하거나 수정하지 못한다 |
 | `ASSISTANT_MEMORY_ENCRYPTION_KEYS` | Backend | `<id>:<base64 32바이트>` 를 쉼표로 이은 목록. 잃으면 민감 본문을 되찾지 못한다 |
 | `HERMES_PROFILE_KEY_DIR` | Backend | profile 이름으로 된 key 파일이 들어 있는 디렉터리 |

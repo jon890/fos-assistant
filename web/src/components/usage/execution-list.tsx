@@ -1,4 +1,5 @@
 import { EmptyState } from "@/components/ui/empty-state";
+import { isInterruptedByRestart } from "@/lib/execution-status";
 import { formatCost, formatDurationFor } from "@/lib/format";
 import { ExecutionCard } from "./execution-card";
 import { ExecutionTable } from "./execution-table";
@@ -11,7 +12,8 @@ export type UsageExecution = {
   model: string | null;
   /** 요청에 실은 reasoning effort. 고르지 않았거나 이 칸이 생기기 전 실행이면 null */
   reasoningEffort: string | null;
-  costMode: string;
+  /** 관리자에게만 온다. 그 밖의 사용자에게는 null */
+  costMode: string | null;
   status: string;
   errorCode: string | null;
   inputTokens: number | null;
@@ -62,6 +64,11 @@ export function reasoningEffortLabel(execution: UsageExecution): string {
   return execution.reasoningEffort ?? "기본";
 }
 
+/** 실행 상세 경로다. 내부 값을 그리는 상세는 관리자 영역에만 있다. */
+export function executionPath(id: number, isAdmin: boolean): string {
+  return isAdmin ? `/admin/executions/${id}` : `/executions/${id}`;
+}
+
 export function isRunning(execution: UsageExecution): boolean {
   return execution.status === "RUNNING";
 }
@@ -98,7 +105,7 @@ export function executionStatusLabel(
   isAdmin: boolean,
 ): string {
   if (isRunning(execution)) return "실행 중";
-  if (execution.errorCode === "ORPHANED") return "중간에 중단됨";
+  if (isInterruptedByRestart(execution.errorCode)) return "중간에 중단됨";
   if (execution.errorCode === "PROVIDER_BLOCKED") return "모델을 쓸 수 없음";
   if (execution.errorCode === "NO_MODEL_AVAILABLE")
     return "사용할 수 있는 모델 없음";

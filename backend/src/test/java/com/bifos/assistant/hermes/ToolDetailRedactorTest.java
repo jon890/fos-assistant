@@ -90,6 +90,40 @@ class ToolDetailRedactorTest {
     }
 
     @Test
+    @DisplayName("가릴 것이 없는 인자는 공백과 키 순서와 글자 표기가 달라도 가려지는 것이 없다고 답한다")
+    void argumentsWithoutSecretsHideNothingRegardlessOfSerialization() {
+        String plain = "{\"to\":\"friend@example.com\",\"subject\":\"저녁 약속 🍜\","
+                + "\"body\":\"안녕하세요.\\n\\\"내일\\\" 7시에 봬요 😀\\t끝\",\"count\":2,\"ratio\":1.50,\"tags\":[\"가\",\"나\"]}";
+        String spaced =
+                "{ \"subject\" : \"저녁 약속 🍜\",\n  \"to\": \"friend@example.com\", \"nested\": {\"b\": 1, \"a\": null} }";
+        String escaped = "{\"body\":\"\\uc548\\ub155 \\ud83d\\ude00 a\\/b\"}";
+
+        assertThat(ToolDetailRedactor.hidesArguments(plain))
+                .as("한글, 이모지, 줄바꿈, 따옴표")
+                .isFalse();
+        assertThat(ToolDetailRedactor.hidesArguments(spaced)).as("공백과 키 순서").isFalse();
+        assertThat(ToolDetailRedactor.hidesArguments(escaped)).as("\\u 로 적은 글자").isFalse();
+        assertThat(ToolDetailRedactor.hidesArguments("{}")).isFalse();
+        assertThat(ToolDetailRedactor.hidesArguments("본문만 있는 글")).isFalse();
+        assertThat(ToolDetailRedactor.hidesArguments(null)).isFalse();
+    }
+
+    @Test
+    @DisplayName("가려지는 글이 하나라도 있거나 JSON 으로 읽히지 않는 인자는 가려지는 것이 있다고 답한다")
+    void argumentsWithSecretsHideSomething() {
+        String token = "QUJDREVGR0hJSktMTU5PUFFSU1RVVldYWVowMTIzNDU2Nzg5";
+
+        assertThat(ToolDetailRedactor.hidesArguments("{\"body\":\"회의록입니다\\n" + token + "\"}"))
+                .isTrue();
+        assertThat(ToolDetailRedactor.hidesArguments("{\"body\":\"안녕\",\"api_token\":\"abc\"}"))
+                .isTrue();
+        assertThat(ToolDetailRedactor.hidesArguments("{\"body\":\"password=hunter2 예요\"}"))
+                .isTrue();
+        assertThat(ToolDetailRedactor.hidesArguments("{\"body\":\"끝나지 않은 글")).isTrue();
+        assertThat(ToolDetailRedactor.hidesArguments("실행 password=hunter2")).isTrue();
+    }
+
+    @Test
     @DisplayName("연결용 도구는 짧고 평범한 비밀값도 원문 전체를 가려 보호한다")
     void hidesAllConnectorDetails() {
         assertThat(ToolDetailRedactor.redact("결과: very short secret", true)).isEqualTo("[연결 도구 내용 가림]");

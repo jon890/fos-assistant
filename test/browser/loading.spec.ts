@@ -22,7 +22,7 @@ function sidebarStatus(page: Page) {
   return page.locator('aside[aria-label="사이드바"] [role="status"]');
 }
 
-test("에이전트 목록은 조회 중에도 역할에 맞는 뼈대를 곧바로 보인다", async ({ page }) => {
+test("에이전트 목록은 조회 중에도 화면에 맞는 뼈대를 곧바로 보인다", async ({ page }) => {
   await page.addInitScript(() => {
     const record = () => {
       const skeleton = document.querySelector<HTMLElement>('main [data-testid="page-skeleton"]');
@@ -33,13 +33,13 @@ test("에이전트 목록은 조회 중에도 역할에 맞는 뼈대를 곧바�
     new MutationObserver(record).observe(document, { childList: true, subtree: true });
   });
 
-  await page.goto("/agents");
+  await page.goto("/admin/agents");
   await expect(page.getByRole("heading", { name: "에이전트", exact: true })).toBeVisible();
   const skeleton = await page.evaluate(() => (window as Window & { agentSkeleton?: string }).agentSkeleton);
   expect(skeleton).toContain("max-w-4xl");
   expect(skeleton).toContain("h-[46.875rem]");
 
-  await setSession(page.context(), { email: "member@example.com", name: "가족 사용자" });
+  // 일반 화면은 ADMIN 에게도 같은 크기의 뼈대를 보인다.
   await page.goto("/agents");
   await expect(page.getByRole("heading", { name: "에이전트", exact: true })).toBeVisible();
   const memberSkeleton = await page.evaluate(() => (window as Window & { agentSkeleton?: string }).agentSkeleton);

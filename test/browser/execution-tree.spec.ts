@@ -154,7 +154,7 @@ test("자식 노드가 있어도 하위 에이전트 사건 줄이 사라지지 
   await page.route("**/api/usage/executions/*/tree", async (route) => {
     await route.fulfill({ json: treeWithChildAndSubagentFixture() });
   });
-  await page.goto("/executions/950");
+  await page.goto("/admin/executions/950");
 
   const tree = page.getByTestId("execution-tree");
   await expect(tree).toBeVisible();
@@ -168,7 +168,7 @@ test("하위 에이전트 사용량 확인 상태를 실패와 다르게 보인�
   await page.route("**/api/usage/executions/*/tree", async (route) => {
     await route.fulfill({ json: treeWithChildAndSubagentFixture("WAITING") });
   });
-  await page.goto("/executions/950");
+  await page.goto("/admin/executions/950");
   const eventRows = page.getByTestId("execution-event-row");
   await expect(eventRows.filter({ hasText: "수치 확인 중" })).toHaveCount(1);
   await expect(page.getByText("실패", { exact: true })).toHaveCount(0);
@@ -189,7 +189,7 @@ test("실행 상세와 작업 과정에 실제 모델, 단계, 기본 강도와 
   await page.route("**/api/usage/executions/*/tree", async (route) => {
     await route.fulfill({ json: deepTreeFixture(1) });
   });
-  await page.goto("/executions/900");
+  await page.goto("/admin/executions/900");
 
   await expect(
     page.getByText("ChatGPT 구독 · example-model", { exact: true }),
@@ -239,7 +239,7 @@ test("관리자는 도우미 줄에서 id 로 채워진 이름과 목표를 함�
       json: treeWithChildAndSubagentFixture(null, "sa-950"),
     });
   });
-  await page.goto("/executions/950");
+  await page.goto("/admin/executions/950");
   await expect(page.getByTestId("execution-event-row")).toHaveText(
     "도우미: sa-950 · 하위 에이전트가 찾기 시작했다",
   );
@@ -273,7 +273,7 @@ test("도구 사건 둘과 하위 에이전트 사건이 각각 한 줄로 보�
   expect(response.ok()).toBeTruthy();
   const id = await lastExecutionId(page);
 
-  await page.goto(`/executions/${id}`);
+  await page.goto(`/admin/executions/${id}`);
   const tree = page.getByTestId("execution-tree");
   await expect(tree).toBeVisible();
   await expect(tree.locator('[data-tool="fake-tool"]')).toHaveCount(1);
@@ -294,7 +294,7 @@ test("사건이 없는 실행을 열면 기록된 작업이 없어요고 보이�
   expect(response.ok()).toBeTruthy();
   const id = await lastExecutionId(page);
 
-  await page.goto(`/executions/${id}`);
+  await page.goto(`/admin/executions/${id}`);
   await expect(
     page.getByText("기록된 작업이 없어요", { exact: true }),
   ).toBeVisible();
@@ -307,7 +307,7 @@ test("깊은 트리를 열어도 좁은 화면과 넓은 화면 모두 가로로
   await page.route("**/api/usage/executions/*/tree", async (route) => {
     await route.fulfill({ json: deepTreeFixture(5) });
   });
-  await page.goto("/executions/900");
+  await page.goto("/admin/executions/900");
 
   const tree = page.getByTestId("execution-tree");
   await expect(tree).toBeVisible();
@@ -379,7 +379,7 @@ test("트리가 위쪽에서 잘렸으면 루트 위에 안내가 보인다", as
       }),
     });
   });
-  await page.goto("/executions/970");
+  await page.goto("/admin/executions/970");
 
   await expect(page.getByTestId("execution-tree-truncated-above")).toHaveText(
     "위쪽 기록이 없어 이곳이 첫 실행이 아닐 수 있어요",
@@ -401,7 +401,7 @@ test("노드 아래가 잘린 것이면 위쪽 안내를 따로 그리지 않아
       json: singleNodeTreeFixture({ treeTruncated: true, nodeTruncated: true }),
     });
   });
-  await page.goto("/executions/970");
+  await page.goto("/admin/executions/970");
 
   await expect(page.getByTestId("execution-tree-truncated-above")).toHaveCount(
     0,
@@ -442,7 +442,7 @@ test("관리자는 붐벼서 실패한 실행의 상세에서 안내 문구와 �
   }
   const id = await lastExecutionId(page);
 
-  await page.goto(`/executions/${id}`);
+  await page.goto(`/admin/executions/${id}`);
   const row = page.getByTestId("execution-event-row");
   await expect(row).toHaveText("실행 실패: 지금 요청이 많아요. 잠시 뒤 다시 보내 주세요. (HERMES_BUSY)");
   // 머리 요약의 내부 값도 그대로 보인다.
@@ -452,7 +452,7 @@ test("관리자는 붐벼서 실패한 실행의 상세에서 안내 문구와 �
 
 test("관리자는 도구 결과의 원본을 줄에서 보지 않고 원본 보기를 눌러야 본다", async ({ page }) => {
   await page.route("**/api/usage/executions/*/tree", (route) => route.fulfill({ json: terminalTreeFixture() }));
-  await page.goto("/executions/980");
+  await page.goto("/admin/executions/980");
 
   const terminal = page.getByTestId("execution-tree").locator('[data-tool="terminal"]');
   await expect(terminal).toContainText("작업을 했어요");

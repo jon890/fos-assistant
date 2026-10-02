@@ -2,7 +2,7 @@
 import { call, expect, expectStatus, step, type Response, type Scenario } from "../harness.ts";
 import { readEventStream } from "../../../web/src/lib/stream.ts";
 import { DAD_BINDING } from "./binding.ts";
-import { TOOL_DETAIL_SECRETS } from "../fake-hermes.ts";
+import { SUBAGENT_PROVIDER_PROBE, TOOL_DETAIL_SECRETS } from "../fake-hermes.ts";
 
 type ChatEvent = {
   type: "delta" | "tool" | "subagent" | "done" | "error";
@@ -44,6 +44,27 @@ type ExecutionNode = {
   children: ExecutionNode[];
 };
 type ExecutionTree = { root: ExecutionNode; truncated: boolean };
+type MonthlyCostView = {
+  estimatedCostMicros: number;
+  pricedSubagents: number;
+  unpricedSubagents: number;
+};
+
+/** 부모 실행 하나의 환산 금액이다. 입력 120 중 80 이 캐시이고 출력이 40 이라 `40 × 5 + 80 × 0.5 + 40 × 30` 이다. */
+const PARENT_RUN_MICROS = 1440;
+/**
+ * 자식 하나의 환산 금액이다. 표본 가격표에서 부모 바인딩과 다른 `anthropic` 의 `example-model-large` 단가로
+ * 일반 입력과 cache write 110 × 15, cache read 50 × 1.5, 출력 20 × 75 를 더한다.
+ */
+const CHILD_RUN_MICROS = 3225;
+
+async function monthlyCost(context: Parameters<Scenario["run"]>[0]): Promise<MonthlyCostView> {
+  return expectStatus(
+    await call(context, "/usage/monthly-cost", { token: context.tokens.dad }),
+    200,
+    "합계 조회",
+  ).json<MonthlyCostView>();
+}
 
 async function events(response: Response): Promise<ChatEvent[]> {
   const received: ChatEvent[] = [];
@@ -145,6 +166,7 @@ export const streamingScenario: Scenario = {
     expect(timingValues.every((value, index) => Number.isFinite(value)
       && (index === 0 || value >= timingValues[index - 1]!)), "실행 시각의 순서가 뒤집혔다");
 
+    const unpricedBefore = (await monthlyCost(context)).unpricedSubagents;
     for (const text of ["자식 늦은 완료 검사", "자식 완료 사건 없음 검사", "압축 뒤 자식 완료 검사"]) {
       step(`${text}: 부모 종료 뒤 session 사용량을 보완한다`);
       const receivedChild = await events(expectStatus(await call(context, "/chat/messages/stream", {
@@ -170,6 +192,34 @@ export const streamingScenario: Scenario = {
       expect(recordedChild?.subagentName?.startsWith("sa-") === true,
         "이름이 없는 자식의 subagent_id를 표시 이름으로 보존하지 못했다");
     }
+
+    step("대시보드에서 읽은 provider 와 session 의 모델로 자식 금액을 합계에 한 번만 더한다");
+    const unpricedAfter = (await monthlyCost(context)).unpricedSubagents;
+    expect(unpricedAfter - unpricedBefore === 3,
+      `대시보드가 provider 를 주지 않은 자식 3건이 가격 미확인으로 세어지지 않았다: ${unpricedBefore} -> ${unpricedAfter}`);
+    const costBefore = await monthlyCost(context);
+    const receivedPriced = await events(expectStatus(await call(context, "/chat/messages/stream", {
+      method: "POST", token: context.tokens.dad, body: { text: SUBAGENT_PROVIDER_PROBE, agentCode: "dad" },
+    }), 200, SUBAGENT_PROVIDER_PROBE));
+    expect(receivedPriced.at(-1)?.type === "done", "자식 provider 확인 검사가 done 으로 끝나지 않았다");
+    let costAfter = costBefore;
+    const pricedDeadline = Date.now() + 20000;
+    while (Date.now() < pricedDeadline) {
+      costAfter = await monthlyCost(context);
+      if (costAfter.pricedSubagents > costBefore.pricedSubagents) break;
+      await new Promise((resolve) => setTimeout(resolve, 250));
+    }
+    expect(costAfter.pricedSubagents === costBefore.pricedSubagents + 1,
+      `금액을 확인한 자식이 1건 늘지 않았다: ${costBefore.pricedSubagents} -> ${costAfter.pricedSubagents}`);
+    expect(costAfter.estimatedCostMicros - costBefore.estimatedCostMicros === PARENT_RUN_MICROS + CHILD_RUN_MICROS,
+      `합계 증가분이 부모 ${PARENT_RUN_MICROS} 와 자식 ${CHILD_RUN_MICROS} 의 합이 아니다: `
+      + `${costAfter.estimatedCostMicros - costBefore.estimatedCostMicros}`);
+    // 재조회 주기(5초)를 한 번 넘겨도 같은 자식을 다시 더하지 않는다.
+    await new Promise((resolve) => setTimeout(resolve, 6000));
+    const costLater = await monthlyCost(context);
+    expect(costLater.pricedSubagents === costAfter.pricedSubagents
+      && costLater.estimatedCostMicros === costAfter.estimatedCostMicros,
+    `다시 조회한 뒤 같은 자식이 두 번 더해졌다: ${JSON.stringify(costAfter)} -> ${JSON.stringify(costLater)}`);
 
     step("Hermes 이벤트 스트림이 중간에 끝나도 최종 답과 실행 기록을 남긴다");
     const interrupted = await events(expectStatus(

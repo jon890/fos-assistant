@@ -5,6 +5,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -15,18 +16,24 @@ import com.bifos.assistant.agent.domain.CostMode;
 import com.bifos.assistant.agent.domain.CredentialScope;
 import com.bifos.assistant.hermes.HermesRunsClient;
 import com.bifos.assistant.hermes.ProfileModelDefaultsClient;
+import com.bifos.assistant.hermes.SubagentProviderClient;
 import com.bifos.assistant.hermes.dto.ProfileModelDefaults;
+import com.bifos.assistant.hermes.dto.SubagentProviderLookup;
 import com.bifos.assistant.hermes.dto.SubagentSessionUsage;
 import com.bifos.assistant.usage.domain.AgentExecution;
+import com.bifos.assistant.usage.domain.CatalogPrice;
 import com.bifos.assistant.usage.domain.ExecutionEvent;
 import com.bifos.assistant.usage.domain.ExecutionEventType;
 import com.bifos.assistant.usage.domain.ExecutionStatus;
+import com.bifos.assistant.usage.domain.ModelPrice;
+import com.bifos.assistant.usage.domain.PriceCatalog;
 import com.bifos.assistant.usage.domain.SubagentUsageJob;
 import com.bifos.assistant.usage.domain.type.ReasoningEffortSource;
 import com.bifos.assistant.usage.infra.AgentExecutionRepository;
 import com.bifos.assistant.usage.infra.ExecutionEventRepository;
 import com.bifos.assistant.usage.infra.SubagentUsageJobRepository;
 import java.lang.reflect.Field;
+import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
@@ -45,6 +52,13 @@ import org.springframework.transaction.support.DefaultTransactionStatus;
 class SubagentUsageReconcilerTest {
 
     private static final Instant NOW = Instant.parse("2026-10-01T00:00:10Z");
+    private static final String PRICING_VERSION = "test-pricing@2026-10-01";
+
+    /**
+     * 일반 입력 10, cache read 2, cache write 3, 출력 4 를 입력 5, cache read 0.5, 출력 30 달러 단가로 환산한
+     * 마이크로 달러다. cache write 는 입력 단가로 센다: (10 + 3) * 5 + 2 * 0.5 + 4 * 30.
+     */
+    private static final long PRICED_MICROS = 186L;
 
     @Test
     @DisplayName("아직 끝나지 않은 자식은 재조회 대상으로 남는다")
@@ -218,7 +232,7 @@ class SubagentUsageReconcilerTest {
         when(fixtures.events.findUnscheduledChildren(any(), any())).thenReturn(List.of(fixtures.start));
         when(fixtures.executions.lockById(1L)).thenReturn(Optional.of(fixtures.parent));
         when(fixtures.agents.findById(2L)).thenReturn(Optional.of(fixtures.agent));
-        when(fixtures.jobs.existsByExecutionIdAndChildSessionId(1L, "child")).thenReturn(false);
+        when(fixtures.jobs.existsByProfileNameAndChildSessionId("dad", "child")).thenReturn(false);
 
         fixtures.reconciler.discover(NOW);
 
@@ -237,7 +251,7 @@ class SubagentUsageReconcilerTest {
         when(fixtures.events.findUnscheduledChildren(any(), any())).thenReturn(List.of(fixtures.start));
         when(fixtures.executions.lockById(1L)).thenReturn(Optional.of(fixtures.parent));
         when(fixtures.agents.findById(2L)).thenReturn(Optional.empty());
-        when(fixtures.jobs.existsByExecutionIdAndChildSessionId(1L, "child")).thenReturn(false);
+        when(fixtures.jobs.existsByProfileNameAndChildSessionId("dad", "child")).thenReturn(false);
 
         fixtures.reconciler.discover(NOW);
 
@@ -255,7 +269,7 @@ class SubagentUsageReconcilerTest {
         when(fixtures.events.findUnscheduledChildren(any(), any())).thenReturn(List.of(fixtures.start));
         when(fixtures.executions.lockById(1L)).thenReturn(Optional.of(fixtures.parent));
         when(fixtures.agents.findById(2L)).thenReturn(Optional.of(fixtures.agent));
-        when(fixtures.jobs.existsByExecutionIdAndChildSessionId(1L, "child")).thenReturn(false);
+        when(fixtures.jobs.existsByProfileNameAndChildSessionId("dad", "child")).thenReturn(false);
 
         fixtures.reconciler.discover(NOW);
 
@@ -282,7 +296,7 @@ class SubagentUsageReconcilerTest {
         when(fixtures.events.findUnscheduledChildren(any(), any())).thenReturn(List.of(fixtures.start));
         when(fixtures.executions.lockById(1L)).thenReturn(Optional.of(fixtures.parent));
         when(fixtures.agents.findById(2L)).thenReturn(Optional.of(agentWithChangedProfile));
-        when(fixtures.jobs.existsByExecutionIdAndChildSessionId(1L, "child")).thenReturn(false);
+        when(fixtures.jobs.existsByProfileNameAndChildSessionId("dad", "child")).thenReturn(false);
 
         fixtures.reconciler.discover(NOW);
 
@@ -322,20 +336,172 @@ class SubagentUsageReconcilerTest {
     }
 
     @Test
-    @DisplayName("SSE 완료 사건이 있으면 HTTP 결과를 중복 저장하지 않고 작업만 끝낸다")
-    void pollDoesNotDuplicateSseCompletion() throws ReflectiveOperationException {
+    @DisplayName("SSE 완료 사건이 있으면 사건을 새로 저장하지 않고 작업 줄에 사용량을 적는다")
+    void pollRecordsUsageWithoutDuplicatingSseCompletion() throws ReflectiveOperationException {
         Fixtures fixtures = fixtures();
         when(fixtures.jobs.findById(10L)).thenReturn(Optional.of(fixtures.job));
         when(fixtures.executions.lockById(1L)).thenReturn(Optional.of(fixtures.parent));
         when(fixtures.events.existsByExecutionIdAndHermesSessionIdAndEventType(
                         1L, "child", ExecutionEventType.SUBAGENT_COMPLETED))
                 .thenReturn(true);
+        when(fixtures.hermes.readSubagentUsage(any(), any(), any())).thenReturn(pricedUsage("example-fast"));
 
         fixtures.reconciler.poll(10L);
 
         verify(fixtures.events, never()).save(any());
         verify(fixtures.jobs).save(fixtures.job);
         assertThat(fixtures.job.status()).isEqualTo("DONE");
+        assertThat(fixtures.job.inputTokens()).isEqualTo(10L);
+        assertThat(fixtures.job.outputTokens()).isEqualTo(4L);
+        assertThat(fixtures.job.estimatedCostMicros()).isEqualTo(PRICED_MICROS);
+    }
+
+    @Test
+    @DisplayName("provider 와 가격이 있는 종료 자식은 토큰 넷과 환산액과 가격표 버전을 줄에 적는다")
+    void pollRecordsTokensAndEstimatedCost() throws ReflectiveOperationException {
+        Fixtures fixtures = fixtures();
+        stubFinalChild(fixtures, pricedUsage("example-fast"));
+
+        fixtures.reconciler.poll(10L);
+
+        SubagentUsageJob job = fixtures.job;
+        assertThat(job.status()).isEqualTo("DONE");
+        assertThat(job.provider()).isEqualTo("openai-codex");
+        assertThat(job.model()).isEqualTo("example-fast");
+        assertThat(job.inputTokens()).isEqualTo(10L);
+        assertThat(job.cacheReadTokens()).isEqualTo(2L);
+        assertThat(job.cacheWriteTokens()).isEqualTo(3L);
+        assertThat(job.outputTokens()).isEqualTo(4L);
+        assertThat(job.estimatedCostMicros()).isEqualTo(PRICED_MICROS);
+        assertThat(job.actualCostMicros()).as("구독 경로의 실제 청구액").isNull();
+        assertThat(job.costCurrency()).isEqualTo("USD");
+        assertThat(job.pricingVersion()).isEqualTo(PRICING_VERSION);
+        assertThat(job.unconfirmedReason()).isNull();
+        assertThat(job.recordedAt()).isEqualTo(NOW);
+    }
+
+    @Test
+    @DisplayName("부모가 종량 경로면 실제 청구액을 환산액과 같게 적는다")
+    void pollRecordsActualCostForApiParent() throws ReflectiveOperationException {
+        Fixtures fixtures = fixtures(CostMode.API);
+        stubFinalChild(fixtures, pricedUsage("example-fast"));
+
+        fixtures.reconciler.poll(10L);
+
+        assertThat(fixtures.job.estimatedCostMicros()).isEqualTo(PRICED_MICROS);
+        assertThat(fixtures.job.actualCostMicros()).isEqualTo(PRICED_MICROS);
+        assertThat(fixtures.job.unconfirmedReason()).isNull();
+    }
+
+    @Test
+    @DisplayName("provider 가 없는 종료 자식은 부모의 provider 로 채우지 않고 PROVIDER_UNKNOWN 으로 끝낸다")
+    void pollLeavesCostEmptyWhenProviderIsMissing() throws ReflectiveOperationException {
+        Fixtures fixtures = fixtures();
+        setField(fixtures.parent, "provider", "openai-codex");
+        stubFinalChild(
+                fixtures,
+                new SubagentSessionUsage("child", "subagent", "parent", "example-fast", 1.0, 2.5, 10L, 4L, 2L, 3L));
+        when(fixtures.providers.read("dad", "child")).thenReturn(SubagentProviderLookup.absent());
+
+        fixtures.reconciler.poll(10L);
+
+        assertThat(fixtures.job.status()).isEqualTo("DONE");
+        assertThat(fixtures.job.provider()).as("부모의 provider 로 채우지 않는다").isNull();
+        assertThat(fixtures.job.outputTokens()).isEqualTo(4L);
+        assertThat(fixtures.job.estimatedCostMicros()).isNull();
+        assertThat(fixtures.job.actualCostMicros()).isNull();
+        assertThat(fixtures.job.pricingVersion()).isNull();
+        assertThat(fixtures.job.unconfirmedReason()).isEqualTo("PROVIDER_UNKNOWN");
+    }
+
+    @Test
+    @DisplayName("출력 토큰을 읽지 못한 종료 자식은 금액 없이 USAGE_UNKNOWN 으로 끝낸다")
+    void pollLeavesCostEmptyWhenTokensAreMissing() throws ReflectiveOperationException {
+        Fixtures fixtures = fixtures();
+        stubFinalChild(
+                fixtures,
+                new SubagentSessionUsage(
+                        "child", "subagent", "parent", "example-fast", "openai-codex", 1.0, 2.5, 10L, null, 2L, 3L));
+
+        fixtures.reconciler.poll(10L);
+
+        assertThat(fixtures.job.status()).isEqualTo("DONE");
+        assertThat(fixtures.job.inputTokens()).isEqualTo(10L);
+        assertThat(fixtures.job.estimatedCostMicros()).isNull();
+        assertThat(fixtures.job.unconfirmedReason()).isEqualTo("USAGE_UNKNOWN");
+    }
+
+    @Test
+    @DisplayName("가격표에 없는 모델의 종료 자식은 금액 없이 PRICE_UNKNOWN 으로 끝낸다")
+    void pollLeavesCostEmptyWhenPriceIsMissing() throws ReflectiveOperationException {
+        Fixtures fixtures = fixtures();
+        stubFinalChild(fixtures, pricedUsage("unlisted-model"));
+
+        fixtures.reconciler.poll(10L);
+
+        assertThat(fixtures.job.status()).isEqualTo("DONE");
+        assertThat(fixtures.job.provider()).isEqualTo("openai-codex");
+        assertThat(fixtures.job.model()).isEqualTo("unlisted-model");
+        assertThat(fixtures.job.estimatedCostMicros()).isNull();
+        assertThat(fixtures.job.actualCostMicros()).isNull();
+        assertThat(fixtures.job.unconfirmedReason()).isEqualTo("PRICE_UNKNOWN");
+    }
+
+    @Test
+    @DisplayName("칸 길이를 넘는 모델과 provider 의 종료 자식도 잘라 적고 DONE 으로 끝낸다")
+    void pollCutsOverlongModelAndProviderToColumnLength() throws ReflectiveOperationException {
+        Fixtures fixtures = fixtures();
+        String model = "m".repeat(129);
+        String provider = "p".repeat(65);
+        stubFinalChild(
+                fixtures,
+                new SubagentSessionUsage("child", "subagent", "parent", model, provider, 1.0, 2.5, 10L, 4L, 2L, 3L));
+
+        fixtures.reconciler.poll(10L);
+
+        ArgumentCaptor<ExecutionEvent> event = ArgumentCaptor.forClass(ExecutionEvent.class);
+        verify(fixtures.events).save(event.capture());
+        assertThat(event.getValue().model()).as("완료 사건의 모델").isEqualTo("m".repeat(128));
+        assertThat(fixtures.job.status()).isEqualTo("DONE");
+        assertThat(fixtures.job.model()).isEqualTo("m".repeat(128));
+        assertThat(fixtures.job.provider()).isEqualTo("p".repeat(64));
+        assertThat(fixtures.job.outputTokens()).isEqualTo(4L);
+        assertThat(fixtures.job.unconfirmedReason()).isEqualTo("PRICE_UNKNOWN");
+    }
+
+    @Test
+    @DisplayName("환산은 자르기 전 모델 이름으로 가격표를 찾는다")
+    void pollPricesWithUncutModelName() throws ReflectiveOperationException {
+        Fixtures fixtures = fixtures();
+        String model = "m".repeat(129);
+        when(fixtures.prices.find("openai-codex", model))
+                .thenReturn(Optional.of(new CatalogPrice(
+                        new ModelPrice(new BigDecimal("5"), new BigDecimal("30"), new BigDecimal("0.5"), List.of()),
+                        PRICING_VERSION)));
+        stubFinalChild(fixtures, pricedUsage(model));
+
+        fixtures.reconciler.poll(10L);
+
+        assertThat(fixtures.job.model()).isEqualTo("m".repeat(128));
+        assertThat(fixtures.job.estimatedCostMicros()).isEqualTo(PRICED_MICROS);
+        assertThat(fixtures.job.unconfirmedReason()).isNull();
+    }
+
+    @Test
+    @DisplayName("이미 사용량을 적은 줄을 다시 조회해도 아무것도 바꾸지 않는다")
+    void pollDoesNothingForRecordedJob() throws ReflectiveOperationException {
+        Fixtures fixtures = fixtures();
+        stubFinalChild(fixtures, pricedUsage("example-fast"));
+
+        fixtures.reconciler.poll(10L);
+        fixtures.reconciler.poll(10L);
+
+        verify(fixtures.hermes, times(1)).readSubagentUsage(any(), any(), any());
+        verify(fixtures.events, times(1)).save(any());
+        verify(fixtures.jobs, times(1)).save(fixtures.job);
+        assertThat(fixtures.job.status()).isEqualTo("DONE");
+        assertThat(fixtures.job.estimatedCostMicros()).isEqualTo(PRICED_MICROS);
+        assertThat(fixtures.job.recordedAt()).isEqualTo(NOW);
     }
 
     @Test
@@ -371,6 +537,167 @@ class SubagentUsageReconcilerTest {
         verify(fixtures.events, never()).save(any());
         assertThat(fixtures.job.status()).isEqualTo("WAITING");
         assertThat(fixtures.job.nextAttemptAt()).isEqualTo(NOW.plusSeconds(5));
+    }
+
+    @Test
+    @DisplayName("session 에 provider 가 없으면 대시보드에서 읽은 provider 로 환산한다")
+    void pollPricesWithProviderFromDashboard() throws ReflectiveOperationException {
+        Fixtures fixtures = fixtures();
+        stubFinalChild(fixtures, usageWithoutProvider(2.5));
+        when(fixtures.providers.read("dad", "child"))
+                .thenReturn(SubagentProviderLookup.found("openai-codex", "example-fast"));
+
+        fixtures.reconciler.poll(10L);
+
+        assertThat(fixtures.job.status()).isEqualTo("DONE");
+        assertThat(fixtures.job.provider()).isEqualTo("openai-codex");
+        assertThat(fixtures.job.estimatedCostMicros()).isEqualTo(PRICED_MICROS);
+        assertThat(fixtures.job.unconfirmedReason()).isNull();
+    }
+
+    @Test
+    @DisplayName("session 에 provider 가 있으면 대시보드를 부르지 않는다")
+    void pollSkipsDashboardWhenSessionHasProvider() throws ReflectiveOperationException {
+        Fixtures fixtures = fixtures();
+        stubFinalChild(fixtures, pricedUsage("example-fast"));
+
+        fixtures.reconciler.poll(10L);
+
+        verify(fixtures.providers, never()).read(any(), any());
+        assertThat(fixtures.job.provider()).isEqualTo("openai-codex");
+    }
+
+    @Test
+    @DisplayName("대시보드가 답한 모델이 session 의 모델과 다르면 provider 를 채우지 않는다")
+    void pollLeavesProviderEmptyWhenDashboardModelDiffers() throws ReflectiveOperationException {
+        Fixtures fixtures = fixtures();
+        stubFinalChild(fixtures, usageWithoutProvider(2.5));
+        when(fixtures.providers.read("dad", "child"))
+                .thenReturn(SubagentProviderLookup.found("openai-codex", "other-model"));
+
+        fixtures.reconciler.poll(10L);
+
+        assertThat(fixtures.job.status()).isEqualTo("DONE");
+        assertThat(fixtures.job.provider()).isNull();
+        assertThat(fixtures.job.estimatedCostMicros()).isNull();
+        assertThat(fixtures.job.unconfirmedReason()).isEqualTo("PROVIDER_UNKNOWN");
+    }
+
+    @Test
+    @DisplayName("대시보드가 모델 없이 provider 만 답해도 환산한다")
+    void pollPricesWhenDashboardModelIsEmpty() throws ReflectiveOperationException {
+        Fixtures fixtures = fixtures();
+        stubFinalChild(fixtures, usageWithoutProvider(2.5));
+        when(fixtures.providers.read("dad", "child")).thenReturn(SubagentProviderLookup.found("openai-codex", null));
+
+        fixtures.reconciler.poll(10L);
+
+        assertThat(fixtures.job.status()).isEqualTo("DONE");
+        assertThat(fixtures.job.provider()).isEqualTo("openai-codex");
+        assertThat(fixtures.job.estimatedCostMicros()).isEqualTo(PRICED_MICROS);
+        assertThat(fixtures.job.unconfirmedReason()).isNull();
+    }
+
+    @Test
+    @DisplayName("대시보드에 닿지 못했고 자식이 막 끝났으면 줄도 완료 사건도 남기지 않고 다시 조회한다")
+    void pollWaitsWhenDashboardIsUnreachableRightAfterEnd() throws ReflectiveOperationException {
+        Fixtures fixtures = fixtures();
+        stubFinalChild(fixtures, usageWithoutProvider(NOW.getEpochSecond() - 60));
+        when(fixtures.providers.read("dad", "child")).thenReturn(SubagentProviderLookup.unreachable());
+        int attempts = fixtures.job.attempts();
+
+        fixtures.reconciler.poll(10L);
+
+        assertThat(fixtures.job.status()).isEqualTo("WAITING");
+        assertThat(fixtures.job.attempts()).isEqualTo(attempts + 1);
+        assertThat(fixtures.job.outputTokens()).as("줄에 적은 토큰").isNull();
+        assertThat(fixtures.job.recordedAt()).isNull();
+        verify(fixtures.events, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("대시보드에 닿지 못한 채 599초가 지났으면 아직 기다린다")
+    void pollWaitsJustInsideProviderRetryWindow() throws ReflectiveOperationException {
+        Fixtures fixtures = fixtures();
+        stubFinalChild(fixtures, usageWithoutProvider(NOW.getEpochSecond() - 599));
+        when(fixtures.providers.read("dad", "child")).thenReturn(SubagentProviderLookup.unreachable());
+
+        fixtures.reconciler.poll(10L);
+
+        assertThat(fixtures.job.status()).isEqualTo("WAITING");
+        assertThat(fixtures.job.unconfirmedReason()).isNull();
+        verify(fixtures.events, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("대시보드에 닿지 못한 채 10분이 지났으면 토큰만 적고 PROVIDER_UNKNOWN 으로 끝낸다")
+    void pollGivesUpProviderAfterRetryWindow() throws ReflectiveOperationException {
+        for (long elapsed : new long[] {600L, 601L}) {
+            Fixtures fixtures = fixtures();
+            stubFinalChild(fixtures, usageWithoutProvider(NOW.getEpochSecond() - elapsed));
+            when(fixtures.providers.read("dad", "child")).thenReturn(SubagentProviderLookup.unreachable());
+
+            fixtures.reconciler.poll(10L);
+
+            assertThat(fixtures.job.status()).as("종료 뒤 %d초의 상태", elapsed).isEqualTo("DONE");
+            assertThat(fixtures.job.unconfirmedReason())
+                    .as("종료 뒤 %d초의 미확인 까닭", elapsed)
+                    .isEqualTo("PROVIDER_UNKNOWN");
+            assertThat(fixtures.job.provider())
+                    .as("종료 뒤 %d초의 provider", elapsed)
+                    .isNull();
+            assertThat(fixtures.job.inputTokens())
+                    .as("종료 뒤 %d초의 입력 토큰", elapsed)
+                    .isEqualTo(10L);
+            assertThat(fixtures.job.outputTokens())
+                    .as("종료 뒤 %d초의 출력 토큰", elapsed)
+                    .isEqualTo(4L);
+            assertThat(fixtures.job.estimatedCostMicros())
+                    .as("종료 뒤 %d초의 환산액", elapsed)
+                    .isNull();
+        }
+    }
+
+    @Test
+    @DisplayName("아직 끝나지 않은 자식은 대시보드를 부르지 않는다")
+    void pollSkipsDashboardForUnfinishedChild() throws ReflectiveOperationException {
+        Fixtures fixtures = fixtures();
+        stubFinalChild(fixtures, usageWithoutProvider(null));
+
+        fixtures.reconciler.poll(10L);
+
+        verify(fixtures.providers, never()).read(any(), any());
+        assertThat(fixtures.job.status()).isEqualTo("WAITING");
+    }
+
+    /** provider 가 없는 자식의 session 응답이다. {@code endedAt} 은 epoch 초이고 null 이면 아직 돌고 있다. */
+    private static SubagentSessionUsage usageWithoutProvider(Number endedAt) {
+        return new SubagentSessionUsage(
+                "child",
+                "subagent",
+                "parent",
+                "example-fast",
+                1.0,
+                endedAt == null ? null : endedAt.doubleValue(),
+                10L,
+                4L,
+                2L,
+                3L);
+    }
+
+    /** provider 가 있는 종료 자식의 session 응답이다. */
+    private static SubagentSessionUsage pricedUsage(String model) {
+        return new SubagentSessionUsage(
+                "child", "subagent", "parent", model, "openai-codex", 1.0, 2.5, 10L, 4L, 2L, 3L);
+    }
+
+    /** 완료 사건이 아직 없는 자식을 조회하면 그 응답이 오게 한다. */
+    private static void stubFinalChild(Fixtures fixtures, SubagentSessionUsage usage) {
+        when(fixtures.jobs.findById(10L)).thenReturn(Optional.of(fixtures.job));
+        when(fixtures.executions.lockById(1L)).thenReturn(Optional.of(fixtures.parent));
+        when(fixtures.events.findByExecutionIdInOrderByExecutionIdAscSequenceAsc(List.of(1L)))
+                .thenReturn(List.of(fixtures.start));
+        when(fixtures.hermes.readSubagentUsage(any(), any(), any())).thenReturn(usage);
     }
 
     private static SubagentUsageJob job() throws ReflectiveOperationException {
@@ -414,17 +741,28 @@ class SubagentUsageReconcilerTest {
     }
 
     private static Fixtures fixtures() throws ReflectiveOperationException {
+        return fixtures(CostMode.SUBSCRIPTION);
+    }
+
+    private static Fixtures fixtures(CostMode parentCostMode) throws ReflectiveOperationException {
         AgentExecutionRepository executions = mock(AgentExecutionRepository.class);
         ExecutionEventRepository events = mock(ExecutionEventRepository.class);
         SubagentUsageJobRepository jobs = mock(SubagentUsageJobRepository.class);
         AgentService agents = mock(AgentService.class);
         HermesRunsClient hermes = mock(HermesRunsClient.class);
         ProfileModelDefaultsClient defaults = mock(ProfileModelDefaultsClient.class);
+        SubagentProviderClient providers = mock(SubagentProviderClient.class);
+        PriceCatalog prices = mock(PriceCatalog.class);
+        when(prices.find(any(), any())).thenReturn(Optional.empty());
+        when(prices.find("openai-codex", "example-fast"))
+                .thenReturn(Optional.of(new CatalogPrice(
+                        new ModelPrice(new BigDecimal("5"), new BigDecimal("30"), new BigDecimal("0.5"), List.of()),
+                        PRICING_VERSION)));
         AgentExecution parent = AgentExecution.builder()
                 .userId(1L)
                 .agentId(2L)
                 .profileName("dad")
-                .costMode(CostMode.SUBSCRIPTION)
+                .costMode(parentCostMode)
                 .reasoningEffortSource(ReasoningEffortSource.UNKNOWN)
                 .status(ExecutionStatus.SUCCEEDED)
                 .startedAt(NOW.minusSeconds(1))
@@ -459,9 +797,24 @@ class SubagentUsageReconcilerTest {
                 agents,
                 hermes,
                 defaults,
+                providers,
+                new CostEstimator(prices),
                 new TestTransactionManager(),
                 Clock.fixed(NOW, ZoneOffset.UTC));
-        return new Fixtures(reconciler, executions, events, jobs, agents, hermes, defaults, parent, start, job, agent);
+        return new Fixtures(
+                reconciler,
+                executions,
+                events,
+                jobs,
+                agents,
+                hermes,
+                defaults,
+                providers,
+                prices,
+                parent,
+                start,
+                job,
+                agent);
     }
 
     private static void setField(Object target, String name, Object value) throws ReflectiveOperationException {
@@ -478,6 +831,8 @@ class SubagentUsageReconcilerTest {
             AgentService agents,
             HermesRunsClient hermes,
             ProfileModelDefaultsClient defaults,
+            SubagentProviderClient providers,
+            PriceCatalog prices,
             AgentExecution parent,
             ExecutionEvent start,
             SubagentUsageJob job,

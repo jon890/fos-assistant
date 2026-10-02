@@ -9,19 +9,16 @@ import { TooltipButton } from "@/components/ui/tooltip-button";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { ConversationNav } from "./conversation-nav";
 import { MainNav } from "./main-nav";
-import { NAV_PENDING_EVENT } from "./nav-pending";
+import { NavPending, NAV_PENDING_EVENT } from "./nav-pending";
+import { useAppName, useShellAccount } from "./shell-account";
 import { useConversations } from "./conversations-provider";
 
 export function Sidebar({
-  isAdmin,
-  displayName,
   onNavigate,
   searchRef,
   onCollapse,
   showStatus = true,
 }: {
-  isAdmin: boolean;
-  displayName?: string;
   /** 링크를 누를 때 그 목적지를 받는다. 서랍은 목적지가 지금 경로와 같을 때만 곧바로 닫는다 */
   onNavigate(href: string): void;
   searchRef: RefObject<HTMLInputElement | null>;
@@ -30,6 +27,8 @@ export function Sidebar({
   showStatus?: boolean;
 }) {
   const { startNew } = useConversations();
+  const appName = useAppName();
+  const account = useShellAccount();
   const [query, setQuery] = useState("");
   // 이동하는 중인 링크의 개수다. 링크마다 하나씩 NavPending 이 두고, 이동이 끝나거나 그 링크가
   // 사라지면 줄어든다. 0보다 크면 사이드바 전체에서 무언가 이동하는 중이다.
@@ -52,17 +51,17 @@ export function Sidebar({
           {pendingCount > 0 ? "이동하는 중" : ""}
         </span>
       ) : null}
-      <div className="mb-5 flex items-center justify-between gap-2 px-2">
+      <div className="mb-5 flex shrink-0 items-center justify-between gap-2 px-2">
         <Link
           href="/"
-          aria-label="우리집 비서 홈"
+          aria-label={`${appName} 홈`}
           onClick={() => {
             startNew();
             onNavigate("/");
           }}
           className="truncate text-base font-semibold"
         >
-          우리집 비서
+          {appName}
         </Link>
         <TooltipButton
           label="사이드바 접기"
@@ -75,7 +74,7 @@ export function Sidebar({
       <Button
         asChild
         variant="outline"
-        className="mb-4 justify-start bg-background hover:bg-accent"
+        className="mb-4 shrink-0 justify-start bg-background hover:bg-accent"
       >
         <Link
           href="/"
@@ -98,19 +97,46 @@ export function Sidebar({
         className="mb-4 shrink-0 bg-background"
       />
       <ConversationNav onNavigate={onNavigate} query={query} />
-      <div className="border-t border-border pt-3">
-        <MainNav isAdmin={isAdmin} onNavigate={onNavigate} />
-        <div className="mt-3 flex items-center justify-between gap-2 px-3 py-2">
-          {displayName ? (
-            <span
-              className="min-w-0 truncate text-xs text-muted-foreground"
-              title={displayName}
+      {/* 대화 목록이 다 줄어든 뒤에 이 구역이 줄어들고 그 안에서 스크롤한다. */}
+      <div className="min-h-0 shrink overflow-y-auto border-t border-border pt-3">
+        <MainNav onNavigate={onNavigate} />
+      </div>
+      {/* 맨 아래 줄은 줄어들지 않는다. 관리자 입구가 여기 있어 화면 높이가 낮아도 보여야 한다. */}
+      <div className="mt-3 flex shrink-0 items-center justify-between gap-2 px-3 py-2">
+        {account.state === "failed" ? (
+          <span className="flex min-w-0 items-center gap-2 text-xs text-muted-foreground">
+            <span className="min-w-0 truncate">계정 정보를 읽지 못했어요</span>
+            <Button
+              variant="outline"
+              size="sm"
+              className="shrink-0 bg-background hover:bg-accent"
+              onClick={account.retry}
             >
-              {displayName}
-            </span>
+              다시 읽기
+            </Button>
+          </span>
+        ) : account.displayName ? (
+          <span
+            className="min-w-0 truncate text-xs text-muted-foreground"
+            title={account.displayName}
+          >
+            {account.displayName}
+          </span>
+        ) : null}
+        <span className="ml-auto flex shrink-0 items-center gap-1">
+          {account.state === "admin" ? (
+            <Link
+              href="/admin"
+              data-testid="admin-entry"
+              onClick={() => onNavigate("/admin")}
+              className="rounded-md px-2 py-1.5 text-xs text-muted-foreground hover:bg-accent hover:text-foreground"
+            >
+              관리자
+              <NavPending />
+            </Link>
           ) : null}
           <ThemeToggle />
-        </div>
+        </span>
       </div>
     </div>
   );
