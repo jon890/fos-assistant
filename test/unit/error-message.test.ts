@@ -25,3 +25,12 @@ test("관리 화면에는 profile과 연결 실패 원인을 구분해 알린다
   assert.match(describeAdminError("HERMES_PROFILE_KEY_MISSING", "원본 오류"), /API key/);
   assert.match(describeAdminError("HERMES_UNAVAILABLE", "원본 오류"), /Hermes 런타임/);
 });
+
+test("문서를 만들고 고치다 거절되면 사용자가 할 일을 알린다", () => {
+  assert.equal(describeError("MEMORY_DOCUMENT_EXISTS", "duplicate"),
+    "같은 이름의 문서가 이미 있어요. 다른 이름을 입력해 주세요.");
+  assert.equal(describeError("MEMORY_REVISION_CONFLICT", "conflict"),
+    "그사이 문서가 바뀌었어요. 문서를 다시 열어 주세요.");
+  assert.equal(describeError("MEMORY_ENCRYPTION_UNAVAILABLE", "no key"),
+    "민감한 문서를 지금 저장하거나 열 수 없어요. 관리자에게 문의해 주세요.");
+});
