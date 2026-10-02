@@ -1,16 +1,16 @@
 package com.bifos.assistant.usage.application;
 
 import com.bifos.assistant.agent.domain.Agent;
-import com.bifos.assistant.usage.domain.ExecutionConversation;
-import com.bifos.assistant.model.domain.ModelChoice;
-import com.bifos.assistant.model.domain.type.ModelTier;
 import com.bifos.assistant.hermes.HermesRunsClient;
 import com.bifos.assistant.hermes.dto.HermesRunResult;
 import com.bifos.assistant.hermes.dto.SessionRuntime;
 import com.bifos.assistant.hermes.dto.TokenUsage;
+import com.bifos.assistant.model.domain.ModelChoice;
+import com.bifos.assistant.model.domain.type.ModelTier;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.usage.domain.AgentExecution;
 import com.bifos.assistant.usage.domain.DelegationKey;
+import com.bifos.assistant.usage.domain.ExecutionConversation;
 import com.bifos.assistant.usage.domain.type.ExecutionStatus;
 import com.bifos.assistant.usage.domain.type.ReasoningEffortSource;
 import com.bifos.assistant.usage.infra.AgentExecutionRepository;
@@ -148,8 +148,7 @@ public class ExecutionRecorder {
         if (requested == null || requested.reasoningEffort() == null) {
             return ReasoningEffortSource.UNKNOWN;
         }
-        boolean chosenByConversation =
-                conversation != null && conversation.reasoningEffort() != null;
+        boolean chosenByConversation = conversation != null && conversation.reasoningEffort() != null;
         return modelTier == null && !chosenByConversation
                 ? ReasoningEffortSource.AGENT_DEFAULT
                 : ReasoningEffortSource.REQUESTED;
@@ -197,7 +196,11 @@ public class ExecutionRecorder {
      * @param requested 원래 실행이 Hermes 에 보낸 provider, 모델, effort. null 이면 기본값으로 본다
      */
     public AgentExecution startInheriting(
-            CurrentUser user, ExecutionConversation conversation, Agent agent, AgentExecution parent, ModelChoice requested) {
+            CurrentUser user,
+            ExecutionConversation conversation,
+            Agent agent,
+            AgentExecution parent,
+            ModelChoice requested) {
         ModelChoice sent = requested == null ? ModelChoice.defaults() : requested;
         ReasoningEffortSource source;
         if (sent.reasoningEffort() == null) {

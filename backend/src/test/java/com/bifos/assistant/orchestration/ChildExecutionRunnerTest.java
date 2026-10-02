@@ -150,7 +150,13 @@ class ChildExecutionRunnerTest {
 
     /** 부모 실행 하나를 루트로 만든다. */
     private AgentExecution parentOf(CurrentUser user, Conversation conversation, String agentCode) {
-        return recorder.start(user, conversation.executionConversation(), agents.findByCode(agentCode).orElseThrow(), null, null, 0L);
+        return recorder.start(
+                user,
+                conversation.executionConversation(),
+                agents.findByCode(agentCode).orElseThrow(),
+                null,
+                null,
+                0L);
     }
 
     private static HermesRunResult completed(String runId, String output) {

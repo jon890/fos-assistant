@@ -1,8 +1,8 @@
 package com.bifos.assistant.chat.application;
 
 import com.bifos.assistant.chat.domain.ModelTierDefinition;
-import com.bifos.assistant.model.domain.type.ModelTier;
 import com.bifos.assistant.chat.infra.ModelTierDefinitionRepository;
+import com.bifos.assistant.model.domain.type.ModelTier;
 import com.bifos.assistant.user.infra.AppUserRepository;
 import java.util.Arrays;
 import lombok.RequiredArgsConstructor;

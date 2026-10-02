@@ -55,9 +55,7 @@ class ConversationPublicIdLookupTest {
         List<Long> ids = List.of(kept.id(), deleted.id());
 
         assertThat(lookup.publicIdsOf(ids)).containsOnlyKeys(kept.id(), deleted.id());
-        assertThat(lookup.activePublicIdsOf(ids))
-                .containsOnlyKeys(kept.id())
-                .containsEntry(kept.id(), kept.publicId());
+        assertThat(lookup.activePublicIdsOf(ids)).containsOnlyKeys(kept.id()).containsEntry(kept.id(), kept.publicId());
     }
 
     @Test

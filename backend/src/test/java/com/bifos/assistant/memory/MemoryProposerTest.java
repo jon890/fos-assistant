@@ -12,9 +12,7 @@ import com.bifos.assistant.agent.domain.type.CostMode;
 import com.bifos.assistant.agent.domain.type.CredentialScope;
 import com.bifos.assistant.agent.infra.AgentRepository;
 import com.bifos.assistant.chat.domain.Conversation;
-import com.bifos.assistant.model.domain.ModelChoice;
 import com.bifos.assistant.chat.domain.type.ModelSelectionMode;
-import com.bifos.assistant.model.domain.type.ModelTier;
 import com.bifos.assistant.chat.infra.ConversationRepository;
 import com.bifos.assistant.hermes.HermesRunsClient;
 import com.bifos.assistant.hermes.StubHermesRunsClient;
@@ -25,6 +23,8 @@ import com.bifos.assistant.memory.application.MemoryProposalProperties;
 import com.bifos.assistant.memory.application.MemoryProposer;
 import com.bifos.assistant.memory.application.MemoryService;
 import com.bifos.assistant.memory.infra.MemoryRepository;
+import com.bifos.assistant.model.domain.ModelChoice;
+import com.bifos.assistant.model.domain.type.ModelTier;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.shared.error.ApiException;
@@ -234,7 +234,8 @@ class MemoryProposerTest {
     void inheritingRunWithoutRequestedChoiceLeavesValuesEmptyAndUnknownSource() {
         parent = recorder.start(USER, conversation.executionConversation(), agent, null, null, 0L);
 
-        AgentExecution child = recorder.startInheriting(USER, conversation.executionConversation(), agent, parent, null);
+        AgentExecution child =
+                recorder.startInheriting(USER, conversation.executionConversation(), agent, parent, null);
 
         assertThat(child.provider()).isNull();
         assertThat(child.model()).isNull();
@@ -336,7 +337,8 @@ class MemoryProposerTest {
                         HermesRunResult.PROVIDER_AUTH_FAILED_PREFIX + " every account is blocked",
                         TokenUsage.empty()));
 
-        assertThatCode(() -> proposer.proposeFrom(USER, conversation.executionConversation(), agent, parent, "답", ModelChoice.defaults()))
+        assertThatCode(() -> proposer.proposeFrom(
+                        USER, conversation.executionConversation(), agent, parent, "답", ModelChoice.defaults()))
                 .doesNotThrowAnyException();
 
         assertThat(memories.findAll()).isEmpty();
@@ -379,7 +381,8 @@ class MemoryProposerTest {
                         new TokenUsage(1_000L, 800L, 500L, 1_500L),
                         new SessionRuntime("served-model", "served-provider")));
 
-        assertThatCode(() -> proposer.proposeFrom(USER, conversation.executionConversation(), agent, parent, "답", RESOLVED))
+        assertThatCode(() ->
+                        proposer.proposeFrom(USER, conversation.executionConversation(), agent, parent, "답", RESOLVED))
                 .doesNotThrowAnyException();
 
         assertThat(memories.findAll()).isEmpty();
@@ -441,7 +444,8 @@ class MemoryProposerTest {
                 new ObjectMapper());
         AgentExecution parent = recorder.start(USER, conversation.executionConversation(), agent, null, null, 0L);
 
-        assertThatCode(() -> isolated.proposeFrom(USER, conversation.executionConversation(), agent, parent, "답", ModelChoice.defaults()))
+        assertThatCode(() -> isolated.proposeFrom(
+                        USER, conversation.executionConversation(), agent, parent, "답", ModelChoice.defaults()))
                 .doesNotThrowAnyException();
     }
 }

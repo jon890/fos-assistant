@@ -9,10 +9,8 @@ import com.bifos.assistant.chat.domain.ChatAttachment;
 import com.bifos.assistant.chat.domain.ChatMessage;
 import com.bifos.assistant.chat.domain.ChatPendingMessage;
 import com.bifos.assistant.chat.domain.Conversation;
-import com.bifos.assistant.model.domain.ModelChoice;
 import com.bifos.assistant.chat.domain.type.MessageRole;
 import com.bifos.assistant.chat.domain.type.ModelSelectionMode;
-import com.bifos.assistant.model.domain.type.ModelTier;
 import com.bifos.assistant.chat.infra.ArtifactStore;
 import com.bifos.assistant.chat.infra.ChatMessageRepository;
 import com.bifos.assistant.chat.infra.ChatPendingMessageRepository;
@@ -25,6 +23,8 @@ import com.bifos.assistant.hermes.dto.HermesRunCommand;
 import com.bifos.assistant.hermes.dto.HermesRunResult;
 import com.bifos.assistant.hermes.dto.RunEvent;
 import com.bifos.assistant.memory.application.MemoryProposer;
+import com.bifos.assistant.model.domain.ModelChoice;
+import com.bifos.assistant.model.domain.type.ModelTier;
 import com.bifos.assistant.orchestration.application.Flow;
 import com.bifos.assistant.orchestration.application.FlowRegistry;
 import com.bifos.assistant.orchestration.domain.RunSession;
@@ -824,7 +824,12 @@ public class ChatService {
         String answer = result.output() == null ? "" : result.output();
         ChatMessage message = messages.save(answerMessage(pending, answer, execution.id()));
         memoryProposer.proposeFrom(
-                pending.user(), pending.conversation().executionConversation(), pending.agent(), execution, answer, requested);
+                pending.user(),
+                pending.conversation().executionConversation(),
+                pending.agent(),
+                execution,
+                answer,
+                requested);
         starterSuggestions.refreshIfStale(pending.user(), pending.agent());
         return new ChatTurn(
                 pending.conversation().id(),

@@ -2,13 +2,13 @@ package com.bifos.assistant.chat.application;
 
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.chat.domain.Conversation;
-import com.bifos.assistant.model.domain.ModelChoice;
 import com.bifos.assistant.chat.domain.ModelTierDefinition;
 import com.bifos.assistant.chat.domain.ModelTierGroupSetting;
 import com.bifos.assistant.chat.domain.type.ModelSelectionMode;
-import com.bifos.assistant.model.domain.type.ModelTier;
 import com.bifos.assistant.chat.infra.ModelTierDefinitionRepository;
 import com.bifos.assistant.chat.infra.ModelTierGroupSettingRepository;
+import com.bifos.assistant.model.domain.ModelChoice;
+import com.bifos.assistant.model.domain.type.ModelTier;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;

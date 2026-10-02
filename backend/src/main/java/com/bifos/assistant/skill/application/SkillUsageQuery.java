@@ -60,12 +60,18 @@ public class SkillUsageQuery {
             groups.computeIfAbsent(new GroupKey(occurrence.agentId(), occurrence.skillName()), key -> new Group())
                     .add(occurrence);
         }
-        Map<Long, Agent> agentsById = agents.findAllById(
-                        groups.keySet().stream().map(GroupKey::agentId).filter(Objects::nonNull).toList())
-                .stream()
-                .collect(Collectors.toMap(Agent::id, Function.identity()));
-        Map<Long, UUID> activeConversations = conversations.activePublicIdsOf(
-                groups.values().stream().map(group -> group.lastConversationId).filter(Objects::nonNull).toList());
+        Map<Long, Agent> agentsById =
+                agents
+                        .findAllById(groups.keySet().stream()
+                                .map(GroupKey::agentId)
+                                .filter(Objects::nonNull)
+                                .toList())
+                        .stream()
+                        .collect(Collectors.toMap(Agent::id, Function.identity()));
+        Map<Long, UUID> activeConversations = conversations.activePublicIdsOf(groups.values().stream()
+                .map(group -> group.lastConversationId)
+                .filter(Objects::nonNull)
+                .toList());
         List<UserSkillUsage> usages = new ArrayList<>();
         for (Map.Entry<GroupKey, Group> entry : groups.entrySet()) {
             Agent agent = agentsById.get(entry.getKey().agentId());
@@ -81,7 +87,8 @@ public class SkillUsageQuery {
                     group.lastInvokedAt,
                     group.lastConversationId == null ? null : activeConversations.get(group.lastConversationId)));
         }
-        usages.sort(Comparator.comparing(UserSkillUsage::lastInvokedAt).reversed()
+        usages.sort(Comparator.comparing(UserSkillUsage::lastInvokedAt)
+                .reversed()
                 .thenComparing(UserSkillUsage::agentCode)
                 .thenComparing(UserSkillUsage::skillName));
         return usages;
@@ -99,15 +106,15 @@ public class SkillUsageQuery {
         }
         Map<Long, Set<String>> names = new LinkedHashMap<>();
         for (ExecutionSkillUse use : uses.findByExecutionIdInOrderByExecutionIdAscSkillNameAsc(executionIds)) {
-            names.computeIfAbsent(use.executionId(), id -> new LinkedHashSet<>()).add(use.skillName());
+            names.computeIfAbsent(use.executionId(), id -> new LinkedHashSet<>())
+                    .add(use.skillName());
         }
         Map<Long, List<String>> result = new LinkedHashMap<>();
         names.forEach((executionId, skillNames) -> result.put(executionId, List.copyOf(skillNames)));
         return result;
     }
 
-    private record GroupKey(Long agentId, String skillName) {
-    }
+    private record GroupKey(Long agentId, String skillName) {}
 
     /**
      * 에이전트와 스킬 이름이 같은 사용을 모은다. 마지막 호출의 대화만 기억한다.
