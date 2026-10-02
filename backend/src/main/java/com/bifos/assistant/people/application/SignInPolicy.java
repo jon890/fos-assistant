@@ -2,6 +2,7 @@ package com.bifos.assistant.people.application;
 
 import com.bifos.assistant.people.domain.AllowedPerson;
 import com.bifos.assistant.people.infra.AllowedPersonRepository;
+import com.bifos.assistant.user.application.SignInRevocation;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -14,7 +15,7 @@ import org.springframework.transaction.annotation.Transactional;
  */
 @Service
 @RequiredArgsConstructor
-public class SignInPolicy {
+public class SignInPolicy implements SignInRevocation {
 
     private final AllowedPersonRepository people;
 
@@ -28,6 +29,7 @@ public class SignInPolicy {
     }
 
     /** 그 주소의 줄이 꺼져 있는가. 줄이 없으면 거짓이다(ADR-059). */
+    @Override
     @Transactional(readOnly = true)
     public boolean revoked(String email) {
         if (email == null || email.isBlank()) {

@@ -1,6 +1,5 @@
 package com.bifos.assistant.user.application;
 
-import com.bifos.assistant.people.application.SignInPolicy;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.auth.TokenUserResolver;
 import com.bifos.assistant.user.domain.AppUser;
@@ -19,7 +18,7 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class AllowedUserResolver implements TokenUserResolver {
 
-    private final SignInPolicy signInPolicy;
+    private final SignInRevocation signInRevocation;
     private final UserProvisioningService provisioning;
 
     /**
@@ -30,7 +29,7 @@ public class AllowedUserResolver implements TokenUserResolver {
      */
     @Transactional
     public Optional<AppUser> resolveAllowed(String email, String displayName) {
-        if (signInPolicy.revoked(email)) {
+        if (signInRevocation.revoked(email)) {
             return Optional.empty();
         }
         return Optional.of(provisioning.resolve(email, displayName));

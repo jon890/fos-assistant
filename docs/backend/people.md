@@ -22,9 +22,9 @@ Control Plane 이 Hermes 를 고치는 호출을 하게 된 근거는
 
 | 패키지 | 맡는 것 |
 | --- | --- |
-| `people` | 허용 목록, 사람을 더하는 흐름 전체의 조립 |
+| `people` | 허용 목록, 사람을 더하는 흐름 전체의 조립, 첫 로그인에 그 사람의 에이전트 만들기(`FirstAgentCreator`) |
 | `hermes` | 대시보드 호출과 key 파일 쓰기 |
-| `user` | 첫 로그인에 에이전트까지 만든다 |
+| `user` | 첫 로그인에 사용자를 만들고 `FirstSignInListener` 를 같은 트랜잭션에서 부른다 |
 | `agent` | 첫 로그인이 쓰는 에이전트 등록 경로 |
 
 **`people` 이 순서를 안다.** 허용 목록에 넣고 profile 을 만들고 key 를 넣는 차례와,
