@@ -2,7 +2,7 @@ package com.bifos.assistant.chat.infra;
 
 import com.bifos.assistant.chat.domain.Conversation;
 import com.bifos.assistant.chat.domain.type.ModelSelectionMode;
-import com.bifos.assistant.chat.domain.type.ModelTier;
+import com.bifos.assistant.model.domain.type.ModelTier;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;

@@ -8,12 +8,12 @@ import com.bifos.assistant.agent.domain.type.AgentVisibility;
 import com.bifos.assistant.agent.domain.type.CostMode;
 import com.bifos.assistant.agent.domain.type.CredentialScope;
 import com.bifos.assistant.chat.domain.Conversation;
-import com.bifos.assistant.chat.domain.ModelChoice;
 import com.bifos.assistant.chat.infra.ConversationRepository;
 import com.bifos.assistant.hermes.HermesRunsClient;
 import com.bifos.assistant.hermes.dto.HermesRunResult;
 import com.bifos.assistant.hermes.dto.SessionRuntime;
 import com.bifos.assistant.hermes.dto.TokenUsage;
+import com.bifos.assistant.model.domain.ModelChoice;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.usage.application.ExecutionRecorder;
@@ -130,7 +130,8 @@ class UsageCostRecordingTest {
     void pricesFailedResultUsingServedProviderAndCache(
             String provider, String model, Long cached, long expectedMicros) {
         Agent agent = apiAgent();
-        AgentExecution execution = recorder.start(caller(), conversation, agent, null, null, 0L);
+        AgentExecution execution =
+                recorder.start(caller(), conversation.executionConversation(), agent, null, null, 0L);
         HermesRunResult result = failedRun(new TokenUsage(1_000L, cached, 500L, 1_500L), provider, model);
 
         AgentExecution failed = recorder.fail(execution, agent, result, requested(agent), "FAILED");
@@ -156,7 +157,8 @@ class UsageCostRecordingTest {
     @DisplayName("실패 응답의 모델이 가격표에 없으면 토큰은 남기고 금액은 비운다")
     void preservesTokensWithoutInventingPriceForFailedUnknownModel() {
         Agent agent = apiAgent();
-        AgentExecution execution = recorder.start(caller(), conversation, agent, null, null, 0L);
+        AgentExecution execution =
+                recorder.start(caller(), conversation.executionConversation(), agent, null, null, 0L);
 
         AgentExecution failed = recorder.fail(
                 execution,
@@ -178,7 +180,8 @@ class UsageCostRecordingTest {
     @DisplayName("실패 응답에 사용량이 없으면 토큰과 금액을 미확인으로 둔다")
     void leavesMissingFailedUsageUnknown() {
         Agent agent = apiAgent();
-        AgentExecution execution = recorder.start(caller(), conversation, agent, null, null, 0L);
+        AgentExecution execution =
+                recorder.start(caller(), conversation.executionConversation(), agent, null, null, 0L);
 
         AgentExecution failed =
                 recorder.fail(execution, agent, failedRun(null, "openai", PRICED_MODEL), requested(agent), "FAILED");
@@ -196,7 +199,8 @@ class UsageCostRecordingTest {
     @DisplayName("실패 응답이 합계 토큰만 알려 주면 입력과 출력을 추측해 환산하지 않는다")
     void leavesFailedCostUnknownWhenOnlyTotalTokensAreReported() {
         Agent agent = apiAgent();
-        AgentExecution execution = recorder.start(caller(), conversation, agent, null, null, 0L);
+        AgentExecution execution =
+                recorder.start(caller(), conversation.executionConversation(), agent, null, null, 0L);
 
         AgentExecution failed = recorder.fail(
                 execution,
@@ -218,7 +222,8 @@ class UsageCostRecordingTest {
         Agent agent = subscriptionAgent();
         when(hermes.readSessionRuntime(agent.apiBaseUrl(), agent.hermesProfile(), "failed-session"))
                 .thenReturn(new SessionRuntime("example-model-large", "anthropic"));
-        AgentExecution execution = recorder.start(caller(), conversation, agent, null, null, 0L);
+        AgentExecution execution =
+                recorder.start(caller(), conversation.executionConversation(), agent, null, null, 0L);
         HermesRunResult result = new HermesRunResult(
                 "failed-run",
                 "failed-session",
@@ -244,18 +249,18 @@ class UsageCostRecordingTest {
         Agent agent = apiAgent();
         complete(run(1_000L, null, 500L), agent);
         recorder.fail(
-                recorder.start(caller(), conversation, agent, null, null, 0L),
+                recorder.start(caller(), conversation.executionConversation(), agent, null, null, 0L),
                 agent,
                 failedRun(new TokenUsage(1_000L, 800L, 500L, 1_500L), PROVIDER, PRICED_MODEL),
                 requested(agent),
                 "FAILED");
         recorder.cancel(
-                recorder.start(caller(), conversation, agent, null, null, 0L),
+                recorder.start(caller(), conversation.executionConversation(), agent, null, null, 0L),
                 agent,
                 run(1_000L, null, 500L),
                 requested(agent));
         fail();
-        recorder.start(caller(), conversation, agent, null, null, 0L);
+        recorder.start(caller(), conversation.executionConversation(), agent, null, null, 0L);
 
         MonthlyCost cost = executions.sumCostBetween(
                 USER_ID, Instant.now().minusSeconds(3_600), Instant.now().plusSeconds(3_600));
@@ -355,12 +360,14 @@ class UsageCostRecordingTest {
     }
 
     private AgentExecution complete(HermesRunResult result, Agent agent) {
-        AgentExecution execution = recorder.start(caller(), conversation, agent, null, null, 0L);
+        AgentExecution execution =
+                recorder.start(caller(), conversation.executionConversation(), agent, null, null, 0L);
         return recorder.complete(execution, agent, result, requested(agent));
     }
 
     private AgentExecution fail() {
-        AgentExecution execution = recorder.start(caller(), conversation, subscriptionAgent(), null, null, 0L);
+        AgentExecution execution =
+                recorder.start(caller(), conversation.executionConversation(), subscriptionAgent(), null, null, 0L);
         return recorder.fail(execution, "HERMES_RUN_FAILED");
     }
 

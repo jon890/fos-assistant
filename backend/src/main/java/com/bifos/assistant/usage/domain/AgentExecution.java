@@ -1,8 +1,8 @@
 package com.bifos.assistant.usage.domain;
 
 import com.bifos.assistant.agent.domain.type.CostMode;
-import com.bifos.assistant.chat.domain.type.ModelTier;
 import com.bifos.assistant.hermes.dto.TokenUsage;
+import com.bifos.assistant.model.domain.type.ModelTier;
 import com.bifos.assistant.usage.domain.type.ExecutionStatus;
 import com.bifos.assistant.usage.domain.type.ReasoningEffortSource;
 import jakarta.persistence.Column;

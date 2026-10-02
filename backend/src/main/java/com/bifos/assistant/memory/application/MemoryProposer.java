@@ -1,17 +1,17 @@
 package com.bifos.assistant.memory.application;
 
 import com.bifos.assistant.agent.domain.Agent;
-import com.bifos.assistant.chat.domain.Conversation;
-import com.bifos.assistant.chat.domain.ModelChoice;
 import com.bifos.assistant.hermes.HermesRunsClient;
 import com.bifos.assistant.hermes.dto.HermesRunCommand;
 import com.bifos.assistant.hermes.dto.HermesRunResult;
+import com.bifos.assistant.model.domain.ModelChoice;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.usage.application.ExecutionEventRecorder;
 import com.bifos.assistant.usage.application.ExecutionRecorder;
 import com.bifos.assistant.usage.domain.AgentExecution;
+import com.bifos.assistant.usage.domain.ExecutionConversation;
 import com.bifos.assistant.usage.domain.ExecutionEvent;
 import com.bifos.assistant.usage.domain.type.ExecutionEventType;
 import com.bifos.assistant.usage.infra.ExecutionEventRepository;
@@ -47,7 +47,7 @@ public class MemoryProposer {
      */
     public void proposeFrom(
             CurrentUser user,
-            Conversation conversation,
+            ExecutionConversation conversation,
             Agent agent,
             AgentExecution parentExecution,
             String answer,

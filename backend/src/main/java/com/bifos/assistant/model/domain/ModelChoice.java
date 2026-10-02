@@ -1,4 +1,4 @@
-package com.bifos.assistant.chat.domain;
+package com.bifos.assistant.model.domain;
 
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;

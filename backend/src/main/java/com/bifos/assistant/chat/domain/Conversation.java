@@ -1,9 +1,11 @@
 package com.bifos.assistant.chat.domain;
 
 import com.bifos.assistant.chat.domain.type.ModelSelectionMode;
-import com.bifos.assistant.chat.domain.type.ModelTier;
+import com.bifos.assistant.model.domain.ModelChoice;
+import com.bifos.assistant.model.domain.type.ModelTier;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
+import com.bifos.assistant.usage.domain.ExecutionConversation;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -139,6 +141,11 @@ public class Conversation {
      */
     public ModelChoice modelChoice() {
         return ModelChoice.stored(modelProvider, model, reasoningEffort);
+    }
+
+    /** 실행 줄이 이 대화에서 읽는 값만 담아 낸다. 대화 번호와 이 대화에서 고른 effort 다. */
+    public ExecutionConversation executionConversation() {
+        return new ExecutionConversation(id, modelChoice().reasoningEffort());
     }
 
     public static String normalizedTitle(String title) {

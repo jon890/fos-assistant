@@ -4,12 +4,12 @@ import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.chat.application.ModelTierService;
 import com.bifos.assistant.chat.application.ResolvedModelTier;
 import com.bifos.assistant.chat.domain.Conversation;
-import com.bifos.assistant.chat.domain.ModelChoice;
 import com.bifos.assistant.context.AssembledContext;
 import com.bifos.assistant.context.ContextAssembler;
 import com.bifos.assistant.hermes.HermesRunsClient;
 import com.bifos.assistant.hermes.dto.HermesRunCommand;
 import com.bifos.assistant.hermes.dto.HermesRunResult;
+import com.bifos.assistant.model.domain.ModelChoice;
 import com.bifos.assistant.orchestration.domain.ChildResult;
 import com.bifos.assistant.orchestration.domain.RunSession;
 import com.bifos.assistant.shared.auth.CurrentUser;
@@ -146,7 +146,7 @@ public class AgentRunner {
         } catch (RuntimeException ex) {
             AgentExecution execution = executions.start(
                     user,
-                    conversation,
+                    conversation == null ? null : conversation.executionConversation(),
                     agent,
                     parentExecutionId,
                     rootExecutionId,
@@ -163,7 +163,7 @@ public class AgentRunner {
         ModelChoice choice = resolved.choice();
         AgentExecution execution = executions.start(
                 user,
-                conversation,
+                conversation.executionConversation(),
                 agent,
                 parentExecutionId,
                 rootExecutionId,

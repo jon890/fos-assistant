@@ -6,6 +6,7 @@ import com.bifos.assistant.agent.domain.type.AgentVisibility;
 import com.bifos.assistant.agent.domain.type.CostMode;
 import com.bifos.assistant.agent.domain.type.CredentialScope;
 import com.bifos.assistant.chat.domain.type.MessageRole;
+import com.bifos.assistant.model.domain.type.ModelTier;
 import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.skill.domain.type.SkillUseSource;
 import com.bifos.assistant.usage.domain.type.ExecutionEventType;
@@ -32,6 +33,7 @@ class StoredEnumNamesTest {
             SkillUseSource.class, List.of("COMMAND", "MODEL"),
             UserRole.class, List.of("ADMIN", "MEMBER"),
             ExecutionStatus.class, List.of("RUNNING", "SUCCEEDED", "FAILED", "CANCELLED"),
+            ModelTier.class, List.of("FAST", "BALANCED", "DEEP"),
             ExecutionEventType.class,
                     List.of(
                             "RUN_STARTED",

@@ -7,12 +7,12 @@ import com.bifos.assistant.agent.domain.type.AgentVisibility;
 import com.bifos.assistant.agent.domain.type.CostMode;
 import com.bifos.assistant.agent.domain.type.CredentialScope;
 import com.bifos.assistant.chat.domain.Conversation;
-import com.bifos.assistant.chat.domain.ModelChoice;
 import com.bifos.assistant.chat.infra.ConversationRepository;
 import com.bifos.assistant.context.AssembledContext;
 import com.bifos.assistant.hermes.HermesRunsClient;
 import com.bifos.assistant.hermes.dto.HermesRunResult;
 import com.bifos.assistant.hermes.dto.TokenUsage;
+import com.bifos.assistant.model.domain.ModelChoice;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.usage.application.ExecutionContextSnapshot;
@@ -72,7 +72,7 @@ class ExecutionLifecycleTest {
     @Test
     @DisplayName("시작한 실행은 종료 정보 없이 RUNNING이고 부모와 루트를 저장한다")
     void startedRunIsRunningWithoutEndInfoAndStoresParentAndRoot() {
-        AgentExecution execution = recorder.start(user(), conversation, agent(), 12L, 3L, 0L);
+        AgentExecution execution = recorder.start(user(), conversation.executionConversation(), agent(), 12L, 3L, 0L);
 
         assertThat(execution.status()).isEqualTo(ExecutionStatus.RUNNING);
         assertThat(execution.finishedAt()).isNull();
@@ -84,7 +84,8 @@ class ExecutionLifecycleTest {
     @Test
     @DisplayName("완료는 같은 줄에 토큰과 금액을 갱신한다")
     void completionUpdatesTokensAndAmountOnSameRow() {
-        AgentExecution execution = recorder.start(user(), conversation, agent(), null, null, 0L);
+        AgentExecution execution =
+                recorder.start(user(), conversation.executionConversation(), agent(), null, null, 0L);
         Long id = execution.id();
 
         AgentExecution completed = recorder.complete(execution, agent(), result(), requested());
@@ -103,7 +104,8 @@ class ExecutionLifecycleTest {
     @Test
     @DisplayName("실패와 run 번호 연결은 같은 줄을 갱신한다")
     void failureAndRunIdLinkUpdateSameRow() {
-        AgentExecution execution = recorder.start(user(), conversation, agent(), null, null, 0L);
+        AgentExecution execution =
+                recorder.start(user(), conversation.executionConversation(), agent(), null, null, 0L);
         Long id = execution.id();
 
         recorder.attachRunId(execution, "run-1");
@@ -144,7 +146,7 @@ class ExecutionLifecycleTest {
 
         AgentExecution execution = recorder.start(
                 user(),
-                conversation,
+                conversation.executionConversation(),
                 agent(),
                 null,
                 null,
@@ -175,7 +177,7 @@ class ExecutionLifecycleTest {
 
         AgentExecution execution = recorder.start(
                 user(),
-                conversation,
+                conversation.executionConversation(),
                 agent(),
                 null,
                 null,
@@ -192,7 +194,7 @@ class ExecutionLifecycleTest {
 
         AgentExecution execution = recorder.start(
                 user(),
-                conversation,
+                conversation.executionConversation(),
                 agent(),
                 null,
                 null,
@@ -205,7 +207,7 @@ class ExecutionLifecycleTest {
     @Test
     @DisplayName("실행 중인 줄은 가격 미확인 실행으로 세지 않는다")
     void runningRowIsNotCountedAsPriceUnknownRun() {
-        recorder.start(user(), conversation, agent(), null, null, 0L);
+        recorder.start(user(), conversation.executionConversation(), agent(), null, null, 0L);
 
         MonthlyCost cost = executions.sumCostBetween(
                 USER_ID, Instant.now().minusSeconds(60), Instant.now().plusSeconds(60));

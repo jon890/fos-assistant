@@ -1,6 +1,6 @@
 package com.bifos.assistant.chat.application;
 
-import com.bifos.assistant.chat.domain.ModelChoice;
+import com.bifos.assistant.model.domain.ModelChoice;
 
 /**
  * 관리자가 한 에이전트의 기본 모델과 그룹의 숨김을 정할 때 보는 값이다.
