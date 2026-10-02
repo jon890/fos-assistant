@@ -22,9 +22,9 @@
 - `backend/src/main/java/com/bifos/assistant/usage/application/ExecutionRecorder.java` 의 `start(...)` 다섯과 `startInheriting(...)` 과 private 메서드들이 `Conversation conversation` 을 받는다. null 도 받는다.
   읽는 곳은 둘이다. `conversation != null && conversation.modelChoice().reasoningEffort() != null` 과 `conversation == null ? null : conversation.id()` 다.
 - 부르는 운영 코드는 `chat/application/ChatService.java`, `orchestration/application/AgentRunner.java`(두 곳), `memory/application/MemoryProposer.java` 다. `MemoryProposer` 는 받은 `Conversation` 을 `executions.startInheriting` 에 넘기기만 한다.
-- 테스트 27 개 안팎이 `start` 류를 부른다. `git grep -n "\.start\(Inheriting\)\?(" -- backend/src/test` 로 찾는다.
+- `Conversation` 을 넘겨 고쳐야 하는 테스트는 다섯이다. `memory/MemoryProposerTest`, `orchestration/ChildExecutionRunnerTest`, `usage/ExecutionLifecycleTest`, `usage/FailedExecutionUsageRoutesTest`, `usage/UsageCostRecordingTest` 다. `any()` 로 받는 stub 은 고치지 않아도 컴파일된다. 대화 자리에 null 을 넘기는 테스트는 없다.
 
-**근거 문서**: 위 ADR-068, `docs/adr/ADR-011-실행은-시작할-때-기록하고-끝날-때-갱신한다.md`, `docs/model-tiers.md` 의 실행 기록 절, `docs/backend/conversation.md`
+**근거 문서**: 위 ADR-068, `docs/adr/ADR-011-실행은-시작할-때-기록하고-끝날-때-갱신한다.md`, `docs/model-tiers.md` 의 「모델 선택」, `docs/backend/conversation.md`
 
 ## 의도 메모
 
@@ -50,16 +50,24 @@ Javadoc 에 「실행 줄이 대화에서 읽는 값이다. `id` 는 대화 번�
 
 ### 4. `MemoryProposer` 와 호출부의 변경
 
-- `MemoryProposer` 의 메서드가 받는 `Conversation conversation` 을 `ExecutionConversation conversation` 으로 바꾼다. `chat` 의 import 를 지운다. 이 메서드를 부르는 운영 코드(`git grep -n "MemoryProposer\|memoryProposer\." -- backend/src/main` 로 찾는다)는 `conversation.executionConversation()` 을 넘긴다. 전에 null 을 넘길 수 있던 자리는 null 검사를 그대로 둔다
-- `ChatService` 와 `AgentRunner` 의 `executions.start(...)` 호출은 `conversation == null ? null : conversation.executionConversation()` 을 넘긴다. 그 자리의 `conversation` 이 null 일 수 없으면 삼항을 쓰지 않는다. 원래 코드에서 null 가능 여부를 읽고 정한다
+`MemoryProposer.proposeFrom` 이 받는 `Conversation conversation` 을 `ExecutionConversation conversation` 으로 바꾸고 `chat` 의 import 를 지운다.
+호출부는 넷이다. 그 밖에는 없다. `StarterSuggestionService` 는 `startDetached` 를 불러 바뀌지 않는다.
+
+| 자리 | 넘기는 값 |
+| --- | --- |
+| `chat/application/ChatService.java` 의 `begin` 안 `executions.start(...)` | `conversation.executionConversation()`. 바로 앞에서 대화를 읽어 null 일 수 없다 |
+| `chat/application/ChatService.java` 의 `proposeFrom` 호출 | `pending.conversation().executionConversation()`. 바로 위에서 대화 번호를 읽어 null 일 수 없다 |
+| `orchestration/application/AgentRunner.java` 의 정상 경로 `executions.start(...)` | `conversation.executionConversation()`. 앞에서 `modelTiers.resolve` 가 대화를 읽어 null 일 수 없다 |
+| `orchestration/application/AgentRunner.java` 의 catch 안 `executions.start(...)` | `conversation == null ? null : conversation.executionConversation()`. 대화가 null 이면 `resolve` 의 예외가 이 catch 로 와서 지금은 `conversation_id` 가 빈 실패 줄이 남는다. 그 동작을 그대로 둔다 |
 
 ### 5. 이 phase 를 검증하는 테스트
 
-- `start` 류와 `MemoryProposer` 를 부르는 기존 테스트의 인자를 `conversation.executionConversation()` 이나 null 로 맞춘다. 단언은 바꾸지 않는다
-- `backend/src/test/java/com/bifos/assistant/usage/ExecutionConversationTest.java` 를 새로 만든다. `ExecutionLifecycleTest` 의 준비 방식을 따른다
-  - 정상: 대화가 effort 를 골랐으면 `executionConversation()` 의 `reasoningEffort` 가 그 값이고, 그 값으로 시작한 실행 줄의 `reasoning_effort_source` 가 옮기기 전과 같은 값이다. 기대값은 `ExecutionRecorder` 의 판정을 읽고 정한다
-  - 경계: 대화가 effort 를 고르지 않았으면 `reasoningEffort` 가 null 이다
-  - 실패: 대화 없이(null) 시작한 실행 줄은 `conversation_id` 가 null 이다
+- 위 테스트 다섯에서 `start`, `startInheriting`, `proposeFrom` 에 넘기던 `Conversation` 을 `conversation.executionConversation()` 으로 바꾼다. 단언은 바꾸지 않는다
+- `backend/src/test/java/com/bifos/assistant/usage/ExecutionConversationTest.java` 를 새로 만든다. `@SpringBootTest` 다. 실행 줄을 만드는 준비는 `ExecutionLifecycleTest` 를, 대화가 effort 를 고르게 하는 준비는 `MemoryProposerTest` 의 `conversations.chooseModelIfActive(..., ModelSelectionMode.CUSTOM)` 뒤 다시 읽는 방식을 따른다
+  - `ExecutionRecorder.start` 는 인자 열둘을 받는 판을 부른다. effort 가 있는 `requested` 와 `modelTier` null 을 넘긴다. 인자 여섯을 받는 판은 `requested` 가 null 이라 두 경우를 구분하지 못한다
+  - 정상: 대화가 effort 를 골랐으면 `executionConversation()` 의 `reasoningEffort` 가 그 값이고, 그 값으로 시작한 실행 줄의 `reasoningEffortSource` 가 `REQUESTED` 다
+  - 경계: 대화가 effort 를 고르지 않았으면 `reasoningEffort` 가 null 이고, 실행 줄의 `reasoningEffortSource` 가 `AGENT_DEFAULT` 다
+  - 실패: 대화 없이(null) 시작한 실행 줄은 `conversationId` 가 null 이다
 
 ### 6. 기준 파일을 줄인다
 
@@ -68,8 +76,8 @@ Javadoc 에 「실행 줄이 대화에서 읽는 값이다. `id` 는 대화 번�
 ./gradlew archTest --rerun -Parchunit.freeze.store.default.allowStoreUpdate=true
 ```
 
-`memory -> chat` 줄이 빠진다. `usage` 는 `RootExecutionQuery` 가 아직 `chat` 을 써서 남는다.
-줄이 늘거나 새 위반으로 실패하면 다시 얼리지 말고 보고한다. 끝난 뒤의 줄 수와 빠진 줄을 회신에 적는다.
+15 줄에서 14 줄이 된다. 빠지는 줄은 `memory -> chat` 하나다. `usage` 는 `RootExecutionQuery` 가 아직 `chat` 을 써서 남는다.
+14 줄이 아니거나 새 위반으로 실패하면 다시 얼리지 말고 보고한다.
 
 ## 검증
 
@@ -77,6 +85,7 @@ Javadoc 에 「실행 줄이 대화에서 읽는 값이다. `id` 는 대화 번�
 # cwd: backend/
 ./gradlew test
 ./gradlew checkstyleMain checkstyleTest
+test "$(grep -c "" config/archunit/store/0fd01c41-aa58-43cb-81c5-236ae5119948)" -eq 14
 ! grep -n "^memory -> chat " config/archunit/store/0fd01c41-aa58-43cb-81c5-236ae5119948
 ! grep -rnE "^import (static )?com\.bifos\.assistant\.chat\." src/main/java/com/bifos/assistant/memory src/main/java/com/bifos/assistant/usage/application/ExecutionRecorder.java src/main/java/com/bifos/assistant/usage/domain
 ```
@@ -99,7 +108,10 @@ node test/e2e/run.ts
 | `backend/src/main/java/com/bifos/assistant/memory/application/MemoryProposer.java` | 수정 |
 | `backend/src/main/java/com/bifos/assistant/chat/application/ChatService.java` | 수정 |
 | `backend/src/main/java/com/bifos/assistant/orchestration/application/AgentRunner.java` | 수정 |
-| `backend/src/main/java/com/bifos/assistant/**/*.java` | 수정 |
 | `backend/src/test/java/com/bifos/assistant/usage/ExecutionConversationTest.java` | 신규 |
-| `backend/src/test/java/com/bifos/assistant/**/*.java` | 수정 |
+| `backend/src/test/java/com/bifos/assistant/memory/MemoryProposerTest.java` | 수정 |
+| `backend/src/test/java/com/bifos/assistant/orchestration/ChildExecutionRunnerTest.java` | 수정 |
+| `backend/src/test/java/com/bifos/assistant/usage/ExecutionLifecycleTest.java` | 수정 |
+| `backend/src/test/java/com/bifos/assistant/usage/FailedExecutionUsageRoutesTest.java` | 수정 |
+| `backend/src/test/java/com/bifos/assistant/usage/UsageCostRecordingTest.java` | 수정 |
 | `backend/config/archunit/store/0fd01c41-aa58-43cb-81c5-236ae5119948` | 수정 |

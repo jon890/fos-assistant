@@ -45,23 +45,25 @@
 
 ### 3. 부르는 쪽의 변경
 
-- `RootExecutionQuery`: `ConversationRepository` 필드를 `ConversationPublicIds` 로 바꾸고 private 메서드의 `findAllById` 줄을 `publicIdsOf(ids)` 호출로 바꾼다. 번호가 없으면 부르지 않는 조건은 그대로 둔다
-- `SkillUsageQuery`: `ConversationRepository` 필드를 `ActiveConversationPublicIds` 로 바꾸고 private `activeConversationPublicIds` 를 지운 뒤 호출을 port 호출로 바꾼다
+- `RootExecutionQuery`: `ConversationRepository` 필드의 타입을 `ConversationPublicIds` 로 바꾸고 필드 이름 `conversations` 는 그대로 둔다. private 메서드의 `findAllById` 줄을 `publicIdsOf(ids)` 호출로 바꾼다. 번호가 없으면 부르지 않는 조건은 그대로 둔다
+- `SkillUsageQuery`: `ConversationRepository` 필드의 타입을 `ActiveConversationPublicIds` 로 바꾸고 필드 이름 `conversations` 는 그대로 둔다. private `activeConversationPublicIds` 를 지운 뒤 호출을 port 호출로 바꾼다
 - 두 클래스에서 `chat` 의 import 를 지운다
 
 ### 4. 이 phase 를 검증하는 테스트
 
-- 두 클래스를 `new` 로 만드는 테스트의 인자를 맞춘다. `git grep -n "new RootExecutionQuery(\|new SkillUsageQuery(" -- backend/src/test` 로 찾는다. `@Autowired` 로 받는 테스트는 고치지 않는다
+- 두 클래스를 쓰는 기존 테스트 넷(`SkillUsageQueryTest`, `RootExecutionQueryTest`, `UsageBreakdownTest`, `UsageControllerTest`)은 모두 `@Autowired` 로 받아 고치지 않는다. 그대로 통과해야 한다
 - `backend/src/test/java/com/bifos/assistant/chat/ConversationPublicIdLookupTest.java` 를 새로 만든다. `@SpringBootTest` 이고 `ConversationWriterTest` 의 준비 방식을 따른다
   - 정상: 대화 둘을 저장하면 `publicIdsOf` 가 두 번호를 각 대화의 공개 식별자로 잇는다
   - 경계: 하나를 지운 뒤 `publicIdsOf` 는 둘 다 담고 `activePublicIdsOf` 는 지우지 않은 하나만 담는다
   - 경계: 빈 목록에는 둘 다 빈 표를 돌려준다
 - `UsageControllerTest` 의 `QUERIES_PER_LIST` 단언이 그대로 통과해야 한다
 
-### 5. 문서와 ADR 의 구현 상태를 고친다
+### 5. ADR 의 구현 상태를 고친다
 
-- `docs/backend/skill.md` 와 `docs/backend/packages.md` 에 두 조회가 저장소를 직접 쓴다는 설명이 있으면 port 이름으로 고친다. `git grep -n "SkillUsageQuery\|RootExecutionQuery" -- docs` 로 찾는다
-- ADR-068 의 `status` 줄과 `docs/adr/INDEX.md` 의 ADR-068 줄의 구현 상태를 그 시점의 문장을 읽고 고친다. 끊은 간선에 「`usage` 와 `memory` 와 `skill` 이 `chat` 을 쓰는 셋(C2)」 을 더하고 「아직 구현 전」 목록에서 C2 를 뺀다
+두 조회가 저장소를 직접 쓴다고 적은 문서는 없다. 고칠 문서는 ADR 과 색인뿐이다.
+`docs/adr/ADR-068-최상위-패키지는-한-방향-층-순서를-따르고-거꾸로-가는-의존은-port-나-이동으로-끊는다.md` 의 `status` 줄의 구현 상태와 `docs/adr/INDEX.md` 의 ADR-068 줄의 `Accepted.` 뒤 문장을 아래로 바꾼다.
+
+「S1 부터 S3 까지 구현됐다. 순환 간선 가운데 `user` 가 `people` 과 `agent` 를 쓰는 둘과 `agent` 가 `people` 을 쓰는 하나(C5), `agent` 가 `skill` 과 `orchestration` 을 쓰는 둘, `agent` 가 `chat` 과 `usage` 를 쓰는 둘(C1), `usage` 와 `memory` 가 `chat` 을 쓰는 둘(C2), `skill` 이 `chat` 을 쓰는 하나를 끊었다. `chat` 이 `orchestration` 을 쓰는 간선과 `memory` 가 `context` 를 쓰는 간선, C3, C4, C7 은 아직 구현 전이다」
 
 고친 문서에 `bash /Users/nhn/personal/fos-skills/content-preview/scripts/style-check.sh <파일>` 을 돌려 종료 코드 0 인지 본다.
 
@@ -72,8 +74,9 @@
 ./gradlew archTest --rerun -Parchunit.freeze.store.default.allowStoreUpdate=true
 ```
 
-`usage -> chat`, `skill -> chat` 줄이 빠지고, `usage`, `skill`, `memory`, `agent` 가 순환 덩어리에서 떨어지면서 그 패키지들의 간선도 함께 빠진다.
-줄이 늘거나 새 위반으로 실패하면 다시 얼리지 말고 보고한다. 끝난 뒤의 줄 수와 남은 줄을 회신에 적는다.
+14 줄에서 4 줄이 된다. 빠지는 열 줄은 `chat -> context`, `chat -> memory`, `chat -> skill`, `chat -> usage`, `memory -> usage`, `orchestration -> context`, `orchestration -> usage`, `skill -> chat`, `usage -> chat`, `usage -> skill` 이다.
+남는 넷은 `chat -> orchestration`, `context -> memory`, `memory -> context`, `orchestration -> chat` 이다.
+이와 다르거나 새 위반으로 실패하면 다시 얼리지 말고 보고한다.
 
 ## 검증
 
@@ -81,7 +84,8 @@
 # cwd: backend/
 ./gradlew test
 ./gradlew checkstyleMain checkstyleTest
-! grep -n "^\(usage\|skill\|memory\) -> chat " config/archunit/store/0fd01c41-aa58-43cb-81c5-236ae5119948
+test "$(grep -c "" config/archunit/store/0fd01c41-aa58-43cb-81c5-236ae5119948)" -eq 4
+! grep -n "usage\|skill" config/archunit/store/0fd01c41-aa58-43cb-81c5-236ae5119948
 ! grep -rnE "^import (static )?com\.bifos\.assistant\.chat\." src/main/java/com/bifos/assistant/usage src/main/java/com/bifos/assistant/skill src/main/java/com/bifos/assistant/memory src/main/java/com/bifos/assistant/model
 ```
 
@@ -103,6 +107,6 @@ node test/e2e/run.ts
 | `backend/src/main/java/com/bifos/assistant/usage/application/RootExecutionQuery.java` | 수정 |
 | `backend/src/main/java/com/bifos/assistant/skill/application/SkillUsageQuery.java` | 수정 |
 | `backend/src/test/java/com/bifos/assistant/chat/ConversationPublicIdLookupTest.java` | 신규 |
-| `backend/src/test/java/com/bifos/assistant/**/*.java` | 수정 |
-| `docs/**/*.md` | 수정 |
+| `docs/adr/ADR-068-최상위-패키지는-한-방향-층-순서를-따르고-거꾸로-가는-의존은-port-나-이동으로-끊는다.md` | 수정 |
+| `docs/adr/INDEX.md` | 수정 |
 | `backend/config/archunit/store/0fd01c41-aa58-43cb-81c5-236ae5119948` | 수정 |
