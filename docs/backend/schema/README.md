@@ -9,7 +9,7 @@ AI credential 은 Hermes profile 의 `.env` 에, profile 의 API server key 는 
 
 | 파일 | 표 |
 | --- | --- |
-| [`users-agents.md`](users-agents.md) | `app_user`, `allowed_person`, `agent`, `model_tier_definition`, `model_tier_group_setting`, `model_hidden`, `agent_token` |
+| [`users-agents.md`](users-agents.md) | `app_user`, `allowed_person`, `agent`, `model_tier_definition`, `model_tier_group_setting`, `model_hidden`, `agent_token`, `service_token`, `service_token_collection` |
 | [`chat.md`](chat.md) | `conversation`, `chat_message`, `chat_pending_message`, `chat_attachment`, `chat_artifact` |
 | [`execution.md`](execution.md) | `agent_execution`, `execution_event`, `subagent_usage_job`, `execution_skill_use`, `hermes_session_binding` |
 | [`memory.md`](memory.md) | `memory`, `memory_revision`, `memory_collection`, `agent_memory_collection` |
@@ -54,7 +54,8 @@ AI credential 은 Hermes profile 의 `.env` 에, profile 의 API server key 는 
 Memory 는 줄을 지운다. 지우기 전에 마지막 값을 `memory_revision` 에 `DELETED` 로 남기므로 본문은 그 표에 남는다. 민감 항목의 판은 암호문으로 남는다.
 화면의 삭제는 목록과 주입에서 빼는 것이고, 본문을 완전히 없애는 길은 아직 없다.
 에이전트를 지워도 `agent_memory_collection` 의 줄은 그대로 둔다. 지운 에이전트는 실행되지 않으므로 그 줄을 읽는 자리가 없다.
+서비스 토큰은 폐기해도 줄이 남는다. 언제까지 쓰였는지가 남아야 한다.
 
-허용 목록에서 빼는 것도 지우지 않고 `enabled` 를 내린다.
+허용 목록에서 빼는 것도 지우지 않고 `enabled` 를 내린다. 그 사람의 서비스 토큰은 모두 폐기한다.
 그 사람의 `app_user` 와 실행 기록은 그대로 둔다.
 그 사람의 Hermes profile 도 지우지 않는다. 다시 들일 때 그것을 다시 만들지 않아도 된다.

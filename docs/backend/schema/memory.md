@@ -7,7 +7,7 @@ Memory 항목과 그 판, 그룹의 collection 목록, 에이전트가 받는 co
 
 사용자와 그룹에 대해 에이전트가 알아야 할 것 하나가 한 줄이다.
 종류가 `MEMORY` 인 줄은 사실 하나이고, `DOCUMENT` 는 이름으로 찾는 긴 글 하나, `SOURCE` 는 출처로 남긴 원문 하나다.
-지금 화면과 제안이 만드는 줄은 모두 `core` collection 의 `MEMORY` 다.
+지금 화면과 제안이 만드는 줄은 모두 `core` collection 의 `MEMORY` 다. 문서 API 가 만드는 줄은 `USER` 범위의 `DOCUMENT` 이고 `ACCEPTED` 다.
 
 | 칸 | 타입 | 뜻 |
 | --- | --- | --- |
@@ -106,7 +106,7 @@ Memory 항목과 그 판, 그룹의 collection 목록, 에이전트가 받는 co
 
 그룹마다 `core`, `career`, `learning`, `health`, `finance`, `home`, `identity` 일곱 개로 시작한다.
 마이그레이션이 사용자가 있는 그룹에 넣고, 그 뒤에 생긴 그룹은 목록을 처음 읽을 때 넣는다.
-목록을 읽는 `MemoryCollectionService.collectionsOf` 와 판을 읽는 `MemoryService.revisionsOf` 는 아직 부르는 API 가 없다. 화면과 API 를 넓힐 때 연결한다.
+목록을 읽는 `MemoryCollectionService.collectionsOf` 는 `GET /api/v1/memory-collections` 가 부른다. 판을 읽는 `MemoryService.revisionsOf` 는 아직 부르는 API 가 없다. 화면과 API 를 넓힐 때 연결한다.
 
 ## agent_memory_collection
 
