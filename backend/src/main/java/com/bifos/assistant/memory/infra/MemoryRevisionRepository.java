@@ -13,4 +13,7 @@ public interface MemoryRevisionRepository extends JpaRepository<MemoryRevision, 
 
     /** 암호화되지 않은 채 남은 판을 찾는다. 민감도로 좁혀 부른다(ADR-055). */
     List<MemoryRevision> findBySensitivityAndContentKeyIdIsNull(MemorySensitivity sensitivity);
+
+    /** 한 항목의 판 가운데 평문으로 남은 것을 찾는다. 그 항목을 민감으로 바꿀 때 함께 암호화한다(ADR-055). */
+    List<MemoryRevision> findByIdMemoryIdAndContentKeyIdIsNull(Long memoryId);
 }

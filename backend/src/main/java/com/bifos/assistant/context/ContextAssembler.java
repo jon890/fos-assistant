@@ -96,6 +96,8 @@ public class ContextAssembler {
     private static void appendAlways(ContextBuilder builder, String header, List<Memory> memories, MemoryScope scope) {
         memories.stream()
                 .filter(memory -> memory.scope() == scope)
+                // 본문을 풀지 않는다. 암호문인 줄은 싣지 않는다(ADR-055)
+                .filter(memory -> !memory.sealed())
                 .sorted(Comparator.comparing(Memory::id))
                 .forEach(memory -> builder.append(memory.id(), header, "- " + memory.content()));
     }

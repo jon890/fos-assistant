@@ -157,10 +157,18 @@ public class MemoryService {
      *
      * <p>항상 싣지 않게 바꾸면 색인으로 간다. 이미 보관(ARCHIVE)한 항목은 보관한 채로 둔다. 이 화면이 보관을 모르므로
      * 본문만 고친 것이 그 항목을 색인으로 되살리지 않게 한다.
+     *
+     * <p>민감 항목은 이 경로로 고치지 못한다. 목록이 본문을 싣지 않아 이 요청이 본문을 읽지 않은 채 덮어쓴다(ADR-055).
+     *
+     * @throws ApiException 민감 항목일 때. MEMORY_SENSITIVE_NOT_EDITABLE
      */
     @Transactional
     public Memory update(CurrentUser user, Long id, String content, boolean alwaysInject) {
         Memory memory = requireWritableForUpdate(user, id);
+        if (memory.sensitivity() == MemorySensitivity.SENSITIVE) {
+            throw new ApiException(
+                    ErrorCode.MEMORY_SENSITIVE_NOT_EDITABLE, "a sensitive memory cannot be edited from the list");
+        }
         MemoryRetrieval retrieval = alwaysInject
                 ? MemoryRetrieval.ALWAYS
                 : memory.retrieval() == MemoryRetrieval.ARCHIVE ? MemoryRetrieval.ARCHIVE : MemoryRetrieval.SEARCH;
@@ -234,8 +242,26 @@ public class MemoryService {
                 ? null
                 : proposalDedupKey(memory.ownerUserId(), memory.title(), content);
         revisions.save(MemoryRevision.of(memory, MemoryChangeType.UPDATED, user.id(), null, clock.instant()));
+        if (sensitivity == MemorySensitivity.SENSITIVE) {
+            sealPlainRevisions(memory.id());
+        }
         memory.revise(body, retrieval, sensitivity, dedupKey, clock.instant());
         return memories.save(memory);
+    }
+
+    /**
+     * 한 항목의 평문 판을 모두 암호화한다. 판의 민감도와 번호와 시각은 그대로이고 저장 모양만 바뀐다(ADR-055).
+     *
+     * <p>평문 판은 두 경우에 생긴다. 일반 항목을 민감으로 바꿀 때와, 민감 항목을 일반으로 바꿨다가 다시 민감으로 바꿀
+     * 때다. 방금 남긴 판도 평문이면 여기서 함께 암호화한다. 이미 민감 항목이었으면 평문 판이 없어 아무것도 하지 않는다.
+     */
+    private void sealPlainRevisions(Long memoryId) {
+        // 방금 남긴 판이 조회에 들어오게 먼저 내보낸다. 조회한 줄은 이미 있는 줄이라 저장이 새 줄을 넣지 않는다
+        revisions.flush();
+        for (MemoryRevision row : revisions.findByIdMemoryIdAndContentKeyIdIsNull(memoryId)) {
+            row.sealInPlace(cipher.seal(row.content(), row.contentBinding()));
+            revisions.save(row);
+        }
     }
 
     /**
