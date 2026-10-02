@@ -64,7 +64,7 @@
 ### 5. 이 phase 를 검증하는 테스트
 
 - `backend/src/test/java/com/bifos/assistant/agent/AgentApiBaseUrlUpdateTest.java` 는 컨트롤러를 `new` 로 만든다. `AgentAdminService` 를 만들어 넘기도록 고치고 단언은 바꾸지 않는다.
-- `backend/src/test/java/com/bifos/assistant/agent/AgentLifecycleFlagsTest.java` 가 컴파일되고 통과하게 고친다.
+- `backend/src/test/java/com/bifos/assistant/agent/AgentLifecycleFlagsTest.java` 가 컴파일되고 통과하게 고친다. 변경 없이 통과하면 그대로 둔다.
 - `backend/src/test/java/com/bifos/assistant/agent/AgentToolServiceTest.java` 의 `new AgentToolService(toolsets, skillStore)` 세 곳에 더한 의존을 넘긴다. 단언은 바꾸지 않는다.
 - `backend/src/test/java/com/bifos/assistant/agent/AgentAdminServiceTest.java` 를 새로 만든다. 정상: 그룹 공개 에이전트를 만들면 저장된 에이전트를 돌려준다. 실패: 이미 쓰는 코드면 `ApiException` 의 `ErrorCode.VALIDATION_FAILED` 이고 `AgentEndpointProbe.requireReachable` 을 부르지 않는다.
 
