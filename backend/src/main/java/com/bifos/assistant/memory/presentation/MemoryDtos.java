@@ -178,4 +178,8 @@ public final class MemoryDtos {
 
     /** 발급 응답이다. 원문 {@code token} 은 여기서만 나온다. */
     public record IssuedServiceTokenView(ServiceTokenView info, String token) {}
+
+    /** 서비스가 읽는 문서다. 본문은 평문이고 {@code revision} 은 지금 값의 판 번호다(ADR-056). */
+    public record ServiceDocumentView(
+            String collection, String documentKey, String title, String content, int revision, Instant updatedAt) {}
 }

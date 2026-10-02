@@ -1,6 +1,8 @@
 package com.bifos.assistant.memory.application;
 
 import com.bifos.assistant.memory.application.model.IssuedServiceToken;
+import com.bifos.assistant.memory.application.model.MemoryAccess;
+import com.bifos.assistant.memory.application.model.ServicePrincipal;
 import com.bifos.assistant.memory.application.model.ServiceTokenGrant;
 import com.bifos.assistant.memory.application.model.ServiceTokenSnapshot;
 import com.bifos.assistant.memory.domain.MemoryPlacement;
@@ -9,6 +11,7 @@ import com.bifos.assistant.memory.domain.ServiceTokenCollection;
 import com.bifos.assistant.memory.infra.ServiceTokenCollectionRepository;
 import com.bifos.assistant.memory.infra.ServiceTokenRepository;
 import com.bifos.assistant.shared.auth.CurrentUser;
+import com.bifos.assistant.shared.auth.UserAccessPolicy;
 import com.bifos.assistant.shared.auth.UserAccessRevoked;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
@@ -49,6 +52,7 @@ public class ServiceTokenService {
     private final ServiceTokenRepository tokens;
     private final ServiceTokenCollectionRepository tokenCollections;
     private final MemoryService memories;
+    private final UserAccessPolicy userAccess;
     private final Clock clock;
     private final SecureRandom random = new SecureRandom();
 
@@ -107,6 +111,40 @@ public class ServiceTokenService {
         live.forEach(token -> token.revoke(now));
         tokens.saveAll(live);
         log.info("service tokens revoked on access removal userId={} count={}", event.userId(), live.size());
+    }
+
+    /**
+     * 원문으로 요청자를 증명한다. 인증마다 주인이 지금도 허용 목록에 켜져 있는지 본다.
+     *
+     * <p>없는 토큰, 폐기된 토큰, 만료된 토큰, 주인이 꺼진 토큰은 메시지까지 같은 UNAUTHENTICATED 다. 다르게 답하면
+     * 토큰이 있다는 사실과 그 상태가 밖에서 보인다. 거절한 요청은 마지막 사용 시각을 적지 않는다.
+     *
+     * @throws ApiException 증명하지 못하면 UNAUTHENTICATED
+     */
+    @Transactional
+    public ServicePrincipal authenticate(String raw) {
+        Instant now = clock.instant();
+        ServiceToken token = tokens.findByTokenHash(Sha256.hex(raw)).orElseThrow(ServiceTokenService::rejected);
+        if (!token.usableAt(now) || !userAccess.allowed(token.userId())) {
+            // 원문과 해시는 남기지 않는다. 폐기되거나 만료되거나 주인이 꺼진 토큰이 쓰인 흔적만 번호로 남긴다
+            log.warn("service token rejected tokenId={}", token.id());
+            throw rejected();
+        }
+        token.markUsed(now);
+        tokens.save(token);
+        List<ServiceTokenCollection> rows = tokenCollections.findByIdTokenIdIn(List.of(token.id()));
+        Set<String> collections =
+                rows.stream().map(ServiceTokenCollection::collection).collect(Collectors.toSet());
+        Set<String> sensitive = rows.stream()
+                .filter(ServiceTokenCollection::allowSensitive)
+                .map(ServiceTokenCollection::collection)
+                .collect(Collectors.toSet());
+        return new ServicePrincipal(
+                token.id(), token.userId(), MemoryAccess.of(collections, sensitive), token.expiresAt());
+    }
+
+    private static ApiException rejected() {
+        return new ApiException(ErrorCode.UNAUTHENTICATED, "invalid service token");
     }
 
     private void requireValid(CurrentUser user, int expiresInDays, List<ServiceTokenGrant> grants) {

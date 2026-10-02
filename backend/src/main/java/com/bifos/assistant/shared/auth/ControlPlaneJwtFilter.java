@@ -34,6 +34,7 @@ public class ControlPlaneJwtFilter extends OncePerRequestFilter {
 
     private static final Logger log = LoggerFactory.getLogger(ControlPlaneJwtFilter.class);
     private static final String BEARER = "Bearer ";
+    private static final String SERVICE_API_PREFIX = "/api/v1/service/";
 
     /**
      * 이 필터가 해석하지 않는 경로다.
@@ -43,7 +44,7 @@ public class ControlPlaneJwtFilter extends OncePerRequestFilter {
      * 장기 토큰을 쓰는 다른 인증 경계다. {@code /api/v1/signin/allowed} 는 아직
      * 사용자가 없는 시점에 돌므로 여기를 지나면 안 된다. 이 필터는 토큰을 받으면 그 자리에서
      * {@code app_user} 를 만들고, 그러면 허용되지 않은 주소로도 사용자가 생긴다. 그 경로는 토큰을
-     * 스스로 검사한다.
+     * 스스로 검사한다. {@code /api/v1/service/} 아래는 서비스 토큰을 쓰는 다른 인증 경계다(ADR-056).
      */
     private static final Set<String> UNFILTERED_PATHS = Set.of(
             "/mcp",
@@ -61,7 +62,8 @@ public class ControlPlaneJwtFilter extends OncePerRequestFilter {
 
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
-        return UNFILTERED_PATHS.contains(request.getRequestURI());
+        String uri = request.getRequestURI();
+        return UNFILTERED_PATHS.contains(uri) || uri.startsWith(SERVICE_API_PREFIX);
     }
 
     @Override

@@ -76,6 +76,24 @@ public class MemoryService {
     }
 
     /**
+     * 서비스 토큰의 주인이 가진 문서 하나를 읽는다. 요청자는 토큰이 정하고 경로는 사용자를 정하지 못한다.
+     *
+     * <p>없는 문서와 읽을 수 없는 문서를 같은 MEMORY_NOT_FOUND 로 숨긴다. 이름이 없는 줄, 승인 전인 항목, 문서가 아닌
+     * 항목, 토큰이 받지 않는 collection, 민감 허용이 없는 민감 문서가 모두 해당한다. 꺼내는 방식으로는 거르지 않는다.
+     */
+    public Memory documentForService(Long userId, MemoryAccess access, String collection, String documentKey) {
+        Memory memory = memories.findByScopeAndOwnerUserIdAndCollectionAndDocumentKey(
+                        MemoryScope.USER, userId, collection, documentKey)
+                .orElseThrow(MemoryService::notFound);
+        if (memory.status() != MemoryStatus.ACCEPTED
+                || memory.entryType() != MemoryEntryType.DOCUMENT
+                || !access.allows(memory.collection(), memory.sensitivity())) {
+            throw notFound();
+        }
+        return memory;
+    }
+
+    /**
      * 요청자의 그룹이 쓰는 collection 이다. 그룹이 없으면 빈 목록이다.
      *
      * <p>줄이 없는 그룹이면 기본 목록을 저장하므로 읽기 전용 트랜잭션으로 두지 않는다.
