@@ -187,7 +187,8 @@ test("모델 목록을 읽지 못해도 관리자가 숨김을 풀 수 있다", 
     ).toBeVisible();
     await section(page)
       .getByRole("checkbox", { name: `openai-codex ${HIDDEN_MODEL} 숨기기` })
-      .uncheck();
+      // 체크를 풀면 그 줄이 사라진다. uncheck 는 사라진 요소의 상태를 확인하려다 멈추므로 누르기만 한다.
+      .click();
     await section(page).getByRole("button", { name: "숨김 저장" }).click();
     await expect(section(page).getByRole("status")).toHaveText(
       "숨김 설정을 저장했어요.",
