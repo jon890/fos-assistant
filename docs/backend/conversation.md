@@ -16,7 +16,7 @@ Hermes 사건을 `execution_event` 로 옮겨 적는 규칙과 실행 나무를 
 | `GET /api/v1/chat/conversations?cursor=&limit=` | 내 대화 목록의 한 쪽. `{ "items": [...], "nextCursor": "..." }`. 지운 대화는 빠진다. 정렬은 `updatedAt desc, id desc`, `limit` 기본 30 상한 100. `nextCursor` 는 뜻을 알 수 없는 문자열이고 다음 쪽의 `cursor` 로 그대로 넘긴다. 마지막 쪽이면 null 이다. 읽을 수 없는 `cursor` 는 `VALIDATION_FAILED` 다 |
 | `GET /api/v1/chat/conversations/{id}` | 대화 한 줄. 첫 쪽에 없는 오래된 대화를 열 때 모델 칸과 에이전트 칸이 쓴다 |
 | `PATCH /api/v1/chat/conversations/{id}` | 이름을 바꾼다. 본문 `{ "title": "..." }`. 바뀐 대화 한 줄을 돌려준다 |
-| `PUT /api/v1/chat/conversations/{id}/model` | 대화의 모델과 effort 를 바꾼다. 본문 `{ "provider", "model", "reasoningEffort" }`. 셋 다 null 이면 기본값으로 되돌린다. 바뀐 대화 한 줄을 돌려준다 |
+| `PUT /api/v1/chat/conversations/{id}/model` | 대화의 모델과 effort 를 바꾼다. 본문 `{ "provider", "model", "reasoningEffort" }`. 셋 다 null 이면 기본값으로 되돌린다. effort 는 `ModelChoice` 가 받는 값(`none`, `low` 부터 `max`)이어야 하고, `none` 은 그 모델의 `disable` 이 `SUPPORTED` 일 때만 받는다. 모델을 비웠으면 에이전트 기본 모델로 판정한다. 아니면 `VALIDATION_FAILED` 다. `none` 일 때만 대화의 에이전트와 그 목록을 읽으므로 목록을 읽지 못하면 `HERMES_UNAVAILABLE`, 에이전트를 쓸 수 없으면 그 오류가 난다. 다른 effort 의 저장은 에이전트 상태와 무관하다. 판정은 저장할 때만 한다. 저장한 뒤 에이전트 기본 모델이나 Hermes 의 지원 값이 바뀌어도 실행은 저장된 `none` 을 그대로 보내고, 실행 때 목록을 읽지 않는다. 바뀐 대화 한 줄을 돌려준다 |
 | `GET /api/v1/chat/model-options?agentCode=` | 그 에이전트의 profile 로 고를 수 있는 모델. 요청자가 쓸 수 있는 에이전트만 받는다 |
 | `DELETE /api/v1/chat/conversations/{id}` | 목록에서 숨긴다. 204 |
 | `GET /api/v1/chat/conversations/{id}/messages` | 메시지 목록. 이전 판도 모두 온다 |
@@ -46,9 +46,12 @@ Hermes 사건을 `execution_event` 로 옮겨 적는 규칙과 실행 나무를 
 | `defaultReasoningEffort` | 에이전트 기본 effort. 정하지 않았으면 null |
 | `defaultFromAgent` | 기본 모델을 에이전트 기본값이 정했으면 참 |
 | `defaultAvailable` | 기본 모델이 `providers[]` 에 있으면 참. 그룹이 숨겼거나 목록에서 빠졌으면 거짓이고, 화면이 다른 모델을 고르라고 알린다 |
-| `providers[]` | `{ "provider", "name", "models": [...], "reasoningCapable": {...} }`. Hermes 가 `authenticated` 를 참으로 준 provider 만 남기고, 그룹이 숨긴 provider 와 모델을 뺀다. 기본 provider 가 맨 앞에 오고, 모델은 Hermes 가 준 차례 그대로다 |
-| `providers[].reasoningCapable` | 모델 이름을 열쇠로 한 참거짓 표. Hermes 의 `capabilities.<모델>.reasoning` 이다. 값이 없는 모델은 참으로 본다. 화면은 거짓인 모델에서 effort 를 고르지 못하게 한다 |
-| `reasoningEfforts` | `["low", "medium", "high", "xhigh", "max"]`. 고정이다 |
+| `providers[]` | `{ "provider", "name", "models": [...], "reasoning": {...} }`. Hermes 가 `authenticated` 를 참으로 준 provider 만 남기고, 그룹이 숨긴 provider 와 모델을 뺀다. 기본 provider 가 맨 앞에 오고, 모델은 Hermes 가 준 차례 그대로다 |
+| `providers[].reasoning` | 모델 이름을 열쇠로 한 표. 값은 `{ "support", "disable" }` 이고 각각 `SUPPORTED`, `UNSUPPORTED`, `UNKNOWN` 이다. 모든 모델이 표에 있다 |
+| `reasoning.<모델>.support` | Hermes 의 `capabilities.<모델>.reasoning` 이 참이면 `SUPPORTED`, 거짓이면 `UNSUPPORTED`, 칸이 없으면 `UNKNOWN` 이다. 우리가 없는 값을 채우지 않는다. 화면은 `UNSUPPORTED` 인 모델에서 effort 를 고르지 못하게 하고, `UNKNOWN` 인 모델은 고르게 두되 지원 미확인으로 알린다 |
+| `reasoning.<모델>.disable` | reasoning 끄기(`none`)를 받는가. Hermes 의 `can_disable_reasoning` 이 참이면 `SUPPORTED`, 거짓이면 `UNSUPPORTED`, 칸이 없으면 `UNKNOWN` 이다. `SUPPORTED` 이고 `support` 가 `UNSUPPORTED` 가 아닌 모델에서만 `none` 을 고를 수 있다 |
+| `providers[].reasoningCapable` | 옛 web 호환용이다. 모델 이름을 열쇠로 한 참거짓 표이고, `support` 가 `UNSUPPORTED` 가 아니면 참이다. backend 와 web 이 같은 순간에 배포된다고 확인하지 못해 이번 배포에서 남기고 다음 배포에서 지운다. 새 화면은 `reasoning` 을 읽는다 |
+| `reasoningEfforts` | `["low", "medium", "high", "xhigh", "max"]`. 고정이다. `none` 은 여기 없고 모델마다 `disable` 이 정한다. `minimal` 은 지원을 확인할 신호가 없어 어디에도 없다 |
 
 `hermes/HermesModelClient` 가 `GET {profile}/api/model/options` 를 부르고, `chat/application/ModelOptionsService` 가 profile 마다 10분 들고 있는다.
 10분이 지나 다시 읽다 Hermes 가 답하지 못하면 들고 있던 옛 목록을 돌려준다. 그 profile 의 목록을 한 번도 읽지 못했으면 `HERMES_UNAVAILABLE` 이다.
@@ -66,7 +69,7 @@ web 은 입력창 아래의 `chat/model-picker.tsx` 로 고른다.
 
 실행을 보낼 때 `chat/application/ModelTierService` 가 대화의 선택, 단계, 에이전트 기본 모델 차례로 세 값을 정하고 `chat/domain/ModelChoice` 에 담는다.
 모델이 비어 있으면 `/v1/runs` 에 `provider`, `model` 을 빼고,
-effort 가 비어 있으면 `model_options` 를 뺀다. 정한 모델이 숨긴 모델이면 제출하지 않고 `MODEL_HIDDEN` 으로 실패시킨다.
+effort 가 비어 있으면 `model_options` 를 뺀다. 비어 있음(미지정)과 `none`(reasoning 끔)은 다른 의도라, `none` 은 `model_options.reasoning.effort` 에 그대로 싣는다. 정한 모델이 숨긴 모델이면 제출하지 않고 `MODEL_HIDDEN` 으로 실패시킨다.
 모델이 비어 있고 그룹에 숨김이 있으면 `ModelOptionsService.profileDefaultOf` 가 들고 있는 목록에서 읽은 profile 의 기본 모델로 같은 판정을 한다.
 Memory 제안은 원래 실행이 해석한 값을 받아 쓰고 `ExecutionRecorder.startInheriting` 으로 원래 실행의 단계와 effort 출처를 이어받는다.
 추천 질문은 대화가 없어 `ModelTierService.detachedChoice` 가 준 에이전트 기본 모델을 싣고 `ExecutionRecorder.startDetached` 가 그 값을 실행 줄에 적는다. 같은 값을 `ModelTierService.requireRunnable` 이 숨김과 견준다.
@@ -169,14 +172,14 @@ turn 이 바꾸는 칸은 `hermes_session_id` 와 `updated_at` 뿐이므로 그 
 
 **화면이 `MEMBER` 역할 사용자에게 그리지 않는 내부 값은 Control Plane 도 보내지 않는다.**
 화면에서만 가리면 브라우저의 개발자 도구로 자기 실행의 금액과 모델과 토큰이 보인다.
-근거는 [ADR-060](../adr/ADR-060-관리자-전용-표시와-동작은-관리자-영역에만-두고-일반-경로의-응답은-서버가-역할에-따라-줄인다.md) 에 있다.
+근거는 [ADR-063](../adr/ADR-063-관리자-전용-표시와-동작은-관리자-영역에만-두고-일반-경로의-응답은-서버가-역할에-따라-줄인다.md) 에 있다.
 
 `ADMIN` 역할에게는 아래 응답이 그대로 간다. `MEMBER` 역할에게는 「빼는 값」 이 `null` 로 간다.
 
 | 응답 | 빼는 값 |
 | --- | --- |
 | `GET /api/v1/usage/executions` 의 실행 한 줄 | `agentCode`, `provider`, `model`, `reasoningEffort`, `costMode`, `runtimeFingerprint`, `instructionsHash`, `costCurrency`, `pricingVersion`, `inputTokens`, `cachedInputTokens`, `outputTokens`, `totalTokens`, `contextChars`, `contextOmittedItems`, `estimatedCostMicros`, `actualCostMicros` |
-| `GET /api/v1/usage/monthly-cost` | `currency`, `estimatedCostMicros`, `actualCostMicros`, `pricedExecutions`, `unpricedExecutions`, `subscriptionExecutions`. 실행 건수 `totalExecutions` 는 모두에게 싣는다 |
+| `GET /api/v1/usage/monthly-cost` | `currency`, `estimatedCostMicros`, `actualCostMicros`, `pricedExecutions`, `unpricedExecutions`, `subscriptionExecutions`, `pricedSubagents`, `pendingSubagents`, `unconfirmedSubagents`, `unpricedSubagents`. 실행 건수 `totalExecutions` 는 모두에게 싣는다 |
 | `GET /api/v1/usage/breakdown` | 응답 전체. `MEMBER` 역할이 부르면 `FORBIDDEN` 이다 |
 | `GET /api/v1/usage/skills` 의 한 줄 | `agentCode` |
 | `GET /api/v1/usage/executions/{id}/tree` 의 실행 노드 | `agentCode`, `provider`, `model`, `reasoningEffort`, `reasoningEffortSource`, `inputTokens`, `cachedInputTokens`, `outputTokens`, `totalTokens`, `estimatedCostMicros`, `requestReceivedAt`, `submittedAt`, `firstDeltaAt`, `finishedAt` |
@@ -262,7 +265,7 @@ Hermes 도 `run.completed` 를 보내지만 그것을 옮겨 적지 않는다.
 `chat`이 그룹 단계 정의, 사용자와 그룹 기본값, 대화의 선택, 그룹의 모델 숨김을 소유한다.
 에이전트 기본 모델의 값은 `agent` 표에 있고, 그 검증과 해석은 `chat` 이 한다.
 실행을 시작할 때 선택을 해석하고 `usage`에 선택 스냅샷을 넘긴다.
-`usage`는 부모 종료 뒤 자식 session의 최종 사용량을 별도 작업으로 보완한다.
+`usage`는 부모 종료 뒤 자식 session의 최종 사용량을 별도 작업으로 조회해 원장 줄에 적고 합계에 더한다.
 `hermes`는 session 조회와 최소한의 profile 기본값 조회를 소유한다.
 선택과 재조회 조건, 실패 처리 계약은 [모델 단계와 실행 기록](../model-tiers.md)이 정한다.
 
@@ -282,10 +285,13 @@ flowchart TD
     P --> R
     R --> E[Hermes 실행]
     E --> F[실제 제공사와 모델 기록]
-    F --> S{미완료 자식 사건}
-    S -->|있음| J[별도 재조회 작업 저장]
+    F --> S{session 이 있는 자식 시작 사건}
+    S -->|있음| J[자식마다 재조회 작업 줄 저장]
     J --> Q{자식 session 종료 확인}
-    Q -->|종료| D[중복 없이 사용량 기록]
+    Q -->|종료| D[작업 줄에 사용량과 금액 기록]
+    D --> K{provider 와 가격 확인}
+    K -->|확인| L[합계에 더함]
+    K -->|미확인| N[가격 미확인으로 셈]
     Q -->|미완료 또는 조회 실패| B{24시간 지남}
     B -->|아니오| W[간격을 늘려 재조회]
     W --> Q

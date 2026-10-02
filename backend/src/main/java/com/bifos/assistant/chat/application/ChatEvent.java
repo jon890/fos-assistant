@@ -105,7 +105,7 @@ public record ChatEvent(
      * 않으면 {@code detail} 만 비운 새 사건을 돌려준다. 근거는 ADR-038 에 있다.
      *
      * <p>{@link InternalValuePolicy} 가 허락하지 않는 사람에게는 {@code subagent} 사건의 모델과 토큰을 비우고,
-     * {@code switched} 사건은 보내지 않는다. 보내지 않는 사건은 빈 값으로 돌려준다. 근거는 ADR-060 에 있다.
+     * {@code switched} 사건은 보내지 않는다. 보내지 않는 사건은 빈 값으로 돌려준다. 근거는 ADR-063 에 있다.
      *
      * <p>그 밖에는 이 사건을 그대로 돌려준다.
      */

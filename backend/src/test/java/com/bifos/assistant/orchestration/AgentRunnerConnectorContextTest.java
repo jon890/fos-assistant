@@ -26,6 +26,7 @@ import com.bifos.assistant.hermes.dto.HermesRunCommand;
 import com.bifos.assistant.hermes.dto.HermesRunResult;
 import com.bifos.assistant.hermes.dto.TokenUsage;
 import com.bifos.assistant.orchestration.application.AgentRunner;
+import com.bifos.assistant.orchestration.application.DelegationOutput;
 import com.bifos.assistant.orchestration.application.DelegationProperties;
 import com.bifos.assistant.orchestration.domain.RunSession;
 import com.bifos.assistant.shared.auth.CurrentUser;
@@ -89,7 +90,7 @@ class AgentRunnerConnectorContextTest {
                 executions,
                 mock(ExecutionEventRecorder.class),
                 mock(ExecutionEventRepository.class),
-                new DelegationProperties(2, 4, 16, Duration.ofSeconds(30), 100),
+                new DelegationOutput(new DelegationProperties(2, 4, 16, Duration.ofSeconds(30), 100)),
                 modelTiers,
                 Clock.fixed(REQUEST_RECEIVED_AT, ZoneOffset.UTC));
     }

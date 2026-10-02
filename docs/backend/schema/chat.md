@@ -17,7 +17,7 @@
 | `title` | VARCHAR(200) | 첫 메시지의 앞부분. 사진을 먼저 올리려고 만든 대화는 첫 메시지 전까지 비어 있다 |
 | `model_provider` | VARCHAR(64) NULL | 이 대화에서 고른 provider. `model` 과 함께 채우거나 함께 비운다 |
 | `model` | VARCHAR(128) NULL | 이 대화에서 직접 고른 모델. 비면 어느 모델로 도는지는 [모델 단계와 실행 기록](../../model-tiers.md) 의 「모델 선택」 이 정한다 |
-| `reasoning_effort` | VARCHAR(16) NULL | 이 대화에서 고른 effort. `low`, `medium`, `high`, `xhigh`, `max` 중 하나. 비면 어느 강도로 도는지는 [모델 단계와 실행 기록](../../model-tiers.md) 의 「모델 선택」 이 정한다 |
+| `reasoning_effort` | VARCHAR(16) NULL | 이 대화에서 고른 effort. `none`, `low`, `medium`, `high`, `xhigh`, `max` 중 하나. `none` 은 reasoning 끄기이고 비어 있음(미지정)과 다르다. 비면 어느 강도로 도는지는 [모델 단계와 실행 기록](../../model-tiers.md) 의 「모델 선택」 이 정한다 |
 | `model_selection_mode` | VARCHAR(16) NULL | `DEFAULT`, `TIER`, `CUSTOM`. 비어 있으면 사용자와 그룹 기본값을 따른다 |
 | `model_tier` | VARCHAR(16) NULL | 이 대화에서 고른 모델 단계 |
 | `updated_at` | DATETIME(6) | 목록 정렬에 쓴다. 같은 값이면 `id` 가 큰 쪽이 앞이다 |

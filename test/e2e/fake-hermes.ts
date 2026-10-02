@@ -76,6 +76,8 @@ const TEST_CLEAR_BUSY_PATH = "/__test/clear-busy";
 const TEST_HOLD_NEXT_CONFIG_PATH = "/__test/hold-next-config";
 const TEST_RELEASE_HELD_CONFIG_PATH = "/__test/release-held-config";
 /** 마지막 실행 요청이 실어 온 provider, 모델, effort 를 돌려준다. 브라우저 검사는 대역을 다른 프로세스에서 띄워 이 길로 묻는다. */
+/** 입력 글과 그 입력에 줄 대본을 받는 경로다. `DemoScript` 를 본다. */
+const TEST_SCRIPT_PATH = "/__test/script";
 const TEST_LAST_SUBMITTED_RUNTIME_PATH = "/__test/last-submitted-runtime";
 
 /** 도구 가리기 검사만 쓰는 가짜 값이다. 실제 연결 값이 아니다. */
@@ -243,6 +245,20 @@ function actualModelFor(input: string, requested: string): string {
   return requested;
 }
 
+/**
+ * 입력 글 하나에 줄 답과 사건 스트림이다. README 에 싣는 화면을 찍는 스크립트가 `POST /__test/script` 로 넣는다.
+ *
+ * <p>대본이 있는 입력은 다른 분기를 타지 않는다. 답은 `output` 그대로이고, 스트림은 `events` 를 받은 순서대로 보낸 뒤
+ * 닫는다. `pause` 가 참이면 `events` 를 보낸 자리에서 `releaseLongActivity` 를 기다려, 도는 중인 화면을 찍을 수 있다.
+ * `subagent.start` 사건에 `child_session_id` 가 있으면 그 session 의 사용량 조회에도 답한다.
+ */
+export type DemoScript = {
+  input: string;
+  output: string;
+  events?: Record<string, unknown>[];
+  pause?: boolean;
+};
+
 /** 계정이 전부 막혔을 때 Hermes 가 붙이는 고정 접두사다. 실측한 문장이다. */
 const PROVIDER_AUTH_FAILED =
   "\u26a0\ufe0f Provider authentication failed: No Codex credentials stored. Run `hermes auth` to authenticate.";
@@ -347,6 +363,12 @@ export const MEMORY_READ_PROBE = "MCP Memory 읽기 검사";
  * 부모가 끝난 뒤 `readMemoryAsSubagent` 로 부른다.
  */
 export const SUBAGENT_MEMORY_PROBE = "MCP 하위 에이전트 검사";
+
+/**
+ * 기존 자식 검사와 같은 흐름이되, 자식 session 응답에 부모 바인딩과 다른 provider 와 모델을 싣는 입력이다.
+ * 자식 금액이 부모의 가격이 아니라 자식의 provider 와 모델로 계산되는지 본다.
+ */
+export const SUBAGENT_PROVIDER_PROBE = "자식 provider 확인 검사";
 
 /**
  * 이 글로 시작하는 입력을 받으면 그 뒤의 줄마다 `<등록 이름> <JSON 인자>` 를 읽어, profile 플러그인의 hook 처럼
@@ -572,6 +594,13 @@ export type FakeHermes = {
   releaseHeldRun(): void;
   /** 지금 붙잡아 둔 실행의 번호와 session 이다. 붙잡은 것이 없으면 `undefined` 다. 플러그인처럼 `_fos_ctx` 를 서명할 때 쓴다. */
   heldRun(): { runId: string; sessionId: string } | undefined;
+  /** 그 run 을 잊는다. 이 뒤 조회와 중지는 404 다. gateway 가 다시 떴거나 종료 뒤 1시간이 지난 것과 같다. */
+  forgetRun(runId: string): void;
+  /**
+   * Control Plane 이 그 run 의 사건 스트림을 열 때까지 기다린다. Control Plane 은 run 번호를 실행 줄에 적은 뒤에 연다.
+   * 제출을 받은 것만으로는 run 번호가 아직 적히지 않았을 수 있어, 재시작 검사가 이것으로 그 순간을 지난 뒤 내린다.
+   */
+  waitForRunEvents(runId: string): Promise<void>;
   /**
    * `LONG_ACTIVITY_PROBE` 스트림이 시작만 한 도구 줄을 남기고 기다리는 멈춤 지점 하나를 푼다. 실행 상태는 바꾸지 않는다.
    * 멈춤 지점이 둘이므로 끝까지 흘리려면 두 번 부른다. 기다리는 스트림이 없으면 아무것도 하지 않는다.
@@ -621,9 +650,15 @@ export function startFakeHermes(
    * 고치지 않게 하기 위해서다.
    */
   const keys: Record<string, string> = { ...profileKeys };
+  /** 실제 Hermes 가 모르는 run 에 주는 404 본문이다. 지운 run 과 한 번도 없던 run 이 같다. */
+  const runNotFound = (runId: string) => ({
+    error: { message: `Run not found: ${runId}`, type: "invalid_request_error", code: "run_not_found" },
+  });
   const runs = new Map<string, Run>();
   const sessions = new Map<string, Session>();
-  const childUsages = new Map<string, { profile: string; parent: string; reads: number; delayed: boolean }>();
+  /** 자식 session 응답이 싣는 모델과 provider 다. 비우면 일반 자식처럼 provider 없이 `example-fast` 를 준다. */
+  const childUsages = new Map<string, { profile: string; parent: string; reads: number; delayed: boolean;
+    model?: string; provider?: string }>();
   /** 대시보드로 만든 profile 과 그 profile 의 `.env` 다. */
   const profiles = new Map<string, Record<string, string>>();
   const apiServerToolsets = new Map(
@@ -649,6 +684,8 @@ export function startFakeHermes(
   /** profile 이름과 전역으로 끈 스킬 이름들이다. */
   const disabledSkills = new Map<string, Set<string>>();
   const blockedProviders = new Set<string>();
+  /** 입력 글과 그 입력의 대본이다. */
+  const scripts = new Map<string, DemoScript>();
   let busy = false;
   let submitCount = 0;
   let modelOptionsCalls = 0;
@@ -657,6 +694,9 @@ export function startFakeHermes(
   let heldRunId: string | undefined;
   let heldRunWaiter: (() => void) | undefined;
   let heldRunReady: Promise<void> | undefined;
+  /** 사건 스트림이 한 번이라도 열린 run 과, 열리기를 기다리는 쪽이다. */
+  const eventsOpened = new Set<string>();
+  const eventsWaiters = new Map<string, (() => void)[]>();
   /** `LONG_ACTIVITY_PROBE` 스트림이 기다리는 자리다. 풀면 나머지 사건을 보낸다. */
   let longActivityGate: (() => void) | undefined;
   let holdNextSoul = false;
@@ -1287,6 +1327,12 @@ export function startFakeHermes(
         return send(response, 204, null);
       }
 
+      if (request.method === "POST" && path === TEST_SCRIPT_PATH) {
+        const script = JSON.parse(await readBody(request)) as DemoScript;
+        scripts.set(script.input, script);
+        return send(response, 204, null);
+      }
+
       if (request.method === "GET" && path === TEST_LAST_SUBMITTED_RUNTIME_PATH) {
         return send(response, 200, lastSubmittedRuntime);
       }
@@ -1334,9 +1380,15 @@ export function startFakeHermes(
                 name: "OpenAI Codex",
                 authenticated: true,
                 models: [DEFAULT_RUNTIME.model, "example-model-mini", "example-fast", "example-balanced", "example-deep"],
+                // 실제로 can_disable_reasoning 은 aggregator provider 의 모델에만 온다.
+                // 이 대역은 reasoning 끄기(none)를 시험하려고 기본 모델에도 준다.
+                // example-balanced 는 칸이 없는 모델(UNKNOWN)이다.
                 capabilities: {
-                  [DEFAULT_RUNTIME.model]: { reasoning: true },
+                  [DEFAULT_RUNTIME.model]: { reasoning: true, can_disable_reasoning: true },
                   "example-model-mini": { reasoning: false },
+                  "example-fast": { reasoning: true },
+                  "example-balanced": {},
+                  "example-deep": { reasoning: true, can_disable_reasoning: false },
                 },
               },
               { slug: "unconfigured", name: "Unconfigured", authenticated: false, models: [] },
@@ -1356,7 +1408,8 @@ export function startFakeHermes(
             const ended = !child.delayed || child.reads > 1;
             return send(response, 200, { object: "session", session: {
               id: sessionId, source: "subagent", parent_session_id: child.parent,
-              model: "example-fast", started_at: 1000, ended_at: ended ? 1002.5 : null,
+              model: child.model ?? "example-fast", started_at: 1000, ended_at: ended ? 1002.5 : null,
+              ...(child.provider === undefined ? {} : { billing_provider: child.provider }),
               end_reason: ended ? "agent_close" : null,
               input_tokens: 100, cache_read_tokens: 50, cache_write_tokens: 10, output_tokens: 20,
             } });
@@ -1382,8 +1435,11 @@ export function startFakeHermes(
           if (!authorized(request, profile)) {
             return send(response, 401, { error: "bad key for this profile" });
           }
+          eventsOpened.add(runId!);
+          for (const done of eventsWaiters.get(runId!) ?? []) done();
+          eventsWaiters.delete(runId!);
           const run = runs.get(runId);
-          if (!run) return send(response, 404, { error: "no such run" });
+          if (!run) return send(response, 404, runNotFound(runId!));
           response.writeHead(200, {
             "Content-Type": "text/event-stream; charset=utf-8",
             "Cache-Control": "no-cache",
@@ -1397,6 +1453,24 @@ export function startFakeHermes(
               emptyUntilStopped.set(runId!, response);
               response.on("close", () => emptyUntilStopped.delete(runId!));
             }
+            return;
+          }
+          const script = scripts.get(run.input);
+          if (script !== undefined) {
+            for (const scripted of script.events ?? []) {
+              if (scripted.event === "subagent.start" && typeof scripted.child_session_id === "string") {
+                childUsages.set(scripted.child_session_id, { profile: profile!, parent: run.session_id, reads: 0, delayed: false });
+              }
+              event(response, scripted);
+            }
+            if (script.pause === true) {
+              await new Promise<void>((resolve) => {
+                longActivityGate = resolve;
+                response.on("close", resolve);
+              });
+            }
+            event(response, { event: "run.completed" });
+            response.end();
             return;
           }
           // 실제 Hermes v0.21.0 이 보내는 형태다.
@@ -1480,13 +1554,15 @@ export function startFakeHermes(
           }
           // 하위 에이전트 사건은 도구 사건과 어미가 다르다. `.started` 와 `.completed` 가 아니다.
           // Hermes v0.21.0 은 여기에 session 번호를 싣지 않고 `preview` 만 보낸다.
-          if (run.input === "자식 늦은 완료 검사" || run.input === "자식 완료 사건 없음 검사" || run.input === "압축 뒤 자식 완료 검사") {
+          if (run.input === "자식 늦은 완료 검사" || run.input === "자식 완료 사건 없음 검사" || run.input === "압축 뒤 자식 완료 검사"
+            || run.input === SUBAGENT_PROVIDER_PROBE) {
             const childSessionId = `child-${run.run_id}`;
             const parentSessionId = run.input === "압축 뒤 자식 완료 검사"
               ? `compacted-${run.session_id}`
               : run.session_id;
             childUsages.set(childSessionId, { profile: profile!, parent: parentSessionId,
-              reads: 0, delayed: run.input === "자식 늦은 완료 검사" });
+              reads: 0, delayed: run.input === "자식 늦은 완료 검사",
+              ...(run.input === SUBAGENT_PROVIDER_PROBE ? { model: "example-model-large", provider: "anthropic" } : {}) });
             const child = { subagent_id: `sa-${run.run_id}`, goal: "부모 뒤에 끝나는 조사",
               model: "example-fast", child_session_id: childSessionId };
             event(response, { event: "subagent.start", ...child });
@@ -1528,7 +1604,7 @@ export function startFakeHermes(
             return send(response, 401, { error: "bad key for this profile" });
           }
           const run = runs.get(runId!);
-          if (!run) return send(response, 404, { error: "no such run" });
+          if (!run) return send(response, 404, runNotFound(runId!));
           run.status = "cancelled";
           if (run.input === "중지 빈 답 검사" || run.input === "중지 조각 전 검사") run.output = "";
           emptyUntilStopped.get(runId!)?.end();
@@ -1634,6 +1710,7 @@ export function startFakeHermes(
           output: memoryReadOutput
             ?? connectorOutput
             ?? (registeredChild === undefined ? undefined : `하위 에이전트 session: ${registeredChild}`)
+            ?? scripts.get(input)?.output
             ?? specialOutputFor(input)
             ?? `[${who} on profile ${profile}]${instructionsEcho} ${input}`,
           input,
@@ -1665,7 +1742,7 @@ export function startFakeHermes(
         return send(response, 401, { error: "bad key for this profile" });
       }
       const run = runs.get(runId);
-      if (!run) return send(response, 404, { error: "no such run" });
+      if (!run) return send(response, 404, runNotFound(runId!));
       return send(response, 200, run);
     })();
   });
@@ -1724,6 +1801,15 @@ export function startFakeHermes(
           const run = runs.get(releasedRunId);
           if (run !== undefined) run.status = "completed";
         },
+        forgetRun: (runId: string) => {
+          runs.delete(runId);
+        },
+        waitForRunEvents: (runId: string) =>
+          eventsOpened.has(runId)
+            ? Promise.resolve()
+            : new Promise<void>((done) => {
+                eventsWaiters.set(runId, [...(eventsWaiters.get(runId) ?? []), done]);
+              }),
         heldRun: () => {
           const run = heldRunId === undefined ? undefined : runs.get(heldRunId);
           return run === undefined ? undefined : { runId: run.run_id, sessionId: run.session_id };

@@ -48,11 +48,25 @@ type ModelOptions = {
     provider: string;
     name: string;
     models: string[];
-    /** 모델 이름을 열쇠로 한 참거짓 표다. 값이 없는 모델은 참으로 본다 */
-    reasoningCapable: Record<string, boolean>;
+    /** 모델 이름을 열쇠로 한 reasoning 지원과 끄기(`none`) 지원이다. Hermes 가 밝히지 않은 칸은 `UNKNOWN` 이다 */
+    reasoning: Record<string, ReasoningCapability>;
   }[];
   reasoningEfforts: string[];
 };
+
+/** 지원 여부다. Hermes 가 밝히지 않았으면 `UNKNOWN` 이다(ADR-060) */
+type Support = "SUPPORTED" | "UNSUPPORTED" | "UNKNOWN";
+
+type ReasoningCapability = { support: Support; disable: Support };
+
+/** 목록을 읽지 못했거나 표에 없는 모델이다. 모르는 것을 지원한다고 채우지 않는다 */
+const UNKNOWN_CAPABILITY: ReasoningCapability = {
+  support: "UNKNOWN",
+  disable: "UNKNOWN",
+};
+
+/** reasoning 을 끄는 effort 다. 「기본」(effort 를 보내지 않음)과 다른 의도다 */
+const EFFORT_NONE = "none";
 
 type OptionsState =
   | { status: "loading" }
@@ -85,21 +99,25 @@ export function modelChoiceLabel(choice: ModelChoice | null): string {
 }
 
 /**
- * 그 모델이 effort 를 받는지다.
+ * 그 모델의 reasoning 지원과 끄기 지원이다.
  *
- * <p>「기본」 이면 기본 모델을 본다. 목록을 읽지 못했거나 표에 값이 없으면 참으로 본다. backend 가 모르는
- * 모델을 참으로 보는 것과 맞춘다.
+ * <p>「기본」 이면 기본 모델을 본다. 목록을 읽지 못했거나 표에 값이 없으면 둘 다 `UNKNOWN` 이다.
  */
-function acceptsEffort(
+function capabilityOf(
   options: ModelOptions | null,
   picked: { provider: string; model: string } | null,
-): boolean {
-  if (options === null) return true;
+): ReasoningCapability {
+  if (options === null) return UNKNOWN_CAPABILITY;
   const provider = picked?.provider ?? options.defaultProvider;
   const model = picked?.model ?? options.defaultModel;
-  if (model === null) return true;
+  if (model === null) return UNKNOWN_CAPABILITY;
   const row = options.providers.find((item) => item.provider === provider);
-  return row?.reasoningCapable[model] ?? true;
+  return row?.reasoning?.[model] ?? UNKNOWN_CAPABILITY;
+}
+
+/** effort 선택지에 보이는 글자다. `none` 만 뜻을 풀어 보인다 */
+function effortLabel(effort: string): string {
+  return effort === EFFORT_NONE ? "끄기" : effort;
 }
 
 function sameChoice(left: ModelChoice | null, right: ModelChoice): boolean {
@@ -192,7 +210,11 @@ export function ModelPicker({
   const options =
     optionsState.status === "loaded" ? optionsState.options : null;
   const pickedModel = parseModelKey(draftModel);
-  const effortEnabled = acceptsEffort(options, pickedModel);
+  const capability = capabilityOf(options, pickedModel);
+  // 지원 미확인도 고르게 둔다. 막으면 고를 수 있는 것을 못 고르게 된다(ADR-060).
+  const effortEnabled = capability.support !== "UNSUPPORTED";
+  const effortUnknown =
+    options !== null && effortEnabled && capability.support === "UNKNOWN";
   const knownKeys = new Set(
     options?.providers.flatMap((row) =>
       row.models.map((model) => modelKey(row.provider, model)),
@@ -209,8 +231,15 @@ export function ModelPicker({
   const defaultLabel = options?.defaultModel
     ? `기본 (${options.defaultModel})`
     : "기본";
-  const listedEfforts = options?.reasoningEfforts ?? REASONING_EFFORTS;
+  // `none` 은 끄기 지원이 확인된 모델에서만 고른다.
+  const listedEfforts = [
+    ...(effortEnabled && capability.disable === "SUPPORTED"
+      ? [EFFORT_NONE]
+      : []),
+    ...(options?.reasoningEfforts ?? REASONING_EFFORTS),
+  ];
   // 대화에 적힌 effort 가 목록에 없으면 그 값도 둔다. 선택지에 없으면 창은 「기본」 을 보이는데 적용하면 옛 값이 나간다.
+  // `none` 을 더한 뒤의 목록으로 견주므로 저장된 `none` 이 둘로 보이지 않는다.
   const efforts =
     shown?.reasoningEffort && !listedEfforts.includes(shown.reasoningEffort)
       ? [...listedEfforts, shown.reasoningEffort]
@@ -226,8 +255,20 @@ export function ModelPicker({
       model: pickedModel?.model ?? null,
       reasoningEffort: effortEnabled && draftEffort !== "" ? draftEffort : null,
     };
+    // 바꾼 것이 없는지는 `none` 을 거르기 전의 값으로 정한다. 그래야 그대로 적용해도 저장된 `none` 이 남는다.
+    const unchanged = sameChoice(choice, next);
+    // `none` 을 새로 골랐는데 그 모델이 끄기를 받는다고 확인되지 않았으면 보내지 않는다. 목록을 읽지 못했으면
+    // 판정할 수 없으니 그대로 둔다.
+    if (
+      !unchanged &&
+      options !== null &&
+      next.reasoningEffort === EFFORT_NONE &&
+      capability.disable !== "SUPPORTED"
+    ) {
+      next.reasoningEffort = null;
+    }
     changeOpen(false);
-    if (sameChoice(choice, next)) return;
+    if (unchanged || sameChoice(choice, next)) return;
     setSaving(next);
     setFailed(false);
     const result = await onChange(next);
@@ -280,7 +321,18 @@ export function ModelPicker({
                 id={modelSelectId}
                 value={draftModel}
                 disabled={optionsState.status === "loading"}
-                onChange={(event) => setDraftModel(event.target.value)}
+                onChange={(event) => {
+                  const nextModel = event.target.value;
+                  setDraftModel(nextModel);
+                  // 새 모델이 끄기를 받지 않으면 창의 임시 선택만 「기본」 으로 비운다. 저장된 값은 적용하기 전에는 그대로다.
+                  if (
+                    draftEffort === EFFORT_NONE &&
+                    capabilityOf(options, parseModelKey(nextModel)).disable !==
+                      "SUPPORTED"
+                  ) {
+                    setDraftEffort("");
+                  }
+                }}
               >
                 <option value={DEFAULT_KEY}>{defaultLabel}</option>
                 {keptKey !== null ? (
@@ -335,7 +387,7 @@ export function ModelPicker({
                 <option value="">기본</option>
                 {efforts.map((effort) => (
                   <option key={effort} value={effort}>
-                    {effort}
+                    {effortLabel(effort)}
                   </option>
                 ))}
               </NativeSelect>
@@ -344,6 +396,15 @@ export function ModelPicker({
                   이 모델은 effort 를 고를 수 없어요.
                 </p>
               )}
+              {effortUnknown ? (
+                <p
+                  data-testid="effort-support-unknown"
+                  className="text-xs text-muted-foreground"
+                >
+                  이 모델의 effort 지원을 확인하지 못했어요. 골라도 모델이
+                  무시할 수 있어요.
+                </p>
+              ) : null}
             </div>
             <DialogFooter>
               <Button

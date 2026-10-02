@@ -115,7 +115,7 @@ public class ChatController {
     public SseEmitter stream(@Valid @RequestBody SendMessageRequest request) {
         CurrentUser user = currentUser.require();
         // 스트림 안에서 바꿔야 없는 대화가 지금처럼 SSE error 사건으로 알려진다.
-        // 도구의 명령 원문과 내부 값은 보내기 직전에 보는 사람에 맞춰 뺀다. 근거는 ADR-038 과 ADR-060 에 있다.
+        // 도구의 명령 원문과 내부 값은 보내기 직전에 보는 사람에 맞춰 뺀다. 근거는 ADR-038 과 ADR-063 에 있다.
         return streams.open(send -> chat.stream(
                 user,
                 numberOf(user, request.conversationId()),

@@ -5,7 +5,7 @@
 | 메서드와 경로 | 쓰임 |
 | --- | --- |
 | `POST /v1/runs` | 실행 제출. `input`, `session_id`, `instructions` 를 받고 `run_id` 와 `status` 를 준다 |
-| `GET /v1/runs/{run_id}` | `status`, `session_id`, `model`, `output`, `usage` 를 준다 |
+| `GET /v1/runs/{run_id}` | `status`, `session_id`, `model`, `output`, `usage` 를 준다. 언제까지 답하는지는 아래 「실행 조회가 답하는 기간」 을 본다 |
 | `GET /v1/runs/{run_id}/events` | SSE. `tool.started`, `tool.completed`, `subagent.start`, `subagent.complete` 와 종료 사건 |
 | `POST /v1/runs/{run_id}/stop` | 실행 중단 |
 | `POST /v1/runs/{run_id}/steer` | 도는 실행에 지시를 더한다. 아래 「도는 실행에 지시를 더하는 `steer`」 를 본다. 우리는 아직 부르지 않는다 |
@@ -45,6 +45,34 @@ v0.21.5 의 `gateway/platforms/api_server_runs.py` 에 `_handle_steer_run` 이 �
 넣지 못한 글과 버려진 글을 받아 둘 자리가 먼저 있어야 해서 대기열을 먼저 만들었다(ADR-048).
 `steer` 를 쓰기 전에 운영 Hermes 에서 `steer` 와 `pending_steer` 의 왕복을 확인한다.
 가짜 Hermes 에는 이 경로가 없다.
+
+## 실행 조회가 답하는 기간
+
+v0.21.5 의 [`gateway/platforms/api_server_runs.py`](https://github.com/NousResearch/hermes-agent/blob/v2026.9.24/gateway/platforms/api_server_runs.py) 와 `api_server.py` 를 2026-10-02 에 소스로 읽었다. 운영 Hermes 에서 왕복으로 확인하지는 않았다.
+
+**실행 상태는 gateway 프로세스의 메모리에 있다.** `_run_statuses` 가 run 번호마다 상태 하나를 갖는다.
+
+| 때 | `GET /v1/runs/{run_id}` |
+| --- | --- |
+| 도는 중 | 200. `status` 는 `running`, `stopping`, `waiting_for_approval` 가운데 하나다. 종료 상태가 아닌 값은 모두 도는 중으로 읽는다 |
+| 끝난 뒤 1시간 안 | 200. 종료 `status` 와 `output`, `usage`, `session_id`, `runtime` 을 그대로 준다. 몇 번을 읽어도 같다 |
+| 끝난 뒤 1시간이 지났다 | 404 `run_not_found`. `_sweep_orphaned_runs_once` 가 1분마다 돌며 `_RUN_STATUS_TTL`(3600초)을 넘긴 `completed`, `failed`, `cancelled` 를 지운다 |
+| gateway 가 다시 떴다 | 404 `run_not_found`. 메모리가 비었다 |
+| 남의 profile 이나 key 로 물었다 | 404. 있는지 알리지 않는다([`concurrency.md`](concurrency.md)) |
+
+**404 로는 「없는 run」 과 「끝난 지 오래된 run」 을 구분하지 못한다.** 어느 쪽이든 다시 물어도 답이 바뀌지 않는다.
+
+**클라이언트가 떠나도 실행은 계속 돈다.** 실행은 gateway 의 task 로 돌고 조회나 사건 스트림 연결에 묶이지 않는다.
+사건 스트림의 버퍼만 `_RUN_STREAM_TTL`(300초) 뒤에 치운다. 다시 구독해도 그 전의 조각은 오지 않는다.
+
+gateway 가 내려가며 끊은 실행은 `interrupted` 로 적힌다. 그 상태도 메모리에 있어 다시 뜬 뒤에는 읽지 못한다.
+
+제출할 때 `Idempotency-Key` 머리말을 주면 Hermes 가 그 run 의 상태를 디스크에 남기고, 다시 뜬 뒤에도 조회에 답한다. 도는 중에 gateway 가 죽은 run 은 `interrupted` 로 답한다.
+**Control Plane 은 이 머리말을 보내지 않는다.**
+
+Control Plane 이 다시 뜰 때 남은 실행을 이 조회로 다시 정한다([ADR-061](../adr/ADR-061-재기동-때-남은-실행은-hermes-에-물어-정하고-도는-실행에는-다시-붙는다.md)).
+
+**가짜 Hermes 의 실행 조회도 이 모양으로 둔다.** 도는 실행은 `running`, 끝난 실행은 같은 답을 되풀이하고, 지운 run 과 모르는 run 은 404 다.
 
 ## `/v1/runs` 는 이미지를 받지 않는다
 
@@ -92,8 +120,20 @@ Control Plane 은 사용자가 대화에서 모델을 고르지 않았으면 두
 **reasoning effort 는 `model_options` 로 그 실행에만 준다.**
 본문의 `model_options: {"reasoning": {"effort": "<값>"}}` 을 받는다. 옛 형식 `model_options.reasoning_effort` 도 받는다.
 받는 값은 `none`, `minimal`, `low`, `medium`, `high`, `xhigh`, `max`, `ultra` 다. 모르는 값은 오류 없이 버리고 기본값으로 돈다.
-모델이 받지 않는 값은 그 provider 의 값으로 맞춘다.
-`model_options` 를 보내지 않으면 그 모델에 정해 둔 설정값을 쓴다.
+모델이 받지 않는 값은 그 provider 의 값으로 맞춘다. 맞추는 규칙은 provider 와 모델마다 다르고 Hermes 가 갖는다.
+`model_options` 를 보내지 않으면 그 모델에 정해 둔 설정값을 쓴다. 이것이 「미지정」 이다.
+
+| 보낸 값 | 상류가 해석하는 것 |
+| --- | --- |
+| 없음(`model_options` 없음, `effort` 없음, 모르는 값) | `reasoning_config` 가 비어 그 모델의 profile 설정값으로 돈다 |
+| `none` | `{"enabled": false}`. 이 실행에서 reasoning 을 끈다. 미지정과 다른 의도다 |
+| `minimal` 부터 `max` | `{"enabled": true, "effort": "<값>"}` 을 전달한다. provider 가 받지 않는 값은 더 약한 쪽의 가까운 값으로 줄이고, 약한 값이 없으면 가장 약한 값으로 맞춘다 |
+
+`none` 을 받아도 모든 route 가 reasoning 을 끌 수 있는 것은 아니다. 끌 수 없는 provider 는 그 값을 줄이거나 빼고, 오류로 알리지 않는다.
+요청이 받아들여졌는지와 provider 가 실제로 무엇을 받았는지는 응답에서 알 수 없다.
+
+위는 v0.21.3(`v2026.9.14`)과 v0.21.5(`v2026.9.24`)의 `_request_reasoning_config` 와 `agent/reasoning_effort.py` 의 `EFFORT_LADDER`, `clamp_effort` 를 읽어 확인했다.
+두 판의 해석이 같았다. 실제 Runs API 왕복으로 확인하지는 않았다.
 근거는 [v0.21.3 `gateway/platforms/api_server.py`](https://github.com/NousResearch/hermes-agent/blob/v2026.9.14/gateway/platforms/api_server.py) 의 `_request_reasoning_config`, `_request_agent_overrides` 와
 [v0.21.3 `gateway/platforms/api_server_runs.py`](https://github.com/NousResearch/hermes-agent/blob/v2026.9.14/gateway/platforms/api_server_runs.py) 가 그것을 넘기는 자리다. v0.21.5 에서도 같다.
 
@@ -211,6 +251,11 @@ model_name = (
 | `providers[].authenticated` | 그 provider 로 실제로 부를 수 있는가 |
 | `providers[].models` | 그 provider 로 고를 수 있는 모델 |
 | `providers[].is_current` | 기본 provider 인가 |
+| `providers[].capabilities.<모델>.reasoning` | 그 모델이 reasoning 을 받는가. 상류 카탈로그가 모르면 상류가 `true` 로 채운다. 그래서 `true` 는 지원이 검증됐다는 뜻이 아니다. 칸이 없을 수도 있다 |
+| `providers[].capabilities.<모델>.can_disable_reasoning` | reasoning 을 끌 수 있는가. 모델 카탈로그를 주는 aggregator provider(`nous`, `openrouter`)의 모델에만 있다. 다른 provider 는 칸이 없다 |
+
+모델별로 받는 effort 수준(`supported_efforts`)은 상류가 일부러 내보내지 않는다. 실제 지원보다 적게 알려 주기 때문이다.
+그래서 `minimal` 을 받는 모델인지 알려 주는 칸은 없다. v2026.9.24 의 `hermes_cli/inventory.py` 의 `_apply_capabilities` 에서 확인했다.
 
 **설정하지 않은 provider 도 목록에 나온다.**
 API server 는 목록을 만들 때 Hermes 가 아는 provider 가운데 빠진 것을 빈 행으로 채운다.

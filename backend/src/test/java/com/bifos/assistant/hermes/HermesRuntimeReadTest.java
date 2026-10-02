@@ -120,6 +120,47 @@ class HermesRuntimeReadTest {
     }
 
     @Test
+    @DisplayName("자식 session 응답에 provider 가 없으면 billing_provider 를 읽는다")
+    void readsSubagentBillingProviderWhenProviderIsAbsent() {
+        bodies.put(
+                "/p/dad/api/sessions/child-1",
+                "{\"session\":{\"id\":\"child-1\",\"source\":\"subagent\","
+                        + "\"model\":\"example-fast\",\"billing_provider\":\"example-provider\"}}");
+
+        SubagentSessionUsage usage = client.readSubagentUsage(baseUrl, "dad", "child-1");
+
+        assertThat(usage).isNotNull();
+        assertThat(usage.provider()).isEqualTo("example-provider");
+    }
+
+    @Test
+    @DisplayName("자식 session 응답에 provider 가 있으면 billing_provider 보다 먼저 읽는다")
+    void prefersSubagentProviderOverBillingProvider() {
+        bodies.put(
+                "/p/dad/api/sessions/child-1",
+                "{\"session\":{\"id\":\"child-1\",\"source\":\"subagent\","
+                        + "\"provider\":\"served-provider\",\"billing_provider\":\"example-provider\"}}");
+
+        SubagentSessionUsage usage = client.readSubagentUsage(baseUrl, "dad", "child-1");
+
+        assertThat(usage).isNotNull();
+        assertThat(usage.provider()).isEqualTo("served-provider");
+    }
+
+    @Test
+    @DisplayName("자식 session 응답에 provider 와 billing_provider 가 모두 없으면 provider 를 비운다")
+    void leavesSubagentProviderNullWhenAbsent() {
+        bodies.put(
+                "/p/dad/api/sessions/child-1",
+                "{\"session\":{\"id\":\"child-1\",\"source\":\"subagent\",\"model\":\"example-fast\"}}");
+
+        SubagentSessionUsage usage = client.readSubagentUsage(baseUrl, "dad", "child-1");
+
+        assertThat(usage).isNotNull();
+        assertThat(usage.provider()).isNull();
+    }
+
+    @Test
     @DisplayName("자식 사용량의 음수, 소수, long 범위 밖 토큰은 모르는 값으로 둔다")
     void rejectsInvalidSubagentTokenNumbers() {
         bodies.put(

@@ -1,4 +1,5 @@
 import { EmptyState } from "@/components/ui/empty-state";
+import { isInterruptedByRestart } from "@/lib/execution-status";
 import { formatCost, formatDurationFor } from "@/lib/format";
 import { ExecutionCard } from "./execution-card";
 import { ExecutionTable } from "./execution-table";
@@ -104,7 +105,7 @@ export function executionStatusLabel(
   isAdmin: boolean,
 ): string {
   if (isRunning(execution)) return "실행 중";
-  if (execution.errorCode === "ORPHANED") return "중간에 중단됨";
+  if (isInterruptedByRestart(execution.errorCode)) return "중간에 중단됨";
   if (execution.errorCode === "PROVIDER_BLOCKED") return "모델을 쓸 수 없음";
   if (execution.errorCode === "NO_MODEL_AVAILABLE")
     return "사용할 수 있는 모델 없음";

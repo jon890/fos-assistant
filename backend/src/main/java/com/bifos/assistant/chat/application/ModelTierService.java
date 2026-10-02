@@ -45,7 +45,7 @@ public class ModelTierService {
     /**
      * 요청자가 고를 수 있는 단계와 기본값이다.
      *
-     * <p>단계가 가리키는 provider 와 모델과 effort 는 내부 값이라 {@code ADMIN} 역할에게만 싣는다(ADR-060).
+     * <p>단계가 가리키는 provider 와 모델과 effort 는 내부 값이라 {@code ADMIN} 역할에게만 싣는다(ADR-063).
      * 그 밖의 요청자는 단계와 이름만 받는다.
      */
     @Transactional(readOnly = true)
@@ -118,6 +118,26 @@ public class ModelTierService {
     @Transactional(readOnly = true)
     public void requireVisible(CurrentUser user, ModelChoice choice) {
         visibility.requireVisible(user.groupId(), choice);
+    }
+
+    /**
+     * 대화에 저장하려는 effort 가 그 모델에서 고를 수 있는 값인지 본다.
+     *
+     * <p>{@code none} 만 판정한다. 그 에이전트의 목록(숨김 적용)에서 모델의 끄기 지원이 확인되지 않으면 거절한다.
+     * 모델을 비웠으면 목록의 기본 모델로 본다. 목록 조회 실패({@code HERMES_UNAVAILABLE})는 그대로 올린다.
+     *
+     * @throws ApiException {@code VALIDATION_FAILED}. 그 모델에서 reasoning 을 끌 수 있는지 확인되지 않을 때
+     */
+    @Transactional(readOnly = true)
+    public void requireEffortAllowed(CurrentUser user, Agent agent, ModelChoice choice) {
+        if (!ModelChoice.EFFORT_NONE.equals(choice.reasoningEffort())) {
+            return;
+        }
+        if (!modelOptions
+                .optionsForAgent(user.groupId(), agent)
+                .allowsEffort(choice.provider(), choice.model(), ModelChoice.EFFORT_NONE)) {
+            throw new ApiException(ErrorCode.VALIDATION_FAILED, "reasoning cannot be turned off for this model");
+        }
     }
 
     /**

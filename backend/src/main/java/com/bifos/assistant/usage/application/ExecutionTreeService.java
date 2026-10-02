@@ -192,7 +192,7 @@ public class ExecutionTreeService {
      * 실행 트리를 응답으로 옮긴다. 도구 사건의 {@code detail} 은 보는 사람에 맞춰 싣는다.
      *
      * <p>{@link InternalValuePolicy} 가 허락하지 않는 사람에게는 노드의 에이전트 코드, 모델, 토큰, 금액, 시각
-     * 구간을 비우고 {@code PROVIDER_SWITCHED} 사건을 사건째 뺀다. 근거는 ADR-060 에 있다.
+     * 구간을 비우고 {@code PROVIDER_SWITCHED} 사건을 사건째 뺀다. 근거는 ADR-063 에 있다.
      */
     private ExecutionNode node(
             Branch branch,

@@ -19,6 +19,7 @@ import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.skill.application.SkillUsageQuery;
 import com.bifos.assistant.usage.application.ExecutionTreeService;
+import com.bifos.assistant.usage.application.UsageSummaryService;
 import com.bifos.assistant.usage.domain.AgentExecution;
 import com.bifos.assistant.usage.domain.ExecutionCost;
 import com.bifos.assistant.usage.domain.ExecutionStatus;
@@ -74,6 +75,9 @@ class UsageBreakdownTest {
     ExecutionTreeService trees;
 
     @Autowired
+    UsageSummaryService summaries;
+
+    @Autowired
     ConversationRepository conversations;
 
     @Autowired
@@ -89,7 +93,8 @@ class UsageBreakdownTest {
         executions.deleteAll();
         career = agent(CAREER_CODE, "진로 비서");
         chore = agent(CHORE_CODE, "집안일 비서");
-        controller = new UsageController(executions, currentUser, agentService, trees, conversations, skillUsage);
+        controller =
+                new UsageController(executions, currentUser, agentService, trees, conversations, skillUsage, summaries);
         when(currentUser.require()).thenReturn(new CurrentUser(USER_ID, "dad@example.com", "dad", 1L, UserRole.ADMIN));
         // 묶음 합계는 관리자만 받는다. 대역이어도 관리자 확인은 실제 판정을 타게 한다.
         doCallRealMethod().when(currentUser).requireAdmin();

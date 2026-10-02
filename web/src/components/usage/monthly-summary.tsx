@@ -1,5 +1,6 @@
 import { Stat } from "@/components/ui/stat";
 import { formatAmount } from "@/lib/format";
+import { subagentGapDetail, subagentGapTotal } from "@/lib/subagent-gap";
 
 /**
  * 이번 달 합계다.
@@ -14,6 +15,10 @@ export type MonthlyCost = {
   unpricedExecutions: number | null;
   actualCostMicros: number | null;
   subscriptionExecutions: number | null;
+  pricedSubagents: number | null;
+  pendingSubagents: number | null;
+  unconfirmedSubagents: number | null;
+  unpricedSubagents: number | null;
   /** 그 달 실행 건수. 모두에게 온다 */
   totalExecutions: number;
 };
@@ -38,6 +43,12 @@ export function MonthlySummary({ monthly, isAdmin }: Props) {
   }
   // 여기부터는 관리자에게만 그린다. 관리자의 응답에는 아래 값이 모두 실려 온다.
   const unpricedExecutions = monthly.unpricedExecutions ?? 0;
+  const gap = {
+    pending: monthly.pendingSubagents ?? 0,
+    unconfirmed: monthly.unconfirmedSubagents ?? 0,
+    unpriced: monthly.unpricedSubagents ?? 0,
+  };
+  const gapTotal = subagentGapTotal(gap);
   return (
     <dl className="mb-6 grid gap-3 sm:grid-cols-2 md:grid-cols-3">
       <Stat
@@ -60,6 +71,14 @@ export function MonthlySummary({ monthly, isAdmin }: Props) {
           label="가격을 찾지 못한 실행"
           value={`${unpricedExecutions.toLocaleString("ko-KR")}건`}
           detail="환산 합계에서 제외됨"
+          className="sm:col-span-2 md:col-span-1"
+        />
+      ) : null}
+      {gapTotal > 0 ? (
+        <Stat
+          label="금액을 확인하지 못한 도우미"
+          value={`${gapTotal.toLocaleString("ko-KR")}건`}
+          detail={`${subagentGapDetail(gap)} · 환산 합계에서 제외됨`}
           className="sm:col-span-2 md:col-span-1"
         />
       ) : null}

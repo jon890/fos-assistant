@@ -12,8 +12,9 @@ import com.bifos.assistant.skill.application.SkillUsageQuery;
 import com.bifos.assistant.usage.application.ExecutionTree;
 import com.bifos.assistant.usage.application.ExecutionTreeService;
 import com.bifos.assistant.usage.application.InternalValuePolicy;
+import com.bifos.assistant.usage.application.MonthlyUsageSummary;
+import com.bifos.assistant.usage.application.UsageSummaryService;
 import com.bifos.assistant.usage.domain.AgentExecution;
-import com.bifos.assistant.usage.domain.MonthlyCostDetail;
 import com.bifos.assistant.usage.infra.AgentExecutionRepository;
 import com.bifos.assistant.usage.presentation.UsageDtos.BreakdownRow;
 import com.bifos.assistant.usage.presentation.UsageDtos.BreakdownView;
@@ -60,6 +61,7 @@ public class UsageController {
     private final ExecutionTreeService executionTrees;
     private final ConversationRepository conversations;
     private final SkillUsageQuery skillUsage;
+    private final UsageSummaryService summaries;
 
     /**
      * 로그인한 사용자 자신의 실행만 준다. 여러 사용자를 가로질러 보는 것은 admin 화면이 맡는다.
@@ -67,7 +69,7 @@ public class UsageController {
      * <p>뿌리만 낸다. 흐름 하나가 실행 넷을 남기므로 전부 내면 목록이 중간 산출물로 찬다. 자식은 실행
      * 나무 화면에서 본다.
      *
-     * <p>{@code MEMBER} 역할에게는 내부 값을 비워 보낸다(ADR-060).
+     * <p>{@code MEMBER} 역할에게는 내부 값을 비워 보낸다(ADR-063).
      */
     @GetMapping("/executions")
     public List<ExecutionView> myExecutions(@RequestParam(defaultValue = "50") int limit) {
@@ -155,9 +157,9 @@ public class UsageController {
      * 이번 달 환산 금액의 합계다.
      *
      * <p>구독료와 견줄 숫자라서 화면이 목록과 함께 보여 준다. 저장된 금액을 더하기만 하고 여기서 다시
-     * 환산하지 않는다.
+     * 환산하지 않는다. native 자식의 금액을 포함하고, 금액을 확인하지 못한 자식 수를 함께 낸다(ADR-062).
      *
-     * <p>{@code MEMBER} 역할에게는 실행 건수만 싣고 금액과 건수 구분은 비운다(ADR-060).
+     * <p>{@code MEMBER} 역할에게는 실행 건수만 싣고 금액과 건수 구분은 비운다(ADR-063).
      */
     @GetMapping("/monthly-cost")
     public MonthlyCostView thisMonthCost() {
@@ -165,7 +167,7 @@ public class UsageController {
         Instant from = month.atDay(1).atStartOfDay(HOUSEHOLD_ZONE).toInstant();
         Instant to = month.plusMonths(1).atDay(1).atStartOfDay(HOUSEHOLD_ZONE).toInstant();
         CurrentUser user = currentUser.require();
-        MonthlyCostDetail cost = executions.sumCostDetailBetween(user.id(), from, to);
+        MonthlyUsageSummary cost = summaries.monthly(user.id(), from, to);
         return MonthlyCostView.from(month.toString(), cost, InternalValuePolicy.visibleTo(user));
     }
 
@@ -173,11 +175,12 @@ public class UsageController {
      * 한 달치 실행을 축 하나로 묶어 준다.
      *
      * <p>네 축이 같은 줄 모양을 쓴다. 화면이 표 하나로 네 축을 모두 그릴 수 있게 하려는 것이다.
-     * 합계는 데이터베이스가 내고 축 하나에 질의 하나만 나간다.
+     * 실행 합계는 데이터베이스가 내고, native 자식의 원장 줄은 {@code UsageSummaryService} 가 그 줄에
+     * 더한다(ADR-062).
      *
      * <p>자기 것만 낸다. 여러 사용자를 가로질러 보는 것은 admin 화면이 맡는다.
      *
-     * <p>응답 전체가 내부 값이라 {@code MEMBER} 역할은 {@code FORBIDDEN} 을 받는다(ADR-060).
+     * <p>응답 전체가 내부 값이라 {@code MEMBER} 역할은 {@code FORBIDDEN} 을 받는다(ADR-063).
      *
      * @param axis {@code agent}, {@code model}, {@code day}, {@code fingerprint} 중 하나
      * @param month {@code 2026-09} 형태의 대상 달. 없으면 이번 달
@@ -194,20 +197,20 @@ public class UsageController {
     private List<BreakdownRow> rows(String axis, Long userId, Instant from, Instant to) {
         return switch (axis) {
             case "agent" ->
-                executions.sumByAgentBetween(userId, from, to).stream()
-                        .map(BreakdownRow::of)
+                summaries.byAgent(userId, from, to).stream()
+                        .map(BreakdownRow::ofAgent)
                         .toList();
             case "model" ->
-                executions.sumByModelBetween(userId, from, to).stream()
-                        .map(BreakdownRow::of)
+                summaries.byModel(userId, from, to).stream()
+                        .map(BreakdownRow::ofModel)
                         .toList();
             case "day" ->
-                executions.sumByDayBetween(userId, from, to).stream()
-                        .map(BreakdownRow::of)
+                summaries.byDay(userId, from, to, HOUSEHOLD_ZONE).stream()
+                        .map(BreakdownRow::ofDay)
                         .toList();
             case "fingerprint" ->
-                executions.sumByFingerprintBetween(userId, from, to).stream()
-                        .map(BreakdownRow::of)
+                summaries.byFingerprint(userId, from, to).stream()
+                        .map(BreakdownRow::ofFingerprint)
                         .toList();
             default ->
                 throw new ApiException(

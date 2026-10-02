@@ -65,7 +65,7 @@ public class AgentDelegationService {
      * 이 프로세스에서 도는 위임 실행의 중지 표시와 run 참조다. 실행 번호가 열쇠다.
      *
      * <p>실행 줄이 생긴 직후 넣고 그 실행이 끝나 상태를 적은 뒤 뺀다. 서버가 다시 뜨면 비고, 그때 남은 RUNNING 줄은
-     * 기동 정리가 끝낸다.
+     * 기동 정리가 Hermes 에 물어 정한다(ADR-061).
      */
     private final ConcurrentHashMap<Long, RunningDelegation> running = new ConcurrentHashMap<>();
 
@@ -129,8 +129,9 @@ public class AgentDelegationService {
      * 적는다. 그래서 멈추기와 끝나기가 겹치면 먼저 적힌 상태가 남는다. CANCELLED 가 적히기를 {@link #STOP_WAIT} 까지
      * 기다리고, 그 안에 적히지 않으면 RUNNING 인 줄을 그대로 돌려준다. 부르는 쪽은 그것을 중지를 요청한 상태로 읽는다.
      *
-     * <p>이 프로세스에 중지 표시가 없는 도는 실행은 서버가 다시 떠 끊긴 실행이다. 기동 정리가 그 줄을 끝내므로 상태를
-     * 기다리지 않고, run 번호가 있으면 Hermes 에 중지만 보낸다. run 번호가 없거나 보내지 못하면 아무것도 멈추지 않았으므로
+     * <p>이 프로세스에 중지 표시가 없는 도는 실행은 서버가 다시 뜬 뒤 기동 정리가 다시 붙어 있는 실행이다(ADR-061).
+     * run 번호가 있으면 Hermes 에 중지만 보내고 상태를 기다리지 않는다. 기동 정리가 다시 물을 때 취소로 읽혀 그 줄이
+     * CANCELLED 로 적힌다. run 번호가 없거나 보내지 못하면 아무것도 멈추지 않았으므로
      * {@link DelegationStop#stopRequested()} 가 거짓이다.
      */
     public Optional<DelegationStop> stop(CurrentUser user, AgentExecution origin, Long executionId) {
@@ -244,7 +245,8 @@ public class AgentDelegationService {
         if (!handoff.rowCreated()) {
             if (handoff.failure() instanceof DataIntegrityViolationException) {
                 // 같은 키를 다른 요청이 먼저 저장했다. 트랜잭션 밖에서 그 줄을 다시 읽는다.
-                return executions.findByDelegationKey(delegationKey.value())
+                return executions
+                        .findByDelegationKey(delegationKey.value())
                         .map(raced -> sameCall(user, origin, raced))
                         .orElseGet(() -> rejected(Failure.SUBMIT_FAILED, origin, "저장에 실패했고 다시 읽은 줄도 없다"));
             }
@@ -359,8 +361,10 @@ public class AgentDelegationService {
     private boolean stopDetached(AgentExecution execution) {
         Optional<Agent> found = agents.findById(execution.agentId());
         if (found.isEmpty()) {
-            log.warn("에이전트 행이 없어 끊긴 위임 실행의 Hermes run 을 멈추지 못했다 executionId={} agentId={}",
-                    execution.id(), execution.agentId());
+            log.warn(
+                    "에이전트 행이 없어 끊긴 위임 실행의 Hermes run 을 멈추지 못했다 executionId={} agentId={}",
+                    execution.id(),
+                    execution.agentId());
             return false;
         }
         try {
@@ -406,7 +410,10 @@ public class AgentDelegationService {
         Long parentId = origin.parentExecutionId();
         while (parentId != null && depth <= properties.maxDepth()) {
             depth++;
-            parentId = executions.findById(parentId).map(AgentExecution::parentExecutionId).orElse(null);
+            parentId = executions
+                    .findById(parentId)
+                    .map(AgentExecution::parentExecutionId)
+                    .orElse(null);
         }
         return depth;
     }

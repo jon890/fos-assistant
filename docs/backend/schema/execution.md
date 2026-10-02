@@ -24,7 +24,7 @@
 | `hermes_session_id` | VARCHAR(128) NULL | 이 실행이 속한 Hermes session. 대화 turn 은 그 대화의 뿌리 session 이고, 뿌리가 없는 옛 대화는 보낸 session 이다. 압축 교체 뒤에는 보낸 session 과 다를 수 있다. 흐름의 하위 실행과 위임한 자식은 Control Plane 이 정한 `fos-<uuid>` 다. 제출하기 전에 적는다. 최상위 session 의 MCP 호출과 최상위 자식의 등록이 서명한 뿌리 session 과 `profile_name` 으로 도는 실행을 찾을 때 쓴다([ADR-032](../../adr/ADR-032-mcp-토큰은-profile-을-증명하고-실제-사용자는-부모-실행에서-정한다.md)). 하위 에이전트 session 은 이 칸이 아니라 `hermes_session_binding` 으로 찾는다. 이 칸이 생기기 전의 실행과 Memory 제안, 추천 질문을 만드는 실행은 비어 있다 |
 | `delegation_key` | VARCHAR(64) NULL, 유일 | `agent_delegate` 로 만든 실행만 채운다. `v1`, 부모 실행의 `profile_name`, 뿌리 session, 그 호출의 session, `tool_call_id` 를 줄바꿈으로 이은 글의 SHA-256 소문자 16진수다. 같은 호출이 다시 와도 실행을 하나만 만든다. `agent_status` 와 `agent_stop` 은 이 칸이 있는 실행만 답한다. 정의는 [ADR-032](../../adr/ADR-032-mcp-토큰은-profile-을-증명하고-실제-사용자는-부모-실행에서-정한다.md) 에 있다 |
 | `output_text` | MEDIUMTEXT NULL | `agent_delegate` 로 만든 실행이 끝났을 때의 답. `agent_status` 와 `agent_stop` 이 `SUCCEEDED` 와 `CANCELLED` 에서 돌려준다. 끝난 상태와 같은 저장에서 적는다. `assistant.delegation.output-max-chars`(기본 100,000자)를 넘으면 자르고 잘렸다는 한 줄을 붙인다. 다른 실행은 채우지 않는다(대화 답은 `chat_message` 가 갖는다) |
-| `result_delivered_at` | DATETIME(6) NULL | 위임 실행의 끝난 결과를 부모에게 전한 시각. 부모가 `agent_status` 나 `agent_stop` 으로 끝난 상태를 받았거나, Control Plane 이 부모 대화를 깨운 turn 에 넣었을 때 적는다. `agent_delegate` 가 줄을 만든 뒤 제출 전에 끝나 `SUBMIT_FAILED` 를 돌려줄 때도 적는다. 부모가 번호를 모르는 결과를 다시 전하지 않기 위해서다. 이 칸이 생기기 전에 끝난 위임 실행은 마이그레이션이 `finished_at`(없으면 그때 시각)으로 채워 깨우지 않는다. 그때 `RUNNING` 이던 줄은 비워 두며, 기동 정리가 `FAILED` 로 적은 뒤 전한다. 비어 있고 `SUCCEEDED` 나 `FAILED` 인 위임 실행이 깨울 대상이다([ADR-040](../../adr/ADR-040-위임-결과는-control-plane-이-부모-대화의-다음-turn-을-열어-전한다.md)) |
+| `result_delivered_at` | DATETIME(6) NULL | 위임 실행의 끝난 결과를 부모에게 전한 시각. 부모가 `agent_status` 나 `agent_stop` 으로 끝난 상태를 받았거나, Control Plane 이 부모 대화를 깨운 turn 에 넣었을 때 적는다. `agent_delegate` 가 줄을 만든 뒤 제출 전에 끝나 `SUBMIT_FAILED` 를 돌려줄 때도 적는다. 부모가 번호를 모르는 결과를 다시 전하지 않기 위해서다. 이 칸이 생기기 전에 끝난 위임 실행은 마이그레이션이 `finished_at`(없으면 그때 시각)으로 채워 깨우지 않는다. 그때 `RUNNING` 이던 줄은 비워 두며, 기동 정리가 끝난 상태로 적은 뒤 전한다([`turn-control.md`](../turn-control.md) 의 「기동할 때 남은 실행 정리」). 비어 있고 `SUCCEEDED` 나 `FAILED` 인 위임 실행이 깨울 대상이다([ADR-040](../../adr/ADR-040-위임-결과는-control-plane-이-부모-대화의-다음-turn-을-열어-전한다.md)) |
 | `provider`, `model` | VARCHAR | 실제로 돈 provider 와 모델. Hermes 의 session 이 답한 값이고, 읽지 못하면 요청한 값이다. 기본값으로 보냈고 둘 다 읽지 못하면 비어 있다 |
 | `reasoning_effort` | VARCHAR(16) NULL | 이 실행에 요청한 effort. 기본값으로 보냈으면 비어 있다. 이 칸이 생기기 전의 실행도 비어 있다 |
 | `reasoning_defaults_checked_at` | DATETIME(6) NULL | `reasoning_effort`가 비어 있고 profile 기본값을 정상 응답으로 읽어 확인한 시각. 응답에 effort가 없어도 적어 같은 실행을 다시 조회하지 않는다. 조회 실패면 비워 다시 시도한다 |
@@ -53,6 +53,7 @@
 자식 실행의 토큰은 부모의 합계에 들어 있지 않다.
 근거는 [`hermes/delegation.md`](../../hermes/delegation.md) 의 「자식 session 으로 결과와 토큰을 보완한다」 절에 있다.
 그래서 부모와 자식을 더한 합계는 실행 나무의 줄을 더해서 만든다.
+실행 줄이 없는 native 자식은 `subagent_usage_job` 줄을 더한다.
 어느 줄도 두 번 세지 않는다.
 
 `CANCELLED` 는 중지한 turn 과 `agent_stop` 으로 멈춘 위임 실행에 쓴다.
@@ -73,10 +74,18 @@
 빼지 않으면 「가격을 찾지 못한 실행」 으로 세어져,
 아직 안 끝난 것과 가격을 모르는 것이 한 숫자에 섞인다.
 
-기동할 때 `RUNNING` 으로 남아 있는 줄은 `FAILED` 로 바꾸고
-`error_code` 를 `ORPHANED` 로 적는다.
-이 Control Plane 은 한 대만 도므로 기동 시점에 돌고 있는 실행이 없다.
-이렇게 끝난 줄은 사용량 목록에서 「중간에 끊김」으로 보인다.
+기동할 때 `RUNNING` 으로 남아 있는 줄은 Hermes 에 물어 정한다.
+절차는 [`turn-control.md`](../turn-control.md) 의 「기동할 때 남은 실행 정리」 가 갖는다.
+그 경로가 실패로 적을 때 쓰는 `error_code` 는 넷이다.
+
+| `error_code` | 뜻 |
+| --- | --- |
+| `ORPHANED` | run 번호가 없어 묻지 못했다. 흐름 turn 의 뿌리도 이 값이다 |
+| `REMOTE_RUN_LOST` | Hermes 가 그 run 을 모른다(404) |
+| `RECONCILE_TIMEOUT` | 상한까지 끝나지 않아 중지를 보냈다 |
+| `RECONCILE_UNREACHABLE` | 상한까지 Hermes 에 한 번도 닿지 못했다 |
+
+넷 모두 사용량 목록에서 「중간에 중단됨」 으로 보인다.
 
 ## execution_event
 
@@ -116,7 +125,7 @@ Hermes 가 보낸 원래 payload 를 통째로 넣지 않는다.
 기존 중복 완료 사건은 최신 한 줄만 키를 채우고 나머지 이력은 보존한다.
 
 이 토큰은 화면이 하위 에이전트가 무엇을 썼는지 보이는 데만 쓴다.
-사용량 합계에 더하지 않는다. 합계는 여전히 `agent_execution` 한 줄씩의 값이다.
+사용량 합계에 더하지 않는다. native 자식의 합계는 아래 `subagent_usage_job` 줄의 값으로 낸다.
 
 | `event_type` | 언제 |
 | --- | --- |
@@ -135,8 +144,10 @@ Hermes 가 보낸 원래 payload 를 통째로 넣지 않는다.
 
 ## subagent_usage_job
 
-부모 실행이 끝난 뒤에도 완료 사건이 오지 않은 자식 session 의 사용량을 다시 조회하는 작업이다.
-재조회 규칙은 [모델 단계와 실행 기록](../../model-tiers.md) 이 정한다.
+native 자식 한 명의 사용량 원장 줄이자, 그 사용량을 session 에서 조회하는 작업이다.
+부모 실행이 끝나면 session 이 있는 시작 사건마다 한 줄이 생긴다.
+재조회 규칙과 합계에 더하는 규칙은 [모델 단계와 실행 기록](../../model-tiers.md) 의 「비동기 자식 사용량」 이 정한다.
+근거는 [ADR-062](../../adr/ADR-062-native-하위-에이전트-사용량은-재조회-작업-줄을-원장으로-넓혀-합계에-더한다.md) 에 있다.
 
 | 칸 | 타입 | 뜻 |
 | --- | --- | --- |
@@ -147,13 +158,29 @@ Hermes 가 보낸 원래 payload 를 통째로 넣지 않는다.
 | `profile_name` | VARCHAR(64) | 부모 실행의 profile |
 | `api_base_url` | VARCHAR(512) | 조회를 보낼 API 주소 |
 | `status` | VARCHAR(16) | `WAITING`, `DONE`, `EXPIRED` |
-| `unconfirmed_reason` | VARCHAR(32) NULL | 확인하지 못하고 끝낸 까닭 |
+| `unconfirmed_reason` | VARCHAR(32) NULL | 사용량이나 금액을 확인하지 못한 까닭. `EXPIRED` 는 `AGENT_MISSING`, `PROFILE_CHANGED`, `DEADLINE`, 금액 없는 `DONE` 은 `PROVIDER_UNKNOWN`, `USAGE_UNKNOWN`, `PRICE_UNKNOWN` |
 | `created_at` | DATETIME(6) | |
 | `next_attempt_at` | DATETIME(6) | 다음 조회 시각 |
 | `expires_at` | DATETIME(6) | 조회 기한. 부모 실행이 끝난 뒤 24시간이다 |
 | `attempts`, `backoff_attempts` | INT | 조회 횟수 |
+| `provider` | VARCHAR(64) NULL | 자식이 돈 provider. session 응답이 주지 않으면 비운다. 부모의 값으로 채우지 않는다 |
+| `model` | VARCHAR(128) NULL | 자식이 돈 모델 |
+| `input_tokens` | BIGINT NULL | cache 를 뺀 일반 입력 토큰 |
+| `cache_read_tokens`, `cache_write_tokens` | BIGINT NULL | cache 에서 읽은 입력과 cache 에 쓴 입력 |
+| `output_tokens` | BIGINT NULL | |
+| `estimated_cost_micros` | BIGINT NULL | 공개 API 가격으로 환산한 금액. 통화 단위의 100만분의 1. 확인하지 못하면 비운다 |
+| `actual_cost_micros` | BIGINT NULL | 부모 실행의 `cost_mode` 가 `API` 일 때만 환산액과 같은 값 |
+| `cost_currency` | CHAR(3) NULL | |
+| `pricing_version` | VARCHAR(32) NULL | 이 금액을 계산한 가격표 |
+| `recorded_at` | DATETIME(6) NULL | 사용량을 적은 시각. `DONE` 으로 바꿀 때 채운다 |
 
 `(execution_id, child_session_id)` 가 유일하다.
+사용자, 에이전트, 달은 부모 실행에서 얻는다. 같은 값을 여기 다시 적지 않는다.
+부모 실행의 토큰 칸과 달리 입력을 셋으로 나눠 적는다. 합계에 더할 때는 셋을 합쳐 부모의 `input_tokens` 와 같은 뜻으로 맞춘다.
+
+사용량 칸이 생기기 전에 끝난 자식은 마이그레이션이 다시 `WAITING` 으로 넣는다.
+이미 `DONE` 이던 줄과, 작업 줄 없이 시작 사건만 남은 자식이 대상이다. 조회 기한은 마이그레이션 시각에서 24시간이다.
+에이전트가 지워졌거나 profile 이 바뀐 부모의 자식은 조회하지 않고 `EXPIRED` 로 넣는다.
 
 ## execution_skill_use
 
@@ -207,4 +234,4 @@ profile 플러그인이 `subagent_start` hook 에서 등록한다. 근거는 [AD
 
 하위 에이전트의 하위 에이전트는 부모 등록의 `origin_execution_id` 와 `user_id` 를 그대로 잇는다. 하위 에이전트 몫의 `agent_execution` 줄은 만들지 않는다. 하위 에이전트는 지금처럼 `execution_event` 의 `SUBAGENT_STARTED`, `SUBAGENT_COMPLETED` 로 보인다.
 
-Control Plane 이 다시 뜨면 도는 실행은 `ORPHANED` 로 끝나지만 등록 줄은 그대로다. 이미 등록한 하위 에이전트는 계속 요청자를 찾는다. 다시 뜬 뒤 그 부모 run 이 새로 만든 최상위 자식은 도는 부모가 없어 등록되지 않는다.
+Control Plane 이 다시 떠도 등록 줄은 그대로다. 이미 등록한 하위 에이전트는 계속 요청자를 찾는다. 기동 정리가 다시 붙은 실행은 `RUNNING` 으로 남아 있어 그 run 이 새로 만든 최상위 자식도 등록된다. 실패로 적힌 실행의 run 이 새로 만든 최상위 자식은 도는 부모가 없어 등록되지 않는다.

@@ -2,12 +2,13 @@ package com.bifos.assistant.usage.presentation;
 
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.skill.application.UserSkillUsage;
+import com.bifos.assistant.usage.application.BreakdownLine;
+import com.bifos.assistant.usage.application.MonthlyUsageSummary;
 import com.bifos.assistant.usage.domain.AgentExecution;
 import com.bifos.assistant.usage.domain.CostByAgent;
 import com.bifos.assistant.usage.domain.CostByDay;
 import com.bifos.assistant.usage.domain.CostByFingerprint;
 import com.bifos.assistant.usage.domain.CostByModel;
-import com.bifos.assistant.usage.domain.MonthlyCostDetail;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -25,10 +26,20 @@ public final class UsageDtos {
     /**
      * 한 달치 환산액과 실제 청구액.
      *
+     * <p>두 금액은 native 자식의 금액을 포함한다. 자식은 실행 수에 세지 않고 아래 네 칸으로 따로 센다.
+     * {@code pendingSubagents}, {@code unconfirmedSubagents}, {@code unpricedSubagents} 가운데 하나라도 0 이
+     * 아니면 합계가 실제보다 작다(ADR-062).
+     *
      * @param month {@code 2026-09} 형태의 대상 달
+     * @param estimatedCostMicros 환산 금액의 합. 금액이 있는 native 자식을 포함한다
      * @param unpricedExecutions 가격을 찾지 못해 합계에 들어가지 못한 실행 수
-     * @param actualCostMicros 실제 청구액의 합. 구독 경로에서는 종량 경로였다면 낼 금액이 청구되지 않는다
+     * @param actualCostMicros 실제 청구액의 합. 구독 경로에서는 종량 경로였다면 낼 금액이 청구되지 않는다.
+     *     금액이 있는 native 자식을 포함한다
      * @param subscriptionExecutions 구독 경로로 돈 실행 수
+     * @param pricedSubagents 금액이 합계에 든 native 자식 수
+     * @param pendingSubagents 사용량을 아직 확인하는 중인 native 자식 수
+     * @param unconfirmedSubagents 사용량을 끝내 확인하지 못한 native 자식 수
+     * @param unpricedSubagents 사용량은 적었지만 금액을 내지 못한 native 자식 수
      * @param totalExecutions 그 달 실행 건수. 가격을 찾은 것과 찾지 못한 것의 합이고 모두에게 싣는다
      */
     public record MonthlyCostView(
@@ -39,17 +50,21 @@ public final class UsageDtos {
             Long unpricedExecutions,
             Long actualCostMicros,
             Long subscriptionExecutions,
+            Long pricedSubagents,
+            Long pendingSubagents,
+            Long unconfirmedSubagents,
+            Long unpricedSubagents,
             long totalExecutions) {
 
         /**
          * 한 달치 합계를 보는 사람에 맞춰 옮긴다.
          *
-         * <p>{@code internal} 이 거짓이면 통화와 금액과 건수 구분을 비우고 달과 실행 건수만 싣는다.
+         * <p>{@code internal} 이 거짓이면 통화와 금액과 건수 구분, native 자식 수를 비우고 달과 실행 건수만 싣는다.
          */
-        static MonthlyCostView from(String month, MonthlyCostDetail cost, boolean internal) {
+        static MonthlyCostView from(String month, MonthlyUsageSummary cost, boolean internal) {
             long total = cost.pricedExecutions() + cost.unpricedExecutions();
             if (!internal) {
-                return new MonthlyCostView(month, null, null, null, null, null, null, total);
+                return new MonthlyCostView(month, null, null, null, null, null, null, null, null, null, null, total);
             }
             return new MonthlyCostView(
                     month,
@@ -59,6 +74,10 @@ public final class UsageDtos {
                     cost.unpricedExecutions(),
                     cost.actualMicros(),
                     cost.subscriptionExecutions(),
+                    cost.pricedSubagents(),
+                    cost.pendingSubagents(),
+                    cost.unconfirmedSubagents(),
+                    cost.unpricedSubagents(),
                     total);
         }
     }
@@ -77,6 +96,8 @@ public final class UsageDtos {
      * @param key 그 묶음을 가리키는 값. 화면이 줄을 구분할 때 쓴다
      * @param label 사람이 읽을 이름
      * @param detail 이름 아래 작게 붙는 보조 설명. 없으면 null
+     * @param executions 그 묶음의 실행 수. native 자식은 세지 않는다
+     * @param subagents 그 묶음의 금액과 토큰에 더한 native 자식 수
      * @param avgContextChars 문맥 글자 수 평균. 남긴 실행이 하나도 없으면 null
      */
     public record BreakdownRow(
@@ -84,6 +105,7 @@ public final class UsageDtos {
             String label,
             String detail,
             Long executions,
+            Long subagents,
             Long estimatedCostMicros,
             Long actualCostMicros,
             Long inputTokens,
@@ -92,13 +114,15 @@ public final class UsageDtos {
             Instant firstSeenAt,
             Instant lastSeenAt) {
 
-        static BreakdownRow of(CostByAgent cost) {
+        static BreakdownRow ofAgent(BreakdownLine<CostByAgent> line) {
+            CostByAgent cost = line.cost();
             String code = cost.agentCode() == null ? String.valueOf(cost.agentId()) : cost.agentCode();
             return new BreakdownRow(
                     code,
                     cost.agentName() == null ? code : cost.agentName(),
                     cost.agentCode(),
                     cost.executions(),
+                    line.subagents(),
                     cost.estimatedMicros(),
                     cost.actualMicros(),
                     cost.inputTokens(),
@@ -108,13 +132,15 @@ public final class UsageDtos {
                     cost.lastSeenAt());
         }
 
-        static BreakdownRow of(CostByModel cost) {
+        static BreakdownRow ofModel(BreakdownLine<CostByModel> line) {
+            CostByModel cost = line.cost();
             String model = cost.model() == null ? "모델 없음" : cost.model();
             return new BreakdownRow(
                     cost.provider() + "/" + model,
                     model,
                     cost.provider(),
                     cost.executions(),
+                    line.subagents(),
                     cost.estimatedMicros(),
                     cost.actualMicros(),
                     cost.inputTokens(),
@@ -124,13 +150,15 @@ public final class UsageDtos {
                     cost.lastSeenAt());
         }
 
-        static BreakdownRow of(CostByDay cost) {
+        static BreakdownRow ofDay(BreakdownLine<CostByDay> line) {
+            CostByDay cost = line.cost();
             String day = cost.day().toString();
             return new BreakdownRow(
                     day,
                     day,
                     null,
                     cost.executions(),
+                    line.subagents(),
                     cost.estimatedMicros(),
                     cost.actualMicros(),
                     cost.inputTokens(),
@@ -140,12 +168,14 @@ public final class UsageDtos {
                     cost.lastSeenAt());
         }
 
-        static BreakdownRow of(CostByFingerprint cost) {
+        static BreakdownRow ofFingerprint(BreakdownLine<CostByFingerprint> line) {
+            CostByFingerprint cost = line.cost();
             return new BreakdownRow(
                     cost.fingerprint(),
                     cost.fingerprint(),
                     null,
                     cost.executions(),
+                    line.subagents(),
                     cost.estimatedMicros(),
                     cost.actualMicros(),
                     cost.inputTokens(),

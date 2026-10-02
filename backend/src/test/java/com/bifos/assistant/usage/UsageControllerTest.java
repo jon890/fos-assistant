@@ -22,6 +22,7 @@ import com.bifos.assistant.skill.domain.ExecutionSkillUse;
 import com.bifos.assistant.skill.domain.SkillUseSource;
 import com.bifos.assistant.skill.infra.ExecutionSkillUseRepository;
 import com.bifos.assistant.usage.application.ExecutionTreeService;
+import com.bifos.assistant.usage.application.UsageSummaryService;
 import com.bifos.assistant.usage.domain.AgentExecution;
 import com.bifos.assistant.usage.domain.ExecutionCost;
 import com.bifos.assistant.usage.domain.ExecutionStatus;
@@ -66,6 +67,9 @@ class UsageControllerTest {
     ExecutionTreeService trees;
 
     @Autowired
+    UsageSummaryService summaries;
+
+    @Autowired
     ConversationRepository conversations;
 
     @Autowired
@@ -94,7 +98,8 @@ class UsageControllerTest {
                         CredentialScope.SHARED_HOUSEHOLD,
                         AgentVisibility.PRIVATE,
                         USER_ID)));
-        controller = new UsageController(executions, currentUser, agentService, trees, conversations, skillUsage);
+        controller =
+                new UsageController(executions, currentUser, agentService, trees, conversations, skillUsage, summaries);
         // 대역이어도 관리자 확인은 실제 판정을 탄다. 그래야 MEMBER 역할의 거절을 볼 수 있다.
         doCallRealMethod().when(currentUser).requireAdmin();
         signInAs(UserRole.ADMIN);

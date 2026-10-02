@@ -72,7 +72,7 @@ import tools.jackson.databind.json.JsonMapper;
  * 싣는지 본다.
  *
  * <p>판정은 컨트롤러가 서비스에 넘기는 사건 소비자에서 하므로 컨트롤러를 거쳐 SSE 응답을 끝까지 읽는다.
- * 근거는 ADR-038 과 ADR-060 에 있다.
+ * 근거는 ADR-038 과 ADR-063 에 있다.
  */
 @SpringBootTest
 @ActiveProfiles("test")
