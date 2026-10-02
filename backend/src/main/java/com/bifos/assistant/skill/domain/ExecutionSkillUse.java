@@ -60,8 +60,7 @@ public class ExecutionSkillUse {
         this.occurredAt = occurredAt;
     }
 
-    public static ExecutionSkillUse of(
-            Long executionId, String skillName, SkillUseSource source, Instant occurredAt) {
+    public static ExecutionSkillUse of(Long executionId, String skillName, SkillUseSource source, Instant occurredAt) {
         return new ExecutionSkillUse(executionId, skillName, source, occurredAt);
     }
 

@@ -7,7 +7,6 @@ import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import lombok.extern.slf4j.Slf4j;
-import org.slf4j.Logger;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
@@ -69,17 +68,19 @@ public class ChatEventStreams {
                 throw new IllegalStateException("chat event stream is closed");
             }
         });
-        Thread heartbeatThread = Thread.ofVirtual().name("chat-follow-heartbeat-").start(() -> {
-            try {
-                do {
-                    Thread.sleep(heartbeat);
-                } while (channel.ping());
-            } catch (InterruptedException ex) {
-                Thread.currentThread().interrupt();
-            } finally {
-                unsubscribe.run();
-            }
-        });
+        Thread heartbeatThread = Thread.ofVirtual()
+                .name("chat-follow-heartbeat-")
+                .start(() -> {
+                    try {
+                        do {
+                            Thread.sleep(heartbeat);
+                        } while (channel.ping());
+                    } catch (InterruptedException ex) {
+                        Thread.currentThread().interrupt();
+                    } finally {
+                        unsubscribe.run();
+                    }
+                });
         Runnable close = () -> {
             channel.close();
             unsubscribe.run();

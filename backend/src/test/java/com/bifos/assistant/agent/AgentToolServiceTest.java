@@ -171,8 +171,7 @@ class AgentToolServiceTest {
                 .extracting(ex -> ((ApiException) ex).code())
                 .isEqualTo(ErrorCode.VALIDATION_FAILED);
 
-        verify(toolsets, Mockito.never())
-                .writeApiServer(ArgumentMatchers.anyString(), ArgumentMatchers.anyList());
+        verify(toolsets, Mockito.never()).writeApiServer(ArgumentMatchers.anyString(), ArgumentMatchers.anyList());
     }
 
     @Test

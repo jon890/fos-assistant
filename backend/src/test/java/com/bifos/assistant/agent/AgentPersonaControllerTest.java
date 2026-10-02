@@ -140,8 +140,7 @@ class AgentPersonaControllerTest {
                 .andExpect(jsonPath("$.code").value(ErrorCode.HERMES_UNAVAILABLE.name()));
     }
 
-    private static RequestBuilder write(
-            String code, String body, String baseHash) {
+    private static RequestBuilder write(String code, String body, String baseHash) {
         return put("/api/v1/agents/{code}/persona", code)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"body\":%s,\"baseHash\":\"%s\"}".formatted(quote(body), baseHash));

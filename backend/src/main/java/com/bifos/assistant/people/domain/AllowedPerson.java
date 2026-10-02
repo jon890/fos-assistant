@@ -41,8 +41,7 @@ public class AllowedPerson {
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
 
-    protected AllowedPerson() {
-    }
+    protected AllowedPerson() {}
 
     private AllowedPerson(String email, String displayName, String hermesProfile) {
         this.email = normalizeEmail(email);

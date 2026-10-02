@@ -5,7 +5,6 @@ import com.bifos.assistant.hermes.HermesProperties;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import lombok.extern.slf4j.Slf4j;
-import org.slf4j.Logger;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
@@ -50,18 +49,18 @@ public class AgentEndpointProbe {
         String uri = stripTrailingSlash(apiBaseUrl) + PROBE_PATH;
         int status;
         try {
-            status = restClient.get()
+            status = restClient
+                    .get()
                     .uri(uri)
                     .header("Authorization", "Bearer " + apiKey)
                     .exchange((request, response) -> response.getStatusCode().value());
         } catch (RuntimeException ex) {
             log.warn("could not reach the new agent address profile={}", profileName, ex);
-            throw new ApiException(ErrorCode.VALIDATION_FAILED,
-                    "could not reach " + uri + ": " + rootMessage(ex), ex);
+            throw new ApiException(ErrorCode.VALIDATION_FAILED, "could not reach " + uri + ": " + rootMessage(ex), ex);
         }
         if (status != 200) {
-            throw new ApiException(ErrorCode.VALIDATION_FAILED,
-                    "the new address answered " + status + " for " + PROBE_PATH);
+            throw new ApiException(
+                    ErrorCode.VALIDATION_FAILED, "the new address answered " + status + " for " + PROBE_PATH);
         }
     }
 

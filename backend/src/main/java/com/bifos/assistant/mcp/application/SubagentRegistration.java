@@ -5,7 +5,6 @@ import com.bifos.assistant.shared.error.ErrorCode;
 import java.security.MessageDigest;
 import java.util.HexFormat;
 import lombok.extern.slf4j.Slf4j;
-import org.slf4j.Logger;
 import tools.jackson.databind.JsonNode;
 
 /**

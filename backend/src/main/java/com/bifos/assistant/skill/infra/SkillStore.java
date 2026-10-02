@@ -31,7 +31,6 @@ import java.util.TreeMap;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import lombok.extern.slf4j.Slf4j;
-import org.slf4j.Logger;
 import org.springframework.stereotype.Component;
 
 /**
@@ -67,10 +66,8 @@ public class SkillStore {
     /** 참고 파일 경로. 두 디렉터리 아래 한 단계뿐이라 {@code ..} 과 {@code /} 가 이름에 들어오지 못한다. */
     private static final Pattern FILE_PATH = Pattern.compile("(references|templates)/[a-z0-9][a-z0-9._-]{0,99}");
 
-    private static final Set<PosixFilePermission> DIRECTORY_PERMISSIONS =
-            PosixFilePermissions.fromString("rwxr-xr-x");
-    private static final Set<PosixFilePermission> FILE_PERMISSIONS =
-            PosixFilePermissions.fromString("rw-r--r--");
+    private static final Set<PosixFilePermission> DIRECTORY_PERMISSIONS = PosixFilePermissions.fromString("rwxr-xr-x");
+    private static final Set<PosixFilePermission> FILE_PERMISSIONS = PosixFilePermissions.fromString("rw-r--r--");
 
     private static final String VERSION_ALPHABET = "abcdefghijklmnopqrstuvwxyz0123456789";
     private static final int VERSION_RANDOM_CHARS = 4;

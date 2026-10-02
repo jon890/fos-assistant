@@ -16,6 +16,7 @@ import com.bifos.assistant.user.infra.AppUserRepository;
 import jakarta.validation.Valid;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -23,7 +24,6 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
-import org.springframework.transaction.annotation.Transactional;
 
 @RestController
 @RequestMapping("/api/v1/admin/agents")
@@ -49,9 +49,15 @@ public class AgentAdminController {
         if (request.visibility() == AgentVisibility.GROUP) {
             lifecycle.requireGroupSafe(request.apiBaseUrl(), request.hermesProfile());
         }
-        Agent agent = Agent.of(request.code(), request.name(),
-                request.hermesProfile(), request.apiBaseUrl(),
-                request.costMode(), request.credentialScope(), request.visibility(), ownerId);
+        Agent agent = Agent.of(
+                request.code(),
+                request.name(),
+                request.hermesProfile(),
+                request.apiBaseUrl(),
+                request.costMode(),
+                request.credentialScope(),
+                request.visibility(),
+                ownerId);
         agent.assignFlow(requireKnownFlow(request.flow()));
         return AdminAgentView.from(agents.save(agent));
     }
@@ -81,8 +87,7 @@ public class AgentAdminController {
 
     @PatchMapping("/{code}")
     @Transactional
-    public AdminAgentView update(@PathVariable String code,
-            @Valid @RequestBody UpdateAgentRequest request) {
+    public AdminAgentView update(@PathVariable String code, @Valid @RequestBody UpdateAgentRequest request) {
         currentUser.requireAdmin();
         Agent agent = requireAgentForUpdate(code);
         if (agent.connectorManaged()) {

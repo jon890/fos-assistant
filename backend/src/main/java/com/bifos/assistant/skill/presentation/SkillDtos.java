@@ -20,8 +20,7 @@ import java.util.List;
  */
 public final class SkillDtos {
 
-    private SkillDtos() {
-    }
+    private SkillDtos() {}
 
     /**
      * 스킬 목록 화면이 받는 것이다.
@@ -82,7 +81,9 @@ public final class SkillDtos {
                     detail.name(),
                     detail.description(),
                     detail.body(),
-                    detail.files().stream().map(file -> new SkillFileView(file.path(), file.size())).toList());
+                    detail.files().stream()
+                            .map(file -> new SkillFileView(file.path(), file.size()))
+                            .toList());
         }
     }
 
@@ -101,7 +102,9 @@ public final class SkillDtos {
         List<SkillFileInput> inputs() {
             return files == null
                     ? List.of()
-                    : files.stream().map(file -> new SkillFileInput(file.path(), file.content())).toList();
+                    : files.stream()
+                            .map(file -> new SkillFileInput(file.path(), file.content()))
+                            .toList();
         }
     }
 

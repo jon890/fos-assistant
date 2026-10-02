@@ -10,7 +10,6 @@ import java.util.regex.Pattern;
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 import lombok.extern.slf4j.Slf4j;
-import org.slf4j.Logger;
 import tools.jackson.databind.JsonNode;
 
 /**
@@ -34,6 +33,7 @@ public record McpCallContext(String rootSessionId, String sessionId, String tool
 
     /** 도구 인자 안에서 이 값이 놓이는 키다. */
     public static final String FIELD = "_fos_ctx";
+
     private static final String VERSION_LINE = "v1";
     private static final String HMAC = "HmacSHA256";
     /** {@code sig} 가 받는 모양이다. 하위 에이전트 등록 서명과 커넥터 정책 요청의 서명도 같은 모양이다. */

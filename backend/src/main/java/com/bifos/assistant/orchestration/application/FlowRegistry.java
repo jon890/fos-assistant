@@ -8,7 +8,6 @@ import java.util.Map;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
-import org.slf4j.Logger;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.stereotype.Service;
@@ -47,8 +46,7 @@ public class FlowRegistry implements ApplicationRunner {
                 .toList();
         if (!unknown.isEmpty()) {
             throw new IllegalStateException(
-                    "모르는 흐름 이름이 에이전트에 적혀 있다 unknown=%s known=%s"
-                            .formatted(unknown, byName.keySet()));
+                    "모르는 흐름 이름이 에이전트에 적혀 있다 unknown=%s known=%s".formatted(unknown, byName.keySet()));
         }
         log.info("등록된 흐름 flows={}", byName.keySet());
     }

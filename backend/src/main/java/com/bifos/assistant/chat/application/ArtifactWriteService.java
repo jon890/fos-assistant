@@ -1,8 +1,8 @@
 package com.bifos.assistant.chat.application;
 
 import com.bifos.assistant.chat.domain.Conversation;
-import com.bifos.assistant.chat.infra.ArtifactStore;
 import com.bifos.assistant.chat.infra.ArtifactSourceFetcher;
+import com.bifos.assistant.chat.infra.ArtifactStore;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
@@ -21,7 +21,8 @@ public class ArtifactWriteService {
     private final ArtifactStore store;
     private final ArtifactSourceFetcher sourceFetcher;
 
-    public ArtifactWriteService(ConversationAccess conversations, ArtifactStore store, ArtifactSourceFetcher sourceFetcher) {
+    public ArtifactWriteService(
+            ConversationAccess conversations, ArtifactStore store, ArtifactSourceFetcher sourceFetcher) {
         this.conversations = conversations;
         this.store = store;
         this.sourceFetcher = sourceFetcher;
@@ -77,7 +78,8 @@ public class ArtifactWriteService {
         if (path == null) {
             throw validation("artifact path is required");
         }
-        String contentType = ArtifactStore.contentTypeOf(path).orElseThrow(() -> validation("URL artifact path must be an image"));
+        String contentType =
+                ArtifactStore.contentTypeOf(path).orElseThrow(() -> validation("URL artifact path must be an image"));
         String mediaType = contentType.split(";", 2)[0];
         if (!mediaType.startsWith("image/")) {
             throw validation("URL artifact path must be an image");

@@ -15,8 +15,7 @@ public final class HermesProfileName {
 
     private static final Pattern PROFILE_NAME = Pattern.compile("[a-z0-9][a-z0-9-]{0,63}");
 
-    private HermesProfileName() {
-    }
+    private HermesProfileName() {}
 
     public static boolean isValid(String name) {
         return name != null && PROFILE_NAME.matcher(name).matches();

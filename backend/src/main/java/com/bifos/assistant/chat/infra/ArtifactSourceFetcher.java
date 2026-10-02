@@ -23,14 +23,14 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
+import java.util.concurrent.SynchronousQueue;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.ThreadPoolExecutor;
-import java.util.concurrent.SynchronousQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import javax.net.ssl.SNIHostName;
-import java.util.concurrent.atomic.AtomicBoolean;
 import javax.net.ssl.SSLParameters;
 import javax.net.ssl.SSLSocket;
 import javax.net.ssl.SSLSocketFactory;
@@ -47,7 +47,12 @@ public class ArtifactSourceFetcher {
     private final DnsResolver dnsResolver;
     private final Transport transport;
     private final ThreadPoolExecutor executor = new ThreadPoolExecutor(
-            0, 4, 30, TimeUnit.SECONDS, new SynchronousQueue<>(), daemonFactory(),
+            0,
+            4,
+            30,
+            TimeUnit.SECONDS,
+            new SynchronousQueue<>(),
+            daemonFactory(),
             new ThreadPoolExecutor.AbortPolicy());
 
     @Autowired
@@ -86,7 +91,8 @@ public class ArtifactSourceFetcher {
         }
     }
 
-    private byte[] fetchResolved(ValidSource source, String expectedContentType, Cancellation cancellation) throws Exception {
+    private byte[] fetchResolved(ValidSource source, String expectedContentType, Cancellation cancellation)
+            throws Exception {
         InetAddress[] addresses = dnsResolver.resolve(source.host());
         if (addresses == null || addresses.length == 0) {
             throw failed("artifact source host has no addresses", null);
@@ -100,7 +106,13 @@ public class ArtifactSourceFetcher {
         }
         Throwable last = null;
         for (InetAddress address : publicAddresses) {
-            try (Response response = transport.get(address, source.host(), source.uri(), properties.connectTimeout(), properties.readTimeout(), cancellation)) {
+            try (Response response = transport.get(
+                    address,
+                    source.host(),
+                    source.uri(),
+                    properties.connectTimeout(),
+                    properties.readTimeout(),
+                    cancellation)) {
                 return validateResponse(response, expectedContentType);
             } catch (IOException ex) {
                 last = ex;
@@ -121,7 +133,11 @@ public class ArtifactSourceFetcher {
         String length = response.headers().get("content-length");
         if (length != null) {
             long value;
-            try { value = Long.parseLong(length); } catch (NumberFormatException ex) { throw failed("artifact source length is invalid", ex); }
+            try {
+                value = Long.parseLong(length);
+            } catch (NumberFormatException ex) {
+                throw failed("artifact source length is invalid", ex);
+            }
             if (value < 0 || value > MAX_BYTES) {
                 throw failed("artifact source is too large", null);
             }
@@ -131,7 +147,8 @@ public class ArtifactSourceFetcher {
     }
 
     private static byte[] readLimited(InputStream body, Long expectedLength) throws IOException {
-        try (InputStream input = body; ByteArrayOutputStream output = new ByteArrayOutputStream()) {
+        try (InputStream input = body;
+                ByteArrayOutputStream output = new ByteArrayOutputStream()) {
             byte[] buffer = new byte[8192];
             int total = 0;
             while (true) {
@@ -159,9 +176,17 @@ public class ArtifactSourceFetcher {
     }
 
     private ValidSource validate(URI source) {
-        if (source == null || !"https".equals(source.getScheme()) || source.getRawUserInfo() != null || source.getRawFragment() != null
-                || source.getHost() == null || source.getHost().endsWith(".") || source.getPort() != -1 && source.getPort() != 443
-                || source.getHost().indexOf(':') >= 0 || source.getHost().matches("[0-9.]+") || !source.getHost().matches("[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+")) {
+        if (source == null
+                || !"https".equals(source.getScheme())
+                || source.getRawUserInfo() != null
+                || source.getRawFragment() != null
+                || source.getHost() == null
+                || source.getHost().endsWith(".")
+                || source.getPort() != -1 && source.getPort() != 443
+                || source.getHost().indexOf(':') >= 0
+                || source.getHost().matches("[0-9.]+")
+                || !source.getHost()
+                        .matches("[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+")) {
             throw failed("artifact source URL is invalid", null);
         }
         String host = source.getHost();
@@ -194,16 +219,30 @@ public class ArtifactSourceFetcher {
         if (is6to4(bytes) || isTeredo(bytes)) {
             return false;
         }
-        return !address.isAnyLocalAddress() && !address.isLoopbackAddress() && !address.isLinkLocalAddress()
-                && !address.isMulticastAddress() && !address.isSiteLocalAddress() && (first & 0xfe) != 0xfc && first != 0xff && !isReservedV6(bytes);
+        return !address.isAnyLocalAddress()
+                && !address.isLoopbackAddress()
+                && !address.isLinkLocalAddress()
+                && !address.isMulticastAddress()
+                && !address.isSiteLocalAddress()
+                && (first & 0xfe) != 0xfc
+                && first != 0xff
+                && !isReservedV6(bytes);
     }
 
     private static boolean isPublicV4(int a, int b, int c, int d) {
-        if (a == 0 || a == 10 || a == 127 || a >= 224 || (a == 100 && b >= 64 && b <= 127) || (a == 169 && b == 254)
-                || (a == 172 && b >= 16 && b <= 31) || (a == 192 && b == 168)
+        if (a == 0
+                || a == 10
+                || a == 127
+                || a >= 224
+                || (a == 100 && b >= 64 && b <= 127)
+                || (a == 169 && b == 254)
+                || (a == 172 && b >= 16 && b <= 31)
+                || (a == 192 && b == 168)
                 || (a == 192 && b == 0 && c == 0 && d != 9 && d != 10)
                 || (a == 192 && b == 88 && c == 99)
-                || (a == 198 && (b == 18 || b == 19)) || (a == 198 && b == 51 && c == 100) || (a == 203 && b == 0 && c == 113)) {
+                || (a == 198 && (b == 18 || b == 19))
+                || (a == 198 && b == 51 && c == 100)
+                || (a == 203 && b == 0 && c == 113)) {
             return false;
         }
         return true;
@@ -218,43 +257,85 @@ public class ArtifactSourceFetcher {
         return bytes[10] == (byte) 0xff && bytes[11] == (byte) 0xff;
     }
 
-    private static boolean hasControlCharacter(String value) { return value.chars().anyMatch(character -> character <= 0x1f || character == 0x7f); }
+    private static boolean hasControlCharacter(String value) {
+        return value.chars().anyMatch(character -> character <= 0x1f || character == 0x7f);
+    }
 
-    private static boolean is6to4(byte[] bytes) { return bytes[0] == 0x20 && bytes[1] == 0x02; }
+    private static boolean is6to4(byte[] bytes) {
+        return bytes[0] == 0x20 && bytes[1] == 0x02;
+    }
 
-    private static boolean isTeredo(byte[] bytes) { return bytes[0] == 0x20 && bytes[1] == 0 && bytes[2] == 0 && bytes[3] == 0; }
+    private static boolean isTeredo(byte[] bytes) {
+        return bytes[0] == 0x20 && bytes[1] == 0 && bytes[2] == 0 && bytes[3] == 0;
+    }
 
     private static boolean isReservedV6(byte[] bytes) {
-        return (bytes[0] == 0x20 && bytes[1] == 0x01 && bytes[2] == 0x00
-                && (bytes[3] == 0x02 || (bytes[3] & 0xf0) == 0x10 || (bytes[3] & 0xf0) == 0x20))
+        return (bytes[0] == 0x20
+                        && bytes[1] == 0x01
+                        && bytes[2] == 0x00
+                        && (bytes[3] == 0x02 || (bytes[3] & 0xf0) == 0x10 || (bytes[3] & 0xf0) == 0x20))
                 || (bytes[0] == 0x20 && bytes[1] == 0x01 && bytes[2] == 0x0d && bytes[3] == (byte) 0xb8);
     }
 
-    private static String mediaType(String value) { return value == null ? "" : value.split(";", 2)[0].trim().toLowerCase(Locale.ROOT); }
+    private static String mediaType(String value) {
+        return value == null ? "" : value.split(";", 2)[0].trim().toLowerCase(Locale.ROOT);
+    }
 
-    private static ApiException failed(String message, Throwable cause) { return cause == null ? new ApiException(ErrorCode.INTERNAL_ERROR, message) : new ApiException(ErrorCode.INTERNAL_ERROR, message, cause); }
+    private static ApiException failed(String message, Throwable cause) {
+        return cause == null
+                ? new ApiException(ErrorCode.INTERNAL_ERROR, message)
+                : new ApiException(ErrorCode.INTERNAL_ERROR, message, cause);
+    }
 
-    private static ThreadFactory daemonFactory() { return runnable -> { Thread thread = new Thread(runnable, "artifact-source-fetcher"); thread.setDaemon(true); return thread; }; }
+    private static ThreadFactory daemonFactory() {
+        return runnable -> {
+            Thread thread = new Thread(runnable, "artifact-source-fetcher");
+            thread.setDaemon(true);
+            return thread;
+        };
+    }
 
-    public interface DnsResolver { InetAddress[] resolve(String host) throws Exception; }
+    public interface DnsResolver {
+        InetAddress[] resolve(String host) throws Exception;
+    }
 
-    public interface Transport { Response get(InetAddress address, String originalHost, URI source, Duration connectTimeout, Duration readTimeout, Cancellation cancellation) throws IOException; }
+    public interface Transport {
+        Response get(
+                InetAddress address,
+                String originalHost,
+                URI source,
+                Duration connectTimeout,
+                Duration readTimeout,
+                Cancellation cancellation)
+                throws IOException;
+    }
 
-    public record Response(int status, Map<String, String> headers, InputStream body) implements AutoCloseable { @Override public void close() throws IOException { body.close(); } }
+    public record Response(int status, Map<String, String> headers, InputStream body) implements AutoCloseable {
+        @Override
+        public void close() throws IOException {
+            body.close();
+        }
+    }
 
     public static final class Cancellation {
         private final AtomicReference<Closeable> active = new AtomicReference<>();
         private final AtomicBoolean closed = new AtomicBoolean();
 
         public void register(Closeable closeable) {
-            if (closed.get()) { close(closeable); return; }
+            if (closed.get()) {
+                close(closeable);
+                return;
+            }
             active.set(closeable);
             if (closed.get()) {
                 close(active.getAndSet(null));
             }
         }
 
-        void close() { closed.set(true); close(active.getAndSet(null)); }
+        void close() {
+            closed.set(true);
+            close(active.getAndSet(null));
+        }
 
         private static void close(Closeable closeable) {
             if (closeable != null) {
@@ -266,7 +347,7 @@ public class ArtifactSourceFetcher {
         }
     }
 
-    private record ValidSource(URI uri, String host) { }
+    private record ValidSource(URI uri, String host) {}
 
     public static final class SocketTransport implements Transport {
         private static final int HTTPS_PORT = 443;
@@ -287,7 +368,15 @@ public class ArtifactSourceFetcher {
             this.port = port;
         }
 
-        @Override public Response get(InetAddress address, String host, URI source, Duration connectTimeout, Duration readTimeout, Cancellation cancellation) throws IOException {
+        @Override
+        public Response get(
+                InetAddress address,
+                String host,
+                URI source,
+                Duration connectTimeout,
+                Duration readTimeout,
+                Cancellation cancellation)
+                throws IOException {
             Socket socket = new Socket();
             try {
                 cancellation.register(socket);
@@ -299,14 +388,21 @@ public class ArtifactSourceFetcher {
                 parameters.setServerNames(List.of(new SNIHostName(host)));
                 ssl.setSSLParameters(parameters);
                 ssl.startHandshake();
-                String target = source.getRawPath() == null || source.getRawPath().isEmpty() ? "/" : source.getRawPath();
+                String target =
+                        source.getRawPath() == null || source.getRawPath().isEmpty() ? "/" : source.getRawPath();
                 if (source.getRawQuery() != null) {
                     target += "?" + source.getRawQuery();
                 }
                 ssl.getOutputStream().write(requestBytes(target, host));
                 ssl.getOutputStream().flush();
                 return parse(ssl, ssl.getInputStream());
-            } catch (IOException | RuntimeException ex) { try { socket.close(); } catch (IOException ignored) { } throw ex; }
+            } catch (IOException | RuntimeException ex) {
+                try {
+                    socket.close();
+                } catch (IOException ignored) {
+                }
+                throw ex;
+            }
         }
 
         public static Response parse(Socket socket, InputStream input) throws IOException {
@@ -361,7 +457,8 @@ public class ArtifactSourceFetcher {
 
         public static byte[] requestBytes(String target, String host) {
             return ("GET " + target + " HTTP/1.1\r\nHost: " + host
-                    + "\r\nAccept-Encoding: identity\r\nConnection: close\r\n\r\n").getBytes(StandardCharsets.US_ASCII);
+                            + "\r\nAccept-Encoding: identity\r\nConnection: close\r\n\r\n")
+                    .getBytes(StandardCharsets.US_ASCII);
         }
 
         private static boolean isHeaderName(String value) {
@@ -370,25 +467,47 @@ public class ArtifactSourceFetcher {
             }
             for (int index = 0; index < value.length(); index++) {
                 char character = value.charAt(index);
-                if (!(character >= '0' && character <= '9') && !(character >= 'A' && character <= 'Z')
-                        && !(character >= 'a' && character <= 'z') && "!#$%&'*+-.^_`|~".indexOf(character) < 0) {
+                if (!(character >= '0' && character <= '9')
+                        && !(character >= 'A' && character <= 'Z')
+                        && !(character >= 'a' && character <= 'z')
+                        && "!#$%&'*+-.^_`|~".indexOf(character) < 0) {
                     return false;
                 }
             }
             return true;
         }
 
-        private static InputStream closeOnClose(InputStream input, Socket socket) { return new FilterInputStream(input) { @Override public void close() throws IOException { try { super.close(); } finally { socket.close(); } } }; }
+        private static InputStream closeOnClose(InputStream input, Socket socket) {
+            return new FilterInputStream(input) {
+                @Override
+                public void close() throws IOException {
+                    try {
+                        super.close();
+                    } finally {
+                        socket.close();
+                    }
+                }
+            };
+        }
     }
 
     private static final class ChunkedInputStream extends InputStream {
-        private final InputStream input; private long remaining = -1; private boolean done;
+        private final InputStream input;
+        private long remaining = -1;
+        private boolean done;
 
-        ChunkedInputStream(InputStream input) { this.input = input; }
+        ChunkedInputStream(InputStream input) {
+            this.input = input;
+        }
 
-        @Override public int read() throws IOException { byte[] one = new byte[1]; return read(one) < 0 ? -1 : one[0] & 255; }
+        @Override
+        public int read() throws IOException {
+            byte[] one = new byte[1];
+            return read(one) < 0 ? -1 : one[0] & 255;
+        }
 
-        @Override public int read(byte[] bytes, int off, int len) throws IOException {
+        @Override
+        public int read(byte[] bytes, int off, int len) throws IOException {
             if (done) {
                 return -1;
             }
@@ -413,8 +532,11 @@ public class ArtifactSourceFetcher {
 
         private void next() throws IOException {
             String line = readLine(input);
-            try { remaining = Long.parseLong(line.split(";", 2)[0], 16); }
-            catch (NumberFormatException ex) { throw new IOException("invalid chunk size", ex); }
+            try {
+                remaining = Long.parseLong(line.split(";", 2)[0], 16);
+            } catch (NumberFormatException ex) {
+                throw new IOException("invalid chunk size", ex);
+            }
             if (remaining < 0) {
                 throw new IOException("invalid chunk size");
             }
@@ -432,16 +554,21 @@ public class ArtifactSourceFetcher {
             }
         }
 
-        private static String readLine(InputStream input) throws IOException { ByteArrayOutputStream line = new ByteArrayOutputStream(); int previous = -1, current; while ((current = input.read()) >= 0) {
-            if (previous == '\r' && current == '\n') {
-                byte[] b = line.toByteArray();
-                return new String(b, 0, b.length - 1, StandardCharsets.US_ASCII);
+        private static String readLine(InputStream input) throws IOException {
+            ByteArrayOutputStream line = new ByteArrayOutputStream();
+            int previous = -1, current;
+            while ((current = input.read()) >= 0) {
+                if (previous == '\r' && current == '\n') {
+                    byte[] b = line.toByteArray();
+                    return new String(b, 0, b.length - 1, StandardCharsets.US_ASCII);
+                }
+                if (line.size() >= 1024) {
+                    throw new IOException("chunk line too long");
+                }
+                line.write(current);
+                previous = current;
             }
-            if (line.size() >= 1024) {
-                throw new IOException("chunk line too long");
-            }
-            line.write(current);
-            previous = current;
-        } throw new IOException("truncated chunk"); }
+            throw new IOException("truncated chunk");
+        }
     }
 }

@@ -1,7 +1,6 @@
 package com.bifos.assistant.shared.error;
 
 import lombok.extern.slf4j.Slf4j;
-import org.slf4j.Logger;
 import org.springframework.dao.PessimisticLockingFailureException;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.ResponseEntity;

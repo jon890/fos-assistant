@@ -1,13 +1,11 @@
 package com.bifos.assistant.hermes;
 
-import com.bifos.assistant.agent.domain.AgentToolPolicy;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import lombok.extern.slf4j.Slf4j;
-import org.slf4j.Logger;
 import org.springframework.http.MediaType;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
@@ -38,7 +36,8 @@ public class HttpHermesToolsetClient implements HermesToolsetClient {
     @Override
     public List<ToolsetCatalogEntry> readCatalog() {
         try {
-            JsonNode response = restClient.get()
+            JsonNode response = restClient
+                    .get()
                     .uri(dashboardBaseUrl + "/api/tools/toolsets")
                     .header("Authorization", "Bearer " + dashboardToken)
                     .accept(MediaType.APPLICATION_JSON)
@@ -63,7 +62,8 @@ public class HttpHermesToolsetClient implements HermesToolsetClient {
     @Override
     public List<String> readEnabled(String apiBaseUrl, String profileName) {
         try {
-            JsonNode response = restClient.get()
+            JsonNode response = restClient
+                    .get()
                     .uri(stripTrailingSlash(apiBaseUrl) + "/v1/toolsets")
                     .header("Authorization", "Bearer " + keyStore.resolve(profileName))
                     .accept(MediaType.APPLICATION_JSON)
@@ -91,14 +91,16 @@ public class HttpHermesToolsetClient implements HermesToolsetClient {
     @Override
     public void writeApiServer(String profileName, List<String> toolsets) {
         try {
-            restClient.put()
+            restClient
+                    .put()
                     .uri(dashboardBaseUrl + "/api/config")
                     .header("Authorization", "Bearer " + dashboardToken)
                     .contentType(MediaType.APPLICATION_JSON)
                     .body(Map.of(
-                            "profile", profileName,
-                            "config", Map.of(
-                                    "platform_toolsets", Map.of("api_server", toolsets))))
+                            "profile",
+                            profileName,
+                            "config",
+                            Map.of("platform_toolsets", Map.of("api_server", toolsets))))
                     .retrieve()
                     .toBodilessEntity();
         } catch (RestClientException ex) {

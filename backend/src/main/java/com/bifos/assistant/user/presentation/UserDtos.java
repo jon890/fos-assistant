@@ -10,12 +10,12 @@ import com.bifos.assistant.shared.auth.CurrentUser;
  */
 public final class UserDtos {
 
-    private UserDtos() {
-    }
+    private UserDtos() {}
 
     public record MeView(Long id, String email, String displayName, String role) {
         static MeView from(CurrentUser user) {
-            return new MeView(user.id(), user.email(), user.displayName(), user.role().name());
+            return new MeView(
+                    user.id(), user.email(), user.displayName(), user.role().name());
         }
     }
 }

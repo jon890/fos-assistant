@@ -45,8 +45,7 @@ public class ChatMessage {
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
 
-    protected ChatMessage() {
-    }
+    protected ChatMessage() {}
 
     private ChatMessage(
             Long conversationId,
@@ -79,8 +78,7 @@ public class ChatMessage {
 
     public static ChatMessage regeneratedAnswer(
             Long conversationId, String content, Long executionId, Long replacesMessageId) {
-        return new ChatMessage(
-                conversationId, MessageRole.ASSISTANT, content, null, executionId, replacesMessageId);
+        return new ChatMessage(conversationId, MessageRole.ASSISTANT, content, null, executionId, replacesMessageId);
     }
 
     public Long id() {

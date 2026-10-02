@@ -57,8 +57,8 @@ public class HermesSessionBinding {
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
 
-    private HermesSessionBinding(String profileName, String sessionId, AgentExecution origin,
-            String rootSessionId, String parentSessionId) {
+    private HermesSessionBinding(
+            String profileName, String sessionId, AgentExecution origin, String rootSessionId, String parentSessionId) {
         this.profileName = profileName;
         this.sessionId = sessionId;
         this.userId = origin.userId();
@@ -68,8 +68,8 @@ public class HermesSessionBinding {
         this.createdAt = Instant.now();
     }
 
-    public static HermesSessionBinding of(String profileName, String sessionId, AgentExecution origin,
-            String rootSessionId, String parentSessionId) {
+    public static HermesSessionBinding of(
+            String profileName, String sessionId, AgentExecution origin, String rootSessionId, String parentSessionId) {
         return new HermesSessionBinding(profileName, sessionId, origin, rootSessionId, parentSessionId);
     }
 

@@ -7,7 +7,6 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import lombok.extern.slf4j.Slf4j;
-import org.slf4j.Logger;
 import org.springframework.http.MediaType;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
@@ -37,7 +36,8 @@ public class HttpHermesSkillClient implements HermesSkillClient {
     public List<HermesSkill> list(String profile) {
         requireValidProfileName(profile);
         try {
-            JsonNode response = restClient.get()
+            JsonNode response = restClient
+                    .get()
                     .uri(baseUrl + "/api/skills?profile={profile}", profile)
                     .header("Authorization", "Bearer " + token)
                     .accept(MediaType.APPLICATION_JSON)
@@ -71,7 +71,8 @@ public class HttpHermesSkillClient implements HermesSkillClient {
     public void toggle(String profile, String name, boolean enabled) {
         requireValidProfileName(profile);
         try {
-            restClient.put()
+            restClient
+                    .put()
                     .uri(baseUrl + "/api/skills/toggle")
                     .header("Authorization", "Bearer " + token)
                     .contentType(MediaType.APPLICATION_JSON)
@@ -93,7 +94,8 @@ public class HttpHermesSkillClient implements HermesSkillClient {
             config.put("platform_toolsets", Map.of("api_server", List.copyOf(apiServerToolsets)));
         }
         try {
-            restClient.put()
+            restClient
+                    .put()
                     .uri(baseUrl + "/api/config")
                     .header("Authorization", "Bearer " + token)
                     .contentType(MediaType.APPLICATION_JSON)

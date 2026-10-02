@@ -5,7 +5,6 @@ import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import java.util.Map;
 import lombok.extern.slf4j.Slf4j;
-import org.slf4j.Logger;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
@@ -150,8 +149,7 @@ public class HttpHermesDashboardClient implements HermesDashboardClient {
      */
     private static void requireValidProfileName(String profileName) {
         if (!HermesProfileName.isValid(profileName)) {
-            throw new ApiException(
-                    ErrorCode.VALIDATION_FAILED, "profile name is not a valid Hermes profile");
+            throw new ApiException(ErrorCode.VALIDATION_FAILED, "profile name is not a valid Hermes profile");
         }
     }
 

@@ -7,7 +7,6 @@ import java.time.Instant;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.slf4j.Logger;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
@@ -37,8 +36,7 @@ public class AttachmentCleaner {
      * @return 지운 건수
      */
     public int cleanExpired(Instant now) {
-        List<ChatAttachment> expired =
-                attachments.findByExpiresAtBeforeAndDeletedAtIsNullOrderByIdAsc(now);
+        List<ChatAttachment> expired = attachments.findByExpiresAtBeforeAndDeletedAtIsNullOrderByIdAsc(now);
         int deleted = 0;
         int failed = 0;
         for (ChatAttachment attachment : expired) {

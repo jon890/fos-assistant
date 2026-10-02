@@ -7,7 +7,6 @@ import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.slf4j.Logger;
 import org.springframework.stereotype.Service;
 
 /**
@@ -61,8 +60,7 @@ public class PersonRegistrar {
      */
     private void requireFreeProfileName(String hermesProfile) {
         if (people.existsByHermesProfile(hermesProfile) || agents.existsByHermesProfile(hermesProfile)) {
-            throw new ApiException(
-                    ErrorCode.PERSON_PROFILE_TAKEN, "this Hermes profile name is already used");
+            throw new ApiException(ErrorCode.PERSON_PROFILE_TAKEN, "this Hermes profile name is already used");
         }
     }
 

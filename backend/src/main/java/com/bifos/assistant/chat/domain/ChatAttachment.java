@@ -84,8 +84,7 @@ public class ChatAttachment {
             String contentType,
             long byteSize,
             Instant expiresAt) {
-        return new ChatAttachment(
-                conversationId, uploadedByUserId, originalName, contentType, byteSize, expiresAt);
+        return new ChatAttachment(conversationId, uploadedByUserId, originalName, contentType, byteSize, expiresAt);
     }
 
     public Long id() {

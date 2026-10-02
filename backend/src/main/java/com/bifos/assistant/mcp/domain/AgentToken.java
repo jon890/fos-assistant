@@ -19,16 +19,33 @@ import lombok.NoArgsConstructor;
 @Table(name = "agent_token")
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class AgentToken {
-    @Id @GeneratedValue(strategy = GenerationType.IDENTITY) private Long id;
-    @Column(name = "profile_name", length = 64) private String profileName;
-    @Column(name = "token_hash", nullable = false, unique = true, length = 64) private String tokenHash;
-    @Column(nullable = false, length = 100) private String label;
-    @Column(name = "created_at", nullable = false) private Instant createdAt;
-    @Column(name = "last_used_at") private Instant lastUsedAt;
-    @Column(name = "revoked_at") private Instant revokedAt;
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @Column(name = "profile_name", length = 64)
+    private String profileName;
+
+    @Column(name = "token_hash", nullable = false, unique = true, length = 64)
+    private String tokenHash;
+
+    @Column(nullable = false, length = 100)
+    private String label;
+
+    @Column(name = "created_at", nullable = false)
+    private Instant createdAt;
+
+    @Column(name = "last_used_at")
+    private Instant lastUsedAt;
+
+    @Column(name = "revoked_at")
+    private Instant revokedAt;
 
     private AgentToken(String profileName, String tokenHash, String label) {
-        this.profileName = profileName; this.tokenHash = tokenHash; this.label = label; this.createdAt = Instant.now();
+        this.profileName = profileName;
+        this.tokenHash = tokenHash;
+        this.label = label;
+        this.createdAt = Instant.now();
     }
 
     /** profile 에 묶인 새 토큰을 만든다. 사용자로 발급하는 길은 없다. */
@@ -36,7 +53,9 @@ public class AgentToken {
         return new AgentToken(profileName, tokenHash, label);
     }
 
-    public void markUsed() { lastUsedAt = Instant.now(); }
+    public void markUsed() {
+        lastUsedAt = Instant.now();
+    }
 
     public void revoke() {
         if (revokedAt == null) {
@@ -44,17 +63,31 @@ public class AgentToken {
         }
     }
 
-    public Long id() { return id; }
+    public Long id() {
+        return id;
+    }
 
-    public String profileName() { return profileName; }
+    public String profileName() {
+        return profileName;
+    }
 
-    public String tokenHash() { return tokenHash; }
+    public String tokenHash() {
+        return tokenHash;
+    }
 
-    public String label() { return label; }
+    public String label() {
+        return label;
+    }
 
-    public Instant createdAt() { return createdAt; }
+    public Instant createdAt() {
+        return createdAt;
+    }
 
-    public Instant lastUsedAt() { return lastUsedAt; }
+    public Instant lastUsedAt() {
+        return lastUsedAt;
+    }
 
-    public Instant revokedAt() { return revokedAt; }
+    public Instant revokedAt() {
+        return revokedAt;
+    }
 }
