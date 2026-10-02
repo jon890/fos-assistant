@@ -42,8 +42,7 @@ class ProfileSkillFilesAdapterTest {
                 PROFILE,
                 Map.of(
                         "weekly-plan",
-                        new SkillBundle(
-                                "weekly-plan", SKILL_MD, List.of(new SkillFile("references/guide.md", "안내")))));
+                        new SkillBundle("weekly-plan", SKILL_MD, List.of(new SkillFile("references/guide.md", "안내")))));
 
         assertThat(adapter.hasUploaded(PROFILE)).isTrue();
 

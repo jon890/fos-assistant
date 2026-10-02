@@ -3,6 +3,7 @@ package com.bifos.assistant.shared;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.bifos.assistant.agent.application.AgentProperties;
+import com.bifos.assistant.agent.application.PeopleProperties;
 import com.bifos.assistant.agent.application.StarterProperties;
 import com.bifos.assistant.chat.application.DelegationWakeProperties;
 import com.bifos.assistant.chat.infra.ArtifactProperties;
@@ -12,7 +13,6 @@ import com.bifos.assistant.context.ContextProperties;
 import com.bifos.assistant.hermes.HermesProperties;
 import com.bifos.assistant.memory.application.MemoryProposalProperties;
 import com.bifos.assistant.orchestration.application.DelegationProperties;
-import com.bifos.assistant.agent.application.PeopleProperties;
 import com.bifos.assistant.shared.auth.AuthProperties;
 import com.bifos.assistant.skill.infra.SkillProperties;
 import com.bifos.assistant.usage.infra.PricingProperties;

@@ -3,12 +3,12 @@ package com.bifos.assistant.user;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.verifyNoInteractions;
 
+import com.bifos.assistant.agent.application.PeopleProperties;
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.agent.domain.type.AgentVisibility;
 import com.bifos.assistant.agent.infra.AgentRepository;
 import com.bifos.assistant.hermes.HermesModelClient;
 import com.bifos.assistant.hermes.HermesProperties;
-import com.bifos.assistant.agent.application.PeopleProperties;
 import com.bifos.assistant.people.domain.AllowedPerson;
 import com.bifos.assistant.people.infra.AllowedPersonRepository;
 import com.bifos.assistant.user.application.UserProvisioningService;
