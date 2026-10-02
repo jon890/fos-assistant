@@ -23,6 +23,8 @@ trap cleanup EXIT
 docker run -d --name "${NAME}" \
   -e MYSQL_ROOT_PASSWORD="${ROOT_PASSWORD}" \
   -p 127.0.0.1::3306 \
+  --health-cmd "mysqladmin ping --protocol=tcp -h 127.0.0.1 -uroot -p${ROOT_PASSWORD} --silent" \
+  --health-interval 2s --health-retries 60 \
   "${IMAGE}" \
   --character-set-server=utf8mb4 \
   --collation-server=utf8mb4_unicode_ci >/dev/null
@@ -30,9 +32,10 @@ docker run -d --name "${NAME}" \
 host_port="$(docker port "${NAME}" 3306/tcp | head -n 1 | sed 's/.*://')"
 
 # 이미지는 초기화하는 동안 소켓으로만 받는 임시 서버를 띄웠다가 내린다. TCP 로 붙어야 준비된 것이다.
+# 그 판정은 컨테이너의 health check 가 하고 여기서는 상태만 읽는다.
 ready=0
 for _ in $(seq 1 60); do
-  if docker exec "${NAME}" mysqladmin ping --protocol=tcp -h 127.0.0.1 -uroot -p"${ROOT_PASSWORD}" --silent >/dev/null 2>&1; then
+  if [ "$(docker inspect --format '{{.State.Health.Status}}' "${NAME}")" = "healthy" ]; then
     ready=1
     break
   fi
