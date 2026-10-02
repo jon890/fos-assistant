@@ -81,7 +81,7 @@ class ExecutionTreeServiceTest {
         agent = agents.findByCode("tree-dad")
                 .orElseGet(() -> agents.save(Agent.of(
                         "tree-dad",
-                        "나무 아빠",
+                        "트리 아빠",
                         "dad",
                         "http://127.0.0.1:1/p/dad",
                         CostMode.SUBSCRIPTION,
@@ -121,7 +121,7 @@ class ExecutionTreeServiceTest {
         assertThat(tree.truncated()).isFalse();
         assertThat(tree.root().executionId()).isEqualTo(execution.id());
         assertThat(tree.root().agentCode()).isEqualTo("tree-dad");
-        assertThat(tree.root().agentName()).isEqualTo("나무 아빠");
+        assertThat(tree.root().agentName()).isEqualTo("트리 아빠");
         assertThat(tree.root().children()).isEmpty();
         assertThat(tree.root().events())
                 .extracting(ExecutionEventView::sequence, ExecutionEventView::eventType)
@@ -156,7 +156,7 @@ class ExecutionTreeServiceTest {
     }
 
     @Test
-    @DisplayName("자식 실행의 에이전트 행이 없어도 나무가 나오고 그 노드의 에이전트 칸이 비어 있다")
+    @DisplayName("자식 실행의 에이전트 행이 없어도 트리가 나오고 그 노드의 에이전트 칸이 비어 있다")
     void treeComesOutWithEmptyAgentColumnWhenChildAgentRowIsMissing() {
         AgentExecution root = execution(OWNER_ID, null, null);
         Agent gone = agents.save(Agent.of(
@@ -191,7 +191,7 @@ class ExecutionTreeServiceTest {
     }
 
     @Test
-    @DisplayName("자식의 번호로 물어도 뿌리부터 나온다")
+    @DisplayName("자식의 번호로 물어도 루트부터 나온다")
     void askingByChildIdStartsFromRoot() {
         AgentExecution root = execution(OWNER_ID, null, null);
         AgentExecution child = execution(OWNER_ID, root.id(), root.id());
@@ -225,7 +225,7 @@ class ExecutionTreeServiceTest {
     }
 
     @Test
-    @DisplayName("뿌리를 찾아 올라가는 길이 순환이면 멈추고 나무가 잘렸다고 알린다")
+    @DisplayName("루트를 찾아 올라가는 길이 순환이면 멈추고 트리가 잘렸다고 알린다")
     void stopsAndReportsTruncatedTreeWhenWalkUpToRootIsCyclic() {
         AgentExecution first = execution(OWNER_ID, null, null);
         AgentExecution second = execution(OWNER_ID, first.id(), null);
@@ -240,7 +240,7 @@ class ExecutionTreeServiceTest {
     }
 
     @Test
-    @DisplayName("상한보다 깊은 나무는 상한까지만 내고 마지막 노드가 잘렸다고 알린다")
+    @DisplayName("상한보다 깊은 트리는 상한까지만 내고 마지막 노드가 잘렸다고 알린다")
     void emitsTreeDeeperThanLimitOnlyToLimitAndFlagsLastNodeTruncated() {
         AgentExecution root = execution(OWNER_ID, null, null);
         List<Long> chain = new ArrayList<>(List.of(root.id()));
@@ -269,7 +269,7 @@ class ExecutionTreeServiceTest {
     }
 
     @Test
-    @DisplayName("뿌리에 닿지 않는 실행은 나무에 넣지 않는다")
+    @DisplayName("루트에 닿지 않는 실행은 트리에 넣지 않는다")
     void leavesRunNotReachingRootOutOfTree() {
         AgentExecution root = execution(OWNER_ID, null, null);
         AgentExecution child = execution(OWNER_ID, root.id(), root.id());

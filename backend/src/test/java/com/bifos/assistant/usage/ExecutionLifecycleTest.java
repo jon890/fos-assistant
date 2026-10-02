@@ -70,7 +70,7 @@ class ExecutionLifecycleTest {
     }
 
     @Test
-    @DisplayName("시작한 실행은 종료 정보 없이 RUNNING이고 부모와 뿌리를 저장한다")
+    @DisplayName("시작한 실행은 종료 정보 없이 RUNNING이고 부모와 루트를 저장한다")
     void startedRunIsRunningWithoutEndInfoAndStoresParentAndRoot() {
         AgentExecution execution = recorder.start(user(), conversation, agent(), 12L, 3L, 0L);
 

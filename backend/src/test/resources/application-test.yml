@@ -51,7 +51,7 @@ assistant:
     agent-root: /agent-side/artifacts
   skill:
     root: build/test-skills
-    # 검사가 게시된 경로에 적힌 글자를 실제 디렉터리와 견주므로 두 뿌리를 같게 둔다
+    # 검사가 게시된 경로에 적힌 글자를 실제 디렉터리와 견주므로 두 루트를 같게 둔다
     agent-root: build/test-skills
 hermes:
   profile-key-dir: build/test-hermes-keys

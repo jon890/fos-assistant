@@ -146,7 +146,7 @@ class ChildExecutionRunnerTest {
         return conversations.save(Conversation.startedBy(user.id(), "제목", agent.id()));
     }
 
-    /** 부모 실행 하나를 뿌리로 만든다. */
+    /** 부모 실행 하나를 루트로 만든다. */
     private AgentExecution parentOf(CurrentUser user, Conversation conversation, String agentCode) {
         return recorder.start(user, conversation, agents.findByCode(agentCode).orElseThrow(), null, null, 0L);
     }
@@ -199,7 +199,7 @@ class ChildExecutionRunnerTest {
         CurrentUser dad = member("child-dad@example.com", "child-dad");
         member("child-mom@example.com", "child-mom");
         Agent shared = agents.findByCode("child-mom").orElseThrow();
-        shared.changeAccess(true, com.bifos.assistant.agent.domain.AgentVisibility.GROUP, null);
+        shared.changeAccess(true, AgentVisibility.GROUP, null);
         agents.save(shared);
         Conversation started = conversationOf(dad, "child-dad");
         transaction.executeWithoutResult(status -> conversations.chooseModelIfActive(

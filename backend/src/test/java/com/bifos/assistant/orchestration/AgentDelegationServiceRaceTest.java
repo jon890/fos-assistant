@@ -82,7 +82,7 @@ class AgentDelegationServiceRaceTest {
     }
 
     @Test
-    @DisplayName("뿌리 잠금을 제한 시간 안에 잡지 못하면 실행을 시작하지 않고 SUBMIT FAILED 다")
+    @DisplayName("루트 잠금을 제한 시간 안에 잡지 못하면 실행을 시작하지 않고 SUBMIT FAILED 다")
     void doesNotStartRunAndSubmitFailedWhenRootLockNotAcquiredInTime() throws Exception {
         DelegationKey holding = key("call_holding");
         DelegationKey waiting = key("call_waiting");

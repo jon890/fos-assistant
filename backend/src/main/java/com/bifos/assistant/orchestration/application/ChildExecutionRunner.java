@@ -28,7 +28,7 @@ import org.springframework.stereotype.Service;
  *   <li>에이전트는 {@link AgentService#requireReadable} 를 지난 것만 쓴다. 위임은 켜졌는지까지 보는
  *       {@link AgentService#requireStartable} 을 쓴다
  *   <li>Memory 는 {@code ContextAssembler} 로 다시 조립한다. 부모 것을 복사하지 않는다
- *   <li>{@code parentExecutionId} 는 부모의 번호이고 {@code rootExecutionId} 는 부모의 뿌리다
+ *   <li>{@code parentExecutionId} 는 부모의 번호이고 {@code rootExecutionId} 는 부모의 루트다
  * </ul>
  *
  * <p>자식의 답을 {@code chat_message} 에 넣지 않는다. 사용자가 읽을 답은 마지막에 합친 하나이고,
@@ -55,11 +55,7 @@ public class ChildExecutionRunner {
      * @param task 이 자식에게만 주는 지시
      */
     public ChildResult run(
-            CurrentUser user,
-            Conversation conversation,
-            AgentExecution parent,
-            String agentCode,
-            String task) {
+            CurrentUser user, Conversation conversation, AgentExecution parent, String agentCode, String task) {
         return run(user, conversation, parent, agentCode, task, (execution, runId) -> {}, () -> false);
     }
 
@@ -122,7 +118,7 @@ public class ChildExecutionRunner {
      *
      * @param user 부모 실행의 주인. 자식도 같은 사용자의 것이다
      * @param conversation 부모 실행이 속한 대화
-     * @param parent 이 위임을 부른 실행. 자식의 부모이고, 뿌리는 그 실행의 뿌리다
+     * @param parent 이 위임을 부른 실행. 자식의 부모이고, 루트는 그 실행의 루트다
      * @param agent {@link #startableAgent} 를 지난 에이전트
      * @param task 이 자식에게만 주는 지시
      * @param delegationKey 실행 줄을 만들 때 함께 적는 키
@@ -160,12 +156,11 @@ public class ChildExecutionRunner {
      * 깊이를 1로 제한한다.
      *
      * <p>부모의 {@code rootExecutionId} 가 이미 채워져 있으면 그 부모가 자식이다. 자식이 다시 자식을
-     * 부르지 않게 한다. 더 깊은 나무가 필요해지는 시점은 흐름 하나를 돌려 보고 정한다.
+     * 부르지 않게 한다. 더 깊은 트리가 필요해지는 시점은 흐름 하나를 돌려 보고 정한다.
      */
     private static void requireNotAChild(AgentExecution parent) {
         if (parent.rootExecutionId() != null) {
-            throw new ApiException(
-                    ErrorCode.ORCHESTRATION_DEPTH_EXCEEDED, "a child cannot spawn another child");
+            throw new ApiException(ErrorCode.ORCHESTRATION_DEPTH_EXCEEDED, "a child cannot spawn another child");
         }
     }
 }

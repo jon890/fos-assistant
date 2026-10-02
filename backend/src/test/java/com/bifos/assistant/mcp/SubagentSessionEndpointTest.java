@@ -136,7 +136,7 @@ class SubagentSessionEndpointTest {
     }
 
     @Test // 10
-    @DisplayName("같은 자식을 다른 뿌리의 도는 실행 아래로 보내면 409 이고 origin 은 그대로다")
+    @DisplayName("같은 자식을 다른 루트의 도는 실행 아래로 보내면 409 이고 origin 은 그대로다")
     void sendingSameChildUnderOtherRootsRunningRunIs409AndOriginUnchanged() throws Exception {
         String child = newChild();
         register(tokenA, McpCallSigner.subagentBody(tokenA, rootA, rootA, child).toString());
@@ -174,7 +174,7 @@ class SubagentSessionEndpointTest {
     }
 
     @Test // 8
-    @DisplayName("profile A 토큰으로 profile B 실행의 뿌리 아래 등록하면 403 이고 줄이 없다")
+    @DisplayName("profile A 토큰으로 profile B 실행의 루트 아래 등록하면 403 이고 줄이 없다")
     void registeringUnderRootOfProfileBRunWithProfileATokenIs403AndNoRow() throws Exception {
         String child = newChild();
 
@@ -293,8 +293,12 @@ class SubagentSessionEndpointTest {
         HttpRequest.Builder builder = HttpRequest.newBuilder(URI.create("http://localhost:" + port + path))
                 .header("Content-Type", "application/json")
                 .POST(HttpRequest.BodyPublishers.ofString(body));
-        if (token != null) builder.header("Authorization", "Bearer " + token);
-        if (origin) builder.header("Origin", "http://browser.example");
+        if (token != null) {
+            builder.header("Authorization", "Bearer " + token);
+        }
+        if (origin) {
+            builder.header("Origin", "http://browser.example");
+        }
         return client.send(builder.build(), HttpResponse.BodyHandlers.ofString());
     }
 

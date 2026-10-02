@@ -346,9 +346,9 @@ public class ChatService {
     }
 
     /**
-     * 중지가 확정된 흐름 turn 이 예외로 끝날 때 뿌리 실행 줄을 취소로 남기고 대기 줄을 멈춘다.
+     * 중지가 확정된 흐름 turn 이 예외로 끝날 때 루트 실행 줄을 취소로 남기고 대기 줄을 멈춘다.
      *
-     * <p>흐름이 뿌리 실행을 이미 끝난 상태로 적었으면 그대로 둔다. 실행 줄을 다시 읽어 본다. 흐름이 들고 있는 객체의
+     * <p>흐름이 루트 실행을 이미 끝난 상태로 적었으면 그대로 둔다. 실행 줄을 다시 읽어 본다. 흐름이 들고 있는 객체의
      * 상태를 여기서는 알 수 없다. {@code rootExecutionId} 가 null 이면 실행 줄을 만들기 전에 끝난 것이다.
      */
     private void cancelFlowAndHoldIfStopConfirmed(
@@ -707,7 +707,7 @@ public class ChatService {
      *
      * <p>고르지 않은 provider, 모델, effort 는 null 그대로 실어 profile 의 기본값으로 돌게 둔다.
      *
-     * <p>보낼 session 을 명령보다 먼저 정한다. 실행 줄에는 그 대화의 뿌리 session 을 적는다. 압축 교체 뒤에는
+     * <p>보낼 session 을 명령보다 먼저 정한다. 실행 줄에는 그 대화의 루트 session 을 적는다. 압축 교체 뒤에는
      * 보내는 session 과 적는 session 이 다르다(ADR-031).
      */
     private PendingTurn begin(
@@ -1023,7 +1023,7 @@ public class ChatService {
             }
             Optional<Agent> childAgent = agents.findById(child.agentId());
             if (childAgent.isEmpty()) {
-                // 뿌리 turn 의 중지는 이미 켰다. 에이전트 행이 없는 자식 하나 때문에 오류로 끝내지 않는다.
+                // 루트 turn 의 중지는 이미 켰다. 에이전트 행이 없는 자식 하나 때문에 오류로 끝내지 않는다.
                 log.warn("에이전트 행이 없어 자식 run 을 함께 멈추지 못했다 executionId={} agentId={}", child.id(), child.agentId());
                 continue;
             }
@@ -1205,7 +1205,7 @@ public class ChatService {
      * 대화에 지금 도는 turn 을 알려 준다.
      *
      * <p>주인 확인을 표시보다 먼저 한다. 남의 대화에 도는 turn 이 있는지 새지 않게 하려는 것이다.
-     * 도는지는 실행 줄의 상태가 아니라 메모리 표시로 본다. 흐름은 뿌리 줄이 끝난 뒤에도 자식이 돈다.
+     * 도는지는 실행 줄의 상태가 아니라 메모리 표시로 본다. 흐름은 루트 줄이 끝난 뒤에도 자식이 돈다.
      */
     @Transactional(readOnly = true)
     public RunningTurn running(CurrentUser user, Long conversationId) {

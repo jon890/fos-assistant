@@ -17,7 +17,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /**
- * V28 이 대화의 뿌리 session 칸과 실행 줄의 session, 위임 칸을 만들고 위임 키를 한 번만 받는지 본다.
+ * V28 이 대화의 루트 session 칸과 실행 줄의 session, 위임 칸을 만들고 위임 키를 한 번만 받는지 본다.
  *
  * <p>다른 검사들은 엔티티로 스키마를 만들어 이 마이그레이션을 지나지 않는다.
  */

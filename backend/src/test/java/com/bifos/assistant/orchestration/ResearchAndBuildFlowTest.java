@@ -55,6 +55,14 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -259,7 +267,7 @@ class ResearchAndBuildFlowTest {
     }
 
     @Test
-    @DisplayName("흐름 한 번이 실행 넷을 남기고 Chief가 뿌리다")
+    @DisplayName("흐름 한 번이 실행 넷을 남기고 Chief가 루트다")
     void oneFlowLeavesFourRunsAndChiefIsRoot() {
         CurrentUser dad = member(MY_EMAIL, MY_AGENT, ResearchAndBuildFlow.NAME);
         hermesAnswersEachStep(SPLIT_JSON);
@@ -313,7 +321,7 @@ class ResearchAndBuildFlowTest {
     }
 
     @Test
-    @DisplayName("Chief 실행 줄에는 대화의 뿌리 session이 적히고 하위 실행 줄에는 각자 보낸 새 session이 적힌다")
+    @DisplayName("Chief 실행 줄에는 대화의 루트 session이 적히고 하위 실행 줄에는 각자 보낸 새 session이 적힌다")
     void chiefRowHasConversationRootSessionAndChildRowsHaveOwnNewSessions() {
         CurrentUser dad = member(MY_EMAIL, MY_AGENT, ResearchAndBuildFlow.NAME);
         hermesAnswersEachStep(SPLIT_JSON);
@@ -364,7 +372,7 @@ class ResearchAndBuildFlowTest {
         stub().willAnswer(command -> {
             HermesRunResult result = answerFor(command.input(), SPLIT_JSON);
             if (!command.input().contains(CHIEF_MARK)) {
-                // 실행 줄이 RUNNING 인 동안 profile 플러그인이 서명하듯 그 명령의 session 을 뿌리와 session 으로 삼는다.
+                // 실행 줄이 RUNNING 인 동안 profile 플러그인이 서명하듯 그 명령의 session 을 루트와 session 으로 삼는다.
                 String session = command.sessionId();
                 try {
                     resolvedByRunId.put(
@@ -554,7 +562,7 @@ class ResearchAndBuildFlowTest {
     }
 
     @Test
-    @DisplayName("사용량 목록에 뿌리 하나만 나오고 월 비용 합계는 넷을 모두 더한다")
+    @DisplayName("사용량 목록에 루트 하나만 나오고 월 비용 합계는 넷을 모두 더한다")
     void usageListShowsOnlyRootAndMonthlyCostSumsAllFour() {
         CurrentUser dad = member(MY_EMAIL, MY_AGENT, ResearchAndBuildFlow.NAME);
         hermesAnswersEachStep(SPLIT_JSON);
@@ -601,7 +609,7 @@ class ResearchAndBuildFlowTest {
     @DisplayName("Researcher와 Engineer가 실제로 함께 떠 있다")
     void researcherAndEngineerActuallyRunTogether() {
         CurrentUser dad = member(MY_EMAIL, MY_AGENT, ResearchAndBuildFlow.NAME);
-        java.util.concurrent.CountDownLatch bothSubmitted = new java.util.concurrent.CountDownLatch(2);
+        CountDownLatch bothSubmitted = new CountDownLatch(2);
         stub().willAnswer(command -> {
             String input = command.input();
             if (input.contains(CHIEF_MARK)) {
@@ -663,9 +671,8 @@ class ResearchAndBuildFlowTest {
         CurrentUser dad = member(MY_EMAIL, MY_AGENT, ResearchAndBuildFlow.NAME);
         hermesAnswersEachStep(SPLIT_JSON);
         List<ChatEvent> relayed = new ArrayList<>();
-        java.util.concurrent.ExecutorService worker = java.util.concurrent.Executors.newSingleThreadExecutor();
-        java.util.concurrent.atomic.AtomicReference<java.util.concurrent.Future<?>> stop =
-                new java.util.concurrent.atomic.AtomicReference<>();
+        ExecutorService worker = Executors.newSingleThreadExecutor();
+        AtomicReference<Future<?>> stop = new AtomicReference<>();
         try {
             chat.stream(dad, null, "전기차를 사는 게 나을까?", MY_AGENT, event -> {
                 relayed.add(event);
@@ -682,7 +689,7 @@ class ResearchAndBuildFlowTest {
                 }
             });
 
-            stop.get().get(1, java.util.concurrent.TimeUnit.SECONDS);
+            stop.get().get(1, TimeUnit.SECONDS);
             assertThat(stub().received()).singleElement();
             assertThat(executionsOf(dad))
                     .singleElement()
@@ -697,9 +704,11 @@ class ResearchAndBuildFlowTest {
     @DisplayName("자식 runId가 저장된 뒤 trackRun 전에 중지해도 그 자식을 멈춘다")
     void stopsChildEvenIfStoppedAfterRunIdSavedBeforeTrackRun() {
         CurrentUser dad = member(MY_EMAIL, MY_AGENT, ResearchAndBuildFlow.NAME);
-        java.util.concurrent.atomic.AtomicBoolean intercepted = new java.util.concurrent.atomic.AtomicBoolean();
+        AtomicBoolean intercepted = new AtomicBoolean();
         stub().willAnswer(command -> {
-            if (command.input().contains(CHIEF_MARK)) return completed("run-chief", SPLIT_JSON);
+            if (command.input().contains(CHIEF_MARK)) {
+                return completed("run-chief", SPLIT_JSON);
+            }
             return HermesRunResult.of(
                     "run-child", null, "cancelled", "", "example-model-large", "anthropic", TokenUsage.empty());
         });
@@ -729,15 +738,13 @@ class ResearchAndBuildFlowTest {
     void stoppingWhileTwoChildrenRunStopsBothAndDoesNotStartMerge() {
         CurrentUser dad = member(MY_EMAIL, MY_AGENT, ResearchAndBuildFlow.NAME);
         List<ChatEvent> relayed = new ArrayList<>();
-        java.util.concurrent.CountDownLatch childrenSubmitted = new java.util.concurrent.CountDownLatch(2);
-        java.util.concurrent.CountDownLatch childrenAwaiting = new java.util.concurrent.CountDownLatch(2);
-        java.util.concurrent.CountDownLatch stopSent = new java.util.concurrent.CountDownLatch(1);
-        java.util.concurrent.atomic.AtomicInteger awaitCalls = new java.util.concurrent.atomic.AtomicInteger();
-        java.util.concurrent.atomic.AtomicBoolean stopped = new java.util.concurrent.atomic.AtomicBoolean();
-        java.util.concurrent.atomic.AtomicReference<Instant> chiefFinishedAt =
-                new java.util.concurrent.atomic.AtomicReference<>();
-        java.util.concurrent.atomic.AtomicReference<Long> chiefLatencyMs =
-                new java.util.concurrent.atomic.AtomicReference<>();
+        CountDownLatch childrenSubmitted = new CountDownLatch(2);
+        CountDownLatch childrenAwaiting = new CountDownLatch(2);
+        CountDownLatch stopSent = new CountDownLatch(1);
+        AtomicInteger awaitCalls = new AtomicInteger();
+        AtomicBoolean stopped = new AtomicBoolean();
+        AtomicReference<Instant> chiefFinishedAt = new AtomicReference<>();
+        AtomicReference<Long> chiefLatencyMs = new AtomicReference<>();
         stub().willAnswer(command -> {
             String input = command.input();
             if (input.contains(CHIEF_MARK)) {
@@ -760,7 +767,9 @@ class ResearchAndBuildFlowTest {
         // 기본값으로 보낸 실행은 세션이 답한 모델로 가격을 찾는다.
         stub().willReportSessionRuntime(new SessionRuntime("example-model-large", "anthropic"));
         stub().beforeAwait(() -> {
-            if (awaitCalls.incrementAndGet() == 1) return;
+            if (awaitCalls.incrementAndGet() == 1) {
+                return;
+            }
             childrenAwaiting.countDown();
             await(childrenAwaiting);
             if (stopped.compareAndSet(false, true)) {
@@ -807,9 +816,9 @@ class ResearchAndBuildFlowTest {
     }
 
     /** 둘 다 제출될 때까지 기다린다. 줄서면 여기서 끝나지 않고 검사가 실패한다. */
-    private static void await(java.util.concurrent.CountDownLatch latch) {
+    private static void await(CountDownLatch latch) {
         try {
-            if (!latch.await(10, java.util.concurrent.TimeUnit.SECONDS)) {
+            if (!latch.await(10, TimeUnit.SECONDS)) {
                 throw new IllegalStateException("두 단계가 함께 떠 있지 않다");
             }
         } catch (InterruptedException ex) {
@@ -819,9 +828,11 @@ class ResearchAndBuildFlowTest {
     }
 
     private void awaitCancellation(Long executionId) {
-        long deadline = System.nanoTime() + java.time.Duration.ofSeconds(1).toNanos();
+        long deadline = System.nanoTime() + Duration.ofSeconds(1).toNanos();
         while (System.nanoTime() < deadline) {
-            if (turns.isCancelled(executionId)) return;
+            if (turns.isCancelled(executionId)) {
+                return;
+            }
             Thread.onSpinWait();
         }
         throw new AssertionError("중지 요청이 turn 에 등록되지 않았다");

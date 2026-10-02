@@ -145,7 +145,7 @@ public class AgentService {
     /**
      * 번호로 에이전트를 읽는다. 행이 없거나 {@code id} 가 null 이면 빈 값이다. 지운 에이전트도 돌려준다.
      *
-     * <p>행이 없어도 오류로 끝내지 않고 그 칸만 비워 그릴 곳(목록, 실행 나무)이 쓴다.
+     * <p>행이 없어도 오류로 끝내지 않고 그 칸만 비워 그릴 곳(목록, 실행 트리)이 쓴다.
      */
     public Optional<Agent> findById(Long id) {
         return id == null ? Optional.empty() : agents.findById(id);

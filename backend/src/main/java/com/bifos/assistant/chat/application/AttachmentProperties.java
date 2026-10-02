@@ -8,7 +8,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  * <p>{@code root} 에 기본값을 두지 않는다. 기본값이 있으면 공유 디렉터리를 붙이지 않은 채 배포해도
  * 기동이 성공하고, 사진이 컨테이너 안에만 쌓여 에이전트가 보지 못한다. 근거는 ADR-020 에 있다.
  *
- * @param root 사진을 두는 디렉터리 뿌리. Control Plane 컨테이너에서 보이는 경로다. 비어 있으면 기동을
+ * @param root 사진을 두는 디렉터리 루트. Control Plane 컨테이너에서 보이는 경로다. 비어 있으면 기동을
  *     멈춘다
  * @param agentRoot 같은 디렉터리를 Hermes 컨테이너에서 보는 경로. 두 컨테이너가 같은 디렉터리를 다른
  *     마운트 지점으로 볼 수 있어 따로 받는다. 에이전트에게 사진 자리를 알릴 때 이것을 적는다. 비어 있으면

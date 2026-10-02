@@ -76,7 +76,7 @@ assistant:
   delegation:
     # 새 자식이 가질 수 있는 가장 깊은 깊이. 사용자가 부른 실행이 0 이다
     max-depth: 2
-    # 한 뿌리 실행 아래에서 동시에 도는 위임 자식 수
+    # 한 루트 실행 아래에서 동시에 도는 위임 자식 수
     max-concurrent-children: 4
     # 서버 전체에서 동시에 도는 위임 수
     max-active: 16

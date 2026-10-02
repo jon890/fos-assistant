@@ -508,7 +508,7 @@ class DelegationWakeServiceTest {
         publisher.publishEvent(new DelegationFinished(conversation.id(), execution.id()));
     }
 
-    /** 대화 turn 이 직접 맡긴 위임 실행 줄을 만든다. {@code parent} 가 뿌리가 아니면 손자 실행이다. */
+    /** 대화 turn 이 직접 맡긴 위임 실행 줄을 만든다. {@code parent} 가 루트가 아니면 손자 실행이다. */
     private AgentExecution delegated(AgentExecution parent, ExecutionStatus status, String output, String errorCode) {
         return delegated(parent, worker, status, output, errorCode);
     }

@@ -352,7 +352,7 @@ class AgentDelegationServiceTest {
         holdUntilStopped();
         DelegationResult started = delegate("앞 turn 의 일");
         AgentExecution nextTurn = turn("fos-" + UUID.randomUUID());
-        assertThat(nextTurn.treeRootId()).as("다음 turn 은 뿌리가 다르다").isNotEqualTo(origin.treeRootId());
+        assertThat(nextTurn.treeRootId()).as("다음 turn 은 루트가 다르다").isNotEqualTo(origin.treeRootId());
 
         AgentExecution stopped = delegations
                 .stop(user, nextTurn, started.executionId())
@@ -365,10 +365,10 @@ class AgentDelegationServiceTest {
     }
 
     @Test
-    @DisplayName("사용자가 뿌리 turn 을 멈추면 그 turn 이 도는 동안 맡긴 자식도 멈춘다")
+    @DisplayName("사용자가 루트 turn 을 멈추면 그 turn 이 도는 동안 맡긴 자식도 멈춘다")
     void stoppingRootTurnAlsoStopsChildrenDelegatedWhileItRuns() throws Exception {
         stub().willAnswer(command -> completed(command, "답"));
-        // 대역 Hermes 는 중지를 받은 뒤에도 completed 를 준다. 뿌리 turn 의 중지가 확정된 뒤에 답하게 해, 확정된 중지를
+        // 대역 Hermes 는 중지를 받은 뒤에도 completed 를 준다. 루트 turn 의 중지가 확정된 뒤에 답하게 해, 확정된 중지를
         // 보고 CANCELLED 로 적는지 본다.
         CountDownLatch awaiting = holdUntilRootStopConfirmed();
         TurnCancellation.TurnHandle handle = turns.open(user.id(), conversation.id());
@@ -396,7 +396,7 @@ class AgentDelegationServiceTest {
     }
 
     @Test
-    @DisplayName("뿌리 turn 의 중지를 Hermes 가 받지 않은 사이에 끝난 자식은 성공으로 남는다")
+    @DisplayName("루트 turn 의 중지를 Hermes 가 받지 않은 사이에 끝난 자식은 성공으로 남는다")
     void childFinishedBeforeHermesAcceptedRootStopStaysSucceeded() throws Exception {
         stub().willAnswer(command -> completed(command, "멀쩡한 답"));
         CountDownLatch stopAttempted = new CountDownLatch(1);
@@ -554,7 +554,7 @@ class AgentDelegationServiceTest {
     }
 
     /**
-     * 완료를 기다리는 자리에서 뿌리 turn 의 중지가 확정될 때까지 멈춰 둔다.
+     * 완료를 기다리는 자리에서 루트 turn 의 중지가 확정될 때까지 멈춰 둔다.
      *
      * <p>확정되지 않아도 10초 뒤에는 이어져 실행 스레드가 검사보다 오래 살지 않는다.
      *
@@ -587,7 +587,7 @@ class AgentDelegationServiceTest {
         }
     }
 
-    /** 이 대화에서 뿌리 session {@code session} 으로 도는 turn 실행이다. */
+    /** 이 대화에서 루트 session {@code session} 으로 도는 turn 실행이다. */
     private AgentExecution turn(String session) {
         return executions.save(AgentExecution.builder()
                 .userId(user.id())
@@ -609,9 +609,13 @@ class AgentDelegationServiceTest {
         long deadline = System.nanoTime() + limit.toNanos();
         while (true) {
             DelegationResult result = delegate(task);
-            if (result.accepted()) return result;
+            if (result.accepted()) {
+                return result;
+            }
             assertThat(result.failure()).as("받아들이지 않은 까닭").isEqualTo(DelegationResult.Failure.BUSY);
-            if (System.nanoTime() > deadline) throw new AssertionError(limit + " 안에 자리가 나지 않았다");
+            if (System.nanoTime() > deadline) {
+                throw new AssertionError(limit + " 안에 자리가 나지 않았다");
+            }
             Thread.sleep(10);
         }
     }
@@ -635,7 +639,9 @@ class AgentDelegationServiceTest {
             boolean ended =
                     executionEvents.findByExecutionIdInOrderByExecutionIdAscSequenceAsc(List.of(executionId)).stream()
                             .anyMatch(event -> event.eventType() != ExecutionEventType.RUN_STARTED);
-            if (execution.status() != ExecutionStatus.RUNNING && ended) return execution;
+            if (execution.status() != ExecutionStatus.RUNNING && ended) {
+                return execution;
+            }
             if (System.nanoTime() > deadline) {
                 throw new AssertionError("실행 " + executionId + " 이 끝나지 않았다. 상태: " + execution.status());
             }

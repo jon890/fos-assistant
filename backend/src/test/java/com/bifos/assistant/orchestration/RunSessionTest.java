@@ -19,7 +19,7 @@ class RunSessionTest {
     }
 
     @Test
-    @DisplayName("압축 교체 뒤에는 보낼 session만 바뀌고 적을 session은 뿌리를 가리킨다")
+    @DisplayName("압축 교체 뒤에는 보낼 session만 바뀌고 적을 session은 루트를 가리킨다")
     void afterCompactionOnlySendSessionChangesAndRecordedPointsToRoot() {
         RunSession session = RunSession.ofConversation("fos-b", "fos-a");
 
@@ -28,7 +28,7 @@ class RunSessionTest {
     }
 
     @Test
-    @DisplayName("뿌리가 빈 옛 대화는 두 값이 모두 보낸 session이다")
+    @DisplayName("루트가 빈 옛 대화는 두 값이 모두 보낸 session이다")
     void oldConversationWithBlankRootHasBothValuesAsSendSession() {
         RunSession session = RunSession.ofConversation("legacy-session", null);
 

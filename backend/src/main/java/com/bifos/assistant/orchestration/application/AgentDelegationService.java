@@ -23,8 +23,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.ReentrantLock;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
@@ -37,14 +36,13 @@ import org.springframework.transaction.annotation.Transactional;
  * 이 패키지는 {@code mcp} 의 타입을 import 하지 않는다. {@code mcp} 가 요청자와 origin 실행을 풀어 넘긴다.
  */
 @Service
+@Slf4j
 public class AgentDelegationService {
 
-    private static final Logger log = LoggerFactory.getLogger(AgentDelegationService.class);
-
     /**
-     * 뿌리별 잠금의 수다. 뿌리 번호로 하나를 고른다.
+     * 루트별 잠금의 수다. 루트 번호로 하나를 고른다.
      *
-     * <p>다른 뿌리가 같은 잠금을 쓰면 줄을 한 번 더 설 뿐 판정은 틀리지 않는다. 뿌리마다 잠금을 만들어 두면 뿌리
+     * <p>다른 루트가 같은 잠금을 쓰면 줄을 한 번 더 설 뿐 판정은 틀리지 않는다. 루트마다 잠금을 만들어 두면 루트
      * 수만큼 쌓이고, 다 쓴 잠금을 지우면 지우는 순간 다른 스레드가 옛 잠금을 쥐는 경합이 생긴다.
      */
     private static final int ROOT_LOCK_STRIPES = 64;
@@ -70,7 +68,7 @@ public class AgentDelegationService {
     private final ConcurrentHashMap<Long, RunningDelegation> running = new ConcurrentHashMap<>();
 
     /**
-     * 같은 호출 확인과 동시 한도 세기부터 실행 줄 저장까지를 뿌리별로 묶는다.
+     * 같은 호출 확인과 동시 한도 세기부터 실행 줄 저장까지를 루트별로 묶는다.
      *
      * <p>서버 하나를 전제로 JVM 안에서 잠근다. 서버가 여러 대가 되면 데이터베이스 잠금으로 옮긴다.
      */
@@ -157,9 +155,9 @@ public class AgentDelegationService {
      * 다른 에이전트의 실행을 origin 실행의 자식으로 시작하고, Hermes 제출까지만 기다린다(ADR-017 「{@code agent_delegate} 는
      * 기다리지 않는다」).
      *
-     * <p>판정은 이 순서로 한다. 부모의 대화, 깊이, 에이전트, 같은 호출, 뿌리당 동시 한도, 전체 한도, 실행 시작, 제출 대기다.
-     * 앞의 셋은 잠그지 않고 기다리지 않는다. 같은 호출 확인부터 실행 줄 저장까지는 뿌리별로 잠가, 세기와 시작 사이에
-     * 다른 위임이 끼어들지 못하게 한다. 제출 대기는 잠금 밖에서 한다. 잠금이 제출 대기까지 덮으면 같은 뿌리의 위임이
+     * <p>판정은 이 순서로 한다. 부모의 대화, 깊이, 에이전트, 같은 호출, 루트당 동시 한도, 전체 한도, 실행 시작, 제출 대기다.
+     * 앞의 셋은 잠그지 않고 기다리지 않는다. 같은 호출 확인부터 실행 줄 저장까지는 루트별로 잠가, 세기와 시작 사이에
+     * 다른 위임이 끼어들지 못하게 한다. 제출 대기는 잠금 밖에서 한다. 잠금이 제출 대기까지 덮으면 같은 루트의 위임이
      * 모두 한 줄로 늘어선다. 잠금도 {@link DelegationProperties#submitTimeout()} 안에서만 기다리고, 그 안에 잡지 못하거나
      * 잡은 뒤 남은 시간이 없으면 실행을 시작하지 않고 거절한다.
      *
@@ -190,7 +188,9 @@ public class AgentDelegationService {
         try {
             agent = children.startableAgent(user, agentCode);
         } catch (ApiException ex) {
-            if (ex.code() == ErrorCode.AGENT_DISABLED) return rejected(Failure.AGENT_DISABLED, origin, "꺼진 에이전트다");
+            if (ex.code() == ErrorCode.AGENT_DISABLED) {
+                return rejected(Failure.AGENT_DISABLED, origin, "꺼진 에이전트다");
+            }
             if (ex.code() == ErrorCode.AGENT_NOT_FOUND) {
                 return rejected(Failure.AGENT_UNAVAILABLE, origin, "없거나 쓸 수 없는 에이전트다");
             }
@@ -204,7 +204,7 @@ public class AgentDelegationService {
         // 잠금도 제출 대기 시간 안에서만 기다린다. 못 잡으면 스레드도 줄도 만들지 않아, 같은 키로 다시 불러도 새로 시작한다.
         // 한도에 닿은 것이 아니라 제한 시간이 지난 것이라 BUSY 가 아니라 SUBMIT_FAILED 다.
         if (!tryLock(lock, deadline)) {
-            return rejected(Failure.SUBMIT_FAILED, origin, "제한 시간 안에 뿌리 잠금을 잡지 못했다");
+            return rejected(Failure.SUBMIT_FAILED, origin, "제한 시간 안에 루트 잠금을 잡지 못했다");
         }
         try {
             Optional<AgentExecution> existing = executions.findByDelegationKey(delegationKey.value());
@@ -213,7 +213,7 @@ public class AgentDelegationService {
             }
             if (executions.countByRootExecutionIdAndStatusAndDelegationKeyIsNotNull(rootId, ExecutionStatus.RUNNING)
                     >= properties.maxConcurrentChildren()) {
-                return rejected(Failure.TOO_MANY_CHILDREN, origin, "뿌리당 동시 위임 한도에 닿았다");
+                return rejected(Failure.TOO_MANY_CHILDREN, origin, "루트당 동시 위임 한도에 닿았다");
             }
             // 남은 시간이 없으면 실행 스레드를 띄우지 않는다. 띄우면 곧바로 포기하게 되고 CANCELLED 줄만 남는다.
             if (deadline - System.nanoTime() <= 0) {
@@ -244,7 +244,8 @@ public class AgentDelegationService {
         if (!handoff.rowCreated()) {
             if (handoff.failure() instanceof DataIntegrityViolationException) {
                 // 같은 키를 다른 요청이 먼저 저장했다. 트랜잭션 밖에서 그 줄을 다시 읽는다.
-                return executions.findByDelegationKey(delegationKey.value())
+                return executions
+                        .findByDelegationKey(delegationKey.value())
                         .map(raced -> sameCall(user, origin, raced))
                         .orElseGet(() -> rejected(Failure.SUBMIT_FAILED, origin, "저장에 실패했고 다시 읽은 줄도 없다"));
             }
@@ -267,7 +268,7 @@ public class AgentDelegationService {
      * <p>어떻게 끝나든 전체 한도 자리를 돌려주고 요청 스레드를 깨운다. 실행 줄 저장이 예외를 던진 경로도 같다.
      *
      * <p>실행은 셋 가운데 하나가 참이면 멈춘다. 요청 스레드가 제출 대기를 포기했다, {@code agent_stop} 이 중지 표시를
-     * 켰다, 사용자가 뿌리 turn 을 멈췄다({@link #rootTurnStopped}). run 번호가 붙으면 뿌리 turn 에 그 run 을 붙여, 사용자가 turn 을 멈출 때 이
+     * 켰다, 사용자가 루트 turn 을 멈췄다({@link #rootTurnStopped}). run 번호가 붙으면 루트 turn 에 그 run 을 붙여, 사용자가 turn 을 멈출 때 이
      * 실행도 함께 멈추게 한다. turn 이 이미 끝났으면 붙일 곳이 없어 붙지 않는다.
      */
     private void run(
@@ -359,8 +360,10 @@ public class AgentDelegationService {
     private boolean stopDetached(AgentExecution execution) {
         Optional<Agent> found = agents.findById(execution.agentId());
         if (found.isEmpty()) {
-            log.warn("에이전트 행이 없어 끊긴 위임 실행의 Hermes run 을 멈추지 못했다 executionId={} agentId={}",
-                    execution.id(), execution.agentId());
+            log.warn(
+                    "에이전트 행이 없어 끊긴 위임 실행의 Hermes run 을 멈추지 못했다 executionId={} agentId={}",
+                    execution.id(),
+                    execution.agentId());
             return false;
         }
         try {
@@ -406,7 +409,10 @@ public class AgentDelegationService {
         Long parentId = origin.parentExecutionId();
         while (parentId != null && depth <= properties.maxDepth()) {
             depth++;
-            parentId = executions.findById(parentId).map(AgentExecution::parentExecutionId).orElse(null);
+            parentId = executions
+                    .findById(parentId)
+                    .map(AgentExecution::parentExecutionId)
+                    .orElse(null);
         }
         return depth;
     }
@@ -426,10 +432,10 @@ public class AgentDelegationService {
     }
 
     /**
-     * 사용자가 뿌리 turn 을 멈췄는지 본다. 흐름의 하위 실행과 같은 판정이다.
+     * 사용자가 루트 turn 을 멈췄는지 본다. 흐름의 하위 실행과 같은 판정이다.
      *
      * <p>중지 버튼을 누른 것만으로는 멈춘 것으로 보지 않는다. Hermes 가 중지를 받아들여 확정된 뒤에만 참이다. 중지를 보내지
-     * 못하면 turn 은 원래대로 돌아가는데, 그 사이에 이 실행이 끝나면 멀쩡한 답을 CANCELLED 로 적게 된다. 뿌리 turn 에 붙은
+     * 못하면 turn 은 원래대로 돌아가는데, 그 사이에 이 실행이 끝나면 멀쩡한 답을 CANCELLED 로 적게 된다. 루트 turn 에 붙은
      * run 이 하나도 없어 Hermes 에 보낼 곳이 없는 중지는 확정을 기다리지 않고 참이다.
      */
     private boolean rootTurnStopped(Long rootId) {
@@ -446,8 +452,8 @@ public class AgentDelegationService {
      * 부르는 쪽이 이 실행을 물을 수 있는지 판정한다(ADR-017 「도구 넷과 한도」).
      *
      * <p>요청자의 실행이고 위임으로 만든 실행({@code delegation_key} 가 있음)이어야 한다. 범위는 origin 실행의 대화다.
-     * 대화의 turn 마다 뿌리 실행이 새로 생기므로, 앞 turn 에서 맡긴 실행을 다음 turn 에서 물으려면 나무가 아니라 대화로
-     * 견줘야 한다. origin 실행에 대화가 없으면 같은 실행 나무로 견준다. 같은 사용자의 다른 대화는 물을 수 없다.
+     * 대화의 turn 마다 루트 실행이 새로 생기므로, 앞 turn 에서 맡긴 실행을 다음 turn 에서 물으려면 트리가 아니라 대화로
+     * 견줘야 한다. origin 실행에 대화가 없으면 같은 실행 트리로 견준다. 같은 사용자의 다른 대화는 물을 수 없다.
      */
     private boolean canQuery(CurrentUser user, AgentExecution origin, AgentExecution execution) {
         if (!Objects.equals(execution.userId(), user.id()) || execution.delegationKey() == null) {

@@ -42,7 +42,7 @@ class ConversationSessionTest {
     }
 
     @Test
-    @DisplayName("새 대화는 fos session을 정해 보낼 session과 뿌리 session에 함께 적는다")
+    @DisplayName("새 대화는 fos session을 정해 보낼 session과 루트 session에 함께 적는다")
     void newConversationFixesSessionAndRecordsItForSendAndRootSession() {
         Conversation conversation = newConversation();
 
@@ -55,7 +55,7 @@ class ConversationSessionTest {
         assertThat(conversation.hermesRootSessionId()).isEqualTo(sessionId);
         Conversation stored = reload(conversation);
         assertThat(stored.hermesSessionId()).as("저장된 보낼 session").isEqualTo(sessionId);
-        assertThat(stored.hermesRootSessionId()).as("저장된 뿌리 session").isEqualTo(sessionId);
+        assertThat(stored.hermesRootSessionId()).as("저장된 루트 session").isEqualTo(sessionId);
     }
 
     @Test
@@ -91,7 +91,7 @@ class ConversationSessionTest {
     }
 
     @Test
-    @DisplayName("Hermes가 정한 session이 있는 옛 대화는 그대로 쓰고 뿌리를 채우지 않는다")
+    @DisplayName("Hermes가 정한 session이 있는 옛 대화는 그대로 쓰고 루트를 채우지 않는다")
     void keepsOldConversationWithHermesSessionAndDoesNotFillRoot() {
         Conversation conversation = newConversation();
         conversations.touchSession(conversation.id(), "legacy-session", Instant.now());

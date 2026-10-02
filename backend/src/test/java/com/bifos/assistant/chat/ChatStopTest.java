@@ -351,14 +351,14 @@ class ChatStopTest {
     }
 
     @Test
-    @DisplayName("에이전트 행이 없는 자식 실행은 건너뛰고 뿌리 실행을 취소로 끝낸다")
+    @DisplayName("에이전트 행이 없는 자식 실행은 건너뛰고 루트 실행을 취소로 끝낸다")
     void skipsChildRunWithoutAgentRowAndEndsRootRunAsCancelled() {
         CurrentUser dad = member("dad@example.com", "dad");
         stub().willReturn(HermesRunResult.of(
                 "run-root", "session", "cancelled", "", "model", "provider", TokenUsage.empty()));
         stub().beforeAwait(() -> {
             AgentExecution root = latestExecution(dad);
-            // 에이전트 번호가 가리키는 행이 없는 자식이다. 같은 뿌리를 가리키며 아직 돈다.
+            // 에이전트 번호가 가리키는 행이 없는 자식이다. 같은 루트를 가리키며 아직 돈다.
             executions.save(AgentExecution.builder()
                     .userId(dad.id())
                     .agentId(-1L)
@@ -462,7 +462,9 @@ class ChatStopTest {
         // 그 요청이 같은 run 에 다시 보내 Hermes 가 받아들였으므로 중지는 성공이다.
         doAnswer(invocation -> {
                     long deadline = System.nanoTime() + Duration.ofSeconds(1).toNanos();
-                    while (attempts.get() == 0 && System.nanoTime() < deadline) Thread.onSpinWait();
+                    while (attempts.get() == 0 && System.nanoTime() < deadline) {
+                        Thread.onSpinWait();
+                    }
                     return invocation.callRealMethod();
                 })
                 .when(turns)
@@ -518,7 +520,9 @@ class ChatStopTest {
                 .hasRuns(any());
         doAnswer(invocation -> {
                     long deadline = System.nanoTime() + Duration.ofSeconds(1).toNanos();
-                    while (attempts.get() == 0 && System.nanoTime() < deadline) Thread.onSpinWait();
+                    while (attempts.get() == 0 && System.nanoTime() < deadline) {
+                        Thread.onSpinWait();
+                    }
                     return invocation.callRealMethod();
                 })
                 .when(turns)
@@ -700,7 +704,9 @@ class ChatStopTest {
     private boolean awaitCancelled(Long executionId) {
         long deadline = System.nanoTime() + Duration.ofSeconds(1).toNanos();
         while (System.nanoTime() < deadline) {
-            if (turns.isCancelled(executionId)) return true;
+            if (turns.isCancelled(executionId)) {
+                return true;
+            }
             Thread.onSpinWait();
         }
         return false;

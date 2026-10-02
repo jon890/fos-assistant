@@ -843,7 +843,7 @@ class ConnectorActionServiceTest {
         connections.save(connection);
     }
 
-    /** 뿌리 session 에서 부른 새 호출 하나의 판정을 묻는다. */
+    /** 루트 session 에서 부른 새 호출 하나의 판정을 묻는다. */
     private ConnectorPolicyAnswer ask(String tool, String args) {
         return policies.decide(PROFILE, root, root, "call_" + UUID.randomUUID(), "mcp__demo__" + tool, tool, args);
     }

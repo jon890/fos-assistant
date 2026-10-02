@@ -46,7 +46,7 @@ public final class ChatDtos {
     public record SendMessageResponse(UUID conversationId, Long executionId, String assistantText) {}
 
     /**
-     * @param hasChildren 이 답이 여러 실행으로 만들어졌다. 화면이 이때만 실행 나무로 가는 길을 보인다
+     * @param hasChildren 이 답이 여러 실행으로 만들어졌다. 화면이 이때만 실행 트리로 가는 길을 보인다
      * @param switchedTo 앞 provider 가 막혀 넘어간 경우 그 답을 만든 provider 와 모델. 넘어가지
      *     않았으면 null
      * @param attachments 이 메시지에 붙은 첨부. 지워진 것도 자리를 남기려고 담는다. 없으면 빈 목록
@@ -73,7 +73,7 @@ public final class ChatDtos {
     /**
      * 대화에 지금 도는 turn 이다. 같은 대화를 연 다른 창이 이것으로 답이 오는 중인지 안다.
      *
-     * @param executionId 그 turn 의 뿌리 실행 번호. 돌지 않거나 아직 번호가 붙기 전이면 null
+     * @param executionId 그 turn 의 루트 실행 번호. 돌지 않거나 아직 번호가 붙기 전이면 null
      * @param startedAt 그 실행이 시작한 시각. 번호가 없거나 실행 줄을 찾지 못하면 null
      */
     public record RunningTurnView(boolean running, Long executionId, Instant startedAt) {

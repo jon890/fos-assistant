@@ -7,7 +7,6 @@ import com.bifos.assistant.usage.domain.CostByAgent;
 import com.bifos.assistant.usage.domain.CostByDay;
 import com.bifos.assistant.usage.domain.CostByFingerprint;
 import com.bifos.assistant.usage.domain.CostByModel;
-import com.bifos.assistant.usage.domain.MonthlyCostDetail;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -20,8 +19,7 @@ import java.util.UUID;
  */
 public final class UsageDtos {
 
-    private UsageDtos() {
-    }
+    private UsageDtos() {}
 
     /**
      * 한 달치 환산액과 실제 청구액.
@@ -38,8 +36,7 @@ public final class UsageDtos {
             Long pricedExecutions,
             Long unpricedExecutions,
             Long actualCostMicros,
-            Long subscriptionExecutions) {
-    }
+            Long subscriptionExecutions) {}
 
     /**
      * 축 하나로 묶어 본 한 달치다.
@@ -47,8 +44,7 @@ public final class UsageDtos {
      * @param axis 어느 축으로 묶었는지
      * @param rows 묶음 줄. 축마다 정렬 기준이 다르고 그 순서대로 준다
      */
-    public record BreakdownView(String axis, String month, String currency, List<BreakdownRow> rows) {
-    }
+    public record BreakdownView(String axis, String month, String currency, List<BreakdownRow> rows) {}
 
     /**
      * 묶음 한 줄이다. 네 축이 같은 모양을 쓴다.
@@ -167,7 +163,7 @@ public final class UsageDtos {
      * 사용량 목록의 한 줄.
      *
      * @param conversationId 이 실행이 속한 대화의 공개 식별자. 대화 없이 돈 실행이면 null
-     * @param hasChildren 이 실행이 부른 실행이 있는가. 화면이 나무로 들어갈 곳을 고를 때 쓴다
+     * @param hasChildren 이 실행이 부른 실행이 있는가. 화면이 트리로 들어갈 곳을 고를 때 쓴다
      * @param retryOfExecutionId 막혀서 넘어오며 이 실행이 대신한 직전 실행. 첫 시도면 null
      * @param skillNames 이 실행에서 쓴 스킬 이름. 없으면 빈 목록
      */
@@ -209,7 +205,10 @@ public final class UsageDtos {
          * <p>{@code agent} 는 행이 없으면 null 이다. 그 줄은 에이전트 코드와 이름만 비운다.
          */
         static ExecutionView from(
-                AgentExecution execution, Agent agent, UUID conversationPublicId, boolean hasChildren,
+                AgentExecution execution,
+                Agent agent,
+                UUID conversationPublicId,
+                boolean hasChildren,
                 List<String> skillNames) {
             return new ExecutionView(
                     execution.id(),

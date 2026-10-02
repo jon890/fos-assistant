@@ -93,7 +93,7 @@ class SessionOwnerResolverTest {
     }
 
     @Test // 5
-    @DisplayName("같은 뿌리로 다음 turn 이 돌아도 등록한 session 은 처음 origin 에 남는다")
+    @DisplayName("같은 루트로 다음 turn 이 돌아도 등록한 session 은 처음 origin 에 남는다")
     void registeredSessionStaysWithFirstOriginEvenIfNextTurnRunsOnSameRoot() {
         String s1 = register(root, root);
         setStatus(dadRun, ExecutionStatus.SUCCEEDED);
@@ -186,7 +186,7 @@ class SessionOwnerResolverTest {
     }
 
     @Test
-    @DisplayName("뿌리가 끝났어도 취소가 아니면 자식 실행의 하위 에이전트는 그대로 정한다")
+    @DisplayName("루트가 끝났어도 취소가 아니면 자식 실행의 하위 에이전트는 그대로 정한다")
     void decidesChildRunSubagentAsIsWhenRootEndedButNotCancelled() {
         String childRoot = newRoot();
         AgentExecution researched = McpCallSigner.running(executions, dad.id(), CONVERSATION_ID, PROFILE, childRoot);
@@ -220,7 +220,7 @@ class SessionOwnerResolverTest {
     }
 
     @Test // 11
-    @DisplayName("등록이 없는 하위 session 은 뿌리에서 실행이 돌아도 거절한다")
+    @DisplayName("등록이 없는 하위 session 은 루트에서 실행이 돌아도 거절한다")
     void rejectsSubSessionWithoutRegistrationEvenIfRunRunsOnRoot() {
         String s9 = newChild();
 
@@ -228,7 +228,7 @@ class SessionOwnerResolverTest {
     }
 
     @Test
-    @DisplayName("등록이 없고 session 이 뿌리와 같으면 도는 실행을 찾고 없으면 거절한다")
+    @DisplayName("등록이 없고 session 이 루트와 같으면 도는 실행을 찾고 없으면 거절한다")
     void findsRunningRunWhenNoRegistrationAndSessionEqualsRootElseRejects() {
         assertOrigin(owners.resolve(PROFILE, root, root), dadRun, dad);
 
@@ -248,7 +248,7 @@ class SessionOwnerResolverTest {
     }
 
     @Test
-    @DisplayName("등록의 뿌리와 서명한 뿌리가 다르면 거절한다")
+    @DisplayName("등록의 루트와 서명한 루트가 다르면 거절한다")
     void rejectsWhenRegistrationRootDiffersFromSignedRoot() {
         String s1 = register(root, root);
         String otherRoot = newRoot();

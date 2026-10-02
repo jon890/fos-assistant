@@ -49,7 +49,7 @@ public record ChatEvent(
                 null, null);
     }
 
-    /** 이 turn 의 실행 줄이 만들어졌다. 흐름이면 뿌리 실행의 번호다. */
+    /** 이 turn 의 실행 줄이 만들어졌다. 흐름이면 루트 실행의 번호다. */
     public static ChatEvent started(UUID conversationId, Long executionId) {
         return new ChatEvent(
                 "started",

@@ -77,7 +77,7 @@ public class ExecutionRecorder {
      * @param retryOfExecutionId 지금은 늘 null 이다. provider 가 막히면 다른 모델로 넘기던 때 채우던 칸이고,
      *     넘김이 없어진 뒤로는 채우지 않는다. 그 전에 남은 실행 기록을 읽으려고 칸과 인자를 남겨 둔다
      * @param hermesSessionId 이 실행 줄에 적을 Hermes session. 제출하기 전에 적힌다. 대화 turn 은 그 대화의
-     *     뿌리 session 이라 Hermes 에 보내는 값과 다를 수 있다(ADR-031). 없으면 null 이다
+     *     루트 session 이라 Hermes 에 보내는 값과 다를 수 있다(ADR-031). 없으면 null 이다
      */
     public AgentExecution start(
             CurrentUser user,
@@ -193,7 +193,7 @@ public class ExecutionRecorder {
      * 사이 바뀐 대화의 선택이 섞인다. 보낸 effort 가 없으면 출처는 {@code UNKNOWN} 이다. 그래야 완료 뒤
      * 보완이 그 줄을 찾는다.
      *
-     * @param parent 원래 실행. 부모와 뿌리 실행 번호가 모두 이 실행이다
+     * @param parent 원래 실행. 부모와 루트 실행 번호가 모두 이 실행이다
      * @param requested 원래 실행이 Hermes 에 보낸 provider, 모델, effort. null 이면 기본값으로 본다
      */
     public AgentExecution startInheriting(
@@ -260,7 +260,7 @@ public class ExecutionRecorder {
     /**
      * 속한 대화 없이 도는 실행을 RUNNING 으로 만들어 돌려준다.
      *
-     * <p>추천 질문을 만드는 실행처럼 turn 이 아닌 실행이 쓴다. 대화, 부모, 뿌리, session 을 비우고 문맥 글자
+     * <p>추천 질문을 만드는 실행처럼 turn 이 아닌 실행이 쓴다. 대화, 부모, 루트, session 을 비우고 문맥 글자
      * 수는 0 으로 적는다. 보낸 모델 선택은 {@code requested} 로 적고, effort 가 있으면 출처는 에이전트
      * 기본값이다.
      *
@@ -282,7 +282,7 @@ public class ExecutionRecorder {
         executions.save(execution);
     }
 
-    /** Flow 뿌리에는 실행기 진입보다 앞선 원래 요청 수신 시각을 남긴다. */
+    /** Flow 루트에는 실행기 진입보다 앞선 원래 요청 수신 시각을 남긴다. */
     public void markRequestReceived(AgentExecution execution, Instant at) {
         execution.markRequestReceived(at);
         executions.save(execution);
@@ -335,7 +335,7 @@ public class ExecutionRecorder {
     /**
      * 이 번호들 중 자식을 가진 것만 낸다.
      *
-     * <p>대화 이력이 어느 답에 실행 나무로 가는 길을 붙일지 정하는 데 쓴다. 실행마다 세지 않고 한 번에
+     * <p>대화 이력이 어느 답에 실행 트리로 가는 길을 붙일지 정하는 데 쓴다. 실행마다 세지 않고 한 번에
      * 읽는다.
      */
     public List<Long> idsHavingChildren(Collection<Long> executionIds) {
