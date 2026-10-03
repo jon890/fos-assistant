@@ -253,6 +253,11 @@ httpx 한도는 client 하나를 기준으로 세므로 listener 전체의 한�
 위의 것이 모두 listener 나 프로세스 단위다.
 한 profile 이 자리를 다 쓰면 다른 profile 이 그만큼 못 쓴다.
 
+Control Plane 은 이 자리를 사용자마다 나눠 쓰게 한다. 한 사용자가 동시에 맡기는 실행을 사용자 실행 한도로 묶는다([`backend/execution-limit.md`](../backend/execution-limit.md)).
+그 한도는 Control Plane 이 제출하는 실행만 센다. native 하위 에이전트와 cron 은 세지 않는다.
+Control Plane 이 대기 시간을 넘겨 먼저 끝낸 run 은 Hermes 가 끝냈다고 답할 때까지 그 사용자의 자리로 센다.
+이 자리는 Control Plane 메모리에만 있어, Control Plane 이 다시 뜨면 그 run 이 Hermes 에서 끝나기 전이라도 세지 않는다.
+
 ## 스레드를 늘리는 비용
 
 스레드 자체는 거의 들지 않는다. 늘어나는 것은 동시에 도는 실행이 쥔 것이다.

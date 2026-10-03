@@ -38,6 +38,7 @@ frontend 는 화면의 동작과 구조이고, hermes 는 외부 런타임인 He
 | [`backend/people.md`](backend/people.md) | 관리자가 사용자를 더하는 절차 |
 | [`backend/skill.md`](backend/skill.md) | 스킬의 저장과 스킬 커맨드 전달 |
 | [`backend/turn-control.md`](backend/turn-control.md) | 응답 중 대기열, 중지, 기동할 때 남은 실행 정리 |
+| [`backend/execution-limit.md`](backend/execution-limit.md) | 사용자 한 명이 Hermes 에 동시에 맡기는 실행의 한도, 세는 실행과 세지 못하는 실행, 한도끼리의 관계, 한도에 닿을 때 |
 
 ## frontend
 
