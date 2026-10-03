@@ -251,6 +251,10 @@ public class AgentDelegationService {
         }
 
         if (!handoff.rowCreated()) {
+            if (isUserBusy(handoff.failure())) {
+                // 실행 줄을 만들기 전에 사용자 실행 한도에 닿았다(ADR-069). 모델에 가는 코드를 늘리지 않고 BUSY 로 알린다.
+                return rejected(Failure.BUSY, origin, "사용자 동시 실행 한도에 닿았다");
+            }
             if (handoff.failure() instanceof DataIntegrityViolationException) {
                 // 같은 키를 다른 요청이 먼저 저장했다. 트랜잭션 밖에서 그 줄을 다시 읽는다.
                 return executions
@@ -318,7 +322,11 @@ public class AgentDelegationService {
             log.info("같은 위임 키의 실행 줄이 먼저 저장됐다 originExecutionId={}", origin.id());
         } catch (RuntimeException ex) {
             failure = ex;
-            log.warn("위임 실행이 예외로 끝났다 originExecutionId={}", origin.id(), ex);
+            if (isUserBusy(ex)) {
+                log.info("사용자 실행 한도에 닿아 위임 실행을 시작하지 않았다 originExecutionId={}", origin.id());
+            } else {
+                log.warn("위임 실행이 예외로 끝났다 originExecutionId={}", origin.id(), ex);
+            }
         } finally {
             Long executionId = delegation.executionId();
             if (executionId != null) {
@@ -449,6 +457,10 @@ public class AgentDelegationService {
      */
     private boolean rootTurnStopped(Long rootId) {
         return turns.isStopConfirmed(rootId) || turns.shouldStopBeforeSubmit(rootId);
+    }
+
+    private static boolean isUserBusy(RuntimeException failure) {
+        return failure instanceof ApiException api && api.code() == ErrorCode.USER_BUSY;
     }
 
     /** 이유는 로그에만 남긴다. 밖으로는 실패 코드만 나간다. */

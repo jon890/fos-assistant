@@ -257,6 +257,12 @@ public class StarterSuggestionService {
                 log.warn("추천은 만들었지만 실행 줄을 끝내지 못했다 executionId={}", execution.id(), ex);
             }
         } catch (Exception ex) {
+            if (execution == null && isUserBusy(ex)) {
+                // 사용자 실행 한도에 닿아 이번에는 건너뛴다(ADR-069). 실패 시각을 적으면 자리가 빈 뒤에도 재시도 시간 동안
+                // 만들지 않는다.
+                log.info("사용자 실행 한도에 닿아 추천 질문을 건너뛴다 userId={} agentId={}", key.userId(), key.agentId());
+                return;
+            }
             if (execution != null) {
                 failQuietly(execution, errorCode(ex));
             }
@@ -386,6 +392,10 @@ public class StarterSuggestionService {
 
     private static String statusOf(HermesRunResult result) {
         return result.status() == null ? "UNKNOWN" : result.status().toUpperCase();
+    }
+
+    private static boolean isUserBusy(Exception exception) {
+        return exception instanceof ApiException api && api.code() == ErrorCode.USER_BUSY;
     }
 
     private static String errorCode(Exception exception) {

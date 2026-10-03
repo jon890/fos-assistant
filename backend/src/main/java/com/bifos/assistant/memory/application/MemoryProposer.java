@@ -88,6 +88,11 @@ public class MemoryProposer {
                     .ifPresent(proposal ->
                             memories.proposeUser(user, proposal.title(), proposal.content(), completed.id()));
         } catch (Exception ex) {
+            if (proposalExecution == null && ex instanceof ApiException api && api.code() == ErrorCode.USER_BUSY) {
+                // 사용자 실행 한도에 닿아 이번에는 건너뛴다(ADR-069). 실행 줄은 만들어지지 않았다.
+                log.info("사용자 실행 한도에 닿아 Memory 제안을 건너뛴다 parentExecutionId={}", parentExecution.id());
+                return;
+            }
             if (proposalExecution != null) {
                 executions.fail(proposalExecution, errorCode(ex));
             }

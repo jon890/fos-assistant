@@ -249,6 +249,9 @@ public class ResearchAndBuildFlow implements Flow {
      *
      * <p>지시 맨 앞에 결과물 폴더 단락을 붙인다. 파일을 실제로 만드는 쪽은 하위 실행이고 폴더는 대화마다 하나라
      * Chief 와 같은 폴더를 알린다. Chief 는 요청 본문 안에서 이미 이 단락을 받는다.
+     *
+     * <p>사용자 실행 한도에 닿아 실행 줄을 만들지 못하면 예외 대신 {@code USER_BUSY} 실패로 돌려준다(ADR-069). 나란히 도는
+     * 다른 단계가 끝날 때까지 기다린 뒤 흐름을 멈추게 하기 위해서다.
      */
     private ChildResult runChild(
             CurrentUser user,
@@ -271,6 +274,11 @@ public class ResearchAndBuildFlow implements Flow {
                     },
                     () -> shouldStop(root.id()),
                     TurnIntent.instructionFor(intent));
+        } catch (ApiException ex) {
+            if (ex.code() == ErrorCode.USER_BUSY) {
+                return ChildResult.failed(null, ErrorCode.USER_BUSY.name());
+            }
+            throw ex;
         } finally {
             cancellation.untrackRun(root.id(), submittedRunId.get());
         }
@@ -299,8 +307,17 @@ public class ResearchAndBuildFlow implements Flow {
         }
     }
 
-    /** 흐름을 멈춘다. 어느 단계가 실패했는지를 Chief 의 실행 줄에 적는다. */
+    /**
+     * 흐름을 멈춘다. 어느 단계가 실패했는지를 Chief 의 실행 줄에 적는다.
+     *
+     * <p>단계가 사용자 실행 한도로 거절됐으면 사용자에게도 {@code USER_BUSY} 를 보인다. 할 일이 진행 중인 작업이 끝난 뒤
+     * 다시 보내기라 {@code ORCHESTRATION_STEP_FAILED} 와 다르다.
+     */
     private ApiException stop(AgentExecution root, String errorCode) {
+        if (ErrorCode.USER_BUSY.name().equals(errorCode)) {
+            executions.fail(root, ErrorCode.USER_BUSY.name());
+            return new ApiException(ErrorCode.USER_BUSY, "a step of the flow hit the user execution limit");
+        }
         executions.fail(root, errorCode == null ? ErrorCode.ORCHESTRATION_STEP_FAILED.name() : errorCode);
         return new ApiException(ErrorCode.ORCHESTRATION_STEP_FAILED, "a step of the flow failed");
     }
