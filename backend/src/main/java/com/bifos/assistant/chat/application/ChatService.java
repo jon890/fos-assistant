@@ -827,6 +827,14 @@ public class ChatService {
         try {
             return hermes.awaitCompletion(pending.command(), runId);
         } catch (ApiException ex) {
+            // Hermes 에서 끝났는지 모르는 run 은 끝날 때까지 사용자 자리를 쥔다(ADR-069).
+            limiter.holdUntilRemoteEnds(
+                    pending.user().id(),
+                    pending.execution().id(),
+                    pending.command().apiBaseUrl(),
+                    pending.command().profileName(),
+                    runId,
+                    false);
             executions.fail(pending.execution(), ex.code().name());
             append(pending, ExecutionEventType.RUN_FAILED, ex.code().name());
             throw ex;

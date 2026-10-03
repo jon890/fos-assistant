@@ -11,6 +11,7 @@ import com.bifos.assistant.hermes.HermesRunsClient;
 import com.bifos.assistant.hermes.dto.HermesRunLookup;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
+import com.bifos.assistant.usage.application.UserExecutionLimiter;
 import com.bifos.assistant.usage.domain.AgentExecution;
 import com.bifos.assistant.usage.domain.type.ExecutionStatus;
 import com.bifos.assistant.usage.infra.AgentExecutionRepository;
@@ -81,6 +82,7 @@ public class RestartReconciler implements SmartLifecycle {
     private final Clock clock;
     private final ConversationRepository conversations;
     private final ConversationEventHub hub;
+    private final UserExecutionLimiter limiter;
 
     /** 잡았지만 아직 묻기 시작하지 않은 줄이다. 실행 번호가 열쇠다. {@code this} 로 지킨다. */
     private final Map<Long, Claimed> pending = new LinkedHashMap<>();
@@ -457,6 +459,9 @@ public class RestartReconciler implements SmartLifecycle {
     private void giveUp(Agent agent, AgentExecution row, boolean reached, boolean finished) {
         if (!finished) {
             sendStop(agent, row);
+            // Hermes 에서 끝났는지 모르는 run 은 끝날 때까지 사용자 자리를 쥔다(ADR-069).
+            limiter.holdUntilRemoteEnds(
+                    row.userId(), row.id(), agent.apiBaseUrl(), row.profileName(), row.hermesRunId(), true);
         }
         try {
             recorder.failWithout(row.id(), reached ? RECONCILE_TIMEOUT : RECONCILE_UNREACHABLE);

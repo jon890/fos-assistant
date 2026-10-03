@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
 
+import com.bifos.assistant.hermes.HermesProperties;
 import com.bifos.assistant.hermes.HermesRunsClient;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
@@ -266,7 +267,10 @@ class TurnCancellationTest {
 
     private static UserExecutionLimiter limiter(int maxRunning) {
         return new UserExecutionLimiter(
-                new UserExecutionProperties(maxRunning, 0, null), mock(AgentExecutionRepository.class));
+                new UserExecutionProperties(maxRunning, 0, null),
+                mock(AgentExecutionRepository.class),
+                mock(HermesRunsClient.class),
+                new HermesProperties(null, null, null, null, null, null, null, null));
     }
 
     private static TurnCancellation turnsWith(UserExecutionLimiter limiter) {

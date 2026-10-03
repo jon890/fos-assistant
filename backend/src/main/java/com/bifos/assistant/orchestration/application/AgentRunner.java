@@ -18,6 +18,7 @@ import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.usage.application.ExecutionContextSnapshot;
 import com.bifos.assistant.usage.application.ExecutionEventRecorder;
 import com.bifos.assistant.usage.application.ExecutionRecorder;
+import com.bifos.assistant.usage.application.UserExecutionLimiter;
 import com.bifos.assistant.usage.domain.AgentExecution;
 import com.bifos.assistant.usage.domain.DelegationKey;
 import com.bifos.assistant.usage.domain.ExecutionEvent;
@@ -64,6 +65,7 @@ public class AgentRunner {
     private final DelegationOutput delegationOutput;
     private final ModelTierService modelTiers;
     private final Clock clock;
+    private final UserExecutionLimiter limiter;
 
     /**
      * 실행 하나를 끝까지 돌린다.
@@ -201,6 +203,9 @@ public class AgentRunner {
             if (runId != null) {
                 // 제출은 됐다. 실행 줄을 FAILED 로 적은 뒤에도 Hermes 에서 돌지 않게 멈춘다.
                 stopSubmitted(agent, execution, runId);
+                // Hermes 에서 끝났는지 모르는 run 은 끝날 때까지 사용자 자리를 쥔다(ADR-069).
+                limiter.holdUntilRemoteEnds(
+                        user.id(), execution.id(), agent.apiBaseUrl(), agent.hermesProfile(), runId, true);
             }
             return fail(execution, ex, 1);
         }
@@ -209,6 +214,9 @@ public class AgentRunner {
         try {
             result = hermes.awaitCompletion(command, runId);
         } catch (RuntimeException ex) {
+            // Hermes 에서 끝났는지 모르는 run 은 끝날 때까지 사용자 자리를 쥔다(ADR-069).
+            limiter.holdUntilRemoteEnds(
+                    user.id(), execution.id(), agent.apiBaseUrl(), agent.hermesProfile(), runId, false);
             if (cancelled.getAsBoolean()) {
                 AgentExecution cancelledExecution = executions.cancel(execution);
                 append(cancelledExecution, ExecutionEventType.RUN_CANCELLED, null, 2);

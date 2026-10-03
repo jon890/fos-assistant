@@ -32,6 +32,7 @@ import com.bifos.assistant.chat.presentation.ChatController;
 import com.bifos.assistant.chat.presentation.ChatEventStreams;
 import com.bifos.assistant.hermes.HermesRunsClient;
 import com.bifos.assistant.hermes.StubHermesRunsClient;
+import com.bifos.assistant.hermes.dto.HermesRunLookup;
 import com.bifos.assistant.hermes.dto.HermesRunResult;
 import com.bifos.assistant.hermes.dto.TokenUsage;
 import com.bifos.assistant.memory.infra.MemoryRepository;
@@ -62,6 +63,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import java.util.function.BooleanSupplier;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -327,6 +329,38 @@ class UserExecutionLimitChatTest {
         assertThat(stub().received()).as("Hermes 제출").isEmpty();
     }
 
+    @Test
+    @DisplayName("기다리다 시간 초과로 끝난 turn 은 FAILED 로 적고, Hermes 가 끝났다고 답할 때까지 사용자 자리 하나를 쥔다")
+    void timedOutTurnHoldsUserSlotUntilHermesReportsFinished() {
+        Conversation conversation = chat.startEmpty(dad, "dad");
+        String runId = "run-timeout-" + UUID.randomUUID();
+        stub().willAnswer(command -> completed(runId, "받지 못할 답"));
+        stub().willLookup(runId, HermesRunLookup.running());
+        // 제출은 성공하고 기다리기만 시간 초과로 끝나게 한다.
+        stub().beforeAwait(() -> {
+            throw new ApiException(ErrorCode.HERMES_RUN_TIMEOUT, "the agent run did not finish in time");
+        });
+
+        assertThatThrownBy(() -> chat.send(dad, conversation.id(), "오래 걸리는 질문", null))
+                .isInstanceOfSatisfying(
+                        ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.HERMES_RUN_TIMEOUT));
+
+        assertThat(executionsIn(conversation))
+                .as("시간 초과로 끝난 실행 줄")
+                .singleElement()
+                .satisfies(row -> {
+                    assertThat(row.status()).isEqualTo(ExecutionStatus.FAILED);
+                    assertThat(row.errorCode()).isEqualTo(ErrorCode.HERMES_RUN_TIMEOUT.name());
+                    assertThat(row.hermesRunId()).isEqualTo(runId);
+                });
+        assertThat(limiter.used(dad.id())).as("turn 이 끝난 뒤 원격 종료 확인 자리").isEqualTo(1);
+
+        stub().willLookup(runId, HermesRunLookup.finished(completed(runId, "늦게 끝난 답")));
+
+        awaitUntil(() -> limiter.used(dad.id()) == 0, "Hermes 가 끝났다고 답한 뒤에도 dad 의 자리가 돌아오지 않았다");
+        assertThat(stub().stopped()).as("끝났는지 모르는 run 에 보낸 중지").containsExactly(runId);
+    }
+
     /** dad 의 두 대화에서 turn 을 하나씩 열어 제출에서 붙잡는다. 돌려주는 것은 붙잡은 표지다. */
     private List<String> holdTwoTurns() {
         List<String> marks = new ArrayList<>();
@@ -410,6 +444,21 @@ class UserExecutionLimitChatTest {
 
     private static HermesRunResult completed(String runId, String output) {
         return HermesRunResult.of(runId, "session", "completed", output, "model", "provider", TokenUsage.empty());
+    }
+
+    private static void awaitUntil(BooleanSupplier condition, String failure) {
+        long deadline = System.nanoTime() + WAIT_LIMIT.toNanos();
+        while (!condition.getAsBoolean()) {
+            if (System.nanoTime() - deadline > 0) {
+                throw new AssertionError(failure + " (" + WAIT_LIMIT + " 동안 기다렸다)");
+            }
+            try {
+                Thread.sleep(10);
+            } catch (InterruptedException ex) {
+                Thread.currentThread().interrupt();
+                throw new IllegalStateException(ex);
+            }
+        }
     }
 
     private static void await(CountDownLatch latch) {

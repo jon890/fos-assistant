@@ -175,6 +175,7 @@ class UserExecutionLimitBackgroundTest {
                 recorder,
                 modelTiers,
                 objectMapper,
+                limiter,
                 Clock.fixed(Instant.parse("2026-01-01T00:00:00Z"), ZoneOffset.UTC),
                 executor);
         heldTurn = turns.open(dad.id(), conversation.id());

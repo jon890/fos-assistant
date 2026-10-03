@@ -36,6 +36,7 @@ import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.usage.application.ExecutionRecorder;
+import com.bifos.assistant.usage.application.UserExecutionLimiter;
 import com.bifos.assistant.usage.domain.CatalogPrice;
 import com.bifos.assistant.usage.domain.ModelPrice;
 import com.bifos.assistant.usage.domain.PriceCatalog;
@@ -132,6 +133,9 @@ class StarterSuggestionServiceTest {
     @Autowired
     ObjectMapper objectMapper;
 
+    @Autowired
+    UserExecutionLimiter limiter;
+
     @MockitoBean
     PriceCatalog prices;
 
@@ -166,6 +170,7 @@ class StarterSuggestionServiceTest {
                 executions,
                 modelTiers,
                 objectMapper,
+                limiter,
                 clock,
                 executor);
     }
@@ -269,6 +274,7 @@ class StarterSuggestionServiceTest {
                 executions,
                 rejecting,
                 objectMapper,
+                limiter,
                 clock,
                 executor);
         answerWith(json(FOUR));
@@ -392,6 +398,7 @@ class StarterSuggestionServiceTest {
                 failingRecorder,
                 modelTiers,
                 objectMapper,
+                limiter,
                 clock,
                 executor);
         answerWith(json(FOUR));

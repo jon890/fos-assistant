@@ -2,6 +2,7 @@ package com.bifos.assistant.orchestration;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
@@ -32,6 +33,7 @@ import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.usage.application.ExecutionEventRecorder;
 import com.bifos.assistant.usage.application.ExecutionRecorder;
+import com.bifos.assistant.usage.application.UserExecutionLimiter;
 import com.bifos.assistant.usage.domain.AgentExecution;
 import com.bifos.assistant.usage.domain.type.ExecutionStatus;
 import com.bifos.assistant.usage.infra.ExecutionEventRepository;
@@ -57,6 +59,7 @@ class AgentRunnerSubmitFailureTest {
     private final HermesRunsClient hermes = mock(HermesRunsClient.class);
     private final ExecutionRecorder executions = mock(ExecutionRecorder.class);
     private final ModelTierService modelTiers = mock(ModelTierService.class);
+    private final UserExecutionLimiter limiter = mock(UserExecutionLimiter.class);
     private final CurrentUser user = new CurrentUser(1L, "runner@example.com", "가", 1L, UserRole.MEMBER);
     private final Agent agent = Agent.of(
             "runner",
@@ -91,7 +94,8 @@ class AgentRunnerSubmitFailureTest {
                 mock(ExecutionEventRepository.class),
                 new DelegationOutput(new DelegationProperties(2, 4, 16, Duration.ofSeconds(30), 100)),
                 modelTiers,
-                Clock.systemUTC());
+                Clock.systemUTC(),
+                limiter);
     }
 
     @Test
@@ -103,6 +107,7 @@ class AgentRunnerSubmitFailureTest {
         AgentRun run = run();
 
         verify(hermes).stop(API_BASE_URL, PROFILE, RUN_ID);
+        verify(limiter).holdUntilRemoteEnds(user.id(), started.id(), API_BASE_URL, PROFILE, RUN_ID, true);
         verify(executions).fail(started, "ORCHESTRATION_STEP_FAILED");
         assertThat(run.execution()).isSameAs(failed);
         assertThat(run.result().succeeded()).isFalse();
@@ -131,8 +136,23 @@ class AgentRunnerSubmitFailureTest {
         AgentRun run = run();
 
         verify(hermes, never()).stop(any(), any(), any());
+        verify(limiter, never()).holdUntilRemoteEnds(any(), any(), any(), any(), any(), anyBoolean());
         verify(executions).fail(started, "ORCHESTRATION_STEP_FAILED");
         assertThat(run.result().succeeded()).isFalse();
+    }
+
+    @Test
+    @DisplayName("기다리다 시간 초과로 끝나면 중지를 아직 보내지 않은 run 으로 사용자 자리를 쥐고 FAILED 로 끝낸다")
+    void holdsUserSlotWithoutStopWhenAwaitTimesOut() {
+        when(hermes.submit(any())).thenReturn(RUN_ID);
+        when(hermes.awaitCompletion(any(), eq(RUN_ID)))
+                .thenThrow(new ApiException(ErrorCode.HERMES_RUN_TIMEOUT, "the agent run did not finish in time"));
+
+        AgentRun run = run();
+
+        verify(limiter).holdUntilRemoteEnds(user.id(), started.id(), API_BASE_URL, PROFILE, RUN_ID, false);
+        verify(executions).fail(started, ErrorCode.HERMES_RUN_TIMEOUT.name());
+        assertThat(run.result().errorCode()).isEqualTo(ErrorCode.HERMES_RUN_TIMEOUT.name());
     }
 
     @Test

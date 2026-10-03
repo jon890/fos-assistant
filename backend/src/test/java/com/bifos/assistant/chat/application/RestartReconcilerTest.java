@@ -33,6 +33,7 @@ import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
+import com.bifos.assistant.usage.application.UserExecutionLimiter;
 import com.bifos.assistant.usage.domain.AgentExecution;
 import com.bifos.assistant.usage.domain.ExecutionEvent;
 import com.bifos.assistant.usage.domain.type.ExecutionEventType;
@@ -72,7 +73,13 @@ import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
  * <p>테스트 profile 은 기동 때 자동으로 돌지 않게 꺼 두었으므로 잡기와 묻기를 직접 부른다. 실행 줄은 이전 프로세스가
  * 남긴 것처럼 저장소로 직접 만든다. 묻기는 가상 스레드에서 돌므로 결과는 기다려 읽는다.
  */
-@SpringBootTest(properties = "assistant.delegation-wake.enabled=true")
+@SpringBootTest(
+        properties = {
+            "assistant.delegation-wake.enabled=true",
+            // 상한을 넘겨 FAILED 로 적은 줄의 사용자 자리가 남아 있는 것을 볼 동안 돌려주지 않게 길게 둔다.
+            // 그 자리를 남기는 검사는 끝나기 전에 그 run 을 모른다고 답하게 해 돌려받는다.
+            "assistant.user-execution.remote-end-max-wait=30s"
+        })
 @ActiveProfiles("test")
 @Import(RestartReconcilerTest.StubRuntime.class)
 class RestartReconcilerTest {
@@ -174,6 +181,9 @@ class RestartReconcilerTest {
 
     @Autowired
     MemoryRepository memories;
+
+    @Autowired
+    UserExecutionLimiter limiter;
 
     private CurrentUser dad;
     private Agent chief;
@@ -355,6 +365,7 @@ class RestartReconcilerTest {
         assertThat(saved.errorCode()).isEqualTo("RECONCILE_TIMEOUT");
         assertThat(stub.stopped()).containsExactly(row.hermesRunId());
         awaitIdle(conversation.id());
+        releaseRemoteEndHold(row);
     }
 
     @Test
@@ -370,6 +381,30 @@ class RestartReconcilerTest {
         AgentExecution saved = awaitStatus(row, ExecutionStatus.FAILED);
         assertThat(saved.errorCode()).isEqualTo("RECONCILE_UNREACHABLE");
         awaitIdle(conversation.id());
+        releaseRemoteEndHold(row);
+    }
+
+    @Test
+    @DisplayName("상한을 넘겨 FAILED 로 적은 줄의 사용자 자리는 Hermes 가 그 run 을 모른다고 답할 때까지 남고, 중지는 한 번만 간다")
+    void keepsUserSlotAfterGiveUpUntilHermesForgetsRun() {
+        AgentExecution row = chatTurn(conversation, chief);
+        stub.willLookup(row.hermesRunId(), HermesRunLookup.running());
+
+        reconciler.claim();
+        reconciler.reconcile(SHORT_WAIT);
+
+        AgentExecution saved = awaitStatus(row, ExecutionStatus.FAILED);
+        assertThat(saved.errorCode()).isEqualTo("RECONCILE_TIMEOUT");
+        awaitIdle(conversation.id());
+        // 기동 정리는 상한을 넘긴 뒤 더 묻지 않는다. 그 뒤의 조회는 원격 종료 확인이 한 것이다.
+        long askedByReconciler = lookupsOf(row);
+        awaitLookups(row, Math.toIntExact(askedByReconciler + 2));
+        assertThat(limiter.used(dad.id())).as("turn 잠금을 푼 뒤 남은 원격 종료 확인 자리").isEqualTo(1);
+
+        stub.willLookup(row.hermesRunId(), HermesRunLookup.notFound());
+
+        awaitUntil(() -> limiter.used(dad.id()) == 0, "Hermes 가 모른다고 답한 뒤에도 dad 의 자리가 돌아오지 않았다");
+        assertThat(stub.stopped()).as("기동 정리가 보낸 중지 하나뿐이다").containsExactly(row.hermesRunId());
     }
 
     @Test
@@ -888,6 +923,22 @@ class RestartReconcilerTest {
         return messages.findByConversationIdOrderByIdAsc(conversation.id()).stream()
                 .filter(message -> message.role() == MessageRole.SYSTEM)
                 .toList();
+    }
+
+    /**
+     * 상한을 넘겨 FAILED 로 적은 줄의 원격 종료 확인 자리를 돌려받는다.
+     *
+     * <p>그 run 을 모른다고 답하게 하고 자리가 돌아올 때까지 기다린다. 확인 스레드가 검사 뒤까지 남아 다음 검사의 조회 기록에
+     * 섞이지 않게 한다.
+     */
+    private void releaseRemoteEndHold(AgentExecution row) {
+        stub.willFailLookup(row.hermesRunId(), new ApiException(ErrorCode.HERMES_UNAVAILABLE, "hermes is down"), 0);
+        stub.willLookup(row.hermesRunId(), HermesRunLookup.notFound());
+        awaitUntil(() -> limiter.used(dad.id()) == 0, "run " + row.hermesRunId() + " 의 원격 종료 확인 자리가 돌아오지 않았다");
+    }
+
+    private long lookupsOf(AgentExecution row) {
+        return stub.lookups().stream().filter(row.hermesRunId()::equals).count();
     }
 
     /** 그 run 을 적어도 {@code count} 번 물을 때까지 기다린다. 되풀이해 묻고 있다는 것을 본 뒤에 단언하려고 쓴다. */

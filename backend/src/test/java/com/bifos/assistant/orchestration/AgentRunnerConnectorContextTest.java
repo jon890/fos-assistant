@@ -35,6 +35,7 @@ import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.usage.application.ExecutionContextSnapshot;
 import com.bifos.assistant.usage.application.ExecutionEventRecorder;
 import com.bifos.assistant.usage.application.ExecutionRecorder;
+import com.bifos.assistant.usage.application.UserExecutionLimiter;
 import com.bifos.assistant.usage.domain.AgentExecution;
 import com.bifos.assistant.usage.domain.DelegationKey;
 import com.bifos.assistant.usage.infra.ExecutionEventRepository;
@@ -93,7 +94,8 @@ class AgentRunnerConnectorContextTest {
                 mock(ExecutionEventRepository.class),
                 new DelegationOutput(new DelegationProperties(2, 4, 16, Duration.ofSeconds(30), 100)),
                 modelTiers,
-                Clock.fixed(REQUEST_RECEIVED_AT, ZoneOffset.UTC));
+                Clock.fixed(REQUEST_RECEIVED_AT, ZoneOffset.UTC),
+                mock(UserExecutionLimiter.class));
     }
 
     @Test
