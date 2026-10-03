@@ -214,13 +214,15 @@ public class DelegationWakeService {
      * 사용자 실행 한도로 거절된 대화의 재시도를 예약한다.
      *
      * <p>실패 시각을 적어 그 사이 다른 계기가 곧바로 다시 열지 않게 한다. 연속 거절이 {@link #MAX_BUSY_RETRIES} 를 넘으면
-     * 예약하지 않는다. 예약하지 못해도 예외를 올리지 않는다. 기존 계기가 다시 시도한다.
+     * 예약하지 않고 센 횟수를 지운다. 그 뒤 다른 계기로 다시 거절되면 새로 10번까지 예약한다. 예약하지 못해도 예외를 올리지 않는다. 기존 계기가 다시 시도한다.
      */
     private void retryLaterAfterUserBusy(Long conversationId) {
         Instant now = Instant.now(clock);
         lastFailures.put(conversationId, now);
         int retries = busyRetries.merge(conversationId, 1, Integer::sum);
         if (retries > MAX_BUSY_RETRIES) {
+            // 센 횟수를 지운다. 남겨 두면 나중에 다른 계기로 다시 거절될 때 재시도를 한 번도 걸지 못한다.
+            busyRetries.remove(conversationId);
             log.info("사용자 실행 한도로 자동 turn 이 연달아 거절돼 더 예약하지 않는다 conversationId={} retries={}", conversationId, retries);
             return;
         }
