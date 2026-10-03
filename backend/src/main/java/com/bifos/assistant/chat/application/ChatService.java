@@ -37,6 +37,7 @@ import com.bifos.assistant.usage.application.ExecutionDeliveryWriter;
 import com.bifos.assistant.usage.application.ExecutionEventRecorder;
 import com.bifos.assistant.usage.application.ExecutionRecorder;
 import com.bifos.assistant.usage.application.InternalValuePolicy;
+import com.bifos.assistant.usage.application.UserExecutionLimiter;
 import com.bifos.assistant.usage.domain.AgentExecution;
 import com.bifos.assistant.usage.domain.ExecutionEvent;
 import com.bifos.assistant.usage.domain.type.ExecutionEventType;
@@ -113,6 +114,7 @@ public class ChatService {
     private final Clock clock;
     private final ChatPendingMessageRepository pendingMessages;
     private final List<AutoTurnResultSource> resultSources;
+    private final UserExecutionLimiter limiter;
 
     public ChatTurn send(CurrentUser user, Long conversationId, String text, String agentCode) {
         return send(user, conversationId, text, agentCode, List.of());
@@ -147,7 +149,7 @@ public class ChatService {
         Routed routed = route(user, conversationId, text, agentCode, attachmentIds);
         // 잠금을 닫으면 닫기 리스너가 맡긴 일의 결과로 자동 turn 을 연다. 이 turn 의 done 이나 stopped 를 보낸 뒤에
         // 닫아야 클라이언트가 이 turn 의 끝을 자동 turn 의 시작보다 먼저 받는다.
-        TurnHandle handle = turns.open(user.id(), routed.conversation().id());
+        TurnHandle handle = openTurn(user, routed);
         try {
             if (routed.flow() != null) {
                 runFlow(user, routed, text, new TurnIntent.Fresh(), onEvent, true, handle);
@@ -440,7 +442,7 @@ public class ChatService {
         Conversation conversation = routed.conversation();
         List<Long> attachmentIds =
                 routed.attached().stream().map(ChatAttachment::id).toList();
-        TurnHandle handle = existingHandle == null ? turns.open(user.id(), conversation.id()) : existingHandle;
+        TurnHandle handle = existingHandle == null ? openTurn(user, routed) : existingHandle;
         boolean closesHandle = existingHandle == null;
         try {
             saveQuestion(user, conversation, text, attachmentIds, intent, onEvent);
@@ -548,7 +550,7 @@ public class ChatService {
             boolean streaming,
             TurnHandle existingHandle) {
         Conversation conversation = routed.conversation();
-        TurnHandle handle = existingHandle == null ? turns.open(user.id(), conversation.id()) : existingHandle;
+        TurnHandle handle = existingHandle == null ? openTurn(user, routed) : existingHandle;
         boolean closesHandle = existingHandle == null;
         try {
             if (intent instanceof TurnIntent.Fresh) {
@@ -628,6 +630,9 @@ public class ChatService {
      * <p>에이전트를 새 대화를 저장하기 전에 정한다. 새 대화는 {@code agentCode} 의 에이전트, 이어 쓰는 대화는
      * 그 대화의 에이전트다. 스킬 커맨드의 이름이 그 에이전트의 켜진 스킬이 아니면 대화를 만들기 전에
      * {@code SKILL_COMMAND_UNKNOWN} 으로 거절한다. 거절한 커맨드는 대화도 메시지도 실행도 남기지 않는다.
+     *
+     * <p>새 대화를 저장하기 전에 사용자 자리가 남았는지 본다(ADR-069). 없으면 {@code USER_BUSY} 로 거절하고 아무것도
+     * 저장하지 않는다. 그대로 저장하면 거절된 요청마다 그 글을 제목으로 한 빈 대화가 목록에 남는다.
      */
     private Routed route(
             CurrentUser user, Long conversationId, String text, String agentCode, List<Long> attachmentIds) {
@@ -652,11 +657,40 @@ public class ChatService {
         }
         Flow flow = flows.find(agent.flow());
         SkillCommand command = commandOf(agent, flow, text);
+        if (existing == null && !limiter.hasTurnRoom(user.id())) {
+            throw new ApiException(ErrorCode.USER_BUSY, "this user has reached the concurrent execution limit");
+        }
         Conversation conversation = existing != null
                 ? existing
                 : conversations.save(Conversation.startedBy(user.id(), titleFrom(text), agent.id(), clock.instant()));
         List<ChatAttachment> attached = attachments.requireAttachable(conversation.id(), attachmentIds);
-        return new Routed(conversation, agent, flow, attached, command, requestReceivedAt);
+        return new Routed(conversation, agent, flow, attached, command, requestReceivedAt, existing == null);
+    }
+
+    /**
+     * 그 대화의 turn 잠금과 사용자 자리를 얻는다.
+     *
+     * <p>{@link #route} 가 새 대화를 저장하기 전에 자리를 보았지만, 그 사이 다른 요청이 자리를 채우면 여기서
+     * {@code USER_BUSY} 가 난다. 그때 방금 만든 빈 대화를 지우고 다시 던진다. 지우다 실패하면 경고 로그만 남기고 원래
+     * 예외를 던진다.
+     */
+    private TurnHandle openTurn(CurrentUser user, Routed routed) {
+        try {
+            return turns.open(user.id(), routed.conversation().id());
+        } catch (ApiException ex) {
+            if (ex.code() == ErrorCode.USER_BUSY && routed.created()) {
+                deleteCreatedConversation(routed.conversation().id());
+            }
+            throw ex;
+        }
+    }
+
+    private void deleteCreatedConversation(Long conversationId) {
+        try {
+            conversations.deleteById(conversationId);
+        } catch (RuntimeException ex) {
+            log.warn("사용자 실행 한도로 거절한 요청의 빈 대화를 지우지 못했다 conversationId={}", conversationId, ex);
+        }
     }
 
     /**
@@ -793,6 +827,14 @@ public class ChatService {
         try {
             return hermes.awaitCompletion(pending.command(), runId);
         } catch (ApiException ex) {
+            // Hermes 에서 끝났는지 모르는 run 은 끝날 때까지 사용자 자리를 쥔다(ADR-069).
+            limiter.holdUntilRemoteEnds(
+                    pending.user().id(),
+                    pending.execution().id(),
+                    pending.command().apiBaseUrl(),
+                    pending.command().profileName(),
+                    runId,
+                    false);
             executions.fail(pending.execution(), ex.code().name());
             append(pending, ExecutionEventType.RUN_FAILED, ex.code().name());
             throw ex;
@@ -934,7 +976,8 @@ public class ChatService {
             throw new ApiException(ErrorCode.AGENT_DISABLED, "this agent is disabled");
         }
         Flow flow = flows.find(agent.flow());
-        return new Routed(conversation, agent, flow, attached, commandOf(agent, flow, question), requestReceivedAt);
+        return new Routed(
+                conversation, agent, flow, attached, commandOf(agent, flow, question), requestReceivedAt, false);
     }
 
     private void saveQuestion(
@@ -1450,6 +1493,7 @@ public class ChatService {
      * 이 turn 이 어느 대화와 에이전트의 것인지, 그리고 어느 흐름으로 갈지. 흐름이 없으면 null 이다.
      * {@code attached} 는 판정을 통과해 이 메시지에 묶을 첨부이고 없으면 빈 목록이다.
      * {@code command} 는 이름을 확인한 스킬 커맨드이고 커맨드가 아니면 null 이다.
+     * {@code created} 는 이 요청이 새로 만든 대화인지다.
      */
     private record Routed(
             Conversation conversation,
@@ -1457,5 +1501,6 @@ public class ChatService {
             Flow flow,
             List<ChatAttachment> attached,
             SkillCommand command,
-            Instant requestReceivedAt) {}
+            Instant requestReceivedAt,
+            boolean created) {}
 }

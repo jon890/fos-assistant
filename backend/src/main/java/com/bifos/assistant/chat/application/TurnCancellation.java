@@ -3,6 +3,8 @@ package com.bifos.assistant.chat.application;
 import com.bifos.assistant.hermes.HermesRunsClient;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
+import com.bifos.assistant.usage.application.TurnSlot;
+import com.bifos.assistant.usage.application.UserExecutionLimiter;
 import jakarta.annotation.PreDestroy;
 import java.io.Closeable;
 import java.time.Duration;
@@ -32,19 +34,71 @@ public class TurnCancellation {
     private final ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
     private final Duration streamGrace;
     private final List<Consumer<TurnClosed>> closeListeners = new CopyOnWriteArrayList<>();
+    private final UserExecutionLimiter limiter;
 
     public TurnCancellation(
-            HermesRunsClient hermes, @Value("${assistant.chat.stop-stream-grace:10s}") Duration streamGrace) {
+            HermesRunsClient hermes,
+            @Value("${assistant.chat.stop-stream-grace:10s}") Duration streamGrace,
+            UserExecutionLimiter limiter) {
         this.hermes = hermes;
         this.streamGrace = streamGrace;
+        this.limiter = limiter;
     }
 
+    /**
+     * 대화 잠금을 잡고 그 turn 의 사용자 자리를 얻는다(ADR-069).
+     *
+     * <p>{@code CONVERSATION_BUSY} 를 {@code USER_BUSY} 보다 먼저 본다. 화면은 {@code CONVERSATION_BUSY} 를 받으면 대기
+     * 메시지로 넣는다. 자리를 먼저 얻고 잠금을 잡는다. 잠금을 잡았다가 되돌리면 닫기 리스너가 불리지 않아, 그 사이
+     * {@code CONVERSATION_BUSY} 를 받고 닫힐 때 다시 오기로 한 깨우기가 다음 계기까지 미뤄진다.
+     *
+     * <p>자리를 얻지 못하면 대화 잠금을 한 번 더 본다. 같은 대화를 함께 연 다른 요청이 그 사이 잠금을 잡았으면 그 자리 때문에
+     * 진 것이므로 {@code CONVERSATION_BUSY} 로 바꿔 던진다. 진 쪽이 대기 메시지로 들어가게 하려는 것이다.
+     *
+     * @throws ApiException {@code CONVERSATION_BUSY}. 그 대화에 도는 turn 이 있다. {@code USER_BUSY}. 그 사용자가 동시 실행
+     *     한도를 모두 쓰고 있다. 둘 다 잠금과 자리를 남기지 않는다
+     */
     public TurnHandle open(Long userId, Long conversationId) {
+        if (byConversation.containsKey(conversationId)) {
+            throw conversationBusy();
+        }
+        TurnSlot slot;
+        try {
+            slot = limiter.acquireTurn(userId);
+        } catch (ApiException ex) {
+            if (ex.code() == ErrorCode.USER_BUSY && byConversation.containsKey(conversationId)) {
+                throw conversationBusy();
+            }
+            throw ex;
+        }
+        return lock(userId, conversationId, slot);
+    }
+
+    /**
+     * {@link #open} 과 같되 사용자 한도를 보지 않고 자리를 얻는다.
+     *
+     * <p>기동 정리 전용이다. 이미 Hermes 에서 도는 turn 이라 거절할 수 없다.
+     */
+    public TurnHandle openRecovered(Long userId, Long conversationId) {
+        if (byConversation.containsKey(conversationId)) {
+            throw conversationBusy();
+        }
+        return lock(userId, conversationId, limiter.acquireRecoveredTurn(userId));
+    }
+
+    /** 얻은 자리를 쥔 채 대화 잠금을 잡는다. 그 사이 다른 turn 이 잡았으면 자리를 돌려주고 거절한다. */
+    private TurnHandle lock(Long userId, Long conversationId, TurnSlot slot) {
         TurnHandle handle = new TurnHandle(userId, conversationId);
+        handle.slot = slot;
         if (byConversation.putIfAbsent(conversationId, handle) != null) {
-            throw new ApiException(ErrorCode.CONVERSATION_BUSY, "this conversation already has a running turn");
+            slot.release();
+            throw conversationBusy();
         }
         return handle;
+    }
+
+    private static ApiException conversationBusy() {
+        return new ApiException(ErrorCode.CONVERSATION_BUSY, "this conversation already has a running turn");
     }
 
     /**
@@ -110,6 +164,11 @@ public class TurnCancellation {
         boolean removed = byConversation.remove(handle.conversationId, handle);
         if (handle.executionId != null) {
             byExecution.remove(handle.executionId, handle);
+        }
+        // 닫기 리스너가 다음 turn 을 열 때 자리가 돌아와 있어야 한다. 자리는 처음 한 번만 돌아간다.
+        TurnSlot slot = handle.slot;
+        if (slot != null) {
+            slot.release();
         }
         // 실행 번호가 붙기 전에 중지한 turn 은 새 run 없이 끝날 수 있다. 이 경우 중지 요청은
         // 성공으로 끝난 것이며, 이미 끝난 turn 과 구분해야 한다.

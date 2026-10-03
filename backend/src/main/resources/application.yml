@@ -84,6 +84,13 @@ assistant:
     submit-timeout: 30s
     # 실행 줄에 적는 위임 답의 길이 상한. 넘으면 자르고 잘렸다는 한 줄을 붙인다
     output-max-chars: 100000
+  user-execution:
+    # 한 사용자가 Hermes 에 동시에 맡길 수 있는 실행 수. turn 자리와 RUNNING 실행 줄의 합이다(ADR-069)
+    max-running: 4
+    # 추천 질문과 Memory 제안이 돈 뒤에도 남겨 둘 사용자 자리 수
+    background-reserve: 1
+    # Hermes 에서 끝났는지 모르는 run 의 자리를 쥐는 상한. 비우면 hermes.run-timeout 과 같다
+    remote-end-max-wait: ${ASSISTANT_USER_EXECUTION_REMOTE_END_MAX_WAIT:}
   connector:
     # 한 사용자가 동시에 돌릴 수 있는 선택지 조회, 등록, 연결 확인 수
     max-concurrent-calls: 1

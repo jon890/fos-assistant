@@ -32,6 +32,7 @@ import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.usage.application.ExecutionContextSnapshot;
 import com.bifos.assistant.usage.application.ExecutionEventRecorder;
 import com.bifos.assistant.usage.application.ExecutionRecorder;
+import com.bifos.assistant.usage.application.UserExecutionLimiter;
 import com.bifos.assistant.usage.domain.AgentExecution;
 import com.bifos.assistant.usage.domain.CatalogPrice;
 import com.bifos.assistant.usage.domain.ModelPrice;
@@ -441,7 +442,8 @@ class MemoryProposerTest {
                 failingRecorder,
                 mock(ExecutionEventRecorder.class),
                 mock(ExecutionEventRepository.class),
-                new ObjectMapper());
+                new ObjectMapper(),
+                mock(UserExecutionLimiter.class));
         AgentExecution parent = recorder.start(USER, conversation.executionConversation(), agent, null, null, 0L);
 
         assertThatCode(() -> isolated.proposeFrom(

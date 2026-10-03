@@ -20,7 +20,7 @@ public record DelegationResult(Long executionId, ExecutionStatus status, Failure
         DEPTH_EXCEEDED,
         /** 한 루트 아래 도는 위임 자식이 한도에 닿았다 */
         TOO_MANY_CHILDREN,
-        /** 서버 전체의 동시 위임이 한도에 닿았다 */
+        /** 서버 전체의 동시 위임이나 그 사용자의 동시 실행이 한도에 닿았다 */
         BUSY,
         SUBMIT_FAILED
     }

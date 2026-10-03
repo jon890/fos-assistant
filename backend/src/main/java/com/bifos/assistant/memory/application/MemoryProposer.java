@@ -10,6 +10,7 @@ import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.usage.application.ExecutionEventRecorder;
 import com.bifos.assistant.usage.application.ExecutionRecorder;
+import com.bifos.assistant.usage.application.UserExecutionLimiter;
 import com.bifos.assistant.usage.domain.AgentExecution;
 import com.bifos.assistant.usage.domain.ExecutionConversation;
 import com.bifos.assistant.usage.domain.ExecutionEvent;
@@ -36,6 +37,7 @@ public class MemoryProposer {
     private final ExecutionEventRecorder eventRecorder;
     private final ExecutionEventRepository executionEvents;
     private final ObjectMapper objectMapper;
+    private final UserExecutionLimiter limiter;
 
     /**
      * 제안을 만들지 못하면 아무것도 만들지 않는다. 원래 대화 실행은 실패시키지 않는다.
@@ -57,6 +59,8 @@ public class MemoryProposer {
         }
 
         AgentExecution proposalExecution = null;
+        String runId = null;
+        boolean awaited = false;
         try {
             ModelChoice choice = requested == null ? ModelChoice.defaults() : requested;
             proposalExecution = executions.startInheriting(user, conversation, agent, parentExecution, choice);
@@ -69,9 +73,10 @@ public class MemoryProposer {
                     choice.provider(),
                     choice.model(),
                     choice.reasoningEffort());
-            String runId = hermes.submit(command);
+            runId = hermes.submit(command);
             executions.attachRunId(proposalExecution, runId);
             HermesRunResult result = hermes.awaitCompletion(command, runId);
+            awaited = true;
             if (result.providerBlocked()) {
                 // 고른 모델의 provider 가 막힌 것은 대화 실행과 같은 코드로 남긴다. 다른 모델로 넘기지 않는다.
                 AgentExecution failed =
@@ -88,6 +93,16 @@ public class MemoryProposer {
                     .ifPresent(proposal ->
                             memories.proposeUser(user, proposal.title(), proposal.content(), completed.id()));
         } catch (Exception ex) {
+            if (proposalExecution == null && ex instanceof ApiException api && api.code() == ErrorCode.USER_BUSY) {
+                // 사용자 실행 한도에 닿아 이번에는 건너뛴다(ADR-069). 실행 줄은 만들어지지 않았다.
+                log.info("사용자 실행 한도에 닿아 Memory 제안을 건너뛴다 parentExecutionId={}", parentExecution.id());
+                return;
+            }
+            if (runId != null && !awaited) {
+                // Hermes 에서 끝났는지 모르는 run 은 끝날 때까지 사용자 자리를 쥔다(ADR-069).
+                limiter.holdUntilRemoteEnds(
+                        user.id(), proposalExecution.id(), agent.apiBaseUrl(), agent.hermesProfile(), runId, false);
+            }
             if (proposalExecution != null) {
                 executions.fail(proposalExecution, errorCode(ex));
             }

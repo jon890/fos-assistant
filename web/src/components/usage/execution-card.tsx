@@ -5,15 +5,17 @@ import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { agentLabel, formatCost, formatTokens, formatWhen } from "@/lib/format";
 import { providerLabel } from "@/lib/provider-label";
-import { executionStatusVariant } from "@/lib/execution-status";
+import {
+  executionStatusLabel,
+  executionStatusVariant,
+  isRunning,
+} from "@/lib/execution-status";
 import {
   actualCostLabel,
   contextCharsLabel,
   contextOmittedLabel,
   durationLabel,
   executionPath,
-  executionStatusLabel,
-  isRunning,
   reasoningEffortLabel,
   retryOfLabel,
   type UsageExecution,

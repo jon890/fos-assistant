@@ -14,12 +14,21 @@ export function executionStatusVariant(execution: {
   status: string;
   errorCode?: string | null;
 }): ExecutionStatusVariant {
-  if (execution.status === "RUNNING") return "info";
+  if (isRunning(execution)) return "info";
   if (execution.status === "FAILED" || (execution.errorCode ?? null) !== null)
     return "destructive";
   if (execution.status === "CANCELLED") return "outline";
   if (execution.status === "SUCCEEDED") return "success";
   return "outline";
+}
+
+/**
+ * 아직 끝나지 않은 실행인가.
+ *
+ * <p>사용량 목록의 타입을 불러오지 않고 필요한 칸만 받는다. lib 이 components 의 타입에 기대지 않게 하려는 것이다.
+ */
+export function isRunning(execution: { status: string }): boolean {
+  return execution.status === "RUNNING";
 }
 
 const RESTART_INTERRUPTED_CODES: ReadonlySet<string> = new Set([
@@ -38,4 +47,30 @@ export function isInterruptedByRestart(
     errorCode !== undefined &&
     RESTART_INTERRUPTED_CODES.has(errorCode)
   );
+}
+
+/**
+ * 상태 배지의 문구다.
+ *
+ * <p>문구가 정해지지 않은 오류 코드는 관리자에게만 원문으로 보인다. 그 밖의 사용자에게는 「실패」 다.
+ *
+ * <p>사용량 목록의 타입을 불러오지 않고 필요한 칸만 받는다. lib 이 components 의 타입에 기대지 않게 하려는 것이다.
+ */
+export function executionStatusLabel(
+  execution: { status: string; errorCode: string | null },
+  isAdmin: boolean,
+): string {
+  if (isRunning(execution)) return "실행 중";
+  if (isInterruptedByRestart(execution.errorCode)) return "중간에 중단됨";
+  if (execution.errorCode === "PROVIDER_BLOCKED") return "모델을 쓸 수 없음";
+  if (execution.errorCode === "NO_MODEL_AVAILABLE")
+    return "사용할 수 있는 모델 없음";
+  // 공유 gateway 의 동시 실행 한도에 닿아 거절당한 것이다. Hermes 가 내려간 것과 원인이 다르다.
+  if (execution.errorCode === "HERMES_BUSY") return "요청이 많아 거절됨";
+  // 사용자 한 명의 동시 실행 한도라 Hermes 가 붐빈 것과 원인이 다르다.
+  if (execution.errorCode === "USER_BUSY")
+    return "동시 실행 한도에 닿아 거절됨";
+  if (execution.status === "FAILED" || execution.errorCode !== null)
+    return isAdmin ? (execution.errorCode ?? "실패") : "실패";
+  return "성공";
 }

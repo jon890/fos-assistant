@@ -103,6 +103,14 @@ public class NextTurnDispatcher {
         }
     }
 
+    /** 사용자 실행 한도로 미룬 위임 결과 자동 turn 을 다시 시도한다. {@link DelegationWakeService} 가 예약해 낸다. */
+    @EventListener
+    public void onWakeRetryDue(WakeRetryDue event) {
+        if (event.conversationId() != null) {
+            tryNext(event.conversationId());
+        }
+    }
+
     /**
      * 기동 전에 보내지 못한 대기 메시지나 전하지 못한 결과가 있는 대화를 차례로 이어 준다.
      *
@@ -138,8 +146,12 @@ public class NextTurnDispatcher {
      * <p>대기 행을 멈추지 못한 대화는 {@link #FAILURE_BACKOFF} 동안 열지 않고 거짓을 돌려준다. 그동안에도 위임 결과는
      * 전한다.
      *
+     * <p>사용자 실행 한도에 닿으면 기다리지 않는다(ADR-069). 대기 줄을 멈추고 그 대화에 {@code USER_BUSY} 를 알린다. 그대로
+     * 두면 이 대화의 turn 이 닫힐 때까지 보낼 계기가 없고, 사용자의 다른 대화가 끝나도 이 대화는 다시 불리지 않는다.
+     * 사용자가 화면에서 다시 보낸다.
+     *
      * @return 대기 메시지가 이 대화의 다음 turn 을 차지했다. 도는 turn 때문에 잠금을 잡지 못한 때도 참이다. 그
-     *     turn 이 닫힐 때 다시 온다
+     *     turn 이 닫힐 때 다시 온다. 사용자 실행 한도로 대기 줄을 멈춘 때도 참이다
      */
     private boolean tryPending(Long conversationId) {
         List<ChatPendingMessage> rows = pendingMessages.findByConversationIdOrderByIdAsc(conversationId);
@@ -160,6 +172,7 @@ public class NextTurnDispatcher {
             return false;
         }
         AppUser owner = user.get();
+        List<Long> ids = rows.stream().map(ChatPendingMessage::id).toList();
         TurnHandle handle;
         try {
             handle = turns.open(owner.id(), conversationId);
@@ -167,11 +180,16 @@ public class NextTurnDispatcher {
             if (ex.code() == ErrorCode.CONVERSATION_BUSY) {
                 return true;
             }
+            if (ex.code() == ErrorCode.USER_BUSY) {
+                log.info("사용자 실행 한도에 닿아 대기 줄을 멈췄다 conversationId={}", conversationId);
+                holdUnsent(conversation, ids);
+                hub.publish(conversationId, ChatEvent.error(ErrorCode.USER_BUSY.name(), ex.getMessage()));
+                return true;
+            }
             throw ex;
         }
         CurrentUser current =
                 new CurrentUser(owner.id(), owner.email(), owner.displayName(), owner.groupId(), owner.role());
-        List<Long> ids = rows.stream().map(ChatPendingMessage::id).toList();
         try {
             Thread.ofVirtual()
                     .name("pending-turn-" + conversationId)

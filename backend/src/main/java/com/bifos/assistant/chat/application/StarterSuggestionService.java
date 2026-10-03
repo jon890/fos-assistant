@@ -15,6 +15,7 @@ import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.usage.application.ExecutionRecorder;
+import com.bifos.assistant.usage.application.UserExecutionLimiter;
 import com.bifos.assistant.usage.domain.AgentExecution;
 import java.time.Clock;
 import java.time.Instant;
@@ -72,6 +73,7 @@ public class StarterSuggestionService {
     private final ExecutionRecorder executions;
     private final ModelTierService modelTiers;
     private final ObjectMapper objectMapper;
+    private final UserExecutionLimiter limiter;
     private final Clock clock;
     private final Executor executor;
 
@@ -94,7 +96,8 @@ public class StarterSuggestionService {
             HermesRunsClient hermes,
             ExecutionRecorder executions,
             ModelTierService modelTiers,
-            ObjectMapper objectMapper) {
+            ObjectMapper objectMapper,
+            UserExecutionLimiter limiter) {
         this(
                 properties,
                 agents,
@@ -104,6 +107,7 @@ public class StarterSuggestionService {
                 executions,
                 modelTiers,
                 objectMapper,
+                limiter,
                 Clock.systemUTC(),
                 Executors.newVirtualThreadPerTaskExecutor());
     }
@@ -118,6 +122,7 @@ public class StarterSuggestionService {
             ExecutionRecorder executions,
             ModelTierService modelTiers,
             ObjectMapper objectMapper,
+            UserExecutionLimiter limiter,
             Clock clock,
             Executor executor) {
         this.properties = properties;
@@ -128,6 +133,7 @@ public class StarterSuggestionService {
         this.executions = executions;
         this.modelTiers = modelTiers;
         this.objectMapper = objectMapper;
+        this.limiter = limiter;
         this.clock = clock;
         this.executor = executor;
     }
@@ -212,6 +218,8 @@ public class StarterSuggestionService {
     /** 이력을 읽어 Hermes 실행 하나를 돌리고 답을 캐시에 넣는다. 어느 경우든 진행 중 표시를 지운다. */
     private void generate(Key key, CurrentUser user, Agent agent) {
         AgentExecution execution = null;
+        String runId = null;
+        boolean awaited = false;
         try {
             String input = prompt(firstQuestions(user, agent));
             ModelChoice choice = modelTiers.detachedChoice(agent);
@@ -228,9 +236,10 @@ public class StarterSuggestionService {
                     choice.provider(),
                     choice.model(),
                     choice.reasoningEffort());
-            String runId = hermes.submit(command);
+            runId = hermes.submit(command);
             executions.attachRunId(execution, runId);
             HermesRunResult result = hermes.awaitCompletion(command, runId);
+            awaited = true;
             if (!result.succeeded()) {
                 executions.fail(
                         execution,
@@ -257,6 +266,17 @@ public class StarterSuggestionService {
                 log.warn("추천은 만들었지만 실행 줄을 끝내지 못했다 executionId={}", execution.id(), ex);
             }
         } catch (Exception ex) {
+            if (execution == null && isUserBusy(ex)) {
+                // 사용자 실행 한도에 닿아 이번에는 건너뛴다(ADR-069). 실패 시각을 적으면 자리가 빈 뒤에도 재시도 시간 동안
+                // 만들지 않는다.
+                log.info("사용자 실행 한도에 닿아 추천 질문을 건너뛴다 userId={} agentId={}", key.userId(), key.agentId());
+                return;
+            }
+            if (runId != null && !awaited) {
+                // Hermes 에서 끝났는지 모르는 run 은 끝날 때까지 사용자 자리를 쥔다(ADR-069).
+                limiter.holdUntilRemoteEnds(
+                        user.id(), execution.id(), agent.apiBaseUrl(), agent.hermesProfile(), runId, false);
+            }
             if (execution != null) {
                 failQuietly(execution, errorCode(ex));
             }
@@ -386,6 +406,10 @@ public class StarterSuggestionService {
 
     private static String statusOf(HermesRunResult result) {
         return result.status() == null ? "UNKNOWN" : result.status().toUpperCase();
+    }
+
+    private static boolean isUserBusy(Exception exception) {
+        return exception instanceof ApiException api && api.code() == ErrorCode.USER_BUSY;
     }
 
     private static String errorCode(Exception exception) {

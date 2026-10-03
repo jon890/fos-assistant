@@ -34,6 +34,10 @@ assistant:
     # 다른 검사가 남긴 RUNNING 줄에 백그라운드 스레드가 붙어 그 검사의 단언을 흔든다.
     # 검사는 잡기와 묻기를 직접 부른다
     enabled: false
+  user-execution:
+    # 같은 H2 를 쓰는 다른 검사가 남긴 RUNNING 줄과 나란히 도는 turn 이 한도에 걸리지 않게 올린다.
+    # 한도 자체는 UserExecutionLimiterTest 와 한도를 보는 검사가 작은 값으로 본다
+    max-running: 1000
   connector:
     max-concurrent-calls: 1
     # 검사는 같은 사용자로 짧은 시간에 여러 번 부른다. 제한 자체는 ConnectorCallLimiterTest 가 본다

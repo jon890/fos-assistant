@@ -14,15 +14,17 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { agentLabel, formatCost, formatTokens, formatWhen } from "@/lib/format";
-import { executionStatusVariant } from "@/lib/execution-status";
+import {
+  executionStatusLabel,
+  executionStatusVariant,
+  isRunning,
+} from "@/lib/execution-status";
 import {
   actualCostLabel,
   contextCharsLabel,
   contextOmittedLabel,
   durationLabel,
   executionPath,
-  executionStatusLabel,
-  isRunning,
   reasoningEffortLabel,
   retryOfLabel,
   type UsageExecution,

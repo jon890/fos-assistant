@@ -3,7 +3,11 @@ package com.bifos.assistant.chat.application;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 
+import com.bifos.assistant.hermes.HermesProperties;
 import com.bifos.assistant.hermes.HermesRunsClient;
+import com.bifos.assistant.usage.application.UserExecutionLimiter;
+import com.bifos.assistant.usage.application.UserExecutionProperties;
+import com.bifos.assistant.usage.infra.AgentExecutionRepository;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
@@ -13,7 +17,14 @@ import org.junit.jupiter.api.Test;
 
 class TurnCancellationCloseTest {
 
-    private final TurnCancellation turns = new TurnCancellation(mock(HermesRunsClient.class), Duration.ofSeconds(1));
+    private final TurnCancellation turns = new TurnCancellation(
+            mock(HermesRunsClient.class),
+            Duration.ofSeconds(1),
+            new UserExecutionLimiter(
+                    new UserExecutionProperties(1000, 0, null),
+                    mock(AgentExecutionRepository.class),
+                    mock(HermesRunsClient.class),
+                    new HermesProperties(null, null, null, null, null, null, null, null)));
 
     @AfterEach
     void tearDown() {
