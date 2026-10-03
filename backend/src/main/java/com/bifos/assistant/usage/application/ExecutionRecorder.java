@@ -8,6 +8,7 @@ import com.bifos.assistant.hermes.dto.TokenUsage;
 import com.bifos.assistant.model.domain.ModelChoice;
 import com.bifos.assistant.model.domain.type.ModelTier;
 import com.bifos.assistant.shared.auth.CurrentUser;
+import com.bifos.assistant.usage.application.model.ExecutionAdmission;
 import com.bifos.assistant.usage.domain.AgentExecution;
 import com.bifos.assistant.usage.domain.DelegationKey;
 import com.bifos.assistant.usage.domain.ExecutionConversation;
@@ -37,8 +38,13 @@ public class ExecutionRecorder {
     private final AgentExecutionRepository executions;
     private final CostEstimator costs;
     private final HermesRunsClient hermes;
+    private final UserExecutionLimiter limiter;
 
-    /** 실행을 RUNNING 으로 만들어 돌려준다. 부모가 없으면 parent 와 root 는 null 이다. */
+    /**
+     * 실행을 RUNNING 으로 만들어 돌려준다. 부모가 없으면 parent 와 root 는 null 이다.
+     *
+     * <p>사용자 실행 한도에 닿으면 {@code USER_BUSY} 를 던지고 줄을 만들지 않는다. 트랜잭션 밖에서 부른다.
+     */
     public AgentExecution start(
             CurrentUser user,
             ExecutionConversation conversation,
@@ -55,7 +61,11 @@ public class ExecutionRecorder {
                 ExecutionContextSnapshot.ofChars(contextChars));
     }
 
-    /** 실행 당시의 상태를 함께 적으며 RUNNING 으로 만들어 돌려준다. */
+    /**
+     * 실행 당시의 상태를 함께 적으며 RUNNING 으로 만들어 돌려준다.
+     *
+     * <p>사용자 실행 한도에 닿으면 {@code USER_BUSY} 를 던지고 줄을 만들지 않는다. 트랜잭션 밖에서 부른다.
+     */
     public AgentExecution start(
             CurrentUser user,
             ExecutionConversation conversation,
@@ -72,6 +82,8 @@ public class ExecutionRecorder {
      * <p>{@code requested} 를 시작할 때 적어 두면 실패로 끝난 실행도 어느 provider 로 시도한 것인지
      * 남는다. 끝나면 세션에서 읽은 실제 값으로 덮인다. 기본값으로 보냈으면 provider 와 모델을 비워 두고
      * effort 만 적는다.
+     *
+     * <p>사용자 실행 한도에 닿으면 {@code USER_BUSY} 를 던지고 줄을 만들지 않는다. 트랜잭션 밖에서 부른다.
      *
      * @param requested 대화가 고른 provider, 모델, effort. null 이면 기본값으로 본다
      * @param retryOfExecutionId 지금은 늘 null 이다. provider 가 막히면 다른 모델로 넘기던 때 채우던 칸이고,
@@ -108,6 +120,8 @@ public class ExecutionRecorder {
      * <p>키를 처음 만들 때 함께 적어야 유일 제약이 같은 호출의 두 번째 줄을 막는다. 뒤에 붙이면 두 요청이 모두
      * 줄을 만든 뒤에야 걸린다. 같은 키의 줄이 이미 있으면 저장이 {@code DataIntegrityViolationException} 으로
      * 실패하고, 부르는 쪽이 그 키로 먼저 저장된 줄을 다시 읽는다.
+     *
+     * <p>사용자 실행 한도에 닿으면 {@code USER_BUSY} 를 던지고 줄을 만들지 않는다. 트랜잭션 밖에서 부른다.
      *
      * @param delegationKey 위임이 아니면 null 이다
      */
@@ -154,7 +168,12 @@ public class ExecutionRecorder {
                 : ReasoningEffortSource.REQUESTED;
     }
 
-    /** 요청을 받은 시각과 대화가 고른 단계를 실행 줄에 복사한다. */
+    /**
+     * 요청을 받은 시각과 대화가 고른 단계를 실행 줄에 복사한다.
+     *
+     * <p>부모가 있으면 흐름 단계나 위임 자식으로, 대화만 있으면 대화 turn 의 루트로, 둘 다 없으면 백그라운드 실행으로
+     * 사용자 실행 한도를 본다(ADR-069). 사용자 실행 한도에 닿으면 {@code USER_BUSY} 를 던지고 줄을 만들지 않는다. 트랜잭션 밖에서 부른다.
+     */
     public AgentExecution start(
             CurrentUser user,
             ExecutionConversation conversation,
@@ -181,7 +200,8 @@ public class ExecutionRecorder {
                 delegationKey,
                 modelTier,
                 requestReceivedAt,
-                effortSource(conversation, requested, modelTier));
+                effortSource(conversation, requested, modelTier),
+                admissionOf(conversation, parentExecutionId));
     }
 
     /**
@@ -191,6 +211,8 @@ public class ExecutionRecorder {
      * <p>단계는 원래 실행 줄에서 복사하고, effort 출처도 원래 실행 줄에서 읽는다. 대화에서 다시 계산하면 그
      * 사이 바뀐 대화의 선택이 섞인다. 보낸 effort 가 없으면 출처는 {@code UNKNOWN} 이다. 그래야 완료 뒤
      * 보완이 그 줄을 찾는다.
+     *
+     * <p>사용자 실행 한도는 백그라운드 실행으로 본다. 사용자 실행 한도에 닿으면 {@code USER_BUSY} 를 던지고 줄을 만들지 않는다. 트랜잭션 밖에서 부른다.
      *
      * @param parent 원래 실행. 부모와 루트 실행 번호가 모두 이 실행이다
      * @param requested 원래 실행이 Hermes 에 보낸 provider, 모델, effort. null 이면 기본값으로 본다
@@ -223,7 +245,16 @@ public class ExecutionRecorder {
                 null,
                 parent.modelTier(),
                 null,
-                source);
+                source,
+                ExecutionAdmission.BACKGROUND);
+    }
+
+    /** 부모가 있으면 자식, 대화만 있으면 대화 turn 의 루트, 둘 다 없으면 백그라운드 실행이다. */
+    private static ExecutionAdmission admissionOf(ExecutionConversation conversation, Long parentExecutionId) {
+        if (parentExecutionId != null) {
+            return ExecutionAdmission.CHILD;
+        }
+        return conversation != null ? ExecutionAdmission.TURN_ROOT : ExecutionAdmission.BACKGROUND;
     }
 
     private AgentExecution record(
@@ -239,25 +270,29 @@ public class ExecutionRecorder {
             DelegationKey delegationKey,
             ModelTier modelTier,
             Instant requestReceivedAt,
-            ReasoningEffortSource effortSource) {
-        return executions.save(base(user, conversation, agent)
-                .hermesSessionId(hermesSessionId)
-                .delegationKey(delegationKey == null ? null : delegationKey.value())
-                .parentExecutionId(parentExecutionId)
-                .rootExecutionId(rootExecutionId)
-                .retryOfExecutionId(retryOfExecutionId)
-                .provider(requested == null ? null : requested.provider())
-                .model(requested == null ? null : requested.model())
-                .reasoningEffort(requested == null ? null : requested.reasoningEffort())
-                .reasoningEffortSource(effortSource)
-                .modelTier(modelTier)
-                .requestReceivedAt(requestReceivedAt)
-                .contextChars(context.contextChars())
-                .contextOmittedItems(context.contextOmittedItems())
-                .runtimeFingerprint(context.runtimeFingerprint())
-                .instructionsHash(context.instructionsHash())
-                .status(ExecutionStatus.RUNNING)
-                .build());
+            ReasoningEffortSource effortSource,
+            ExecutionAdmission admission) {
+        return limiter.admit(
+                user.id(),
+                admission,
+                () -> executions.save(base(user, conversation, agent)
+                        .hermesSessionId(hermesSessionId)
+                        .delegationKey(delegationKey == null ? null : delegationKey.value())
+                        .parentExecutionId(parentExecutionId)
+                        .rootExecutionId(rootExecutionId)
+                        .retryOfExecutionId(retryOfExecutionId)
+                        .provider(requested == null ? null : requested.provider())
+                        .model(requested == null ? null : requested.model())
+                        .reasoningEffort(requested == null ? null : requested.reasoningEffort())
+                        .reasoningEffortSource(effortSource)
+                        .modelTier(modelTier)
+                        .requestReceivedAt(requestReceivedAt)
+                        .contextChars(context.contextChars())
+                        .contextOmittedItems(context.contextOmittedItems())
+                        .runtimeFingerprint(context.runtimeFingerprint())
+                        .instructionsHash(context.instructionsHash())
+                        .status(ExecutionStatus.RUNNING)
+                        .build()));
     }
 
     /**
@@ -266,6 +301,8 @@ public class ExecutionRecorder {
      * <p>추천 질문을 만드는 실행처럼 turn 이 아닌 실행이 쓴다. 대화, 부모, 루트, session 을 비우고 문맥 글자
      * 수는 0 으로 적는다. 보낸 모델 선택은 {@code requested} 로 적고, effort 가 있으면 출처는 에이전트
      * 기본값이다.
+     *
+     * <p>사용자 실행 한도는 백그라운드 실행으로 본다. 사용자 실행 한도에 닿으면 {@code USER_BUSY} 를 던지고 줄을 만들지 않는다. 트랜잭션 밖에서 부른다.
      *
      * @param requested Hermes 에 보낸 provider, 모델, effort
      */

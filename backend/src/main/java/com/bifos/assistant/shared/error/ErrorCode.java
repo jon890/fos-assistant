@@ -15,6 +15,8 @@ public enum ErrorCode {
     EXECUTION_NOT_FOUND(HttpStatus.NOT_FOUND),
     EXECUTION_NOT_RUNNING(HttpStatus.CONFLICT),
     CONVERSATION_BUSY(HttpStatus.CONFLICT),
+    /** 그 사용자가 여러 대화와 위임으로 동시 실행 한도를 모두 쓰고 있다(ADR-069). */
+    USER_BUSY(HttpStatus.CONFLICT),
     /** 대기 메시지가 상한에 닿았다. 개수가 찼거나, 더하면 합친 글이 메시지 길이 상한을 넘는다. */
     PENDING_QUEUE_FULL(HttpStatus.CONFLICT),
     /** 취소하려는 대기 메시지가 이미 보내졌거나 없다. 남의 대화의 대기 메시지도 같은 응답으로 숨긴다. */

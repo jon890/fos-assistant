@@ -7,10 +7,18 @@ import static org.mockito.Mockito.mock;
 import com.bifos.assistant.hermes.HermesRunsClient;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
+import com.bifos.assistant.usage.application.UserExecutionLimiter;
+import com.bifos.assistant.usage.application.UserExecutionProperties;
+import com.bifos.assistant.usage.infra.AgentExecutionRepository;
 import java.io.Closeable;
 import java.time.Duration;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
@@ -20,7 +28,7 @@ import org.junit.jupiter.api.Test;
 
 class TurnCancellationTest {
 
-    private final TurnCancellation turns = new TurnCancellation(mock(HermesRunsClient.class), Duration.ofMillis(10));
+    private final TurnCancellation turns = turnsWithLimit(1000);
 
     @AfterEach
     void closeScheduler() {
@@ -59,7 +67,7 @@ class TurnCancellationTest {
     @Test
     @DisplayName("Hermes 중지가 확정되기 전에는 유예 시간으로 스트림을 닫지 않는다")
     void doesNotCloseStreamByGracePeriodBeforeHermesStopIsConfirmed() throws InterruptedException {
-        TurnCancellation delayed = new TurnCancellation(mock(HermesRunsClient.class), Duration.ofMillis(10));
+        TurnCancellation delayed = turnsWithLimit(1000);
         try {
             TurnHandle handle = delayed.open(1L, 2L);
             CountDownLatch closed = new CountDownLatch(1);
@@ -108,5 +116,164 @@ class TurnCancellationTest {
         assertThat(turns.runIfIdle(2L, worked::incrementAndGet)).isFalse();
         assertThat(worked.get()).isZero();
         assertThatThrownBy(() -> turns.open(1L, 2L)).isInstanceOf(ApiException.class);
+    }
+
+    @Test
+    @DisplayName("한도가 1 이면 다른 대화를 열 때 USER_BUSY 이고 그 대화의 잠금이 남지 않는다")
+    void rejectsSecondConversationWithUserBusyAndLeavesNoLock() {
+        UserExecutionLimiter limiter = limiter(1);
+        TurnCancellation limited = turnsWith(limiter);
+        try {
+            AtomicInteger closed = new AtomicInteger();
+            limited.addCloseListener(event -> closed.incrementAndGet());
+            limited.open(1L, 2L);
+
+            assertThatThrownBy(() -> limited.open(1L, 3L))
+                    .isInstanceOfSatisfying(
+                            ApiException.class, e -> assertThat(e.code()).isEqualTo(ErrorCode.USER_BUSY));
+
+            assertThat(limited.markOf(3L)).isEqualTo(TurnMark.NONE);
+            assertThat(closed.get()).as("열지 못한 대화의 닫기 리스너").isZero();
+            assertThat(limiter.used(1L)).isEqualTo(1);
+        } finally {
+            limited.shutdown();
+        }
+    }
+
+    @Test
+    @DisplayName("같은 대화를 두 스레드가 함께 열면 하나만 열리고 자리는 하나만 쓰인다")
+    void opensSameConversationOnceUnderRace() throws Exception {
+        UserExecutionLimiter limiter = limiter(1);
+        TurnCancellation limited = turnsWith(limiter);
+        ExecutorService pool = Executors.newFixedThreadPool(2);
+        try {
+            for (long conversationId = 100L; conversationId < 150L; conversationId++) {
+                long target = conversationId;
+                CountDownLatch start = new CountDownLatch(1);
+                List<Future<TurnHandle>> results = new ArrayList<>();
+                for (int i = 0; i < 2; i++) {
+                    results.add(pool.submit(() -> {
+                        start.await();
+                        try {
+                            return limited.open(1L, target);
+                        } catch (ApiException e) {
+                            // 한 자리만 남았을 때 진 쪽은 자리를 잠깐 다투어 USER_BUSY 를 받을 수 있다. 한도를 넘지 않는 쪽의 오차다.
+                            assertThat(e.code()).isIn(ErrorCode.CONVERSATION_BUSY, ErrorCode.USER_BUSY);
+                            return null;
+                        }
+                    }));
+                }
+                start.countDown();
+                List<TurnHandle> opened = new ArrayList<>();
+                for (Future<TurnHandle> result : results) {
+                    TurnHandle handle = result.get(5, TimeUnit.SECONDS);
+                    if (handle != null) {
+                        opened.add(handle);
+                    }
+                }
+
+                assertThat(opened).as("대화 %d 에 열린 turn", target).hasSize(1);
+                assertThat(limiter.used(1L)).as("대화 %d 를 연 뒤 쓴 자리", target).isEqualTo(1);
+
+                limited.close(opened.get(0));
+                assertThat(limiter.used(1L)).as("대화 %d 를 닫은 뒤 쓴 자리", target).isZero();
+            }
+        } finally {
+            pool.shutdownNow();
+            limited.shutdown();
+        }
+    }
+
+    @Test
+    @DisplayName("같은 대화에 이미 turn 이 있으면 사용자 자리가 없어도 CONVERSATION_BUSY 가 먼저 나간다")
+    void reportsConversationBusyBeforeUserBusy() {
+        UserExecutionLimiter limiter = limiter(1);
+        TurnCancellation limited = turnsWith(limiter);
+        try {
+            limited.open(1L, 2L);
+
+            assertThatThrownBy(() -> limited.open(1L, 2L))
+                    .isInstanceOfSatisfying(
+                            ApiException.class, e -> assertThat(e.code()).isEqualTo(ErrorCode.CONVERSATION_BUSY));
+            assertThat(limiter.used(1L)).isEqualTo(1);
+        } finally {
+            limited.shutdown();
+        }
+    }
+
+    @Test
+    @DisplayName("닫으면 자리가 돌아와 다른 대화를 열고, 두 번 닫아도 한 번만 돌아온다")
+    void returnsSlotOnceOnClose() {
+        UserExecutionLimiter limiter = limiter(2);
+        TurnCancellation limited = turnsWith(limiter);
+        try {
+            TurnHandle first = limited.open(1L, 2L);
+            limited.open(1L, 3L);
+
+            limited.close(first);
+            limited.close(first);
+
+            assertThat(limiter.used(1L)).isEqualTo(1);
+            limited.open(1L, 4L);
+            assertThat(limiter.used(1L)).isEqualTo(2);
+            assertThatThrownBy(() -> limited.open(1L, 5L))
+                    .isInstanceOfSatisfying(
+                            ApiException.class, e -> assertThat(e.code()).isEqualTo(ErrorCode.USER_BUSY));
+        } finally {
+            limited.shutdown();
+        }
+    }
+
+    @Test
+    @DisplayName("닫기 리스너가 불릴 때 자리는 이미 돌아와 있다")
+    void returnsSlotBeforeCloseListenerRuns() {
+        UserExecutionLimiter limiter = limiter(1);
+        TurnCancellation limited = turnsWith(limiter);
+        try {
+            AtomicReference<TurnHandle> reopened = new AtomicReference<>();
+            limited.addCloseListener(event -> {
+                if (event.conversationId().equals(2L)) {
+                    reopened.set(limited.open(1L, 3L));
+                }
+            });
+
+            limited.close(limited.open(1L, 2L));
+
+            assertThat(reopened.get()).as("닫기 리스너가 연 다음 turn").isNotNull();
+        } finally {
+            limited.shutdown();
+        }
+    }
+
+    @Test
+    @DisplayName("기동 정리가 여는 turn 은 한도를 넘겨도 열린다")
+    void opensRecoveredTurnBeyondLimit() {
+        UserExecutionLimiter limiter = limiter(1);
+        TurnCancellation limited = turnsWith(limiter);
+        try {
+            limited.open(1L, 2L);
+
+            TurnHandle recovered = limited.openRecovered(1L, 3L);
+
+            assertThat(limited.markOf(3L).running()).isTrue();
+            assertThat(limiter.used(1L)).isEqualTo(2);
+            limited.close(recovered);
+            assertThat(limiter.used(1L)).isEqualTo(1);
+        } finally {
+            limited.shutdown();
+        }
+    }
+
+    private static UserExecutionLimiter limiter(int maxRunning) {
+        return new UserExecutionLimiter(
+                new UserExecutionProperties(maxRunning, 0, null), mock(AgentExecutionRepository.class));
+    }
+
+    private static TurnCancellation turnsWith(UserExecutionLimiter limiter) {
+        return new TurnCancellation(mock(HermesRunsClient.class), Duration.ofMillis(10), limiter);
+    }
+
+    private static TurnCancellation turnsWithLimit(int maxRunning) {
+        return turnsWith(limiter(maxRunning));
     }
 }

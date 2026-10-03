@@ -280,7 +280,7 @@ public class RestartReconciler implements SmartLifecycle {
         if (opened) {
             TurnHandle handle;
             try {
-                handle = turns.open(row.userId(), row.conversationId());
+                handle = turns.openRecovered(row.userId(), row.conversationId());
             } catch (ApiException ex) {
                 if (ex.code() != ErrorCode.CONVERSATION_BUSY) {
                     throw ex;

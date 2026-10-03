@@ -76,6 +76,15 @@ public interface AgentExecutionRepository extends JpaRepository<AgentExecution, 
      */
     long countByRootExecutionIdAndStatusAndDelegationKeyIsNotNull(Long rootExecutionId, ExecutionStatus status);
 
+    /** 그 사용자의 그 상태인 실행 줄 수다. 대화 turn 의 루트 줄은 turn 자리로 세므로 뺀다(ADR-069). */
+    @Query("""
+            select count(e) from AgentExecution e
+            where e.userId = :userId
+              and e.status = :status
+              and (e.parentExecutionId is not null or e.conversationId is null)
+            """)
+    long countRunningOutsideTurns(@Param("userId") Long userId, @Param("status") ExecutionStatus status);
+
     /**
      * 이 실행의 결과를 부모에게 전했다고 적는다. 이미 적혀 있으면 바꾸지 않고 0 을 돌려준다.
      *
