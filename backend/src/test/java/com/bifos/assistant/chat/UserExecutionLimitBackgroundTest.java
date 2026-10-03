@@ -48,10 +48,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.context.TestConfiguration;
-import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
-import org.springframework.context.annotation.Primary;
 import org.springframework.test.context.ActiveProfiles;
 import tools.jackson.databind.ObjectMapper;
 
@@ -70,17 +67,8 @@ import tools.jackson.databind.ObjectMapper;
             "assistant.memory.propose.enabled=true"
         })
 @ActiveProfiles("test")
-@Import(UserExecutionLimitBackgroundTest.StubRuntime.class)
+@Import(ChatServiceTest.StubRuntime.class)
 class UserExecutionLimitBackgroundTest {
-
-    @TestConfiguration
-    static class StubRuntime {
-        @Bean
-        @Primary
-        StubHermesRunsClient stubHermesRunsClient() {
-            return new StubHermesRunsClient();
-        }
-    }
 
     private static final String PROMPTS = "[\"일정 정리해 줘\",\"장보기 목록 만들어 줘\"]";
 

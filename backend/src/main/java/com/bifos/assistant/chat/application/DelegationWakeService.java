@@ -226,7 +226,7 @@ public class DelegationWakeService {
         }
         try {
             scheduler.schedule(
-                    () -> dueAfterUserBusy(conversationId),
+                    () -> dueAfterUserBusy(conversationId, now),
                     now.plus(FAILURE_BACKOFF).plus(BUSY_RETRY_MARGIN));
         } catch (RuntimeException ex) {
             log.warn("사용자 실행 한도로 미룬 자동 turn 을 예약하지 못했다 conversationId={}", conversationId, ex);
@@ -234,12 +234,31 @@ public class DelegationWakeService {
     }
 
     /**
-     * 예약한 재시도의 때가 됐다. 실패 시각을 지운 뒤 사건을 낸다.
+     * 예약한 재시도의 때가 됐다. 새 가상 스레드에서 실패 시각을 지우고 사건을 낸다.
      *
-     * <p>지우지 않으면 {@link #inFailureBackoff} 가 실제 시계로 다시 세어 재시도가 막힐 수 있다.
+     * <p>사건을 받는 쪽이 같은 스레드에서 DB 를 읽고 turn 을 연다. 스케줄러 스레드에서 그대로 돌리면 그동안 다른 예약
+     * 작업이 밀린다.
+     *
+     * @param scheduledAt 예약하며 적은 실패 시각
      */
-    private void dueAfterUserBusy(Long conversationId) {
-        lastFailures.remove(conversationId);
+    private void dueAfterUserBusy(Long conversationId, Instant scheduledAt) {
+        try {
+            Thread.ofVirtual()
+                    .name("delegation-wake-retry-" + conversationId)
+                    .start(() -> retryAfterUserBusy(conversationId, scheduledAt));
+        } catch (RuntimeException | Error ex) {
+            log.warn("사용자 실행 한도로 미룬 자동 turn 의 재시도 스레드를 띄우지 못했다 conversationId={}", conversationId, ex);
+        }
+    }
+
+    /**
+     * 예약하며 적은 실패 시각을 지운 뒤 사건을 낸다.
+     *
+     * <p>지우지 않으면 {@link #inFailureBackoff} 가 실제 시계로 다시 세어 재시도가 막힐 수 있다. 그 사이 다른 실패가 새
+     * 시각을 적었으면 지우지 않는다. 그 실패의 유예를 지킨다.
+     */
+    private void retryAfterUserBusy(Long conversationId, Instant scheduledAt) {
+        lastFailures.remove(conversationId, scheduledAt);
         try {
             events.publishEvent(new WakeRetryDue(conversationId));
         } catch (RuntimeException ex) {

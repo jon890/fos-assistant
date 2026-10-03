@@ -8,6 +8,7 @@ import com.bifos.assistant.hermes.HermesProperties;
 import com.bifos.assistant.hermes.HermesRunsClient;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
+import com.bifos.assistant.usage.application.TurnSlot;
 import com.bifos.assistant.usage.application.UserExecutionLimiter;
 import com.bifos.assistant.usage.application.UserExecutionProperties;
 import com.bifos.assistant.usage.infra.AgentExecutionRepository;
@@ -21,6 +22,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.AfterEach;
@@ -197,6 +199,44 @@ class TurnCancellationTest {
                     .isInstanceOfSatisfying(
                             ApiException.class, e -> assertThat(e.code()).isEqualTo(ErrorCode.CONVERSATION_BUSY));
             assertThat(limiter.used(1L)).isEqualTo(1);
+        } finally {
+            limited.shutdown();
+        }
+    }
+
+    @Test
+    @DisplayName("자리를 얻는 사이 같은 대화를 다른 요청이 열어 자리가 없으면 USER_BUSY 가 아니라 CONVERSATION_BUSY 다")
+    void reportsConversationBusyWhenSameConversationOpensWhileAcquiringSlot() {
+        AtomicReference<TurnCancellation> turnsRef = new AtomicReference<>();
+        AtomicBoolean rivalStarted = new AtomicBoolean();
+        AtomicReference<TurnHandle> rival = new AtomicReference<>();
+        // 대화 잠금을 보고 지나간 뒤 자리를 얻기 전에, 같은 대화를 연 다른 요청이 하나뿐인 자리와 잠금을 먼저 가져간다.
+        UserExecutionLimiter limiter =
+                new UserExecutionLimiter(
+                        new UserExecutionProperties(1, 0, null),
+                        mock(AgentExecutionRepository.class),
+                        mock(HermesRunsClient.class),
+                        new HermesProperties(null, null, null, null, null, null, null, null)) {
+                    @Override
+                    public TurnSlot acquireTurn(Long userId) {
+                        if (rivalStarted.compareAndSet(false, true)) {
+                            rival.set(turnsRef.get().open(userId, 2L));
+                        }
+                        return super.acquireTurn(userId);
+                    }
+                };
+        TurnCancellation limited = turnsWith(limiter);
+        turnsRef.set(limited);
+        try {
+            assertThatThrownBy(() -> limited.open(1L, 2L))
+                    .isInstanceOfSatisfying(
+                            ApiException.class, e -> assertThat(e.code()).isEqualTo(ErrorCode.CONVERSATION_BUSY));
+
+            assertThat(rival.get()).as("먼저 연 다른 요청의 turn").isNotNull();
+            assertThat(limiter.used(1L)).as("진 쪽이 남긴 자리 없이 쓴 자리").isEqualTo(1);
+            limited.close(rival.get());
+            assertThat(limiter.used(1L)).as("먼저 연 turn 을 닫은 뒤 쓴 자리").isZero();
+            assertThat(limited.markOf(2L)).isEqualTo(TurnMark.NONE);
         } finally {
             limited.shutdown();
         }

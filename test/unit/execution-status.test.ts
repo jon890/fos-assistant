@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { executionStatusLabel, executionStatusVariant, isInterruptedByRestart } from "../../web/src/lib/execution-status.ts";
+import { executionStatusLabel, executionStatusVariant, isInterruptedByRestart, isRunning } from "../../web/src/lib/execution-status.ts";
 
 test("도는 중인 실행은 오류 코드가 있어도 info 다", () => {
   assert.equal(executionStatusVariant({ status: "RUNNING", errorCode: null }), "info");
@@ -61,4 +61,11 @@ test("도는 중이거나 성공했거나 재시작으로 중단된 실행의 �
   assert.equal(executionStatusLabel({ status: "FAILED", errorCode: "PROVIDER_BLOCKED" }, false), "모델을 쓸 수 없음");
   assert.equal(executionStatusLabel({ status: "FAILED", errorCode: "NO_MODEL_AVAILABLE" }, false),
     "사용할 수 있는 모델 없음");
+});
+
+test("RUNNING 만 도는 중이다", () => {
+  assert.equal(isRunning({ status: "RUNNING" }), true);
+  for (const status of ["SUCCEEDED", "FAILED", "CANCELLED", "running", ""]) {
+    assert.equal(isRunning({ status }), false, status);
+  }
 });

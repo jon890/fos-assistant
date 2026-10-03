@@ -45,19 +45,22 @@ import org.springframework.transaction.support.TransactionTemplate;
 /**
  * 사용자 자리를 turn 자리, 원격 종료 확인 자리, 실행 줄의 합으로 세고, 판정과 자리 만들기를 한 잠금 안에서 하는지 본다(ADR-069).
  *
- * <p>원격 종료 확인 자리는 대역 Hermes 의 조회 답으로 돌려주는 때를 정한다. 다시 묻는 간격은 테스트 profile 의
+ * <p>원격 종료 확인 자리는 대역 Hermes 의 조회 답으로 돌려주는 때를 정한다. 다시 묻는 간격은 이 클래스가 적은
  * {@code hermes.poll-interval} 이다. 쥔 자리를 남기는 검사는 끝나기 전에 그 run 을 모른다고 답하게 해 돌려받는다.
  */
 @SpringBootTest(
         properties = {
             "assistant.user-execution.max-running=3",
             "assistant.user-execution.background-reserve=1",
-            "assistant.user-execution.remote-end-max-wait=2s"
+            "assistant.user-execution.remote-end-max-wait=2s",
+            // 조회 횟수를 세는 검사가 test profile 의 값이 바뀌어도 같은 간격으로 돌게 여기 적는다
+            "hermes.poll-interval=10ms"
         })
 @ActiveProfiles("test")
 @Import(UserExecutionLimiterTest.StubRuntime.class)
 class UserExecutionLimiterTest {
 
+    /** {@code ChatServiceTest.StubRuntime} 은 chat 패키지 안에서만 보여 이 패키지에서 import 하지 못하므로 따로 둔다. */
     @TestConfiguration
     static class StubRuntime {
         @Bean

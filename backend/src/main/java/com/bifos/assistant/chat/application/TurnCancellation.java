@@ -52,6 +52,9 @@ public class TurnCancellation {
      * 메시지로 넣는다. 자리를 먼저 얻고 잠금을 잡는다. 잠금을 잡았다가 되돌리면 닫기 리스너가 불리지 않아, 그 사이
      * {@code CONVERSATION_BUSY} 를 받고 닫힐 때 다시 오기로 한 깨우기가 다음 계기까지 미뤄진다.
      *
+     * <p>자리를 얻지 못하면 대화 잠금을 한 번 더 본다. 같은 대화를 함께 연 다른 요청이 그 사이 잠금을 잡았으면 그 자리 때문에
+     * 진 것이므로 {@code CONVERSATION_BUSY} 로 바꿔 던진다. 진 쪽이 대기 메시지로 들어가게 하려는 것이다.
+     *
      * @throws ApiException {@code CONVERSATION_BUSY}. 그 대화에 도는 turn 이 있다. {@code USER_BUSY}. 그 사용자가 동시 실행
      *     한도를 모두 쓰고 있다. 둘 다 잠금과 자리를 남기지 않는다
      */
@@ -59,7 +62,16 @@ public class TurnCancellation {
         if (byConversation.containsKey(conversationId)) {
             throw conversationBusy();
         }
-        return lock(userId, conversationId, limiter.acquireTurn(userId));
+        TurnSlot slot;
+        try {
+            slot = limiter.acquireTurn(userId);
+        } catch (ApiException ex) {
+            if (ex.code() == ErrorCode.USER_BUSY && byConversation.containsKey(conversationId)) {
+                throw conversationBusy();
+            }
+            throw ex;
+        }
+        return lock(userId, conversationId, slot);
     }
 
     /**

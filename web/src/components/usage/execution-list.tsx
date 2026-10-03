@@ -1,4 +1,5 @@
 import { EmptyState } from "@/components/ui/empty-state";
+import { isRunning } from "@/lib/execution-status";
 import { formatCost, formatDurationFor } from "@/lib/format";
 import { ExecutionCard } from "./execution-card";
 import { ExecutionTable } from "./execution-table";
@@ -66,10 +67,6 @@ export function reasoningEffortLabel(execution: UsageExecution): string {
 /** 실행 상세 경로다. 내부 값을 그리는 상세는 관리자 영역에만 있다. */
 export function executionPath(id: number, isAdmin: boolean): string {
   return isAdmin ? `/admin/executions/${id}` : `/executions/${id}`;
-}
-
-export function isRunning(execution: UsageExecution): boolean {
-  return execution.status === "RUNNING";
 }
 
 /**

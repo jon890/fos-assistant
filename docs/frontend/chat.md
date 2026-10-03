@@ -242,6 +242,7 @@ flowchart TD
 | --- | --- |
 | 대상이 마지막 메시지가 아니다 | `MESSAGE_NOT_LATEST`. 화면이 이력을 다시 읽는다 |
 | 그 대화에서 도는 실행이 있다 | `CONVERSATION_BUSY`. 끝난 뒤에 다시 누르게 한다 |
+| 그 사용자가 동시 실행 한도를 모두 쓰고 있다 | `USER_BUSY`. 진행 중인 작업이 끝난 뒤 다시 누르게 한다([`backend/execution-limit.md`](../backend/execution-limit.md)) |
 | 다시 생성이 실패했다 | 이전 판이 그대로 남는다. 새 판은 생기지 않는다 |
 
 **판은 답 한 줄 단위다.**

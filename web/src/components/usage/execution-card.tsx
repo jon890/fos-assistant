@@ -8,6 +8,7 @@ import { providerLabel } from "@/lib/provider-label";
 import {
   executionStatusLabel,
   executionStatusVariant,
+  isRunning,
 } from "@/lib/execution-status";
 import {
   actualCostLabel,
@@ -15,7 +16,6 @@ import {
   contextOmittedLabel,
   durationLabel,
   executionPath,
-  isRunning,
   reasoningEffortLabel,
   retryOfLabel,
   type UsageExecution,

@@ -68,6 +68,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 @Import(UserExecutionLimitDelegationTest.StubRuntime.class)
 class UserExecutionLimitDelegationTest {
 
+    /** {@code ChatServiceTest.StubRuntime} 은 chat 패키지 안에서만 보여 이 패키지에서 import 하지 못하므로 따로 둔다. */
     @TestConfiguration
     static class StubRuntime {
         @Bean

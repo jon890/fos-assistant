@@ -14,12 +14,21 @@ export function executionStatusVariant(execution: {
   status: string;
   errorCode?: string | null;
 }): ExecutionStatusVariant {
-  if (execution.status === "RUNNING") return "info";
+  if (isRunning(execution)) return "info";
   if (execution.status === "FAILED" || (execution.errorCode ?? null) !== null)
     return "destructive";
   if (execution.status === "CANCELLED") return "outline";
   if (execution.status === "SUCCEEDED") return "success";
   return "outline";
+}
+
+/**
+ * 아직 끝나지 않은 실행인가.
+ *
+ * <p>사용량 목록의 타입을 불러오지 않고 필요한 칸만 받는다. lib 이 components 의 타입에 기대지 않게 하려는 것이다.
+ */
+export function isRunning(execution: { status: string }): boolean {
+  return execution.status === "RUNNING";
 }
 
 const RESTART_INTERRUPTED_CODES: ReadonlySet<string> = new Set([
@@ -45,13 +54,13 @@ export function isInterruptedByRestart(
  *
  * <p>문구가 정해지지 않은 오류 코드는 관리자에게만 원문으로 보인다. 그 밖의 사용자에게는 「실패」 다.
  *
- * <p>사용량 목록의 타입을 불러오지 않고 필요한 칸만 받는다. 단위 테스트가 `node --test` 로 직접 읽기 때문이다.
+ * <p>사용량 목록의 타입을 불러오지 않고 필요한 칸만 받는다. lib 이 components 의 타입에 기대지 않게 하려는 것이다.
  */
 export function executionStatusLabel(
   execution: { status: string; errorCode: string | null },
   isAdmin: boolean,
 ): string {
-  if (execution.status === "RUNNING") return "실행 중";
+  if (isRunning(execution)) return "실행 중";
   if (isInterruptedByRestart(execution.errorCode)) return "중간에 중단됨";
   if (execution.errorCode === "PROVIDER_BLOCKED") return "모델을 쓸 수 없음";
   if (execution.errorCode === "NO_MODEL_AVAILABLE")

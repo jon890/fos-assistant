@@ -10,6 +10,7 @@ import com.bifos.assistant.agent.domain.type.CredentialScope;
 import com.bifos.assistant.agent.infra.AgentRepository;
 import com.bifos.assistant.chat.application.DelegationFinished;
 import com.bifos.assistant.chat.application.TurnCancellation;
+import com.bifos.assistant.chat.application.WakeRetryDue;
 import com.bifos.assistant.chat.domain.ChatMessage;
 import com.bifos.assistant.chat.domain.Conversation;
 import com.bifos.assistant.chat.domain.type.MessageRole;
@@ -35,8 +36,11 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -48,6 +52,7 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
 import org.springframework.context.annotation.Primary;
+import org.springframework.context.event.EventListener;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
@@ -56,11 +61,16 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
  * 위임 결과 자동 turn 이 사용자 실행 한도에 닿았을 때 상한이 있는 재시도를 거는지 본다(ADR-069).
  *
  * <p>한도를 2 로 두고 그 사용자의 RUNNING 자식 줄 둘로 자리를 채운다. 예약은 받은 작업을 모아 두는 대역 스케줄러가 받고,
- * 검사가 곧바로 돌린다. 30초를 실제로 기다리지 않는다.
+ * 검사가 곧바로 돌린다. 30초를 실제로 기다리지 않는다. 예약한 작업은 가상 스레드를 띄우고 돌아오므로 검사는 그 스레드가
+ * 끝날 때까지 기다린다.
  */
 @SpringBootTest(properties = {"assistant.delegation-wake.enabled=true", "assistant.user-execution.max-running=2"})
 @ActiveProfiles("test")
-@Import({ChatServiceTest.StubRuntime.class, DelegationWakeUserLimitTest.CapturingSchedulerConfig.class})
+@Import({
+    ChatServiceTest.StubRuntime.class,
+    DelegationWakeUserLimitTest.CapturingSchedulerConfig.class,
+    DelegationWakeUserLimitTest.RetryThreadsConfig.class
+})
 class DelegationWakeUserLimitTest {
 
     private static final Duration WAIT_LIMIT = Duration.ofSeconds(10);
@@ -100,12 +110,44 @@ class DelegationWakeUserLimitTest {
         }
     }
 
+    /** 재시도 사건을 낸 스레드를 모은다. 그 스레드가 끝나면 사건을 받은 쪽의 일도 끝났다. */
+    static final class RetryThreads {
+        private final BlockingQueue<Thread> threads = new LinkedBlockingQueue<>();
+
+        @EventListener
+        public void onWakeRetryDue(WakeRetryDue event) {
+            threads.add(Thread.currentThread());
+        }
+
+        /** 재시도 사건 하나가 나고 그 스레드가 끝날 때까지 기다린다. 제한 시간을 넘으면 실패한다. */
+        void awaitOne() throws InterruptedException {
+            Thread thread = threads.poll(WAIT_LIMIT.toMillis(), TimeUnit.MILLISECONDS);
+            if (thread == null) {
+                fail("재시도 사건이 %s 안에 나지 않았다", WAIT_LIMIT);
+            }
+            if (!thread.join(WAIT_LIMIT)) {
+                fail("재시도 스레드 %s 가 %s 안에 끝나지 않았다", thread.getName(), WAIT_LIMIT);
+            }
+        }
+    }
+
+    @TestConfiguration
+    static class RetryThreadsConfig {
+        @Bean
+        RetryThreads retryThreads() {
+            return new RetryThreads();
+        }
+    }
+
     /** 자동 turn 의 답 조각은 이 검사가 보지 않는다. 실제 스트림 주소로 연결하지 않게 대역으로 둔다. */
     @MockitoBean
     HermesRunEventStream eventStream;
 
     @Autowired
     CapturingTaskScheduler scheduler;
+
+    @Autowired
+    RetryThreads retryThreads;
 
     @Autowired
     UserExecutionLimiter limiter;
@@ -154,6 +196,7 @@ class DelegationWakeUserLimitTest {
         awaitAllIdle();
         stub().reset();
         scheduler.clear();
+        retryThreads.threads.clear();
         executionEvents.deleteAll();
         executions.deleteAll();
         messages.deleteAll();
@@ -207,7 +250,7 @@ class DelegationWakeUserLimitTest {
 
     @Test
     @DisplayName("한도에 닿은 거절이 이어지면 10번까지만 재시도를 예약한다")
-    void schedulesAtMostTenRetriesWhileRejectionsContinue() {
+    void schedulesAtMostTenRetriesWhileRejectionsContinue() throws InterruptedException {
         fillSlots();
         AgentExecution done = delegated(ExecutionStatus.SUCCEEDED, "조사 결과");
 
@@ -215,7 +258,7 @@ class DelegationWakeUserLimitTest {
         int ran = 0;
         for (List<Runnable> due = scheduler.drain(); !due.isEmpty(); due = scheduler.drain()) {
             for (Runnable task : due) {
-                task.run();
+                runRetry(task);
                 ran++;
             }
             assertThat(ran).as("돌린 재시도 수").isLessThanOrEqualTo(MAX_BUSY_RETRIES);
@@ -230,7 +273,7 @@ class DelegationWakeUserLimitTest {
 
     @Test
     @DisplayName("자리가 난 뒤 예약한 재시도가 돌면 결과를 전한다")
-    void deliversResultWhenScheduledRetryRunsAfterSlotFrees() {
+    void deliversResultWhenScheduledRetryRunsAfterSlotFrees() throws InterruptedException {
         List<AgentExecution> fillers = fillSlots();
         AgentExecution done = delegated(ExecutionStatus.SUCCEEDED, "조사 결과");
         finished(done);
@@ -238,7 +281,7 @@ class DelegationWakeUserLimitTest {
         assertThat(due).as("예약한 재시도").hasSize(1);
 
         executions.deleteAll(fillers);
-        due.getFirst().run();
+        runRetry(due.getFirst());
         awaitIdle(conversation.id());
 
         assertThat(executions.findById(done.id()).orElseThrow().resultDeliveredAt())
@@ -249,6 +292,44 @@ class DelegationWakeUserLimitTest {
                 .containsExactly(MessageRole.SYSTEM, MessageRole.ASSISTANT);
         assertThat(scheduler.drain()).as("결과를 전한 뒤의 예약").isEmpty();
         assertThat(limiter.used(dad.id())).as("자동 turn 이 끝난 뒤 쥔 자리").isZero();
+    }
+
+    @Test
+    @DisplayName("예약 뒤 다른 실패가 시각을 새로 적었으면 재시도가 그 시각을 지우지 않는다")
+    void keepsNewerFailureTimeWhenEarlierRetryRuns() throws InterruptedException {
+        List<AgentExecution> fillers = fillSlots();
+        AgentExecution done = delegated(ExecutionStatus.SUCCEEDED, "조사 결과");
+        finished(done);
+        List<Runnable> first = scheduler.drain();
+        assertThat(first).as("처음 예약한 재시도").hasSize(1);
+        // 처음 재시도도 한도에 닿아 거절된다. 새 실패 시각을 적고 다음 재시도를 예약한다.
+        runRetry(first.getFirst());
+        List<Runnable> second = scheduler.drain();
+        assertThat(second).as("다시 거절된 뒤 예약한 재시도").hasSize(1);
+        executions.deleteAll(fillers);
+
+        // 실제 시계를 앞당길 수 없어, 새 시각을 적은 뒤 앞 예약이 닿는 순서를 처음 작업을 한 번 더 돌려 만든다.
+        runRetry(first.getFirst());
+        awaitIdle(conversation.id());
+
+        assertThat(executions.findById(done.id()).orElseThrow().resultDeliveredAt())
+                .as("새 실패의 유예 안에 앞 재시도가 전한 표시")
+                .isNull();
+        assertThat(stub().received()).as("새 실패의 유예 안의 Hermes 제출").isEmpty();
+        assertThat(scheduler.drain()).as("유예 안에 막힌 재시도가 더 건 예약").isEmpty();
+
+        runRetry(second.getFirst());
+        awaitIdle(conversation.id());
+
+        assertThat(executions.findById(done.id()).orElseThrow().resultDeliveredAt())
+                .as("새 시각을 적은 쪽의 재시도가 전한 표시")
+                .isNotNull();
+    }
+
+    /** 예약한 재시도 작업을 돌리고, 그 작업이 띄운 스레드가 사건을 내고 끝날 때까지 기다린다. */
+    private void runRetry(Runnable task) throws InterruptedException {
+        task.run();
+        retryThreads.awaitOne();
     }
 
     /** 대화 turn 의 루트가 아닌 RUNNING 줄 둘로 dad 의 자리를 채운다. 대화가 없어 결과로 전해지지 않는다. */

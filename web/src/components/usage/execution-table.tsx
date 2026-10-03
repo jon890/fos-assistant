@@ -17,6 +17,7 @@ import { agentLabel, formatCost, formatTokens, formatWhen } from "@/lib/format";
 import {
   executionStatusLabel,
   executionStatusVariant,
+  isRunning,
 } from "@/lib/execution-status";
 import {
   actualCostLabel,
@@ -24,7 +25,6 @@ import {
   contextOmittedLabel,
   durationLabel,
   executionPath,
-  isRunning,
   reasoningEffortLabel,
   retryOfLabel,
   type UsageExecution,
