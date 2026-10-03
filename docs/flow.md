@@ -163,7 +163,7 @@ Control Plane 이 직접 적는 것이다.
 | `PENDING_MESSAGE_NOT_FOUND` | 취소하려는 대기 메시지가 이미 보내졌거나 없다 | 입력창에 되돌리지 않고 대기 줄을 다시 읽는다 |
 | `EXECUTION_NOT_FOUND` | 없는 실행이거나 남의 실행이다 | 사용량 목록으로 되돌린다 |
 
-`HERMES_BUSY` 와 `USER_BUSY` 를 받아도 Control Plane 은 다시 보내지 않는다.
+사용자가 보낸 요청이 `HERMES_BUSY` 나 `USER_BUSY` 를 받으면 Control Plane 은 다시 보내지 않는다. 위임 결과 자동 turn 의 재시도는 [`backend/execution-limit.md`](backend/execution-limit.md) 의 「한도에 닿을 때」 가 갖는다.
 한도에 닿은 상태에서 다시 보내면 한도를 더 밀어붙인다. 다시 보낼지는 사람이 정한다.
 
 `EXECUTION_NOT_FOUND` 는 두 원인을 같은 응답으로 숨긴다.

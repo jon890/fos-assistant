@@ -13,7 +13,7 @@
 
 **근거 문서**: `docs/backend/execution-limit.md` 의 「세는 방법」, 「기동 정리와의 관계」, 「설정」 절, `docs/adr/ADR-069-사용자-전체-실행-한도는-turn-자리와-실행-줄을-사용자-잠금-하나에서-센다.md`, `docs/backend/turn-control.md` 의 「중지」 절.
 
-- 실행 줄은 모두 `backend/src/main/java/com/bifos/assistant/usage/application/ExecutionRecorder.java` 의 private `record(...)` 에서 `executions.save(...)` 로 `RUNNING` 이 되어 생긴다. 공개 진입은 `start(...)`(12개 인자 판과 그것을 부르는 9개 인자 판), `startInheriting(...)`(Memory 제안), `startDetached(...)`(추천 질문) 셋이다.
+- 실행 줄은 모두 `backend/src/main/java/com/bifos/assistant/usage/application/ExecutionRecorder.java` 의 private `record(...)` 에서 `executions.save(...)` 로 `RUNNING` 이 되어 생긴다. 공개 진입은 `start(...)`(인자 6, 6, 9, 10, 12개의 다섯 overload 가 모두 12개 인자 판으로 모인다), `startInheriting(...)`(Memory 제안), `startDetached(...)`(추천 질문)이고, 셋 모두 private `record(...)` 로 간다.
 - `start` 를 부르는 곳: `chat/application/ChatService.java` 의 `begin`(대화 turn 의 루트, `parentExecutionId` null, 대화 있음), `orchestration/application/AgentRunner.java` 의 `run`(흐름 Chief 는 parent null 이고 대화 있음, 흐름 단계와 위임 자식은 parent 있음). 이 호출들은 모두 트랜잭션 밖이다.
 - 대화 잠금은 `chat/application/TurnCancellation.java` 의 `open(Long userId, Long conversationId)` 가 `byConversation.putIfAbsent` 로 잡고 `close(TurnHandle)` 가 풀며 닫기 리스너를 부른다. `runIfIdle` 은 `TurnHandle(null, conversationId)` 로 잡고 실행을 열지 않는다. `TurnHandle` 은 `chat/application/TurnHandle.java` 이고 생성자는 `TurnHandle(Long userId, Long conversationId)` 다.
 - `chat/application/RestartReconciler.java` 의 잡기 단계(약 283행)가 `turns.open(row.userId(), row.conversationId())` 로 기동 때 남은 대화 turn 의 잠금을 잡는다.
@@ -120,6 +120,7 @@ turn 자리 하나. `public void release()` 는 처음 한 번만 제한기에 �
 | `TurnSlot acquireTurn(Long userId)` | 잠금 안에서 `used(userId)` 가 `maxRunning` 이상이면 `new ApiException(ErrorCode.USER_BUSY, "this user has reached the concurrent execution limit")` 를 던진다. 아니면 turn 자리를 하나 늘리고 `TurnSlot` 을 돌려준다 |
 | `TurnSlot acquireRecoveredTurn(Long userId)` | 한도를 보지 않고 turn 자리를 늘린다. 기동 정리 전용 |
 | `<T> T admit(Long userId, ExecutionAdmission admission, Supplier<T> create)` | `TURN_ROOT` 면 잠금 없이 `create.get()`. `CHILD` 와 `BACKGROUND` 는 먼저 `TransactionSynchronizationManager.isActualTransactionActive()` 가 참이면 `IllegalStateException` 을 던진다. 잠금 안에서 `CHILD` 는 `used >= maxRunning`, `BACKGROUND` 는 `used + 1 + backgroundReserve > maxRunning` 이면 `USER_BUSY` 를 던지고, 통과하면 같은 잠금 안에서 `create.get()` 을 부른다 |
+| `boolean hasTurnRoom(Long userId)` | 잠금 안에서 `used(userId) < maxRunning` 을 돌려준다. 자리를 만들지 않는다. phase 02 가 새 대화를 저장하기 전에 한 번 본다 |
 | `int used(Long userId)` | 잠금 안에서 turn 자리 + 원격 종료 확인 자리 + `countRunningOutsideTurns(userId, RUNNING)` 를 돌려준다. 테스트와 로그용으로 공개한다 |
 
 `TurnSlot.release()` 가 부르는 패키지 메서드는 잠금 안에서 turn 자리를 하나 줄이고 0 이 되면 맵에서 지운다.
@@ -136,9 +137,14 @@ turn 자리 하나. `public void release()` 는 처음 한 번만 제한기에 �
 
 ### 10. `backend/src/main/java/com/bifos/assistant/chat/application/TurnHandle.java`, `TurnCancellation.java`
 
-- `TurnHandle` 에 `TurnSlot slot` 필드(패키지 접근)를 둔다.
+- `TurnHandle` 에 `volatile TurnSlot slot` 필드(패키지 접근)를 둔다. 닫는 스레드와 여는 스레드가 다르다.
 - `TurnCancellation` 생성자에 `UserExecutionLimiter` 를 더한다.
-- `open(userId, conversationId)`: `putIfAbsent` 가 성공한 뒤 `handle.slot = limiter.acquireTurn(userId)`. 예외가 나면 `byConversation.remove(conversationId, handle)` 로 되돌리고 닫기 리스너를 부르지 않은 채 다시 던진다.
+- `open(userId, conversationId)` 의 순서:
+  1. `byConversation.containsKey(conversationId)` 면 지금처럼 `CONVERSATION_BUSY`.
+  2. `slot = limiter.acquireTurn(userId)`. 여기서 `USER_BUSY` 가 나면 대화 잠금을 잡은 적이 없으니 그대로 올린다.
+  3. `putIfAbsent` 가 실패하면(그 사이 다른 turn 이 잡았다) `slot.release()` 하고 `CONVERSATION_BUSY`.
+  4. 성공하면 `handle.slot = slot`.
+  대화 잠금을 잡았다가 되돌리는 순서로 두지 않는다. 되돌린 잠금은 닫기 리스너를 부르지 않아, 그 사이 `CONVERSATION_BUSY` 를 받고 「닫힐 때 다시 온다」 고 본 깨우기가 다음 계기까지 미뤄진다.
 - 새 메서드 `openRecovered(Long userId, Long conversationId)`: `open` 과 같되 `acquireRecoveredTurn` 을 쓴다. Javadoc: 기동 정리 전용, 이미 Hermes 에서 도는 turn 이라 한도를 보지 않는다.
 - `close(handle)`: 맵에서 뺀 직후, `notifyClosed` 보다 먼저 `handle.slot` 이 있으면 `release()` 한다. 닫기 리스너가 다음 turn 을 열 때 자리가 돌아와 있어야 한다.
 - `runIfIdle` 은 바꾸지 않는다. 자리를 얻지 않는다.
@@ -146,7 +152,7 @@ turn 자리 하나. `public void release()` 는 처음 한 번만 제한기에 �
 
 ### 11. `backend/src/main/java/com/bifos/assistant/chat/application/RestartReconciler.java`
 
-잡기 단계의 `turns.open(row.userId(), row.conversationId())` 를 `turns.openRecovered(...)` 로 바꾼다. 묻기 단계가 다시 잡는 자리(같은 파일에서 `turns.open(` 을 찾는다)도 같다.
+잡기 단계의 `turns.open(row.userId(), row.conversationId())`(이 파일의 `turns.open(` 은 이 한 곳이다)를 `turns.openRecovered(...)` 로 바꾼다.
 
 ### 12. 테스트
 
@@ -160,7 +166,7 @@ turn 자리 하나. `public void release()` 는 처음 한 번만 제한기에 �
   - **경쟁**: 스레드 16개가 `CountDownLatch` 로 함께 출발해 절반은 `acquireTurn`, 절반은 `admit(CHILD, () -> 실제 RUNNING 줄 저장)` 을 부른다. 성공한 수의 합이 정확히 3 이고, 끝난 뒤 `used` 가 3 이다. 잠금을 빼면 실패하는 검사여야 한다.
   - 활성 트랜잭션 안에서 `admit(CHILD, ...)` 를 부르면 `IllegalStateException`(`TransactionTemplate` 으로 감싼다).
 - `backend/src/test/java/com/bifos/assistant/chat/application/TurnCancellationTest.java` 에 더한다:
-  - 한도가 1 인 제한기로 대화 A 의 `open` 뒤 대화 B 의 `open` 이 `USER_BUSY` 이고, B 의 잠금이 남지 않는다(`markOf(B)` 가 `TurnMark.NONE`, 닫기 리스너가 불리지 않는다).
+  - 한도가 1 인 제한기로 대화 A 의 `open` 뒤 대화 B 의 `open` 이 `USER_BUSY` 이고, B 의 잠금이 남지 않는다(`markOf(B)` 가 `TurnMark.NONE`, 닫기 리스너가 불리지 않는다). 같은 사용자 번호로 다른 스레드가 같은 대화를 동시에 열면 하나만 열리고 자리는 하나만 쓰인다.
   - 같은 대화에 이미 turn 이 있으면 `CONVERSATION_BUSY` 가 먼저 나간다.
   - `close` 뒤 자리가 돌아와 다른 대화의 `open` 이 된다. `close` 를 두 번 불러도 자리는 한 번만 돌아온다.
   - `openRecovered` 는 한도를 넘겨도 연다.

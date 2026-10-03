@@ -37,6 +37,16 @@ phase 01 이 끝난 상태:
 
 ## 작업 항목
 
+### 0. `chat/application/ChatService.java`: 새 대화로 보낸 요청이 거절되면 대화를 남기지 않는다
+
+`route(...)` 는 대화 번호가 없으면 `turns.open` 전에 `conversations.save(Conversation.startedBy(...))` 로 새 대화를 저장한다. 그대로 두면 `USER_BUSY` 로 거절된 요청마다 사용자 글을 제목으로 한 빈 대화가 목록에 남는다.
+
+- `ChatService` 에 `UserExecutionLimiter limiter` 를 주입한다.
+- `route` 에서 `existing == null` 이면 새 대화를 저장하기 전에 `if (!limiter.hasTurnRoom(user.id())) throw new ApiException(ErrorCode.USER_BUSY, ...)` 로 먼저 거절한다. 아무것도 저장하지 않는다.
+- private record `Routed`(파일 끝 근처)에 `boolean created` 를 더해 새로 만든 대화인지 싣는다.
+- `turns.open` 을 부르는 네 자리(`stream`, `runTurn` 과 `runFlow` 의 `existingHandle == null` 갈래, `regenerate`) 가운데 `Routed` 를 가진 셋은 새 private 메서드 `openTurn(CurrentUser user, Routed routed)` 를 거친다. `USER_BUSY` 가 나고 `routed.created()` 면 `conversations.deleteById(routed.conversation().id())` 로 방금 만든 빈 대화를 지운 뒤 다시 던진다. 미리 본 뒤 그 사이 자리가 찬 경우다. 지우다 실패하면 `warn` 만 남기고 원래 예외를 던진다.
+- `regenerate` 는 기존 대화라 지울 것이 없다.
+
 ### 1. `chat/application/NextTurnDispatcher.java`
 
 `tryPending` 에서 `turns.open` 의 `ApiException` 이 `USER_BUSY` 면 대기 행 번호 목록으로 `holdUnsent(conversation, ids)` 를 부르고 `hub.publish(conversationId, ChatEvent.error(ErrorCode.USER_BUSY.name(), ex.getMessage()))` 를 낸 뒤 참을 돌려준다(이 대화의 다음 turn 은 대기 메시지가 차지했다). `ids` 계산을 `open` 앞으로 옮긴다. `info` 로그에 대화 번호만 남긴다.
@@ -46,6 +56,7 @@ phase 01 이 끝난 상태:
 ### 2. `chat/application/DelegationWakeService.java`
 
 - `tryWake` 에서 `turns.open` 의 `ApiException` 이 `USER_BUSY` 면: `lastFailures.put(conversationId, Instant.now(clock))` 를 적고, 이 대화의 연속 거절 수(`ConcurrentHashMap<Long, Integer> busyRetries`)를 하나 늘린다. 그 수가 `MAX_BUSY_RETRIES`(10, 상수)를 넘지 않으면 `FAILURE_BACKOFF` 에 1초를 더한 뒤 `WakeRetryDue(conversationId)` 사건을 내도록 예약한다. 넘으면 예약하지 않고 `info` 로그를 남긴다. 결과의 `result_delivered_at` 은 적지 않는다.
+- 예약한 작업은 그 대화의 `lastFailures` 를 지운 뒤 `WakeRetryDue` 를 낸다. 지우지 않으면 `inFailureBackoff` 가 실제 시계(`Clock.systemUTC()`)로 30초를 다시 세어 재시도가 막힐 수 있고, 검사에서 예약을 곧바로 돌려도 막힌다.
 - `turns.open` 이 성공하면 그 대화의 `busyRetries` 를 지운다.
 - 예약에는 Spring Boot 가 `@EnableScheduling`(`shared/config/SchedulingConfig.java`)으로 만든 `TaskScheduler` 빈을 주입해 `schedule(Runnable, Instant)` 를 쓴다. 사건은 `ApplicationEventPublisher` 로 낸다.
 - 클래스 Javadoc 에 「사용자 실행 한도에 닿으면 상한이 있는 재시도」 를 더한다.
@@ -69,26 +80,28 @@ phase 01 이 끝난 상태:
 
 ### 6. 테스트
 
-모두 `@SpringBootTest` 에 `assistant.user-execution.max-running` 을 작은 값으로 준다. 실행을 붙잡아 두는 데는 `backend/src/test/java/com/bifos/assistant/hermes/StubHermesRunsClient.java` 의 `holdSubmits()`/`releaseSubmits()` 나 `beforeAwait(Runnable)` 을 쓴다. 기존 본보기는 `ChatRunningTurnTest`, `PendingBeforeDelegationTest`, `DelegationWakeServiceTest`, `AgentDelegationServiceTest` 다.
+모두 `@SpringBootTest`, `@ActiveProfiles("test")`, `@Import(ChatServiceTest.StubRuntime.class)` 에 `assistant.user-execution.max-running` 을 작은 값으로 준다. 대역 Hermes 는 `StubHermesRunsClient` 빈이다.
+**실행을 붙잡을 때는 입력별 latch 를 건 `willAnswer` 를 쓴다**(본보기: `backend/src/test/java/com/bifos/assistant/orchestration/ResearchAndBuildFlowTest.java` 의 `willAnswer` 와 `CountDownLatch`). `holdSubmits()` 와 `beforeAwait()` 는 대역 전체에 걸려 다른 사용자의 실행까지 붙잡는다. 기존 본보기는 `ChatRunningTurnTest`, `PendingBeforeDelegationTest`, `DelegationWakeServiceTest`, `AgentDelegationServiceTest` 다.
 
 - `backend/src/test/java/com/bifos/assistant/chat/UserExecutionLimitChatTest.java` 신규(max-running=2):
-  - 같은 사용자가 대화 둘에서 turn 을 붙잡아 둔 채 셋째 대화로 보내면 409 `USER_BUSY` 다. 셋째 대화에 사용자 메시지가 저장되지 않았고 실행 줄도 없다. Hermes 제출 수가 늘지 않았다.
+  - 같은 사용자가 대화 둘에서 turn 을 붙잡아 둔 채 기존 셋째 대화로 보내면 409 `USER_BUSY` 다. 셋째 대화에 사용자 메시지가 저장되지 않았고 실행 줄도 없다. Hermes 제출 수가 늘지 않았다.
+  - 같은 상태에서 대화 번호 없이(새 대화로) 보내면 `USER_BUSY` 이고 그 사용자의 대화 수가 늘지 않는다.
   - 그때 다른 사용자의 보내기는 성공한다.
   - 붙잡은 turn 하나를 끝내면 같은 사용자가 다시 보낼 수 있다(자리가 샜거나 두 번 돌아오지 않는다: `UserExecutionLimiter.used` 가 끝난 뒤 0).
   - 다시 생성도 한도에 닿으면 `USER_BUSY` 이고 이전 답을 바꾸지 않는다.
-  - 대기 메시지 turn: 한도에 닿은 상태에서 다른 대화의 turn 이 닫혀 `tryNext` 가 그 대화의 대기 행을 보내려 하면, 대기 행이 남고 `held` 가 참이며 대화 단위 SSE(또는 `ConversationEventHub` 대역)에 `USER_BUSY` 오류가 간다.
+  - 대기 메시지 turn: 그 사용자의 `RUNNING` 자식 줄(`parentExecutionId` 있음)을 저장소에 직접 두 줄 저장해 자리를 채우고, 도는 turn 이 없는 대화에 대기 행을 저장한 뒤 `NextTurnDispatcher.tryNext(그 대화)` 를 부른다. 대기 행이 남고 `held` 가 참이며 `ConversationEventHub` 로 그 대화에 `USER_BUSY` 오류 사건이 간다(구독을 열어 받거나 대역으로 확인). 저장한 줄은 끝에 지운다.
 - `backend/src/test/java/com/bifos/assistant/orchestration/UserExecutionLimitDelegationTest.java` 신규(max-running=2):
   - 부모 turn 이 돌고 위임 자식 하나가 돈다(2자리). 둘째 `agent_delegate` 는 `BUSY` 를 곧바로 돌려준다(제출 대기 시간 `submit-timeout` 보다 훨씬 짧게, 예를 들어 2초 안에). 실행 줄이 생기지 않았다. 부모 turn 은 그대로 끝까지 돈다. 교착이 없다는 단언이다.
-  - 흐름 turn 에서 Researcher 와 Engineer 가 함께 뜨는데 자리가 하나만 남으면, 그 turn 은 `USER_BUSY` 로 끝나고 루트 줄의 `error_code` 가 `USER_BUSY` 다. max-running 을 2 로 두고 다른 대화의 turn 하나를 붙잡아 재현한다.
-- `backend/src/test/java/com/bifos/assistant/chat/DelegationWakeServiceTest.java` 에 더한다: 한도에 닿아 `tryWake` 가 거절되면 결과가 전해지지 않은 채 남고 재시도가 예약된다. 거절이 10번 이어지면 더 예약하지 않는다(`TaskScheduler` 대역으로 예약 수를 센다). 자리가 나면 재시도가 결과를 전한다.
-- `backend/src/test/java/com/bifos/assistant/chat/StarterSuggestionServiceTest.java` 와 `backend/src/test/java/com/bifos/assistant/memory/MemoryProposerTest.java` 에 더한다. 두 파일이 제한기를 실물로 쓰지 않으면 `UserExecutionLimiter` 대역이 `USER_BUSY` 를 던지게 한다: max-running=2, background-reserve=1 에서 turn 자리 하나를 쥔 사용자의 추천 질문과 Memory 제안은 실행 줄을 만들지 않고 Hermes 에 제출하지 않는다. 추천 질문은 실패 시각을 적지 않아 자리가 빈 뒤 다음 읽기에서 만든다.
+  - 흐름 turn 에서 Researcher 와 Engineer 가 함께 뜨는데 자리가 하나만 남으면, 한쪽은 돌고 다른 쪽은 줄 없이 거절되며, 흐름은 도는 쪽이 끝날 때까지 기다린 뒤 `USER_BUSY` 로 끝나고 루트 줄의 `error_code` 가 `USER_BUSY` 다. 다른 turn 없이 max-running 을 2 로 두면 turn 자리 1에 단계 하나가 들어가 재현된다. 흐름 에이전트를 만드는 방법은 `ResearchAndBuildFlowTest` 를 따른다.
+- `backend/src/test/java/com/bifos/assistant/chat/DelegationWakeServiceTest.java` 에 더한다: 한도에 닿아 `tryWake` 가 거절되면 결과가 전해지지 않은 채 남고 재시도가 예약된다. 거절이 10번 이어지면 더 예약하지 않는다. 자리가 나면 재시도가 결과를 전한다. `TaskScheduler` 는 받은 작업을 모아 두었다가 검사가 곧바로 돌리는 `@Primary` 대역 빈으로 바꾼다. 이 검사 클래스의 기존 속성에 `assistant.user-execution.max-running` 을 더해야 하면 새 검사 클래스 `DelegationWakeUserLimitTest` 로 분리해도 된다.
+- `backend/src/test/java/com/bifos/assistant/chat/UserExecutionLimitBackgroundTest.java` 신규. `properties = {"assistant.user-execution.max-running=2", "assistant.user-execution.background-reserve=1", "assistant.starters.enabled=true", "assistant.memory.propose.enabled=true"}`. 기존 `StarterSuggestionServiceTest` 와 `MemoryProposerTest` 의 준비 방법을 따른다: max-running=2, background-reserve=1 에서 turn 자리 하나를 쥔 사용자의 추천 질문과 Memory 제안은 실행 줄을 만들지 않고 Hermes 에 제출하지 않는다. 추천 질문은 실패 시각을 적지 않아 자리가 빈 뒤 다음 읽기에서 만든다.
 - 기존 위임, 대화 잠금, 중지, 기동 정리, 깨우기 검사를 지우거나 약하게 바꾸지 않는다.
 
 ## 검증
 
 ```bash
 # cwd: backend/
-./gradlew test --tests '*UserExecutionLimitChatTest' --tests '*UserExecutionLimitDelegationTest' --tests '*DelegationWakeServiceTest' --tests '*StarterSuggestion*' --tests '*MemoryProposer*' --tests '*AgentDelegationServiceTest' --tests '*McpAgentToolsTest' --tests '*PendingBeforeDelegationTest'
+./gradlew test --tests '*UserExecutionLimitChatTest' --tests '*UserExecutionLimitDelegationTest' --tests '*DelegationWakeServiceTest' --tests '*UserExecutionLimitBackgroundTest' --tests '*StarterSuggestion*' --tests '*MemoryProposer*' --tests '*AgentDelegationServiceTest' --tests '*McpAgentToolsTest' --tests '*PendingBeforeDelegationTest'
 ./gradlew test
 ./gradlew qualityCheck
 ```
@@ -117,5 +130,6 @@ scripts/quality.sh check
 | `backend/src/test/java/com/bifos/assistant/chat/UserExecutionLimitChatTest.java` | 신규 |
 | `backend/src/test/java/com/bifos/assistant/orchestration/UserExecutionLimitDelegationTest.java` | 신규 |
 | `backend/src/test/java/com/bifos/assistant/chat/DelegationWakeServiceTest.java` | 수정 |
-| `backend/src/test/java/com/bifos/assistant/chat/StarterSuggestionServiceTest.java` | 수정 |
-| `backend/src/test/java/com/bifos/assistant/memory/MemoryProposerTest.java` | 수정 |
+| `backend/src/test/java/com/bifos/assistant/chat/UserExecutionLimitBackgroundTest.java` | 신규 |
+| `backend/src/main/java/com/bifos/assistant/chat/application/ChatService.java` | 수정 |
+| `backend/src/test/java/com/bifos/assistant/chat/*Test.java` | 수정 |

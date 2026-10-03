@@ -17,7 +17,7 @@ phase 01 부터 03 이 끝난 상태: 보내기와 다시 생성은 질문을 �
 웹:
 - `web/src/components/error-message.ts` 의 `MESSAGES` 가 코드를 한국어 문구로 바꾼다. 검사는 `test/unit/error-message.test.ts` 다.
 - `web/src/components/chat/conversation-session.tsx` 의 `rejectBeforeStart` 는 `CONVERSATION_BUSY` 만 대기 메시지로 넣고, 나머지 코드는 글을 입력창에 되돌린 뒤 `reportRejected(code, message)` 로 알린다. 그래서 `USER_BUSY` 는 문구만 더하면 「글을 되돌리고 안내」 가 된다. 코드를 바꾸지 않는다.
-- `web/src/components/usage/execution-list.tsx` 의 `executionStatusLabel` 이 `HERMES_BUSY` 를 「요청이 많아 거절됨」 으로 보인다. 그 밖의 실패 코드는 일반 사용자에게 「실패」 다. 검사는 `test/unit/execution-status.test.ts` 다.
+- `web/src/components/usage/execution-list.tsx` 의 `executionStatusLabel` 이 `HERMES_BUSY` 를 「요청이 많아 거절됨」 으로 보인다. 그 밖의 실패 코드는 일반 사용자에게 「실패」 다. 이 함수를 `execution-card.tsx` 와 `execution-table.tsx` 가 import 한다. `test/unit/execution-status.test.ts` 는 `web/src/lib/execution-status.ts` 의 `executionStatusVariant` 만 검사한다. `.tsx` 는 JSX 와 `@/` 별칭 때문에 `node --test` 가 불러오지 못한다.
 
 e2e:
 - `test/e2e/run.ts` 가 Control Plane 을 `./gradlew smokeRun` 으로 띄우고 `SCENARIOS` 배열을 차례로 돈다. 환경 변수는 `...process.env` 를 이어받는다.
@@ -42,14 +42,16 @@ e2e:
     "다른 대화에서 진행 중인 작업이 많아요. 진행 중인 작업이 끝난 뒤 다시 보내 주세요.",
 ```
 
-### 2. `web/src/components/usage/execution-list.tsx`
+### 2. `executionStatusLabel` 을 `web/src/lib/execution-status.ts` 로 옮긴다
 
-`executionStatusLabel` 의 `HERMES_BUSY` 줄 다음에 `if (execution.errorCode === "USER_BUSY") return "동시 실행 한도에 닿아 거절됨";` 과 한 줄 주석(사용자 한 명의 동시 실행 한도라 Hermes 가 붐빈 것과 원인이 다르다)을 더한다.
+- `executionStatusLabel` 과 그 Javadoc 을 `web/src/lib/execution-status.ts` 로 옮긴다. 쓰는 보조 함수(`isRunning`, `isInterruptedByRestart`)가 이미 거기 있으면 그대로 쓰고, `execution-list.tsx` 에 있으면 함께 옮긴다. 타입은 `import type` 으로 가져온다.
+- `execution-list.tsx`, `execution-card.tsx`, `execution-table.tsx` 의 import 를 새 위치로 바꾼다. 동작은 바꾸지 않는다.
+- `HERMES_BUSY` 줄 다음에 `if (execution.errorCode === "USER_BUSY") return "동시 실행 한도에 닿아 거절됨";` 과 한 줄 주석(사용자 한 명의 동시 실행 한도라 Hermes 가 붐빈 것과 원인이 다르다)을 더한다.
 
 ### 3. `test/unit/error-message.test.ts`, `test/unit/execution-status.test.ts`
 
 - `describeError("USER_BUSY", "fallback")` 이 위 문구다.
-- `executionStatusLabel({ status: "FAILED", errorCode: "USER_BUSY", ... }, false)` 가 「동시 실행 한도에 닿아 거절됨」 이다. 파일의 기존 단언 모양을 따른다.
+- `executionStatusLabel({ status: "FAILED", errorCode: "USER_BUSY", ... }, false)` 가 「동시 실행 한도에 닿아 거절됨」 이고, 옮기기 전과 같은 입력(`HERMES_BUSY`, 일반 실패, 관리자 여부)이 같은 문구를 낸다. 파일의 기존 단언 모양을 따른다.
 
 ### 4. `test/e2e/fake-hermes.ts`
 
@@ -60,23 +62,25 @@ e2e:
 
 ### 5. `test/e2e/scenarios/user-execution-limit.ts` 신규, `test/e2e/run.ts`
 
-`userExecutionLimitScenario: Scenario` 를 만들고 `run.ts` 의 `SCENARIOS` 에서 `busyScenario` 바로 뒤에 넣는다.
+`userExecutionLimitScenario: Scenario` 를 만들고 `run.ts` 의 `SCENARIOS` 맨 끝에 넣는다. Control Plane 을 다시 띄우므로 다른 시나리오 뒤에 둔다.
 
-1. 한도는 `Number(process.env.ASSISTANT_USER_EXECUTION_MAX_RUNNING ?? "4")` 로 읽는다.
-2. dad 의 `RUNNING` 실행이 없을 때까지 기다린다(`GET /usage/executions?limit=50` 을 짧게 반복. 앞 시나리오가 남긴 추천 질문 실행 때문이다).
-3. `slowRuns(1500)` 과 `resetRunConcurrency()` 뒤, dad 가 새 대화로 한도보다 2 개 많은 `POST /chat/messages` 를 한꺼번에 보낸다(대화 번호 없이 보내 매번 새 대화). 같은 순간 kid 도 하나를 보낸다. 각 요청의 시작과 끝 시각을 기록한다.
+한 사용자가 넘치게 보내는 쪽은 aunt, 동시에 보내는 다른 사용자는 kid 로 한다. dad 는 앞 시나리오가 많이 써서 `RUNNING` 자식 줄이나 원격 종료 확인 자리가 남아 있을 수 있다. `/usage/executions` 는 루트 실행만 보여 그것을 기다리는 조건으로 잡지 못한다. aunt 가 보낼 에이전트 코드는 앞 시나리오(`people`)가 첫 요청에 만든 것을 `GET /agents` 로 찾아 쓴다. aunt 로 대화가 돌지 않으면 앞 시나리오가 실행을 남기지 않은 다른 사용자를 고르고 그 까닭을 회신에 적는다.
+
+1. 측정할 한도 목록은 기본값 4 하나다. 환경 변수 `E2E_MEASURE_USER_LIMITS`(예: `2,6`)가 있으면 그 값들을 더한다. 기본값이 아닌 한도는 `process.env.ASSISTANT_USER_EXECUTION_MAX_RUNNING` 을 그 값으로 두고 `context.restartControlPlane()` 으로 다시 띄워 측정한 뒤, 끝나면 그 환경 변수를 지우고 다시 띄워 기본값으로 되돌린다. `run.ts` 의 `launch` 는 띄울 때마다 `process.env` 를 읽는다.
+2. aunt 의 루트 실행이 모두 끝날 때까지 기다린다(`GET /usage/executions?limit=50` 을 짧게 반복).
+3. `slowRuns(1500)` 과 `resetRunConcurrency()` 뒤, aunt 가 새 대화로 한도보다 2 개 많은 `POST /chat/messages` 를 한꺼번에 보낸다(대화 번호 없이 보내 매번 새 대화). 같은 순간 kid 도 하나를 보낸다. 각 요청의 시작과 끝 시각을 기록한다.
 4. 단언:
-   - dad 의 200 수가 한도와 같고 나머지는 409 이며 본문 `code` 가 `USER_BUSY` 다.
+   - aunt 의 200 수가 한도와 같고 나머지는 409 이며 본문 `code` 가 `USER_BUSY` 다. 거절된 수만큼 aunt 의 대화가 늘지 않았다.
    - kid 의 요청은 200 이다.
-   - `runConcurrency().maxByProfile` 의 dad profile 값이 한도 이하다.
-   - 모두 끝난 뒤 dad 가 하나를 더 보내면 200 이다(자리가 새지 않았다).
-5. 측정값을 `console.log` 로 한 줄씩 출력한다: 한도, dad 의 보낸 수, 받아들여진 수, 거절된 수, dad profile 의 동시 최댓값, 전체 동시 최댓값, 받아들여진 요청의 응답 시간 최소, 중앙값, 최대(ms), 거절 응답 시간 최대(ms). 글 본문은 출력하지 않는다.
+   - `runConcurrency().maxByProfile` 의 aunt profile 값이 한도 이하다.
+   - 모두 끝난 뒤 aunt 가 하나를 더 보내면 200 이다(자리가 새지 않았다).
+5. 측정값을 `console.log` 로 한 줄씩 출력한다: 한도, aunt 의 보낸 수, 받아들여진 수, 거절된 수, aunt profile 의 동시 최댓값, 전체 동시 최댓값, 받아들여진 요청의 응답 시간 최소, 중앙값, 최대(ms), 거절 응답 시간 최대(ms). 글 본문은 출력하지 않는다.
 6. `finally` 에서 `slowRuns(undefined)` 로 되돌린다.
 
 ### 6. 측정과 `docs/backend/execution-limit.md`
 
-- 아래 「검증」 의 e2e 를 기본 한도로 한 번 돌리고, `ASSISTANT_USER_EXECUTION_MAX_RUNNING=2` 와 `=6` 으로 한 번씩 더 돌려 출력된 값을 모은다. 실패하면 값을 모으기 전에 원인을 고친다.
-- `docs/backend/execution-limit.md` 의 「측정」 절에서 「측정 결과는 구현을 마친 뒤 이 절에 적는다.」 줄을 지우고, 측정 조건(합성 사용자 둘, 한 사용자가 한도보다 2 개 많이 한꺼번에 보냄, 가짜 Hermes 지연 1.5초, 측정 날짜)과 한도별 결과 표(보낸 수, 받아들여진 수, 거절 수, 동시 최댓값, 응답 시간)를 적는다. 기본값 4 가 측정과 맞지 않으면 그 까닭과 바꾼 값을 적고 `application.yml` 과 문서의 기본값을 함께 바꾼다.
+- 아래 「검증」 의 `E2E_MEASURE_USER_LIMITS=2,6 node test/e2e/run.ts` 가 출력한 값을 모은다. 실패하면 값을 모으기 전에 원인을 고친다.
+- `docs/backend/execution-limit.md` 의 「측정」 절에서 「측정 결과는 구현을 마친 뒤 이 절에 적는다.」 줄을 지우고, 측정 조건(합성 사용자 둘, 한 사용자가 한도보다 2 개 많이 한꺼번에 보냄, 가짜 Hermes 지연 1.5초, 측정 날짜)과 한도별 결과 표(보낸 수, 받아들여진 수, 거절 수, 동시 최댓값, 응답 시간)를 적는다.
 - 「운영 Hermes 의 메모리 최댓값은 이 측정이 다루지 않는다.」 문장은 남긴다.
 
 ## 검증
@@ -86,8 +90,7 @@ e2e:
 node --test test/unit/error-message.test.ts test/unit/execution-status.test.ts
 node --test 'test/unit/**/*.test.ts'
 node test/e2e/run.ts
-ASSISTANT_USER_EXECUTION_MAX_RUNNING=2 node test/e2e/run.ts
-ASSISTANT_USER_EXECUTION_MAX_RUNNING=6 node test/e2e/run.ts
+E2E_MEASURE_USER_LIMITS=2,6 node test/e2e/run.ts
 scripts/check-public-safe.sh
 scripts/quality.sh check
 ```
@@ -105,10 +108,12 @@ pnpm typecheck
 |---|---|
 | `web/src/components/error-message.ts` | 수정 |
 | `web/src/components/usage/execution-list.tsx` | 수정 |
+| `web/src/components/usage/execution-card.tsx` | 수정 |
+| `web/src/components/usage/execution-table.tsx` | 수정 |
+| `web/src/lib/execution-status.ts` | 수정 |
 | `test/unit/error-message.test.ts` | 수정 |
 | `test/unit/execution-status.test.ts` | 수정 |
 | `test/e2e/fake-hermes.ts` | 수정 |
 | `test/e2e/scenarios/user-execution-limit.ts` | 신규 |
 | `test/e2e/run.ts` | 수정 |
 | `docs/backend/execution-limit.md` | 수정 |
-| `backend/src/main/resources/application.yml` | 수정 |
