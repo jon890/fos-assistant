@@ -129,7 +129,7 @@ scripts/quality.sh check
 | `backend/src/main/java/com/bifos/assistant/mcp/application/McpToolService.java` | 수정 |
 | `backend/src/test/java/com/bifos/assistant/chat/UserExecutionLimitChatTest.java` | 신규 |
 | `backend/src/test/java/com/bifos/assistant/orchestration/UserExecutionLimitDelegationTest.java` | 신규 |
-| `backend/src/test/java/com/bifos/assistant/chat/DelegationWakeServiceTest.java` | 수정 |
+| `backend/src/test/java/com/bifos/assistant/chat/DelegationWakeUserLimitTest.java` | 신규 |
 | `backend/src/test/java/com/bifos/assistant/chat/UserExecutionLimitBackgroundTest.java` | 신규 |
 | `backend/src/main/java/com/bifos/assistant/chat/application/ChatService.java` | 수정 |
 | `backend/src/test/java/com/bifos/assistant/chat/*Test.java` | 수정 |
