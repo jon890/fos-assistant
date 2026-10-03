@@ -593,6 +593,16 @@ export type FakeHermes = {
    */
   connectorToolCalls(): readonly ConnectorToolCall[];
   holdNextRun(): void;
+  /**
+   * 값이 있으면 추천 질문이 아닌 새 실행을 제출 시각에서 `ms` 가 지날 때까지 `running` 으로 답하고 그 뒤 `completed`
+   * 로 답한다. `undefined` 면 끈다. `holdNextRun` 으로 붙잡은 실행은 이 지연 없이 붙잡힌 채로 있다.
+   */
+  slowRuns(ms: number | undefined): void;
+  /**
+   * `slowRuns` 가 켜진 동안 제출된 실행이 제출부터 완료나 중지까지 나란히 돈 최댓값이다. 전체와 profile 별로 적는다.
+   */
+  runConcurrency(): { maxTotal: number; maxByProfile: Record<string, number> };
+  resetRunConcurrency(): void;
   waitForHeldRun(): Promise<void>;
   releaseHeldRun(): void;
   /** 지금 붙잡아 둔 실행의 번호와 session 이다. 붙잡은 것이 없으면 `undefined` 다. 플러그인처럼 `_fos_ctx` 를 서명할 때 쓴다. */
@@ -694,6 +704,18 @@ export function startFakeHermes(
   let modelOptionsCalls = 0;
   let lastSubmittedRuntime: { provider?: string; model?: string; reasoningEffort?: string } = {};
   let holdNextRun = false;
+  /** `slowRuns` 가 정한 지연이다. 없으면 실행이 제출 즉시 `completed` 다. */
+  let slowRunMs: number | undefined;
+  /** 지연 중인 실행의 번호와 그 profile 이다. 완료나 중지로 빠진다. */
+  const slowActive = new Map<string, string>();
+  let maxTotalConcurrency = 0;
+  const maxProfileConcurrency = new Map<string, number>();
+  /** 지연 중인 실행 하나를 끝낸다. 이미 중지된 실행의 상태는 덮어쓰지 않는다. */
+  const finishSlowRun = (runId: string) => {
+    if (!slowActive.delete(runId)) return;
+    const run = runs.get(runId);
+    if (run !== undefined && run.status === "running") run.status = "completed";
+  };
   let heldRunId: string | undefined;
   let heldRunWaiter: (() => void) | undefined;
   let heldRunReady: Promise<void> | undefined;
@@ -1459,6 +1481,8 @@ export function startFakeHermes(
             Connection: "keep-alive",
           });
           response.write(": keepalive\n\n");
+          // 지연 중인 실행은 끝나거나 중지될 때까지 스트림을 연 채로 둔다. 실제 Hermes 가 도는 동안 그렇게 한다.
+          while (slowActive.has(runId!) && !response.destroyed) await wait(20);
           if (run.input === "중지 조각 전 검사" && run.status !== "completed") {
             if (run.status === "cancelled") {
               response.end();
@@ -1624,6 +1648,7 @@ export function startFakeHermes(
           emptyUntilStopped.delete(runId!);
           stoppedRuns.push(runId!);
           if (heldRunId === runId) releaseHeldRun();
+          slowActive.delete(runId!);
           return send(response, 200, { status: "stopping" });
         }
         const match = RUN_PATH.exec(path);
@@ -1714,9 +1739,10 @@ export function startFakeHermes(
         const instructionsEcho = echoed.length > 0 ? ` [instructions: ${echoed}]` : "";
         const held = holdNextRun && !starterRun;
         if (held) holdNextRun = false;
+        const slow = !held && !starterRun && slowRunMs !== undefined;
         runs.set(runId, {
           run_id: runId,
-          status: held ? "running" : "completed",
+          status: held || slow ? "running" : "completed",
           session_id: sessionId,
                   // 실제 Hermes 와 같이 요청 본문의 값을 그대로 되돌려 준다. 실제로 돈 모델이 아니다.
           model: submitted.model ?? profile!,
@@ -1744,6 +1770,13 @@ export function startFakeHermes(
         if (held) {
           heldRunId = runId;
           heldRunWaiter?.();
+        }
+        if (slow) {
+          slowActive.set(runId, profile!);
+          maxTotalConcurrency = Math.max(maxTotalConcurrency, slowActive.size);
+          const sameProfile = [...slowActive.values()].filter((name) => name === profile).length;
+          maxProfileConcurrency.set(profile!, Math.max(maxProfileConcurrency.get(profile!) ?? 0, sameProfile));
+          setTimeout(() => finishSlowRun(runId), slowRunMs);
         }
         return send(response, 200, { run_id: runId, status: "queued" });
       }
@@ -1805,6 +1838,17 @@ export function startFakeHermes(
           heldRunReady = new Promise<void>((done) => {
             heldRunWaiter = done;
           });
+        },
+        slowRuns: (ms: number | undefined) => {
+          slowRunMs = ms;
+        },
+        runConcurrency: () => ({
+          maxTotal: maxTotalConcurrency,
+          maxByProfile: Object.fromEntries(maxProfileConcurrency),
+        }),
+        resetRunConcurrency: () => {
+          maxTotalConcurrency = 0;
+          maxProfileConcurrency.clear();
         },
         waitForHeldRun: () => heldRunReady ?? Promise.reject(new Error("유지할 실행을 먼저 지정해야 한다")),
         releaseHeldRun: () => {

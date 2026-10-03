@@ -1,5 +1,4 @@
 import { EmptyState } from "@/components/ui/empty-state";
-import { isInterruptedByRestart } from "@/lib/execution-status";
 import { formatCost, formatDurationFor } from "@/lib/format";
 import { ExecutionCard } from "./execution-card";
 import { ExecutionTable } from "./execution-table";
@@ -93,27 +92,6 @@ export function durationLabel(
   return isRunning(execution)
     ? ""
     : formatDurationFor(execution.latencyMs ?? 0, isAdmin);
-}
-
-/**
- * 상태 배지의 문구다.
- *
- * <p>문구가 정해지지 않은 오류 코드는 관리자에게만 원문으로 보인다. 그 밖의 사용자에게는 「실패」 다.
- */
-export function executionStatusLabel(
-  execution: UsageExecution,
-  isAdmin: boolean,
-): string {
-  if (isRunning(execution)) return "실행 중";
-  if (isInterruptedByRestart(execution.errorCode)) return "중간에 중단됨";
-  if (execution.errorCode === "PROVIDER_BLOCKED") return "모델을 쓸 수 없음";
-  if (execution.errorCode === "NO_MODEL_AVAILABLE")
-    return "사용할 수 있는 모델 없음";
-  // 공유 gateway 의 동시 실행 한도에 닿아 거절당한 것이다. Hermes 가 내려간 것과 원인이 다르다.
-  if (execution.errorCode === "HERMES_BUSY") return "요청이 많아 거절됨";
-  if (execution.status === "FAILED" || execution.errorCode !== null)
-    return isAdmin ? (execution.errorCode ?? "실패") : "실패";
-  return "성공";
 }
 
 /**

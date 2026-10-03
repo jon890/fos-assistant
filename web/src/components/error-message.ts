@@ -31,6 +31,8 @@ const MESSAGES: Record<string, string> = {
     "대화를 찾지 못했어요. 대화 목록으로 돌아가 다시 골라 주세요.",
   MESSAGE_NOT_LATEST: "그사이 대화가 바뀌었어요. 최신 대화를 다시 불러왔어요.",
   CONVERSATION_BUSY: "아직 답을 만들고 있어요. 답이 끝난 뒤 다시 눌러 주세요.",
+  USER_BUSY:
+    "다른 대화에서 진행 중인 작업이 많아요. 진행 중인 작업이 끝난 뒤 다시 보내 주세요.",
   PENDING_QUEUE_FULL:
     "대기 중인 메시지가 가득 찼어요. 답이 끝난 뒤 보내 주세요.",
   PENDING_MESSAGE_NOT_FOUND: "이미 보낸 메시지예요.",
