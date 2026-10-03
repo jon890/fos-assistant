@@ -249,26 +249,44 @@ class DelegationWakeUserLimitTest {
     }
 
     @Test
-    @DisplayName("한도에 닿은 거절이 이어지면 10번까지만 재시도를 예약한다")
-    void schedulesAtMostTenRetriesWhileRejectionsContinue() throws InterruptedException {
-        fillSlots();
+    @DisplayName("한도에 닿은 거절이 10번을 넘으면 5분 간격으로 이어 예약하고 자리가 나면 결과를 전한다")
+    void keepsRetryingAtLongIntervalAfterTenRejections() throws InterruptedException {
+        List<AgentExecution> fillers = fillSlots();
         AgentExecution done = delegated(ExecutionStatus.SUCCEEDED, "조사 결과");
 
         finished(done);
-        int ran = 0;
-        for (List<Runnable> due = scheduler.drain(); !due.isEmpty(); due = scheduler.drain()) {
-            for (Runnable task : due) {
-                runRetry(task);
-                ran++;
-            }
-            assertThat(ran).as("돌린 재시도 수").isLessThanOrEqualTo(MAX_BUSY_RETRIES);
+        for (int ran = 0; ran < MAX_BUSY_RETRIES; ran++) {
+            List<Runnable> due = scheduler.drain();
+            assertThat(due).as("%d번째 짧은 재시도", ran + 1).hasSize(1);
+            runRetry(due.getFirst());
         }
+        List<Instant> times = scheduler.startTimes;
+        Instant shortRetry = times.get(times.size() - 2);
+        Instant longRetry = times.getLast();
+        assertThat(longRetry)
+                .as("10번을 넘긴 뒤의 예약 시각")
+                .isAfterOrEqualTo(Instant.now().plus(Duration.ofMinutes(5)).minus(WAIT_LIMIT));
+        assertThat(shortRetry).as("10번째 예약 시각").isBefore(Instant.now().plus(Duration.ofMinutes(1)));
 
-        assertThat(ran).as("예약된 재시도 수").isEqualTo(MAX_BUSY_RETRIES);
+        List<Runnable> slow = scheduler.drain();
+        assertThat(slow).as("한 대화에 걸린 예약").hasSize(1);
+        runRetry(slow.getFirst());
+        List<Runnable> again = scheduler.drain();
+        assertThat(again).as("여전히 막히면 다시 건 예약").hasSize(1);
+        assertThat(scheduler.startTimes.getLast())
+                .as("이어 건 예약도 5분 간격")
+                .isAfterOrEqualTo(Instant.now().plus(Duration.ofMinutes(5)).minus(WAIT_LIMIT));
         assertThat(executions.findById(done.id()).orElseThrow().resultDeliveredAt())
-                .as("전했다는 표시")
+                .as("막혀 있는 동안 전했다는 표시")
                 .isNull();
-        assertThat(stub().received()).as("Hermes 제출").isEmpty();
+        assertThat(stub().received()).as("막혀 있는 동안 Hermes 제출").isEmpty();
+
+        executions.deleteAll(fillers);
+        runRetry(again.getFirst());
+        awaitIdle(conversation.id());
+        assertThat(executions.findById(done.id()).orElseThrow().resultDeliveredAt())
+                .as("자리가 난 뒤 전했다는 표시")
+                .isNotNull();
     }
 
     @Test

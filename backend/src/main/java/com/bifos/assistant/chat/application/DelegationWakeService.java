@@ -35,9 +35,9 @@ import org.springframework.stereotype.Service;
  * <p>여는지는 그 대화의 turn 잠금을 잡을 수 있는지로 정한다. 잡지 못하면 그 turn 이 닫힐 때 {@link NextTurnDispatcher} 가 다시 부른다. 기다리는
  * 목록은 따로 두지 않는다. 아직 전하지 않은 끝난 위임 실행 줄이 곧 목록이다.
  *
- * <p>사용자 실행 한도에 닿으면 상한이 있는 재시도를 건다(ADR-069). 결과를 잃지 않게 {@link #FAILURE_BACKOFF} 뒤 다시
- * 시도하되, 연속 {@link #MAX_BUSY_RETRIES} 번까지만 예약한다. 그 뒤에는 그 대화의 turn 닫기, 위임 종료, 기동 같은 기존
- * 계기에 맡긴다. 재시도는 {@link WakeRetryDue} 사건으로 내고 {@link NextTurnDispatcher} 가 받는다. 대화를 다시 부르는
+ * <p>사용자 실행 한도에 닿으면 재시도를 건다(ADR-069). 결과를 잃지 않게 {@link #FAILURE_BACKOFF} 뒤 다시
+ * 시도하되, 연속 {@link #MAX_BUSY_RETRIES} 번을 넘기면 {@link #LONG_BUSY_RETRY} 간격으로 늦춘다. 한 대화에 걸린 예약은
+ * 하나뿐이라 짧은 간격으로 끝없이 되풀이하지 않는다. 재시도는 {@link WakeRetryDue} 사건으로 내고 {@link NextTurnDispatcher} 가 받는다. 대화를 다시 부르는
  * 자리를 그것 하나로 두기 위해서다.
  *
  * <p>잠금과 재시도 수는 {@link TurnCancellation} 의 메모리 맵처럼 서버 하나를 전제로 한다.
@@ -60,6 +60,9 @@ public class DelegationWakeService {
     /** 사용자 실행 한도로 거절된 자동 turn 을 연달아 다시 시도하는 횟수의 상한이다. */
     static final int MAX_BUSY_RETRIES = 10;
 
+    /** 연속 거절이 {@link #MAX_BUSY_RETRIES} 를 넘은 뒤의 재시도 간격이다. 결과가 끝내 남지 않게 늦게라도 다시 시도한다. */
+    static final Duration LONG_BUSY_RETRY = Duration.ofMinutes(5);
+
     /** 재시도를 {@link #FAILURE_BACKOFF} 에서 이만큼 더 늦춘다. 실패 시각이 지워지기 전에 사건이 닿지 않게 한다. */
     private static final Duration BUSY_RETRY_MARGIN = Duration.ofSeconds(1);
 
@@ -81,6 +84,8 @@ public class DelegationWakeService {
     private final Map<Long, Instant> lastFailures = new ConcurrentHashMap<>();
     /** 사용자 실행 한도로 자동 turn 이 연달아 거절된 대화와 그 횟수다. 잠금을 잡으면 지운다. */
     private final Map<Long, Integer> busyRetries = new ConcurrentHashMap<>();
+    /** 사용자 실행 한도로 미룬 재시도가 걸려 있는 대화다. 한 대화에 예약을 하나만 둔다. */
+    private final Set<Long> pendingBusyRetries = ConcurrentHashMap.newKeySet();
 
     public DelegationWakeService(
             DelegationWakeProperties properties,
@@ -213,24 +218,29 @@ public class DelegationWakeService {
     /**
      * 사용자 실행 한도로 거절된 대화의 재시도를 예약한다.
      *
-     * <p>실패 시각을 적어 그 사이 다른 계기가 곧바로 다시 열지 않게 한다. 연속 거절이 {@link #MAX_BUSY_RETRIES} 를 넘으면
-     * 예약하지 않고 센 횟수를 지운다. 그 뒤 다른 계기로 다시 거절되면 새로 10번까지 예약한다. 예약하지 못해도 예외를 올리지 않는다. 기존 계기가 다시 시도한다.
+     * <p>실패 시각을 적어 그 사이 다른 계기가 곧바로 다시 열지 않게 한다. 연속 거절이 {@link #MAX_BUSY_RETRIES} 번까지는
+     * {@link #FAILURE_BACKOFF} 뒤에, 그 뒤로는 {@link #LONG_BUSY_RETRY} 뒤에 다시 시도한다. 이미 예약이 걸려 있으면 더 걸지
+     * 않는다. 예약하지 못해도 예외를 올리지 않는다. 기존 계기가 다시 시도한다.
      */
     private void retryLaterAfterUserBusy(Long conversationId) {
         Instant now = Instant.now(clock);
         lastFailures.put(conversationId, now);
         int retries = busyRetries.merge(conversationId, 1, Integer::sum);
-        if (retries > MAX_BUSY_RETRIES) {
-            // 센 횟수를 지운다. 남겨 두면 나중에 다른 계기로 다시 거절될 때 재시도를 한 번도 걸지 못한다.
-            busyRetries.remove(conversationId);
-            log.info("사용자 실행 한도로 자동 turn 이 연달아 거절돼 더 예약하지 않는다 conversationId={} retries={}", conversationId, retries);
+        if (!pendingBusyRetries.add(conversationId)) {
             return;
         }
+        Duration delay = retries > MAX_BUSY_RETRIES ? LONG_BUSY_RETRY : FAILURE_BACKOFF.plus(BUSY_RETRY_MARGIN);
+        if (retries == MAX_BUSY_RETRIES + 1) {
+            log.info(
+                    "사용자 실행 한도로 자동 turn 이 연달아 거절돼 간격을 늘린다 conversationId={} retries={} delay={}",
+                    conversationId,
+                    retries,
+                    delay);
+        }
         try {
-            scheduler.schedule(
-                    () -> dueAfterUserBusy(conversationId, now),
-                    now.plus(FAILURE_BACKOFF).plus(BUSY_RETRY_MARGIN));
+            scheduler.schedule(() -> dueAfterUserBusy(conversationId, now), now.plus(delay));
         } catch (RuntimeException ex) {
+            pendingBusyRetries.remove(conversationId);
             log.warn("사용자 실행 한도로 미룬 자동 turn 을 예약하지 못했다 conversationId={}", conversationId, ex);
         }
     }
@@ -249,6 +259,7 @@ public class DelegationWakeService {
                     .name("delegation-wake-retry-" + conversationId)
                     .start(() -> retryAfterUserBusy(conversationId, scheduledAt));
         } catch (RuntimeException | Error ex) {
+            pendingBusyRetries.remove(conversationId);
             log.warn("사용자 실행 한도로 미룬 자동 turn 의 재시도 스레드를 띄우지 못했다 conversationId={}", conversationId, ex);
         }
     }
@@ -260,6 +271,7 @@ public class DelegationWakeService {
      * 시각을 적었으면 지우지 않는다. 그 실패의 유예를 지킨다.
      */
     private void retryAfterUserBusy(Long conversationId, Instant scheduledAt) {
+        pendingBusyRetries.remove(conversationId);
         lastFailures.remove(conversationId, scheduledAt);
         try {
             events.publishEvent(new WakeRetryDue(conversationId));

@@ -37,7 +37,7 @@ turn 이 닫힐 때, 위임이 끝났을 때, 서버가 뜰 때, 기동 정리�
 
 **사용자 실행 한도에 닿으면 대기 행을 보내지 않고 멈춘다.** turn 잠금을 열 때 `USER_BUSY` 가 오면 대기 행을 지우지 않고 그 대화의 대기 줄을 멈춘 뒤 대화 단위 SSE 로 `error` 사건을 낸다.
 멈추지 않고 두면 그 대화의 turn 이 닫힐 때까지 보낼 계기가 없고, 사용자의 다른 대화가 끝나도 이 대화의 `tryNext` 는 불리지 않는다. 사용자가 「보내기」 로 다시 보낸다.
-위임 결과 자동 turn 이 `USER_BUSY` 를 받으면 결과를 전했다고 적지 않고 `FAILURE_BACKOFF` 뒤 다시 시도한다. 연속 10번까지만 다시 시도한다. 한도는 [`execution-limit.md`](execution-limit.md) 가 갖는다.
+위임 결과 자동 turn 이 `USER_BUSY` 를 받으면 결과를 전했다고 적지 않고 `FAILURE_BACKOFF` 뒤 다시 시도한다. 연속 거절이 10번을 넘으면 5분 간격으로 늦추고, 한 대화에 예약을 하나만 둔다. 한도는 [`execution-limit.md`](execution-limit.md) 가 갖는다.
 
 turn 이 중지로 끝나면 `ChatService` 가 취소된 turn 을 돌려주는 자리에서 `TurnCancellation.markStopped` 를 적고 그 대화의 대기 행을 모두 멈춰 둔다.
 **잠금을 풀기 전에 멈춘다.** 잠금을 푼 뒤 종료 리스너에서 멈추면 그 사이 다른 스레드의 `tryNext` 가 아직 멈추지 않은 행으로 turn 을 연다.
