@@ -64,6 +64,7 @@ assistant:
   context:
     max-chars: 8000
     index-budget-ratio: 4
+    result-stale-after: 6h
   memory:
     propose:
       enabled: false
@@ -84,6 +85,9 @@ assistant:
     submit-timeout: 30s
     # 실행 줄에 적는 위임 답의 길이 상한. 넘으면 자르고 잘렸다는 한 줄을 붙인다
     output-max-chars: 100000
+    # agent_status 의 wait_seconds 로 맡긴 실행이 끝나기를 기다리는 시간의 상한. 더 긴 값은 이 값으로 줄인다.
+    # 기다리는 동안 그 도구 호출이 Hermes turn 을 붙잡으므로 hermes.run-timeout 보다 훨씬 짧게 둔다
+    status-wait-max: 20s
   user-execution:
     # 한 사용자가 Hermes 에 동시에 맡길 수 있는 실행 수. turn 자리와 RUNNING 실행 줄의 합이다(ADR-069)
     max-running: 4
@@ -124,6 +128,21 @@ assistant:
     history-conversations: 20
     # 만들기가 실패한 뒤 같은 사용자와 에이전트의 추천을 다시 만들지 않는 시간
     retry-after-failure: 10m
+  proactive-check:
+    # 먼저 살펴보기(ADR-080). 꺼 두면 살펴보기를 시작하지 않는다
+    enabled: true
+    # 살펴보기 turn 하나가 돌 수 있는 시간. hermes.run-timeout 보다 짧지 않으면 기동에 실패한다
+    max-duration: 4m
+    # 살펴보기 turn 하나가 시작할 수 있는 도구 호출 수
+    max-tool-calls: 40
+    # 살펴보기 트리에서 맡길 수 있는 위임 자식 수. 0 이면 맡기지 않는다
+    max-delegations: 3
+    # 점검 대화의 루트 session 하나로 보내는 살펴보기 수. 닿으면 session 을 바꾼다
+    session-max-checks: 14
+    # 최근에 알린 발견으로 읽는 기간. 같은 것을 다시 알리지 않는 판정과 다음 입력에 쓴다
+    digest-window: 30d
+    # 다음 살펴보기의 입력에 싣는 최근 발견 수
+    digest-max-items: 20
   auth:
     jwt-secret: ${ASSISTANT_JWT_SECRET}
   attachment:

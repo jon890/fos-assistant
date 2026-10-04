@@ -74,6 +74,9 @@ public class RecoveredRunRecorder {
     private final ConversationEventHub hub;
     private final ApplicationEventPublisher events;
     private final ResultDeliveryRecorder resultDeliveries;
+    /** 답을 그대로 남기면 안 되는 turn 을 가린다. 구현이 없으면 모든 답을 남긴다. */
+    private final List<RecoveredAnswerGuard> answerGuards;
+
     private final Clock clock;
 
     /**
@@ -233,8 +236,7 @@ public class RecoveredRunRecorder {
                 return new Written(
                         saved, RecoveredRunKind.CHAT_TURN, ExecutionEventType.RUN_CANCELLED, null, null, null);
             }
-            String answer = result.output();
-            Long messageId = answer == null || answer.isBlank() ? null : saveAnswer(saved, answer);
+            Long messageId = saveAnswer(saved, result.output());
             String sessionId = blankToNull(result.sessionId());
             if (sessionId != null) {
                 conversationWriter.touchSession(conversation.id(), sessionId, clock.instant());
@@ -295,6 +297,11 @@ public class RecoveredRunRecorder {
      * <p>대화의 마지막 유효 메시지가 답이면 그 답을 다시 생성하던 turn 이다. 다시 생성은 질문을 새로 저장하지
      * 않기 때문이다. 그때는 앞 답을 대신한 것으로 적는다.
      *
+     * <p>{@link RecoveredAnswerGuard} 가 막는 turn(먼저 살펴보기 turn)이면 답 대신 그 알림 줄 하나를 남기고 그 번호를
+     * 돌려준다. 그 답은 검사하지 않은 글이기 때문이다. 답이 비었어도 그 줄은 남긴다.
+     *
+     * <p>그 밖의 turn 이 취소로 끝났고 답이 비었으면 아무것도 남기지 않고 null 이다.
+     *
      * <p>다시 생성인지는 저장된 값이 아니라 마지막 유효 메시지로 미루어 정한다. 그래서 한 대화에 {@code RUNNING}
      * 루트 줄이 둘이면 뒤에 적는 답이 앞에 적은 답을 대신한 것으로 저장된다. 대화 하나에는 도는 turn 이 하나뿐이라
      * 보통 생기지 않는다.
@@ -304,9 +311,20 @@ public class RecoveredRunRecorder {
             return null;
         }
         Long conversationId = row.conversationId();
+        Instant now = clock.instant();
+        Optional<String> notice = answerGuards.stream()
+                .map(guard -> guard.noticeInsteadOfAnswer(row.id(), row.status()))
+                .flatMap(Optional::stream)
+                .findFirst();
+        if (notice.isPresent()) {
+            return messages.save(ChatMessage.fromSystem(conversationId, notice.get(), now))
+                    .id();
+        }
+        if (row.status() == ExecutionStatus.CANCELLED && (answer == null || answer.isBlank())) {
+            return null;
+        }
         List<ChatMessage> active = activeMessages(conversationId);
         ChatMessage last = active.isEmpty() ? null : active.getLast();
-        Instant now = clock.instant();
         ChatMessage message = last != null && last.role() == MessageRole.ASSISTANT
                 ? ChatMessage.regeneratedAnswer(conversationId, answer, row.id(), last.id(), now)
                 : ChatMessage.fromAssistant(conversationId, answer, row.id(), now);

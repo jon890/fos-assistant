@@ -17,6 +17,7 @@ import { executionStatusVariant } from "@/lib/execution-status";
 import { fetchExecutionTree } from "@/lib/usage-api";
 import {
   ExecutionTree,
+  type ExecutionContextSource,
   type ExecutionTreeNode,
   type ExecutionTreeResponse,
 } from "./execution-tree";
@@ -63,6 +64,64 @@ function effortSourceLabel(node: ExecutionTreeNode): string {
     return `에이전트 기본값 ${node.reasoningEffort}`;
   if (node.reasoningEffortSource === "UNKNOWN") return "미확인";
   return `선택한 값 ${node.reasoningEffort}`;
+}
+
+const CONTEXT_SOURCE_LABELS: Record<string, string> = {
+  MEMORY_ALWAYS: "기억(항상)",
+  MEMORY_INDEX: "기억(제목만)",
+  DELEGATION_RESULT: "맡긴 일 결과",
+  CONNECTOR_RESULT: "승인한 동작 결과",
+};
+
+const BODY_MODE_LABELS: Record<string, string> = {
+  INLINE: "본문",
+  TITLE_ONLY: "제목만",
+  OMITTED: "자리가 없어 뺐어요",
+};
+
+/** `FRESH` 는 그리지 않는다. 지금 상태로 보는 것이 보통이라 표시가 없을 때의 뜻이다. */
+const FRESHNESS_LABELS: Record<string, string | null> = {
+  FRESH: null,
+  STALE: "오래됨",
+  UNKNOWN: "시각 모름",
+};
+
+/** 아는 값은 화면 문구로 바꾸고, 모르는 값은 원문 그대로 둔다. */
+function labelOf(labels: Record<string, string | null>, value: string) {
+  return Object.hasOwn(labels, value) ? labels[value] : value;
+}
+
+/** 관리자 실행 상세에서 이 실행의 문맥에 실은 항목을 실은 순서대로 그린다. */
+function ContextSources({ sources }: { sources: ExecutionContextSource[] }) {
+  return (
+    <section className="mt-5 text-sm" data-testid="execution-context-sources">
+      <h2 className="mb-2 font-medium">실은 문맥</h2>
+      {sources.length === 0 ? (
+        <p className="text-muted-foreground">실은 문맥이 없어요</p>
+      ) : (
+        <ul className="space-y-1">
+          {sources.map((item, index) => {
+            const freshness = labelOf(FRESHNESS_LABELS, item.freshness);
+            return (
+              <li
+                key={`${index}-${item.ref}`}
+                className="flex min-w-0 flex-wrap gap-x-3"
+              >
+                <span>{labelOf(CONTEXT_SOURCE_LABELS, item.source)}</span>
+                <span className="min-w-0 break-all font-mono text-muted-foreground">
+                  {item.ref}
+                </span>
+                <span>{labelOf(BODY_MODE_LABELS, item.bodyMode)}</span>
+                {freshness ? (
+                  <span className="text-muted-foreground">{freshness}</span>
+                ) : null}
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </section>
+  );
 }
 
 function recordedTimes(
@@ -251,6 +310,9 @@ export function ExecutionDetail({ executionId }: { executionId: number }) {
               </div>
             ))}
           </dl>
+        ) : null}
+        {isAdmin ? (
+          <ContextSources sources={summary.contextSources ?? []} />
         ) : null}
       </header>
       <ExecutionTree

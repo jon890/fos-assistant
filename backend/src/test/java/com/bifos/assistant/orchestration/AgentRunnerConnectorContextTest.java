@@ -92,7 +92,8 @@ class AgentRunnerConnectorContextTest {
                 executions,
                 mock(ExecutionEventRecorder.class),
                 mock(ExecutionEventRepository.class),
-                new DelegationOutput(new DelegationProperties(2, 4, 16, Duration.ofSeconds(30), 100)),
+                new DelegationOutput(
+                        new DelegationProperties(2, 4, 16, Duration.ofSeconds(30), 100, Duration.ofSeconds(20))),
                 modelTiers,
                 Clock.fixed(REQUEST_RECEIVED_AT, ZoneOffset.UTC),
                 mock(UserExecutionLimiter.class));

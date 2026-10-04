@@ -38,6 +38,7 @@ Hermes 사건을 `execution_event` 로 옮겨 적는 규칙과 실행 트리를 
 ### 대화의 모델 선택
 
 대화 한 줄(`ConversationView`)은 `provider`, `model`, `reasoningEffort` 를 싣는다. 고르지 않았으면 셋 다 null 이다.
+`purpose`(`CHAT`, `CHECK`)도 싣는다. 화면이 점검 대화를 알아보는 데 쓴다([`proactive-check.md`](proactive-check.md)).
 
 `GET /api/v1/chat/model-options` 의 응답이다.
 
@@ -184,7 +185,7 @@ turn 이 바꾸는 칸은 `hermes_session_id` 와 `updated_at` 뿐이므로 그 
 | `GET /api/v1/usage/monthly-cost` | `currency`, `estimatedCostMicros`, `actualCostMicros`, `pricedExecutions`, `unpricedExecutions`, `subscriptionExecutions`, `pricedSubagents`, `pendingSubagents`, `unconfirmedSubagents`, `unpricedSubagents`. 실행 건수 `totalExecutions` 는 모두에게 싣는다 |
 | `GET /api/v1/usage/breakdown` | 응답 전체. `MEMBER` 역할이 부르면 `FORBIDDEN` 이다 |
 | `GET /api/v1/usage/skills` 의 한 줄 | `agentCode` |
-| `GET /api/v1/usage/executions/{id}/tree` 의 실행 노드 | `agentCode`, `provider`, `model`, `reasoningEffort`, `reasoningEffortSource`, `inputTokens`, `cachedInputTokens`, `outputTokens`, `totalTokens`, `estimatedCostMicros`, `requestReceivedAt`, `submittedAt`, `firstDeltaAt`, `finishedAt` |
+| `GET /api/v1/usage/executions/{id}/tree` 의 실행 노드 | `agentCode`, `provider`, `model`, `reasoningEffort`, `reasoningEffortSource`, `inputTokens`, `cachedInputTokens`, `outputTokens`, `totalTokens`, `estimatedCostMicros`, `requestReceivedAt`, `submittedAt`, `firstDeltaAt`, `finishedAt`, `contextSources` |
 | 같은 응답의 사건 | `model`, `inputTokens`, `outputTokens`. `PROVIDER_SWITCHED` 사건은 사건째 뺀다 |
 | `GET /api/v1/chat/conversations/{id}/messages` 의 메시지 | `switchedTo` |
 | 대화 스트림과 대화 단위 SSE 의 `subagent` 사건 | `model`, `inputTokens`, `outputTokens` |

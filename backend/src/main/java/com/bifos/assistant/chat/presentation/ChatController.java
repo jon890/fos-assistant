@@ -313,6 +313,7 @@ public class ChatController {
                 choice.reasoningEffort(),
                 conversation.modelSelectionMode(),
                 conversation.modelTier(),
+                conversation.purpose(),
                 label == null ? null : label.taskId(),
                 label == null ? null : label.title());
     }

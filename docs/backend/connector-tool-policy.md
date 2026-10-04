@@ -138,6 +138,7 @@ Control Plane 의 판정 순서다.
 | `hermes_tool` 이 그 커넥터의 `mcp_server` 로 만든 접두사(`mcp__<서버>__`)로 시작하지 않는다 | 거절 | `UNDECLARED` |
 | `schema: 2` 인데 `tool` 이 없거나 `tools` 에 없다 | 거절 | `UNDECLARED` |
 | 위험도가 `DESTRUCTIVE` 나 `FINANCIAL` 이다 | 거절 | `RISK_NOT_OPEN` |
+| 먼저 살펴보기 트리 안의 호출이고, 위험도가 `READ` 이면서 승인 방식이 `none` 인 도구가 아니다 | 거절 | `READ_ONLY_RUN` |
 | `args_json` 이 16KB 를 넘는다 | 거절 | `ARGS_TOO_LARGE` |
 | `approval` 이 `none` 이다 | 허용 | |
 | `approval` 이 `required` 이고 선언이 상시 허락을 닫지 않았고 유효한 상시 허락이 있다 | 허용 | |
@@ -146,6 +147,7 @@ Control Plane 의 판정 순서다.
 - `allow` 로 답하는 것은 판정이 허용일 때뿐이다. 거절과 승인 필요는 `block` 이다
 - 승인 필요인 호출은 막고 `connector_action` 에 `decision: NEEDS_APPROVAL`, `passed: false`, `status: PENDING` 으로 남긴다. `args_json` 에 인자 원문을 저장한다. 모델에게는 승인 요청 번호를 담은 글을 주고, 사용자의 승인을 기다리고 있으니 같은 도구를 다시 부르지 말라고 말한다. 승인 줄이 그 뒤에 지나는 상태는 [커넥터 연결](../connectors.md) 의 「승인」 이 갖는다
 - 상시 허락은 그 사용자가 그 커넥터의 그 도구에 준 것 가운데 거두지 않았고 기간이 남은 것이다. 선언이 `"grant": false` 인 도구는 남은 허락이 있어도 보지 않는다. 그 줄은 1분마다 도는 정리(`ConnectorActionExpirer`)가 거둔다. `approval` 이 `required` 가 아니게 바뀐 도구의 줄도 같다. 읽은 카탈로그에서 허락을 줄 수 없는 선언을 찾은 줄만 거두고, 카탈로그를 읽지 못한 커넥터와 선언에 없는 도구의 줄은 두고 본다. 거둔 줄은 선언이 다시 열려도 효력이 돌아오지 않는다. 원래 도구 이름을 확인하지 못한 호출은 허락이 없는 것으로 판정한다
+- 먼저 살펴보기 트리인지는 origin 실행으로 `ProactiveCheckGuard.isCheckTree` 가 정한다. 그 트리에서는 위험도가 `READ` 이고 승인 방식이 `none` 인 도구만 허용한다. 상시 허락이 있어도 나머지를 거절하고 승인 줄을 만들지 않는다. `READ` 라도 manifest 가 승인을 요구하면 거절한다. 사람이 보지 않는 실행에서 승인 요청이 쌓이지 않게 하기 위해서다([ADR-080](../adr/ADR-080-먼저-살펴보기는-점검-대화의-turn-하나로-돌고-읽기-경계를-control-plane-이-강제한다.md))
 - 판정은 Hermes 와 DB 를 모르는 함수 하나가 한다. 모델의 인자와 서버의 `readOnlyHint` 는 판정에 들어가지 않는다
 - Control Plane 은 hook 이 보낸 `tool` 을 그대로 믿지 않는다. 카탈로그의 `mcp_server` 와 `tool` 로 등록 이름을 다시 계산해 `hermes_tool` 과 다르면 `tool` 이 없는 호출로 읽는다. `tool` 이 도구 이름 형식(`^[A-Za-z0-9_.-]{1,128}$`)이 아닌 요청은 서명이 틀린 요청처럼 403 으로 거절한다
 - 허용한 호출이 다시 왔을 때 연결이 `READY` 가 아니면 처음의 허용을 돌려주지 않고 막는다. 해제한 연결에 앞의 허용이 나가지 않게 한다

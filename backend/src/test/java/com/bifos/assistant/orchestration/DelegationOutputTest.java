@@ -14,7 +14,7 @@ class DelegationOutputTest {
     private static final String NOTICE = "\n\n[답이 5자를 넘어 뒷부분을 잘랐다]";
 
     private final DelegationOutputClip clip =
-            new DelegationOutput(new DelegationProperties(2, 4, 16, Duration.ofSeconds(30), 5));
+            new DelegationOutput(new DelegationProperties(2, 4, 16, Duration.ofSeconds(30), 5, Duration.ofSeconds(20)));
 
     @Test
     @DisplayName("상한 이하의 답은 그대로 돌려준다")

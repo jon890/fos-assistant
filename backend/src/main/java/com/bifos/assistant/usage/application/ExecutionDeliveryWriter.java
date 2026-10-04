@@ -22,4 +22,10 @@ public class ExecutionDeliveryWriter {
     public int markResultDelivered(Long id, Instant at) {
         return repository.markResultDelivered(id, at);
     }
+
+    /** 한 루트 아래의 위임 결과를 모두 전했다고 적는다. 뜻은 {@link AgentExecutionRepository#markTreeDelivered} 가 적는다. */
+    @Transactional
+    public int markTreeDelivered(Long rootExecutionId, Instant at) {
+        return repository.markTreeDelivered(rootExecutionId, at);
+    }
 }

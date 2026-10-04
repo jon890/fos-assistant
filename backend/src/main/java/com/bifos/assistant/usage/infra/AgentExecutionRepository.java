@@ -76,6 +76,9 @@ public interface AgentExecutionRepository extends JpaRepository<AgentExecution, 
      */
     long countByRootExecutionIdAndStatusAndDelegationKeyIsNotNull(Long rootExecutionId, ExecutionStatus status);
 
+    /** 한 루트 아래의 위임 실행 수다. 상태와 무관하게 센다. 먼저 살펴보기 한 번이 맡긴 수를 적을 때 쓴다(ADR-080). */
+    long countByRootExecutionIdAndDelegationKeyIsNotNull(Long rootExecutionId);
+
     /** 그 사용자의 그 상태인 실행 줄 수다. 대화 turn 의 루트 줄은 turn 자리로 세므로 뺀다(ADR-069). */
     @Query("""
             select count(e) from AgentExecution e
@@ -95,6 +98,23 @@ public interface AgentExecutionRepository extends JpaRepository<AgentExecution, 
     @Modifying
     @Query("update AgentExecution e set e.resultDeliveredAt = :at where e.id = :id and e.resultDeliveredAt is null")
     int markResultDelivered(@Param("id") Long id, @Param("at") Instant at);
+
+    /**
+     * 한 루트 아래의 위임 실행 가운데 결과를 전하지 않은 줄을 모두 전했다고 적고 적은 줄 수를 돌려준다.
+     *
+     * <p>상태는 보지 않는다. 아직 도는 줄도 적어, 나중에 끝나도 부모 대화를 깨우지 않는다. 먼저 살펴보기가 끝날 때 쓴다(ADR-080).
+     * 이미 적힌 줄은 먼저 적은 시각을 그대로 둔다.
+     *
+     * <p>트랜잭션은 {@code ExecutionDeliveryWriter} 가 연다.
+     */
+    @Modifying
+    @Query("""
+            update AgentExecution e set e.resultDeliveredAt = :at
+            where e.rootExecutionId = :rootExecutionId
+                and e.delegationKey is not null
+                and e.resultDeliveredAt is null
+            """)
+    int markTreeDelivered(@Param("rootExecutionId") Long rootExecutionId, @Param("at") Instant at);
 
     /**
      * 그 대화에 아직 전하지 않은 끝난 위임 결과를 오래된 순으로 읽는다.

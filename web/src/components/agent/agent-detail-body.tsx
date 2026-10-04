@@ -6,6 +6,7 @@ import { Notice } from "@/components/ui/notice";
 import { AgentAccessSection } from "./agent-access-section";
 import { AgentAdminSection } from "./agent-admin-section";
 import { AgentModelSection } from "./agent-model-section";
+import { AgentProactiveCheckSection } from "./agent-proactive-check-section";
 import { AgentSkillsSection } from "./agent-skills-section";
 import { AgentToolsSection } from "./agent-tools-section";
 import { PersonaEditor } from "./persona-editor";
@@ -16,6 +17,7 @@ import {
   type PersonaView,
 } from "@/lib/agent";
 import { fetchPersona } from "@/lib/agent-api";
+import type { ProactiveCheckStatus } from "@/lib/proactive-check";
 import type { SkillListView } from "@/lib/skill";
 
 /** 서버가 읽어 온 값이거나, 읽지 못했을 때 화면에 보일 안내다. */
@@ -30,6 +32,8 @@ type Props = {
   tools: Loaded<{ initialTools: AgentToolsView; admin: boolean }> | null;
   /** 스킬 절을 그리지 않으면 null 이다. 관리자가 다른 사람의 비공개 에이전트를 열 때다. */
   skills: Loaded<SkillListView> | null;
+  /** 먼저 살펴보기 절을 그리지 않으면 null 이다. 커넥터 에이전트와, 관리자가 읽지 못하는 다른 사람의 비공개 에이전트다. */
+  proactiveCheck: Loaded<ProactiveCheckStatus> | null;
   initialVisibility: AdminAgent["visibility"] | undefined;
   adminAgent?: AdminAgent;
   /** 요청자가 이 에이전트의 공개 범위를 바꾸고 지울 수 있으면 참이다. 「공개와 삭제」 절을 그릴지 정한다. */
@@ -72,6 +76,7 @@ export function AgentDetailBody({
   initialPersona,
   tools,
   skills,
+  proactiveCheck,
   initialVisibility,
   adminAgent,
   canManageAccess,
@@ -160,6 +165,23 @@ export function AgentDetailBody({
           <h2 className="font-semibold">스킬</h2>
           <Notice variant="error" role="alert" className="mt-3">
             {skills.message}
+          </Notice>
+        </section>
+      )}
+      {connectorManaged ||
+      proactiveCheck === null ? null : proactiveCheck.ok ? (
+        <AgentProactiveCheckSection
+          code={code}
+          initialStatus={proactiveCheck.data}
+        />
+      ) : (
+        <section
+          aria-label="먼저 살펴보기"
+          className="mx-auto mt-8 w-full max-w-2xl rounded-md border border-border p-4"
+        >
+          <h2 className="font-semibold">먼저 살펴보기</h2>
+          <Notice variant="error" role="alert" className="mt-3">
+            {proactiveCheck.message}
           </Notice>
         </section>
       )}

@@ -18,6 +18,7 @@ Control Plane 이 Hermes 에 실행을 맡기는 길은 `HermesRunsClient.submit
 | 대기 메시지 turn | `NextTurnDispatcher.tryPending` 에서 `ChatService.runPendingMessages` | turn 자리 |
 | 위임 결과와 커넥터 결과의 자동 turn | `DelegationWakeService.tryWake` 에서 `ChatService.runDelegationResults` | turn 자리 |
 | 흐름의 Chief | `ChatService.runFlow` 에서 `ResearchAndBuildFlow`, `AgentRunner.run` | turn 자리 |
+| 먼저 살펴보기 | `ProactiveCheckService.start` 가 잠금을 잡고 가상 스레드에서 `ChatService.runProactiveCheck` | turn 자리 |
 | 흐름의 Researcher, Engineer, Synthesizer | `ChildExecutionRunner.run` 에서 `AgentRunner.run` | 실행 줄 |
 | `agent_delegate` 로 맡긴 자식 | `AgentDelegationService.delegate` 에서 `ChildExecutionRunner.delegate`, `AgentRunner.run` | 실행 줄 |
 | Memory 제안 | `ChatService.finish` 에서 `MemoryProposer.proposeFrom` | 실행 줄, 백그라운드 |
@@ -155,6 +156,7 @@ flowchart TD
 | --- | --- | --- |
 | 보내기 | 질문을 저장하기 전에 409 `USER_BUSY`. 스트림이면 `started` 전에 `error` 사건이다. 새 대화로 보낸 것이면 대화도 남기지 않는다. 새 대화를 저장하기 전에 자리를 한 번 보고, 그 사이 자리가 차서 잠금을 열 때 거절되면 방금 만든 빈 대화를 지운다. 지우다 실패하면 경고 로그만 남고 빈 대화가 목록에 남는다 | 쓴 글이 입력창에 돌아오고, 진행 중인 작업이 끝난 뒤 다시 보내라는 안내가 보인다. 대기 메시지로 넣지 않는다 |
 | 다시 생성 | `started` 전에 `USER_BUSY` | 같은 안내가 보인다 |
+| 먼저 살펴보기 | 202 를 돌려주기 전에 409 `USER_BUSY`. 이번 요청이 만든 점검 대화는 지운다 | 단추 옆에 진행 중인 작업이 끝난 뒤 다시 누르라는 안내가 보인다 |
 | 대기 메시지 turn | 대기 행을 지우지 않고 그 대화의 대기 줄을 멈춘 뒤 대화 단위 SSE 로 `USER_BUSY` 를 보낸다 | 멈춘 대기 줄과 안내가 보인다. 사용자가 「보내기」 로 다시 보낸다 |
 | 위임 결과 자동 turn | 결과를 전했다고 적지 않는다. `FAILURE_BACKOFF`(30초) 뒤 그 대화의 실패 시각을 지우고 다시 시도한다. 연속 거절이 10번을 넘으면 5분 간격으로 늦춘다. 한 대화에 걸린 예약은 하나뿐이다 | 결과는 자리가 난 뒤의 turn 에 전해진다 |
 | 결과 다시 전달 | `started` 전에 `USER_BUSY`. 전달 묶음은 `FAILED` 나 `STOPPED` 그대로 남고 다시 시도를 예약하지 않는다 | 같은 안내가 보이고 「결과 다시 전달」 이 그대로 남는다 |

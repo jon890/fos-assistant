@@ -31,6 +31,11 @@ export type Conversation = {
   /** 선택하지 않은 새 대화는 null 이고, 서버가 새 선택 방식을 주면 그 값을 쓴다. */
   modelSelectionMode?: "DEFAULT" | "TIER" | "CUSTOM" | null;
   modelTier?: "FAST" | "BALANCED" | "DEEP" | null;
+  /**
+   * 먼저 살펴보기의 결과가 남는 점검 대화면 `CHECK` 다. 이 provider 가 서버 응답을 읽을 때 없으면 `CHAT` 으로 채운다.
+   * `replace` 로 받은 줄은 부른 쪽이 준 그대로라 비어 있을 수 있다.
+   */
+  purpose?: "CHAT" | "CHECK";
   /** 예약 작업이 만든 대화면 그 작업이다. 아니면 null 이다 */
   taskId: string | null;
   taskTitle: string | null;
@@ -75,6 +80,11 @@ type ConversationsValue = {
 };
 
 const ConversationsContext = createContext<ConversationsValue | null>(null);
+
+/** 응답에 `purpose` 가 없으면 보통 대화로 채운다. */
+function withPurpose(conversation: Conversation): Conversation {
+  return { ...conversation, purpose: conversation.purpose ?? "CHAT" };
+}
 
 async function failure(response: Response): Promise<Error> {
   const payload = (await response.json().catch(() => ({}))) as ErrorPayload;
@@ -135,7 +145,8 @@ export function ConversationsProvider({
     async (cursor: string | null, limit: number) => {
       const response = await requestConversationPage(cursor, limit);
       if (!response.ok) throw await failure(response);
-      return (await response.json()) as ConversationPage;
+      const loaded = (await response.json()) as ConversationPage;
+      return { ...loaded, items: loaded.items.map(withPurpose) };
     },
     [],
   );
@@ -217,7 +228,7 @@ export function ConversationsProvider({
     try {
       const response = await requestConversation(id);
       if (!response.ok) return;
-      const found = (await response.json()) as Conversation;
+      const found = withPurpose((await response.json()) as Conversation);
       setPinned((current) => new Map(current).set(id, found));
     } catch {
       // 읽지 못해도 대화 화면은 열린다. 모델 칸만 기본값으로 보인다.
@@ -239,7 +250,7 @@ export function ConversationsProvider({
     async (id: string, title: string) => {
       const response = await renameConversation(id, title);
       if (!response.ok) throw await failure(response);
-      const updated = (await response.json()) as Conversation;
+      const updated = withPurpose((await response.json()) as Conversation);
       commit((current) => ({
         ...current,
         items: current.items.map((item) => (item.id === id ? updated : item)),
