@@ -76,6 +76,8 @@
 - `backend/src/test/java/com/bifos/assistant/architecture/TopLevelPackageOrder.java` 의 `ORDER` 에 `"proactive"` 를 `"chat"` 과 `"orchestration"` 사이에 넣는다. 열다섯이 된다
 - `backend/src/test/java/com/bifos/assistant/architecture/TopLevelPackageOrderTest.java` 의 개수 단언을 고친다. `allowsTopPackageToUseEveryOtherPackage` 의 `hasSize(13)` 은 14, `orderHasFourteenDistinctPackages` 의 두 `hasSize(14)` 는 15 다. 메서드 이름을 `orderHasFifteenDistinctPackages`, `@DisplayName` 을 「층 순서는 겹치는 이름 없이 열다섯이다」 로 바꾼다
 
+- `backend/src/test/java/com/bifos/assistant/architecture/StoredEnumNamesTest.java` 의 저장 enum 고정 목록에 새로 저장하는 enum 여섯(`ConversationPurpose`, `CheckTrigger`, `CheckStatus`, `CheckOutcome`, `FindingKind`, `FindingReason`)을 더한다
+
 ### 6. 이 phase 를 검증하는 시험
 
 - `backend/src/test/java/com/bifos/assistant/proactive/ProactiveCheckMigrationTest.java` 신규: H2 에서 Flyway 가 마지막 마이그레이션까지 적용되고(번호를 시험에 적지 않는다), 기존 대화 줄의 `purpose` 가 `CHAT` 이며, `proactive_check` 줄을 저장하고 `root_execution_id` 가 같은 두 줄은 유일 제약에 걸리는지 본다. 본보기는 `chat/DelegationWakeMigrationTest.java`
@@ -120,6 +122,7 @@ node --test test/unit/migration-collation.test.ts
 | `backend/src/main/resources/application.yml` | 수정 |
 | `backend/src/test/resources/application-test.yml` | 수정 |
 | `backend/src/test/java/com/bifos/assistant/architecture/TopLevelPackageOrderTest.java` | 수정 |
+| `backend/src/test/java/com/bifos/assistant/architecture/StoredEnumNamesTest.java` | 수정 |
 | `backend/src/test/java/com/bifos/assistant/architecture/TopLevelPackageOrder.java` | 수정 |
 | `backend/src/test/java/com/bifos/assistant/proactive/ProactiveCheckMigrationTest.java` | 신규 |
 | `backend/src/test/java/com/bifos/assistant/proactive/ProactiveCheckRepositoryTest.java` | 신규 |
