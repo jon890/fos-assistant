@@ -191,6 +191,9 @@ public class ConnectorActionService {
      * 대화마다 승인 줄의 결과를 전한 가장 늦은 시각이다. 전한 줄이 없는 대화는 빠진다. 먼저 알리기가 할 일에 연결한 대화의 결과
      * 도착을 볼 때 읽는다.
      *
+     * <p>실행한 줄({@code SUCCEEDED}, {@code FAILED}, {@code UNKNOWN})만 센다. 거절하거나 만료한 줄도 알림 줄을 남기며 전한 시각을
+     * 적지만, 승인한 동작의 결과가 아니다.
+     *
      * <p>대화마다 읽지 않고 집계 한 번으로 읽는다. 번호가 비면 읽지 않는다.
      */
     @Transactional(readOnly = true)
@@ -198,7 +201,7 @@ public class ConnectorActionService {
         if (conversationIds.isEmpty()) {
             return Map.of();
         }
-        return actions.findLastDeliveredByConversation(conversationIds).stream()
+        return actions.findLastDeliveredByConversation(conversationIds, EXECUTED).stream()
                 .collect(Collectors.toMap(ActionDelivery::getConversationId, ActionDelivery::getDeliveredAt));
     }
 

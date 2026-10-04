@@ -90,12 +90,14 @@ public interface ConnectorActionRepository extends JpaRepository<ConnectorAction
     /** 그 연결에 그 상태의 승인 줄이 있는가. */
     boolean existsByUserIdAndConnectorIdAndStatus(Long userId, String connectorId, ActionStatus status);
 
-    /** 대화마다 승인 줄의 결과를 전한 가장 늦은 시각이다. 전한 줄이 없는 대화는 나오지 않는다. */
+    /** 대화마다 그 상태인 승인 줄의 결과를 전한 가장 늦은 시각이다. 전한 줄이 없는 대화는 나오지 않는다. */
     @Query("""
             select a.conversationId as conversationId, max(a.resultDeliveredAt) as deliveredAt
             from ConnectorAction a
-            where a.conversationId in :conversationIds and a.resultDeliveredAt is not null
+            where a.conversationId in :conversationIds and a.status in :statuses and a.resultDeliveredAt is not null
             group by a.conversationId
             """)
-    List<ActionDelivery> findLastDeliveredByConversation(@Param("conversationIds") Collection<Long> conversationIds);
+    List<ActionDelivery> findLastDeliveredByConversation(
+            @Param("conversationIds") Collection<Long> conversationIds,
+            @Param("statuses") Collection<ActionStatus> statuses);
 }

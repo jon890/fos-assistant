@@ -19,7 +19,15 @@ public final class FollowUpDtos {
      * @param waiting null 이면 거짓이다
      * @param conversationId 연결할 대화의 공개 식별자. 없으면 연결하지 않는다
      */
-    public record CreateFollowUpRequest(String title, String dueAt, Boolean waiting, String conversationId) {}
+    public record CreateFollowUpRequest(String title, String dueAt, Boolean waiting, String conversationId) {
+
+        /** 제목을 빼고 낸다. 제목을 로그에 남기지 않는다. */
+        @Override
+        public String toString() {
+            return "CreateFollowUpRequest[dueAt=" + dueAt + ", waiting=" + waiting + ", conversationId="
+                    + conversationId + "]";
+        }
+    }
 
     /**
      * @param conversationId 연결한 대화의 공개 식별자. 연결하지 않았거나 대화를 지웠으면 null
@@ -49,6 +57,12 @@ public final class FollowUpDtos {
                     snapshot.createdAt(),
                     snapshot.acceptedAt(),
                     snapshot.closedAt());
+        }
+
+        /** 제목을 빼고 번호와 상태만 낸다. 제목을 로그에 남기지 않는다. */
+        @Override
+        public String toString() {
+            return "FollowUpView[id=" + id + ", status=" + status + "]";
         }
     }
 }

@@ -22,6 +22,7 @@ import com.bifos.assistant.chat.domain.ChatMessage;
 import com.bifos.assistant.chat.domain.Conversation;
 import com.bifos.assistant.chat.infra.ChatMessageRepository;
 import com.bifos.assistant.chat.infra.ConversationRepository;
+import com.bifos.assistant.connector.domain.type.ActionStatus;
 import com.bifos.assistant.followup.application.FollowUpService;
 import com.bifos.assistant.followup.domain.FollowUp;
 import com.bifos.assistant.followup.infra.FollowUpRepository;
@@ -47,6 +48,8 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.TestConfiguration;
@@ -231,12 +234,30 @@ class FollowUpAttentionSourceTest {
     void showsLinkedUpdateFromApproval() {
         Conversation conversation = conversationOf(dad);
         open("승인 결과를 기다리는 일", null, false, conversation, NOW.minus(Duration.ofHours(2)));
-        actionDelivered(dad, conversation, NOW.minus(Duration.ofHours(1)));
+        actionDelivered(dad, conversation, ActionStatus.SUCCEEDED, NOW.minus(Duration.ofHours(1)));
 
         AttentionItem item = onlyItem(service.view(dad));
 
         assertThat(item.level()).isEqualTo(AttentionLevel.NOW);
         assertThat(item.why().signals()).containsExactly(AttentionSignal.LINKED_UPDATE);
+    }
+
+    @ParameterizedTest
+    @EnumSource(
+            value = ActionStatus.class,
+            names = {"EXPIRED", "REJECTED"})
+    @DisplayName("받아들인 뒤 알림 줄을 전한 승인 줄이 실행하지 않고 끝났으면 LINKED_UPDATE 가 아니다")
+    void ignoresApprovalClosedWithoutExecution(ActionStatus closed) {
+        Conversation conversation = conversationOf(dad);
+        open("실행하지 않은 승인의 일", null, false, conversation, NOW.minus(Duration.ofHours(2)));
+        actionDelivered(dad, conversation, closed, NOW.minus(Duration.ofHours(1)));
+
+        AttentionItem item = onlyItem(service.view(dad));
+
+        assertThat(item.level()).as("%s 승인 줄만 전한 할 일의 단계", closed).isEqualTo(AttentionLevel.LATER);
+        assertThat(item.why().signals())
+                .as("%s 승인 줄만 전한 할 일의 신호", closed)
+                .doesNotContain(AttentionSignal.LINKED_UPDATE);
     }
 
     @Test
@@ -259,6 +280,7 @@ class FollowUpAttentionSourceTest {
         open("대화만 오간 일", null, false, conversation, NOW.minus(Duration.ofHours(2)));
         messages.save(ChatMessage.fromUser(conversation.id(), dad.id(), "어떻게 됐어?", NOW.minus(Duration.ofHours(1))));
         messages.save(ChatMessage.fromAssistant(conversation.id(), "확인해 볼게요", null, NOW.minus(Duration.ofMinutes(50))));
+        actionDelivered(dad, conversation, ActionStatus.EXPIRED, NOW.minus(Duration.ofMinutes(40)));
         messages.save(ChatMessage.fromSystem(conversation.id(), "승인 요청이 만료됐어요", NOW.minus(Duration.ofMinutes(40))));
 
         AttentionItem item = onlyItem(service.view(dad));
@@ -283,7 +305,7 @@ class FollowUpAttentionSourceTest {
     }
 
     @Test
-    @DisplayName("숨긴 할 일은 대화에 메시지가 더 와도 나오지 않고 새 결과가 전해지면 다시 나온다")
+    @DisplayName("숨긴 할 일은 대화에 메시지와 만료 알림 줄이 더 와도 나오지 않고 새 결과가 전해지면 다시 나온다")
     void hiddenFollowUpReturnsOnNewDelivery() {
         Conversation conversation = conversationOf(dad);
         FollowUp open = open("숨길 일", null, false, conversation, NOW.minus(Duration.ofHours(2)));
@@ -293,8 +315,11 @@ class FollowUpAttentionSourceTest {
         assertThat(card(service.view(dad)).items()).isEmpty();
 
         messages.save(ChatMessage.fromAssistant(conversation.id(), "확인해 볼게요", null, NOW.minus(Duration.ofMinutes(50))));
+        actionDelivered(dad, conversation, ActionStatus.EXPIRED, NOW.minus(Duration.ofMinutes(40)));
         messages.save(ChatMessage.fromSystem(conversation.id(), "승인 요청이 만료됐어요", NOW.minus(Duration.ofMinutes(40))));
-        assertThat(card(service.view(dad)).items()).as("메시지가 더 와도 상태가 같다").isEmpty();
+        assertThat(card(service.view(dad)).items())
+                .as("메시지와 만료한 승인 줄의 알림 줄이 더 와도 상태가 같다")
+                .isEmpty();
 
         delegationDelivered(conversation, NOW.minus(Duration.ofMinutes(30)));
         AttentionItem again = onlyItem(service.view(dad));
@@ -374,19 +399,24 @@ class FollowUpAttentionSourceTest {
                 delegation.id());
     }
 
-    /** 끝나서 결과를 대화에 전한 승인 줄 하나를 넣는다. 승인 줄을 만드는 길은 커넥터 검사가 본다. */
-    private void actionDelivered(CurrentUser owner, Conversation conversation, Instant deliveredAt) {
+    /**
+     * 그 상태로 끝나 대화에 전한 시각을 적은 승인 줄 하나를 넣는다. 실행한 줄은 결과를, 거절하거나 만료한 줄은 알림 줄을 전했을 때 이
+     * 시각이 적힌다. 승인 줄을 만드는 길은 커넥터 검사가 본다.
+     */
+    private void actionDelivered(
+            CurrentUser owner, Conversation conversation, ActionStatus status, Instant deliveredAt) {
         jdbc.update(
                 """
                 INSERT INTO connector_action (public_id, user_id, agent_id, connector_id, tool_name, hermes_tool, risk,
                     approval_mode, decision, passed, status, origin_execution_id, conversation_id, dedupe_key,
                     args_json, args_sha256, expires_at, created_at, result_delivered_at)
                 VALUES (?, ?, ?, 'follow-up-notes', 'write_note', 'mcp__demo__write_note', 'WRITE', 'REQUIRED',
-                    'NEEDS_APPROVAL', TRUE, 'SUCCEEDED', 0, ?, ?, '{"text":"안녕"}', 'sha', ?, ?, ?)
+                    'NEEDS_APPROVAL', TRUE, ?, 0, ?, ?, '{"text":"안녕"}', 'sha', ?, ?, ?)
                 """,
                 bytes(UUID.randomUUID()),
                 owner.id(),
                 chief.id(),
+                status.name(),
                 conversation.id(),
                 UUID.randomUUID().toString(),
                 Timestamp.from(NOW.plus(Duration.ofHours(3))),

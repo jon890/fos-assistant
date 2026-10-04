@@ -75,10 +75,18 @@ export const followUpScenario: Scenario = {
     );
     expect(cleared.dueAt === null, `기한을 지웠는데 남았다: ${cleared.dueAt}`);
 
-    step("기한을 읽지 못하거나 제목이 공백뿐이거나 없으면 400 VALIDATION_FAILED 다");
+    step("기한을 읽지 못하거나 연도가 범위 밖이거나 제목이 공백뿐이거나 없으면 400 VALIDATION_FAILED 다");
     expectValidation(
       await call(context, "/follow-ups", { method: "POST", token: dad, body: { title: "할 일 검사 8402", dueAt: "내일" } }),
       "읽지 못하는 기한",
+    );
+    expectValidation(
+      await call(context, "/follow-ups", {
+        method: "POST",
+        token: dad,
+        body: { title: "할 일 검사 8403", dueAt: "+10000-01-01T00:00:00Z" },
+      }),
+      "연도가 9999 를 넘는 기한",
     );
     expectValidation(
       await call(context, "/follow-ups", { method: "POST", token: dad, body: { title: "   " } }),

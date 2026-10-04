@@ -107,17 +107,23 @@ public class FollowUpService {
         Long conversationId =
                 input.conversationId() == null ? null : conversations.requireOwnId(user, input.conversationId());
         Instant now = clock.instant();
-        FollowUp saved;
+        Created result;
         try {
-            saved = transactions.execute(status -> openTitle(user, key, now)
-                    .orElseGet(() -> followUps.saveAndFlush(FollowUp.opened(
-                            user.id(), conversationId, title, key, input.dueAt(), input.waiting(), now))));
+            result = transactions.execute(status -> openTitle(user, key, now)
+                    .orElseGet(() -> new Created(
+                            followUps.saveAndFlush(FollowUp.opened(
+                                    user.id(), conversationId, title, key, input.dueAt(), input.waiting(), now)),
+                            "created")));
         } catch (DataIntegrityViolationException ex) {
             // 같은 제목이 동시에 열렸다. 먼저 저장된 줄을 돌려준다.
-            saved = transactions.execute(status -> openTitle(user, key, now).orElseThrow(() -> ex));
+            result = transactions.execute(status -> openTitle(user, key, now).orElseThrow(() -> ex));
         }
-        log.info("follow-up created userId={} followUpId={}", user.id(), saved.publicId());
-        return snapshot(saved);
+        log.info(
+                "follow-up {} userId={} followUpId={}",
+                result.action(),
+                user.id(),
+                result.followUp().publicId());
+        return snapshot(result.followUp());
     }
 
     /**
@@ -191,22 +197,35 @@ public class FollowUpService {
         return snapshot(saved);
     }
 
-    /** 같은 제목의 열린 줄을 찾아, {@code PROPOSED} 면 받아들인다. 트랜잭션 안에서 부른다. */
-    private Optional<FollowUp> openTitle(CurrentUser user, String key, Instant now) {
+    /**
+     * 같은 제목의 열린 줄을 찾아, {@code PROPOSED} 면 받아들인다. 트랜잭션 안에서 부른다.
+     *
+     * <p>동작은 그 줄을 그대로 돌려줬으면 {@code reused}, 받아들였으면 {@code accepted} 다.
+     */
+    private Optional<Created> openTitle(CurrentUser user, String key, Instant now) {
         return followUps
                 .findByUserIdAndTitleKeyAndOpenMarker(user.id(), key, FollowUp.OPEN_MARKER)
                 .map(existing -> {
                     if (existing.status() != FollowUpStatus.PROPOSED) {
-                        return existing;
+                        return new Created(existing, "reused");
                     }
                     existing.accept(now);
-                    return followUps.saveAndFlush(existing);
+                    return new Created(followUps.saveAndFlush(existing), "accepted");
                 });
     }
 
+    /**
+     * 더하기가 돌려줄 줄과 로그에 적을 동작이다.
+     *
+     * @param action 새로 만들었으면 {@code created}, 같은 열린 줄을 돌려줬으면 {@code reused}, 제안을 받아들였으면
+     *     {@code accepted}
+     */
+    private record Created(FollowUp followUp, String action) {}
+
+    /** 주인의 할 일을 잠그고 읽는다. 같은 줄을 바꾸는 요청이 서로 덮지 않게 한다. 트랜잭션 안에서 부른다. */
     private FollowUp requireOwn(CurrentUser user, UUID id) {
         return followUps
-                .findByPublicIdAndUserId(id, user.id())
+                .findByPublicIdAndUserIdForUpdate(id, user.id())
                 .orElseThrow(() -> new ApiException(ErrorCode.FOLLOW_UP_NOT_FOUND, "no such follow-up"));
     }
 

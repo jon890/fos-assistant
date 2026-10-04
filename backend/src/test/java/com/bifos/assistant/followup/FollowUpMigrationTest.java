@@ -70,7 +70,6 @@ class FollowUpMigrationTest {
                 """.formatted(publicId, userId, TITLE_KEY, status, openMarker));
     }
 
-    /** 같은 검사를 실제 MySQL 에서 돌리는 하위 클래스가 바꿔 끼울 수 있다. */
     Database createDatabase() {
         return new Database("jdbc:h2:mem:migration-" + UUID.randomUUID() + ";MODE=MySQL;DB_CLOSE_DELAY=-1", "sa", "");
     }

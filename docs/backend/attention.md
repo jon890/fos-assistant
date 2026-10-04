@@ -54,6 +54,10 @@
 숨기면 `stateKey` 가 그 결과 전달 시각과 기한 구간을 담아, 다음 결과가 전해지거나 기한이 다가오거나 지날 때까지 보이지 않는다.
 연결한 대화를 지웠으면 그 할 일은 남고 `conversationId` 는 `null` 이며 결과 도착을 보지 않는다.
 
+할 일의 `at` 은 제안이면 `created_at`, 열린 할 일이면 `updated_at` 이다.
+연결한 대화의 결과 도착이 그보다 뒤면 그 전달 시각이다.
+`signals` 는 `OVERDUE` 나 `DUE_SOON`, `LINKED_UPDATE`, `WAITING` 순이고, `WAITING` 은 제안에도 붙는다.
+
 `MEMORY_PROPOSED` 는 기억 메뉴의 제안 건수에 이미 센다. 지금 화면의 건수에는 세지 않는다.
 
 `DELIVERY_FAILED` 는 결과 전달 묶음의 상태를 읽기만 한다. 그 상태를 저장하고 다시 전달하는 일은 `chat` 의 `ResultDeliveryRecorder` 가 갖는다.

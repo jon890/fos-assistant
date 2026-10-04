@@ -43,7 +43,7 @@ frontend 는 화면의 동작과 구조이고, hermes 는 외부 런타임인 He
 | [`backend/execution-limit.md`](backend/execution-limit.md) | 사용자 한 명이 Hermes 에 동시에 맡기는 실행의 한도, 세는 실행과 세지 못하는 실행, 한도끼리의 관계, 한도에 닿을 때 |
 | [`backend/context-bundle.md`](backend/context-bundle.md) | 여러 기록에서 모은 문맥의 항목 모델, 출처와 권한과 신선도, Hermes 에 넘기는 형식, 합성 시나리오. 아직 구현 전이다 |
 | [`backend/attention.md`](backend/attention.md) | 먼저 알리기의 후보와 판정 표, 억제와 중복, 숨기기와 미루기, 지표, 지금 화면의 API |
-| [`backend/follow-up.md`](backend/follow-up.md) | 할 일의 상태, 제안 도구와 제안 억제, API. 아직 구현 전이다 |
+| [`backend/follow-up.md`](backend/follow-up.md) | 할 일의 상태, 제안 도구와 제안 억제, API. 제안 도구와 제안 억제는 아직 구현 전이다 |
 
 ## frontend
 
