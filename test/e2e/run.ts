@@ -59,6 +59,7 @@ import { DELEGATION_PROFILE, delegationScenario } from "./scenarios/delegation.t
 import { connectorScenario } from "./scenarios/connector.ts";
 import { connectorPolicyScenario } from "./scenarios/connector-policy.ts";
 import { notificationsScenario } from "./scenarios/notifications.ts";
+import { deliveryRetryScenario } from "./scenarios/delivery-retry.ts";
 import { scheduledTaskScenario } from "./scenarios/scheduled-task.ts";
 import { connectorDelegationScenario } from "./scenarios/connector-delegation.ts";
 import { CHAT_QUEUE_PROFILE, chatQueueRestartScenario, chatQueueScenario } from "./scenarios/chat-queue.ts";
@@ -126,6 +127,8 @@ const SCENARIOS: readonly Scenario[] = [
   connectorScenario,
   connectorPolicyScenario,
   notificationsScenario,
+  // 승인 요청을 하나 더 만드므로 알림 수를 세는 시나리오 뒤에 둔다.
+  deliveryRetryScenario,
   // 커넥터를 다시 등록하고 해제로 끝난다. 승인이 필요한 도구를 예약 turn 에서 부르므로 알림 시나리오와 같은 준비를 쓴다.
   scheduledTaskScenario,
   connectorDelegationScenario,

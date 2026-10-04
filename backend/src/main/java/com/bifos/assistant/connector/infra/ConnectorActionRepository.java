@@ -60,6 +60,10 @@ public interface ConnectorActionRepository extends JpaRepository<ConnectorAction
     List<ConnectorAction> findByConversationIdAndStatusInAndResultDeliveredAtIsNullOrderByIdAsc(
             Long conversationId, Collection<ActionStatus> statuses);
 
+    /** 그 대화와 그 사용자의 승인 줄 가운데 그 번호들이다. 순서는 정하지 않는다. */
+    List<ConnectorAction> findByConversationIdAndUserIdAndPublicIdIn(
+            Long conversationId, Long userId, Collection<UUID> publicIds);
+
     /** 전하지 않은 끝난 승인 줄이 있는 대화들이다. 대화 없이 돈 실행의 줄은 뺀다. */
     @Query("""
             select distinct a.conversationId from ConnectorAction a

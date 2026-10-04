@@ -195,6 +195,8 @@ flowchart TD
 | 적다가 실패했다(일시적인 DB 오류) | 실패로 적지 않고 다시 묻는다. Hermes 가 같은 답을 다시 준다 |
 | 같은 실행을 두 번 적으려 한다 | 실행 줄을 잠그고 `RUNNING` 인지 본 뒤에 적는다. 이미 끝난 줄이면 메시지도 사건도 더하지 않는다 |
 | 끝난 위임 결과 | 부모 대화에는 `result_delivered_at` 이 빈 줄만 전하므로 다시 떠도 한 번만 간다 |
+| 정한 줄이 결과를 전하던 자동 turn 이나 다시 전달 turn 의 부모 실행 줄이다 | 실행 줄을 적는 트랜잭션에서 그 전달 시도도 닫는다. `SUCCEEDED` 는 `SUCCEEDED`, `FAILED` 는 실행 줄의 `error_code` 를 적은 `FAILED`, `CANCELLED` 는 `STOPPED` 다([`agent-delegation.md`](agent-delegation.md) 의 「결과 전달이 끝나지 않았을 때」) |
+| 알림 줄만 저장하고 부모 실행 줄이 생기기 전에 내려간 전달 시도 | 실행 줄이 없어 이 정리의 대상이 아니다. `ResultDeliveryRecovery` 가 기동할 때 `FAILED`(`INTERRUPTED`)로 닫고 사용자가 다시 전달한다 |
 
 **다음 turn 을 정하는 자리는 그대로 `NextTurnDispatcher.tryNext` 하나다.**
 다시 정하는 쪽은 turn 을 열지 않는다. 잠금을 풀면 닫기 리스너가 `tryNext` 를 부르고, 위임 실행을 적으면 `DelegationFinished` 가 `tryNext` 를 부른다.
