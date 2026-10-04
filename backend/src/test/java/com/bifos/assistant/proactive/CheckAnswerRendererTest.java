@@ -48,8 +48,7 @@ class CheckAnswerRendererTest {
             List<String> questions,
             List<String> followUps,
             List<String> sourceFailures) {
-        return new CheckResultBlock(
-                1, CheckOutcome.FINDINGS, summary, findings, questions, followUps, sourceFailures);
+        return new CheckResultBlock(1, CheckOutcome.FINDINGS, summary, findings, questions, followUps, sourceFailures);
     }
 
     private String render(CheckResultBlock block) {
@@ -166,8 +165,7 @@ class CheckAnswerRendererTest {
                 List.of(),
                 new Next("ACTION", "![이미지](https://evil.example/n.png)"),
                 null);
-        CheckResultBlock block =
-                block(hostile, List.of(finding), List.of(hostile), List.of(hostile), List.of(hostile));
+        CheckResultBlock block = block(hostile, List.of(finding), List.of(hostile), List.of(hostile), List.of(hostile));
 
         String rendered = render(block);
 
@@ -256,7 +254,8 @@ class CheckAnswerRendererTest {
         Finding untitled = finding(null, "https://example.com/a", "CLOSED");
         JudgedFinding judged = FindingJudgement.judge(untitled, START, NOW, Set.of());
 
-        String rendered = renderer.render(block(null, List.of(untitled), List.of(), List.of(), List.of()), List.of(judged));
+        String rendered =
+                renderer.render(block(null, List.of(untitled), List.of(), List.of(), List.of()), List.of(judged));
 
         assertThat(judged.kind()).isEqualTo(FindingKind.REFERENCE);
         assertThat(rendered).contains("- (제목 없음): 이미 마감됐어요");

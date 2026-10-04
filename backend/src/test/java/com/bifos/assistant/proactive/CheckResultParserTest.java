@@ -50,8 +50,7 @@ class CheckResultParserTest {
     @Test
     @DisplayName("답 끝의 정상 블록을 모든 칸까지 읽는다")
     void parsesValidBlock() {
-        CheckResultBlock result =
-                parser.parse("살펴봤어요.\n\n" + block(VALID_JSON)).orElseThrow();
+        CheckResultBlock result = parser.parse("살펴봤어요.\n\n" + block(VALID_JSON)).orElseThrow();
 
         assertThat(result.version()).isEqualTo(1);
         assertThat(result.outcome()).isEqualTo(CheckOutcome.FINDINGS);
@@ -159,9 +158,7 @@ class CheckResultParserTest {
                   "sourceFailures": ["s1", "s2", "s3", "s4", "s5", "s6"]
                 }""".formatted(
                         "가".repeat(301),
-                        String.join(
-                                ",",
-                                longFinding(), FINDING, FINDING, FINDING, FINDING, FINDING, FINDING, FINDING),
+                        String.join(",", longFinding(), FINDING, FINDING, FINDING, FINDING, FINDING, FINDING, FINDING),
                         "나".repeat(301));
 
         CheckResultBlock result = parser.parse(block(json)).orElseThrow();
@@ -240,8 +237,7 @@ class CheckResultParserTest {
                   "unknowns": [%s],
                   "next": {"type": "ACTION", "text": "%s"},
                   "changeSinceLast": "%s"
-                }"""
-                .formatted(
+                }""".formatted(
                         "a".repeat(41),
                         "k".repeat(121),
                         "t".repeat(121),

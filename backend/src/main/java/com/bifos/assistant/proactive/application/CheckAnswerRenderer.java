@@ -51,9 +51,8 @@ public class CheckAnswerRenderer {
 
     /** 결과를 그린다. 빈 절은 그리지 않는다. */
     public String render(CheckResultBlock block, List<JudgedFinding> judged) {
-        List<JudgedFinding> fresh = judged.stream()
-                .filter(each -> each.kind() == FindingKind.NEW)
-                .toList();
+        List<JudgedFinding> fresh =
+                judged.stream().filter(each -> each.kind() == FindingKind.NEW).toList();
         List<JudgedFinding> references = judged.stream()
                 .filter(each -> each.kind() == FindingKind.REFERENCE)
                 .toList();

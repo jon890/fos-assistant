@@ -12,4 +12,8 @@ import java.time.Instant;
  * @param checkedAt 확인 시각을 읽었을 때만 채운다
  */
 public record JudgedFinding(
-        CheckResultBlock.Finding finding, FindingKind kind, FindingReason reason, String sourceUrl, Instant checkedAt) {}
+        CheckResultBlock.Finding finding,
+        FindingKind kind,
+        FindingReason reason,
+        String sourceUrl,
+        Instant checkedAt) {}

@@ -62,8 +62,7 @@ class FindingJudgementTest {
                 base.changeSinceLast());
     }
 
-    private static Finding withContent(
-            Finding base, String title, String whyItMatters, List<String> facts, Next next) {
+    private static Finding withContent(Finding base, String title, String whyItMatters, List<String> facts, Next next) {
         return new Finding(
                 base.area(),
                 base.topicKey(),
@@ -126,7 +125,13 @@ class FindingJudgementTest {
     @DisplayName("http 나 https 가 아닌 주소와 절대 주소가 아닌 주소와 host 가 없는 주소는 원문이 아니다")
     void unsafeOrRelativeSourceUrlIsNoSource() {
         for (String url : new String[] {
-            "javascript:alert(1)", "ftp://example.com/a", "/relative/path", "example.com/a", "https://", "https:///a", "http://a b"
+            "javascript:alert(1)",
+            "ftp://example.com/a",
+            "/relative/path",
+            "example.com/a",
+            "https://",
+            "https:///a",
+            "http://a b"
         }) {
             JudgedFinding judged = judge(with(valid(), url, CHECKED_AT, "CURRENT"));
 
@@ -168,10 +173,8 @@ class FindingJudgementTest {
                 .isEqualTo(FindingKind.NEW);
         assertThat(judge(with(valid(), URL, "2026-10-04T01:08:00Z", "CURRENT")).kind())
                 .isEqualTo(FindingKind.NEW);
-        assertReference(
-                judge(with(valid(), URL, "2026-10-04T00:54:59Z", "CURRENT")), FindingReason.NOT_CHECKED_NOW);
-        assertReference(
-                judge(with(valid(), URL, "2026-10-04T01:08:01Z", "CURRENT")), FindingReason.NOT_CHECKED_NOW);
+        assertReference(judge(with(valid(), URL, "2026-10-04T00:54:59Z", "CURRENT")), FindingReason.NOT_CHECKED_NOW);
+        assertReference(judge(with(valid(), URL, "2026-10-04T01:08:01Z", "CURRENT")), FindingReason.NOT_CHECKED_NOW);
     }
 
     @Test
@@ -200,13 +203,17 @@ class FindingJudgementTest {
         Finding base = valid();
         Next next = base.next();
 
-        assertReference(judge(withContent(base, base.title(), base.whyItMatters(), List.of(), next)), FindingReason.INCOMPLETE);
+        assertReference(
+                judge(withContent(base, base.title(), base.whyItMatters(), List.of(), next)), FindingReason.INCOMPLETE);
         assertReference(
                 judge(withContent(base, base.title(), base.whyItMatters(), List.of(" "), next)),
                 FindingReason.INCOMPLETE);
-        assertReference(judge(withContent(base, null, base.whyItMatters(), base.facts(), next)), FindingReason.INCOMPLETE);
+        assertReference(
+                judge(withContent(base, null, base.whyItMatters(), base.facts(), next)), FindingReason.INCOMPLETE);
         assertReference(judge(withContent(base, base.title(), null, base.facts(), next)), FindingReason.INCOMPLETE);
-        assertReference(judge(withContent(base, base.title(), base.whyItMatters(), base.facts(), null)), FindingReason.INCOMPLETE);
+        assertReference(
+                judge(withContent(base, base.title(), base.whyItMatters(), base.facts(), null)),
+                FindingReason.INCOMPLETE);
         assertReference(
                 judge(withContent(base, base.title(), base.whyItMatters(), base.facts(), new Next("ACTION", null))),
                 FindingReason.INCOMPLETE);
