@@ -58,6 +58,7 @@ public final class ChatDtos {
      * @param attachments 이 메시지에 붙은 첨부. 지워진 것도 자리를 남기려고 담는다. 없으면 빈 목록
      * @param artifacts 이 답의 turn 이 대화 폴더에 만든 HTML. 지워진 것도 담는다. 사용자 메시지와 결과물이 없는
      *     답은 빈 목록
+     * @param delivery 이 알림 줄이 묶음의 마지막 시도의 마지막 알림 줄이면 그 묶음의 번호와 상태. 아니면 null
      */
     public record MessageView(
             Long id,
@@ -72,7 +73,16 @@ public final class ChatDtos {
             List<AttachmentView> attachments,
             List<ArtifactView> artifacts,
             ActivitySummary activity,
-            String status) {}
+            String status,
+            DeliveryView delivery) {}
+
+    /**
+     * 알림 줄 아래에 그리는 전달 묶음이다(ADR-075). 오류 코드는 싣지 않는다. 원인은 관리자 영역의 실행 상세가 보인다.
+     *
+     * @param id 전달 묶음 번호. 다시 전달할 때 이 번호로 부른다
+     * @param status {@code DELIVERING}, {@code DELIVERED}, {@code FAILED}, {@code STOPPED} 가운데 하나
+     */
+    public record DeliveryView(Long id, String status) {}
 
     public record StopResponse(String status) {}
 

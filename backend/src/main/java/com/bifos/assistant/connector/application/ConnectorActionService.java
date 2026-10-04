@@ -41,6 +41,7 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -239,6 +240,29 @@ public class ConnectorActionService {
         return undelivered(conversationId, EXECUTED);
     }
 
+    /**
+     * 그 대화와 그 사용자의 실행한 승인 줄을 번호의 순서로 다시 읽는다. 결과를 다시 전달할 때 쓴다(ADR-075).
+     *
+     * <p>전했는지는 보지 않는다. 없거나 남의 줄이거나 실행을 보내지 않고 끝난 줄은 뺀다. 실행을 다시 보내지 않는다.
+     */
+    @Transactional(readOnly = true)
+    public List<ConnectorActionResult> resultsFor(Long conversationId, Long userId, List<UUID> actionIds) {
+        if (actionIds.isEmpty()) {
+            return List.of();
+        }
+        Map<UUID, ConnectorAction> found = new HashMap<>();
+        actions.findByConversationIdAndUserIdAndPublicIdIn(conversationId, userId, actionIds).stream()
+                .filter(action -> EXECUTED.contains(action.status()))
+                .forEach(action -> found.put(action.publicId(), action));
+        Map<String, Optional<ConnectorManifest>> manifests = new HashMap<>();
+        return actionIds.stream()
+                .distinct()
+                .map(found::get)
+                .filter(Objects::nonNull)
+                .map(action -> resultOf(action, manifests))
+                .toList();
+    }
+
     /** 그 대화에서 알림 줄만 남길 줄이다. 실행하지 않고 끝났고 아직 전하지 않은 것이다. */
     @Transactional(readOnly = true)
     public List<ConnectorActionResult> undeliveredClosures(Long conversationId) {
@@ -274,18 +298,20 @@ public class ConnectorActionService {
         return actions
                 .findByConversationIdAndStatusInAndResultDeliveredAtIsNullOrderByIdAsc(conversationId, statuses)
                 .stream()
-                .map(action -> {
-                    ConnectorActionView view =
-                            view(action, manifests.computeIfAbsent(action.connectorId(), this::readManifest));
-                    return new ConnectorActionResult(
-                            action.publicId(),
-                            view.title(),
-                            action.toolName() == null ? action.hermesTool() : action.toolName(),
-                            action.status(),
-                            action.errorCode(),
-                            action.resultText());
-                })
+                .map(action -> resultOf(action, manifests))
                 .toList();
+    }
+
+    /** @param manifests 커넥터마다 한 번만 읽으려고 부르는 쪽이 들고 있는 manifest 들 */
+    private ConnectorActionResult resultOf(ConnectorAction action, Map<String, Optional<ConnectorManifest>> manifests) {
+        ConnectorActionView view = view(action, manifests.computeIfAbsent(action.connectorId(), this::readManifest));
+        return new ConnectorActionResult(
+                action.publicId(),
+                view.title(),
+                action.toolName() == null ? action.hermesTool() : action.toolName(),
+                action.status(),
+                action.errorCode(),
+                action.resultText());
     }
 
     /**

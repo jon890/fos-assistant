@@ -109,6 +109,17 @@ export function regenerateLatestAnswer(
   });
 }
 
+/** 실패하거나 중지한 결과 전달을 저장된 결과만으로 다시 전달하고 그 답을 SSE 로 받는다. */
+export function retryDelivery(
+  conversationId: string,
+  deliveryId: number,
+): Promise<Response> {
+  return fetch(
+    `${conversationPath(conversationId)}/deliveries/${deliveryId}/retry`,
+    { method: "POST" },
+  );
+}
+
 /** 도는 실행을 멈춰 달라고 요청한다. 받아들이면 202 를 준다. */
 export function stopExecution(executionId: number): Promise<Response> {
   return fetch(`/api/chat/executions/${executionId}/stop`, {

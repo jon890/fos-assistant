@@ -42,6 +42,7 @@ import {
   fetchRunningTurn,
   openConversationEvents,
   regenerateLatestAnswer,
+  retryDelivery as requestDeliveryRetry,
   sendChatMessage,
   startChatStream,
   stopExecution,
@@ -113,6 +114,7 @@ type ObservedTurnFilter = {
 /** 대화 단위 SSE 로 받아 그리고 있는 자동 turn 이다. `pendingId` 는 흘러오는 답 조각의 임시 식별자다. */
 type AutoTurn = { state: TurnStreamState; pendingId: string };
 type TurnStreamCallbacks = {
+  onSystem?(event: ChatEvent): void;
   onStarted?(event: ChatEvent): void | Promise<void>;
   onDelta?(text: string): void;
   onReset?(): void;
@@ -295,6 +297,8 @@ export function ConversationSession({
   const [flowIsSlow, setFlowIsSlow] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [turnError, setTurnError] = useState<string | null>(null);
+  /** 「결과 다시 전달」 요청을 보내고 끝나기를 기다리는 중이다. 알림 줄의 단추를 막는다 */
+  const [deliveryRetrying, setDeliveryRetrying] = useState(false);
   /** 보낸 스킬 커맨드의 이름이 이 에이전트에 없었다. 입력창 아래에 알리고 다음 보내기를 시작하면 지운다 */
   const [unknownSkill, setUnknownSkill] = useState<string | null>(null);
   /** `/` 목록에 띄울 스킬 이름과 그 목록을 읽은 에이전트다. 에이전트를 바꾸면 그 에이전트의 목록을 다시 읽는다 */
@@ -867,7 +871,9 @@ export function ConversationSession({
     state: TurnStreamState,
     callbacks: TurnStreamCallbacks,
   ) {
-    if (event.type === "started") {
+    if (event.type === "system") {
+      callbacks.onSystem?.(event);
+    } else if (event.type === "started") {
       state.started = true;
       currentExecutionId.current = event.executionId ?? null;
       setExecutionId(event.executionId ?? null);
@@ -1051,15 +1057,19 @@ export function ConversationSession({
       // 이 창이 연결되기 전에 시작한 turn 이다. 끝나면 저장된 답을 읽어 보인다.
       if (event.type === "done" || event.type === "stopped") {
         await refreshMessages(id, selectionVersion.current).catch(() => {});
-      } else if (event.type === "error" && hasPendingItems.current) {
-        // 대기 메시지를 보내려다 사용자 메시지를 저장하기 전에 실패했다. turn 이 열리지 않아 답 자리가 없으므로
-        // 입력창 위에 까닭을 알린다. 대기 줄은 멈춘 채 남고 이어 오는 `pending` 사건이 그것을 보인다.
-        setError(
-          describeError(
-            event.code ?? "INTERNAL_ERROR",
-            event.message ?? "요청을 처리하지 못했어요.",
-          ),
-        );
+      } else if (event.type === "error") {
+        if (hasPendingItems.current) {
+          // 대기 메시지를 보내려다 사용자 메시지를 저장하기 전에 실패했다. turn 이 열리지 않아 답 자리가 없으므로
+          // 입력창 위에 까닭을 알린다. 대기 줄은 멈춘 채 남고 이어 오는 `pending` 사건이 그것을 보인다.
+          setError(
+            describeError(
+              event.code ?? "INTERNAL_ERROR",
+              event.message ?? "요청을 처리하지 못했어요.",
+            ),
+          );
+        }
+        // `started` 전에 실패한 자동 turn 도 알림 줄의 전달 상태가 바뀌었으므로 이력을 다시 읽어 「결과 다시 전달」 을 그린다.
+        await refreshMessages(id, selectionVersion.current).catch(() => {});
       }
       return;
     }
@@ -1684,6 +1694,158 @@ export function ConversationSession({
     }
   }
 
+  /**
+   * 실패하거나 중지한 결과 전달을 저장된 결과만으로 다시 전달하고 그 답을 흘려 그린다. 보낸 turn 과 같은 방식으로
+   * 입력창을 막고, 끊긴 스트림과 끝 처리도 다시 생성과 같다.
+   */
+  async function retryDeliveryTurn(deliveryId: number) {
+    if (conversationId === null || sending || sentTurnToken.current !== null)
+      return;
+    const version = selectionVersion.current;
+    const pendingId = `assistant-retry-${Date.now()}`;
+    const stream = { started: false, done: false, reportedError: false };
+    const savedBefore = savedIdsOf(turns);
+    /** 스트림이 끊겨 보는 창으로 넘어갔다. 보기가 입력창을 풀므로 끝낼 때 풀지 않는다. */
+    let handedOff = false;
+    /** 끊긴 turn 을 판단하며 이력을 이미 다시 읽었다. 실패 처리에서 한 번 더 읽지 않는다. */
+    let historyRead = false;
+    sentTurnToken.current = pendingId;
+    setDeliveryRetrying(true);
+    setSending(true);
+    setError(null);
+    setTurnError(null);
+    setUnknownSkill(null);
+    setActivity(emptyActivity(Date.now()));
+    setLiveExpanded(false);
+    liveExpandedRef.current = false;
+    setExpandedOnDone(null);
+    currentExecutionId.current = null;
+    setExecutionId(null);
+    setStopRequested(false);
+    setFlowIsSlow(false);
+    try {
+      const response = await requestDeliveryRetry(conversationId, deliveryId);
+      if (!response.ok) {
+        const payload = await readPayload<ErrorPayload>(response);
+        setError(describeError(payload.code, payload.message));
+        setActivity(null);
+        // 한도와 대화 잠금은 잠시 뒤 다시 누르면 되므로 단추를 그대로 둔다. 나머지는 서버의 상태대로 다시 그린다.
+        if (
+          payload.code !== "CONVERSATION_BUSY" &&
+          payload.code !== "USER_BUSY"
+        )
+          await refreshMessages(conversationId, version).catch(() => {});
+        return;
+      }
+      try {
+        await consumeTurnStream(response, version, stream, {
+          onSystem: (event) => {
+            const line: Turn = {
+              id: event.messageId ?? `system-${Date.now()}`,
+              role: "SYSTEM",
+              content: event.text ?? "",
+              senderName: null,
+            };
+            setTurns((previous) =>
+              previous.some((turn) => turn.id === line.id)
+                ? previous
+                : [...previous, line],
+            );
+          },
+          onDelta: (textDelta) => {
+            setTurns((previous) => {
+              const current = previous.find((turn) => turn.id === pendingId);
+              return current
+                ? previous.map((turn) =>
+                    turn.id === pendingId
+                      ? { ...turn, content: turn.content + textDelta }
+                      : turn,
+                  )
+                : [
+                    ...previous,
+                    {
+                      id: pendingId,
+                      role: "ASSISTANT",
+                      content: textDelta,
+                      senderName: null,
+                    },
+                  ];
+            });
+          },
+          onReset: () => {
+            setTurns((previous) =>
+              previous.filter((turn) => turn.id !== pendingId),
+            );
+          },
+          onError: async (event) => {
+            setTurns((previous) =>
+              previous.filter((turn) => turn.id !== pendingId),
+            );
+            setTurnError(
+              describeError(
+                event.code ?? "INTERNAL_ERROR",
+                event.message ?? "요청을 처리하지 못했어요.",
+              ),
+            );
+            await refreshMessages(conversationId, version);
+          },
+          onDone: async (event) => {
+            setTurns((previous) =>
+              previous.filter((turn) => turn.id !== pendingId),
+            );
+            await Promise.all([
+              refresh(),
+              refreshMessages(event.conversationId!, version),
+            ]);
+          },
+        });
+      } catch (reason) {
+        // 끝 사건을 받은 뒤의 실패는 그대로 올린다. 받기 전에 읽기가 깨졌으면 끊긴 것으로 보고 아래에서 묻는다.
+        if (stream.done || stream.reportedError) throw reason;
+      }
+      if (!stream.done && !stream.reportedError) {
+        const kind = await settleInterruptedStream(
+          version,
+          savedBefore,
+          pendingId,
+          {
+            onMissing: async (history) => {
+              historyRead = history !== null;
+            },
+          },
+        );
+        if (kind === "observing") handedOff = true;
+        if (kind !== "missing") return;
+        throw new Error(
+          describeError("STREAM_INTERRUPTED", "응답 연결이 끊겼어요."),
+        );
+      }
+    } catch (reason) {
+      if (selectionVersion.current === version) {
+        setTurns((previous) =>
+          previous.filter((turn) => turn.id !== pendingId),
+        );
+        setActivity(
+          (previous) => previous && failActivity(previous, Date.now()),
+        );
+        setTurnError(
+          reason instanceof Error
+            ? reason.message
+            : "결과를 다시 전달하지 못했어요.",
+        );
+        if (!historyRead)
+          await refreshMessages(conversationId, version).catch(() => {});
+      }
+    } finally {
+      if (selectionVersion.current === version && !handedOff) {
+        setSending(false);
+        setFlowIsSlow(false);
+      }
+      setDeliveryRetrying(false);
+      void finishSentTurn(pendingId);
+    }
+  }
+
   async function stop() {
     const executionId = currentExecutionId.current;
     if (executionId === null || stopRequested) return;
@@ -1843,6 +2005,11 @@ export function ConversationSession({
             onRetry={() => {
               void regenerate();
             }}
+            onRetryDelivery={(deliveryId) => {
+              void retryDeliveryTurn(deliveryId);
+            }}
+            // 다른 turn 이 도는 동안에는 보내도 서버가 막으므로 단추도 막는다.
+            deliveryRetrying={deliveryRetrying || sending}
             // 질문 카드는 답이 오는 중에도 보인다. 그때 고른 답은 입력창의 보내기와 같이 대기 메시지로 들어간다.
             onAnswer={(text) => {
               void submit([], text);

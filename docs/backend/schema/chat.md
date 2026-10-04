@@ -1,6 +1,6 @@
 # 대화
 
-대화와 메시지, 대기 메시지, 사진 첨부, 결과물을 저장하는 표 다섯의 칸과 제약을 갖는다.
+대화와 메시지, 대기 메시지, 사진 첨부, 결과물, 결과 전달 기록을 저장하는 표 여덟의 칸과 제약을 갖는다.
 이 표들을 읽고 쓰는 경로는 [`backend/conversation.md`](../conversation.md) 와 그 옆의 문서들이 갖는다.
 
 ## conversation
@@ -74,7 +74,7 @@ FK 를 더하려면 이미 행이 없는 대화를 먼저 정리해야 하고, �
 중지한 실행의 답도 한 줄로 남는다.
 근거는 [ADR-021](../../adr/ADR-021-중지한-답은-멈춘-자리까지-남긴다.md) 에 있다.
 
-`SYSTEM` 줄은 Control Plane 이 부모 대화를 깨울 때 한 줄 남긴다. 본문은 어느 에이전트의 결과가 도착했는지 알리는 짧은 글이고, 자식의 답 전문은 넣지 않는다.
+`SYSTEM` 줄은 Control Plane 이 부모 대화를 깨울 때 한 줄 남긴다. 사용자가 결과를 다시 전달할 때도 한 줄 남긴다. 본문은 어느 에이전트의 결과가 도착했는지 알리는 짧은 글이고, 자식의 답 전문은 넣지 않는다.
 다시 생성의 대상이 아니다. 근거는 [ADR-040](../../adr/ADR-040-위임-결과는-control-plane-이-부모-대화의-다음-turn-을-열어-전한다.md) 에 있다.
 
 `sender_user_id` 는 화면이 보낸 사람 이름을 보이기 위한 것이다.
@@ -161,3 +161,62 @@ turn 이 도는 동안 사용자가 보낸 메시지 하나가 한 행이다. �
 
 **행을 지우지 않는다.** 첨부와 같다. 파일이 지워지면 `deleted_at` 을 적어 화면이 「보관 기간이 지나 볼 수 없습니다」를 보인다.
 근거는 [ADR-027](../../adr/ADR-027-에이전트가-만든-html-은-대화별-폴더에-두고-스크립트-없이-보인다.md) 에 있다.
+
+## result_delivery
+
+자동 turn 하나가 부모 대화에 넘긴 결과들의 묶음이다. 그 turn 이 알림 줄을 저장할 때 생긴다.
+결정은 [ADR-075](../../adr/ADR-075-결과-전달은-묶음과-시도로-남기고-사용자가-저장된-결과만-다시-전달한다.md), 상태가 바뀌는 흐름은 [`agent-delegation.md`](../agent-delegation.md) 의 「결과 전달이 끝나지 않았을 때」 에 있다.
+
+| 칸 | 타입 | 뜻 |
+| --- | --- | --- |
+| `id` | BIGINT | 화면과 다시 전달 경로가 쓰는 번호다. 대화 주인만 그 대화의 묶음을 부른다 |
+| `conversation_id` | BIGINT | 결과를 받은 대화 |
+| `status` | VARCHAR(20) | `DELIVERING`, `DELIVERED`, `FAILED`, `STOPPED`. 마지막 시도의 끝과 같다 |
+| `attempt_count` | INT | 지금까지 만든 시도 수. 다시 전달할 때 하나 늘린다 |
+| `created_at` | DATETIME(6) | |
+| `updated_at` | DATETIME(6) | 상태가 바뀐 시각 |
+
+색인은 `(conversation_id, status)` 다.
+
+**다시 전달은 `status` 를 `FAILED` 나 `STOPPED` 에서 `DELIVERING` 으로 바꾸는 조건부 update 로 시작한다.** 바뀐 줄이 없으면 시작하지 않는다. 한 묶음에 도는 시도가 둘이 되지 않는 근거다.
+묶음과 시도의 상태는 같은 트랜잭션에서 바꾼다.
+
+외래 키를 두지 않는다. `connector_action` 과 같이 대화가 지워져도 기록을 남긴다. 지운 대화의 묶음은 다시 전달하지 못한다.
+
+## result_delivery_item
+
+묶음에 든 결과 하나가 한 행이다.
+
+| 칸 | 타입 | 뜻 |
+| --- | --- | --- |
+| `id` | BIGINT | 넣은 순서다. 다시 전달할 때 이 순서로 입력을 만든다 |
+| `delivery_id` | BIGINT FK | `result_delivery` |
+| `source` | VARCHAR(40) | 결과를 낸 쪽. 위임 결과는 `DELEGATION`, 승인한 커넥터 호출의 결과는 `CONNECTOR_ACTION` 이다 |
+| `result_key` | VARCHAR(64) | 그쪽의 결과 이름. `DELEGATION` 은 `agent_execution.id`, `CONNECTOR_ACTION` 은 `connector_action.public_id` 의 UUID 글이다 |
+
+`(source, result_key)` 에 유일 제약이 있다. 한 결과는 한 묶음에만 든다. 같은 결과를 두 자동 turn 이 함께 넘기려 하면 뒤의 트랜잭션이 알림 줄까지 함께 되돌아간다.
+색인은 `(delivery_id, id)` 다. 다시 전달할 때 묶음의 항목을 넣은 순서로 읽는다.
+
+결과 본문은 여기 두지 않는다. 다시 전달할 때 실행 줄의 `output_text` 와 승인 줄의 `result_text` 를 다시 읽는다.
+
+## result_delivery_attempt
+
+묶음을 부모에 넘긴 한 번이 한 행이다. 첫 시도는 묶음과 함께, 다음 시도는 다시 전달할 때 생긴다.
+
+| 칸 | 타입 | 뜻 |
+| --- | --- | --- |
+| `id` | BIGINT | |
+| `delivery_id` | BIGINT FK | `result_delivery` |
+| `attempt_no` | INT | 1 부터 센다 |
+| `status` | VARCHAR(20) | `RUNNING`, `SUCCEEDED`, `FAILED`, `STOPPED` |
+| `execution_id` | BIGINT NULL | 이 시도의 부모 turn 실행 줄. 실행 줄을 만들면 채운다. 그 전에 실패했거나 내려갔으면 비어 있다 |
+| `notice_message_id` | BIGINT NULL | 이 시도가 저장한 마지막 `SYSTEM` 줄. 화면은 묶음의 마지막 시도의 이 줄 아래에 상태와 버튼을 그린다 |
+| `error_code` | VARCHAR(64) NULL | `FAILED` 의 원인. 부모 turn 의 오류 코드이거나, 실행 줄이 생기기 전에 내려간 `INTERRUPTED` 다 |
+| `started_at` | DATETIME(6) | |
+| `finished_at` | DATETIME(6) NULL | `RUNNING` 이면 비어 있다 |
+
+`(delivery_id, attempt_no)` 에 유일 제약이 있다. 색인은 `(status, started_at)` 과 `(execution_id)` 다.
+기동할 때 앞 프로세스가 남긴 `RUNNING` 시도를 `started_at` 으로 고르고, 기동 정리가 실행 줄을 적을 때 `execution_id` 로 찾는다.
+
+`execution_id` 와 `notice_message_id` 에는 외래 키를 두지 않는다. 그 줄이 지워져도 시도의 끝은 남는다.
+

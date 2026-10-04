@@ -59,6 +59,7 @@ import { DELEGATION_PROFILE, delegationScenario } from "./scenarios/delegation.t
 import { connectorScenario } from "./scenarios/connector.ts";
 import { connectorPolicyScenario } from "./scenarios/connector-policy.ts";
 import { notificationsScenario } from "./scenarios/notifications.ts";
+import { deliveryRetryScenario } from "./scenarios/delivery-retry.ts";
 import { connectorDelegationScenario } from "./scenarios/connector-delegation.ts";
 import { CHAT_QUEUE_PROFILE, chatQueueRestartScenario, chatQueueScenario } from "./scenarios/chat-queue.ts";
 import { restartReconcileScenario } from "./scenarios/restart-reconcile.ts";
@@ -125,6 +126,8 @@ const SCENARIOS: readonly Scenario[] = [
   connectorScenario,
   connectorPolicyScenario,
   notificationsScenario,
+  // 승인 요청을 하나 더 만드므로 알림 수를 세는 시나리오 뒤에 둔다.
+  deliveryRetryScenario,
   connectorDelegationScenario,
   // 에이전트를 하나 만들고 끄므로 에이전트 수를 세는 시나리오 뒤에 둔다.
   chatQueueScenario,

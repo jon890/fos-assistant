@@ -13,6 +13,7 @@ Control Plane 이 Hermes 에 실행을 맡기는 길은 `HermesRunsClient.submit
 | --- | --- | --- |
 | 보내기(`POST /api/v1/chat/messages`, `.../messages/stream`) | `ChatService.send`, `stream` 에서 `runTurn` | turn 자리 |
 | 다시 생성(`.../regenerate/stream`) | `ChatService.regenerate` | turn 자리 |
+| 결과 다시 전달(`.../deliveries/{deliveryId}/retry/stream`) | `ChatService.retryDelivery` 에서 `runTurn` | turn 자리 |
 | 스킬 커맨드 | 보내기와 같은 `runTurn` | turn 자리 |
 | 대기 메시지 turn | `NextTurnDispatcher.tryPending` 에서 `ChatService.runPendingMessages` | turn 자리 |
 | 위임 결과와 커넥터 결과의 자동 turn | `DelegationWakeService.tryWake` 에서 `ChatService.runDelegationResults` | turn 자리 |
@@ -156,10 +157,14 @@ flowchart TD
 | 다시 생성 | `started` 전에 `USER_BUSY` | 같은 안내가 보인다 |
 | 대기 메시지 turn | 대기 행을 지우지 않고 그 대화의 대기 줄을 멈춘 뒤 대화 단위 SSE 로 `USER_BUSY` 를 보낸다 | 멈춘 대기 줄과 안내가 보인다. 사용자가 「보내기」 로 다시 보낸다 |
 | 위임 결과 자동 turn | 결과를 전했다고 적지 않는다. `FAILURE_BACKOFF`(30초) 뒤 그 대화의 실패 시각을 지우고 다시 시도한다. 연속 거절이 10번을 넘으면 5분 간격으로 늦춘다. 한 대화에 걸린 예약은 하나뿐이다 | 결과는 자리가 난 뒤의 turn 에 전해진다 |
+| 결과 다시 전달 | `started` 전에 `USER_BUSY`. 전달 묶음은 `FAILED` 나 `STOPPED` 그대로 남고 다시 시도를 예약하지 않는다 | 같은 안내가 보이고 「결과 다시 전달」 이 그대로 남는다 |
 | 흐름 단계 | 그 단계의 실행 줄을 만들지 않는다. 루트 줄을 `USER_BUSY` 로 실패로 적고 turn 은 `USER_BUSY` 로 끝난다 | 같은 안내가 보인다 |
 | `agent_delegate` | 실행 줄을 만들지 않고 `BUSY` 도구 결과를 돌려준다 | 모델이 직접 하거나, 앞의 작업이 끝난 뒤 다시 맡기거나, 실패를 알린다 |
 | 추천 질문 | 실행 줄을 만들지 않는다. 실패 시각도 적지 않아 다음 읽기에서 다시 시도한다 | 추천이 이번에는 바뀌지 않는다 |
 | Memory 제안 | 실행 줄을 만들지 않는다 | 제안이 생기지 않는다 |
+
+**한도로 미룬 자동 turn 은 전달 실패가 아니다.** 미룬 자동 turn 은 대화 잠금을 잡기 전에 거절돼 알림 줄도 전달 묶음도 남기지 않는다. 결과는 전하지 않은 채 남아 위의 재시도가 전한다.
+전달 묶음의 `FAILED` 는 잠금을 잡고 알림 줄을 저장한 뒤의 실패다. 그 묶음은 자동으로 다시 시도하지 않고 사용자가 다시 전달한다([`agent-delegation.md`](agent-delegation.md) 의 「결과 전달이 끝나지 않았을 때」).
 
 **부모는 자식 자리를 기다리지 않는다.**
 위임 자식과 흐름 단계는 자리가 없으면 곧바로 거절된다. 부모가 자리를 쥔 채 자식을 기다리는 교착이 없다.

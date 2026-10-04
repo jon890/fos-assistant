@@ -249,6 +249,45 @@ flowchart TD
 예전에 수정으로 생긴 사용자 메시지의 판은 데이터베이스에 남아 있어, 화면이 그 turn 의 판도 넘겨 볼 수 있게 둔다.
 새로 만드는 경로는 없다.
 
+## 결과 다시 전달
+
+맡긴 일의 결과를 부모 에이전트가 정리하지 못했으면, 그 결과의 알림 줄 아래에 상태와 「결과 다시 전달」 이 보인다.
+누르면 저장된 결과만 다시 넘겨 답을 받는다. 맡긴 일이나 승인한 동작을 다시 실행하지 않는다.
+결정은 [ADR-075](../adr/ADR-075-결과-전달은-묶음과-시도로-남기고-사용자가-저장된-결과만-다시-전달한다.md), 서버의 판정은 [`backend/agent-delegation.md`](../backend/agent-delegation.md) 의 「결과 전달이 끝나지 않았을 때」 에 있다.
+
+이력 API 의 `SYSTEM` 줄에는 `delivery` 가 붙을 수 있다. `{ "id": 12, "status": "FAILED" }` 모양이고, 그 묶음의 마지막 시도가 저장한 마지막 알림 줄에만 붙는다.
+오류 코드는 싣지 않는다. 원인은 관리자 영역의 실행 상세에서 본다.
+
+| `delivery.status` | 알림 줄 아래 | 버튼 |
+| --- | --- | --- |
+| 없음, `DELIVERING`, `DELIVERED` | 아무것도 그리지 않는다 | 없다 |
+| `FAILED` | 「결과를 정리하지 못했어요」 | 「결과 다시 전달」 을 테두리 단추로 보인다 |
+| `STOPPED` | 「결과 정리를 중지했어요」 | 같은 단추를 글자 단추로 덜 눈에 띄게 보인다 |
+
+```mermaid
+flowchart TD
+    A[결과 다시 전달] --> B[단추를 바로 막는다]
+    B --> C[POST /api/chat/conversations/id/deliveries/deliveryId/retry]
+    C --> D{첫 사건}
+    D -- system --> E[새 알림 줄을 잇고 started 부터 답을 그린다]
+    E --> F{끝 사건}
+    F -- done 이나 stopped --> G[이력을 다시 읽는다. 버튼은 새 알림 줄로 옮겨 가거나 사라진다]
+    F -- error --> H[오류 안내를 보이고 이력을 다시 읽는다]
+    D -- error 나 4xx --> H
+```
+
+다시 전달 turn 은 보낸 turn 과 같이 그린다. 도는 동안 입력창은 「중지」 를 보이고, 중지하면 그 묶음은 `STOPPED` 로 남는다.
+
+| 상황 | 화면 |
+| --- | --- |
+| `CONVERSATION_BUSY` | 지금 도는 답이 끝난 뒤 다시 누르게 한다. 버튼은 남는다 |
+| `USER_BUSY` | 진행 중인 작업이 끝난 뒤 다시 누르게 한다([`backend/execution-limit.md`](../backend/execution-limit.md)). 버튼은 남는다 |
+| `DELIVERY_NOT_RETRYABLE` | 「지금은 이 결과를 다시 전할 수 없어요」 를 보이고 이력을 다시 읽는다 |
+| `DELIVERY_NOT_FOUND`, `AGENT_NOT_FOUND`, `AGENT_DISABLED` | 그 안내를 보인다. 이력을 다시 읽는다 |
+| 다른 창에서 같은 묶음을 다시 전달하고 있다 | 이력을 다시 읽을 때 `DELIVERING` 이라 버튼이 사라진다. 그 turn 은 「다른 창에서 답하는 중일 때」 처럼 보인다 |
+| 대화를 연 채로 자동 turn 이 실패했다 | 대화 단위 SSE 의 `error` 를 받으면 이력을 다시 읽어 버튼을 그린다. `started` 전에 실패한 turn 도 같다 |
+| 새로 고친다, 다른 기기에서 연다 | 이력 API 가 상태를 주므로 같은 버튼이 보인다 |
+
 ## 메시지 동작
 
 | 어디 | 동작 |

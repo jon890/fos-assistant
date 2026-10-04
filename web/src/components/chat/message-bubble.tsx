@@ -17,6 +17,7 @@ import { MessageActions } from "./message-actions";
 import type { VersionSlot } from "@/lib/message-versions";
 import { VersionSwitcher } from "./version-switcher";
 import { parseSkillCommand } from "./skill-command";
+import { Button } from "@/components/ui/button";
 
 /** 대화에 붙은 사진 한 장이다. `ChatDtos.AttachmentView` 를 그대로 받는다 */
 export type MessageAttachment = {
@@ -34,6 +35,12 @@ export type MessageArtifact = {
   byteSize: number;
   /** 보관 기간이 지나 파일이 지워졌다 */
   deleted: boolean;
+};
+
+/** 결과 전달 묶음의 상태다. `ChatDtos.DeliveryView` 를 그대로 받는다 */
+export type MessageDelivery = {
+  id: number;
+  status: "DELIVERING" | "DELIVERED" | "FAILED" | "STOPPED";
 };
 
 export type Turn = {
@@ -55,6 +62,8 @@ export type Turn = {
   activity?: ActivitySummary | null;
   status?: "SUCCEEDED" | "FAILED" | "CANCELLED" | "RUNNING" | null;
   replacesMessageId?: number | null;
+  /** 이 알림 줄이 결과 묶음의 마지막 알림 줄이면 그 묶음의 상태 */
+  delivery?: MessageDelivery | null;
 };
 
 function AttachmentGallery({
@@ -199,6 +208,8 @@ export function MessageBubble({
   onOpenArtifact,
   skillCommandChip = false,
   liveActivity,
+  onRetryDelivery,
+  deliveryRetrying = false,
 }: {
   turn: Turn;
   conversationId: string | null;
@@ -221,6 +232,10 @@ export function MessageBubble({
   skillCommandChip?: boolean;
   /** 답이 흘러나오는 동안의 진행 중 작업 과정이다. 저장된 블록과 같은 자리에 그린다 */
   liveActivity?: React.ReactNode;
+  /** 실패하거나 중지한 결과 전달의 「결과 다시 전달」 을 누르면 그 묶음 번호로 부른다 */
+  onRetryDelivery?(deliveryId: number): void;
+  /** 다시 전달을 보내는 중이면 단추를 막는다 */
+  deliveryRetrying?: boolean;
 }) {
   const user = turn.role === "USER";
   const sentAt = turn.createdAt ? formatWhen(turn.createdAt) : null;
@@ -230,14 +245,37 @@ export function MessageBubble({
 
   if (turn.role === "SYSTEM") {
     // 사람이 쓴 말도 비서의 답도 아니다. 복사, 다시 생성, 판 넘기기를 두지 않는다.
+    const delivery =
+      turn.delivery?.status === "FAILED" || turn.delivery?.status === "STOPPED"
+        ? turn.delivery
+        : null;
     return (
       <li
         data-testid="system-message"
-        className="flex min-w-0 justify-center px-4"
+        className="flex min-w-0 flex-col items-center gap-1.5 px-4"
       >
         <p className="min-w-0 max-w-full whitespace-pre-wrap break-words text-center text-xs text-muted-foreground">
           {turn.content}
         </p>
+        {delivery ? (
+          <div className="flex flex-wrap items-center justify-center gap-2 text-xs text-muted-foreground">
+            <span data-testid="delivery-status">
+              {delivery.status === "FAILED"
+                ? "결과를 정리하지 못했어요"
+                : "결과 정리를 중지했어요"}
+            </span>
+            <Button
+              type="button"
+              variant={delivery.status === "FAILED" ? "outline" : "ghost"}
+              size="xs"
+              data-testid="delivery-retry"
+              disabled={deliveryRetrying}
+              onClick={() => onRetryDelivery?.(delivery.id)}
+            >
+              결과 다시 전달
+            </Button>
+          </div>
+        ) : null}
       </li>
     );
   }
