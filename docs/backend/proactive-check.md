@@ -214,7 +214,7 @@ session 을 새로 바꾼 뒤에도 최근에 알린 발견과 변화 신호는 
 
 turn 이 어떻게 끝나든 잠금을 풀기 전에 `ProactiveCheckService` 가 아래를 한다.
 
-0. `ProactiveCheckRun.close()` 로 시간 상한 스레드를 끝내고 도구 호출 셈을 엔티티에 옮긴다. 셈은 스트림 스레드가 `AtomicInteger` 로 들고 있다
+0. `ProactiveCheckRun.close()` 로 시간 상한 스레드를 끝낸다. 도구 호출 셈은 스트림 스레드가 `AtomicInteger` 로 들고 있다가 1 에서 줄을 적을 때 넘긴다
 1. `proactive_check` 의 상태, 결과, 오류 코드, 도구 호출 수, 위임 수, 끝난 시각을 적는다
 2. 그 트리의 위임 자식 가운데 결과를 전하지 않은 줄을 모두 전했다고 적는다(`ExecutionDeliveryWriter.markTreeDelivered`). 아직 도는 줄도 적는다
 3. `ProactiveCheckEnded(rootExecutionId)` 사건을 낸다. `orchestration` 이 받아 그 트리의 도는 위임 자식을 멈춘다
@@ -223,7 +223,9 @@ turn 이 어떻게 끝나든 잠금을 풀기 전에 `ProactiveCheckService` 가
 자식의 답은 살펴보기 turn 이 `agent_status` 로 이미 읽었거나, 끝나기 전에 읽지 못했으면 버린다. 버린 수는 남기지 않는다.
 
 실패해서 끝나면 위 셋에 더해 「살펴보기를 끝내지 못했어요」 알림 줄을 `ConversationNotices` 로 남기고 대화 SSE 로 `error` 를 보낸다.
-멈춘 뒤 예외로 끝난 살펴보기는 멈췄다는 알림 줄만 남긴다. 알림 줄은 한 살펴보기에 하나다.
+멈춘 뒤 예외로 끝난 살펴보기는 멈췄다는 알림 줄만 남기고 대화 SSE 로 `error` 대신 `stopped` 를 보낸다. 알림 줄은 한 살펴보기에 하나다.
+
+**전달 표시는 실행 줄의 저장이 덮어쓰지 않는다.** `agent_execution.result_delivered_at` 은 조건부 update 로만 채우고 엔티티 저장에서 빠진다. 이 서버가 돌리는 위임 자식이 끝날 때 처음부터 들고 있던 엔티티를 저장해도 2 의 표시가 남는다.
 
 **상한으로 멈춘 살펴보기는 대기 메시지를 멈추지 않는다.**
 사용자가 살펴보기 동안 점검 대화에 보낸 대기 메시지는 사용자가 멈춘 것이 아니라 Control Plane 이 멈춘 것이라 그대로 다음 turn 으로 보낸다.

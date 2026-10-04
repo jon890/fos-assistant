@@ -59,6 +59,8 @@
   3. `ApplicationEventPublisher.publishEvent(new ProactiveCheckEnded(rootExecutionId))`
 - 각 단계가 실패해도 다음 단계와 잠금 풀기는 한다. 경고 로그를 남긴다
 
+- `AgentExecution` 의 `result_delivered_at` 칸을 `updatable = false` 로 둔다. 이 서버가 돌리는 위임 자식은 처음부터 들고 있던 엔티티를 끝날 때 `save` 로 merge 해, 조건부 update 로 적은 전달 표시를 null 로 덮어쓴다. 그 칸은 저장소의 조건부 update 로만 채운다
+
 ### 3. 사건과 받는 쪽
 
 - `backend/src/main/java/com/bifos/assistant/proactive/application/ProactiveCheckEnded.java`: record `ProactiveCheckEnded(Long rootExecutionId)`
@@ -111,5 +113,7 @@ scripts/check-mysql-migration.sh
 | `backend/src/main/java/com/bifos/assistant/orchestration/application/ProactiveCheckEndedListener.java` | 신규 |
 | `backend/src/main/java/com/bifos/assistant/orchestration/application/AgentDelegationService.java` | 수정 |
 | `backend/src/test/java/com/bifos/assistant/proactive/ProactiveCheckLimitTest.java` | 신규 |
+| `backend/src/test/java/com/bifos/assistant/proactive/ProactiveCheckTimeLimitTest.java` | 신규 |
+| `backend/src/main/java/com/bifos/assistant/usage/domain/AgentExecution.java` | 수정 |
 | `backend/src/test/java/com/bifos/assistant/proactive/ProactiveCheckEndTest.java` | 신규 |
 | `backend/src/test/java/com/bifos/assistant/orchestration/AgentDelegationServiceTest.java` | 수정 |
