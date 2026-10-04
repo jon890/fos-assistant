@@ -50,7 +50,8 @@ async function readUnreadCount(): Promise<
 /**
  * 로그인한 모든 화면에서 읽지 않은 알림 수를 들고 있는다.
  *
- * <p>첫 쪽을 읽은 뒤에 사용자 단위 SSE 를 연다. 순서가 바뀌면 늦게 온 읽기 응답이 사건의 수를 덮어쓴다.
+ * <p>첫 쪽을 읽은 뒤에 사용자 단위 SSE 를 열고, 연결이 서면 수를 한 번 더 읽는다.
+ * 순서가 바뀌면 늦게 온 읽기 응답이 사건의 수를 덮어쓴다.
  * 연결이 끊기면 잠시 뒤 다시 읽고 다시 연다. 4xx 는 다시 열어도 같으므로 다시 열지 않는다.
  */
 export function NotificationsProvider({
@@ -62,6 +63,19 @@ export function NotificationsProvider({
 }) {
   const [unreadCount, setUnreadCount] = useState(0);
   const refreshing = useRef(0);
+
+  const refresh = useCallback(() => {
+    const ticket = ++refreshing.current;
+    void readUnreadCount()
+      .then((read) => {
+        // 더 나중에 시작한 읽기가 있거나 그 사이 사건이 왔으면 이 응답은 버린다.
+        if (read.ok && ticket === refreshing.current)
+          setUnreadCount(read.count);
+      })
+      .catch(() => {
+        /* 다음 사건이나 다시 연결이 수를 맞춘다. */
+      });
+  }, []);
 
   useEffect(() => {
     if (!enabled) return;
@@ -85,6 +99,8 @@ export function NotificationsProvider({
           }
           const response = await openNotificationEvents(controller.signal);
           if (response.ok) {
+            // 첫 읽기와 연결 사이에 커밋된 알림의 사건은 오지 않으므로 연결이 선 뒤 한 번 더 읽는다.
+            refresh();
             await readEventStream<NotificationEvent>(response, (event) => {
               // 이 사건보다 먼저 시작한 refresh 의 응답이 이 수를 덮지 않게 버린다.
               refreshing.current += 1;
@@ -109,20 +125,7 @@ export function NotificationsProvider({
       controller.abort();
       window.clearTimeout(timer);
     };
-  }, [enabled]);
-
-  const refresh = useCallback(() => {
-    const ticket = ++refreshing.current;
-    void readUnreadCount()
-      .then((read) => {
-        // 더 나중에 시작한 읽기가 있거나 그 사이 사건이 왔으면 이 응답은 버린다.
-        if (read.ok && ticket === refreshing.current)
-          setUnreadCount(read.count);
-      })
-      .catch(() => {
-        /* 다음 사건이나 다시 연결이 수를 맞춘다. */
-      });
-  }, []);
+  }, [enabled, refresh]);
 
   const value = useMemo(
     () => ({ unreadCount, refresh }),

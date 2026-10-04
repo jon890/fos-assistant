@@ -37,7 +37,7 @@ function formatCreatedAt(createdAt: string): string {
 /** 내 알림 목록이다. 첫 쪽은 화면이 열린 뒤 브라우저가 읽는다. */
 export function NotificationList() {
   const router = useRouter();
-  const { refresh } = useUnreadNotifications();
+  const { unreadCount, refresh } = useUnreadNotifications();
   const [items, setItems] = useState<NotificationView[]>([]);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -178,7 +178,8 @@ export function NotificationList() {
     }
   }, [refresh]);
 
-  const hasUnread = items.some((item) => item.readAt === null);
+  const hasUnread =
+    unreadCount > 0 || items.some((item) => item.readAt === null);
 
   return (
     <div className="mx-auto w-full max-w-3xl">
