@@ -83,7 +83,16 @@ public class FollowUpService {
     /** 끝나지 않은 할 일을 만든 순서로 낸다. */
     @Transactional(readOnly = true)
     public List<FollowUpSnapshot> list(CurrentUser user) {
-        return snapshots(followUps.findByUserIdAndStatusInOrderByIdAsc(user.id(), LISTED));
+        return openAndProposedOf(user.id());
+    }
+
+    /**
+     * 그 사용자의 {@code PROPOSED} 와 {@code OPEN} 을 만든 순서로 낸다. 먼저 알리기의 판정이 읽는다. 연결한 대화를 지웠으면 그 줄의
+     * 공개 식별자는 null 이다.
+     */
+    @Transactional(readOnly = true)
+    public List<FollowUpSnapshot> openAndProposedOf(Long userId) {
+        return snapshots(followUps.findByUserIdAndStatusInOrderByIdAsc(userId, LISTED));
     }
 
     /**
