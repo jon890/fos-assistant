@@ -22,6 +22,9 @@
 | `/connections` | 커넥터 목록 |
 | `/connections/{id}` | 커넥터 하나의 연결 화면 |
 | `/connections/accountbook` | 옛 주소. `/connections/{id}` 로 넘긴다 |
+| `/tasks` | 내 예약 작업 목록과 「새 작업」([`../backend/task.md`](../backend/task.md) 의 「화면」) |
+| `/tasks/new` | 예약 작업 만들기 |
+| `/tasks/{id}` | 예약 작업 하나. 고치기, 멈추기와 다시 켜기, 지우기, 최근 실행 |
 | `/notifications` | 내 알림 목록. 알림 단추가 이 화면으로 온다([`../backend/notification.md`](../backend/notification.md) 의 「화면」) |
 | `/admin` | 관리자 영역의 첫 주소. `/admin/people` 로 넘긴다 |
 | `/admin/people` | 사용자 관리 |

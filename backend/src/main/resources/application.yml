@@ -168,6 +168,21 @@ assistant:
     cleanup-cron: "0 30 4 * * *"
     # 사건이 없는 동안 알림 SSE 에 주석 줄을 보내는 간격. 앞단 프록시가 연결을 끊지 않게 한다
     stream-heartbeat: 20s
+  task:
+    # 발화기와 시작 단계가 도는 때(초 포함 6필드). 검사에서는 - 로 끈다
+    dispatch-cron: "*/30 * * * * *"
+    # 이만큼 늦은 예정 시각은 놓친 것으로 보지 않는다
+    missed-grace: 2m
+    # QUEUED 줄이 만들어진 뒤 이만큼 열리지 못하면 SKIPPED(BUSY) 로 닫는다
+    start-timeout: 10m
+    # 사용자당 보관하지 않은 예약 작업 수(ADR-079)
+    max-per-user: 10
+    # 반복 시각의 최소 간격. 이보다 짧은 cron 은 만들 때 거절한다(ADR-079)
+    min-interval: 15m
+    # 사용자당 24시간 안의 발화 수(ADR-079)
+    max-runs-per-day: 48
+    # 시간대를 비운 작업의 시간대
+    default-time-zone: Asia/Seoul
   pricing:
     # models.dev 카탈로그를 복사해 둔 경로. 없으면 실행 비용을 비워 두고 기동은 계속한다
     catalog-path: ${ASSISTANT_PRICING_CATALOG:}

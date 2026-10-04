@@ -31,6 +31,9 @@ export type Conversation = {
   /** 선택하지 않은 새 대화는 null 이고, 서버가 새 선택 방식을 주면 그 값을 쓴다. */
   modelSelectionMode?: "DEFAULT" | "TIER" | "CUSTOM" | null;
   modelTier?: "FAST" | "BALANCED" | "DEEP" | null;
+  /** 예약 작업이 만든 대화면 그 작업이다. 아니면 null 이다 */
+  taskId: string | null;
+  taskTitle: string | null;
 };
 
 type ErrorPayload = { code?: string; message?: string };
