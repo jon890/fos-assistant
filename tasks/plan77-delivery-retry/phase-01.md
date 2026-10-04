@@ -137,7 +137,7 @@ CREATE INDEX idx_result_delivery_attempt_execution ON result_delivery_attempt (e
 - `begin`: `executions.start` 로 실행 줄을 만든 직후, `intent` 가 `DelegationResults` 면 `resultDeliveries.attachExecution(attemptId, execution.id())` 를 부른다. `modelTiers.resolve` 가 실패한 경로도 `begin` 을 거치므로 함께 잇는다. `attachExecution` 이 던지면 경고 로그만 남기고 삼킨다. 던지게 두면 실행 줄이 `RUNNING` 으로 남는다(`begin` 뒤에는 그 줄을 실패로 적는 경로가 없다)
 - 새 private 메서드 `runDeliveryTurn(CurrentUser owner, Routed routed, String input, Long attemptId, TurnHandle handle, Consumer<ChatEvent> onEvent)` 가 `runTurn` 과 끝 사건 내기를 감싼다. phase 03 의 다시 전달도 이 메서드를 쓴다
   - `runTurn` 이 돌려준 `ChatTurn` 이 중지면 `finish(attemptId, STOPPED, null)`, 아니면 `finish(attemptId, SUCCEEDED, null)`
-  - 예외로 끝났는데 `turns.isStopConfirmed(handle)` 가 참이면 `finish(attemptId, STOPPED, null)` 이다. 중지가 확정된 뒤 submit, relay, await 가 던지면 `cancelAndHoldIfStopConfirmed` 가 실행 줄을 `CANCELLED` 로 적으므로 시도도 중지로 닫는다
+  - 예외로 끝났는데 `turns.isStopConfirmed(handle)` 가 참이면 `finish(attemptId, STOPPED, null)` 이다. 사용자가 중지를 확정한 turn 이므로 실패가 아니라 중지로 남긴다. 실행 줄은 예외 종류에 따라 다르다. `submit` 과 `awaitCompletion` 이 `ApiException` 을 잡으면 먼저 `executions.fail` 로 `FAILED` 를 적어 `cancelAndHoldIfStopConfirmed` 가 취소를 적지 않고, 그 밖의 예외면 `cancelAndHoldIfStopConfirmed` 가 `CANCELLED` 로 적는다
   - 그 밖의 `ApiException` 이면 `finish(attemptId, FAILED, ex.code().name())`, 다른 `RuntimeException` 이면 `finish(attemptId, FAILED, ErrorCode.INTERNAL_ERROR.name())` 를 부르고 원래 예외를 다시 던진다
   - 닫았는지를 지역 변수로 두고, `finally` 에서 아직 닫지 않았으면 `finish(attemptId, FAILED, ErrorCode.INTERNAL_ERROR.name())` 를 부른다. `Error` 로 끝나도 시도가 `RUNNING` 으로 남지 않게 하려는 것이다
   - `finish` 자체가 던지면 경고 로그만 남기고 원래 결과를 지킨다
@@ -157,13 +157,13 @@ CREATE INDEX idx_result_delivery_attempt_execution ON result_delivery_attempt (e
 | provider 실패 | 대역 Hermes 가 `failed` 상태를 돌려줌 | 시도 `FAILED`, `error_code` 가 `HERMES_RUN_FAILED`, 묶음 `FAILED`. 위임 결과의 `result_delivered_at` 은 채워짐. 30초를 기다리지 않고 `tryWake` 를 다시 불러도 대역 Hermes 의 제출 수가 늘지 않음 |
 | 실행 줄 전 실패 | `ContextAssembler` 를 `@MockitoSpyBean` 으로 감싸 `assemble` 이 한 번 던지게 함 | 시도 `FAILED`, `execution_id` 가 비어 있음, `error_code` 가 `INTERNAL_ERROR`(던진 예외가 `ApiException` 이면 그 코드). `SYSTEM` 줄은 남음 |
 | 사용자 중지 | `stub().beforeAwait(...)` 에서 그 turn 의 실행 번호로 `chat.stop(dad, executionId)` | 시도 `STOPPED`, 묶음 `STOPPED`, `error_code` 비어 있음 |
-| 중지를 확정한 뒤 await 가 던진다 | `beforeAwait` 에서 중지한 뒤 `stub().willFail(new ApiException(HERMES_UNAVAILABLE, ...))` | 실행 줄 `CANCELLED`, 시도 `STOPPED` |
+| 중지를 확정한 뒤 await 가 던진다 | `stub().beforeAwait` 안에서 `chat.stop` 을 부른 뒤 `IllegalStateException` 을 던진다 | 실행 줄 `CANCELLED`, 시도 `STOPPED`, 묶음 `STOPPED` |
 | 시도를 잇다 실패한다 | `ResultDeliveryRecorder` 를 `@MockitoSpyBean` 으로 감싸 `attachExecution` 이 한 번 던지게 함 | turn 은 그대로 답을 남기고 시도는 `SUCCEEDED` 로 닫힘. `execution_id` 는 비어 있음 |
 | 위임 결과와 승인 결과를 함께 | `AutoTurnResultSource` 를 구현한 테스트 전용 `@TestConfiguration` bean 이 결과 하나(`source()` 는 `TEST_SOURCE`)를 낸다 | 묶음 하나에 항목 둘. 순서는 `DELEGATION` 다음 `TEST_SOURCE` |
 | 같은 결과의 종료 사건이 겹쳐 온다 | 같은 `DelegationFinished` 를 스레드 둘에서 동시에 냄 | 묶음 하나, 시도 하나, `ASSISTANT` 줄 하나, 대역 Hermes 제출 하나 |
 | 같은 결과를 두 묶음에 넣으려 한다 | 트랜잭션 안에서 `open` 을 같은 항목으로 두 번 | 두 번째가 유일 제약으로 실패하고 그 트랜잭션이 되돌아감 |
 
-`chat.stop` 이 쓰는 실행 번호는 `stub().beforeAwait` 안에서 찾는다. 기존 중지 검사 `backend/src/test/java/com/bifos/assistant/chat/ChatStopTest.java` 의 `latestExecution(dad)` 와 같은 방법을 따른다. `stub().willFail` 의 정확한 모양은 `backend/src/test/java/com/bifos/assistant/hermes/StubHermesRunsClient.java` 를 읽고 맞춘다.
+`chat.stop` 이 쓰는 실행 번호는 `stub().beforeAwait` 안에서 찾는다. 기존 중지 검사 `backend/src/test/java/com/bifos/assistant/chat/ChatStopTest.java` 의 `latestExecution(dad)` 와 같은 방법을 따른다. `stub().beforeAwait` 의 정확한 모양은 `backend/src/test/java/com/bifos/assistant/hermes/StubHermesRunsClient.java` 를 읽고 맞춘다.
 
 ## 검증
 

@@ -64,7 +64,7 @@
 | 실행 줄이 취소로 끝났다 | 실행 줄 `CANCELLED` | 시도 `STOPPED`, 묶음 `STOPPED` |
 | 실행 줄이 아직 돈다 | 실행 줄 `RUNNING` | 기동 때의 정리는 건너뛴다. 그 뒤 `RecoveredRunRecorder.failWithout(executionId, "REMOTE_RUN_LOST")` 를 부르면 시도 `FAILED` 와 `REMOTE_RUN_LOST`, 묶음 `FAILED` |
 | 기동 정리가 성공으로 정했다 | 실행 줄 `RUNNING` 과 run 번호, 대화가 있는 대화 turn 루트 줄. `RecoveredRunRecorder.settle(executionId, 완료 결과)` | 실행 줄 `SUCCEEDED`, 답 줄 저장, 시도 `SUCCEEDED`, 묶음 `DELIVERED` |
-| 닫은 묶음은 자동으로 다시 열리지 않는다 | 첫 검사의 묶음에 루트 부모 줄과 `result_delivered_at` 이 채워진 위임 자식 줄을 함께 만들고 항목으로 건다. 닫은 뒤 `NextTurnDispatcher.dispatchAfterStartup()` | 대역 Hermes 제출 없음. 같은 준비에서 `result_delivered_at` 만 비운 대조 줄로는 제출이 하나 생겨 검사가 기동 훑기를 실제로 거친다는 것을 보인다 |
+| 닫은 묶음은 자동으로 다시 열리지 않는다 | 첫 검사의 묶음에 루트 부모 줄과 `result_delivered_at` 이 채워진 위임 자식 줄을 함께 만들고 항목으로 건다. 닫은 뒤 `NextTurnDispatcher.dispatchAfterStartup()` | 순서: 닫은 뒤 `dispatchAfterStartup()` 을 부르고 그 대화의 `awaitIdle` 뒤 제출 수 0 을 본다. 그다음 다른 대화에 `result_delivered_at` 만 비운 대조 줄을 만들고 `dispatchAfterStartup()` 과 그 대화의 `awaitIdle` 뒤 전체 제출 수가 1 인지 본다. 대조가 1 이어야 앞의 0 이 기동 훑기를 실제로 거친 결과다 |
 | 기동 연결 | `ResultDeliveryRecovery` 를 고정 시각의 `Clock` 으로 직접 만들고 `closeAfterStartup()` 을 부른다 | 그 시각 전에 시작한 시도만 닫힘 |
 
 기존 `backend/src/test/java/com/bifos/assistant/chat/RecoveredRunRecorderTest.java` 와 `RestartReconcilerTest` 는 고치지 않는다. 생성자 의존이 늘어 그 테스트가 직접 객체를 만들고 있으면 새 의존만 넘기도록 고치고 단언은 바꾸지 않는다.
