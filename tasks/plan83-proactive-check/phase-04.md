@@ -75,7 +75,7 @@
 
 `CheckTurn` 의 구현이다. 살펴보기 한 번마다 만든다(빈이 아니다).
 
-- `static final String INSTRUCTIONS`: 문서 「Control Plane 지시」 의 여섯 규칙과 결과 블록의 칸 이름, 허용 값, 상한을 한국어로 적는다. 칸 이름은 `docs/backend/proactive-check.md` 의 「결과 계약」 표와 같아야 한다
+- `static final String INSTRUCTIONS`: 문서 「Control Plane 지시」 의 규칙 전부와 결과 블록의 칸 이름, 허용 값, 상한을 한국어로 적는다. 칸 이름은 `docs/backend/proactive-check.md` 의 「결과 계약」 표와 같아야 한다
 - `input()`: 차례로 아래 단락이다
   1. 「먼저 살펴보기를 시작한다. `skill_view(name="proactive-check")` 로 지침을 읽고 그 절차대로 살펴본다.」
   2. 지금 시각(ISO-8601, UTC)
