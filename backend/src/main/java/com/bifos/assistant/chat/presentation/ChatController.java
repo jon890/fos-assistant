@@ -10,10 +10,12 @@ import com.bifos.assistant.chat.application.ConversationPage;
 import com.bifos.assistant.chat.application.ModelOptionsService;
 import com.bifos.assistant.chat.application.ModelTierOptions;
 import com.bifos.assistant.chat.application.ModelTierService;
+import com.bifos.assistant.chat.application.model.DeliveryState;
 import com.bifos.assistant.chat.domain.ChatArtifact;
 import com.bifos.assistant.chat.domain.ChatAttachment;
 import com.bifos.assistant.chat.domain.ChatMessage;
 import com.bifos.assistant.chat.domain.Conversation;
+import com.bifos.assistant.chat.domain.type.MessageRole;
 import com.bifos.assistant.chat.presentation.ChatDtos.ArtifactView;
 import com.bifos.assistant.chat.presentation.ChatDtos.AttachmentView;
 import com.bifos.assistant.chat.presentation.ChatDtos.ChooseModelRequest;
@@ -21,6 +23,7 @@ import com.bifos.assistant.chat.presentation.ChatDtos.ChooseModelTierRequest;
 import com.bifos.assistant.chat.presentation.ChatDtos.ConversationPageView;
 import com.bifos.assistant.chat.presentation.ChatDtos.ConversationRefView;
 import com.bifos.assistant.chat.presentation.ChatDtos.ConversationView;
+import com.bifos.assistant.chat.presentation.ChatDtos.DeliveryView;
 import com.bifos.assistant.chat.presentation.ChatDtos.MessageView;
 import com.bifos.assistant.chat.presentation.ChatDtos.ModelOptionsView;
 import com.bifos.assistant.chat.presentation.ChatDtos.RenameConversationRequest;
@@ -134,6 +137,18 @@ public class ChatController {
         Long id = access.requireOwnId(user, conversationId);
         return streams.open(
                 send -> chat.regenerate(user, id, event -> event.forViewer(user).ifPresent(send)));
+    }
+
+    /** 저장된 결과만 다시 읽어 그 전달 묶음을 부모 에이전트에 다시 넘긴다(ADR-070). 사건은 요청한 창에만 간다. */
+    @PostMapping(
+            path = "/conversations/{conversationId}/deliveries/{deliveryId}/retry/stream",
+            produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    public SseEmitter retryDelivery(@PathVariable UUID conversationId, @PathVariable Long deliveryId) {
+        CurrentUser user = currentUser.require();
+        // SSE 를 열기 전에 확인해야 남의 대화에 200 스트림 오류가 아닌 404를 돌려준다.
+        Long id = access.requireOwnId(user, conversationId);
+        return streams.open(send -> chat.retryDelivery(
+                user, id, deliveryId, event -> event.forViewer(user).ifPresent(send)));
     }
 
     /** 본문의 공개 식별자를 서비스가 받는 대화 번호로 바꾼다. 비어 있으면 새 대화다. */
@@ -287,6 +302,7 @@ public class ChatController {
         Map<Long, ExecutionStatus> statuses = chat.statuses(history);
         Map<Long, List<ChatAttachment>> attached = chat.attachmentsByMessage(user, number);
         Map<Long, List<ChatArtifact>> produced = chat.artifactsByMessage(history);
+        Map<Long, DeliveryState> deliveries = chat.deliveryStates(number);
         return history.stream()
                 .map(it -> new MessageView(
                         it.id(),
@@ -308,7 +324,19 @@ public class ChatController {
                         it.executionId() == null ? null : activity.get(it.executionId()),
                         it.executionId() == null || statuses.get(it.executionId()) == null
                                 ? null
-                                : statuses.get(it.executionId()).name()))
+                                : statuses.get(it.executionId()).name(),
+                        deliveryOf(it, deliveries)))
                 .toList();
+    }
+
+    /** 알림 줄이 아니거나 그 줄을 마지막 알림 줄로 가진 묶음이 없으면 null 이다. */
+    private static DeliveryView deliveryOf(ChatMessage message, Map<Long, DeliveryState> deliveries) {
+        if (message.role() != MessageRole.SYSTEM) {
+            return null;
+        }
+        DeliveryState state = deliveries.get(message.id());
+        return state == null
+                ? null
+                : new DeliveryView(state.deliveryId(), state.status().name());
     }
 }

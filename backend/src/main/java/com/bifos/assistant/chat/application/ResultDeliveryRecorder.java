@@ -1,19 +1,29 @@
 package com.bifos.assistant.chat.application;
 
 import com.bifos.assistant.chat.application.model.DeliveryItemRef;
+import com.bifos.assistant.chat.application.model.DeliveryState;
 import com.bifos.assistant.chat.application.model.ResultDeliveryStart;
 import com.bifos.assistant.chat.domain.ResultDelivery;
 import com.bifos.assistant.chat.domain.ResultDeliveryAttempt;
 import com.bifos.assistant.chat.domain.ResultDeliveryItem;
 import com.bifos.assistant.chat.domain.type.DeliveryAttemptStatus;
+import com.bifos.assistant.chat.domain.type.DeliveryStatus;
 import com.bifos.assistant.chat.infra.ResultDeliveryAttemptRepository;
 import com.bifos.assistant.chat.infra.ResultDeliveryItemRepository;
 import com.bifos.assistant.chat.infra.ResultDeliveryRepository;
+import com.bifos.assistant.shared.error.ApiException;
+import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.usage.domain.AgentExecution;
 import com.bifos.assistant.usage.infra.AgentExecutionRepository;
 import java.time.Clock;
 import java.time.Instant;
+import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -35,6 +45,11 @@ public class ResultDeliveryRecorder {
 
     /** 부모 turn 의 실행 줄 없이 프로세스가 내려가 끝을 모르는 시도에 적는 오류 코드다. */
     public static final String INTERRUPTED = "INTERRUPTED";
+
+    /** 사용자가 다시 전달할 수 있는 묶음 상태들이다. */
+    private static final Set<DeliveryStatus> RETRYABLE = Arrays.stream(DeliveryStatus.values())
+            .filter(DeliveryStatus::retryable)
+            .collect(Collectors.toUnmodifiableSet());
 
     private final ResultDeliveryRepository deliveries;
     private final ResultDeliveryItemRepository deliveryItems;
@@ -65,6 +80,82 @@ public class ResultDeliveryRecorder {
         ResultDeliveryAttempt attempt =
                 attempts.save(ResultDeliveryAttempt.started(delivery.id(), 1, noticeMessageId, now));
         return new ResultDeliveryStart(delivery.id(), attempt.id());
+    }
+
+    /**
+     * 그 대화의 묶음을 읽는다.
+     *
+     * @throws ApiException {@code DELIVERY_NOT_FOUND}. 없거나 다른 대화의 묶음일 때
+     */
+    public ResultDelivery require(Long conversationId, Long deliveryId) {
+        return deliveries
+                .findByIdAndConversationId(deliveryId, conversationId)
+                .orElseThrow(() -> new ApiException(ErrorCode.DELIVERY_NOT_FOUND, "no such result delivery"));
+    }
+
+    /** 묶음에 넣은 결과들이다. 넣은 순서다. */
+    public List<DeliveryItemRef> itemsOf(Long deliveryId) {
+        return deliveryItems.findByDeliveryIdOrderByIdAsc(deliveryId).stream()
+                .map(item -> new DeliveryItemRef(item.source(), item.resultKey()))
+                .toList();
+    }
+
+    /**
+     * 묶음을 {@code FAILED} 나 {@code STOPPED} 에서 {@code DELIVERING} 으로 바꾸고 새 시도의 번호를 돌려준다. 다시 전달의
+     * 알림 줄을 저장하는 트랜잭션 안에서 부른다.
+     *
+     * <p>조건부 update 라 같은 묶음을 함께 바꾸려는 요청 가운데 하나만 바꾼다. 활성 시도를 하나로 지키는 것은 이 update 다.
+     *
+     * @return 늘린 뒤의 시도 수. 새 시도의 {@code attempt_no} 다
+     * @throws ApiException {@code DELIVERY_NOT_RETRYABLE}. 바뀐 줄이 없을 때
+     */
+    @Transactional
+    public int claimRetry(Long deliveryId, Instant now) {
+        if (deliveries.claimRetry(deliveryId, RETRYABLE, now) == 0) {
+            throw notRetryable();
+        }
+        return deliveries
+                .findById(deliveryId)
+                .map(ResultDelivery::attemptCount)
+                .orElseThrow(ResultDeliveryRecorder::notRetryable);
+    }
+
+    /** 도는 중인 시도를 저장하고 그 번호를 돌려준다. {@link #claimRetry} 와 같은 트랜잭션에서 부른다. */
+    @Transactional
+    public Long addAttempt(Long deliveryId, int attemptNo, Long noticeMessageId, Instant now) {
+        return attempts.save(ResultDeliveryAttempt.started(deliveryId, attemptNo, noticeMessageId, now))
+                .id();
+    }
+
+    /**
+     * 그 대화의 묶음마다 마지막 시도가 저장한 마지막 알림 줄을 열쇠로, 묶음의 번호와 상태를 낸다. 이력 API 가 알림 줄 아래에
+     * 그린다.
+     *
+     * <p>마지막 시도는 {@code attempt_no} 가 가장 큰 시도다. 그 시도에 알림 줄이 없으면 그 묶음은 빠진다. 질의는 묶음과
+     * 시도에 한 번씩이다.
+     */
+    @Transactional(readOnly = true)
+    public Map<Long, DeliveryState> statesByNotice(Long conversationId) {
+        Map<Long, ResultDelivery> byId = deliveries.findByConversationId(conversationId).stream()
+                .collect(Collectors.toMap(ResultDelivery::id, Function.identity()));
+        if (byId.isEmpty()) {
+            return Map.of();
+        }
+        Map<Long, ResultDeliveryAttempt> latest = new HashMap<>();
+        for (ResultDeliveryAttempt attempt : attempts.findByDeliveryIdIn(byId.keySet())) {
+            latest.merge(
+                    attempt.deliveryId(),
+                    attempt,
+                    (left, right) -> left.attemptNo() >= right.attemptNo() ? left : right);
+        }
+        Map<Long, DeliveryState> states = new HashMap<>();
+        latest.values().stream()
+                .filter(attempt -> attempt.noticeMessageId() != null)
+                .forEach(attempt -> {
+                    ResultDelivery delivery = byId.get(attempt.deliveryId());
+                    states.put(attempt.noticeMessageId(), new DeliveryState(delivery.id(), delivery.status()));
+                });
+        return states;
     }
 
     /** 시도에 부모 turn 의 실행 줄을 잇는다. 이미 이어진 시도는 그대로 둔다. */
@@ -168,5 +259,9 @@ public class ResultDeliveryRecorder {
 
     private static String errorCodeOf(AgentExecution execution, DeliveryAttemptStatus status) {
         return status == DeliveryAttemptStatus.FAILED ? execution.errorCode() : null;
+    }
+
+    private static ApiException notRetryable() {
+        return new ApiException(ErrorCode.DELIVERY_NOT_RETRYABLE, "this result delivery cannot be retried now");
     }
 }

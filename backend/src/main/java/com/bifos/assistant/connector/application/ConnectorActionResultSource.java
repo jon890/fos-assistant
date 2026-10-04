@@ -7,6 +7,7 @@ import com.bifos.assistant.connector.domain.type.ActionStatus;
 import com.bifos.assistant.shared.util.ExternalData;
 import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -48,6 +49,26 @@ public class ConnectorActionResultSource implements AutoTurnResultSource {
     @Override
     public List<Long> conversationsWithUndelivered() {
         return actions.conversationsWithUndelivered();
+    }
+
+    /** UUID 로 읽지 못하는 열쇠는 뺀다. 알림 줄과 입력은 처음 전할 때와 같은 글이다. */
+    @Override
+    public List<AutoTurnResult> resultsFor(Long conversationId, Long userId, List<String> keys) {
+        List<UUID> actionIds = keys.stream()
+                .map(ConnectorActionResultSource::actionIdOf)
+                .flatMap(Optional::stream)
+                .toList();
+        return actions.resultsFor(conversationId, userId, actionIds).stream()
+                .map(result -> new AutoTurnResult(result.actionId().toString(), notice(result), input(result)))
+                .toList();
+    }
+
+    private static Optional<UUID> actionIdOf(String key) {
+        try {
+            return Optional.of(UUID.fromString(key));
+        } catch (IllegalArgumentException ex) {
+            return Optional.empty();
+        }
     }
 
     private static String notice(ConnectorActionResult result) {

@@ -504,17 +504,23 @@ class ResultDeliveryRecordTest {
         }
     }
 
-    /** 위임 결과 말고 다른 출처의 결과를 내는 대역이다. 검사가 넣은 결과만 낸다. */
+    /** 위임 결과 말고 다른 출처의 결과를 내는 대역이다. 검사가 넣은 결과만 낸다. 사용자는 구분하지 않는다. */
     static final class TestResultSource implements AutoTurnResultSource {
         private final Map<Long, List<AutoTurnResult>> pending = new ConcurrentHashMap<>();
 
+        /** 전한 뒤에도 다시 읽을 수 있게 넣은 결과를 모두 둔다. */
+        private final Map<Long, List<AutoTurnResult>> offered = new ConcurrentHashMap<>();
+
         void offer(Long conversationId, AutoTurnResult result) {
             pending.computeIfAbsent(conversationId, id -> new CopyOnWriteArrayList<>())
+                    .add(result);
+            offered.computeIfAbsent(conversationId, id -> new CopyOnWriteArrayList<>())
                     .add(result);
         }
 
         void clear() {
             pending.clear();
+            offered.clear();
         }
 
         @Override
@@ -530,6 +536,16 @@ class ResultDeliveryRecordTest {
         @Override
         public void markDelivered(List<String> keys, Instant now) {
             pending.values().forEach(results -> results.removeIf(result -> keys.contains(result.key())));
+        }
+
+        @Override
+        public List<AutoTurnResult> resultsFor(Long conversationId, Long userId, List<String> keys) {
+            List<AutoTurnResult> results = offered.getOrDefault(conversationId, List.of());
+            return keys.stream()
+                    .flatMap(key -> results.stream()
+                            .filter(result -> result.key().equals(key))
+                            .limit(1))
+                    .toList();
         }
 
         @Override

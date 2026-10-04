@@ -3,6 +3,9 @@ package com.bifos.assistant.chat.infra;
 import com.bifos.assistant.chat.domain.ResultDelivery;
 import com.bifos.assistant.chat.domain.type.DeliveryStatus;
 import java.time.Instant;
+import java.util.Collection;
+import java.util.List;
+import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -15,4 +18,21 @@ public interface ResultDeliveryRepository extends JpaRepository<ResultDelivery, 
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query("update ResultDelivery d set d.status = :status, d.updatedAt = :at where d.id = :id")
     int changeStatus(@Param("id") Long id, @Param("status") DeliveryStatus status, @Param("at") Instant at);
+
+    /** 그 대화의 묶음이다. 다른 대화의 묶음이면 빈 값이다. */
+    Optional<ResultDelivery> findByIdAndConversationId(Long id, Long conversationId);
+
+    /** 그 대화의 묶음들이다. 순서는 정하지 않는다. */
+    List<ResultDelivery> findByConversationId(Long conversationId);
+
+    /**
+     * 묶음이 그 상태들 가운데 하나일 때만 {@code DELIVERING} 으로 바꾸고 시도 수를 하나 늘린다. 바뀐 행 수를 돌려준다.
+     *
+     * <p>다시 전달을 시작하는 자리다. 같은 묶음을 두 요청이 함께 바꾸려 해도 한쪽만 1 을 받는다.
+     */
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("update ResultDelivery d set d.status = com.bifos.assistant.chat.domain.type.DeliveryStatus.DELIVERING,"
+            + " d.attemptCount = d.attemptCount + 1, d.updatedAt = :at"
+            + " where d.id = :id and d.status in :from")
+    int claimRetry(@Param("id") Long id, @Param("from") Collection<DeliveryStatus> from, @Param("at") Instant at);
 }

@@ -3,6 +3,7 @@ package com.bifos.assistant.chat.infra;
 import com.bifos.assistant.chat.domain.ResultDeliveryAttempt;
 import com.bifos.assistant.chat.domain.type.DeliveryAttemptStatus;
 import java.time.Instant;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -34,4 +35,7 @@ public interface ResultDeliveryAttemptRepository extends JpaRepository<ResultDel
 
     /** 그 실행 줄을 이은 시도 가운데 그 상태인 것 하나다. */
     Optional<ResultDeliveryAttempt> findFirstByExecutionIdAndStatus(Long executionId, DeliveryAttemptStatus status);
+
+    /** 그 묶음들의 시도다. 순서는 정하지 않는다. */
+    List<ResultDeliveryAttempt> findByDeliveryIdIn(Collection<Long> deliveryIds);
 }

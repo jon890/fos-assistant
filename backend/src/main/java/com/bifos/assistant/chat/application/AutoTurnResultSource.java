@@ -30,6 +30,16 @@ public interface AutoTurnResultSource {
      */
     void markDelivered(List<String> keys, Instant now);
 
+    /**
+     * 이미 전한 결과를 열쇠로 다시 읽는다. 사용자가 결과를 다시 전달할 때 부른다(ADR-070).
+     *
+     * <p>그 대화와 그 사용자의 결과만 {@code keys} 의 순서로 낸다. 없거나 남의 것이거나 읽지 못하는 열쇠는 뺀다. 결과를 낸
+     * 쪽의 일(외부 호출)은 다시 하지 않고 저장된 결과만 읽는다.
+     *
+     * @param keys 전달 묶음의 항목에 적힌 결과 이름들
+     */
+    List<AutoTurnResult> resultsFor(Long conversationId, Long userId, List<String> keys);
+
     /** 전하지 않은 결과가 있는 대화들이다. 기동할 때 훑는다. */
     List<Long> conversationsWithUndelivered();
 }

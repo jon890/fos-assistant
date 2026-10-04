@@ -5,6 +5,7 @@ import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.chat.application.model.AutoTurnDelivery;
 import com.bifos.assistant.chat.application.model.AutoTurnResult;
 import com.bifos.assistant.chat.application.model.DeliveryItemRef;
+import com.bifos.assistant.chat.application.model.DeliveryState;
 import com.bifos.assistant.chat.application.model.ResultDeliveryStart;
 import com.bifos.assistant.chat.domain.ChatArtifact;
 import com.bifos.assistant.chat.domain.ChatAttachment;
@@ -52,6 +53,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -91,6 +93,9 @@ public class ChatService {
 
     /** 대화 목록 한 쪽의 상한이다. 웹이 더 크게 요청해도 이만큼만 읽는다. */
     public static final int MAX_CONVERSATION_PAGE = 100;
+
+    /** 다시 전달할 때 남기는 알림 줄이다. 결과마다 알림 줄을 다시 남기지 않고 이 한 줄만 남긴다(ADR-070). */
+    static final String RETRY_NOTICE = "맡긴 일의 결과를 다시 전해요";
 
     private final ConversationRepository conversations;
     private final ConversationWriter conversationWriter;
@@ -189,13 +194,11 @@ public class ChatService {
     public void runDelegationResults(
             CurrentUser owner, Long conversationId, TurnHandle handle, Consumer<ChatEvent> onEvent) {
         List<AgentExecution> results = executionRepository.findUndeliveredResults(conversationId);
+        Map<Long, Agent> resultAgents = resultAgentsOf(results);
         List<AutoTurnDelivery> deliveries = new ArrayList<>();
+        List<AutoTurnResult> extras = new ArrayList<>();
         List<String> notices = new ArrayList<>();
-        StringBuilder input = new StringBuilder();
         if (!results.isEmpty()) {
-            Map<Long, Agent> resultAgents =
-                    agents.byIds(results.stream().map(AgentExecution::agentId).toList());
-            input.append(delegationInput(results, resultAgents));
             notices.add(delegationNotice(results, resultAgents));
         }
         // 승인한 동작의 결과처럼 다른 패키지가 가진 결과를 같은 turn 에 모은다. 위임 결과가 없어도 돈다.
@@ -204,20 +207,16 @@ public class ChatService {
             if (extra.isEmpty()) {
                 continue;
             }
-            for (AutoTurnResult result : extra) {
-                if (!input.isEmpty()) {
-                    input.append("\n\n");
-                }
-                input.append(result.input());
-                notices.add(result.notice());
-            }
+            extras.addAll(extra);
+            extra.forEach(result -> notices.add(result.notice()));
             deliveries.add(new AutoTurnDelivery(
                     source, extra.stream().map(AutoTurnResult::key).toList()));
         }
         if (notices.isEmpty()) {
             return;
         }
-        Routed routed = route(owner, conversationId, input.toString(), null, List.of());
+        String input = deliveryInput(results, resultAgents, extras);
+        Routed routed = route(owner, conversationId, input, null, List.of());
         if (routed.flow() != null) {
             // 흐름은 이 입력을 받을 자리가 없다. 깨우는 쪽이 이미 거르므로 그 사이 흐름이 붙은 경우뿐이다.
             // 깨우는 쪽이 거르는 것과 별개로 남긴다. 거르기와 잠금 사이에 에이전트의 흐름이 바뀌어도 흐름에 이 입력을 보내지 않는다.
@@ -225,7 +224,139 @@ public class ChatService {
             return;
         }
         Long attemptId = recordDelivery(routed.conversation(), results, notices, deliveries, onEvent);
-        runDeliveryTurn(owner, routed, input.toString(), attemptId, handle, onEvent);
+        runDeliveryTurn(owner, routed, input, new TurnIntent.DelegationResults(attemptId, false), handle, onEvent);
+    }
+
+    /**
+     * 저장된 결과만 다시 읽어 전달 묶음 하나를 부모에 다시 넘긴다(ADR-070). 자식 실행과 커넥터 호출은 다시 하지 않는다.
+     *
+     * <p>대화, 묶음, 상태, 에이전트를 잠금 전에 본다. 잠금 전에 본 상태는 빠른 거절일 뿐이다. 잠금을 연 뒤 항목의 결과를
+     * 다시 읽고, 묶음을 조건부 update 로 {@code DELIVERING} 으로 바꾸는 것과 알림 줄과 새 시도를 한 트랜잭션에 적는다.
+     * 활성 시도를 하나로 지키는 것은 그 update 다.
+     *
+     * <p>사람이 요청한 turn 이라 자동 turn 수를 0 으로 돌린다. 사건은 요청한 창에만 간다.
+     *
+     * @param onEvent 알림 줄, {@code started}, 답 조각, {@code done} 이나 {@code stopped} 를 받는다
+     * @throws ApiException {@code CONVERSATION_NOT_FOUND}, {@code DELIVERY_NOT_FOUND}, {@code DELIVERY_NOT_RETRYABLE},
+     *     {@code AGENT_NOT_FOUND}, {@code AGENT_DISABLED}, {@code CONVERSATION_BUSY}, {@code USER_BUSY}. 이 예외들은 묶음을
+     *     바꾸지 않는다
+     */
+    public void retryDelivery(CurrentUser user, Long conversationId, Long deliveryId, Consumer<ChatEvent> onEvent) {
+        Conversation conversation = access.requireOwn(user, conversationId);
+        if (!resultDeliveries.require(conversation.id(), deliveryId).status().retryable()) {
+            throw deliveryNotRetryable();
+        }
+        Agent agent = agents.requireById(conversation.agentId());
+        if (agent.isDeleted() || !agent.isReadableBy(user.id())) {
+            throw new ApiException(ErrorCode.AGENT_NOT_FOUND, "no such agent");
+        }
+        if (!agent.enabled()) {
+            throw new ApiException(ErrorCode.AGENT_DISABLED, "this agent is disabled");
+        }
+        if (flows.find(agent.flow()) != null) {
+            throw deliveryNotRetryable();
+        }
+        // 사용자 실행 한도에 닿으면 USER_BUSY 가 그대로 올라간다. 묶음을 바꾸지 않고 다시 시도를 예약하지 않는다.
+        TurnHandle handle = turns.open(user.id(), conversation.id());
+        try {
+            String input = retryInput(user, conversation.id(), resultDeliveries.itemsOf(deliveryId));
+            Routed routed = route(user, conversation.id(), input, null, List.of());
+            // 잠금 전에 본 에이전트는 그 사이 바뀌었을 수 있다. 자동 turn 이 잠금 뒤 흐름을 다시 거르는 것과 같다.
+            if (routed.flow() != null) {
+                throw deliveryNotRetryable();
+            }
+            if (!routed.agent().isReadableBy(user.id())) {
+                throw new ApiException(ErrorCode.AGENT_NOT_FOUND, "no such agent");
+            }
+            Long attemptId = recordRetry(routed.conversation(), deliveryId, onEvent);
+            runDeliveryTurn(user, routed, input, new TurnIntent.DelegationResults(attemptId, true), handle, onEvent);
+        } finally {
+            turns.close(handle);
+        }
+    }
+
+    /**
+     * 그 대화의 알림 줄 번호마다 그 줄이 마지막 시도의 마지막 알림 줄인 묶음의 번호와 상태다. 이력 API 가 쓴다.
+     *
+     * <p>주인 확인은 부르는 쪽이 마친 번호로 부른다.
+     */
+    public Map<Long, DeliveryState> deliveryStates(Long conversationId) {
+        return resultDeliveries.statesByNotice(conversationId);
+    }
+
+    /**
+     * 묶음의 항목을 결과를 낸 쪽의 줄에서 다시 읽어 자동 turn 과 같은 모양의 입력을 만든다.
+     *
+     * <p>위임 결과는 그 사용자와 그 대화의 끝난 실행 줄만 항목 순서로 쓴다. 그 밖의 결과는 출처 이름이 같은 {@link
+     * AutoTurnResultSource} 가 다시 읽는다. 맞는 구현이 없으면 경고 로그만 남기고 뺀다. 지워졌거나 남의 것인 결과는 빼고
+     * 넘긴다.
+     *
+     * @throws ApiException {@code DELIVERY_NOT_RETRYABLE}. 남은 결과가 없을 때
+     */
+    private String retryInput(CurrentUser user, Long conversationId, List<DeliveryItemRef> items) {
+        List<Long> executionIds = new ArrayList<>();
+        Map<String, List<String>> keysBySource = new LinkedHashMap<>();
+        for (DeliveryItemRef item : items) {
+            if (!ResultDeliveryRecorder.DELEGATION_SOURCE.equals(item.source())) {
+                keysBySource
+                        .computeIfAbsent(item.source(), source -> new ArrayList<>())
+                        .add(item.resultKey());
+                continue;
+            }
+            try {
+                executionIds.add(Long.valueOf(item.resultKey()));
+            } catch (NumberFormatException ex) {
+                log.warn("실행 번호로 읽지 못하는 위임 결과 항목을 뺀다 resultKey={}", item.resultKey());
+            }
+        }
+        Map<Long, AgentExecution> found = executionRepository.findAllById(executionIds).stream()
+                .filter(execution -> user.id().equals(execution.userId())
+                        && conversationId.equals(execution.conversationId())
+                        && (execution.status() == ExecutionStatus.SUCCEEDED
+                                || execution.status() == ExecutionStatus.FAILED))
+                .collect(Collectors.toMap(AgentExecution::id, execution -> execution));
+        List<AgentExecution> results = executionIds.stream()
+                .distinct()
+                .map(found::get)
+                .filter(Objects::nonNull)
+                .toList();
+        List<AutoTurnResult> extras = new ArrayList<>();
+        keysBySource.forEach((source, keys) -> resultSources.stream()
+                .filter(candidate -> candidate.source().equals(source))
+                .findFirst()
+                .ifPresentOrElse(
+                        candidate -> extras.addAll(candidate.resultsFor(conversationId, user.id(), keys)),
+                        () -> log.warn("출처 이름에 맞는 결과 구현이 없어 그 항목을 뺀다 source={}", source)));
+        if (results.isEmpty() && extras.isEmpty()) {
+            throw deliveryNotRetryable();
+        }
+        return deliveryInput(results, resultAgentsOf(results), extras);
+    }
+
+    /**
+     * 다시 전달을 시작한다. 묶음을 {@code DELIVERING} 으로 바꾸는 조건부 update, 알림 줄 저장, 새 시도 저장, 자동 turn 수
+     * 초기화를 한 트랜잭션에 적고 새 시도의 번호를 돌려준다. 커밋한 뒤 알림 줄의 {@code system} 사건을 낸다.
+     *
+     * <p>그 사이 다른 요청이 묶음을 먼저 바꿨으면 {@code DELIVERY_NOT_RETRYABLE} 로 되돌아가 알림 줄도 시도도 남지 않는다.
+     */
+    private Long recordRetry(Conversation conversation, Long deliveryId, Consumer<ChatEvent> onEvent) {
+        record Saved(ChatMessage line, Long attemptId) {}
+        Saved saved = transactions.execute(status -> {
+            Instant now = Instant.now(clock);
+            int attemptNo = resultDeliveries.claimRetry(deliveryId, now);
+            ChatMessage line = messages.save(ChatMessage.fromSystem(conversation.id(), RETRY_NOTICE, now));
+            Long attemptId = resultDeliveries.addAttempt(deliveryId, attemptNo, line.id(), now);
+            // 사람이 요청한 turn 이라 사용자의 질문 없이 연 turn 의 수를 새로 센다.
+            conversationWriter.resetAutoTurns(conversation.id());
+            return new Saved(line, attemptId);
+        });
+        onEvent.accept(ChatEvent.system(
+                conversation.publicId(), saved.line().id(), saved.line().content()));
+        return saved.attemptId();
+    }
+
+    private static ApiException deliveryNotRetryable() {
+        return new ApiException(ErrorCode.DELIVERY_NOT_RETRYABLE, "this result delivery cannot be retried now");
     }
 
     /**
@@ -276,13 +407,14 @@ public class ChatService {
             CurrentUser owner,
             Routed routed,
             String input,
-            Long attemptId,
+            TurnIntent.DelegationResults intent,
             TurnHandle handle,
             Consumer<ChatEvent> onEvent) {
+        Long attemptId = intent.attemptId();
         boolean closed = false;
         ChatTurn turn;
         try {
-            turn = runTurn(owner, routed, input, new TurnIntent.DelegationResults(attemptId), onEvent, true, handle);
+            turn = runTurn(owner, routed, input, intent, onEvent, true, handle);
             closed = true;
             closeAttempt(
                     attemptId,
@@ -490,6 +622,32 @@ public class ChatService {
             }
         }
         return input.toString();
+    }
+
+    /**
+     * 자동 turn 과 다시 전달이 함께 쓰는 Hermes 입력이다. 위임 결과의 단락이 먼저이고, 그 뒤로 그 밖의 결과의 단락을 빈 줄로
+     * 잇는다.
+     */
+    private static String deliveryInput(
+            List<AgentExecution> results, Map<Long, Agent> resultAgents, List<AutoTurnResult> extras) {
+        StringBuilder input = new StringBuilder();
+        if (!results.isEmpty()) {
+            input.append(delegationInput(results, resultAgents));
+        }
+        for (AutoTurnResult extra : extras) {
+            if (!input.isEmpty()) {
+                input.append("\n\n");
+            }
+            input.append(extra.input());
+        }
+        return input.toString();
+    }
+
+    /** 위임 결과를 낸 에이전트들이다. 결과가 없으면 읽지 않는다. */
+    private Map<Long, Agent> resultAgentsOf(List<AgentExecution> results) {
+        return results.isEmpty()
+                ? Map.of()
+                : agents.byIds(results.stream().map(AgentExecution::agentId).toList());
     }
 
     private static boolean isExternalResult(AgentExecution execution, Map<Long, Agent> resultAgents) {

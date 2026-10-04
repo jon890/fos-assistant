@@ -22,6 +22,10 @@ public enum ErrorCode {
     /** 취소하려는 대기 메시지가 이미 보내졌거나 없다. 남의 대화의 대기 메시지도 같은 응답으로 숨긴다. */
     PENDING_MESSAGE_NOT_FOUND(HttpStatus.NOT_FOUND),
     MESSAGE_NOT_LATEST(HttpStatus.CONFLICT),
+    /** 그 대화의 전달 묶음이 아니거나 없는 묶음이다. 남의 대화의 묶음도 같은 응답으로 숨긴다(ADR-070). */
+    DELIVERY_NOT_FOUND(HttpStatus.NOT_FOUND),
+    /** 묶음이 {@code DELIVERING} 이나 {@code DELIVERED} 이거나, 넘길 결과가 남지 않았거나, 대화에 흐름이 붙었다(ADR-070). */
+    DELIVERY_NOT_RETRYABLE(HttpStatus.CONFLICT),
     MEMORY_SCOPE_REQUIRED(HttpStatus.BAD_REQUEST),
     /** 민감 항목을 항상 싣게 하려 했다. 조립 판정이 틀려도 민감 본문이 나가지 않게 저장할 때 막는다. */
     MEMORY_SENSITIVE_ALWAYS(HttpStatus.BAD_REQUEST),
