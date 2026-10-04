@@ -2,27 +2,40 @@ package com.bifos.assistant.chat;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
+import com.bifos.assistant.agent.application.AgentService;
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.agent.domain.type.AgentVisibility;
 import com.bifos.assistant.agent.domain.type.CostMode;
 import com.bifos.assistant.agent.domain.type.CredentialScope;
 import com.bifos.assistant.agent.infra.AgentRepository;
 import com.bifos.assistant.chat.application.ChatService;
+import com.bifos.assistant.chat.application.ConversationAccess;
 import com.bifos.assistant.chat.application.ConversationPage;
 import com.bifos.assistant.chat.application.ConversationWriter;
+import com.bifos.assistant.chat.application.ModelTierService;
 import com.bifos.assistant.chat.domain.Conversation;
+import com.bifos.assistant.chat.domain.type.ConversationPurpose;
 import com.bifos.assistant.chat.infra.ChatMessageRepository;
 import com.bifos.assistant.chat.infra.ConversationRepository;
+import com.bifos.assistant.chat.presentation.ChatController;
+import com.bifos.assistant.chat.presentation.ChatDtos.ConversationPageView;
+import com.bifos.assistant.chat.presentation.ChatDtos.ConversationView;
+import com.bifos.assistant.chat.presentation.ChatEventStreams;
 import com.bifos.assistant.memory.infra.MemoryRepository;
 import com.bifos.assistant.shared.auth.CurrentUser;
+import com.bifos.assistant.shared.auth.CurrentUserProvider;
 import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.usage.infra.AgentExecutionRepository;
 import com.bifos.assistant.usage.infra.ExecutionEventRepository;
+import com.bifos.assistant.user.application.UserDisplayNameService;
 import com.bifos.assistant.user.domain.AppUser;
 import com.bifos.assistant.user.infra.AppUserRepository;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
@@ -66,6 +79,12 @@ class ConversationPagingTest {
 
     @Autowired
     AppUserRepository users;
+
+    @Autowired
+    AgentService agentService;
+
+    @Autowired
+    ConversationAccess access;
 
     @BeforeEach
     void reset() {
@@ -176,6 +195,30 @@ class ConversationPagingTest {
 
         assertThat(chat.conversationsOf(dad, null, 100_000).items()).hasSize(ChatService.MAX_CONVERSATION_PAGE);
         assertThat(chat.conversationsOf(dad, null, 0).items()).hasSize(1);
+    }
+
+    @Test
+    @DisplayName("목록 응답의 한 줄은 보통 대화이면 purpose 가 CHAT 이다")
+    void listResponseCarriesChatPurpose() {
+        CurrentUser dad = member("paging-dad");
+        Long started = started(dad, 1).id();
+        CurrentUserProvider currentUser = mock(CurrentUserProvider.class);
+        when(currentUser.require()).thenReturn(dad);
+        ChatController controller = new ChatController(
+                chat,
+                currentUser,
+                new UserDisplayNameService(users),
+                agentService,
+                access,
+                new ChatEventStreams(Duration.ofSeconds(20)),
+                null,
+                mock(ModelTierService.class));
+
+        ConversationPageView page = controller.conversations(null, 10);
+
+        assertThat(page.items()).extracting(ConversationView::purpose).containsExactly(ConversationPurpose.CHAT);
+        assertThat(conversations.findById(started).orElseThrow().publicId())
+                .isEqualTo(page.items().getFirst().id());
     }
 
     @Test

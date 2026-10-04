@@ -261,7 +261,8 @@ public class ChatController {
                 choice.model(),
                 choice.reasoningEffort(),
                 conversation.modelSelectionMode(),
-                conversation.modelTier());
+                conversation.modelTier(),
+                conversation.purpose());
     }
 
     /**
