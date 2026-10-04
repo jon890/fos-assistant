@@ -39,6 +39,10 @@ type Props = {
   onOpenArtifact(messageId: Turn["id"], path: string, name: string): void;
   /** 사용자 메시지 맨 앞의 스킬 커맨드를 칩으로 그린다. 흐름이 붙은 에이전트의 대화는 커맨드를 해석하지 않아 거짓이다 */
   skillCommandChips: boolean;
+  /** 실패하거나 중지한 결과 전달을 다시 전달한다 */
+  onRetryDelivery?(deliveryId: number): void;
+  /** 다시 전달을 보내는 중이다. 알림 줄의 단추를 막는다 */
+  deliveryRetrying?: boolean;
 };
 
 export function MessageList({
@@ -61,6 +65,8 @@ export function MessageList({
   onAnswer,
   onOpenArtifact,
   skillCommandChips,
+  onRetryDelivery,
+  deliveryRetrying,
 }: Props) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const shouldFollow = useRef(true);
@@ -252,6 +258,8 @@ export function MessageList({
                         }
                         onOpenArtifact={onOpenArtifact}
                         skillCommandChip={skillCommandChips}
+                        onRetryDelivery={onRetryDelivery}
+                        deliveryRetrying={deliveryRetrying}
                         liveActivity={
                           pendingAssistant && hasLiveActivity
                             ? liveActivityBlock

@@ -49,3 +49,10 @@ test("사용자 동시 실행 한도에 닿으면 끝난 뒤 다시 보내라고
   assert.equal(describeError("USER_BUSY", "fallback"),
     "진행 중인 작업이 많아요. 진행 중인 작업이 끝난 뒤 다시 보내 주세요.");
 });
+
+test("결과를 다시 전하려다 거절되면 서버 원문 대신 해요체 문구를 보인다", () => {
+  assert.equal(describeError("DELIVERY_NOT_FOUND", "delivery not found"),
+    "다시 전할 결과를 찾지 못했어요.");
+  assert.equal(describeError("DELIVERY_NOT_RETRYABLE", "delivery is not retryable"),
+    "지금은 이 결과를 다시 전할 수 없어요.");
+});

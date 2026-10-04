@@ -7,6 +7,7 @@ import com.bifos.assistant.connector.domain.type.ActionStatus;
 import com.bifos.assistant.shared.util.ExternalData;
 import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -23,7 +24,15 @@ public class ConnectorActionResultSource implements AutoTurnResultSource {
 
     static final String UNKNOWN_INPUT = "실행 여부를 알 수 없다. 다시 실행하지 말고 사용자에게 확인을 부탁한다.";
 
+    /** 전달 묶음의 항목에 적는 출처 이름이다. 결과 이름은 승인 줄의 {@code public_id} UUID 글이다. */
+    static final String SOURCE = "CONNECTOR_ACTION";
+
     private final ConnectorActionService actions;
+
+    @Override
+    public String source() {
+        return SOURCE;
+    }
 
     @Override
     public List<AutoTurnResult> undelivered(Long conversationId) {
@@ -40,6 +49,26 @@ public class ConnectorActionResultSource implements AutoTurnResultSource {
     @Override
     public List<Long> conversationsWithUndelivered() {
         return actions.conversationsWithUndelivered();
+    }
+
+    /** UUID 로 읽지 못하는 열쇠는 뺀다. 알림 줄과 입력은 처음 전할 때와 같은 글이다. */
+    @Override
+    public List<AutoTurnResult> resultsFor(Long conversationId, Long userId, List<String> keys) {
+        List<UUID> actionIds = keys.stream()
+                .map(ConnectorActionResultSource::actionIdOf)
+                .flatMap(Optional::stream)
+                .toList();
+        return actions.resultsFor(conversationId, userId, actionIds).stream()
+                .map(result -> new AutoTurnResult(result.actionId().toString(), notice(result), input(result)))
+                .toList();
+    }
+
+    private static Optional<UUID> actionIdOf(String key) {
+        try {
+            return Optional.of(UUID.fromString(key));
+        } catch (IllegalArgumentException ex) {
+            return Optional.empty();
+        }
     }
 
     private static String notice(ConnectorActionResult result) {
