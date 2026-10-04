@@ -155,7 +155,10 @@ class ToolPolicyDecisionTest {
             assertThat(ToolPolicyDecision.decide(ConnectionStatus.READY, true, 2, WRITE, granted, 2, true))
                     .as("상시 허락 %s", granted)
                     .isEqualTo(new ToolPolicyDecision(
-                            ActionDecision.DENIED, ActionDenyReason.READ_ONLY_RUN, ToolRisk.WRITE, ToolApproval.REQUIRED));
+                            ActionDecision.DENIED,
+                            ActionDenyReason.READ_ONLY_RUN,
+                            ToolRisk.WRITE,
+                            ToolApproval.REQUIRED));
         }
     }
 

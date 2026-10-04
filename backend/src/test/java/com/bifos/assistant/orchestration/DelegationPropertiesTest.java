@@ -28,7 +28,8 @@ class DelegationPropertiesTest {
     @Test
     @DisplayName("모든 값이 1 이상이면 그대로 쓴다")
     void usesValuesAsIsWhenAllAreAtLeastOne() {
-        DelegationProperties properties = new DelegationProperties(1, 1, 1, Duration.ofMillis(1), 1, Duration.ofMillis(1));
+        DelegationProperties properties =
+                new DelegationProperties(1, 1, 1, Duration.ofMillis(1), 1, Duration.ofMillis(1));
 
         assertThat(properties.maxDepth()).isEqualTo(1);
         assertThat(properties.submitTimeout()).isEqualTo(Duration.ofMillis(1));

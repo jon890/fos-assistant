@@ -684,7 +684,8 @@ class McpAgentToolsTest {
                     .as("인자 %s: %s", arguments, response)
                     .isEqualTo(-32602);
         }
-        ObjectNode zero = json.createObjectNode().put("execution_id", running.id()).put("wait_seconds", 0);
+        ObjectNode zero =
+                json.createObjectNode().put("execution_id", running.id()).put("wait_seconds", 0);
         zero.set("_fos_ctx", McpCallSigner.context(sharedToken, "agent_status", root));
         assertStatus(
                 send(sharedToken, toolCall("agent_status", zero)),
@@ -707,8 +708,9 @@ class McpAgentToolsTest {
         });
         String root = McpCallSigner.newRoot();
         turn(userA, root);
-        long executionId =
-                started(delegate(sharedToken, root, OWN_A_CODE, "기다려 받을 일")).path("execution_id").asLong();
+        long executionId = started(delegate(sharedToken, root, OWN_A_CODE, "기다려 받을 일"))
+                .path("execution_id")
+                .asLong();
         assertThat(awaiting.await(10, TimeUnit.SECONDS)).as("실행이 완료 대기에 들어섰다").isTrue();
 
         Thread.ofVirtual().start(() -> {
@@ -719,12 +721,12 @@ class McpAgentToolsTest {
             }
             release.countDown();
         });
-        ObjectNode arguments = json.createObjectNode().put("execution_id", executionId).put("wait_seconds", 10);
+        ObjectNode arguments =
+                json.createObjectNode().put("execution_id", executionId).put("wait_seconds", 10);
         arguments.set("_fos_ctx", McpCallSigner.context(sharedToken, "agent_status", root));
         HttpResponse<String> response = send(sharedToken, toolCall("agent_status", arguments));
 
-        assertStatus(
-                response, "{\"execution_id\":" + executionId + ",\"status\":\"SUCCEEDED\",\"output\":\"기다린 답\"}");
+        assertStatus(response, "{\"execution_id\":" + executionId + ",\"status\":\"SUCCEEDED\",\"output\":\"기다린 답\"}");
         awaitFinished(executionId);
         assertThat(deliveredAt(executionId)).as("결과를 전했다고 적은 시각").isNotNull();
     }
@@ -745,9 +747,7 @@ class McpAgentToolsTest {
 
         assertThat(listed).contains(GROUP_CODE, OWN_A_CODE);
         assertThat(body).isEqualTo("가의 본문");
-        assertStatus(
-                status,
-                "{\"execution_id\":" + finished.id() + ",\"status\":\"SUCCEEDED\",\"output\":\"살펴본 결과\"}");
+        assertStatus(status, "{\"execution_id\":" + finished.id() + ",\"status\":\"SUCCEEDED\",\"output\":\"살펴본 결과\"}");
     }
 
     @Test

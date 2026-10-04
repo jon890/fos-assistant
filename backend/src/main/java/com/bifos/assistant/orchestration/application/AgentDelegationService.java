@@ -142,10 +142,7 @@ public class AgentDelegationService {
      */
     public Optional<AgentExecution> status(CurrentUser user, AgentExecution origin, Long executionId, Duration wait) {
         Optional<AgentExecution> found = status(user, origin, executionId);
-        if (found.isEmpty()
-                || found.get().status() != ExecutionStatus.RUNNING
-                || wait.isZero()
-                || wait.isNegative()) {
+        if (found.isEmpty() || found.get().status() != ExecutionStatus.RUNNING || wait.isZero() || wait.isNegative()) {
             return found;
         }
         RunningDelegation delegation = running.get(executionId);

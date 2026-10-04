@@ -647,9 +647,7 @@ class AgentDelegationServiceTest {
         DelegationResult result = delegateFrom(checkTurn, WORKER, "셸이 있는 에이전트에 맡긴다");
 
         assertThat(result.failure()).as("결과: %s", result).isEqualTo(DelegationResult.Failure.CHECK_TARGET);
-        assertThat(executions.findByRootExecutionId(checkTurn.id()))
-                .as("만든 자식")
-                .isEmpty();
+        assertThat(executions.findByRootExecutionId(checkTurn.id())).as("만든 자식").isEmpty();
         assertThat(stub().received()).isEmpty();
     }
 
@@ -695,8 +693,7 @@ class AgentDelegationServiceTest {
 
         for (int i = 0; i <= MAX_CHECK_DELEGATIONS; i++) {
             String task = "보통 일 " + i;
-            DelegationResult accepted =
-                    acceptedWithin(Duration.ofSeconds(5), () -> delegateFrom(origin, WORKER, task));
+            DelegationResult accepted = acceptedWithin(Duration.ofSeconds(5), () -> delegateFrom(origin, WORKER, task));
             assertThat(awaitFinished(accepted.executionId()).status()).isEqualTo(ExecutionStatus.SUCCEEDED);
         }
 

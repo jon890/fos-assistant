@@ -47,6 +47,7 @@ public class McpController {
     /** 먼저 살펴보기 트리에서 받는 도구. 읽기와 위임뿐이다. 새 도구를 더하면 여기 넣을지 함께 정한다(ADR-077). */
     private static final Set<String> CHECK_TREE_TOOLS =
             Set.of(MEMORY_READ, AGENT_LIST, AGENT_DELEGATE, AGENT_STATUS, AGENT_STOP);
+
     private final McpToolService tools;
     private final McpCallerResolver callers;
     private final ProactiveCheckGuard checkGuard;
@@ -190,7 +191,8 @@ public class McpController {
             return invalidParams(id, INVALID_ARGUMENTS);
         }
         Duration wait = waitSeconds == null ? Duration.ZERO : Duration.ofSeconds(waitSeconds.longValue());
-        return response(id, tools.agentStatus(caller, arguments.get("execution_id").longValue(), wait));
+        return response(
+                id, tools.agentStatus(caller, arguments.get("execution_id").longValue(), wait));
     }
 
     /** 인자는 {@code agent_status} 와 같이 정수 {@code execution_id} 하나뿐이다. */
