@@ -764,7 +764,16 @@ public class ChatService {
             }
             ModelChoice choice = resolved.choice();
             PendingTurn pending = begin(
-                    user, routed, input, context, snapshot, choice, resolved.tier(), intent, requestReceivedAt, onEvent);
+                    user,
+                    routed,
+                    input,
+                    context,
+                    snapshot,
+                    choice,
+                    resolved.tier(),
+                    intent,
+                    requestReceivedAt,
+                    onEvent);
             if (command != null) {
                 skillUses.recordCommand(pending.execution().id(), command.name());
             }

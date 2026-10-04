@@ -193,9 +193,8 @@ public class ProactiveCheckRun implements CheckTurn {
         List<JudgedFinding> judged = block.findings().stream()
                 .map(finding -> FindingJudgement.judge(finding, check.startedAt(), now, announced))
                 .toList();
-        newFindings = (int) judged.stream()
-                .filter(each -> each.kind() == FindingKind.NEW)
-                .count();
+        newFindings = (int)
+                judged.stream().filter(each -> each.kind() == FindingKind.NEW).count();
         referenceFindings = judged.size() - newFindings;
         deps.findings()
                 .saveAll(judged.stream()
@@ -242,12 +241,10 @@ public class ProactiveCheckRun implements CheckTurn {
 
     private String buildInput(Instant now) {
         Long conversationId = check.conversationId();
-        StringBuilder text = new StringBuilder(OPENING)
-                .append("\n\n지금 시각: ")
-                .append(now)
-                .append("\n\n변화 신호\n");
-        Optional<ProactiveCheck> last = deps.checks()
-                .findFirstByConversationIdAndStatusNotOrderByIdDesc(conversationId, CheckStatus.RUNNING);
+        StringBuilder text =
+                new StringBuilder(OPENING).append("\n\n지금 시각: ").append(now).append("\n\n변화 신호\n");
+        Optional<ProactiveCheck> last =
+                deps.checks().findFirstByConversationIdAndStatusNotOrderByIdDesc(conversationId, CheckStatus.RUNNING);
         if (last.isEmpty()) {
             text.append("- 지난 살펴보기: 처음\n- 그 뒤 사용자가 이 대화에 보낸 메시지: ")
                     .append(UNKNOWN)
@@ -314,14 +311,15 @@ public class ProactiveCheckRun implements CheckTurn {
         if (recent.isEmpty()) {
             return NO_RECENT_FINDINGS;
         }
-        Map<Long, ProactiveCheck> checksById = deps
-                .checks()
-                .findAllById(recent.stream()
-                        .map(ProactiveCheckFinding::checkId)
-                        .distinct()
-                        .toList())
-                .stream()
-                .collect(Collectors.toMap(ProactiveCheck::id, Function.identity()));
+        Map<Long, ProactiveCheck> checksById =
+                deps
+                        .checks()
+                        .findAllById(recent.stream()
+                                .map(ProactiveCheckFinding::checkId)
+                                .distinct()
+                                .toList())
+                        .stream()
+                        .collect(Collectors.toMap(ProactiveCheck::id, Function.identity()));
         Map<Long, String> countsByCheck = new HashMap<>();
         String lines = recent.stream()
                 .map(finding -> "- [" + finding.area() + "] " + orDash(finding.topicKey())
@@ -329,10 +327,11 @@ public class ProactiveCheckRun implements CheckTurn {
                         + " · " + orDash(finding.sourceUrl())
                         + " · 확인 " + (finding.checkedAt() == null ? UNKNOWN : DATE.format(finding.checkedAt()))
                         + " · 그 뒤 사용자 메시지 "
-                        + countsByCheck.computeIfAbsent(finding.checkId(), id -> userMessagesAfter(Optional.ofNullable(
-                                        checksById.get(id))
-                                .map(ProactiveCheck::finishedAt)
-                                .orElse(null))))
+                        + countsByCheck.computeIfAbsent(
+                                finding.checkId(),
+                                id -> userMessagesAfter(Optional.ofNullable(checksById.get(id))
+                                        .map(ProactiveCheck::finishedAt)
+                                        .orElse(null))))
                 .collect(Collectors.joining("\n"));
         return ExternalData.wrap(lines);
     }
@@ -343,7 +342,8 @@ public class ProactiveCheckRun implements CheckTurn {
                 .findings()
                 .findByConversationIdAndKindAndCreatedAtAfter(check.conversationId(), FindingKind.NEW, after)
                 .stream()
-                .filter(finding -> finding.topicKey() != null && !finding.topicKey().isBlank())
+                .filter(finding ->
+                        finding.topicKey() != null && !finding.topicKey().isBlank())
                 .map(finding -> new AnnouncedKey(finding.topicKey(), finding.sourceUrl()))
                 .collect(Collectors.toSet());
     }

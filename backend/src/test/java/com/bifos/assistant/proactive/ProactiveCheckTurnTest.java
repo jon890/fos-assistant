@@ -165,8 +165,8 @@ class ProactiveCheckTurnTest {
         when(toolsets.readEnabled(anyString(), anyString())).thenReturn(List.of("web", "skills", "fos-assistant"));
         when(skillClient.list(anyString())).thenReturn(List.of(new HermesSkill("proactive-check", "살펴보기", true)));
         String suffix = UUID.randomUUID().toString().substring(0, 8);
-        AppUser user = users.save(
-                AppUser.of("check-" + suffix + "@example.com", "점검", 1L, UserRole.MEMBER, Instant.now()));
+        AppUser user =
+                users.save(AppUser.of("check-" + suffix + "@example.com", "점검", 1L, UserRole.MEMBER, Instant.now()));
         owner = new CurrentUser(user.id(), user.email(), user.displayName(), user.groupId(), user.role());
         String code = "check-" + suffix;
         agent = agents.save(Agent.of(
@@ -255,8 +255,7 @@ class ProactiveCheckTurnTest {
         assertThat(messages.findByConversationIdOrderByIdAsc(conversation.id()))
                 .extracting(ChatMessage::role, ChatMessage::content)
                 .containsExactly(
-                        tuple(MessageRole.SYSTEM, "먼저 살펴보기를 시작했어요"),
-                        tuple(MessageRole.SYSTEM, "살펴봤지만 새로 알릴 것이 없어요"));
+                        tuple(MessageRole.SYSTEM, "먼저 살펴보기를 시작했어요"), tuple(MessageRole.SYSTEM, "살펴봤지만 새로 알릴 것이 없어요"));
         ProactiveCheck check = onlyCheckOf(conversation);
         assertThat(check.status()).isEqualTo(CheckStatus.SUCCEEDED);
         assertThat(check.outcome()).isEqualTo(CheckOutcome.NOTHING_NEW);
@@ -331,7 +330,8 @@ class ProactiveCheckTurnTest {
                 .contains("- Memory 문맥이 지난 살펴보기와 같은지: 같음")
                 .contains("[study] " + TOPIC_KEY + " · Kafka 정확히 한 번 처리 · " + SOURCE_URL)
                 .contains("그 뒤 사용자 메시지 1개");
-        ChatMessage answer = messages.findByConversationIdOrderByIdAsc(conversation.id()).getLast();
+        ChatMessage answer =
+                messages.findByConversationIdOrderByIdAsc(conversation.id()).getLast();
         assertThat(answer.role()).isEqualTo(MessageRole.ASSISTANT);
         assertThat(answer.content()).contains("새로 알릴 것은 없어요").contains("이미 알린 것이에요");
         ProactiveCheck second = checksOf(conversation).getLast();
@@ -349,7 +349,11 @@ class ProactiveCheckTurnTest {
         Conversation existing = conversations.save(
                 Conversation.startedForCheck(owner.id(), "먼저 살펴보기 · 커리어", agent.id(), Instant.now()));
         ProactiveCheck interrupted = checks.save(ProactiveCheck.started(
-                owner.id(), agent.id(), existing.id(), CheckTrigger.MANUAL, Instant.now().minusSeconds(60)));
+                owner.id(),
+                agent.id(),
+                existing.id(),
+                CheckTrigger.MANUAL,
+                Instant.now().minusSeconds(60)));
         findings.save(ProactiveCheckFinding.of(
                 interrupted.id(),
                 existing.id(),
@@ -456,7 +460,8 @@ class ProactiveCheckTurnTest {
         stub().willAnswer(command -> answer(block("{\"version\":1,\"outcome\":\"NOTHING_NEW\"}")));
         runCheck();
 
-        assertThat(checksOf(conversation)).extracting(ProactiveCheck::status)
+        assertThat(checksOf(conversation))
+                .extracting(ProactiveCheck::status)
                 .containsExactly(CheckStatus.FAILED, CheckStatus.SUCCEEDED);
     }
 

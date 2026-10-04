@@ -90,7 +90,8 @@ public class ProactiveCheckService {
     public UUID start(CurrentUser user, String agentCode, CheckTrigger trigger) {
         Agent agent = agents.requireStartable(user, agentCode);
         if (!readiness.check(agent).available()) {
-            throw new ApiException(ErrorCode.PROACTIVE_CHECK_UNAVAILABLE, "this agent cannot run a proactive check now");
+            throw new ApiException(
+                    ErrorCode.PROACTIVE_CHECK_UNAVAILABLE, "this agent cannot run a proactive check now");
         }
         OpenedCheck opened = checkConversations.findOrCreate(user, agent);
         Conversation conversation = opened.conversation();

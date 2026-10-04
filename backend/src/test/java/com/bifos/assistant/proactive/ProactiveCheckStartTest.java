@@ -250,7 +250,9 @@ class ProactiveCheckStartTest {
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.code").value("USER_BUSY"));
 
-        assertThat(ownersConversations()).extracting(Conversation::id).containsExactlyInAnyOrder(first.id(), second.id());
+        assertThat(ownersConversations())
+                .extracting(Conversation::id)
+                .containsExactlyInAnyOrder(first.id(), second.id());
         assertThat(stub().received()).isEmpty();
     }
 
@@ -308,8 +310,8 @@ class ProactiveCheckStartTest {
 
     private CurrentUser user(String name) {
         String suffix = UUID.randomUUID().toString().substring(0, 8);
-        AppUser saved = users.save(
-                AppUser.of(name + "-" + suffix + "@example.com", name, 1L, UserRole.MEMBER, Instant.now()));
+        AppUser saved =
+                users.save(AppUser.of(name + "-" + suffix + "@example.com", name, 1L, UserRole.MEMBER, Instant.now()));
         createdUsers.add(saved.id());
         return new CurrentUser(saved.id(), saved.email(), saved.displayName(), saved.groupId(), saved.role());
     }
