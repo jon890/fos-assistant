@@ -73,9 +73,9 @@
 | --- | --- | --- |
 | 첫 지운 표시가 실패해도 같은 정리의 대조가 맞춘다 | HTML 하나를 답에 묶고 파일을 40일 전으로 한다. 첫 `markDeleted` 만 던지는 writer 로 만든 cleaner 를 미래 `now` 로 한 번 돌린다 | 파일이 없다. 행의 `deletedAt` 이 차 있다. 파일 응답이 410 `ARTIFACT_GONE`, 메시지 목록의 `deleted` 가 `true` 다 |
 | 파일이 없고 행은 살아 있는 재기동 상태를 맞춘다 | HTML 을 답에 묶은 뒤 파일을 직접 지운다 | 미래 `now` 로 `cleanExpired` 한 뒤 행의 `deletedAt` 이 차 있고 410 이다 |
-| 지운 표시는 기간 시작 전에 만든 행에만 적는다 | 첫 turn 이 `a/index.html` 을 만들고 두 번째 turn 이 같은 경로를 다시 써 행이 둘이다. 그 뒤 파일을 직접 지운다 | `now` 를 첫 행의 `createdAt` + 1ms + 30일로 주면 `cutoff` 가 두 행 사이에 온다. `cleanExpired(now)` 뒤 첫 행만 `deletedAt` 이 차 있고 둘째 행은 비었다. `markDeleted` 의 `createdAt` 조건을 빼면 이 테스트가 실패해야 한다 |
-| 같은 경로에 파일이 있으면 행을 적지 않는다 | 위처럼 행 둘을 만들되 파일은 지금 시각 그대로 둔다 | 위와 같은 `now` 로 정리한 뒤 두 행 모두 `deletedAt` 이 비었고 파일이 남는다 |
-| 한 건의 실패가 나머지를 막지 않는다 | 두 대화에 HTML 을 하나씩 묶고 두 파일을 직접 지운다. 첫 `markDeleted` 만 던지는 writer 를 쓴다 | 미래 `now` 로 한 번 정리하면 예외가 `cleanExpired` 밖으로 나오지 않고, 실패한 건도 대조가 다시 적어 두 행 모두 `deletedAt` 이 차 있다 |
+| 지운 표시는 기간 시작 전에 만든 행에만 적는다 | 첫 turn 이 `a/index.html` 을 만들고 두 번째 turn 이 같은 경로를 다시 써 행이 둘이다. 그 뒤 파일을 직접 지운다 | `now` 를 첫 행의 `createdAt` + 1ms + 30일로 주면 `cutoff` 가 두 행 사이에 온다. `cleanExpired(now)` 뒤 첫 행만 `deletedAt` 이 차 있고 둘째 행은 비었다. `markDeleted` 의 `createdAt` 조건을 빼면 이 테스트가 실패해야 한다. 단언 전에 둘째 행의 `createdAt` 이 `cutoff` 보다 늦다는 전제를 먼저 단언한다 |
+| 같은 경로에 파일이 있으면 행을 적지 않는다 | 위처럼 행 둘을 만들되 파일은 지금 시각 그대로 둔다 | 전제로 둘째 행의 `createdAt` 과 파일의 수정 시각이 `cutoff` 보다 늦다고 먼저 단언한다. 위와 같은 `now` 로 정리한 뒤 두 행 모두 `deletedAt` 이 비었고 파일이 남는다 |
+| 한 건의 실패가 나머지를 막지 않는다 | 두 대화에 HTML 을 하나씩 묶고 두 파일을 직접 지운다. 첫 `markDeleted` 만 던지는 writer 를 쓴다 | 미래 `now` 로 한 번 정리하면 예외가 `cleanExpired` 밖으로 나오지 않고 실패하지 않은 행만 `deletedAt` 이 차 있다. 같은 cleaner 로 한 번 더 정리하면 두 행 모두 차 있다 |
 
 ## 검증
 
