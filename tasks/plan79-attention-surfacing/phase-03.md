@@ -123,6 +123,8 @@ test "$(grep -c '아직 구현 전' docs/backend/attention.md)" = 1
 | 파일 | 변경 |
 | --- | --- |
 | `backend/src/main/java/com/bifos/assistant/chat/infra/ResultDeliveryRepository.java` | 수정 |
+| `backend/src/main/java/com/bifos/assistant/attention/application/model/AttentionSignal.java` | 수정 |
+| `backend/src/main/java/com/bifos/assistant/attention/application/model/AttentionSourceRef.java` | 수정 |
 | `backend/src/main/java/com/bifos/assistant/chat/application/model/FailedDelivery.java` | 신규 |
 | `backend/src/main/java/com/bifos/assistant/chat/application/OwnConversations.java` | 수정 |
 | `backend/src/main/java/com/bifos/assistant/attention/application/FailedTurnCandidates.java` | 수정 |
