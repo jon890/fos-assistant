@@ -18,6 +18,7 @@ import com.bifos.assistant.orchestration.application.ChildExecutionRunner;
 import com.bifos.assistant.orchestration.application.DelegationProperties;
 import com.bifos.assistant.orchestration.application.DelegationResult;
 import com.bifos.assistant.orchestration.domain.ChildResult;
+import com.bifos.assistant.proactive.application.ProactiveCheckGuard;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.usage.application.ExecutionDeliveryWriter;
@@ -71,6 +72,9 @@ class AgentDelegationServiceRaceTest {
         when(agent.apiBaseUrl()).thenReturn("http://agent-runtime.test/p/" + WORKER);
         when(agent.hermesProfile()).thenReturn(WORKER);
         when(children.startableAgent(user, WORKER)).thenReturn(agent);
+        // 보통 turn 의 위임만 본다. 살펴보기 트리가 아니라고 답한다.
+        ProactiveCheckGuard checkGuard = mock(ProactiveCheckGuard.class);
+        when(checkGuard.isCheckTree(any())).thenReturn(false);
         // 서버 전체 한도를 1 로 둬, 거절한 요청이 자리를 돌려주지 않고 남기면 다음 요청이 BUSY 가 된다.
         delegations = new AgentDelegationService(
                 mock(AgentService.class),
@@ -78,10 +82,11 @@ class AgentDelegationServiceRaceTest {
                 mock(ExecutionDeliveryWriter.class),
                 children,
                 conversations,
-                new DelegationProperties(2, 4, 1, SUBMIT_TIMEOUT, 100),
+                new DelegationProperties(2, 4, 1, SUBMIT_TIMEOUT, 100, Duration.ofSeconds(20)),
                 mock(TurnCancellation.class),
                 mock(HermesRunsClient.class),
                 event -> {},
+                checkGuard,
                 Clock.systemUTC());
     }
 

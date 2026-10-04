@@ -18,8 +18,12 @@ import com.bifos.assistant.hermes.dto.TokenUsage;
 import com.bifos.assistant.mcp.application.AgentTokenService;
 import com.bifos.assistant.mcp.infra.AgentTokenRepository;
 import com.bifos.assistant.memory.application.MemoryService;
+import com.bifos.assistant.memory.domain.Memory;
 import com.bifos.assistant.memory.domain.type.MemoryScope;
 import com.bifos.assistant.orchestration.application.SubagentSessionRegistrar;
+import com.bifos.assistant.proactive.domain.ProactiveCheck;
+import com.bifos.assistant.proactive.domain.type.CheckTrigger;
+import com.bifos.assistant.proactive.infra.ProactiveCheckRepository;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.shared.error.ApiException;
@@ -46,6 +50,7 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -149,6 +154,11 @@ class McpAgentToolsTest {
 
     @Autowired
     ExecutionEventRepository executionEvents;
+
+    @Autowired
+    ProactiveCheckRepository checks;
+
+    private final List<Long> createdChecks = new ArrayList<>();
 
     private final HttpClient client = HttpClient.newHttpClient();
     private final JsonMapper json = JsonMapper.builder().build();
@@ -649,6 +659,95 @@ class McpAgentToolsTest {
                     .as("인자 %s: %s", arguments, response)
                     .isEqualTo(-32602);
         }
+    }
+
+    @Test
+    @DisplayName("agent status 의 wait seconds 가 0 이상 정수가 아니거나 다른 키가 함께 오면 인자 오류다")
+    void agentStatusWaitSecondsIsArgumentErrorUnlessNonNegativeInteger() throws Exception {
+        String root = McpCallSigner.newRoot();
+        AgentExecution parent = McpCallSigner.running(executions, userA.id(), null, SHARED, root);
+        AgentExecution running = delegated(userA.id(), parent, ExecutionStatus.RUNNING, null, null);
+
+        List<ObjectNode> invalid = new ArrayList<>();
+        invalid.add(json.createObjectNode().put("execution_id", running.id()).put("wait_seconds", -1));
+        invalid.add(json.createObjectNode().put("execution_id", running.id()).put("wait_seconds", "5"));
+        invalid.add(json.createObjectNode().put("execution_id", running.id()).put("wait_seconds", 1.5));
+        invalid.add(json.createObjectNode().put("wait_seconds", 1));
+        invalid.add(json.createObjectNode()
+                .put("execution_id", running.id())
+                .put("wait_seconds", 1)
+                .put("user_id", userB.id()));
+        for (ObjectNode arguments : invalid) {
+            arguments.set("_fos_ctx", McpCallSigner.context(sharedToken, "agent_status", root));
+            JsonNode response = body(send(sharedToken, toolCall("agent_status", arguments)));
+            assertThat(response.path("error").path("code").asInt())
+                    .as("인자 %s: %s", arguments, response)
+                    .isEqualTo(-32602);
+        }
+        ObjectNode zero = json.createObjectNode().put("execution_id", running.id()).put("wait_seconds", 0);
+        zero.set("_fos_ctx", McpCallSigner.context(sharedToken, "agent_status", root));
+        assertStatus(
+                send(sharedToken, toolCall("agent_status", zero)),
+                "{\"execution_id\":" + running.id() + ",\"status\":\"RUNNING\"}");
+    }
+
+    @Test
+    @DisplayName("agent status 에 wait seconds 를 주면 그 사이 끝난 위임의 결과를 한 번에 받고 결과를 전했다고 적는다")
+    void agentStatusWithWaitSecondsReturnsResultOfDelegationThatEndsMeanwhile() throws Exception {
+        stub().willAnswer(command -> answered(command, "기다린 답"));
+        CountDownLatch awaiting = new CountDownLatch(1);
+        CountDownLatch release = new CountDownLatch(1);
+        stub().beforeAwait(() -> {
+            awaiting.countDown();
+            try {
+                release.await(10, TimeUnit.SECONDS);
+            } catch (InterruptedException ex) {
+                Thread.currentThread().interrupt();
+            }
+        });
+        String root = McpCallSigner.newRoot();
+        turn(userA, root);
+        long executionId =
+                started(delegate(sharedToken, root, OWN_A_CODE, "기다려 받을 일")).path("execution_id").asLong();
+        assertThat(awaiting.await(10, TimeUnit.SECONDS)).as("실행이 완료 대기에 들어섰다").isTrue();
+
+        Thread.ofVirtual().start(() -> {
+            try {
+                Thread.sleep(200);
+            } catch (InterruptedException ex) {
+                Thread.currentThread().interrupt();
+            }
+            release.countDown();
+        });
+        ObjectNode arguments = json.createObjectNode().put("execution_id", executionId).put("wait_seconds", 10);
+        arguments.set("_fos_ctx", McpCallSigner.context(sharedToken, "agent_status", root));
+        HttpResponse<String> response = send(sharedToken, toolCall("agent_status", arguments));
+
+        assertStatus(
+                response, "{\"execution_id\":" + executionId + ",\"status\":\"SUCCEEDED\",\"output\":\"기다린 답\"}");
+        awaitFinished(executionId);
+        assertThat(deliveredAt(executionId)).as("결과를 전했다고 적은 시각").isNotNull();
+    }
+
+    @Test
+    @DisplayName("먼저 살펴보기 트리에서도 agent list 와 memory read 와 agent status 는 그대로 동작한다")
+    void readAndDelegationToolsWorkInCheckTree() throws Exception {
+        Memory indexed = memories.create(current(userA), MemoryScope.USER, "색인", "가의 본문", false);
+        String root = McpCallSigner.newRoot();
+        AgentExecution checkTurn = checkTurn(userA, root);
+        AgentExecution finished = delegated(userA.id(), checkTurn, ExecutionStatus.SUCCEEDED, "살펴본 결과", null);
+        ObjectNode memoryArguments = json.createObjectNode().put("id", indexed.id());
+        memoryArguments.set("_fos_ctx", McpCallSigner.context(sharedToken, "memory_read", root));
+
+        List<String> listed = codes(agentList(sharedToken, root));
+        String body = resultText(send(sharedToken, toolCall("memory_read", memoryArguments)));
+        HttpResponse<String> status = agentStatus(sharedToken, root, finished.id());
+
+        assertThat(listed).contains(GROUP_CODE, OWN_A_CODE);
+        assertThat(body).isEqualTo("가의 본문");
+        assertStatus(
+                status,
+                "{\"execution_id\":" + finished.id() + ",\"status\":\"SUCCEEDED\",\"output\":\"살펴본 결과\"}");
     }
 
     @Test
@@ -1174,6 +1273,38 @@ class McpAgentToolsTest {
                 Thread.currentThread().interrupt();
             }
         });
+    }
+
+    @AfterEach
+    void tearDown() {
+        checks.deleteAllById(createdChecks);
+        createdChecks.clear();
+    }
+
+    /**
+     * 사용자의 점검 대화에서 루트 session {@code root} 로 도는 살펴보기 turn 을 만든다. 그 실행이 살펴보기 트리의 루트다.
+     *
+     * <p>Memory 를 읽을 수 있게 기본 collection 을 받은 일반 에이전트의 실행으로 둔다.
+     */
+    private AgentExecution checkTurn(AppUser user, String root) {
+        Long agentId = agents.findByCode(GROUP_CODE).orElseThrow().id();
+        Conversation conversation =
+                conversations.save(Conversation.startedForCheck(user.id(), "점검 대화", agentId, Instant.now()));
+        AgentExecution turn = executions.save(AgentExecution.builder()
+                .userId(user.id())
+                .agentId(agentId)
+                .conversationId(conversation.id())
+                .profileName(SHARED)
+                .hermesSessionId(root)
+                .costMode(CostMode.SUBSCRIPTION)
+                .status(ExecutionStatus.RUNNING)
+                .startedAt(STARTED)
+                .build());
+        ProactiveCheck check =
+                ProactiveCheck.started(user.id(), agentId, conversation.id(), CheckTrigger.MANUAL, STARTED);
+        check.attachRoot(turn.id(), root);
+        createdChecks.add(checks.save(check).id());
+        return turn;
     }
 
     private static HermesRunResult answered(HermesRunCommand command, String output) {

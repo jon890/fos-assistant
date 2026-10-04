@@ -36,6 +36,8 @@ public record ToolPolicyDecision(
      * @param declared 그 도구의 선언. manifest 에 없으면 빈 값
      * @param granted 그 도구에 유효한 상시 허락이 있는가
      * @param argsBytes 인자 글의 UTF-8 바이트 수
+     * @param readOnlyRun 먼저 살펴보기 트리 안의 호출인가. 참이면 위험도가 {@code READ} 이고 승인 방식이 {@code none} 인
+     *     도구만 받는다(ADR-077)
      */
     public static ToolPolicyDecision decide(
             ConnectionStatus connectionStatus,
@@ -43,7 +45,8 @@ public record ToolPolicyDecision(
             int schema,
             Optional<ToolPolicy> declared,
             boolean granted,
-            int argsBytes) {
+            int argsBytes,
+            boolean readOnlyRun) {
         if (connectionStatus != ConnectionStatus.READY) {
             return denied(ActionDenyReason.NOT_READY, null);
         }
@@ -56,6 +59,11 @@ public record ToolPolicyDecision(
         ToolPolicy policy = declared.orElseGet(() -> new ToolPolicy(ToolRisk.WRITE, ToolApproval.REQUIRED, null, true));
         if (policy.risk() == ToolRisk.DESTRUCTIVE || policy.risk() == ToolRisk.FINANCIAL) {
             return denied(ActionDenyReason.RISK_NOT_OPEN, policy);
+        }
+        // 살펴보기는 사람이 보지 않는 실행이라 승인 줄을 만들지 않는다. manifest 는 READ 도구에도 required 나 always 를
+        // 선언할 수 있어 위험도만 보면 승인 줄이 생기거나 상시 허락으로 통과한다. 그래서 승인 방식까지 본다.
+        if (readOnlyRun && !(policy.risk() == ToolRisk.READ && policy.approval() == ToolApproval.NONE)) {
+            return denied(ActionDenyReason.READ_ONLY_RUN, policy);
         }
         if (argsBytes > MAX_ARGS_BYTES) {
             return denied(ActionDenyReason.ARGS_TOO_LARGE, policy);

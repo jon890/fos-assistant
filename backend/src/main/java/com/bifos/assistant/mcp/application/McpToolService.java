@@ -19,6 +19,7 @@ import com.bifos.assistant.usage.domain.AgentExecution;
 import com.bifos.assistant.usage.domain.DelegationKey;
 import com.bifos.assistant.usage.domain.type.ExecutionStatus;
 import java.time.Clock;
+import java.time.Duration;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -52,6 +53,7 @@ public class McpToolService {
             "artifact source URL is invalid",
             "artifact source host is not allowed");
     private static final String EXECUTION_NOT_FOUND = "실행을 찾을 수 없습니다.";
+    private static final String NOT_ALLOWED_IN_CHECK = "먼저 살펴보기에서는 쓸 수 없는 도구입니다.";
     /** {@code agent_delegate} 의 {@code task} 길이 상한. 대화 메시지 상한과 같다. */
     public static final int TASK_MAX_CHARS = 8000;
 
@@ -133,7 +135,7 @@ public class McpToolService {
                         "name",
                         "agent_status",
                         "description",
-                        "다른 에이전트에게 맡긴 실행의 지금 상태와 결과를 읽는다. execution_id 에는 agent_delegate 로 받은 번호를 넣는다. 결과는 끝나면 자동으로 전달되므로 기다리려고 반복해서 부르지 않는다. 사용자가 진행 상황을 물을 때 한 번 부른다.",
+                        "다른 에이전트에게 맡긴 실행의 지금 상태와 결과를 읽는다. execution_id 에는 agent_delegate 로 받은 번호를 넣는다. 이번 답에 그 결과가 필요하면 wait_seconds(최대 20)로 끝나기를 기다린다. 필요하지 않으면 끝난 결과는 다음 turn 에 자동으로 전달되므로 반복해서 부르지 않는다.",
                         "inputSchema",
                         Map.of(
                                 "type",
@@ -141,7 +143,9 @@ public class McpToolService {
                                 "additionalProperties",
                                 false,
                                 "properties",
-                                Map.of("execution_id", Map.of("type", "integer")),
+                                Map.of(
+                                        "execution_id", Map.of("type", "integer"),
+                                        "wait_seconds", Map.of("type", "integer", "minimum", 0)),
                                 "required",
                                 List.of("execution_id"))),
                 Map.of(
@@ -168,6 +172,11 @@ public class McpToolService {
      */
     public Map<String, Object> invalidContext() {
         return result(INVALID_CONTEXT, true);
+    }
+
+    /** 먼저 살펴보기 트리에서 받지 않는 도구를 부른 호출의 도구 결과다. 도구는 돌리지 않는다(ADR-077). */
+    public Map<String, Object> notAllowedInCheck() {
+        return result(NOT_ALLOWED_IN_CHECK, true);
     }
 
     public Map<String, Object> readMemory(McpCaller caller, Long id) {
@@ -232,10 +241,12 @@ public class McpToolService {
      *
      * <p>연결용 에이전트의 답은 외부 서비스의 글을 담으므로 부모 대화에 전할 때와 같이 {@code <external-data>} 로
      * 감싼다. 에이전트 행이 없는 실행도 출처를 모르므로 감싼다(ADR-049).
+     *
+     * @param wait 그 실행이 끝나기를 기다릴 시간. 0 이면 곧바로 답한다. 상한은 {@link AgentDelegationService} 가 줄인다
      */
-    public Map<String, Object> agentStatus(McpCaller caller, Long executionId) {
+    public Map<String, Object> agentStatus(McpCaller caller, Long executionId, Duration wait) {
         return delegations
-                .status(caller.user(), caller.originExecution(), executionId)
+                .status(caller.user(), caller.originExecution(), executionId, wait)
                 .map(execution -> {
                     markDeliveredIfFinished(execution);
                     return result(JSON.writeValueAsString(statusOf(execution)), false);
@@ -297,6 +308,8 @@ public class McpToolService {
             case TOO_MANY_CHILDREN -> "이미 맡긴 일이 많습니다. 앞의 일이 끝난 뒤 다시 맡겨 주세요.";
             case BUSY -> "지금은 맡길 수 없습니다. 직접 처리하거나 앞의 작업이 끝난 뒤 다시 맡겨 주세요.";
             case SUBMIT_FAILED -> "실행을 시작하지 못했습니다.";
+            case CHECK_TARGET -> "먼저 살펴보기에서는 연결한 서비스의 에이전트에만 맡길 수 있습니다.";
+            case CHECK_LIMIT -> "이번 살펴보기에서는 더 맡길 수 없습니다.";
         };
     }
 

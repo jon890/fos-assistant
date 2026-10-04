@@ -10,5 +10,7 @@ public enum ActionDenyReason {
     NOT_READY,
     UNDECLARED,
     RISK_NOT_OPEN,
-    ARGS_TOO_LARGE
+    ARGS_TOO_LARGE,
+    /** 먼저 살펴보기 트리 안의 호출인데 위험도가 {@code READ} 이고 승인 방식이 {@code none} 인 도구가 아니다(ADR-077) */
+    READ_ONLY_RUN
 }

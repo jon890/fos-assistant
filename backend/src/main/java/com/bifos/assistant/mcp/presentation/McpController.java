@@ -9,8 +9,10 @@ import com.bifos.assistant.mcp.application.McpPrincipal;
 import com.bifos.assistant.mcp.application.McpToolService;
 import com.bifos.assistant.mcp.presentation.McpDtos.ArtifactWriteArguments;
 import com.bifos.assistant.mcp.presentation.McpDtos.MemoryReadArguments;
+import com.bifos.assistant.proactive.application.ProactiveCheckGuard;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
+import java.time.Duration;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Set;
@@ -41,8 +43,13 @@ public class McpController {
     private static final String AGENT_STATUS = "agent_status";
     private static final String AGENT_DELEGATE = "agent_delegate";
     private static final String AGENT_STOP = "agent_stop";
+    private static final String WAIT_SECONDS = "wait_seconds";
+    /** 먼저 살펴보기 트리에서 받는 도구. 읽기와 위임뿐이다. 새 도구를 더하면 여기 넣을지 함께 정한다(ADR-077). */
+    private static final Set<String> CHECK_TREE_TOOLS =
+            Set.of(MEMORY_READ, AGENT_LIST, AGENT_DELEGATE, AGENT_STATUS, AGENT_STOP);
     private final McpToolService tools;
     private final McpCallerResolver callers;
+    private final ProactiveCheckGuard checkGuard;
     private final BuildProperties buildProperties;
     /** 받아들이는 도구 이름과 그 처리. 이름 검사와 분기가 이 한 곳에서 정해진다. */
     private final Map<String, ToolHandler> handlers = Map.of(
@@ -95,12 +102,14 @@ public class McpController {
     }
 
     /**
-     * 도구 호출을 네 단계로 판정한다. 모든 도구가 같은 순서를 지난다.
+     * 도구 호출을 다섯 단계로 판정한다. 모든 도구가 같은 순서를 지난다.
      *
      * <ol>
      *   <li>{@code params.name} 이 문자열이고 {@code params.arguments} 가 객체인지 본다. 아니면 {@code -32602}
      *   <li>이름으로 처리를 고른다. 모르는 도구면 {@code -32601}
      *   <li>원래 인자의 {@code _fos_ctx} 로 요청자를 정한다(ADR-032). 정하지 못하면 {@link McpToolService#invalidContext()}
+     *   <li>요청자의 origin 실행이 먼저 살펴보기 트리이고 {@link #CHECK_TREE_TOOLS} 밖의 도구면
+     *       {@link McpToolService#notAllowedInCheck()}
      *   <li>{@code _fos_ctx} 를 뗀 인자로 도구별 검사를 하고 그 요청자로 도구를 돌린다
      * </ol>
      */
@@ -124,6 +133,9 @@ public class McpController {
                 throw ex;
             }
             return response(id, tools.invalidContext());
+        }
+        if (!CHECK_TREE_TOOLS.contains(toolName) && checkGuard.isCheckTree(caller.originExecution())) {
+            return response(id, tools.notAllowedInCheck());
         }
         return handler.handle(caller, id, withoutCallContext(arguments));
     }
@@ -159,12 +171,26 @@ public class McpController {
         return response(id, tools.listAgents(caller));
     }
 
+    /**
+     * 인자는 정수 {@code execution_id} 하나와 선택 {@code wait_seconds} 다. {@code wait_seconds} 는 0 이상 정수이고, 상한을
+     * 넘는 값은 위임 쪽이 줄인다. 다른 키가 오면 인자 오류다.
+     */
     private Map<String, Object> agentStatus(McpCaller caller, JsonNode id, JsonNode arguments) {
-        if (!onlyExecutionId(arguments)) {
+        JsonNode waitSeconds = arguments.get(WAIT_SECONDS);
+        JsonNode executionIdOnly = arguments;
+        if (waitSeconds != null) {
+            if (!waitSeconds.isIntegralNumber() || !waitSeconds.canConvertToLong() || waitSeconds.longValue() < 0) {
+                return invalidParams(id, INVALID_ARGUMENTS);
+            }
+            ObjectNode copy = ((ObjectNode) arguments).deepCopy();
+            copy.remove(WAIT_SECONDS);
+            executionIdOnly = copy;
+        }
+        if (!onlyExecutionId(executionIdOnly)) {
             return invalidParams(id, INVALID_ARGUMENTS);
         }
-        return response(
-                id, tools.agentStatus(caller, arguments.get("execution_id").longValue()));
+        Duration wait = waitSeconds == null ? Duration.ZERO : Duration.ofSeconds(waitSeconds.longValue());
+        return response(id, tools.agentStatus(caller, arguments.get("execution_id").longValue(), wait));
     }
 
     /** 인자는 {@code agent_status} 와 같이 정수 {@code execution_id} 하나뿐이다. */
