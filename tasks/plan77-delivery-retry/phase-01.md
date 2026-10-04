@@ -165,6 +165,13 @@ CREATE INDEX idx_result_delivery_attempt_execution ON result_delivery_attempt (e
 
 `chat.stop` 이 쓰는 실행 번호는 `stub().beforeAwait` 안에서 찾는다. 기존 중지 검사 `backend/src/test/java/com/bifos/assistant/chat/ChatStopTest.java` 의 `latestExecution(dad)` 와 같은 방법을 따른다. `stub().beforeAwait` 의 정확한 모양은 `backend/src/test/java/com/bifos/assistant/hermes/StubHermesRunsClient.java` 를 읽고 맞춘다.
 
+### 10. `backend/src/test/java/com/bifos/assistant/CollationMixQueryMysqlTest.java`
+
+이 검사는 V57 스키마에서 문맥을 띄운다. V66 의 표가 없어 `ddl-auto=validate` 가 실패하므로 `none` 으로 바꾼다.
+「실패는 모두 1267」 단언은 약하게 바꾸지 않는다. V57 뒤에 생긴 표의 저장소(`ResultDeliveryRepository`, `ResultDeliveryItemRepository`, `ResultDeliveryAttemptRepository`)를 상수 목록으로 두고,
+그 저장소의 실패는 오류 1146(표 없음)인지, 나머지 실패는 모두 1267 인지 나눠 단언한다. 뒤 phase 가 이 저장소에 메서드를 더해도 이 검사를 다시 고치지 않는다.
+Javadoc 의 「V58 부터 V65 까지는」 문단을 이 방식으로 고친다.
+
 ## 검증
 
 ```bash
@@ -181,7 +188,7 @@ node --test 'test/unit/**/*.test.ts'
 scripts/quality.sh check
 ```
 
-기대: 모두 종료 코드 0. `RepositoryQueryMysqlTest` 가 새 저장소 메서드 다섯을 실제 MySQL 에서 실행한다. 인자 타입 때문에 실패하면 `backend/src/test/java/com/bifos/assistant/testsupport/RepositoryQuerySweep.java` 에 그 타입의 값을 더한다. 건너뛰게 하지 않는다.
+기대: 모두 종료 코드 0. `RepositoryQueryMysqlTest` 가 새 저장소 메서드 넷을 실제 MySQL 에서 실행한다. 인자 타입 때문에 실패하면 `backend/src/test/java/com/bifos/assistant/testsupport/RepositoryQuerySweep.java` 에 그 타입의 값을 더한다. 건너뛰게 하지 않는다.
 
 ## 변경 파일
 
@@ -204,3 +211,4 @@ scripts/quality.sh check
 | `backend/src/main/java/com/bifos/assistant/chat/application/TurnIntent.java` | 수정 |
 | `backend/src/main/java/com/bifos/assistant/chat/application/ChatService.java` | 수정 |
 | `backend/src/test/java/com/bifos/assistant/chat/ResultDeliveryRecordTest.java` | 신규 |
+| `backend/src/test/java/com/bifos/assistant/CollationMixQueryMysqlTest.java` | 수정 |
