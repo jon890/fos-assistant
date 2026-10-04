@@ -5,6 +5,8 @@ import { expect, setSession, test, type FakeHermesControl } from "./fixtures.ts"
 import { CONTROL_PLANE_BASE_URL, JWT_SECRET, WEB_BASE_URL } from "./settings.ts";
 
 const HOUR_MS = 60 * 60 * 1000;
+// 할 일 동작 뒤에는 router.refresh() 가 서버 화면을 다시 받아야 바뀐다. CI 부하 아래에서는 기본 대기 5초를 넘은 적이 있다.
+const REFRESHED = { timeout: 15_000 };
 
 test.describe("지금 화면", () => {
   function memberOf(projectName: string) {
@@ -351,7 +353,7 @@ test.describe("지금 화면", () => {
     await expect(dialog).toHaveCount(0);
 
     const row = needsMe.getByTestId("now-item").filter({ hasText: title });
-    await expect(row).toHaveCount(1);
+    await expect(row).toHaveCount(1, REFRESHED);
     await expect(row).toContainText("기한이 다가왔어요");
     await expect(row.getByText("지금", { exact: true })).toBeVisible();
     await expect(row).toContainText("직접 더함");
@@ -376,7 +378,7 @@ test.describe("지금 화면", () => {
     await openNow(page);
     await expect(row).toHaveCount(1);
     await clickSending(page, row.getByRole("button", { name: "끝냄" }), "POST", /^\/api\/follow-ups\/[^/]+\/done$/);
-    await expect(row).toHaveCount(0);
+    await expect(row).toHaveCount(0, REFRESHED);
   });
 
   test("에이전트가 제안한 할 일은 건수에 세지 않고 고쳐서 받아들이거나 거절할 수 있다", async ({
@@ -425,7 +427,7 @@ test.describe("지금 화면", () => {
       "POST",
       /^\/api\/follow-ups\/[^/]+\/accept$/,
     );
-    await expect(row).toContainText("챙기고 있는 할 일이에요");
+    await expect(row).toContainText("챙기고 있는 할 일이에요", REFRESHED);
     for (const name of ["끝냄", "그만둠", "고치기"]) {
       await expect(row.getByRole("button", { name, exact: true })).toBeVisible();
     }
@@ -453,7 +455,7 @@ test.describe("지금 화면", () => {
       "POST",
       /^\/api\/follow-ups\/[^/]+\/reject$/,
     );
-    await expect(rejected).toHaveCount(0);
+    await expect(rejected).toHaveCount(0, REFRESHED);
   });
 
   // 이 파일의 검사들이 같은 사용자와 에이전트를 함께 쓰므로 검사마다 지우지 않고 끝에 한 번 지운다.
