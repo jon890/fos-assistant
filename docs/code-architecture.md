@@ -105,6 +105,8 @@ profile key 와 AI credential 은 계속 홈서버 파일에 둔다.
 - Hermes native 하위 에이전트와 cron 을 사용자 실행 한도에 넣는 것. Control Plane 이 제출하지 않아 세지 못한다
 - `connector_action` 줄의 보관 기한과 정리. 지금은 도구 호출마다 남긴 줄을 지우지 않는다
 - 여러 기록에서 모은 문맥 묶음([ADR-071](adr/ADR-071-여러-출처의-문맥은-항목마다-출처와-권한과-신선도를-지닌-묶음으로-조립한다.md)). 지금은 `ContextAssembler` 가 Memory 만 모으고 결과는 `ChatService` 가 글로 잇는다. 항목 모델은 `context` 패키지에 둔다. 아래 패키지(`usage`)가 그 타입을 import 하지 못하므로 실행 기록에는 참조 값만 넘긴다
+- 먼저 알리기와 지금 화면의 판정([`backend/attention.md`](backend/attention.md)). 새 최상위 패키지 `attention` 을 층 순서 맨 위에 둔다
+- 할 일([`backend/follow-up.md`](backend/follow-up.md)). 새 최상위 패키지 `followup` 을 `chat` 바로 위에 둔다
 
 SSE 중계와 스트리밍은 끝났다.
 `HermesRunEventStream` 이 받아 `ChatService.stream` 이 화면으로 중계한다.

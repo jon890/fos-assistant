@@ -1,6 +1,6 @@
 # 저장 모델
 
-Control Plane 의 표와 칸이 무엇을 뜻하는지를 갖는다. 표는 주제별로 아래 다섯 파일에 나눠 적는다.
+Control Plane 의 표와 칸이 무엇을 뜻하는지를 갖는다. 표는 주제별로 아래 여섯 파일에 나눠 적는다.
 MySQL 8.4 에 둔다. 마이그레이션은 `backend/src/main/resources/db/migration/` 이 소유하고 이 문서는 뜻을 적는다.
 DB 색인(index)은 마이그레이션이 갖는다. 이 문서는 표마다 칸과 유일 제약과 FK 만 적는다.
 
@@ -14,6 +14,7 @@ AI credential 은 Hermes profile 의 `.env` 에, profile 의 API server key 는 
 | [`execution.md`](execution.md) | `agent_execution`, `execution_event`, `subagent_usage_job`, `execution_skill_use`, `hermes_session_binding`, `execution_context_source`(아직 구현 전이다) |
 | [`memory.md`](memory.md) | `memory`, `memory_revision`, `memory_collection`, `agent_memory_collection` |
 | [`connector.md`](connector.md) | `connector_connection`, `connector_action`, `connector_tool_grant` |
+| [`attention.md`](attention.md) | `follow_up`, `attention_control`, `attention_event`. 아직 구현 전이다 |
 
 ## 마이그레이션 작성 규칙
 
