@@ -146,6 +146,8 @@ public final class ChatDtos {
      * @param provider 이 대화에서 고른 provider. 고르지 않았으면 null
      * @param model 이 대화에서 고른 모델. 고르지 않았으면 null 이고 그 profile 의 기본 모델로 돈다
      * @param reasoningEffort 이 대화에서 고른 effort. 고르지 않았으면 null
+     * @param taskId 이 대화를 만든 예약 작업의 공개 식별자. 작업이 만든 대화가 아니면 null
+     * @param taskTitle 그 작업의 이름. 지운 작업도 이름을 싣는다. 작업이 만든 대화가 아니면 null
      */
     public record ConversationView(
             UUID id,
@@ -157,7 +159,9 @@ public final class ChatDtos {
             String model,
             String reasoningEffort,
             ModelSelectionMode modelSelectionMode,
-            ModelTier modelTier) {}
+            ModelTier modelTier,
+            UUID taskId,
+            String taskTitle) {}
 
     /**
      * 대화 목록의 한 쪽이다.

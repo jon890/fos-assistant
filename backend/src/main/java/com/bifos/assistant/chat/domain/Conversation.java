@@ -111,6 +111,11 @@ public class Conversation {
     @Getter
     private int autoTurnCount;
 
+    /** 이 대화를 만든 예약 작업의 번호다. 사용자가 연 대화는 비어 있다(ADR-073). */
+    @Column(name = "task_id")
+    @Getter
+    private Long taskId;
+
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
 
@@ -132,6 +137,13 @@ public class Conversation {
 
     public static Conversation startedBy(Long userId, String title, Long agentId, Instant now) {
         return new Conversation(userId, title, agentId, now);
+    }
+
+    /** 예약 작업이 발화해 연 대화다. 제목은 작업 이름이다. */
+    public static Conversation startedForTask(Long userId, String title, Long agentId, Long taskId, Instant now) {
+        Conversation conversation = new Conversation(userId, title, agentId, now);
+        conversation.taskId = taskId;
+        return conversation;
     }
 
     /**
