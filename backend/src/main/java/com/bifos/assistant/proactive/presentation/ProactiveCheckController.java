@@ -14,7 +14,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
-/** 에이전트 화면의 먼저 살펴보기 절이 부른다(ADR-077). */
+/** 에이전트 화면의 먼저 살펴보기 절이 부른다(ADR-080). */
 @RestController
 @RequestMapping("/api/v1/agents/{code}/proactive-check")
 @RequiredArgsConstructor

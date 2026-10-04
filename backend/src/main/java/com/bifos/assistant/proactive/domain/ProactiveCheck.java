@@ -18,7 +18,7 @@ import lombok.NoArgsConstructor;
 import lombok.experimental.Accessors;
 
 /**
- * 먼저 살펴보기 한 번이다(ADR-077). 시작할 때 만들고 끝날 때 갱신한다.
+ * 먼저 살펴보기 한 번이다(ADR-080). 시작할 때 만들고 끝날 때 갱신한다.
  *
  * <p>토큰과 금액은 {@code agent_execution} 이 갖고 여기 다시 적지 않는다. 살펴보기 한 번의 비용은 {@code rootExecutionId} 로
  * 그 트리의 실행 줄을 합쳐 얻는다.

@@ -44,7 +44,7 @@ public class McpController {
     private static final String AGENT_DELEGATE = "agent_delegate";
     private static final String AGENT_STOP = "agent_stop";
     private static final String WAIT_SECONDS = "wait_seconds";
-    /** 먼저 살펴보기 트리에서 받는 도구. 읽기와 위임뿐이다. 새 도구를 더하면 여기 넣을지 함께 정한다(ADR-077). */
+    /** 먼저 살펴보기 트리에서 받는 도구. 읽기와 위임뿐이다. 새 도구를 더하면 여기 넣을지 함께 정한다(ADR-080). */
     private static final Set<String> CHECK_TREE_TOOLS =
             Set.of(MEMORY_READ, AGENT_LIST, AGENT_DELEGATE, AGENT_STATUS, AGENT_STOP);
 

@@ -4,6 +4,6 @@ package com.bifos.assistant.chat.domain.type;
 public enum ConversationPurpose {
     /** 사용자가 묻고 에이전트가 답하는 보통 대화. */
     CHAT,
-    /** 먼저 살펴보기의 결과가 남는 점검 대화(ADR-077). 사용자와 에이전트마다 하나를 이어 쓴다. */
+    /** 먼저 살펴보기의 결과가 남는 점검 대화(ADR-080). 사용자와 에이전트마다 하나를 이어 쓴다. */
     CHECK
 }

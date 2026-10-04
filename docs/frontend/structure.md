@@ -22,6 +22,9 @@
 | `/connections` | 커넥터 목록 |
 | `/connections/{id}` | 커넥터 하나의 연결 화면 |
 | `/connections/accountbook` | 옛 주소. `/connections/{id}` 로 넘긴다 |
+| `/tasks` | 내 예약 작업 목록과 「새 작업」([`../backend/task.md`](../backend/task.md) 의 「화면」) |
+| `/tasks/new` | 예약 작업 만들기 |
+| `/tasks/{id}` | 예약 작업 하나. 고치기, 멈추기와 다시 켜기, 지우기, 최근 실행 |
 | `/notifications` | 내 알림 목록. 알림 단추가 이 화면으로 온다([`../backend/notification.md`](../backend/notification.md) 의 「화면」) |
 | `/admin` | 관리자 영역의 첫 주소. `/admin/people` 로 넘긴다 |
 | `/admin/people` | 사용자 관리 |
@@ -120,7 +123,7 @@
 | 누른 뒤 | `POST /api/v1/agents/{code}/proactive-check/runs` 가 202 면 `/chat/{conversationId}` 로 간다 |
 | 거절됐다 | `USER_BUSY`, `CONVERSATION_BUSY` 는 단추 아래에 끝난 뒤 다시 누르라는 안내를 보인다. `PROACTIVE_CHECK_UNAVAILABLE` 이면 절을 다시 읽어 까닭을 그린다 |
 
-이 절은 나중에 매일 깨우기 설정(켜기, 시각과 시간대, 다음 실행)이 들어갈 자리다. 지금은 단추와 마지막 살펴보기만 그리고, 설정 자리를 비워 두지 않는다([ADR-077](../adr/ADR-077-먼저-살펴보기는-점검-대화의-turn-하나로-돌고-읽기-경계를-control-plane-이-강제한다.md) 의 「다음 단계」).
+이 절은 나중에 매일 깨우기 설정(켜기, 시각과 시간대, 다음 실행)이 들어갈 자리다. 지금은 단추와 마지막 살펴보기만 그리고, 설정 자리를 비워 두지 않는다([ADR-080](../adr/ADR-080-먼저-살펴보기는-점검-대화의-turn-하나로-돌고-읽기-경계를-control-plane-이-강제한다.md) 의 「다음 단계」).
 관리자 영역 상세(`/admin/agents/{code}`)에서는 상태 조회가 성공했을 때만 그린다. 남의 비공개 에이전트처럼 관리자가 대화를 시작할 수 없는 에이전트는 404 라 절을 그리지 않는다.
 
 마지막 살펴보기의 결과는 「새로 알릴 것이 있었어요」, 「새로 알릴 것이 없었어요」, 「결과를 정리하지 못했어요」, 「멈췄어요」, 「끝내지 못했어요」, 돌고 있을 때의 「지금 살펴보는 중이에요」 가운데 하나다.

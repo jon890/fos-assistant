@@ -17,6 +17,7 @@ AI credential 은 Hermes profile 의 `.env` 에, profile 의 API server key 는 
 | [`attention.md`](attention.md) | `follow_up`, `attention_control`, `attention_event`. 아직 구현 전이다 |
 | [`notification.md`](notification.md) | `notification` |
 | [`proactive.md`](proactive.md) | `proactive_check`, `proactive_check_finding` |
+| [`task.md`](task.md) | `task`, `task_trigger`, `task_run` |
 
 ## 마이그레이션 작성 규칙
 
@@ -137,5 +138,7 @@ Memory 는 줄을 지운다. 지우기 전에 마지막 값을 `memory_revision`
 허용 목록에서 빼는 것도 지우지 않고 `enabled` 를 내린다. 그 사람의 서비스 토큰은 모두 폐기한다.
 그 사람의 `app_user` 와 실행 기록은 그대로 둔다.
 그 사람의 Hermes profile 도 지우지 않는다. 다시 들일 때 그것을 다시 만들지 않아도 된다.
+
+예약 작업은 지우면 `task.state` 를 `ARCHIVED` 로 둔다. 작업과 시각과 발화 기록의 줄은 남는다. 작업이 만든 대화와 그 실행 기록이 이 줄을 가리킨다.
 
 알림(`notification`)은 보관 기간이 지나면 줄을 지운다. 알림은 다른 표의 사실을 알리는 사본이라, 원인이 된 승인 줄과 실행 기록이 남아 있다.

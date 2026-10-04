@@ -8,7 +8,7 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.validation.annotation.Validated;
 
 /**
- * 먼저 살펴보기의 설정이다(ADR-077). 칸과 기본값의 뜻은 {@code docs/backend/proactive-check.md} 의 「설정」 이 갖는다.
+ * 먼저 살펴보기의 설정이다(ADR-080). 칸과 기본값의 뜻은 {@code docs/backend/proactive-check.md} 의 「설정」 이 갖는다.
  *
  * @param enabled 꺼 두면 살펴보기를 시작하지 않는다
  * @param maxDuration 살펴보기 turn 하나가 돌 수 있는 시간. {@code hermes.run-timeout} 보다 짧아야 한다

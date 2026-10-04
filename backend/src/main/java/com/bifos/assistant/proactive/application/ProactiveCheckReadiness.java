@@ -14,7 +14,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 /**
- * 그 에이전트로 살펴보기를 시작할 수 있는지 판정한다(ADR-077).
+ * 그 에이전트로 살펴보기를 시작할 수 있는지 판정한다(ADR-080).
  *
  * <p>까닭은 {@code docs/backend/proactive-check.md} 의 「시작 전 점검」 순서대로 보고 걸린 것을 모두 모은다. 켜진 스킬과
  * toolset 을 읽다 Hermes 가 실패하면 그 예외를 그대로 올린다. 확인하지 못한 에이전트를 시작할 수 있다고 하지 않기 위해서다.

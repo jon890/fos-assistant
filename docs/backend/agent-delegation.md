@@ -169,7 +169,7 @@ sequenceDiagram
 
 ## 위임 결과가 도착했을 때
 
-맡긴 자식이 끝나면 Control Plane 이 부모 대화의 다음 turn 을 연다. 부모는 맡긴 뒤 기다리지 않는다. 먼저 살펴보기 트리는 예외다([ADR-077](../adr/ADR-077-먼저-살펴보기는-점검-대화의-turn-하나로-돌고-읽기-경계를-control-plane-이-강제한다.md)).
+맡긴 자식이 끝나면 Control Plane 이 부모 대화의 다음 turn 을 연다. 부모는 맡긴 뒤 기다리지 않는다. 먼저 살펴보기 트리는 예외다([ADR-080](../adr/ADR-080-먼저-살펴보기는-점검-대화의-turn-하나로-돌고-읽기-경계를-control-plane-이-강제한다.md)).
 결정은 [ADR-040](../adr/ADR-040-위임-결과는-control-plane-이-부모-대화의-다음-turn-을-열어-전한다.md) 에 있다.
 
 ```mermaid

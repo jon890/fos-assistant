@@ -19,7 +19,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 /**
- * 먼저 살펴보기의 점검 대화를 찾고 만든다(ADR-077). 규칙은 {@code docs/backend/proactive-check.md} 의 「점검 대화」 가
+ * 먼저 살펴보기의 점검 대화를 찾고 만든다(ADR-080). 규칙은 {@code docs/backend/proactive-check.md} 의 「점검 대화」 가
  * 갖는다.
  *
  * <p>점검 대화는 사용자와 에이전트마다 지우지 않은 것 가운데 {@code id} 가 가장 큰 것 하나를 이어 쓴다. 요청자의 것만 찾고

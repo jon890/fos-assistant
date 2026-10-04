@@ -32,7 +32,7 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 
 /**
- * 먼저 살펴보기의 진입점이다(ADR-077). 진입 경로는 {@code docs/backend/proactive-check.md} 의 「진입점」 이 갖는다.
+ * 먼저 살펴보기의 진입점이다(ADR-080). 진입 경로는 {@code docs/backend/proactive-check.md} 의 「진입점」 이 갖는다.
  *
  * <p>모든 경로가 먼저 요청자가 그 에이전트로 대화를 시작할 수 있는지 본다. 아니면 {@code AGENT_NOT_FOUND} 나
  * {@code AGENT_DISABLED} 이고 Hermes 를 부르지 않는다.

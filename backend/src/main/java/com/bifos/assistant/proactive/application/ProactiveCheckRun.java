@@ -38,7 +38,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.PageRequest;
 
 /**
- * 먼저 살펴보기 한 번의 {@link CheckTurn} 이다(ADR-077, ADR-078). 살펴보기마다 새로 만들고 빈으로 두지 않는다.
+ * 먼저 살펴보기 한 번의 {@link CheckTurn} 이다(ADR-080, ADR-081). 살펴보기마다 새로 만들고 빈으로 두지 않는다.
  *
  * <p>입력과 지시, 대화에 남기는 글은 {@code docs/backend/proactive-check.md} 의 「실행에 싣는 것」, 「Control Plane 지시」,
  * 「대화에 남는 것」 이 갖는다. 결과와 셈은 이 객체가 들고 있다가 {@link #record} 로 살펴보기 줄에 한 번 적는다. 스트림 스레드와

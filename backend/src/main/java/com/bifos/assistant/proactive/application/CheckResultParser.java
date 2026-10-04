@@ -13,7 +13,7 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
- * 살펴보기 답 끝의 {@code <fos-check-result>} 블록을 읽는다. 형식은 ADR-078 과 {@code docs/backend/proactive-check.md}
+ * 살펴보기 답 끝의 {@code <fos-check-result>} 블록을 읽는다. 형식은 ADR-081 과 {@code docs/backend/proactive-check.md}
  * 의 「결과 계약」 이 갖는다.
  *
  * <p>상한을 넘는 글은 잘라 읽고 넘는 배열 원소는 버린다. 블록을 읽지 못한 것으로 보는 경우는 JSON 이 아니거나,

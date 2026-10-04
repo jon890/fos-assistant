@@ -84,7 +84,7 @@ public class Conversation {
     /**
      * 보통 대화인지 먼저 살펴보기의 점검 대화인지다. 만들 때 정하고 바뀌지 않는다.
      *
-     * <p>사용자와 에이전트마다 지우지 않은 점검 대화 가운데 {@code id} 가 가장 큰 것을 쓴다(ADR-077).
+     * <p>사용자와 에이전트마다 지우지 않은 점검 대화 가운데 {@code id} 가 가장 큰 것을 쓴다(ADR-080).
      */
     @Enumerated(EnumType.STRING)
     @Column(name = "purpose", nullable = false, updatable = false, length = 16)
@@ -122,6 +122,11 @@ public class Conversation {
     @Getter
     private int autoTurnCount;
 
+    /** 이 대화를 만든 예약 작업의 번호다. 사용자가 연 대화는 비어 있다(ADR-078). */
+    @Column(name = "task_id")
+    @Getter
+    private Long taskId;
+
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
 
@@ -149,6 +154,13 @@ public class Conversation {
     /** 먼저 살펴보기의 결과가 남는 점검 대화를 만든다. */
     public static Conversation startedForCheck(Long userId, String title, Long agentId, Instant now) {
         return new Conversation(userId, title, agentId, ConversationPurpose.CHECK, now);
+    }
+
+    /** 예약 작업이 발화해 연 대화다. 제목은 작업 이름이다. */
+    public static Conversation startedForTask(Long userId, String title, Long agentId, Long taskId, Instant now) {
+        Conversation conversation = new Conversation(userId, title, agentId, ConversationPurpose.CHAT, now);
+        conversation.taskId = taskId;
+        return conversation;
     }
 
     /**

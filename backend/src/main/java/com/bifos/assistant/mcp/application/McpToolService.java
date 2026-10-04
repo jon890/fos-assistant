@@ -174,7 +174,7 @@ public class McpToolService {
         return result(INVALID_CONTEXT, true);
     }
 
-    /** 먼저 살펴보기 트리에서 받지 않는 도구를 부른 호출의 도구 결과다. 도구는 돌리지 않는다(ADR-077). */
+    /** 먼저 살펴보기 트리에서 받지 않는 도구를 부른 호출의 도구 결과다. 도구는 돌리지 않는다(ADR-080). */
     public Map<String, Object> notAllowedInCheck() {
         return result(NOT_ALLOWED_IN_CHECK, true);
     }

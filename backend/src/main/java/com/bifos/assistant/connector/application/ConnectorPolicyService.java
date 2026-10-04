@@ -203,7 +203,7 @@ public class ConnectorPolicyService {
                 .orElse(null);
         // 승인 카드와 알림이 같은 도구 제목을 쓰도록 선언을 한 번 찾아 둔다.
         Optional<ToolPolicy> declared = manifest.flatMap(value -> ConnectorToolPolicies.find(value, confirmedTool));
-        // 커넥터 에이전트의 실행은 위임 자식이라, 살펴보기가 맡긴 것이면 트리 루트가 살펴보기 turn 이다(ADR-077).
+        // 커넥터 에이전트의 실행은 위임 자식이라, 살펴보기가 맡긴 것이면 트리 루트가 살펴보기 turn 이다(ADR-080).
         boolean readOnlyRun = checkGuard.isCheckTree(origin);
         ToolPolicyDecision decision = manifest.map(value -> ToolPolicyDecision.decide(
                         connection.status(),

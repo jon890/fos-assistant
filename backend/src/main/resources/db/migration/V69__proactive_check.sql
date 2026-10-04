@@ -1,4 +1,4 @@
--- 먼저 살펴보기(ADR-077)의 점검 대화를 가리는 칸과, 살펴보기 한 번과 그 발견을 저장하는 표 둘이다.
+-- 먼저 살펴보기(ADR-080)의 점검 대화를 가리는 칸과, 살펴보기 한 번과 그 발견을 저장하는 표 둘이다.
 -- 칸의 뜻은 docs/backend/schema/proactive.md 와 docs/backend/schema/chat.md 가 갖는다.
 ALTER TABLE conversation ADD COLUMN purpose VARCHAR(16) NOT NULL DEFAULT 'CHAT';
 

@@ -79,5 +79,9 @@
 | [ADR-073](ADR-073-할-일은-에이전트가-제안하고-사람이-받아들인-것만-챙긴다.md) | 할 일은 에이전트가 제안하고 사람이 받아들인 것만 챙긴다 | backend, frontend, hermes | Accepted. 아직 구현 전이다 |
 | [ADR-074](ADR-074-지금-화면은-원래-기록을-읽어-만든-view-이고-정해진-카드-넷만-그린다.md) | 지금 화면은 원래 기록을 읽어 만든 view 이고 정해진 카드 넷만 그린다 | frontend | Accepted. 아직 구현 전이다 |
 | [ADR-075](ADR-075-결과-전달은-묶음과-시도로-남기고-사용자가-저장된-결과만-다시-전달한다.md) | 결과 전달은 묶음과 시도로 남기고 사용자가 저장된 결과만 다시 전달한다 | backend, frontend | Accepted. ADR-040 의 「turn 이 실패해도 같은 결과로 다시 깨우지 않는다」 는 그대로 두고 사용자가 요청하는 복구를 더한다 |
-| [ADR-077](ADR-077-먼저-살펴보기는-점검-대화의-turn-하나로-돌고-읽기-경계를-control-plane-이-강제한다.md) | 먼저 살펴보기는 점검 대화의 turn 하나로 돌고 읽기 경계를 Control Plane 이 강제한다 | backend, frontend | Accepted |
-| [ADR-078](ADR-078-살펴보기-결과는-답-끝의-구조화-블록으로-받고-control-plane-이-검사해-그린다.md) | 살펴보기 결과는 답 끝의 구조화 블록으로 받고 Control Plane 이 검사해 그린다 | backend | Accepted. ADR-009 의 신뢰하지 않는 글 원칙을 살펴보기 결과에 적용한다 |
+| [ADR-076](ADR-076-예약-작업은-control-plane-이-갖고-발화한-실행은-대화-turn-경로로-돈다.md) | 예약 작업은 Control Plane 이 갖고 발화한 실행은 대화 turn 경로로 돈다 | backend | Accepted |
+| [ADR-077](ADR-077-발화는-trigger-와-예정-시각의-유일-제약으로-한-번만-만들고-놓친-발화는-작업마다-정한다.md) | 발화는 trigger 와 예정 시각의 유일 제약으로 한 번만 만들고 놓친 발화는 작업마다 정한다 | backend | Accepted |
+| [ADR-078](ADR-078-예약-작업의-결과는-실행마다-새-대화가-기본이고-목록은-작업으로-묶는다.md) | 예약 작업의 결과는 실행마다 새 대화가 기본이고 목록은 작업으로 묶는다 | backend, frontend | Accepted |
+| [ADR-079](ADR-079-예약-작업은-사용자당-10개-최소-간격-15분-하루-48번으로-제한한다.md) | 예약 작업은 사용자당 10개, 최소 간격 15분, 하루 48번으로 제한한다 | backend | Accepted |
+| [ADR-080](ADR-080-먼저-살펴보기는-점검-대화의-turn-하나로-돌고-읽기-경계를-control-plane-이-강제한다.md) | 먼저 살펴보기는 점검 대화의 turn 하나로 돌고 읽기 경계를 Control Plane 이 강제한다 | backend, frontend | Accepted |
+| [ADR-081](ADR-081-살펴보기-결과는-답-끝의-구조화-블록으로-받고-control-plane-이-검사해-그린다.md) | 살펴보기 결과는 답 끝의 구조화 블록으로 받고 Control Plane 이 검사해 그린다 | backend | Accepted. ADR-009 의 신뢰하지 않는 글 원칙을 살펴보기 결과에 적용한다 |

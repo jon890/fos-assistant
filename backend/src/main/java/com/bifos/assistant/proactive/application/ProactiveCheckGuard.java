@@ -8,7 +8,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 /**
- * 실행 하나가 먼저 살펴보기 트리 안에 있는지 정한다(ADR-077).
+ * 실행 하나가 먼저 살펴보기 트리 안에 있는지 정한다(ADR-080).
  *
  * <p>그 실행의 트리 루트({@link AgentExecution#treeRootId()})가 {@code proactive_check.root_execution_id} 에 있으면 살펴보기
  * 트리다. 커넥터 도구 판정, Control Plane MCP, 위임이 이 판정으로 읽기 경계를 건다. 경계는

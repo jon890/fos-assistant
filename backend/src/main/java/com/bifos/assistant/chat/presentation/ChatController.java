@@ -7,10 +7,12 @@ import com.bifos.assistant.chat.application.ChatService;
 import com.bifos.assistant.chat.application.ChatTurn;
 import com.bifos.assistant.chat.application.ConversationAccess;
 import com.bifos.assistant.chat.application.ConversationPage;
+import com.bifos.assistant.chat.application.ConversationTaskLabels;
 import com.bifos.assistant.chat.application.ModelOptionsService;
 import com.bifos.assistant.chat.application.ModelTierOptions;
 import com.bifos.assistant.chat.application.ModelTierService;
 import com.bifos.assistant.chat.application.model.DeliveryState;
+import com.bifos.assistant.chat.application.model.TaskLabel;
 import com.bifos.assistant.chat.domain.ChatArtifact;
 import com.bifos.assistant.chat.domain.ChatAttachment;
 import com.bifos.assistant.chat.domain.ChatMessage;
@@ -41,8 +43,11 @@ import com.bifos.assistant.shared.auth.CurrentUserProvider;
 import com.bifos.assistant.usage.domain.type.ExecutionStatus;
 import com.bifos.assistant.user.application.UserDisplayNameService;
 import jakarta.validation.Valid;
+import java.util.Collection;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -74,6 +79,7 @@ public class ChatController {
     private final ChatEventStreams streams;
     private final ModelOptionsService modelOptions;
     private final ModelTierService modelTiers;
+    private final List<ConversationTaskLabels> taskLabels;
 
     @Autowired
     public ChatController(
@@ -84,7 +90,8 @@ public class ChatController {
             ConversationAccess access,
             ChatEventStreams streams,
             ModelOptionsService modelOptions,
-            ModelTierService modelTiers) {
+            ModelTierService modelTiers,
+            List<ConversationTaskLabels> taskLabels) {
         this.chat = chat;
         this.currentUser = currentUser;
         this.userNames = userNames;
@@ -93,6 +100,7 @@ public class ChatController {
         this.streams = streams;
         this.modelOptions = modelOptions;
         this.modelTiers = modelTiers;
+        this.taskLabels = taskLabels;
     }
 
     @PostMapping("/messages")
@@ -167,12 +175,20 @@ public class ChatController {
     public ConversationPageView conversations(
             @RequestParam(required = false) String cursor, @RequestParam(defaultValue = "30") int limit) {
         ConversationPage page = chat.conversationsOf(currentUser.require(), cursor, limit);
-        // 목록은 에이전트를 줄마다 읽지 않고 한 번에 읽는다. 행이 없는 줄은 에이전트 칸만 비운다.
+        // 목록은 에이전트와 작업 이름을 줄마다 읽지 않고 한 번에 읽는다. 행이 없는 줄은 그 칸만 비운다.
         Map<Long, Agent> byId =
                 agents.byIds(page.items().stream().map(Conversation::agentId).toList());
+        Map<Long, TaskLabel> labels = labelsOf(page.items().stream()
+                .map(Conversation::taskId)
+                .filter(Objects::nonNull)
+                .distinct()
+                .toList());
         return new ConversationPageView(
                 page.items().stream()
-                        .map(conversation -> viewOf(conversation, byId.get(conversation.agentId())))
+                        .map(conversation -> viewOf(
+                                conversation,
+                                byId.get(conversation.agentId()),
+                                conversation.taskId() == null ? null : labels.get(conversation.taskId())))
                         .toList(),
                 page.nextCursor());
     }
@@ -181,7 +197,7 @@ public class ChatController {
     @GetMapping("/conversations/{conversationId}")
     public ConversationView conversation(@PathVariable UUID conversationId) {
         Conversation found = chat.conversationOf(currentUser.require(), conversationId);
-        return viewOf(found, agents.findById(found.agentId()).orElse(null));
+        return viewOf(found);
     }
 
     @PatchMapping("/conversations/{conversationId}")
@@ -189,7 +205,7 @@ public class ChatController {
             @PathVariable UUID conversationId, @Valid @RequestBody RenameConversationRequest request) {
         CurrentUser user = currentUser.require();
         Conversation renamed = chat.rename(user, access.requireOwnId(user, conversationId), request.title());
-        return viewOf(renamed, agents.findById(renamed.agentId()).orElse(null));
+        return viewOf(renamed);
     }
 
     /** 대화에서 쓸 모델과 effort 를 바꾸고 바뀐 대화 한 줄을 돌려준다. */
@@ -197,7 +213,7 @@ public class ChatController {
     public ConversationView chooseModel(@PathVariable UUID conversationId, @RequestBody ChooseModelRequest request) {
         CurrentUser user = currentUser.require();
         Conversation chosen = chat.chooseModel(user, access.requireOwnId(user, conversationId), request.toChoice());
-        return viewOf(chosen, agents.findById(chosen.agentId()).orElse(null));
+        return viewOf(chosen);
     }
 
     /**
@@ -242,7 +258,7 @@ public class ChatController {
         CurrentUser user = currentUser.require();
         Conversation chosen =
                 chat.chooseModelTier(user, access.requireOwnId(user, conversationId), request.mode(), request.tier());
-        return viewOf(chosen, agents.findById(chosen.agentId()).orElse(null));
+        return viewOf(chosen);
     }
 
     @DeleteMapping("/conversations/{conversationId}")
@@ -263,8 +279,28 @@ public class ChatController {
                 access.requireOwn(currentUser.require(), number).publicId());
     }
 
-    /** 에이전트 행이 없으면({@code agent} 가 null) 에이전트 코드와 이름만 비운 줄을 돌려준다. */
-    private ConversationView viewOf(Conversation conversation, Agent agent) {
+    /** 대화 한 줄의 에이전트와 작업 이름을 읽어 줄을 만든다. */
+    private ConversationView viewOf(Conversation conversation) {
+        Long taskId = conversation.taskId();
+        TaskLabel label = taskId == null ? null : labelsOf(List.of(taskId)).get(taskId);
+        return viewOf(conversation, agents.findById(conversation.agentId()).orElse(null), label);
+    }
+
+    /** 작업 번호마다 이름이다. 구현이 없으면 비어 있다. */
+    private Map<Long, TaskLabel> labelsOf(Collection<Long> taskIds) {
+        if (taskIds.isEmpty()) {
+            return Map.of();
+        }
+        Map<Long, TaskLabel> labels = new HashMap<>();
+        taskLabels.forEach(source -> labels.putAll(source.labelsOf(taskIds)));
+        return labels;
+    }
+
+    /**
+     * 에이전트 행이 없으면({@code agent} 가 null) 에이전트 코드와 이름만 비운 줄을 돌려준다. 작업이 만든 대화가 아니거나 작업 행이
+     * 없으면({@code label} 이 null) 작업 칸을 비운다.
+     */
+    private ConversationView viewOf(Conversation conversation, Agent agent, TaskLabel label) {
         ModelChoice choice = conversation.modelChoice();
         return new ConversationView(
                 conversation.publicId(),
@@ -277,7 +313,9 @@ public class ChatController {
                 choice.reasoningEffort(),
                 conversation.modelSelectionMode(),
                 conversation.modelTier(),
-                conversation.purpose());
+                conversation.purpose(),
+                label == null ? null : label.taskId(),
+                label == null ? null : label.title());
     }
 
     /**

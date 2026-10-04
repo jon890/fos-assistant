@@ -6,6 +6,6 @@ public enum CheckOutcome {
     FINDINGS,
     /** 새로 알릴 것이 없다. */
     NOTHING_NEW,
-    /** 답 끝의 결과 블록이 없거나 읽지 못했다(ADR-078). 결과를 그리지 않는다. */
+    /** 답 끝의 결과 블록이 없거나 읽지 못했다(ADR-081). 결과를 그리지 않는다. */
     INVALID_RESULT
 }

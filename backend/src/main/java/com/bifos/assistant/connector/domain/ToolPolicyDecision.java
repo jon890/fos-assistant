@@ -37,7 +37,7 @@ public record ToolPolicyDecision(
      * @param granted 그 도구에 유효한 상시 허락이 있는가
      * @param argsBytes 인자 글의 UTF-8 바이트 수
      * @param readOnlyRun 먼저 살펴보기 트리 안의 호출인가. 참이면 위험도가 {@code READ} 이고 승인 방식이 {@code none} 인
-     *     도구만 받는다(ADR-077)
+     *     도구만 받는다(ADR-080)
      */
     public static ToolPolicyDecision decide(
             ConnectionStatus connectionStatus,

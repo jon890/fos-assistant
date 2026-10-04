@@ -3,7 +3,7 @@ package com.bifos.assistant.chat.application;
 import com.bifos.assistant.chat.application.model.CheckAnswer;
 
 /**
- * 먼저 살펴보기 turn 하나에서 살펴보기만의 일을 맡는 port 다(ADR-077).
+ * 먼저 살펴보기 turn 하나에서 살펴보기만의 일을 맡는 port 다(ADR-080).
  *
  * <p>{@code chat} 은 {@code proactive} 를 import 하지 않는다. {@code proactive} 가 이 인터페이스를 구현해
  * {@link ChatService#runProactiveCheck} 에 넘긴다. 살펴보기 한 번마다 새 구현을 만든다.

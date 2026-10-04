@@ -33,6 +33,9 @@ export type Conversation = {
   modelTier?: "FAST" | "BALANCED" | "DEEP" | null;
   /** 먼저 살펴보기의 결과가 남는 점검 대화면 `CHECK` 다. 응답에 없으면 보통 대화로 읽는다. */
   purpose?: "CHAT" | "CHECK";
+  /** 예약 작업이 만든 대화면 그 작업이다. 아니면 null 이다 */
+  taskId: string | null;
+  taskTitle: string | null;
 };
 
 type ErrorPayload = { code?: string; message?: string };

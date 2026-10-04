@@ -23,9 +23,9 @@ public record DelegationResult(Long executionId, ExecutionStatus status, Failure
         /** 서버 전체의 동시 위임이나 그 사용자의 동시 실행이 한도에 닿았다 */
         BUSY,
         SUBMIT_FAILED,
-        /** 먼저 살펴보기 트리에서 요청자의 커넥터 에이전트가 아닌 곳에 맡기려 했다(ADR-077) */
+        /** 먼저 살펴보기 트리에서 요청자의 커넥터 에이전트가 아닌 곳에 맡기려 했다(ADR-080) */
         CHECK_TARGET,
-        /** 먼저 살펴보기 트리에서 맡긴 수가 상한에 닿았거나 그 살펴보기가 이미 끝났다(ADR-077) */
+        /** 먼저 살펴보기 트리에서 맡긴 수가 상한에 닿았거나 그 살펴보기가 이미 끝났다(ADR-080) */
         CHECK_LIMIT
     }
 
