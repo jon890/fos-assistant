@@ -243,9 +243,10 @@ test.describe("지금 화면", () => {
     const before = await summaryCount(page);
     expect(before, "실패를 만들었는데 지금 볼 것의 수가 0 이다").toBeGreaterThanOrEqual(1);
     const cardCount = failures.getByTestId("card-now-count");
-    await expect(cardCount).toHaveAccessibleName(/^지금 볼 것 \d+건$/);
     const cardBefore = Number(await cardCount.textContent());
     expect(cardBefore, "실패 카드 머리의 수").toBeGreaterThanOrEqual(1);
+    // 숫자 배지는 낭독기에서 숨기고 옆의 sr-only 글이 수를 읽어 준다.
+    await expect(failures.getByText(`지금 볼 것 ${cardBefore}건`)).toHaveCount(1);
 
     const controlled = failures.locator(`[data-item-key="${key}"]`);
     await controlled.getByRole("button", { name: "이 항목 제어" }).click();
@@ -254,6 +255,7 @@ test.describe("지금 화면", () => {
     await expect(controlled.getByRole("button", { name: "되돌리기" })).toBeVisible();
     // 카드 머리의 수는 화면을 다시 읽지 않고 숨긴 만큼 줄인다.
     await expectBadge(cardCount, cardBefore - 1);
+    await expect(failures.getByText(`지금 볼 것 ${cardBefore - 1}건`)).toHaveCount(cardBefore - 1 > 0 ? 1 : 0);
     expect(await summaryCount(page), "숨긴 뒤 지금 볼 것의 수").toBe(before - 1);
     // 경로가 그대로여도 사이드바의 수를 다시 읽는다.
     let sidebar = await openSidebar(page, testInfo);

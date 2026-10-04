@@ -57,21 +57,23 @@ const FOLLOW_UP_ACTIONS: Partial<
  *
  * @param card 이 항목이 있는 카드. 제어는 카드마다 따로 걸린다
  * @param readAt 응답을 읽은 시각. 서버에서 그린 글과 브라우저에서 다시 그린 글이 같도록 지금 시각 대신 쓴다
- * @param onControlChange 숨기거나 미뤘으면 참, 되돌렸으면 거짓으로 부른다. 카드 머리의 수를 다시 읽지 않고 맞추려는 것이다
+ * @param control 이 항목에 건 제어. 카드가 열쇠별로 갖고 내려 준다. 없으면 `null`
+ * @param onControlChange 숨기거나 미뤘으면 그 제어로, 되돌렸으면 `null` 로 부른다. 카드가 제어를 한 곳에 모아 머리의 수를 다시 읽지 않고 맞춘다
  */
 export function NowItem({
   card,
   item,
   readAt,
+  control,
   onControlChange,
 }: {
   card: AttentionCardKey;
   item: AttentionItem;
   readAt: string;
-  onControlChange(controlled: boolean): void;
+  control: ItemControl | null;
+  onControlChange(control: ItemControl | null): void;
 }) {
   const router = useRouter();
-  const [control, setControl] = useState<ItemControl | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState<ItemAction["kind"] | null>(null);
   const [editing, setEditing] = useState(false);
@@ -94,11 +96,6 @@ export function NowItem({
   function acted() {
     recordAttentionEvent(item.itemKey, item.stateKey, "ACTED");
     router.refresh();
-  }
-
-  function changeControl(next: ItemControl | null) {
-    setControl(next);
-    onControlChange(next !== null);
   }
 
   async function changeFollowUp(kind: ItemAction["kind"]) {
@@ -124,7 +121,7 @@ export function NowItem({
           card={card}
           item={item}
           control={control}
-          onRestored={() => changeControl(null)}
+          onRestored={() => onControlChange(null)}
           onError={setError}
         />
         {error ? <Notice variant="error">{error}</Notice> : null}
@@ -144,7 +141,7 @@ export function NowItem({
         item={item}
         href={href}
         onOpen={opened}
-        onControlled={changeControl}
+        onControlled={onControlChange}
         onError={setError}
       />
       <p className="text-sm text-muted-foreground">{reasonText(item.why)}</p>

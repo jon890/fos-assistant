@@ -198,6 +198,35 @@ export function moreText(
   return { text: `${card.moreCount}개 더 있어요`, href };
 }
 
+/**
+ * 지금 그리는 항목에 없는 열쇠를 제어 표에서 뺀다. 숨긴 항목이 다시 읽은 응답에서 빠졌다가 같은 열쇠로 돌아와도
+ * 옛 제어가 남아 카드 머리의 수를 틀리게 하지 않게 하려는 것이다.
+ *
+ * @returns 뺄 열쇠가 없으면 받은 표 그대로
+ */
+export function pruneControls<T>(
+  controls: ReadonlyMap<string, T>,
+  items: readonly AttentionItem[],
+): ReadonlyMap<string, T> {
+  const present = new Set(items.map((item) => item.itemKey));
+  const kept = [...controls].filter(([itemKey]) => present.has(itemKey));
+  return kept.length === controls.size ? controls : new Map(kept);
+}
+
+/**
+ * 카드 머리에 그릴 수다. 서버가 상한 전에 센 `nowCount` 에서, 지금 그리는 `NOW` 항목 가운데 이 화면에서 제어한 것만큼 뺀다.
+ * 다시 읽은 응답에서 빠진 항목은 서버의 수에서도 빠졌으므로 다시 빼지 않는다.
+ */
+export function visibleNowCount(
+  card: AttentionCard,
+  controls: ReadonlyMap<string, unknown>,
+): number {
+  const controlled = card.items.filter(
+    (item) => item.attention === "NOW" && controls.has(item.itemKey),
+  ).length;
+  return Math.max(0, card.nowCount - controlled);
+}
+
 /** 사이드바 「지금 볼 것」 링크의 접근성 이름이다 */
 export function nowLinkLabel(nowCount: number): string {
   return nowCount > 0 ? `지금 볼 것 ${nowCount}건` : "지금 볼 것";

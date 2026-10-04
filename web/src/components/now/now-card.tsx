@@ -15,14 +15,19 @@ import {
   cardEmptyText,
   cardTitle,
   moreText,
+  nowLinkLabel,
+  pruneControls,
+  visibleNowCount,
   type AttentionCard,
 } from "@/lib/attention";
 import { AddFollowUpButton } from "./add-follow-up-button";
 import { NowItem } from "./now-item";
+import type { ItemControl } from "./now-item-controls";
 
 /**
  * 지금 화면의 카드 하나다. 머리의 수는 서버가 상한 전에 센 `nowCount` 이고, 보이는 항목을 다시 세지 않는다.
  * 이 화면에서 숨기거나 미룬 `NOW` 항목만큼은 다시 읽지 않고 빼서 그리고, 되돌리면 다시 더한다.
+ * 항목마다 건 제어는 이 카드가 열쇠별 표 하나로 갖고 각 항목에 내려 준다.
  * 「내 차례」 카드 끝에는 「할 일 더하기」 를 둔다.
  *
  * @param readAt 응답을 읽은 시각. 항목의 상대 시각을 이 시각 기준으로 센다
@@ -34,25 +39,24 @@ export function NowCard({
   card: AttentionCard;
   readAt: string;
 }) {
-  const [controlled, setControlled] = useState<ReadonlySet<string>>(
-    () => new Set(),
+  const [controls, setControls] = useState<ReadonlyMap<string, ItemControl>>(
+    () => new Map(),
   );
+  // 다시 읽은 응답에서 빠진 항목의 제어는 그 자리에서 버린다. 같은 열쇠로 돌아온 항목에 옛 제어가 남지 않게 한다.
+  const [seenItems, setSeenItems] = useState(card.items);
+  if (seenItems !== card.items) {
+    setSeenItems(card.items);
+    setControls(pruneControls(controls, card.items));
+  }
   const more = moreText(card);
-  // 다시 읽은 응답에서 빠진 항목은 서버의 수에서도 빠졌으므로, 지금 그리는 항목 가운데 제어한 것만 뺀다.
-  const nowCount = Math.max(
-    0,
-    card.nowCount -
-      card.items.filter(
-        (item) => item.attention === "NOW" && controlled.has(item.itemKey),
-      ).length,
-  );
+  const nowCount = visibleNowCount(card, controls);
 
-  function changeControl(itemKey: string, on: boolean) {
-    setControlled((previous) => {
-      const next = new Set(previous);
-      if (on) next.add(itemKey);
-      else next.delete(itemKey);
-      return next;
+  function changeControl(itemKey: string, next: ItemControl | null) {
+    setControls((previous) => {
+      const updated = new Map(previous);
+      if (next === null) updated.delete(itemKey);
+      else updated.set(itemKey, next);
+      return updated;
     });
   }
 
@@ -66,11 +70,12 @@ export function NowCard({
           <CardAction>
             <Badge
               variant="warning"
-              aria-label={`지금 볼 것 ${nowCount}건`}
+              aria-hidden="true"
               data-testid="card-now-count"
             >
               {nowCount}
             </Badge>
+            <span className="sr-only">{nowLinkLabel(nowCount)}</span>
           </CardAction>
         ) : null}
       </CardHeader>
@@ -91,7 +96,8 @@ export function NowCard({
                 card={card.key}
                 item={item}
                 readAt={readAt}
-                onControlChange={(on) => changeControl(item.itemKey, on)}
+                control={controls.get(item.itemKey) ?? null}
+                onControlChange={(next) => changeControl(item.itemKey, next)}
               />
             ))}
           </ul>

@@ -10,9 +10,11 @@ import {
   moreText,
   nowLinkLabel,
   originText,
+  pruneControls,
   reasonText,
   seoulInputToIso,
   snoozeUntil,
+  visibleNowCount,
   type AttentionCard,
   type AttentionCardKey,
   type AttentionItem,
@@ -130,6 +132,50 @@ test("더 있는 항목이 없으면 안내가 없다", () => {
 test("「지금 볼 것」 링크의 이름은 0 이면 수를 싣지 않는다", () => {
   assert.equal(nowLinkLabel(0), "지금 볼 것");
   assert.equal(nowLinkLabel(3), "지금 볼 것 3건");
+});
+
+test("카드 머리의 수는 지금 그리는 NOW 항목 가운데 제어한 것만큼 뺀다", () => {
+  const failures = card("failures", {
+    nowCount: 3,
+    items: [
+      item({ itemKey: "a", attention: "NOW" }),
+      item({ itemKey: "b", attention: "NOW" }),
+      item({ itemKey: "c", attention: "LATER" }),
+    ],
+  });
+  assert.equal(visibleNowCount(failures, new Map()), 3);
+  assert.equal(visibleNowCount(failures, new Map([["a", "hidden"]])), 2);
+  // LATER 항목과 그리지 않는 항목의 제어는 수에 영향이 없다.
+  assert.equal(
+    visibleNowCount(failures, new Map([["c", "hidden"], ["gone", "snoozed"]])),
+    3,
+  );
+  assert.equal(
+    visibleNowCount(failures, new Map([["a", "hidden"], ["b", "snoozed"]])),
+    1,
+  );
+});
+
+test("카드 머리의 수는 0 아래로 내려가지 않는다", () => {
+  const failures = card("failures", {
+    nowCount: 0,
+    items: [item({ itemKey: "a", attention: "NOW" })],
+  });
+  assert.equal(visibleNowCount(failures, new Map([["a", "hidden"]])), 0);
+});
+
+test("다시 읽은 응답에서 빠진 항목의 제어는 표에서 빠진다", () => {
+  const controls = new Map([["a", "hidden"], ["b", "snoozed"]]);
+  const pruned = pruneControls(controls, [item({ itemKey: "b" })]);
+  assert.deepEqual([...pruned], [["b", "snoozed"]]);
+  // 빠졌다가 같은 열쇠로 돌아와도 옛 제어가 되살아나지 않는다.
+  assert.equal(pruned.has("a"), false);
+});
+
+test("뺄 열쇠가 없으면 받은 표를 그대로 돌려준다", () => {
+  const controls = new Map([["a", "hidden"]]);
+  assert.equal(pruneControls(controls, [item({ itemKey: "a" })]), controls);
+  assert.equal(pruneControls(new Map(), []).size, 0);
 });
 
 test("「내일 아침」 은 서울 기준 다음 날 09:00 이다", () => {
