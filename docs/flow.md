@@ -245,7 +245,7 @@ source 하나를 읽지 못하면 그 카드만 「불러오지 못했다」 로
 
 ## 할 일을 제안할 때
 
-**아직 구현 전이다.** 구현한 PR 이 이 줄을 지운다. 계약은 [`backend/follow-up.md`](backend/follow-up.md) 가 갖는다.
+계약은 [`backend/follow-up.md`](backend/follow-up.md) 가 갖는다.
 
 ```mermaid
 sequenceDiagram

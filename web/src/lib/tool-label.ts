@@ -27,6 +27,10 @@ const LABELS: Record<string, Label> = {
     done: "결과물을 저장했어요",
   },
   memory_read: { running: "기억을 떠올리고 있어요", done: "기억을 떠올렸어요" },
+  follow_up_propose: {
+    running: "할 일을 제안하고 있어요",
+    done: "할 일을 제안했어요",
+  },
 };
 
 /** 표에 없는 MCP 도구다. 도구 이름 원문을 보이지 않고 연결된 서비스를 썼다고만 알린다. */

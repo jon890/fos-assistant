@@ -5,6 +5,8 @@ import com.bifos.assistant.agent.infra.AgentRepository;
 import com.bifos.assistant.chat.application.ArtifactWriteRequest;
 import com.bifos.assistant.chat.application.ArtifactWriteResult;
 import com.bifos.assistant.chat.application.ArtifactWriteService;
+import com.bifos.assistant.followup.application.FollowUpService;
+import com.bifos.assistant.followup.application.model.FollowUpProposalOutcome;
 import com.bifos.assistant.memory.application.MemoryService;
 import com.bifos.assistant.memory.domain.Memory;
 import com.bifos.assistant.orchestration.application.AgentDelegationService;
@@ -20,10 +22,19 @@ import com.bifos.assistant.usage.domain.AgentExecution;
 import com.bifos.assistant.usage.domain.DelegationKey;
 import com.bifos.assistant.usage.domain.type.ExecutionStatus;
 import java.time.Clock;
+import java.time.DateTimeException;
 import java.time.Duration;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
+import java.time.OffsetDateTime;
+import java.time.ZoneId;
+import java.time.ZoneOffset;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -58,6 +69,14 @@ public class McpToolService {
     /** {@code agent_delegate} 의 {@code task} 길이 상한. 대화 메시지 상한과 같다. */
     public static final int TASK_MAX_CHARS = 8000;
 
+    private static final String DUE_AT_FORMAT = "due_at 은 2026-10-05 나 2026-10-05T18:00 형식이다.";
+    /** {@code due_at} 에 시간대가 없을 때 읽는 시간대다. 날짜만 주면 그날 이 시각까지로 본다. */
+    private static final ZoneId SEOUL = ZoneId.of("Asia/Seoul");
+
+    private static final LocalTime END_OF_DAY = LocalTime.of(23, 59);
+    private static final int MIN_DUE_YEAR = 1;
+    private static final int MAX_DUE_YEAR = 9999;
+
     private final MemoryService memories;
     private final ArtifactWriteService artifacts;
     private final AgentDelegationService delegations;
@@ -66,6 +85,7 @@ public class McpToolService {
 
     private final ExecutionDeliveryWriter deliveryWriter;
     private final AgentRepository agents;
+    private final FollowUpService followUps;
     private final Clock clock;
 
     public List<Map<String, Object>> tools() {
@@ -167,7 +187,34 @@ public class McpToolService {
                                 "properties",
                                 Map.of("execution_id", Map.of("type", "integer")),
                                 "required",
-                                List.of("execution_id"))));
+                                List.of("execution_id"))),
+                Map.of(
+                        "name",
+                        "follow_up_propose",
+                        "description",
+                        "사용자가 나중에 해야 하거나 끝나기를 기다리는 일을 할 일로 제안한다. 사용자가 받아들여야 챙긴다. 대화에서 분명히 나온 후속 작업만 제안하고, 같은 대화에서 거절한 것은 다시 제안하지 않는다. due_at 은 2026-10-05 나 2026-10-05T18:00 형식이다.",
+                        "inputSchema",
+                        Map.of(
+                                "type",
+                                "object",
+                                "additionalProperties",
+                                false,
+                                "properties",
+                                Map.of(
+                                        "title",
+                                        Map.of(
+                                                "type",
+                                                "string",
+                                                "minLength",
+                                                1,
+                                                "maxLength",
+                                                FollowUpService.TITLE_MAX),
+                                        "due_at",
+                                        Map.of("type", "string"),
+                                        "waiting",
+                                        Map.of("type", "boolean")),
+                                "required",
+                                List.of("title"))));
     }
 
     /**
@@ -304,6 +351,78 @@ public class McpToolService {
         started.put("execution_id", delegated.executionId());
         started.put("status", delegated.status().name());
         return result(JSON.writeValueAsString(started), false);
+    }
+
+    /**
+     * 할 일을 {@code PROPOSED} 로 제안하고 그 결과를 한 줄 글로 돌려준다. 글은 {@code docs/backend/follow-up.md} 의 「제안 도구」
+     * 표가 갖는다.
+     *
+     * <p>주인과 대화는 origin 실행에서 정한다. 인자로 받지 않는다(ADR-032). 값이 틀린 인자는 모델이 고쳐 다시 부를 수 있게
+     * {@code isError} 와 무엇이 틀렸는지 한 줄로 답한다.
+     *
+     * @param dueAt 모델이 준 기한 글. 없으면 null
+     */
+    public Map<String, Object> proposeFollowUp(McpCaller caller, String title, String dueAt, boolean waiting) {
+        AgentExecution origin = caller.originExecution();
+        Long conversationId = origin.conversationId();
+        if (conversationId == null) {
+            return result("대화 밖의 실행에서는 할 일을 제안할 수 없다.", true);
+        }
+        String stripped = title.strip();
+        int length = stripped.codePointCount(0, stripped.length());
+        if (length < 1 || length > FollowUpService.TITLE_MAX) {
+            return result("title 은 1자부터 200자까지다.", true);
+        }
+        Instant due = null;
+        if (dueAt != null) {
+            Optional<Instant> parsed = parseDueAt(dueAt);
+            if (parsed.isEmpty()) {
+                return result(DUE_AT_FORMAT, true);
+            }
+            due = parsed.get();
+        }
+        FollowUpProposalOutcome outcome =
+                followUps.propose(caller.user(), conversationId, origin.id(), stripped, due, waiting);
+        return switch (outcome) {
+            case CREATED -> result("할 일로 제안했다. 사용자가 지금 화면에서 받아들이면 챙긴다.", false);
+            case DUPLICATE -> result("같은 할 일이 이미 있다. 새로 만들지 않았다.", false);
+            case DECLINED_BEFORE -> result("사용자가 이 할 일을 거절했다. 다시 제안하지 않는다.", true);
+            case TOO_MANY_PROPOSALS, TOO_MANY_IN_RUN -> result("이 대화에 받아들이기를 기다리는 제안이 많다. 사용자가 정한 뒤에 제안한다.", true);
+        };
+    }
+
+    /**
+     * 기한 글을 시각으로 읽는다. 날짜만이면 그날 23시 59분, 시간대가 없으면 {@code Asia/Seoul} 이다.
+     *
+     * <p>날짜, 시간대가 붙은 시각, 시간대가 없는 시각의 차례로 읽고 처음 읽힌 것을 쓴다. UTC 로 바꾼 연도가 1부터 9999 밖이면 읽지
+     * 못한 것으로 본다. 사람이 쓰는 API 와 같은 범위이고, 그 밖의 시각은 DB 칸이 담지 못한다.
+     */
+    private static Optional<Instant> parseDueAt(String text) {
+        Instant parsed = null;
+        try {
+            parsed = LocalDate.parse(text).atTime(END_OF_DAY).atZone(SEOUL).toInstant();
+        } catch (DateTimeException ignored) {
+            // 날짜만이 아니다. 다음 모양으로 읽는다.
+        }
+        if (parsed == null) {
+            try {
+                parsed = OffsetDateTime.parse(text).toInstant();
+            } catch (DateTimeException ignored) {
+                // 시간대가 붙은 시각이 아니다. 다음 모양으로 읽는다.
+            }
+        }
+        if (parsed == null) {
+            try {
+                parsed = LocalDateTime.parse(text).atZone(SEOUL).toInstant();
+            } catch (DateTimeException ignored) {
+                // 세 모양 모두 아니다.
+            }
+        }
+        if (parsed == null) {
+            return Optional.empty();
+        }
+        int year = parsed.atZone(ZoneOffset.UTC).getYear();
+        return year < MIN_DUE_YEAR || year > MAX_DUE_YEAR ? Optional.empty() : Optional.of(parsed);
     }
 
     private static String delegationFailureMessage(Failure failure) {

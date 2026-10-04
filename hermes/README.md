@@ -70,7 +70,7 @@ Control Plane 의 `agent_*` 도구는 이 값으로 부모 실행을 찾고, 서
 
 | 도구 | 서명하지 못할 때 |
 | --- | --- |
-| `agent_*`, `memory_read`, `artifact_write` | 막는다. 모델에게 막은 이유가 간다 |
+| `agent_*`, `memory_read`, `artifact_write`, `follow_up_propose` | 막는다. 모델에게 막은 이유가 간다 |
 | 그 밖의 Control Plane MCP 도구 | 막지 않고 원래 인자 그대로 보낸다 |
 | Control Plane MCP 가 아닌 도구 | 건드리지 않는다. `skill_manage` 만 아래처럼 막는다 |
 

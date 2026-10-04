@@ -360,6 +360,8 @@ export const ARTIFACT_WRITE_PROBE = "MCP 결과물 파일 검사";
  * 이 글 뒤에 공백과 Memory 번호를 붙여 보내면 그 run 안에서 `memory_read` 를 부르고, 도구 결과의 text 를 답으로 돌려준다.
  */
 export const MEMORY_READ_PROBE = "MCP Memory 읽기 검사";
+/** 이 글과 빈칸 뒤의 JSON 을 `follow_up_propose` 의 인자로 실어 부르고, 도구 결과의 text 를 답으로 돌려준다. */
+export const FOLLOW_UP_PROPOSE_PROBE = "MCP 할 일 제안 검사";
 
 /**
  * 이 글로 시작하는 입력을 받으면 그 run 안에서 하위 에이전트 session 을 등록하고, 답으로 자식 session 을 돌려준다.
@@ -875,32 +877,41 @@ export function startFakeHermes(
   };
 
   /**
-   * profile 플러그인처럼 서명한 `_fos_ctx` 를 붙여 `memory_read` 를 부르고 도구 결과의 text 를 돌려준다.
+   * profile 플러그인처럼 서명한 `_fos_ctx` 를 붙여 Control Plane MCP 도구 하나를 부르고 도구 결과의 text 를 돌려준다.
    *
    * <p>제출받은 run 의 session 이 곧 루트 session 이다. run 마다 자기 session 으로 서명하므로, 나란히 도는 두 run 이
    * 서로의 session 을 쓰면 요청자가 뒤섞여 검사가 실패한다. 하위 에이전트는 루트와 자기 session 을 따로 준다.
+   * 주소와 토큰은 `setMemoryReadMcp` 로 받은 것을 쓴다.
    */
-  const readMemoryViaMcp = async (
-    memoryId: number,
+  const callControlPlaneToolViaMcp = async (
+    name: string,
+    args: Record<string, unknown>,
     sessionId: string | undefined,
     rootSessionId: string | undefined = sessionId,
   ): Promise<string> => {
-    if (memoryReadMcp === undefined) throw new Error("memory_read MCP runtime is not configured");
+    if (memoryReadMcp === undefined) throw new Error(`${name} MCP runtime is not configured`);
     if (sessionId === undefined || rootSessionId === undefined) {
-      throw new Error("memory_read MCP needs the submitted session_id to sign _fos_ctx");
+      throw new Error(`${name} MCP needs the submitted session_id to sign _fos_ctx`);
     }
-    const _fos_ctx = signedCallContext(memoryReadMcp.token, "memory_read", rootSessionId, sessionId, `call_${randomUUID()}`);
+    const _fos_ctx = signedCallContext(memoryReadMcp.token, name, rootSessionId, sessionId, `call_${randomUUID()}`);
     const response = await fetch(memoryReadMcp.endpoint, {
       method: "POST",
       headers: { Authorization: `Bearer ${memoryReadMcp.token}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/call", params: { name: "memory_read", arguments: { id: memoryId, _fos_ctx } } }),
+      body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/call", params: { name, arguments: { ...args, _fos_ctx } } }),
     });
-    if (!response.ok) throw new Error(`memory_read MCP HTTP ${response.status}`);
+    if (!response.ok) throw new Error(`${name} MCP HTTP ${response.status}`);
     const body = await response.json() as { result?: { content?: { text?: string }[] } };
     const text = body.result?.content?.[0]?.text;
-    if (text === undefined) throw new Error("memory_read MCP response has no text");
+    if (text === undefined) throw new Error(`${name} MCP response has no text`);
     return text;
   };
+
+  /** 서명한 `_fos_ctx` 를 붙여 `memory_read` 를 부르고 도구 결과의 text 를 돌려준다. */
+  const readMemoryViaMcp = (
+    memoryId: number,
+    sessionId: string | undefined,
+    rootSessionId: string | undefined = sessionId,
+  ): Promise<string> => callControlPlaneToolViaMcp("memory_read", { id: memoryId }, sessionId, rootSessionId);
 
   /**
    * profile 플러그인의 `subagent_start` hook 처럼 자식 session 을 부모의 루트 아래 등록한다.
@@ -1784,6 +1795,14 @@ export function startFakeHermes(
         const memoryReadOutput = input.startsWith(memoryReadPrefix)
           ? await readMemoryViaMcp(Number(input.slice(memoryReadPrefix.length)), submitted.session_id)
           : undefined;
+        const followUpProposePrefix = `${FOLLOW_UP_PROPOSE_PROBE} `;
+        const followUpProposeOutput = input.startsWith(followUpProposePrefix)
+          ? await callControlPlaneToolViaMcp(
+            "follow_up_propose",
+            JSON.parse(input.slice(followUpProposePrefix.length)) as Record<string, unknown>,
+            submitted.session_id,
+          )
+          : undefined;
         const connectorOutput = input.startsWith(CONNECTOR_TOOL_PROBE)
           ? await callConnectorTools(profile!, input, submitted.session_id, submitCount)
           : undefined;
@@ -1851,6 +1870,7 @@ export function startFakeHermes(
           model: submitted.model ?? profile!,
           output: (proactiveRun ? script?.output ?? defaultProactiveOutput() : undefined)
             ?? memoryReadOutput
+            ?? followUpProposeOutput
             ?? connectorOutput
             ?? (registeredChild === undefined ? undefined : `하위 에이전트 session: ${registeredChild}`)
             ?? scripts.get(input)?.output

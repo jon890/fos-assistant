@@ -141,6 +141,7 @@ class McpCallerInvariantTest {
                 json.createObjectNode().put("agent_code", "worker").put("task", "일"));
         arguments.put("agent_status", json.createObjectNode().put("execution_id", 1));
         arguments.put("agent_stop", json.createObjectNode().put("execution_id", 1));
+        arguments.put("follow_up_propose", json.createObjectNode().put("title", "할 일 검사 7391"));
         return arguments;
     }
 

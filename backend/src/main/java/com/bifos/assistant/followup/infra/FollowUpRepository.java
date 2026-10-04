@@ -3,6 +3,7 @@ package com.bifos.assistant.followup.infra;
 import com.bifos.assistant.followup.domain.FollowUp;
 import com.bifos.assistant.followup.domain.type.FollowUpStatus;
 import jakarta.persistence.LockModeType;
+import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
@@ -30,4 +31,13 @@ public interface FollowUpRepository extends JpaRepository<FollowUp, Long> {
 
     /** 같은 제목의 열린 줄이다. {@code openMarker} 에 {@link FollowUp#OPEN_MARKER} 를 넘긴다. */
     Optional<FollowUp> findByUserIdAndTitleKeyAndOpenMarker(Long userId, String titleKey, Integer openMarker);
+
+    /** 그 대화에서 {@code closedAfter} 뒤에 그 상태로 끝난 같은 제목의 줄이 있는가. 거절한 제안을 다시 받지 않으려고 본다. */
+    boolean existsByConversationIdAndTitleKeyAndStatusAndClosedAtAfter(
+            Long conversationId, String titleKey, FollowUpStatus status, Instant closedAfter);
+
+    long countByConversationIdAndStatus(Long conversationId, FollowUpStatus status);
+
+    /** 그 실행이 제안한 줄의 수다. 끝난 줄도 센다. */
+    long countByProposedByExecutionId(Long executionId);
 }

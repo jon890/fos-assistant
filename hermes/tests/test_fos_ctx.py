@@ -213,8 +213,8 @@ class HookTest(PluginFixture):
                 self.assertTrue(result["message"])
 
     def test_memory_and_artifact_tools_block_without_signature(self):
-        """서명이 없으면 memory 와 artifact 도구 호출을 막는다."""
-        for tool in ("memory_read", "artifact_write"):
+        """서명이 없으면 memory, artifact, 할 일 제안 도구 호출을 막는다."""
+        for tool in ("memory_read", "artifact_write", "follow_up_propose"):
             name = "mcp__fos_assistant__" + tool
             with self.subTest(tool=tool, state="signed"):
                 self.token, self.secret_error = FAKE_MCP_CREDENTIAL, None

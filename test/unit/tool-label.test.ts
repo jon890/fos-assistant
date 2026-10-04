@@ -22,6 +22,8 @@ test("MCP 도구는 마지막 __ 뒤의 이름으로 표를 찾는다", () => {
   assert.equal(toolLabel("mcp__fos_assistant__artifact_write", true), "결과물을 저장하고 있어요");
   assert.equal(toolLabel("mcp__fos_assistant__artifact_write", false), "결과물을 저장했어요");
   assert.equal(toolLabel("mcp__fos__artifact_write", false), "결과물을 저장했어요");
+  assert.equal(toolLabel("mcp__fos_assistant__follow_up_propose", true), "할 일을 제안하고 있어요");
+  assert.equal(toolLabel("mcp__fos_assistant__follow_up_propose", false), "할 일을 제안했어요");
 });
 
 test("표에 없는 이름과 null 은 일반 문장이다", () => {
