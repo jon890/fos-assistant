@@ -29,6 +29,8 @@
 
   `skills` toolset 에 함께 든 `skill_manage` 는 fos-ctx 의 `pre_tool_call` 이 이미 모든 실행에서 막는다.
 
+  **살펴보기 트리만 위임 결과를 한 turn 안에서 기다린다.** `agent_status` 의 `wait_seconds` 는 살펴보기 트리에서만 기다린다. 살펴보기는 끝난 뒤 자동 turn 을 열지 않으므로 [ADR-040](ADR-040-위임-결과는-control-plane-이-부모-대화의-다음-turn-을-열어-전한다.md) 의 「부모는 기다리지 않는다」 의 예외다. 기다리는 동안 같은 profile 의 다른 MCP 호출이 기다린다([`hermes/fos-ctx.md`](../hermes/fos-ctx.md)). 그 밖의 실행은 ADR-040 그대로다.
+
   **한 번의 살펴보기에 상한 셋을 강제한다.** 시간과 도구 호출 수는 Control Plane 이 넘는 순간 그 turn 을 중지하고, 위임 수는 맡길 때 거절한다.
   값은 `assistant.proactive-check` 설정이 갖는다. 사용량과 비용은 기존 실행 줄에 그대로 남고, 살펴보기 한 번의 상태와 셈은 `proactive_check` 에 남는다.
 
