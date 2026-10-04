@@ -81,7 +81,7 @@ Control Plane 의 패키지마다 맡는 책임과 패키지 사이의 방향 �
 ### proactive
 
 `proactive` 는 `chat` 바로 위다. 살펴보기 turn 은 `ChatService.runProactiveCheck` 가 돌리고, 살펴보기만의 일은 `chat` 이 가진 port `CheckTurn` 을 `proactive` 가 구현해 넘긴다.
-`chat` 은 `proactive` 를 import 하지 않는다.
+`chat` 은 `proactive` 를 import 하지 않는다. 기동 정리가 끝낸 살펴보기 turn 의 답을 대화에 남기지 않도록, `chat` 의 port `RecoveredAnswerGuard` 도 `proactive` 가 구현한다.
 `orchestration`, `mcp`, `connector` 는 `proactive` 보다 위라 `ProactiveCheckGuard` 로 살펴보기 트리인지 묻는다.
 살펴보기가 끝나 도는 위임 자식을 멈추는 일은 `proactive` 가 낸 `ProactiveCheckEnded` 사건을 `orchestration` 이 받아 한다.
 
