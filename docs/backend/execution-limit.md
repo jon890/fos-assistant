@@ -13,6 +13,7 @@ Control Plane 이 Hermes 에 실행을 맡기는 길은 `HermesRunsClient.submit
 | --- | --- | --- |
 | 보내기(`POST /api/v1/chat/messages`, `.../messages/stream`) | `ChatService.send`, `stream` 에서 `runTurn` | turn 자리 |
 | 다시 생성(`.../regenerate/stream`) | `ChatService.regenerate` | turn 자리 |
+| 결과 다시 전달(`.../deliveries/{deliveryId}/retry/stream`) | `ChatService.retryDelivery` 에서 `runTurn` | turn 자리 |
 | 스킬 커맨드 | 보내기와 같은 `runTurn` | turn 자리 |
 | 대기 메시지 turn | `NextTurnDispatcher.tryPending` 에서 `ChatService.runPendingMessages` | turn 자리 |
 | 위임 결과와 커넥터 결과의 자동 turn | `DelegationWakeService.tryWake` 에서 `ChatService.runDelegationResults` | turn 자리 |

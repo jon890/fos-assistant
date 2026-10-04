@@ -2008,7 +2008,8 @@ export function ConversationSession({
             onRetryDelivery={(deliveryId) => {
               void retryDeliveryTurn(deliveryId);
             }}
-            deliveryRetrying={deliveryRetrying}
+            // 다른 turn 이 도는 동안에는 보내도 서버가 막으므로 단추도 막는다.
+            deliveryRetrying={deliveryRetrying || sending}
             // 질문 카드는 답이 오는 중에도 보인다. 그때 고른 답은 입력창의 보내기와 같이 대기 메시지로 들어간다.
             onAnswer={(text) => {
               void submit([], text);

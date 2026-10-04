@@ -195,6 +195,7 @@ turn 이 도는 동안 사용자가 보낸 메시지 하나가 한 행이다. �
 | `result_key` | VARCHAR(64) | 그쪽의 결과 이름. `DELEGATION` 은 `agent_execution.id`, `CONNECTOR_ACTION` 은 `connector_action.public_id` 의 UUID 글이다 |
 
 `(source, result_key)` 에 유일 제약이 있다. 한 결과는 한 묶음에만 든다. 같은 결과를 두 자동 turn 이 함께 넘기려 하면 뒤의 트랜잭션이 알림 줄까지 함께 되돌아간다.
+색인은 `(delivery_id, id)` 다. 다시 전달할 때 묶음의 항목을 넣은 순서로 읽는다.
 
 결과 본문은 여기 두지 않는다. 다시 전달할 때 실행 줄의 `output_text` 와 승인 줄의 `result_text` 를 다시 읽는다.
 

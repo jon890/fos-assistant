@@ -23,6 +23,7 @@ Hermes 사건을 `execution_event` 로 옮겨 적는 규칙과 실행 트리를 
 | `POST /api/v1/chat/messages` | 한 번에 받는다 |
 | `POST /api/v1/chat/messages/stream` | 사건으로 받는다 |
 | `POST /api/v1/chat/conversations/{id}/regenerate/stream` | 마지막 답을 다시 만든다. 본문이 없다 |
+| `POST /api/v1/chat/conversations/{id}/deliveries/{deliveryId}/retry/stream` | 실패하거나 중지한 결과 전달 묶음을 저장된 결과만으로 다시 전달한다. 본문이 없다. 판정은 [`agent-delegation.md`](agent-delegation.md) 의 「다시 전달이 갈리는 지점」 이 갖는다 |
 | `POST /api/v1/chat/executions/{id}/stop` | 돌고 있는 실행을 멈춘다. 202 와 `{ "status": "stopping" }` |
 | `GET /api/v1/chat/conversations/{id}/events` | 대화 단위 SSE. 끝나지 않는다. 요청한 연결이 없는 turn(위임 결과로 열린 자동 turn, 대기 메시지로 연 turn)의 사건과 `system`, `user`, `pending` 사건을 싣는다. 연결 직후 `: connected` 주석 줄을 보내 사건이 없어도 응답 헤더가 바로 나가고, 20초마다 `: ping` 을 보낸다 |
 | `GET /api/v1/chat/conversations/{id}/pending` | 대기 줄. `{ "held", "items": [{ "id", "text", "createdAt" }] }`. 없으면 `held` 가 false 이고 `items` 가 빈 목록이다 |
@@ -104,6 +105,7 @@ turn 이 바꾸는 칸은 `hermes_session_id` 와 `updated_at` 뿐이므로 그 
 | `replacesMessageId` | 이 메시지가 새 판으로 대신하는 이전 메시지. 없으면 null |
 | `activity` | 작업 과정의 요약. `{ toolCount, subagentCount, durationMs }`. 사건이 없는 답과 사용자 메시지는 null |
 | `artifacts` | 그 답의 turn 이 만든 결과물 파일. [`artifact.md`](artifact.md) 의 「메시지 한 줄의 `artifacts`」 절이 모양을 갖는다 |
+| `delivery` | `SYSTEM` 줄이 결과 전달 묶음의 마지막 시도가 저장한 마지막 알림 줄일 때만 `{ id, status }` 이고, 아니면 null 이다. 오류 코드는 싣지 않는다. 화면은 [`../frontend/chat.md`](../frontend/chat.md) 의 「결과 다시 전달」 이 갖는다 |
 
 `activity` 는 답을 만든 실행과 그 아래 자식 실행의 `execution_event` 를 모두 센다.
 예전에 provider 가 막혀 다음 모델로 넘어간 turn 은 막힌 시도가 따로 실행 줄을 갖는다. 요약은 답을 만든 실행만 세고 막힌 시도의 사건은 넣지 않는다. 지금은 Control Plane 이 provider 를 넘기지 않아 새 turn 에는 이런 줄이 생기지 않는다.
@@ -135,7 +137,7 @@ turn 이 바꾸는 칸은 `hermes_session_id` 와 `updated_at` 뿐이므로 그 
 | `done` | 끝나서 저장했다 | `conversationId`, `messageId`, `executionId` |
 | `stopped` | 중지로 끝나서 저장했다 | `conversationId`, `messageId`, `executionId`. 남긴 답이 없으면 `messageId` 가 null |
 | `error` | 실패했다 | `code`, `message` |
-| `system` | 알림 줄을 저장했다. 대화 단위 SSE 로만 간다 | `conversationId`, `messageId`, `text` |
+| `system` | 알림 줄을 저장했다. 대화 단위 SSE 로 간다. 결과 다시 전달의 요청 SSE 에서는 다시 전달 알림 줄을 `started` 앞에 한 번 보낸다 | `conversationId`, `messageId`, `text` |
 | `user` | 대기 메시지를 합쳐 사용자 메시지로 저장했다. 대화 단위 SSE 로만 간다 | `conversationId`, `messageId`, `text` |
 | `pending` | 대기 줄이 바뀌었다. 화면이 대기 줄을 다시 읽는다. 대화 단위 SSE 로만 간다 | `conversationId` |
 | `approval` | 그 대화의 승인 줄이 생겼거나 상태가 바뀌었다. 화면이 승인 줄을 다시 읽는다. 줄의 내용은 싣지 않는다. 대화 단위 SSE 로만 간다 | `conversationId`, `detail`(승인 요청 번호) |

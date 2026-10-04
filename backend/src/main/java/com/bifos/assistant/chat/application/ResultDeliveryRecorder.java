@@ -261,7 +261,8 @@ public class ResultDeliveryRecorder {
         return status == DeliveryAttemptStatus.FAILED ? execution.errorCode() : null;
     }
 
-    private static ApiException notRetryable() {
+    /** 다시 전달할 수 없는 묶음의 거절이다. 다시 전달을 판정하는 자리가 함께 쓴다. */
+    static ApiException notRetryable() {
         return new ApiException(ErrorCode.DELIVERY_NOT_RETRYABLE, "this result delivery cannot be retried now");
     }
 }

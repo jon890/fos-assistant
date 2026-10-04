@@ -223,3 +223,54 @@ test("대화를 연 채 자동 turn 이 시작 전에 실패하면 새로 고치
   await expect(page.getByRole("button", { name: "결과 다시 전달" })).toBeEnabled();
   await expect(page.getByTestId("system-message")).toHaveCount(1);
 });
+
+test("다른 turn 이 도는 동안 단추가 막히고 그 turn 이 끝나면 다시 눌린다", async ({ page }) => {
+  const conversationId = await createConversation(page, "다른 turn 진행 중 검사");
+  await routeMessages(page, conversationId, () => [
+    notice(EARLIER_NOTICE_ID, EARLIER_NOTICE, null),
+    notice(LAST_NOTICE_ID, LAST_NOTICE, { id: DELIVERY_ID, status: "FAILED" }),
+  ]);
+  // 자동 turn 의 앞부분을 먼저 보내고, 화면이 다시 연결하면 시험이 막힌 단추를 본 다음에 끝 사건을 보낸다.
+  let releaseDone!: () => void;
+  const doneReleased = new Promise<void>((resolve) => {
+    releaseDone = resolve;
+  });
+  let eventRequests = 0;
+  await page.route(`**/api/chat/conversations/${conversationId}/events`, async (route: Route) => {
+    eventRequests += 1;
+    if (eventRequests === 1) {
+      await route.fulfill({ status: 200, headers: SSE_HEADERS, body: eventStream([
+        { type: "started", conversationId, executionId: RETRY_EXECUTION_ID },
+        { type: "delta", text: RETRY_ANSWER },
+      ]) });
+      return;
+    }
+    if (eventRequests === 2) {
+      await doneReleased;
+      await route.fulfill({ status: 200, headers: SSE_HEADERS, body: eventStream([
+        { type: "done", conversationId, messageId: RETRY_ANSWER_ID, executionId: RETRY_EXECUTION_ID },
+      ]) });
+      return;
+    }
+    await new Promise(() => {});
+  });
+  const retryRequests: string[] = [];
+  await page.route(`**/api/chat/conversations/${conversationId}/deliveries/*/retry`, async (route: Route) => {
+    retryRequests.push(route.request().url());
+    await route.fulfill({ status: 409, json: { code: "CONVERSATION_BUSY", message: "busy" } });
+  });
+
+  await page.goto(`/chat/${conversationId}`);
+
+  const button = page.getByRole("button", { name: "결과 다시 전달" });
+  const composer = page.getByTestId("composer-shell");
+  await expect(composer.getByRole("button", { name: "중지" })).toBeVisible();
+  await expect(button).toBeDisabled();
+  // 막힌 단추를 눌러도 요청이 나가지 않는다.
+  await button.click({ force: true });
+  releaseDone();
+
+  await expect(composer.getByRole("button", { name: "중지" })).toHaveCount(0, { timeout: 15_000 });
+  await expect(button).toBeEnabled();
+  expect(retryRequests).toEqual([]);
+});

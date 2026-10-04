@@ -244,7 +244,7 @@ public class ChatService {
     public void retryDelivery(CurrentUser user, Long conversationId, Long deliveryId, Consumer<ChatEvent> onEvent) {
         Conversation conversation = access.requireOwn(user, conversationId);
         if (!resultDeliveries.require(conversation.id(), deliveryId).status().retryable()) {
-            throw deliveryNotRetryable();
+            throw ResultDeliveryRecorder.notRetryable();
         }
         Agent agent = agents.requireById(conversation.agentId());
         if (agent.isDeleted() || !agent.isReadableBy(user.id())) {
@@ -254,7 +254,7 @@ public class ChatService {
             throw new ApiException(ErrorCode.AGENT_DISABLED, "this agent is disabled");
         }
         if (flows.find(agent.flow()) != null) {
-            throw deliveryNotRetryable();
+            throw ResultDeliveryRecorder.notRetryable();
         }
         // 사용자 실행 한도에 닿으면 USER_BUSY 가 그대로 올라간다. 묶음을 바꾸지 않고 다시 시도를 예약하지 않는다.
         TurnHandle handle = turns.open(user.id(), conversation.id());
@@ -263,7 +263,7 @@ public class ChatService {
             Routed routed = route(user, conversation.id(), input, null, List.of());
             // 잠금 전에 본 에이전트는 그 사이 바뀌었을 수 있다. 자동 turn 이 잠금 뒤 흐름을 다시 거르는 것과 같다.
             if (routed.flow() != null) {
-                throw deliveryNotRetryable();
+                throw ResultDeliveryRecorder.notRetryable();
             }
             if (!routed.agent().isReadableBy(user.id())) {
                 throw new ApiException(ErrorCode.AGENT_NOT_FOUND, "no such agent");
@@ -328,7 +328,7 @@ public class ChatService {
                         candidate -> extras.addAll(candidate.resultsFor(conversationId, user.id(), keys)),
                         () -> log.warn("출처 이름에 맞는 결과 구현이 없어 그 항목을 뺀다 source={}", source)));
         if (results.isEmpty() && extras.isEmpty()) {
-            throw deliveryNotRetryable();
+            throw ResultDeliveryRecorder.notRetryable();
         }
         return deliveryInput(results, resultAgentsOf(results), extras);
     }
@@ -353,10 +353,6 @@ public class ChatService {
         onEvent.accept(ChatEvent.system(
                 conversation.publicId(), saved.line().id(), saved.line().content()));
         return saved.attemptId();
-    }
-
-    private static ApiException deliveryNotRetryable() {
-        return new ApiException(ErrorCode.DELIVERY_NOT_RETRYABLE, "this result delivery cannot be retried now");
     }
 
     /**

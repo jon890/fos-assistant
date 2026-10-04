@@ -30,7 +30,7 @@ import org.springframework.transaction.PlatformTransactionManager;
  * 검사가 실패하면 그 검사가 이 종류의 결함을 더는 잡지 못한다는 뜻이다.
  *
  * <p>V57 스키마에는 그 뒤에 생긴 표가 없어 지금의 엔티티로 검증하면 문맥이 뜨지 않는다. 그래서 {@code ddl-auto} 를
- * {@code none} 으로 둔다. V57 뒤에 생긴 표의 저장소는 {@link #TABLES_AFTER_BEFORE_VERSION} 에 둔다. 그 저장소의 실패는 표가 없다는
+ * {@code none} 으로 둔다. V57 뒤에 생긴 표의 저장소는 {@link #TABLES_CREATED_AFTER_V57} 에 둔다. 그 저장소의 실패는 표가 없다는
  * 오류 1146 이어야 하고, 나머지 실패는 모두 1267 이어야 한다. 그 저장소에 메서드를 더해도 이 검사를 고치지 않는다.
  * V57 뒤에 표를 새로 만들면 그 저장소를 목록에 더한다. 있던 표에 칸을 더해 실패하는 메서드가 생기면 이 나눔으로는 부족하므로
  * 그때 다시 정한다.
@@ -47,7 +47,7 @@ class CollationMixQueryMysqlTest {
     private static final int NO_SUCH_TABLE = 1146;
 
     /** V57 뒤의 마이그레이션이 만든 표의 저장소다. V57 스키마에서는 그 표가 없다. */
-    private static final List<Class<?>> TABLES_AFTER_BEFORE_VERSION = List.of(
+    private static final List<Class<?>> TABLES_CREATED_AFTER_V57 = List.of(
             ResultDeliveryRepository.class, ResultDeliveryItemRepository.class, ResultDeliveryAttemptRepository.class);
 
     @Autowired
@@ -109,7 +109,7 @@ class CollationMixQueryMysqlTest {
     /** 실패한 메서드가 V57 뒤에 생긴 표의 저장소에 있는가. 메서드 이름은 {@code 저장소.메서드} 모양이다. */
     private static boolean onTableAfterBeforeVersion(RepositoryQuerySweep.Failure failure) {
         String repository = failure.method().substring(0, failure.method().indexOf('.'));
-        return TABLES_AFTER_BEFORE_VERSION.stream()
+        return TABLES_CREATED_AFTER_V57.stream()
                 .anyMatch(type -> type.getSimpleName().equals(repository));
     }
 
