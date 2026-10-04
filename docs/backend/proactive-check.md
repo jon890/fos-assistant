@@ -297,7 +297,8 @@ turn 이 어떻게 끝나든 잠금을 풀기 전에 `ProactiveCheckService` 가
 ### 그리기
 
 `CheckAnswerRenderer` 가 Markdown 글 하나를 만든다. 모델이 쓴 글은 모두 Markdown 문법 글자를 이스케이프한다.
-이스케이프하는 글자는 `CheckAnswerRenderer.MARKDOWN_SPECIALS` 가 갖는다. 백슬래시, 백틱, 별표, 밑줄, 대괄호와 괄호 두 쌍, `#`, `!`, `<`, `>`, `|` 다.
+이스케이프하는 글자는 `CheckAnswerRenderer.MARKDOWN_SPECIALS` 가 갖는다. 백슬래시, 백틱, 별표, 밑줄, 대괄호와 괄호 두 쌍, `#`, `!`, `<`, `>`, `|`, `:`, `.` 다.
+뒤의 둘은 화면의 GFM 이 평문의 `https://` 와 `www.` 를 링크로 바꾸지 않게 하려고 넣는다. 모델 글의 줄바꿈과 이어진 공백은 한 칸으로 합쳐, 줄 머리에 목록 문법이 생기지 않게 한다. 원문 링크 주소 안의 괄호는 `%28`, `%29` 로 바꾼다.
 링크는 1 을 통과한 `sourceUrl` 로만 만든다. 참고로 내린 발견의 주소는 링크로 만들지 않는다.
 
 ```text
