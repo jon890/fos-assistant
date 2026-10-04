@@ -31,7 +31,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /**
- * 결과 전달의 묶음과 시도를 적는 자리다(ADR-070). 전달 기록을 쓰는 곳은 이 클래스 하나다.
+ * 결과 전달의 묶음과 시도를 적는 자리다(ADR-075). 전달 기록을 쓰는 곳은 이 클래스 하나다.
  *
  * <p>묶음과 시도의 상태는 늘 같은 트랜잭션에서 바꾼다.
  */

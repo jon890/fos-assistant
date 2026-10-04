@@ -237,6 +237,7 @@ sequenceDiagram
 
 판정이 「승인 필요」 인 호출의 흐름이다. 근거는 [ADR-050](../adr/ADR-050-커넥터-쓰기는-control-plane-이-승인-줄을-저장하고-승인한-인자로-한-번만-실행한다.md) 이다.
 승인과 거절은 그 요청이 나온 대화의 승인 카드에서 한다.
+새 승인 줄이 생기면 `APPROVAL_REQUESTED` 알림이 함께 생겨, 사용자가 다른 화면에 있어도 그 대화로 올 수 있다([`notification.md`](notification.md)).
 
 ```mermaid
 sequenceDiagram
@@ -249,7 +250,7 @@ sequenceDiagram
 
     M->>H: mcp__<서버>__write_note(args)
     H->>C: 정책 확인
-    C->>C: connector_action PENDING 과 인자 저장
+    C->>C: connector_action PENDING 과 인자 저장, APPROVAL_REQUESTED 알림 저장
     C-->>U: 대화 SSE 의 approval 사건
     C-->>H: block, 승인 요청 번호
     H-->>M: 승인을 기다린다. 다시 부르지 않는다
@@ -272,7 +273,7 @@ sequenceDiagram
 | 실행 요청이 시간 안에 답하지 않는다 | `UNKNOWN`. 다시 실행하지 않고 「실행했는지 알 수 없어요」 를 보인다 |
 | 실행을 보낸 뒤 서버가 다시 뜬다 | 기동 정리가 `EXECUTING` 을 `UNKNOWN` 으로 바꾸고 대화에 전한다 |
 | 사용자가 거절한다 | `REJECTED`. 알림 줄만 남긴다 |
-| 24시간 안에 답이 없다 | `EXPIRED`. 알림 줄만 남긴다 |
+| 24시간 안에 답이 없다 | `EXPIRED`. 대화의 알림 줄을 남기고 `APPROVAL_EXPIRED` 알림을 만든다([`notification.md`](notification.md)) |
 | 승인할 때 연결이 `READY` 가 아니다 | 실행하지 않고 `REJECTED` 로 둔다. 승인 요청은 오류가 아니라 그 끝난 줄을 받는다 |
 | 승인한 호출이 실행되는 동안 그 연결을 해제하거나 값을 다시 등록한다 | `CONNECTOR_ACTION_EXECUTING` 으로 거절한다. 실행이 끝난 뒤 다시 한다 |
 | 그 대화의 turn 이 도는 중에 결과가 온다 | 결과를 쌓아 두고 turn 이 끝난 뒤 전한다. 위임 결과와 같다 |

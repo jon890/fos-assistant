@@ -13,7 +13,7 @@ import java.util.List;
 public interface AutoTurnResultSource {
 
     /**
-     * 전달 묶음의 항목에 적는 출처 이름이다(ADR-070). 40자 안의 대문자 이름이다.
+     * 전달 묶음의 항목에 적는 출처 이름이다(ADR-075). 40자 안의 대문자 이름이다.
      *
      * <p>{@code "DELEGATION"} 은 위임 결과가 쓰므로 쓰지 못한다. 구현마다 다른 이름이어야 한다. 한 결과는
      * {@code (출처 이름, 결과 이름)} 으로 한 묶음에만 든다.
@@ -31,7 +31,7 @@ public interface AutoTurnResultSource {
     void markDelivered(List<String> keys, Instant now);
 
     /**
-     * 이미 전한 결과를 열쇠로 다시 읽는다. 사용자가 결과를 다시 전달할 때 부른다(ADR-070).
+     * 이미 전한 결과를 열쇠로 다시 읽는다. 사용자가 결과를 다시 전달할 때 부른다(ADR-075).
      *
      * <p>그 대화와 그 사용자의 결과만 {@code keys} 의 순서로 낸다. 없거나 남의 것이거나 읽지 못하는 열쇠는 뺀다. 결과를 낸
      * 쪽의 일(외부 호출)은 다시 하지 않고 저장된 결과만 읽는다.

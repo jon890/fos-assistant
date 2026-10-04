@@ -4,6 +4,17 @@ import type { Page, Request } from "../../web/node_modules/@playwright/test/inde
 /** 사이드바가 그릴 만큼 대화가 많은 사용자를 흉내 낸다. 한 페이지(기본 30개)를 넘겨야 한다. */
 const CONVERSATION_COUNT = 70;
 
+// 알림 단위 SSE 가 열려 있으면 networkidle 이 오지 않는다. 빈 응답으로 끝낸다.
+test.beforeEach(async ({ page }) => {
+  await page.route("**/api/notifications/events", (route) =>
+    route.fulfill({ status: 200, contentType: "text/event-stream", body: "" }),
+  );
+});
+
+test.afterEach(async ({ page }) => {
+  await page.unrouteAll({ behavior: "ignoreErrors" });
+});
+
 type Counts = { list: number; prefetch: number; other: number; total: number };
 
 async function seedConversations(page: Page): Promise<string[]> {

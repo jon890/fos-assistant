@@ -16,7 +16,7 @@ import lombok.NoArgsConstructor;
 import lombok.experimental.Accessors;
 
 /**
- * 자동 turn 하나가 부모 대화에 넘긴 결과들의 묶음이다(ADR-070).
+ * 자동 turn 하나가 부모 대화에 넘긴 결과들의 묶음이다(ADR-075).
  *
  * <p>알림 줄을 저장하는 트랜잭션에서 항목, 첫 시도와 함께 생긴다. 상태는 마지막 시도가 끝난 방식과 같고, 시도의 상태와
  * 같은 트랜잭션에서 바꾼다.

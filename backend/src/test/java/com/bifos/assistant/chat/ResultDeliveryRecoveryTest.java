@@ -69,7 +69,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 
 /**
  * 이전 프로세스가 {@code RUNNING} 으로 남긴 전달 시도를 기동할 때 닫고, 기동 정리가 정한 부모 실행 줄의 시도를 그 줄과 함께
- * 닫는지 본다(ADR-070).
+ * 닫는지 본다(ADR-075).
  *
  * <p>줄은 이전 프로세스가 남긴 것처럼 저장소로 직접 만든다. 기준 시각은 고정한 값을 넘긴다. 깨우기를 켜 두어 「다시 열리지
  * 않는다」 검사가 실제로 기동 훑기를 거친다.

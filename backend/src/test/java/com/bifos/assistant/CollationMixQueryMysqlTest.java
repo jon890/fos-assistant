@@ -2,9 +2,6 @@ package com.bifos.assistant;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.bifos.assistant.chat.infra.ResultDeliveryAttemptRepository;
-import com.bifos.assistant.chat.infra.ResultDeliveryItemRepository;
-import com.bifos.assistant.chat.infra.ResultDeliveryRepository;
 import com.bifos.assistant.testsupport.MysqlTestDatabase;
 import com.bifos.assistant.testsupport.RepositoryQuerySweep;
 import java.sql.SQLException;
@@ -29,11 +26,9 @@ import org.springframework.transaction.PlatformTransactionManager;
  * <p>이 증거가 없으면 {@link RepositoryQueryMysqlTest} 가 통과하는 것이 쿼리가 맞아서인지 검사가 보지 못해서인지 알 수 없다. 이
  * 검사가 실패하면 그 검사가 이 종류의 결함을 더는 잡지 못한다는 뜻이다.
  *
- * <p>V57 스키마에는 그 뒤에 생긴 표가 없어 지금의 엔티티로 검증하면 문맥이 뜨지 않는다. 그래서 {@code ddl-auto} 를
- * {@code none} 으로 둔다. V57 뒤에 생긴 표의 저장소는 {@link #TABLES_CREATED_AFTER_V57} 에 둔다. 그 저장소의 실패는 표가 없다는
- * 오류 1146 이어야 하고, 나머지 실패는 모두 1267 이어야 한다. 그 저장소에 메서드를 더해도 이 검사를 고치지 않는다.
- * V57 뒤에 표를 새로 만들면 그 저장소를 목록에 더한다. 있던 표에 칸을 더해 실패하는 메서드가 생기면 이 나눔으로는 부족하므로
- * 그때 다시 정한다.
+ * <p>V57 뒤의 마이그레이션이 표와 칸을 더하므로 V57 스키마는 지금의 엔티티 검증을 통과하지 못한다. 그래서 {@code ddl-auto} 를
+ * {@code none} 으로 두어 검증 없이 문맥을 띄운다. 그 결과 V57 뒤에 생긴 표의 쿼리는 없는 표 오류로 실패한다. 그 실패는 이 검사가
+ * 보려는 것이 아니므로 실패 전체를 단언하지 않고, 정렬 규칙이 섞인 두 메서드가 실패 목록에 있고 그 실패가 오류 1267 인지만 본다.
  */
 @Tag("mysql")
 @SpringBootTest
@@ -44,11 +39,10 @@ class CollationMixQueryMysqlTest {
     private static final String OLD_COLLATION = "utf8mb4_unicode_ci";
     private static final String NEW_COLLATION = "utf8mb4_0900_ai_ci";
     private static final int ILLEGAL_MIX_OF_COLLATIONS = 1267;
-    private static final int NO_SUCH_TABLE = 1146;
 
-    /** V57 뒤의 마이그레이션이 만든 표의 저장소다. V57 스키마에서는 그 표가 없다. */
-    private static final List<Class<?>> TABLES_CREATED_AFTER_V57 = List.of(
-            ResultDeliveryRepository.class, ResultDeliveryItemRepository.class, ResultDeliveryAttemptRepository.class);
+    /** V57 스키마에서 정렬 규칙이 다른 두 표의 문자열 칸을 비교하는 저장소 메서드다. */
+    private static final List<String> COLLATION_MIXED_METHODS = List.of(
+            "ExecutionEventRepository.findUnscheduledChildren", "ExecutionEventRepository.countUnscheduledChildren");
 
     @Autowired
     private ApplicationContext context;
@@ -91,26 +85,13 @@ class CollationMixQueryMysqlTest {
 
         assertThat(failures)
                 .extracting(RepositoryQuerySweep.Failure::method)
-                .contains(
-                        "ExecutionEventRepository.findUnscheduledChildren",
-                        "ExecutionEventRepository.countUnscheduledChildren");
+                .contains(COLLATION_MIXED_METHODS.toArray(String[]::new));
+        // V57 뒤에 생긴 표의 쿼리는 없는 표 오류로 실패하므로 정렬 규칙이 섞인 두 메서드의 실패만 오류 코드를 본다.
         assertThat(failures)
-                .filteredOn(failure -> !onTableAfterBeforeVersion(failure))
+                .filteredOn(failure -> COLLATION_MIXED_METHODS.contains(failure.method()))
                 .allSatisfy(failure -> assertThat(sqlErrorCode(failure.cause()))
                         .as("%s 의 SQL 오류 코드. 원인: %s", failure.method(), failure.cause())
                         .isEqualTo(ILLEGAL_MIX_OF_COLLATIONS));
-        assertThat(failures)
-                .filteredOn(CollationMixQueryMysqlTest::onTableAfterBeforeVersion)
-                .allSatisfy(failure -> assertThat(sqlErrorCode(failure.cause()))
-                        .as("V57 에 표가 없는 %s 의 SQL 오류 코드. 원인: %s", failure.method(), failure.cause())
-                        .isEqualTo(NO_SUCH_TABLE));
-    }
-
-    /** 실패한 메서드가 V57 뒤에 생긴 표의 저장소에 있는가. 메서드 이름은 {@code 저장소.메서드} 모양이다. */
-    private static boolean onTableAfterBeforeVersion(RepositoryQuerySweep.Failure failure) {
-        String repository = failure.method().substring(0, failure.method().indexOf('.'));
-        return TABLES_CREATED_AFTER_V57.stream()
-                .anyMatch(type -> type.getSimpleName().equals(repository));
     }
 
     private String tableCollation(String table) {

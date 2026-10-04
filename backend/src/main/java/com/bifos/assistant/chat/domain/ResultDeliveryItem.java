@@ -13,7 +13,7 @@ import lombok.NoArgsConstructor;
 import lombok.experimental.Accessors;
 
 /**
- * 전달 묶음에 든 결과 하나다(ADR-070).
+ * 전달 묶음에 든 결과 하나다(ADR-075).
  *
  * <p>결과 본문은 두지 않는다. 다시 전달할 때 그 결과를 낸 쪽의 줄에서 다시 읽는다. {@code (source, result_key)} 가
  * 유일해 한 결과는 한 묶음에만 든다.

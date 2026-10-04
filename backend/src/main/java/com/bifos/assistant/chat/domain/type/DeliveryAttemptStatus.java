@@ -1,6 +1,6 @@
 package com.bifos.assistant.chat.domain.type;
 
-/** 전달 시도 한 번의 상태다(ADR-070). */
+/** 전달 시도 한 번의 상태다(ADR-075). */
 public enum DeliveryAttemptStatus {
     RUNNING,
     SUCCEEDED,

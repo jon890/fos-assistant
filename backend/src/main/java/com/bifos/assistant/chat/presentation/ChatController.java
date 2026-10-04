@@ -139,7 +139,7 @@ public class ChatController {
                 send -> chat.regenerate(user, id, event -> event.forViewer(user).ifPresent(send)));
     }
 
-    /** 저장된 결과만 다시 읽어 그 전달 묶음을 부모 에이전트에 다시 넘긴다(ADR-070). 사건은 요청한 창에만 간다. */
+    /** 저장된 결과만 다시 읽어 그 전달 묶음을 부모 에이전트에 다시 넘긴다(ADR-075). 사건은 요청한 창에만 간다. */
     @PostMapping(
             path = "/conversations/{conversationId}/deliveries/{deliveryId}/retry/stream",
             produces = MediaType.TEXT_EVENT_STREAM_VALUE)

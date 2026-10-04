@@ -53,7 +53,7 @@ Hermes 가 Control Plane MCP 의 `agent_list`, `agent_delegate`, `agent_status`,
 | `connector.application.ConnectorActionListener` | `ConnectorActionChanged` 를 받아 그 대화에 `approval` 사건을 내고, 거절과 만료의 알림 줄을 남기고, 깨우기 서비스를 부른다. 방향은 `connector` 에서 `chat` 으로 하나다 |
 | `chat.application.DelegationWakeProperties` | `assistant.delegation-wake.enabled`, `max-auto-turns`. 테스트 profile 은 끈다. 같은 H2 와 대역 Hermes 를 쓰는 다른 검사에서 자동 turn 이 열리지 않게 하기 위해서다 |
 | `chat.application.ChatService` | `TurnIntent.DelegationResults` 로 도는 자동 turn. 사용자 질문 대신 `SYSTEM` 알림 줄들을 저장하고, 결과를 적은 글을 Hermes 입력으로 넣는다. 위임 결과 뒤에 `AutoTurnResultSource` 의 단락을 잇고, 알림 줄과 같은 트랜잭션에서 그쪽에 전했다고 적는다. 사용자 질문을 저장할 때 `auto_turn_count` 를 0 으로 돌린다 |
-| `chat.application.ResultDeliveryRecorder` | 전달 묶음과 항목과 시도를 적는다([ADR-070](../adr/ADR-070-결과-전달은-묶음과-시도로-남기고-사용자가-저장된-결과만-다시-전달한다.md)). 알림 줄을 저장하는 트랜잭션 안에서 묶음과 첫 시도를 만들고, 부모 실행 줄이 생기면 시도에 잇고, turn 이 끝나면 시도와 묶음을 닫는다. 다시 전달을 시작하는 조건부 update 와 화면에 줄 묶음 상태도 여기 있다 |
+| `chat.application.ResultDeliveryRecorder` | 전달 묶음과 항목과 시도를 적는다([ADR-075](../adr/ADR-075-결과-전달은-묶음과-시도로-남기고-사용자가-저장된-결과만-다시-전달한다.md)). 알림 줄을 저장하는 트랜잭션 안에서 묶음과 첫 시도를 만들고, 부모 실행 줄이 생기면 시도에 잇고, turn 이 끝나면 시도와 묶음을 닫는다. 다시 전달을 시작하는 조건부 update 와 화면에 줄 묶음 상태도 여기 있다 |
 | `chat.application.ResultDeliveryRecovery` | 기동할 때 이전 프로세스가 남긴 `RUNNING` 시도를 닫는다. 실행 줄이 없으면 `FAILED`(`INTERRUPTED`), 실행 줄이 이미 끝났으면 그 끝을 따른다. 실행 줄이 아직 `RUNNING` 이면 기동 정리가 그 줄을 정할 때 `RecoveredRunRecorder` 가 닫는다 |
 | `chat.application.TurnCancellation` | turn 을 닫을 때 등록된 종료 리스너(`NextTurnDispatcher`)를 `TurnClosed(conversationId, stopped)` 로 부른다 |
 | `chat.application.ConversationEventHub` | 대화 번호마다 열린 SSE 구독을 들고, 요청한 연결이 없는 turn(자동 turn, 대기 메시지로 연 turn)의 사건을 모든 구독에 보낸다 |
@@ -225,9 +225,9 @@ sequenceDiagram
 ## 결과 전달이 끝나지 않았을 때
 
 자동 turn 이 부모에 넘긴 결과들은 전달 묶음 하나로 남고, 넘긴 한 번 한 번이 전달 시도로 남는다.
-결정은 [ADR-070](../adr/ADR-070-결과-전달은-묶음과-시도로-남기고-사용자가-저장된-결과만-다시-전달한다.md), 표의 칸은 [`schema/chat.md`](schema/chat.md) 의 `result_delivery` 에 있다.
+결정은 [ADR-075](../adr/ADR-075-결과-전달은-묶음과-시도로-남기고-사용자가-저장된-결과만-다시-전달한다.md), 표의 칸은 [`schema/chat.md`](schema/chat.md) 의 `result_delivery` 에 있다.
 
-**「도착 알림 저장」 과 「부모 결과 정리 완료」 는 다른 상태다.**
+**「도착 알림 줄 저장」 과 「부모 결과 정리 완료」 는 다른 상태다.**
 알림 줄과 `result_delivered_at` 은 결과가 부모 대화에 도착했다는 뜻이다. 부모가 그 결과로 답을 남겼는지는 묶음의 상태가 갖는다.
 
 | 묶음 상태 | 뜻 | 화면 |

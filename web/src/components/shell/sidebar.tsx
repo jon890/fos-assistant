@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { TooltipButton } from "@/components/ui/tooltip-button";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
+import { NotificationBell } from "@/components/notification/notification-bell";
 import { ConversationNav } from "./conversation-nav";
 import { MainNav } from "./main-nav";
 import { NavPending, NAV_PENDING_EVENT } from "./nav-pending";
@@ -135,6 +136,7 @@ export function Sidebar({
               <NavPending />
             </Link>
           ) : null}
+          <NotificationBell onNavigate={onNavigate} />
           <ThemeToggle />
         </span>
       </div>

@@ -9,7 +9,7 @@ import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 
 /**
- * 이전 프로세스가 {@code RUNNING} 으로 남긴 전달 시도를 기동할 때 닫는다(ADR-070).
+ * 이전 프로세스가 {@code RUNNING} 으로 남긴 전달 시도를 기동할 때 닫는다(ADR-075).
  *
  * <p>알림 줄은 저장했는데 부모 turn 의 실행 줄이 생기기 전에 내려간 전달은 실행 줄이 없어 기동 정리({@link
  * RestartReconciler})가 보지 못한다. 그 시도를 「실패(중단)」 로 닫아 사용자가 다시 전달할 수 있게 한다.

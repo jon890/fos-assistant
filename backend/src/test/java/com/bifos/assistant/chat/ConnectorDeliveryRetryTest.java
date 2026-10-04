@@ -70,7 +70,7 @@ import tools.jackson.databind.json.JsonMapper;
 
 /**
  * 승인해 실행한 결과의 전달을 다시 전달하면 승인 줄에 저장된 결과만 다시 읽고 커넥터를 다시 부르지 않는지 본다(ADR-050,
- * ADR-070).
+ * ADR-075).
  *
  * <p>구성은 {@link ConnectorActionDeliveryTest} 와 같게 둔다. 같은 Spring 컨텍스트를 써서 컨텍스트 수를 늘리지 않는다. 승인은
  * 실제 승인 경로로 하고, 커넥터 실행은 대역이 답한다.

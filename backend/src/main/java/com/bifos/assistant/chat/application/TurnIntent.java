@@ -19,7 +19,7 @@ public sealed interface TurnIntent {
             + RESULT_HANDLING_RULES;
 
     /**
-     * 사용자가 결과를 다시 전달할 때의 지시다(ADR-070).
+     * 사용자가 결과를 다시 전달할 때의 지시다(ADR-075).
      *
      * <p>자동 turn 의 「이어서 할 일이 있으면 진행한다」 를 주지 않는다. 첫 시도가 시간 초과로 끝났으면 원격 run 이 이미
      * 이어서 일을 맡겼을 수 있어, 같은 일을 다시 맡기지 않게 한다.
@@ -43,9 +43,9 @@ public sealed interface TurnIntent {
 
     /**
      * 맡긴 일의 결과를 부모에 넘기는 turn 이다. 사용자의 질문 없이 Control Plane 이 연 자동 turn(ADR-040)이거나, 사용자가
-     * 저장된 결과를 다시 전달하는 turn(ADR-070)이다.
+     * 저장된 결과를 다시 전달하는 turn(ADR-075)이다.
      *
-     * <p>알림 줄과 전달 시도는 이 turn 을 열기 전에 이미 저장돼 있다(ADR-070).
+     * <p>알림 줄과 전달 시도는 이 turn 을 열기 전에 이미 저장돼 있다(ADR-075).
      *
      * @param attemptId 이 turn 의 전달 시도 번호. 실행 줄을 만들면 그 번호를 이 시도에 잇는다
      * @param retry 사용자가 다시 전달한 turn 이다. 지시가 {@link #DELIVERY_RETRY_INSTRUCTION} 이 된다

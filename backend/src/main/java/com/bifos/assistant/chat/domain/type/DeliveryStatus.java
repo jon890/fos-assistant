@@ -1,6 +1,6 @@
 package com.bifos.assistant.chat.domain.type;
 
-/** 전달 묶음의 상태다. 마지막 시도가 끝난 방식과 같다(ADR-070). */
+/** 전달 묶음의 상태다. 마지막 시도가 끝난 방식과 같다(ADR-075). */
 public enum DeliveryStatus {
     /** 시도 하나가 도는 중이다. */
     DELIVERING,

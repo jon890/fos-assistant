@@ -17,7 +17,7 @@ import lombok.NoArgsConstructor;
 import lombok.experimental.Accessors;
 
 /**
- * 전달 묶음을 부모 대화에 넘긴 한 번이다(ADR-070).
+ * 전달 묶음을 부모 대화에 넘긴 한 번이다(ADR-075).
  *
  * <p>부모 turn 의 실행 줄을 만들면 그 번호를 잇고, 그 turn 이 끝난 방식으로 닫는다. 실행 줄이 생기기 전에 끝났으면
  * {@code execution_id} 는 비어 있다.

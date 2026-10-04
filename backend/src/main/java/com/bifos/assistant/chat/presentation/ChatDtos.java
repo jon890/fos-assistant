@@ -77,7 +77,7 @@ public final class ChatDtos {
             DeliveryView delivery) {}
 
     /**
-     * 알림 줄 아래에 그리는 전달 묶음이다(ADR-070). 오류 코드는 싣지 않는다. 원인은 관리자 영역의 실행 상세가 보인다.
+     * 알림 줄 아래에 그리는 전달 묶음이다(ADR-075). 오류 코드는 싣지 않는다. 원인은 관리자 영역의 실행 상세가 보인다.
      *
      * @param id 전달 묶음 번호. 다시 전달할 때 이 번호로 부른다
      * @param status {@code DELIVERING}, {@code DELIVERED}, {@code FAILED}, {@code STOPPED} 가운데 하나

@@ -1,11 +1,14 @@
 package com.bifos.assistant.connector.application;
 
+import com.bifos.assistant.chat.application.ConversationNotices;
 import com.bifos.assistant.connector.application.model.ConnectorActionChanged;
+import com.bifos.assistant.connector.application.model.ConnectorActionView;
 import com.bifos.assistant.connector.application.model.ConnectorPolicyAnswer;
 import com.bifos.assistant.connector.domain.ConnectorAction;
 import com.bifos.assistant.connector.domain.ConnectorActionKey;
 import com.bifos.assistant.connector.domain.ConnectorConnection;
 import com.bifos.assistant.connector.domain.HermesToolName;
+import com.bifos.assistant.connector.domain.ToolPolicy;
 import com.bifos.assistant.connector.domain.ToolPolicyDecision;
 import com.bifos.assistant.connector.domain.type.ActionDecision;
 import com.bifos.assistant.connector.domain.type.ActionDenyReason;
@@ -15,6 +18,10 @@ import com.bifos.assistant.connector.infra.ConnectorActionRepository;
 import com.bifos.assistant.connector.infra.ConnectorConnectionRepository;
 import com.bifos.assistant.connector.infra.ConnectorToolGrantRepository;
 import com.bifos.assistant.hermes.dto.ConnectorManifest;
+import com.bifos.assistant.notification.application.NotificationService;
+import com.bifos.assistant.notification.domain.NotificationTarget;
+import com.bifos.assistant.notification.domain.type.NotificationKind;
+import com.bifos.assistant.notification.domain.type.NotificationTargetType;
 import com.bifos.assistant.orchestration.application.SessionOwnerResolver;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.util.Sha256;
@@ -70,6 +77,9 @@ public class ConnectorPolicyService {
     private static final String APPROVAL_WITHOUT_CONVERSATION_MESSAGE =
             "이 동작은 사용자의 승인이 필요하다. 승인 요청 번호는 %s 다. " + "이 실행은 대화가 없어 승인받을 화면이 없으므로 실행되지 않는다. 같은 도구를 다시 부르지 않는다.";
 
+    /** 새 승인 줄을 알리는 알림의 제목이다. 본문은 도구 제목이다. */
+    static final String APPROVAL_REQUESTED_TITLE = "승인을 기다리는 요청이 있어요";
+
     private final ConnectorActionRepository actions;
     private final ConnectorConnectionRepository connections;
     private final ConnectorToolGrantRepository grants;
@@ -77,6 +87,8 @@ public class ConnectorPolicyService {
     private final ConnectorCatalogCache catalog;
     private final ConnectorPolicyProperties properties;
     private final ApplicationEventPublisher events;
+    private final NotificationService notifications;
+    private final ConversationNotices conversations;
     private final TransactionTemplate transactions;
     private final Clock clock;
 
@@ -91,8 +103,21 @@ public class ConnectorPolicyService {
             ConnectorCatalogCache catalog,
             ConnectorPolicyProperties properties,
             ApplicationEventPublisher events,
+            NotificationService notifications,
+            ConversationNotices conversations,
             PlatformTransactionManager transactionManager) {
-        this(actions, connections, grants, owners, catalog, properties, events, transactionManager, Clock.systemUTC());
+        this(
+                actions,
+                connections,
+                grants,
+                owners,
+                catalog,
+                properties,
+                events,
+                notifications,
+                conversations,
+                transactionManager,
+                Clock.systemUTC());
     }
 
     public ConnectorPolicyService(
@@ -103,6 +128,8 @@ public class ConnectorPolicyService {
             ConnectorCatalogCache catalog,
             ConnectorPolicyProperties properties,
             ApplicationEventPublisher events,
+            NotificationService notifications,
+            ConversationNotices conversations,
             PlatformTransactionManager transactionManager,
             Clock clock) {
         this.actions = actions;
@@ -112,6 +139,8 @@ public class ConnectorPolicyService {
         this.catalog = catalog;
         this.properties = properties;
         this.events = events;
+        this.notifications = notifications;
+        this.conversations = conversations;
         this.transactions = new TransactionTemplate(transactionManager);
         this.clock = clock;
     }
@@ -165,11 +194,13 @@ public class ConnectorPolicyService {
         // 등록 이름과 맞는 것을 확인한 원래 이름만 쓴다. manifest 가 없으면 확인할 수 없어 비운다.
         String confirmedTool = manifest.map(value -> confirmedTool(value, hermesTool, toolName))
                 .orElse(null);
+        // 승인 카드와 알림이 같은 도구 제목을 쓰도록 선언을 한 번 찾아 둔다.
+        Optional<ToolPolicy> declared = manifest.flatMap(value -> ConnectorToolPolicies.find(value, confirmedTool));
         ToolPolicyDecision decision = manifest.map(value -> ToolPolicyDecision.decide(
                         connection.status(),
                         ownServerTool(value, hermesTool),
                         value.schema(),
-                        ConnectorToolPolicies.find(value, confirmedTool),
+                        declared,
                         granted(connection, confirmedTool, now),
                         argsJson.getBytes(StandardCharsets.UTF_8).length))
                 .orElseGet(ToolPolicyDecision::policyUnavailable);
@@ -191,7 +222,14 @@ public class ConnectorPolicyService {
             action.awaitApproval(argsJson, now.plus(properties.approvalTtl()));
         }
         try {
-            ConnectorAction saved = transactions.execute(status -> actions.saveAndFlush(action));
+            ConnectorAction saved = transactions.execute(status -> {
+                ConnectorAction stored = actions.saveAndFlush(action);
+                // 알림은 승인 줄과 한 트랜잭션이다. 알림 저장이 실패하면 승인 줄도 남지 않는다(ADR-070).
+                if (needsApproval && stored.conversationId() != null) {
+                    notifyApprovalRequested(stored, ConnectorActionView.titleOf(declared));
+                }
+                return stored;
+            });
             // 사건은 커밋한 뒤에 낸다. 받은 쪽이 읽었을 때 줄이 있어야 한다.
             if (needsApproval && saved.conversationId() != null) {
                 events.publishEvent(new ConnectorActionChanged(saved.conversationId(), saved.publicId()));
@@ -203,6 +241,18 @@ public class ConnectorPolicyService {
                     .map(first -> replayed(first, hermesTool, argsSha256))
                     .orElseThrow(() -> ex);
         }
+    }
+
+    /** 승인 줄의 주인에게 새 요청을 알린다. 대화가 지워졌거나 없으면 눌러도 갈 곳이 없어 남기지 않는다. */
+    private void notifyApprovalRequested(ConnectorAction action, String toolTitle) {
+        conversations
+                .publicIdOf(action.conversationId())
+                .ifPresent(conversationId -> notifications.notify(
+                        action.userId(),
+                        NotificationKind.APPROVAL_REQUESTED,
+                        APPROVAL_REQUESTED_TITLE,
+                        "「" + toolTitle + "」",
+                        new NotificationTarget(NotificationTargetType.CONVERSATION, conversationId)));
     }
 
     /** 그 사용자가 그 커넥터의 그 도구에 준 유효한 상시 허락이 있는가. 원래 이름을 확인하지 못한 호출은 없는 것이다. */

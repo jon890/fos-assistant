@@ -76,7 +76,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /**
- * 자동 turn 이 부모 대화에 넘긴 결과를 전달 묶음과 시도로 남기고, 그 turn 이 끝난 방식으로 닫는지 본다(ADR-070).
+ * 자동 turn 이 부모 대화에 넘긴 결과를 전달 묶음과 시도로 남기고, 그 turn 이 끝난 방식으로 닫는지 본다(ADR-075).
  *
  * <p>자동 turn 은 테스트 스레드 밖의 가상 스레드에서 돈다. 검사마다 그 turn 이 끝날 때까지 기다린 뒤 단언한다.
  */
@@ -245,7 +245,7 @@ class ResultDeliveryRecordTest {
         assertThat(attempt.finishedAt()).isNotNull();
         assertThat(onlyDelivery().status()).isEqualTo(DeliveryStatus.FAILED);
         assertThat(executions.findById(done.id()).orElseThrow().resultDeliveredAt())
-                .as("도착 알림 저장은 그대로 남는다")
+                .as("도착 알림 줄 저장은 그대로 남는다")
                 .isNotNull();
         assertThat(stub().received()).hasSize(1);
 

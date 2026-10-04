@@ -83,7 +83,7 @@ import org.springframework.transaction.support.TransactionTemplate;
  * 한 provider 안에서 계정을 돌려 쓰는 것은 Hermes 가 이미 하므로 여기서 하지 않는다.
  *
  * <p>자동 turn 은 알림 줄 저장, 전했다는 표시, 자동 turn 수 증가, 전달 묶음과 첫 시도 저장을 한 트랜잭션에 적는다. 그
- * 시도는 부모 turn 의 실행 줄을 잇고 그 turn 이 끝난 방식으로 닫힌다(ADR-070).
+ * 시도는 부모 turn 의 실행 줄을 잇고 그 turn 이 끝난 방식으로 닫힌다(ADR-075).
  */
 @Service
 @Slf4j
@@ -94,7 +94,7 @@ public class ChatService {
     /** 대화 목록 한 쪽의 상한이다. 웹이 더 크게 요청해도 이만큼만 읽는다. */
     public static final int MAX_CONVERSATION_PAGE = 100;
 
-    /** 다시 전달할 때 남기는 알림 줄이다. 결과마다 알림 줄을 다시 남기지 않고 이 한 줄만 남긴다(ADR-070). */
+    /** 다시 전달할 때 남기는 알림 줄이다. 결과마다 알림 줄을 다시 남기지 않고 이 한 줄만 남긴다(ADR-075). */
     static final String RETRY_NOTICE = "맡긴 일의 결과를 다시 전해요";
 
     private final ConversationRepository conversations;
@@ -185,7 +185,7 @@ public class ChatService {
      * 있어 여기서 다시 읽는다. 비었으면 아무것도 남기지 않고 돌아간다.
      *
      * <p>알림 줄은 위임 결과에 한 줄, 그 밖의 결과마다 한 줄이다. 알림 줄 저장, 결과마다 전했다는 표시, 자동 turn 수
-     * 증가, 전달 묶음과 항목과 첫 시도 저장은 한 트랜잭션이다(ADR-070). 그 뒤 Hermes 가 실패해도 같은
+     * 증가, 전달 묶음과 항목과 첫 시도 저장은 한 트랜잭션이다(ADR-075). 그 뒤 Hermes 가 실패해도 같은
      * 결과로 다시 깨우지 않는다. 같은 실패를 되풀이하지 않기 위해서다. 실패는 시도에 남기고 예외로 올라간다.
      *
      * @param owner 대화 주인. 요청이 없으므로 부르는 쪽이 사용자 행으로 만든다
@@ -228,7 +228,7 @@ public class ChatService {
     }
 
     /**
-     * 저장된 결과만 다시 읽어 전달 묶음 하나를 부모에 다시 넘긴다(ADR-070). 자식 실행과 커넥터 호출은 다시 하지 않는다.
+     * 저장된 결과만 다시 읽어 전달 묶음 하나를 부모에 다시 넘긴다(ADR-075). 자식 실행과 커넥터 호출은 다시 하지 않는다.
      *
      * <p>대화, 묶음, 상태, 에이전트를 잠금 전에 본다. 잠금 전에 본 상태는 빠른 거절일 뿐이다. 잠금을 연 뒤 항목의 결과를
      * 다시 읽고, 묶음을 조건부 update 로 {@code DELIVERING} 으로 바꾸는 것과 알림 줄과 새 시도를 한 트랜잭션에 적는다.
@@ -391,7 +391,7 @@ public class ChatService {
     }
 
     /**
-     * 전달 시도 하나로 부모 turn 을 돌리고, 그 turn 이 끝난 방식으로 시도를 닫은 뒤 끝 사건을 낸다(ADR-070).
+     * 전달 시도 하나로 부모 turn 을 돌리고, 그 turn 이 끝난 방식으로 시도를 닫은 뒤 끝 사건을 낸다(ADR-075).
      *
      * <p>답을 남기면 {@code SUCCEEDED}, 중지로 끝나면 {@code STOPPED} 다. 예외로 끝났어도 사용자가 중지를 확정했으면
      * {@code STOPPED} 다. 그 밖의 예외는 {@code FAILED} 와 그 예외의 오류 코드이고, 원래 예외를 다시 던진다.
@@ -1028,7 +1028,7 @@ public class ChatService {
     }
 
     /**
-     * 자동 turn 의 전달 시도에 그 turn 의 실행 줄을 잇는다(ADR-070).
+     * 자동 turn 의 전달 시도에 그 turn 의 실행 줄을 잇는다(ADR-075).
      *
      * <p>실패해도 던지지 않는다. 던지면 방금 만든 실행 줄이 {@code RUNNING} 으로 남는다. 이 뒤에는 그 줄을 실패로 적는
      * 경로가 없다. 시도는 이어지지 않은 채 turn 이 끝난 방식으로 닫힌다.

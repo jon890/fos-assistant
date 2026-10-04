@@ -56,7 +56,7 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 /**
- * 결과 다시 전달이 사용자 실행 한도에 닿으면 묶음을 바꾸지 않고 다시 시도를 예약하지 않는지 본다(ADR-069, ADR-070).
+ * 결과 다시 전달이 사용자 실행 한도에 닿으면 묶음을 바꾸지 않고 다시 시도를 예약하지 않는지 본다(ADR-069, ADR-075).
  *
  * <p>한도를 2 로 두고 그 사용자의 RUNNING 자식 줄 둘로 자리를 채운다. 구성은 {@link DelegationWakeUserLimitTest} 와 같게
  * 둔다. 같은 Spring 컨텍스트를 써서 컨텍스트 수를 늘리지 않고, 예약은 그 검사의 대역 스케줄러가 받는다.
