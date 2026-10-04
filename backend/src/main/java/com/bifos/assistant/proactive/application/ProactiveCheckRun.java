@@ -344,9 +344,7 @@ public class ProactiveCheckRun implements CheckTurn {
                 return;
             }
         }
-        Thread.ofVirtual()
-                .name("proactive-check-stop-" + executionId)
-                .start(() -> stopQuietly(reason, executionId));
+        Thread.ofVirtual().name("proactive-check-stop-" + executionId).start(() -> stopQuietly(reason, executionId));
     }
 
     /** 이미 끝난 turn 이면 멈추기가 {@code EXECUTION_NOT_RUNNING} 으로 끝난다. 어떤 예외든 경고 로그만 남긴다. */

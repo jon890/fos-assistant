@@ -210,8 +210,8 @@ class ProactiveCheckEndTest {
     void marksTreeDeliveredCountsDelegationsAndOpensNoAutoTurn() {
         String runningRunId = "run-child-" + UUID.randomUUID();
         stub().beforeAwait(() -> leaveChildren(runningRunId));
-        stub().willAnswer(command -> result(
-                "<fos-check-result>\n{\"version\":1,\"outcome\":\"NOTHING_NEW\"}\n</fos-check-result>"));
+        stub().willAnswer(command ->
+                result("<fos-check-result>\n{\"version\":1,\"outcome\":\"NOTHING_NEW\"}\n</fos-check-result>"));
 
         runCheck();
 

@@ -169,11 +169,7 @@ public class ProactiveCheckService {
      * @param failure turn 이 던진 예외. 돌아왔거나 {@link Error} 로 끝났으면 null 이다
      */
     private void finish(
-            Long conversationId,
-            TurnHandle handle,
-            ProactiveCheckRun run,
-            boolean returned,
-            RuntimeException failure) {
+            Long conversationId, TurnHandle handle, ProactiveCheckRun run, boolean returned, RuntimeException failure) {
         recordQuietly(run::close, conversationId);
         Long rootId = run.rootExecutionId();
         int delegations = rootId == null ? 0 : countDelegations(rootId, conversationId);
@@ -187,8 +183,8 @@ public class ProactiveCheckService {
             recordQuietly(() -> run.record(delegations), conversationId);
             recordQuietly(
                     () -> notices.publicIdOf(conversationId)
-                            .ifPresent(publicId ->
-                                    hub.publish(conversationId, ChatEvent.stopped(publicId, null, rootId))),
+                            .ifPresent(
+                                    publicId -> hub.publish(conversationId, ChatEvent.stopped(publicId, null, rootId))),
                     conversationId);
         } else {
             String code = failure instanceof ApiException api ? api.code().name() : ErrorCode.INTERNAL_ERROR.name();

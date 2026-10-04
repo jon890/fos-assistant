@@ -583,7 +583,8 @@ class AgentDelegationServiceTest {
         AgentExecution other = awaitFinished(otherRunning.executionId());
         assertThat(other.status()).as("다른 루트의 자식").isEqualTo(ExecutionStatus.SUCCEEDED);
         assertThat(stub().stopped())
-                .contains(executions.findById(running.executionId()).orElseThrow().hermesRunId())
+                .contains(
+                        executions.findById(running.executionId()).orElseThrow().hermesRunId())
                 .doesNotContain(other.hermesRunId(), finishedRunId);
         assertThat(executions.findById(finished.id()).orElseThrow().status())
                 .as("끝난 자식")

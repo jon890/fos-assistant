@@ -227,14 +227,11 @@ class ProactiveCheckLimitTest {
         assertThat(check.errorCode()).isEqualTo("CHECK_TOOL_LIMIT");
         assertThat(check.toolCalls()).isEqualTo(MAX_TOOL_CALLS + 1);
         assertThat(check.finishedAt()).isNotNull();
-        assertThat(stub().stopped())
-                .as("살펴보기 turn 의 run 에 간 중지")
-                .contains(rootRunId(check));
+        assertThat(stub().stopped()).as("살펴보기 turn 의 run 에 간 중지").contains(rootRunId(check));
         assertThat(messages.findByConversationIdOrderByIdAsc(conversation.id()))
                 .as("시작 줄과 멈춤 줄뿐이고 답 조각은 남지 않는다")
                 .extracting(ChatMessage::role, ChatMessage::content)
-                .containsExactly(
-                        tuple(MessageRole.SYSTEM, START_NOTICE), tuple(MessageRole.SYSTEM, TOOL_LIMIT_NOTICE));
+                .containsExactly(tuple(MessageRole.SYSTEM, START_NOTICE), tuple(MessageRole.SYSTEM, TOOL_LIMIT_NOTICE));
     }
 
     @Test
@@ -261,14 +258,13 @@ class ProactiveCheckLimitTest {
         stub().beforeAwait(() -> {
             // 살펴보기 turn 이 도는 동안 사용자가 대기 메시지를 보낸다.
             if (queued.compareAndSet(false, true)) {
-                pendingMessages.save(ChatPendingMessage.queued(
-                        conversation.id(), owner.id(), PENDING_TEXT, false, Instant.now()));
+                pendingMessages.save(
+                        ChatPendingMessage.queued(conversation.id(), owner.id(), PENDING_TEXT, false, Instant.now()));
             }
             await(stopReceived);
         });
-        stub().willAnswer(command -> command.input().contains(PENDING_TEXT)
-                ? completed(PENDING_ANSWER)
-                : cancelled("멈춘 답"));
+        stub().willAnswer(command ->
+                command.input().contains(PENDING_TEXT) ? completed(PENDING_ANSWER) : cancelled("멈춘 답"));
         hermesStreams(toolEvents(MAX_TOOL_CALLS + 1));
 
         runCheck();
