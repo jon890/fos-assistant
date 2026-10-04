@@ -22,6 +22,11 @@ test("대화가 대상인 알림은 그 대화 주소로 간다", () => {
   assert.equal(notificationHref(view()), `/chat/${CONVERSATION_ID}`);
 });
 
+test("작업이 대상인 알림은 그 작업 주소로 간다", () => {
+  const taskId = "99999999-8888-4777-8666-555555555555";
+  assert.equal(notificationHref(view({ kind: "TASK_FAILED", targetType: "TASK", targetId: taskId })), `/tasks/${taskId}`);
+});
+
 test("대상이 없는 알림은 갈 곳이 없다", () => {
   assert.equal(notificationHref(view({ targetType: null, targetId: null })), null);
   assert.equal(notificationHref(view({ targetId: null })), null);

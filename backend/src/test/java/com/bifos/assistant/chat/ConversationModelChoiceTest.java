@@ -338,7 +338,8 @@ class ConversationModelChoiceTest {
                 access,
                 new ChatEventStreams(Duration.ofSeconds(20)),
                 null,
-                mock(ModelTierService.class));
+                mock(ModelTierService.class),
+                List.of());
     }
 
     private static void rejected(Runnable action) {
