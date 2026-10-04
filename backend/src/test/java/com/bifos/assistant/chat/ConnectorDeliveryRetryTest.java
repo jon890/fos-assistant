@@ -263,7 +263,9 @@ class ConnectorDeliveryRetryTest {
         verify(connector, times(1)).execute(anyString(), anyString(), anyString(), anyString());
         List<HermesRunCommand> received = stub().received();
         assertThat(received).hasSize(2);
-        assertThat(received.get(1).input()).contains("상태: UNKNOWN]\n" + UNKNOWN_INPUT);
+        assertThat(received.get(1).input())
+                .contains("[출처: 승인한 동작, 동작: 메모 쓰기, 상태: UNKNOWN, 끝난 시각: ")
+                .contains("]\n" + UNKNOWN_INPUT);
         assertThat(deliveries.findById(delivery.id()).orElseThrow().status()).isEqualTo(DeliveryStatus.DELIVERED);
     }
 

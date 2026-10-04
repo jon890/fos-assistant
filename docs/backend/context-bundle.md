@@ -3,9 +3,6 @@
 Control Plane 이 여러 기록에서 모은 문맥의 항목 모델, source 마다의 판정, Hermes 에 넘기는 형식, 로그와 저장 규칙을 갖는다.
 결정은 [ADR-071](../adr/ADR-071-여러-출처의-문맥은-항목마다-출처와-권한과-신선도를-지닌-묶음으로-조립한다.md) 에 있다.
 
-**아직 구현 전이다.** 지금은 `ContextAssembler` 가 Memory 만 모으고, `ChatService.runDelegationResults` 가 결과를 `input` 에 잇는다.
-구현한 PR 이 이 단락을 지운다.
-
 Memory 의 층과 예산과 `memory_read` 는 [`memory.md`](memory.md) 가 그대로 갖는다. 이 문서는 그 위에 얹는 항목 모델만 갖는다.
 
 ## 항목의 칸
@@ -25,7 +22,7 @@ Memory 의 층과 예산과 `memory_read` 는 [`memory.md`](memory.md) 가 그�
 | `title`, `body` | 문자열 | 글로 옮길 때만 쓴다. 저장하지 않고 로그에 내지 않는다 |
 
 **항목 타입의 `toString` 은 `source` 와 `ref` 만 낸다.** Java record 의 기본 `toString` 은 모든 칸을 내므로, 항목이나 묶음을 로그에 넘기면 본문이 그대로 남는다.
-`AssembledContext` 도 같은 이유로 `toString` 을 고친다. 지금은 `instructions` 를 그대로 낸다.
+`AssembledContext` 도 같은 이유로 `toString` 이 `instructions` 를 내지 않고 글자 수와 항목 수만 낸다.
 
 ## 참여하는 source
 
@@ -81,8 +78,9 @@ Runs API 는 `instructions` 와 `input` 두 글을 받는다([`../hermes/runs-ap
 ```
 
 `FAILED` 면 상태 뒤에 `, 오류: <코드>` 를 지금처럼 붙인다. 도구의 원래 이름과 승인 줄의 공개 식별자는 지금처럼 싣지 않는다.
+사용자가 결과를 다시 전달하는 turn(`ChatService.retryDelivery`)도 같은 형식의 머리줄을 쓰고, 신선도는 다시 전하는 시각으로 판정한다.
 
-자동 turn 의 지시(`TurnIntent.DELEGATION_RESULTS_INSTRUCTION`)에 아래 글을 더한다.
+결과를 전하는 두 지시가 함께 끝에 붙이는 `TurnIntent.RESULT_HANDLING_RULES` 에 아래 글을 더한다. 자동 turn 과 다시 전달이 모두 받는다.
 
 > 결과마다 [출처: …] 줄이 있다. 출처가 다른 내용이 서로 어긋나면 하나를 고르지 말고 두 출처와 시각을 함께 말한다.
 > 사용자가 받아들인 기억과 외부 결과가 어긋나면 기억을 고치지 말고, 바꿀 것이 있으면 사용자에게 묻는다.

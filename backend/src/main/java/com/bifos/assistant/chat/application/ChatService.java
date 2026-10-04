@@ -4,6 +4,7 @@ import com.bifos.assistant.agent.application.AgentService;
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.chat.application.model.AutoTurnDelivery;
 import com.bifos.assistant.chat.application.model.AutoTurnResult;
+import com.bifos.assistant.chat.application.model.DeliveryInput;
 import com.bifos.assistant.chat.application.model.DeliveryItemRef;
 import com.bifos.assistant.chat.application.model.DeliveryState;
 import com.bifos.assistant.chat.application.model.ResultDeliveryStart;
@@ -22,12 +23,21 @@ import com.bifos.assistant.chat.infra.ChatPendingMessageRepository;
 import com.bifos.assistant.chat.infra.ConversationRepository;
 import com.bifos.assistant.context.AssembledContext;
 import com.bifos.assistant.context.ContextAssembler;
+import com.bifos.assistant.context.ContextBodyMode;
+import com.bifos.assistant.context.ContextFreshness;
+import com.bifos.assistant.context.ContextItem;
+import com.bifos.assistant.context.ContextProperties;
+import com.bifos.assistant.context.ContextSource;
+import com.bifos.assistant.context.ContextTrust;
+import com.bifos.assistant.context.ResultHeader;
 import com.bifos.assistant.hermes.HermesRunEventStream;
 import com.bifos.assistant.hermes.HermesRunsClient;
 import com.bifos.assistant.hermes.dto.HermesRunCommand;
 import com.bifos.assistant.hermes.dto.HermesRunResult;
 import com.bifos.assistant.hermes.dto.RunEvent;
 import com.bifos.assistant.memory.application.MemoryProposer;
+import com.bifos.assistant.memory.domain.type.MemoryScope;
+import com.bifos.assistant.memory.domain.type.MemorySensitivity;
 import com.bifos.assistant.model.domain.ModelChoice;
 import com.bifos.assistant.model.domain.type.ModelTier;
 import com.bifos.assistant.shared.auth.CurrentUser;
@@ -36,6 +46,7 @@ import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.shared.util.ExternalData;
 import com.bifos.assistant.skill.application.SkillCommandCatalog;
 import com.bifos.assistant.skill.application.SkillUseRecorder;
+import com.bifos.assistant.usage.application.ContextSourceRef;
 import com.bifos.assistant.usage.application.ExecutionContextSnapshot;
 import com.bifos.assistant.usage.application.ExecutionDeliveryWriter;
 import com.bifos.assistant.usage.application.ExecutionEventRecorder;
@@ -127,6 +138,7 @@ public class ChatService {
     private final List<AutoTurnResultSource> resultSources;
     private final UserExecutionLimiter limiter;
     private final ResultDeliveryRecorder resultDeliveries;
+    private final ContextProperties contextProperties;
 
     public ChatTurn send(CurrentUser user, Long conversationId, String text, String agentCode) {
         return send(user, conversationId, text, agentCode, List.of());
@@ -215,8 +227,9 @@ public class ChatService {
         if (notices.isEmpty()) {
             return;
         }
-        String input = deliveryInput(results, resultAgents, extras);
-        Routed routed = route(owner, conversationId, input, null, List.of());
+        DeliveryInput delivery =
+                deliveryInput(results, resultAgents, extras, clock.instant(), contextProperties.resultStaleAfter());
+        Routed routed = route(owner, conversationId, delivery.input(), null, List.of());
         if (routed.flow() != null) {
             // 흐름은 이 입력을 받을 자리가 없다. 깨우는 쪽이 이미 거르므로 그 사이 흐름이 붙은 경우뿐이다.
             // 깨우는 쪽이 거르는 것과 별개로 남긴다. 거르기와 잠금 사이에 에이전트의 흐름이 바뀌어도 흐름에 이 입력을 보내지 않는다.
@@ -224,7 +237,13 @@ public class ChatService {
             return;
         }
         Long attemptId = recordDelivery(routed.conversation(), results, notices, deliveries, onEvent);
-        runDeliveryTurn(owner, routed, input, new TurnIntent.DelegationResults(attemptId, false), handle, onEvent);
+        runDeliveryTurn(
+                owner,
+                routed,
+                delivery.input(),
+                new TurnIntent.DelegationResults(attemptId, false, delivery.items()),
+                handle,
+                onEvent);
     }
 
     /**
@@ -259,8 +278,8 @@ public class ChatService {
         // 사용자 실행 한도에 닿으면 USER_BUSY 가 그대로 올라간다. 묶음을 바꾸지 않고 다시 시도를 예약하지 않는다.
         TurnHandle handle = turns.open(user.id(), conversation.id());
         try {
-            String input = retryInput(user, conversation.id(), resultDeliveries.itemsOf(deliveryId));
-            Routed routed = route(user, conversation.id(), input, null, List.of());
+            DeliveryInput delivery = retryInput(user, conversation.id(), resultDeliveries.itemsOf(deliveryId));
+            Routed routed = route(user, conversation.id(), delivery.input(), null, List.of());
             // 잠금 전에 본 에이전트는 그 사이 바뀌었을 수 있다. 자동 turn 이 잠금 뒤 흐름을 다시 거르는 것과 같다.
             if (routed.flow() != null) {
                 throw ResultDeliveryRecorder.notRetryable();
@@ -269,7 +288,13 @@ public class ChatService {
                 throw new ApiException(ErrorCode.AGENT_NOT_FOUND, "no such agent");
             }
             Long attemptId = recordRetry(routed.conversation(), deliveryId, onEvent);
-            runDeliveryTurn(user, routed, input, new TurnIntent.DelegationResults(attemptId, true), handle, onEvent);
+            runDeliveryTurn(
+                    user,
+                    routed,
+                    delivery.input(),
+                    new TurnIntent.DelegationResults(attemptId, true, delivery.items()),
+                    handle,
+                    onEvent);
         } finally {
             turns.close(handle);
         }
@@ -285,7 +310,9 @@ public class ChatService {
     }
 
     /**
-     * 묶음의 항목을 결과를 낸 쪽의 줄에서 다시 읽어 자동 turn 과 같은 모양의 입력을 만든다.
+     * 묶음의 항목을 결과를 낸 쪽의 줄에서 다시 읽어 자동 turn 과 같은 모양의 입력과 결과 항목을 만든다.
+     *
+     * <p>신선도는 지금 시각으로 다시 판정한다. 몇 시간 뒤에 다시 전하면 머리줄에 「오래됨」 이 붙는다(ADR-071).
      *
      * <p>위임 결과는 그 사용자와 그 대화의 끝난 실행 줄만 항목 순서로 쓴다. 그 밖의 결과는 출처 이름이 같은 {@link
      * AutoTurnResultSource} 가 다시 읽는다. 맞는 구현이 없으면 경고 로그만 남기고 뺀다. 지워졌거나 남의 것인 결과는 빼고
@@ -293,7 +320,7 @@ public class ChatService {
      *
      * @throws ApiException {@code DELIVERY_NOT_RETRYABLE}. 남은 결과가 없을 때
      */
-    private String retryInput(CurrentUser user, Long conversationId, List<DeliveryItemRef> items) {
+    private DeliveryInput retryInput(CurrentUser user, Long conversationId, List<DeliveryItemRef> items) {
         List<Long> executionIds = new ArrayList<>();
         Map<String, List<String>> keysBySource = new LinkedHashMap<>();
         for (DeliveryItemRef item : items) {
@@ -330,7 +357,8 @@ public class ChatService {
         if (results.isEmpty() && extras.isEmpty()) {
             throw ResultDeliveryRecorder.notRetryable();
         }
-        return deliveryInput(results, resultAgentsOf(results), extras);
+        return deliveryInput(
+                results, resultAgentsOf(results), extras, clock.instant(), contextProperties.resultStaleAfter());
     }
 
     /**
@@ -623,53 +651,89 @@ public class ChatService {
     }
 
     /**
-     * 결과마다 에이전트 이름, 실행 번호, 상태를 적은 머리줄을 두고, 답이 있으면 그 아래에 잇는다. 실패는 오류 코드를
-     * 머리줄에 더한다.
+     * 결과마다 출처 머리줄을 두고, 답이 있으면 그 아래에 잇는다. 머리줄에는 에이전트 이름, 실행 번호, 상태, 끝난 시각을 적고 실패는
+     * 오류 코드를 더한다. 오래된 결과는 신선도와 안내 한 줄을 더한다(ADR-071).
      *
      * <p>연결용 에이전트의 답은 외부 서비스의 글을 담으므로 {@code <external-data>} 로 감싸 지시가 아니라고 알린다.
      * 에이전트 행이 없는 결과도 출처를 모르므로 감싼다. 감싸도 모델이 그 글을 따르지 않는다는 보장은 없다(ADR-049).
+     *
+     * <p>결과마다 {@code DELEGATION_RESULT} 항목을 하나씩 만든다. 본문은 입력에만 싣고 항목에 두지 않는다.
      */
-    private static String delegationInput(List<AgentExecution> results, Map<Long, Agent> resultAgents) {
+    private static DeliveryInput delegationInput(
+            List<AgentExecution> results, Map<Long, Agent> resultAgents, Instant now, Duration staleAfter) {
         StringBuilder input = new StringBuilder("맡긴 일의 결과가 도착했다.");
+        List<ContextItem> items = new ArrayList<>();
         for (AgentExecution result : results) {
-            input.append("\n\n[에이전트: ")
-                    .append(agentName(result, resultAgents))
-                    .append(", 실행 번호: ")
-                    .append(result.id())
-                    .append(", 상태: ")
-                    .append(result.status().name());
+            boolean external = isExternalResult(result, resultAgents);
+            ContextItem item = delegationItem(result, external, now, staleAfter);
+            items.add(item);
+            List<String> fields = new ArrayList<>(List.of(
+                    "에이전트: " + agentName(result, resultAgents),
+                    "실행 번호: " + result.id(),
+                    "상태: " + result.status().name()));
             if (result.status() == ExecutionStatus.FAILED) {
-                input.append(", 오류: ").append(result.errorCode());
+                fields.add("오류: " + result.errorCode());
             }
-            input.append(']');
+            input.append("\n\n").append(ResultHeader.render("맡긴 일", fields, item.asOf(), item.freshness(), staleAfter));
             if (result.outputText() != null && !result.outputText().isBlank()) {
-                input.append('\n')
-                        .append(
-                                isExternalResult(result, resultAgents)
-                                        ? ExternalData.wrap(result.outputText())
-                                        : result.outputText());
+                input.append('\n').append(external ? ExternalData.wrap(result.outputText()) : result.outputText());
             }
         }
-        return input.toString();
+        return new DeliveryInput(input.toString(), items);
     }
 
     /**
-     * 자동 turn 과 다시 전달이 함께 쓰는 Hermes 입력이다. 위임 결과의 단락이 먼저이고, 그 뒤로 그 밖의 결과의 단락을 빈 줄로
-     * 잇는다.
+     * 위임 결과 하나의 문맥 항목이다. 그 사용자와 그 대화의 실행만 오므로 실행 줄의 사용자가 대화 주인이다.
+     *
+     * @param external 커넥터 에이전트의 답이거나 출처를 모르는 답이다
      */
-    private static String deliveryInput(
-            List<AgentExecution> results, Map<Long, Agent> resultAgents, List<AutoTurnResult> extras) {
+    private static ContextItem delegationItem(
+            AgentExecution result, boolean external, Instant now, Duration staleAfter) {
+        ContextFreshness freshness = ResultHeader.freshnessOf(result.finishedAt(), now, staleAfter);
+        return new ContextItem(
+                ContextSource.DELEGATION_RESULT,
+                "execution:" + result.id(),
+                MemoryScope.USER,
+                result.userId(),
+                MemorySensitivity.SENSITIVE,
+                external ? ContextTrust.EXTERNAL : ContextTrust.AGENT,
+                result.finishedAt(),
+                freshness,
+                ContextBodyMode.INLINE,
+                List.of(),
+                null,
+                null);
+    }
+
+    /**
+     * 자동 turn 과 다시 전달이 함께 쓰는 Hermes 입력과 결과 항목이다. 위임 결과의 단락이 먼저이고, 그 뒤로 그 밖의 결과의 단락을
+     * 빈 줄로 잇는다. 항목도 같은 순서다. 항목이 없는 그 밖의 결과는 단락만 싣는다.
+     *
+     * @param now 묶음을 만든 시각. 결과의 신선도를 이 시각으로 판정한다
+     */
+    private static DeliveryInput deliveryInput(
+            List<AgentExecution> results,
+            Map<Long, Agent> resultAgents,
+            List<AutoTurnResult> extras,
+            Instant now,
+            Duration staleAfter) {
         StringBuilder input = new StringBuilder();
+        List<ContextItem> items = new ArrayList<>();
         if (!results.isEmpty()) {
-            input.append(delegationInput(results, resultAgents));
+            DeliveryInput delegation = delegationInput(results, resultAgents, now, staleAfter);
+            input.append(delegation.input());
+            items.addAll(delegation.items());
         }
         for (AutoTurnResult extra : extras) {
             if (!input.isEmpty()) {
                 input.append("\n\n");
             }
             input.append(extra.input());
+            if (extra.item() != null) {
+                items.add(extra.item());
+            }
         }
-        return input.toString();
+        return new DeliveryInput(input.toString(), items);
     }
 
     /** 위임 결과를 낸 에이전트들이다. 결과가 없으면 읽지 않는다. */
@@ -696,6 +760,21 @@ public class ChatService {
     private static String agentName(AgentExecution execution, Map<Long, Agent> resultAgents) {
         Agent agent = resultAgents.get(execution.agentId());
         return agent == null ? execution.profileName() : agent.name();
+    }
+
+    /**
+     * 실행에 남길 문맥 항목의 참조다. 결과를 전하는 turn 이면 Memory 항목 뒤로 입력에 실은 결과 항목을 잇는다(ADR-071).
+     *
+     * <p>커넥터 에이전트의 turn 은 Memory 항목이 없어 결과 항목만 남는다.
+     */
+    private static List<ContextSourceRef> sourceRefs(AssembledContext context, TurnIntent intent) {
+        if (!(intent instanceof TurnIntent.DelegationResults results)
+                || results.items().isEmpty()) {
+            return ContextSourceRefs.of(context);
+        }
+        List<ContextSourceRef> refs = new ArrayList<>(ContextSourceRefs.of(context));
+        refs.addAll(ContextSourceRefs.of(results.items()));
+        return refs;
     }
 
     /**
@@ -745,7 +824,7 @@ public class ChatService {
                     null,
                     context.instructionsHash(),
                     context.omittedItems(),
-                    ContextSourceRefs.of(context));
+                    sourceRefs(context, intent));
 
             ResolvedModelTier resolved;
             try {

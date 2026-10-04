@@ -1,6 +1,7 @@
 package com.bifos.assistant.chat.application;
 
 import com.bifos.assistant.context.AssembledContext;
+import com.bifos.assistant.context.ContextItem;
 import com.bifos.assistant.usage.application.ContextSourceRef;
 import java.util.List;
 import lombok.AccessLevel;
@@ -17,7 +18,12 @@ public final class ContextSourceRefs {
 
     /** 묶음에 실은 순서 그대로 옮긴다. 묶음이 비면 빈 목록이다. */
     public static List<ContextSourceRef> of(AssembledContext context) {
-        return context.bundle().items().stream()
+        return of(context.bundle().items());
+    }
+
+    /** 항목을 받은 순서 그대로 옮긴다. 결과를 전하는 turn 이 Memory 항목 뒤로 결과 항목을 이을 때 쓴다. */
+    public static List<ContextSourceRef> of(List<ContextItem> items) {
+        return items.stream()
                 .map(item -> new ContextSourceRef(
                         item.source().name(),
                         item.ref(),

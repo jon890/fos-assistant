@@ -47,13 +47,17 @@ import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.usage.application.ExecutionDeliveryWriter;
 import com.bifos.assistant.usage.domain.AgentExecution;
+import com.bifos.assistant.usage.domain.ExecutionContextSource;
 import com.bifos.assistant.usage.domain.type.ExecutionStatus;
 import com.bifos.assistant.usage.infra.AgentExecutionRepository;
+import com.bifos.assistant.usage.infra.ExecutionContextSourceRepository;
 import com.bifos.assistant.usage.infra.ExecutionEventRepository;
 import com.bifos.assistant.user.domain.AppUser;
 import com.bifos.assistant.user.infra.AppUserRepository;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
@@ -92,6 +96,10 @@ class ResultDeliveryRetryTest {
 
     /** {@code ChatService} 의 다시 전달 알림 줄이다. 상수는 package-private 이라 글로 견준다. */
     private static final String RETRY_NOTICE = "맡긴 일의 결과를 다시 전해요";
+
+    /** 결과 머리줄의 끝난 시각 형식이다. 기대값을 넣은 시각에서 따로 계산하려고 둔다. */
+    private static final DateTimeFormatter SEOUL_TIME =
+            DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm").withZone(ZoneId.of("Asia/Seoul"));
 
     @MockitoBean
     HermesRunEventStream eventStream;
@@ -156,6 +164,9 @@ class ResultDeliveryRetryTest {
 
     @Autowired
     HermesRunsClient hermes;
+
+    @Autowired
+    ExecutionContextSourceRepository contextSources;
 
     private CurrentUser dad;
     private Agent chief;
@@ -269,6 +280,39 @@ class ResultDeliveryRetryTest {
         assertThat(received.get(1).input()).isEqualTo(received.get(0).input());
         assertThat(received.get(1).input()).contains("조사 결과\n\n메모를 남겼다");
         assertThat(deliveries.findById(delivery.id()).orElseThrow().status()).isEqualTo(DeliveryStatus.DELIVERED);
+    }
+
+    @Test
+    @DisplayName("7시간 전에 끝난 위임 결과를 다시 전달하면 머리줄에 오래됨과 안내 줄이 붙고 그 turn 의 실행에 STALE 참조가 남는다")
+    void retriesStaleDelegationResultWithStaleHeaderAndReference() {
+        Instant finishedAt = Instant.now().minus(Duration.ofHours(7));
+        AgentExecution done = delegated(ExecutionStatus.SUCCEEDED, "조사 결과", finishedAt);
+        ResultDelivery delivery = failedDelivery(done);
+
+        chat.retryDelivery(dad, conversation.id(), delivery.id(), events::add);
+
+        List<HermesRunCommand> received = stub().received();
+        assertThat(received).hasSize(2);
+        HermesRunCommand retried = received.get(1);
+        assertThat(retried.input())
+                .as("다시 전달의 입력")
+                .contains("[출처: 맡긴 일, 에이전트: 조사원, 실행 번호: " + done.id() + ", 상태: SUCCEEDED, 끝난 시각: "
+                        + SEOUL_TIME.format(finishedAt) + ", 신선도: 오래됨]\n"
+                        + "이 결과는 6시간보다 전에 끝났다. 지금 상태와 다를 수 있다.\n조사 결과");
+        assertThat(retried.instructions())
+                .as("다시 전달의 지시")
+                .contains("결과마다 [출처: …] 줄이 있다. 출처가 다른 내용이 서로 어긋나면 하나를 고르지 말고 두 출처와 시각을 함께 말한다.")
+                .contains("사용자가 받아들인 기억과 외부 결과가 어긋나면 기억을 고치지 말고, 바꿀 것이 있으면 사용자에게 묻는다.")
+                .contains("신선도가 오래됨인 결과는 지금 상태와 다를 수 있다고 알린다.");
+        Long retryExecutionId = messagesOf(MessageRole.ASSISTANT).getLast().executionId();
+        assertThat(contextSources.findByIdExecutionIdOrderByIdPositionAsc(retryExecutionId))
+                .as("다시 전달 turn 의 실행 %s 에 남은 문맥 참조", retryExecutionId)
+                .extracting(
+                        ExecutionContextSource::source,
+                        ExecutionContextSource::sourceRef,
+                        ExecutionContextSource::bodyMode,
+                        ExecutionContextSource::freshness)
+                .containsExactly(tuple("DELEGATION_RESULT", "execution:" + done.id(), "INLINE", "STALE"));
     }
 
     @Test
@@ -577,9 +621,13 @@ class ResultDeliveryRetryTest {
         publisher.publishEvent(new DelegationFinished(conversation.id(), execution.id()));
     }
 
-    /** 대화 turn 이 직접 맡긴 위임 실행 줄을 만든다. */
+    /** 대화 turn 이 직접 맡긴 위임 실행 줄을 만든다. 끝난 시각은 비어 있다. */
     private AgentExecution delegated(ExecutionStatus status, String output) {
-        AgentExecution execution = AgentExecution.builder()
+        return delegated(status, output, null);
+    }
+
+    private AgentExecution delegated(ExecutionStatus status, String output, Instant finishedAt) {
+        AgentExecution.Builder builder = AgentExecution.builder()
                 .userId(dad.id())
                 .conversationId(conversation.id())
                 .agentId(worker.id())
@@ -589,8 +637,11 @@ class ResultDeliveryRetryTest {
                 .profileName("worker")
                 .costMode(CostMode.SUBSCRIPTION)
                 .status(status)
-                .startedAt(Instant.now())
-                .build();
+                .startedAt(Instant.now());
+        if (finishedAt != null) {
+            builder.timing(finishedAt.minusSeconds(30), finishedAt);
+        }
+        AgentExecution execution = builder.build();
         execution.recordOutput(output);
         return executions.save(execution);
     }
