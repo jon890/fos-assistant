@@ -135,36 +135,27 @@ scripts/check-public-safe.sh
 
 ## 확인
 
-아래 검사를 한 번에 돌린다.
+로컬 검사는 `scripts/check-local.sh` 하나로 돌린다. 돌리는 명령과 순서, 작업 폴더, `pnpm build` 의 자리표시자 환경 변수는 그 스크립트가 갖는다.
+명령을 여기 옮겨 적지 않는다. 옮겨 적은 목록은 작업 폴더가 어긋난 채 남은 적이 있다.
 
 ```bash
 # cwd: 저장소 root
+# 머지 전 확인. 브라우저 검사는 고친 화면의 spec 만 돌린다
+scripts/check-local.sh usage-breakdown memory-document
+# 인자가 없으면 브라우저 검사까지 전체를 돌린다
 scripts/check-local.sh
 ```
 
+인자는 브라우저 검사에만 쓰이고 `pnpm test:browser` 에 그대로 넘어간다. 나머지 단계는 인자와 상관없이 모두 돈다.
 처음 받은 checkout 에서도 그대로 돈다.
 처음 실패한 단계에서 멈추고 그 로그의 끝을 보인다.
 
 `scripts/quality.sh check` 는 파일을 바꾸지 않고 검사하고, `fix` 는 기계가 고칠 수 있는 위반만 고친다. 새 위반은 기준에 더하지 않는다.
 자세한 것은 [`backend/AGENTS.md`](backend/AGENTS.md) 와 [`web/AGENTS.md`](web/AGENTS.md) 에 있다.
 
-스크립트가 차례로 돌리는 명령은 아래와 같다.
-
-```bash
-cd backend && ./gradlew test
-scripts/check-mysql-migration.sh
-cd web && pnpm typecheck && pnpm build
-cd web && pnpm test:browser
-node test/e2e/run.ts
-node --test 'test/unit/**/*.test.ts'
-python3 -m unittest discover -s hermes/tests
-scripts/check-public-safe.sh
-scripts/quality.sh check
-```
-
 **위 검사가 모두 통과하면 머지한다. 머지마다 승인을 받지 않는다.**
 다만 통과를 **직접 돌려 확인한 것**이라야 한다. 브라우저 검사만은 PR 의 CI(`browser-mobile`, `browser-desktop`)가 통과한 것을 확인으로 본다.
-로컬에서는 고친 화면과 관련된 spec 만 돌린다. 전체 브라우저 검사는 한 번에 10분 가까이 걸리고 여러 작업이 나란히 돌면 이 머신의 자원이 모자라 흔들린다.
+그래서 로컬에서는 위처럼 고친 화면과 관련된 spec 만 인자로 준다. 전체 브라우저 검사는 한 번에 10분 가까이 걸리고 여러 작업이 나란히 돌면 이 머신의 자원이 모자라 흔들린다.
 워커의 보고를 읽는 것은 확인이 아니다.
 실제로 워커가 통과했다고 보고한 것이 전체로 돌리니 실패한 적이 있다.
 
@@ -176,7 +167,7 @@ PR 실패는 그 PR 에서 고친다. 모인 실패 이슈는 고치거나 까�
 
 공개 정보 검사의 값 목록은 repository secret `PUBLIC_REPO_DENYLIST` 다. `fos-home-infra` 의 목록이 바뀌면 secret 도 다시 넣는다.
 
-**위 명령을 적힌 순서대로 모두 돌린다.**
+**스크립트의 단계를 건너뛰지 않는다.** 브라우저 검사의 범위만 인자로 정한다.
 
 **브라우저 검사는 운영과 같은 빌드 결과를 띄워 검사한다.**
 `pnpm test:browser` 가 웹 서버를 띄우기 전에 빌드하므로, 따로 빌드하지 않아도 옛 화면을 검사하지 않는다.

@@ -1,10 +1,14 @@
 #!/usr/bin/env bash
-# 머지 전 로컬 검사를 AGENTS.md 「확인」 절의 순서대로 모두 돌린다.
+# 머지 전 로컬 검사를 차례로 돌린다. 돌리는 명령과 순서, 작업 폴더는 이 스크립트가 정본이다.
 #
 # 처음 받은 checkout 에서도 돌도록 웹 의존성과 Playwright 의 chromium 을 먼저 설치한다.
 # 둘 다 이미 있으면 바로 끝난다. `pnpm build` 에는 web/AGENTS.md 의 자리표시자 환경 변수를 준다.
 #
 # 단계마다 로그를 따로 남기고, 처음 실패한 단계에서 멈춰 그 로그의 끝을 보인다.
+#
+# 사용법: scripts/check-local.sh [브라우저 spec ...]
+# 인자는 브라우저 검사에만 넘긴다. 인자가 없으면 브라우저 검사 전체를 돌린다.
+# 머지 전 로컬 확인에서는 고친 화면의 spec 만 준다. 전체 브라우저 검사는 PR 의 CI 가 맡는다.
 set -Eeuo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -68,13 +72,16 @@ PY
 }
 
 echo "로그: ${LOG_DIR}"
+if [ "$#" -gt 0 ]; then
+  echo "브라우저 검사는 인자로 준 spec 만 돌린다: $*"
+fi
 step web-install     pnpm --dir "${ROOT}/web" install --frozen-lockfile
 step playwright      pnpm --dir "${ROOT}/web" exec playwright install chromium
 step backend         bash -c "cd '${ROOT}/backend' && ./gradlew test"
 step mysql-migration "${ROOT}/scripts/check-mysql-migration.sh"
 step web-typecheck   pnpm --dir "${ROOT}/web" typecheck
 step web-build       build_web
-step browser         pnpm --dir "${ROOT}/web" test:browser
+step browser         pnpm --dir "${ROOT}/web" test:browser "$@"
 step e2e             bash -c "cd '${ROOT}' && node test/e2e/run.ts"
 step unit            bash -c "cd '${ROOT}' && node --test 'test/unit/**/*.test.ts'"
 step hermes          check_hermes

@@ -207,7 +207,7 @@ How this project uses Hermes is described in [`docs/hermes/README.md`](docs/herm
 - [`AGENTS.md`](AGENTS.md) has the rules of the repository, including what must never be written into a public repository.
 - [`docs/README.md`](docs/README.md) is the index of all documents.
 - [`docs/adr/INDEX.md`](docs/adr/INDEX.md) lists the decisions that are hard to reverse.
-- `scripts/check-local.sh` runs every check that CI runs. Run it before opening a pull request.
+- `scripts/check-local.sh` runs the checks that CI runs. Before opening a pull request, pass the browser specs for the screens you changed; with no arguments it runs the whole browser suite. See the 「확인」 section of [`AGENTS.md`](AGENTS.md).
 
 ### Contributing a connector
 
