@@ -69,7 +69,7 @@
 
 - `docs/adr/ADR-074-지금-화면은-원래-기록을-읽어-만든-view-이고-정해진-카드-넷만-그린다.md` 의 `status` 줄을 `` - **status**: `accepted` `` 로 둔다. `docs/adr/INDEX.md` 의 ADR-074 줄의 상태를 `Accepted` 로 둔다
 - `docs/frontend/now.md` 머리의 「**아직 구현 전이다.** 구현한 PR 이 이 단락을 지운다.」 를 지운다
-- `docs/frontend/structure.md` 의 `/now` 줄 끝 「아직 구현 전이다」 와 `docs/README.md` 의 `frontend/now.md` 줄 끝 「아직 구현 전이다」 를 지운다
+- `docs/README.md` 의 `frontend/now.md` 줄 끝 「아직 구현 전이다」 를 지운다
 - `docs/flow.md` 「지금 화면을 열 때」 의 「**아직 구현 전이다.** 구현한 PR 이 이 줄을 지운다.」 를 지운다. 「할 일을 제안할 때」 의 같은 줄은 plan80 phase 03 이 이미 지웠으므로(Blocked 조건이 확인한다) 이 파일에 「아직 구현 전」 이 남지 않는다
 - `docs/prd.md` 「답하는 비서에서 먼저 챙기는 비서로」 표에서 ADR-073 줄(「대화에서 나온 할 일을 에이전트가 제안하고 …」)과 ADR-074 줄(「지금 화면이 실행 상태와 할 일에 따라 …」)을 「범위와 확인 방법」 표 끝으로 옮긴다. ADR-071 줄과 첫 반응 시간 줄은 남긴다. 그 두 줄은 ADR-071 의 `status` 와 `docs/model-tiers.md` 「첫 반응 시간」 의 「아직 구현 전」 을 지우는 PR 이 옮긴다. 줄이 남으므로 그 절의 머리 문단(「**아직 구현 전이다.** …」)도 남긴다
 
@@ -107,7 +107,6 @@ node --test 'test/unit/**/*.test.ts'
 ! grep -n '아직 구현 전' docs/frontend/now.md
 ! grep -n 'ADR-074.*아직 구현 전' docs/adr/INDEX.md
 ! grep -n '아직 구현 전' docs/adr/ADR-074-지금-화면은-원래-기록을-읽어-만든-view-이고-정해진-카드-넷만-그린다.md
-! grep -n '/now.*아직 구현 전' docs/frontend/structure.md
 ! grep -n 'frontend/now.md.*아직 구현 전' docs/README.md
 ! grep -n '아직 구현 전' docs/flow.md
 ```
@@ -141,7 +140,6 @@ pnpm test:browser ../test/browser/loading.spec.ts
 | `docs/adr/ADR-074-지금-화면은-원래-기록을-읽어-만든-view-이고-정해진-카드-넷만-그린다.md` | 수정 |
 | `docs/adr/INDEX.md` | 수정 |
 | `docs/frontend/now.md` | 수정 |
-| `docs/frontend/structure.md` | 수정 |
 | `docs/README.md` | 수정 |
 | `docs/flow.md` | 수정 |
 | `docs/prd.md` | 수정 |
