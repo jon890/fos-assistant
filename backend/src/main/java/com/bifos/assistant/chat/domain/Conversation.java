@@ -1,5 +1,6 @@
 package com.bifos.assistant.chat.domain;
 
+import com.bifos.assistant.chat.domain.type.ConversationPurpose;
 import com.bifos.assistant.chat.domain.type.ModelSelectionMode;
 import com.bifos.assistant.model.domain.ModelChoice;
 import com.bifos.assistant.model.domain.type.ModelTier;
@@ -80,6 +81,16 @@ public class Conversation {
     @Getter
     private String title;
 
+    /**
+     * 보통 대화인지 먼저 살펴보기의 점검 대화인지다. 만들 때 정하고 바뀌지 않는다.
+     *
+     * <p>사용자와 에이전트마다 지우지 않은 점검 대화 가운데 {@code id} 가 가장 큰 것을 쓴다(ADR-077).
+     */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "purpose", nullable = false, updatable = false, length = 16)
+    @Getter
+    private ConversationPurpose purpose;
+
     /** 이 대화에서 고른 provider. {@code model} 과 함께 채우거나 함께 비운다. */
     @Column(name = "model_provider", length = ModelChoice.PROVIDER_MAX_LENGTH)
     private String modelProvider;
@@ -122,16 +133,22 @@ public class Conversation {
     @Getter
     private Instant deletedAt;
 
-    private Conversation(Long userId, String title, Long agentId, Instant now) {
+    private Conversation(Long userId, String title, Long agentId, ConversationPurpose purpose, Instant now) {
         this.userId = userId;
         this.title = title;
         this.agentId = agentId;
+        this.purpose = purpose;
         this.createdAt = now;
         this.updatedAt = this.createdAt;
     }
 
     public static Conversation startedBy(Long userId, String title, Long agentId, Instant now) {
-        return new Conversation(userId, title, agentId, now);
+        return new Conversation(userId, title, agentId, ConversationPurpose.CHAT, now);
+    }
+
+    /** 먼저 살펴보기의 결과가 남는 점검 대화를 만든다. */
+    public static Conversation startedForCheck(Long userId, String title, Long agentId, Instant now) {
+        return new Conversation(userId, title, agentId, ConversationPurpose.CHECK, now);
     }
 
     /**

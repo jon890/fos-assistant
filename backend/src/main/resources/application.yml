@@ -124,6 +124,21 @@ assistant:
     history-conversations: 20
     # 만들기가 실패한 뒤 같은 사용자와 에이전트의 추천을 다시 만들지 않는 시간
     retry-after-failure: 10m
+  proactive-check:
+    # 먼저 살펴보기(ADR-077). 꺼 두면 살펴보기를 시작하지 않는다
+    enabled: true
+    # 살펴보기 turn 하나가 돌 수 있는 시간. hermes.run-timeout 보다 짧지 않으면 기동에 실패한다
+    max-duration: 4m
+    # 살펴보기 turn 하나가 시작할 수 있는 도구 호출 수
+    max-tool-calls: 40
+    # 살펴보기 트리에서 맡길 수 있는 위임 자식 수. 0 이면 맡기지 않는다
+    max-delegations: 3
+    # 점검 대화의 루트 session 하나로 보내는 살펴보기 수. 닿으면 session 을 바꾼다
+    session-max-checks: 14
+    # 최근에 알린 발견으로 읽는 기간. 같은 것을 다시 알리지 않는 판정과 다음 입력에 쓴다
+    digest-window: 30d
+    # 다음 살펴보기의 입력에 싣는 최근 발견 수
+    digest-max-items: 20
   auth:
     jwt-secret: ${ASSISTANT_JWT_SECRET}
   attachment:

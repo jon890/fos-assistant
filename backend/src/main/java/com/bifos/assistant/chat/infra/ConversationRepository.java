@@ -1,6 +1,7 @@
 package com.bifos.assistant.chat.infra;
 
 import com.bifos.assistant.chat.domain.Conversation;
+import com.bifos.assistant.chat.domain.type.ConversationPurpose;
 import com.bifos.assistant.chat.domain.type.ModelSelectionMode;
 import com.bifos.assistant.model.domain.type.ModelTier;
 import java.time.Instant;
@@ -38,6 +39,10 @@ public interface ConversationRepository extends JpaRepository<Conversation, Long
     /** 그 사용자가 그 에이전트와 나눈 지우지 않은 대화를 최근 것부터 읽는다. 개수는 {@code pageable} 이 정한다. */
     List<Conversation> findByUserIdAndAgentIdAndDeletedAtIsNullOrderByUpdatedAtDesc(
             Long userId, Long agentId, Pageable pageable);
+
+    /** 그 사용자가 그 에이전트와 그 목적으로 연 지우지 않은 대화 가운데 가장 나중에 만든 것. 점검 대화를 찾는다. */
+    Optional<Conversation> findFirstByUserIdAndAgentIdAndPurposeAndDeletedAtIsNullOrderByIdDesc(
+            Long userId, Long agentId, ConversationPurpose purpose);
 
     /** 어느 대화가 그 값을 보낼 session 이나 루트 session 으로 쓰는지. 지운 대화도 센다. */
     boolean existsByHermesSessionIdOrHermesRootSessionId(String hermesSessionId, String hermesRootSessionId);
