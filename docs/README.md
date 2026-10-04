@@ -27,7 +27,7 @@ frontend 는 화면의 동작과 구조이고, hermes 는 외부 런타임인 He
 | [`backend/quality.md`](backend/quality.md) | 구조 규칙과 코드 규칙의 기준 파일을 갱신하는 방법, 뺀 규칙의 까닭 |
 | [`backend/schema/README.md`](backend/schema/README.md) | 표와 칸의 뜻. 표를 다섯 파일로 나눈 색인이 있다 |
 | [`backend/agent.md`](backend/agent.md) | 페르소나, 에이전트 도구, 에이전트를 만들고 지우는 규칙 |
-| [`backend/agent-delegation.md`](backend/agent-delegation.md) | `agent_*` 도구로 다른 에이전트에게 맡기는 경로와 결과 도착 |
+| [`backend/agent-delegation.md`](backend/agent-delegation.md) | `agent_*` 도구로 다른 에이전트에게 맡기는 경로와 결과 도착, 끝나지 않은 결과 전달과 다시 전달 |
 | [`backend/artifact.md`](backend/artifact.md) | 에이전트가 만든 결과물 파일의 저장과 조회 |
 | [`backend/attachment.md`](backend/attachment.md) | 대화에 올린 사진의 저장과 전달 |
 | [`backend/connector-install.md`](backend/connector-install.md) | 대시보드 plugin 의 커넥터 경로를 쓰는 방법, 커넥터 설치와 실패 처리, 커넥터 에이전트의 경계 |
@@ -46,7 +46,7 @@ frontend 는 화면의 동작과 구조이고, hermes 는 외부 런타임인 He
 | --- | --- |
 | [`frontend/structure.md`](frontend/structure.md) | 화면 목록, 에이전트 화면과 사용량 화면의 구성, 화면의 정체성 |
 | [`frontend/shell.md`](frontend/shell.md) | 대화 이력과 목록, 화면 틀, 로딩 표시, 밝기 모드 |
-| [`frontend/chat.md`](frontend/chat.md) | 대화 화면의 모델 선택, 에이전트 질문, 다시 생성, 메시지 동작 |
+| [`frontend/chat.md`](frontend/chat.md) | 대화 화면의 모델 선택, 에이전트 질문, 다시 생성, 결과 다시 전달, 메시지 동작 |
 | [`frontend/activity.md`](frontend/activity.md) | 실행 하나를 다시 보는 화면과 작업 과정 표시 |
 
 화면에 관한 결정은 `adr/INDEX.md` 에서 층 칸이 frontend 인 것을 본다.
