@@ -64,7 +64,7 @@ interface ArtifactCleanupProbe {
    2. `probe.afterJudged(id)` 를 부른다.
    3. 확장자가 `html` 인 파일부터 지운다. 지우기 직전 `Files.readAttributes(file, BasicFileAttributes.class, LinkOption.NOFOLLOW_LINKS)` 로 수정 시각을 다시 읽는다. `cutoff` 보다 앞서지 않으면 그 폴더의 삭제를 멈춘다. 파일이 이미 없으면 건너뛴다. 지운 파일만 결과에 담는다.
    4. 나머지 파일을 지우기 전에 `regularFilesUnder(folder)` 로 다시 훑는다. `cutoff` 보다 앞서지 않은 파일이 하나라도 있으면 멈춘다.
-   5. 나머지 파일을 3과 같이 지우기 직전 재확인하며 지운다.
+   5. 4에서 다시 훑은 목록의 파일 가운데 3에서 지우지 않은 것(확장자가 `html` 이 아닌 파일과, 4에서 새로 보인 오래된 HTML)을 3과 같이 지우기 직전 재확인하며 지운다.
 4. 멈출 때는 `log.info` 로 대화 번호와 까닭을 남긴다. 파일 경로는 남기지 않는다.
 
 `Files.deleteIfExists` 가 실패하면 지금처럼 경고 로그를 남기고 그 파일만 건너뛴다.
@@ -86,7 +86,9 @@ probe 는 정리를 부른 스레드에서 잠금을 잡은 채 돈다. `Reentra
 | 정리 중 MCP 쓰기는 정리가 끝날 때까지 기다린다 | 위와 같음 | 다른 스레드에서 `store.write(7L, "a/late.html", ...)` 를 시작하고 300ms 안에 끝나지 않았음을 단언한다 | 정리가 끝난 뒤 그 쓰기가 끝나고 `late.html` 이 남는다 |
 | 다른 대화의 정리는 영향받지 않는다 | `7/` 은 최근 파일, `8/` 은 40일 전 파일 | 없음 | `8/` 의 파일만 지워진다 |
 
-넷째 테스트의 스레드는 `CompletableFuture.runAsync` 로 시작하고 `get(5, TimeUnit.SECONDS)` 로 기다린다. probe 안에서 막지 않는다.
+넷째 테스트는 probe 안에서 `CompletableFuture.runAsync` 로 쓰기를 시작하고, 같은 probe 안에서 `future.get(300, TimeUnit.MILLISECONDS)` 가 `TimeoutException` 을 내는지 단언한다. 정리가 끝난 뒤 `future.get(5, TimeUnit.SECONDS)` 로 기다린다. 기한 없는 대기는 쓰지 않는다.
+`afterJudged` 는 checked 예외를 선언하지 않으므로 probe 안의 `Files.writeString` 같은 호출은 `UncheckedIOException` 으로 감싼다.
+probe 가 `store` 를 참조해야 하면 `AtomicReference<ArtifactStore>` 에 담아 생성 순서를 푼다.
 기존 `backend/src/test/java/com/bifos/assistant/chat/ArtifactTest.java` 의 정리 테스트도 그대로 통과해야 한다.
 
 ## 검증
@@ -94,7 +96,7 @@ probe 는 정리를 부른 스레드에서 잠금을 잡은 채 돈다. `Reentra
 ```bash
 # cwd: backend/
 ./gradlew test --tests 'com.bifos.assistant.chat.infra.ArtifactStoreCleanupTest' --tests 'com.bifos.assistant.chat.infra.ArtifactStoreWriteTest' --tests 'com.bifos.assistant.chat.ArtifactTest'
-./gradlew checkstyleMain checkstyleTest
+./gradlew checkstyleMain checkstyleTest spotlessCheck
 ```
 
 셋 모두 종료 코드 0 이어야 한다.

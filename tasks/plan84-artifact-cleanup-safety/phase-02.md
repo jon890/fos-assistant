@@ -1,6 +1,6 @@
 # Phase 02. 지운 뒤 행 쪽에서 지운 표시를 맞춘다
 
-**Execution profile**: standard
+**Execution profile**: deep
 
 ## 목표
 
@@ -59,24 +59,30 @@
 
 ### 5. 이 phase 를 검증하는 테스트
 
-`backend/src/test/java/com/bifos/assistant/chat/ArtifactTest.java` 에 더한다. 기존 `expiredDeletedHtmlRecordsDeletionTimeAndReturns410` 이 행을 만드는 방법(`stub().beforeAwait(...)`, `chat.send`, `Files.setLastModifiedTime`)을 따른다.
-행의 `createdAt` 을 과거로 만들어야 하면 `artifactRows` 로 읽은 행을 고칠 수 없으므로 `cleanExpired` 에 넘기는 `now` 를 미래(예: `Instant.now().plus(Duration.ofDays(31))`)로 준다.
+`backend/src/test/java/com/bifos/assistant/chat/ArtifactTest.java` 를 고친다. 행을 만드는 방법은 기존 `expiredDeletedHtmlRecordsDeletionTimeAndReturns410` 을 따른다(`stub().beforeAwait(...)`, `chat.send`, `Files.setLastModifiedTime`).
+
+**행의 `createdAt` 은 지금 시각이라 `cleanExpired(Instant.now())` 로는 기간 시작보다 이르지 않다.** 행을 대상에 넣으려면 `cleanExpired` 에 미래 `now` 를 넘긴다.
+기본값은 `Instant.now().plus(Duration.ofDays(31))` 다. 이때 `cutoff` 는 지금보다 하루 뒤라 지금 만든 행과 40일 전 파일이 모두 대상이 된다.
+
+**기존 `expiredDeletedHtmlRecordsDeletionTimeAndReturns410` 을 고친다.** 지금은 `cleanExpired(Instant.now())` 를 부르므로 `markDeleted` 의 새 조건 때문에 `deletedAt` 이 비어 실패한다. 그 호출을 위 미래 `now` 로 바꾼다. 나머지 단언은 그대로 둔다.
+
+첫 `markDeleted` 만 던지는 writer 가 필요한 테스트는 `ChatArtifactWriter` 하위 클래스를 만들되, 던지지 않는 호출은 `super` 가 아니라 `@Autowired` 로 받은 `ChatArtifactWriter` 빈에 위임한다. `super` 를 부르면 Spring 프록시를 거치지 않아 `@Modifying` update 에 트랜잭션이 없다. `activeCreatedBefore` 도 그 빈에 위임한다.
+그 writer 로 `new ArtifactCleaner(store, failingOnce, properties, clock)` 를 만든다. 생성자 인자는 `@RequiredArgsConstructor` 순서(`ArtifactStore`, `ChatArtifactWriter`, `ArtifactProperties`, `Clock`)다. 테스트 클래스에 없는 빈은 `@Autowired` 로 받는다.
 
 | 테스트 | 준비 | 기대 |
 | --- | --- | --- |
-| 첫 지운 표시가 실패해도 다음 정리가 맞춘다 | HTML 하나를 답에 묶고 파일을 40일 전으로 한다. 첫 `markDeleted` 만 던지는 `ChatArtifactWriter` 하위 클래스로 `new ArtifactCleaner(store, failingOnce, properties, clock)` 를 만든다 | 첫 `cleanExpired` 뒤 파일이 없다. 같은 실행의 대조가 표시를 적거나, 그렇지 않으면 두 번째 `cleanExpired` 뒤 `deletedAt` 이 차 있다. 파일 응답이 410 `ARTIFACT_GONE`, 메시지 목록의 `deleted` 가 `true` 다 |
+| 첫 지운 표시가 실패해도 같은 정리의 대조가 맞춘다 | HTML 하나를 답에 묶고 파일을 40일 전으로 한다. 첫 `markDeleted` 만 던지는 writer 로 만든 cleaner 를 미래 `now` 로 한 번 돌린다 | 파일이 없다. 행의 `deletedAt` 이 차 있다. 파일 응답이 410 `ARTIFACT_GONE`, 메시지 목록의 `deleted` 가 `true` 다 |
 | 파일이 없고 행은 살아 있는 재기동 상태를 맞춘다 | HTML 을 답에 묶은 뒤 파일을 직접 지운다 | 미래 `now` 로 `cleanExpired` 한 뒤 행의 `deletedAt` 이 차 있고 410 이다 |
-| 같은 경로에 새 파일이 있으면 새 행을 적지 않는다 | 첫 turn 이 `a/index.html` 을 만든다. 두 번째 turn 이 같은 경로를 다시 쓴다. 파일은 지금 시각이다 | `now` 를 첫 행의 `createdAt` + 1ms + 30일로 주면 `cutoff` 가 두 행 사이에 온다. `cleanExpired(now)` 뒤 두 행 모두 `deletedAt` 이 비었고 파일이 남는다 |
-| 한 건의 실패가 나머지를 막지 않는다 | 두 대화에 HTML 을 하나씩 묶고 두 파일을 직접 지운다. 첫 `markDeleted` 만 던진다 | 미래 `now` 로 한 번 정리한 뒤 실패하지 않은 쪽 행의 `deletedAt` 이 차 있다 |
-
-`ArtifactCleaner` 의 생성자 인자는 `@RequiredArgsConstructor` 순서(`ArtifactStore`, `ChatArtifactWriter`, `ArtifactProperties`, `Clock`)다. 테스트 클래스에 없는 빈은 `@Autowired` 로 받는다.
+| 지운 표시는 기간 시작 전에 만든 행에만 적는다 | 첫 turn 이 `a/index.html` 을 만들고 두 번째 turn 이 같은 경로를 다시 써 행이 둘이다. 그 뒤 파일을 직접 지운다 | `now` 를 첫 행의 `createdAt` + 1ms + 30일로 주면 `cutoff` 가 두 행 사이에 온다. `cleanExpired(now)` 뒤 첫 행만 `deletedAt` 이 차 있고 둘째 행은 비었다. `markDeleted` 의 `createdAt` 조건을 빼면 이 테스트가 실패해야 한다 |
+| 같은 경로에 파일이 있으면 행을 적지 않는다 | 위처럼 행 둘을 만들되 파일은 지금 시각 그대로 둔다 | 위와 같은 `now` 로 정리한 뒤 두 행 모두 `deletedAt` 이 비었고 파일이 남는다 |
+| 한 건의 실패가 나머지를 막지 않는다 | 두 대화에 HTML 을 하나씩 묶고 두 파일을 직접 지운다. 첫 `markDeleted` 만 던지는 writer 를 쓴다 | 미래 `now` 로 한 번 정리하면 예외가 `cleanExpired` 밖으로 나오지 않고, 실패한 건도 대조가 다시 적어 두 행 모두 `deletedAt` 이 차 있다 |
 
 ## 검증
 
 ```bash
 # cwd: backend/
 ./gradlew test --tests 'com.bifos.assistant.chat.ArtifactTest' --tests 'com.bifos.assistant.chat.infra.ArtifactStoreCleanupTest' --tests 'com.bifos.assistant.chat.ChatArtifactMigrationTest'
-./gradlew checkstyleMain checkstyleTest
+./gradlew checkstyleMain checkstyleTest spotlessCheck
 ```
 
 ```bash
