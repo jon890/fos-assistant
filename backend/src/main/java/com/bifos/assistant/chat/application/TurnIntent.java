@@ -4,7 +4,7 @@ import com.bifos.assistant.chat.domain.ChatMessage;
 import com.bifos.assistant.context.ContextItem;
 import java.util.List;
 
-/** 이 turn 이 새 질문인지, 마지막 답의 다시 생성인지, 맡긴 일의 결과를 전하는 turn 인지, 예약 작업이 연 turn 인지. */
+/** 이 turn 이 새 질문인지, 마지막 답의 다시 생성인지, 맡긴 일의 결과를 전하는 turn 인지, 예약 작업이 연 turn 인지, 먼저 살펴보기 turn 인지. */
 public sealed interface TurnIntent {
 
     String REGENERATE_INSTRUCTION = "사용자가 바로 앞 질문에 대한 답을 다시 받기를 원한다. 앞의 답을 되풀이하지 말고 새로 답한다.";
@@ -74,6 +74,15 @@ public sealed interface TurnIntent {
      */
     record Scheduled(String notice) implements TurnIntent {}
 
+    /**
+     * 사용자의 질문 없이 Control Plane 이 연 먼저 살펴보기 turn 이다(ADR-080).
+     *
+     * <p>질문 대신 시작 알림 줄을 남기고, 답 조각을 흘리지 않고, 성공한 답은 {@code check} 가 바꾼 글로 남긴다.
+     *
+     * @param check 살펴보기만의 일을 맡는 쪽
+     */
+    record ProactiveCheck(CheckTurn check) implements TurnIntent {}
+
     static String instructionFor(TurnIntent intent) {
         if (intent instanceof Regenerate regenerate && regenerate.previousAnswer() != null) {
             return REGENERATE_INSTRUCTION;
@@ -83,6 +92,9 @@ public sealed interface TurnIntent {
         }
         if (intent instanceof Scheduled) {
             return SCHEDULED_INSTRUCTION;
+        }
+        if (intent instanceof ProactiveCheck proactive) {
+            return proactive.check().instructions();
         }
         return null;
     }

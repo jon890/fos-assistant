@@ -239,7 +239,8 @@ public class AgentExecution {
      * <p>부모가 {@code agent_status} 나 {@code agent_stop} 으로 결과를 직접 받았을 때도 적는다. 한 실행의 결과는
      * 한 번만 전하므로 {@code AgentExecutionRepository#markResultDelivered} 가 비어 있을 때만 채운다.
      */
-    @Column(name = "result_delivered_at")
+    // 엔티티 저장이 이 칸을 메모리의 옛 값으로 덮지 않게 한다. 도는 위임 자식에 적은 표시가 그 자식이 끝날 때 지워지면 안 된다.
+    @Column(name = "result_delivered_at", updatable = false)
     @Getter
     private Instant resultDeliveredAt;
 

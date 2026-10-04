@@ -1,0 +1,83 @@
+import { toolsetText } from "@/lib/toolset-label";
+
+/** 살펴보기를 시작하지 못하게 막는 까닭이다. `toolsets` 는 `TOOLSETS_NOT_ALLOWED` 일 때만 차 있다. */
+export type ProactiveCheckBlocker = {
+  code:
+    | "DISABLED"
+    | "AGENT_NOT_SUPPORTED"
+    | "SKILL_MISSING"
+    | "TOOLSETS_NOT_ALLOWED";
+  toolsets: string[];
+};
+
+/** 사용자가 그 에이전트로 연 마지막 살펴보기다. 돌고 있으면 `finishedAt` 이 null 이다. */
+export type ProactiveCheckLastCheck = {
+  status: "RUNNING" | "SUCCEEDED" | "FAILED" | "STOPPED";
+  /** 성공했을 때만 있다. */
+  outcome: "FINDINGS" | "NOTHING_NEW" | "INVALID_RESULT" | null;
+  startedAt: string;
+  finishedAt: string | null;
+};
+
+export type ProactiveCheckStatus = {
+  available: boolean;
+  blockers: ProactiveCheckBlocker[];
+  /** 요청자의 점검 대화다. 아직 없으면 null 이다. */
+  conversationId: string | null;
+  lastCheck: ProactiveCheckLastCheck | null;
+};
+
+export function fetchProactiveCheckStatus(code: string): Promise<Response> {
+  return fetch(`/api/agents/${code}/proactive-check`, { cache: "no-store" });
+}
+
+/** 살펴보기를 시작한다. 202 면 본문에 점검 대화의 공개 식별자가 있다. */
+export function startProactiveCheck(code: string): Promise<Response> {
+  return fetch(`/api/agents/${code}/proactive-check/runs`, { method: "POST" });
+}
+
+/** 시작 요청에서만 뜻이 정해지는 오류 코드의 문구다. 나머지는 공용 문구를 쓴다. */
+export const START_FAILURES: Record<string, string> = {
+  USER_BUSY: "진행 중인 작업이 끝난 뒤 다시 눌러 주세요.",
+};
+
+/** 막는 까닭 하나를 사용자가 할 일이 드러나는 문장으로 바꾼다. */
+export function describeBlocker(blocker: ProactiveCheckBlocker): string {
+  switch (blocker.code) {
+    case "DISABLED":
+      return "지금은 먼저 살펴보기를 쓸 수 없어요.";
+    case "AGENT_NOT_SUPPORTED":
+      return "이 에이전트는 먼저 살펴보기를 하지 않아요.";
+    case "SKILL_MISSING":
+      return "이 에이전트에 proactive-check 스킬이 없거나 꺼져 있어요. 에이전트를 준비하는 사람이 그 스킬을 설치하고 켜야 해요.";
+    case "TOOLSETS_NOT_ALLOWED": {
+      const names = blocker.toolsets
+        .map(
+          (name) => toolsetText(name, { label: name, description: "" }).label,
+        )
+        .join(", ");
+      return `${names} 도구가 켜져 있어서 살펴볼 수 없어요. 위 도구 절에서 꺼 주세요.`;
+    }
+  }
+}
+
+/** 마지막 살펴보기가 어떻게 끝났는지를 한 구절로 바꾼다. */
+export function describeLastCheck(check: ProactiveCheckLastCheck): string {
+  switch (check.status) {
+    case "RUNNING":
+      return "지금 살펴보는 중이에요";
+    case "FAILED":
+      return "끝내지 못했어요";
+    case "STOPPED":
+      return "멈췄어요";
+    case "SUCCEEDED":
+      switch (check.outcome) {
+        case "FINDINGS":
+          return "새로 알릴 것이 있었어요";
+        case "NOTHING_NEW":
+          return "새로 알릴 것이 없었어요";
+        default:
+          return "결과를 정리하지 못했어요";
+      }
+  }
+}

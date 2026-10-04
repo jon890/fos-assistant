@@ -145,6 +145,31 @@ Control Plane 이 직접 적는 것이다.
 사건은 관측용이고 그것 때문에 답이 사라지면 안 된다.
 기동할 때 남은 실행을 정리하는 경로도 끝 사건을 남긴다. 실패로 적은 실행에는 그 오류 코드를 담은 `RUN_FAILED` 가 남는다.
 
+## 먼저 살펴보기
+
+사용자가 에이전트 상세나 점검 대화에서 「지금 살펴보기」 를 누르면 Control Plane 이 그 사용자 대신 점검 대화에 turn 하나를 연다.
+단추를 누른 요청은 시작을 확인하고 곧바로 끝나고, 진행과 결과는 점검 대화의 대화 단위 SSE 와 이력으로 온다.
+
+```mermaid
+flowchart TD
+    A[지금 살펴보기] --> B{시작 전 점검}
+    B -- 막는 까닭 --> X[409 PROACTIVE_CHECK_UNAVAILABLE. 화면이 까닭과 끌 toolset 을 보인다]
+    B -- 통과 --> C{점검 대화가 있는가}
+    C -- 없다 --> D[점검 대화를 만든다]
+    C -- 있다 --> E{turn 자리와 대화 잠금}
+    D --> E
+    E -- USER_BUSY 나 CONVERSATION_BUSY --> Y[409. 새로 만든 대화는 지운다]
+    E -- 얻었다 --> F[202 conversationId. 화면이 점검 대화로 간다]
+    F --> G[살펴보기 turn. 읽기 경계와 상한 안에서 돈다]
+    G --> H{결과 블록}
+    H -- 발견 --> I[검사한 결과를 답으로 남긴다]
+    H -- NOTHING_NEW --> J[새로 알릴 것이 없다는 알림 줄]
+    H -- 없거나 읽지 못함 --> K[정리하지 못했다는 알림 줄]
+    G -- 상한이나 중지 --> L[멈췄다는 알림 줄]
+```
+
+흐름의 세부와 경계는 [`backend/proactive-check.md`](backend/proactive-check.md) 가 갖는다.
+
 ## 실행이 실패할 때
 
 | 오류 코드 | 원인 | 화면이 하는 일 |
@@ -162,6 +187,7 @@ Control Plane 이 직접 적는 것이다.
 | `PENDING_QUEUE_FULL` | 대기 메시지가 5개이거나, 더하면 합친 길이가 8000자를 넘는다 | 답이 끝난 뒤 보내도록 안내한다. 쓴 문장은 입력창에 되돌린다 |
 | `PENDING_MESSAGE_NOT_FOUND` | 취소하려는 대기 메시지가 이미 보내졌거나 없다 | 입력창에 되돌리지 않고 대기 줄을 다시 읽는다 |
 | `EXECUTION_NOT_FOUND` | 없는 실행이거나 남의 실행이다 | 사용량 목록으로 되돌린다 |
+| `PROACTIVE_CHECK_UNAVAILABLE` | 먼저 살펴보기를 시작할 수 없다. 까닭은 상태 조회가 준다([`backend/proactive-check.md`](backend/proactive-check.md) 의 「시작 전 점검」) | 상태를 다시 읽어 까닭마다 할 일을 보인다. toolset 이 걸렸으면 끌 toolset 이름을 보인다 |
 | `DELIVERY_NOT_FOUND` | 다시 전달하려는 결과 묶음이 그 대화에 없다 | 안내를 보이고 이력을 다시 읽는다 |
 | `DELIVERY_NOT_RETRYABLE` | 다시 전달하려는 묶음이 이미 전하는 중이거나 끝났다. 묶음의 결과가 남지 않았거나 대화에 흐름이 붙은 때도 같다 | 안내를 보이고 이력을 다시 읽는다 |
 

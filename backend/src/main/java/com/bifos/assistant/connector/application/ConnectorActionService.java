@@ -565,7 +565,11 @@ public class ConnectorActionService {
         return new Approval(actions.save(action), connection.get().agent().hermesProfile());
     }
 
-    /** 상시 허락은 없는 것으로 두고 지금 정책으로 다시 판정한다. 허락이 있어 통과하는 호출은 승인 줄이 되지 않는다. */
+    /**
+     * 상시 허락은 없는 것으로 두고 지금 정책으로 다시 판정한다. 허락이 있어 통과하는 호출은 승인 줄이 되지 않는다.
+     *
+     * <p>살펴보기의 읽기 경계는 보지 않는다. 살펴보기 트리에서는 승인 줄이 생기지 않아, 여기 오는 줄은 보통 실행의 것이다.
+     */
     private static ToolPolicyDecision redecide(
             ConnectorConnection connection, ConnectorManifest manifest, ConnectorAction action) {
         return ToolPolicyDecision.decide(
@@ -574,7 +578,8 @@ public class ConnectorActionService {
                 manifest.schema(),
                 ConnectorToolPolicies.find(manifest, action.toolName()),
                 false,
-                action.argsJson().getBytes(StandardCharsets.UTF_8).length);
+                action.argsJson().getBytes(StandardCharsets.UTF_8).length,
+                false);
     }
 
     /**

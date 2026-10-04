@@ -66,6 +66,8 @@ const MESSAGES: Record<string, string> = {
   SERVICE_TOKEN_NOT_FOUND:
     "토큰을 찾지 못했어요. 화면을 새로고침해 확인해 주세요.",
   NOTIFICATION_NOT_FOUND: "이미 지워졌거나 없는 알림이에요.",
+  PROACTIVE_CHECK_UNAVAILABLE:
+    "지금은 이 에이전트로 살펴볼 수 없어요. 에이전트 화면에서 까닭을 확인해 주세요.",
   TASK_NOT_FOUND: "이미 지워졌거나 없는 작업이에요.",
   TASK_LIMIT_REACHED:
     "예약 작업은 10개까지 만들 수 있어요. 쓰지 않는 작업을 지워 주세요.",

@@ -60,6 +60,12 @@ Hermes 가 스킬을 읽는 방식은 [`hermes/skills.md`](../hermes/skills.md) 
 - 이름은 대화를 만들기 전에 확인한다. 거절한 커맨드는 대화도 메시지도 실행도 남기지 않는다. 목록을 읽다 Hermes 가 실패하면 그 오류로 거절하고 캐시에 두지 않는다
 - 흐름이 붙은 에이전트에서는 커맨드를 해석하지 않고 글 그대로 보낸다. 입력창도 `/` 목록을 띄우지 않는다
 
+### 이름이 정해진 스킬
+
+`proactive-check` 는 먼저 살펴보기의 분야 지침이다. 에이전트에 이 이름의 스킬이 켜져 있으면 그 에이전트는 살펴보기를 할 수 있다.
+살펴보기 turn 은 사용자 커맨드가 아니라 Control Plane 이 이 스킬을 읽으라는 입력을 만들어 보낸다. 호출 이력에는 남기지 않는다. 모델이 `skill_view` 로 읽으면 `MODEL` 로 남는다.
+사용자가 `/proactive-check` 로 직접 부르면 보통 스킬 커맨드이고 읽기 경계를 받지 않는다. 계약은 [`proactive-check.md`](proactive-check.md) 가 갖는다.
+
 ## 호출 이력
 
 `execution_skill_use` 한 표에 둔다([`backend/schema/execution.md`](schema/execution.md)).

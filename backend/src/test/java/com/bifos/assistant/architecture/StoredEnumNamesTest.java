@@ -5,8 +5,14 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.bifos.assistant.agent.domain.type.AgentVisibility;
 import com.bifos.assistant.agent.domain.type.CostMode;
 import com.bifos.assistant.agent.domain.type.CredentialScope;
+import com.bifos.assistant.chat.domain.type.ConversationPurpose;
 import com.bifos.assistant.chat.domain.type.MessageRole;
 import com.bifos.assistant.model.domain.type.ModelTier;
+import com.bifos.assistant.proactive.domain.type.CheckOutcome;
+import com.bifos.assistant.proactive.domain.type.CheckStatus;
+import com.bifos.assistant.proactive.domain.type.CheckTrigger;
+import com.bifos.assistant.proactive.domain.type.FindingKind;
+import com.bifos.assistant.proactive.domain.type.FindingReason;
 import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.skill.domain.type.SkillUseSource;
 import com.bifos.assistant.usage.domain.type.ExecutionEventType;
@@ -25,16 +31,18 @@ import org.junit.jupiter.api.Test;
  */
 class StoredEnumNamesTest {
 
-    private static final Map<Class<? extends Enum<?>>, List<String>> STORED_ENUMS = Map.of(
-            CostMode.class, List.of("SUBSCRIPTION", "API"),
-            CredentialScope.class, List.of("SHARED_HOUSEHOLD", "DEDICATED"),
-            AgentVisibility.class, List.of("PRIVATE", "GROUP"),
-            MessageRole.class, List.of("USER", "ASSISTANT", "SYSTEM"),
-            SkillUseSource.class, List.of("COMMAND", "MODEL"),
-            UserRole.class, List.of("ADMIN", "MEMBER"),
-            ExecutionStatus.class, List.of("RUNNING", "SUCCEEDED", "FAILED", "CANCELLED"),
-            ModelTier.class, List.of("FAST", "BALANCED", "DEEP"),
-            ExecutionEventType.class,
+    private static final Map<Class<? extends Enum<?>>, List<String>> STORED_ENUMS = Map.ofEntries(
+            Map.entry(CostMode.class, List.of("SUBSCRIPTION", "API")),
+            Map.entry(CredentialScope.class, List.of("SHARED_HOUSEHOLD", "DEDICATED")),
+            Map.entry(AgentVisibility.class, List.of("PRIVATE", "GROUP")),
+            Map.entry(MessageRole.class, List.of("USER", "ASSISTANT", "SYSTEM")),
+            Map.entry(ConversationPurpose.class, List.of("CHAT", "CHECK")),
+            Map.entry(SkillUseSource.class, List.of("COMMAND", "MODEL")),
+            Map.entry(UserRole.class, List.of("ADMIN", "MEMBER")),
+            Map.entry(ExecutionStatus.class, List.of("RUNNING", "SUCCEEDED", "FAILED", "CANCELLED")),
+            Map.entry(ModelTier.class, List.of("FAST", "BALANCED", "DEEP")),
+            Map.entry(
+                    ExecutionEventType.class,
                     List.of(
                             "RUN_STARTED",
                             "RUN_COMPLETED",
@@ -44,7 +52,21 @@ class StoredEnumNamesTest {
                             "TOOL_COMPLETED",
                             "SUBAGENT_STARTED",
                             "SUBAGENT_COMPLETED",
-                            "PROVIDER_SWITCHED"));
+                            "PROVIDER_SWITCHED")),
+            Map.entry(CheckTrigger.class, List.of("MANUAL", "SCHEDULED")),
+            Map.entry(CheckStatus.class, List.of("RUNNING", "SUCCEEDED", "FAILED", "STOPPED")),
+            Map.entry(CheckOutcome.class, List.of("FINDINGS", "NOTHING_NEW", "INVALID_RESULT")),
+            Map.entry(FindingKind.class, List.of("NEW", "REFERENCE")),
+            Map.entry(
+                    FindingReason.class,
+                    List.of(
+                            "NO_SOURCE",
+                            "NOT_CHECKED_NOW",
+                            "CLOSED",
+                            "STALE",
+                            "FRESHNESS_UNKNOWN",
+                            "INCOMPLETE",
+                            "REPEATED")));
 
     @Test
     @DisplayName("저장되는 enum 의 상수 이름이 순서까지 옮기기 전과 같다")

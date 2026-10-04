@@ -38,6 +38,7 @@ Hermes 사건을 `execution_event` 로 옮겨 적는 규칙과 실행 트리를 
 ### 대화의 모델 선택
 
 대화 한 줄(`ConversationView`)은 `provider`, `model`, `reasoningEffort` 를 싣는다. 고르지 않았으면 셋 다 null 이다.
+`purpose`(`CHAT`, `CHECK`)도 싣는다. 화면이 점검 대화를 알아보는 데 쓴다([`proactive-check.md`](proactive-check.md)).
 
 `GET /api/v1/chat/model-options` 의 응답이다.
 
