@@ -1,5 +1,6 @@
 package com.bifos.assistant.connector.application;
 
+import com.bifos.assistant.chat.application.ConversationNotices;
 import com.bifos.assistant.connector.application.model.ConnectorActionChanged;
 import com.bifos.assistant.connector.application.model.ConnectorActionResult;
 import com.bifos.assistant.connector.application.model.ConnectorActionView;
@@ -22,6 +23,10 @@ import com.bifos.assistant.hermes.HermesConnectorClient;
 import com.bifos.assistant.hermes.ToolDetailRedactor;
 import com.bifos.assistant.hermes.dto.CallResult;
 import com.bifos.assistant.hermes.dto.ConnectorManifest;
+import com.bifos.assistant.notification.application.NotificationService;
+import com.bifos.assistant.notification.domain.NotificationTarget;
+import com.bifos.assistant.notification.domain.type.NotificationKind;
+import com.bifos.assistant.notification.domain.type.NotificationTargetType;
 import com.bifos.assistant.orchestration.application.DelegationProperties;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.error.ApiException;
@@ -74,6 +79,9 @@ public class ConnectorActionService {
     private static final Set<ActionStatus> CLOSED_WITHOUT_EXECUTION =
             Set.of(ActionStatus.REJECTED, ActionStatus.EXPIRED);
 
+    /** 만료한 승인 줄을 알리는 알림의 제목이다. 본문은 도구 제목이다. */
+    static final String APPROVAL_EXPIRED_TITLE = "승인 요청이 만료됐어요";
+
     private static final String EXECUTING_MESSAGE = "an approved action of this connection is still executing";
 
     /** 도구를 선언하지 않는 manifest 판이다. */
@@ -94,6 +102,8 @@ public class ConnectorActionService {
     private final HermesConnectorClient connector;
     private final DelegationProperties delegation;
     private final ApplicationEventPublisher events;
+    private final NotificationService notifications;
+    private final ConversationNotices conversations;
     private final TransactionTemplate transactions;
     private final Clock clock;
 
@@ -109,6 +119,8 @@ public class ConnectorActionService {
             HermesConnectorClient connector,
             DelegationProperties delegation,
             ApplicationEventPublisher events,
+            NotificationService notifications,
+            ConversationNotices conversations,
             PlatformTransactionManager transactionManager) {
         this(
                 actions,
@@ -119,6 +131,8 @@ public class ConnectorActionService {
                 connector,
                 delegation,
                 events,
+                notifications,
+                conversations,
                 transactionManager,
                 Clock.systemUTC());
     }
@@ -132,6 +146,8 @@ public class ConnectorActionService {
             HermesConnectorClient connector,
             DelegationProperties delegation,
             ApplicationEventPublisher events,
+            NotificationService notifications,
+            ConversationNotices conversations,
             PlatformTransactionManager transactionManager,
             Clock clock) {
         this.actions = actions;
@@ -142,6 +158,8 @@ public class ConnectorActionService {
         this.connector = connector;
         this.delegation = delegation;
         this.events = events;
+        this.notifications = notifications;
+        this.conversations = conversations;
         this.transactions = new TransactionTemplate(transactionManager);
         this.clock = clock;
     }
@@ -335,11 +353,17 @@ public class ConnectorActionService {
     /**
      * {@code now} 에 기다리는 시간이 지난 승인 줄을 만료로 바꾼다. 한 줄이 실패해도 나머지를 계속한다.
      *
+     * <p>만료와 그 알림 줄은 한 트랜잭션이다. 알림의 도구 제목을 얻으려 카탈로그를 읽는데, 행을 잠근 트랜잭션 안에서
+     * 읽지 않으려고 만료할 줄의 커넥터마다 한 번씩 먼저 읽어 둔다.
+     *
      * @return 만료로 바꾼 건수
      */
     public int expire(Instant now) {
+        List<ConnectorAction> dueActions = actions.findByStatusAndExpiresAtBefore(ActionStatus.PENDING, now);
+        Map<String, Optional<ConnectorManifest>> manifests = new HashMap<>();
+        dueActions.forEach(due -> manifests.computeIfAbsent(due.connectorId(), this::readManifest));
         int expired = 0;
-        for (ConnectorAction due : actions.findByStatusAndExpiresAtBefore(ActionStatus.PENDING, now)) {
+        for (ConnectorAction due : dueActions) {
             try {
                 // 줄을 잠그고 다시 읽는다. 그 사이 승인이나 거절이 끝났으면 건드리지 않는다.
                 Optional<ConnectorAction> changed =
@@ -348,7 +372,9 @@ public class ConnectorActionService {
                                         && action.expiresAt().isBefore(now))
                                 .map(action -> {
                                     action.expire(now);
-                                    return actions.save(action);
+                                    ConnectorAction saved = actions.save(action);
+                                    notifyExpired(saved, manifests.get(saved.connectorId()));
+                                    return saved;
                                 }));
                 if (changed.isPresent()) {
                     publish(changed.get());
@@ -467,7 +493,9 @@ public class ConnectorActionService {
         ConnectorAction action = requirePending(user, actionId);
         if (!action.expiresAt().isAfter(now)) {
             action.expire(now);
-            return Approval.refused(actions.save(action));
+            ConnectorAction saved = actions.save(action);
+            notifyExpired(saved, readManifest(saved.connectorId()));
+            return Approval.refused(saved);
         }
         Optional<ConnectorManifest> manifest = readManifest(action.connectorId());
         // 승인 줄이 `hiddenArgs` 로 낸 것과 같은 조건이다. 사람이 다 읽지 못한 인자로는 실행하지 않는다. 기간을 실은
@@ -619,6 +647,30 @@ public class ConnectorActionService {
         return action.status() == ActionStatus.PENDING
                 && grantClosed(manifest, action)
                 && ToolDetailRedactor.hidesArguments(action.argsJson());
+    }
+
+    /**
+     * 만료한 승인 줄의 주인에게 알린다. 그 줄을 만료로 바꾼 트랜잭션 안에서 부른다.
+     *
+     * <p>대화 없이 돈 실행의 줄과, 대화가 지워졌거나 없는 줄은 눌러도 갈 곳이 없어 남기지 않는다. 도구 제목은 승인 카드와
+     * 같은 규칙이다.
+     *
+     * @param manifest 그 줄의 커넥터 manifest. 읽지 못했으면 빈 값
+     */
+    private void notifyExpired(ConnectorAction action, Optional<ConnectorManifest> manifest) {
+        if (action.conversationId() == null) {
+            return;
+        }
+        String toolTitle = ConnectorActionView.titleOf(
+                manifest.flatMap(found -> ConnectorToolPolicies.find(found, action.toolName())));
+        conversations
+                .publicIdOf(action.conversationId())
+                .ifPresent(conversationId -> notifications.notify(
+                        action.userId(),
+                        NotificationKind.APPROVAL_EXPIRED,
+                        APPROVAL_EXPIRED_TITLE,
+                        "「" + toolTitle + "」",
+                        new NotificationTarget(NotificationTargetType.CONVERSATION, conversationId)));
     }
 
     /** 읽지 못했거나 카탈로그에 없으면 빈 값이다. 예외 메시지에는 원격 응답이 섞일 수 있어 종류만 남긴다. */

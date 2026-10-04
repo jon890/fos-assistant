@@ -26,9 +26,9 @@ import org.springframework.transaction.PlatformTransactionManager;
  * <p>이 증거가 없으면 {@link RepositoryQueryMysqlTest} 가 통과하는 것이 쿼리가 맞아서인지 검사가 보지 못해서인지 알 수 없다. 이
  * 검사가 실패하면 그 검사가 이 종류의 결함을 더는 잡지 못한다는 뜻이다.
  *
- * <p>V58 부터 V65 까지는 정렬 규칙만 바꾸므로 V57 스키마도 지금의 엔티티로 {@code ddl-auto=validate} 를 통과한다. 그 뒤에 칸을
- * 더하는 마이그레이션이 생기면 V57 스키마가 엔티티 검증을 통과하지 못해 이 문맥이 뜨지 않는다. 그때는 이 클래스의 {@code ddl-auto} 를
- * {@code none} 으로 바꾼다. 없는 칸 때문에 실패하는 메서드가 생기면 「실패는 모두 1267」 단언을 빼고 두 메서드의 단언만 남긴다.
+ * <p>V57 뒤의 마이그레이션이 표와 칸을 더하므로 V57 스키마는 지금의 엔티티 검증을 통과하지 못한다. 그래서 {@code ddl-auto} 를
+ * {@code none} 으로 두어 검증 없이 문맥을 띄운다. 그 결과 V57 뒤에 생긴 표의 쿼리는 없는 표 오류로 실패한다. 그 실패는 이 검사가
+ * 보려는 것이 아니므로 실패 전체를 단언하지 않고, 정렬 규칙이 섞인 두 메서드가 실패 목록에 있고 그 실패가 오류 1267 인지만 본다.
  */
 @Tag("mysql")
 @SpringBootTest
@@ -39,6 +39,10 @@ class CollationMixQueryMysqlTest {
     private static final String OLD_COLLATION = "utf8mb4_unicode_ci";
     private static final String NEW_COLLATION = "utf8mb4_0900_ai_ci";
     private static final int ILLEGAL_MIX_OF_COLLATIONS = 1267;
+
+    /** V57 스키마에서 정렬 규칙이 다른 두 표의 문자열 칸을 비교하는 저장소 메서드다. */
+    private static final List<String> COLLATION_MIXED_METHODS = List.of(
+            "ExecutionEventRepository.findUnscheduledChildren", "ExecutionEventRepository.countUnscheduledChildren");
 
     @Autowired
     private ApplicationContext context;
@@ -61,7 +65,7 @@ class CollationMixQueryMysqlTest {
         registry.add("spring.datasource.driver-class-name", () -> "com.mysql.cj.jdbc.Driver");
         registry.add("spring.flyway.enabled", () -> "true");
         registry.add("spring.flyway.target", () -> BEFORE_VERSION);
-        registry.add("spring.jpa.hibernate.ddl-auto", () -> "validate");
+        registry.add("spring.jpa.hibernate.ddl-auto", () -> "none");
     }
 
     @Test
@@ -81,10 +85,10 @@ class CollationMixQueryMysqlTest {
 
         assertThat(failures)
                 .extracting(RepositoryQuerySweep.Failure::method)
-                .contains(
-                        "ExecutionEventRepository.findUnscheduledChildren",
-                        "ExecutionEventRepository.countUnscheduledChildren");
+                .contains(COLLATION_MIXED_METHODS.toArray(String[]::new));
+        // V57 뒤에 생긴 표의 쿼리는 없는 표 오류로 실패하므로 정렬 규칙이 섞인 두 메서드의 실패만 오류 코드를 본다.
         assertThat(failures)
+                .filteredOn(failure -> COLLATION_MIXED_METHODS.contains(failure.method()))
                 .allSatisfy(failure -> assertThat(sqlErrorCode(failure.cause()))
                         .as("%s 의 SQL 오류 코드. 원인: %s", failure.method(), failure.cause())
                         .isEqualTo(ILLEGAL_MIX_OF_COLLATIONS));
