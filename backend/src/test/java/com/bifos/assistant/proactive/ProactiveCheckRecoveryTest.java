@@ -11,6 +11,8 @@ import com.bifos.assistant.chat.application.RestartReconciler;
 import com.bifos.assistant.chat.domain.Conversation;
 import com.bifos.assistant.chat.infra.ChatMessageRepository;
 import com.bifos.assistant.chat.infra.ConversationRepository;
+import com.bifos.assistant.hermes.HermesRunsClient;
+import com.bifos.assistant.hermes.StubHermesRunsClient;
 import com.bifos.assistant.proactive.application.ProactiveCheckRecovery;
 import com.bifos.assistant.proactive.domain.ProactiveCheck;
 import com.bifos.assistant.proactive.domain.type.CheckOutcome;
@@ -36,17 +38,33 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Import;
+import org.springframework.context.annotation.Primary;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /**
  * 서버가 도중에 내려가 {@code RUNNING} 으로 남은 먼저 살펴보기를 기동할 때 닫는지 본다.
  *
- * <p>기동은 이미 지났으므로 같은 빈 셋으로 새 복구를 만들어 시작한다. 시각은 고정한다. 모든 데이터는 합성이다.
+ * <p>기동은 이미 지났으므로 같은 빈 셋으로 새 복구를 만들어 시작한다. 시각은 고정한다. Hermes 는 대역이고 받은 중지를 적는다. 모든
+ * 데이터는 합성이다.
  */
 @SpringBootTest
 @ActiveProfiles("test")
+@Import(ProactiveCheckRecoveryTest.StubRuntime.class)
 class ProactiveCheckRecoveryTest {
+
+    @TestConfiguration
+    static class StubRuntime {
+        @Bean
+        @Primary
+        StubHermesRunsClient stubHermesRunsClient() {
+            return new StubHermesRunsClient();
+        }
+    }
 
     private static final Instant STARTED = Instant.parse("2026-10-01T00:00:00Z");
     private static final Instant NOW = Instant.parse("2026-10-01T00:10:00Z");
@@ -62,6 +80,12 @@ class ProactiveCheckRecoveryTest {
 
     @Autowired
     ExecutionDeliveryWriter deliveryWriter;
+
+    @Autowired
+    ApplicationEventPublisher events;
+
+    @Autowired
+    HermesRunsClient hermes;
 
     @Autowired
     AgentExecutionRepository executions;
@@ -91,6 +115,7 @@ class ProactiveCheckRecoveryTest {
 
     @BeforeEach
     void setUp() {
+        stub().reset();
         String suffix = UUID.randomUUID().toString().substring(0, 8);
         user = users.save(AppUser.of("recovery-" + suffix + "@example.com", "복구", 1L, UserRole.MEMBER, STARTED));
         agent = agents.save(agent("recovery-" + suffix, false));
@@ -141,6 +166,25 @@ class ProactiveCheckRecoveryTest {
     }
 
     @Test
+    @DisplayName("닫은 살펴보기 트리에서 run 번호가 있는 도는 위임 자식에만 Hermes 중지가 가고 다시 붙을 루트 turn 은 멈추지 않는다")
+    void stopsRunningDelegatedChildrenButNotRootTurn() {
+        AgentExecution root = rootTurn();
+        AgentExecution runningChild = child(root, ExecutionStatus.RUNNING);
+        AgentExecution finishedChild = child(root, ExecutionStatus.SUCCEEDED);
+        check(root);
+
+        newRecovery().start();
+
+        assertThat(stub().stopped())
+                .as("Hermes 에 보낸 중지")
+                .containsExactly(runningChild.hermesRunId())
+                .doesNotContain(root.hermesRunId(), finishedChild.hermesRunId());
+        assertThat(executions.findById(root.id()).orElseThrow().status())
+                .as("루트 turn 은 기동 정리가 다시 붙는다")
+                .isEqualTo(ExecutionStatus.RUNNING);
+    }
+
+    @Test
     @DisplayName("루트 실행이 생기기 전에 남은 살펴보기도 닫고 이미 끝난 살펴보기는 그대로 둔다")
     void closesCheckWithoutRootAndLeavesEndedCheck() {
         ProactiveCheck withoutRoot = check(null);
@@ -159,6 +203,7 @@ class ProactiveCheckRecoveryTest {
         assertThat(untouched.status()).isEqualTo(CheckStatus.SUCCEEDED);
         assertThat(untouched.errorCode()).isNull();
         assertThat(untouched.finishedAt()).isEqualTo(STARTED.plusSeconds(60));
+        assertThat(stub().stopped()).as("루트가 없으면 멈출 자식도 없다").isEmpty();
     }
 
     @Test
@@ -172,7 +217,11 @@ class ProactiveCheckRecoveryTest {
     }
 
     private ProactiveCheckRecovery newRecovery() {
-        return new ProactiveCheckRecovery(checks, deliveryWriter, Clock.fixed(NOW, ZoneOffset.UTC));
+        return new ProactiveCheckRecovery(checks, deliveryWriter, events, Clock.fixed(NOW, ZoneOffset.UTC));
+    }
+
+    private StubHermesRunsClient stub() {
+        return (StubHermesRunsClient) hermes;
     }
 
     /** 점검 대화의 {@code RUNNING} 살펴보기 줄이다. {@code root} 가 null 이면 루트 실행이 생기기 전이다. */

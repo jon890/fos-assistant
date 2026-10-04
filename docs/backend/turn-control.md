@@ -179,7 +179,7 @@ flowchart TD
 | --- | --- |
 | Hermes 에서 성공으로 끝났다 | `SUCCEEDED`. 답과 토큰과 비용을 적는다. 대화 turn 이면 답이 이력에 남는다. 먼저 살펴보기 turn 이면 답 대신 알림 줄 하나만 남는다 |
 | Hermes 에서 실패로 끝났다(`failed`, `error`, `interrupted`) | `FAILED`. `error_code` 는 보통 turn 과 같다. 받은 사용량을 남긴다 |
-| Hermes 에서 취소로 끝났다 | `CANCELLED`. 멈춘 자리까지의 답과 사용량을 남긴다 |
+| Hermes 에서 취소로 끝났다 | `CANCELLED`. 멈춘 자리까지의 답과 사용량을 남긴다. 먼저 살펴보기 turn 이면 답 대신 「살펴보기를 멈췄어요」 알림 줄 하나만 남는다 |
 | 아직 돈다 | `RUNNING` 으로 두고 `hermes.poll-interval` 마다 다시 묻는다 |
 | 404 다 | `FAILED`(`REMOTE_RUN_LOST`). Hermes 가 그 run 을 모른다. gateway 가 다시 떴거나 종료 뒤 1시간이 지났다 |
 | 닿지 못했다(연결 실패, 5xx, 429) | `RUNNING` 과 잠금을 그대로 두고 다시 묻는다. 간격은 `hermes.poll-interval` 에서 시작해 5초까지 늘린다 |

@@ -10,6 +10,7 @@ import java.time.Instant;
 import java.util.concurrent.atomic.AtomicBoolean;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.SmartLifecycle;
 import org.springframework.stereotype.Component;
 
@@ -17,8 +18,10 @@ import org.springframework.stereotype.Component;
  * 서버가 도중에 내려가 {@code RUNNING} 으로 남은 먼저 살펴보기를 기동할 때 닫는다(ADR-080). 규칙은
  * {@code docs/backend/proactive-check.md} 의 「끝날 때」 가 갖는다.
  *
- * <p>그 줄을 {@code FAILED}, {@code error_code = INTERRUPTED} 로 적고, 루트 실행이 있으면 그 트리의 위임 결과를 전했다고 적는다.
- * 대화에는 알림 줄을 남기지 않는다.
+ * <p>그 줄을 {@code FAILED}, {@code error_code = INTERRUPTED} 로 적고, 루트 실행이 있으면 그 트리의 위임 결과를 전했다고 적은 뒤
+ * {@link ProactiveCheckEnded} 를 낸다. {@code orchestration} 이 받아 그 트리의 도는 위임 자식을 멈춘다. 기동 때는 이 서버가 돌리는
+ * 위임이 없으므로 run 번호가 있는 자식에 Hermes 중지만 보낸다. 다시 붙는 루트 turn 자체는 멈추지 않는다. 그 turn 은
+ * {@code hermes.run-timeout} 까지 돌 수 있다. 대화에는 알림 줄을 남기지 않는다.
  *
  * <p>{@link RestartReconciler} 보다 먼저 돈다. 그 정리가 끝낸 위임 자식이나 이미 끝나 있던 위임 자식이 점검 대화에 읽기 경계
  * 밖의 자동 turn 을 열지 않게 하기 위해서다. 그래서 그 정리보다 작은 lifecycle 단계에서 시작한다. 그 정리를 빈으로 받으면 Spring
@@ -34,6 +37,7 @@ public class ProactiveCheckRecovery implements SmartLifecycle {
 
     private final ProactiveCheckRepository checks;
     private final ExecutionDeliveryWriter deliveryWriter;
+    private final ApplicationEventPublisher events;
     private final Clock clock;
 
     /** 이 프로세스에서 이미 닫았다. 다시 시작할 때 도는 살펴보기는 이 프로세스의 것이라 닫지 않는다. */
@@ -85,9 +89,26 @@ public class ProactiveCheckRecovery implements SmartLifecycle {
                 closed++;
             } catch (RuntimeException ex) {
                 log.warn("기동 전에 돌던 먼저 살펴보기를 닫지 못했다 checkId={}", check.id(), ex);
+                continue;
+            }
+            if (check.rootExecutionId() != null) {
+                stopChildren(check);
             }
         }
         return closed;
+    }
+
+    /** 그 트리의 도는 위임 자식을 멈추라는 사건을 낸다. 실패해도 다음 줄로 넘어간다. 줄은 이미 닫혔다. */
+    private void stopChildren(ProactiveCheck check) {
+        try {
+            events.publishEvent(new ProactiveCheckEnded(check.rootExecutionId()));
+        } catch (RuntimeException ex) {
+            log.warn(
+                    "닫은 살펴보기 트리의 위임 자식을 멈추지 못했다 checkId={} rootExecutionId={}",
+                    check.id(),
+                    check.rootExecutionId(),
+                    ex);
+        }
     }
 
     /**

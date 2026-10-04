@@ -208,7 +208,7 @@ session 을 새로 바꾼 뒤에도 최근에 알린 발견과 변화 신호는 
 | `digest-window` | 30일 | 0 보다 크다 |
 | `digest-max-items` | 20 | 1 이상 |
 
-`agent_status` 의 `wait_seconds` 상한은 `assistant.delegation.status-wait-max`(기본 20초)다. 살펴보기가 아니어도 쓴다.
+`agent_status` 의 `wait_seconds` 상한은 `assistant.delegation.status-wait-max`(기본 20초)다. 살펴보기 트리에서만 기다리고, 그 밖의 실행은 받아도 기다리지 않는다([ADR-040](../adr/ADR-040-위임-결과는-control-plane-이-부모-대화의-다음-turn-을-열어-전한다.md)).
 
 ## 끝날 때
 
@@ -231,7 +231,8 @@ turn 이 어떻게 끝나든 잠금을 풀기 전에 `ProactiveCheckService` 가
 도중에 서버가 내려가면 `proactive_check` 줄이 `RUNNING` 으로 남는다. 기동할 때 `ProactiveCheckRecovery` 가 그런 줄을 `FAILED`, `error_code = INTERRUPTED` 로 적고, 루트 실행이 있으면 그 트리의 위임 결과를 전했다고 적는다.
 기동 정리([`turn-control.md`](turn-control.md) 의 「기동할 때 남은 실행 정리」)보다 먼저 돈다. 그래야 기동 정리가 끝낸 위임 자식이 점검 대화에 읽기 경계 밖의 자동 turn 을 열지 않는다.
 대화에는 알림 줄을 남기지 않는다. 상태 조회의 마지막 살펴보기가 「끝내지 못했어요」 로 보인다.
-기동 정리가 다시 붙어 끝낸 살펴보기 turn 의 답은 검사하지 않은 글이라 남기지 않고 「살펴보기를 끝내지 못했어요」 알림 줄 하나만 남긴다.
+기동 정리가 다시 붙어 끝낸 살펴보기 turn 의 답은 검사하지 않은 글이라 남기지 않고 「살펴보기를 끝내지 못했어요」 알림 줄 하나만 남긴다. 그 turn 이 취소로 끝났으면 답이 비었어도 「살펴보기를 멈췄어요」 알림 줄 하나를 남긴다.
+닫은 줄마다 `ProactiveCheckEnded` 를 내 그 트리의 도는 위임 자식을 멈춘다. 기동 때는 이 서버가 돌리는 위임이 없으므로 run 번호가 있는 자식에 Hermes 중지를 보낸다. 다시 붙는 루트 turn 은 멈추지 않으며 `hermes.run-timeout` 까지 돌 수 있다.
 
 **발견은 대화에 답을 남긴 뒤 저장한다.** 답 메시지 저장이 실패하면 발견도 남기지 않는다. 사용자가 보지 못한 발견이 다음 살펴보기에서 「이미 알린 것」 으로 내려가지 않게 하기 위해서다.
 

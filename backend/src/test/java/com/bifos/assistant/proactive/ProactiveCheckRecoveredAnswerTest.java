@@ -52,6 +52,7 @@ class ProactiveCheckRecoveredAnswerTest {
 
     private static final Instant STARTED = Instant.parse("2026-10-01T00:00:00Z");
     private static final String FAILED_NOTICE = "살펴보기를 끝내지 못했어요. 잠시 뒤 다시 눌러 주세요";
+    private static final String STOPPED_NOTICE = "살펴보기를 멈췄어요";
     private static final String CHECK_ANSWER = "살펴본 글\n<fos-check-result>\n"
             + "{\"version\":1,\"outcome\":\"NOTHING_NEW\",\"summary\":\"검사하지 않은 요약\"}\n</fos-check-result>";
 
@@ -124,13 +125,9 @@ class ProactiveCheckRecoveredAnswerTest {
     @Test
     @DisplayName("기동 정리가 끝낸 살펴보기 turn 의 답은 남지 않고 실패 알림 줄 하나만 남는다")
     void leavesOnlyFailedNoticeForRecoveredCheckTurn() {
-        AgentExecution root = turn();
-        ProactiveCheck check =
-                ProactiveCheck.started(user.id(), agent.id(), conversation.id(), CheckTrigger.MANUAL, STARTED);
-        check.attachRoot(root.id(), root.hermesSessionId());
-        createdChecks.add(checks.save(check).id());
+        AgentExecution root = checkRoot();
 
-        boolean written = recorder.settle(root.id(), completed(CHECK_ANSWER));
+        boolean written = recorder.settle(root.id(), ended("completed", CHECK_ANSWER));
 
         assertThat(written).as("RUNNING 줄을 적었다").isTrue();
         assertThat(executions.findById(root.id()).orElseThrow().status()).isEqualTo(ExecutionStatus.SUCCEEDED);
@@ -141,6 +138,32 @@ class ProactiveCheckRecoveredAnswerTest {
         assertThat(history)
                 .extracting(ChatMessage::content)
                 .noneMatch(content -> content.contains("fos-check-result") || content.contains("검사하지 않은 요약"));
+    }
+
+    @Test
+    @DisplayName("기동 정리가 끝낸 살펴보기 turn 이 취소로 끝났으면 그때까지의 답 대신 멈춤 알림 줄 하나만 남는다")
+    void leavesOnlyStoppedNoticeForCancelledCheckTurn() {
+        AgentExecution root = checkRoot();
+
+        boolean written = recorder.settle(root.id(), ended("cancelled", CHECK_ANSWER));
+
+        assertThat(written).as("RUNNING 줄을 적었다").isTrue();
+        assertThat(executions.findById(root.id()).orElseThrow().status()).isEqualTo(ExecutionStatus.CANCELLED);
+        assertThat(messages.findByConversationIdOrderByIdAsc(conversation.id()))
+                .extracting(ChatMessage::role, ChatMessage::content)
+                .containsExactly(tuple(MessageRole.SYSTEM, STOPPED_NOTICE));
+    }
+
+    @Test
+    @DisplayName("취소로 끝난 살펴보기 turn 의 답이 비었어도 멈춤 알림 줄 하나는 남는다")
+    void leavesStoppedNoticeForCancelledCheckTurnWithoutAnswer() {
+        AgentExecution root = checkRoot();
+
+        recorder.settle(root.id(), ended("cancelled", ""));
+
+        assertThat(messages.findByConversationIdOrderByIdAsc(conversation.id()))
+                .extracting(ChatMessage::role, ChatMessage::content)
+                .containsExactly(tuple(MessageRole.SYSTEM, STOPPED_NOTICE));
     }
 
     @Test
@@ -155,7 +178,7 @@ class ProactiveCheckRecoveredAnswerTest {
         messages.save(ChatMessage.fromUser(conversation.id(), user.id(), "이 공고를 더 알려 줘", STARTED.plusSeconds(120)));
         AgentExecution ordinary = turn();
 
-        boolean written = recorder.settle(ordinary.id(), completed("공고의 요구 조건은 이렇다"));
+        boolean written = recorder.settle(ordinary.id(), ended("completed", "공고의 요구 조건은 이렇다"));
 
         assertThat(written).as("RUNNING 줄을 적었다").isTrue();
         assertThat(messages.findByConversationIdOrderByIdAsc(conversation.id()))
@@ -163,6 +186,16 @@ class ProactiveCheckRecoveredAnswerTest {
                 .containsExactly(
                         tuple(MessageRole.USER, "이 공고를 더 알려 줘", null),
                         tuple(MessageRole.ASSISTANT, "공고의 요구 조건은 이렇다", ordinary.id()));
+    }
+
+    /** 점검 대화에서 돌던 살펴보기 turn 의 실행 줄이다. 살펴보기 줄이 그 실행을 루트로 가리킨다. */
+    private AgentExecution checkRoot() {
+        AgentExecution root = turn();
+        ProactiveCheck check =
+                ProactiveCheck.started(user.id(), agent.id(), conversation.id(), CheckTrigger.MANUAL, STARTED);
+        check.attachRoot(root.id(), root.hermesSessionId());
+        createdChecks.add(checks.save(check).id());
+        return root;
     }
 
     /** 점검 대화에서 돌던 대화 turn 의 실행 줄이다. */
@@ -182,11 +215,11 @@ class ProactiveCheckRecoveredAnswerTest {
         return saved;
     }
 
-    private static HermesRunResult completed(String output) {
+    private static HermesRunResult ended(String status, String output) {
         return new HermesRunResult(
                 "run-1",
                 "sess-1",
-                "completed",
+                status,
                 output,
                 null,
                 null,
