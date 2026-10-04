@@ -254,5 +254,5 @@ Control Plane 이 다시 떠도 등록 줄은 그대로다. 이미 등록한 하
 | `created_at` | DATETIME(6) | |
 
 기본 키는 `(execution_id, position)` 이다.
-`OMITTED` 줄은 자리가 없어 빠진 Memory 항목이다. 그 수는 `agent_execution.context_omitted_items` 와 같다.
+`OMITTED` 줄은 자리가 없어 빠진 Memory 항목이거나 결과를 알 수 없어 본문을 싣지 않은 승인 결과다. `MEMORY_` 로 시작하는 `OMITTED` 줄의 수는 `agent_execution.context_omitted_items` 와 같다.
 실행 줄을 지우지 않으므로 이 줄도 지우지 않는다.

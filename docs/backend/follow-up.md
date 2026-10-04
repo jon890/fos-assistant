@@ -37,11 +37,11 @@ Control Plane MCP 서버에 `follow_up_propose` 를 더한다.
 | 입력 | 타입 | 뜻 |
 | --- | --- | --- |
 | `title` | 문자열, 1자부터 200자 | 할 일 한 줄. 앞뒤 공백을 지운다 |
-| `due_at` | 문자열, 선택 | `2026-10-05` 나 `2026-10-05T18:00` 형식. 시간대가 없으면 `Asia/Seoul` 로 읽는다 |
+| `due_at` | 문자열, 선택 | `2026-10-05` 나 `2026-10-05T18:00` 형식. 시간대가 없으면 `Asia/Seoul` 로 읽는다. 날짜만 주면 그날 23:59 다 |
 | `waiting` | 참거짓, 선택 | 기다리는 중이면 참 |
 
 - **주인과 대화는 호출의 origin 실행에서 정한다.** `McpCallerResolver` 가 찾은 origin 실행의 `user_id` 가 주인이고 `conversation_id` 가 대화다. 인자로 받지 않는다
-- 대화가 없는 실행(추천 질문 같은 것)에서 부르면 거절한다
+- 대화가 없는 실행(추천 질문 같은 것)에서 부르면 거절한다. 글은 「대화 밖의 실행에서는 할 일을 제안할 수 없다.」 다
 - 커넥터 에이전트는 Control Plane MCP 도구를 받지 못한다. 지금 `McpCallerResolver` 의 거절이 그대로 막는다(ADR-045)
 - **fos-ctx 가 이 도구를 서명 필수로 안다.** `hermes/plugins/fos-ctx/__init__.py` 의 `REQUIRED_TOOLS` 에 넣는다. plugin 을 먼저 배포한다
 
@@ -52,8 +52,10 @@ Control Plane MCP 서버에 `follow_up_propose` 를 더한다.
 | 새 제안 | 거짓 | 「할 일로 제안했다. 사용자가 지금 화면에서 받아들이면 챙긴다.」 |
 | 같은 할 일이 이미 있다 | 거짓 | 「같은 할 일이 이미 있다. 새로 만들지 않았다.」 |
 | 이 대화에서 거절한 적이 있다 | 참 | 「사용자가 이 할 일을 거절했다. 다시 제안하지 않는다.」 |
-| 열린 제안이 많다 | 참 | 「이 대화에 받아들이기를 기다리는 제안이 많다. 사용자가 정한 뒤에 제안한다.」 |
-| 입력 오류 | 참 | 무엇이 틀렸는지 한 줄 |
+| 열린 제안이 많다. 한 대화의 3개나 한 실행의 2개에 닿았다 | 참 | 「이 대화에 받아들이기를 기다리는 제안이 많다. 사용자가 정한 뒤에 제안한다.」 |
+| 값 오류. 빈 제목, 읽지 못하는 `due_at` | 참 | 무엇이 틀렸는지 한 줄 |
+
+인자의 모양이 틀리면(필수 칸이 없거나 타입이 다르면) 도구 결과가 아니라 JSON-RPC 오류 `-32602` 로 답한다. 다른 Control Plane MCP 도구와 같다.
 
 ## 제안 억제
 
@@ -76,7 +78,7 @@ Control Plane MCP 서버에 `follow_up_propose` 를 더한다.
 | --- | --- |
 | `GET /api/v1/follow-ups` | `PROPOSED` 와 `OPEN` 을 만든 순서로 낸다 |
 | `POST /api/v1/follow-ups` | 본문 `{ title, dueAt?, waiting?, conversationId? }`. 바로 `OPEN` 으로 만든다. `conversationId` 는 요청자의 대화여야 한다 |
-| `PATCH /api/v1/follow-ups/{id}` | 본문 `{ title?, dueAt?, waiting? }`. `dueAt` 을 `null` 로 보내면 기한을 지운다 |
+| `PATCH /api/v1/follow-ups/{id}` | 본문 `{ title?, dueAt?, waiting? }`. 본문에 없는 칸은 그대로 둔다. `dueAt` 을 `null` 로 보내면 기한을 지운다 |
 | `POST /api/v1/follow-ups/{id}/accept` | `PROPOSED` 를 `OPEN` 으로. `accepted_at` 을 적는다 |
 | `POST /api/v1/follow-ups/{id}/reject` | `PROPOSED` 를 `REJECTED` 로 |
 | `POST /api/v1/follow-ups/{id}/done` | `OPEN` 을 `DONE` 으로 |

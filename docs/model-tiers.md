@@ -278,10 +278,11 @@ reasoningEffortSource와 위 네 시각을 실행 줄에서 반환한다.
 | 제출까지 | `submitted_at` − `request_received_at` | Control Plane 이 문맥을 조립하고 실행 줄을 만드는 시간. 문맥 묶음([`backend/context-bundle.md`](backend/context-bundle.md))이 여기에 든다 |
 | 첫 조각까지 | `first_delta_at` − `submitted_at` | Hermes 와 모델이 첫 조각을 내는 시간 |
 
-- **세는 실행은 사용자가 보낸 대화 turn 의 루트 실행이다.** `conversation_id` 가 있고 `parent_execution_id` 가 비어 있으며, 그 답 메시지 바로 앞 메시지의 `role` 이 `USER` 인 실행이다. 다시 생성도 든다. 자동 turn 은 요청 대신 내부 trigger 시각을 써서 뺀다
+- **세는 실행은 사용자가 보낸 대화 turn 의 루트 실행이다.** `conversation_id` 가 있고 `parent_execution_id` 가 비어 있으며, 그 답 메시지보다 앞선 메시지 가운데 `ASSISTANT` 가 아닌 가장 최근 메시지의 `role` 이 `USER` 인 실행이다. 다시 생성도 든다. 자동 turn 은 그 메시지가 `SYSTEM` 이라 빠진다. 자동 turn 은 요청 대신 내부 trigger 시각을 쓰기 때문이다
+- 집계는 사용량 분해(`/api/v1/usage/breakdown`)와 같이 요청한 관리자 자신의 실행만 센다
 - 시각이 비어 있는 실행은 세지 않는다. 0 으로 채우지 않는다. 한 번에 받는 경로는 `first_delta_at` 이 비어 첫 반응 시간과 첫 조각까지에 들지 않는다
 - 날짜(`Asia/Seoul`)와 모델 단계별로 건수, 중앙값, 90번째 백분위를 낸다. 기간은 최근 30일이다
-- 관리자 사용량 화면 `/admin/usage` 의 「첫 반응 시간」 절에만 보인다. 경로는 `GET /api/v1/admin/usage/latency?days=30` 이다. 네 시각처럼 관리자 영역의 값이다([ADR-063](adr/ADR-063-관리자-전용-표시와-동작은-관리자-영역에만-두고-일반-경로의-응답은-서버가-역할에-따라-줄인다.md))
+- 관리자 사용량 화면 `/admin/usage` 의 「첫 반응 시간」 절에만 보인다. 경로는 `GET /api/v1/admin/usage/latency?days=30` 이다. `days` 는 1 부터 90 까지이고 벗어나면 400 `VALIDATION_FAILED` 다. 네 시각처럼 관리자 영역의 값이다([ADR-063](adr/ADR-063-관리자-전용-표시와-동작은-관리자-영역에만-두고-일반-경로의-응답은-서버가-역할에-따라-줄인다.md))
 - 브라우저가 그리는 시간은 재지 않는다. 화면의 체감과 위 값의 차이는 네트워크와 그리기 시간이다
 
 실행 상세의 실제 제공사, 모델, 토큰, 금액은 관리자 영역의 실행 상세(`/admin/executions/{id}`)에만 보인다.

@@ -33,12 +33,12 @@ Memory 의 층과 예산과 `memory_read` 는 [`memory.md`](memory.md) 가 그�
 | --- | --- | --- | --- | --- | --- | --- |
 | `MEMORY_ALWAYS` | `memory` 의 `ALWAYS` | ADR-053 의 세 조건 | 원래 값. `SENSITIVE` 는 이 층에 오지 못한다 | `USER_APPROVED` | `INLINE` | 대화 turn 의 `instructions` |
 | `MEMORY_INDEX` | `memory` 의 `SEARCH` | ADR-053 의 세 조건 | 원래 값 | `USER_APPROVED` | `TITLE_ONLY` | 대화 turn 의 `instructions` |
-| `DELEGATION_RESULT` | 끝난 위임 실행의 `output_text` | 그 대화의 주인. 부모가 루트 turn 인 위임만 | `SENSITIVE` | 커넥터 에이전트의 답이면 `EXTERNAL`, 아니면 `AGENT` | `INLINE` | 자동 turn 의 `input` |
+| `DELEGATION_RESULT` | 끝난 위임 실행의 `output_text` | 그 대화의 주인. `AgentExecutionRepository.findUndeliveredResults` 의 조건대로 `SUCCEEDED` 나 `FAILED` 이고 아직 전하지 않았으며 부모가 루트 turn 인 위임만 | `SENSITIVE` | 커넥터 에이전트의 답이면 `EXTERNAL`, 아니면 `AGENT` | `INLINE` | 자동 turn 의 `input` |
 | `CONNECTOR_RESULT` | `connector_action` 의 `result_text` | 그 대화의 주인 | `SENSITIVE` | `EXTERNAL` | `INLINE`. `UNKNOWN` 이면 `OMITTED` | 자동 turn 의 `input` |
 | `EXECUTION_STATE` | `agent_execution` 의 상태와 시각 | 실행 줄의 `user_id` | `NORMAL` | `CONTROL_PLANE` | 본문이 없다 | 지금 화면과 먼저 알리기 |
 | `FOLLOW_UP` | `follow_up` | 주인 | `SENSITIVE` | 사람이 받아들였으면 `USER_APPROVED`, 제안이면 `AGENT` | `TITLE_ONLY` | 지금 화면과 먼저 알리기 |
 
-**`EXECUTION_STATE` 와 `FOLLOW_UP` 은 대화 turn 에 싣지 않는다.** 대화마다 실으면 할 일이 지식처럼 쓰여 새 Memory 층이 된다([ADR-073](../adr/ADR-073-할-일은-에이전트가-제안하고-사람이-받아들인-것만-챙긴다.md)).
+**`EXECUTION_STATE` 와 `FOLLOW_UP` 은 대화 turn 에 싣지 않는다.** 지금 화면과 먼저 알리기가 「왜 보였는가」 의 `sources` 에 이 `source` 이름과 `ref` 형식을 쓴다. 판정은 `attention` 이 요청자의 기록만 읽는 조회로 하고, 이 문서의 항목 타입을 import 하지 않아도 된다. 대화마다 실으면 할 일이 지식처럼 쓰여 새 Memory 층이 된다([ADR-073](../adr/ADR-073-할-일은-에이전트가-제안하고-사람이-받아들인-것만-챙긴다.md)).
 
 **커넥터의 실시간 데이터는 source 가 아니다.** Control Plane 은 커넥터를 직접 부르지 않는다.
 일정 같은 커넥터 데이터는 커넥터 에이전트가 실행하고 남긴 결과(`DELEGATION_RESULT`, `CONNECTOR_RESULT`)로만 들어온다.
@@ -74,6 +74,7 @@ Runs API 는 `instructions` 와 `input` 두 글을 받는다([`../hermes/runs-ap
 [출처: 맡긴 일, 에이전트: 조사 도우미, 실행 번호: 412, 상태: SUCCEEDED, 끝난 시각: 2026-10-03 14:05]
 (결과 본문)
 
+승인한 동작의 결과가 도착했다.
 [출처: 승인한 동작, 동작: 초안 만들기, 상태: SUCCEEDED, 끝난 시각: 2026-10-03 08:07, 신선도: 오래됨]
 이 결과는 6시간보다 전에 끝났다. 지금 상태와 다를 수 있다.
 (external-data 로 감싼 결과 본문)

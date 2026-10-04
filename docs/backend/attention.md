@@ -31,12 +31,14 @@
 | `APPROVAL_PENDING` | `needs_me` | `connector_action` | `PENDING` 이고 `expires_at` 전 | 늘 | 승인, 거절, 만료 | `connector_action:<공개 식별자>` | `status` | `CONTROL_PLANE` |
 | `MEMORY_PROPOSED` | `needs_me` | 주인의 `USER` Memory | `PROPOSED` | 아니다 | 받아들임, 거절 | `memory:<번호>` | `revision` | `MODEL_INFERRED` |
 | `FOLLOW_UP_PROPOSED` | `needs_me` | `follow_up` | `PROPOSED` | 아니다 | 받아들임, 거절 | `follow_up:<공개 식별자>` | `updated_at` | `MODEL_INFERRED` |
-| `FOLLOW_UP_OPEN` | `needs_me` | `follow_up` | `OPEN` | 기한이 `due-soon` 안이거나 지났다. 또는 연결한 대화에 새 답이 왔다 | 끝냄, 그만둠 | `follow_up:<공개 식별자>` | `updated_at` 과 연결한 대화의 마지막 메시지 번호 | `USER_CONFIRMED` |
+| `FOLLOW_UP_OPEN` | `needs_me` | `follow_up` | `OPEN` | 기한이 `due-soon` 안이거나 지났다. 또는 연결한 대화에 결과가 도착했다 | 끝냄, 그만둠 | `follow_up:<공개 식별자>` | `updated_at` 과 연결한 대화의 마지막 `SYSTEM` 메시지 번호 | `USER_CONFIRMED` |
 | `DELEGATION_RUNNING` | `delegated` | 주인의 위임 실행. `delegation_key` 가 있다 | `RUNNING` | 시작한 지 `long-running-after` 를 넘었다 | 끝남 | `execution:<번호>` | `status` | `CONTROL_PLANE` |
 | `DELEGATION_FINISHED` | `delegated` | 주인의 위임 실행 | 끝났고 `finished_at` 이 `delegated-window` 안 | 아니다 | 없다 | `execution:<번호>` | `status` | `CONTROL_PLANE` |
 | `CONVERSATION_RECENT` | `continue` | 주인의 대화. `deleted_at` 이 비어 있다 | `updated_at` 순으로 `continue-count` 개 | 아니다 | 없다 | `conversation:<대화 공개 식별자>` | `updated_at` | `CONTROL_PLANE` |
 
-「연결한 대화에 새 답이 왔다」 는 그 대화의 마지막 `ASSISTANT` 나 `SYSTEM` 메시지가 할 일의 `accepted_at` 과 그 항목의 마지막 `OPENED` 사건보다 뒤라는 뜻이다.
+「연결한 대화에 결과가 도착했다」 는 그 대화에 할 일의 `accepted_at` 보다 뒤에 `SYSTEM` 메시지(맡긴 일이나 승인한 동작의 결과가 도착했다는 알림 줄)가 생겼다는 뜻이다.
+사용자가 그 대화에서 주고받는 답은 세지 않는다. 대화하는 동안 할 일이 계속 `NOW` 가 되지 않게 하려는 것이다.
+숨기면 `stateKey` 가 그 `SYSTEM` 메시지 번호를 담아, 다음 결과가 도착할 때까지 보이지 않는다.
 
 `MEMORY_PROPOSED` 는 기억 메뉴의 제안 건수에 이미 센다. 지금 화면의 건수에는 세지 않는다.
 
@@ -48,8 +50,8 @@
 
 | 순서 | 신호 | 맞는 경우 |
 | --- | --- | --- |
-| 1 | `HIDDEN` | 사용자가 같은 `itemKey` 와 같은 `stateKey` 를 숨겼다 |
-| 2 | `SNOOZED` | 사용자가 미룬 기한이 아직 지나지 않았다 |
+| 1 | `HIDDEN` | 사용자가 같은 카드의 같은 `itemKey` 와 같은 `stateKey` 를 숨겼다 |
+| 2 | `SNOOZED` | 사용자가 같은 카드의 그 항목을 미룬 기한이 아직 지나지 않았다 |
 | 3 | `RESOLVED` | 위 표의 「해결된 상태」 다 |
 | 4 | `TOO_OLD` | 후보 조건의 기간을 벗어났다 |
 | 5 | `DUPLICATE` | 같은 `itemKey` 가 앞선 카드에 이미 있다. 카드 순서는 `failures`, `needs_me`, `delegated`, `continue` 다 |
@@ -68,10 +70,11 @@
 | `delegated-window` | 24시간 | 끝난 위임을 보이는 기간 |
 | `long-running-after` | 30분 | 도는 위임이 `NOW` 가 되는 시간 |
 | `due-soon` | 24시간 | 기한이 이만큼 남으면 `NOW` |
-| `continue-count` | 5 | 이어서 하기에 보이는 대화 수 |
+| `continue-count` | 5 | 이어서 하기 카드의 항목 상한. 이 카드에는 `max-items-per-card` 대신 이 값을 쓴다 |
 | `max-items-per-card` | 10 | 카드 하나의 항목 상한. 넘으면 `moreCount` 로 센다 |
 | `snooze-max` | 8일 | 미루기 기한의 상한 |
 | `event-retention` | 90일 | 지표 사건을 남기는 기간 |
+| `cleanup-cron` | `0 30 4 * * *` | 보관 기간이 지난 지표 사건을 지우는 시각 |
 
 ## 「왜 보였는가」
 
@@ -94,7 +97,7 @@
 | `DELIVERY_NOT_DONE` | 결과는 저장됐지만 부모 답을 만들지 못했다 |
 | `EXPIRES_SOON` | 승인 기한이 6시간 안이다 |
 | `DUE_SOON`, `OVERDUE` | 할 일의 기한이 다가왔다, 지났다 |
-| `LINKED_UPDATE` | 할 일에 연결한 대화에 새 답이 왔다 |
+| `LINKED_UPDATE` | 할 일에 연결한 대화에 결과가 도착했다 |
 | `WAITING` | 할 일이 기다리는 중이다 |
 | `LONG_RUNNING` | 맡긴 일이 오래 돌고 있다 |
 
@@ -127,14 +130,16 @@
 | --- | --- |
 | `GET /api/v1/attention` | 카드 넷과 항목, `nowCount`, `readAt`. 응답에 실린 `NOW` 와 `LATER` 항목마다 `SHOWN` 사건을 한 번 남긴다 |
 | `GET /api/v1/attention/summary` | `{ "nowCount": 3 }`. 사이드바와 홈의 한 줄이 읽는다. 사건을 남기지 않는다 |
-| `POST /api/v1/attention/hide` | 본문 `{ itemKey, stateKey }`. 그 상태가 바뀔 때까지 숨긴다 |
-| `POST /api/v1/attention/snooze` | 본문 `{ itemKey, until }`. `until` 은 지금보다 뒤이고 `snooze-max` 안이어야 한다. 아니면 400 `VALIDATION_FAILED` |
-| `POST /api/v1/attention/restore` | 본문 `{ itemKey }`. 숨기기와 미루기를 지운다 |
+| `POST /api/v1/attention/hide` | 본문 `{ card, itemKey, stateKey }`. 그 카드에서 그 상태가 바뀔 때까지 숨긴다 |
+| `POST /api/v1/attention/snooze` | 본문 `{ card, itemKey, until }`. `until` 은 지금보다 뒤이고 `snooze-max` 안이어야 한다. 아니면 400 `VALIDATION_FAILED` |
+| `POST /api/v1/attention/restore` | 본문 `{ card, itemKey }`. 그 카드의 숨기기와 미루기를 지운다 |
 | `POST /api/v1/attention/events` | 본문 `{ itemKey, stateKey, type }`. `type` 은 `OPENED` 나 `ACTED` 다 |
-| `GET /api/v1/admin/attention/metrics?days=30` | 관리자만. 아래 「지표」 를 `trigger` 별로 센다. 제목과 항목 열쇠를 내지 않는다 |
+| `GET /api/v1/admin/attention/metrics?days=30` | 관리자만. 아래 「지표」 를 `trigger` 별로 센다. 제목과 항목 열쇠를 내지 않는다. `days` 는 1 부터 90 까지이고 벗어나면 400 `VALIDATION_FAILED` 다 |
 
 `itemKey` 에 `:` 와 UUID 가 들어 있어 경로 대신 본문으로 받는다.
-`itemKey` 의 주인이 요청자가 아니면 숨기기와 미루기는 404 다. 남의 항목이 있는지 알리지 않는다.
+**제어는 카드마다 따로 둔다.** 같은 대화가 실패 카드와 이어서 하기 카드에 함께 열쇠로 쓰여도, 한 카드에서 숨긴 것이 다른 카드의 제어를 덮어쓰지 않는다.
+`hide`, `snooze`, `restore`, `events` 는 성공하면 본문 없이 204 로 답한다. 같은 요청을 다시 보내도 204 다.
+`hide`, `snooze`, `events` 의 `itemKey` 가 지금 요청자의 후보에 없으면 404 `ATTENTION_ITEM_NOT_FOUND` 다. 남의 항목과 없는 항목을 같은 응답으로 숨긴다. `restore` 는 지운 것이 없어도 204 다.
 
 응답의 모양은 아래와 같다.
 
@@ -156,7 +161,9 @@
           "conversationId": "7b1e…",
           "agentName": "집안일 도우미",
           "at": "2026-10-03T13:10:00Z",
-          "why": { "trigger": "EXECUTION_FAILED", "signals": ["NOT_RETRIED"], "confidence": "CONTROL_PLANE", "sources": [] }
+          "why": { "trigger": "EXECUTION_FAILED", "signals": ["NOT_RETRIED"], "confidence": "CONTROL_PLANE", "sources": [] },
+          "execution": null,
+          "followUp": null
         }
       ]
     }
@@ -165,6 +172,21 @@
 ```
 
 `title` 은 대화 제목이나 할 일 제목이나 승인 줄의 동작 이름이다. 화면은 평문으로 그린다(ADR-009).
+
+항목 종류에 따라 아래 칸을 더 채운다. 해당하지 않으면 `null` 이다. 화면이 `itemKey` 를 잘라 식별자를 얻지 않게 하려는 것이다.
+
+| 칸 | 채우는 항목 | 담는 것 |
+| --- | --- | --- |
+| `execution` | `DELEGATION_RUNNING`, `DELEGATION_FINISHED` | `{ id, status }`. `status` 는 `RUNNING`, `SUCCEEDED`, `FAILED`, `CANCELLED` |
+| `followUp` | `FOLLOW_UP_PROPOSED`, `FOLLOW_UP_OPEN` | `{ id, dueAt, waiting, proposed }`. `id` 는 할 일의 공개 식별자 |
+| `actionId` | `APPROVAL_PENDING` | 승인 줄의 공개 식별자 |
+
+## 웹 알림과의 경계
+
+웹 알림(ADR-070, 따로 진행 중)은 일어난 일의 사건 목록이고 읽음 상태를 갖는다. 이 문서의 판정은 아직 남은 일을 현재 상태에서 계산한 view 다.
+같은 승인 대기가 알림 목록과 지금 화면에 함께 보일 수 있다.
+**지금 화면에서 그 승인을 처리해도 알림의 읽음 상태는 바꾸지 않는다.** 알림도 원인의 상태를 따라 바뀌지 않는다. 알림은 사람이 그 알림을 누를 때 읽음이 된다.
+이 판정은 `notification` 표를 읽거나 쓰지 않는다.
 
 ## 저장
 
@@ -188,6 +210,8 @@
 | `NOW` 의 헛보임 | `NOW` 로 보였다가 행동 없이 숨긴 항목 ÷ `NOW` 로 보인 항목. false positive 의 대리값이다 |
 | 첫 행동까지 시간 | 같은 항목의 첫 `SHOWN` 에서 첫 `OPENED` 나 `ACTED` 까지의 중앙값. #161 의 time-to-first-useful-action 이다 |
 | 오래된 항목 비율 | `SHOWN` 때 출처의 신선도가 `STALE` 이던 항목 ÷ `SHOWN` |
+
+지금의 후보는 모두 판정할 때 읽은 기록이라 신선도가 늘 `FRESH` 다. 오래된 항목 비율은 결과 source 가 후보에 들어오기 전까지 0 이다.
 
 **아직 재지 않는 것**: 지금 화면을 본 뒤 같은 것을 찾으려고 대화나 검색으로 돌아간 비율이다. 화면 사이의 이동을 기록하는 길이 없다.
 첫 반응 시간은 [`../model-tiers.md`](../model-tiers.md) 의 「첫 반응 시간」 이 갖는다.
