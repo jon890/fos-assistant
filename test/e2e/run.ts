@@ -58,6 +58,7 @@ import { NATIVE_DELEGATION_PROFILE, nativeDelegationScenario } from "./scenarios
 import { DELEGATION_PROFILE, delegationScenario } from "./scenarios/delegation.ts";
 import { connectorScenario } from "./scenarios/connector.ts";
 import { connectorPolicyScenario } from "./scenarios/connector-policy.ts";
+import { deliveryRetryScenario } from "./scenarios/delivery-retry.ts";
 import { connectorDelegationScenario } from "./scenarios/connector-delegation.ts";
 import { CHAT_QUEUE_PROFILE, chatQueueRestartScenario, chatQueueScenario } from "./scenarios/chat-queue.ts";
 import { restartReconcileScenario } from "./scenarios/restart-reconcile.ts";
@@ -123,6 +124,7 @@ const SCENARIOS: readonly Scenario[] = [
   // 전용 에이전트를 하나 만들지만 해제로 끝나므로 에이전트 수를 세는 시나리오 뒤에 둔다.
   connectorScenario,
   connectorPolicyScenario,
+  deliveryRetryScenario,
   connectorDelegationScenario,
   // 에이전트를 하나 만들고 끄므로 에이전트 수를 세는 시나리오 뒤에 둔다.
   chatQueueScenario,
