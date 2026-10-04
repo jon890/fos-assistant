@@ -1,6 +1,8 @@
 package com.bifos.assistant.orchestration;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doAnswer;
 
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.agent.domain.type.AgentVisibility;
@@ -21,6 +23,7 @@ import com.bifos.assistant.hermes.dto.TokenUsage;
 import com.bifos.assistant.orchestration.application.AgentDelegationService;
 import com.bifos.assistant.orchestration.application.DelegationResult;
 import com.bifos.assistant.orchestration.application.DelegationStop;
+import com.bifos.assistant.proactive.application.ProactiveCheckGuard;
 import com.bifos.assistant.proactive.domain.ProactiveCheck;
 import com.bifos.assistant.proactive.domain.type.CheckOutcome;
 import com.bifos.assistant.proactive.domain.type.CheckTrigger;
@@ -65,6 +68,7 @@ import org.springframework.context.annotation.Import;
 import org.springframework.context.annotation.Primary;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 
 /**
  * 위임 시작의 제출 대기, 서버 전체 한도, 답 자르기, 같은 호출의 동시 요청, 중지를 고정한다(ADR-017).
@@ -141,6 +145,10 @@ class AgentDelegationServiceTest {
 
     @Autowired
     ProactiveCheckRepository checks;
+
+    /** 위임 판정 사이에 살펴보기가 끝나는 경우를 만든다. 정하지 않은 검사에서는 실제 그대로다. */
+    @MockitoSpyBean
+    ProactiveCheckGuard checkGuard;
 
     private final List<Long> createdChecks = new ArrayList<>();
 
@@ -722,6 +730,31 @@ class AgentDelegationServiceTest {
                     .isEqualTo(DelegationResult.Failure.CHECK_LIMIT);
             assertThat(executions.findByRootExecutionId(checkTurn.id())).isEmpty();
         }
+        assertThat(stub().received()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("루트 잠금 안의 판정 뒤 실행 줄을 만들기 전에 살펴보기가 끝나면 줄을 만들지 않고 CHECK LIMIT 이다")
+    void checkTreeRejectsAsCheckLimitWhenCheckEndsBeforeRowIsCreated() {
+        connectorAgent(CONNECTOR, user.id());
+        AgentExecution checkTurn = checkTurn();
+        doAnswer(invocation -> {
+                    Object running = invocation.callRealMethod();
+                    // 루트 잠금 안의 판정이 RUNNING 을 본 직후 살펴보기가 끝난다.
+                    ProactiveCheck check =
+                            checks.findByRootExecutionId(checkTurn.id()).orElseThrow();
+                    check.stop("CHECK_TIME_LIMIT", 0, 0, Instant.parse("2026-09-30T00:05:00Z"));
+                    checks.save(check);
+                    return running;
+                })
+                .doCallRealMethod()
+                .when(checkGuard)
+                .checkOf(any());
+
+        DelegationResult result = delegateFrom(checkTurn, CONNECTOR, "끝나는 살펴보기에서 맡긴다");
+
+        assertThat(result.failure()).as("결과: %s", result).isEqualTo(DelegationResult.Failure.CHECK_LIMIT);
+        assertThat(executions.findByRootExecutionId(checkTurn.id())).as("만든 자식").isEmpty();
         assertThat(stub().received()).isEmpty();
     }
 

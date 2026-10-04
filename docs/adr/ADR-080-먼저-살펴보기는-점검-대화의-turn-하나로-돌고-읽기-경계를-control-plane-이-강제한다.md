@@ -23,7 +23,7 @@
   | 경계 | 막는 것 |
   | --- | --- |
   | 시작 전 점검 | 에이전트의 켜진 toolset 이 `web`, `vision`, `todo`, `skills` 와 Control Plane MCP 밖이면 시작하지 않는다. 화면이 끌 toolset 이름을 보인다 |
-  | 커넥터 도구 판정 | 살펴보기 트리 안의 커넥터 호출은 위험도가 `READ` 인 도구만 허용한다. 상시 허락이 있어도 쓰기는 거절하고 승인 줄을 만들지 않는다 |
+  | 커넥터 도구 판정 | 살펴보기 트리 안의 커넥터 호출은 위험도가 `READ` 이고 승인 방식이 `none` 인 도구만 허용하고, 나머지는 `READ_ONLY_RUN` 으로 거절한다. 상시 허락이 있어도 쓰기는 거절하고 승인 줄을 만들지 않는다 |
   | Control Plane MCP | 살펴보기 트리 안에서는 `memory_read`, `agent_list`, `agent_delegate`, `agent_status`, `agent_stop` 만 받는다. `artifact_write` 는 거절한다 |
   | 위임 | 맡길 수 있는 곳은 요청자의 커넥터 에이전트뿐이고, 한 번의 살펴보기에서 맡기는 수에 상한을 둔다 |
 

@@ -175,7 +175,7 @@ session 을 새로 바꾼 뒤에도 최근에 알린 발견과 변화 신호는 
 | --- | --- | --- |
 | 커넥터 도구 판정 | `ConnectorPolicyService.decide` | 위험도가 `READ` 이고 승인 방식이 `none` 인 도구만 허용한다. 나머지는 `READ_ONLY_RUN` 으로 거절한다. 상시 허락을 보지 않고 승인 줄을 만들지 않는다 |
 | Control Plane MCP | `McpController` | `memory_read`, `agent_list`, `agent_delegate`, `agent_status`, `agent_stop` 만 받는다. 나머지는 「먼저 살펴보기에서는 쓸 수 없는 도구입니다.」 오류 결과다 |
-| 위임 | `AgentDelegationService.delegate` | 맡길 곳이 요청자의 커넥터 에이전트가 아니면 `CHECK_TARGET`, 그 트리에서 이미 맡긴 수가 `max-delegations` 이상이거나 그 살펴보기가 이미 끝났으면(`proactive_check.status` 가 `RUNNING` 이 아니면) `CHECK_LIMIT` 로 거절한다 |
+| 위임 | `AgentDelegationService.delegate` | 맡길 곳이 요청자의 커넥터 에이전트가 아니면 `CHECK_TARGET`, 그 트리에서 이미 맡긴 수가 `max-delegations` 이상이거나 그 살펴보기가 이미 끝났으면(`proactive_check.status` 가 `RUNNING` 이 아니면) `CHECK_LIMIT` 로 거절한다. 끝났는지는 실행 스레드가 실행을 시작하기 전에 한 번 더 본다 |
 
 살펴보기 트리인지는 `ProactiveCheckGuard.isCheckTree(AgentExecution)` 가 정한다.
 그 실행의 트리 루트(`AgentExecution.treeRootId()`)가 `proactive_check.root_execution_id` 에 있으면 참이다.
@@ -190,6 +190,9 @@ session 을 새로 바꾼 뒤에도 최근에 알린 발견과 변화 신호는 
 | 시간 `max-duration` | `ProactiveCheckRun` 이 실행 줄이 생길 때 예약한다 | `ChatService.stop` 으로 그 turn 과 자식을 멈춘다. `error_code = CHECK_TIME_LIMIT` |
 | 도구 호출 `max-tool-calls` | `ChatService` 가 살펴보기 turn 의 `tool.started` 마다 `CheckTurn.toolStarted` 를 부른다 | 넘는 순간 같은 중지. `error_code = CHECK_TOOL_LIMIT` |
 | 위임 `max-delegations` | `AgentDelegationService.delegate` 가 루트 잠금 안에서 그 트리의 위임 자식 수를 센다 | 도구 결과 `CHECK_LIMIT`. 모델은 직접 하거나 그만둔다 |
+
+**상한 중지가 실패하면 멈춘 까닭을 되돌리고 다시 시도한다.** `ChatService.stop` 이 예외로 끝나면(`HERMES_UNAVAILABLE` 따위) 정한 까닭을 비우고 1초 뒤 다시 멈춘다. 도구 상한은 다음 `tool.started` 에서도 다시 시도한다. 시도는 한 살펴보기에 3번까지다.
+까닭이 비어 있는 동안 turn 이 예외로 끝나면 상한으로 멈춘 것(`STOPPED`, `CHECK_*_LIMIT`)이 아니라 그 오류 코드의 `FAILED` 로 적는다. 멈추지 못한 turn 을 상한으로 멈췄다고 적지 않기 위해서다.
 
 도구 호출 수는 살펴보기 turn 자신의 `tool.started` 만 센다. 커넥터 에이전트 안의 호출은 그 자식 실행의 몫이고, 위임 수와 `hermes.run-timeout` 이 묶는다.
 **시간 상한은 `hermes.run-timeout` 보다 짧아야 한다.** 기동할 때 검사하고 아니면 뜨지 않는다.
@@ -308,8 +311,8 @@ turn 이 어떻게 끝나든 잠금을 풀기 전에 `ProactiveCheckService` 가
 ### 그리기
 
 `CheckAnswerRenderer` 가 Markdown 글 하나를 만든다. 모델이 쓴 글은 모두 Markdown 문법 글자를 이스케이프한다.
-이스케이프하는 글자는 `CheckAnswerRenderer.MARKDOWN_SPECIALS` 가 갖는다. 백슬래시, 백틱, 별표, 밑줄, 대괄호와 괄호 두 쌍, `#`, `!`, `<`, `>`, `|`, `:`, `.` 다.
-뒤의 둘은 화면의 GFM 이 평문의 `https://` 와 `www.` 를 링크로 바꾸지 않게 하려고 넣는다. 모델 글의 줄바꿈과 이어진 공백은 한 칸으로 합쳐, 줄 머리에 목록 문법이 생기지 않게 한다. 원문 링크 주소 안의 괄호는 `%28`, `%29` 로 바꾼다.
+이스케이프하는 글자는 `CheckAnswerRenderer.MARKDOWN_SPECIALS` 가 갖는다. 백슬래시, 백틱, 별표, 밑줄, 대괄호와 괄호 두 쌍, `#`, `!`, `<`, `>`, `|`, `:`, `.`, `-`, `+`, `=`, `~` 다.
+`:` 와 `.` 는 화면의 GFM 이 평문의 `https://` 와 `www.` 를 링크로 바꾸지 않게 하려고 넣는다. `-`, `+`, `=`, `~` 는 글이 그려지는 자리의 줄 머리에 와도 목록, 제목 밑줄, 취소선이 되지 않게 하려고 넣는다. 모델 글의 줄바꿈과 이어진 공백은 한 칸으로 합쳐, 줄 머리에 목록 문법이 생기지 않게 한다. 원문 링크 주소 안의 괄호는 `%28`, `%29` 로 바꾼다.
 링크는 1 을 통과한 `sourceUrl` 로만 만든다. 참고로 내린 발견의 주소는 링크로 만들지 않는다.
 
 ```text
@@ -339,7 +342,10 @@ turn 이 어떻게 끝나든 잠금을 풀기 전에 `ProactiveCheckService` 가
 - {sourceFailures}
 ```
 
-빈 절은 그리지 않는다. 까닭의 한국어는 아래다.
+빈 절은 그리지 않는다.
+**「새로 알릴 것」 이 없으면 `summary` 와 `followUpCandidates` 를 그리지 않는다.** 원문 검사를 거친 발견 없이 모델이 쓴 글이 추천처럼 보이지 않게 하기 위해서다. 질문, 참고, 확인하지 못한 출처는 그대로 그린다.
+
+까닭의 한국어는 아래다.
 
 | 까닭 | 글 |
 | --- | --- |
@@ -389,7 +395,7 @@ turn 이 어떻게 끝나든 잠금을 풀기 전에 `ProactiveCheckService` 가
 | --- | --- |
 | 결과 계약의 검사와 그리기. 원문 없는 주장, 마감 공고, 오래된 동향, 블록 없음, 마크다운 주입 | `proactive` 의 단위 시험 |
 | 시작 전 점검, 점검 대화의 찾기와 만들기, 다른 사용자의 접근, session 교체 | `ProactiveCheckService` 시험 |
-| 시간과 도구 호출 상한, 끝날 때의 전달 표시 | `ChatService` 와 `ProactiveCheckService` 시험 |
+| 시간과 도구 호출 상한, 상한 중지가 실패했을 때의 다시 시도, 끝날 때의 전달 표시 | `ChatService` 와 `ProactiveCheckService` 시험 |
 | 커넥터 쓰기 거절, MCP 도구 거절, 위임 대상과 수 | 각 판정 자리의 시험 |
 | 웹 도구에서 커리어 커넥터 위임을 거쳐 대화에 결과가 남는 합성 흐름, 검색 결과의 지시가 쓰기로 이어지지 않음, 연결 해제 뒤의 출처 실패 | `test/e2e/scenarios/proactive-check.ts` |
 

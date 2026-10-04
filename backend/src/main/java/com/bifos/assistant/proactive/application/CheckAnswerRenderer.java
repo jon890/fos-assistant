@@ -30,10 +30,11 @@ public class CheckAnswerRenderer {
     /**
      * 이스케이프할 글자다. 백슬래시, 백틱, 별표, 밑줄, 대괄호와 괄호 두 쌍, {@code #}, {@code !}, {@code <}, {@code >},
      * {@code |} 에 더해 {@code :} 와 {@code .} 를 둔다. 뒤의 둘은 화면의 GFM 이 평문 {@code https://...} 와
-     * {@code www.} 를 링크로 바꾸지 못하게 한다. CommonMark 는 ASCII 문장부호의 백슬래시 이스케이프를 받고 화면에는 원래 글자가
-     * 보인다.
+     * {@code www.} 를 링크로 바꾸지 못하게 한다. 줄 머리 문법 글자 {@code -}, {@code +}, {@code =}, {@code ~} 도 둔다. 글이
+     * 그려지는 자리의 줄 머리에 와도 목록, 제목 밑줄, 취소선이 되지 못하게 한다. CommonMark 는 ASCII 문장부호의 백슬래시
+     * 이스케이프를 받고 화면에는 원래 글자가 보인다.
      */
-    static final String MARKDOWN_SPECIALS = "\\`*_[]()#!<>|:.";
+    static final String MARKDOWN_SPECIALS = "\\`*_[]()#!<>|:.-+=~";
 
     private static final DateTimeFormatter CHECKED_AT_FORMAT = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm XXX");
     private static final String ITEM_JOINER = "; ";
@@ -49,7 +50,12 @@ public class CheckAnswerRenderer {
             FindingReason.INCOMPLETE, "근거가 부족해요",
             FindingReason.REPEATED, "이미 알린 것이에요");
 
-    /** 결과를 그린다. 빈 절은 그리지 않는다. */
+    /**
+     * 결과를 그린다. 빈 절은 그리지 않는다.
+     *
+     * <p>「새로 알릴 것」 이 없으면 요약과 할 일 후보를 그리지 않는다. 원문 검사를 거친 발견 없이 모델이 쓴 글이 추천처럼 보이지 않게
+     * 하기 위해서다. 질문과 참고와 확인하지 못한 출처는 그대로 그린다.
+     */
     public String render(CheckResultBlock block, List<JudgedFinding> judged) {
         List<JudgedFinding> fresh =
                 judged.stream().filter(each -> each.kind() == FindingKind.NEW).toList();
@@ -58,8 +64,8 @@ public class CheckAnswerRenderer {
                 .toList();
 
         List<String> parts = new ArrayList<>();
-        addIfPresent(parts, block.summary() == null ? null : escape(block.summary()));
         if (!fresh.isEmpty()) {
+            addIfPresent(parts, block.summary() == null ? null : escape(block.summary()));
             parts.add("**새로 알릴 것**\n\n" + newFindings(fresh));
         } else if (block.questions().isEmpty()) {
             parts.add(NO_NEW_LINE);
@@ -68,7 +74,9 @@ public class CheckAnswerRenderer {
             parts.add("**참고 (새 추천이 아니에요)**\n" + referenceLines(references));
         }
         addSection(parts, "물어보고 싶은 것", block.questions());
-        addSection(parts, "할 일 후보", block.followUpCandidates());
+        if (!fresh.isEmpty()) {
+            addSection(parts, "할 일 후보", block.followUpCandidates());
+        }
         addSection(parts, "확인하지 못한 출처", block.sourceFailures());
         return String.join("\n\n", parts);
     }

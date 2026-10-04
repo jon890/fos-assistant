@@ -7,6 +7,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.when;
 
 import com.bifos.assistant.agent.domain.Agent;
@@ -68,6 +69,7 @@ import org.springframework.context.annotation.Import;
 import org.springframework.context.annotation.Primary;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /**
@@ -96,6 +98,10 @@ class ProactiveCheckLimitTest {
     private static final String USER_STOP_NOTICE = "살펴보기를 멈췄어요";
     private static final String PENDING_TEXT = "살펴보는 동안 보낸 질문";
     private static final String PENDING_ANSWER = "대기 메시지에 답했어요";
+    private static final String FAILED_NOTICE = "살펴보기를 끝내지 못했어요. 잠시 뒤 다시 눌러 주세요";
+
+    /** 상한에 닿은 살펴보기에 멈추기를 부르는 최대 횟수다. 문서의 「상한」 이 정한다. */
+    private static final int STOP_ATTEMPTS = 3;
 
     @TestConfiguration
     static class StubRuntime {
@@ -109,7 +115,8 @@ class ProactiveCheckLimitTest {
     @Autowired
     ProactiveCheckService service;
 
-    @Autowired
+    /** 멈추기가 실패하는 경우를 만든다. 정하지 않은 검사에서는 실제 그대로다. */
+    @MockitoSpyBean
     ChatService chat;
 
     @Autowired
@@ -348,6 +355,58 @@ class ProactiveCheckLimitTest {
                 .containsExactly(START_NOTICE, TOOL_LIMIT_NOTICE);
     }
 
+    @Test
+    @DisplayName("상한 중지가 한 번 HERMES_UNAVAILABLE 로 실패하면 다시 멈춰 CHECK_TOOL_LIMIT 와 도구 호출 한도 알림 줄로 끝난다")
+    void retriesLimitStopAfterFailedStop() {
+        holdUntilStopped();
+        doThrow(new ApiException(ErrorCode.HERMES_UNAVAILABLE, "could not stop every Hermes run"))
+                .doCallRealMethod()
+                .when(chat)
+                .stop(any(), any());
+        stub().willAnswer(command -> cancelled("<fos-check-result>{\"version\":1"));
+        hermesStreams(toolEvents(MAX_TOOL_CALLS + 1));
+
+        runCheck();
+
+        ProactiveCheck check = onlyCheck();
+        assertThat(check.status()).isEqualTo(CheckStatus.STOPPED);
+        assertThat(check.errorCode()).isEqualTo("CHECK_TOOL_LIMIT");
+        assertThat(stub().stopped()).as("다시 시도해 살펴보기 turn 의 run 에 간 중지").containsExactly(rootRunId(check));
+        assertThat(messages.findByConversationIdOrderByIdAsc(conversation.id()))
+                .extracting(ChatMessage::content)
+                .containsExactly(START_NOTICE, TOOL_LIMIT_NOTICE);
+    }
+
+    @Test
+    @DisplayName("상한 중지가 계속 실패한 뒤 turn 이 예외로 끝나면 상한 까닭 없이 FAILED 와 그 오류 코드와 실패 알림 줄이 남는다")
+    void recordsFailureWhenLimitStopKeepsFailingAndTurnThrows() {
+        CountDownLatch attempts = new CountDownLatch(STOP_ATTEMPTS);
+        doAnswer(invocation -> {
+                    attempts.countDown();
+                    throw new ApiException(ErrorCode.HERMES_UNAVAILABLE, "could not stop every Hermes run");
+                })
+                .when(chat)
+                .stop(any(), any());
+        stub().beforeAwait(() -> {
+            // 멈추기 시도를 모두 쓴 뒤 turn 이 실패한다. 마지막 시도가 까닭을 되돌릴 틈을 둔다.
+            await(attempts);
+            pause(Duration.ofMillis(300));
+            stub().willFail(new ApiException(ErrorCode.HERMES_RUN_FAILED, "run failed"));
+        });
+        stub().willAnswer(command -> cancelled("멈추지 않은 답"));
+        hermesStreams(toolEvents(MAX_TOOL_CALLS + 1));
+
+        runCheck();
+
+        ProactiveCheck check = onlyCheck();
+        assertThat(attempts.getCount()).as("남은 멈추기 시도").isZero();
+        assertThat(check.status()).isEqualTo(CheckStatus.FAILED);
+        assertThat(check.errorCode()).as("상한 까닭이 아니라 turn 의 오류 코드").isEqualTo("HERMES_RUN_FAILED");
+        assertThat(messages.findByConversationIdOrderByIdAsc(conversation.id()))
+                .extracting(ChatMessage::content)
+                .containsExactly(START_NOTICE, FAILED_NOTICE);
+    }
+
     /** 살펴보기를 시작하고 그 대화의 잠금이 풀릴 때까지 기다린다. */
     private void runCheck() {
         service.start(owner, agent.code(), CheckTrigger.MANUAL);
@@ -376,6 +435,14 @@ class ProactiveCheckLimitTest {
     private static void await(CountDownLatch latch) {
         try {
             latch.await(10, TimeUnit.SECONDS);
+        } catch (InterruptedException ex) {
+            Thread.currentThread().interrupt();
+        }
+    }
+
+    private static void pause(Duration duration) {
+        try {
+            Thread.sleep(duration);
         } catch (InterruptedException ex) {
             Thread.currentThread().interrupt();
         }
