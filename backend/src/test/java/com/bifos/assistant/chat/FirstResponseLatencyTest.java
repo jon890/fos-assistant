@@ -9,7 +9,6 @@ import static org.mockito.Mockito.when;
 import com.bifos.assistant.agent.domain.type.CostMode;
 import com.bifos.assistant.chat.application.FirstResponseLatencyService;
 import com.bifos.assistant.chat.application.ScheduledTurnExecutions;
-import com.bifos.assistant.chat.application.model.LatencyRow;
 import com.bifos.assistant.chat.domain.ChatMessage;
 import com.bifos.assistant.chat.infra.ChatMessageRepository;
 import com.bifos.assistant.chat.presentation.ChatDtos.LatencyRowView;
@@ -126,12 +125,12 @@ class FirstResponseLatencyTest {
     @DisplayName("SYSTEM 알림 줄 뒤에 답한 자동 turn 은 세지 않는다")
     void doesNotCountAutoTurnAnsweredAfterSystemNotice() {
         long conversationId = nextConversationId++;
-        AgentExecution auto = execution(ADMIN_ID, ModelTier.FAST, YESTERDAY_NOON, 100L, 1_000L, null);
+        AgentExecution auto = execution(conversationId, ADMIN_ID, ModelTier.FAST, YESTERDAY_NOON, 100L, 1_000L, null);
         message(ChatMessage.fromSystem(conversationId, "위임 결과가 도착했어요", YESTERDAY_NOON));
         message(ChatMessage.fromAssistant(conversationId, "결과를 전해요", auto.id(), YESTERDAY_NOON));
         userTurn(ADMIN_ID, ModelTier.FAST, YESTERDAY_NOON.plusSeconds(60), 100L, 2_000L);
 
-        List<LatencyRow> rows = rowsOf(30);
+        List<LatencyRowView> rows = rowsOf(30);
 
         assertThat(rows).singleElement().satisfies(row -> {
             assertThat(row.turns()).isEqualTo(1L);
@@ -143,15 +142,16 @@ class FirstResponseLatencyTest {
     @DisplayName("다시 생성한 두 번째 답의 실행도 사용자 turn 으로 센다")
     void countsExecutionOfRegeneratedAnswerAsUserTurn() {
         long conversationId = nextConversationId++;
-        AgentExecution first = execution(ADMIN_ID, ModelTier.FAST, YESTERDAY_NOON, 100L, 1_000L, null);
-        AgentExecution second = execution(ADMIN_ID, ModelTier.FAST, YESTERDAY_NOON.plusSeconds(30), 100L, 3_000L, null);
+        AgentExecution first = execution(conversationId, ADMIN_ID, ModelTier.FAST, YESTERDAY_NOON, 100L, 1_000L, null);
+        AgentExecution second =
+                execution(conversationId, ADMIN_ID, ModelTier.FAST, YESTERDAY_NOON.plusSeconds(30), 100L, 3_000L, null);
         message(ChatMessage.fromUser(conversationId, ADMIN_ID, "질문이에요", YESTERDAY_NOON));
         ChatMessage firstAnswer =
                 message(ChatMessage.fromAssistant(conversationId, "첫 답", first.id(), YESTERDAY_NOON.plusSeconds(2)));
         message(ChatMessage.regeneratedAnswer(
                 conversationId, "다시 쓴 답", second.id(), firstAnswer.id(), YESTERDAY_NOON.plusSeconds(33)));
 
-        List<LatencyRow> rows = rowsOf(30);
+        List<LatencyRowView> rows = rowsOf(30);
 
         assertThat(rows).singleElement().satisfies(row -> {
             assertThat(row.turns()).isEqualTo(2L);
@@ -165,7 +165,7 @@ class FirstResponseLatencyTest {
     void turnWithoutFirstDeltaCountsOnlyToSubmit() {
         userTurn(ADMIN_ID, ModelTier.FAST, YESTERDAY_NOON, 100L, null);
 
-        LatencyRow row = rowsOf(30).getFirst();
+        LatencyRowView row = rowsOf(30).getFirst();
 
         assertThat(row.turns()).isOne();
         assertThat(row.toSubmit().count()).isOne();
@@ -183,7 +183,7 @@ class FirstResponseLatencyTest {
         AgentExecution root = userTurn(ADMIN_ID, ModelTier.FAST, YESTERDAY_NOON, 100L, 1_000L);
         userTurn(ADMIN_ID, ModelTier.FAST, YESTERDAY_NOON.plusSeconds(10), 100L, 5_000L, root.id());
 
-        List<LatencyRow> rows = rowsOf(30);
+        List<LatencyRowView> rows = rowsOf(30);
 
         assertThat(rows)
                 .singleElement()
@@ -194,7 +194,8 @@ class FirstResponseLatencyTest {
     @DisplayName("예약 작업 발화가 연 turn 은 지시가 USER 메시지로 남아도 세지 않는다")
     void doesNotCountScheduledTaskTurnEvenThoughInstructionIsUserMessage() {
         long conversationId = nextConversationId++;
-        AgentExecution scheduled = execution(ADMIN_ID, ModelTier.FAST, YESTERDAY_NOON, 100L, 1_000L, null);
+        AgentExecution scheduled =
+                execution(conversationId, ADMIN_ID, ModelTier.FAST, YESTERDAY_NOON, 100L, 1_000L, null);
         message(ChatMessage.fromSystem(conversationId, "예약 작업이 시작됐어요", YESTERDAY_NOON));
         message(ChatMessage.fromUser(conversationId, ADMIN_ID, "화요일 회의 일정을 알려 줘", YESTERDAY_NOON));
         message(ChatMessage.fromAssistant(conversationId, "회의는 화요일 10시예요", scheduled.id(), YESTERDAY_NOON));
@@ -203,7 +204,7 @@ class FirstResponseLatencyTest {
         savedRuns.add(taskRuns.save(run));
         userTurn(ADMIN_ID, ModelTier.FAST, YESTERDAY_NOON.plusSeconds(60), 100L, 2_000L);
 
-        List<LatencyRow> rows = rowsOf(30);
+        List<LatencyRowView> rows = rowsOf(30);
 
         assertThat(rows).singleElement().satisfies(row -> {
             assertThat(row.turns()).isOne();
@@ -217,7 +218,7 @@ class FirstResponseLatencyTest {
         userTurn(ADMIN_ID, ModelTier.FAST, YESTERDAY_NOON, 100L, 1_000L);
         userTurn(OTHER_USER_ID, ModelTier.FAST, YESTERDAY_NOON.plusSeconds(10), 100L, 8_000L);
 
-        List<LatencyRow> rows = rowsOf(30);
+        List<LatencyRowView> rows = rowsOf(30);
 
         assertThat(rows)
                 .singleElement()
@@ -231,9 +232,9 @@ class FirstResponseLatencyTest {
         userTurn(ADMIN_ID, ModelTier.FAST, Instant.parse("2026-10-04T14:30:00Z"), 100L, 1_000L);
         userTurn(ADMIN_ID, ModelTier.FAST, Instant.parse("2026-10-04T15:30:00Z"), 100L, 1_000L);
 
-        List<LatencyRow> rows = rowsOf(30);
+        List<LatencyRowView> rows = rowsOf(30);
 
-        assertThat(rows).extracting(LatencyRow::date).containsExactly(YESTERDAY, YESTERDAY.plusDays(1));
+        assertThat(rows).extracting(LatencyRowView::date).containsExactly(YESTERDAY, YESTERDAY.plusDays(1));
     }
 
     @Test
@@ -244,10 +245,10 @@ class FirstResponseLatencyTest {
         userTurn(ADMIN_ID, ModelTier.FAST, YESTERDAY_NOON.plusSeconds(2), 100L, 1_000L);
         userTurn(ADMIN_ID, ModelTier.BALANCED, YESTERDAY_NOON.plusSeconds(3), 100L, 1_000L);
 
-        List<LatencyRow> rows = rowsOf(30);
+        List<LatencyRowView> rows = rowsOf(30);
 
         assertThat(rows)
-                .extracting(LatencyRow::modelTier)
+                .extracting(LatencyRowView::modelTier)
                 .containsExactly(ModelTier.FAST, ModelTier.BALANCED, ModelTier.DEEP, null);
     }
 
@@ -260,7 +261,7 @@ class FirstResponseLatencyTest {
         assertThat(rowsOf(30))
                 .singleElement()
                 .satisfies(row -> assertThat(row.turns()).isOne());
-        assertThat(rowsOf(90)).extracting(LatencyRow::turns).containsExactly(1L, 1L);
+        assertThat(rowsOf(90)).extracting(LatencyRowView::turns).containsExactly(1L, 1L);
     }
 
     @Test
@@ -283,16 +284,8 @@ class FirstResponseLatencyTest {
         }
     }
 
-    private List<LatencyRow> rowsOf(int days) {
-        return controller.latency(days).rows().stream()
-                .map(view -> new LatencyRow(
-                        view.date(),
-                        view.modelTier(),
-                        view.turns(),
-                        view.firstResponse(),
-                        view.toSubmit(),
-                        view.toFirstDelta()))
-                .toList();
+    private List<LatencyRowView> rowsOf(int days) {
+        return controller.latency(days).rows();
     }
 
     private static CurrentUser admin(UserRole role) {
@@ -307,7 +300,7 @@ class FirstResponseLatencyTest {
     private AgentExecution userTurn(
             Long userId, ModelTier tier, Instant received, Long submitMs, Long firstDeltaMs, Long parentId) {
         long conversationId = nextConversationId++;
-        AgentExecution execution = execution(userId, tier, received, submitMs, firstDeltaMs, parentId);
+        AgentExecution execution = execution(conversationId, userId, tier, received, submitMs, firstDeltaMs, parentId);
         message(ChatMessage.fromUser(conversationId, userId, "이번 주 일정이 어떻게 돼?", received));
         message(ChatMessage.fromAssistant(conversationId, "주간 회의는 화요일 10시예요", execution.id(), received));
         return execution;
@@ -315,10 +308,16 @@ class FirstResponseLatencyTest {
 
     /** 요청을 받은 시각에서 밀리초만큼 뒤에 제출하고 첫 조각을 받은 실행이다. 밀리초가 null 이면 그 시각을 비운다. */
     private AgentExecution execution(
-            Long userId, ModelTier tier, Instant received, Long submitMs, Long firstDeltaMs, Long parentId) {
+            long conversationId,
+            Long userId,
+            ModelTier tier,
+            Instant received,
+            Long submitMs,
+            Long firstDeltaMs,
+            Long parentId) {
         AgentExecution execution = AgentExecution.builder()
                 .userId(userId)
-                .conversationId(9_000L)
+                .conversationId(conversationId)
                 .parentExecutionId(parentId)
                 .profileName("test-profile")
                 .modelTier(tier)

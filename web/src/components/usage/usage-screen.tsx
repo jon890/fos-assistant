@@ -34,7 +34,8 @@ export async function UsageScreen({
 }) {
   const tab = parseUsageTab((await searchParams).tab, isAdmin);
   // 스킬 탭일 때만 호출 이력을 더 읽는다. 다른 탭은 이 조회를 하지 않는다.
-  // 나눠 보기 두 조회와 첫 반응 시간은 관리자에게만 그리므로 관리자일 때만 읽는다.
+  // 나눠 보기 두 조회는 관리자에게만 그리므로 관리자일 때만 읽는다.
+  // 첫 반응 시간은 관리자의 요약 탭에만 그리므로 그때만 읽는다.
   const [
     executionsResult,
     monthlyResult,
@@ -51,7 +52,7 @@ export async function UsageScreen({
     isAdmin
       ? callControlPlane<Breakdown>("/api/v1/usage/breakdown?axis=fingerprint")
       : null,
-    isAdmin
+    isAdmin && tab === "summary"
       ? callControlPlane<LatencySummary>("/api/v1/admin/usage/latency?days=30")
       : null,
     tab === "skills"

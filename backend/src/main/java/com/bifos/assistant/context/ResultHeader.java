@@ -54,8 +54,16 @@ public final class ResultHeader {
             return header.append(']').toString();
         }
         return header.append(", 신선도: 오래됨]\n이 결과는 ")
-                .append(staleAfter.toHours())
-                .append("시간보다 전에 끝났다. 지금 상태와 다를 수 있다.")
+                .append(durationLabel(staleAfter))
+                .append("보다 전에 끝났다. 지금 상태와 다를 수 있다.")
                 .toString();
+    }
+
+    /** 정시면 「N시간」, 정시가 아니면 「N분」 이다. 시간으로 내리면 30분이 「0시간」 이 된다. */
+    private static String durationLabel(Duration staleAfter) {
+        if (staleAfter.equals(Duration.ofHours(staleAfter.toHours()))) {
+            return staleAfter.toHours() + "시간";
+        }
+        return staleAfter.toMinutes() + "분";
     }
 }

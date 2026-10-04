@@ -77,8 +77,8 @@ export function LatencySection({ summary }: { summary: LatencySummary }) {
     >
       <h2 className="mb-1 text-lg font-semibold">첫 반응 시간</h2>
       <p className="mb-3 text-sm text-muted-foreground">
-        최근 30일 동안 보낸 질문에 첫 글자가 나오기까지 걸린 시간이에요. 화면을
-        그리는 시간은 들지 않아요.
+        최근 {summary.days}일 동안 보낸 질문에 첫 글자가 나오기까지 걸린
+        시간이에요. 화면을 그리는 시간은 들지 않아요.
       </p>
       {summary.rows.length === 0 ? (
         <EmptyState

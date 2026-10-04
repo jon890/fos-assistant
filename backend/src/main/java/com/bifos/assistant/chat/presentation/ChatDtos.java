@@ -360,12 +360,29 @@ public final class ChatDtos {
             LocalDate date,
             ModelTier modelTier,
             long turns,
-            LatencyStat firstResponse,
-            LatencyStat toSubmit,
-            LatencyStat toFirstDelta) {
+            LatencyStatView firstResponse,
+            LatencyStatView toSubmit,
+            LatencyStatView toFirstDelta) {
         static LatencyRowView from(LatencyRow row) {
             return new LatencyRowView(
-                    row.date(), row.modelTier(), row.turns(), row.firstResponse(), row.toSubmit(), row.toFirstDelta());
+                    row.date(),
+                    row.modelTier(),
+                    row.turns(),
+                    LatencyStatView.from(row.firstResponse()),
+                    LatencyStatView.from(row.toSubmit()),
+                    LatencyStatView.from(row.toFirstDelta()));
+        }
+    }
+
+    /**
+     * 지표 하나의 건수와 백분위다. 값이 없는 지표는 {@code count} 가 0 이고 두 백분위가 null 이다.
+     *
+     * @param p50Ms 중앙값. 밀리초
+     * @param p90Ms 90번째 백분위. 밀리초
+     */
+    public record LatencyStatView(long count, Long p50Ms, Long p90Ms) {
+        static LatencyStatView from(LatencyStat stat) {
+            return new LatencyStatView(stat.count(), stat.p50Ms(), stat.p90Ms());
         }
     }
 }

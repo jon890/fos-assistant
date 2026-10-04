@@ -1,11 +1,17 @@
 import { expect, setSession, test } from "./fixtures.ts";
 
-/** 한국 달력의 오늘이다. 집계가 `Asia/Seoul` 로 날짜를 끊는다. */
-function todayInSeoul(): string {
-  return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Seoul" }).format(new Date());
+const ONE_DAY_MS = 24 * 60 * 60 * 1000;
+
+/** 한국 달력의 날짜다. 집계가 `Asia/Seoul` 로 날짜를 끊는다. */
+function dateInSeoul(at: number): string {
+  return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Seoul" }).format(new Date(at));
 }
 
 test("화면에서 보낸 질문이 관리자 사용량의 첫 반응 시간 절에 오늘 줄로 보인다", async ({ page }) => {
+  // 보내기 전에 날짜를 정해 둔다. 한국 자정을 넘기며 돌아도 그날이나 다음 날 가운데 한 줄에 잡힌다.
+  // Asia/Seoul 에는 일광 절약 시간이 없어 24시간 뒤가 늘 다음 날이다.
+  const sentAt = Date.now();
+  const dates = [dateInSeoul(sentAt), dateInSeoul(sentAt + ONE_DAY_MS)];
   await page.goto("/");
   const composer = page.getByRole("textbox", { name: "메시지" });
   await composer.fill("첫 반응 시간 검사");
@@ -17,9 +23,11 @@ test("화면에서 보낸 질문이 관리자 사용량의 첫 반응 시간 절
   await page.goto("/admin/usage");
   const section = page.getByTestId("latency-section");
   await expect(section.getByRole("heading", { name: "첫 반응 시간", level: 2 })).toBeVisible();
-  const today = section.locator(`[data-testid="latency-row"][data-date="${todayInSeoul()}"]:visible`).first();
-  await expect(today).toBeVisible();
-  await expect(today).toContainText(/[1-9]\d*건/);
+  const row = section
+    .locator(dates.map((date) => `[data-testid="latency-row"][data-date="${date}"]:visible`).join(", "))
+    .first();
+  await expect(row).toBeVisible();
+  await expect(row).toContainText(/[1-9]\d*건/);
 });
 
 test("MEMBER 역할의 일반 사용량 화면에는 첫 반응 시간 절이 없다", async ({ context, page }) => {

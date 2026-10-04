@@ -69,6 +69,24 @@ class ResultHeaderTest {
     }
 
     @Test
+    @DisplayName("기준이 정시가 아니면 안내 줄에 시간 대신 분을 적는다")
+    void rendersStaleNoteInMinutesWhenStaleAfterIsNotWholeHours() {
+        Duration ninetyMinutes = Duration.ofMinutes(90);
+        Instant executed = NOW.minus(Duration.ofHours(2));
+
+        String header = ResultHeader.render(
+                "승인한 동작",
+                List.of("동작: 초안 만들기", "상태: SUCCEEDED"),
+                executed,
+                ResultHeader.freshnessOf(executed, NOW, ninetyMinutes),
+                ninetyMinutes);
+
+        assertThat(header)
+                .isEqualTo("[출처: 승인한 동작, 동작: 초안 만들기, 상태: SUCCEEDED, 끝난 시각: 2026-10-03 15:30, 신선도: 오래됨]\n"
+                        + "이 결과는 90분보다 전에 끝났다. 지금 상태와 다를 수 있다.");
+    }
+
+    @Test
     @DisplayName("끝난 시각이 비어 있으면 머리줄에 끝난 시각: 모름 을 적는다")
     void rendersUnknownTimeWhenAsOfIsMissing() {
         String header = ResultHeader.render(

@@ -11,15 +11,12 @@ import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.usage.application.model.ExecutionAdmission;
 import com.bifos.assistant.usage.domain.AgentExecution;
 import com.bifos.assistant.usage.domain.DelegationKey;
-import com.bifos.assistant.usage.domain.ExecutionContextSource;
 import com.bifos.assistant.usage.domain.ExecutionConversation;
 import com.bifos.assistant.usage.domain.type.ExecutionStatus;
 import com.bifos.assistant.usage.domain.type.ReasoningEffortSource;
 import com.bifos.assistant.usage.infra.AgentExecutionRepository;
-import com.bifos.assistant.usage.infra.ExecutionContextSourceRepository;
 import java.time.Clock;
 import java.time.Instant;
-import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
@@ -42,7 +39,7 @@ public class ExecutionRecorder {
     private final CostEstimator costs;
     private final HermesRunsClient hermes;
     private final UserExecutionLimiter limiter;
-    private final ExecutionContextSourceRepository contextSources;
+    private final ExecutionContextSourceWriter contextSources;
 
     /**
      * 실행을 RUNNING 으로 만들어 돌려준다. 부모가 없으면 parent 와 root 는 null 이다.
@@ -297,36 +294,8 @@ public class ExecutionRecorder {
                         .instructionsHash(context.instructionsHash())
                         .status(ExecutionStatus.RUNNING)
                         .build()));
-        recordSources(execution, context.sources());
+        contextSources.write(execution.id(), context.sources());
         return execution;
-    }
-
-    /**
-     * 실행에 실은 문맥 항목의 참조를 실은 순서대로 남긴다(ADR-071).
-     *
-     * <p>사용자 잠금 밖에서 실행 줄을 만든 직후에 부른다. 잠금 안의 일이 늘면 같은 사용자의 다른 turn 이 기다린다. 사건
-     * 저장처럼 관측용이라 저장이 실패해도 실행은 그대로 간다. 로그에는 제목과 본문 없이 실행 번호와 개수만 낸다.
-     */
-    private void recordSources(AgentExecution execution, List<ContextSourceRef> sources) {
-        if (sources.isEmpty()) {
-            return;
-        }
-        Instant now = clock.instant();
-        List<ExecutionContextSource> rows = new ArrayList<>(sources.size());
-        for (int position = 0; position < sources.size(); position++) {
-            ContextSourceRef ref = sources.get(position);
-            rows.add(ExecutionContextSource.of(
-                    execution.id(), position, ref.source(), ref.ref(), ref.bodyMode(), ref.freshness(), now));
-        }
-        try {
-            contextSources.saveAll(rows);
-        } catch (RuntimeException ex) {
-            log.warn(
-                    "execution context sources not recorded executionId={} count={}",
-                    execution.id(),
-                    sources.size(),
-                    ex);
-        }
     }
 
     /**

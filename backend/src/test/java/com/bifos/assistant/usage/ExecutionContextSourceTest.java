@@ -18,6 +18,7 @@ import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.usage.application.ContextSourceRef;
 import com.bifos.assistant.usage.application.CostEstimator;
 import com.bifos.assistant.usage.application.ExecutionContextSnapshot;
+import com.bifos.assistant.usage.application.ExecutionContextSourceWriter;
 import com.bifos.assistant.usage.application.ExecutionRecorder;
 import com.bifos.assistant.usage.application.ExecutionTreeService;
 import com.bifos.assistant.usage.application.UserExecutionLimiter;
@@ -37,6 +38,8 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.dao.DataAccessResourceFailureException;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 /** 실행마다 실은 문맥 항목의 참조를 남기고 관리자에게만 실행 트리로 보이는지 확인한다(ADR-071). */
 @SpringBootTest
@@ -74,6 +77,9 @@ class ExecutionContextSourceTest {
 
     @Autowired
     UserExecutionLimiter limiter;
+
+    @Autowired
+    PlatformTransactionManager transactionManager;
 
     /** 실제로 돈 모델을 읽는 세션 조회를 여기서는 하지 않는다. 기록 규칙만 보는 검사다. */
     @MockitoBean
@@ -127,12 +133,41 @@ class ExecutionContextSourceTest {
     void executionIsCreatedWhenSourceStoreFails() {
         ExecutionContextSourceRepository failing = mock(ExecutionContextSourceRepository.class);
         when(failing.saveAll(any())).thenThrow(new DataAccessResourceFailureException("저장소가 닫혔다"));
-        ExecutionRecorder swapped = new ExecutionRecorder(clock, executions, costs, hermes, limiter, failing);
+        ExecutionRecorder swapped = new ExecutionRecorder(
+                clock,
+                executions,
+                costs,
+                hermes,
+                limiter,
+                new ExecutionContextSourceWriter(failing, transactionManager, clock));
 
         AgentExecution execution = start(swapped, adminUser());
 
         assertThat(executions.findById(execution.id()))
                 .as("참조 저장이 실패한 뒤의 실행 줄")
+                .hasValueSatisfying(saved -> assertThat(saved.status()).isEqualTo(ExecutionStatus.RUNNING));
+        assertThat(contextSources.findByIdExecutionIdOrderByIdPositionAsc(execution.id()))
+                .isEmpty();
+    }
+
+    @Test
+    @DisplayName("바깥 트랜잭션 안에서 참조 저장이 실패해도 바깥 트랜잭션은 커밋되고 실행 줄이 남는다")
+    void outerTransactionCommitsWhenSourceStoreFails() {
+        // source_ref 칸은 80자다. 넘는 참조는 데이터베이스가 거절해 실제 저장소에서 저장이 실패한다
+        List<ContextSourceRef> tooLong =
+                List.of(new ContextSourceRef("MEMORY_ALWAYS", "memory:" + "9".repeat(80), "INLINE", "FRESH"));
+        TransactionTemplate outer = new TransactionTemplate(transactionManager);
+
+        AgentExecution execution = outer.execute(status -> recorder.start(
+                adminUser(),
+                conversation.executionConversation(),
+                agent(),
+                null,
+                null,
+                new ExecutionContextSnapshot(120L, null, null, 1, tooLong)));
+
+        assertThat(executions.findById(execution.id()))
+                .as("바깥 트랜잭션이 끝난 뒤의 실행 줄")
                 .hasValueSatisfying(saved -> assertThat(saved.status()).isEqualTo(ExecutionStatus.RUNNING));
         assertThat(contextSources.findByIdExecutionIdOrderByIdPositionAsc(execution.id()))
                 .isEmpty();
