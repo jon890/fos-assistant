@@ -55,7 +55,7 @@
 
 - `DelegationResult.Failure` 에 `CHECK_TARGET`, `CHECK_LIMIT` 을 더하고 `McpToolService.delegationFailureMessage` 에 글을 더한다. 「먼저 살펴보기에서는 연결한 서비스의 에이전트에만 맡길 수 있습니다.」, 「이번 살펴보기에서는 더 맡길 수 없습니다.」
 - `AgentDelegationService.delegate`: 에이전트를 정한 뒤 `ProactiveCheckGuard.isCheckTree(origin)` 이면, 그 에이전트가 커넥터 에이전트(`agent.connectorManaged()`)이면서 주인(`agent.ownerUserId()`)이 요청자인 경우가 아닐 때 `CHECK_TARGET`. 루트 잠금 안에서 같은 호출 확인 다음에 그 살펴보기의 `proactive_check.status` 가 `RUNNING` 이 아니거나 `countByRootExecutionIdAndDelegationKeyIsNotNull(rootId) >= maxDelegations()` 이면 `CHECK_LIMIT`. 앞의 조건은 멈추는 동안 이미 나간 `agent_delegate` 가 끝날 때의 정리(`markTreeDelivered`) 뒤에 자식 줄을 만들어, 그 결과로 점검 대화에 보통 자동 turn 이 열리는 것을 막는다
-- `DelegationProperties` record 에 `statusWaitMax`(기본 20초, 0 보다 크다)를 마지막 칸으로 더하고 `application.yml` 의 `assistant.delegation` 에 `status-wait-max` 를 주석과 함께 더한다. 기존 5인자 생성자를 쓰는 시험이 넷이다(`AgentRunnerSubmitFailureTest`, `AgentRunnerConnectorContextTest`, `DelegationOutputTest`, `DelegationPropertiesTest`). record 에 5인자 생성자 `DelegationProperties(int maxDepth, int maxConcurrentChildren, int maxActive, Duration submitTimeout, int outputMaxChars)` 를 더해 `statusWaitMax` 를 20초로 채우면 앞의 셋은 고치지 않아도 된다. `DelegationPropertiesTest` 에는 `statusWaitMax` 가 0 이하일 때 기동이 실패하는 경우를 더한다
+- `DelegationProperties` record 에 `statusWaitMax`(기본 20초, 0 보다 크다)를 마지막 칸으로 더하고 `application.yml` 의 `assistant.delegation` 에 `status-wait-max` 를 주석과 함께 더한다. 생성자는 canonical 하나로 둔다. public 생성자가 둘인 `@ConfigurationProperties` record 는 Spring Boot 가 바인딩할 생성자를 고르지 못해 기동이 실패한다. 그래서 5인자로 부르던 시험 넷(`AgentRunnerSubmitFailureTest`, `AgentRunnerConnectorContextTest`, `DelegationOutputTest`, `DelegationPropertiesTest`)의 생성자 호출에 `Duration.ofSeconds(20)` 을 더한다. `DelegationPropertiesTest` 에는 `statusWaitMax` 가 0 이하일 때 실패하는 경우와, 설정을 비웠을 때 20초로 뜨는 경우를 더한다
 - `AgentDelegationService.status(CurrentUser user, AgentExecution origin, Long executionId, Duration wait)` 를 더한다. 기존 3인자 `status` 는 `@Transactional(readOnly = true)` 라 그 안에서 기다리면 다시 읽어도 같은 영속 컨텍스트의 엔티티가 나오고 DB 연결도 쥔다. 그래서 4인자는 트랜잭션을 걸지 않는다. 3인자로 물을 수 있는지 판정하고, `RUNNING` 이고 이 서버의 `running` 에 있으면 트랜잭션 밖에서 `min(wait, statusWaitMax)` 까지 `awaitEnded` 한 뒤 `executions.findById` 로 새로 읽는다. `stop` 과 같은 형태다
 - `AgentDelegationService` 는 명시 생성자를 쓴다. `ProactiveCheckGuard` 를 받게 바꾸면 `orchestration/AgentDelegationServiceRaceTest.java` 가 그 생성자를 직접 부르므로 함께 고친다(살펴보기 트리가 아니라고 답하는 대역을 넘긴다)
 - `McpToolService.agentStatus` 가 `wait_seconds` 를 받아 넘긴다
@@ -107,4 +107,7 @@ python3 -m unittest discover -s hermes/tests
 | `backend/src/test/java/com/bifos/assistant/orchestration/AgentDelegationServiceTest.java` | 수정 |
 | `backend/src/test/java/com/bifos/assistant/orchestration/AgentDelegationServiceRaceTest.java` | 수정 |
 | `backend/src/test/java/com/bifos/assistant/orchestration/DelegationPropertiesTest.java` | 수정 |
+| `backend/src/test/java/com/bifos/assistant/orchestration/AgentRunnerSubmitFailureTest.java` | 수정 |
+| `backend/src/test/java/com/bifos/assistant/orchestration/AgentRunnerConnectorContextTest.java` | 수정 |
+| `backend/src/test/java/com/bifos/assistant/orchestration/DelegationOutputTest.java` | 수정 |
 | `backend/src/main/java/com/bifos/assistant/connector/application/ConnectorActionService.java` | 수정 |

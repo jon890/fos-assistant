@@ -115,7 +115,7 @@ sequenceDiagram
 | --- | --- | --- |
 | 허용된 Memory | `ContextAssembler.assemble`. 그 에이전트가 받는 collection 만이다([ADR-053](../adr/ADR-053-에이전트는-허용된-collection-의-memory-만-받는다.md)). 보통 turn 과 같다 | `instructions` |
 | 지난 결과와 사용자의 논의 | 점검 대화의 Hermes session. 지난 답과 그 뒤 사용자가 받아들이거나 거절하거나 관심을 좁힌 대화가 그 안에 있다 | `session_id` |
-| 최근에 알린 발견 | 그 점검 대화의 `NEW` 발견 가운데 `digest-window` 안의 것을 `digest-max-items` 개까지. 영역, 주제 키, 제목, 원문 주소, 확인 날짜, 그 살펴보기 뒤 사용자가 보낸 메시지 수 | `input`. 모델이 쓴 글에서 온 것이라 `<external-data>` 로 감싼다 |
+| 최근에 알린 발견 | 그 점검 대화의 `NEW` 발견 가운데 `digest-window` 안의 것을 `digest-max-items` 개까지. 영역, 주제 키, 제목, 원문 주소, 확인 날짜, 그 살펴보기가 끝난 뒤 지금까지 사용자가 보낸 메시지 수 | `input`. 모델이 쓴 글에서 온 것이라 `<external-data>` 로 감싼다 |
 | 변화 신호 | 지난 살펴보기 시각, 그 뒤 사용자가 점검 대화에 보낸 메시지 수, Memory 문맥이 지난 살펴보기와 같은지(`agent_execution.instructions_hash` 비교) | `input` |
 | 분야의 맥락 | 분야 지침이 정한 질의로 커넥터 에이전트에 맡겨 읽는다. 커리어는 아래 「분야 지침이 지킬 것」 | 살펴보기 turn 이 도구로 읽는다 |
 

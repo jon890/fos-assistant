@@ -14,7 +14,7 @@
 **근거 문서**: `docs/backend/schema/proactive.md`, `docs/backend/schema/chat.md` 의 `conversation.purpose` 줄, `docs/backend/proactive-check.md` 의 「설정」, `docs/backend/packages.md` 의 「최상위 패키지의 층 순서」 와 「proactive」, `docs/adr/ADR-077-먼저-살펴보기는-점검-대화의-turn-하나로-돌고-읽기-경계를-control-plane-이-강제한다.md`
 
 - 마이그레이션 규칙은 `docs/backend/schema/README.md` 의 「마이그레이션 작성 규칙」 이 갖는다. 새 표는 `ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci` 를 적는다. 이 파일은 DDL 만 담는다.
-- Flyway 번호는 V68 이다. V66 과 V67 은 다른 작업이 예약했다. **머지 직전에 main 의 가장 큰 번호에 1 을 더한 번호로 옮기고, 그보다 낮은 빈 번호를 남기지 않는다.** 운영에 V68 이 적용된 뒤 낮은 번호가 들어오면 Flyway 가 기동을 멈춘다(`out-of-order` 거짓). 일회용 DB 를 쓰는 `scripts/check-mysql-migration.sh` 는 이 문제를 잡지 못한다.
+- Flyway 번호는 지금 main 의 다음 번호인 V67 이 아니라 V68 을 쓴다. V67 과 V68 은 다른 계획(#167 의 결과 전달, `tasks/plan79-attention-surfacing`, `tasks/plan80-follow-up`)도 쓴다. **머지 직전에 main 의 가장 큰 번호에 1 을 더한 번호로 옮기고, 그보다 낮은 빈 번호를 남기지 않는다.** 운영에 V68 이 적용된 뒤 낮은 번호가 들어오면 Flyway 가 기동을 멈춘다(`out-of-order` 거짓). 일회용 DB 를 쓰는 `scripts/check-mysql-migration.sh` 는 이 문제를 잡지 못한다.
 - 이 브랜치는 #163, #164 가 머지된 main 위에 있다. 층 순서에 `notification` 이 이미 있다.
 - 이미 적용된 마이그레이션 파일은 고치지 않는다.
 - 엔티티 본보기: `backend/src/main/java/com/bifos/assistant/chat/domain/Conversation.java`(정적 팩터리, `@Column` 이름), `backend/src/main/java/com/bifos/assistant/usage/domain/AgentExecution.java`.
@@ -78,7 +78,7 @@
 
 ### 6. 이 phase 를 검증하는 시험
 
-- `backend/src/test/java/com/bifos/assistant/proactive/ProactiveCheckMigrationTest.java` 신규: H2 에서 Flyway 가 V68 까지 적용되고, 기존 대화 줄의 `purpose` 가 `CHAT` 이며, `proactive_check` 줄을 저장하고 `root_execution_id` 가 같은 두 줄은 유일 제약에 걸리는지 본다. 본보기는 `chat/DelegationWakeMigrationTest.java`
+- `backend/src/test/java/com/bifos/assistant/proactive/ProactiveCheckMigrationTest.java` 신규: H2 에서 Flyway 가 마지막 마이그레이션까지 적용되고(번호를 시험에 적지 않는다), 기존 대화 줄의 `purpose` 가 `CHAT` 이며, `proactive_check` 줄을 저장하고 `root_execution_id` 가 같은 두 줄은 유일 제약에 걸리는지 본다. 본보기는 `chat/DelegationWakeMigrationTest.java`
 - `backend/src/test/java/com/bifos/assistant/proactive/ProactiveCheckRepositoryTest.java` 신규: 점검 대화 찾기(`findFirstByUserIdAndAgentIdAndPurposeAndDeletedAtIsNullOrderByIdDesc`)가 지운 대화와 `CHAT` 대화와 다른 사용자의 대화를 고르지 않는지, `countByConversationIdAndHermesRootSessionId` 가 session 별로 세는지, 발견 읽기가 `created_at` 범위와 `kind` 로 거르고 `topic_key` 를 돌려주는지 본다
 - `backend/src/test/java/com/bifos/assistant/proactive/ProactiveCheckPropertiesTest.java` 신규: `max-duration` 이 `hermes.run-timeout` 이상이면 기동이 실패하고, 기본값으로는 뜨는지 본다. 본보기는 `orchestration/DelegationPropertiesTest.java`
 

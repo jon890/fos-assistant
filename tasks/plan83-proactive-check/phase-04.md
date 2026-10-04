@@ -54,9 +54,10 @@
 `public void runProactiveCheck(CurrentUser owner, Long conversationId, TurnHandle handle, CheckTurn check, Consumer<ChatEvent> onEvent)`
 
 - 부르는 쪽이 그 대화의 잠금을 이미 잡았다. `runDelegationResults` 와 같은 모양이다
-- `route(owner, conversationId, check.input(), null, List.of())` 로 정한다. 흐름이 붙었으면 `CONVERSATION_BUSY` 대신 `ApiException(ErrorCode.PROACTIVE_CHECK_UNAVAILABLE, ...)` 를 던진다
+- `check.input()` 은 한 번만 불러 지역 변수에 담고 `route` 와 `runTurn` 에 같은 값을 넘긴다. 부를 때마다 시각과 DB 를 다시 읽기 때문이다. `ProactiveCheckRun` 도 처음 만든 값을 들고 있다가 다시 불리면 그 값을 돌려준다
+- `route(owner, conversationId, input, null, List.of())` 로 정한다. 흐름이 붙었으면 `CONVERSATION_BUSY` 대신 `ApiException(ErrorCode.PROACTIVE_CHECK_UNAVAILABLE, ...)` 를 던진다
 - `check.renewSession()` 이 참이면 `ConversationSessions.renew(conversation)` 를 먼저 부른다
-- `runTurn(owner, routed, check.input(), new TurnIntent.ProactiveCheck(check), onEvent, true, handle)` 을 부르고 `done` 이나 `stopped` 를 보낸다
+- `runTurn(owner, routed, input, new TurnIntent.ProactiveCheck(check), onEvent, true, handle)` 을 부르고 `done` 이나 `stopped` 를 보낸다
 - `runTurn` 과 그 아래에서 `ProactiveCheck` 일 때만 다르게 한다
   - `saveQuestion`: 한 트랜잭션에서 `check.startNotice()` 로 `SYSTEM` 줄 하나를 저장하고 `ChatEvent.system` 을 보낸다. 제목과 `auto_turn_count` 와 대기 행은 건드리지 않는다
   - 실행 줄을 만든 뒤(`begin` 과 `turns.rekey` 다음) `check.started(executionId, conversation.hermesRootSessionId())`
@@ -81,7 +82,7 @@
   3. 변화 신호: 지난 살펴보기 시각(없으면 「처음」), 그 뒤 사용자가 점검 대화에 보낸 메시지 수, Memory 문맥이 지난 살펴보기와 같은지(같음, 바뀜, 모름)
   4. 최근에 알린 발견 목록을 `ExternalData.wrap` 으로 감싼 단락. 발견이 없으면 「최근에 알린 발견이 없다.」
 - 지난 살펴보기는 `ProactiveCheckRepository.findFirstByConversationIdAndStatusNotOrderByIdDesc(conversationId, RUNNING)` 다. 메시지 수는 `ChatMessageRepository` 에 새로 더하는 `long countByConversationIdAndRoleAndCreatedAtAfter(Long conversationId, MessageRole role, Instant after)` 로 `USER` 를 센다. Memory 문맥 비교는 지난 살펴보기의 루트 실행 줄의 `instructions_hash` 와 이번 문맥의 해시를 견준다. 실행 줄의 값은 `ChatService.runTurn` 이 `ContextAssembler.assemble` 과 `withResponseInstructions` 로 조립한 `AssembledContext.instructionsHash()` 다. 그래서 이번 값도 입력을 만들기 전에 같은 두 메서드로 조립해 구한다. 어느 쪽이든 값이 없으면 「모름」 이다
-- 최근에 알린 발견은 `ProactiveCheckFindingRepository.findByConversationIdAndKindAndCreatedAtAfterOrderByIdDesc(conversationId, NEW, now - digestWindow, PageRequest.ofSize(digestMaxItems))` 로 읽어 `- [area] topicKey · title · sourceUrl · 확인 yyyy-MM-dd · 그 뒤 사용자 메시지 N개` 로 적는다. 메시지 수는 그 발견을 낸 살펴보기가 끝난 뒤부터 다음 살펴보기가 시작하기 전까지의 `USER` 메시지 수다
+- 최근에 알린 발견은 `ProactiveCheckFindingRepository.findByConversationIdAndKindAndCreatedAtAfterOrderByIdDesc(conversationId, NEW, now - digestWindow, PageRequest.ofSize(digestMaxItems))` 로 읽어 `- [area] topicKey · title · sourceUrl · 확인 yyyy-MM-dd · 그 뒤 사용자 메시지 N개` 로 적는다. 메시지 수는 그 발견을 낸 살펴보기가 끝난 뒤부터 지금까지의 `USER` 메시지 수다(`countByConversationIdAndRoleAndCreatedAtAfter(conversationId, USER, 그 살펴보기의 finishedAt)`). 같은 살펴보기의 발견은 한 번만 센다
 - 되풀이 판정에 쓸 이미 알린 묶음은 `findByConversationIdAndKindAndCreatedAtAfter(conversationId, NEW, now - digestWindow)` 로 읽어 `AnnouncedKey` 집합으로 만든다
 - `started`: `ProactiveCheck.attachRoot` 로 루트 번호와 루트 session 을 적어 저장한다
 - `toolStarted`: `AtomicInteger` 로 센다. 엔티티는 끝날 때 그 값으로 한 번 적는다. 상한 판정은 phase 05 가 더한다

@@ -44,7 +44,8 @@
 
 - `CheckTurn` 에 `boolean holdPendingOnStop()` 을 더한다. `ProactiveCheckRun` 은 멈춘 까닭이 상한이면 거짓, 사용자 중지면 참이다
 - `ChatService` 의 `stoppedTurn` 과 `cancelAndHoldIfStopConfirmed` 는 살펴보기 turn 이고 `holdPendingOnStop()` 이 거짓이면 `markStoppedAndHoldPending` 대신 `turns.markStopped(handle)` 만 부른다. 보통 turn 과 자동 turn 은 그대로다
-- `ProactiveCheckService` 는 turn 이 예외로 끝났을 때, 그 살펴보기가 멈춤으로 확정됐으면(`ProactiveCheckRun` 이 멈춘 까닭을 들었거나 `TurnCancellation.isStopConfirmed`) 실패 알림 줄을 남기지 않는다. 이때 `cancel` 이 멈췄다는 줄을 이미 남겼다. 줄은 `STOPPED` 로 적는다
+- `ProactiveCheckRun` 은 `stoppedNotice()` 가 불렸는지(그 줄을 `ChatService.cancel` 이 저장했는지)를 들고 있다
+- `ProactiveCheckService` 는 turn 이 예외로 끝났을 때, 그 살펴보기가 멈춤으로 확정됐으면(`ProactiveCheckRun` 이 멈춘 까닭을 들었거나 `TurnCancellation.isStopConfirmed`) 실패 알림 줄을 남기지 않는다. 멈춤 줄이 아직 저장되지 않았으면 `ConversationNotices.post` 로 멈춤 줄을 남긴다. `awaitCompletion` 이나 `submit` 이 `ApiException` 으로 끝나 실행 줄이 이미 `FAILED` 면 `cancelAndHoldIfStopConfirmed` 가 `cancel` 을 부르지 않아 멈춤 줄이 없기 때문이다. 살펴보기 줄은 `STOPPED` 로 적는다
 
 ### 2. 위임 결과 정리와 위임 수
 
@@ -62,7 +63,7 @@
 
 - `backend/src/main/java/com/bifos/assistant/proactive/application/ProactiveCheckEnded.java`: record `ProactiveCheckEnded(Long rootExecutionId)`
 - `backend/src/main/java/com/bifos/assistant/orchestration/application/ProactiveCheckEndedListener.java`: `@EventListener` 로 받아 `AgentDelegationService.stopRunningChildrenOf(rootExecutionId)` 를 부른다
-- `AgentDelegationService.stopRunningChildrenOf(Long rootExecutionId)`: 그 루트 아래 `RUNNING` 이고 `delegationKey` 가 있는 줄마다, 이 서버가 돌리는 것이면 중지 표시를 켜고 run 번호가 있으면 Hermes 에 중지를 보낸다. 이 서버가 돌리지 않는 것은 `stopDetached` 와 같게 한다. 끝나기를 기다리지 않는다. 권한 판정(`canQuery`)을 거치지 않는다. 부르는 쪽이 Control Plane 이다
+- `AgentDelegationService.stopRunningChildrenOf(Long rootExecutionId)`: 먼저 그 루트의 잠금(`lockOf(rootId)`) 안에서 `ExecutionDeliveryWriter.markTreeDelivered` 를 한 번 더 부른다. 살펴보기 줄이 끝난 것을 위임 판정이 보기 직전에 만든 자식 줄까지 전달 표시가 붙는다. 그 뒤 그 루트 아래 `RUNNING` 이고 `delegationKey` 가 있는 줄마다, 이 서버가 돌리는 것이면 중지 표시를 켜고 run 번호가 있으면 Hermes 에 중지를 보낸다. 이 서버가 돌리지 않는 것은 `stopDetached` 와 같게 한다. 끝나기를 기다리지 않는다. 권한 판정(`canQuery`)을 거치지 않는다. 부르는 쪽이 Control Plane 이다
 
 ### 4. 이 phase 를 검증하는 시험
 
@@ -72,6 +73,7 @@
   - 상한 안에서 끝나면 시간 상한 스레드가 멈추기를 부르지 않는다
   - 상한으로 멈춘 뒤 그 대화의 대기 메시지가 멈추지 않고(`held` 거짓) 다음 turn 으로 나간다. 사용자가 `POST .../stop` 으로 멈추면 대기 줄이 멈춘다
   - 대화에 남은 알림 줄이 시작 줄과 멈춤 줄 둘뿐이다
+  - 상한으로 멈춘 뒤 `awaitCompletion` 이 `ApiException` 으로 끝나도(`StubHermesRunsClient.willFail`) 알림 줄이 시작과 멈춤 둘이다
   - 시험은 `@SpringBootTest(properties = ...)` 로 `hermes.run-timeout` 을 넉넉히(예: 30초) 두고, 시간 상한 시험만 `max-duration` 을 짧게 둔다
 - `backend/src/test/java/com/bifos/assistant/proactive/ProactiveCheckEndTest.java`(`assistant.delegation-wake.enabled=true`):
   - 살펴보기 turn 아래에 끝난 위임 자식 하나와 도는 위임 자식 하나를 둔 채 살펴보기가 끝나면 두 줄 모두 `result_delivered_at` 이 적히고, 점검 대화에 자동 turn 이 열리지 않으며(`DelegationResults` 알림 줄이 없다), `proactive_check.delegations` 가 2 다
