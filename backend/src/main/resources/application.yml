@@ -64,6 +64,7 @@ assistant:
   context:
     max-chars: 8000
     index-budget-ratio: 4
+    result-stale-after: 6h
   memory:
     propose:
       enabled: false

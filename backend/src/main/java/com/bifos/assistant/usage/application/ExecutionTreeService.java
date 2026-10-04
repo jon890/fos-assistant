@@ -6,10 +6,12 @@ import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.usage.domain.AgentExecution;
+import com.bifos.assistant.usage.domain.ExecutionContextSource;
 import com.bifos.assistant.usage.domain.ExecutionEvent;
 import com.bifos.assistant.usage.domain.SubagentUsageJob;
 import com.bifos.assistant.usage.domain.type.ExecutionEventType;
 import com.bifos.assistant.usage.infra.AgentExecutionRepository;
+import com.bifos.assistant.usage.infra.ExecutionContextSourceRepository;
 import com.bifos.assistant.usage.infra.ExecutionEventRepository;
 import com.bifos.assistant.usage.infra.SubagentUsageJobRepository;
 import java.util.ArrayList;
@@ -53,6 +55,7 @@ public class ExecutionTreeService {
     private final ExecutionEventRepository events;
     private final AgentService agents;
     private final SubagentUsageJobRepository jobs;
+    private final ExecutionContextSourceRepository contextSources;
 
     /**
      * 질의를 여럿 내므로 한 트랜잭션으로 묶는다.
@@ -78,7 +81,8 @@ public class ExecutionTreeService {
         warnAboutUnreachable(root, descendants, used, cut);
 
         Map<Long, List<ExecutionEvent>> byExecution = eventsOf(used);
-        ExecutionNode rootNode = node(rootBranch, byExecution, usageStatuses(used, byExecution), user);
+        Map<Long, List<ContextSourceRef>> sources = InternalValuePolicy.visibleTo(user) ? sourcesOf(used) : Map.of();
+        ExecutionNode rootNode = node(rootBranch, byExecution, usageStatuses(used, byExecution), sources, user);
         return new ExecutionTree(rootNode, ascent.truncated() || isTruncatedSomewhere(rootBranch));
     }
 
@@ -189,15 +193,35 @@ public class ExecutionTreeService {
     }
 
     /**
+     * 트리에 담긴 실행들에 실은 문맥 항목의 참조를 한 번에 읽어 실행 번호로 묶는다. 실은 순서를 지킨다.
+     *
+     * <p>내부 값이라 관리자에게 낼 때만 읽는다.
+     */
+    private Map<Long, List<ContextSourceRef>> sourcesOf(Set<Long> executionIds) {
+        if (executionIds.isEmpty()) {
+            return Map.of();
+        }
+        return contextSources.findByIdExecutionIdInOrderByIdExecutionIdAscIdPositionAsc(executionIds).stream()
+                .collect(Collectors.groupingBy(
+                        ExecutionContextSource::executionId,
+                        LinkedHashMap::new,
+                        Collectors.mapping(
+                                row -> new ContextSourceRef(
+                                        row.source(), row.sourceRef(), row.bodyMode(), row.freshness()),
+                                Collectors.toList())));
+    }
+
+    /**
      * 실행 트리를 응답으로 옮긴다. 도구 사건의 {@code detail} 은 보는 사람에 맞춰 싣는다.
      *
      * <p>{@link InternalValuePolicy} 가 허락하지 않는 사람에게는 노드의 에이전트 코드, 모델, 토큰, 금액, 시각
-     * 구간을 비우고 {@code PROVIDER_SWITCHED} 사건을 사건째 뺀다. 근거는 ADR-063 에 있다.
+     * 구간과 실은 문맥 항목을 비우고 {@code PROVIDER_SWITCHED} 사건을 사건째 뺀다. 근거는 ADR-063 에 있다.
      */
     private ExecutionNode node(
             Branch branch,
             Map<Long, List<ExecutionEvent>> byExecution,
             Map<Long, Map<String, String>> usageStatuses,
+            Map<Long, List<ContextSourceRef>> sources,
             CurrentUser viewer) {
         AgentExecution execution = branch.execution();
         Agent agent = agents.findById(execution.agentId()).orElse(null);
@@ -226,6 +250,7 @@ public class ExecutionTreeService {
                 internal ? execution.firstDeltaAt() : null,
                 execution.startedAt(),
                 internal ? execution.finishedAt() : null,
+                internal ? sources.getOrDefault(execution.id(), List.of()) : null,
                 byExecution.getOrDefault(execution.id(), List.of()).stream()
                         .filter(event -> internal || event.eventType() != ExecutionEventType.PROVIDER_SWITCHED)
                         .map(event -> ExecutionEventView.from(
@@ -238,7 +263,7 @@ public class ExecutionTreeService {
                                                 .get(event.hermesSessionId())))
                         .toList(),
                 branch.children().stream()
-                        .map(child -> node(child, byExecution, usageStatuses, viewer))
+                        .map(child -> node(child, byExecution, usageStatuses, sources, viewer))
                         .toList());
     }
 

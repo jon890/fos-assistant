@@ -203,6 +203,51 @@ test("실행 상세와 작업 과정에 실제 모델, 단계, 기본 강도와 
   ).toContainText("균형");
 });
 
+test("관리자 실행 상세에만 실은 문맥이 보이고 MEMBER 의 일반 실행 상세에는 없다", async ({
+  context,
+  page,
+}) => {
+  const tree = deepTreeFixture(1);
+  const withSources = {
+    ...tree,
+    root: {
+      ...tree.root,
+      contextSources: [
+        { source: "MEMORY_ALWAYS", ref: "memory:9101", bodyMode: "INLINE", freshness: "FRESH" },
+        { source: "MEMORY_INDEX", ref: "memory:9102", bodyMode: "TITLE_ONLY", freshness: "STALE" },
+        { source: "SOMETHING_NEW", ref: "memory:9103", bodyMode: "OMITTED", freshness: "UNKNOWN" },
+      ],
+    },
+  };
+  await page.route("**/api/usage/executions/*/tree", async (route) => {
+    await route.fulfill({ json: withSources });
+  });
+  await page.goto("/admin/executions/900");
+
+  const sources = page.getByTestId("execution-context-sources");
+  await expect(sources).toBeVisible();
+  const rows = sources.getByRole("listitem");
+  await expect(rows).toHaveCount(3);
+  await expect(rows.nth(0)).toHaveText(/기억\(항상\)\s*memory:9101\s*본문$/);
+  await expect(rows.nth(1)).toContainText("기억(제목만)");
+  await expect(rows.nth(1)).toContainText("제목만");
+  await expect(rows.nth(1)).toContainText("오래됨");
+  // 모르는 출처 이름은 원문 그대로 그린다.
+  await expect(rows.nth(2)).toContainText("SOMETHING_NEW");
+  await expect(rows.nth(2)).toContainText("자리가 없어 뺐어요");
+  await expect(rows.nth(2)).toContainText("시각 모름");
+
+  await setSession(context, {
+    email: "member@example.com",
+    name: "가족 사용자",
+  });
+  await page.goto("/executions/900");
+
+  await expect(page.getByText("균형", { exact: true })).toBeVisible();
+  await expect(page.getByTestId("execution-context-sources")).toHaveCount(0);
+  await expect(page.getByText("memory:9101")).toHaveCount(0);
+});
+
 test("MEMBER는 실행 상세에서 단계와 걸린 시간만 본다", async ({
   context,
   page,

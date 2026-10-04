@@ -39,6 +39,7 @@ public class ExecutionRecorder {
     private final CostEstimator costs;
     private final HermesRunsClient hermes;
     private final UserExecutionLimiter limiter;
+    private final ExecutionContextSourceWriter contextSources;
 
     /**
      * 실행을 RUNNING 으로 만들어 돌려준다. 부모가 없으면 parent 와 root 는 null 이다.
@@ -272,7 +273,7 @@ public class ExecutionRecorder {
             Instant requestReceivedAt,
             ReasoningEffortSource effortSource,
             ExecutionAdmission admission) {
-        return limiter.admit(
+        AgentExecution execution = limiter.admit(
                 user.id(),
                 admission,
                 () -> executions.save(base(user, conversation, agent)
@@ -293,6 +294,8 @@ public class ExecutionRecorder {
                         .instructionsHash(context.instructionsHash())
                         .status(ExecutionStatus.RUNNING)
                         .build()));
+        contextSources.write(execution.id(), context.sources());
+        return execution;
     }
 
     /**

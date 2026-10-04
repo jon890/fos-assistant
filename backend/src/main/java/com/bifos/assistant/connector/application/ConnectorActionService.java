@@ -311,7 +311,9 @@ public class ConnectorActionService {
                 action.toolName() == null ? action.hermesTool() : action.toolName(),
                 action.status(),
                 action.errorCode(),
-                action.resultText());
+                action.resultText(),
+                action.userId(),
+                action.executedAt());
     }
 
     /**
