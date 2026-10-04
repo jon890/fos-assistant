@@ -139,11 +139,12 @@
 **「아직 구현 전」 표시를 지운다.**
 
 - `docs/adr/ADR-073-할-일은-에이전트가-제안하고-사람이-받아들인-것만-챙긴다.md` 의 `status` 줄을 `` - **status**: `accepted` `` 로 둔다
-- `docs/adr/INDEX.md` 의 ADR-073 줄 상태를 `Accepted` 로 고친다
-- `docs/backend/follow-up.md` 의 「**아직 구현 전이다.** 구현한 PR 이 이 단락을 지운다.」 단락을 지운다
+- `docs/adr/INDEX.md` 의 ADR-073 줄 상태 「Accepted. 제안 도구와 제안 억제는 아직 구현 전이다」 를 `Accepted` 로 고친다
+- `docs/backend/follow-up.md` 머리의 「**제안 도구(`follow_up_propose`)와 제안 억제는 아직 구현 전이다.** 구현한 PR 이 이 단락을 지운다.」 와 그 다음 줄 「상태와 API 는 구현돼 있다.」 를 함께 지운다
 - `docs/flow.md` 「할 일을 제안할 때」 의 「**아직 구현 전이다.** 구현한 PR 이 이 줄을 지운다.」 를 지우고 「계약은 …」 문장만 남긴다
-- `docs/code-architecture.md` 「아직 만들지 않은 것」 의 할 일 줄을 지운다. 「새 최상위 패키지 `followup` 을 `chat` 바로 위에 둔다」 로 끝나는 줄이다
-- `docs/README.md` 의 `backend/follow-up.md` 줄 끝 「아직 구현 전이다」 를 지운다
+- `docs/code-architecture.md` 「아직 만들지 않은 것」 의 할 일 줄을 지운다. 「할 일의 제안 도구 `follow_up_propose`」 로 시작해 「지금은 사람이 직접 더한 할 일과 API 만 있다」 로 끝나는 줄이다
+- `docs/README.md` 의 `backend/follow-up.md` 줄 끝 「제안 도구와 제안 억제는 아직 구현 전이다」 문장을 통째로 지운다
+- `docs/backend/packages.md` 「패키지와 책임」 표의 `followup` 줄에서 「(제안 도구는 아직 구현 전이다. [`follow-up.md`](follow-up.md))」 를 「([`follow-up.md`](follow-up.md))」 로 고친다
 
 ### 6. e2e 대역
 
@@ -216,6 +217,8 @@ git grep -q "follow_up_propose" -- hermes/README.md
 git grep -q "follow_up_propose" -- docs/hermes/delegation.md
 ! git grep -n "아직 구현 전" -- docs/backend/follow-up.md docs/adr/ADR-073-할-일은-에이전트가-제안하고-사람이-받아들인-것만-챙긴다.md
 ! git grep -n "ADR-073.*아직 구현 전" -- docs/adr/INDEX.md
+! git grep -n "아직 구현 전" -- docs/code-architecture.md docs/backend/packages.md | grep -i "follow"
+! git grep -n "follow-up.md.*아직 구현 전" -- docs/README.md
 ```
 
 ```bash
