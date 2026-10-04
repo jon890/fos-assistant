@@ -39,6 +39,27 @@ test.describe("지금 화면", () => {
     }
   }
 
+  /**
+   * 지금 화면으로 가서 hydration 이 끝나기를 기다린다. 사이드바의 「지금 볼 것」 링크는 마운트된 뒤 수를 읽으므로
+   * 그 응답이 온 시점이면 화면의 단추에 이벤트 핸들러가 붙어 있다. 그 전에 누른 클릭은 요청 없이 사라진다.
+   */
+  async function openNow(page: Page) {
+    const summary = page.waitForResponse((response) => new URL(response.url()).pathname === "/api/attention/summary");
+    await page.goto("/now");
+    await summary;
+  }
+
+  /** 상태를 바꾸는 단추를 누르고, 그 요청이 실제로 나가 성공했는지까지 확인한다. */
+  async function clickSending(page: Page, target: Locator, method: string, pathname: RegExp) {
+    const [response] = await Promise.all([
+      page.waitForResponse(
+        (candidate) => candidate.request().method() === method && pathname.test(new URL(candidate.url()).pathname),
+      ),
+      target.click(),
+    ]);
+    expect(response.ok(), `${method} ${response.url()} 가 실패했다: ${response.status()}`).toBeTruthy();
+  }
+
   async function openSidebar(page: Page, testInfo: TestInfo) {
     if (testInfo.project.name === "mobile") {
       await page.getByRole("button", { name: "사이드바 열기" }).click();
@@ -50,7 +71,7 @@ test.describe("지금 화면", () => {
     const title = "주간 장보기 목록 정리";
     await failTurn(page, hermes, title);
 
-    await page.goto("/now");
+    await openNow(page);
     await expect(page.getByRole("heading", { level: 1, name: "지금 볼 것" })).toBeVisible();
     await expect(page.locator('[data-testid^="now-card-"]').first()).toHaveAttribute("data-testid", "now-card-failures");
     const row = page.getByTestId("now-card-failures").getByTestId("now-item").filter({ hasText: title });
@@ -66,11 +87,11 @@ test.describe("지금 화면", () => {
   });
 
   test("실패한 대화에 다시 보내 성공하면 실패 카드에서 빠지고 이어서 하기에 보인다", async ({ page, hermes }) => {
-    await page.goto("/now");
+    await openNow(page);
     const failures = page.getByTestId("now-card-failures");
     if ((await failures.getByTestId("now-item").count()) === 0) {
       await failTurn(page, hermes, "주간 장보기 목록 정리");
-      await page.goto("/now");
+      await openNow(page);
     }
     const links = failures.getByTestId("now-item").getByRole("link");
     await expect(links.first()).toBeVisible();
@@ -85,7 +106,7 @@ test.describe("지금 화면", () => {
       expect(retried.ok(), `다시 보내기가 실패했다: ${retried.status()}`).toBeTruthy();
     }
 
-    await page.goto("/now");
+    await openNow(page);
     await expect(failures.getByTestId("now-item")).toHaveCount(0);
     await expect(failures).toContainText("실패한 일이 없어요");
     await expect(
@@ -99,7 +120,7 @@ test.describe("지금 화면", () => {
     });
     expect(created.ok(), `대화를 만들지 못했다: ${created.status()}`).toBeTruthy();
 
-    await page.goto("/now");
+    await openNow(page);
     const cards = page.locator('[data-testid^="now-card-"]');
     await expect(cards).toHaveCount(4);
     const first = await cards.nth(0).boundingBox();
@@ -166,7 +187,7 @@ test.describe("지금 화면", () => {
     });
 
     // 모바일 머리의 알림 단추도 `notification-count` 를 그리고 넓은 폭에서도 DOM 에 남으므로 사이드바 안에서만 찾는다.
-    await page.goto("/now");
+    await openNow(page);
     let sidebar = await openSidebar(page, testInfo);
     await expect(sidebar.getByTestId("notification-count")).toHaveText("1");
     await expect(sidebar.getByTestId("now-count")).toHaveText("1");
@@ -233,7 +254,7 @@ test.describe("지금 화면", () => {
     const title = "주간 장보기 영수증 정리";
     await failTurn(page, hermes, title);
 
-    await page.goto("/now");
+    await openNow(page);
     const failures = page.getByTestId("now-card-failures");
     const row = failures.getByTestId("now-item").filter({ hasText: title });
     await expect(row).toHaveCount(1);
@@ -250,7 +271,7 @@ test.describe("지금 화면", () => {
 
     const controlled = failures.locator(`[data-item-key="${key}"]`);
     await controlled.getByRole("button", { name: "이 항목 제어" }).click();
-    await page.getByRole("menuitem", { name: "숨기기" }).click();
+    await clickSending(page, page.getByRole("menuitem", { name: "숨기기" }), "POST", /^\/api\/attention\/hide$/);
     await expect(controlled).toContainText("숨겼어요");
     await expect(controlled.getByRole("button", { name: "되돌리기" })).toBeVisible();
     // 카드 머리의 수는 화면을 다시 읽지 않고 숨긴 만큼 줄인다.
@@ -261,7 +282,7 @@ test.describe("지금 화면", () => {
     let sidebar = await openSidebar(page, testInfo);
     await expectBadge(sidebar.getByTestId("now-count"), before - 1);
 
-    await page.goto("/now");
+    await openNow(page);
     await expect(failures.getByTestId("now-item").filter({ hasText: title })).toHaveCount(0);
     // 제어는 카드마다 걸려 같은 대화가 이어서 하기 카드에는 보인다.
     await expect(page.getByTestId("now-card-continue").locator(`a[href="/chat/${conversationId}"]`)).toBeVisible();
@@ -269,7 +290,7 @@ test.describe("지금 화면", () => {
     await expectBadge(sidebar.getByTestId("now-count"), before - 1);
 
     await failTurn(page, hermes, "다시 정리해 주세요", conversationId);
-    await page.goto("/now");
+    await openNow(page);
     await expect(failures.locator(`a[href="/chat/${conversationId}"]`).first()).toBeVisible();
   });
 
@@ -277,7 +298,7 @@ test.describe("지금 화면", () => {
     const title = "주간 장보기 쿠폰 정리";
     await failTurn(page, hermes, title);
 
-    await page.goto("/now");
+    await openNow(page);
     const failures = page.getByTestId("now-card-failures");
     const row = failures.getByTestId("now-item").filter({ hasText: title });
     await expect(row).toHaveCount(1);
@@ -287,11 +308,16 @@ test.describe("지금 화면", () => {
     expect(cardBefore, "실패 카드 머리의 수").toBeGreaterThanOrEqual(1);
 
     await controlled.getByRole("button", { name: "이 항목 제어" }).click();
-    await page.getByRole("menuitem", { name: "숨기기" }).click();
+    await clickSending(page, page.getByRole("menuitem", { name: "숨기기" }), "POST", /^\/api\/attention\/hide$/);
     await expect(controlled).toContainText("숨겼어요");
     await expectBadge(cardCount, cardBefore - 1);
 
-    await controlled.getByRole("button", { name: "되돌리기" }).click();
+    await clickSending(
+      page,
+      controlled.getByRole("button", { name: "되돌리기" }),
+      "POST",
+      /^\/api\/attention\/restore$/,
+    );
     await expect(controlled).toContainText(title);
     await expect(cardCount).toHaveText(String(cardBefore));
   });
@@ -301,7 +327,7 @@ test.describe("지금 화면", () => {
     await setSession(context, { email: `now-empty-${testInfo.project.name}@example.com`, name: "빈 화면 사용자" });
     expect((await page.request.get("/api/me")).ok()).toBeTruthy();
 
-    await page.goto("/now");
+    await openNow(page);
     await expect(page.getByText("지금 확인할 것이 없어요")).toBeVisible();
     await expect(page.locator('[data-testid^="now-card-"]')).toHaveCount(0);
     await page.getByRole("button", { name: "할 일 더하기" }).click();
@@ -313,7 +339,7 @@ test.describe("지금 화면", () => {
 
   test("직접 더한 할 일은 내 차례에 보이고 미뤘다 되돌린 뒤 끝낼 수 있다", async ({ page }) => {
     const title = "장보기 예약 확인";
-    await page.goto("/now");
+    await openNow(page);
     const needsMe = page.getByTestId("now-card-needs_me");
     await needsMe.getByRole("button", { name: "할 일 더하기" }).click();
     const dialog = page.getByRole("dialog", { name: "할 일 더하기" });
@@ -321,7 +347,7 @@ test.describe("지금 화면", () => {
     await dialog
       .getByLabel("기한", { exact: true })
       .fill(isoToSeoulInput(new Date(Date.now() + 3 * HOUR_MS).toISOString()));
-    await dialog.getByRole("button", { name: "저장" }).click();
+    await clickSending(page, dialog.getByRole("button", { name: "저장" }), "POST", /^\/api\/follow-ups$/);
     await expect(dialog).toHaveCount(0);
 
     const row = needsMe.getByTestId("now-item").filter({ hasText: title });
@@ -332,14 +358,24 @@ test.describe("지금 화면", () => {
 
     const controlled = needsMe.locator(`[data-item-key="${await rowKey(row)}"]`);
     await controlled.getByRole("button", { name: "이 항목 제어" }).click();
-    await page.getByRole("menuitem", { name: "내일 아침으로 미루기" }).click();
+    await clickSending(
+      page,
+      page.getByRole("menuitem", { name: "내일 아침으로 미루기" }),
+      "POST",
+      /^\/api\/attention\/snooze$/,
+    );
     await expect(controlled).toContainText("미뤘어요");
-    await controlled.getByRole("button", { name: "되돌리기" }).click();
+    await clickSending(
+      page,
+      controlled.getByRole("button", { name: "되돌리기" }),
+      "POST",
+      /^\/api\/attention\/restore$/,
+    );
     await expect(controlled).toContainText(title);
 
-    await page.goto("/now");
+    await openNow(page);
     await expect(row).toHaveCount(1);
-    await row.getByRole("button", { name: "끝냄" }).click();
+    await clickSending(page, row.getByRole("button", { name: "끝냄" }), "POST", /^\/api\/follow-ups\/[^/]+\/done$/);
     await expect(row).toHaveCount(0);
   });
 
@@ -348,11 +384,11 @@ test.describe("지금 화면", () => {
     hermes,
   }, testInfo) => {
     const email = memberOf(testInfo.project.name).email;
-    await page.goto("/now");
+    await openNow(page);
     const failed = page.getByTestId("now-card-failures").getByTestId("now-item").getByRole("link");
     if ((await failed.count()) === 0) {
       await failTurn(page, hermes, "주간 장보기 영수증 정리");
-      await page.goto("/now");
+      await openNow(page);
     }
     const conversationId = conversationIdOf(await failed.first().getAttribute("href"));
 
@@ -361,7 +397,7 @@ test.describe("지금 화면", () => {
     await proposeFollowUp(email, conversationId, title);
     expect(await summaryCount(page), "제안이 지금 볼 것의 수에 들어갔다").toBe(before);
 
-    await page.goto("/now");
+    await openNow(page);
     const needsMe = page.getByTestId("now-card-needs_me");
     const row = needsMe.getByTestId("now-item").filter({ hasText: title });
     await expect(row).toHaveCount(1);
@@ -374,16 +410,21 @@ test.describe("지금 화면", () => {
     const dialog = page.getByRole("dialog", { name: "할 일 고치기" });
     await expect(dialog.getByLabel("제목", { exact: true })).toHaveValue(title);
     await dialog.getByLabel("기한", { exact: true }).fill(due);
-    await dialog.getByRole("button", { name: "저장" }).click();
+    await clickSending(page, dialog.getByRole("button", { name: "저장" }), "PATCH", /^\/api\/follow-ups\/[^/]+$/);
     await expect(dialog).toHaveCount(0);
 
-    await page.goto("/now");
+    await openNow(page);
     await row.getByRole("button", { name: "고치기" }).click();
     await expect(dialog.getByLabel("기한", { exact: true })).toHaveValue(due);
     await dialog.getByRole("button", { name: "취소" }).click();
     await expect(dialog).toHaveCount(0);
 
-    await row.getByRole("button", { name: "받아들이기" }).click();
+    await clickSending(
+      page,
+      row.getByRole("button", { name: "받아들이기" }),
+      "POST",
+      /^\/api\/follow-ups\/[^/]+\/accept$/,
+    );
     await expect(row).toContainText("챙기고 있는 할 일이에요");
     for (const name of ["끝냄", "그만둠", "고치기"]) {
       await expect(row.getByRole("button", { name, exact: true })).toBeVisible();
@@ -403,10 +444,15 @@ test.describe("지금 화면", () => {
 
     const second = "주말 장보기 목록 공유";
     await proposeFollowUp(email, conversationId, second);
-    await page.goto("/now");
+    await openNow(page);
     const rejected = needsMe.getByTestId("now-item").filter({ hasText: second });
     await expect(rejected).toHaveCount(1);
-    await rejected.getByRole("button", { name: "거절" }).click();
+    await clickSending(
+      page,
+      rejected.getByRole("button", { name: "거절" }),
+      "POST",
+      /^\/api\/follow-ups\/[^/]+\/reject$/,
+    );
     await expect(rejected).toHaveCount(0);
   });
 
