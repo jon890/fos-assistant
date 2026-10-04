@@ -135,7 +135,8 @@ scripts/check-public-safe.sh
 
 ## 확인
 
-아래 검사를 한 번에 돌린다.
+**검사 명령의 정본은 `scripts/check-local.sh` 다.** 단계마다 어느 폴더에서 무엇을 돌리는지, `pnpm build` 에 어떤 자리표시자 환경 변수를 주는지가 그 스크립트에 있다.
+이 문서와 다른 문서는 명령을 따로 옮겨 적지 않고 이 절을 가리킨다.
 
 ```bash
 # cwd: 저장소 root
@@ -145,26 +146,32 @@ scripts/check-local.sh
 처음 받은 checkout 에서도 그대로 돈다.
 처음 실패한 단계에서 멈추고 그 로그의 끝을 보인다.
 
+스크립트는 아래를 이 순서로 돌린다.
+
+| 단계 | 검사하는 것 |
+| --- | --- |
+| `backend`, `mysql-migration` | Control Plane 테스트와 실제 MySQL 8.4 에서의 마이그레이션과 저장소 쿼리 |
+| `web-typecheck`, `web-build` | 화면의 타입과 운영 이미지와 같은 방식의 빌드 |
+| `browser` | 전체 브라우저 검사. 운영과 같은 빌드를 띄워 돌린다 |
+| `e2e`, `unit`, `hermes` | Hermes 대역을 띄운 전체 흐름, Node 단위 테스트, plugin 테스트 |
+| `public-safe`, `quality` | 공개 정보 검사와 코드 품질 검사 |
+
 `scripts/quality.sh check` 는 파일을 바꾸지 않고 검사하고, `fix` 는 기계가 고칠 수 있는 위반만 고친다. 새 위반은 기준에 더하지 않는다.
 자세한 것은 [`backend/AGENTS.md`](backend/AGENTS.md) 와 [`web/AGENTS.md`](web/AGENTS.md) 에 있다.
 
-스크립트가 차례로 돌리는 명령은 아래와 같다.
+### 무엇을 어디서 돌리는가
 
-```bash
-cd backend && ./gradlew test
-scripts/check-mysql-migration.sh
-cd web && pnpm typecheck && pnpm build
-cd web && pnpm test:browser
-node test/e2e/run.ts
-node --test 'test/unit/**/*.test.ts'
-python3 -m unittest discover -s hermes/tests
-scripts/check-public-safe.sh
-scripts/quality.sh check
-```
+| 용도 | 언제 | 어떻게 |
+| --- | --- | --- |
+| 전체 검사 | 머지 전에 한 번 | `scripts/check-local.sh`. 브라우저 단계를 포함하므로 한 번에 10분 가까이 걸린다 |
+| 수정 중 대상 검사 | 화면을 고치는 동안 | `pnpm --dir web test:browser <spec 이름 일부>` 로 고친 화면과 관련된 spec 만 돌린다 |
+| 머지 전 브라우저 확인 | PR 마다 | CI 의 `browser-mobile`, `browser-desktop` 이 merge ref 에서 전체 browser spec 을 돌린 결과 |
 
 **위 검사가 모두 통과하면 머지한다. 머지마다 승인을 받지 않는다.**
 다만 통과를 **직접 돌려 확인한 것**이라야 한다. 브라우저 검사만은 PR 의 CI(`browser-mobile`, `browser-desktop`)가 통과한 것을 확인으로 본다.
+그래서 브라우저 단계를 뺀 나머지 단계는 직접 돌려 확인하고, 브라우저는 CI 결과를 본다.
 로컬에서는 고친 화면과 관련된 spec 만 돌린다. 전체 브라우저 검사는 한 번에 10분 가까이 걸리고 여러 작업이 나란히 돌면 이 머신의 자원이 모자라 흔들린다.
+여러 작업이 나란히 돌 때는 브라우저 단계를 뺀 나머지를 `scripts/check-local.sh` 에서 옮겨 단계별로 돌린다. 스크립트에 단계를 건너뛰는 옵션은 없다.
 워커의 보고를 읽는 것은 확인이 아니다.
 실제로 워커가 통과했다고 보고한 것이 전체로 돌리니 실패한 적이 있다.
 
@@ -175,8 +182,6 @@ PR 에서는 대상 브랜치와 합친 결과인 merge ref 를 검사한다.
 PR 실패는 그 PR 에서 고친다. 모인 실패 이슈는 고치거나 까닭을 적어 닫는다.
 
 공개 정보 검사의 값 목록은 repository secret `PUBLIC_REPO_DENYLIST` 다. `fos-home-infra` 의 목록이 바뀌면 secret 도 다시 넣는다.
-
-**위 명령을 적힌 순서대로 모두 돌린다.**
 
 **브라우저 검사는 운영과 같은 빌드 결과를 띄워 검사한다.**
 `pnpm test:browser` 가 웹 서버를 띄우기 전에 빌드하므로, 따로 빌드하지 않아도 옛 화면을 검사하지 않는다.

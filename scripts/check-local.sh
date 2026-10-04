@@ -4,6 +4,9 @@
 # 처음 받은 checkout 에서도 돌도록 웹 의존성과 Playwright 의 chromium 을 먼저 설치한다.
 # 둘 다 이미 있으면 바로 끝난다. `pnpm build` 에는 web/AGENTS.md 의 자리표시자 환경 변수를 준다.
 #
+# 브라우저 단계는 전체 spec 을 돌려 10분 가까이 걸린다. 수정 중에는 고친 화면의 spec 만 돌리고,
+# 머지 전 브라우저 확인은 PR 의 CI(`browser-mobile`, `browser-desktop`)를 따른다(AGENTS.md 「확인」).
+#
 # 단계마다 로그를 따로 남기고, 처음 실패한 단계에서 멈춰 그 로그의 끝을 보인다.
 set -Eeuo pipefail
 
