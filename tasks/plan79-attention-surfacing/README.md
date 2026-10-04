@@ -48,7 +48,7 @@
 - **판정은 보이기만 한다.** `attention` 패키지는 Hermes 를 부르지 않고, 실행이나 커넥터 호출을 시작하지 않고, 다른 패키지의 기록을 고치지 않는다. 고치는 동작은 각 패키지의 기존 API 가 한다
 - **응답에 오류 코드, 모델, 토큰, 금액을 싣지 않는다.** 일반 경로라 역할과 상관없이 뺀다(ADR-063). DTO 에 그 칸을 두지 않는다
 - **로그에는 사용자 번호, 카드 열쇠, 개수만 낸다.** 항목 제목, 대화 제목, `itemKey` 를 로그에 내지 않는다
-- **웹 알림(ADR-070, 따로 진행 중)의 `notification` 표를 읽거나 쓰지 않는다.** 지금 화면에서 승인을 처리해도 알림의 읽음 상태를 바꾸지 않는다(`docs/backend/attention.md` 「웹 알림과의 경계」)
+- **웹 알림(ADR-070, `notification` 패키지)의 `notification` 표를 읽거나 쓰지 않는다.** 지금 화면에서 승인을 처리해도 알림의 읽음 상태를 바꾸지 않는다(`docs/backend/attention.md` 「웹 알림과의 경계」)
 - 다른 패키지의 기록은 그 패키지의 `application` 에 읽기 메서드를 두고 읽는다. `attention` 이 다른 패키지의 `infra` 를 바로 import 하지 않는다
 - 저장소에 메서드를 더하면 `RepositoryQueryMysqlTest` 가 실제 MySQL 에서 실행한다. 인자 타입을 만들지 못해 실패하면 `backend/src/test/java/com/bifos/assistant/testsupport/RepositoryQuerySweep.java` 에 그 타입의 값을 더한다. 건너뛰게 하지 않는다
 - backend 의 새 코드는 `backend/AGENTS.md` 를 지킨다. 로거는 `@Slf4j`, 시각은 주입받은 `Clock`, 저장하는 enum 은 `attention.domain.type`, 저장하지 않는 값은 `attention.application.model`, 요청과 응답 record 는 `AttentionDtos.java` 하나, 테스트 메서드에는 한국어 `@DisplayName`

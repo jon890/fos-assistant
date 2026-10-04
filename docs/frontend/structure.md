@@ -22,6 +22,7 @@
 | `/connections` | 커넥터 목록 |
 | `/connections/{id}` | 커넥터 하나의 연결 화면 |
 | `/connections/accountbook` | 옛 주소. `/connections/{id}` 로 넘긴다 |
+| `/notifications` | 내 알림 목록. 알림 단추가 이 화면으로 온다([`../backend/notification.md`](../backend/notification.md) 의 「화면」) |
 | `/admin` | 관리자 영역의 첫 주소. `/admin/people` 로 넘긴다 |
 | `/admin/people` | 사용자 관리 |
 | `/admin/agents` | 그룹의 모든 에이전트와 운영 profile 등록 |

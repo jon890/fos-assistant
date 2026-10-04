@@ -178,6 +178,8 @@ public enum ErrorCode {
     CONNECTOR_ACTION_NOT_PENDING(HttpStatus.CONFLICT),
     /** 그 연결에 승인해 실행을 보낸 호출이 아직 끝나지 않았다. 끝난 뒤에 다시 등록하거나 해제한다(ADR-050). */
     CONNECTOR_ACTION_EXECUTING(HttpStatus.CONFLICT),
+    /** 없는 알림과 남의 알림을 같은 응답으로 숨긴다. 번호를 훑어 남의 것이 있는지 알아낼 수 없게 한다(ADR-070). */
+    NOTIFICATION_NOT_FOUND(HttpStatus.NOT_FOUND),
     /** 그 경로가 받지 않는 메서드로 왔다. 받는 메서드는 {@code Allow} 헤더가 적는다. */
     METHOD_NOT_ALLOWED(HttpStatus.METHOD_NOT_ALLOWED),
     INTERNAL_ERROR(HttpStatus.INTERNAL_SERVER_ERROR);

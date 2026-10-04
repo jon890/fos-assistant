@@ -64,7 +64,7 @@
 - `web/src/app/api/attention/summary/route.ts` 신규: `GET` 이 `callControlPlane<{ nowCount: number }>("/api/v1/attention/summary")` 를 돌려준다
 - `web/src/lib/attention-api.ts` 신규: `fetchAttentionSummary(): Promise<Response>` 가 `/api/attention/summary` 를 `cache: "no-store"` 로 부른다
 - `web/src/components/shell/main-nav.tsx`: `LINKS` 맨 앞에 `{ href: "/now", label: "지금" }`. 기억 제안 건수와 같은 `useEffect([pathname])` 로 `fetchAttentionSummary` 를 읽어 `nowCount` 가 0 보다 크면 메뉴 글자 오른쪽에 `data-testid="now-count"` 배지를 붙인다. 배지의 접근성 이름은 「지금 볼 것 N건」 이다. 실패하면 0 으로 둔다
-- **사이드바의 두 수를 섞지 않는다**(`docs/frontend/now.md` 「주소와 들어오는 길」). 「지금」 배지는 메뉴 맨 위에, 웹 알림(ADR-070)의 읽지 않은 수는 사이드바 맨 아래 밝기 단추 옆 알림 단추에 있다. 그 알림 단추가 main 에 있으면 두 배지가 서로의 수를 더하거나 빼지 않는지 브라우저 검사에서 함께 본다. 없으면 「지금」 배지만 본다
+- **사이드바의 두 수를 섞지 않는다**(`docs/frontend/now.md` 「주소와 들어오는 길」). 「지금」 배지는 메뉴 맨 위에, 웹 알림(ADR-070)의 읽지 않은 수는 사이드바 맨 아래 밝기 단추 옆 알림 단추에 있다. 알림 단추는 `web/src/components/notification/notification-bell.tsx` 이고 그 배지는 `data-testid="notification-count"` 다. 「지금」 배지는 `data-testid="now-count"` 로 다른 이름을 쓰고, 두 배지가 서로의 수를 더하거나 빼지 않는지 브라우저 검사에서 함께 본다
 
 ### 5. `test/unit/attention.test.ts` 신규
 

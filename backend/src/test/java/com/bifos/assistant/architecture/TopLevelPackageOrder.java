@@ -24,6 +24,7 @@ final class TopLevelPackageOrder extends ArchCondition<JavaClass> {
     static final List<String> ORDER = List.of(
             "hermes",
             "user",
+            "notification",
             "model",
             "agent",
             "skill",

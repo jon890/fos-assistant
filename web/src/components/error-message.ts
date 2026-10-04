@@ -63,6 +63,7 @@ const MESSAGES: Record<string, string> = {
   MEMORY_IMPORT_TOO_LARGE: "가져올 파일이 너무 커요. 나눠서 올려 주세요.",
   SERVICE_TOKEN_NOT_FOUND:
     "토큰을 찾지 못했어요. 화면을 새로고침해 확인해 주세요.",
+  NOTIFICATION_NOT_FOUND: "이미 지워졌거나 없는 알림이에요.",
 };
 
 export function describeError(code: string, fallback: string): string {

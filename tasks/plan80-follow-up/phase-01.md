@@ -84,7 +84,7 @@ record 하나로는 둘을 구분하지 못한다. 컨트롤러가 본문을 Jac
 ### 4. 층 순서
 
 - `TopLevelPackageOrder.ORDER` 에서 `"chat"` 바로 뒤에 `"followup"` 을 넣는다
-- `backend/src/test/java/com/bifos/assistant/architecture/TopLevelPackageOrderTest.java` 의 개수 단언(`hasSize(13)` 둘, `others` 의 `hasSize(12)`, `@DisplayName` 의 「열셋」)을 지금 값에 1 을 더한 값으로 고친다. plan79 가 먼저 `attention` 을 넣었으면 그 값에서 1 을 더한다
+- `backend/src/test/java/com/bifos/assistant/architecture/TopLevelPackageOrderTest.java` 의 개수 단언(두 `hasSize`, `others` 의 `hasSize`, 메서드 이름과 `@DisplayName` 의 수)을 지금 값에 1 을 더한 값으로 고친다. 구현할 때 값을 다시 읽는다. 2026-10-04 main 은 `notification` 을 더해 14 개였고, plan79 가 `attention` 을 넣으면 15 개다. plan79 가 먼저 `attention` 을 넣었으면 그 값에서 1 을 더한다
 - `docs/backend/packages.md` 의 「패키지와 책임」 표에 `followup` 줄(「할 일의 저장과 상태 전이, 사람이 쓰는 API, 에이전트의 제안 저장」)을 더하고, 「최상위 패키지의 층 순서」 표에 `chat` 다음 자리로 넣고 뒤의 자리 번호를 하나씩 민다
 
 ### 5. 문서

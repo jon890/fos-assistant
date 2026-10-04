@@ -1,6 +1,6 @@
 # 저장 모델
 
-Control Plane 의 표와 칸이 무엇을 뜻하는지를 갖는다. 표는 주제별로 아래 여섯 파일에 나눠 적는다.
+Control Plane 의 표와 칸이 무엇을 뜻하는지를 갖는다. 표는 주제별로 아래 파일에 나눠 적는다.
 MySQL 8.4 에 둔다. 마이그레이션은 `backend/src/main/resources/db/migration/` 이 소유하고 이 문서는 뜻을 적는다.
 DB 색인(index)은 마이그레이션이 갖는다. 이 문서는 표마다 칸과 유일 제약과 FK 만 적는다.
 
@@ -15,6 +15,7 @@ AI credential 은 Hermes profile 의 `.env` 에, profile 의 API server key 는 
 | [`memory.md`](memory.md) | `memory`, `memory_revision`, `memory_collection`, `agent_memory_collection` |
 | [`connector.md`](connector.md) | `connector_connection`, `connector_action`, `connector_tool_grant` |
 | [`attention.md`](attention.md) | `follow_up`, `attention_control`, `attention_event`. 아직 구현 전이다 |
+| [`notification.md`](notification.md) | `notification` |
 
 ## 마이그레이션 작성 규칙
 
@@ -135,3 +136,5 @@ Memory 는 줄을 지운다. 지우기 전에 마지막 값을 `memory_revision`
 허용 목록에서 빼는 것도 지우지 않고 `enabled` 를 내린다. 그 사람의 서비스 토큰은 모두 폐기한다.
 그 사람의 `app_user` 와 실행 기록은 그대로 둔다.
 그 사람의 Hermes profile 도 지우지 않는다. 다시 들일 때 그것을 다시 만들지 않아도 된다.
+
+알림(`notification`)은 보관 기간이 지나면 줄을 지운다. 알림은 다른 표의 사실을 알리는 사본이라, 원인이 된 승인 줄과 실행 기록이 남아 있다.

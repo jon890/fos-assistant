@@ -20,8 +20,8 @@
 
 | 무엇 | 어디 |
 | --- | --- |
-| 층 순서 | `backend/src/test/java/com/bifos/assistant/architecture/TopLevelPackageOrder.java` 의 `ORDER`(지금 13개, 맨 위 `connector`). 검사는 `ArchitectureRules.TOP_LEVEL_PACKAGES_FOLLOW_LAYER_ORDER` |
-| 순서 개수 단언 | `backend/src/test/java/com/bifos/assistant/architecture/TopLevelPackageOrderTest.java` 의 `allowsTopPackageToUseEveryOtherPackage`(`hasSize(12)`, `"connector"`)와 `orderHasThirteenDistinctPackages`(`hasSize(13)`) |
+| 층 순서 | `backend/src/test/java/com/bifos/assistant/architecture/TopLevelPackageOrder.java` 의 `ORDER`(지금 14개, 맨 위 `connector`. `notification` 이 3번째에 있다). 검사는 `ArchitectureRules.TOP_LEVEL_PACKAGES_FOLLOW_LAYER_ORDER` |
+| 순서 개수 단언 | `backend/src/test/java/com/bifos/assistant/architecture/TopLevelPackageOrderTest.java` 의 `allowsTopPackageToUseEveryOtherPackage`(`hasSize(13)`, `"connector"`)와 `orderHasFourteenDistinctPackages`(`hasSize(14)`). 구현할 때 값을 다시 읽는다. 다른 작업이 패키지를 더했을 수 있다 |
 | 현재 사용자 | `shared.auth.CurrentUserProvider.require()`, 관리자는 `requireAdmin()` |
 | 실행 줄 | `usage.domain.AgentExecution`, 저장소 `usage.infra.AgentExecutionRepository`. 상태 enum 은 `usage.domain.type.ExecutionStatus`(`RUNNING`, `SUCCEEDED`, `FAILED`, `CANCELLED`) |
 | 대화 | `chat.domain.Conversation`(`publicId`, `title`, `agentId`, `updatedAt`, `deletedAt`), 저장소 `chat.infra.ConversationRepository`. 목록은 `ChatService.conversationsOf(CurrentUser, String cursor, int limit)` 가 이미 지운 대화를 빼고 `updatedAt` 순으로 낸다 |
@@ -49,11 +49,11 @@
 
 - `TopLevelPackageOrder.ORDER` 끝(`"connector"` 뒤)에 `"attention"` 을 더한다
 - `TopLevelPackageOrderTest`:
-  - `allowsTopPackageToUseEveryOtherPackage` 의 `hasSize(12)` 를 `hasSize(13)` 으로, `violations("connector", others)` 를 `violations("attention", others)` 로
-  - `orderHasThirteenDistinctPackages` 를 `orderHasFourteenDistinctPackages` 로 이름을 바꾸고 `@DisplayName` 을 「층 순서는 겹치는 이름 없이 열넷이다」 로, 두 `hasSize(13)` 을 `hasSize(14)` 로
+  - 개수 단언을 지금 값에 1 을 더한 값으로 고친다. main 이 14 개일 때는 `allowsTopPackageToUseEveryOtherPackage` 의 `hasSize(13)` 을 `hasSize(14)` 로, `orderHasFourteenDistinctPackages` 를 `orderHasFifteenDistinctPackages` 로 이름을 바꾸고 `@DisplayName` 을 「층 순서는 겹치는 이름 없이 열다섯이다」 로, 두 `hasSize(14)` 를 `hasSize(15)` 로 고친다
+  - `violations("connector", others)` 를 `violations("attention", others)` 로
 - `docs/backend/packages.md`:
   - 「패키지와 책임」 표 끝에 `| \`attention\` | 먼저 알리기의 판정과 지금 화면이 읽는 카드. 다른 패키지의 기록을 읽기만 한다 |` 를 더한다
-  - 「최상위 패키지의 층 순서」 의 「자리 1 이 맨 아래이고 13 이 맨 위다」 를 「14 가 맨 위다」 로, 표에 `| 14 | \`attention\` |` 를 더한다
+  - 「최상위 패키지의 층 순서」 의 맨 위 자리 번호를 하나 올리고 표 끝에 `attention` 줄을 더한다. 2026-10-04 main 은 「14 가 맨 위다」 이므로 「15 가 맨 위다」 와 `| 15 | \`attention\` |` 가 된다
 
 ### 2. 저장하는 enum 과 화면용 값
 
