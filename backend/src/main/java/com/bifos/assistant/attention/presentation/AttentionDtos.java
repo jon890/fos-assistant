@@ -4,12 +4,15 @@ import com.bifos.assistant.attention.application.model.AttentionCard;
 import com.bifos.assistant.attention.application.model.AttentionExecutionRef;
 import com.bifos.assistant.attention.application.model.AttentionFollowUpRef;
 import com.bifos.assistant.attention.application.model.AttentionItem;
+import com.bifos.assistant.attention.application.model.AttentionMetric;
 import com.bifos.assistant.attention.application.model.AttentionSignal;
 import com.bifos.assistant.attention.application.model.AttentionSourceRef;
 import com.bifos.assistant.attention.application.model.AttentionView;
 import com.bifos.assistant.attention.application.model.AttentionWhy;
+import com.bifos.assistant.attention.domain.type.AttentionEventType;
 import com.bifos.assistant.attention.domain.type.CardKey;
 import java.time.Instant;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
@@ -27,6 +30,79 @@ public final class AttentionDtos {
     /** 카드 열쇠를 응답의 소문자 글로 바꾼다. */
     public static String cardKeyText(CardKey key) {
         return key.name().toLowerCase(Locale.ROOT);
+    }
+
+    /**
+     * 요청의 카드 글을 카드 열쇠로 바꾼다. {@code failures}, {@code needs_me}, {@code delegated}, {@code continue} 만 받는다.
+     *
+     * @return 모르는 글이거나 null 이면 null
+     */
+    public static CardKey cardOf(String text) {
+        return text == null
+                ? null
+                : Arrays.stream(CardKey.values())
+                        .filter(key -> cardKeyText(key).equals(text))
+                        .findFirst()
+                        .orElse(null);
+    }
+
+    /**
+     * 요청의 사건 글을 사건 종류로 바꾼다. 이름이 맞는지만 보고, 받는 종류인지는 서비스가 본다.
+     *
+     * @return {@link AttentionEventType} 이름이 아니면 null
+     */
+    public static AttentionEventType eventTypeOf(String text) {
+        return text == null
+                ? null
+                : Arrays.stream(AttentionEventType.values())
+                        .filter(type -> type.name().equals(text))
+                        .findFirst()
+                        .orElse(null);
+    }
+
+    /** @param card 카드 열쇠의 소문자 글 */
+    public record HideRequest(String card, String itemKey, String stateKey) {}
+
+    /** @param until 지금보다 뒤이고 {@code snooze-max} 안이어야 한다 */
+    public record SnoozeRequest(String card, String itemKey, Instant until) {}
+
+    public record RestoreRequest(String card, String itemKey) {}
+
+    /** @param type {@code OPENED} 나 {@code ACTED} */
+    public record EventRequest(String itemKey, String stateKey, String type) {}
+
+    /**
+     * 관리자 지표다. 제목, 항목 열쇠, 사용자 번호를 싣지 않는다.
+     *
+     * @param days 센 기간의 일 수
+     * @param rows {@code trigger} 선언 순서다. 보인 항목이 없는 {@code trigger} 는 줄이 없다
+     */
+    public record MetricsResponse(int days, List<MetricRow> rows) {}
+
+    /** 뜻은 {@code docs/backend/attention.md} 의 「지표」 가 갖는다. */
+    public record MetricRow(
+            String trigger,
+            long shown,
+            long hidden,
+            long snoozed,
+            long acted,
+            long nowShown,
+            long nowHiddenWithoutAction,
+            long staleShown,
+            Long medianSecondsToFirstAction) {
+
+        public static MetricRow from(AttentionMetric metric) {
+            return new MetricRow(
+                    metric.trigger().name(),
+                    metric.shown(),
+                    metric.hidden(),
+                    metric.snoozed(),
+                    metric.acted(),
+                    metric.nowShown(),
+                    metric.nowHiddenWithoutAction(),
+                    metric.staleShown(),
+                    metric.medianSecondsToFirstAction());
+        }
     }
 
     /**

@@ -1,5 +1,5 @@
 /**
- * 실패한 turn 이 지금 화면의 실패 카드에 올라오고, 같은 대화에서 다시 성공하면 내려가는지 본다.
+ * 실패한 turn 이 지금 화면의 실패 카드에 올라오고, 숨기고 되돌릴 수 있고, 같은 대화에서 다시 성공하면 내려가는지 본다.
  *
  * <p>계약은 `docs/backend/attention.md` 의 「API」 가 갖는다. 응답에 실행의 오류 코드가 실리지 않는 것과,
  * 사이드바가 읽는 건수가 카드의 합과 같은 것도 함께 본다.
@@ -7,7 +7,7 @@
 import { call, expect, expectStatus, step, type Scenario } from "../harness.ts";
 
 type Turn = { conversationId: string };
-type Item = { itemKey: string; attention: string; conversationId: string | null };
+type Item = { itemKey: string; stateKey: string; attention: string; conversationId: string | null };
 type Card = { key: string; status: string; nowCount: number; items: Item[] };
 type View = { nowCount: number; cards: Card[] };
 
@@ -64,6 +64,62 @@ export const attentionScenario: Scenario = {
     expect(
       summary.nowCount === view.nowCount,
       `건수가 다르다: summary ${summary.nowCount}, 지금 화면 ${view.nowCount}`,
+    );
+
+    step("실패 카드에서 숨기면 그 카드와 건수에서 빠진다");
+    const hide = { card: "failures", itemKey, stateKey: failure!.stateKey };
+    expectStatus(
+      await call(context, "/attention/hide", { method: "POST", token, body: hide }),
+      204,
+      "실패 항목 숨기기",
+    );
+    const hidden = expectStatus(await call(context, "/attention", { token }), 200, "숨긴 뒤 지금 화면");
+    expect(
+      !failuresOf(hidden.json<View>()).some((item) => item.itemKey === itemKey),
+      `숨겼는데 실패 카드에 ${itemKey} 가 남았다:\n${hidden.body}`,
+    );
+    const hiddenSummary = expectStatus(
+      await call(context, "/attention/summary", { token }),
+      200,
+      "숨긴 뒤 지금 화면 건수",
+    ).json<{ nowCount: number }>();
+    expect(
+      hiddenSummary.nowCount === summary.nowCount - 1,
+      `숨긴 뒤 건수가 하나 줄지 않았다: 전 ${summary.nowCount}, 뒤 ${hiddenSummary.nowCount}`,
+    );
+
+    step("같은 숨기기를 다시 보내도 204 다");
+    expectStatus(
+      await call(context, "/attention/hide", { method: "POST", token, body: hide }),
+      204,
+      "같은 숨기기 다시 보내기",
+    );
+
+    step("되돌리면 실패 카드에 다시 보인다");
+    expectStatus(
+      await call(context, "/attention/restore", { method: "POST", token, body: { card: "failures", itemKey } }),
+      204,
+      "실패 항목 되돌리기",
+    );
+    const restored = expectStatus(await call(context, "/attention", { token }), 200, "되돌린 뒤 지금 화면");
+    expect(
+      failuresOf(restored.json<View>()).some((item) => item.itemKey === itemKey),
+      `되돌렸는데 실패 카드에 ${itemKey} 가 없다:\n${restored.body}`,
+    );
+
+    step("후보에 없는 대화 열쇠로 숨기면 404 다");
+    expectStatus(
+      await call(context, "/attention/hide", {
+        method: "POST",
+        token,
+        body: {
+          card: "failures",
+          itemKey: "conversation:00000000-0000-4000-8000-000000000000",
+          stateKey: failure!.stateKey,
+        },
+      }),
+      404,
+      "후보에 없는 항목 숨기기",
     );
 
     step("같은 대화에서 다시 성공하면 그 항목이 사라진다");

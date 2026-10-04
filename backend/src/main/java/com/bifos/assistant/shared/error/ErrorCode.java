@@ -184,6 +184,11 @@ public enum ErrorCode {
     CONNECTOR_ACTION_EXECUTING(HttpStatus.CONFLICT),
     /** 없는 알림과 남의 알림을 같은 응답으로 숨긴다. 번호를 훑어 남의 것이 있는지 알아낼 수 없게 한다(ADR-070). */
     NOTIFICATION_NOT_FOUND(HttpStatus.NOT_FOUND),
+    /**
+     * 지금 화면에서 숨기거나 미루거나 사건을 남기려 한 항목이 요청자의 지금 후보에 없다. 남의 항목과 없는 항목을 같은 응답으로
+     * 숨긴다. 볼 수 있던 것만 숨길 수 있다.
+     */
+    ATTENTION_ITEM_NOT_FOUND(HttpStatus.NOT_FOUND),
     /** 없는 작업, 남의 작업, 지운 작업을 같은 응답으로 숨긴다(ADR-076). */
     TASK_NOT_FOUND(HttpStatus.NOT_FOUND),
     /** 보관하지 않은 예약 작업이 사용자당 상한에 닿았다(ADR-079). */
