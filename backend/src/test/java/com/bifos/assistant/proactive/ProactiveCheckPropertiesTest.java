@@ -39,8 +39,7 @@ class ProactiveCheckPropertiesTest {
     @DisplayName("max-duration 이 hermes.run-timeout 과 같거나 길면 기동이 실패한다")
     void failsToStartWhenMaxDurationIsNotShorterThanRunTimeout() {
         for (String maxDuration : new String[] {"2m", "3m"}) {
-            runner.withPropertyValues(
-                            "hermes.run-timeout=2m", "assistant.proactive-check.max-duration=" + maxDuration)
+            runner.withPropertyValues("hermes.run-timeout=2m", "assistant.proactive-check.max-duration=" + maxDuration)
                     .run(context -> assertThat(context)
                             .as("max-duration=%s, run-timeout=2m", maxDuration)
                             .getFailure()

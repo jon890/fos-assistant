@@ -40,8 +40,8 @@ class ProactiveCheckMigrationTest {
         url = "jdbc:h2:mem:proactive-check-migration-" + UUID.randomUUID() + ";MODE=MySQL;DB_CLOSE_DELAY=-1";
         // 칸을 더하기 전 스키마에 대화를 넣어 두면, 이미 있던 대화가 어떤 purpose 로 채워지는지 본다.
         flyway().target(versionBeforeProactiveCheck()).load().migrate();
-        execute("INSERT INTO app_user (id, email, display_name, group_id, role, created_at)"
-                + " VALUES (" + USER + ", 'u@example.com', 'u', 1, 'MEMBER', CURRENT_TIMESTAMP(6))");
+        execute("INSERT INTO app_user (id, email, display_name, group_id, role, created_at)" + " VALUES (" + USER
+                + ", 'u@example.com', 'u', 1, 'MEMBER', CURRENT_TIMESTAMP(6))");
         execute("INSERT INTO agent (id, code, name, hermes_profile, api_base_url, cost_mode,"
                 + " credential_scope, visibility, owner_user_id, enabled, created_at)"
                 + " VALUES (" + AGENT + ", 'a', 'n', 'p', 'http://localhost', 'SUBSCRIPTION', 'SHARED_HOUSEHOLD',"
@@ -65,9 +65,7 @@ class ProactiveCheckMigrationTest {
         MigrationInfo[] all = info.all();
 
         assertThat(info.pending()).as("적용하지 않은 마이그레이션").isEmpty();
-        assertThat(info.current().getVersion())
-                .as("적용한 마지막 버전")
-                .isEqualTo(all[all.length - 1].getVersion());
+        assertThat(info.current().getVersion()).as("적용한 마지막 버전").isEqualTo(all[all.length - 1].getVersion());
         assertThat(Arrays.stream(info.applied()).map(MigrationInfo::getDescription))
                 .as("적용한 마이그레이션의 설명")
                 .contains(MIGRATION_DESCRIPTION);

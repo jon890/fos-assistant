@@ -79,8 +79,8 @@ class ProactiveCheckRepositoryTest {
         save(Conversation.startedBy(USER, "보통", AGENT, NOW));
         save(Conversation.startedForCheck(OTHER_USER, "남의 점검", AGENT, NOW));
 
-        Optional<Conversation> found = transactions.execute(status -> conversations
-                .findFirstByUserIdAndAgentIdAndPurposeAndDeletedAtIsNullOrderByIdDesc(
+        Optional<Conversation> found = transactions.execute(
+                status -> conversations.findFirstByUserIdAndAgentIdAndPurposeAndDeletedAtIsNullOrderByIdDesc(
                         USER, AGENT, ConversationPurpose.CHECK));
 
         assertThat(found).as("고른 점검 대화").map(Conversation::id).contains(expected.id());
@@ -94,8 +94,8 @@ class ProactiveCheckRepositoryTest {
         transactions.executeWithoutResult(status -> conversations.deleteIfActive(deleted.id(), USER, NOW));
         save(Conversation.startedBy(USER, "보통", AGENT, NOW));
 
-        Optional<Conversation> found = transactions.execute(status -> conversations
-                .findFirstByUserIdAndAgentIdAndPurposeAndDeletedAtIsNullOrderByIdDesc(
+        Optional<Conversation> found = transactions.execute(
+                status -> conversations.findFirstByUserIdAndAgentIdAndPurposeAndDeletedAtIsNullOrderByIdDesc(
                         USER, AGENT, ConversationPurpose.CHECK));
 
         assertThat(found).isEmpty();
@@ -111,7 +111,9 @@ class ProactiveCheckRepositoryTest {
 
         assertThat(count(CONVERSATION, "session-a")).as("같은 대화의 session-a").isEqualTo(2);
         assertThat(count(CONVERSATION, "session-b")).as("같은 대화의 session-b").isEqualTo(1);
-        assertThat(count(OTHER_CONVERSATION, "session-a")).as("다른 대화의 session-a").isEqualTo(1);
+        assertThat(count(OTHER_CONVERSATION, "session-a"))
+                .as("다른 대화의 session-a")
+                .isEqualTo(1);
         assertThat(count(CONVERSATION, "session-c")).as("보낸 적 없는 session").isZero();
     }
 
@@ -142,16 +144,17 @@ class ProactiveCheckRepositoryTest {
         ProactiveCheck otherCheck = saveCheck(OTHER_CONVERSATION, "session-a", 22L);
         saveFinding(check, CONVERSATION, FindingKind.NEW, "topic-old", after.minusSeconds(1));
         saveFinding(check, CONVERSATION, FindingKind.NEW, "topic-boundary", after);
-        ProactiveCheckFinding first = saveFinding(check, CONVERSATION, FindingKind.NEW, "topic-1", after.plusSeconds(1));
+        ProactiveCheckFinding first =
+                saveFinding(check, CONVERSATION, FindingKind.NEW, "topic-1", after.plusSeconds(1));
         ProactiveCheckFinding second = saveFinding(check, CONVERSATION, FindingKind.NEW, "topic-2", NOW);
         saveFinding(check, CONVERSATION, FindingKind.REFERENCE, "topic-reference", NOW);
         saveFinding(otherCheck, OTHER_CONVERSATION, FindingKind.NEW, "topic-other", NOW);
 
-        List<ProactiveCheckFinding> recent = transactions.execute(
-                status -> findings.findByConversationIdAndKindAndCreatedAtAfterOrderByIdDesc(
+        List<ProactiveCheckFinding> recent =
+                transactions.execute(status -> findings.findByConversationIdAndKindAndCreatedAtAfterOrderByIdDesc(
                         CONVERSATION, FindingKind.NEW, after, PageRequest.of(0, 10)));
-        List<ProactiveCheckFinding> limited = transactions.execute(
-                status -> findings.findByConversationIdAndKindAndCreatedAtAfterOrderByIdDesc(
+        List<ProactiveCheckFinding> limited =
+                transactions.execute(status -> findings.findByConversationIdAndKindAndCreatedAtAfterOrderByIdDesc(
                         CONVERSATION, FindingKind.NEW, after, PageRequest.of(0, 1)));
         List<ProactiveCheckFinding> notified = transactions.execute(
                 status -> findings.findByConversationIdAndKindAndCreatedAtAfter(CONVERSATION, FindingKind.NEW, after));
@@ -161,7 +164,10 @@ class ProactiveCheckRepositoryTest {
                 .extracting(ProactiveCheckFinding::id)
                 .containsExactly(second.id(), first.id());
         assertThat(recent).extracting(ProactiveCheckFinding::topicKey).containsExactly("topic-2", "topic-1");
-        assertThat(limited).as("쪽 크기 1").extracting(ProactiveCheckFinding::topicKey).containsExactly("topic-2");
+        assertThat(limited)
+                .as("쪽 크기 1")
+                .extracting(ProactiveCheckFinding::topicKey)
+                .containsExactly("topic-2");
         assertThat(notified)
                 .as("이미 알린 묶음")
                 .extracting(ProactiveCheckFinding::topicKey)

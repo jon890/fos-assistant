@@ -113,12 +113,7 @@ public class ProactiveCheck {
     }
 
     public void succeed(
-            CheckOutcome outcome,
-            int newFindings,
-            int referenceFindings,
-            int toolCalls,
-            int delegations,
-            Instant now) {
+            CheckOutcome outcome, int newFindings, int referenceFindings, int toolCalls, int delegations, Instant now) {
         this.status = CheckStatus.SUCCEEDED;
         this.outcome = outcome;
         this.newFindings = newFindings;
