@@ -24,6 +24,9 @@ public interface ChatArtifactRepository extends JpaRepository<ChatArtifact, Long
      *
      * <p>이미 적힌 행은 처음 시각을 그대로 둔다.
      *
+     * <p>{@code createdBefore} 보다 앞서 만든 행에만 적는다. 같은 경로에 파일을 새로 쓰면 새 행이 생기는데, 그 행은
+     * 지운 파일이 아니라 새 파일을 가리키므로 건드리지 않는다.
+     *
      * <p>트랜잭션은 {@code ChatArtifactWriter} 가 연다.
      */
     @Modifying(flushAutomatically = true, clearAutomatically = true)
@@ -33,7 +36,14 @@ public interface ChatArtifactRepository extends JpaRepository<ChatArtifact, Long
              where a.conversationId = :conversationId
                and a.path = :path
                and a.deletedAt is null
+               and a.createdAt < :createdBefore
             """)
     int markDeleted(
-            @Param("conversationId") Long conversationId, @Param("path") String path, @Param("now") Instant now);
+            @Param("conversationId") Long conversationId,
+            @Param("path") String path,
+            @Param("now") Instant now,
+            @Param("createdBefore") Instant createdBefore);
+
+    /** 지운 표시가 없고 {@code createdBefore} 보다 앞서 만든 행이다. 파일이 없는데 행이 살아 있는 것을 찾을 때 쓴다. */
+    List<ChatArtifact> findByDeletedAtIsNullAndCreatedAtBefore(Instant createdBefore);
 }

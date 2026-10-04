@@ -206,6 +206,35 @@ public class ArtifactStore {
     }
 
     /**
+     * 그 대화 폴더에 그 경로의 파일이 없다고 확인되면 참이다.
+     *
+     * <p>파일이 없는데 지운 표시가 없는 행을 맞출 때 쓴다. 결과물 루트가 디렉터리가 아니면 거짓이다. 붙지 않은 루트를
+     * 보고 모든 행을 지웠다고 적지 않으려는 것이다. 빈 경로, 절대 경로, 정규화하면 대화 폴더 밖으로 나가는 경로,
+     * 경로로 쓸 수 없는 글자가 섞인 경로도 거짓이다. 모르는 것을 지웠다고 적지 않는다. 없다고 확인할 수 없는 경우도
+     * 거짓이 되도록 {@link Files#notExists} 로 본다.
+     */
+    public boolean isMissing(Long conversationId, String relativePath) {
+        if (conversationId == null || relativePath == null || relativePath.isBlank() || !Files.isDirectory(root)) {
+            return false;
+        }
+        try {
+            Path requested = Path.of(relativePath);
+            if (requested.isAbsolute()) {
+                return false;
+            }
+            Path folder = folderOf(conversationId);
+            Path file = folder.resolve(requested).normalize();
+            if (!file.startsWith(folder) || file.equals(folder)) {
+                return false;
+            }
+            return Files.notExists(file, LinkOption.NOFOLLOW_LINKS);
+        } catch (RuntimeException ex) {
+            log.debug("could not check an artifact path conversationId={}", conversationId, ex);
+            return false;
+        }
+    }
+
+    /**
      * 결과물을 쓸 최종 경로를 판정하고 필요한 부모 폴더를 만든다.
      *
      * <p>기존 읽기 경로와 달리 아직 없는 최종 파일도 받는다. 대화 폴더와 이미 있던 부모는 링크를 따라가지
