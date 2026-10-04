@@ -123,6 +123,8 @@ public class ProactiveCheckRun implements CheckTurn {
     private volatile CheckOutcome outcome;
     private volatile int newFindings;
     private volatile int referenceFindings;
+    /** 검사한 발견. 답 메시지를 저장한 뒤 {@link #saveFindings} 가 저장한다. 블록에 발견이 없으면 비어 있다. */
+    private volatile List<ProactiveCheckFinding> pendingFindings = List.of();
     /** 멈춤 알림 줄의 글을 내줬다. 그 줄은 부르는 쪽이 저장했다. */
     private volatile boolean stopped;
 
@@ -215,7 +217,9 @@ public class ProactiveCheckRun implements CheckTurn {
     }
 
     /**
-     * 결과 블록을 읽고 발견을 검사해 대화에 남길 글을 정한다. 발견은 여기서 저장하고, 결과와 셈은 {@link #record} 가 적는다.
+     * 결과 블록을 읽고 발견을 검사해 대화에 남길 글을 정한다. 발견은 들고 있다가 답 메시지를 저장한 뒤 {@link #saveFindings} 가
+     * 저장하고, 결과와 셈은 {@link #record} 가 적는다. 답을 저장하지 못했는데 발견이 남으면 사용자가 보지 못한 발견이 다음 살펴보기에서
+     * 이미 알린 것으로 내려가기 때문이다.
      */
     @Override
     public CheckAnswer answer(Long executionId, String output) {
@@ -237,20 +241,19 @@ public class ProactiveCheckRun implements CheckTurn {
         newFindings = (int)
                 judged.stream().filter(each -> each.kind() == FindingKind.NEW).count();
         referenceFindings = judged.size() - newFindings;
-        deps.findings()
-                .saveAll(judged.stream()
-                        .map(each -> ProactiveCheckFinding.of(
-                                check.id(),
-                                check.conversationId(),
-                                each.kind(),
-                                each.reason(),
-                                Objects.requireNonNullElse(each.finding().area(), ""),
-                                each.finding().topicKey(),
-                                Objects.requireNonNullElse(each.finding().title(), ""),
-                                each.sourceUrl(),
-                                each.checkedAt(),
-                                now))
-                        .toList());
+        pendingFindings = judged.stream()
+                .map(each -> ProactiveCheckFinding.of(
+                        check.id(),
+                        check.conversationId(),
+                        each.kind(),
+                        each.reason(),
+                        Objects.requireNonNullElse(each.finding().area(), ""),
+                        each.finding().topicKey(),
+                        Objects.requireNonNullElse(each.finding().title(), ""),
+                        each.sourceUrl(),
+                        each.checkedAt(),
+                        now))
+                .toList();
         return new CheckAnswer(deps.renderer().render(block, judged), false);
     }
 
@@ -315,6 +318,14 @@ public class ProactiveCheckRun implements CheckTurn {
             check.succeed(outcome, newFindings, referenceFindings, toolCalls.get(), delegations, now);
         }
         deps.checks().save(check);
+    }
+
+    /** 들고 있던 발견을 저장한다. turn 이 답 메시지를 저장하고 돌아왔을 때만 부른다. 발견이 없으면 아무것도 하지 않는다. */
+    void saveFindings() {
+        List<ProactiveCheckFinding> judged = pendingFindings;
+        if (!judged.isEmpty()) {
+            deps.findings().saveAll(judged);
+        }
     }
 
     /** turn 이 예외로 끝났을 때 살펴보기 줄을 {@code FAILED} 와 그 오류 코드로 적는다. */

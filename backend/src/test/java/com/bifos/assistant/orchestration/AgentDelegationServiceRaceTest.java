@@ -59,6 +59,7 @@ class AgentDelegationServiceRaceTest {
     private final ConversationRepository conversations = mock(ConversationRepository.class);
     private final CurrentUser user = new CurrentUser(1L, "race-a@example.com", "가", 1L, UserRole.MEMBER);
     private final AgentExecution origin = mock(AgentExecution.class);
+    private final ProactiveCheckGuard checkGuard = mock(ProactiveCheckGuard.class);
     private AgentDelegationService delegations;
 
     @BeforeEach
@@ -72,8 +73,7 @@ class AgentDelegationServiceRaceTest {
         when(agent.apiBaseUrl()).thenReturn("http://agent-runtime.test/p/" + WORKER);
         when(agent.hermesProfile()).thenReturn(WORKER);
         when(children.startableAgent(user, WORKER)).thenReturn(agent);
-        // 보통 turn 의 위임만 본다. 살펴보기 트리가 아니라고 답한다.
-        ProactiveCheckGuard checkGuard = mock(ProactiveCheckGuard.class);
+        // 보통 turn 의 위임을 본다. 살펴보기 트리를 보는 검사만 참으로 바꾼다.
         when(checkGuard.isCheckTree(any())).thenReturn(false);
         // 서버 전체 한도를 1 로 둬, 거절한 요청이 자리를 돌려주지 않고 남기면 다음 요청이 BUSY 가 된다.
         delegations = new AgentDelegationService(
@@ -175,6 +175,31 @@ class AgentDelegationServiceRaceTest {
 
         assertThat(result.failure()).as("결과: %s", result).isEqualTo(DelegationResult.Failure.SUBMIT_FAILED);
         assertThat(result.executionId()).isNull();
+    }
+
+    @Test
+    @DisplayName("살펴보기 트리에서 RUNNING 으로 읽은 실행이 도는 표시를 찾기 전에 끝났으면 한 번 다시 읽어 끝난 상태를 준다")
+    void rereadsEndedRowWhenRunEndsBeforeRunningLookup() {
+        when(checkGuard.isCheckTree(origin)).thenReturn(true);
+        AgentExecution runningRow = delegatedRow(88L, ExecutionStatus.RUNNING);
+        AgentExecution endedRow = delegatedRow(88L, ExecutionStatus.SUCCEEDED);
+        // 처음 읽을 때는 돌고, 도는 표시를 찾을 때는 이미 끝나 표시가 없다.
+        when(executions.findById(88L)).thenReturn(Optional.of(runningRow)).thenReturn(Optional.of(endedRow));
+
+        Optional<AgentExecution> read = delegations.status(user, origin, 88L, Duration.ofSeconds(5));
+
+        assertThat(read).as("다시 읽은 줄").containsSame(endedRow);
+    }
+
+    /** 이 대화에서 요청자가 맡긴 위임 실행 줄이다. */
+    private AgentExecution delegatedRow(Long id, ExecutionStatus status) {
+        AgentExecution row = mock(AgentExecution.class);
+        when(row.id()).thenReturn(id);
+        when(row.userId()).thenReturn(user.id());
+        when(row.conversationId()).thenReturn(CONVERSATION_ID);
+        when(row.delegationKey()).thenReturn("race-key-" + id);
+        when(row.status()).thenReturn(status);
+        return row;
     }
 
     /** 다음 실행이 줄을 만들고 곧바로 제출하게 한다. */

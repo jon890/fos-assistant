@@ -134,20 +134,28 @@ public class AgentDelegationService {
     /**
      * {@link #status(CurrentUser, AgentExecution, Long)} 와 같이 읽되, 그 실행이 이 서버에서 돌고 있으면 끝나기를 기다린 뒤 다시 읽는다.
      *
+     * <p>먼저 살펴보기 트리에서만 기다린다(ADR-080). 그 밖의 origin 은 {@code wait} 를 받아도 기다리지 않는다. 부모는 맡긴 뒤
+     * 기다리지 않고 끝난 결과는 다음 turn 에 전해지기 때문이다(ADR-040).
+     *
      * <p>기다리는 시간은 {@code wait} 와 {@link DelegationProperties#statusWaitMax()} 가운데 짧은 쪽이다. 0 이하이면 기다리지
-     * 않는다. 이 서버가 돌리지 않는 {@code RUNNING} 실행은 끝나도 알 길이 없어 기다리지 않는다.
+     * 않는다. 이 서버가 돌리지 않는 {@code RUNNING} 실행은 끝나도 알 길이 없어 기다리지 않는다. 처음 읽은 뒤 그 사이 끝나 도는
+     * 표시가 없어졌으면 한 번 다시 읽어 끝난 상태를 준다.
      *
      * <p>트랜잭션을 걸지 않는다. 한 트랜잭션 안에서 기다리면 다시 읽어도 같은 영속 컨텍스트의 엔티티가 나오고, 기다리는 동안 DB
      * 연결도 쥔다. {@link #stop} 과 같은 형태다.
      */
     public Optional<AgentExecution> status(CurrentUser user, AgentExecution origin, Long executionId, Duration wait) {
         Optional<AgentExecution> found = status(user, origin, executionId);
-        if (found.isEmpty() || found.get().status() != ExecutionStatus.RUNNING || wait.isZero() || wait.isNegative()) {
+        if (found.isEmpty()
+                || found.get().status() != ExecutionStatus.RUNNING
+                || wait.isZero()
+                || wait.isNegative()
+                || !checkGuard.isCheckTree(origin)) {
             return found;
         }
         RunningDelegation delegation = running.get(executionId);
         if (delegation == null) {
-            return found;
+            return executions.findById(executionId);
         }
         delegation.awaitEnded(wait.compareTo(properties.statusWaitMax()) < 0 ? wait : properties.statusWaitMax());
         return executions.findById(executionId);

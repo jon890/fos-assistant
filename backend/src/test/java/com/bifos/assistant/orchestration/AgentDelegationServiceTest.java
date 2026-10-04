@@ -726,15 +726,17 @@ class AgentDelegationServiceTest {
     }
 
     @Test
-    @DisplayName("기다릴 시간을 주면 그 사이 끝난 위임 실행의 결과를 한 번에 받는다")
+    @DisplayName("살펴보기 트리에서 기다릴 시간을 주면 그 사이 끝난 위임 실행의 결과를 한 번에 받는다")
     void statusWithWaitReturnsResultOfRunThatEndsMeanwhile() throws Exception {
+        connectorAgent(CONNECTOR, user.id());
+        AgentExecution checkTurn = checkTurn();
         stub().willAnswer(command -> completed(command, "기다린 답"));
         CountDownLatch release = new CountDownLatch(1);
         CountDownLatch awaiting = holdUntil(release);
-        DelegationResult started = delegate("기다려 받을 일");
+        DelegationResult started = delegateFrom(checkTurn, CONNECTOR, "기다려 받을 일");
         await(awaiting);
         assertThat(delegations
-                        .status(user, origin, started.executionId(), Duration.ZERO)
+                        .status(user, checkTurn, started.executionId(), Duration.ZERO)
                         .orElseThrow()
                         .status())
                 .as("기다리지 않으면 곧바로 지금 상태다")
@@ -745,7 +747,7 @@ class AgentDelegationServiceTest {
             release.countDown();
         });
         AgentExecution read = delegations
-                .status(user, origin, started.executionId(), Duration.ofSeconds(10))
+                .status(user, checkTurn, started.executionId(), Duration.ofSeconds(10))
                 .orElseThrow();
 
         assertThat(read.status()).isEqualTo(ExecutionStatus.SUCCEEDED);
@@ -754,17 +756,40 @@ class AgentDelegationServiceTest {
     }
 
     @Test
-    @DisplayName("기다릴 시간이 상한을 넘으면 상한까지만 기다리고 그때의 RUNNING 을 준다")
-    void statusWaitIsCappedAtStatusWaitMax() throws Exception {
-        stub().willAnswer(command -> completed(command, "늦은 답"));
+    @DisplayName("보통 turn 은 기다릴 시간을 줘도 기다리지 않고 곧바로 RUNNING 을 준다")
+    void statusFromOrdinaryTurnDoesNotWait() throws Exception {
+        stub().willAnswer(command -> completed(command, "기다리지 않은 답"));
         CountDownLatch release = new CountDownLatch(1);
         CountDownLatch awaiting = holdUntil(release);
-        DelegationResult started = delegate("오래 걸리는 일");
+        DelegationResult started = delegate("보통 turn 이 맡긴 일");
         await(awaiting);
 
         long before = System.nanoTime();
         AgentExecution read = delegations
-                .status(user, origin, started.executionId(), Duration.ofSeconds(60))
+                .status(user, origin, started.executionId(), Duration.ofSeconds(10))
+                .orElseThrow();
+        Duration waited = Duration.ofNanos(System.nanoTime() - before);
+        release.countDown();
+
+        assertThat(read.status()).isEqualTo(ExecutionStatus.RUNNING);
+        assertThat(waited).as("상한 %s 보다 짧다", STATUS_WAIT_MAX).isLessThan(STATUS_WAIT_MAX);
+        assertThat(awaitFinished(started.executionId()).status()).isEqualTo(ExecutionStatus.SUCCEEDED);
+    }
+
+    @Test
+    @DisplayName("살펴보기 트리에서 기다릴 시간이 상한을 넘으면 상한까지만 기다리고 그때의 RUNNING 을 준다")
+    void statusWaitIsCappedAtStatusWaitMax() throws Exception {
+        connectorAgent(CONNECTOR, user.id());
+        AgentExecution checkTurn = checkTurn();
+        stub().willAnswer(command -> completed(command, "늦은 답"));
+        CountDownLatch release = new CountDownLatch(1);
+        CountDownLatch awaiting = holdUntil(release);
+        DelegationResult started = delegateFrom(checkTurn, CONNECTOR, "오래 걸리는 일");
+        await(awaiting);
+
+        long before = System.nanoTime();
+        AgentExecution read = delegations
+                .status(user, checkTurn, started.executionId(), Duration.ofSeconds(60))
                 .orElseThrow();
         Duration waited = Duration.ofNanos(System.nanoTime() - before);
         release.countDown();
@@ -778,14 +803,15 @@ class AgentDelegationServiceTest {
     }
 
     @Test
-    @DisplayName("이 서버가 돌리지 않는 RUNNING 실행은 기다릴 시간을 줘도 기다리지 않는다")
+    @DisplayName("살펴보기 트리에서도 이 서버가 돌리지 않는 RUNNING 실행은 기다릴 시간을 줘도 기다리지 않는다")
     void statusDoesNotWaitForRunNotRunningOnThisServer() {
+        AgentExecution checkTurn = checkTurn();
         AgentExecution detached = executions.save(AgentExecution.builder()
                 .userId(user.id())
                 .conversationId(conversation.id())
                 .agentId(agents.findByCode(WORKER).orElseThrow().id())
-                .parentExecutionId(origin.id())
-                .rootExecutionId(origin.id())
+                .parentExecutionId(checkTurn.id())
+                .rootExecutionId(checkTurn.id())
                 .delegationKey("detached-" + UUID.randomUUID())
                 .profileName(WORKER)
                 .costMode(CostMode.API)
@@ -795,7 +821,7 @@ class AgentDelegationServiceTest {
 
         long before = System.nanoTime();
         AgentExecution read = delegations
-                .status(user, origin, detached.id(), Duration.ofSeconds(60))
+                .status(user, checkTurn, detached.id(), Duration.ofSeconds(60))
                 .orElseThrow();
         Duration waited = Duration.ofNanos(System.nanoTime() - before);
 

@@ -15,6 +15,7 @@ import com.bifos.assistant.chat.application.ArtifactWriteService;
 import com.bifos.assistant.memory.application.MemoryService;
 import com.bifos.assistant.memory.domain.Memory;
 import com.bifos.assistant.orchestration.application.AgentDelegationService;
+import com.bifos.assistant.orchestration.application.DelegationProperties;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.shared.error.ApiException;
@@ -22,6 +23,7 @@ import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.usage.application.ExecutionDeliveryWriter;
 import com.bifos.assistant.usage.domain.AgentExecution;
 import java.time.Clock;
+import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -41,6 +43,7 @@ class McpToolServiceTest {
             memories,
             artifacts,
             mock(AgentDelegationService.class),
+            new DelegationProperties(2, 4, 16, Duration.ofSeconds(30), 1000, Duration.ofSeconds(20)),
             mock(ExecutionDeliveryWriter.class),
             mock(AgentRepository.class),
             Clock.systemUTC());
@@ -133,6 +136,20 @@ class McpToolServiceTest {
                         List.of(Map.of("type", "text", "text", "호출 맥락을 확인할 수 없습니다. 새 대화에서 다시 시도해 주세요.")),
                         "isError",
                         true));
+    }
+
+    @Test
+    @DisplayName("agent status 설명은 기다리지 말라는 문장을 지키고 먼저 살펴보기에서만 설정한 상한까지 기다린다고 적는다")
+    void agentStatusDescriptionKeepsNoWaitRuleAndStatesCheckWaitMax() {
+        String description = tools.tools().stream()
+                .filter(tool -> "agent_status".equals(tool.get("name")))
+                .map(tool -> (String) tool.get("description"))
+                .findFirst()
+                .orElseThrow();
+
+        assertThat(description)
+                .contains("결과는 끝나면 자동으로 전달되므로 기다리려고 반복해서 부르지 않는다. 사용자가 진행 상황을 물을 때 한 번 부른다.")
+                .endsWith("먼저 살펴보기에서는 wait_seconds 로 끝나기를 기다린다(최대 20초).");
     }
 
     private static Logger logger() {

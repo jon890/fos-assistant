@@ -19,7 +19,7 @@
 | `trigger_type` | VARCHAR(16) | `MANUAL`(단추), `SCHEDULED`(매일 깨우기, 아직 없다) |
 | `status` | VARCHAR(16) | `RUNNING`, `SUCCEEDED`, `FAILED`, `STOPPED` |
 | `outcome` | VARCHAR(16) NULL | `FINDINGS`, `NOTHING_NEW`, `INVALID_RESULT`. `SUCCEEDED` 일 때만 채운다 |
-| `error_code` | VARCHAR(64) NULL | `FAILED` 와 `STOPPED` 의 까닭. 상한으로 멈추면 `CHECK_TIME_LIMIT`, `CHECK_TOOL_LIMIT` 이고 사용자가 멈추면 비어 있다 |
+| `error_code` | VARCHAR(64) NULL | `FAILED` 와 `STOPPED` 의 까닭. 상한으로 멈추면 `CHECK_TIME_LIMIT`, `CHECK_TOOL_LIMIT` 이고 사용자가 멈추면 비어 있다. 서버가 도중에 내려가 기동할 때 닫은 줄은 `INTERRUPTED` 다 |
 | `tool_calls` | INT NOT NULL DEFAULT 0 | 살펴보기 turn 이 시작한 도구 호출 수 |
 | `delegations` | INT NOT NULL DEFAULT 0 | 그 트리에서 맡긴 위임 자식 수. 끝날 때 센다 |
 | `new_findings` | INT NOT NULL DEFAULT 0 | 「새로 알릴 것」 으로 그린 발견 수 |

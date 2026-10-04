@@ -8,6 +8,7 @@ import com.bifos.assistant.chat.application.ArtifactWriteService;
 import com.bifos.assistant.memory.application.MemoryService;
 import com.bifos.assistant.memory.domain.Memory;
 import com.bifos.assistant.orchestration.application.AgentDelegationService;
+import com.bifos.assistant.orchestration.application.DelegationProperties;
 import com.bifos.assistant.orchestration.application.DelegationResult;
 import com.bifos.assistant.orchestration.application.DelegationResult.Failure;
 import com.bifos.assistant.shared.auth.CurrentUser;
@@ -60,6 +61,9 @@ public class McpToolService {
     private final MemoryService memories;
     private final ArtifactWriteService artifacts;
     private final AgentDelegationService delegations;
+    /** {@code agent_status} 설명에 기다리는 시간의 상한을 적는다. */
+    private final DelegationProperties delegationProperties;
+
     private final ExecutionDeliveryWriter deliveryWriter;
     private final AgentRepository agents;
     private final Clock clock;
@@ -135,7 +139,8 @@ public class McpToolService {
                         "name",
                         "agent_status",
                         "description",
-                        "다른 에이전트에게 맡긴 실행의 지금 상태와 결과를 읽는다. execution_id 에는 agent_delegate 로 받은 번호를 넣는다. 이번 답에 그 결과가 필요하면 wait_seconds(최대 20)로 끝나기를 기다린다. 필요하지 않으면 끝난 결과는 다음 turn 에 자동으로 전달되므로 반복해서 부르지 않는다.",
+                        "다른 에이전트에게 맡긴 실행의 지금 상태와 결과를 읽는다. execution_id 에는 agent_delegate 로 받은 번호를 넣는다. 결과는 끝나면 자동으로 전달되므로 기다리려고 반복해서 부르지 않는다. 사용자가 진행 상황을 물을 때 한 번 부른다. 먼저 살펴보기에서는 wait_seconds 로 끝나기를 기다린다(최대 "
+                                + delegationProperties.statusWaitMax().toSeconds() + "초).",
                         "inputSchema",
                         Map.of(
                                 "type",
@@ -242,7 +247,8 @@ public class McpToolService {
      * <p>연결용 에이전트의 답은 외부 서비스의 글을 담으므로 부모 대화에 전할 때와 같이 {@code <external-data>} 로
      * 감싼다. 에이전트 행이 없는 실행도 출처를 모르므로 감싼다(ADR-049).
      *
-     * @param wait 그 실행이 끝나기를 기다릴 시간. 0 이면 곧바로 답한다. 상한은 {@link AgentDelegationService} 가 줄인다
+     * @param wait 그 실행이 끝나기를 기다릴 시간. 0 이면 곧바로 답한다. 먼저 살펴보기 트리가 아니면 기다리지 않고 상한은
+     *     {@link AgentDelegationService} 가 줄인다
      */
     public Map<String, Object> agentStatus(McpCaller caller, Long executionId, Duration wait) {
         return delegations

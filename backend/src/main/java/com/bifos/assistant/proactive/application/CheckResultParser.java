@@ -9,6 +9,7 @@ import java.util.List;
 import java.util.Optional;
 import org.springframework.stereotype.Component;
 import tools.jackson.core.JacksonException;
+import tools.jackson.databind.DeserializationFeature;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
@@ -25,7 +26,11 @@ public class CheckResultParser {
     public static final String OPEN_TAG = "<fos-check-result>";
     public static final String CLOSE_TAG = "</fos-check-result>";
 
-    private static final JsonMapper JSON = JsonMapper.builder().build();
+    /** JSON 객체 뒤에 남는 글이 있으면 읽지 않는다. 여는 태그를 넓혀 볼 때 두 블록에 걸친 범위를 받지 않게 한다. */
+    private static final JsonMapper JSON = JsonMapper.builder()
+            .enable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS)
+            .build();
+
     private static final String CODE_FENCE = "```";
 
     private static final int SUMMARY_MAX = 300;
@@ -49,30 +54,46 @@ public class CheckResultParser {
     /** 계약에 상한이 없는 짧은 칸(시각, 신선도, next 종류)이 끝없이 길어지지 않게 하는 값이다. */
     private static final int SHORT_FIELD_MAX = 64;
 
-    /** 마지막 블록을 읽는다. 블록이 없거나 읽지 못하면 빈 값이다. */
+    /**
+     * 마지막 블록을 읽는다. 블록이 없거나 읽지 못하면 빈 값이다.
+     *
+     * <p>마지막 닫는 태그를 먼저 찾고 그 앞의 가장 가까운 여는 태그를 고른다. 블록 뒤의 모델 글이 여는 태그를 말해도 블록을 읽는다.
+     * 그 사이가 JSON 객체 하나가 아니면 그 앞의 여는 태그로 하나씩 넓혀 본다. JSON 문자열 값이 여는 태그 글을 담아도 블록을 읽기
+     * 위해서다. 넓힌 범위에 앞 블록의 닫는 태그가 들면 JSON 뒤에 남는 글이 있어 읽지 않으므로, 마지막 블록이 깨졌을 때 앞 블록을 대신
+     * 읽지 않는다.
+     */
     public Optional<CheckResultBlock> parse(String answer) {
         if (answer == null) {
             return Optional.empty();
         }
-        int open = answer.lastIndexOf(OPEN_TAG);
-        if (open < 0) {
-            return Optional.empty();
-        }
-        int bodyStart = open + OPEN_TAG.length();
-        int close = answer.indexOf(CLOSE_TAG, bodyStart);
+        int close = answer.lastIndexOf(CLOSE_TAG);
         if (close < 0) {
             return Optional.empty();
         }
-        String body = stripFence(answer.substring(bodyStart, close).strip());
-        JsonNode root;
+        for (int open = answer.lastIndexOf(OPEN_TAG, close - OPEN_TAG.length());
+                open >= 0;
+                open = answer.lastIndexOf(OPEN_TAG, open - 1)) {
+            JsonNode root = objectOf(answer.substring(open + OPEN_TAG.length(), close));
+            if (root != null) {
+                return blockOf(root);
+            }
+        }
+        return Optional.empty();
+    }
+
+    /** 태그 사이의 글이 JSON 객체 하나이면 그 객체다. 아니면 null 이다. */
+    private static JsonNode objectOf(String between) {
+        String body = stripFence(between.strip());
         try {
-            root = JSON.readTree(body);
+            JsonNode root = JSON.readTree(body);
+            return root != null && root.isObject() ? root : null;
         } catch (JacksonException ex) {
-            return Optional.empty();
+            return null;
         }
-        if (root == null || !root.isObject()) {
-            return Optional.empty();
-        }
+    }
+
+    /** 읽은 JSON 객체를 계약대로 검사해 블록으로 바꾼다. */
+    private static Optional<CheckResultBlock> blockOf(JsonNode root) {
         JsonNode version = root.get("version");
         if (version == null || !version.isIntegralNumber() || version.asInt() != 1) {
             return Optional.empty();

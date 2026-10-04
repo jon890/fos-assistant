@@ -63,7 +63,8 @@ export function AgentProactiveCheckSection({ code, initialStatus }: Props) {
       if (response.ok) {
         const started = (await response.json()) as { conversationId: string };
         // 점검 대화가 새로 만들어졌을 수 있다. 사이드바 목록에 그 줄이 보이도록 목록을 다시 읽고 옮긴다.
-        await refresh();
+        // 살펴보기는 이미 시작했으므로 목록을 읽지 못해도 점검 대화로 간다. 사이드바는 그 오류를 따로 보인다.
+        await refresh().catch(() => undefined);
         // 이동이 끝나기 전에 다시 누르지 않게 단추를 잠근 채 둔다.
         router.push(`/chat/${started.conversationId}`);
         return;

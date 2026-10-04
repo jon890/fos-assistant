@@ -6,7 +6,9 @@ import static org.assertj.core.api.Assertions.tuple;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.when;
 
 import com.bifos.assistant.agent.domain.Agent;
@@ -68,8 +70,10 @@ import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
 import org.springframework.context.annotation.Primary;
+import org.springframework.dao.DataAccessResourceFailureException;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /**
@@ -122,7 +126,8 @@ class ProactiveCheckTurnTest {
     @Autowired
     ConversationRepository conversations;
 
-    @Autowired
+    /** 답 메시지 저장이 실패하는 검사만 바꾼다. 그 밖의 검사에서는 실제 동작 그대로다. */
+    @MockitoSpyBean
     ChatMessageRepository messages;
 
     @Autowired
@@ -463,6 +468,24 @@ class ProactiveCheckTurnTest {
         assertThat(checksOf(conversation))
                 .extracting(ProactiveCheck::status)
                 .containsExactly(CheckStatus.FAILED, CheckStatus.SUCCEEDED);
+    }
+
+    @Test
+    @DisplayName("답 메시지를 저장하지 못하면 발견을 남기지 않고 살펴보기는 실패로 남는다")
+    void leavesNoFindingWhenAnswerMessageFailsToSave() {
+        stub().willAnswer(command -> answer(findingsBlock(TOPIC_KEY, SOURCE_URL, null)));
+        // 답 메시지 저장만 실패시킨다. 알림 줄 저장은 실제로 저장된다.
+        doThrow(new DataAccessResourceFailureException("답 메시지를 저장할 수 없다"))
+                .when(messages)
+                .save(argThat((ChatMessage message) -> message != null && message.role() == MessageRole.ASSISTANT));
+
+        Conversation conversation = runCheck();
+
+        assertThat(findingsOf(conversation)).as("남은 발견").isEmpty();
+        assertThat(onlyCheckOf(conversation).status()).isEqualTo(CheckStatus.FAILED);
+        assertThat(messages.findByConversationIdOrderByIdAsc(conversation.id()))
+                .extracting(ChatMessage::content)
+                .containsExactly("먼저 살펴보기를 시작했어요", "살펴보기를 끝내지 못했어요. 잠시 뒤 다시 눌러 주세요");
     }
 
     /** 살펴보기를 시작하고 그 대화의 잠금이 풀릴 때까지 기다린 뒤 점검 대화를 돌려준다. */

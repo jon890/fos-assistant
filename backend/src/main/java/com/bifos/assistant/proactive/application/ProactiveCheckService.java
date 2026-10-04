@@ -159,8 +159,8 @@ public class ProactiveCheckService {
      * 끝난 살펴보기를 문서의 「끝날 때」 순서로 정리한다. 잠금을 풀기 전에 부른다. 잠금을 풀면 닫기 리스너가 곧바로 다음 turn 을 정하므로,
      * 그 전에 위임 결과를 전했다고 적어 두어야 점검 대화에 자동 turn 이 열리지 않는다.
      *
-     * <p>시간 상한 스레드를 끝내고, 위임 수와 함께 줄을 적고, 그 트리의 위임 결과를 전했다고 적고, 끝났다는 사건을 낸다. 각 단계가
-     * 실패해도 다음 단계로 넘어간다.
+     * <p>시간 상한 스레드를 끝내고, 돌아온 turn 이면 발견을 저장하고, 위임 수와 함께 줄을 적고, 그 트리의 위임 결과를 전했다고 적고,
+     * 끝났다는 사건을 낸다. 각 단계가 실패해도 다음 단계로 넘어간다.
      *
      * <p>예외로 끝났어도 상한에 닿았거나 사용자의 중지가 확정됐으면 멈춘 것으로 적고 실패 알림 줄을 남기지 않는다. 실행 줄이 이미
      * {@code FAILED} 로 적혀 멈춤 알림 줄이 저장되지 않았으면 여기서 남긴다. 알림 줄은 한 살펴보기에 하나다.
@@ -174,6 +174,8 @@ public class ProactiveCheckService {
         Long rootId = run.rootExecutionId();
         int delegations = rootId == null ? 0 : countDelegations(rootId, conversationId);
         if (returned) {
+            // 돌아왔으면 답 메시지는 저장됐다. 답을 저장하지 못한 turn 은 예외로 끝나 발견을 남기지 않는다.
+            recordQuietly(run::saveFindings, conversationId);
             recordQuietly(() -> run.record(delegations), conversationId);
         } else if (run.limitStopped() || turns.isStopConfirmed(handle)) {
             log.info("멈춘 살펴보기가 예외로 끝났다 conversationId={}", conversationId, failure);

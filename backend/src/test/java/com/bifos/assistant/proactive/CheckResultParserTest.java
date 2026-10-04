@@ -222,6 +222,36 @@ class CheckResultParserTest {
         assertThat(result).isPresent();
     }
 
+    @Test
+    @DisplayName("JSON 문자열 값이 여는 태그나 닫는 태그 글을 담아도 블록을 읽고 그 값을 그대로 둔다")
+    void readsBlockWhoseStringValuesContainTags() {
+        String summary = "결과는 <fos-check-result> 와 </fos-check-result> 사이에 둔다";
+        String json = "{\"version\": 1, \"outcome\": \"NOTHING_NEW\", \"summary\": \"" + summary + "\"}";
+
+        CheckResultBlock result = parser.parse("앞 글\n" + block(json)).orElseThrow();
+
+        assertThat(result.outcome()).isEqualTo(CheckOutcome.NOTHING_NEW);
+        assertThat(result.summary()).isEqualTo(summary);
+    }
+
+    @Test
+    @DisplayName("블록 뒤의 모델 글이 여는 태그를 말해도 블록을 읽는다")
+    void readsBlockFollowedByTextMentioningOpenTag() {
+        String answer = block(VALID_JSON) + "\n위 내용은 " + CheckResultParser.OPEN_TAG + " 블록에 담았어요";
+
+        CheckResultBlock result = parser.parse(answer).orElseThrow();
+
+        assertThat(result.outcome()).isEqualTo(CheckOutcome.FINDINGS);
+    }
+
+    @Test
+    @DisplayName("마지막 블록이 깨졌으면 앞 블록을 대신 읽지 않는다")
+    void doesNotFallBackToEarlierBlockWhenLastIsBroken() {
+        String answer = block(VALID_JSON) + "\n중간 글\n" + block("{\"version\": 1, \"outcome\": ");
+
+        assertThat(parser.parse(answer)).isEmpty();
+    }
+
     private static String longFinding() {
         String longItem = "\"" + "다".repeat(301) + "\"";
         String items = String.join(",", longItem, longItem, longItem, longItem, longItem, longItem, longItem);
