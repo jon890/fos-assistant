@@ -10,7 +10,7 @@ import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /**
- * 보관 기간이 지난 알림 줄을 지운다(ADR-070).
+ * 보관 기간이 지난 알림을 지운다(ADR-070).
  *
  * <p>읽었는지는 보지 않는다. 알림은 다른 표의 사실을 알리는 사본이라, 원인이 된 승인 줄과 실행 기록은 따로 남는다.
  */

@@ -43,8 +43,13 @@ export function NotificationList() {
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  /** 첫 쪽을 읽기 시작한 차례다. 더 나중에 시작한 읽기가 있으면 이전 응답은 버린다 */
+  /**
+   * 첫 쪽을 읽기 시작한 차례다. 더 나중에 시작한 첫 쪽 읽기가 있으면 이전 응답은 버린다.
+   * 그보다 먼저 시작한 다음 쪽 읽기의 응답도 버린다
+   */
   const firstPageTicket = useRef(0);
+  /** 첫 쪽을 한 번이라도 읽어 목록이 이어 읽을 자리를 갖고 있는지다 */
+  const loadedOnce = useRef(false);
 
   const loadFirstPage = useCallback(() => {
     const ticket = ++firstPageTicket.current;
@@ -64,9 +69,22 @@ export function NotificationList() {
         setError(result);
         return;
       }
-      setItems(result.items);
-      setNextCursor(result.nextCursor);
       setError(null);
+      // 처음 읽었으면 그대로 쓴다. 다시 읽었으면 이미 내려 읽은 목록을 두고 첫 쪽을 앞에 합친다.
+      // 같은 알림은 새로 읽은 값을 쓴다. 이어 읽을 자리는 목록 끝의 것이라 그대로 둔다.
+      if (!loadedOnce.current) {
+        loadedOnce.current = true;
+        setItems(result.items);
+        setNextCursor(result.nextCursor);
+        return;
+      }
+      setItems((current) => {
+        const fresh = new Set(result.items.map((item) => item.id));
+        return [
+          ...result.items,
+          ...current.filter((item) => !fresh.has(item.id)),
+        ];
+      });
     });
   }, []);
 
@@ -79,6 +97,7 @@ export function NotificationList() {
 
   const loadMore = useCallback(async () => {
     if (nextCursor === null || loadingMore) return;
+    const ticket = firstPageTicket.current;
     setLoadingMore(true);
     try {
       const response = await fetchNotifications(nextCursor, PAGE_SIZE);
@@ -87,6 +106,8 @@ export function NotificationList() {
         return;
       }
       const page = (await response.json()) as NotificationPage;
+      // 그 사이 첫 쪽을 다시 읽기 시작했으면 버린다. 이어 읽을 자리는 그대로라 다음에 다시 읽는다.
+      if (ticket !== firstPageTicket.current) return;
       setItems((current) => {
         const known = new Set(current.map((item) => item.id));
         return [

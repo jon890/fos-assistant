@@ -224,7 +224,7 @@ public class ConnectorPolicyService {
         try {
             ConnectorAction saved = transactions.execute(status -> {
                 ConnectorAction stored = actions.saveAndFlush(action);
-                // 알림 줄은 승인 줄과 한 트랜잭션이다. 알림 저장이 실패하면 승인 줄도 남지 않는다(ADR-070).
+                // 알림은 승인 줄과 한 트랜잭션이다. 알림 저장이 실패하면 승인 줄도 남지 않는다(ADR-070).
                 if (needsApproval && stored.conversationId() != null) {
                     notifyApprovalRequested(stored, ConnectorActionView.titleOf(declared));
                 }

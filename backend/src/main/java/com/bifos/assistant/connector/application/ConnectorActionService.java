@@ -353,15 +353,18 @@ public class ConnectorActionService {
     /**
      * {@code now} 에 기다리는 시간이 지난 승인 줄을 만료로 바꾼다. 한 줄이 실패해도 나머지를 계속한다.
      *
-     * <p>만료와 그 알림 줄은 한 트랜잭션이다. 알림의 도구 제목을 얻으려 카탈로그를 읽는데, 행을 잠근 트랜잭션 안에서
-     * 읽지 않으려고 만료할 줄의 커넥터마다 한 번씩 먼저 읽어 둔다.
+     * <p>만료와 그 알림은 한 트랜잭션이다. 알림의 도구 제목을 얻으려 카탈로그를 읽는데, 행을 잠근 트랜잭션 안에서
+     * 읽지 않으려고 만료할 줄의 커넥터마다 한 번씩 먼저 읽어 둔다. 대화 없는 줄은 알림을 남기지 않으므로 그 커넥터는
+     * 읽지 않는다.
      *
      * @return 만료로 바꾼 건수
      */
     public int expire(Instant now) {
         List<ConnectorAction> dueActions = actions.findByStatusAndExpiresAtBefore(ActionStatus.PENDING, now);
         Map<String, Optional<ConnectorManifest>> manifests = new HashMap<>();
-        dueActions.forEach(due -> manifests.computeIfAbsent(due.connectorId(), this::readManifest));
+        dueActions.stream()
+                .filter(due -> due.conversationId() != null)
+                .forEach(due -> manifests.computeIfAbsent(due.connectorId(), this::readManifest));
         int expired = 0;
         for (ConnectorAction due : dueActions) {
             try {
@@ -373,7 +376,7 @@ public class ConnectorActionService {
                                 .map(action -> {
                                     action.expire(now);
                                     ConnectorAction saved = actions.save(action);
-                                    notifyExpired(saved, manifests.get(saved.connectorId()));
+                                    notifyExpired(saved, manifests.getOrDefault(saved.connectorId(), Optional.empty()));
                                     return saved;
                                 }));
                 if (changed.isPresent()) {

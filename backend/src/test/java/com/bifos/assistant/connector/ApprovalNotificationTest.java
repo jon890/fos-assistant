@@ -2,6 +2,9 @@ package com.bifos.assistant.connector;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.clearInvocations;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.bifos.assistant.agent.domain.Agent;
@@ -55,7 +58,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
- * 승인이 필요한 커넥터 호출이 새 승인 줄을 만들 때와 그 줄이 만료될 때 알림 줄을 남기는지 실제 DB 로 확인한다(ADR-070).
+ * 승인이 필요한 커넥터 호출이 새 승인 줄을 만들 때와 그 줄이 만료될 때 알림을 남기는지 실제 DB 로 확인한다(ADR-070).
  *
  * <p>계약은 {@code docs/backend/notification.md} 의 「알림 종류」 다. 승인 카드가 뜰 대화가 있어야 알림이 생기므로 실제
  * 대화를 저장하고 실행이 그 대화 번호를 갖게 준비한다. 컨텍스트 수를 늘리지 않으려고 {@link ConnectorActionServiceTest} 와
@@ -276,6 +279,21 @@ class ApprovalNotificationTest {
         assertThat(service.expire(expiresAt.plusMillis(1))).isEqualTo(1);
 
         assertThat(onlyNotification().body()).isEqualTo("「" + ConnectorActionView.UNNAMED_TITLE + "」");
+    }
+
+    @Test
+    @DisplayName("대화 없이 돈 실행의 승인 줄만 만료하면 알림을 만들지 않고 카탈로그도 읽지 않는다")
+    void expiryWithoutConversationSkipsNotificationAndCatalog() {
+        ask(startRun(null), WRITE, ARGS);
+        Instant expiresAt = onlyActionExpiry();
+        ConnectorPolicyTestDoubles.expireCatalog();
+        clearInvocations(connector);
+
+        assertThat(service.expire(expiresAt.plusMillis(1))).isEqualTo(1);
+
+        verify(connector, never()).readCatalog();
+        assertThat(notifications.findAll()).isEmpty();
+        assertThat(received).isEmpty();
     }
 
     @Test

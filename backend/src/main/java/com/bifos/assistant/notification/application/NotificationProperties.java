@@ -8,7 +8,7 @@ import org.springframework.validation.annotation.Validated;
 /**
  * 알림의 설정이다(ADR-070).
  *
- * @param retention 알림 줄을 남기는 기간. 읽었는지와 상관없이 지난 줄을 지운다
+ * @param retention 알림을 남기는 기간. 읽었는지와 상관없이 지난 줄을 지운다
  * @param cleanupCron 오래된 줄을 지우는 때. 일정이 이 값을 설정 이름으로 읽는다. {@code -} 이면 돌지 않는다
  * @param streamHeartbeat 알림 SSE 에 주석 {@code ping} 을 보내는 간격
  */

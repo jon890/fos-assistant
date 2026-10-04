@@ -20,7 +20,9 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.TimeUnit;
 import org.assertj.core.api.ThrowableAssert.ThrowingCallable;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -36,7 +38,7 @@ import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /**
- * 알림 줄을 만들고 읽고 읽음으로 표시하는 흐름을 실제 DB 로 확인한다(ADR-070).
+ * 알림을 만들고 읽고 읽음으로 표시하는 흐름을 실제 DB 로 확인한다(ADR-070).
  *
  * <p>계약은 {@code docs/backend/notification.md} 다. 받는 사람은 번호로만 두므로 사용자 줄을 만들지 않고 다른 검사와 겹치지
  * 않는 번호를 쓴다.
@@ -105,7 +107,25 @@ class NotificationServiceTest {
     }
 
     @Test
-    @DisplayName("트랜잭션이 되돌아가면 알림 줄도 사건도 남지 않는다")
+    @DisplayName("두 트랜잭션이 겹쳐 차례로 커밋하면 나중에 커밋한 쪽의 사건이 두 알림을 모두 센 2 를 싣는다")
+    void laterCommitCountsBothWhenTransactionsOverlap() {
+        Notification first = transactions.execute(status -> {
+            Notification row = service.notify(ALICE, NotificationKind.APPROVAL_REQUESTED, "먼저 연 쪽", "", null);
+            // 먼저 연 트랜잭션이 커밋하기 전에 다른 스레드의 트랜잭션이 알림을 만들고 먼저 커밋한다.
+            CompletableFuture.runAsync(() -> transactions.executeWithoutResult(
+                            inner -> service.notify(ALICE, NotificationKind.APPROVAL_REQUESTED, "나중에 연 쪽", "", null)))
+                    .orTimeout(10, TimeUnit.SECONDS)
+                    .join();
+            return row;
+        });
+
+        assertThat(aliceEvents).hasSize(2);
+        assertThat(aliceEvents.getLast()).as("나중에 커밋한 쪽의 사건").isEqualTo(NotificationEvent.created(first.publicId(), 2));
+        assertThat(service.unreadCount(ALICE)).isEqualTo(2);
+    }
+
+    @Test
+    @DisplayName("트랜잭션이 되돌아가면 알림도 사건도 남지 않는다")
     void rolledBackTransactionLeavesNoRowAndNoEvent() {
         transactions.executeWithoutResult(status -> {
             service.notify(ALICE, NotificationKind.APPROVAL_EXPIRED, "승인 요청이 만료됐어요", "", null);

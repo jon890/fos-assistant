@@ -162,9 +162,9 @@ assistant:
     # 에이전트 하나에 올릴 수 있는 스킬 수. 새 스킬을 만들 때만 본다
     max-per-agent: ${ASSISTANT_SKILL_MAX_PER_AGENT:30}
   notification:
-    # 알림 줄을 남기는 기간. 읽었는지와 상관없이 지난 줄을 지운다
+    # 알림을 남기는 기간. 읽었는지와 상관없이 지난 줄을 지운다
     retention: 90d
-    # 보관 기간이 지난 알림 줄을 지우는 시각. Control Plane 의 시간대를 따른다
+    # 보관 기간이 지난 알림을 지우는 시각. Control Plane 의 시간대를 따른다
     cleanup-cron: "0 30 4 * * *"
     # 사건이 없는 동안 알림 SSE 에 주석 줄을 보내는 간격. 앞단 프록시가 연결을 끊지 않게 한다
     stream-heartbeat: 20s

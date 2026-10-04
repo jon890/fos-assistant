@@ -69,6 +69,7 @@ class NotificationControllerTest {
 
     private final CurrentUserProvider currentUser = mock(CurrentUserProvider.class);
     private final JsonMapper json = JsonMapper.builder().build();
+    private final List<MvcResult> streams = new ArrayList<>();
     private MockMvc mvc;
 
     @BeforeEach
@@ -88,6 +89,9 @@ class NotificationControllerTest {
 
     @AfterEach
     void tearDown() {
+        // 연 스트림을 끝내 hub 의 구독과 주석 줄 스레드가 다음 검사로 남지 않게 한다.
+        streams.forEach(stream -> stream.getRequest().getAsyncContext().complete());
+        streams.clear();
         notifications.deleteAll();
     }
 
@@ -210,9 +214,11 @@ class NotificationControllerTest {
     }
 
     private MvcResult subscribe() throws Exception {
-        return mvc.perform(get("/api/v1/notifications/events"))
+        MvcResult subscribed = mvc.perform(get("/api/v1/notifications/events"))
                 .andExpect(request().asyncStarted())
                 .andReturn();
+        streams.add(subscribed);
+        return subscribed;
     }
 
     private JsonNode body(MockHttpServletResponse response, int status) throws Exception {

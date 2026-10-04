@@ -86,6 +86,8 @@ export function NotificationsProvider({
           const response = await openNotificationEvents(controller.signal);
           if (response.ok) {
             await readEventStream<NotificationEvent>(response, (event) => {
+              // 이 사건보다 먼저 시작한 refresh 의 응답이 이 수를 덮지 않게 버린다.
+              refreshing.current += 1;
               setUnreadCount(event.unreadCount);
               window.dispatchEvent(
                 new CustomEvent(NOTIFICATIONS_CHANGED_EVENT),
@@ -113,7 +115,7 @@ export function NotificationsProvider({
     const ticket = ++refreshing.current;
     void readUnreadCount()
       .then((read) => {
-        // 더 나중에 시작한 읽기가 있으면 이 응답은 버린다.
+        // 더 나중에 시작한 읽기가 있거나 그 사이 사건이 왔으면 이 응답은 버린다.
         if (read.ok && ticket === refreshing.current)
           setUnreadCount(read.count);
       })

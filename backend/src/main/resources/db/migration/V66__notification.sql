@@ -1,5 +1,5 @@
 -- 사용자에게 대화 밖에서 알리는 줄이다(ADR-070). 칸의 뜻은 docs/backend/schema/notification.md 가 갖는다.
--- 갈 곳(target_*)은 지워져도 알림 줄을 남기므로 user_id 에만 외래 키를 둔다.
+-- 갈 곳(target_*)은 지워져도 알림을 남기므로 user_id 에만 외래 키를 둔다.
 CREATE TABLE notification (
     id BIGINT NOT NULL AUTO_INCREMENT,
     public_id BINARY(16) NOT NULL,

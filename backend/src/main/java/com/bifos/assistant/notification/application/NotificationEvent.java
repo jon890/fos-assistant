@@ -18,7 +18,7 @@ public record NotificationEvent(
     public static final String CREATED = "created";
     public static final String READ = "read";
 
-    /** 새 알림 줄이 커밋됐다. */
+    /** 새 알림이 커밋됐다. */
     public static NotificationEvent created(UUID notificationId, long unreadCount) {
         return new NotificationEvent(CREATED, notificationId, unreadCount);
     }
