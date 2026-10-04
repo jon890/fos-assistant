@@ -1,0 +1,204 @@
+/**
+ * 지금 화면이 읽는 `GET /api/v1/attention` 응답의 모양과, 그 응답을 화면 글로 바꾸는 순수 함수다.
+ *
+ * <p>칸은 `docs/backend/attention.md` 의 「API」 가 정한다. 문구는 `docs/frontend/now.md` 의 「카드」 와 「이유 문구」 표 그대로다.
+ * 이유 문구를 서버가 보내지 않고 여기서 정하는 것은 모델이 쓴 글로 이유를 만들지 않기 위해서다.
+ *
+ * <p>단위 테스트가 `node --test` 로 직접 읽으므로 다른 모듈을 import 하지 않는다.
+ */
+
+export type AttentionCardKey =
+  "failures" | "needs_me" | "delegated" | "continue";
+
+export type AttentionLevel = "NOW" | "LATER";
+
+export type AttentionWhy = {
+  trigger: string;
+  signals: string[];
+  confidence: string;
+  sources: { source: string; ref: string; asOf: string | null }[];
+};
+
+export type AttentionItem = {
+  /** 제어와 사건을 보낼 때 그대로 돌려보내는 값이다. 잘라 식별자를 얻지 않는다 */
+  itemKey: string;
+  stateKey: string;
+  attention: AttentionLevel;
+  /** 화면 안에서만 보이므로 값이 하나다. 화면은 이 칸으로 가르지 않는다 */
+  channel: "IN_APP";
+  /** 모델이 쓴 글일 수 있다. 평문으로만 그린다 */
+  title: string;
+  conversationId: string | null;
+  agentName: string | null;
+  at: string;
+  why: AttentionWhy;
+  execution: { id: number; status: string } | null;
+  actionId: string | null;
+  followUp: {
+    id: string;
+    dueAt: string | null;
+    waiting: boolean;
+    proposed: boolean;
+  } | null;
+};
+
+export type AttentionCard = {
+  key: AttentionCardKey;
+  status: "OK" | "UNAVAILABLE";
+  /** 상한으로 자르기 전에 서버가 센 이 카드의 `NOW` 항목 수다 */
+  nowCount: number;
+  moreCount: number;
+  items: AttentionItem[];
+};
+
+export type AttentionView = {
+  readAt: string;
+  nowCount: number;
+  cards: AttentionCard[];
+};
+
+/**
+ * `trigger` 마다 문구 표다. 위쪽 줄이 먼저다. `signals` 가 `null` 인 줄이 그 `trigger` 의 「없음」 줄이다.
+ *
+ * <p>`only` 가 참인 줄은 `signals` 가 그 하나뿐일 때만 맞는다(표의 「`WAITING` 만」).
+ */
+const REASONS: Record<
+  string,
+  readonly { signal: string | null; only?: boolean; text: string }[]
+> = {
+  EXECUTION_FAILED: [
+    {
+      signal: "NOT_RETRIED",
+      text: "답을 만들지 못했고 아직 다시 보내지 않았어요",
+    },
+    { signal: null, text: "답을 만들지 못했어요" },
+  ],
+  DELIVERY_FAILED: [
+    {
+      signal: "DELIVERY_NOT_DONE",
+      text: "결과는 도착했는데 정리한 답을 만들지 못했어요",
+    },
+    { signal: null, text: "결과를 정리한 답을 만들지 못했어요" },
+  ],
+  APPROVAL_PENDING: [
+    { signal: "EXPIRES_SOON", text: "승인을 기다리고 있어요. 곧 만료돼요" },
+    { signal: null, text: "승인을 기다리고 있어요" },
+  ],
+  MEMORY_PROPOSED: [
+    { signal: null, text: "에이전트가 기억할 것을 제안했어요" },
+  ],
+  FOLLOW_UP_PROPOSED: [{ signal: null, text: "에이전트가 할 일로 제안했어요" }],
+  FOLLOW_UP_OPEN: [
+    { signal: "DUE_SOON", text: "기한이 다가왔어요" },
+    { signal: "OVERDUE", text: "기한이 지났어요" },
+    { signal: "LINKED_UPDATE", text: "연결한 대화에 결과가 도착했어요" },
+    { signal: "WAITING", only: true, text: "기다리는 중이에요" },
+    { signal: null, text: "챙기고 있는 할 일이에요" },
+  ],
+  DELEGATION_RUNNING: [
+    { signal: "LONG_RUNNING", text: "맡긴 일이 오래 걸리고 있어요" },
+    { signal: null, text: "맡긴 일이 진행 중이에요" },
+  ],
+  DELEGATION_FINISHED: [{ signal: null, text: "맡긴 일이 끝났어요" }],
+  CONVERSATION_RECENT: [{ signal: null, text: "최근에 나눈 대화예요" }],
+};
+
+/**
+ * 항목의 이유 한 줄이다. `signals` 가 여럿이면 표의 위쪽 줄을, 표에 없는 조합은 그 `trigger` 의 「없음」 줄을 쓴다.
+ *
+ * @returns 모르는 `trigger` 면 빈 글
+ */
+export function reasonText(why: AttentionWhy): string {
+  const rows = REASONS[why.trigger];
+  if (!rows) return "";
+  const row = rows.find((candidate) => {
+    if (candidate.signal === null) return true;
+    if (candidate.only)
+      return why.signals.length === 1 && why.signals[0] === candidate.signal;
+    return why.signals.includes(candidate.signal);
+  });
+  return row?.text ?? "";
+}
+
+const CARD_TITLES: Record<AttentionCardKey, string> = {
+  failures: "실패",
+  needs_me: "내 차례",
+  delegated: "맡긴 일",
+  continue: "이어서 하기",
+};
+
+const CARD_EMPTY_TEXTS: Record<AttentionCardKey, string> = {
+  failures: "실패한 일이 없어요",
+  needs_me: "확인할 것이 없어요",
+  delegated: "맡긴 일이 없어요",
+  continue: "최근 대화가 없어요",
+};
+
+export function cardTitle(key: AttentionCardKey): string {
+  return CARD_TITLES[key];
+}
+
+export function cardEmptyText(key: AttentionCardKey): string {
+  return CARD_EMPTY_TEXTS[key];
+}
+
+/** 네 카드가 모두 읽혔고 모두 비었는가. 하나라도 읽지 못했으면 거짓이다 */
+export function allCardsEmpty(cards: AttentionCard[]): boolean {
+  return cards.every((card) => card.status === "OK" && card.items.length === 0);
+}
+
+/**
+ * 제목 링크가 갈 원래 기록이다. `docs/backend/attention.md` 의 「카드의 단추와 승인 경계」 를 따른다.
+ *
+ * @returns 갈 곳이 없으면 `null`
+ */
+export function itemHref(item: AttentionItem): string | null {
+  switch (item.why.trigger) {
+    case "EXECUTION_FAILED":
+    case "DELIVERY_FAILED":
+    case "APPROVAL_PENDING":
+    case "CONVERSATION_RECENT":
+    case "FOLLOW_UP_PROPOSED":
+    case "FOLLOW_UP_OPEN":
+      return item.conversationId === null
+        ? null
+        : `/chat/${item.conversationId}`;
+    case "MEMORY_PROPOSED":
+      return "/memory";
+    case "DELEGATION_RUNNING":
+    case "DELEGATION_FINISHED":
+      return item.execution === null
+        ? null
+        : `/executions/${item.execution.id}`;
+    default:
+      return null;
+  }
+}
+
+/** 할 일이 어디서 왔는지다. 에이전트가 제안했으면 「대화에서」, 사람이 더했으면 「직접 더함」. 할 일이 아니면 `null` */
+export function originText(item: AttentionItem): string | null {
+  if (item.followUp === null) return null;
+  return item.followUp.proposed ? "대화에서" : "직접 더함";
+}
+
+/**
+ * 상한을 넘어 빠진 항목의 안내다. 실패와 맡긴 일만 실행 기록으로 보낸다.
+ * 내 차례는 여러 종류가 섞여 보낼 곳이 없고, 이어서 하기의 나머지 대화는 사이드바 목록에 있다.
+ *
+ * @returns `moreCount` 가 0 이면 `null`
+ */
+export function moreText(
+  card: AttentionCard,
+): { text: string; href: string | null } | null {
+  if (card.moreCount <= 0) return null;
+  const href =
+    card.key === "failures" || card.key === "delegated"
+      ? "/usage?tab=executions"
+      : null;
+  return { text: `${card.moreCount}개 더 있어요`, href };
+}
+
+/** 사이드바 「지금 볼 것」 링크의 접근성 이름이다 */
+export function nowLinkLabel(nowCount: number): string {
+  return nowCount > 0 ? `지금 볼 것 ${nowCount}건` : "지금 볼 것";
+}
