@@ -36,6 +36,7 @@ import com.bifos.assistant.user.domain.AppUser;
 import com.bifos.assistant.user.infra.AppUserRepository;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 import org.hamcrest.Matchers;
 import org.junit.jupiter.api.BeforeEach;
@@ -108,7 +109,8 @@ class ConversationMissingAgentTest {
                         access,
                         new ChatEventStreams(Duration.ofSeconds(20)),
                         null,
-                        mock(ModelTierService.class)))
+                        mock(ModelTierService.class),
+                        List.of()))
                 .setControllerAdvice(new GlobalExceptionHandler())
                 .build();
         AppUser user = users.save(AppUser.of("dad@example.com", "dad", 1L, UserRole.MEMBER, Instant.now()));

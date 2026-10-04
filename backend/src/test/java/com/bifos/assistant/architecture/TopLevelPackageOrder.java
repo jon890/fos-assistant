@@ -35,7 +35,8 @@ final class TopLevelPackageOrder extends ArchCondition<JavaClass> {
             "orchestration",
             "mcp",
             "people",
-            "connector");
+            "connector",
+            "task");
 
     private TopLevelPackageEdges edges = TopLevelPackageEdges.of(List.of());
 

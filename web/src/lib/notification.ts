@@ -1,7 +1,12 @@
-export type NotificationKind = "APPROVAL_REQUESTED" | "APPROVAL_EXPIRED";
+export type NotificationKind =
+  | "APPROVAL_REQUESTED"
+  | "APPROVAL_EXPIRED"
+  | "TASK_SUCCEEDED"
+  | "TASK_FAILED"
+  | "TASK_SKIPPED";
 
 /** 알림을 누르면 갈 곳의 종류다. 갈 곳이 없는 알림은 `null` 이다 */
-export type NotificationTargetType = "CONVERSATION";
+export type NotificationTargetType = "CONVERSATION" | "TASK";
 
 export type NotificationView = {
   id: string;
@@ -32,6 +37,9 @@ export type NotificationEvent = {
 export function notificationHref(view: NotificationView): string | null {
   if (view.targetType === "CONVERSATION" && view.targetId) {
     return `/chat/${view.targetId}`;
+  }
+  if (view.targetType === "TASK" && view.targetId) {
+    return `/tasks/${view.targetId}`;
   }
   return null;
 }
