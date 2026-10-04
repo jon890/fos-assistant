@@ -1,0 +1,12 @@
+{
+  "name": "plan77-web-notification",
+  "description": "웹 알림 — 승인 요청과 만료를 notification 표에 남기고 사용자 단위 SSE 와 알림 단추, 알림 화면으로 어느 화면에서든 보이게 한다",
+  "status": "pending",
+  "created_at": "2026-10-04",
+  "total_phases": 2,
+  "current_phase": 1,
+  "phases": [
+    { "number": 1, "file": "phase-01.md", "execution_profile": "deep" },
+    { "number": 2, "file": "phase-02.md", "execution_profile": "standard" }
+  ]
+}
