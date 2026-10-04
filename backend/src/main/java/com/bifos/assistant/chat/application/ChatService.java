@@ -4,6 +4,7 @@ import com.bifos.assistant.agent.application.AgentService;
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.chat.application.model.AutoTurnDelivery;
 import com.bifos.assistant.chat.application.model.AutoTurnResult;
+import com.bifos.assistant.chat.application.model.CheckAnswer;
 import com.bifos.assistant.chat.application.model.DeliveryItemRef;
 import com.bifos.assistant.chat.application.model.DeliveryState;
 import com.bifos.assistant.chat.application.model.ResultDeliveryStart;
@@ -449,6 +450,37 @@ public class ChatService {
         }
     }
 
+    /**
+     * 먼저 살펴보기 turn 하나를 돌린다(ADR-077). 살펴보기만의 일은 {@code check} 가 맡는다.
+     *
+     * <p>부르는 쪽이 그 대화의 turn 잠금을 이미 잡았다. 입력은 한 번만 만들어 라우팅과 turn 에 같은 값을 넘긴다.
+     * 흐름이 붙은 대화면 {@code PROACTIVE_CHECK_UNAVAILABLE} 로 거절한다. session 을 바꿀 차례면 turn 을 열기 전에 바꾼다.
+     *
+     * <p>질문 대신 시작 알림 줄을 남기고, 답 조각은 흘리지 않는다. 성공한 답은 {@code check} 가 바꾼 글로 남기고, 멈추면
+     * 그때까지의 답 대신 멈춤 알림 줄만 남긴다. Memory 제안, 추천 질문 갱신, 자동 turn 수, 제목은 건드리지 않는다. 실패는
+     * 예외로 올라가고 실패 알림 줄은 부르는 쪽이 남긴다.
+     *
+     * @param owner 대화 주인
+     * @param onEvent 알림 줄, {@code started}, 도구와 하위 에이전트 사건, {@code done} 이나 {@code stopped} 를 받는다
+     */
+    public void runProactiveCheck(
+            CurrentUser owner, Long conversationId, TurnHandle handle, CheckTurn check, Consumer<ChatEvent> onEvent) {
+        String input = check.input();
+        Routed routed = route(owner, conversationId, input, null, List.of());
+        if (routed.flow() != null) {
+            throw new ApiException(
+                    ErrorCode.PROACTIVE_CHECK_UNAVAILABLE, "an agent with a flow does not run a proactive check");
+        }
+        if (check.renewSession()) {
+            sessions.renew(routed.conversation());
+        }
+        ChatTurn turn = runTurn(owner, routed, input, new TurnIntent.ProactiveCheck(check), onEvent, true, handle);
+        onEvent.accept(
+                turn.cancelled()
+                        ? ChatEvent.stopped(turn.conversationPublicId(), turn.messageId(), turn.executionId())
+                        : ChatEvent.done(turn.conversationPublicId(), turn.messageId(), turn.executionId()));
+    }
+
     /** 읽은 대기 행이 저장 전에 취소돼 다시 읽는 횟수의 상한이다. */
     private static final int PENDING_READ_ATTEMPTS = 3;
 
@@ -723,19 +755,23 @@ public class ChatService {
                         ModelChoice.defaults(),
                         null,
                         intent,
-                        requestReceivedAt);
+                        requestReceivedAt,
+                        onEvent);
                 String code = ex instanceof ApiException api ? api.code().name() : "MODEL_TIER_RESOLVE_FAILED";
                 executions.fail(failed.execution(), code);
                 append(failed, ExecutionEventType.RUN_FAILED, code);
                 throw ex;
             }
             ModelChoice choice = resolved.choice();
-            PendingTurn pending =
-                    begin(user, routed, input, context, snapshot, choice, resolved.tier(), intent, requestReceivedAt);
+            PendingTurn pending = begin(
+                    user, routed, input, context, snapshot, choice, resolved.tier(), intent, requestReceivedAt, onEvent);
             if (command != null) {
                 skillUses.recordCommand(pending.execution().id(), command.name());
             }
             turns.rekey(handle, pending.execution().id());
+            if (intent instanceof TurnIntent.ProactiveCheck proactive) {
+                startCheck(proactive.check(), pending);
+            }
             if (streaming) {
                 onEvent.accept(ChatEvent.started(
                         conversation.publicId(), pending.execution().id()));
@@ -994,7 +1030,8 @@ public class ChatService {
             ModelChoice choice,
             ModelTier modelTier,
             TurnIntent intent,
-            Instant requestReceivedAt) {
+            Instant requestReceivedAt,
+            Consumer<ChatEvent> onEvent) {
         Conversation conversation = routed.conversation();
         Agent agent = routed.agent();
         RunSession session = sessions.ensure(conversation);
@@ -1024,7 +1061,32 @@ public class ChatService {
             attachDeliveryExecution(results.attemptId(), execution.id());
         }
         return new PendingTurn(
-                user, conversation, agent, command, execution, new SequenceCounter(), new StringBuilder(), intent);
+                user,
+                conversation,
+                agent,
+                command,
+                execution,
+                new SequenceCounter(),
+                new StringBuilder(),
+                intent,
+                onEvent);
+    }
+
+    /**
+     * 먼저 살펴보기 turn 의 실행 줄을 살펴보기에 잇는다.
+     *
+     * <p>잇지 못하면 실행 줄을 실패로 적고 던진다. 잇지 않은 채 보내면 그 실행이 살펴보기 트리로 판정되지 않아 읽기 경계 밖에서
+     * 돈다.
+     */
+    private void startCheck(CheckTurn check, PendingTurn pending) {
+        try {
+            check.started(pending.execution().id(), pending.conversation().hermesRootSessionId());
+        } catch (RuntimeException ex) {
+            String code = ex instanceof ApiException api ? api.code().name() : ErrorCode.INTERNAL_ERROR.name();
+            executions.fail(pending.execution(), code);
+            append(pending, ExecutionEventType.RUN_FAILED, code);
+            throw ex;
+        }
     }
 
     /**
@@ -1118,6 +1180,9 @@ public class ChatService {
         AgentExecution execution = executions.complete(pending.execution(), pending.agent(), result, requested);
         append(pending, ExecutionEventType.RUN_COMPLETED, null);
         String answer = result.output() == null ? "" : result.output();
+        if (pending.intent() instanceof TurnIntent.ProactiveCheck proactive) {
+            return finishCheck(pending, proactive.check(), execution.id(), answer);
+        }
         ChatMessage message = messages.save(answerMessage(pending, answer, execution.id()));
         memoryProposer.proposeFrom(
                 pending.user(),
@@ -1136,6 +1201,25 @@ public class ChatService {
                 false);
     }
 
+    /**
+     * 먼저 살펴보기 turn 의 답을 {@code check} 가 바꾼 글로 남긴다. 알림 줄이면 {@code system} 사건을 낸다.
+     *
+     * <p>Memory 제안과 추천 질문 갱신을 띄우지 않는다. 사용자의 질문이 없는 turn 이다.
+     */
+    private ChatTurn finishCheck(PendingTurn pending, CheckTurn check, Long executionId, String output) {
+        CheckAnswer checked = check.answer(executionId, output);
+        Conversation conversation = pending.conversation();
+        ChatMessage message;
+        if (checked.notice()) {
+            message = messages.save(ChatMessage.fromSystem(conversation.id(), checked.text(), clock.instant()));
+            pending.onEvent().accept(ChatEvent.system(conversation.publicId(), message.id(), message.content()));
+        } else {
+            message = messages.save(answerMessage(pending, checked.text(), executionId));
+        }
+        return new ChatTurn(
+                conversation.id(), conversation.publicId(), executionId, checked.text(), message.id(), false);
+    }
+
     private ChatTurn cancel(PendingTurn pending, HermesRunResult result, ModelChoice requested) {
         AgentExecution execution = executions.cancel(pending.execution(), pending.agent(), result, requested);
         String answer;
@@ -1146,6 +1230,14 @@ public class ChatService {
                             && !result.output().isBlank()
                     ? result.output()
                     : pending.streamed().toString();
+        }
+        if (pending.intent() instanceof TurnIntent.ProactiveCheck proactive) {
+            // 검사하지 않은 답이 대화에 남지 않게 그때까지의 답 대신 멈춤 알림 줄만 남긴다.
+            answer = "";
+            ChatMessage notice = messages.save(ChatMessage.fromSystem(
+                    pending.conversation().id(), proactive.check().stoppedNotice(), clock.instant()));
+            pending.onEvent()
+                    .accept(ChatEvent.system(pending.conversation().publicId(), notice.id(), notice.content()));
         }
         ChatMessage message = answer.isBlank() ? null : messages.save(answerMessage(pending, answer, execution.id()));
         if (result != null && result.sessionId() != null && !result.sessionId().isBlank()) {
@@ -1253,6 +1345,13 @@ public class ChatService {
             List<Long> attachmentIds,
             TurnIntent intent,
             Consumer<ChatEvent> onEvent) {
+        if (intent instanceof TurnIntent.ProactiveCheck proactive) {
+            // 질문 대신 시작 알림 줄 하나를 남긴다. 제목, 자동 turn 수, 대기 행은 건드리지 않는다.
+            ChatMessage notice = transactions.execute(status -> messages.save(
+                    ChatMessage.fromSystem(conversation.id(), proactive.check().startNotice(), clock.instant())));
+            onEvent.accept(ChatEvent.system(conversation.publicId(), notice.id(), notice.content()));
+            return;
+        }
         // 다시 생성은 질문을 이미 저장했다. 자동 turn 의 알림 줄은 이 turn 을 열기 전에 저장했다.
         if (!(intent instanceof TurnIntent.Fresh fresh)) {
             return;
@@ -1649,14 +1748,21 @@ public class ChatService {
     private void forward(PendingTurn pending, RunEvent event, Consumer<ChatEvent> onEvent) {
         append(pending, event);
         String type = event.type() == null ? "" : event.type().toLowerCase();
+        CheckTurn check = pending.intent() instanceof TurnIntent.ProactiveCheck proactive ? proactive.check() : null;
         if ("message.delta".equals(type) && event.text() != null) {
             executions.markFirstDelta(pending.execution());
             synchronized (pending) {
                 pending.streamed().append(event.text());
-                onEvent.accept(ChatEvent.delta(event.text()));
+                // 살펴보기의 답은 결과 블록의 JSON 이 섞인 글이라 흘리지 않는다. 검사해 그린 글만 남긴다.
+                if (check == null) {
+                    onEvent.accept(ChatEvent.delta(event.text()));
+                }
             }
         } else if ("tool.started".equals(type)) {
             onEvent.accept(ChatEvent.tool(event.toolName(), event.detail(), ChatEvent.STARTED, null, null));
+            if (check != null) {
+                check.toolStarted(pending.execution().id());
+            }
         } else if ("tool.completed".equals(type)) {
             onEvent.accept(ChatEvent.tool(
                     event.toolName(), event.detail(), ChatEvent.COMPLETED, event.durationMs(), event.failed()));
@@ -1735,7 +1841,8 @@ public class ChatService {
             AgentExecution execution,
             SequenceCounter counter,
             StringBuilder streamed,
-            TurnIntent intent) {}
+            TurnIntent intent,
+            Consumer<ChatEvent> onEvent) {}
 
     /**
      * 이 turn 이 어느 대화와 에이전트의 것인지, 그리고 어느 흐름으로 갈지. 흐름이 없으면 null 이다.

@@ -68,6 +68,16 @@ public interface ConversationRepository extends JpaRepository<Conversation, Long
             """)
     int assignSessionIfAbsent(@Param("id") Long id, @Param("sessionId") String sessionId);
 
+    /**
+     * 보낼 session 과 루트 session 을 같은 새 값으로 바꾼다. 먼저 살펴보기가 한 session 으로 보낸 수가 상한에 닿았을 때 쓴다.
+     *
+     * <p>{@code updatedAt} 은 바꾸지 않는다. 트랜잭션은 {@code ConversationWriter} 가 연다.
+     */
+    @Modifying
+    @Query(
+            "update Conversation c set c.hermesSessionId = :sessionId, c.hermesRootSessionId = :sessionId where c.id = :id")
+    int replaceSessions(@Param("id") Long id, @Param("sessionId") String sessionId);
+
     /** 사용자의 질문 없이 연 turn 의 수를 0 으로 돌린다. 이미 0 이면 줄을 건드리지 않고 0 을 돌려준다. 트랜잭션은 {@code ConversationWriter} 가 연다. */
     @Modifying
     @Query("update Conversation c set c.autoTurnCount = 0 where c.id = :id and c.autoTurnCount <> 0")

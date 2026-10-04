@@ -38,6 +38,13 @@ public final class ProactiveCheckDtos {
     }
 
     /**
+     * 살펴보기를 시작했다.
+     *
+     * @param conversationId 결과가 남는 점검 대화의 공개 식별자
+     */
+    public record StartedResponse(UUID conversationId) {}
+
+    /**
      * 막는 까닭 하나다.
      *
      * @param code {@code CheckBlockerCode} 의 이름

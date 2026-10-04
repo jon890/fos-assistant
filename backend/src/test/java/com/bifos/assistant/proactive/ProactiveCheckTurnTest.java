@@ -1,0 +1,542 @@
+package com.bifos.assistant.proactive;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.fail;
+import static org.assertj.core.api.Assertions.tuple;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.when;
+
+import com.bifos.assistant.agent.domain.Agent;
+import com.bifos.assistant.agent.domain.type.AgentVisibility;
+import com.bifos.assistant.agent.domain.type.CostMode;
+import com.bifos.assistant.agent.domain.type.CredentialScope;
+import com.bifos.assistant.agent.infra.AgentRepository;
+import com.bifos.assistant.chat.application.ChatEvent;
+import com.bifos.assistant.chat.application.ConversationEventHub;
+import com.bifos.assistant.chat.application.TurnCancellation;
+import com.bifos.assistant.chat.domain.ChatMessage;
+import com.bifos.assistant.chat.domain.Conversation;
+import com.bifos.assistant.chat.domain.type.MessageRole;
+import com.bifos.assistant.chat.infra.ChatMessageRepository;
+import com.bifos.assistant.chat.infra.ConversationRepository;
+import com.bifos.assistant.hermes.HermesRunEventStream;
+import com.bifos.assistant.hermes.HermesRunsClient;
+import com.bifos.assistant.hermes.HermesSkillClient;
+import com.bifos.assistant.hermes.HermesSkillClient.HermesSkill;
+import com.bifos.assistant.hermes.HermesToolsetClient;
+import com.bifos.assistant.hermes.StubHermesRunsClient;
+import com.bifos.assistant.hermes.dto.HermesRunCommand;
+import com.bifos.assistant.hermes.dto.HermesRunResult;
+import com.bifos.assistant.hermes.dto.RunEvent;
+import com.bifos.assistant.hermes.dto.TokenUsage;
+import com.bifos.assistant.proactive.application.ProactiveCheckService;
+import com.bifos.assistant.proactive.domain.ProactiveCheck;
+import com.bifos.assistant.proactive.domain.ProactiveCheckFinding;
+import com.bifos.assistant.proactive.domain.type.CheckOutcome;
+import com.bifos.assistant.proactive.domain.type.CheckStatus;
+import com.bifos.assistant.proactive.domain.type.CheckTrigger;
+import com.bifos.assistant.proactive.domain.type.FindingKind;
+import com.bifos.assistant.proactive.domain.type.FindingReason;
+import com.bifos.assistant.proactive.infra.ProactiveCheckFindingRepository;
+import com.bifos.assistant.proactive.infra.ProactiveCheckRepository;
+import com.bifos.assistant.shared.auth.CurrentUser;
+import com.bifos.assistant.shared.domain.type.UserRole;
+import com.bifos.assistant.shared.error.ApiException;
+import com.bifos.assistant.shared.error.ErrorCode;
+import com.bifos.assistant.usage.domain.AgentExecution;
+import com.bifos.assistant.usage.infra.AgentExecutionRepository;
+import com.bifos.assistant.usage.infra.ExecutionEventRepository;
+import com.bifos.assistant.user.domain.AppUser;
+import com.bifos.assistant.user.infra.AppUserRepository;
+import java.time.Duration;
+import java.time.Instant;
+import java.util.Comparator;
+import java.util.List;
+import java.util.UUID;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.function.Consumer;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Import;
+import org.springframework.context.annotation.Primary;
+import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.transaction.support.TransactionTemplate;
+
+/**
+ * 먼저 살펴보기 turn 하나가 점검 대화에 무엇을 남기고 Hermes 에 무엇을 보내는지 본다.
+ *
+ * <p>turn 은 가상 스레드에서 돈다. 검사마다 그 대화의 잠금이 풀릴 때까지 기다린 뒤 단언한다. Hermes 의 실행, 스트림, toolset, 스킬
+ * 목록은 대역이고 모든 데이터는 합성이다.
+ */
+@SpringBootTest(
+        properties = {
+            "hermes.run-timeout=30s",
+            "assistant.proactive-check.max-duration=20s",
+            "assistant.proactive-check.session-max-checks=2"
+        })
+@ActiveProfiles("test")
+@Import(ProactiveCheckTurnTest.StubRuntime.class)
+class ProactiveCheckTurnTest {
+
+    private static final Duration WAIT_LIMIT = Duration.ofSeconds(10);
+    private static final String TOPIC_KEY = "study:kafka-exactly-once";
+    private static final String SOURCE_URL = "https://docs.example.test/kafka/exactly-once";
+
+    @TestConfiguration
+    static class StubRuntime {
+        @Bean
+        @Primary
+        StubHermesRunsClient stubHermesRunsClient() {
+            return new StubHermesRunsClient();
+        }
+    }
+
+    @Autowired
+    ProactiveCheckService service;
+
+    @Autowired
+    TurnCancellation turns;
+
+    @Autowired
+    ConversationEventHub hub;
+
+    @Autowired
+    HermesRunsClient hermes;
+
+    @Autowired
+    AppUserRepository users;
+
+    @Autowired
+    AgentRepository agents;
+
+    @Autowired
+    ConversationRepository conversations;
+
+    @Autowired
+    ChatMessageRepository messages;
+
+    @Autowired
+    AgentExecutionRepository executions;
+
+    @Autowired
+    ExecutionEventRepository executionEvents;
+
+    @Autowired
+    ProactiveCheckRepository checks;
+
+    @Autowired
+    ProactiveCheckFindingRepository findings;
+
+    @Autowired
+    TransactionTemplate transactions;
+
+    /** 실제 Hermes 를 부르지 않도록 켜진 toolset 을 대역으로 둔다. */
+    @MockitoBean
+    HermesToolsetClient toolsets;
+
+    /** 켜진 스킬 목록을 대역으로 둔다. */
+    @MockitoBean
+    HermesSkillClient skillClient;
+
+    /** 실제 스트림 주소로 연결하지 않게 대역으로 둔다. 사건을 흘리는 검사만 답을 정한다. */
+    @MockitoBean
+    HermesRunEventStream eventStream;
+
+    private CurrentUser owner;
+    private Agent agent;
+
+    private StubHermesRunsClient stub() {
+        return (StubHermesRunsClient) hermes;
+    }
+
+    @BeforeEach
+    void setUp() {
+        stub().reset();
+        when(toolsets.readEnabled(anyString(), anyString())).thenReturn(List.of("web", "skills", "fos-assistant"));
+        when(skillClient.list(anyString())).thenReturn(List.of(new HermesSkill("proactive-check", "살펴보기", true)));
+        String suffix = UUID.randomUUID().toString().substring(0, 8);
+        AppUser user = users.save(
+                AppUser.of("check-" + suffix + "@example.com", "점검", 1L, UserRole.MEMBER, Instant.now()));
+        owner = new CurrentUser(user.id(), user.email(), user.displayName(), user.groupId(), user.role());
+        String code = "check-" + suffix;
+        agent = agents.save(Agent.of(
+                code,
+                "커리어",
+                code,
+                "http://agent-runtime.test/p/" + code,
+                CostMode.SUBSCRIPTION,
+                CredentialScope.SHARED_HOUSEHOLD,
+                AgentVisibility.PRIVATE,
+                owner.id(),
+                Instant.now()));
+    }
+
+    @AfterEach
+    void tearDown() {
+        List<Conversation> owned = conversations.findAll().stream()
+                .filter(conversation -> conversation.userId().equals(owner.id()))
+                .toList();
+        owned.forEach(conversation -> awaitIdle(conversation.id()));
+        List<Long> conversationIds = owned.stream().map(Conversation::id).toList();
+        findings.deleteAll(findings.findAll().stream()
+                .filter(finding -> conversationIds.contains(finding.conversationId()))
+                .toList());
+        checks.deleteAll(checks.findAll().stream()
+                .filter(check -> check.userId().equals(owner.id()))
+                .toList());
+        List<AgentExecution> ownExecutions = executions.findAll().stream()
+                .filter(execution -> execution.userId().equals(owner.id()))
+                .toList();
+        executionEvents.deleteAll(executionEvents.findAll().stream()
+                .filter(event -> ownExecutions.stream()
+                        .anyMatch(execution -> execution.id().equals(event.executionId())))
+                .toList());
+        executions.deleteAll(ownExecutions);
+        transactions.executeWithoutResult(status -> {
+            conversationIds.forEach(id -> messages.deleteAll(messages.findByConversationIdOrderByIdAsc(id)));
+            conversations.deleteAllById(conversationIds);
+        });
+        agents.deleteById(agent.id());
+        users.deleteById(owner.id());
+    }
+
+    @Test
+    @DisplayName("결과 블록이 든 답이면 시작 알림 줄과 그려진 답이 남고 살펴보기 줄과 발견 줄이 생긴다")
+    void leavesStartNoticeAndRenderedAnswerForFindings() {
+        stub().willAnswer(command -> answer(findingsBlock(TOPIC_KEY, SOURCE_URL, null)));
+
+        Conversation conversation = runCheck();
+
+        List<ChatMessage> history = messages.findByConversationIdOrderByIdAsc(conversation.id());
+        assertThat(history).extracting(ChatMessage::role).containsExactly(MessageRole.SYSTEM, MessageRole.ASSISTANT);
+        assertThat(history.getFirst().content()).isEqualTo("먼저 살펴보기를 시작했어요");
+        ChatMessage answer = history.getLast();
+        assertThat(answer.executionId()).as("실행 번호가 붙은 답").isNotNull();
+        assertThat(answer.content())
+                .as("그려진 답")
+                .contains("**새로 알릴 것**")
+                .contains("Kafka 정확히 한 번 처리")
+                .doesNotContain("fos-check-result")
+                .doesNotContain("\"outcome\"")
+                .doesNotContain("블록 밖의 글");
+
+        ProactiveCheck check = onlyCheckOf(conversation);
+        assertThat(check.status()).isEqualTo(CheckStatus.SUCCEEDED);
+        assertThat(check.outcome()).isEqualTo(CheckOutcome.FINDINGS);
+        assertThat(check.newFindings()).isEqualTo(1);
+        assertThat(check.referenceFindings()).isZero();
+        assertThat(check.rootExecutionId()).isEqualTo(answer.executionId());
+        assertThat(check.finishedAt()).isNotNull();
+        List<ProactiveCheckFinding> saved = findingsOf(conversation);
+        assertThat(saved).hasSize(1);
+        assertThat(saved.getFirst().kind()).isEqualTo(FindingKind.NEW);
+        assertThat(saved.getFirst().topicKey()).isEqualTo(TOPIC_KEY);
+        assertThat(saved.getFirst().sourceUrl()).isEqualTo(SOURCE_URL);
+        assertThat(saved.getFirst().checkId()).isEqualTo(check.id());
+    }
+
+    @Test
+    @DisplayName("NOTHING_NEW 면 새로 알릴 것이 없다는 알림 줄만 남는다")
+    void leavesOnlyNoticeForNothingNew() {
+        stub().willAnswer(command -> answer(block("{\"version\":1,\"outcome\":\"NOTHING_NEW\",\"findings\":[]}")));
+
+        Conversation conversation = runCheck();
+
+        assertThat(messages.findByConversationIdOrderByIdAsc(conversation.id()))
+                .extracting(ChatMessage::role, ChatMessage::content)
+                .containsExactly(
+                        tuple(MessageRole.SYSTEM, "먼저 살펴보기를 시작했어요"),
+                        tuple(MessageRole.SYSTEM, "살펴봤지만 새로 알릴 것이 없어요"));
+        ProactiveCheck check = onlyCheckOf(conversation);
+        assertThat(check.status()).isEqualTo(CheckStatus.SUCCEEDED);
+        assertThat(check.outcome()).isEqualTo(CheckOutcome.NOTHING_NEW);
+        assertThat(findingsOf(conversation)).isEmpty();
+    }
+
+    @Test
+    @DisplayName("결과 블록이 없으면 결과를 정리하지 못했다는 알림 줄과 INVALID_RESULT 가 남는다")
+    void leavesInvalidResultWhenBlockIsMissing() {
+        stub().willAnswer(command -> answer("블록 없이 끝난 답"));
+
+        Conversation conversation = runCheck();
+
+        List<ChatMessage> history = messages.findByConversationIdOrderByIdAsc(conversation.id());
+        assertThat(history).extracting(ChatMessage::role).containsExactly(MessageRole.SYSTEM, MessageRole.SYSTEM);
+        assertThat(history.getLast().content()).isEqualTo("살펴봤지만 결과를 정리하지 못했어요");
+        ProactiveCheck check = onlyCheckOf(conversation);
+        assertThat(check.status()).isEqualTo(CheckStatus.SUCCEEDED);
+        assertThat(check.outcome()).isEqualTo(CheckOutcome.INVALID_RESULT);
+    }
+
+    @Test
+    @DisplayName("Hermes 에 보낸 명령이 Control Plane 지시와 지침 읽기 문장과 감싼 최근 발견을 싣는다")
+    void sendsInstructionsAndInputWithWrappedRecentFindings() {
+        stub().willAnswer(command -> answer(findingsBlock(TOPIC_KEY, SOURCE_URL, null)));
+        runCheck();
+        stub().willAnswer(command -> answer(block("{\"version\":1,\"outcome\":\"NOTHING_NEW\"}")));
+
+        runCheck();
+
+        HermesRunCommand second = stub().received().getLast();
+        assertThat(second.instructions())
+                .contains("이번 실행은 읽기만 한다")
+                .contains("<fos-check-result>")
+                .contains("changeSinceLast");
+        assertThat(second.input())
+                .contains("skill_view(name=\"proactive-check\")")
+                .contains("<external-data>")
+                .contains("</external-data>");
+        String wrapped = second.input().substring(second.input().indexOf("<external-data>"));
+        assertThat(wrapped).as("감싼 단락 안의 최근 발견").contains(TOPIC_KEY).contains(SOURCE_URL);
+    }
+
+    @Test
+    @DisplayName("살펴보기 turn 은 Memory 제안 실행을 보내지 않고 자동 turn 수와 제목을 바꾸지 않는다")
+    void doesNotProposeMemoryNorTouchAutoTurnsAndTitle() {
+        stub().willAnswer(command -> answer(findingsBlock(TOPIC_KEY, SOURCE_URL, null)));
+
+        Conversation conversation = runCheck();
+
+        assertThat(stub().received()).as("Hermes 에 보낸 실행은 살펴보기 하나뿐이다").hasSize(1);
+        Conversation stored = conversations.findById(conversation.id()).orElseThrow();
+        assertThat(stored.autoTurnCount()).isZero();
+        assertThat(stored.title()).isEqualTo("먼저 살펴보기 · 커리어");
+    }
+
+    @Test
+    @DisplayName("두 번째 살펴보기는 앞의 발견과 변화 신호를 싣고 같은 근거의 발견을 이미 알린 참고로 그린다")
+    void secondCheckCarriesPreviousFindingsAndMarksRepeat() {
+        stub().willAnswer(command -> answer(findingsBlock(TOPIC_KEY, SOURCE_URL, null)));
+        Conversation conversation = runCheck();
+        ProactiveCheck first = onlyCheckOf(conversation);
+        messages.save(ChatMessage.fromUser(
+                conversation.id(), owner.id(), "공부 자료 고마워요", first.finishedAt().plusSeconds(1)));
+
+        runCheck();
+
+        String input = stub().received().getLast().input();
+        assertThat(input)
+                .contains("- 지난 살펴보기: " + first.finishedAt())
+                .contains("- 그 뒤 사용자가 이 대화에 보낸 메시지: 1개")
+                .contains("- Memory 문맥이 지난 살펴보기와 같은지: 같음")
+                .contains("[study] " + TOPIC_KEY + " · Kafka 정확히 한 번 처리 · " + SOURCE_URL)
+                .contains("그 뒤 사용자 메시지 1개");
+        ChatMessage answer = messages.findByConversationIdOrderByIdAsc(conversation.id()).getLast();
+        assertThat(answer.role()).isEqualTo(MessageRole.ASSISTANT);
+        assertThat(answer.content()).contains("새로 알릴 것은 없어요").contains("이미 알린 것이에요");
+        ProactiveCheck second = checksOf(conversation).getLast();
+        assertThat(second.newFindings()).isZero();
+        assertThat(second.referenceFindings()).isEqualTo(1);
+        assertThat(findingsOf(conversation))
+                .filteredOn(finding -> finding.checkId().equals(second.id()))
+                .extracting(ProactiveCheckFinding::reason)
+                .containsExactly(FindingReason.REPEATED);
+    }
+
+    @Test
+    @DisplayName("발견을 낸 살펴보기가 끝난 시각이 없으면 그 발견 뒤의 사용자 메시지 수를 모름으로 싣는다")
+    void writesUnknownMessageCountWhenFindingCheckHasNoFinishTime() {
+        Conversation existing = conversations.save(
+                Conversation.startedForCheck(owner.id(), "먼저 살펴보기 · 커리어", agent.id(), Instant.now()));
+        ProactiveCheck interrupted = checks.save(ProactiveCheck.started(
+                owner.id(), agent.id(), existing.id(), CheckTrigger.MANUAL, Instant.now().minusSeconds(60)));
+        findings.save(ProactiveCheckFinding.of(
+                interrupted.id(),
+                existing.id(),
+                FindingKind.NEW,
+                null,
+                "study",
+                TOPIC_KEY,
+                "Kafka 정확히 한 번 처리",
+                SOURCE_URL,
+                Instant.now().minusSeconds(60),
+                Instant.now().minusSeconds(30)));
+        stub().willAnswer(command -> answer(block("{\"version\":1,\"outcome\":\"NOTHING_NEW\"}")));
+
+        runCheck();
+
+        assertThat(stub().received().getLast().input())
+                .contains("[study] " + TOPIC_KEY)
+                .contains("그 뒤 사용자 메시지 모름");
+    }
+
+    @Test
+    @DisplayName("처음 살펴보기는 변화 신호를 처음과 모름으로 싣고 최근 발견이 없다고 적는다")
+    void firstCheckSaysFirstAndNoRecentFindings() {
+        stub().willAnswer(command -> answer(block("{\"version\":1,\"outcome\":\"NOTHING_NEW\"}")));
+
+        runCheck();
+
+        assertThat(stub().received().getFirst().input())
+                .contains("- 지난 살펴보기: 처음")
+                .contains("- Memory 문맥이 지난 살펴보기와 같은지: 모름")
+                .contains("최근에 알린 발견이 없다.")
+                .doesNotContain("<external-data>");
+    }
+
+    @Test
+    @DisplayName("답 조각은 대화 사건으로 흘리지 않고 도구 사건은 흘리며 도구 호출 수를 적는다")
+    void streamsToolEventsButNotDeltas() {
+        stub().willAnswer(command -> answer(block("{\"version\":1,\"outcome\":\"NOTHING_NEW\"}")));
+        hermesStreams(
+                new RunEvent("message.delta", "<fos-check-result>{\"version\"", null, null, null, null),
+                new RunEvent("tool.started", null, "web_search", "kafka", null, null),
+                new RunEvent("tool.started", null, "web_extract", "docs", null, null),
+                new RunEvent("run.completed", null, null, null, null, null));
+        Conversation existing = conversations.save(
+                Conversation.startedForCheck(owner.id(), "먼저 살펴보기 · 커리어", agent.id(), Instant.now()));
+        List<ChatEvent> published = new CopyOnWriteArrayList<>();
+        Runnable unsubscribe = hub.subscribe(existing.id(), published::add);
+        try {
+            runCheck();
+        } finally {
+            unsubscribe.run();
+        }
+
+        assertThat(published).extracting(ChatEvent::type).contains("system", "started", "tool", "done");
+        assertThat(published).extracting(ChatEvent::type).doesNotContain("delta");
+        assertThat(published)
+                .filteredOn(event -> "tool".equals(event.type()))
+                .extracting(ChatEvent::toolName)
+                .containsExactly("web_search", "web_extract");
+        assertThat(onlyCheckOf(existing).toolCalls()).isEqualTo(2);
+        assertThat(messages.findByConversationIdOrderByIdAsc(existing.id()))
+                .extracting(ChatMessage::content)
+                .noneMatch(content -> content.contains("fos-check-result"));
+    }
+
+    @Test
+    @DisplayName("같은 session 으로 session-max-checks 번 돈 뒤의 살펴보기는 새 루트 session 으로 보낸다")
+    void renewsSessionAfterMaxChecks() {
+        stub().willAnswer(command -> answer(block("{\"version\":1,\"outcome\":\"NOTHING_NEW\"}")));
+
+        Conversation conversation = runCheck();
+        runCheck();
+        runCheck();
+
+        List<ProactiveCheck> ran = checksOf(conversation);
+        assertThat(ran).hasSize(3);
+        String firstRoot = ran.get(0).hermesRootSessionId();
+        assertThat(firstRoot).startsWith("fos-");
+        assertThat(ran.get(1).hermesRootSessionId()).isEqualTo(firstRoot);
+        assertThat(ran.get(2).hermesRootSessionId()).as("셋째 살펴보기의 루트 session").isNotEqualTo(firstRoot);
+        List<HermesRunCommand> sent = stub().received();
+        assertThat(sent.get(2).sessionId())
+                .as("셋째 살펴보기에 보낸 session")
+                .isEqualTo(ran.get(2).hermesRootSessionId());
+        Conversation stored = conversations.findById(conversation.id()).orElseThrow();
+        assertThat(stored.hermesRootSessionId()).isEqualTo(ran.get(2).hermesRootSessionId());
+    }
+
+    @Test
+    @DisplayName("실행이 실패하면 FAILED 와 실패 알림 줄이 남고 잠금이 풀려 다음 살펴보기를 시작할 수 있다")
+    void failedRunLeavesFailureAndReleasesLock() {
+        stub().willFail(new ApiException(ErrorCode.HERMES_UNAVAILABLE, "runtime is down"));
+
+        Conversation conversation = runCheck();
+
+        ProactiveCheck failed = onlyCheckOf(conversation);
+        assertThat(failed.status()).isEqualTo(CheckStatus.FAILED);
+        assertThat(failed.errorCode()).isEqualTo("HERMES_UNAVAILABLE");
+        assertThat(failed.finishedAt()).isNotNull();
+        assertThat(messages.findByConversationIdOrderByIdAsc(conversation.id()))
+                .extracting(ChatMessage::content)
+                .containsExactly("먼저 살펴보기를 시작했어요", "살펴보기를 끝내지 못했어요. 잠시 뒤 다시 눌러 주세요");
+
+        stub().willAnswer(command -> answer(block("{\"version\":1,\"outcome\":\"NOTHING_NEW\"}")));
+        runCheck();
+
+        assertThat(checksOf(conversation)).extracting(ProactiveCheck::status)
+                .containsExactly(CheckStatus.FAILED, CheckStatus.SUCCEEDED);
+    }
+
+    /** 살펴보기를 시작하고 그 대화의 잠금이 풀릴 때까지 기다린 뒤 점검 대화를 돌려준다. */
+    private Conversation runCheck() {
+        UUID publicId = service.start(owner, agent.code(), CheckTrigger.MANUAL);
+        Conversation conversation = conversations
+                .findByPublicIdAndUserIdAndDeletedAtIsNull(publicId, owner.id())
+                .orElseThrow();
+        awaitIdle(conversation.id());
+        return conversation;
+    }
+
+    private ProactiveCheck onlyCheckOf(Conversation conversation) {
+        List<ProactiveCheck> found = checksOf(conversation);
+        assertThat(found).as("점검 대화의 살펴보기 줄").hasSize(1);
+        return found.getFirst();
+    }
+
+    private List<ProactiveCheck> checksOf(Conversation conversation) {
+        return checks.findAll().stream()
+                .filter(check -> check.conversationId().equals(conversation.id()))
+                .sorted(Comparator.comparing(ProactiveCheck::id))
+                .toList();
+    }
+
+    private List<ProactiveCheckFinding> findingsOf(Conversation conversation) {
+        return findings.findAll().stream()
+                .filter(finding -> finding.conversationId().equals(conversation.id()))
+                .sorted(Comparator.comparing(ProactiveCheckFinding::id))
+                .toList();
+    }
+
+    /** 확인 시각을 지금으로 둔 발견 하나짜리 결과 블록이다. */
+    private static String findingsBlock(String topicKey, String sourceUrl, String changeSinceLast) {
+        String change = changeSinceLast == null ? "" : ",\"changeSinceLast\":\"" + changeSinceLast + "\"";
+        return block("{\"version\":1,\"outcome\":\"FINDINGS\",\"summary\":\"공부할 자료를 찾았어요\",\"findings\":[{"
+                + "\"area\":\"study\",\"topicKey\":\"" + topicKey + "\",\"title\":\"Kafka 정확히 한 번 처리\","
+                + "\"sourceUrl\":\"" + sourceUrl + "\",\"checkedAt\":\"" + Instant.now() + "\","
+                + "\"freshness\":\"CURRENT\",\"whyItMatters\":\"지금 하는 일과 닿아 있어요\","
+                + "\"facts\":[\"트랜잭션 프로듀서를 쓴다\"],\"next\":{\"type\":\"ACTION\",\"text\":\"문서를 읽는다\"}"
+                + change + "}]}");
+    }
+
+    private static String block(String json) {
+        return "블록 밖의 글\n<fos-check-result>\n" + json + "\n</fos-check-result>";
+    }
+
+    /** session 을 비워 돌려준다. 대화의 session 이 그대로 남아 다음 turn 이 같은 session 으로 이어진다. */
+    private static HermesRunResult answer(String output) {
+        return HermesRunResult.of(
+                "run-" + UUID.randomUUID(), null, "completed", output, "model", "provider", TokenUsage.empty());
+    }
+
+    /** Hermes 가 스트림으로 이 사건들을 차례로 보낸 것처럼 만든다. */
+    private void hermesStreams(RunEvent... events) {
+        doAnswer(invocation -> {
+                    Consumer<RunEvent> onEvent = invocation.getArgument(3);
+                    for (RunEvent event : events) {
+                        onEvent.accept(event);
+                    }
+                    return null;
+                })
+                .when(eventStream)
+                .open(any(), any(), any(), any(), any(), anyBoolean());
+    }
+
+    /** 그 대화에 도는 turn 이 없어질 때까지 기다린다. 제한 시간을 넘으면 실패한다. */
+    private void awaitIdle(Long conversationId) {
+        long deadline = System.nanoTime() + WAIT_LIMIT.toNanos();
+        while (turns.markOf(conversationId).running()) {
+            if (System.nanoTime() > deadline) {
+                fail("대화 %d 의 turn 이 %s 안에 끝나지 않았다", conversationId, WAIT_LIMIT);
+            }
+            try {
+                Thread.sleep(10);
+            } catch (InterruptedException ex) {
+                Thread.currentThread().interrupt();
+                fail("기다리는 중에 끊겼다");
+            }
+        }
+    }
+}
