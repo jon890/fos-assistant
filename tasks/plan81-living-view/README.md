@@ -76,7 +76,7 @@ phase 마다 기대는 backend 가 다르다. 각 phase 의 「Blocked 조건」
 
 - phase 03 이 이 plan 의 마지막이다. phase 03 이 아래 표시를 지운다
   - `docs/adr/ADR-074-…md` 의 `status` 와 `docs/adr/INDEX.md` 의 ADR-074 줄에 있는 「아직 구현 전이다」
-  - `docs/frontend/now.md` 머리 단락, `docs/frontend/structure.md` 의 `/now` 줄, `docs/README.md` 의 `frontend/now.md` 줄에 있는 「아직 구현 전이다」
+  - `docs/frontend/now.md` 머리 단락, `docs/README.md` 의 `frontend/now.md` 줄에 있는 「아직 구현 전이다」
   - `docs/flow.md` 「지금 화면을 열 때」 의 「아직 구현 전이다」
   - `docs/prd.md` 「답하는 비서에서 먼저 챙기는 비서로」 표의 ADR-073 줄과 ADR-074 줄을 「범위와 확인 방법」 표로 옮긴다. ADR-072 줄은 plan79 phase 03 이 이미 옮겼다. ADR-071 줄과 첫 반응 시간 줄은 그 ADR 이나 절의 「아직 구현 전」 을 지우는 PR 이 옮긴다
 - 이 디렉터리는 PR 4 의 `build-with-teams` 마감 단계가 지운다. phase 는 `tasks/` 를 고치지 않는다
