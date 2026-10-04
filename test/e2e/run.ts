@@ -61,6 +61,7 @@ import { connectorPolicyScenario } from "./scenarios/connector-policy.ts";
 import { notificationsScenario } from "./scenarios/notifications.ts";
 import { deliveryRetryScenario } from "./scenarios/delivery-retry.ts";
 import { connectorDelegationScenario } from "./scenarios/connector-delegation.ts";
+import { proactiveCheckScenario } from "./scenarios/proactive-check.ts";
 import { CHAT_QUEUE_PROFILE, chatQueueRestartScenario, chatQueueScenario } from "./scenarios/chat-queue.ts";
 import { restartReconcileScenario } from "./scenarios/restart-reconcile.ts";
 import { userExecutionLimitScenario } from "./scenarios/user-execution-limit.ts";
@@ -129,6 +130,9 @@ const SCENARIOS: readonly Scenario[] = [
   // 승인 요청을 하나 더 만드므로 알림 수를 세는 시나리오 뒤에 둔다.
   deliveryRetryScenario,
   connectorDelegationScenario,
+  // 시험 커넥터를 다시 등록해 쓰고 해제로 끝나므로 커넥터 시나리오들 뒤에 둔다. 도구 호출 상한을 바꿔 Control Plane 을 다시 띄웠다가
+  // 기본값으로 되돌려 다시 띄운다.
+  proactiveCheckScenario,
   // 에이전트를 하나 만들고 끄므로 에이전트 수를 세는 시나리오 뒤에 둔다.
   chatQueueScenario,
   // 사용량 합계를 세는 시나리오 뒤에 둔다. 실패한 실행을 하나 더 남기기 때문이다.

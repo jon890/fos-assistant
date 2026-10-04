@@ -223,6 +223,8 @@ type Run = {
   usage: typeof FAKE_USAGE;
   /** v0.21.5 실행 조회의 실제로 돈 provider 와 모델이다. 끝난 실행에만 있다. */
   runtime?: { provider: string; model: string; route_source: string };
+  /** 살펴보기 실행이면 사건 스트림이 흘릴 도구 사건과 기다릴 자리다. */
+  proactive?: { tools: string[]; gate?: Promise<void> };
 };
 
 /**
@@ -388,6 +390,73 @@ export type ConnectorToolCall = { profile: string; hermesTool: string; argsJson:
  * 끝내고 열 쌍을 더 보낸 뒤 스트림을 닫는다. 펼친 작업 과정 목록의 높이와 스크롤, 맨 아래를 따라가는 동작을 보려는 입력이다.
  */
 export const LONG_ACTIVITY_PROBE = "긴 작업 과정 검사";
+
+/**
+ * Control Plane 이 먼저 살펴보기 입력에 넣는 지침 읽기 호출이다. 입력에 이것이 있으면 살펴보기 실행으로 본다.
+ *
+ * <p>`ProactiveCheckRun.OPENING` 과 같아야 한다. 어긋나면 살펴보기 실행이 보통 실행으로 답을 받아 결과 블록이 없다.
+ */
+const PROACTIVE_CHECK_CALL = 'skill_view(name="proactive-check")';
+
+/**
+ * 다음 살펴보기 실행 하나에 줄 각본이다. `setProactiveScript` 로 넣고, 살펴보기 실행 하나가 받으면 지운다.
+ *
+ * <p>각본이 없는 살펴보기는 곧바로 `defaultProactiveOutput` 의 답을 준다.
+ */
+export type ProactiveScript = {
+  /** 흘릴 도구 이름이다. 이름마다 `tool.started` 와 `tool.completed` 를 차례로 보낸다. */
+  tools?: string[];
+  /** 참이면 시나리오가 `releaseHeldRun` 을 부를 때까지 실행을 `running` 으로 둔다. 그 사이 시나리오가 플러그인 역할로 MCP 를 부른다. */
+  hold?: boolean;
+  /**
+   * 참이면 사건 스트림이 도구 사건을 보내기 전에 `releaseProactiveEvents` 를 기다린다. 시나리오가 대화 SSE 를 연 뒤에 도구 사건이
+   * 흐르게 하려는 것이다. 점검 대화가 시작 요청에서 처음 생기면 SSE 를 그 전에 열 수 없다.
+   */
+  waitBeforeEvents?: boolean;
+  /** 마지막 답 글이다. `message.delta` 로도 흘린다. */
+  output: string;
+};
+
+/** 각본 없는 살펴보기가 내는 발견 하나의 주제 키와 원문 주소다. 브라우저 검사가 두 번째 답의 「이미 알린 것이에요」 를 이것으로 안다. */
+export const PROACTIVE_DEFAULT_FINDING = {
+  topicKey: "study:e2e-sample",
+  title: "검사용 공부 자료",
+  sourceUrl: "https://example.com/e2e/study",
+} as const;
+
+/** 결과 블록 JSON 을 답 끝에 둔 답 글을 만든다. 블록 앞의 글은 Control Plane 이 버린다. */
+export function proactiveOutput(block: Record<string, unknown>): string {
+  return `살펴본 결과를 정리했다.\n\n<fos-check-result>\n${JSON.stringify(block, null, 2)}\n</fos-check-result>`;
+}
+
+/**
+ * 각본 없는 살펴보기의 답이다. 발견 하나가 「새로 알릴 것」 의 조건을 모두 갖춘다.
+ *
+ * <p>확인 시각은 답을 만드는 지금이다. 고정 시각이면 Control Plane 이 「이번에 다시 확인하지 않았어요」 로 내린다.
+ */
+function defaultProactiveOutput(): string {
+  return proactiveOutput({
+    version: 1,
+    outcome: "FINDINGS",
+    summary: "공부 자료 하나를 찾았어요",
+    findings: [
+      {
+        area: "study",
+        topicKey: PROACTIVE_DEFAULT_FINDING.topicKey,
+        title: PROACTIVE_DEFAULT_FINDING.title,
+        sourceUrl: PROACTIVE_DEFAULT_FINDING.sourceUrl,
+        checkedAt: new Date().toISOString(),
+        freshness: "CURRENT",
+        whyItMatters: "검사에서만 쓰는 합성 발견이에요",
+        facts: ["검사용 원문에 적힌 합성 사실"],
+        next: { type: "QUESTION", text: "이 자료를 이번 주에 읽어 볼까요" },
+      },
+    ],
+  });
+}
+
+/** 각본 없는 살펴보기가 흘리는 도구 사건이다. */
+const DEFAULT_PROACTIVE_TOOLS = ["web_search", "web_extract"];
 
 /** HTML 이 부르는 사진이다. 1픽셀짜리 PNG 다. */
 const ONE_PIXEL_PNG = Buffer.from(
@@ -637,6 +706,12 @@ export type FakeHermes = {
   readMemoryAsSubagent(childSessionId: string, memoryId: number): Promise<string>;
   /** 등록하지 않은 자식 session 으로 그 루트에 서명해 `memory_read` 를 부른다. */
   readMemoryAsUnregisteredSubagent(rootSessionId: string, memoryId: number): Promise<string>;
+  /** 다음 살펴보기 실행 하나의 각본을 넣는다. 앞에 넣고 아직 쓰지 않은 각본은 바뀐다. */
+  setProactiveScript(script: ProactiveScript): void;
+  /** `waitBeforeEvents` 각본의 사건 스트림이 도구 사건을 보내게 한다. 스트림이 열리기 전에 불러도 풀린다. */
+  releaseProactiveEvents(): void;
+  /** 받은 살펴보기 실행의 profile 과 입력 원문을 받은 순서대로 돌려준다. */
+  proactiveInputs(): readonly { profile: string; input: string }[];
 };
 
 /**
@@ -741,6 +816,12 @@ export function startFakeHermes(
   const subagentRegistrations: { childSessionId: string; rootSessionId: string; status: number }[] = [];
   let connectorPolicyEndpoint: string | undefined;
   const connectorToolCalls: ConnectorToolCall[] = [];
+  /** 다음 살펴보기 실행의 각본이다. 살펴보기 실행 하나가 가져간다. */
+  let proactiveScript: ProactiveScript | undefined;
+  /** `waitBeforeEvents` 각본이 기다리는 자리와 그것을 푸는 함수다. 각본을 넣을 때 만든다. */
+  let proactiveGate: Promise<void> | undefined;
+  let openProactiveGate: (() => void) | undefined;
+  const proactiveInputs: { profile: string; input: string }[] = [];
 
   /**
    * profile 플러그인의 `pre_tool_call` hook 처럼 커넥터 도구 호출마다 Control Plane 에 판정을 묻는다.
@@ -1483,6 +1564,20 @@ export function startFakeHermes(
           response.write(": keepalive\n\n");
           // 지연 중인 실행은 끝나거나 중지될 때까지 스트림을 연 채로 둔다. 실제 Hermes 가 도는 동안 그렇게 한다.
           while (slowActive.has(runId!) && !response.destroyed) await wait(20);
+          // 살펴보기 실행이다. 도구 사건과 마지막 답 글을 흘린다. Control Plane 은 답 조각을 화면으로 보내지 않아야 한다.
+          if (run.proactive !== undefined) {
+            if (run.proactive.gate !== undefined) {
+              await Promise.race([run.proactive.gate, new Promise<void>((resolve) => response.on("close", resolve))]);
+            }
+            for (const tool of run.proactive.tools) {
+              event(response, { event: "tool.started", tool, preview: tool });
+              event(response, { event: "tool.completed", tool, duration: 0.1, error: false });
+            }
+            event(response, { event: "message.delta", delta: run.output });
+            event(response, { event: "run.completed" });
+            response.end();
+            return;
+          }
           if (run.input === "중지 조각 전 검사" && run.status !== "completed") {
             if (run.status === "cancelled") {
               response.end();
@@ -1737,8 +1832,16 @@ export function startFakeHermes(
         }
         const echoed = withoutAskGuide(withoutResponseGuide(submitted.instructions ?? ""));
         const instructionsEcho = echoed.length > 0 ? ` [instructions: ${echoed}]` : "";
-        const held = holdNextRun && !starterRun;
-        if (held) holdNextRun = false;
+        // 살펴보기 실행은 넣어 둔 각본 하나를 가져간다. 각본이 없으면 기본 답을 준다.
+        const proactiveRun = !starterRun && input.includes(PROACTIVE_CHECK_CALL);
+        const script = proactiveRun ? proactiveScript : undefined;
+        if (proactiveRun) {
+          proactiveScript = undefined;
+          proactiveInputs.push({ profile: profile!, input: submitted.input ?? "" });
+        }
+        const heldByNext = holdNextRun && !starterRun;
+        if (heldByNext) holdNextRun = false;
+        const held = heldByNext || script?.hold === true;
         const slow = !held && !starterRun && slowRunMs !== undefined;
         runs.set(runId, {
           run_id: runId,
@@ -1746,7 +1849,8 @@ export function startFakeHermes(
           session_id: sessionId,
                   // 실제 Hermes 와 같이 요청 본문의 값을 그대로 되돌려 준다. 실제로 돈 모델이 아니다.
           model: submitted.model ?? profile!,
-          output: memoryReadOutput
+          output: (proactiveRun ? script?.output ?? defaultProactiveOutput() : undefined)
+            ?? memoryReadOutput
             ?? connectorOutput
             ?? (registeredChild === undefined ? undefined : `하위 에이전트 session: ${registeredChild}`)
             ?? scripts.get(input)?.output
@@ -1756,6 +1860,12 @@ export function startFakeHermes(
           provider: submitted.provider ?? null,
           interruptEvents: input === "스트림 중단 검사",
           usage: FAKE_USAGE,
+          proactive: proactiveRun
+            ? {
+                tools: script === undefined ? DEFAULT_PROACTIVE_TOOLS : script.tools ?? [],
+                gate: script?.waitBeforeEvents === true ? proactiveGate : undefined,
+              }
+            : undefined,
         });
         // 실제로 돈 모델은 세션 행과 v0.21.5 실행 조회의 runtime 에 남는다.
         // provider 와 모델을 빼고 온 실행은 profile 의 기본값으로 돈다.
@@ -1898,11 +2008,27 @@ export function startFakeHermes(
         },
         readMemoryAsUnregisteredSubagent: (rootSessionId, memoryId) =>
           readMemoryViaMcp(memoryId, `native-${randomUUID()}`, rootSessionId),
+        setProactiveScript: (script: ProactiveScript) => {
+          proactiveScript = { ...script, tools: [...(script.tools ?? [])] };
+          proactiveGate = script.waitBeforeEvents === true
+            ? new Promise<void>((done) => {
+                openProactiveGate = done;
+              })
+            : undefined;
+          if (script.hold === true) {
+            heldRunReady = new Promise<void>((done) => {
+              heldRunWaiter = done;
+            });
+          }
+        },
+        releaseProactiveEvents: () => openProactiveGate?.(),
+        proactiveInputs: () => proactiveInputs.map((entry) => ({ ...entry })),
         close: () =>
           new Promise<void>((done) => {
             holdNextRun = false;
             releaseHeldRun();
             releaseLongActivity();
+            openProactiveGate?.();
             holdNextSoul = false;
             heldSoul = undefined;
             server.closeAllConnections();
