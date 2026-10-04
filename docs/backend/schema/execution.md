@@ -235,3 +235,24 @@ profile 플러그인이 `subagent_start` hook 에서 등록한다. 근거는 [AD
 하위 에이전트의 하위 에이전트는 부모 등록의 `origin_execution_id` 와 `user_id` 를 그대로 잇는다. 하위 에이전트 몫의 `agent_execution` 줄은 만들지 않는다. 하위 에이전트는 지금처럼 `execution_event` 의 `SUBAGENT_STARTED`, `SUBAGENT_COMPLETED` 로 보인다.
 
 Control Plane 이 다시 떠도 등록 줄은 그대로다. 이미 등록한 하위 에이전트는 계속 요청자를 찾는다. 기동 정리가 다시 붙은 실행은 `RUNNING` 으로 남아 있어 그 run 이 새로 만든 최상위 자식도 등록된다. 실패로 적힌 실행의 run 이 새로 만든 최상위 자식은 도는 부모가 없어 등록되지 않는다.
+
+## execution_context_source
+
+**아직 구현 전이다.** 표를 만든 PR 이 이 줄을 지운다.
+
+실행 하나에 실은 문맥 항목의 참조다. 어느 답에 어느 기록이 들어갔는지 나중에 찾으려고 남긴다.
+제목과 본문은 남기지 않는다. 항목의 뜻은 [`../context-bundle.md`](../context-bundle.md) 가 갖는다.
+
+| 칸 | 타입 | 뜻 |
+| --- | --- | --- |
+| `execution_id` | BIGINT | 이 문맥을 받은 실행 |
+| `position` | INT | 그 실행의 문맥 안에서의 순서. 0 부터 |
+| `source` | VARCHAR(32) | 항목의 `source` |
+| `source_ref` | VARCHAR(80) | 항목의 `ref`. `memory:<번호>` 처럼 원래 기록을 가리킨다 |
+| `body_mode` | VARCHAR(16) | `INLINE`, `TITLE_ONLY`, `OMITTED` |
+| `freshness` | VARCHAR(16) | `FRESH`, `STALE`, `UNKNOWN` |
+| `created_at` | DATETIME(6) | |
+
+기본 키는 `(execution_id, position)` 이다.
+`OMITTED` 줄은 자리가 없어 빠진 Memory 항목이거나 결과를 알 수 없어 본문을 싣지 않은 승인 결과다. `MEMORY_` 로 시작하는 `OMITTED` 줄의 수는 `agent_execution.context_omitted_items` 와 같다.
+실행 줄을 지우지 않으므로 이 줄도 지우지 않는다.
