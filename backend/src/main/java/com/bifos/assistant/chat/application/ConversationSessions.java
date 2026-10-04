@@ -48,6 +48,18 @@ public class ConversationSessions {
         return sessionOf(conversation);
     }
 
+    /**
+     * 새 session 을 정해 보낼 session 과 루트 session 을 함께 바꾸고 돌려준다. 그 뒤의 turn 도 새 session 으로 이어진다.
+     *
+     * <p>먼저 살펴보기가 한 session 으로 보낸 수가 상한에 닿았을 때 쓴다. 대화의 {@code updatedAt} 은 바꾸지 않는다.
+     */
+    public RunSession renew(Conversation conversation) {
+        String created = RunSession.newSessionId();
+        conversationWriter.replaceSessions(conversation.id(), created);
+        conversation.assignNewSession(created);
+        return sessionOf(conversation);
+    }
+
     private static RunSession sessionOf(Conversation conversation) {
         return RunSession.ofConversation(conversation.hermesSessionId(), conversation.hermesRootSessionId());
     }

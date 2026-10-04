@@ -11,6 +11,9 @@ import com.bifos.assistant.chat.infra.ConversationRepository;
 import com.bifos.assistant.mcp.application.AgentTokenService;
 import com.bifos.assistant.mcp.infra.AgentTokenRepository;
 import com.bifos.assistant.orchestration.application.SubagentSessionRegistrar;
+import com.bifos.assistant.proactive.domain.ProactiveCheck;
+import com.bifos.assistant.proactive.domain.type.CheckTrigger;
+import com.bifos.assistant.proactive.infra.ProactiveCheckRepository;
 import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.usage.domain.AgentExecution;
 import com.bifos.assistant.usage.domain.type.ExecutionStatus;
@@ -83,6 +86,9 @@ class McpArtifactWriteToolTest {
 
     @Autowired
     SubagentSessionRegistrar registrar;
+
+    @Autowired
+    ProactiveCheckRepository checks;
 
     private static final String PROFILE = "mcp-artifact-write";
 
@@ -441,6 +447,30 @@ class McpArtifactWriteToolTest {
                     .isEqualTo("보존");
         } finally {
             Files.deleteIfExists(target);
+        }
+    }
+
+    @Test
+    @DisplayName("먼저 살펴보기 트리에서 artifact write 는 쓰지 않고 거절 결과다")
+    void artifactWriteInCheckTreeIsRefusedWithoutWriting() throws Exception {
+        Conversation conversation = conversations.save(Conversation.startedBy(dad.id(), "", null, Instant.now()));
+        ProactiveCheck check =
+                ProactiveCheck.started(dad.id(), 1L, conversation.id(), CheckTrigger.MANUAL, Instant.now());
+        check.attachRoot(dadRun.id(), dadRoot);
+        ProactiveCheck saved = checks.save(check);
+        // 결과물 폴더는 디스크에 남아 다른 검사의 대화 번호와 겹칠 수 있으므로 경로를 새로 만든다.
+        String path = "check-" + UUID.randomUUID() + ".html";
+        try {
+            JsonNode result = body(call(dadToken, conversation.publicId().toString(), path, "<p>x</p>"));
+
+            assertThat(result.path("result").path("isError").asBoolean())
+                    .as("결과: %s", result)
+                    .isTrue();
+            assertThat(result.path("result").path("content").get(0).path("text").asString())
+                    .isEqualTo("먼저 살펴보기에서는 쓸 수 없는 도구입니다.");
+            assertThat(store.resolveInside(conversation.id(), path)).isEmpty();
+        } finally {
+            checks.delete(saved);
         }
     }
 

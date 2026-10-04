@@ -1,6 +1,7 @@
 package com.bifos.assistant.context;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.tuple;
 
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.agent.domain.type.AgentVisibility;
@@ -15,6 +16,7 @@ import com.bifos.assistant.memory.domain.type.MemorySensitivity;
 import com.bifos.assistant.memory.infra.MemoryRepository;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.domain.type.UserRole;
+import com.bifos.assistant.shared.util.Sha256;
 import java.time.Instant;
 import java.util.List;
 import java.util.Set;
@@ -343,6 +345,145 @@ class ContextAssemblerTest {
 
         assertThat(assembler.assembleForOwner(ADMIN).instructions()).contains("커리어 색인");
         assertThat(assembler.assembleForOwner(MEMBER)).isEqualTo(AssembledContext.empty());
+    }
+
+    @Test
+    @DisplayName("충돌이 없으면 항목에서 옮긴 글이 지금 형식과 같고 지문도 그 글의 것이다")
+    void rendersSameTextAndHashFromItemsWithoutConflict() {
+        memories.create(ADMIN, MemoryScope.GROUP, "그룹 회의", "주간 회의는 화요일 10시", true);
+        memories.create(ADMIN, MemoryScope.USER, "아침 습관", "아침에는 차를 마신다", true);
+        Memory firstIndexed = memories.create(ADMIN, MemoryScope.USER, "장보기 목록", "우유와 달걀", false);
+        Memory secondIndexed = memories.create(ADMIN, MemoryScope.GROUP, "여행 계획", "가을에 바다", false);
+        String expected = "# 우리 그룹이 함께 아는 것\n\n"
+                + "- 주간 회의는 화요일 10시\n\n"
+                + "# 지금 묻는 사람에 대해 아는 것\n\n"
+                + "- 아침에는 차를 마신다\n\n"
+                + "# 더 물어볼 수 있는 것\n\n"
+                + "아래는 제목만 적은 것이다. 필요하면 memory_read 도구로 본문을 읽는다.\n\n"
+                + "- [" + firstIndexed.id() + "] 장보기 목록\n\n"
+                + "- [" + secondIndexed.id() + "] 여행 계획";
+
+        AssembledContext result = assembler.assemble(ADMIN, agentId);
+
+        assertThat(result.instructions()).isEqualTo(expected);
+        assertThat(result.chars()).isEqualTo(expected.length());
+        assertThat(result.instructionsHash()).isEqualTo(Sha256.hex16(expected));
+    }
+
+    @Test
+    @DisplayName("묶음은 글에 실은 순서대로 항상 층 항목과 제목만 실은 색인 항목을 갖는다")
+    void bundlesItemsInRenderedOrder() {
+        Memory group = memories.create(ADMIN, MemoryScope.GROUP, "그룹 회의", "주간 회의는 화요일 10시", true);
+        Memory personal = memories.create(ADMIN, MemoryScope.USER, "아침 습관", "아침에는 차를 마신다", true);
+        Memory firstIndexed = memories.create(ADMIN, MemoryScope.USER, "장보기 목록", "우유와 달걀", false);
+        Memory secondIndexed = memories.create(ADMIN, MemoryScope.GROUP, "여행 계획", "가을에 바다", false);
+
+        List<ContextItem> items = assembler.assemble(ADMIN, agentId).bundle().items();
+
+        assertThat(items)
+                .extracting(ContextItem::source, ContextItem::ref, ContextItem::bodyMode)
+                .containsExactly(
+                        tuple(ContextSource.MEMORY_ALWAYS, "memory:" + group.id(), ContextBodyMode.INLINE),
+                        tuple(ContextSource.MEMORY_ALWAYS, "memory:" + personal.id(), ContextBodyMode.INLINE),
+                        tuple(ContextSource.MEMORY_INDEX, "memory:" + firstIndexed.id(), ContextBodyMode.TITLE_ONLY),
+                        tuple(ContextSource.MEMORY_INDEX, "memory:" + secondIndexed.id(), ContextBodyMode.TITLE_ONLY));
+        assertThat(items)
+                .extracting(ContextItem::title, ContextItem::body)
+                .containsExactly(
+                        tuple(null, "주간 회의는 화요일 10시"),
+                        tuple(null, "아침에는 차를 마신다"),
+                        tuple("장보기 목록", null),
+                        tuple("여행 계획", null));
+        assertThat(items)
+                .extracting(ContextItem::scope, ContextItem::ownerUserId)
+                .containsExactly(
+                        tuple(MemoryScope.GROUP, null),
+                        tuple(MemoryScope.USER, ADMIN.id()),
+                        tuple(MemoryScope.USER, ADMIN.id()),
+                        tuple(MemoryScope.GROUP, null));
+        assertThat(items).allSatisfy(item -> {
+            assertThat(item.trust()).isEqualTo(ContextTrust.USER_APPROVED);
+            assertThat(item.freshness()).isEqualTo(ContextFreshness.FRESH);
+            assertThat(item.sensitivity()).isEqualTo(MemorySensitivity.NORMAL);
+            assertThat(item.asOf()).isNotNull();
+            assertThat(item.conflictsWith()).isEmpty();
+        });
+    }
+
+    @Test
+    @DisplayName("상한을 넘어 뺀 항목은 묶음의 원래 자리에 빠졌다고 남는다")
+    void keepsOmittedItemInBundleAtItsPlace() {
+        Memory tooLong = memories.create(ADMIN, MemoryScope.GROUP, "너무 긴 항목", "가".repeat(9_000), true);
+        Memory shortOne = memories.create(ADMIN, MemoryScope.GROUP, "짧은 항목", "짧은 내용", true);
+        Memory indexed = memories.create(ADMIN, MemoryScope.USER, "색인만 하는 제목", "색인 본문", false);
+
+        AssembledContext result = assembler.assemble(ADMIN, agentId);
+
+        assertThat(result.bundle().items())
+                .extracting(ContextItem::ref, ContextItem::bodyMode)
+                .containsExactly(
+                        tuple("memory:" + tooLong.id(), ContextBodyMode.OMITTED),
+                        tuple("memory:" + shortOne.id(), ContextBodyMode.INLINE),
+                        tuple("memory:" + indexed.id(), ContextBodyMode.TITLE_ONLY));
+        assertThat(result.bundle().items())
+                .filteredOn(item -> item.bodyMode() == ContextBodyMode.OMITTED)
+                .hasSize(result.omittedItems());
+    }
+
+    @Test
+    @DisplayName("같은 이름의 개인 문서와 그룹 문서는 색인 줄 끝에 서로를 가리키고 충돌 상대로 서로를 적는다")
+    void marksSameNamePersonalAndGroupDocumentsAsConflicting() {
+        Long personal = insertDocument("USER", 1L, null, "home-rules", "집 관리 규칙");
+        Long group = insertDocument("GROUP", null, 10L, "home-rules", "집 관리 규칙");
+        Long other = insertDocument("USER", 1L, null, "garden-notes", "정원 메모");
+        String expected = "# 더 물어볼 수 있는 것\n\n"
+                + "아래는 제목만 적은 것이다. 필요하면 memory_read 도구로 본문을 읽는다.\n\n"
+                + "- [" + personal + "] 집 관리 규칙 (같은 이름의 그룹 문서 [" + group + "] 가 있다)\n\n"
+                + "- [" + group + "] 집 관리 규칙 (같은 이름의 개인 문서 [" + personal + "] 가 있다)\n\n"
+                + "- [" + other + "] 정원 메모";
+
+        AssembledContext result = assembler.assemble(ADMIN, agentId);
+
+        assertThat(result.instructions()).isEqualTo(expected);
+        assertThat(result.bundle().items())
+                .extracting(ContextItem::ref, ContextItem::conflictsWith)
+                .containsExactly(
+                        tuple("memory:" + personal, List.of("memory:" + group)),
+                        tuple("memory:" + group, List.of("memory:" + personal)),
+                        tuple("memory:" + other, List.of()));
+        assertThat(result.omittedItems()).isZero();
+    }
+
+    @Test
+    @DisplayName("조립 결과와 묶음과 항목의 문자열 표현에 제목과 본문이 없다")
+    void keepsTitlesAndBodiesOutOfToString() {
+        memories.create(ADMIN, MemoryScope.USER, "항상 제목", "평문-표식-7391", true);
+        memories.create(ADMIN, MemoryScope.USER, "제목-표식-4820", "색인 본문", false);
+
+        AssembledContext result = assembler.assemble(ADMIN, agentId);
+
+        assertThat(result.instructions()).contains("평문-표식-7391", "제목-표식-4820");
+        assertThat(result.toString())
+                .startsWith("AssembledContext[chars=" + result.chars())
+                .doesNotContain("평문-표식-7391", "제목-표식-4820");
+        assertThat(result.bundle().toString())
+                .startsWith("ContextBundle[size=2")
+                .doesNotContain("평문-표식-7391", "제목-표식-4820", "항상 제목", "색인 본문");
+        assertThat(result.bundle().items())
+                .allSatisfy(item -> assertThat(item.toString())
+                        .isEqualTo("ContextItem[source=" + item.source() + ", ref=" + item.ref() + "]"));
+    }
+
+    /** 문서를 저장소에 바로 넣는다. 그룹 문서는 서비스로 만들 수 없어 표에 직접 쓴다. */
+    private Long insertDocument(String scope, Long ownerUserId, Long groupId, String documentKey, String title) {
+        jdbc.update("""
+                INSERT INTO memory (scope, owner_user_id, group_id, collection, entry_type, document_key, title,
+                    content, retrieval, always_inject, sensitivity, revision, status, created_at, updated_at)
+                VALUES (?, ?, ?, 'core', 'DOCUMENT', ?, ?, '문서 본문', 'SEARCH', FALSE, 'NORMAL', 1, 'ACCEPTED',
+                    CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6))
+                """, scope, ownerUserId, groupId, documentKey, title);
+        return jdbc.queryForObject(
+                "SELECT id FROM memory WHERE scope = ? AND document_key = ?", Long.class, scope, documentKey);
     }
 
     private static CurrentUser user(Long id, Long groupId, UserRole role) {

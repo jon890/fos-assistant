@@ -4,25 +4,33 @@ import com.bifos.assistant.shared.util.Sha256;
 import java.util.List;
 
 /**
- * 조립한 문자열과 그 길이, 그리고 자리가 없어 싣지 못한 항목의 번호다.
+ * 조립한 문자열과 그 길이, 자리가 없어 싣지 못한 항목의 번호, 그리고 글로 옮긴 문맥 묶음이다.
  *
  * <p>길이와 지문을 실행 기록에 남긴다. 빠진 항목은 번호로 들고 있어 화면이 그 항목에 표시를 달 수
  * 있다.
+ *
+ * <p>{@code instructions} 에 Memory 본문이 들어 있어 {@link #toString()} 은 길이와 개수만 낸다(ADR-071).
  */
-public record AssembledContext(String instructions, long chars, List<Long> omittedMemoryIds) {
+public record AssembledContext(String instructions, long chars, List<Long> omittedMemoryIds, ContextBundle bundle) {
 
     public AssembledContext {
         omittedMemoryIds = omittedMemoryIds == null ? List.of() : List.copyOf(omittedMemoryIds);
+        bundle = bundle == null ? ContextBundle.empty() : bundle;
     }
 
-    /** 빠진 항목이 하나도 없는 문맥이다. */
+    /** 빠진 항목이 하나도 없고 묶음이 빈 문맥이다. */
     public AssembledContext(String instructions, long chars) {
         this(instructions, chars, List.of());
     }
 
+    /** 묶음이 빈 문맥이다. */
+    public AssembledContext(String instructions, long chars, List<Long> omittedMemoryIds) {
+        this(instructions, chars, omittedMemoryIds, ContextBundle.empty());
+    }
+
     /** 넣을 항목이 없으면 빈 문자열 대신 null 을 보낸다. */
     public static AssembledContext empty() {
-        return new AssembledContext(null, 0, List.of());
+        return new AssembledContext(null, 0, List.of(), ContextBundle.empty());
     }
 
     /**
@@ -49,5 +57,12 @@ public record AssembledContext(String instructions, long chars, List<Long> omitt
             return null;
         }
         return Sha256.hex16(instructions);
+    }
+
+    /** 본문이 로그에 남지 않게 글자 수와 빠진 수와 항목 수만 낸다. */
+    @Override
+    public String toString() {
+        return "AssembledContext[chars=" + chars + ", omittedItems=" + omittedItems() + ", items="
+                + bundle.items().size() + "]";
     }
 }

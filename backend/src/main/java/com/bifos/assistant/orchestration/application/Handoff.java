@@ -30,9 +30,11 @@ final class Handoff {
     private final CountDownLatch rowDecided = new CountDownLatch(1);
     /** 제출했거나 실행이 끝났을 때 열린다. */
     private final CountDownLatch settled = new CountDownLatch(1);
+
     private volatile AgentExecution execution;
     private volatile boolean submitted;
     private volatile RuntimeException failure;
+    private volatile boolean checkEnded;
 
     /** 실행 스레드가 실행 줄을 만든 직후 부른다. 요청 스레드가 먼저 포기했으면 상태는 그대로 ABANDONED 다. */
     void onRowCreated(AgentExecution created) {
@@ -54,6 +56,11 @@ final class Handoff {
         settled.countDown();
     }
 
+    /** 실행 스레드가 실행 줄을 만들기 전에 그 먼저 살펴보기가 끝난 것을 봤다. 곧이어 {@link #markEnded} 가 불린다. */
+    void markCheckEnded() {
+        checkEnded = true;
+    }
+
     /** 요청 스레드가 포기한다. 실행 줄이 이미 생겼으면 거짓이고 그 줄을 돌려줘야 한다. */
     boolean abandon() {
         return stage.compareAndSet(Stage.WAITING, Stage.ABANDONED);
@@ -73,6 +80,10 @@ final class Handoff {
 
     AgentExecution execution() {
         return execution;
+    }
+
+    boolean checkEnded() {
+        return checkEnded;
     }
 
     RuntimeException failure() {

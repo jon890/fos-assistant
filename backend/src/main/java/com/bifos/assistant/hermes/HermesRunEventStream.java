@@ -30,6 +30,15 @@ public class HermesRunEventStream {
 
     private static final String SKILL_VIEW_STARTED = "tool.started";
 
+    /**
+     * Memory 본문을 읽는 Control Plane MCP 도구 이름의 끝이다. Hermes 는 {@code mcp__fos_assistant__memory_read} 처럼
+     * 서버 이름을 앞에 붙여 보낸다.
+     */
+    private static final String MEMORY_READ_TOOL_SUFFIX = "memory_read";
+
+    /** 인자를 {@code preview} 에 싣는 도구 시작 사건이다. */
+    private static final String MEMORY_READ_STARTED = "tool.started";
+
     private final RestClient restClient;
     private final HermesProfileKeyStore keyStore;
     private final ObjectMapper objectMapper;
@@ -142,6 +151,10 @@ public class HermesRunEventStream {
         String type = firstText(root, payload, "event", "type");
         String toolName = firstText(root, payload, "tool", "tool_name", "toolName", "name");
         String detail = firstDetail(root, payload);
+        if (memoryReadResult(type, toolName)) {
+            // 결과에 Memory 본문이 실린다. 인자를 담은 tool.started 의 preview 만 실행 사건에 남긴다(ADR-071)
+            detail = null;
+        }
         String skillName = null;
         if (type != null && type.toLowerCase(Locale.ROOT).startsWith("tool.")) {
             // 긴 스킬 이름은 token 으로 보여 가려진다. 스킬 사용 기록에 넘길 이름은 가리기 전에 꺼내 검증한다.
@@ -165,6 +178,13 @@ public class HermesRunEventStream {
                 firstNumber(root, payload, "output_tokens"),
                 firstText(root, payload, "status"),
                 skillName);
+    }
+
+    /** {@code memory_read} 도구의 사건 가운데 시작이 아닌 것이다. Hermes 가 뒤에 결과를 싣기 시작해도 본문을 남기지 않는다. */
+    private static boolean memoryReadResult(String type, String toolName) {
+        return toolName != null
+                && toolName.endsWith(MEMORY_READ_TOOL_SUFFIX)
+                && !MEMORY_READ_STARTED.equalsIgnoreCase(type);
     }
 
     private static String firstDetail(JsonNode root, JsonNode payload) {

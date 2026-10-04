@@ -30,6 +30,11 @@ public class ConversationWriter {
     }
 
     @Transactional
+    public int replaceSessions(Long id, String sessionId) {
+        return repository.replaceSessions(id, sessionId);
+    }
+
+    @Transactional
     public int resetAutoTurns(Long id) {
         return repository.resetAutoTurns(id);
     }

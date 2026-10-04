@@ -2,6 +2,7 @@ package com.bifos.assistant.chat;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.tuple;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.argThat;
@@ -42,6 +43,7 @@ import com.bifos.assistant.hermes.dto.RunEvent;
 import com.bifos.assistant.hermes.dto.SessionRuntime;
 import com.bifos.assistant.hermes.dto.TokenUsage;
 import com.bifos.assistant.memory.application.MemoryService;
+import com.bifos.assistant.memory.domain.Memory;
 import com.bifos.assistant.memory.domain.type.MemoryScope;
 import com.bifos.assistant.memory.infra.MemoryRepository;
 import com.bifos.assistant.model.domain.type.ModelTier;
@@ -60,10 +62,12 @@ import com.bifos.assistant.skill.domain.ExecutionSkillUse;
 import com.bifos.assistant.skill.domain.type.SkillUseSource;
 import com.bifos.assistant.skill.infra.ExecutionSkillUseRepository;
 import com.bifos.assistant.usage.domain.AgentExecution;
+import com.bifos.assistant.usage.domain.ExecutionContextSource;
 import com.bifos.assistant.usage.domain.ExecutionEvent;
 import com.bifos.assistant.usage.domain.type.ExecutionEventType;
 import com.bifos.assistant.usage.domain.type.ExecutionStatus;
 import com.bifos.assistant.usage.infra.AgentExecutionRepository;
+import com.bifos.assistant.usage.infra.ExecutionContextSourceRepository;
 import com.bifos.assistant.usage.infra.ExecutionEventRepository;
 import com.bifos.assistant.user.domain.AppUser;
 import com.bifos.assistant.user.infra.AppUserRepository;
@@ -188,6 +192,9 @@ class ChatServiceTest {
     AgentExecutionRepository executions;
 
     @Autowired
+    ExecutionContextSourceRepository contextSources;
+
+    @Autowired
     MemoryService memories;
 
     @Autowired
@@ -271,6 +278,7 @@ class ChatServiceTest {
         SKILL_CLOCK.advance(Duration.ofHours(1));
         stub().reset();
         skillUses.deleteAll();
+        contextSources.deleteAll();
         executionEvents.deleteAll();
         executions.deleteAll();
         messages.deleteAll();
@@ -413,6 +421,36 @@ class ChatServiceTest {
         // 실행 기록은 공통 지침과 Memory를 세고, turn 전용 지침은 제외한다.
         assertThat(executions.findById(turn.executionId()).orElseThrow().contextChars())
                 .isEqualTo((long) (instructions.length() - ("\n\n" + AskFormat.GUIDE).length()));
+    }
+
+    @Test
+    @DisplayName("turn 에 실은 항상 층과 색인 항목의 참조를 제목과 본문 없이 실행에 남긴다")
+    void recordsAlwaysAndIndexSourcesOfTurnWithoutTitleOrBody() {
+        CurrentUser dad = member("dad@example.com", "dad");
+        Memory always = memories.create(dad, MemoryScope.USER, "자전거 보관", "자전거는 지하 2층 보관대에 둔다", true);
+        Memory indexed = memories.create(dad, MemoryScope.USER, "화분 물 주기", "평문-표식-7391 화분은 열흘마다 물을 준다", false);
+        stub().willReturn(HermesRunResult.of("run-1", "sess-1", "completed", "네", "dad", null, TokenUsage.empty()));
+
+        ChatTurn turn = chat.send(dad, null, "주말 계획", "dad");
+
+        assertThat(contextSources.findByIdExecutionIdOrderByIdPositionAsc(turn.executionId()))
+                .as("실행 %s 에 남은 문맥 참조", turn.executionId())
+                .extracting(
+                        ExecutionContextSource::position,
+                        ExecutionContextSource::source,
+                        ExecutionContextSource::sourceRef,
+                        ExecutionContextSource::bodyMode)
+                .containsExactly(
+                        tuple(0, "MEMORY_ALWAYS", "memory:" + always.id(), "INLINE"),
+                        tuple(1, "MEMORY_INDEX", "memory:" + indexed.id(), "TITLE_ONLY"));
+        // 표의 모든 칸을 읽어 어느 칸에도 제목과 본문이 없는지 본다.
+        List<Map<String, Object>> rows =
+                jdbc.queryForList("select * from execution_context_source where execution_id = ?", turn.executionId());
+        assertThat(rows).hasSize(2);
+        assertThat(rows.stream().flatMap(row -> row.values().stream()).map(String::valueOf))
+                .as("실행 %s 의 문맥 참조 줄의 칸 값", turn.executionId())
+                .noneSatisfy(value ->
+                        assertThat(value).containsAnyOf("자전거 보관", "자전거는 지하 2층 보관대에 둔다", "화분 물 주기", "평문-표식-7391"));
     }
 
     @Test

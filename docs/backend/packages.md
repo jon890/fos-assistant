@@ -24,7 +24,7 @@ Control Plane 의 패키지마다 맡는 책임과 패키지 사이의 방향 �
 | `chat` | 대화, 메시지, 한 번의 실행 흐름, 대화의 모델 선택, 추천 질문 생성, 흐름의 계약과 등록 |
 | `usage` | 실행 기록, 실행 사건, 비용 환산, 사용량 조회, 사용자 실행 한도([`execution-limit.md`](execution-limit.md)) |
 | `memory` | 개인과 그룹 공용 Memory, 제안과 승인, 판 기록, 그룹의 collection 목록, 에이전트의 실행에 보이는 항목 판정, 문서 쓰기와 고치기, 서비스 토큰, 다른 서비스의 문서 읽기, 기존 개인 지식의 들이기 |
-| `context` | 실행에 넣을 `instructions` 조립 |
+| `context` | 실행에 넣을 `instructions` 조립과 문맥 묶음의 항목 모델 |
 | `mcp` | Memory 본문 조회, 결과물 쓰기 도구의 인자 검사, 장기 토큰 인증과 profile 묶기, 요청자 판정 |
 | `people` | 로그인 허용 목록과 사람을 더하는 흐름, 첫 로그인에 그 사람의 에이전트 만들기 |
 | `orchestration` | 흐름의 구현과 자식 실행, MCP `agent_*` 위임의 시작과 조회와 중지, 하위 에이전트 session 등록 |
@@ -33,6 +33,7 @@ Control Plane 의 패키지마다 맡는 책임과 패키지 사이의 방향 �
 | `task` | 예약 작업과 시각, 발화 기록, 발화기와 예약 turn 시작([`task.md`](task.md)) |
 | `notification` | 사용자에게 대화 밖에서 알리는 줄의 저장과 읽음 표시, 사용자 단위 SSE, 오래된 줄 정리([`notification.md`](notification.md)) |
 | `followup` | 할 일의 저장과 상태 전이, 사람이 쓰는 API, 에이전트의 제안 저장(제안 도구는 아직 구현 전이다. [`follow-up.md`](follow-up.md)) |
+| `proactive` | 먼저 살펴보기의 시작 전 점검, 점검 대화의 살펴보기 turn, 상한, 결과 계약의 검사와 그리기, 살펴보기 트리 판정([`proactive-check.md`](proactive-check.md)) |
 | `attention` | 먼저 알리기의 판정과 지금 화면이 읽는 카드. 다른 패키지의 기록을 읽기만 한다([`attention.md`](attention.md)) |
 
 검사: `ArchitectureRules.SHARED_DOES_NOT_DEPEND_ON_DOMAINS`
@@ -50,7 +51,7 @@ Control Plane 의 패키지마다 맡는 책임과 패키지 사이의 방향 �
 
 ### 최상위 패키지의 층 순서
 
-최상위 패키지는 아래 순서를 따른다. 자리 1 이 맨 아래이고 17 이 맨 위다.
+최상위 패키지는 아래 순서를 따른다. 자리 1 이 맨 아래이고 18 이 맨 위다.
 
 | 자리 | 패키지 |
 | --- | --- |
@@ -65,12 +66,13 @@ Control Plane 의 패키지마다 맡는 책임과 패키지 사이의 방향 �
 | 9 | `context` |
 | 10 | `chat` |
 | 11 | `followup` |
-| 12 | `orchestration` |
-| 13 | `mcp` |
-| 14 | `people` |
-| 15 | `connector` |
-| 16 | `task` |
-| 17 | `attention` |
+| 12 | `proactive` |
+| 13 | `orchestration` |
+| 14 | `mcp` |
+| 15 | `people` |
+| 16 | `connector` |
+| 17 | `task` |
+| 18 | `attention` |
 
 위 패키지는 아래 패키지를 쓰고 아래 패키지는 위 패키지를 import 하지 않는다.
 거꾸로 써야 하면 아래 패키지에 port 를 두고 위 패키지가 구현한다.
@@ -81,6 +83,13 @@ Control Plane 의 패키지마다 맡는 책임과 패키지 사이의 방향 �
 `notification` 은 `user` 바로 위다. 알림을 만드는 쪽(`connector`, 그 위의 패키지)이 모두 이 패키지를 부르고, 이 패키지는 알림을 받는 사용자 말고 다른 도메인을 모른다.
 `attention` 은 맨 위다. 먼저 알리기의 후보를 읽으려고 `usage`, `chat`, `agent`, `memory`, `connector`, `followup` 의 `application` 을 부르고, 어느 패키지도 `attention` 을 import 하지 않는다.
 검사: `ArchitectureRules.TOP_LEVEL_PACKAGES_FOLLOW_LAYER_ORDER`, 근거: ADR-068
+
+### proactive
+
+`proactive` 는 `followup` 바로 위다. 살펴보기 turn 은 `ChatService.runProactiveCheck` 가 돌리고, 살펴보기만의 일은 `chat` 이 가진 port `CheckTurn` 을 `proactive` 가 구현해 넘긴다.
+`chat` 은 `proactive` 를 import 하지 않는다. 기동 정리가 끝낸 살펴보기 turn 의 답을 대화에 남기지 않도록, `chat` 의 port `RecoveredAnswerGuard` 도 `proactive` 가 구현한다.
+`orchestration`, `mcp`, `connector` 는 `proactive` 보다 위라 `ProactiveCheckGuard` 로 살펴보기 트리인지 묻는다.
+살펴보기가 끝나 도는 위임 자식을 멈추는 일은 `proactive` 가 낸 `ProactiveCheckEnded` 사건을 `orchestration` 이 받아 한다.
 
 ### connector
 

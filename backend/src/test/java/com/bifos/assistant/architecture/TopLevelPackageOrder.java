@@ -33,6 +33,7 @@ final class TopLevelPackageOrder extends ArchCondition<JavaClass> {
             "context",
             "chat",
             "followup",
+            "proactive",
             "orchestration",
             "mcp",
             "people",
