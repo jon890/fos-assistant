@@ -115,14 +115,14 @@ Nous Research 의 [Hermes Agent](https://github.com/NousResearch/hermes-agent) �
 - **사진과 HTML 결과물.** 사진을 올려 에이전트에게 보이고, 에이전트가 만든 HTML 페이지를 옆 패널에서 본다. 그 페이지의 스크립트는 돌지 않는다.
 - **다른 서비스의 읽기 전용 접근.** 사용자에 묶인 서비스 토큰으로 다른 서비스가 그 사용자의 문서만 읽는다.
 
-collection 을 고치는 화면, 앞선 판을 읽는 화면, 문서를 사람이 직접 쓰는 화면은 계획이고 아직 만들지 않았다.
+collection 을 고치는 화면과 항목의 앞선 판을 읽는 화면처럼 Memory 의 일부 화면은 아직 만들지 않았다. 지금 목록은 [`docs/code-architecture.md`](docs/code-architecture.md) 의 「Memory 에서 아직 만들지 않은 것」 에 있다.
 전체 범위와 항목별 확인 방법은 [`docs/prd.md`](docs/prd.md) 에 있다.
 
 ## 하지 않는 일
 
 - **Hermes core 를 고치지 않는다.** profile, API server, plugin hook 이라는 공식 확장 지점만 쓴다.
 - **사람이 보지 않은 것을 기억에 남기지 않는다.** Hermes 내장 memory 도구를 에이전트에 주지 않는다. 기억에 닿는 길은 Control Plane 하나다.
-- **비밀값을 데이터베이스에 넣지 않는다.** AI credential 과 커넥터 토큰은 Hermes profile 안에만 있고, 서비스 토큰은 해시로만 저장한다.
+- **비밀값을 데이터베이스에 넣지 않는다.** AI credential 과 커넥터 토큰은 Hermes 쪽에 두고, 서비스 토큰은 해시로만 저장한다. profile 을 나눴다고 AI 계정이 갈리지는 않는다. OAuth 로그인은 여러 profile 이 함께 쓸 수 있다. 무엇이 갈리고 무엇을 함께 쓰는지는 [`docs/hermes/README.md`](docs/hermes/README.md) 의 「OAuth credential 은 여기서 빠진다」 에 있다.
 - **누구나 가입하는 서비스가 아니다.** 그룹에 사람을 더하는 것은 관리자가 한다.
 - **에이전트가 만든 페이지의 스크립트를 돌리지 않는다.**
 - **운영 절차를 갖지 않는다.** 배포와 환경마다 다른 값은 운영하는 쪽이 갖는다.
@@ -208,7 +208,7 @@ hermes/bundle.sh --out <디렉터리> --mcp-url <Control Plane MCP 주소>
 - [`AGENTS.md`](AGENTS.md) 에 저장소의 규칙이 있다. 공개 저장소에 적으면 안 되는 것도 거기 있다.
 - [`docs/README.md`](docs/README.md) 는 문서 전체의 색인이다.
 - [`docs/adr/INDEX.md`](docs/adr/INDEX.md) 는 되돌리기 어려운 결정의 목록이다.
-- `scripts/check-local.sh` 는 CI 가 돌리는 검사를 모두 돌린다. PR 을 열기 전에 돌린다.
+- `scripts/check-local.sh` 는 CI 가 돌리는 검사를 돌린다. PR 을 열기 전에 고친 화면의 브라우저 spec 을 인자로 주어 돌린다. 인자가 없으면 브라우저 검사 전체를 돌린다. 자세한 것은 [`AGENTS.md`](AGENTS.md) 의 「확인」 절에 있다.
 
 ### 커넥터 기여
 

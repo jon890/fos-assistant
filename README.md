@@ -114,14 +114,14 @@ Adding a user is a single decision by an administrator, and it must not slow any
 - **Photos and HTML results.** Attach photos for an agent to read, and open the HTML pages an agent produces in a side panel. Scripts in those pages do not run.
 - **Read-only access for other services.** A service token bound to a user lets another service read that user's documents and nothing else.
 
-Screens for editing collections, viewing earlier revisions, and writing documents by hand are planned and not built yet.
+Some Memory screens, such as editing collections and viewing earlier revisions of an entry, are not built yet. The current list is in [`docs/code-architecture.md`](docs/code-architecture.md).
 The full scope, with how each item is verified, is in [`docs/prd.md`](docs/prd.md).
 
 ## What it does not do
 
 - **It does not modify Hermes core.** Only the official extension points are used: profiles, the API server, and plugin hooks.
 - **It does not remember what no person has seen.** Hermes' built-in memory tool is not given to agents. The Control Plane is the only path to memory.
-- **It does not store secrets in the database.** AI credentials and connector tokens live only in Hermes profiles, and service tokens are stored only as hashes.
+- **It does not store secrets in the database.** AI credentials and connector tokens stay on the Hermes side, and service tokens are stored only as hashes. Separate profiles do not by themselves mean separate AI accounts: an OAuth login can be shared across profiles. How credentials are separated or shared is in [`docs/hermes/README.md`](docs/hermes/README.md).
 - **It is not an open sign-up service.** An administrator adds people to a group.
 - **It does not run scripts in agent-made pages.**
 - **It does not carry operating procedures.** Deployment and host-specific values belong to whoever runs it.
@@ -207,7 +207,7 @@ How this project uses Hermes is described in [`docs/hermes/README.md`](docs/herm
 - [`AGENTS.md`](AGENTS.md) has the rules of the repository, including what must never be written into a public repository.
 - [`docs/README.md`](docs/README.md) is the index of all documents.
 - [`docs/adr/INDEX.md`](docs/adr/INDEX.md) lists the decisions that are hard to reverse.
-- `scripts/check-local.sh` runs every check that CI runs. Run it before opening a pull request.
+- `scripts/check-local.sh` runs the checks that CI runs. Before opening a pull request, pass the browser specs for the screens you changed; with no arguments it runs the whole browser suite. See the 「확인」 section of [`AGENTS.md`](AGENTS.md).
 
 ### Contributing a connector
 

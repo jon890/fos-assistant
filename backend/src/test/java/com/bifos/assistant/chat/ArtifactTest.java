@@ -10,6 +10,7 @@ import com.bifos.assistant.agent.domain.type.CredentialScope;
 import com.bifos.assistant.agent.infra.AgentRepository;
 import com.bifos.assistant.chat.application.ArtifactCleaner;
 import com.bifos.assistant.chat.application.ArtifactService;
+import com.bifos.assistant.chat.application.ChatArtifactWriter;
 import com.bifos.assistant.chat.application.ChatService;
 import com.bifos.assistant.chat.domain.ChatArtifact;
 import com.bifos.assistant.chat.domain.ChatMessage;
@@ -51,6 +52,7 @@ import java.nio.file.LinkOption;
 import java.nio.file.Path;
 import java.nio.file.attribute.FileTime;
 import java.nio.file.attribute.PosixFilePermissions;
+import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
@@ -61,6 +63,7 @@ import java.util.Comparator;
 import java.util.Date;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
 import org.junit.jupiter.api.AfterEach;
@@ -135,6 +138,12 @@ class ArtifactTest {
 
     @Autowired
     ChatArtifactRepository artifactRows;
+
+    @Autowired
+    ChatArtifactWriter artifactWriter;
+
+    @Autowired
+    Clock clock;
 
     @Autowired
     AppUserRepository users;
@@ -637,7 +646,7 @@ class ArtifactTest {
         Path html = root.resolve(String.valueOf(conversation.id())).resolve("a").resolve("index.html");
         Files.setLastModifiedTime(html, FileTime.from(Instant.now().minus(Duration.ofDays(31))));
 
-        int removed = cleaner.cleanExpired(Instant.now());
+        int removed = cleaner.cleanExpired(futureNow());
 
         assertThat(removed).isEqualTo(1);
         assertThat(Files.exists(html)).isFalse();
@@ -649,6 +658,193 @@ class ArtifactTest {
         assertThat(code(response)).isEqualTo("ARTIFACT_GONE");
         assertThat(answerArtifacts(conversation))
                 .containsExactly(List.of("a/index.html", String.valueOf(htmlBytes()), "true"));
+    }
+
+    @Test
+    @DisplayName("지운 뒤 지운 표시가 실패해도 같은 정리의 대조가 행에 지운 시각을 적는다")
+    void reconcileMarksRowWhenFirstMarkFailsInSameRun() throws Exception {
+        Conversation conversation = chat.startEmpty(dad, "dad");
+        stub().beforeAwait(() -> writeDuringTurn(conversation.id(), "a/index.html", HTML));
+        chat.send(dad, conversation.id(), "만들어 줘", null);
+        Path html = htmlPath(conversation, "a/index.html");
+        Files.setLastModifiedTime(html, FileTime.from(Instant.now().minus(Duration.ofDays(40))));
+        ArtifactCleaner failingOnce = cleanerWith(new FailingOnceWriter(artifactRows, artifactWriter));
+
+        int removed = failingOnce.cleanExpired(futureNow());
+
+        assertThat(removed).isEqualTo(1);
+        assertThat(Files.exists(html)).isFalse();
+        assertThat(artifactRows.findAll())
+                .singleElement()
+                .satisfies(row -> assertThat(row.deletedAt()).isNotNull());
+        HttpResponse<String> response = file(conversation, "a/index.html");
+        assertThat(response.statusCode()).isEqualTo(410);
+        assertThat(code(response)).isEqualTo("ARTIFACT_GONE");
+        assertThat(answerArtifacts(conversation))
+                .containsExactly(List.of("a/index.html", String.valueOf(htmlBytes()), "true"));
+    }
+
+    @Test
+    @DisplayName("대화 폴더째 없으면 루트가 정상이 아닌 것으로 보고 행에 지운 시각을 적지 않는다")
+    void reconcileLeavesRowsWhenConversationFolderIsMissing() throws Exception {
+        Conversation conversation = chat.startEmpty(dad, "dad");
+        stub().beforeAwait(() -> writeDuringTurn(conversation.id(), "a/index.html", HTML));
+        chat.send(dad, conversation.id(), "만들어 줘", null);
+        Path folder = root.resolve(String.valueOf(conversation.id()));
+        Files.delete(htmlPath(conversation, "a/index.html"));
+        Files.delete(folder.resolve("a"));
+        Files.delete(folder);
+
+        cleaner.cleanExpired(futureNow());
+
+        assertThat(artifactRows.findAll())
+                .singleElement()
+                .satisfies(row -> assertThat(row.deletedAt()).isNull());
+    }
+
+    @Test
+    @DisplayName("파일이 없는데 행이 살아 있으면 정리가 행에 지운 시각을 적고 410 이다")
+    void reconcileMarksRowWhoseFileIsAlreadyGone() throws Exception {
+        Conversation conversation = chat.startEmpty(dad, "dad");
+        stub().beforeAwait(() -> writeDuringTurn(conversation.id(), "a/index.html", HTML));
+        chat.send(dad, conversation.id(), "만들어 줘", null);
+        Files.delete(htmlPath(conversation, "a/index.html"));
+
+        cleaner.cleanExpired(futureNow());
+
+        assertThat(artifactRows.findAll())
+                .singleElement()
+                .satisfies(row -> assertThat(row.deletedAt()).isNotNull());
+        HttpResponse<String> response = file(conversation, "a/index.html");
+        assertThat(response.statusCode()).isEqualTo(410);
+        assertThat(code(response)).isEqualTo("ARTIFACT_GONE");
+    }
+
+    @Test
+    @DisplayName("지운 표시는 기간 시작 전에 만든 행에만 적고 같은 경로의 새 행은 비워 둔다")
+    void reconcileMarksOnlyRowsCreatedBeforeCutoff() throws Exception {
+        Conversation conversation = chat.startEmpty(dad, "dad");
+        List<ChatArtifact> rows = twoRowsOnSamePath(conversation);
+        Files.delete(htmlPath(conversation, "a/index.html"));
+        Instant now = nowPlacingCutoffAfter(rows.get(0));
+        Instant cutoff = now.minus(Duration.ofDays(properties.retentionDays()));
+        assertThat(rows.get(1).createdAt()).as("둘째 행은 기간 시작 뒤에 만들었다").isAfter(cutoff);
+
+        cleaner.cleanExpired(now);
+
+        List<ChatArtifact> after = artifactRows.findByMessageIdInOrderByIdAsc(
+                rows.stream().map(ChatArtifact::messageId).toList());
+        assertThat(after).hasSize(2);
+        assertThat(after.get(0).deletedAt()).as("첫 행").isNotNull();
+        assertThat(after.get(1).deletedAt()).as("둘째 행").isNull();
+    }
+
+    @Test
+    @DisplayName("같은 경로에 파일이 있으면 정리가 어느 행에도 지운 시각을 적지 않는다")
+    void reconcileLeavesRowsWhenFileStillExists() throws Exception {
+        Conversation conversation = chat.startEmpty(dad, "dad");
+        List<ChatArtifact> rows = twoRowsOnSamePath(conversation);
+        Path html = htmlPath(conversation, "a/index.html");
+        Instant now = nowPlacingCutoffAfter(rows.get(0));
+        Instant cutoff = now.minus(Duration.ofDays(properties.retentionDays()));
+        assertThat(rows.get(1).createdAt()).as("둘째 행은 기간 시작 뒤에 만들었다").isAfter(cutoff);
+        assertThat(Files.getLastModifiedTime(html).toInstant())
+                .as("파일은 기간 시작 뒤에 바뀌었다")
+                .isAfter(cutoff);
+
+        cleaner.cleanExpired(now);
+
+        assertThat(Files.exists(html)).isTrue();
+        assertThat(artifactRows.findByMessageIdInOrderByIdAsc(
+                        rows.stream().map(ChatArtifact::messageId).toList()))
+                .hasSize(2)
+                .allSatisfy(row -> assertThat(row.deletedAt()).isNull());
+    }
+
+    @Test
+    @DisplayName("대조의 한 건이 실패해도 나머지를 맞추고 다음 정리가 실패한 행을 맞춘다")
+    void reconcileContinuesAfterOneFailureAndRetriesNextRun() throws Exception {
+        Conversation first = chat.startEmpty(dad, "dad");
+        stub().beforeAwait(() -> writeDuringTurn(first.id(), "a/index.html", HTML));
+        chat.send(dad, first.id(), "만들어 줘", null);
+        Conversation second = chat.startEmpty(dad, "dad");
+        stub().beforeAwait(() -> writeDuringTurn(second.id(), "b/index.html", HTML));
+        chat.send(dad, second.id(), "만들어 줘", null);
+        Files.delete(htmlPath(first, "a/index.html"));
+        Files.delete(htmlPath(second, "b/index.html"));
+        ArtifactCleaner failingOnce = cleanerWith(new FailingOnceWriter(artifactRows, artifactWriter));
+
+        failingOnce.cleanExpired(futureNow());
+
+        assertThat(artifactRows.findAll())
+                .hasSize(2)
+                .filteredOn(row -> row.deletedAt() != null)
+                .as("실패하지 않은 한 행만 적혔다")
+                .hasSize(1);
+
+        failingOnce.cleanExpired(futureNow());
+
+        assertThat(artifactRows.findAll())
+                .hasSize(2)
+                .allSatisfy(row -> assertThat(row.deletedAt()).isNotNull());
+    }
+
+    /** 행의 {@code createdAt} 이 지금이라 기간 시작이 그보다 늦도록 보관 기간보다 하루 뒤를 정리 시각으로 쓴다. */
+    private Instant futureNow() {
+        return Instant.now().plus(Duration.ofDays(properties.retentionDays() + 1L));
+    }
+
+    /** 기간 시작이 그 행의 {@code createdAt} 보다 1ms 뒤에 오는 정리 시각이다. */
+    private Instant nowPlacingCutoffAfter(ChatArtifact row) {
+        return row.createdAt().plusMillis(1).plus(Duration.ofDays(properties.retentionDays()));
+    }
+
+    /** 두 turn 이 같은 경로를 써 행이 둘인 상태를 만든다. 반환은 id 순서다. */
+    private List<ChatArtifact> twoRowsOnSamePath(Conversation conversation) {
+        stub().beforeAwait(() -> writeDuringTurn(conversation.id(), "a/index.html", HTML));
+        chat.send(dad, conversation.id(), "만들어 줘", null);
+        chat.send(dad, conversation.id(), "고쳐 줘", null);
+        List<ChatArtifact> rows = artifactRows.findByMessageIdInOrderByIdAsc(assistantMessageIds(conversation.id()));
+        assertThat(rows).extracting(ChatArtifact::path).containsExactly("a/index.html", "a/index.html");
+        return rows;
+    }
+
+    private Path htmlPath(Conversation conversation, String relativePath) {
+        return root.resolve(String.valueOf(conversation.id())).resolve(relativePath);
+    }
+
+    private ArtifactCleaner cleanerWith(ChatArtifactWriter writer) {
+        return new ArtifactCleaner(store, writer, properties, clock);
+    }
+
+    /**
+     * 첫 지운 표시만 던지는 writer 다.
+     *
+     * <p>던지지 않는 호출은 Spring 빈에 넘긴다. {@code super} 를 부르면 프록시를 거치지 않아 조건부 update 에
+     * 트랜잭션이 없다.
+     */
+    static class FailingOnceWriter extends ChatArtifactWriter {
+
+        private final ChatArtifactWriter delegate;
+        private final AtomicBoolean failed = new AtomicBoolean();
+
+        FailingOnceWriter(ChatArtifactRepository repository, ChatArtifactWriter delegate) {
+            super(repository);
+            this.delegate = delegate;
+        }
+
+        @Override
+        public int markDeleted(Long conversationId, String path, Instant now, Instant createdBefore) {
+            if (failed.compareAndSet(false, true)) {
+                throw new IllegalStateException("첫 지운 표시를 일부러 실패시킨다");
+            }
+            return delegate.markDeleted(conversationId, path, now, createdBefore);
+        }
+
+        @Override
+        public List<ChatArtifact> activeCreatedBefore(Instant createdBefore) {
+            return delegate.activeCreatedBefore(createdBefore);
+        }
     }
 
     /** 대화 이력의 답마다 붙은 결과물을 {@code [path, byteSize, deleted]} 로 모은다. */
