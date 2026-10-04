@@ -131,8 +131,8 @@
 | --- | --- |
 | `GET /api/v1/attention` | 카드 넷과 항목, `nowCount`, `readAt`. 응답에 실린 `NOW` 와 `LATER` 항목마다 `SHOWN` 사건을 한 번 남긴다 |
 | `GET /api/v1/attention/summary` | `{ "nowCount": 3 }`. 사이드바와 홈의 한 줄이 읽는다. 사건을 남기지 않는다 |
-| `POST /api/v1/attention/hide` | 본문 `{ card, itemKey, stateKey }`. 그 카드에서 그 상태가 바뀔 때까지 숨긴다 |
-| `POST /api/v1/attention/snooze` | 본문 `{ card, itemKey, until }`. `until` 은 지금보다 뒤이고 `snooze-max` 안이어야 한다. 아니면 400 `VALIDATION_FAILED` |
+| `POST /api/v1/attention/hide` | 본문 `{ card, itemKey, stateKey }`. 그 카드에서 그 상태가 바뀔 때까지 숨기고 `HIDDEN` 사건을 남긴다 |
+| `POST /api/v1/attention/snooze` | 본문 `{ card, itemKey, until }`. `until` 은 지금보다 뒤이고 `snooze-max` 안이어야 한다. 아니면 400 `VALIDATION_FAILED`. 받으면 `SNOOZED` 사건을 남긴다 |
 | `POST /api/v1/attention/restore` | 본문 `{ card, itemKey }`. 그 카드의 숨기기와 미루기를 지운다 |
 | `POST /api/v1/attention/events` | 본문 `{ itemKey, stateKey, type }`. `type` 은 `OPENED` 나 `ACTED` 다 |
 | `GET /api/v1/admin/attention/metrics?days=30` | 관리자만. 아래 「지표」 를 `trigger` 별로 센다. 제목과 항목 열쇠를 내지 않는다. `days` 는 1 부터 90 까지이고 벗어나면 400 `VALIDATION_FAILED` 다 |
