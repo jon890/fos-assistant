@@ -1,0 +1,13 @@
+{
+  "name": "plan78-scheduled-tasks",
+  "description": "예약 작업과 시각 trigger — 작업과 발화 기록을 Control Plane 이 갖고 정한 시각에 주인의 대화 turn 을 한 번만 열며, 작업 화면과 목록 묶음을 더한다",
+  "status": "pending",
+  "created_at": "2026-10-04",
+  "total_phases": 3,
+  "current_phase": 1,
+  "phases": [
+    { "number": 1, "file": "phase-01.md", "execution_profile": "deep" },
+    { "number": 2, "file": "phase-02.md", "execution_profile": "deep" },
+    { "number": 3, "file": "phase-03.md", "execution_profile": "standard" }
+  ]
+}
