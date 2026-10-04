@@ -29,7 +29,7 @@
 | `ARCHIVED` | 지운 작업. 목록과 발화에서 빠진다. 대화와 발화 기록은 남는다 | 지우기 |
 
 다시 켜면 `next_fire_at` 을 지금 뒤의 첫 시각으로 다시 계산한다. 멈춘 동안의 시각은 놓친 발화로 세지 않는다.
-작업을 고치면 시각이 바뀌었을 때만 `next_fire_at` 을 다시 계산한다. 에이전트는 고칠 수 있다. 다음 발화부터 새 에이전트로 돈다. `SINGLE` 작업의 에이전트를 바꾸면 다음 발화는 새 대화를 연다. 대화의 에이전트는 바뀌지 않기 때문이다([`schema/chat.md`](schema/chat.md) 의 `conversation`).
+작업을 고칠 때는 작업 수 상한을 보지 않는다. 시각(종류, cron, `fireAt`, 시간대)이 바뀌었을 때만 시각을 다시 검사하고 `next_fire_at` 을 다시 계산한다. 그래서 이미 발화한 `ONCE` 작업도 이름과 지시를 고칠 수 있다. 에이전트는 고칠 수 있다. 다음 발화부터 새 에이전트로 돈다. `SINGLE` 작업의 에이전트를 바꾸면 다음 발화는 새 대화를 연다. 대화의 에이전트는 바뀌지 않기 때문이다([`schema/chat.md`](schema/chat.md) 의 `conversation`).
 
 ### 시각
 
@@ -38,7 +38,8 @@
 | `CRON` | 표준 5필드 cron(`분 시 일 월 요일`). 예: 매달 1일 9시는 `0 9 1 * *` | 필드가 다섯이 아니거나 읽지 못하면 `TASK_SCHEDULE_INVALID`. 지금부터 1년 안의 예정 시각을 펼쳐 이어지는 두 시각의 간격이 `assistant.task.min-interval`(기본 15분)보다 짧으면 `TASK_SCHEDULE_INVALID` |
 | `ONCE` | 그 시간대의 날짜와 시각 하나 | 지금보다 뒤가 아니면 `TASK_SCHEDULE_INVALID` |
 
-`CRON` 의 예정 시각은 그 작업의 시간대로 계산한다. 서머타임이 있는 시간대에서 없는 시각은 건너뛰고 겹친 시각은 한 번만 돈다. Spring `CronExpression` 의 계산을 따른다.
+`CRON` 의 예정 시각은 그 작업의 시간대로 계산한다. Spring `CronExpression` 의 계산을 따른다. 서머타임이 있는 시간대에서 없는 시각은 그날 건너뛰고, 겹친 시각은 두 번 돈다. 두 번의 예정 시각은 서로 다른 순간이라 발화 기록도 두 줄이다.
+앞으로 다음 시각이 없는 cron(예: `0 9 31 2 *`)은 `TASK_SCHEDULE_INVALID` 로 거절한다.
 `ONCE` 는 한 번 발화하면 `next_fire_at` 이 비고 작업은 `ACTIVE` 로 남는다. 화면은 「다음 실행 없음」 으로 보인다.
 
 사용자당 보관하지 않은 작업은 `assistant.task.max-per-user`(기본 10)개까지다. 넘으면 `TASK_LIMIT_REACHED` 다.
@@ -72,7 +73,7 @@ sequenceDiagram
 
 ### 발화
 
-`next_fire_at` 이 지금보다 앞이고 작업이 `ACTIVE` 인 trigger 를 행 잠금으로 읽어 하나씩 처리한다.
+`next_fire_at` 이 지금보다 앞이고 작업이 `ACTIVE` 인 trigger 를 하나씩 처리한다. trigger 마다 트랜잭션 하나에서 그 줄을 행 잠금으로 다시 읽고 처리한다. 한 trigger 의 실패는 그 trigger 만 되돌리고 다른 trigger 의 발화를 막지 않는다.
 
 | 상황 | 처리 |
 | --- | --- |
@@ -93,7 +94,7 @@ sequenceDiagram
 | 작업이 `PAUSED` 나 `ARCHIVED` 가 됐다 | `SKIPPED`(`PAUSED`). 알리지 않는다 |
 | 주인이 허용 목록에서 꺼졌다(ADR-059) | `SKIPPED`(`OWNER_REVOKED`). 알리지 않는다. 볼 사람이 없다 |
 | 에이전트를 지웠거나 껐거나 주인이 더는 쓸 수 없거나 흐름이 붙었다 | `SKIPPED`(`AGENT_UNAVAILABLE`)와 알림 |
-| 예정 시각에서 `assistant.task.start-timeout`(기본 10분)이 지났다 | `SKIPPED`(`BUSY`)와 알림 |
+| 그 줄을 만든 때(`created_at`)에서 `assistant.task.start-timeout`(기본 10분)이 지났다 | `SKIPPED`(`BUSY`)와 알림. 예정 시각이 아니라 만든 때부터 잰다. 놓친 발화로 늦게 만든 줄도 10분 동안 열 기회를 갖는다 |
 | 대화를 준비한다 | `NEW_PER_RUN` 은 그 줄이 대화를 아직 갖지 않았으면 새 대화를 만들어 줄에 적는다. `SINGLE` 은 작업의 대화가 있고 지워지지 않았고 에이전트가 같으면 그것을, 아니면 새 대화를 만들어 작업에 적는다. 새 대화의 제목은 작업 이름이고 `task_id` 가 그 작업이다 |
 | turn 잠금이 `CONVERSATION_BUSY` 나 `USER_BUSY` 다 | `QUEUED` 로 두고 다음 tick 에 다시 본다. 이미 만든 대화는 줄에 남아 다시 쓴다 |
 | 잠금을 얻었다 | `RUNNING` 과 `started_at` 을 적고 가상 스레드에서 turn 을 돌린다 |
@@ -112,6 +113,7 @@ turn 은 위임 결과를 전하는 자동 turn 과 같은 모양으로 돈다(`
 ### 기동할 때
 
 `RUNNING` 으로 남은 `task_run` 은 `FAILED`(`INTERRUPTED`)로 닫고 `NEVER` 가 아니면 `TASK_FAILED` 를 알린다. 다시 돌리지 않는다. 쓰기가 두 번 일어날 수 있다.
+발화기는 이 정리가 끝난 뒤에야 돈다. 그 전에 연 줄을 정리가 닫지 않게 하기 위해서다.
 그 turn 의 실행 줄은 [대기열과 중지](turn-control.md) 의 「기동할 때 남은 실행 정리」 가 따로 정한다. 답이 대화에 늦게 남을 수 있다.
 `QUEUED` 줄은 그대로 두고 다음 tick 이 연다.
 
@@ -154,6 +156,8 @@ turn 은 위임 결과를 전하는 자동 turn 과 같은 모양으로 돈다(`
 `TaskRequest` 는 `title`, `agentCode`, `instruction`, `schedule`, `conversationMode`, `missedPolicy`, `notify` 이다. 뒤의 셋은 비우면 기본값이다.
 `schedule` 은 `{ type: "CRON", cron, timeZone }` 이나 `{ type: "ONCE", fireAt, timeZone }` 이다. `fireAt` 은 시간대 없는 날짜와 시각(`2026-11-01T09:00`)이고 `timeZone` 으로 해석한다. `timeZone` 을 비우면 기본 시간대다.
 
+`ScheduleView` 는 요청과 같은 모양이다. `{ type, cron, fireAt, timeZone }` 이고, `fireAt` 은 저장한 UTC 시각을 그 작업의 시간대로 바꾼 시간대 없는 날짜와 시각이다.
+
 `TaskView` 는 `id`, `title`, `agentCode`, `agentName`, `instruction`, `state`, `schedule`, `nextFireAt`, `lastFiredAt`, `conversationMode`, `missedPolicy`, `notify`, `createdAt` 이다.
 `TaskRunView` 는 `id`, `scheduledFor`, `status`, `reason`, `conversationId`, `startedAt`, `finishedAt` 이다. `conversationId` 는 대화의 공개 식별자다.
 
@@ -179,7 +183,7 @@ turn 은 위임 결과를 전하는 자동 turn 과 같은 모양으로 돈다(`
 | --- | --- | --- |
 | `assistant.task.dispatch-cron` | `*/30 * * * * *` | 발화기와 시작 단계가 도는 때. 검사에서는 `-` 로 끈다 |
 | `assistant.task.missed-grace` | `2m` | 이만큼 늦은 예정 시각은 놓친 것으로 보지 않는다 |
-| `assistant.task.start-timeout` | `10m` | `QUEUED` 가 이만큼 열리지 못하면 `SKIPPED`(`BUSY`) |
+| `assistant.task.start-timeout` | `10m` | `QUEUED` 줄이 만들어진 뒤 이만큼 열리지 못하면 `SKIPPED`(`BUSY`) |
 | `assistant.task.max-per-user` | `10` | 사용자당 보관하지 않은 작업 수 |
 | `assistant.task.min-interval` | `15m` | 반복 시각의 최소 간격 |
 | `assistant.task.max-runs-per-day` | `48` | 사용자당 24시간 안의 발화 수 |

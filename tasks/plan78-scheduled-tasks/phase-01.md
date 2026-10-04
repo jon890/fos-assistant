@@ -23,8 +23,8 @@
 - 저장되는 enum 은 `<기능>.domain.type` 에 둔다(`backend/AGENTS.md` 의 「enum 은 저장 여부로 둘 곳을 정한다」).
 - 설정 record: `B/notification/application/NotificationProperties.java`(`@Validated`, `@ConfigurationProperties`).
 - 현재 사용자와 오류: `CurrentUserProvider.require()`, `new ApiException(ErrorCode, message)`, `B/shared/error/ErrorCode.java`. DTO 는 `presentation/TaskDtos.java` 하나에 둔다. 요청 본문은 `@Valid` 와 jakarta 제약으로 검사한다.
-- 에이전트 확인: `B/agent/application/AgentService.java` 의 `Agent requireStartable(CurrentUser user, String code)`(지웠거나 읽을 수 없으면 `AGENT_NOT_FOUND`, 꺼졌으면 `AGENT_DISABLED`). 흐름이 붙은 에이전트는 `B/agent/application/KnownFlows` 로 판정한다. `B/chat/application/DelegationWakeService.java` 의 `tryWake` 가 `flows.find(agent.flow()) != null` 로 거른다. `KnownFlows` 에 같은 판정을 하는 메서드가 있는지 읽고, 없으면 `FlowRegistry.find` 와 같은 뜻의 메서드를 그 port 에 더한다.
-- 대화 목록 응답: `B/chat/presentation/ChatController.java` 의 `viewOf(Conversation, Agent)` 가 `ChatDtos.ConversationView` 를 만든다. 목록과 단건 조회가 같은 함수를 쓴다.
+- 에이전트 확인: `B/agent/application/AgentService.java` 의 `Agent requireStartable(CurrentUser user, String code)`(지웠거나 읽을 수 없으면 `AGENT_NOT_FOUND`, 꺼졌으면 `AGENT_DISABLED`). 흐름이 붙은 에이전트는 `B/agent/application/KnownFlows` 의 `known(agent.flow())` 로 판정한다(`FlowRegistry` 가 구현한다). 이 port 는 고치지 않는다.
+- 대화 응답: `B/chat/presentation/ChatController.java` 의 `viewOf(Conversation, Agent)` 가 `ChatDtos.ConversationView` 를 만든다. 목록, 단건 조회, `rename`, `chooseModel`, `chooseModelTier` 의 다섯 응답이 같은 함수를 쓴다. 웹은 rename 응답으로 목록의 줄을 통째로 바꾸므로 다섯 응답 모두 작업 칸을 실어야 한다.
 - 아래 패키지가 위 패키지의 값을 받는 port: `B/chat/application/AutoTurnResultSource` 를 `connector` 가 구현하고 `ChatService` 가 `List<AutoTurnResultSource>` 로 받는다(ADR-068).
 - 트랜잭션은 application 층에만 둔다. 저장소 메서드에 `@Transactional` 을 달면 `ArchitectureRules.TRANSACTIONAL_ONLY_IN_APPLICATION` 에 걸린다. 수정 쿼리(`@Modifying`)는 application 의 트랜잭션 안에서 부른다. `B/notification/application/NotificationCleaner.java` 가 `TransactionTemplate` 으로 감싸는 본보기다.
 - 시각 계산은 Spring 의 `org.springframework.scheduling.support.CronExpression` 을 쓴다. 6필드(초 포함)를 받으므로 5필드 앞에 `"0 "` 을 붙여 읽는다. 새 의존을 더하지 않는다.
@@ -78,7 +78,7 @@
 
 - `static CronExpression parseCron(String fiveFields)`: 공백으로 나눈 필드가 다섯이 아니거나 `CronExpression.parse("0 " + fiveFields)` 가 실패하면 `ApiException(TASK_SCHEDULE_INVALID)`
 - `static void requireMinInterval(CronExpression cron, ZoneId zone, Instant from, Duration min)`: `from` 부터 1년 안의 예정 시각을 차례로 펼쳐(최대 400,000번) 이어지는 두 시각의 간격이 `min` 보다 짧으면 `TASK_SCHEDULE_INVALID`
-- `static Instant nextAfter(CronExpression cron, ZoneId zone, Instant after)`: `after` 뒤의 첫 예정 시각. 없으면 `null`
+- `static Instant nextAfter(CronExpression cron, ZoneId zone, Instant after)`: `after` 뒤의 첫 예정 시각. 없으면 `null`. 만들거나 시각을 고칠 때 이 값이 `null` 인 cron(예: `0 9 31 2 *`)은 `TASK_SCHEDULE_INVALID` 로 거절한다
 - `static Instant latestAtOrBefore(CronExpression cron, ZoneId zone, Instant from, Instant now)`: `from` 이상 `now` 이하의 예정 시각 가운데 가장 늦은 것. 없으면 `null`. phase 02 가 놓친 발화에 쓴다
 - `ONCE` 의 `fireAt` 은 시간대 없는 `LocalDateTime`(초는 있어도 없어도 된다)을 그 시간대로 해석한다. 지금보다 뒤가 아니면 `TASK_SCHEDULE_INVALID`
 - 시간대 이름을 `ZoneId.of` 가 읽지 못하면 `TASK_SCHEDULE_INVALID`
@@ -88,7 +88,7 @@
 | 메서드 | 동작 |
 | --- | --- |
 | `create(CurrentUser user, TaskInput input)` | 보관하지 않은 작업 수가 `maxPerUser` 이상이면 `TASK_LIMIT_REACHED`. 에이전트는 `requireStartable` 을 지나야 하고 흐름이 붙었으면 `TASK_AGENT_NOT_SUPPORTED`. 시각을 검사하고 `task` 와 `task_trigger` 를 한 트랜잭션에 저장한다. `next_fire_at` 은 `CRON` 이면 지금 뒤의 첫 시각, `ONCE` 면 그 시각 |
-| `update(CurrentUser user, UUID taskId, TaskInput input)` | 같은 검사. 시각(종류, cron, fireAt, 시간대)이 바뀌었을 때만 `next_fire_at` 을 다시 계산한다. `ARCHIVED` 면 `TASK_NOT_FOUND` |
+| `update(CurrentUser user, UUID taskId, TaskInput input)` | 작업 수 상한은 보지 않는다. 에이전트 검사는 `create` 와 같다. 시각(종류, cron, fireAt, 시간대)이 저장된 값과 다를 때만 시각을 검사하고 `next_fire_at` 을 다시 계산한다. 그래서 이미 발화한 `ONCE` 작업도 같은 시각을 보내며 이름을 고칠 수 있다. `ARCHIVED` 면 `TASK_NOT_FOUND` |
 | `pause`, `resume`, `archive` | `pause` 는 `ACTIVE` 만, `resume` 은 `PAUSED` 만 바꾸고 다른 상태면 그대로 돌려준다. `resume` 은 `next_fire_at` 을 지금 뒤의 첫 시각으로 다시 계산한다. 이미 지난 `ONCE` 는 `next_fire_at` 이 빈 채로 남는다. `archive` 는 `ARCHIVED` 와 `archived_at` |
 | `list(CurrentUser user)`, `get(CurrentUser user, UUID taskId)` | 주인의 보관하지 않은 작업만. 남의 것과 없는 것은 같은 `TASK_NOT_FOUND` |
 | `runs(CurrentUser user, UUID taskId, int limit)` | `limit` 1 이상 100 이하, 밖이면 `VALIDATION_FAILED`. 예정 시각 역순 |
@@ -100,6 +100,7 @@
 `docs/backend/task.md` 의 「API」 표 그대로다. `DELETE` 는 204 다.
 `TaskRequest(@NotBlank @Size(max = 100) String title, @NotBlank String agentCode, @NotBlank @Size(max = 8000) String instruction, @NotNull @Valid ScheduleRequest schedule, ConversationMode conversationMode, MissedPolicy missedPolicy, NotifyPolicy notify)`. 뒤의 셋은 null 이면 기본값이다. `title` 은 앞뒤 공백을 뗀 뒤 저장한다.
 `ScheduleRequest(@NotNull TriggerType type, String cron, LocalDateTime fireAt, String timeZone)`. `CRON` 인데 `cron` 이 비거나 `ONCE` 인데 `fireAt` 이 비면 `TASK_SCHEDULE_INVALID`.
+`ScheduleView(TriggerType type, String cron, LocalDateTime fireAt, String timeZone)` 이다. `fireAt` 은 저장한 UTC 시각을 그 작업의 시간대로 바꾼 값이고 `CRON` 이면 null 이다.
 `TaskView` 와 `TaskRunView` 의 칸은 `docs/backend/task.md` 의 「API」 가 적은 그대로다. `TaskRunView.conversationId` 는 대화의 공개 식별자이고, 대화 번호를 공개 식별자로 바꿀 때는 `chat` 의 기존 조회를 쓴다. `reason` 은 enum 이름 그대로 싣는다. 화면이 문구로 바꾼다.
 
 ### 4. `B/shared/error/ErrorCode.java`
@@ -112,7 +113,7 @@
 - `B/chat/application/ConversationTaskLabels.java`: port. `Map<Long, TaskLabel> labelsOf(Collection<Long> taskIds)`
 - `B/chat/application/model/TaskLabel.java`: `record TaskLabel(UUID taskId, String title)`
 - `B/chat/presentation/ChatDtos.java` 의 `ConversationView` 끝에 `UUID taskId, String taskTitle` 을 더한다. 작업 대화가 아니면 둘 다 null
-- `B/chat/presentation/ChatController.java`: 목록과 단건 조회가 `viewOf` 를 부르기 전에 그 쪽의 `taskId` 들을 모아 port 로 한 번에 읽는다. 구현이 없을 수 있으므로 `List<ConversationTaskLabels>` 로 받는다. 보관한 작업도 이름을 돌려준다
+- `B/chat/presentation/ChatController.java`: `viewOf` 를 부르는 다섯 응답(목록, 단건, `rename`, `chooseModel`, `chooseModelTier`) 모두 작업 칸을 싣는다. 목록은 그 쪽의 `taskId` 들을 모아 port 로 한 번에 읽고, 나머지는 그 대화 하나의 `taskId` 로 읽는다. 구현이 없을 수 있으므로 `List<ConversationTaskLabels>` 로 받는다. 보관한 작업도 이름을 돌려준다
 - `TaskLabelSource` 가 `task` 표에서 번호로 읽어 `public_id` 와 `title` 을 돌려준다
 
 ### 6. 층 순서와 설정
@@ -132,10 +133,10 @@
 
 | 파일 | 확인하는 것 |
 | --- | --- |
-| `TaskScheduleTest.java` | `0 9 1 * *` 를 `Asia/Seoul` 로 읽어 `2026-10-04T00:00:00Z` 뒤의 첫 시각이 `2026-10-31T15:00:00Z`(11월 1일 9시)다. 필드가 넷이거나 여섯인 값과 읽지 못하는 값은 `TASK_SCHEDULE_INVALID`. `*/5 * * * *` 와 `0,10 9 * * *` 는 최소 간격 15분에 걸리고 `*/15 * * * *` 와 `0 9 * * 1` 은 통과한다. `latestAtOrBefore` 가 사흘 놓친 매일 9시 작업에서 마지막 하루만 돌려준다. `America/New_York` 의 서머타임 시작일에 없는 2시 30분 cron 이 그날 건너뛴다. 없는 시간대 이름은 `TASK_SCHEDULE_INVALID` |
-| `TaskServiceTest.java` | `Clock.fixed` 로 시각을 고정한다. 만들면 `task` 와 `task_trigger` 가 함께 생기고 `next_fire_at` 이 맞다. 11번째 작업은 `TASK_LIMIT_REACHED`, 하나를 보관하면 다시 만들 수 있다. 지난 `ONCE` 는 `TASK_SCHEDULE_INVALID`. 꺼진 에이전트는 `AGENT_DISABLED`, 흐름 에이전트는 `TASK_AGENT_NOT_SUPPORTED`, 남의 비공개 에이전트는 `AGENT_NOT_FOUND`. 남의 작업은 조회, 고치기, 멈추기, 지우기가 모두 `TASK_NOT_FOUND`. 멈춘 뒤 시계를 사흘 옮겨 다시 켜면 `next_fire_at` 이 그 뒤의 첫 시각이다. 이름만 고치면 `next_fire_at` 이 그대로다 |
+| `TaskScheduleTest.java` | `0 9 1 * *` 를 `Asia/Seoul` 로 읽어 `2026-10-04T00:00:00Z` 뒤의 첫 시각이 `2026-11-01T00:00:00Z`(11월 1일 9시)다. `0 9 31 2 *` 는 다음 시각이 없어 `TASK_SCHEDULE_INVALID` 다. 필드가 넷이거나 여섯인 값과 읽지 못하는 값은 `TASK_SCHEDULE_INVALID`. `*/5 * * * *` 와 `0,10 9 * * *` 는 최소 간격 15분에 걸리고 `*/15 * * * *` 와 `0 9 * * 1` 은 통과한다. `latestAtOrBefore` 가 사흘 놓친 매일 9시 작업에서 마지막 하루만 돌려준다. `America/New_York` 의 서머타임 시작일에 없는 2시 30분 cron 이 그날 건너뛰고, 서머타임이 끝나는 2026-11-01 의 `30 1 * * *` 는 서로 다른 두 순간(05:30Z 와 06:30Z)을 낸다. 없는 시간대 이름은 `TASK_SCHEDULE_INVALID` |
+| `TaskServiceTest.java` | `Clock.fixed` 로 시각을 고정한다. 만들면 `task` 와 `task_trigger` 가 함께 생기고 `next_fire_at` 이 맞다. 11번째 작업은 `TASK_LIMIT_REACHED`, 하나를 보관하면 다시 만들 수 있다. 지난 `ONCE` 는 `TASK_SCHEDULE_INVALID`. 꺼진 에이전트는 `AGENT_DISABLED`, 흐름 에이전트는 `TASK_AGENT_NOT_SUPPORTED`, 남의 비공개 에이전트는 `AGENT_NOT_FOUND`. 남의 작업은 조회, 고치기, 멈추기, 지우기가 모두 `TASK_NOT_FOUND`. 멈춘 뒤 시계를 사흘 옮겨 다시 켜면 `next_fire_at` 이 그 뒤의 첫 시각이다. 이름만 고치면 `next_fire_at` 이 그대로다. 작업이 10개인 사용자도 기존 작업을 고칠 수 있다. 이미 발화한 `ONCE` 작업은 같은 시각을 보내며 이름을 고칠 수 있다 |
 | `TaskControllerTest.java` | 만들기, 목록, 고치기, 멈추기, 다시 켜기, 지우기(204), 발화 기록의 응답 모양. 본문 검증 실패는 `VALIDATION_FAILED`. 형식이 틀린 `taskId` 는 400 |
-| `ConversationTaskLabelTest.java` | 작업이 만든 대화가 목록과 단건 조회에서 `taskId` 와 `taskTitle` 을 싣고, 보통 대화는 둘 다 null 이다. 보관한 작업의 대화도 이름을 싣는다 |
+| `ConversationTaskLabelTest.java` | 작업이 만든 대화가 목록, 단건 조회, 이름 바꾸기 응답에서 `taskId` 와 `taskTitle` 을 싣고, 보통 대화는 둘 다 null 이다. 보관한 작업의 대화도 이름을 싣는다 |
 
 `RepositoryQueryMysqlTest` 가 새 저장소 메서드를 실제 MySQL 에서 스스로 실행한다. 인자를 만들지 못하는 타입이 나오면 `RepositoryQuerySweep` 에 그 타입의 값을 더한다(`backend/AGENTS.md` 의 「저장소 쿼리는 실제 MySQL 에서도 실행한다」).
 
@@ -188,8 +189,6 @@ scripts/check-public-safe.sh
 | `backend/src/main/java/com/bifos/assistant/chat/application/model/TaskLabel.java` | 신규 |
 | `backend/src/main/java/com/bifos/assistant/chat/presentation/ChatDtos.java` | 수정 |
 | `backend/src/main/java/com/bifos/assistant/chat/presentation/ChatController.java` | 수정 |
-| `backend/src/main/java/com/bifos/assistant/agent/application/KnownFlows.java` | 수정 |
-| `backend/src/main/java/com/bifos/assistant/chat/application/FlowRegistry.java` | 수정 |
 | `backend/src/main/java/com/bifos/assistant/shared/error/ErrorCode.java` | 수정 |
 | `backend/src/main/resources/application.yml` | 수정 |
 | `backend/src/test/resources/application-test.yml` | 수정 |

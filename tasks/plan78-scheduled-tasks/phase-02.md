@@ -55,9 +55,10 @@ turn 의 저장은 `B/chat/application/ChatService.java` 의 `saveQuestion` 이 
 
 ### 2. `B/task/application/TaskFiring.java` 발화
 
-`@Transactional public int fireDue(Instant now)`.
+`public int fireDue(Instant now)`. 트랜잭션을 메서드 하나에 걸지 않는다.
 
-- `TaskTriggerRepository` 에 `@Lock(PESSIMISTIC_WRITE)` 조회를 더한다. `next_fire_at <= now` 이고 작업이 `ACTIVE` 인 trigger 를 `next_fire_at` 순으로 읽는다
+- 먼저 잠그지 않고 `next_fire_at <= now` 이고 작업이 `ACTIVE` 인 trigger 번호를 `next_fire_at` 순으로 읽는다
+- **trigger 마다 `TransactionTemplate` 트랜잭션 하나**에서 `TaskTriggerRepository` 의 `@Lock(PESSIMISTIC_WRITE)` 조회로 그 줄을 다시 읽고, 조건이 아직 맞으면 처리한다. trigger 하나의 예외는 잡아 로그를 남기고 다음 trigger 로 간다. 그 trigger 만 되돌아가고 다음 tick 에 다시 시도된다
 - trigger 마다 `docs/backend/task.md` 의 「발화」 표 그대로 처리한다. 예정 시각은 `TaskSchedule.latestAtOrBefore` 로 구한다
 - 하루 상한: `TaskRunRepository` 에 `owner_user_id` 와 `created_at > now - 24h` 와 `status <> SKIPPED` 로 세는 쿼리를 더한다. `maxRunsPerDay` 이상이면 `SKIPPED`(`DAILY_LIMIT`)
 - 같은 `(trigger_id, scheduled_for)` 가 있는지 먼저 보고 있으면 만들지 않는다. 유일 제약이 마지막 방어선이다
@@ -87,6 +88,7 @@ turn 의 저장은 `B/chat/application/ChatService.java` 의 `saveQuestion` 이 
 ### 5. `B/task/application/TaskDispatcher.java` 와 기동 정리
 
 - `@Scheduled(cron = "${assistant.task.dispatch-cron}") public void runScheduled()` 가 `tick(clock.instant())` 를 부른다. `tick` 은 `fireDue` 뒤에 `startQueued` 를 부르고, 둘의 예외를 따로 잡는다
+- `@Scheduled` 는 `ApplicationReadyEvent` 보다 먼저 돌기 시작한다. `TaskRunRecovery` 가 끝나기 전에는 `runScheduled` 가 아무것도 하지 않게 한다(`TaskRunRecovery` 가 끝나면 켜는 `AtomicBoolean`). 그 전에 연 줄을 정리가 닫지 않게 하기 위해서다
 - `B/task/application/TaskRunRecovery.java`: `@EventListener(ApplicationReadyEvent.class) @Order(20)` 에서 `RUNNING` 줄을 `FAILED`(`INTERRUPTED`)로 닫고 알린다
 
 ### 6. e2e 와 설정
@@ -104,17 +106,17 @@ turn 의 저장은 `B/chat/application/ChatService.java` 의 `saveQuestion` 이 
 
 | 파일 | 확인하는 것 |
 | --- | --- |
-| `TaskFiringTest.java` | `0 9 1 * *` `Asia/Seoul` 작업에서 시계를 `2026-10-31T15:00:30Z` 로 두고 `fireDue` 하면 `QUEUED` 하나와 `next_fire_at = 2026-11-30T15:00:00Z`. 같은 시각으로 다시 불러도 하나. **서버를 다시 띄운 것처럼** 새 `TaskFiring` 빈(같은 DB)으로 다시 불러도 하나. 사흘 늦게 부르면 `RUN_ONCE` 는 마지막 예정 시각 하나, `SKIP` 은 `SKIPPED`(`MISSED`) 하나이고 알림이 없다. 멈춘 작업은 발화하지 않는다. 그 사용자의 24시간 안 발화가 48개면 `SKIPPED`(`DAILY_LIMIT`)와 `TASK_SKIPPED` 알림. `ONCE` 는 한 번 뒤 `next_fire_at` 이 빈다 |
-| `TaskRunStarterTest.java` | 가짜 Hermes 로 `QUEUED` 를 열면 `SUCCEEDED` 와 `execution_id` 가 차고, 새 대화의 `task_id` 와 제목이 작업이고, 메시지가 SYSTEM 알림 줄, USER 지시, ASSISTANT 답 순이고 `auto_turn_count` 가 0 이다. `ALWAYS` 면 `TASK_SUCCEEDED` 하나, `ON_FAILURE` 면 없음. 사용자 자리를 채워 두면 `QUEUED` 로 남고 대화가 하나만 생긴다. 예정 시각에서 10분이 지나면 `SKIPPED`(`BUSY`)와 알림. 에이전트를 끄면 `SKIPPED`(`AGENT_UNAVAILABLE`). 주인을 허용 목록에서 끄면 `SKIPPED`(`OWNER_REVOKED`)이고 알림이 없다. 멈춘 작업의 `QUEUED` 는 `SKIPPED`(`PAUSED`). Hermes 가 실패하면 `FAILED` 와 `TASK_FAILED`. `SINGLE` 은 두 번째 발화가 같은 대화에 이어진다 |
-| `TaskRunRecoveryTest.java` | `RUNNING` 줄이 기동 정리에서 `FAILED`(`INTERRUPTED`)가 되고 알림이 하나 생긴다. `QUEUED` 줄은 그대로다 |
+| `TaskFiringTest.java` | `0 9 1 * *` `Asia/Seoul` 작업에서 시계를 `2026-11-01T00:00:30Z` 로 두고 `fireDue` 하면 `QUEUED` 하나와 `next_fire_at = 2026-12-01T00:00:00Z`. 같은 시각으로 다시 불러도 하나. **발화를 만든 뒤 `next_fire_at` 을 옮기기 전에 서버가 내려간 것처럼** trigger 의 `next_fire_at` 을 `2026-11-01T00:00:00Z` 로 되돌린 뒤 `fireDue` 를 다시 불러도 줄은 하나이고 예외가 없으며 `next_fire_at` 은 다시 12월 1일이다. 예외를 내는 trigger(예: 저장된 시간대 이름이 틀린 줄)와 정상 trigger 를 함께 두면 정상 trigger 는 발화한다. 사흘 늦게 부르면 `RUN_ONCE` 는 마지막 예정 시각 하나, `SKIP` 은 `SKIPPED`(`MISSED`) 하나이고 알림이 없다. 멈춘 작업은 발화하지 않는다. 그 사용자의 24시간 안 발화가 48개면 `SKIPPED`(`DAILY_LIMIT`)와 `TASK_SKIPPED` 알림. `ONCE` 는 한 번 뒤 `next_fire_at` 이 빈다 |
+| `TaskRunStarterTest.java` | 가짜 Hermes 로 `QUEUED` 를 열면 `SUCCEEDED` 와 `execution_id` 가 차고, 새 대화의 `task_id` 와 제목이 작업이고, 메시지가 SYSTEM 알림 줄, USER 지시, ASSISTANT 답 순이고 `auto_turn_count` 가 0 이다. `ALWAYS` 면 `TASK_SUCCEEDED` 하나, `ON_FAILURE` 면 없음. 사용자 자리를 채워 두면 `QUEUED` 로 남고 대화가 하나만 생긴다. 사용자 자리를 채운 채 줄을 만든 때에서 10분이 지나면 `SKIPPED`(`BUSY`)와 알림. 놓친 발화로 예정 시각보다 30분 늦게 만든 `QUEUED` 줄은 바로 열린다. 에이전트를 끄면 `SKIPPED`(`AGENT_UNAVAILABLE`). 주인을 허용 목록에서 끄면 `SKIPPED`(`OWNER_REVOKED`)이고 알림이 없다. 멈춘 작업의 `QUEUED` 는 `SKIPPED`(`PAUSED`). Hermes 가 실패하면 `FAILED` 와 `TASK_FAILED`. `SINGLE` 은 두 번째 발화가 같은 대화에 이어진다 |
+| `TaskRunRecoveryTest.java` | `RUNNING` 줄이 기동 정리에서 `FAILED`(`INTERRUPTED`)가 되고 알림이 하나 생긴다. `QUEUED` 줄은 그대로다. 정리가 끝나기 전에 `runScheduled` 를 부르면 아무 줄도 만들거나 열지 않는다 |
 
 `test/e2e/scenarios/scheduled-task.ts`:
 
 - `test/e2e/scenarios/connector-policy.ts` 와 `notifications.ts` 가 승인이 필요한 커넥터 도구를 부르게 하는 방식(가짜 Hermes 의 probe 문구, 연결 등록, 정책 hook)을 읽고 같은 방법을 쓴다
-- 그 커넥터 에이전트로 `ONCE` 작업을 지금부터 3초 뒤(`timeZone: "UTC"`)로 만들고, 지시에 승인이 필요한 도구를 부르는 probe 문구를 넣는다
+- 그 커넥터 에이전트로 `ONCE` 작업을 지금부터 3초 뒤(`timeZone: "UTC"`)로 만든다. 가짜 Hermes 는 입력이 `CONNECTOR_TOOL_PROBE` 문구로 **시작할 때만** probe 로 본다(`test/e2e/fake-hermes.ts`). 지시의 맨 앞에 그 문구를 둔다
 - `GET /api/v1/tasks/{id}/runs` 를 짧은 간격으로 읽어 한 줄이 `SUCCEEDED` 가 되기를 기다린다(상한 60초)
 - 그 줄의 대화의 승인 줄 목록에 `PENDING` 이 있고, 알림 목록에 그 대화를 가리키는 `APPROVAL_REQUESTED` 와 `TASK_SUCCEEDED` 가 있다
-- 그 승인 줄을 승인하면 기존 승인 경로대로 실행되고 결과가 그 대화에 이어진다
+- 그 승인 줄을 승인하면 기존 승인 경로대로 실행되고 결과가 그 대화에 이어진다. e2e 의 승인 만료는 15초다(`test/e2e/run.ts` 의 `ASSISTANT_CONNECTOR_POLICY_APPROVAL_TTL`). `SUCCEEDED` 를 본 뒤 바로 승인한다
 - 발화 기록은 여전히 한 줄이다
 - 이웃 시나리오처럼 `finally` 에서 정책 hook 을 되돌리고 연결을 해제하고 작업을 지운다
 
