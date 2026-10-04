@@ -4,11 +4,15 @@ import { join } from "node:path";
 import test from "node:test";
 import {
   allCardsEmpty,
+  isoToSeoulInput,
+  itemActions,
   itemHref,
   moreText,
   nowLinkLabel,
   originText,
   reasonText,
+  seoulInputToIso,
+  snoozeUntil,
   type AttentionCard,
   type AttentionCardKey,
   type AttentionItem,
@@ -126,4 +130,51 @@ test("더 있는 항목이 없으면 안내가 없다", () => {
 test("「지금 볼 것」 링크의 이름은 0 이면 수를 싣지 않는다", () => {
   assert.equal(nowLinkLabel(0), "지금 볼 것");
   assert.equal(nowLinkLabel(3), "지금 볼 것 3건");
+});
+
+test("「내일 아침」 은 서울 기준 다음 날 09:00 이다", () => {
+  // 서울 23:30 이면 바로 다음 날 아침이다.
+  assert.equal(snoozeUntil("tomorrow", new Date("2026-10-04T14:30:00Z")), "2026-10-05T00:00:00.000Z");
+  // 서울에서 이미 날짜가 넘어간 01:30 이면 그다음 날 아침이다.
+  assert.equal(snoozeUntil("tomorrow", new Date("2026-10-04T16:30:00Z")), "2026-10-06T00:00:00.000Z");
+});
+
+test("「일주일 뒤」 는 7일 뒤 같은 시각이다", () => {
+  assert.equal(snoozeUntil("week", new Date("2026-10-04T01:00:00Z")), "2026-10-11T01:00:00.000Z");
+});
+
+test("기한 입력은 서울의 벽시계로 읽고 그대로 되돌린다", () => {
+  assert.equal(seoulInputToIso("2026-10-05T18:00"), "2026-10-05T09:00:00.000Z");
+  assert.equal(isoToSeoulInput("2026-10-05T09:00:00Z"), "2026-10-05T18:00");
+  assert.equal(isoToSeoulInput(null), "");
+});
+
+test("빈 기한이나 형식이 틀린 기한은 없는 기한이다", () => {
+  assert.equal(seoulInputToIso(""), null);
+  assert.equal(seoulInputToIso("내일"), null);
+});
+
+test("항목의 단추는 now.md 「동작」 표를 따른다", () => {
+  const conversationId = "7b1e0000-0000-4000-8000-000000000000";
+  const followUp = { id: "0199a000-0000-7000-8000-000000000001", dueAt: null, waiting: false, proposed: true };
+  const labels = (target: AttentionItem) => itemActions(target).map((action) => [action.kind, action.label]);
+  assert.deepEqual(labels(item({ why: why("FOLLOW_UP_PROPOSED", []), conversationId, followUp })), [
+    ["accept", "받아들이기"],
+    ["reject", "거절"],
+    ["edit", "고치기"],
+  ]);
+  assert.deepEqual(labels(item({ why: why("FOLLOW_UP_OPEN", []), followUp: { ...followUp, proposed: false } })), [
+    ["done", "끝냄"],
+    ["drop", "그만둠"],
+    ["edit", "고치기"],
+  ]);
+  assert.deepEqual(labels(item({ why: why("APPROVAL_PENDING", []), conversationId })), [["link", "대화에서 보기"]]);
+  assert.deepEqual(labels(item({ why: why("DELIVERY_FAILED", ["DELIVERY_NOT_DONE"]), conversationId })), [
+    ["link", "대화 열기"],
+  ]);
+  assert.deepEqual(labels(item({ why: why("CONVERSATION_RECENT", []), conversationId })), []);
+});
+
+test("갈 곳이 없는 항목에는 링크 단추가 없다", () => {
+  assert.deepEqual(itemActions(item({ why: why("APPROVAL_PENDING", []), conversationId: null })), []);
 });

@@ -1,5 +1,10 @@
+"use client";
+
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
   Card,
   CardAction,
@@ -14,10 +19,12 @@ import {
   moreText,
   type AttentionCard,
 } from "@/lib/attention";
+import { FollowUpDialog } from "./follow-up-dialog";
 import { NowItem } from "./now-item";
 
 /**
  * 지금 화면의 카드 하나다. 머리의 수는 서버가 상한 전에 센 `nowCount` 이고, 보이는 항목을 다시 세지 않는다.
+ * 「내 차례」 카드 끝에는 「할 일 더하기」 를 두고, 저장하면 서버 부품을 다시 읽는다.
  *
  * @param readAt 응답을 읽은 시각. 항목의 상대 시각을 이 시각 기준으로 센다
  */
@@ -28,6 +35,8 @@ export function NowCard({
   card: AttentionCard;
   readAt: string;
 }) {
+  const router = useRouter();
+  const [adding, setAdding] = useState(false);
   const more = moreText(card);
   return (
     <Card data-testid={`now-card-${card.key}`}>
@@ -53,7 +62,12 @@ export function NowCard({
         ) : (
           <ul className="flex flex-col gap-3">
             {card.items.map((item) => (
-              <NowItem key={item.itemKey} item={item} readAt={readAt} />
+              <NowItem
+                key={item.itemKey}
+                card={card.key}
+                item={item}
+                readAt={readAt}
+              />
             ))}
           </ul>
         )}
@@ -69,6 +83,27 @@ export function NowCard({
           ) : (
             <p className="text-sm text-muted-foreground">{more.text}</p>
           )
+        ) : null}
+        {card.key === "needs_me" ? (
+          <>
+            <Button
+              variant="outline"
+              size="sm"
+              className="self-start"
+              onClick={() => setAdding(true)}
+            >
+              할 일 더하기
+            </Button>
+            <FollowUpDialog
+              open={adding}
+              onOpenChange={setAdding}
+              followUp={null}
+              onSaved={() => {
+                setAdding(false);
+                router.refresh();
+              }}
+            />
+          </>
         ) : null}
       </CardContent>
     </Card>

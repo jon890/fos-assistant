@@ -1,6 +1,10 @@
-import type { Page, Route, TestInfo } from "../../web/node_modules/@playwright/test/index.js";
+import { SignJWT } from "../../web/node_modules/jose/dist/webapi/index.js";
+import type { Locator, Page, Route, TestInfo } from "../../web/node_modules/@playwright/test/index.js";
+import { isoToSeoulInput } from "../../web/src/lib/attention.ts";
 import { expect, setSession, test, type FakeHermesControl } from "./fixtures.ts";
-import { WEB_BASE_URL } from "./settings.ts";
+import { CONTROL_PLANE_BASE_URL, JWT_SECRET, WEB_BASE_URL } from "./settings.ts";
+
+const HOUR_MS = 60 * 60 * 1000;
 
 test.describe("지금 화면", () => {
   function memberOf(projectName: string) {
@@ -70,7 +74,10 @@ test.describe("지금 화면", () => {
     }
     const links = failures.getByTestId("now-item").getByRole("link");
     await expect(links.first()).toBeVisible();
-    const hrefs = await links.evaluateAll((elements) => elements.map((element) => element.getAttribute("href") ?? ""));
+    // 한 줄에 제목 링크와 「대화 열기」 가 함께 있어 같은 주소를 한 번씩만 다시 보낸다.
+    const hrefs = [
+      ...new Set(await links.evaluateAll((elements) => elements.map((element) => element.getAttribute("href") ?? ""))),
+    ];
     const conversationIds = hrefs.map((href) => /^\/chat\/([0-9a-f-]+)$/.exec(href)?.[1]);
     for (const conversationId of conversationIds) {
       expect(conversationId, `실패 항목의 링크가 대화로 가지 않는다: ${hrefs.join(", ")}`).toBeTruthy();
@@ -173,6 +180,182 @@ test.describe("지금 화면", () => {
     await expect(sidebar.getByRole("link", { name: "지금 볼 것 1건" })).toBeVisible();
 
     await page.unrouteAll({ behavior: "ignoreErrors" });
+  });
+
+  /**
+   * 에이전트가 제안한 할 일을 만든다. 제안은 에이전트의 제안 도구만 만들므로 test-support 경로로 넣는다.
+   * 그 사용자의 메일로 서명한 Control Plane 토큰으로 부른다.
+   */
+  async function proposeFollowUp(email: string, conversationId: string, title: string): Promise<string> {
+    const token = await new SignJWT({ name: "지금 화면 보는 사용자" })
+      .setProtectedHeader({ alg: "HS256" })
+      .setSubject(email)
+      .setIssuedAt()
+      .setExpirationTime("2m")
+      .sign(new TextEncoder().encode(JWT_SECRET));
+    const response = await fetch(`${CONTROL_PLANE_BASE_URL}/api/v1/test-support/follow-ups/proposed`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ conversationId, title }),
+    });
+    expect(response.status, `할 일을 제안하지 못했다: ${await response.clone().text()}`).toBe(200);
+    const { id } = (await response.json()) as { id?: unknown };
+    expect(typeof id, "제안한 할 일의 식별자가 없다").toBe("string");
+    return id as string;
+  }
+
+  async function summaryCount(page: Page): Promise<number> {
+    const response = await page.request.get("/api/attention/summary");
+    expect(response.ok(), `지금 볼 것의 수를 읽지 못했다: ${response.status()}`).toBeTruthy();
+    return ((await response.json()) as { nowCount: number }).nowCount;
+  }
+
+  /** 항목의 열쇠로 그 줄을 찾는다. 숨기거나 미룬 줄은 제목이 사라져 글로 찾지 못한다. */
+  async function rowKey(row: Locator): Promise<string> {
+    const key = await row.getAttribute("data-item-key");
+    expect(key, "항목의 열쇠가 없다").toBeTruthy();
+    return key!;
+  }
+
+  function conversationIdOf(href: string | null): string {
+    const id = /^\/chat\/([0-9a-f-]+)$/.exec(href ?? "")?.[1];
+    expect(id, `대화로 가는 링크가 아니다: ${href}`).toBeTruthy();
+    return id!;
+  }
+
+  test("숨긴 실패는 실패 카드에서 빠지고 상태가 바뀌면 다시 보인다", async ({ page, hermes }, testInfo) => {
+    const title = "주간 장보기 영수증 정리";
+    await failTurn(page, hermes, title);
+
+    await page.goto("/now");
+    const failures = page.getByTestId("now-card-failures");
+    const row = failures.getByTestId("now-item").filter({ hasText: title });
+    await expect(row).toHaveCount(1);
+    const conversationId = conversationIdOf(await row.getByRole("link", { name: title }).getAttribute("href"));
+    const key = await rowKey(row);
+    // 앞 검사가 실패를 모두 다시 보냈으므로 이 사용자의 지금 볼 것은 이 실패 하나다.
+    let sidebar = await openSidebar(page, testInfo);
+    await expect(sidebar.getByTestId("now-count")).toHaveText("1");
+
+    await page.goto("/now");
+    const controlled = failures.locator(`[data-item-key="${key}"]`);
+    await controlled.getByRole("button", { name: "이 항목 제어" }).click();
+    await page.getByRole("menuitem", { name: "숨기기" }).click();
+    await expect(controlled).toContainText("숨겼어요");
+    await expect(controlled.getByRole("button", { name: "되돌리기" })).toBeVisible();
+    // 경로가 그대로여도 사이드바의 수를 다시 읽는다.
+    sidebar = await openSidebar(page, testInfo);
+    await expect(sidebar.getByTestId("now-count")).toHaveCount(0);
+
+    await page.goto("/now");
+    await expect(failures.getByTestId("now-item").filter({ hasText: title })).toHaveCount(0);
+    // 제어는 카드마다 걸려 같은 대화가 이어서 하기 카드에는 보인다.
+    await expect(page.getByTestId("now-card-continue").locator(`a[href="/chat/${conversationId}"]`)).toBeVisible();
+    sidebar = await openSidebar(page, testInfo);
+    await expect(sidebar.getByTestId("now-count")).toHaveCount(0);
+
+    await failTurn(page, hermes, "다시 정리해 주세요", conversationId);
+    await page.goto("/now");
+    await expect(failures.locator(`a[href="/chat/${conversationId}"]`).first()).toBeVisible();
+  });
+
+  test("직접 더한 할 일은 내 차례에 보이고 미뤘다 되돌린 뒤 끝낼 수 있다", async ({ page }) => {
+    const title = "장보기 예약 확인";
+    await page.goto("/now");
+    const needsMe = page.getByTestId("now-card-needs_me");
+    await needsMe.getByRole("button", { name: "할 일 더하기" }).click();
+    const dialog = page.getByRole("dialog", { name: "할 일 더하기" });
+    await dialog.getByLabel("제목", { exact: true }).fill(title);
+    await dialog
+      .getByLabel("기한", { exact: true })
+      .fill(isoToSeoulInput(new Date(Date.now() + 3 * HOUR_MS).toISOString()));
+    await dialog.getByRole("button", { name: "저장" }).click();
+    await expect(dialog).toHaveCount(0);
+
+    const row = needsMe.getByTestId("now-item").filter({ hasText: title });
+    await expect(row).toHaveCount(1);
+    await expect(row).toContainText("기한이 다가왔어요");
+    await expect(row.getByText("지금", { exact: true })).toBeVisible();
+    await expect(row).toContainText("직접 더함");
+
+    const controlled = needsMe.locator(`[data-item-key="${await rowKey(row)}"]`);
+    await controlled.getByRole("button", { name: "이 항목 제어" }).click();
+    await page.getByRole("menuitem", { name: "내일 아침으로 미루기" }).click();
+    await expect(controlled).toContainText("미뤘어요");
+    await controlled.getByRole("button", { name: "되돌리기" }).click();
+    await expect(controlled).toContainText(title);
+
+    await page.goto("/now");
+    await expect(row).toHaveCount(1);
+    await row.getByRole("button", { name: "끝냄" }).click();
+    await expect(row).toHaveCount(0);
+  });
+
+  test("에이전트가 제안한 할 일은 건수에 세지 않고 고쳐서 받아들이거나 거절할 수 있다", async ({
+    page,
+    hermes,
+  }, testInfo) => {
+    const email = memberOf(testInfo.project.name).email;
+    await page.goto("/now");
+    const failed = page.getByTestId("now-card-failures").getByTestId("now-item").getByRole("link");
+    if ((await failed.count()) === 0) {
+      await failTurn(page, hermes, "주간 장보기 영수증 정리");
+      await page.goto("/now");
+    }
+    const conversationId = conversationIdOf(await failed.first().getAttribute("href"));
+
+    const title = "학교 상담 신청서 내기";
+    const before = await summaryCount(page);
+    await proposeFollowUp(email, conversationId, title);
+    expect(await summaryCount(page), "제안이 지금 볼 것의 수에 들어갔다").toBe(before);
+
+    await page.goto("/now");
+    const needsMe = page.getByTestId("now-card-needs_me");
+    const row = needsMe.getByTestId("now-item").filter({ hasText: title });
+    await expect(row).toHaveCount(1);
+    await expect(row).toHaveAttribute("data-attention", "LATER");
+    await expect(row).toContainText("에이전트가 할 일로 제안했어요");
+    await expect(row).toContainText("대화에서");
+
+    const due = isoToSeoulInput(new Date(Date.now() + 72 * HOUR_MS).toISOString());
+    await row.getByRole("button", { name: "고치기" }).click();
+    const dialog = page.getByRole("dialog", { name: "할 일 고치기" });
+    await expect(dialog.getByLabel("제목", { exact: true })).toHaveValue(title);
+    await dialog.getByLabel("기한", { exact: true }).fill(due);
+    await dialog.getByRole("button", { name: "저장" }).click();
+    await expect(dialog).toHaveCount(0);
+
+    await page.goto("/now");
+    await row.getByRole("button", { name: "고치기" }).click();
+    await expect(dialog.getByLabel("기한", { exact: true })).toHaveValue(due);
+    await dialog.getByRole("button", { name: "취소" }).click();
+    await expect(dialog).toHaveCount(0);
+
+    await row.getByRole("button", { name: "받아들이기" }).click();
+    await expect(row).toContainText("챙기고 있는 할 일이에요");
+    for (const name of ["끝냄", "그만둠", "고치기"]) {
+      await expect(row.getByRole("button", { name, exact: true })).toBeVisible();
+    }
+    await expect(row.getByRole("button", { name: "받아들이기" })).toHaveCount(0);
+    await expect(row.getByRole("button", { name: "거절" })).toHaveCount(0);
+
+    if (testInfo.project.name === "mobile") {
+      await row.getByRole("button", { name: "이 항목 제어" }).click();
+      await expect(page.getByRole("menuitem", { name: "일주일 뒤로 미루기" })).toBeVisible();
+      expect(
+        await page.evaluate(() => document.documentElement.scrollWidth),
+        "메뉴나 단추가 좁은 폭 밖으로 넘친다",
+      ).toBeLessThanOrEqual(390);
+      await page.keyboard.press("Escape");
+    }
+
+    const second = "주말 장보기 목록 공유";
+    await proposeFollowUp(email, conversationId, second);
+    await page.goto("/now");
+    const rejected = needsMe.getByTestId("now-item").filter({ hasText: second });
+    await expect(rejected).toHaveCount(1);
+    await rejected.getByRole("button", { name: "거절" }).click();
+    await expect(rejected).toHaveCount(0);
   });
 
   // 이 파일의 검사들이 같은 사용자와 에이전트를 함께 쓰므로 검사마다 지우지 않고 끝에 한 번 지운다.

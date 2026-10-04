@@ -202,3 +202,109 @@ export function moreText(
 export function nowLinkLabel(nowCount: number): string {
   return nowCount > 0 ? `지금 볼 것 ${nowCount}건` : "지금 볼 것";
 }
+
+/**
+ * 가족이 사는 시간대(`Asia/Seoul`)와 UTC 의 차이다. 한국은 일광 절약 시간이 없어 고정으로 더하고 뺀다.
+ * 브라우저의 시간대를 따르지 않는다. 같은 화면이 어느 기기에서도 같은 기한을 보내게 하려는 것이다.
+ */
+const SEOUL_OFFSET_MS = 9 * 60 * 60 * 1000;
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * 미루기의 기한이다. 「내일 아침」 은 서울 기준 다음 날 09:00, 「일주일 뒤」 는 지금에서 7일 뒤 같은 시각이다.
+ *
+ * @returns `toISOString()` 글
+ */
+export function snoozeUntil(kind: "tomorrow" | "week", now: Date): string {
+  if (kind === "week")
+    return new Date(now.getTime() + 7 * DAY_MS).toISOString();
+  const seoul = new Date(now.getTime() + SEOUL_OFFSET_MS);
+  const nextMorning = Date.UTC(
+    seoul.getUTCFullYear(),
+    seoul.getUTCMonth(),
+    seoul.getUTCDate() + 1,
+    9,
+  );
+  return new Date(nextMorning - SEOUL_OFFSET_MS).toISOString();
+}
+
+const SEOUL_INPUT = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/;
+
+/**
+ * `datetime-local` 입력의 `YYYY-MM-DDTHH:mm` 을 서울의 그 시각으로 읽는다.
+ *
+ * @returns `toISOString()` 글. 빈 글이거나 형식이 틀리거나 없는 날짜면 `null`
+ */
+export function seoulInputToIso(value: string): string | null {
+  const match = SEOUL_INPUT.exec(value);
+  if (!match) return null;
+  const [year, month, day, hour, minute] = match.slice(1).map(Number);
+  const wall = Date.UTC(year, month - 1, day, hour, minute);
+  const parsed = new Date(wall);
+  // Date.UTC 는 2월 30일 같은 값을 다음 달로 넘긴다. 넘겼으면 없는 날짜로 본다.
+  if (
+    parsed.getUTCFullYear() !== year ||
+    parsed.getUTCMonth() !== month - 1 ||
+    parsed.getUTCDate() !== day ||
+    parsed.getUTCHours() !== hour ||
+    parsed.getUTCMinutes() !== minute
+  ) {
+    return null;
+  }
+  return new Date(wall - SEOUL_OFFSET_MS).toISOString();
+}
+
+/**
+ * `seoulInputToIso` 의 반대다. 서울의 벽시계로 `datetime-local` 입력값을 만든다.
+ *
+ * @returns `null` 이거나 읽지 못하는 시각이면 빈 글
+ */
+export function isoToSeoulInput(iso: string | null): string {
+  if (iso === null) return "";
+  const time = new Date(iso).getTime();
+  if (Number.isNaN(time)) return "";
+  return new Date(time + SEOUL_OFFSET_MS).toISOString().slice(0, 16);
+}
+
+export type ItemAction = {
+  kind: "link" | "accept" | "reject" | "edit" | "done" | "drop";
+  label: string;
+};
+
+/**
+ * 항목의 단추다. `docs/frontend/now.md` 의 「동작」 표를 `trigger` 로 고른다.
+ *
+ * <p>결과 전달 실패도 「대화 열기」 뿐이다. 다시 전달은 그 대화의 알림 줄이 한다.
+ * `link` 단추는 갈 곳(`itemHref`)이 없으면 내지 않는다.
+ */
+export function itemActions(item: AttentionItem): ItemAction[] {
+  const link = (label: string): ItemAction[] =>
+    itemHref(item) === null ? [] : [{ kind: "link", label }];
+  switch (item.why.trigger) {
+    case "EXECUTION_FAILED":
+    case "DELIVERY_FAILED":
+      return link("대화 열기");
+    case "APPROVAL_PENDING":
+      return link("대화에서 보기");
+    case "MEMORY_PROPOSED":
+      return link("기억에서 보기");
+    case "FOLLOW_UP_PROPOSED":
+      return [
+        { kind: "accept", label: "받아들이기" },
+        { kind: "reject", label: "거절" },
+        { kind: "edit", label: "고치기" },
+      ];
+    case "FOLLOW_UP_OPEN":
+      return [
+        { kind: "done", label: "끝냄" },
+        { kind: "drop", label: "그만둠" },
+        { kind: "edit", label: "고치기" },
+      ];
+    case "DELEGATION_RUNNING":
+    case "DELEGATION_FINISHED":
+      return link("작업 과정 보기");
+    default:
+      return [];
+  }
+}

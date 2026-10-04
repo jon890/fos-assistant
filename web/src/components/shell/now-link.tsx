@@ -4,33 +4,45 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { nowLinkLabel } from "@/lib/attention";
-import { fetchAttentionSummary } from "@/lib/attention-api";
+import {
+  ATTENTION_CHANGED_EVENT,
+  fetchAttentionSummary,
+} from "@/lib/attention-api";
 import { NavPending } from "./nav-pending";
 
 /**
  * 사이드바 최상단의 「지금 볼 것」 링크다. 주요 화면 메뉴가 아니어서 대화 목록이 길어도 스크롤 없이 보인다.
  *
  * <p>배지는 `nowCount` 하나만 그린다. 알림 단추의 읽지 않은 수와 섞이지 않게 muted 바탕에 테두리 없이 그리고,
- * 낭독기에서는 숨긴 채 링크의 `aria-label` 이 수를 읽는다. 화면을 옮길 때마다 다시 읽는다.
+ * 낭독기에서는 숨긴 채 링크의 `aria-label` 이 수를 읽는다. 화면을 옮길 때마다 다시 읽고,
+ * 지금 화면 안의 동작처럼 경로가 그대로인 변화는 `ATTENTION_CHANGED_EVENT` 를 받아 다시 읽는다.
  */
 export function NowLink({ onNavigate }: { onNavigate(href: string): void }) {
   const pathname = usePathname();
   const [nowCount, setNowCount] = useState(0);
   useEffect(() => {
+    // 읽기마다 차례 번호를 붙여, 늦게 온 앞선 답이 나중 답을 덮지 않게 한다.
+    let latest = 0;
     let stale = false;
-    void fetchAttentionSummary()
-      .then((response) => (response.ok ? response.json() : { nowCount: 0 }))
-      .then((summary: { nowCount?: unknown }) => {
-        if (stale) return;
-        setNowCount(
-          typeof summary.nowCount === "number" ? summary.nowCount : 0,
-        );
-      })
-      .catch(() => {
-        if (!stale) setNowCount(0);
-      });
+    const read = () => {
+      const turn = ++latest;
+      void fetchAttentionSummary()
+        .then((response) => (response.ok ? response.json() : { nowCount: 0 }))
+        .then((summary: { nowCount?: unknown }) => {
+          if (stale || turn !== latest) return;
+          setNowCount(
+            typeof summary.nowCount === "number" ? summary.nowCount : 0,
+          );
+        })
+        .catch(() => {
+          if (!stale && turn === latest) setNowCount(0);
+        });
+    };
+    read();
+    window.addEventListener(ATTENTION_CHANGED_EVENT, read);
     return () => {
       stale = true;
+      window.removeEventListener(ATTENTION_CHANGED_EVENT, read);
     };
   }, [pathname]);
 
