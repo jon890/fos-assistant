@@ -31,14 +31,15 @@
 | `APPROVAL_PENDING` | `needs_me` | `connector_action` | `PENDING` 이고 `expires_at` 전 | 늘 | 승인, 거절, 만료 | `connector_action:<공개 식별자>` | `status` | `CONTROL_PLANE` |
 | `MEMORY_PROPOSED` | `needs_me` | 주인의 `USER` Memory | `PROPOSED` | 아니다 | 받아들임, 거절 | `memory:<번호>` | `revision` | `MODEL_INFERRED` |
 | `FOLLOW_UP_PROPOSED` | `needs_me` | `follow_up` | `PROPOSED` | 아니다 | 받아들임, 거절 | `follow_up:<공개 식별자>` | `updated_at` | `MODEL_INFERRED` |
-| `FOLLOW_UP_OPEN` | `needs_me` | `follow_up` | `OPEN` | 기한이 `due-soon` 안이거나 지났다. 또는 연결한 대화에 결과가 도착했다 | 끝냄, 그만둠 | `follow_up:<공개 식별자>` | `updated_at` 과 연결한 대화의 마지막 `SYSTEM` 메시지 번호 | `USER_CONFIRMED` |
+| `FOLLOW_UP_OPEN` | `needs_me` | `follow_up` | `OPEN` | 기한이 `due-soon` 안이거나 지났다. 또는 연결한 대화에 결과가 도착했다 | 끝냄, 그만둠 | `follow_up:<공개 식별자>` | `updated_at` 과 연결한 대화의 마지막 결과 전달 시각 | `USER_CONFIRMED` |
 | `DELEGATION_RUNNING` | `delegated` | 주인의 위임 실행. `delegation_key` 가 있다 | `RUNNING` | 시작한 지 `long-running-after` 를 넘었다 | 끝남 | `execution:<번호>` | `status` | `CONTROL_PLANE` |
 | `DELEGATION_FINISHED` | `delegated` | 주인의 위임 실행 | 끝났고 `finished_at` 이 `delegated-window` 안 | 아니다 | 없다 | `execution:<번호>` | `status` | `CONTROL_PLANE` |
 | `CONVERSATION_RECENT` | `continue` | 주인의 대화. `deleted_at` 이 비어 있다 | `updated_at` 순으로 `continue-count` 개 | 아니다 | 없다 | `conversation:<대화 공개 식별자>` | `updated_at` | `CONTROL_PLANE` |
 
-「연결한 대화에 결과가 도착했다」 는 그 대화에 할 일의 `accepted_at` 보다 뒤에 `SYSTEM` 메시지(맡긴 일이나 승인한 동작의 결과가 도착했다는 알림 줄)가 생겼다는 뜻이다.
+「연결한 대화에 결과가 도착했다」 는 그 대화의 맡긴 일(`agent_execution.result_delivered_at`)이나 승인한 동작(`connector_action.result_delivered_at`)의 결과가 할 일의 `accepted_at` 보다 뒤에 전해졌다는 뜻이다.
+`SYSTEM` 메시지로 판정하지 않는다. 자동 turn 한도 안내와 승인 거절이나 만료 알림도 `SYSTEM` 메시지라 결과 도착과 구분하지 못한다.
 사용자가 그 대화에서 주고받는 답은 세지 않는다. 대화하는 동안 할 일이 계속 `NOW` 가 되지 않게 하려는 것이다.
-숨기면 `stateKey` 가 그 `SYSTEM` 메시지 번호를 담아, 다음 결과가 도착할 때까지 보이지 않는다.
+숨기면 `stateKey` 가 그 결과 전달 시각을 담아, 다음 결과가 전해질 때까지 보이지 않는다.
 
 `MEMORY_PROPOSED` 는 기억 메뉴의 제안 건수에 이미 센다. 지금 화면의 건수에는 세지 않는다.
 
@@ -139,7 +140,7 @@
 `itemKey` 에 `:` 와 UUID 가 들어 있어 경로 대신 본문으로 받는다.
 **제어는 카드마다 따로 둔다.** 같은 대화가 실패 카드와 이어서 하기 카드에 함께 열쇠로 쓰여도, 한 카드에서 숨긴 것이 다른 카드의 제어를 덮어쓰지 않는다.
 `hide`, `snooze`, `restore`, `events` 는 성공하면 본문 없이 204 로 답한다. 같은 요청을 다시 보내도 204 다.
-`hide`, `snooze`, `events` 의 `itemKey` 가 지금 요청자의 후보에 없으면 404 `ATTENTION_ITEM_NOT_FOUND` 다. 남의 항목과 없는 항목을 같은 응답으로 숨긴다. `restore` 는 지운 것이 없어도 204 다.
+`hide`, `snooze` 의 `itemKey` 가 지금 요청자의 후보에 없으면 404 `ATTENTION_ITEM_NOT_FOUND` 다. `events` 는 지금 후보에 있거나, 그 요청자에게 같은 `itemKey` 의 `SHOWN` 사건이 있으면 받는다. 받아들이기와 끝냄처럼 동작이 성공하면 그 항목이 후보에서 빠지므로, 그 뒤에 보내는 `ACTED` 를 잃지 않게 하려는 것이다. 둘 다 아니면 404 `ATTENTION_ITEM_NOT_FOUND` 다. 남의 항목과 없는 항목을 같은 응답으로 숨긴다. `restore` 는 지운 것이 없어도 204 다.
 
 응답의 모양은 아래와 같다.
 
