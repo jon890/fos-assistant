@@ -18,12 +18,15 @@ Hermes 에 설치하는 묶음과 그때 받는 값은 [`hermes/README.md`](../h
 ## 개별 실행
 
 전체 검사는 [`AGENTS.md`](../AGENTS.md) 의 「확인」 절이 갖는다.
-한 쪽만 돌릴 때는 아래와 같다.
+한 쪽만 돌릴 때는 아래와 같다. 각 줄은 저장소 root 에서 따로 돈다.
 
 ```bash
-cd backend && ./gradlew test
-cd web && pnpm install && pnpm typecheck && pnpm build
+# cwd: 저장소 root
+(cd backend && ./gradlew test)
+(cd web && pnpm install && pnpm typecheck)
 ```
+
+`pnpm build` 는 자리표시자 환경 변수가 있어야 통과한다. 그 값은 [`web/AGENTS.md`](../web/AGENTS.md) 의 「검사」 절이 갖는다.
 
 ## 환경 변수
 
