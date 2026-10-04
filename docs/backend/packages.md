@@ -30,6 +30,7 @@ Control Plane 의 패키지마다 맡는 책임과 패키지 사이의 방향 �
 | `orchestration` | 흐름의 구현과 자식 실행, MCP `agent_*` 위임의 시작과 조회와 중지, 하위 에이전트 session 등록 |
 | `skill` | 올린 스킬의 읽기와 쓰기, 버전 디렉터리, Hermes 에 게시, 스킬 목록과 호출 이력 조회 |
 | `connector` | 커넥터 카탈로그, 사용자별 연결, 커넥터 도구 호출의 판정과 기록 |
+| `notification` | 사용자에게 대화 밖에서 알리는 줄의 저장과 읽음 표시, 사용자 단위 SSE, 오래된 줄 정리([`notification.md`](notification.md)) |
 
 검사: `ArchitectureRules.SHARED_DOES_NOT_DEPEND_ON_DOMAINS`
 
@@ -46,28 +47,30 @@ Control Plane 의 패키지마다 맡는 책임과 패키지 사이의 방향 �
 
 ### 최상위 패키지의 층 순서
 
-최상위 패키지는 아래 순서를 따른다. 자리 1 이 맨 아래이고 13 이 맨 위다.
+최상위 패키지는 아래 순서를 따른다. 자리 1 이 맨 아래이고 14 가 맨 위다.
 
 | 자리 | 패키지 |
 | --- | --- |
 | 1 | `hermes` |
 | 2 | `user` |
-| 3 | `model` |
-| 4 | `agent` |
-| 5 | `skill` |
-| 6 | `usage` |
-| 7 | `memory` |
-| 8 | `context` |
-| 9 | `chat` |
-| 10 | `orchestration` |
-| 11 | `mcp` |
-| 12 | `people` |
-| 13 | `connector` |
+| 3 | `notification` |
+| 4 | `model` |
+| 5 | `agent` |
+| 6 | `skill` |
+| 7 | `usage` |
+| 8 | `memory` |
+| 9 | `context` |
+| 10 | `chat` |
+| 11 | `orchestration` |
+| 12 | `mcp` |
+| 13 | `people` |
+| 14 | `connector` |
 
 위 패키지는 아래 패키지를 쓰고 아래 패키지는 위 패키지를 import 하지 않는다.
 거꾸로 써야 하면 아래 패키지에 port 를 두고 위 패키지가 구현한다.
 새 최상위 패키지를 만들면 이 순서의 자리를 정하고 `TopLevelPackageOrder.ORDER` 에 넣는다.
 `shared` 는 순서 밖이고 어느 패키지도 쓰지 않는다.
+`notification` 은 `user` 바로 위다. 알림을 만드는 쪽(`connector`, 그 위의 패키지)이 모두 이 패키지를 부르고, 이 패키지는 알림을 받는 사용자 말고 다른 도메인을 모른다.
 검사: `ArchitectureRules.TOP_LEVEL_PACKAGES_FOLLOW_LAYER_ORDER`, 근거: ADR-068
 
 ### connector
@@ -88,12 +91,12 @@ Control Plane 의 패키지마다 맡는 책임과 패키지 사이의 방향 �
 | --- | --- |
 | `connector.presentation.ConnectorPolicyController` | `POST /internal/hermes/connector-policy`. profile 토큰으로 인증한 요청을 받아 서명을 확인하고 판정을 돌려준다 |
 | `connector.application.ConnectorPolicyRequest` | 요청 본문과 서명 검증. `_fos_ctx` 와 같은 key 를 쓰고 HMAC 은 `mcp.application.McpCallContext` 의 것을 부른다 |
-| `connector.application.ConnectorPolicyService` | 실행과 연결과 카탈로그를 찾아 판정하고 `connector_action` 한 줄을 남긴다 |
+| `connector.application.ConnectorPolicyService` | 실행과 연결과 카탈로그를 찾아 판정하고 `connector_action` 한 줄을 남긴다. 승인 줄이면 같은 트랜잭션에서 `APPROVAL_REQUESTED` 알림도 남긴다 |
 | `connector.application.ConnectorCatalogCache` | 판정 경로가 쓰는 카탈로그를 60초 동안 메모리에 둔다. 화면 경로는 쓰지 않는다 |
 | `connector.domain.ToolPolicyDecision` | 판정 함수. Hermes 와 DB 를 모른다 |
 | `connector.domain.ConnectorAction` | 판정 한 줄과 승인 줄. 승인 상태 전이를 갖는다 |
 
-**다른 패키지는 `connector` 를 import 하지 않는다.** `connector` 가 `agent`, `hermes`, `mcp`, `orchestration`, `usage`, `user` 를 부른다. 승인 줄의 대화 권한을 확인하려고 `chat` 도 부른다. `connector` 가 `mcp` 를 쓰므로 `mcp` 가 `connector` 를 부르면 순환이 된다. `chat` 이 승인 결과를 읽어야 할 때는 `chat` 에 port 를 두고 `connector` 가 구현한다.
+**다른 패키지는 `connector` 를 import 하지 않는다.** `connector` 가 `agent`, `hermes`, `mcp`, `orchestration`, `usage`, `user` 를 부른다. 승인 줄의 대화 권한을 확인하고 알림이 가리킬 대화의 공개 식별자를 찾으려고 `chat` 도 부른다. 승인 요청과 만료의 알림을 같은 트랜잭션에서 만들려고 `notification` 도 부른다. `connector` 가 `mcp` 를 쓰므로 `mcp` 가 `connector` 를 부르면 순환이 된다. `chat` 이 승인 결과를 읽어야 할 때는 `chat` 에 port 를 두고 `connector` 가 구현한다.
 검사: `ArchitectureRules.TOP_LEVEL_PACKAGES_FREE_OF_CYCLES`
 
 ## 한 번의 대화가 지나는 길

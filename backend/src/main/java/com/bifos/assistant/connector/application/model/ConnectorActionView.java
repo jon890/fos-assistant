@@ -47,14 +47,11 @@ public record ConnectorActionView(
      */
     public static ConnectorActionView from(
             ConnectorAction action, Optional<ToolPolicy> declared, boolean grantable, boolean hiddenArgs) {
-        String title = declared.map(ToolPolicy::title)
-                .filter(declaredTitle -> !declaredTitle.isBlank())
-                .orElse(UNNAMED_TITLE);
         return new ConnectorActionView(
                 action.publicId(),
                 action.connectorId(),
                 action.toolName(),
-                title,
+                titleOf(declared),
                 action.risk(),
                 action.status(),
                 ToolDetailRedactor.redactArguments(action.argsJson()),
@@ -64,5 +61,17 @@ public record ConnectorActionView(
                 action.expiresAt(),
                 action.grantAllowed() && grantable,
                 hiddenArgs);
+    }
+
+    /**
+     * 사람에게 보일 도구 제목이다. 승인 카드와 알림이 같은 제목을 쓰도록 둘 다 이 규칙을 부른다.
+     *
+     * @param declared 카탈로그가 선언한 그 도구의 정책. 선언이 없거나 카탈로그를 읽지 못했으면 빈 값
+     * @return 선언의 제목. 없거나 공백이면 {@link #UNNAMED_TITLE}
+     */
+    public static String titleOf(Optional<ToolPolicy> declared) {
+        return declared.map(ToolPolicy::title)
+                .filter(declaredTitle -> !declaredTitle.isBlank())
+                .orElse(UNNAMED_TITLE);
     }
 }
