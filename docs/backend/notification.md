@@ -23,6 +23,8 @@
 **알림과 그 원인은 한 트랜잭션이다.** 승인 줄을 저장하는 트랜잭션과 만료로 바꾸는 트랜잭션 안에서 알림을 만든다.
 그 트랜잭션이 끝난 뒤에 사용자 단위 SSE 로 알린다. 화면이 사건을 받고 다시 읽을 때 줄이 있어야 한다.
 
+예약 작업의 `TASK_SUCCEEDED`, `TASK_FAILED`, `TASK_SKIPPED` 는 [`task.md`](task.md) 의 「알림」 이 갖는다.
+
 아직 만들지 않은 종류는 [`../code-architecture.md`](../code-architecture.md) 의 「아직 만들지 않은 것」 이 갖는다.
 
 ## 흐름
@@ -74,7 +76,7 @@ sequenceDiagram
 | GET | `/notifications/events` | `text/event-stream`. 아래 사건 |
 
 `NotificationView` 는 `id`(공개 식별자), `kind`, `title`, `body`, `targetType`, `targetId`, `createdAt`, `readAt` 이다.
-`targetType` 은 지금 `CONVERSATION` 하나이고 `targetId` 는 대화의 공개 식별자다. 갈 곳이 없으면 둘 다 비어 있다.
+`targetType` 은 `CONVERSATION` 이나 `TASK` 이고 `targetId` 는 그 대화나 예약 작업의 공개 식별자다. 갈 곳이 없으면 둘 다 비어 있다.
 
 사건은 대화 SSE 와 같은 모양이다. `data:` 줄 하나에 JSON 하나이고 종류는 `type` 칸으로 구분한다. 열자마자 주석 `connected` 를 보내고 정해 둔 간격마다 주석 `ping` 을 보낸다.
 

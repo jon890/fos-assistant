@@ -10,6 +10,7 @@ import com.bifos.assistant.chat.application.ChatService;
 import com.bifos.assistant.chat.application.ModelTierService;
 import com.bifos.assistant.chat.presentation.ChatController;
 import com.bifos.assistant.shared.error.GlobalExceptionHandler;
+import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -23,7 +24,7 @@ class ModelTierRequestValidationTest {
     private final ChatService chat = mock(ChatService.class);
     private final ModelTierService tiers = mock(ModelTierService.class);
     private final MockMvc mvc = MockMvcBuilders.standaloneSetup(
-                    new ChatController(chat, null, null, null, null, null, null, tiers))
+                    new ChatController(chat, null, null, null, null, null, null, tiers, List.of()))
             .setControllerAdvice(new GlobalExceptionHandler())
             .build();
 
