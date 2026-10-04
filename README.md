@@ -114,7 +114,7 @@ Adding a user is a single decision by an administrator, and it must not slow any
 - **Photos and HTML results.** Attach photos for an agent to read, and open the HTML pages an agent produces in a side panel. Scripts in those pages do not run.
 - **Read-only access for other services.** A service token bound to a user lets another service read that user's documents and nothing else.
 
-Screens for editing collections, viewing earlier revisions, and writing documents by hand are planned and not built yet.
+Some Memory screens, such as editing collections and viewing earlier revisions of an entry, are not built yet. The current list is in [`docs/code-architecture.md`](docs/code-architecture.md).
 The full scope, with how each item is verified, is in [`docs/prd.md`](docs/prd.md).
 
 ## What it does not do

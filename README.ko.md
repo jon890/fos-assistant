@@ -115,7 +115,7 @@ Nous Research 의 [Hermes Agent](https://github.com/NousResearch/hermes-agent) �
 - **사진과 HTML 결과물.** 사진을 올려 에이전트에게 보이고, 에이전트가 만든 HTML 페이지를 옆 패널에서 본다. 그 페이지의 스크립트는 돌지 않는다.
 - **다른 서비스의 읽기 전용 접근.** 사용자에 묶인 서비스 토큰으로 다른 서비스가 그 사용자의 문서만 읽는다.
 
-collection 을 고치는 화면, 앞선 판을 읽는 화면, 문서를 사람이 직접 쓰는 화면은 계획이고 아직 만들지 않았다.
+collection 을 고치는 화면과 항목의 앞선 판을 읽는 화면처럼 Memory 의 일부 화면은 아직 만들지 않았다. 지금 목록은 [`docs/code-architecture.md`](docs/code-architecture.md) 의 「Memory 에서 아직 만들지 않은 것」 에 있다.
 전체 범위와 항목별 확인 방법은 [`docs/prd.md`](docs/prd.md) 에 있다.
 
 ## 하지 않는 일
