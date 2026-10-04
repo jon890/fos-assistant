@@ -1,0 +1,25 @@
+{
+  "name": "plan80-follow-up",
+  "description": "에이전트가 제안하고 사람이 받아들인 할 일(follow_up)을 만든다 — 대화에서 나온 후속 작업을 남기되 사람이 받아들인 것만 먼저 알리기 대상으로 삼는다",
+  "status": "pending",
+  "created_at": "2026-10-04",
+  "total_phases": 3,
+  "current_phase": 1,
+  "phases": [
+    {
+      "number": 1,
+      "file": "phase-01.md",
+      "execution_profile": "deep"
+    },
+    {
+      "number": 2,
+      "file": "phase-02.md",
+      "execution_profile": "standard"
+    },
+    {
+      "number": 3,
+      "file": "phase-03.md",
+      "execution_profile": "deep"
+    }
+  ]
+}
