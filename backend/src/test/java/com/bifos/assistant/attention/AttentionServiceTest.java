@@ -19,12 +19,16 @@ import com.bifos.assistant.attention.application.model.AttentionSourceRef;
 import com.bifos.assistant.attention.application.model.AttentionView;
 import com.bifos.assistant.attention.application.model.CardStatus;
 import com.bifos.assistant.attention.domain.type.AttentionLevel;
+import com.bifos.assistant.attention.domain.type.AttentionTrigger;
 import com.bifos.assistant.attention.domain.type.CardKey;
 import com.bifos.assistant.attention.presentation.AttentionController;
 import com.bifos.assistant.chat.domain.ChatMessage;
 import com.bifos.assistant.chat.domain.Conversation;
+import com.bifos.assistant.chat.domain.ResultDelivery;
+import com.bifos.assistant.chat.domain.type.DeliveryStatus;
 import com.bifos.assistant.chat.infra.ChatMessageRepository;
 import com.bifos.assistant.chat.infra.ConversationRepository;
+import com.bifos.assistant.chat.infra.ResultDeliveryRepository;
 import com.bifos.assistant.hermes.HermesConnectorClient;
 import com.bifos.assistant.hermes.dto.ConnectorManifest;
 import com.bifos.assistant.hermes.dto.ConnectorTool;
@@ -61,6 +65,8 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
@@ -136,6 +142,12 @@ class AttentionServiceTest {
     AgentExecutionRepository executions;
 
     @Autowired
+    ResultDeliveryRepository deliveries;
+
+    @Autowired
+    PlatformTransactionManager transactionManager;
+
+    @Autowired
     JdbcTemplate jdbc;
 
     private final List<Long> createdUsers = new ArrayList<>();
@@ -156,6 +168,16 @@ class AttentionServiceTest {
         SecurityContextHolder.clearContext();
         FAILING.failing = false;
         for (Long userId : createdUsers) {
+            String ownConversations = "(SELECT id FROM conversation WHERE user_id = ?)";
+            jdbc.update(
+                    "DELETE FROM result_delivery_attempt WHERE delivery_id IN"
+                            + " (SELECT id FROM result_delivery WHERE conversation_id IN " + ownConversations + ")",
+                    userId);
+            jdbc.update(
+                    "DELETE FROM result_delivery_item WHERE delivery_id IN"
+                            + " (SELECT id FROM result_delivery WHERE conversation_id IN " + ownConversations + ")",
+                    userId);
+            jdbc.update("DELETE FROM result_delivery WHERE conversation_id IN " + ownConversations, userId);
             jdbc.update("DELETE FROM connector_action WHERE user_id = ?", userId);
             jdbc.update("DELETE FROM agent_execution WHERE user_id = ?", userId);
             jdbc.update(
@@ -261,6 +283,119 @@ class AttentionServiceTest {
         Instant started = NOW.minus(Duration.ofDays(8)).minusSeconds(60);
         message(ChatMessage.fromUser(conversation.id(), dad.id(), "목록 정리해 줘", started));
         failedRoot(dad, conversation, started, NOW.minus(Duration.ofDays(8)));
+
+        assertThat(card(service.view(dad), CardKey.FAILURES).items()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("FAILED 결과 전달 묶음은 실패 카드에 DELIVERY_FAILED 와 DELIVERY_NOT_DONE 과 묶음 출처를 달고 보인다")
+    void showsFailedDelivery() {
+        Conversation conversation = conversationOf(dad, "주간 장보기 목록 정리");
+        ResultDelivery delivery = deliveryOf(conversation, DeliveryStatus.FAILED, NOW);
+
+        AttentionView view = service.view(dad);
+
+        AttentionItem item = onlyItem(view, CardKey.FAILURES);
+        assertThat(item.itemKey()).isEqualTo("conversation:" + conversation.publicId());
+        assertThat(item.level()).isEqualTo(AttentionLevel.NOW);
+        assertThat(item.conversationId()).isEqualTo(conversation.publicId());
+        assertThat(item.why().trigger()).isEqualTo(AttentionTrigger.DELIVERY_FAILED);
+        assertThat(item.why().signals()).containsExactly(AttentionSignal.DELIVERY_NOT_DONE);
+        assertThat(item.why().sources())
+                .extracting(AttentionSourceRef::source, AttentionSourceRef::ref, AttentionSourceRef::asOf)
+                .containsExactly(tuple("RESULT_DELIVERY", "result_delivery:" + delivery.id(), NOW));
+        assertThat(view.nowCount()).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("같은 대화에 실패한 사용자 turn 도 있으면 항목 하나에 신호가 둘 다 들고 더 최근인 쪽이 trigger 다")
+    void mergesFailedTurnAndFailedDelivery() {
+        Conversation conversation = conversationOf(dad, "주간 장보기 목록 정리");
+        message(ChatMessage.fromUser(conversation.id(), dad.id(), "목록 정리해 줘", NOW.minusSeconds(600)));
+        AgentExecution failed = failedRoot(dad, conversation, NOW.minusSeconds(600), NOW.minusSeconds(540));
+        ResultDelivery delivery = deliveryOf(conversation, DeliveryStatus.FAILED, NOW.minusSeconds(60));
+
+        AttentionItem item = onlyItem(service.view(dad), CardKey.FAILURES);
+
+        assertThat(item.why().trigger()).isEqualTo(AttentionTrigger.DELIVERY_FAILED);
+        assertThat(item.why().signals())
+                .containsExactly(AttentionSignal.NOT_RETRIED, AttentionSignal.DELIVERY_NOT_DONE);
+        assertThat(item.why().sources())
+                .extracting(AttentionSourceRef::source, AttentionSourceRef::ref)
+                .containsExactly(
+                        tuple("EXECUTION_STATE", "execution:" + failed.id()),
+                        tuple("RESULT_DELIVERY", "result_delivery:" + delivery.id()));
+        assertThat(item.at()).isEqualTo(NOW.minusSeconds(60));
+    }
+
+    @Test
+    @DisplayName("결과 전달 실패만 바뀌어도 stateKey 가 바뀌어 숨긴 항목이 다시 보인다")
+    void changesStateKeyWhenDeliveryAttemptsGrow() {
+        Conversation conversation = conversationOf(dad, "주간 장보기 목록 정리");
+        ResultDelivery delivery = deliveryOf(conversation, DeliveryStatus.FAILED, NOW.minusSeconds(60));
+        String before = onlyItem(service.view(dad), CardKey.FAILURES).stateKey();
+        jdbc.update("UPDATE result_delivery SET attempt_count = 2 WHERE id = ?", delivery.id());
+
+        String after = onlyItem(service.view(dad), CardKey.FAILURES).stateKey();
+
+        assertThat(after).isNotEqualTo(before);
+    }
+
+    @Test
+    @DisplayName("DELIVERING 과 STOPPED 와 DELIVERED 묶음은 실패 카드에 없다")
+    void skipsNonFailedDeliveries() {
+        deliveryOf(conversationOf(dad, "전달 중인 대화"), DeliveryStatus.DELIVERING, NOW.minusSeconds(60));
+        deliveryOf(conversationOf(dad, "멈춘 대화"), DeliveryStatus.STOPPED, NOW.minusSeconds(60));
+        deliveryOf(conversationOf(dad, "전달된 대화"), DeliveryStatus.DELIVERED, NOW.minusSeconds(60));
+
+        assertThat(card(service.view(dad), CardKey.FAILURES).items()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("끝난 지 8일 지난 FAILED 묶음은 실패 카드에 없다")
+    void skipsFailedDeliveryOutsideWindow() {
+        deliveryOf(
+                conversationOf(dad, "주간 장보기 목록 정리"),
+                DeliveryStatus.FAILED,
+                NOW.minus(Duration.ofDays(8)).minusSeconds(60));
+
+        assertThat(card(service.view(dad), CardKey.FAILURES).items()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("다시 전달로 DELIVERED 가 된 뒤 사용자 turn 이 실패하면 그 실패는 EXECUTION_FAILED 로 남는다")
+    void keepsUserTurnFailureAfterDeliveredRetry() {
+        Conversation conversation = conversationOf(dad, "주간 장보기 목록 정리");
+        deliveryOf(conversation, DeliveryStatus.DELIVERED, NOW.minusSeconds(600));
+        executions.save(
+                root(dad, conversation, ExecutionStatus.SUCCEEDED, NOW.minusSeconds(600), NOW.minusSeconds(580)));
+        message(ChatMessage.fromUser(conversation.id(), dad.id(), "다음 목록도 정리해 줘", NOW.minusSeconds(300)));
+        failedRoot(dad, conversation, NOW.minusSeconds(300), NOW.minusSeconds(240));
+
+        AttentionItem item = onlyItem(service.view(dad), CardKey.FAILURES);
+
+        assertThat(item.why().trigger()).isEqualTo(AttentionTrigger.EXECUTION_FAILED);
+        assertThat(item.why().signals()).containsExactly(AttentionSignal.NOT_RETRIED);
+    }
+
+    @Test
+    @DisplayName("다른 사용자 대화의 FAILED 묶음은 응답에 없다")
+    void hidesOtherUsersFailedDelivery() {
+        CurrentUser mom = member();
+        deliveryOf(conversationOf(mom, "엄마의 대화"), DeliveryStatus.FAILED, NOW.minusSeconds(60));
+
+        AttentionView view = service.view(dad);
+
+        assertThat(card(view, CardKey.FAILURES).items()).isEmpty();
+        assertThat(view.nowCount()).isZero();
+    }
+
+    @Test
+    @DisplayName("지운 대화의 FAILED 묶음은 응답에 없다")
+    void hidesFailedDeliveryOfDeletedConversation() {
+        Conversation conversation = conversationOf(dad, "지운 대화");
+        deliveryOf(conversation, DeliveryStatus.FAILED, NOW.minusSeconds(60));
+        jdbc.update("UPDATE conversation SET deleted_at = ? WHERE id = ?", Timestamp.from(NOW), conversation.id());
 
         assertThat(card(service.view(dad), CardKey.FAILURES).items()).isEmpty();
     }
@@ -376,6 +511,14 @@ class AttentionServiceTest {
 
     private Conversation conversationOf(CurrentUser owner, String title) {
         return conversations.save(Conversation.startedBy(owner.id(), title, chief.id(), NOW.minusSeconds(3_600)));
+    }
+
+    /** 열린 묶음을 저장하고 상태와 바뀐 시각을 그 값으로 맞춘다. */
+    private ResultDelivery deliveryOf(Conversation conversation, DeliveryStatus status, Instant updatedAt) {
+        ResultDelivery delivery = deliveries.save(ResultDelivery.opened(conversation.id(), updatedAt));
+        new TransactionTemplate(transactionManager)
+                .executeWithoutResult(transaction -> deliveries.changeStatus(delivery.id(), status, updatedAt));
+        return delivery;
     }
 
     private void message(ChatMessage message) {

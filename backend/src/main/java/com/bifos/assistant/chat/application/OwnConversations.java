@@ -1,13 +1,17 @@
 package com.bifos.assistant.chat.application;
 
+import com.bifos.assistant.chat.application.model.FailedDelivery;
 import com.bifos.assistant.chat.domain.ChatMessage;
 import com.bifos.assistant.chat.domain.Conversation;
 import com.bifos.assistant.chat.domain.type.MessageRole;
 import com.bifos.assistant.chat.infra.ChatMessageRepository;
 import com.bifos.assistant.chat.infra.ConversationRepository;
+import com.bifos.assistant.chat.infra.ResultDeliveryRepository;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import java.time.Instant;
 import java.util.Collection;
+import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -27,6 +31,7 @@ public class OwnConversations {
 
     private final ConversationRepository conversations;
     private final ChatMessageRepository messages;
+    private final ResultDeliveryRepository deliveries;
 
     /**
      * 번호들 가운데 요청자의 것이고 지우지 않은 대화만 번호로 묶어 낸다.
@@ -56,5 +61,24 @@ public class OwnConversations {
                 .map(ChatMessage::role)
                 .filter(MessageRole.USER::equals)
                 .isPresent();
+    }
+
+    /**
+     * {@code since} 뒤에 {@code FAILED} 로 바뀐 요청자의 결과 전달 묶음을 대화마다 가장 최근 하나씩 최근 순으로 낸다.
+     *
+     * <p>지운 대화의 묶음은 뺀다. 묶음의 상태를 저장하거나 고치지 않는다.
+     */
+    public List<FailedDelivery> failedDeliveriesOf(CurrentUser user, Instant since) {
+        Map<Long, FailedDelivery> latest = new LinkedHashMap<>();
+        deliveries
+                .findFailedOfUser(user.id(), since)
+                .forEach(delivery -> latest.putIfAbsent(
+                        delivery.conversationId(),
+                        new FailedDelivery(
+                                delivery.id(),
+                                delivery.conversationId(),
+                                delivery.attemptCount(),
+                                delivery.updatedAt())));
+        return List.copyOf(latest.values());
     }
 }

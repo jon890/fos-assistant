@@ -4,7 +4,7 @@
 결정은 [ADR-072](../adr/ADR-072-먼저-알리기의-기본값은-알리지-않음이고-control-plane-기록에서-정한-신호만-화면-안에-올린다.md) 와 [ADR-074](../adr/ADR-074-지금-화면은-원래-기록을-읽어-만든-view-이고-정해진-카드-넷만-그린다.md) 에 있다.
 화면의 배치와 문구는 [`../frontend/now.md`](../frontend/now.md) 가 갖는다.
 
-**아직 구현 전이다.** 구현한 PR 이 이 단락을 지운다.
+**할 일 후보(`FOLLOW_UP_PROPOSED`, `FOLLOW_UP_OPEN`)와 `due-soon` 은 아직 구현 전이다.** 구현한 PR 이 이 단락을 지운다.
 
 ## 패키지
 
@@ -28,7 +28,7 @@
 | `trigger` | 카드 | 원래 기록 | 후보 조건 | `NOW` 조건 | 해결된 상태 | `itemKey` | `stateKey` 의 재료 | 확신도 |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | `EXECUTION_FAILED` | `failures` | 사용자가 보낸 대화 turn 의 루트 실행. `conversation_id` 가 있고 `parent_execution_id` 가 비어 있다. 자동 turn 의 실패는 `DELIVERY_FAILED` 가 맡는다 | `FAILED` 이고 `finished_at` 이 `failure-window` 안 | 늘 | 같은 대화에 그 뒤 `SUCCEEDED` 루트 실행이 있다. 대화를 지웠다 | `conversation:<대화 공개 식별자>` | 그 대화의 마지막 실패 실행 번호 | `CONTROL_PLANE` |
-| `DELIVERY_FAILED` | `failures` | #162 가 저장하는 결과 전달 상태 | #162 가 정한 실패 상태 | 늘 | #162 가 정한 완료나 의도적 중단 | 위와 같은 대화 열쇠. 실패한 turn 과 한 항목으로 합친다 | 마지막 전달 시도의 번호 | `CONTROL_PLANE` |
+| `DELIVERY_FAILED` | `failures` | 결과 전달 묶음 `result_delivery`([ADR-075](../adr/ADR-075-결과-전달은-묶음과-시도로-남기고-사용자가-저장된-결과만-다시-전달한다.md)). 사용자는 그 대화의 `user_id` 다 | `FAILED` 이고 `updated_at` 이 `failure-window` 안. `DELIVERING` 은 시도가 도는 중이라 후보가 아니다 | 늘 | `DELIVERED`, `STOPPED`. 대화를 지웠다 | 위와 같은 대화 열쇠. 실패한 turn 과 한 항목으로 합친다 | 묶음 번호와 `attempt_count`. 실패한 turn 과 합치면 그 실행 번호도 함께 | `CONTROL_PLANE` |
 | `APPROVAL_PENDING` | `needs_me` | `connector_action` | `PENDING` 이고 `expires_at` 전 | 늘 | 승인, 거절, 만료 | `connector_action:<공개 식별자>` | `status` | `CONTROL_PLANE` |
 | `MEMORY_PROPOSED` | `needs_me` | 주인의 `USER` Memory | `PROPOSED` | 아니다 | 받아들임, 거절 | `memory:<번호>` | `revision` | `MODEL_INFERRED` |
 | `FOLLOW_UP_PROPOSED` | `needs_me` | `follow_up` | `PROPOSED` | 아니다 | 받아들임, 거절 | `follow_up:<공개 식별자>` | `updated_at` | `MODEL_INFERRED` |
@@ -46,7 +46,7 @@
 
 `MEMORY_PROPOSED` 는 기억 메뉴의 제안 건수에 이미 센다. 지금 화면의 건수에는 세지 않는다.
 
-`DELIVERY_FAILED` 는 #162 가 main 에 들어온 뒤에 더한다. 그 상태를 이 패키지가 저장하거나 고치지 않는다.
+`DELIVERY_FAILED` 는 결과 전달 묶음의 상태를 읽기만 한다. 그 상태를 저장하고 다시 전달하는 일은 `chat` 의 `ResultDeliveryRecorder` 가 갖는다.
 
 ## 억제 신호
 
@@ -80,7 +80,7 @@
 | `event-retention` | 90일 | 지표 사건을 남기는 기간 |
 | `cleanup-cron` | `0 30 4 * * *` | 보관 기간이 지난 지표 사건을 지우는 시각 |
 
-## 「왜 보였는가」
+## 왜 보였는가
 
 항목마다 아래 칸을 낸다. 화면은 이 코드를 정해진 문구로 그린다([`../frontend/now.md`](../frontend/now.md) 의 「이유 문구」).
 
@@ -127,7 +127,7 @@
 | 항목 | 단추 | 가는 곳 |
 | --- | --- | --- |
 | 실패한 turn | 대화 열기 | `/chat/{대화 공개 식별자}`. 다시 보낼지는 사람이 대화에서 정한다 |
-| 결과 전달 실패 | 결과 다시 전하기 | #162 가 여는 사람 요청 경로. 원래 자식 작업이나 커넥터 쓰기를 다시 실행하지 않는다 |
+| 결과 전달 실패 | 대화 열기 | `/chat/{대화 공개 식별자}`. 다시 전달은 그 대화의 알림 줄 아래 「결과 다시 전달」 이 한다. 응답에 묶음 번호를 싣지 않는다 |
 | 승인 대기 | 대화에서 보기 | 그 대화의 승인 카드. 승인과 거절은 기존 `POST /api/v1/connector-actions/{actionId}/approve`, `.../reject` 다 |
 | Memory 제안 | 기억에서 보기 | `/memory` |
 | 할 일 제안 | 받아들이기, 거절 | [`follow-up.md`](follow-up.md) 의 API |
