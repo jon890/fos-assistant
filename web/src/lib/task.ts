@@ -102,6 +102,13 @@ function isWhole(field: string, max: number, min = 0): boolean {
   return /^\d+$/.test(field) && Number(field) >= min && Number(field) <= max;
 }
 
+function onceTimeOf(fireAt: string): string {
+  const seconds = fireAt.slice(17, 19);
+  return /^[0-5]\d$/.test(seconds) && seconds !== "00"
+    ? fireAt.slice(11, 19)
+    : fireAt.slice(11, 16);
+}
+
 /** 저장된 시각을 화면의 고르기로 되돌린다. 매일, 매주, 매달 모양이 아닌 cron 은 `cron` 이다. */
 export function choiceOf(schedule: {
   type: "CRON" | "ONCE";
@@ -112,7 +119,8 @@ export function choiceOf(schedule: {
     return {
       kind: "once",
       date: schedule.fireAt.slice(0, 10),
-      time: schedule.fireAt.slice(11, 16),
+      // 초가 0 이 아니면 초까지 남겨, 화면에서 시각을 바꾸지 않은 저장이 원래 값을 그대로 보낸다
+      time: onceTimeOf(schedule.fireAt),
     };
   }
   const cron = schedule.cron ?? "";

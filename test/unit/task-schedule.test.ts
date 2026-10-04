@@ -77,3 +77,9 @@ test("까닭을 화면 문구로 바꾸고 보이지 않을 까닭은 null 이�
   assert.equal(runReasonText("OWNER_REVOKED"), null);
   assert.equal(runReasonText(null), null);
 });
+
+test("초가 있는 ONCE 는 초를 보존해 되돌려 보낸다", () => {
+  const choice = choiceOf({ type: "ONCE", cron: null, fireAt: "2026-11-01T09:00:30" });
+  assert.deepEqual(choice, { kind: "once", date: "2026-11-01", time: "09:00:30" });
+  assert.equal(scheduleRequestOf(choice, ZONE).fireAt, "2026-11-01T09:00:30");
+});

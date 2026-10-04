@@ -68,6 +68,8 @@ export function ConversationNav({
   const [actionError, setActionError] = useState<string | null>(null);
   /** 사용자가 펼친 작업 묶음이다 */
   const [expandedTasks, setExpandedTasks] = useState<Set<string>>(new Set());
+  // 강제로 펼쳐진 줄도 사용자가 누르면 접히도록, 접은 작업을 따로 기억한다
+  const [collapsedTasks, setCollapsedTasks] = useState<Set<string>>(new Set());
   const cancelledEdit = useRef(false);
   /** 메뉴에서 이름 바꾸기를 골랐다. 메뉴가 닫히며 초점을 메뉴 단추로 옮기면 입력칸이 blur 되어 편집이 끝나므로 그때는 막는다 */
   const renameChosen = useRef(false);
@@ -323,26 +325,38 @@ export function ConversationNav({
               <ol className="flex flex-col gap-0.5">
                 {tasks.map((group) => {
                   const open =
-                    searching ||
-                    expandedTasks.has(group.taskId) ||
-                    group.conversations.some(
-                      (item) => pathname === `/chat/${item.id}`,
-                    );
+                    !collapsedTasks.has(group.taskId) &&
+                    (searching ||
+                      expandedTasks.has(group.taskId) ||
+                      group.conversations.some(
+                        (item) => pathname === `/chat/${item.id}`,
+                      ));
                   return (
                     <li key={group.taskId}>
                       <button
                         type="button"
                         data-testid="task-group"
                         aria-expanded={open}
-                        onClick={() =>
-                          setExpandedTasks((current) => {
+                        onClick={() => {
+                          const toggle = (current: Set<string>) => {
                             const next = new Set(current);
                             if (next.has(group.taskId))
                               next.delete(group.taskId);
                             else next.add(group.taskId);
                             return next;
-                          })
-                        }
+                          };
+                          if (open) setCollapsedTasks(toggle);
+                          else {
+                            setCollapsedTasks((current) => {
+                              const next = new Set(current);
+                              next.delete(group.taskId);
+                              return next;
+                            });
+                            setExpandedTasks((current) =>
+                              new Set(current).add(group.taskId),
+                            );
+                          }
+                        }}
                         className="flex w-full min-w-0 items-center rounded-md px-2 py-2 text-left text-sm hover:bg-accent"
                       >
                         <span className="min-w-0 flex-1 truncate">
