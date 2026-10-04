@@ -52,6 +52,9 @@ public interface ConnectorActionRepository extends JpaRepository<ConnectorAction
 
     List<ConnectorAction> findByStatusAndExpiresAtBefore(ActionStatus status, Instant now);
 
+    /** 그 사용자의 그 상태인 줄이다. 만든 순이다. 먼저 알리기가 답을 기다리는 줄을 읽는다. */
+    List<ConnectorAction> findByUserIdAndStatusOrderByIdAsc(Long userId, ActionStatus status);
+
     List<ConnectorAction> findByStatus(ActionStatus status);
 
     List<ConnectorAction> findByStatusAndDecidedAtBefore(ActionStatus status, Instant before);

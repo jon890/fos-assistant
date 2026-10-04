@@ -8,9 +8,10 @@
 
 ## 패키지
 
-판정은 새 최상위 패키지 `attention` 이 맡는다. 층 순서의 맨 위(`connector` 위)에 둔다.
+판정은 새 최상위 패키지 `attention` 이 맡는다. 층 순서의 맨 위(`task` 위)에 둔다.
 실행 기록(`usage`), Memory 제안(`memory`), 대화(`chat`), 할 일(`followup`), 승인 줄(`connector`)을 모두 읽기 때문이다.
 `attention` 은 읽기만 하고 그 패키지들의 기록을 고치지 않는다. 고치는 동작은 카드의 단추가 각 패키지의 기존 API 로 보낸다.
+**`attention` 은 다른 패키지의 `infra` 를 import 하지 않는다.** 원래 기록은 그 패키지의 `application` 에 둔 읽기 메서드로 읽는다. 저장 방식이 바뀌어도 판정을 고치지 않게 하려는 것이다.
 
 ## 판정 셋
 
@@ -36,7 +37,7 @@
 | `DELEGATION_FINISHED` | `delegated` | 주인의 위임 실행 | 끝났고 `finished_at` 이 `delegated-window` 안 | 아니다 | 없다 | `execution:<번호>` | `status` | `CONTROL_PLANE` |
 | `CONVERSATION_RECENT` | `continue` | 주인의 대화. `deleted_at` 이 비어 있다 | `updated_at` 순으로 `continue-count` 개 | 아니다 | 없다 | `conversation:<대화 공개 식별자>` | `updated_at` | `CONTROL_PLANE` |
 
-「사용자가 보낸 turn」 은 그 실행의 `started_at` 이전에 그 대화에 저장된 메시지 가운데 `ASSISTANT` 가 아닌 가장 최근 메시지의 `role` 이 `USER` 라는 뜻이다. 다시 생성도 든다. 자동 turn 은 그 메시지가 `SYSTEM` 이라 빠진다. 실패한 turn 에는 답 메시지가 없을 수 있어 실행의 시작 시각으로 질문을 찾는다.
+「사용자가 보낸 turn」 은 그 실행의 `started_at` 이전에 그 대화에 저장된 메시지 가운데 `ASSISTANT` 가 아닌 가장 최근 메시지의 `role` 이 `USER` 라는 뜻이다. 다시 생성도 든다. 자동 turn 은 그 메시지가 `SYSTEM` 이라 빠진다. 실패한 turn 에는 답 메시지가 없을 수 있어 실행의 시작 시각으로 질문을 찾는다. 예약 작업의 turn 도 든다. 예약 turn 은 알림 줄 다음에 지시를 `USER` 메시지로 저장하고, 사용자가 맡긴 일이 실패한 것이라 화면에 올린다.
 
 「연결한 대화에 결과가 도착했다」 는 그 대화의 맡긴 일(`agent_execution.result_delivered_at`)이나 승인한 동작(`connector_action.result_delivered_at`)의 결과가 할 일의 `accepted_at` 보다 뒤에 전해졌다는 뜻이다.
 `SYSTEM` 메시지로 판정하지 않는다. 자동 turn 한도 안내와 승인 거절이나 만료 알림도 `SYSTEM` 메시지라 결과 도착과 구분하지 못한다.
@@ -104,6 +105,18 @@
 | `WAITING` | 할 일이 기다리는 중이다 |
 | `LONG_RUNNING` | 맡긴 일이 오래 돌고 있다 |
 
+「출처 이름」 은 `sources[].source` 의 글이다. 아래 표가 전부다.
+`EXECUTION_STATE` 와 `FOLLOW_UP` 은 [`context-bundle.md`](context-bundle.md) 「참여하는 source」 의 이름이고, 나머지는 판정에만 쓰는 이름이다.
+
+| `source` | `ref` | `asOf` | 쓰는 trigger |
+| --- | --- | --- | --- |
+| `EXECUTION_STATE` | `execution:<실행 번호>` | 판정 시각(`readAt`) | `EXECUTION_FAILED`, `DELEGATION_RUNNING`, `DELEGATION_FINISHED` |
+| `APPROVAL_REQUEST` | `connector_action:<공개 식별자>` | 승인 줄의 `created_at` | `APPROVAL_PENDING` |
+| `MEMORY_PROPOSAL` | `memory:<번호>` | Memory 의 `updated_at` | `MEMORY_PROPOSED` |
+| `CONVERSATION` | `conversation:<공개 식별자>` | 대화의 `updated_at` | `CONVERSATION_RECENT` |
+| `FOLLOW_UP` | `follow_up:<공개 식별자>` | 할 일의 `updated_at` | `FOLLOW_UP_PROPOSED`, `FOLLOW_UP_OPEN` |
+| `RESULT_DELIVERY` | `result_delivery:<묶음 번호>` | 묶음의 `updated_at` | `DELIVERY_FAILED` |
+
 `sources` 의 `ref` 는 문맥 묶음의 참조와 같은 형식이다([`context-bundle.md`](context-bundle.md) 의 「항목의 칸」).
 **응답에 실행의 오류 코드, 모델, 금액을 싣지 않는다.** 일반 경로의 응답이라 역할과 상관없이 뺀다([ADR-063](../adr/ADR-063-관리자-전용-표시와-동작은-관리자-영역에만-두고-일반-경로의-응답은-서버가-역할에-따라-줄인다.md)).
 
@@ -166,7 +179,8 @@
           "conversationId": "7b1e…",
           "agentName": "집안일 도우미",
           "at": "2026-10-03T13:10:00Z",
-          "why": { "trigger": "EXECUTION_FAILED", "signals": ["NOT_RETRIED"], "confidence": "CONTROL_PLANE", "sources": [] },
+          "why": { "trigger": "EXECUTION_FAILED", "signals": ["NOT_RETRIED"], "confidence": "CONTROL_PLANE", "sources": [{ "source": "EXECUTION_STATE", "ref": "execution:812", "asOf": "2026-10-04T09:00:00Z" }] },
+          "actionId": null,
           "execution": null,
           "followUp": null
         }
@@ -176,7 +190,7 @@
 }
 ```
 
-**건수는 서버가 한 가지로 센다.** 카드의 `nowCount` 는 그 카드에서 `NOW` 인 항목 수이고 상한으로 자르기 전에 센다. 응답 맨 위의 `nowCount` 와 `summary` 의 `nowCount` 는 카드 `nowCount` 의 합이다. 화면은 카드 배지와 사이드바와 홈의 한 줄에 이 값만 쓰고, 보이는 항목을 다시 세지 않는다. 그래서 사이드바의 수는 늘 카드 배지의 합과 같다. 상한 때문에 보이지 않는 `NOW` 항목은 `moreCount` 에 함께 든다.
+**건수는 서버가 한 가지로 센다.** 카드의 `nowCount` 는 그 카드에서 `NOW` 인 항목 수이고 상한으로 자르기 전에 센다. 응답 맨 위의 `nowCount` 와 `summary` 의 `nowCount` 는 카드 `nowCount` 의 합이다. 화면은 카드 배지와 사이드바와 홈의 한 줄에 이 값만 쓰고, 보이는 항목을 다시 세지 않는다. 그래서 사이드바의 수는 늘 카드 배지의 합과 같다. 상한 때문에 보이지 않는 `NOW` 항목은 `moreCount` 에 함께 든다. 이어서 하기 카드의 `moreCount` 는 최근 대화 `continue-count` 더하기 `max-items-per-card` 개 안에서 센 수다. 화면은 이 수를 링크 없는 글로만 그린다.
 
 `title` 은 대화 제목이나 할 일 제목이나 승인 줄의 동작 이름이다. 화면은 평문으로 그린다(ADR-009).
 

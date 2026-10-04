@@ -4,6 +4,7 @@ import com.bifos.assistant.memory.domain.Memory;
 import com.bifos.assistant.memory.domain.type.MemoryEntryType;
 import com.bifos.assistant.memory.domain.type.MemoryScope;
 import com.bifos.assistant.memory.domain.type.MemorySensitivity;
+import com.bifos.assistant.memory.domain.type.MemoryStatus;
 import jakarta.persistence.LockModeType;
 import java.util.Collection;
 import java.util.List;
@@ -20,6 +21,9 @@ public interface MemoryRepository extends JpaRepository<Memory, Long>, JpaSpecif
 
     List<Memory> findByScopeAndOwnerUserIdAndEntryTypeOrderByCollectionAscDocumentKeyAsc(
             MemoryScope scope, Long ownerUserId, MemoryEntryType entryType);
+
+    List<Memory> findByScopeAndOwnerUserIdAndStatusOrderByIdAsc(
+            MemoryScope scope, Long ownerUserId, MemoryStatus status);
 
     Optional<Memory> findByScopeAndOwnerUserIdAndCollectionAndDocumentKey(
             MemoryScope scope, Long ownerUserId, String collection, String documentKey);
