@@ -4,6 +4,7 @@ import com.bifos.assistant.task.domain.TaskRun;
 import com.bifos.assistant.task.domain.type.TaskRunStatus;
 import jakarta.persistence.LockModeType;
 import java.time.Instant;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.domain.Pageable;
@@ -33,4 +34,8 @@ public interface TaskRunRepository extends JpaRepository<TaskRun, Long> {
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select r from TaskRun r where r.id = :id")
     Optional<TaskRun> findByIdForUpdate(@Param("id") Long id);
+
+    /** 그 번호들 가운데 발화의 루트 실행인 번호를 읽는다. 예약 작업이 연 turn 을 가릴 때 쓴다. */
+    @Query("select r.executionId from TaskRun r where r.executionId in :executionIds")
+    List<Long> findExecutionIdsIn(@Param("executionIds") Collection<Long> executionIds);
 }

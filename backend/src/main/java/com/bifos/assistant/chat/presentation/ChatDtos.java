@@ -7,6 +7,9 @@ import com.bifos.assistant.chat.application.ModelOptions;
 import com.bifos.assistant.chat.application.PendingQueue;
 import com.bifos.assistant.chat.application.RunningTurn;
 import com.bifos.assistant.chat.application.StarterSuggestions;
+import com.bifos.assistant.chat.application.model.LatencyRow;
+import com.bifos.assistant.chat.application.model.LatencyStat;
+import com.bifos.assistant.chat.application.model.LatencySummary;
 import com.bifos.assistant.chat.domain.ChatArtifact;
 import com.bifos.assistant.chat.domain.ChatAttachment;
 import com.bifos.assistant.chat.domain.ChatPendingMessage;
@@ -20,6 +23,7 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -327,6 +331,41 @@ public final class ChatDtos {
     public record StartersView(List<String> prompts, String status) {
         static StartersView from(StarterSuggestions suggestions) {
             return new StartersView(suggestions.prompts(), suggestions.status().name());
+        }
+    }
+
+    /**
+     * 관리자 사용량 화면의 첫 반응 시간 절이 받는 집계다.
+     *
+     * @param days 집계한 기간의 일수
+     * @param rows 날짜 오름차순이고 같은 날짜 안에서는 단계 순서다
+     */
+    public record LatencySummaryView(int days, List<LatencyRowView> rows) {
+        static LatencySummaryView from(LatencySummary summary) {
+            return new LatencySummaryView(
+                    summary.days(),
+                    summary.rows().stream().map(LatencyRowView::from).toList());
+        }
+    }
+
+    /**
+     * @param date {@code Asia/Seoul} 의 날짜
+     * @param modelTier 모델 단계. 단계를 고르지 않은 실행은 null
+     * @param turns 답 메시지가 있는 사용자 turn 수
+     * @param firstResponse 요청을 받은 때부터 첫 조각까지
+     * @param toSubmit 요청을 받은 때부터 제출까지
+     * @param toFirstDelta 제출한 때부터 첫 조각까지
+     */
+    public record LatencyRowView(
+            LocalDate date,
+            ModelTier modelTier,
+            long turns,
+            LatencyStat firstResponse,
+            LatencyStat toSubmit,
+            LatencyStat toFirstDelta) {
+        static LatencyRowView from(LatencyRow row) {
+            return new LatencyRowView(
+                    row.date(), row.modelTier(), row.turns(), row.firstResponse(), row.toSubmit(), row.toFirstDelta());
         }
     }
 }

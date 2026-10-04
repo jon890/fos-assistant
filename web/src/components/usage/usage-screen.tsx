@@ -6,6 +6,10 @@ import {
 } from "@/components/usage/execution-list";
 import { FingerprintSection } from "@/components/usage/fingerprint-section";
 import {
+  LatencySection,
+  type LatencySummary,
+} from "@/components/usage/latency-section";
+import {
   MonthlySummary,
   type MonthlyCost,
 } from "@/components/usage/monthly-summary";
@@ -30,12 +34,13 @@ export async function UsageScreen({
 }) {
   const tab = parseUsageTab((await searchParams).tab, isAdmin);
   // 스킬 탭일 때만 호출 이력을 더 읽는다. 다른 탭은 이 조회를 하지 않는다.
-  // 나눠 보기 두 조회는 관리자에게만 그리므로 관리자일 때만 읽는다.
+  // 나눠 보기 두 조회와 첫 반응 시간은 관리자에게만 그리므로 관리자일 때만 읽는다.
   const [
     executionsResult,
     monthlyResult,
     breakdownResult,
     fingerprintResult,
+    latencyResult,
     skillsResult,
   ] = await Promise.all([
     callControlPlane<UsageExecution[]>("/api/v1/usage/executions?limit=50"),
@@ -45,6 +50,9 @@ export async function UsageScreen({
       : null,
     isAdmin
       ? callControlPlane<Breakdown>("/api/v1/usage/breakdown?axis=fingerprint")
+      : null,
+    isAdmin
+      ? callControlPlane<LatencySummary>("/api/v1/admin/usage/latency?days=30")
       : null,
     tab === "skills"
       ? callControlPlane<SkillUsageRow[]>("/api/v1/usage/skills")
@@ -78,6 +86,13 @@ export async function UsageScreen({
               <BreakdownSection initial={breakdownResult.data} />
             ) : (
               <p className="mb-8 text-sm">{breakdownResult.message}</p>
+            )
+          ) : null}
+          {latencyResult ? (
+            latencyResult.ok ? (
+              <LatencySection summary={latencyResult.data} />
+            ) : (
+              <p className="mb-8 text-sm">{latencyResult.message}</p>
             )
           ) : null}
         </>
