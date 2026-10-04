@@ -685,6 +685,24 @@ class ArtifactTest {
     }
 
     @Test
+    @DisplayName("대화 폴더째 없으면 루트가 정상이 아닌 것으로 보고 행에 지운 시각을 적지 않는다")
+    void reconcileLeavesRowsWhenConversationFolderIsMissing() throws Exception {
+        Conversation conversation = chat.startEmpty(dad, "dad");
+        stub().beforeAwait(() -> writeDuringTurn(conversation.id(), "a/index.html", HTML));
+        chat.send(dad, conversation.id(), "만들어 줘", null);
+        Path folder = root.resolve(String.valueOf(conversation.id()));
+        Files.delete(htmlPath(conversation, "a/index.html"));
+        Files.delete(folder.resolve("a"));
+        Files.delete(folder);
+
+        cleaner.cleanExpired(futureNow());
+
+        assertThat(artifactRows.findAll())
+                .singleElement()
+                .satisfies(row -> assertThat(row.deletedAt()).isNull());
+    }
+
+    @Test
     @DisplayName("파일이 없는데 행이 살아 있으면 정리가 행에 지운 시각을 적고 410 이다")
     void reconcileMarksRowWhoseFileIsAlreadyGone() throws Exception {
         Conversation conversation = chat.startEmpty(dad, "dad");
