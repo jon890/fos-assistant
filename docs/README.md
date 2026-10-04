@@ -39,6 +39,7 @@ frontend 는 화면의 동작과 구조이고, hermes 는 외부 런타임인 He
 | [`backend/skill.md`](backend/skill.md) | 스킬의 저장과 스킬 커맨드 전달 |
 | [`backend/turn-control.md`](backend/turn-control.md) | 응답 중 대기열, 중지, 기동할 때 남은 실행 정리 |
 | [`backend/notification.md`](backend/notification.md) | 대화 밖에서 사용자에게 알리는 것. 알림 종류, 만드는 때, 사용자 단위 SSE, 알림 화면, 보관 |
+| [`backend/proactive-check.md`](backend/proactive-check.md) | 먼저 살펴보기의 진입점, 시작 전 점검, 점검 대화, 읽기 경계, 상한, 결과 계약, 분야 지침이 지킬 것 |
 | [`backend/execution-limit.md`](backend/execution-limit.md) | 사용자 한 명이 Hermes 에 동시에 맡기는 실행의 한도, 세는 실행과 세지 못하는 실행, 한도끼리의 관계, 한도에 닿을 때 |
 | [`backend/context-bundle.md`](backend/context-bundle.md) | 여러 기록에서 모은 문맥의 항목 모델, 출처와 권한과 신선도, Hermes 에 넘기는 형식, 합성 시나리오. 아직 구현 전이다 |
 | [`backend/attention.md`](backend/attention.md) | 먼저 알리기의 후보와 판정 표, 억제와 중복, 숨기기와 미루기, 지표, 지금 화면의 API. 아직 구현 전이다 |

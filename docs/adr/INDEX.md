@@ -78,3 +78,5 @@
 | [ADR-072](ADR-072-먼저-알리기의-기본값은-알리지-않음이고-control-plane-기록에서-정한-신호만-화면-안에-올린다.md) | 먼저 알리기의 기본값은 알리지 않음이고 Control Plane 기록에서 정한 신호만 화면 안에 올린다 | backend, frontend | Accepted. 아직 구현 전이다 |
 | [ADR-073](ADR-073-할-일은-에이전트가-제안하고-사람이-받아들인-것만-챙긴다.md) | 할 일은 에이전트가 제안하고 사람이 받아들인 것만 챙긴다 | backend, frontend, hermes | Accepted. 아직 구현 전이다 |
 | [ADR-074](ADR-074-지금-화면은-원래-기록을-읽어-만든-view-이고-정해진-카드-넷만-그린다.md) | 지금 화면은 원래 기록을 읽어 만든 view 이고 정해진 카드 넷만 그린다 | frontend | Accepted. 아직 구현 전이다 |
+| [ADR-077](ADR-077-먼저-살펴보기는-점검-대화의-turn-하나로-돌고-읽기-경계를-control-plane-이-강제한다.md) | 먼저 살펴보기는 점검 대화의 turn 하나로 돌고 읽기 경계를 Control Plane 이 강제한다 | backend, frontend | Accepted |
+| [ADR-078](ADR-078-살펴보기-결과는-답-끝의-구조화-블록으로-받고-control-plane-이-검사해-그린다.md) | 살펴보기 결과는 답 끝의 구조화 블록으로 받고 Control Plane 이 검사해 그린다 | backend | Accepted. ADR-009 의 신뢰하지 않는 글 원칙을 살펴보기 결과에 적용한다 |

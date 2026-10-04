@@ -23,10 +23,11 @@
 | `updated_at` | DATETIME(6) | 목록 정렬에 쓴다. 같은 값이면 `id` 가 큰 쪽이 앞이다 |
 | `deleted_at` | DATETIME(6) NULL | 사용자가 지운 시각. 채워지면 목록과 조회와 보내기에서 없는 대화와 같다 |
 | `auto_turn_count` | INT NOT NULL DEFAULT 0 | 마지막 사용자 질문 뒤로 Control Plane 이 위임 결과를 전하려고 연 turn 수. 사용자 질문을 저장할 때 0 으로 돌린다. `assistant.delegation-wake.max-auto-turns`(기본 10)에 닿으면 더 깨우지 않는다 |
+| `purpose` | VARCHAR(16) NOT NULL DEFAULT 'CHAT' | `CHAT` 은 보통 대화, `CHECK` 는 먼저 살펴보기의 점검 대화다. 만들 때 정하고 바뀌지 않는다. 사용자와 에이전트마다 지우지 않은 점검 대화 가운데 `id` 가 가장 큰 것을 쓴다([`proactive-check.md`](../proactive-check.md)) |
 
 `hermes_session_id` 가 특정 profile 안의 값이라, 대화의 에이전트는 중간에 바뀌지 않는다.
 
-색인은 `(user_id, deleted_at, updated_at, id)` 다(V51). 목록이 사용자의 지우지 않은 대화를 `updated_at desc, id desc` 로 쪽마다 읽는다.
+색인은 `(user_id, deleted_at, updated_at, id)` 다(V51). 점검 대화를 찾는 `(user_id, agent_id, purpose)` 도 있다(V68). 목록이 사용자의 지우지 않은 대화를 `updated_at desc, id desc` 로 쪽마다 읽는다.
 지운 대화가 쌓여도 한 쪽을 읽는 줄 수가 쪽 크기에 머문다.
 
 **`agent_id` 에 FK 를 두지 않는다.** 칸도 NULL 을 받는다(V4 가 칸을 더하며 그렇게 만들었다).
