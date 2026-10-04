@@ -12,6 +12,7 @@ import {
   AlertDialogFooter,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   focusWithoutTooltip,
@@ -263,6 +264,11 @@ export function ConversationNav({
                         )}
                         title={title}
                       >
+                        {conversation.purpose === "CHECK" ? (
+                          <Badge variant="outline" className="mr-2">
+                            살펴보기
+                          </Badge>
+                        ) : null}
                         <span className="min-w-0 flex-1 truncate">{title}</span>
                         <NavPending />
                       </Link>

@@ -31,6 +31,8 @@ export type Conversation = {
   /** 선택하지 않은 새 대화는 null 이고, 서버가 새 선택 방식을 주면 그 값을 쓴다. */
   modelSelectionMode?: "DEFAULT" | "TIER" | "CUSTOM" | null;
   modelTier?: "FAST" | "BALANCED" | "DEEP" | null;
+  /** 먼저 살펴보기의 결과가 남는 점검 대화면 `CHECK` 다. 응답에 없으면 보통 대화로 읽는다. */
+  purpose?: "CHAT" | "CHECK";
 };
 
 type ErrorPayload = { code?: string; message?: string };
