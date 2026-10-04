@@ -28,6 +28,8 @@ import {
   useAppName,
 } from "./shell-account";
 import { Sidebar } from "./sidebar";
+import { NotificationBell } from "@/components/notification/notification-bell";
+import { NotificationsProvider } from "@/components/notification/notifications-provider";
 import { useShortcuts } from "./use-shortcuts";
 import { cn } from "cn";
 import { TooltipButton } from "@/components/ui/tooltip-button";
@@ -257,6 +259,7 @@ function ShellBody({
             <span className="min-w-0 flex-1 truncate text-center text-sm font-medium">
               {title ?? appName}
             </span>
+            <NotificationBell size="icon" />
             <TooltipButton label="새 대화" size="icon" asChild>
               <Link href="/" onClick={startNew}>
                 <SquarePen aria-hidden="true" className="size-5" />
@@ -348,7 +351,9 @@ export function AppShell({
             <AppNameContext.Provider value={appName}>
               {/* 관리자 영역에서는 대화 목록을 읽지 않는다. */}
               <ConversationsProvider enabled={signedIn && !inAdminArea}>
-                <ShellBody signedIn={signedIn}>{children}</ShellBody>
+                <NotificationsProvider enabled={signedIn && !inAdminArea}>
+                  <ShellBody signedIn={signedIn}>{children}</ShellBody>
+                </NotificationsProvider>
               </ConversationsProvider>
             </AppNameContext.Provider>
           </ShellAccountContext.Provider>
