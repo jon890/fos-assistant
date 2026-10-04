@@ -7,6 +7,7 @@ import com.bifos.assistant.usage.domain.AgentExecution;
 import com.bifos.assistant.usage.domain.ExecutionCost;
 import com.bifos.assistant.usage.domain.type.ExecutionStatus;
 import com.bifos.assistant.usage.infra.AgentExecutionRepository;
+import com.bifos.assistant.usage.infra.SubagentUsageJobRepository;
 import java.time.Instant;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
@@ -42,6 +43,7 @@ public class UsageTestSupportController {
     private static final String DEFAULT_MODEL = "example-model";
 
     private final AgentExecutionRepository executions;
+    private final SubagentUsageJobRepository jobs;
     private final AgentRepository agents;
     private final CurrentUserProvider currentUser;
 
@@ -75,12 +77,20 @@ public class UsageTestSupportController {
         }
     }
 
-    /** 부르는 사람의 실행 기록을 지운다. 검사가 심은 것만 남기려면 먼저 비워야 한다. */
+    /**
+     * 부르는 사람의 실행 기록과 그 실행의 하위 에이전트 재조회 작업 줄을 지운다. 검사가 심은 것만 남기려면 먼저 비워야 한다.
+     *
+     * <p>작업 줄을 남기면 부모 실행이 없어 재조회가 그 줄의 상태를 바꾸지 못한다. 다음 시도 시각이 굳은 채
+     * {@code WAITING} 으로 남아 재조회 차례의 앞을 차지하고, 뒤에 생긴 작업이 한 주기 안에 돌지 못한다.
+     */
     @DeleteMapping("/executions")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void clearExecutions() {
-        executions.deleteAll(
-                executions.findByUserIdOrderByIdDesc(currentUser.require().id(), PageRequest.of(0, CLEARED_AT_ONCE)));
+        List<AgentExecution> cleared =
+                executions.findByUserIdOrderByIdDesc(currentUser.require().id(), PageRequest.of(0, CLEARED_AT_ONCE));
+        jobs.deleteAll(jobs.findByExecutionIdIn(
+                cleared.stream().map(AgentExecution::id).toList()));
+        executions.deleteAll(cleared);
     }
 
     /**
