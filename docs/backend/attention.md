@@ -192,8 +192,8 @@
 
 표의 칸은 [`schema/attention.md`](schema/attention.md) 가 갖는다.
 
-- `attention_control`: 사용자의 숨기기와 미루기. 한 사용자의 한 `itemKey` 에 한 줄이다
-- `attention_event`: 지표 사건. 같은 사용자, `itemKey`, `stateKey`, `type` 은 한 줄만 남긴다
+- `attention_control`: 사용자의 숨기기와 미루기. 한 사용자의 한 카드의 한 `itemKey` 에 한 줄이다
+- `attention_event`: 지표 사건. 같은 사용자, `itemKey`, `stateKey`, `type`, 판정(`attention`)은 한 줄만 남긴다. 같은 상태에서 `LATER` 가 `NOW` 로 바뀌면 `NOW` 의 `SHOWN` 이 따로 남는다
 
 원래 기록을 지워도 이 두 표의 줄은 남는다. 열쇠가 가리키는 기록이 없으면 판정 후보가 되지 않아 보이지 않는다.
 `attention_event` 는 `event-retention` 이 지난 줄을 하루 한 번 지운다.
