@@ -18,7 +18,7 @@
 
 - 판정 표, 억제 신호, 기준값, 「왜」 칸은 `docs/backend/attention.md` 가 갖는다. 이 phase 가 구현하는 줄은 그 「후보와 trigger」 표의 `FOLLOW_UP_PROPOSED` 와 `FOLLOW_UP_OPEN` 이다
   - `FOLLOW_UP_PROPOSED`: 카드 `needs_me`, 후보 조건 `PROPOSED`, 늘 `LATER`, 해결 상태는 받아들임과 거절, `itemKey` 는 `follow_up:<공개 식별자>`, `stateKey` 재료는 `updated_at`, 확신도 `MODEL_INFERRED`
-  - `FOLLOW_UP_OPEN`: 카드 `needs_me`, 후보 조건 `OPEN`, 기한이 `due-soon` 안이면 `DUE_SOON`, 지났으면 `OVERDUE`, 연결한 대화에 결과가 도착했으면 `LINKED_UPDATE` 로 `NOW`. `waiting` 이 참이면 `WAITING` 신호를 붙인다. `stateKey` 재료는 `updated_at` 과 연결한 대화의 마지막 결과 전달 시각, 확신도 `USER_CONFIRMED`
+  - `FOLLOW_UP_OPEN`: 카드 `needs_me`, 후보 조건 `OPEN`, 기한이 `due-soon` 안이면 `DUE_SOON`, 지났으면 `OVERDUE`, 연결한 대화에 결과가 도착했으면 `LINKED_UPDATE` 로 `NOW`. `waiting` 이 참이면 `WAITING` 신호를 붙인다. `stateKey` 재료는 `updated_at`, 기한 구간(없음, `DUE_SOON`, `OVERDUE`), 연결한 대화의 마지막 결과 전달 시각, 확신도 `USER_CONFIRMED`
   - 「연결한 대화에 결과가 도착했다」 는 그 대화의 맡긴 일(`agent_execution.result_delivered_at`)이나 승인한 동작(`connector_action.result_delivered_at`)의 결과가 할 일의 `accepted_at` 보다 뒤에 전해졌다는 뜻이다. `SYSTEM` 메시지로 판정하지 않는다. 자동 turn 한도 안내(`DelegationWakeService.LIMIT_NOTICE`)와 승인 거절이나 만료 알림(`ConversationNotices.post`)도 `SYSTEM` 메시지라 구분하지 못한다. 사용자가 그 대화에서 주고받는 메시지는 세지 않는다. 대화하는 동안 할 일이 계속 `NOW` 가 되지 않게 하려는 것이다. 사건 표(`attention_event`)는 읽지 않는다
 - **plan79 phase 01 이 만든 `attention.application.AttentionCandidates` 인터페이스를 구현한다.** 그 인터페이스는 `Set<CardKey> cards()` 와 `List<AttentionCandidate> read(CurrentUser user, Instant now)` 를 갖는다. `AttentionTrigger` 의 `FOLLOW_UP_PROPOSED` 와 `FOLLOW_UP_OPEN` 은 plan79 phase 01 이 미리 둔다. 원래 기록을 읽지 못하면 예외를 던지고, `AttentionService.view` 가 그 카드를 `UNAVAILABLE` 로 낸다. 구현할 때 실제 코드의 이름을 읽어 맞춘다
 - **`attention` 은 다른 패키지의 `infra` 를 바로 import 하지 않는다**(plan79 README 의 「모든 phase 에 걸리는 규칙」). 그래서 읽기 메서드를 각 패키지의 `application` 에 둔다
@@ -46,7 +46,7 @@
 - `FollowUpService.openAndProposedOf`, `ConversationResultDeliveries.lastDeliveredAt`, `ConnectorActionService.lastResultDeliveredAt` 으로 읽는다. 두 결과 전달 시각 가운데 늦은 것을 그 대화의 마지막 결과 전달 시각으로 쓴다
 - `PROPOSED` 는 `FOLLOW_UP_PROPOSED`, `LATER`, 확신도 `MODEL_INFERRED`
 - `OPEN` 은 `FOLLOW_UP_OPEN`. `due_at` 이 지금부터 `assistant.attention.due-soon` 안이면 `DUE_SOON`, 지금보다 앞이면 `OVERDUE`, 연결한 대화의 마지막 결과 전달 시각이 `accepted_at` 보다 뒤면 `LINKED_UPDATE`. 셋 가운데 하나라도 있으면 `NOW`, 없으면 `LATER`. `waiting` 이 참이면 `WAITING` 을 신호 목록에 더한다
-- `stateKey` 는 `updated_at` 과 연결한 대화의 마지막 결과 전달 시각(없으면 0)으로 만든다
+- `stateKey` 는 `updated_at`, 기한 구간(없음, `DUE_SOON`, `OVERDUE`), 연결한 대화의 마지막 결과 전달 시각(없으면 0)으로 만든다. 기한 구간을 넣어야 `LATER` 일 때 숨긴 할 일이 기한이 다가오면 다시 보인다
 - `sources` 는 `{ source: "FOLLOW_UP", ref: "follow_up:<공개 식별자>", asOf: updated_at }` 하나다. 연결한 대화가 있으면 `conversationId` 칸에 그 공개 식별자를 싣는다
 - 후보의 `followUp` 칸을 plan79 phase 01 의 `AttentionFollowUpRef(id, dueAt, waiting, proposed)` 로 채운다. 응답의 `followUp` 칸이 된다(`docs/backend/attention.md` 「API」 의 응답 칸 표). `execution` 과 `actionId` 는 `null` 이다
 - 숨기기와 미루기, 중복 억제는 plan79 의 공통 단계가 한다. 이 source 는 후보와 신호만 낸다
@@ -66,6 +66,7 @@
 | 연결한 대화에 `accepted_at` 뒤의 `USER`, `ASSISTANT` 메시지와 승인 만료 알림(`SYSTEM`)만 있는 `OPEN`(기한 없음) | `LATER`. 신호에 `LINKED_UPDATE` 가 없다 |
 | 그 항목을 같은 `card`, `stateKey` 로 숨김 | 응답에 없다. 그 대화에 메시지가 더 와도 나오지 않는다. 새 결과가 전해지면 다시 나온다 |
 | 기한이 10시간 뒤인 `OPEN` 의 응답 | `followUp` 칸이 `{ id, dueAt, waiting: false, proposed: false }` 다 |
+| 기한이 3일 뒤인 `OPEN` 을 `LATER` 일 때 숨긴 뒤 시계를 기한 10시간 전으로 옮김 | 다시 보이고 `NOW`, 신호 `DUE_SOON` |
 | `DONE` 이 된 할 일 | 응답에 없다 |
 | 아이의 요청 | 아빠의 할 일이 없다 |
 

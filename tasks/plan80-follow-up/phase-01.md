@@ -32,7 +32,7 @@
 - 할 일을 Memory 의 한 종류로 두지 않는다. 상태와 기한이 있고 대화마다 실리면 안 된다(ADR-073 의 대안 기각)
 - `open_marker` 는 열린 줄만 1 이고 끝난 줄은 NULL 이다. MySQL 과 H2 모두 유일 제약에서 NULL 을 서로 다르다고 본다. 그래서 끝난 할 일과 같은 제목을 다시 열 수 있다
 - 사람이 직접 더한 줄은 `proposed_by_execution_id` 가 비고 바로 `OPEN` 이며 `accepted_at` 을 만든 시각으로 적는다
-- 같은 열린 제목을 사람이 다시 더하면 새 줄을 만들지 않고 있는 줄을 돌려준다. 유일 제약 위반을 500 으로 내지 않는다. 동시에 들어온 두 요청은 제약이 하나만 남기고, 진 쪽은 다시 읽어 그 줄을 돌려준다
+- 같은 열린 제목을 사람이 다시 더하면 새 줄을 만들지 않고 있는 줄을 돌려준다. 그 줄이 `PROPOSED` 면 받아들인 것으로 보고 `OPEN` 으로 바꾼다. 유일 제약 위반을 500 으로 내지 않는다. 동시에 들어온 두 요청은 제약이 하나만 남기고, 진 쪽은 다시 읽어 그 줄을 돌려준다
 - `title_key` 는 phase 03 의 제안 억제도 쓴다. 정규화 함수를 서비스 하나에 두어 두 경로가 같은 값을 쓰게 한다
 
 ## 작업 항목
@@ -63,7 +63,7 @@
 
 - `static String titleKey(String title)`: `Normalizer.normalize(title, Normalizer.Form.NFC)` 뒤 `strip()`, 연속 공백(`\\s+`)을 한 칸으로, `toLowerCase(Locale.ROOT)`, 그 글의 `Sha256.hex`. phase 03 도 이 함수를 쓴다
 - `list(CurrentUser)`: `PROPOSED` 와 `OPEN` 을 만든 순서로
-- `create(CurrentUser, title, dueAt, waiting, conversationPublicId)`: 제목을 `strip()` 해 1자부터 200자가 아니면 400 `VALIDATION_FAILED`. `conversationPublicId` 가 있으면 `ConversationAccess.requireOwnId` 로 번호를 얻는다. 같은 `titleKey` 의 열린 줄이 있으면 그 줄을 돌려준다. 없으면 `OPEN` 줄을 만든다
+- `create(CurrentUser, title, dueAt, waiting, conversationPublicId)`: 제목을 `strip()` 해 1자부터 200자가 아니면 400 `VALIDATION_FAILED`. `conversationPublicId` 가 있으면 `ConversationAccess.requireOwnId` 로 번호를 얻는다. 같은 `titleKey` 의 열린 줄이 있으면 새 줄을 만들지 않는다. 그 줄이 `PROPOSED` 면 `accept` 와 같이 `OPEN` 으로 바꾸고 `accepted_at` 을 적어 돌려주고, `OPEN` 이면 그대로 돌려준다. 없으면 `OPEN` 줄을 만든다
 - `update(CurrentUser, UUID id, ...)`: `PROPOSED` 나 `OPEN` 만. 제목을 바꾸면 `titleKey` 도 다시 계산한다. 바꾼 제목이 다른 열린 줄과 같아지면 409 `FOLLOW_UP_STATE_CONFLICT`
 - `accept`, `reject`, `done`, `drop(CurrentUser, UUID id)`: `docs/backend/follow-up.md` 「상태」 표의 전이만. 아니면 409 `FOLLOW_UP_STATE_CONFLICT`
 - 남의 줄과 없는 줄은 404 `FOLLOW_UP_NOT_FOUND`
@@ -102,6 +102,7 @@ record 하나로는 둘을 구분하지 못한다. 컨트롤러가 본문을 Jac
 | 아빠가 제목 `할 일 검사 7391` 로 `create` | `OPEN`, `acceptedAt` 이 채워지고 `proposed` 가 거짓 |
 | 같은 제목에 공백만 다르게 다시 `create` | 새 줄 없이 같은 `id` |
 | `done` 뒤 같은 제목으로 `create` | 새 `OPEN` 줄. 앞 줄은 `DONE` 이고 `closedAt` 이 있다 |
+| `FollowUp.proposed(...)` 로 저장한 `PROPOSED` 와 같은 제목으로 `create` | 새 줄 없이 같은 `id`, `status` 가 `OPEN`, `acceptedAt` 이 있다 |
 | `OPEN` 에 `accept` | 409 `FOLLOW_UP_STATE_CONFLICT` |
 | `DONE` 에 `update` | 409 `FOLLOW_UP_STATE_CONFLICT` |
 | 아이가 아빠의 `id` 로 `done` | 404 `FOLLOW_UP_NOT_FOUND` |

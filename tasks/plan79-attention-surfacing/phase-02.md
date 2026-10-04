@@ -84,7 +84,7 @@ DDL 만 담는다. `docs/backend/schema/attention.md` 의 두 표를 그대로 �
 | `hide(CurrentUser user, String card, String itemKey, String stateKey)` | `card` 가 `failures`, `needs_me`, `delegated`, `continue` 가 아니면 `VALIDATION_FAILED`. 그 카드의 후보 목록에 `itemKey` 가 없으면 `ATTENTION_ITEM_NOT_FOUND`. 그 카드의 줄이 있으면 `HIDE` 로 고치고 없으면 만든다. `HIDDEN` 사건을 남긴다 |
 | `snooze(CurrentUser user, String card, String itemKey, Instant until)` | `card` 검사는 위와 같다. `until` 이 지금 뒤이고 `snoozeMax` 안이 아니면 `VALIDATION_FAILED`. 나머지는 위와 같고 `SNOOZED` 사건을 남긴다 |
 | `restore(CurrentUser user, String card, String itemKey)` | `card` 검사는 위와 같다. 그 사용자의 그 카드의 그 줄을 지운다. 없어도 204 다 |
-| `record(CurrentUser user, String itemKey, String stateKey, AttentionEventType type)` | `OPENED`, `ACTED` 만 받는다. 다른 값은 `VALIDATION_FAILED`. 지금 후보에 있거나 그 사용자에게 같은 `itemKey` 의 `SHOWN` 사건이 있으면 받는다. 동작이 성공해 후보에서 빠진 뒤의 `ACTED` 를 잃지 않으려는 것이다. 둘 다 아니면 `ATTENTION_ITEM_NOT_FOUND` |
+| `record(CurrentUser user, String itemKey, String stateKey, AttentionEventType type)` | `OPENED`, `ACTED` 만 받는다. 다른 값은 `VALIDATION_FAILED`. 지금 후보에 있거나 그 사용자에게 같은 `itemKey` 의 `SHOWN` 사건이 있으면 받는다. 동작이 성공해 후보에서 빠진 뒤의 `ACTED` 를 잃지 않으려는 것이다. 둘 다 아니면 `ATTENTION_ITEM_NOT_FOUND`. 사건의 `trigger_type` 과 `attention` 은 지금 후보에 있으면 지금 판정에서, 없으면 같은 사용자와 `itemKey` 의 가장 최근 `SHOWN` 사건에서 옮긴다 |
 
 `shared.error.ErrorCode` 에 `ATTENTION_ITEM_NOT_FOUND(HttpStatus.NOT_FOUND)` 를 더한다.
 「후보 목록」 은 `AttentionService` 가 억제 전에 모은 후보다. `AttentionService` 에 `candidatesOf(CurrentUser user)` 를 두고 `view` 와 같이 쓴다.
@@ -152,7 +152,7 @@ DDL 만 담는다. `docs/backend/schema/attention.md` 의 두 표를 그대로 �
 | 내일 오전으로 미룬다 | 지금은 빠지고, 시계를 그 뒤로 옮긴 `view` 에는 보인다 |
 | `until` 이 9일 뒤 | `VALIDATION_FAILED` |
 | 다른 사용자의 대화 열쇠로 숨긴다 | `ATTENTION_ITEM_NOT_FOUND` |
-| `SHOWN` 이 남은 승인 대기를 처리해 후보에서 빠진 뒤 `ACTED` 를 보낸다 | 204. `ACTED` 사건이 남는다 |
+| `SHOWN` 이 남은 승인 대기를 처리해 후보에서 빠진 뒤 `ACTED` 를 보낸다 | 204. `ACTED` 사건이 남고 `trigger_type` 은 `APPROVAL_PENDING`, `attention` 은 그 `SHOWN` 의 `NOW` 다 |
 | `SHOWN` 도 없고 후보에도 없는 열쇠로 `OPENED` 를 보낸다 | `ATTENTION_ITEM_NOT_FOUND` |
 | `restore` | 다시 보인다 |
 | `view` 를 두 번 부른다 | 항목마다 `SHOWN` 이 한 줄이다 |

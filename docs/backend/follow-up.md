@@ -77,7 +77,7 @@ Control Plane MCP 서버에 `follow_up_propose` 를 더한다.
 | 경로 | 하는 일 |
 | --- | --- |
 | `GET /api/v1/follow-ups` | `PROPOSED` 와 `OPEN` 을 만든 순서로 낸다 |
-| `POST /api/v1/follow-ups` | 본문 `{ title, dueAt?, waiting?, conversationId? }`. 바로 `OPEN` 으로 만든다. `conversationId` 는 요청자의 대화여야 한다 |
+| `POST /api/v1/follow-ups` | 본문 `{ title, dueAt?, waiting?, conversationId? }`. 바로 `OPEN` 으로 만든다. `conversationId` 는 요청자의 대화여야 한다. 같은 `title_key` 의 열린 줄이 있으면 새 줄을 만들지 않는다. 그 줄이 `PROPOSED` 면 사람이 받아들인 것으로 보고 `OPEN` 으로 바꿔 돌려주고, `OPEN` 이면 그대로 돌려준다 |
 | `PATCH /api/v1/follow-ups/{id}` | 본문 `{ title?, dueAt?, waiting? }`. 본문에 없는 칸은 그대로 둔다. `dueAt` 을 `null` 로 보내면 기한을 지운다 |
 | `POST /api/v1/follow-ups/{id}/accept` | `PROPOSED` 를 `OPEN` 으로. `accepted_at` 을 적는다 |
 | `POST /api/v1/follow-ups/{id}/reject` | `PROPOSED` 를 `REJECTED` 로 |
