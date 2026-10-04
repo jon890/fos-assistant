@@ -238,8 +238,6 @@ Control Plane 이 다시 떠도 등록 줄은 그대로다. 이미 등록한 하
 
 ## execution_context_source
 
-**아직 구현 전이다.** 표를 만든 PR 이 이 줄을 지운다.
-
 실행 하나에 실은 문맥 항목의 참조다. 어느 답에 어느 기록이 들어갔는지 나중에 찾으려고 남긴다.
 제목과 본문은 남기지 않는다. 항목의 뜻은 [`../context-bundle.md`](../context-bundle.md) 가 갖는다.
 

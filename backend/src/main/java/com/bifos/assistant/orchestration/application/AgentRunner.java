@@ -1,6 +1,7 @@
 package com.bifos.assistant.orchestration.application;
 
 import com.bifos.assistant.agent.domain.Agent;
+import com.bifos.assistant.chat.application.ContextSourceRefs;
 import com.bifos.assistant.chat.application.ModelTierService;
 import com.bifos.assistant.chat.application.ResolvedModelTier;
 import com.bifos.assistant.chat.domain.Conversation;
@@ -140,8 +141,12 @@ public class AgentRunner {
         AssembledContext context =
                 agent.connectorManaged() ? AssembledContext.empty() : contextAssembler.assemble(user, agent.id());
         context = contextAssembler.withResponseInstructions(context);
-        ExecutionContextSnapshot snapshot =
-                new ExecutionContextSnapshot(context.chars(), null, context.instructionsHash());
+        ExecutionContextSnapshot snapshot = new ExecutionContextSnapshot(
+                context.chars(),
+                null,
+                context.instructionsHash(),
+                context.omittedItems(),
+                ContextSourceRefs.of(context));
         ResolvedModelTier resolved;
         try {
             resolved = modelTiers.resolve(user, conversation, agent);

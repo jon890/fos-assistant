@@ -741,7 +741,11 @@ public class ChatService {
                     : contextAssembler.assemble(user, routed.agent().id());
             context = contextAssembler.withResponseInstructions(context);
             ExecutionContextSnapshot snapshot = new ExecutionContextSnapshot(
-                    context.chars(), null, context.instructionsHash(), context.omittedItems());
+                    context.chars(),
+                    null,
+                    context.instructionsHash(),
+                    context.omittedItems(),
+                    ContextSourceRefs.of(context));
 
             ResolvedModelTier resolved;
             try {

@@ -29,10 +29,19 @@ export type ExecutionEventView = {
   subagentUsageStatus?: "WAITING" | "RECORDED" | "UNCONFIRMED" | null;
 };
 
+/** 실행 하나의 문맥에 실은 항목의 참조다. 제목과 본문은 오지 않는다. */
+export type ExecutionContextSource = {
+  source: string;
+  ref: string;
+  bodyMode: string;
+  freshness: string;
+};
+
 /**
  * 트리의 노드 하나다.
  *
  * @see truncated 이 노드 아래를 잘랐다는 뜻이다. 자식 자리에 한 줄로 그린다.
+ * @see contextSources 관리자에게만 온다. 그 밖에는 null 이다.
  */
 export type ExecutionTreeNode = {
   truncated: boolean;
@@ -57,6 +66,7 @@ export type ExecutionTreeNode = {
   submittedAt?: string | null;
   firstDeltaAt?: string | null;
   finishedAt?: string | null;
+  contextSources?: ExecutionContextSource[] | null;
   events: ExecutionEventView[];
   children: ExecutionTreeNode[];
 };
