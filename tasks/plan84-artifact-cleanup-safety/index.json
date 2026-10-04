@@ -1,0 +1,12 @@
+{
+  "name": "plan84-artifact-cleanup-safety",
+  "description": "결과물 정리가 판정 뒤 갱신된 대화의 파일을 지우지 않게 하고, 파일 삭제 뒤 남은 행의 지운 표시를 다음 정리에서 맞춘다 — #168, #169",
+  "status": "pending",
+  "created_at": "2026-10-05",
+  "total_phases": 2,
+  "current_phase": 1,
+  "phases": [
+    { "number": 1, "file": "phase-01.md", "execution_profile": "deep" },
+    { "number": 2, "file": "phase-02.md", "execution_profile": "standard" }
+  ]
+}
