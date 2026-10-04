@@ -35,6 +35,8 @@ Hermes 는 profile 마다 아래를 따로 가진다.
 
 ### OAuth credential 은 여기서 빠진다
 
+AI credential 이 어디 있고 profile 사이에 무엇을 함께 쓰는지는 이 절과 다음 절이 갖는다. 다른 문서는 요약만 두고 여기를 가리킨다.
+
 `.env` 와 달리 OAuth 는 profile 로 갈리지 않는다.
 profile 에 `auth.json` 이 없으면 루트의 `~/.hermes/auth.json` 을 읽는다.
 v0.21.0 의 `tui_gateway/methods_profiles.py` 주석이 그것을 말한다.
@@ -57,7 +59,8 @@ Hermes 주석에 따르면 복사하면 갱신 토큰이 둘로 갈라지고 한
 
 ### 우리가 더하는 것
 
-- 에이전트마다 `credential_scope` 를 적는다. 기본값이 없어 만드는 사람이 반드시 고른다.
+- 에이전트마다 `credential_scope` 를 적는다. `SHARED_HOUSEHOLD` 는 그룹이 함께 쓰는 AI 계정, `DEDICATED` 는 그 profile 만의 계정이다.
+  관리자 API 로 만들 때는 기본값이 없어 만드는 사람이 반드시 고른다. 첫 로그인이 만드는 에이전트는 설정값을 쓰고 기본은 `SHARED_HOUSEHOLD` 다([`backend/people.md`](../backend/people.md)). 에이전트 만들기 화면이 만드는 에이전트는 `SHARED_HOUSEHOLD` 로 적는다.
 - 운영 저장소의 검사가 격리 여부를 판정하고, 공유는 명시할 때만 넘어간다.
 - profile 마다 `fallback_providers` 를 비워 둔다. 한 사람의 요청이 다른 모델로 넘어가지 않는다.
 - Control Plane 은 대화를 시작할 때 사용자가 쓸 수 있는 에이전트에서 profile 이름을 꺼낸다.
