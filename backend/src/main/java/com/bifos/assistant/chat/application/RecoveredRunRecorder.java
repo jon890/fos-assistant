@@ -46,6 +46,8 @@ import org.springframework.transaction.support.TransactionTemplate;
  * 않는다. 줄이 이미 끝난 상태라 다음 기동이 그 줄을 다시 적지 않기 때문이다. 위임 결과만은 전했다는 표시가 실행
  * 줄에 있어 기동 뒤 깨우기가 전한다.
  *
+ * <p>그 실행 줄을 이은 전달 시도는 실행 줄을 적는 트랜잭션에서 함께 닫는다(ADR-070). 둘이 함께 적히거나 함께 되돌아간다.
+ *
  * <p>Hermes 에 묻고 기다리는 것, turn 잠금, 대기 줄을 멈추는 것은 여기서 하지 않는다. 부르는 쪽이 한다. 다시
  * 붙어 끝난 대화 turn 은 Memory 제안과 추천 질문 갱신을 돌리지 않는다.
  */
@@ -71,6 +73,7 @@ public class RecoveredRunRecorder {
     private final ArtifactService artifacts;
     private final ConversationEventHub hub;
     private final ApplicationEventPublisher events;
+    private final ResultDeliveryRecorder resultDeliveries;
     private final Clock clock;
 
     /**
@@ -129,11 +132,17 @@ public class RecoveredRunRecorder {
      * @param write 잠근 줄을 받아 적고, 트랜잭션 뒤에 할 일을 돌려준다
      */
     private boolean finishOnce(Long executionId, Function<AgentExecution, Written> write) {
-        Written written = transactions.execute(status -> executionRepository
-                .lockById(executionId)
-                .filter(row -> row.status() == ExecutionStatus.RUNNING)
-                .map(write)
-                .orElse(null));
+        Written written = transactions.execute(status -> {
+            Written locked = executionRepository
+                    .lockById(executionId)
+                    .filter(row -> row.status() == ExecutionStatus.RUNNING)
+                    .map(write)
+                    .orElse(null);
+            if (locked != null) {
+                resultDeliveries.finishByExecution(locked.row());
+            }
+            return locked;
+        });
         if (written == null) {
             return false;
         }

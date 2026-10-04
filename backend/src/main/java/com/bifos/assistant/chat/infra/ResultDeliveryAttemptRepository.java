@@ -3,6 +3,8 @@ package com.bifos.assistant.chat.infra;
 import com.bifos.assistant.chat.domain.ResultDeliveryAttempt;
 import com.bifos.assistant.chat.domain.type.DeliveryAttemptStatus;
 import java.time.Instant;
+import java.util.List;
+import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -26,4 +28,10 @@ public interface ResultDeliveryAttemptRepository extends JpaRepository<ResultDel
             @Param("status") DeliveryAttemptStatus status,
             @Param("errorCode") String errorCode,
             @Param("at") Instant at);
+
+    /** 그 상태로 그 시각 전에 시작한 시도들이다. 기동할 때 이전 프로세스가 남긴 시도를 찾는다. */
+    List<ResultDeliveryAttempt> findByStatusAndStartedAtBefore(DeliveryAttemptStatus status, Instant before);
+
+    /** 그 실행 줄을 이은 시도 가운데 그 상태인 것 하나다. */
+    Optional<ResultDeliveryAttempt> findFirstByExecutionIdAndStatus(Long executionId, DeliveryAttemptStatus status);
 }
