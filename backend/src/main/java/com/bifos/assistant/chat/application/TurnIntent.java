@@ -4,7 +4,7 @@ import com.bifos.assistant.chat.application.model.AutoTurnDelivery;
 import com.bifos.assistant.chat.domain.ChatMessage;
 import java.util.List;
 
-/** 이 turn 이 새 질문인지, 마지막 답의 다시 생성인지, 맡긴 일의 결과를 전하는 자동 turn 인지. */
+/** 이 turn 이 새 질문인지, 마지막 답의 다시 생성인지, 맡긴 일의 결과를 전하는 자동 turn 인지, 예약 작업이 연 turn 인지. */
 public sealed interface TurnIntent {
 
     String REGENERATE_INSTRUCTION = "사용자가 바로 앞 질문에 대한 답을 다시 받기를 원한다. 앞의 답을 되풀이하지 말고 새로 답한다.";
@@ -15,6 +15,8 @@ public sealed interface TurnIntent {
             + "사용자의 원래 요청에 답하는 데만 쓴다. "
             + "승인한 동작의 결과가 함께 왔으면 그 동작은 이미 실행된 것이다. 같은 도구를 다시 부르지 않고 "
             + "결과만 사용자에게 알린다.";
+
+    String SCHEDULED_INSTRUCTION = "예약 작업으로 연 turn 이다. 사용자는 지금 화면에 없을 수 있다. " + "사용자의 승인이 필요한 도구는 승인 요청을 남기고 답을 마친다.";
 
     /** @param pendingIds 이 turn 이 합쳐 보내는 대기 메시지들. 사용자가 바로 보낸 turn 은 비어 있다 */
     record Fresh(List<Long> pendingIds) implements TurnIntent {
@@ -45,12 +47,22 @@ public sealed interface TurnIntent {
         }
     }
 
+    /**
+     * 예약 작업이 사람 없이 연 turn 이다(ADR-071). 작업의 지시가 사용자 메시지로 들어간다.
+     *
+     * @param notice 사용자 메시지 앞에 대화에 남기는 알림 줄의 글
+     */
+    record Scheduled(String notice) implements TurnIntent {}
+
     static String instructionFor(TurnIntent intent) {
         if (intent instanceof Regenerate regenerate && regenerate.previousAnswer() != null) {
             return REGENERATE_INSTRUCTION;
         }
         if (intent instanceof DelegationResults) {
             return DELEGATION_RESULTS_INSTRUCTION;
+        }
+        if (intent instanceof Scheduled) {
+            return SCHEDULED_INSTRUCTION;
         }
         return null;
     }

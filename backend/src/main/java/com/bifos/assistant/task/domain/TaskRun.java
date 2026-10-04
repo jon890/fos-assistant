@@ -113,6 +113,48 @@ public class TaskRun {
         return run;
     }
 
+    /** 이 발화가 결과를 남길 대화를 적는다. 열지 못해 다음 tick 에 다시 볼 때 같은 대화를 쓴다. */
+    public void useConversation(Long conversationId) {
+        this.conversationId = Objects.requireNonNull(conversationId, "conversationId");
+    }
+
+    /** turn 잠금을 얻어 연다. */
+    public void start(Instant now) {
+        this.status = TaskRunStatus.RUNNING;
+        this.startedAt = micros(now);
+    }
+
+    /** turn 이 답을 마쳤다. */
+    public void succeed(Long executionId, Instant now) {
+        finish(TaskRunStatus.SUCCEEDED, null, executionId, now);
+    }
+
+    /** 사용자가 turn 을 중지했다. */
+    public void cancel(Long executionId, Instant now) {
+        finish(TaskRunStatus.CANCELLED, null, executionId, now);
+    }
+
+    /** turn 이 예외로 끝났거나 도는 중에 서버가 다시 시작됐다. */
+    public void fail(TaskRunReason reason, Instant now) {
+        finish(TaskRunStatus.FAILED, Objects.requireNonNull(reason, "reason"), executionId, now);
+    }
+
+    /** 열지 않고 건너뛴다. */
+    public void skip(TaskRunReason reason, Instant now) {
+        finish(TaskRunStatus.SKIPPED, Objects.requireNonNull(reason, "reason"), executionId, now);
+    }
+
+    private void finish(TaskRunStatus finalStatus, TaskRunReason why, Long rootExecutionId, Instant now) {
+        this.status = finalStatus;
+        this.reason = why;
+        this.executionId = rootExecutionId;
+        this.finishedAt = micros(now);
+    }
+
+    private static Instant micros(Instant instant) {
+        return Objects.requireNonNull(instant, "now").truncatedTo(ChronoUnit.MICROS);
+    }
+
     private static TaskRun created(
             Long taskId,
             Long triggerId,

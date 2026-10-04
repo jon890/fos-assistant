@@ -226,6 +226,39 @@ public class ChatService {
                         : ChatEvent.done(turn.conversationPublicId(), turn.messageId(), turn.executionId()));
     }
 
+    /**
+     * 예약 작업의 지시로 사용자의 질문 없이 turn 하나를 돌린다(ADR-071).
+     *
+     * <p>부르는 쪽이 그 대화의 turn 잠금을 이미 잡았다. 사람이 보낸 turn 과 같은 경로를 탄다. 그래서 커넥터 도구 판정과
+     * 승인 줄, 승인 요청 알림이 사람이 보낸 turn 과 같다. 알림 줄과 지시를 사용자 메시지로 남기고 자동 turn 수를 0 으로
+     * 돌리는 것은 한 트랜잭션이다. 실패는 예외로 올라간다.
+     *
+     * @param owner 대화 주인. 요청이 없으므로 부르는 쪽이 사용자 행으로 만든다
+     * @param notice 지시 앞에 대화에 남기는 알림 줄의 글
+     * @param instruction 사용자 메시지로 남기고 Hermes 에 보내는 작업의 지시
+     * @param onEvent 알림 줄, 사용자 메시지, {@code started}, 답 조각, {@code done} 이나 {@code stopped} 를 받는다
+     * @throws ApiException 대화의 에이전트에 흐름이 붙었으면 {@code TASK_AGENT_NOT_SUPPORTED}
+     */
+    public ChatTurn runScheduledTurn(
+            CurrentUser owner,
+            Long conversationId,
+            TurnHandle handle,
+            String notice,
+            String instruction,
+            Consumer<ChatEvent> onEvent) {
+        Routed routed = route(owner, conversationId, instruction, null, List.of());
+        if (routed.flow() != null) {
+            // 흐름은 지시를 흐름 안에서 저장해 알림 줄과 한 트랜잭션으로 묶을 수 없다. 작업을 만들 때 이미 거른다.
+            throw new ApiException(ErrorCode.TASK_AGENT_NOT_SUPPORTED, "an agent with a flow cannot run a task");
+        }
+        ChatTurn turn = runTurn(owner, routed, instruction, new TurnIntent.Scheduled(notice), onEvent, true, handle);
+        onEvent.accept(
+                turn.cancelled()
+                        ? ChatEvent.stopped(turn.conversationPublicId(), turn.messageId(), turn.executionId())
+                        : ChatEvent.done(turn.conversationPublicId(), turn.messageId(), turn.executionId()));
+        return turn;
+    }
+
     /** 읽은 대기 행이 저장 전에 취소돼 다시 읽는 횟수의 상한이다. */
     private static final int PENDING_READ_ATTEMPTS = 3;
 
@@ -1006,6 +1039,23 @@ public class ChatService {
             saved.forEach(line -> onEvent.accept(ChatEvent.system(conversation.publicId(), line.id(), line.content())));
             return;
         }
+        if (intent instanceof TurnIntent.Scheduled scheduled) {
+            // 알림 줄, 지시, 자동 turn 수 초기화가 함께 남거나 함께 빠진다. 사람이 질문한 것과 같게 자동 turn 수를 새로 센다.
+            List<ChatMessage> saved = transactions.execute(status -> {
+                Instant savedAt = clock.instant();
+                ChatMessage line =
+                        messages.save(ChatMessage.fromSystem(conversation.id(), scheduled.notice(), savedAt));
+                fillBlankTitle(conversation, text);
+                ChatMessage question = messages.save(ChatMessage.fromUser(conversation.id(), user.id(), text, savedAt));
+                conversationWriter.resetAutoTurns(conversation.id());
+                return List.of(line, question);
+            });
+            ChatMessage line = saved.get(0);
+            ChatMessage question = saved.get(1);
+            onEvent.accept(ChatEvent.system(conversation.publicId(), line.id(), line.content()));
+            onEvent.accept(ChatEvent.user(conversation.publicId(), question.id(), text));
+            return;
+        }
         if (!(intent instanceof TurnIntent.Fresh fresh)) {
             return;
         }
@@ -1386,6 +1436,15 @@ public class ChatService {
     public Conversation startEmpty(CurrentUser user, String agentCode) {
         Agent agent = agents.requireStartable(user, agentCode);
         return conversations.save(Conversation.startedBy(user.id(), "", agent.id(), clock.instant()));
+    }
+
+    /**
+     * 예약 작업이 결과를 남길 빈 대화를 만든다(ADR-073). 제목은 작업 이름이고 메시지는 첫 turn 이 남긴다.
+     *
+     * <p>주인과 에이전트를 쓸 수 있는지는 부르는 쪽이 이미 확인했다. 부르는 쪽의 트랜잭션이 있으면 그 안에서 저장한다.
+     */
+    public Conversation startForTask(Long ownerUserId, Long agentId, String title, Long taskId) {
+        return conversations.save(Conversation.startedForTask(ownerUserId, title, agentId, taskId, clock.instant()));
     }
 
     private static String titleFrom(String text) {

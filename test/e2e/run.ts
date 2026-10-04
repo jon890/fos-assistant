@@ -59,6 +59,7 @@ import { DELEGATION_PROFILE, delegationScenario } from "./scenarios/delegation.t
 import { connectorScenario } from "./scenarios/connector.ts";
 import { connectorPolicyScenario } from "./scenarios/connector-policy.ts";
 import { notificationsScenario } from "./scenarios/notifications.ts";
+import { scheduledTaskScenario } from "./scenarios/scheduled-task.ts";
 import { connectorDelegationScenario } from "./scenarios/connector-delegation.ts";
 import { CHAT_QUEUE_PROFILE, chatQueueRestartScenario, chatQueueScenario } from "./scenarios/chat-queue.ts";
 import { restartReconcileScenario } from "./scenarios/restart-reconcile.ts";
@@ -125,6 +126,8 @@ const SCENARIOS: readonly Scenario[] = [
   connectorScenario,
   connectorPolicyScenario,
   notificationsScenario,
+  // 커넥터를 다시 등록하고 해제로 끝난다. 승인이 필요한 도구를 예약 turn 에서 부르므로 알림 시나리오와 같은 준비를 쓴다.
+  scheduledTaskScenario,
   connectorDelegationScenario,
   // 에이전트를 하나 만들고 끄므로 에이전트 수를 세는 시나리오 뒤에 둔다.
   chatQueueScenario,
@@ -220,6 +223,8 @@ function startControlPlane(
       // 요청을 만든 직후에 답하므로 이 시간 안에 끝난다. 만료 정리도 1분이 아니라 1초마다 돌린다.
       ASSISTANT_CONNECTOR_POLICY_APPROVAL_TTL: "15s",
       ASSISTANT_CONNECTOR_POLICY_EXPIRE_CRON: "* * * * * *",
+      // 예약 작업이 정한 시각에 발화하는 것을 기본값 30초를 기다리지 않고 본다.
+      ASSISTANT_TASK_DISPATCH_CRON: "* * * * * *",
       HERMES_PROFILE_KEY_DIR: keyDir,
       // 기본값이 없어 주지 않으면 기동하지 못한다. 실행마다 만든 임시 디렉터리 아래에 둔다.
       ASSISTANT_ATTACHMENT_ROOT: attachmentRoot,
