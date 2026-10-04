@@ -160,12 +160,6 @@ public class Task {
         return state == TaskState.ARCHIVED;
     }
 
-    /** {@code SINGLE} 작업이 결과를 쌓을 대화를 적는다. */
-    public void useConversation(Long conversationId, Instant now) {
-        this.conversationId = Objects.requireNonNull(conversationId, "conversationId");
-        updatedAt = micros(now);
-    }
-
     private void apply(
             Long agentId, String title, String instruction, ConversationMode mode, NotifyPolicy notify, Instant now) {
         this.agentId = Objects.requireNonNull(agentId, "agentId");

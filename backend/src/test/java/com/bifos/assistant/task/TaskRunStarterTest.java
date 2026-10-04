@@ -2,12 +2,17 @@ package com.bifos.assistant.task;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.fail;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doAnswer;
 
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.agent.domain.type.AgentVisibility;
 import com.bifos.assistant.agent.domain.type.CostMode;
 import com.bifos.assistant.agent.domain.type.CredentialScope;
 import com.bifos.assistant.agent.infra.AgentRepository;
+import com.bifos.assistant.chat.application.ChatService;
 import com.bifos.assistant.chat.application.ConversationWriter;
 import com.bifos.assistant.chat.application.TurnCancellation;
 import com.bifos.assistant.chat.application.TurnIntent;
@@ -39,6 +44,7 @@ import com.bifos.assistant.task.domain.type.MissedPolicy;
 import com.bifos.assistant.task.domain.type.NotifyPolicy;
 import com.bifos.assistant.task.domain.type.TaskRunReason;
 import com.bifos.assistant.task.domain.type.TaskRunStatus;
+import com.bifos.assistant.task.domain.type.TaskState;
 import com.bifos.assistant.task.infra.TaskRepository;
 import com.bifos.assistant.task.infra.TaskRunRepository;
 import com.bifos.assistant.task.infra.TaskTriggerRepository;
@@ -65,6 +71,10 @@ import org.springframework.context.annotation.Primary;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
+import org.springframework.transaction.support.TransactionTemplate;
 
 /**
  * 시작 단계가 {@code QUEUED} 발화를 작업 주인의 대화 turn 으로 여는지 실제 DB 와 가짜 Hermes 로 본다. 규칙은
@@ -97,6 +107,13 @@ class TaskRunStarterTest {
     /** 답 조각은 이 검사가 보지 않는다. 실제 스트림 주소로 연결하지 않게 대역으로 둔다. */
     @MockitoBean
     HermesRunEventStream eventStream;
+
+    /** 시작 단계가 대화를 만드는 사이에 다른 트랜잭션을 끼워 넣는다. 끼우지 않은 검사에서는 실제 메서드가 그대로 돈다. */
+    @MockitoSpyBean
+    ChatService chat;
+
+    @Autowired
+    PlatformTransactionManager transactionManager;
 
     @Autowired
     TaskRunStarter starter;
@@ -404,6 +421,43 @@ class TaskRunStarterTest {
                         MessageRole.SYSTEM,
                         MessageRole.USER,
                         MessageRole.ASSISTANT);
+    }
+
+    @Test
+    @DisplayName("SINGLE 작업이 첫 발화로 대화를 적는 사이 사용자가 작업을 멈추고 이름을 바꿔도 그 변경이 남는다")
+    void keepsUserEditCommittedWhileSingleRunRecordsConversation() {
+        Fixture fixture = fixture(ConversationMode.SINGLE, NotifyPolicy.NEVER);
+        TaskRun run = queued(fixture, SCHEDULED, NOW);
+        String renamed = "이름을 바꾼 정리";
+        Instant edited = NOW.plusNanos(1_234_567);
+        TransactionTemplate userTransaction = new TransactionTemplate(transactionManager);
+        userTransaction.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+        doAnswer(invocation -> {
+                    // 시작 단계의 준비 트랜잭션이 작업을 읽은 뒤, 커밋하기 전에 사용자의 수정이 먼저 커밋된다.
+                    userTransaction.executeWithoutResult(status -> {
+                        Task task = tasks.findById(fixture.task().id()).orElseThrow();
+                        task.edit(
+                                task.agentId(),
+                                renamed,
+                                task.instruction(),
+                                task.conversationMode(),
+                                task.notifyPolicy(),
+                                edited);
+                        task.pause(edited);
+                    });
+                    return invocation.callRealMethod();
+                })
+                .when(chat)
+                .startForTask(
+                        anyLong(), anyLong(), anyString(), eq(fixture.task().id()));
+
+        starter.startQueued(NOW);
+        TaskRun finished = awaitFinished(run);
+
+        Task task = tasks.findById(fixture.task().id()).orElseThrow();
+        assertThat(task.state()).as("사용자가 멈춘 상태").isEqualTo(TaskState.PAUSED);
+        assertThat(task.title()).as("사용자가 바꾼 이름").isEqualTo(renamed);
+        assertThat(task.conversationId()).as("작업에 적은 대화").isNotNull().isEqualTo(finished.conversationId());
     }
 
     /** 그 사용자의 turn 자리 둘을 먼저 얻어 한도를 채운다. 정리 단계가 돌려준다. */

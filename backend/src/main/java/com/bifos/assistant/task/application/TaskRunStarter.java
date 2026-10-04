@@ -27,6 +27,7 @@ import com.bifos.assistant.user.domain.AppUser;
 import com.bifos.assistant.user.infra.AppUserRepository;
 import java.time.Clock;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
@@ -193,7 +194,8 @@ public class TaskRunStarter {
             conversationId = reusableConversation(task).orElseGet(() -> {
                 Long created = chat.startForTask(task.ownerUserId(), task.agentId(), task.title(), task.id())
                         .id();
-                task.useConversation(created, now);
+                // 잠그지 않고 읽은 task 를 고치면 그 줄 전체를 읽은 때의 값으로 덮는다. 대화 칸만 적는다.
+                tasks.useConversation(task.id(), created, now.truncatedTo(ChronoUnit.MICROS));
                 return created;
             });
         } else {
