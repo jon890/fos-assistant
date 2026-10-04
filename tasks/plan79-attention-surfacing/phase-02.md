@@ -236,6 +236,7 @@ scripts/check-public-safe.sh
 | `backend/src/main/java/com/bifos/assistant/attention/infra/AttentionControlRepository.java` | 신규 |
 | `backend/src/main/java/com/bifos/assistant/attention/infra/AttentionEventRepository.java` | 신규 |
 | `backend/src/main/java/com/bifos/assistant/attention/application/model/AttentionSnapshot.java` | 신규 |
+| `backend/src/main/java/com/bifos/assistant/attention/application/model/AttentionMetric.java` | 신규 |
 | `backend/src/main/java/com/bifos/assistant/attention/application/AttentionProperties.java` | 수정 |
 | `backend/src/main/java/com/bifos/assistant/attention/application/AttentionService.java` | 수정 |
 | `backend/src/main/java/com/bifos/assistant/attention/application/AttentionEventWriter.java` | 신규 |
