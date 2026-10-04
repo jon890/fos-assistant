@@ -1,5 +1,6 @@
 package com.bifos.assistant.proactive.application;
 
+import com.bifos.assistant.chat.application.ChatService;
 import com.bifos.assistant.chat.application.CheckTurn;
 import com.bifos.assistant.chat.application.model.CheckAnswer;
 import com.bifos.assistant.chat.domain.type.MessageRole;
@@ -30,8 +31,10 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.PageRequest;
 
 /**
@@ -40,7 +43,11 @@ import org.springframework.data.domain.PageRequest;
  * <p>입력과 지시, 대화에 남기는 글은 {@code docs/backend/proactive-check.md} 의 「실행에 싣는 것」, 「Control Plane 지시」,
  * 「대화에 남는 것」 이 갖는다. 결과와 셈은 이 객체가 들고 있다가 {@link #record} 로 살펴보기 줄에 한 번 적는다. 스트림 스레드와
  * turn 스레드가 같은 엔티티를 함께 고치지 않게 하기 위해서다.
+ *
+ * <p>시간과 도구 호출 상한도 여기서 지킨다. 뜻은 문서의 「상한」 이 갖는다. 상한에 닿으면 멈춘 까닭을 처음 한 번만 정하고 가상
+ * 스레드에서 {@link ChatService#stop} 을 부른다. {@link #close} 뒤에는 까닭을 정하지 않고 멈추기를 부르지 않는다.
  */
+@Slf4j
 public class ProactiveCheckRun implements CheckTurn {
 
     /**
@@ -90,6 +97,14 @@ public class ProactiveCheckRun implements CheckTurn {
     static final String NOTHING_NEW_NOTICE = "살펴봤지만 새로 알릴 것이 없어요";
     static final String INVALID_RESULT_NOTICE = "살펴봤지만 결과를 정리하지 못했어요";
     static final String STOPPED_NOTICE = "살펴보기를 멈췄어요";
+    static final String TIME_LIMIT_NOTICE = "시간 한도에 닿아 살펴보기를 멈췄어요";
+    static final String TOOL_LIMIT_NOTICE = "도구 호출 한도에 닿아 살펴보기를 멈췄어요";
+
+    /** 시간 상한으로 멈췄을 때 살펴보기 줄의 {@code error_code} 다. */
+    static final String TIME_LIMIT = "CHECK_TIME_LIMIT";
+
+    /** 도구 호출 상한으로 멈췄을 때 살펴보기 줄의 {@code error_code} 다. */
+    static final String TOOL_LIMIT = "CHECK_TOOL_LIMIT";
 
     static final String OPENING = "먼저 살펴보기를 시작한다. `skill_view(name=\"proactive-check\")` 로 지침을 읽고 그 절차대로 살펴본다.";
     static final String NO_RECENT_FINDINGS = "최근에 알린 발견이 없다.";
@@ -108,12 +123,23 @@ public class ProactiveCheckRun implements CheckTurn {
     private volatile CheckOutcome outcome;
     private volatile int newFindings;
     private volatile int referenceFindings;
+    /** 멈춤 알림 줄의 글을 내줬다. 그 줄은 부르는 쪽이 저장했다. */
     private volatile boolean stopped;
+
+    /** 상한으로 멈춘 까닭. 처음 정한 것만 남는다. 사용자가 멈췄거나 멈추지 않았으면 비어 있다. */
+    private final AtomicReference<String> stopReason = new AtomicReference<>();
+
+    /** 닫힘 표시와 시간 상한 스레드를 함께 바꾸고 읽는 잠금이다. 상한 판정이 닫힌 뒤에 끼어들지 않게 한다. */
+    private final Object limitLock = new Object();
+
+    private boolean closed;
+    private Thread timeLimit;
 
     /**
      * 살펴보기 한 번이 쓰는 저장소와 부품이다. {@code ProactiveCheckService} 가 자기 빈으로 채워 넘긴다.
      *
      * @param executions 지난 살펴보기의 루트 실행 줄을 읽어 Memory 문맥 지문을 견준다
+     * @param chat 상한에 닿은 turn 을 멈춘다
      */
     record Deps(
             ProactiveCheckProperties properties,
@@ -124,6 +150,7 @@ public class ProactiveCheckRun implements CheckTurn {
             ContextAssembler contextAssembler,
             CheckResultParser parser,
             CheckAnswerRenderer renderer,
+            ChatService chat,
             Clock clock) {}
 
     /**
@@ -162,15 +189,29 @@ public class ProactiveCheckRun implements CheckTurn {
         return renewSession;
     }
 
+    /** 루트 실행을 살펴보기 줄에 적은 뒤 {@code max-duration} 이 지나면 깨는 시간 상한 스레드를 띄운다. */
     @Override
     public void started(Long executionId, String hermesRootSessionId) {
         check.attachRoot(executionId, hermesRootSessionId);
         deps.checks().save(check);
+        Thread timer = Thread.ofVirtual()
+                .name("proactive-check-time-limit-" + executionId)
+                .unstarted(() -> awaitTimeLimit(executionId));
+        synchronized (limitLock) {
+            if (closed) {
+                return;
+            }
+            timeLimit = timer;
+        }
+        timer.start();
     }
 
+    /** 스트림을 읽는 스레드에서 불린다. 센 값이 {@code max-tool-calls} 를 넘는 첫 순간 멈춘다. */
     @Override
     public void toolStarted(Long executionId) {
-        toolCalls.incrementAndGet();
+        if (toolCalls.incrementAndGet() > deps.properties().maxToolCalls()) {
+            limitReached(TOOL_LIMIT, executionId);
+        }
     }
 
     /**
@@ -213,30 +254,108 @@ public class ProactiveCheckRun implements CheckTurn {
         return new CheckAnswer(deps.renderer().render(block, judged), false);
     }
 
+    /** 멈춘 까닭에 맞는 알림 줄의 글이다. 부르면 그 줄을 저장한 것으로 본다. */
     @Override
     public String stoppedNotice() {
         stopped = true;
+        String reason = stopReason.get();
+        if (TIME_LIMIT.equals(reason)) {
+            return TIME_LIMIT_NOTICE;
+        }
+        if (TOOL_LIMIT.equals(reason)) {
+            return TOOL_LIMIT_NOTICE;
+        }
         return STOPPED_NOTICE;
     }
 
+    /** 상한으로 멈췄으면 거짓이다. Control Plane 이 멈춘 것이라 대기 메시지를 그대로 보낸다. */
+    @Override
+    public boolean holdPendingOnStop() {
+        return stopReason.get() == null;
+    }
+
+    /** 시간 상한 스레드를 깨워 끝내고, 그 뒤로는 상한에 닿아도 멈추기를 부르지 않는다. 줄을 적기 전에 부른다. */
+    public void close() {
+        Thread timer;
+        synchronized (limitLock) {
+            closed = true;
+            timer = timeLimit;
+        }
+        if (timer != null) {
+            timer.interrupt();
+        }
+    }
+
+    /** 상한에 닿아 멈춘 까닭을 정했는지다. */
+    boolean limitStopped() {
+        return stopReason.get() != null;
+    }
+
+    /** 멈춤 알림 줄의 글을 이미 내줬는지다. 냈으면 그 줄은 대화에 저장됐다. */
+    boolean stoppedNoticeSaved() {
+        return stopped;
+    }
+
+    /** 살펴보기 turn 의 실행 줄. 실행 줄을 만들기 전에 끝났으면 null 이다. */
+    Long rootExecutionId() {
+        return check.rootExecutionId();
+    }
+
     /**
-     * turn 이 예외 없이 끝난 뒤 들고 있던 결과와 셈을 살펴보기 줄에 적는다. 멈춤 알림 줄을 냈으면 {@code STOPPED}, 아니면
-     * {@code SUCCEEDED} 다.
+     * turn 이 끝난 뒤 들고 있던 결과와 셈을 살펴보기 줄에 적는다. 멈춤 알림 줄을 냈으면 {@code STOPPED} 와 멈춘 까닭, 아니면
+     * {@code SUCCEEDED} 다. 사용자가 멈췄으면 까닭은 비어 있다.
+     *
+     * @param delegations 그 트리에서 맡긴 위임 자식 수
      */
-    void record() {
+    void record(int delegations) {
         Instant now = deps.clock().instant();
         if (stopped || outcome == null) {
-            check.stop(null, toolCalls.get(), 0, now);
+            check.stop(stopReason.get(), toolCalls.get(), delegations, now);
         } else {
-            check.succeed(outcome, newFindings, referenceFindings, toolCalls.get(), 0, now);
+            check.succeed(outcome, newFindings, referenceFindings, toolCalls.get(), delegations, now);
         }
         deps.checks().save(check);
     }
 
     /** turn 이 예외로 끝났을 때 살펴보기 줄을 {@code FAILED} 와 그 오류 코드로 적는다. */
-    void recordFailure(String errorCode) {
-        check.fail(errorCode, toolCalls.get(), 0, deps.clock().instant());
+    void recordFailure(String errorCode, int delegations) {
+        check.fail(errorCode, toolCalls.get(), delegations, deps.clock().instant());
         deps.checks().save(check);
+    }
+
+    /** {@code max-duration} 만큼 잔 뒤 끝나지 않았으면 멈춘다. {@link #close} 가 깨우면 그대로 끝난다. */
+    private void awaitTimeLimit(Long executionId) {
+        try {
+            Thread.sleep(deps.properties().maxDuration());
+        } catch (InterruptedException ex) {
+            return;
+        }
+        limitReached(TIME_LIMIT, executionId);
+    }
+
+    /**
+     * 멈춘 까닭을 처음 한 번만 정하고 가상 스레드에서 멈춘다. 닫혔거나 이미 까닭이 있으면 아무것도 하지 않는다.
+     *
+     * <p>도구 호출 수는 스트림을 읽는 스레드가 turn 의 잠금을 쥔 채 센다. 그 자리에서 멈추기를 부르지 않고 따로 띄운다.
+     */
+    private void limitReached(String reason, Long executionId) {
+        synchronized (limitLock) {
+            if (closed || !stopReason.compareAndSet(null, reason)) {
+                return;
+            }
+        }
+        Thread.ofVirtual()
+                .name("proactive-check-stop-" + executionId)
+                .start(() -> stopQuietly(reason, executionId));
+    }
+
+    /** 이미 끝난 turn 이면 멈추기가 {@code EXECUTION_NOT_RUNNING} 으로 끝난다. 어떤 예외든 경고 로그만 남긴다. */
+    private void stopQuietly(String reason, Long executionId) {
+        try {
+            deps.chat().stop(owner, executionId);
+        } catch (RuntimeException ex) {
+            log.warn("상한에 닿은 살펴보기를 멈추지 못했다 executionId={} reason={}", executionId, reason, ex);
+        }
     }
 
     private String buildInput(Instant now) {

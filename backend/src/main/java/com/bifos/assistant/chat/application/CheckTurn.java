@@ -33,4 +33,10 @@ public interface CheckTurn {
 
     /** 멈췄을 때 남기는 알림 줄의 글이다. */
     String stoppedNotice();
+
+    /**
+     * 멈춘 turn 뒤에 그 대화의 대기 줄을 멈춰 둘지다. 사용자가 멈췄으면 참이고, Control Plane 이 상한으로 멈췄으면 거짓이다. 거짓이면 대기
+     * 메시지가 그대로 다음 turn 으로 간다.
+     */
+    boolean holdPendingOnStop();
 }

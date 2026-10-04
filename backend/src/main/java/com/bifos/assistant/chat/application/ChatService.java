@@ -556,8 +556,23 @@ public class ChatService {
         try {
             return recorded(cancel(pending, result, choice), startedAt);
         } finally {
-            markStoppedAndHoldPending(handle, pending.conversation().id());
+            markStoppedTurn(handle, pending);
         }
+    }
+
+    /**
+     * 멈춘 turn 을 적는다. 상한으로 멈춘 살펴보기 turn 은 대기 줄을 멈추지 않고, 나머지는 {@link #markStoppedAndHoldPending} 과 같다.
+     *
+     * <p>상한으로 멈춘 것은 사용자가 아니라 Control Plane 이라, 살펴보기 동안 사용자가 보낸 대기 메시지를 그대로 다음 turn 으로
+     * 보낸다(ADR-077).
+     */
+    private void markStoppedTurn(TurnHandle handle, PendingTurn pending) {
+        if (pending.intent() instanceof TurnIntent.ProactiveCheck proactive
+                && !proactive.check().holdPendingOnStop()) {
+            turns.markStopped(handle);
+            return;
+        }
+        markStoppedAndHoldPending(handle, pending.conversation().id());
     }
 
     /**
@@ -580,7 +595,7 @@ public class ChatService {
                     pending.execution().id(),
                     ex);
         } finally {
-            markStoppedAndHoldPending(handle, pending.conversation().id());
+            markStoppedTurn(handle, pending);
         }
     }
 

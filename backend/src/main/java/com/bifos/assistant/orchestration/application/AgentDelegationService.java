@@ -161,6 +161,45 @@ public class AgentDelegationService {
     }
 
     /**
+     * 끝난 먼저 살펴보기 트리의 위임 결과를 전했다고 적고, 그 트리에서 도는 위임 자식을 멈춘다(ADR-077).
+     *
+     * <p>전달 표시는 그 루트의 잠금 안에서 한 번 더 적는다. 살펴보기가 끝나기 직전에 위임 판정을 지나 만든 자식 줄까지 표시가
+     * 붙는다. 그 뒤 {@code RUNNING} 인 위임 자식마다, 이 서버가 돌리는 것이면 중지 표시를 켜고 run 번호가 있으면 Hermes 에 중지를
+     * 보낸다. 이 서버가 돌리지 않는 것은 run 번호가 있으면 Hermes 에 중지만 보낸다. 끝나기를 기다리지 않는다.
+     *
+     * <p>부르는 쪽이 Control Plane 이라 {@link #canQuery} 를 거치지 않는다. 전달 표시가 실패해도 자식은 멈춘다.
+     *
+     * @param rootExecutionId 살펴보기 turn 의 실행 줄
+     */
+    public void stopRunningChildrenOf(Long rootExecutionId) {
+        ReentrantLock lock = lockOf(rootExecutionId);
+        lock.lock();
+        try {
+            deliveryWriter.markTreeDelivered(rootExecutionId, clock.instant());
+        } catch (RuntimeException ex) {
+            log.warn("끝난 살펴보기 트리의 위임 결과를 전했다고 적지 못했다 rootExecutionId={}", rootExecutionId, ex);
+        } finally {
+            lock.unlock();
+        }
+        for (AgentExecution child : executions.findByRootExecutionId(rootExecutionId)) {
+            if (child.status() != ExecutionStatus.RUNNING || child.delegationKey() == null) {
+                continue;
+            }
+            RunningDelegation delegation = running.get(child.id());
+            if (delegation == null) {
+                if (child.hermesRunId() != null) {
+                    stopDetached(child);
+                }
+                continue;
+            }
+            String runId = delegation.requestStop();
+            if (runId != null) {
+                sendStop(delegation, runId);
+            }
+        }
+    }
+
+    /**
      * 다른 에이전트의 실행을 origin 실행의 자식으로 시작하고, Hermes 제출까지만 기다린다(ADR-017 「{@code agent_delegate} 는
      * 기다리지 않는다」).
      *

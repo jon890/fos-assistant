@@ -22,11 +22,13 @@ import com.bifos.assistant.proactive.infra.ProactiveCheckRepository;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
+import com.bifos.assistant.usage.application.ExecutionDeliveryWriter;
 import com.bifos.assistant.usage.infra.AgentExecutionRepository;
 import java.time.Clock;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 
 /**
@@ -57,6 +59,8 @@ public class ProactiveCheckService {
     private final ContextAssembler contextAssembler;
     private final CheckResultParser parser;
     private final CheckAnswerRenderer renderer;
+    private final ExecutionDeliveryWriter deliveryWriter;
+    private final ApplicationEventPublisher events;
     private final Clock clock;
 
     /**
@@ -132,25 +136,81 @@ public class ProactiveCheckService {
     }
 
     /**
-     * turn 을 돌리고 결과를 살펴보기 줄에 적은 뒤 잠금을 푼다.
-     *
-     * <p>예외로 끝나면 줄을 {@code FAILED} 와 오류 코드로 적고, 실패 알림 줄을 남기고, 대화 SSE 로 {@code error} 를 보낸다. 줄을
-     * 적다 실패해도 잠금은 푼다.
+     * turn 을 돌리고, 어떻게 끝나든 잠금을 풀기 전에 끝을 정리한다. 정리는 {@link #finish} 가 한다. 정리가 실패해도 잠금은 푼다.
      */
     private void runCheck(CurrentUser owner, Long conversationId, TurnHandle handle, ProactiveCheckRun run) {
+        boolean returned = false;
+        RuntimeException failure = null;
         try {
             chat.runProactiveCheck(owner, conversationId, handle, run, event -> hub.publish(conversationId, event));
-            recordQuietly(run::record, conversationId);
+            returned = true;
         } catch (RuntimeException ex) {
-            String code = ex instanceof ApiException api ? api.code().name() : ErrorCode.INTERNAL_ERROR.name();
-            log.warn("살펴보기가 실패했다 conversationId={} code={}", conversationId, code, ex);
-            recordQuietly(() -> run.recordFailure(code), conversationId);
-            recordQuietly(() -> notices.post(conversationId, FAILED_NOTICE), conversationId);
-            hub.publish(
-                    conversationId,
-                    ChatEvent.error(code, ex instanceof ApiException ? ex.getMessage() : "internal error"));
+            failure = ex;
         } finally {
-            turns.close(handle);
+            try {
+                finish(conversationId, handle, run, returned, failure);
+            } finally {
+                turns.close(handle);
+            }
+        }
+    }
+
+    /**
+     * 끝난 살펴보기를 문서의 「끝날 때」 순서로 정리한다. 잠금을 풀기 전에 부른다. 잠금을 풀면 닫기 리스너가 곧바로 다음 turn 을 정하므로,
+     * 그 전에 위임 결과를 전했다고 적어 두어야 점검 대화에 자동 turn 이 열리지 않는다.
+     *
+     * <p>시간 상한 스레드를 끝내고, 위임 수와 함께 줄을 적고, 그 트리의 위임 결과를 전했다고 적고, 끝났다는 사건을 낸다. 각 단계가
+     * 실패해도 다음 단계로 넘어간다.
+     *
+     * <p>예외로 끝났어도 상한에 닿았거나 사용자의 중지가 확정됐으면 멈춘 것으로 적고 실패 알림 줄을 남기지 않는다. 실행 줄이 이미
+     * {@code FAILED} 로 적혀 멈춤 알림 줄이 저장되지 않았으면 여기서 남긴다. 알림 줄은 한 살펴보기에 하나다.
+     *
+     * @param returned turn 이 예외 없이 돌아왔다
+     * @param failure turn 이 던진 예외. 돌아왔거나 {@link Error} 로 끝났으면 null 이다
+     */
+    private void finish(
+            Long conversationId,
+            TurnHandle handle,
+            ProactiveCheckRun run,
+            boolean returned,
+            RuntimeException failure) {
+        recordQuietly(run::close, conversationId);
+        Long rootId = run.rootExecutionId();
+        int delegations = rootId == null ? 0 : countDelegations(rootId, conversationId);
+        if (returned) {
+            recordQuietly(() -> run.record(delegations), conversationId);
+        } else if (run.limitStopped() || turns.isStopConfirmed(handle)) {
+            log.info("멈춘 살펴보기가 예외로 끝났다 conversationId={}", conversationId, failure);
+            if (!run.stoppedNoticeSaved()) {
+                recordQuietly(() -> notices.post(conversationId, run.stoppedNotice()), conversationId);
+            }
+            recordQuietly(() -> run.record(delegations), conversationId);
+            recordQuietly(
+                    () -> notices.publicIdOf(conversationId)
+                            .ifPresent(publicId ->
+                                    hub.publish(conversationId, ChatEvent.stopped(publicId, null, rootId))),
+                    conversationId);
+        } else {
+            String code = failure instanceof ApiException api ? api.code().name() : ErrorCode.INTERNAL_ERROR.name();
+            log.warn("살펴보기가 실패했다 conversationId={} code={}", conversationId, code, failure);
+            recordQuietly(() -> run.recordFailure(code, delegations), conversationId);
+            recordQuietly(() -> notices.post(conversationId, FAILED_NOTICE), conversationId);
+            String message = failure instanceof ApiException ? failure.getMessage() : "internal error";
+            recordQuietly(() -> hub.publish(conversationId, ChatEvent.error(code, message)), conversationId);
+        }
+        if (rootId != null) {
+            recordQuietly(() -> deliveryWriter.markTreeDelivered(rootId, clock.instant()), conversationId);
+            recordQuietly(() -> events.publishEvent(new ProactiveCheckEnded(rootId)), conversationId);
+        }
+    }
+
+    /** 그 트리에서 맡긴 위임 자식 수. 세지 못하면 0 으로 적는다. */
+    private int countDelegations(Long rootId, Long conversationId) {
+        try {
+            return Math.toIntExact(executions.countByRootExecutionIdAndDelegationKeyIsNotNull(rootId));
+        } catch (RuntimeException ex) {
+            log.warn("살펴보기 트리의 위임 수를 세지 못했다 conversationId={} rootExecutionId={}", conversationId, rootId, ex);
+            return 0;
         }
     }
 
@@ -174,6 +234,6 @@ public class ProactiveCheckService {
 
     private ProactiveCheckRun.Deps deps() {
         return new ProactiveCheckRun.Deps(
-                properties, checks, findings, messages, executions, contextAssembler, parser, renderer, clock);
+                properties, checks, findings, messages, executions, contextAssembler, parser, renderer, chat, clock);
     }
 }

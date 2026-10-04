@@ -25,6 +25,7 @@ import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
+import com.bifos.assistant.usage.application.ExecutionDeliveryWriter;
 import com.bifos.assistant.usage.domain.AgentExecution;
 import com.bifos.assistant.usage.domain.DelegationKey;
 import com.bifos.assistant.usage.domain.type.ExecutionEventType;
@@ -119,6 +120,9 @@ class AgentDelegationServiceTest {
 
     @Autowired
     ChatService chat;
+
+    @Autowired
+    ExecutionDeliveryWriter deliveryWriter;
 
     private CurrentUser user;
     private AgentExecution origin;
@@ -536,6 +540,74 @@ class AgentDelegationServiceTest {
                         .status())
                 .isEqualTo(ExecutionStatus.CANCELLED);
         awaitFinished(started.executionId());
+    }
+
+    @Test
+    @DisplayName("살펴보기 트리의 도는 자식을 멈추면 그 루트의 도는 위임 자식만 멈추고 끝난 자식과 다른 루트의 자식은 그대로 둔다")
+    void stopRunningChildrenOfStopsOnlyRunningDelegationsOfThatRoot() throws Exception {
+        stub().willAnswer(command -> completed(command, "답"));
+        holdUntilStopped();
+        DelegationResult running = delegate("살펴보기가 맡긴 일");
+        AgentExecution otherOrigin = turn("fos-" + UUID.randomUUID());
+        String otherRoot = otherOrigin.hermesSessionId();
+        DelegationResult otherRunning = delegations.delegate(
+                user,
+                otherOrigin,
+                DelegationKey.of(CHIEF_PROFILE, otherRoot, otherRoot, "call_" + UUID.randomUUID()),
+                WORKER,
+                "다른 루트가 맡긴 일");
+        String finishedRunId = "run-finished-" + UUID.randomUUID();
+        AgentExecution finished = executions.save(AgentExecution.builder()
+                .userId(user.id())
+                .conversationId(conversation.id())
+                .agentId(agents.findByCode(WORKER).orElseThrow().id())
+                .parentExecutionId(origin.id())
+                .rootExecutionId(origin.id())
+                .delegationKey("finished-" + UUID.randomUUID())
+                .profileName(WORKER)
+                .hermesRunId(finishedRunId)
+                .costMode(CostMode.API)
+                .status(ExecutionStatus.SUCCEEDED)
+                .startedAt(Instant.parse("2026-09-30T00:00:00Z"))
+                .build());
+        assertThat(running.accepted()).as("결과: %s", running).isTrue();
+        assertThat(otherRunning.accepted()).as("결과: %s", otherRunning).isTrue();
+
+        delegations.stopRunningChildrenOf(origin.id());
+
+        AgentExecution stopped = awaitFinished(running.executionId());
+        assertThat(stopped.status()).isEqualTo(ExecutionStatus.CANCELLED);
+        assertThat(stopped.resultDeliveredAt())
+                .as("CANCELLED 로 끝난 뒤에도 남은 전달 표시")
+                .isNotNull();
+        AgentExecution other = awaitFinished(otherRunning.executionId());
+        assertThat(other.status()).as("다른 루트의 자식").isEqualTo(ExecutionStatus.SUCCEEDED);
+        assertThat(stub().stopped())
+                .contains(executions.findById(running.executionId()).orElseThrow().hermesRunId())
+                .doesNotContain(other.hermesRunId(), finishedRunId);
+        assertThat(executions.findById(finished.id()).orElseThrow().status())
+                .as("끝난 자식")
+                .isEqualTo(ExecutionStatus.SUCCEEDED);
+        assertThat(other.resultDeliveredAt()).as("다른 루트의 자식").isNull();
+    }
+
+    @Test
+    @DisplayName("이 서버가 돌리는 위임 자식에 전달 표시를 적은 뒤 그 자식이 SUCCEEDED 로 끝나도 전달 표시가 남는다")
+    void keepsDeliveryMarkWhenRunningChildSucceedsAfterwards() throws Exception {
+        stub().willAnswer(command -> completed(command, "늦게 끝난 답"));
+        stub().holdSubmits();
+        DelegationResult started = delegate("살펴보기가 끝난 뒤에 끝나는 일");
+        assertThat(started.accepted()).as("결과: %s", started).isTrue();
+
+        deliveryWriter.markTreeDelivered(origin.id(), Instant.now());
+        stub().releaseSubmits();
+
+        AgentExecution finished = awaitFinished(started.executionId());
+        assertThat(finished.status()).isEqualTo(ExecutionStatus.SUCCEEDED);
+        assertThat(finished.outputText()).isEqualTo("늦게 끝난 답");
+        assertThat(finished.resultDeliveredAt())
+                .as("run 번호를 적는 저장과 SUCCEEDED 저장 뒤의 전달 표시")
+                .isNotNull();
     }
 
     /**
