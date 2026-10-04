@@ -18,12 +18,15 @@ Hermes 에 설치하는 묶음과 그때 받는 값은 [`hermes/README.md`](../h
 ## 개별 실행
 
 전체 검사는 [`AGENTS.md`](../AGENTS.md) 의 「확인」 절이 갖는다.
-한 쪽만 돌릴 때는 아래와 같다.
+한 쪽만 돌릴 때는 아래와 같다. 괄호 안에서 돌리므로 어느 폴더에서 시작해도 서로 영향을 주지 않는다.
 
 ```bash
-cd backend && ./gradlew test
-cd web && pnpm install && pnpm typecheck && pnpm build
+# cwd: 저장소 root
+(cd backend && ./gradlew test)
+(cd web && pnpm install && pnpm typecheck)
 ```
+
+`pnpm build` 는 자리표시자 환경 변수가 있어야 통과한다. 값과 명령은 [`web/AGENTS.md`](../web/AGENTS.md) 가 갖는다.
 
 ## 환경 변수
 
@@ -53,4 +56,5 @@ cd web && pnpm install && pnpm typecheck && pnpm build
 | `ASSISTANT_SKILL_MAX_PER_AGENT` | Backend | 에이전트 하나에 올릴 수 있는 스킬 수. 기본 30. 새 스킬을 만들 때만 본다 |
 
 AI credential 은 이 저장소와 데이터베이스 어디에도 두지 않는다.
-각 사용자의 credential 은 그 사람의 Hermes profile `.env` 안에만 있다.
+credential 은 Hermes 안에 있다. profile 의 `.env` 에 둔 API key 는 그 profile 만 쓰고, OAuth 로그인은 profile 이 자기 `auth.json` 을 갖지 않으면 Hermes 루트의 로그인을 함께 쓴다.
+무엇이 격리되고 무엇이 공유되는지는 [`docs/hermes/README.md`](hermes/README.md) 의 「OAuth credential 은 여기서 빠진다」 가 소유한다.

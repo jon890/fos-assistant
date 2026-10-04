@@ -95,7 +95,7 @@ It does not fit you yet if:
 ## Principles
 
 1. **Yours.** The person owns the agent's tools, memory, and model choice.
-2. **Not mixed.** Someone else's memory and credentials never enter your run.
+2. **Not mixed.** Someone else's memory and connector tokens never enter your run. Conversations and memory are isolated per person, while the AI account (an API key or an OAuth login) can be shared by the group when that is stated explicitly.
 3. **Orchestrated.** Work is split across several agents and merged, rather than queued behind a single one. The agent decides what to split. The Control Plane decides who can see what.
 4. **It remembers.** What was learned once is not asked again in the next conversation.
 
@@ -121,7 +121,7 @@ The full scope, with how each item is verified, is in [`docs/prd.md`](docs/prd.m
 
 - **It does not modify Hermes core.** Only the official extension points are used: profiles, the API server, and plugin hooks.
 - **It does not remember what no person has seen.** Hermes' built-in memory tool is not given to agents. The Control Plane is the only path to memory.
-- **It does not store secrets in the database.** AI credentials and connector tokens live only in Hermes profiles, and service tokens are stored only as hashes.
+- **It does not store secrets in the database.** AI credentials and connector tokens live in Hermes (a profile's `.env`, or the Hermes OAuth login a profile may share), and service tokens are stored only as hashes. How an AI account is shared is described in [`docs/hermes/README.md`](docs/hermes/README.md).
 - **It is not an open sign-up service.** An administrator adds people to a group.
 - **It does not run scripts in agent-made pages.**
 - **It does not carry operating procedures.** Deployment and host-specific values belong to whoever runs it.
