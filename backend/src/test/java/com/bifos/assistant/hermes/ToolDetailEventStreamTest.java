@@ -23,10 +23,22 @@ class ToolDetailEventStreamTest {
 
             """;
 
+    private static final String MEMORY_READ_RAW = """
+            data: {"event":"tool.started","tool":"mcp__fos_assistant__memory_read","preview":"{\\"id\\": 12}"}
+
+            data: {"event":"tool.completed","tool":"mcp__fos_assistant__memory_read","result":"평문-표식-7391"}
+
+            """;
+
+    private static final String OTHER_TOOL_RAW = """
+            data: {"event":"tool.completed","tool":"web_search","result":"Bearer short-secret 검색 결과"}
+
+            """;
+
     @Test
     @DisplayName("같은 스트림의 도구 시작과 완료에서 UUID 번호표를 유지하고 비밀값은 가린다")
     void preservesUuidLabelsAcrossStartedAndCompletedEvents() throws IOException {
-        HttpServer server = startServer();
+        HttpServer server = startServer(RAW);
         try {
             List<RunEvent> events = read(server, false);
 
@@ -39,7 +51,7 @@ class ToolDetailEventStreamTest {
     @Test
     @DisplayName("연결용 스트림은 두 사건 모두 원문 전체를 가린다")
     void hidesAllDetailsForConnectorStream() throws IOException {
-        HttpServer server = startServer();
+        HttpServer server = startServer(RAW);
         try {
             assertThat(read(server, true))
                     .extracting(RunEvent::detail)
@@ -49,10 +61,36 @@ class ToolDetailEventStreamTest {
         }
     }
 
-    private static HttpServer startServer() throws IOException {
+    @Test
+    @DisplayName("memory_read 사건은 시작의 인자만 남기고 완료의 결과는 남기지 않는다")
+    void keepsOnlyArgumentsOfMemoryReadEvents() throws IOException {
+        HttpServer server = startServer(MEMORY_READ_RAW);
+        try {
+            List<RunEvent> events = read(server, false);
+
+            // 가리는 쪽이 JSON 인자를 다시 직렬화해 공백이 빠진다
+            assertThat(events).extracting(RunEvent::detail).containsExactly("{\"id\":12}", null);
+            assertThat(events).extracting(RunEvent::toolName).containsOnly("mcp__fos_assistant__memory_read");
+        } finally {
+            server.stop(0);
+        }
+    }
+
+    @Test
+    @DisplayName("다른 도구의 완료 사건은 결과를 가려 남긴다")
+    void keepsRedactedResultOfOtherToolCompletedEvent() throws IOException {
+        HttpServer server = startServer(OTHER_TOOL_RAW);
+        try {
+            assertThat(read(server, false)).extracting(RunEvent::detail).containsExactly("[가림] 검색 결과");
+        } finally {
+            server.stop(0);
+        }
+    }
+
+    private static HttpServer startServer(String raw) throws IOException {
         HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
         server.createContext("/v1/runs/run-one/events", exchange -> {
-            byte[] data = RAW.getBytes(StandardCharsets.UTF_8);
+            byte[] data = raw.getBytes(StandardCharsets.UTF_8);
             exchange.getResponseHeaders().set("Content-Type", "text/event-stream");
             exchange.sendResponseHeaders(200, data.length);
             try (var body = exchange.getResponseBody()) {
