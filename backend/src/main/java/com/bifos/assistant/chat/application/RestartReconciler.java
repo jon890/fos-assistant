@@ -113,10 +113,15 @@ public class RestartReconciler implements SmartLifecycle {
     /** {@link #start} 가 불린 시각이다. 기동 때의 잡기가 실패해 다시 잡을 때 이보다 뒤에 시작한 줄은 건드리지 않는다. */
     private volatile Instant startedAt;
 
-    /** 웹 서버를 여는 lifecycle 보다 먼저 시작한다. 그 사이 들어온 보내기가 같은 session 에 turn 을 열지 못한다. */
+    /**
+     * 이 정리가 시작하는 lifecycle 단계다. 웹 서버를 여는 lifecycle 보다 먼저 시작한다. 그 사이 들어온 보내기가 같은 session 에 turn 을
+     * 열지 못한다. 이 정리보다 먼저 돌아야 하는 기동 일은 이 값보다 작은 단계를 쓴다.
+     */
+    public static final int PHASE = WebServerApplicationContext.START_STOP_LIFECYCLE_PHASE - 1;
+
     @Override
     public int getPhase() {
-        return WebServerApplicationContext.START_STOP_LIFECYCLE_PHASE - 1;
+        return PHASE;
     }
 
     @Override

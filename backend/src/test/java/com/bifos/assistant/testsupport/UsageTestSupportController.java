@@ -2,6 +2,7 @@ package com.bifos.assistant.testsupport;
 
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.agent.infra.AgentRepository;
+import com.bifos.assistant.proactive.infra.ProactiveCheckRepository;
 import com.bifos.assistant.shared.auth.CurrentUserProvider;
 import com.bifos.assistant.usage.domain.AgentExecution;
 import com.bifos.assistant.usage.domain.ExecutionCost;
@@ -44,6 +45,7 @@ public class UsageTestSupportController {
 
     private final AgentExecutionRepository executions;
     private final SubagentUsageJobRepository jobs;
+    private final ProactiveCheckRepository proactiveChecks;
     private final AgentRepository agents;
     private final CurrentUserProvider currentUser;
 
@@ -82,14 +84,18 @@ public class UsageTestSupportController {
      *
      * <p>작업 줄을 남기면 부모 실행이 없어 재조회가 그 줄의 상태를 바꾸지 못한다. 다음 시도 시각이 굳은 채
      * {@code WAITING} 으로 남아 재조회 차례의 앞을 차지하고, 뒤에 생긴 작업이 한 주기 안에 돌지 못한다.
+     *
+     * <p>먼저 살펴보기 줄({@code proactive_check})도 루트 실행을 외래 키로 가리키므로 실행보다 먼저 지운다. 남기면 실행을 지우는
+     * 문장이 외래 키에 걸려 실패한다. 그 살펴보기의 발견 줄은 마이그레이션의 {@code ON DELETE CASCADE} 로 함께 지워진다.
      */
     @DeleteMapping("/executions")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void clearExecutions() {
         List<AgentExecution> cleared =
                 executions.findByUserIdOrderByIdDesc(currentUser.require().id(), PageRequest.of(0, CLEARED_AT_ONCE));
-        jobs.deleteAll(jobs.findByExecutionIdIn(
-                cleared.stream().map(AgentExecution::id).toList()));
+        List<Long> ids = cleared.stream().map(AgentExecution::id).toList();
+        jobs.deleteAll(jobs.findByExecutionIdIn(ids));
+        ids.forEach(id -> proactiveChecks.findByRootExecutionId(id).ifPresent(proactiveChecks::delete));
         executions.deleteAll(cleared);
     }
 

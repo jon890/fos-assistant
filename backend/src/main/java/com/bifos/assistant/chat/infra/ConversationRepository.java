@@ -1,6 +1,7 @@
 package com.bifos.assistant.chat.infra;
 
 import com.bifos.assistant.chat.domain.Conversation;
+import com.bifos.assistant.chat.domain.type.ConversationPurpose;
 import com.bifos.assistant.chat.domain.type.ModelSelectionMode;
 import com.bifos.assistant.model.domain.type.ModelTier;
 import java.time.Instant;
@@ -39,6 +40,10 @@ public interface ConversationRepository extends JpaRepository<Conversation, Long
     List<Conversation> findByUserIdAndAgentIdAndDeletedAtIsNullOrderByUpdatedAtDesc(
             Long userId, Long agentId, Pageable pageable);
 
+    /** 그 사용자가 그 에이전트와 그 목적으로 연 지우지 않은 대화 가운데 가장 나중에 만든 것. 점검 대화를 찾는다. */
+    Optional<Conversation> findFirstByUserIdAndAgentIdAndPurposeAndDeletedAtIsNullOrderByIdDesc(
+            Long userId, Long agentId, ConversationPurpose purpose);
+
     /** 어느 대화가 그 값을 보낼 session 이나 루트 session 으로 쓰는지. 지운 대화도 센다. */
     boolean existsByHermesSessionIdOrHermesRootSessionId(String hermesSessionId, String hermesRootSessionId);
 
@@ -62,6 +67,16 @@ public interface ConversationRepository extends JpaRepository<Conversation, Long
              where c.id = :id and c.hermesSessionId is null
             """)
     int assignSessionIfAbsent(@Param("id") Long id, @Param("sessionId") String sessionId);
+
+    /**
+     * 보낼 session 과 루트 session 을 같은 새 값으로 바꾼다. 먼저 살펴보기가 한 session 으로 보낸 수가 상한에 닿았을 때 쓴다.
+     *
+     * <p>{@code updatedAt} 은 바꾸지 않는다. 트랜잭션은 {@code ConversationWriter} 가 연다.
+     */
+    @Modifying
+    @Query(
+            "update Conversation c set c.hermesSessionId = :sessionId, c.hermesRootSessionId = :sessionId where c.id = :id")
+    int replaceSessions(@Param("id") Long id, @Param("sessionId") String sessionId);
 
     /** 사용자의 질문 없이 연 turn 의 수를 0 으로 돌린다. 이미 0 이면 줄을 건드리지 않고 0 을 돌려준다. 트랜잭션은 {@code ConversationWriter} 가 연다. */
     @Modifying

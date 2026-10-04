@@ -8,6 +8,9 @@ import com.bifos.assistant.chat.domain.Conversation;
 import com.bifos.assistant.chat.infra.ConversationRepository;
 import com.bifos.assistant.hermes.HermesRunsClient;
 import com.bifos.assistant.orchestration.application.DelegationResult.Failure;
+import com.bifos.assistant.proactive.application.ProactiveCheckGuard;
+import com.bifos.assistant.proactive.domain.ProactiveCheck;
+import com.bifos.assistant.proactive.domain.type.CheckStatus;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
@@ -61,6 +64,7 @@ public class AgentDelegationService {
     private final TurnCancellation turns;
     private final HermesRunsClient hermes;
     private final ApplicationEventPublisher events;
+    private final ProactiveCheckGuard checkGuard;
     private final Clock clock;
 
     /**
@@ -91,6 +95,7 @@ public class AgentDelegationService {
             TurnCancellation turns,
             HermesRunsClient hermes,
             ApplicationEventPublisher events,
+            ProactiveCheckGuard checkGuard,
             Clock clock) {
         this.agents = agents;
         this.executions = executions;
@@ -101,6 +106,7 @@ public class AgentDelegationService {
         this.turns = turns;
         this.hermes = hermes;
         this.events = events;
+        this.checkGuard = checkGuard;
         this.clock = clock;
         this.activeDelegations = new Semaphore(properties.maxActive());
         for (int i = 0; i < ROOT_LOCK_STRIPES; i++) {
@@ -123,6 +129,36 @@ public class AgentDelegationService {
     @Transactional(readOnly = true)
     public Optional<AgentExecution> status(CurrentUser user, AgentExecution origin, Long executionId) {
         return executions.findById(executionId).filter(execution -> canQuery(user, origin, execution));
+    }
+
+    /**
+     * {@link #status(CurrentUser, AgentExecution, Long)} 와 같이 읽되, 그 실행이 이 서버에서 돌고 있으면 끝나기를 기다린 뒤 다시 읽는다.
+     *
+     * <p>먼저 살펴보기 트리에서만 기다린다(ADR-080). 그 밖의 origin 은 {@code wait} 를 받아도 기다리지 않는다. 부모는 맡긴 뒤
+     * 기다리지 않고 끝난 결과는 다음 turn 에 전해지기 때문이다(ADR-040).
+     *
+     * <p>기다리는 시간은 {@code wait} 와 {@link DelegationProperties#statusWaitMax()} 가운데 짧은 쪽이다. 0 이하이면 기다리지
+     * 않는다. 이 서버가 돌리지 않는 {@code RUNNING} 실행은 끝나도 알 길이 없어 기다리지 않는다. 처음 읽은 뒤 그 사이 끝나 도는
+     * 표시가 없어졌으면 한 번 다시 읽어 끝난 상태를 준다.
+     *
+     * <p>트랜잭션을 걸지 않는다. 한 트랜잭션 안에서 기다리면 다시 읽어도 같은 영속 컨텍스트의 엔티티가 나오고, 기다리는 동안 DB
+     * 연결도 쥔다. {@link #stop} 과 같은 형태다.
+     */
+    public Optional<AgentExecution> status(CurrentUser user, AgentExecution origin, Long executionId, Duration wait) {
+        Optional<AgentExecution> found = status(user, origin, executionId);
+        if (found.isEmpty()
+                || found.get().status() != ExecutionStatus.RUNNING
+                || wait.isZero()
+                || wait.isNegative()
+                || !checkGuard.isCheckTree(origin)) {
+            return found;
+        }
+        RunningDelegation delegation = running.get(executionId);
+        if (delegation == null) {
+            return executions.findById(executionId);
+        }
+        delegation.awaitEnded(wait.compareTo(properties.statusWaitMax()) < 0 ? wait : properties.statusWaitMax());
+        return executions.findById(executionId);
     }
 
     /**
@@ -161,11 +197,51 @@ public class AgentDelegationService {
     }
 
     /**
+     * 끝난 먼저 살펴보기 트리의 위임 결과를 전했다고 적고, 그 트리에서 도는 위임 자식을 멈춘다(ADR-080).
+     *
+     * <p>전달 표시는 그 루트의 잠금 안에서 한 번 더 적는다. 살펴보기가 끝나기 직전에 위임 판정을 지나 만든 자식 줄까지 표시가
+     * 붙는다. 그 뒤 {@code RUNNING} 인 위임 자식마다, 이 서버가 돌리는 것이면 중지 표시를 켜고 run 번호가 있으면 Hermes 에 중지를
+     * 보낸다. 이 서버가 돌리지 않는 것은 run 번호가 있으면 Hermes 에 중지만 보낸다. 끝나기를 기다리지 않는다.
+     *
+     * <p>부르는 쪽이 Control Plane 이라 {@link #canQuery} 를 거치지 않는다. 전달 표시가 실패해도 자식은 멈춘다.
+     *
+     * @param rootExecutionId 살펴보기 turn 의 실행 줄
+     */
+    public void stopRunningChildrenOf(Long rootExecutionId) {
+        ReentrantLock lock = lockOf(rootExecutionId);
+        lock.lock();
+        try {
+            deliveryWriter.markTreeDelivered(rootExecutionId, clock.instant());
+        } catch (RuntimeException ex) {
+            log.warn("끝난 살펴보기 트리의 위임 결과를 전했다고 적지 못했다 rootExecutionId={}", rootExecutionId, ex);
+        } finally {
+            lock.unlock();
+        }
+        for (AgentExecution child : executions.findByRootExecutionId(rootExecutionId)) {
+            if (child.status() != ExecutionStatus.RUNNING || child.delegationKey() == null) {
+                continue;
+            }
+            RunningDelegation delegation = running.get(child.id());
+            if (delegation == null) {
+                if (child.hermesRunId() != null) {
+                    stopDetached(child);
+                }
+                continue;
+            }
+            String runId = delegation.requestStop();
+            if (runId != null) {
+                sendStop(delegation, runId);
+            }
+        }
+    }
+
+    /**
      * 다른 에이전트의 실행을 origin 실행의 자식으로 시작하고, Hermes 제출까지만 기다린다(ADR-017 「{@code agent_delegate} 는
      * 기다리지 않는다」).
      *
-     * <p>판정은 이 순서로 한다. 부모의 대화, 깊이, 에이전트, 같은 호출, 루트당 동시 한도, 전체 한도, 실행 시작, 제출 대기다.
-     * 앞의 셋은 잠그지 않고 기다리지 않는다. 같은 호출 확인부터 실행 줄 저장까지는 루트별로 잠가, 세기와 시작 사이에
+     * <p>판정은 이 순서로 한다. 부모의 대화, 깊이, 에이전트, 살펴보기의 맡길 곳, 같은 호출, 살펴보기의 위임 상한, 루트당 동시
+     * 한도, 전체 한도, 실행 시작, 제출 대기다. 앞의 넷은 잠그지 않고 기다리지 않는다. 살펴보기의 둘은 먼저 살펴보기 트리에서만
+     * 본다({@code docs/backend/proactive-check.md} 의 「읽기 경계」). 같은 호출 확인부터 실행 줄 저장까지는 루트별로 잠가, 세기와 시작 사이에
      * 다른 위임이 끼어들지 못하게 한다. 제출 대기는 잠금 밖에서 한다. 잠금이 제출 대기까지 덮으면 같은 루트의 위임이
      * 모두 한 줄로 늘어선다. 잠금도 {@link DelegationProperties#submitTimeout()} 안에서만 기다리고, 그 안에 잡지 못하거나
      * 잡은 뒤 남은 시간이 없으면 실행을 시작하지 않고 거절한다.
@@ -205,6 +281,12 @@ public class AgentDelegationService {
             }
             throw ex;
         }
+        boolean checkTree = checkGuard.isCheckTree(origin);
+        // 다른 에이전트는 셸이나 브라우저를 가질 수 있어 읽기 경계 밖이다. 커넥터 에이전트는 자기 MCP 서버만 갖고 그 호출이
+        // 커넥터 판정의 읽기 경계에 걸린다.
+        if (checkTree && !(agent.connectorManaged() && Objects.equals(agent.ownerUserId(), user.id()))) {
+            return rejected(Failure.CHECK_TARGET, origin, "살펴보기 트리에서 요청자의 커넥터 에이전트가 아닌 곳에 맡기려 했다");
+        }
 
         Long rootId = origin.treeRootId();
         long deadline = System.nanoTime() + properties.submitTimeout().toNanos();
@@ -219,6 +301,9 @@ public class AgentDelegationService {
             Optional<AgentExecution> existing = executions.findByDelegationKey(delegationKey.value());
             if (existing.isPresent()) {
                 return sameCall(user, origin, existing.get());
+            }
+            if (checkTree && !withinCheckLimit(origin, rootId)) {
+                return rejected(Failure.CHECK_LIMIT, origin, "살펴보기가 끝났거나 위임 상한에 닿았다");
             }
             if (executions.countByRootExecutionIdAndStatusAndDelegationKeyIsNotNull(rootId, ExecutionStatus.RUNNING)
                     >= properties.maxConcurrentChildren()) {
@@ -273,6 +358,21 @@ public class AgentDelegationService {
         }
         // 제한 시간이 지나도 줄이 있으면 번호를 돌려준다. 뒤따르는 결과는 그 줄에 적힌다.
         return DelegationResult.started(execution.id(), ExecutionStatus.RUNNING);
+    }
+
+    /**
+     * 살펴보기 트리에서 하나 더 맡길 수 있는가. 루트 잠금 안에서 부른다.
+     *
+     * <p>그 살펴보기가 {@code RUNNING} 이 아니면 맡기지 않는다. 멈추는 동안 이미 나간 {@code agent_delegate} 가 끝날 때의 정리
+     * ({@link #stopRunningChildrenOf}) 뒤에 자식 줄을 만들면, 그 결과로 점검 대화에 보통 자동 turn 이 열린다. 맡긴 수는 끝난
+     * 자식까지 센다. 한 번의 살펴보기에서 맡긴 총수의 상한이다.
+     */
+    private boolean withinCheckLimit(AgentExecution origin, Long rootId) {
+        Optional<ProactiveCheck> check = checkGuard.checkOf(origin);
+        if (check.isEmpty() || check.get().status() != CheckStatus.RUNNING) {
+            return false;
+        }
+        return executions.countByRootExecutionIdAndDelegationKeyIsNotNull(rootId) < checkGuard.maxDelegations();
     }
 
     /**

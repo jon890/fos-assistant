@@ -23,6 +23,7 @@ import com.bifos.assistant.notification.domain.NotificationTarget;
 import com.bifos.assistant.notification.domain.type.NotificationKind;
 import com.bifos.assistant.notification.domain.type.NotificationTargetType;
 import com.bifos.assistant.orchestration.application.SessionOwnerResolver;
+import com.bifos.assistant.proactive.application.ProactiveCheckGuard;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.util.Sha256;
 import com.bifos.assistant.usage.domain.AgentExecution;
@@ -62,6 +63,7 @@ public class ConnectorPolicyService {
     private static final String UNDECLARED_MESSAGE = "이 도구는 사용이 허락되지 않아 실행하지 않았다. 다시 부르지 않는다.";
     private static final String RISK_NOT_OPEN_MESSAGE = "이 도구는 아직 열리지 않아 실행하지 않았다. 다시 부르지 않는다.";
     private static final String ARGS_TOO_LARGE_MESSAGE = "인자가 너무 커서 실행하지 않았다. 나눠서 요청한다.";
+    private static final String READ_ONLY_RUN_MESSAGE = "먼저 살펴보기에서는 읽기 도구만 쓸 수 있습니다.";
     /**
      * 승인을 기다리는 호출에 답하는 글이다. 모델이 읽는다.
      *
@@ -89,6 +91,7 @@ public class ConnectorPolicyService {
     private final ApplicationEventPublisher events;
     private final NotificationService notifications;
     private final ConversationNotices conversations;
+    private final ProactiveCheckGuard checkGuard;
     private final TransactionTemplate transactions;
     private final Clock clock;
 
@@ -105,6 +108,7 @@ public class ConnectorPolicyService {
             ApplicationEventPublisher events,
             NotificationService notifications,
             ConversationNotices conversations,
+            ProactiveCheckGuard checkGuard,
             PlatformTransactionManager transactionManager) {
         this(
                 actions,
@@ -116,6 +120,7 @@ public class ConnectorPolicyService {
                 events,
                 notifications,
                 conversations,
+                checkGuard,
                 transactionManager,
                 Clock.systemUTC());
     }
@@ -130,6 +135,7 @@ public class ConnectorPolicyService {
             ApplicationEventPublisher events,
             NotificationService notifications,
             ConversationNotices conversations,
+            ProactiveCheckGuard checkGuard,
             PlatformTransactionManager transactionManager,
             Clock clock) {
         this.actions = actions;
@@ -141,6 +147,7 @@ public class ConnectorPolicyService {
         this.events = events;
         this.notifications = notifications;
         this.conversations = conversations;
+        this.checkGuard = checkGuard;
         this.transactions = new TransactionTemplate(transactionManager);
         this.clock = clock;
     }
@@ -196,13 +203,16 @@ public class ConnectorPolicyService {
                 .orElse(null);
         // 승인 카드와 알림이 같은 도구 제목을 쓰도록 선언을 한 번 찾아 둔다.
         Optional<ToolPolicy> declared = manifest.flatMap(value -> ConnectorToolPolicies.find(value, confirmedTool));
+        // 커넥터 에이전트의 실행은 위임 자식이라, 살펴보기가 맡긴 것이면 트리 루트가 살펴보기 turn 이다(ADR-080).
+        boolean readOnlyRun = checkGuard.isCheckTree(origin);
         ToolPolicyDecision decision = manifest.map(value -> ToolPolicyDecision.decide(
                         connection.status(),
                         ownServerTool(value, hermesTool),
                         value.schema(),
                         declared,
                         granted(connection, confirmedTool, now),
-                        argsJson.getBytes(StandardCharsets.UTF_8).length))
+                        argsJson.getBytes(StandardCharsets.UTF_8).length,
+                        readOnlyRun))
                 .orElseGet(ToolPolicyDecision::policyUnavailable);
         // 허용만 통과시킨다. 승인이 필요한 호출을 통과시키면 사람의 확인 없이 쓰기가 나간다.
         boolean passed = decision.decision() == ActionDecision.ALLOWED;
@@ -348,6 +358,7 @@ public class ConnectorPolicyService {
             case UNDECLARED -> UNDECLARED_MESSAGE;
             case RISK_NOT_OPEN -> RISK_NOT_OPEN_MESSAGE;
             case ARGS_TOO_LARGE -> ARGS_TOO_LARGE_MESSAGE;
+            case READ_ONLY_RUN -> READ_ONLY_RUN_MESSAGE;
         };
     }
 }

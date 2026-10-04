@@ -10,6 +10,7 @@ import type {
   AgentView,
   PersonaView,
 } from "@/lib/agent";
+import type { ProactiveCheckStatus } from "@/lib/proactive-check";
 import type { SkillListView } from "@/lib/skill";
 
 /**
@@ -33,17 +34,31 @@ export async function loadAgentDetail(
     !(
       agentsResult.ok && agentsResult.data.some((agent) => agent.code === code)
     );
-  const [personaResult, adminAgentsResult, toolsResult, skillsResult] =
-    await Promise.all([
-      callControlPlane<PersonaView>(`/api/v1/agents/${code}/persona`),
-      admin
-        ? callControlPlane<AdminAgent[]>("/api/v1/admin/agents")
-        : Promise.resolve(null),
-      useAdminTools
-        ? callControlPlane<AgentToolsView>(`/api/v1/admin/agents/${code}/tools`)
-        : callControlPlane<AgentToolsView>(`/api/v1/agents/${code}/tools`),
-      callControlPlane<SkillListView>(`/api/v1/agents/${code}/skills`),
-    ]);
+  // 커넥터 에이전트는 살펴보기를 하지 않으므로 상태를 읽지 않는다.
+  const listedAgent = agentsResult.ok
+    ? agentsResult.data.find((agent) => agent.code === code)
+    : undefined;
+  const [
+    personaResult,
+    adminAgentsResult,
+    toolsResult,
+    skillsResult,
+    proactiveCheckResult,
+  ] = await Promise.all([
+    callControlPlane<PersonaView>(`/api/v1/agents/${code}/persona`),
+    admin
+      ? callControlPlane<AdminAgent[]>("/api/v1/admin/agents")
+      : Promise.resolve(null),
+    useAdminTools
+      ? callControlPlane<AgentToolsView>(`/api/v1/admin/agents/${code}/tools`)
+      : callControlPlane<AgentToolsView>(`/api/v1/agents/${code}/tools`),
+    callControlPlane<SkillListView>(`/api/v1/agents/${code}/skills`),
+    listedAgent?.connectorManaged === true
+      ? Promise.resolve(null)
+      : callControlPlane<ProactiveCheckStatus>(
+          `/api/v1/agents/${code}/proactive-check`,
+        ),
+  ]);
   const adminAgent = adminAgentsResult?.ok
     ? adminAgentsResult.data.find((agent) => agent.code === code)
     : undefined;
@@ -77,6 +92,21 @@ export async function loadAgentDetail(
           ok: false as const,
           message: describeError(skillsResult.code, skillsResult.message),
         };
+  // 관리자가 대화를 시작할 수 없는 다른 사람의 비공개 에이전트는 404 라 읽지 못한다. 그때 절을 그리지 않는다.
+  const proactiveCheck =
+    proactiveCheckResult === null
+      ? null
+      : proactiveCheckResult.ok
+        ? { ok: true as const, data: proactiveCheckResult.data }
+        : admin
+          ? null
+          : {
+              ok: false as const,
+              message: describeError(
+                proactiveCheckResult.code,
+                proactiveCheckResult.message,
+              ),
+            };
   const visibility =
     adminAgent?.visibility ??
     (agentsResult.ok
@@ -102,6 +132,7 @@ export async function loadAgentDetail(
           initialPersona={null}
           tools={tools}
           skills={skills}
+          proactiveCheck={proactiveCheck}
           initialVisibility={visibility}
           adminAgent={connectorManaged ? undefined : adminAgent}
           canManageAccess={canManageAccess}
@@ -133,6 +164,7 @@ export async function loadAgentDetail(
       initialPersona={personaResult.data}
       tools={tools}
       skills={skills}
+      proactiveCheck={proactiveCheck}
       initialVisibility={visibility}
       adminAgent={connectorManaged ? undefined : adminAgent}
       canManageAccess={canManageAccess}

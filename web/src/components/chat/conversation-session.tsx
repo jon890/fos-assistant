@@ -29,6 +29,7 @@ import {
   type useConversation,
   useConversations,
 } from "@/components/shell/conversations-provider";
+import { Button } from "@/components/ui/button";
 import { escapeOnlyClosedTooltip } from "@/components/ui/tooltip-button";
 import { Notice } from "@/components/ui/notice";
 import {
@@ -49,6 +50,7 @@ import {
 } from "@/lib/chat-api";
 import { fetchExecutionTree } from "@/lib/usage-api";
 import { agentLabel } from "@/lib/format";
+import { START_FAILURES, startProactiveCheck } from "@/lib/proactive-check";
 import type { ChatEvent } from "@/lib/chat-event";
 import type { PendingResult } from "@/lib/pending-messages";
 import { foldVersions } from "@/lib/message-versions";
@@ -297,6 +299,10 @@ export function ConversationSession({
   const [flowIsSlow, setFlowIsSlow] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [turnError, setTurnError] = useState<string | null>(null);
+  /** 점검 대화의 「지금 살펴보기」 요청을 보내고 응답을 기다리는 중이다 */
+  const [checkStarting, setCheckStarting] = useState(false);
+  /** 「지금 살펴보기」 가 거절된 까닭이다. 다음에 누르면 지운다 */
+  const [checkError, setCheckError] = useState<string | null>(null);
   /** 「결과 다시 전달」 요청을 보내고 끝나기를 기다리는 중이다. 알림 줄의 단추를 막는다 */
   const [deliveryRetrying, setDeliveryRetrying] = useState(false);
   /** 보낸 스킬 커맨드의 이름이 이 에이전트에 없었다. 입력창 아래에 알리고 다음 보내기를 시작하면 지운다 */
@@ -967,6 +973,54 @@ export function ConversationSession({
       refreshMessages(id, version).catch(() => {}),
     ]);
     if (selectionVersion.current === version) setSending(false);
+  }
+
+  /**
+   * 점검 대화에서 살펴보기를 시작하고 도는 turn 을 따라간다.
+   *
+   * <p>202 가 오면 대화 단위 SSE 가 시작 알림 줄을 먼저 전했을 수 있다. 그 turn 을 이미 받고 있으면 따로 보지
+   * 않는다. 아니면 도는 turn 을 물어 보는 중 상태로 넘긴다. 이미 끝났으면 이력을 다시 읽는다.
+   */
+  async function startCheck() {
+    const id = conversationIdRef.current;
+    const code = currentConversation?.agentCode;
+    if (id === null || !code || sending || checkStarting) return;
+    const version = selectionVersion.current;
+    setCheckStarting(true);
+    setCheckError(null);
+    try {
+      const response = await startProactiveCheck(code);
+      if (!response.ok) {
+        const payload = await readPayload<ErrorPayload>(response).catch(
+          () => null,
+        );
+        setCheckError(
+          START_FAILURES[payload?.code ?? ""] ??
+            describeError(
+              payload?.code ?? "INTERNAL_ERROR",
+              payload?.message ?? "요청을 처리하지 못했어요.",
+            ),
+        );
+        return;
+      }
+      const runningResponse = await fetchRunningTurn(id);
+      const running = runningResponse.ok
+        ? await readPayload<RunningTurn>(runningResponse)
+        : null;
+      if (selectionVersion.current !== version) return;
+      if (autoTurn.current !== null || observedTurnFilter.current !== null)
+        return;
+      if (running?.running) {
+        beginObserving(id, version, running);
+      } else {
+        await refreshMessages(id, version);
+      }
+    } catch {
+      if (selectionVersion.current === version)
+        setCheckError(describeError("HERMES_UNAVAILABLE", "연결할 수 없어요."));
+    } finally {
+      setCheckStarting(false);
+    }
   }
 
   /**
@@ -1956,7 +2010,25 @@ export function ConversationSession({
                 </span>
               </div>
             </div>
+            {currentConversation?.purpose === "CHECK" ? (
+              <Button
+                variant="outline"
+                size="sm"
+                className="shrink-0"
+                disabled={sending}
+                loading={checkStarting}
+                loadingText="시작하는 중"
+                onClick={() => void startCheck()}
+              >
+                지금 살펴보기
+              </Button>
+            ) : null}
           </div>
+        )}
+        {startScreen || checkError === null ? null : (
+          <Notice variant="error" role="alert" className="mt-3">
+            {checkError}
+          </Notice>
         )}
 
         {startScreen ? null : (

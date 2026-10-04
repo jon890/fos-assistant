@@ -375,3 +375,18 @@ sequenceDiagram
 | 만들기가 실패하거나 Hermes 가 멈춰 있다 | 이전 추천을 그대로 둔다. 없으면 `NONE` 이고 화면은 자리를 비운다 |
 | 재시작했다 | 캐시가 비어 첫 화면이 다시 만든다 |
 | 그룹 공개 에이전트다 | 그 사용자의 대화만 읽는다 |
+
+## 점검 대화
+
+먼저 살펴보기의 결과가 남는 대화다([`backend/proactive-check.md`](../backend/proactive-check.md)).
+대화 응답의 `purpose` 가 `CHECK` 이면 머리 줄의 에이전트 이름 옆에 「지금 살펴보기」 단추를 둔다.
+
+| 때 | 하는 일 |
+| --- | --- |
+| 단추를 누른다 | `POST /api/v1/agents/{code}/proactive-check/runs`. 202 면 이 대화의 도는 turn 을 따라간다. 화면을 옮기지 않는다 |
+| 이 대화에 도는 turn 이 있다 | 단추를 끈다 |
+| 거절됐다 | `USER_BUSY` 와 `CONVERSATION_BUSY` 는 끝난 뒤 다시 누르라는 안내를, `PROACTIVE_CHECK_UNAVAILABLE` 은 에이전트 화면에서 까닭을 확인하라는 안내를 단추 아래에 보인다 |
+
+살펴보기 turn 은 답 조각을 흘리지 않는다. 도는 동안 작업 과정 줄만 보이고, 끝나면 결과 답이나 알림 줄이 이력에 들어온다.
+입력창은 보통 대화와 같다. 사용자가 결과를 두고 바로 묻는다.
+
