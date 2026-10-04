@@ -39,7 +39,7 @@
 | `ONCE` | 그 시간대의 날짜와 시각 하나 | 지금보다 뒤가 아니면 `TASK_SCHEDULE_INVALID` |
 
 `CRON` 의 예정 시각은 그 작업의 시간대로 계산한다. Spring `CronExpression` 의 계산을 따른다. 서머타임이 있는 시간대에서 없는 시각은 그날 건너뛰고, 겹친 시각은 두 번 돈다. 두 번의 예정 시각은 서로 다른 순간이라 발화 기록도 두 줄이다.
-앞으로 다음 시각이 없는 cron(예: `0 9 31 2 *`)은 `TASK_SCHEDULE_INVALID` 로 거절한다.
+다음 시각이 없는 cron(예: `0 9 31 2 *`)은 `TASK_SCHEDULE_INVALID` 로 거절한다.
 `ONCE` 는 한 번 발화하면 `next_fire_at` 이 비고 작업은 `ACTIVE` 로 남는다. 화면은 「다음 실행 없음」 으로 보인다.
 
 사용자당 보관하지 않은 작업은 `assistant.task.max-per-user`(기본 10)개까지다. 넘으면 `TASK_LIMIT_REACHED` 다.

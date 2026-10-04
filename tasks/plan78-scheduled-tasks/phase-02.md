@@ -88,7 +88,7 @@ turn 의 저장은 `B/chat/application/ChatService.java` 의 `saveQuestion` 이 
 ### 5. `B/task/application/TaskDispatcher.java` 와 기동 정리
 
 - `@Scheduled(cron = "${assistant.task.dispatch-cron}") public void runScheduled()` 가 `tick(clock.instant())` 를 부른다. `tick` 은 `fireDue` 뒤에 `startQueued` 를 부르고, 둘의 예외를 따로 잡는다
-- `@Scheduled` 는 `ApplicationReadyEvent` 보다 먼저 돌기 시작한다. `TaskRunRecovery` 가 끝나기 전에는 `runScheduled` 가 아무것도 하지 않게 한다(`TaskRunRecovery` 가 끝나면 켜는 `AtomicBoolean`). 그 전에 연 줄을 정리가 닫지 않게 하기 위해서다
+- `@Scheduled` 는 `ApplicationReadyEvent` 보다 먼저 돌기 시작한다. `TaskRunRecovery` 가 끝나기 전에는 `runScheduled` 가 아무것도 하지 않게 한다(`TaskRunRecovery` 가 끝나면 켜는 `AtomicBoolean`). 정리가 예외로 끝나도 로그를 남기고 `finally` 에서 켠다. 켜지 않으면 다시 띄울 때까지 모든 작업이 발화하지 않는다. 그 전에 연 줄을 정리가 닫지 않게 하기 위해서다
 - `B/task/application/TaskRunRecovery.java`: `@EventListener(ApplicationReadyEvent.class) @Order(20)` 에서 `RUNNING` 줄을 `FAILED`(`INTERRUPTED`)로 닫고 알린다
 
 ### 6. e2e 와 설정
@@ -108,7 +108,7 @@ turn 의 저장은 `B/chat/application/ChatService.java` 의 `saveQuestion` 이 
 | --- | --- |
 | `TaskFiringTest.java` | `0 9 1 * *` `Asia/Seoul` 작업에서 시계를 `2026-11-01T00:00:30Z` 로 두고 `fireDue` 하면 `QUEUED` 하나와 `next_fire_at = 2026-12-01T00:00:00Z`. 같은 시각으로 다시 불러도 하나. **발화를 만든 뒤 `next_fire_at` 을 옮기기 전에 서버가 내려간 것처럼** trigger 의 `next_fire_at` 을 `2026-11-01T00:00:00Z` 로 되돌린 뒤 `fireDue` 를 다시 불러도 줄은 하나이고 예외가 없으며 `next_fire_at` 은 다시 12월 1일이다. 예외를 내는 trigger(예: 저장된 시간대 이름이 틀린 줄)와 정상 trigger 를 함께 두면 정상 trigger 는 발화한다. 사흘 늦게 부르면 `RUN_ONCE` 는 마지막 예정 시각 하나, `SKIP` 은 `SKIPPED`(`MISSED`) 하나이고 알림이 없다. 멈춘 작업은 발화하지 않는다. 그 사용자의 24시간 안 발화가 48개면 `SKIPPED`(`DAILY_LIMIT`)와 `TASK_SKIPPED` 알림. `ONCE` 는 한 번 뒤 `next_fire_at` 이 빈다 |
 | `TaskRunStarterTest.java` | 가짜 Hermes 로 `QUEUED` 를 열면 `SUCCEEDED` 와 `execution_id` 가 차고, 새 대화의 `task_id` 와 제목이 작업이고, 메시지가 SYSTEM 알림 줄, USER 지시, ASSISTANT 답 순이고 `auto_turn_count` 가 0 이다. `ALWAYS` 면 `TASK_SUCCEEDED` 하나, `ON_FAILURE` 면 없음. 사용자 자리를 채워 두면 `QUEUED` 로 남고 대화가 하나만 생긴다. 사용자 자리를 채운 채 줄을 만든 때에서 10분이 지나면 `SKIPPED`(`BUSY`)와 알림. 놓친 발화로 예정 시각보다 30분 늦게 만든 `QUEUED` 줄은 바로 열린다. 에이전트를 끄면 `SKIPPED`(`AGENT_UNAVAILABLE`). 주인을 허용 목록에서 끄면 `SKIPPED`(`OWNER_REVOKED`)이고 알림이 없다. 멈춘 작업의 `QUEUED` 는 `SKIPPED`(`PAUSED`). Hermes 가 실패하면 `FAILED` 와 `TASK_FAILED`. `SINGLE` 은 두 번째 발화가 같은 대화에 이어진다 |
-| `TaskRunRecoveryTest.java` | `RUNNING` 줄이 기동 정리에서 `FAILED`(`INTERRUPTED`)가 되고 알림이 하나 생긴다. `QUEUED` 줄은 그대로다. 정리가 끝나기 전에 `runScheduled` 를 부르면 아무 줄도 만들거나 열지 않는다 |
+| `TaskRunRecoveryTest.java` | `RUNNING` 줄이 기동 정리에서 `FAILED`(`INTERRUPTED`)가 되고 알림이 하나 생긴다. `QUEUED` 줄은 그대로다. 정리가 끝나기 전에 `runScheduled` 를 부르면 아무 줄도 만들거나 열지 않는다. `@SpringBootTest` 컨텍스트에서는 `ApplicationReadyEvent` 가 이미 지나 플래그가 켜져 있으므로, 이 경우는 `TaskRunRecovery` 와 `TaskDispatcher` 를 직접 만들어 확인한다. 정리가 예외로 끝나도 플래그가 켜진다 |
 
 `test/e2e/scenarios/scheduled-task.ts`:
 
