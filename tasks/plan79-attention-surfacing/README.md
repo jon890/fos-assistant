@@ -10,37 +10,36 @@
 | --- | --- | --- |
 | 01 | 새 최상위 패키지 `attention`, 읽을 때 계산하는 판정, `GET /api/v1/attention`, `GET /api/v1/attention/summary` | 없다 |
 | 02 | 숨기기, 미루기, 되돌리기, 지표 사건, 관리자 지표, 사건 보관 기간 정리 | phase 01 |
-| 03 | 결과 전달 실패 후보 `DELIVERY_FAILED` | #162 가 main 에 들어왔다 |
+| 03 | 결과 전달 실패 후보 `DELIVERY_FAILED`, 「아직 구현 전」 표시 정리 | phase 02 |
 
 화면은 이 plan 이 만들지 않는다. plan81 이 이 API 를 읽어 그린다.
 할 일(`follow_up`)의 후보 `FOLLOW_UP_PROPOSED`, `FOLLOW_UP_OPEN` 은 plan80 이 더한다.
+결과 전달 상태는 PR #167 로 main 에 들어왔다(`V67__result_delivery.sql`, ADR-075). phase 03 은 그 표를 읽기만 한다.
 
-## 다른 plan 과의 순서
+## PR 과 순서
 
-네 plan 의 구현 순서는 아래 하나다. 네 README 가 같은 표를 갖는다.
+plan79, plan80, plan81 은 PR 넷으로 나눠 낸다. 세 README 가 같은 표를 갖는다.
 
-| 순서 | phase | 먼저 있어야 하는 것 |
-| --- | --- | --- |
-| 언제든 | plan78 01, 02, 03 | 없다 |
-| 1 | plan79 01, 02 | 없다 |
-| 2 | plan80 01, 02 | plan80 02 는 plan79 01(`attention` 패키지) |
-| 3 | plan81 01, 02 | plan79 01, 02 와 plan80 01, 02 |
-| 4 | plan80 03 | plan81 02(할 일을 받아들일 화면) |
-| 5 | plan81 03 | plan80 03 |
-| #162 뒤 | plan78 04, plan79 03 | #162 가 main 에 있다 |
+| PR | 브랜치 | 담는 phase | 계획서 처리 |
+| --- | --- | --- | --- |
+| 1 | `living-view-plan79` | plan79 01, 02, 03 | `tasks/plan79-attention-surfacing/` 전체를 지운다 |
+| 2 | `living-view-plan80`(PR 1 브랜치 위) | plan80 01, 02 | `tasks/plan80-follow-up/phase-01.md`, `phase-02.md` 를 지우고 `index.json` 을 phase 03 하나로 고친다. README 는 남는다 |
+| 3 | `living-view-plan81`(PR 2 브랜치 위) | plan81 01, 02 | `tasks/plan81-living-view/phase-01.md`, `phase-02.md` 를 지우고 `index.json` 을 phase 03 하나로 고친다. README 는 남는다 |
+| 4 | `living-view-plan81-final`(PR 3 브랜치 위) | plan80 03, plan81 03 | `tasks/plan80-follow-up/`, `tasks/plan81-living-view/` 전체를 지운다. 이 PR 이 `Closes #160`, `Closes #161` 을 적는다 |
 
-- **이 plan 은 plan78 의 코드에 기대지 않는다.** 판정 응답의 `sources[].ref` 는 문맥 묶음의 참조와 같은 형식(`execution:<번호>` 같은 글)을 쓰지만, plan78 의 타입을 import 하지 않는다. plan78 보다 먼저 머지돼도 동작한다
-- phase 02 의 마이그레이션 번호는 자리표시다. 구현할 때 main 의 마지막 다음 번호를 쓰고, phase 02 의 「변경 파일」 표도 같은 커밋에서 고친다
-- plan80 phase 02 가 `AttentionCandidates` 구현을 하나 더한다. 그래서 plan80 phase 02 는 이 plan 의 phase 01 뒤다. plan80 phase 01 은 `followup` 패키지만 만들어 이 plan 과 겹치지 않는다
+- **이 plan 은 plan78 의 코드에 기대지 않는다.** 판정 응답의 `sources[].ref` 는 문맥 묶음의 참조와 같은 형식(`execution:<번호>` 같은 글)을 쓰지만, 문맥 묶음의 타입을 import 하지 않는다. plan78 은 이 네 PR 과 따로 간다
+- 마이그레이션 번호는 phase 02 의 `V71__attention_control_event.sql` 로 고정한다. V69 와 V70 은 다른 작업이 쓴다. 머지 직전 main 과 겹치면 다음 번호로 옮기고 변경 파일 표도 같은 커밋에서 고친다
+- plan80 phase 02 가 `attention.application.AttentionCandidates` 구현을 하나 더한다. plan80 phase 01 은 `followup` 패키지만 만들어 이 plan 과 겹치지 않는다
 - plan81 은 phase 01 과 02 의 API 를 읽는다
 
-## PR 과 계획서 삭제
+## 계획서 삭제와 「아직 구현 전」 표시
 
-- phase 01 과 02 는 한 PR 로 낸다. phase 03 은 #162 가 머지된 뒤 따로 PR 을 낸다
-- **phase 03 이 막혀 있으면 phase 01, 02 만 먼저 낸다.** 그 PR 은 phase 02 의 작업 항목대로 ADR-072 의 `status` 와 `docs/adr/INDEX.md` 의 그 줄, `docs/backend/attention.md` 의 구현 전 단락, `docs/code-architecture.md` 의 `attention` 줄을 「`DELIVERY_FAILED` 는 아직 구현 전이다」 로 바꾼다. 이 디렉터리에서는 `phase-01.md`, `phase-02.md` 를 지우고 `index.json` 을 phase 03 하나로 고친다
-- phase 03 을 낸 PR 이 남은 「아직 구현 전」 표시를 모두 지우고 이 디렉터리를 지운다
-- phase 03 은 `docs/README.md` 의 `backend/attention.md` 줄 끝 「아직 구현 전이다」 도 지운다
+- phase 02 가 `docs/backend/schema/attention.md` 의 `attention_control`, `attention_event` 절의 「아직 구현 전이다」 와 `docs/backend/schema/README.md` 의 표시를 `follow_up` 만 남게 고친다
+- phase 03 이 ADR-072 의 `status`, `docs/adr/INDEX.md` 의 ADR-072 줄, `docs/code-architecture.md` 의 `attention` 줄의 「아직 구현 전」 을 지운다
+- phase 03 은 `docs/backend/attention.md` 와 `docs/README.md` 의 `backend/attention.md` 줄에 할 일 후보의 「아직 구현 전」 만 남긴다. 그 표시는 plan80 phase 02 가 지운다
+- phase 03 은 `docs/prd.md` 「답하는 비서에서 먼저 챙기는 비서로」 표의 ADR-072 줄을 「범위와 확인 방법」 표로 옮긴다
 - `docs/adr/ADR-074-…` 의 「아직 구현 전이다」 는 plan81 이 지운다. 이 plan 은 건드리지 않는다
+- 이 디렉터리는 PR 1 의 `build-with-teams` 마감 단계가 지운다. phase 는 `tasks/` 를 고치지 않는다
 
 ## 모든 phase 에 걸리는 규칙
 
@@ -49,8 +48,8 @@
 - **응답에 오류 코드, 모델, 토큰, 금액을 싣지 않는다.** 일반 경로라 역할과 상관없이 뺀다(ADR-063). DTO 에 그 칸을 두지 않는다
 - **로그에는 사용자 번호, 카드 열쇠, 개수만 낸다.** 항목 제목, 대화 제목, `itemKey` 를 로그에 내지 않는다
 - **웹 알림(ADR-070, `notification` 패키지)의 `notification` 표를 읽거나 쓰지 않는다.** 지금 화면에서 승인을 처리해도 알림의 읽음 상태를 바꾸지 않는다(`docs/backend/attention.md` 「웹 알림과의 경계」)
-- 다른 패키지의 기록은 그 패키지의 `application` 에 읽기 메서드를 두고 읽는다. `attention` 이 다른 패키지의 `infra` 를 바로 import 하지 않는다
-- 저장소에 메서드를 더하면 `RepositoryQueryMysqlTest` 가 실제 MySQL 에서 실행한다. 인자 타입을 만들지 못해 실패하면 `backend/src/test/java/com/bifos/assistant/testsupport/RepositoryQuerySweep.java` 에 그 타입의 값을 더한다. 건너뛰게 하지 않는다
+- 다른 패키지의 기록은 그 패키지의 `application` 에 읽기 메서드를 두고 읽는다. `attention` 이 다른 패키지의 `infra` 를 바로 import 하지 않는다. phase 01 이 이 규칙을 `docs/backend/attention.md` 「패키지」 에 적는다
+- 저장소에 메서드를 더하면 `RepositoryQueryMysqlTest` 가 실제 MySQL 에서 실행한다. 인자 타입 `Long`, `Instant`, `UUID`, `Collection`, enum 은 `backend/src/test/java/com/bifos/assistant/testsupport/RepositoryQuerySweep.java` 가 이미 만든다. 그 파일은 고치지 않는다
 - backend 의 새 코드는 `backend/AGENTS.md` 를 지킨다. 로거는 `@Slf4j`, 시각은 주입받은 `Clock`, 저장하는 enum 은 `attention.domain.type`, 저장하지 않는 값은 `attention.application.model`, 요청과 응답 record 는 `AttentionDtos.java` 하나, 테스트 메서드에는 한국어 `@DisplayName`
 - 기능 변경과 포맷(`./gradlew spotlessApply`)은 다른 커밋이다
 - 주석과 Javadoc 은 한국어로 쓴다. 용어는 루트 `AGENTS.md` 의 「용어」 표를 따른다(실행 트리, 루트, 할 일, 지금 화면)
@@ -62,4 +61,4 @@
 - 문맥 묶음(plan78)
 - 화면 밖 채널(Discord, Web Push). ADR-072 의 열린 질문이다
 - 집중 모드처럼 알리기를 끄는 설정
-- 결과 전달 실패 상태의 저장과 다시 전하기(#162)
+- 결과 전달 상태의 저장과 다시 전달. ADR-075 와 `chat` 패키지가 갖는다
