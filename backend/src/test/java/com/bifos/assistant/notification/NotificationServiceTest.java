@@ -16,7 +16,9 @@ import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
+import java.time.Clock;
 import java.time.Instant;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -222,6 +224,30 @@ class NotificationServiceTest {
         assertThat(again.readAt()).isEqualTo(readAt);
         assertThat(notifications.findById(first.id()).orElseThrow().readAt()).isEqualTo(readAt);
         assertThat(aliceEvents).as("새로 읽음이 된 한 번만 사건이 간다").containsExactly(NotificationEvent.read(1));
+    }
+
+    @Test
+    @DisplayName("시계가 나노초까지 주어도 만든 시각과 읽은 시각은 DB 에서 다시 읽은 값과 같다")
+    void storedTimesMatchDatabasePrecisionWhenClockHasNanos() {
+        // Linux 의 시스템 시계는 나노초까지 주지만 칸은 DATETIME(6) 이다. 그 시계를 고정해 macOS 에서도 재현한다.
+        Instant nanos = Instant.parse("2026-10-01T00:00:00.123456789Z");
+        NotificationService nanoService =
+                new NotificationService(notifications, hub, Clock.fixed(nanos, ZoneOffset.UTC), transactionManager);
+        Instant micros = Instant.parse("2026-10-01T00:00:00.123456Z");
+
+        Notification created = transactions.execute(
+                status -> nanoService.notify(ALICE, NotificationKind.APPROVAL_REQUESTED, "제목", "본문", null));
+        Instant readAt = transactions
+                .execute(status -> nanoService.markRead(alice(), created.publicId()))
+                .readAt();
+        Notification again = transactions.execute(status -> nanoService.markRead(alice(), created.publicId()));
+
+        assertThat(created.createdAt()).as("만든 시각").isEqualTo(micros);
+        assertThat(readAt).as("처음 읽은 시각").isEqualTo(micros);
+        assertThat(again.readAt()).as("다시 읽음으로 표시한 뒤 DB 에서 읽은 시각").isEqualTo(readAt);
+        Notification stored = notifications.findById(created.id()).orElseThrow();
+        assertThat(stored.createdAt()).as("DB 의 만든 시각").isEqualTo(created.createdAt());
+        assertThat(stored.readAt()).as("DB 의 읽은 시각").isEqualTo(readAt);
     }
 
     @Test

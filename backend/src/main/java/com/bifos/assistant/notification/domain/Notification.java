@@ -12,6 +12,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.Objects;
 import java.util.UUID;
 import lombok.AccessLevel;
@@ -81,10 +82,11 @@ public class Notification {
     @Column(name = "target_public_id", columnDefinition = "BINARY(16)")
     private UUID targetPublicId;
 
+    /** 칸이 {@code DATETIME(6)} 이라 마이크로초까지만 둔다. 메모리의 값과 DB 에서 다시 읽은 값이 같아야 한다. */
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
 
-    /** 읽음으로 표시한 시각이다. 비면 읽지 않았다. */
+    /** 읽음으로 표시한 시각이다. 비면 읽지 않았다. {@code createdAt} 처럼 마이크로초까지만 둔다. */
     @Column(name = "read_at")
     private Instant readAt;
 
@@ -104,14 +106,14 @@ public class Notification {
             notification.targetType = target.type();
             notification.targetPublicId = target.publicId();
         }
-        notification.createdAt = Objects.requireNonNull(now, "now");
+        notification.createdAt = Objects.requireNonNull(now, "now").truncatedTo(ChronoUnit.MICROS);
         return notification;
     }
 
     /** 읽음으로 표시한다. 이미 읽은 줄은 처음 읽은 시각을 그대로 둔다. */
     public void markRead(Instant now) {
         if (readAt == null) {
-            readAt = now;
+            readAt = now.truncatedTo(ChronoUnit.MICROS);
         }
     }
 
