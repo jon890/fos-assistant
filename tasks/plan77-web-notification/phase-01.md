@@ -197,6 +197,7 @@ scripts/check-public-safe.sh
 | `backend/src/test/resources/application-test.yml` | 수정 |
 | `backend/src/test/java/com/bifos/assistant/architecture/TopLevelPackageOrder.java` | 수정 |
 | `backend/src/test/java/com/bifos/assistant/architecture/TopLevelPackageOrderTest.java` | 수정 |
+| `backend/src/test/java/com/bifos/assistant/CollationMixQueryMysqlTest.java` | 수정 |
 | `backend/src/test/java/com/bifos/assistant/notification/NotificationServiceTest.java` | 신규 |
 | `backend/src/test/java/com/bifos/assistant/notification/NotificationCleanerTest.java` | 신규 |
 | `backend/src/test/java/com/bifos/assistant/notification/NotificationControllerTest.java` | 신규 |
