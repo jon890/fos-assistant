@@ -1,6 +1,6 @@
 # Phase 03. 실행마다 실은 Memory 항목의 참조
 
-**Execution profile**: standard
+**Execution profile**: deep
 
 ## 목표
 
@@ -12,7 +12,7 @@
 ## 컨텍스트
 
 - 표의 칸은 `docs/backend/schema/execution.md` 의 「execution_context_source」 가 갖는다. `execution_id` BIGINT, `position` INT, `source` VARCHAR(32), `source_ref` VARCHAR(80), `body_mode` VARCHAR(16), `freshness` VARCHAR(16), `created_at` DATETIME(6), 기본 키 `(execution_id, position)`
-- 마이그레이션은 `backend/src/main/resources/db/migration/` 에 있고 지금 마지막은 `V65__subagent_usage_job_collation.sql` 이다. **새 파일 이름은 `V66__execution_context_source.sql` 로 적었지만, 구현할 때 `origin/main` 의 마지막 다음 번호로 바꾸고 아래 변경 파일 표도 함께 고친다.** 다른 작업이 같은 번호를 먼저 쓸 수 있다
+- 마이그레이션은 `backend/src/main/resources/db/migration/` 에 있고 main 의 마지막은 `V68__task.sql` 이다. `V69` 는 다른 작업이 예약했으므로 이 표는 `V70__execution_context_source.sql` 을 쓴다. 머지 직전 main 이 `V70` 을 먼저 쓰면 그 다음 번호로 옮기고 아래 변경 파일 표도 함께 고친다
 - 새 표는 `ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci` 를 적는다. `test/unit/migration-collation.test.ts` 가 본다(`docs/backend/schema/README.md` 「마이그레이션 작성 규칙」)
 - 실행 줄은 `backend/src/main/java/com/bifos/assistant/usage/application/ExecutionRecorder.java` 의 private `record(...)` 가 `limiter.admit(...)` 안에서 만든다. 문맥 값은 `ExecutionContextSnapshot`(`usage/application/ExecutionContextSnapshot.java`, `record(Long contextChars, String runtimeFingerprint, String instructionsHash, Integer contextOmittedItems)`)으로 받는다
 - 스냅숏을 만드는 곳은 `chat/application/ChatService.java` 의 `runTurn`(`new ExecutionContextSnapshot(...)`)과 `orchestration/application/AgentRunner.java` 둘이다
@@ -32,14 +32,14 @@
 
 ## 작업 항목
 
-### 1. `backend/src/main/resources/db/migration/V66__execution_context_source.sql` (신규)
+### 1. `backend/src/main/resources/db/migration/V70__execution_context_source.sql` (신규)
 
 위 칸과 기본 키로 표를 만든다. DDL 만 담는다.
 
 ### 2. 엔티티와 저장소
 
-- `backend/src/main/java/com/bifos/assistant/usage/domain/ExecutionContextSource.java`: 위 표의 엔티티. 기본 키는 `backend/src/main/java/com/bifos/assistant/usage/domain/ExecutionContextSourceId.java`(`executionId`, `position`)다. `memory.domain.ServiceTokenCollectionId` 의 복합 키 모양을 따른다. `source`, `bodyMode`, `freshness` 는 문자열 칸이다
-- `backend/src/main/java/com/bifos/assistant/usage/infra/ExecutionContextSourceRepository.java`: `List<ExecutionContextSource> findByExecutionIdOrderByPositionAsc(Long executionId)` 와 `List<ExecutionContextSource> findByExecutionIdInOrderByExecutionIdAscPositionAsc(Collection<Long> executionIds)`. 인자 타입이 `Long` 과 `Collection<Long>` 이라 `RepositoryQuerySweep` 에 더할 것이 없는지 실행해 본다
+- `backend/src/main/java/com/bifos/assistant/usage/domain/ExecutionContextSource.java`: 위 표의 엔티티. 기본 키는 `backend/src/main/java/com/bifos/assistant/usage/domain/ExecutionContextSourceId.java`(`executionId`, `position`)다. `memory.domain.ServiceTokenCollectionId` 의 복합 키 모양(`@Embeddable record` 와 `@EmbeddedId`)을 따른다. 그래서 `executionId` 와 `position` 은 엔티티의 `id` 안에 있다. `source`, `bodyMode`, `freshness` 는 문자열 칸이다
+- `backend/src/main/java/com/bifos/assistant/usage/infra/ExecutionContextSourceRepository.java`: `List<ExecutionContextSource> findByIdExecutionIdOrderByIdPositionAsc(Long executionId)` 와 `List<ExecutionContextSource> findByIdExecutionIdInOrderByIdExecutionIdAscIdPositionAsc(Collection<Long> executionIds)`. 본보기 저장소 `ServiceTokenCollectionRepository` 도 `findByIdTokenIdIn` 으로 쓴다. 인자 타입이 `Long` 과 `Collection<Long>` 이라 `RepositoryQuerySweep` 에 더할 것이 없는지 실행해 본다
 
 ### 3. `usage` 의 참조 타입과 기록
 
@@ -55,7 +55,7 @@
 
 ### 5. 실행 트리 응답
 
-`ExecutionNode` 에 `List<ContextSourceRef> contextSources` 를 더한다. `ExecutionTreeService` 는 트리의 실행 번호로 한 번에 읽고(`findByExecutionIdInOrderByExecutionIdAscPositionAsc`), `internal` 이 참일 때만 싣는다. 아니면 `null` 이다.
+`ExecutionNode` 에 `List<ContextSourceRef> contextSources` 를 더한다. `ExecutionTreeService` 는 트리의 실행 번호로 한 번에 읽고(`findByIdExecutionIdInOrderByIdExecutionIdAscIdPositionAsc`), `internal` 이 참일 때만 싣는다. 아니면 `null` 이다.
 
 ### 6. 관리자 실행 상세
 
@@ -92,9 +92,11 @@
 
 `test/browser/execution-tree.spec.ts` 의 「실행 상세와 작업 과정에 실제 모델, 단계, 기본 강도와 기록된 시각만 보인다」 옆에 검사 하나를 더한다. 관리자 영역의 실행 상세에 `execution-context-sources` 가 있고, `MEMBER` 의 일반 실행 상세에는 없다.
 
-### 8. 저장 모델 문서의 구현 전 표시
+### 8. 저장 모델 문서의 구현 전 표시와 역할별로 빼는 값
 
 `docs/backend/schema/execution.md` 「execution_context_source」 의 「**아직 구현 전이다.** 표를 만든 PR 이 이 줄을 지운다.」 줄과 `docs/backend/schema/README.md` 의 `execution_context_source(아직 구현 전이다)` 의 괄호를 지운다.
+`docs/backend/conversation.md` 「역할에 따라 응답에서 빼는 값」 표의 `GET /api/v1/usage/executions/{id}/tree` 의 실행 노드 줄 끝에 `contextSources` 를 더한다.
+
 ADR-071, `docs/adr/INDEX.md`, `docs/backend/context-bundle.md`, `docs/code-architecture.md` 의 구현 전 표시는 phase 04 가 지운다.
 
 ## 검증
@@ -126,7 +128,7 @@ pnpm test:browser execution-tree
 
 | 파일 | 변경 |
 |---|---|
-| `backend/src/main/resources/db/migration/V66__execution_context_source.sql` | 신규 |
+| `backend/src/main/resources/db/migration/V70__execution_context_source.sql` | 신규 |
 | `backend/src/main/java/com/bifos/assistant/usage/domain/ExecutionContextSource.java` | 신규 |
 | `backend/src/main/java/com/bifos/assistant/usage/domain/ExecutionContextSourceId.java` | 신규 |
 | `backend/src/main/java/com/bifos/assistant/usage/infra/ExecutionContextSourceRepository.java` | 신규 |
@@ -145,3 +147,4 @@ pnpm test:browser execution-tree
 | `test/browser/execution-tree.spec.ts` | 수정 |
 | `docs/backend/schema/execution.md` | 수정 |
 | `docs/backend/schema/README.md` | 수정 |
+| `docs/backend/conversation.md` | 수정 |

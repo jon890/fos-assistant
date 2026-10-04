@@ -14,6 +14,8 @@
 - 실행 줄에 네 시각이 이미 남는다. `backend/src/main/java/com/bifos/assistant/usage/domain/AgentExecution.java` 의 `requestReceivedAt()`, `submittedAt()`, `firstDeltaAt()`, `finishedAt()` 이고, 단계는 `modelTier()`(`model.domain.type.ModelTier` 의 `FAST`, `BALANCED`, `DEEP`, 비어 있을 수 있다)다
 - 자동 turn(위임 결과를 전하는 turn)은 요청 대신 내부 trigger 시각을 `request_received_at` 에 적는다. 그래서 집계에서 뺀다
 - 실행 줄에는 자동 turn 인지 적는 칸이 없다. 그 turn 의 답 메시지(`chat_message`, `role=ASSISTANT`, `execution_id`=그 실행)보다 앞선 메시지 가운데 `ASSISTANT` 가 아닌 가장 최근 줄의 `role` 로 가린다. `USER` 면 사용자 turn 이고 `SYSTEM` 이면 자동 turn 이다. 다시 생성은 앞선 질문이 `USER` 라 사용자 turn 으로 든다
+- 예약 작업 turn 은 `ChatService.saveQuestion` 이 `SYSTEM` 알림 줄 다음에 작업 지시를 `USER` 메시지로 저장한다. 위 판정만으로는 사용자 turn 으로 세진다. 사람이 기다리지 않는 turn 이므로 뺀다. `task_run.execution_id`(`task/domain/TaskRun.java` 의 `executionId()`)가 그 발화의 루트 실행 번호다
+- `chat` 은 `task` 를 import 하지 못한다(ADR-068). 본보기는 `chat/application/ConversationTaskLabels.java`(port)와 그 구현 `task/application/TaskLabelSource.java` 다
 - 이 판정은 `chat_message` 와 `agent_execution` 을 함께 읽는다. `usage` 는 `chat` 을 import 하지 못하므로(ADR-068) 집계는 `chat` 패키지가 맡는다. `chat` 은 `usage` 위에 있어 `AgentExecution` 을 읽을 수 있다
 - 관리자 사용량 화면은 `web/src/app/admin/usage/page.tsx` → `web/src/components/usage/usage-screen.tsx` 의 `UsageScreen`(서버 컴포넌트, `admin={true}`)이다. `callControlPlane` 으로 Control Plane 을 바로 부른다. `summary` 탭에 `MonthlySummary` 와 `BreakdownSection` 이 있다
 - 관리자 전용 경로의 본보기는 `backend/src/main/java/com/bifos/assistant/chat/presentation/ModelAdminController.java` 다. `@RequestMapping("/api/v1/admin")` 과 `currentUser.requireAdmin()` 을 쓴다. `MEMBER` 는 `ErrorCode.FORBIDDEN`(403)을 받는다
@@ -28,12 +30,14 @@
 - 백분위는 nearest-rank 방식이다. 값 n 개를 오름차순으로 두고 p 백분위는 `ceil(p/100 × n)` 번째 값이다
 - 시각이 비어 있는 실행은 그 지표에서만 뺀다. 0 으로 채우지 않는다. 한 번에 받는 경로(`POST /api/v1/chat/messages`)는 `first_delta_at` 이 비어 첫 반응 시간과 첫 조각까지에 들지 않고 제출까지에만 든다
 - 답 메시지가 없는 실행(제출 전 실패 같은 것)은 뺀다. 사용자 turn 인지 가릴 수 없다
+- 예약 turn 이 끝나기 전에 서버가 다시 시작돼 `task_run.execution_id` 가 비면 그 실행은 빠지지 않는다. 드물고 지표를 크게 흔들지 않는다
+- 사용자 turn 이 도는 중에 승인 거절이나 만료 알림 줄(`ConversationNotices.post`)이 저장되면 그 답은 자동 turn 으로 판정돼 빠진다. 드문 경우라 받아들이고 문서에 한계로 적는다
 
 ## 작업 항목
 
 ### 1. `backend/src/main/java/com/bifos/assistant/chat/infra/ChatMessageRepository.java` 에 조회 하나
 
-기간 안의 사용자 turn 루트 실행의 네 값만 읽는 JPQL 을 더한다. 반환은 새 record `chat.application.model.TurnTiming(Instant requestReceivedAt, Instant submittedAt, Instant firstDeltaAt, ModelTier modelTier)` 의 생성자 식이다.
+기간 안의 사용자 turn 루트 실행의 네 값만 읽는 JPQL 을 더한다. 반환은 새 record `chat.domain.TurnTiming(Long executionId, Instant requestReceivedAt, Instant submittedAt, Instant firstDeltaAt, ModelTier modelTier)` 의 생성자 식(`select new com.bifos.assistant.chat.domain.TurnTiming(...)`)이다. infra 가 application 을 쓰지 못하므로(`ArchitectureRules.LAYER_DIRECTION`) 투영 record 는 `usage.domain.MonthlyCost` 처럼 `domain` 에 둔다.
 
 조건:
 - `AgentExecution e` 와 `ChatMessage a` 를 `a.executionId = e.id` 로 잇고 `a.role = ASSISTANT`
@@ -42,18 +46,25 @@
 
 `RepositoryQueryMysqlTest` 가 이 메서드를 스스로 찾아 실제 MySQL 에서 돌린다. 인자 타입은 `Long`, `Instant` 라 `RepositoryQuerySweep` 에 더할 것이 없다.
 
-### 2. `backend/src/main/java/com/bifos/assistant/chat/application/FirstResponseLatencyService.java` (신규)
+### 2. 예약 turn 을 빼는 port
+
+- `backend/src/main/java/com/bifos/assistant/chat/application/ScheduledTurnExecutions.java`(신규 interface): `Set<Long> scheduledAmong(Collection<Long> executionIds)` 가 예약 작업 발화의 루트 실행인 번호만 돌려준다. 번호가 비면 빈 집합이다
+- `backend/src/main/java/com/bifos/assistant/task/infra/TaskRunRepository.java`: `List<Long>` 을 내는 JPQL `select r.executionId from TaskRun r where r.executionId in :executionIds` 를 더한다. 이름은 `findExecutionIdsIn`. `RepositoryQueryMysqlTest` 가 이 메서드도 스스로 찾는다. 인자 타입 `Collection<Long>` 이 `RepositoryQuerySweep` 에 없으면 거기에 값을 더한다
+- `backend/src/main/java/com/bifos/assistant/task/application/ScheduledTurnSource.java`(신규 `@Service`): 위 port 를 구현한다. 빈 `in` 절을 피하려고 번호가 비면 읽지 않는다(`TaskLabelSource` 와 같다)
+
+### 3. `backend/src/main/java/com/bifos/assistant/chat/application/FirstResponseLatencyService.java` (신규)
 
 `summarize(Long userId, int days)` 가 `LatencySummary` 를 낸다.
 - `days` 는 1 이상 90 이하. 밖이면 `ApiException(ErrorCode.VALIDATION_FAILED, ...)`
 - 기간은 주입받은 `Clock` 의 지금에서 `days` 일 전부터 지금까지
+- 조회한 줄의 `executionId` 를 `ScheduledTurnExecutions.scheduledAmong` 에 넘겨 받은 번호의 줄을 뺀다
 - 줄마다 날짜(`Asia/Seoul` 의 `LocalDate`)와 `modelTier`(비면 `null`)로 묶는다
-- 묶음마다 `count`(답 메시지가 있는 사용자 turn 수), 세 지표 각각의 `count`, `p50Ms`, `p90Ms` 를 낸다. 값이 없는 지표는 셋 다 `null` 이 아니라 `count` 0 과 `null` 백분위다
+- 묶음마다 `LatencyRow(LocalDate date, ModelTier modelTier, long turns, LatencyStat firstResponse, LatencyStat toSubmit, LatencyStat toFirstDelta)` 하나를 낸다. `turns` 는 답 메시지가 있는 사용자 turn 수다. 세 지표 각각은 `count`, `p50Ms`, `p90Ms` 를 낸다. 값이 없는 지표는 셋 다 `null` 이 아니라 `count` 0 과 `null` 백분위다
 - 날짜 오름차순, 같은 날짜 안에서는 `FAST`, `BALANCED`, `DEEP`, 단계 없음 순서
 
-반환 타입 `chat.application.model.LatencySummary` 와 `chat.application.model.LatencyRow`, `chat.application.model.LatencyStat(long count, Long p50Ms, Long p90Ms)` 를 각각 파일 하나로 둔다.
+반환 타입 `chat.application.model.LatencySummary(int days, List<LatencyRow> rows)` 와 `chat.application.model.LatencyRow`, `chat.application.model.LatencyStat(long count, Long p50Ms, Long p90Ms)` 를 각각 파일 하나로 둔다.
 
-### 3. `backend/src/main/java/com/bifos/assistant/chat/presentation/LatencyAdminController.java` (신규)
+### 4. `backend/src/main/java/com/bifos/assistant/chat/presentation/LatencyAdminController.java` (신규)
 
 `@RequestMapping("/api/v1/admin/usage")` 의 `@GetMapping("/latency")`, 인자 `@RequestParam(defaultValue = "30") int days`.
 `currentUser.requireAdmin()` 으로 요청자를 받고 `FirstResponseLatencyService.summarize(admin.id(), days)` 를 응답으로 옮긴다.
@@ -66,7 +77,7 @@
   "toFirstDelta": { "count": 3, "p50Ms": 1650, "p90Ms": 3900 } } ] }
 ```
 
-### 4. `backend/src/test/java/com/bifos/assistant/chat/FirstResponseLatencyTest.java` (신규)
+### 5. `backend/src/test/java/com/bifos/assistant/chat/FirstResponseLatencyTest.java` (신규)
 
 `@SpringBootTest`, `@ActiveProfiles("test")`. `UsageBreakdownTest` 처럼 `CurrentUserProvider` 를 대역으로 두고 `doCallRealMethod().when(currentUser).requireAdmin()` 으로 실제 판정을 탄다. 실행 줄과 메시지를 저장소로 심고 고정 `Clock` 을 준다.
 
@@ -77,29 +88,32 @@
 | `USER` 질문, 첫 답, 다시 생성한 두 번째 `ASSISTANT` 답(`replaces_message_id`) | 두 번째 답의 실행도 사용자 turn 으로 센다 |
 | `first_delta_at` 이 빈 사용자 turn | `turns` 와 `toSubmit` 에는 들고 `firstResponse` 와 `toFirstDelta` 에는 들지 않는다 |
 | `parent_execution_id` 가 있는 자식 실행 | 세지 않는다 |
+| `SYSTEM` 알림 줄 뒤 `USER` 지시와 `ASSISTANT` 답이 있고, 그 실행 번호가 `task_run.execution_id` 에 있는 예약 turn | 세지 않는다 |
 | 다른 사용자의 실행 | 세지 않는다 |
 | 한국 시각 자정을 넘는 실행(세계 표준시 15:30) | 다음 날짜 줄로 묶인다 |
 | `MEMBER` 역할의 요청 | `FORBIDDEN` |
 | `days=0`, `days=91` | `VALIDATION_FAILED` |
 
-### 5. `web/src/components/usage/latency-section.tsx` (신규)
+### 6. `web/src/components/usage/latency-section.tsx` (신규)
 
 서버 컴포넌트에서 받은 응답을 표로 그린다. 제목 「첫 반응 시간」, 설명 한 줄 「최근 30일 동안 보낸 질문에 첫 글자가 나오기까지 걸린 시간이에요. 화면을 그리는 시간은 들지 않아요.」.
 넓은 화면은 `web/src/components/ui/table.tsx` 의 표로 날짜, 단계, 질문 수, 첫 반응(중앙값과 90번째), 제출까지, 첫 조각까지를 그린다. 좁은 화면(`md` 미만)은 줄마다 카드로 그린다. `breakdown-table.tsx` 의 넓은 화면과 좁은 화면 분기를 따른다.
 줄이 없으면 `EmptyState` 로 「아직 잴 질문이 없어요」. 밀리초는 `1.8초` 처럼 초로 그린다. 바깥 요소에 `data-testid="latency-section"` 을 둔다.
+응답 타입 `LatencySummary`, `LatencyRow`, `LatencyStat` 은 이 파일에서 export 한다.
 
-### 6. `web/src/components/usage/usage-screen.tsx`
+### 7. `web/src/components/usage/usage-screen.tsx`
 
 `isAdmin` 일 때만 `Promise.all` 에 `callControlPlane<LatencySummary>("/api/v1/admin/usage/latency?days=30")` 를 더한다. `summary` 탭에서 `BreakdownSection` 아래에 `LatencySection` 을 그린다. 실패하면 그 자리에 응답의 `message` 한 줄만 그린다. 일반 사용량 화면(`/usage`)은 이 조회를 하지 않는다.
 
-### 7. `test/browser/usage-latency.spec.ts` (신규)
+### 8. `test/browser/usage-latency.spec.ts` (신규)
 
 `test/browser/chat.spec.ts` 가 입력창으로 보내는 방식을 따라 화면에서 질문 하나를 보낸다(스트리밍 경로라 `first_delta_at` 이 남는다). 답이 끝난 뒤 `/admin/usage` 를 열어 `latency-section` 에 오늘 날짜 줄이 있고 질문 수가 1 이상인지 본다.
 `MEMBER` 역할 세션으로 `/usage` 를 열면 `latency-section` 이 없는지 본다. 역할을 바꾸는 방법은 `test/browser/admin-area.spec.ts` 의 `MEMBER` 검사를 따른다.
 
-### 8. `docs/model-tiers.md` 와 대조
+### 9. `docs/model-tiers.md` 와 대조
 
-「첫 반응 시간」 절의 세는 실행 기준(답 메시지보다 앞선 `ASSISTANT` 가 아닌 가장 최근 메시지의 `role` 이 `USER`)과 집계 범위(요청한 관리자 자신의 실행)가 작업 항목 1, 2 와 같은지 확인한다.
+「첫 반응 시간」 절의 세는 실행 기준(답 메시지보다 앞선 `ASSISTANT` 가 아닌 가장 최근 메시지의 `role` 이 `USER`)과 집계 범위(요청한 관리자 자신의 실행)가 작업 항목 1, 3 과 같은지 확인한다.
+세는 실행 기준 줄에 「예약 작업 turn 은 지시가 `USER` 메시지로 남지만 사람이 기다리지 않아 뺀다. `task_run.execution_id` 로 가린다」 를 더하고, 「사용자 turn 이 도는 중에 승인 거절이나 만료 알림 줄이 저장되면 그 답은 자동 turn 으로 판정돼 빠진다」 를 한계로 한 줄 적는다.
 절 머리의 「**집계는 아직 구현 전이다.** …」 줄을 지운다.
 
 ## 검증
@@ -130,7 +144,10 @@ pnpm test:browser usage-latency
 | 파일 | 변경 |
 |---|---|
 | `backend/src/main/java/com/bifos/assistant/chat/infra/ChatMessageRepository.java` | 수정 |
-| `backend/src/main/java/com/bifos/assistant/chat/application/model/TurnTiming.java` | 신규 |
+| `backend/src/main/java/com/bifos/assistant/chat/domain/TurnTiming.java` | 신규 |
+| `backend/src/main/java/com/bifos/assistant/chat/application/ScheduledTurnExecutions.java` | 신규 |
+| `backend/src/main/java/com/bifos/assistant/task/infra/TaskRunRepository.java` | 수정 |
+| `backend/src/main/java/com/bifos/assistant/task/application/ScheduledTurnSource.java` | 신규 |
 | `backend/src/main/java/com/bifos/assistant/chat/application/model/LatencySummary.java` | 신규 |
 | `backend/src/main/java/com/bifos/assistant/chat/application/model/LatencyRow.java` | 신규 |
 | `backend/src/main/java/com/bifos/assistant/chat/application/model/LatencyStat.java` | 신규 |
