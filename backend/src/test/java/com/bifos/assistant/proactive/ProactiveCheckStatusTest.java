@@ -130,7 +130,8 @@ class ProactiveCheckStatusTest {
 
     /** 실행 번호와 루트 session 과 오류 코드가 적힌, 실패한 살펴보기를 남긴다. */
     private void failedCheck(CurrentUser user, Agent agent, Conversation conversation) {
-        ProactiveCheck check = ProactiveCheck.started(user.id(), agent.id(), conversation.id(), CheckTrigger.MANUAL, NOW);
+        ProactiveCheck check =
+                ProactiveCheck.started(user.id(), agent.id(), conversation.id(), CheckTrigger.MANUAL, NOW);
         check.attachRoot(987_654L, "root-session-secret");
         check.fail("HERMES_UNAVAILABLE", 3, 1, NOW.plusSeconds(30));
         createdChecks.add(checks.save(check).id());

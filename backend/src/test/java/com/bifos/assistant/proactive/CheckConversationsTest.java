@@ -125,7 +125,8 @@ class CheckConversationsTest {
     @Test
     @DisplayName("지운 점검 대화는 다시 쓰지 않고 새로 만든다")
     void deletedCheckConversationIsNotReused() {
-        Long deletedId = checkConversations.findOrCreate(user, agent).conversation().id();
+        Long deletedId =
+                checkConversations.findOrCreate(user, agent).conversation().id();
         transactions.executeWithoutResult(status -> conversations.deleteIfActive(deletedId, user.id(), NOW));
 
         OpenedCheck reopened = checkConversations.findOrCreate(user, agent);
@@ -153,9 +154,7 @@ class CheckConversationsTest {
 
             assertThat(checkConversationsOf(false)).as("만든 점검 대화").hasSize(1);
             assertThat(one.conversation().id()).isEqualTo(other.conversation().id());
-            assertThat(List.of(one.created(), other.created()))
-                    .as("한쪽만 만들었다")
-                    .containsExactlyInAnyOrder(true, false);
+            assertThat(List.of(one.created(), other.created())).as("한쪽만 만들었다").containsExactlyInAnyOrder(true, false);
         } finally {
             pool.shutdownNow();
         }
@@ -179,7 +178,8 @@ class CheckConversationsTest {
     @Test
     @DisplayName("이미 있는 점검 대화는 사용자 자리가 없어도 돌려준다")
     void returnsExistingEvenWhenUserHasNoRoom() {
-        Long existingId = checkConversations.findOrCreate(user, agent).conversation().id();
+        Long existingId =
+                checkConversations.findOrCreate(user, agent).conversation().id();
         List<TurnSlot> held = holdAllSlots();
         try {
             OpenedCheck found = checkConversations.findOrCreate(user, agent);
@@ -194,7 +194,8 @@ class CheckConversationsTest {
     @Test
     @DisplayName("방금 만든 점검 대화를 지우면 다시 찾지 못한다")
     void deleteCreatedRemovesConversation() {
-        Long createdId = checkConversations.findOrCreate(user, agent).conversation().id();
+        Long createdId =
+                checkConversations.findOrCreate(user, agent).conversation().id();
 
         checkConversations.deleteCreated(createdId);
 

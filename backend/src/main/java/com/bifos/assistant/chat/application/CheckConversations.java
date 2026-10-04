@@ -96,9 +96,8 @@ public class CheckConversations {
         if (title.length() <= TITLE_MAX_LENGTH) {
             return title;
         }
-        int end = Character.isHighSurrogate(title.charAt(TITLE_MAX_LENGTH - 1))
-                ? TITLE_MAX_LENGTH - 1
-                : TITLE_MAX_LENGTH;
+        int end =
+                Character.isHighSurrogate(title.charAt(TITLE_MAX_LENGTH - 1)) ? TITLE_MAX_LENGTH - 1 : TITLE_MAX_LENGTH;
         return title.substring(0, end);
     }
 }
