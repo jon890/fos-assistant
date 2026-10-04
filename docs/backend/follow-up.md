@@ -84,6 +84,10 @@ Control Plane MCP 서버에 `follow_up_propose` 를 더한다.
 | `POST /api/v1/follow-ups/{id}/done` | `OPEN` 을 `DONE` 으로 |
 | `POST /api/v1/follow-ups/{id}/drop` | `OPEN` 을 `DROPPED` 로 |
 
+`title` 이 비었거나 200자를 넘으면 400 `VALIDATION_FAILED` 다. 앞뒤 공백을 지운 길이로 센다.
+`dueAt` 은 시간대가 붙은 ISO-8601 시각(`2026-10-05T09:00:00Z`)이다. 읽지 못하면 400 `VALIDATION_FAILED` 다.
+본문의 `conversationId` 가 UUID 가 아니면 400 `VALIDATION_FAILED` 다. `PATCH` 의 `title` 과 `waiting` 은 키가 없거나 `null` 이면 그대로 둔다.
+
 응답의 칸은 `id`, `title`, `status`, `dueAt`, `waiting`, `conversationId`(대화 공개 식별자), `proposed`(에이전트가 제안했는지), `createdAt`, `acceptedAt`, `closedAt` 이다.
 
 ## 지키는 것

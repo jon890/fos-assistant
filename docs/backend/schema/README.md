@@ -14,7 +14,7 @@ AI credential 은 Hermes profile 의 `.env` 에, profile 의 API server key 는 
 | [`execution.md`](execution.md) | `agent_execution`, `execution_event`, `subagent_usage_job`, `execution_skill_use`, `hermes_session_binding`, `execution_context_source`(아직 구현 전이다) |
 | [`memory.md`](memory.md) | `memory`, `memory_revision`, `memory_collection`, `agent_memory_collection` |
 | [`connector.md`](connector.md) | `connector_connection`, `connector_action`, `connector_tool_grant` |
-| [`attention.md`](attention.md) | `follow_up`, `attention_control`, `attention_event`. `follow_up` 은 아직 구현 전이다 |
+| [`attention.md`](attention.md) | `follow_up`, `attention_control`, `attention_event` |
 | [`notification.md`](notification.md) | `notification` |
 | [`task.md`](task.md) | `task`, `task_trigger`, `task_run` |
 

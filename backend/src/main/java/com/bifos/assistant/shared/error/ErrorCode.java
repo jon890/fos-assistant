@@ -189,6 +189,10 @@ public enum ErrorCode {
      * 숨긴다. 볼 수 있던 것만 숨길 수 있다.
      */
     ATTENTION_ITEM_NOT_FOUND(HttpStatus.NOT_FOUND),
+    /** 없는 할 일과 남의 할 일을 같은 응답으로 숨긴다(ADR-073). */
+    FOLLOW_UP_NOT_FOUND(HttpStatus.NOT_FOUND),
+    /** 그 할 일의 지금 상태에서 허용하지 않는 전이이거나, 바꾼 제목이 같은 사용자의 다른 열린 할 일과 같다(ADR-073). */
+    FOLLOW_UP_STATE_CONFLICT(HttpStatus.CONFLICT),
     /** 없는 작업, 남의 작업, 지운 작업을 같은 응답으로 숨긴다(ADR-076). */
     TASK_NOT_FOUND(HttpStatus.NOT_FOUND),
     /** 보관하지 않은 예약 작업이 사용자당 상한에 닿았다(ADR-079). */

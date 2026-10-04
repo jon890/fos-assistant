@@ -32,6 +32,7 @@ final class TopLevelPackageOrder extends ArchCondition<JavaClass> {
             "memory",
             "context",
             "chat",
+            "followup",
             "orchestration",
             "mcp",
             "people",

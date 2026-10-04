@@ -32,6 +32,7 @@ Control Plane 의 패키지마다 맡는 책임과 패키지 사이의 방향 �
 | `connector` | 커넥터 카탈로그, 사용자별 연결, 커넥터 도구 호출의 판정과 기록 |
 | `task` | 예약 작업과 시각, 발화 기록, 발화기와 예약 turn 시작([`task.md`](task.md)) |
 | `notification` | 사용자에게 대화 밖에서 알리는 줄의 저장과 읽음 표시, 사용자 단위 SSE, 오래된 줄 정리([`notification.md`](notification.md)) |
+| `followup` | 할 일의 저장과 상태 전이, 사람이 쓰는 API, 에이전트의 제안 저장([`follow-up.md`](follow-up.md)) |
 | `attention` | 먼저 알리기의 판정과 지금 화면이 읽는 카드. 다른 패키지의 기록을 읽기만 한다([`attention.md`](attention.md)) |
 
 검사: `ArchitectureRules.SHARED_DOES_NOT_DEPEND_ON_DOMAINS`
@@ -49,7 +50,7 @@ Control Plane 의 패키지마다 맡는 책임과 패키지 사이의 방향 �
 
 ### 최상위 패키지의 층 순서
 
-최상위 패키지는 아래 순서를 따른다. 자리 1 이 맨 아래이고 16 이 맨 위다.
+최상위 패키지는 아래 순서를 따른다. 자리 1 이 맨 아래이고 17 이 맨 위다.
 
 | 자리 | 패키지 |
 | --- | --- |
@@ -63,18 +64,20 @@ Control Plane 의 패키지마다 맡는 책임과 패키지 사이의 방향 �
 | 8 | `memory` |
 | 9 | `context` |
 | 10 | `chat` |
-| 11 | `orchestration` |
-| 12 | `mcp` |
-| 13 | `people` |
-| 14 | `connector` |
-| 15 | `task` |
-| 16 | `attention` |
+| 11 | `followup` |
+| 12 | `orchestration` |
+| 13 | `mcp` |
+| 14 | `people` |
+| 15 | `connector` |
+| 16 | `task` |
+| 17 | `attention` |
 
 위 패키지는 아래 패키지를 쓰고 아래 패키지는 위 패키지를 import 하지 않는다.
 거꾸로 써야 하면 아래 패키지에 port 를 두고 위 패키지가 구현한다.
 새 최상위 패키지를 만들면 이 순서의 자리를 정하고 `TopLevelPackageOrder.ORDER` 에 넣는다.
 `shared` 는 순서 밖이고 어느 패키지도 쓰지 않는다.
 `task` 는 `attention` 바로 아래다. 예약 turn 을 열려고 `chat` 을, 에이전트와 주인을 다시 확인하려고 `agent` 와 `user` 를, 결과를 알리려고 `notification` 을 쓴다. 대화 목록이 작업 이름을 보이려고 `chat` 에 port(`ConversationTaskLabels`)를 두고 `task` 가 구현한다.
+`followup` 은 `chat` 바로 위다. 대화 주인을 확인하고 공개 식별자를 얻으려고 `chat` 을 쓰고, 제안 도구(`mcp`)와 먼저 알리기(`attention`)가 `followup` 을 쓴다.
 `notification` 은 `user` 바로 위다. 알림을 만드는 쪽(`connector`, 그 위의 패키지)이 모두 이 패키지를 부르고, 이 패키지는 알림을 받는 사용자 말고 다른 도메인을 모른다.
 `attention` 은 맨 위다. 먼저 알리기의 후보를 읽으려고 `usage`, `chat`, `agent`, `memory`, `connector` 의 `application` 을 부르고, 어느 패키지도 `attention` 을 import 하지 않는다.
 검사: `ArchitectureRules.TOP_LEVEL_PACKAGES_FOLLOW_LAYER_ORDER`, 근거: ADR-068
