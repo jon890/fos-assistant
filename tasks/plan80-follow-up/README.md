@@ -1,6 +1,6 @@
 # plan80 할 일
 
-에이전트가 대화 중에 제안하고 사람이 받아들인 할 일(`follow_up`)을 만든다. #160 의 「사용자가 명시한 추적 목표」 가 이것이다.
+에이전트가 대화 중에 제안하고 사람이 받아들인 할 일(`follow_up`)을 만든다. #160 원문이 「추적 목표」 라고 부른 것이 이것이다.
 결정은 `docs/adr/ADR-073-할-일은-에이전트가-제안하고-사람이-받아들인-것만-챙긴다.md`, 계약은 `docs/backend/follow-up.md` 와 `docs/backend/schema/attention.md` 의 「follow_up」 이 갖는다.
 
 ## 이 plan 이 만드는 것

@@ -75,8 +75,8 @@
 - `AttentionControl(CardKey card, String itemKey, String stateKey, Instant snoozedUntil)`. phase 02 가 표에서 읽어 채운다. 숨기기는 `stateKey` 가, 미루기는 `snoozedUntil` 이 채워진다. **제어는 카드마다 따로다.** 같은 `itemKey` 가 두 카드에 쓰여도 한 카드의 제어가 다른 카드에 걸리지 않는다
 - `AttentionItem(String itemKey, String stateKey, AttentionLevel level, AttentionTrigger trigger, String title, UUID conversationId, String agentName, Instant at, AttentionWhy why, AttentionExecutionRef execution, UUID actionId, AttentionFollowUpRef followUp)`
 - `AttentionWhy(AttentionTrigger trigger, List<AttentionSignal> signals, AttentionConfidence confidence, List<AttentionSourceRef> sources)`
-- `AttentionCard(CardKey key, CardStatus status, int moreCount, List<AttentionItem> items)`
-- `AttentionView(Instant readAt, int nowCount, List<AttentionCard> cards)`
+- `AttentionCard(CardKey key, CardStatus status, int nowCount, int moreCount, List<AttentionItem> items)`. `nowCount` 는 상한으로 자르기 전 그 카드의 `NOW` 항목 수다
+- `AttentionView(Instant readAt, int nowCount, List<AttentionCard> cards)`. `nowCount` 는 카드 `nowCount` 의 합이다
 
 `stateKey` 는 `Sha256.hex16(<재료 글>)` 이다. 재료는 `docs/backend/attention.md` 「후보와 trigger」 표의 「`stateKey` 의 재료」 칸을 `|` 로 이은 글이다. 예: 실패는 `"EXECUTION_FAILED|" + 마지막 실패 실행 번호`.
 `itemKey` 는 같은 표의 `itemKey` 칸 형식이다(`conversation:<UUID>`, `connector_action:<UUID>`, `memory:<번호>`, `execution:<번호>`).
@@ -107,6 +107,7 @@
 | `connector` | `ConnectorActionRepository.findByUserIdAndStatusOrderByIdAsc(Long userId, ActionStatus status)` |
 | `connector` | 새 `connector.application.model.PendingApproval(UUID actionId, String title, Long conversationId, Instant createdAt, Instant expiresAt)` 와 `ConnectorActionService.pendingApprovalsOf(CurrentUser user)`. 이름은 `listForConversation` 이 쓰는 것과 같은 manifest 경로(`view`)로 정한다. 인자와 결과 글은 담지 않는다 |
 | `memory` | `MemoryRepository.findByScopeAndOwnerUserIdAndStatusOrderByIdAsc(MemoryScope scope, Long ownerUserId, MemoryStatus status)` 와 `MemoryService.proposalsOf(CurrentUser user)`(USER 범위의 주인 것, `PROPOSED`) |
+| `chat` | `ChatMessageRepository.findTopByConversationIdAndRoleNotAndCreatedAtLessThanEqualOrderByIdDesc(Long conversationId, MessageRole role, Instant createdAt)`(새 파생 쿼리, `RepositoryQueryMysqlTest` 가 실제 MySQL 에서 실행한다). 새 `OwnConversations` 의 `startedByUser(Long conversationId, Instant startedAt)` 가 이 메서드에 `MessageRole.ASSISTANT` 를 넘겨, 찾은 줄의 `role` 이 `USER` 면 참을 낸다. 실패한 turn 에는 답 메시지가 없을 수 있어 실행의 `startedAt` 으로 질문을 찾는다 |
 | `chat` | 새 `chat.application.OwnConversations`(`@Service`): `activeOf(CurrentUser user, Collection<Long> ids)` → `Map<Long, Conversation>`. `ConversationRepository.findAllById` 로 읽고 `userId` 가 같고 `deletedAt` 이 비어 있는 것만 남긴다. 빈 번호면 읽지 않는다(`ConversationPublicIdLookup` 과 같은 까닭) |
 
 새 저장소 메서드는 `RepositoryQueryMysqlTest` 가 실제 MySQL 에서 실행한다. 인자 타입 `ActionStatus`, `MemoryScope`, `MemoryStatus`, `ExecutionStatus`, `Instant`, `Long` 을 `RepositoryQuerySweep` 이 만들지 못하면 그 값을 더한다.
@@ -118,7 +119,7 @@
 
 | 구현 | 카드 | 읽는 것 | 후보 |
 | --- | --- | --- | --- |
-| `FailedTurnCandidates` | `FAILURES` | `AttentionExecutionQuery.unresolvedFailedTurns(user.id(), now - failureWindow)`, `OwnConversations.activeOf`, `AgentService.byIds` | 대화마다 가장 최근 실패 하나. 지운 대화는 뺀다. `trigger` `EXECUTION_FAILED`, `signals` `[NOT_RETRIED]`, `nowSignal` 참, `at` 은 그 실행의 `finishedAt`, `title` 은 대화 제목, `sources` 는 `EXECUTION_STATE`, `execution:<번호>` |
+| `FailedTurnCandidates` | `FAILURES` | `AttentionExecutionQuery.unresolvedFailedTurns(user.id(), now - failureWindow)`, `OwnConversations.activeOf`, `OwnConversations.startedByUser`, `AgentService.byIds` | 사용자가 보낸 turn 의 실패만 고른다(`startedByUser` 가 참). 자동 turn 의 실패는 `DELIVERY_FAILED`(phase 03)가 맡는다. 대화마다 가장 최근 실패 하나. 지운 대화는 뺀다. `trigger` `EXECUTION_FAILED`, `signals` `[NOT_RETRIED]`, `nowSignal` 참, `at` 은 그 실행의 `finishedAt`, `title` 은 대화 제목, `sources` 는 `EXECUTION_STATE`, `execution:<번호>` |
 | `ApprovalCandidates` | `NEEDS_ME` | `ConnectorActionService.pendingApprovalsOf(user)`, `OwnConversations.activeOf` | `expiresAt` 이 `now` 뒤인 줄. `trigger` `APPROVAL_PENDING`, `nowSignal` 참, 남은 시간이 6시간 이하면 `signals` 에 `EXPIRES_SOON`. `title` 은 동작 이름. `actionId` 는 승인 줄의 공개 식별자. `stateKey` 재료는 `PENDING` |
 | `MemoryProposalCandidates` | `NEEDS_ME` | `MemoryService.proposalsOf(user)` | `trigger` `MEMORY_PROPOSED`, `confidence` `MODEL_INFERRED`, `nowSignal` 거짓, `title` 은 Memory 제목. `stateKey` 재료는 `revision` |
 | `DelegationCandidates` | `DELEGATED` | `AttentionExecutionQuery.delegations(user.id(), now - delegatedWindow)`, `OwnConversations.activeOf`, `AgentService.byIds` | `RUNNING` 은 `DELEGATION_RUNNING`, 시작한 지 `longRunningAfter` 를 넘으면 `nowSignal` 참과 `LONG_RUNNING`. 끝난 것은 `DELEGATION_FINISHED`. `title` 은 대화 제목, `agentName` 은 맡은 에이전트 이름. `execution` 은 `{ 실행 번호, status }`. 대화가 없거나 지워졌으면 뺀다 |
@@ -144,7 +145,7 @@
   - `view(CurrentUser user)`: 모든 `AttentionCandidates` 를 부르고, 하나가 `RuntimeException` 을 던지면 그 구현의 `cards()` 를 `unavailable` 에 넣고 `log.warn("attention source failed userId={} cards={}", ...)` 만 남긴다. 제어는 이 phase 에서 빈 목록이다. `nowCount` 는 상한으로 잘리기 전 `NOW` 항목 수다
   - `summary(CurrentUser user)`: `view` 와 같은 계산을 하고 `nowCount` 만 쓴다
 - `attention.presentation.AttentionController`(`@RequestMapping("/api/v1/attention")`): `GET ""` → `AttentionDtos.ViewResponse`, `GET "/summary"` → `AttentionDtos.SummaryResponse(int nowCount)`
-- `attention.presentation.AttentionDtos`: `ViewResponse(Instant readAt, int nowCount, List<CardView> cards)`, `CardView(String key, String status, int moreCount, List<ItemView> items)`, `ItemView(String itemKey, String stateKey, String attention, String title, UUID conversationId, String agentName, Instant at, WhyView why, ExecutionView execution, UUID actionId, FollowUpView followUp)`, `ExecutionView(Long id, String status)`, `FollowUpView(UUID id, Instant dueAt, boolean waiting, boolean proposed)`. 해당하지 않는 칸은 `null` 로 낸다. 화면이 `itemKey` 를 잘라 식별자를 얻지 않게 하려는 것이다, `WhyView(String trigger, List<String> signals, String confidence, List<SourceView> sources)`, `SourceView(String source, String ref, Instant asOf)`. 응답 모양은 `docs/backend/attention.md` 「API」 의 JSON 과 응답 칸 표와 같다. 오류 코드, 모델, 금액 칸을 두지 않는다
+- `attention.presentation.AttentionDtos`: `ViewResponse(Instant readAt, int nowCount, List<CardView> cards)`, `CardView(String key, String status, int nowCount, int moreCount, List<ItemView> items)`, `ItemView(String itemKey, String stateKey, String attention, String title, UUID conversationId, String agentName, Instant at, WhyView why, ExecutionView execution, UUID actionId, FollowUpView followUp)`, `ExecutionView(Long id, String status)`, `FollowUpView(UUID id, Instant dueAt, boolean waiting, boolean proposed)`. 해당하지 않는 칸은 `null` 로 낸다. 화면이 `itemKey` 를 잘라 식별자를 얻지 않게 하려는 것이다, `WhyView(String trigger, List<String> signals, String confidence, List<SourceView> sources)`, `SourceView(String source, String ref, Instant asOf)`. 응답 모양은 `docs/backend/attention.md` 「API」 의 JSON 과 응답 칸 표와 같다. 오류 코드, 모델, 금액 칸을 두지 않는다
 
 ### 8. 이 phase 를 검증하는 테스트
 
@@ -160,6 +161,7 @@
 | `snoozedUntil` 이 지금 뒤인 제어와 앞인 제어 | 앞의 것만 빠진다 |
 | 맡긴 일 카드에만 `NOW` 가 있다 | 카드 순서가 `DELEGATED`, `FAILURES`, `NEEDS_ME`, `CONTINUE` |
 | 한 카드에 후보 12개, 상한 10 | 항목 10개, `moreCount` 2 |
+| 한 카드에 `NOW` 후보 12개, 상한 10 | 항목 10개, 카드 `nowCount` 12, 맨 위 `nowCount` 는 카드 `nowCount` 의 합 |
 | `CONTINUE` 후보 8개, `continueCount` 5 | 항목 5개, `moreCount` 3 |
 | `unavailable` 에 `NEEDS_ME` | 그 카드만 `UNAVAILABLE`, 나머지는 그대로 |
 
@@ -169,6 +171,8 @@
 | --- | --- |
 | 한 사용자의 대화에 `FAILED` 루트 실행 하나 | `failures` 에 `conversation:<UUID>` 항목, `why.signals` 가 `["NOT_RETRIED"]`, `nowCount` 1 |
 | 같은 대화에 그 뒤 `SUCCEEDED` 루트 실행이 생긴다 | 실패 항목이 없다 |
+| 자동 turn 의 `FAILED` 루트 실행. 그 실행이 시작되기 전 마지막 메시지가 `SYSTEM` 이다 | 실패 항목이 없다 |
+| 다시 생성의 `FAILED` 루트 실행. 앞선 메시지가 `ASSISTANT` 와 그 앞의 `USER` 다 | 실패 항목이 있다 |
 | 다른 사용자의 `FAILED` 실행 | 응답에 없다 |
 | `finishedAt` 이 8일 전인 실패 | 응답에 없다 |
 | `PENDING` 승인 줄, `expiresAt` 이 3시간 뒤 | `needs_me` 에 `connector_action:<UUID>`, `EXPIRES_SOON`, `actionId` 가 그 공개 식별자 |
@@ -245,6 +249,7 @@ grep -rn "errorCode\|estimatedCost" backend/src/main/java/com/bifos/assistant/at
 | `backend/src/main/java/com/bifos/assistant/memory/infra/MemoryRepository.java` | 수정 |
 | `backend/src/main/java/com/bifos/assistant/memory/application/MemoryService.java` | 수정 |
 | `backend/src/main/java/com/bifos/assistant/chat/application/OwnConversations.java` | 신규 |
+| `backend/src/main/java/com/bifos/assistant/chat/infra/ChatMessageRepository.java` | 수정 |
 | `backend/src/main/resources/application.yml` | 수정 |
 | `backend/src/test/java/com/bifos/assistant/testsupport/RepositoryQuerySweep.java` | 수정 |
 | `backend/src/test/java/com/bifos/assistant/attention/AttentionJudgeTest.java` | 신규 |

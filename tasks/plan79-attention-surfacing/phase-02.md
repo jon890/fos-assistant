@@ -46,7 +46,7 @@ phase 01 이 만든 것을 쓴다.
 
 ### 1. 마이그레이션 `V67__attention_control_event.sql`
 
-**구현할 때 main 의 마지막 다음 번호로 바꾸고 이 phase 의 「변경 파일」 표와 `README.md` 의 그 줄도 고친다.** 지금 main 의 마지막은 V65 이고 plan78 이 V66 을 쓸 예정이다.
+**파일 이름의 번호는 자리표시다. 구현할 때 main 의 마지막 다음 번호로 바꾸고 이 phase 의 「변경 파일」 표도 같은 커밋에서 고친다.** 다른 작업이 먼저 번호를 쓰므로 계획서의 번호를 믿지 않는다.
 
 DDL 만 담는다. `docs/backend/schema/attention.md` 의 두 표를 그대로 만든다.
 
@@ -81,10 +81,10 @@ DDL 만 담는다. `docs/backend/schema/attention.md` 의 두 표를 그대로 �
 
 | 메서드 | 하는 일 |
 | --- | --- |
-| `hide(CurrentUser user, String card, String itemKey, String stateKey)` | `card` 가 `failures`, `needs_me`, `delegated`, `continue` 가 아니면 `VALIDATION_FAILED`. 그 카드의 후보 목록에 `itemKey` 가 없으면 `ATTENTION_ITEM_NOT_FOUND`. 그 카드의 줄이 있으면 `HIDE` 로 고치고 없으면 만든다. `HIDDEN` 사건을 남긴다 |
-| `snooze(CurrentUser user, String card, String itemKey, Instant until)` | `card` 검사는 위와 같다. `until` 이 지금 뒤이고 `snoozeMax` 안이 아니면 `VALIDATION_FAILED`. 나머지는 위와 같고 `SNOOZED` 사건을 남긴다 |
-| `restore(CurrentUser user, String card, String itemKey)` | `card` 검사는 위와 같다. 그 사용자의 그 카드의 그 줄을 지운다. 없어도 204 다 |
-| `record(CurrentUser user, String itemKey, String stateKey, AttentionEventType type)` | `OPENED`, `ACTED` 만 받는다. 다른 값은 `VALIDATION_FAILED`. 지금 후보에 있거나 그 사용자에게 같은 `itemKey` 의 `SHOWN` 사건이 있으면 받는다. 동작이 성공해 후보에서 빠진 뒤의 `ACTED` 를 잃지 않으려는 것이다. 둘 다 아니면 `ATTENTION_ITEM_NOT_FOUND`. 사건의 `trigger_type` 과 `attention` 은 지금 후보에 있으면 지금 판정에서, 없으면 같은 사용자와 `itemKey` 의 가장 최근 `SHOWN` 사건에서 옮긴다 |
+| `hide(CurrentUser user, String card, String itemKey, String stateKey)` | 먼저 길이를 본다. `itemKey` 가 비었거나 80자를 넘거나 `stateKey` 가 비었거나 64자를 넘으면 `VALIDATION_FAILED`. `card` 가 `failures`, `needs_me`, `delegated`, `continue` 가 아니면 `VALIDATION_FAILED`. 그 카드의 후보 목록에 `itemKey` 가 없으면 `ATTENTION_ITEM_NOT_FOUND`. 그 카드의 줄이 있으면 `HIDE` 로 고치고 없으면 만든다. `HIDDEN` 사건을 남긴다 |
+| `snooze(CurrentUser user, String card, String itemKey, Instant until)` | `itemKey` 길이 검사와 `card` 검사는 위와 같다. `until` 이 지금 뒤이고 `snoozeMax` 안이 아니면 `VALIDATION_FAILED`. 나머지는 위와 같고 `SNOOZED` 사건을 남긴다 |
+| `restore(CurrentUser user, String card, String itemKey)` | `itemKey` 길이 검사와 `card` 검사는 위와 같다. 그 사용자의 그 카드의 그 줄을 지운다. 없어도 204 다 |
+| `record(CurrentUser user, String itemKey, String stateKey, AttentionEventType type)` | 먼저 `hide` 와 같은 길이 검사를 한다. `OPENED`, `ACTED` 만 받는다. 다른 값은 `VALIDATION_FAILED`. 지금 후보에 있거나 그 사용자에게 같은 `itemKey` 의 `SHOWN` 사건이 있으면 받는다. 동작이 성공해 후보에서 빠진 뒤의 `ACTED` 를 잃지 않으려는 것이다. 둘 다 아니면 `ATTENTION_ITEM_NOT_FOUND`. 사건의 `trigger_type` 과 `attention` 은 지금 후보에 있으면 지금 판정에서, 없으면 같은 사용자와 `itemKey` 의 가장 최근 `SHOWN` 사건에서 옮긴다 |
 
 `shared.error.ErrorCode` 에 `ATTENTION_ITEM_NOT_FOUND(HttpStatus.NOT_FOUND)` 를 더한다.
 「후보 목록」 은 `AttentionService` 가 억제 전에 모은 후보다. `AttentionService` 에 `candidatesOf(CurrentUser user)` 를 두고 `view` 와 같이 쓴다.
@@ -158,6 +158,8 @@ DDL 만 담는다. `docs/backend/schema/attention.md` 의 두 표를 그대로 �
 | `view` 를 두 번 부른다 | 항목마다 `SHOWN` 이 한 줄이다 |
 | 20분 전에 시작한 `RUNNING` 위임으로 `view`, 시계를 15분 옮겨 다시 `view` | 같은 `stateKey` 에 `LATER` 의 `SHOWN` 과 `NOW` 의 `SHOWN` 이 한 줄씩 있다 |
 | `card` 가 `unknown` | `VALIDATION_FAILED` |
+| `hide` 의 `stateKey` 가 65자 | 후보를 읽지 않고 `VALIDATION_FAILED` |
+| `record` 의 `itemKey` 가 81자 | 후보를 읽지 않고 `VALIDATION_FAILED` |
 | `summary` 를 부른다 | 사건이 늘지 않는다 |
 | `record` 에 `SHOWN` | `VALIDATION_FAILED` |
 

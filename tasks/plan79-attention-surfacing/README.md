@@ -30,7 +30,7 @@
 | #162 뒤 | plan78 04, plan79 03 | #162 가 main 에 있다 |
 
 - **이 plan 은 plan78 의 코드에 기대지 않는다.** 판정 응답의 `sources[].ref` 는 문맥 묶음의 참조와 같은 형식(`execution:<번호>` 같은 글)을 쓰지만, plan78 의 타입을 import 하지 않는다. plan78 보다 먼저 머지돼도 동작한다
-- 마이그레이션 번호는 plan78 이 V66 을 쓴다고 보고 V67 로 적었다. 구현할 때 main 의 마지막 다음 번호로 바꾸고, phase 02 의 「변경 파일」 표와 이 줄도 고친다
+- phase 02 의 마이그레이션 번호는 자리표시다. 구현할 때 main 의 마지막 다음 번호를 쓰고, phase 02 의 「변경 파일」 표도 같은 커밋에서 고친다
 - plan80 phase 02 가 `AttentionCandidates` 구현을 하나 더한다. 그래서 plan80 phase 02 는 이 plan 의 phase 01 뒤다. plan80 phase 01 은 `followup` 패키지만 만들어 이 plan 과 겹치지 않는다
 - plan81 은 phase 01 과 02 의 API 를 읽는다
 

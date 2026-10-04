@@ -41,18 +41,17 @@
 
 응답 타입과 순수 함수만 둔다. 다른 web 파일을 import 하지 않는다(단위 테스트가 상대 경로로 읽는다).
 
-- 타입: `AttentionCardKey`(`"failures" | "needs_me" | "delegated" | "continue"`), `AttentionLevel`(`"NOW" | "LATER"`), `AttentionWhy`(`trigger`, `signals: string[]`, `confidence`, `sources: { source: string; ref: string; asOf: string | null }[]`), `AttentionItem`(`itemKey`, `stateKey`, `attention`, `title`, `conversationId`, `agentName`, `at`, `why`, `execution: { id: number; status: string } | null`, `actionId: string | null`, `followUp: { id: string; dueAt: string | null; waiting: boolean; proposed: boolean } | null`). 칸은 `docs/backend/attention.md` 의 「API」 응답 표를 따른다, `AttentionCard`(`key`, `status: "OK" | "UNAVAILABLE"`, `moreCount`, `items`), `AttentionView`(`readAt`, `nowCount`, `cards`)
+- 타입: `AttentionCardKey`(`"failures" | "needs_me" | "delegated" | "continue"`), `AttentionLevel`(`"NOW" | "LATER"`), `AttentionWhy`(`trigger`, `signals: string[]`, `confidence`, `sources: { source: string; ref: string; asOf: string | null }[]`), `AttentionItem`(`itemKey`, `stateKey`, `attention`, `title`, `conversationId`, `agentName`, `at`, `why`, `execution: { id: number; status: string } | null`, `actionId: string | null`, `followUp: { id: string; dueAt: string | null; waiting: boolean; proposed: boolean } | null`). 칸은 `docs/backend/attention.md` 의 「API」 응답 표를 따른다, `AttentionCard`(`key`, `status: "OK" | "UNAVAILABLE"`, `nowCount`, `moreCount`, `items`), `AttentionView`(`readAt`, `nowCount`, `cards`)
 - plan79 의 응답 record 를 읽어 칸 이름을 맞춘다. 다르면 이 파일을 응답에 맞추고 `docs/backend/attention.md` 의 응답 예와 견준다
 - `reasonText(why: AttentionWhy): string` — `docs/frontend/now.md` 의 「이유 문구」 표 그대로. `signals` 가 여럿이면 표의 위쪽 줄, 표에 없는 조합은 그 `trigger` 의 「없음」 줄. 모르는 `trigger` 는 빈 문자열
 - `cardTitle(key)`, `cardEmptyText(key)` — 「카드」 표의 제목과 비었을 때 문구
 - `allCardsEmpty(cards: AttentionCard[]): boolean` — 네 카드가 모두 `OK` 이고 항목이 0 이면 참. 하나라도 `UNAVAILABLE` 이면 거짓
-- `nowCountOf(card): number` — 카드 안 `attention === "NOW"` 항목 수
 
 ### 2. `web/src/components/now/` 부품
 
 - `now-screen.tsx` 의 `NowScreen`(async 서버 부품): `callControlPlane<AttentionView>("/api/v1/attention")`. 실패면 `<p className="text-sm">{result.message}</p>`. 바깥 틀은 `<div className="mx-auto w-full max-w-4xl">`, 제목 `h1` 은 「지금 볼 것」. `allCardsEmpty` 면 `EmptyState` 로 「지금 확인할 것이 없어요」, 아니면 `grid gap-4 md:grid-cols-2` 안에 응답 순서대로 `NowCard`
-- `now-card.tsx` 의 `NowCard`: `Card` 머리에 `cardTitle`, `nowCountOf` 가 0 보다 크면 `Badge variant="warning"` 으로 그 수. `UNAVAILABLE` 이면 `Notice variant="warning"` 으로 「이 카드를 불러오지 못했어요. 잠시 뒤에 다시 열어 주세요」. 항목이 없으면 `cardEmptyText` 한 줄. `moreCount` 가 있으면 「N개 더 있어요」 링크(`failures`, `delegated` 는 `/usage?tab=executions`, `continue` 는 링크 없이 글만). `data-testid="now-card-{key}"`
-- `now-item.tsx` 의 `NowItem`: 제목 링크(`prefetch={false}`, 갈 곳은 `docs/backend/attention.md` 의 「카드의 단추와 승인 경계」 표. 대화는 `/chat/{conversationId}`, 맡긴 일은 `/executions/{execution.id}`, 승인 대기는 그 대화, Memory 제안은 `/memory`. `itemKey` 를 잘라 식별자를 얻지 않는다), 이유 한 줄(`reasonText`), 출처 줄(에이전트 이름, 시각), `NOW` 면 `Badge variant="warning"` 「지금」. `data-testid="now-item"`, `data-attention` 에 `NOW`/`LATER`. 맡긴 일은 `execution.status` 로 `executionStatusLabel` 문구를 함께 그린다
+- `now-card.tsx` 의 `NowCard`: `Card` 머리에 `cardTitle`, 카드의 `nowCount`(서버가 상한 전에 센 값)가 0 보다 크면 `Badge variant="warning"` 으로 그 수. 화면이 보이는 항목을 다시 세지 않는다. `UNAVAILABLE` 이면 `Notice variant="warning"` 으로 「이 카드를 불러오지 못했어요. 잠시 뒤에 다시 열어 주세요」. 항목이 없으면 `cardEmptyText` 한 줄. `moreCount` 가 있으면 「N개 더 있어요」 링크(`failures`, `delegated` 는 `/usage?tab=executions`, `continue` 는 링크 없이 글만). `data-testid="now-card-{key}"`
+- `now-item.tsx` 의 `NowItem`: 제목 링크(`prefetch={false}`, 갈 곳은 `docs/backend/attention.md` 의 「카드의 단추와 승인 경계」 표. 대화는 `/chat/{conversationId}`, 맡긴 일은 `/executions/{execution.id}`, 승인 대기는 그 대화, Memory 제안은 `/memory`. `itemKey` 를 잘라 식별자를 얻지 않는다), 이유 한 줄(`reasonText`), 출처 줄(에이전트 이름, 시각), `NOW` 면 `Badge variant="warning"` 「지금」. `data-testid="now-item"`, `data-attention` 에 `NOW`/`LATER`. 맡긴 일은 `executionStatusLabel({ status: execution.status, errorCode: null }, false)` 문구를 함께 그린다. 판정 응답에는 오류 코드가 없으므로 `errorCode` 는 늘 `null` 로 넘긴다
 - 좁은 폭에서 출처 줄과 단추가 줄바꿈되게 `flex-wrap` 을 쓰고 가로 스크롤이 생기지 않게 한다
 
 ### 3. `web/src/app/now/page.tsx`, `web/src/app/now/loading.tsx`
