@@ -174,3 +174,71 @@ Control Plane 이 직접 적는 것이다.
 실패한 실행도 기록에 남는다.
 사용량 화면에서 무엇이 실패했는지 볼 수 있다.
 실행 트리의 실패 줄은 오류 코드를 위 표의 안내 문구로 바꿔 보이고, 코드 원문은 관리자 영역의 실행 상세(`/admin/executions/{id}`)에서만 함께 보인다.
+
+## 지금 화면을 열 때
+
+**아직 구현 전이다.** 구현한 PR 이 이 줄을 지운다.
+판정 표는 [`backend/attention.md`](backend/attention.md), 화면은 [`frontend/now.md`](frontend/now.md) 가 갖는다.
+
+```mermaid
+sequenceDiagram
+    participant B as 브라우저
+    participant W as Next.js 서버 라우트
+    participant C as Control Plane
+
+    B->>W: / 를 연다
+    W-->>B: 새 대화 화면. 서버에서 읽는 것이 없다
+    B->>W: 그린 뒤 건수를 묻는다
+    W->>C: GET /api/v1/attention/summary
+    alt 읽었다
+        C-->>B: nowCount
+        B->>B: 0 보다 크면 「확인할 것 N건」 을 그린다
+    else 실패했다
+        B->>B: 그 줄을 그리지 않는다
+    end
+    B->>W: /now 를 연다
+    W->>C: GET /api/v1/attention
+    C->>C: 실행, 승인 줄, Memory 제안, 할 일, 대화를 요청자 것만 읽는다
+    C->>C: 숨기기와 미루기를 읽고 후보마다 NOW, LATER, SUPPRESSED 를 정한다
+    C->>C: 보인 항목마다 SHOWN 사건을 한 번 남긴다
+    C-->>W: 카드 넷, 항목의 이유와 출처
+    W-->>B: 지금 화면
+    opt 숨기기나 미루기
+        B->>W: hide 나 snooze
+        W->>C: POST /api/v1/attention/hide 나 /snooze
+        C->>C: attention_control 을 쓴다. 원래 기록은 그대로다
+    end
+    opt 항목의 동작
+        B->>W: 승인, 할 일 받아들이기 같은 기존 경로
+        B->>W: OPENED 나 ACTED 사건
+    end
+```
+
+source 하나를 읽지 못하면 그 카드만 「불러오지 못했다」 로 내고 나머지 카드는 그린다.
+판정은 Hermes 를 부르지 않고, 실행이나 커넥터 호출을 시작하지 않는다.
+
+## 할 일을 제안할 때
+
+**아직 구현 전이다.** 구현한 PR 이 이 줄을 지운다. 계약은 [`backend/follow-up.md`](backend/follow-up.md) 가 갖는다.
+
+```mermaid
+sequenceDiagram
+    participant H as Hermes
+    participant C as Control Plane
+    participant B as 브라우저
+
+    H->>C: POST /mcp follow_up_propose 와 서명한 _fos_ctx
+    C->>C: origin 실행에서 주인과 대화를 정한다
+    alt 같은 할 일이 열려 있다
+        C-->>H: 새로 만들지 않았다
+    else 이 대화에서 거절한 적이 있거나 열린 제안이 많다
+        C-->>H: isError 와 그 까닭
+    else
+        C->>C: follow_up 을 PROPOSED 로 만든다
+        C-->>H: 제안했다
+    end
+    B->>C: 지금 화면의 「받아들이기」
+    C->>C: OPEN 으로 바꾸고 accepted_at 을 적는다
+```
+
+받아들이기 전의 제안은 지금 화면에 보이지만 건수에 세지 않는다.
