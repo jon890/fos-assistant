@@ -9,7 +9,6 @@ import com.bifos.assistant.chat.infra.ConversationRepository;
 import com.bifos.assistant.hermes.HermesRunsClient;
 import com.bifos.assistant.orchestration.application.DelegationResult.Failure;
 import com.bifos.assistant.proactive.application.ProactiveCheckGuard;
-import com.bifos.assistant.proactive.domain.ProactiveCheck;
 import com.bifos.assistant.proactive.domain.type.CheckStatus;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.error.ApiException;
@@ -321,7 +320,8 @@ public class AgentDelegationService {
             try {
                 Thread.ofVirtual()
                         .name("agent-delegate-" + rootId)
-                        .start(() -> run(user, conversation.get(), origin, agent, task, delegationKey, started));
+                        .start(() ->
+                                run(user, conversation.get(), origin, agent, task, delegationKey, checkTree, started));
             } catch (RuntimeException | Error ex) {
                 activeDelegations.release();
                 log.warn("위임 실행 스레드를 띄우지 못했다 originExecutionId={}", origin.id(), ex);
@@ -336,6 +336,9 @@ public class AgentDelegationService {
         }
 
         if (!handoff.rowCreated()) {
+            if (handoff.checkEnded()) {
+                return rejected(Failure.CHECK_LIMIT, origin, "실행 줄을 만들기 전에 살펴보기가 끝났다");
+            }
             if (isUserBusy(handoff.failure())) {
                 // 실행 줄을 만들기 전에 사용자 실행 한도에 닿았다(ADR-069). 모델에 가는 코드를 늘리지 않고 BUSY 로 알린다.
                 return rejected(Failure.BUSY, origin, "사용자 동시 실행 한도에 닿았다");
@@ -368,11 +371,16 @@ public class AgentDelegationService {
      * 자식까지 센다. 한 번의 살펴보기에서 맡긴 총수의 상한이다.
      */
     private boolean withinCheckLimit(AgentExecution origin, Long rootId) {
-        Optional<ProactiveCheck> check = checkGuard.checkOf(origin);
-        if (check.isEmpty() || check.get().status() != CheckStatus.RUNNING) {
-            return false;
-        }
-        return executions.countByRootExecutionIdAndDelegationKeyIsNotNull(rootId) < checkGuard.maxDelegations();
+        return checkRunning(origin)
+                && executions.countByRootExecutionIdAndDelegationKeyIsNotNull(rootId) < checkGuard.maxDelegations();
+    }
+
+    /** origin 이 속한 살펴보기가 아직 {@code RUNNING} 인가. 살펴보기 트리가 아니면 거짓이다. */
+    private boolean checkRunning(AgentExecution origin) {
+        return checkGuard
+                .checkOf(origin)
+                .map(check -> check.status() == CheckStatus.RUNNING)
+                .orElse(false);
     }
 
     /**
@@ -383,6 +391,11 @@ public class AgentDelegationService {
      * <p>실행은 셋 가운데 하나가 참이면 멈춘다. 요청 스레드가 제출 대기를 포기했다, {@code agent_stop} 이 중지 표시를
      * 켰다, 사용자가 루트 turn 을 멈췄다({@link #rootTurnStopped}). run 번호가 붙으면 루트 turn 에 그 run 을 붙여, 사용자가 turn 을 멈출 때 이
      * 실행도 함께 멈추게 한다. turn 이 이미 끝났으면 붙일 곳이 없어 붙지 않는다.
+     *
+     * <p>살펴보기 트리면 실행을 시작하기 전에 그 살펴보기가 아직 {@code RUNNING} 인지 한 번 더 본다. 루트 잠금 안에서 본 뒤 이
+     * 스레드가 뜨기까지 살펴보기가 끝났으면 실행 줄을 만들지 않고 요청 스레드가 {@code CHECK_LIMIT} 로 거절한다.
+     *
+     * @param checkTree origin 이 먼저 살펴보기 트리 안에 있다
      */
     private void run(
             CurrentUser user,
@@ -391,11 +404,16 @@ public class AgentDelegationService {
             Agent agent,
             String task,
             DelegationKey delegationKey,
+            boolean checkTree,
             Handoff handoff) {
         Long rootId = origin.treeRootId();
         RunningDelegation delegation = new RunningDelegation(agent.apiBaseUrl(), agent.hermesProfile());
         RuntimeException failure = null;
         try {
+            if (checkTree && !checkRunning(origin)) {
+                handoff.markCheckEnded();
+                return;
+            }
             children.delegate(
                     user,
                     conversation,
