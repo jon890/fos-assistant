@@ -177,11 +177,15 @@ public class TaskRunStarter {
     /**
      * 이 줄이 결과를 남길 대화를 정하고 줄에 적는다.
      *
-     * <p>줄이 이미 대화를 가졌으면 그것을 다시 쓴다. 앞 tick 에서 잠금을 얻지 못한 줄이다. {@code SINGLE} 은 작업의 대화가
-     * 지워지지 않았고 에이전트가 같으면 그것을, 아니면 새로 만들어 작업에도 적는다. 대화의 에이전트는 바뀌지 않기 때문이다.
+     * <p>줄이 이미 대화를 가졌고 그 대화가 지워지지 않았으면 그것을 다시 쓴다. 앞 tick 에서 잠금을 얻지 못한 줄이다. 기다리는 동안
+     * 사용자가 그 대화를 지웠으면 처음 준비하는 줄처럼 다시 정한다. {@code SINGLE} 은 작업의 대화가 지워지지 않았고 에이전트가
+     * 같으면 그것을, 아니면 새로 만들어 작업에도 적는다. 대화의 에이전트는 바뀌지 않기 때문이다.
      */
     private Long conversationFor(Task task, TaskRun run, Instant now) {
-        if (run.conversationId() != null) {
+        if (run.conversationId() != null
+                && conversations
+                        .findByIdAndUserIdAndDeletedAtIsNull(run.conversationId(), task.ownerUserId())
+                        .isPresent()) {
             return run.conversationId();
         }
         Long conversationId;

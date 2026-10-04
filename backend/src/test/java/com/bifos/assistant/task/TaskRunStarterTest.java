@@ -8,6 +8,7 @@ import com.bifos.assistant.agent.domain.type.AgentVisibility;
 import com.bifos.assistant.agent.domain.type.CostMode;
 import com.bifos.assistant.agent.domain.type.CredentialScope;
 import com.bifos.assistant.agent.infra.AgentRepository;
+import com.bifos.assistant.chat.application.ConversationWriter;
 import com.bifos.assistant.chat.application.TurnCancellation;
 import com.bifos.assistant.chat.application.TurnIntent;
 import com.bifos.assistant.chat.domain.ChatMessage;
@@ -131,6 +132,9 @@ class TaskRunStarterTest {
     ConversationRepository conversations;
 
     @Autowired
+    ConversationWriter conversationWriter;
+
+    @Autowired
     ChatMessageRepository messages;
 
     @Autowired
@@ -238,6 +242,42 @@ class TaskRunStarterTest {
             assertThat(notification.body()).isEqualTo("다른 대화가 오래 돌고 있어 시작하지 못했어요");
             assertThat(notification.targetType()).isEqualTo(NotificationTargetType.TASK);
             assertThat(notification.targetPublicId()).isEqualTo(fixture.task().publicId());
+        });
+    }
+
+    @Test
+    @DisplayName("QUEUED 로 기다리는 동안 줄의 대화를 지우면 다음에 열 때 새 대화로 SUCCEEDED 가 되고 알림이 새 대화를 가리킨다")
+    void opensInNewConversationWhenWaitingConversationDeleted() {
+        Fixture fixture = fixture(ConversationMode.NEW_PER_RUN, NotifyPolicy.ALWAYS);
+        TaskRun run = queued(fixture, SCHEDULED, NOW);
+        fillSlots(fixture.owner());
+        starter.startQueued(NOW);
+        Long deleted = runs.findById(run.id()).orElseThrow().conversationId();
+        assertThat(deleted).as("기다리는 줄의 대화").isNotNull();
+        assertThat(conversationWriter.deleteIfActive(deleted, fixture.owner().id(), NOW))
+                .as("지운 대화 수")
+                .isEqualTo(1);
+        heldSlots.forEach(TurnSlot::release);
+        heldSlots.clear();
+
+        int started = starter.startQueued(NOW.plus(Duration.ofMinutes(1)));
+
+        assertThat(started).as("연 줄 수").isEqualTo(1);
+        TaskRun finished = awaitFinished(run);
+        assertThat(finished.status()).isEqualTo(TaskRunStatus.SUCCEEDED);
+        assertThat(finished.conversationId()).as("새로 적은 대화").isNotNull().isNotEqualTo(deleted);
+        Conversation conversation =
+                conversations.findById(finished.conversationId()).orElseThrow();
+        assertThat(conversation.taskId())
+                .as("새 대화의 작업")
+                .isEqualTo(fixture.task().id());
+        assertThat(messages.findByConversationIdOrderByIdAsc(conversation.id()))
+                .extracting(ChatMessage::role)
+                .containsExactly(MessageRole.SYSTEM, MessageRole.USER, MessageRole.ASSISTANT);
+        assertThat(notificationsOf(fixture.owner().id())).singleElement().satisfies(notification -> {
+            assertThat(notification.kind()).isEqualTo(NotificationKind.TASK_SUCCEEDED);
+            assertThat(notification.targetType()).isEqualTo(NotificationTargetType.CONVERSATION);
+            assertThat(notification.targetPublicId()).isEqualTo(conversation.publicId());
         });
     }
 
