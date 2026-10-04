@@ -1,6 +1,6 @@
 # Phase 03. 시작 전 점검, 점검 대화, 상태 조회
 
-**Execution profile**: standard
+**Execution profile**: deep
 
 ## 목표
 
@@ -63,7 +63,7 @@
 
 - `ErrorCode.PROACTIVE_CHECK_UNAVAILABLE(HttpStatus.CONFLICT)` 를 Javadoc 한 줄과 함께 더한다. 이 phase 에서는 쓰지 않아도 phase 04 가 쓴다
 - `ChatDtos.ConversationView` 에 `ConversationPurpose purpose` 를 더하고 만드는 자리를 모두 고친다
-- 웹의 대화 타입은 phase 07 이 고친다. 응답에 칸이 하나 늘 뿐이라 지금 웹은 깨지지 않는다
+- 웹의 대화 타입은 phase 08 이 고친다. 응답에 칸이 하나 늘 뿐이라 지금 웹은 깨지지 않는다
 
 ### 6. 이 phase 를 검증하는 시험
 

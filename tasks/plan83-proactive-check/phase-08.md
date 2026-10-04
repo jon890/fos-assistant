@@ -42,7 +42,8 @@
 - `web/src/components/agent/agent-proactive-check-section.tsx` 신규: `<section aria-label="먼저 살펴보기">`. 문서 표의 상태마다 그린다. 단추를 누르면 시작하고 202 면 `/chat/{conversationId}` 로 간다. 거절 문구는 단추 아래 `Notice` 로 그린다
 - `agent-detail-loader.tsx` 가 상태를 서버에서 함께 읽어 넘긴다. 실패하면 절 안에 실패 문구만 그린다. 커넥터 에이전트는 읽지 않는다
 - `agent-detail-body.tsx` 가 스킬 절 다음에 그린다
-- `agent-detail-body.tsx` 를 쓰는 관리자 영역 상세(`/admin/agents/{code}`)에서도 같은 절이 보이는지 확인한다. 관리자도 자기 점검 대화만 다룬다
+- `agent-detail-body.tsx` 를 쓰는 관리자 영역 상세(`/admin/agents/{code}`)에서는 상태 조회가 성공했을 때만 절을 그린다. 관리자가 대화를 시작할 수 없는 남의 비공개 에이전트는 404 라 절을 그리지 않는다. 관리자도 자기 점검 대화만 다룬다
+- 절은 나중에 매일 깨우기 설정(켜기, 시각과 시간대, 다음 실행)이 들어갈 자리다. 지금은 단추와 마지막 살펴보기만 그리고 빈 설정 자리를 두지 않는다
 
 ### 3. 대화 목록의 배지와 점검 대화의 단추
 
@@ -59,7 +60,7 @@
 - 시험 에이전트에 `terminal` 을 켜면 절에 「터미널」 같은 한국어 이름과 끄라는 안내가 보이고 단추가 꺼져 있다
 - 허용된 toolset 과 스킬만 두면 단추가 켜지고, 누르면 `/chat/<UUID>` 로 가서 시작 알림 줄과 결과 답(원문 링크 하나)이 보인다
 - 사이드바 목록의 그 대화 줄에 「살펴보기」 배지가 보인다
-- 점검 대화 머리 줄의 「지금 살펴보기」 를 누르면 같은 대화에 시작 알림 줄이 하나 더 생긴다
+- 점검 대화 머리 줄의 「지금 살펴보기」 를 누르면 같은 대화에 시작 알림 줄이 하나 더 생기고, 기본 답의 발견이 이번에는 「이미 알린 것이에요」 참고로 보인다
 - 검사 끝에서 바꾼 toolset 과 스킬을 되돌린다
 
 ## 검증
@@ -68,7 +69,6 @@
 # cwd: web/
 pnpm typecheck
 pnpm build
-작업 공간 밖의 브라우저 검사 대기 스크립트
 pnpm test:browser proactive-check
 ```
 
@@ -77,6 +77,8 @@ pnpm test:browser proactive-check
 scripts/quality.sh check
 grep -rn 'style={{' web/src/
 ```
+
+브라우저 검사가 여럿 나란히 돌면 이 머신의 자원이 모자라 흔들린다. 작업 공간 밖에 브라우저 검사 대기 스크립트가 있으면 먼저 돌린다.
 
 기대값: 앞의 명령은 종료 코드 0. `grep` 은 아무것도 내지 않는다(종료 코드 1). 전체 브라우저 검사는 PR 의 CI `browser-mobile`, `browser-desktop` 이 돌린다.
 

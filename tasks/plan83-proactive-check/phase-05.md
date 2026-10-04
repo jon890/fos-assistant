@@ -26,16 +26,25 @@
 - 멈추기가 `EXECUTION_NOT_RUNNING` 이나 다른 예외로 끝나면 경고 로그만 남긴다. 이미 끝난 turn 이다.
 - 전달 표시는 아직 도는 위임 자식에도 적는다. 그 자식이 나중에 끝나도 점검 대화에 자동 turn 이 열리지 않는다. 자동 turn 은 읽기 경계 밖의 보통 turn 이다.
 - 전달 표시와 사건은 잠금을 풀기 전에 한다. 잠금을 풀면 닫기 리스너가 곧바로 다음 turn 을 정한다.
+- 상한으로 멈춘 살펴보기는 대기 메시지를 멈추지 않는다. 사용자가 멈춘 것이 아니다. 사용자가 중지를 눌렀을 때만 보통 turn 처럼 대기 줄을 멈춘다(`docs/backend/proactive-check.md` 「끝날 때」).
+- 알림 줄은 한 살펴보기에 하나다. 멈춘 뒤 예외로 끝나면 멈췄다는 줄만 남기고 실패 줄을 더하지 않는다.
 
 ## 작업 항목
 
 ### 1. `ProactiveCheckRun` 의 상한
 
 - 멈춘 까닭을 들고 있는 칸을 둔다. 값은 `CHECK_TIME_LIMIT`, `CHECK_TOOL_LIMIT`, 없음이다. 처음 정한 까닭만 남긴다
-- `started(executionId, ...)` 에서 `max-duration` 뒤에 깨는 가상 스레드를 하나 띄운다. 그때까지 끝나지 않았으면 까닭을 `CHECK_TIME_LIMIT` 로 정하고 `ChatService.stop(owner, executionId)` 를 부른다. 살펴보기가 끝나면 그 스레드를 깨워 끝낸다
+- `started(executionId, ...)` 에서 `max-duration` 뒤에 깨는 가상 스레드를 하나 띄운다. 그때까지 끝나지 않았으면 까닭을 `CHECK_TIME_LIMIT` 로 정하고 `ChatService.stop(owner, executionId)` 를 부른다
+- `public void close()` 를 더한다. 시간 상한 스레드를 깨워(interrupt) 끝내고, 그 뒤로는 멈추기를 부르지 않게 닫힘 표시를 켠다. `ProactiveCheckService` 의 가상 스레드 `finally` 에서 줄을 적기 전에 부른다. 도구 호출 수는 phase 04 대로 `AtomicInteger` 로 들고 있다가 줄을 적을 때 넘긴다
 - `toolStarted` 에서 센 값이 `max-tool-calls` 를 넘는 첫 순간 까닭을 `CHECK_TOOL_LIMIT` 로 정하고 가상 스레드에서 `ChatService.stop` 을 부른다
 - `stoppedNotice` 가 까닭에 따라 「시간 한도에 닿아 살펴보기를 멈췄어요」, 「도구 호출 한도에 닿아 살펴보기를 멈췄어요」, 「살펴보기를 멈췄어요」 를 돌려준다
 - 끝날 때 줄을 `STOPPED` 와 그 까닭(`error_code`)으로 적는다. 사용자가 멈췄으면 `error_code` 는 비운다
+
+### 1-1. 멈췄을 때의 대기 메시지와 알림 줄
+
+- `CheckTurn` 에 `boolean holdPendingOnStop()` 을 더한다. `ProactiveCheckRun` 은 멈춘 까닭이 상한이면 거짓, 사용자 중지면 참이다
+- `ChatService` 의 `stoppedTurn` 과 `cancelAndHoldIfStopConfirmed` 는 살펴보기 turn 이고 `holdPendingOnStop()` 이 거짓이면 `markStoppedAndHoldPending` 대신 `turns.markStopped(handle)` 만 부른다. 보통 turn 과 자동 turn 은 그대로다
+- `ProactiveCheckService` 는 turn 이 예외로 끝났을 때, 그 살펴보기가 멈춤으로 확정됐으면(`ProactiveCheckRun` 이 멈춘 까닭을 들었거나 `TurnCancellation.isStopConfirmed`) 실패 알림 줄을 남기지 않는다. 이때 `cancel` 이 멈췄다는 줄을 이미 남겼다. 줄은 `STOPPED` 로 적는다
 
 ### 2. 위임 결과 정리와 위임 수
 
@@ -61,6 +70,9 @@
   - `@MockitoBean HermesRunEventStream` 이 `tool.started` 를 `max-tool-calls + 1` 번 흘리면 Hermes 에 중지가 가고(`StubHermesRunsClient.stopped()`), 줄이 `STOPPED` 와 `CHECK_TOOL_LIMIT`, 대화에 도구 호출 한도 알림 줄이 남고 답 조각이 남지 않는다
   - `max-duration` 을 짧게(예: 1초, `hermes.run-timeout` 은 그보다 길게) 두고 실행이 끝나지 않으면 줄이 `STOPPED` 와 `CHECK_TIME_LIMIT`, 시간 한도 알림 줄
   - 상한 안에서 끝나면 시간 상한 스레드가 멈추기를 부르지 않는다
+  - 상한으로 멈춘 뒤 그 대화의 대기 메시지가 멈추지 않고(`held` 거짓) 다음 turn 으로 나간다. 사용자가 `POST .../stop` 으로 멈추면 대기 줄이 멈춘다
+  - 대화에 남은 알림 줄이 시작 줄과 멈춤 줄 둘뿐이다
+  - 시험은 `@SpringBootTest(properties = ...)` 로 `hermes.run-timeout` 을 넉넉히(예: 30초) 두고, 시간 상한 시험만 `max-duration` 을 짧게 둔다
 - `backend/src/test/java/com/bifos/assistant/proactive/ProactiveCheckEndTest.java`(`assistant.delegation-wake.enabled=true`):
   - 살펴보기 turn 아래에 끝난 위임 자식 하나와 도는 위임 자식 하나를 둔 채 살펴보기가 끝나면 두 줄 모두 `result_delivered_at` 이 적히고, 점검 대화에 자동 turn 이 열리지 않으며(`DelegationResults` 알림 줄이 없다), `proactive_check.delegations` 가 2 다
   - `ProactiveCheckEnded` 를 받아 도는 자식에 중지가 간다
@@ -88,6 +100,8 @@ scripts/check-mysql-migration.sh
 | 파일 | 변경 |
 | --- | --- |
 | `backend/src/main/java/com/bifos/assistant/proactive/application/ProactiveCheckRun.java` | 수정 |
+| `backend/src/main/java/com/bifos/assistant/chat/application/CheckTurn.java` | 수정 |
+| `backend/src/main/java/com/bifos/assistant/chat/application/ChatService.java` | 수정 |
 | `backend/src/main/java/com/bifos/assistant/proactive/application/ProactiveCheckService.java` | 수정 |
 | `backend/src/main/java/com/bifos/assistant/proactive/application/ProactiveCheckEnded.java` | 신규 |
 | `backend/src/main/java/com/bifos/assistant/usage/infra/AgentExecutionRepository.java` | 수정 |

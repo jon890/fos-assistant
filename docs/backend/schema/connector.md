@@ -53,7 +53,7 @@
 | `risk` | `VARCHAR(16)` | 판정 당시의 위험도. 정책을 읽지 못했거나, 선언이 없었거나, 연결이 준비되지 않아 거절한 호출은 비운다 |
 | `approval_mode` | `VARCHAR(16)` | 판정 당시의 승인 방식. 위와 같을 때 비운다 |
 | `decision` | `VARCHAR(20) NOT NULL` | `ALLOWED`, `DENIED`, `NEEDS_APPROVAL` |
-| `deny_reason` | `VARCHAR(40)` | `DENIED` 일 때만. `POLICY_UNAVAILABLE`, `NOT_READY`, `UNDECLARED`, `RISK_NOT_OPEN`, `ARGS_TOO_LARGE` |
+| `deny_reason` | `VARCHAR(40)` | `DENIED` 일 때만. `POLICY_UNAVAILABLE`, `NOT_READY`, `UNDECLARED`, `RISK_NOT_OPEN`, `ARGS_TOO_LARGE`, `READ_ONLY_RUN`(먼저 살펴보기 트리) |
 | `passed` | `BOOLEAN NOT NULL` | hook 에 통과로 답했는가. `decision` 이 `ALLOWED` 일 때만 참이다 |
 | `status` | `VARCHAR(20)` | 승인 줄만. `PENDING`, `EXECUTING`, `SUCCEEDED`, `FAILED`, `UNKNOWN`, `REJECTED`, `EXPIRED` |
 | `origin_execution_id` | `BIGINT NOT NULL` | hook 의 session 으로 찾은 실행 |

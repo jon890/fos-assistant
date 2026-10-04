@@ -7,6 +7,7 @@
 ## proactive_check
 
 살펴보기 한 번이다. 시작할 때 만들고 끝날 때 갱신한다. 실행의 토큰과 금액은 `agent_execution` 이 갖고 여기 다시 적지 않는다.
+살펴보기 한 번의 비용은 `root_execution_id` 로 그 트리의 실행 줄을 합쳐 얻는다([`proactive-check.md`](../proactive-check.md) 의 「비용과 효과」).
 
 | 칸 | 타입 | 뜻 |
 | --- | --- | --- |
@@ -40,8 +41,9 @@
 | `check_id` | BIGINT FK `proactive_check` ON DELETE CASCADE | 이 발견을 낸 살펴보기 |
 | `conversation_id` | BIGINT | 점검 대화. 입력에 실을 발견을 대화로 읽으려고 둔다. `proactive_check.conversation_id` 와 같다 |
 | `kind` | VARCHAR(16) | `NEW` 는 「새로 알릴 것」, `REFERENCE` 는 「참고」 |
-| `reason` | VARCHAR(32) NULL | `REFERENCE` 의 까닭. `NO_SOURCE`, `NOT_CHECKED_NOW`, `CLOSED`, `STALE`, `FRESHNESS_UNKNOWN`, `INCOMPLETE` |
+| `reason` | VARCHAR(32) NULL | `REFERENCE` 의 까닭. `NO_SOURCE`, `NOT_CHECKED_NOW`, `CLOSED`, `STALE`, `FRESHNESS_UNKNOWN`, `INCOMPLETE`, `REPEATED` |
 | `area` | VARCHAR(40) | 분야 지침이 정한 영역 |
+| `topic_key` | VARCHAR(120) NULL | 분야 지침이 정한 주제 키. 같은 주제와 같은 원문을 다시 알리지 않는 판정에 쓴다 |
 | `title` | VARCHAR(120) | 발견의 제목. 모델이 쓴 글이다 |
 | `source_url` | VARCHAR(2000) NULL | 검사를 통과한 원문 주소. `NO_SOURCE` 면 비어 있다 |
 | `checked_at` | DATETIME(6) NULL | 원문을 확인한 시각. 읽지 못했으면 비어 있다 |
