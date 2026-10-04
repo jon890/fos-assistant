@@ -180,11 +180,11 @@ public enum ErrorCode {
     CONNECTOR_ACTION_EXECUTING(HttpStatus.CONFLICT),
     /** 없는 알림과 남의 알림을 같은 응답으로 숨긴다. 번호를 훑어 남의 것이 있는지 알아낼 수 없게 한다(ADR-070). */
     NOTIFICATION_NOT_FOUND(HttpStatus.NOT_FOUND),
-    /** 없는 작업, 남의 작업, 지운 작업을 같은 응답으로 숨긴다(ADR-071). */
+    /** 없는 작업, 남의 작업, 지운 작업을 같은 응답으로 숨긴다(ADR-076). */
     TASK_NOT_FOUND(HttpStatus.NOT_FOUND),
-    /** 보관하지 않은 예약 작업이 사용자당 상한에 닿았다(ADR-074). */
+    /** 보관하지 않은 예약 작업이 사용자당 상한에 닿았다(ADR-079). */
     TASK_LIMIT_REACHED(HttpStatus.CONFLICT),
-    /** 예약 작업의 시각을 읽지 못했거나, 다음 시각이 없거나, 최소 간격보다 짧거나, 이미 지났다(ADR-074). */
+    /** 예약 작업의 시각을 읽지 못했거나, 다음 시각이 없거나, 최소 간격보다 짧거나, 이미 지났다(ADR-079). */
     TASK_SCHEDULE_INVALID(HttpStatus.BAD_REQUEST),
     /** 흐름이 붙은 에이전트로는 예약 작업을 만들지 않는다. */
     TASK_AGENT_NOT_SUPPORTED(HttpStatus.BAD_REQUEST),

@@ -17,7 +17,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /**
- * 기동 전에 돌던 발화를 {@code FAILED}({@code INTERRUPTED})로 닫고 알린다(ADR-072).
+ * 기동 전에 돌던 발화를 {@code FAILED}({@code INTERRUPTED})로 닫고 알린다(ADR-077).
  *
  * <p>다시 돌리지 않는다. 쓰기가 두 번 일어날 수 있다. {@code QUEUED} 줄은 그대로 두고 다음 tick 이 연다. 규칙은 {@code
  * docs/backend/task.md} 의 「기동할 때」 가 갖는다.

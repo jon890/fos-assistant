@@ -11,7 +11,7 @@
 
 ## 컨텍스트
 
-**근거 문서**: `docs/backend/task.md` 의 「발화와 시작」, 「알림」, 「설정」, `docs/adr/ADR-071-예약-작업은-control-plane-이-갖고-발화한-실행은-대화-turn-경로로-돈다.md`, `docs/adr/ADR-072-발화는-trigger-와-예정-시각의-유일-제약으로-한-번만-만들고-놓친-발화는-작업마다-정한다.md`, `docs/adr/ADR-074-예약-작업은-사용자당-10개-최소-간격-15분-하루-48번으로-제한한다.md`, `docs/backend/notification.md`, `docs/backend/turn-control.md` 의 「기동할 때 남은 실행 정리」.
+**근거 문서**: `docs/backend/task.md` 의 「발화와 시작」, 「알림」, 「설정」, `docs/adr/ADR-076-예약-작업은-control-plane-이-갖고-발화한-실행은-대화-turn-경로로-돈다.md`, `docs/adr/ADR-077-발화는-trigger-와-예정-시각의-유일-제약으로-한-번만-만들고-놓친-발화는-작업마다-정한다.md`, `docs/adr/ADR-079-예약-작업은-사용자당-10개-최소-간격-15분-하루-48번으로-제한한다.md`, `docs/backend/notification.md`, `docs/backend/turn-control.md` 의 「기동할 때 남은 실행 정리」.
 
 경로는 `backend/src/main/java/com/bifos/assistant/` 아래를 `B/` 로 줄여 쓴다. phase 01 이 만든 `B/task/` 의 엔티티, 저장소, `TaskSchedule`, `TaskProperties` 를 쓴다. 구현 전에 그 파일들을 읽어 이름을 맞춘다.
 
@@ -37,8 +37,8 @@ turn 의 저장은 `B/chat/application/ChatService.java` 의 `saveQuestion` 이 
 
 ## 의도 메모
 
-- 발화와 시작을 나눈다. 발화는 짧은 트랜잭션 하나이고, turn 은 Hermes 를 부르는 긴 일이라 트랜잭션 밖에서 연다(ADR-072).
-- 예약 turn 을 위한 판정이나 허락을 따로 두지 않는다. `ChatService` 의 기존 turn 경로를 그대로 탄다. 그래서 커넥터 도구 판정과 승인 줄과 `APPROVAL_REQUESTED` 알림이 사람이 보낸 turn 과 같다(ADR-071).
+- 발화와 시작을 나눈다. 발화는 짧은 트랜잭션 하나이고, turn 은 Hermes 를 부르는 긴 일이라 트랜잭션 밖에서 연다(ADR-077).
+- 예약 turn 을 위한 판정이나 허락을 따로 두지 않는다. `ChatService` 의 기존 turn 경로를 그대로 탄다. 그래서 커넥터 도구 판정과 승인 줄과 `APPROVAL_REQUESTED` 알림이 사람이 보낸 turn 과 같다(ADR-076).
 - `RUNNING` 으로 남은 줄은 기동할 때 다시 돌리지 않는다. 쓰기가 두 번 일어날 수 있다.
 - `QUEUED` 줄이 열리지 못해도 대화를 다시 만들지 않는다. 처음 만든 대화 번호를 줄에 적어 둔다.
 

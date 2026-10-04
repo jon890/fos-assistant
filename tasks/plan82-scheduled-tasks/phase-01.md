@@ -11,7 +11,7 @@
 
 ## 컨텍스트
 
-**근거 문서**: `docs/backend/task.md` 의 「작업」, 「시각」, 「API」, 「설정」, `docs/backend/schema/task.md` 전체, `docs/adr/ADR-071-예약-작업은-control-plane-이-갖고-발화한-실행은-대화-turn-경로로-돈다.md`, `docs/adr/ADR-073-예약-작업의-결과는-실행마다-새-대화가-기본이고-목록은-작업으로-묶는다.md`, `docs/adr/ADR-074-예약-작업은-사용자당-10개-최소-간격-15분-하루-48번으로-제한한다.md`, `docs/backend/packages.md` 의 「최상위 패키지의 층 순서」.
+**근거 문서**: `docs/backend/task.md` 의 「작업」, 「시각」, 「API」, 「설정」, `docs/backend/schema/task.md` 전체, `docs/adr/ADR-076-예약-작업은-control-plane-이-갖고-발화한-실행은-대화-turn-경로로-돈다.md`, `docs/adr/ADR-078-예약-작업의-결과는-실행마다-새-대화가-기본이고-목록은-작업으로-묶는다.md`, `docs/adr/ADR-079-예약-작업은-사용자당-10개-최소-간격-15분-하루-48번으로-제한한다.md`, `docs/backend/packages.md` 의 「최상위 패키지의 층 순서」.
 
 경로는 `backend/src/main/java/com/bifos/assistant/` 아래를 `B/` 로 줄여 쓴다.
 
@@ -29,20 +29,20 @@
 - 트랜잭션은 application 층에만 둔다. 저장소 메서드에 `@Transactional` 을 달면 `ArchitectureRules.TRANSACTIONAL_ONLY_IN_APPLICATION` 에 걸린다. 수정 쿼리(`@Modifying`)는 application 의 트랜잭션 안에서 부른다. `B/notification/application/NotificationCleaner.java` 가 `TransactionTemplate` 으로 감싸는 본보기다.
 - 시각 계산은 Spring 의 `org.springframework.scheduling.support.CronExpression` 을 쓴다. 6필드(초 포함)를 받으므로 5필드 앞에 `"0 "` 을 붙여 읽는다. 새 의존을 더하지 않는다.
 
-새 마이그레이션 번호는 `V67` 이다. 구현 전에 `ls backend/src/main/resources/db/migration | sort -V | tail -3` 과 `gh pr list --state open` 으로 다른 브랜치가 V67 을 쥐지 않았는지 확인한다.
+새 마이그레이션 번호는 `V68` 이다. 구현 전에 `ls backend/src/main/resources/db/migration | sort -V | tail -3` 과 `gh pr list --state open` 으로 다른 브랜치가 V68 을 쥐지 않았는지 확인한다.
 마이그레이션 규칙은 `docs/backend/schema/README.md` 의 「마이그레이션 작성 규칙」 이다. 새 표마다 `ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci` 를 적는다. 이 파일은 DDL 만 담는다.
 `instruction` 은 `TEXT` 이므로 엔티티에 `columnDefinition = "TEXT"` 로 못 박는다(`backend/AGENTS.md` 의 「엔티티와 마이그레이션은 따로 논다」).
 
 ## 의도 메모
 
 - 서버는 cron 만 안다. 「매일」, 「매주」 같은 고르기는 화면이 cron 으로 바꾼다. 저장 형식을 하나로 두기 위해서다.
-- 최소 간격은 만들 때 거절한다. 발화할 때 줄이면 사용자가 무엇이 안 되는지 모른다(ADR-074).
+- 최소 간격은 만들 때 거절한다. 발화할 때 줄이면 사용자가 무엇이 안 되는지 모른다(ADR-079).
 - `chat` 은 작업 이름을 모른다. 목록의 작업 이름은 `chat` 의 port 를 `task` 가 구현해 준다.
-- `task_trigger` 를 작업 표에 합치지 않는다. 다른 종류의 trigger 를 더할 자리이고, 발화 기록의 유일 제약이 trigger 번호를 쓴다(ADR-072).
+- `task_trigger` 를 작업 표에 합치지 않는다. 다른 종류의 trigger 를 더할 자리이고, 발화 기록의 유일 제약이 trigger 번호를 쓴다(ADR-077).
 
 ## 작업 항목
 
-### 1. 마이그레이션 `backend/src/main/resources/db/migration/V67__task.sql`
+### 1. 마이그레이션 `backend/src/main/resources/db/migration/V68__task.sql`
 
 `docs/backend/schema/task.md` 의 세 표 `task`, `task_trigger`, `task_run` 을 만들고 `conversation` 에 `task_id BIGINT NULL` 을 더한다.
 
@@ -163,7 +163,7 @@ scripts/check-public-safe.sh
 
 | 파일 | 변경 |
 |---|---|
-| `backend/src/main/resources/db/migration/V67__task.sql` | 신규 |
+| `backend/src/main/resources/db/migration/V68__task.sql` | 신규 |
 | `backend/src/main/java/com/bifos/assistant/task/domain/Task.java` | 신규 |
 | `backend/src/main/java/com/bifos/assistant/task/domain/TaskTrigger.java` | 신규 |
 | `backend/src/main/java/com/bifos/assistant/task/domain/TaskRun.java` | 신규 |

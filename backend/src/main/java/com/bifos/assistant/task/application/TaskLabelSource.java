@@ -11,7 +11,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 /**
- * 대화 목록에 작업 이름을 준다(ADR-073). 지운 작업도 이름을 돌려준다. 그 작업이 만든 대화는 남기 때문이다.
+ * 대화 목록에 작업 이름을 준다(ADR-078). 지운 작업도 이름을 돌려준다. 그 작업이 만든 대화는 남기 때문이다.
  *
  * <p>트랜잭션을 열지 않아 조회 하나가 자기 트랜잭션으로 돈다. 빈 {@code in} 절은 데이터베이스마다 다르게 동작하므로 번호가 비면
  * 읽지 않는다.

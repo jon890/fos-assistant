@@ -10,7 +10,7 @@
 
 ## 컨텍스트
 
-**근거 문서**: `docs/backend/task.md` 의 「작업」, 「시각」, 「API」, 「화면」, 「알림」, `docs/adr/ADR-073-예약-작업의-결과는-실행마다-새-대화가-기본이고-목록은-작업으로-묶는다.md`, `docs/frontend/shell.md` 의 「대화 목록」, `docs/frontend/structure.md` 의 화면 표, `web/AGENTS.md` 전체.
+**근거 문서**: `docs/backend/task.md` 의 「작업」, 「시각」, 「API」, 「화면」, 「알림」, `docs/adr/ADR-078-예약-작업의-결과는-실행마다-새-대화가-기본이고-목록은-작업으로-묶는다.md`, `docs/frontend/shell.md` 의 「대화 목록」, `docs/frontend/structure.md` 의 화면 표, `web/AGENTS.md` 전체.
 
 Control Plane API 는 phase 01 이 만들었다. 구현 전에 `backend/src/main/java/com/bifos/assistant/task/presentation/TaskDtos.java` 와 `backend/src/main/java/com/bifos/assistant/chat/presentation/ChatDtos.java` 의 `ConversationView` 를 읽어 칸 이름을 맞춘다.
 

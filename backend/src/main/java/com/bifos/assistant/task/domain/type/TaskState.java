@@ -1,7 +1,7 @@
 package com.bifos.assistant.task.domain.type;
 
 /**
- * 예약 작업의 상태다(ADR-071). DB 에 이름 그대로 저장되므로 값을 바꾸면 마이그레이션이 필요하다.
+ * 예약 작업의 상태다(ADR-076). DB 에 이름 그대로 저장되므로 값을 바꾸면 마이그레이션이 필요하다.
  *
  * <p>무엇이 바꾸는지는 {@code docs/backend/task.md} 의 「작업」 이 갖는다.
  */

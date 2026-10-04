@@ -35,7 +35,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /**
- * {@code QUEUED} 발화를 작업 주인의 대화 turn 으로 연다(ADR-071).
+ * {@code QUEUED} 발화를 작업 주인의 대화 turn 으로 연다(ADR-076).
  *
  * <p>규칙은 {@code docs/backend/task.md} 의 「시작」 이 갖는다. 상태 판정과 건너뛰기와 대화 준비는 줄을 잠그고 다시 읽는 짧은
  * 트랜잭션이다. turn 은 그 밖에서 가상 스레드로 돌고, 위임 결과를 전하는 자동 turn 과 같은 모양이다

@@ -45,7 +45,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
 
 /**
- * 작업이 만든 대화가 대화 응답에 작업의 공개 식별자와 이름을 싣는지 본다(ADR-073).
+ * 작업이 만든 대화가 대화 응답에 작업의 공개 식별자와 이름을 싣는지 본다(ADR-078).
  *
  * <p>목록, 단건, 이름 바꾸기, 모델 고르기 응답은 같은 줄 모양을 쓴다. 웹이 이름 바꾸기 응답으로 목록의 줄을 통째로 바꾸므로 모두
  * 작업 칸을 실어야 한다.

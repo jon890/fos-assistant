@@ -22,7 +22,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /**
- * 예정 시각이 된 작업의 발화를 {@code task_run} 줄로 한 번만 만든다(ADR-072).
+ * 예정 시각이 된 작업의 발화를 {@code task_run} 줄로 한 번만 만든다(ADR-077).
  *
  * <p>규칙은 {@code docs/backend/task.md} 의 「발화」 가 갖는다. 발화는 짧은 트랜잭션이고 turn 은 {@link TaskRunStarter} 가
  * 트랜잭션 밖에서 연다. trigger 마다 트랜잭션 하나에서 줄을 잠그고 다시 읽는다. 한 trigger 의 실패는 그 trigger 만

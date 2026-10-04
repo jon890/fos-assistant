@@ -1,4 +1,4 @@
-## ADR-072: 발화는 trigger 와 예정 시각의 유일 제약으로 한 번만 만들고 놓친 발화는 작업마다 정한다
+## ADR-077: 발화는 trigger 와 예정 시각의 유일 제약으로 한 번만 만들고 놓친 발화는 작업마다 정한다
 
 - **status**: `accepted`
 - **결정**: 발화 하나는 `task_run` 줄 하나다. `(trigger_id, scheduled_for)` 에 유일 제약을 둔다.

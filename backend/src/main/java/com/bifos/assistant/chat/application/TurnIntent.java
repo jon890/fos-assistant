@@ -48,7 +48,7 @@ public sealed interface TurnIntent {
     }
 
     /**
-     * 예약 작업이 사람 없이 연 turn 이다(ADR-071). 작업의 지시가 사용자 메시지로 들어간다.
+     * 예약 작업이 사람 없이 연 turn 이다(ADR-076). 작업의 지시가 사용자 메시지로 들어간다.
      *
      * @param notice 사용자 메시지 앞에 대화에 남기는 알림 줄의 글
      */

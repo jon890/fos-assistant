@@ -24,7 +24,7 @@ import org.hibernate.annotations.UuidGenerator;
 import org.hibernate.type.SqlTypes;
 
 /**
- * 발화 한 번이다(ADR-072).
+ * 발화 한 번이다(ADR-077).
  *
  * <p>칸의 뜻은 {@code docs/backend/schema/task.md} 의 「task_run」 이 갖는다. 같은 trigger 의 같은 예정 시각은 한 줄뿐이다.
  *

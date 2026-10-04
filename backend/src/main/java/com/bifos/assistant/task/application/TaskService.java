@@ -40,7 +40,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * 예약 작업을 만들고 고치고 멈추고 지운다(ADR-071, ADR-074).
+ * 예약 작업을 만들고 고치고 멈추고 지운다(ADR-076, ADR-079).
  *
  * <p>계약은 {@code docs/backend/task.md} 의 「작업」, 「시각」, 「API」 가 갖는다. 로그인한 사용자 자신의 작업만 다룬다. 남의
  * 작업, 없는 작업, 지운 작업은 같은 {@code TASK_NOT_FOUND} 다. 모든 시각은 주입받은 {@link Clock} 에서 나온다.

@@ -111,7 +111,7 @@ public class Conversation {
     @Getter
     private int autoTurnCount;
 
-    /** 이 대화를 만든 예약 작업의 번호다. 사용자가 연 대화는 비어 있다(ADR-073). */
+    /** 이 대화를 만든 예약 작업의 번호다. 사용자가 연 대화는 비어 있다(ADR-078). */
     @Column(name = "task_id")
     @Getter
     private Long taskId;

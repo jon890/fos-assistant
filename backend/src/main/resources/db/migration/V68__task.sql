@@ -1,4 +1,4 @@
--- 예약 작업과 그 시각, 발화 한 번을 저장한다(ADR-071, ADR-072). 칸의 뜻은 docs/backend/schema/task.md 가 갖는다.
+-- 예약 작업과 그 시각, 발화 한 번을 저장한다(ADR-076, ADR-077). 칸의 뜻은 docs/backend/schema/task.md 가 갖는다.
 -- 에이전트와 대화는 지워도 행이 남는 표라 task 는 owner_user_id 에만 외래 키를 둔다.
 CREATE TABLE task (
     id BIGINT NOT NULL AUTO_INCREMENT,
@@ -39,7 +39,7 @@ CREATE TABLE task_trigger (
     CONSTRAINT fk_task_trigger_task FOREIGN KEY (task_id) REFERENCES task(id)
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci;
 
--- 발화 한 번이다. 같은 trigger 의 같은 예정 시각은 한 줄뿐이다(ADR-072).
+-- 발화 한 번이다. 같은 trigger 의 같은 예정 시각은 한 줄뿐이다(ADR-077).
 CREATE TABLE task_run (
     id BIGINT NOT NULL AUTO_INCREMENT,
     public_id BINARY(16) NOT NULL,
@@ -64,6 +64,6 @@ CREATE TABLE task_run (
     CONSTRAINT fk_task_run_trigger FOREIGN KEY (trigger_id) REFERENCES task_trigger(id)
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci;
 
--- 이 대화를 만든 예약 작업이다(ADR-073). 사용자가 연 대화는 비어 있다. conversation.agent_id 처럼 외래 키를 두지 않는다.
+-- 이 대화를 만든 예약 작업이다(ADR-078). 사용자가 연 대화는 비어 있다. conversation.agent_id 처럼 외래 키를 두지 않는다.
 ALTER TABLE conversation ADD COLUMN task_id BIGINT NULL;
 CREATE INDEX idx_conversation_task ON conversation (task_id);

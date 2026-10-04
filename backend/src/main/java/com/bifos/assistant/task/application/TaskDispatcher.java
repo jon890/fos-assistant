@@ -8,7 +8,7 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 /**
- * 정해 둔 간격마다 발화기와 시작 단계를 차례로 부른다(ADR-072).
+ * 정해 둔 간격마다 발화기와 시작 단계를 차례로 부른다(ADR-077).
  *
  * <p>간격은 {@code assistant.task.dispatch-cron} 이 정하고 검사에서는 {@code -} 로 끈다. 일정은 기동 정리보다 먼저 돌기
  * 시작하므로 {@link TaskRunRecovery} 가 끝나기 전에는 아무것도 하지 않는다. 같은 예약 작업이 차례로 돌므로 시작 단계가
