@@ -133,8 +133,9 @@ public class AttentionControlService {
     /**
      * 사용자가 항목을 열었거나({@code OPENED}) 단추로 동작한({@code ACTED}) 사건을 남긴다.
      *
-     * <p>지금 후보에 있거나 그 요청자에게 같은 항목의 {@code SHOWN} 사건이 있으면 받는다. 동작이 성공하면 그 항목이 후보에서
-     * 빠지므로, 그 뒤에 보내는 {@code ACTED} 를 잃지 않게 하려는 것이다.
+     * <p>지금 후보에 있거나 그 요청자에게 같은 항목, 같은 상태의 {@code SHOWN} 사건이 있으면 받는다. 동작이 성공하면 그 항목이
+     * 후보에서 빠지므로, 그 뒤에 보내는 {@code ACTED} 를 잃지 않게 하려는 것이다. 상태까지 맞춰 보인 적 없는 상태의 줄이 쌓이지
+     * 않게 한다.
      *
      * @param type 모르는 사건 글이면 null
      */
@@ -146,7 +147,7 @@ public class AttentionControlService {
         }
         AttentionSnapshot snapshot = attention.snapshot(user);
         Judged judged = judgedInCards(snapshot, List.of(CardKey.values()), itemKey)
-                .or(() -> lastShown(user, itemKey))
+                .or(() -> lastShownInState(user, itemKey, stateKey))
                 .or(() -> suppressedInCandidates(snapshot, List.of(CardKey.values()), itemKey))
                 .orElseThrow(AttentionControlService::notFound);
         writer.recordOnce(event(user, itemKey, stateKey, judged, type, snapshot.now()));
@@ -212,9 +213,21 @@ public class AttentionControlService {
         return Optional.empty();
     }
 
-    /** 그 요청자의 그 항목의 가장 최근 {@code SHOWN} 사건의 {@code trigger} 와 판정이다. */
+    /**
+     * 그 요청자의 그 항목의 가장 최근 {@code SHOWN} 사건의 {@code trigger} 와 판정이다.
+     *
+     * <p>숨기기와 미루기 전용이고 상태와 상관없이 본다. 그 요청은 본문에 {@code stateKey} 가 없어 지금 후보의 상태로 사건을 남기므로,
+     * 상태가 바뀐 뒤에도 그 항목이 보였던 판정을 이어 받는다. {@code OPENED} 와 {@code ACTED} 는 {@link #lastShownInState} 를 쓴다.
+     */
     private Optional<Judged> lastShown(CurrentUser user, String itemKey) {
         return events.findFirstByUserIdAndItemKeyAndEventTypeOrderByIdDesc(user.id(), itemKey, AttentionEventType.SHOWN)
+                .map(shown -> new Judged(shown.trigger(), shown.level()));
+    }
+
+    /** 요청자의 {@code SHOWN} 사건 가운데 항목과 상태가 같은 가장 최근 것의 {@code trigger} 와 판정이다. */
+    private Optional<Judged> lastShownInState(CurrentUser user, String itemKey, String stateKey) {
+        return events.findFirstByUserIdAndItemKeyAndStateKeyAndEventTypeOrderByIdDesc(
+                        user.id(), itemKey, stateKey, AttentionEventType.SHOWN)
                 .map(shown -> new Judged(shown.trigger(), shown.level()));
     }
 

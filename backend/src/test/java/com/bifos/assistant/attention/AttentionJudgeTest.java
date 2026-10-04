@@ -185,6 +185,42 @@ class AttentionJudgeTest {
     }
 
     @Test
+    @DisplayName("NOW 와 LATER 가 섞인 후보 12개는 NOW 먼저, 최근 순, 같은 시각은 itemKey 글 순으로 앞 10개만 남는다")
+    void keepsFirstTenInNowRecentAndKeyOrder() {
+        List<AttentionCandidate> mixed = List.of(
+                timed("later:06", false, NOW.minus(Duration.ofMinutes(7))),
+                timed("now:d", true, NOW.minus(Duration.ofMinutes(30))),
+                timed("later:01", false, NOW),
+                timed("later:08", false, NOW.minus(Duration.ofMinutes(9))),
+                timed("now:b", true, NOW.minus(Duration.ofMinutes(1))),
+                timed("later:03", false, NOW.minus(Duration.ofMinutes(3))),
+                timed("later:07", false, NOW.minus(Duration.ofMinutes(8))),
+                timed("now:a", true, NOW.minus(Duration.ofMinutes(1))),
+                timed("later:02", false, NOW.minus(Duration.ofMinutes(2))),
+                timed("now:c", true, NOW.minus(Duration.ofMinutes(5))),
+                timed("later:05", false, NOW.minus(Duration.ofMinutes(6))),
+                timed("later:04", false, NOW.minus(Duration.ofMinutes(4))));
+
+        AttentionCard delegated = card(judge(Map.of(CardKey.DELEGATED, mixed)), CardKey.DELEGATED);
+
+        assertThat(delegated.items())
+                .extracting(AttentionItem::itemKey)
+                .containsExactly(
+                        "now:a",
+                        "now:b",
+                        "now:c",
+                        "now:d",
+                        "later:01",
+                        "later:02",
+                        "later:03",
+                        "later:04",
+                        "later:05",
+                        "later:06");
+        assertThat(delegated.moreCount()).isEqualTo(2);
+        assertThat(delegated.nowCount()).isEqualTo(4);
+    }
+
+    @Test
     @DisplayName("NOW 후보 12개는 항목 10개로 잘려도 카드 nowCount 는 12 이고 맨 위 건수는 카드 nowCount 의 합이다")
     void countsNowBeforeCapAndSumsCards() {
         List<AttentionCard> cards = judge(Map.of(
@@ -263,6 +299,27 @@ class AttentionJudgeTest {
                         null,
                         null))
                 .toList();
+    }
+
+    /** 맡긴 일 카드에 시각을 정한 후보 하나를 만든다. */
+    private static AttentionCandidate timed(String itemKey, boolean nowSignal, Instant at) {
+        return new AttentionCandidate(
+                CardKey.DELEGATED,
+                itemKey,
+                "s",
+                AttentionTrigger.DELEGATION_RUNNING,
+                false,
+                nowSignal,
+                List.of(),
+                AttentionConfidence.CONTROL_PLANE,
+                "여행 일정 짜기",
+                null,
+                null,
+                at,
+                List.of(),
+                null,
+                null,
+                null);
     }
 
     private static AttentionCandidate candidate(

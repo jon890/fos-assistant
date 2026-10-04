@@ -7,7 +7,7 @@
 import { call, expect, expectStatus, step, type Scenario } from "../harness.ts";
 
 type Turn = { conversationId: string };
-type Item = { itemKey: string; stateKey: string; attention: string; conversationId: string | null };
+type Item = { itemKey: string; stateKey: string; attention: string; channel: string; conversationId: string | null };
 type Card = { key: string; status: string; nowCount: number; items: Item[] };
 type View = { nowCount: number; cards: Card[] };
 
@@ -43,13 +43,14 @@ export const attentionScenario: Scenario = {
       context.hermes.clearBusy();
     }
 
-    step("실패 카드에 그 대화가 NOW 로 있고 응답에 오류 코드가 없다");
+    step("실패 카드에 그 대화가 NOW 와 IN_APP 으로 있고 응답에 오류 코드가 없다");
     const viewed = expectStatus(await call(context, "/attention", { token }), 200, "지금 화면");
     expect(!viewed.body.includes("HERMES_BUSY"), `응답에 실행의 오류 코드가 실렸다:\n${viewed.body}`);
     const view = viewed.json<View>();
     const failure = failuresOf(view).find((item) => item.itemKey === itemKey);
     expect(failure !== undefined, `실패 카드에 ${itemKey} 가 없다:\n${viewed.body}`);
     expect(failure!.attention === "NOW", `실패 항목이 NOW 가 아니다: ${failure!.attention}`);
+    expect(failure!.channel === "IN_APP", `실패 항목의 channel 이 IN_APP 이 아니다: ${failure!.channel}`);
     expect(
       failure!.conversationId === started.conversationId,
       `실패 항목의 대화가 다르다: ${failure!.conversationId}`,

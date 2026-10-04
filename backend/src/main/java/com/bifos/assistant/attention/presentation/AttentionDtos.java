@@ -141,12 +141,14 @@ public final class AttentionDtos {
      * 를 잘라 식별자를 얻지 않게 하려는 것이다.
      *
      * @param attention {@code NOW} 나 {@code LATER}
+     * @param channel 항목을 보이는 길. 늘 {@code IN_APP} 이다
      * @param title 평문으로 그린다
      */
     public record ItemView(
             String itemKey,
             String stateKey,
             String attention,
+            String channel,
             String title,
             UUID conversationId,
             String agentName,
@@ -161,6 +163,7 @@ public final class AttentionDtos {
                     item.itemKey(),
                     item.stateKey(),
                     item.level().name(),
+                    item.channel().name(),
                     item.title(),
                     item.conversationId(),
                     item.agentName(),

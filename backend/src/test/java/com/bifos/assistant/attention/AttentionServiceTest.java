@@ -34,6 +34,7 @@ import com.bifos.assistant.hermes.dto.ConnectorManifest;
 import com.bifos.assistant.hermes.dto.ConnectorTool;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.domain.type.UserRole;
+import com.bifos.assistant.shared.util.Sha256;
 import com.bifos.assistant.usage.domain.AgentExecution;
 import com.bifos.assistant.usage.domain.type.ExecutionStatus;
 import com.bifos.assistant.usage.infra.AgentExecutionRepository;
@@ -168,6 +169,8 @@ class AttentionServiceTest {
         SecurityContextHolder.clearContext();
         FAILING.failing = false;
         for (Long userId : createdUsers) {
+            jdbc.update("DELETE FROM attention_event WHERE user_id = ?", userId);
+            jdbc.update("DELETE FROM attention_control WHERE user_id = ?", userId);
             String ownConversations = "(SELECT id FROM conversation WHERE user_id = ?)";
             jdbc.update(
                     "DELETE FROM result_delivery_attempt WHERE delivery_id IN"
@@ -342,6 +345,34 @@ class AttentionServiceTest {
     }
 
     @Test
+    @DisplayName("stateKey 는 실패한 turn 만이면 실행 번호, 결과 전달만이면 묶음 번호와 시도 수, 둘 다면 실행 쪽 앞 글에 둘을 이은 글의 지문이다")
+    void derivesStateKeyFromFailureMaterial() {
+        Conversation turnOnly = conversationOf(dad, "실패한 turn 만 있는 대화");
+        message(ChatMessage.fromUser(turnOnly.id(), dad.id(), "목록 정리해 줘", NOW.minusSeconds(600)));
+        AgentExecution turnOnlyFailed = failedRoot(dad, turnOnly, NOW.minusSeconds(600), NOW.minusSeconds(540));
+        Conversation deliveryOnly = conversationOf(dad, "결과 전달만 실패한 대화");
+        ResultDelivery deliveryOnlyFailed = deliveryOf(deliveryOnly, DeliveryStatus.FAILED, NOW.minusSeconds(120));
+        Conversation both = conversationOf(dad, "둘 다 실패한 대화");
+        message(ChatMessage.fromUser(both.id(), dad.id(), "일정 정리해 줘", NOW.minusSeconds(500)));
+        AgentExecution bothFailed = failedRoot(dad, both, NOW.minusSeconds(500), NOW.minusSeconds(450));
+        ResultDelivery bothDelivery = deliveryOf(both, DeliveryStatus.FAILED, NOW.minusSeconds(60));
+
+        List<AttentionItem> items = card(service.view(dad), CardKey.FAILURES).items();
+
+        assertThat(items)
+                .extracting(AttentionItem::conversationId, AttentionItem::stateKey)
+                .containsExactlyInAnyOrder(
+                        tuple(turnOnly.publicId(), Sha256.hex16("EXECUTION_FAILED|" + turnOnlyFailed.id())),
+                        tuple(
+                                deliveryOnly.publicId(),
+                                Sha256.hex16("DELIVERY_FAILED|" + deliveryOnlyFailed.id() + "|1")),
+                        tuple(
+                                both.publicId(),
+                                Sha256.hex16("EXECUTION_FAILED|" + bothFailed.id() + "|DELIVERY_FAILED|"
+                                        + bothDelivery.id() + "|1")));
+    }
+
+    @Test
     @DisplayName("DELIVERING 과 STOPPED 와 DELIVERED 묶음은 실패 카드에 없다")
     void skipsNonFailedDeliveries() {
         deliveryOf(conversationOf(dad, "전달 중인 대화"), DeliveryStatus.DELIVERING, NOW.minusSeconds(60));
@@ -483,7 +514,7 @@ class AttentionServiceTest {
 
         String body = JsonMapper.builder().build().writeValueAsString(controller.view());
 
-        assertThat(body).contains("\"key\":\"failures\"", "\"attention\":\"NOW\"");
+        assertThat(body).contains("\"key\":\"failures\"", "\"attention\":\"NOW\"", "\"channel\":\"IN_APP\"");
         assertThat(body)
                 .doesNotContain("errorCode", "\"model\"", "estimatedCostMicros", "HERMES_BUSY", "example-model");
     }

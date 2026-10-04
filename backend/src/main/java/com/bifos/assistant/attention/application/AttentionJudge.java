@@ -2,6 +2,7 @@ package com.bifos.assistant.attention.application;
 
 import com.bifos.assistant.attention.application.model.AttentionCandidate;
 import com.bifos.assistant.attention.application.model.AttentionCard;
+import com.bifos.assistant.attention.application.model.AttentionChannel;
 import com.bifos.assistant.attention.application.model.AttentionConfidence;
 import com.bifos.assistant.attention.application.model.AttentionControl;
 import com.bifos.assistant.attention.application.model.AttentionItem;
@@ -118,6 +119,7 @@ public class AttentionJudge {
                 candidate.itemKey(),
                 candidate.stateKey(),
                 now ? AttentionLevel.NOW : AttentionLevel.LATER,
+                AttentionChannel.IN_APP,
                 candidate.trigger(),
                 candidate.title(),
                 candidate.conversationId(),

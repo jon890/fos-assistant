@@ -59,7 +59,7 @@
 | `item_key` | VARCHAR(80) | |
 | `state_key` | VARCHAR(64) | |
 | `trigger_type` | VARCHAR(32) | 판정의 `trigger` |
-| `attention` | VARCHAR(16) | 그때의 판정. `NOW`, `LATER`. 숨겼거나 미뤄 응답에 없던 항목에 한 일이면 `SUPPRESSED` |
+| `attention` | VARCHAR(16) | 그때의 판정. `NOW`, `LATER`, `SUPPRESSED`. 정하는 차례는 표 아래에 있다 |
 | `event_type` | VARCHAR(16) | `SHOWN`, `OPENED`, `ACTED`, `HIDDEN`, `SNOOZED` |
 | `stale` | BOOLEAN NOT NULL DEFAULT FALSE | 그때 출처의 신선도가 `STALE` 이었다 |
 | `created_at` | DATETIME(6) | |
@@ -67,6 +67,14 @@
 | 제약 | 칸 | 막는 것 |
 | --- | --- | --- |
 | `uk_attention_event_once` | `user_id`, `item_key`, `state_key`, `event_type`, `attention` | 화면을 열 때마다 같은 사건이 쌓이는 것. 같은 상태에서 `LATER` 가 `NOW` 로 바뀌면 `NOW` 의 `SHOWN` 이 따로 남는다 |
+
+`attention` 은 아래를 차례로 보고 처음 맞는 것을 쓴다.
+
+1. 지금 응답에 그 항목이 있으면 그 판정이다. `HIDDEN`, `SNOOZED` 는 요청의 카드 안에서만 찾는다.
+2. 없으면 그 요청자가 그 항목으로 남긴 가장 최근 `SHOWN` 의 판정이다. `OPENED`, `ACTED` 는 `stateKey` 까지 같은 `SHOWN` 만 보고, `HIDDEN`, `SNOOZED` 는 상태와 상관없이 본다.
+3. 그것도 없고 숨겼거나 미뤄 억제 전 후보에만 있으면 `SUPPRESSED` 다.
+
+그래서 한 번 보였다가 숨긴 항목의 사건은 `SUPPRESSED` 가 아니라 그때 보인 `NOW` 나 `LATER` 로 남는다.
 
 `created_at` 에 색인을 둔다. 보관 기간이 지난 줄을 지울 때 쓴다.
 제목과 본문을 담는 칸이 없다.

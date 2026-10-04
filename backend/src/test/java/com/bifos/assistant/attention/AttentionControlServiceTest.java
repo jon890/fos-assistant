@@ -314,6 +314,18 @@ class AttentionControlServiceTest {
     }
 
     @Test
+    @DisplayName("후보에서 빠진 항목에 보인 적 없는 stateKey 로 ACTED 를 보내면 ATTENTION_ITEM_NOT_FOUND 이고 사건이 없다")
+    void rejectsActedWithUnshownStateAfterApprovalLeftCandidates() {
+        shownThenApprovedAction();
+        AttentionItem approval = shownApproval;
+
+        assertCode(
+                () -> controls.record(dad, approval.itemKey(), "0123456789abcdef", AttentionEventType.ACTED),
+                ErrorCode.ATTENTION_ITEM_NOT_FOUND);
+        assertThat(events(AttentionEventType.ACTED)).isEmpty();
+    }
+
+    @Test
     @DisplayName("같은 ACTED 를 두 번 보내도 사건은 한 줄이다")
     void keepsOneRowForRepeatedActed() {
         shownThenApprovedAction();
