@@ -1,0 +1,193 @@
+package com.bifos.assistant.proactive.application;
+
+import com.bifos.assistant.proactive.application.model.CheckResultBlock;
+import com.bifos.assistant.proactive.application.model.CheckResultBlock.Finding;
+import com.bifos.assistant.proactive.application.model.CheckResultBlock.Next;
+import com.bifos.assistant.proactive.domain.type.CheckOutcome;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Optional;
+import org.springframework.stereotype.Component;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.json.JsonMapper;
+
+/**
+ * 살펴보기 답 끝의 {@code <fos-check-result>} 블록을 읽는다. 형식은 ADR-078 과 {@code docs/backend/proactive-check.md}
+ * 의 「결과 계약」 이 갖는다.
+ *
+ * <p>상한을 넘는 글은 잘라 읽고 넘는 배열 원소는 버린다. 블록을 읽지 못한 것으로 보는 경우는 JSON 이 아니거나,
+ * {@code version} 이 1 이 아니거나, {@code outcome} 이 없거나 모르는 값일 때뿐이다. 읽지 못해도 예외를 밖으로 던지지 않는다.
+ */
+@Component
+public class CheckResultParser {
+
+    public static final String OPEN_TAG = "<fos-check-result>";
+    public static final String CLOSE_TAG = "</fos-check-result>";
+
+    private static final JsonMapper JSON = JsonMapper.builder().build();
+    private static final String CODE_FENCE = "```";
+
+    private static final int SUMMARY_MAX = 300;
+    private static final int QUESTION_MAX = 300;
+    private static final int FOLLOW_UP_MAX = 200;
+    private static final int SOURCE_FAILURE_MAX = 200;
+    private static final int FINDINGS_MAX = 5;
+    private static final int QUESTIONS_MAX = 3;
+    private static final int FOLLOW_UPS_MAX = 3;
+    private static final int SOURCE_FAILURES_MAX = 5;
+
+    private static final int AREA_MAX = 40;
+    private static final int TOPIC_KEY_MAX = 120;
+    private static final int TITLE_MAX = 120;
+    private static final int SOURCE_URL_MAX = 2000;
+    private static final int WHY_IT_MATTERS_MAX = 600;
+    private static final int ITEM_MAX = 300;
+    private static final int ITEMS_MAX = 6;
+    private static final int NEXT_TEXT_MAX = 300;
+    private static final int CHANGE_SINCE_LAST_MAX = 300;
+    /** 계약에 상한이 없는 짧은 칸(시각, 신선도, next 종류)이 끝없이 길어지지 않게 하는 값이다. */
+    private static final int SHORT_FIELD_MAX = 64;
+
+    /** 마지막 블록을 읽는다. 블록이 없거나 읽지 못하면 빈 값이다. */
+    public Optional<CheckResultBlock> parse(String answer) {
+        if (answer == null) {
+            return Optional.empty();
+        }
+        int open = answer.lastIndexOf(OPEN_TAG);
+        if (open < 0) {
+            return Optional.empty();
+        }
+        int bodyStart = open + OPEN_TAG.length();
+        int close = answer.indexOf(CLOSE_TAG, bodyStart);
+        if (close < 0) {
+            return Optional.empty();
+        }
+        String body = stripFence(answer.substring(bodyStart, close).strip());
+        JsonNode root;
+        try {
+            root = JSON.readTree(body);
+        } catch (JacksonException ex) {
+            return Optional.empty();
+        }
+        if (root == null || !root.isObject()) {
+            return Optional.empty();
+        }
+        JsonNode version = root.get("version");
+        if (version == null || !version.isIntegralNumber() || version.asInt() != 1) {
+            return Optional.empty();
+        }
+        Optional<CheckOutcome> outcome = outcomeOf(root.get("outcome"));
+        if (outcome.isEmpty()) {
+            return Optional.empty();
+        }
+        return Optional.of(new CheckResultBlock(
+                1,
+                outcome.get(),
+                text(root.get("summary"), SUMMARY_MAX),
+                findings(root.get("findings")),
+                texts(root.get("questions"), QUESTIONS_MAX, QUESTION_MAX),
+                texts(root.get("followUpCandidates"), FOLLOW_UPS_MAX, FOLLOW_UP_MAX),
+                texts(root.get("sourceFailures"), SOURCE_FAILURES_MAX, SOURCE_FAILURE_MAX)));
+    }
+
+    /** 앞뒤를 코드 울타리({@code ```json} 등)로 감쌌으면 벗긴다. */
+    private static String stripFence(String body) {
+        if (!body.startsWith(CODE_FENCE)) {
+            return body;
+        }
+        int lineEnd = body.indexOf('\n');
+        String inner = lineEnd < 0 ? "" : body.substring(lineEnd + 1).strip();
+        return inner.endsWith(CODE_FENCE)
+                ? inner.substring(0, inner.length() - CODE_FENCE.length()).strip()
+                : inner;
+    }
+
+    /** 모델이 내는 값은 {@code FINDINGS} 와 {@code NOTHING_NEW} 뿐이다. {@code INVALID_RESULT} 는 이 코드가 정하는 값이다. */
+    private static Optional<CheckOutcome> outcomeOf(JsonNode node) {
+        String value = text(node, SHORT_FIELD_MAX);
+        if (CheckOutcome.FINDINGS.name().equals(value)) {
+            return Optional.of(CheckOutcome.FINDINGS);
+        }
+        if (CheckOutcome.NOTHING_NEW.name().equals(value)) {
+            return Optional.of(CheckOutcome.NOTHING_NEW);
+        }
+        return Optional.empty();
+    }
+
+    private static List<Finding> findings(JsonNode array) {
+        List<Finding> found = new ArrayList<>();
+        if (array == null || !array.isArray()) {
+            return found;
+        }
+        for (JsonNode element : array) {
+            if (found.size() >= FINDINGS_MAX) {
+                break;
+            }
+            if (element.isObject()) {
+                found.add(finding(element));
+            }
+        }
+        return List.copyOf(found);
+    }
+
+    private static Finding finding(JsonNode node) {
+        return new Finding(
+                text(node.get("area"), AREA_MAX),
+                text(node.get("topicKey"), TOPIC_KEY_MAX),
+                text(node.get("title"), TITLE_MAX),
+                text(node.get("sourceUrl"), SOURCE_URL_MAX),
+                text(node.get("checkedAt"), SHORT_FIELD_MAX),
+                text(node.get("publishedAt"), SHORT_FIELD_MAX),
+                text(node.get("freshness"), SHORT_FIELD_MAX),
+                text(node.get("whyItMatters"), WHY_IT_MATTERS_MAX),
+                texts(node.get("facts"), ITEMS_MAX, ITEM_MAX),
+                texts(node.get("inferences"), ITEMS_MAX, ITEM_MAX),
+                texts(node.get("unknowns"), ITEMS_MAX, ITEM_MAX),
+                next(node.get("next")),
+                text(node.get("changeSinceLast"), CHANGE_SINCE_LAST_MAX));
+    }
+
+    private static Next next(JsonNode node) {
+        if (node == null || !node.isObject()) {
+            return null;
+        }
+        return new Next(text(node.get("type"), SHORT_FIELD_MAX), text(node.get("text"), NEXT_TEXT_MAX));
+    }
+
+    /** 문자열 칸만 읽는다. 문자열이 아니거나 비어 있으면 {@code null} 이다. 앞뒤 공백은 벗기고 상한에서 자른다. */
+    private static String text(JsonNode node, int max) {
+        if (node == null || !node.isString()) {
+            return null;
+        }
+        String value = node.asString().strip();
+        return value.isEmpty() ? null : clip(value, max);
+    }
+
+    /** 문자열 원소만 모은다. 문자열이 아니거나 빈 원소는 건너뛰고, 상한을 넘는 원소는 버린다. */
+    private static List<String> texts(JsonNode array, int maxItems, int maxLength) {
+        List<String> items = new ArrayList<>();
+        if (array == null || !array.isArray()) {
+            return items;
+        }
+        for (JsonNode element : array) {
+            if (items.size() >= maxItems) {
+                break;
+            }
+            String value = text(element, maxLength);
+            if (value != null) {
+                items.add(value);
+            }
+        }
+        return List.copyOf(items);
+    }
+
+    /** UTF-16 대리쌍 한가운데에서 자르지 않는다. */
+    private static String clip(String value, int max) {
+        if (value.length() <= max) {
+            return value;
+        }
+        int end = Character.isHighSurrogate(value.charAt(max - 1)) ? max - 1 : max;
+        return value.substring(0, end);
+    }
+}
