@@ -227,6 +227,11 @@ export function visibleNowCount(
   return Math.max(0, card.nowCount - controlled);
 }
 
+/** 관리자 지표의 비율이다. 전체가 0 이면 나눌 수 없어 「-」 다 */
+export function ratioText(part: number, whole: number): string {
+  return whole === 0 ? "-" : `${Math.round((part * 100) / whole)}%`;
+}
+
 /** 사이드바 「지금 볼 것」 링크의 접근성 이름이다 */
 export function nowLinkLabel(nowCount: number): string {
   return nowCount > 0 ? `지금 볼 것 ${nowCount}건` : "지금 볼 것";

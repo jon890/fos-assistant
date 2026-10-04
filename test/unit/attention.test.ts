@@ -11,6 +11,7 @@ import {
   nowLinkLabel,
   originText,
   pruneControls,
+  ratioText,
   reasonText,
   seoulInputToIso,
   snoozeUntil,
@@ -229,4 +230,11 @@ test("할 일 식별자가 없는 할 일 항목에는 단추가 없다", () => 
   for (const trigger of ["FOLLOW_UP_PROPOSED", "FOLLOW_UP_OPEN"]) {
     assert.deepEqual(itemActions(item({ why: why(trigger, []), followUp: null })), [], trigger);
   }
+});
+
+test("비율은 반올림한 퍼센트이고 전체가 0 이면 대시다", () => {
+  assert.equal(ratioText(1, 4), "25%");
+  assert.equal(ratioText(2, 3), "67%");
+  assert.equal(ratioText(0, 5), "0%");
+  assert.equal(ratioText(0, 0), "-");
 });

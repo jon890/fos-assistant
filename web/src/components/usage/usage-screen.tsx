@@ -4,6 +4,10 @@ import {
   ExecutionList,
   type UsageExecution,
 } from "@/components/usage/execution-list";
+import {
+  AttentionMetricsSection,
+  type AttentionMetrics,
+} from "@/components/usage/attention-metrics-section";
 import { FingerprintSection } from "@/components/usage/fingerprint-section";
 import {
   LatencySection,
@@ -42,6 +46,7 @@ export async function UsageScreen({
     breakdownResult,
     fingerprintResult,
     latencyResult,
+    attentionResult,
     skillsResult,
   ] = await Promise.all([
     callControlPlane<UsageExecution[]>("/api/v1/usage/executions?limit=50"),
@@ -54,6 +59,11 @@ export async function UsageScreen({
       : null,
     isAdmin && tab === "summary"
       ? callControlPlane<LatencySummary>("/api/v1/admin/usage/latency?days=30")
+      : null,
+    isAdmin && tab === "summary"
+      ? callControlPlane<AttentionMetrics>(
+          "/api/v1/admin/attention/metrics?days=30",
+        )
       : null,
     tab === "skills"
       ? callControlPlane<SkillUsageRow[]>("/api/v1/usage/skills")
@@ -94,6 +104,13 @@ export async function UsageScreen({
               <LatencySection summary={latencyResult.data} />
             ) : (
               <p className="mb-8 text-sm">{latencyResult.message}</p>
+            )
+          ) : null}
+          {attentionResult ? (
+            attentionResult.ok ? (
+              <AttentionMetricsSection metrics={attentionResult.data} />
+            ) : (
+              <p className="mb-8 text-sm">{attentionResult.message}</p>
             )
           ) : null}
         </>
