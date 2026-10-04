@@ -32,8 +32,9 @@ Control Plane 에 `notification` 패키지를 만든다. 승인이 필요한 커
 만료는 `B/connector/application/ConnectorActionService.java` 의 `public int expire(Instant now)` 다. 줄마다 `transactions.execute(... findByPublicIdForUpdate ... action.expire(now) ... actions.save(action))` 로 잠그고 바꾼 뒤 `publish(changed.get())` 한다.
 `B/connector/application/ConnectorActionExpirer.java` 가 1분마다 부른다.
 
-도구 제목은 승인 카드가 쓰는 제목과 같아야 한다. 카드의 제목은 `ConnectorActionService` 가 커넥터 선언의 도구 정책 제목(`ToolPolicy::title`)으로 채우고, 대화 알림 줄은 `ConnectorActionListener.closureNotice` 가 `closure.title()` 을 「」 로 감싼다.
-`decide` 안에서는 판정에 쓴 선언 도구 정책을 이미 갖고 있다. 그 제목이 없으면 `hermesTool` 을 쓴다. 만료 쪽은 `ConnectorActionService` 가 카드 제목을 계산하는 방식을 그대로 쓴다. 구현 전에 두 곳에서 제목을 얻는 코드를 읽고 같은 값이 나오게 한다.
+도구 제목은 승인 카드가 쓰는 제목과 같아야 한다. 카드의 제목은 `B/connector/application/model/ConnectorActionView.java` 가 정한다. 선언의 도구 제목(`ToolPolicy::title`)이 없거나 공백이면 `ConnectorActionView.UNNAMED_TITLE`(「이름 없는 동작」)이다. `hermesTool` 은 쓰지 않는다. 대화 알림 줄은 `ConnectorActionListener.closureNotice` 가 그 제목을 「」 로 감싼다.
+`decide` 안에서 선언 도구 정책은 `ConnectorToolPolicies.find(value, confirmedTool)` 로 람다 안에서만 계산된다. 지역 변수로 꺼내 제목을 얻는다. 같은 대체 규칙을 쓰도록 `ConnectorActionView` 에 제목만 계산하는 정적 도우미를 두고 두 곳이 함께 부른다.
+만료 쪽은 manifest 를 읽어야 제목을 얻는다. 행을 잠근 트랜잭션 안에서 카탈로그를 읽지 않는다(같은 클래스의 `revokeClosedGrants` 가 지키는 규칙). `expire` 가 만료 대상 줄을 읽은 뒤 트랜잭션에 들어가기 전에 커넥터별로 manifest 를 한 번 읽어 둔다. 읽지 못하면 그 커넥터의 제목은 `UNNAMED_TITLE` 이다. `beginApproval` 의 즉시 만료 경로는 이미 트랜잭션 안에서 읽으므로 그대로 둔다.
 
 새 마이그레이션 번호는 `V66` 이다. 구현 전에 `ls backend/src/main/resources/db/migration | sort -V | tail -3` 과 `gh pr list --state open` 으로 다른 브랜치가 V66 을 쥐지 않았는지 확인한다. 쥐었으면 다음 빈 번호를 쓴다.
 마이그레이션 규칙은 `docs/backend/schema/README.md` 의 「마이그레이션 작성 규칙」 이다. 새 표는 `ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci` 를 적는다. 엔티티와 마이그레이션의 칸 타입을 맞춘다(`backend/AGENTS.md` 의 「엔티티와 마이그레이션은 따로 논다」).
@@ -58,16 +59,18 @@ Control Plane 에 `notification` 패키지를 만든다. 승인이 필요한 커
 
 | 파일 | 내용 |
 | --- | --- |
-| `domain/Notification.java` | 엔티티. 정적 팩토리 `Notification.of(Long userId, NotificationKind kind, String title, String body, NotificationTarget target, Instant now)`. `markRead(Instant now)` 는 이미 읽었으면 바꾸지 않는다. 손 접근자는 Lombok 으로 만든다(Checkstyle `entityHandwrittenAccessor`) |
+| `domain/Notification.java` | 엔티티. 정적 팩토리 `Notification.of(Long userId, NotificationKind kind, String title, String body, NotificationTarget target, Instant now)`. `title` 은 200자, `body` 는 500자를 넘으면 잘라 저장한다. `markRead(Instant now)` 는 이미 읽었으면 바꾸지 않는다. 손 접근자는 Lombok 으로 만든다(Checkstyle `entityHandwrittenAccessor`) |
 | `domain/type/NotificationKind.java` | `APPROVAL_REQUESTED`, `APPROVAL_EXPIRED`. `@Enumerated(EnumType.STRING)` 으로 저장한다 |
 | `domain/type/NotificationTargetType.java` | `CONVERSATION` |
 | `domain/NotificationTarget.java` | `record NotificationTarget(NotificationTargetType type, UUID publicId)`. 엔티티에는 두 칸으로 펼쳐 저장한다. 갈 곳이 없으면 `null` 을 넘기고 두 칸을 비운다 |
 | `infra/NotificationRepository.java` | `findByPublicIdAndUserId`, 커서 페이지 조회(만든 시각 역순, 같은 시각이면 `id` 역순), `countByUserIdAndReadAtIsNull`, 사용자의 읽지 않은 줄을 한 번에 읽음으로 바꾸는 update 쿼리, `deleteByCreatedAtBefore` |
 | `application/NotificationService.java` | 아래 표 |
 | `application/NotificationEventHub.java` | 사용자 번호를 키로 하는 구독 허브. `Runnable subscribe(Long userId, Consumer<NotificationEvent>)`, `void publish(Long userId, NotificationEvent)` |
-| `application/NotificationEvent.java` | `record NotificationEvent(String type, UUID notificationId, long unreadCount)`. 정적 팩토리 `created(UUID, long)`, `read(long)` |
+| `application/NotificationEvent.java` | `record NotificationEvent(String type, UUID notificationId, long unreadCount)`. 정적 팩토리 `created(UUID, long)`, `read(long)`. `notificationId` 에 `@JsonInclude(JsonInclude.Include.NON_NULL)` 을 단다(Jackson 3, `com.fasterxml.jackson.annotation` 의 애너테이션은 그대로다. 저장소의 다른 `@JsonInclude` 사용처를 `git grep JsonInclude` 로 찾아 같은 import 를 쓴다). 저장소에 null 칸을 빼는 전역 설정이 없다 |
+| `application/NotificationPage.java` | `record NotificationPage(List<Notification> items, String nextCursor, long unreadCount)`. 서비스 안에 중첩 타입으로 두지 않는다(`ArchitectureRules.SERVICES_DO_NOT_EXPOSE_NESTED_TYPES`) |
+| `application/NotificationCursor.java` | 커서를 만들고 읽는다. `B/chat/application/ConversationCursor.java` 와 같은 방식(만든 시각과 번호). 형식이 틀린 커서는 `ApiException(VALIDATION_FAILED)` |
 | `application/NotificationCleaner.java` | `@Scheduled(cron = "${assistant.notification.cleanup-cron}")` 의 `runScheduled()`, 본체 `int cleanExpired(Instant now)` 가 `now - retention` 보다 오래된 줄을 지운다 |
-| `application/NotificationProperties.java` | `@ConfigurationProperties("assistant.notification")` record. `retention`(기본 `90d`), `cleanupCron`, `streamHeartbeat`(기본 `20s`) |
+| `application/NotificationProperties.java` | `@Validated` 와 `@ConfigurationProperties("assistant.notification")` record(`ArchitectureRules.CONFIGURATION_PROPERTIES_ARE_VALIDATED`). `retention`(기본 `90d`), `cleanupCron`, `streamHeartbeat`(기본 `20s`) |
 | `presentation/NotificationController.java` | 아래 API. 경로와 권한과 흐름만 둔다 |
 | `presentation/NotificationDtos.java` | `NotificationView`, `NotificationPageView`, `UnreadCountView` |
 | `presentation/NotificationEventStreams.java` | 사용자 단위 SSE 를 여는 도우미. `ChatEventStreams.follow` 와 같은 동작 |
@@ -104,15 +107,17 @@ SSE 의 `data:` JSON 은 `{"type":"created","notificationId":"...","unreadCount"
 ### 5. 승인 요청과 만료에 알림을 붙인다
 
 - `ConnectorPolicyService.decide`: 새 승인 줄을 `saveAndFlush` 하는 같은 `transactions.execute` 안에서, `needsApproval && saved.conversationId() != null` 이면 `notifications.notify(saved.userId(), APPROVAL_REQUESTED, "승인을 기다리는 요청이 있어요", "「" + 도구 제목 + "」", new NotificationTarget(CONVERSATION, 대화 공개 식별자))` 를 부른다.
-  대화 공개 식별자는 `connector` 가 이미 쓰는 길로 읽는다. `B/chat/application/ConversationNotices.java` 의 `publicIdOf(Long)` 가 있다(`connector` 는 `chat` 위라 쓸 수 있다).
+  대화 공개 식별자는 `B/chat/application/ConversationNotices.java` 의 `publicIdOf(Long)` 로 읽는다(`connector` 는 `chat` 위라 쓸 수 있다). 이 메서드는 `Optional<UUID>` 를 돌려주고 대화가 없거나 지워졌으면 비어 있다. **비어 있으면 알림을 남기지 않는다.**
   재사용한 `PENDING` 줄과 유니크 충돌로 돌려받은 줄에서는 부르지 않는다.
 - `ConnectorActionService.expire`: 줄을 잠그고 `action.expire(now)` 한 같은 트랜잭션 안에서, `conversationId` 가 있으면 `APPROVAL_EXPIRED` 를 「승인 요청이 만료됐어요」 와 「도구 제목」 으로 남긴다.
+  만료 쪽도 `publicIdOf` 가 비어 있으면 알림을 남기지 않는다.
   승인하려다 이미 만료돼 `beginApproval` 이 바로 `expire` 하는 경로도 같은 알림을 남긴다. 그 경로를 찾아 같은 도우미를 부른다.
 - 두 곳 모두 알림 저장이 실패하면 트랜잭션이 되돌아간다. 따로 잡지 않는다.
 
 ### 6. 층 순서와 설정
 
 - `backend/src/test/java/com/bifos/assistant/architecture/TopLevelPackageOrder.java` 의 `ORDER` 에 `"notification"` 을 `"user"` 바로 뒤에 넣는다.
+- `backend/src/test/java/com/bifos/assistant/architecture/TopLevelPackageOrderTest.java` 의 개수 단언을 고친다. `allowsTopPackageToUseEveryOtherPackage` 의 `hasSize(12)` 를 13 으로, `orderHasThirteenDistinctPackages` 의 두 `hasSize(13)` 을 14 로. 메서드 이름을 `orderHasFourteenDistinctPackages` 로, `@DisplayName` 의 「열셋」 을 「열넷」 으로 바꾼다.
 - `backend/src/main/resources/application.yml` 의 `assistant:` 아래에 `notification:` 을 더한다. `retention: 90d`, `cleanup-cron: "0 30 4 * * *"`, `stream-heartbeat: 20s`. 각 키 위에 한 줄 주석을 단다.
 - `backend/src/test/resources/application-test.yml` 에 `assistant.notification.cleanup-cron: "-"` 를 더한다.
 
@@ -122,10 +127,10 @@ SSE 의 `data:` JSON 은 `{"type":"created","notificationId":"...","unreadCount"
 
 | 파일 | 확인하는 것 |
 | --- | --- |
-| `NotificationServiceTest.java` | 알림을 저장하면 커밋 뒤 그 사용자 구독자만 `created` 와 읽지 않은 수를 받는다. 트랜잭션이 되돌아가면 줄도 사건도 없다. 트랜잭션 밖에서 `notify` 를 부르면 실패한다. 커서 페이지가 만든 시각 역순이고 다음 쪽이 이어진다. `limit` 0 과 101 은 `VALIDATION_FAILED`. 남의 알림 읽음 표시는 `NOTIFICATION_NOT_FOUND`. 이미 읽은 줄을 다시 읽어도 `read_at` 이 바뀌지 않는다. 모두 읽음 뒤 읽지 않은 수가 0 이다 |
+| `NotificationServiceTest.java` | 알림을 저장하면 커밋 뒤 그 사용자 구독자만 `created` 와 읽지 않은 수를 받는다. 형식이 틀린 커서는 `VALIDATION_FAILED`. 201자 제목과 501자 본문이 칸 길이로 잘려 저장된다. 트랜잭션이 되돌아가면 줄도 사건도 없다. 트랜잭션 밖에서 `notify` 를 부르면 실패한다. 커서 페이지가 만든 시각 역순이고 다음 쪽이 이어진다. `limit` 0 과 101 은 `VALIDATION_FAILED`. 남의 알림 읽음 표시는 `NOTIFICATION_NOT_FOUND`. 이미 읽은 줄을 다시 읽어도 `read_at` 이 바뀌지 않는다. 모두 읽음 뒤 읽지 않은 수가 0 이다 |
 | `NotificationCleanerTest.java` | `Clock.fixed` 로 시각을 고정하고 보관 기간보다 오래된 줄만 지운다. 읽지 않은 오래된 줄도 지운다 |
-| `NotificationControllerTest.java` | 목록, 읽음, 모두 읽음의 응답 모양. 형식이 틀린 `notificationId` 는 400 `VALIDATION_FAILED`. SSE 경로가 `text/event-stream` 으로 열리고 첫 주석 `connected` 를 보낸다(`ConversationEventControllerTest` 의 standaloneSetup 방식) |
-| `ApprovalNotificationTest.java` | `ConnectorPolicyService.decide` 로 승인 줄을 만들면 `APPROVAL_REQUESTED` 가 하나 생기고 대상이 그 대화다. 같은 호출을 다시 판정하면 알림이 늘지 않는다. 대화 없는 실행의 승인 줄은 알림이 없다. `expire(now)` 가 줄을 만료하면 `APPROVAL_EXPIRED` 가 하나 생긴다. 이 파일은 `backend/src/test/java/com/bifos/assistant/connector/` 에 둔다. `ConnectorPolicyTestDoubles.java` 와 `ConnectorActionServiceTest.java` 의 준비 방식을 따른다 |
+| `NotificationControllerTest.java` | 목록, 읽음, 모두 읽음의 응답 모양. 형식이 틀린 `notificationId` 는 400 `VALIDATION_FAILED`. SSE 경로가 `text/event-stream` 으로 열리고 첫 주석 `connected` 를 보낸다(`ConversationEventControllerTest` 의 standaloneSetup 방식). `read` 사건의 JSON 에 `notificationId` 키가 없고 `created` 사건에는 있다 |
+| `ApprovalNotificationTest.java` | 실제 `Conversation` 을 저장하고 승인 줄의 실행이 그 대화 번호를 갖게 준비한다. 기존 `ConnectorActionServiceTest` 는 없는 대화 번호(`CONVERSATION = 7L`)를 쓰므로 그 검사는 알림 없이 그대로 통과해야 한다. `ConnectorPolicyService.decide` 로 승인 줄을 만들면 `APPROVAL_REQUESTED` 가 하나 생기고 대상이 그 대화다. 같은 호출을 다시 판정하면 알림이 늘지 않는다. 대화 없는 실행의 승인 줄은 알림이 없다. `expire(now)` 가 줄을 만료하면 `APPROVAL_EXPIRED` 가 하나 생기고 본문이 카드 제목과 같다. 선언 제목이 없는 도구는 「이름 없는 동작」 이다. 지운 대화의 승인 줄은 알림이 없다. 이 파일은 `backend/src/test/java/com/bifos/assistant/connector/` 에 둔다. `ConnectorPolicyTestDoubles.java` 와 `ConnectorActionServiceTest.java` 의 준비 방식을 따른다 |
 
 ### 8. e2e 시나리오 `test/e2e/scenarios/notifications.ts`
 
@@ -134,7 +139,9 @@ SSE 의 `data:` JSON 은 `{"type":"created","notificationId":"...","unreadCount"
 다른 사용자의 토큰으로는 그 알림을 읽음으로 표시하지 못한다(404).
 `POST /api/v1/notifications/read-all` 뒤 `unreadCount` 가 0 이다.
 `GET /api/v1/notifications/events` 를 열어 둔 채 승인 요청을 하나 더 만들면 `created` 사건을 받는다. SSE 는 `web/src/lib/stream.ts` 의 `readEventStream` 으로 읽는다(`test/e2e/scenarios/conversation-manage.ts` 참고).
-`test/e2e/run.ts` 의 `SCENARIOS` 에서 `connector-policy` 시나리오 뒤에 넣는다. 앞 시나리오가 남긴 상태를 가정하지 말고 이 시나리오가 필요한 연결과 대화를 직접 만든다. 이미 있으면 그대로 쓴다.
+`test/e2e/run.ts` 의 `SCENARIOS` 에서 `connector-policy` 시나리오 뒤에 넣는다. 앞 시나리오가 남긴 상태를 가정하지 않는다.
+정리는 이웃 시나리오의 관례를 따른다. 시작할 때 연결을 다시 등록하고, `finally` 에서 `setPolicyHook` 을 되돌린 뒤 해제한다(`connector-policy.ts` 의 끝부분, `connector-delegation.ts` 머리 주석).
+e2e 는 만료 cron 이 1초마다 돌고 승인 TTL 이 짧다. SSE 로 받은 `created` 가 앞선 줄의 `APPROVAL_EXPIRED` 일 수 있으므로, 받은 `notificationId` 를 목록에서 찾아 새 대화의 `APPROVAL_REQUESTED` 인지 대조한다.
 
 ### 9. 문서
 
@@ -175,6 +182,8 @@ scripts/check-public-safe.sh
 | `backend/src/main/java/com/bifos/assistant/notification/application/NotificationService.java` | 신규 |
 | `backend/src/main/java/com/bifos/assistant/notification/application/NotificationEventHub.java` | 신규 |
 | `backend/src/main/java/com/bifos/assistant/notification/application/NotificationEvent.java` | 신규 |
+| `backend/src/main/java/com/bifos/assistant/notification/application/NotificationPage.java` | 신규 |
+| `backend/src/main/java/com/bifos/assistant/notification/application/NotificationCursor.java` | 신규 |
 | `backend/src/main/java/com/bifos/assistant/notification/application/NotificationCleaner.java` | 신규 |
 | `backend/src/main/java/com/bifos/assistant/notification/application/NotificationProperties.java` | 신규 |
 | `backend/src/main/java/com/bifos/assistant/notification/presentation/NotificationController.java` | 신규 |
@@ -183,9 +192,11 @@ scripts/check-public-safe.sh
 | `backend/src/main/java/com/bifos/assistant/shared/error/ErrorCode.java` | 수정 |
 | `backend/src/main/java/com/bifos/assistant/connector/application/ConnectorPolicyService.java` | 수정 |
 | `backend/src/main/java/com/bifos/assistant/connector/application/ConnectorActionService.java` | 수정 |
+| `backend/src/main/java/com/bifos/assistant/connector/application/model/ConnectorActionView.java` | 수정 |
 | `backend/src/main/resources/application.yml` | 수정 |
 | `backend/src/test/resources/application-test.yml` | 수정 |
 | `backend/src/test/java/com/bifos/assistant/architecture/TopLevelPackageOrder.java` | 수정 |
+| `backend/src/test/java/com/bifos/assistant/architecture/TopLevelPackageOrderTest.java` | 수정 |
 | `backend/src/test/java/com/bifos/assistant/notification/NotificationServiceTest.java` | 신규 |
 | `backend/src/test/java/com/bifos/assistant/notification/NotificationCleanerTest.java` | 신규 |
 | `backend/src/test/java/com/bifos/assistant/notification/NotificationControllerTest.java` | 신규 |
