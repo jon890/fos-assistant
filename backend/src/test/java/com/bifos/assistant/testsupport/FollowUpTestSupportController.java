@@ -8,6 +8,7 @@ import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.auth.CurrentUserProvider;
 import jakarta.persistence.EntityManager;
 import java.time.Clock;
+import java.util.Objects;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -42,6 +43,7 @@ public class FollowUpTestSupportController {
     @PostMapping("/proposed")
     public ProposedFollowUp proposed(@RequestBody ProposedRequest request) {
         CurrentUser user = currentUser.require();
+        String title = Objects.requireNonNull(request.title(), "title");
         Long conversationId = conversations.requireOwnId(user, request.conversationId());
         Long executionId = entityManager
                 .createQuery("select max(e.id) from AgentExecution e where e.conversationId = :id", Long.class)
@@ -51,8 +53,8 @@ public class FollowUpTestSupportController {
                 user.id(),
                 conversationId,
                 executionId,
-                request.title().strip(),
-                FollowUpService.titleKey(request.title()),
+                title.strip(),
+                FollowUpService.titleKey(title),
                 null,
                 false,
                 clock.instant()));

@@ -57,15 +57,18 @@ const FOLLOW_UP_ACTIONS: Partial<
  *
  * @param card 이 항목이 있는 카드. 제어는 카드마다 따로 걸린다
  * @param readAt 응답을 읽은 시각. 서버에서 그린 글과 브라우저에서 다시 그린 글이 같도록 지금 시각 대신 쓴다
+ * @param onControlChange 숨기거나 미뤘으면 참, 되돌렸으면 거짓으로 부른다. 카드 머리의 수를 다시 읽지 않고 맞추려는 것이다
  */
 export function NowItem({
   card,
   item,
   readAt,
+  onControlChange,
 }: {
   card: AttentionCardKey;
   item: AttentionItem;
   readAt: string;
+  onControlChange(controlled: boolean): void;
 }) {
   const router = useRouter();
   const [control, setControl] = useState<ItemControl | null>(null);
@@ -74,7 +77,6 @@ export function NowItem({
   const [editing, setEditing] = useState(false);
 
   const href = itemHref(item);
-  const title = item.title || "새 대화";
   const origin = originText(item);
   const actions = itemActions(item);
   const followUp = item.followUp;
@@ -85,11 +87,6 @@ export function NowItem({
       {formatRelative(item.at, new Date(readAt))}
     </time>,
   ];
-  // 판정 응답에는 오류 코드가 없다. 상태만으로 문구와 색을 고른다.
-  const execution = item.execution
-    ? { status: item.execution.status, errorCode: null }
-    : null;
-
   function opened() {
     recordAttentionEvent(item.itemKey, item.stateKey, "OPENED");
   }
@@ -97,6 +94,11 @@ export function NowItem({
   function acted() {
     recordAttentionEvent(item.itemKey, item.stateKey, "ACTED");
     router.refresh();
+  }
+
+  function changeControl(next: ItemControl | null) {
+    setControl(next);
+    onControlChange(next !== null);
   }
 
   async function changeFollowUp(kind: ItemAction["kind"]) {
@@ -122,7 +124,7 @@ export function NowItem({
           card={card}
           item={item}
           control={control}
-          onRestored={() => setControl(null)}
+          onRestored={() => changeControl(null)}
           onError={setError}
         />
         {error ? <Notice variant="error">{error}</Notice> : null}
@@ -137,43 +139,19 @@ export function NowItem({
       data-attention={item.attention}
       className="flex flex-col gap-1"
     >
-      <div className="flex items-start gap-2">
-        <div className="flex min-w-0 flex-1 flex-wrap items-start gap-2">
-          {href ? (
-            <Link
-              href={href}
-              prefetch={false}
-              onClick={opened}
-              className="min-w-0 flex-1 font-medium break-words hover:underline"
-            >
-              {title}
-            </Link>
-          ) : (
-            <span className="min-w-0 flex-1 font-medium break-words">
-              {title}
-            </span>
-          )}
-          {item.attention === "NOW" ? (
-            <Badge variant="warning">지금</Badge>
-          ) : null}
-          {execution ? (
-            <Badge variant={executionStatusVariant(execution)}>
-              {executionStatusLabel(execution, false)}
-            </Badge>
-          ) : null}
-        </div>
-        <NowItemControls
-          card={card}
-          item={item}
-          onControlled={setControl}
-          onError={setError}
-        />
-      </div>
+      <NowItemHeader
+        card={card}
+        item={item}
+        href={href}
+        onOpen={opened}
+        onControlled={changeControl}
+        onError={setError}
+      />
       <p className="text-sm text-muted-foreground">{reasonText(item.why)}</p>
       <p className="flex flex-wrap gap-x-1 text-xs text-muted-foreground">
         {sources.map((source, index) => (
           <Fragment key={index}>
-            {index > 0 ? <span>·</span> : null}
+            {index > 0 ? <span aria-hidden="true">·</span> : null}
             <span className="min-w-0 break-words">{source}</span>
           </Fragment>
         ))}
@@ -206,6 +184,63 @@ export function NowItem({
         />
       ) : null}
     </li>
+  );
+}
+
+/** 항목의 머리 줄이다. 제목 링크, 「지금」 과 실행 상태 배지, 오른쪽의 제어 메뉴를 둔다. */
+function NowItemHeader({
+  card,
+  item,
+  href,
+  onOpen,
+  onControlled,
+  onError,
+}: {
+  card: AttentionCardKey;
+  item: AttentionItem;
+  href: string | null;
+  onOpen(): void;
+  onControlled(control: ItemControl): void;
+  onError(message: string | null): void;
+}) {
+  const title = item.title || "새 대화";
+  // 판정 응답에는 오류 코드가 없다. 상태만으로 문구와 색을 고른다.
+  const execution = item.execution
+    ? { status: item.execution.status, errorCode: null }
+    : null;
+  return (
+    <div className="flex items-start gap-2">
+      <div className="flex min-w-0 flex-1 flex-wrap items-start gap-2">
+        {href ? (
+          <Link
+            href={href}
+            prefetch={false}
+            onClick={onOpen}
+            className="min-w-0 flex-1 font-medium break-words hover:underline"
+          >
+            {title}
+          </Link>
+        ) : (
+          <span className="min-w-0 flex-1 font-medium break-words">
+            {title}
+          </span>
+        )}
+        {item.attention === "NOW" ? (
+          <Badge variant="warning">지금</Badge>
+        ) : null}
+        {execution ? (
+          <Badge variant={executionStatusVariant(execution)}>
+            {executionStatusLabel(execution, false)}
+          </Badge>
+        ) : null}
+      </div>
+      <NowItemControls
+        card={card}
+        item={item}
+        onControlled={onControlled}
+        onError={onError}
+      />
+    </div>
   );
 }
 

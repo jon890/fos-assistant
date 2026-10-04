@@ -276,7 +276,7 @@ export type ItemAction = {
  * 항목의 단추다. `docs/frontend/now.md` 의 「동작」 표를 `trigger` 로 고른다.
  *
  * <p>결과 전달 실패도 「대화 열기」 뿐이다. 다시 전달은 그 대화의 알림 줄이 한다.
- * `link` 단추는 갈 곳(`itemHref`)이 없으면 내지 않는다.
+ * `link` 단추는 갈 곳(`itemHref`)이 없으면 내지 않는다. 할 일 단추는 보낼 식별자(`followUp`)가 없으면 내지 않는다.
  */
 export function itemActions(item: AttentionItem): ItemAction[] {
   const link = (label: string): ItemAction[] =>
@@ -290,12 +290,14 @@ export function itemActions(item: AttentionItem): ItemAction[] {
     case "MEMORY_PROPOSED":
       return link("기억에서 보기");
     case "FOLLOW_UP_PROPOSED":
+      if (item.followUp === null) return [];
       return [
         { kind: "accept", label: "받아들이기" },
         { kind: "reject", label: "거절" },
         { kind: "edit", label: "고치기" },
       ];
     case "FOLLOW_UP_OPEN":
+      if (item.followUp === null) return [];
       return [
         { kind: "done", label: "끝냄" },
         { kind: "drop", label: "그만둠" },

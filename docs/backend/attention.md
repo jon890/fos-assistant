@@ -144,10 +144,10 @@
 | 결과 전달 실패 | 대화 열기 | `/chat/{대화 공개 식별자}`. 다시 전달은 그 대화의 알림 줄 아래 「결과 다시 전달」 이 한다. 응답에 묶음 번호를 싣지 않는다 |
 | 승인 대기 | 대화에서 보기 | 그 대화의 승인 카드. 승인과 거절은 기존 `POST /api/v1/connector-actions/{actionId}/approve`, `.../reject` 다 |
 | Memory 제안 | 기억에서 보기 | `/memory` |
-| 할 일 제안 | 받아들이기, 거절 | [`follow-up.md`](follow-up.md) 의 API |
+| 할 일 제안 | 받아들이기, 거절, 고치기 | [`follow-up.md`](follow-up.md) 의 API |
 | 열린 할 일 | 끝냄, 그만둠, 고치기 | [`follow-up.md`](follow-up.md) 의 API |
 | 맡긴 일 | 작업 과정 보기 | `/executions/{번호}` |
-| 이어서 하기 | 대화 열기 | `/chat/{대화 공개 식별자}` |
+| 이어서 하기 | 제목 링크(단추 없음) | `/chat/{대화 공개 식별자}` |
 
 **판정이 시작하지 않는 것**: Hermes 실행, 커넥터 호출, Memory 쓰기, 할 일 만들기.
 사용자의 확인 없이 무언가를 실행하는 proactive 동작은 이 문서의 범위 밖이다. 열려면 새 ADR 과 ADR-050 같은 승인 줄이 먼저 있어야 한다.

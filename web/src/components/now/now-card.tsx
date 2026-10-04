@@ -1,10 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import {
   Card,
   CardAction,
@@ -19,12 +17,13 @@ import {
   moreText,
   type AttentionCard,
 } from "@/lib/attention";
-import { FollowUpDialog } from "./follow-up-dialog";
+import { AddFollowUpButton } from "./add-follow-up-button";
 import { NowItem } from "./now-item";
 
 /**
  * 지금 화면의 카드 하나다. 머리의 수는 서버가 상한 전에 센 `nowCount` 이고, 보이는 항목을 다시 세지 않는다.
- * 「내 차례」 카드 끝에는 「할 일 더하기」 를 두고, 저장하면 서버 부품을 다시 읽는다.
+ * 이 화면에서 숨기거나 미룬 `NOW` 항목만큼은 다시 읽지 않고 빼서 그리고, 되돌리면 다시 더한다.
+ * 「내 차례」 카드 끝에는 「할 일 더하기」 를 둔다.
  *
  * @param readAt 응답을 읽은 시각. 항목의 상대 시각을 이 시각 기준으로 센다
  */
@@ -35,18 +34,43 @@ export function NowCard({
   card: AttentionCard;
   readAt: string;
 }) {
-  const router = useRouter();
-  const [adding, setAdding] = useState(false);
+  const [controlled, setControlled] = useState<ReadonlySet<string>>(
+    () => new Set(),
+  );
   const more = moreText(card);
+  // 다시 읽은 응답에서 빠진 항목은 서버의 수에서도 빠졌으므로, 지금 그리는 항목 가운데 제어한 것만 뺀다.
+  const nowCount = Math.max(
+    0,
+    card.nowCount -
+      card.items.filter(
+        (item) => item.attention === "NOW" && controlled.has(item.itemKey),
+      ).length,
+  );
+
+  function changeControl(itemKey: string, on: boolean) {
+    setControlled((previous) => {
+      const next = new Set(previous);
+      if (on) next.add(itemKey);
+      else next.delete(itemKey);
+      return next;
+    });
+  }
+
   return (
     <Card data-testid={`now-card-${card.key}`}>
       <CardHeader>
         <CardTitle>
           <h2>{cardTitle(card.key)}</h2>
         </CardTitle>
-        {card.nowCount > 0 ? (
+        {nowCount > 0 ? (
           <CardAction>
-            <Badge variant="warning">{card.nowCount}</Badge>
+            <Badge
+              variant="warning"
+              aria-label={`지금 볼 것 ${nowCount}건`}
+              data-testid="card-now-count"
+            >
+              {nowCount}
+            </Badge>
           </CardAction>
         ) : null}
       </CardHeader>
@@ -67,6 +91,7 @@ export function NowCard({
                 card={card.key}
                 item={item}
                 readAt={readAt}
+                onControlChange={(on) => changeControl(item.itemKey, on)}
               />
             ))}
           </ul>
@@ -84,27 +109,7 @@ export function NowCard({
             <p className="text-sm text-muted-foreground">{more.text}</p>
           )
         ) : null}
-        {card.key === "needs_me" ? (
-          <>
-            <Button
-              variant="outline"
-              size="sm"
-              className="self-start"
-              onClick={() => setAdding(true)}
-            >
-              할 일 더하기
-            </Button>
-            <FollowUpDialog
-              open={adding}
-              onOpenChange={setAdding}
-              followUp={null}
-              onSaved={() => {
-                setAdding(false);
-                router.refresh();
-              }}
-            />
-          </>
-        ) : null}
+        {card.key === "needs_me" ? <AddFollowUpButton /> : null}
       </CardContent>
     </Card>
   );

@@ -223,6 +223,12 @@ test.describe("지금 화면", () => {
     return id!;
   }
 
+  /** 수가 0 보다 크면 배지에 그 수가, 0 이면 배지가 없다. */
+  async function expectBadge(badge: Locator, count: number) {
+    if (count > 0) await expect(badge).toHaveText(String(count));
+    else await expect(badge).toHaveCount(0);
+  }
+
   test("숨긴 실패는 실패 카드에서 빠지고 상태가 바뀌면 다시 보인다", async ({ page, hermes }, testInfo) => {
     const title = "주간 장보기 영수증 정리";
     await failTurn(page, hermes, title);
@@ -233,30 +239,74 @@ test.describe("지금 화면", () => {
     await expect(row).toHaveCount(1);
     const conversationId = conversationIdOf(await row.getByRole("link", { name: title }).getAttribute("href"));
     const key = await rowKey(row);
-    // 앞 검사가 실패를 모두 다시 보냈으므로 이 사용자의 지금 볼 것은 이 실패 하나다.
-    let sidebar = await openSidebar(page, testInfo);
-    await expect(sidebar.getByTestId("now-count")).toHaveText("1");
+    // 앞 검사가 남긴 항목이 있을 수 있어 숨기기 전의 수를 읽고, 숨긴 뒤 그 수에서 하나 줄었는지 본다.
+    const before = await summaryCount(page);
+    expect(before, "실패를 만들었는데 지금 볼 것의 수가 0 이다").toBeGreaterThanOrEqual(1);
+    const cardCount = failures.getByTestId("card-now-count");
+    await expect(cardCount).toHaveAccessibleName(/^지금 볼 것 \d+건$/);
+    const cardBefore = Number(await cardCount.textContent());
+    expect(cardBefore, "실패 카드 머리의 수").toBeGreaterThanOrEqual(1);
 
-    await page.goto("/now");
     const controlled = failures.locator(`[data-item-key="${key}"]`);
     await controlled.getByRole("button", { name: "이 항목 제어" }).click();
     await page.getByRole("menuitem", { name: "숨기기" }).click();
     await expect(controlled).toContainText("숨겼어요");
     await expect(controlled.getByRole("button", { name: "되돌리기" })).toBeVisible();
+    // 카드 머리의 수는 화면을 다시 읽지 않고 숨긴 만큼 줄인다.
+    await expectBadge(cardCount, cardBefore - 1);
+    expect(await summaryCount(page), "숨긴 뒤 지금 볼 것의 수").toBe(before - 1);
     // 경로가 그대로여도 사이드바의 수를 다시 읽는다.
-    sidebar = await openSidebar(page, testInfo);
-    await expect(sidebar.getByTestId("now-count")).toHaveCount(0);
+    let sidebar = await openSidebar(page, testInfo);
+    await expectBadge(sidebar.getByTestId("now-count"), before - 1);
 
     await page.goto("/now");
     await expect(failures.getByTestId("now-item").filter({ hasText: title })).toHaveCount(0);
     // 제어는 카드마다 걸려 같은 대화가 이어서 하기 카드에는 보인다.
     await expect(page.getByTestId("now-card-continue").locator(`a[href="/chat/${conversationId}"]`)).toBeVisible();
     sidebar = await openSidebar(page, testInfo);
-    await expect(sidebar.getByTestId("now-count")).toHaveCount(0);
+    await expectBadge(sidebar.getByTestId("now-count"), before - 1);
 
     await failTurn(page, hermes, "다시 정리해 주세요", conversationId);
     await page.goto("/now");
     await expect(failures.locator(`a[href="/chat/${conversationId}"]`).first()).toBeVisible();
+  });
+
+  test("숨겼다 되돌리면 카드 머리의 수가 다시 늘어난다", async ({ page, hermes }) => {
+    const title = "주간 장보기 쿠폰 정리";
+    await failTurn(page, hermes, title);
+
+    await page.goto("/now");
+    const failures = page.getByTestId("now-card-failures");
+    const row = failures.getByTestId("now-item").filter({ hasText: title });
+    await expect(row).toHaveCount(1);
+    const controlled = failures.locator(`[data-item-key="${await rowKey(row)}"]`);
+    const cardCount = failures.getByTestId("card-now-count");
+    const cardBefore = Number(await cardCount.textContent());
+    expect(cardBefore, "실패 카드 머리의 수").toBeGreaterThanOrEqual(1);
+
+    await controlled.getByRole("button", { name: "이 항목 제어" }).click();
+    await page.getByRole("menuitem", { name: "숨기기" }).click();
+    await expect(controlled).toContainText("숨겼어요");
+    await expectBadge(cardCount, cardBefore - 1);
+
+    await controlled.getByRole("button", { name: "되돌리기" }).click();
+    await expect(controlled).toContainText(title);
+    await expect(cardCount).toHaveText(String(cardBefore));
+  });
+
+  test("네 카드가 모두 비어도 빈 화면 아래에서 할 일을 더할 수 있다", async ({ context, page }, testInfo) => {
+    // 아무것도 만들지 않은 사용자라 네 카드가 모두 빈다. 이 검사는 저장하지 않아 다음 실행에도 빈 채로 남는다.
+    await setSession(context, { email: `now-empty-${testInfo.project.name}@example.com`, name: "빈 화면 사용자" });
+    expect((await page.request.get("/api/me")).ok()).toBeTruthy();
+
+    await page.goto("/now");
+    await expect(page.getByText("지금 확인할 것이 없어요")).toBeVisible();
+    await expect(page.locator('[data-testid^="now-card-"]')).toHaveCount(0);
+    await page.getByRole("button", { name: "할 일 더하기" }).click();
+    const dialog = page.getByRole("dialog", { name: "할 일 더하기" });
+    await expect(dialog.getByLabel("제목", { exact: true })).toBeVisible();
+    await dialog.getByRole("button", { name: "취소" }).click();
+    await expect(dialog).toHaveCount(0);
   });
 
   test("직접 더한 할 일은 내 차례에 보이고 미뤘다 되돌린 뒤 끝낼 수 있다", async ({ page }) => {

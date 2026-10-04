@@ -178,3 +178,9 @@ test("항목의 단추는 now.md 「동작」 표를 따른다", () => {
 test("갈 곳이 없는 항목에는 링크 단추가 없다", () => {
   assert.deepEqual(itemActions(item({ why: why("APPROVAL_PENDING", []), conversationId: null })), []);
 });
+
+test("할 일 식별자가 없는 할 일 항목에는 단추가 없다", () => {
+  for (const trigger of ["FOLLOW_UP_PROPOSED", "FOLLOW_UP_OPEN"]) {
+    assert.deepEqual(itemActions(item({ why: why(trigger, []), followUp: null })), [], trigger);
+  }
+});
