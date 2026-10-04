@@ -12,7 +12,7 @@
 | 칸 | 받는 값 | 기본 |
 | --- | --- | --- |
 | 이름 | 앞뒤 공백을 뗀 1자에서 100자 | |
-| 에이전트 | 주인이 대화를 시작할 수 있는 에이전트(`AgentService.requireStartable`). 흐름이 붙은 에이전트는 받지 않는다 | |
+| 에이전트 | 주인이 대화를 시작할 수 있는 에이전트(`AgentService.requireStartable`). 흐름이 붙은 에이전트는 400 `TASK_AGENT_NOT_SUPPORTED` 로 거절한다 | |
 | 지시 | 1자에서 8000자. 대화 메시지 상한과 같다. 발화마다 이 글이 사용자 메시지로 들어간다 | |
 | 시각 | `CRON` 이나 `ONCE`. 아래 「시각」 | |
 | 시간대 | IANA 이름 | `assistant.task.default-time-zone`(기본 `Asia/Seoul`) |
@@ -61,7 +61,7 @@ sequenceDiagram
     S->>S: 주인이 꺼지지 않았는지, 에이전트를 쓸 수 있는지 다시 본다
     S->>C: 대화를 준비하고 turn 잠금을 연다 (사용자 실행 한도)
     S->>DB: RUNNING
-    C->>C: 알림 줄과 지시를 사용자 메시지로 저장, 자동 turn 수를 0 으로
+    C->>C: 알림 줄(SYSTEM)을 남기고 지시를 사용자 메시지로 저장, 자동 turn 수를 0 으로
     C->>H: Memory 를 조립한 run 제출
     H-->>C: 답
     C-->>S: 끝난 turn
@@ -100,7 +100,7 @@ sequenceDiagram
 | 잠금을 얻었다 | `RUNNING` 과 `started_at` 을 적고 가상 스레드에서 turn 을 돌린다 |
 
 turn 은 위임 결과를 전하는 자동 turn 과 같은 모양으로 돈다(`DelegationWakeService.runAutoTurn`). 대화 SSE 로 사건을 내고, 끝나면 잠금을 푼다.
-그 turn 은 먼저 「예약 작업 「이름」 을 시작했어요」 알림 줄과 지시를 사용자 메시지로 저장하고, 대화의 자동 turn 수를 0 으로 돌린다. 지시 뒤에는 사용자가 화면에 없을 수 있다는 안내를 붙인다.
+그 turn 은 먼저 「예약 작업 「이름」 을 시작했어요」 알림 줄(`SYSTEM`)을 남기고 지시를 사용자 메시지로 저장하고, 대화의 자동 turn 수를 0 으로 돌린다. 지시 뒤에는 사용자가 화면에 없을 수 있다는 안내를 붙인다.
 
 | turn 이 끝난 모양 | `task_run` | 알림 |
 | --- | --- | --- |
@@ -140,7 +140,7 @@ turn 은 위임 결과를 전하는 자동 turn 과 같은 모양으로 돈다(`
 
 ## API
 
-모두 `/api/v1` 아래이고 로그인한 사용자 자신의 작업만 다룬다. 남의 작업과 없는 작업은 같은 404 `TASK_NOT_FOUND` 다.
+모두 `/api/v1` 아래이고 로그인한 사용자 자신의 작업만 다룬다. 남의 작업, 없는 작업, 지운 작업은 같은 404 `TASK_NOT_FOUND` 다.
 
 | 메서드 | 경로 | 본문 | 응답 |
 | --- | --- | --- | --- |
@@ -151,7 +151,7 @@ turn 은 위임 결과를 전하는 자동 turn 과 같은 모양으로 돈다(`
 | POST | `/tasks/{taskId}/pause` | | `TaskView` |
 | POST | `/tasks/{taskId}/resume` | | `TaskView` |
 | DELETE | `/tasks/{taskId}` | | 204. 보관한다 |
-| GET | `/tasks/{taskId}/runs?limit=` | | `List<TaskRunView>`. 예정 시각의 역순. `limit` 기본 20, 상한 100 |
+| GET | `/tasks/{taskId}/runs?limit=` | | `List<TaskRunView>`. 예정 시각의 역순. `limit` 기본 20, 상한 100. 1 에서 100 밖이면 400 `VALIDATION_FAILED` |
 
 `TaskRequest` 는 `title`, `agentCode`, `instruction`, `schedule`, `conversationMode`, `missedPolicy`, `notify` 이다. 뒤의 셋은 비우면 기본값이다.
 `schedule` 은 `{ type: "CRON", cron, timeZone }` 이나 `{ type: "ONCE", fireAt, timeZone }` 이다. `fireAt` 은 시간대 없는 날짜와 시각(`2026-11-01T09:00`)이고 `timeZone` 으로 해석한다. `timeZone` 을 비우면 기본 시간대다.
@@ -172,6 +172,7 @@ turn 은 위임 결과를 전하는 자동 turn 과 같은 모양으로 돈다(`
 | `/tasks/{id}` | 작업 고치기, 멈추기와 다시 켜기, 지우기, 최근 실행 목록. 실행 줄을 누르면 그 대화로 간다 |
 
 시각을 고르는 칸은 「매일」, 「매주」(요일), 「매달」(날짜), 「한 번」(날짜), 「직접 입력」(cron) 중 하나와 시각이다. 앞의 넷은 화면이 5필드 cron 이나 `ONCE` 로 바꿔 보낸다. 서버는 cron 만 안다.
+에이전트 고르기 목록은 새 대화 화면과 같은 목록이다. 에이전트 목록 API 가 흐름과 켜짐 여부를 싣지 않아 흐름 에이전트를 목록에서 빼지 못한다. 그런 에이전트를 고르면 서버가 거절하고 화면은 「이 에이전트로는 예약 작업을 만들 수 없어요.」 를 보인다.
 주요 화면 메뉴에 「예약 작업」 을 더한다.
 
 대화 목록은 `taskId` 가 있는 대화를 날짜 묶음에서 빼고, 목록 맨 위의 「예약 작업」 묶음 아래 작업 이름마다 접힌 줄 하나로 모은다. 작업 이름 줄을 누르면 그 작업의 대화가 최근 순으로 펼쳐진다. 지금 연 대화가 작업 대화면 그 작업 줄이 펼쳐진 채 보인다.
