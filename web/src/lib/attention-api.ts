@@ -1,7 +1,7 @@
 import type { AttentionCardKey } from "@/lib/attention";
 import { memoryRequest, type MemoryApiResult } from "@/lib/memory-api";
 
-/** 지금 화면과 사이드바가 부르는 요청이다. 응답을 읽고 실패를 다루는 일은 부르는 쪽이 맡는다. */
+/** 지금 화면과 사이드바가 부르는 요청이다. 응답을 읽고 실패를 다루는 일은 부르는 쪽이 맡는다. 건수 읽기만 0 으로 대신한다. */
 
 /**
  * 지금 볼 것이 바뀌었을 수 있다는 브라우저 사건이다. 사이드바 「지금 볼 것」 이 받아 수를 다시 읽는다.
@@ -11,9 +11,18 @@ export const ATTENTION_CHANGED_EVENT = "attention-changed";
 
 const CONTROL_FAILED = "바꾸지 못했어요. 다시 시도해 주세요.";
 
-/** 지금 볼 것의 건수(`nowCount`)를 읽는다. */
-export function fetchAttentionSummary(): Promise<Response> {
-  return fetch("/api/attention/summary", { cache: "no-store" });
+/** 지금 볼 것의 건수(`nowCount`)를 읽는다. 읽지 못하거나 수가 아니면 0 이다. */
+export async function readNowCount(): Promise<number> {
+  try {
+    const response = await fetch("/api/attention/summary", {
+      cache: "no-store",
+    });
+    if (!response.ok) return 0;
+    const summary = (await response.json()) as { nowCount?: unknown };
+    return typeof summary.nowCount === "number" ? summary.nowCount : 0;
+  } catch {
+    return 0;
+  }
 }
 
 async function control(

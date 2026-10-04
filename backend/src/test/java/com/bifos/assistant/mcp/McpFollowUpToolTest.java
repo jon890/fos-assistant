@@ -11,7 +11,11 @@ import com.bifos.assistant.followup.domain.type.FollowUpStatus;
 import com.bifos.assistant.followup.infra.FollowUpRepository;
 import com.bifos.assistant.mcp.application.AgentTokenService;
 import com.bifos.assistant.mcp.application.McpToolService;
+import com.bifos.assistant.proactive.domain.ProactiveCheck;
+import com.bifos.assistant.proactive.domain.type.CheckTrigger;
+import com.bifos.assistant.proactive.infra.ProactiveCheckRepository;
 import com.bifos.assistant.shared.domain.type.UserRole;
+import com.bifos.assistant.usage.domain.AgentExecution;
 import com.bifos.assistant.usage.infra.AgentExecutionRepository;
 import com.bifos.assistant.user.domain.AppUser;
 import com.bifos.assistant.user.infra.AppUserRepository;
@@ -79,6 +83,9 @@ class McpFollowUpToolTest {
     @Autowired
     McpToolService toolService;
 
+    @Autowired
+    ProactiveCheckRepository checks;
+
     private final HttpClient client = HttpClient.newHttpClient();
     private final JsonMapper json = JsonMapper.builder().build();
     private final List<Long> createdUsers = new ArrayList<>();
@@ -86,6 +93,7 @@ class McpFollowUpToolTest {
     private String dadToken;
     private String dadRoot;
     private Conversation conversation;
+    private AgentExecution dadRun;
 
     @BeforeEach
     void setUp() {
@@ -97,7 +105,7 @@ class McpFollowUpToolTest {
         Agent agent = McpCallSigner.agentFor(agents, PROFILE);
         conversation = conversations.save(Conversation.startedBy(dad.id(), "할 일 검사 대화", agent.id(), Instant.now()));
         dadRoot = McpCallSigner.newRoot();
-        McpCallSigner.running(executions, agents, dad.id(), conversation.id(), PROFILE, dadRoot);
+        dadRun = McpCallSigner.running(executions, agents, dad.id(), conversation.id(), PROFILE, dadRoot);
     }
 
     @AfterEach
@@ -247,6 +255,23 @@ class McpFollowUpToolTest {
         assertThat(result.path("isError").asBoolean()).isTrue();
         assertThat(text(result)).isEqualTo("대화 밖의 실행에서는 할 일을 제안할 수 없다.");
         assertThat(rows()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("먼저 살펴보기 트리에서 부르면 쓸 수 없는 도구라는 결과이고 줄이 생기지 않는다")
+    void refusesProposalInCheckTree() throws Exception {
+        ProactiveCheck check =
+                ProactiveCheck.started(dad.id(), 1L, conversation.id(), CheckTrigger.MANUAL, Instant.now());
+        check.attachRoot(dadRun.id(), dadRoot);
+        ProactiveCheck saved = checks.save(check);
+        try {
+            JsonNode result = propose(arguments());
+
+            assertThat(result).as("결과: %s", result).isEqualTo(json.valueToTree(toolService.notAllowedInCheck()));
+            assertThat(rows()).isEmpty();
+        } finally {
+            checks.delete(saved);
+        }
     }
 
     private ObjectNode arguments() {

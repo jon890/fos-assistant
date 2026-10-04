@@ -188,7 +188,7 @@ FOS 실행 #105 같은 대화의 다음 turn          ← 돌아도 S1 은 #100 
 | 요청자 | 모든 도구가 위 「MCP 호출의 요청자를 정할 때」 의 판정을 지난다. 서명하는 쪽의 계약은 [`../hermes/fos-ctx.md`](../hermes/fos-ctx.md#부모-실행을-잇는-방법) 에 있다 |
 
 **먼저 살펴보기 트리에서는 `memory_read`, `agent_list`, `agent_delegate`, `agent_status`, `agent_stop` 만 받는다.**
-요청자를 정한 뒤 `ProactiveCheckGuard.isCheckTree` 가 참이면 나머지 도구는 「먼저 살펴보기에서는 쓸 수 없는 도구입니다.」 오류 결과(`isError: true`)다. 지금은 `artifact_write` 가 여기 걸린다.
+요청자를 정한 뒤 `ProactiveCheckGuard.isCheckTree` 가 참이면 나머지 도구는 「먼저 살펴보기에서는 쓸 수 없는 도구입니다.」 오류 결과(`isError: true`)다. 지금은 `artifact_write` 와 `follow_up_propose` 가 여기 걸린다.
 새 도구를 더하면 살펴보기에서 받을지 함께 정한다([`proactive-check.md`](proactive-check.md) 의 「읽기 경계」).
 
 도구마다의 인자와 결과는 아래가 갖는다.

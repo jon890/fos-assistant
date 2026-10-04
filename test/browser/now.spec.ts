@@ -499,8 +499,11 @@ test.describe("지금 화면", () => {
 
     await page.route(summaryPath, (route: Route) => route.fulfill({ status: 500, json: { message: "읽지 못했어요" } }));
     try {
-      const [summary] = await Promise.all([page.waitForResponse(summaryPath), page.goto("/")]);
-      expect(summary.status()).toBe(500);
+      // 앞 단계에서 「지금 볼 것」 을 다시 읽은 200 응답이 늦게 끝날 수 있어 500 응답만 기다린다.
+      const failed = page.waitForResponse(
+        (response) => response.url().endsWith("/api/attention/summary") && response.status() === 500,
+      );
+      await Promise.all([failed, page.goto("/")]);
       await expect(page.getByRole("heading", { level: 1, name: /무엇을 도와드릴까요\?$/ })).toBeVisible();
       await expect(page.getByTestId("composer-shell")).toBeVisible();
       await expect(page.getByTestId("attention-line")).toHaveCount(0);

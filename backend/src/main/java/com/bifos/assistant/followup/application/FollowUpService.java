@@ -28,6 +28,7 @@ import java.util.function.BiConsumer;
 import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.dao.PessimisticLockingFailureException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Transactional;
@@ -142,7 +143,8 @@ public class FollowUpService {
      * 가 갖는다.
      *
      * <p>세는 것과 저장하는 것 사이에 잠금을 두지 않는다. 같은 대화에서 나란히 제안하면 상한을 조금 넘을 수 있다. 같은 제목이 동시에
-     * 들어오면 유일 제약이 하나만 남기고, 진 쪽은 트랜잭션 밖에서 잡아 {@code DUPLICATE} 로 답한다.
+     * 들어오면 유일 제약이 하나만 남기고, 진 쪽은 트랜잭션 밖에서 잡아 다시 읽은 뒤 {@code DUPLICATE} 로 답한다. MySQL 이 동시 삽입을
+     * 교착으로 끊은 경우도 같다.
      *
      * @param owner origin 실행의 사용자
      * @param conversationId origin 실행의 대화 번호
@@ -177,8 +179,15 @@ public class FollowUpService {
                         FollowUp.proposed(owner.id(), conversationId, executionId, stripped, key, dueAt, waiting, now));
                 return FollowUpProposalOutcome.CREATED;
             });
-        } catch (DataIntegrityViolationException ex) {
-            // 같은 제목이 동시에 열렸다. 먼저 저장된 줄이 남는다.
+        } catch (DataIntegrityViolationException | PessimisticLockingFailureException ex) {
+            // 같은 제목이 동시에 열려 유일 제약에 걸렸거나, MySQL 이 같은 유일 키의 동시 삽입을 교착으로 끊었다.
+            // 먼저 저장된 줄이 있을 때만 같은 할 일로 답한다. 없으면 다른 까닭의 저장 실패라 그대로 던진다.
+            boolean saved = Boolean.TRUE.equals(transactions.execute(status -> followUps
+                    .findByUserIdAndTitleKeyAndOpenMarker(owner.id(), key, FollowUp.OPEN_MARKER)
+                    .isPresent()));
+            if (!saved) {
+                throw ex;
+            }
             outcome = FollowUpProposalOutcome.DUPLICATE;
         }
         log.info("follow-up proposal userId={} executionId={} outcome={}", owner.id(), executionId, outcome);

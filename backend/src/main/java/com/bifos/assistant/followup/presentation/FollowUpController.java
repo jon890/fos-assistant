@@ -1,5 +1,6 @@
 package com.bifos.assistant.followup.presentation;
 
+import com.bifos.assistant.followup.application.FollowUpDueAt;
 import com.bifos.assistant.followup.application.FollowUpService;
 import com.bifos.assistant.followup.application.model.FollowUpPatch;
 import com.bifos.assistant.followup.application.model.NewFollowUp;
@@ -9,9 +10,6 @@ import com.bifos.assistant.shared.auth.CurrentUserProvider;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import java.time.Instant;
-import java.time.OffsetDateTime;
-import java.time.ZoneOffset;
-import java.time.format.DateTimeParseException;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -33,9 +31,6 @@ import tools.jackson.databind.JsonNode;
 @RequestMapping("/api/v1/follow-ups")
 @RequiredArgsConstructor
 public class FollowUpController {
-    private static final int MIN_YEAR = 1;
-    private static final int MAX_YEAR = 9999;
-
     private final FollowUpService followUps;
     private final CurrentUserProvider currentUser;
 
@@ -50,7 +45,7 @@ public class FollowUpController {
     public FollowUpView create(@RequestBody CreateFollowUpRequest request) {
         NewFollowUp input = new NewFollowUp(
                 request.title(),
-                request.dueAt() == null ? null : parseInstant(request.dueAt()),
+                request.dueAt() == null ? null : FollowUpDueAt.parseWithOffset(request.dueAt()),
                 Boolean.TRUE.equals(request.waiting()),
                 request.conversationId() == null ? null : parseConversationId(request.conversationId()));
         return FollowUpView.from(followUps.create(currentUser.require(), input));
@@ -89,7 +84,7 @@ public class FollowUpController {
             if (!dueAtNode.isString()) {
                 throw invalid("dueAt must be an ISO-8601 instant with offset");
             }
-            dueAt = parseInstant(dueAtNode.asString());
+            dueAt = FollowUpDueAt.parseWithOffset(dueAtNode.asString());
         }
         return FollowUpView.from(
                 followUps.update(currentUser.require(), id, new FollowUpPatch(title, dueAtPresent, dueAt, waiting)));
@@ -113,25 +108,6 @@ public class FollowUpController {
     @PostMapping("/{id}/drop")
     public FollowUpView drop(@PathVariable UUID id) {
         return FollowUpView.from(followUps.drop(currentUser.require(), id));
-    }
-
-    /**
-     * {@code 2026-10-05T09:00:00Z} 나 {@code 2026-10-05T18:00:00+09:00} 처럼 시간대가 붙은 시각을 읽는다.
-     *
-     * <p>UTC 로 바꾼 연도가 1부터 9999 밖이면 400 이다. 그런 시각은 DB 칸과 응답의 ISO-8601 글이 담지 못한다.
-     */
-    private static Instant parseInstant(String text) {
-        OffsetDateTime parsed;
-        try {
-            parsed = OffsetDateTime.parse(text);
-        } catch (DateTimeParseException ex) {
-            throw new ApiException(ErrorCode.VALIDATION_FAILED, "dueAt must be an ISO-8601 instant with offset", ex);
-        }
-        int year = parsed.atZoneSameInstant(ZoneOffset.UTC).getYear();
-        if (year < MIN_YEAR || year > MAX_YEAR) {
-            throw invalid("dueAt year must be 1 to 9999");
-        }
-        return parsed.toInstant();
     }
 
     private static UUID parseConversationId(String text) {

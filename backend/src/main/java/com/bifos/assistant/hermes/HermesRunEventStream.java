@@ -39,6 +39,9 @@ public class HermesRunEventStream {
     /** 인자를 {@code preview} 에 싣는 도구 시작 사건이다. */
     private static final String MEMORY_READ_STARTED = "tool.started";
 
+    /** 할 일을 제안하는 Control Plane MCP 도구 이름의 끝이다. 인자에 할 일 제목이 실린다. */
+    private static final String FOLLOW_UP_PROPOSE_TOOL_SUFFIX = "follow_up_propose";
+
     private final RestClient restClient;
     private final HermesProfileKeyStore keyStore;
     private final ObjectMapper objectMapper;
@@ -153,6 +156,11 @@ public class HermesRunEventStream {
         String detail = firstDetail(root, payload);
         if (memoryReadResult(type, toolName)) {
             // 결과에 Memory 본문이 실린다. 인자를 담은 tool.started 의 preview 만 실행 사건에 남긴다(ADR-071)
+            detail = null;
+        }
+        if (toolName != null && toolName.endsWith(FOLLOW_UP_PROPOSE_TOOL_SUFFIX)) {
+            // 시작의 preview 에 할 일 제목이 실린다. 관리자가 실행 기록에서 남의 할 일 제목을 읽지 못하게
+            // 시작과 끝 모두 남기지 않는다
             detail = null;
         }
         String skillName = null;

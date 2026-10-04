@@ -5,6 +5,7 @@ import com.bifos.assistant.agent.infra.AgentRepository;
 import com.bifos.assistant.chat.application.ArtifactWriteRequest;
 import com.bifos.assistant.chat.application.ArtifactWriteResult;
 import com.bifos.assistant.chat.application.ArtifactWriteService;
+import com.bifos.assistant.followup.application.FollowUpDueAt;
 import com.bifos.assistant.followup.application.FollowUpService;
 import com.bifos.assistant.followup.application.model.FollowUpProposalOutcome;
 import com.bifos.assistant.memory.application.MemoryService;
@@ -22,15 +23,8 @@ import com.bifos.assistant.usage.domain.AgentExecution;
 import com.bifos.assistant.usage.domain.DelegationKey;
 import com.bifos.assistant.usage.domain.type.ExecutionStatus;
 import java.time.Clock;
-import java.time.DateTimeException;
 import java.time.Duration;
 import java.time.Instant;
-import java.time.LocalDate;
-import java.time.LocalDateTime;
-import java.time.LocalTime;
-import java.time.OffsetDateTime;
-import java.time.ZoneId;
-import java.time.ZoneOffset;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -70,12 +64,6 @@ public class McpToolService {
     public static final int TASK_MAX_CHARS = 8000;
 
     private static final String DUE_AT_FORMAT = "due_at 은 2026-10-05 나 2026-10-05T18:00 형식이다.";
-    /** {@code due_at} 에 시간대가 없을 때 읽는 시간대다. 날짜만 주면 그날 이 시각까지로 본다. */
-    private static final ZoneId SEOUL = ZoneId.of("Asia/Seoul");
-
-    private static final LocalTime END_OF_DAY = LocalTime.of(23, 59);
-    private static final int MIN_DUE_YEAR = 1;
-    private static final int MAX_DUE_YEAR = 9999;
 
     private final MemoryService memories;
     private final ArtifactWriteService artifacts;
@@ -375,7 +363,7 @@ public class McpToolService {
         }
         Instant due = null;
         if (dueAt != null) {
-            Optional<Instant> parsed = parseDueAt(dueAt);
+            Optional<Instant> parsed = FollowUpDueAt.parseLenient(dueAt);
             if (parsed.isEmpty()) {
                 return result(DUE_AT_FORMAT, true);
             }
@@ -389,40 +377,6 @@ public class McpToolService {
             case DECLINED_BEFORE -> result("사용자가 이 할 일을 거절했다. 다시 제안하지 않는다.", true);
             case TOO_MANY_PROPOSALS, TOO_MANY_IN_RUN -> result("이 대화에 받아들이기를 기다리는 제안이 많다. 사용자가 정한 뒤에 제안한다.", true);
         };
-    }
-
-    /**
-     * 기한 글을 시각으로 읽는다. 날짜만이면 그날 23시 59분, 시간대가 없으면 {@code Asia/Seoul} 이다.
-     *
-     * <p>날짜, 시간대가 붙은 시각, 시간대가 없는 시각의 차례로 읽고 처음 읽힌 것을 쓴다. UTC 로 바꾼 연도가 1부터 9999 밖이면 읽지
-     * 못한 것으로 본다. 사람이 쓰는 API 와 같은 범위이고, 그 밖의 시각은 DB 칸이 담지 못한다.
-     */
-    private static Optional<Instant> parseDueAt(String text) {
-        Instant parsed = null;
-        try {
-            parsed = LocalDate.parse(text).atTime(END_OF_DAY).atZone(SEOUL).toInstant();
-        } catch (DateTimeException ignored) {
-            // 날짜만이 아니다. 다음 모양으로 읽는다.
-        }
-        if (parsed == null) {
-            try {
-                parsed = OffsetDateTime.parse(text).toInstant();
-            } catch (DateTimeException ignored) {
-                // 시간대가 붙은 시각이 아니다. 다음 모양으로 읽는다.
-            }
-        }
-        if (parsed == null) {
-            try {
-                parsed = LocalDateTime.parse(text).atZone(SEOUL).toInstant();
-            } catch (DateTimeException ignored) {
-                // 세 모양 모두 아니다.
-            }
-        }
-        if (parsed == null) {
-            return Optional.empty();
-        }
-        int year = parsed.atZone(ZoneOffset.UTC).getYear();
-        return year < MIN_DUE_YEAR || year > MAX_DUE_YEAR ? Optional.empty() : Optional.of(parsed);
     }
 
     private static String delegationFailureMessage(Failure failure) {

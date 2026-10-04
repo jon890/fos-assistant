@@ -53,11 +53,13 @@ export function AttentionMetricsSection({
 }) {
   return (
     <section
-      aria-label="먼저 알리기"
+      aria-labelledby="attention-metrics-heading"
       className="mb-8"
       data-testid="attention-metrics-section"
     >
-      <h2 className="mb-1 text-lg font-semibold">먼저 알리기</h2>
+      <h2 id="attention-metrics-heading" className="mb-1 text-lg font-semibold">
+        먼저 알리기
+      </h2>
       <p className="mb-3 text-sm text-muted-foreground">
         최근 {metrics.days}일 동안 지금 화면에 보인 항목을 종류별로 모았어요.
       </p>

@@ -108,7 +108,7 @@ Hermes 기본 스킬만 있어도 색인 안내문이 `skill_manage` 를 권하�
 
 | 타입 | 책임 |
 | --- | --- |
-| `mcp/presentation/McpDtos` | `memory_read` 와 `artifact_write` 의 요청 형태. 데이터 record 를 컨트롤러 안에 두지 않는다 |
+| `mcp/presentation/McpDtos` | `memory_read`, `artifact_write`, `follow_up_propose` 의 요청 형태. 데이터 record 를 컨트롤러 안에 두지 않는다 |
 | `mcp/presentation/McpController` | 도구 이름에 따라 인자를 검사하고 JSON-RPC 오류로 바꾼다 |
 | `mcp/application/McpToolService` | 도구 목록과 MCP `content`, `isError` 결과를 만든다 |
 | `chat/application/ArtifactWriteRequest`, `ArtifactWriteResult` | 각각 UUID, 상대 경로와 입력 방식, 저장된 경로와 바이트 수를 전달한다 |
