@@ -80,7 +80,7 @@ Memory 의 기본 근거는 [`adr/ADR-003-memory-권한은-주입으로-강제�
 
 | 값 | 두는 곳 |
 | --- | --- |
-| 사용자의 AI credential | 그 사람의 Hermes profile `.env` |
+| 사용자의 AI credential | Hermes 쪽. provider API key 는 profile `.env` 에 둔다. OAuth 로그인은 profile 에 자기 `auth.json` 이 없으면 여러 profile 이 Hermes 루트의 것을 함께 쓴다([`hermes/README.md`](hermes/README.md)) |
 | profile 의 API server key | 홈서버의 mode 600 파일. 파일 이름이 profile 이름이다 |
 | Hermes 대시보드를 부를 토큰 | Control Plane 의 환경 변수와 그 plugin 의 환경 변수 |
 | 웹과 Control Plane 이 나눠 가지는 HMAC 비밀값 | 두 서비스의 환경 변수 |

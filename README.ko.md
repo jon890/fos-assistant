@@ -122,7 +122,7 @@ collection 을 고치는 화면과 항목의 앞선 판을 읽는 화면처럼 M
 
 - **Hermes core 를 고치지 않는다.** profile, API server, plugin hook 이라는 공식 확장 지점만 쓴다.
 - **사람이 보지 않은 것을 기억에 남기지 않는다.** Hermes 내장 memory 도구를 에이전트에 주지 않는다. 기억에 닿는 길은 Control Plane 하나다.
-- **비밀값을 데이터베이스에 넣지 않는다.** AI credential 과 커넥터 토큰은 Hermes profile 안에만 있고, 서비스 토큰은 해시로만 저장한다.
+- **비밀값을 데이터베이스에 넣지 않는다.** AI credential 과 커넥터 토큰은 Hermes 쪽에 두고, 서비스 토큰은 해시로만 저장한다. profile 을 나눴다고 AI 계정이 갈리지는 않는다. OAuth 로그인은 여러 profile 이 함께 쓸 수 있다. 무엇이 갈리고 무엇을 함께 쓰는지는 [`docs/hermes/README.md`](docs/hermes/README.md) 의 「OAuth credential 은 여기서 빠진다」 에 있다.
 - **누구나 가입하는 서비스가 아니다.** 그룹에 사람을 더하는 것은 관리자가 한다.
 - **에이전트가 만든 페이지의 스크립트를 돌리지 않는다.**
 - **운영 절차를 갖지 않는다.** 배포와 환경마다 다른 값은 운영하는 쪽이 갖는다.

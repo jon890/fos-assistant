@@ -121,7 +121,7 @@ The full scope, with how each item is verified, is in [`docs/prd.md`](docs/prd.m
 
 - **It does not modify Hermes core.** Only the official extension points are used: profiles, the API server, and plugin hooks.
 - **It does not remember what no person has seen.** Hermes' built-in memory tool is not given to agents. The Control Plane is the only path to memory.
-- **It does not store secrets in the database.** AI credentials and connector tokens live only in Hermes profiles, and service tokens are stored only as hashes.
+- **It does not store secrets in the database.** AI credentials and connector tokens stay on the Hermes side, and service tokens are stored only as hashes. Separate profiles do not by themselves mean separate AI accounts: an OAuth login can be shared across profiles. How credentials are separated or shared is in [`docs/hermes/README.md`](docs/hermes/README.md).
 - **It is not an open sign-up service.** An administrator adds people to a group.
 - **It does not run scripts in agent-made pages.**
 - **It does not carry operating procedures.** Deployment and host-specific values belong to whoever runs it.
