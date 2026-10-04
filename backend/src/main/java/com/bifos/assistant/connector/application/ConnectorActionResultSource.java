@@ -23,7 +23,15 @@ public class ConnectorActionResultSource implements AutoTurnResultSource {
 
     static final String UNKNOWN_INPUT = "실행 여부를 알 수 없다. 다시 실행하지 말고 사용자에게 확인을 부탁한다.";
 
+    /** 전달 묶음의 항목에 적는 출처 이름이다. 결과 이름은 승인 줄의 {@code public_id} UUID 글이다. */
+    static final String SOURCE = "CONNECTOR_ACTION";
+
     private final ConnectorActionService actions;
+
+    @Override
+    public String source() {
+        return SOURCE;
+    }
 
     @Override
     public List<AutoTurnResult> undelivered(Long conversationId) {

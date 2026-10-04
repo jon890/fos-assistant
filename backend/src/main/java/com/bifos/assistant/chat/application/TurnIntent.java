@@ -1,6 +1,5 @@
 package com.bifos.assistant.chat.application;
 
-import com.bifos.assistant.chat.application.model.AutoTurnDelivery;
 import com.bifos.assistant.chat.domain.ChatMessage;
 import java.util.List;
 
@@ -32,18 +31,11 @@ public sealed interface TurnIntent {
     /**
      * 사용자의 질문 없이 Control Plane 이 연 turn 이다(ADR-040).
      *
-     * @param executionIds 이 turn 이 전하는 위임 실행들. 승인 결과만 전하는 turn 은 비어 있다
-     * @param notices 대화에 남기는 알림 줄의 글들. 위임 알림이 먼저이고 그 뒤로 결과마다 한 줄이다
-     * @param deliveries 위임 결과 말고 이 turn 이 전하는 결과들. 알림 줄과 같은 트랜잭션에서 전했다고 적는다
+     * <p>알림 줄과 전달 묶음은 이 turn 을 열기 전에 이미 저장돼 있다(ADR-070).
+     *
+     * @param attemptId 이 turn 의 전달 시도 번호. 실행 줄을 만들면 그 번호를 이 시도에 잇는다
      */
-    record DelegationResults(List<Long> executionIds, List<String> notices, List<AutoTurnDelivery> deliveries)
-            implements TurnIntent {
-        public DelegationResults {
-            executionIds = List.copyOf(executionIds);
-            notices = List.copyOf(notices);
-            deliveries = List.copyOf(deliveries);
-        }
-    }
+    record DelegationResults(Long attemptId) implements TurnIntent {}
 
     static String instructionFor(TurnIntent intent) {
         if (intent instanceof Regenerate regenerate && regenerate.previousAnswer() != null) {

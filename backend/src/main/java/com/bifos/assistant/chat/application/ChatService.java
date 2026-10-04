@@ -4,12 +4,15 @@ import com.bifos.assistant.agent.application.AgentService;
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.chat.application.model.AutoTurnDelivery;
 import com.bifos.assistant.chat.application.model.AutoTurnResult;
+import com.bifos.assistant.chat.application.model.DeliveryItemRef;
+import com.bifos.assistant.chat.application.model.ResultDeliveryStart;
 import com.bifos.assistant.chat.domain.ChatArtifact;
 import com.bifos.assistant.chat.domain.ChatAttachment;
 import com.bifos.assistant.chat.domain.ChatMessage;
 import com.bifos.assistant.chat.domain.ChatPendingMessage;
 import com.bifos.assistant.chat.domain.Conversation;
 import com.bifos.assistant.chat.domain.RunSession;
+import com.bifos.assistant.chat.domain.type.DeliveryAttemptStatus;
 import com.bifos.assistant.chat.domain.type.MessageRole;
 import com.bifos.assistant.chat.domain.type.ModelSelectionMode;
 import com.bifos.assistant.chat.infra.ArtifactStore;
@@ -76,6 +79,9 @@ import org.springframework.transaction.support.TransactionTemplate;
  * <p>쓸 모델과 effort 는 대화가 고른 값이다. 고르지 않았으면 모델을 빼고 보내 profile 의 기본값으로
  * 돈다. 그 provider 의 계정이 전부 막혀도 다른 모델로 넘기지 않고 {@code PROVIDER_BLOCKED} 로 실패한다.
  * 한 provider 안에서 계정을 돌려 쓰는 것은 Hermes 가 이미 하므로 여기서 하지 않는다.
+ *
+ * <p>자동 turn 은 알림 줄 저장, 전했다는 표시, 자동 turn 수 증가, 전달 묶음과 첫 시도 저장을 한 트랜잭션에 적는다. 그
+ * 시도는 부모 turn 의 실행 줄을 잇고 그 turn 이 끝난 방식으로 닫힌다(ADR-070).
  */
 @Service
 @Slf4j
@@ -115,6 +121,7 @@ public class ChatService {
     private final ChatPendingMessageRepository pendingMessages;
     private final List<AutoTurnResultSource> resultSources;
     private final UserExecutionLimiter limiter;
+    private final ResultDeliveryRecorder resultDeliveries;
 
     public ChatTurn send(CurrentUser user, Long conversationId, String text, String agentCode) {
         return send(user, conversationId, text, agentCode, List.of());
@@ -173,8 +180,8 @@ public class ChatService {
      * 있어 여기서 다시 읽는다. 비었으면 아무것도 남기지 않고 돌아간다.
      *
      * <p>알림 줄은 위임 결과에 한 줄, 그 밖의 결과마다 한 줄이다. 알림 줄 저장, 결과마다 전했다는 표시, 자동 turn 수
-     * 증가는 한 트랜잭션이다. 그 뒤 Hermes 가 실패해도 같은
-     * 결과로 다시 깨우지 않는다. 같은 실패를 되풀이하지 않기 위해서다. 실패는 예외로 올라간다.
+     * 증가, 전달 묶음과 항목과 첫 시도 저장은 한 트랜잭션이다(ADR-070). 그 뒤 Hermes 가 실패해도 같은
+     * 결과로 다시 깨우지 않는다. 같은 실패를 되풀이하지 않기 위해서다. 실패는 시도에 남기고 예외로 올라간다.
      *
      * @param owner 대화 주인. 요청이 없으므로 부르는 쪽이 사용자 행으로 만든다
      * @param onEvent 알림 줄, {@code started}, 답 조각, {@code done} 이나 {@code stopped} 를 받는다
@@ -217,13 +224,101 @@ public class ChatService {
             log.warn("흐름이 붙은 대화라 맡긴 일의 결과를 전하지 않는다 conversationId={}", conversationId);
             return;
         }
-        List<Long> ids = results.stream().map(AgentExecution::id).toList();
-        TurnIntent intent = new TurnIntent.DelegationResults(ids, notices, deliveries);
-        ChatTurn turn = runTurn(owner, routed, input.toString(), intent, onEvent, true, handle);
+        Long attemptId = recordDelivery(routed.conversation(), results, notices, deliveries, onEvent);
+        runDeliveryTurn(owner, routed, input.toString(), attemptId, handle, onEvent);
+    }
+
+    /**
+     * 알림 줄, 전했다는 표시, 자동 turn 수, 전달 묶음과 항목과 첫 시도를 한 트랜잭션에 적고 그 시도의 번호를 돌려준다.
+     *
+     * <p>알림 줄이 곧 전했다는 표시다. 이 쓰기들이 모두 함께 남거나 함께 빠진다. 제목은 채우지 않는다. 항목은 위임 결과가 먼저이고
+     * 그 뒤로 결과를 낸 쪽의 순서대로다. 저장한 알림 줄마다 {@code system} 사건을 낸다.
+     */
+    private Long recordDelivery(
+            Conversation conversation,
+            List<AgentExecution> results,
+            List<String> notices,
+            List<AutoTurnDelivery> deliveries,
+            Consumer<ChatEvent> onEvent) {
+        List<DeliveryItemRef> items = new ArrayList<>();
+        results.forEach(result ->
+                items.add(new DeliveryItemRef(ResultDeliveryRecorder.DELEGATION_SOURCE, String.valueOf(result.id()))));
+        deliveries.forEach(delivery -> delivery.keys()
+                .forEach(key -> items.add(new DeliveryItemRef(delivery.source().source(), key))));
+        record Saved(List<ChatMessage> lines, Long attemptId) {}
+        Saved saved = transactions.execute(status -> {
+            Instant deliveredAt = Instant.now(clock);
+            List<ChatMessage> lines = notices.stream()
+                    .map(notice -> messages.save(ChatMessage.fromSystem(conversation.id(), notice, deliveredAt)))
+                    .toList();
+            results.forEach(result -> deliveryWriter.markResultDelivered(result.id(), deliveredAt));
+            deliveries.forEach(delivery -> delivery.source().markDelivered(delivery.keys(), deliveredAt));
+            conversationWriter.incrementAutoTurns(conversation.id());
+            ResultDeliveryStart start = resultDeliveries.open(
+                    conversation.id(), items, lines.getLast().id(), deliveredAt);
+            return new Saved(lines, start.attemptId());
+        });
+        saved.lines()
+                .forEach(line -> onEvent.accept(ChatEvent.system(conversation.publicId(), line.id(), line.content())));
+        return saved.attemptId();
+    }
+
+    /**
+     * 전달 시도 하나로 부모 turn 을 돌리고, 그 turn 이 끝난 방식으로 시도를 닫은 뒤 끝 사건을 낸다(ADR-070).
+     *
+     * <p>답을 남기면 {@code SUCCEEDED}, 중지로 끝나면 {@code STOPPED} 다. 예외로 끝났어도 사용자가 중지를 확정했으면
+     * {@code STOPPED} 다. 그 밖의 예외는 {@code FAILED} 와 그 예외의 오류 코드이고, 원래 예외를 다시 던진다.
+     * {@code Error} 로 끝나도 시도가 {@code RUNNING} 으로 남지 않게 {@code finally} 에서 닫는다.
+     *
+     * <p>끝 사건은 시도를 닫은 뒤에 낸다. 화면이 끝 사건을 받고 이력을 다시 읽을 때 묶음 상태가 이미 바뀌어 있어야 한다.
+     */
+    private void runDeliveryTurn(
+            CurrentUser owner,
+            Routed routed,
+            String input,
+            Long attemptId,
+            TurnHandle handle,
+            Consumer<ChatEvent> onEvent) {
+        boolean closed = false;
+        ChatTurn turn;
+        try {
+            turn = runTurn(owner, routed, input, new TurnIntent.DelegationResults(attemptId), onEvent, true, handle);
+            closed = true;
+            closeAttempt(
+                    attemptId,
+                    turn.cancelled() ? DeliveryAttemptStatus.STOPPED : DeliveryAttemptStatus.SUCCEEDED,
+                    null);
+        } catch (RuntimeException ex) {
+            closed = true;
+            if (turns.isStopConfirmed(handle)) {
+                closeAttempt(attemptId, DeliveryAttemptStatus.STOPPED, null);
+            } else {
+                String code = ex instanceof ApiException api ? api.code().name() : ErrorCode.INTERNAL_ERROR.name();
+                closeAttempt(attemptId, DeliveryAttemptStatus.FAILED, code);
+            }
+            throw ex;
+        } finally {
+            if (!closed) {
+                closeAttempt(attemptId, DeliveryAttemptStatus.FAILED, ErrorCode.INTERNAL_ERROR.name());
+            }
+        }
         onEvent.accept(
                 turn.cancelled()
                         ? ChatEvent.stopped(turn.conversationPublicId(), turn.messageId(), turn.executionId())
                         : ChatEvent.done(turn.conversationPublicId(), turn.messageId(), turn.executionId()));
+    }
+
+    /**
+     * 전달 시도를 닫는다. 닫다 실패해도 turn 의 결과나 원래 예외를 바꾸지 않고 경고 로그만 남긴다.
+     *
+     * <p>그렇게 남은 시도는 다음 기동의 정리가 닫는다.
+     */
+    private void closeAttempt(Long attemptId, DeliveryAttemptStatus status, String errorCode) {
+        try {
+            resultDeliveries.finish(attemptId, status, errorCode);
+        } catch (RuntimeException ex) {
+            log.warn("전달 시도를 닫지 못했다 attemptId={} status={}", attemptId, status, ex);
+        }
     }
 
     /** 읽은 대기 행이 저장 전에 취소돼 다시 읽는 횟수의 상한이다. */
@@ -771,8 +866,25 @@ public class ChatService {
                 null,
                 modelTier,
                 requestReceivedAt);
+        if (intent instanceof TurnIntent.DelegationResults results) {
+            attachDeliveryExecution(results.attemptId(), execution.id());
+        }
         return new PendingTurn(
                 user, conversation, agent, command, execution, new SequenceCounter(), new StringBuilder(), intent);
+    }
+
+    /**
+     * 자동 turn 의 전달 시도에 그 turn 의 실행 줄을 잇는다(ADR-070).
+     *
+     * <p>실패해도 던지지 않는다. 던지면 방금 만든 실행 줄이 {@code RUNNING} 으로 남는다. 이 뒤에는 그 줄을 실패로 적는
+     * 경로가 없다. 시도는 이어지지 않은 채 turn 이 끝난 방식으로 닫힌다.
+     */
+    private void attachDeliveryExecution(Long attemptId, Long executionId) {
+        try {
+            resultDeliveries.attachExecution(attemptId, executionId);
+        } catch (RuntimeException ex) {
+            log.warn("전달 시도에 실행 줄을 잇지 못했다 attemptId={} executionId={}", attemptId, executionId, ex);
+        }
     }
 
     private String submit(PendingTurn pending) {
@@ -987,25 +1099,7 @@ public class ChatService {
             List<Long> attachmentIds,
             TurnIntent intent,
             Consumer<ChatEvent> onEvent) {
-        if (intent instanceof TurnIntent.Regenerate) {
-            return;
-        }
-        if (intent instanceof TurnIntent.DelegationResults results) {
-            // 알림 줄이 곧 전했다는 표시다. 알림 줄, 전했다는 표시, 자동 turn 수가 함께 남거나 함께 빠진다.
-            // 제목은 채우지 않는다.
-            List<ChatMessage> saved = transactions.execute(status -> {
-                Instant deliveredAt = Instant.now(clock);
-                List<ChatMessage> lines = results.notices().stream()
-                        .map(notice -> messages.save(ChatMessage.fromSystem(conversation.id(), notice, deliveredAt)))
-                        .toList();
-                results.executionIds().forEach(id -> deliveryWriter.markResultDelivered(id, deliveredAt));
-                results.deliveries().forEach(delivery -> delivery.source().markDelivered(delivery.keys(), deliveredAt));
-                conversationWriter.incrementAutoTurns(conversation.id());
-                return lines;
-            });
-            saved.forEach(line -> onEvent.accept(ChatEvent.system(conversation.publicId(), line.id(), line.content())));
-            return;
-        }
+        // 다시 생성은 질문을 이미 저장했다. 자동 turn 의 알림 줄은 이 turn 을 열기 전에 저장했다.
         if (!(intent instanceof TurnIntent.Fresh fresh)) {
             return;
         }

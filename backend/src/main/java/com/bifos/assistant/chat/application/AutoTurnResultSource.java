@@ -12,6 +12,14 @@ import java.util.List;
  */
 public interface AutoTurnResultSource {
 
+    /**
+     * 전달 묶음의 항목에 적는 출처 이름이다(ADR-070). 40자 안의 대문자 이름이다.
+     *
+     * <p>{@code "DELEGATION"} 은 위임 결과가 쓰므로 쓰지 못한다. 구현마다 다른 이름이어야 한다. 한 결과는
+     * {@code (출처 이름, 결과 이름)} 으로 한 묶음에만 든다.
+     */
+    String source();
+
     /** 그 대화에 아직 전하지 않은 결과다. 생긴 순서다. */
     List<AutoTurnResult> undelivered(Long conversationId);
 
