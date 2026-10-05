@@ -122,9 +122,12 @@ pnpm --dir web test:browser connector-connection agent-connections connector-age
 | 파일 | 변경 |
 | --- | --- |
 | `backend/src/main/java/com/bifos/assistant/connector/presentation/AgentConnectionController.java` | 신규 |
+| `backend/src/main/java/com/bifos/assistant/connector/presentation/ConnectionDtos.java` | 수정 |
 | `backend/src/test/java/com/bifos/assistant/connector/AgentConnectionControllerTest.java` | 신규 |
 | `test/e2e/fake-hermes.ts` | 수정 |
 | `web/src/lib/connection.ts` | 수정 |
+| `web/src/lib/connection-route.ts` | 수정 |
+| `test/browser/admin-area.spec.ts` | 수정 |
 | `web/src/lib/agent-connection.ts` | 신규 |
 | `web/src/app/api/agents/[code]/connections/route.ts` | 신규 |
 | `web/src/app/api/agents/[code]/connections/[connectorId]/route.ts` | 신규 |
