@@ -17,6 +17,7 @@ import com.bifos.assistant.agent.domain.type.CostMode;
 import com.bifos.assistant.agent.domain.type.CredentialScope;
 import com.bifos.assistant.agent.infra.AgentRepository;
 import com.bifos.assistant.agent.presentation.AgentController;
+import com.bifos.assistant.agent.application.KnownFlows;
 import com.bifos.assistant.agent.presentation.AgentDtos.AgentView;
 import com.bifos.assistant.chat.application.ArtifactService;
 import com.bifos.assistant.chat.application.AttachmentService;
@@ -97,6 +98,8 @@ class ChatAttachmentTurnTest {
 
     @Autowired
     ChatService chat;
+    @Autowired
+    KnownFlows flows;
     /** 결과물 폴더 단락의 문구는 {@code ArtifactTest} 가 글자 그대로 견준다. 여기서는 그 단락을 받아 쓴다. */
     @Autowired
     ArtifactService artifactService;
@@ -396,7 +399,7 @@ class ChatAttachmentTurnTest {
         CurrentUserProvider provider = mock(CurrentUserProvider.class);
         when(provider.require()).thenReturn(dad);
 
-        List<AgentView> listed = new AgentController(agentService, provider, agentLifecycle).readable();
+        List<AgentView> listed = new AgentController(agentService, provider, agentLifecycle, flows).readable();
 
         assertThat(listed)
                 .extracting(AgentView::code, AgentView::acceptsAttachments)
