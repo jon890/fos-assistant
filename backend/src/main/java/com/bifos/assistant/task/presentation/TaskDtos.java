@@ -1,13 +1,13 @@
 package com.bifos.assistant.task.presentation;
 
 import com.bifos.assistant.agent.domain.Agent;
+import com.bifos.assistant.proactive.application.model.CheckBlocker;
+import com.bifos.assistant.task.application.model.ProactiveSchedule;
+import com.bifos.assistant.task.application.model.ProactiveSchedule.LastCheck;
 import com.bifos.assistant.task.application.model.ScheduleInput;
 import com.bifos.assistant.task.application.model.TaskDetail;
 import com.bifos.assistant.task.application.model.TaskInput;
 import com.bifos.assistant.task.application.model.TaskRunDetail;
-import com.bifos.assistant.task.application.model.ProactiveSchedule;
-import com.bifos.assistant.task.application.model.ProactiveSchedule.LastCheck;
-import com.bifos.assistant.proactive.application.model.CheckBlocker;
 import com.bifos.assistant.task.domain.Task;
 import com.bifos.assistant.task.domain.TaskRun;
 import com.bifos.assistant.task.domain.TaskTrigger;
@@ -34,7 +34,10 @@ import lombok.NoArgsConstructor;
 public final class TaskDtos {
 
     /** 매일 깨우기를 켜거나 끄는 요청이다. */
-    public record ProactiveScheduleRequest(boolean enabled, @NotBlank String time, @NotBlank String timezone) {}
+    public record ProactiveScheduleRequest(
+            boolean enabled,
+            @NotBlank String time,
+            @NotBlank String timezone) {}
 
     /** 에이전트별 매일 깨우기 설정이다. */
     public record ProactiveScheduleView(

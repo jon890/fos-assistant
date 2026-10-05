@@ -143,8 +143,7 @@ class CheckResultParserTest {
     @Test
     @DisplayName("version 2 보고에서 모델이 쓴 changed와 done과 next만 상한 안에서 읽는다")
     void readsVersionTwoReportWithoutModelControlledEvidenceOrApprovals() {
-        CheckResultBlock result = parser
-                .read(block("""
+        CheckResultBlock result = parser.read(block("""
                         {
                           "version": 2,
                           "outcome": "FINDINGS",
@@ -155,8 +154,7 @@ class CheckResultParserTest {
                             "needsApproval": ["fake-id"],
                             "next": ["다음 주 확인", "지원 조건 비교", "버린다"]
                           }
-                        }"""))
-                .block();
+                        }""")).block();
 
         assertThat(result.version()).isEqualTo(2);
         assertThat(result.report().changed()).containsExactly("새 공고", "새 자료", "세 번째");

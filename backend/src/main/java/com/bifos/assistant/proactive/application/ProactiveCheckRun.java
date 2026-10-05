@@ -595,8 +595,11 @@ public class ProactiveCheckRun implements CheckTurn {
         List<AgentExecution> tree = new ArrayList<>(deps.executions().findByRootExecutionId(rootId));
         deps.executions().findById(rootId).ifPresent(tree::add);
         long input = tree.stream().mapToLong(each -> orZero(each.inputTokens())).sum();
-        long cachedInput = tree.stream().mapToLong(each -> orZero(each.cachedInputTokens())).sum();
-        long output = tree.stream().mapToLong(each -> orZero(each.outputTokens())).sum();
+        long cachedInput = tree.stream()
+                .mapToLong(each -> orZero(each.cachedInputTokens()))
+                .sum();
+        long output =
+                tree.stream().mapToLong(each -> orZero(each.outputTokens())).sum();
         return new TreeTokens(input, cachedInput, output);
     }
 

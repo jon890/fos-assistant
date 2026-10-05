@@ -1,12 +1,12 @@
 package com.bifos.assistant.task.application;
 
+import com.bifos.assistant.proactive.domain.type.CheckStatus;
+import com.bifos.assistant.proactive.infra.ProactiveCheckRepository;
 import com.bifos.assistant.task.domain.TaskRun;
 import com.bifos.assistant.task.domain.type.TaskRunReason;
 import com.bifos.assistant.task.domain.type.TaskRunStatus;
 import com.bifos.assistant.task.infra.TaskRepository;
 import com.bifos.assistant.task.infra.TaskRunRepository;
-import com.bifos.assistant.proactive.domain.type.CheckStatus;
-import com.bifos.assistant.proactive.infra.ProactiveCheckRepository;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.concurrent.atomic.AtomicBoolean;

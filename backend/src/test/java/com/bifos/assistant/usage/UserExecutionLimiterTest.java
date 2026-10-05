@@ -161,8 +161,8 @@ class UserExecutionLimiterTest {
         assertThat(limiter.isBackgroundConversation(991L)).isTrue();
         limiter.admit(userId, ExecutionAdmission.BACKGROUND_CHILD, () -> saveRunning(userId, 10L, 1L));
 
-        assertUserBusy(() -> limiter.admit(
-                userId, ExecutionAdmission.BACKGROUND_CHILD, () -> saveRunning(userId, 10L, 1L)));
+        assertUserBusy(
+                () -> limiter.admit(userId, ExecutionAdmission.BACKGROUND_CHILD, () -> saveRunning(userId, 10L, 1L)));
         limiter.acquireTurn(userId);
         assertThat(limiter.used(userId)).isEqualTo(3);
 

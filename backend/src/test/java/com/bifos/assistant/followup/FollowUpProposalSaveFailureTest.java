@@ -44,8 +44,7 @@ class FollowUpProposalSaveFailureTest {
     void setUp() {
         repository = mock(FollowUpRepository.class);
         ConversationAccess conversations = mock(ConversationAccess.class);
-        when(conversations.requireOwn(DAD, 11L))
-                .thenReturn(Conversation.startedBy(DAD.id(), "대화", 1L, NOW));
+        when(conversations.requireOwn(DAD, 11L)).thenReturn(Conversation.startedBy(DAD.id(), "대화", 1L, NOW));
         followUps = new FollowUpService(
                 repository,
                 conversations,

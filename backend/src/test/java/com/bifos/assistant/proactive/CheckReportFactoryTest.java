@@ -12,10 +12,10 @@ import com.bifos.assistant.proactive.domain.CheckReport;
 import com.bifos.assistant.proactive.domain.type.CheckOutcome;
 import com.bifos.assistant.proactive.domain.type.FindingKind;
 import com.bifos.assistant.proactive.domain.type.FindingReason;
-import java.util.List;
-import java.util.UUID;
 import java.time.Instant;
+import java.util.List;
 import java.util.Set;
+import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -38,7 +38,8 @@ class CheckReportFactoryTest {
                 List.of(),
                 new CheckResultBlock.ReportDraft(List.of("바뀜"), List.of("확인"), List.of("다음")));
         List<JudgedFinding> judged = List.of(
-                new JudgedFinding(null, FindingKind.REFERENCE, FindingReason.CLOSED, "https://example.com/closed", null),
+                new JudgedFinding(
+                        null, FindingKind.REFERENCE, FindingReason.CLOSED, "https://example.com/closed", null),
                 judged("https://example.com/a"),
                 judged("https://example.com/a"),
                 judged("https://example.com/b"),

@@ -255,7 +255,8 @@ public class ExecutionRecorder {
             ExecutionConversation conversation, Long parentExecutionId, Long rootExecutionId) {
         if (parentExecutionId != null) {
             Long rootId = rootExecutionId == null ? parentExecutionId : rootExecutionId;
-            Long rootConversationId = executions.findById(rootId)
+            Long rootConversationId = executions
+                    .findById(rootId)
                     .map(AgentExecution::conversationId)
                     .orElse(null);
             if (limiter.isBackgroundConversation(rootConversationId)) {

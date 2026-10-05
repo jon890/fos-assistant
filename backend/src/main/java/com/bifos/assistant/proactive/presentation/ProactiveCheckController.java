@@ -35,5 +35,4 @@ public class ProactiveCheckController {
     public StartedResponse start(@PathVariable String code) {
         return new StartedResponse(checks.start(currentUser.require(), code, CheckTrigger.MANUAL));
     }
-
 }

@@ -318,7 +318,8 @@ class ProactiveCheckStartTest {
 
         UUID returned = service.start(owner, agent.code(), CheckTrigger.SCHEDULED);
 
-        ProactiveCheck skipped = checks.findFirstByUserIdAndAgentIdOrderByIdDesc(owner.id(), agent.id()).orElseThrow();
+        ProactiveCheck skipped = checks.findFirstByUserIdAndAgentIdOrderByIdDesc(owner.id(), agent.id())
+                .orElseThrow();
         assertThat(returned).isEqualTo(conversation.publicId());
         assertThat(skipped.skippedReason()).isEqualTo(CheckSkippedReason.UNREAD_REPORT);
         assertThat(skipped.rootExecutionId()).isNull();

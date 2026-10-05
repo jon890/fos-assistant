@@ -11,19 +11,19 @@ import com.bifos.assistant.chat.application.TurnCancellation;
 import com.bifos.assistant.chat.application.TurnHandle;
 import com.bifos.assistant.chat.domain.Conversation;
 import com.bifos.assistant.chat.infra.ConversationRepository;
+import com.bifos.assistant.proactive.application.ProactiveCheckService;
+import com.bifos.assistant.proactive.domain.type.CheckStatus;
+import com.bifos.assistant.proactive.infra.ProactiveCheckRepository;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.task.domain.Task;
 import com.bifos.assistant.task.domain.TaskRun;
 import com.bifos.assistant.task.domain.type.ConversationMode;
+import com.bifos.assistant.task.domain.type.TaskKind;
 import com.bifos.assistant.task.domain.type.TaskRunReason;
 import com.bifos.assistant.task.domain.type.TaskRunStatus;
 import com.bifos.assistant.task.domain.type.TaskState;
-import com.bifos.assistant.task.domain.type.TaskKind;
-import com.bifos.assistant.proactive.application.ProactiveCheckService;
-import com.bifos.assistant.proactive.domain.type.CheckStatus;
-import com.bifos.assistant.proactive.infra.ProactiveCheckRepository;
 import com.bifos.assistant.task.infra.TaskRepository;
 import com.bifos.assistant.task.infra.TaskRunRepository;
 import com.bifos.assistant.user.application.SignInRevocation;
@@ -194,16 +194,13 @@ public class TaskRunStarter {
                 skipCheck(runId, TaskRunReason.AGENT_UNAVAILABLE, now);
                 return false;
             }
-            proactiveChecks.startScheduled(
-                    prepared.owner(),
-                    prepared.agentCode(),
-                    check -> {
-                        Boolean marked = transactions.execute(
-                                status -> markCheckRunning(runId, check.id(), check.conversationId(), now));
-                        if (!Boolean.TRUE.equals(marked)) {
-                            throw new IllegalStateException("scheduled proactive check could not link its task run");
-                        }
-                    });
+            proactiveChecks.startScheduled(prepared.owner(), prepared.agentCode(), check -> {
+                Boolean marked = transactions.execute(
+                        status -> markCheckRunning(runId, check.id(), check.conversationId(), now));
+                if (!Boolean.TRUE.equals(marked)) {
+                    throw new IllegalStateException("scheduled proactive check could not link its task run");
+                }
+            });
         } catch (ApiException ex) {
             if (ex.code() == ErrorCode.USER_BUSY || ex.code() == ErrorCode.CONVERSATION_BUSY) {
                 return false;

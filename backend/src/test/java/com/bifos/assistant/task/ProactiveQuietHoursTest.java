@@ -36,8 +36,10 @@ class ProactiveQuietHoursTest {
     void suppressesScheduledCheckNotificationsDuringQuietHours() {
         quietSchedule(ZoneId.of("Asia/Seoul"));
 
-        assertThat(policy().allows(origin, Instant.parse("2026-10-05T13:00:00Z"))).isFalse();
-        assertThat(policy().allows(origin, Instant.parse("2026-10-05T21:59:59Z"))).isFalse();
+        assertThat(policy().allows(origin, Instant.parse("2026-10-05T13:00:00Z")))
+                .isFalse();
+        assertThat(policy().allows(origin, Instant.parse("2026-10-05T21:59:59Z")))
+                .isFalse();
     }
 
     @Test
@@ -45,8 +47,10 @@ class ProactiveQuietHoursTest {
     void allowsScheduledCheckNotificationsOutsideQuietHours() {
         quietSchedule(ZoneId.of("Asia/Seoul"));
 
-        assertThat(policy().allows(origin, Instant.parse("2026-10-04T22:00:00Z"))).isTrue();
-        assertThat(policy().allows(origin, Instant.parse("2026-10-05T12:59:59Z"))).isTrue();
+        assertThat(policy().allows(origin, Instant.parse("2026-10-04T22:00:00Z")))
+                .isTrue();
+        assertThat(policy().allows(origin, Instant.parse("2026-10-05T12:59:59Z")))
+                .isTrue();
     }
 
     @Test
@@ -55,10 +59,12 @@ class ProactiveQuietHoursTest {
         when(checks.checkOf(origin)).thenReturn(Optional.of(scheduled));
         when(scheduled.trigger()).thenReturn(CheckTrigger.MANUAL);
 
-        assertThat(policy().allows(origin, Instant.parse("2026-10-05T13:00:00Z"))).isTrue();
+        assertThat(policy().allows(origin, Instant.parse("2026-10-05T13:00:00Z")))
+                .isTrue();
 
         when(checks.checkOf(origin)).thenReturn(Optional.empty());
-        assertThat(policy().allows(origin, Instant.parse("2026-10-05T13:00:00Z"))).isTrue();
+        assertThat(policy().allows(origin, Instant.parse("2026-10-05T13:00:00Z")))
+                .isTrue();
     }
 
     @Test
@@ -68,9 +74,11 @@ class ProactiveQuietHoursTest {
         when(scheduled.trigger()).thenReturn(CheckTrigger.SCHEDULED);
         when(scheduled.userId()).thenReturn(101L);
         when(scheduled.agentId()).thenReturn(201L);
-        when(tasks.findByOwnerUserIdAndAgentIdAndKind(101L, 201L, TaskKind.CHECK)).thenReturn(Optional.empty());
+        when(tasks.findByOwnerUserIdAndAgentIdAndKind(101L, 201L, TaskKind.CHECK))
+                .thenReturn(Optional.empty());
 
-        assertThat(policy().allows(origin, Instant.parse("2026-10-05T10:00:00Z"))).isFalse();
+        assertThat(policy().allows(origin, Instant.parse("2026-10-05T10:00:00Z")))
+                .isFalse();
         verify(tasks).findByOwnerUserIdAndAgentIdAndKind(101L, 201L, TaskKind.CHECK);
     }
 
@@ -79,7 +87,8 @@ class ProactiveQuietHoursTest {
         when(scheduled.trigger()).thenReturn(CheckTrigger.SCHEDULED);
         when(scheduled.userId()).thenReturn(101L);
         when(scheduled.agentId()).thenReturn(201L);
-        when(tasks.findByOwnerUserIdAndAgentIdAndKind(101L, 201L, TaskKind.CHECK)).thenReturn(Optional.of(schedule));
+        when(tasks.findByOwnerUserIdAndAgentIdAndKind(101L, 201L, TaskKind.CHECK))
+                .thenReturn(Optional.of(schedule));
         when(schedule.archived()).thenReturn(false);
         when(schedule.id()).thenReturn(301L);
         when(triggers.findByTaskId(301L)).thenReturn(Optional.of(trigger));

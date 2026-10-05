@@ -110,8 +110,7 @@ public class ProactiveCheckService {
      * 예약 작업이 자기 {@code task_run}에 정확히 그 점검 줄을 잇도록, Hermes 호출 전에 저장한 점검 줄을 넘긴다.
      * 기존 UUID 반환 경로는 위의 메서드가 유지한다.
      */
-    public UUID start(
-            CurrentUser user, String agentCode, CheckTrigger trigger, Consumer<ProactiveCheck> beforeRun) {
+    public UUID start(CurrentUser user, String agentCode, CheckTrigger trigger, Consumer<ProactiveCheck> beforeRun) {
         Agent agent = agents.requireStartable(user, agentCode);
         if (!readiness.check(agent).available()) {
             throw new ApiException(
@@ -121,7 +120,12 @@ public class ProactiveCheckService {
         Conversation conversation = opened.conversation();
         if (trigger == CheckTrigger.SCHEDULED && hasUnreadReport(conversation.id())) {
             ProactiveCheck skipped = ProactiveCheck.started(
-                    user.id(), agent.id(), conversation.id(), trigger, agent.proactiveCheckWritesAllowed(), clock.instant());
+                    user.id(),
+                    agent.id(),
+                    conversation.id(),
+                    trigger,
+                    agent.proactiveCheckWritesAllowed(),
+                    clock.instant());
             skipped.skip(CheckSkippedReason.UNREAD_REPORT, clock.instant());
             saveLinked(skipped, beforeRun);
             return conversation.publicId();
@@ -167,7 +171,8 @@ public class ProactiveCheckService {
     @Transactional
     public void openReport(CurrentUser user, Long checkId) {
         ProactiveCheck check = checks.findByIdAndUserIdAndReportIsNotNull(checkId, user.id())
-                .orElseThrow(() -> new ApiException(ErrorCode.PROACTIVE_CHECK_NOT_FOUND, "no such proactive check report"));
+                .orElseThrow(
+                        () -> new ApiException(ErrorCode.PROACTIVE_CHECK_NOT_FOUND, "no such proactive check report"));
         check.openReport(clock.instant());
     }
 

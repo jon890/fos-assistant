@@ -53,8 +53,10 @@ public class ProactiveScheduleService {
     @Transactional(readOnly = true)
     public ProactiveSchedule get(CurrentUser user, String agentCode) {
         Agent agent = agents.requireReadable(user, agentCode);
-        Task task = tasks.findByOwnerUserIdAndAgentIdAndKind(user.id(), agent.id(), TaskKind.CHECK).orElse(null);
-        TaskTrigger trigger = task == null ? null : triggers.findByTaskId(task.id()).orElse(null);
+        Task task = tasks.findByOwnerUserIdAndAgentIdAndKind(user.id(), agent.id(), TaskKind.CHECK)
+                .orElse(null);
+        TaskTrigger trigger =
+                task == null ? null : triggers.findByTaskId(task.id()).orElse(null);
         return view(user, agent, task, trigger);
     }
 
@@ -69,12 +71,14 @@ public class ProactiveScheduleService {
         Agent agent = enabled ? agents.requireStartable(user, agentCode) : agents.requireReadable(user, agentCode);
         ZoneId zone = TaskSchedule.parseZone(requiredTimeZone(timeZone));
         LocalTime localTime = parseTime(time);
-        Task task = tasks.findByOwnerUserIdAndAgentIdAndKindForUpdate(user.id(), agent.id(), TaskKind.CHECK).orElse(null);
+        Task task = tasks.findByOwnerUserIdAndAgentIdAndKindForUpdate(user.id(), agent.id(), TaskKind.CHECK)
+                .orElse(null);
         Instant now = clock.instant();
         String cron = cron(localTime);
         Instant next = TaskSchedule.nextAfter(TaskSchedule.parseCron(cron), zone, now);
         if (enabled && !blockers(agent).isEmpty()) {
-            throw new ApiException(ErrorCode.PROACTIVE_CHECK_UNAVAILABLE, "this agent cannot schedule a proactive check now");
+            throw new ApiException(
+                    ErrorCode.PROACTIVE_CHECK_UNAVAILABLE, "this agent cannot schedule a proactive check now");
         }
         if (task == null) {
             task = tasks.save(Task.check(user.id(), agent.id(), CHECK_TITLE, now));
@@ -95,7 +99,8 @@ public class ProactiveScheduleService {
 
     private ProactiveSchedule view(CurrentUser user, Agent agent, Task task, TaskTrigger trigger) {
         List<CheckBlocker> blockers = blockers(agent);
-        ProactiveCheck last = checks.findFirstByUserIdAndAgentIdOrderByIdDesc(user.id(), agent.id()).orElse(null);
+        ProactiveCheck last = checks.findFirstByUserIdAndAgentIdOrderByIdDesc(user.id(), agent.id())
+                .orElse(null);
         return new ProactiveSchedule(
                 task != null && task.state() == TaskState.ACTIVE,
                 trigger == null ? DEFAULT_TIME : timeOf(trigger),
@@ -117,8 +122,8 @@ public class ProactiveScheduleService {
     private List<CheckBlocker> blockers(Agent agent) {
         CheckReadiness checked = readiness.check(agent);
         List<CheckBlocker> blockers = new ArrayList<>(checked.blockers());
-        boolean unsupported = blockers.stream()
-                .anyMatch(blocker -> blocker.code() == CheckBlockerCode.AGENT_NOT_SUPPORTED);
+        boolean unsupported =
+                blockers.stream().anyMatch(blocker -> blocker.code() == CheckBlockerCode.AGENT_NOT_SUPPORTED);
         if (unsupported) {
             return List.copyOf(blockers);
         }

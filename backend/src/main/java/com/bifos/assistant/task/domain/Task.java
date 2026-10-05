@@ -2,8 +2,8 @@ package com.bifos.assistant.task.domain;
 
 import com.bifos.assistant.task.domain.type.ConversationMode;
 import com.bifos.assistant.task.domain.type.NotifyPolicy;
-import com.bifos.assistant.task.domain.type.TaskState;
 import com.bifos.assistant.task.domain.type.TaskKind;
+import com.bifos.assistant.task.domain.type.TaskState;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;

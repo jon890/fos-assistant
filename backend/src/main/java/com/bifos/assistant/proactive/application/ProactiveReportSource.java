@@ -18,7 +18,12 @@ public class ProactiveReportSource {
     public List<UnreadCheckReport> unreadOf(Long userId) {
         return checks.findByUserIdAndReportIsNotNullAndReportOpenedAtIsNullOrderByStartedAtDesc(userId).stream()
                 .map(check -> new UnreadCheckReport(
-                        check.id(), check.agentId(), check.conversationId(), check.startedAt(), check.finishedAt(), check.report()))
+                        check.id(),
+                        check.agentId(),
+                        check.conversationId(),
+                        check.startedAt(),
+                        check.finishedAt(),
+                        check.report()))
                 .toList();
     }
 }

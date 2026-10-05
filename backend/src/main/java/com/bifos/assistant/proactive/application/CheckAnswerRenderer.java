@@ -95,9 +95,8 @@ public class CheckAnswerRenderer {
         addSection(parts, "바뀐 점", report.changed());
         addSection(parts, "한 일", report.done());
         if (!report.evidence().isEmpty()) {
-            parts.add("**근거**\n" + report.evidence().stream()
-                    .map(url -> "- " + link(url))
-                    .collect(Collectors.joining("\n")));
+            parts.add("**근거**\n"
+                    + report.evidence().stream().map(url -> "- " + link(url)).collect(Collectors.joining("\n")));
         }
         addSection(parts, "남은 승인", report.needsApproval());
         addSection(parts, "다음에 볼 것", report.next());

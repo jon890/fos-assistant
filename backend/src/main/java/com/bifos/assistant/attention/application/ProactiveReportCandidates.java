@@ -40,9 +40,10 @@ public class ProactiveReportCandidates implements AttentionCandidates {
         if (unread.isEmpty()) {
             return List.of();
         }
-        Map<Long, Conversation> owned =
-                conversations.activeOf(user, unread.stream().map(UnreadCheckReport::conversationId).toList());
-        Map<Long, Agent> agentsById = agents.byIds(unread.stream().map(UnreadCheckReport::agentId).toList());
+        Map<Long, Conversation> owned = conversations.activeOf(
+                user, unread.stream().map(UnreadCheckReport::conversationId).toList());
+        Map<Long, Agent> agentsById =
+                agents.byIds(unread.stream().map(UnreadCheckReport::agentId).toList());
         return unread.stream()
                 .filter(check -> owned.containsKey(check.conversationId()))
                 .map(check -> candidate(check, owned.get(check.conversationId()), agentsById.get(check.agentId())))
@@ -65,7 +66,9 @@ public class ProactiveReportCandidates implements AttentionCandidates {
         return new AttentionCandidate(
                 CardKey.REPORTS,
                 itemKey,
-                AttentionCandidates.stateKey(AttentionTrigger.PROACTIVE_REPORT_TRIGGER, check.checkId().toString()),
+                AttentionCandidates.stateKey(
+                        AttentionTrigger.PROACTIVE_REPORT_TRIGGER,
+                        check.checkId().toString()),
                 AttentionTrigger.PROACTIVE_REPORT_TRIGGER,
                 false,
                 false,

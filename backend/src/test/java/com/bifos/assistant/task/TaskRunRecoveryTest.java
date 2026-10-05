@@ -14,6 +14,11 @@ import com.bifos.assistant.notification.domain.Notification;
 import com.bifos.assistant.notification.domain.type.NotificationKind;
 import com.bifos.assistant.notification.domain.type.NotificationTargetType;
 import com.bifos.assistant.notification.infra.NotificationRepository;
+import com.bifos.assistant.proactive.domain.ProactiveCheck;
+import com.bifos.assistant.proactive.domain.type.CheckInvalidReason;
+import com.bifos.assistant.proactive.domain.type.CheckSkippedReason;
+import com.bifos.assistant.proactive.domain.type.CheckTrigger;
+import com.bifos.assistant.proactive.infra.ProactiveCheckRepository;
 import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.task.application.TaskDispatcher;
 import com.bifos.assistant.task.application.TaskFiring;
@@ -28,14 +33,9 @@ import com.bifos.assistant.task.domain.type.MissedPolicy;
 import com.bifos.assistant.task.domain.type.NotifyPolicy;
 import com.bifos.assistant.task.domain.type.TaskRunReason;
 import com.bifos.assistant.task.domain.type.TaskRunStatus;
-import com.bifos.assistant.proactive.domain.ProactiveCheck;
-import com.bifos.assistant.proactive.domain.type.CheckSkippedReason;
-import com.bifos.assistant.proactive.domain.type.CheckTrigger;
-import com.bifos.assistant.proactive.domain.type.CheckInvalidReason;
 import com.bifos.assistant.task.infra.TaskRepository;
 import com.bifos.assistant.task.infra.TaskRunRepository;
 import com.bifos.assistant.task.infra.TaskTriggerRepository;
-import com.bifos.assistant.proactive.infra.ProactiveCheckRepository;
 import com.bifos.assistant.user.domain.AppUser;
 import com.bifos.assistant.user.infra.AppUserRepository;
 import java.time.Clock;
@@ -203,8 +203,8 @@ class TaskRunRecoveryTest {
     void recoversUnreadScheduledCheckWithoutCountingItAsInterrupted() {
         Fixture fixture = fixture(NotifyPolicy.ALWAYS);
         Task checkTask = tasks.save(Task.check(fixture.ownerId(), fixture.task().agentId(), "매일 먼저 살펴보기", NOW));
-        TaskTrigger checkTrigger = triggers.save(
-                TaskTrigger.cron(checkTask.id(), "0 9 * * *", SEOUL, MissedPolicy.SKIP, SCHEDULED, NOW));
+        TaskTrigger checkTrigger =
+                triggers.save(TaskTrigger.cron(checkTask.id(), "0 9 * * *", SEOUL, MissedPolicy.SKIP, SCHEDULED, NOW));
         ProactiveCheck check = ProactiveCheck.started(
                 fixture.ownerId(), fixture.task().agentId(), 999_999L, CheckTrigger.SCHEDULED, false, NOW);
         check.skip(CheckSkippedReason.UNREAD_REPORT, NOW);
@@ -231,8 +231,8 @@ class TaskRunRecoveryTest {
     void recoversCompletedCheckWithItsRootExecution() {
         Fixture fixture = fixture(NotifyPolicy.NEVER);
         Task checkTask = tasks.save(Task.check(fixture.ownerId(), fixture.task().agentId(), "매일 먼저 살펴보기", NOW));
-        TaskTrigger checkTrigger = triggers.save(
-                TaskTrigger.cron(checkTask.id(), "0 9 * * *", SEOUL, MissedPolicy.SKIP, SCHEDULED, NOW));
+        TaskTrigger checkTrigger =
+                triggers.save(TaskTrigger.cron(checkTask.id(), "0 9 * * *", SEOUL, MissedPolicy.SKIP, SCHEDULED, NOW));
         ProactiveCheck check = ProactiveCheck.started(
                 fixture.ownerId(), fixture.task().agentId(), 999_998L, CheckTrigger.SCHEDULED, false, NOW);
         check.attachRoot(7_777L, "scheduled-session");

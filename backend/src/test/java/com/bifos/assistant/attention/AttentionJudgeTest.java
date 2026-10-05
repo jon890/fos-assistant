@@ -171,7 +171,8 @@ class AttentionJudgeTest {
 
         assertThat(cards)
                 .extracting(AttentionCard::key)
-                .containsExactly(CardKey.DELEGATED, CardKey.FAILURES, CardKey.NEEDS_ME, CardKey.CONTINUE, CardKey.REPORTS);
+                .containsExactly(
+                        CardKey.DELEGATED, CardKey.FAILURES, CardKey.NEEDS_ME, CardKey.CONTINUE, CardKey.REPORTS);
     }
 
     @Test

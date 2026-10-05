@@ -49,7 +49,8 @@ class CheckAnswerRendererTest {
             List<String> questions,
             List<String> followUps,
             List<String> sourceFailures) {
-        return new CheckResultBlock(1, CheckOutcome.FINDINGS, summary, findings, questions, followUps, sourceFailures, null);
+        return new CheckResultBlock(
+                1, CheckOutcome.FINDINGS, summary, findings, questions, followUps, sourceFailures, null);
     }
 
     private String render(CheckResultBlock block) {

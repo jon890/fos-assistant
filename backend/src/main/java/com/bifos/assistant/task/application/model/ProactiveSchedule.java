@@ -1,8 +1,8 @@
 package com.bifos.assistant.task.application.model;
 
 import com.bifos.assistant.proactive.application.model.CheckBlocker;
-import com.bifos.assistant.proactive.domain.type.CheckOutcome;
 import com.bifos.assistant.proactive.domain.type.CheckInvalidReason;
+import com.bifos.assistant.proactive.domain.type.CheckOutcome;
 import com.bifos.assistant.proactive.domain.type.CheckSkippedReason;
 import com.bifos.assistant.proactive.domain.type.CheckStatus;
 import java.time.Instant;

@@ -245,7 +245,8 @@ class ConnectorActionServiceTest {
         ProactiveCheck otherTree = checks.findById(createdChecks.getFirst()).orElseThrow();
 
         assertThat(reportApprovals.pendingPublicIds(run.id())).containsExactly(rootPending);
-        assertThat(reportApprovals.pendingPublicIds(otherTree.rootExecutionId())).containsExactly(childPending);
+        assertThat(reportApprovals.pendingPublicIds(otherTree.rootExecutionId()))
+                .containsExactly(childPending);
 
         jdbc.update("UPDATE connector_action SET user_id = ? WHERE origin_execution_id = ?", owner.id() + 1, run.id());
         assertThat(reportApprovals.pendingPublicIds(run.id())).isEmpty();

@@ -2,20 +2,20 @@ package com.bifos.assistant.task;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 
 import com.bifos.assistant.agent.application.AgentService;
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.hermes.HermesToolsetClient;
 import com.bifos.assistant.proactive.application.ProactiveCheckReadiness;
-import com.bifos.assistant.proactive.application.model.CheckReadiness;
 import com.bifos.assistant.proactive.application.model.CheckBlocker;
 import com.bifos.assistant.proactive.application.model.CheckBlockerCode;
+import com.bifos.assistant.proactive.application.model.CheckReadiness;
 import com.bifos.assistant.proactive.infra.ProactiveCheckRepository;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.domain.type.UserRole;
@@ -48,8 +48,8 @@ class ProactiveScheduleServiceTest {
     @DisplayName("지원하지 않는 에이전트의 일정 조회는 Hermes 도구 목록을 호출하지 않는다")
     void unsupportedAgentReturnsBlockerWithoutHermesCalls() {
         when(agents.requireReadable(user, "connector")).thenReturn(agent);
-        when(readiness.check(agent)).thenReturn(new CheckReadiness(
-                List.of(CheckBlocker.of(CheckBlockerCode.AGENT_NOT_SUPPORTED))));
+        when(readiness.check(agent))
+                .thenReturn(new CheckReadiness(List.of(CheckBlocker.of(CheckBlockerCode.AGENT_NOT_SUPPORTED))));
 
         assertThat(service(false).get(user, "connector").blockers())
                 .containsExactly(CheckBlocker.of(CheckBlockerCode.AGENT_NOT_SUPPORTED));
@@ -86,12 +86,10 @@ class ProactiveScheduleServiceTest {
         when(toolsets.readEnabled("http://agent-runtime.test", "career")).thenReturn(List.of("web", "terminal"));
 
         assertThat(service.get(user, "career").schedulingAvailable()).isFalse();
-        assertThat(service.get(user, "career").blockers())
-                .singleElement()
-                .satisfies(blocker -> {
-                    assertThat(blocker.code().name()).isEqualTo("ISOLATED_EXECUTION_REQUIRED");
-                    assertThat(blocker.toolsets()).containsExactly("terminal");
-                });
+        assertThat(service.get(user, "career").blockers()).singleElement().satisfies(blocker -> {
+            assertThat(blocker.code().name()).isEqualTo("ISOLATED_EXECUTION_REQUIRED");
+            assertThat(blocker.toolsets()).containsExactly("terminal");
+        });
     }
 
     private ProactiveScheduleService service(boolean isolatedExecutionEnabled) {
@@ -103,7 +101,14 @@ class ProactiveScheduleServiceTest {
                 tasks,
                 triggers,
                 checks,
-                new TaskProperties("-", java.time.Duration.ofMinutes(2), java.time.Duration.ofMinutes(10), 10, java.time.Duration.ofMinutes(15), 48, ZoneOffset.UTC.getId()),
+                new TaskProperties(
+                        "-",
+                        java.time.Duration.ofMinutes(2),
+                        java.time.Duration.ofMinutes(10),
+                        10,
+                        java.time.Duration.ofMinutes(15),
+                        48,
+                        ZoneOffset.UTC.getId()),
                 Clock.fixed(Instant.parse("2026-10-05T00:00:00Z"), ZoneOffset.UTC));
     }
 }

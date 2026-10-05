@@ -37,6 +37,10 @@ import com.bifos.assistant.notification.domain.type.NotificationTargetType;
 import com.bifos.assistant.notification.infra.NotificationRepository;
 import com.bifos.assistant.people.domain.AllowedPerson;
 import com.bifos.assistant.people.infra.AllowedPersonRepository;
+import com.bifos.assistant.proactive.domain.ProactiveCheck;
+import com.bifos.assistant.proactive.domain.type.CheckStatus;
+import com.bifos.assistant.proactive.domain.type.CheckTrigger;
+import com.bifos.assistant.proactive.infra.ProactiveCheckRepository;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.shared.error.ApiException;
@@ -55,10 +59,6 @@ import com.bifos.assistant.task.domain.type.TaskState;
 import com.bifos.assistant.task.infra.TaskRepository;
 import com.bifos.assistant.task.infra.TaskRunRepository;
 import com.bifos.assistant.task.infra.TaskTriggerRepository;
-import com.bifos.assistant.proactive.domain.ProactiveCheck;
-import com.bifos.assistant.proactive.domain.type.CheckStatus;
-import com.bifos.assistant.proactive.domain.type.CheckTrigger;
-import com.bifos.assistant.proactive.infra.ProactiveCheckRepository;
 import com.bifos.assistant.usage.application.TurnSlot;
 import com.bifos.assistant.usage.application.UserExecutionLimiter;
 import com.bifos.assistant.user.domain.AppUser;
@@ -675,10 +675,12 @@ class TaskRunStarterTest {
     @DisplayName("CHECK 발화는 점검 대화에서 SCHEDULED 살펴보기를 열고 task_run에 점검과 루트 실행을 연결한다")
     void startsScheduledCheckAndRecoversItsResult() {
         Fixture fixture = fixture(ConversationMode.SINGLE, NotifyPolicy.NEVER);
-        Task checkTask = tasks.save(Task.check(fixture.owner().id(), fixture.task().agentId(), "매일 먼저 살펴보기", NOW));
-        TaskTrigger checkTrigger = triggers.save(
-                TaskTrigger.cron(checkTask.id(), "0 9 * * *", SEOUL, MissedPolicy.SKIP, SCHEDULED, NOW));
-        TaskRun run = runs.save(TaskRun.queued(checkTask.id(), checkTrigger.id(), fixture.owner().id(), SCHEDULED, NOW));
+        Task checkTask =
+                tasks.save(Task.check(fixture.owner().id(), fixture.task().agentId(), "매일 먼저 살펴보기", NOW));
+        TaskTrigger checkTrigger =
+                triggers.save(TaskTrigger.cron(checkTask.id(), "0 9 * * *", SEOUL, MissedPolicy.SKIP, SCHEDULED, NOW));
+        TaskRun run = runs.save(TaskRun.queued(
+                checkTask.id(), checkTrigger.id(), fixture.owner().id(), SCHEDULED, NOW));
         stub().willReturn(HermesRunResult.of(
                 "run-check",
                 "check-session",
@@ -694,7 +696,8 @@ class TaskRunStarterTest {
         ProactiveCheck check = checks.findById(linked.proactiveCheckId()).orElseThrow();
         createdChecks.add(check.id());
         assertThat(check.trigger()).isEqualTo(CheckTrigger.SCHEDULED);
-        assertThat(conversations.findById(check.conversationId()).orElseThrow().taskId()).isNull();
+        assertThat(conversations.findById(check.conversationId()).orElseThrow().taskId())
+                .isNull();
         assertThat(linked.conversationId()).isEqualTo(check.conversationId());
         assertThat(service.list(currentUser(fixture.owner())))
                 .extracting(detail -> detail.task().id())

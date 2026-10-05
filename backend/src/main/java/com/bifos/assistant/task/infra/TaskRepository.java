@@ -1,8 +1,8 @@
 package com.bifos.assistant.task.infra;
 
 import com.bifos.assistant.task.domain.Task;
-import com.bifos.assistant.task.domain.type.TaskState;
 import com.bifos.assistant.task.domain.type.TaskKind;
+import com.bifos.assistant.task.domain.type.TaskState;
 import jakarta.persistence.LockModeType;
 import java.time.Instant;
 import java.util.List;
