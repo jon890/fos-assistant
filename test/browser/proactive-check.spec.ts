@@ -94,3 +94,32 @@ test("단추 하나로 살펴보기를 시작하고 결과와 배지를 보며 �
     await restore(page);
   }
 });
+
+test("결과를 읽지 못한 살펴보기는 점검 대화와 마지막 살펴보기 줄에 같은 까닭을 보인다", async ({ page, hermes }) => {
+  try {
+    await prepare(page);
+    await page.goto(`/agents/${AGENT_CODE}`);
+
+    // 답이 비었으면 형식 탓으로 말하지 않는다.
+    await hermes.setProactiveOutput("");
+    await section(page).getByRole("button", { name: "지금 살펴보기" }).click();
+    await expect(page).toHaveURL(CONVERSATION_URL);
+    await expect(page.getByText("살펴봤지만 답을 받지 못했어요. 다시 눌러 주세요")).toBeVisible();
+    await page.goto(`/agents/${AGENT_CODE}`);
+    await expect(section(page).getByText("답을 받지 못했어요", { exact: false })).toBeVisible();
+
+    // 블록이 없으면 형식 문제로 알린다.
+    await hermes.setProactiveOutput("블록 없이 끝난 답");
+    await section(page).getByRole("button", { name: "지금 살펴보기" }).click();
+    await expect(page).toHaveURL(CONVERSATION_URL);
+    await expect(
+      page.getByText("살펴봤지만 결과 형식이 맞지 않아 정리하지 못했어요. 다시 눌러 주세요"),
+    ).toBeVisible();
+    await page.goto(`/agents/${AGENT_CODE}`);
+    await expect(
+      section(page).getByText("결과 형식이 맞지 않아 정리하지 못했어요", { exact: false }),
+    ).toBeVisible();
+  } finally {
+    await restore(page);
+  }
+});

@@ -15,6 +15,14 @@ export type ProactiveCheckLastCheck = {
   status: "RUNNING" | "SUCCEEDED" | "FAILED" | "STOPPED";
   /** 성공했을 때만 있다. */
   outcome: "FINDINGS" | "NOTHING_NEW" | "INVALID_RESULT" | null;
+  /** 결과를 읽지 못한 까닭이다. `outcome` 이 `INVALID_RESULT` 일 때만 있고, 까닭을 남기기 전에 끝난 살펴보기는 null 이다. */
+  invalidReason:
+    | "EMPTY_ANSWER"
+    | "NO_BLOCK"
+    | "NOT_JSON"
+    | "BAD_VERSION"
+    | "BAD_OUTCOME"
+    | null;
   startedAt: string;
   finishedAt: string | null;
 };
@@ -61,7 +69,10 @@ export function describeBlocker(blocker: ProactiveCheckBlocker): string {
   }
 }
 
-/** 마지막 살펴보기가 어떻게 끝났는지를 한 구절로 바꾼다. */
+/**
+ * 마지막 살펴보기가 어떻게 끝났는지를 한 구절로 바꾼다. 결과를 읽지 못했으면 점검 대화의 알림 줄과 같은 말을 쓴다.
+ * 답이 비었을 때만 형식 탓으로 말하지 않는다.
+ */
 export function describeLastCheck(check: ProactiveCheckLastCheck): string {
   switch (check.status) {
     case "RUNNING":
@@ -77,7 +88,9 @@ export function describeLastCheck(check: ProactiveCheckLastCheck): string {
         case "NOTHING_NEW":
           return "새로 알릴 것이 없었어요";
         default:
-          return "결과 형식이 맞지 않아 정리하지 못했어요";
+          return check.invalidReason === "EMPTY_ANSWER"
+            ? "답을 받지 못했어요"
+            : "결과 형식이 맞지 않아 정리하지 못했어요";
       }
   }
 }
