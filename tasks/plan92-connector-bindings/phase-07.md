@@ -121,6 +121,7 @@ scripts/check-local.sh agent-connections connector-connection connector-agent-de
 | `docs/adr/ADR-039-외부-서비스-연결은-사용자별-전용-에이전트로-실행한다.md` | 수정 |
 | `docs/adr/ADR-044-커넥터-manifest-는-읽기-전용-이미지-도구만-열-수-있다.md` | 수정 |
 | `docs/adr/ADR-045-커넥터-에이전트는-자기-mcp-서버만-받고-memory-와-control-plane-도구를-받지-않는다.md` | 수정 |
+| `docs/adr/ADR-049-커넥터-도구-호출은-profile-plugin-의-hook-이-control-plane-에-물어-판정한다.md` | 수정 |
 | `docs/adr/ADR-080-먼저-살펴보기는-점검-대화의-turn-하나로-돌고-읽기-경계를-control-plane-이-강제한다.md` | 수정 |
 | `docs/adr/ADR-082-먼저-살펴보기의-쓰기-도구는-관리자가-에이전트마다-켜고-커넥터-쓰기는-승인-카드로-보낸다.md` | 수정 |
 | `docs/adr/ADR-083-커넥터는-사용자가-한-번-연결하고-자기-에이전트에-여럿-붙여-그-에이전트가-도구를-직접-부른다.md` | 수정 |
