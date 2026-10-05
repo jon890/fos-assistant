@@ -16,6 +16,7 @@ frontend 는 화면의 동작과 구조이고, hermes 는 외부 런타임인 He
 | [`connector-authoring.md`](connector-authoring.md) | 범용 커넥터를 만드는 방법, 갖출 것, PR 에 필요한 것, 공통 검사 |
 | [`connectors/gmail.md`](connectors/gmail.md) | Gmail 커넥터의 도구와 정책, 보안, 설정 안내, 실제 계정 확인 |
 | [`self-hosting.md`](self-hosting.md) | 기술 스택, 개별 실행, 주요 환경 변수 |
+| [`privacy.md`](privacy.md) | 개인정보 처리 안내. 커넥터 데이터가 어디로 가고 어디에 남는가 |
 | [`model-tiers.md`](model-tiers.md) | 모델 단계의 선택 규칙, 에이전트 기본 모델, 모델 숨김, 비동기 자식 사용량 |
 | [`adr/INDEX.md`](adr/INDEX.md) | 되돌리기 어려운 결정의 목록 |
 
