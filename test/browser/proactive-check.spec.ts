@@ -218,6 +218,17 @@ test("새 보고는 다섯 칸 카드로 보이고 열면 점검 대화로 간�
     await page.goto(`/agents/${AGENT_CODE}`);
     await section(page).getByRole("button", { name: "지금 살펴보기" }).click();
     await expect(page).toHaveURL(CONVERSATION_URL);
+    // 시작 응답은 202 다. 보고를 저장하기 전에 지금 화면을 열면 빈 응답을 한 번 읽고 검사가 끝난다.
+    await expect
+      .poll(async () => {
+        const response = await page.request.get(
+          `/api/agents/${AGENT_CODE}/proactive-check`,
+        );
+        expect(response.ok()).toBeTruthy();
+        const { lastCheck } = await response.json();
+        return `${lastCheck?.status}:${lastCheck?.outcome}`;
+      })
+      .toBe("SUCCEEDED:FINDINGS");
     await page.goto("/now");
 
     const card = page.getByTestId("now-card-reports");
