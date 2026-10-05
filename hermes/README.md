@@ -16,9 +16,10 @@ Control Plane 이 기대는 Hermes 쪽 코드다. Hermes 에 설치하는 plugin
 
 | 커넥터 | 하는 일 | 문서 |
 | --- | --- | --- |
-| `gmail` | 사용자의 Gmail 을 찾고 읽고, 승인받은 초안과 메일을 쓴다 | [Gmail 커넥터](../docs/connectors/gmail.md) |
+| `gmail` | Gmail 을 찾고 읽고, 승인받은 메일과 라벨, 자동 분류 필터를 쓴다 | [Gmail 커넥터](../docs/connectors/gmail.md) |
 
-커넥터의 MCP 서버는 Python 으로 쓰고 `mcp` SDK 와 그 SDK 가 함께 설치하는 것 밖의 의존성을 두지 않는다. 운영 목록의 `command` 는 그 SDK 가 있는 Python 실행 파일이어야 한다.
+커넥터의 MCP 서버는 TypeScript 로 쓰고 의존성까지 한 JavaScript 파일로 묶어 커밋한다.
+운영 목록의 `command` 는 Bun 실행 파일이어야 한다. 서버 실행 중 패키지를 내려받지 않는다.
 만드는 방법과 공통 검사는 [커넥터 만들기](../docs/connector-authoring.md) 가 갖는다.
 
 ## 설치 묶음
@@ -57,10 +58,11 @@ python3 -m unittest discover -s hermes/tests
 ```
 
 Hermes 모듈은 가짜로 끼우므로 Hermes 를 설치하지 않아도 돈다. 실제 Hermes 와 맞는지는 운영 저장소의 live 검사가 본다.
-Python 3.13 과 PyYAML 과 `mcp` SDK 가 있어야 한다. Hermes 이미지와 같은 판이다.
+Python 3.13 과 PyYAML 과 `mcp` SDK, 커넥터를 실행할 Bun 이 있어야 한다. Hermes 이미지와 같은 버전이다.
 검사는 `mcp==2.0.0` 으로 돌고 plugin 의 지원 범위는 `mcp>=2.0,<3` 이다. SDK 계약은 [커넥터 설치](../docs/backend/connector-install.md) 의 「MCP SDK 계약」 이 갖는다.
 커넥터 도구 호출 검사는 `tests/fixtures/demo-connector/` 의 시험 커넥터를 자식 프로세스로 띄운다.
-`tests/test_connectors_contract.py` 는 `connectors/` 아래 커넥터를 모두 찾아 계약을 본다. 커넥터마다의 검사는 `tests/connectors/` 에 있다.
+`tests/test_connectors_contract.py` 는 `connectors/` 아래 커넥터를 모두 찾아 계약을 본다. 커넥터 전용 시험은 각 커넥터의 `tests/` 에 있다.
+타입 검사와 전용 시험, 묶음 파일 비교는 저장소 루트의 `bash scripts/check-connectors.sh` 로 돌린다.
 
 ## fos-ctx 가 붙이는 것
 
@@ -199,7 +201,7 @@ API server 의 session 응답은 provider 를 주지 않는다. 그 값은 Herme
 저장소를 쓰는 연결을 열지 않는다. 그래서 이 경로는 `state.db` 의 내용을 바꾸지 못한다.
 쓰는 연결이 하나도 없을 때 읽으면 SQLite 가 WAL 보조 파일(`state.db-shm`, `state.db-wal`)을 만들 수 있다. 그 디렉터리에 쓸 수 없고 보조 파일도 없으면 열지 못해 503 이다.
 
-**Hermes 판을 올리면 표 이름과 칸 이름을 다시 확인한다.** 이름이 바뀌면 이 경로가 503 으로 답하고 Control Plane 은 그 자식을 가격 미확인으로 남긴다.
+**Hermes 버전을 올리면 표 이름과 칸 이름을 다시 확인한다.** 이름이 바뀌면 이 경로가 503 으로 답하고 Control Plane 은 그 자식을 가격 미확인으로 남긴다.
 
 **카탈로그 응답.** `fields[]` 는 manifest 의 칸 그대로(`env`, `options` 포함)이고 `verify` 는 `{tool}` 이다.
 `toolsets` 와 `attachments` 는 manifest 에 없으면 빈 목록과 거짓이다. 옛 대시보드 plugin 은 두 칸을 내지 않고, Control Plane 은 없는 칸을 같은 기본값으로 읽는다.

@@ -6,6 +6,10 @@
 
 ### 결정
 
+**대체된 부분**: Python 서버와 단일 scope 는 [ADR-084](ADR-084-gmail-typescript-filters.md)로 대체했다.
+TypeScript 묶음 파일과 필터 권한을 쓰며, 휴지통·메일 삭제 차단과 기존 연결·승인 계약은 유지한다.
+아래 표의 서버와 scope 행은 초기 결정의 기록이다.
+
 | 항목 | 정한 것 |
 | --- | --- |
 | 인증 | 사용자가 자기 Google Cloud 프로젝트에서 만든 OAuth client 의 id, secret 과 자기 계정의 refresh token 을 연결 화면에 붙여 넣는다. Control Plane 과 웹에는 OAuth 로그인 흐름이 없다 |

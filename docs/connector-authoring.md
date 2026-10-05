@@ -21,9 +21,14 @@ hermes/connectors/<id>/
   connector.json           입력 칸, 확인 도구, 도구 정책
   .mcp.json                MCP 서버 하나의 정의
   .claude-plugin/plugin.json
-  server.py                stdio MCP 서버
+  src/server.ts            TypeScript stdio MCP 서버
+  dist/<id>-mcp.js          의존성까지 묶어 커밋한 실행 파일
+  package.json, bun.lock    빌드와 시험의 의존성
+  tsconfig.json             타입 검사 설정
+  scripts/build.ts          묶음 파일 빌드
+  scripts/check-bundle.ts   커밋한 묶음 파일과 재빌드 결과 비교
+  tests/<id>.test.ts        로컬 HTTP 대역으로 도는 검사
   skills/<이름>/SKILL.md    에이전트의 지침이 된다
-hermes/tests/connectors/test_<id>.py    대역으로 도는 검사. id 의 `-` 는 `_` 로 쓴다
 docs/connectors/<id>.md                 도구와 정책, 보안, 설정 안내, 실제 계정 확인
 .github/CODEOWNERS                      `/hermes/connectors/<id>/` 한 줄
 ```
@@ -42,7 +47,7 @@ docs/connectors/<id>.md                 도구와 정책, 보안, 설정 안내,
 | 상태를 바꾸지 않고 읽는다 | `READ`. 서버의 도구에도 `read_only_hint` 를 참으로 둔다 |
 | 계정 안에서 되돌릴 수 있게 쓴다 | `WRITE` 와 `title` |
 | 데이터를 계정 밖의 사람에게 보낸다. 메일 보내기, 게시, 공유 | `WRITE`, `title`, `"outbound": true`, `"grant": false` |
-| 지우거나 되돌리기 어렵게 바꾼다 | 도구를 만들지 않는다 |
+| 메일 같은 사용자 데이터를 지우거나 되돌리기 어렵게 바꾼다 | 도구를 만들지 않는다 |
 | 돈이 움직인다 | 도구를 만들지 않는다 |
 
 - **쓰는 도구는 모두 승인을 받는다.** `WRITE` 의 하한이 `required` 다
@@ -52,6 +57,7 @@ docs/connectors/<id>.md                 도구와 정책, 보안, 설정 안내,
 - 쓰는 도구의 인자는 사람이 읽을 수 있는 글로 받는다. 승인 카드가 인자를 키와 값으로 그대로 보인다. 번호만 받아 서버가 나머지를 채우면 사람이 무엇을 승인하는지 읽지 못한다
 - 사람이나 주소를 받는 인자는 카드의 글과 실제 값이 다르게 읽히지 않는 모양만 받는다. 표시 이름, 인코딩된 낱말, 보이지 않는 문자를 거절한다
 - 승인한 인자 그대로 실행한다. 서버가 받는 사람이나 내용을 다른 곳에서 읽어 바꾸지 않는다
+- 필터처럼 다시 만들 수 있는 설정을 지우는 도구는 `WRITE`, `"grant": false`, `"outbound": false` 로 선언한다. 지울 설정을 조회한 뒤 매번 승인받는다
 - 도구 하나는 프로세스 안의 상태에 기대지 않는다. 승인한 호출은 새 프로세스에서 돈다
 - 결과를 모를 때 쓰기를 다시 부르지 않는다. 보낸 뒤 답을 받지 못한 쓰기는 따로 둔 오류 코드로 끝내고 `errors` 표에서 `outcome_unknown` 에 잇는다. 그 호출은 실패가 아니라 「실행했는지 모름」 으로 기록된다
 
@@ -65,8 +71,10 @@ docs/connectors/<id>.md                 도구와 정책, 보안, 설정 안내,
 
 ### MCP 서버
 
-- Python 으로 쓰고 표준 라이브러리와 `mcp` SDK, 그 SDK 와 함께 설치되는 `mcp_types`, `anyio` 만 쓴다. 운영자가 준 실행 파일의 환경에 다른 패키지가 없다
-- `.mcp.json` 의 `command` 는 `python3`, 첫 인자는 `${CLAUDE_PLUGIN_ROOT}/server.py` 다. 실제 실행 파일은 운영 목록이 정한다
+- TypeScript 로 쓰고 `@modelcontextprotocol/sdk` 와 `zod` 를 포함해 의존성을 한 JavaScript 파일로 묶어 커밋한다. 실행할 때 패키지를 내려받지 않는다
+- `.mcp.json` 의 `command` 는 `bun`, 인자는 `${CLAUDE_PLUGIN_ROOT}/dist/<id>-mcp.js` 하나다. 실제 실행 파일은 운영 목록이 정한다. Python MCP 서버는 허용하지 않는다
+- 빌드는 Bun `1.3.5` 와 lockfile 로 고정한다. `scripts/build.ts` 는 `target: "bun"` 을 쓰고 `scripts/check-bundle.ts` 는 임시 디렉터리에 다시 빌드해 커밋된 파일과 바이트를 비교한 뒤 임시 파일을 지운다
+- 사용자 컴퓨터에서 한 번 돌리는 자격 증명 발급 스크립트는 Python 표준 라이브러리를 써도 된다. 서버 실행 의존성에는 포함하지 않는다
 - 외부 호출에는 제한 시간을 둔다. 대시보드가 확인 도구를 기다리는 시간은 10초, 승인한 호출을 기다리는 시간은 60초다
 - 외부에서 온 글을 결과에 담을 때 길이를 자른다
 
@@ -104,6 +112,8 @@ docs/connectors/<id>.md                 도구와 정책, 보안, 설정 안내,
 
 `hermes/tests/test_connectors_contract.py` 가 `hermes/connectors/` 바로 아래 디렉터리를 모두 찾아 아래를 본다.
 CI 의 `hermes` job 과 `scripts/check-local.sh` 가 돌린다. 커넥터를 더하면 검사 대상이 된다.
+`scripts/check-connectors.sh` 는 커넥터마다 lockfile 설치, 타입 검사, 전용 시험과 묶음 파일 일치를 확인한다.
+전용 시험은 각 커넥터의 `tests/` 에 모으고, 여러 커넥터에 걸친 계약 검사만 `hermes/tests/` 에 둔다.
 
 | 보는 것 | 어긋나면 |
 | --- | --- |
@@ -117,9 +127,9 @@ CI 의 `hermes` job 과 `scripts/check-local.sh` 가 돌린다. 커넥터를 더
 | `READ` 가 아닌 도구가 모두 `outbound` 를 boolean 으로 선언했고, 참인 도구는 `grant` 가 거짓이다 | 밖으로 나가는 도구에 상시 허락이 열린다 |
 | env 이름에 `TOKEN`, `SECRET`, `PASSWORD`, `KEY` 가 든 칸이 `secret: true` 다 | 비밀값이 화면과 응답에 보인다 |
 | `operator_env` 와 `operator_secrets` 가 비었다 | 운영 값 없이 돌지 않는다 |
-| `.mcp.json` 의 `command` 가 `python3` 이고 Python 파일이 표준 라이브러리와 `mcp`, `mcp_types`, `anyio` 만 import 한다 | 운영자의 환경에서 뜨지 않는다 |
+| `.mcp.json` 의 `command` 가 `bun` 이고 `dist/<id>-mcp.js` 하나를 실행한다. TypeScript 소스가 있고 Python 서버는 없다 | 운영자의 환경에서 뜨지 않는다 |
 | 스킬이 하나 이상 있다 | 에이전트에 지침이 없다 |
-| `hermes/tests/connectors/test_<id>.py`, `docs/connectors/<id>.md`, `CODEOWNERS` 의 줄이 있다 | 검사나 안내나 소유자가 없다 |
+| `tests/<id>.test.ts`, `docs/connectors/<id>.md`, `CODEOWNERS` 의 줄이 있다 | 검사나 안내나 소유자가 없다 |
 
 검사가 보지 못하는 것은 리뷰가 본다. 위험도 분류가 맞는지, 어느 도구가 밖으로 나가는지, scope 가 가장 작은지다.
 
@@ -136,4 +146,4 @@ CI 의 `hermes` job 과 `scripts/check-local.sh` 가 돌린다. 커넥터를 더
 
 저장소에 있는 커넥터는 운영자가 대시보드의 커넥터 목록에 올려야 카탈로그에 나온다.
 목록의 모양은 [`hermes/README.md`](../hermes/README.md) 의 「커넥터」 가 갖는다.
-그 항목의 `command` 는 `mcp` SDK 가 있는 Python 실행 파일이어야 한다.
+그 항목의 `command` 는 Bun 실행 파일이어야 한다. 의존성은 커밋한 묶음 파일에 들어 있다.

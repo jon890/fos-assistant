@@ -216,7 +216,7 @@ A general-purpose connector is one directory, `hermes/connectors/<id>/`. A pull 
 - A `connector.json` with `schema: 2` that declares every tool the MCP server exposes, each with a risk and a reason for it in the connector's document.
 - Calls that write require approval. Tools that send data to people outside the account also declare `"grant": false`, so each call is approved by a person. Tools that delete are not exposed.
 - Secrets come in only through environment variables declared in `fields`, and the smallest OAuth scope or permission that works.
-- An MCP server in Python that depends on nothing beyond the `mcp` SDK, and tests that run against a local fake of the service, never the real one.
+- An MCP server in TypeScript, bundled with its dependencies into one committed JavaScript file for Bun. Connector tests live alongside the source and use a local fake of the service.
 - A setup guide under `docs/connectors/` and an owner line in `.github/CODEOWNERS`.
 
 `hermes/tests/test_connectors_contract.py` checks the contract for every directory under `hermes/connectors/`, so a new connector is checked as soon as it is added.

@@ -217,7 +217,7 @@ hermes/bundle.sh --out <디렉터리> --mcp-url <Control Plane MCP 주소>
 - `schema: 2` 인 `connector.json`. MCP 서버가 내는 도구를 모두 선언하고, 도구마다 위험도와 그 까닭을 커넥터 문서에 적는다.
 - 쓰는 호출은 승인을 받는다. 데이터를 계정 밖의 사람에게 보내는 도구는 `"grant": false` 도 선언해 호출마다 사람이 승인한다. 지우는 도구는 열지 않는다.
 - 비밀값은 `fields` 에 선언한 환경 변수로만 받고, 동작하는 가장 작은 OAuth scope 나 권한을 쓴다.
-- MCP 서버는 Python 으로 쓰고 `mcp` SDK 밖의 의존성을 두지 않는다. 검사는 그 서비스를 흉내 낸 로컬 대역으로 돌고 실제 서비스에 닿지 않는다.
+- MCP 서버는 TypeScript 로 쓰고 의존성까지 Bun 용 JavaScript 파일 하나로 묶어 커밋한다. 전용 시험은 소스 옆에 두고 실제 서비스를 흉내 낸 로컬 대역으로 돌린다.
 - `docs/connectors/` 아래의 설정 안내 문서와 `.github/CODEOWNERS` 의 소유자 한 줄.
 
 `hermes/tests/test_connectors_contract.py` 가 `hermes/connectors/` 아래 디렉터리를 모두 찾아 계약을 본다. 새 커넥터는 더하는 순간 검사 대상이 된다.
