@@ -1,4 +1,7 @@
 import { describe, expect, test } from "bun:test";
+import { Client } from "@modelcontextprotocol/sdk/client/index.js";
+import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
+import { join } from "node:path";
 import { confirmComposedMessage, createGmailServer } from "../src/server.ts";
 import {
   FakeGoogle,
@@ -124,7 +127,7 @@ describe("Python Gmail 회귀의 HTTP 경계 이관", () => {
     }
   });
 
-  test("환경 proxy 값이 있어도 localhost FakeGoogle에 직접 요청한다", async () => {
+  test("시작 시 상속된 모든 proxy 환경에서도 자식 서버는 Gmail에 직접 연결한다", async () => {
     const proxyKeys = [
       "HTTP_PROXY",
       "HTTPS_PROXY",
@@ -132,13 +135,8 @@ describe("Python Gmail 회귀의 HTTP 경계 이관", () => {
       "http_proxy",
       "https_proxy",
       "all_proxy",
-      "NO_PROXY",
-      "no_proxy",
     ];
-    const saved = Object.fromEntries(
-      proxyKeys.map((key) => [key, process.env[key]]),
-    );
-    const { fake, server } = setup();
+    const { fake } = setup();
     let proxyRequests = 0;
     const proxy = Bun.serve({
       hostname: "127.0.0.1",
@@ -149,23 +147,32 @@ describe("Python Gmail 회귀의 HTTP 경계 이관", () => {
       },
     });
     fake.on("GET", "/gmail/profile", { emailAddress: "me" });
+    const env = {
+      ...process.env,
+      TEST_GMAIL_TOKEN_URL: `${fake.url}/token`,
+      TEST_GMAIL_API_BASE: `${fake.url}/gmail`,
+    } as Record<string, string>;
+    for (const key of proxyKeys) env[key] = proxy.url.toString();
+    delete env.NO_PROXY;
+    delete env.no_proxy;
+    const transport = new StdioClientTransport({
+      command: process.execPath,
+      args: [join(import.meta.dir, "runtime-driver.ts")],
+      env,
+      stderr: "pipe",
+    });
+    const client = new Client({ name: "proxy-child-test", version: "1.0.0" });
     try {
-      for (const key of proxyKeys.slice(0, 6))
-        process.env[key] = proxy.url.toString();
-      delete process.env.NO_PROXY;
-      delete process.env.no_proxy;
-      await withMcp(server, async (client) => {
-        expect((await tool(client, "get_profile")).result.isError).not.toBe(
-          true,
-        );
+      await client.connect(transport);
+      const result = await client.callTool({
+        name: "get_profile",
+        arguments: {},
       });
+      expect(result.isError).not.toBe(true);
       expect(fake.seen("GET", "/gmail/profile")).toHaveLength(1);
       expect(proxyRequests).toBe(0);
     } finally {
-      for (const [key, value] of Object.entries(saved)) {
-        if (value === undefined) delete process.env[key];
-        else process.env[key] = value;
-      }
+      await client.close();
       proxy.stop(true);
       fake.stop();
     }
