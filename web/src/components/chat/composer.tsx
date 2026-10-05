@@ -480,7 +480,11 @@ export function Composer({
     setItems(nextItems);
 
     for (let index = 0; index < toUpload.length; index++) {
-      void uploadOne(toUpload[index]!, targetConversationId, newItems[index]!.key);
+      void uploadOne(
+        toUpload[index]!,
+        targetConversationId,
+        newItems[index]!.key,
+      );
     }
   }
 

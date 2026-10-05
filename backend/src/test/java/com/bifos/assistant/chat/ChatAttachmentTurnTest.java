@@ -203,7 +203,12 @@ class ChatAttachmentTurnTest {
         List<ChatAttachment> selected = new ArrayList<>(photos);
         selected.sort(Comparator.comparing(ChatAttachment::id).reversed());
 
-        chat.send(dad, conversationId, "이 사진 설명해 줘", null, selected.stream().map(ChatAttachment::id).toList());
+        chat.send(
+                dad,
+                conversationId,
+                "이 사진 설명해 줘",
+                null,
+                selected.stream().map(ChatAttachment::id).toList());
 
         String input = stub().received().getFirst().input();
         StringBuilder expected = new StringBuilder(artifactPreamble(conversationId))
@@ -229,9 +234,11 @@ class ChatAttachmentTurnTest {
                 .append("이 사진 설명해 줘");
         assertThat(input).isEqualTo(expected.toString());
         assertThat(userMessageOf(conversationId).content()).isEqualTo("이 사진 설명해 줘");
-        assertThat(chat.attachmentsByMessage(dad, conversationId).get(userMessageOf(conversationId).id()))
+        assertThat(chat.attachmentsByMessage(dad, conversationId)
+                        .get(userMessageOf(conversationId).id()))
                 .extracting(ChatAttachment::id)
-                .containsExactlyElementsOf(selected.stream().map(ChatAttachment::id).toList());
+                .containsExactlyElementsOf(
+                        selected.stream().map(ChatAttachment::id).toList());
 
         chat.regenerate(dad, conversationId, event -> {});
 

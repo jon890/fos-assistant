@@ -133,7 +133,8 @@ class AttachmentServiceTest {
     @Test
     @DisplayName("설정을 생략하면 사진 서른 장을 한 번에 보낼 수 있다")
     void defaultsToThirtyImages() {
-        AttachmentProperties defaults = new AttachmentProperties("/attachments", "/agent-attachments", null, null, null);
+        AttachmentProperties defaults =
+                new AttachmentProperties("/attachments", "/agent-attachments", null, null, null);
 
         assertThat(defaults.maxFiles()).isEqualTo(30);
     }
@@ -295,8 +296,7 @@ class AttachmentServiceTest {
 
         assertThat(service.allOf(mine))
                 .extracting(ChatAttachment::id, ChatAttachment::position)
-                .containsExactly(
-                        tuple(third.id(), 0), tuple(first.id(), 1), tuple(second.id(), 2));
+                .containsExactly(tuple(third.id(), 0), tuple(first.id(), 1), tuple(second.id(), 2));
     }
 
     @Test
@@ -306,12 +306,14 @@ class AttachmentServiceTest {
         ChatAttachment alreadyBound = upload(OWNER, mine, "image/png", IMAGE);
         service.attach(701L, mine, List.of(alreadyBound.id()));
 
-        assertCode(() -> service.attach(702L, mine, List.of(first.id(), alreadyBound.id())), ErrorCode.VALIDATION_FAILED);
+        assertCode(
+                () -> service.attach(702L, mine, List.of(first.id(), alreadyBound.id())), ErrorCode.VALIDATION_FAILED);
 
         ChatAttachment reloadedFirst = attachments.findById(first.id()).orElseThrow();
         assertThat(reloadedFirst.messageId()).isNull();
         assertThat(reloadedFirst.position()).isZero();
-        assertThat(attachments.findById(alreadyBound.id()).orElseThrow().messageId()).isEqualTo(701L);
+        assertThat(attachments.findById(alreadyBound.id()).orElseThrow().messageId())
+                .isEqualTo(701L);
     }
 
     private ChatAttachment upload(CurrentUser user, Long conversationId, String contentType, byte[] body) {

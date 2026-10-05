@@ -10,10 +10,10 @@ import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import org.flywaydb.core.api.MigrationInfo;
-import org.flywaydb.core.api.MigrationVersion;
 import java.util.UUID;
 import org.flywaydb.core.Flyway;
+import org.flywaydb.core.api.MigrationInfo;
+import org.flywaydb.core.api.MigrationVersion;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -33,7 +33,9 @@ class ChatAttachmentPositionMigrationTest {
     /** 실제 MySQL 검사가 같은 마이그레이션과 줄을 쓴다. */
     Database createDatabase() {
         return new Database(
-                "jdbc:h2:mem:chat-attachment-position-" + UUID.randomUUID() + ";MODE=MySQL;DB_CLOSE_DELAY=-1", "sa", "");
+                "jdbc:h2:mem:chat-attachment-position-" + UUID.randomUUID() + ";MODE=MySQL;DB_CLOSE_DELAY=-1",
+                "sa",
+                "");
     }
 
     @Test
@@ -86,7 +88,8 @@ class ChatAttachmentPositionMigrationTest {
     }
 
     private void seedAttachments() throws SQLException {
-        try (Connection connection = connect(); Statement statement = connection.createStatement()) {
+        try (Connection connection = connect();
+                Statement statement = connection.createStatement()) {
             statement.executeUpdate("""
                     INSERT INTO chat_attachment
                         (id, conversation_id, message_id, uploaded_by_user_id, original_name, stored_name,
@@ -104,8 +107,8 @@ class ChatAttachmentPositionMigrationTest {
     private List<Position> positionsOf(long messageId) throws SQLException {
         try (Connection connection = connect();
                 Statement statement = connection.createStatement();
-                ResultSet rows = statement.executeQuery(
-                        "SELECT id, position FROM chat_attachment WHERE message_id = " + messageId + " ORDER BY position")) {
+                ResultSet rows = statement.executeQuery("SELECT id, position FROM chat_attachment WHERE message_id = "
+                        + messageId + " ORDER BY position")) {
             ArrayList<Position> positions = new ArrayList<>();
             while (rows.next()) {
                 positions.add(new Position(rows.getLong(1), rows.getInt(2)));
