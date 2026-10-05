@@ -17,5 +17,6 @@ class AttachmentUploadLimitMysqlTest extends AttachmentUploadLimitTest {
         registry.add("spring.datasource.url", database::url);
         registry.add("spring.datasource.username", database::username);
         registry.add("spring.datasource.password", database::password);
+        registry.add("spring.datasource.driver-class-name", () -> "com.mysql.cj.jdbc.Driver");
     }
 }
