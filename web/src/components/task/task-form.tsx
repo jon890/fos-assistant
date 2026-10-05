@@ -277,6 +277,7 @@ export function TaskForm({
           <Input
             id="task-cron"
             required
+            maxLength={100}
             placeholder="0 9 * * 1"
             value={cron}
             onChange={(event) => setCron(event.target.value)}
