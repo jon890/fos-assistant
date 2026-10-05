@@ -45,6 +45,7 @@
 | `docker_forward_env`, `docker_env` | 컨테이너에 넣을 환경 변수. 운영자가 명시한 값이라 차단 목록을 거치지 않는다 | 없음 |
 | `credential_files`, `env_passthrough` | profile 파일과 환경 값을 컨테이너에 넣는 목록 | 없음 |
 
+`cwd` 를 `/workspace` 로 두면 Hermes 가 호스트 쪽에 그 경로가 없다는 경고(`TERMINAL_CWD does not exist`)를 남기지만 컨테이너 안의 작업 디렉터리는 `/workspace` 다.
 `TERMINAL_SANDBOX_DIR` 는 프로세스 환경에서 읽는다. 없으면 그 profile 의 `<HERMES_HOME>/sandboxes` 다.
 
 ## 컨테이너
@@ -145,6 +146,8 @@ profile 셋을 썼다. 사용자 A 의 profile 둘, 사용자 B 의 profile 하�
 | 사용자 A 의 두 profile 이 쓴 `/workspace` 파일 | 서로 보인다 |
 | 사용자 B 의 `/workspace` | A 의 파일이 없다 |
 | 사용자별 볼륨 방식에서 같은 시험 | 위와 같다. 컨테이너는 profile 마다 하나 |
+| 대시보드 plugin 이 쓰는 `terminal:` 블록을 둔 뒤 실제 `PUT /api/config` 처리기로 도구 목록을 저장 | 블록이 남는다. 값이 빈 `docker_env: {}` 만 지워지고 기본값이 같아 동작은 같다 |
+| 그 블록으로 셸과 `write_file` | `/workspace` 에서 돈다. 읽기 전용으로 붙인 경로는 읽히고 쓰기는 「Read-only file system」 이다. 전용 망에 붙는다 |
 
 ## 같은 프로세스에 남는 구멍
 
