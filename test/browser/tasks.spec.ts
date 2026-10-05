@@ -188,3 +188,60 @@ test("지금 연 작업 대화의 작업 줄을 눌러 접을 수 있다", async
   await group.click();
   await expect(group).toHaveAttribute("aria-expanded", "true");
 });
+
+test("접어 둔 작업 줄도 검색에 걸리면 다시 펼친다", async ({ page }, testInfo) => {
+  const taskId = "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee";
+  const row = (id: string, title: string, updatedAt: string, withTask: boolean) => ({
+    id,
+    title,
+    agentCode: "browser",
+    agentName: "브라우저",
+    updatedAt,
+    provider: null,
+    model: null,
+    reasoningEffort: null,
+    modelSelectionMode: null,
+    modelTier: null,
+    taskId: withTask ? taskId : null,
+    taskTitle: withTask ? "아침 요약" : null,
+  });
+  await page.route("**/api/chat/conversations?**", (route: Route) => {
+    if (new URL(route.request().url()).pathname !== "/api/chat/conversations") return route.fallback();
+    return route.fulfill({
+      json: {
+        items: [
+          row("11111111-1111-4111-8111-111111111111", "보통 대화", "2026-10-04T08:00:00Z", false),
+          row("22222222-2222-4222-8222-222222222222", "작업 대화 최근", "2026-10-04T07:00:00Z", true),
+          row("33333333-3333-4333-8333-333333333333", "작업 대화 이전", "2026-10-03T07:00:00Z", true),
+        ],
+        nextCursor: null,
+      },
+    });
+  });
+  await page.goto("/chat/22222222-2222-4222-8222-222222222222");
+  await openSidebarIfNarrow(page, testInfo.project.name);
+  const nav = page.getByRole("navigation", { name: "대화 목록" });
+  const group = nav.getByTestId("task-group");
+  await expect(group).toHaveAttribute("aria-expanded", "true");
+  await expect(nav.getByRole("link", { name: "작업 대화 이전" })).toBeVisible();
+  await group.click();
+  await expect(group).toHaveAttribute("aria-expanded", "false");
+
+  const search = page.getByRole("searchbox", { name: "대화 검색" });
+  await search.fill("작업 대화");
+  await expect(group).toHaveAttribute("aria-expanded", "true");
+  await expect(nav.getByRole("link", { name: "작업 대화 이전" })).toBeVisible();
+  await group.click();
+  await expect(group).toHaveAttribute("aria-expanded", "false");
+  await expect(nav.getByRole("link", { name: "작업 대화 이전" })).toHaveCount(0);
+
+  await search.fill("작업 대화 이전");
+  await expect(group).toHaveAttribute("aria-expanded", "true");
+  await expect(nav.getByRole("link", { name: "작업 대화 이전" })).toBeVisible();
+  await group.click();
+  await expect(group).toHaveAttribute("aria-expanded", "false");
+
+  await search.clear();
+  await expect(group).toHaveAttribute("aria-expanded", "true");
+  await expect(nav.getByRole("link", { name: "작업 대화 최근" })).toBeVisible();
+});
