@@ -49,6 +49,7 @@ import { regenerateScenario } from "./scenarios/regenerate.ts";
 import { orchestrationScenario, FLOW_BINDING } from "./scenarios/orchestration.ts";
 import { modelSelectionScenario } from "./scenarios/model-selection.ts";
 import { busyScenario } from "./scenarios/busy.ts";
+import { attentionScenario } from "./scenarios/attention.ts";
 import { chatAttachmentScenario } from "./scenarios/chat-attachment.ts";
 import { artifactScenario } from "./scenarios/artifact.ts";
 import { AGENT_TOOLS_PROFILE, agentToolsScenario } from "./scenarios/agent-tools.ts";
@@ -140,6 +141,8 @@ const SCENARIOS: readonly Scenario[] = [
   chatQueueScenario,
   // 사용량 합계를 세는 시나리오 뒤에 둔다. 실패한 실행을 하나 더 남기기 때문이다.
   busyScenario,
+  // 실패한 turn 을 하나 더 남기므로 사용량 합계를 세는 시나리오 뒤에 둔다.
+  attentionScenario,
   // 막힌 provider 를 만들어 두고 끝나므로 turn 을 돌리는 시나리오 가운데 마지막에 둔다. 앞 시나리오가 그 막힘에 걸리지 않게 한다.
   modelSelectionScenario,
   // Control Plane 을 다시 띄우므로 맨 끝에 둔다. 막힌 provider 를 먼저 푼다.

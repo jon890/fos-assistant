@@ -5,6 +5,7 @@ import com.bifos.assistant.connector.application.model.ConnectorActionChanged;
 import com.bifos.assistant.connector.application.model.ConnectorActionResult;
 import com.bifos.assistant.connector.application.model.ConnectorActionView;
 import com.bifos.assistant.connector.application.model.ConnectorGrantView;
+import com.bifos.assistant.connector.application.model.PendingApproval;
 import com.bifos.assistant.connector.domain.ConnectorAction;
 import com.bifos.assistant.connector.domain.ConnectorConnection;
 import com.bifos.assistant.connector.domain.ConnectorToolGrant;
@@ -180,6 +181,26 @@ public class ConnectorActionService {
         Map<String, Optional<ConnectorManifest>> manifests = new HashMap<>();
         return found.stream()
                 .map(action -> view(action, manifests.computeIfAbsent(action.connectorId(), this::readManifest)))
+                .toList();
+    }
+
+    /**
+     * 그 사용자의 답을 기다리는 승인 줄을 만든 순으로 준다. 먼저 알리기의 판정이 읽는다.
+     *
+     * <p>사람에게 보일 이름은 승인 카드와 같은 규칙이다. 커넥터마다 카탈로그를 한 번만 읽는다. 인자와 결과 글은 담지 않는다.
+     */
+    @Transactional(readOnly = true)
+    public List<PendingApproval> pendingApprovalsOf(CurrentUser user) {
+        Map<String, Optional<ConnectorManifest>> manifests = new HashMap<>();
+        return actions.findByUserIdAndStatusOrderByIdAsc(user.id(), ActionStatus.PENDING).stream()
+                .map(action -> new PendingApproval(
+                        action.publicId(),
+                        view(action, manifests.computeIfAbsent(action.connectorId(), this::readManifest))
+                                .title(),
+                        action.agentId(),
+                        action.conversationId(),
+                        action.createdAt(),
+                        action.expiresAt()))
                 .toList();
     }
 

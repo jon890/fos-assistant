@@ -70,6 +70,12 @@ public class MemoryService {
                 MemoryScope.USER, user.id(), MemoryEntryType.DOCUMENT);
     }
 
+    /** 요청자가 주인인 USER 범위의 제안을 만든 순으로 낸다. 먼저 알리기의 판정이 읽는다. */
+    public List<Memory> proposalsOf(CurrentUser user) {
+        return memories.findByScopeAndOwnerUserIdAndStatusOrderByIdAsc(
+                MemoryScope.USER, user.id(), MemoryStatus.PROPOSED);
+    }
+
     /** 번호로 문서 하나를 읽는다. 없는 문서와 남의 문서와 문서가 아닌 항목은 같은 MEMORY_NOT_FOUND 다. */
     public Memory documentFor(CurrentUser user, Long id) {
         return requireOwnDocument(user, memories.findById(id).orElseThrow(MemoryService::notFound));

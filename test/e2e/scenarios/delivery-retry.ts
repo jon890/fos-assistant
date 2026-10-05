@@ -18,6 +18,8 @@ type Message = {
   delivery: { id: number; status: string } | null;
 };
 type ChatEvent = { type: string; code?: string };
+type AttentionItem = { conversationId: string | null; why: { trigger: string; signals: string[] } };
+type AttentionView = { cards: { key: string; items: AttentionItem[] }[] };
 
 const CONNECTION = `/connections/${DEMO_CONNECTOR.id}`;
 const PREFIX = `mcp__${DEMO_CONNECTOR.mcp_server}__`;
@@ -57,6 +59,13 @@ async function awaitMessages(
     await new Promise((resolve) => setTimeout(resolve, 100));
   }
   fail(`${what}: ${timeoutMs / 1000}초 안에 기대한 이력이 되지 않았다. 마지막 목록: ${JSON.stringify(last.map((m) => [m.role, m.content, m.delivery]))}`);
+}
+
+/** 지금 화면의 실패 카드에서 그 대화의 항목을 찾는다. */
+async function failureOf(context: Context, conversationId: string): Promise<AttentionItem | undefined> {
+  const view = expectStatus(await call(context, "/attention", { token: context.tokens.dad }), 200, "지금 화면")
+    .json<AttentionView>();
+  return view.cards.find((card) => card.key === "failures")?.items.find((item) => item.conversationId === conversationId);
 }
 
 function requestNumber(answer: string): string | undefined {
@@ -124,6 +133,11 @@ export const deliveryRetryScenario: Scenario = {
       expect(approved.status === "SUCCEEDED", `승인한 줄이 SUCCEEDED 가 아니다: ${JSON.stringify(approved)}`);
       const failedHistory = await awaitMessages(context, conversationId, endsWithFailedDelivery, "전달 실패의 알림 줄");
       const deliveryId = failedHistory.at(-1)!.delivery!.id;
+      const failure = await failureOf(context, conversationId);
+      expect(
+        failure !== undefined && failure.why.trigger === "DELIVERY_FAILED" && failure.why.signals.includes("DELIVERY_NOT_DONE"),
+        `결과 전달 실패가 실패 카드에 DELIVERY_FAILED 로 보이지 않는다: ${JSON.stringify(failure)}`,
+      );
       const noticeId = failedHistory.at(-1)!.id;
       const callsAfterApproval = mine().length;
       expect(
@@ -168,6 +182,8 @@ export const deliveryRetryScenario: Scenario = {
       const firstNotice = delivered.find((message) => message.id === noticeId);
       expect(firstNotice?.role === "SYSTEM" && firstNotice.delivery === null,
         `첫 알림 줄에 delivery 가 남았다: ${JSON.stringify(firstNotice)}`);
+      const resolved = await failureOf(context, conversationId);
+      expect(resolved === undefined, `다시 전달이 끝났는데 실패 카드에 남았다: ${JSON.stringify(resolved)}`);
 
       step("마지막 입력에 저장된 결과가 실리고 커넥터 호출은 늘지 않는다");
       const input = context.hermes.lastSubmittedInput() ?? "";

@@ -202,6 +202,23 @@ assistant:
     max-runs-per-day: 48
     # 시간대를 비운 작업의 시간대
     default-time-zone: Asia/Seoul
+  attention:
+    # 실패한 turn 을 지금 화면에 보이는 기간
+    failure-window: 7d
+    # 끝난 위임을 맡긴 일 카드에 보이는 기간
+    delegated-window: 24h
+    # 도는 위임이 이만큼 지나면 NOW 가 된다
+    long-running-after: 30m
+    # 이어서 하기 카드의 항목 상한
+    continue-count: 5
+    # 이어서 하기를 뺀 카드 하나의 항목 상한. 넘으면 moreCount 로 센다
+    max-items-per-card: 10
+    # 미루기 기한의 상한. 지금부터 이만큼 뒤까지만 받는다
+    snooze-max: 8d
+    # 지표 사건을 남기는 기간. 지난 줄은 cleanup-cron 에 지운다
+    event-retention: 90d
+    # 보관 기간이 지난 지표 사건을 지우는 시각. Control Plane 의 시간대를 따른다
+    cleanup-cron: "0 30 4 * * *"
   pricing:
     # models.dev 카탈로그를 복사해 둔 경로. 없으면 실행 비용을 비워 두고 기동은 계속한다
     catalog-path: ${ASSISTANT_PRICING_CATALOG:}

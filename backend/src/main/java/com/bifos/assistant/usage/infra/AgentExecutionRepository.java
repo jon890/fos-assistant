@@ -148,6 +148,43 @@ public interface AgentExecutionRepository extends JpaRepository<AgentExecution, 
             """)
     List<Long> findConversationsWithUndeliveredResults();
 
+    /**
+     * 그 사용자의 대화 turn 루트 실행 가운데 {@code since} 뒤에 실패했고 아직 다시 돌려 성공하지 않은 것을 최근 순으로 읽는다.
+     *
+     * <p>같은 대화에 그 뒤 성공한 루트 실행이 있으면 해결된 실패라 뺀다. 먼저 알리기의 실패 카드가 읽는다.
+     */
+    @Query("""
+            select e from AgentExecution e
+            where e.userId = :userId
+                and e.conversationId is not null
+                and e.parentExecutionId is null
+                and e.status = com.bifos.assistant.usage.domain.type.ExecutionStatus.FAILED
+                and e.finishedAt >= :since
+                and not exists (select s.id from AgentExecution s
+                    where s.conversationId = e.conversationId
+                        and s.id > e.id
+                        and s.parentExecutionId is null
+                        and s.status = com.bifos.assistant.usage.domain.type.ExecutionStatus.SUCCEEDED)
+            order by e.id desc
+            """)
+    List<AgentExecution> findUnresolvedFailedTurns(@Param("userId") Long userId, @Param("since") Instant since);
+
+    /**
+     * 그 사용자의 위임 실행 가운데 도는 중이거나 {@code finishedSince} 뒤에 끝난 것을 최근 순으로 읽는다.
+     *
+     * <p>먼저 알리기의 맡긴 일 카드가 읽는다.
+     */
+    @Query("""
+            select e from AgentExecution e
+            where e.userId = :userId
+                and e.delegationKey is not null
+                and (e.status = com.bifos.assistant.usage.domain.type.ExecutionStatus.RUNNING
+                    or e.finishedAt >= :finishedSince)
+            order by e.id desc
+            """)
+    List<AgentExecution> findDelegationsForAttention(
+            @Param("userId") Long userId, @Param("finishedSince") Instant finishedSince);
+
     /** 루트와 그 자손을 한 번에 읽는다. 루트 자신은 rootExecutionId 가 null 이라 따로 읽는다. */
     List<AgentExecution> findByRootExecutionId(Long rootExecutionId);
 

@@ -17,6 +17,10 @@ public interface ChatMessageRepository extends JpaRepository<ChatMessage, Long> 
     /** 대화에서 그 역할이 처음 남긴 메시지를 읽는다. */
     Optional<ChatMessage> findFirstByConversationIdAndRoleOrderByIdAsc(Long conversationId, MessageRole role);
 
+    /** 그 시각까지 그 대화에 저장된 메시지 가운데 그 역할이 아닌 가장 최근 메시지를 읽는다. */
+    Optional<ChatMessage> findTopByConversationIdAndRoleNotAndCreatedAtLessThanEqualOrderByIdDesc(
+            Long conversationId, MessageRole role, Instant createdAt);
+
     /** 대화에서 그 역할이 그 시각 뒤에 남긴 메시지 수. 먼저 살펴보기가 지난 살펴보기 뒤 사용자가 보낸 메시지를 센다. */
     long countByConversationIdAndRoleAndCreatedAtAfter(Long conversationId, MessageRole role, Instant after);
 

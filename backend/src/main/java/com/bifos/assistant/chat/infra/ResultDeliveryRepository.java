@@ -35,4 +35,17 @@ public interface ResultDeliveryRepository extends JpaRepository<ResultDelivery, 
             + " d.attemptCount = d.attemptCount + 1, d.updatedAt = :at"
             + " where d.id = :id and d.status in :from")
     int claimRetry(@Param("id") Long id, @Param("from") Collection<DeliveryStatus> from, @Param("at") Instant at);
+
+    /**
+     * 그 사용자의 지우지 않은 대화에서 {@code FAILED} 이고 {@code since} 뒤에 바뀐 묶음을 최근 순으로 읽는다.
+     *
+     * <p>묶음에는 사용자 칸이 없어 대화의 {@code user_id} 로 잇는다. 먼저 알리기의 실패 카드가 읽는다.
+     */
+    @Query("select d from ResultDelivery d"
+            + " where d.status = com.bifos.assistant.chat.domain.type.DeliveryStatus.FAILED"
+            + " and d.updatedAt >= :since"
+            + " and exists (select c.id from Conversation c"
+            + " where c.id = d.conversationId and c.userId = :userId and c.deletedAt is null)"
+            + " order by d.id desc")
+    List<ResultDelivery> findFailedOfUser(@Param("userId") Long userId, @Param("since") Instant since);
 }

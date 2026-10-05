@@ -4,13 +4,14 @@
 결정은 [ADR-072](../adr/ADR-072-먼저-알리기의-기본값은-알리지-않음이고-control-plane-기록에서-정한-신호만-화면-안에-올린다.md) 와 [ADR-074](../adr/ADR-074-지금-화면은-원래-기록을-읽어-만든-view-이고-정해진-카드-넷만-그린다.md) 에 있다.
 화면의 배치와 문구는 [`../frontend/now.md`](../frontend/now.md) 가 갖는다.
 
-**아직 구현 전이다.** 구현한 PR 이 이 단락을 지운다.
+**할 일 후보(`FOLLOW_UP_PROPOSED`, `FOLLOW_UP_OPEN`)와 `due-soon` 은 아직 구현 전이다.** 구현한 PR 이 이 단락을 지운다.
 
 ## 패키지
 
-판정은 새 최상위 패키지 `attention` 이 맡는다. 층 순서의 맨 위(`connector` 위)에 둔다.
+판정은 최상위 패키지 `attention` 이 맡는다. 층 순서의 맨 위(`task` 위)에 둔다.
 실행 기록(`usage`), Memory 제안(`memory`), 대화(`chat`), 할 일(`followup`), 승인 줄(`connector`)을 모두 읽기 때문이다.
 `attention` 은 읽기만 하고 그 패키지들의 기록을 고치지 않는다. 고치는 동작은 카드의 단추가 각 패키지의 기존 API 로 보낸다.
+**`attention` 은 다른 패키지의 `infra` 를 import 하지 않는다.** 원래 기록은 그 패키지의 `application` 에 둔 읽기 메서드로 읽는다. 저장 방식이 바뀌어도 판정을 고치지 않게 하려는 것이다.
 
 ## 판정 셋
 
@@ -27,16 +28,27 @@
 | `trigger` | 카드 | 원래 기록 | 후보 조건 | `NOW` 조건 | 해결된 상태 | `itemKey` | `stateKey` 의 재료 | 확신도 |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | `EXECUTION_FAILED` | `failures` | 사용자가 보낸 대화 turn 의 루트 실행. `conversation_id` 가 있고 `parent_execution_id` 가 비어 있다. 자동 turn 의 실패는 `DELIVERY_FAILED` 가 맡는다 | `FAILED` 이고 `finished_at` 이 `failure-window` 안 | 늘 | 같은 대화에 그 뒤 `SUCCEEDED` 루트 실행이 있다. 대화를 지웠다 | `conversation:<대화 공개 식별자>` | 그 대화의 마지막 실패 실행 번호 | `CONTROL_PLANE` |
-| `DELIVERY_FAILED` | `failures` | #162 가 저장하는 결과 전달 상태 | #162 가 정한 실패 상태 | 늘 | #162 가 정한 완료나 의도적 중단 | 위와 같은 대화 열쇠. 실패한 turn 과 한 항목으로 합친다 | 마지막 전달 시도의 번호 | `CONTROL_PLANE` |
-| `APPROVAL_PENDING` | `needs_me` | `connector_action` | `PENDING` 이고 `expires_at` 전 | 늘 | 승인, 거절, 만료 | `connector_action:<공개 식별자>` | `status` | `CONTROL_PLANE` |
+| `DELIVERY_FAILED` | `failures` | 결과 전달 묶음 `result_delivery`([ADR-075](../adr/ADR-075-결과-전달은-묶음과-시도로-남기고-사용자가-저장된-결과만-다시-전달한다.md)). 사용자는 그 대화의 `user_id` 다 | `FAILED` 이고 `updated_at` 이 `failure-window` 안. `DELIVERING` 은 시도가 도는 중이라 후보가 아니다 | 늘 | `DELIVERED`, `STOPPED`. 대화를 지웠다 | 위와 같은 대화 열쇠. 실패한 turn 과 한 항목으로 합친다 | 묶음 번호와 `attempt_count`. 실패한 turn 과 합치면 그 실행 번호도 함께 | `CONTROL_PLANE` |
+| `APPROVAL_PENDING` | `needs_me` | `connector_action` | `PENDING` 이고 `expires_at` 전. 요청자의 지우지 않은 대화에 속한다 | 늘 | 승인, 거절, 만료 | `connector_action:<공개 식별자>` | `status` | `CONTROL_PLANE` |
 | `MEMORY_PROPOSED` | `needs_me` | 주인의 `USER` Memory | `PROPOSED` | 아니다 | 받아들임, 거절 | `memory:<번호>` | `revision` | `MODEL_INFERRED` |
 | `FOLLOW_UP_PROPOSED` | `needs_me` | `follow_up` | `PROPOSED` | 아니다 | 받아들임, 거절 | `follow_up:<공개 식별자>` | `updated_at` | `MODEL_INFERRED` |
 | `FOLLOW_UP_OPEN` | `needs_me` | `follow_up` | `OPEN` | 기한이 `due-soon` 안이거나 지났다. 또는 연결한 대화에 결과가 도착했다 | 끝냄, 그만둠 | `follow_up:<공개 식별자>` | `updated_at`, 기한 구간(없음, `DUE_SOON`, `OVERDUE`), 연결한 대화의 마지막 결과 전달 시각 | `USER_CONFIRMED` |
-| `DELEGATION_RUNNING` | `delegated` | 주인의 위임 실행. `delegation_key` 가 있다 | `RUNNING` | 시작한 지 `long-running-after` 를 넘었다 | 끝남 | `execution:<번호>` | `status` | `CONTROL_PLANE` |
-| `DELEGATION_FINISHED` | `delegated` | 주인의 위임 실행 | 끝났고 `finished_at` 이 `delegated-window` 안 | 아니다 | 없다 | `execution:<번호>` | `status` | `CONTROL_PLANE` |
+| `DELEGATION_RUNNING` | `delegated` | 주인의 위임 실행. `delegation_key` 가 있다 | `RUNNING`. 요청자의 지우지 않은 대화에 속한다 | 시작한 지 `long-running-after` 를 넘었다 | 끝남 | `execution:<번호>` | `status` | `CONTROL_PLANE` |
+| `DELEGATION_FINISHED` | `delegated` | 주인의 위임 실행 | 끝났고 `finished_at` 이 `delegated-window` 안. 요청자의 지우지 않은 대화에 속한다 | 아니다 | 없다 | `execution:<번호>` | `status` | `CONTROL_PLANE` |
 | `CONVERSATION_RECENT` | `continue` | 주인의 대화. `deleted_at` 이 비어 있다 | `updated_at` 순으로 `continue-count` 개 | 아니다 | 없다 | `conversation:<대화 공개 식별자>` | `updated_at` | `CONTROL_PLANE` |
 
-「사용자가 보낸 turn」 은 그 실행의 `started_at` 이전에 그 대화에 저장된 메시지 가운데 `ASSISTANT` 가 아닌 가장 최근 메시지의 `role` 이 `USER` 라는 뜻이다. 다시 생성도 든다. 자동 turn 은 그 메시지가 `SYSTEM` 이라 빠진다. 실패한 turn 에는 답 메시지가 없을 수 있어 실행의 시작 시각으로 질문을 찾는다.
+**같은 대화에 실패한 turn 과 결과 전달 실패가 함께 있으면 한 항목으로 합친다.**
+`trigger` 는 둘 가운데 더 최근 쪽이다. 묶음의 `updated_at` 이 실행의 `finished_at` 보다 뒤면 `DELIVERY_FAILED` 이고, 같거나 앞이면 `EXECUTION_FAILED` 다.
+`signals` 는 `NOT_RETRIED` 와 `DELIVERY_NOT_DONE` 을 이 순서로 함께 담고, `sources` 도 `EXECUTION_STATE` 다음에 `RESULT_DELIVERY` 를 담는다.
+`at` 은 `trigger` 로 고른 쪽의 시각이다.
+`stateKey` 는 `<trigger 이름>|<재료>` 글의 SHA-256 앞 16바이트를 16진수로 쓴 것이다. 앞 글은 실행이 있으면 `EXECUTION_FAILED` 로 고정한다.
+그래서 실패한 turn 만이면 `EXECUTION_FAILED|<실행 번호>` 이고, 결과 전달 실패만이면 `DELIVERY_FAILED|<묶음 번호>|<attempt_count>` 이고, 둘 다면 `EXECUTION_FAILED|<실행 번호>|DELIVERY_FAILED|<묶음 번호>|<attempt_count>` 다.
+더 최근인 쪽만 바뀌어서는 `stateKey` 가 바뀌지 않아 숨긴 항목이 다시 보이지 않는다.
+
+승인 대기와 맡긴 일은 요청자의 지우지 않은 대화에 속한 것만 후보가 된다.
+대화 없이 생긴 승인 대기는 보이지 않는다. 승인 카드가 대화 안에만 있어 「대화에서 보기」 로 갈 곳이 없기 때문이다.
+
+「사용자가 보낸 turn」 은 그 실행의 `started_at` 이전에 그 대화에 저장된 메시지 가운데 `ASSISTANT` 가 아닌 가장 최근 메시지의 `role` 이 `USER` 라는 뜻이다. 다시 생성도 든다. 자동 turn 은 그 메시지가 `SYSTEM` 이라 빠진다. 실패한 turn 에는 답 메시지가 없을 수 있어 실행의 시작 시각으로 질문을 찾는다. 예약 작업의 turn 도 든다. 예약 turn 은 알림 줄 다음에 지시를 `USER` 메시지로 저장하고, 사용자가 맡긴 일이 실패한 것이라 화면에 올린다.
 
 「연결한 대화에 결과가 도착했다」 는 그 대화의 맡긴 일(`agent_execution.result_delivered_at`)이나 승인한 동작(`connector_action.result_delivered_at`)의 결과가 할 일의 `accepted_at` 보다 뒤에 전해졌다는 뜻이다.
 `SYSTEM` 메시지로 판정하지 않는다. 자동 turn 한도 안내와 승인 거절이나 만료 알림도 `SYSTEM` 메시지라 결과 도착과 구분하지 못한다.
@@ -45,7 +57,7 @@
 
 `MEMORY_PROPOSED` 는 기억 메뉴의 제안 건수에 이미 센다. 지금 화면의 건수에는 세지 않는다.
 
-`DELIVERY_FAILED` 는 #162 가 main 에 들어온 뒤에 더한다. 그 상태를 이 패키지가 저장하거나 고치지 않는다.
+`DELIVERY_FAILED` 는 결과 전달 묶음의 상태를 읽기만 한다. 그 상태를 저장하고 다시 전달하는 일은 `chat` 의 `ResultDeliveryRecorder` 가 갖는다.
 
 ## 억제 신호
 
@@ -79,7 +91,7 @@
 | `event-retention` | 90일 | 지표 사건을 남기는 기간 |
 | `cleanup-cron` | `0 30 4 * * *` | 보관 기간이 지난 지표 사건을 지우는 시각 |
 
-## 「왜 보였는가」
+## 왜 보였는가
 
 항목마다 아래 칸을 낸다. 화면은 이 코드를 정해진 문구로 그린다([`../frontend/now.md`](../frontend/now.md) 의 「이유 문구」).
 
@@ -104,6 +116,18 @@
 | `WAITING` | 할 일이 기다리는 중이다 |
 | `LONG_RUNNING` | 맡긴 일이 오래 돌고 있다 |
 
+「출처 이름」 은 `sources[].source` 의 글이다. 아래 표가 전부다.
+`EXECUTION_STATE` 와 `FOLLOW_UP` 은 [`context-bundle.md`](context-bundle.md) 「참여하는 source」 의 이름이고, 나머지는 판정에만 쓰는 이름이다.
+
+| `source` | `ref` | `asOf` | 쓰는 trigger |
+| --- | --- | --- | --- |
+| `EXECUTION_STATE` | `execution:<실행 번호>` | 판정 시각(`readAt`) | `EXECUTION_FAILED`, `DELEGATION_RUNNING`, `DELEGATION_FINISHED` |
+| `APPROVAL_REQUEST` | `connector_action:<공개 식별자>` | 승인 줄의 `created_at` | `APPROVAL_PENDING` |
+| `MEMORY_PROPOSAL` | `memory:<번호>` | Memory 의 `updated_at` | `MEMORY_PROPOSED` |
+| `CONVERSATION` | `conversation:<공개 식별자>` | 대화의 `updated_at` | `CONVERSATION_RECENT` |
+| `FOLLOW_UP` | `follow_up:<공개 식별자>` | 할 일의 `updated_at` | `FOLLOW_UP_PROPOSED`, `FOLLOW_UP_OPEN` |
+| `RESULT_DELIVERY` | `result_delivery:<묶음 번호>` | 묶음의 `updated_at` | `DELIVERY_FAILED` |
+
 `sources` 의 `ref` 는 문맥 묶음의 참조와 같은 형식이다([`context-bundle.md`](context-bundle.md) 의 「항목의 칸」).
 **응답에 실행의 오류 코드, 모델, 금액을 싣지 않는다.** 일반 경로의 응답이라 역할과 상관없이 뺀다([ADR-063](../adr/ADR-063-관리자-전용-표시와-동작은-관리자-영역에만-두고-일반-경로의-응답은-서버가-역할에-따라-줄인다.md)).
 
@@ -114,7 +138,7 @@
 | 항목 | 단추 | 가는 곳 |
 | --- | --- | --- |
 | 실패한 turn | 대화 열기 | `/chat/{대화 공개 식별자}`. 다시 보낼지는 사람이 대화에서 정한다 |
-| 결과 전달 실패 | 결과 다시 전하기 | #162 가 여는 사람 요청 경로. 원래 자식 작업이나 커넥터 쓰기를 다시 실행하지 않는다 |
+| 결과 전달 실패 | 대화 열기 | `/chat/{대화 공개 식별자}`. 다시 전달은 그 대화의 알림 줄 아래 「결과 다시 전달」 이 한다. 응답에 묶음 번호를 싣지 않는다 |
 | 승인 대기 | 대화에서 보기 | 그 대화의 승인 카드. 승인과 거절은 기존 `POST /api/v1/connector-actions/{actionId}/approve`, `.../reject` 다 |
 | Memory 제안 | 기억에서 보기 | `/memory` |
 | 할 일 제안 | 받아들이기, 거절 | [`follow-up.md`](follow-up.md) 의 API |
@@ -143,7 +167,11 @@
 **제어는 카드마다 따로 둔다.** 같은 대화가 실패 카드와 이어서 하기 카드에 함께 열쇠로 쓰여도, 한 카드에서 숨긴 것이 다른 카드의 제어를 덮어쓰지 않는다.
 `hide`, `snooze`, `restore`, `events` 는 성공하면 본문 없이 204 로 답한다. 같은 요청을 다시 보내도 204 다.
 **열쇠의 길이를 먼저 본다.** `itemKey` 가 비었거나 80자를 넘거나, `stateKey` 가 비었거나 64자를 넘으면 후보를 읽기 전에 400 `VALIDATION_FAILED` 다. `hide`, `snooze`, `restore`, `events` 가 모두 그렇다. 길이는 `attention_control` 과 `attention_event` 의 칸 길이와 같다.
-`hide`, `snooze` 의 `itemKey` 가 지금 요청자의 후보에 없으면 404 `ATTENTION_ITEM_NOT_FOUND` 다. `events` 는 지금 후보에 있거나, 그 요청자에게 같은 `itemKey` 의 `SHOWN` 사건이 있으면 받는다. 받아들이기와 끝냄처럼 동작이 성공하면 그 항목이 후보에서 빠지므로, 그 뒤에 보내는 `ACTED` 를 잃지 않게 하려는 것이다. 둘 다 아니면 404 `ATTENTION_ITEM_NOT_FOUND` 다. 남의 항목과 없는 항목을 같은 응답으로 숨긴다. `restore` 는 지운 것이 없어도 204 다.
+`hide`, `snooze` 의 `itemKey` 가 지금 요청자의 후보에 없으면 404 `ATTENTION_ITEM_NOT_FOUND` 다. `events` 는 지금 후보에 있거나, 그 요청자에게 `itemKey` 와 `stateKey` 가 같은 `SHOWN` 사건이 있으면 받는다. 받아들이기와 끝냄처럼 동작이 성공하면 그 항목이 후보에서 빠지므로, 그 뒤에 보내는 `ACTED` 를 잃지 않게 하려는 것이다. 둘 다 아니면 404 `ATTENTION_ITEM_NOT_FOUND` 다. 남의 항목과 없는 항목을 같은 응답으로 숨긴다. `restore` 는 지운 것이 없어도 204 다.
+카드의 출처를 모두 읽지 못하면 그 카드의 후보가 비어 있어, 그 카드 항목의 `hide` 와 `snooze` 도 404 `ATTENTION_ITEM_NOT_FOUND` 다.
+여러 출처 가운데 일부만 실패해 카드가 `UNAVAILABLE` 이면 읽은 출처의 후보는 받는다.
+
+**숨기기와 미루기를 읽지 못하면 두 `GET` 이 통째로 실패한다.** `attention_control` 을 읽지 못한 채 판정하면 숨긴 항목이 다시 보이기 때문이다. 출처 하나를 읽지 못했을 때 그 카드만 `UNAVAILABLE` 로 내는 것과 다르다.
 
 응답의 모양은 아래와 같다.
 
@@ -162,11 +190,13 @@
           "itemKey": "conversation:7b1e…",
           "stateKey": "3f9a…",
           "attention": "NOW",
+          "channel": "IN_APP",
           "title": "주간 장보기 목록 정리",
           "conversationId": "7b1e…",
           "agentName": "집안일 도우미",
           "at": "2026-10-03T13:10:00Z",
-          "why": { "trigger": "EXECUTION_FAILED", "signals": ["NOT_RETRIED"], "confidence": "CONTROL_PLANE", "sources": [] },
+          "why": { "trigger": "EXECUTION_FAILED", "signals": ["NOT_RETRIED"], "confidence": "CONTROL_PLANE", "sources": [{ "source": "EXECUTION_STATE", "ref": "execution:812", "asOf": "2026-10-04T09:00:00Z" }] },
+          "actionId": null,
           "execution": null,
           "followUp": null
         }
@@ -176,9 +206,10 @@
 }
 ```
 
-**건수는 서버가 한 가지로 센다.** 카드의 `nowCount` 는 그 카드에서 `NOW` 인 항목 수이고 상한으로 자르기 전에 센다. 응답 맨 위의 `nowCount` 와 `summary` 의 `nowCount` 는 카드 `nowCount` 의 합이다. 화면은 카드 배지와 사이드바와 홈의 한 줄에 이 값만 쓰고, 보이는 항목을 다시 세지 않는다. 그래서 사이드바의 수는 늘 카드 배지의 합과 같다. 상한 때문에 보이지 않는 `NOW` 항목은 `moreCount` 에 함께 든다.
+**건수는 서버가 한 가지로 센다.** 카드의 `nowCount` 는 그 카드에서 `NOW` 인 항목 수이고 상한으로 자르기 전에 센다. 응답 맨 위의 `nowCount` 와 `summary` 의 `nowCount` 는 카드 `nowCount` 의 합이다. 화면은 카드 배지와 사이드바와 홈의 한 줄에 이 값만 쓰고, 보이는 항목을 다시 세지 않는다. 그래서 사이드바의 수는 늘 카드 배지의 합과 같다. 상한 때문에 보이지 않는 `NOW` 항목은 `moreCount` 에 함께 든다. 이어서 하기 카드의 `moreCount` 는 최근 대화 `continue-count` 더하기 `max-items-per-card` 개 안에서 센 수다. 화면은 이 수를 링크 없는 글로만 그린다.
 
 `title` 은 대화 제목이나 할 일 제목이나 승인 줄의 동작 이름이다. 화면은 평문으로 그린다(ADR-009).
+`channel` 은 그 항목을 보이는 길이다. 화면 안에서만 보이므로 값은 늘 `IN_APP` 하나다(ADR-072).
 
 항목 종류에 따라 아래 칸을 더 채운다. 해당하지 않으면 `null` 이다. 화면이 `itemKey` 를 잘라 식별자를 얻지 않게 하려는 것이다.
 
@@ -200,7 +231,8 @@
 표의 칸은 [`schema/attention.md`](schema/attention.md) 가 갖는다.
 
 - `attention_control`: 사용자의 숨기기와 미루기. 한 사용자의 한 카드의 한 `itemKey` 에 한 줄이다
-- `attention_event`: 지표 사건. 같은 사용자, `itemKey`, `stateKey`, `type`, 판정(`attention`)은 한 줄만 남긴다. 같은 상태에서 `LATER` 가 `NOW` 로 바뀌면 `NOW` 의 `SHOWN` 이 따로 남는다
+- `attention_event`: 지표 사건. 같은 사용자, `itemKey`, `stateKey`, `type`, 판정(`attention`)은 한 줄만 남긴다. 같은 상태에서 `LATER` 가 `NOW` 로 바뀌면 `NOW` 의 `SHOWN` 이 따로 남는다. 모든 사건 종류가 같은 규칙이다. 같은 줄이 이미 있으면 넣지 않고, 줄마다 따로 커밋해 한 줄의 충돌이 다른 줄이나 제어 줄을 되돌리지 않는다
+- `attention_event` 의 판정 칸은 셋 가운데 먼저 맞는 것이다. 지금 응답에 그 항목이 있으면 그 판정, 없으면 그 항목의 가장 최근 `SHOWN` 의 판정(`OPENED`, `ACTED` 는 같은 `stateKey` 의 `SHOWN` 만 본다), 그것도 없으면 `SUPPRESSED` 다. 차례는 [`schema/attention.md`](schema/attention.md) 의 「attention_event」 에 있다
 
 원래 기록을 지워도 이 두 표의 줄은 남는다. 열쇠가 가리키는 기록이 없으면 판정 후보가 되지 않아 보이지 않는다.
 `attention_event` 는 `event-retention` 이 지난 줄을 하루 한 번 지운다.
@@ -217,6 +249,34 @@
 | `NOW` 의 헛보임 | `NOW` 로 보였다가 행동 없이 숨긴 항목 ÷ `NOW` 로 보인 항목. false positive 의 대리값이다 |
 | 첫 행동까지 시간 | 같은 항목의 첫 `SHOWN` 에서 첫 `OPENED` 나 `ACTED` 까지의 중앙값. #161 의 time-to-first-useful-action 이다 |
 | 오래된 항목 비율 | `SHOWN` 때 출처의 신선도가 `STALE` 이던 항목 ÷ `SHOWN` |
+
+`GET /api/v1/admin/attention/metrics` 는 비율을 내지 않고 위 계산의 분자와 분모를 센 수로 낸다.
+
+```json
+{
+  "days": 30,
+  "rows": [
+    { "trigger": "EXECUTION_FAILED", "shown": 12, "hidden": 3, "snoozed": 1, "acted": 7, "nowShown": 12, "nowHiddenWithoutAction": 2, "staleShown": 0, "medianSecondsToFirstAction": 540 }
+  ]
+}
+```
+
+**항목 하나는 `(사용자, itemKey, stateKey)` 다.** 기간은 지금부터 `days` 일 전 이후에 남긴 사건이다.
+기간 안에 `SHOWN` 이 있는 항목만 세고, 그 항목의 `trigger` 는 기간 안의 첫 `SHOWN` 의 것이다.
+`rows` 는 `trigger` 마다 한 줄이고 위 「후보와 trigger」 표의 순서다. 보인 항목이 없는 `trigger` 는 줄이 없다.
+
+| 칸 | 뜻 |
+| --- | --- |
+| `days` | 센 기간의 일 수. 요청의 `days` 다 |
+| `rows[].trigger` | 그 줄의 `trigger` |
+| `rows[].shown` | `SHOWN` 이 있는 항목 수 |
+| `rows[].hidden` | 그 가운데 `HIDDEN` 이 있는 항목 수 |
+| `rows[].snoozed` | 그 가운데 `SNOOZED` 가 있는 항목 수 |
+| `rows[].acted` | 그 가운데 `OPENED` 나 `ACTED` 가 있는 항목 수 |
+| `rows[].nowShown` | 그 가운데 `NOW` 로 보인 `SHOWN` 이 있는 항목 수 |
+| `rows[].nowHiddenWithoutAction` | `nowShown` 가운데 `OPENED` 와 `ACTED` 없이 `HIDDEN` 이 있는 항목 수 |
+| `rows[].staleShown` | 그 가운데 출처가 `STALE` 이던 `SHOWN` 이 있는 항목 수 |
+| `rows[].medianSecondsToFirstAction` | 첫 `SHOWN` 에서 첫 `OPENED` 나 `ACTED` 까지 걸린 초의 중앙값. 짝수 개면 가운데 둘의 평균을 내림한다. 첫 행동이 첫 `SHOWN` 보다 앞이면 0 초로 센다. 행동한 항목이 없으면 `null` |
 
 지금의 후보는 모두 판정할 때 읽은 기록이라 신선도가 늘 `FRESH` 다. 오래된 항목 비율은 결과 source 가 후보에 들어오기 전까지 0 이다.
 
