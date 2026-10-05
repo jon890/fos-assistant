@@ -6,6 +6,7 @@ import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.verify;
 
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.agent.domain.type.AgentVisibility;
@@ -32,10 +33,12 @@ import com.bifos.assistant.notification.domain.type.NotificationTargetType;
 import com.bifos.assistant.notification.infra.NotificationRepository;
 import com.bifos.assistant.people.domain.AllowedPerson;
 import com.bifos.assistant.people.infra.AllowedPersonRepository;
+import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.task.application.TaskRunStarter;
+import com.bifos.assistant.task.application.TaskService;
 import com.bifos.assistant.task.domain.Task;
 import com.bifos.assistant.task.domain.TaskRun;
 import com.bifos.assistant.task.domain.TaskTrigger;
@@ -58,10 +61,14 @@ import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.TestConfiguration;
@@ -121,8 +128,11 @@ class TaskRunStarterTest {
     @Autowired
     HermesRunsClient hermes;
 
-    @Autowired
+    @MockitoSpyBean
     TurnCancellation turns;
+
+    @Autowired
+    TaskService service;
 
     @Autowired
     UserExecutionLimiter limiter;
@@ -476,6 +486,120 @@ class TaskRunStarterTest {
     }
 
     @Test
+    @DisplayName("준비 뒤 시작 전에 멈춘 작업은 새 실행을 열지 않는다")
+    void skipsWhenPausedAfterPreparation() {
+        Fixture fixture = fixture(ConversationMode.NEW_PER_RUN, NotifyPolicy.ALWAYS);
+        TaskRun run = queued(fixture, SCHEDULED, NOW);
+        doAnswer(invocation -> {
+                    newUserTransaction()
+                            .executeWithoutResult(status -> service.pause(
+                                    currentUser(fixture.owner()), fixture.task().publicId()));
+                    return invocation.callRealMethod();
+                })
+                .when(turns)
+                .open(eq(fixture.owner().id()), anyLong());
+
+        assertThat(starter.startQueued(NOW)).isZero();
+
+        assertPausedWithoutSubmission(fixture, run);
+    }
+
+    @Test
+    @DisplayName("준비 뒤 시작 전에 지운 작업도 새 실행을 열지 않는다")
+    void skipsWhenArchivedAfterPreparation() {
+        Fixture fixture = fixture(ConversationMode.NEW_PER_RUN, NotifyPolicy.ALWAYS);
+        TaskRun run = queued(fixture, SCHEDULED, NOW);
+        doAnswer(invocation -> {
+                    newUserTransaction()
+                            .executeWithoutResult(status -> service.archive(
+                                    currentUser(fixture.owner()), fixture.task().publicId()));
+                    return invocation.callRealMethod();
+                })
+                .when(turns)
+                .open(eq(fixture.owner().id()), anyLong());
+
+        assertThat(starter.startQueued(NOW)).isZero();
+
+        assertPausedWithoutSubmission(fixture, run);
+    }
+
+    @Test
+    @DisplayName("멈추기가 커밋되기 전이면 시작 단계가 기다렸다가 멈춘 상태를 본다")
+    void waitsForPauseCommitBeforeStarting() throws Exception {
+        Fixture fixture = fixture(ConversationMode.NEW_PER_RUN, NotifyPolicy.ALWAYS);
+        TaskRun run = queued(fixture, SCHEDULED, NOW);
+        CountDownLatch locked = new CountDownLatch(1);
+        CountDownLatch opened = new CountDownLatch(1);
+        try (var executor = Executors.newVirtualThreadPerTaskExecutor()) {
+            var pause = executor.submit(() -> {
+                assertThat(opened.await(10, TimeUnit.SECONDS)).isTrue();
+                newUserTransaction().executeWithoutResult(status -> {
+                    Task task = tasks.findByIdForUpdate(fixture.task().id()).orElseThrow();
+                    task.pause(NOW);
+                    tasks.flush();
+                    locked.countDown();
+                    try {
+                        Thread.sleep(300);
+                    } catch (InterruptedException ex) {
+                        Thread.currentThread().interrupt();
+                        throw new IllegalStateException(ex);
+                    }
+                });
+                return null;
+            });
+            doAnswer(invocation -> {
+                        opened.countDown();
+                        assertThat(locked.await(10, TimeUnit.SECONDS)).isTrue();
+                        return invocation.callRealMethod();
+                    })
+                    .when(turns)
+                    .open(eq(fixture.owner().id()), anyLong());
+
+            var start = executor.submit(() -> starter.startQueued(NOW));
+            assertThat(start.get(10, TimeUnit.SECONDS)).isZero();
+            pause.get(10, TimeUnit.SECONDS);
+        }
+
+        assertPausedWithoutSubmission(fixture, run);
+    }
+
+    private TransactionTemplate newUserTransaction() {
+        TransactionTemplate transaction = new TransactionTemplate(transactionManager);
+        transaction.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+        return transaction;
+    }
+
+    private static CurrentUser currentUser(AppUser user) {
+        return new CurrentUser(user.id(), user.email(), user.displayName(), user.groupId(), user.role());
+    }
+
+    private void assertPausedWithoutSubmission(Fixture fixture, TaskRun run) {
+        TaskRun skipped = awaitFinished(run);
+        assertThat(skipped.status()).isEqualTo(TaskRunStatus.SKIPPED);
+        assertThat(skipped.reason()).isEqualTo(TaskRunReason.PAUSED);
+        assertThat(stub().received()).isEmpty();
+
+        ArgumentCaptor<Long> preparedConversation = ArgumentCaptor.forClass(Long.class);
+        verify(turns).open(eq(fixture.owner().id()), preparedConversation.capture());
+        Long conversationId = preparedConversation.getValue();
+        if (fixture.task().conversationMode() == ConversationMode.NEW_PER_RUN) {
+            assertThat(skipped.conversationId()).isNull();
+            assertThat(conversations.findById(conversationId)).isEmpty();
+            assertThat(messages.findByConversationIdOrderByIdAsc(conversationId))
+                    .isEmpty();
+        } else {
+            assertThat(skipped.conversationId()).isEqualTo(conversationId);
+            assertThat(conversations.findById(conversationId)).isPresent();
+        }
+        assertThat(messages.findByConversationIdOrderByIdAsc(conversationId))
+                .extracting(ChatMessage::role)
+                .doesNotContain(MessageRole.USER);
+        assertThat(turns.markOf(conversationId).running()).isFalse();
+        assertThat(limiter.hasTurnRoom(fixture.owner().id())).isTrue();
+        assertThat(notificationsOf(fixture.owner().id())).isEmpty();
+    }
+
+    @Test
     @DisplayName("Hermes 가 실패하면 FAILED 로 적고 그 대화를 가리키는 TASK_FAILED 를 알린다")
     void recordsFailureAndNotifies() {
         Fixture fixture = fixture(ConversationMode.NEW_PER_RUN, NotifyPolicy.ON_FAILURE);
@@ -562,6 +686,7 @@ class TaskRunStarterTest {
         assertThat(task.state()).as("사용자가 멈춘 상태").isEqualTo(TaskState.PAUSED);
         assertThat(task.title()).as("사용자가 바꾼 이름").isEqualTo(renamed);
         assertThat(task.conversationId()).as("작업에 적은 대화").isNotNull().isEqualTo(finished.conversationId());
+        assertPausedWithoutSubmission(fixture, run);
     }
 
     /** 그 사용자의 turn 자리 둘을 먼저 얻어 한도를 채운다. 정리 단계가 돌려준다. */

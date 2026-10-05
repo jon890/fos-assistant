@@ -99,7 +99,7 @@ public class TaskService {
     @Transactional
     public TaskDetail update(CurrentUser user, UUID taskId, TaskInput input) {
         Instant now = clock.instant();
-        Task task = requireTask(user, taskId);
+        Task task = requireTaskForUpdate(user, taskId);
         TaskTrigger trigger = requireTrigger(task);
         Agent agent = requireAgent(user, input.agentCode());
         task.edit(agent.id(), title(input.title()), input.instruction(), modeOf(input), notifyOf(input), now);
@@ -118,7 +118,7 @@ public class TaskService {
     /** 멈춘다. {@code ACTIVE} 가 아니면 그대로 돌려준다. */
     @Transactional
     public TaskDetail pause(CurrentUser user, UUID taskId) {
-        Task task = requireTask(user, taskId);
+        Task task = requireTaskForUpdate(user, taskId);
         task.pause(clock.instant());
         return detailOf(task, requireTrigger(task));
     }
@@ -132,7 +132,7 @@ public class TaskService {
     @Transactional
     public TaskDetail resume(CurrentUser user, UUID taskId) {
         Instant now = clock.instant();
-        Task task = requireTask(user, taskId);
+        Task task = requireTaskForUpdate(user, taskId);
         TaskTrigger trigger = requireTrigger(task);
         if (task.resume(now)) {
             trigger.moveNext(nextOf(trigger, now), now);
@@ -143,7 +143,7 @@ public class TaskService {
     /** 지운다. 줄은 {@code ARCHIVED} 로 남는다. */
     @Transactional
     public void archive(CurrentUser user, UUID taskId) {
-        requireTask(user, taskId).archive(clock.instant());
+        requireTaskForUpdate(user, taskId).archive(clock.instant());
     }
 
     /** 내 보관하지 않은 작업을 만든 순서의 역순으로 읽는다. */
@@ -195,6 +195,12 @@ public class TaskService {
 
     private Task requireTask(CurrentUser user, UUID taskId) {
         return tasks.findByPublicIdAndOwnerUserId(taskId, user.id())
+                .filter(task -> !task.archived())
+                .orElseThrow(() -> new ApiException(ErrorCode.TASK_NOT_FOUND, NOT_FOUND_MESSAGE));
+    }
+
+    private Task requireTaskForUpdate(CurrentUser user, UUID taskId) {
+        return tasks.findByPublicIdAndOwnerUserIdForUpdate(taskId, user.id())
                 .filter(task -> !task.archived())
                 .orElseThrow(() -> new ApiException(ErrorCode.TASK_NOT_FOUND, NOT_FOUND_MESSAGE));
     }
