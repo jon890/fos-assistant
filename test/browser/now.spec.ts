@@ -458,6 +458,60 @@ test.describe("지금 화면", () => {
     await expect(rejected).toHaveCount(0, REFRESHED);
   });
 
+  test("새 대화 화면의 「확인할 것 N건」 은 늦게 도착해도 입력창을 밀지 않고 읽지 못하면 그리지 않는다", async ({
+    page,
+    hermes,
+  }) => {
+    await failTurn(page, hermes, "주간 장보기 목록 정리");
+    const summaryPath = "**/api/attention/summary";
+    let release: () => void = () => {};
+    const heldUntilReleased = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    // 사이드바 「지금 볼 것」 의 요청도 같은 경로라 함께 붙잡힌다.
+    await page.route(summaryPath, async (route: Route) => {
+      await heldUntilReleased;
+      await route.continue();
+    });
+    try {
+      await page.goto("/");
+      await expect(page.getByRole("heading", { level: 1, name: /무엇을 도와드릴까요\?$/ })).toBeVisible();
+      const composer = page.getByTestId("composer-shell");
+      await expect(composer).toBeVisible();
+      await expect(page.getByTestId("attention-line")).toHaveCount(0);
+      // 에이전트를 읽는 동안의 뼈대가 한 줄로 바뀌며 입력창이 움직인 값을 기준으로 삼지 않는다.
+      await expect(page.getByRole("main").getByText("장보기 비서", { exact: true })).toBeVisible();
+      await expect(page.getByRole("status", { name: "에이전트를 읽는 중" })).toHaveCount(0);
+      const before = (await composer.boundingBox())?.y;
+      expect(before, "입력창의 자리를 읽지 못했다").toBeDefined();
+
+      release();
+      const line = page.getByTestId("attention-line");
+      await expect(line).toHaveText(/^확인할 것 \d+건$/);
+      expect((await composer.boundingBox())?.y, "한 줄이 생기며 입력창이 움직였다").toBe(before);
+
+      await line.click();
+      await expect(page).toHaveURL(/\/now$/);
+    } finally {
+      release();
+      await page.unroute(summaryPath);
+    }
+
+    await page.route(summaryPath, (route: Route) => route.fulfill({ status: 500, json: { message: "읽지 못했어요" } }));
+    try {
+      // 앞 단계에서 「지금 볼 것」 을 다시 읽은 200 응답이 늦게 끝날 수 있어 500 응답만 기다린다.
+      const failed = page.waitForResponse(
+        (response) => response.url().endsWith("/api/attention/summary") && response.status() === 500,
+      );
+      await Promise.all([failed, page.goto("/")]);
+      await expect(page.getByRole("heading", { level: 1, name: /무엇을 도와드릴까요\?$/ })).toBeVisible();
+      await expect(page.getByTestId("composer-shell")).toBeVisible();
+      await expect(page.getByTestId("attention-line")).toHaveCount(0);
+    } finally {
+      await page.unroute(summaryPath);
+    }
+  });
+
   // 이 파일의 검사들이 같은 사용자와 에이전트를 함께 쓰므로 검사마다 지우지 않고 끝에 한 번 지운다.
   test.afterAll(async ({ browser }, testInfo) => {
     const context = await browser.newContext({ baseURL: WEB_BASE_URL });

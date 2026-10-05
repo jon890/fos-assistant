@@ -4,10 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { nowLinkLabel } from "@/lib/attention";
-import {
-  ATTENTION_CHANGED_EVENT,
-  fetchAttentionSummary,
-} from "@/lib/attention-api";
+import { ATTENTION_CHANGED_EVENT, readNowCount } from "@/lib/attention-api";
 import { NavPending } from "./nav-pending";
 
 /**
@@ -26,17 +23,9 @@ export function NowLink({ onNavigate }: { onNavigate(href: string): void }) {
     let stale = false;
     const read = () => {
       const turn = ++latest;
-      void fetchAttentionSummary()
-        .then((response) => (response.ok ? response.json() : { nowCount: 0 }))
-        .then((summary: { nowCount?: unknown }) => {
-          if (stale || turn !== latest) return;
-          setNowCount(
-            typeof summary.nowCount === "number" ? summary.nowCount : 0,
-          );
-        })
-        .catch(() => {
-          if (!stale && turn === latest) setNowCount(0);
-        });
+      void readNowCount().then((count) => {
+        if (!stale && turn === latest) setNowCount(count);
+      });
     };
     read();
     window.addEventListener(ATTENTION_CHANGED_EVENT, read);

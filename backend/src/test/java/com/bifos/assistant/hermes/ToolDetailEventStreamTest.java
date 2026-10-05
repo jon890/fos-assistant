@@ -30,6 +30,13 @@ class ToolDetailEventStreamTest {
 
             """;
 
+    private static final String FOLLOW_UP_PROPOSE_RAW = """
+            data: {"event":"tool.started","tool":"mcp__fos_assistant__follow_up_propose","preview":"{\\"title\\": \\"제목-표식-5170\\"}"}
+
+            data: {"event":"tool.completed","tool":"mcp__fos_assistant__follow_up_propose","result":"제목-표식-5170 제안됨"}
+
+            """;
+
     private static final String OTHER_TOOL_RAW = """
             data: {"event":"tool.completed","tool":"web_search","result":"Bearer short-secret 검색 결과"}
 
@@ -71,6 +78,20 @@ class ToolDetailEventStreamTest {
             // 가리는 쪽이 JSON 인자를 다시 직렬화해 공백이 빠진다
             assertThat(events).extracting(RunEvent::detail).containsExactly("{\"id\":12}", null);
             assertThat(events).extracting(RunEvent::toolName).containsOnly("mcp__fos_assistant__memory_read");
+        } finally {
+            server.stop(0);
+        }
+    }
+
+    @Test
+    @DisplayName("follow_up_propose 사건은 시작과 완료 모두 내용을 남기지 않는다")
+    void keepsNoDetailOfFollowUpProposeEvents() throws IOException {
+        HttpServer server = startServer(FOLLOW_UP_PROPOSE_RAW);
+        try {
+            List<RunEvent> events = read(server, false);
+
+            assertThat(events).extracting(RunEvent::detail).containsExactly(null, null);
+            assertThat(events).extracting(RunEvent::toolName).containsOnly("mcp__fos_assistant__follow_up_propose");
         } finally {
             server.stop(0);
         }

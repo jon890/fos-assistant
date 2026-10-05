@@ -56,7 +56,7 @@ Memory 제안은 session 을 적지 않는다. 그래서 그 실행 안에서는
 
 ## MCP 호출의 요청자를 정할 때
 
-`memory_read`, `artifact_write`, `agent_list`, `agent_delegate`, `agent_status`, `agent_stop` 이 모두 이 길을 지난다.
+`memory_read`, `artifact_write`, `agent_list`, `agent_delegate`, `agent_status`, `agent_stop`, `follow_up_propose` 가 모두 이 길을 지난다.
 
 ```mermaid
 sequenceDiagram
@@ -184,11 +184,11 @@ FOS 실행 #105 같은 대화의 다음 turn          ← 돌아도 S1 은 #100 
 | 경로 | `/mcp` |
 | 프로토콜 | Streamable HTTP `2025-03-26` |
 | 인증 | profile마다 다른 Bearer 토큰. 토큰은 그 profile 을 증명할 뿐 사용자를 정하지 않는다 |
-| 도구 | `memory_read`, `artifact_write`, `agent_list`, `agent_delegate`, `agent_status`, `agent_stop` |
+| 도구 | `memory_read`, `artifact_write`, `agent_list`, `agent_delegate`, `agent_status`, `agent_stop`, `follow_up_propose` |
 | 요청자 | 모든 도구가 위 「MCP 호출의 요청자를 정할 때」 의 판정을 지난다. 서명하는 쪽의 계약은 [`../hermes/fos-ctx.md`](../hermes/fos-ctx.md#부모-실행을-잇는-방법) 에 있다 |
 
 **먼저 살펴보기 트리에서는 `memory_read`, `agent_list`, `agent_delegate`, `agent_status`, `agent_stop` 만 받는다.**
-요청자를 정한 뒤 `ProactiveCheckGuard.isCheckTree` 가 참이면 나머지 도구는 「먼저 살펴보기에서는 쓸 수 없는 도구입니다.」 오류 결과(`isError: true`)다. 지금은 `artifact_write` 가 여기 걸린다.
+요청자를 정한 뒤 `ProactiveCheckGuard.isCheckTree` 가 참이면 나머지 도구는 「먼저 살펴보기에서는 쓸 수 없는 도구입니다.」 오류 결과(`isError: true`)다. 지금은 `artifact_write` 와 `follow_up_propose` 가 여기 걸린다.
 새 도구를 더하면 살펴보기에서 받을지 함께 정한다([`proactive-check.md`](proactive-check.md) 의 「읽기 경계」).
 
 도구마다의 인자와 결과는 아래가 갖는다.
@@ -198,6 +198,7 @@ FOS 실행 #105 같은 대화의 다음 turn          ← 돌아도 S1 은 #100 
 | `memory_read` | [`memory.md`](memory.md) 의 「Memory 본문을 읽는 길」 |
 | `artifact_write` | 아래 「결과물 쓰기 도구」 |
 | `agent_list`, `agent_delegate`, `agent_status`, `agent_stop` | [`agent-delegation.md`](agent-delegation.md) 의 「도구 계약」 |
+| `follow_up_propose` | [`follow-up.md`](follow-up.md) 의 「제안 도구」 |
 
 **Hermes 는 MCP 도구 이름 앞에 서버 이름을 붙인다.** 처음에는 Memory 만 담아 서버 이름이 `fos-assistant-memory` 였다.
 결과물 쓰기가 같은 서버에 들어오면서 `mcp__fos_assistant_memory__artifact_write` 처럼 Memory 와 무관한 도구에 Memory 가 붙어 2026-09-29 에 `fos-assistant` 로 바꿨다.

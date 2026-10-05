@@ -15,6 +15,11 @@ async function controlPlaneToken(): Promise<string> {
     .sign(new TextEncoder().encode(JWT_SECRET));
 }
 
+test("관리자 사용량 요약에 먼저 알리기 지표 절이 보인다", async ({ page }) => {
+  await page.goto("/admin/usage");
+  await expect(page.getByRole("heading", { name: "먼저 알리기" })).toBeVisible();
+});
+
 test("화면 폭에 맞춰 실행 기록을 카드나 표로 보인다", async ({ page }, testInfo) => {
   const response = await page.request.post("/api/chat", {
     data: { text: "사용량 화면 검사", agentCode: "browser" },
@@ -355,6 +360,12 @@ test.describe("MEMBER 역할 사용자의 사용량 화면", () => {
       const deleted = await page.request.delete(`/api/agents/${agent.code}`);
       expect(deleted.status(), `검사가 만든 에이전트 ${agent.code} 를 지우지 못했다`).toBe(204);
     }
+  });
+
+  test("사용량 요약에 먼저 알리기 지표 절이 없다", async ({ page }) => {
+    await page.goto("/usage");
+    await expect(page.getByText("이번 달 실행", { exact: true })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "먼저 알리기" })).toHaveCount(0);
   });
 
   test("실행 기록과 요약과 대화의 작업 과정에 내부 값이 없다", async ({ page }, testInfo) => {

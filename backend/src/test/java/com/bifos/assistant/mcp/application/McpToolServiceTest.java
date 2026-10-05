@@ -12,6 +12,7 @@ import ch.qos.logback.core.read.ListAppender;
 import com.bifos.assistant.agent.infra.AgentRepository;
 import com.bifos.assistant.chat.application.ArtifactWriteRequest;
 import com.bifos.assistant.chat.application.ArtifactWriteService;
+import com.bifos.assistant.followup.application.FollowUpService;
 import com.bifos.assistant.memory.application.MemoryService;
 import com.bifos.assistant.memory.domain.Memory;
 import com.bifos.assistant.orchestration.application.AgentDelegationService;
@@ -46,6 +47,7 @@ class McpToolServiceTest {
             new DelegationProperties(2, 4, 16, Duration.ofSeconds(30), 1000, Duration.ofSeconds(20)),
             mock(ExecutionDeliveryWriter.class),
             mock(AgentRepository.class),
+            mock(FollowUpService.class),
             Clock.systemUTC());
     private final AgentExecution parent = mock(AgentExecution.class);
     private McpCaller caller;

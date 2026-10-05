@@ -3,6 +3,7 @@ package com.bifos.assistant.followup.application;
 import com.bifos.assistant.chat.application.ConversationAccess;
 import com.bifos.assistant.chat.application.ConversationPublicIdLookup;
 import com.bifos.assistant.followup.application.model.FollowUpPatch;
+import com.bifos.assistant.followup.application.model.FollowUpProposalOutcome;
 import com.bifos.assistant.followup.application.model.FollowUpSnapshot;
 import com.bifos.assistant.followup.application.model.NewFollowUp;
 import com.bifos.assistant.followup.domain.FollowUp;
@@ -14,6 +15,7 @@ import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.shared.util.Sha256;
 import java.text.Normalizer;
 import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.Locale;
@@ -26,6 +28,7 @@ import java.util.function.BiConsumer;
 import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.dao.PessimisticLockingFailureException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Transactional;
@@ -44,7 +47,16 @@ import org.springframework.transaction.support.TransactionTemplate;
 public class FollowUpService {
 
     /** {@code follow_up.title} 의 칸 길이다. 앞뒤 공백을 지운 글자 수로 센다. */
-    static final int TITLE_MAX = 200;
+    public static final int TITLE_MAX = 200;
+
+    /** 같은 대화에서 거절한 제목을 다시 받지 않는 기간이다. */
+    static final Duration REJECTED_COOLDOWN = Duration.ofDays(30);
+
+    /** 한 대화에 받아들이기를 기다리는 제안의 상한이다. */
+    static final int MAX_OPEN_PROPOSALS_PER_CONVERSATION = 3;
+
+    /** 한 실행이 제안할 수 있는 줄의 상한이다. */
+    static final int MAX_PROPOSALS_PER_EXECUTION = 2;
 
     private static final Set<FollowUpStatus> LISTED = Set.of(FollowUpStatus.PROPOSED, FollowUpStatus.OPEN);
 
@@ -124,6 +136,62 @@ public class FollowUpService {
                 user.id(),
                 result.followUp().publicId());
         return snapshot(result.followUp());
+    }
+
+    /**
+     * 에이전트가 대화 중에 할 일을 제안한다. 새 줄은 {@code PROPOSED} 다. 규칙은 {@code docs/backend/follow-up.md} 의 「제안 억제」
+     * 가 갖는다.
+     *
+     * <p>세는 것과 저장하는 것 사이에 잠금을 두지 않는다. 같은 대화에서 나란히 제안하면 상한을 조금 넘을 수 있다. 같은 제목이 동시에
+     * 들어오면 유일 제약이 하나만 남기고, 진 쪽은 트랜잭션 밖에서 잡아 다시 읽은 뒤 {@code DUPLICATE} 로 답한다. MySQL 이 동시 삽입을
+     * 교착으로 끊은 경우도 같다.
+     *
+     * @param owner origin 실행의 사용자
+     * @param conversationId origin 실행의 대화 번호
+     * @param executionId 제안한 origin 실행의 번호
+     * @param dueAt 기한. 없으면 null
+     */
+    public FollowUpProposalOutcome propose(
+            CurrentUser owner, Long conversationId, Long executionId, String title, Instant dueAt, boolean waiting) {
+        String stripped = requireTitle(title);
+        String key = titleKey(stripped);
+        Instant now = clock.instant();
+        FollowUpProposalOutcome outcome;
+        try {
+            outcome = transactions.execute(status -> {
+                if (followUps
+                        .findByUserIdAndTitleKeyAndOpenMarker(owner.id(), key, FollowUp.OPEN_MARKER)
+                        .isPresent()) {
+                    return FollowUpProposalOutcome.DUPLICATE;
+                }
+                if (followUps.existsByConversationIdAndTitleKeyAndStatusAndClosedAtAfter(
+                        conversationId, key, FollowUpStatus.REJECTED, now.minus(REJECTED_COOLDOWN))) {
+                    return FollowUpProposalOutcome.DECLINED_BEFORE;
+                }
+                if (followUps.countByConversationIdAndStatus(conversationId, FollowUpStatus.PROPOSED)
+                        >= MAX_OPEN_PROPOSALS_PER_CONVERSATION) {
+                    return FollowUpProposalOutcome.TOO_MANY_PROPOSALS;
+                }
+                if (followUps.countByProposedByExecutionId(executionId) >= MAX_PROPOSALS_PER_EXECUTION) {
+                    return FollowUpProposalOutcome.TOO_MANY_IN_RUN;
+                }
+                followUps.saveAndFlush(
+                        FollowUp.proposed(owner.id(), conversationId, executionId, stripped, key, dueAt, waiting, now));
+                return FollowUpProposalOutcome.CREATED;
+            });
+        } catch (DataIntegrityViolationException | PessimisticLockingFailureException ex) {
+            // 같은 제목이 동시에 열려 유일 제약에 걸렸거나, MySQL 이 같은 유일 키의 동시 삽입을 교착으로 끊었다.
+            // 먼저 저장된 줄이 있을 때만 같은 할 일로 답한다. 없으면 다른 까닭의 저장 실패라 그대로 던진다.
+            boolean saved = Boolean.TRUE.equals(transactions.execute(status -> followUps
+                    .findByUserIdAndTitleKeyAndOpenMarker(owner.id(), key, FollowUp.OPEN_MARKER)
+                    .isPresent()));
+            if (!saved) {
+                throw ex;
+            }
+            outcome = FollowUpProposalOutcome.DUPLICATE;
+        }
+        log.info("follow-up proposal userId={} executionId={} outcome={}", owner.id(), executionId, outcome);
+        return outcome;
     }
 
     /**
