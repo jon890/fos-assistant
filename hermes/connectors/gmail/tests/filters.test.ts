@@ -100,6 +100,54 @@ describe("Gmail 라벨과 필터", () => {
     }
   });
 
+  test.each([
+    ["text_color", "#16a766", "#f691b3"],
+    ["background_color", "#f691b3", "#16a766"],
+  ])(
+    "공식 색상표의 %s 값은 Gmail 요청에 그대로 쓴다",
+    async (_field, textColor, backgroundColor) => {
+      const { fake, server } = setup();
+      fake.on("POST", "/gmail/labels", { id: "Label_9" });
+      try {
+        await withMcp(server, async (client) => {
+          const result = await tool(client, "create_label", {
+            name: "색상표 확인",
+            text_color: textColor,
+            background_color: backgroundColor,
+          });
+          expect(result.result.isError).not.toBe(true);
+        });
+        const request = fake.seen("POST", "/gmail/labels")[0]!;
+        const body = JSON.parse(request.body);
+        expect(body.color).toEqual({ textColor, backgroundColor });
+      } finally {
+        fake.stop();
+      }
+    },
+  );
+
+  test.each([
+    ["text_color", "#cd74e6", "#16a766"],
+    ["background_color", "#16a766", "#cd74e6"],
+  ])(
+    "지원하지 않는 %s 색상은 HTTP 전에 거절한다",
+    async (_field, textColor, backgroundColor) => {
+      const { fake, server } = setup();
+      try {
+        await withMcp(server, (client) =>
+          expectFailure(client, "GMAIL_INVALID_INPUT", "create_label", {
+            name: "지원하지 않는 색",
+            text_color: textColor,
+            background_color: backgroundColor,
+          }),
+        );
+        expect(fake.seen("POST", "/gmail/labels")).toHaveLength(0);
+      } finally {
+        fake.stop();
+      }
+    },
+  );
+
   test("라벨 이름은 225자까지이고 시스템 라벨은 만들거나 수정하지 않는다", async () => {
     const { fake, server } = setup();
     try {
