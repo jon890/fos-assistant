@@ -18,6 +18,15 @@ public interface ConversationRepository extends JpaRepository<Conversation, Long
 
     Optional<Conversation> findByIdAndUserIdAndDeletedAtIsNull(Long id, Long userId);
 
+    /** 메시지가 없는 예약 작업 대화만 지운다. 트랜잭션은 예약 작업의 시작 단계가 연다. */
+    @Modifying(flushAutomatically = true)
+    @Query("""
+            delete from Conversation c
+             where c.id = :id and c.taskId is not null
+               and not exists (select m.id from ChatMessage m where m.conversationId = c.id)
+            """)
+    int discardEmptyTaskConversation(@Param("id") Long id);
+
     Optional<Conversation> findByPublicIdAndUserIdAndDeletedAtIsNull(UUID publicId, Long userId);
 
     /** 그 사용자의 지우지 않은 대화를 최근 것부터 첫 쪽만큼 읽는다. 개수는 {@code pageable} 이 정한다. */

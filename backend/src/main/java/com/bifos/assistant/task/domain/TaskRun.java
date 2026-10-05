@@ -118,6 +118,11 @@ public class TaskRun {
         this.conversationId = Objects.requireNonNull(conversationId, "conversationId");
     }
 
+    /** 발화가 미리 만든 빈 대화를 지웠을 때만 부른다. */
+    public void forgetConversation() {
+        this.conversationId = null;
+    }
+
     /** turn 잠금을 얻어 연다. */
     public void start(Instant now) {
         this.status = TaskRunStatus.RUNNING;
