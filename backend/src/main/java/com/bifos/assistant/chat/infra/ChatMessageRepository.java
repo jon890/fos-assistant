@@ -14,9 +14,6 @@ public interface ChatMessageRepository extends JpaRepository<ChatMessage, Long> 
 
     List<ChatMessage> findByConversationIdOrderByIdAsc(Long conversationId);
 
-    /** 대화에 메시지가 하나라도 있는지 본다. */
-    boolean existsByConversationId(Long conversationId);
-
     /** 대화에서 그 역할이 처음 남긴 메시지를 읽는다. */
     Optional<ChatMessage> findFirstByConversationIdAndRoleOrderByIdAsc(Long conversationId, MessageRole role);
 
