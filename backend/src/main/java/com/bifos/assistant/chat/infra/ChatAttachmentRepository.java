@@ -19,28 +19,27 @@ public interface ChatAttachmentRepository extends JpaRepository<ChatAttachment, 
 
     List<ChatAttachment> findByConversationIdOrderByIdAsc(Long conversationId);
 
+    List<ChatAttachment> findByConversationIdOrderByMessageIdAscPositionAsc(Long conversationId);
+
     /** 아직 메시지에 묶이지 않았고 지워지지 않은 첨부의 수. 한 번 보낼 때의 장수 상한을 이것으로 본다. */
     long countByConversationIdAndMessageIdIsNullAndDeletedAtIsNull(Long conversationId);
 
     List<ChatAttachment> findByExpiresAtBeforeAndDeletedAtIsNullOrderByIdAsc(Instant now);
 
-    /**
-     * 아직 묶이지 않은 보이는 첨부만 이 메시지에 묶는다.
-     *
-     * <p>조건을 갱신 쿼리에 두어, 두 요청이 같은 첨부를 동시에 묶으려 하면 뒤의 것은 갱신한 행 수가
-     * 모자라게 된다.
-     */
+    /** 아직 묶이지 않았고 지워지지 않은 첨부 하나를 지정한 자리로 묶는다. */
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query("""
             update ChatAttachment a
-               set a.messageId = :messageId
-             where a.id in :ids
+               set a.messageId = :messageId,
+                   a.position = :position
+             where a.id = :attachmentId
                and a.conversationId = :conversationId
                and a.messageId is null
                and a.deletedAt is null
             """)
-    int attachToMessage(
+    int attachToMessageAtPosition(
             @Param("messageId") Long messageId,
             @Param("conversationId") Long conversationId,
-            @Param("ids") Collection<Long> ids);
+            @Param("attachmentId") Long attachmentId,
+            @Param("position") int position);
 }

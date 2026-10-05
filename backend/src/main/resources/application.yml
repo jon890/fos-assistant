@@ -151,7 +151,7 @@ assistant:
     # 같은 디렉터리를 Hermes 컨테이너에서 보는 경로. 값을 둘로 두는 것이 아니라 두 컨테이너가 같은
     # 디렉터리를 다른 마운트 지점으로 보는 것이다. 에이전트에게는 이 경로를 알린다. 기본값이 없다
     agent-root: ${ASSISTANT_ATTACHMENT_AGENT_ROOT}
-    max-files: 10
+    max-files: 30
     max-bytes: 10485760
     retention-days: 30
     # 보관 기간이 지난 사진을 지우는 시각. Control Plane 의 시간대를 따른다

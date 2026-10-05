@@ -91,7 +91,7 @@ type Props = {
 };
 
 const ACCEPTED_TYPES = ["image/jpeg", "image/png", "image/gif", "image/webp"];
-const MAX_ATTACHMENTS = 10;
+const MAX_ATTACHMENTS = 30;
 const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024;
 /** 미리보기의 긴 변 길이다. 열 장에 33MB 였던 실측이 있어 원본을 그대로 그리지 않는다 */
 const THUMBNAIL_MAX_SIDE = 192;
@@ -103,7 +103,7 @@ type AttachmentItem = {
   attachmentId: number | null;
   errorMessage: string | null;
   /** 이 첨부가 올라간 대화의 공개 식별자다. 지울 때 이 식별자로 서버 DELETE 를 부른다 */
-  conversationId: string;
+  conversationId: string | null;
 };
 
 async function buildThumbnail(file: File): Promise<string> {
@@ -212,6 +212,7 @@ export function Composer({
         if (
           item.status === "done" &&
           item.attachmentId !== null &&
+          item.conversationId !== null &&
           !sending.has(item.key)
         ) {
           void deleteAttachment(item.conversationId, item.attachmentId);
@@ -304,9 +305,11 @@ export function Composer({
   }, [blocking, onBlockingChange]);
 
   function updateItem(key: string, patch: Partial<AttachmentItem>) {
-    setItems((previous) =>
-      previous.map((item) => (item.key === key ? { ...item, ...patch } : item)),
+    const updated = itemsRef.current.map((item) =>
+      item.key === key ? { ...item, ...patch } : item,
     );
+    itemsRef.current = updated;
+    setItems(updated);
   }
 
   async function ensureConversationId(): Promise<string | null> {
@@ -368,29 +371,21 @@ export function Composer({
     }
   }
 
-  async function uploadOne(file: File, targetConversationId: string) {
-    const key = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
-    let previewUrl = "";
-    try {
-      previewUrl = await buildThumbnail(file);
-    } catch {
-      previewUrl = "";
-    }
-    if (!mountedRef.current) {
-      if (previewUrl) URL.revokeObjectURL(previewUrl);
-      return;
-    }
-    setItems((previous) => [
-      ...previous,
-      {
-        key,
-        previewUrl,
-        status: "uploading",
-        attachmentId: null,
-        errorMessage: null,
-        conversationId: targetConversationId,
-      },
-    ]);
+  async function uploadOne(
+    file: File,
+    targetConversationId: string,
+    key: string,
+  ) {
+    const thumbnail = buildThumbnail(file).catch(() => "");
+    void thumbnail.then((previewUrl) => {
+      if (!previewUrl) return;
+      const item = itemsRef.current.find((candidate) => candidate.key === key);
+      if (!mountedRef.current || !item || pendingRemovalRef.current.has(key)) {
+        URL.revokeObjectURL(previewUrl);
+        return;
+      }
+      updateItem(key, { previewUrl });
+    });
 
     try {
       const form = new FormData();
@@ -444,7 +439,10 @@ export function Composer({
     ).length;
     const accepted = files.filter((file) => ACCEPTED_TYPES.includes(file.type));
     // 상한은 한 번에 고를 때만 센다. 이미 붙은 첨부를 빼고 남은 자리만큼만 올린다.
-    const remainingSlots = Math.max(0, MAX_ATTACHMENTS - items.length);
+    const remainingSlots = Math.max(
+      0,
+      MAX_ATTACHMENTS - itemsRef.current.length,
+    );
     const overflowCount = Math.max(0, accepted.length - remainingSlots);
     const capped = accepted.slice(0, remainingSlots);
     const oversize = capped.filter((file) => file.size > MAX_ATTACHMENT_BYTES);
@@ -470,11 +468,35 @@ export function Composer({
 
     if (toUpload.length === 0) return;
 
-    const targetConversationId = await ensureConversationId();
-    if (targetConversationId === null || !mountedRef.current) return;
+    const newItems = toUpload.map(() => ({
+      key: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+      previewUrl: "",
+      status: "uploading" as const,
+      attachmentId: null,
+      errorMessage: null,
+      conversationId: null,
+    }));
+    const nextItems = [...itemsRef.current, ...newItems];
+    itemsRef.current = nextItems;
+    setItems(nextItems);
 
-    for (const file of toUpload) {
-      void uploadOne(file, targetConversationId);
+    const targetConversationId = await ensureConversationId();
+    if (targetConversationId === null || !mountedRef.current) {
+      for (const item of newItems) pendingRemovalRef.current.delete(item.key);
+      const retained = itemsRef.current.filter(
+        (item) => !newItems.some((created) => created.key === item.key),
+      );
+      itemsRef.current = retained;
+      if (mountedRef.current) setItems(retained);
+      return;
+    }
+
+    for (let index = 0; index < toUpload.length; index++) {
+      const item = newItems[index]!;
+      if (!itemsRef.current.some((current) => current.key === item.key))
+        continue;
+      updateItem(item.key, { conversationId: targetConversationId });
+      void uploadOne(toUpload[index]!, targetConversationId, item.key);
     }
   }
 
@@ -538,10 +560,14 @@ export function Composer({
     const target = itemsRef.current.find((item) => item.key === key);
     if (!target) return;
     if (target.previewUrl) URL.revokeObjectURL(target.previewUrl);
-    if (target.status === "uploading") {
+    if (target.status === "uploading" && target.conversationId !== null) {
       pendingRemovalRef.current.add(key);
+    } else if (target.status === "uploading") {
+      pendingRemovalRef.current.delete(key);
     } else if (target.status === "done" && target.attachmentId !== null) {
-      void deleteAttachment(target.conversationId, target.attachmentId);
+      if (target.conversationId !== null) {
+        void deleteAttachment(target.conversationId, target.attachmentId);
+      }
     }
     itemsRef.current = itemsRef.current.filter((item) => item.key !== key);
     setItems((previous) => previous.filter((item) => item.key !== key));
