@@ -756,12 +756,62 @@ class ConnectorPolicyEndpointTest {
         assertThat(notifications.count()).as("승인 알림").isZero();
     }
 
+    @Test
+    @DisplayName("쓰기를 허용한 살펴보기에서 쓰기 도구는 상시 허락이 있어도 action_id 와 PENDING 승인 줄과 승인 알림을 만든다")
+    void writeToolInWritesAllowedCheckTreeAsksApprovalEvenWithGrant() throws Exception {
+        connect(true);
+        grants.save(ConnectorToolGrant.of(owner.id(), DEMO, "write_note", NOW.plus(Duration.ofDays(3650)), NOW));
+        String checkRoot = startCheckTreeChild(true);
+
+        HttpResponse<String> response = askIn(checkRoot, "mcp__demo__write_note", "write_note", ARGS);
+
+        assertApprovalRequested(response);
+        Map<String, Object> row = onlyRow();
+        assertThat(row.get("DECISION")).isEqualTo("NEEDS_APPROVAL");
+        assertThat(row.get("DENY_REASON")).isNull();
+        assertThat(row.get("PASSED")).isEqualTo(false);
+        assertThat(row.get("STATUS")).isEqualTo("PENDING");
+        assertThat(row.get("ARGS_JSON")).isEqualTo(ARGS);
+        assertThat(notifications.count()).as("승인 알림").isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("쓰기를 허용한 살펴보기에서도 READ 와 none 인 도구는 allow 이고 DESTRUCTIVE 는 RISK_NOT_OPEN 이다")
+    void writesAllowedCheckTreeAllowsReadAndKeepsRiskNotOpen() throws Exception {
+        connect(true);
+        String checkRoot = startCheckTreeChild(true);
+
+        HttpResponse<String> read = askIn(checkRoot, "mcp__demo__list_scopes", "list_scopes", ARGS);
+        HttpResponse<String> purge = askIn(checkRoot, "mcp__demo__purge_notes", "purge_notes", ARGS);
+
+        assertThat(json.readTree(read.body()).path("decision").asString()).isEqualTo("allow");
+        assertBlocked(purge, "이 도구는 아직 열리지 않아 실행하지 않았다. 다시 부르지 않는다.");
+        assertThat(jdbc.queryForList(
+                        "SELECT decision, deny_reason, tool_name, status FROM connector_action ORDER BY id"))
+                .extracting(
+                        row -> row.get("DECISION"),
+                        row -> row.get("DENY_REASON"),
+                        row -> row.get("TOOL_NAME"),
+                        row -> row.get("STATUS"))
+                .containsExactly(
+                        tuple("ALLOWED", null, "list_scopes", null),
+                        tuple("DENIED", "RISK_NOT_OPEN", "purge_notes", null));
+        assertThat(notifications.count()).as("승인 알림").isZero();
+    }
+
+    /** 읽기 경계의 살펴보기 트리를 만든다. */
+    private String startCheckTreeChild() {
+        return startCheckTreeChild(false);
+    }
+
     /**
      * 살펴보기 turn 을 루트로 둔 커넥터 에이전트의 위임 실행을 만들고, 그 실행의 루트 session 을 돌려준다.
      *
      * <p>승인 카드가 뜰 대화가 있어야 알림이 생기므로 실제 대화를 저장한다. 그래서 알림이 없는 것은 대화가 없어서가 아니다.
+     *
+     * @param writesAllowed 그 살펴보기 줄에 옮겨 적은 쓰기 허용 값
      */
-    private String startCheckTreeChild() {
+    private String startCheckTreeChild(boolean writesAllowed) {
         Conversation conversation =
                 conversations.save(Conversation.startedForCheck(owner.id(), "점검 대화", agent.id(), Instant.now()));
         AgentExecution checkTurn = executions.save(AgentExecution.builder()
@@ -773,8 +823,8 @@ class ConnectorPolicyEndpointTest {
                 .status(ExecutionStatus.RUNNING)
                 .startedAt(NOW)
                 .build());
-        ProactiveCheck check =
-                ProactiveCheck.started(owner.id(), agent.id(), conversation.id(), CheckTrigger.MANUAL, NOW);
+        ProactiveCheck check = ProactiveCheck.started(
+                owner.id(), agent.id(), conversation.id(), CheckTrigger.MANUAL, writesAllowed, NOW);
         check.attachRoot(checkTurn.id(), checkTurn.hermesSessionId());
         createdChecks.add(checks.save(check).id());
         String childRoot = "fos-" + UUID.randomUUID();

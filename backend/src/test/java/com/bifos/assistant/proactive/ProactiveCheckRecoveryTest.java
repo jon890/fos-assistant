@@ -189,7 +189,7 @@ class ProactiveCheckRecoveryTest {
     void closesCheckWithoutRootAndLeavesEndedCheck() {
         ProactiveCheck withoutRoot = check(null);
         ProactiveCheck ended =
-                ProactiveCheck.started(user.id(), agent.id(), conversation.id(), CheckTrigger.MANUAL, STARTED);
+                ProactiveCheck.started(user.id(), agent.id(), conversation.id(), CheckTrigger.MANUAL, false, STARTED);
         ended.succeed(CheckOutcome.NOTHING_NEW, 0, 0, 3, 0, STARTED.plusSeconds(60));
         ended = checks.save(ended);
         createdChecks.add(ended.id());
@@ -227,7 +227,7 @@ class ProactiveCheckRecoveryTest {
     /** 점검 대화의 {@code RUNNING} 살펴보기 줄이다. {@code root} 가 null 이면 루트 실행이 생기기 전이다. */
     private ProactiveCheck check(AgentExecution root) {
         ProactiveCheck check =
-                ProactiveCheck.started(user.id(), agent.id(), conversation.id(), CheckTrigger.MANUAL, STARTED);
+                ProactiveCheck.started(user.id(), agent.id(), conversation.id(), CheckTrigger.MANUAL, false, STARTED);
         if (root != null) {
             check.attachRoot(root.id(), root.hermesSessionId());
         }

@@ -10,6 +10,7 @@ import com.bifos.assistant.connector.domain.ConnectorConnection;
 import com.bifos.assistant.connector.domain.HermesToolName;
 import com.bifos.assistant.connector.domain.ToolPolicy;
 import com.bifos.assistant.connector.domain.ToolPolicyDecision;
+import com.bifos.assistant.connector.domain.ToolPolicyDecision.CheckBoundary;
 import com.bifos.assistant.connector.domain.type.ActionDecision;
 import com.bifos.assistant.connector.domain.type.ActionDenyReason;
 import com.bifos.assistant.connector.domain.type.ActionStatus;
@@ -204,7 +205,8 @@ public class ConnectorPolicyService {
         // 승인 카드와 알림이 같은 도구 제목을 쓰도록 선언을 한 번 찾아 둔다.
         Optional<ToolPolicy> declared = manifest.flatMap(value -> ConnectorToolPolicies.find(value, confirmedTool));
         // 커넥터 에이전트의 실행은 위임 자식이라, 살펴보기가 맡긴 것이면 트리 루트가 살펴보기 turn 이다(ADR-080).
-        boolean readOnlyRun = checkGuard.isCheckTree(origin);
+        // 그 살펴보기가 쓰기 도구를 허용했으면 쓰기를 거절하지 않고 승인 줄로 보낸다(ADR-082).
+        CheckBoundary boundary = checkBoundary(origin);
         ToolPolicyDecision decision = manifest.map(value -> ToolPolicyDecision.decide(
                         connection.status(),
                         ownServerTool(value, hermesTool),
@@ -212,7 +214,7 @@ public class ConnectorPolicyService {
                         declared,
                         granted(connection, confirmedTool, now),
                         argsJson.getBytes(StandardCharsets.UTF_8).length,
-                        readOnlyRun))
+                        boundary))
                 .orElseGet(ToolPolicyDecision::policyUnavailable);
         // 허용만 통과시킨다. 승인이 필요한 호출을 통과시키면 사람의 확인 없이 쓰기가 나간다.
         boolean passed = decision.decision() == ActionDecision.ALLOWED;
@@ -251,6 +253,14 @@ public class ConnectorPolicyService {
                     .map(first -> replayed(first, hermesTool, argsSha256))
                     .orElseThrow(() -> ex);
         }
+    }
+
+    /** 살펴보기 줄을 한 번 읽어 경계를 정한다. 줄이 없으면 살펴보기 트리가 아니다. */
+    private CheckBoundary checkBoundary(AgentExecution origin) {
+        return checkGuard
+                .checkOf(origin)
+                .map(check -> check.writesAllowed() ? CheckBoundary.APPROVAL_ONLY : CheckBoundary.READ_ONLY)
+                .orElse(CheckBoundary.NOT_CHECK);
     }
 
     /** 승인 줄의 주인에게 새 요청을 알린다. 대화가 지워졌거나 없으면 눌러도 갈 곳이 없어 남기지 않는다. */

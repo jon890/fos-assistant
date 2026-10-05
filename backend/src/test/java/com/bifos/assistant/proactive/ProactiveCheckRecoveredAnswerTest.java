@@ -171,7 +171,7 @@ class ProactiveCheckRecoveredAnswerTest {
     void keepsRecoveredAnswerOfOrdinaryTurnInCheckConversation() {
         AgentExecution checkRoot = turn();
         ProactiveCheck check =
-                ProactiveCheck.started(user.id(), agent.id(), conversation.id(), CheckTrigger.MANUAL, STARTED);
+                ProactiveCheck.started(user.id(), agent.id(), conversation.id(), CheckTrigger.MANUAL, false, STARTED);
         check.attachRoot(checkRoot.id(), checkRoot.hermesSessionId());
         check.fail("INTERRUPTED", 0, 0, STARTED.plusSeconds(60));
         createdChecks.add(checks.save(check).id());
@@ -192,7 +192,7 @@ class ProactiveCheckRecoveredAnswerTest {
     private AgentExecution checkRoot() {
         AgentExecution root = turn();
         ProactiveCheck check =
-                ProactiveCheck.started(user.id(), agent.id(), conversation.id(), CheckTrigger.MANUAL, STARTED);
+                ProactiveCheck.started(user.id(), agent.id(), conversation.id(), CheckTrigger.MANUAL, false, STARTED);
         check.attachRoot(root.id(), root.hermesSessionId());
         createdChecks.add(checks.save(check).id());
         return root;

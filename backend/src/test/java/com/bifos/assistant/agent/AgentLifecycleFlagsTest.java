@@ -185,7 +185,8 @@ class AgentLifecycleFlagsTest {
         agents.save(privateAgentOf(kept, owner));
         signIn(administrator);
 
-        assertNotFound(() -> admin.update(helper, new UpdateAgentRequest(true, AgentVisibility.PRIVATE, null, null)));
+        assertNotFound(
+                () -> admin.update(helper, new UpdateAgentRequest(true, AgentVisibility.PRIVATE, null, null, null)));
         assertThat(agents.findByCode(helper).orElseThrow().enabled()).isFalse();
         assertThat(admin.list()).extracting(AdminAgentView::code).contains(kept).doesNotContain(helper);
     }
@@ -211,7 +212,8 @@ class AgentLifecycleFlagsTest {
         agents.save(privateAgentOf(helper, owner));
         signIn(administrator);
 
-        AdminAgentView view = admin.update(helper, new UpdateAgentRequest(true, AgentVisibility.GROUP, null, null));
+        AdminAgentView view =
+                admin.update(helper, new UpdateAgentRequest(true, AgentVisibility.GROUP, null, null, null));
 
         assertThat(view.visibility()).isEqualTo("GROUP");
         assertThat(view.ownerUserId()).isEqualTo(owner.id());

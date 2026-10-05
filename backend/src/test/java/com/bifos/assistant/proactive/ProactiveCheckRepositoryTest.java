@@ -211,7 +211,7 @@ class ProactiveCheckRepositoryTest {
     }
 
     private ProactiveCheck saveCheck(long conversationId, String rootSessionId, long rootExecutionId) {
-        ProactiveCheck check = ProactiveCheck.started(USER, AGENT, conversationId, CheckTrigger.MANUAL, NOW);
+        ProactiveCheck check = ProactiveCheck.started(USER, AGENT, conversationId, CheckTrigger.MANUAL, false, NOW);
         check.attachRoot(rootExecutionId, rootSessionId);
         return transactions.execute(status -> checks.save(check));
     }

@@ -10,11 +10,13 @@ import com.bifos.assistant.mcp.application.McpToolService;
 import com.bifos.assistant.mcp.presentation.McpDtos.ArtifactWriteArguments;
 import com.bifos.assistant.mcp.presentation.McpDtos.MemoryReadArguments;
 import com.bifos.assistant.proactive.application.ProactiveCheckGuard;
+import com.bifos.assistant.proactive.domain.ProactiveCheck;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import java.time.Duration;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.regex.Pattern;
@@ -47,6 +49,8 @@ public class McpController {
     /** 먼저 살펴보기 트리에서 받는 도구. 읽기와 위임뿐이다. 새 도구를 더하면 여기 넣을지 함께 정한다(ADR-080). */
     private static final Set<String> CHECK_TREE_TOOLS =
             Set.of(MEMORY_READ, AGENT_LIST, AGENT_DELEGATE, AGENT_STATUS, AGENT_STOP);
+    /** 쓰기 도구를 허용한 살펴보기가 더 받는 도구. 그 살펴보기의 점검 대화에만 쓰고 결과물은 그 폴더에 남는다(ADR-082). */
+    private static final Set<String> CHECK_TREE_WRITE_TOOLS = Set.of(ARTIFACT_WRITE);
 
     private final McpToolService tools;
     private final McpCallerResolver callers;
@@ -110,7 +114,8 @@ public class McpController {
      *   <li>이름으로 처리를 고른다. 모르는 도구면 {@code -32601}
      *   <li>원래 인자의 {@code _fos_ctx} 로 요청자를 정한다(ADR-032). 정하지 못하면 {@link McpToolService#invalidContext()}
      *   <li>요청자의 origin 실행이 먼저 살펴보기 트리이고 {@link #CHECK_TREE_TOOLS} 밖의 도구면
-     *       {@link McpToolService#notAllowedInCheck()}
+     *       {@link McpToolService#notAllowedInCheck()}. 쓰기 도구를 허용한 살펴보기는 {@link #CHECK_TREE_WRITE_TOOLS} 를 그
+     *       점검 대화에 한해 받는다
      *   <li>{@code _fos_ctx} 를 뗀 인자로 도구별 검사를 하고 그 요청자로 도구를 돌린다
      * </ol>
      */
@@ -135,10 +140,31 @@ public class McpController {
             }
             return response(id, tools.invalidContext());
         }
-        if (!CHECK_TREE_TOOLS.contains(toolName) && checkGuard.isCheckTree(caller.originExecution())) {
-            return response(id, tools.notAllowedInCheck());
+        if (!CHECK_TREE_TOOLS.contains(toolName)) {
+            // 살펴보기 줄을 한 번만 읽어 트리인지와 쓰기 허용을 함께 본다.
+            Optional<ProactiveCheck> check = checkGuard.checkOf(caller.originExecution());
+            if (check.isPresent() && !writeAllowedInCheck(toolName, check.get(), arguments)) {
+                return response(id, tools.notAllowedInCheck());
+            }
         }
         return handler.handle(caller, id, withoutCallContext(arguments));
+    }
+
+    /**
+     * 쓰기 도구를 허용한 살펴보기가 이 쓰기 도구를 받는가(ADR-082). 결과물은 그 살펴보기의 점검 대화에만 쓴다. 요청한 대화가 그 대화가
+     * 아니거나 대화 식별자를 읽지 못하면 받지 않는다. 같은 사용자의 다른 대화에 웹 결과에서 온 글을 쓰지 않게 하기 위해서다.
+     */
+    private boolean writeAllowedInCheck(String toolName, ProactiveCheck check, JsonNode arguments) {
+        if (!CHECK_TREE_WRITE_TOOLS.contains(toolName) || !check.writesAllowed()) {
+            return false;
+        }
+        JsonNode conversationId = arguments.get("conversation_id");
+        if (conversationId == null
+                || !conversationId.isTextual()
+                || !UUID_TEXT.matcher(conversationId.asString()).matches()) {
+            return false;
+        }
+        return checkGuard.isCheckConversation(check, UUID.fromString(conversationId.asString()));
     }
 
     /**

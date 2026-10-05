@@ -11,6 +11,7 @@ import com.bifos.assistant.connector.domain.ConnectorConnection;
 import com.bifos.assistant.connector.domain.ConnectorToolGrant;
 import com.bifos.assistant.connector.domain.ToolPolicy;
 import com.bifos.assistant.connector.domain.ToolPolicyDecision;
+import com.bifos.assistant.connector.domain.ToolPolicyDecision.CheckBoundary;
 import com.bifos.assistant.connector.domain.type.ActionDecision;
 import com.bifos.assistant.connector.domain.type.ActionStatus;
 import com.bifos.assistant.connector.domain.type.ConnectionStatus;
@@ -589,7 +590,8 @@ public class ConnectorActionService {
     /**
      * 상시 허락은 없는 것으로 두고 지금 정책으로 다시 판정한다. 허락이 있어 통과하는 호출은 승인 줄이 되지 않는다.
      *
-     * <p>살펴보기의 읽기 경계는 보지 않는다. 살펴보기 트리에서는 승인 줄이 생기지 않아, 여기 오는 줄은 보통 실행의 것이다.
+     * <p>살펴보기의 경계는 보지 않는다. 읽기 경계의 살펴보기는 승인 줄을 만들지 않고, 쓰기 도구를 허용한 살펴보기(ADR-082)의 승인
+     * 줄은 사람이 승인한 것이라 보통 실행의 줄과 같게 판정한다.
      */
     private static ToolPolicyDecision redecide(
             ConnectorConnection connection, ConnectorManifest manifest, ConnectorAction action) {
@@ -600,7 +602,7 @@ public class ConnectorActionService {
                 ConnectorToolPolicies.find(manifest, action.toolName()),
                 false,
                 action.argsJson().getBytes(StandardCharsets.UTF_8).length,
-                false);
+                CheckBoundary.NOT_CHECK);
     }
 
     /**

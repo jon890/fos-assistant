@@ -140,4 +140,48 @@ class ProactiveCheckReadinessTest {
                 .containsExactly(CheckBlockerCode.DISABLED, CheckBlockerCode.SKILL_MISSING);
         assertThat(result.available()).isFalse();
     }
+
+    @Test
+    @DisplayName("쓰기 허용이 꺼져 있으면 terminal 하나만 켜져도 TOOLSETS_NOT_ALLOWED 다")
+    void writesOffBlocksTerminal() {
+        enabled(List.of("web", "skills", "terminal", "fos-assistant"), Set.of("proactive-check"));
+
+        CheckReadiness result = readiness(true).check(agent);
+
+        assertThat(result.blockers())
+                .as("막는 까닭")
+                .containsExactly(new CheckBlocker(CheckBlockerCode.TOOLSETS_NOT_ALLOWED, List.of("terminal")));
+    }
+
+    @Test
+    @DisplayName("쓰기 허용을 켜면 terminal, file 같은 관리자 등급 toolset 과 Control Plane MCP 가 켜져 있어도 막는 까닭이 없다")
+    void writesOnAllowsKnownToolsetsAndControlPlaneMcp() {
+        agent.changeProactiveCheckWritesAllowed(true);
+        enabled(
+                List.of("web", "skills", "terminal", "file", "browser", "code_execution", "tts", "fos-assistant"),
+                Set.of("proactive-check"));
+
+        CheckReadiness result = readiness(true).check(agent);
+
+        assertThat(result.blockers()).as("막는 까닭").isEmpty();
+        assertThat(result.available()).isTrue();
+    }
+
+    @Test
+    @DisplayName("쓰기 허용을 켜도 delegation, clarify, cronjob 과 모르는 MCP 서버는 정렬해 TOOLSETS_NOT_ALLOWED 에 싣는다")
+    void writesOnStillBlocksDelegationClarifyCronjobAndUnknownServers() {
+        agent.changeProactiveCheckWritesAllowed(true);
+        enabled(
+                List.of("terminal", "delegation", "web", "other-mcp", "cronjob", "clarify", "fos-assistant"),
+                Set.of("proactive-check"));
+
+        CheckReadiness result = readiness(true).check(agent);
+
+        assertThat(result.blockers())
+                .as("막는 까닭")
+                .containsExactly(new CheckBlocker(
+                        CheckBlockerCode.TOOLSETS_NOT_ALLOWED,
+                        List.of("clarify", "cronjob", "delegation", "other-mcp")));
+        assertThat(result.available()).isFalse();
+    }
 }

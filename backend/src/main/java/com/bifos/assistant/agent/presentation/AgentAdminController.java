@@ -52,6 +52,10 @@ public class AgentAdminController {
         return AdminAgentView.from(adminAgents.update(
                 code,
                 new AgentUpdateCommand(
-                        request.enabled(), request.visibility(), request.ownerEmail(), request.apiBaseUrl())));
+                        request.enabled(),
+                        request.visibility(),
+                        request.ownerEmail(),
+                        request.apiBaseUrl(),
+                        request.proactiveCheckWritesAllowed())));
     }
 }
