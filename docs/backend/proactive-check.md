@@ -179,7 +179,7 @@ session 을 새로 바꾼 뒤에도 최근에 알린 발견과 변화 신호는 
 | 자리 | 클래스 | 살펴보기 트리에서 하는 일 | 쓰기 도구를 허용한 살펴보기 |
 | --- | --- | --- | --- |
 | 커넥터 도구 판정 | `ConnectorPolicyService.decide` | 위험도가 `READ` 이고 승인 방식이 `none` 인 도구만 허용한다. 나머지는 `READ_ONLY_RUN` 으로 거절한다. 상시 허락을 보지 않고 승인 줄을 만들지 않는다 | `READ` 이고 `none` 인 도구는 허용한다. 나머지는 상시 허락을 보지 않고 승인 필요로 판정해 승인 카드를 만든다. `DESTRUCTIVE`, `FINANCIAL` 은 `RISK_NOT_OPEN`, 16KB 를 넘는 인자는 `ARGS_TOO_LARGE` 다 |
-| Control Plane MCP | `McpController` | `memory_read`, `agent_list`, `agent_delegate`, `agent_status`, `agent_stop` 만 받는다. 나머지는 「먼저 살펴보기에서는 쓸 수 없는 도구입니다.」 오류 결과다 | 그 살펴보기의 점검 대화에 쓰는 `artifact_write` 를 더 받는다. 다른 대화로 쓰면 같은 오류 결과다 |
+| Control Plane MCP | `McpController` | `memory_read`, `agent_list`, `agent_delegate`, `agent_status`, `agent_stop` 만 받는다. 나머지는 「먼저 살펴보기에서는 쓸 수 없는 도구입니다.」 오류 결과다 | 그 살펴보기의 점검 대화에 쓰는 `artifact_write` 를 더 받는다. 다른 대화로 쓰면 같은 오류 결과다. `follow_up_propose` 는 여기서도 받지 않는다 |
 | 위임 | `AgentDelegationService.delegate` | 맡길 곳이 요청자의 커넥터 에이전트가 아니면 `CHECK_TARGET`, 그 트리에서 이미 맡긴 수가 `max-delegations` 이상이거나 그 살펴보기가 이미 끝났으면(`proactive_check.status` 가 `RUNNING` 이 아니면) `CHECK_LIMIT` 로 거절한다. 끝났는지는 실행 스레드가 실행을 시작하기 전에 한 번 더 본다 | 같다 |
 
 살펴보기 트리인지는 `ProactiveCheckGuard.isCheckTree(AgentExecution)` 가, 쓰기 도구를 허용한 살펴보기인지는 `ProactiveCheckGuard.checkOf` 로 한 번 읽은 그 살펴보기 줄의 `writes_allowed` 가 정한다. 커넥터 판정과 MCP 가 이 줄 하나로 경계를 정한다.
