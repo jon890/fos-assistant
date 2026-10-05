@@ -194,7 +194,7 @@ Hermes 의 `proxy.enabled` 는 `iron-proxy` 를 Hermes 쪽에 띄우고 컨테�
 | --- | --- |
 | 기본 목록에서 `pypi.org`, `files.pythonhosted.org`, `registry.npmjs.org`, `example.com`, `github.com` | 모두 403(`rejected_by: allowlist`) |
 | 기본 목록에서 `pip download` | 「No matching distribution」 로 실패, 약 7.7초 |
-| 목록에 pypi 와 npm 을 더한 뒤 `pip download`(5회) | 성공. 첫 회 647ms, 나머지 376~392ms. proxy 없이 307~388ms |
+| 목록에 pypi 와 npm 을 더한 뒤 `pip download`(5회) | 성공. 첫 회 647ms, 나머지 376ms 에서 392ms. proxy 없이 307ms 에서 388ms |
 | 목록에 없는 웹 주소 | 403 |
 | 목록에 있지만 proxy 토큰이 없는 provider 요청 | 403 |
 | 프록시 환경을 무시하고 소켓을 직접 연다 | **연결된다.** proxy 는 환경 변수를 따르는 프로그램만 거른다 |
@@ -237,11 +237,11 @@ colima VM(4 CPU, 8 GiB) 에서 측정했다. 이미지는 `python:3.11-slim` 이
 
 | 항목 | 측정 |
 | --- | --- |
-| 첫 셸 호출(컨테이너 생성 포함) | 2.3~3.8초 |
-| 이어지는 셸 호출 | 0.3~0.8초 |
+| 첫 셸 호출(컨테이너 생성 포함) | 2.3초에서 3.8초 |
+| 이어지는 셸 호출 | 0.3초에서 0.8초 |
 | 멈춘 컨테이너를 다시 띄운 호출 | 3.3초 |
-| 첫 `execute_code`(원격 커널 기동 포함) | 3.1~4.0초 |
-| 유휴 컨테이너 메모리 | 0.6~15 MiB |
+| 첫 `execute_code`(원격 커널 기동 포함) | 3.1초에서 4.0초 |
+| 유휴 컨테이너 메모리 | 0.6 MiB 에서 15 MiB |
 | 컨테이너 수 | profile 마다 하나(사용자별 볼륨 방식) 또는 사용자마다 하나(공유 키). 셸을 한 번도 쓰지 않은 profile 은 만들지 않는다 |
 
 디스크 상한(`container_disk`)은 storage driver 가 XFS pquota 를 지원할 때만 걸린다. 측정 환경에서는 걸리지 않았다.
