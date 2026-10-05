@@ -108,7 +108,8 @@ sequenceDiagram
     C->>F: 표식이 있는 가장 새 버전 디렉터리를 찾는다
     C->>C: 새 스킬이면 설명 60자와 올린 스킬 수 한도를 본다
     C->>F: 지금 버전의 올린 스킬 전체와 이번 변경을 새 버전 디렉터리에 쓴다
-    C->>D: skills.external_dirs 를 새 버전으로, skills toolset 을 켠다
+    C->>D: skills.external_dirs 를 새 버전으로, skills toolset 을 켠다, sandbox_owner
+    Note over C,D: skills 를 켜는 목록에 셸·파일 도구가 있으면 plugin 이 실행 공간 설정을 다시 쓰거나 409 로 거절한다
     alt 설정 쓰기 성공
         C->>F: 새 버전에 게시 표식을 쓰고 오래된 버전을 지운다 (표식 있는 최근 3개 남김)
         C-->>U: 저장한 스킬

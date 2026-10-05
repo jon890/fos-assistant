@@ -31,12 +31,17 @@
 
 확인 창 문구 단언을 새 문구로 바꾼다.
 
+### 4. `test/unit/error-message.test.ts`
+
+기존 단언과 같은 모양으로 `describeError("AGENT_SANDBOX_UNAVAILABLE", ...)` 가 「격리된 실행 공간이 준비되지 않아 이 도구를 켤 수 없어요.」 를 돌려주는지 단언한다.
+
 ## 검증
 
 ```bash
 # cwd: 저장소 root
-(cd web && pnpm lint && pnpm format:check && pnpm typecheck)
-(cd web && pnpm test:browser agent-tools.spec.ts)
+node --test test/unit/error-message.test.ts
+cd web && pnpm lint && pnpm format:check && pnpm typecheck
+cd web && pnpm test:browser agent-tools.spec.ts
 ```
 
 ## 변경 파일
@@ -46,3 +51,4 @@
 | `web/src/components/agent/agent-tools-section.tsx` | 수정 |
 | `web/src/components/error-message.ts` | 수정 |
 | `test/browser/agent-tools.spec.ts` | 수정 |
+| `test/unit/error-message.test.ts` | 수정 |

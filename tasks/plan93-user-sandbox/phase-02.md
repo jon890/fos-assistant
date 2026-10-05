@@ -1,12 +1,14 @@
 # Phase 02. Control Plane 이 실행 공간 주인을 보내고 스킬의 비밀 요청 칸을 거절한다
 
-**Execution profile**: standard
+**Execution profile**: deep
 
 ## 목표
 
 도구 저장 때 `sandbox_owner` 를 보내고, plugin 의 409 `sandbox_unavailable` 을 `AGENT_SANDBOX_UNAVAILABLE` 로 알린다. 올린 스킬 앞머리의 비밀 요청 칸을 거절한다. 가짜 Hermes 와 e2e 가 이 계약을 따른다.
 
 **범위 외**: plugin(phase 01), 화면 문구(phase 03).
+
+도구 목록을 쓰는 경로는 둘이다. 도구 저장(`AgentToolService.write` → `HermesToolsetClient.writeApiServer`)과 스킬 게시(`skill/infra/SkillPublisher.publish` → `HermesSkillClient.publish`, `skills` 가 꺼져 있으면 지금 도구에 `skills` 를 더한 목록을 같은 본문에 싣는다). 둘 다 `sandbox_owner` 를 보내고 같은 409 를 옮긴다.
 
 ## 컨텍스트
 
@@ -31,26 +33,36 @@
 ### 1. `HermesToolsetClient`, `HttpHermesToolsetClient`
 
 - `void writeApiServer(String profileName, List<String> toolsets, String sandboxOwner)` 로 바꾼다. 본문은 `{"profile", "config": {"platform_toolsets": {"api_server": [...]}}, "sandbox_owner"}`.
-- `RestClientResponseException` 이 409 이고 응답 본문에 `sandbox_unavailable` 이 있으면 `new ApiException(ErrorCode.AGENT_SANDBOX_UNAVAILABLE, "the isolated shell workspace is not configured")`.
+- `RestClientResponseException` 이 409 이고 응답 본문 JSON 의 `code` 칸이 `sandbox_unavailable` 이면(부분 문자열 검색이 아니라 JSON 칸 비교) `new ApiException(ErrorCode.AGENT_SANDBOX_UNAVAILABLE, "the isolated shell workspace is not configured")`.
+
+### 1-1. `HermesSkillClient`, `HttpHermesSkillClient`, `SkillPublisher`
+
+- `HermesSkillClient.publish` 에 `String sandboxOwner` 인자를 더하고 `HttpHermesSkillClient` 가 본문 최상위에 `sandbox_owner` 로 싣는다(도구 목록이 없을 때도 싣는다. plugin 은 셸 도구가 목록에 있을 때만 쓴다).
+- 같은 409 판정을 `HermesRequestRejected` 로 바꾸기 전에 먼저 해 `AGENT_SANDBOX_UNAVAILABLE` 로 옮긴다. 판정 함수는 `hermes` 패키지 안에 하나 두고 두 클라이언트가 함께 쓴다.
+- `SkillPublisher.publish` 가 `agent.sandboxOwner()` 를 넘긴다.
 
 ### 2. `ErrorCode`
 
 `AGENT_SANDBOX_UNAVAILABLE(HttpStatus.CONFLICT)` 를 한국어 Javadoc 과 함께 더한다.
 
-### 3. `AgentToolService`
+### 3. `Agent`, `AgentToolService`
 
-`sandboxOwner(Agent)` : `ownerUserId` 가 있으면 `"u" + ownerUserId`, 없으면 `"a" + id`. `write` 가 그 값을 넘긴다.
+- 도메인 `agent/domain/Agent.java` 에 `public String sandboxOwner()` : `ownerUserId` 가 있으면 `"u" + ownerUserId`, 없으면 `"a" + id`. 규칙을 도메인에 두어 `skill.infra` 가 `agent.application` 을 참조하지 않게 한다.
+- `AgentToolService.write` 가 `agent.sandboxOwner()` 를 넘긴다.
 
 ### 4. `SkillFrontmatter`, `SkillService`
 
-- `SkillFrontmatter` 에 `boolean requestsSecrets` 를 더한다. 앞머리 최상위 `required_environment_variables`, `required_credential_files` 가 있거나, `setup` 이 map 이고 `collect_secrets` 가 있거나, `prerequisites` 가 map 이고 `env_vars` 가 있으면 true.
+- `SkillFrontmatter` 에 `boolean requestsSecrets` 를 더한다. 앞머리 최상위 `required_environment_variables`, `required_credential_files` 키가 있거나, `setup` 이 map 이고 `collect_secrets` 키가 있거나, `prerequisites` 가 map 이고 `env_vars` 키가 있으면 true. 키가 있으면 값(빈 목록, null 포함)과 관계없이 true 다.
 - `SkillService.requireSkillMd` 가 true 면 `VALIDATION_FAILED`, 메시지 `"SKILL.md frontmatter must not request environment values or credential files"`.
 
 ### 5. 테스트
 
-- `backend/src/test/java/com/bifos/assistant/hermes/HermesToolsetRequestTest.java`: 본문에 `sandbox_owner` 가 실린다. 409 `{"code":"sandbox_unavailable"}` 응답이 `AGENT_SANDBOX_UNAVAILABLE` 이다. 다른 409 는 `HERMES_UNAVAILABLE`.
+- `backend/src/test/java/com/bifos/assistant/hermes/HermesToolsetRequestTest.java`: 시험 서버가 상태 코드를 200 으로 고정해 두었으므로(`sendResponseHeaders(200`) 응답 상태를 정하는 칸을 더한다. 본문에 `sandbox_owner` 가 실린다. 409 `{"code":"sandbox_unavailable"}` 응답이 `AGENT_SANDBOX_UNAVAILABLE` 이다. 다른 409 는 `HERMES_UNAVAILABLE`.
 - `backend/src/test/java/com/bifos/assistant/agent/AgentToolServiceTest.java`, `AgentToolServiceAccessTest.java`: 주인이 있으면 `u<번호>`, 없으면 `a<번호>` 를 넘긴다. 기존 `writeApiServer` 검증을 세 인자로 고친다.
 - `backend/src/test/java/com/bifos/assistant/skill/SkillServiceTest.java`, `backend/src/test/java/com/bifos/assistant/connector/ConnectorConnectionServiceTest.java`: `never()` 검증을 세 인자로 고친다.
+- `backend/src/test/java/com/bifos/assistant/hermes/HermesSkillRequestTest.java`: 게시 본문에 `sandbox_owner` 가 실린다. 409 `sandbox_unavailable` 이 `AGENT_SANDBOX_UNAVAILABLE` 이다.
+- `SkillPublisher` 를 쓰는 기존 테스트(`grep -rn "publish(" backend/src/test` 로 찾는다)의 호출과 검증을 새 인자에 맞춘다. terminal 이 켜지고 skills 가 꺼진 에이전트에 게시하면 `agent.sandboxOwner()` 가 넘어간다.
+- `backend/src/test/java/com/bifos/assistant/agent/AgentSandboxOwnerTest.java`(신규): `sandboxOwner()` 가 주인 있으면 `u<번호>`, 없으면 `a<번호>`.
 - `backend/src/test/java/com/bifos/assistant/skill/SkillFrontmatterTest.java`: 네 칸 각각이 `requestsSecrets` true, 없는 앞머리는 false.
 - `SkillServiceTest`: 비밀 요청 칸이 있는 `SKILL.md` 저장이 `VALIDATION_FAILED`.
 
@@ -63,9 +75,9 @@
 
 ```bash
 # cwd: 저장소 root
-(cd backend && ./gradlew test --tests '*HermesToolsetRequestTest' --tests '*AgentToolService*' --tests '*Skill*' --tests '*ConnectorConnectionServiceTest')
-(cd backend && ./gradlew test)
-(cd backend && ./gradlew qualityCheck)
+cd backend && ./gradlew test --tests '*HermesToolsetRequestTest' --tests '*HermesSkillRequestTest' --tests '*AgentToolService*' --tests '*Skill*' --tests '*AgentSandboxOwnerTest' --tests '*ConnectorConnectionServiceTest'
+cd backend && ./gradlew test
+cd backend && ./gradlew qualityCheck
 node test/e2e/run.ts
 scripts/quality.sh check
 ```
@@ -78,6 +90,13 @@ scripts/quality.sh check
 | `backend/src/main/java/com/bifos/assistant/hermes/HttpHermesToolsetClient.java` | 수정 |
 | `backend/src/main/java/com/bifos/assistant/shared/error/ErrorCode.java` | 수정 |
 | `backend/src/main/java/com/bifos/assistant/agent/application/AgentToolService.java` | 수정 |
+| `backend/src/main/java/com/bifos/assistant/agent/domain/Agent.java` | 수정 |
+| `backend/src/main/java/com/bifos/assistant/hermes/HermesSkillClient.java` | 수정 |
+| `backend/src/main/java/com/bifos/assistant/hermes/HttpHermesSkillClient.java` | 수정 |
+| `backend/src/main/java/com/bifos/assistant/skill/infra/SkillPublisher.java` | 수정 |
+| `backend/src/test/java/com/bifos/assistant/hermes/HermesSkillRequestTest.java` | 수정 |
+| `backend/src/test/java/com/bifos/assistant/agent/AgentSandboxOwnerTest.java` | 신규 |
+| `backend/src/test/java/com/bifos/assistant/skill/**` | 수정 |
 | `backend/src/main/java/com/bifos/assistant/skill/application/SkillFrontmatter.java` | 수정 |
 | `backend/src/main/java/com/bifos/assistant/skill/application/SkillService.java` | 수정 |
 | `backend/src/test/java/com/bifos/assistant/hermes/HermesToolsetRequestTest.java` | 수정 |

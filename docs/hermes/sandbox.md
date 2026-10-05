@@ -11,7 +11,7 @@
 
 | 도구 | 어디서 도나 | 근거 |
 | --- | --- | --- |
-| `terminal`, `process_manage` | 컨테이너. `docker exec` 로 bash 를 띄운다 | `tools/environments/docker.py` |
+| `terminal`, `process_manage` | 컨테이너. 명령마다 컨테이너 안에서 bash 를 띄운다 | `tools/environments/docker.py` |
 | `read_file`, `write_file`, `patch`, `search_files` | 컨테이너. `_get_file_ops` 가 terminal 과 같은 환경을 받아 `ShellFileOperations` 로 읽고 쓴다 | `tools/file_tools.py` 의 `_get_file_ops` |
 | `execute_code` | 컨테이너 안의 원격 커널. 스크립트가 부르는 도구는 Hermes 로 돌아와 다시 판정된다 | `tools/code_execution_tool.py` 의 `SANDBOX_ALLOWED_TOOLS` |
 | `delegate_task` 의 자식 | 자식 실행은 Hermes 안에서 돌고, 자식의 셸과 파일 도구는 부모와 같은 컨테이너를 쓴다 | `tools/terminal_tool.py` 의 `_resolve_container_task_id` |

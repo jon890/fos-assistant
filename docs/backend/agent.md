@@ -84,7 +84,7 @@
 - 이름과 설명은 대시보드 `GET /api/tools/toolsets` 에서 읽는다. 그 응답의 `enabled` 는 CLI 기준이라 쓰지 않는다
 - Hermes 가 쓰기 없이 미분류 toolset 을 켤 수 있다. 도구 응답의 `unclassifiedEnabled` 는 listener 에서 켜진 미분류 이름이고, 화면은 관리자에게 알리라는 경고를 보인다
 - 그룹 공개에서 막는 toolset 은 `terminal`, `file`, `code_execution`, `browser`, `computer_use`, `session_search` 여섯이다. 이 문서는 이 여섯을 「셸·파일 계열」 이라 부른다. 셸·파일 계열이 켜진 에이전트는 `PRIVATE` 만 된다. `GROUP` 생성과 수정, 도구 변경 모두에서 최종 listener 주소의 현재 목록을 본다. 꺼진 에이전트의 공개 범위 변경은 검사하지 않고 켤 때 검사한다. 읽지 못하면 변경하지 않는다
-- 도구를 쓸 때마다 본문에 `sandbox_owner` 를 함께 보낸다. 에이전트 주인이 있으면 `u<사용자 번호>`, 없으면 `a<에이전트 번호>` 다. 대시보드 plugin 은 `terminal`, `file`, `code_execution` 가운데 하나라도 켜는 저장에서 그 값으로 사용자 실행 공간을 정하고 profile 의 `terminal:` 설정을 다시 쓴다. 실행 공간이 운영에 설정돼 있지 않으면 plugin 이 거절하고 Control Plane 은 `AGENT_SANDBOX_UNAVAILABLE` 로 알린다. 근거는 [ADR-084](../adr/ADR-084-셸과-파일-도구는-사용자별-docker-실행-공간에서만-돈다.md) 다
+- 도구를 쓸 때마다(스킬 게시가 `skills` 를 함께 켤 때 포함) 본문에 `sandbox_owner` 를 함께 보낸다. 에이전트 주인이 있으면 `u<사용자 번호>`, 없으면 `a<에이전트 번호>` 다. 대시보드 plugin 은 `terminal`, `file`, `code_execution` 가운데 하나라도 켜는 저장에서 그 값으로 사용자 실행 공간을 정하고 profile 의 `terminal:` 설정을 다시 쓴다. 실행 공간이 운영에 설정돼 있지 않으면 plugin 이 거절하고 Control Plane 은 `AGENT_SANDBOX_UNAVAILABLE` 로 알린다. 근거는 [ADR-084](../adr/ADR-084-셸과-파일-도구는-사용자별-docker-실행-공간에서만-돈다.md) 다
 - 도구 변경과 에이전트 접근 범위 변경은 같은 에이전트 행의 쓰기 잠금을 잡고 검사한다. 이미 잠겨 있으면 `AGENT_BUSY` 로 곧바로 알린다
 
 | 경로 | 누가 | 무엇 |
