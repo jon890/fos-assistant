@@ -77,7 +77,7 @@ export function describeLastCheck(check: ProactiveCheckLastCheck): string {
         case "NOTHING_NEW":
           return "새로 알릴 것이 없었어요";
         default:
-          return "결과를 정리하지 못했어요";
+          return "결과 형식이 맞지 않아 정리하지 못했어요";
       }
   }
 }

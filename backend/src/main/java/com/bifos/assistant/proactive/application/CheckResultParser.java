@@ -3,10 +3,15 @@ package com.bifos.assistant.proactive.application;
 import com.bifos.assistant.proactive.application.model.CheckResultBlock;
 import com.bifos.assistant.proactive.application.model.CheckResultBlock.Finding;
 import com.bifos.assistant.proactive.application.model.CheckResultBlock.Next;
+import com.bifos.assistant.proactive.application.model.CheckResultRead;
+import com.bifos.assistant.proactive.domain.type.CheckInvalidReason;
 import com.bifos.assistant.proactive.domain.type.CheckOutcome;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 import org.springframework.stereotype.Component;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.DeserializationFeature;
@@ -17,8 +22,12 @@ import tools.jackson.databind.json.JsonMapper;
  * 살펴보기 답 끝의 {@code <fos-check-result>} 블록을 읽는다. 형식은 ADR-081 과 {@code docs/backend/proactive-check.md}
  * 의 「결과 계약」 이 갖는다.
  *
- * <p>상한을 넘는 글은 잘라 읽고 넘는 배열 원소는 버린다. 블록을 읽지 못한 것으로 보는 경우는 JSON 이 아니거나,
- * {@code version} 이 1 이 아니거나, {@code outcome} 이 없거나 모르는 값일 때뿐이다. 읽지 못해도 예외를 밖으로 던지지 않는다.
+ * <p>상한을 넘는 글은 잘라 읽고 넘는 배열 원소는 버린다. 블록을 읽지 못한 것으로 보는 경우는 답이 비었거나, 블록이 없거나,
+ * JSON 이 아니거나, {@code version} 이 1 이 아니거나, {@code outcome} 이 없거나 모르는 값일 때뿐이고 그 까닭을
+ * {@link CheckInvalidReason} 으로 돌려준다. 읽지 못해도 예외를 밖으로 던지지 않는다.
+ *
+ * <p>태그 글자 사이에 낀 보이지 않는 서식 문자(Unicode {@code Cf}. 폭 없는 공백, U+FEFF 등)는 무시한다. 모델이 여는 태그 가운데에
+ * U+FEFF 를 끼워 낸 답이 운영에서 블록 없음으로 떨어진 적이 있다. 태그 밖의 글은 그대로 검사한다.
  */
 @Component
 public class CheckResultParser {
@@ -30,6 +39,9 @@ public class CheckResultParser {
     private static final JsonMapper JSON = JsonMapper.builder()
             .enable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS)
             .build();
+
+    private static final Pattern LOOSE_OPEN_TAG = looseTag(OPEN_TAG);
+    private static final Pattern LOOSE_CLOSE_TAG = looseTag(CLOSE_TAG);
 
     private static final String CODE_FENCE = "```";
 
@@ -55,30 +67,43 @@ public class CheckResultParser {
     private static final int SHORT_FIELD_MAX = 64;
 
     /**
-     * 마지막 블록을 읽는다. 블록이 없거나 읽지 못하면 빈 값이다.
+     * 마지막 블록을 읽는다. 블록이 없거나 읽지 못하면 그 까닭을 돌려준다.
      *
      * <p>마지막 닫는 태그를 먼저 찾고 그 앞의 가장 가까운 여는 태그를 고른다. 블록 뒤의 모델 글이 여는 태그를 말해도 블록을 읽는다.
      * 그 사이가 JSON 객체 하나가 아니면 그 앞의 여는 태그로 하나씩 넓혀 본다. JSON 문자열 값이 여는 태그 글을 담아도 블록을 읽기
      * 위해서다. 넓힌 범위에 앞 블록의 닫는 태그가 들면 JSON 뒤에 남는 글이 있어 읽지 않으므로, 마지막 블록이 깨졌을 때 앞 블록을 대신
      * 읽지 않는다.
      */
-    public Optional<CheckResultBlock> parse(String answer) {
-        if (answer == null) {
-            return Optional.empty();
+    public CheckResultRead read(String answer) {
+        if (answer == null || answer.isBlank()) {
+            return CheckResultRead.invalid(CheckInvalidReason.EMPTY_ANSWER);
         }
-        int close = answer.lastIndexOf(CLOSE_TAG);
-        if (close < 0) {
-            return Optional.empty();
+        String text = canonicalTags(answer);
+        int close = text.lastIndexOf(CLOSE_TAG);
+        int open = close < 0 ? -1 : text.lastIndexOf(OPEN_TAG, close - OPEN_TAG.length());
+        if (open < 0) {
+            return CheckResultRead.invalid(CheckInvalidReason.NO_BLOCK);
         }
-        for (int open = answer.lastIndexOf(OPEN_TAG, close - OPEN_TAG.length());
-                open >= 0;
-                open = answer.lastIndexOf(OPEN_TAG, open - 1)) {
-            JsonNode root = objectOf(answer.substring(open + OPEN_TAG.length(), close));
+        for (; open >= 0; open = text.lastIndexOf(OPEN_TAG, open - 1)) {
+            JsonNode root = objectOf(text.substring(open + OPEN_TAG.length(), close));
             if (root != null) {
                 return blockOf(root);
             }
         }
-        return Optional.empty();
+        return CheckResultRead.invalid(CheckInvalidReason.NOT_JSON);
+    }
+
+    /** 태그 글자 사이에 서식 문자가 몇 개든 끼어도 맞는 패턴이다. */
+    private static Pattern looseTag(String tag) {
+        return Pattern.compile(tag.chars()
+                .mapToObj(ch -> Pattern.quote(Character.toString(ch)))
+                .collect(Collectors.joining("\\p{Cf}*")));
+    }
+
+    /** 서식 문자가 낀 태그를 원래 태그로 바꾼다. 태그 밖의 글은 건드리지 않는다. */
+    private static String canonicalTags(String answer) {
+        String opened = LOOSE_OPEN_TAG.matcher(answer).replaceAll(Matcher.quoteReplacement(OPEN_TAG));
+        return LOOSE_CLOSE_TAG.matcher(opened).replaceAll(Matcher.quoteReplacement(CLOSE_TAG));
     }
 
     /** 태그 사이의 글이 JSON 객체 하나이면 그 객체다. 아니면 null 이다. */
@@ -93,16 +118,16 @@ public class CheckResultParser {
     }
 
     /** 읽은 JSON 객체를 계약대로 검사해 블록으로 바꾼다. */
-    private static Optional<CheckResultBlock> blockOf(JsonNode root) {
+    private static CheckResultRead blockOf(JsonNode root) {
         JsonNode version = root.get("version");
         if (version == null || !version.isIntegralNumber() || version.asInt() != 1) {
-            return Optional.empty();
+            return CheckResultRead.invalid(CheckInvalidReason.BAD_VERSION);
         }
         Optional<CheckOutcome> outcome = outcomeOf(root.get("outcome"));
         if (outcome.isEmpty()) {
-            return Optional.empty();
+            return CheckResultRead.invalid(CheckInvalidReason.BAD_OUTCOME);
         }
-        return Optional.of(new CheckResultBlock(
+        return CheckResultRead.of(new CheckResultBlock(
                 1,
                 outcome.get(),
                 text(root.get("summary"), SUMMARY_MAX),
