@@ -1130,7 +1130,7 @@ export function createGmailServer(options: GmailOptions = {}) {
   register(
     "create_label",
     {
-      name: z.string(),
+      name: z.string().default(""),
       text_color: z.string().default(""),
       background_color: z.string().default(""),
       label_list_visibility: z.string().default(""),
@@ -1159,13 +1159,14 @@ export function createGmailServer(options: GmailOptions = {}) {
   register(
     "update_label",
     {
-      label: z.string(),
+      label: z.string().default(""),
       name: z.string().default(""),
       text_color: z.string().default(""),
       background_color: z.string().default(""),
     },
     { readOnlyHint: false, destructiveHint: false },
     async (input) => {
+      if (!input.label.trim()) throw new GmailError("GMAIL_INVALID_INPUT");
       if (SYSTEM_LABELS.has(input.label.toUpperCase()))
         throw new GmailError("GMAIL_INVALID_INPUT");
       if (!input.name && !input.text_color && !input.background_color)
@@ -1260,7 +1261,7 @@ export function createGmailServer(options: GmailOptions = {}) {
   );
   register(
     "delete_filter",
-    { filter_id: z.string() },
+    { filter_id: z.string().default("") },
     { readOnlyHint: false, destructiveHint: true },
     async ({ filter_id }) => {
       try {
@@ -1276,10 +1277,10 @@ export function createGmailServer(options: GmailOptions = {}) {
   register(
     "apply_labels_to_query",
     {
-      query: z.string(),
+      query: z.string().default(""),
       add_labels: z.string().default(""),
       remove_labels: z.string().default(""),
-      expected_count: z.string(),
+      expected_count: z.string().default(""),
     },
     { readOnlyHint: false, destructiveHint: false },
     async (input) => {

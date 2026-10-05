@@ -396,7 +396,7 @@ describe("Gmail 라벨과 필터", () => {
     }
   });
 
-  test("기존 메일 대상 수가 달라지거나 501개면 쓰지 않고 실제 수를 돌려준다", async () => {
+  test("기존 메일 대상 수가 다르면 쓰지 않고 실제 수를 돌려준다", async () => {
     const { fake, server } = setup();
     fake.on("GET", "/gmail/messages", { messages: [{ id: "m1" }] });
     try {
@@ -412,6 +412,55 @@ describe("Gmail 라벨과 필터", () => {
         });
       });
       expect(fake.seen("POST", "/gmail/messages/batchModify")).toHaveLength(0);
+    } finally {
+      fake.stop();
+    }
+  });
+
+  test.each([
+    ["create_label", {}, "name"],
+    ["update_label", { name: "새 이름" }, "label"],
+    ["delete_filter", {}, "filter_id"],
+    [
+      "apply_labels_to_query",
+      { expected_count: "1", add_labels: "영수증" },
+      "query",
+    ],
+    [
+      "apply_labels_to_query",
+      { query: "from:news@example.com", add_labels: "영수증" },
+      "expected_count",
+    ],
+  ])(
+    "필수 %s 없이 %s를 호출하면 HTTP 전에 invalid input이다",
+    async (name, arguments_, _missing) => {
+      const { fake, server } = setup();
+      try {
+        await withMcp(server, (client) =>
+          expectFailure(client, "GMAIL_INVALID_INPUT", name, arguments_),
+        );
+        expect(fake.requests).toHaveLength(0);
+      } finally {
+        fake.stop();
+      }
+    },
+  );
+
+  test("expected_count는 문자열이 아니면 SDK 오류를 반환하고 HTTP를 부르지 않는다", async () => {
+    const { fake, server } = setup();
+    try {
+      await withMcp(server, async (client) => {
+        const result = await client.callTool({
+          name: "apply_labels_to_query",
+          arguments: {
+            query: "from:news@example.com",
+            add_labels: "영수증",
+            expected_count: 1,
+          },
+        });
+        expect(result.isError).toBe(true);
+      });
+      expect(fake.requests).toHaveLength(0);
     } finally {
       fake.stop();
     }
