@@ -180,7 +180,9 @@ test("격리 실행 공간이 필요한 도구를 켜면 매일 깨우기 저장
   }
 });
 
-test("켜진 깨우기가 도구 변경으로 막혀도 사용자가 끌 수 있다", async ({ page }) => {
+test("켜진 깨우기가 도구 변경으로 막혀도 사용자가 끌 수 있다", async ({
+  page,
+}) => {
   try {
     await prepare(page);
     const enabled = await page.request.put(
@@ -197,8 +199,10 @@ test("켜진 깨우기가 도구 변경으로 막혀도 사용자가 끌 수 있
     await expect(toggle).toBeEnabled();
     await toggle.click();
     const saved = page.waitForResponse(
-      (response) => response.request().method() === "PUT" &&
-        new URL(response.url()).pathname === `/api/agents/${AGENT_CODE}/proactive-check/schedule`,
+      (response) =>
+        response.request().method() === "PUT" &&
+        new URL(response.url()).pathname ===
+          `/api/agents/${AGENT_CODE}/proactive-check/schedule`,
     );
     await check.getByRole("button", { name: "저장" }).click();
     expect((await saved).ok()).toBeTruthy();
@@ -278,7 +282,10 @@ test("단추 하나로 살펴보기를 시작하고 결과와 배지를 보며 �
       "href",
       "https://example.com/e2e/study",
     );
-    await expect(source.nth(1)).toHaveAttribute("href", "https://example.com/e2e/study");
+    await expect(source.nth(1)).toHaveAttribute(
+      "href",
+      "https://example.com/e2e/study",
+    );
 
     // 대화 목록의 점검 대화 줄에 「살펴보기」 배지가 붙는다.
     const mobile = testInfo.project.name === "mobile";
@@ -337,7 +344,9 @@ test("결과를 읽지 못한 살펴보기는 점검 대화와 마지막 살펴�
     ).toBeVisible();
     await page.goto(`/agents/${AGENT_CODE}`);
     await expect(
-      section(page).getByText(/^마지막 살펴보기.*결과 형식이 맞지 않아 정리하지 못했어요/),
+      section(page).getByText(
+        /^마지막 살펴보기.*결과 형식이 맞지 않아 정리하지 못했어요/,
+      ),
     ).toBeVisible();
   } finally {
     await restore(page);
