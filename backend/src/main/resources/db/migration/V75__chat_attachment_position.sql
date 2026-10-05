@@ -1,0 +1,1 @@
+ALTER TABLE chat_attachment ADD COLUMN position INT NOT NULL DEFAULT 0;

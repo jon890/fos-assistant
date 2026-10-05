@@ -26,6 +26,13 @@ public class ConversationAccess {
                 .orElseThrow(ConversationAccess::notFound);
     }
 
+    /** 사진 upload 동안 장수 확인과 저장을 직렬화할 대화 행을 잠근다. */
+    public Conversation requireOwnForUpload(CurrentUser user, Long conversationId) {
+        return conversations
+                .findActiveByIdAndUserIdForUpload(conversationId, user.id())
+                .orElseThrow(ConversationAccess::notFound);
+    }
+
     /** 공개 식별자로 주인의 대화를 찾는다. 번호로 찾을 때와 같은 응답으로 숨긴다. */
     public Conversation requireOwn(CurrentUser user, UUID publicId) {
         return conversations

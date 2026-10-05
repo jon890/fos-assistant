@@ -38,6 +38,11 @@ public class ChatAttachment {
     @Getter
     private Long messageId;
 
+    /** 같은 메시지 안에서 사진이 놓인 자리다. 0부터 시작한다. */
+    @Column(name = "position", nullable = false)
+    @Getter
+    private int position;
+
     @Column(name = "uploaded_by_user_id", nullable = false)
     @Getter
     private Long uploadedByUserId;

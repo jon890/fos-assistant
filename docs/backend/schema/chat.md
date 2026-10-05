@@ -119,6 +119,7 @@ turn 이 도는 동안 사용자가 보낸 메시지 하나가 한 행이다. �
 | `id` | BIGINT | |
 | `conversation_id` | BIGINT | 어느 대화에 올렸는가. 디렉터리 이름이기도 하다 |
 | `message_id` | BIGINT NULL | 함께 보낸 메시지. 아직 보내지 않았으면 비어 있다 |
+| `position` | INT NOT NULL | 같은 메시지에 붙인 사진의 고른 순서. 0부터 센다. 기존에 메시지에 묶인 행은 첨부 번호 순서로 채웠다 |
 | `uploaded_by_user_id` | BIGINT | 올린 사람 |
 | `original_name` | VARCHAR(255) | 올릴 때의 파일 이름. 화면이 보인다 |
 | `stored_name` | VARCHAR(255) NULL | 디스크에 둔 이름. `{id}.{확장자}` 다. 번호를 받은 직후 같은 트랜잭션에서 채우므로 커밋된 행에는 언제나 있다 |
@@ -137,6 +138,9 @@ turn 이 도는 동안 사용자가 보낸 메시지 하나가 한 행이다. �
 
 `message_id` 가 비어 있는 행은 올렸지만 보내지 않은 것이다.
 그 행도 `expires_at` 이 지나면 함께 지운다.
+
+같은 메시지의 사진은 `position` 오름차순으로 화면, Hermes 입력, 사용자가 보는 사진 순번에 함께 쓴다.
+지운 사진도 그 자리를 차지한다.
 
 한 사용자가 남의 대화의 첨부를 읽지 못한다.
 `conversation.user_id` 가 그 경계를 갖고, 첨부는 그 대화를 통해서만 닿는다.
@@ -222,4 +226,3 @@ turn 이 도는 동안 사용자가 보낸 메시지 하나가 한 행이다. �
 기동할 때 앞 프로세스가 남긴 `RUNNING` 시도를 `started_at` 으로 고르고, 기동 정리가 실행 줄을 적을 때 `execution_id` 로 찾는다.
 
 `execution_id` 와 `notice_message_id` 에는 외래 키를 두지 않는다. 그 줄이 지워져도 시도의 끝은 남는다.
-
