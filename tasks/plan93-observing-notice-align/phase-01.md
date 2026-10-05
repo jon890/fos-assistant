@@ -31,7 +31,8 @@
 `test/browser/observe-running.spec.ts`의 다른 창 안내 검사와 연결 끊김 검사를 보강한다.
 메시지 열(`#message-scroll`이 아니라 data-testid message-scroll의 첫 자식)의 boundingBox와 observing-notice를 비교한다.
 왼쪽 끝과 너비 차이가 1 CSS 픽셀 미만이어야 한다.
-오류 Notice를 보이는 기존 실패 검사에서도 메시지 열과 상자의 왼쪽 끝과 너비를 비교한다.
+실행 중 중지 API를 503으로 응답시키는 실패 검사를 추가한다.
+오류 Notice(`[data-slot="notice"][data-variant="error"]`)와 관찰 안내가 함께 보이는 둘째 창에서 메시지 열과 상자의 왼쪽 끝과 너비를 비교한다.
 데스크톱과 모바일 프로젝트에서 실행해 원래의 정렬 누락이 실패로 드러나게 한다.
 
 ## 검증
