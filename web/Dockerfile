@@ -17,7 +17,8 @@ COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
 ENV NEXT_TELEMETRY_DISABLED=1
-# Secrets are read at request time, so the build only needs placeholders that never ship.
+# 비밀값은 요청을 받을 때 읽으므로 빌드에는 배포되지 않는 자리표시자만 준다.
+# 이 다섯 값이 자리표시자의 정본이다. 로컬 pnpm build, scripts/check-local.sh, test/browser/web-server.ts 가 같은 값을 쓴다.
 ENV AUTH_SECRET=build-time-placeholder
 ENV ASSISTANT_JWT_SECRET=build-time-placeholder
 ENV CONTROL_PLANE_BASE_URL=http://build-time-placeholder
