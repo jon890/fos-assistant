@@ -24,6 +24,7 @@ import com.bifos.assistant.hermes.HermesSkillClient.HermesSkill;
 import com.bifos.assistant.hermes.HermesToolsetClient;
 import com.bifos.assistant.proactive.application.ProactiveCheckService;
 import com.bifos.assistant.proactive.domain.ProactiveCheck;
+import com.bifos.assistant.proactive.domain.type.CheckInvalidReason;
 import com.bifos.assistant.proactive.domain.type.CheckTrigger;
 import com.bifos.assistant.proactive.infra.ProactiveCheckRepository;
 import com.bifos.assistant.proactive.presentation.ProactiveCheckController;
@@ -138,6 +139,24 @@ class ProactiveCheckStatusTest {
     }
 
     @Test
+    @DisplayName("결과를 읽지 못한 마지막 살펴보기는 그 까닭을 함께 받는다")
+    void ownerSeesInvalidReasonOfLastCheck() throws Exception {
+        Agent groupAgent = agent(AgentVisibility.GROUP);
+        Conversation ownersCheck = checkConversationOf(owner, groupAgent);
+        ProactiveCheck check = ProactiveCheck.started(
+                owner.id(), groupAgent.id(), ownersCheck.id(), CheckTrigger.MANUAL, false, NOW);
+        check.succeedInvalid(CheckInvalidReason.EMPTY_ANSWER, 0, 0, NOW.plusSeconds(30));
+        createdChecks.add(checks.save(check).id());
+        when(currentUser.require()).thenReturn(owner);
+
+        mvc.perform(get("/api/v1/agents/{code}/proactive-check", groupAgent.code()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.lastCheck.status").value("SUCCEEDED"))
+                .andExpect(jsonPath("$.lastCheck.outcome").value("INVALID_RESULT"))
+                .andExpect(jsonPath("$.lastCheck.invalidReason").value("EMPTY_ANSWER"));
+    }
+
+    @Test
     @DisplayName("다른 사용자의 비공개 에이전트는 404 AGENT_NOT_FOUND 이고 Hermes 를 부르지 않는다")
     void othersPrivateAgentIsNotFound() throws Exception {
         Agent privateAgent = agent(AgentVisibility.PRIVATE);
@@ -207,6 +226,7 @@ class ProactiveCheckStatusTest {
                         .value(ownersCheck.publicId().toString()))
                 .andExpect(jsonPath("$.lastCheck.status").value("FAILED"))
                 .andExpect(jsonPath("$.lastCheck.outcome").value(nullValue()))
+                .andExpect(jsonPath("$.lastCheck.invalidReason").value(nullValue()))
                 .andExpect(jsonPath("$.lastCheck.startedAt").exists())
                 .andExpect(jsonPath("$.lastCheck.finishedAt").exists())
                 .andExpect(content().string(not(containsString("987654"))))
