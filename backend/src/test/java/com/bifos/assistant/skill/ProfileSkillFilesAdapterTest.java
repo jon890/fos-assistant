@@ -16,7 +16,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
-/** agent 가 묻는 두 동작이 SkillStore 로 넘어가는지 본다. */
+/** agent 가 묻는 동작이 SkillStore 로 넘어가는지 본다. */
 class ProfileSkillFilesAdapterTest {
 
     private static final String PROFILE = "ua-adaptertest";
@@ -58,5 +58,24 @@ class ProfileSkillFilesAdapterTest {
 
         assertThat(adapter.hasUploaded(PROFILE)).isFalse();
         assertThatCode(() -> adapter.deleteAll(PROFILE)).doesNotThrowAnyException();
+    }
+
+    @Test
+    @DisplayName("비밀 요청 칸이 있는 올린 스킬의 이름만 돌린다. 표식 없는 더 새 버전의 것도 센다")
+    void listsUploadedSkillsRequestingSecrets(@TempDir Path root) {
+        SkillStore store = storeAt(root);
+        ProfileSkillFilesAdapter adapter = new ProfileSkillFilesAdapter(store);
+        String requestsEnv = "---\nname: legacy-env\ndescription: 옛 스킬\n"
+                + "required_environment_variables:\n  - name: API_KEY\n---\n# legacy-env\n";
+
+        assertThat(adapter.uploadedRequestingSecrets(PROFILE)).isEmpty();
+
+        store.writeVersion(
+                PROFILE,
+                Map.of(
+                        "weekly-plan", new SkillBundle("weekly-plan", SKILL_MD, List.of()),
+                        "legacy-env", new SkillBundle("legacy-env", requestsEnv, List.of())));
+
+        assertThat(adapter.uploadedRequestingSecrets(PROFILE)).containsExactly("legacy-env");
     }
 }

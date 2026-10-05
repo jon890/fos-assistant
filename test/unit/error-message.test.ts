@@ -71,3 +71,8 @@ test("셸이나 파일 도구가 켜진 에이전트의 주인 변경 실패는 
   assert.equal(describeError("AGENT_OWNER_CHANGE_REQUIRES_SHELL_OFF", "turn off shell first"),
     "셸이나 파일 도구가 켜진 에이전트는 주인을 바꿀 수 없어요. 먼저 그 도구를 꺼 주세요.");
 });
+
+test("비밀 요청 스킬이 있는 에이전트의 셸 도구 저장 실패는 그 스킬을 먼저 고치라고 알린다", () => {
+  assert.equal(describeError("AGENT_SKILL_REQUESTS_SECRETS", "uploaded skills request secrets"),
+    "이 에이전트의 스킬 가운데 환경 값이나 파일을 요청하는 것이 있어 이 도구를 켤 수 없어요. 그 스킬을 먼저 고치거나 지워 주세요.");
+});

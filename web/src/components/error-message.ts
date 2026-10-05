@@ -51,6 +51,8 @@ const MESSAGES: Record<string, string> = {
     "격리된 실행 공간이 준비되지 않아 이 도구를 켤 수 없어요.",
   AGENT_OWNER_CHANGE_REQUIRES_SHELL_OFF:
     "셸이나 파일 도구가 켜진 에이전트는 주인을 바꿀 수 없어요. 먼저 그 도구를 꺼 주세요.",
+  AGENT_SKILL_REQUESTS_SECRETS:
+    "이 에이전트의 스킬 가운데 환경 값이나 파일을 요청하는 것이 있어 이 도구를 켤 수 없어요. 그 스킬을 먼저 고치거나 지워 주세요.",
   SKILL_NAME_TAKEN: "같은 이름의 기본 스킬이 있어요.",
   SKILL_NOT_FOUND:
     "스킬을 찾지 못했어요. 이미 지워졌는지 목록에서 확인해 주세요.",

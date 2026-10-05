@@ -20,6 +20,7 @@
 
   Control Plane 은 올린 스킬의 앞머리에 `required_environment_variables`, `required_credential_files`, `setup.collect_secrets`, `prerequisites.env_vars` 가 있으면 저장을 거절한다.
   Hermes 는 스킬을 읽을 때 이 칸의 이름으로 profile 의 값과 파일을 실행 공간에 넣는다. 실측에서 Control Plane MCP 토큰과 커넥터 값 파일이 그렇게 들어왔다.
+  이 검사가 생기기 전에 올린 스킬도 막으려고, 스킬 저장은 새 버전에 함께 실리는 기존 스킬에 이 칸이 있으면 거절하고, 도구 저장은 그런 스킬이 올라간 에이전트에서 셸과 파일 도구를 켜거나 켠 채 두는 것을 `AGENT_SKILL_REQUESTS_SECRETS` 로 거절한다.
 
   Docker 는 컨테이너 생성 요청 본문을 검사하는 socket proxy 로만 다룬다. proxy 는 운영 저장소가 소유한다.
   egress proxy(Hermes 의 iron-proxy)는 지금 켜지 않는다. 동작 계약과 측정은 [`hermes/sandbox.md`](../hermes/sandbox.md) 가 갖는다.
@@ -52,7 +53,7 @@
     - 커리어 실행기처럼 운영 비밀 파일을 읽는 스크립트는 그 profile 에 읽기 전용으로 붙여야 돈다. 그 비밀은 그 사용자의 실행 공간에서 셸로 읽힌다. 커넥터(MCP)로 옮기면 컨테이너 밖으로 뺄 수 있다.
     - 운영 반영이 이 변경의 배포보다 먼저다. 반영 전에 배포하면 셸 계열 도구를 켜는 저장이 모두 거절된다. 이미 켜진 profile 은 다음 저장이나 운영의 일괄 반영 전까지 로컬 셸로 남는다.
     - 키가 바뀌면 이전 키의 컨테이너와 `/root` 디렉터리가 남는다. 정리는 운영이 한다.
-    - 이미 게시된 스킬에 비밀 요청 칸이 있으면 저장 검사가 걸리지 않는다. 그 스킬은 계속 값을 실행 공간에 넣는다. 운영이 한 번 점검한다.
+    - 셸 도구가 이미 켜진 profile 에 남은 옛 스킬만 운영이 점검한다. 두 검사는 새 저장에서만 돌아, 그 스킬은 고치거나 지울 때까지 계속 값을 실행 공간에 넣는다.
     - Hermes 를 올릴 때 terminal backend 계약을 다시 본다. 확인 항목은 [`hermes/upgrades.md`](../hermes/upgrades.md) 가 갖는다.
 
 - **적용 범위**: 대시보드 plugin 의 `PUT /api/config`, `HermesToolsetClient`, `HermesSkillClient`, `AgentToolService`, `AgentAdminService` 와 `AgentLifecycleService` 의 주인 변경 검사, `SkillPublisher`, `Agent` 의 실행 공간 주인 키, 올린 스킬 저장 검사, 에이전트 도구 화면의 확인 문구. 흐름은 [`backend/agent.md`](../backend/agent.md) 의 「에이전트 도구를 고를 때」 가 갖는다.

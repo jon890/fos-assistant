@@ -58,6 +58,12 @@ public enum ErrorCode {
      * 가리키고 컨테이너도 재사용되므로, 도구를 먼저 끈 뒤에만 주인을 바꾼다.
      */
     AGENT_OWNER_CHANGE_REQUIRES_SHELL_OFF(HttpStatus.CONFLICT),
+    /**
+     * 셸이나 파일 등급의 도구를 켜거나 켠 채 두려 했지만 그 에이전트에 올린 스킬 가운데 환경 값이나 자격 증명 파일을 요청하는
+     * 것이 있다(ADR-084). Hermes 가 그 값을 실행 공간에 넣으므로 그 스킬을 먼저 고치거나 지워야 한다. 도구 목록은 바뀌지
+     * 않았다.
+     */
+    AGENT_SKILL_REQUESTS_SECRETS(HttpStatus.CONFLICT),
     /** 요청자가 만들 수 있는 에이전트 수를 이미 채웠다. 지운 에이전트는 세지 않는다. */
     AGENT_LIMIT_REACHED(HttpStatus.CONFLICT),
     /** Hermes가 저장 뒤 읽은 toolset 목록을 요청한 목록과 다르게 돌려줬다. */

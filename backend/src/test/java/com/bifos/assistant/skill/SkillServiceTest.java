@@ -247,6 +247,46 @@ class SkillServiceTest {
     }
 
     @Test
+    @DisplayName("함께 실리는 기존 스킬에 비밀 요청 칸이 있으면 다른 스킬 저장을 그 이름과 함께 거절하고 새 디렉터리를 쓰지 않는다")
+    void rejectsSavingAnotherSkillWhenStoredSkillRequestsSecrets() {
+        String before = publishLegacyVersion();
+
+        assertThatThrownBy(() -> skills.save(OWNER, OWNED, "shopping", skillMd("shopping"), List.of()))
+                .isInstanceOfSatisfying(ApiException.class, ex -> {
+                    assertThat(ex.code()).isEqualTo(ErrorCode.VALIDATION_FAILED);
+                    assertThat(ex.getMessage())
+                            .contains("fix or delete them first")
+                            .endsWith(": legacy-env");
+                });
+
+        verify(skillClient, never()).publish(anyString(), anyList(), any(), anyString());
+        assertThat(store.currentVersion(OWNED_PROFILE)).contains(before);
+        assertThat(versionDirs(OWNED_PROFILE)).as("검사는 버전 디렉터리를 쓰기 전에 돈다").containsExactly(before);
+    }
+
+    @Test
+    @DisplayName("비밀 요청 칸이 있는 기존 스킬 자체를 고쳐 저장하는 것은 허용한다")
+    void allowsFixingStoredSkillThatRequestsSecrets() {
+        publishLegacyVersion();
+
+        skills.save(OWNER, OWNED, "legacy-env", skillMd("legacy-env"), List.of());
+
+        assertThat(store.readCurrent(OWNED_PROFILE).get("legacy-env").skillMd()).isEqualTo(skillMd("legacy-env"));
+    }
+
+    @Test
+    @DisplayName("비밀 요청 칸이 있는 기존 스킬은 지울 수 있고, 다른 스킬을 지울 때도 검사하지 않는다")
+    void allowsDeletingWhileStoredSkillRequestsSecrets() {
+        publishLegacyVersion();
+
+        skills.delete(OWNER, OWNED, "weekly-plan");
+        assertThat(store.readCurrent(OWNED_PROFILE)).containsOnlyKeys("legacy-env");
+
+        skills.delete(OWNER, OWNED, "legacy-env");
+        assertThat(store.readCurrent(OWNED_PROFILE)).isEmpty();
+    }
+
+    @Test
     @DisplayName("게시가 timeout 이나 5xx 로 실패하면 표식 없이 남고 다음 성공이 그것을 지우며 실패한 변경은 없다")
     void leavesUnmarkedOnTimeoutOr5xxAndNextSuccessClearsIt() {
         skills.save(OWNER, OWNED, "weekly-plan", skillMd("weekly-plan"), List.of());
@@ -847,6 +887,21 @@ class SkillServiceTest {
             throw new IllegalArgumentException("파일 " + fileCount + "개에 담을 수 없는 크기: " + totalBytes);
         }
         return files;
+    }
+
+    /**
+     * 저장 검사가 생기기 전에 올라간 것처럼, 비밀 요청 칸이 있는 {@code legacy-env} 와 보통 스킬 {@code weekly-plan} 을
+     * 서비스를 거치지 않고 지금 버전으로 둔다. 그 버전 이름을 돌린다.
+     */
+    private String publishLegacyVersion() {
+        String legacy = "---\nname: legacy-env\ndescription: 옛 스킬\n"
+                + "required_credential_files:\n  - path: token.json\n---\n# legacy-env\n";
+        Map<String, SkillBundle> bundles = new LinkedHashMap<>();
+        bundles.put("weekly-plan", new SkillBundle("weekly-plan", skillMd("weekly-plan"), List.of()));
+        bundles.put("legacy-env", new SkillBundle("legacy-env", legacy, List.of()));
+        String version = store.writeVersion(OWNED_PROFILE, bundles);
+        store.markPublished(OWNED_PROFILE, version);
+        return version;
     }
 
     private static String skillMd(String name) {

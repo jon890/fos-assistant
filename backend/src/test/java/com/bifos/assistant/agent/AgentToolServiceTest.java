@@ -212,4 +212,38 @@ class AgentToolServiceTest {
         assertThat(result.toolsets()).extracting(AgentToolView::name).containsExactly("web", "skills");
         verify(toolsets).writeApiServer(agent.hermesProfile(), List.of("web", "skills", "fos-assistant"), "u1");
     }
+
+    @Test
+    @DisplayName("비밀 요청 스킬이 올라간 에이전트에 terminal 을 켜면 AGENT_SKILL_REQUESTS_SECRETS 로 거절하고 Hermes 에 쓰지 않는다")
+    void rejectsEnablingTerminalWhenUploadedSkillRequestsSecrets() {
+        when(skillFiles.uploadedRequestingSecrets(agent.hermesProfile())).thenReturn(List.of("legacy-env"));
+        when(toolsets.readCatalog())
+                .thenReturn(List.of(
+                        new ToolsetCatalogEntry("web", "Web", "검색"),
+                        new ToolsetCatalogEntry("terminal", "Terminal", "셸")));
+
+        // terminal 은 관리자 등급이라 관리자가 켠다.
+        CurrentUser admin = new CurrentUser(9L, "admin@example.com", "관리자", 1L, UserRole.ADMIN);
+
+        assertThatThrownBy(() -> service.write(admin, agent, List.of("web", "terminal")))
+                .isInstanceOfSatisfying(ApiException.class, ex -> {
+                    assertThat(ex.code()).isEqualTo(ErrorCode.AGENT_SKILL_REQUESTS_SECRETS);
+                    assertThat(ex.getMessage()).endsWith(": legacy-env");
+                });
+
+        verify(toolsets, Mockito.never())
+                .writeApiServer(ArgumentMatchers.anyString(), ArgumentMatchers.anyList(), ArgumentMatchers.anyString());
+    }
+
+    @Test
+    @DisplayName("비밀 요청 스킬이 올라가 있어도 셸 도구가 없는 저장은 그대로 쓴다")
+    void keepsSaveWithoutSandboxToolsetEvenWhenUploadedSkillRequestsSecrets() {
+        when(skillFiles.uploadedRequestingSecrets(agent.hermesProfile())).thenReturn(List.of("legacy-env"));
+        when(toolsets.readEnabled(agent.apiBaseUrl(), agent.hermesProfile())).thenReturn(List.of(), List.of("web"));
+
+        AgentToolsetsView result = service.write(owner, agent, List.of("web"));
+
+        assertThat(result.toolsets()).extracting(AgentToolView::name).containsExactly("web");
+        verify(toolsets).writeApiServer(agent.hermesProfile(), List.of("web", "fos-assistant"), "u1");
+    }
 }
