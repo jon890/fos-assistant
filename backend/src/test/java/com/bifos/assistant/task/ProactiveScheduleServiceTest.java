@@ -27,6 +27,7 @@ import com.bifos.assistant.task.application.TaskProperties;
 import com.bifos.assistant.task.infra.TaskRepository;
 import com.bifos.assistant.task.infra.TaskTriggerRepository;
 import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.List;
@@ -103,10 +104,10 @@ class ProactiveScheduleServiceTest {
                 checks,
                 new TaskProperties(
                         "-",
-                        java.time.Duration.ofMinutes(2),
-                        java.time.Duration.ofMinutes(10),
+                        Duration.ofMinutes(2),
+                        Duration.ofMinutes(10),
                         10,
-                        java.time.Duration.ofMinutes(15),
+                        Duration.ofMinutes(15),
                         48,
                         ZoneOffset.UTC.getId()),
                 Clock.fixed(Instant.parse("2026-10-05T00:00:00Z"), ZoneOffset.UTC));

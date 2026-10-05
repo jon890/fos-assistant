@@ -18,6 +18,7 @@ import com.bifos.assistant.task.domain.TaskTrigger;
 import com.bifos.assistant.task.domain.type.MissedPolicy;
 import com.bifos.assistant.task.domain.type.TaskKind;
 import com.bifos.assistant.task.domain.type.TaskState;
+import com.bifos.assistant.task.domain.type.TriggerType;
 import com.bifos.assistant.task.infra.TaskRepository;
 import com.bifos.assistant.task.infra.TaskTriggerRepository;
 import java.time.Clock;
@@ -85,7 +86,7 @@ public class ProactiveScheduleService {
             triggers.save(TaskTrigger.cron(task.id(), cron, zone, MissedPolicy.SKIP, next, now));
         } else {
             TaskTrigger trigger = requireTrigger(task);
-            trigger.reschedule(com.bifos.assistant.task.domain.type.TriggerType.CRON, cron, null, zone, next, now);
+            trigger.reschedule(TriggerType.CRON, cron, null, zone, next, now);
             trigger.changeMissedPolicy(MissedPolicy.SKIP, now);
         }
         if (enabled) {

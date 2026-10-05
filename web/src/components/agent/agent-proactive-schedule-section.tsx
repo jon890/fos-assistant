@@ -158,17 +158,7 @@ export function AgentProactiveScheduleSection({ code }: { code: string }) {
               />
             </div>
           </div>
-          {schedule.blockers.length > 0 ? (
-            <ul className="flex flex-col gap-2">
-              {schedule.blockers.map((blocker) => (
-                <li key={blocker.code}>
-                  <Notice variant="info">
-                    {describeScheduleBlocker(blocker)}
-                  </Notice>
-                </li>
-              ))}
-            </ul>
-          ) : null}
+          <ScheduleBlockers blockers={schedule.blockers} />
           <div className="flex flex-wrap items-center gap-3">
             <Button
               type="submit"
@@ -184,21 +174,46 @@ export function AgentProactiveScheduleSection({ code }: { code: string }) {
               </p>
             ) : null}
           </div>
-          {schedule.lastCheck ? (
-            <p className="text-sm text-muted-foreground">
-              마지막 결과{" "}
-              {formatWhen(
-                schedule.lastCheck.finishedAt ?? schedule.lastCheck.startedAt,
-              )}
-              , {describeLastCheck(schedule.lastCheck)}
-            </p>
-          ) : (
-            <p className="text-sm text-muted-foreground">
-              아직 매일 깨우기 결과가 없어요.
-            </p>
-          )}
+          <LastCheckResult lastCheck={schedule.lastCheck} />
         </form>
       )}
     </section>
+  );
+}
+
+function ScheduleBlockers({
+  blockers,
+}: {
+  blockers: ProactiveCheckSchedule["blockers"];
+}) {
+  if (blockers.length === 0) return null;
+  return (
+    <ul className="flex flex-col gap-2">
+      {blockers.map((blocker) => (
+        <li key={blocker.code}>
+          <Notice variant="info">{describeScheduleBlocker(blocker)}</Notice>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function LastCheckResult({
+  lastCheck,
+}: {
+  lastCheck: ProactiveCheckSchedule["lastCheck"];
+}) {
+  if (lastCheck === null) {
+    return (
+      <p className="text-sm text-muted-foreground">
+        아직 매일 깨우기 결과가 없어요.
+      </p>
+    );
+  }
+  return (
+    <p className="text-sm text-muted-foreground">
+      마지막 결과 {formatWhen(lastCheck.finishedAt ?? lastCheck.startedAt)},{" "}
+      {describeLastCheck(lastCheck)}
+    </p>
   );
 }
