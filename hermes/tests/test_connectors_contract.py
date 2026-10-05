@@ -158,6 +158,35 @@ class ConnectorsContractTest(base.ConnectorGateCase):
             with self.subTest(connector=root.name):
                 self.assertEqual(check_connector(root, REPO, self.plugin._load_connector), [])
 
+    def test_connector_skills_do_not_request_secrets(self):
+        """커넥터 스킬은 앞머리로 비밀값을 요청하지 않는다(ADR-084).
+
+        Hermes 는 이 칸들에 적힌 값과 파일을 셸 실행 공간에 넘긴다. 커넥터 값은 MCP 서버만 받는다.
+        """
+        skills = sorted(CONNECTORS.rglob("SKILL.md"))
+        self.assertTrue(skills, "%s 아래에 SKILL.md 가 없다" % CONNECTORS)
+        for path in skills:
+            with self.subTest(skill=str(path.relative_to(REPO))):
+                self.assertEqual(secret_requests(path), [])
+
+
+def secret_requests(path: pathlib.Path) -> list[str]:
+    """SKILL.md 앞머리에서 비밀값을 요청하는 칸의 이름 목록이다."""
+    import yaml
+
+    text = path.read_text(encoding="utf-8")
+    if not text.startswith("---\n"):
+        return []
+    head = yaml.safe_load(text[4:text.index("\n---", 4)]) or {}
+    found = [key for key in ("required_environment_variables", "required_credential_files") if key in head]
+    setup = head.get("setup")
+    if isinstance(setup, dict) and "collect_secrets" in setup:
+        found.append("setup.collect_secrets")
+    prerequisites = head.get("prerequisites")
+    if isinstance(prerequisites, dict) and "env_vars" in prerequisites:
+        found.append("prerequisites.env_vars")
+    return found
+
 
 class ContractCatchesViolationsTest(base.ConnectorGateCase):
     """실제 커넥터를 복사해 하나씩 망가뜨리면 같은 검사가 위반을 내는지 본다."""

@@ -26,7 +26,7 @@ Hermes core 는 고치지 않는다.
 | `GET /api/profiles/<이름>/soul` | profile 의 SOUL.md 를 읽는다 |
 | `PUT /api/profiles/<이름>/soul` | profile 의 SOUL.md 를 쓴다 |
 | `GET /api/tools/toolsets` | 도구 이름과 설명을 읽는다 |
-| `PUT /api/config` | 지정한 profile 의 API 도구 목록과 올린 스킬 경로만 쓴다. 켠 도구는 `agent.disabled_toolsets` 에서 뺀다 |
+| `PUT /api/config` | 지정한 profile 의 API 도구 목록과 올린 스킬 경로만 쓴다. 켠 도구는 `agent.disabled_toolsets` 에서 뺀다. `terminal`, `file`, `code_execution` 가운데 하나라도 켜면 `sandbox_owner` 를 받아 그 profile 의 `terminal:` 을 docker 실행 공간 설정으로 통째로 바꾼다. 실행 공간 설정이 없으면 409 다(ADR-084) |
 | `GET /api/skills` | 지정한 profile 의 스킬 목록을 읽는다 |
 | `PUT /api/skills/toggle` | 지정한 profile 의 스킬 하나를 켜고 끈다 |
 | `GET /api/profiles/<이름>/sessions/<session id>/provider` | 그 profile 의 자식 session 한 줄에서 provider 와 모델만 읽는다 |
@@ -154,6 +154,15 @@ logger = logging.getLogger(__name__)
 ENV_VAR = "HERMES_DASHBOARD_PROFILE_API_SECRET"
 # Control Plane 이 올린 스킬을 두는 루트의 Hermes 컨테이너 쪽 경로다. Compose 가 준다.
 SKILL_ROOT_ENV = "FOS_ASSISTANT_SKILL_AGENT_ROOT"
+# 셸과 파일 도구를 돌릴 docker 실행 공간 설정 JSON 이다. 모양은 `hermes/README.md` 의 「셸 실행 공간」 이 갖는다(ADR-084).
+SANDBOX_ENV = "FOS_ASSISTANT_SANDBOX"
+# 켜면 profile 의 `terminal:` 을 실행 공간 설정으로 바꿔야 하는 도구다. 설정이 없으면 켜지 않는다.
+SANDBOX_TOOLSETS = frozenset({"terminal", "file", "code_execution"})
+# 실행 공간 사용자 디렉터리 이름이다. Control Plane 이 사용자마다 정해 보낸다.
+SANDBOX_OWNER_RE = re.compile(r"^[a-z][a-z0-9-]{0,63}$")
+SANDBOX_NETWORK_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$")
+# 실행 공간이 직접 쓰는 컨테이너 경로다. 운영 마운트가 이 자리를 가리면 사용자 공간이 바뀐다.
+SANDBOX_RESERVED_PATHS = ("/workspace", "/root")
 
 # 토큰으로 인증할 요청이다. 여기 없는 것은 모두 쿠키 검사로 넘어간다.
 # 값은 그 요청에서 먼저 돌릴 검사 함수의 이름이다. None 은 토큰만 본다.
@@ -439,6 +448,12 @@ def _rejected(detail: str, status_code: int = 400):
     from starlette.responses import JSONResponse
 
     return JSONResponse({"detail": detail}, status_code=status_code)
+
+
+def _sandbox_unavailable():
+    from starlette.responses import JSONResponse
+
+    return JSONResponse({"detail": "실행 공간이 설정되지 않았다", "code": "sandbox_unavailable"}, status_code=409)
 
 
 async def _json_object(request):
@@ -1744,11 +1759,125 @@ def _operator_skill_dirs(saved: dict, profile: str, root: pathlib.Path) -> list:
     return [entry for entry in raw if not (isinstance(entry, str) and entry.startswith(prefix))]
 
 
+def _sandbox_path_ok(value) -> bool:
+    """`:` 없는 절대 경로이고 빈 조각과 `..` 이 없는지 본다."""
+    if not isinstance(value, str) or not value.startswith("/") or ":" in value:
+        return False
+    return all(part not in ("", "..") for part in value.split("/")[1:])
+
+
+def _sandbox_mount_ok(value) -> bool:
+    """`<원본 절대 경로>:<컨테이너 절대 경로>` 하나를 본다. 컨테이너 경로가 `/workspace`, `/root` 자리면 틀리다."""
+    if not isinstance(value, str):
+        return False
+    pieces = value.split(":")
+    if len(pieces) != 2 or not all(_sandbox_path_ok(piece) for piece in pieces):
+        return False
+    target = pieces[1]
+    # 경로 조각 기준으로 본다. `/rootfs` 는 `/root` 아래가 아니다.
+    return not any(target == reserved or target.startswith(reserved + "/") for reserved in SANDBOX_RESERVED_PATHS)
+
+
+def _sandbox_mounts_ok(value) -> bool:
+    return isinstance(value, list) and all(_sandbox_mount_ok(entry) for entry in value)
+
+
+def _sandbox_policy() -> Optional[dict]:
+    """`SANDBOX_ENV` 의 JSON 을 읽어 검증한다. 없거나 하나라도 틀리면 None 이다.
+
+    None 이면 셸과 파일 도구를 켜지 않는다. 로컬 셸로 두지 않고 닫는다(ADR-084).
+    """
+    raw = os.environ.get(SANDBOX_ENV, "").strip()
+    if not raw:
+        logger.error("dashboard-profile-api: %s 가 없다", SANDBOX_ENV)
+        return None
+    try:
+        value = json.loads(raw)
+    except ValueError:
+        logger.error("dashboard-profile-api: %s 가 JSON 이 아니다", SANDBOX_ENV)
+        return None
+    if not isinstance(value, dict):
+        logger.error("dashboard-profile-api: %s 가 JSON object 가 아니다", SANDBOX_ENV)
+        return None
+
+    def invalid(key):
+        logger.error("dashboard-profile-api: %s 의 %s 가 올바르지 않다", SANDBOX_ENV, key)
+        return None
+
+    image = value.get("image")
+    if (not isinstance(image, str) or not image
+            or any(ch.isspace() or ord(ch) < 32 or ord(ch) == 127 for ch in image)):
+        return invalid("image")
+    if not _sandbox_path_ok(value.get("workspace_root")):
+        return invalid("workspace_root")
+    network = value.get("network")
+    if network is not None and not (isinstance(network, str) and SANDBOX_NETWORK_RE.match(network)):
+        return invalid("network")
+    cpu = value.get("cpu", 1)
+    if isinstance(cpu, bool) or not isinstance(cpu, (int, float)) or not 0 < cpu <= 8:
+        return invalid("cpu")
+    memory_mb = value.get("memory_mb", 1024)
+    if isinstance(memory_mb, bool) or not isinstance(memory_mb, int) or not 256 <= memory_mb <= 16384:
+        return invalid("memory_mb")
+    read_only_mounts = value.get("read_only_mounts", [])
+    if not _sandbox_mounts_ok(read_only_mounts):
+        return invalid("read_only_mounts")
+    profile_mounts = value.get("profile_mounts", {})
+    if (not isinstance(profile_mounts, dict)
+            or not all(isinstance(name, str) and _sandbox_mounts_ok(mounts) for name, mounts in profile_mounts.items())):
+        return invalid("profile_mounts")
+    return {
+        "image": image,
+        "workspace_root": value["workspace_root"],
+        "network": network,
+        "cpu": cpu,
+        "memory_mb": memory_mb,
+        "read_only_mounts": list(read_only_mounts),
+        "profile_mounts": {name: list(mounts) for name, mounts in profile_mounts.items()},
+    }
+
+
+def _sandbox_workspace(policy: dict, owner: str) -> str:
+    return "%s/%s" % (policy["workspace_root"].rstrip("/"), owner)
+
+
+def _sandbox_terminal(policy: dict, profile: str, owner: str) -> dict:
+    """profile 의 `terminal:` 전체다. 모양은 `hermes/README.md` 의 「셸 실행 공간」 과 같다.
+
+    값을 건네는 칸(`docker_forward_env`, `env_passthrough`, `credential_files`)은 비워 둔다.
+    profile 의 비밀값이 실행 공간에 들어가지 않게 하려는 것이다.
+    """
+    mounts = policy["read_only_mounts"] + policy["profile_mounts"].get(profile, [])
+    return {
+        "backend": "docker",
+        "cwd": "/workspace",
+        "docker_image": policy["image"],
+        "container_persistent": True,
+        "docker_persist_across_processes": True,
+        "docker_orphan_reaper": True,
+        "docker_mount_cwd_to_workspace": False,
+        "docker_run_as_host_user": False,
+        "docker_network": True,
+        "docker_extra_args": ["--network=%s" % policy["network"]] if policy["network"] else [],
+        "docker_volumes": ["%s:/workspace" % _sandbox_workspace(policy, owner)] + ["%s:ro" % m for m in mounts],
+        "docker_forward_env": [],
+        "docker_env": {},
+        "env_passthrough": [],
+        "credential_files": [],
+        "container_cpu": policy["cpu"],
+        "container_memory": policy["memory_mb"],
+    }
+
+
 async def _check_config_update(request):
     """공유 토큰의 설정 쓰기를 profile 별 API 도구 목록과 올린 스킬 경로로 제한한다."""
     body = await _json_object(request)
-    if body is None or set(body) != {"profile", "config"}:
-        return _rejected("profile 과 config 만 필요하다")
+    if body is None or set(body) - {"sandbox_owner"} != {"profile", "config"}:
+        return _rejected("profile 과 config 와 sandbox_owner 만 받는다")
+    # Hermes 처리기는 config 와 profile 만 읽으므로 sandbox_owner 는 이 검사만 쓴다.
+    owner = body.get("sandbox_owner")
+    if "sandbox_owner" in body and not (isinstance(owner, str) and SANDBOX_OWNER_RE.match(owner)):
+        return _rejected("sandbox_owner 형식이 올바르지 않다")
     profile = body["profile"]
     rejected = _profile_rejection(profile, request)
     if rejected is not None:
@@ -1765,6 +1894,13 @@ async def _check_config_update(request):
         rejected = _toolset_rejection(platform["api_server"])
         if rejected is not None:
             return rejected
+    sandbox = None
+    if platform is not None and SANDBOX_TOOLSETS & set(platform["api_server"]):
+        if owner is None:
+            return _rejected("셸 도구에는 sandbox_owner 가 필요하다")
+        sandbox = _sandbox_policy()
+        if sandbox is None:
+            return _sandbox_unavailable()
     skills = config.get("skills")
     skill_dirs = None
     if skills is not None:
@@ -1811,6 +1947,9 @@ async def _check_config_update(request):
             if CONTROL_PLANE_MCP not in mcp_names and not (set(allowed) & builtins):
                 return _rejected("내장 도구가 하나 이상 필요하다")
             updated["platform_toolsets"] = {**(saved.get("platform_toolsets") or {}), **platform}
+        if sandbox is not None:
+            # 칸 일부만 고치면 운영자가 남긴 local 설정이나 값 전달 칸이 섞인다. 통째로 바꾼다.
+            updated["terminal"] = _sandbox_terminal(sandbox, profile, owner)
         if skill_dirs is not None:
             # PUT /api/config 는 목록을 통째로 바꾼다. 운영자가 넣은 경로가 있으면 지우지 않고 멈춘다.
             if _operator_skill_dirs(saved, profile, root):
@@ -1835,8 +1974,14 @@ async def _check_config_update(request):
             return _rejected("다른 platform 의 도구 목록이 바뀐다")
         if skill_dirs and "skills" not in effective:
             return _rejected("skills 도구가 꺼진 채로 스킬을 게시할 수 없다")
-        # 처리기의 병합은 본문의 키만 쓴다. 본문에 없는 disabled_toolsets 와 고정 목록은 plugin 이 먼저 쓴다.
-        if updated.get("agent") != saved.get("agent"):
+        if sandbox is not None:
+            # Docker 는 없는 원본 디렉터리를 스스로 만든다. 여기서는 권한을 미리 맞춰 보는 것뿐이라 실패해도 거절하지 않는다.
+            try:
+                os.makedirs(_sandbox_workspace(sandbox, owner), exist_ok=True)
+            except OSError:
+                logger.warning("dashboard-profile-api: 실행 공간 사용자 디렉터리를 만들지 못했다", exc_info=True)
+        # 처리기의 병합은 본문의 키만 쓴다. 본문에 없는 disabled_toolsets, 고정 목록, terminal 은 plugin 이 먼저 쓴다.
+        if updated.get("agent") != saved.get("agent") or updated.get("terminal") != saved.get("terminal"):
             request.state.fos_checked_config = (config_path, original, updated)
     except Exception:
         logger.exception("dashboard-profile-api: profile 설정을 검증하지 못했다")

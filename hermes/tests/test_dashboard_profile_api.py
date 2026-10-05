@@ -200,8 +200,11 @@ class ProfileApiRouteTest(unittest.TestCase):
         self.root.mkdir()
         self.skill_root = base / "skills"
         self.skill_root.mkdir()
+        self.sandbox_root = base / "sandbox"
+        self.sandbox_root.mkdir()
         # 커넥터 검사도 환경 변수를 바꿔 끼운다. 되돌리는 순서가 엇갈리지 않게 같은 방식으로 건다.
-        skill_env = mock.patch.dict(os.environ, {"FOS_ASSISTANT_SKILL_AGENT_ROOT": str(self.skill_root)})
+        skill_env = mock.patch.dict(os.environ, {"FOS_ASSISTANT_SKILL_AGENT_ROOT": str(self.skill_root),
+                                                 "FOS_ASSISTANT_SANDBOX": json.dumps(self.sandbox_policy())})
         skill_env.start()
         self.addCleanup(skill_env.stop)
         # 운영 profile 하나가 먼저 있다. 되돌리기가 이것을 건드리면 안 된다.
@@ -1823,6 +1826,7 @@ class ProfileApiRouteTest(unittest.TestCase):
     def code_execution_body(self, *extra):
         body = self.toolset_body()
         body["config"]["platform_toolsets"]["api_server"] = ["code_execution", "delegation", "fos-assistant", *extra]
+        body["sandbox_owner"] = "user-1"
         return body
 
     def test_toolset_update_lifts_disabled_names_only_for_api(self):
@@ -1868,6 +1872,177 @@ class ProfileApiRouteTest(unittest.TestCase):
         original = path.read_bytes()
         self.handler_status = 500
         self.assertEqual(self.request("/api/config", "PUT", token="valid", body=self.code_execution_body()), 500)
+        self.assertEqual(path.read_bytes(), original)
+
+    def sandbox_policy(self, **changed):
+        """검사용 실행 공간 설정이다. 경로와 이름은 모두 임시 값이다."""
+        policy = {
+            "image": "sandbox-image:test",
+            "workspace_root": str(self.sandbox_root),
+            "network": "sandbox-net",
+            "cpu": 2,
+            "memory_mb": 2048,
+            "read_only_mounts": ["/srv/shared:/opt/shared"],
+            "profile_mounts": {"owner": ["/srv/owner-skills:/opt/owner-skills"],
+                               "alice": ["/srv/alice-skills:/opt/alice-skills"]},
+        }
+        policy.update(changed)
+        return {key: value for key, value in policy.items() if value is not None}
+
+    def set_sandbox_policy(self, policy):
+        os.environ["FOS_ASSISTANT_SANDBOX"] = policy if isinstance(policy, str) else json.dumps(policy)
+
+    def file_body(self, owner="user-1"):
+        body = self.toolset_body()
+        body["config"]["platform_toolsets"]["api_server"] = ["delegation", "file", "fos-assistant"]
+        if owner is not None:
+            body["sandbox_owner"] = owner
+        return body
+
+    def expected_terminal(self, owner, mounts, extra_args=("--network=sandbox-net",), cpu=2, memory=2048):
+        """`hermes/README.md` 의 「셸 실행 공간」 YAML 을 그대로 옮긴 기대값이다."""
+        return {
+            "backend": "docker",
+            "cwd": "/workspace",
+            "docker_image": "sandbox-image:test",
+            "container_persistent": True,
+            "docker_persist_across_processes": True,
+            "docker_orphan_reaper": True,
+            "docker_mount_cwd_to_workspace": False,
+            "docker_run_as_host_user": False,
+            "docker_network": True,
+            "docker_extra_args": list(extra_args),
+            "docker_volumes": ["%s/%s:/workspace" % (self.sandbox_root, owner)] + [m + ":ro" for m in mounts],
+            "docker_forward_env": [],
+            "docker_env": {},
+            "env_passthrough": [],
+            "credential_files": [],
+            "container_cpu": cpu,
+            "container_memory": memory,
+        }
+
+    def test_shell_toolset_writes_the_sandbox_terminal(self):
+        """셸 도구를 켜면 profile 의 terminal: 을 실행 공간 설정으로 통째로 바꾼다."""
+        path = self.root / "owner/config.yaml"
+        config = yaml.safe_load(path.read_text(encoding="utf-8"))
+        # 운영자가 남긴 local 설정과 값 전달 칸이 남지 않아야 한다.
+        config["terminal"] = {"backend": "local", "env_passthrough": ["OPENAI_API_KEY"], "timeout": 60}
+        path.write_text(yaml.safe_dump(config), encoding="utf-8")
+        body = self.toolset_body()
+        body["config"]["platform_toolsets"]["api_server"] = ["delegation", "fos-assistant", "terminal"]
+        body["sandbox_owner"] = "user-1"
+        self.assertEqual(self.request("/api/config", "PUT", token="valid", body=body), 200)
+        saved = self.saved_config()
+        self.assertEqual(saved["terminal"], self.expected_terminal(
+            "user-1", ["/srv/shared:/opt/shared", "/srv/owner-skills:/opt/owner-skills"]))
+        # 빈 목록 칸이 저장된 YAML 에 그대로 남아야 Hermes 기본값(값 전달)으로 돌아가지 않는다.
+        raw = path.read_text(encoding="utf-8")
+        for key in ("docker_forward_env: []", "env_passthrough: []", "credential_files: []"):
+            self.assertIn(key, raw)
+        self.assertTrue((self.sandbox_root / "user-1").is_dir())
+
+    def test_sandbox_terminal_mounts_profile_entries_only_on_that_profile(self):
+        """profile_mounts 는 그 profile 의 실행 공간에만 붙고, network 가 없으면 추가 인자가 없다."""
+        self.make_profile("blog")
+        self.register_memory("blog")
+        self.set_sandbox_policy(self.sandbox_policy(network=None, cpu=None, memory_mb=None))
+        body = self.file_body(owner="user-2")
+        body["profile"] = "blog"
+        self.assertEqual(self.request("/api/config", "PUT", token="valid", body=body), 200)
+        saved = yaml.safe_load((self.root / "blog/config.yaml").read_text(encoding="utf-8"))
+        self.assertEqual(saved["terminal"], self.expected_terminal(
+            "user-2", ["/srv/shared:/opt/shared"], extra_args=(), cpu=1, memory=1024))
+
+    def test_shell_toolset_without_sandbox_policy_is_unavailable(self):
+        """실행 공간 설정이 없으면 셸·파일 도구를 켜는 저장을 409 sandbox_unavailable 로 거절한다."""
+        os.environ.pop("FOS_ASSISTANT_SANDBOX")
+        path = self.root / "owner/config.yaml"
+        original = path.read_bytes()
+        response = self.request("/api/config", "PUT", token="valid", body=self.file_body(), full_response=True)
+        self.assertEqual(response.status_code, 409)
+        self.assertEqual(response.body["code"], "sandbox_unavailable")
+        self.assertEqual(path.read_bytes(), original)
+
+    def test_invalid_sandbox_policy_is_unavailable(self):
+        """실행 공간 설정이 하나라도 틀리면 설정이 없는 것과 같이 409 로 거절한다."""
+        root = str(self.sandbox_root)
+        cases = [
+            ("not json", "{"),
+            ("not object", []),
+            ("missing image", self.sandbox_policy(image=None)),
+            ("image with space", self.sandbox_policy(image="bad image")),
+            ("relative root", self.sandbox_policy(workspace_root="sandbox")),
+            ("dotdot root", self.sandbox_policy(workspace_root=root + "/../sandbox")),
+            ("empty piece root", self.sandbox_policy(workspace_root=root + "//x")),
+            ("colon root", self.sandbox_policy(workspace_root=root + ":x")),
+            ("bad network", self.sandbox_policy(network="-net")),
+            ("zero cpu", self.sandbox_policy(cpu=0)),
+            ("too much cpu", self.sandbox_policy(cpu=8.5)),
+            ("small memory", self.sandbox_policy(memory_mb=255)),
+            ("large memory", self.sandbox_policy(memory_mb=16385)),
+            ("float memory", self.sandbox_policy(memory_mb=1024.5)),
+            ("relative mount source", self.sandbox_policy(read_only_mounts=["srv:/opt/x"])),
+            ("dotdot mount", self.sandbox_policy(read_only_mounts=["/srv/../etc:/opt/x"])),
+            ("three pieces", self.sandbox_policy(read_only_mounts=["/srv:/opt/x:rw"])),
+            ("workspace mount", self.sandbox_policy(read_only_mounts=["/srv:/workspace"])),
+            ("under workspace", self.sandbox_policy(read_only_mounts=["/srv:/workspace/x"])),
+            ("under root", self.sandbox_policy(profile_mounts={"owner": ["/srv:/root/.hermes"]})),
+            ("mounts not list", self.sandbox_policy(read_only_mounts="/srv:/opt/x")),
+        ]
+        path = self.root / "owner/config.yaml"
+        original = path.read_bytes()
+        for label, policy in cases:
+            with self.subTest(label=label):
+                self.set_sandbox_policy(policy)
+                response = self.request("/api/config", "PUT", token="valid", body=self.file_body(), full_response=True)
+                self.assertEqual(response.status_code, 409)
+                self.assertEqual(response.body["code"], "sandbox_unavailable")
+                self.assertEqual(path.read_bytes(), original)
+
+    def test_sandbox_policy_accepts_paths_that_only_share_a_prefix(self):
+        """`/rootfs` 와 `/workspaces` 는 `/root`, `/workspace` 아래가 아니다."""
+        self.set_sandbox_policy(self.sandbox_policy(read_only_mounts=["/srv/a:/rootfs", "/srv/b:/workspaces/x"]))
+        self.assertEqual(self.request("/api/config", "PUT", token="valid", body=self.file_body()), 200)
+        self.assertEqual(self.saved_config()["terminal"]["docker_volumes"][1:3],
+                         ["/srv/a:/rootfs:ro", "/srv/b:/workspaces/x:ro"])
+
+    def test_shell_toolset_needs_a_valid_sandbox_owner(self):
+        """셸 도구를 켜는데 sandbox_owner 가 없거나 형식이 틀리면 400 이다."""
+        path = self.root / "owner/config.yaml"
+        original = path.read_bytes()
+        for label, owner in [("missing", None), ("upper", "User"), ("digit first", "1user"), ("slash", "a/b"),
+                             ("dotdot", ".."), ("too long", "a" * 65), ("number", 1)]:
+            with self.subTest(label=label):
+                self.assertEqual(self.request("/api/config", "PUT", token="valid", body=self.file_body(owner)), 400)
+                self.assertEqual(path.read_bytes(), original)
+        # 형식이 틀린 sandbox_owner 는 셸 도구가 없어도 거절한다.
+        body = self.toolset_body()
+        body["sandbox_owner"] = "User"
+        self.assertEqual(self.request("/api/config", "PUT", token="valid", body=body), 400)
+        self.assertEqual(path.read_bytes(), original)
+        # 64자까지는 받는다.
+        self.assertEqual(self.request("/api/config", "PUT", token="valid", body=self.file_body("a" * 64)), 200)
+
+    def test_toolset_update_without_shell_keeps_terminal_without_policy(self):
+        """셸 도구가 없는 저장은 실행 공간 설정이 없어도 되고 terminal: 을 건드리지 않는다."""
+        os.environ.pop("FOS_ASSISTANT_SANDBOX")
+        path = self.root / "owner/config.yaml"
+        config = yaml.safe_load(path.read_text(encoding="utf-8"))
+        config["terminal"] = {"backend": "docker", "docker_image": "kept"}
+        path.write_text(yaml.safe_dump(config), encoding="utf-8")
+        body = self.toolset_body()
+        body["sandbox_owner"] = "user-1"
+        self.assertEqual(self.request("/api/config", "PUT", token="valid", body=body), 200)
+        self.assertEqual(self.saved_config()["terminal"], {"backend": "docker", "docker_image": "kept"})
+        self.assertEqual(self.request("/api/config", "PUT", token="valid", body=self.toolset_body()), 200)
+        self.assertEqual(self.saved_config()["terminal"], {"backend": "docker", "docker_image": "kept"})
+
+    def test_sandbox_terminal_is_restored_when_handler_fails(self):
+        """agent 가 그대로여도 terminal: 을 먼저 썼으면 처리기가 실패할 때 원래 바이트로 되돌린다."""
+        path = self.root / "owner/config.yaml"
+        original = path.read_bytes()
+        self.handler_status = 500
+        self.assertEqual(self.request("/api/config", "PUT", token="valid", body=self.file_body()), 500)
         self.assertEqual(path.read_bytes(), original)
 
     def make_skill_version(self, profile, version, link=None):
@@ -1999,6 +2174,9 @@ class ProfileApiRouteTest(unittest.TestCase):
         wrong_type = self.toolset_body()
         wrong_type["config"]["platform_toolsets"]["api_server"] = "delegation"
         cases.append(("wrong list type", wrong_type, (), 400))
+        extra_key = self.toolset_body()
+        extra_key["sandbox"] = "user-1"
+        cases.append(("extra body key", extra_key, (), 400))
 
         original = (self.root / "owner/config.yaml").read_bytes()
         for label, body, query_profiles, expected in cases:
