@@ -296,6 +296,30 @@ class ProactiveCheckStartTest {
     }
 
     @Test
+    @DisplayName("삭제된 점검 대화의 미열람 보고는 새 점검 대화의 예약 실행을 막지 않는다")
+    void deletedConversationReportDoesNotBlockNextScheduledCheck() {
+        Conversation deleted = conversations.save(
+                Conversation.startedForCheck(owner.id(), "삭제할 점검", agent.id(), Instant.now()));
+        ProactiveCheck old = ProactiveCheck.started(
+                owner.id(), agent.id(), deleted.id(), CheckTrigger.MANUAL, false, Instant.now());
+        old.succeed(CheckOutcome.FINDINGS, 0, 0,
+                new CheckReport(List.of("지난 보고"), List.of(), List.of(), List.of(), List.of()),
+                0, 0, 0, 0, 0, Instant.now());
+        checks.save(old);
+        transactions.executeWithoutResult(status -> conversations.deleteIfActive(deleted.id(), owner.id(), Instant.now()));
+
+        UUID returned = service.start(owner, agent.code(), CheckTrigger.SCHEDULED);
+        Conversation created = checkConversation();
+        awaitIdle(created.id());
+
+        ProactiveCheck current = checks.findFirstByUserIdAndAgentIdOrderByIdDesc(owner.id(), agent.id()).orElseThrow();
+        assertThat(returned).isEqualTo(created.publicId()).isNotEqualTo(deleted.publicId());
+        assertThat(current.skippedReason()).isNull();
+        assertThat(current.rootExecutionId()).isNotNull();
+        assertThat(stub().received()).hasSize(1);
+    }
+
+    @Test
     @DisplayName("열지 않은 보고가 있으면 예약 살펴보기는 모델을 부르지 않고 UNREAD_REPORT로 끝난다")
     void skipsScheduledCheckWhenReportIsUnread() {
         Conversation conversation = conversations.save(
