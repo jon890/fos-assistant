@@ -10,7 +10,7 @@ frontend 는 화면의 동작과 구조이고, hermes 는 외부 런타임인 He
 | 문서 | 소유하는 것 |
 | --- | --- |
 | [`prd.md`](prd.md) | 제품의 목적과 범위, 범위 밖, 아직 정하지 않은 것 |
-| [`code-architecture.md`](code-architecture.md) | 패키지 경계, Hermes 쪽 코드의 배치, 비밀값을 두는 곳, 아직 만들지 않은 것 |
+| [`code-architecture.md`](code-architecture.md) | 패키지 경계, 사용자와 profile, 에이전트, 대화의 층, Hermes 쪽 코드의 배치, 비밀값을 두는 곳, 아직 만들지 않은 것 |
 | [`flow.md`](flow.md) | 화면 전환과 호출 순서, 두 방향의 토큰, 실행이 실패할 때의 흐름 |
 | [`connectors.md`](connectors.md) | 커넥터 선언 파일, 연결 API, 승인, 토큰 저장 |
 | [`connector-authoring.md`](connector-authoring.md) | 범용 커넥터를 만드는 방법, 갖출 것, PR 에 필요한 것, 공통 검사 |
