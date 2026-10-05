@@ -50,7 +50,7 @@ public class ConnectorConnection {
     private String connectorId;
 
     @OneToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "agent_id", nullable = false, unique = true)
+    @JoinColumn(name = "agent_id", nullable = true, unique = true)
     private Agent agent;
 
     @Enumerated(EnumType.STRING)
@@ -69,6 +69,10 @@ public class ConnectorConnection {
 
     @Column(name = "checked_at")
     private Instant checkedAt;
+
+    /** 연결의 칸 값을 대시보드 plugin 의 보관 파일에 둔 적이 있다. 옛 연결은 연결 확인이 값을 옮길 때 참이 된다(ADR-083). */
+    @Column(name = "vault_stored", nullable = false)
+    private boolean vaultStored;
 
     /** 마지막 확인에서 MCP 서버가 낸 도구 가운데 manifest 가 선언하지 않은 수다. 그 도구의 호출은 거절된다. */
     @Column(name = "undeclared_tools", nullable = false)
@@ -128,6 +132,10 @@ public class ConnectorConnection {
     /** 앞선 대기 값을 지우지 않고 논리 OR 로 누적한다. */
     public void markRestartRequired(boolean restartRequired) {
         this.restartRequired = this.restartRequired || restartRequired;
+    }
+
+    public void markVaultStored() {
+        this.vaultStored = true;
     }
 
     public void recordUndeclaredTools(int count) {
