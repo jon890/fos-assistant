@@ -1231,6 +1231,12 @@ export function startFakeHermes(
         send(response, 400, { error: "invalid configuration" });
         return true;
       }
+      // plugin 처럼 칸이 있으면 셸 도구가 없어도 모양을 본다.
+      if (body.sandbox_owner !== undefined
+          && (typeof body.sandbox_owner !== "string" || !SANDBOX_OWNER_PATTERN.test(body.sandbox_owner))) {
+        send(response, 400, { error: "sandbox_owner has an invalid shape" });
+        return true;
+      }
       const profile = body.profile;
       let nextToolsets: string[] | undefined;
       if (configKeys.includes("platform_toolsets")) {

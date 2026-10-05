@@ -317,6 +317,20 @@ class AgentApiBaseUrlUpdateTest {
         assertThat(agent.ownerUserId()).isEqualTo(2L);
     }
 
+    @Test
+    @DisplayName("실행 공간을 쓰지 않는 개인 전용 도구만 켜졌으면 주인을 바꿀 수 있다")
+    void changesOwnerWhenOnlyNonSandboxPrivateToolsetsOn() {
+        agent.changeAccess(true, AgentVisibility.PRIVATE, 1L);
+        AppUser next = owner(2L);
+        when(users.findByEmail("next@example.com")).thenReturn(Optional.of(next));
+        when(hermesToolsets.readEnabled(CURRENT_URL, "dad"))
+                .thenReturn(List.of("browser", "session_search", "fos-assistant"));
+
+        controller.update("dad", new UpdateAgentRequest(true, AgentVisibility.PRIVATE, "next@example.com", null, null));
+
+        assertThat(agent.ownerUserId()).isEqualTo(2L);
+    }
+
     private static CreateAgentRequest privateRequest(String code, String apiBaseUrl) {
         return new CreateAgentRequest(
                 code,

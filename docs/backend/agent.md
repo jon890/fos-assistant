@@ -246,7 +246,7 @@ sequenceDiagram
 | `memory` 를 켜거나 Control Plane MCP(`fos-assistant`) 를 빼려 한다 | Control Plane 과 plugin 이 모두 거절한다 |
 | 요청한 도구가 빠지거나 분류된 도구가 예상과 다르다 | `AGENT_TOOLS_NOT_APPLIED` 로 켜지지 않은 이름을 알린다. 화면은 도구 목록을 다시 읽고, profile 설정에서 막힌 도구는 관리자에게 알리라고 안내한다. 미분류 도구만 더 켜진 것은 성공 응답의 `unclassifiedEnabled` 로 따로 알린다 |
 | `terminal`, `file`, `code_execution` 을 켜는데 운영의 실행 공간 설정이 없다 | 409 `AGENT_SANDBOX_UNAVAILABLE`. 아무것도 바뀌지 않는다. 화면은 「격리된 실행 공간이 준비되지 않아 이 도구를 켤 수 없어요」 를 보인다 |
-| 셸·파일 계열이 켜진 에이전트의 주인을 관리자가 바꾼다 | 409 `AGENT_OWNER_CHANGE_REQUIRES_SHELL_OFF`. 아무것도 바뀌지 않는다. profile 의 `terminal:` 이 옛 주인의 사용자 디렉터리를 가리키고 오래 가는 컨테이너가 재사용되기 때문이다. 최종 listener 주소의 도구를 먼저 끈다. 주인이 그대로인 접근 변경은 검사하지 않는다 |
+| `terminal`, `file`, `code_execution` 가운데 하나라도 켜진 에이전트의 주인을 관리자가 바꾼다 | 409 `AGENT_OWNER_CHANGE_REQUIRES_SHELL_OFF`. 아무것도 바뀌지 않는다. profile 의 `terminal:` 이 옛 주인의 사용자 디렉터리를 가리키기 때문이다. 그 도구를 먼저 끄고, 새 주인이 다시 켜면 실행 공간을 새로 쓴다. `browser`, `computer_use`, `session_search` 만 켜졌으면 막지 않는다. 주인이 그대로인 접근 변경은 검사하지 않는다 |
 | 셸·파일 도구가 이미 켜진 profile 의 다른 도구를 바꾼다 | 켜진 셸·파일 도구가 저장 목록에 함께 있으므로 위와 같이 실행 공간을 다시 쓰거나 거절한다 |
 | 대시보드나 listener 가 멈춰 있다 | 도구 절만 열리지 않는다. 대화는 그대로 돈다 |
 

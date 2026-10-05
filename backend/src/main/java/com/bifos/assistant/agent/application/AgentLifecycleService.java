@@ -219,7 +219,7 @@ public class AgentLifecycleService {
      * 주인의 에이전트가 옛 주인의 파일을 읽고 쓴다. 그룹 공개 검사와 같은 목록을 읽는다.
      */
     public void requireOwnerChangeSafe(String apiBaseUrl, String profileName) {
-        if (AgentToolPolicy.hasPrivateOnlyToolset(hermesToolsets.readEnabled(apiBaseUrl, profileName))) {
+        if (AgentToolPolicy.hasSandboxToolset(hermesToolsets.readEnabled(apiBaseUrl, profileName))) {
             throw new ApiException(
                     ErrorCode.AGENT_OWNER_CHANGE_REQUIRES_SHELL_OFF,
                     "turn off shell and file toolsets before changing the owner");
