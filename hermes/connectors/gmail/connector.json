@@ -2,7 +2,7 @@
   "schema": 2,
   "id": "gmail",
   "title": "Gmail",
-  "description": "Gmail 의 메일을 찾고 읽고, 승인한 초안과 메일을 씁니다.",
+  "description": "Gmail 의 메일과 라벨, 필터를 읽고 승인한 초안, 메일, 라벨과 필터를 만듭니다.",
   "fields": [
     { "key": "client_id", "env": "GMAIL_OAUTH_CLIENT_ID", "label": "OAuth 클라이언트 ID",
       "description": "Google Cloud 콘솔의 「사용자 인증 정보」 에서 만든 데스크톱 앱 클라이언트의 ID 입니다.",
@@ -26,12 +26,20 @@
     "create_draft": { "risk": "WRITE", "title": "초안 만들기", "outbound": false },
     "modify_labels": { "risk": "WRITE", "title": "라벨 바꾸기", "grant": false, "outbound": false },
     "send_message": { "risk": "WRITE", "title": "메일 보내기", "grant": false, "outbound": true },
-    "reply_to_message": { "risk": "WRITE", "title": "답장 보내기", "grant": false, "outbound": true }
+    "reply_to_message": { "risk": "WRITE", "title": "답장 보내기", "grant": false, "outbound": true },
+    "create_label": { "risk": "WRITE", "title": "라벨 만들기", "outbound": false },
+    "update_label": { "risk": "WRITE", "title": "라벨 설정 바꾸기", "outbound": false },
+    "list_filters": { "risk": "READ" },
+    "create_filter": { "risk": "WRITE", "title": "필터 만들기", "grant": false, "outbound": false },
+    "delete_filter": { "risk": "WRITE", "title": "필터 지우기", "grant": false, "outbound": false },
+    "apply_labels_to_query": { "risk": "WRITE", "title": "검색한 메일의 라벨 바꾸기", "grant": false, "outbound": false }
   },
   "errors": {
     "GMAIL_UNAUTHORIZED": "credential_rejected",
     "GMAIL_FORBIDDEN": "forbidden",
+    "GMAIL_FILTER_SCOPE_REQUIRED": "forbidden",
     "GMAIL_INVALID_INPUT": "invalid_input",
+    "GMAIL_TARGET_COUNT_CHANGED": "invalid_input",
     "GMAIL_SEND_UNKNOWN": "outcome_unknown",
     "GMAIL_UNAVAILABLE": "unavailable"
   }
