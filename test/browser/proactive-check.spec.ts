@@ -101,10 +101,10 @@ test("허용되지 않은 도구가 켜져 있으면 까닭을 알리고 단추�
       check.getByRole("button", { name: "지금 살펴보기" }),
     ).toBeDisabled();
     await expect(
-      check.getByText("명령 실행 도구가 켜져 있어서 살펴볼 수 없어요."),
+      check.getByText("명령 실행 도구가 켜져 있어서 살펴볼 수 없어요.").first(),
     ).toBeVisible();
     await expect(
-      check.getByText("위 도구 절에서 꺼 주세요.", { exact: false }),
+      check.getByText("위 도구 절에서 꺼 주세요.", { exact: false }).first(),
     ).toBeVisible();
     await expect(check.getByText("점검 대화 열기")).toHaveCount(0);
   } finally {
@@ -258,15 +258,16 @@ test("단추 하나로 살펴보기를 시작하고 결과와 배지를 보며 �
     await check.getByRole("button", { name: "지금 살펴보기" }).click();
     await expect(page).toHaveURL(CONVERSATION_URL);
 
-    // 시작 알림 줄과 결과 답이 이력에 들어온다. 결과의 원문 링크는 하나다.
+    // 시작 알림 줄과 결과 답이 이력에 들어온다. 보고와 발견은 같은 검사한 원문을 가리킨다.
     await expect(page.getByText(START_NOTICE)).toHaveCount(1);
     await expect(page.getByText("새로 알릴 것", { exact: true })).toBeVisible();
     const source = page.getByRole("link", { name: "example.com" });
-    await expect(source).toHaveCount(1);
-    await expect(source).toHaveAttribute(
+    await expect(source).toHaveCount(2);
+    await expect(source.nth(0)).toHaveAttribute(
       "href",
       "https://example.com/e2e/study",
     );
+    await expect(source.nth(1)).toHaveAttribute("href", "https://example.com/e2e/study");
 
     // 대화 목록의 점검 대화 줄에 「살펴보기」 배지가 붙는다.
     const mobile = testInfo.project.name === "mobile";
@@ -311,7 +312,7 @@ test("결과를 읽지 못한 살펴보기는 점검 대화와 마지막 살펴�
     ).toBeVisible();
     await page.goto(`/agents/${AGENT_CODE}`);
     await expect(
-      section(page).getByText("답을 받지 못했어요", { exact: false }),
+      section(page).getByText(/^마지막 살펴보기.*답을 받지 못했어요/),
     ).toBeVisible();
 
     // 블록이 없으면 형식 문제로 알린다.
@@ -325,9 +326,7 @@ test("결과를 읽지 못한 살펴보기는 점검 대화와 마지막 살펴�
     ).toBeVisible();
     await page.goto(`/agents/${AGENT_CODE}`);
     await expect(
-      section(page).getByText("결과 형식이 맞지 않아 정리하지 못했어요", {
-        exact: false,
-      }),
+      section(page).getByText(/^마지막 살펴보기.*결과 형식이 맞지 않아 정리하지 못했어요/),
     ).toBeVisible();
   } finally {
     await restore(page);
