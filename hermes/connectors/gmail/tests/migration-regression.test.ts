@@ -125,30 +125,48 @@ describe("Python Gmail 회귀의 HTTP 경계 이관", () => {
   });
 
   test("환경 proxy 값이 있어도 localhost FakeGoogle에 직접 요청한다", async () => {
+    const proxyKeys = [
+      "HTTP_PROXY",
+      "HTTPS_PROXY",
+      "ALL_PROXY",
+      "http_proxy",
+      "https_proxy",
+      "all_proxy",
+      "NO_PROXY",
+      "no_proxy",
+    ];
     const saved = Object.fromEntries(
-      ["HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY", "NO_PROXY"].map((key) => [
-        key,
-        process.env[key],
-      ]),
+      proxyKeys.map((key) => [key, process.env[key]]),
     );
     const { fake, server } = setup();
+    let proxyRequests = 0;
+    const proxy = Bun.serve({
+      hostname: "127.0.0.1",
+      port: 0,
+      fetch: () => {
+        proxyRequests += 1;
+        return new Response(null, { status: 502 });
+      },
+    });
     fake.on("GET", "/gmail/profile", { emailAddress: "me" });
     try {
-      process.env.HTTP_PROXY = "http://127.0.0.1:1";
-      process.env.HTTPS_PROXY = "http://127.0.0.1:1";
-      process.env.ALL_PROXY = "http://127.0.0.1:1";
+      for (const key of proxyKeys.slice(0, 6))
+        process.env[key] = proxy.url.toString();
       delete process.env.NO_PROXY;
+      delete process.env.no_proxy;
       await withMcp(server, async (client) => {
         expect((await tool(client, "get_profile")).result.isError).not.toBe(
           true,
         );
       });
       expect(fake.seen("GET", "/gmail/profile")).toHaveLength(1);
+      expect(proxyRequests).toBe(0);
     } finally {
       for (const [key, value] of Object.entries(saved)) {
         if (value === undefined) delete process.env[key];
         else process.env[key] = value;
       }
+      proxy.stop(true);
       fake.stop();
     }
   });

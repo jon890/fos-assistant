@@ -3,7 +3,15 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { z } from "zod";
 import { HTML_NAMED_ENTITIES } from "./html-entities.ts";
 
-const REQUIRED_BUN_VERSION = "1.3.5";
+const MINIMUM_BUN_VERSION = [1, 3, 14] as const;
+const PROXY_ENVIRONMENT_KEYS = [
+  "HTTP_PROXY",
+  "HTTPS_PROXY",
+  "ALL_PROXY",
+  "http_proxy",
+  "https_proxy",
+  "all_proxy",
+] as const;
 const TOKEN_URL = "https://oauth2.googleapis.com/token";
 const API_BASE = "https://gmail.googleapis.com/gmail/v1/users/me";
 const RESPONSE_MAX_BYTES = 10 * 1024 * 1024;
@@ -60,6 +68,30 @@ const COLORS = new Set(
 );
 
 type Env = Record<string, string | undefined>;
+
+/** Bun의 fetch가 환경 프록시를 따라가지 않게 MCP 프로세스에서 제거한다. */
+function clearProxyEnvironment() {
+  for (const key of PROXY_ENVIRONMENT_KEYS) delete process.env[key];
+}
+
+/** 최소 Bun 1.3.14 release 이상인지 SemVer 숫자로 비교한다. */
+export function isSupportedBunVersion(version: string) {
+  const match =
+    /^(\d+)\.(\d+)\.(\d+)(?:-([0-9A-Za-z.-]+))?(?:\+[0-9A-Za-z.-]+)?$/.exec(
+      version,
+    );
+  if (!match) return false;
+
+  const major = Number(match[1]);
+  const minor = Number(match[2]);
+  const patch = Number(match[3]);
+  const prerelease = match[4] !== undefined;
+  if (major !== MINIMUM_BUN_VERSION[0]) return major > MINIMUM_BUN_VERSION[0];
+  if (minor !== MINIMUM_BUN_VERSION[1]) return minor > MINIMUM_BUN_VERSION[1];
+  if (patch !== MINIMUM_BUN_VERSION[2]) return patch > MINIMUM_BUN_VERSION[2];
+  return !prerelease;
+}
+
 export interface GmailOptions {
   tokenUrl?: string;
   apiBase?: string;
@@ -520,6 +552,7 @@ class Gmail {
   readonly apiBase: string;
   readonly timeoutMs: number;
   constructor(options: GmailOptions) {
+    clearProxyEnvironment();
     this.env = options.env ?? process.env;
     this.tokenUrl = options.tokenUrl ?? TOKEN_URL;
     this.apiBase = options.apiBase ?? API_BASE;
@@ -533,11 +566,10 @@ class Gmail {
     allowEmptySuccess = false,
   ): Promise<any> {
     let response: Response;
+    clearProxyEnvironment();
     try {
       response = await fetch(url, {
         ...init,
-        // Bun의 빈 proxy 값은 환경 HTTP_PROXY 등을 쓰지 않고 직접 연결한다.
-        proxy: "",
         redirect: "manual",
         signal: AbortSignal.timeout(this.timeoutMs),
       });
@@ -1374,9 +1406,9 @@ export function createGmailServer(options: GmailOptions = {}) {
 }
 
 if (import.meta.main) {
-  if (Bun.version !== REQUIRED_BUN_VERSION) {
+  if (!isSupportedBunVersion(Bun.version)) {
     process.stderr.write(
-      `GMAIL_MCP_UNSUPPORTED_BUN_VERSION: expected ${REQUIRED_BUN_VERSION}, got ${Bun.version}\n`,
+      `GMAIL_MCP_UNSUPPORTED_BUN_VERSION: expected Bun 1.3.14 or later, got ${Bun.version}\n`,
     );
     process.exitCode = 1;
   } else {

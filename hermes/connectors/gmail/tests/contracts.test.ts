@@ -1,7 +1,7 @@
 import { expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { createGmailServer } from "../src/server.ts";
+import { createGmailServer, isSupportedBunVersion } from "../src/server.ts";
 import { withMcp } from "./support.ts";
 
 const root = join(import.meta.dir, "..");
@@ -53,9 +53,12 @@ test("Gmail 서버 소스에는 메일 삭제·trash·attachment download endpoi
   expect(source).not.toMatch(/\/messages[^\n]*"DELETE"/);
 });
 
-test("서버는 Bun 1.3.5가 아니면 실행을 거절하는 guard를 둔다", () => {
-  const source = readFileSync(join(root, "src/server.ts"), "utf8");
-  expect(source).toContain('const REQUIRED_BUN_VERSION = "1.3.5"');
-  expect(source).toContain("Bun.version !== REQUIRED_BUN_VERSION");
-  expect(source).toContain("GMAIL_MCP_UNSUPPORTED_BUN_VERSION");
+test.each([
+  ["1.3.13", false],
+  ["1.3.14-canary.1", false],
+  ["1.3.14", true],
+  ["1.4.0", true],
+  ["2.0.0", true],
+])("Bun %s의 최소 1.3.14 지원 여부를 숫자로 비교한다", (version, expected) => {
+  expect(isSupportedBunVersion(version)).toBe(expected);
 });
