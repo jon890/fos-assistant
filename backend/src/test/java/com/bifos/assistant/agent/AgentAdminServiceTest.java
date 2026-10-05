@@ -10,9 +10,11 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import com.bifos.assistant.agent.application.AgentAdminService;
+import com.bifos.assistant.agent.application.AgentConnectorBindings;
 import com.bifos.assistant.agent.application.AgentCreateCommand;
 import com.bifos.assistant.agent.application.AgentEndpointProbe;
 import com.bifos.assistant.agent.application.AgentLifecycleService;
+import com.bifos.assistant.agent.application.AgentUpdateCommand;
 import com.bifos.assistant.agent.application.KnownFlows;
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.agent.domain.type.AgentVisibility;
@@ -21,15 +23,17 @@ import com.bifos.assistant.agent.domain.type.CredentialScope;
 import com.bifos.assistant.agent.infra.AgentRepository;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
+import com.bifos.assistant.user.domain.AppUser;
 import com.bifos.assistant.user.infra.AppUserRepository;
 import java.time.Clock;
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
-/** 관리자가 에이전트를 등록하는 유스케이스의 결과와 검사 순서를 본다. */
+/** 관리자가 에이전트를 등록하고 고치는 유스케이스의 결과와 검사 순서를 본다. */
 class AgentAdminServiceTest {
 
     private static final String API_BASE_URL = "http://127.0.0.1:2/p/group";
@@ -39,9 +43,10 @@ class AgentAdminServiceTest {
     private final AgentLifecycleService lifecycle = mock(AgentLifecycleService.class);
     private final AgentEndpointProbe endpointProbe = mock(AgentEndpointProbe.class);
     private final KnownFlows flows = mock(KnownFlows.class);
+    private final AgentConnectorBindings connectorBindings = mock(AgentConnectorBindings.class);
 
     private final AgentAdminService service =
-            new AgentAdminService(agents, users, lifecycle, endpointProbe, flows, Clock.systemUTC());
+            new AgentAdminService(agents, users, lifecycle, endpointProbe, flows, connectorBindings, Clock.systemUTC());
 
     @BeforeEach
     void setUp() {
@@ -92,6 +97,72 @@ class AgentAdminServiceTest {
         when(agents.findAll()).thenReturn(List.of(live, deleted));
 
         assertThat(service.list()).containsExactly(live);
+    }
+
+    @Test
+    @DisplayName("연결이 붙은 에이전트의 주인을 바꾸면 AGENT HAS CONNECTIONS 로 거절하고 저장하지 않는다")
+    void rejectsOwnerChangeOfAgentWithConnections() {
+        Agent agent = privateAgent(1L);
+        when(agents.findByCodeForUpdate("mine")).thenReturn(Optional.of(agent));
+        AppUser newOwner = mock(AppUser.class);
+        when(newOwner.id()).thenReturn(2L);
+        when(users.findByEmail("new@example.com")).thenReturn(Optional.of(newOwner));
+        when(connectorBindings.hasBindings(agent.id())).thenReturn(true);
+
+        assertThatThrownBy(() -> service.update(
+                        "mine", new AgentUpdateCommand(true, AgentVisibility.PRIVATE, "new@example.com", null, null)))
+                .isInstanceOf(ApiException.class)
+                .extracting(ex -> ((ApiException) ex).code())
+                .isEqualTo(ErrorCode.AGENT_HAS_CONNECTIONS);
+
+        assertThat(agent.ownerUserId()).isEqualTo(1L);
+        verify(agents, never()).save(any(Agent.class));
+    }
+
+    @Test
+    @DisplayName("연결이 붙은 에이전트를 그룹으로 바꾸면 AGENT CONNECTIONS REQUIRE PRIVATE 로 거절한다")
+    void rejectsGroupVisibilityOfAgentWithConnections() {
+        Agent agent = privateAgent(1L);
+        when(agents.findByCodeForUpdate("mine")).thenReturn(Optional.of(agent));
+        when(connectorBindings.hasBindings(agent.id())).thenReturn(true);
+
+        assertThatThrownBy(() ->
+                        service.update("mine", new AgentUpdateCommand(true, AgentVisibility.GROUP, null, null, null)))
+                .isInstanceOf(ApiException.class)
+                .extracting(ex -> ((ApiException) ex).code())
+                .isEqualTo(ErrorCode.AGENT_CONNECTIONS_REQUIRE_PRIVATE);
+
+        assertThat(agent.visibility()).isEqualTo(AgentVisibility.PRIVATE);
+        verify(agents, never()).save(any(Agent.class));
+        verifyNoInteractions(lifecycle);
+    }
+
+    @Test
+    @DisplayName("연결이 붙은 에이전트도 주인과 공개 범위를 그대로 두는 수정은 저장한다")
+    void savesUpdateKeepingOwnerOfAgentWithConnections() {
+        Agent agent = privateAgent(1L);
+        when(agents.findByCodeForUpdate("mine")).thenReturn(Optional.of(agent));
+        when(connectorBindings.hasBindings(agent.id())).thenReturn(true);
+
+        Agent updated =
+                service.update("mine", new AgentUpdateCommand(false, AgentVisibility.PRIVATE, null, null, null));
+
+        assertThat(updated.enabled()).isFalse();
+        assertThat(updated.ownerUserId()).isEqualTo(1L);
+        verify(agents).save(agent);
+    }
+
+    private static Agent privateAgent(Long ownerId) {
+        return Agent.of(
+                "mine",
+                "Mine",
+                "mine-profile",
+                API_BASE_URL,
+                CostMode.SUBSCRIPTION,
+                CredentialScope.SHARED_HOUSEHOLD,
+                AgentVisibility.PRIVATE,
+                ownerId,
+                Instant.now());
     }
 
     private static AgentCreateCommand groupCommand() {

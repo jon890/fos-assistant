@@ -1,5 +1,6 @@
 package com.bifos.assistant.chat.application;
 
+import com.bifos.assistant.agent.application.AgentConnectorBindings;
 import com.bifos.assistant.agent.application.AgentService;
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.chat.application.model.AutoTurnDelivery;
@@ -33,6 +34,7 @@ import com.bifos.assistant.context.ContextTrust;
 import com.bifos.assistant.context.ResultHeader;
 import com.bifos.assistant.hermes.HermesRunEventStream;
 import com.bifos.assistant.hermes.HermesRunsClient;
+import com.bifos.assistant.hermes.ToolDetailScope;
 import com.bifos.assistant.hermes.dto.HermesRunCommand;
 import com.bifos.assistant.hermes.dto.HermesRunResult;
 import com.bifos.assistant.hermes.dto.RunEvent;
@@ -115,6 +117,7 @@ public class ChatService {
     private final ConversationAccess access;
     private final ChatMessageRepository messages;
     private final AgentService agents;
+    private final AgentConnectorBindings connectorBindings;
     private final HermesRunsClient hermes;
     private final HermesRunEventStream eventStream;
     private final ExecutionRecorder executions;
@@ -1271,6 +1274,7 @@ public class ChatService {
         // 일부 HTTP 스트림은 다른 스레드의 close 중에도 readLine 을 놓지 않는다.
         // 중지 유예 시간이 지나면 요청 스레드를 먼저 풀어 상태 조회와 stopped 사건으로 진행한다.
         CompletableFuture<Void> streamDone = new CompletableFuture<>();
+        ToolDetailScope detailScope = toolDetailScope(pending.agent());
         Thread.startVirtualThread(() -> {
             try {
                 eventStream.open(
@@ -1285,7 +1289,7 @@ public class ChatService {
                             }
                         },
                         stream -> turns.attachStream(handle, stream),
-                        pending.agent().connectorManaged());
+                        detailScope);
             } catch (ApiException ex) {
                 log.warn("Hermes event stream ended before final status runId={}", runId, ex);
             } finally {
@@ -1294,6 +1298,17 @@ public class ChatService {
             }
         });
         turns.awaitStreamOrGrace(handle, streamDone);
+    }
+
+    /**
+     * 실행 기록에서 내용을 통째로 가릴 도구다. 옛 커넥터 에이전트는 모두 가리고, 다른 에이전트는 붙은 커넥터 서버의 도구만
+     * 가린다(ADR-083). 외부 서비스의 글이 실행 기록에 남지 않게 한다.
+     */
+    private ToolDetailScope toolDetailScope(Agent agent) {
+        if (agent.connectorManaged()) {
+            return ToolDetailScope.ALL;
+        }
+        return ToolDetailScope.prefixes(connectorBindings.connectorToolPrefixes(agent.id()));
     }
 
     private HermesRunResult awaitCompletion(PendingTurn pending, String runId) {

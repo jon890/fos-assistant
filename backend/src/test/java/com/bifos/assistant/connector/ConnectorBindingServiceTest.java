@@ -586,7 +586,7 @@ class ConnectorBindingServiceTest {
         Agent legacy = agent(owner, AgentVisibility.PRIVATE);
         legacy.markConnectorManaged();
         agents.save(legacy);
-        ConnectorConnection connection = ConnectorConnection.pending(owner.id(), DEMO, legacy, Instant.now());
+        ConnectorConnection connection = ConnectorConnection.pending(owner.id(), DEMO, Instant.now());
         connection.ready(Instant.now());
         connection = connections.save(connection);
         ConnectorBinding binding = ConnectorBinding.pending(legacy, connection, null, Instant.now());

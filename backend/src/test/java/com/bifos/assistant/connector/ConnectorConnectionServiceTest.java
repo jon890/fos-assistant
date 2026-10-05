@@ -229,7 +229,6 @@ class ConnectorConnectionServiceTest {
         assertThat(registered.status()).isEqualTo(ConnectionStatus.READY);
         assertThat(registered.bindings()).isEmpty();
         assertThat(stored(user).vaultStored()).isTrue();
-        assertThat(stored(user).agent()).isNull();
         assertThat(agents.count()).isZero();
         verify(connector, never()).putEnv(anyString(), anyString(), anyString());
         verify(connector, never()).putConnector(anyString(), anyString(), anyBoolean());
@@ -770,7 +769,7 @@ class ConnectorConnectionServiceTest {
     void legacyCheckImportsVaultThenVerifies() {
         CurrentUser user = user(UserRole.MEMBER, 1L);
         Agent legacy = agent(user, true);
-        ConnectorConnection connection = legacyConnection(user, legacy);
+        ConnectorConnection connection = legacyConnection(user);
         ConnectorBinding binding = readyBinding(legacy, connection, null);
         when(connector.readConnector(anyString(), anyString())).thenReturn(state(HermesConnectorClient.MODE_ISOLATED));
 
@@ -794,7 +793,7 @@ class ConnectorConnectionServiceTest {
     void legacyCheckKeepsStateWhenImportFails() {
         CurrentUser user = user(UserRole.MEMBER, 1L);
         Agent legacy = agent(user, true);
-        legacyConnection(user, legacy);
+        legacyConnection(user);
         readyBinding(legacy, stored(user), null);
         when(connector.readConnector(anyString(), anyString())).thenReturn(state(HermesConnectorClient.MODE_ISOLATED));
         doThrow(new IllegalStateException()).when(connector).importVault(anyString(), anyString(), anyString());
@@ -909,7 +908,7 @@ class ConnectorConnectionServiceTest {
         when(connector.readConnector(anyString(), anyString())).thenReturn(state(HermesConnectorClient.MODE_ISOLATED));
         CurrentUser user = user(UserRole.MEMBER, 1L);
         Agent legacy = agent(user, true);
-        legacyConnection(user, legacy);
+        legacyConnection(user);
         ConnectorBinding binding = readyBinding(legacy, stored(user), null);
 
         assertThat(service.check(user, DEMO).bindings())
@@ -1184,9 +1183,9 @@ class ConnectorConnectionServiceTest {
         return bindings.save(binding);
     }
 
-    /** 이 변경 전에 만든 연결처럼 옛 커넥터 에이전트를 가리키고 보관 파일이 없는 READY 연결을 넣는다. */
-    private ConnectorConnection legacyConnection(CurrentUser owner, Agent legacy) {
-        ConnectorConnection connection = ConnectorConnection.pending(owner.id(), DEMO, legacy, NOW);
+    /** 이 변경 전에 만든 연결처럼 보관 파일이 없는 READY 연결을 넣는다. 옛 커넥터 에이전트와는 바인딩으로 잇는다. */
+    private ConnectorConnection legacyConnection(CurrentUser owner) {
+        ConnectorConnection connection = ConnectorConnection.pending(owner.id(), DEMO, NOW);
         connection.ready(NOW);
         return connections.save(connection);
     }

@@ -66,16 +66,17 @@ public class HermesRunEventStream {
             String runId,
             Consumer<RunEvent> onEvent,
             Consumer<Closeable> onOpened) {
-        open(apiBaseUrl, profileName, runId, onEvent, onOpened, false);
+        open(apiBaseUrl, profileName, runId, onEvent, onOpened, ToolDetailScope.NONE);
     }
 
+    /** @param scope 내용을 통째로 가릴 도구의 범위. 비밀값과 식별자는 범위와 관계없이 가린다 */
     public void open(
             String apiBaseUrl,
             String profileName,
             String runId,
             Consumer<RunEvent> onEvent,
             Consumer<Closeable> onOpened,
-            boolean connectorManaged) {
+            ToolDetailScope scope) {
         String apiKey = keyStore.resolve(profileName);
         try (InputStream body = restClient
                 .get()
@@ -88,7 +89,7 @@ public class HermesRunEventStream {
                 throw new ApiException(ErrorCode.HERMES_UNAVAILABLE, "Hermes returned an empty event stream");
             }
             onOpened.accept(body);
-            readEvents(body, onEvent, connectorManaged);
+            readEvents(body, onEvent, scope);
         } catch (RestClientException ex) {
             throw HermesCallFailure.of(ex, "could not read the Hermes event stream");
         } catch (IOException ex) {
@@ -96,14 +97,14 @@ public class HermesRunEventStream {
         }
     }
 
-    private void readEvents(InputStream body, Consumer<RunEvent> onEvent, boolean connectorManaged) throws IOException {
+    private void readEvents(InputStream body, Consumer<RunEvent> onEvent, ToolDetailScope scope) throws IOException {
         Map<String, String> identifiers = new LinkedHashMap<>();
         try (BufferedReader reader = new BufferedReader(new InputStreamReader(body, StandardCharsets.UTF_8))) {
             StringBuilder data = new StringBuilder();
             String line;
             while ((line = reader.readLine()) != null) {
                 if (line.isEmpty()) {
-                    emit(data, onEvent, connectorManaged, identifiers);
+                    emit(data, onEvent, scope, identifiers);
                     continue;
                 }
                 if (line.startsWith(":")) {
@@ -116,12 +117,12 @@ public class HermesRunEventStream {
                     data.append(line.substring(5).stripLeading());
                 }
             }
-            emit(data, onEvent, connectorManaged, identifiers);
+            emit(data, onEvent, scope, identifiers);
         }
     }
 
     private void emit(
-            StringBuilder data, Consumer<RunEvent> onEvent, boolean connectorManaged, Map<String, String> identifiers)
+            StringBuilder data, Consumer<RunEvent> onEvent, ToolDetailScope scope, Map<String, String> identifiers)
             throws IOException {
         if (data.isEmpty()) {
             return;
@@ -129,7 +130,7 @@ public class HermesRunEventStream {
         String raw = data.toString();
         data.setLength(0);
         try {
-            onEvent.accept(toRunEvent(objectMapper.readTree(raw), connectorManaged, identifiers));
+            onEvent.accept(toRunEvent(objectMapper.readTree(raw), scope, identifiers));
         } catch (JacksonException ex) {
             throw new IOException("Hermes sent an invalid event");
         }
@@ -142,14 +143,14 @@ public class HermesRunEventStream {
      * 것은 다른 형태로 보내는 구현이 섞일 때를 위한 것이다.
      */
     static RunEvent toRunEvent(JsonNode root) {
-        return toRunEvent(root, false);
+        return toRunEvent(root, ToolDetailScope.NONE);
     }
 
-    static RunEvent toRunEvent(JsonNode root, boolean connectorManaged) {
-        return toRunEvent(root, connectorManaged, new LinkedHashMap<>());
+    static RunEvent toRunEvent(JsonNode root, ToolDetailScope scope) {
+        return toRunEvent(root, scope, new LinkedHashMap<>());
     }
 
-    private static RunEvent toRunEvent(JsonNode root, boolean connectorManaged, Map<String, String> identifiers) {
+    private static RunEvent toRunEvent(JsonNode root, ToolDetailScope scope, Map<String, String> identifiers) {
         JsonNode payload = root.path("data");
         String type = firstText(root, payload, "event", "type");
         String toolName = firstText(root, payload, "tool", "tool_name", "toolName", "name");
@@ -166,10 +167,10 @@ public class HermesRunEventStream {
         String skillName = null;
         if (type != null && type.toLowerCase(Locale.ROOT).startsWith("tool.")) {
             // 긴 스킬 이름은 token 으로 보여 가려진다. 스킬 사용 기록에 넘길 이름은 가리기 전에 꺼내 검증한다.
-            if (!connectorManaged && SKILL_VIEW_STARTED.equalsIgnoreCase(type) && SKILL_VIEW_TOOL.equals(toolName)) {
+            if (!scope.hideAll() && SKILL_VIEW_STARTED.equalsIgnoreCase(type) && SKILL_VIEW_TOOL.equals(toolName)) {
                 skillName = HermesSkillName.fromPreview(detail);
             }
-            detail = ToolDetailRedactor.redact(detail, connectorManaged, identifiers);
+            detail = ToolDetailRedactor.redact(detail, toolName, scope, identifiers);
         }
         return new RunEvent(
                 type,

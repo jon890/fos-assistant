@@ -13,6 +13,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -26,11 +27,12 @@ public class AgentToolService {
     private final ProfileSkillFiles skillFiles;
     private final AgentService agents;
     private final AgentRepository agentRepository;
+    private final AgentConnectorBindings connectorBindings;
 
     public AgentToolsetsView read(CurrentUser user, Agent agent) {
         requireOwnerOrAdmin(user, agent);
         List<String> enabled = toolsets.readEnabled(agent.apiBaseUrl(), agent.hermesProfile());
-        return response(user, agent, toolsets.readCatalog(), enabled);
+        return response(user, agent, toolsets.readCatalog(), enabled, connectorBindings.connectorServers(agent.id()));
     }
 
     public AgentToolsetsView write(CurrentUser user, Agent agent, List<String> requested) {
@@ -43,15 +45,21 @@ public class AgentToolService {
         }
         List<ToolsetCatalogEntry> catalog = toolsets.readCatalog();
         Map<String, ToolsetCatalogEntry> knownCatalog = catalogByName(catalog);
-        if (requested != null && requested.stream().anyMatch(name -> !knownCatalog.containsKey(name))) {
+        // 붙은 커넥터의 MCP 서버는 내장 toolset 카탈로그에 없다. 그 이름은 정책이 목록 끝에 늘 더한다(ADR-083).
+        Set<String> connectorServers = connectorBindings.connectorServers(agent.id());
+        if (requested != null
+                && requested.stream()
+                        .anyMatch(name -> name == null
+                                || (!knownCatalog.containsKey(name) && !connectorServers.contains(name)))) {
             throw new ApiException(ErrorCode.VALIDATION_FAILED, "the requested toolset is not in the Hermes catalog");
         }
         List<String> current = toolsets.readEnabled(agent.apiBaseUrl(), agent.hermesProfile());
-        List<String> desired = AgentToolPolicy.requestedForWrite(user, agent, requested, current);
+        List<String> desired = AgentToolPolicy.requestedForWrite(user, agent, requested, current, connectorServers);
         toolsets.writeApiServer(agent.hermesProfile(), desired);
         List<String> applied = toolsets.readEnabled(agent.apiBaseUrl(), agent.hermesProfile());
         List<String> desiredBuiltin = desired.stream()
                 .filter(name -> !AgentToolPolicy.CONTROL_PLANE_MCP.equals(name))
+                .filter(name -> !connectorServers.contains(name))
                 .toList();
         List<String> controlledApplied = applied.stream()
                 .filter(name -> AgentToolPolicy.isKnown(name) || AgentToolPolicy.MEMORY.equals(name))
@@ -63,7 +71,7 @@ public class AgentToolService {
             throw new ApiException(
                     ErrorCode.AGENT_TOOLS_NOT_APPLIED, "Hermes did not apply the requested toolsets", missing);
         }
-        return response(user, agent, catalog, applied);
+        return response(user, agent, catalog, applied, connectorServers);
     }
 
     /** 관리자가 다른 사람의 에이전트까지 도구 목록을 읽는다. 관리자인지는 부르는 쪽이 먼저 확인한다. */
@@ -132,12 +140,18 @@ public class AgentToolService {
                 .toList();
     }
 
+    /** 붙은 커넥터의 MCP 서버는 Control Plane 이 넣은 이름이라 분류하지 못한 도구로 알리지 않는다. */
     private static AgentToolsetsView response(
-            CurrentUser user, Agent agent, List<ToolsetCatalogEntry> catalog, List<String> enabled) {
+            CurrentUser user,
+            Agent agent,
+            List<ToolsetCatalogEntry> catalog,
+            List<String> enabled,
+            Set<String> connectorServers) {
         List<String> unclassified = enabled.stream()
                 .filter(name -> !AgentToolPolicy.isKnown(name))
                 .filter(name -> !AgentToolPolicy.MEMORY.equals(name))
                 .filter(name -> !AgentToolPolicy.CONTROL_PLANE_MCP.equals(name))
+                .filter(name -> !connectorServers.contains(name))
                 .toList();
         return new AgentToolsetsView(views(user, agent, catalog, enabled), unclassified);
     }

@@ -20,6 +20,10 @@ import com.bifos.assistant.agent.domain.type.AgentVisibility;
 import com.bifos.assistant.agent.domain.type.CostMode;
 import com.bifos.assistant.agent.domain.type.CredentialScope;
 import com.bifos.assistant.agent.infra.AgentRepository;
+import com.bifos.assistant.connector.domain.ConnectorBinding;
+import com.bifos.assistant.connector.domain.ConnectorConnection;
+import com.bifos.assistant.connector.infra.ConnectorBindingRepository;
+import com.bifos.assistant.connector.infra.ConnectorConnectionRepository;
 import com.bifos.assistant.hermes.HermesRequestRejected;
 import com.bifos.assistant.hermes.HermesSkillClient;
 import com.bifos.assistant.hermes.HermesSkillClient.HermesSkill;
@@ -109,6 +113,12 @@ class SkillServiceTest {
     @Autowired
     AgentRepository agents;
 
+    @Autowired
+    ConnectorConnectionRepository connections;
+
+    @Autowired
+    ConnectorBindingRepository bindings;
+
     @MockitoBean
     HermesSkillClient skillClient;
 
@@ -130,6 +140,8 @@ class SkillServiceTest {
         for (String profile : List.of(OWNED_PROFILE, GROUP_PROFILE)) {
             store.deleteAll(profile);
         }
+        bindings.deleteAll();
+        connections.deleteAll();
         for (String code : List.of(OWNED, GROUP)) {
             agents.findByCode(code).ifPresent(agents::delete);
         }
@@ -164,6 +176,28 @@ class SkillServiceTest {
         assertThat(Files.readAllLines(Path.of(dirs.getValue().get(0), "weekly-plan", "SKILL.md")))
                 .as("게시한 경로에 SKILL.md 가 있다")
                 .contains("name: weekly-plan");
+    }
+
+    @Test
+    @DisplayName("연결이 붙은 에이전트에 게시하면 도구 목록 끝에 붙은 커넥터 서버 이름이 함께 간다")
+    void publishSendsAttachedConnectorServersWithToolList() {
+        Agent owned = agents.findByCode(OWNED).orElseThrow();
+        ConnectorConnection connection =
+                connections.save(ConnectorConnection.pending(OWNER.id(), "demo-notes", Instant.now()));
+        bindings.save(ConnectorBinding.pending(owned, connection, "demo", Instant.now()));
+        when(toolsets.readEnabled(anyString(), anyString())).thenReturn(List.of("web", "fos-assistant", "demo"));
+
+        try {
+            skills.save(OWNER, OWNED, "weekly-plan", skillMd("weekly-plan"), List.of());
+
+            ArgumentCaptor<List<String>> apiServer = captor();
+            verify(skillClient).publish(eq(OWNED_PROFILE), anyList(), apiServer.capture());
+            assertThat(apiServer.getValue()).containsExactly("web", "skills", "fos-assistant", "demo");
+        } finally {
+            // 바인딩 줄이 에이전트를 가리켜 남으면 같은 컨텍스트의 다른 검사가 에이전트를 지우지 못한다.
+            bindings.deleteAll();
+            connections.deleteAll();
+        }
     }
 
     @Test

@@ -24,6 +24,7 @@
 
 - `(user_id, connector_id)` 가 유니크다. 한 사람이 같은 커넥터를 둘 연결하지 못한다
 - `agent_id`, `restart_required`, `desired_enabled` 는 연결을 에이전트에 붙이는 바인딩([ADR-083](../../adr/ADR-083-커넥터는-사용자가-한-번-연결하고-자기-에이전트에-여럿-붙여-그-에이전트가-도구를-직접-부른다.md))이 생기며 쓰지 않는 칸이 됐다. 이전 이미지로 되돌릴 때를 위해 남겨 두고, 칸을 지우는 마이그레이션은 옛 커넥터 에이전트를 정리할 때 둔다. `agent_id` 의 유일 제약과 FK 는 남아 있고 비어 있는 값은 유일 제약에 걸리지 않는다
+- 엔티티는 이 세 칸을 매핑하지 않는다. 새 행에서 `agent_id` 는 비고 두 boolean 칸은 기본값 거짓으로 저장된다. 옛 행의 값은 고치지 않아 그대로 남는다
 - V45 가 그때까지 `READY` 이던 연결을 모두 `PENDING` 으로 내렸다. 연결 확인과 gateway 재시작과 관리자 반영 완료로 다시 `READY` 가 된다. 까닭은 그 마이그레이션의 주석에 있다
 - 해제해도 행은 남기고 `fields` 를 `{"values": {}, "secretPrefixes": {}}` 로 비운다. 지우는 경로는 없다
 - 칸 값이 비밀이 아닌지는 DB 가 아니라 Control Plane 이 manifest 의 `secret` 으로 판정해 지킨다
@@ -72,7 +73,7 @@
 | `id` | `BIGINT` 기본키 | |
 | `public_id` | `BINARY(16) NOT NULL`, 유니크 | 화면과 모델에 보이는 승인 요청 번호. 대화의 공개 식별자와 같은 방식이다([ADR-025](../../adr/ADR-025-대화는-주소에-공개-식별자를-쓰고-번호는-안에만-둔다.md)) |
 | `user_id` | `BIGINT NOT NULL` | 연결의 주인 |
-| `agent_id` | `BIGINT NOT NULL` | 연결용 에이전트 |
+| `agent_id` | `BIGINT NOT NULL` | 판정한 실행의 에이전트. 그 에이전트에 붙은 바인딩으로 판정했고, 승인하면 그 에이전트의 profile 에서 실행한다. 바인딩 전에 남은 옛 줄은 옛 커넥터 에이전트를 가리킨다 |
 | `connector_id` | `VARCHAR(64) NOT NULL` | |
 | `tool_name` | `VARCHAR(128)` | MCP 서버의 원래 도구 이름. 대응 파일에서 찾지 못했거나 등록 이름과 맞는 것을 확인하지 못한 호출은 비운다 |
 | `hermes_tool` | `VARCHAR(128) NOT NULL` | hook 이 받은 등록 이름 |
@@ -91,7 +92,7 @@
 | `decided_at` | `DATETIME(6)` | 승인, 거절, 만료한 시각 |
 | `executed_at` | `DATETIME(6)` | 실행 결과를 적은 시각 |
 | `result_text` | `MEDIUMTEXT` | 실행 결과. 위임 답과 같은 상한으로 자른다 |
-| `error_code` | `VARCHAR(64)` | 공통 오류 어휘 넷과 `TIMEOUT`. 사용자가 거절한 것이 아니라 시스템이 실행하지 않고 끝낸 `REJECTED` 줄은 `not_executable`(승인할 때 연결이 준비되지 않았거나 정책이 바뀜)이나 `connection_changed`(연결을 해제했거나 값을 다시 등록함)다 |
+| `error_code` | `VARCHAR(64)` | 공통 오류 어휘 넷과 `TIMEOUT`. 사용자가 거절한 것이 아니라 시스템이 실행하지 않고 끝낸 `REJECTED` 줄은 `not_executable`(승인할 때 연결이나 그 에이전트의 바인딩이 준비되지 않았거나, 그 에이전트에서 연결을 떼었거나, 정책이 바뀜)이나 `connection_changed`(연결을 해제했거나 값을 다시 등록함)다 |
 | `result_delivered_at` | `DATETIME(6)` | 결과나 거절, 만료를 대화에 전한 시각. `agent_execution` 의 같은 이름 칸과 뜻이 같다 |
 | `created_at` | `DATETIME(6) NOT NULL` | |
 

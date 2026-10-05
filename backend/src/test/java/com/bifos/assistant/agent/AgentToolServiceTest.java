@@ -8,6 +8,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import com.bifos.assistant.agent.application.AgentConnectorBindings;
 import com.bifos.assistant.agent.application.AgentService;
 import com.bifos.assistant.agent.application.AgentToolService;
 import com.bifos.assistant.agent.application.AgentToolView;
@@ -26,6 +27,7 @@ import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import java.time.Instant;
 import java.util.List;
+import java.util.Set;
 import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -38,8 +40,9 @@ class AgentToolServiceTest {
 
     private final HermesToolsetClient toolsets = mock(HermesToolsetClient.class);
     private final ProfileSkillFiles skillFiles = mock(ProfileSkillFiles.class);
-    private final AgentToolService service =
-            new AgentToolService(toolsets, skillFiles, mock(AgentService.class), mock(AgentRepository.class));
+    private final AgentConnectorBindings connectorBindings = mock(AgentConnectorBindings.class);
+    private final AgentToolService service = new AgentToolService(
+            toolsets, skillFiles, mock(AgentService.class), mock(AgentRepository.class), connectorBindings);
     private final CurrentUser owner = new CurrentUser(1L, "owner@example.com", "주인", 1L, UserRole.MEMBER);
     private final Agent agent = Agent.of(
             "tools",
@@ -87,7 +90,11 @@ class AgentToolServiceTest {
     void otherUserReadingGroupAgentCannotChangeOwnerTier() {
         HermesToolsetClient isolatedToolsets = mock(HermesToolsetClient.class);
         AgentToolService isolatedService = new AgentToolService(
-                isolatedToolsets, mock(ProfileSkillFiles.class), mock(AgentService.class), mock(AgentRepository.class));
+                isolatedToolsets,
+                mock(ProfileSkillFiles.class),
+                mock(AgentService.class),
+                mock(AgentRepository.class),
+                mock(AgentConnectorBindings.class));
         Agent groupAgent = Agent.of(
                 "group-tools",
                 "그룹 도구",
@@ -113,7 +120,11 @@ class AgentToolServiceTest {
     void otherUserReadingGroupAgentCannotReadToolList() {
         HermesToolsetClient isolatedToolsets = mock(HermesToolsetClient.class);
         AgentToolService isolatedService = new AgentToolService(
-                isolatedToolsets, mock(ProfileSkillFiles.class), mock(AgentService.class), mock(AgentRepository.class));
+                isolatedToolsets,
+                mock(ProfileSkillFiles.class),
+                mock(AgentService.class),
+                mock(AgentRepository.class),
+                mock(AgentConnectorBindings.class));
         Agent groupAgent = Agent.of(
                 "group-read",
                 "그룹 도구",
@@ -144,6 +155,21 @@ class AgentToolServiceTest {
 
         Assertions.assertThat(result.toolsets()).extracting(AgentToolView::name).containsExactly("web");
         Assertions.assertThat(result.unclassifiedEnabled()).containsExactly("connections");
+    }
+
+    @Test
+    @DisplayName("붙은 커넥터 서버는 미분류 목록에 없고 저장할 때 목록 끝에 함께 보낸다")
+    void leavesConnectorServersOutOfUnclassifiedAndSendsThemOnWrite() {
+        when(connectorBindings.connectorServers(agent.id())).thenReturn(Set.of("demo"));
+        when(toolsets.readEnabled(agent.apiBaseUrl(), agent.hermesProfile()))
+                .thenReturn(List.of("web", "demo", "connections"), List.of("web", "demo"), List.of("web", "demo"));
+
+        AgentToolsetsView read = service.read(owner, agent);
+        AgentToolsetsView written = service.write(owner, agent, List.of("web", "demo"));
+
+        assertThat(read.unclassifiedEnabled()).containsExactly("connections");
+        assertThat(written.unclassifiedEnabled()).isEmpty();
+        verify(toolsets).writeApiServer(agent.hermesProfile(), List.of("web", "fos-assistant", "demo"));
     }
 
     @Test

@@ -7,6 +7,7 @@ import com.bifos.assistant.agent.domain.type.AgentVisibility;
 import com.bifos.assistant.agent.domain.type.CostMode;
 import com.bifos.assistant.agent.domain.type.CredentialScope;
 import com.bifos.assistant.connector.domain.ConnectionFields;
+import com.bifos.assistant.connector.domain.ConnectorBinding;
 import com.bifos.assistant.connector.domain.ConnectorConnection;
 import com.bifos.assistant.connector.domain.type.ConnectionStatus;
 import java.time.Instant;
@@ -22,12 +23,11 @@ class ConnectorConnectionTest {
             new ConnectionFields(Map.of("scope", "a"), Map.of("token", "demo_ok_"));
 
     @Test
-    @DisplayName("새 연결은 에이전트 없이 PENDING 으로 만들고 보관 파일 이름은 연결 번호 앞에 c 를 붙인다")
-    void newConnectionHasNoAgentAndNamesVaultAfterId() {
+    @DisplayName("새 연결은 PENDING 으로 만들고 보관 파일 이름은 연결 번호 앞에 c 를 붙인다")
+    void newConnectionIsPendingAndNamesVaultAfterId() {
         ConnectorConnection connection = ConnectorConnection.pending(1L, "demo-notes", CREATED);
         ReflectionTestUtils.setField(connection, "id", 42L);
 
-        assertThat(connection.agent()).isNull();
         assertThat(connection.status()).isEqualTo(ConnectionStatus.PENDING);
         assertThat(connection.vaultStored()).isFalse();
         assertThat(connection.vault()).isEqualTo("c42");
@@ -65,11 +65,12 @@ class ConnectorConnectionTest {
     }
 
     @Test
-    @DisplayName("연결의 메서드는 옛 커넥터 에이전트를 켜거나 끄지 않고 사진 받기도 바꾸지 않는다")
+    @DisplayName("연결의 메서드는 바인딩으로 붙은 옛 커넥터 에이전트를 켜거나 끄지 않고 사진 받기도 바꾸지 않는다")
     void connectionMethodsLeaveAgentUntouched() {
         Agent enabled = agent();
         enabled.acceptConnectorAttachments(true);
-        ConnectorConnection connection = ConnectorConnection.pending(1L, "demo-notes", enabled, CREATED);
+        ConnectorConnection connection = ConnectorConnection.pending(1L, "demo-notes", CREATED);
+        ConnectorBinding.pending(enabled, connection, "demo", CREATED);
 
         connection.pending(LATER);
         connection.disconnected(LATER);
@@ -79,7 +80,8 @@ class ConnectorConnectionTest {
 
         Agent disabled = agent();
         disabled.changeAccess(false, disabled.visibility(), disabled.ownerUserId());
-        ConnectorConnection other = ConnectorConnection.pending(1L, "demo-notes", disabled, CREATED);
+        ConnectorConnection other = ConnectorConnection.pending(1L, "demo-notes", CREATED);
+        ConnectorBinding.pending(disabled, other, "demo", CREATED);
 
         other.ready(LATER);
 

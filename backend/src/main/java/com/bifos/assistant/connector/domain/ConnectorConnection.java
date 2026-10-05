@@ -1,17 +1,13 @@
 package com.bifos.assistant.connector.domain;
 
-import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.connector.domain.type.ConnectionStatus;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
-import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
-import jakarta.persistence.JoinColumn;
-import jakarta.persistence.OneToOne;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 import java.time.Instant;
@@ -25,6 +21,9 @@ import lombok.experimental.Accessors;
  *
  * <p>상태는 「값이 확인돼 쓸 수 있는가」 다. 에이전트에 설치되고 반영됐는지는 바인딩({@link ConnectorBinding})이 갖는다.
  * 연결의 메서드는 에이전트를 켜거나 끄지 않는다(ADR-083).
+ *
+ * <p>표의 {@code agent_id}, {@code restart_required}, {@code desired_enabled} 칸은 쓰지 않는 칸으로 남아 매핑하지 않는다.
+ * 새 행에서 {@code agent_id} 는 비고 두 boolean 칸은 기본값으로 저장된다.
  *
  * <p>상태를 바꾸는 메서드는 시각을 인자로 받는다. 비밀 칸의 원문을 받는 메서드는 두지 않는다.
  */
@@ -52,10 +51,6 @@ public class ConnectorConnection {
     @Column(name = "connector_id", nullable = false, length = 64)
     private String connectorId;
 
-    @OneToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "agent_id", nullable = true, unique = true)
-    private Agent agent;
-
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     private ConnectionStatus status;
@@ -63,12 +58,6 @@ public class ConnectorConnection {
     /** JSON 텍스트 열이다. {@code ConnectionFieldsConverter} 가 자동으로 읽고 쓴다. */
     @Column(nullable = false, length = FIELDS_LENGTH)
     private ConnectionFields fields;
-
-    @Column(name = "restart_required", nullable = false)
-    private boolean restartRequired;
-
-    @Column(name = "desired_enabled", nullable = false)
-    private boolean desiredEnabled;
 
     @Column(name = "checked_at")
     private Instant checkedAt;
@@ -87,10 +76,9 @@ public class ConnectorConnection {
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
 
-    private ConnectorConnection(Long userId, String connectorId, Agent agent, Instant now) {
+    private ConnectorConnection(Long userId, String connectorId, Instant now) {
         this.userId = userId;
         this.connectorId = connectorId;
-        this.agent = agent;
         this.status = ConnectionStatus.PENDING;
         this.fields = ConnectionFields.empty();
         this.createdAt = now;
@@ -99,11 +87,7 @@ public class ConnectorConnection {
 
     /** 에이전트 없는 연결이다. 값은 보관 파일에 두고 에이전트에는 바인딩으로 붙인다(ADR-083). */
     public static ConnectorConnection pending(Long userId, String connectorId, Instant now) {
-        return new ConnectorConnection(userId, connectorId, null, now);
-    }
-
-    public static ConnectorConnection pending(Long userId, String connectorId, Agent agent, Instant now) {
-        return new ConnectorConnection(userId, connectorId, agent, now);
+        return new ConnectorConnection(userId, connectorId, now);
     }
 
     /**

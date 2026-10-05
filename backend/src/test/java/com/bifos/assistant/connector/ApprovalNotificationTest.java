@@ -18,9 +18,11 @@ import com.bifos.assistant.connector.application.ConnectorActionService;
 import com.bifos.assistant.connector.application.ConnectorPolicyService;
 import com.bifos.assistant.connector.application.model.ConnectorActionView;
 import com.bifos.assistant.connector.application.model.ConnectorPolicyAnswer;
+import com.bifos.assistant.connector.domain.ConnectorBinding;
 import com.bifos.assistant.connector.domain.ConnectorConnection;
 import com.bifos.assistant.connector.domain.type.ActionStatus;
 import com.bifos.assistant.connector.infra.ConnectorActionRepository;
+import com.bifos.assistant.connector.infra.ConnectorBindingRepository;
 import com.bifos.assistant.connector.infra.ConnectorConnectionRepository;
 import com.bifos.assistant.hermes.HermesConnectorClient;
 import com.bifos.assistant.hermes.dto.CallResult;
@@ -105,6 +107,9 @@ class ApprovalNotificationTest {
     ConnectorConnectionRepository connections;
 
     @Autowired
+    ConnectorBindingRepository bindings;
+
+    @Autowired
     ConversationRepository conversations;
 
     @Autowired
@@ -144,6 +149,7 @@ class ApprovalNotificationTest {
         jdbc.update("DELETE FROM connector_action");
         jdbc.update("DELETE FROM connector_tool_grant");
         notifications.deleteAll();
+        bindings.deleteAll();
         connections.deleteAll();
         McpCallSigner.clearRuns(jdbc, List.of(PROFILE));
         agents.deleteAll();
@@ -170,10 +176,13 @@ class ApprovalNotificationTest {
         agent = agents.save(agent);
         conversation = conversations.save(Conversation.startedBy(owner.id(), "승인 대화", agent.id(), Instant.now()));
         root = startRun(conversation.id());
-        ConnectorConnection connection =
-                ConnectorConnection.pending(owner.id(), DEMO, agent, Instant.parse("2026-10-01T00:00:00Z"));
-        connection.ready(Instant.parse("2026-10-01T00:00:00Z"));
-        connections.save(connection);
+        Instant connectedAt = Instant.parse("2026-10-01T00:00:00Z");
+        ConnectorConnection connection = ConnectorConnection.pending(owner.id(), DEMO, connectedAt);
+        connection.ready(connectedAt);
+        connection = connections.save(connection);
+        ConnectorBinding binding = ConnectorBinding.pending(agent, connection, DECLARING.mcpServer(), connectedAt);
+        binding.ready(connectedAt);
+        bindings.save(binding);
         subscription = hub.subscribe(owner.id(), received::add);
     }
 

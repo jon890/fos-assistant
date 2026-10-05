@@ -23,7 +23,7 @@ class ConnectorBindingTest {
     void legacyConnectorAgentFollowsBindingState() {
         Agent agent = agent(true);
         agent.changeAccess(false, agent.visibility(), agent.ownerUserId());
-        ConnectorBinding binding = ConnectorBinding.pending(agent, connection(agent), "demo", CREATED);
+        ConnectorBinding binding = ConnectorBinding.pending(agent, connection(), "demo", CREATED);
 
         binding.ready(LATER);
 
@@ -44,7 +44,7 @@ class ConnectorBindingTest {
     @DisplayName("일반 에이전트의 바인딩은 상태가 바뀌어도 에이전트의 enabled 를 바꾸지 않는다")
     void ordinaryAgentEnabledIsUntouched() {
         Agent enabledAgent = agent(false);
-        ConnectorBinding binding = ConnectorBinding.pending(enabledAgent, connection(null), "demo", CREATED);
+        ConnectorBinding binding = ConnectorBinding.pending(enabledAgent, connection(), "demo", CREATED);
 
         binding.beginInstall(LATER);
         binding.installed(true, LATER);
@@ -55,7 +55,7 @@ class ConnectorBindingTest {
 
         Agent disabledAgent = agent(false);
         disabledAgent.changeAccess(false, disabledAgent.visibility(), disabledAgent.ownerUserId());
-        ConnectorBinding other = ConnectorBinding.pending(disabledAgent, connection(null), "demo", CREATED);
+        ConnectorBinding other = ConnectorBinding.pending(disabledAgent, connection(), "demo", CREATED);
 
         other.ready(LATER);
 
@@ -66,7 +66,7 @@ class ConnectorBindingTest {
     @Test
     @DisplayName("installed 는 재시작 대기를 누적하고 재시작이 필요한 설치의 시각만 대기 시작으로 적는다")
     void installedAccumulatesRestartRequired() {
-        ConnectorBinding binding = ConnectorBinding.pending(agent(false), connection(null), "demo", CREATED);
+        ConnectorBinding binding = ConnectorBinding.pending(agent(false), connection(), "demo", CREATED);
         assertThat(binding.restartRequired()).isFalse();
         assertThat(binding.restartRequiredSince()).isNull();
         assertThat(binding.desiredEnabled()).isFalse();
@@ -98,7 +98,7 @@ class ConnectorBindingTest {
     @Test
     @DisplayName("재시작 대기 표시는 거짓이 와도 앞선 참을 지우지 않는다")
     void markRestartRequiredAccumulatesWithLogicalOr() {
-        ConnectorBinding binding = ConnectorBinding.pending(agent(false), connection(null), "demo", CREATED);
+        ConnectorBinding binding = ConnectorBinding.pending(agent(false), connection(), "demo", CREATED);
 
         binding.markRestartRequired(true);
         binding.markRestartRequired(false);
@@ -109,7 +109,7 @@ class ConnectorBindingTest {
     @Test
     @DisplayName("서버 이름이 빈 옛 바인딩에 서버 이름을 적는다")
     void recordServerFillsServerName() {
-        ConnectorBinding binding = ConnectorBinding.pending(agent(false), connection(null), null, CREATED);
+        ConnectorBinding binding = ConnectorBinding.pending(agent(false), connection(), null, CREATED);
         assertThat(binding.mcpServer()).isNull();
 
         binding.recordServer("demo");
@@ -134,7 +134,7 @@ class ConnectorBindingTest {
         return agent;
     }
 
-    private static ConnectorConnection connection(Agent agent) {
-        return ConnectorConnection.pending(1L, "demo-notes", agent, CREATED);
+    private static ConnectorConnection connection() {
+        return ConnectorConnection.pending(1L, "demo-notes", CREATED);
     }
 }

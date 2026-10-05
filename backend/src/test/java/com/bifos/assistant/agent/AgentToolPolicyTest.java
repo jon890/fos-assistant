@@ -14,6 +14,7 @@ import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import java.time.Instant;
 import java.util.List;
+import java.util.Set;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -26,8 +27,8 @@ class AgentToolPolicyTest {
     @Test
     @DisplayName("주인은 주인 등급을 켜고 기억 MCP는 항상 남는다")
     void ownerEnablesOwnerTierAndMemoryMcpAlwaysStays() {
-        List<String> result =
-                AgentToolPolicy.requestedForWrite(OWNER, agent(AgentVisibility.PRIVATE), List.of("web"), List.of());
+        List<String> result = AgentToolPolicy.requestedForWrite(
+                OWNER, agent(AgentVisibility.PRIVATE), List.of("web"), List.of(), Set.of());
 
         assertThat(result).containsExactly("web", AgentToolPolicy.CONTROL_PLANE_MCP);
     }
@@ -36,7 +37,7 @@ class AgentToolPolicyTest {
     @DisplayName("주인은 관리자 등급을 새로 켤 수 없다")
     void ownerCannotNewlyEnableAdminTier() {
         assertThatThrownBy(() -> AgentToolPolicy.requestedForWrite(
-                        OWNER, agent(AgentVisibility.PRIVATE), List.of("terminal"), List.of()))
+                        OWNER, agent(AgentVisibility.PRIVATE), List.of("terminal"), List.of(), Set.of()))
                 .isInstanceOf(ApiException.class)
                 .extracting(ex -> ((ApiException) ex).code())
                 .isEqualTo(ErrorCode.FORBIDDEN);
@@ -46,7 +47,7 @@ class AgentToolPolicyTest {
     @DisplayName("주인은 이미 켜진 관리자 등급도 끌 수 없다")
     void ownerCannotDisableAlreadyEnabledAdminTier() {
         assertThatThrownBy(() -> AgentToolPolicy.requestedForWrite(
-                        OWNER, agent(AgentVisibility.PRIVATE), List.of(), List.of("terminal")))
+                        OWNER, agent(AgentVisibility.PRIVATE), List.of(), List.of("terminal"), Set.of()))
                 .isInstanceOf(ApiException.class)
                 .extracting(ex -> ((ApiException) ex).code())
                 .isEqualTo(ErrorCode.FORBIDDEN);
@@ -56,7 +57,7 @@ class AgentToolPolicyTest {
     @DisplayName("관리자는 관리자 등급을 켤 수 있다")
     void adminCanEnableAdminTier() {
         assertThat(AgentToolPolicy.requestedForWrite(
-                        ADMIN, agent(AgentVisibility.PRIVATE), List.of("terminal"), List.of()))
+                        ADMIN, agent(AgentVisibility.PRIVATE), List.of("terminal"), List.of(), Set.of()))
                 .containsExactly("terminal", AgentToolPolicy.CONTROL_PLANE_MCP);
     }
 
@@ -64,12 +65,12 @@ class AgentToolPolicyTest {
     @DisplayName("memory와 모르는 이름은 거절한다")
     void rejectsMemoryAndUnknownNames() {
         assertThatThrownBy(() -> AgentToolPolicy.requestedForWrite(
-                        ADMIN, agent(AgentVisibility.PRIVATE), List.of("memory"), List.of()))
+                        ADMIN, agent(AgentVisibility.PRIVATE), List.of("memory"), List.of(), Set.of()))
                 .isInstanceOf(ApiException.class)
                 .extracting(ex -> ((ApiException) ex).code())
                 .isEqualTo(ErrorCode.VALIDATION_FAILED);
         assertThatThrownBy(() -> AgentToolPolicy.requestedForWrite(
-                        ADMIN, agent(AgentVisibility.PRIVATE), List.of("unknown"), List.of()))
+                        ADMIN, agent(AgentVisibility.PRIVATE), List.of("unknown"), List.of(), Set.of()))
                 .isInstanceOf(ApiException.class)
                 .extracting(ex -> ((ApiException) ex).code())
                 .isEqualTo(ErrorCode.VALIDATION_FAILED);
@@ -79,7 +80,7 @@ class AgentToolPolicyTest {
     @DisplayName("그룹 에이전트는 셸과 파일 계열을 켤 수 없다")
     void groupAgentCannotEnableShellAndFileFamilies() {
         assertThatThrownBy(() -> AgentToolPolicy.requestedForWrite(
-                        ADMIN, agent(AgentVisibility.GROUP), List.of("terminal"), List.of()))
+                        ADMIN, agent(AgentVisibility.GROUP), List.of("terminal"), List.of(), Set.of()))
                 .isInstanceOf(ApiException.class)
                 .extracting(ex -> ((ApiException) ex).code())
                 .isEqualTo(ErrorCode.AGENT_TOOLS_REQUIRE_PRIVATE);
@@ -89,17 +90,17 @@ class AgentToolPolicyTest {
     @DisplayName("지난 대화 검색은 관리자만 켜고 그룹 에이전트에는 둘 수 없다")
     void pastConversationSearchIsAdminOnlyAndNotAllowedForGroupAgent() {
         assertThatThrownBy(() -> AgentToolPolicy.requestedForWrite(
-                        OWNER, agent(AgentVisibility.PRIVATE), List.of("session_search"), List.of()))
+                        OWNER, agent(AgentVisibility.PRIVATE), List.of("session_search"), List.of(), Set.of()))
                 .isInstanceOf(ApiException.class)
                 .extracting(ex -> ((ApiException) ex).code())
                 .isEqualTo(ErrorCode.FORBIDDEN);
         assertThatThrownBy(() -> AgentToolPolicy.requestedForWrite(
-                        ADMIN, agent(AgentVisibility.GROUP), List.of("session_search"), List.of()))
+                        ADMIN, agent(AgentVisibility.GROUP), List.of("session_search"), List.of(), Set.of()))
                 .isInstanceOf(ApiException.class)
                 .extracting(ex -> ((ApiException) ex).code())
                 .isEqualTo(ErrorCode.AGENT_TOOLS_REQUIRE_PRIVATE);
         assertThat(AgentToolPolicy.requestedForWrite(
-                        ADMIN, agent(AgentVisibility.PRIVATE), List.of("session_search"), List.of()))
+                        ADMIN, agent(AgentVisibility.PRIVATE), List.of("session_search"), List.of(), Set.of()))
                 .containsExactly("session_search", AgentToolPolicy.CONTROL_PLANE_MCP);
     }
 
@@ -111,18 +112,38 @@ class AgentToolPolicyTest {
                         OWNER,
                         agent(AgentVisibility.GROUP),
                         List.of("session_search", "web"),
-                        List.of("session_search")))
+                        List.of("session_search"),
+                        Set.of()))
                 .isInstanceOf(ApiException.class)
                 .extracting(ex -> ((ApiException) ex).code())
                 .isEqualTo(ErrorCode.AGENT_TOOLS_REQUIRE_PRIVATE);
         assertThatThrownBy(() -> AgentToolPolicy.requestedForWrite(
-                        OWNER, agent(AgentVisibility.GROUP), List.of("web"), List.of("session_search")))
+                        OWNER, agent(AgentVisibility.GROUP), List.of("web"), List.of("session_search"), Set.of()))
                 .isInstanceOf(ApiException.class)
                 .extracting(ex -> ((ApiException) ex).code())
                 .isEqualTo(ErrorCode.FORBIDDEN);
         assertThat(AgentToolPolicy.requestedForWrite(
-                        ADMIN, agent(AgentVisibility.GROUP), List.of("web"), List.of("session_search")))
+                        ADMIN, agent(AgentVisibility.GROUP), List.of("web"), List.of("session_search"), Set.of()))
                 .containsExactly("web", AgentToolPolicy.CONTROL_PLANE_MCP);
+    }
+
+    @Test
+    @DisplayName("붙은 커넥터 서버 이름은 목록 끝에 더하고 요청에 들어와도 거절하지 않는다")
+    void appendsConnectorServersAndAcceptsThemInRequest() {
+        Set<String> servers = Set.of("demo");
+
+        assertThat(AgentToolPolicy.requestedForWrite(
+                        OWNER, agent(AgentVisibility.PRIVATE), List.of("web"), List.of("web"), servers))
+                .containsExactly("web", AgentToolPolicy.CONTROL_PLANE_MCP, "demo");
+        assertThat(AgentToolPolicy.requestedForWrite(
+                        OWNER, agent(AgentVisibility.PRIVATE), List.of("demo", "web"), List.of("web", "demo"), servers))
+                .containsExactly("web", AgentToolPolicy.CONTROL_PLANE_MCP, "demo");
+        assertThatThrownBy(() -> AgentToolPolicy.requestedForWrite(
+                        OWNER, agent(AgentVisibility.PRIVATE), List.of("other"), List.of(), servers))
+                .as("붙지 않은 서버 이름은 지금처럼 모르는 이름이다")
+                .isInstanceOf(ApiException.class)
+                .extracting(ex -> ((ApiException) ex).code())
+                .isEqualTo(ErrorCode.VALIDATION_FAILED);
     }
 
     private static Agent agent(AgentVisibility visibility) {

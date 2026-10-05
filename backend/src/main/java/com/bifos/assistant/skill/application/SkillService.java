@@ -1,5 +1,6 @@
 package com.bifos.assistant.skill.application;
 
+import com.bifos.assistant.agent.application.AgentConnectorBindings;
 import com.bifos.assistant.agent.application.AgentService;
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.hermes.HermesRequestRejected;
@@ -69,6 +70,7 @@ public class SkillService {
     public static final int MAX_DESCRIPTION_CHARS = 1024;
 
     private final AgentService agents;
+    private final AgentConnectorBindings connectorBindings;
     private final SkillStore store;
     private final SkillPublisher publisher;
     private final SkillUsageQuery usage;
@@ -225,7 +227,7 @@ public class SkillService {
         Map<String, SkillBundle> remaining = new LinkedHashMap<>(current);
         remaining.remove(name);
         if (remaining.isEmpty()) {
-            publisher.publish(user, agent, List.of());
+            publisher.publish(user, agent, List.of(), connectorBindings.connectorServers(agent.id()));
             store.deleteAll(profile);
         } else {
             publishVersion(user, agent, remaining);
@@ -273,7 +275,11 @@ public class SkillService {
         String profile = agent.hermesProfile();
         String version = store.writeVersion(profile, skills);
         try {
-            publisher.publish(user, agent, List.of(store.agentPath(profile, version)));
+            publisher.publish(
+                    user,
+                    agent,
+                    List.of(store.agentPath(profile, version)),
+                    connectorBindings.connectorServers(agent.id()));
         } catch (HermesRequestRejected rejected) {
             discardQuietly(profile, version);
             throw rejected;

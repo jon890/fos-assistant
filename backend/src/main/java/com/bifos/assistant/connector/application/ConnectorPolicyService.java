@@ -6,6 +6,7 @@ import com.bifos.assistant.connector.application.model.ConnectorActionView;
 import com.bifos.assistant.connector.application.model.ConnectorPolicyAnswer;
 import com.bifos.assistant.connector.domain.ConnectorAction;
 import com.bifos.assistant.connector.domain.ConnectorActionKey;
+import com.bifos.assistant.connector.domain.ConnectorBinding;
 import com.bifos.assistant.connector.domain.ConnectorConnection;
 import com.bifos.assistant.connector.domain.HermesToolName;
 import com.bifos.assistant.connector.domain.ToolPolicy;
@@ -14,9 +15,10 @@ import com.bifos.assistant.connector.domain.ToolPolicyDecision.CheckBoundary;
 import com.bifos.assistant.connector.domain.type.ActionDecision;
 import com.bifos.assistant.connector.domain.type.ActionDenyReason;
 import com.bifos.assistant.connector.domain.type.ActionStatus;
+import com.bifos.assistant.connector.domain.type.BindingStatus;
 import com.bifos.assistant.connector.domain.type.ConnectionStatus;
 import com.bifos.assistant.connector.infra.ConnectorActionRepository;
-import com.bifos.assistant.connector.infra.ConnectorConnectionRepository;
+import com.bifos.assistant.connector.infra.ConnectorBindingRepository;
 import com.bifos.assistant.connector.infra.ConnectorToolGrantRepository;
 import com.bifos.assistant.hermes.dto.ConnectorManifest;
 import com.bifos.assistant.notification.application.NotificationService;
@@ -31,6 +33,7 @@ import com.bifos.assistant.usage.domain.AgentExecution;
 import java.nio.charset.StandardCharsets;
 import java.time.Clock;
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -47,6 +50,9 @@ import org.springframework.transaction.support.TransactionTemplate;
  * 찾지 못한 호출은 줄에 적을 사용자와 에이전트를 알 수 없어서이고, 같은 키로 다른 도구나 다른 인자를 보낸 호출은 키가
  * 유니크라 새 줄을 만들 수 없어서다.
  *
+ * <p>연결은 그 실행의 에이전트에 붙은 바인딩에서 고른다(ADR-083). 한 에이전트에 연결이 여럿이므로 등록 이름의 서버 앞부분이
+ * 맞는 바인딩 하나를 쓴다.
+ *
  * <p>통과로 답하는 것은 판정이 허용일 때뿐이다. 승인이 필요한 호출은 막고 인자 원문과 함께 {@code PENDING} 으로
  * 저장한다(ADR-050). 실행은 주인이 승인한 뒤 {@link ConnectorActionService} 가 한다. 그 밖의 줄은 인자 원문을 저장하지 않고
  * 해시만 남긴다.
@@ -61,6 +67,9 @@ public class ConnectorPolicyService {
     private static final String POLICY_UNAVAILABLE_MESSAGE =
             "이 도구의 사용 정책을 지금 확인하지 못해 실행하지 않았다. 잠시 뒤 다시 시도하라고 사용자에게 알린다.";
     private static final String NOT_READY_MESSAGE = "이 연결이 준비되지 않아 실행하지 않았다. 사용자에게 연결 화면에서 연결을 확인하라고 알린다.";
+    /** 연결은 쓸 수 있는데 이 에이전트에 붙인 것이 아직 반영되지 않았다. 연결 확인을 다시 해도 풀리지 않는다. */
+    static final String BINDING_PENDING_MESSAGE = "관리자가 반영을 마치면 이 연결을 쓸 수 있다. 지금은 실행하지 않았으니 사용자에게 반영을 기다리라고 알린다.";
+
     private static final String UNDECLARED_MESSAGE = "이 도구는 사용이 허락되지 않아 실행하지 않았다. 다시 부르지 않는다.";
     private static final String RISK_NOT_OPEN_MESSAGE = "이 도구는 아직 열리지 않아 실행하지 않았다. 다시 부르지 않는다.";
     private static final String ARGS_TOO_LARGE_MESSAGE = "인자가 너무 커서 실행하지 않았다. 나눠서 요청한다.";
@@ -84,7 +93,7 @@ public class ConnectorPolicyService {
     static final String APPROVAL_REQUESTED_TITLE = "승인을 기다리는 요청이 있어요";
 
     private final ConnectorActionRepository actions;
-    private final ConnectorConnectionRepository connections;
+    private final ConnectorBindingRepository bindings;
     private final ConnectorToolGrantRepository grants;
     private final SessionOwnerResolver owners;
     private final ConnectorCatalogCache catalog;
@@ -101,7 +110,7 @@ public class ConnectorPolicyService {
     @Autowired
     public ConnectorPolicyService(
             ConnectorActionRepository actions,
-            ConnectorConnectionRepository connections,
+            ConnectorBindingRepository bindings,
             ConnectorToolGrantRepository grants,
             SessionOwnerResolver owners,
             ConnectorCatalogCache catalog,
@@ -113,7 +122,7 @@ public class ConnectorPolicyService {
             PlatformTransactionManager transactionManager) {
         this(
                 actions,
-                connections,
+                bindings,
                 grants,
                 owners,
                 catalog,
@@ -128,7 +137,7 @@ public class ConnectorPolicyService {
 
     public ConnectorPolicyService(
             ConnectorActionRepository actions,
-            ConnectorConnectionRepository connections,
+            ConnectorBindingRepository bindings,
             ConnectorToolGrantRepository grants,
             SessionOwnerResolver owners,
             ConnectorCatalogCache catalog,
@@ -140,7 +149,7 @@ public class ConnectorPolicyService {
             PlatformTransactionManager transactionManager,
             Clock clock) {
         this.actions = actions;
-        this.connections = connections;
+        this.bindings = bindings;
         this.grants = grants;
         this.owners = owners;
         this.catalog = catalog;
@@ -184,31 +193,50 @@ public class ConnectorPolicyService {
             // 까닭은 찾는 쪽이 이미 로그에 남겼다.
             return blockedWithoutRecord("origin 실행을 찾지 못했다");
         }
-        Optional<ConnectorConnection> found =
-                origin.agentId() == null ? Optional.empty() : connections.findByAgentId(origin.agentId());
-        if (found.isEmpty()) {
-            return blockedWithoutRecord("그 실행의 에이전트에 연결이 없다");
+        List<ConnectorBinding> attached =
+                origin.agentId() == null ? List.of() : bindings.findByAgentId(origin.agentId());
+        // 등록 이름의 서버 앞부분으로 그 호출의 연결을 고른다. 대시보드가 한 profile 에서 서버 이름이 겹치지 않게 막으므로
+        // 맞는 바인딩은 하나다. 둘 이상이면 어느 연결의 정책으로 판정할지 정할 수 없어 막는다.
+        ConnectorBinding binding = null;
+        Optional<ConnectorManifest> manifest = Optional.empty();
+        int matches = 0;
+        for (ConnectorBinding candidate : attached) {
+            Optional<ConnectorManifest> declared =
+                    readManifest(candidate.connection().connectorId());
+            if (servesTool(candidate, declared, hermesTool)) {
+                binding = candidate;
+                manifest = declared;
+                matches++;
+            }
         }
-        ConnectorConnection connection = found.get();
+        if (matches == 0) {
+            return blockedWithoutRecord("그 실행의 에이전트에 그 도구의 서버를 붙인 연결이 없다");
+        }
+        if (matches > 1) {
+            return blockedWithoutRecord("등록 이름에 맞는 연결이 둘 이상이다");
+        }
+        ConnectorConnection connection = binding.connection();
         if (!connection.userId().equals(origin.userId())) {
             return blockedWithoutRecord("연결의 주인이 실행의 사용자와 다르다");
         }
-        if (!connection.agent().hermesProfile().equals(profileName)) {
-            return blockedWithoutRecord("연결용 에이전트의 profile 이 토큰의 profile 과 다르다");
+        if (!binding.agent().hermesProfile().equals(profileName)) {
+            return blockedWithoutRecord("바인딩의 에이전트 profile 이 토큰의 profile 과 다르다");
         }
+        ConnectionStatus usable = usableStatus(connection, binding);
+        boolean bindingPending =
+                connection.status() == ConnectionStatus.READY && binding.status() != BindingStatus.READY;
 
         Instant now = Instant.now(clock);
-        Optional<ConnectorManifest> manifest = readManifest(connection.connectorId());
         // 등록 이름과 맞는 것을 확인한 원래 이름만 쓴다. manifest 가 없으면 확인할 수 없어 비운다.
         String confirmedTool = manifest.map(value -> confirmedTool(value, hermesTool, toolName))
                 .orElse(null);
         // 승인 카드와 알림이 같은 도구 제목을 쓰도록 선언을 한 번 찾아 둔다.
         Optional<ToolPolicy> declared = manifest.flatMap(value -> ConnectorToolPolicies.find(value, confirmedTool));
-        // 커넥터 에이전트의 실행은 위임 자식이라, 살펴보기가 맡긴 것이면 트리 루트가 살펴보기 turn 이다(ADR-080).
-        // 그 살펴보기가 쓰기 도구를 허용했으면 쓰기를 거절하지 않고 승인 줄로 보낸다(ADR-082).
+        // 직접 부른 호출도 위임 자식의 호출도 같은 트리 루트로 경계가 정해진다. 살펴보기 turn 의 트리면 루트가 그 turn 이다
+        // (ADR-080). 그 살펴보기가 쓰기 도구를 허용했으면 쓰기를 거절하지 않고 승인 줄로 보낸다(ADR-082).
         CheckBoundary boundary = checkBoundary(origin);
         ToolPolicyDecision decision = manifest.map(value -> ToolPolicyDecision.decide(
-                        connection.status(),
+                        usable,
                         ownServerTool(value, hermesTool),
                         value.schema(),
                         declared,
@@ -229,7 +257,16 @@ public class ConnectorPolicyService {
             }
         }
         ConnectorAction action = ConnectorAction.decided(
-                connection, origin, hermesTool, confirmedTool, decision, passed, dedupeKey, argsSha256, now);
+                connection,
+                origin.agentId(),
+                origin,
+                hermesTool,
+                confirmedTool,
+                decision,
+                passed,
+                dedupeKey,
+                argsSha256,
+                now);
         if (needsApproval) {
             action.awaitApproval(argsJson, now.plus(properties.approvalTtl()));
         }
@@ -245,6 +282,9 @@ public class ConnectorPolicyService {
             // 사건은 커밋한 뒤에 낸다. 받은 쪽이 읽었을 때 줄이 있어야 한다.
             if (needsApproval && saved.conversationId() != null) {
                 events.publishEvent(new ConnectorActionChanged(saved.conversationId(), saved.publicId()));
+            }
+            if (bindingPending && saved.denyReason() == ActionDenyReason.NOT_READY) {
+                return new ConnectorPolicyAnswer(false, BINDING_PENDING_MESSAGE, null);
             }
             return answer(saved);
         } catch (DataIntegrityViolationException ex) {
@@ -300,8 +340,9 @@ public class ConnectorPolicyService {
      * <p>한 session 에서 같은 {@code tool_call_id} 가 되풀이되면 키가 같다. 줄의 판정을 그대로 주면 앞서 허용한
      * 읽기 도구의 답이 다른 도구나 다른 인자의 호출에 나간다. 새 줄은 만들지 않는다. 키가 유니크라 만들 수 없다.
      *
-     * <p>허용한 줄은 연결이 지금도 {@code READY} 일 때만 다시 허용한다. 연결을 해제한 뒤에 같은 호출이 다시 와도
-     * 앞의 허용이 나가지 않게 한다. 막은 줄과 승인 줄은 연결 상태와 상관없이 처음 답을 돌려준다.
+     * <p>허용한 줄은 그 에이전트에 그 연결이 지금도 붙어 있고 연결과 바인딩이 모두 {@code READY} 일 때만 다시 허용한다.
+     * 연결을 해제하거나 떼어 낸 뒤에 같은 호출이 다시 와도 앞의 허용이 나가지 않게 한다. 막은 줄과 승인 줄은 연결 상태와
+     * 상관없이 처음 답을 돌려준다.
      */
     private ConnectorPolicyAnswer replayed(ConnectorAction recorded, String hermesTool, String argsSha256) {
         if (!recorded.hermesTool().equals(hermesTool)) {
@@ -310,18 +351,43 @@ public class ConnectorPolicyService {
         if (!recorded.argsSha256().equals(argsSha256)) {
             return blockedWithoutRecord("같은 키의 줄과 인자가 다르다");
         }
-        if (recorded.passed() && !stillReady(recorded.agentId())) {
+        if (recorded.passed() && !stillReady(recorded.agentId(), recorded.connectorId())) {
             log.warn("connector policy replay blocked: 허용한 줄의 연결이 지금은 READY 가 아니다");
             return new ConnectorPolicyAnswer(false, NOT_READY_MESSAGE, null);
         }
         return answer(recorded);
     }
 
-    private boolean stillReady(Long agentId) {
-        return connections
-                .findByAgentId(agentId)
-                .map(connection -> connection.status() == ConnectionStatus.READY)
-                .orElse(false);
+    private boolean stillReady(Long agentId, String connectorId) {
+        return bindings.findByAgentId(agentId).stream()
+                .filter(binding -> binding.connection().connectorId().equals(connectorId))
+                .anyMatch(binding -> usableStatus(binding.connection(), binding) == ConnectionStatus.READY);
+    }
+
+    /**
+     * 판정에 넘길 연결 상태다. 연결이 {@code READY} 이고 그 에이전트에 붙인 바인딩도 {@code READY} 일 때만 {@code READY} 다.
+     *
+     * <p>값이 확인됐어도 공유 gateway 가 아직 그 profile 의 MCP 서버를 보지 못했으면 쓸 수 없다. 승인한 호출의 실행도 같은
+     * 규칙으로 다시 판정한다.
+     */
+    static ConnectionStatus usableStatus(ConnectorConnection connection, ConnectorBinding binding) {
+        return connection.status() == ConnectionStatus.READY && binding.status() == BindingStatus.READY
+                ? ConnectionStatus.READY
+                : ConnectionStatus.PENDING;
+    }
+
+    /**
+     * 등록 이름이 그 바인딩의 MCP 서버가 낸 도구의 것인가.
+     *
+     * <p>manifest 를 읽었으면 그 서버 이름으로 본다. 읽지 못했으면 붙일 때 적어 둔 서버 이름으로 고른다. 그 호출은 정책을 확인하지
+     * 못한 줄로 남는다.
+     */
+    private static boolean servesTool(
+            ConnectorBinding binding, Optional<ConnectorManifest> manifest, String hermesTool) {
+        if (manifest.isPresent()) {
+            return ownServerTool(manifest.get(), hermesTool);
+        }
+        return binding.mcpServer() != null && hermesTool.startsWith(HermesToolName.of(binding.mcpServer(), ""));
     }
 
     /** 등록 이름이 그 커넥터의 MCP 서버가 낸 도구의 것인가. 서버 이름까지의 앞부분이 같은지로 본다. */

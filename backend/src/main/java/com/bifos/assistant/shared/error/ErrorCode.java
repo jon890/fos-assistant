@@ -53,6 +53,11 @@ public enum ErrorCode {
     AGENT_TOOLS_REQUIRE_PRIVATE(HttpStatus.CONFLICT),
     /** 연결은 비공개 에이전트에만 붙인다. 남이 주인의 계정으로 외부 서비스를 쓰지 못하게 한다(ADR-083). */
     AGENT_CONNECTIONS_REQUIRE_PRIVATE(HttpStatus.CONFLICT),
+    /**
+     * 연결이 붙은 에이전트는 주인을 바꾸지 못한다. 남의 값이 든 profile 이 새 주인에게 넘어가고, 새 주인은 남의 연결이라 떼지도
+     * 못한다. 지금 주인이 먼저 뗀다(ADR-083).
+     */
+    AGENT_HAS_CONNECTIONS(HttpStatus.CONFLICT),
     /** 요청자가 만들 수 있는 에이전트 수를 이미 채웠다. 지운 에이전트는 세지 않는다. */
     AGENT_LIMIT_REACHED(HttpStatus.CONFLICT),
     /** Hermes가 저장 뒤 읽은 toolset 목록을 요청한 목록과 다르게 돌려줬다. */
