@@ -43,7 +43,7 @@ import org.springframework.transaction.support.TransactionTemplate;
  * ({@code DelegationWakeService}). 예약 turn 을 위한 판정이나 허락을 따로 두지 않는다. 쓰기 도구는 사람이 보낸 turn 과 같은
  * 승인 경로를 탄다.
  *
- * <p>잠금은 {@link TurnCancellation} 의 메모리 맵처럼 서버 하나를 전제로 한다.
+ * <p>잠금은 {@link TurnCancellation} 의 메모리 맵처럼 서버 하나를 전제로 한다. DB 줄은 {@code task_run} 다음 {@code task} 순서로 잠근다.
  */
 @Slf4j
 @Component
@@ -216,10 +216,15 @@ public class TaskRunStarter {
                 .map(Conversation::id);
     }
 
-    /** 다시 읽어 아직 {@code QUEUED} 일 때만 {@code RUNNING} 으로 바꾼다. 두 tick 이 같은 줄을 함께 열지 않는다. */
+    /** 줄과 작업을 차례로 잠그고 다시 읽는다. 아직 {@code QUEUED} 이고 작업이 {@code ACTIVE} 일 때만 {@code RUNNING} 으로 바꾼다. */
     private boolean markRunning(Long runId, Instant now) {
         TaskRun run = runs.findByIdForUpdate(runId).orElse(null);
         if (run == null || run.status() != TaskRunStatus.QUEUED) {
+            return false;
+        }
+        Task task = tasks.findByIdForUpdate(run.taskId()).orElseThrow();
+        if (task.state() != TaskState.ACTIVE) {
+            skip(task, run, TaskRunReason.PAUSED, now);
             return false;
         }
         run.start(now);

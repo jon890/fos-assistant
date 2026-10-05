@@ -8,6 +8,8 @@ import com.bifos.assistant.agent.domain.type.AgentVisibility;
 import com.bifos.assistant.agent.domain.type.CostMode;
 import com.bifos.assistant.agent.domain.type.CredentialScope;
 import com.bifos.assistant.agent.infra.AgentRepository;
+import com.bifos.assistant.chat.domain.Conversation;
+import com.bifos.assistant.chat.infra.ConversationRepository;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.shared.error.ApiException;
@@ -35,6 +37,9 @@ import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.time.temporal.ChronoUnit;
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import org.assertj.core.api.ThrowableAssert.ThrowingCallable;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -47,6 +52,8 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
 import org.springframework.context.annotation.Primary;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 /**
  * 예약 작업을 만들고 고치고 멈추고 지우는 규칙을 실제 DB 로 본다. 규칙은 {@code docs/backend/task.md} 의 「작업」 과 「시각」 이다.
@@ -72,6 +79,12 @@ class TaskServiceTest {
             return CLOCK;
         }
     }
+
+    @Autowired
+    PlatformTransactionManager transactionManager;
+
+    @Autowired
+    ConversationRepository conversations;
 
     @Autowired
     TaskService service;
@@ -321,6 +334,54 @@ class TaskServiceTest {
         assertThat(service.runs(owner, taskId, 100)).isEmpty();
         assertCode(() -> service.runs(owner, taskId, 0), ErrorCode.VALIDATION_FAILED);
         assertCode(() -> service.runs(owner, taskId, 101), ErrorCode.VALIDATION_FAILED);
+    }
+
+    @Test
+    @DisplayName("고치기가 시작 단계가 적은 대화 번호를 되돌리지 않는다")
+    void preservesConversationRecordedWhileUpdateWaits() throws Exception {
+        CurrentUser owner = member();
+        Agent agent = agentOf(owner, AgentVisibility.PRIVATE);
+        LocalDateTime fireAt = LocalDateTime.parse("2026-10-04T12:00");
+        Task task = service.create(owner, once("한 번", agent, fireAt)).task();
+        Conversation conversation =
+                conversations.save(Conversation.startedForTask(owner.id(), "합성 대화", agent.id(), task.id(), NOW));
+        CountDownLatch locked = new CountDownLatch(1);
+        CountDownLatch updating = new CountDownLatch(1);
+        CountDownLatch release = new CountDownLatch(1);
+        try (var executor = Executors.newVirtualThreadPerTaskExecutor()) {
+            var record = executor.submit(() -> {
+                new TransactionTemplate(transactionManager).executeWithoutResult(status -> {
+                    tasks.findByIdForUpdate(task.id()).orElseThrow();
+                    locked.countDown();
+                    try {
+                        assertThat(release.await(10, TimeUnit.SECONDS)).isTrue();
+                    } catch (InterruptedException ex) {
+                        Thread.currentThread().interrupt();
+                        throw new IllegalStateException(ex);
+                    }
+                    tasks.useConversation(task.id(), conversation.id(), NOW.truncatedTo(ChronoUnit.MICROS));
+                });
+            });
+            try {
+                assertThat(locked.await(10, TimeUnit.SECONDS)).isTrue();
+                var update = executor.submit(() -> {
+                    updating.countDown();
+                    return service.update(owner, task.publicId(), once("고친 이름", agent, fireAt));
+                });
+                assertThat(updating.await(10, TimeUnit.SECONDS)).isTrue();
+                Thread.sleep(200);
+                assertThat(update.isDone()).as("작업 잠금이 풀리기 전에는 고치기가 끝나지 않는다").isFalse();
+                release.countDown();
+                record.get(10, TimeUnit.SECONDS);
+                update.get(10, TimeUnit.SECONDS);
+            } finally {
+                release.countDown();
+            }
+        }
+
+        Task stored = tasks.findById(task.id()).orElseThrow();
+        assertThat(stored.conversationId()).isEqualTo(conversation.id());
+        assertThat(stored.title()).isEqualTo("고친 이름");
     }
 
     private TaskInput monthly(String title, CurrentUser owner) {
