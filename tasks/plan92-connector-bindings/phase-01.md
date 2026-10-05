@@ -129,5 +129,6 @@ node --test 'test/unit/**/*.test.ts'
 | `backend/src/main/java/com/bifos/assistant/connector/infra/ConnectorBindingRepository.java` | 신규 |
 | `backend/src/test/java/com/bifos/assistant/connector/ConnectorBindingMigrationTest.java` | 신규 |
 | `backend/src/test/java/com/bifos/assistant/connector/ConnectorBindingTest.java` | 신규 |
+| `backend/src/test/java/com/bifos/assistant/connector/ConnectorBindingMysqlMigrationTest.java` | 신규 |
 | `backend/src/test/java/com/bifos/assistant/architecture/StoredEnumNamesTest.java` | 수정 |
 | `docs/backend/schema/connector.md` | 수정 |
