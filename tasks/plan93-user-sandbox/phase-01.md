@@ -37,10 +37,6 @@
 - 셸 도구 검사는 기존 `_toolset_rejection` 검사 뒤에 둔다.
 - 모듈 docstring 의 「여는 것」 표 `PUT /api/config` 줄을 계약에 맞게 고친다.
 
-### 3. `hermes/tests/test_connectors_contract.py`
-
-저장소의 범용 커넥터(`hermes/connectors/*/skills/**/SKILL.md` 와 `SKILL.md` 가 있는 곳 전부)의 앞머리에 `required_environment_variables`, `required_credential_files`, `setup.collect_secrets`, `prerequisites.env_vars` 가 없음을 단언하는 시험 하나를 더한다(ADR-084 「감당할 것」).
-
 ### 2. `hermes/tests/test_dashboard_profile_api.py`
 
 기존 `PUT /api/config` 시험 묶음(`test_toolset_update_restores_config_when_handler_fails` 주변)의 준비 함수를 그대로 쓴다.
@@ -54,6 +50,10 @@
 - 셸 도구를 켜는데 `sandbox_owner` 가 없거나 형식이 틀리면 400.
 - 셸 도구가 없는 저장은 정책이 없어도 200 이고 기존 `terminal:` 이 그대로다.
 - 처리기가 실패하면 `terminal:` 도 원래대로 되돌아간다.
+
+### 3. `hermes/tests/test_connectors_contract.py`
+
+저장소의 범용 커넥터(`hermes/connectors/*/skills/**/SKILL.md` 와 `SKILL.md` 가 있는 곳 전부)의 앞머리에 `required_environment_variables`, `required_credential_files`, `setup.collect_secrets`, `prerequisites.env_vars` 가 없음을 단언하는 시험 하나를 더한다(ADR-084 「감당할 것」).
 
 ## 검증
 

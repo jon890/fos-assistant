@@ -38,7 +38,7 @@
 ### 1-1. `HermesSkillClient`, `HttpHermesSkillClient`, `SkillPublisher`
 
 - `HermesSkillClient.publish` 에 `String sandboxOwner` 인자를 더하고 `HttpHermesSkillClient` 가 본문 최상위에 `sandbox_owner` 로 싣는다(도구 목록이 없을 때도 싣는다. plugin 은 셸 도구가 목록에 있을 때만 쓴다).
-- 같은 409 판정을 `HermesRequestRejected` 로 바꾸기 전에 먼저 해 `AGENT_SANDBOX_UNAVAILABLE` 로 옮긴다. 판정 함수는 `hermes` 패키지 안에 하나 두고 두 클라이언트가 함께 쓴다.
+- 같은 409 는 오류 코드만 `AGENT_SANDBOX_UNAVAILABLE` 로 둔 `HermesRequestRejected`(`new HermesRequestRejected(ErrorCode.AGENT_SANDBOX_UNAVAILABLE, message, response)`)로 던진다. `SkillService.publishVersion` 이 `HermesRequestRejected` 를 잡아 방금 쓴 버전 디렉터리를 지우므로 이 타입을 지켜야 한다. 판정 함수는 `hermes` 패키지 안에 하나 두고 두 클라이언트가 함께 쓴다.
 - `SkillPublisher.publish` 가 `agent.sandboxOwner()` 를 넘긴다.
 
 ### 2. `ErrorCode`
@@ -64,7 +64,7 @@
 - `SkillPublisher` 를 쓰는 기존 테스트(`grep -rn "publish(" backend/src/test` 로 찾는다)의 호출과 검증을 새 인자에 맞춘다. terminal 이 켜지고 skills 가 꺼진 에이전트에 게시하면 `agent.sandboxOwner()` 가 넘어간다.
 - `backend/src/test/java/com/bifos/assistant/agent/AgentSandboxOwnerTest.java`(신규): `sandboxOwner()` 가 주인 있으면 `u<번호>`, 없으면 `a<번호>`.
 - `backend/src/test/java/com/bifos/assistant/skill/SkillFrontmatterTest.java`: 네 칸 각각이 `requestsSecrets` true, 없는 앞머리는 false.
-- `SkillServiceTest`: 비밀 요청 칸이 있는 `SKILL.md` 저장이 `VALIDATION_FAILED`.
+- `SkillServiceTest`: 비밀 요청 칸이 있는 `SKILL.md` 저장이 `VALIDATION_FAILED`. 게시가 `AGENT_SANDBOX_UNAVAILABLE` 의 `HermesRequestRejected` 로 거절되면 쓴 버전 디렉터리가 지워지고 오류 코드가 그대로 나간다.
 
 ### 6. 가짜 Hermes 와 e2e
 
@@ -102,8 +102,6 @@ scripts/quality.sh check
 | `backend/src/test/java/com/bifos/assistant/hermes/HermesToolsetRequestTest.java` | 수정 |
 | `backend/src/test/java/com/bifos/assistant/agent/AgentToolServiceTest.java` | 수정 |
 | `backend/src/test/java/com/bifos/assistant/agent/AgentToolServiceAccessTest.java` | 수정 |
-| `backend/src/test/java/com/bifos/assistant/skill/SkillServiceTest.java` | 수정 |
-| `backend/src/test/java/com/bifos/assistant/skill/SkillFrontmatterTest.java` | 수정 |
 | `backend/src/test/java/com/bifos/assistant/connector/ConnectorConnectionServiceTest.java` | 수정 |
 | `test/e2e/fake-hermes.ts` | 수정 |
 | `test/e2e/scenarios/agent-tools.ts` | 수정 |
