@@ -163,13 +163,7 @@ class RegenerateDeletedAttachmentTest {
 
     private ChatAttachment createAttachment(Long conversationId, CurrentUser user, String name) {
         ChatAttachment attachment = attachments.save(ChatAttachment.of(
-                conversationId,
-                user.id(),
-                name,
-                "image/png",
-                1,
-                Instant.now().plusSeconds(1),
-                Instant.now()));
+                conversationId, user.id(), name, "image/png", 1, Instant.now().plusSeconds(1), Instant.now()));
         attachment.nameStoredFile(attachment.id() + ".png");
         attachments.save(attachment);
         return attachment;

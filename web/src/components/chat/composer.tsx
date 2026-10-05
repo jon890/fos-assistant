@@ -439,7 +439,10 @@ export function Composer({
     ).length;
     const accepted = files.filter((file) => ACCEPTED_TYPES.includes(file.type));
     // 상한은 한 번에 고를 때만 센다. 이미 붙은 첨부를 빼고 남은 자리만큼만 올린다.
-    const remainingSlots = Math.max(0, MAX_ATTACHMENTS - itemsRef.current.length);
+    const remainingSlots = Math.max(
+      0,
+      MAX_ATTACHMENTS - itemsRef.current.length,
+    );
     const overflowCount = Math.max(0, accepted.length - remainingSlots);
     const capped = accepted.slice(0, remainingSlots);
     const oversize = capped.filter((file) => file.size > MAX_ATTACHMENT_BYTES);
@@ -490,13 +493,10 @@ export function Composer({
 
     for (let index = 0; index < toUpload.length; index++) {
       const item = newItems[index]!;
-      if (!itemsRef.current.some((current) => current.key === item.key)) continue;
+      if (!itemsRef.current.some((current) => current.key === item.key))
+        continue;
       updateItem(item.key, { conversationId: targetConversationId });
-      void uploadOne(
-        toUpload[index]!,
-        targetConversationId,
-        item.key,
-      );
+      void uploadOne(toUpload[index]!, targetConversationId, item.key);
     }
   }
 

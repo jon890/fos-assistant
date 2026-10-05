@@ -25,10 +25,10 @@ import java.util.Comparator;
 import java.util.Date;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
-import java.util.concurrent.CountDownLatch;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.BeforeEach;
@@ -124,15 +124,21 @@ class AttachmentUploadLimitTest {
             ready.await();
             start.countDown();
 
-            List<HttpResponse<String>> completed = responses.stream().map(this::await).toList();
+            List<HttpResponse<String>> completed =
+                    responses.stream().map(this::await).toList();
             assertThat(completed).extracting(HttpResponse::statusCode).containsOnly(200, 400);
-            assertThat(completed).filteredOn(response -> response.statusCode() == 200).hasSize(30);
-            assertThat(completed).filteredOn(response -> response.statusCode() == 400).hasSize(2);
+            assertThat(completed)
+                    .filteredOn(response -> response.statusCode() == 200)
+                    .hasSize(30);
+            assertThat(completed)
+                    .filteredOn(response -> response.statusCode() == 400)
+                    .hasSize(2);
             assertThat(completed)
                     .filteredOn(response -> response.statusCode() == 400)
                     .extracting(this::code)
                     .containsOnly("VALIDATION_FAILED");
-            assertThat(attachments.findByConversationIdOrderByIdAsc(conversationId)).hasSize(30);
+            assertThat(attachments.findByConversationIdOrderByIdAsc(conversationId))
+                    .hasSize(30);
         } finally {
             executor.shutdownNow();
         }
