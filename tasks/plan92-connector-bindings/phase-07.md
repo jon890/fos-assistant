@@ -36,6 +36,7 @@ git grep -n -E "커넥터 에이전트|연결용 에이전트|연결용 profile|
 - `docs/backend/connector-install.md`: 「설치와 실패 처리」 를 연결 등록과 바인딩 설치로 나눠 다시 쓴다. 「커넥터 에이전트의 경계」 를 「옛 커넥터 에이전트」 절로 바꿔 남는 동안의 규칙만 적는다. 「연결 상태의 흐름」 mermaid 를 연결 상태와 바인딩 상태 둘로 그린다. 옮겨 가기 절차(연결 확인이 값을 옮기고, 붙이고, 반영 완료 뒤 옛 에이전트를 지운다)를 적는다
 - `docs/backend/connector-tool-policy.md`: 판정이 바인딩으로 연결을 고르는 것, 판정에 넘기는 상태, 줄의 `agent_id` 뜻, 승인 실행의 profile
 - `docs/connectors/gmail.md`: 커넥터 에이전트를 말하는 줄을 붙이기로 고친다
+- `docs/privacy.md`: 값이 남는 곳을 보관 파일과 붙인 에이전트 profile 의 복사본으로 고친다. 연결을 해제하면 둘 다 지워지고, 떼면 그 profile 의 복사본만 지워진다는 것을 「연결을 끊고 지우는 법」 에 적는다
 - `docs/connector-authoring.md`: 「본문이 그 에이전트의 지침」 과 8,000자 상한을 말하는 절을, 커넥터 스킬이 붙인 에이전트의 스킬로 설치된다는 것과 올린 스킬과 같은 제한으로 고친다
 - 코드 주석이 절 이름을 가리킨다. `ConnectorConnectionService` 의 클래스 주석이 「설치와 실패 처리」 를 가리키므로 `docs/backend/connector-install.md` 를 다시 쓸 때 그 절 이름을 남긴다. `test/unit` 의 문서 참조 검사가 본다
 
@@ -97,6 +98,7 @@ scripts/quality.sh check
 | `docs/connectors.md` | 수정 |
 | `docs/connectors/gmail.md` | 수정 |
 | `docs/connector-authoring.md` | 수정 |
+| `docs/privacy.md` | 수정 |
 | `docs/backend/connector-install.md` | 수정 |
 | `docs/backend/connector-tool-policy.md` | 수정 |
 | `docs/flow.md` | 수정 |
