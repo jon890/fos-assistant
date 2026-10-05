@@ -1,8 +1,8 @@
 {
   "mcpServers": {
     "gmail": {
-      "command": "python3",
-      "args": ["${CLAUDE_PLUGIN_ROOT}/server.py"],
+      "command": "bun",
+      "args": ["${CLAUDE_PLUGIN_ROOT}/dist/gmail-mcp.js"],
       "env": {
         "GMAIL_OAUTH_CLIENT_ID": "${GMAIL_OAUTH_CLIENT_ID}",
         "GMAIL_OAUTH_CLIENT_SECRET": "${GMAIL_OAUTH_CLIENT_SECRET}",
