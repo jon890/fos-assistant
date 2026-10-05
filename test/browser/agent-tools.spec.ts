@@ -13,6 +13,8 @@ function toolRow(page: Page, label: string) {
 }
 
 async function makePrivate(page: Page, ownerEmail = TEST_EMAIL) {
+  // 셸·파일 도구가 켜진 채로는 주인을 바꿀 수 없다(ADR-084). 앞 시험이 켜 둔 도구를 먼저 끈다.
+  await disableConfigurableTools(page);
   const response = await page.request.patch(`/api/admin/agents/${AGENT_CODE}`, {
     data: { enabled: true, visibility: "PRIVATE", ownerEmail },
   });
