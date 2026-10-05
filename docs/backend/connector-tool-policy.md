@@ -89,12 +89,33 @@ Hermes 는 MCP 도구를 `mcp__<서버>__<도구>` 로 등록하면서 글자를
 - `prefix` 는 서버 이름으로 계산한 등록 이름의 앞부분이다. hook 은 이 값으로 그 호출이 어느 커넥터 서버의 것인지만 안다. 원래 도구 이름은 `tools` 에서만 찾는다
 - `tools` 는 manifest 가 선언한 도구다. `schema: 1` 은 `verify.tool` 과 `options.tool` 만 든다
 - 설정, 소유 기록과 한 묶음으로 쓰고 실패하면 함께 되돌린다. 해제하면 그 서버의 항목을 뺀다
-- 이 파일이 있는 profile 이 연결용 profile 이다
+- 이 파일이 있는 profile 에서 `fos-ctx` hook 이 커넥터 도구 호출을 묻는다
+
+`isolated` 칸이 그 profile 의 설치 방식을 적는다([ADR-083](../adr/ADR-083-커넥터는-사용자가-한-번-연결하고-자기-에이전트에-여럿-붙여-그-에이전트가-도구를-직접-부른다.md)).
+`v` 는 `1` 그대로다. 칸이 없으면 참으로 읽으므로 옛 파일은 바꾸지 않아도 된다. 칸이 있는데 boolean 이 아니면 hook 은 파일을 읽지 못한 것으로 본다.
+
+| `isolated` | 쓰는 설치 | `servers` 에 싣는 것 |
+| --- | --- | --- |
+| 없음(`true` 와 같다) | 옛 설치. 커넥터마다 만든 전용 profile 이다 | 운영 목록에 있고 manifest 를 읽을 수 있는 커넥터의 서버 |
+| `false` | 바인딩 설치. 일반 에이전트의 profile 에 커넥터를 붙인 것이다 | 소유 기록의 모든 서버. manifest 를 읽지 못한 서버는 `tools` 를 빈 객체로 싣는다 |
+
+두 방식은 대응에 없는 도구를 다르게 다룬다.
+
+| 호출 | 옛 설치 profile | 바인딩 profile |
+| --- | --- | --- |
+| 대응의 서버와 맞는 도구 | 묻는다 | 묻는다 |
+| 대응의 어느 서버와도 맞지 않는 `mcp__` 도구 | 막는다. 그 profile 에는 커넥터 서버만 있다 | 건드리지 않는다. Control Plane MCP 와 운영자가 넣은 다른 MCP 서버의 도구다 |
+| `execute_code` | 막는다 | 건드리지 않는다. 그 안에서 부른 커넥터 도구는 session 이 없어 막힌다 |
+| 커넥터 도구의 결과 | 바꾸지 않는다. Control Plane 이 위임 결과를 감싼다 | hook 이 `<external-data>` 로 감싼다 |
+
+**바인딩 profile 에서 대응에 실리지 않은 커넥터 서버는 판정 없이 나간다.**
+그래서 바인딩 설치는 manifest 를 읽지 못한 서버도 빈 `tools` 로 싣는다. Control Plane 은 그 서버의 도구를 선언 없는 도구로 막는다.
+터미널이나 파일 도구를 가진 에이전트는 이 파일을 고칠 수 있다. 이 위험은 ADR-083 의 「감당할 것」 에 있다.
 
 ### 도구 호출 판정
 
-연결용 profile 의 `fos-ctx` hook 은 MCP 도구 호출마다 Control Plane 에 묻는다.
-hook 이 어느 호출을 묻고 어느 호출을 묻지 않고 막는지는 [`hermes/README.md`](../../hermes/README.md) 의 「연결용 profile 의 커넥터 도구 호출을 묻는다」 가 갖는다.
+대응 파일이 있는 profile 의 `fos-ctx` hook 은 커넥터 MCP 도구 호출마다 Control Plane 에 묻는다.
+hook 이 어느 호출을 묻고 어느 호출을 묻지 않고 막는지는 [`hermes/README.md`](../../hermes/README.md) 의 「커넥터 도구 호출을 묻는다」 가 갖는다.
 
 **`POST /internal/hermes/connector-policy`**
 

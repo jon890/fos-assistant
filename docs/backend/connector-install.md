@@ -9,18 +9,97 @@ Control Plane 이 대시보드 plugin 의 커넥터 경로로 연결을 등록�
 대시보드 plugin(`hermes/plugins/dashboard-profile-api`) 이 여는 커넥터 경로를 Control Plane 이 쓰는 방법이다.
 경로마다의 요청과 응답은 [`hermes/README.md`](../../hermes/README.md) 의 「dashboard-profile-api 가 여는 것」 표가 갖는다.
 
-- `call` 은 `tool` 이 그 커넥터의 `options.tool` 이나 `verify.tool` 일 때만 받는다. `values` 를 메모리에서 env 로 넘겨 MCP 서버를 한 번 띄우고, `initialize` 와 `tools/call` 한 번 뒤 닫는다. 디스크에 쓰지 않는다
+설치는 두 가지다. 커넥터마다 만든 전용 profile 에 하는 **옛 설치**와, 일반 에이전트의 profile 에 연결을 붙이는 **바인딩 설치**다([ADR-083](../adr/ADR-083-커넥터는-사용자가-한-번-연결하고-자기-에이전트에-여럿-붙여-그-에이전트가-도구를-직접-부른다.md)).
+소유 기록 `.fos-connectors.json` 의 항목이 `mode` 로 방식을 적는다. `bind` 가 바인딩 설치이고, 칸이 없거나 `isolated` 이면 옛 설치다.
+`PUT /api/connectors` 는 본문에 `bind` 칸이 없으면 지금처럼 옛 설치를 한다. 그래서 새 칸을 모르는 옛 Control Plane 과 함께 돈다.
+
+- `call` 은 `tool` 이 그 커넥터의 `options.tool` 이나 `verify.tool` 일 때만 받는다. 칸 값을 메모리에서 env 로 넘겨 MCP 서버를 한 번 띄우고, `initialize` 와 `tools/call` 한 번 뒤 닫는다. 디스크에 쓰지 않는다
+- `call` 의 칸 값은 본문의 `values` 나 보관 파일(`vault`) 가운데 정확히 하나에서 온다. `vault` 면 그 보관 파일의 커넥터가 경로의 커넥터와 같아야 하고, 아니면 400 이다
 - `call` 은 자식을 띄우기 전에 `mcp` SDK 가 지원 범위인지 본다. 범위 밖이면 부르지 않고 `unavailable` 이다. 아래 「MCP SDK 계약」 이 갖는다
 - `call` 의 시간 제한은 10초, 동시 실행은 대시보드 프로세스 전체에서 4개다. 시간을 넘기면 자식 프로세스를 끝내고 `unavailable` 이다. 이미 4개가 돌고 있으면 기다리지 않고 `unavailable` 이다
-- 커넥터 key 의 `PUT /api/env` 와 `DELETE /api/env` 는 관리 표식이 있는 profile 에만 된다. 허용 key 는 카탈로그 manifest 의 `fields[].env` 다. `operator_env` 는 사용자 요청으로 쓰지 못한다. 그 이름의 `PUT` 과 `DELETE` 는 성공으로 답하되 아무것도 쓰지 않고 `restart_required` 는 false 다. 한 배포 동안 옛 Control Plane 이 그 이름을 쓰려 하기 때문이다([ADR-041](../adr/ADR-041-hermes-에-설치하는-plugin-과-profile-틀은-이-저장소가-소유한다.md))
 - Control Plane 은 카탈로그의 `fields[].env` 로 `PUT /api/env` 의 key 를 정하고 `verify.tool` 로 확인 도구를 부른다. `env` 이름은 Control Plane 의 응답에 담지 않는다
+- 카탈로그는 커넥터마다 `skills`(바인딩 설치가 복사할 스킬 이름 목록)를 낸다. 입력 칸이 없는 커넥터(빈 `fields`)도 받는다. 그 커넥터의 보관 파일은 빈 `values` 다
 - 운영 목록에서 빠진 커넥터도 그 profile 에 소유 기록이 남아 있으면 `PUT /api/connectors` 의 `enabled: false` 를 받는다. 이때 대시보드가 그 기록의 서버 env 가 참조하던 key 를 profile `.env` 에서 지운다. `GET /api/connectors` 는 그 기록을 `configured: false` 로 낸다
 - 운영 목록에도 없고 소유 기록도 없는 plugin 의 `enabled: false` 는 끌 것이 없으므로 `changed: false` 로 성공한다. `enabled: true` 는 거절한다. `GET /api/connectors` 는 그런 plugin 을 목록에 넣지 않고, Control Plane 은 목록에 없는 것을 설치 안 됨(`enabled: false`, `configured: false`)으로 읽는다. 카탈로그에서 빠진 연결의 해제와 반영 완료가 끝까지 가게 하기 위해서다
+- `GET /api/connectors` 는 커넥터마다 `mode`(`bind`, `isolated`)를 낸다. 설치하지 않은 커넥터는 `isolated` 로 답하므로 설치한 항목의 값만 읽는다
+- 운영자는 대시보드 프로세스의 환경 변수로 커넥터 목록을 준다. 자세한 모양은 [`hermes/README.md`](../../hermes/README.md) 의 「운영 값」 과 「커넥터」 가 갖는다
+- `call` 의 자식 프로세스가 받는 env 도 같은 문서의 「커넥터」 가 갖는다. 대시보드 프로세스의 다른 env 는 넘어가지 않는다
+
+### 표식
+
+profile 이 어떤 요청을 받는지는 두 표식이 정한다. 판정은 요청의 칸이 아니라 대상의 방식으로 한다.
+
+| 표식 | 누가 두는가 | 받는 것 |
+| --- | --- | --- |
+| 관리 표식 `.fos-assistant-managed` | 대시보드 plugin 이 토큰으로 만든 profile 에 쓴다 | 두 방식의 설치와 떼기, 상태 조회, probe, 실행 |
+| 커넥터 표식 `.fos-connector-host` | 운영자가 사람이 만든 profile 에 둔다. plugin 은 쓰지 않는다 | 바인딩 설치와 그 떼기, 상태 조회, 바인딩 항목의 probe 와 실행 |
+
+- `GET /api/connectors` 는 두 표식 가운데 하나가 있으면 받는다
+- `PUT /api/connectors` 의 설치는 `bind` 칸이 있으면 두 표식 가운데 하나, 없으면 관리 표식만 받는다
+- `PUT /api/connectors` 의 떼기는 소유 기록의 그 항목이 `bind` 면 두 표식 가운데 하나, 아니면 관리 표식만 받는다
+- `POST /api/mcp/servers/<서버>/test` 와 `POST /api/connectors/<id>/execute` 는 커넥터 표식만 있는 profile 에서 소유 기록의 그 항목이 `bind` 여야 한다
+- 표식이 맞지 않으면 401 이다
+
+### 옛 설치
+
+- 커넥터 key 의 `PUT /api/env` 와 `DELETE /api/env` 는 관리 표식이 있는 profile 에만 된다. 허용 key 는 카탈로그 manifest 의 `fields[].env` 다. `operator_env` 는 사용자 요청으로 쓰지 못한다. 그 이름의 `PUT` 과 `DELETE` 는 성공으로 답하되 아무것도 쓰지 않고 `restart_required` 는 false 다. 한 배포 동안 옛 Control Plane 이 그 이름을 쓰려 하기 때문이다([ADR-041](../adr/ADR-041-hermes-에-설치하는-plugin-과-profile-틀은-이-저장소가-소유한다.md))
 - 설치는 API 도구 목록(`platform_toolsets.api_server`)을 그 profile 에 설치한 커넥터의 MCP 서버 이름에 그 커넥터들의 manifest 가 선언한 `toolsets` 를 더한 것으로 통째로 다시 쓴다. 서버 이름이 먼저이고 겹친 이름은 한 번만 둔다. 운영 목록에서 빠져 manifest 를 읽을 수 없는 커넥터의 `toolsets` 는 더하지 않는다. Control Plane MCP 와 선언하지 않은 내장 도구는 목록에서 빠지고, `mcp_servers` 의 Control Plane MCP 등록도 지운다. 그 profile 의 MCP 토큰과 `fos-ctx` plugin 은 그대로 둔다. 마지막 커넥터를 끄면 목록은 `no_mcp` 하나다. 목록을 비우면 Hermes 가 등록된 MCP 서버를 모두 통과시키기 때문이다([ADR-045](../adr/ADR-045-커넥터-에이전트는-자기-mcp-서버만-받고-memory-와-control-plane-도구를-받지-않는다.md)). 선언으로 열 수 있는 내장 도구는 읽기 전용 이미지 도구뿐이다([ADR-044](../adr/ADR-044-커넥터-manifest-는-읽기-전용-이미지-도구만-열-수-있다.md))
 - `GET /api/connectors` 의 `configured` 는 서버 정의가 소유 기록과 같고 API 도구 목록이 설치가 쓰는 목록(설치한 커넥터의 서버 이름에 선언한 `toolsets` 를 더한 것)과 정확히 같고 Control Plane MCP 등록이 없을 때만 참이다. Control Plane MCP 나 선언하지 않은 내장 도구가 목록에 남은 옛 모양은 `configured: false` 다
 - 설치와 제거는 쓰기 전에 `config.yaml`, 소유 기록, `SOUL.md` 를 `connector-backups/` 에 떠 둔다. profile `.env` 는 떠 두지 않는다. 쓸 때마다 그 디렉터리에 남아 있는 `.env` 사본을 지운다
-- 운영자는 대시보드 프로세스의 환경 변수로 커넥터 목록을 준다. 자세한 모양은 [`hermes/README.md`](../../hermes/README.md) 의 「운영 값」 과 「커넥터」 가 갖는다
-- `call` 의 자식 프로세스가 받는 env 도 같은 문서의 「커넥터」 가 갖는다. 대시보드 프로세스의 다른 env 는 넘어가지 않는다
+- 이름 대응 파일은 `isolated` 칸 없이 쓴다
+
+### 바인딩 설치
+
+`PUT /api/connectors` 의 본문에 `bind: {vault}` 를 더하면 그 보관 파일의 값으로 그 profile 에 커넥터를 붙인다.
+그 profile 의 Control Plane MCP 등록, 다른 도구 이름, `SOUL.md` 는 건드리지 않는다.
+
+받는 profile 의 조건이다. 하나라도 어기면 설치는 409 이고 파일이 하나도 바뀌지 않는다.
+
+- 관리 표식이나 커넥터 표식이 있다. 없으면 401 이다
+- `platform_toolsets.api_server` 목록이 있고 그 안에 Control Plane MCP 가 있다. 목록이 없는 profile 에 이름 하나만 든 목록을 만들면 내장 도구와 Control Plane MCP 가 모두 닫히고, MCP 이름이 없던 목록에 이름을 더하면 운영자의 다른 MCP 서버가 막히기 때문이다
+- 소유 기록에 옛 설치 항목이 없다. 반대로 바인딩 항목이 있는 profile 은 옛 설치를 받지 않는다
+- 커넥터의 env 이름이 그 커넥터의 소유 기록 없이 이미 `.env` 에 있지 않고, 기본 key 나 다른 바인딩 커넥터의 env 이름과 겹치지 않는다
+- 서버 이름이 운영자가 등록한 서버와 겹치지 않는다
+- 복사할 스킬 디렉터리가 그 커넥터의 소유 기록 없이 이미 있지 않다
+
+보관 파일이 없거나 다른 커넥터의 것이면 400 이다. 보관 값이 지금 칸 선언과 맞지 않아도 400 이다.
+
+| 무엇 | 붙일 때 | 뗄 때(`enabled: false`) |
+| --- | --- | --- |
+| profile `.env` | manifest 의 `fields[].env` 마다 보관 값을 쓰고, 보관 파일에 없는 선택 칸의 key 는 지운다 | 그 커넥터의 env key 를 지운다. manifest 가 없으면 소유 기록의 서버 정의가 `${이름}` 으로 참조하던 이름이다 |
+| `mcp_servers` | 그 커넥터의 서버 정의를 둔다. 값이 없는 선택 칸은 정의의 `env` 에 빈 글을 명시한다 | 그 서버 정의를 지운다 |
+| `platform_toolsets.api_server` | 서버 이름을 더한다. 있던 이름은 그대로 두고 `no_mcp` 는 뺀다. manifest 의 `toolsets` 는 더하지 않는다 | 그 이름만 뺀다 |
+| 스킬 | plugin 의 스킬 디렉터리를 그 profile 의 `skills/<앞머리 name>/` 로 복사한다. `SKILL.md` 와 `references/`, `templates/` 아래 정규 파일이다 | 소유 기록의 `skills` 디렉터리를 지운다 |
+| 소유 기록 | 항목에 `mode: bind`, `vault`, `skills` 를 적는다 | 그 항목을 지운다 |
+| 이름 대응 파일 | `isolated: false` 를 싣고 소유 기록의 모든 서버를 싣는다. manifest 를 읽지 못한 서버는 빈 `tools` 다 | 남은 바인딩이 없으면 지운다 |
+| `fos-ctx` | 묶음에 든 판으로 맞춘다 | 건드리지 않는다 |
+| 답의 `restart_required` | 바뀐 것이 있으면 참이다. 떠 있는 profile 에 더한 MCP 서버는 gateway 를 다시 띄워야 보인다 | 거짓이다. 도구 목록에서 이름을 빼므로 다음 실행부터 막힌다 |
+
+- 붙이기는 한 묶음으로 쓴다. 실패하면 이 요청이 쓴 파일만 되돌린다
+- 쓰기 전에 `config.yaml`, 소유 기록, 이름 대응 파일을 `connector-backups/` 에 떠 둔다. `.env` 와 스킬 파일은 떠 두지 않는다
+- `GET /api/connectors` 의 바인딩 항목 `configured` 는 서버 정의가 소유 기록과 같고, 서버 이름이 API 도구 목록에 있고, 소유 기록의 스킬 파일이 plugin 의 본문과 같을 때 참이다. Control Plane MCP 등록이 있어도 된다
+- 떼어도 gateway 의 스킬 색인은 재시작 전까지 그 스킬 이름을 남긴다. 모델이 그 스킬을 읽으려 하면 파일이 없어 실패할 뿐이다
+
+**도구 목록은 설치와 Control Plane 의 도구 저장이 나눠 쓴다.**
+토큰으로 부른 `PUT /api/config` 가 `platform_toolsets` 를 보내면, 소유 기록의 바인딩 항목이 설치한 서버 이름이 요청의 `api_server` 목록에 모두 있어야 한다.
+하나라도 빠지면 409 「연결된 커넥터의 도구 이름이 빠졌다」 로 거절한다. Hermes 처리기가 목록을 통째로 바꾸므로 조용히 지워지는 길을 남기지 않는다.
+그래서 Control Plane 의 도구 저장과 스킬 게시는 붙은 커넥터 서버 이름을 함께 보낸다. 스킬 경로만 쓰는 요청과 옛 설치 profile 은 이 검사를 하지 않는다.
+
+### 보관 파일
+
+연결의 칸 값의 원본은 대시보드 plugin 이 연결마다 하나씩 두는 보관 파일이다. 대시보드의 HERMES_HOME 아래 `connector-vault/` 에 있다.
+Control Plane DB 에는 지금처럼 비밀이 아닌 칸 값과 비밀 칸의 앞부분만 둔다.
+
+| 경로 | 본문 | 하는 일 |
+| --- | --- | --- |
+| `PUT /api/connector-vault` | `{vault, connector, values}` | 칸 값을 검사해 쓴다. 모르는 키, 필수 칸 누락, `pattern` 위반, 두 줄 이상인 값은 400 이다. 같은 `vault` 가 다른 커넥터의 것이면 409 다 |
+| `DELETE /api/connector-vault` | `{vault}` | 지운다. 없었으면 `changed: false` 다 |
+| `POST /api/connector-vault/import` | `{vault, connector, profile}` | 그 커넥터를 옛 설치한 관리 profile 의 `.env` 에서 칸 값을 읽어 쓴다. 필수 칸이 비면 400 이다 |
+
+- `vault` 는 `^c[1-9][0-9]{0,18}$` 다. 연결 번호 앞에 `c` 를 붙인다
+- 빈 선택 칸은 넣지 않는다
+- 값과 경로는 응답, 로그, 예외 메시지, 설정 백업에 없다
+- 쓰기와 지우기는 profile 쓰기 잠금 안에서 한다. 바인딩 설치도 같은 잠금 안에서 보관 파일을 읽으므로 그 사이에 값이 바뀌지 않는다
 
 ## 설치와 실패 처리
 

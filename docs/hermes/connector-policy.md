@@ -77,6 +77,34 @@ profile 둘의 callback 을 동시에 돌렸을 때 한쪽이 0.4초 걸리는 �
 [dispatcher 바깥 예외](https://github.com/NousResearch/hermes-agent/blob/v2026.9.24/model_tools.py#L765),
 [executor 바깥 예외](https://github.com/NousResearch/hermes-agent/blob/v2026.9.24/agent/tool_executor.py#L651)
 
+## 도구 결과를 바꾸는 hook
+
+`transform_tool_result` hook 은 도구 결과가 모델의 문맥에 들어가기 전에 그 글을 바꾼다.
+2026-10-05 에 같은 판의 소스로 확인했다. 실행으로는 확인하지 않았다.
+바인딩 profile 의 `fos-ctx` 가 이 hook 으로 커넥터 도구 결과를 `<external-data>` 로 감싼다([ADR-083](../adr/ADR-083-커넥터는-사용자가-한-번-연결하고-자기-에이전트에-여럿-붙여-그-에이전트가-도구를-직접-부른다.md)).
+
+| 확인한 것 | 내용 |
+| --- | --- |
+| 도는 때 | `post_tool_call` 뒤, 결과가 문맥에 들어가기 전이다 |
+| 받는 것 | `tool_name`, `args`, `result`, `task_id`, `session_id`, `tool_call_id`, `turn_id`, `api_request_id`, `duration_ms`, `status`, `error_type`, `error_message` |
+| 결과를 바꾸는 값 | callback 이 돌려준 글 가운데 처음 것이 결과가 된다. 글이 아닌 값과 `None` 은 무시한다 |
+| 실패 | 닫히지 않는다. callback 이 예외를 던지거나 제한 시간을 넘기면 그 callback 을 건너뛰고 원래 결과가 간다 |
+| `pre_tool_call` 이 막은 호출 | 이 hook 에 닿지 않는다. dispatcher 와 executor 가 막은 결과를 그 앞에서 돌려준다 |
+| 도구가 예외를 던졌다 | 이 hook 에 닿지 않는다. Hermes 가 만든 오류 글이 그대로 간다 |
+| 중계 도구 `tool_call` | dispatcher 가 안쪽 등록 이름으로 다시 들어가므로 hook 도 안쪽 이름을 받는다 |
+
+**MCP 결과에는 Hermes 가 따로 `<untrusted_tool_result>` 감싸기를 한다.**
+이 hook 이 돌고 난 뒤, 결과를 대화 메시지로 만들 때 이름이 `mcp_` 로 시작하는 도구의 글에 건다.
+32자보다 짧은 글은 감싸지 않는다. 본문 안의 `untrusted_tool_result` 표시는 대소문자에 상관없이 `untrusted-tool-result` 로 바꾼다.
+그래서 바인딩 profile 의 커넥터 도구 결과는 `<external-data>` 가 안쪽, `<untrusted_tool_result>` 가 바깥쪽이다. hook 이 실패해도 바깥쪽은 남는다.
+
+근거: [`_apply_transform_tool_result_hook`](https://github.com/NousResearch/hermes-agent/blob/v2026.9.24/model_tools.py#L848),
+[dispatcher 가 막은 호출을 돌려주는 자리](https://github.com/NousResearch/hermes-agent/blob/v2026.9.24/model_tools.py#L940),
+[executor 가 막은 호출에 hook 을 걸지 않는 자리](https://github.com/NousResearch/hermes-agent/blob/v2026.9.24/agent/tool_executor.py#L1753),
+[hook 의 제한 시간 목록](https://github.com/NousResearch/hermes-agent/blob/v2026.9.24/hermes_cli/plugins_dispatch.py#L42),
+[`_maybe_wrap_untrusted`](https://github.com/NousResearch/hermes-agent/blob/v2026.9.24/agent/tool_dispatch_helpers.py#L515),
+[감싸는 도구와 32자 하한](https://github.com/NousResearch/hermes-agent/blob/v2026.9.24/agent/tool_dispatch_helpers.py#L436)
+
 ## 도구를 모델에게서 빼는 설정
 
 `mcp_servers.<서버>.tools.include` 와 `tools.exclude` 가 있다. 접두사가 붙기 전의 원래 도구 이름과 glob 을 받는다.
@@ -120,6 +148,7 @@ hook 이 `{"action": "approve", "message": "<사유>", "rule_key": "<키>"}` 를
 - 떠 있는 공유 gateway 가 profile 의 `fos-ctx` 를 새 판으로 바꾼 뒤 재시작 없이 새 코드를 읽는지
 - native 자식과 공유 gateway 에서 실제 커넥터 호출이 hook 을 거치는지. 대역 서버의 호출 기록과 `connector_action` 을 견준다
 - Control Plane 이 내려가 있을 때 연결용 에이전트의 도구가 막히는지
+- 바인딩 profile 에서 커넥터 도구의 결과가 `<external-data>` 안에 있고 그 바깥을 `<untrusted_tool_result>` 가 감싸는지. 실행 기록의 도구 내용으로 본다
 - 대시보드 plugin 을 올린 뒤 카탈로그에 커넥터가 그대로 있는지. 스킬 본문 검증이 새로 생겨, 전에는 나오던 커넥터가 빠질 수 있다
 - Control Plane 을 옛 판으로 되돌렸다가 다시 올렸으면 사진을 받는 연결을 한 번 연결 확인한다. 옛 판은 `vision` 을 선언 밖의 도구로 보고 목록에서 뺀다
 - 떠 있는 공유 gateway 가 바뀐 `SOUL.md` 를 재시작 없이 다음 실행부터 읽는지. 읽지 않으면 지침 갱신에도 재시작과 관리자 반영 완료가 필요하다
