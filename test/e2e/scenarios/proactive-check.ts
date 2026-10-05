@@ -411,7 +411,7 @@ export const proactiveCheckScenario: Scenario = {
         );
         expect(limited === "CHECK_LIMIT", `상한을 넘는 맡기기의 실패 코드가 다르다: ${limited}`);
 
-        step("결과: 놓으면 원문 링크 하나만 「새로 알릴 것」 에 남고 나머지는 참고와 까닭으로 남는다");
+        step("결과: 놓으면 검증된 원문만 보고 근거와 「새로 알릴 것」 에 남고 나머지는 참고와 까닭으로 남는다");
         context.hermes.releaseHeldRun();
         held = false;
         await awaitEvent(firstEvents.events, (event) => event.type === "done", "살펴보기 끝");
