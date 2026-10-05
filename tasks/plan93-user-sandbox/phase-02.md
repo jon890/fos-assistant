@@ -92,6 +92,7 @@ scripts/quality.sh check
 | `backend/src/main/java/com/bifos/assistant/agent/application/AgentToolService.java` | 수정 |
 | `backend/src/main/java/com/bifos/assistant/agent/domain/Agent.java` | 수정 |
 | `backend/src/main/java/com/bifos/assistant/hermes/HermesSkillClient.java` | 수정 |
+| `backend/src/main/java/com/bifos/assistant/hermes/HermesCallFailure.java` | 수정 |
 | `backend/src/main/java/com/bifos/assistant/hermes/HttpHermesSkillClient.java` | 수정 |
 | `backend/src/main/java/com/bifos/assistant/skill/infra/SkillPublisher.java` | 수정 |
 | `backend/src/test/java/com/bifos/assistant/hermes/HermesSkillRequestTest.java` | 수정 |
