@@ -530,6 +530,38 @@ class ConnectorBindingServiceTest {
     }
 
     @Test
+    @DisplayName("반영 완료에서 다시 보낸 설치가 configured 가 아니거나 probe 가 실패하면 PENDING 과 재시작 대기로 남고 연결 실패다")
+    void confirmAppliedKeepsRestartWaitWhenNotConfiguredOrProbeFails() {
+        CurrentUser owner = user(UserRole.MEMBER, 1L);
+        CurrentUser admin = user(UserRole.ADMIN, 1L);
+        connect(owner, DEMO, VALUES);
+        Agent agent = agent(owner, AgentVisibility.PRIVATE);
+        service.bind(owner, agent.code(), DEMO);
+        Instant shown = shownTo(admin);
+        when(connector.bindConnector(anyString(), anyString(), anyString()))
+                .thenReturn(new InstallResult(false, false));
+
+        when(connector.readConnector(anyString(), anyString()))
+                .thenReturn(new ConnectorState("p", true, false, false, true, HermesConnectorClient.MODE_BIND));
+        assertThatThrownBy(() -> service.confirmApplied(admin, agent.code(), DEMO, shown))
+                .as("configured 가 아니다")
+                .isInstanceOf(ConnectorOperationFailure.class);
+        assertThat(onlyBinding())
+                .extracting(ConnectorBinding::status, ConnectorBinding::restartRequired)
+                .containsExactly(BindingStatus.PENDING, true);
+
+        when(connector.readConnector(anyString(), anyString()))
+                .thenReturn(new ConnectorState("p", true, true, false, true, HermesConnectorClient.MODE_BIND));
+        when(connector.probe(anyString(), anyString())).thenReturn(new ProbeResult(false, List.of()));
+        assertThatThrownBy(() -> service.confirmApplied(admin, agent.code(), DEMO, shown))
+                .as("probe 가 실패한다")
+                .isInstanceOf(ConnectorOperationFailure.class);
+        assertThat(onlyBinding())
+                .extracting(ConnectorBinding::status, ConnectorBinding::restartRequired)
+                .containsExactly(BindingStatus.PENDING, true);
+    }
+
+    @Test
     @DisplayName("MEMBER 와 다른 그룹의 관리자는 반영 완료를 누를 수 없다")
     void forbidsMemberAndOtherGroupAdminFromConfirming() {
         CurrentUser owner = user(UserRole.MEMBER, 1L);

@@ -1069,9 +1069,28 @@ def _tool_map_bytes(tool_map: dict) -> bytes:
 
 
 def _env_value(env_text: str, key: str) -> str:
-    """profile `.env` 본문에서 그 key 의 마지막 값을 읽는다. 없으면 빈 문자열이다."""
-    values = [line.partition("=")[2].strip().strip("\"'")
-              for line in env_text.splitlines() if line.startswith(key + "=")]
+    """profile `.env` 본문에서 그 key 의 마지막 값을 읽는다. 없으면 빈 문자열이다.
+
+    `_env_line` 이 쓴 줄을 그대로 되돌린다. 큰따옴표 안의 `\\"` 와 `\\\\` 를 풀고, 작은따옴표 안은 그대로 읽는다.
+    이름을 찾는 규칙은 `_env_line_key` 와 같아 `export KEY=` 꼴과 `=` 둘레의 공백도 받는다.
+    """
+    values = []
+    for line in env_text.splitlines():
+        if _env_line_key(line) != key:
+            continue
+        raw = line.partition("=")[2].strip()
+        if len(raw) >= 2 and raw[0] == '"':
+            value, index = [], 1
+            while index < len(raw) and raw[index] != '"':
+                if raw[index] == "\\" and index + 1 < len(raw) and raw[index + 1] in '"\\':
+                    index += 1
+                value.append(raw[index])
+                index += 1
+            values.append("".join(value))
+        elif len(raw) >= 2 and raw[0] == "'" and raw.find("'", 1) > 0:
+            values.append(raw[1:raw.find("'", 1)])
+        else:
+            values.append(raw)
     return values[-1] if values else ""
 
 
@@ -1515,6 +1534,41 @@ def _entry_field_env(plugin: str, entry: dict) -> set:
     return {key for key, value in entry["server"]["env"].items() if value == "${%s}" % key}
 
 
+def _bind_entry_shape(entry) -> None:
+    """떼기가 쓰는 바인딩 항목의 모양만 본다. 지금 manifest 의 실행 정의와는 견주지 않는다.
+
+    항목이 객체이고 `mode` 가 `bind` 여야 한다. 서버 이름과 스킬 이름은 설정에서 지울 키와 지울 디렉터리 이름이라
+    경로 조각으로 쓸 수 있는지 `_connector_state` 와 같은 규칙으로 본다.
+    """
+    skills = entry.get("skills") if isinstance(entry, dict) else None
+    if (not isinstance(entry, dict) or entry.get("mode") != BIND_MODE
+            or not isinstance(entry.get("mcp_server"), str) or not SERVER_NAME_RE.match(entry["mcp_server"])
+            or not isinstance(skills, list) or len(set(map(str, skills))) != len(skills)
+            or any(not isinstance(name, str) or not SKILL_NAME_RE.match(name) or ".." in name for name in skills)):
+        raise ValueError("connector 소유 기록의 바인딩 필드가 올바르지 않다")
+
+
+def _bind_entry_env(manifest: dict | None, entry: dict) -> set:
+    """떼기가 profile `.env` 에서 지울 이름이다.
+
+    기록의 서버 정의가 `${이름}` 으로 참조하는 이름은 늘 지운다. 운영 목록에서 빠졌거나 실행 정의가 바뀌어도 설치할 때 쓴
+    이름이 거기 남아 있다. manifest 가 있고 기록의 실행 정의가 지금과 같으면 칸의 env 이름도 지운다.
+    Control Plane 이 쓰는 이름은 지우지 않는다.
+    """
+    server = entry.get("server")
+    env = server.get("env") if isinstance(server, dict) else None
+    names = {key for key, value in env.items() if isinstance(key, str) and value == "${%s}" % key} \
+        if isinstance(env, dict) else set()
+    if manifest is not None:
+        try:
+            matches = _server_matches(manifest, server)
+        except (KeyError, TypeError, AttributeError):
+            matches = False
+        if matches:
+            names |= {field["env"] for field in manifest["fields"]}
+    return names - BASE_ENV_KEYS
+
+
 def _skill_tree_files(directory: pathlib.Path) -> dict | None:
     """profile 에 설치한 스킬 디렉터리 하나의 정규 파일이다. `{상대 경로: 경로}` 다. 없으면 None 이다.
 
@@ -1564,13 +1618,23 @@ def _connector_bind_config(profile_dir: pathlib.Path, plugin: str, enabled: bool
     originals = {path: path.read_bytes() if path.exists() else None
                  for path in (config_path, state_path, env_path, tool_map_path, *plugin_values)}
     saved = yaml.safe_load(originals[config_path]) or {}
-    state = _connector_state(json.loads(originals[state_path])) if originals[state_path] else {}
+    if not originals[state_path]:
+        state = {}
+    elif enabled:
+        state = _connector_state(json.loads(originals[state_path]))
+    else:
+        # 떼기는 기록 전체를 지금 manifest 와 견주지 않는다. 운영자가 실행 정의를 바꾼 뒤에도 떼야 `.env` 의 비밀이 남지 않는다.
+        state = json.loads(originals[state_path])
+        if not isinstance(state, dict):
+            raise ValueError("connector 소유 기록이 올바르지 않다")
     if any(_entry_mode(entry) != BIND_MODE for entry in state.values()):
         raise FileExistsError("옛 설치가 있는 profile 에 바인딩을 하지 않는다")
     servers = dict(saved.get("mcp_servers") or {})
     platform = dict(saved.get("platform_toolsets") or {})
     allowed = platform.get("api_server")
     owned = state.get(plugin)
+    if not enabled and owned is not None:
+        _bind_entry_shape(owned)
     manifest = _connector_manifest(plugin) if plugin in _connector_roots() else None
     env_lines = originals[env_path].decode("utf-8").splitlines(keepends=True) if originals[env_path] else []
     previous_skills = list(owned["skills"]) if owned else []
@@ -1637,7 +1701,7 @@ def _connector_bind_config(profile_dir: pathlib.Path, plugin: str, enabled: bool
         servers.pop(name, None)
         if isinstance(allowed, list):
             allowed = [item for item in allowed if item != name]
-        field_env = _entry_field_env(plugin, owned)
+        field_env = _bind_entry_env(manifest, owned)
         kept = [line for line in env_lines if _env_line_key(line) not in field_env]
         new_env = "".join(kept).encode("utf-8") if originals[env_path] is not None else None
         state.pop(plugin)
@@ -1879,10 +1943,11 @@ async def _connector_request(request):
                                  "policy_hook": _policy_hook_active(profile_dir, config, state)}, status_code=200)
         if body["enabled"] and "bind" in body:
             # 붙이는 요청 안에서 보관 파일을 읽는다. 보관 파일 쓰기와 같은 잠금 안이라 그 사이에 바뀌지 않는다.
-            manifest = _connector_manifest(body["plugin"])
+            # 파일을 읽는 동안 이벤트 루프를 막지 않는다.
+            manifest = await asyncio.to_thread(_connector_manifest, body["plugin"])
             if manifest is None:
                 raise ValueError("쓸 수 없는 connector 는 설치하지 않는다")
-            stored = _read_vault(body["bind"]["vault"])
+            stored = await asyncio.to_thread(_read_vault, body["bind"]["vault"])
             if stored is None or stored["connector"] != body["plugin"]:
                 return _rejected("그 connector 의 보관 파일이 없다")
             values = _vault_values(manifest, stored["values"])

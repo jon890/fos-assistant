@@ -755,7 +755,7 @@ test("관리자 목록은 선언하지 않은 도구가 있는 연결을 단추 
   await page.goto("/admin/connections");
   const panel = page.getByTestId("connector-admin-panel");
   await expect(panel).toContainText("도구 확인 사용자");
-  await expect(panel).toContainText("연결됨");
+  await expect(panel).toContainText("붙음");
   await expect(panel.getByTestId("admin-undeclared")).toContainText(
     "선언하지 않은 도구 1개",
   );

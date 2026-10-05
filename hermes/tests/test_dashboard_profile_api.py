@@ -1584,6 +1584,97 @@ class ProfileApiRouteTest(unittest.TestCase):
         self.assertEqual(list((self.root / "alice/skills").iterdir()), [])
         self.assertIs(self.bind(OTHER, enabled=False).body["changed"], False)
 
+    def test_detaching_after_the_operator_changes_the_run_definition_removes_server_env_and_skills(self):
+        """운영자가 커넥터의 실행 정의를 바꾸거나 운영 목록에서 빼도 떼기는 그 서버와 이름과 env 와 스킬을 지운다."""
+        demo, _ = self.bind_fixture()
+        alice = self.root / "alice"
+        for label in ("run definition changed", "removed from operator list"):
+            with self.subTest(label):
+                self.assertEqual(self.vault("PUT", vault="c1", connector=DEMO,
+                                            values={"token": DEMO_VALUE, "scope": "a"}).status_code, 200)
+                self.assertEqual(self.bind(DEMO, "c1").status_code, 200)
+                self.assertEqual(self.bind(OTHER, "c2").status_code, 200)
+                (alice / ".env").write_text((alice / ".env").read_text(encoding="utf-8") + "KEEP=me\n",
+                                            encoding="utf-8")
+                declared = json.loads((demo / ".mcp.json").read_text(encoding="utf-8"))
+                original = json.dumps(declared)
+                if label == "run definition changed":
+                    # 서버의 실행 인자와 칸 env 이름이 함께 바뀐다. 지금 manifest 로는 기록을 검증할 수 없다.
+                    server = declared["mcpServers"]["demo"]
+                    server["args"].append("--verbose")
+                    server["env"]["DEMO_SECRET"] = server["env"].pop("DEMO_TOKEN").replace("TOKEN", "SECRET")
+                    connector_json = json.loads((demo / "connector.json").read_text(encoding="utf-8"))
+                    connector_original = json.dumps(connector_json)
+                    connector_json["fields"][0]["env"] = "DEMO_SECRET"
+                    (demo / "connector.json").write_text(json.dumps(connector_json), encoding="utf-8")
+                    (demo / ".mcp.json").write_text(json.dumps(declared), encoding="utf-8")
+                    context = contextlib.nullcontext()
+                else:
+                    connector_original = None
+                    roots = json.loads(os.environ["FOS_ASSISTANT_CONNECTOR_ROOTS"])
+                    roots.pop(DEMO)
+                    context = mock.patch.dict(os.environ, {"FOS_ASSISTANT_CONNECTOR_ROOTS": json.dumps(roots)})
+                with context:
+                    removed = self.bind(DEMO, enabled=False)
+                self.assertEqual(removed.status_code, 200, removed.body)
+                self.assertIs(removed.body["changed"], True)
+                config = self.alice_config()
+                self.assertNotIn("demo", config["mcp_servers"])
+                self.assertEqual(config["platform_toolsets"]["api_server"],
+                                 ["delegation", "fos-assistant", "terminal", "other"])
+                self.assertEqual((alice / ".env").read_text(encoding="utf-8").splitlines(),
+                                 ["OTHER_TOKEN=" + OTHER_VALUE, "OTHER_SCOPE=a", "KEEP=me"])
+                self.assertFalse((alice / "skills/demo").exists())
+                self.assertEqual(sorted(json.loads((alice / ".fos-connectors.json").read_text())), [OTHER])
+                # 다음 경우를 위해 되돌린다.
+                (demo / ".mcp.json").write_text(original, encoding="utf-8")
+                if connector_original is not None:
+                    (demo / "connector.json").write_text(connector_original, encoding="utf-8")
+                self.assertEqual(self.bind(OTHER, enabled=False).status_code, 200)
+                (alice / ".env").write_text("", encoding="utf-8")
+
+    def test_detaching_refuses_a_binding_entry_whose_names_cannot_be_paths(self):
+        """떼기는 기록을 모양만 보지만, 지울 서버 이름이나 스킬 이름이 경로 조각이 될 수 없으면 아무 파일도 바꾸지 않는다."""
+        self.bind_fixture()
+        self.assertEqual(self.bind(DEMO, "c1").status_code, 200)
+        state_path = self.root / "alice/.fos-connectors.json"
+        record = json.loads(state_path.read_text(encoding="utf-8"))
+        record[DEMO]["skills"] = ["../outside"]
+        state_path.write_text(json.dumps(record), encoding="utf-8")
+        before = self.tree("alice")
+
+        self.assertEqual(self.bind(DEMO, enabled=False).status_code, 503)
+
+        self.assertEqual(self.tree("alice"), before)
+
+    def test_values_with_quotes_and_backslashes_round_trip_through_vault_binding_and_import(self):
+        """`"` 와 `\\` 가 든 값은 보관 파일에서 바인딩 `.env` 로 쓰인 뒤 실행과 옮기기가 같은 값으로 읽는다."""
+        self.bind_fixture()
+        tricky = 'a "quoted" path\\to\\ dir #1'
+        self.assertEqual(self.vault("PUT", vault="c1", connector=DEMO,
+                                    values={"token": DEMO_VALUE, "scope": tricky}).status_code, 200)
+        self.assertEqual(self.bind(DEMO, "c1").status_code, 200)
+
+        env_text = (self.root / "alice/.env").read_text(encoding="utf-8")
+        self.assertIn('DEMO_SCOPE="', env_text)
+        self.assertEqual(self.plugin._env_value(env_text, "DEMO_SCOPE"), tricky)
+        self.assertEqual(self.plugin._env_value(env_text, "DEMO_TOKEN"), DEMO_VALUE)
+        # 옮기기는 그 profile 의 `.env` 를 읽어 새 보관 파일을 만든다. 처음 보관한 값과 같아야 한다.
+        imported = self.vault("POST", VAULT_IMPORT, vault="c7", connector=DEMO, profile="alice")
+        self.assertEqual(imported.status_code, 200, imported.body)
+        self.assertEqual(json.loads((self.hermes_root / "connector-vault/c7.json").read_text())["values"],
+                         {"token": DEMO_VALUE, "scope": tricky})
+
+    def test_env_value_reads_what_env_line_writes(self):
+        """`_env_value` 는 `_env_line` 의 역이고 `export` 꼴과 `=` 둘레의 공백과 작은따옴표도 읽는다."""
+        for value in ('plain', 'a "b" c', 'back\\slash', 'end\\', '"', "it's #hash", ""):
+            with self.subTest(value=value):
+                self.assertEqual(self.plugin._env_value(self.plugin._env_line("K", value), "K"), value)
+        self.assertEqual(self.plugin._env_value('export K="x \\" y"\n', "K"), 'x " y')
+        self.assertEqual(self.plugin._env_value("K = 'single \\ kept'\n", "K"), "single \\ kept")
+        self.assertEqual(self.plugin._env_value("K=first\nOTHER=x\nK=last\n", "K"), "last")
+        self.assertEqual(self.plugin._env_value("KK=x\n", "K"), "")
+
     def test_binding_failures_change_no_file(self):
         """기록 없는 env 와 겹치거나, 스킬 디렉터리가 있거나, 방식이 섞이거나, 표식이 없거나, 보관 파일이 맞지 않으면 아무 파일도 바꾸지 않는다."""
         _, other = self.bind_fixture()

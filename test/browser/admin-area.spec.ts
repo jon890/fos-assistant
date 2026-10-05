@@ -216,7 +216,7 @@ test("관리자 연결 목록은 붙인 에이전트마다 한 줄이고 한 줄
     await first.getByRole("button", { name: "반영 완료" }).click();
 
     // 반영된 줄은 단추가 사라진다. 시험 서버가 선언하지 않은 도구를 하나 내므로 그 표시와 함께 목록에 남는다.
-    await expect(first).toContainText("연결됨");
+    await expect(first).toContainText("붙음");
     await expect(first.getByRole("button", { name: "반영 완료" })).toHaveCount(0);
     await expect(second).toContainText("반영 대기");
     await expect(second.getByRole("button", { name: "반영 완료" })).toBeVisible();

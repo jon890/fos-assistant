@@ -854,6 +854,42 @@ class ConnectorConnectionServiceTest {
     }
 
     @Test
+    @DisplayName("재시작 대기 바인딩의 서버 이름이 비었으면 연결 확인이 설치를 다시 보내지 않고 manifest 의 이름으로 채운다")
+    void checkRecordsServerNameOfRestartPendingBinding() {
+        CurrentUser user = user(UserRole.MEMBER, 1L);
+        service.register(user, DEMO, VALUES);
+        ConnectorBinding binding = ConnectorBinding.pending(agent(user, false), stored(user), null, NOW);
+        binding.installed(true, NOW);
+        bindings.save(binding);
+
+        service.check(user, DEMO);
+
+        ConnectorBinding checked = bindings.findById(binding.id()).orElseThrow();
+        assertThat(checked.mcpServer()).isEqualTo("demo");
+        assertThat(checked.status()).isEqualTo(BindingStatus.PENDING);
+        assertThat(checked.restartRequired()).isTrue();
+        verify(connector, never()).bindConnector(anyString(), anyString(), anyString());
+    }
+
+    @Test
+    @DisplayName("보관 파일이 없고 옛 바인딩도 없는 연결의 확인은 확인 도구를 부르지 않고 PENDING 을 커밋하며 CONNECTOR_NOT_CONNECTED 다")
+    void checkWithoutVaultOrLegacyBindingAsksToRegisterAgain() {
+        CurrentUser user = user(UserRole.MEMBER, 1L);
+        legacyConnection(user);
+
+        assertCode(() -> service.check(user, DEMO), ErrorCode.CONNECTOR_NOT_CONNECTED);
+
+        verify(connector, never()).importVault(anyString(), anyString(), anyString());
+        verify(connector, never()).callWithVault(anyString(), anyString(), anyString());
+        assertThat(stored(user).status()).isEqualTo(ConnectionStatus.PENDING);
+        assertThat(stored(user).vaultStored()).isFalse();
+
+        // 값을 다시 등록하면 보관 파일이 생기고 확인이 다시 된다.
+        service.register(user, DEMO, VALUES);
+        assertThat(service.check(user, DEMO).status()).isEqualTo(ConnectionStatus.READY);
+    }
+
+    @Test
     @DisplayName("다시 보낸 설치가 바뀐 것이 있다고 답하면 그 시각으로 재시작 대기가 시작된다")
     void checkStartsRestartWaitWhenReinstallChangesSomething() {
         CurrentUser user = user(UserRole.MEMBER, 1L);

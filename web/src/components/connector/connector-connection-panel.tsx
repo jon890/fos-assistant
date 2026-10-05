@@ -262,6 +262,14 @@ export function ConnectorConnectionPanel({ id }: { id: string }) {
       return setError(result.message);
     }
     setPending(null);
+    if (
+      !result.ok &&
+      kind === "check" &&
+      result.code === "CONNECTOR_NOT_CONNECTED"
+    ) {
+      // 확인할 값이 남아 있지 않다. 이 화면이 연결 화면이므로 공통 문구 대신 값을 다시 넣으라고 알린다.
+      return setError("값을 다시 입력해 연결해 주세요.");
+    }
     if (!result.ok) return setError(result.message);
     setLoaded({ kind: "ready", connector, connection: result.data });
   }

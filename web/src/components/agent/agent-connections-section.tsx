@@ -37,6 +37,7 @@ type Props = {
 
 const BLOCKED_MESSAGES: Record<AgentConnectionBlock, string> = {
   AGENT_NOT_PRIVATE: "비공개 에이전트에만 붙일 수 있어요.",
+  // 서버가 돌려줄 수 있어 타입과 문구를 채워 둔다. 지금 화면은 옛 에이전트에서 이 절을 그리지 않는다.
   LEGACY_AGENT:
     "예전 방식의 연결 에이전트에는 붙일 수 없어요. 쓰던 에이전트에 붙여 주세요.",
 };
@@ -203,8 +204,9 @@ export function AgentConnectionsSection({
     null,
   );
   // 공개 범위는 이 화면에서 바뀔 수 있다. 그룹 공개를 비공개로 되돌리면 다시 붙일 수 있다.
+  // 공개 범위를 모르면 서버가 준 까닭을 그대로 쓴다.
   const blockedReason: AgentConnectionBlock | null =
-    initialBlockedReason === "LEGACY_AGENT"
+    visibility === undefined || initialBlockedReason === "LEGACY_AGENT"
       ? initialBlockedReason
       : visibility === GROUP_VISIBILITY
         ? "AGENT_NOT_PRIVATE"
@@ -259,13 +261,15 @@ export function AgentConnectionsSection({
     >
       <h2 className="font-semibold">이 에이전트가 쓰는 연결</h2>
       {connections.length === 0 ? (
-        <p className="mt-2 text-sm">
+        <p className="mt-2 text-sm text-muted-foreground">
+          아직 연결한 계정이 없어요.{" "}
           <Link
             href="/connections"
             className="text-foreground underline underline-offset-4"
           >
             연결 화면
           </Link>
+          에서 먼저 연결해요.
         </p>
       ) : (
         <>

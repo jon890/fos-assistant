@@ -912,13 +912,17 @@ export function startFakeHermes(
         send(response, 400, { error: "invalid connector request" });
         return;
       }
+      connectorRequests.push(`unbind ${profile}`);
+      // 그 profile 에 붙지 않은 커넥터는 뗄 것이 없다. 실제 대시보드처럼 아무것도 바꾸지 않고 바뀐 것 없이 답한다.
+      if (!bound.delete(plugin)) {
+        answer(false, false);
+        return;
+      }
       const env = envOf(profile);
       for (const field of connector.fields) delete env[field.env];
       if (toolsets !== undefined) {
         apiServerToolsets.set(profile, toolsets.filter((name) => name !== connector.mcp_server));
       }
-      bound.delete(plugin);
-      connectorRequests.push(`unbind ${profile}`);
       answer(true, false);
       return;
     }

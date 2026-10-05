@@ -30,9 +30,13 @@ import org.springframework.web.bind.annotation.RestController;
  * 브라우저 검사에서 예전 방식의 연결 에이전트를 만든다.
  *
  * <p>연결 등록은 더는 커넥터마다 에이전트를 만들지 않는다(ADR-083). 옛 커넥터 에이전트는 운영의 마이그레이션이 남긴 것뿐이라
- * 브라우저 검사가 만들 길이 없어, 운영 코드에 문을 더하지 않고 여기서 저장소로 직접 넣는다. 모양은 마이그레이션이 옛 연결마다
- * 채운 것과 같다. 에이전트는 Control Plane 이 profile 을 만든 비공개 에이전트이고, 연결은 값이 보관 파일에 있는 {@code READY}
- * 이며, 그 둘의 바인딩은 {@code READY} 이고 서버 이름이 비어 있다.
+ * 브라우저 검사가 만들 길이 없어, 운영 코드에 문을 더하지 않고 여기서 저장소로 직접 넣는다. 에이전트와 바인딩의 모양은
+ * 마이그레이션이 옛 연결마다 채운 것과 같다. 에이전트는 Control Plane 이 profile 을 만든 비공개 에이전트이고, 연결과의 바인딩은
+ * {@code READY} 이고 서버 이름이 비어 있다.
+ *
+ * <p>연결만 마이그레이션의 모양과 다르다. 마이그레이션이 채운 옛 연결은 값이 그 에이전트의 profile 에만 있어
+ * {@code vault_stored} 가 거짓이지만, 여기서는 값이 이미 보관 파일에 있는 {@code READY} 연결({@code vault_stored} 참)로 둔다.
+ * 시험 대역의 profile 에는 옛 설치와 그 값이 없어, 거짓으로 두면 에이전트를 지울 때 보관 파일로 옮기기가 실패해 지우지 못한다.
  */
 @RestController
 @RequestMapping("/api/v1/test-support/connector")

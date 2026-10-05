@@ -42,7 +42,9 @@ import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 /**
  * 연결을 에이전트에 붙이고 떼고, 붙인 바인딩을 그 profile 의 설치와 맞춘다(ADR-083).
@@ -76,9 +78,17 @@ public class ConnectorBindingService implements AgentConnectorDetacher {
     private final HermesToolsetClient toolsets;
     private final SkillPublisher skills;
     private final ConnectorActionService approvals;
+    private final TransactionTemplate transactions;
     private final Clock clock;
 
-    // 검사가 시각을 고정할 수 있게 Clock 을 받는 생성자를 따로 둔다.
+    /**
+     * 반영 완료의 트랜잭션이 본 결과다. 확인하지 못한 상태도 커밋한 뒤에 실패를 알리려고 값으로 돌려준다.
+     *
+     * @param view 반영을 확인한 바인딩의 모습. 확인하지 못했으면 null
+     */
+    private record Confirmed(AgentConnectionView view) {}
+
+    // TransactionTemplate 은 transaction manager 로 여기서 만들고, 검사가 시각을 고정할 수 있게 Clock 을 받는 생성자를 따로 둔다.
     @Autowired
     public ConnectorBindingService(
             ConnectorBindingRepository bindings,
@@ -88,8 +98,19 @@ public class ConnectorBindingService implements AgentConnectorDetacher {
             HermesConnectorClient connector,
             HermesToolsetClient toolsets,
             SkillPublisher skills,
-            ConnectorActionService approvals) {
-        this(bindings, connections, agents, users, connector, toolsets, skills, approvals, Clock.systemUTC());
+            ConnectorActionService approvals,
+            PlatformTransactionManager transactionManager) {
+        this(
+                bindings,
+                connections,
+                agents,
+                users,
+                connector,
+                toolsets,
+                skills,
+                approvals,
+                transactionManager,
+                Clock.systemUTC());
     }
 
     public ConnectorBindingService(
@@ -101,6 +122,7 @@ public class ConnectorBindingService implements AgentConnectorDetacher {
             HermesToolsetClient toolsets,
             SkillPublisher skills,
             ConnectorActionService approvals,
+            PlatformTransactionManager transactionManager,
             Clock clock) {
         this.bindings = bindings;
         this.connections = connections;
@@ -110,6 +132,7 @@ public class ConnectorBindingService implements AgentConnectorDetacher {
         this.toolsets = toolsets;
         this.skills = skills;
         this.approvals = approvals;
+        this.transactions = new TransactionTemplate(transactionManager);
         this.clock = clock;
     }
 
@@ -225,8 +248,15 @@ public class ConnectorBindingService implements AgentConnectorDetacher {
      * <p>{@code shownSince} 는 관리자 목록에 보였던 그 바인딩의 재시작 대기 시작 시각이다. 바인딩의 값이 그보다 늦으면 관리자가
      * 재시작한 뒤에 다시 설치된 것이라 대기를 풀지 않고 거절한다. 두 값이 모두 비었으면 같은 값으로 본다. 마이그레이션이 채우지
      * 못한 옛 바인딩이다. 같으면 설치를 한 번 다시 보내 반영됐는지 본다.
+     *
+     * <p>반영을 확인한 때만 대기를 푼다. 설치를 다시 보냈는데 configured 나 probe 가 실패하면 {@code PENDING} 과 재시작
+     * 대기로 남고, 그 상태를 커밋한 뒤 연결 실패로 끝낸다.
+     *
+     * <p>붙이기와 같은 차례로 주인의 사용자 행 다음에 에이전트 행을 잠근다. 에이전트 id 와 주인 id 는 트랜잭션 밖에서 읽고,
+     * 트랜잭션의 첫 문장이 주인의 사용자 행 잠금이다. MySQL 의 REPEATABLE READ 는 첫 일반 읽기에서 읽기 시점을 정하므로,
+     * 잠금 없는 읽기가 먼저 오면 사용자 행 잠금을 기다린 뒤에도 등록이 커밋한 새 재시작 대기 시각을 보지 못한다. 잠근 뒤 주인이
+     * 바뀌었으면 {@code AGENT_BUSY} 다.
      */
-    @Transactional(noRollbackFor = ConnectorOperationFailure.class)
     public AgentConnectionView confirmApplied(
             CurrentUser admin, String agentCode, String connectorId, Instant shownSince) {
         if (!admin.isAdmin()) {
@@ -235,14 +265,37 @@ public class ConnectorBindingService implements AgentConnectorDetacher {
         Agent found = agents.findByCode(agentCode)
                 .filter(agent -> !agent.isDeleted())
                 .orElseThrow(ConnectorBindingService::agentNotFound);
+        Long agentId = found.id();
         Long ownerId = found.ownerUserId();
-        AppUser owner =
-                ownerId == null ? null : users.findByIdForUpdate(ownerId).orElse(null);
+        if (ownerId == null) {
+            throw new ApiException(ErrorCode.FORBIDDEN, "no such user");
+        }
+        Confirmed confirmed =
+                transactions.execute(status -> confirmLocked(admin, agentId, ownerId, connectorId, shownSince));
+        if (confirmed == null || confirmed.view() == null) {
+            throw new ConnectorOperationFailure();
+        }
+        return confirmed.view();
+    }
+
+    /**
+     * 반영 완료의 트랜잭션이다. 트랜잭션 안에서만 부른다.
+     *
+     * @return 반영을 확인했으면 그 바인딩의 모습. 확인하지 못했으면 view 가 null 이고, 바인딩의 상태는 커밋된다
+     */
+    private Confirmed confirmLocked(
+            CurrentUser admin, Long agentId, Long ownerId, String connectorId, Instant shownSince) {
+        AppUser owner = users.findByIdForUpdate(ownerId).orElse(null);
         if (owner == null || !owner.groupId().equals(admin.groupId())) {
             throw new ApiException(ErrorCode.FORBIDDEN, "no such user");
         }
-        // 붙이기와 같은 차례로 주인의 사용자 행 다음에 에이전트 행을 잠근다. 잠금을 기다린 뒤 바인딩을 새로 읽는다.
-        Agent agent = agents.findByIdForUpdate(found.id()).orElseThrow(ConnectorBindingService::agentNotFound);
+        Agent agent = agents.findByIdForUpdate(agentId)
+                .filter(candidate -> !candidate.isDeleted())
+                .orElseThrow(ConnectorBindingService::agentNotFound);
+        if (!Objects.equals(agent.ownerUserId(), ownerId)) {
+            // 주인을 읽은 뒤 바뀌었다. 잠근 사용자 행이 지금 주인의 것이 아니다.
+            throw new ApiException(ErrorCode.AGENT_BUSY, "the agent owner changed while confirming");
+        }
         ConnectorConnection connection = connections
                 .findByUserIdAndConnectorId(ownerId, connectorId)
                 .orElseThrow(ConnectorBindingService::notBound);
@@ -257,9 +310,9 @@ public class ConnectorBindingService implements AgentConnectorDetacher {
         boolean failed = resync(binding, manifest, true);
         bindings.save(binding);
         if (failed || binding.status() != BindingStatus.READY) {
-            throw new ConnectorOperationFailure();
+            return new Confirmed(null);
         }
-        return view(connection, binding, manifest.orElse(null));
+        return new Confirmed(view(connection, binding, manifest.orElse(null)));
     }
 
     /**
@@ -387,14 +440,15 @@ public class ConnectorBindingService implements AgentConnectorDetacher {
      */
     public boolean resync(ConnectorBinding binding, Optional<ConnectorManifest> manifest, boolean afterRestart) {
         Instant now = now();
+        // 재시작 대기로 일찍 돌아가도 서버 이름은 채운다. 관리자 반영 완료의 probe 가 그 이름을 쓴다.
+        if (binding.mcpServer() == null && manifest.isPresent()) {
+            binding.recordServer(manifest.get().mcpServer());
+        }
         if ((!afterRestart && binding.restartRequired()) || manifest.isEmpty()) {
             binding.pending(now);
             return false;
         }
         ConnectorManifest declared = manifest.get();
-        if (binding.mcpServer() == null) {
-            binding.recordServer(declared.mcpServer());
-        }
         Agent agent = binding.agent();
         boolean legacy = agent.connectorManaged();
         String profile = agent.hermesProfile();
