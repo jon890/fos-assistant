@@ -31,6 +31,14 @@ DEMO_BASE = "http://demo.test/base"
 # 앞선 판의 plugin 이 이름으로 알던 커넥터다. 그 판이 남긴 소유 기록을 인정하는지 보는 검사만 쓴다.
 LEGACY = "fos-accountbook"
 LEGACY_BASE = "http://legacy.test/base"
+# 바인딩 설치 검사가 시험 커넥터와 함께 붙이는 두 번째 커넥터다. 시험 커넥터를 복사해 이름과 env 이름만 바꾼다.
+OTHER = "other-notes"
+OTHER_BASE = "http://other.test/base"
+# 보관 파일에 넣는 칸 값이다. 응답과 백업 어디에도 나오면 안 된다.
+DEMO_VALUE = "demo_ok_0123456789"
+OTHER_VALUE = "other_1234"
+VAULT = "/api/connector-vault"
+VAULT_IMPORT = "/api/connector-vault/import"
 
 # 설정이 없을 때 API 경로가 떨어지는 복합 toolset 을 줄여 흉내 낸다.
 WIDE_TOOLSETS = {"code_execution", "delegation", "file", "memory", "terminal", "web"}
@@ -469,7 +477,7 @@ class ProfileApiRouteTest(unittest.TestCase):
         self.assertEqual(self.connector_probe(), 204)
         status = self.connector_status()
         self.assertEqual(status.status_code, 200)
-        self.assertEqual(status.body["connectors"], [{"plugin": DEMO, "enabled": True, "configured": True}])
+        self.assertEqual(status.body["connectors"], [{"plugin": DEMO, "enabled": True, "configured": True, "mode": "isolated"}])
         self.assertEqual(self.connector(False).status_code, 200)
 
     def test_installed_connector_is_blocked_when_operator_env_value_changes(self):
@@ -491,7 +499,7 @@ class ProfileApiRouteTest(unittest.TestCase):
         with self.without_environment("FOS_ASSISTANT_CONNECTOR_ROOTS"):
             status = self.connector_status()
             self.assertEqual(status.status_code, 200)
-            self.assertEqual(status.body["connectors"], [{"plugin": DEMO, "enabled": True, "configured": False}])
+            self.assertEqual(status.body["connectors"], [{"plugin": DEMO, "enabled": True, "configured": False, "mode": "isolated"}])
             self.assertEqual(self.connector_probe(), 404)
             self.assertEqual(self.connector(True).status_code, 400)
             self.assertIn("demo", self.alice_config()["mcp_servers"])
@@ -630,7 +638,7 @@ class ProfileApiRouteTest(unittest.TestCase):
         config["platform_toolsets"]["api_server"] = ["fos-assistant", "demo"]
         path.write_text(yaml.safe_dump(config, sort_keys=False, allow_unicode=True), encoding="utf-8")
         self.assertEqual(self.connector_status().body["connectors"],
-                         [{"plugin": DEMO, "enabled": True, "configured": False}])
+                         [{"plugin": DEMO, "enabled": True, "configured": False, "mode": "isolated"}])
         installed = self.connector()
         self.assertEqual(installed.status_code, 200)
         self.assertTrue(installed.body["changed"])
@@ -639,7 +647,7 @@ class ProfileApiRouteTest(unittest.TestCase):
         self.assertEqual(config["platform_toolsets"]["api_server"], ["demo"])
         self.assertNotIn("fos-assistant", config["mcp_servers"])
         self.assertEqual(self.connector_status().body["connectors"],
-                         [{"plugin": DEMO, "enabled": True, "configured": True}])
+                         [{"plugin": DEMO, "enabled": True, "configured": True, "mode": "isolated"}])
 
     def test_connector_install_works_without_control_plane_mcp_in_allowlist(self):
         """목록에 Control Plane MCP 가 없는 관리 profile 에도 설치하고 목록을 커넥터 서버만으로 쓴다."""
@@ -692,12 +700,12 @@ class ProfileApiRouteTest(unittest.TestCase):
         self.assertEqual(config["platform_toolsets"]["api_server"], ["demo", "vision"])
         self.assertNotIn("fos-assistant", config["mcp_servers"])
         self.assertEqual(self.connector_status().body["connectors"],
-                         [{"plugin": DEMO, "enabled": True, "configured": True}])
+                         [{"plugin": DEMO, "enabled": True, "configured": True, "mode": "isolated"}])
         # 선언이 바뀌면 같은 목록이 아니라 설치가 덜 된 것으로 보고, 다시 설치하면 새 목록이 된다.
         del declared["toolsets"]
         manifest.write_text(json.dumps(declared), encoding="utf-8")
         self.assertEqual(self.connector_status().body["connectors"],
-                         [{"plugin": DEMO, "enabled": True, "configured": False}])
+                         [{"plugin": DEMO, "enabled": True, "configured": False, "mode": "isolated"}])
         self.assertEqual(self.connector().status_code, 200)
         self.assertEqual(self.alice_config()["platform_toolsets"]["api_server"], ["demo"])
         # 마지막 커넥터를 끄면 선언한 toolset 도 남지 않는다.
@@ -809,7 +817,7 @@ class ProfileApiRouteTest(unittest.TestCase):
         self.assertEqual((self.root / "alice/config.yaml").read_bytes(), before)
         self.assertFalse((self.root / "alice/.fos-connectors.json").exists())
         self.assertEqual(self.connector_status().body["connectors"],
-                         [{"plugin": DEMO, "enabled": False, "configured": False}])
+                         [{"plugin": DEMO, "enabled": False, "configured": False, "mode": "isolated"}])
         # 이름 형식 검사와 관리 표식 검사는 끄기에도 그대로 걸린다.
         self.assertEqual(self.connector(False, plugin="unknown", profile="owner").status_code, 401)
         self.assertEqual(self.connector(False, plugin="../demo-notes").status_code, 400)
@@ -849,7 +857,7 @@ class ProfileApiRouteTest(unittest.TestCase):
         self.connector()
         response = self.connector_status()
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.body["connectors"], [{"plugin": DEMO, "enabled": True, "configured": True}])
+        self.assertEqual(response.body["connectors"], [{"plugin": DEMO, "enabled": True, "configured": True, "mode": "isolated"}])
         self.assertNotIn(DEMO_BASE, json.dumps(response.body))
         self.assertEqual(self.connector_probe(), 204)
         # 설치한 커넥터의 서버가 아니면 등록된 MCP 서버여도 넘기지 않는다.
@@ -1165,7 +1173,7 @@ class ProfileApiRouteTest(unittest.TestCase):
                                   "erase": {"risk": "WRITE", "approval": "always"}})
         status = self.connector_status()
         self.assertEqual(status.status_code, 200)
-        self.assertEqual(status.body["connectors"], [{"plugin": DEMO, "enabled": True, "configured": True}])
+        self.assertEqual(status.body["connectors"], [{"plugin": DEMO, "enabled": True, "configured": True, "mode": "isolated"}])
         self.assertIs(self.policy_hook(), False)
 
         self.assertEqual(self.connector().status_code, 200)
@@ -1306,7 +1314,7 @@ class ProfileApiRouteTest(unittest.TestCase):
         # 앞선 판의 목록에는 Control Plane MCP 가 함께 있다. 다시 설치하기 전에는 설치가 덜 된 것이다.
         status = self.connector_status()
         self.assertEqual(status.status_code, 200)
-        self.assertEqual(status.body["connectors"], [{"plugin": LEGACY, "enabled": True, "configured": False}])
+        self.assertEqual(status.body["connectors"], [{"plugin": LEGACY, "enabled": True, "configured": False, "mode": "isolated"}])
         self.assertEqual(self.connector_probe("accountbook"), 204)
         self.assertEqual(record_path.read_bytes(), record_before)
 
@@ -1337,7 +1345,7 @@ class ProfileApiRouteTest(unittest.TestCase):
                                                    "ACCOUNTBOOK_FAMILY_UUID": ""})
         self.assertEqual(self.alice_config()["mcp_servers"]["accountbook"], record["server"])
         self.assertEqual(self.connector_status().body["connectors"],
-                         [{"plugin": LEGACY, "enabled": True, "configured": True}])
+                         [{"plugin": LEGACY, "enabled": True, "configured": True, "mode": "isolated"}])
         self.assertEqual(self.connector_probe("accountbook"), 204)
 
     def test_legacy_ownership_record_meets_a_manifest_that_excludes_tools(self):
@@ -1347,7 +1355,7 @@ class ProfileApiRouteTest(unittest.TestCase):
                            {"list_families": {"risk": "READ"}, "purge": {"risk": "DESTRUCTIVE"}})
         status = self.connector_status()
         self.assertEqual(status.status_code, 200)
-        self.assertEqual(status.body["connectors"], [{"plugin": LEGACY, "enabled": True, "configured": False}])
+        self.assertEqual(status.body["connectors"], [{"plugin": LEGACY, "enabled": True, "configured": False, "mode": "isolated"}])
         self.assertIs(status.body["policy_hook"], False)
         self.assertNotIn("tools", legacy)
 
@@ -1359,7 +1367,7 @@ class ProfileApiRouteTest(unittest.TestCase):
         record = json.loads((self.root / "alice/.fos-connectors.json").read_text(encoding="utf-8"))
         self.assertEqual(record[LEGACY]["server"], server)
         status = self.connector_status()
-        self.assertEqual(status.body["connectors"], [{"plugin": LEGACY, "enabled": True, "configured": True}])
+        self.assertEqual(status.body["connectors"], [{"plugin": LEGACY, "enabled": True, "configured": True, "mode": "isolated"}])
         self.assertIs(status.body["policy_hook"], True)
 
         self.assertEqual(self.connector(False, plugin=LEGACY).status_code, 200)
@@ -1393,12 +1401,464 @@ class ProfileApiRouteTest(unittest.TestCase):
         self.legacy_fixture()
         with self.without_environment("FOS_ASSISTANT_CONNECTOR_ROOTS"):
             self.assertEqual(self.connector_status().body["connectors"],
-                             [{"plugin": LEGACY, "enabled": True, "configured": False}])
+                             [{"plugin": LEGACY, "enabled": True, "configured": False, "mode": "isolated"}])
             self.assertEqual(self.connector(False, plugin=LEGACY).status_code, 200)
         config = self.alice_config()
         self.assertNotIn("accountbook", config["mcp_servers"])
         self.assertEqual(config["platform_toolsets"]["api_server"], ["no_mcp"])
         self.assertEqual((self.root / "alice/.env").read_text(encoding="utf-8"), "OTHER=keep\n")
+
+    def other_connector(self):
+        """시험 커넥터를 복사해 이름, 서버 이름, env 이름, 스킬 이름을 바꾼 두 번째 커넥터를 만든다."""
+        root = self.root.parent / "other-connector"
+        shutil.copytree(DEMO_CONNECTOR, root)
+        declared = json.loads((root / "connector.json").read_text(encoding="utf-8"))
+        declared.update(id=OTHER, title="다른 메모", operator_env=["OTHER_BASE"])
+        declared["fields"][0].update(env="OTHER_TOKEN", pattern="^other_[0-9]{4}$")
+        declared["fields"][1].update(env="OTHER_SCOPE")
+        (root / "connector.json").write_text(json.dumps(declared), encoding="utf-8")
+        (root / ".mcp.json").write_text(json.dumps({"mcpServers": {"other": {
+            "command": "python3", "args": ["${CLAUDE_PLUGIN_ROOT}/server.py"],
+            "env": {"OTHER_TOKEN": "${OTHER_TOKEN}", "OTHER_SCOPE": "${OTHER_SCOPE:-}", "OTHER_BASE": "${OTHER_BASE}"},
+        }}}), encoding="utf-8")
+        (root / ".claude-plugin/plugin.json").write_text(json.dumps({"name": OTHER, "skills": "./skills"}),
+                                                         encoding="utf-8")
+        shutil.rmtree(root / "skills/demo")
+        (root / "skills/other-dir").mkdir()
+        (root / "skills/other-dir/SKILL.md").write_text(
+            "---\nname: other\ndescription: 두 번째 커넥터의 스킬이다.\n---\n\n# 다른 메모\n", encoding="utf-8")
+        return root
+
+    def bind_fixture(self):
+        """바인딩 설치 검사의 준비다. 커넥터 둘을 운영 목록에 올리고 일반 에이전트의 관리 profile 과 보관 파일 둘을 둔다."""
+        self.make_profile("alice")
+        self.plugin._apply_template("alice")
+        demo = self.root.parent / "demo-connector"
+        shutil.copytree(DEMO_CONNECTOR, demo)
+        (demo / "skills/demo/references").mkdir()
+        (demo / "skills/demo/references/guide.md").write_text("범위를 고르는 법\n", encoding="utf-8")
+        other = self.other_connector()
+        self.connector_environment({DEMO: {"root": str(demo), "env": {"DEMO_BASE": DEMO_BASE}},
+                                    OTHER: {"root": str(other), "env": {"OTHER_BASE": OTHER_BASE}}})
+        # 보관 파일은 대시보드의 Hermes 루트 아래에 있다. 검사마다 임시 디렉터리를 루트로 준다.
+        self.hermes_root = self.root.parent / "hermes"
+        self.hermes_root.mkdir()
+        home = mock.patch.object(sys.modules["hermes_constants"], "get_default_hermes_root",
+                                 lambda: str(self.hermes_root))
+        home.start()
+        self.addCleanup(home.stop)
+        # 일반 에이전트는 Control Plane MCP 와 내장 도구를 쓰고 사용자의 성격 본문이 있다.
+        config = self.alice_config()
+        config["platform_toolsets"]["api_server"] = ["delegation", "fos-assistant", "terminal"]
+        self.write_config("alice", config)
+        (self.root / "alice/SOUL.md").write_text("사용자의 성격\n", encoding="utf-8")
+        self.assertEqual(self.vault("PUT", vault="c1", connector=DEMO, values={"token": DEMO_VALUE}).status_code, 200)
+        self.assertEqual(self.vault("PUT", vault="c2", connector=OTHER,
+                                    values={"token": OTHER_VALUE, "scope": "a"}).status_code, 200)
+        return demo, other
+
+    def write_config(self, profile, config):
+        (self.root / profile / "config.yaml").write_text(
+            yaml.safe_dump(config, sort_keys=False, allow_unicode=True), encoding="utf-8")
+
+    def vault(self, method, path=VAULT, **body):
+        return self.request(path, method, token="valid", full_response=True, body=body,
+                            query_profiles=[body["profile"]] if "profile" in body else ())
+
+    def bind(self, plugin=DEMO, vault="c1", profile="alice", enabled=True):
+        body = {"profile": profile, "plugin": plugin, "enabled": enabled}
+        if enabled:
+            body["bind"] = {"vault": vault}
+        return self.request("/api/connectors", "PUT", token="valid", full_response=True, body=body)
+
+    def tree(self, profile):
+        """profile 디렉터리의 모든 파일 내용이다. 실패한 요청이 아무것도 바꾸지 않았는지 볼 때 쓴다."""
+        base = self.root / profile
+        return {str(path.relative_to(base)): path.read_bytes() for path in sorted(base.rglob("*"))
+                if path.is_file() and "__pycache__" not in path.parts}
+
+    def status_of(self, profile="alice"):
+        response = self.request("/api/connectors", "GET", token="valid", query_profiles=[profile],
+                                full_response=True)
+        self.assertEqual(response.status_code, 200)
+        return response.body
+
+    def test_binding_two_connectors_adds_their_names_and_keeps_the_profile(self):
+        """두 커넥터를 차례로 붙이면 도구 목록에 서버 이름만 더해지고 Control Plane MCP 와 SOUL.md 는 그대로이며 스킬이 생긴다."""
+        demo, other = self.bind_fixture()
+        before = self.alice_config()
+        catalog = {entry["id"]: entry["skills"] for entry in
+                   self.request("/api/connectors/catalog", "GET", token="valid", full_response=True).body}
+        self.assertEqual(catalog, {DEMO: ["demo"], OTHER: ["other"]})
+
+        for plugin, vault in ((DEMO, "c1"), (OTHER, "c2")):
+            with self.subTest(plugin):
+                response = self.bind(plugin, vault)
+                self.assertEqual(response.status_code, 200, response.body)
+                self.assertIs(response.body["changed"], True)
+                self.assertIs(response.body["restart_required"], True)
+        config = self.alice_config()
+        self.assertEqual(config["platform_toolsets"]["api_server"],
+                         ["delegation", "fos-assistant", "terminal", "demo", "other"])
+        self.assertEqual(config["mcp_servers"]["fos-assistant"], before["mcp_servers"]["fos-assistant"])
+        self.assertEqual(config["agent"], before["agent"])
+        self.assertEqual(config["mcp_servers"]["demo"]["env"],
+                         {"DEMO_TOKEN": "${DEMO_TOKEN}", "DEMO_SCOPE": "", "DEMO_BASE": DEMO_BASE})
+        self.assertEqual(config["mcp_servers"]["other"]["env"],
+                         {"OTHER_TOKEN": "${OTHER_TOKEN}", "OTHER_SCOPE": "${OTHER_SCOPE}", "OTHER_BASE": OTHER_BASE})
+        self.assertEqual((self.root / "alice/SOUL.md").read_text(encoding="utf-8"), "사용자의 성격\n")
+        env = self.root / "alice/.env"
+        self.assertEqual(env.read_text(encoding="utf-8").splitlines(),
+                         ["DEMO_TOKEN=" + DEMO_VALUE, "OTHER_TOKEN=" + OTHER_VALUE, "OTHER_SCOPE=a"])
+        self.assertEqual(env.stat().st_mode & 0o777, 0o600)
+        for target, source in (("skills/demo/SKILL.md", demo / "skills/demo/SKILL.md"),
+                               ("skills/demo/references/guide.md", demo / "skills/demo/references/guide.md"),
+                               ("skills/other/SKILL.md", other / "skills/other-dir/SKILL.md")):
+            installed = self.root / "alice" / target
+            self.assertEqual(installed.read_bytes(), source.read_bytes(), target)
+            self.assertEqual(installed.stat().st_mode & 0o777, 0o644, target)
+        record = json.loads((self.root / "alice/.fos-connectors.json").read_text(encoding="utf-8"))
+        self.assertEqual(record[DEMO], {"server": config["mcp_servers"]["demo"], "allowlist_added": True,
+                                        "mcp_server": "demo", "mode": "bind", "vault": "c1", "skills": ["demo"]})
+        self.assertEqual(record[OTHER]["skills"], ["other"])
+        self.assertEqual(self.tool_map(), {"v": 1, "isolated": False, "servers": {
+            "demo": {"connector": DEMO, "prefix": "mcp__demo__", "tools": {"mcp__demo__list_scopes": "list_scopes"}},
+            "other": {"connector": OTHER, "prefix": "mcp__other__",
+                      "tools": {"mcp__other__list_scopes": "list_scopes"}}}})
+        status = self.status_of()
+        self.assertEqual(status["connectors"], [
+            {"plugin": DEMO, "enabled": True, "configured": True, "mode": "bind"},
+            {"plugin": OTHER, "enabled": True, "configured": True, "mode": "bind"}])
+        self.assertIs(status["policy_hook"], True)
+
+        repeated = self.bind()
+        self.assertIs(repeated.body["changed"], False)
+        self.assertIs(repeated.body["restart_required"], False)
+        # 스킬 본문이 plugin 과 달라지면 설치가 덜 된 것으로 답하고, 다시 붙이면 plugin 의 본문으로 돌린다.
+        (self.root / "alice/skills/demo/SKILL.md").write_text("바뀐 본문\n", encoding="utf-8")
+        self.assertEqual(self.status_of()["connectors"][0]["configured"], False)
+        self.assertIs(self.bind().body["changed"], True)
+        self.assertEqual(self.status_of()["connectors"][0]["configured"], True)
+        # 칸 값은 응답에도 설정 백업에도 없다.
+        for path in (self.root / "alice/connector-backups").rglob("*"):
+            if path.is_file():
+                self.assertNotIn(DEMO_VALUE.encode(), path.read_bytes(), path.name)
+        self.assertNotIn(DEMO_VALUE, json.dumps(status))
+
+    def test_detaching_one_binding_removes_only_its_name_env_and_skills(self):
+        """하나를 떼면 그 서버와 이름과 env 와 스킬만 빠지고 다른 바인딩은 남으며 재시작이 필요 없다."""
+        self.bind_fixture()
+        self.assertEqual(self.bind(DEMO, "c1").status_code, 200)
+        self.assertEqual(self.bind(OTHER, "c2").status_code, 200)
+        before = self.alice_config()
+
+        removed = self.bind(DEMO, enabled=False)
+        self.assertEqual(removed.status_code, 200, removed.body)
+        self.assertIs(removed.body["changed"], True)
+        self.assertIs(removed.body["restart_required"], False)
+        config = self.alice_config()
+        self.assertNotIn("demo", config["mcp_servers"])
+        self.assertEqual(config["mcp_servers"]["other"], before["mcp_servers"]["other"])
+        self.assertEqual(config["mcp_servers"]["fos-assistant"], before["mcp_servers"]["fos-assistant"])
+        self.assertEqual(config["platform_toolsets"]["api_server"], ["delegation", "fos-assistant", "terminal", "other"])
+        self.assertEqual((self.root / "alice/.env").read_text(encoding="utf-8").splitlines(),
+                         ["OTHER_TOKEN=" + OTHER_VALUE, "OTHER_SCOPE=a"])
+        self.assertFalse((self.root / "alice/skills/demo").exists())
+        self.assertTrue((self.root / "alice/skills/other/SKILL.md").is_file())
+        self.assertEqual(sorted(json.loads((self.root / "alice/.fos-connectors.json").read_text())), [OTHER])
+        self.assertEqual(list(self.tool_map()["servers"]), ["other"])
+        self.assertEqual((self.root / "alice/SOUL.md").read_text(encoding="utf-8"), "사용자의 성격\n")
+        self.assertEqual(self.status_of()["connectors"], [
+            {"plugin": DEMO, "enabled": False, "configured": False, "mode": "isolated"},
+            {"plugin": OTHER, "enabled": True, "configured": True, "mode": "bind"}])
+
+        # 마지막 바인딩을 떼면 대응 파일이 없어지고 목록은 붙이기 전으로 돌아간다.
+        last = self.bind(OTHER, enabled=False)
+        self.assertEqual(last.status_code, 200)
+        self.assertIs(last.body["restart_required"], False)
+        self.assertFalse((self.root / "alice" / self.plugin.CONNECTOR_TOOL_MAP).exists())
+        self.assertEqual(json.loads((self.root / "alice/.fos-connectors.json").read_text()), {})
+        self.assertEqual(self.alice_config()["platform_toolsets"]["api_server"],
+                         ["delegation", "fos-assistant", "terminal"])
+        self.assertEqual((self.root / "alice/.env").read_text(encoding="utf-8"), "")
+        self.assertEqual(list((self.root / "alice/skills").iterdir()), [])
+        self.assertIs(self.bind(OTHER, enabled=False).body["changed"], False)
+
+    def test_binding_failures_change_no_file(self):
+        """기록 없는 env 와 겹치거나, 스킬 디렉터리가 있거나, 방식이 섞이거나, 표식이 없거나, 보관 파일이 맞지 않으면 아무 파일도 바꾸지 않는다."""
+        _, other = self.bind_fixture()
+        alice = self.root / "alice"
+
+        def refused(response, status, profile="alice"):
+            self.assertEqual(response.status_code, status, response.body)
+            self.assertEqual(self.tree(profile), before)
+
+        (alice / ".env").write_text("DEMO_TOKEN=someone-else\n", encoding="utf-8")
+        before = self.tree("alice")
+        refused(self.bind(), 409)
+        (alice / ".env").unlink()
+
+        (alice / "skills/demo").mkdir(parents=True)
+        (alice / "skills/demo/SKILL.md").write_text("사람이 둔 스킬\n", encoding="utf-8")
+        before = self.tree("alice")
+        refused(self.bind(), 409)
+        shutil.rmtree(alice / "skills")
+
+        before = self.tree("alice")
+        refused(self.bind(vault="c2"), 400)
+        refused(self.bind(vault="c9"), 400)
+        refused(self.bind(vault="../c1"), 400)
+
+        # 다른 바인딩 커넥터가 같은 env 이름을 쓰면 붙이지 않는다.
+        self.assertEqual(self.bind().status_code, 200)
+        declared = json.loads((other / "connector.json").read_text(encoding="utf-8"))
+        declared["fields"][1]["env"] = "DEMO_SCOPE"
+        (other / "connector.json").write_text(json.dumps(declared), encoding="utf-8")
+        mcp = json.loads((other / ".mcp.json").read_text(encoding="utf-8"))
+        mcp["mcpServers"]["other"]["env"] = {"OTHER_TOKEN": "${OTHER_TOKEN}", "DEMO_SCOPE": "${DEMO_SCOPE:-}",
+                                             "OTHER_BASE": "${OTHER_BASE}"}
+        (other / ".mcp.json").write_text(json.dumps(mcp), encoding="utf-8")
+        self.assertEqual(self.vault("PUT", vault="c3", connector=OTHER, values={"token": OTHER_VALUE}).status_code, 200)
+        before = self.tree("alice")
+        refused(self.bind(OTHER, "c3"), 409)
+        # 바인딩이 있는 profile 에 옛 설치를 보내도 거절한다.
+        refused(self.connector(plugin=OTHER), 409)
+
+        # 옛 설치가 있는 profile 에 바인딩을 보내면 거절한다.
+        self.make_profile("bob")
+        self.plugin._apply_template("bob")
+        self.assertEqual(self.connector(profile="bob").status_code, 200)
+        before = self.tree("bob")
+        refused(self.bind(OTHER, "c2", profile="bob"), 409, "bob")
+        # 표식이 없는 profile 은 401 이다.
+        before = self.tree("owner")
+        refused(self.bind(profile="owner"), 401, "owner")
+
+    def test_binding_rolls_back_every_file_it_wrote_when_the_last_write_fails(self):
+        """마지막 파일의 쓰기가 실패하면 먼저 쓴 설정, 소유 기록, 대응 파일, `.env`, 스킬을 되돌리고 만든 디렉터리를 지운다."""
+        self.bind_fixture()
+        profile = self.root / "alice"
+        (profile / ".env").write_text("OTHER=keep\n", encoding="utf-8")
+        # plugin 파일이 마지막에 쓰이도록 profile 의 hook plugin 을 지운다.
+        shutil.rmtree(profile / "plugins")
+
+        def files():
+            return {name: value for name, value in self.tree("alice").items()
+                    if not name.startswith("connector-backups")}
+
+        before = files()
+        write = self.plugin._atomic_private_write
+        attempted = []
+
+        def failing_write(target, value):
+            # 실패 뒤의 쓰기는 되돌리기다. 시도한 쓰기로 세지 않는다.
+            if "connector-backups" in target.parts or None in attempted:
+                return write(target, value)
+            if target == profile / "plugins/fos-ctx/__init__.py":
+                attempted.append(None)
+                raise OSError("injected")
+            attempted.append(target)
+            return write(target, value)
+
+        with mock.patch.object(self.plugin, "_atomic_private_write", side_effect=failing_write):
+            self.assertEqual(self.bind().status_code, 503)
+        # 실패한 쓰기가 마지막이었다. 그 앞에 나머지 파일을 모두 썼어야 되돌리기를 검사한 것이다.
+        self.assertEqual(attempted[-1], None)
+        self.assertLessEqual({profile / "config.yaml", profile / ".env", profile / self.plugin.CONNECTOR_STATE,
+                              profile / self.plugin.CONNECTOR_TOOL_MAP, profile / "skills/demo/SKILL.md"},
+                             set(attempted))
+        self.assertEqual(files(), before)
+        self.assertFalse((profile / "skills").exists())
+        self.assertFalse((profile / "plugins").exists())
+
+    def test_binding_needs_an_api_list_that_holds_the_control_plane_mcp(self):
+        """API 도구 목록이 없거나 그 안에 Control Plane MCP 가 없으면 바인딩 설치는 409 이고 아무것도 바꾸지 않는다."""
+        self.bind_fixture()
+        for label, change in (
+            ("no list", lambda platform: platform.pop("api_server")),
+            ("no control plane", lambda platform: platform.update(api_server=["delegation", "terminal"])),
+        ):
+            with self.subTest(label):
+                config = self.alice_config()
+                change(config["platform_toolsets"])
+                self.write_config("alice", config)
+                before = self.tree("alice")
+                self.assertEqual(self.bind().status_code, 409)
+                self.assertEqual(self.tree("alice"), before)
+
+    def test_config_update_must_keep_bound_server_names(self):
+        """도구 저장이 붙은 커넥터의 서버 이름을 빠뜨리면 409 이고 설정이 그대로다. 함께 보내면 지금처럼 쓴다."""
+        self.bind_fixture()
+        self.assertEqual(self.bind().status_code, 200)
+        path = self.root / "alice/config.yaml"
+        original = path.read_bytes()
+        body = {"profile": "alice", "config": {"platform_toolsets": {"api_server": ["delegation", "fos-assistant"]}}}
+        self.assertEqual(self.request("/api/config", "PUT", token="valid", body=body), 409)
+        self.assertEqual(path.read_bytes(), original)
+        body["config"]["platform_toolsets"]["api_server"].append("demo")
+        self.assertEqual(self.request("/api/config", "PUT", token="valid", body=body), 200)
+        self.assertEqual(self.alice_config()["platform_toolsets"]["api_server"], ["delegation", "fos-assistant", "demo"])
+        # 스킬 경로만 쓰는 요청은 도구 목록을 바꾸지 않으므로 보지 않는다.
+        self.assertEqual(self.request("/api/config", "PUT", token="valid",
+                                      body={"profile": "alice", "config": {"skills": {"external_dirs": []}}}), 200)
+
+    def test_tool_map_keeps_a_bound_server_whose_connector_left_the_operator_list(self):
+        """운영 목록에서 빠진 바인딩 커넥터의 서버도 빈 `tools` 로 대응에 남고, 떼면 기록이 참조하던 env 를 지운다."""
+        demo, _ = self.bind_fixture()
+        self.assertEqual(self.bind(DEMO, "c1").status_code, 200)
+        self.assertEqual(self.bind(OTHER, "c2").status_code, 200)
+        listed = {DEMO: {"root": str(demo), "env": {"DEMO_BASE": DEMO_BASE}}}
+        with mock.patch.dict(os.environ, {"FOS_ASSISTANT_CONNECTOR_ROOTS": json.dumps(listed)}):
+            # 다른 값으로 다시 붙이면 대응 파일을 다시 쓴다. 빠진 커넥터의 서버는 도구 없이 남는다.
+            self.assertEqual(self.vault("PUT", vault="c1", connector=DEMO,
+                                        values={"token": "demo_new_0123456789"}).status_code, 200)
+            self.assertIs(self.bind(DEMO, "c1").body["changed"], True)
+            self.assertEqual(self.tool_map()["servers"]["other"],
+                             {"connector": OTHER, "prefix": "mcp__other__", "tools": {}})
+            self.assertIn("mcp__demo__list_scopes", self.tool_map()["servers"]["demo"]["tools"])
+            status = self.status_of()
+            self.assertEqual(status["connectors"][1], {"plugin": OTHER, "enabled": True, "configured": False,
+                                                       "mode": "bind"})
+            self.assertIs(status["policy_hook"], True)
+            self.assertEqual(self.bind(OTHER, enabled=False).status_code, 200)
+        self.assertEqual((self.root / "alice/.env").read_text(encoding="utf-8").splitlines(),
+                         ["DEMO_TOKEN=demo_new_0123456789"])
+        self.assertFalse((self.root / "alice/skills/other").exists())
+        self.assertNotIn("other", self.alice_config()["platform_toolsets"]["api_server"])
+
+    def test_profile_with_only_the_connector_marker_takes_bindings_only(self):
+        """커넥터 표식만 있는 사람이 만든 profile 은 조회, 바인딩 설치, 떼기가 되고 옛 설치는 401 이다."""
+        self.bind_fixture()
+        self.make_profile("human")
+        config = yaml.safe_load((self.root / "human/config.yaml").read_text(encoding="utf-8"))
+        config.update(
+            mcp_servers={"fos-assistant": {"url": "http://control-plane.test/mcp"}},
+            platform_toolsets={"api_server": ["web", "fos-assistant"]},
+            plugins={"enabled": ["fos-ctx"], "disabled": [], "entries": {"fos-ctx": {"allow_tool_override": False}}})
+        self.write_config("human", config)
+        (self.root / "human" / self.plugin.CONNECTOR_HOST_MARKER).write_text("", encoding="utf-8")
+
+        self.assertEqual(self.status_of("human")["connectors"][0],
+                         {"plugin": DEMO, "enabled": False, "configured": False, "mode": "isolated"})
+        before = self.tree("human")
+        self.assertEqual(self.connector(profile="human").status_code, 401)
+        self.assertEqual(self.tree("human"), before)
+
+        installed = self.bind(profile="human")
+        self.assertEqual(installed.status_code, 200, installed.body)
+        self.assertIs(installed.body["restart_required"], True)
+        self.assertIs(installed.body["plugin_updated"], True)
+        self.assertFalse((self.root / "human/SOUL.md").exists())
+        self.assertEqual(self.request("/api/connectors", "GET", token="valid", query_profiles=["human"],
+                                      full_response=True).body["policy_hook"], True)
+        self.assertEqual(self.status_of("human")["connectors"][0],
+                         {"plugin": DEMO, "enabled": True, "configured": True, "mode": "bind"})
+        self.assertEqual(self.connector_probe(profile="human"), 204)
+
+        removed = self.bind(profile="human", enabled=False)
+        self.assertEqual(removed.status_code, 200)
+        self.assertEqual(self.request("/api/connectors", "GET", token="valid", query_profiles=["human"],
+                                      full_response=True).body["connectors"][0]["enabled"], False)
+        self.assertEqual(yaml.safe_load((self.root / "human/config.yaml").read_text())["platform_toolsets"],
+                         {"api_server": ["web", "fos-assistant"]})
+
+    def test_vault_files_are_written_deleted_and_imported_without_echoing_values(self):
+        """보관 파일을 쓰고 지우고 옮긴다. 형식 오류와 필수 칸 누락은 400 이고 응답에 값이 없다."""
+        self.bind_fixture()
+        directory = self.hermes_root / "connector-vault"
+        self.assertEqual(directory.stat().st_mode & 0o777, 0o700)
+        stored = directory / "c1.json"
+        self.assertEqual(stored.stat().st_mode & 0o777, 0o600)
+        self.assertEqual(json.loads(stored.read_text(encoding="utf-8")),
+                         {"v": 1, "connector": DEMO, "values": {"token": DEMO_VALUE}})
+        # 빈 선택 칸은 넣지 않는다.
+        self.assertEqual(self.vault("PUT", vault="c3", connector=DEMO,
+                                    values={"token": DEMO_VALUE, "scope": ""}).status_code, 200)
+        self.assertEqual(json.loads((directory / "c3.json").read_text())["values"], {"token": DEMO_VALUE})
+
+        written = stored.read_bytes()
+        secret = "demo_bad_0123456789"
+        for label, body in (
+            ("unknown key", {"vault": "c1", "connector": DEMO, "values": {"token": secret, "other": "x"}}),
+            ("required missing", {"vault": "c1", "connector": DEMO, "values": {"scope": "a"}}),
+            ("required empty", {"vault": "c1", "connector": DEMO, "values": {"token": ""}}),
+            ("pattern", {"vault": "c1", "connector": DEMO, "values": {"token": secret + "0"}}),
+            ("two lines", {"vault": "c1", "connector": DEMO, "values": {"token": secret, "scope": "a\nb"}}),
+            ("not a string", {"vault": "c1", "connector": DEMO, "values": {"token": 1}}),
+            ("values not an object", {"vault": "c1", "connector": DEMO, "values": [secret]}),
+            ("bad vault name", {"vault": "c0", "connector": DEMO, "values": {"token": secret}}),
+            ("path in vault name", {"vault": "../c1", "connector": DEMO, "values": {"token": secret}}),
+            ("unknown connector", {"vault": "c1", "connector": "unknown", "values": {"token": secret}}),
+            ("extra key", {"vault": "c1", "connector": DEMO, "values": {"token": secret}, "profile": "alice"}),
+        ):
+            with self.subTest(label):
+                response = self.vault("PUT", **body)
+                self.assertEqual(response.status_code, 400)
+                self.assertNotIn(secret, json.dumps(response.body))
+                self.assertEqual(stored.read_bytes(), written)
+        # 같은 이름의 보관 파일이 다른 커넥터의 것이면 409 다.
+        self.assertEqual(self.vault("PUT", vault="c1", connector=OTHER,
+                                    values={"token": OTHER_VALUE}).status_code, 409)
+        self.assertEqual(stored.read_bytes(), written)
+        self.assertEqual(self.request(VAULT, "PUT", body={"vault": "c1", "connector": DEMO,
+                                                          "values": {"token": DEMO_VALUE}}), 401)
+
+        deleted = self.vault("DELETE", vault="c3")
+        self.assertEqual((deleted.status_code, deleted.body), (200, {"changed": True}))
+        self.assertFalse((directory / "c3.json").exists())
+        self.assertEqual(self.vault("DELETE", vault="c3").body, {"changed": False})
+        self.assertEqual(self.vault("DELETE", vault="c3", connector=DEMO).status_code, 400)
+
+        # 옛 설치의 관리 profile 에서 칸 값을 옮긴다. 빈 선택 칸은 넣지 않는다.
+        self.make_profile("bob")
+        self.plugin._apply_template("bob")
+        (self.root / "bob/.env").write_text("DEMO_TOKEN=%s\nDEMO_SCOPE=\nOTHER=keep\n" % DEMO_VALUE, encoding="utf-8")
+        self.assertEqual(self.connector(profile="bob").status_code, 200)
+        imported = self.vault("POST", VAULT_IMPORT, vault="c5", connector=DEMO, profile="bob")
+        self.assertEqual((imported.status_code, imported.body), (200, {"ok": True}))
+        self.assertEqual(json.loads((directory / "c5.json").read_text()),
+                         {"v": 1, "connector": DEMO, "values": {"token": DEMO_VALUE}})
+        (self.root / "bob/.env").write_text("DEMO_SCOPE=a\n", encoding="utf-8")
+        missing = self.vault("POST", VAULT_IMPORT, vault="c6", connector=DEMO, profile="bob")
+        self.assertEqual(missing.status_code, 400)
+        self.assertFalse((directory / "c6.json").exists())
+        self.assertEqual(self.vault("POST", VAULT_IMPORT, vault="c6", connector=DEMO, profile="owner").status_code, 401)
+        self.assertEqual(self.vault("POST", VAULT_IMPORT, vault="c6", connector=OTHER, profile="bob").status_code, 404)
+        self.assertEqual(self.vault("POST", VAULT_IMPORT, vault="c6", connector=DEMO, profile="nobody").status_code, 404)
+
+    def test_connector_without_fields_is_bound_with_an_empty_vault(self):
+        """칸이 없는 커넥터는 카탈로그에 오르고, 빈 `values` 의 보관 파일로 확인 도구를 부르고 바인딩 설치가 된다."""
+        demo, _ = self.bind_fixture()
+        declared = json.loads((demo / "connector.json").read_text(encoding="utf-8"))
+        declared["fields"] = []
+        (demo / "connector.json").write_text(json.dumps(declared), encoding="utf-8")
+        mcp = json.loads((demo / ".mcp.json").read_text(encoding="utf-8"))
+        mcp["mcpServers"]["demo"]["env"] = {"DEMO_BASE": "${DEMO_BASE}"}
+        (demo / ".mcp.json").write_text(json.dumps(mcp), encoding="utf-8")
+        entry = next(item for item in self.request("/api/connectors/catalog", "GET", token="valid",
+                                                   full_response=True).body if item["id"] == DEMO)
+        self.assertEqual((entry["fields"], entry["skills"]), ([], ["demo"]))
+
+        self.assertEqual(self.vault("PUT", vault="c7", connector=DEMO, values={}).status_code, 200)
+        seen = []
+
+        async def verify(manifest, tool, env):
+            seen.append((tool, env))
+            return types.SimpleNamespace(structured_content={"scopes": []}, is_error=False, content=[])
+
+        with mock.patch.object(self.plugin, "_mcp_sdk_problem", return_value=None), \
+                mock.patch.object(self.plugin, "_run_connector_tool", verify):
+            called = self.request("/api/connectors/%s/call" % DEMO, "POST", token="valid", full_response=True,
+                                  body={"tool": "list_scopes", "vault": "c7"})
+        self.assertEqual((called.status_code, called.body), (200, {"ok": True, "result": {"scopes": []}}))
+        self.assertEqual(seen, [("list_scopes", {"DEMO_BASE": DEMO_BASE,
+                                                 "PATH": os.path.dirname(self.connector_command)})])
+
+        installed = self.bind(vault="c7")
+        self.assertEqual(installed.status_code, 200, installed.body)
+        self.assertEqual(self.alice_config()["mcp_servers"]["demo"]["env"], {"DEMO_BASE": DEMO_BASE})
+        self.assertFalse((self.root / "alice/.env").exists())
+        self.assertEqual(self.status_of()["connectors"][0]["configured"], True)
 
     def register_memory(self, name, server="fos-assistant"):
         path = self.root / name / "config.yaml"

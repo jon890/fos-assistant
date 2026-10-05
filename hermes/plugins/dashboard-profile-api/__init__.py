@@ -19,9 +19,12 @@ Hermes core 는 고치지 않는다.
 | `PUT /api/env` | 그 profile 의 `.env` 에 정해 둔 key 한 줄을 쓴다 |
 | `DELETE /api/env` | 관리 profile 의 커넥터 칸 key 만 지운다 |
 | `GET /api/connectors/catalog` | 운영 목록에 있고 검증을 통과한 커넥터의 manifest 를 낸다. `schema` 와 도구마다의 위험도와 승인 방식(`tools`)을 함께 낸다 |
-| `POST /api/connectors/<id>/call` | 후보 값으로 그 커넥터의 선택지 도구나 확인 도구를 한 번 부른다 |
+| `POST /api/connectors/<id>/call` | 후보 값이나 보관 파일의 값으로 그 커넥터의 선택지 도구나 확인 도구를 한 번 부른다 |
 | `POST /api/connectors/<id>/execute` | Control Plane 이 승인한 호출을 그 profile 의 값과 받은 인자로 한 번 실행한다 |
-| `GET PUT /api/connectors` | 커넥터의 상태를 읽거나 관리 profile 에 설치하고 제거한다. 설치는 plugin 의 스킬 본문을 그 profile 의 SOUL.md 에 쓴다 |
+| `GET PUT /api/connectors` | 커넥터의 상태를 읽거나 profile 에 설치하고 제거한다. 옛 설치는 plugin 의 스킬 본문을 그 profile 의 SOUL.md 에 쓴다. 바인딩 설치(`bind`)는 보관 파일의 값과 plugin 의 스킬을 그 profile 에 복사한다 |
+| `PUT /api/connector-vault` | 연결의 칸 값을 보관 파일 하나에 쓴다 |
+| `DELETE /api/connector-vault` | 보관 파일 하나를 지운다 |
+| `POST /api/connector-vault/import` | 커넥터를 설치한 관리 profile 의 `.env` 에서 그 커넥터의 칸 값을 보관 파일로 옮긴다 |
 | `POST /api/mcp/servers/<서버>/test` | 그 profile 에 설치한 커넥터의 MCP 서버만 probe 한다 |
 | `GET /api/profiles/<이름>/soul` | profile 의 SOUL.md 를 읽는다 |
 | `PUT /api/profiles/<이름>/soul` | profile 의 SOUL.md 를 쓴다 |
@@ -200,6 +203,9 @@ PROFILE_PLUGIN_DIR = PLUGIN_DIR / "profile-plugins"
 
 # 이 토큰으로 만든 profile 이라는 표식이다. 지우기 판정이 이 파일 하나를 본다.
 MANAGED_MARKER = ".fos-assistant-managed"
+# 운영자가 사람이 만든 profile 에 두는 표식이다. 그 profile 이 커넥터의 바인딩 설치를 받는다는 뜻이다.
+# 이 plugin 은 이 파일을 쓰지 않는다(ADR-083).
+CONNECTOR_HOST_MARKER = ".fos-connector-host"
 
 # 틀을 쓴 뒤 API 경로에 하나라도 남으면 만든 것을 지운다.
 FORBIDDEN_TOOLSETS = frozenset({"memory", "terminal", "file", "code_execution", "browser"})
@@ -215,6 +221,22 @@ CONNECTOR_ROOTS_ENV = "FOS_ASSISTANT_CONNECTOR_ROOTS"
 # 커넥터 MCP 서버를 실행할 파일의 절대 경로다. 운영 목록 항목에 `command` 가 없을 때 쓴다.
 CONNECTOR_COMMAND_ENV = "FOS_ASSISTANT_CONNECTOR_COMMAND"
 CONNECTOR_STATE = ".fos-connectors.json"
+# 연결의 칸 값을 두는 보관 파일의 디렉터리다. 대시보드의 Hermes 루트 아래에 둔다(ADR-083).
+CONNECTOR_VAULT_DIR = "connector-vault"
+# 보관 파일 이름이다. Control Plane 의 연결 id 앞에 `c` 를 붙인다. 경로 조각으로 쓰기 전에 본다.
+VAULT_ID_RE = re.compile(r"^c[1-9][0-9]{0,18}$")
+VAULT_PATH = "/api/connector-vault"
+VAULT_IMPORT_PATH = "/api/connector-vault/import"
+VAULT_ROUTES = frozenset({(VAULT_PATH, "PUT"), (VAULT_PATH, "DELETE"), (VAULT_IMPORT_PATH, "POST")})
+# 소유 기록 항목의 설치 방식이다. 칸이 없으면 옛 설치다.
+BIND_MODE = "bind"
+ISOLATED_MODE = "isolated"
+# 바인딩 설치가 커넥터의 스킬을 복사하는 profile 안의 디렉터리와, 스킬 디렉터리 아래에서 복사하는 하위 디렉터리다.
+PROFILE_SKILLS_DIR = "skills"
+CONNECTOR_SKILL_PARTS = ("references", "templates")
+# 커넥터 스킬 하나의 상한이다. Control Plane 이 올린 스킬에 거는 제한과 같다(`docs/backend/skill.md`).
+CONNECTOR_SKILL_MAX_FILES = 20
+CONNECTOR_SKILL_MAX_CHARS = 100_000
 # 설치가 profile 에 쓰는 이름 대응 파일이다. 정책 hook 이 Hermes 등록 이름으로 원래 도구 이름을 찾는다(ADR-049).
 CONNECTOR_TOOL_MAP = ".fos-connector-tools.json"
 # 커넥터 도구 호출을 판정하는 hook 을 가진 profile plugin 과, 묶음의 판과 견주는 그 파일들이다.
@@ -599,9 +621,12 @@ def _read_connector_json(root: pathlib.Path, relative: str):
 
 
 def _connector_fields(declared) -> list:
-    """`connector.json` 의 `fields` 를 검증한다. 틀리면 예외다."""
-    if not isinstance(declared, list) or not declared:
-        raise ValueError("fields 는 비어 있지 않은 목록이다")
+    """`connector.json` 의 `fields` 를 검증한다. 틀리면 예외다.
+
+    빈 목록도 받는다. 값을 받지 않는 일반 MCP 서버가 입력 칸 없이 카탈로그에 오르는 길이다(ADR-083).
+    """
+    if not isinstance(declared, list):
+        raise ValueError("fields 는 목록이다")
     for field in declared:
         if (not isinstance(field, dict)
                 or not isinstance(field.get("key"), str) or not FIELD_KEY_RE.match(field["key"])
@@ -753,6 +778,75 @@ def _connector_persona(skill_dirs: list) -> str | None:
     return persona
 
 
+def _skill_name(skill_md: str, fallback: str) -> str:
+    """`SKILL.md` 앞머리의 `name` 이다. 없으면 디렉터리 이름이다. 경로 조각으로 쓸 수 없는 이름이면 예외다.
+
+    Hermes 가 스킬 목록을 만들 때 같은 규칙으로 이름을 정한다(`tools/skills_tool.py` 의 `_find_all_skills`).
+    """
+    import yaml
+    text = skill_md.lstrip("﻿").replace("\r\n", "\n")
+    name = fallback
+    if text.startswith("---\n"):
+        head, separator, _ = text[4:].partition("\n---\n")
+        if not separator:
+            raise ValueError("SKILL.md 의 앞머리가 닫히지 않았다")
+        front = yaml.safe_load(head) if head.strip() else {}
+        if not isinstance(front, dict):
+            raise ValueError("SKILL.md 의 앞머리가 객체가 아니다")
+        name = front.get("name", fallback)
+    # 설치와 떼기가 이 이름을 profile 의 스킬 디렉터리 이름으로 쓴다.
+    if not isinstance(name, str) or not SKILL_NAME_RE.match(name) or ".." in name:
+        raise ValueError("스킬 이름이 경로로 쓸 수 없는 모양이다")
+    return name
+
+
+def _connector_skills(skill_dirs: list) -> dict:
+    """바인딩 설치가 profile 에 복사할 스킬이다. `{스킬 이름: {상대 경로: 파일 바이트}}` 다. 틀리면 예외다.
+
+    스킬마다 `SKILL.md` 와 `references/`, `templates/` 아래 정규 파일을 읽는다.
+    스킬 디렉터리 아래 어느 항목이든 링크이면 거절한다. 링크가 plugin 밖의 파일을 가리키면 그 내용이 profile 로 복사된다.
+    UTF-8 로 읽히지 않는 파일, 상한을 넘는 스킬, 이름이 겹치는 스킬도 거절한다. 본문은 로그에 싣지 않는다.
+    """
+    skills = {}
+    for directory in skill_dirs:
+        for skill in sorted(directory.iterdir()):
+            if skill.is_symlink():
+                raise ValueError("스킬 디렉터리 아래에 링크가 있다")
+            source = skill / "SKILL.md"
+            if not skill.is_dir() or not source.is_file():
+                continue
+            for current, dirs, names in os.walk(skill):
+                if any(os.path.islink(os.path.join(current, child)) for child in dirs + names):
+                    raise ValueError("스킬 디렉터리 아래에 링크가 있다")
+            paths = [source]
+            for part in CONNECTOR_SKILL_PARTS:
+                if (skill / part).is_dir():
+                    for current, dirs, names in os.walk(skill / part):
+                        dirs.sort()
+                        paths.extend(pathlib.Path(current) / name for name in sorted(names)
+                                     if (pathlib.Path(current) / name).is_file())
+            if len(paths) > CONNECTOR_SKILL_MAX_FILES:
+                raise ValueError("스킬 하나의 파일이 %d개를 넘는다" % CONNECTOR_SKILL_MAX_FILES)
+            files = {}
+            for path in paths:
+                relative = path.relative_to(skill)
+                if any(part in ("", ".", "..") for part in relative.parts):
+                    raise ValueError("스킬 파일 경로에 . 이나 .. 이 있다")
+                data = path.read_bytes()
+                try:
+                    text = data.decode("utf-8")
+                except UnicodeDecodeError:
+                    raise ValueError("스킬 파일이 UTF-8 이 아니다") from None
+                if len(text) > CONNECTOR_SKILL_MAX_CHARS:
+                    raise ValueError("스킬 파일이 %d자를 넘는다" % CONNECTOR_SKILL_MAX_CHARS)
+                files[relative.as_posix()] = data
+            name = _skill_name(files["SKILL.md"].decode("utf-8"), skill.name)
+            if name in skills:
+                raise ValueError("스킬 이름이 겹친다")
+            skills[name] = files
+    return skills
+
+
 def _load_connector(connector_id: str, entry: dict) -> dict:
     """plugin 디렉터리의 `connector.json`, `.mcp.json`, `plugin.json` 을 읽어 검증한다. 틀리면 예외다.
 
@@ -852,7 +946,8 @@ def _load_connector(connector_id: str, entry: dict) -> dict:
     if command is None or not os.access(command, os.X_OK):
         raise ValueError("커넥터 실행 파일이 없거나 실행할 수 없다")
 
-    # 스킬은 읽되 등록하지 않는다. 설치가 본문을 `SOUL.md` 에 써 지침으로 넣고 skills toolset 은 열지 않는다.
+    # 옛 설치는 스킬 본문을 `SOUL.md` 에 써 지침으로 넣고 skills toolset 은 열지 않는다.
+    # 바인딩 설치는 스킬 디렉터리를 그 profile 의 스킬로 복사한다. 둘 다 같은 디렉터리를 읽는다.
     skills = plugin.get("skills", "./skills")
     if isinstance(skills, str):
         skills = [skills]
@@ -865,6 +960,7 @@ def _load_connector(connector_id: str, entry: dict) -> dict:
             raise ValueError("스킬은 plugin 안의 링크 없는 디렉터리여야 한다")
         skill_dirs.append(path.resolve())
     persona = _connector_persona(skill_dirs)
+    installed_skills = _connector_skills(skill_dirs)
 
     env = {name: "${%s}" % name for name in server["env"]}
     # 운영자 env 는 profile `.env` 를 거치지 않는다. 운영 목록의 값을 서버 정의에 직접 넣는다.
@@ -890,6 +986,7 @@ def _load_connector(connector_id: str, entry: dict) -> dict:
         "toolsets": list(toolsets),
         "attachments": attachments,
         "persona": persona,
+        "skills": installed_skills,
         # 대시보드가 `call` 로 부를 수 있는 도구다. 도구 정책인 `tools` 와 뜻이 다르다.
         "call_tools": frozenset({verify["tool"]} | option_tools),
         "tools": tools,
@@ -939,18 +1036,31 @@ def _connector_server(manifest: dict) -> dict:
 def _connector_tool_map(state: dict) -> dict:
     """소유 기록의 커넥터로 만든 이름 대응이다. 형식은 `docs/backend/connector-tool-policy.md` 의 「이름 대응」 이 갖는다.
 
-    운영 목록에서 빠졌거나 manifest 를 읽을 수 없는 커넥터는 싣지 않는다. 대응이 없는 도구는 hook 이 막는다.
+    옛 설치는 운영 목록에서 빠졌거나 manifest 를 읽을 수 없는 커넥터를 싣지 않는다. 대응이 없는 도구는 hook 이 막는다.
+    바인딩 설치는 `isolated: false` 를 싣고 소유 기록의 모든 서버를 싣는다. manifest 를 읽지 못한 서버는 빈 `tools` 다.
+    바인딩 profile 의 hook 은 대응에 없는 서버를 통과시키므로, 서버가 빠지면 그 도구가 판정 없이 나간다(ADR-083).
     """
     roots = _connector_roots()
+    bound = any(_entry_mode(entry) == BIND_MODE for entry in state.values())
     servers = {}
-    for plugin in state:
+    for plugin, entry in state.items():
         manifest = _connector_manifest(plugin) if plugin in roots else None
         if manifest is None:
+            if bound:
+                name = entry["mcp_server"]
+                servers[name] = {"connector": plugin, "prefix": _hermes_tool_name(name, ""), "tools": {}}
             continue
         name = manifest["mcp_server"]
         servers[name] = {"connector": plugin, "prefix": _hermes_tool_name(name, ""),
                          "tools": {_hermes_tool_name(name, tool): tool for tool in manifest["tools"]}}
+    if bound:
+        return {"v": 1, "isolated": False, "servers": servers}
     return {"v": 1, "servers": servers}
+
+
+def _entry_mode(entry) -> str:
+    """소유 기록 항목의 설치 방식이다. 칸이 없으면 옛 설치다."""
+    return entry.get("mode", ISOLATED_MODE) if isinstance(entry, dict) else ISOLATED_MODE
 
 
 def _tool_map_bytes(tool_map: dict) -> bytes:
@@ -1002,16 +1112,30 @@ def _connector_state(value) -> dict:
     """소유 기록의 모양을 보고, 운영 목록의 커넥터는 지금 manifest 의 실행 정의와 맞는지 본다.
 
     운영 목록에서 빠진 커넥터의 기록은 모양만 본다. 그 기록으로는 설치를 끄는 것만 한다.
+    바인딩 항목(`mode: bind`)은 서버 이름, 보관 파일 이름, 설치한 스킬 이름을 갖는다.
+    스킬 이름은 떼기가 지울 디렉터리 이름이라 경로 조각으로 쓸 수 있는지 여기서 본다.
     """
     if not isinstance(value, dict):
         raise ValueError("connector 소유 기록이 올바르지 않다")
     roots = _connector_roots()
     for plugin, entry in value.items():
         if (not isinstance(entry, dict) or not {"server", "allowlist_added"} <= set(entry)
-                or set(entry) - {"server", "allowlist_added", "mcp_server"}
+                or set(entry) - {"server", "allowlist_added", "mcp_server", "mode", "vault", "skills"}
                 or not isinstance(entry["allowlist_added"], bool)
-                or not isinstance(entry.get("mcp_server", ""), str)):
+                or not isinstance(entry.get("mcp_server", ""), str)
+                or entry.get("mode", ISOLATED_MODE) not in (ISOLATED_MODE, BIND_MODE)):
             raise ValueError("connector 소유 기록의 필드가 올바르지 않다")
+        if entry.get("mode") == BIND_MODE:
+            skills = entry.get("skills")
+            if (not {"mcp_server", "vault", "skills"} <= set(entry)
+                    or not SERVER_NAME_RE.match(entry["mcp_server"])
+                    or not isinstance(entry["vault"], str) or not VAULT_ID_RE.match(entry["vault"])
+                    or not isinstance(skills, list) or len(set(map(str, skills))) != len(skills)
+                    or any(not isinstance(name, str) or not SKILL_NAME_RE.match(name) or ".." in name
+                           for name in skills)):
+                raise ValueError("connector 소유 기록의 바인딩 필드가 올바르지 않다")
+        elif "vault" in entry or "skills" in entry:
+            raise ValueError("옛 설치의 소유 기록에 바인딩 필드가 있다")
         server = entry["server"]
         tools = server.get("tools") if isinstance(server, dict) else None
         if (not isinstance(server, dict) or set(server) - {"tools"} != {"command", "args", "env", "enabled"}
@@ -1081,6 +1205,7 @@ def _connector_config(profile_dir: pathlib.Path, plugin: str, enabled: bool) -> 
     `plugin_updated` 는 그 plugin 파일이 바뀌었는지다. 떠 있는 gateway 가 옛 코드를 쥐고 있을 수 있어 따로 답한다.
     이 설치는 커넥터 전용 profile 을 전제한다. Control Plane 이 커넥터 에이전트의 profile 로만 부른다.
     일반 에이전트의 profile 에 설치하면 그 profile 의 Control Plane MCP 등록과 도구 목록이 사라지고 제거해도 돌아오지 않는다.
+    그래서 바인딩 설치가 있는 profile 에는 설치하지 않는다. 일반 에이전트에 붙이는 것은 `_connector_bind_config` 다.
     """
     import yaml
     if profile_dir.resolve() != profile_dir:
@@ -1104,6 +1229,9 @@ def _connector_config(profile_dir: pathlib.Path, plugin: str, enabled: bool) -> 
                  for path in (config_path, state_path, env_path, soul_path, tool_map_path, *plugin_values)}
     saved = yaml.safe_load(originals[config_path]) or {}
     state = _connector_state(json.loads(originals[state_path])) if originals[state_path] else {}
+    if enabled and any(_entry_mode(entry) == BIND_MODE for entry in state.values()):
+        # 두 설치를 섞으면 이 설치가 지우는 Control Plane MCP 등록을 바인딩 설치가 전제하므로 서로를 깬다.
+        raise FileExistsError("바인딩 설치가 있는 profile 에 옛 설치를 하지 않는다")
     servers = dict(saved.get("mcp_servers") or {})
     owned = state.get(plugin)
     listed = plugin in _connector_roots()
@@ -1222,6 +1350,412 @@ def _connector_config(profile_dir: pathlib.Path, plugin: str, enabled: bool) -> 
     return {"changed": True, "restart_required": bool(owned), "plugin_updated": plugin_updated}
 
 
+def _vault_dir() -> pathlib.Path:
+    """보관 파일 디렉터리다. 대시보드의 Hermes 루트 아래다."""
+    from hermes_constants import get_default_hermes_root
+
+    return pathlib.Path(get_default_hermes_root()) / CONNECTOR_VAULT_DIR
+
+
+def _vault_path(vault: str) -> pathlib.Path:
+    """보관 파일 경로다. 이름은 부르는 쪽이 `VAULT_ID_RE` 로 본 것이어야 한다. 디렉터리나 파일이 링크이면 예외다."""
+    if not VAULT_ID_RE.match(vault):
+        raise ValueError("보관 파일 이름이 올바르지 않다")
+    directory = _vault_dir()
+    path = directory / ("%s.json" % vault)
+    if directory.is_symlink() or path.is_symlink():
+        raise ValueError("보관 파일 경로에 심볼릭 링크가 있다")
+    return path
+
+
+def _read_vault(vault: str) -> dict | None:
+    """보관 파일을 읽는다. 없으면 None 이다. 모양이 틀리면 예외다. 값은 예외 메시지에 싣지 않는다."""
+    path = _vault_path(vault)
+    if not path.exists():
+        return None
+    value = json.loads(path.read_text(encoding="utf-8"))
+    values = value.get("values") if isinstance(value, dict) else None
+    if (not isinstance(value, dict) or set(value) != {"v", "connector", "values"} or value["v"] != 1
+            or not isinstance(value["connector"], str) or not CONNECTOR_ID_RE.match(value["connector"])
+            or not isinstance(values, dict)
+            or any(not isinstance(key, str) or not isinstance(item, str) for key, item in values.items())):
+        raise ValueError("보관 파일의 모양이 올바르지 않다")
+    return value
+
+
+def _write_vault(vault: str, connector: str, values: dict) -> None:
+    """보관 파일을 쓴다. 같은 이름의 파일이 다른 커넥터의 것이면 `FileExistsError` 다."""
+    path = _vault_path(vault)
+    path.parent.mkdir(mode=0o700, exist_ok=True)
+    os.chmod(path.parent, 0o700)
+    stored = _read_vault(vault)
+    if stored is not None and stored["connector"] != connector:
+        raise FileExistsError("다른 커넥터의 보관 파일이다")
+    _atomic_private_write(path, (json.dumps({"v": 1, "connector": connector, "values": values},
+                                            sort_keys=True, ensure_ascii=False) + "\n").encode("utf-8"))
+    os.chmod(path, 0o600)
+
+
+def _vault_values(manifest: dict, values) -> dict | None:
+    """보관할 칸 값을 manifest 의 칸으로 검사한다. 맞으면 빈 선택 칸을 뺀 값이고, 틀리면 None 이다.
+
+    모르는 키, 문자열이 아닌 값, 두 줄 이상인 값을 받지 않는다. 필수 칸은 비어 있지 않아야 한다.
+    형식은 `call` 과 같게 본다. 비운 선택 칸은 형식을 보지 않는다.
+    """
+    if not isinstance(values, dict):
+        return None
+    fields = {field["key"]: field for field in manifest["fields"]}
+    kept = {}
+    for key, value in values.items():
+        field = fields.get(key)
+        if field is None or not isinstance(value, str) or any(ch in value for ch in "\r\n\0"):
+            return None
+        required = field.get("required", True)
+        if "pattern" in field and (value or required) and not re.fullmatch(field["pattern"], value):
+            return None
+        if value:
+            kept[key] = value
+    if any(field.get("required", True) and key not in kept for key, field in fields.items()):
+        return None
+    return kept
+
+
+async def _connector_vault_request(request):
+    """보관 파일을 쓰고 지우고, 관리 profile 의 `.env` 에서 옮긴다. 값과 경로를 응답과 로그에 싣지 않는다."""
+    from starlette.responses import JSONResponse
+
+    path = request.url.path
+    method = request.method.upper()
+    body = await _json_object(request)
+    expected = {(VAULT_PATH, "PUT"): {"vault", "connector", "values"}, (VAULT_PATH, "DELETE"): {"vault"},
+                (VAULT_IMPORT_PATH, "POST"): {"vault", "connector", "profile"}}[(path, method)]
+    if (body is None or set(body) != expected
+            or not isinstance(body["vault"], str) or not VAULT_ID_RE.match(body["vault"])
+            or ("connector" in body and (not isinstance(body["connector"], str)
+                                         or not CONNECTOR_ID_RE.match(body["connector"])))):
+        return _rejected("%s 만 필요하다" % ", ".join(sorted(expected)))
+    vault = body["vault"]
+    try:
+        if method == "DELETE":
+            def delete():
+                target = _vault_path(vault)
+                if not target.exists():
+                    return False
+                target.unlink()
+                return True
+
+            return JSONResponse({"changed": await asyncio.to_thread(delete)}, status_code=200)
+
+        connector = body["connector"]
+        manifest = _connector_manifest(connector) if connector in _connector_roots() else None
+        if manifest is None:
+            return _rejected("쓸 수 있는 connector 가 아니다")
+        if method == "PUT":
+            values = _vault_values(manifest, body["values"])
+            if values is None:
+                return _rejected("칸 값이 그 connector 의 칸 선언과 맞지 않는다")
+        else:
+            rejected = _profile_rejection(body["profile"], request)
+            if rejected is not None:
+                return rejected
+            missing = _missing_profile(body["profile"])
+            if missing is not None:
+                return missing
+            from hermes_cli.profiles import get_profile_dir
+            profile_dir = get_profile_dir(body["profile"])
+            if not (profile_dir / MANAGED_MARKER).is_file():
+                return _rejected("관리 표식이 없는 profile 이다", 401)
+            state_path = profile_dir / CONNECTOR_STATE
+            state = json.loads(state_path.read_text(encoding="utf-8")) if state_path.is_file() else {}
+            if not isinstance(state, dict) or connector not in state:
+                return _rejected("설치하지 않은 connector 다", 404)
+            env_path = profile_dir / ".env"
+            if env_path.is_symlink():
+                raise ValueError("profile 의 .env 가 링크다")
+            env_text = env_path.read_text(encoding="utf-8") if env_path.is_file() else ""
+            # 빈 선택 칸은 넣지 않는다. 필수 칸이 비면 아래 검사가 거절한다.
+            values = _vault_values(manifest, {field["key"]: _env_value(env_text, field["env"])
+                                              for field in manifest["fields"]
+                                              if _env_value(env_text, field["env"])})
+            if values is None:
+                return _rejected("profile 의 값이 그 connector 의 칸 선언과 맞지 않는다")
+        await asyncio.to_thread(_write_vault, vault, connector, values)
+        return JSONResponse({"ok": True}, status_code=200)
+    except FileExistsError:
+        return _rejected("다른 connector 의 보관 파일이다", 409)
+    except Exception as error:
+        logger.warning("dashboard-profile-api: 보관 파일을 다루지 못했다: %s", type(error).__name__)
+        return _rejected("보관 파일을 다루지 못했다", 503)
+
+
+def _env_line_key(line: str) -> str:
+    """`.env` 한 줄이 값을 주는 이름이다. Hermes 의 `.env` 읽기처럼 `export` 와 `=` 둘레의 공백을 받는다."""
+    stripped = line.strip()
+    if stripped.startswith("export "):
+        stripped = stripped[7:].lstrip()
+    key, separator, _ = stripped.partition("=")
+    return key.strip() if separator else ""
+
+
+def _env_line(key: str, value: str) -> str:
+    """Hermes 의 `.env` 쓰기와 같은 모양의 한 줄이다. dotenv 에서 뜻이 있는 글자가 있으면 따옴표로 감싼다."""
+    if value and ("#" in value or '"' in value or "'" in value or any(ch.isspace() for ch in value)):
+        value = '"%s"' % value.replace("\\", "\\\\").replace('"', '\\"')
+    return "%s=%s\n" % (key, value)
+
+
+def _entry_field_env(plugin: str, entry: dict) -> set:
+    """소유 기록 항목의 커넥터가 profile `.env` 에 두는 이름이다.
+
+    manifest 가 있으면 칸의 env 이름이고, 운영 목록에서 빠졌으면 기록의 서버 정의가 `${이름}` 으로 참조하던 이름이다.
+    """
+    manifest = _connector_manifest(plugin) if plugin in _connector_roots() else None
+    if manifest is not None:
+        return {field["env"] for field in manifest["fields"]}
+    return {key for key, value in entry["server"]["env"].items() if value == "${%s}" % key}
+
+
+def _skill_tree_files(directory: pathlib.Path) -> dict | None:
+    """profile 에 설치한 스킬 디렉터리 하나의 정규 파일이다. `{상대 경로: 경로}` 다. 없으면 None 이다.
+
+    그 아래 어느 항목이든 링크이면 예외다. 링크를 따라 profile 밖의 파일을 지우거나 읽지 않는다.
+    """
+    if directory.is_symlink():
+        raise ValueError("스킬 디렉터리가 링크다")
+    if not directory.is_dir():
+        return None
+    files = {}
+    for current, dirs, names in os.walk(directory):
+        for child in dirs + names:
+            if os.path.islink(os.path.join(current, child)):
+                raise ValueError("스킬 디렉터리 아래에 링크가 있다")
+        for name in names:
+            path = pathlib.Path(current) / name
+            files[path.relative_to(directory).as_posix()] = path
+    return files
+
+
+def _connector_bind_config(profile_dir: pathlib.Path, plugin: str, enabled: bool,
+                           vault: str | None = None, values: dict | None = None) -> dict:
+    """일반 에이전트의 profile 에 커넥터를 붙이거나 뗀다. 실패하면 같은 요청 안에서 이 요청이 쓴 파일만 되돌린다.
+
+    붙이기는 보관 파일의 값(`values`)을 그 profile `.env` 에 쓰고, 서버를 더하고, API 도구 목록에 서버 이름을 더하고,
+    plugin 의 스킬을 그 profile 의 스킬로 복사한다. Control Plane MCP 등록, 다른 도구 이름, `SOUL.md` 는 건드리지 않는다.
+    떼기는 그 서버와 이름과 env 와 스킬만 지운다(ADR-083).
+    떠 있는 profile 에 더한 서버는 gateway 를 다시 띄워야 보이므로 붙이기는 바뀐 것이 있으면 재시작이 필요하다고 답한다.
+    떼기는 도구 목록에서 이름을 빼 다음 실행부터 막히므로 재시작이 필요 없다고 답한다.
+    """
+    import yaml
+    if profile_dir.resolve() != profile_dir:
+        raise ValueError("profile 경로에 심볼릭 링크가 있다")
+    config_path = profile_dir / "config.yaml"
+    state_path = profile_dir / CONNECTOR_STATE
+    env_path = profile_dir / ".env"
+    tool_map_path = profile_dir / CONNECTOR_TOOL_MAP
+    skills_dir = profile_dir / PROFILE_SKILLS_DIR
+    plugin_dir = profile_dir / "plugins" / POLICY_PLUGIN
+    bundled = (_profile_plugin_files(POLICY_PLUGIN) if enabled else None) or {}
+    plugin_values = {plugin_dir / file_name: value for file_name, value in bundled.items()}
+    plugin_dirs = (plugin_dir.parent, plugin_dir) if plugin_values else ()
+    for path in (config_path, state_path, env_path, tool_map_path, skills_dir, *plugin_dirs, *plugin_values):
+        if path.is_symlink():
+            raise ValueError("profile 설정에 심볼릭 링크가 있다")
+    _remove_backup_env_copies(profile_dir)
+    originals = {path: path.read_bytes() if path.exists() else None
+                 for path in (config_path, state_path, env_path, tool_map_path, *plugin_values)}
+    saved = yaml.safe_load(originals[config_path]) or {}
+    state = _connector_state(json.loads(originals[state_path])) if originals[state_path] else {}
+    if any(_entry_mode(entry) != BIND_MODE for entry in state.values()):
+        raise FileExistsError("옛 설치가 있는 profile 에 바인딩을 하지 않는다")
+    servers = dict(saved.get("mcp_servers") or {})
+    platform = dict(saved.get("platform_toolsets") or {})
+    allowed = platform.get("api_server")
+    owned = state.get(plugin)
+    manifest = _connector_manifest(plugin) if plugin in _connector_roots() else None
+    env_lines = originals[env_path].decode("utf-8").splitlines(keepends=True) if originals[env_path] else []
+    previous_skills = list(owned["skills"]) if owned else []
+
+    if enabled:
+        if manifest is None:
+            raise ValueError("쓸 수 없는 connector 는 설치하지 않는다")
+        # 목록이 없는 profile 에 이름 하나만 든 목록을 만들면 내장 도구와 Control Plane MCP 가 모두 닫히고,
+        # MCP 이름이 하나도 없던 목록에 이름을 더하면 운영자의 다른 MCP 서버가 막힌다.
+        if not isinstance(allowed, list) or CONTROL_PLANE_MCP not in allowed:
+            raise FileExistsError("API 도구 목록에 Control Plane MCP 가 없는 profile 이다")
+        name = manifest["mcp_server"]
+        if name in servers and (not owned or servers[name] != owned["server"]):
+            raise FileExistsError("운영자가 등록하거나 바꾼 MCP 서버가 있다")
+        if owned and name not in servers:
+            raise FileExistsError("설치한 MCP 서버가 밖에서 지워졌다")
+        field_env = [field["env"] for field in manifest["fields"]]
+        others = set()
+        for other, entry in state.items():
+            if other != plugin:
+                others |= _entry_field_env(other, entry)
+        present = {_env_line_key(line) for line in env_lines}
+        for env_name in field_env:
+            if env_name in BASE_ENV_KEYS or env_name in others or (env_name in present and not owned):
+                raise FileExistsError("다른 설정이 쓰는 환경 변수와 겹친다")
+        server = _connector_server(manifest)
+        # Hermes 는 빈 변수의 참조를 그대로 남긴다. 값이 없는 선택 칸은 빈 값을 명시한다.
+        for field in manifest["fields"]:
+            if field["env"] in manifest["optional_env"] and not values.get(field["key"]):
+                server["env"][field["env"]] = ""
+        servers[name] = server
+        allowed = [item for item in allowed if item != "no_mcp"]
+        if name not in allowed:
+            allowed.append(name)
+        # 있던 줄은 그 자리에서 바꾸고 새 줄은 뒤에 붙인다. 같은 값으로 다시 붙이면 파일이 그대로다.
+        wanted = {field["env"]: _env_line(field["env"], values[field["key"]]) for field in manifest["fields"]
+                  if values.get(field["key"])}
+        kept = []
+        for line in env_lines:
+            key = _env_line_key(line)
+            if key not in field_env:
+                kept.append(line)
+            elif key in wanted:
+                kept.append(wanted.pop(key))
+        if kept and not kept[-1].endswith("\n"):
+            kept[-1] += "\n"
+        kept.extend(wanted.values())
+        new_env = "".join(kept).encode("utf-8") if kept or originals[env_path] is not None else None
+        skills = sorted(manifest["skills"])
+        for skill in skills:
+            if (skills_dir / skill).exists() and skill not in previous_skills:
+                raise FileExistsError("이미 있는 스킬 디렉터리와 이름이 겹친다")
+        state[plugin] = {"server": server, "allowlist_added": True, "mcp_server": name,
+                         "mode": BIND_MODE, "vault": vault, "skills": skills}
+        desired = {skills_dir / skill / relative: data
+                   for skill in skills for relative, data in manifest["skills"][skill].items()}
+    else:
+        if not owned:
+            return {"changed": False, "restart_required": False, "plugin_updated": False}
+        name = owned["mcp_server"]
+        # 기록과 다른 정의는 이 설치가 쓴 것이 아니다. 지우지 않고 멈춘다. 밖에서 이미 지워졌으면 지울 것이 없다.
+        if name in servers and servers[name] != owned["server"]:
+            raise FileExistsError("운영자가 바꾼 MCP 서버가 있다")
+        servers.pop(name, None)
+        if isinstance(allowed, list):
+            allowed = [item for item in allowed if item != name]
+        field_env = _entry_field_env(plugin, owned)
+        kept = [line for line in env_lines if _env_line_key(line) not in field_env]
+        new_env = "".join(kept).encode("utf-8") if originals[env_path] is not None else None
+        state.pop(plugin)
+        skills = []
+        desired = {}
+
+    # 이 커넥터가 전에 설치한 스킬의 파일 가운데 이번에 쓰지 않는 것은 지운다.
+    stale = []
+    for skill in previous_skills:
+        found = _skill_tree_files(skills_dir / skill) or {}
+        stale.extend(path for path in found.values() if path not in desired)
+    for path in desired:
+        for parent in path.relative_to(skills_dir).parents:
+            if (skills_dir / parent).is_symlink():
+                raise ValueError("스킬 경로에 심볼릭 링크가 있다")
+        if path.is_symlink():
+            raise ValueError("스킬 경로에 심볼릭 링크가 있다")
+    for path in (*desired, *stale):
+        originals[path] = path.read_bytes() if path.exists() else None
+
+    if isinstance(allowed, list):
+        platform["api_server"] = allowed
+    updated = {**saved, "mcp_servers": servers, "platform_toolsets": platform}
+    targets = {config_path: yaml.safe_dump(updated, sort_keys=False, allow_unicode=True).encode(),
+               state_path: (json.dumps(state) + "\n").encode(), env_path: new_env,
+               # 붙은 커넥터가 남지 않으면 대응 파일을 지운다. hook 이 판정할 서버가 없다.
+               tool_map_path: _tool_map_bytes(_connector_tool_map(state)) if state else None,
+               **desired, **{path: None for path in stale}}
+    # plugin 파일은 맨 뒤에 쓴다. 앞의 쓰기가 실패하면 plugin 은 손대지 않은 채 남는다.
+    targets.update(plugin_values)
+    plugin_updated = any(originals[path] != value for path, value in plugin_values.items())
+    if all(originals[path] == value for path, value in targets.items()):
+        return {"changed": False, "restart_required": False, "plugin_updated": False}
+    backup = profile_dir / "connector-backups" / str(time.time_ns())
+    backup.mkdir(parents=True, mode=0o700)
+    os.chmod(backup.parent, 0o700)
+    for path in (config_path, state_path, tool_map_path):
+        # `.env` 와 스킬 파일은 뜨지 않는다. `.env` 에는 사용자의 비밀 원문이 있다.
+        if originals[path] is not None:
+            _atomic_private_write(backup / path.name, originals[path])
+    for path, value in plugin_values.items():
+        if originals[path] is not None and originals[path] != value:
+            _atomic_private_write(backup / ("%s.%s" % (POLICY_PLUGIN, path.name)), originals[path])
+
+    def shared(path):
+        # 스킬과 plugin 파일은 gateway 가 읽는 파일이다. 새 profile 에 plugin 을 복사할 때와 같은 644 로 둔다.
+        return path in plugin_values or skills_dir in path.parents
+
+    written = []
+    created_dirs = []
+    try:
+        if any((path.read_bytes() if path.exists() else None) != value for path, value in originals.items()):
+            raise FileExistsError("저장 전 profile 설정이 밖에서 바뀌었다")
+        for path, value in targets.items():
+            current = path.read_bytes() if path.exists() else None
+            if current != originals[path]:
+                raise FileExistsError("profile 설정이 밖에서 바뀌었다")
+            if current == value:
+                continue
+            if value is None:
+                path.unlink()
+            else:
+                for directory in reversed(path.parents):
+                    if directory in profile_dir.parents or directory == profile_dir or directory.is_dir():
+                        continue
+                    directory.mkdir()
+                    created_dirs.append(directory)
+                    os.chmod(directory, 0o755)
+                _atomic_private_write(path, value)
+                if shared(path):
+                    os.chmod(path, 0o644)
+            written.append(path)
+    except Exception:
+        for path in reversed(written):
+            # 이 요청이 쓴 값일 때만 복원한다. 바깥의 새 수정은 덮어쓰지 않는다.
+            if (path.read_bytes() if path.exists() else None) != targets[path]:
+                continue
+            value = originals[path]
+            if value is None:
+                path.unlink(missing_ok=True)
+            else:
+                _atomic_private_write(path, value)
+                if shared(path):
+                    os.chmod(path, 0o644)
+        for directory in reversed(created_dirs):
+            # 이 요청이 만든 디렉터리만 지운다. 그 사이 밖에서 무엇이 생겼으면 비어 있지 않아 남는다.
+            try:
+                directory.rmdir()
+            except OSError:
+                pass
+        raise
+    # 파일을 모두 지운 스킬 디렉터리는 빈 디렉터리만 남는다. 지우지 못해도 설치는 끝난 것이다.
+    for skill in previous_skills:
+        for current, dirs, names in os.walk(skills_dir / skill, topdown=False):
+            try:
+                os.rmdir(current)
+            except OSError:
+                pass
+    return {"changed": True, "restart_required": enabled, "plugin_updated": plugin_updated}
+
+
+def _bind_skills_installed(profile_dir: pathlib.Path, manifest: dict, entry: dict) -> bool:
+    """소유 기록의 스킬이 plugin 의 스킬과 같고, 설치한 파일이 plugin 의 본문과 같은지 본다. 읽다가 예외가 나면 거짓이다."""
+    try:
+        if sorted(entry["skills"]) != sorted(manifest["skills"]):
+            return False
+        skills_dir = profile_dir / PROFILE_SKILLS_DIR
+        if skills_dir.is_symlink():
+            return False
+        for skill, files in manifest["skills"].items():
+            found = _skill_tree_files(skills_dir / skill)
+            if found is None or {key: path.read_bytes() for key, path in found.items()} != files:
+                return False
+        return True
+    except Exception:
+        return False
+
+
 def _policy_hook_active(profile_dir: pathlib.Path, config: dict, state: dict) -> bool:
     """그 profile 에서 커넥터 도구 호출이 정책 hook 을 거치는지 본다. 읽다가 예외가 나면 거짓이다.
 
@@ -1257,6 +1791,20 @@ def _policy_hook_active(profile_dir: pathlib.Path, config: dict, state: dict) ->
         return False
 
 
+def _owned_mode(profile_dir: pathlib.Path, plugin: str) -> str | None:
+    """소유 기록에서 그 커넥터 항목의 설치 방식만 읽는다. 항목이 없거나 기록을 읽지 못하면 None 이다.
+
+    표식 판정과 처리 경로를 고르는 데만 쓴다. 기록 전체의 검증은 설치와 떼기가 한다.
+    """
+    try:
+        state = json.loads((profile_dir / CONNECTOR_STATE).read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+    if not isinstance(state, dict) or not isinstance(state.get(plugin), dict):
+        return None
+    return _entry_mode(state[plugin])
+
+
 async def _connector_request(request):
     from hermes_cli.profiles import get_profile_dir
     from starlette.responses import JSONResponse
@@ -1268,12 +1816,16 @@ async def _connector_request(request):
         body = {"profile": profiles[0]}
     else:
         body = await _json_object(request)
+        bind = body.get("bind") if isinstance(body, dict) else None
         # 운영 목록에 없는 이름은 끄기만 받는다. 소유 기록이 있으면 설치를 끄고, 없으면 바꾸지 않고 성공이다.
-        if (body is None or set(body) != {"profile", "plugin", "enabled"}
+        # `bind` 는 바인딩 설치에서만 뜻이 있다. 떼기는 소유 기록의 설치 방식을 따른다.
+        if (body is None or not {"profile", "plugin", "enabled"} <= set(body) <= {"profile", "plugin", "enabled", "bind"}
                 or not isinstance(body["plugin"], str) or not CONNECTOR_ID_RE.match(body["plugin"])
                 or not isinstance(body["enabled"], bool)
-                or (body["enabled"] and body["plugin"] not in roots)):
-            return _rejected("profile, 알려진 plugin, enabled 만 필요하다")
+                or (body["enabled"] and body["plugin"] not in roots)
+                or ("bind" in body and (not isinstance(bind, dict) or set(bind) != {"vault"}
+                                        or not isinstance(bind["vault"], str) or not VAULT_ID_RE.match(bind["vault"])))):
+            return _rejected("profile, 알려진 plugin, enabled 와 바인딩이면 bind.vault 만 필요하다")
     rejected = _profile_rejection(body["profile"], request)
     if rejected is not None:
         return rejected
@@ -1281,7 +1833,12 @@ async def _connector_request(request):
     if missing is not None:
         return missing
     profile_dir = get_profile_dir(body["profile"])
-    if not (profile_dir / MANAGED_MARKER).is_file():
+    # 표식은 대상의 방식으로 판정한다. 커넥터 표식만 있는 사람이 만든 profile 은 바인딩 설치만 받는다.
+    managed = (profile_dir / MANAGED_MARKER).is_file()
+    host = (profile_dir / CONNECTOR_HOST_MARKER).is_file()
+    bind_target = request.method.upper() == "GET" or (
+        "bind" in body if body["enabled"] else _owned_mode(profile_dir, body["plugin"]) == BIND_MODE)
+    if not (managed or (host and bind_target)):
         return _rejected("관리 표식이 없는 profile 이다", 401)
     try:
         if request.method.upper() == "GET":
@@ -1297,21 +1854,46 @@ async def _connector_request(request):
             # 설치가 쓰는 목록과 같고 Control Plane MCP 등록이 없어야 설치가 끝난 것이다.
             # 이 값은 profile 단위다. 목록이 profile 하나에 하나뿐이라 서버 이름을 찾지 못하는 기록이 하나라도 있으면
             # 그 profile 의 커넥터가 모두 `configured: false` 다.
-            isolated = (expected is not None and CONTROL_PLANE_MCP not in servers
-                        and (config.get("platform_toolsets") or {}).get("api_server") == expected)
+            allowed = (config.get("platform_toolsets") or {}).get("api_server")
+            isolated = (expected is not None and CONTROL_PLANE_MCP not in servers and allowed == expected)
             connectors = []
             for plugin in roots:
                 manifest = _connector_manifest(plugin)
-                connectors.append({
-                    "plugin": plugin, "enabled": plugin in state,
-                    "configured": (plugin in state and manifest is not None and isolated
-                                   and servers.get(manifest["mcp_server"]) == state[plugin]["server"])})
+                entry = state.get(plugin)
+                # 설치하지 않은 커넥터는 소유 기록의 기본값처럼 옛 설치로 답한다. 읽는 쪽은 설치한 항목의 값만 쓴다.
+                mode = _entry_mode(entry)
+                if entry is None or manifest is None or servers.get(manifest["mcp_server"]) != entry["server"]:
+                    configured = False
+                elif mode == BIND_MODE:
+                    # Control Plane MCP 등록이 있어도 된다. 바인딩 설치는 그 등록과 다른 도구 이름을 그대로 둔다.
+                    configured = (isinstance(allowed, list) and manifest["mcp_server"] in allowed
+                                  and _bind_skills_installed(profile_dir, manifest, entry))
+                else:
+                    configured = isolated
+                connectors.append({"plugin": plugin, "enabled": entry is not None, "configured": configured,
+                                   "mode": mode})
             # 운영 목록에서 빠진 커넥터의 기록은 설치를 끌 수 있게 보이되 쓸 수 있다고 답하지 않는다.
-            connectors.extend({"plugin": plugin, "enabled": True, "configured": False}
-                              for plugin in state if plugin not in roots)
+            connectors.extend({"plugin": plugin, "enabled": True, "configured": False, "mode": _entry_mode(entry)}
+                              for plugin, entry in state.items() if plugin not in roots)
             return JSONResponse({"profile": body["profile"], "connectors": connectors,
                                  "policy_hook": _policy_hook_active(profile_dir, config, state)}, status_code=200)
-        result = await asyncio.to_thread(_connector_config, profile_dir, body["plugin"], body["enabled"])
+        if body["enabled"] and "bind" in body:
+            # 붙이는 요청 안에서 보관 파일을 읽는다. 보관 파일 쓰기와 같은 잠금 안이라 그 사이에 바뀌지 않는다.
+            manifest = _connector_manifest(body["plugin"])
+            if manifest is None:
+                raise ValueError("쓸 수 없는 connector 는 설치하지 않는다")
+            stored = _read_vault(body["bind"]["vault"])
+            if stored is None or stored["connector"] != body["plugin"]:
+                return _rejected("그 connector 의 보관 파일이 없다")
+            values = _vault_values(manifest, stored["values"])
+            if values is None:
+                return _rejected("보관 파일의 값이 지금 칸 선언과 맞지 않는다")
+            result = await asyncio.to_thread(_connector_bind_config, profile_dir, body["plugin"], True,
+                                             body["bind"]["vault"], values)
+        elif not body["enabled"] and _owned_mode(profile_dir, body["plugin"]) == BIND_MODE:
+            result = await asyncio.to_thread(_connector_bind_config, profile_dir, body["plugin"], False)
+        else:
+            result = await asyncio.to_thread(_connector_config, profile_dir, body["plugin"], body["enabled"])
         return JSONResponse({**body, **result}, status_code=200)
     except FileExistsError:
         return _rejected("운영자 설정과 충돌한다", 409)
@@ -1321,7 +1903,10 @@ async def _connector_request(request):
 
 
 def _connector_catalog_response():
-    """검증을 통과한 커넥터의 카탈로그다. 운영자 env 의 이름과 값, 오류 대응 표는 담지 않는다."""
+    """검증을 통과한 커넥터의 카탈로그다. 운영자 env 의 이름과 값, 오류 대응 표, 스킬 본문은 담지 않는다.
+
+    `skills` 는 바인딩 설치가 profile 에 복사할 스킬의 이름이다. 이름 순이다.
+    """
     from starlette.responses import JSONResponse
 
     return JSONResponse(
@@ -1329,6 +1914,7 @@ def _connector_catalog_response():
           "description": manifest["description"],
           "fields": manifest["fields"], "verify": manifest["verify"], "mcp_server": manifest["mcp_server"],
           "toolsets": manifest["toolsets"], "attachments": manifest["attachments"],
+          "skills": sorted(manifest["skills"]),
           # 사람 말 제목이 없는 도구는 `title` 을 내지 않는다. 읽는 쪽이 도구 이름을 보인다.
           "tools": {name: {key: value for key, value in policy.items() if value is not None}
                     for name, policy in manifest["tools"].items()}}
@@ -1415,7 +2001,10 @@ def _connector_call_answer(manifest: dict, result) -> dict:
 
 
 async def _connector_call_request(request, connector_id: str):
-    """후보 값으로 선택지 도구나 확인 도구를 한 번 부른다. 값을 디스크와 응답과 로그에 남기지 않는다."""
+    """후보 값이나 보관 파일의 값으로 선택지 도구나 확인 도구를 한 번 부른다. 값을 디스크와 응답과 로그에 남기지 않는다.
+
+    본문은 `values` 와 `vault` 가운데 정확히 하나를 갖는다. `vault` 는 그 커넥터의 보관 파일이어야 한다.
+    """
     from starlette.responses import JSONResponse
     global _connector_calls
 
@@ -1426,14 +2015,28 @@ async def _connector_call_request(request, connector_id: str):
     if manifest is None:
         return _rejected("없는 connector 다", 404)
     body = await _json_object(request)
-    if body is None or set(body) != {"tool", "values"} or not isinstance(body["values"], dict):
-        return _rejected("tool 과 values 만 필요하다")
+    if (body is None or set(body) not in ({"tool", "values"}, {"tool", "vault"})
+            or ("values" in body and not isinstance(body["values"], dict))
+            or ("vault" in body and (not isinstance(body["vault"], str) or not VAULT_ID_RE.match(body["vault"])))):
+        return _rejected("tool 과, values 나 vault 가운데 하나만 필요하다")
     tool = body["tool"]
     if not isinstance(tool, str) or tool not in manifest["call_tools"]:
         return _rejected("이 커넥터가 선택지나 확인에 쓰는 도구가 아니다")
+    if "vault" in body:
+        try:
+            stored = await asyncio.to_thread(_read_vault, body["vault"])
+        except Exception as error:
+            logger.warning("dashboard-profile-api: 커넥터 %s 의 보관 파일을 읽지 못했다: %s",
+                           connector_id, type(error).__name__)
+            return failed("unavailable")
+        if stored is None or stored["connector"] != connector_id:
+            return _rejected("이 커넥터의 보관 파일이 없다")
+        candidates = stored["values"]
+    else:
+        candidates = body["values"]
     fields = {field["key"]: field for field in manifest["fields"]}
     env = {}
-    for key, value in body["values"].items():
+    for key, value in candidates.items():
         field = fields.get(key)
         if field is None or not isinstance(value, str) or any(ch in value for ch in "\r\n\0"):
             return failed("invalid_input")
@@ -1552,13 +2155,17 @@ async def _connector_execute_request(request, connector_id: str):
             return missing
         from hermes_cli.profiles import get_profile_dir
         profile_dir = get_profile_dir(body["profile"])
-        if not (profile_dir / MANAGED_MARKER).is_file():
+        managed = (profile_dir / MANAGED_MARKER).is_file()
+        if not managed and not (profile_dir / CONNECTOR_HOST_MARKER).is_file():
             return _rejected("관리 표식이 없는 profile 이다", 401)
         state_path = profile_dir / CONNECTOR_STATE
         # 기록을 검증하면서 지금 manifest 의 실행 정의와 맞는지도 함께 본다.
         state = _connector_state(json.loads(state_path.read_text(encoding="utf-8"))) if state_path.is_file() else {}
         if connector_id not in state:
             return _rejected("설치하지 않은 connector 다", 404)
+        # 커넥터 표식만 있는 profile 은 바인딩 설치만 받는다. 그 밖의 항목으로는 실행하지 않는다.
+        if not managed and _entry_mode(state[connector_id]) != BIND_MODE:
+            return _rejected("관리 표식이 없는 profile 이다", 401)
         env_path = profile_dir / ".env"
         env_text = env_path.read_text(encoding="utf-8") if env_path.is_file() else ""
     except Exception as error:
@@ -1623,7 +2230,8 @@ async def _check_connector_probe(request):
     from hermes_cli.profiles import get_profile_dir
     server = PROBE_ROUTE_RE.match(request.url.path).group(1)
     profile_dir = get_profile_dir(request.query_params.getlist("profile")[0])
-    if not (profile_dir / MANAGED_MARKER).is_file():
+    managed = (profile_dir / MANAGED_MARKER).is_file()
+    if not managed and not (profile_dir / CONNECTOR_HOST_MARKER).is_file():
         return _rejected("관리 표식이 없는 profile 이다", 401)
     state_path = profile_dir / CONNECTOR_STATE
     try:
@@ -1637,6 +2245,9 @@ async def _check_connector_probe(request):
                       and (_connector_manifest(plugin) or {}).get("mcp_server") == server), None)
         if not owned:
             return _rejected("설치하지 않은 connector 다", 404)
+        # 커넥터 표식만 있는 profile 은 바인딩 설치만 받는다.
+        if not managed and _entry_mode(owned) != BIND_MODE:
+            return _rejected("관리 표식이 없는 profile 이다", 401)
         config = yaml.safe_load((profile_dir / "config.yaml").read_text(encoding="utf-8")) or {}
         if (config.get("mcp_servers") or {}).get(server) != owned["server"]:
             return _rejected("운영자 설정과 충돌한다", 409)
@@ -1744,8 +2355,29 @@ def _operator_skill_dirs(saved: dict, profile: str, root: pathlib.Path) -> list:
     return [entry for entry in raw if not (isinstance(entry, str) and entry.startswith(prefix))]
 
 
+def _bound_servers(profile_dir: pathlib.Path) -> list:
+    """소유 기록의 바인딩 항목이 설치한 서버 이름이다. 기록이 없으면 빈 목록이다.
+
+    기록은 JSON 모양만 본다. `_connector_state` 는 manifest 의 실행 정의가 바뀌면 예외를 내어,
+    운영자가 커넥터를 바꾸면 그 커넥터가 붙은 모든 에이전트의 도구 저장이 실패하기 때문이다.
+    """
+    path = profile_dir / CONNECTOR_STATE
+    if not path.is_file():
+        return []
+    state = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(state, dict):
+        raise ValueError("connector 소유 기록이 올바르지 않다")
+    return [entry["mcp_server"] for entry in state.values()
+            if _entry_mode(entry) == BIND_MODE and isinstance(entry.get("mcp_server"), str)]
+
+
 async def _check_config_update(request):
-    """공유 토큰의 설정 쓰기를 profile 별 API 도구 목록과 올린 스킬 경로로 제한한다."""
+    """공유 토큰의 설정 쓰기를 profile 별 API 도구 목록과 올린 스킬 경로로 제한한다.
+
+    처리기는 API 도구 목록을 통째로 바꾼다. 그래서 바인딩 설치가 더한 커넥터 서버 이름은
+    Control Plane 이 목록에 함께 보낸다는 계약이다. 그 이름이 하나라도 빠진 요청은 409 로 거절한다(ADR-083).
+    조용히 지워지면 붙은 커넥터의 도구가 말없이 사라진다.
+    """
     body = await _json_object(request)
     if body is None or set(body) != {"profile", "config"}:
         return _rejected("profile 과 config 만 필요하다")
@@ -1808,6 +2440,8 @@ async def _check_config_update(request):
             known = builtins | _get_plugin_toolset_keys() | mcp_names | {CONTROL_PLANE_MCP}
             if set(allowed) - known:
                 return _rejected("모르는 도구 이름이 있다")
+            if set(_bound_servers(get_profile_dir(profile))) - set(allowed):
+                return _rejected("연결된 커넥터의 도구 이름이 빠졌다", 409)
             if CONTROL_PLANE_MCP not in mcp_names and not (set(allowed) & builtins):
                 return _rejected("내장 도구가 하나 이상 필요하다")
             updated["platform_toolsets"] = {**(saved.get("platform_toolsets") or {}), **platform}
@@ -2101,7 +2735,9 @@ def _install_gate() -> bool:
                 state = json.loads(state_path.read_text(encoding="utf-8")) if state_path.exists() else {}
                 installed = [manifest for manifest in owners if manifest["id"] in state]
                 for manifest in installed:
-                    if body["key"] not in manifest["optional_env"]:
+                    # 바인딩 설치의 env 는 설치 묶음이 쓰므로 옛 설치만 다시 쓴다.
+                    if (body["key"] not in manifest["optional_env"]
+                            or (isinstance(state, dict) and _entry_mode(state[manifest["id"]]) == BIND_MODE)):
                         continue
                     try:
                         # 비운 선택 칸의 명시적 빈 값도 갱신한다. 재시작만으로는 바뀌지 않는다.
@@ -2142,6 +2778,14 @@ def _install_gate() -> bool:
                 return _rejected("Control Plane 토큰이 필요하다", 401)
             return await asyncio.to_thread(
                 _session_provider_response, provider_match.group(1), provider_match.group(2))
+
+        if (path, method) in VAULT_ROUTES:
+            principal, _ = seam.authenticate_token(request)
+            if principal is None or getattr(principal, "provider", None) != ProfileApiProvider.name:
+                return _rejected("Control Plane 토큰이 필요하다", 401)
+            # 바인딩 설치가 보관 파일을 읽는 것과 같은 잠금 안에서 쓰고 지운다.
+            async with PROFILE_WRITE_LOCK:
+                return await _connector_vault_request(request)
 
         call = CALL_ROUTE_RE.match(path) if method == "POST" else None
         execute = EXECUTE_ROUTE_RE.match(path) if method == "POST" else None
@@ -2235,6 +2879,8 @@ def register(ctx) -> None:
         opened.setdefault(path, []).append(method)
     opened[CONNECTORS_PATH] = ["GET", "PUT"]
     opened[CATALOG_PATH] = ["GET"]
+    for path, method in VAULT_ROUTES:
+        opened.setdefault(path, []).append(method)
     opened["/api/profiles/<이름>/model-defaults"] = ["GET"]
     opened["/api/profiles/<이름>/sessions/<session id>/provider"] = ["GET"]
     logger.info(
