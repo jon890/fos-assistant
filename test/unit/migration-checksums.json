@@ -57,5 +57,14 @@
   "V62__model_hidden_collation.sql": "6c1a9a82cf032198dd50bb88f827c94259478e8d996db1fde3516b8975d5789c",
   "V63__model_tier_definition_collation.sql": "18cd728e0bc0a6d8cdc79c8071632cbf2dad58fb4bf6b151f17823f663670247",
   "V64__model_tier_group_setting_collation.sql": "39a2aad6e6f9bbea86be381887821ec686bf68cb5dafd4bdbaf9fa8fa26c9627",
-  "V65__subagent_usage_job_collation.sql": "1a866e1d07fb45cd108c88fc2601359f8bab52226ac1ab94e53631548b5e1d46"
+  "V65__subagent_usage_job_collation.sql": "1a866e1d07fb45cd108c88fc2601359f8bab52226ac1ab94e53631548b5e1d46",
+  "V66__notification.sql": "212d2b96d23e177e69c3396bfe27c7deffaa33af2ad43752fb1063ed2f0c1b75",
+  "V67__result_delivery.sql": "944f551a54f2fe9c2126d9c4a66a9151d7dd643eeb45514664c00fae78770c9a",
+  "V68__task.sql": "718696b119dc3bab3abd775a7628067f92b7b8e44dc527df3f73669528d39e2e",
+  "V69__proactive_check.sql": "25816f4e7303ff2d26f47fe84806a0b539fa3f67f1544e9b7ecdd009736fbd67",
+  "V70__execution_context_source.sql": "82f2eeb3bcc00445fb1d498241a7edae7a9393de014e076c3bb428066bee1f8b",
+  "V71__attention_control_event.sql": "7e256a4c8388c4d9b8afa2f1109d651d3b4b96e56a668d4a67db26bc97b3908b",
+  "V72__follow_up.sql": "27a4880b2fc772db7b80bb50b182bb08c5ff3410b1f34af9ddbe584f281dd14f",
+  "V73__proactive_check_writes.sql": "514d01a5b17652899c4fd6b6c0a0645d9310665e769dfbb03f094948f211098a",
+  "V74__proactive_check_invalid_reason.sql": "bb9e5c5346695ae4a117dc51f5c1a8cf11e80eb6c3b46d434cb553811d697055"
 }
