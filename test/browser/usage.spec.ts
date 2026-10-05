@@ -189,11 +189,12 @@ test("붐벼서 거절된 실행은 다른 실패와 다르게 보인다", async
 });
 
 /**
- * 요청한 effort 가 실행 한 줄에 보이고, 고르지 않은 실행은 「기본」 으로 보이는지 본다.
+ * 요청한 effort와 완료 뒤 보완된 profile 기본 강도가 실행 한 줄에 보이는지 본다.
  *
  * <p>다른 검사가 남긴 실행이 목록에 섞여 있으므로 응답의 실행 번호로 이 검사의 줄을 특정한다.
  */
-test("실행 기록에 요청한 effort 가 보이고 고르지 않으면 기본으로 보인다", async ({ page }, testInfo) => {
+test("실행 기록에 요청한 effort와 보완된 profile 기본 강도가 보인다", async ({ page }, testInfo) => {
+  test.setTimeout(60_000);
   const created = await page.request.post("/api/chat/conversations", {
     data: { agentCode: SWITCH_AGENT_CODE },
   });
@@ -216,6 +217,19 @@ test("실행 기록에 요청한 effort 가 보이고 고르지 않으면 기본
   expect(byDefault.ok(), `기본값 보내기가 실패했다: ${byDefault.status()}`).toBeTruthy();
   const byDefaultId = ((await byDefault.json()) as { executionId: number }).executionId;
 
+  // 완료 직후에는 비어 있을 수 있다. 비동기 조회가 profile 기본 강도를 보완한 뒤 화면을 읽는다.
+  await expect.poll(async () => {
+    const response = await page.request.get(`/api/usage/executions/${byDefaultId}/tree`);
+    expect(response.ok()).toBeTruthy();
+    const tree = (await response.json()) as {
+      root: { reasoningEffort: string | null; reasoningEffortSource: string | null };
+    };
+    return {
+      effort: tree.root.reasoningEffort,
+      source: tree.root.reasoningEffortSource,
+    };
+  }, { timeout: 30_000 }).toEqual({ effort: "medium", source: "PROFILE_DEFAULT" });
+
   await page.goto("/admin/usage?tab=executions");
   const rowOf = (executionId: number) => {
     const link = page.locator(`a[href="/admin/executions/${executionId}"]`);
@@ -224,7 +238,7 @@ test("실행 기록에 요청한 effort 가 보이고 고르지 않으면 기본
       : link.locator("xpath=ancestor::tr");
   };
   await expect(rowOf(withEffortId).getByTestId("execution-effort")).toHaveText("high");
-  await expect(rowOf(byDefaultId).getByTestId("execution-effort")).toHaveText("기본");
+  await expect(rowOf(byDefaultId).getByTestId("execution-effort")).toHaveText("medium");
 });
 
 const TAB_LABELS = ["요약", "실행 기록", "스킬", "설정별 사용량"];
