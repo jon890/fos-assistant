@@ -26,7 +26,7 @@ Hermes 가 스킬을 읽는 방식은 [`hermes/skills.md`](../hermes/skills.md) 
 | 파일 | `SKILL.md` 와 `references/`, `templates/` 아래 텍스트 파일. 파일 20개까지 |
 | 크기 | 파일마다 10만 자, 합계 1 MiB |
 | 앞머리 | `name` 이 스킬 이름과 같다. `description` 은 1024자까지이고, 새 스킬이면 60자까지다. 60자는 앞뒤 공백과 앞뒤 따옴표를 뺀 code point 로, 1024자는 앞뒤를 빼지 않은 code point 로 센다 |
-| 앞머리의 비밀 요청 칸 | `required_environment_variables`, `required_credential_files`, `setup.collect_secrets`, `prerequisites.env_vars` 가 없다. Hermes 는 스킬을 읽을 때 이 칸의 이름으로 profile 의 환경 값과 파일을 셸 실행 공간에 넣는다([ADR-084](../adr/ADR-084-셸과-파일-도구는-사용자별-docker-실행-공간에서만-돈다.md)) |
+| 앞머리의 비밀 요청 칸 | `required_environment_variables`, `required_credential_files`, `setup.collect_secrets`, `prerequisites.env_vars` 가 없다. Hermes 는 스킬을 읽을 때 이 칸의 이름으로 profile 의 환경 값과 파일을 셸 실행 공간에 넣는다([ADR-086](../adr/ADR-086-셸과-파일-도구는-사용자별-docker-실행-공간에서만-돈다.md)) |
 | 본문 | 닫는 `---` 뒤에 공백이 아닌 글이 있어야 한다 |
 | 개수 | 에이전트마다 올린 스킬 `assistant.skill.max-per-agent` 개. 기본 30. 새 스킬을 만들 때만 에이전트 행 잠금 안에서 센다. 표식 없는 더 새 버전의 이름도 센다 |
 

@@ -26,7 +26,7 @@ Hermes core 는 고치지 않는다.
 | `GET /api/profiles/<이름>/soul` | profile 의 SOUL.md 를 읽는다 |
 | `PUT /api/profiles/<이름>/soul` | profile 의 SOUL.md 를 쓴다 |
 | `GET /api/tools/toolsets` | 도구 이름과 설명을 읽는다 |
-| `PUT /api/config` | 지정한 profile 의 API 도구 목록과 올린 스킬 경로만 쓴다. 켠 도구는 `agent.disabled_toolsets` 에서 뺀다. `terminal`, `file`, `code_execution` 가운데 하나라도 켜면 `sandbox_owner` 를 받아 그 profile 의 `terminal:` 을 docker 실행 공간 설정으로 통째로 바꾼다. 실행 공간 설정이 없으면 409 다(ADR-084) |
+| `PUT /api/config` | 지정한 profile 의 API 도구 목록과 올린 스킬 경로만 쓴다. 켠 도구는 `agent.disabled_toolsets` 에서 뺀다. `terminal`, `file`, `code_execution` 가운데 하나라도 켜면 `sandbox_owner` 를 받아 그 profile 의 `terminal:` 을 docker 실행 공간 설정으로 통째로 바꾼다. 실행 공간 설정이 없으면 409 다(ADR-086) |
 | `GET /api/skills` | 지정한 profile 의 스킬 목록을 읽는다 |
 | `PUT /api/skills/toggle` | 지정한 profile 의 스킬 하나를 켜고 끈다 |
 | `GET /api/profiles/<이름>/sessions/<session id>/provider` | 그 profile 의 자식 session 한 줄에서 provider 와 모델만 읽는다 |
@@ -154,7 +154,7 @@ logger = logging.getLogger(__name__)
 ENV_VAR = "HERMES_DASHBOARD_PROFILE_API_SECRET"
 # Control Plane 이 올린 스킬을 두는 루트의 Hermes 컨테이너 쪽 경로다. Compose 가 준다.
 SKILL_ROOT_ENV = "FOS_ASSISTANT_SKILL_AGENT_ROOT"
-# 셸과 파일 도구를 돌릴 docker 실행 공간 설정 JSON 이다. 모양은 `hermes/README.md` 의 「셸 실행 공간」 이 갖는다(ADR-084).
+# 셸과 파일 도구를 돌릴 docker 실행 공간 설정 JSON 이다. 모양은 `hermes/README.md` 의 「셸 실행 공간」 이 갖는다(ADR-086).
 SANDBOX_ENV = "FOS_ASSISTANT_SANDBOX"
 # 켜면 profile 의 `terminal:` 을 실행 공간 설정으로 바꿔야 하는 도구다. 설정이 없으면 켜지 않는다.
 SANDBOX_TOOLSETS = frozenset({"terminal", "file", "code_execution"})
@@ -1803,7 +1803,7 @@ def _sandbox_mount_overlaps(mount: str, workspace_root: str) -> bool:
 def _sandbox_policy() -> Optional[dict]:
     """`SANDBOX_ENV` 의 JSON 을 읽어 검증한다. 없거나 하나라도 틀리면 None 이다.
 
-    None 이면 셸과 파일 도구를 켜지 않는다. 로컬 셸로 두지 않고 닫는다(ADR-084).
+    None 이면 셸과 파일 도구를 켜지 않는다. 로컬 셸로 두지 않고 닫는다(ADR-086).
     """
     raw = os.environ.get(SANDBOX_ENV, "").strip()
     if not raw:

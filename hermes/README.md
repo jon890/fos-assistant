@@ -52,7 +52,7 @@ plugin 파일, 주소를 채운 `default-config.yaml.template`, 틀의 `plugins.
 
 ### 셸 실행 공간
 
-`FOS_ASSISTANT_SANDBOX` 는 JSON object 다. 결정은 [ADR-084](../docs/adr/ADR-084-셸과-파일-도구는-사용자별-docker-실행-공간에서만-돈다.md), Hermes 의 동작은 [실행 공간](../docs/hermes/sandbox.md) 이 갖는다.
+`FOS_ASSISTANT_SANDBOX` 는 JSON object 다. 결정은 [ADR-086](../docs/adr/ADR-086-셸과-파일-도구는-사용자별-docker-실행-공간에서만-돈다.md), Hermes 의 동작은 [실행 공간](../docs/hermes/sandbox.md) 이 갖는다.
 
 | 키 | 필수 | 모양 |
 | --- | --- | --- |

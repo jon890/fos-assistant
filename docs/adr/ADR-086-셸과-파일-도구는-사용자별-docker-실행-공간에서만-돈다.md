@@ -1,4 +1,4 @@
-## ADR-084: 셸과 파일 도구는 사용자별 docker 실행 공간에서만 돈다
+## ADR-086: 셸과 파일 도구는 사용자별 docker 실행 공간에서만 돈다
 
 - **status**: `accepted`
 - **결정**: `terminal`, `file`, `code_execution` toolset 이 켜진 profile 은 Hermes 의 docker terminal backend 로만 돈다.

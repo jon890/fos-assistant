@@ -51,16 +51,16 @@ public enum ErrorCode {
     AGENT_BUSY(HttpStatus.CONFLICT),
     /** 셸이나 파일, 다른 사람의 대화에 닿는 toolset은 그룹 에이전트에 둘 수 없다. */
     AGENT_TOOLS_REQUIRE_PRIVATE(HttpStatus.CONFLICT),
-    /** 셸이나 파일 도구를 켜려 했지만 Hermes 쪽 사용자별 격리 실행 공간이 준비되지 않았다(ADR-084). 도구 목록은 바뀌지 않았다. */
+    /** 셸이나 파일 도구를 켜려 했지만 Hermes 쪽 사용자별 격리 실행 공간이 준비되지 않았다(ADR-086). 도구 목록은 바뀌지 않았다. */
     AGENT_SANDBOX_UNAVAILABLE(HttpStatus.CONFLICT),
     /**
-     * 셸이나 파일 등급의 도구가 켜진 에이전트의 주인을 바꾸려 했다(ADR-084). 그 profile 의 실행 공간은 옛 주인의 디렉터리를
+     * 셸이나 파일 등급의 도구가 켜진 에이전트의 주인을 바꾸려 했다(ADR-086). 그 profile 의 실행 공간은 옛 주인의 디렉터리를
      * 가리키고 컨테이너도 재사용되므로, 도구를 먼저 끈 뒤에만 주인을 바꾼다.
      */
     AGENT_OWNER_CHANGE_REQUIRES_SHELL_OFF(HttpStatus.CONFLICT),
     /**
      * 셸이나 파일 등급의 도구를 켜거나 켠 채 두려 했지만 그 에이전트에 올린 스킬 가운데 환경 값이나 자격 증명 파일을 요청하는
-     * 것이 있다(ADR-084). Hermes 가 그 값을 실행 공간에 넣으므로 그 스킬을 먼저 고치거나 지워야 한다. 도구 목록은 바뀌지
+     * 것이 있다(ADR-086). Hermes 가 그 값을 실행 공간에 넣으므로 그 스킬을 먼저 고치거나 지워야 한다. 도구 목록은 바뀌지
      * 않았다.
      */
     AGENT_SKILL_REQUESTS_SECRETS(HttpStatus.CONFLICT),

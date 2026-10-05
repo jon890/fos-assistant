@@ -75,7 +75,7 @@ public class AgentAdminService {
         if (command.enabled() && command.visibility() == AgentVisibility.GROUP) {
             lifecycle.requireGroupSafe(apiBaseUrl, agent.hermesProfile());
         }
-        // 셸이나 파일 도구가 켜진 profile 은 실행 공간이 지금 주인의 디렉터리를 가리킨다(ADR-084). 주인이 바뀔 때만 본다.
+        // 셸이나 파일 도구가 켜진 profile 은 실행 공간이 지금 주인의 디렉터리를 가리킨다(ADR-086). 주인이 바뀔 때만 본다.
         if (!Objects.equals(ownerId, agent.ownerUserId())) {
             lifecycle.requireOwnerChangeSafe(apiBaseUrl, agent.hermesProfile());
         }

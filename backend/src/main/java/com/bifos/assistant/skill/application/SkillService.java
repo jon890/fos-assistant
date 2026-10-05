@@ -329,7 +329,7 @@ public class SkillService {
         if (!frontmatter.hasBody()) {
             throw new ApiException(ErrorCode.VALIDATION_FAILED, "SKILL.md must have content after the frontmatter");
         }
-        // Hermes 는 이 칸에 적힌 이름으로 profile 의 환경 값과 파일을 셸 실행 공간에 넣는다(ADR-084).
+        // Hermes 는 이 칸에 적힌 이름으로 profile 의 환경 값과 파일을 셸 실행 공간에 넣는다(ADR-086).
         if (frontmatter.requestsSecrets()) {
             throw new ApiException(
                     ErrorCode.VALIDATION_FAILED,
@@ -339,7 +339,7 @@ public class SkillService {
     }
 
     /**
-     * 새 버전에 함께 실리는 기존 스킬 가운데 비밀 요청 칸을 가진 것이 있으면 거절한다(ADR-084). 저장 검사가 생기기 전에
+     * 새 버전에 함께 실리는 기존 스킬 가운데 비밀 요청 칸을 가진 것이 있으면 거절한다(ADR-086). 저장 검사가 생기기 전에
      * 올린 스킬이 다른 스킬의 저장을 타고 다시 게시되지 않게 하려는 것이다. 버전 디렉터리를 쓰기 전에 본다. 지우기는
      * 그런 스킬을 지울 수 있어야 하므로 이 검사를 거치지 않는다.
      */

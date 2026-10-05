@@ -92,7 +92,7 @@ public record SkillFrontmatter(
     }
 
     /**
-     * 이미 저장된 {@code SKILL.md} 가 비밀 요청 칸을 가졌는가(ADR-084). 저장 검사가 생기기 전에 올린 스킬을 거르는
+     * 이미 저장된 {@code SKILL.md} 가 비밀 요청 칸을 가졌는가(ADR-086). 저장 검사가 생기기 전에 올린 스킬을 거르는
      * 자리가 쓴다. 앞머리를 읽지 못하면 {@code false} 다. 읽지 못하는 옛 스킬 때문에 저장과 도구 변경이 영영 막히지
      * 않게 하려는 것이다.
      */
@@ -104,7 +104,7 @@ public record SkillFrontmatter(
         }
     }
 
-    /** Hermes 가 profile 의 환경 값이나 파일을 셸 실행 공간에 넣게 만드는 앞머리 칸이 있는가(ADR-084). */
+    /** Hermes 가 profile 의 환경 값이나 파일을 셸 실행 공간에 넣게 만드는 앞머리 칸이 있는가(ADR-086). */
     private static boolean requestsSecrets(Map<?, ?> values) {
         return values.containsKey("required_environment_variables")
                 || values.containsKey("required_credential_files")

@@ -159,7 +159,7 @@ class ConnectorsContractTest(base.ConnectorGateCase):
                 self.assertEqual(check_connector(root, REPO, self.plugin._load_connector), [])
 
     def test_connector_skills_do_not_request_secrets(self):
-        """커넥터 스킬은 앞머리로 비밀값을 요청하지 않는다(ADR-084).
+        """커넥터 스킬은 앞머리로 비밀값을 요청하지 않는다(ADR-086).
 
         Hermes 는 이 칸들에 적힌 값과 파일을 셸 실행 공간에 넘긴다. 커넥터 값은 MCP 서버만 받는다.
         """

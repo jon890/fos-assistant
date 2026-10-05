@@ -35,7 +35,7 @@ token provider 등록, profile 생성의 `name`, 환경 쓰기의 `profile/key/v
 함수 이름과 인자 유지가 plugin 의 실제 HTTP 동작 검증을 대신하지 않는다.
 
 **셸 계열 도구의 실행 공간 계약이 그대로인지 본다.**
-[ADR-084](../adr/ADR-084-셸과-파일-도구는-사용자별-docker-실행-공간에서만-돈다.md) 는 docker backend 의 아래 동작에 기댄다.
+[ADR-086](../adr/ADR-086-셸과-파일-도구는-사용자별-docker-실행-공간에서만-돈다.md) 는 docker backend 의 아래 동작에 기댄다.
 하나라도 바뀌면 셸 계열 도구가 다시 Hermes 컨테이너로 새거나 실행 공간이 동작하지 않는다.
 [실행 공간](sandbox.md) 의 「측정 결과」 시험을 새 이미지에서 다시 돌린다.
 

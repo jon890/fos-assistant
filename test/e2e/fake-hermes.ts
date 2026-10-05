@@ -80,7 +80,7 @@ const TEST_RELEASE_HELD_CONFIG_PATH = "/__test/release-held-config";
 const TEST_SANDBOX_UNAVAILABLE_PATH = "/__test/sandbox-unavailable";
 /** 마지막으로 받은 설정 쓰기의 `sandbox_owner` 를 돌려준다. */
 const TEST_LAST_SANDBOX_OWNER_PATH = "/__test/last-sandbox-owner";
-/** plugin 이 셸 도구가 있는 설정 쓰기에서 실행 공간을 띄우는 도구들이다(ADR-084). */
+/** plugin 이 셸 도구가 있는 설정 쓰기에서 실행 공간을 띄우는 도구들이다(ADR-086). */
 const SANDBOX_TOOLSETS = ["terminal", "file", "code_execution"];
 /** plugin 이 받는 `sandbox_owner` 의 모양이다. */
 const SANDBOX_OWNER_PATTERN = /^[a-z][a-z0-9-]{0,63}$/;

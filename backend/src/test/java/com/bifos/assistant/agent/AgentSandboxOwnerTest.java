@@ -11,7 +11,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.util.ReflectionTestUtils;
 
-/** 셸과 파일 도구의 격리 실행 공간 주인 키를 에이전트의 주인으로 정하는지 본다(ADR-084). */
+/** 셸과 파일 도구의 격리 실행 공간 주인 키를 에이전트의 주인으로 정하는지 본다(ADR-086). */
 class AgentSandboxOwnerTest {
 
     private static final Instant NOW = Instant.parse("2026-10-05T00:00:00Z");

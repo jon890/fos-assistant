@@ -48,7 +48,7 @@ public class AgentToolService {
         }
         List<String> current = toolsets.readEnabled(agent.apiBaseUrl(), agent.hermesProfile());
         List<String> desired = AgentToolPolicy.requestedForWrite(user, agent, requested, current);
-        // 셸 도구가 켜지면 Hermes 가 스킬이 요청한 profile 의 환경 값과 파일을 실행 공간에 넣는다(ADR-084).
+        // 셸 도구가 켜지면 Hermes 가 스킬이 요청한 profile 의 환경 값과 파일을 실행 공간에 넣는다(ADR-086).
         if (AgentToolPolicy.hasSandboxToolset(desired)) {
             List<String> requesting = skillFiles.uploadedRequestingSecrets(agent.hermesProfile());
             if (!requesting.isEmpty()) {

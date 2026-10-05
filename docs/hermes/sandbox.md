@@ -1,7 +1,7 @@
 # 실행 공간(terminal backend)
 
 2026-10-05 에 운영과 같은 이미지(v0.21.5, `v2026.9.24`)를 격리 환경에 띄워 측정했다.
-결정은 [ADR-084](../adr/ADR-084-셸과-파일-도구는-사용자별-docker-실행-공간에서만-돈다.md) 가 갖는다.
+결정은 [ADR-086](../adr/ADR-086-셸과-파일-도구는-사용자별-docker-실행-공간에서만-돈다.md) 가 갖는다.
 측정은 도구를 모델 없이 직접 불렀다. gateway 가 profile 하나의 turn 을 묶는 함수(`gateway/run.py` 의 `_profile_runtime_scope`)로 profile 을 묶고 그 안에서 `registry.dispatch` 로 도구를 불렀다.
 합성 비밀 파일만 썼다. 운영 Hermes 와 운영 DB 는 건드리지 않았다.
 

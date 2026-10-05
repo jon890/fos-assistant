@@ -86,4 +86,4 @@
 | [ADR-080](ADR-080-먼저-살펴보기는-점검-대화의-turn-하나로-돌고-읽기-경계를-control-plane-이-강제한다.md) | 먼저 살펴보기는 점검 대화의 turn 하나로 돌고 읽기 경계를 Control Plane 이 강제한다 | backend, frontend | Accepted. ADR-040 의 「부모는 맡긴 뒤 기다리지 않는다」 에 살펴보기 트리의 예외를 둔다 |
 | [ADR-081](ADR-081-살펴보기-결과는-답-끝의-구조화-블록으로-받고-control-plane-이-검사해-그린다.md) | 살펴보기 결과는 답 끝의 구조화 블록으로 받고 Control Plane 이 검사해 그린다 | backend | Accepted. ADR-009 의 신뢰하지 않는 글 원칙을 살펴보기 결과에 적용한다 |
 | [ADR-082](ADR-082-먼저-살펴보기의-쓰기-도구는-관리자가-에이전트마다-켜고-커넥터-쓰기는-승인-카드로-보낸다.md) | 먼저 살펴보기의 쓰기 도구는 관리자가 에이전트마다 켜고, 커넥터 쓰기는 승인 카드로 보낸다 | backend, frontend | Accepted. 켠 에이전트에 한해 ADR-080 의 읽기 경계를 넓힌다 |
-| [ADR-084](ADR-084-셸과-파일-도구는-사용자별-docker-실행-공간에서만-돈다.md) | 셸과 파일 도구는 사용자별 docker 실행 공간에서만 돈다 | backend, frontend, hermes | Accepted. ADR-082 의 남는 위험을 사용자 실행 공간 안으로 줄인다. ADR-029 의 「파일 접근을 격리하지 않는다」 전제는 실행 공간이 적용된 profile 에서 바뀐다 |
+| [ADR-086](ADR-086-셸과-파일-도구는-사용자별-docker-실행-공간에서만-돈다.md) | 셸과 파일 도구는 사용자별 docker 실행 공간에서만 돈다 | backend, frontend, hermes | Accepted. ADR-082 의 남는 위험을 사용자 실행 공간 안으로 줄인다. ADR-029 의 「파일 접근을 격리하지 않는다」 전제는 실행 공간이 적용된 profile 에서 바뀐다 |

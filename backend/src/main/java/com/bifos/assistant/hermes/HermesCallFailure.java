@@ -51,7 +51,7 @@ final class HermesCallFailure {
     }
 
     /**
-     * plugin 이 격리 실행 공간이 준비되지 않아 설정 쓰기를 거절했으면 그 거절을 돌려준다(ADR-084).
+     * plugin 이 격리 실행 공간이 준비되지 않아 설정 쓰기를 거절했으면 그 거절을 돌려준다(ADR-086).
      *
      * <p>409 이고 응답 본문 JSON 의 {@code code} 칸이 {@link #SANDBOX_UNAVAILABLE_CODE} 일 때만 값이 있다. 본문을
      * 글자로 찾지 않는다. {@code detail} 같은 다른 칸에 같은 낱말이 들어 있어도 다른 거절로 본다. 돌려주는 예외는
