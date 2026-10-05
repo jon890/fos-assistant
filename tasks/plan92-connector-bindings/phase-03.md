@@ -133,6 +133,12 @@ scripts/quality.sh check
 | `backend/src/test/java/com/bifos/assistant/skill/SkillServiceTest.java` | 수정 |
 | `backend/src/main/java/com/bifos/assistant/agent/domain/AgentToolPolicy.java` | 수정 |
 | `backend/src/main/java/com/bifos/assistant/skill/infra/SkillPublisher.java` | 수정 |
+| `backend/src/main/java/com/bifos/assistant/skill/application/SkillService.java` | 수정 |
+| `backend/src/main/java/com/bifos/assistant/connector/infra/ConnectorBindingRepository.java` | 수정 |
+| `backend/src/test/java/com/bifos/assistant/connector/ConnectorBindingServiceTest.java` | 수정 |
+| `backend/src/test/java/com/bifos/assistant/connector/ConnectorBindingTest.java` | 수정 |
+| `backend/src/test/java/com/bifos/assistant/connector/ConnectorConnectionServiceTest.java` | 수정 |
+| `backend/src/test/java/com/bifos/assistant/hermes/SkillViewStreamTest.java` | 수정 |
 | `backend/src/main/java/com/bifos/assistant/shared/error/ErrorCode.java` | 수정 |
 | `backend/src/test/java/com/bifos/assistant/agent/AgentLifecycleServiceTest.java` | 수정 |
 | `backend/src/test/java/com/bifos/assistant/agent/AgentToolServiceTest.java` | 수정 |
