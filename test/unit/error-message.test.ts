@@ -61,3 +61,8 @@ test("이미 처리한 할 일을 다시 바꾸려 하면 화면을 다시 열�
   assert.equal(describeError("FOLLOW_UP_STATE_CONFLICT", "follow-up is not in a state that allows this"),
     "이미 처리했거나 같은 할 일이 있어요. 화면을 다시 열어 주세요.");
 });
+
+test("실행 공간이 준비되지 않은 도구 저장 실패는 해요체 문구를 보인다", () => {
+  assert.equal(describeError("AGENT_SANDBOX_UNAVAILABLE", "sandbox unavailable"),
+    "격리된 실행 공간이 준비되지 않아 이 도구를 켤 수 없어요.");
+});

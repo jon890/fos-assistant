@@ -42,7 +42,7 @@ function confirmationDescription(name: string): string {
     case "terminal":
     case "file":
     case "code_execution":
-      return "이 도구는 홈서버 파일과 셸에 닿을 수 있어요.";
+      return "이 도구는 이 사용자만의 격리된 실행 공간에서 셸과 파일을 다뤄요. 다른 사용자의 파일과 서버 비밀에는 닿지 않지만 인터넷에는 나갈 수 있어요.";
     case "browser":
       return "이 도구는 웹 브라우저를 조작할 수 있어요.";
     case "session_search":
