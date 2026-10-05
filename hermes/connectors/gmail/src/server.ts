@@ -1,6 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
+import { HTML_NAMED_ENTITIES } from "./html-entities.ts";
 
 const TOKEN_URL = "https://oauth2.googleapis.com/token";
 const API_BASE = "https://gmail.googleapis.com/gmail/v1/users/me";
@@ -167,7 +168,7 @@ function plainHtml(value: string) {
     if (!name) continue;
     if (closing) {
       const index = hidden.lastIndexOf(name);
-      if (index >= 0) hidden.splice(index, 1);
+      if (index >= 0) hidden.splice(index);
       else if (/^(br|p|div|tr|li|h[1-6]|blockquote)$/.test(name))
         pieces.push("\n");
       continue;
@@ -175,9 +176,12 @@ function plainHtml(value: string) {
     if (name === "body" && hidden.length === 1 && hidden[0] === "head")
       hidden.length = 0;
     const attributes = token.slice(token.indexOf(name) + name.length);
-    const hiddenAttribute = /(?:^|\s)hidden(?:\s|=|>|\/)/i.test(attributes);
+    const attributeNames = attributes.replace(/"[^"]*"|'[^']*'/g, '""');
+    const hiddenAttribute = /(?:^|\s)hidden(?:\s|=|>|\/)/i.test(attributeNames);
     const canContainText = !voidElements.has(name) && !/\/\s*>$/.test(token);
-    if (
+    if (hidden.length && canContainText) {
+      hidden.push(name);
+    } else if (
       canContainText &&
       (/^(script|style|title|head|template|noscript)$/.test(name) ||
         hiddenAttribute)
@@ -186,15 +190,96 @@ function plainHtml(value: string) {
     else if (/^(br|p|div|tr|li|h[1-6]|blockquote)$/.test(name))
       pieces.push("\n");
   }
-  return pieces
-    .join("")
-    .replace(/&nbsp;/gi, " ")
-    .replace(/&amp;/gi, "&")
+  return decodeHtmlEntities(pieces.join(""))
     .split(/\r?\n/)
     .map((line) => line.replace(/\s+/g, " ").trim())
     .filter(Boolean)
     .join("\n");
 }
+
+/** HTML5 문자 참조는 한 번만 풀어 이중 해석을 막는다. */
+const HTML_CHARACTER_REFERENCE =
+  /&(#[0-9]+;?|#[xX][0-9a-fA-F]+;?|[^\t\n\f <&#;]{1,32};?)/g;
+const C1_CHARACTER_REPLACEMENTS: Readonly<Record<number, string>> = {
+  0: "\ufffd",
+  13: "\r",
+  128: "€",
+  129: "\x81",
+  130: "‚",
+  131: "ƒ",
+  132: "„",
+  133: "…",
+  134: "†",
+  135: "‡",
+  136: "ˆ",
+  137: "‰",
+  138: "Š",
+  139: "‹",
+  140: "Œ",
+  141: "\x8d",
+  142: "Ž",
+  143: "\x8f",
+  144: "\x90",
+  145: "‘",
+  146: "’",
+  147: "“",
+  148: "”",
+  149: "•",
+  150: "–",
+  151: "—",
+  152: "˜",
+  153: "™",
+  154: "š",
+  155: "›",
+  156: "œ",
+  157: "\x9d",
+  158: "ž",
+  159: "Ÿ",
+};
+
+/** Python html.unescape와 같은 HTML5 named/numeric 문자 참조 처리다. */
+function decodeHtmlEntities(value: string) {
+  return value.replace(
+    HTML_CHARACTER_REFERENCE,
+    (source, reference: string) => {
+      if (!reference.startsWith("#")) {
+        if (Object.hasOwn(HTML_NAMED_ENTITIES, reference)) {
+          return HTML_NAMED_ENTITIES[reference]!;
+        }
+
+        for (let end = reference.length - 1; end > 1; end -= 1) {
+          const prefix = reference.slice(0, end);
+          if (Object.hasOwn(HTML_NAMED_ENTITIES, prefix)) {
+            return HTML_NAMED_ENTITIES[prefix]! + reference.slice(end);
+          }
+        }
+        return source;
+      }
+
+      const hexadecimal = reference[1]?.toLowerCase() === "x";
+      const digits = reference.slice(hexadecimal ? 2 : 1).replace(/;$/, "");
+      const codePoint = Number.parseInt(digits, hexadecimal ? 16 : 10);
+      const replacement = C1_CHARACTER_REPLACEMENTS[codePoint];
+      if (replacement !== undefined) return replacement;
+      if (codePoint >= 0xd800 && codePoint <= 0xdfff) return "\ufffd";
+      if (codePoint > 0x10ffff) return "\ufffd";
+      if (
+        codePoint === 1 ||
+        (codePoint >= 2 && codePoint <= 8) ||
+        (codePoint >= 11 && codePoint <= 12) ||
+        (codePoint >= 14 && codePoint <= 31) ||
+        (codePoint >= 127 && codePoint <= 159) ||
+        (codePoint >= 0xfdd0 && codePoint <= 0xfdef) ||
+        (codePoint & 0xffff) === 0xfffe ||
+        (codePoint & 0xffff) === 0xffff
+      ) {
+        return "";
+      }
+      return String.fromCodePoint(codePoint);
+    },
+  );
+}
+
 function headers(part: any): Record<string, string> {
   const found: Record<string, string> = {};
   for (const header of part?.headers ?? [])
@@ -664,6 +749,29 @@ function filterCriteria(input: any) {
 export function createGmailServer(options: GmailOptions = {}) {
   const gmail = new Gmail(options);
   const server = new McpServer({ name: "fos-gmail", version: "1.0.0" });
+  const descriptions: Record<string, string> = {
+    get_profile: "연결한 Gmail 계정의 주소와 메일·스레드 수를 읽습니다.",
+    list_labels: "라벨의 ID, 이름, 종류를 읽습니다.",
+    search_messages:
+      "Gmail 검색어로 메일 요약을 찾습니다. 예: query에 from:news@example.com을 넣습니다.",
+    get_message: "message_id로 메일 한 통의 머리, 본문, 첨부 목록을 읽습니다.",
+    get_thread: "thread_id로 스레드의 메일을 순서대로 읽습니다.",
+    create_draft:
+      "승인 후 초안을 만듭니다. reply_to_message_id를 주면 같은 스레드에 답장 초안을 만듭니다.",
+    modify_labels:
+      "승인 후 메일 한 통의 라벨을 바꿉니다. 예: remove_labels에 INBOX를 넣어 보관합니다.",
+    send_message:
+      "승인 후 새 메일을 보냅니다. 결과 불명은 보낸편지함에서 확인합니다.",
+    reply_to_message: "승인 후 원래 메일의 스레드에 답장을 보냅니다.",
+    create_label: "승인 후 사용자 라벨을 만듭니다.",
+    update_label: "승인 후 사용자 라벨의 이름이나 색을 바꿉니다.",
+    list_filters: "저장된 Gmail 필터와 조건, 동작을 읽습니다.",
+    create_filter:
+      "매번 승인 후 새 메일 필터를 만듭니다. 전달 동작은 허용하지 않습니다.",
+    delete_filter: "매번 승인 후 filter_id의 필터를 지웁니다.",
+    apply_labels_to_query:
+      "매번 승인 후 검색한 기존 메일의 라벨을 바꿉니다. expected_count에 승인한 정확한 대상 수를 넣습니다.",
+  };
   const register = (
     name: string,
     schema: any,
@@ -672,7 +780,11 @@ export function createGmailServer(options: GmailOptions = {}) {
   ) =>
     server.registerTool(
       name,
-      { inputSchema: schema, annotations },
+      {
+        description: `${descriptions[name]} 필요한 인자와 결과를 확인한 뒤 사용합니다.`,
+        inputSchema: schema,
+        annotations,
+      },
       (input: any) => guard(() => run(input)),
     );
   register("get_profile", {}, { readOnlyHint: true }, async () => {

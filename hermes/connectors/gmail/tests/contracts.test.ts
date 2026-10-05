@@ -26,6 +26,26 @@ test("manifest 도구 선언은 MCP 서버 도구와 정확히 일치한다", as
   });
 });
 
+test("모든 MCP 도구는 사용자가 판단할 수 있는 설명을 제공한다", async () => {
+  const server = createGmailServer({ env: {} });
+  await withMcp(server, async (client) => {
+    const tools = await client.listTools();
+    expect(tools.tools).toHaveLength(15);
+    for (const tool of tools.tools) {
+      expect(tool.description?.trim().length).toBeGreaterThan(20);
+    }
+    const byName = new Map(
+      tools.tools.map((tool) => [tool.name, tool.description ?? ""]),
+    );
+    expect(byName.get("search_messages")).toMatch(/검색|search/i);
+    expect(byName.get("modify_labels")).toMatch(/보관|archive|라벨|label/i);
+    expect(byName.get("send_message")).toMatch(/결과|unknown|확인/i);
+    expect(byName.get("apply_labels_to_query")).toMatch(
+      /expected_count|승인|개수/i,
+    );
+  });
+});
+
 test("Gmail 서버 소스에는 메일 삭제·trash·attachment download endpoint가 없다", () => {
   const source = readFileSync(join(root, "src/server.ts"), "utf8");
   for (const blocked of ["batchDelete", "/trash", "/attachments/"])

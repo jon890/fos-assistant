@@ -383,6 +383,8 @@ describe("Python Gmail 회귀의 MIME 한계 이관", () => {
       "<br hidden>보임",
       '<img aria-hidden="true" src="x">보임',
       "<span hidden />보임",
+      '<div title="foo hidden bar">보임</div>',
+      '<DIV title="foo hidden bar">보임</DIV>',
     ];
     for (const [index, html] of examples.entries()) {
       fake.on("GET", `/gmail/messages/h${index}`, {
@@ -402,6 +404,32 @@ describe("Python Gmail 회귀의 MIME 한계 이관", () => {
         body: { data: raw("<span hidden>숨김</span>보임") },
       },
     });
+    fake.on("GET", "/gmail/messages/hidden-value", {
+      id: "hidden-value",
+      payload: {
+        mimeType: "text/html",
+        headers: [],
+        body: { data: raw('<div hidden="true">숨김</div>보임') },
+      },
+    });
+    fake.on("GET", "/gmail/messages/nested-hidden", {
+      id: "nested-hidden",
+      payload: {
+        mimeType: "text/html",
+        headers: [],
+        body: {
+          data: raw("<div hidden><div>SECRET</div>STILL_SECRET</div>VISIBLE"),
+        },
+      },
+    });
+    fake.on("GET", "/gmail/messages/script-tag", {
+      id: "script-tag",
+      payload: {
+        mimeType: "text/html",
+        headers: [],
+        body: { data: raw('<script>"<div>"</script>VISIBLE') },
+      },
+    });
     try {
       await withMcp(server, async (client) => {
         for (const index of examples.keys()) {
@@ -415,6 +443,74 @@ describe("Python Gmail 회귀의 MIME 한계 이관", () => {
         });
         expect(hidden.body).toMatchObject({ body: "보임" });
         expect(JSON.stringify(hidden.body)).not.toContain("숨김");
+        const hiddenValue = await tool(client, "get_message", {
+          message_id: "hidden-value",
+        });
+        expect(hiddenValue.body).toMatchObject({ body: "보임" });
+        expect(JSON.stringify(hiddenValue.body)).not.toContain("숨김");
+        const nested = await tool(client, "get_message", {
+          message_id: "nested-hidden",
+        });
+        expect(nested.body).toMatchObject({ body: "VISIBLE" });
+        expect(JSON.stringify(nested.body)).not.toContain("SECRET");
+        const script = await tool(client, "get_message", {
+          message_id: "script-tag",
+        });
+        expect(script.body).toMatchObject({ body: "VISIBLE" });
+      });
+    } finally {
+      fake.stop();
+    }
+  });
+
+  test("HTML5 named·numeric entity는 한 번만 풀고 hidden 본문에는 섞지 않는다", async () => {
+    const { fake, server } = setup();
+    const html = [
+      "&lt;&gt;&quot;&apos;&copy;&eacute;&NotEqualTilde;",
+      "&#54620;&#x1F600;",
+      "&amp;lt;",
+      "<span hidden>&copy;비밀</span>보임",
+    ].join("|");
+    fake.on("GET", "/gmail/messages/entities", {
+      id: "entities",
+      payload: {
+        mimeType: "text/html",
+        headers: [],
+        body: { data: raw(html) },
+      },
+    });
+    try {
+      await withMcp(server, async (client) => {
+        const result = await tool(client, "get_message", {
+          message_id: "entities",
+        });
+        expect(result.body.body).toBe("<>\"'©é≂̸|한😀|&lt;|보임");
+      });
+    } finally {
+      fake.stop();
+    }
+  });
+
+  test("HTML entity edge case는 Python html.unescape와 같은 결과를 낸다", async () => {
+    const { fake, server } = setup();
+    const html =
+      "&amp|&notit;|&#0;|&#x110000;|&#xD800;|&#128;|&#1;|&#x0b;|&constructor;|&toString;";
+    fake.on("GET", "/gmail/messages/entity-edge", {
+      id: "entity-edge",
+      payload: {
+        mimeType: "text/html",
+        headers: [],
+        body: { data: raw(html) },
+      },
+    });
+    try {
+      await withMcp(server, async (client) => {
+        const result = await tool(client, "get_message", {
+          message_id: "entity-edge",
+        });
+        expect(result.body.body).toBe(
+          "&|¬it;|�|�|�|€|||&constructor;|&toString;",
+        );
       });
     } finally {
       fake.stop();
