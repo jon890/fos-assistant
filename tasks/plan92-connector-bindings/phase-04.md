@@ -39,7 +39,7 @@
 
 ### 2. `ProactiveCheckRun`
 
-- `COMMON_RULES` 의 위임 줄을 「연결한 서비스의 도구는 직접 부른다. 읽기만 하는 실행에서는 조회 도구만 쓸 수 있다.」 로 바꾼다
+- `COMMON_RULES` 에서 위임 줄을 떼어 두 줄 가운데 하나를 싣는다. 살펴보기 에이전트에 붙은 연결이 있으면(`AgentConnectorBindings.connectorServers(agent.id())` 가 비지 않음) 「연결한 서비스의 도구는 직접 부른다. 읽기만 하는 실행에서는 조회 도구만 쓸 수 있다.」, 없으면 지금의 위임 줄 그대로다. 옮겨 가는 동안 붙이기 전의 에이전트와 고치기 전의 분야 스킬이 지금처럼 돌게 하기 위해서다
 - `WRITES_RULE` 은 그대로다
 - 이 글은 `docs/backend/proactive-check.md` 의 「Control Plane 지시」 와 같아야 한다. 둘을 함께 고친다
 
@@ -58,7 +58,7 @@
 ### 5. 시험
 
 - `backend/src/test/java/com/bifos/assistant/proactive/ProactiveCheckReadinessTest.java`(수정): 붙은 커넥터 서버가 켜진 에이전트는 읽기 전용과 쓰기 허용 모두 시작할 수 있다. 붙지 않은 MCP 서버는 여전히 `TOOLSETS_NOT_ALLOWED`. 옛 커넥터 에이전트는 `AGENT_NOT_SUPPORTED`
-- `backend/src/test/java/com/bifos/assistant/proactive/ProactiveCheckTurnTest.java`(수정): 살펴보기 turn 의 지시에 「연결한 서비스의 도구는 직접 부른다」 가 있고 위임 줄이 없다
+- `backend/src/test/java/com/bifos/assistant/proactive/ProactiveCheckTurnTest.java`(수정): 연결이 붙은 에이전트의 살펴보기 지시에는 「연결한 서비스의 도구는 직접 부른다」 가 있고 위임 줄이 없다. 붙은 연결이 없는 에이전트는 지금의 위임 줄 그대로다
 - `backend/src/test/java/com/bifos/assistant/connector/ConnectorPolicyEndpointTest.java`(수정): 살펴보기 turn 이 직접 부른 커넥터 쓰기 도구가 읽기 전용이면 `READ_ONLY_RUN`, 쓰기 허용이면 승인 줄이 된다
 
 ## 검증

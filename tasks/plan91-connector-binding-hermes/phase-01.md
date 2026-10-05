@@ -84,7 +84,8 @@
 
 ### 4. 카탈로그
 
-`GET /api/connectors/catalog` 의 커넥터마다 `skills`(스킬 이름 목록, 이름 순)를 더한다. 본문은 싣지 않는다.
+- `GET /api/connectors/catalog` 의 커넥터마다 `skills`(스킬 이름 목록, 이름 순)를 더한다. 본문은 싣지 않는다
+- 입력 칸이 없는 커넥터를 받는다. 지금 `_connector_fields(declared)` 는 빈 목록을 「fields 는 비어 있지 않은 목록이다」 로 거절한다. 빈 목록을 받게 고친다. 값을 받지 않는 일반 MCP 서버를 카탈로그로 올리는 길이다(ADR-083 의 「칸이 없는 커넥터」). `verify.tool` 은 지금처럼 있어야 하고 `.mcp.json` 서버 env 가 `operator_env` 와 같아야 한다는 규칙도 그대로다. 칸이 없는 커넥터의 보관 파일은 빈 `values` 다
 
 ### 5. 시험
 
@@ -98,6 +99,7 @@
   - 커넥터 표식만 있는 profile 에서 `GET`, 바인딩 설치, 떼기가 되고 옛 설치는 401
   - 보관 파일: 쓰고 지우고 옮기기. 형식 오류와 필수 칸 누락이 400 이고 응답에 값이 없다
   - 카탈로그의 `skills`
+  - 칸이 없는 커넥터가 카탈로그에 오르고, 빈 `values` 의 보관 파일로 확인 도구를 부르고 바인딩 설치가 된다
 - `hermes/tests/test_connector_call.py`: `vault` 로 부르는 `call` 과 `values` 와 `vault` 를 함께 보낸 요청의 거절
 
 ## 검증

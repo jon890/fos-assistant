@@ -54,7 +54,7 @@
 ### 3. 에이전트의 공개와 삭제
 
 - `AgentLifecycleService.changeVisibility` 와 `AgentAdminService.update`: 그룹으로 바꾸는데 `AgentConnectorBindings.hasBindings(agent.id())` 가 참이면 `AGENT_CONNECTIONS_REQUIRE_PRIVATE`(phase 02 가 더한 코드)
-- `AgentLifecycleService.delete`: `profileManaged()` 로 profile 을 거두기 전에 `AgentConnectorDetacher.detachAll(agent)` 를 부른다. 실패하면 지우지 않고 그 오류를 올린다
+- `AgentLifecycleService.delete`: profile 이 Control Plane 이 만든 것이든 사람이 만든 것이든 먼저 `AgentConnectorDetacher.detachAll(agent)` 를 부른다. 사람이 만든 profile 은 거두지 않으므로 떼지 않으면 그 profile 에 커넥터 서버와 비밀이 남는다. 그 뒤 `profileManaged()` 면 profile 을 거둔다. 실패하면 지우지 않고 그 오류를 올린다
 - 옛 커넥터 에이전트를 지울 수 있게 한다. `delete` 의 권한 판정은 주인과 `ADMIN` 이고 `isEditableBy` 의 옛 커넥터 예외를 이 경로에만 적용하지 않는다. 다른 편집 경로(성격, 스킬, 도구, 공개)는 지금처럼 막는다
 - 사용자당 에이전트 상한 계산(`countByOwnerUserIdAndDeletedAtIsNullAndConnectorManagedFalse`)은 그대로 둔다
 - `AgentAdminService.update` 가 주인을 바꾸는데 `hasBindings` 가 참이면 `AGENT_HAS_CONNECTIONS`(새 코드, 409)로 거절한다. 남의 값이 든 profile 이 새 주인에게 넘어가고, 새 주인은 남의 연결이라 뗄 수도 없기 때문이다. 주인이 먼저 떼야 한다

@@ -11,7 +11,7 @@
 | phase | 하는 일 |
 | --- | --- |
 | 01 | 대시보드 plugin 의 보관 파일, 바인딩 설치와 떼기, 도구 목록 보존, 카탈로그의 스킬 이름 |
-| 02 | `fos-ctx` 의 바인딩 profile 판정, 대시보드 plugin 계약 문서 |
+| 02 | `fos-ctx` 의 바인딩 profile 판정과 커넥터 결과의 `<external-data>` 감싸기, 대시보드 plugin 계약 문서 |
 
 브랜치는 `plan91-connector-binding-hermes` 이고 PR 하나로 올린다.
 
@@ -46,6 +46,8 @@
 - 바인딩 설치는 `api_server` 목록이 있고 그 안에 Control Plane MCP 가 있는 profile 만 받는다
 - `PUT /api/config` 는 소유 기록의 바인딩 서버 이름이 빠진 목록을 409 로 거절한다. Control Plane 이 그 이름을 함께 보낸다
 - 바인딩 profile 의 대응 파일에는 소유 기록의 모든 커넥터 서버가 실린다. manifest 를 읽지 못한 서버는 빈 `tools` 로 실린다
+- 입력 칸이 없는 커넥터(빈 `fields`)를 카탈로그가 받는다
+- `fos-ctx` 는 바인딩 profile 의 커넥터 도구 결과를 `transform_tool_result` 로 `<external-data>` 에 감싼다
 
 ## 모든 phase 에 걸리는 규칙
 

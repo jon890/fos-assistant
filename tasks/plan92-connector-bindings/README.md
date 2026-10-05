@@ -53,10 +53,10 @@ phase 는 앞 phase 의 결과에 기댄다. 차례로 한다.
 | `agent` 의 읽기 port | `AgentConnectorBindings` 의 `hasBindings`, `connectorServers`, `connectorToolPrefixes`. 구현은 `ConnectorBindingLookup` | 02 |
 | `agent` 의 떼기 port | `AgentConnectorDetacher` 의 `detachAll`. 구현은 `ConnectorBindingService` | 02 |
 | 에이전트의 연결 목록 응답 | `AgentConnectionsView(connections, blockedReason)`, `AgentConnectionView` | 02 |
-| 새 오류 코드 | `AGENT_CONNECTIONS_REQUIRE_PRIVATE`, `CONNECTOR_NOT_CONNECTED`, `CONNECTOR_BIND_CONFLICT`, `CONNECTOR_PROFILE_NOT_READY` | 02 |
+| 새 오류 코드 | `AGENT_CONNECTIONS_REQUIRE_PRIVATE`, `CONNECTOR_NOT_CONNECTED`, `CONNECTOR_BIND_CONFLICT`, `CONNECTOR_PROFILE_NOT_READY`, `CONNECTOR_RESTART_AGAIN` | 02 |
 | 새 오류 코드 | `AGENT_HAS_CONNECTIONS`(바인딩이 있는 에이전트의 주인 변경) | 03 |
 | 에이전트 경로 | `GET`, `PUT`, `DELETE /api/v1/agents/{code}/connections[/{connectorId}]` | 05 |
-| 관리자 반영 완료 | `POST /api/v1/admin/agents/{code}/connections/{connectorId}/confirm`. 컨트롤러는 `AdminAgentConnectionController` | 02 |
+| 관리자 반영 완료 | `POST /api/v1/admin/agents/{code}/connections/{connectorId}/confirm`, 본문 `{restartRequiredSince}`(목록에서 본 값). 컨트롤러는 `AdminAgentConnectionController` | 02 |
 | 대시보드 경로 | `docs/backend/connector-install.md` 의 「대시보드 plugin 계약」 | `plan91-connector-binding-hermes` |
 
 ## 모든 phase 에 걸리는 규칙
@@ -66,7 +66,7 @@ phase 는 앞 phase 의 결과에 기댄다. 차례로 한다.
 - 비밀 칸의 원문은 DB, 로그, 응답, 예외 메시지에 없다. 보관 파일과 profile `.env` 에만 있다
 - 옛 커넥터 에이전트는 이 plan 이 끝나도 지금처럼 돈다. 그 에이전트의 경계(ADR-045)를 지키는 코드(`McpCallerResolver`, `AgentRunner` 와 `ChatService` 의 Memory 생략, `ExternalData` 감싸기, 도구 내용 가림)는 지우지 않는다
 - 관리자는 남의 에이전트에 연결을 붙이거나 떼지 못한다. 반영 완료만 누른다
-- Flyway 번호는 머지 직전 main 의 다음 번호로 옮긴다. 이 계획서는 `V77`(표), `V78`(옛 연결의 바인딩 채우기)로 적는다. `V74` 부터 `V76` 까지는 다른 작업이 쓴다
+- Flyway 번호는 머지 직전 main 의 다음 번호로 옮긴다. 이 계획서는 `V77`(표), `V78`(옛 연결의 바인딩 채우기)로 적는다. `V74` 는 이미 main 에 있고(먼저 살펴보기의 결과 오류 까닭), `V75` 와 `V76` 은 사진 순서 작업이 쓴다
 - 도구 저장과 스킬 게시는 붙은 커넥터 서버 이름을 함께 보낸다. 빠지면 대시보드가 409 로 거절한다
 - 머지 전에는 `scripts/check-local.sh <고친 화면의 spec>` 을 돌린다(phase 07 의 검증). 단계를 건너뛰지 않는다. 전체 브라우저 검사는 PR 의 CI 가 맡는다
 - 기능 변경과 포맷은 다른 커밋이다. 커밋 메시지는 `<type>(<범위>): <메시지>`, 범위는 `backend`, `web`, `docs`, `hermes`, `infra`
@@ -78,12 +78,13 @@ phase 는 앞 phase 의 결과에 기댄다. 차례로 한다.
 3. 사람이 만든 profile 의 에이전트에 붙이려면 운영자가 그 profile 에 커넥터 표식을 두고 `fos-ctx` 를 켠다. 절차의 문장은 운영 저장소가 갖는다
 4. 붙인 바인딩마다 관리자가 공유 gateway 를 재시작하고 반영 완료를 누른다
 
-**backend 이미지를 되돌릴 때**: 이 plan 의 마이그레이션은 표와 칸을 더하기만 해서 이전 이미지가 뜬다. 다만 새 경로로 만든 연결은 `agent_id` 가 비어 있어 이전 이미지가 그 행을 읽으면 실패한다. 해제해도 행은 `DISCONNECTED` 로 남고 이전 이미지는 상태와 상관없이 `connection.agent()` 를 읽는다. 그래서 되돌리기 전에 `agent_id` 가 빈 연결 행과 그 연결의 바인딩 행을 지운다. 그 사용자는 되돌린 뒤 옛 방식으로 다시 연결한다. 실행 명령은 운영 저장소에 둔다.
+**backend 이미지를 되돌릴 때**: DB 복원이 필요하다. 마이그레이션은 표와 칸을 더하기만 하지만, 새 코드가 만든 연결 행(`agent_id` 가 빔)은 해제해도 남고 이전 이미지가 읽지 못한다. 또 새 코드는 연결의 `restart_required`, `desired_enabled` 를 더 고치지 않아 이전 이미지가 낡은 값을 읽는다. 그래서 배포 직전에 운영 DB 백업을 받고, 되돌릴 때는 그 백업으로 돌린다. 백업과 복원 명령은 운영 저장소가 갖는다.
 
 ## 옮겨 가기
 
 사용자마다 연결마다 한다. 끊김이 없고, 옛 에이전트를 지우기 전까지 되돌릴 수 있다.
 
+0. 먼저 살펴보기를 쓰는 분야(커리어)는 그 분야 패키지의 `proactive-check` 스킬을 먼저 고친다. 「붙은 커넥터 도구가 있으면 직접 부르고, 없으면 연결 에이전트에 맡긴다」 로 바꾼다. 이 저장소 밖(fos-agents)의 일이고 코디네이터가 그 저장소 워커에 맡긴다. phase 04 의 Control Plane 지시도 붙은 연결이 없는 에이전트에는 옛 위임 줄을 남기므로, 스킬을 고치기 전에 이 plan 을 배포해도 지금의 살펴보기가 깨지지 않는다
 1. 「연결」 화면에서 연결 확인을 누른다. 옛 에이전트의 profile 에 있던 값이 보관 파일로 옮겨진다
 2. 원래 쓰던 에이전트의 상세에서 그 연결을 붙인다. 바인딩은 「반영 대기」 다
 3. 관리자가 공유 gateway 를 재시작하고 반영 완료를 누른다
