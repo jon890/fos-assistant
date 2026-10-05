@@ -343,6 +343,20 @@ class ProactiveCheckTurnTest {
     }
 
     @Test
+    @DisplayName("답이 비었으면 답을 받지 못했다는 알림 줄과 EMPTY_ANSWER 가 남는다")
+    void leavesEmptyAnswerWhenAnswerIsBlank() {
+        stub().willAnswer(command -> answer(""));
+
+        Conversation conversation = runCheck();
+
+        List<ChatMessage> history = messages.findByConversationIdOrderByIdAsc(conversation.id());
+        assertThat(history.getLast().content()).isEqualTo("살펴봤지만 답을 받지 못했어요. 다시 눌러 주세요");
+        ProactiveCheck check = onlyCheckOf(conversation);
+        assertThat(check.outcome()).isEqualTo(CheckOutcome.INVALID_RESULT);
+        assertThat(check.invalidReason()).isEqualTo(CheckInvalidReason.EMPTY_ANSWER);
+    }
+
+    @Test
     @DisplayName("결과 블록을 읽으면 읽지 못한 까닭을 비워 둔다")
     void leavesInvalidReasonEmptyWhenBlockIsRead() {
         stub().willAnswer(command -> answer(block("{\"version\":1,\"outcome\":\"NOTHING_NEW\"}")));

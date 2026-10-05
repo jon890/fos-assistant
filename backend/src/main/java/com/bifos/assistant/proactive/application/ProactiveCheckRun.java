@@ -112,6 +112,9 @@ public class ProactiveCheckRun implements CheckTurn {
     static final String START_NOTICE = "먼저 살펴보기를 시작했어요";
     static final String NOTHING_NEW_NOTICE = "살펴봤지만 새로 알릴 것이 없어요";
     static final String INVALID_RESULT_NOTICE = "살펴봤지만 결과 형식이 맞지 않아 정리하지 못했어요. 다시 눌러 주세요";
+    /** 답이 비어 결과 블록을 읽지 못했을 때의 알림 줄이다. 형식 탓으로 안내하지 않는다. */
+    static final String EMPTY_ANSWER_NOTICE = "살펴봤지만 답을 받지 못했어요. 다시 눌러 주세요";
+
     static final String STOPPED_NOTICE = "살펴보기를 멈췄어요";
     static final String TIME_LIMIT_NOTICE = "시간 한도에 닿아 살펴보기를 멈췄어요";
     static final String TOOL_LIMIT_NOTICE = "도구 호출 한도에 닿아 살펴보기를 멈췄어요";
@@ -266,7 +269,9 @@ public class ProactiveCheckRun implements CheckTurn {
                     executionId,
                     invalidReason,
                     output == null ? 0 : output.length());
-            return new CheckAnswer(INVALID_RESULT_NOTICE, true);
+            return new CheckAnswer(
+                    invalidReason == CheckInvalidReason.EMPTY_ANSWER ? EMPTY_ANSWER_NOTICE : INVALID_RESULT_NOTICE,
+                    true);
         }
         CheckResultBlock block = read.block();
         outcome = block.outcome();
