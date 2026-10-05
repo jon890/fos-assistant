@@ -100,7 +100,8 @@ MCP 서버 이름은 `gmail` 이다. 인자는 `search_messages` 의 `max_result
 | `GMAIL_UNAVAILABLE` | `unavailable` | 연결하지 못했다. 시간 안에 답이 없다. Gmail API 가 3xx, 429, 5xx 나 위에 없는 4xx 로 답했다. 응답을 읽지 못했다. 토큰 endpoint 가 `invalid_grant` 와 `invalid_client` 밖의 오류로 답했다 |
 
 오류 결과는 코드만 담는다. 대상 수 변경에는 서버가 센 `actual_count` 도 담는다.
-필터 권한 오류도 서버는 코드만 반환하고 스킬이 토큰 재발급을 안내한다. Google 이 준 오류 글과 요청한 주소는 결과와 로그에 싣지 않는다.
+승인 실행은 현재 공통 오류 어휘만 전달하므로 서버의 원래 코드와 `actual_count` 는 에이전트에 닿지 않는다. 일괄 적용의 `invalid_input` 은 인자를 확인하고 읽기 검색으로 다시 센 뒤 새 승인을 받는다. 필터 쓰기의 `forbidden` 은 `list_filters` 로 확인하고, 읽기 결과가 `GMAIL_FILTER_SCOPE_REQUIRED` 일 때 토큰 재발급을 안내한다.
+Google 이 준 오류 글과 요청한 주소는 결과와 로그에 싣지 않는다.
 외부 호출의 제한 시간은 호출마다 15초다. 대시보드가 확인 도구를 기다리는 시간은 10초라, Google 이 느리게 답하면 등록과 연결 확인이 서버의 제한 시간보다 먼저 `unavailable` 로 끝난다. 어느 호출도 다시 부르지 않는다. 보내기가 시간 안에 답하지 않았을 때 다시 부르면 메일이 두 번 나갈 수 있다.
 
 ## scope 와 휴지통
@@ -139,7 +140,7 @@ MCP 서버 이름은 `gmail` 이다. 인자는 `search_messages` 의 `max_result
 4. `apply_labels_to_query` 에 같은 검색어와 라벨, 센 수를 글자로 적은 `expected_count` 를 넣는다.
 
 **승인 카드에는 검색어와 대상 수를 함께 보인다.** 서버가 다시 검색한 수가 다르면 아무것도 바꾸지 않고 `GMAIL_TARGET_COUNT_CHANGED` 와 `actual_count` 를 반환한다.
-에이전트는 새 수로 다시 승인을 요청한다. 501통 이상이면 일부만 바꾸지 않고 거절한다.
+승인 경로에서는 `invalid_input` 만 받으므로 에이전트가 같은 검색어로 모든 쪽을 다시 읽어 센 뒤 새 승인을 요청한다. 501통 이상이면 일부만 바꾸지 않고 거절한다.
 승인한 수가 0이고 검색도 비어 있으면 쓰기 없이 대상 수 0으로 끝난다.
 수가 같아도 검색과 변경 사이에 새 메일이 오면 그 메일은 이번 적용 대상에 들지 않는다.
 
@@ -147,7 +148,7 @@ MCP 서버 이름은 `gmail` 이다. 인자는 `search_messages` 의 `max_result
 
 TypeScript 서버를 의존성까지 `dist/gmail-mcp.js` 하나로 묶어 커밋한다. 실행 파일은 Bun 이다.
 빌드와 실행에 같은 도구를 써 별도 변환을 줄이고, 실행할 때 패키지를 내려받지 않는다.
-Bun `1.3.5` 와 lockfile 을 고정해 CI 의 재빌드 결과가 커밋한 파일과 같은지 검사한다.
+Bun `1.3.5` 와 lockfile 을 고정해 CI 의 재빌드 결과가 커밋한 파일과 같은지 검사한다. 실행도 같은 버전을 요구하며, 다른 버전이면 시작하지 않는다. 이 버전에서 환경 프록시를 우회하는 동작을 확인했다.
 전용 시험은 [`tests/`](../../hermes/connectors/gmail/tests/)에 있다. 타입 검사와 시험, 묶음 파일 비교는 `bash scripts/check-connectors.sh` 로 실행한다.
 `get_refresh_token.py` 는 서버 실행에 쓰지 않는 로컬 일회성 도구라 Python 표준 라이브러리를 유지한다.
 
@@ -220,7 +221,7 @@ Python 을 쓸 수 없으면 [OAuth 2.0 Playground](https://developers.google.co
 ### 기존 토큰에 필터 권한 더하기
 
 `gmail.modify` 만 받은 옛 토큰도 연결 확인과 라벨·메일 도구는 계속 쓸 수 있다.
-필터 도구에서 `GMAIL_FILTER_SCOPE_REQUIRED` 가 나오면 다음 순서로 바꾼다.
+필터 쓰기가 `forbidden` 으로 끝나면 먼저 `list_filters` 를 부른다. 읽기 결과가 `GMAIL_FILTER_SCOPE_REQUIRED` 이면 다음 순서로 바꾼다. 조회가 성공하면 쓰기 오류의 다른 원인을 확인한다.
 
 1. Google Cloud 동의 화면의 데이터 액세스에 `gmail.settings.basic` 을 더한다.
 2. 위 토큰 발급 스크립트를 다시 실행해 두 scope 를 함께 허용한다.

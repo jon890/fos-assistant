@@ -306,7 +306,9 @@ describe("Gmail 기존 MCP 회귀", () => {
     const { fake, server } = setup();
     fake.on("GET", "/gmail/profile", { emailAddress: "me@example.com" });
     try {
-      await withMcp(server, (client) => tool(client, "get_profile"));
+      await withMcp(server, async (client) => {
+        await tool(client, "get_profile");
+      });
       expect(
         fake.requests.map((request) => `${request.method} ${request.path}`),
       ).not.toEqual(

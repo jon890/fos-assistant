@@ -844,16 +844,14 @@ describe("조립한 메일 확인과 전송 경계", () => {
     });
     fake.on("POST", "/gmail/messages/send", { id: "sent" });
     try {
-      await withMcp(
-        server,
-        async (client) =>
-          await tool(client, "reply_to_message", {
-            message_id: "orig",
-            to: "a@example.com",
-            subject: "s",
-            body: "b",
-          }),
-      );
+      await withMcp(server, async (client) => {
+        await tool(client, "reply_to_message", {
+          message_id: "orig",
+          to: "a@example.com",
+          subject: "s",
+          body: "b",
+        });
+      });
       const source = Buffer.from(
         JSON.parse(fake.seen("POST", "/gmail/messages/send")[0]!.body).raw,
         "base64url",
@@ -869,17 +867,15 @@ describe("조립한 메일 확인과 전송 경계", () => {
     const { fake, server } = setup();
     fake.on("POST", "/gmail/messages/send", { id: "sent" });
     try {
-      await withMcp(
-        server,
-        async (client) =>
-          await tool(client, "send_message", {
-            to: "a@example.com, b@example.com",
-            cc: "c@example.com",
-            bcc: "d@example.com, e@example.com",
-            subject: "s",
-            body: "b",
-          }),
-      );
+      await withMcp(server, async (client) => {
+        await tool(client, "send_message", {
+          to: "a@example.com, b@example.com",
+          cc: "c@example.com",
+          bcc: "d@example.com, e@example.com",
+          subject: "s",
+          body: "b",
+        });
+      });
       const source = Buffer.from(
         JSON.parse(fake.seen("POST", "/gmail/messages/send")[0]!.body).raw,
         "base64url",

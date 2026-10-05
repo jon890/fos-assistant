@@ -52,3 +52,10 @@ test("Gmail 서버 소스에는 메일 삭제·trash·attachment download endpoi
     expect(source).not.toContain(blocked);
   expect(source).not.toMatch(/\/messages[^\n]*"DELETE"/);
 });
+
+test("서버는 Bun 1.3.5가 아니면 실행을 거절하는 guard를 둔다", () => {
+  const source = readFileSync(join(root, "src/server.ts"), "utf8");
+  expect(source).toContain('const REQUIRED_BUN_VERSION = "1.3.5"');
+  expect(source).toContain("Bun.version !== REQUIRED_BUN_VERSION");
+  expect(source).toContain("GMAIL_MCP_UNSUPPORTED_BUN_VERSION");
+});

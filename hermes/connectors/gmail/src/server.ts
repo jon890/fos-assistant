@@ -3,6 +3,7 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { z } from "zod";
 import { HTML_NAMED_ENTITIES } from "./html-entities.ts";
 
+const REQUIRED_BUN_VERSION = "1.3.5";
 const TOKEN_URL = "https://oauth2.googleapis.com/token";
 const API_BASE = "https://gmail.googleapis.com/gmail/v1/users/me";
 const RESPONSE_MAX_BYTES = 10 * 1024 * 1024;
@@ -1372,10 +1373,17 @@ export function createGmailServer(options: GmailOptions = {}) {
 }
 
 if (import.meta.main) {
-  try {
-    await createGmailServer().connect(new StdioServerTransport());
-  } catch {
-    process.stderr.write("GMAIL_MCP_START_FAILED\n");
-    process.exitCode = 2;
+  if (Bun.version !== REQUIRED_BUN_VERSION) {
+    process.stderr.write(
+      `GMAIL_MCP_UNSUPPORTED_BUN_VERSION: expected ${REQUIRED_BUN_VERSION}, got ${Bun.version}\n`,
+    );
+    process.exitCode = 1;
+  } else {
+    try {
+      await createGmailServer().connect(new StdioServerTransport());
+    } catch {
+      process.stderr.write("GMAIL_MCP_START_FAILED\n");
+      process.exitCode = 2;
+    }
   }
 }
