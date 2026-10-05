@@ -585,7 +585,8 @@ class TaskRunStarterTest {
         if (fixture.task().conversationMode() == ConversationMode.NEW_PER_RUN) {
             assertThat(skipped.conversationId()).isNull();
             assertThat(conversations.findById(conversationId)).isEmpty();
-            assertThat(messages.findByConversationIdOrderByIdAsc(conversationId)).isEmpty();
+            assertThat(messages.findByConversationIdOrderByIdAsc(conversationId))
+                    .isEmpty();
         } else {
             assertThat(skipped.conversationId()).isEqualTo(conversationId);
             assertThat(conversations.findById(conversationId)).isPresent();
