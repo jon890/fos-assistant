@@ -13,7 +13,7 @@
 | --- | --- | --- |
 | 이름 | 앞뒤 공백을 뗀 1자에서 100자 | |
 | 에이전트 | 주인이 대화를 시작할 수 있는 에이전트(`AgentService.requireStartable`). 흐름이 붙은 에이전트는 400 `TASK_AGENT_NOT_SUPPORTED` 로 거절한다 | |
-| 지시 | 1자에서 8000자. 대화 메시지 상한과 같다. 발화마다 이 글이 사용자 메시지로 들어간다 | |
+| 지시 | 1자에서 8000자. 대화 메시지 상한과 같다. 발화마다 이 글이 사용자 메시지로 들어간다. `/이름` 으로 시작하면 사람이 보낸 메시지처럼 그 에이전트의 스킬 커맨드로 돈다. 그 에이전트에 켜진 스킬이 아니면 그 발화는 `FAILED` 로 닫힌다 | |
 | 시각 | `CRON` 이나 `ONCE`. 아래 「시각」 | |
 | 시간대 | IANA 이름 | `assistant.task.default-time-zone`(기본 `Asia/Seoul`) |
 | 대화 방식 | `NEW_PER_RUN`, `SINGLE` | `NEW_PER_RUN` |
@@ -35,7 +35,7 @@
 
 | 종류 | 값 | 검사 |
 | --- | --- | --- |
-| `CRON` | 표준 5필드 cron(`분 시 일 월 요일`). 예: 매달 1일 9시는 `0 9 1 * *` | 필드가 다섯이 아니거나 읽지 못하면 `TASK_SCHEDULE_INVALID`. 지금부터 1년 안의 예정 시각을 펼쳐 이어지는 두 시각의 간격이 `assistant.task.min-interval`(기본 15분)보다 짧으면 `TASK_SCHEDULE_INVALID` |
+| `CRON` | 표준 5필드 cron(`분 시 일 월 요일`). 예: 매달 1일 9시는 `0 9 1 * *` | 앞뒤 공백을 뗀 글이 100자를 넘으면 `TASK_SCHEDULE_INVALID`. 저장 칸(`task_trigger.cron_expr`)의 길이다. 필드가 다섯이 아니거나 읽지 못하면 `TASK_SCHEDULE_INVALID`. 지금부터 1년 안의 예정 시각을 펼쳐 이어지는 두 시각의 간격이 `assistant.task.min-interval`(기본 15분)보다 짧으면 `TASK_SCHEDULE_INVALID` |
 | `ONCE` | 그 시간대의 날짜와 시각 하나 | 지금보다 뒤가 아니면 `TASK_SCHEDULE_INVALID` |
 
 `CRON` 의 예정 시각은 그 작업의 시간대로 계산한다. Spring `CronExpression` 의 계산을 따른다. 서머타임이 있는 시간대에서 없는 시각은 그날 건너뛰고, 겹친 시각은 두 번 돈다. 두 번의 예정 시각은 서로 다른 순간이라 발화 기록도 두 줄이다.
