@@ -6,6 +6,7 @@ import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.verify;
 
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.agent.domain.type.AgentVisibility;
@@ -67,6 +68,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.TestConfiguration;
@@ -576,10 +578,22 @@ class TaskRunStarterTest {
         assertThat(skipped.status()).isEqualTo(TaskRunStatus.SKIPPED);
         assertThat(skipped.reason()).isEqualTo(TaskRunReason.PAUSED);
         assertThat(stub().received()).isEmpty();
-        assertThat(messages.findByConversationIdOrderByIdAsc(skipped.conversationId()))
+
+        ArgumentCaptor<Long> preparedConversation = ArgumentCaptor.forClass(Long.class);
+        verify(turns).open(eq(fixture.owner().id()), preparedConversation.capture());
+        Long conversationId = preparedConversation.getValue();
+        if (fixture.task().conversationMode() == ConversationMode.NEW_PER_RUN) {
+            assertThat(skipped.conversationId()).isNull();
+            assertThat(conversations.findById(conversationId)).isEmpty();
+            assertThat(messages.findByConversationIdOrderByIdAsc(conversationId)).isEmpty();
+        } else {
+            assertThat(skipped.conversationId()).isEqualTo(conversationId);
+            assertThat(conversations.findById(conversationId)).isPresent();
+        }
+        assertThat(messages.findByConversationIdOrderByIdAsc(conversationId))
                 .extracting(ChatMessage::role)
                 .doesNotContain(MessageRole.USER);
-        assertThat(turns.markOf(skipped.conversationId()).running()).isFalse();
+        assertThat(turns.markOf(conversationId).running()).isFalse();
         assertThat(limiter.hasTurnRoom(fixture.owner().id())).isTrue();
         assertThat(notificationsOf(fixture.owner().id())).isEmpty();
     }
