@@ -8,6 +8,7 @@ import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.user.infra.AppUserRepository;
 import java.time.Clock;
 import java.util.List;
+import java.util.Objects;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -73,6 +74,10 @@ public class AgentAdminService {
         String apiBaseUrl = effectiveApiBaseUrl(agent, command.apiBaseUrl());
         if (command.enabled() && command.visibility() == AgentVisibility.GROUP) {
             lifecycle.requireGroupSafe(apiBaseUrl, agent.hermesProfile());
+        }
+        // 셸이나 파일 도구가 켜진 profile 은 실행 공간이 지금 주인의 디렉터리를 가리킨다(ADR-084). 주인이 바뀔 때만 본다.
+        if (!Objects.equals(ownerId, agent.ownerUserId())) {
+            lifecycle.requireOwnerChangeSafe(apiBaseUrl, agent.hermesProfile());
         }
         agent.changeAccess(command.enabled(), command.visibility(), ownerId);
         if (!apiBaseUrl.equals(agent.apiBaseUrl())) {

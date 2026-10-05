@@ -66,3 +66,8 @@ test("실행 공간이 준비되지 않은 도구 저장 실패는 해요체 문
   assert.equal(describeError("AGENT_SANDBOX_UNAVAILABLE", "sandbox unavailable"),
     "격리된 실행 공간이 준비되지 않아 이 도구를 켤 수 없어요.");
 });
+
+test("셸이나 파일 도구가 켜진 에이전트의 주인 변경 실패는 도구를 먼저 끄라고 알린다", () => {
+  assert.equal(describeError("AGENT_OWNER_CHANGE_REQUIRES_SHELL_OFF", "turn off shell first"),
+    "셸이나 파일 도구가 켜진 에이전트는 주인을 바꿀 수 없어요. 먼저 그 도구를 꺼 주세요.");
+});

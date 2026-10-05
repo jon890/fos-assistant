@@ -24,6 +24,8 @@
   Docker 는 컨테이너 생성 요청 본문을 검사하는 socket proxy 로만 다룬다. proxy 는 운영 저장소가 소유한다.
   egress proxy(Hermes 의 iron-proxy)는 지금 켜지 않는다. 동작 계약과 측정은 [`hermes/sandbox.md`](../hermes/sandbox.md) 가 갖는다.
 
+  셸·파일 도구가 켜진 에이전트의 주인 변경은 거절한다. 실행 공간 디렉터리가 옛 주인의 것으로 남기 때문이다.
+
 - **맥락**: 모든 profile 이 Hermes 컨테이너 하나에서 돈다. 셸과 파일 도구를 켠 에이전트는 다른 profile 의 `.env`, 커넥터 값 파일, 커넥터 코드, Hermes 설정을 읽고 고칠 수 있었다([`hermes/tools-and-skills.md`](../hermes/tools-and-skills.md)).
   사용자는 터미널, 파일, 코드 실행을 최대한 열어 쓰되 사용자마다 격리된 파일 공간에서만 읽고 쓰게 하기로 했다(2026-10-05).
   밖으로 나가는 네트워크는 열어 두고 기록만 하며, 허용 목록 방식은 실측 비용을 본 뒤 다시 정하기로 했다.

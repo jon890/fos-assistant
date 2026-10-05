@@ -3,6 +3,8 @@ package com.bifos.assistant.agent;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -13,6 +15,7 @@ import com.bifos.assistant.agent.application.AgentAdminService;
 import com.bifos.assistant.agent.application.AgentCreateCommand;
 import com.bifos.assistant.agent.application.AgentEndpointProbe;
 import com.bifos.assistant.agent.application.AgentLifecycleService;
+import com.bifos.assistant.agent.application.AgentUpdateCommand;
 import com.bifos.assistant.agent.application.KnownFlows;
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.agent.domain.type.AgentVisibility;
@@ -21,8 +24,10 @@ import com.bifos.assistant.agent.domain.type.CredentialScope;
 import com.bifos.assistant.agent.infra.AgentRepository;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
+import com.bifos.assistant.user.domain.AppUser;
 import com.bifos.assistant.user.infra.AppUserRepository;
 import java.time.Clock;
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
@@ -92,6 +97,60 @@ class AgentAdminServiceTest {
         when(agents.findAll()).thenReturn(List.of(live, deleted));
 
         assertThat(service.list()).containsExactly(live);
+    }
+
+    @Test
+    @DisplayName("셸이나 파일 도구가 켜진 에이전트의 주인을 바꾸면 거절하고 주인을 그대로 둔다")
+    void rejectsOwnerChangeWhenShellToolsetEnabled() {
+        Agent agent = privateAgent(1L);
+        AppUser next = mock(AppUser.class);
+        when(next.id()).thenReturn(2L);
+        when(users.findByEmail("next@example.com")).thenReturn(Optional.of(next));
+        doThrow(new ApiException(ErrorCode.AGENT_OWNER_CHANGE_REQUIRES_SHELL_OFF, "shell is on"))
+                .when(lifecycle)
+                .requireOwnerChangeSafe(API_BASE_URL, "dad-profile");
+
+        assertThatThrownBy(() -> service.update("dad", privateUpdate("next@example.com")))
+                .isInstanceOf(ApiException.class)
+                .extracting(ex -> ((ApiException) ex).code())
+                .isEqualTo(ErrorCode.AGENT_OWNER_CHANGE_REQUIRES_SHELL_OFF);
+
+        assertThat(agent.ownerUserId()).isEqualTo(1L);
+        verify(agents, never()).save(any(Agent.class));
+    }
+
+    @Test
+    @DisplayName("주인이 그대로인 접근 변경은 셸 도구가 켜져 있어도 저장한다")
+    void keepsAccessChangeWithSameOwner() {
+        Agent agent = privateAgent(1L);
+        doThrow(new ApiException(ErrorCode.AGENT_OWNER_CHANGE_REQUIRES_SHELL_OFF, "shell is on"))
+                .when(lifecycle)
+                .requireOwnerChangeSafe(anyString(), anyString());
+
+        Agent saved = service.update("dad", new AgentUpdateCommand(false, AgentVisibility.PRIVATE, null, null, null));
+
+        assertThat(saved.enabled()).isFalse();
+        assertThat(saved.ownerUserId()).isEqualTo(1L);
+        verify(agents).save(agent);
+    }
+
+    private Agent privateAgent(Long ownerId) {
+        Agent agent = Agent.of(
+                "dad",
+                "Dad",
+                "dad-profile",
+                API_BASE_URL,
+                CostMode.SUBSCRIPTION,
+                CredentialScope.SHARED_HOUSEHOLD,
+                AgentVisibility.PRIVATE,
+                ownerId,
+                Instant.now());
+        when(agents.findByCodeForUpdate("dad")).thenReturn(Optional.of(agent));
+        return agent;
+    }
+
+    private static AgentUpdateCommand privateUpdate(String ownerEmail) {
+        return new AgentUpdateCommand(true, AgentVisibility.PRIVATE, ownerEmail, null, null);
     }
 
     private static AgentCreateCommand groupCommand() {

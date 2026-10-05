@@ -163,6 +163,10 @@ SANDBOX_OWNER_RE = re.compile(r"^[a-z][a-z0-9-]{0,63}$")
 SANDBOX_NETWORK_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$")
 # 실행 공간이 직접 쓰는 컨테이너 경로다. 운영 마운트가 이 자리를 가리면 사용자 공간이 바뀐다.
 SANDBOX_RESERVED_PATHS = ("/workspace", "/root")
+# hermes/README.md 의 「셸 실행 공간」 계약 표에 있는 최상위 키다. 그 밖의 키가 있으면 정책 전체를 틀린 것으로 본다.
+SANDBOX_POLICY_KEYS = frozenset({
+    "image", "workspace_root", "network", "cpu", "memory_mb", "read_only_mounts", "profile_mounts",
+})
 
 # 토큰으로 인증할 요청이다. 여기 없는 것은 모두 쿠키 검사로 넘어간다.
 # 값은 그 요청에서 먼저 돌릴 검사 함수의 이름이다. None 은 토큰만 본다.
@@ -1782,6 +1786,20 @@ def _sandbox_mounts_ok(value) -> bool:
     return isinstance(value, list) and all(_sandbox_mount_ok(entry) for entry in value)
 
 
+def _sandbox_mount_overlaps(mount: str, workspace_root: str) -> bool:
+    """마운트 원본이 `workspace_root` 와 같거나 그 아래이거나 그 상위인가. 경로 조각 기준으로 본다.
+
+    겹치면 다른 사용자의 `/workspace` 가 읽기 전용 마운트로 함께 보인다.
+    """
+    source = mount.split(":")[0].rstrip("/") or "/"
+    root = workspace_root.rstrip("/") or "/"
+
+    def under(child, parent):
+        return child == parent or parent == "/" or child.startswith(parent + "/")
+
+    return under(source, root) or under(root, source)
+
+
 def _sandbox_policy() -> Optional[dict]:
     """`SANDBOX_ENV` 의 JSON 을 읽어 검증한다. 없거나 하나라도 틀리면 None 이다.
 
@@ -1802,6 +1820,12 @@ def _sandbox_policy() -> Optional[dict]:
 
     def invalid(key):
         logger.error("dashboard-profile-api: %s 의 %s 가 올바르지 않다", SANDBOX_ENV, key)
+        return None
+
+    unknown = sorted(set(value) - SANDBOX_POLICY_KEYS)
+    if unknown:
+        # 계약에 없는 키를 조용히 버리면 운영자가 걸었다고 믿는 제한이 빠진 채로 돈다.
+        logger.error("dashboard-profile-api: %s 에 계약에 없는 키가 있다 %s", SANDBOX_ENV, unknown)
         return None
 
     image = value.get("image")
@@ -1825,6 +1849,12 @@ def _sandbox_policy() -> Optional[dict]:
     profile_mounts = value.get("profile_mounts", {})
     if (not isinstance(profile_mounts, dict)
             or not all(isinstance(name, str) and _sandbox_mounts_ok(mounts) for name, mounts in profile_mounts.items())):
+        return invalid("profile_mounts")
+    workspace_root = value["workspace_root"]
+    if any(_sandbox_mount_overlaps(mount, workspace_root) for mount in read_only_mounts):
+        return invalid("read_only_mounts")
+    if any(_sandbox_mount_overlaps(mount, workspace_root)
+           for mounts in profile_mounts.values() for mount in mounts):
         return invalid("profile_mounts")
     return {
         "image": image,
@@ -1976,6 +2006,7 @@ async def _check_config_update(request):
             return _rejected("skills 도구가 꺼진 채로 스킬을 게시할 수 없다")
         if sandbox is not None:
             # Docker 는 없는 원본 디렉터리를 스스로 만든다. 여기서는 권한을 미리 맞춰 보는 것뿐이라 실패해도 거절하지 않는다.
+            # 처리기가 실패해도 지우지 않는다. 빈 디렉터리만 남는다.
             try:
                 os.makedirs(_sandbox_workspace(sandbox, owner), exist_ok=True)
             except OSError:

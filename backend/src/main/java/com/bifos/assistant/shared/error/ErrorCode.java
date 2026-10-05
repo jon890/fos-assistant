@@ -53,6 +53,11 @@ public enum ErrorCode {
     AGENT_TOOLS_REQUIRE_PRIVATE(HttpStatus.CONFLICT),
     /** 셸이나 파일 도구를 켜려 했지만 Hermes 쪽 사용자별 격리 실행 공간이 준비되지 않았다(ADR-084). 도구 목록은 바뀌지 않았다. */
     AGENT_SANDBOX_UNAVAILABLE(HttpStatus.CONFLICT),
+    /**
+     * 셸이나 파일 등급의 도구가 켜진 에이전트의 주인을 바꾸려 했다(ADR-084). 그 profile 의 실행 공간은 옛 주인의 디렉터리를
+     * 가리키고 컨테이너도 재사용되므로, 도구를 먼저 끈 뒤에만 주인을 바꾼다.
+     */
+    AGENT_OWNER_CHANGE_REQUIRES_SHELL_OFF(HttpStatus.CONFLICT),
     /** 요청자가 만들 수 있는 에이전트 수를 이미 채웠다. 지운 에이전트는 세지 않는다. */
     AGENT_LIMIT_REACHED(HttpStatus.CONFLICT),
     /** Hermes가 저장 뒤 읽은 toolset 목록을 요청한 목록과 다르게 돌려줬다. */

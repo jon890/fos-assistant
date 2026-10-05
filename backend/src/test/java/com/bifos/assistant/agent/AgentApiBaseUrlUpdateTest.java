@@ -286,6 +286,37 @@ class AgentApiBaseUrlUpdateTest {
         verify(agents, never()).save(agent);
     }
 
+    @Test
+    @DisplayName("셸 도구가 켜진 에이전트의 주인을 바꾸면 AGENT_OWNER_CHANGE_REQUIRES_SHELL_OFF 로 거절한다")
+    void rejectsOwnerChangeWhenTerminalEnabled() {
+        agent.changeAccess(true, AgentVisibility.PRIVATE, 1L);
+        AppUser next = owner(2L);
+        when(users.findByEmail("next@example.com")).thenReturn(Optional.of(next));
+        when(hermesToolsets.readEnabled(CURRENT_URL, "dad")).thenReturn(List.of("terminal"));
+
+        assertThatThrownBy(() -> controller.update(
+                        "dad", new UpdateAgentRequest(true, AgentVisibility.PRIVATE, "next@example.com", null, null)))
+                .isInstanceOf(ApiException.class)
+                .extracting(ex -> ((ApiException) ex).code())
+                .isEqualTo(ErrorCode.AGENT_OWNER_CHANGE_REQUIRES_SHELL_OFF);
+
+        assertThat(agent.ownerUserId()).isEqualTo(1L);
+        verify(agents, never()).save(agent);
+    }
+
+    @Test
+    @DisplayName("셸 도구가 꺼진 에이전트는 주인을 바꿔 저장한다")
+    void changesOwnerWhenShellToolsetsOff() {
+        agent.changeAccess(true, AgentVisibility.PRIVATE, 1L);
+        AppUser next = owner(2L);
+        when(users.findByEmail("next@example.com")).thenReturn(Optional.of(next));
+        when(hermesToolsets.readEnabled(CURRENT_URL, "dad")).thenReturn(List.of("web", "fos-assistant"));
+
+        controller.update("dad", new UpdateAgentRequest(true, AgentVisibility.PRIVATE, "next@example.com", null, null));
+
+        assertThat(agent.ownerUserId()).isEqualTo(2L);
+    }
+
     private static CreateAgentRequest privateRequest(String code, String apiBaseUrl) {
         return new CreateAgentRequest(
                 code,

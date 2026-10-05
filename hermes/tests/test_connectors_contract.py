@@ -169,6 +169,14 @@ class ConnectorsContractTest(base.ConnectorGateCase):
             with self.subTest(skill=str(path.relative_to(REPO))):
                 self.assertEqual(secret_requests(path), [])
 
+    def test_secret_check_rejects_non_mapping_front_matter(self):
+        """앞머리가 mapping 이 아니면 칸을 검사할 수 없으므로 위반으로 본다."""
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        path = pathlib.Path(tmp.name) / "SKILL.md"
+        path.write_text("---\n- required_environment_variables\n---\n본문\n", encoding="utf-8")
+        self.assertEqual(secret_requests(path), ["앞머리가 mapping 이 아니다"])
+
 
 def secret_requests(path: pathlib.Path) -> list[str]:
     """SKILL.md 앞머리에서 비밀값을 요청하는 칸의 이름 목록이다."""
@@ -178,6 +186,9 @@ def secret_requests(path: pathlib.Path) -> list[str]:
     if not text.startswith("---\n"):
         return []
     head = yaml.safe_load(text[4:text.index("\n---", 4)]) or {}
+    if not isinstance(head, dict):
+        # 목록이나 글자 앞머리는 칸 이름으로 검사할 수 없다. 통과로 두지 않고 위반으로 돌린다.
+        return ["앞머리가 mapping 이 아니다"]
     found = [key for key in ("required_environment_variables", "required_credential_files") if key in head]
     setup = head.get("setup")
     if isinstance(setup, dict) and "collect_secrets" in setup:

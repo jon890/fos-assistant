@@ -5,6 +5,7 @@ import com.bifos.assistant.shared.error.ErrorCode;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.MediaType;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
@@ -107,9 +108,9 @@ public class HttpHermesToolsetClient implements HermesToolsetClient {
                     .toBodilessEntity();
         } catch (RestClientException ex) {
             log.warn("Hermes API 실행 toolset을 쓰지 못했다 profile={}", profileName, ex);
-            if (HermesCallFailure.isSandboxUnavailable(ex)) {
-                throw new ApiException(
-                        ErrorCode.AGENT_SANDBOX_UNAVAILABLE, HermesCallFailure.SANDBOX_UNAVAILABLE_MESSAGE, ex);
+            Optional<HermesRequestRejected> sandboxRejection = HermesCallFailure.sandboxRejection(ex);
+            if (sandboxRejection.isPresent()) {
+                throw sandboxRejection.get();
             }
             throw HermesCallFailure.of(ex, "could not write Hermes toolsets");
         }

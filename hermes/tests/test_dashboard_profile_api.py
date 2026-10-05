@@ -1988,6 +1988,12 @@ class ProfileApiRouteTest(unittest.TestCase):
             ("under workspace", self.sandbox_policy(read_only_mounts=["/srv:/workspace/x"])),
             ("under root", self.sandbox_policy(profile_mounts={"owner": ["/srv:/root/.hermes"]})),
             ("mounts not list", self.sandbox_policy(read_only_mounts="/srv:/opt/x")),
+            ("mount source is workspace root", self.sandbox_policy(read_only_mounts=[root + ":/opt/x"])),
+            ("mount source under workspace root",
+             self.sandbox_policy(read_only_mounts=[root + "/user-2:/opt/x"])),
+            ("mount source above workspace root",
+             self.sandbox_policy(profile_mounts={"owner": [str(self.sandbox_root.parent) + ":/opt/x"]})),
+            ("unknown top-level key", dict(self.sandbox_policy(), docker_extra_args=["--privileged"])),
         ]
         path = self.root / "owner/config.yaml"
         original = path.read_bytes()
@@ -2000,8 +2006,9 @@ class ProfileApiRouteTest(unittest.TestCase):
                 self.assertEqual(path.read_bytes(), original)
 
     def test_sandbox_policy_accepts_paths_that_only_share_a_prefix(self):
-        """`/rootfs` 와 `/workspaces` 는 `/root`, `/workspace` 아래가 아니다."""
-        self.set_sandbox_policy(self.sandbox_policy(read_only_mounts=["/srv/a:/rootfs", "/srv/b:/workspaces/x"]))
+        """`/rootfs` 와 `/workspaces` 는 `/root`, `/workspace` 아래가 아니다. `<root>-other` 도 `workspace_root` 아래가 아니다."""
+        self.set_sandbox_policy(self.sandbox_policy(read_only_mounts=[
+            "/srv/a:/rootfs", "/srv/b:/workspaces/x", str(self.sandbox_root) + "-other:/opt/other"]))
         self.assertEqual(self.request("/api/config", "PUT", token="valid", body=self.file_body()), 200)
         self.assertEqual(self.saved_config()["terminal"]["docker_volumes"][1:3],
                          ["/srv/a:/rootfs:ro", "/srv/b:/workspaces/x:ro"])

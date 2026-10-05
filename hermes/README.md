@@ -65,6 +65,8 @@ plugin 파일, 주소를 채운 `default-config.yaml.template`, 틀의 `plugins.
 | `profile_mounts` | 아니오 | profile 이름마다 위와 같은 목록. 그 profile 의 실행 공간에만 읽기 전용으로 붙는다 |
 
 경로에 `..`, 빈 조각, `:` 셋 이상, `/workspace` 나 `/root` 로 시작하는 컨테이너 경로가 있으면 값 전체를 읽지 못한 것으로 본다.
+`read_only_mounts` 와 `profile_mounts` 의 원본이 `workspace_root` 와 같거나 그 아래이거나 그 상위이면(경로 조각 기준) 값 전체를 읽지 못한 것으로 본다. 다른 사용자의 디렉터리가 보이기 때문이다.
+위 표에 없는 최상위 키가 있으면 값 전체를 읽지 못한 것으로 본다. 모르는 키를 버리고 돌면 운영자가 걸었다고 믿는 제한이 빠진다.
 plugin 이 쓰는 `terminal:` 은 이렇다. 모든 칸을 통째로 바꾼다.
 
 ```yaml

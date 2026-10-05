@@ -49,6 +49,8 @@ const MESSAGES: Record<string, string> = {
   AGENT_BUSY: "다른 설정 변경이 끝날 때까지 기다린 뒤 다시 시도해 주세요.",
   AGENT_SANDBOX_UNAVAILABLE:
     "격리된 실행 공간이 준비되지 않아 이 도구를 켤 수 없어요.",
+  AGENT_OWNER_CHANGE_REQUIRES_SHELL_OFF:
+    "셸이나 파일 도구가 켜진 에이전트는 주인을 바꿀 수 없어요. 먼저 그 도구를 꺼 주세요.",
   SKILL_NAME_TAKEN: "같은 이름의 기본 스킬이 있어요.",
   SKILL_NOT_FOUND:
     "스킬을 찾지 못했어요. 이미 지워졌는지 목록에서 확인해 주세요.",
