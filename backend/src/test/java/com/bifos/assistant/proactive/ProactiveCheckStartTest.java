@@ -318,7 +318,10 @@ class ProactiveCheckStartTest {
                 status -> conversations.deleteIfActive(deleted.id(), owner.id(), Instant.now()));
 
         UUID returned = service.start(owner, agent.code(), CheckTrigger.SCHEDULED);
-        Conversation created = checkConversation();
+        Conversation created = ownersConversations().stream()
+                .filter(conversation -> conversation.publicId().equals(returned))
+                .findFirst()
+                .orElseThrow();
         awaitIdle(created.id());
 
         ProactiveCheck current = checks.findFirstByUserIdAndAgentIdOrderByIdDesc(owner.id(), agent.id())
