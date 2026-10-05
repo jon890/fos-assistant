@@ -1,6 +1,7 @@
 package com.bifos.assistant.usage.infra;
 
 import com.bifos.assistant.usage.domain.AgentExecution;
+import com.bifos.assistant.usage.domain.ConversationDelivery;
 import com.bifos.assistant.usage.domain.CostByAgent;
 import com.bifos.assistant.usage.domain.CostByDay;
 import com.bifos.assistant.usage.domain.CostByFingerprint;
@@ -358,4 +359,21 @@ public interface AgentExecutionRepository extends JpaRepository<AgentExecution, 
             """)
     List<CostByFingerprint> sumByFingerprintBetween(
             @Param("userId") Long userId, @Param("from") Instant from, @Param("to") Instant to);
+
+    /**
+     * 대화마다 위임 실행의 결과를 전한 가장 늦은 시각이다. 전한 실행이 없는 대화는 나오지 않는다.
+     *
+     * <p>{@code delegation_key} 가 없는 실행(대화 turn 의 루트, 흐름의 하위 실행)은 세지 않는다. 대화를 이어 가며 생기는
+     * 실행이 결과 도착으로 보이면 안 된다. 먼저 알리기가 할 일에 연결한 대화의 결과 도착을 볼 때 쓴다.
+     */
+    @Query("""
+            select new com.bifos.assistant.usage.domain.ConversationDelivery(
+                e.conversationId, max(e.resultDeliveredAt))
+            from AgentExecution e
+            where e.conversationId in :conversationIds
+                and e.delegationKey is not null and e.resultDeliveredAt is not null
+            group by e.conversationId
+            """)
+    List<ConversationDelivery> findLastDeliveredByConversation(
+            @Param("conversationIds") Collection<Long> conversationIds);
 }

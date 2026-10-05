@@ -3,7 +3,8 @@
 에이전트가 제안하고 사람이 받아들인 할 일의 상태, MCP 도구, 제안 억제 규칙, API 를 갖는다.
 결정은 [ADR-073](../adr/ADR-073-할-일은-에이전트가-제안하고-사람이-받아들인-것만-챙긴다.md) 에 있다.
 
-**아직 구현 전이다.** 구현한 PR 이 이 단락을 지운다.
+**제안 도구(`follow_up_propose`)와 제안 억제는 아직 구현 전이다.** 구현한 PR 이 이 단락을 지운다.
+상태와 API 는 구현돼 있다.
 
 ## 무엇인가
 
@@ -83,6 +84,12 @@ Control Plane MCP 서버에 `follow_up_propose` 를 더한다.
 | `POST /api/v1/follow-ups/{id}/reject` | `PROPOSED` 를 `REJECTED` 로 |
 | `POST /api/v1/follow-ups/{id}/done` | `OPEN` 을 `DONE` 으로 |
 | `POST /api/v1/follow-ups/{id}/drop` | `OPEN` 을 `DROPPED` 로 |
+
+`title` 이 비었거나 200자를 넘으면 400 `VALIDATION_FAILED` 다. 앞뒤 공백을 지운 길이로 센다.
+`dueAt` 은 시간대가 붙은 ISO-8601 시각(`2026-10-05T09:00:00Z`)이다. 읽지 못하면 400 `VALIDATION_FAILED` 다.
+`dueAt` 을 UTC 로 바꾼 연도가 1부터 9999 밖이면 400 `VALIDATION_FAILED` 다.
+본문의 `conversationId` 가 UUID 가 아니면 400 `VALIDATION_FAILED` 다.
+`conversationId` 가 요청자의 대화가 아니거나 지운 대화면 404 `CONVERSATION_NOT_FOUND` 다. `PATCH` 의 `title` 과 `waiting` 은 키가 없거나 `null` 이면 그대로 둔다.
 
 응답의 칸은 `id`, `title`, `status`, `dueAt`, `waiting`, `conversationId`(대화 공개 식별자), `proposed`(에이전트가 제안했는지), `createdAt`, `acceptedAt`, `closedAt` 이다.
 

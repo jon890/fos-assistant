@@ -63,6 +63,7 @@ public final class AgentDtos {
      *     보일지 이 값으로 정한다
      * @param ownedByMe 요청자가 이 에이전트의 주인이다
      * @param connectorManaged 커넥터 연결이 만든 에이전트다. 화면이 도구와 스킬 편집을 그리지 않는다
+     * @param runsTasks 예약 작업을 돌릴 수 있다. 흐름이 붙은 에이전트는 거짓이다. 화면이 작업의 에이전트 목록을 이 값으로 거른다
      */
     public record AgentView(
             String code,
@@ -71,8 +72,9 @@ public final class AgentDtos {
             boolean acceptsAttachments,
             boolean editable,
             boolean ownedByMe,
-            boolean connectorManaged) {
-        static AgentView from(Agent agent, boolean editable, boolean ownedByMe) {
+            boolean connectorManaged,
+            boolean runsTasks) {
+        static AgentView from(Agent agent, boolean editable, boolean ownedByMe, boolean runsTasks) {
             return new AgentView(
                     agent.code(),
                     agent.name(),
@@ -80,7 +82,8 @@ public final class AgentDtos {
                     agent.acceptsAttachments(),
                     editable,
                     ownedByMe,
-                    agent.connectorManaged());
+                    agent.connectorManaged(),
+                    runsTasks);
         }
     }
 

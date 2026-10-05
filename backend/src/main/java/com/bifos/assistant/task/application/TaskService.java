@@ -257,7 +257,13 @@ public class TaskService {
         if (input.cron() == null || input.cron().isBlank()) {
             throw new ApiException(ErrorCode.TASK_SCHEDULE_INVALID, "cron is required for CRON");
         }
-        return new Schedule(TriggerType.CRON, input.cron().strip(), null, zone, null);
+        String cron = input.cron().strip();
+        if (cron.length() > TaskTrigger.CRON_MAX) {
+            throw new ApiException(
+                    ErrorCode.TASK_SCHEDULE_INVALID,
+                    "a cron expression must have at most " + TaskTrigger.CRON_MAX + " characters");
+        }
+        return new Schedule(TriggerType.CRON, cron, null, zone, null);
     }
 
     /** 요청의 시각이 저장된 시각과 같은지 본다. 종류, cron, {@code fireAt}, 시간대를 견준다. */

@@ -11,6 +11,7 @@ import { NotificationBell } from "@/components/notification/notification-bell";
 import { ConversationNav } from "./conversation-nav";
 import { MainNav } from "./main-nav";
 import { NavPending, NAV_PENDING_EVENT } from "./nav-pending";
+import { NowLink } from "./now-link";
 import { useAppName, useShellAccount } from "./shell-account";
 import { useConversations } from "./conversations-provider";
 
@@ -75,7 +76,7 @@ export function Sidebar({
       <Button
         asChild
         variant="outline"
-        className="mb-4 shrink-0 justify-start bg-background hover:bg-accent"
+        className="mb-2 shrink-0 justify-start bg-background hover:bg-accent"
       >
         <Link
           href="/"
@@ -88,6 +89,8 @@ export function Sidebar({
           새 대화
         </Link>
       </Button>
+      {/* 주요 화면 메뉴가 아니다. 대화 목록이 길어도 스크롤 없이 보이도록 「새 대화」 바로 아래에 둔다. */}
+      <NowLink onNavigate={onNavigate} />
       <Input
         ref={searchRef}
         type="search"
