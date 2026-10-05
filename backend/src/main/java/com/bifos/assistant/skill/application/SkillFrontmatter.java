@@ -27,8 +27,13 @@ import org.yaml.snakeyaml.resolver.Resolver;
  * @param rawDescription 앞머리의 {@code description} 을 문자열로 바꾼 원래 값. 앞뒤를 빼지 않는다.
  *     날짜처럼 보이는 값은 적힌 글자 그대로다. {@link TextTimestampResolver} 를 본다
  * @param hasBody 닫는 {@code ---} 줄 뒤에 공백이 아닌 글이 있는가
+ * @param requestsSecrets 앞머리가 환경 값이나 자격 증명 파일을 요청하는 칸을 가졌는가. 최상위 {@code
+ *     required_environment_variables}, {@code required_credential_files}, map 인 {@code setup} 의 {@code
+ *     collect_secrets}, map 인 {@code prerequisites} 의 {@code env_vars} 가운데 하나라도 키가 있으면 값과 관계없이
+ *     참이다. 파서는 거절하지 않고 저장 검사가 거절한다. 옛 스킬의 설명을 읽는 자리도 이 파서를 쓰기 때문이다
  */
-public record SkillFrontmatter(String name, String description, String rawDescription, boolean hasBody) {
+public record SkillFrontmatter(
+        String name, String description, String rawDescription, boolean hasBody, boolean requestsSecrets) {
 
     private static final String FENCE = "---";
 
@@ -82,7 +87,17 @@ public record SkillFrontmatter(String name, String description, String rawDescri
             throw invalid("SKILL.md frontmatter needs a description");
         }
         String body = String.join("\n", Arrays.copyOfRange(lines, end + 1, lines.length));
-        return new SkillFrontmatter(name, description, String.valueOf(descriptionValue), !body.isBlank());
+        return new SkillFrontmatter(
+                name, description, String.valueOf(descriptionValue), !body.isBlank(), requestsSecrets(values));
+    }
+
+    /** Hermes 가 profile 의 환경 값이나 파일을 셸 실행 공간에 넣게 만드는 앞머리 칸이 있는가(ADR-084). */
+    private static boolean requestsSecrets(Map<?, ?> values) {
+        return values.containsKey("required_environment_variables")
+                || values.containsKey("required_credential_files")
+                || (values.get("setup") instanceof Map<?, ?> setup && setup.containsKey("collect_secrets"))
+                || (values.get("prerequisites") instanceof Map<?, ?> prerequisites
+                        && prerequisites.containsKey("env_vars"));
     }
 
     /**

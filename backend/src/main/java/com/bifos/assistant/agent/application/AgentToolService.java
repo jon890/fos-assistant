@@ -48,7 +48,7 @@ public class AgentToolService {
         }
         List<String> current = toolsets.readEnabled(agent.apiBaseUrl(), agent.hermesProfile());
         List<String> desired = AgentToolPolicy.requestedForWrite(user, agent, requested, current);
-        toolsets.writeApiServer(agent.hermesProfile(), desired);
+        toolsets.writeApiServer(agent.hermesProfile(), desired, agent.sandboxOwner());
         List<String> applied = toolsets.readEnabled(agent.apiBaseUrl(), agent.hermesProfile());
         List<String> desiredBuiltin = desired.stream()
                 .filter(name -> !AgentToolPolicy.CONTROL_PLANE_MCP.equals(name))

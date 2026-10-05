@@ -12,6 +12,7 @@ import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
+import org.springframework.web.client.RestClientResponseException;
 import tools.jackson.databind.JsonNode;
 
 /** Hermes 대시보드의 스킬 경로를 HTTP 로 부른다. 주소와 토큰은 설정으로만 받는다. */
@@ -86,7 +87,8 @@ public class HttpHermesSkillClient implements HermesSkillClient {
     }
 
     @Override
-    public void publish(String profile, List<String> externalDirs, List<String> apiServerToolsets) {
+    public void publish(
+            String profile, List<String> externalDirs, List<String> apiServerToolsets, String sandboxOwner) {
         requireValidProfileName(profile);
         Map<String, Object> config = new LinkedHashMap<>();
         config.put("skills", Map.of("external_dirs", List.copyOf(externalDirs)));
@@ -99,11 +101,16 @@ public class HttpHermesSkillClient implements HermesSkillClient {
                     .uri(baseUrl + "/api/config")
                     .header("Authorization", "Bearer " + token)
                     .contentType(MediaType.APPLICATION_JSON)
-                    .body(Map.of("profile", profile, "config", config))
+                    .body(Map.of("profile", profile, "config", config, "sandbox_owner", sandboxOwner))
                     .retrieve()
                     .toBodilessEntity();
         } catch (RestClientException ex) {
             log.warn("Hermes 스킬 경로를 게시하지 못했다 profile={} dirs={}", profile, externalDirs.size(), ex);
+            // 게시가 거절됐다는 사실을 지켜야 SkillService 가 방금 쓴 버전 디렉터리를 지운다. 오류 코드만 바꾼다.
+            if (HermesCallFailure.isSandboxUnavailable(ex) && ex instanceof RestClientResponseException response) {
+                throw new HermesRequestRejected(
+                        ErrorCode.AGENT_SANDBOX_UNAVAILABLE, HermesCallFailure.SANDBOX_UNAVAILABLE_MESSAGE, response);
+            }
             throw HermesCallFailure.ofDistinguishingRejection(ex, "could not publish the skill directory");
         }
     }

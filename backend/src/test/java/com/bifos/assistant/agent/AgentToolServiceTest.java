@@ -155,7 +155,7 @@ class AgentToolServiceTest {
         AgentToolsetsView result = service.write(owner, agent, List.of("web"));
 
         assertThat(result.unclassifiedEnabled()).containsExactly("connections");
-        verify(toolsets).writeApiServer(agent.hermesProfile(), List.of("web", "fos-assistant"));
+        verify(toolsets).writeApiServer(agent.hermesProfile(), List.of("web", "fos-assistant"), "u1");
     }
 
     @Test
@@ -171,6 +171,18 @@ class AgentToolServiceTest {
     }
 
     @Test
+    @DisplayName("실행 공간이 준비되지 않아 저장이 거절되면 AGENT_SANDBOX_UNAVAILABLE 을 그대로 돌린다")
+    void passesSandboxUnavailableThroughWhenWriteIsRejected() {
+        doThrow(new ApiException(ErrorCode.AGENT_SANDBOX_UNAVAILABLE, "the isolated shell workspace is not configured"))
+                .when(toolsets)
+                .writeApiServer(agent.hermesProfile(), List.of("web", "fos-assistant"), "u1");
+
+        assertThatThrownBy(() -> service.write(owner, agent, List.of("web")))
+                .isInstanceOfSatisfying(
+                        ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.AGENT_SANDBOX_UNAVAILABLE));
+    }
+
+    @Test
     @DisplayName("올린 스킬이 있으면 skills 를 끄는 저장을 거절하고 Hermes 를 부르지 않는다")
     void rejectsDisablingSkillsWhenUploadedSkillsExistAndSkipsHermes() {
         when(skillFiles.hasUploaded(agent.hermesProfile())).thenReturn(true);
@@ -180,7 +192,8 @@ class AgentToolServiceTest {
                 .extracting(ex -> ((ApiException) ex).code())
                 .isEqualTo(ErrorCode.VALIDATION_FAILED);
 
-        verify(toolsets, Mockito.never()).writeApiServer(ArgumentMatchers.anyString(), ArgumentMatchers.anyList());
+        verify(toolsets, Mockito.never())
+                .writeApiServer(ArgumentMatchers.anyString(), ArgumentMatchers.anyList(), ArgumentMatchers.anyString());
     }
 
     @Test
@@ -197,6 +210,6 @@ class AgentToolServiceTest {
         AgentToolsetsView result = service.write(owner, agent, List.of("web", "skills"));
 
         assertThat(result.toolsets()).extracting(AgentToolView::name).containsExactly("web", "skills");
-        verify(toolsets).writeApiServer(agent.hermesProfile(), List.of("web", "skills", "fos-assistant"));
+        verify(toolsets).writeApiServer(agent.hermesProfile(), List.of("web", "skills", "fos-assistant"), "u1");
     }
 }

@@ -51,6 +51,8 @@ public enum ErrorCode {
     AGENT_BUSY(HttpStatus.CONFLICT),
     /** 셸이나 파일, 다른 사람의 대화에 닿는 toolset은 그룹 에이전트에 둘 수 없다. */
     AGENT_TOOLS_REQUIRE_PRIVATE(HttpStatus.CONFLICT),
+    /** 셸이나 파일 도구를 켜려 했지만 Hermes 쪽 사용자별 격리 실행 공간이 준비되지 않았다(ADR-084). 도구 목록은 바뀌지 않았다. */
+    AGENT_SANDBOX_UNAVAILABLE(HttpStatus.CONFLICT),
     /** 요청자가 만들 수 있는 에이전트 수를 이미 채웠다. 지운 에이전트는 세지 않는다. */
     AGENT_LIMIT_REACHED(HttpStatus.CONFLICT),
     /** Hermes가 저장 뒤 읽은 toolset 목록을 요청한 목록과 다르게 돌려줬다. */

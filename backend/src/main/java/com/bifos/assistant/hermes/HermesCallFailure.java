@@ -7,6 +7,9 @@ import lombok.NoArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestClientResponseException;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.json.JsonMapper;
 
 /**
  * Hermes 호출이 실패한 이유를 오류 코드로 옮긴다.
@@ -20,6 +23,14 @@ import org.springframework.web.client.RestClientResponseException;
  */
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
 final class HermesCallFailure {
+
+    /** 격리 실행 공간이 준비되지 않았을 때 plugin 이 409 응답의 {@code code} 칸에 싣는 값이다. */
+    static final String SANDBOX_UNAVAILABLE_CODE = "sandbox_unavailable";
+
+    /** 셸과 파일 도구를 켜는 설정 쓰기가 실행 공간이 없어 거절됐을 때 쓰는 메시지다. */
+    static final String SANDBOX_UNAVAILABLE_MESSAGE = "the isolated shell workspace is not configured";
+
+    private static final JsonMapper JSON = JsonMapper.builder().build();
 
     static ApiException of(RestClientException cause, String message) {
         return new ApiException(codeOf(cause), message, cause);
@@ -36,6 +47,25 @@ final class HermesCallFailure {
             return new HermesRequestRejected(codeOf(cause), message, response);
         }
         return of(cause, message);
+    }
+
+    /**
+     * plugin 이 격리 실행 공간이 준비되지 않아 설정 쓰기를 거절했는가(ADR-084).
+     *
+     * <p>409 이고 응답 본문 JSON 의 {@code code} 칸이 {@link #SANDBOX_UNAVAILABLE_CODE} 일 때만 참이다. 본문을
+     * 글자로 찾지 않는다. {@code detail} 같은 다른 칸에 같은 낱말이 들어 있어도 다른 거절로 본다.
+     */
+    static boolean isSandboxUnavailable(RestClientException cause) {
+        if (!(cause instanceof RestClientResponseException response)
+                || response.getStatusCode().value() != HttpStatus.CONFLICT.value()) {
+            return false;
+        }
+        try {
+            JsonNode code = JSON.readTree(response.getResponseBodyAsString()).get("code");
+            return code != null && code.isTextual() && SANDBOX_UNAVAILABLE_CODE.equals(code.asText());
+        } catch (JacksonException ex) {
+            return false;
+        }
     }
 
     private static ErrorCode codeOf(RestClientException cause) {

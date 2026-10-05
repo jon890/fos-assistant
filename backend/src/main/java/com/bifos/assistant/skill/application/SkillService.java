@@ -328,6 +328,12 @@ public class SkillService {
         if (!frontmatter.hasBody()) {
             throw new ApiException(ErrorCode.VALIDATION_FAILED, "SKILL.md must have content after the frontmatter");
         }
+        // Hermes 는 이 칸에 적힌 이름으로 profile 의 환경 값과 파일을 셸 실행 공간에 넣는다(ADR-084).
+        if (frontmatter.requestsSecrets()) {
+            throw new ApiException(
+                    ErrorCode.VALIDATION_FAILED,
+                    "SKILL.md frontmatter must not request environment values or credential files");
+        }
         return frontmatter;
     }
 

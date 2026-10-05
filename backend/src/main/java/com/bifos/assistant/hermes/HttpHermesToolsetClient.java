@@ -89,7 +89,7 @@ public class HttpHermesToolsetClient implements HermesToolsetClient {
     }
 
     @Override
-    public void writeApiServer(String profileName, List<String> toolsets) {
+    public void writeApiServer(String profileName, List<String> toolsets, String sandboxOwner) {
         try {
             restClient
                     .put()
@@ -100,11 +100,17 @@ public class HttpHermesToolsetClient implements HermesToolsetClient {
                             "profile",
                             profileName,
                             "config",
-                            Map.of("platform_toolsets", Map.of("api_server", toolsets))))
+                            Map.of("platform_toolsets", Map.of("api_server", toolsets)),
+                            "sandbox_owner",
+                            sandboxOwner))
                     .retrieve()
                     .toBodilessEntity();
         } catch (RestClientException ex) {
             log.warn("Hermes API 실행 toolset을 쓰지 못했다 profile={}", profileName, ex);
+            if (HermesCallFailure.isSandboxUnavailable(ex)) {
+                throw new ApiException(
+                        ErrorCode.AGENT_SANDBOX_UNAVAILABLE, HermesCallFailure.SANDBOX_UNAVAILABLE_MESSAGE, ex);
+            }
             throw HermesCallFailure.of(ex, "could not write Hermes toolsets");
         }
     }

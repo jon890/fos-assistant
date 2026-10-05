@@ -209,7 +209,7 @@ class ConnectorConnectionServiceTest {
         order.verify(connector).putEnv(profile, "DEMO_TOKEN", TOKEN);
         order.verify(connector).deleteEnv(profile, "DEMO_SCOPE");
         order.verify(connector).putConnector(profile, DEMO, true);
-        verify(toolsets, never()).writeApiServer(any(), any());
+        verify(toolsets, never()).writeApiServer(any(), any(), any());
         assertThat(registered.status()).isEqualTo(ConnectionStatus.PENDING);
         assertThat(stored(user).desiredEnabled()).isTrue();
         Agent agent = agents.findByCode(registered.agentCode()).orElseThrow();
@@ -229,7 +229,7 @@ class ConnectorConnectionServiceTest {
         String profile = profileOf(registered);
         // 목록은 설치가 커넥터의 MCP 서버와 선언한 toolset 으로 쓴다.
         verify(connector).putConnector(profile, DEMO, true);
-        verify(toolsets, never()).writeApiServer(any(), any());
+        verify(toolsets, never()).writeApiServer(any(), any(), any());
         assertThat(agents.findByCode(registered.agentCode()).orElseThrow().acceptsAttachments())
                 .isFalse();
     }
@@ -254,7 +254,7 @@ class ConnectorConnectionServiceTest {
 
         // 등록의 설치와 연결 확인마다 다시 보낸 설치다.
         verify(connector, times(3)).putConnector(profile, DEMO, true);
-        verify(toolsets, never()).writeApiServer(any(), any());
+        verify(toolsets, never()).writeApiServer(any(), any(), any());
         assertThat(checked.status()).isEqualTo(ConnectionStatus.READY);
         assertThat(agents.findByCode(registered.agentCode()).orElseThrow().acceptsAttachments())
                 .isTrue();
@@ -276,7 +276,7 @@ class ConnectorConnectionServiceTest {
 
         // 등록의 설치와 다시 보낸 설치다.
         verify(connector, times(2)).putConnector(profile, DEMO, true);
-        verify(toolsets, never()).writeApiServer(any(), any());
+        verify(toolsets, never()).writeApiServer(any(), any(), any());
         assertThat(confirmed.status()).isEqualTo(ConnectionStatus.READY);
         assertThat(agents.findByCode(registered.agentCode()).orElseThrow().acceptsAttachments())
                 .isTrue();
@@ -294,7 +294,7 @@ class ConnectorConnectionServiceTest {
         ConnectionSnapshot checked = service.check(user, DEMO);
 
         verify(connector, times(2)).putConnector(profile, DEMO, true);
-        verify(toolsets, never()).writeApiServer(any(), any());
+        verify(toolsets, never()).writeApiServer(any(), any(), any());
         assertThat(checked.status()).isEqualTo(ConnectionStatus.PENDING);
         assertThat(agentEnabled(user)).isFalse();
         // 사진 단추는 있는데 이미지 도구가 없는 상태를 만들지 않는다.
@@ -402,7 +402,7 @@ class ConnectorConnectionServiceTest {
 
         assertThat(service.check(user, DEMO).status()).isEqualTo(ConnectionStatus.READY);
 
-        verify(toolsets, never()).writeApiServer(any(), any());
+        verify(toolsets, never()).writeApiServer(any(), any(), any());
     }
 
     @Test
@@ -428,7 +428,7 @@ class ConnectorConnectionServiceTest {
             assertThat(service.catalog(user)).extracting(ConnectorSummary::id).containsExactly(PIN);
             assertCode(() -> service.register(user, DEMO, VALUES), ErrorCode.CONNECTOR_NOT_FOUND);
         }
-        verify(toolsets, never()).writeApiServer(anyString(), anyList());
+        verify(toolsets, never()).writeApiServer(anyString(), anyList(), anyString());
     }
 
     @Test
@@ -468,7 +468,7 @@ class ConnectorConnectionServiceTest {
         // 다시 보낸 뒤의 설치 상태를 읽고 나서 probe 한다.
         order.verify(connector).readConnector(profile, DEMO);
         order.verify(connector).probe(profile, "demo");
-        verify(toolsets, never()).writeApiServer(any(), any());
+        verify(toolsets, never()).writeApiServer(any(), any(), any());
         assertThat(checked.status()).isEqualTo(ConnectionStatus.READY);
         assertThat(checked.restartRequired()).isFalse();
     }
@@ -1099,7 +1099,7 @@ class ConnectorConnectionServiceTest {
 
         ConnectionSnapshot checked = service.check(user, DEMO);
 
-        verify(toolsets, never()).writeApiServer(any(), any());
+        verify(toolsets, never()).writeApiServer(any(), any(), any());
         // 등록의 설치와 다시 보낸 설치다.
         verify(connector, times(2)).putConnector(profile, DEMO, true);
         assertThat(checked.status()).isEqualTo(ConnectionStatus.PENDING);
@@ -1116,7 +1116,7 @@ class ConnectorConnectionServiceTest {
 
         ConnectionSnapshot checked = service.check(user, DEMO);
 
-        verify(toolsets, never()).writeApiServer(any(), any());
+        verify(toolsets, never()).writeApiServer(any(), any(), any());
         assertThat(checked.status()).isEqualTo(ConnectionStatus.READY);
         assertThat(agentEnabled(user)).isTrue();
     }
@@ -1136,7 +1136,7 @@ class ConnectorConnectionServiceTest {
 
         // 등록의 설치와 다시 보낸 설치다.
         verify(connector, times(2)).putConnector(profile, DEMO, true);
-        verify(toolsets, never()).writeApiServer(any(), any());
+        verify(toolsets, never()).writeApiServer(any(), any(), any());
         assertThat(checked.status()).isEqualTo(ConnectionStatus.READY);
         assertThat(checked.restartRequired()).isFalse();
         assertThat(agentEnabled(user)).isTrue();
@@ -1210,7 +1210,7 @@ class ConnectorConnectionServiceTest {
 
         // 등록의 설치와 다시 보낸 설치다.
         verify(connector, times(2)).putConnector(profile, DEMO, true);
-        verify(toolsets, never()).writeApiServer(any(), any());
+        verify(toolsets, never()).writeApiServer(any(), any(), any());
         assertThat(confirmed.status()).isEqualTo(ConnectionStatus.READY);
         assertThat(confirmed.restartRequired()).isFalse();
         assertThat(agentEnabled(member)).isTrue();
@@ -1252,7 +1252,7 @@ class ConnectorConnectionServiceTest {
 
         ConnectionSnapshot checked = service.check(user, DEMO);
 
-        verify(toolsets, never()).writeApiServer(any(), any());
+        verify(toolsets, never()).writeApiServer(any(), any(), any());
         verify(connector, never()).probe(anyString(), anyString());
         assertThat(checked.status()).isEqualTo(ConnectionStatus.PENDING);
     }
@@ -1284,7 +1284,7 @@ class ConnectorConnectionServiceTest {
 
         // 등록의 설치와 다시 설치다.
         verify(connector, times(2)).putConnector(profile, DEMO, true);
-        verify(toolsets, never()).writeApiServer(any(), any());
+        verify(toolsets, never()).writeApiServer(any(), any(), any());
         assertThat(stored(member).status()).isEqualTo(ConnectionStatus.PENDING);
     }
 
