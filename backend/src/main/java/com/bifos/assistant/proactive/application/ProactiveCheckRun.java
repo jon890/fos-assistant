@@ -145,6 +145,7 @@ public class ProactiveCheckRun implements CheckTurn {
     private volatile CheckOutcome outcome;
     /** 결과 블록을 읽지 못한 까닭. {@link #outcome} 이 {@code INVALID_RESULT} 일 때만 있다. */
     private volatile CheckInvalidReason invalidReason;
+
     private volatile int newFindings;
     private volatile int referenceFindings;
     /** 검사한 발견. 답 메시지를 저장한 뒤 {@link #saveFindings} 가 저장한다. 블록에 발견이 없으면 비어 있다. */

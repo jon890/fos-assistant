@@ -154,13 +154,15 @@ class CheckResultParserTest {
     @DisplayName("태그 밖의 서식 문자는 무시하지 않는다")
     void keepsFormatCharactersOutsideTags() {
         assertInvalid(block("\uFEFF" + VALID_JSON), CheckInvalidReason.NOT_JSON);
-        assertInvalid("<fos-check-result >\n" + VALID_JSON + "\n" + CheckResultParser.CLOSE_TAG, CheckInvalidReason.NO_BLOCK);
+        assertInvalid(
+                "<fos-check-result >\n" + VALID_JSON + "\n" + CheckResultParser.CLOSE_TAG, CheckInvalidReason.NO_BLOCK);
     }
 
     @Test
     @DisplayName("NOTHING_NEW 는 칸이 모두 비어도 읽는다")
     void parsesNothingNewWithoutOtherFields() {
-        CheckResultBlock result = parser.read(block("{\"version\": 1, \"outcome\": \"NOTHING_NEW\"}")).block();
+        CheckResultBlock result = parser.read(block("{\"version\": 1, \"outcome\": \"NOTHING_NEW\"}"))
+                .block();
 
         assertThat(result.outcome()).isEqualTo(CheckOutcome.NOTHING_NEW);
         assertThat(result.summary()).isNull();
