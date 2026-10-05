@@ -21,7 +21,7 @@
 
 | 경로 | 하는 일 |
 | --- | --- |
-| `GET /api/v1/agents/{code}/proactive-check` | 살펴보기를 할 수 있는지, 막는 까닭, 점검 대화의 공개 식별자, 마지막 살펴보기를 준다 |
+| `GET /api/v1/agents/{code}/proactive-check` | 살펴보기를 할 수 있는지, 막는 까닭, 점검 대화의 공개 식별자, 마지막 살펴보기를 준다. 마지막 살펴보기에는 상태, 결과, 읽지 못한 까닭(`invalidReason`), 시작과 끝 시각만 싣는다 |
 | `POST /api/v1/agents/{code}/proactive-check/runs` | 살펴보기를 시작하고 202 와 점검 대화의 공개 식별자를 준다. 결과는 그 대화의 SSE 와 이력으로 온다 |
 
 두 경로 모두 요청자가 그 에이전트로 대화를 시작할 수 있어야 한다(`AgentService.requireStartable`). 아니면 `AGENT_NOT_FOUND` 다.
