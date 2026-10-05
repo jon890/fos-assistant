@@ -304,9 +304,11 @@ export function Composer({
   }, [blocking, onBlockingChange]);
 
   function updateItem(key: string, patch: Partial<AttachmentItem>) {
-    setItems((previous) =>
-      previous.map((item) => (item.key === key ? { ...item, ...patch } : item)),
+    const updated = itemsRef.current.map((item) =>
+      item.key === key ? { ...item, ...patch } : item,
     );
+    itemsRef.current = updated;
+    setItems(updated);
   }
 
   async function ensureConversationId(): Promise<string | null> {
@@ -368,29 +370,21 @@ export function Composer({
     }
   }
 
-  async function uploadOne(file: File, targetConversationId: string) {
-    const key = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
-    let previewUrl = "";
-    try {
-      previewUrl = await buildThumbnail(file);
-    } catch {
-      previewUrl = "";
-    }
-    if (!mountedRef.current) {
-      if (previewUrl) URL.revokeObjectURL(previewUrl);
-      return;
-    }
-    setItems((previous) => [
-      ...previous,
-      {
-        key,
-        previewUrl,
-        status: "uploading",
-        attachmentId: null,
-        errorMessage: null,
-        conversationId: targetConversationId,
-      },
-    ]);
+  async function uploadOne(
+    file: File,
+    targetConversationId: string,
+    key: string,
+  ) {
+    const thumbnail = buildThumbnail(file).catch(() => "");
+    void thumbnail.then((previewUrl) => {
+      if (!previewUrl) return;
+      const item = itemsRef.current.find((candidate) => candidate.key === key);
+      if (!mountedRef.current || !item || pendingRemovalRef.current.has(key)) {
+        URL.revokeObjectURL(previewUrl);
+        return;
+      }
+      updateItem(key, { previewUrl });
+    });
 
     try {
       const form = new FormData();
@@ -473,8 +467,20 @@ export function Composer({
     const targetConversationId = await ensureConversationId();
     if (targetConversationId === null || !mountedRef.current) return;
 
-    for (const file of toUpload) {
-      void uploadOne(file, targetConversationId);
+    const newItems = toUpload.map(() => ({
+      key: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+      previewUrl: "",
+      status: "uploading" as const,
+      attachmentId: null,
+      errorMessage: null,
+      conversationId: targetConversationId,
+    }));
+    const nextItems = [...itemsRef.current, ...newItems];
+    itemsRef.current = nextItems;
+    setItems(nextItems);
+
+    for (let index = 0; index < toUpload.length; index++) {
+      void uploadOne(toUpload[index]!, targetConversationId, newItems[index]!.key);
     }
   }
 

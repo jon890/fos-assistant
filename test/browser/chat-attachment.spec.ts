@@ -76,6 +76,85 @@ test("미리보기의 지우는 단추를 누르면 그 사진만 빠진다", as
   await expect(items).toHaveCount(1);
 });
 
+test("썸네일과 upload 응답이 거꾸로 끝나도 고른 순서로 미리보기와 전송 목록을 유지한다", async ({
+  page,
+}, testInfo) => {
+  await page.addInitScript(() => {
+    const original = window.createImageBitmap.bind(window);
+    const delayByName: Record<string, number> = {
+      "first.png": 300,
+      "second.png": 200,
+      "third.png": 100,
+    };
+    window.createImageBitmap = async (image, options) => {
+      const name = image instanceof File ? image.name : "";
+      const delay = delayByName[name];
+      if (delay) await new Promise((resolve) => window.setTimeout(resolve, delay));
+      return original(image, options);
+    };
+  });
+  await openNewConversation(page, testInfo);
+
+  const releaseUploads = new Map<string, () => void>();
+  const attachmentIds = new Map<string, number>();
+  const completedNames: string[] = [];
+  page.on("response", async (response) => {
+    if (
+      response.request().method() !== "POST" ||
+      !/\/api\/chat\/conversations\/[^/]+\/attachments$/.test(response.url()) ||
+      !response.ok()
+    ) {
+      return;
+    }
+    const name = response.request().postData()?.match(/filename="([^"]+)"/)?.[1];
+    if (!name) return;
+    attachmentIds.set(name, ((await response.json()) as { id: number }).id);
+    completedNames.push(name);
+  });
+  await page.route("**/api/chat/conversations/*/attachments", async (route) => {
+    if (route.request().method() !== "POST") {
+      await route.continue();
+      return;
+    }
+    const name = route.request().postData()?.match(/filename="([^"]+)"/)?.[1];
+    if (!name) throw new Error("첨부 파일 이름을 읽지 못했어요.");
+    await new Promise<void>((resolve) => releaseUploads.set(name, resolve));
+    await route.continue();
+  });
+
+  try {
+    await page.getByTestId("attachment-input").setInputFiles([
+      pngFile("first.png"),
+      pngFile("second.png"),
+      pngFile("third.png"),
+    ]);
+    await expect(page.getByTestId("attachment-previews").locator("> div")).toHaveCount(3);
+    await expect.poll(() => releaseUploads.size).toBe(3);
+    for (const name of ["third.png", "second.png", "first.png"]) {
+      releaseUploads.get(name)?.();
+      await expect.poll(() => attachmentIds.has(name)).toBe(true);
+    }
+    await expect(page.getByTestId("attachment-uploading")).toHaveCount(0);
+    await expect.poll(() => attachmentIds.size).toBe(3);
+
+    const sent = page.waitForRequest(
+      (request) => /\/api\/chat(\/stream)?$/.test(request.url()) && request.method() === "POST",
+    );
+    await page.getByRole("textbox", { name: "메시지" }).fill("순서 검사");
+    await page.getByRole("button", { name: "보내기" }).click();
+    const body = (await sent).postDataJSON() as { attachmentIds: number[] };
+
+    expect(body.attachmentIds).toEqual([
+      attachmentIds.get("first.png"),
+      attachmentIds.get("second.png"),
+      attachmentIds.get("third.png"),
+    ]);
+    expect(completedNames).toEqual(["third.png", "second.png", "first.png"]);
+  } finally {
+    await page.unroute("**/api/chat/conversations/*/attachments");
+  }
+});
+
 test("지운 첨부는 서버 상한을 계속 차지하지 않아 지운 뒤 다시 30장을 올릴 수 있다", async ({
   page,
 }, testInfo) => {

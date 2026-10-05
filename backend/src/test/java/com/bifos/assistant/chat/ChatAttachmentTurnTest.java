@@ -192,15 +192,18 @@ class ChatAttachmentTurnTest {
     }
 
     @Test
-    @DisplayName("사진 서른 장을 붙이면 Hermes 입력에 모든 순번과 이름이 있고 저장한 본문은 그대로다")
-    void hermesInputWithThirtyImagesHasAllOrdinalsAndNamesAndStoresBodyAsIs() {
+    @DisplayName("사진 서른 장을 붙이면 Hermes와 다시 생성 입력과 말풍선이 선택 순서를 지킨다")
+    void thirtyImagesKeepSelectedOrderInHermesRegenerationAndMessageBubble() {
         Long conversationId = chat.startEmpty(dad, "dad").id();
+        assertThat(properties.maxFiles()).isEqualTo(30);
         List<ChatAttachment> photos = new ArrayList<>();
-        for (int i = 1; i <= properties.maxFiles(); i++) {
+        for (int i = 1; i <= 30; i++) {
             photos.add(upload(dad, conversationId, "사진-" + i + ".png"));
         }
+        List<ChatAttachment> selected = new ArrayList<>(photos);
+        selected.sort(Comparator.comparing(ChatAttachment::id).reversed());
 
-        chat.send(dad, conversationId, "이 사진 설명해 줘", null, photos.stream().map(ChatAttachment::id).toList());
+        chat.send(dad, conversationId, "이 사진 설명해 줘", null, selected.stream().map(ChatAttachment::id).toList());
 
         String input = stub().received().getFirst().input();
         StringBuilder expected = new StringBuilder(artifactPreamble(conversationId))
@@ -209,8 +212,8 @@ class ChatAttachmentTurnTest {
                 .append("/")
                 .append(conversationId)
                 .append("\n");
-        for (int i = 0; i < photos.size(); i++) {
-            ChatAttachment photo = photos.get(i);
+        for (int i = 0; i < selected.size(); i++) {
+            ChatAttachment photo = selected.get(i);
             expected.append("- ")
                     .append(i + 1)
                     .append("번째 사진: ")
@@ -226,6 +229,13 @@ class ChatAttachmentTurnTest {
                 .append("이 사진 설명해 줘");
         assertThat(input).isEqualTo(expected.toString());
         assertThat(userMessageOf(conversationId).content()).isEqualTo("이 사진 설명해 줘");
+        assertThat(chat.attachmentsByMessage(dad, conversationId).get(userMessageOf(conversationId).id()))
+                .extracting(ChatAttachment::id)
+                .containsExactlyElementsOf(selected.stream().map(ChatAttachment::id).toList());
+
+        chat.regenerate(dad, conversationId, event -> {});
+
+        assertThat(stub().received()).extracting(HermesRunCommand::input).containsExactly(input, input);
     }
 
     @Test

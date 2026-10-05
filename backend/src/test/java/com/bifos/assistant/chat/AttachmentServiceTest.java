@@ -2,6 +2,7 @@ package com.bifos.assistant.chat;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.groups.Tuple.tuple;
 
 import com.bifos.assistant.chat.application.AttachmentContent;
 import com.bifos.assistant.chat.application.AttachmentService;
@@ -140,8 +141,9 @@ class AttachmentServiceTest {
     @Test
     @DisplayName("묶이지 않은 사진 서른 장은 올리고 서른한 번째는 거절한다")
     void acceptsThirtyUnboundImagesAndRejectsTheThirtyFirst() {
+        assertThat(properties.maxFiles()).isEqualTo(30);
         List<Long> ids = new ArrayList<>();
-        for (int i = 0; i < properties.maxFiles(); i++) {
+        for (int i = 0; i < 30; i++) {
             ids.add(upload(OWNER, mine, "image/png", IMAGE).id());
         }
 
@@ -152,7 +154,7 @@ class AttachmentServiceTest {
         tooMany.add(Long.MAX_VALUE);
         assertCode(() -> service.requireAttachable(mine, tooMany), ErrorCode.VALIDATION_FAILED);
 
-        assertThat(attachments.findByConversationIdOrderByIdAsc(mine)).hasSize(properties.maxFiles());
+        assertThat(attachments.findByConversationIdOrderByIdAsc(mine)).hasSize(30);
     }
 
     @Test
@@ -280,6 +282,36 @@ class AttachmentServiceTest {
         assertCode(() -> service.attach(702L, mine, List.of(id)), ErrorCode.VALIDATION_FAILED);
 
         assertThat(attachments.findById(id).orElseThrow().messageId()).isEqualTo(701L);
+    }
+
+    @Test
+    @DisplayName("요청한 첨부 순서가 저장한 position 과 조회 순서가 된다")
+    void storesAndReadsAttachmentsInRequestedOrder() {
+        ChatAttachment first = upload(OWNER, mine, "image/png", IMAGE);
+        ChatAttachment second = upload(OWNER, mine, "image/png", IMAGE);
+        ChatAttachment third = upload(OWNER, mine, "image/png", IMAGE);
+
+        service.attach(701L, mine, List.of(third.id(), first.id(), second.id()));
+
+        assertThat(service.allOf(mine))
+                .extracting(ChatAttachment::id, ChatAttachment::position)
+                .containsExactly(
+                        tuple(third.id(), 0), tuple(first.id(), 1), tuple(second.id(), 2));
+    }
+
+    @Test
+    @DisplayName("뒤 첨부의 조건부 갱신이 실패하면 앞 첨부의 message id 와 position 도 남지 않는다")
+    void rollsBackEarlierAttachmentWhenLaterConditionalUpdateFails() {
+        ChatAttachment first = upload(OWNER, mine, "image/png", IMAGE);
+        ChatAttachment alreadyBound = upload(OWNER, mine, "image/png", IMAGE);
+        service.attach(701L, mine, List.of(alreadyBound.id()));
+
+        assertCode(() -> service.attach(702L, mine, List.of(first.id(), alreadyBound.id())), ErrorCode.VALIDATION_FAILED);
+
+        ChatAttachment reloadedFirst = attachments.findById(first.id()).orElseThrow();
+        assertThat(reloadedFirst.messageId()).isNull();
+        assertThat(reloadedFirst.position()).isZero();
+        assertThat(attachments.findById(alreadyBound.id()).orElseThrow().messageId()).isEqualTo(701L);
     }
 
     private ChatAttachment upload(CurrentUser user, Long conversationId, String contentType, byte[] body) {
