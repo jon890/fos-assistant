@@ -78,6 +78,10 @@ public class AgentAdminService {
         if (!apiBaseUrl.equals(agent.apiBaseUrl())) {
             agent.changeApiBaseUrl(apiBaseUrl);
         }
+        // 비어 있으면 그대로 둔다. 주소나 사용 여부만 고치는 요청이 이 설정을 끄지 않게 한다.
+        if (command.proactiveCheckWritesAllowed() != null) {
+            agent.changeProactiveCheckWritesAllowed(command.proactiveCheckWritesAllowed());
+        }
         return agents.save(agent);
     }
 

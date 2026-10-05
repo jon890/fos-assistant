@@ -455,7 +455,7 @@ class McpArtifactWriteToolTest {
     void artifactWriteInCheckTreeIsRefusedWithoutWriting() throws Exception {
         Conversation conversation = conversations.save(Conversation.startedBy(dad.id(), "", null, Instant.now()));
         ProactiveCheck check =
-                ProactiveCheck.started(dad.id(), 1L, conversation.id(), CheckTrigger.MANUAL, Instant.now());
+                ProactiveCheck.started(dad.id(), 1L, conversation.id(), CheckTrigger.MANUAL, false, Instant.now());
         check.attachRoot(dadRun.id(), dadRoot);
         ProactiveCheck saved = checks.save(check);
         // 결과물 폴더는 디스크에 남아 다른 검사의 대화 번호와 겹칠 수 있으므로 경로를 새로 만든다.
@@ -469,6 +469,42 @@ class McpArtifactWriteToolTest {
             assertThat(result.path("result").path("content").get(0).path("text").asString())
                     .isEqualTo("먼저 살펴보기에서는 쓸 수 없는 도구입니다.");
             assertThat(store.resolveInside(conversation.id(), path)).isEmpty();
+        } finally {
+            checks.delete(saved);
+        }
+    }
+
+    @Test
+    @DisplayName("쓰기 도구를 허용한 먼저 살펴보기 트리의 artifact write 는 점검 대화에만 쓰고 같은 사용자의 다른 대화는 거절한다")
+    void artifactWriteInWritesAllowedCheckTreeWritesOnlyToCheckConversation() throws Exception {
+        Conversation conversation =
+                conversations.save(Conversation.startedForCheck(dad.id(), "먼저 살펴보기 · 시험", null, Instant.now()));
+        Conversation other = conversations.save(Conversation.startedBy(dad.id(), "", null, Instant.now()));
+        ProactiveCheck check =
+                ProactiveCheck.started(dad.id(), 1L, conversation.id(), CheckTrigger.MANUAL, true, Instant.now());
+        check.attachRoot(dadRun.id(), dadRoot);
+        ProactiveCheck saved = checks.save(check);
+        String path = "check-" + UUID.randomUUID() + ".html";
+        try {
+            JsonNode result = body(call(dadToken, conversation.publicId().toString(), path, "<p>x</p>"));
+            JsonNode refused = body(call(dadToken, other.publicId().toString(), path, "<p>y</p>"));
+
+            assertThat(result.path("result").path("isError").asBoolean())
+                    .as("결과: %s", result)
+                    .isFalse();
+            assertThat(Files.readString(
+                            store.resolveInside(conversation.id(), path).orElseThrow()))
+                    .isEqualTo("<p>x</p>");
+            assertThat(refused.path("result").path("isError").asBoolean())
+                    .as("다른 대화의 결과: %s", refused)
+                    .isTrue();
+            assertThat(refused.path("result")
+                            .path("content")
+                            .get(0)
+                            .path("text")
+                            .asString())
+                    .isEqualTo("먼저 살펴보기에서는 쓸 수 없는 도구입니다.");
+            assertThat(store.resolveInside(other.id(), path)).as("다른 대화의 파일").isEmpty();
         } finally {
             checks.delete(saved);
         }

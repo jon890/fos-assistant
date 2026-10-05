@@ -875,6 +875,7 @@ class AgentDelegationServiceTest {
                 agents.findByCode(WORKER).orElseThrow().id(),
                 conversation.id(),
                 CheckTrigger.MANUAL,
+                false,
                 Instant.parse("2026-09-30T00:00:00Z"));
         check.attachRoot(checkTurn.id(), checkTurn.hermesSessionId());
         ending.accept(check);

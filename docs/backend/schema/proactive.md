@@ -22,6 +22,7 @@
 | `error_code` | VARCHAR(64) NULL | `FAILED` 와 `STOPPED` 의 까닭. 상한으로 멈추면 `CHECK_TIME_LIMIT`, `CHECK_TOOL_LIMIT` 이고 사용자가 멈추면 비어 있다. 서버가 도중에 내려가 기동할 때 닫은 줄은 `INTERRUPTED` 다 |
 | `tool_calls` | INT NOT NULL DEFAULT 0 | 살펴보기 turn 이 시작한 도구 호출 수 |
 | `delegations` | INT NOT NULL DEFAULT 0 | 그 트리에서 맡긴 위임 자식 수. 끝날 때 센다 |
+| `writes_allowed` | BOOLEAN NOT NULL DEFAULT FALSE | 시작할 때 옮겨 적은 그 에이전트의 「먼저 살펴보기에 쓰기 도구 허용」 값. 그 살펴보기의 경계를 정한다(ADR-082) |
 | `new_findings` | INT NOT NULL DEFAULT 0 | 「새로 알릴 것」 으로 그린 발견 수 |
 | `reference_findings` | INT NOT NULL DEFAULT 0 | 「참고」 로 내린 발견 수 |
 | `started_at` | DATETIME(6) | |

@@ -13,6 +13,8 @@ export type AdminAgent = {
   flow: string | null;
   /** 연결 화면이 소유하므로 일반 에이전트 편집 화면에서 바꾸지 않는다. */
   connectorManaged: boolean;
+  /** 「먼저 살펴보기에 쓰기 도구 허용」. 관리자만 바꾸고 관리자 응답에만 온다(ADR-082) */
+  proactiveCheckWritesAllowed: boolean;
 };
 
 /** 사용자가 쓸 수 있는 에이전트 한 줄이다. 관리 화면의 `AdminAgent` 보다 정보가 적다. */

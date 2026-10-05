@@ -1319,7 +1319,7 @@ class McpAgentToolsTest {
                 .startedAt(STARTED)
                 .build());
         ProactiveCheck check =
-                ProactiveCheck.started(user.id(), agentId, conversation.id(), CheckTrigger.MANUAL, STARTED);
+                ProactiveCheck.started(user.id(), agentId, conversation.id(), CheckTrigger.MANUAL, false, STARTED);
         check.attachRoot(turn.id(), root);
         createdChecks.add(checks.save(check).id());
         return turn;

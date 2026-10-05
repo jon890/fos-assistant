@@ -110,8 +110,14 @@ public class ProactiveCheckService {
         }
         ProactiveCheck check = null;
         try {
-            check = checks.save(
-                    ProactiveCheck.started(user.id(), agent.id(), conversation.id(), trigger, clock.instant()));
+            // 그 에이전트의 쓰기 허용 값을 지금 옮겨 적는다. 이 살펴보기의 경계는 옮겨 적은 값이 정한다(ADR-082).
+            check = checks.save(ProactiveCheck.started(
+                    user.id(),
+                    agent.id(),
+                    conversation.id(),
+                    trigger,
+                    agent.proactiveCheckWritesAllowed(),
+                    clock.instant()));
             ProactiveCheckRun run = new ProactiveCheckRun(user, agent.id(), check, renewsSession(conversation), deps());
             Thread.ofVirtual()
                     .name("proactive-check-" + conversation.id())

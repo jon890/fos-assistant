@@ -9,5 +9,11 @@ import com.bifos.assistant.agent.domain.type.AgentVisibility;
  *
  * @param ownerEmail 새 주인의 메일 주소. 비어 있으면 지금 주인이 남는다
  * @param apiBaseUrl 새 Hermes API 주소. 비어 있으면 지금 값을 그대로 둔다
+ * @param proactiveCheckWritesAllowed 「먼저 살펴보기에 쓰기 도구 허용」 의 새 값. 비어 있으면 지금 값을 그대로 둔다(ADR-082)
  */
-public record AgentUpdateCommand(Boolean enabled, AgentVisibility visibility, String ownerEmail, String apiBaseUrl) {}
+public record AgentUpdateCommand(
+        Boolean enabled,
+        AgentVisibility visibility,
+        String ownerEmail,
+        String apiBaseUrl,
+        Boolean proactiveCheckWritesAllowed) {}

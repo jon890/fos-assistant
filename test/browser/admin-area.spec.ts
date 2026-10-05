@@ -133,6 +133,36 @@ test("관리자 영역의 에이전트 목록은 등록 양식을 갖고 상세 
   await expect(page.getByTestId("agent-model-section")).toBeVisible();
 });
 
+test("관리 절에서 먼저 살펴보기 쓰기 허용을 켜면 위험 문구가 보이고 새로 고쳐도 남으며 끄면 사라진다", async ({ page }) => {
+  const risk = "켜면 먼저 살펴보기가 셸, 파일, 브라우저, 외부 메시지 같은 관리자 도구를 써서, 웹 결과 속 글이 명령 실행이나 외부 연락으로 이어질 수 있어요";
+  try {
+    await page.goto("/admin/agents/browser");
+    const admin = page.getByRole("region", { name: "관리" });
+    const toggle = admin.getByRole("switch", { name: "먼저 살펴보기에 쓰기 도구 허용" });
+    await expect(toggle).toHaveAttribute("aria-checked", "false");
+    await expect(admin.getByText(risk)).toHaveCount(0);
+
+    await toggle.click();
+    await expect(toggle).toHaveAttribute("aria-checked", "true");
+    await expect(admin.getByText(risk)).toBeVisible();
+
+    // 저장됐는지는 서버에서 다시 읽은 화면으로 본다.
+    await page.reload();
+    await expect(toggle).toHaveAttribute("aria-checked", "true");
+    await expect(admin.getByText(risk)).toBeVisible();
+
+    await toggle.click();
+    await expect(toggle).toHaveAttribute("aria-checked", "false");
+    await expect(admin.getByText(risk)).toHaveCount(0);
+  } finally {
+    // 중간에 실패해도 다른 검사가 쓰는 에이전트를 꺼진 상태로 되돌린다.
+    const restored = await page.request.patch("/api/admin/agents/browser", {
+      data: { enabled: true, visibility: "PRIVATE", ownerEmail: null, proactiveCheckWritesAllowed: false },
+    });
+    expect(restored.ok(), `쓰기 허용을 되돌리지 못했다: ${restored.status()}`).toBeTruthy();
+  }
+});
+
 test("일반 화면의 에이전트 상세에는 관리 절과 모델 절이 없다", async ({ page }) => {
   await page.goto("/agents/browser");
   await expect(page.getByRole("heading", { name: "브라우저 비서" })).toBeVisible();

@@ -30,6 +30,13 @@ public class ProactiveCheckReadiness {
     static final Set<String> ALLOWED_TOOLSETS =
             Set.of("web", "vision", "todo", AgentToolPolicy.SKILLS, AgentToolPolicy.CONTROL_PLANE_MCP);
 
+    /**
+     * 쓰기 도구를 허용한 에이전트(ADR-082)에서도 막는 toolset 이다. {@code delegation} 의 자식과 {@code cronjob} 이 건 예약 작업은
+     * Control Plane 이 세지도 멈추지도 못하고, 예약 작업은 살펴보기가 끝난 뒤에도 돈다. {@code clarify} 는 답할 사람이 없는 실행에서 시간
+     * 상한까지 기다리기만 한다.
+     */
+    static final Set<String> ALWAYS_BLOCKED_TOOLSETS = Set.of("delegation", "clarify", "cronjob");
+
     /** 무엇을 읽고 무엇을 고를지 정하는 분야 지침 스킬의 이름이다. */
     static final String SKILL_NAME = "proactive-check";
 
@@ -50,8 +57,9 @@ public class ProactiveCheckReadiness {
         if (!skills.enabledNames(agent).contains(SKILL_NAME)) {
             blockers.add(CheckBlocker.of(CheckBlockerCode.SKILL_MISSING));
         }
+        boolean writesAllowed = agent.proactiveCheckWritesAllowed();
         List<String> notAllowed = toolsets.readEnabled(agent.apiBaseUrl(), agent.hermesProfile()).stream()
-                .filter(name -> !ALLOWED_TOOLSETS.contains(name))
+                .filter(name -> !allowed(name, writesAllowed))
                 .distinct()
                 .sorted()
                 .toList();
@@ -59,5 +67,19 @@ public class ProactiveCheckReadiness {
             blockers.add(new CheckBlocker(CheckBlockerCode.TOOLSETS_NOT_ALLOWED, notAllowed));
         }
         return new CheckReadiness(blockers);
+    }
+
+    /**
+     * 살펴보기 에이전트에 켜 둘 수 있는 toolset 인가. 쓰기 도구를 허용한 에이전트는 Control Plane 이 아는 toolset 전부와 Control Plane
+     * MCP 를 받고 {@link #ALWAYS_BLOCKED_TOOLSETS} 만 막는다. 모르는 이름(다른 MCP 서버)은 무엇을 하는지 판정하지 못해 막는다.
+     */
+    private static boolean allowed(String name, boolean writesAllowed) {
+        if (!writesAllowed) {
+            return ALLOWED_TOOLSETS.contains(name);
+        }
+        if (ALWAYS_BLOCKED_TOOLSETS.contains(name)) {
+            return false;
+        }
+        return AgentToolPolicy.CONTROL_PLANE_MCP.equals(name) || AgentToolPolicy.isKnown(name);
     }
 }

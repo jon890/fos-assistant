@@ -25,6 +25,19 @@ public record ToolPolicyDecision(
     /** 도구를 선언하지 않는 manifest 판이다. */
     private static final int LEGACY_SCHEMA = 1;
 
+    /** 호출이 먼저 살펴보기 트리 안에 있는지와 그 살펴보기가 쓰기 도구를 허용했는지다. 저장하지 않는다. */
+    public enum CheckBoundary {
+        /** 살펴보기 트리 밖의 호출이다. 보통 판정을 그대로 한다. */
+        NOT_CHECK,
+        /** 읽기 경계의 살펴보기다(ADR-080). 위험도가 {@code READ} 이고 승인 방식이 {@code none} 인 도구만 받는다. */
+        READ_ONLY,
+        /**
+         * 쓰기 도구를 허용한 살펴보기다(ADR-082). 위험도가 {@code READ} 이고 승인 방식이 {@code none} 인 도구는 받고, 나머지는 상시
+         * 허락을 보지 않고 승인 필요로 판정한다.
+         */
+        APPROVAL_ONLY
+    }
+
     /** manifest 를 읽지 못했을 때다. */
     public static ToolPolicyDecision policyUnavailable() {
         return denied(ActionDenyReason.POLICY_UNAVAILABLE, null);
@@ -36,8 +49,7 @@ public record ToolPolicyDecision(
      * @param declared 그 도구의 선언. manifest 에 없으면 빈 값
      * @param granted 그 도구에 유효한 상시 허락이 있는가
      * @param argsBytes 인자 글의 UTF-8 바이트 수
-     * @param readOnlyRun 먼저 살펴보기 트리 안의 호출인가. 참이면 위험도가 {@code READ} 이고 승인 방식이 {@code none} 인
-     *     도구만 받는다(ADR-080)
+     * @param boundary 먼저 살펴보기 트리 안의 호출인지와 그 살펴보기의 경계. 뜻은 {@link CheckBoundary} 가 갖는다
      */
     public static ToolPolicyDecision decide(
             ConnectionStatus connectionStatus,
@@ -46,7 +58,7 @@ public record ToolPolicyDecision(
             Optional<ToolPolicy> declared,
             boolean granted,
             int argsBytes,
-            boolean readOnlyRun) {
+            CheckBoundary boundary) {
         if (connectionStatus != ConnectionStatus.READY) {
             return denied(ActionDenyReason.NOT_READY, null);
         }
@@ -62,11 +74,17 @@ public record ToolPolicyDecision(
         }
         // 살펴보기는 사람이 보지 않는 실행이라 승인 줄을 만들지 않는다. manifest 는 READ 도구에도 required 나 always 를
         // 선언할 수 있어 위험도만 보면 승인 줄이 생기거나 상시 허락으로 통과한다. 그래서 승인 방식까지 본다.
-        if (readOnlyRun && !(policy.risk() == ToolRisk.READ && policy.approval() == ToolApproval.NONE)) {
+        boolean readWithoutApproval = policy.risk() == ToolRisk.READ && policy.approval() == ToolApproval.NONE;
+        if (boundary == CheckBoundary.READ_ONLY && !readWithoutApproval) {
             return denied(ActionDenyReason.READ_ONLY_RUN, policy);
         }
         if (argsBytes > MAX_ARGS_BYTES) {
             return denied(ActionDenyReason.ARGS_TOO_LARGE, policy);
+        }
+        // 쓰기를 허용한 살펴보기도 사람이 보지 않는 실행이라 웹 결과의 글이 쓰기를 부를 수 있다. 상시 허락과 선언의 승인 방식을 보지
+        // 않고 승인 줄로 보내, 사람이 승인해야만 외부에 쓴다(ADR-082). 인자 상한은 승인 줄에 원문을 두므로 그 앞에서 본다.
+        if (boundary == CheckBoundary.APPROVAL_ONLY && !readWithoutApproval) {
+            return new ToolPolicyDecision(ActionDecision.NEEDS_APPROVAL, null, policy.risk(), policy.approval());
         }
         // 선언이 상시 허락을 닫은 도구는 남은 허락을 보지 않는다(ADR-065).
         if (policy.approval() == ToolApproval.NONE

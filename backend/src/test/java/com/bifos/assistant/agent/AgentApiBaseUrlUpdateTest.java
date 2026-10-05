@@ -265,7 +265,7 @@ class AgentApiBaseUrlUpdateTest {
     @DisplayName("그룹 에이전트를 끄는 요청은 도구를 읽지 않는다")
     void skipsToolReadWhenDisablingGroupAgent() {
         AdminAgentView view =
-                controller.update("dad", new UpdateAgentRequest(false, AgentVisibility.GROUP, null, null));
+                controller.update("dad", new UpdateAgentRequest(false, AgentVisibility.GROUP, null, null, null));
 
         assertThat(view.enabled()).isFalse();
         verifyNoInteractions(hermesToolsets);
@@ -306,6 +306,6 @@ class AgentApiBaseUrlUpdateTest {
     }
 
     private static UpdateAgentRequest request(String apiBaseUrl) {
-        return new UpdateAgentRequest(true, AgentVisibility.GROUP, null, apiBaseUrl);
+        return new UpdateAgentRequest(true, AgentVisibility.GROUP, null, apiBaseUrl, null);
     }
 }

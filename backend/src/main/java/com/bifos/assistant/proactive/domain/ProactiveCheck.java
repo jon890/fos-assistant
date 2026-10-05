@@ -80,6 +80,13 @@ public class ProactiveCheck {
     @Column(name = "delegations", nullable = false)
     private int delegations;
 
+    /**
+     * 시작할 때 옮겨 적은 그 에이전트의 「먼저 살펴보기에 쓰기 도구 허용」 이다(ADR-082). 이 살펴보기의 경계는 에이전트 칸이 아니라
+     * 이 값이 정한다. 도중에 에이전트 설정을 바꿔도 한 살펴보기 안에서 경계가 바뀌지 않게 하기 위해서다.
+     */
+    @Column(name = "writes_allowed", nullable = false, updatable = false)
+    private boolean writesAllowed;
+
     @Column(name = "new_findings", nullable = false)
     private int newFindings;
 
@@ -92,18 +99,21 @@ public class ProactiveCheck {
     @Column(name = "finished_at")
     private Instant finishedAt;
 
-    private ProactiveCheck(Long userId, Long agentId, Long conversationId, CheckTrigger trigger, Instant now) {
+    private ProactiveCheck(
+            Long userId, Long agentId, Long conversationId, CheckTrigger trigger, boolean writesAllowed, Instant now) {
         this.userId = userId;
         this.agentId = agentId;
         this.conversationId = conversationId;
         this.trigger = trigger;
+        this.writesAllowed = writesAllowed;
         this.status = CheckStatus.RUNNING;
         this.startedAt = now;
     }
 
+    /** @param writesAllowed 시작하는 지금 그 에이전트의 「먼저 살펴보기에 쓰기 도구 허용」 값 */
     public static ProactiveCheck started(
-            Long userId, Long agentId, Long conversationId, CheckTrigger trigger, Instant now) {
-        return new ProactiveCheck(userId, agentId, conversationId, trigger, now);
+            Long userId, Long agentId, Long conversationId, CheckTrigger trigger, boolean writesAllowed, Instant now) {
+        return new ProactiveCheck(userId, agentId, conversationId, trigger, writesAllowed, now);
     }
 
     /** 살펴보기 turn 의 실행 줄과 그 turn 을 보낸 루트 session 을 적는다. */

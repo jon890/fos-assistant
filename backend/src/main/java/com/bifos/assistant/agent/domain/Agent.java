@@ -111,6 +111,16 @@ public class Agent {
     private boolean connectorAttachments;
 
     /**
+     * 「먼저 살펴보기에 쓰기 도구 허용」 이다. 관리자만 바꾼다(ADR-082).
+     *
+     * <p>참이면 이 에이전트의 먼저 살펴보기가 쓰기 toolset 과 결과물 쓰기를 쓰고 커넥터 쓰기를 승인 카드로 보낸다. 살펴보기는 시작할 때
+     * 이 값을 자기 줄에 옮겨 적고 그 값으로 경계를 정한다. 그래서 도중에 바꿔도 이미 시작한 살펴보기는 바뀌지 않는다.
+     */
+    @Column(name = "proactive_check_writes_allowed", nullable = false)
+    @Getter
+    private boolean proactiveCheckWritesAllowed;
+
+    /**
      * 지운 시각. 비어 있으면 지우지 않았다.
      *
      * <p>행은 지우지 않는다. 대화, 실행, 사용량이 {@code agent_id} 로 이 에이전트의 이름을 읽기 때문이다.
@@ -256,6 +266,11 @@ public class Agent {
 
     public boolean isReadableBy(Long userId) {
         return visibility == AgentVisibility.GROUP || Objects.equals(ownerUserId, userId);
+    }
+
+    /** 「먼저 살펴보기에 쓰기 도구 허용」 을 켜거나 끈다. 관리자 경로만 부른다. */
+    public void changeProactiveCheckWritesAllowed(boolean allowed) {
+        this.proactiveCheckWritesAllowed = allowed;
     }
 
     public void changeAccess(boolean enabled, AgentVisibility visibility, Long ownerUserId) {

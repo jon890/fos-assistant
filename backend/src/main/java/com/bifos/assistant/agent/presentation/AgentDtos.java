@@ -119,9 +119,15 @@ public final class AgentDtos {
      *
      * @param apiBaseUrl 새 Hermes API 주소. 비어 있으면 지금 값을 그대로 둔다. 다른 것만 고치는 요청이
      *     주소를 지우면 안 되기 때문이다
+     * @param proactiveCheckWritesAllowed 「먼저 살펴보기에 쓰기 도구 허용」. 비어 있으면 지금 값을 그대로 둔다. 같은
+     *     까닭이다(ADR-082)
      */
     public record UpdateAgentRequest(
-            @NotNull Boolean enabled, @NotNull AgentVisibility visibility, String ownerEmail, String apiBaseUrl) {}
+            @NotNull Boolean enabled,
+            @NotNull AgentVisibility visibility,
+            String ownerEmail,
+            String apiBaseUrl,
+            Boolean proactiveCheckWritesAllowed) {}
 
     /** 에이전트 API 실행에 켤 toolset 전체다. */
     public record UpdateToolsetsRequest(@NotNull List<@NotBlank String> enabled) {}
@@ -153,6 +159,9 @@ public final class AgentDtos {
      * 관리 화면이 보는 에이전트 한 줄.
      *
      * <p>모델 칸을 두지 않는다. 에이전트 기본 모델은 {@code chat} 의 관리자 경로가 따로 돌려준다(ADR-054).
+     *
+     * @param proactiveCheckWritesAllowed 「먼저 살펴보기에 쓰기 도구 허용」. 관리자 전용 값이라 사용자 응답
+     *     {@link AgentView} 에는 싣지 않는다(ADR-063, ADR-082)
      */
     public record AdminAgentView(
             Long id,
@@ -166,7 +175,8 @@ public final class AgentDtos {
             Long ownerUserId,
             boolean enabled,
             String flow,
-            boolean connectorManaged) {
+            boolean connectorManaged,
+            boolean proactiveCheckWritesAllowed) {
         static AdminAgentView from(Agent agent) {
             return new AdminAgentView(
                     agent.id(),
@@ -180,7 +190,8 @@ public final class AgentDtos {
                     agent.ownerUserId(),
                     agent.enabled(),
                     agent.flow(),
-                    agent.connectorManaged());
+                    agent.connectorManaged(),
+                    agent.proactiveCheckWritesAllowed());
         }
     }
 }

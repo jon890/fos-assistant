@@ -33,6 +33,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
@@ -257,11 +258,12 @@ class McpFollowUpToolTest {
         assertThat(rows()).isEmpty();
     }
 
-    @Test
-    @DisplayName("먼저 살펴보기 트리에서 부르면 쓸 수 없는 도구라는 결과이고 줄이 생기지 않는다")
-    void refusesProposalInCheckTree() throws Exception {
-        ProactiveCheck check =
-                ProactiveCheck.started(dad.id(), 1L, conversation.id(), CheckTrigger.MANUAL, Instant.now());
+    @ParameterizedTest(name = "쓰기 도구 허용 {0}")
+    @ValueSource(booleans = {false, true})
+    @DisplayName("먼저 살펴보기 트리에서 부르면 쓰기 도구를 허용했든 아니든 쓸 수 없는 도구라는 결과이고 줄이 생기지 않는다")
+    void refusesProposalInCheckTree(boolean writesAllowed) throws Exception {
+        ProactiveCheck check = ProactiveCheck.started(
+                dad.id(), 1L, conversation.id(), CheckTrigger.MANUAL, writesAllowed, Instant.now());
         check.attachRoot(dadRun.id(), dadRoot);
         ProactiveCheck saved = checks.save(check);
         try {

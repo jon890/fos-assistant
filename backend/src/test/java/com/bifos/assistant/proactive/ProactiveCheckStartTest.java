@@ -238,6 +238,25 @@ class ProactiveCheckStartTest {
     }
 
     @Test
+    @DisplayName("쓰기 허용을 켠 에이전트는 terminal 이 켜져 있어도 202 로 시작하고 살펴보기 줄에 그 값을 옮겨 적는다")
+    void startsWithTerminalWhenWritesAllowed() throws Exception {
+        agent.changeProactiveCheckWritesAllowed(true);
+        agent = agents.save(agent);
+        when(toolsets.readEnabled(anyString(), anyString())).thenReturn(List.of("web", "skills", "terminal", "file"));
+
+        started();
+        awaitIdle(checkConversation().id());
+
+        Conversation conversation = checkConversation();
+        assertThat(checks.findAll().stream()
+                        .filter(check -> check.conversationId().equals(conversation.id()))
+                        .map(ProactiveCheck::writesAllowed)
+                        .toList())
+                .as("살펴보기 줄의 쓰기 허용 값")
+                .containsExactly(true);
+    }
+
+    @Test
     @DisplayName("사용자 자리가 없으면 409 USER_BUSY 이고 새 점검 대화가 남지 않는다")
     void rejectsUserBusyWithoutLeavingConversation() throws Exception {
         Conversation first = conversations.save(Conversation.startedBy(owner.id(), "첫 대화", agent.id(), Instant.now()));

@@ -46,6 +46,9 @@ import com.bifos.assistant.hermes.dto.ConnectorTool;
 import com.bifos.assistant.mcp.McpCallSigner;
 import com.bifos.assistant.mcp.infra.AgentTokenRepository;
 import com.bifos.assistant.orchestration.application.DelegationProperties;
+import com.bifos.assistant.proactive.domain.ProactiveCheck;
+import com.bifos.assistant.proactive.domain.type.CheckTrigger;
+import com.bifos.assistant.proactive.infra.ProactiveCheckRepository;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.shared.error.ApiException;
@@ -73,8 +76,10 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Stream;
 import org.assertj.core.api.ThrowableAssert.ThrowingCallable;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -162,8 +167,13 @@ class ConnectorActionServiceTest {
     @Autowired
     JdbcTemplate jdbc;
 
+    @Autowired
+    ProactiveCheckRepository checks;
+
     @MockitoBean
     HermesConnectorClient connector;
+
+    private final List<Long> createdChecks = new ArrayList<>();
 
     private AppUser owner;
     private CurrentUser me;
@@ -266,6 +276,53 @@ class ConnectorActionServiceTest {
         assertThat(row.executedAt()).isNotNull();
         assertThat(grants.findAll()).isEmpty();
         assertThat(recorder.seen).containsExactly(new Seen(new ConnectorActionChanged(CONVERSATION, actionId), false));
+    }
+
+    @AfterEach
+    void tearDown() {
+        checks.deleteAllById(createdChecks);
+        createdChecks.clear();
+    }
+
+    @Test
+    @DisplayName("쓰기를 허용한 살펴보기 트리의 승인 줄을 승인하면 EXECUTING 을 거쳐 저장한 인자로 커넥터 서버에 한 번 닿는다")
+    void approvingActionFromWritesAllowedCheckExecutesOnce() {
+        UUID actionId = askInWritesAllowedCheck(WRITE, ARGS).actionId();
+        assertThat(onlyAction().status()).as("승인 전").isEqualTo(ActionStatus.PENDING);
+        AtomicReference<String> statusWhileExecuting = new AtomicReference<>();
+        when(connector.execute(anyString(), anyString(), anyString(), anyString()))
+                .thenAnswer(call -> {
+                    statusWhileExecuting.set(jdbc.queryForObject("SELECT status FROM connector_action", String.class));
+                    return CallResult.success(JSON.readTree("{\"saved\":true}"));
+                });
+
+        ConnectorActionView approved = service.approve(me, actionId, null);
+
+        verify(connector, times(1)).execute(PROFILE, DEMO, "mcp__demo__write_note", ARGS);
+        assertThat(statusWhileExecuting.get()).as("실행하는 동안의 상태").isEqualTo("EXECUTING");
+        assertThat(approved.status()).isEqualTo(ActionStatus.SUCCEEDED);
+        assertThat(onlyAction().status()).isEqualTo(ActionStatus.SUCCEEDED);
+    }
+
+    @Test
+    @DisplayName("쓰기를 허용한 살펴보기 트리의 READ 와 always 승인 줄은 기간을 실은 승인이 VALIDATION_FAILED 이고 기간 없이 승인하면 한 번 실행한다")
+    void grantOnAlwaysReadToolFromCheckIsRejectedAndPlainApprovalExecutes() {
+        catalogBecomes(manifest(List.of(
+                new ConnectorTool("list_scopes", "READ", "none", null, null),
+                new ConnectorTool("peek_scope", "READ", "always", "범위 엿보기", null))));
+        UUID actionId = askInWritesAllowedCheck("peek_scope", ARGS).actionId();
+
+        assertThat(actionId).as("승인 줄 번호").isNotNull();
+        assertThat(service.listForConversation(me, CONVERSATION))
+                .extracting(ConnectorActionView::actionId, ConnectorActionView::grantAllowed)
+                .containsExactly(tuple(actionId, false));
+        assertCode(() -> service.approve(me, actionId, GrantPeriod.HOUR), ErrorCode.VALIDATION_FAILED);
+        assertThat(onlyAction().status()).isEqualTo(ActionStatus.PENDING);
+        assertThat(grants.findAll()).isEmpty();
+        verify(connector, never()).execute(anyString(), anyString(), anyString(), anyString());
+
+        assertThat(service.approve(me, actionId, null).status()).isEqualTo(ActionStatus.SUCCEEDED);
+        verify(connector, times(1)).execute(PROFILE, DEMO, "mcp__demo__peek_scope", ARGS);
     }
 
     @Test
@@ -1139,6 +1196,42 @@ class ConnectorActionServiceTest {
     /** 루트 session 에서 부른 새 호출 하나의 판정을 묻는다. */
     private ConnectorPolicyAnswer ask(String tool, String args) {
         return policies.decide(PROFILE, root, root, "call_" + UUID.randomUUID(), "mcp__demo__" + tool, tool, args);
+    }
+
+    /**
+     * 쓰기 도구를 허용한 살펴보기 turn 을 루트로 둔 커넥터 에이전트의 위임 실행을 만들고, 그 실행에서 부른 새 호출 하나를 판정한다.
+     */
+    private ConnectorPolicyAnswer askInWritesAllowedCheck(String tool, String args) {
+        Instant started = Instant.parse("2026-10-01T00:00:00Z");
+        AgentExecution checkTurn = executions.save(AgentExecution.builder()
+                .userId(owner.id())
+                .conversationId(CONVERSATION)
+                .profileName(PROFILE)
+                .hermesSessionId("fos-" + UUID.randomUUID())
+                .costMode(CostMode.SUBSCRIPTION)
+                .status(ExecutionStatus.RUNNING)
+                .startedAt(started)
+                .build());
+        ProactiveCheck check =
+                ProactiveCheck.started(owner.id(), agent.id(), CONVERSATION, CheckTrigger.MANUAL, true, started);
+        check.attachRoot(checkTurn.id(), checkTurn.hermesSessionId());
+        createdChecks.add(checks.save(check).id());
+        String childRoot = "fos-" + UUID.randomUUID();
+        executions.save(AgentExecution.builder()
+                .userId(owner.id())
+                .agentId(agent.id())
+                .conversationId(CONVERSATION)
+                .parentExecutionId(checkTurn.id())
+                .rootExecutionId(checkTurn.id())
+                .delegationKey("check-" + UUID.randomUUID())
+                .profileName(PROFILE)
+                .hermesSessionId(childRoot)
+                .costMode(CostMode.SUBSCRIPTION)
+                .status(ExecutionStatus.RUNNING)
+                .startedAt(started)
+                .build());
+        return policies.decide(
+                PROFILE, childRoot, childRoot, "call_" + UUID.randomUUID(), "mcp__demo__" + tool, tool, args);
     }
 
     /** 카탈로그를 바꾸고, 다음 판정이 다시 읽게 보관 시간보다 멀리 옮긴다. */

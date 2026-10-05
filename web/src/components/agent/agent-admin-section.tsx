@@ -6,11 +6,16 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Notice } from "@/components/ui/notice";
+import { Switch } from "@/components/ui/switch";
 import { describeAdminError } from "@/components/error-message";
 import type { AdminAgent } from "@/lib/agent";
 import { updateAdminAgent } from "@/lib/agent-api";
 
-type AgentAction = "enabled" | "address";
+type AgentAction = "enabled" | "address" | "writes";
+
+/** 「먼저 살펴보기에 쓰기 도구 허용」 을 켰을 때 보이는 위험 안내다. 글은 docs/frontend/structure.md 의 관리 절과 같다. */
+const WRITES_RISK =
+  "켜면 먼저 살펴보기가 셸, 파일, 브라우저, 외부 메시지 같은 관리자 도구를 써서, 웹 결과 속 글이 명령 실행이나 외부 연락으로 이어질 수 있어요";
 
 type Props = {
   initialAgent: AdminAgent;
@@ -33,7 +38,9 @@ export function AgentAdminSection({ initialAgent, visibility }: Props) {
   const busy = pending !== null;
 
   async function update(
-    changes: Partial<Pick<AdminAgent, "enabled" | "apiBaseUrl">>,
+    changes: Partial<
+      Pick<AdminAgent, "enabled" | "apiBaseUrl" | "proactiveCheckWritesAllowed">
+    >,
     action: AgentAction,
   ): Promise<void> {
     setPending(action);
@@ -45,6 +52,8 @@ export function AgentAdminSection({ initialAgent, visibility }: Props) {
         // 공개 범위와 주인은 바꾸지 않는다. 주인을 비워 보내 기존 주인을 그대로 둔다.
         ownerEmail: null,
         apiBaseUrl: changes.apiBaseUrl,
+        // 비워 보내면 서버가 지금 값을 둔다. 이 칸을 바꿀 때만 싣는다.
+        proactiveCheckWritesAllowed: changes.proactiveCheckWritesAllowed,
       });
       if (!response.ok) {
         const result = await payload<{ code: string; message: string }>(
@@ -117,6 +126,34 @@ export function AgentAdminSection({ initialAgent, visibility }: Props) {
           주소 저장
         </Button>
       </form>
+      {agent.connectorManaged ? null : (
+        <div className="mt-4">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <p className="text-sm font-medium">
+                먼저 살펴보기에 쓰기 도구 허용
+              </p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                연결한 서비스에 쓰는 일은 켜도 사용자 승인을 기다려요.
+              </p>
+            </div>
+            <Switch
+              checked={agent.proactiveCheckWritesAllowed}
+              loading={pending === "writes"}
+              disabled={busy}
+              aria-label="먼저 살펴보기에 쓰기 도구 허용"
+              onCheckedChange={(next) =>
+                void update({ proactiveCheckWritesAllowed: next }, "writes")
+              }
+            />
+          </div>
+          {agent.proactiveCheckWritesAllowed ? (
+            <Notice variant="warning" className="mt-2">
+              {WRITES_RISK}
+            </Notice>
+          ) : null}
+        </div>
+      )}
       <div className="mt-4 flex flex-wrap gap-2">
         <Button
           size="sm"
