@@ -104,7 +104,7 @@ Adding a user is a single decision by an administrator, and it must not slow any
 
 ## What it does
 
-- **Connectors with approval.** Register a personal token for an outside service and use an agent dedicated to it. A call that writes to that service runs only after you approve it, once, with exactly the arguments you approved.
+- **Connectors with approval.** A connector hands an agent the tools of an outside service and widens what that agent can do. Connect your account once, then attach that connection to any of your private agents, and the agent calls the service's tools directly. A call that writes to that service runs only after you approve it, once, with exactly the arguments you approved.
 - **Delegation.** One request can fan out to several agents, and the child runs still execute with the requester's permissions only.
 - **Agents you build and share.** Create an agent from the web UI, write its persona, and choose its tools. Publish it to your group and others can talk to it, while each person's memory and conversations stay private.
 - **Skills and `/commands`.** Upload skills to an agent and call one directly by typing `/` in the composer.

@@ -30,6 +30,9 @@ Hermes Agent 를 Agent Runtime 으로 두고 이 저장소는 Control Plane 과 
 | #161 의 Living View | **지금 화면**, 주소는 `/now` | Living View |
 | `notification` 표의 줄. 알림 단추와 알림 화면에 보이는 것 | **알림** | 알림 줄 |
 | 대화 안에 끼우는 안내 줄(`SYSTEM` 메시지) | **알림 줄** | |
+| 에이전트에게 쥐어 주는 도구 묶음. plugin 의 `connector.json` 이 선언한다 | **커넥터** | 커넥터 에이전트(옮겨 가기 설명 밖) |
+| 사용자가 커넥터 하나에 계정을 연결한 것 | **연결**, 코드는 `connector_connection` | |
+| 에이전트에 연결을 붙인 것 | **바인딩**, 화면에서는 「붙이기」, 코드는 `agent_connector_binding` | |
 
 `MEMBER` 는 코드의 값이므로 그대로 쓰되, 사람을 가리킬 때는 쓰지 않는다.
 

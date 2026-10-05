@@ -58,7 +58,7 @@ Memory 항목과 그 판, 그룹의 collection 목록, 에이전트가 받는 co
 | 되돌린 동안 옛 코드가 한 일 | 다시 올리면 | 맞추는 것 |
 | --- | --- | --- |
 | `always_inject` 를 참으로 만들거나 고쳤다 | `retrieval` 이 `SEARCH` 로 남아 항상 층에서 색인으로 내려간다 | `always_inject` 가 참이고 `retrieval` 이 `SEARCH` 인 줄을 `ALWAYS` 로, 거짓이고 `ALWAYS` 인 줄을 `SEARCH` 로 고친다 |
-| 에이전트를 만들었다 | `agent_memory_collection` 에 줄이 없어 그 에이전트가 Memory 를 받지 않는다 | 줄이 하나도 없고 커넥터 에이전트가 아닌 에이전트에 `core` 를 넣는다 |
+| 에이전트를 만들었다 | `agent_memory_collection` 에 줄이 없어 그 에이전트가 Memory 를 받지 않는다 | 줄이 하나도 없고 옛 커넥터 에이전트가 아닌 에이전트에 `core` 를 넣는다 |
 | Memory 를 고치거나 지웠다 | `memory_revision` 에 그 판이 없다 | 맞출 수 없다. 그 사이의 이력은 비어 있다 |
 
 근거는 [ADR-003](../../adr/ADR-003-memory-권한은-주입으로-강제한다.md), [ADR-012](../../adr/ADR-012-memory-는-사람이-승인한-것만-남는다.md),
@@ -122,4 +122,4 @@ Memory 항목과 그 판, 그룹의 collection 목록, 에이전트가 받는 co
 | `created_at` | DATETIME(6) | |
 
 **줄이 하나도 없는 에이전트는 Memory 를 받지 않는다.**
-에이전트를 처음 저장할 때 `core` 한 줄을 민감 허용 없이 넣는다. 커넥터 에이전트에는 넣지 않고, 줄이 있어도 커넥터 에이전트는 받지 않는다.
+에이전트를 처음 저장할 때 `core` 한 줄을 민감 허용 없이 넣는다. 옛 커넥터 에이전트에는 넣지 않고, 줄이 있어도 옛 커넥터 에이전트는 받지 않는다.

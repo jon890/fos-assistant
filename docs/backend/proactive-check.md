@@ -48,7 +48,7 @@
 | 까닭 코드 | 조건 | 화면이 보이는 것 |
 | --- | --- | --- |
 | `DISABLED` | 설정으로 꺼 두었다 | 지금은 살펴보기를 쓸 수 없다는 안내 |
-| `AGENT_NOT_SUPPORTED` | 커넥터 에이전트이거나 흐름이 붙은 에이전트다 | 이 에이전트는 살펴보기를 하지 않는다는 안내 |
+| `AGENT_NOT_SUPPORTED` | 옛 커넥터 에이전트이거나 흐름이 붙은 에이전트다 | 이 에이전트는 살펴보기를 하지 않는다는 안내 |
 | `SKILL_MISSING` | 켜진 스킬에 `proactive-check` 가 없다 | 그 스킬을 설치하거나 켜야 한다는 안내 |
 | `TOOLSETS_NOT_ALLOWED` | 켜진 toolset 에 허용 목록 밖의 것이 있다. `toolsets` 에 그 이름들을 싣는다 | 끌 toolset 의 이름. 화면은 `lib/toolset-label.ts` 의 한국어 이름으로 보인다 |
 
@@ -189,7 +189,7 @@ session 을 새로 바꾼 뒤에도 최근에 알린 발견과 변화 신호는 
 그 실행의 트리 루트(`AgentExecution.treeRootId()`)가 `proactive_check.root_execution_id` 에 있으면 참이다.
 살펴보기 turn 이 붙은 커넥터 서버의 도구를 직접 부르면 그 호출의 트리 루트가 살펴보기 turn 자신이고, 옛 커넥터 에이전트의 실행은 위임 자식이라 루트가 살펴보기 turn 이다. 그래서 커넥터 판정은 두 경우를 같은 기준으로 막는다.
 
-커넥터 에이전트는 Memory 를 받지 않는다([ADR-045](../adr/ADR-045-커넥터-에이전트는-자기-mcp-서버만-받고-memory-와-control-plane-도구를-받지-않는다.md)). 개인화는 살펴보기를 도는 일반 에이전트가 하고, 커넥터에는 필요한 질의만 간다.
+옛 커넥터 에이전트는 Memory 를 받지 않는다([ADR-045](../adr/ADR-045-커넥터-에이전트는-자기-mcp-서버만-받고-memory-와-control-plane-도구를-받지-않는다.md)). 개인화는 살펴보기를 도는 일반 에이전트가 하고, 커넥터에는 필요한 질의만 간다.
 
 ## 상한
 
@@ -202,7 +202,7 @@ session 을 새로 바꾼 뒤에도 최근에 알린 발견과 변화 신호는 
 **상한 중지가 실패하면 멈춘 까닭을 되돌리고 다시 시도한다.** `ChatService.stop` 이 예외로 끝나면(`HERMES_UNAVAILABLE` 따위) 정한 까닭을 비우고 1초 뒤 다시 멈춘다. 도구 상한은 다음 `tool.started` 에서도 다시 시도한다. 시도는 한 살펴보기에 3번까지다.
 까닭이 비어 있는 동안 turn 이 예외로 끝나면 상한으로 멈춘 것(`STOPPED`, `CHECK_*_LIMIT`)이 아니라 그 오류 코드의 `FAILED` 로 적는다. 멈추지 못한 turn 을 상한으로 멈췄다고 적지 않기 위해서다.
 
-도구 호출 수는 살펴보기 turn 자신의 `tool.started` 만 센다. 커넥터 에이전트 안의 호출은 그 자식 실행의 몫이고, 위임 수와 `hermes.run-timeout` 이 묶는다.
+도구 호출 수는 살펴보기 turn 자신의 `tool.started` 만 센다. 옛 커넥터 에이전트 안의 호출은 그 자식 실행의 몫이고, 위임 수와 `hermes.run-timeout` 이 묶는다.
 **시간 상한은 `hermes.run-timeout` 보다 짧아야 한다.** 기동할 때 검사하고 아니면 뜨지 않는다.
 
 ### 설정

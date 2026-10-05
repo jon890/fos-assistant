@@ -1,10 +1,26 @@
 # 커넥터 연결
 
-사용자는 「연결」 화면에서 외부 서비스의 개인 토큰을 넣어 그 서비스 전용 에이전트를 만든다.
-연결은 사용자별 전용 profile 과 비공개 에이전트를 갖는다([ADR-039](adr/ADR-039-외부-서비스-연결은-사용자별-전용-에이전트로-실행한다.md)).
+**커넥터는 에이전트에게 도구를 쥐어 주는 것이고, 에이전트의 역할을 넓혀 주는 것이다.**
+커넥터는 따로 도는 실행 주체가 아니라 에이전트가 쓰는 외부 서비스의 MCP 도구 묶음이다([ADR-083](adr/ADR-083-커넥터는-사용자가-한-번-연결하고-자기-에이전트에-여럿-붙여-그-에이전트가-도구를-직접-부른다.md)).
+
+사용자는 「연결」 화면에서 커넥터마다 계정을 한 번 연결한다. 이것이 **연결**이고 사용자와 커넥터마다 하나다.
+그 연결을 자기 에이전트의 상세에서 붙이고 뗀다. 이것이 **바인딩**이고 에이전트와 연결은 다대다다. 화면에서는 「붙이기」 와 「떼기」 라 쓴다.
+붙인 에이전트는 그 커넥터의 도구를 같은 turn 에서 직접 부른다. 붙이고 반영하는 순서는 [커넥터 설치](backend/connector-install.md) 가 갖는다.
 어떤 커넥터가 있고 무엇을 입력받는지는 plugin 의 `connector.json` 이 선언하고, Control Plane 은 서비스 이름과 주소를 모른다([ADR-043](adr/ADR-043-커넥터는-plugin-의-connector-json-으로-선언하고-control-plane-은-범용-흐름만-갖는다.md)).
 임의 plugin 을 설치하는 화면은 없다. 연결할 수 있는 커넥터는 운영자가 대시보드 plugin 에 준 목록뿐이다.
 이 저장소가 갖는 범용 커넥터는 `hermes/connectors/` 에 있고([ADR-064](adr/ADR-064-범용-커넥터는-이-저장소의-hermes-connectors-에-두고-저장소가-유지보수한다.md)), 만드는 방법은 [커넥터 만들기](connector-authoring.md) 가 갖는다.
+
+## 언제 에이전트를 나누는가
+
+**기본은 한 에이전트에 연결을 여럿 붙인다.**
+역할을 격리하거나 나눠야 할 때만 일반 에이전트를 하나 더 만들어 그쪽에만 붙이고, 다른 에이전트는 `agent_delegate` 로 그 에이전트에 맡긴다.
+커넥터를 위한 특별한 에이전트 종류는 만들지 않는다.
+
+1. **터미널이나 파일 계열 도구가 켜진 에이전트에는 외부 글이 들어오는 커넥터(예: 메일)를 붙이지 않기를 권한다.** 그 조합에서는 외부 글의 숨은 지시가 모델을 속여 승인 카드를 비켜 갈 수 있다. 근거는 ADR-083 의 「감당할 것」 이고, 붙이는 화면의 위험 안내도 같은 근거로 띄운다
+2. **붙인 커넥터의 도구 정의 때문에 입력이 크게 늘면 나눈다.** 도구 정의는 그 에이전트의 모든 turn 에 실린다. 에이전트 상세의 연결 목록이 보이는 도구 수를 기준으로 삼는다
+3. **그룹에 공개할 에이전트는 따로 둔다.** 연결은 비공개 에이전트에만 붙고, 연결이 붙은 에이전트는 그룹에 공개하지 못한다
+4. **성격, Memory, 대화 맥락을 따로 두고 싶을 때 나눈다**
+5. **나눈다고 비밀값이 격리되지는 않는다.** profile 을 나눠도 파일 접근은 나뉘지 않는다. 터미널 도구를 가진 에이전트는 다른 profile 의 `.env` 와 보관 파일에 닿는다. 실행 공간의 격리는 이슈 #190 이 다룬다
 
 ## connector.json
 
@@ -39,7 +55,7 @@ plugin 디렉터리 root 에 둔다. 소유는 그 plugin 의 저장소다. 같�
 | --- | --- |
 | `schema` | `1` 이나 `2`. `2` 는 [커넥터 도구 정책](backend/connector-tool-policy.md) 의 「도구 정책」 이 적은 `tools` 를 선언한다 |
 | `id` | 커넥터 번호. `^[a-z0-9][a-z0-9-]{0,63}$`. 운영 목록의 이름과 같아야 한다 |
-| `title`, `description` | 화면에 그대로 보인다. 전용 에이전트의 이름은 `title` 이다 |
+| `title`, `description` | 화면에 그대로 보인다 |
 | `fields[].key` | 칸 번호. 요청의 `values` 와 저장의 키다. `^[a-z][a-z0-9_]{0,31}$`, 커넥터 안에서 유일 |
 | `fields[].env` | 이 칸 값을 쓸 profile `.env` 이름. `.mcp.json` 의 서버 env 가 `${이름}` 으로 참조해야 한다 |
 | `fields[].secret` | 참이면 화면이 가리고 응답에 원문을 담지 않는다. 저장하는 것은 아래 「저장과 비밀값」 이 갖는다 |
@@ -47,8 +63,8 @@ plugin 디렉터리 root 에 둔다. 소유는 그 plugin 의 저장소다. 같�
 | `fields[].pattern` | 있으면 Control Plane 과 대시보드가 모두 검사한다 |
 | `fields[].options` | 선택지 칸. `tool` 을 불러 결과의 `items` 배열에서 `value`, `label` 칸을 꺼낸다. `auto_select_single` 이 참이면 하나뿐일 때 화면이 고른다 |
 | `verify.tool` | 등록 전에 후보 값으로 부르는 확인 도구. 성공하면 값이 유효하다고 본다 |
-| `toolsets` | 선택. 연결용 에이전트에 켤 내장 toolset 이름 목록이다. 지금은 `vision` 만 받는다. 없으면 빈 목록이다 |
-| `attachments` | 선택 boolean. 참이면 연결용 에이전트의 대화가 사진을 받는다. 없으면 거짓이다 |
+| `toolsets` | 선택. 옛 커넥터 에이전트에 켤 내장 toolset 이름 목록이다. 지금은 `vision` 만 받는다. 없으면 빈 목록이다. 연결을 붙인 에이전트의 도구는 바꾸지 않는다. 그 에이전트의 도구는 주인이 정한다 |
+| `attachments` | 선택 boolean. 참이면 옛 커넥터 에이전트의 대화가 사진을 받는다. 없으면 거짓이다. 연결을 붙인 에이전트가 사진을 받는지는 그 에이전트의 설정이 정한다 |
 | `operator_env` | 사용자가 넣지 않고 운영자가 주는 env 이름. 값은 운영 설정이 갖는다. **비밀이 아닌 운영 설정만 둔다.** 값이 profile 설정과 소유 기록에 그대로 복제된다 |
 | `operator_secrets` | 운영자가 주는 비밀의 env 이름 목록. 지금은 지원하지 않는다. 비어 있지 않으면 그 커넥터를 카탈로그에 내지 않는다([ADR-046](adr/ADR-046-운영-비밀은-operator-env-와-다른-칸으로-선언하고-자식-mcp-프로세스에만-넣는다.md)) |
 | `errors` | 도구 오류 코드를 공통 어휘로 바꾸는 표. 표에 없는 코드는 `unavailable` 이다. `outcome_unknown` 은 쓰기를 보냈는데 됐는지 모른다는 뜻이다 |
@@ -77,24 +93,74 @@ plugin 디렉터리 root 에 둔다. 소유는 그 plugin 의 저장소다. 같�
 
 | 경로 | 요청 | 결과 |
 | --- | --- | --- |
-| `GET /api/v1/connectors` | 없음 | `[{id, title, description, fields[], tools[], myStatus, available}]`. `fields[]` 는 `key, label, description, secret, required, pattern, hasOptions, autoSelectSingle` 만 담는다. `tools[]` 는 `name, title, risk, approval, grant` 이고 `schema: 1` 은 빈 목록이다. `risk` 와 `approval` 은 `READ`, `NONE` 같은 대문자 enum 이름이고 `grant` 는 그 도구에 상시 허락을 줄 수 있는지다 |
+| `GET /api/v1/connectors` | 없음 | `[{id, title, description, fields[], tools[], myStatus, available, bindings[]}]`. `fields[]` 는 `key, label, description, secret, required, pattern, hasOptions, autoSelectSingle` 만 담는다. `tools[]` 는 `name, title, risk, approval, grant` 이고 `schema: 1` 은 빈 목록이다. `risk` 와 `approval` 은 `READ`, `NONE` 같은 대문자 enum 이름이고 `grant` 는 그 도구에 상시 허락을 줄 수 있는지다. `bindings[]` 는 내 연결이 붙은 에이전트다 |
 | `GET /api/v1/connections/{id}` | 없음 | 자기 연결 상태 |
 | `POST /api/v1/connections/{id}/options/{fieldKey}` | `{values}` | `[{value, label}]`. 아무것도 저장하지 않는다 |
-| `POST /api/v1/connections/{id}` | `{values}` | 등록 또는 값 교체. 확인 도구가 통과해야 저장한다 |
-| `POST /api/v1/connections/{id}/check` | 없음 | 설치 상태와 MCP probe 재확인 |
-| `DELETE /api/v1/connections/{id}` | 없음 | env 제거와 에이전트 비활성화 |
-| `GET /api/v1/admin/connections` | 없음 | 같은 그룹의 연결 목록. ADMIN 전용 |
-| `POST /api/v1/admin/connections/{id}/{userId}/confirm` | 없음 | 운영 반영 완료 확인. ADMIN 전용 |
+| `POST /api/v1/connections/{id}` | `{values}` | 등록 또는 값 교체. 확인 도구가 통과해야 보관 파일에 쓰고, 붙은 바인딩마다 설치를 다시 보낸다. 입력 칸이 없는 커넥터는 빈 `values` 다 |
+| `POST /api/v1/connections/{id}/check` | 없음 | 연결 확인. 보관 파일의 값으로 확인 도구를 부르고 붙은 바인딩마다 설치와 반영을 맞춘다 |
+| `DELETE /api/v1/connections/{id}` | 없음 | 연결 해제. 붙은 바인딩을 모두 떼고 보관 파일을 지운다 |
+| `GET /api/v1/agents/{code}/connections` | 없음 | `{connections[], blockedReason}`. 그 에이전트에서 본 내 연결이다. 그 에이전트의 주인만 읽는다 |
+| `PUT /api/v1/agents/{code}/connections/{connectorId}` | 없음 | 붙인다. 이미 붙어 있으면 지금 상태를 돌려준다. 결과는 연결 한 줄이다 |
+| `DELETE /api/v1/agents/{code}/connections/{connectorId}` | 없음 | 뗀다. 204. 붙어 있지 않으면 아무것도 하지 않는다 |
+| `GET /api/v1/admin/connections` | 없음 | 같은 그룹 사용자의 바인딩 목록. ADMIN 전용 |
+| `POST /api/v1/admin/agents/{code}/connections/{connectorId}/confirm` | `{restartRequiredSince}` | 바인딩 하나의 반영 완료. 본문은 관리자 목록에서 본 그 바인딩의 값이다. ADMIN 전용 |
 
-- 상태 응답은 `connectorId`, `status`, `secretPrefixes{key: 앞 4자}`, `values{key: 값}`, `checkedAt`, `agentCode`, `restartRequired`, `undeclaredTools` 를 갖는다. 등록 전에는 `DISCONNECTED` 이고 나머지는 비거나 null 이다
-- 관리자 목록 항목은 `connectorId`, `userId`, `displayName`, `status`, `agentCode`, `restartRequired`, `undeclaredTools` 만 담는다. 다른 사용자의 칸 값과 비밀 앞부분은 넣지 않는다
+- 상태 응답은 `connectorId`, `status`, `secretPrefixes{key: 앞 4자}`, `values{key: 값}`, `checkedAt`, `bindings[]`, `undeclaredTools` 를 갖는다. 등록 전에는 `DISCONNECTED` 이고 나머지는 비거나 null 이다
+- `bindings[]` 의 항목은 `agentCode`, `agentName`, `status`, `restartRequired` 다. `status` 는 바인딩 상태다. 재시작 대기는 연결이 아니라 바인딩마다 있다
+- 에이전트의 연결 목록 항목은 `connectorId`, `title`, `connectionStatus`, `bound`, `status`, `restartRequired`, `toolCount`, `skills` 다. `status` 는 붙어 있지 않으면 null 이다. `toolCount` 는 커넥터가 선언한 도구 수이고 `skills` 는 붙이면 그 profile 에 설치되는 스킬 이름이다. 해제한 연결은 목록에서 빠진다. env 이름, 보관 파일 이름, 서버 이름은 담지 않는다
+- `blockedReason` 은 붙일 수 없는 까닭이다. 그룹에 공개된 에이전트는 `AGENT_NOT_PRIVATE`, 옛 커넥터 에이전트는 `LEGACY_AGENT` 이고, 붙일 수 있으면 null 이다
+- 관리자 목록 항목은 `connectorId`, `userId`, `displayName`, `agentCode`, `status`, `restartRequired`, `restartRequiredSince`, `undeclaredTools` 만 담는다. `status` 는 바인딩 상태다. 다른 사용자의 칸 값과 비밀 앞부분은 넣지 않는다
 - 모르는 `id` 는 `CONNECTOR_NOT_FOUND`(404) 다. 운영 목록에서 빠진 커넥터의 기존 연결은 읽기와 해제만 된다
-- 목록의 `available` 은 그 커넥터가 지금 카탈로그에 있는지다. 카탈로그에서 빠졌지만 내 연결이 `DISCONNECTED` 가 아닌 커넥터는 `available: false`, 빈 `fields`, 빈 `description` 으로 함께 낸다. 이때 `title` 은 전용 에이전트의 이름이다. 화면이 해제하러 들어갈 길을 남기기 위해서다
+- 목록의 `available` 은 그 커넥터가 지금 카탈로그에 있는지다. 카탈로그에서 빠졌지만 내 연결이 `DISCONNECTED` 가 아닌 커넥터는 `available: false`, 빈 `fields`, 빈 `description` 으로 함께 낸다. 이때 `title` 은 커넥터 번호다. 화면이 해제하러 들어갈 길을 남기기 위해서다
 - `values` 의 키는 그 커넥터의 `fields[].key` 만 받는다. 모르는 키, 필수 칸 누락, `pattern` 불일치는 `VALIDATION_FAILED` 다. 비밀이 아닌 칸의 값은 500자까지, 비밀 칸의 값은 4096자까지다. 저장할 칸 값 전체가 `fields` 열에 들어가지 않아도 같은 오류다. 외부에 반영하기 전에 검사한다
 - 선택지와 확인은 후보 값을 저장하지 않고 응답에 되돌려 담지 않는다
 - 외부 설치, 확인, 해제가 실패하면 `CONNECTOR_OPERATION_FAILED`(502) 다
 - 선택지 조회, 등록, 연결 확인은 사용자별 호출 제한을 먼저 지난다. 넘으면 외부를 부르지 않고 `CONNECTOR_RATE_LIMITED`(429) 다
-- `PENDING` 은 값을 등록했으나 실행 준비가 끝나지 않은 상태, `READY` 는 설치가 켜져 있고 재시작이 필요 없으며 정책 hook 이 켜져 있고 MCP probe 에서 도구를 확인한 상태다. probe 는 공유 gateway 의 실제 실행 확인을 대신하지 않는다
+- 연결의 `PENDING` 은 값을 확인하지 못한 상태, `READY` 는 등록이나 연결 확인에서 확인 도구가 통과한 상태다. 연결 상태는 「값이 확인돼 쓸 수 있는가」 만 뜻한다
+- 바인딩의 `READY` 는 그 에이전트의 profile 에 바인딩 방식으로 설치가 켜져 있고, 설치가 configured 이며, 정책 hook 이 켜져 있고, MCP probe 에서 도구를 확인했고, 재시작 대기가 아닌 상태다. 그 밖에는 `PENDING` 이다. probe 는 공유 gateway 의 실제 실행 확인을 대신하지 않는다
+- 커넥터 도구는 연결과 바인딩이 모두 `READY` 일 때만 판정을 통과한다. 바인딩 상태는 에이전트를 켜거나 끄지 않는다. 그 에이전트의 다른 도구는 그대로 돈다
+
+### 붙이기와 떼기
+
+붙이고 떼는 사람은 그 에이전트의 주인이고 자기 연결만 붙인다. 관리자도 남의 에이전트에 붙이거나 떼지 못하고 반영 완료만 누른다.
+읽을 수 없는 에이전트는 `AGENT_NOT_FOUND`(404), 읽을 수 있어도 주인이 아니면 `FORBIDDEN`(403)이다.
+
+| 붙일 때 거절하는 경우 | 오류 |
+| --- | --- |
+| 그 에이전트가 `PRIVATE` 가 아니다 | `AGENT_CONNECTIONS_REQUIRE_PRIVATE`(409) |
+| 옛 커넥터 에이전트다 | `VALIDATION_FAILED`(400) |
+| 내 연결이 `READY` 가 아니거나 값이 보관 파일에 없다 | `CONNECTOR_NOT_CONNECTED`(409) |
+| 커넥터가 카탈로그에 없다 | `CONNECTOR_NOT_FOUND`(404) |
+| 커넥터의 스킬 이름이 그 에이전트의 스킬과 겹친다 | `SKILL_NAME_TAKEN`(409) |
+| 대시보드가 그 profile 의 설정이나 이미 붙은 다른 커넥터와 충돌한다고 거절했다 | `CONNECTOR_BIND_CONFLICT`(409) |
+| 그 profile 이 아직 커넥터를 받을 준비가 되지 않았다. 표식이 없다 | `CONNECTOR_PROFILE_NOT_READY`(409) |
+| 그 밖의 외부 실패 | `CONNECTOR_OPERATION_FAILED`(502) |
+
+- 대시보드가 거절한 두 경우(`CONNECTOR_BIND_CONFLICT`, `CONNECTOR_PROFILE_NOT_READY`)는 대시보드가 아무것도 바꾸지 않았으므로 바인딩 행도 남지 않는다. 그 밖의 외부 실패는 바인딩을 `PENDING` 으로 남긴다. 대시보드가 반쯤 반영했을 수 있어 다음 연결 확인이 설치를 다시 보낸다
+- 붙인 바인딩은 늘 `PENDING` 이고 대개 재시작 대기다. 관리자가 공유 gateway 를 재시작하고 반영 완료를 누르면 `READY` 가 된다
+- 붙이기는 `skills` toolset 을 켜지 않는다. 그 에이전트의 도구는 주인이 정한다([ADR-029](adr/ADR-029-에이전트-도구는-control-plane-이-등급으로-판정하고-hermes-설정-api-로-쓴다.md)). `skills` 가 꺼진 에이전트는 커넥터의 지침을 읽지 못하고, 화면이 그것을 안내한다
+- 떼기는 그 에이전트의 실행이 판정한 `PENDING` 승인 줄을 `REJECTED`(`errorCode: connection_changed`)로 끝낸다. 상시 허락은 사용자와 커넥터에 묶여 같은 연결을 붙인 다른 에이전트에도 걸리므로 그대로 둔다. 그 에이전트의 승인 줄이 `EXECUTING` 이면 `CONNECTOR_ACTION_EXECUTING`(409)으로 거절한다
+- 떼기는 도구 목록에서 서버 이름을 빼므로 재시작을 기다리지 않고 다음 실행부터 막힌다
+- 옛 커넥터 에이전트에서는 떼지 않는다. `VALIDATION_FAILED` 로 거절하고, 그 에이전트를 지우면 바인딩이 함께 떨어진다
+
+**연결이 붙은 에이전트는 비공개로 남는다.** 남이 주인의 계정으로 외부 서비스를 쓰지 못하게 하기 위해서다.
+
+| 바인딩이 하나라도 있는 에이전트에 | 결과 |
+| --- | --- |
+| 주인이나 관리자가 그룹 공개로 바꾼다 | `AGENT_CONNECTIONS_REQUIRE_PRIVATE`(409) |
+| 관리자가 주인을 바꾼다 | `AGENT_HAS_CONNECTIONS`(409) |
+| 주인이나 관리자가 지운다 | 바인딩을 모두 뗀 뒤 지운다. 떼지 못하면 지우지 않고 그 오류를 돌려준다 |
+
+붙이기, 떼기, 관리자 반영 완료, 공개 범위 변경, 관리자 수정, 지우기가 같은 에이전트에 동시에 와도 한쪽이 다른 쪽의 커밋을 보고 판정한다. 잠금의 차례는 [커넥터 설치](backend/connector-install.md) 의 「설치와 실패 처리」 가 갖는다.
+
+### 관리자 반영 완료
+
+관리자는 공유 gateway 를 재시작한 뒤 관리자 목록에서 바인딩마다 반영 완료를 누른다.
+
+- 그 에이전트의 주인이 관리자와 같은 그룹이어야 한다. 아니면 `FORBIDDEN`(403)이다
+- 바인딩의 재시작 대기 시각이 본문의 `restartRequiredSince` 보다 늦거나 본문이 비었으면 `CONNECTOR_RESTART_AGAIN`(409)으로 거절한다. 관리자가 목록을 본 뒤에 다시 설치된 바인딩이라 재시작한 gateway 가 아직 보지 못했을 수 있기 때문이다. 화면은 성공하든 거절되든 목록을 다시 읽어 바뀐 값을 받는다
+- 바인딩에 재시작 대기 시각이 없으면 본문을 보지 않는다
+- 받으면 설치를 한 번 다시 보내 반영됐는지 본다. 그래도 `READY` 가 되지 않으면 `CONNECTOR_OPERATION_FAILED`(502)다
 
 ## 승인
 
@@ -144,8 +210,8 @@ plugin 디렉터리 root 에 둔다. 소유는 그 plugin 의 저장소다. 같�
 - 화면은 `toolName`, `actionId`, `errorCode` 를 그리지 않는다. 이름은 `title` 로, 인자는 키와 값으로 보인다. web 의 서버 라우트는 `resultText` 를 브라우저로 옮기지 않는다
 - 그 줄의 `user_id` 가 로그인 사용자와 다르면 `CONNECTOR_ACTION_NOT_FOUND`(404) 다. 관리자도 같다
 - 요청이 왔을 때 이미 `PENDING` 이 아니던 줄의 승인과 거절은 `CONNECTOR_ACTION_NOT_PENDING`(409) 다. 같은 승인을 두 번 눌러도 실행은 한 번이다
-- 승인은 받았으나 실행할 수 없어 그 요청이 끝낸 줄은 오류가 아니라 200 과 끝난 줄을 돌려준다. 기다리는 시간이 지났으면 `EXPIRED`, 연결이 `READY` 가 아니거나 정책이 바뀌었으면 `REJECTED` 와 `errorCode: not_executable` 이다. 부른 쪽은 「이미 처리된 요청」(409)과 「승인했지만 실행하지 않은 요청」(200 의 `status`)을 구분한다
-- 승인은 행 잠금 아래에서 `EXECUTING` 으로 바꾸고 커밋한 뒤, 트랜잭션 밖에서 대시보드의 실행 경로를 부른다. 연결이 `READY` 가 아니면 실행하지 않고 `REJECTED` 로 둔다. 승인은 그 사용자의 행을 먼저 잠그고 승인 줄을 잠근다. 연결을 다시 등록하거나 해제하는 쪽과 같은 순서다
+- 승인은 받았으나 실행할 수 없어 그 요청이 끝낸 줄은 오류가 아니라 200 과 끝난 줄을 돌려준다. 기다리는 시간이 지났으면 `EXPIRED`, 연결이나 그 줄의 에이전트에 붙은 바인딩이 `READY` 가 아니거나, 그 에이전트에서 연결을 뗐거나, 정책이 바뀌었으면 `REJECTED` 와 `errorCode: not_executable` 이다. 부른 쪽은 「이미 처리된 요청」(409)과 「승인했지만 실행하지 않은 요청」(200 의 `status`)을 구분한다
+- 승인은 행 잠금 아래에서 `EXECUTING` 으로 바꾸고 커밋한 뒤, 트랜잭션 밖에서 대시보드의 실행 경로를 부른다. 연결과 그 줄의 에이전트에 붙은 바인딩이 모두 `READY` 가 아니면 실행하지 않고 `REJECTED` 로 둔다. 승인은 그 사용자의 행을 먼저 잠그고 승인 줄을 잠근다. 연결을 다시 등록하거나 해제하는 쪽, 붙이고 떼는 쪽과 같은 순서다. 그래서 승인이 본 바인딩은 커밋할 때까지 떼어지지 않는다
 - 실행 요청이 시간 안에 답하지 않았거나 연결이 끊겼으면 `UNKNOWN` 이다
 - `grant` 는 `approval: required` 이고 선언이 상시 허락을 닫지 않은 도구에만 받는다. `always` 이거나, 선언이 `"grant": false` 이거나, `tool_name` 이 빈 줄이면 `VALIDATION_FAILED` 다. 승인 줄의 `grantAllowed` 도 같은 조건으로 낸다. 선언은 승인 줄을 읽을 때의 카탈로그로 보고, 카탈로그를 읽지 못하면 거짓이다([ADR-065](adr/ADR-065-외부로-나가는-도구는-상시-허락을-닫는-선언을-둔다.md)). `TODAY` 는 `Asia/Seoul` 의 그날 끝(다음 날 0시)까지다. 서버의 시간대 설정과 상관없다. 사용량 화면의 달 경계와 같은 고정 시간대다
 - 같은 실행에서 같은 도구와 같은 `args_sha256` 의 `PENDING` 이 이미 있으면 새 줄을 만들지 않고 그 번호를 돌려준다
@@ -169,7 +235,8 @@ plugin 디렉터리 root 에 둔다. 소유는 그 plugin 의 저장소다. 같�
 | --- | --- |
 | `{profile, hermes_tool, args}` | `{ok: true, result}` 또는 `{ok: false, error: <공통 어휘>}` |
 
-- 그 profile 에 관리 표식이 있고 그 커넥터의 소유 기록이 있어야 한다
+- Control Plane 은 승인 줄의 에이전트(판정한 실행의 에이전트)에 붙은 바인딩의 profile 로 보낸다([ADR-083](adr/ADR-083-커넥터는-사용자가-한-번-연결하고-자기-에이전트에-여럿-붙여-그-에이전트가-도구를-직접-부른다.md))
+- 그 profile 에 그 커넥터의 소유 기록이 있어야 한다. 관리 표식이 있거나, 커넥터 표식만 있으면 그 항목이 바인딩 설치여야 한다
 - 커넥터 MCP 서버를 자식으로 한 번 띄워 `tools/list` 를 읽고, 등록 이름이 `hermes_tool` 과 같은 도구가 정확히 하나일 때 그 도구를 `args` 로 부른다. `schema: 2` 는 그 도구가 `tools` 에 있어야 한다
 - 자식의 env 는 그 profile `.env` 에서 manifest 의 `fields[].env` 만 꺼내고 운영 목록의 `env` 를 더한다. 나머지 값은 넘기지 않는다
 - 시간 제한은 60초, 동시 실행은 `call` 과 같은 한도를 함께 쓴다
@@ -181,10 +248,21 @@ plugin 디렉터리 root 에 둔다. 소유는 그 plugin 의 저장소다. 같�
 
 ## 저장과 비밀값
 
-`connector_connection` 은 사용자, 커넥터, 에이전트 바인딩, 상태, 칸 값, 마지막 확인 시각, 재시작 필요 여부, 활성화 후보 여부, 선언하지 않은 도구 수를 저장한다([`backend/schema/connector.md`](backend/schema/connector.md)).
+`connector_connection` 은 사용자, 커넥터, 상태, 칸 값, 마지막 확인 시각, 값을 보관 파일에 두었는지, 선언하지 않은 도구 수를 저장한다.
+에이전트에 붙인 것은 `agent_connector_binding` 이 바인딩마다 상태와 재시작 대기를 저장한다([`backend/schema/connector.md`](backend/schema/connector.md)).
 비밀 칸은 원문과 해시를 저장하지 않고, 값이 충분히 길 때만 앞부분을 남긴다. 길이 기준과 저장 칸은 [`backend/schema/connector.md`](backend/schema/connector.md) 의 「connector_connection」 이 갖는다.
 화면은 연결된 상태에서 앞부분이 없는 필수 비밀 칸을 「입력됨」 으로만 보인다. 앞부분이 없는 선택 비밀 칸은 입력 여부를 응답으로 알 수 없어 보이지 않는다.
 브라우저는 등록을 제출한 직후 비밀 칸 입력을 비우고 다시 표시하지 않는다. 선택지를 고르는 동안은 작성 중인 입력을 쓰고, 조회가 실패해도 입력을 비운다.
 요청 record 의 문자열 표현, 외부 오류, 로그와 응답에 비밀 원문을 남기지 않는다.
 `connector_action` 은 도구 호출마다의 판정과 승인 줄을 저장한다. 인자 원문은 승인 줄에만 두고 주인에게만 보인다. 관리자 목록과 로그에는 싣지 않는다.
-해제한 뒤에는 profile 디렉터리의 어느 파일에도 칸 값의 원문이 남지 않는다. 설정 백업이 `.env` 를 담지 않기 때문이다.
+
+**칸 값의 원문은 Hermes 쪽 두 곳에만 있다.**
+
+| 어디 | 무엇 | 언제 지워지는가 |
+| --- | --- | --- |
+| 보관 파일 | 연결마다 하나인 원본. 대시보드 plugin 이 둔다 | 연결을 해제할 때 |
+| 붙인 에이전트 profile 의 `.env` | 붙일 때 보관 파일에서 복사한 값. 서버 정의의 `env` 는 `${이름}` 참조만 갖고 그 profile 의 secret scope 에서 풀린다 | 그 에이전트에서 뗄 때. 연결 해제는 붙은 바인딩을 모두 떼므로 함께 지워진다 |
+
+값을 바꾸면 보관 파일을 다시 쓰고 붙은 profile 마다 복사본을 다시 쓴다. 떠 있는 MCP 프로세스는 옛 값을 쥐고 있어 그 바인딩들이 재시작 대기가 된다.
+설정 백업은 `.env` 와 보관 파일을 담지 않는다. 그래서 떼거나 해제한 뒤에는 그 profile 디렉터리의 어느 파일에도 칸 값의 원문이 남지 않는다.
+옛 커넥터 에이전트는 남아 있는 동안 자기 profile 의 `.env` 에 값을 갖는다. 연결 확인이 그 값을 보관 파일로 옮기고, 그 에이전트를 지우면 그 profile 이 거둬진다.

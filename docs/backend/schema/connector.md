@@ -32,13 +32,13 @@
 - V40 이전에 저장한 앞부분은 원래 길이를 알 수 없어 V40 이 모든 행의 `secretPrefixes` 를 비웠다. `values` 는 그대로 뒀다
 - 가계부 전용으로 먼저 만든 `accountbook_connection` 은 V38 이 이 표로 옮기고 지웠다
 
-`agent.connector_managed BOOLEAN NOT NULL DEFAULT FALSE` 는 연결 전용 에이전트를 표시한다.
-이 값이 참인 에이전트는 일반 설정 편집과 공개, 삭제 경로를 막고 사용자당 에이전트 상한에 세지 않는다.
-상태 변화는 [커넥터 연결](../../connectors.md)이 갖는다.
+`agent.connector_managed BOOLEAN NOT NULL DEFAULT FALSE` 는 바인딩이 생기기 전에 연결마다 만든 옛 커넥터 에이전트를 표시한다. 지금은 새로 참이 되지 않는다.
+이 값이 참인 에이전트는 일반 설정 편집과 공개 범위 변경을 막고 사용자당 에이전트 상한에 세지 않는다. 지우기는 받는다. 사용자가 새 방식으로 옮긴 뒤 그 에이전트를 지울 길이 이것뿐이다.
+남아 있는 동안의 규칙은 [커넥터 설치](../connector-install.md) 의 「옛 커넥터 에이전트」 가 갖는다.
 
-`agent.connector_attachments BOOLEAN NOT NULL DEFAULT FALSE` 는 그 연결용 에이전트가 사진을 받는지다.
+`agent.connector_attachments BOOLEAN NOT NULL DEFAULT FALSE` 는 그 옛 커넥터 에이전트가 사진을 받는지다.
 선언은 plugin 의 `connector.json` 에 있다. Control Plane 이 연결 확인과 관리자 반영 완료에서 선언한 toolset 이 켜진 것을 확인했을 때만 참으로 둔다.
-연결용이 아닌 에이전트에서는 쓰지 않는다.
+옛 커넥터 에이전트가 아닌 에이전트에서는 쓰지 않는다.
 
 ## agent_connector_binding
 

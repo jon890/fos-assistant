@@ -147,7 +147,7 @@ hook 이 `{"action": "approve", "message": "<사유>", "rule_key": "<키>"}` 를
 
 - 떠 있는 공유 gateway 가 profile 의 `fos-ctx` 를 새 판으로 바꾼 뒤 재시작 없이 새 코드를 읽는지
 - native 자식과 공유 gateway 에서 실제 커넥터 호출이 hook 을 거치는지. 대역 서버의 호출 기록과 `connector_action` 을 견준다
-- Control Plane 이 내려가 있을 때 연결용 에이전트의 도구가 막히는지
+- Control Plane 이 내려가 있을 때 연결을 붙인 에이전트의 커넥터 도구가 막히는지
 - 바인딩 profile 에서 커넥터 도구의 결과가 `<external-data>` 안에 있고 그 바깥을 `<untrusted_tool_result>` 가 감싸는지. 실행 기록의 도구 내용으로 본다
 - 대시보드 plugin 을 올린 뒤 카탈로그에 커넥터가 그대로 있는지. 스킬 본문 검증이 새로 생겨, 전에는 나오던 커넥터가 빠질 수 있다
 - Control Plane 을 옛 판으로 되돌렸다가 다시 올렸으면 사진을 받는 연결을 한 번 연결 확인한다. 옛 판은 `vision` 을 선언 밖의 도구로 보고 목록에서 뺀다
