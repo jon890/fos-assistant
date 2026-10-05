@@ -26,7 +26,7 @@ Hermes 에 설치하는 묶음과 그때 받는 값은 [`hermes/README.md`](../h
 (cd web && pnpm install && pnpm typecheck)
 ```
 
-`pnpm build` 는 자리표시자 환경 변수가 있어야 통과한다. 그 값은 [`web/AGENTS.md`](../web/AGENTS.md) 의 「검사」 절이 갖는다.
+`pnpm build` 는 자리표시자 환경 변수가 있어야 통과한다. 그 값은 `web/Dockerfile` 의 build 단계가 갖는다.
 
 ## 환경 변수
 
