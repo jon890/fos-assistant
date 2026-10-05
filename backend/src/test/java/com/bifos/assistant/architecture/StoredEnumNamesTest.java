@@ -8,6 +8,7 @@ import com.bifos.assistant.agent.domain.type.CredentialScope;
 import com.bifos.assistant.chat.domain.type.ConversationPurpose;
 import com.bifos.assistant.chat.domain.type.MessageRole;
 import com.bifos.assistant.model.domain.type.ModelTier;
+import com.bifos.assistant.proactive.domain.type.CheckInvalidReason;
 import com.bifos.assistant.proactive.domain.type.CheckOutcome;
 import com.bifos.assistant.proactive.domain.type.CheckStatus;
 import com.bifos.assistant.proactive.domain.type.CheckTrigger;
@@ -56,6 +57,9 @@ class StoredEnumNamesTest {
             Map.entry(CheckTrigger.class, List.of("MANUAL", "SCHEDULED")),
             Map.entry(CheckStatus.class, List.of("RUNNING", "SUCCEEDED", "FAILED", "STOPPED")),
             Map.entry(CheckOutcome.class, List.of("FINDINGS", "NOTHING_NEW", "INVALID_RESULT")),
+            Map.entry(
+                    CheckInvalidReason.class,
+                    List.of("EMPTY_ANSWER", "NO_BLOCK", "NOT_JSON", "BAD_VERSION", "BAD_OUTCOME")),
             Map.entry(FindingKind.class, List.of("NEW", "REFERENCE")),
             Map.entry(
                     FindingReason.class,

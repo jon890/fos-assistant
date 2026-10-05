@@ -1,5 +1,6 @@
 package com.bifos.assistant.proactive.domain;
 
+import com.bifos.assistant.proactive.domain.type.CheckInvalidReason;
 import com.bifos.assistant.proactive.domain.type.CheckOutcome;
 import com.bifos.assistant.proactive.domain.type.CheckStatus;
 import com.bifos.assistant.proactive.domain.type.CheckTrigger;
@@ -70,6 +71,11 @@ public class ProactiveCheck {
     @Column(name = "outcome", length = 16)
     private CheckOutcome outcome;
 
+    /** 결과 블록을 읽지 못한 까닭. {@code outcome} 이 {@code INVALID_RESULT} 일 때만 채운다. */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "invalid_reason", length = 32)
+    private CheckInvalidReason invalidReason;
+
     /** {@code FAILED} 와 {@code STOPPED} 의 까닭. 사용자가 멈추면 비어 있다. */
     @Column(name = "error_code", length = 64)
     private String errorCode;
@@ -128,6 +134,14 @@ public class ProactiveCheck {
         this.outcome = outcome;
         this.newFindings = newFindings;
         this.referenceFindings = referenceFindings;
+        finish(null, toolCalls, delegations, now);
+    }
+
+    /** turn 은 끝났지만 결과 블록을 읽지 못했다. 읽지 못한 까닭을 함께 적는다. */
+    public void succeedInvalid(CheckInvalidReason invalidReason, int toolCalls, int delegations, Instant now) {
+        this.status = CheckStatus.SUCCEEDED;
+        this.outcome = CheckOutcome.INVALID_RESULT;
+        this.invalidReason = invalidReason;
         finish(null, toolCalls, delegations, now);
     }
 
