@@ -6,7 +6,7 @@ import {
   waitForStreamedContentAfterLoad,
   type FakeHermesControl,
 } from "./fixtures.ts";
-import type { BrowserContext, Page } from "../../web/node_modules/@playwright/test/index.js";
+import type { BrowserContext, Locator, Page } from "../../web/node_modules/@playwright/test/index.js";
 
 /** 보는 창이 도는 turn 을 다시 묻는 주기다. 화면의 값과 같아야 한다. */
 const OBSERVE_INTERVAL_MS = 3_000;
@@ -52,6 +52,31 @@ async function releaseAndSettle(page: Page, hermes: FakeHermesControl) {
 
 function composer(page: Page) {
   return page.getByTestId("composer-shell");
+}
+
+/** 메시지 열과 안내 상자가 같은 가로 위치와 너비인지 확인한다. */
+async function expectAlignedWithMessageColumn(page: Page, element: Locator) {
+  const messageColumn = page
+    .getByTestId("message-scroll")
+    .locator(":scope > div")
+    .first();
+  await expect(messageColumn).toBeVisible();
+
+  const [messageColumnBox, elementBox] = await Promise.all([
+    messageColumn.boundingBox(),
+    element.boundingBox(),
+  ]);
+  if (!messageColumnBox || !elementBox)
+    throw new Error("메시지 열 또는 안내 상자의 위치를 읽지 못했다.");
+
+  expect(
+    Math.abs(messageColumnBox.x - elementBox.x),
+    "안내 상자의 왼쪽 끝이 메시지 열과 다르다",
+  ).toBeLessThan(1);
+  expect(
+    Math.abs(messageColumnBox.width - elementBox.width),
+    "안내 상자의 너비가 메시지 열과 다르다",
+  ).toBeLessThan(1);
 }
 
 /** 끊김 문구의 앞부분이다. 넘어간 창에는 나오지 않아야 한다. */
@@ -124,7 +149,9 @@ test("다른 창에서 답하는 중이면 기다리는 표시와 중지를 보�
   const conversationId = await startHeldTurn(page, hermes, "다른 창 보기 검사");
   try {
     const other = await openOtherWindow(context, conversationId);
-    await expect(other.getByTestId("observing-notice")).toBeVisible();
+    const notice = other.getByTestId("observing-notice");
+    await expect(notice).toBeVisible();
+    await expectAlignedWithMessageColumn(other, notice);
     // 붙잡힌 run 이 이미 사건을 남겼으면 작업 과정이, 아니면 기다리는 점이 보인다. 어느 쪽이든 기다리는 표시다.
     await expect(other.getByLabel("비서의 답을 기다리는 중")
       .or(other.locator('[data-testid="activity-block"][data-mode="live"]')).first()).toBeVisible();
@@ -272,6 +299,7 @@ test("보낸 창의 스트림이 끊겨도 turn 이 돌면 기다리는 표시�
     await expect(notice).toBeVisible();
     await expect(notice).toContainText("답을 기다리고 있어요");
     await expect(notice).not.toContainText("다른 창");
+    await expectAlignedWithMessageColumn(page, notice);
     await expect(page.getByLabel("비서의 답을 기다리는 중")
       .or(page.locator('[data-testid="activity-block"][data-mode="live"]')).first()).toBeVisible();
     await expect(page.getByText(INTERRUPTED_MESSAGE)).toHaveCount(0);
@@ -285,6 +313,30 @@ test("보낸 창의 스트림이 끊겨도 turn 이 돌면 기다리는 표시�
     await expect(page.getByTestId("user-message").first()).toContainText(text);
     await expect(page.getByText(INTERRUPTED_MESSAGE)).toHaveCount(0);
     await expect(composer(page).getByRole("button", { name: "중지" })).toHaveCount(0);
+  } finally {
+    await releaseAndSettle(page, hermes);
+  }
+});
+
+test("다른 창에서 중지를 못 하면 오류 안내와 기다리는 안내가 메시지 열에 맞는다", async ({ context, page, hermes }) => {
+  const conversationId = await startHeldTurn(page, hermes, "다른 창 중지 실패 정렬 검사");
+  try {
+    const other = await openOtherWindow(context, conversationId);
+    const observingNotice = other.getByTestId("observing-notice");
+    await expect(observingNotice).toBeVisible();
+    await other.route("**/api/chat/executions/*/stop", (route) => route.fulfill({
+      status: 503,
+      contentType: "application/json",
+      body: JSON.stringify({ code: "HERMES_UNAVAILABLE", message: "중지하지 못했다" }),
+    }));
+
+    await composer(other).getByRole("button", { name: "중지" }).click();
+
+    const errorNotice = other.locator('[data-slot="notice"][data-variant="error"]');
+    await expect(errorNotice).toBeVisible();
+    await expect(observingNotice).toBeVisible();
+    await expectAlignedWithMessageColumn(other, errorNotice);
+    await expectAlignedWithMessageColumn(other, observingNotice);
   } finally {
     await releaseAndSettle(page, hermes);
   }

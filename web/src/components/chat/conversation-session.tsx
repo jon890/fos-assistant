@@ -2106,20 +2106,26 @@ export function ConversationSession({
               locked={agentLocked}
             />
           ) : null}
-          {error ? (
-            <Notice variant="error" className="mb-2">
-              {error}
-            </Notice>
-          ) : null}
-          {observing ? (
-            <p
-              data-testid="observing-notice"
-              className="mb-2 text-xs text-muted-foreground"
-            >
-              {observing.sentHere
-                ? "응답 연결이 끊겨 답을 기다리고 있어요. 답이 완성되면 여기에 나타나요."
-                : "다른 창에서 답을 만들고 있어요. 완성되면 이 창에도 나타나요."}
-            </p>
+          {error || observing ? (
+            <div className="px-1">
+              <div className="mx-auto w-full max-w-3xl">
+                {error ? (
+                  <Notice variant="error" className="mb-2">
+                    {error}
+                  </Notice>
+                ) : null}
+                {observing ? (
+                  <p
+                    data-testid="observing-notice"
+                    className="mb-2 text-xs text-muted-foreground"
+                  >
+                    {observing.sentHere
+                      ? "응답 연결이 끊겨 답을 기다리고 있어요. 답이 완성되면 여기에 나타나요."
+                      : "다른 창에서 답을 만들고 있어요. 완성되면 이 창에도 나타나요."}
+                  </p>
+                ) : null}
+              </div>
+            </div>
           ) : null}
           <ApprovalList
             conversationId={conversationId}
