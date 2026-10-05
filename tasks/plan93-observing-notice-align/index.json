@@ -1,9 +1,0 @@
-{
-  "name": "plan93-observing-notice-align",
-  "description": "대화 안내와 오류를 메시지 열에 정렬한다",
-  "status": "pending",
-  "created_at": "2026-10-05",
-  "total_phases": 1,
-  "current_phase": 1,
-  "phases": [{ "number": 1, "file": "phase-01.md", "execution_profile": "standard" }]
-}
