@@ -8,9 +8,11 @@ import com.bifos.assistant.chat.infra.ChatMessageRepository;
 import com.bifos.assistant.context.ContextAssembler;
 import com.bifos.assistant.proactive.application.model.AnnouncedKey;
 import com.bifos.assistant.proactive.application.model.CheckResultBlock;
+import com.bifos.assistant.proactive.application.model.CheckResultRead;
 import com.bifos.assistant.proactive.application.model.JudgedFinding;
 import com.bifos.assistant.proactive.domain.ProactiveCheck;
 import com.bifos.assistant.proactive.domain.ProactiveCheckFinding;
+import com.bifos.assistant.proactive.domain.type.CheckInvalidReason;
 import com.bifos.assistant.proactive.domain.type.CheckOutcome;
 import com.bifos.assistant.proactive.domain.type.CheckStatus;
 import com.bifos.assistant.proactive.domain.type.FindingKind;
@@ -109,7 +111,10 @@ public class ProactiveCheckRun implements CheckTurn {
 
     static final String START_NOTICE = "먼저 살펴보기를 시작했어요";
     static final String NOTHING_NEW_NOTICE = "살펴봤지만 새로 알릴 것이 없어요";
-    static final String INVALID_RESULT_NOTICE = "살펴봤지만 결과를 정리하지 못했어요";
+    static final String INVALID_RESULT_NOTICE = "살펴봤지만 결과 형식이 맞지 않아 정리하지 못했어요. 다시 눌러 주세요";
+    /** 답이 비어 결과 블록을 읽지 못했을 때의 알림 줄이다. 형식 탓으로 안내하지 않는다. */
+    static final String EMPTY_ANSWER_NOTICE = "살펴봤지만 답을 받지 못했어요. 다시 눌러 주세요";
+
     static final String STOPPED_NOTICE = "살펴보기를 멈췄어요";
     static final String TIME_LIMIT_NOTICE = "시간 한도에 닿아 살펴보기를 멈췄어요";
     static final String TOOL_LIMIT_NOTICE = "도구 호출 한도에 닿아 살펴보기를 멈췄어요";
@@ -141,6 +146,9 @@ public class ProactiveCheckRun implements CheckTurn {
     private final AtomicInteger toolCalls = new AtomicInteger();
     private volatile String input;
     private volatile CheckOutcome outcome;
+    /** 결과 블록을 읽지 못한 까닭. {@link #outcome} 이 {@code INVALID_RESULT} 일 때만 있다. */
+    private volatile CheckInvalidReason invalidReason;
+
     private volatile int newFindings;
     private volatile int referenceFindings;
     /** 검사한 발견. 답 메시지를 저장한 뒤 {@link #saveFindings} 가 저장한다. 블록에 발견이 없으면 비어 있다. */
@@ -246,15 +254,26 @@ public class ProactiveCheckRun implements CheckTurn {
      * 저장하고, 결과와 셈은 {@link #record} 가 적는다. 답을 저장하지 못했는데 발견이 남으면 사용자가 보지 못한 발견이 다음 살펴보기에서
      * 이미 알린 것으로 내려가기 때문이다.
      * NOTHING_NEW 여도 질문이나 읽지 못한 출처가 있으면 그린다.
+     *
+     * <p>블록을 읽지 못하면 까닭과 답의 길이만 로그에 남긴다. 답은 개인 맥락을 담을 수 있어 본문을 남기지 않는다.
      */
     @Override
     public CheckAnswer answer(Long executionId, String output) {
-        Optional<CheckResultBlock> parsed = deps.parser().parse(output);
-        if (parsed.isEmpty()) {
+        CheckResultRead read = deps.parser().read(output);
+        if (read.block() == null) {
             outcome = CheckOutcome.INVALID_RESULT;
-            return new CheckAnswer(INVALID_RESULT_NOTICE, true);
+            invalidReason = read.invalidReason();
+            log.warn(
+                    "살펴보기 결과 블록을 읽지 못했다 checkId={} executionId={} reason={} answerLength={}",
+                    check.id(),
+                    executionId,
+                    invalidReason,
+                    output == null ? 0 : output.length());
+            return new CheckAnswer(
+                    invalidReason == CheckInvalidReason.EMPTY_ANSWER ? EMPTY_ANSWER_NOTICE : INVALID_RESULT_NOTICE,
+                    true);
         }
-        CheckResultBlock block = parsed.get();
+        CheckResultBlock block = read.block();
         outcome = block.outcome();
         if (block.outcome() == CheckOutcome.NOTHING_NEW
                 && block.findings().isEmpty()
@@ -343,6 +362,8 @@ public class ProactiveCheckRun implements CheckTurn {
         Instant now = deps.clock().instant();
         if (stopped || outcome == null) {
             check.stop(stopReason.get(), toolCalls.get(), delegations, now);
+        } else if (outcome == CheckOutcome.INVALID_RESULT) {
+            check.succeedInvalid(invalidReason, toolCalls.get(), delegations, now);
         } else {
             check.succeed(outcome, newFindings, referenceFindings, toolCalls.get(), delegations, now);
         }

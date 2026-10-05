@@ -19,6 +19,7 @@
 | `trigger_type` | VARCHAR(16) | `MANUAL`(단추), `SCHEDULED`(매일 깨우기, 아직 없다) |
 | `status` | VARCHAR(16) | `RUNNING`, `SUCCEEDED`, `FAILED`, `STOPPED` |
 | `outcome` | VARCHAR(16) NULL | `FINDINGS`, `NOTHING_NEW`, `INVALID_RESULT`. `SUCCEEDED` 일 때만 채운다 |
+| `invalid_reason` | VARCHAR(32) NULL | 결과 블록을 읽지 못한 까닭. `outcome` 이 `INVALID_RESULT` 일 때만 채운다. `EMPTY_ANSWER`, `NO_BLOCK`, `NOT_JSON`, `BAD_VERSION`, `BAD_OUTCOME`. 뜻은 [`proactive-check.md`](../proactive-check.md) 의 「결과 계약」 이 갖는다. 이 칸을 더하기 전에 끝난 줄은 비어 있다 |
 | `error_code` | VARCHAR(64) NULL | `FAILED` 와 `STOPPED` 의 까닭. 상한으로 멈추면 `CHECK_TIME_LIMIT`, `CHECK_TOOL_LIMIT` 이고 사용자가 멈추면 비어 있다. 서버가 도중에 내려가 기동할 때 닫은 줄은 `INTERRUPTED` 다 |
 | `tool_calls` | INT NOT NULL DEFAULT 0 | 살펴보기 turn 이 시작한 도구 호출 수 |
 | `delegations` | INT NOT NULL DEFAULT 0 | 그 트리에서 맡긴 위임 자식 수. 끝날 때 센다 |
