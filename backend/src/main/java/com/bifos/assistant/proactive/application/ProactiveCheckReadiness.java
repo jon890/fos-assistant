@@ -1,5 +1,6 @@
 package com.bifos.assistant.proactive.application;
 
+import com.bifos.assistant.agent.application.AgentConnectorBindings;
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.agent.domain.AgentToolPolicy;
 import com.bifos.assistant.hermes.HermesToolsetClient;
@@ -18,6 +19,10 @@ import org.springframework.stereotype.Component;
  *
  * <p>까닭은 {@code docs/backend/proactive-check.md} 의 「시작 전 점검」 순서대로 보고 걸린 것을 모두 모은다. 켜진 스킬과
  * toolset 을 읽다 Hermes 가 실패하면 그 예외를 그대로 올린다. 확인하지 못한 에이전트를 시작할 수 있다고 하지 않기 위해서다.
+ *
+ * <p>그 에이전트에 붙은 커넥터 MCP 서버(ADR-083)는 쓰기 허용과 상관없이 받는다. 그 서버의 도구는 Control Plane 이 호출마다 판정해
+ * 읽기만 하는 살펴보기에서는 읽기 도구만, 쓰기를 허용한 살펴보기에서는 나머지를 승인 카드로 보내므로 읽기 경계를 깨지 않는다. 붙지
+ * 않은 다른 MCP 서버는 무엇을 하는지 판정하지 못해 지금처럼 막는다.
  */
 @Component
 @RequiredArgsConstructor
@@ -43,6 +48,7 @@ public class ProactiveCheckReadiness {
     private final ProactiveCheckProperties properties;
     private final SkillCommandCatalog skills;
     private final HermesToolsetClient toolsets;
+    private final AgentConnectorBindings connectorBindings;
 
     public CheckReadiness check(Agent agent) {
         List<CheckBlocker> blockers = new ArrayList<>();
@@ -58,8 +64,9 @@ public class ProactiveCheckReadiness {
             blockers.add(CheckBlocker.of(CheckBlockerCode.SKILL_MISSING));
         }
         boolean writesAllowed = agent.proactiveCheckWritesAllowed();
+        Set<String> connectorServers = connectorBindings.connectorServers(agent.id());
         List<String> notAllowed = toolsets.readEnabled(agent.apiBaseUrl(), agent.hermesProfile()).stream()
-                .filter(name -> !allowed(name, writesAllowed))
+                .filter(name -> !connectorServers.contains(name) && !allowed(name, writesAllowed))
                 .distinct()
                 .sorted()
                 .toList();
@@ -71,7 +78,8 @@ public class ProactiveCheckReadiness {
 
     /**
      * 살펴보기 에이전트에 켜 둘 수 있는 toolset 인가. 쓰기 도구를 허용한 에이전트는 Control Plane 이 아는 toolset 전부와 Control Plane
-     * MCP 를 받고 {@link #ALWAYS_BLOCKED_TOOLSETS} 만 막는다. 모르는 이름(다른 MCP 서버)은 무엇을 하는지 판정하지 못해 막는다.
+     * MCP 를 받고 {@link #ALWAYS_BLOCKED_TOOLSETS} 만 막는다. 모르는 이름(다른 MCP 서버)은 무엇을 하는지 판정하지 못해 막는다. 붙은
+     * 커넥터 서버는 이 판정 앞에서 따로 받는다.
      */
     private static boolean allowed(String name, boolean writesAllowed) {
         if (!writesAllowed) {

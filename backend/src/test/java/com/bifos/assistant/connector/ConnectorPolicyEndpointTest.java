@@ -870,6 +870,55 @@ class ConnectorPolicyEndpointTest {
         assertThat(notifications.count()).as("승인 알림").isZero();
     }
 
+    @Test
+    @DisplayName("살펴보기 turn 이 직접 부른 커넥터 쓰기 도구는 읽기 전용이면 READ_ONLY_RUN 이고 승인 줄과 알림이 없다")
+    void directWriteCallOfCheckTurnIsDeniedAsReadOnlyRun() throws Exception {
+        Agent plain = plainAgent();
+        bind(plain, connection(owner, DEMO, true), true);
+        String plainToken = tokens.issue(PLAIN_PROFILE, "plain").rawToken();
+        String checkRoot = startDirectCheckTurn(plain, false);
+
+        HttpResponse<String> write =
+                send(plainToken, body(plainToken, "mcp__demo__write_note", "write_note", checkRoot, newCall(), ARGS));
+        HttpResponse<String> read =
+                send(plainToken, body(plainToken, "mcp__demo__list_scopes", "list_scopes", checkRoot, newCall(), ARGS));
+
+        assertBlocked(write, READ_ONLY_RUN_MESSAGE);
+        assertThat(json.readTree(read.body()).path("decision").asString()).isEqualTo("allow");
+        assertThat(jdbc.queryForList(
+                        "SELECT decision, deny_reason, tool_name, status, agent_id FROM connector_action ORDER BY id"))
+                .extracting(
+                        row -> row.get("DECISION"),
+                        row -> row.get("DENY_REASON"),
+                        row -> row.get("TOOL_NAME"),
+                        row -> row.get("STATUS"),
+                        row -> ((Number) row.get("AGENT_ID")).longValue())
+                .containsExactly(
+                        tuple("DENIED", "READ_ONLY_RUN", "write_note", null, plain.id()),
+                        tuple("ALLOWED", null, "list_scopes", null, plain.id()));
+        assertThat(notifications.count()).as("승인 알림").isZero();
+    }
+
+    @Test
+    @DisplayName("쓰기를 허용한 살펴보기 turn 이 직접 부른 커넥터 쓰기 도구는 승인 줄과 승인 알림이 된다")
+    void directWriteCallOfWritesAllowedCheckTurnAsksApproval() throws Exception {
+        Agent plain = plainAgent();
+        bind(plain, connection(owner, DEMO, true), true);
+        String plainToken = tokens.issue(PLAIN_PROFILE, "plain").rawToken();
+        String checkRoot = startDirectCheckTurn(plain, true);
+
+        HttpResponse<String> write =
+                send(plainToken, body(plainToken, "mcp__demo__write_note", "write_note", checkRoot, newCall(), ARGS));
+
+        assertApprovalRequested(write);
+        Map<String, Object> row = onlyRow();
+        assertThat(row.get("DECISION")).isEqualTo("NEEDS_APPROVAL");
+        assertThat(row.get("STATUS")).isEqualTo("PENDING");
+        assertThat(row.get("ARGS_JSON")).isEqualTo(ARGS);
+        assertThat(((Number) row.get("AGENT_ID")).longValue()).isEqualTo(plain.id());
+        assertThat(notifications.count()).as("승인 알림").isEqualTo(1);
+    }
+
     /** 읽기 경계의 살펴보기 트리를 만든다. */
     private String startCheckTreeChild() {
         return startCheckTreeChild(false);
@@ -913,6 +962,31 @@ class ConnectorPolicyEndpointTest {
                 .startedAt(NOW)
                 .build());
         return childRoot;
+    }
+
+    /**
+     * 연결이 붙은 일반 에이전트의 살펴보기 turn 을 루트로 만들고 그 루트 session 을 돌려준다. 그 turn 이 커넥터 도구를 직접 부른다.
+     *
+     * @param writesAllowed 그 살펴보기 줄에 옮겨 적은 쓰기 허용 값
+     */
+    private String startDirectCheckTurn(Agent target, boolean writesAllowed) {
+        Conversation conversation =
+                conversations.save(Conversation.startedForCheck(owner.id(), "점검 대화", target.id(), Instant.now()));
+        AgentExecution checkTurn = executions.save(AgentExecution.builder()
+                .userId(owner.id())
+                .agentId(target.id())
+                .conversationId(conversation.id())
+                .profileName(target.hermesProfile())
+                .hermesSessionId("fos-" + UUID.randomUUID())
+                .costMode(CostMode.SUBSCRIPTION)
+                .status(ExecutionStatus.RUNNING)
+                .startedAt(NOW)
+                .build());
+        ProactiveCheck check = ProactiveCheck.started(
+                owner.id(), target.id(), conversation.id(), CheckTrigger.MANUAL, writesAllowed, NOW);
+        check.attachRoot(checkTurn.id(), checkTurn.hermesSessionId());
+        createdChecks.add(checks.save(check).id());
+        return checkTurn.hermesSessionId();
     }
 
     /** 같은 사용자가 보통 대화에서 돌린 커넥터 에이전트의 실행을 만들고 그 루트 session 을 돌려준다. */

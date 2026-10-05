@@ -5,6 +5,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import com.bifos.assistant.agent.application.AgentConnectorBindings;
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.agent.domain.type.AgentVisibility;
 import com.bifos.assistant.agent.domain.type.CostMode;
@@ -31,11 +32,15 @@ class ProactiveCheckReadinessTest {
 
     private final HermesToolsetClient toolsets = mock(HermesToolsetClient.class);
     private final SkillCommandCatalog skills = mock(SkillCommandCatalog.class);
+    private final AgentConnectorBindings connectorBindings = mock(AgentConnectorBindings.class);
     private final Agent agent = agent("career");
 
     private ProactiveCheckReadiness readiness(boolean enabled) {
         return new ProactiveCheckReadiness(
-                new ProactiveCheckProperties(enabled, MINUTE, 40, 3, 14, MINUTE, 20), skills, toolsets);
+                new ProactiveCheckProperties(enabled, MINUTE, 40, 3, 14, MINUTE, 20),
+                skills,
+                toolsets,
+                connectorBindings);
     }
 
     private static Agent agent(String code) {
@@ -183,5 +188,57 @@ class ProactiveCheckReadinessTest {
                         CheckBlockerCode.TOOLSETS_NOT_ALLOWED,
                         List.of("clarify", "cronjob", "delegation", "other-mcp")));
         assertThat(result.available()).isFalse();
+    }
+
+    @Test
+    @DisplayName("붙은 커넥터 서버가 켜져 있으면 읽기 전용에서도 막는 까닭이 없다")
+    void boundConnectorServerIsAllowedWhenWritesOff() {
+        when(connectorBindings.connectorServers(agent.id())).thenReturn(Set.of("career"));
+        enabled(List.of("web", "skills", "fos-assistant", "career"), Set.of("proactive-check"));
+
+        CheckReadiness result = readiness(true).check(agent);
+
+        assertThat(result.blockers()).as("막는 까닭").isEmpty();
+        assertThat(result.available()).isTrue();
+    }
+
+    @Test
+    @DisplayName("붙은 커넥터 서버가 켜져 있으면 쓰기 허용에서도 막는 까닭이 없다")
+    void boundConnectorServerIsAllowedWhenWritesOn() {
+        agent.changeProactiveCheckWritesAllowed(true);
+        when(connectorBindings.connectorServers(agent.id())).thenReturn(Set.of("career"));
+        enabled(List.of("web", "skills", "fos-assistant", "career"), Set.of("proactive-check"));
+
+        CheckReadiness result = readiness(true).check(agent);
+
+        assertThat(result.blockers()).as("막는 까닭").isEmpty();
+        assertThat(result.available()).isTrue();
+    }
+
+    @Test
+    @DisplayName("붙지 않은 MCP 서버는 다른 서버가 붙어 있어도 읽기 전용과 쓰기 허용 모두 TOOLSETS_NOT_ALLOWED 다")
+    void unboundMcpServerIsStillNotAllowed() {
+        when(connectorBindings.connectorServers(agent.id())).thenReturn(Set.of("career"));
+        enabled(List.of("web", "skills", "career", "other-mcp"), Set.of("proactive-check"));
+
+        CheckReadiness readOnly = readiness(true).check(agent);
+        agent.changeProactiveCheckWritesAllowed(true);
+        CheckReadiness writes = readiness(true).check(agent);
+
+        CheckBlocker expected = new CheckBlocker(CheckBlockerCode.TOOLSETS_NOT_ALLOWED, List.of("other-mcp"));
+        assertThat(readOnly.blockers()).as("읽기 전용").containsExactly(expected);
+        assertThat(writes.blockers()).as("쓰기 허용").containsExactly(expected);
+    }
+
+    @Test
+    @DisplayName("연결이 붙은 에이전트라도 옛 커넥터 에이전트는 AGENT_NOT_SUPPORTED 다")
+    void legacyConnectorAgentIsStillNotSupportedEvenWithBindings() {
+        agent.markConnectorManaged();
+        when(connectorBindings.connectorServers(agent.id())).thenReturn(Set.of("career"));
+
+        CheckReadiness result = readiness(true).check(agent);
+
+        assertThat(codes(result)).as("막는 까닭").containsExactly(CheckBlockerCode.AGENT_NOT_SUPPORTED);
+        verifyNoInteractions(toolsets, skills);
     }
 }
