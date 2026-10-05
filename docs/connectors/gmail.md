@@ -64,8 +64,8 @@ MCP 서버 이름은 `gmail` 이다. 인자는 `search_messages` 의 `max_result
 | `update_label` | `label`(번호나 이름), `name`, `text_color`, `background_color` | 바뀐 라벨 |
 | `list_filters` | 없음 | `{filters: [...]}` |
 | `create_filter` | `from`, `to`, `subject`, `query`, `negated_query`, `has_attachment`, `size`, `size_comparison`, `add_labels`, `remove_labels`, `forward` | 저장한 필터 |
-| `delete_filter` | `filter_id` | 지운 필터 번호와 완료 여부 |
-| `apply_labels_to_query` | `query`, `add_labels`, `remove_labels`, `expected_count` | 적용한 대상 수와 검색어, 라벨 번호 |
+| `delete_filter` | `filter_id` | `{deleted, filter_id}` |
+| `apply_labels_to_query` | `query`, `add_labels`, `remove_labels`, `expected_count` | `{count, query, add_label_ids, remove_label_ids}` |
 | `send_message` | `to`, `subject`, `body`, `cc`, `bcc` | `{id, thread_id}` |
 | `reply_to_message` | `message_id`, `to`, `subject`, `body`, `cc` | `{id, thread_id}` |
 
@@ -100,7 +100,7 @@ MCP 서버 이름은 `gmail` 이다. 인자는 `search_messages` 의 `max_result
 | `GMAIL_UNAVAILABLE` | `unavailable` | 연결하지 못했다. 시간 안에 답이 없다. Gmail API 가 3xx, 429, 5xx 나 위에 없는 4xx 로 답했다. 응답을 읽지 못했다. 토큰 endpoint 가 `invalid_grant` 와 `invalid_client` 밖의 오류로 답했다 |
 
 오류 결과는 코드만 담는다. 대상 수 변경에는 서버가 센 `actual_count` 도 담는다.
-필터 권한 오류에는 토큰 재발급 안내를 담는다. Google 이 준 오류 글과 요청한 주소는 결과와 로그에 싣지 않는다.
+필터 권한 오류도 서버는 코드만 반환하고 스킬이 토큰 재발급을 안내한다. Google 이 준 오류 글과 요청한 주소는 결과와 로그에 싣지 않는다.
 외부 호출의 제한 시간은 호출마다 15초다. 대시보드가 확인 도구를 기다리는 시간은 10초라, Google 이 느리게 답하면 등록과 연결 확인이 서버의 제한 시간보다 먼저 `unavailable` 로 끝난다. 어느 호출도 다시 부르지 않는다. 보내기가 시간 안에 답하지 않았을 때 다시 부르면 메일이 두 번 나갈 수 있다.
 
 ## scope 와 휴지통
