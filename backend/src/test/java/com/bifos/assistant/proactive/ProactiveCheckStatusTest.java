@@ -143,8 +143,8 @@ class ProactiveCheckStatusTest {
     void ownerSeesInvalidReasonOfLastCheck() throws Exception {
         Agent groupAgent = agent(AgentVisibility.GROUP);
         Conversation ownersCheck = checkConversationOf(owner, groupAgent);
-        ProactiveCheck check = ProactiveCheck.started(
-                owner.id(), groupAgent.id(), ownersCheck.id(), CheckTrigger.MANUAL, false, NOW);
+        ProactiveCheck check =
+                ProactiveCheck.started(owner.id(), groupAgent.id(), ownersCheck.id(), CheckTrigger.MANUAL, false, NOW);
         check.succeedInvalid(CheckInvalidReason.EMPTY_ANSWER, 0, 0, NOW.plusSeconds(30));
         createdChecks.add(checks.save(check).id());
         when(currentUser.require()).thenReturn(owner);
