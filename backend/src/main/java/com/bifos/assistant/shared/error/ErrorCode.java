@@ -51,6 +51,8 @@ public enum ErrorCode {
     AGENT_BUSY(HttpStatus.CONFLICT),
     /** 셸이나 파일, 다른 사람의 대화에 닿는 toolset은 그룹 에이전트에 둘 수 없다. */
     AGENT_TOOLS_REQUIRE_PRIVATE(HttpStatus.CONFLICT),
+    /** 연결은 비공개 에이전트에만 붙인다. 남이 주인의 계정으로 외부 서비스를 쓰지 못하게 한다(ADR-083). */
+    AGENT_CONNECTIONS_REQUIRE_PRIVATE(HttpStatus.CONFLICT),
     /** 요청자가 만들 수 있는 에이전트 수를 이미 채웠다. 지운 에이전트는 세지 않는다. */
     AGENT_LIMIT_REACHED(HttpStatus.CONFLICT),
     /** Hermes가 저장 뒤 읽은 toolset 목록을 요청한 목록과 다르게 돌려줬다. */
@@ -184,6 +186,18 @@ public enum ErrorCode {
     CONNECTOR_ACTION_NOT_PENDING(HttpStatus.CONFLICT),
     /** 그 연결에 승인해 실행을 보낸 호출이 아직 끝나지 않았다. 끝난 뒤에 다시 등록하거나 해제한다(ADR-050). */
     CONNECTOR_ACTION_EXECUTING(HttpStatus.CONFLICT),
+    /** 붙이려는 연결이 값이 확인돼 쓸 수 있는 상태가 아니거나 보관 파일에 값이 없다(ADR-083). */
+    CONNECTOR_NOT_CONNECTED(HttpStatus.CONFLICT),
+    /** 대시보드가 그 profile 의 설정이나 이미 붙은 다른 커넥터와 충돌해 붙이기를 거절했다. 아무것도 바뀌지 않았다. */
+    CONNECTOR_BIND_CONFLICT(HttpStatus.CONFLICT),
+    /** 그 에이전트의 profile 이 아직 커넥터를 받을 준비가 되지 않았다. 운영자가 표식을 둔 뒤에 붙인다. */
+    CONNECTOR_PROFILE_NOT_READY(HttpStatus.CONFLICT),
+    /**
+     * 관리자가 본 뒤에 그 바인딩이 다시 설치돼 재시작이 한 번 더 필요하다. 반영 완료가 대기를 풀지 않는다.
+     *
+     * <p>재시작한 뒤에 들어온 설치는 떠 있는 gateway 가 아직 보지 못했기 때문이다.
+     */
+    CONNECTOR_RESTART_AGAIN(HttpStatus.CONFLICT),
     /** 없는 알림과 남의 알림을 같은 응답으로 숨긴다. 번호를 훑어 남의 것이 있는지 알아낼 수 없게 한다(ADR-070). */
     NOTIFICATION_NOT_FOUND(HttpStatus.NOT_FOUND),
     /**

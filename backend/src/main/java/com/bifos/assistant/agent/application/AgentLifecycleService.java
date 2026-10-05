@@ -87,20 +87,10 @@ public class AgentLifecycleService {
         if (!user.isAdmin()) {
             requireBelowLimit(user);
         }
-        return provisionAgent(user, name, visibility, false);
+        return provisionAgent(user, name, visibility);
     }
 
-    /**
-     * 커넥터 연결용 비공개 에이전트를 만든다.
-     *
-     * <p>사용자가 지울 수 없는 에이전트라 사용자당 상한을 거치지 않고, 상한 계산에서도 빠진다.
-     */
-    @Transactional
-    public Agent createConnectorAgent(CurrentUser user, String name) {
-        return provisionAgent(user, name, AgentVisibility.PRIVATE, true);
-    }
-
-    private Agent provisionAgent(CurrentUser user, String name, AgentVisibility visibility, boolean connectorManaged) {
+    private Agent provisionAgent(CurrentUser user, String name, AgentVisibility visibility) {
         String agentName = requireName(name);
         AgentVisibility effectiveVisibility = visibility == null ? AgentVisibility.PRIVATE : visibility;
 
@@ -133,9 +123,6 @@ public class AgentLifecycleService {
                     user.id(),
                     clock.instant());
             agent.markManagedProfile();
-            if (connectorManaged) {
-                agent.markConnectorManaged();
-            }
             // 제약 위반이 커밋 때가 아니라 여기서 드러나야 profile 을 거둘 수 있다.
             return agents.saveAndFlush(agent);
         } catch (RuntimeException failure) {

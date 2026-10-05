@@ -1,7 +1,10 @@
 package com.bifos.assistant.connector.application;
 
 import com.bifos.assistant.agent.domain.AgentToolPolicy;
+import com.bifos.assistant.hermes.HermesConnectorClient;
 import com.bifos.assistant.hermes.dto.ConnectorManifest;
+import java.util.List;
+import java.util.Optional;
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -15,6 +18,29 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
 final class ConnectorManifests {
+
+    /**
+     * 카탈로그를 요청마다 다시 읽고 받는 manifest 만 남긴다. 운영자가 목록을 바꾸면 화면에 바로 보여야 하기 때문이다.
+     *
+     * @throws com.bifos.assistant.shared.error.ApiException {@code CONNECTOR_UNAVAILABLE}. 카탈로그를 읽지 못했을 때
+     */
+    static List<ConnectorManifest> read(HermesConnectorClient connector) {
+        final List<ConnectorManifest> manifests;
+        try {
+            manifests = connector.readCatalog();
+        } catch (RuntimeException ex) {
+            log.warn("connector catalog read failed: {}", ex.getClass().getSimpleName());
+            throw ConnectorErrors.unavailable();
+        }
+        return manifests.stream().filter(ConnectorManifests::accepted).toList();
+    }
+
+    /** 그 번호의 manifest 다. 카탈로그에 없거나 받지 않는 선언이면 빈 값이다. */
+    static Optional<ConnectorManifest> find(HermesConnectorClient connector, String connectorId) {
+        return read(connector).stream()
+                .filter(manifest -> manifest.id().equals(connectorId))
+                .findFirst();
+    }
 
     /**
      * manifest 로 열 수 없는 내장 toolset 을 선언한 커넥터와 도구 정책이 하한보다 느슨한 커넥터는 받지 않는다.

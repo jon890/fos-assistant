@@ -1,6 +1,8 @@
 package com.bifos.assistant.connector.presentation;
 
 import com.bifos.assistant.connector.application.model.AdminConnectionSnapshot;
+import com.bifos.assistant.connector.application.model.AgentConnectionView;
+import com.bifos.assistant.connector.application.model.BoundAgentSummary;
 import com.bifos.assistant.connector.application.model.ConnectionSnapshot;
 import com.bifos.assistant.connector.application.model.ConnectorFieldSummary;
 import com.bifos.assistant.connector.application.model.ConnectorOption;
@@ -64,6 +66,18 @@ public final class ConnectionDtos {
         }
     }
 
+    /**
+     * 연결이 붙은 에이전트 하나다. 상태는 enum 이름 그대로 낸다.
+     *
+     * @param restartRequired 그 에이전트의 profile 이 공유 gateway 재시작을 기다린다
+     */
+    public record BoundAgentView(String agentCode, String agentName, String status, boolean restartRequired) {
+        static BoundAgentView from(BoundAgentSummary value) {
+            return new BoundAgentView(
+                    value.agentCode(), value.agentName(), value.status().name(), value.restartRequired());
+        }
+    }
+
     public record ConnectorView(
             String id,
             String title,
@@ -71,7 +85,8 @@ public final class ConnectionDtos {
             List<ConnectorFieldView> fields,
             List<ConnectorToolView> tools,
             String myStatus,
-            boolean available) {
+            boolean available,
+            List<BoundAgentView> bindings) {
         static ConnectorView from(ConnectorSummary value) {
             return new ConnectorView(
                     value.id(),
@@ -80,7 +95,8 @@ public final class ConnectionDtos {
                     value.fields().stream().map(ConnectorFieldView::from).toList(),
                     value.tools().stream().map(ConnectorToolView::from).toList(),
                     value.myStatus().name(),
-                    value.available());
+                    value.available(),
+                    value.bindings().stream().map(BoundAgentView::from).toList());
         }
     }
 
@@ -90,14 +106,14 @@ public final class ConnectionDtos {
         }
     }
 
+    /** 재시작 대기는 연결이 아니라 붙은 에이전트마다 {@code bindings} 에 있다. */
     public record ConnectionView(
             String connectorId,
             String status,
             Map<String, String> secretPrefixes,
             Map<String, String> values,
             Instant checkedAt,
-            String agentCode,
-            boolean restartRequired,
+            List<BoundAgentView> bindings,
             int undeclaredTools) {
         static ConnectionView from(ConnectionSnapshot value) {
             return new ConnectionView(
@@ -106,8 +122,7 @@ public final class ConnectionDtos {
                     value.secretPrefixes(),
                     value.values(),
                     value.checkedAt(),
-                    value.agentCode(),
-                    value.restartRequired(),
+                    value.bindings().stream().map(BoundAgentView::from).toList(),
                     value.undeclaredTools());
         }
     }
@@ -131,24 +146,65 @@ public final class ConnectionDtos {
         }
     }
 
-    /** 다른 사용자의 칸 값과 비밀 앞부분은 담지 않는다. */
+    /**
+     * 관리자가 보는 바인딩 한 줄이다. 다른 사용자의 칸 값과 비밀 앞부분은 담지 않는다.
+     *
+     * @param restartRequiredSince 반영 완료 요청이 그대로 돌려보낼 재시작 대기 시작 시각
+     */
     public record AdminConnectionView(
             String connectorId,
             Long userId,
             String displayName,
-            String status,
             String agentCode,
+            String status,
             boolean restartRequired,
+            Instant restartRequiredSince,
             int undeclaredTools) {
         static AdminConnectionView from(AdminConnectionSnapshot value) {
             return new AdminConnectionView(
                     value.connectorId(),
                     value.userId(),
                     value.displayName(),
-                    value.status().name(),
                     value.agentCode(),
+                    value.status().name(),
                     value.restartRequired(),
+                    value.restartRequiredSince(),
                     value.undeclaredTools());
+        }
+    }
+
+    /**
+     * 관리자 반영 완료 요청이다.
+     *
+     * @param restartRequiredSince 관리자 목록에서 본 그 바인딩의 재시작 대기 시작 시각. 대기가 없었으면 null
+     */
+    public record ConfirmRequest(Instant restartRequiredSince) {}
+
+    /**
+     * 에이전트 하나에서 본 연결 하나다. 상태는 enum 이름 그대로 내고, 붙어 있지 않으면 {@code status} 가 null 이다.
+     *
+     * @param toolCount 커넥터가 선언한 도구 수
+     * @param skills 붙이면 그 profile 에 설치되는 커넥터 스킬 이름
+     */
+    public record AgentConnectionResponse(
+            String connectorId,
+            String title,
+            String connectionStatus,
+            boolean bound,
+            String status,
+            boolean restartRequired,
+            int toolCount,
+            List<String> skills) {
+        static AgentConnectionResponse from(AgentConnectionView value) {
+            return new AgentConnectionResponse(
+                    value.connectorId(),
+                    value.title(),
+                    value.connectionStatus().name(),
+                    value.bound(),
+                    value.status() == null ? null : value.status().name(),
+                    value.restartRequired(),
+                    value.toolCount(),
+                    value.skills());
         }
     }
 }

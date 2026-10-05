@@ -537,6 +537,31 @@ public class ConnectorActionService {
                 grants.findActiveByUserIdAndConnectorId(connection.userId(), connection.connectorId(), now);
         active.forEach(grant -> grant.revoke(now));
         grants.saveAll(active);
+        publishAfterCommit(rejected);
+    }
+
+    /**
+     * 그 에이전트에서 연결을 뗄 때 그 에이전트의 실행이 판정한 줄만 거절한다. 트랜잭션 안에서 부른다.
+     *
+     * <p>상시 허락은 건드리지 않는다. 허락은 사용자와 커넥터에 묶여 같은 연결을 붙인 다른 에이전트에도 걸린다.
+     * {@code EXECUTING} 이 남은 줄이 있으면 {@code CONNECTOR_ACTION_EXECUTING} 으로 거절한다. 실행이 그 profile 의 값으로
+     * 돌고 있어 그 사이 떼면 결과를 알 수 없다. 부르는 쪽이 사용자 행을 잠근 채 부르고 승인도 같은 행을 먼저 잠그므로
+     * 줄을 따로 잠그지 않는다.
+     */
+    public void rejectPendingFor(ConnectorConnection connection, Long agentId, Instant now) {
+        if (!actions.findByUserIdAndConnectorIdAndAgentIdAndStatus(
+                        connection.userId(), connection.connectorId(), agentId, ActionStatus.EXECUTING)
+                .isEmpty()) {
+            throw new ApiException(ErrorCode.CONNECTOR_ACTION_EXECUTING, EXECUTING_MESSAGE);
+        }
+        List<ConnectorAction> pending = actions.findByUserIdAndConnectorIdAndAgentIdAndStatus(
+                connection.userId(), connection.connectorId(), agentId, ActionStatus.PENDING);
+        pending.forEach(action -> action.refuse(ConnectorAction.CONNECTION_CHANGED, now));
+        publishAfterCommit(actions.saveAll(pending));
+    }
+
+    /** 거절한 줄의 사건을 트랜잭션이 커밋한 뒤에 낸다. 트랜잭션 밖이면 바로 낸다. */
+    private void publishAfterCommit(List<ConnectorAction> rejected) {
         if (rejected.isEmpty()) {
             return;
         }

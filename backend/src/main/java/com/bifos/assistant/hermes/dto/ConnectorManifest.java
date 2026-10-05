@@ -13,6 +13,7 @@ import java.util.List;
  * @param attachments 참이면 연결용 에이전트의 대화가 사진을 받는다
  * @param schema manifest 의 판. 2 부터 도구마다 정책을 선언한다
  * @param tools 도구마다의 정책 선언. 카탈로그가 내지 않았으면 빈 목록
+ * @param skills 바인딩 설치가 그 profile 에 복사할 스킬 이름. 옛 대시보드 plugin 은 내지 않고, 없으면 빈 목록
  */
 public record ConnectorManifest(
         String id,
@@ -24,11 +25,28 @@ public record ConnectorManifest(
         List<String> toolsets,
         boolean attachments,
         int schema,
-        List<ConnectorTool> tools) {
+        List<ConnectorTool> tools,
+        List<String> skills) {
 
     public ConnectorManifest {
         fields = List.copyOf(fields);
         toolsets = List.copyOf(toolsets);
         tools = List.copyOf(tools);
+        skills = List.copyOf(skills);
+    }
+
+    /** 스킬을 내지 않는 선언이다. 옛 대시보드 plugin 의 카탈로그와 검사가 쓴다. */
+    public ConnectorManifest(
+            String id,
+            String title,
+            String description,
+            List<ConnectorField> fields,
+            String verifyTool,
+            String mcpServer,
+            List<String> toolsets,
+            boolean attachments,
+            int schema,
+            List<ConnectorTool> tools) {
+        this(id, title, description, fields, verifyTool, mcpServer, toolsets, attachments, schema, tools, List.of());
     }
 }

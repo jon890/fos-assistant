@@ -200,16 +200,17 @@ class AgentLifecycleServiceTest {
     }
 
     @Test
-    @DisplayName("커넥터 연결용 에이전트는 다섯이어도 만들고 상한에 세지 않는다")
-    void createsConnectorAgentsBeyondLimitWithoutCounting() {
+    @DisplayName("예전 방식의 연결 에이전트는 상한에 세지 않아 넷과 그것을 가진 사용자가 다섯째를 만든다")
+    void legacyConnectorAgentsDoNotCountTowardLimit() {
         CurrentUser kid = member();
-        seedAgents(kid, 5);
+        seedAgents(kid, 4);
+        Agent legacy = seedAgents(kid, 1).get(0);
+        legacy.markConnectorManaged();
+        agents.save(legacy);
 
-        Agent connectorAgent = lifecycle.createConnectorAgent(kid, "가계부");
-        createdProfiles.add(connectorAgent.hermesProfile());
+        Agent created = create(kid, "다섯째", null);
 
-        assertThat(connectorAgent.connectorManaged()).isTrue();
-        assertThat(connectorAgent.visibility()).isEqualTo(AgentVisibility.PRIVATE);
+        assertThat(created.connectorManaged()).isFalse();
         assertThat(agents.countByOwnerUserIdAndDeletedAtIsNullAndConnectorManagedFalse(kid.id()))
                 .isEqualTo(5);
         assertCode(() -> lifecycle.create(kid, "여섯째", null), ErrorCode.AGENT_LIMIT_REACHED);
