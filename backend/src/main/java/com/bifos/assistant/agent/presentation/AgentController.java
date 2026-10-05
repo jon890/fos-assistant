@@ -50,8 +50,7 @@ public class AgentController {
 
     /** 주인이나 {@code ADMIN} 이 공개 범위를 바꾼다. 주인은 그대로 남는다. */
     @PatchMapping("/{code}/visibility")
-    public AgentView changeVisibility(
-            @PathVariable String code, @Valid @RequestBody ChangeVisibilityRequest request) {
+    public AgentView changeVisibility(@PathVariable String code, @Valid @RequestBody ChangeVisibilityRequest request) {
         CurrentUser user = currentUser.require();
         return view(user, lifecycle.changeVisibility(user, code, request.visibility()));
     }
