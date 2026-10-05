@@ -128,6 +128,9 @@ scripts/quality.sh check
 | `backend/src/main/java/com/bifos/assistant/connector/application/model/AgentConnectionView.java` | 신규 |
 | `backend/src/main/java/com/bifos/assistant/connector/application/model/AgentConnectionsView.java` | 신규 |
 | `backend/src/main/java/com/bifos/assistant/connector/application/ConnectorBindingLookup.java` | 신규 |
+| `backend/src/main/java/com/bifos/assistant/connector/application/ConnectorManifests.java` | 수정 |
+| `backend/src/main/java/com/bifos/assistant/connector/application/model/BoundAgentSummary.java` | 신규 |
+| `backend/src/main/java/com/bifos/assistant/agent/infra/AgentRepository.java` | 수정 |
 | `backend/src/main/java/com/bifos/assistant/agent/application/AgentConnectorDetacher.java` | 신규 |
 | `backend/src/main/java/com/bifos/assistant/hermes/dto/ConnectorManifest.java` | 수정 |
 | `backend/src/main/java/com/bifos/assistant/connector/presentation/ConnectionDtos.java` | 수정 |
