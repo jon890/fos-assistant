@@ -85,6 +85,22 @@ class AttachmentUploadLimitTest {
     }
 
     @Test
+    @DisplayName("실제 HTTP 요청으로 사진 서른 장은 올리고 서른한 번째는 입력 오류로 거절한다")
+    void acceptsThirtyUploadsAndRejectsTheThirtyFirst() throws Exception {
+        for (int i = 0; i < properties.maxFiles(); i++) {
+            HttpResponse<String> response = upload(i + 1, 1);
+
+            assertThat(response.statusCode()).as(response.body()).isEqualTo(200);
+        }
+
+        HttpResponse<String> response = upload(properties.maxFiles() + 1, 1);
+
+        assertThat(response.statusCode()).as(response.body()).isEqualTo(400);
+        assertThat(code(response)).isEqualTo("VALIDATION_FAILED");
+        assertThat(attachments.findByConversationIdOrderByIdAsc(conversationId)).hasSize(properties.maxFiles());
+    }
+
+    @Test
     @DisplayName("기본 상한 1MB 를 넘는 2MB 사진이 올라간다")
     void uploads2MbPhotoOverDefault1MbLimit() throws Exception {
         HttpResponse<String> response = upload(2 * MB);
@@ -116,7 +132,11 @@ class AttachmentUploadLimitTest {
     }
 
     private HttpResponse<String> upload(int size) throws Exception {
-        String boundary = "attachment-boundary-" + size;
+        return upload(size, size);
+    }
+
+    private HttpResponse<String> upload(int requestNumber, int size) throws Exception {
+        String boundary = "attachment-boundary-" + requestNumber + "-" + size;
         ByteArrayOutputStream body = new ByteArrayOutputStream(size + 512);
         body.write(("--" + boundary + "\r\n"
                         + "Content-Disposition: form-data; name=\"file\"; filename=\"photo.jpg\"\r\n"

@@ -76,19 +76,19 @@ test("미리보기의 지우는 단추를 누르면 그 사진만 빠진다", as
   await expect(items).toHaveCount(1);
 });
 
-test("지운 첨부는 서버 상한을 계속 차지하지 않아 지운 뒤 다시 10장을 올릴 수 있다", async ({
+test("지운 첨부는 서버 상한을 계속 차지하지 않아 지운 뒤 다시 30장을 올릴 수 있다", async ({
   page,
 }, testInfo) => {
   await openNewConversation(page, testInfo);
 
-  // 열 장을 채운 뒤 하나를 지운다. 지우는 단추가 서버 DELETE 를 부르지 않으면 「묶이지 않은 첨부」
+  // 서른 장을 채운 뒤 하나를 지운다. 지우는 단추가 서버 DELETE 를 부르지 않으면 「묶이지 않은 첨부」
   // 상한을 계속 차지해, 그 뒤로 한 장도 더 올릴 수 없다.
   await page.getByTestId("attachment-input").setInputFiles(
-    Array.from({ length: 10 }, (_, index) => pngFile(`cap-${index}.png`)),
+    Array.from({ length: 30 }, (_, index) => pngFile(`cap-${index}.png`)),
   );
   await expect(page.getByTestId("attachment-uploading")).toHaveCount(0);
   const items = page.getByTestId("attachment-previews").locator("> div");
-  await expect(items).toHaveCount(10);
+  await expect(items).toHaveCount(30);
 
   // DELETE 가 끝나기 전에 다음 사진을 올리면 순서에 따라 상한에 걸린다. 응답을 기다린 뒤 고른다.
   const deleted = page.waitForResponse(
@@ -97,12 +97,12 @@ test("지운 첨부는 서버 상한을 계속 차지하지 않아 지운 뒤 �
       && response.request().method() === "DELETE",
   );
   await items.first().getByRole("button", { name: "사진 지우기" }).click();
-  await expect(items).toHaveCount(9);
+  await expect(items).toHaveCount(29);
   expect((await deleted).ok()).toBeTruthy();
 
   await page.getByTestId("attachment-input").setInputFiles([pngFile("cap-extra.png")]);
   await expect(page.getByTestId("attachment-uploading")).toHaveCount(0);
-  await expect(items).toHaveCount(10);
+  await expect(items).toHaveCount(30);
   // 서버가 상한 초과로 거절했으면 이 문구가 그 첨부의 자리에 남는다. DELETE 가 불렸다면 나오지 않는다.
   await expect(page.getByText("too many images are waiting to be sent")).toHaveCount(0);
 });
@@ -132,35 +132,35 @@ test("새 대화에서 사진을 고르고 글과 함께 보내면 사진이 보
   ).toBeVisible();
 });
 
-test("11장을 고르면 10장만 올라가고 넘은 것을 알린다", async ({ page }, testInfo) => {
+test("31장을 고르면 30장만 올라가고 넘은 것을 알린다", async ({ page }, testInfo) => {
   await openNewConversation(page, testInfo);
 
-  const files = Array.from({ length: 11 }, (_, index) => pngFile(`over-${index}.png`));
+  const files = Array.from({ length: 31 }, (_, index) => pngFile(`over-${index}.png`));
   await page.getByTestId("attachment-input").setInputFiles(files);
 
-  await expect(page.getByTestId("attachment-previews").locator("> div")).toHaveCount(10);
-  await expect(page.getByTestId("attachment-notice")).toContainText("10장까지");
-  // 개수만 세면 통과하지만 실제로는 열 장 모두가 올라가는 중 오류로 빠졌을 수도 있다.
+  await expect(page.getByTestId("attachment-previews").locator("> div")).toHaveCount(30);
+  await expect(page.getByTestId("attachment-notice")).toContainText("30장까지");
+  // 개수만 세면 통과하지만 실제로는 서른 장 모두가 올라가는 중 오류로 빠졌을 수도 있다.
   await expect(page.getByTestId("attachment-uploading")).toHaveCount(0);
-  await expect(page.getByTestId("attachment-previews").locator("> div")).toHaveCount(10);
+  await expect(page.getByTestId("attachment-previews").locator("> div")).toHaveCount(30);
   await expect(page.getByText("사진을 올리지 못했어요.")).toHaveCount(0);
 });
 
-test("이미 여섯 장을 붙인 뒤 여섯 장을 더 고르면 네 장만 올라가고 알린다", async ({ page }, testInfo) => {
+test("이미 열여섯 장을 붙인 뒤 열여섯 장을 더 고르면 열네 장만 올라가고 알린다", async ({ page }, testInfo) => {
   await openNewConversation(page, testInfo);
 
   await page.getByTestId("attachment-input").setInputFiles(
-    Array.from({ length: 6 }, (_, index) => pngFile(`slot-${index}.png`)),
+    Array.from({ length: 16 }, (_, index) => pngFile(`slot-${index}.png`)),
   );
   await expect(page.getByTestId("attachment-uploading")).toHaveCount(0);
-  await expect(page.getByTestId("attachment-previews").locator("> div")).toHaveCount(6);
+  await expect(page.getByTestId("attachment-previews").locator("> div")).toHaveCount(16);
 
   await page.getByTestId("attachment-input").setInputFiles(
-    Array.from({ length: 6 }, (_, index) => pngFile(`slot-more-${index}.png`)),
+    Array.from({ length: 16 }, (_, index) => pngFile(`slot-more-${index}.png`)),
   );
 
-  await expect(page.getByTestId("attachment-previews").locator("> div")).toHaveCount(10);
-  await expect(page.getByTestId("attachment-notice")).toContainText("10장까지");
+  await expect(page.getByTestId("attachment-previews").locator("> div")).toHaveCount(30);
+  await expect(page.getByTestId("attachment-notice")).toContainText("30장까지");
 });
 
 test("10MB 를 넘는 파일은 올라가지 않고 알린다", async ({ page }, testInfo) => {
@@ -358,16 +358,16 @@ test("올리는 중에 대화를 바꾸면 그 사진은 새 대화에 붙지 �
 
   try {
     await page.getByTestId("attachment-input").setInputFiles(
-      Array.from({ length: 10 }, (_, index) => pngFile(`held-${index}.png`)),
+      Array.from({ length: 30 }, (_, index) => pngFile(`held-${index}.png`)),
     );
-    await expect.poll(() => heldUploads.length).toBe(10);
+    await expect.poll(() => heldUploads.length).toBe(30);
 
     targetId = await selectConversationByText(page, targetText);
     expect(targetId).not.toBe(originId);
 
     for (const release of heldUploads) release();
-    // 사라진 입력창이 응답을 받은 뒤 열 장을 모두 서버에서 지워야 원래 대화의 상한이 빈다.
-    await expect.poll(() => deletedCount, { timeout: 15_000 }).toBe(10);
+    // 사라진 입력창이 응답을 받은 뒤 서른 장을 모두 서버에서 지워야 원래 대화의 상한이 빈다.
+    await expect.poll(() => deletedCount, { timeout: 15_000 }).toBe(30);
   } finally {
     await page.unroute("**/api/chat/conversations/*/attachments");
   }
@@ -382,10 +382,10 @@ test("올리는 중에 대화를 바꾸면 그 사진은 새 대화에 붙지 �
 
   await selectConversationByText(page, originText);
   await page.getByTestId("attachment-input").setInputFiles(
-    Array.from({ length: 10 }, (_, index) => pngFile(`again-${index}.png`)),
+    Array.from({ length: 30 }, (_, index) => pngFile(`again-${index}.png`)),
   );
   await expect(page.getByTestId("attachment-uploading")).toHaveCount(0);
-  await expect(page.getByTestId("attachment-previews").locator("> div")).toHaveCount(10);
+  await expect(page.getByTestId("attachment-previews").locator("> div")).toHaveCount(30);
   await expect(page.getByText("too many images are waiting to be sent")).toHaveCount(0);
   await expect(page.getByText("사진을 올리지 못했어요.")).toHaveCount(0);
 });

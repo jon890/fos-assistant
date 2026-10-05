@@ -130,13 +130,28 @@ class AttachmentServiceTest {
     }
 
     @Test
-    @DisplayName("묶이지 않은 사진이 상한만큼 있으면 한 장 더 올리지 못한다")
-    void cannotUploadOneMoreWhenUnboundImagesReachLimit() {
+    @DisplayName("설정을 생략하면 사진 서른 장을 한 번에 보낼 수 있다")
+    void defaultsToThirtyImages() {
+        AttachmentProperties defaults = new AttachmentProperties("/attachments", "/agent-attachments", null, null, null);
+
+        assertThat(defaults.maxFiles()).isEqualTo(30);
+    }
+
+    @Test
+    @DisplayName("묶이지 않은 사진 서른 장은 올리고 서른한 번째는 거절한다")
+    void acceptsThirtyUnboundImagesAndRejectsTheThirtyFirst() {
+        List<Long> ids = new ArrayList<>();
         for (int i = 0; i < properties.maxFiles(); i++) {
-            upload(OWNER, mine, "image/png", IMAGE);
+            ids.add(upload(OWNER, mine, "image/png", IMAGE).id());
         }
 
+        service.requireAttachable(mine, ids);
         assertCode(() -> upload(OWNER, mine, "image/png", IMAGE), ErrorCode.VALIDATION_FAILED);
+
+        List<Long> tooMany = new ArrayList<>(ids);
+        tooMany.add(Long.MAX_VALUE);
+        assertCode(() -> service.requireAttachable(mine, tooMany), ErrorCode.VALIDATION_FAILED);
+
         assertThat(attachments.findByConversationIdOrderByIdAsc(mine)).hasSize(properties.maxFiles());
     }
 

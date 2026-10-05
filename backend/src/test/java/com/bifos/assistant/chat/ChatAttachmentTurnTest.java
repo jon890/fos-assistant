@@ -57,6 +57,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.stream.Stream;
@@ -191,24 +192,39 @@ class ChatAttachmentTurnTest {
     }
 
     @Test
-    @DisplayName("사진을 붙이면 Hermes 입력에 에이전트 쪽 자리와 디스크 이름이 있고 저장한 본문은 그대로다")
-    void hermesInputWithImagesHasAgentSlotAndDiskNameAndStoresBodyAsIs() {
+    @DisplayName("사진 서른 장을 붙이면 Hermes 입력에 모든 순번과 이름이 있고 저장한 본문은 그대로다")
+    void hermesInputWithThirtyImagesHasAllOrdinalsAndNamesAndStoresBodyAsIs() {
         Long conversationId = chat.startEmpty(dad, "dad").id();
-        ChatAttachment photo = upload(dad, conversationId, "바다.png");
+        List<ChatAttachment> photos = new ArrayList<>();
+        for (int i = 1; i <= properties.maxFiles(); i++) {
+            photos.add(upload(dad, conversationId, "사진-" + i + ".png"));
+        }
 
-        chat.send(dad, conversationId, "이 사진 설명해 줘", null, List.of(photo.id()));
+        chat.send(dad, conversationId, "이 사진 설명해 줘", null, photos.stream().map(ChatAttachment::id).toList());
 
         String input = stub().received().getFirst().input();
-        String expected = artifactPreamble(conversationId)
-                + "[이번 메시지에 올린 사진]\n"
-                + AGENT_ROOT + "/" + conversationId + "\n"
-                + "- 1번째 사진: " + photo.id() + ".png (올린 이름: 바다.png)\n"
-                + "\n"
-                + "이미지는 read_file 로 읽지 말고 vision_analyze 로 본다.\n"
-                + "사용자에게 사진을 가리킬 때는 파일 이름 대신 몇 번째 사진인지로 적는다.\n"
-                + "\n"
-                + "이 사진 설명해 줘";
-        assertThat(input).isEqualTo(expected);
+        StringBuilder expected = new StringBuilder(artifactPreamble(conversationId))
+                .append("[이번 메시지에 올린 사진]\n")
+                .append(AGENT_ROOT)
+                .append("/")
+                .append(conversationId)
+                .append("\n");
+        for (int i = 0; i < photos.size(); i++) {
+            ChatAttachment photo = photos.get(i);
+            expected.append("- ")
+                    .append(i + 1)
+                    .append("번째 사진: ")
+                    .append(photo.id())
+                    .append(".png (올린 이름: ")
+                    .append(photo.originalName())
+                    .append(")\n");
+        }
+        expected.append("\n")
+                .append("이미지는 read_file 로 읽지 말고 vision_analyze 로 본다.\n")
+                .append("사용자에게 사진을 가리킬 때는 파일 이름 대신 몇 번째 사진인지로 적는다.\n")
+                .append("\n")
+                .append("이 사진 설명해 줘");
+        assertThat(input).isEqualTo(expected.toString());
         assertThat(userMessageOf(conversationId).content()).isEqualTo("이 사진 설명해 줘");
     }
 
