@@ -47,6 +47,22 @@ test("메뉴의 예약 작업으로 가면 빈 목록 문구가 보인다", asyn
   await expect(page.getByText("아직 예약 작업이 없어요.")).toBeVisible();
 });
 
+test("작업 만들기의 에이전트 목록은 예약 작업을 돌릴 수 없는 에이전트를 뺀다", async ({ page }) => {
+  await page.route("**/api/agents", (route: Route) =>
+    route.fulfill({
+      json: [
+        { code: "flowed", name: "흐름 도우미", runsTasks: false },
+        { code: "browser", name: "예약 도우미", runsTasks: true },
+        { code: "legacy", name: "기존 도우미" },
+      ],
+    }),
+  );
+  await page.goto("/tasks/new");
+  const agents = page.getByLabel("에이전트", { exact: true });
+  await expect(agents.locator("option")).toHaveText(["예약 도우미", "기존 도우미"]);
+  await expect(agents).toHaveValue("browser");
+});
+
 test("새 작업을 저장하면 상세로 가고 목록에 시각이 사람 말로 보인다", async ({ page }) => {
   await page.goto("/tasks/new");
   await page.getByLabel("이름", { exact: true }).fill("월간 정리");

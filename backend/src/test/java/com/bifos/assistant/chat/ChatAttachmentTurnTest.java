@@ -11,6 +11,7 @@ import static org.mockito.Mockito.when;
 
 import com.bifos.assistant.agent.application.AgentLifecycleService;
 import com.bifos.assistant.agent.application.AgentService;
+import com.bifos.assistant.agent.application.KnownFlows;
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.agent.domain.type.AgentVisibility;
 import com.bifos.assistant.agent.domain.type.CostMode;
@@ -97,6 +98,9 @@ class ChatAttachmentTurnTest {
 
     @Autowired
     ChatService chat;
+
+    @Autowired
+    KnownFlows flows;
     /** 결과물 폴더 단락의 문구는 {@code ArtifactTest} 가 글자 그대로 견준다. 여기서는 그 단락을 받아 쓴다. */
     @Autowired
     ArtifactService artifactService;
@@ -396,7 +400,7 @@ class ChatAttachmentTurnTest {
         CurrentUserProvider provider = mock(CurrentUserProvider.class);
         when(provider.require()).thenReturn(dad);
 
-        List<AgentView> listed = new AgentController(agentService, provider, agentLifecycle).readable();
+        List<AgentView> listed = new AgentController(agentService, provider, agentLifecycle, flows).readable();
 
         assertThat(listed)
                 .extracting(AgentView::code, AgentView::acceptsAttachments)
