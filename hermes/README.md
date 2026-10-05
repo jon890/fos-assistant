@@ -290,7 +290,7 @@ provider credential 은 이 토큰으로 쓰지 못한다.
 | --- | --- | --- |
 | 운영 목록에서 빠졌다 | 상태 조회에 나오지 않고 설치는 400 이다. 제거는 끌 것이 없어 `changed: false` 로 성공한다 | 상태 조회는 `configured: false` 다. 제거는 되고 probe 는 404 다 |
 | 실행 파일을 받지 못했다 | 설치가 503 이다 | 상태 조회, 제거, probe 가 모두 503 이다 |
-| 설치한 뒤 실행 파일, plugin 경로, 운영자 env 값이 바뀌었다 | 해당 없음 | 상태 조회, 제거, probe 가 모두 503 이다 |
+| 설치한 뒤 실행 파일, plugin 경로, 실행 정의의 command·args, 운영자 env 값이 바뀌었다 | 해당 없음 | 상태 조회, 제거, probe 가 모두 503 이다 |
 
 운영 목록에서 빠진 커넥터를 제거하면 plugin 이 그 기록의 서버 env 가 `${이름}` 으로 참조하던 key 를 profile `.env` 에서 함께 지운다. Control Plane 이 그 이름을 더는 알 수 없기 때문이다.
 값이 바뀌어 503 이 된 profile 은 값을 되돌리면 다시 읽힌다.
@@ -299,7 +299,7 @@ provider credential 은 이 토큰으로 쓰지 못한다.
 설치와 제거는 Hermes 등록 이름과 원래 도구 이름의 대응을 그 profile 의 `.fos-connector-tools.json` 에 다시 쓰고, 설치는 `approval: always` 인 도구를 서버 정의의 `tools.exclude` 에 넣고 profile 의 `fos-ctx` 를 묶음의 판으로 맞춘 뒤 파일이 바뀌었는지를 `plugin_updated` 로 답한다.
 `GET /api/connectors` 는 `policy_hook` 을 함께 낸다. `fos-ctx` 가 켜져 있고 묶음의 판과 같고 대응 파일과 `tools.exclude` 가 지금 manifest 와 맞을 때만 참이며, 조건은 [커넥터 도구 정책](../docs/backend/connector-tool-policy.md) 의 「hook 이 켜져 있는지」 가 갖는다.
 
-**한 배포 동안 옛 Control Plane 의 호출과 옛 소유 기록을 그대로 받는다**([ADR-041](../docs/adr/ADR-041-hermes-에-설치하는-plugin-과-profile-틀은-이-저장소가-소유한다.md)).
+**한 배포 동안 옛 Control Plane 의 호출과 옛 소유 기록의 필드 모양·운영자 env 표현을 받는다**([ADR-041](../docs/adr/ADR-041-hermes-에-설치하는-plugin-과-profile-틀은-이-저장소가-소유한다.md)). 실행 정의의 command·args 가 지금 manifest 와 다른 기록까지 받는 것은 아니다.
 
 - 옛 기록은 운영자 env 를 `${이름}` 참조로 갖고 MCP 서버 이름 칸이 없다. 운영자 env 는 그 참조와 지금의 직접 값을 같다고 본다. 다음 설치 요청이 기록을 새 모양으로 다시 쓴다
 - 운영자 env 이름의 `PUT /api/env` 와 `DELETE /api/env` 는 성공으로 답하고 아무것도 쓰지 않는다
