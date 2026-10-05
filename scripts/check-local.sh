@@ -4,7 +4,8 @@
 # 처음 받은 checkout 에서도 돌도록 웹 의존성과 Playwright 의 chromium 을 먼저 설치한다.
 # 둘 다 이미 있으면 바로 끝난다. `pnpm build` 에는 web/Dockerfile 과 같은 자리표시자 환경 변수를 준다.
 #
-# 단계마다 로그를 따로 남기고, 처음 실패한 단계에서 멈춰 그 로그의 끝을 보인다.
+# 단계마다 임시 로그를 만들고, 처음 실패한 단계에서 멈춰 마지막 40줄을 보인다.
+# 정상·오류 종료 모두 임시 로그를 지운다.
 #
 # 사용법: scripts/check-local.sh [--skip-browser] [브라우저 spec ...]
 # 인자는 브라우저 검사에만 넘긴다. 인자가 없으면 브라우저 검사 전체를 돌린다.
@@ -82,7 +83,7 @@ PY
   python3 -m unittest discover -s hermes/tests
 }
 
-echo "로그: ${LOG_DIR}"
+echo "임시 로그(종료 시 삭제): ${LOG_DIR}"
 if [ "$#" -gt 0 ]; then
   echo "브라우저 검사는 인자로 준 spec 만 돌린다: $*"
 fi

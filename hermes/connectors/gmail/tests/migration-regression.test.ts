@@ -47,6 +47,19 @@ function raw(body: string) {
   return Buffer.from(body).toString("base64url");
 }
 
+function decodedSubject(rawMessage: string) {
+  const header = rawMessage.split("\r\n\r\n", 1)[0] ?? "";
+  const subject = header
+    .split("\r\n")
+    .filter((line) => line.startsWith("Subject:") || /^[ \t]/.test(line))
+    .join(" ")
+    .replace(/^Subject:\s*/, "")
+    .replace(/\?=\s+=\?/g, "?==?");
+  return subject.replace(/=\?UTF-8\?B\?([^?]+)\?=/gi, (_word, value) =>
+    Buffer.from(value, "base64").toString("utf8"),
+  );
+}
+
 describe("Python Gmail 회귀의 HTTP 경계 이관", () => {
   test.each([
     "GMAIL_OAUTH_CLIENT_ID",
@@ -363,6 +376,51 @@ describe("Python Gmail 회귀의 MIME 한계 이관", () => {
     }
   });
 
+  test("void 또는 self-closing hidden 요소는 뒤의 보이는 HTML을 숨기지 않는다", async () => {
+    const { fake, server } = setup();
+    const examples = [
+      '<img hidden src="x">보임',
+      "<br hidden>보임",
+      '<img aria-hidden="true" src="x">보임',
+      "<span hidden />보임",
+    ];
+    for (const [index, html] of examples.entries()) {
+      fake.on("GET", `/gmail/messages/h${index}`, {
+        id: `h${index}`,
+        payload: {
+          mimeType: "text/html",
+          headers: [],
+          body: { data: raw(html) },
+        },
+      });
+    }
+    fake.on("GET", "/gmail/messages/hidden", {
+      id: "hidden",
+      payload: {
+        mimeType: "text/html",
+        headers: [],
+        body: { data: raw("<span hidden>숨김</span>보임") },
+      },
+    });
+    try {
+      await withMcp(server, async (client) => {
+        for (const index of examples.keys()) {
+          const result = await tool(client, "get_message", {
+            message_id: `h${index}`,
+          });
+          expect(result.body).toMatchObject({ body: "보임" });
+        }
+        const hidden = await tool(client, "get_message", {
+          message_id: "hidden",
+        });
+        expect(hidden.body).toMatchObject({ body: "보임" });
+        expect(JSON.stringify(hidden.body)).not.toContain("숨김");
+      });
+    } finally {
+      fake.stop();
+    }
+  });
+
   test("1000자 header, EUC-KR encoded subject, 20000자 본문 경계를 보존한다", async () => {
     const { fake, server } = setup();
     const euckr = Buffer.from([0xc7, 0xd1, 0xb1, 0xdb]).toString("base64");
@@ -439,9 +497,176 @@ describe("Python Gmail 회귀의 MIME 한계 이관", () => {
       fake.stop();
     }
   });
+
+  test("emoji는 header, body, thread body, filename 한계를 code point로 센다", async () => {
+    const { fake, server } = setup();
+    const emoji = "😀";
+    const file255 = emoji.repeat(255);
+    const file256 = emoji.repeat(256);
+    fake.on("GET", "/gmail/messages/m1", {
+      id: "m1",
+      payload: {
+        mimeType: "multipart/mixed",
+        headers: [{ name: "Subject", value: emoji.repeat(1001) }],
+        parts: [
+          {
+            mimeType: "text/plain",
+            headers: [],
+            body: { data: raw(emoji.repeat(20001)) },
+          },
+          {
+            mimeType: "application/pdf",
+            filename: file255,
+            body: { attachmentId: "a1" },
+          },
+          {
+            mimeType: "application/pdf",
+            filename: file256,
+            body: { attachmentId: "a2" },
+          },
+        ],
+      },
+    });
+    fake.on("GET", "/gmail/threads/t1", {
+      id: "t1",
+      messages: [mail("t1", emoji.repeat(5001))],
+    });
+    try {
+      await withMcp(server, async (client) => {
+        const message = (
+          await tool(client, "get_message", { message_id: "m1" })
+        ).body;
+        expect(Array.from(message.subject as string)).toHaveLength(1000);
+        expect(Array.from(message.body as string)).toHaveLength(20000);
+        expect(
+          (message.attachments as Array<{ filename: string }>).map(
+            (item) => Array.from(item.filename).length,
+          ),
+        ).toEqual([255, 255]);
+        const thread = (await tool(client, "get_thread", { thread_id: "t1" }))
+          .body;
+        expect(
+          Array.from((thread.messages as Array<{ body: string }>)[0]!.body),
+        ).toHaveLength(5000);
+      });
+    } finally {
+      fake.stop();
+    }
+  });
 });
 
 describe("조립한 메일 확인과 전송 경계", () => {
+  test("send, draft, reply의 Unicode 제목은 ASCII RFC 2047 header로 접고 원문으로 읽힌다", async () => {
+    const { fake, server } = setup();
+    const subject = `${"한국어 😀 ".repeat(20)}끝`;
+    fake.on("POST", "/gmail/drafts", { id: "d1", message: { id: "m1" } });
+    fake.on("POST", "/gmail/messages/send", { id: "sent" });
+    fake.on("GET", "/gmail/messages/orig", {
+      id: "orig",
+      threadId: "t1",
+      payload: { headers: [] },
+    });
+    try {
+      await withMcp(server, async (client) => {
+        await tool(client, "create_draft", {
+          to: "a@example.com",
+          subject,
+          body: "b",
+        });
+        await tool(client, "send_message", {
+          to: "a@example.com",
+          subject,
+          body: "b",
+        });
+        await tool(client, "reply_to_message", {
+          message_id: "orig",
+          to: "a@example.com",
+          subject,
+          body: "b",
+        });
+      });
+      const requests = [
+        fake.seen("POST", "/gmail/drafts")[0]!,
+        ...fake.seen("POST", "/gmail/messages/send"),
+      ];
+      for (const request of requests) {
+        const payload = JSON.parse(request.body);
+        const source = Buffer.from(
+          payload.message?.raw ?? payload.raw,
+          "base64url",
+        ).toString("utf8");
+        const header = source.split("\r\n\r\n", 1)[0]!;
+        expect(header).toMatch(/^Subject: [\x00-\x7f\r\n\t ]+$/m);
+        expect(decodedSubject(source)).toBe(subject);
+      }
+    } finally {
+      fake.stop();
+    }
+  });
+
+  test.each([
+    ["create_draft", "reply_to_message_id"],
+    ["reply_to_message", "message_id"],
+  ])(
+    "답장 원본 ID가 안전하지 않으면 %s는 HTTP 전에 거절한다",
+    async (name, field) => {
+      const { fake, server } = setup();
+      try {
+        await withMcp(server, async (client) => {
+          for (const value of ["/trash", "a".repeat(65)]) {
+            await expectFailure(client, "GMAIL_INVALID_INPUT", name, {
+              to: "a@example.com",
+              subject: "s",
+              body: "b",
+              [field]: value,
+            });
+          }
+        });
+        expect(fake.requests).toHaveLength(0);
+      } finally {
+        fake.stop();
+      }
+    },
+  );
+
+  test("빈 create_draft 답장 원본 ID는 새 초안으로 허용한다", async () => {
+    const { fake, server } = setup();
+    fake.on("POST", "/gmail/drafts", { id: "d1", message: { id: "m1" } });
+    try {
+      await withMcp(server, async (client) => {
+        const result = await tool(client, "create_draft", {
+          to: "a@example.com",
+          subject: "s",
+          body: "b",
+          reply_to_message_id: "",
+        });
+        expect(result.result.isError).not.toBe(true);
+      });
+    } finally {
+      fake.stop();
+    }
+  });
+
+  test.each([new Response(null, { status: 204 }), json({}, 200)])(
+    "send의 빈 성공 응답은 재시도 없이 결과 불명이다",
+    async (response) => {
+      const { fake, server } = setup();
+      fake.routes.set("POST /gmail/messages/send", response);
+      try {
+        await withMcp(server, (client) =>
+          expectFailure(client, "GMAIL_SEND_UNKNOWN", "send_message", {
+            to: "a@example.com",
+            subject: "s",
+            body: "b",
+          }),
+        );
+        expect(fake.seen("POST", "/gmail/messages/send")).toHaveLength(1);
+      } finally {
+        fake.stop();
+      }
+    },
+  );
+
   test.each([
     { to: "Kim <a@example.com>" },
     { subject: "=?utf-8?q?Wire_money?=" },
@@ -605,7 +830,7 @@ describe("조립한 메일 확인과 전송 경계", () => {
             JSON.parse(request.body).raw,
             "base64url",
           ).toString();
-          expect(source).toContain(`Subject: ${subject}`);
+          expect(decodedSubject(source)).toBe(subject);
         }
       });
     } finally {

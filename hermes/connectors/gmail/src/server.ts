@@ -106,6 +106,8 @@ const strings = (value: string) =>
 const blocked = (labels: string[]) =>
   labels.some((label) => BLOCKED.has(label.toUpperCase()));
 const codePoints = (value: string) => Array.from(value).length;
+const truncateCodePoints = (value: string, limit: number) =>
+  Array.from(value).slice(0, limit).join("");
 
 async function bounded(response: Response, error: string): Promise<Uint8Array> {
   const length = Number(response.headers.get("content-length") ?? 0);
@@ -137,6 +139,22 @@ async function bounded(response: Response, error: string): Promise<Uint8Array> {
 function plainHtml(value: string) {
   const hidden: string[] = [];
   const pieces: string[] = [];
+  const voidElements = new Set([
+    "area",
+    "base",
+    "br",
+    "col",
+    "embed",
+    "hr",
+    "img",
+    "input",
+    "link",
+    "meta",
+    "param",
+    "source",
+    "track",
+    "wbr",
+  ]);
   for (const token of value.match(
     /<!--[\s\S]*?-->|<(?:"[^"]*"|'[^']*'|[^'">])*>|[^<]+/g,
   ) ?? []) {
@@ -156,9 +174,13 @@ function plainHtml(value: string) {
     }
     if (name === "body" && hidden.length === 1 && hidden[0] === "head")
       hidden.length = 0;
-    else if (
-      /^(script|style|title|head|template|noscript)$/.test(name) ||
-      /\bhidden(?:\s|=|>)/i.test(token)
+    const attributes = token.slice(token.indexOf(name) + name.length);
+    const hiddenAttribute = /(?:^|\s)hidden(?:\s|=|>|\/)/i.test(attributes);
+    const canContainText = !voidElements.has(name) && !/\/\s*>$/.test(token);
+    if (
+      canContainText &&
+      (/^(script|style|title|head|template|noscript)$/.test(name) ||
+        hiddenAttribute)
     )
       hidden.push(name);
     else if (/^(br|p|div|tr|li|h[1-6]|blockquote)$/.test(name))
@@ -239,10 +261,34 @@ function decodeHeader(value: string) {
     },
   );
 }
+
+/** UTF-8 제목을 RFC 2047 B encoded-word로 만들되 Unicode code point를 중간에서 나누지 않는다. */
+function encodeSubjectHeader(subject: string) {
+  if (/^[\x20-\x7e]*$/.test(subject)) return subject;
+  const words: string[] = [];
+  let bytes: number[] = [];
+  for (const point of Array.from(subject)) {
+    const encoded = Array.from(new TextEncoder().encode(point));
+    if (bytes.length && bytes.length + encoded.length > 45) {
+      words.push(
+        `=?UTF-8?B?${Uint8Array.from(bytes).toBase64({ alphabet: "base64" })}?=`,
+      );
+      bytes = [];
+    }
+    bytes.push(...encoded);
+  }
+  if (bytes.length)
+    words.push(
+      `=?UTF-8?B?${Uint8Array.from(bytes).toBase64({ alphabet: "base64" })}?=`,
+    );
+  return words.join("\r\n ");
+}
+
 function header(part: any, name: string) {
-  return Array.from(decodeHeader(headers(part)[name] ?? ""))
-    .slice(0, HEADER_MAX_CHARS)
-    .join("");
+  return truncateCodePoints(
+    decodeHeader(headers(part)[name] ?? ""),
+    HEADER_MAX_CHARS,
+  );
 }
 function decodePart(part: any) {
   const value = part?.body?.data;
@@ -274,8 +320,8 @@ function collect(
   if (typeof part.filename === "string" && part.filename) {
     if (found.attachments.length < ATTACHMENTS_MAX)
       found.attachments.push({
-        filename: part.filename.slice(0, FILENAME_MAX_CHARS),
-        mime_type: mime.slice(0, HEADER_MAX_CHARS),
+        filename: truncateCodePoints(part.filename, FILENAME_MAX_CHARS),
+        mime_type: truncateCodePoints(mime, HEADER_MAX_CHARS),
         size: typeof part.body?.size === "number" ? part.body.size : 0,
       });
     return;
@@ -311,8 +357,8 @@ function message(resource: any, limit: number) {
     subject: header(resource?.payload, "subject"),
     date: header(resource?.payload, "date"),
     labels: labels(resource),
-    body: body.slice(0, limit),
-    body_truncated: body.length > limit,
+    body: truncateCodePoints(body, limit),
+    body_truncated: codePoints(body) > limit,
     attachments: found.attachments,
   };
 }
@@ -340,7 +386,10 @@ export function confirmComposedMessage(
   if (separator < 0) throw new GmailError("GMAIL_INVALID_INPUT");
 
   const fields = new Map<string, string[]>();
-  for (const line of source.slice(0, separator).split("\r\n")) {
+  const unfoldedHeaders = source
+    .slice(0, separator)
+    .replace(/\r\n[ \t]+/g, " ");
+  for (const line of unfoldedHeaders.split("\r\n")) {
     const matched = /^([^:\s]+):[ \t]*(.*)$/.exec(line);
     if (!matched) throw new GmailError("GMAIL_INVALID_INPUT");
     const name = matched[1].toLowerCase();
@@ -363,7 +412,10 @@ export function confirmComposedMessage(
   }
 
   const subjects = fields.get("subject") ?? [];
-  if (subjects.length !== 1 || subjects[0].trim() !== subject.trim()) {
+  if (
+    subjects.length !== 1 ||
+    decodeHeader(subjects[0]).trim() !== subject.trim()
+  ) {
     throw new GmailError("GMAIL_INVALID_INPUT");
   }
 }
@@ -384,6 +436,7 @@ class Gmail {
     init: RequestInit,
     tokenEndpoint = false,
     unavailable = "GMAIL_UNAVAILABLE",
+    allowEmptySuccess = false,
   ): Promise<any> {
     let response: Response;
     try {
@@ -424,7 +477,10 @@ class Gmail {
         response.status >= 500 ? unavailable : "GMAIL_UNAVAILABLE",
       );
     }
-    if (raw.length === 0) return {};
+    if (raw.length === 0) {
+      if (allowEmptySuccess) return {};
+      throw new GmailError(unavailable);
+    }
     if (!data || typeof data !== "object" || Array.isArray(data))
       throw new GmailError(unavailable);
     return data;
@@ -481,6 +537,7 @@ class Gmail {
       method === "POST" && path === "/messages/send"
         ? "GMAIL_SEND_UNKNOWN"
         : "GMAIL_UNAVAILABLE",
+      method === "DELETE" || path === "/messages/batchModify",
     );
   }
   async labelList(accessToken?: string) {
@@ -796,7 +853,7 @@ export function createGmailServer(options: GmailOptions = {}) {
       `To: ${to.join(", ")}`,
       ...(cc.length ? [`Cc: ${cc.join(", ")}`] : []),
       ...(bcc.length ? [`Bcc: ${bcc.join(", ")}`] : []),
-      `Subject: ${input.subject}`,
+      `Subject: ${encodeSubjectHeader(input.subject)}`,
       ...(reply?.messageId
         ? [
             `In-Reply-To: ${reply.messageId}`,
@@ -852,9 +909,12 @@ export function createGmailServer(options: GmailOptions = {}) {
     async (input) => {
       // 원래 메일을 읽기 전에 새 메일 인자를 먼저 검증한다.
       compose(input);
+      const replyMessageId = input.reply_to_message_id
+        ? id(input.reply_to_message_id)
+        : "";
       const accessToken = await gmail.token();
-      const context = input.reply_to_message_id
-        ? await replyContext(input.reply_to_message_id, accessToken)
+      const context = replyMessageId
+        ? await replyContext(replyMessageId, accessToken)
         : undefined;
       const message: any = { raw: compose(input, context) };
       if (context?.threadId) message.threadId = context.threadId;
@@ -910,6 +970,9 @@ export function createGmailServer(options: GmailOptions = {}) {
       const value = await gmail.api("/messages/send", "POST", undefined, {
         raw: compose(input),
       });
+      if (typeof value.id !== "string" || !value.id) {
+        throw new GmailError("GMAIL_SEND_UNKNOWN");
+      }
       return { id: value.id, thread_id: value.threadId };
     },
   );
@@ -925,8 +988,9 @@ export function createGmailServer(options: GmailOptions = {}) {
     { readOnlyHint: false, destructiveHint: false, openWorldHint: true },
     async (input) => {
       compose({ ...input, bcc: "" });
+      const messageId = id(input.message_id);
       const accessToken = await gmail.token();
-      const context = await replyContext(input.message_id, accessToken);
+      const context = await replyContext(messageId, accessToken);
       const request: any = { raw: compose({ ...input, bcc: "" }, context) };
       if (context.threadId) request.threadId = context.threadId;
       const value = await gmail.api(
@@ -936,6 +1000,9 @@ export function createGmailServer(options: GmailOptions = {}) {
         request,
         accessToken,
       );
+      if (typeof value.id !== "string" || !value.id) {
+        throw new GmailError("GMAIL_SEND_UNKNOWN");
+      }
       return { id: value.id, thread_id: value.threadId };
     },
   );
