@@ -2,20 +2,19 @@
  * 예약 작업이 정한 시각에 발화해 작업 주인의 대화 turn 을 열고, 그 turn 의 쓰기 도구가 사람이 보낸 turn 과 같은 승인을
  * 거치는지 전체 흐름으로 본다.
  *
- * <p>승인이 필요한 커넥터 도구는 커넥터 도구 정책 시나리오와 같은 방법으로 부른다. 앞의 시나리오가 해제로 끝나므로 여기서
- * 다시 등록하고 끝에서 해제한다. 발화기는 `run.ts` 가 1초마다 돌게 해 두었다.
+ * <p>승인이 필요한 커넥터 도구는 커넥터 도구 정책 시나리오와 같은 방법으로 부른다. 시작에서 연결을 등록해 비공개 에이전트에
+ * 붙이고 반영 완료까지 한 뒤, 끝에서 작업과 그 에이전트를 지우고 연결을 해제한다. 발화기는 `run.ts` 가 1초마다 돌게 해 두었다.
  */
 import { call, expect, expectStatus, fail, step, type Context, type Scenario } from "../harness.ts";
-import { CONNECTOR_TOOL_PROBE, DEMO_CONNECTOR, DEMO_TOKEN_OK } from "../fake-hermes.ts";
+import { CONNECTOR_TOOL_PROBE, DEMO_CONNECTOR } from "../fake-hermes.ts";
+import { ConnectorSetup, useConnectorPolicy } from "../connector-support.ts";
 
-type ConnectionView = { status: string; agentCode: string | null };
 type TaskView = { id: string; state: string; nextFireAt: string | null };
 type TaskRunView = { id: string; status: string; reason: string | null; conversationId: string | null };
 type ActionView = { actionId: string; status: string };
 type Message = { id: number; role: "USER" | "ASSISTANT" | "SYSTEM"; content: string };
 type NotificationView = { kind: string; targetType: string | null; targetId: string | null };
 
-const CONNECTION = `/connections/${DEMO_CONNECTOR.id}`;
 const PREFIX = `mcp__${DEMO_CONNECTOR.mcp_server}__`;
 const TITLE = "예약 메모";
 /** 발화한 줄이 끝나기를 기다리는 상한이다. */
@@ -49,31 +48,15 @@ export const scheduledTaskScenario: Scenario = {
   name: "예약 작업",
 
   async run(context) {
-    context.hermes.setConnectorPolicy(`${context.api.replace(/\/api\/v1$/, "")}/internal/hermes/connector-policy`);
-    let profile: string | undefined;
+    useConnectorPolicy(context);
+    const setup = new ConnectorSetup(context, context.tokens.dad);
     let taskId: string | undefined;
     let failed = false;
     try {
-      step("시험 커넥터를 다시 등록하고 연결을 확인해 READY 로 만든다");
-      const requestsAtRegister = context.hermes.connectorRequests().length;
-      expectStatus(
-        await call(context, CONNECTION, {
-          method: "POST", token: context.tokens.dad, body: { values: { token: DEMO_TOKEN_OK, scope: "a" } },
-        }),
-        200,
-        "등록",
-      );
-      const installLine = context.hermes.connectorRequests().slice(requestsAtRegister)
-        .find((line) => /^install \S+ on$/.test(line));
-      expect(installLine !== undefined, "등록 동안 설치 요청이 없었다");
-      profile = installLine!.split(" ")[1]!;
-      const ready = expectStatus(
-        await call(context, `${CONNECTION}/check`, { method: "POST", token: context.tokens.dad }), 200, "연결 확인",
-      ).json<ConnectionView>();
-      expect(ready.status === "READY" && ready.agentCode !== null, `READY 가 아니다: ${JSON.stringify(ready)}`);
-      const agentCode = ready.agentCode!;
+      step("시험 커넥터를 등록하고 비공개 에이전트에 붙여 반영 완료까지 한다");
+      const agentCode = (await setup.attachedAgent("예약 시험 비서")).code;
 
-      step("그 커넥터 에이전트로 쓰기 도구를 부르는 한 번 도는 작업을 3초 뒤로 만든다");
+      step("연결을 붙인 그 에이전트로 쓰기 도구를 부르는 한 번 도는 작업을 3초 뒤로 만든다");
       const hermesTool = `${PREFIX}write_note`;
       const created = expectStatus(
         await call(context, "/tasks", {
@@ -171,18 +154,19 @@ export const scheduledTaskScenario: Scenario = {
       failed = true;
       throw error;
     } finally {
-      // 어디서 실패해도 대역과 연결과 작업을 되돌린다. 정리가 실패해도 원래 실패를 가리지 않는다.
-      if (profile !== undefined) context.hermes.setPolicyHook(profile, true);
+      // 어디서 실패해도 작업과 에이전트와 연결을 되돌린다. 정리가 실패해도 원래 실패를 가리지 않는다.
+      let taskCleanupError: unknown;
       try {
         if (taskId !== undefined) {
           expectStatus(
             await call(context, `/tasks/${taskId}`, { method: "DELETE", token: context.tokens.dad }), 204, "작업 지우기",
           );
         }
-        expectStatus(await call(context, CONNECTION, { method: "DELETE", token: context.tokens.dad }), 200, "해제");
       } catch (cleanupError) {
-        if (!failed) throw cleanupError;
+        taskCleanupError = cleanupError;
       }
+      await setup.cleanUp(failed);
+      if (taskCleanupError !== undefined && !failed) throw taskCleanupError;
     }
   },
 };

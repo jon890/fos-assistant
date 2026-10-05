@@ -1,14 +1,15 @@
 /**
  * 승인이 필요한 커넥터 호출이 승인 요청을 만들면 그 사용자의 알림이 생기고, 사용자 단위 SSE 로 알려지는지 전체 흐름으로 본다.
  *
- * <p>승인 요청은 커넥터 도구 정책 시나리오와 같은 방법으로 만든다. 앞의 시나리오가 해제로 끝나므로 여기서 다시 등록하고
- * 끝에서 해제한다. 앞 시나리오가 남긴 알림이 있을 수 있어 수를 세지 않고 이 시나리오가 만든 줄을 찾아 본다.
+ * <p>승인 요청은 커넥터 도구 정책 시나리오와 같은 방법으로 만든다. 시작에서 연결을 등록해 비공개 에이전트에 붙이고 반영
+ * 완료까지 한 뒤, 끝에서 그 에이전트를 지우고 연결을 해제한다. 앞 시나리오가 남긴 알림이 있을 수 있어 수를 세지 않고 이
+ * 시나리오가 만든 줄을 찾아 본다.
  */
 import { call, expect, expectStatus, fail, step, type Context, type Scenario } from "../harness.ts";
-import { CONNECTOR_TOOL_PROBE, DEMO_CONNECTOR, DEMO_TOKEN_OK } from "../fake-hermes.ts";
+import { CONNECTOR_TOOL_PROBE, DEMO_CONNECTOR } from "../fake-hermes.ts";
+import { ConnectorSetup, useConnectorPolicy } from "../connector-support.ts";
 import { readEventStream } from "../../../web/src/lib/stream.ts";
 
-type ConnectionView = { status: string; agentCode: string | null };
 type Turn = { conversationId: string; assistantText: string };
 type NotificationView = {
   id: string;
@@ -23,11 +24,10 @@ type NotificationView = {
 type NotificationPageView = { items: NotificationView[]; nextCursor: string | null; unreadCount: number };
 type NotificationEvent = { type: string; notificationId?: string; unreadCount: number };
 
-const CONNECTION = `/connections/${DEMO_CONNECTOR.id}`;
 const PREFIX = `mcp__${DEMO_CONNECTOR.mcp_server}__`;
 const SSE_TIMEOUT_MS = 10_000;
 
-/** 연결용 에이전트에게 승인이 필요한 도구 호출을 시켜 승인 요청을 하나 만들고, 그 요청이 나온 대화를 돌려준다. */
+/** 연결을 붙인 에이전트에게 승인이 필요한 도구 호출을 시켜 승인 요청을 하나 만들고, 그 요청이 나온 대화를 돌려준다. */
 async function requestApproval(context: Context, agentCode: string, text: string): Promise<string> {
   const hermesTool = `${PREFIX}write_note`;
   const turn = expectStatus(
@@ -83,29 +83,13 @@ export const notificationsScenario: Scenario = {
   name: "알림",
 
   async run(context) {
-    context.hermes.setConnectorPolicy(`${context.api.replace(/\/api\/v1$/, "")}/internal/hermes/connector-policy`);
-    let profile: string | undefined;
+    useConnectorPolicy(context);
+    const setup = new ConnectorSetup(context, context.tokens.dad);
     let stream: { events: NotificationEvent[]; close: () => Promise<void> } | undefined;
     let failed = false;
     try {
-      step("시험 커넥터를 다시 등록하고 연결을 확인해 READY 로 만든다");
-      const requestsAtRegister = context.hermes.connectorRequests().length;
-      expectStatus(
-        await call(context, CONNECTION, {
-          method: "POST", token: context.tokens.dad, body: { values: { token: DEMO_TOKEN_OK, scope: "a" } },
-        }),
-        200,
-        "등록",
-      );
-      const installLine = context.hermes.connectorRequests().slice(requestsAtRegister)
-        .find((line) => /^install \S+ on$/.test(line));
-      expect(installLine !== undefined, "등록 동안 설치 요청이 없었다");
-      profile = installLine!.split(" ")[1]!;
-      const ready = expectStatus(
-        await call(context, `${CONNECTION}/check`, { method: "POST", token: context.tokens.dad }), 200, "연결 확인",
-      ).json<ConnectionView>();
-      expect(ready.status === "READY" && ready.agentCode !== null, `READY 가 아니다: ${JSON.stringify(ready)}`);
-      const agentCode = ready.agentCode!;
+      step("시험 커넥터를 등록하고 비공개 에이전트에 붙여 반영 완료까지 한다");
+      const agentCode = (await setup.attachedAgent("알림 시험 비서")).code;
 
       step("승인 요청을 만들면 그 사용자의 알림 목록에 그 대화를 가리키는 APPROVAL_REQUESTED 가 생긴다");
       const firstConversation = await requestApproval(context, agentCode, "알림으로 알릴 글");
@@ -175,14 +159,9 @@ export const notificationsScenario: Scenario = {
       failed = true;
       throw error;
     } finally {
-      // 어디서 실패해도 SSE 와 대역과 연결을 되돌린다. 정리가 실패해도 원래 실패를 가리지 않는다.
+      // 어디서 실패해도 SSE 와 에이전트와 연결을 되돌린다. 정리가 실패해도 원래 실패를 가리지 않는다.
       await stream?.close();
-      if (profile !== undefined) context.hermes.setPolicyHook(profile, true);
-      try {
-        expectStatus(await call(context, CONNECTION, { method: "DELETE", token: context.tokens.dad }), 200, "해제");
-      } catch (cleanupError) {
-        if (!failed) throw cleanupError;
-      }
+      await setup.cleanUp(failed);
     }
   },
 };

@@ -2,13 +2,14 @@
  * 승인한 커넥터 호출의 결과 전달이 실패한 뒤 다시 전달하면 저장된 결과만으로 답이 생기는지 전체 흐름으로 본다.
  *
  * <p>대역 Hermes 가 run 제출을 거절하는 동안 승인하면 결과 전달 묶음이 FAILED 로 남는다. 거절을 푼 뒤 다시 전달하면
- * 커넥터 서버에 닿는 호출 없이 부모 에이전트의 답이 이어진다. 앞의 시나리오처럼 연결을 등록하고 끝에서 해제한다.
+ * 커넥터 서버에 닿는 호출 없이 그 에이전트의 답이 이어진다. 앞의 시나리오처럼 연결을 등록해 비공개 에이전트에 붙이고,
+ * 끝에서 그 에이전트를 지우고 연결을 해제한다.
  */
 import { call, expect, expectStatus, fail, step, type Context, type Response, type Scenario } from "../harness.ts";
 import { readEventStream } from "../../../web/src/lib/stream.ts";
-import { CONNECTOR_TOOL_PROBE, DEMO_CONNECTOR, DEMO_TOKEN_OK, type ConnectorToolCall } from "../fake-hermes.ts";
+import { CONNECTOR_TOOL_PROBE, DEMO_CONNECTOR, type ConnectorToolCall } from "../fake-hermes.ts";
+import { ConnectorSetup, useConnectorPolicy } from "../connector-support.ts";
 
-type ConnectionView = { status: string; agentCode: string | null };
 type Turn = { conversationId: string; assistantText: string };
 type ActionView = { actionId: string; status: string };
 type Message = {
@@ -21,7 +22,6 @@ type ChatEvent = { type: string; code?: string };
 type AttentionItem = { conversationId: string | null; why: { trigger: string; signals: string[] } };
 type AttentionView = { cards: { key: string; items: AttentionItem[] }[] };
 
-const CONNECTION = `/connections/${DEMO_CONNECTOR.id}`;
 const PREFIX = `mcp__${DEMO_CONNECTOR.mcp_server}__`;
 const RETRY_NOTICE = "맡긴 일의 결과를 다시 전해요";
 const NOTE_TEXT = "다시 전달 시험 메모";
@@ -81,26 +81,13 @@ export const deliveryRetryScenario: Scenario = {
   name: "결과 다시 전달",
 
   async run(context) {
-    context.hermes.setConnectorPolicy(`${context.api.replace(/\/api\/v1$/, "")}/internal/hermes/connector-policy`);
+    useConnectorPolicy(context);
+    const setup = new ConnectorSetup(context, context.tokens.dad);
     let failed = false;
     try {
-      step("연결을 등록하고 write_note 승인 줄을 만든다");
-      const requestsAtRegister = context.hermes.connectorRequests().length;
-      expectStatus(
-        await call(context, CONNECTION, {
-          method: "POST", token: context.tokens.dad, body: { values: { token: DEMO_TOKEN_OK, scope: "a" } },
-        }),
-        200,
-        "등록",
-      );
-      const installLine = context.hermes.connectorRequests().slice(requestsAtRegister)
-        .find((line) => /^install \S+ on$/.test(line));
-      expect(installLine !== undefined, "등록 동안 설치 요청이 없었다");
-      const profile = installLine!.split(" ")[1]!;
-      const ready = expectStatus(
-        await call(context, `${CONNECTION}/check`, { method: "POST", token: context.tokens.dad }), 200, "연결 확인",
-      ).json<ConnectionView>();
-      expect(ready.status === "READY" && ready.agentCode !== null, `READY 가 아니다: ${JSON.stringify(ready)}`);
+      step("연결을 비공개 에이전트에 붙이고 write_note 승인 줄을 만든다");
+      const agent = await setup.attachedAgent("다시 전달 시험 비서");
+      const profile = agent.profile;
       const mine = (): ConnectorToolCall[] =>
         context.hermes.connectorToolCalls().filter((entry) => entry.profile === profile);
 
@@ -110,7 +97,7 @@ export const deliveryRetryScenario: Scenario = {
           token: context.tokens.dad,
           body: {
             text: `${CONNECTOR_TOOL_PROBE}\n${PREFIX}write_note ${JSON.stringify({ text: NOTE_TEXT })}`,
-            agentCode: ready.agentCode,
+            agentCode: agent.code,
           },
         }),
         200,
@@ -212,13 +199,9 @@ export const deliveryRetryScenario: Scenario = {
       failed = true;
       throw error;
     } finally {
-      // 어디서 실패해도 대역과 연결을 되돌린다. 정리가 실패해도 원래 실패를 가리지 않는다.
+      // 어디서 실패해도 대역과 에이전트와 연결을 되돌린다. 정리가 실패해도 원래 실패를 가리지 않는다.
       context.hermes.clearBusy();
-      try {
-        expectStatus(await call(context, CONNECTION, { method: "DELETE", token: context.tokens.dad }), 200, "해제");
-      } catch (cleanupError) {
-        if (!failed) throw cleanupError;
-      }
+      await setup.cleanUp(failed);
     }
   },
 };

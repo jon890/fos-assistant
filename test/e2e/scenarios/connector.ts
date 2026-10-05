@@ -1,25 +1,19 @@
 /**
  * 두 번째 커넥터가 코드 변경 없이 붙는지 전체 흐름으로 본다.
  *
- * <p>대역의 카탈로그에 시험 커넥터 하나가 있을 뿐이다. Control Plane 은 그 선언만 읽고 등록, 확인, 해제까지
- * 돈다. 시험 커넥터는 칸 이름과 env 이름이 다른 서비스와 겹치지 않는다.
+ * <p>대역의 카탈로그에는 시험 커넥터만 있다. Control Plane 은 그 선언만 읽고 등록, 확인, 해제까지 돈다. 시험 커넥터는
+ * 칸 이름과 env 이름이 다른 서비스와 겹치지 않는다. 연결은 계정 하나이고 에이전트를 만들지 않는다(ADR-083). 값은 대역의
+ * 보관 파일에만 가고, 에이전트에 붙이는 흐름은 연결 붙이기 시나리오가 본다.
  */
 import { call, expect, expectStatus, step, type Scenario } from "../harness.ts";
 import { DEMO_CONNECTOR, DEMO_TOKEN_BAD, DEMO_TOKEN_OK } from "../fake-hermes.ts";
+import type { BoundAgentView, ConnectionView } from "../connector-support.ts";
 
 type FieldView = { key: string; hasOptions: boolean; secret: boolean; required: boolean };
 type ToolView = { name: string; title: string | null; risk: string; approval: string; grant: boolean };
 type ConnectorView = {
   id: string; title: string; fields: FieldView[]; tools: ToolView[]; myStatus: string; available: boolean;
-};
-type ConnectionView = {
-  connectorId: string;
-  status: string;
-  secretPrefixes: Record<string, string>;
-  values: Record<string, string>;
-  agentCode: string | null;
-  restartRequired: boolean;
-  undeclaredTools: number;
+  bindings: BoundAgentView[];
 };
 
 const CONNECTION = `/connections/${DEMO_CONNECTOR.id}`;
@@ -32,8 +26,11 @@ export const connectorScenario: Scenario = {
     const catalogResponse = expectStatus(await call(context, "/connectors", { token: context.tokens.dad }), 200, "커넥터 목록");
     const demo = catalogResponse.json<ConnectorView[]>().find((connector) => connector.id === DEMO_CONNECTOR.id);
     expect(demo !== undefined, `커넥터 목록에 ${DEMO_CONNECTOR.id} 가 없다\n${catalogResponse.body}`);
-    expect(demo!.title === DEMO_CONNECTOR.title && demo!.available && demo!.myStatus === "DISCONNECTED",
-      `시험 커넥터 항목이 다르다\n${catalogResponse.body}`);
+    expect(
+      demo!.title === DEMO_CONNECTOR.title && demo!.available && demo!.myStatus === "DISCONNECTED"
+        && demo!.bindings.length === 0,
+      `시험 커넥터 항목이 다르다\n${catalogResponse.body}`,
+    );
     expect(demo!.fields.map((field) => field.key).join() === "token,scope", `칸 순서가 다르다\n${catalogResponse.body}`);
     expect(demo!.fields[0]!.secret && demo!.fields[0]!.required && demo!.fields[1]!.hasOptions,
       `칸의 성질이 선언과 다르다\n${catalogResponse.body}`);
@@ -78,110 +75,112 @@ export const connectorScenario: Scenario = {
     );
     expect(rejected.json<{ code: string }>().code === "CONNECTOR_CREDENTIAL_REJECTED", `오류 코드가 다르다\n${rejected.body}`);
     expect(!rejected.body.includes(DEMO_TOKEN_BAD), "오류 응답에 토큰이 되돌아왔다");
-    const afterRejected = call(context, CONNECTION, { token: context.tokens.dad });
-    const rejectedState = expectStatus(await afterRejected, 200, "거절 뒤 상태").json<ConnectionView>();
-    expect(rejectedState.status === "DISCONNECTED" && rejectedState.agentCode === null, "거절됐는데 연결이 남았다");
+    const rejectedState = expectStatus(await call(context, CONNECTION, { token: context.tokens.dad }), 200, "거절 뒤 상태")
+      .json<ConnectionView>();
+    expect(
+      rejectedState.status === "DISCONNECTED" && rejectedState.bindings.length === 0,
+      `거절됐는데 연결이 남았다: ${JSON.stringify(rejectedState)}`,
+    );
     expect(context.hermes.profiles().length === profilesBefore, "거절됐는데 profile 이 만들어졌다");
     expect(
       context.hermes.connectorRequests().slice(requestsBefore).join() === "call list_scopes",
       `거절 뒤에는 확인 호출만 있어야 한다: ${context.hermes.connectorRequests().slice(requestsBefore).join()}`,
     );
 
-    step("통과한 토큰으로 등록하면 PENDING 이고 대역이 확인, env, 설치 순으로 받고 도구 목록 쓰기는 받지 않는다");
-    const knownProfiles = new Set(context.hermes.profiles());
+    step("통과한 토큰으로 등록하면 READY 이고 붙은 에이전트가 없으며 대역은 확인과 보관 파일 쓰기만 받는다");
     const requestsAtRegister = context.hermes.connectorRequests().length;
     const registered = expectStatus(
+      await call(context, CONNECTION, { method: "POST", token: context.tokens.dad, body: { values: { token: DEMO_TOKEN_OK } } }),
+      200,
+      "등록",
+    );
+    const connected = registered.json<ConnectionView & { agentCode?: unknown }>();
+    expect(
+      connected.status === "READY" && connected.bindings.length === 0 && !("agentCode" in connected),
+      `등록 응답이 붙은 에이전트 없는 READY 가 아니다\n${registered.body}`,
+    );
+    expect(
+      connected.secretPrefixes.token === DEMO_TOKEN_OK.slice(0, 4) && Object.keys(connected.values).length === 0,
+      `등록한 칸 값이 다르다\n${registered.body}`,
+    );
+    expect(
+      context.hermes.connectorRequests().slice(requestsAtRegister).join(" | ") === "call list_scopes | vault put",
+      `등록 동안 확인과 보관 파일 쓰기 한 번만 받아야 한다: ${context.hermes.connectorRequests().slice(requestsAtRegister).join(" | ")}`,
+    );
+    expect(context.hermes.profiles().length === profilesBefore, "등록이 profile 을 만들었다");
+
+    step("값을 바꾸면 보관 파일을 한 번 다시 쓰고 선택 칸이 반영된다");
+    const requestsAtReplace = context.hermes.connectorRequests().length;
+    const replaced = expectStatus(
       await call(context, CONNECTION, {
         method: "POST", token: context.tokens.dad, body: { values: { token: DEMO_TOKEN_OK, scope: "a" } },
       }),
       200,
-      "등록",
+      "값 교체",
     );
-    expect(registered.json<ConnectionView>().status === "PENDING", `등록 직후 상태가 PENDING 이 아니다\n${registered.body}`);
-    const created = context.hermes.profiles().filter((name) => !knownProfiles.has(name));
-    expect(created.length === 1, `전용 profile 이 하나 만들어져야 한다: ${created.join()}`);
-    const profile = created[0]!;
-    const requests = context.hermes.connectorRequests().slice(requestsAtRegister);
-    const at = (line: string): number => requests.indexOf(line);
-    const order = [
-      at("call list_scopes"),
-      at(`env put ${profile} DEMO_TOKEN`),
-      at(`env put ${profile} DEMO_SCOPE`),
-      at(`install ${profile} on`),
-    ];
+    const replacedView = replaced.json<ConnectionView>();
     expect(
-      order.every((index, position) => index >= 0 && (position === 0 || index > order[position - 1]!)),
-      `요청 순서가 확인, env, 설치가 아니다: ${requests.join(" | ")}`,
+      replacedView.status === "READY" && replacedView.values.scope === "a" && replacedView.bindings.length === 0,
+      `값을 바꾼 응답이 다르다\n${replaced.body}`,
     );
     expect(
-      !requests.some((line) => line.startsWith("toolsets ")),
-      `등록 동안 PUT /api/config 로 도구 목록을 쓰면 안 된다: ${requests.join(" | ")}`,
+      context.hermes.connectorRequests().slice(requestsAtReplace).join(" | ") === "call list_scopes | vault put",
+      `값 교체 동안 확인과 보관 파일 쓰기 한 번만 받아야 한다: ${context.hermes.connectorRequests().slice(requestsAtReplace).join(" | ")}`,
     );
-    expect(context.hermes.profileEnv(profile).DEMO_TOKEN === DEMO_TOKEN_OK, "토큰이 profile env 에 들어가지 않았다");
 
-    step("연결을 확인하면 설치를 다시 보낸 뒤 READY 이고 16자 이상인 비밀은 앞 4자만 보인다");
+    step("연결을 확인하면 보관 파일의 값으로 확인 도구를 부르고 READY 이며 16자 이상인 비밀은 앞 4자만 보인다");
     const requestsAtCheck = context.hermes.connectorRequests().length;
     const checked = expectStatus(await call(context, `${CONNECTION}/check`, { method: "POST", token: context.tokens.dad }), 200, "연결 확인");
     const ready = checked.json<ConnectionView>();
-    expect(ready.status === "READY", `READY 가 아니다\n${checked.body}`);
-    expect(ready.undeclaredTools === 1, `선언하지 않은 도구 수가 1 이 아니다\n${checked.body}`);
-    const checkRequests = context.hermes.connectorRequests().slice(requestsAtCheck);
-    const reinstalledAt = checkRequests.indexOf(`install ${profile} on`);
+    expect(ready.status === "READY" && ready.checkedAt !== null, `READY 가 아니다\n${checked.body}`);
     expect(
-      reinstalledAt >= 0 && reinstalledAt < checkRequests.indexOf(`probe ${profile}`),
-      `연결 확인이 probe 앞에서 설치를 다시 보내지 않았다: ${checkRequests.join(" | ")}`,
-    );
-    expect(
-      !checkRequests.some((line) => line.startsWith("toolsets ")),
-      `연결 확인 동안 PUT /api/config 로 도구 목록을 쓰면 안 된다: ${checkRequests.join(" | ")}`,
+      context.hermes.connectorRequests().slice(requestsAtCheck).join(" | ") === "call list_scopes",
+      `붙은 에이전트가 없는 연결 확인은 확인 도구만 불러야 한다: ${context.hermes.connectorRequests().slice(requestsAtCheck).join(" | ")}`,
     );
     expect(DEMO_TOKEN_OK.length >= 16, "검사용 토큰이 앞부분을 저장하는 길이보다 짧다");
     expect(ready.secretPrefixes.token === DEMO_TOKEN_OK.slice(0, 4), `비밀 앞부분이 다르다\n${checked.body}`);
     expect(ready.values.scope === "a" && ready.values.token === undefined, `칸 값이 다르다\n${checked.body}`);
-    expect(context.hermes.connectorRequests().some((line) => line === `probe ${profile}`), "MCP 서버 확인 요청이 없었다");
-    const toolsets = context.hermes.apiServerToolsetsOf(profile) ?? [];
+    const catalogAfter = expectStatus(await call(context, "/connectors", { token: context.tokens.dad }), 200, "등록 뒤 커넥터 목록");
+    const listed = catalogAfter.json<ConnectorView[]>().find((connector) => connector.id === DEMO_CONNECTOR.id);
     expect(
-      toolsets.join() === [DEMO_CONNECTOR.mcp_server, ...DEMO_CONNECTOR.toolsets].join(),
-      `연결 확인 뒤 도구 목록이 커넥터 서버와 선언한 toolset 이 아니다: ${toolsets.join()}`,
+      listed?.myStatus === "READY" && listed.bindings.length === 0,
+      `등록 뒤 목록의 시험 커넥터가 붙은 에이전트 없는 READY 가 아니다\n${catalogAfter.body}`,
     );
     const reads = [
       registered.body,
+      replaced.body,
       checked.body,
+      catalogAfter.body,
       (await call(context, CONNECTION, { token: context.tokens.dad })).body,
-      (await call(context, "/connectors", { token: context.tokens.dad })).body,
       (await call(context, "/admin/connections", { token: context.tokens.dad })).body,
     ];
     reads.forEach((body, index) => expect(!body.includes(DEMO_TOKEN_OK), `응답 ${index} 에 토큰 원문이 있다`));
-
-    step("정책 hook 이 꺼져 있으면 연결 확인이 PENDING 으로 내리고 다시 켜지면 READY 로 돌아온다");
-    const installLine = context.hermes.connectorRequests().find((line) => /^install \S+ on$/.test(line));
-    const hookProfile = installLine?.split(" ")[1];
-    expect(hookProfile === profile, `설치 요청의 profile 이 연결용 profile 과 다르다: ${installLine}`);
-    context.hermes.setPolicyHook(hookProfile!, false);
-    const hookOff = expectStatus(
-      await call(context, `${CONNECTION}/check`, { method: "POST", token: context.tokens.dad }), 200, "hook 이 꺼진 연결 확인",
+    expect(
+      !context.hermes.connectorRequests().some((line) => line.includes(DEMO_TOKEN_OK)),
+      "대역의 요청 기록에 토큰 원문이 있다",
     );
-    expect(hookOff.json<ConnectionView>().status === "PENDING", `hook 이 꺼졌는데 PENDING 이 아니다\n${hookOff.body}`);
-    context.hermes.setPolicyHook(hookProfile!, true);
-    const hookOn = expectStatus(
-      await call(context, `${CONNECTION}/check`, { method: "POST", token: context.tokens.dad }), 200, "hook 이 켜진 연결 확인",
-    );
-    expect(hookOn.json<ConnectionView>().status === "READY", `hook 이 켜졌는데 READY 가 아니다\n${hookOn.body}`);
 
     step("다른 사용자는 이 연결을 읽지 못한다");
     const others = expectStatus(await call(context, CONNECTION, { token: context.tokens.kid }), 200, "다른 사용자의 상태").json<ConnectionView>();
     expect(
-      others.status === "DISCONNECTED" && others.agentCode === null && Object.keys(others.secretPrefixes).length === 0
+      others.status === "DISCONNECTED" && others.bindings.length === 0 && Object.keys(others.secretPrefixes).length === 0
         && Object.keys(others.values).length === 0,
       `다른 사용자에게 연결이 보인다: ${JSON.stringify(others)}`,
     );
     expectStatus(await call(context, "/admin/connections", { token: context.tokens.kid }), 403, "일반 사용자의 관리자 목록");
     expectStatus(await call(context, CONNECTION, { method: "DELETE", token: context.tokens.kid }), 400, "다른 사용자의 해제");
 
-    step("해제하면 DISCONNECTED 이고 대역의 env 와 설치가 지워진다");
+    step("해제하면 DISCONNECTED 이고 대역의 보관 파일이 지워진다");
+    const requestsAtDisconnect = context.hermes.connectorRequests().length;
     const disconnected = expectStatus(await call(context, CONNECTION, { method: "DELETE", token: context.tokens.dad }), 200, "해제");
-    expect(disconnected.json<ConnectionView>().status === "DISCONNECTED", `해제 뒤 상태가 다르다\n${disconnected.body}`);
-    expect(context.hermes.connectorRequests().includes(`install ${profile} off`), "설치 해제 요청이 없었다");
-    expect(context.hermes.profileEnv(profile).DEMO_TOKEN === undefined, "해제했는데 토큰 env 가 남았다");
+    const disconnectedView = disconnected.json<ConnectionView>();
+    expect(
+      disconnectedView.status === "DISCONNECTED" && disconnectedView.bindings.length === 0,
+      `해제 뒤 상태가 다르다\n${disconnected.body}`,
+    );
+    expect(
+      context.hermes.connectorRequests().slice(requestsAtDisconnect).join(" | ") === "vault delete",
+      `붙은 에이전트가 없는 해제는 보관 파일만 지워야 한다: ${context.hermes.connectorRequests().slice(requestsAtDisconnect).join(" | ")}`,
+    );
   },
 };
