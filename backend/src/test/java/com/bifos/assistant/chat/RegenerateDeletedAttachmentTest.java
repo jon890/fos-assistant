@@ -126,6 +126,55 @@ class RegenerateDeletedAttachmentTest {
                                 conversations.findById(first.conversationId()).orElseThrow()) + "사진을 설명해 줘");
     }
 
+    @Test
+    @DisplayName("중간 사진을 지워도 다시 생성 입력은 position 순서와 비어 있는 순번을 지킨다")
+    @Transactional
+    void regenerationKeepsPositionOrderAndOrdinalGapAfterMiddlePhotoDeletion() {
+        CurrentUser dad = member();
+        stub().willReturnInOrder(
+                        HermesRunResult.of("first", "session", "completed", "첫 답", "m", "p", TokenUsage.empty()),
+                        HermesRunResult.of("again", "session", "completed", "새 답", "m", "p", TokenUsage.empty()));
+        var first = chat.send(dad, null, "사진을 설명해 줘", "dad");
+        var question = messages.findByConversationIdOrderByIdAsc(first.conversationId()).stream()
+                .filter(message -> message.role() == MessageRole.USER)
+                .findFirst()
+                .orElseThrow();
+
+        ChatAttachment firstPhoto = createAttachment(first.conversationId(), dad, "first.png");
+        ChatAttachment middlePhoto = createAttachment(first.conversationId(), dad, "middle.png");
+        ChatAttachment lastPhoto = createAttachment(first.conversationId(), dad, "last.png");
+        attachments.attachToMessageAtPosition(question.id(), first.conversationId(), lastPhoto.id(), 0);
+        attachments.attachToMessageAtPosition(question.id(), first.conversationId(), middlePhoto.id(), 1);
+        attachments.attachToMessageAtPosition(question.id(), first.conversationId(), firstPhoto.id(), 2);
+        assertThat(firstPhoto.id()).isLessThan(lastPhoto.id());
+        ChatAttachment deletedMiddle = attachments.findById(middlePhoto.id()).orElseThrow();
+        deletedMiddle.markDeleted(Instant.now());
+        attachments.save(deletedMiddle);
+
+        chat.regenerate(dad, first.conversationId(), event -> {});
+
+        String input = stub().received().get(1).input();
+        assertThat(input)
+                .contains("- 1번째 사진: " + lastPhoto.storedName())
+                .contains("- 3번째 사진: " + firstPhoto.storedName())
+                .doesNotContain("2번째 사진", deletedMiddle.storedName());
+        assertThat(input.indexOf(lastPhoto.storedName())).isLessThan(input.indexOf(firstPhoto.storedName()));
+    }
+
+    private ChatAttachment createAttachment(Long conversationId, CurrentUser user, String name) {
+        ChatAttachment attachment = attachments.save(ChatAttachment.of(
+                conversationId,
+                user.id(),
+                name,
+                "image/png",
+                1,
+                Instant.now().plusSeconds(1),
+                Instant.now()));
+        attachment.nameStoredFile(attachment.id() + ".png");
+        attachments.save(attachment);
+        return attachment;
+    }
+
     private CurrentUser member() {
         AppUser user = users.save(AppUser.of("deleted-photo@example.com", "dad", 1L, UserRole.MEMBER, Instant.now()));
         agents.save(Agent.of(

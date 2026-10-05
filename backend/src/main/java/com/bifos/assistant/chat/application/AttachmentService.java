@@ -58,7 +58,7 @@ public class AttachmentService {
             String contentType,
             long byteSize,
             InputStreamSource body) {
-        access.requireOwn(user, conversationId);
+        access.requireOwnForUpload(user, conversationId);
         String normalizedType = normalize(contentType);
         String extension = AttachmentStore.extensionFor(normalizedType)
                 .orElseThrow(() -> new ApiException(

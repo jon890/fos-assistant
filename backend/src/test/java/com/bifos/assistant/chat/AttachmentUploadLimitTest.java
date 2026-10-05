@@ -23,7 +23,13 @@ import java.nio.file.Path;
 import java.time.Instant;
 import java.util.Comparator;
 import java.util.Date;
+import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.CountDownLatch;
+import java.util.stream.IntStream;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -101,6 +107,38 @@ class AttachmentUploadLimitTest {
     }
 
     @Test
+    @DisplayName("같은 대화에 동시에 올린 서른두 요청은 서른 개만 성공한다")
+    void concurrentUploadsKeepTheUnboundAttachmentLimit() throws Exception {
+        assertThat(properties.maxFiles()).isEqualTo(30);
+        ExecutorService executor = Executors.newFixedThreadPool(32);
+        try {
+            CountDownLatch ready = new CountDownLatch(32);
+            CountDownLatch start = new CountDownLatch(1);
+            List<Future<HttpResponse<String>>> responses = IntStream.rangeClosed(1, 32)
+                    .mapToObj(number -> executor.submit(() -> {
+                        ready.countDown();
+                        start.await();
+                        return upload(number, 1);
+                    }))
+                    .toList();
+            ready.await();
+            start.countDown();
+
+            List<HttpResponse<String>> completed = responses.stream().map(this::await).toList();
+            assertThat(completed).extracting(HttpResponse::statusCode).containsOnly(200, 400);
+            assertThat(completed).filteredOn(response -> response.statusCode() == 200).hasSize(30);
+            assertThat(completed).filteredOn(response -> response.statusCode() == 400).hasSize(2);
+            assertThat(completed)
+                    .filteredOn(response -> response.statusCode() == 400)
+                    .extracting(this::code)
+                    .containsOnly("VALIDATION_FAILED");
+            assertThat(attachments.findByConversationIdOrderByIdAsc(conversationId)).hasSize(30);
+        } finally {
+            executor.shutdownNow();
+        }
+    }
+
+    @Test
     @DisplayName("기본 상한 1MB 를 넘는 2MB 사진이 올라간다")
     void uploads2MbPhotoOverDefault1MbLimit() throws Exception {
         HttpResponse<String> response = upload(2 * MB);
@@ -157,6 +195,14 @@ class AttachmentUploadLimitTest {
     private String code(HttpResponse<String> response) {
         JsonNode node = json.readTree(response.body());
         return node.path("code").asString();
+    }
+
+    private HttpResponse<String> await(Future<HttpResponse<String>> response) {
+        try {
+            return response.get();
+        } catch (Exception ex) {
+            throw new AssertionError("동시 upload 응답을 받지 못했어요.", ex);
+        }
     }
 
     private String jwt() {

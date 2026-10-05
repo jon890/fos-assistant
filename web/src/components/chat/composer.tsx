@@ -103,7 +103,7 @@ type AttachmentItem = {
   attachmentId: number | null;
   errorMessage: string | null;
   /** 이 첨부가 올라간 대화의 공개 식별자다. 지울 때 이 식별자로 서버 DELETE 를 부른다 */
-  conversationId: string;
+  conversationId: string | null;
 };
 
 async function buildThumbnail(file: File): Promise<string> {
@@ -212,6 +212,7 @@ export function Composer({
         if (
           item.status === "done" &&
           item.attachmentId !== null &&
+          item.conversationId !== null &&
           !sending.has(item.key)
         ) {
           void deleteAttachment(item.conversationId, item.attachmentId);
@@ -438,7 +439,7 @@ export function Composer({
     ).length;
     const accepted = files.filter((file) => ACCEPTED_TYPES.includes(file.type));
     // 상한은 한 번에 고를 때만 센다. 이미 붙은 첨부를 빼고 남은 자리만큼만 올린다.
-    const remainingSlots = Math.max(0, MAX_ATTACHMENTS - items.length);
+    const remainingSlots = Math.max(0, MAX_ATTACHMENTS - itemsRef.current.length);
     const overflowCount = Math.max(0, accepted.length - remainingSlots);
     const capped = accepted.slice(0, remainingSlots);
     const oversize = capped.filter((file) => file.size > MAX_ATTACHMENT_BYTES);
@@ -464,26 +465,37 @@ export function Composer({
 
     if (toUpload.length === 0) return;
 
-    const targetConversationId = await ensureConversationId();
-    if (targetConversationId === null || !mountedRef.current) return;
-
     const newItems = toUpload.map(() => ({
       key: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
       previewUrl: "",
       status: "uploading" as const,
       attachmentId: null,
       errorMessage: null,
-      conversationId: targetConversationId,
+      conversationId: null,
     }));
     const nextItems = [...itemsRef.current, ...newItems];
     itemsRef.current = nextItems;
     setItems(nextItems);
 
+    const targetConversationId = await ensureConversationId();
+    if (targetConversationId === null || !mountedRef.current) {
+      for (const item of newItems) pendingRemovalRef.current.delete(item.key);
+      const retained = itemsRef.current.filter(
+        (item) => !newItems.some((created) => created.key === item.key),
+      );
+      itemsRef.current = retained;
+      if (mountedRef.current) setItems(retained);
+      return;
+    }
+
     for (let index = 0; index < toUpload.length; index++) {
+      const item = newItems[index]!;
+      if (!itemsRef.current.some((current) => current.key === item.key)) continue;
+      updateItem(item.key, { conversationId: targetConversationId });
       void uploadOne(
         toUpload[index]!,
         targetConversationId,
-        newItems[index]!.key,
+        item.key,
       );
     }
   }
@@ -548,10 +560,14 @@ export function Composer({
     const target = itemsRef.current.find((item) => item.key === key);
     if (!target) return;
     if (target.previewUrl) URL.revokeObjectURL(target.previewUrl);
-    if (target.status === "uploading") {
+    if (target.status === "uploading" && target.conversationId !== null) {
       pendingRemovalRef.current.add(key);
+    } else if (target.status === "uploading") {
+      pendingRemovalRef.current.delete(key);
     } else if (target.status === "done" && target.attachmentId !== null) {
-      void deleteAttachment(target.conversationId, target.attachmentId);
+      if (target.conversationId !== null) {
+        void deleteAttachment(target.conversationId, target.attachmentId);
+      }
     }
     itemsRef.current = itemsRef.current.filter((item) => item.key !== key);
     setItems((previous) => previous.filter((item) => item.key !== key));

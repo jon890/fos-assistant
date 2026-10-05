@@ -4,12 +4,14 @@ import com.bifos.assistant.chat.domain.Conversation;
 import com.bifos.assistant.chat.domain.type.ConversationPurpose;
 import com.bifos.assistant.chat.domain.type.ModelSelectionMode;
 import com.bifos.assistant.model.domain.type.ModelTier;
+import jakarta.persistence.LockModeType;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -17,6 +19,14 @@ import org.springframework.data.repository.query.Param;
 public interface ConversationRepository extends JpaRepository<Conversation, Long> {
 
     Optional<Conversation> findByIdAndUserIdAndDeletedAtIsNull(Long id, Long userId);
+
+    /** 같은 대화의 첨부 upload 를 장수 확인부터 저장까지 하나씩 처리한다. */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("""
+            select c from Conversation c
+             where c.id = :id and c.userId = :userId and c.deletedAt is null
+            """)
+    Optional<Conversation> findActiveByIdAndUserIdForUpload(@Param("id") Long id, @Param("userId") Long userId);
 
     /** 메시지가 없는 예약 작업 대화만 지운다. 트랜잭션은 예약 작업의 시작 단계가 연다. */
     @Modifying(flushAutomatically = true)

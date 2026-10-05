@@ -55,6 +55,7 @@ test("사진을 고르면 미리보기가 붙고 올리는 동안 보내기가 �
     await expect(page.getByTestId("attachment-uploading")).toBeVisible();
     await expect(send).toBeDisabled();
 
+    await expect.poll(() => releaseUpload !== null).toBe(true);
     releaseUpload?.();
     await expect(page.getByTestId("attachment-uploading")).toHaveCount(0);
     await expect(send).toBeEnabled();
@@ -152,6 +153,52 @@ test("썸네일과 upload 응답이 거꾸로 끝나도 고른 순서로 미리�
     expect(completedNames).toEqual(["third.png", "second.png", "first.png"]);
   } finally {
     await page.unroute("**/api/chat/conversations/*/attachments");
+  }
+});
+
+test("새 대화 생성 응답을 기다리는 두 선택은 합쳐서 서른 장만 예약한다", async ({ page }, testInfo) => {
+  await openNewConversation(page, testInfo);
+
+  let releaseConversation: (() => void) | null = null;
+  let uploadRequests = 0;
+  page.on("request", (request) => {
+    if (
+      request.method() === "POST" &&
+      /\/api\/chat\/conversations\/[^/]+\/attachments$/.test(request.url())
+    ) {
+      uploadRequests += 1;
+    }
+  });
+  await page.route("**/api/chat/conversations", async (route) => {
+    if (route.request().method() !== "POST") {
+      await route.continue();
+      return;
+    }
+    await new Promise<void>((resolve) => {
+      releaseConversation = resolve;
+    });
+    await route.continue();
+  });
+
+  try {
+    await page.getByTestId("attachment-input").setInputFiles(
+      Array.from({ length: 16 }, (_, index) => pngFile(`first-${index}.png`)),
+    );
+    await expect(page.getByTestId("attachment-previews").locator("> div")).toHaveCount(16);
+
+    await page.getByTestId("attachment-input").setInputFiles(
+      Array.from({ length: 16 }, (_, index) => pngFile(`second-${index}.png`)),
+    );
+    await expect(page.getByTestId("attachment-previews").locator("> div")).toHaveCount(30);
+    await expect(page.getByTestId("attachment-notice")).toContainText("2장은 올리지 못했어요");
+    expect(uploadRequests).toBe(0);
+
+    await expect.poll(() => releaseConversation !== null).toBe(true);
+    releaseConversation?.();
+    await expect.poll(() => uploadRequests).toBe(30);
+    await expect(page.getByTestId("attachment-uploading")).toHaveCount(0);
+  } finally {
+    await page.unroute("**/api/chat/conversations");
   }
 });
 
