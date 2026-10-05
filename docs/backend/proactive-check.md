@@ -420,6 +420,6 @@ turn 이 어떻게 끝나든 잠금을 풀기 전에 `ProactiveCheckService` 가
 | 시작 전 점검, 점검 대화의 찾기와 만들기, 다른 사용자의 접근, session 교체 | `ProactiveCheckService` 시험 |
 | 시간과 도구 호출 상한, 상한 중지가 실패했을 때의 다시 시도, 끝날 때의 전달 표시 | `ChatService` 와 `ProactiveCheckService` 시험 |
 | 커넥터 쓰기 거절, MCP 도구 거절, 위임 대상과 수 | 각 판정 자리의 시험 |
-| 웹 도구에서 커리어 커넥터 위임을 거쳐 대화에 결과가 남는 합성 흐름, 검색 결과의 지시가 쓰기로 이어지지 않음, 연결 해제 뒤의 출처 실패 | `test/e2e/scenarios/proactive-check.ts` |
+| 웹 도구와 붙은 커넥터의 읽기 도구 직접 호출을 거쳐 대화에 결과가 남는 합성 흐름, 쓰기 도구의 `READ_ONLY_RUN` 거절과 쓰기 허용 때의 승인 줄, 검색 결과의 지시가 쓰기로 이어지지 않음, 연결 해제 뒤의 출처 실패 | `test/e2e/scenarios/proactive-check.ts` |
 
 시험과 공개 기록에는 합성 데이터만 쓴다.
