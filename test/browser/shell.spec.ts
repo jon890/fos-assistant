@@ -109,10 +109,12 @@ test("사이드바는 일반 화면에 있고 로그인 화면에는 없다", as
   await openSidebar(page, testInfo);
   const sidebar = page.getByRole("complementary", { name: "사이드바" });
   await expect(sidebar).toBeVisible();
-  // 사이드바는 대화 목록, 주요 화면 메뉴, 맨 아래 줄의 세 구역이다. 관리자 입구는 메뉴가 아니라 맨 아래 줄에 있다.
+  // 사이드바는 맨 위의 「새 대화」 와 「지금 볼 것」, 대화 목록, 주요 화면 메뉴, 맨 아래 줄이다. 관리자 입구는 메뉴가 아니라 맨 아래 줄에 있다.
   await expect(sidebar.getByRole("navigation", { name: "대화 목록" })).toBeVisible();
   const menu = sidebar.getByRole("navigation", { name: "주요 화면" });
   await expect(menu.getByRole("link")).toHaveText([/^에이전트/, /^연결/, /^예약 작업/, /^기억/, /^사용량/]);
+  await expect(sidebar.getByRole("link", { name: /^지금 볼 것/ })).toBeVisible();
+  await expect(menu.getByRole("link", { name: /^지금 볼 것/ })).toHaveCount(0);
   await expect(sidebar.getByTestId("admin-entry")).toBeVisible();
   await expect(menu.getByTestId("admin-entry")).toHaveCount(0);
   expect(await page.evaluate(() => document.documentElement.scrollWidth))

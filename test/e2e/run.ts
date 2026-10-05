@@ -39,6 +39,7 @@ import { memoryScenario } from "./scenarios/memory.ts";
 import { memoryDocumentScenario } from "./scenarios/memory-document.ts";
 import { memoryImportScenario } from "./scenarios/memory-import.ts";
 import { chatScenario } from "./scenarios/chat.ts";
+import { followUpScenario } from "./scenarios/follow-up.ts";
 import { conversationHistoryScenario } from "./scenarios/conversation-history.ts";
 import { conversationManageScenario } from "./scenarios/conversation-manage.ts";
 import { usageCostScenario } from "./scenarios/usage-cost.ts";
@@ -109,6 +110,8 @@ const SCENARIOS: readonly Scenario[] = [
   skillsScenario,
   memoryScenario,
   chatScenario,
+  // turn 을 돌리지 않는다. 바로 뒤의 사용량 시나리오가 실행 수를 앞의 대화 turn 수와 같은지 본다.
+  followUpScenario,
   usageCostScenario,
   conversationHistoryScenario,
   conversationManageScenario,
