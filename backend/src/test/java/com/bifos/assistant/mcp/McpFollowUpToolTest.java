@@ -260,8 +260,8 @@ class McpFollowUpToolTest {
 
     @ParameterizedTest(name = "쓰기 도구 허용 {0}")
     @ValueSource(booleans = {false, true})
-    @DisplayName("먼저 살펴보기 트리에서 부르면 쓰기 도구를 허용했든 아니든 쓸 수 없는 도구라는 결과이고 줄이 생기지 않는다")
-    void refusesProposalInCheckTree(boolean writesAllowed) throws Exception {
+    @DisplayName("먼저 살펴보기 트리는 쓰기 도구 허용과 관계없이 사람이 받아들일 할 일을 제안한다")
+    void allowsProposalInCheckTree(boolean writesAllowed) throws Exception {
         ProactiveCheck check = ProactiveCheck.started(
                 dad.id(), 1L, conversation.id(), CheckTrigger.MANUAL, writesAllowed, Instant.now());
         check.attachRoot(dadRun.id(), dadRoot);
@@ -269,8 +269,9 @@ class McpFollowUpToolTest {
         try {
             JsonNode result = propose(arguments());
 
-            assertThat(result).as("결과: %s", result).isEqualTo(json.valueToTree(toolService.notAllowedInCheck()));
-            assertThat(rows()).isEmpty();
+            assertThat(result.path("isError").asBoolean()).isFalse();
+            assertThat(rows()).hasSize(1);
+            assertThat(rows().getFirst().status()).isEqualTo(FollowUpStatus.PROPOSED);
         } finally {
             checks.delete(saved);
         }

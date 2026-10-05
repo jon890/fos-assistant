@@ -10,6 +10,7 @@ import static org.mockito.Mockito.when;
 
 import com.bifos.assistant.chat.application.ConversationAccess;
 import com.bifos.assistant.chat.application.ConversationPublicIdLookup;
+import com.bifos.assistant.chat.domain.Conversation;
 import com.bifos.assistant.followup.application.FollowUpService;
 import com.bifos.assistant.followup.application.model.FollowUpProposalOutcome;
 import com.bifos.assistant.followup.domain.FollowUp;
@@ -42,9 +43,11 @@ class FollowUpProposalSaveFailureTest {
     @BeforeEach
     void setUp() {
         repository = mock(FollowUpRepository.class);
+        ConversationAccess conversations = mock(ConversationAccess.class);
+        when(conversations.requireOwn(DAD, 11L)).thenReturn(Conversation.startedBy(DAD.id(), "대화", 1L, NOW));
         followUps = new FollowUpService(
                 repository,
-                mock(ConversationAccess.class),
+                conversations,
                 mock(ConversationPublicIdLookup.class),
                 mock(PlatformTransactionManager.class),
                 Clock.fixed(NOW, ZoneOffset.UTC));

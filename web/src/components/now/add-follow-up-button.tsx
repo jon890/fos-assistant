@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { FollowUpDialog } from "./follow-up-dialog";
 
 /**
- * 「할 일 더하기」 단추와 그 대화 상자다. 「내 차례」 카드 끝과, 네 카드가 모두 빈 화면 아래에 같은 것을 둔다.
+ * 「할 일 더하기」 단추와 그 대화 상자다. 「내 차례」 카드 끝과, 다섯 카드가 모두 빈 화면 아래에 같은 것을 둔다.
  * 저장하면 서버 부품을 다시 읽는다.
  */
 export function AddFollowUpButton() {

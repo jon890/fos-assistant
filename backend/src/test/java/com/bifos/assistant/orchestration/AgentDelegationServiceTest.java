@@ -714,7 +714,7 @@ class AgentDelegationServiceTest {
         connectorAgent(CONNECTOR, user.id());
         Instant now = Instant.parse("2026-09-30T00:05:00Z");
         List<Consumer<ProactiveCheck>> endings = List.of(
-                check -> check.succeed(CheckOutcome.NOTHING_NEW, 0, 0, 0, 0, now),
+                check -> check.succeed(CheckOutcome.NOTHING_NEW, 0, 0, null, 0, 0, 0, 0, 0, now),
                 check -> check.stop("CHECK_TIME_LIMIT", 0, 0, now),
                 check -> check.stop(null, 0, 0, now),
                 check -> check.fail("HERMES_RUN_FAILED", 0, 0, now));

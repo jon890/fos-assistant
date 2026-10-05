@@ -38,4 +38,43 @@ public record AttentionCandidate(
         List<AttentionSourceRef> sources,
         AttentionExecutionRef execution,
         UUID actionId,
-        AttentionFollowUpRef followUp) {}
+        AttentionFollowUpRef followUp,
+        AttentionReport report) {
+
+    public AttentionCandidate(
+            CardKey card,
+            String itemKey,
+            String stateKey,
+            AttentionTrigger trigger,
+            boolean resolved,
+            boolean nowSignal,
+            List<AttentionSignal> signals,
+            AttentionConfidence confidence,
+            String title,
+            UUID conversationId,
+            String agentName,
+            Instant at,
+            List<AttentionSourceRef> sources,
+            AttentionExecutionRef execution,
+            UUID actionId,
+            AttentionFollowUpRef followUp) {
+        this(
+                card,
+                itemKey,
+                stateKey,
+                trigger,
+                resolved,
+                nowSignal,
+                signals,
+                confidence,
+                title,
+                conversationId,
+                agentName,
+                at,
+                sources,
+                execution,
+                actionId,
+                followUp,
+                null);
+    }
+}

@@ -16,6 +16,7 @@ import com.bifos.assistant.context.ContextAssembler;
 import com.bifos.assistant.proactive.application.model.CheckReadiness;
 import com.bifos.assistant.proactive.application.model.CheckStatusView;
 import com.bifos.assistant.proactive.domain.ProactiveCheck;
+import com.bifos.assistant.proactive.domain.type.CheckSkippedReason;
 import com.bifos.assistant.proactive.domain.type.CheckTrigger;
 import com.bifos.assistant.proactive.infra.ProactiveCheckFindingRepository;
 import com.bifos.assistant.proactive.infra.ProactiveCheckRepository;
@@ -26,10 +27,13 @@ import com.bifos.assistant.usage.application.ExecutionDeliveryWriter;
 import com.bifos.assistant.usage.infra.AgentExecutionRepository;
 import java.time.Clock;
 import java.util.UUID;
+import java.util.function.Consumer;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 /**
  * 먼저 살펴보기의 진입점이다(ADR-080). 진입 경로는 {@code docs/backend/proactive-check.md} 의 「진입점」 이 갖는다.
@@ -59,9 +63,11 @@ public class ProactiveCheckService {
     private final ContextAssembler contextAssembler;
     private final CheckResultParser parser;
     private final CheckAnswerRenderer renderer;
+    private final CheckReportFactory reportFactory;
     private final ExecutionDeliveryWriter deliveryWriter;
     private final ApplicationEventPublisher events;
     private final Clock clock;
+    private final TransactionTemplate transactions;
 
     /**
      * 살펴보기를 할 수 있는지, 요청자의 점검 대화, 요청자의 마지막 살펴보기를 읽는다.
@@ -92,6 +98,19 @@ public class ProactiveCheckService {
      *     {@code USER_BUSY}, {@code CONVERSATION_BUSY}
      */
     public UUID start(CurrentUser user, String agentCode, CheckTrigger trigger) {
+        return start(user, agentCode, trigger, ignored -> {});
+    }
+
+    /** 예약 작업이 점검 줄을 자기 실행 기록에 잇는 전용 진입점이다. */
+    public UUID startScheduled(CurrentUser user, String agentCode, Consumer<ProactiveCheck> beforeRun) {
+        return start(user, agentCode, CheckTrigger.SCHEDULED, beforeRun);
+    }
+
+    /**
+     * 예약 작업이 자기 {@code task_run}에 정확히 그 점검 줄을 잇도록, Hermes 호출 전에 저장한 점검 줄을 넘긴다.
+     * 기존 UUID 반환 경로는 위의 메서드가 유지한다.
+     */
+    public UUID start(CurrentUser user, String agentCode, CheckTrigger trigger, Consumer<ProactiveCheck> beforeRun) {
         Agent agent = agents.requireStartable(user, agentCode);
         if (!readiness.check(agent).available()) {
             throw new ApiException(
@@ -99,9 +118,23 @@ public class ProactiveCheckService {
         }
         OpenedCheck opened = checkConversations.findOrCreate(user, agent);
         Conversation conversation = opened.conversation();
+        if (trigger == CheckTrigger.SCHEDULED && hasUnreadReport(conversation.id())) {
+            ProactiveCheck skipped = ProactiveCheck.started(
+                    user.id(),
+                    agent.id(),
+                    conversation.id(),
+                    trigger,
+                    agent.proactiveCheckWritesAllowed(),
+                    clock.instant());
+            skipped.skip(CheckSkippedReason.UNREAD_REPORT, clock.instant());
+            saveLinked(skipped, beforeRun);
+            return conversation.publicId();
+        }
         TurnHandle handle;
         try {
-            handle = turns.open(user.id(), conversation.id());
+            handle = trigger == CheckTrigger.SCHEDULED
+                    ? turns.openBackground(user.id(), conversation.id())
+                    : turns.open(user.id(), conversation.id());
         } catch (ApiException ex) {
             if (ex.code() == ErrorCode.USER_BUSY && opened.created()) {
                 checkConversations.deleteCreated(conversation.id());
@@ -111,13 +144,14 @@ public class ProactiveCheckService {
         ProactiveCheck check = null;
         try {
             // 그 에이전트의 쓰기 허용 값을 지금 옮겨 적는다. 이 살펴보기의 경계는 옮겨 적은 값이 정한다(ADR-082).
-            check = checks.save(ProactiveCheck.started(
+            ProactiveCheck started = ProactiveCheck.started(
                     user.id(),
                     agent.id(),
                     conversation.id(),
                     trigger,
                     agent.proactiveCheckWritesAllowed(),
-                    clock.instant()));
+                    clock.instant());
+            check = saveLinked(started, beforeRun);
             ProactiveCheckRun run = new ProactiveCheckRun(user, agent.id(), check, renewsSession(conversation), deps());
             Thread.ofVirtual()
                     .name("proactive-check-" + conversation.id())
@@ -131,6 +165,28 @@ public class ProactiveCheckService {
             throw ex;
         }
         return conversation.publicId();
+    }
+
+    /** 보고를 연 사용자만 시각을 적는다. 이미 연 보고를 다시 열어도 첫 시각을 보존한다. */
+    @Transactional
+    public void openReport(CurrentUser user, Long checkId) {
+        ProactiveCheck check = checks.findByIdAndUserIdAndReportIsNotNull(checkId, user.id())
+                .orElseThrow(
+                        () -> new ApiException(ErrorCode.PROACTIVE_CHECK_NOT_FOUND, "no such proactive check report"));
+        check.openReport(clock.instant());
+    }
+
+    private boolean hasUnreadReport(Long conversationId) {
+        return checks.existsByConversationIdAndReportIsNotNullAndReportOpenedAtIsNull(conversationId);
+    }
+
+    /** 점검 줄 저장과 예약 실행 줄 연결은 Hermes 호출보다 먼저 같은 짧은 트랜잭션에서 끝낸다. */
+    private ProactiveCheck saveLinked(ProactiveCheck check, Consumer<ProactiveCheck> beforeRun) {
+        return transactions.execute(status -> {
+            ProactiveCheck saved = checks.saveAndFlush(check);
+            beforeRun.accept(saved);
+            return saved;
+        });
     }
 
     /** 같은 루트 session 으로 보낸 살펴보기가 상한에 닿았으면 참이다. 루트 session 이 비었으면 바꾸지 않는다. */
@@ -238,6 +294,16 @@ public class ProactiveCheckService {
 
     private ProactiveCheckRun.Deps deps() {
         return new ProactiveCheckRun.Deps(
-                properties, checks, findings, messages, executions, contextAssembler, parser, renderer, chat, clock);
+                properties,
+                checks,
+                findings,
+                messages,
+                executions,
+                contextAssembler,
+                parser,
+                renderer,
+                reportFactory,
+                chat,
+                clock);
     }
 }

@@ -29,7 +29,11 @@ import com.bifos.assistant.hermes.StubHermesRunsClient;
 import com.bifos.assistant.hermes.dto.HermesRunResult;
 import com.bifos.assistant.hermes.dto.TokenUsage;
 import com.bifos.assistant.proactive.application.ProactiveCheckService;
+import com.bifos.assistant.proactive.domain.CheckReport;
 import com.bifos.assistant.proactive.domain.ProactiveCheck;
+import com.bifos.assistant.proactive.domain.type.CheckOutcome;
+import com.bifos.assistant.proactive.domain.type.CheckSkippedReason;
+import com.bifos.assistant.proactive.domain.type.CheckTrigger;
 import com.bifos.assistant.proactive.infra.ProactiveCheckFindingRepository;
 import com.bifos.assistant.proactive.infra.ProactiveCheckRepository;
 import com.bifos.assistant.proactive.presentation.ProactiveCheckController;
@@ -289,6 +293,74 @@ class ProactiveCheckStartTest {
         assertThat(checks.findAll())
                 .filteredOn(check -> check.conversationId().equals(existing.id()))
                 .isEmpty();
+    }
+
+    @Test
+    @DisplayName("삭제된 점검 대화의 미열람 보고는 새 점검 대화의 예약 실행을 막지 않는다")
+    void deletedConversationReportDoesNotBlockNextScheduledCheck() {
+        Conversation deleted =
+                conversations.save(Conversation.startedForCheck(owner.id(), "삭제할 점검", agent.id(), Instant.now()));
+        ProactiveCheck old =
+                ProactiveCheck.started(owner.id(), agent.id(), deleted.id(), CheckTrigger.MANUAL, false, Instant.now());
+        old.succeed(
+                CheckOutcome.FINDINGS,
+                0,
+                0,
+                new CheckReport(List.of("지난 보고"), List.of(), List.of(), List.of(), List.of()),
+                0,
+                0,
+                0,
+                0,
+                0,
+                Instant.now());
+        checks.save(old);
+        transactions.executeWithoutResult(
+                status -> conversations.deleteIfActive(deleted.id(), owner.id(), Instant.now()));
+
+        UUID returned = service.start(owner, agent.code(), CheckTrigger.SCHEDULED);
+        Conversation created = ownersConversations().stream()
+                .filter(conversation -> conversation.publicId().equals(returned))
+                .findFirst()
+                .orElseThrow();
+        awaitIdle(created.id());
+
+        ProactiveCheck current = checks.findFirstByUserIdAndAgentIdOrderByIdDesc(owner.id(), agent.id())
+                .orElseThrow();
+        assertThat(returned).isEqualTo(created.publicId()).isNotEqualTo(deleted.publicId());
+        assertThat(current.skippedReason()).isNull();
+        assertThat(current.rootExecutionId()).isNotNull();
+        assertThat(stub().received()).hasSize(1);
+    }
+
+    @Test
+    @DisplayName("열지 않은 보고가 있으면 예약 살펴보기는 모델을 부르지 않고 UNREAD_REPORT로 끝난다")
+    void skipsScheduledCheckWhenReportIsUnread() {
+        Conversation conversation = conversations.save(
+                Conversation.startedForCheck(owner.id(), "먼저 살펴보기 · 커리어", agent.id(), Instant.now()));
+        ProactiveCheck report = checks.save(ProactiveCheck.started(
+                owner.id(), agent.id(), conversation.id(), CheckTrigger.MANUAL, false, Instant.now()));
+        report.succeed(
+                CheckOutcome.FINDINGS,
+                0,
+                0,
+                new CheckReport(List.of("바뀜"), List.of(), List.of(), List.of(), List.of()),
+                0,
+                0,
+                0,
+                0,
+                0,
+                Instant.now());
+        checks.save(report);
+        int receivedBefore = stub().received().size();
+
+        UUID returned = service.start(owner, agent.code(), CheckTrigger.SCHEDULED);
+
+        ProactiveCheck skipped = checks.findFirstByUserIdAndAgentIdOrderByIdDesc(owner.id(), agent.id())
+                .orElseThrow();
+        assertThat(returned).isEqualTo(conversation.publicId());
+        assertThat(skipped.skippedReason()).isEqualTo(CheckSkippedReason.UNREAD_REPORT);
+        assertThat(skipped.rootExecutionId()).isNull();
+        assertThat(stub().received()).hasSize(receivedBefore);
     }
 
     @Test

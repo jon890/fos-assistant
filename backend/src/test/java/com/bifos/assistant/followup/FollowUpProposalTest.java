@@ -199,6 +199,36 @@ class FollowUpProposalTest {
     }
 
     @Test
+    @DisplayName("점검 대화의 7일 지난 제안은 남아 있지만 새 제안 상한에서 빠진다")
+    void excludesOldCheckProposalsFromLimit() {
+        conversation = conversations.save(Conversation.startedForCheck(dad.id(), "점검 제안 검사", agent.id(), NOW));
+        propose(run(), "점검 할 일 1");
+        propose(run(), "점검 할 일 2");
+        propose(run(), "점검 할 일 3");
+
+        CLOCK.set(NOW.plus(Duration.ofDays(7)));
+        assertThat(propose(run(), "점검 할 일 4")).isEqualTo(FollowUpProposalOutcome.TOO_MANY_PROPOSALS);
+
+        CLOCK.set(NOW.plus(Duration.ofDays(7)).plusSeconds(1));
+        assertThat(propose(run(), "점검 할 일 4")).isEqualTo(FollowUpProposalOutcome.CREATED);
+        assertThat(rowsOf(dad)).hasSize(4);
+        assertThat(rowsOf(dad)).allMatch(row -> row.status() == FollowUpStatus.PROPOSED);
+    }
+
+    @Test
+    @DisplayName("보통 대화는 7일이 지나도 열린 제안 셋을 모두 센다")
+    void keepsOldChatProposalsInLimit() {
+        propose(run(), "보통 할 일 1");
+        propose(run(), "보통 할 일 2");
+        propose(run(), "보통 할 일 3");
+
+        CLOCK.set(NOW.plus(Duration.ofDays(8)));
+
+        assertThat(propose(run(), "보통 할 일 4")).isEqualTo(FollowUpProposalOutcome.TOO_MANY_PROPOSALS);
+        assertThat(rowsOf(dad)).hasSize(3);
+    }
+
+    @Test
     @DisplayName("한 실행이 다른 제목 셋을 제안하면 셋째가 TOO_MANY_IN_RUN 이다")
     void limitsProposalsPerExecution() {
         AgentExecution run = run();

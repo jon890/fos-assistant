@@ -10,11 +10,13 @@ import com.bifos.assistant.proactive.application.model.AnnouncedKey;
 import com.bifos.assistant.proactive.application.model.CheckResultBlock;
 import com.bifos.assistant.proactive.application.model.CheckResultRead;
 import com.bifos.assistant.proactive.application.model.JudgedFinding;
+import com.bifos.assistant.proactive.domain.CheckReport;
 import com.bifos.assistant.proactive.domain.ProactiveCheck;
 import com.bifos.assistant.proactive.domain.ProactiveCheckFinding;
 import com.bifos.assistant.proactive.domain.type.CheckInvalidReason;
 import com.bifos.assistant.proactive.domain.type.CheckOutcome;
 import com.bifos.assistant.proactive.domain.type.CheckStatus;
+import com.bifos.assistant.proactive.domain.type.CheckTrigger;
 import com.bifos.assistant.proactive.domain.type.FindingKind;
 import com.bifos.assistant.proactive.infra.ProactiveCheckFindingRepository;
 import com.bifos.assistant.proactive.infra.ProactiveCheckRepository;
@@ -27,6 +29,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -73,6 +76,7 @@ public class ProactiveCheckRun implements CheckTurn {
             - 최근에 알린 발견을 같은 근거로 다시 알리지 않는다. 새 원문이 있거나 마감, 적합성이 바뀌었을 때만 changeSinceLast 에 적고 다시 알린다.
             - 사용자가 답하지 않은 것을 선호나 거절로 여기지 않는다. 메시지 수는 반응이 있었는지만 알린다.
             - 다른 에이전트에는 연결한 서비스의 에이전트에만 필요한 질의를 맡기고, agent_status 의 wait_seconds 로 기다린다.
+            - follow_up_propose 는 PROPOSED 할 일만 만든다. 사용자가 받아들여야 OPEN 이 되며, 이 실행은 할 일을 직접 받아들이거나 끝낼 수 없다.
             - 답 끝에 아래 결과 블록 하나를 둔다. 블록 밖의 글은 사용자에게 보이지 않는다.
 
             <fos-check-result>
@@ -80,13 +84,14 @@ public class ProactiveCheckRun implements CheckTurn {
             </fos-check-result>
 
             결과 블록의 칸:
-            - version: 정수 1
+            - version: 정수 2. version 1도 읽지만 보고 카드는 만들지 않는다
             - outcome: FINDINGS 또는 NOTHING_NEW
             - summary: 문자열, 선택, 300자까지. 한두 문장 요약
             - findings: 배열, 5개까지. NOTHING_NEW 면 비운다
             - questions: 문자열 배열, 3개까지, 각 300자까지. 사용자에게 묻고 싶은 것
             - followUpCandidates: 문자열 배열, 3개까지, 각 200자까지. 할 일 후보
             - sourceFailures: 문자열 배열, 5개까지, 각 200자까지. 읽지 못한 출처와 까닭
+            - report: 객체. changed와 done은 각각 문자열 배열 3개까지, next는 문자열 배열 2개까지. evidence와 needsApproval은 적지 않는다
 
             findings 의 한 칸:
             - area: 문자열, 40자까지. 분야 지침이 정한 영역
@@ -153,6 +158,8 @@ public class ProactiveCheckRun implements CheckTurn {
     private volatile int referenceFindings;
     /** 검사한 발견. 답 메시지를 저장한 뒤 {@link #saveFindings} 가 저장한다. 블록에 발견이 없으면 비어 있다. */
     private volatile List<ProactiveCheckFinding> pendingFindings = List.of();
+    /** 결과 블록 v2를 검사해 만든 보고다. */
+    private volatile CheckReport pendingReport;
     /** 멈춤 알림 줄의 글을 내줬다. 그 줄은 부르는 쪽이 저장했다. */
     private volatile boolean stopped;
 
@@ -184,6 +191,7 @@ public class ProactiveCheckRun implements CheckTurn {
             ContextAssembler contextAssembler,
             CheckResultParser parser,
             CheckAnswerRenderer renderer,
+            CheckReportFactory reportFactory,
             ChatService chat,
             Clock clock) {}
 
@@ -217,6 +225,11 @@ public class ProactiveCheckRun implements CheckTurn {
     @Override
     public String startNotice() {
         return START_NOTICE;
+    }
+
+    @Override
+    public boolean notifyStart() {
+        return check.trigger() == CheckTrigger.MANUAL;
     }
 
     @Override
@@ -271,7 +284,8 @@ public class ProactiveCheckRun implements CheckTurn {
                     output == null ? 0 : output.length());
             return new CheckAnswer(
                     invalidReason == CheckInvalidReason.EMPTY_ANSWER ? EMPTY_ANSWER_NOTICE : INVALID_RESULT_NOTICE,
-                    true);
+                    true,
+                    false);
         }
         CheckResultBlock block = read.block();
         outcome = block.outcome();
@@ -279,7 +293,10 @@ public class ProactiveCheckRun implements CheckTurn {
                 && block.findings().isEmpty()
                 && block.questions().isEmpty()
                 && block.sourceFailures().isEmpty()) {
-            return new CheckAnswer(NOTHING_NEW_NOTICE, true);
+            if (check.trigger() == CheckTrigger.SCHEDULED) {
+                return new CheckAnswer("", false, true);
+            }
+            return new CheckAnswer(NOTHING_NEW_NOTICE, true, false);
         }
         Instant now = deps.clock().instant();
         Set<AnnouncedKey> announced = announcedSince(now.minus(deps.properties().digestWindow()));
@@ -302,7 +319,8 @@ public class ProactiveCheckRun implements CheckTurn {
                         each.checkedAt(),
                         now))
                 .toList();
-        return new CheckAnswer(deps.renderer().render(block, judged), false);
+        pendingReport = deps.reportFactory().create(block, judged, executionId);
+        return new CheckAnswer(deps.renderer().render(block, judged, pendingReport), false, false);
     }
 
     /** 멈춘 까닭에 맞는 알림 줄의 글이다. 부르면 그 줄을 저장한 것으로 본다. */
@@ -365,7 +383,18 @@ public class ProactiveCheckRun implements CheckTurn {
         } else if (outcome == CheckOutcome.INVALID_RESULT) {
             check.succeedInvalid(invalidReason, toolCalls.get(), delegations, now);
         } else {
-            check.succeed(outcome, newFindings, referenceFindings, toolCalls.get(), delegations, now);
+            TreeTokens tokens = treeTokens();
+            check.succeed(
+                    outcome,
+                    newFindings,
+                    referenceFindings,
+                    pendingReport,
+                    toolCalls.get(),
+                    delegations,
+                    tokens.input(),
+                    tokens.cachedInput(),
+                    tokens.output(),
+                    now);
         }
         deps.checks().save(check);
     }
@@ -555,6 +584,31 @@ public class ProactiveCheckRun implements CheckTurn {
                         finding.topicKey() != null && !finding.topicKey().isBlank())
                 .map(finding -> new AnnouncedKey(finding.topicKey(), finding.sourceUrl()))
                 .collect(Collectors.toSet());
+    }
+
+    /** 루트와 자식 실행의 토큰을 모두 더한다. 아직 적히지 않은 토큰은 0으로 센다. */
+    private TreeTokens treeTokens() {
+        Long rootId = check.rootExecutionId();
+        if (rootId == null) {
+            return TreeTokens.ZERO;
+        }
+        List<AgentExecution> tree = new ArrayList<>(deps.executions().findByRootExecutionId(rootId));
+        deps.executions().findById(rootId).ifPresent(tree::add);
+        long input = tree.stream().mapToLong(each -> orZero(each.inputTokens())).sum();
+        long cachedInput = tree.stream()
+                .mapToLong(each -> orZero(each.cachedInputTokens()))
+                .sum();
+        long output =
+                tree.stream().mapToLong(each -> orZero(each.outputTokens())).sum();
+        return new TreeTokens(input, cachedInput, output);
+    }
+
+    private static long orZero(Long value) {
+        return value == null ? 0 : value;
+    }
+
+    private record TreeTokens(long input, long cachedInput, long output) {
+        private static final TreeTokens ZERO = new TreeTokens(0, 0, 0);
     }
 
     private static String orDash(String value) {

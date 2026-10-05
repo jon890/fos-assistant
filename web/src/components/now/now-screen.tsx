@@ -6,7 +6,7 @@ import { NowCard } from "./now-card";
 
 /**
  * 지금 화면이다. 카드와 항목은 서버 응답의 순서대로 그리고 다시 정렬하지 않는다. 순서 규칙은 서버 하나가 갖는다.
- * 네 카드가 모두 비어 빈 화면 하나를 그릴 때도 그 아래에 「할 일 더하기」 를 둔다.
+ * 다섯 카드가 모두 비어 빈 화면 하나를 그릴 때도 그 아래에 「할 일 더하기」 를 둔다.
  */
 export async function NowScreen() {
   const result = await callControlPlane<AttentionView>("/api/v1/attention");

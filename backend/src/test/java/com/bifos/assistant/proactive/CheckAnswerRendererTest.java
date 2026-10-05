@@ -8,6 +8,7 @@ import com.bifos.assistant.proactive.application.model.CheckResultBlock;
 import com.bifos.assistant.proactive.application.model.CheckResultBlock.Finding;
 import com.bifos.assistant.proactive.application.model.CheckResultBlock.Next;
 import com.bifos.assistant.proactive.application.model.JudgedFinding;
+import com.bifos.assistant.proactive.domain.CheckReport;
 import com.bifos.assistant.proactive.domain.type.CheckOutcome;
 import com.bifos.assistant.proactive.domain.type.FindingKind;
 import java.time.Instant;
@@ -48,7 +49,8 @@ class CheckAnswerRendererTest {
             List<String> questions,
             List<String> followUps,
             List<String> sourceFailures) {
-        return new CheckResultBlock(1, CheckOutcome.FINDINGS, summary, findings, questions, followUps, sourceFailures);
+        return new CheckResultBlock(
+                1, CheckOutcome.FINDINGS, summary, findings, questions, followUps, sourceFailures, null);
     }
 
     private String render(CheckResultBlock block) {
@@ -56,6 +58,17 @@ class CheckAnswerRendererTest {
                 .map(each -> FindingJudgement.judge(each, START, NOW, Set.of()))
                 .toList();
         return renderer.render(block, judged);
+    }
+
+    @Test
+    @DisplayName("다섯 칸 보고 뒤에도 질문과 출처 장애를 빠뜨리지 않는다")
+    void reportKeepsQuestionsAndSourceFailures() {
+        CheckReport report = new CheckReport(List.of("바뀜"), List.of(), List.of(), List.of(), List.of());
+        CheckResultBlock result = block(null, List.of(), List.of("조건을 알려 주세요"), List.of(), List.of("출처 응답 없음"));
+
+        String rendered = renderer.render(result, List.of(), report);
+
+        assertThat(rendered).contains("**바뀐 점**", "바뀜", "**물어보고 싶은 것**", "조건을 알려 주세요", "**확인하지 못한 출처**", "출처 응답 없음");
     }
 
     @Test
@@ -110,6 +123,26 @@ class CheckAnswerRendererTest {
 
                 **확인하지 못한 출처**
                 - blog\\.example\\: 접속 실패""");
+    }
+
+    @Test
+    @DisplayName("Control Plane 이 채운 다섯 칸 보고는 모델이 넣은 승인 번호 대신 실제 승인 번호만 그린다")
+    void rendersControlPlaneReport() {
+        CheckReport report = new CheckReport(
+                List.of("새 공고가 열렸어요"),
+                List.of("원문을 확인했어요"),
+                List.of("https://example.com/posting"),
+                List.of("7c9955be-0000-4000-8000-000000000001"),
+                List.of("지원 조건을 비교해요"));
+
+        String rendered = renderer.render(block(null, List.of(), List.of(), List.of(), List.of()), List.of(), report);
+
+        assertThat(rendered)
+                .contains("**바뀐 점**\n- 새 공고가 열렸어요")
+                .contains("**한 일**\n- 원문을 확인했어요")
+                .contains("[example\\.com](https://example.com/posting)")
+                .contains("**남은 승인**\n- 7c9955be\\-0000\\-4000\\-8000\\-000000000001")
+                .contains("**다음에 볼 것**\n- 지원 조건을 비교해요");
     }
 
     @Test

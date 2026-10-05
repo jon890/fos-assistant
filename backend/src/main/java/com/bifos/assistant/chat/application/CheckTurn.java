@@ -19,6 +19,11 @@ public interface CheckTurn {
     /** turn 을 시작할 때 남기는 알림 줄의 글이다. */
     String startNotice();
 
+    /** 사람이 직접 시작한 살펴보기만 시작 알림 줄을 남긴다. */
+    default boolean notifyStart() {
+        return true;
+    }
+
     /** 이번 살펴보기를 새 session 으로 시작할지다. */
     boolean renewSession();
 

@@ -23,6 +23,7 @@ import {
 import { AddFollowUpButton } from "./add-follow-up-button";
 import { NowItem } from "./now-item";
 import type { ItemControl } from "./now-item-controls";
+import { ProactiveReportItem } from "./proactive-report-item";
 
 /**
  * 지금 화면의 카드 하나다. 머리의 수는 서버가 상한 전에 센 `nowCount` 이고, 보이는 항목을 다시 세지 않는다.
@@ -90,16 +91,20 @@ export function NowCard({
           </p>
         ) : (
           <ul className="flex flex-col gap-3">
-            {card.items.map((item) => (
-              <NowItem
-                key={item.itemKey}
-                card={card.key}
-                item={item}
-                readAt={readAt}
-                control={controls.get(item.itemKey) ?? null}
-                onControlChange={(next) => changeControl(item.itemKey, next)}
-              />
-            ))}
+            {card.items.map((item) =>
+              card.key === "reports" ? (
+                <ProactiveReportItem key={item.itemKey} item={item} />
+              ) : (
+                <NowItem
+                  key={item.itemKey}
+                  card={card.key}
+                  item={item}
+                  readAt={readAt}
+                  control={controls.get(item.itemKey) ?? null}
+                  onControlChange={(next) => changeControl(item.itemKey, next)}
+                />
+              ),
+            )}
           </ul>
         )}
         {more ? (

@@ -13,17 +13,23 @@
 | `public_id` | `BINARY(16) NOT NULL`, 유니크 | 화면과 API 가 쓰는 UUID v7 |
 | `owner_user_id` | `BIGINT NOT NULL` | 누구의 권한으로 도는가. `app_user` 참조. 바뀌지 않는다 |
 | `agent_id` | `BIGINT NOT NULL` | 어느 에이전트로 도는가. 주인이 고칠 수 있다 |
+| `kind` | `VARCHAR(16) NOT NULL DEFAULT 'TURN'` | `TURN` 은 보통 예약 turn, `CHECK` 는 매일 깨우기 |
 | `title` | `VARCHAR(100) NOT NULL` | |
-| `instruction` | `TEXT NOT NULL` | 발화마다 사용자 메시지로 넣을 글. 8000자까지 받는다 |
+| `instruction` | `TEXT NULL` | `TURN` 은 발화마다 사용자 메시지로 넣을 글로 8000자까지 받는다. `CHECK` 는 비운다 |
 | `state` | `VARCHAR(20) NOT NULL` | `ACTIVE`, `PAUSED`, `ARCHIVED` |
 | `conversation_mode` | `VARCHAR(20) NOT NULL` | `NEW_PER_RUN`, `SINGLE` |
 | `conversation_id` | `BIGINT` | `SINGLE` 일 때 결과를 쌓는 대화. 첫 발화가 만들기 전에는 비어 있다. `NEW_PER_RUN` 은 늘 비어 있다 |
 | `notify` | `VARCHAR(20) NOT NULL` | `ALWAYS`, `ON_FAILURE`, `NEVER` |
 | `created_at`, `updated_at` | `DATETIME(6) NOT NULL` | |
 | `archived_at` | `DATETIME(6)` | 지운 시각. `state` 가 `ARCHIVED` 일 때만 찬다 |
+| `check_owner_user_id`, `check_agent_id` | BIGINT 생성 열 | `CHECK` 일 때만 주인과 에이전트 번호를 채운다. 두 칸의 유일 제약으로 깨우기 설정 하나를 강제한다 |
 
 - 외래 키는 `owner_user_id` 에만 둔다. 에이전트와 대화는 지워도 행이 남는 표라 걸지 않는다
 - 지우면 `ARCHIVED` 로 둔다. 줄은 남는다. 발화 기록과 대화가 이 줄을 가리킨다
+
+`CHECK` 는 켜고 끄기를 `ACTIVE`, `PAUSED` 로 저장하며 같은 설정 줄을 다시 쓴다.
+대화는 점검 대화를 쓰므로 `conversation_mode`, `conversation_id` 로 대화를 만들지 않는다.
+일반 예약 작업 API 는 `TURN` 만 읽고 바꾼다.
 
 ## task_trigger
 
@@ -58,9 +64,10 @@
 | `owner_user_id` | `BIGINT NOT NULL` | 그 발화 때의 작업 주인. 하루 발화 수를 셀 때 조인 없이 센다 |
 | `scheduled_for` | `DATETIME(6) NOT NULL` | 발화하기로 한 예정 시각 |
 | `status` | `VARCHAR(20) NOT NULL` | `QUEUED`, `RUNNING`, `SUCCEEDED`, `FAILED`, `CANCELLED`, `SKIPPED` |
-| `reason` | `VARCHAR(32)` | `SKIPPED` 와 `FAILED` 의 까닭. `MISSED`, `DAILY_LIMIT`, `PAUSED`, `OWNER_REVOKED`, `AGENT_UNAVAILABLE`, `BUSY`, `FAILED`, `INTERRUPTED` |
+| `reason` | `VARCHAR(32)` | `SKIPPED` 와 `FAILED` 의 까닭. `MISSED`, `DAILY_LIMIT`, `PAUSED`, `OWNER_REVOKED`, `AGENT_UNAVAILABLE`, `BUSY`, `FAILED`, `INTERRUPTED`, `UNREAD_REPORT` |
 | `conversation_id` | `BIGINT` | 결과를 남긴 대화. 시작 전에 끝난 줄은 비어 있을 수 있다 |
 | `execution_id` | `BIGINT` | 이 발화의 루트 `agent_execution`. turn 이 끝난 모양을 받았을 때만 찬다 |
+| `proactive_check_id` | `BIGINT NULL` | `CHECK` 발화가 연 점검 줄. 저장과 발화 연결을 한 트랜잭션으로 끝낸다. 다음 tick 과 기동 복구가 점검 결과를 동기화한다 |
 | `created_at` | `DATETIME(6) NOT NULL` | 줄을 만든 시각 |
 | `started_at` | `DATETIME(6)` | `RUNNING` 으로 바꾼 시각 |
 | `finished_at` | `DATETIME(6)` | 끝난 시각 |

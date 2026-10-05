@@ -6,7 +6,8 @@
 
 ## proactive_check
 
-살펴보기 한 번이다. 시작할 때 만들고 끝날 때 갱신한다. 실행의 토큰과 금액은 `agent_execution` 이 갖고 여기 다시 적지 않는다.
+살펴보기 한 번이다. 시작할 때 만들고 끝날 때 갱신한다. 실행별 토큰과 금액은 `agent_execution` 이 갖는다.
+깨우기 예산을 측정할 트리 토큰 합계만 여기에도 남긴다.
 살펴보기 한 번의 비용은 `root_execution_id` 로 그 트리의 실행 줄을 합쳐 얻는다([`proactive-check.md`](../proactive-check.md) 의 「비용과 효과」).
 
 | 칸 | 타입 | 뜻 |
@@ -16,7 +17,7 @@
 | `conversation_id` | BIGINT FK `conversation` | 결과가 남는 점검 대화 |
 | `root_execution_id` | BIGINT NULL UNIQUE FK `agent_execution` | 살펴보기 turn 의 실행 줄. 실행 줄을 만들기 전에 실패하면 비어 있다. 살펴보기 트리를 가리는 기준이다 |
 | `hermes_root_session_id` | VARCHAR(128) NULL | 이 살펴보기를 보낸 점검 대화의 루트 session. session 을 바꿀지 셀 때 쓴다 |
-| `trigger_type` | VARCHAR(16) | `MANUAL`(단추), `SCHEDULED`(매일 깨우기, 아직 없다) |
+| `trigger_type` | VARCHAR(16) | `MANUAL`(단추), `SCHEDULED`(매일 깨우기) |
 | `status` | VARCHAR(16) | `RUNNING`, `SUCCEEDED`, `FAILED`, `STOPPED` |
 | `outcome` | VARCHAR(16) NULL | `FINDINGS`, `NOTHING_NEW`, `INVALID_RESULT`. `SUCCEEDED` 일 때만 채운다 |
 | `invalid_reason` | VARCHAR(32) NULL | 결과 블록을 읽지 못한 까닭. `outcome` 이 `INVALID_RESULT` 일 때만 채운다. `EMPTY_ANSWER`, `NO_BLOCK`, `NOT_JSON`, `BAD_VERSION`, `BAD_OUTCOME`. 뜻은 [`proactive-check.md`](../proactive-check.md) 의 「결과 계약」 이 갖는다. 이 칸을 더하기 전에 끝난 줄은 비어 있다 |
@@ -26,6 +27,12 @@
 | `writes_allowed` | BOOLEAN NOT NULL DEFAULT FALSE | 시작할 때 옮겨 적은 그 에이전트의 「먼저 살펴보기에 쓰기 도구 허용」 값. 그 살펴보기의 경계를 정한다(ADR-082) |
 | `new_findings` | INT NOT NULL DEFAULT 0 | 「새로 알릴 것」 으로 그린 발견 수 |
 | `reference_findings` | INT NOT NULL DEFAULT 0 | 「참고」 로 내린 발견 수 |
+| `report_json` | JSON NULL | Control Plane 이 검사해 채운 다섯 칸 보고 |
+| `tree_input_tokens` | BIGINT NULL | 루트와 자식 실행의 입력 토큰 합계 |
+| `tree_cached_input_tokens` | BIGINT NULL | 같은 트리의 캐시 입력 토큰 합계 |
+| `tree_output_tokens` | BIGINT NULL | 같은 트리의 출력 토큰 합계 |
+| `skipped_reason` | VARCHAR(32) NULL | 모델 없이 끝낸 까닭. 지금은 `UNREAD_REPORT` 를 쓴다 |
+| `report_opened_at` | DATETIME(6) NULL | 요청자가 보고를 연 시각 |
 | `started_at` | DATETIME(6) | |
 | `finished_at` | DATETIME(6) NULL | 끝나면 채운다 |
 

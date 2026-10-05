@@ -3,6 +3,7 @@ package com.bifos.assistant.proactive.application;
 import com.bifos.assistant.proactive.application.model.CheckResultBlock;
 import com.bifos.assistant.proactive.application.model.CheckResultBlock.Finding;
 import com.bifos.assistant.proactive.application.model.JudgedFinding;
+import com.bifos.assistant.proactive.domain.CheckReport;
 import com.bifos.assistant.proactive.domain.type.FindingKind;
 import com.bifos.assistant.proactive.domain.type.FindingReason;
 import java.net.URI;
@@ -57,6 +58,14 @@ public class CheckAnswerRenderer {
      * 하기 위해서다. 질문과 참고와 확인하지 못한 출처는 그대로 그린다.
      */
     public String render(CheckResultBlock block, List<JudgedFinding> judged) {
+        return render(block, judged, null);
+    }
+
+    /** v2 보고가 있으면 다섯 칸으로 먼저 그린다. URL과 승인 번호는 Control Plane 이 채운 값만 쓴다. */
+    public String render(CheckResultBlock block, List<JudgedFinding> judged, CheckReport report) {
+        if (report != null) {
+            return report(report) + "\n\n" + render(block, judged);
+        }
         List<JudgedFinding> fresh =
                 judged.stream().filter(each -> each.kind() == FindingKind.NEW).toList();
         List<JudgedFinding> references = judged.stream()
@@ -79,6 +88,23 @@ public class CheckAnswerRenderer {
         }
         addSection(parts, "확인하지 못한 출처", block.sourceFailures());
         return String.join("\n\n", parts);
+    }
+
+    private static String report(CheckReport report) {
+        List<String> parts = new ArrayList<>();
+        addSection(parts, "바뀐 점", report.changed());
+        addSection(parts, "한 일", report.done());
+        if (!report.evidence().isEmpty()) {
+            parts.add("**근거**\n"
+                    + report.evidence().stream().map(url -> "- " + link(url)).collect(Collectors.joining("\n")));
+        }
+        addSection(parts, "남은 승인", report.needsApproval());
+        addSection(parts, "다음에 볼 것", report.next());
+        return String.join("\n\n", parts);
+    }
+
+    private static String link(String url) {
+        return "[" + escape(hostOf(url)) + "](" + linkDestination(url) + ")";
     }
 
     private static String newFindings(List<JudgedFinding> fresh) {

@@ -37,10 +37,11 @@ test("Pretendard와 테마별 브랜드 색을 자체 글꼴 단추에 적용한
   expect(contrast(themeColors.light.primaryForeground, themeColors.light.primary)).toBeGreaterThanOrEqual(4.5);
   expect(contrast(themeColors.dark.primaryForeground, themeColors.dark.primary)).toBeGreaterThanOrEqual(4.5);
 
-  const primaryButton = page.getByRole("button", { name: "저장", exact: true });
+  const persona = page.getByRole("textbox", { name: /성격$/ });
+  const primaryButton = persona.locator("..").getByRole("button", { name: "저장", exact: true });
   // 성격이 비어 있으면 저장 단추가 잠겨 muted 바탕이다. 글을 넣어 단추를 켠 뒤 강조 색을 본다.
   // 저장하지 않으므로 이 에이전트의 성격은 바뀌지 않는다.
-  await page.getByRole("textbox", { name: /성격$/ }).fill("단추 색을 보려고 넣은 글");
+  await persona.fill("단추 색을 보려고 넣은 글");
   await expect(primaryButton).toBeEnabled();
   const readColors = () => primaryButton.evaluate((button) => {
     const buttonStyles = getComputedStyle(button);

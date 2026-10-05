@@ -18,6 +18,8 @@ public enum TaskRunReason {
     AGENT_UNAVAILABLE,
     /** 시작 기한 안에 turn 잠금을 얻지 못했다. */
     BUSY,
+    /** 읽지 않은 보고가 있어 다음 깨우기를 건너뛰었다. */
+    UNREAD_REPORT,
     /** turn 이 예외로 끝났다. */
     FAILED,
     /** 도는 중에 서버가 다시 시작됐다. */
