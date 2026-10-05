@@ -68,8 +68,7 @@ class CheckAnswerRendererTest {
 
         String rendered = renderer.render(result, List.of(), report);
 
-        assertThat(rendered).contains("**바뀐 점**", "바뀜", "**물어보고 싶은 것**", "조건을 알려 주세요",
-                "**확인하지 못한 출처**", "출처 응답 없음");
+        assertThat(rendered).contains("**바뀐 점**", "바뀜", "**물어보고 싶은 것**", "조건을 알려 주세요", "**확인하지 못한 출처**", "출처 응답 없음");
     }
 
     @Test
