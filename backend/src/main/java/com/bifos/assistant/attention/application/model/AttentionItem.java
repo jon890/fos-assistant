@@ -24,4 +24,5 @@ public record AttentionItem(
         AttentionWhy why,
         AttentionExecutionRef execution,
         UUID actionId,
-        AttentionFollowUpRef followUp) {}
+        AttentionFollowUpRef followUp,
+        AttentionReport report) {}

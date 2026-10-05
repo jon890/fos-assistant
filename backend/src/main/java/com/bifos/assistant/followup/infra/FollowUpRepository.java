@@ -38,6 +38,10 @@ public interface FollowUpRepository extends JpaRepository<FollowUp, Long> {
 
     long countByConversationIdAndStatus(Long conversationId, FollowUpStatus status);
 
+    /** 점검 대화에서 제안 상한을 셀 때 최근 제안만 포함한다. */
+    long countByConversationIdAndStatusAndCreatedAtGreaterThanEqual(
+            Long conversationId, FollowUpStatus status, Instant createdAfter);
+
     /** 그 실행이 제안한 줄의 수다. 끝난 줄도 센다. */
     long countByProposedByExecutionId(Long executionId);
 }

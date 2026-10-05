@@ -1,6 +1,9 @@
 package com.bifos.assistant.task.presentation;
 
 import com.bifos.assistant.agent.domain.Agent;
+import com.bifos.assistant.proactive.application.model.CheckBlocker;
+import com.bifos.assistant.task.application.model.ProactiveSchedule;
+import com.bifos.assistant.task.application.model.ProactiveSchedule.LastCheck;
 import com.bifos.assistant.task.application.model.ScheduleInput;
 import com.bifos.assistant.task.application.model.TaskDetail;
 import com.bifos.assistant.task.application.model.TaskInput;
@@ -21,6 +24,7 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import java.time.Instant;
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.UUID;
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
@@ -28,6 +32,62 @@ import lombok.NoArgsConstructor;
 /** 예약 작업 경로의 요청과 응답 모양이다. 계약은 {@code docs/backend/task.md} 의 「API」 가 갖는다. */
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
 public final class TaskDtos {
+
+    /** 매일 깨우기를 켜거나 끄는 요청이다. */
+    public record ProactiveScheduleRequest(
+            boolean enabled,
+            @NotBlank String time,
+            @NotBlank String timezone) {}
+
+    /** 에이전트별 매일 깨우기 설정이다. */
+    public record ProactiveScheduleView(
+            boolean enabled,
+            String time,
+            String timezone,
+            Instant nextRunAt,
+            LastCheckView lastCheck,
+            boolean schedulingAvailable,
+            List<ProactiveBlockerView> blockers) {
+
+        public static ProactiveScheduleView from(ProactiveSchedule schedule) {
+            return new ProactiveScheduleView(
+                    schedule.enabled(),
+                    schedule.time(),
+                    schedule.timeZone(),
+                    schedule.nextRunAt(),
+                    schedule.lastCheck() == null ? null : LastCheckView.from(schedule.lastCheck()),
+                    schedule.schedulingAvailable(),
+                    schedule.blockers().stream().map(ProactiveBlockerView::from).toList());
+        }
+    }
+
+    /** 매일 깨우기를 막는 까닭이다. */
+    public record ProactiveBlockerView(String code, List<String> toolsets) {
+
+        static ProactiveBlockerView from(CheckBlocker blocker) {
+            return new ProactiveBlockerView(blocker.code().name(), blocker.toolsets());
+        }
+    }
+
+    /** 매일 깨우기가 마지막으로 연 살펴보기다. */
+    public record LastCheckView(
+            String status,
+            String outcome,
+            String invalidReason,
+            String skippedReason,
+            Instant startedAt,
+            Instant finishedAt) {
+
+        static LastCheckView from(LastCheck check) {
+            return new LastCheckView(
+                    check.status().name(),
+                    check.outcome() == null ? null : check.outcome().name(),
+                    check.invalidReason() == null ? null : check.invalidReason().name(),
+                    check.skippedReason() == null ? null : check.skippedReason().name(),
+                    check.startedAt(),
+                    check.finishedAt());
+        }
+    }
 
     /**
      * 작업을 만들거나 고치는 요청이다. 뒤의 셋은 비우면 기본값이다.

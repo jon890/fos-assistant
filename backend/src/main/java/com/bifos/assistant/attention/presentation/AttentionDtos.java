@@ -5,6 +5,7 @@ import com.bifos.assistant.attention.application.model.AttentionExecutionRef;
 import com.bifos.assistant.attention.application.model.AttentionFollowUpRef;
 import com.bifos.assistant.attention.application.model.AttentionItem;
 import com.bifos.assistant.attention.application.model.AttentionMetric;
+import com.bifos.assistant.attention.application.model.AttentionReport;
 import com.bifos.assistant.attention.application.model.AttentionSignal;
 import com.bifos.assistant.attention.application.model.AttentionSourceRef;
 import com.bifos.assistant.attention.application.model.AttentionView;
@@ -137,7 +138,7 @@ public final class AttentionDtos {
     }
 
     /**
-     * 항목 하나다. 해당하지 않는 {@code execution}, {@code actionId}, {@code followUp} 은 null 로 낸다. 화면이 {@code itemKey}
+     * 항목 하나다. 해당하지 않는 {@code execution}, {@code actionId}, {@code followUp}, {@code report} 은 null 로 낸다. 화면이 {@code itemKey}
      * 를 잘라 식별자를 얻지 않게 하려는 것이다.
      *
      * @param attention {@code NOW} 나 {@code LATER}
@@ -156,7 +157,8 @@ public final class AttentionDtos {
             WhyView why,
             ExecutionView execution,
             UUID actionId,
-            FollowUpView followUp) {
+            FollowUpView followUp,
+            ReportView report) {
 
         static ItemView from(AttentionItem item) {
             return new ItemView(
@@ -171,7 +173,31 @@ public final class AttentionDtos {
                     WhyView.from(item.why()),
                     ExecutionView.from(item.execution()),
                     item.actionId(),
-                    FollowUpView.from(item.followUp()));
+                    FollowUpView.from(item.followUp()),
+                    ReportView.from(item.report()));
+        }
+    }
+
+    public record ReportView(
+            Long checkId,
+            String agentCode,
+            List<String> changed,
+            List<String> done,
+            List<String> evidence,
+            List<String> needsApproval,
+            List<String> next) {
+
+        static ReportView from(AttentionReport report) {
+            return report == null
+                    ? null
+                    : new ReportView(
+                            report.checkId(),
+                            report.agentCode(),
+                            report.changed(),
+                            report.done(),
+                            report.evidence(),
+                            report.needsApproval(),
+                            report.next());
         }
     }
 

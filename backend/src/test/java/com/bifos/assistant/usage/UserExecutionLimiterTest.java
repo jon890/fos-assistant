@@ -138,6 +138,39 @@ class UserExecutionLimiterTest {
     }
 
     @Test
+    @DisplayName("백그라운드 turn 두 개 뒤에도 사용자 대화 한 자리는 남고 셋째 깨우기는 거절한다")
+    void reservesForegroundSlotForBackgroundTurns() {
+        TurnSlot first = limiter.acquireBackgroundTurn(userId);
+        limiter.acquireBackgroundTurn(userId);
+
+        assertUserBusy(() -> limiter.acquireBackgroundTurn(userId));
+        assertThat(limiter.used(userId)).isEqualTo(2);
+        assertThat(limiter.hasTurnRoom(userId)).isTrue();
+
+        limiter.acquireTurn(userId);
+        assertThat(limiter.used(userId)).isEqualTo(3);
+
+        first.release();
+        assertThat(limiter.used(userId)).isEqualTo(2);
+    }
+
+    @Test
+    @DisplayName("매일 깨우기의 위임 자식도 사용자 대화 한 자리를 남긴다")
+    void reservesForegroundSlotForScheduledChildren() {
+        TurnSlot background = limiter.acquireBackgroundTurn(userId, 991L);
+        assertThat(limiter.isBackgroundConversation(991L)).isTrue();
+        limiter.admit(userId, ExecutionAdmission.BACKGROUND_CHILD, () -> saveRunning(userId, 10L, 1L));
+
+        assertUserBusy(
+                () -> limiter.admit(userId, ExecutionAdmission.BACKGROUND_CHILD, () -> saveRunning(userId, 10L, 1L)));
+        limiter.acquireTurn(userId);
+        assertThat(limiter.used(userId)).isEqualTo(3);
+
+        background.release();
+        assertThat(limiter.isBackgroundConversation(991L)).isFalse();
+    }
+
+    @Test
     @DisplayName("turn 자리 둘과 자식 줄 하나면 셋째 자식은 USER_BUSY 이고 줄을 만들지 않는다")
     void rejectsChildWhenTurnsAndChildFillLimit() {
         limiter.acquireTurn(userId);

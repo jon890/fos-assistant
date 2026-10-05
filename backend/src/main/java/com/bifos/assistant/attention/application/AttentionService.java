@@ -25,7 +25,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 /**
- * 요청자의 원래 기록을 읽어 지금 화면의 카드 넷을 계산한다. 판정 결과를 저장하지 않는다(ADR-072).
+ * 요청자의 원래 기록을 읽어 지금 화면의 카드 다섯을 계산한다. 판정 결과를 저장하지 않는다(ADR-072).
  *
  * <p>트랜잭션을 열지 않는다. 후보마다 읽는 쪽이 자기 트랜잭션으로 돌아, 한 쪽의 실패가 다른 쪽의 읽기를 되돌리지 않는다.
  */
@@ -42,7 +42,7 @@ public class AttentionService {
     private final Clock clock;
 
     /**
-     * 카드 넷과 건수를 계산한다. 읽지 못한 기록이 든 카드만 {@code UNAVAILABLE} 이다.
+     * 카드 다섯과 건수를 계산한다. 읽지 못한 기록이 든 카드만 {@code UNAVAILABLE} 이다.
      *
      * <p>응답에 실린 {@code NOW} 와 {@code LATER} 항목마다 {@code SHOWN} 사건을 남긴다. 남기지 못해도 응답은 낸다.
      */

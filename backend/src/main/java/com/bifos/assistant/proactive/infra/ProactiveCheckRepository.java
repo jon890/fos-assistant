@@ -2,14 +2,25 @@ package com.bifos.assistant.proactive.infra;
 
 import com.bifos.assistant.proactive.domain.ProactiveCheck;
 import com.bifos.assistant.proactive.domain.type.CheckStatus;
+import jakarta.persistence.LockModeType;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 
 public interface ProactiveCheckRepository extends JpaRepository<ProactiveCheck, Long> {
 
     /** 그 사용자가 그 에이전트로 연 마지막 살펴보기. */
     Optional<ProactiveCheck> findFirstByUserIdAndAgentIdOrderByIdDesc(Long userId, Long agentId);
+
+    boolean existsByUserIdAndAgentIdAndReportIsNotNullAndReportOpenedAtIsNull(Long userId, Long agentId);
+
+    boolean existsByConversationIdAndReportIsNotNullAndReportOpenedAtIsNull(Long conversationId);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    Optional<ProactiveCheck> findByIdAndUserIdAndReportIsNotNull(Long id, Long userId);
+
+    List<ProactiveCheck> findByUserIdAndReportIsNotNullAndReportOpenedAtIsNullOrderByStartedAtDesc(Long userId);
 
     /** 그 실행 줄이 살펴보기 turn 인지. 살펴보기 트리를 가리는 데 쓴다. */
     boolean existsByRootExecutionId(Long rootExecutionId);

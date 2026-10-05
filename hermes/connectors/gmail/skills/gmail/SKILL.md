@@ -1,6 +1,6 @@
 ---
 name: gmail
-description: 사용자의 Gmail 에서 메일을 찾고 읽고, 승인받은 초안과 메일을 쓴다.
+description: Gmail 메일을 찾고 읽고, 승인받은 메일과 라벨, 자동 분류 필터를 쓴다.
 ---
 
 # Gmail
@@ -25,6 +25,7 @@ description: 사용자의 Gmail 에서 메일을 찾고 읽고, 승인받은 초
 - `get_thread`: 주고받은 메일을 한 번에 읽는다. 검색 결과의 `thread_id` 를 쓴다
 - `list_labels`: 라벨의 이름을 본다. 사용자 라벨을 더하거나 떼기 전에 이름을 확인한다
 - `get_profile`: 연결한 계정의 주소를 본다
+- `list_filters`: 저장된 자동 분류 조건과 라벨 동작을 읽는다
 
 결과가 더 있으면 `next_page_token` 을 `page_token` 에 넣어 다음 쪽을 읽는다.
 본문이 잘렸으면(`body_truncated`) 잘렸다고 말한다. 첨부는 이름과 종류와 크기만 보이고 내용은 읽지 못한다.
@@ -59,7 +60,24 @@ description: 사용자의 Gmail 에서 메일을 찾고 읽고, 승인받은 초
 메일을 지우거나 휴지통으로 옮기지 못한다. 스팸으로 보내지도 못하고, 휴지통과 스팸에서 꺼내지도 못한다.
 요청받으면 못 한다고 말하고 보관을 권한다. 지우려면 사용자가 Gmail 에서 직접 한다.
 
+## 라벨과 자동 분류
+
+1. `list_labels` 로 라벨을 확인하고, 없으면 `create_label` 을 부른다. 이름은 1부터 225자다.
+2. `create_filter` 에 조건과 `add_labels`, `remove_labels` 를 글자로 넣어 앞으로 오는 메일의 분류를 저장한다.
+3. 기존 메일은 `search_messages` 의 모든 쪽에서 번호를 모아 센다. 같은 검색어와 라벨, 센 수를 글자로 적은 `expected_count` 로 `apply_labels_to_query` 를 요청한다.
+
+라벨 만들기와 `update_label` 의 이름·색 변경은 상시 허락을 줄 수 있다. 시스템 라벨은 바꾸지 못한다.
+필터 만들기와 `delete_filter`, 기존 메일 적용은 매번 승인한다. 한 번에 최대 500통이다.
+필터는 새 메일에만 적용된다. 필터를 바꾸려면 `list_filters` 로 원래 설정을 읽고, `delete_filter` 로 지운 뒤 `create_filter` 로 다시 만든다.
+두 쓰기에 각각 승인이 필요하다. 다시 만들기가 실패하면 원래 설정을 사용자에게 알리고 새 승인을 받아 복구한다.
+
+승인 실행에서 `apply_labels_to_query` 가 `invalid_input` 으로 끝나면 인자를 확인하고, 같은 검색어로 `search_messages` 의 모든 쪽을 다시 읽어 대상 수를 센다. 새 수와 검색어를 보여 주고 다시 승인을 요청한다.
+서버는 수가 달라졌을 때 `GMAIL_TARGET_COUNT_CHANGED` 와 `actual_count` 를 반환하지만, 현재 승인 경로는 공통 오류 어휘만 전달한다. 이 경로에서 이전 수나 반환하지 않은 수를 새 수로 쓰지 않는다.
+대상이 501통 이상이면 검색 조건을 나누어 각 500통 이내로 요청한다. 일부만 적용한 것으로 말하지 않는다.
+필터와 일괄 적용도 `TRASH`, `SPAM` 을 더하거나 떼지 못한다. `forward` 와 전달 주소 관리는 하지 못한다.
+
 ## 오류
 
 메일을 읽지 못했으면 읽지 못했다고 말한다. 내용을 지어내지 않는다.
 자격 증명이 거절됐으면 연결 화면에서 값을 다시 등록해야 한다고 알린다.
+필터 쓰기가 `forbidden` 으로 끝나면 읽기 도구 `list_filters` 로 권한을 확인한다. 여기서 `GMAIL_FILTER_SCOPE_REQUIRED` 가 나오면 Google Cloud 동의 화면에 `gmail.settings.basic` 을 더하고, `gmail.modify` 와 함께 토큰을 다시 받아 연결 값을 바꾸라고 알린다. 조회가 성공하면 쓰기 오류를 권한 부족으로 단정하지 않는다.

@@ -1,5 +1,7 @@
 package com.bifos.assistant.task.application;
 
+import com.bifos.assistant.proactive.domain.type.CheckStatus;
+import com.bifos.assistant.proactive.infra.ProactiveCheckRepository;
 import com.bifos.assistant.task.domain.TaskRun;
 import com.bifos.assistant.task.domain.type.TaskRunReason;
 import com.bifos.assistant.task.domain.type.TaskRunStatus;
@@ -33,6 +35,7 @@ public class TaskRunRecovery {
     private final TaskRunRepository runs;
     private final TaskRepository tasks;
     private final TaskNotices notices;
+    private final ProactiveCheckRepository checks;
     private final TransactionTemplate transactions;
     private final Clock clock;
 
@@ -83,6 +86,20 @@ public class TaskRunRecovery {
         TaskRun run = runs.findByIdForUpdate(runId).orElse(null);
         if (run == null || run.status() != TaskRunStatus.RUNNING) {
             return false;
+        }
+        if (run.proactiveCheckId() != null) {
+            var check = checks.findById(run.proactiveCheckId()).orElse(null);
+            if (check != null && check.status() != CheckStatus.RUNNING) {
+                if (check.skippedReason() != null) {
+                    run.skip(TaskRunReason.UNREAD_REPORT, now);
+                } else if (check.status() == CheckStatus.SUCCEEDED) {
+                    run.succeed(check.rootExecutionId(), now);
+                } else {
+                    run.fail(TaskRunReason.FAILED, now);
+                }
+                notices.announce(tasks.findById(run.taskId()).orElseThrow(), run);
+                return true;
+            }
         }
         run.fail(TaskRunReason.INTERRUPTED, now);
         notices.announce(tasks.findById(run.taskId()).orElseThrow(), run);

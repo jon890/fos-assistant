@@ -23,7 +23,7 @@ import tools.jackson.databind.json.JsonMapper;
  * 의 「결과 계약」 이 갖는다.
  *
  * <p>상한을 넘는 글은 잘라 읽고 넘는 배열 원소는 버린다. 블록을 읽지 못한 것으로 보는 경우는 답이 비었거나, 블록이 없거나,
- * JSON 이 아니거나, {@code version} 이 1 이 아니거나, {@code outcome} 이 없거나 모르는 값일 때뿐이고 그 까닭을
+ * JSON 이 아니거나, {@code version} 이 1이나 2가 아니거나, {@code outcome} 이 없거나 모르는 값일 때뿐이고 그 까닭을
  * {@link CheckInvalidReason} 으로 돌려준다. 읽지 못해도 예외를 밖으로 던지지 않는다.
  *
  * <p>태그 글자 사이에 낀 보이지 않는 서식 문자(Unicode {@code Cf}. 폭 없는 공백, U+FEFF 등)는 무시한다. 모델이 여는 태그 가운데에
@@ -53,6 +53,10 @@ public class CheckResultParser {
     private static final int QUESTIONS_MAX = 3;
     private static final int FOLLOW_UPS_MAX = 3;
     private static final int SOURCE_FAILURES_MAX = 5;
+    private static final int REPORT_CHANGED_MAX = 3;
+    private static final int REPORT_DONE_MAX = 3;
+    private static final int REPORT_NEXT_MAX = 2;
+    private static final int REPORT_LINE_MAX = 300;
 
     private static final int AREA_MAX = 40;
     private static final int TOPIC_KEY_MAX = 120;
@@ -120,7 +124,7 @@ public class CheckResultParser {
     /** 읽은 JSON 객체를 계약대로 검사해 블록으로 바꾼다. */
     private static CheckResultRead blockOf(JsonNode root) {
         JsonNode version = root.get("version");
-        if (version == null || !version.isIntegralNumber() || version.asInt() != 1) {
+        if (version == null || !version.isIntegralNumber() || (version.asInt() != 1 && version.asInt() != 2)) {
             return CheckResultRead.invalid(CheckInvalidReason.BAD_VERSION);
         }
         Optional<CheckOutcome> outcome = outcomeOf(root.get("outcome"));
@@ -128,13 +132,14 @@ public class CheckResultParser {
             return CheckResultRead.invalid(CheckInvalidReason.BAD_OUTCOME);
         }
         return CheckResultRead.of(new CheckResultBlock(
-                1,
+                version.asInt(),
                 outcome.get(),
                 text(root.get("summary"), SUMMARY_MAX),
                 findings(root.get("findings")),
                 texts(root.get("questions"), QUESTIONS_MAX, QUESTION_MAX),
                 texts(root.get("followUpCandidates"), FOLLOW_UPS_MAX, FOLLOW_UP_MAX),
-                texts(root.get("sourceFailures"), SOURCE_FAILURES_MAX, SOURCE_FAILURE_MAX)));
+                texts(root.get("sourceFailures"), SOURCE_FAILURES_MAX, SOURCE_FAILURE_MAX),
+                version.asInt() == 2 ? report(root.get("report")) : null));
     }
 
     /** 앞뒤를 코드 울타리({@code ```json} 등)로 감쌌으면 벗긴다. */
@@ -199,6 +204,17 @@ public class CheckResultParser {
             return null;
         }
         return new Next(text(node.get("type"), SHORT_FIELD_MAX), text(node.get("text"), NEXT_TEXT_MAX));
+    }
+
+    /** 모델이 쓴 승인 번호와 근거 주소는 믿지 않고 읽지 않는다. */
+    private static CheckResultBlock.ReportDraft report(JsonNode node) {
+        if (node == null || !node.isObject()) {
+            return null;
+        }
+        return new CheckResultBlock.ReportDraft(
+                texts(node.get("changed"), REPORT_CHANGED_MAX, REPORT_LINE_MAX),
+                texts(node.get("done"), REPORT_DONE_MAX, REPORT_LINE_MAX),
+                texts(node.get("next"), REPORT_NEXT_MAX, REPORT_LINE_MAX));
     }
 
     /** 문자열 칸만 읽는다. 문자열이 아니거나 비어 있으면 {@code null} 이다. 앞뒤 공백은 벗기고 상한에서 자른다. */

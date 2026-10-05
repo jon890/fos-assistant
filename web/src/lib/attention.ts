@@ -8,7 +8,7 @@
  */
 
 export type AttentionCardKey =
-  "failures" | "needs_me" | "delegated" | "continue";
+  "failures" | "needs_me" | "delegated" | "continue" | "reports";
 
 export type AttentionLevel = "NOW" | "LATER";
 
@@ -40,6 +40,18 @@ export type AttentionItem = {
     waiting: boolean;
     proposed: boolean;
   } | null;
+  /** 「보고」 카드의 다섯 칸 요약이다. 그 밖의 카드에서는 null 이다. */
+  report: AttentionReport | null;
+};
+
+export type AttentionReport = {
+  checkId: number;
+  agentCode: string;
+  changed: string[];
+  done: string[];
+  evidence: string[];
+  needsApproval: string[];
+  next: string[];
 };
 
 export type AttentionCard = {
@@ -101,6 +113,7 @@ const REASONS: Record<
   ],
   DELEGATION_FINISHED: [{ signal: null, text: "맡긴 일이 끝났어요" }],
   CONVERSATION_RECENT: [{ signal: null, text: "최근에 나눈 대화예요" }],
+  PROACTIVE_REPORT_TRIGGER: [{ signal: null, text: "새 보고가 있어요" }],
 };
 
 /**
@@ -125,6 +138,7 @@ const CARD_TITLES: Record<AttentionCardKey, string> = {
   needs_me: "내 차례",
   delegated: "맡긴 일",
   continue: "이어서 하기",
+  reports: "보고",
 };
 
 const CARD_EMPTY_TEXTS: Record<AttentionCardKey, string> = {
@@ -132,6 +146,7 @@ const CARD_EMPTY_TEXTS: Record<AttentionCardKey, string> = {
   needs_me: "확인할 것이 없어요",
   delegated: "맡긴 일이 없어요",
   continue: "최근 대화가 없어요",
+  reports: "새 보고가 없어요",
 };
 
 export function cardTitle(key: AttentionCardKey): string {
@@ -142,7 +157,7 @@ export function cardEmptyText(key: AttentionCardKey): string {
   return CARD_EMPTY_TEXTS[key];
 }
 
-/** 네 카드가 모두 읽혔고 모두 비었는가. 하나라도 읽지 못했으면 거짓이다 */
+/** 다섯 카드가 모두 읽혔고 모두 비었는가. 하나라도 읽지 못했으면 거짓이다 */
 export function allCardsEmpty(cards: AttentionCard[]): boolean {
   return cards.every((card) => card.status === "OK" && card.items.length === 0);
 }

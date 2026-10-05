@@ -48,7 +48,10 @@ def server_tools(server: dict, root: pathlib.Path) -> dict[str, bool]:
     args = [str(a).replace("${CLAUDE_PLUGIN_ROOT}", str(root)) for a in server.get("args", [])]
     # 칸마다 뜻 없는 글을 준다. 실제 값이 아니므로 서비스는 거절하고, 도구 목록만 읽는다.
     env = {name: "placeholder" for name in server.get("env", {})}
-    return asyncio.run(asyncio.wait_for(_list_tools(sys.executable, args, env), SERVER_TIMEOUT_SECONDS))
+    command = shutil.which(server.get("command", ""))
+    if command is None:
+        raise ValueError("커넥터 실행 파일을 찾지 못한다")
+    return asyncio.run(asyncio.wait_for(_list_tools(command, args, env), SERVER_TIMEOUT_SECONDS))
 
 
 def imported_roots(source: str) -> set[str]:
@@ -109,8 +112,14 @@ def check_connector(root: pathlib.Path, repo: pathlib.Path, load_connector) -> l
     if server is None:
         problems.append(".mcp.json 에 서버가 없다")
     else:
-        if server.get("command") != "python3":
-            problems.append(".mcp.json 의 command 가 python3 가 아니다: %r" % server.get("command"))
+        if server.get("command") != "bun":
+            problems.append(".mcp.json 의 command 가 bun 이 아니다: %r" % server.get("command"))
+        if server.get("args") != ["${CLAUDE_PLUGIN_ROOT}/dist/%s-mcp.js" % name]:
+            problems.append(".mcp.json 이 커밋한 묶음 파일 하나를 실행하지 않는다")
+        if not (root / "src/server.ts").is_file():
+            problems.append("TypeScript 서버 소스가 없다")
+        if (root / "server.py").exists():
+            problems.append("Python MCP 서버는 허용하지 않는다")
         try:
             served = server_tools(server, root)
         except Exception as error:
@@ -136,8 +145,7 @@ def check_connector(root: pathlib.Path, repo: pathlib.Path, load_connector) -> l
     if not any(skills_dir.glob("*/SKILL.md")):
         problems.append("스킬이 없다: %s" % skills_dir)
 
-    slug = name.replace("-", "_")
-    for needed in ("hermes/tests/connectors/test_%s.py" % slug, "docs/connectors/%s.md" % name):
+    for needed in ("hermes/connectors/%s/tests/%s.test.ts" % (name, name), "docs/connectors/%s.md" % name):
         if not (repo / needed).is_file():
             problems.append("파일이 없다: %s" % needed)
     owners = repo / ".github/CODEOWNERS"
@@ -206,7 +214,7 @@ class ContractCatchesViolationsTest(base.ConnectorGateCase):
         tmp = tempfile.TemporaryDirectory()
         self.addCleanup(tmp.cleanup)
         root = pathlib.Path(tmp.name).resolve() / source.name
-        shutil.copytree(source, root, ignore=shutil.ignore_patterns("__pycache__"))
+        shutil.copytree(source, root, ignore=shutil.ignore_patterns("__pycache__", "node_modules"))
         change(root)
         return check_connector(root, REPO, self.plugin._load_connector)
 
@@ -249,11 +257,32 @@ class ContractCatchesViolationsTest(base.ConnectorGateCase):
                     field["secret"] = False
         self.assert_reported(self.broken_copy(self.edit_declaration(mutate)), "secret")
 
-    def test_third_party_import_in_server_is_reported(self):
+    def test_third_party_import_in_local_helper_is_reported(self):
         def change(root):
-            server = root / "server.py"
+            server = root / "scripts/get_refresh_token.py"
             server.write_text("import requests\n" + server.read_text(encoding="utf-8"), encoding="utf-8")
         self.assert_reported(self.broken_copy(change), "requests")
+
+    def test_python_server_is_reported(self):
+        def change(root):
+            (root / "server.py").write_text("print('unused')\n", encoding="utf-8")
+        self.assert_reported(self.broken_copy(change), "Python MCP 서버")
+
+    def test_wrong_runtime_is_reported(self):
+        def change(root):
+            path = root / ".mcp.json"
+            value = read_json(path)
+            next(iter(value["mcpServers"].values()))["command"] = "python3"
+            path.write_text(json.dumps(value), encoding="utf-8")
+        self.assert_reported(self.broken_copy(change), "command 가 bun")
+
+    def test_unbundled_entrypoint_is_reported(self):
+        def change(root):
+            path = root / ".mcp.json"
+            value = read_json(path)
+            next(iter(value["mcpServers"].values()))["args"] = ["${CLAUDE_PLUGIN_ROOT}/src/server.ts"]
+            path.write_text(json.dumps(value), encoding="utf-8")
+        self.assert_reported(self.broken_copy(change), "묶음 파일 하나")
 
 
 if __name__ == "__main__":

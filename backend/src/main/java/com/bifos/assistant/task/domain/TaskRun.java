@@ -84,6 +84,10 @@ public class TaskRun {
     @Column(name = "execution_id")
     private Long executionId;
 
+    /** {@code CHECK} 작업이 연 먼저 살펴보기 줄. 끝난 뒤 실행 번호와 상태를 회복할 때 쓴다. */
+    @Column(name = "proactive_check_id")
+    private Long proactiveCheckId;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
@@ -116,6 +120,11 @@ public class TaskRun {
     /** 이 발화가 결과를 남길 대화를 적는다. 열지 못해 다음 tick 에 다시 볼 때 같은 대화를 쓴다. */
     public void useConversation(Long conversationId) {
         this.conversationId = Objects.requireNonNull(conversationId, "conversationId");
+    }
+
+    /** 깨우기가 연 먼저 살펴보기 줄을 적는다. */
+    public void useProactiveCheck(Long checkId) {
+        proactiveCheckId = Objects.requireNonNull(checkId, "checkId");
     }
 
     /** 발화가 미리 만든 빈 대화를 지웠을 때만 부른다. */

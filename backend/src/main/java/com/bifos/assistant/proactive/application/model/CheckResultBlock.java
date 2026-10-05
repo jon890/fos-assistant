@@ -19,7 +19,8 @@ public record CheckResultBlock(
         List<Finding> findings,
         List<String> questions,
         List<String> followUpCandidates,
-        List<String> sourceFailures) {
+        List<String> sourceFailures,
+        ReportDraft report) {
 
     /** 발견 하나다. */
     public record Finding(
@@ -39,4 +40,7 @@ public record CheckResultBlock(
 
     /** 발견의 다음 행동이나 논의할 질문이다. {@code type} 은 {@code ACTION} 이나 {@code QUESTION} 이다. */
     public record Next(String type, String text) {}
+
+    /** 결과 블록 v2에서 모델이 제안한 보고 글이다. 근거와 승인 항목은 Control Plane 이 채운다. */
+    public record ReportDraft(List<String> changed, List<String> done, List<String> next) {}
 }

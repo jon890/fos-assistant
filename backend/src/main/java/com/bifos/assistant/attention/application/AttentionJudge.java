@@ -20,7 +20,7 @@ import java.util.Set;
 import org.springframework.stereotype.Component;
 
 /**
- * 후보와 사용자 제어를 받아 카드 넷을 정한다. 원래 기록을 읽지 않고 상태가 없다.
+ * 후보와 사용자 제어를 받아 카드 다섯을 정한다. 원래 기록을 읽지 않고 상태가 없다.
  *
  * <p>억제, 중복, {@code NOW} 판정, 카드 안의 순서와 상한, 카드 순서를 여기 모은다. 규칙은 {@code docs/backend/attention.md} 의
  * 「억제 신호」 와 「API」 가 갖는다.
@@ -40,7 +40,7 @@ public class AttentionJudge {
      * @param controls 요청자의 숨기기와 미루기
      * @param maxItemsPerCard 이어서 하기를 뺀 카드의 항목 상한
      * @param continueCount 이어서 하기 카드의 항목 상한
-     * @return 카드 넷. {@code NOW} 항목이 있는 카드가 먼저이고, 같은 무리 안에서는 {@link CardKey} 선언 순서다
+     * @return 카드 다섯. {@code NOW} 항목이 있는 카드가 먼저이고, 같은 무리 안에서는 {@link CardKey} 선언 순서다
      */
     public List<AttentionCard> judge(
             Map<CardKey, List<AttentionCandidate>> candidates,
@@ -128,6 +128,7 @@ public class AttentionJudge {
                 new AttentionWhy(candidate.trigger(), candidate.signals(), candidate.confidence(), candidate.sources()),
                 candidate.execution(),
                 candidate.actionId(),
-                candidate.followUp());
+                candidate.followUp(),
+                candidate.report());
     }
 }
