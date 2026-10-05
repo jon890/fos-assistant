@@ -303,7 +303,8 @@ class TaskRunStarterTest {
         assertThat(skipped.status()).isEqualTo(TaskRunStatus.SKIPPED);
         assertThat(skipped.reason()).isEqualTo(TaskRunReason.BUSY);
         assertThat(skipped.conversationId()).isEqualTo(conversationId);
-        assertThat(tasks.findById(fixture.task().id()).orElseThrow().conversationId()).isEqualTo(conversationId);
+        assertThat(tasks.findById(fixture.task().id()).orElseThrow().conversationId())
+                .isEqualTo(conversationId);
         assertThat(conversations.findById(conversationId)).isPresent();
     }
 
@@ -336,11 +337,18 @@ class TaskRunStarterTest {
         Long previousId = runs.findById(run.id()).orElseThrow().conversationId();
         String code = "replacement-" + UUID.randomUUID().toString().substring(0, 8);
         Agent replacement = agents.save(Agent.of(
-                code, code, code, "http://agent-runtime.test/p/" + code,
-                CostMode.SUBSCRIPTION, CredentialScope.SHARED_HOUSEHOLD,
-                AgentVisibility.PRIVATE, fixture.owner().id(), NOW));
+                code,
+                code,
+                code,
+                "http://agent-runtime.test/p/" + code,
+                CostMode.SUBSCRIPTION,
+                CredentialScope.SHARED_HOUSEHOLD,
+                AgentVisibility.PRIVATE,
+                fixture.owner().id(),
+                NOW));
         Task task = tasks.findById(fixture.task().id()).orElseThrow();
-        task.edit(replacement.id(), task.title(), task.instruction(), task.conversationMode(), task.notifyPolicy(), NOW);
+        task.edit(
+                replacement.id(), task.title(), task.instruction(), task.conversationMode(), task.notifyPolicy(), NOW);
         tasks.save(task);
         heldSlots.forEach(TurnSlot::release);
         heldSlots.clear();
@@ -350,7 +358,11 @@ class TaskRunStarterTest {
         TaskRun finished = awaitFinished(run);
         assertThat(finished.status()).isEqualTo(TaskRunStatus.SUCCEEDED);
         assertThat(finished.conversationId()).isNotEqualTo(previousId);
-        assertThat(conversations.findById(finished.conversationId()).orElseThrow().agentId()).isEqualTo(replacement.id());
+        assertThat(conversations
+                        .findById(finished.conversationId())
+                        .orElseThrow()
+                        .agentId())
+                .isEqualTo(replacement.id());
         assertThat(conversations.findById(previousId)).isEmpty();
     }
 
