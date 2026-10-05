@@ -66,5 +66,7 @@
   "V71__attention_control_event.sql": "7e256a4c8388c4d9b8afa2f1109d651d3b4b96e56a668d4a67db26bc97b3908b",
   "V72__follow_up.sql": "27a4880b2fc772db7b80bb50b182bb08c5ff3410b1f34af9ddbe584f281dd14f",
   "V73__proactive_check_writes.sql": "514d01a5b17652899c4fd6b6c0a0645d9310665e769dfbb03f094948f211098a",
-  "V74__proactive_check_invalid_reason.sql": "bb9e5c5346695ae4a117dc51f5c1a8cf11e80eb6c3b46d434cb553811d697055"
+  "V74__proactive_check_invalid_reason.sql": "bb9e5c5346695ae4a117dc51f5c1a8cf11e80eb6c3b46d434cb553811d697055",
+  "V75__chat_attachment_position.sql": "91c731461948c6273c4e4de037d915f71f859b4225d90cd278b5bf10b7b4e6b8",
+  "V76__chat_attachment_position_backfill.sql": "cc4f94bbf631a2d2459bc66365af0a1dbd049a8fe61ed77d4a117c7003c6e3cd"
 }
