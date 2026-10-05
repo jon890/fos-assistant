@@ -133,7 +133,7 @@ profile 디렉터리에 이름 대응 파일 `.fos-connector-tools.json` 이 있
 
 **바인딩 profile 은 대응 파일에 그 profile 의 모든 커넥터 서버가 실려 있다는 데 기댄다.**
 대응에 없는 `mcp__` 도구를 통과시키므로, 실리지 않은 커넥터 서버가 있으면 그 서버의 도구가 판정 없이 나간다.
-대시보드 plugin 의 바인딩 설치가 소유 기록의 모든 서버를 싣고, manifest 를 읽지 못한 서버는 빈 `tools` 로 싣는다.
+대시보드 plugin 의 바인딩 설치와 떼기가 소유 기록의 모든 서버를 싣고, manifest 를 읽지 못했거나 소유 기록의 서버 이름이나 실행 정의가 지금 manifest 와 다른 서버는 소유 기록의 이름으로 빈 `tools` 와 함께 싣는다.
 
 **바인딩 profile 의 커넥터 도구 결과는 `<external-data>` 로 감싼다.**
 fos-ctx 의 `transform_tool_result` hook 이 대응 파일의 서버와 맞는 도구의 결과가 글이면 Control Plane 의 `ExternalData` 와 같은 모양으로 바꾼다.
