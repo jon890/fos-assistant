@@ -9,6 +9,7 @@ const demoConnector = {
   description: "검사에서만 쓰는 커넥터입니다.",
   myStatus: "DISCONNECTED",
   available: true,
+  bindings: [],
   tools: [
     {
       name: "list_scopes",
@@ -62,8 +63,7 @@ const disconnected = {
   secretPrefixes: {},
   values: {},
   checkedAt: null,
-  agentCode: null,
-  restartRequired: false,
+  bindings: [],
   undeclaredTools: 0,
 };
 const pending = {
@@ -71,7 +71,6 @@ const pending = {
   status: "PENDING",
   secretPrefixes: { token: "demo" },
   values: { scope: SCOPE_ID },
-  agentCode: "demo-notes-browser",
 };
 const ready = {
   ...pending,
@@ -127,9 +126,12 @@ test("카드에서 연결 화면으로 들어가 값을 등록하고 확인한 �
   await expect(page.getByLabel("토큰", { exact: true })).toHaveValue("");
   await page.getByRole("button", { name: "연결 다시 확인" }).click();
   await expect(page.getByTestId("connection-status")).toHaveText("연결됨");
-  await expect(
-    page.getByRole("link", { name: "에이전트 열기" }),
-  ).toHaveAttribute("href", "/agents/demo-notes-browser");
+  await expect(page.getByTestId("connection-bindings")).toContainText(
+    "아직 이 연결을 쓰는 에이전트가 없어요. 에이전트 화면에서 붙여요.",
+  );
+  await expect(page.getByRole("link", { name: "에이전트 열기" })).toHaveCount(
+    0,
+  );
   await expect(page.getByText(/마지막 확인:/)).toBeVisible();
   expect(
     await page.evaluate(
@@ -316,9 +318,7 @@ test("운영 목록에서 빠진 연결은 쓸 수 없다고 알리고 해제만
   );
   await page.route(`**/api/connections/${DEMO_ID}`, async (route) => {
     if (route.request().method() === "DELETE") {
-      return route.fulfill({
-        json: { ...disconnected, restartRequired: true },
-      });
+      return route.fulfill({ json: disconnected });
     }
     return route.fulfill({ json: ready });
   });
@@ -349,52 +349,118 @@ test("옛 가계부 연결 주소는 새 연결 화면으로 넘어간다", asyn
   await expect(page).toHaveURL(/\/connections\/fos-accountbook$/);
 });
 
-test("관리자는 반영 대기 연결을 완료로 확인한다", async ({ page }) => {
+const SHOWN_SINCE = "2026-10-01T00:00:00.123456Z";
+
+function adminBinding(
+  agentCode: string,
+  overrides: Record<string, unknown> = {},
+) {
+  return {
+    connectorId: DEMO_ID,
+    userId: 77,
+    displayName: "연결 확인 사용자",
+    agentCode,
+    status: "PENDING",
+    restartRequired: true,
+    restartRequiredSince: SHOWN_SINCE,
+    undeclaredTools: 0,
+    ...overrides,
+  };
+}
+
+const boundView = {
+  connectorId: DEMO_ID,
+  title: "검사용 메모",
+  connectionStatus: "READY",
+  bound: true,
+  status: "READY",
+  restartRequired: false,
+  toolCount: 3,
+  skills: [],
+};
+
+test("관리자는 바인딩마다 한 줄을 보고 반영 완료에 목록에서 받은 대기 시각을 실어 보낸다", async ({
+  page,
+}) => {
+  let confirmed = false;
   let confirmedPath = "";
+  let confirmedBody: unknown;
   await page.route("**/api/admin/connections", (route) =>
     route.fulfill({
       json: [
-        {
-          connectorId: DEMO_ID,
-          userId: 77,
-          displayName: "연결 확인 사용자",
-          status: "PENDING",
-          agentCode: "demo-notes-browser",
-          restartRequired: true,
-          undeclaredTools: 0,
-        },
+        adminBinding(
+          "agent-first",
+          confirmed
+            ? {
+                status: "READY",
+                restartRequired: false,
+                restartRequiredSince: null,
+              }
+            : {},
+        ),
+        adminBinding("agent-second"),
       ],
     }),
   );
-  await page.route("**/api/admin/connections/*/*/confirm", (route) => {
+  await page.route("**/api/admin/agents/*/connections/*/confirm", (route) => {
+    confirmed = true;
     confirmedPath = new URL(route.request().url()).pathname;
-    return route.fulfill({
-      json: {
-        connectorId: DEMO_ID,
-        userId: 77,
-        displayName: null,
-        status: "READY",
-        agentCode: "demo-notes-browser",
-        restartRequired: false,
-        undeclaredTools: 0,
-      },
-    });
+    confirmedBody = route.request().postDataJSON();
+    return route.fulfill({ json: boundView });
   });
   await page.goto("/admin/connections");
   const panel = page.getByTestId("connector-admin-panel");
-  await expect(panel).toContainText("연결 확인 사용자");
-  await expect(panel).toContainText("검사용 메모");
+  const rows = panel.getByRole("listitem");
+  await expect(rows).toHaveCount(2);
+  await expect(rows.nth(0)).toContainText("연결 확인 사용자");
+  await expect(rows.nth(0)).toContainText("검사용 메모");
+  await expect(rows.nth(0)).toContainText("에이전트 agent-first");
+  await expect(rows.nth(0)).toContainText("반영 대기");
+  await expect(rows.nth(1)).toContainText("에이전트 agent-second");
   await expect(panel).toContainText("공유 gateway 를 재시작한 뒤 눌러 주세요.");
-  await panel.getByRole("button", { name: "반영 완료 확인" }).click();
-  await expect(
-    panel.getByText("반영 확인이 필요한 연결이 없어요."),
-  ).toBeVisible();
-  expect(confirmedPath).toBe(`/api/admin/connections/${DEMO_ID}/77/confirm`);
+
+  await rows.nth(0).getByRole("button", { name: "반영 완료" }).click();
+
+  await expect(rows).toHaveCount(1);
+  await expect(rows.nth(0)).toContainText("에이전트 agent-second");
+  expect(confirmedPath).toBe(
+    `/api/admin/agents/agent-first/connections/${DEMO_ID}/confirm`,
+  );
+  expect(confirmedBody).toEqual({ restartRequiredSince: SHOWN_SINCE });
   expect(
     await page.evaluate(
       () => document.documentElement.scrollWidth <= window.innerWidth,
     ),
   ).toBe(true);
+});
+
+test("재시작한 뒤 다시 설치된 바인딩의 반영 완료는 한 번 더 재시작하라고 알리고 목록을 다시 읽는다", async ({
+  page,
+}) => {
+  let reads = 0;
+  await page.route("**/api/admin/connections", (route) => {
+    reads += 1;
+    return route.fulfill({ json: [adminBinding("agent-first")] });
+  });
+  await page.route("**/api/admin/agents/*/connections/*/confirm", (route) =>
+    route.fulfill({
+      status: 409,
+      json: { code: "CONNECTOR_RESTART_AGAIN", message: "raw upstream" },
+    }),
+  );
+  await page.goto("/admin/connections");
+  const panel = page.getByTestId("connector-admin-panel");
+  await expect(panel.getByRole("listitem")).toHaveCount(1);
+  const before = reads;
+
+  await panel.getByRole("button", { name: "반영 완료" }).click();
+
+  await expect(panel.getByRole("alert")).toHaveText(
+    "재시작한 뒤에 다시 설치됐어요. 한 번 더 재시작한 뒤 눌러 주세요.",
+  );
+  await expect(page.getByText("raw upstream")).toHaveCount(0);
+  expect(reads).toBeGreaterThan(before);
+  await expect(panel.getByRole("button", { name: "반영 완료" })).toBeVisible();
 });
 
 test("연결 화면이 도구마다 위험도와 실행 방식을 보인다", async ({ page }) => {
@@ -675,12 +741,12 @@ test("관리자 목록은 선언하지 않은 도구가 있는 연결을 단추 
     route.fulfill({
       json: [
         {
-          connectorId: DEMO_ID,
+          ...adminBinding("agent-tools"),
           userId: 78,
           displayName: "도구 확인 사용자",
           status: "READY",
-          agentCode: "demo-notes-browser",
           restartRequired: false,
+          restartRequiredSince: null,
           undeclaredTools: 1,
         },
       ],
@@ -693,9 +759,7 @@ test("관리자 목록은 선언하지 않은 도구가 있는 연결을 단추 
   await expect(panel.getByTestId("admin-undeclared")).toContainText(
     "선언하지 않은 도구 1개",
   );
-  await expect(
-    panel.getByRole("button", { name: "반영 완료 확인" }),
-  ).toHaveCount(0);
+  await expect(panel.getByRole("button", { name: "반영 완료" })).toHaveCount(0);
 });
 
 test("390px 폭에서도 도구 목록이 가로로 넘치지 않는다", async ({ page }) => {
@@ -710,4 +774,98 @@ test("390px 폭에서도 도구 목록이 가로로 넘치지 않는다", async 
       () => document.documentElement.scrollWidth <= window.innerWidth,
     ),
   ).toBe(true);
+});
+
+test("붙인 에이전트는 이름과 반영 대기로 보이고 상세로 이어지며 카드에 수가 보인다", async ({
+  page,
+}) => {
+  const bindings = [
+    {
+      agentCode: "agent-first",
+      agentName: "숙제 도우미",
+      status: "PENDING",
+      restartRequired: true,
+    },
+    {
+      agentCode: "agent-second",
+      agentName: "가계 비서",
+      status: "READY",
+      restartRequired: false,
+    },
+  ];
+  await page.route("**/api/connectors", (route) =>
+    route.fulfill({
+      json: [{ ...demoConnector, myStatus: "READY", bindings }],
+    }),
+  );
+  await page.route(`**/api/connections/${DEMO_ID}`, (route) =>
+    route.fulfill({ json: { ...ready, bindings } }),
+  );
+  await page.goto("/connections");
+  await expect(
+    page.getByText(
+      "계정을 한 번 연결하고, 에이전트 화면에서 그 에이전트가 쓸 연결을 붙여요.",
+    ),
+  ).toBeVisible();
+  await expect(page.getByTestId("connector-binding-count")).toHaveText(
+    "붙인 에이전트 2개",
+  );
+
+  await page.goto(`/connections/${DEMO_ID}`);
+  const rows = page.getByTestId("connection-binding");
+  await expect(rows).toHaveCount(2);
+  await expect(rows.nth(0)).toContainText("반영 대기");
+  await expect(rows.nth(1)).not.toContainText("반영 대기");
+  await expect(
+    rows.nth(0).getByRole("link", { name: "숙제 도우미" }),
+  ).toHaveAttribute("href", "/agents/agent-first");
+  await expect(page.getByText("agent-first")).toHaveCount(0);
+});
+
+test("해제가 중간에 멈춰 연결이 준비 중이면 다시 해제하라고 알린다", async ({
+  page,
+}) => {
+  let failed = false;
+  await page.route(`**/api/connections/${DEMO_ID}`, (route) => {
+    if (route.request().method() === "DELETE") {
+      failed = true;
+      return route.fulfill({
+        status: 502,
+        json: { code: "CONNECTOR_OPERATION_FAILED", message: "raw upstream" },
+      });
+    }
+    return route.fulfill({
+      json: failed ? { ...ready, status: "PENDING" } : ready,
+    });
+  });
+  await page.goto(`/connections/${DEMO_ID}`);
+  await page.getByRole("button", { name: "연결 해제" }).click();
+  await expect(page.getByRole("main").getByRole("alert")).toHaveText(
+    "해제가 끝나지 않았어요. 다시 해제를 눌러 주세요.",
+  );
+  await expect(page.getByTestId("connection-status")).toHaveText("준비 중");
+  await expect(page.getByRole("button", { name: "연결 해제" })).toBeVisible();
+});
+
+test("입력 칸이 없는 커넥터는 입력 없이 연결하기 단추만 보인다", async ({
+  page,
+}) => {
+  let submitted: unknown;
+  await page.route("**/api/connectors", (route) =>
+    route.fulfill({ json: [{ ...demoConnector, fields: [] }] }),
+  );
+  await page.route(`**/api/connections/${DEMO_ID}`, (route) => {
+    if (route.request().method() === "POST") {
+      submitted = route.request().postDataJSON();
+      return route.fulfill({
+        json: { ...ready, secretPrefixes: {}, values: {} },
+      });
+    }
+    return route.fulfill({ json: disconnected });
+  });
+  await page.goto(`/connections/${DEMO_ID}`);
+  await expect(page.getByRole("main").getByRole("textbox")).toHaveCount(0);
+  await page.getByRole("button", { name: "연결하기" }).click();
+  await expect(page.getByTestId("connection-status")).toHaveText("연결됨");
+  expect(submitted).toEqual({ values: {} });
 });

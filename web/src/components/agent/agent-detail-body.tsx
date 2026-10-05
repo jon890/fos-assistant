@@ -5,6 +5,7 @@ import { describeError } from "@/components/error-message";
 import { Notice } from "@/components/ui/notice";
 import { AgentAccessSection } from "./agent-access-section";
 import { AgentAdminSection } from "./agent-admin-section";
+import { AgentConnectionsSection } from "./agent-connections-section";
 import { AgentModelSection } from "./agent-model-section";
 import { AgentProactiveCheckSection } from "./agent-proactive-check-section";
 import { AgentSkillsSection } from "./agent-skills-section";
@@ -17,6 +18,7 @@ import {
   type PersonaView,
 } from "@/lib/agent";
 import { fetchPersona } from "@/lib/agent-api";
+import type { AgentConnectionsList } from "@/lib/agent-connection";
 import type { ProactiveCheckStatus } from "@/lib/proactive-check";
 import type { SkillListView } from "@/lib/skill";
 
@@ -32,14 +34,16 @@ type Props = {
   tools: Loaded<{ initialTools: AgentToolsView; admin: boolean }> | null;
   /** 스킬 절을 그리지 않으면 null 이다. 관리자가 다른 사람의 비공개 에이전트를 열 때다. */
   skills: Loaded<SkillListView> | null;
-  /** 먼저 살펴보기 절을 그리지 않으면 null 이다. 커넥터 에이전트와, 관리자가 읽지 못하는 다른 사람의 비공개 에이전트다. */
+  /** 먼저 살펴보기 절을 그리지 않으면 null 이다. 예전 방식의 연결 에이전트와, 관리자가 읽지 못하는 다른 사람의 비공개 에이전트다. */
   proactiveCheck: Loaded<ProactiveCheckStatus> | null;
+  /** 「이 에이전트가 쓰는 연결」 절을 그리지 않으면 null 이다. 주인에게만 그린다. */
+  connections?: Loaded<AgentConnectionsList> | null;
   initialVisibility: AdminAgent["visibility"] | undefined;
   adminAgent?: AdminAgent;
   /** 요청자가 이 에이전트의 공개 범위를 바꾸고 지울 수 있으면 참이다. 「공개와 삭제」 절을 그릴지 정한다. */
   canManageAccess: boolean;
   adminError: string | null;
-  /** 연결 화면이 설정을 소유하는 에이전트면 일반 편집 절을 숨긴다. */
+  /** 예전 방식의 연결 에이전트면 일반 편집 절을 숨기고 지우기만 남긴다. */
   connectorManaged?: boolean;
   /** 에이전트를 지운 뒤 돌아갈 목록 주소다. */
   listHref: string;
@@ -77,6 +81,7 @@ export function AgentDetailBody({
   tools,
   skills,
   proactiveCheck,
+  connections = null,
   initialVisibility,
   adminAgent,
   canManageAccess,
@@ -85,6 +90,18 @@ export function AgentDetailBody({
   listHref,
 }: Props) {
   const [visibility, setVisibility] = useState(initialVisibility);
+  // 도구 절과 연결 절이 서로의 위험을 알린다. 도구 절이 켜진 도구를, 연결 절이 붙은 연결이 있는지를 알려 준다.
+  const [enabledTools, setEnabledTools] = useState<string[] | null>(
+    tools?.ok
+      ? tools.data.initialTools.toolsets
+          .filter((tool) => tool.enabled)
+          .map((tool) => tool.name)
+      : null,
+  );
+  const [hasConnections, setHasConnections] = useState(
+    connections?.ok === true &&
+      connections.data.connections.some((item) => item.bound),
+  );
   const [persona, setPersona] = useState<Loaded<PersonaView> | null>(
     initialPersona ? { ok: true, data: initialPersona } : null,
   );
@@ -118,7 +135,8 @@ export function AgentDetailBody({
             <div className="mx-auto w-full max-w-2xl">
               <h1 className="mb-4 text-xl font-semibold">{name}</h1>
               <Notice variant="info">
-                연결 화면에서 이 에이전트의 연결 상태를 관리해요.
+                예전 방식의 연결 에이전트예요. 쓰던 에이전트에 이 연결을 붙인 뒤
+                이 에이전트를 지워 주세요.
               </Notice>
             </div>
           ) : persona.ok ? (
@@ -143,6 +161,8 @@ export function AgentDetailBody({
           initialTools={tools.data.initialTools}
           admin={tools.data.admin}
           visibility={visibility}
+          hasConnections={hasConnections}
+          onToolsChange={setEnabledTools}
         />
       ) : (
         <section
@@ -152,6 +172,26 @@ export function AgentDetailBody({
           <h2 className="font-semibold">도구</h2>
           <Notice variant="error" role="alert" className="mt-3">
             {tools.message}
+          </Notice>
+        </section>
+      )}
+      {connectorManaged || connections === null ? null : connections.ok ? (
+        <AgentConnectionsSection
+          code={code}
+          initialConnections={connections.data.connections}
+          initialBlockedReason={connections.data.blockedReason}
+          visibility={visibility}
+          enabledTools={enabledTools}
+          onBoundChange={setHasConnections}
+        />
+      ) : (
+        <section
+          aria-label="이 에이전트가 쓰는 연결"
+          className="mx-auto mt-8 w-full max-w-2xl rounded-md border border-border p-4"
+        >
+          <h2 className="font-semibold">이 에이전트가 쓰는 연결</h2>
+          <Notice variant="error" role="alert" className="mt-3">
+            {connections.message}
           </Notice>
         </section>
       )}
@@ -196,6 +236,7 @@ export function AgentDetailBody({
           visibility={visibility}
           listHref={listHref}
           onVisibilityChange={(next) => void changeVisibility(next)}
+          connectorManaged={connectorManaged}
         />
       ) : null}
     </>

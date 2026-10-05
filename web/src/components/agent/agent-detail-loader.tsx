@@ -10,6 +10,7 @@ import type {
   AgentView,
   PersonaView,
 } from "@/lib/agent";
+import type { AgentConnectionsList } from "@/lib/agent-connection";
 import type { ProactiveCheckStatus } from "@/lib/proactive-check";
 import type { SkillListView } from "@/lib/skill";
 
@@ -34,16 +35,20 @@ export async function loadAgentDetail(
     !(
       agentsResult.ok && agentsResult.data.some((agent) => agent.code === code)
     );
-  // 커넥터 에이전트는 살펴보기를 하지 않으므로 상태를 읽지 않는다.
+  // 예전 방식의 연결 에이전트는 살펴보기를 하지 않고 다른 연결을 받지 않으므로 둘 다 읽지 않는다.
   const listedAgent = agentsResult.ok
     ? agentsResult.data.find((agent) => agent.code === code)
     : undefined;
+  // 연결을 붙이고 떼는 것은 주인만 한다. 관리자도 남의 에이전트의 연결 절은 그리지 않는다.
+  const readsConnections =
+    listedAgent?.ownedByMe === true && listedAgent.connectorManaged !== true;
   const [
     personaResult,
     adminAgentsResult,
     toolsResult,
     skillsResult,
     proactiveCheckResult,
+    connectionsResult,
   ] = await Promise.all([
     callControlPlane<PersonaView>(`/api/v1/agents/${code}/persona`),
     admin
@@ -58,6 +63,11 @@ export async function loadAgentDetail(
       : callControlPlane<ProactiveCheckStatus>(
           `/api/v1/agents/${code}/proactive-check`,
         ),
+    readsConnections
+      ? callControlPlane<AgentConnectionsList>(
+          `/api/v1/agents/${code}/connections`,
+        )
+      : Promise.resolve(null),
   ]);
   const adminAgent = adminAgentsResult?.ok
     ? adminAgentsResult.data.find((agent) => agent.code === code)
@@ -107,6 +117,18 @@ export async function loadAgentDetail(
                 proactiveCheckResult.message,
               ),
             };
+  const connections =
+    connectionsResult === null
+      ? null
+      : connectionsResult.ok
+        ? { ok: true as const, data: connectionsResult.data }
+        : {
+            ok: false as const,
+            message: describeError(
+              connectionsResult.code,
+              connectionsResult.message,
+            ),
+          };
   const visibility =
     adminAgent?.visibility ??
     (agentsResult.ok
@@ -118,9 +140,12 @@ export async function loadAgentDetail(
     : undefined;
   const connectorManaged =
     listed?.connectorManaged === true || adminAgent?.connectorManaged === true;
+  // 예전 방식의 연결 에이전트도 이 절을 그린다. 공개 범위는 숨기고 지우기만 남긴다.
+  // 그 에이전트는 편집 대상이 아니라 목록의 editable 이 거짓이므로 주인인지로 정한다.
   const canManageAccess =
-    !connectorManaged &&
-    (listed?.editable === true || adminAgent !== undefined);
+    listed?.editable === true ||
+    adminAgent !== undefined ||
+    (connectorManaged && listed?.ownedByMe === true);
   const listHref = admin ? "/admin/agents" : "/agents";
 
   if (!personaResult.ok) {
@@ -133,6 +158,7 @@ export async function loadAgentDetail(
           tools={tools}
           skills={skills}
           proactiveCheck={proactiveCheck}
+          connections={connections}
           initialVisibility={visibility}
           adminAgent={connectorManaged ? undefined : adminAgent}
           canManageAccess={canManageAccess}
@@ -165,6 +191,7 @@ export async function loadAgentDetail(
       tools={tools}
       skills={skills}
       proactiveCheck={proactiveCheck}
+      connections={connections}
       initialVisibility={visibility}
       adminAgent={connectorManaged ? undefined : adminAgent}
       canManageAccess={canManageAccess}

@@ -26,6 +26,7 @@ import {
   readConnectors,
   readOptions,
   registerConnection,
+  type BoundAgent,
   type ConnectorConnection,
   type ConnectorField,
   type ConnectorOption,
@@ -66,6 +67,41 @@ async function fetchLoaded(id: string): Promise<Loaded> {
   if (!catalog.ok) return { kind: "failed", message: catalog.message };
   const connector = catalog.data.find((item) => item.id === id) ?? null;
   return { kind: "ready", connector, connection: connection.data };
+}
+
+/** 이 연결을 붙인 에이전트 목록이다. 붙이기와 떼기는 에이전트 화면에서 한다. */
+function BoundAgents({ bindings }: { bindings: BoundAgent[] }) {
+  return (
+    <section className="space-y-2" data-testid="connection-bindings">
+      <h2 className="text-sm font-semibold">붙인 에이전트</h2>
+      {bindings.length === 0 ? (
+        <p className="text-sm text-muted-foreground">
+          아직 이 연결을 쓰는 에이전트가 없어요. 에이전트 화면에서 붙여요.
+        </p>
+      ) : (
+        <ul className="divide-y divide-border rounded-md border border-border">
+          {bindings.map((binding) => (
+            <li
+              key={binding.agentCode}
+              className="flex flex-wrap items-center justify-between gap-2 p-3 text-sm"
+              data-testid="connection-binding"
+            >
+              <Link
+                prefetch={false}
+                href={`/agents/${binding.agentCode}`}
+                className="min-w-0 break-all text-foreground underline underline-offset-4"
+              >
+                {binding.agentName}
+              </Link>
+              {binding.restartRequired || binding.status === "PENDING" ? (
+                <Badge variant="warning">반영 대기</Badge>
+              ) : null}
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  );
 }
 
 function NotFound() {
@@ -209,6 +245,22 @@ export function ConnectorConnectionPanel({ id }: { id: string }) {
     const result = await (kind === "check"
       ? checkConnection(id)
       : disconnectConnection(id));
+    if (
+      !result.ok &&
+      kind === "disconnect" &&
+      result.code === "CONNECTOR_OPERATION_FAILED"
+    ) {
+      // 붙은 에이전트에서 떼다 멈춘 해제는 연결을 준비 중으로 남긴다. 다시 누르면 남은 것부터 이어서 뗀다.
+      const fresh = await readConnection(id);
+      setPending(null);
+      if (fresh.ok) {
+        setLoaded({ kind: "ready", connector, connection: fresh.data });
+        if (fresh.data.status === "PENDING") {
+          return setError("해제가 끝나지 않았어요. 다시 해제를 눌러 주세요.");
+        }
+      }
+      return setError(result.message);
+    }
     setPending(null);
     if (!result.ok) return setError(result.message);
     setLoaded({ kind: "ready", connector, connection: result.data });
@@ -243,10 +295,7 @@ export function ConnectorConnectionPanel({ id }: { id: string }) {
             <span>
               상태{" "}
               <Badge variant="outline" data-testid="connection-status">
-                {connectionStatusLabel(
-                  status,
-                  connection.restartRequired && status !== "DISCONNECTED",
-                )}
+                {connectionStatusLabel(status)}
               </Badge>
             </span>
             {shown.map(({ field, value }) => (
@@ -260,25 +309,13 @@ export function ConnectorConnectionPanel({ id }: { id: string }) {
               마지막 확인: {formatChecked(connection.checkedAt)}
             </p>
           ) : null}
-          {connection.restartRequired ? (
-            <Notice variant="info" role="status">
-              관리자가 실행 반영을 확인할 때까지 기다려 주세요.
-            </Notice>
-          ) : null}
           {!available ? (
             <Notice variant="info" role="status">
               지금은 쓸 수 없어요. 연결을 해제할 수만 있어요.
             </Notice>
           ) : null}
-          {status === "READY" && connection.agentCode ? (
-            <p className="text-sm">
-              <Link
-                href={`/agents/${connection.agentCode}`}
-                className="text-foreground underline underline-offset-4"
-              >
-                에이전트 열기
-              </Link>
-            </p>
+          {status !== "DISCONNECTED" ? (
+            <BoundAgents bindings={connection.bindings} />
           ) : null}
           {available ? (
             <form onSubmit={save} className="space-y-3">

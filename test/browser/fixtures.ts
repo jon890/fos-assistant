@@ -200,9 +200,10 @@ export async function setAgentVisibility(
   }
 }
 
-async function connectorCall(
+/** 그 사용자의 메일로 서명한 Control Plane 토큰으로 경로 하나를 부른다. */
+async function callAs(
   email: string,
-  method: "POST" | "DELETE",
+  method: "POST" | "PUT" | "DELETE",
   path: string,
   body?: unknown,
 ): Promise<Response> {
@@ -212,23 +213,35 @@ async function connectorCall(
     .setIssuedAt()
     .setExpirationTime("2m")
     .sign(new TextEncoder().encode(JWT_SECRET));
-  return fetch(
-    `${CONTROL_PLANE_BASE_URL}/api/v1/connections/${DEMO_CONNECTOR.id}${path}`,
-    {
-      method,
-      headers: {
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "application/json",
-      },
-      body: body === undefined ? undefined : JSON.stringify(body),
+  return fetch(`${CONTROL_PLANE_BASE_URL}${path}`, {
+    method,
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
     },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
+}
+
+function connectorCall(
+  email: string,
+  method: "POST" | "DELETE",
+  path: string,
+  body?: unknown,
+): Promise<Response> {
+  return callAs(
+    email,
+    method,
+    `/api/v1/connections/${DEMO_CONNECTOR.id}${path}`,
+    body,
   );
 }
 
 /**
- * 그 사용자로 시험 커넥터를 등록하고 확인해 `READY` 로 만든다. 만들어진 커넥터 에이전트의 코드를 돌려준다.
+ * 그 사용자로 시험 커넥터를 등록하고 확인해 `READY` 로 만든다. 연결의 상태를 돌려준다.
  *
- * <p>커넥터 호출에는 사용자별 동시 1개 제한이 있어 등록과 확인을 차례로 보낸다.
+ * <p>연결 등록은 에이전트를 만들지 않는다. 에이전트에 붙이는 것은 `bindDemoConnector` 가 한다.
+ * 커넥터 호출에는 사용자별 동시 1개 제한이 있어 등록과 확인을 차례로 보낸다.
  */
 export async function connectDemoConnector(email: string): Promise<string> {
   const registered = await connectorCall(email, "POST", "", {
@@ -243,23 +256,64 @@ export async function connectDemoConnector(email: string): Promise<string> {
     throw new Error(
       `시험 커넥터를 확인하지 못했다: ${checked.status} ${await checked.text()}`,
     );
-  const view = (await checked.json()) as {
-    status: string;
-    agentCode: string | null;
-  };
-  if (view.status !== "READY" || !view.agentCode) {
+  const view = (await checked.json()) as { status: string };
+  if (view.status !== "READY") {
     throw new Error(`시험 커넥터가 READY 가 아니다: ${view.status}`);
   }
-  return view.agentCode;
+  return view.status;
 }
 
-/** 그 사용자의 시험 커넥터 연결을 해제한다. */
+/** 그 사용자의 시험 커넥터 연결을 해제한다. 붙은 에이전트에서도 모두 뗀다. */
 export async function disconnectDemoConnector(email: string): Promise<void> {
   const response = await connectorCall(email, "DELETE", "");
   if (!response.ok)
     throw new Error(
       `시험 커넥터를 해제하지 못했다: ${response.status} ${await response.text()}`,
     );
+}
+
+/** 그 사용자의 시험 커넥터 연결을 그 사용자의 에이전트에 붙인다. 붙인 줄의 상태를 돌려준다. */
+export async function bindDemoConnector(
+  email: string,
+  agentCode: string,
+): Promise<{ bound: boolean; status: string | null; restartRequired: boolean }> {
+  const response = await callAs(
+    email,
+    "PUT",
+    `/api/v1/agents/${agentCode}/connections/${DEMO_CONNECTOR.id}`,
+  );
+  if (!response.ok)
+    throw new Error(
+      `시험 커넥터를 붙이지 못했다: ${agentCode} ${response.status} ${await response.text()}`,
+    );
+  return (await response.json()) as {
+    bound: boolean;
+    status: string | null;
+    restartRequired: boolean;
+  };
+}
+
+/**
+ * 그 사용자의 예전 방식 연결 에이전트를 만들고 에이전트 번호(화면 주소의 코드)를 돌려준다.
+ *
+ * <p>연결 등록은 더는 이런 에이전트를 만들지 않으므로 검사에서만 뜨는 경로로 만든다. 그 사용자의 시험 커넥터 연결도
+ * `READY` 가 된다. 검사가 끝나면 에이전트를 지우고 연결을 해제한다.
+ */
+export async function createLegacyConnectorAgent(email: string): Promise<string> {
+  const response = await callAs(
+    email,
+    "POST",
+    "/api/v1/test-support/connector/legacy-agent",
+    { email, connectorId: DEMO_CONNECTOR.id },
+  );
+  if (!response.ok)
+    throw new Error(
+      `예전 방식의 연결 에이전트를 만들지 못했다: ${response.status} ${await response.text()}`,
+    );
+  const { code } = (await response.json()) as { code?: unknown };
+  if (typeof code !== "string")
+    throw new Error("예전 방식의 연결 에이전트 번호가 없다");
+  return code;
 }
 
 export async function setSession(

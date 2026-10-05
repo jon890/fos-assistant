@@ -2,6 +2,7 @@ package com.bifos.assistant.connector.presentation;
 
 import com.bifos.assistant.connector.application.model.AdminConnectionSnapshot;
 import com.bifos.assistant.connector.application.model.AgentConnectionView;
+import com.bifos.assistant.connector.application.model.AgentConnectionsView;
 import com.bifos.assistant.connector.application.model.BoundAgentSummary;
 import com.bifos.assistant.connector.application.model.ConnectionSnapshot;
 import com.bifos.assistant.connector.application.model.ConnectorFieldSummary;
@@ -205,6 +206,21 @@ public final class ConnectionDtos {
                     value.restartRequired(),
                     value.toolCount(),
                     value.skills());
+        }
+    }
+
+    /**
+     * 에이전트 하나의 연결 목록이다. 주인에게만 낸다. env 이름, 보관 파일 이름, 서버 이름은 담지 않는다.
+     *
+     * @param blockedReason 붙일 수 없는 까닭. 붙일 수 있으면 null 이다. {@code AGENT_NOT_PRIVATE} 나 {@code LEGACY_AGENT}
+     */
+    public record AgentConnectionsResponse(List<AgentConnectionResponse> connections, String blockedReason) {
+        static AgentConnectionsResponse from(AgentConnectionsView value) {
+            return new AgentConnectionsResponse(
+                    value.connections().stream()
+                            .map(AgentConnectionResponse::from)
+                            .toList(),
+                    value.blockedReason());
         }
     }
 }

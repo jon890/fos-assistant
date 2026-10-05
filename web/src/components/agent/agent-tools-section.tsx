@@ -21,7 +21,11 @@ import {
   type ToolsetView,
 } from "@/lib/agent";
 import { fetchAgentTools, saveAgentTools } from "@/lib/agent-api";
+import { SHELL_OR_FILE_TOOLSETS } from "@/lib/agent-connection";
 import { toolsetText } from "@/lib/toolset-label";
+
+const CONNECTION_RISK_MESSAGE =
+  "이 에이전트에 붙은 연결의 비밀값을 이 도구로 읽을 수 있고, 연결 도구의 승인 없이 그 서비스를 부를 수 있어요.";
 
 type ErrorPayload = {
   code: string;
@@ -34,6 +38,10 @@ type Props = {
   initialTools: AgentToolsView;
   admin: boolean;
   visibility: AdminAgent["visibility"] | undefined;
+  /** 이 에이전트에 붙은 연결이 있다. 셸과 파일 도구를 켤 때 그 연결의 위험을 함께 알린다. */
+  hasConnections?: boolean;
+  /** 저장하거나 다시 읽은 뒤 켜진 도구 이름을 알린다. 연결 절의 위험 안내가 받는다. */
+  onToolsChange?(enabled: string[]): void;
 };
 
 /** 관리자 도구를 켤 때 그 도구가 실제로 닿는 대상을 짧게 알린다. */
@@ -72,6 +80,8 @@ export function AgentToolsSection({
   initialTools,
   admin,
   visibility,
+  hasConnections = false,
+  onToolsChange,
 }: Props) {
   const [tools, setTools] = useState(initialTools.toolsets);
   const [unclassifiedEnabled, setUnclassifiedEnabled] = useState(
@@ -82,13 +92,20 @@ export function AgentToolsSection({
   const [missing, setMissing] = useState<string[]>([]);
   const [confirming, setConfirming] = useState<ToolsetView | null>(null);
 
+  function apply(view: AgentToolsView) {
+    setTools(view.toolsets);
+    setUnclassifiedEnabled(view.unclassifiedEnabled);
+    onToolsChange?.(
+      view.toolsets.filter((tool) => tool.enabled).map((tool) => tool.name),
+    );
+  }
+
   async function reload(): Promise<AgentToolsView | null> {
     try {
       const response = await fetchAgentTools(code, admin);
       if (!response.ok) return null;
       const fresh = (await response.json()) as AgentToolsView;
-      setTools(fresh.toolsets);
-      setUnclassifiedEnabled(fresh.unclassifiedEnabled);
+      apply(fresh);
       return fresh;
     } catch {
       return null;
@@ -106,9 +123,7 @@ export function AgentToolsSection({
         next.filter((tool) => tool.enabled).map((tool) => tool.name),
       );
       if (response.ok) {
-        const saved = (await response.json()) as AgentToolsView;
-        setTools(saved.toolsets);
-        setUnclassifiedEnabled(saved.unclassifiedEnabled);
+        apply((await response.json()) as AgentToolsView);
         return;
       }
       const failure = (await response.json()) as ErrorPayload;
@@ -245,6 +260,10 @@ export function AgentToolsSection({
                 에이전트가 쓸 수 있어요.
               </AlertDialogDescription>
             </AlertDialogHeader>
+            {hasConnections &&
+            SHELL_OR_FILE_TOOLSETS.includes(confirming.name) ? (
+              <Notice variant="warning">{CONNECTION_RISK_MESSAGE}</Notice>
+            ) : null}
             <AlertDialogFooter>
               <AlertDialogCancel asChild>
                 <Button variant="outline" disabled={pendingToolName !== null}>

@@ -11,6 +11,7 @@ import {
   type ToolRisk,
 } from "@/lib/connection";
 import { readJsonBody } from "@/lib/json-body";
+import { AGENT_CODE_PATTERN } from "@/lib/agent";
 
 /** Control Plane 의 오류 본문을 브라우저에 그대로 전달하지 않는다. 표에 없는 코드는 연결 실패로 바꾼다. */
 export function connectionResponse<T>(result: ControlPlaneResult<T>) {
@@ -58,7 +59,14 @@ export async function readValuesBody(
   return Object.fromEntries(entries) as Record<string, string>;
 }
 
-type Kind = "catalog" | "connection" | "options" | "admin" | "adminItem";
+type Kind =
+  | "catalog"
+  | "connection"
+  | "options"
+  | "admin"
+  | "agentConnections"
+  | "agentConnection"
+  | "none";
 
 /** 비정상 응답 본문 때문에 Control Plane 호출 자체가 던져도 고정 오류로 돌린다. */
 export async function connectorCall<T>(
@@ -90,8 +98,13 @@ function safeData(kind: Kind, value: unknown) {
       return list(value).map(safeOption);
     case "admin":
       return list(value).map(safeAdmin);
-    case "adminItem":
-      return safeAdmin(value);
+    case "agentConnections":
+      return safeAgentConnections(value);
+    case "agentConnection":
+      return safeAgentConnection(value);
+    case "none":
+      // 본문 없는 성공(204)이다. 원격이 무엇을 실어 보내도 옮기지 않는다.
+      return null;
   }
 }
 
@@ -132,11 +145,34 @@ function status(value: unknown) {
   return value;
 }
 
-function agentCode(value: unknown): string | null {
-  if (value === null || value === undefined) return null;
+function agentCode(value: unknown): string {
   const code = text(value);
-  if (!CONNECTOR_ID_PATTERN.test(code)) throw new Error();
+  if (!AGENT_CODE_PATTERN.test(code)) throw new Error();
   return code;
+}
+
+function bindingStatus(value: unknown) {
+  if (value !== "PENDING" && value !== "READY") throw new Error();
+  return value;
+}
+
+function count(value: unknown): number {
+  if (!Number.isSafeInteger(value) || (value as number) < 0) throw new Error();
+  return value as number;
+}
+
+/** 연결이 붙은 에이전트 한 줄이다. 칸이 없는 옛 응답은 빈 목록으로 읽는다. */
+function safeBindings(value: unknown) {
+  if (value === null || value === undefined) return [];
+  return list(value).map((entry) => {
+    const item = record(entry);
+    return {
+      agentCode: agentCode(item.agentCode),
+      agentName: text(item.agentName),
+      status: bindingStatus(item.status),
+      restartRequired: bool(item.restartRequired),
+    };
+  });
 }
 
 function stringMap(value: unknown): Record<string, string> {
@@ -158,6 +194,7 @@ function safeSummary(value: unknown) {
     tools: safeTools(item.tools),
     myStatus: status(item.myStatus),
     available: bool(item.available),
+    bindings: safeBindings(item.bindings),
   };
 }
 
@@ -231,8 +268,7 @@ function safeConnection(value: unknown) {
     secretPrefixes,
     values: stringMap(item.values),
     checkedAt,
-    agentCode: agentCode(item.agentCode),
-    restartRequired: bool(item.restartRequired),
+    bindings: safeBindings(item.bindings),
     undeclaredTools: undeclaredCount(item.undeclaredTools),
   };
 }
@@ -241,13 +277,46 @@ function safeAdmin(value: unknown) {
   const item = record(value);
   if (!Number.isSafeInteger(item.userId) || (item.userId as number) <= 0)
     throw new Error();
+  const since = nullableText(item.restartRequiredSince);
+  if (since !== null && !Number.isFinite(Date.parse(since))) throw new Error();
   return {
     connectorId: connectorId(item.connectorId),
     userId: item.userId as number,
     displayName: nullableText(item.displayName),
-    status: status(item.status),
     agentCode: agentCode(item.agentCode),
+    status: bindingStatus(item.status),
     restartRequired: bool(item.restartRequired),
+    restartRequiredSince: since,
     undeclaredTools: undeclaredCount(item.undeclaredTools),
+  };
+}
+
+const BLOCKED_REASONS = ["AGENT_NOT_PRIVATE", "LEGACY_AGENT"];
+
+function safeAgentConnections(value: unknown) {
+  const item = record(value);
+  const blocked = nullableText(item.blockedReason);
+  if (blocked !== null && !BLOCKED_REASONS.includes(blocked)) throw new Error();
+  return {
+    connections: list(item.connections).map(safeAgentConnection),
+    blockedReason: blocked,
+  };
+}
+
+/** 에이전트에서 본 연결 하나다. 칸 이름 밖의 값은 옮기지 않는다. */
+function safeAgentConnection(value: unknown) {
+  const item = record(value);
+  return {
+    connectorId: connectorId(item.connectorId),
+    title: text(item.title),
+    connectionStatus: status(item.connectionStatus),
+    bound: bool(item.bound),
+    status:
+      item.status === null || item.status === undefined
+        ? null
+        : bindingStatus(item.status),
+    restartRequired: bool(item.restartRequired),
+    toolCount: count(item.toolCount),
+    skills: list(item.skills ?? []).map(text),
   };
 }
