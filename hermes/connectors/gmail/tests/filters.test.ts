@@ -18,6 +18,11 @@ const labels = [
   { id: "Label_8", name: "새 라벨", type: "user" },
 ];
 
+const officialPalette =
+  "#000000 #434343 #666666 #999999 #cccccc #efefef #f3f3f3 #ffffff #fb4c2f #ffad47 #fad165 #16a766 #43d692 #4a86e8 #a479e2 #f691b3 #f6c5be #ffe6c7 #fef1d1 #b9e4d0 #c6f3de #c9daf8 #e4d7f5 #fcdee8 #efa093 #ffd6a2 #fce8b3 #89d3b2 #a0eac9 #a4c2f4 #d0bcf1 #fbc8d9 #e66550 #ffbc6b #fcda83 #44b984 #68dfa9 #6d9eeb #b694e8 #f7a7c0 #cc3a21 #eaa041 #f2c960 #149e60 #3dc789 #3c78d8 #8e63ce #e07798 #ac2b16 #cf8933 #d5ae49 #0b804b #2a9c68 #285bac #653e9b #b65775 #822111 #a46a21 #aa8831 #076239 #1a764d #1c4587 #41236d #83334c #464646 #e7e7e7 #0d3472 #b6cff5 #0d3b44 #98d7e4 #3d188e #e3d7ff #711a36 #fbd3e0 #8a1c0a #f2b2a8 #7a2e0b #ffc8af #7a4706 #ffdeb5 #594c05 #fbe983 #684e07 #fdedc1 #0b4f30 #b3efd3 #04502e #a2dcc1 #c2c2c2 #4986e7 #2da2bb #b99aff #994a64 #f691b2 #ff7537 #ffad46 #662e37 #ebdbde #cca6ac #094228 #42d692 #16a765".split(
+    " ",
+  );
+
 function setup() {
   const fake = new FakeGoogle();
   fake.on("POST", "/token", { access_token: accessToken, expires_in: 3599 });
@@ -100,35 +105,41 @@ describe("Gmail 라벨과 필터", () => {
     }
   });
 
-  test.each([
-    ["text_color", "#16a766", "#f691b3"],
-    ["background_color", "#f691b3", "#16a766"],
-  ])(
-    "공식 색상표의 %s 값은 Gmail 요청에 그대로 쓴다",
-    async (_field, textColor, backgroundColor) => {
-      const { fake, server } = setup();
-      fake.on("POST", "/gmail/labels", { id: "Label_9" });
-      try {
-        await withMcp(server, async (client) => {
-          const result = await tool(client, "create_label", {
-            name: "색상표 확인",
-            text_color: textColor,
-            background_color: backgroundColor,
-          });
-          expect(result.result.isError).not.toBe(true);
-        });
-        const request = fake.seen("POST", "/gmail/labels")[0]!;
-        const body = JSON.parse(request.body);
-        expect(body.color).toEqual({ textColor, backgroundColor });
-      } finally {
-        fake.stop();
-      }
-    },
-  );
+  test("공식 색상표의 모든 색은 text와 background 요청에 그대로 쓴다", async () => {
+    const { fake, server } = setup();
+    fake.on("POST", "/gmail/labels", { id: "Label_9" });
+    try {
+      await withMcp(server, async (client) => {
+        for (const color of officialPalette) {
+          for (const [textColor, backgroundColor] of [
+            [color, "#000000"],
+            ["#000000", color],
+          ]) {
+            fake.requests.length = 0;
+            const result = await tool(client, "create_label", {
+              name: "색상표 확인",
+              text_color: textColor,
+              background_color: backgroundColor,
+            });
+            expect(result.result.isError).not.toBe(true);
+            const request = fake.seen("POST", "/gmail/labels")[0]!;
+            expect(JSON.parse(request.body).color).toEqual({
+              textColor,
+              backgroundColor,
+            });
+          }
+        }
+      });
+    } finally {
+      fake.stop();
+    }
+  });
 
   test.each([
     ["text_color", "#cd74e6", "#16a766"],
     ["background_color", "#16a766", "#cd74e6"],
+    ["old_text_color", "#b3dc6c", "#16a766"],
+    ["old_background_color", "#16a766", "#123456"],
   ])(
     "지원하지 않는 %s 색상은 HTTP 전에 거절한다",
     async (_field, textColor, backgroundColor) => {
