@@ -131,7 +131,7 @@ assistant:
   proactive-check:
     # 먼저 살펴보기(ADR-080). 꺼 두면 살펴보기를 시작하지 않는다
     enabled: true
-    # #190 사용자별 격리 실행 공간이 운영에 반영되기 전에는 셸·파일·코드 실행 toolset의 매일 깨우기를 막는다
+    # ADR-086의 기존 profile 반영과 격리 실행 확인 전에는 셸·파일·코드 실행 toolset의 매일 깨우기를 막는다(ADR-085)
     isolated-execution-enabled: false
     # 살펴보기 turn 하나가 돌 수 있는 시간. hermes.run-timeout 보다 짧지 않으면 기동에 실패한다
     max-duration: 4m
