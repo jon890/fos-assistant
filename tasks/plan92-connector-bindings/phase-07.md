@@ -33,18 +33,19 @@ git grep -n -E "커넥터 에이전트|연결용 에이전트|연결용 profile|
 ### 1. 커넥터 문서
 
 - `docs/connectors.md`: 첫 단락을 커넥터의 정의로 시작한다. 연결(계정 한 번)과 바인딩(에이전트에 붙이기)을 설명하고 「Control Plane API」 표를 phase 05 의 경로로 바꾼다. 「저장과 비밀값」 에 보관 파일과 profile `.env` 의 복사본을 적는다. 승인 절의 「연결용 에이전트」 를 「연결을 붙인 에이전트」 로 고친다
-- `docs/backend/connector-install.md`: 「설치와 실패 처리」 를 연결 등록과 바인딩 설치로 나눠 다시 쓴다. 「커넥터 에이전트의 경계」 를 「옛 커넥터 에이전트」 절로 바꿔 남는 동안의 규칙만 적는다. 「연결 상태의 흐름」 mermaid 를 연결 상태와 바인딩 상태 둘로 그린다. 옮겨 가기 절차(연결 확인이 값을 옮기고, 붙이고, 반영 완료 뒤 옛 에이전트를 지운다)를 적는다
+- `docs/backend/connector-install.md`: 「설치와 실패 처리」 를 연결 등록과 바인딩 설치로 나눠 다시 쓴다. 「커넥터 에이전트의 경계」 를 「옛 커넥터 에이전트」 절로 바꿔 남는 동안의 규칙만 적고, 그 절 이름을 가리키는 `docs/backend/agent-delegation.md` 와 `docs/connectors/gmail.md` 의 참조를 같은 커밋에서 고친다(문서 참조 검사는 코드 파일만 보므로 이 둘을 잡지 못한다). 「연결 상태의 흐름」 mermaid 를 연결 상태와 바인딩 상태 둘로 그린다. 옮겨 가기 절차(연결 확인이 값을 옮기고, 붙이고, 반영 완료 뒤 옛 에이전트를 지운다)를 적는다
 - `docs/backend/connector-tool-policy.md`: 판정이 바인딩으로 연결을 고르는 것, 판정에 넘기는 상태, 줄의 `agent_id` 뜻, 승인 실행의 profile
 - `docs/connectors/gmail.md`: 커넥터 에이전트를 말하는 줄을 붙이기로 고친다
 - `docs/privacy.md`: 값이 남는 곳을 보관 파일과 붙인 에이전트 profile 의 복사본으로 고친다. 연결을 해제하면 둘 다 지워지고, 떼면 그 profile 의 복사본만 지워진다는 것을 「연결을 끊고 지우는 법」 에 적는다
-- `docs/connector-authoring.md`: 「본문이 그 에이전트의 지침」 과 8,000자 상한을 말하는 절을, 커넥터 스킬이 붙인 에이전트의 스킬로 설치된다는 것과 올린 스킬과 같은 제한으로 고친다
+- `docs/connector-authoring.md`: 「본문이 그 에이전트의 지침」 과 8,000자 상한을 말하는 절을 고친다. 붙인 에이전트에는 스킬로 설치되고 그 제한은 파일 20개, 파일마다 10만 자다. 8,000자 상한은 옛 커넥터 에이전트의 `SOUL.md` 에만 남는다
 - 코드 주석이 절 이름을 가리킨다. `ConnectorConnectionService` 의 클래스 주석이 「설치와 실패 처리」 를 가리키므로 `docs/backend/connector-install.md` 를 다시 쓸 때 그 절 이름을 남긴다. `test/unit` 의 문서 참조 검사가 본다
 
 ### 2. 흐름과 구조
 
 - `docs/flow.md`: 「커넥터를 붙일 때」 절을 더한다. 계정 연결, 붙이기, 재시작 대기와 반영 완료, 직접 호출의 판정, 떼기를 mermaid 시퀀스로 그리고 실패(대시보드 409, 표식 없는 profile, 연결 미확인)와 동시 요청(같은 사용자의 잠금)의 갈래를 넣는다
 - `docs/code-architecture.md`: `fos-ctx` 줄을 「바인딩 profile 과 옛 설치 profile 의 커넥터 도구 호출을 Control Plane 에 물어 막는다」 로 고친다
-- `docs/backend/packages.md`: 「connector」 절에 바인딩과 port `AgentConnectorBindings` 를 적고 옛 커넥터 에이전트 문장을 「남아 있는 동안」 으로 고친다
+- `docs/backend/packages.md`: 패키지 표의 `connector` 줄과 그 아래 `### connector` 절에 바인딩과 port `AgentConnectorBindings`, `AgentConnectorDetacher` 를 적고 옛 커넥터 에이전트 문장을 「남아 있는 동안」 으로 고친다
+- `docs/README.md`: 문서 색인의 「커넥터 에이전트의 경계」 줄을 새 절 이름으로 고친다
 - `docs/frontend/structure.md`: 에이전트 상세의 「연결」 절과 옛 에이전트 표시, 「연결」 화면의 붙인 에이전트 목록
 - `docs/prd.md`: 커넥터 문단을 정의와 바인딩으로 고친다
 
@@ -98,6 +99,8 @@ scripts/check-local.sh agent-connections connector-connection connector-agent-de
 | `docs/backend/packages.md` | 수정 |
 | `docs/frontend/structure.md` | 수정 |
 | `docs/prd.md` | 수정 |
+| `docs/README.md` | 수정 |
+| `docs/backend/agent-delegation.md` | 수정 |
 | `docs/backend/*.md` | 수정 |
 | `docs/backend/schema/*.md` | 수정 |
 | `docs/frontend/chat.md` | 수정 |

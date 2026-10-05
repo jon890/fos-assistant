@@ -39,6 +39,8 @@
 
 ### 2. `ProactiveCheckRun`
 
+- `ProactiveCheckRun` 은 bean 이 아니다. `ProactiveCheckService` 가 `new ProactiveCheckRun(user, agent.id(), check, renewsSession(conversation), deps())` 로 만든다. 생성자에 `boolean directConnectors` 인자를 더하고, `ProactiveCheckService` 가 살펴보기를 시작할 때 `AgentConnectorBindings.connectorServers(agent.id())` 가 비지 않는지로 정해 넘긴다. 시작할 때 고정하므로 살펴보기 도중에 붙이거나 떼도 지시가 바뀌지 않는다
+- 지시 상수는 지금 `INSTRUCTIONS` 와 `WRITES_INSTRUCTIONS` 둘이고, 쓰는 자리에서 `check.writesAllowed()` 로 고른다. 위임 줄을 `COMMON_RULES` 에서 떼어 `DELEGATE_RULE` 과 `DIRECT_RULE` 두 상수로 두고, 네 조합을 `directConnectors` 와 `writesAllowed` 로 고른다
 - `COMMON_RULES` 에서 위임 줄을 떼어 두 줄 가운데 하나를 싣는다. 살펴보기 에이전트에 붙은 연결이 있으면(`AgentConnectorBindings.connectorServers(agent.id())` 가 비지 않음) 「연결한 서비스의 도구는 직접 부른다. 읽기만 하는 실행에서는 조회 도구만 쓸 수 있다.」, 없으면 지금의 위임 줄 그대로다. 옮겨 가는 동안 붙이기 전의 에이전트와 고치기 전의 분야 스킬이 지금처럼 돌게 하기 위해서다
 - `WRITES_RULE` 은 그대로다
 - 이 글은 `docs/backend/proactive-check.md` 의 「Control Plane 지시」 와 같아야 한다. 둘을 함께 고친다
@@ -76,6 +78,7 @@ cd backend && ./gradlew test
 | --- | --- |
 | `backend/src/main/java/com/bifos/assistant/proactive/application/ProactiveCheckReadiness.java` | 수정 |
 | `backend/src/main/java/com/bifos/assistant/proactive/application/ProactiveCheckRun.java` | 수정 |
+| `backend/src/main/java/com/bifos/assistant/proactive/application/ProactiveCheckService.java` | 수정 |
 | `backend/src/main/java/com/bifos/assistant/mcp/application/McpToolService.java` | 수정 |
 | `backend/src/main/java/com/bifos/assistant/orchestration/application/AgentDelegationService.java` | 수정 |
 | `backend/src/test/java/com/bifos/assistant/proactive/ProactiveCheckReadinessTest.java` | 수정 |

@@ -69,7 +69,7 @@ ALTER TABLE connector_connection MODIFY COLUMN agent_id BIGINT NULL;
 ### 2. `backend/src/main/resources/db/migration/V78__connector_binding_backfill.sql`
 
 DML 만 둔다. `DISCONNECTED` 가 아닌 연결마다 그 연결의 `agent_id` 로 바인딩 한 줄을 만든다. `status`, `restart_required`, `desired_enabled`, `checked_at`, `created_at`, `updated_at` 은 연결의 값을 그대로 옮긴다.
-옛 연결의 `vault_stored` 는 거짓으로 둔다. 연결 확인이 옛 profile 의 값을 보관 파일로 옮길 때 참이 된다(phase 02).
+`restart_required` 가 참인 바인딩의 `restart_required_since` 는 그 연결의 `updated_at` 으로 채운다. 옛 연결의 `vault_stored` 는 거짓으로 둔다. 연결 확인이 옛 profile 의 값을 보관 파일로 옮길 때 참이 된다(phase 02).
 
 ### 3. `connector/domain/ConnectorBinding.java` 와 `connector/domain/type/BindingStatus.java`
 
@@ -93,7 +93,7 @@ DML 만 둔다. `DISCONNECTED` 가 아닌 연결마다 그 연결의 `agent_id` 
 - `boolean existsByAgentId(Long agentId)`
 - `List<ConnectorBinding> findByConnectionUserIdIn(Collection<Long> userIds)`
 
-`RepositoryQueryMysqlTest` 가 저장소 쿼리를 실제 MySQL 에서 돌린다면 새 메서드를 그 시험에 더한다(`backend/AGENTS.md` 의 「저장소 쿼리는 실제 MySQL 에서도 실행한다」).
+새 저장소의 쿼리는 `RepositoryQueryMysqlTest` 가 모든 저장소를 찾아 실제 MySQL 에서 돌리므로 그 시험을 고치지 않는다(`scripts/check-mysql-migration.sh`).
 
 ### 6. `docs/backend/schema/connector.md`
 
@@ -102,9 +102,8 @@ DML 만 둔다. `DISCONNECTED` 가 아닌 연결마다 그 연결의 `agent_id` 
 
 ### 7. 이 phase 를 검증하는 시험
 
-- `backend/src/test/java/com/bifos/assistant/connector/ConnectorBindingMigrationTest.java`(신규): H2 에 V76 까지 마이그레이션하고 연결 셋(`READY` 이면서 재시작 대기 없음, `PENDING` 이면서 재시작 대기, `DISCONNECTED`)을 넣은 뒤 V78 까지 적용한다. 앞의 둘은 같은 상태와 칸의 바인딩이 하나씩 생기고 `DISCONNECTED` 는 바인딩이 없다. 모든 연결의 `vault_stored` 가 거짓이다
+- `backend/src/test/java/com/bifos/assistant/connector/ConnectorBindingMigrationTest.java`(신규): H2 에 V77 바로 앞 번호(지금은 V74)까지 마이그레이션하고 연결 셋(`READY` 이면서 재시작 대기 없음, `PENDING` 이면서 재시작 대기, `DISCONNECTED`)을 넣은 뒤 V78 까지 적용한다. 앞의 둘은 같은 상태와 칸의 바인딩이 하나씩 생기고, 재시작 대기인 것은 `restart_required_since` 가 연결의 `updated_at` 이며 `DISCONNECTED` 는 바인딩이 없다. 모든 연결의 `vault_stored` 가 거짓이다
 - `backend/src/test/java/com/bifos/assistant/connector/ConnectorBindingTest.java`(신규): 옛 커넥터 에이전트의 바인딩은 `ready` 가 에이전트를 켜고 `pending` 이 끄며 사진 받기를 내린다. 일반 에이전트의 바인딩은 에이전트의 `enabled` 를 바꾸지 않는다. `installed` 는 재시작 필요를 누적한다
-- `MysqlMigrationTest` 가 새 표의 정렬 규칙을 단언하는 목록을 갖고 있으면 새 표를 더한다
 - `backend/src/test/java/com/bifos/assistant/architecture/StoredEnumNamesTest.java`(수정): `STORED_ENUMS` 에 `BindingStatus` 의 `PENDING`, `READY` 를 더한다. 저장되는 enum 은 `domain.type` 아래에 둔다는 이 검사의 규칙을 따른다
 
 ## 검증
@@ -130,7 +129,5 @@ node --test 'test/unit/**/*.test.ts'
 | `backend/src/main/java/com/bifos/assistant/connector/infra/ConnectorBindingRepository.java` | 신규 |
 | `backend/src/test/java/com/bifos/assistant/connector/ConnectorBindingMigrationTest.java` | 신규 |
 | `backend/src/test/java/com/bifos/assistant/connector/ConnectorBindingTest.java` | 신규 |
-| `backend/src/test/java/com/bifos/assistant/MysqlMigrationTest.java` | 수정 |
 | `backend/src/test/java/com/bifos/assistant/architecture/StoredEnumNamesTest.java` | 수정 |
-| `backend/src/test/java/com/bifos/assistant/RepositoryQueryMysqlTest.java` | 수정 |
 | `docs/backend/schema/connector.md` | 수정 |

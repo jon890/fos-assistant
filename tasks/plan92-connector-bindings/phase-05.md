@@ -49,8 +49,8 @@
 | `GET /api/v1/agents/{code}/connections` | 없음 | `{connections: [AgentConnectionView], blockedReason}`. 주인만 |
 | `PUT /api/v1/agents/{code}/connections/{connectorId}` | 없음 | 붙인다. `AgentConnectionView` |
 | `DELETE /api/v1/agents/{code}/connections/{connectorId}` | 없음 | 뗀다. 204 |
-| `GET /api/v1/admin/connections` | 없음 | 바인딩마다 한 항목. `connectorId, userId, displayName, agentCode, status, restartRequired, undeclaredTools` |
-| `POST /api/v1/admin/agents/{code}/connections/{connectorId}/confirm` | 없음 | 반영 완료. 옛 `POST /api/v1/admin/connections/{id}/{userId}/confirm` 은 지운다 |
+| `GET /api/v1/admin/connections` | 없음 | 바인딩마다 한 항목. `connectorId, userId, displayName, agentCode, status, restartRequired, restartRequiredSince, undeclaredTools` |
+| `POST /api/v1/admin/agents/{code}/connections/{connectorId}/confirm` | `{restartRequiredSince}`. 목록에서 받은 값 그대로 | 반영 완료. 옛 `POST /api/v1/admin/connections/{id}/{userId}/confirm` 은 지운다 |
 
 - 새 컨트롤러 `connector/presentation/AgentConnectionController.java` 가 에이전트 경로 셋을 갖는다. 관리자 반영 완료는 phase 02 의 `AdminAgentConnectionController` 다
 - 응답에 env 이름, 보관 파일 이름, 서버 이름, 비밀 원문을 담지 않는다. `AgentConnectionView` 의 칸은 `connectorId, title, connectionStatus, bound, status, restartRequired, toolCount, skills` 다
@@ -101,7 +101,8 @@
 - `backend/src/test/java/com/bifos/assistant/connector/AgentConnectionControllerTest.java`(신규): 주인이 붙이고 뗀다. 남의 비공개 에이전트는 `AGENT_NOT_FOUND`, 읽을 수 있는 남의 에이전트와 관리자는 `FORBIDDEN` 이다. 경우마다 코드 하나를 단언한다. 응답 본문에 env 이름, 보관 파일 이름, 서버 이름이 없다
 - `test/browser/connector-connection.spec.ts`(수정): 연결한 뒤 붙인 에이전트가 없다는 안내가 보인다
 - `test/browser/agent-connections.spec.ts`(신규): 비공개 에이전트에서 연결을 붙이면 확인 창의 위험 문구가 보이고 「반영 대기」 가 된다. 떼면 「붙지 않음」 이 된다. 그룹 공개 에이전트에서는 붙이기 단추 대신 까닭이 보인다
-- `test/browser/connector-agent-detail.spec.ts`(수정): 옛 커넥터 에이전트는 「예전 방식」 안내와 지우기 단추를 보인다. 이 시험은 옛 에이전트를 시험 DB 에 직접 만드는 준비가 필요하면 `test/browser/fixtures.ts` 에 함수를 더한다
+- `test/browser/connector-agent-detail.spec.ts`(수정): 옛 커넥터 에이전트는 「예전 방식」 안내와 지우기 단추를 보인다. 새 연결은 옛 에이전트를 만들지 않으므로, 브라우저 검사의 backend(따로 뜬 프로세스의 H2)에 시험 지원 경로를 둔다
+- `backend/src/test/java/com/bifos/assistant/testsupport/ConnectorTestSupportController.java`(신규): 시험에서만 뜨는 경로 `POST /api/v1/test-support/connector/legacy-agent` 가 사용자 메일과 커넥터 id 를 받아 옛 커넥터 에이전트(`connectorManaged` 참)와 `READY` 연결과 바인딩을 만들고 에이전트 번호를 돌려준다. 본보기와 켜는 방법은 같은 디렉터리의 `ChatTestSupportController.java` 다. `test/browser/fixtures.ts` 에 이 경로를 부르는 `createLegacyConnectorAgent(email)` 를 더한다
 - `test/browser/admin.spec.ts`(수정): 관리자 연결 목록이 바인딩마다 한 줄이다
 - `test/browser/fixtures.ts`(수정): `connectDemoConnector` 가 에이전트 번호 대신 연결 상태를 돌려주고, 붙이기 준비 함수 `bindDemoConnector(email, agentCode)` 를 더한다
 
@@ -138,6 +139,7 @@ pnpm --dir web test:browser connector-connection agent-connections connector-age
 | `web/src/components/agent/agent-access-section.tsx` | 수정 |
 | `web/src/components/agent/agent-tools-section.tsx` | 수정 |
 | `test/browser/fixtures.ts` | 수정 |
+| `backend/src/test/java/com/bifos/assistant/testsupport/ConnectorTestSupportController.java` | 신규 |
 | `test/browser/connector-connection.spec.ts` | 수정 |
 | `test/browser/agent-connections.spec.ts` | 신규 |
 | `test/browser/connector-agent-detail.spec.ts` | 수정 |

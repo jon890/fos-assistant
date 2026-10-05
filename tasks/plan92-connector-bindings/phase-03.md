@@ -49,7 +49,6 @@
 
 - `beginApproval`: 연결을 찾은 뒤 `bindings.findByAgentIdAndConnectionId(action.agentId(), connection.id())` 가 있고 `READY` 여야 실행한다. 없거나 `READY` 가 아니면 `not_executable`. 실행할 profile 은 그 바인딩의 에이전트 profile 이다
 - `redecide` 에 넘기는 상태도 1 과 같은 규칙이다
-- phase 02 가 만든 `rejectPendingFor(connection, agentId, now)` 를 떼기에서 쓴다. 에이전트 단위 `EXECUTING` 검사도 같은 자리에 둔다
 
 ### 3. 에이전트의 공개와 삭제
 
@@ -68,7 +67,7 @@
 ### 5. 실행 기록 가림
 
 - `hermes` 패키지에 `record ToolDetailScope(boolean hideAll, Set<String> hiddenPrefixes)` 와 `boolean hides(String toolName)` 를 둔다
-- `HermesRunEventStream` 과 `ToolDetailRedactor.redact` 의 `boolean connectorManaged` 를 `ToolDetailScope` 로 바꾼다. 가리는 글 `[연결 도구 내용 가림]` 과 스킬 기록 생략 규칙은 `hideAll` 일 때 지금과 같다. 일반 에이전트는 `hides(toolName)` 인 도구의 내용만 그 글로 바꾼다
+- `HermesRunEventStream.open` 의 `boolean connectorManaged` 인자를 `ToolDetailScope` 로 바꾼다. `ToolDetailRedactor.redact` 에는 `ToolDetailScope` 를 받는 메서드를 더하고, 지금의 `boolean` 메서드는 `hideAll` 범위로 넘기는 보조 메서드로 남긴다. 이미 적용된 Java 마이그레이션 `backend/src/main/java/db/migration/V41__RedactToolDetails.java` 가 그 메서드를 쓰고 고치지 않는다. 가리는 글 `[연결 도구 내용 가림]` 과 스킬 기록 생략 규칙은 `hideAll` 일 때 지금과 같다. 일반 에이전트는 `hides(toolName)` 인 도구의 내용만 그 글로 바꾼다
 - `ChatService` 는 turn 을 열 때 `agent.connectorManaged()` 면 `hideAll`, 아니면 `AgentConnectorBindings.connectorToolPrefixes(agent.id())` 로 범위를 만든다
 
 ### 6. 연결 엔티티에서 옛 칸 매핑 빼기
@@ -89,6 +88,9 @@
 - `backend/src/test/java/com/bifos/assistant/agent/AgentLifecycleServiceTest.java`(수정): 바인딩이 있는 에이전트를 그룹으로 바꾸면 `AGENT_CONNECTIONS_REQUIRE_PRIVATE`. 지우면 `detachAll` 을 먼저 부른다. 옛 커넥터 에이전트도 주인이 지울 수 있다
 - `backend/src/test/java/com/bifos/assistant/agent/AgentToolServiceTest.java`(수정): 붙은 커넥터 서버 이름이 `unclassified` 에 없다
 - `backend/src/test/java/com/bifos/assistant/hermes/ToolDetailEventStreamTest.java`(수정): 일반 에이전트에서 붙은 커넥터 도구의 내용만 가린다. 옛 커넥터 에이전트는 모두 가린다
+- `open(..., anyBoolean())` 로 대역을 세운 시험의 인자를 `any(ToolDetailScope.class)` 로 고친다: `backend/src/test/java/com/bifos/assistant/chat/ChatServiceTest.java`, `chat/ChatStopTest.java`, `chat/ToolDetailStreamTest.java`, `proactive/ProactiveCheckLimitTest.java`, `proactive/ProactiveCheckTurnTest.java`. `hermes/HermesRunEventStreamTest.java` 도 새 인자로 고친다. `hermes/ToolDetailRedactorTest.java` 는 boolean 메서드가 남아 그대로 돈다
+- 두 서비스를 직접 만드는 시험이 새 port 를 넘기게 고친다: `agent/AgentApiBaseUrlUpdateTest.java`, `agent/AgentProactiveCheckWritesAdminTest.java`
+- `backend/src/test/java/com/bifos/assistant/agent/AgentLifecycleServiceTest.java`: 붙이기가 에이전트 행 잠금을 쥔 동안 공개 범위 변경이 기다렸다가 바인딩을 보고 `AGENT_CONNECTIONS_REQUIRE_PRIVATE` 로 거절되는 차례
 - `backend/src/test/java/com/bifos/assistant/agent/AgentAdminServiceTest.java`(수정): 바인딩이 있는 에이전트의 주인 변경은 `AGENT_HAS_CONNECTIONS`
 - `backend/src/test/java/com/bifos/assistant/agent/AgentToolPolicyTest.java`(수정): `connectorServers` 가 목록 끝에 더해지고 요청에 들어와도 거절되지 않는다
 - `backend/src/test/java/com/bifos/assistant/skill/SkillServiceTest.java`(수정): 스킬 게시가 붙은 커넥터 서버 이름을 함께 보낸다
@@ -97,7 +99,7 @@
 ## 검증
 
 ```bash
-cd backend && ./gradlew test --tests '*ConnectorPolicyEndpointTest' --tests '*ConnectorActionServiceTest' --tests '*AgentLifecycleServiceTest' --tests '*AgentToolServiceTest' --tests '*ToolDetailEventStreamTest' --tests '*AgentAdminServiceTest' --tests '*AgentToolPolicyTest' --tests '*SkillServiceTest' --tests '*ConnectorDeliveryRetryTest' --tests '*ApprovalNotificationTest'
+cd backend && ./gradlew test --tests '*ConnectorPolicyEndpointTest' --tests '*ConnectorActionServiceTest' --tests '*AgentLifecycleServiceTest' --tests '*AgentToolServiceTest' --tests '*ToolDetailEventStreamTest' --tests '*HermesRunEventStreamTest' --tests '*ToolDetailRedactorTest' --tests '*ChatServiceTest' --tests '*ChatStopTest' --tests '*ToolDetailStreamTest' --tests '*ProactiveCheckLimitTest' --tests '*ProactiveCheckTurnTest' --tests '*AgentApiBaseUrlUpdateTest' --tests '*AgentProactiveCheckWritesAdminTest' --tests '*AgentAdminServiceTest' --tests '*AgentToolPolicyTest' --tests '*SkillServiceTest' --tests '*ConnectorDeliveryRetryTest' --tests '*ApprovalNotificationTest'
 cd backend && ./gradlew test
 scripts/quality.sh check
 ```
@@ -110,7 +112,6 @@ scripts/quality.sh check
 | --- | --- |
 | `backend/src/main/java/com/bifos/assistant/connector/application/ConnectorPolicyService.java` | 수정 |
 | `backend/src/main/java/com/bifos/assistant/connector/application/ConnectorActionService.java` | 수정 |
-| `backend/src/main/java/com/bifos/assistant/connector/application/ConnectorBindingService.java` | 수정 |
 | `backend/src/main/java/com/bifos/assistant/connector/domain/ConnectorAction.java` | 수정 |
 | `backend/src/main/java/com/bifos/assistant/connector/domain/ConnectorConnection.java` | 수정 |
 | `backend/src/main/java/com/bifos/assistant/connector/infra/ConnectorConnectionRepository.java` | 수정 |
@@ -136,4 +137,12 @@ scripts/quality.sh check
 | `backend/src/test/java/com/bifos/assistant/agent/AgentLifecycleServiceTest.java` | 수정 |
 | `backend/src/test/java/com/bifos/assistant/agent/AgentToolServiceTest.java` | 수정 |
 | `backend/src/test/java/com/bifos/assistant/hermes/ToolDetailEventStreamTest.java` | 수정 |
+| `backend/src/test/java/com/bifos/assistant/chat/ChatServiceTest.java` | 수정 |
+| `backend/src/test/java/com/bifos/assistant/chat/ChatStopTest.java` | 수정 |
+| `backend/src/test/java/com/bifos/assistant/chat/ToolDetailStreamTest.java` | 수정 |
+| `backend/src/test/java/com/bifos/assistant/proactive/ProactiveCheckLimitTest.java` | 수정 |
+| `backend/src/test/java/com/bifos/assistant/proactive/ProactiveCheckTurnTest.java` | 수정 |
+| `backend/src/test/java/com/bifos/assistant/hermes/HermesRunEventStreamTest.java` | 수정 |
+| `backend/src/test/java/com/bifos/assistant/agent/AgentApiBaseUrlUpdateTest.java` | 수정 |
+| `backend/src/test/java/com/bifos/assistant/agent/AgentProactiveCheckWritesAdminTest.java` | 수정 |
 | `docs/backend/schema/connector.md` | 수정 |

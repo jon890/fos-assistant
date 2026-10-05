@@ -19,7 +19,13 @@
 | 07 | docs | 책임 문서, 옛 ADR 의 대체 표시, 용어 |
 
 phase 는 앞 phase 의 결과에 기댄다. 차례로 한다.
-**e2e 와 브라우저 검사는 phase 05 와 06 에서 다시 통과한다.** 그 앞 phase 의 검증은 backend 검사로 한다. 연결 등록이 에이전트를 만들지 않게 되는 phase 02 부터 옛 흐름을 전제한 e2e 시나리오가 깨지기 때문이다.
+**e2e 와 브라우저 검사는 phase 05 와 06 에서 다시 통과한다.** 그 앞 phase 의 검증은 backend 검사로 한다. 연결 등록이 에이전트를 만들지 않게 되는 phase 02 부터 옛 흐름을 전제한 시험이 깨지기 때문이다. 이 PR 은 한 번에 머지하므로 main 에 깨진 커밋이 머지되지는 않는다. phase 02 부터 깨진 채 남는 것과 고치는 phase 는 아래다.
+
+| 깨진 채인 검사 | 깨지는 phase | 고치는 phase |
+| --- | --- | --- |
+| `test/browser/connector-connection.spec.ts`, `test/browser/connector-agent-detail.spec.ts`, `test/browser/admin.spec.ts` | 02 | 05 |
+| `test/e2e/run.ts` 의 `connector.ts`, `connector-policy.ts`, `connector-delegation.ts`, `proactive-check.ts`, `delivery-retry.ts`, `notifications.ts`, `scheduled-task.ts` | 02 | 06 |
+| 웹의 연결 화면이 부르는 관리자 반영 완료 주소 | 02 | 05 |
 브랜치는 `plan92-connector-bindings` 이고 PR 하나로 올린다.
 
 ## 말
@@ -40,7 +46,7 @@ phase 는 앞 phase 의 결과에 기댄다. 차례로 한다.
 정본은 phase 01 과 03 이 고칠 `docs/backend/schema/connector.md` 다. 여기에는 phase 사이에 맞춰야 할 이름만 둔다.
 
 - `connector_connection`: `(user_id, connector_id)` 유일은 그대로다. `vault_stored BOOLEAN NOT NULL DEFAULT FALSE` 를 더하고 `agent_id` 를 비워도 되게 한다. `agent_id`, `restart_required`, `desired_enabled` 는 쓰지 않는 칸으로 남는다. 칸을 지우는 마이그레이션은 옛 커넥터 에이전트를 정리하는 다음 작업이 둔다. `status` 는 `DISCONNECTED`, `PENDING`, `READY` 그대로이고 뜻이 「값이 확인돼 쓸 수 있는가」 로 바뀐다
-- `agent_connector_binding`: `id`, `agent_id`, `connection_id`, `mcp_server`(붙일 때의 서버 이름, 옛 바인딩은 확인 때 채움), `status`(`PENDING`, `READY`), `restart_required`, `desired_enabled`, `checked_at`, `created_at`, `updated_at`. `(agent_id, connection_id)` 유일. 떼면 행을 지운다
+- `agent_connector_binding`: `id`, `agent_id`, `connection_id`, `mcp_server`(붙일 때의 서버 이름, 옛 바인딩은 확인 때 채움), `status`(`PENDING`, `READY`), `restart_required`, `restart_required_since`, `desired_enabled`, `checked_at`, `created_at`, `updated_at`. `(agent_id, connection_id)` 유일. 떼면 행을 지운다
 - `connector_action.agent_id` 는 「판정한 실행의 에이전트」 다. 옛 줄은 옛 커넥터 에이전트를 가리킨 채 남는다
 - `connector_tool_grant` 는 바꾸지 않는다. 상시 허락은 지금처럼 사용자와 커넥터에 묶인다
 
@@ -85,7 +91,7 @@ phase 는 앞 phase 의 결과에 기댄다. 차례로 한다.
 사용자마다 연결마다 한다. 끊김이 없고, 옛 에이전트를 지우기 전까지 되돌릴 수 있다.
 
 0. 먼저 살펴보기를 쓰는 분야(커리어)는 그 분야 패키지의 `proactive-check` 스킬을 먼저 고친다. 「붙은 커넥터 도구가 있으면 직접 부르고, 없으면 연결 에이전트에 맡긴다」 로 바꾼다. 이 저장소 밖(fos-agents)의 일이고 코디네이터가 그 저장소 워커에 맡긴다. phase 04 의 Control Plane 지시도 붙은 연결이 없는 에이전트에는 옛 위임 줄을 남기므로, 스킬을 고치기 전에 이 plan 을 배포해도 지금의 살펴보기가 깨지지 않는다
-1. 「연결」 화면에서 연결 확인을 누른다. 옛 에이전트의 profile 에 있던 값이 보관 파일로 옮겨진다
+1. 「연결」 화면에서 연결 확인을 누른다. 옛 에이전트의 profile 에 있던 값이 보관 파일로 옮겨진다. 이 확인은 옛 에이전트의 profile 에 설치를 다시 보내는데, `plan91-connector-binding-hermes` 가 `fos-ctx` 파일을 바꿨으므로 그 바인딩이 재시작 대기가 되고 옛 에이전트가 꺼진다. 관리자가 공유 gateway 를 재시작하고 반영 완료를 누를 때까지 옛 에이전트를 쓸 수 없다. 3단계의 재시작과 함께 하면 한 번으로 끝난다
 2. 원래 쓰던 에이전트의 상세에서 그 연결을 붙인다. 바인딩은 「반영 대기」 다
 3. 관리자가 공유 gateway 를 재시작하고 반영 완료를 누른다
 4. 그 에이전트로 커넥터 도구를 한 번 불러 본다. 쓰기 도구는 승인 카드가 뜨는지 본다

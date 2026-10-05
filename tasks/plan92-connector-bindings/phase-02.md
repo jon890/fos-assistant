@@ -49,14 +49,14 @@
 - `ConnectorState` 에 `mode`(`"bind"` 나 `"isolated"`, 없으면 `"isolated"`)를 더한다
 - 대시보드가 409 로 답하면 `ConnectorInstallConflict`, 401 이면 `ConnectorProfileRejected` 를 던진다. 둘 다 `hermes` 패키지의 새 예외이고 메시지에 응답 본문을 싣지 않는다
 - 보관 파일 이름은 연결 id 로 만든다. `ConnectorConnection` 에 `String vault()` 를 두고 `"c" + id` 를 돌려준다
-- `hermes/dto/ConnectorManifest.java` 에 `List<String> skills` 를 더하고 `HttpHermesConnectorClient` 의 카탈로그 읽기가 칸 `skills` 를 읽는다. 없으면 빈 목록이다(옛 대시보드 plugin)
+- `hermes/dto/ConnectorManifest.java` 에 `List<String> skills` 를 더하고 지금의 10개 인자 생성자를 `skills = List.of()` 로 넘기는 보조 생성자로 남긴다. 시험 여덟 곳이 그 생성자를 쓴다. 이어서 `HttpHermesConnectorClient` 의 카탈로그 읽기가 칸 `skills` 를 읽는다. 없으면 빈 목록이다(옛 대시보드 plugin)
 
 ### 2. 연결 서비스: `ConnectorConnectionService`
 
 사용자와 커넥터 단위로 바꾼다. 에이전트를 만들지 않는다. `AgentLifecycleService` 의존을 지운다.
 
 - `register(user, connectorId, values)`: 입력 칸이 없는 커넥터는 빈 `values` 를 받는다. 확인 도구 호출은 지금처럼 트랜잭션 밖이다. 트랜잭션 안에서 사용자 행을 잠그고 연결을 찾거나 `ConnectorConnection.pending(userId, connectorId, now)` 로 만든다. `approvals.rejectPendingFor(connection, now)` 뒤 `putVault(connection.vault(), id, accepted)` 를 부르고 `connection.connected(stored, now)` 로 `READY` 와 `vault_stored` 를 둔다. 이어서 그 연결의 바인딩마다 아래 3의 `reinstall` 을 부른다. 바인딩 하나가 실패해도 연결은 저장하고 그 바인딩만 `PENDING` 이다
-- `disconnect(user, connectorId)`: 잠금, 승인 줄 정리, 바인딩마다 떼기(아래 3의 `detach`), `deleteVault`, `connection.disconnected(now)`. 옛 바인딩은 옛 방식으로 env 를 지우고 설치를 끈다. 바인딩마다 떼기가 성공하면 그 행을 바로 지우고, 보관 파일은 바인딩이 모두 떼어진 뒤 마지막에 지운다. 중간에 실패하면 연결을 `PENDING` 으로 두고 `CONNECTOR_OPERATION_FAILED` 로 끝낸다. 남은 바인딩의 profile `.env` 에는 비밀이 남아 있다. 사용자가 해제를 다시 누르면 남은 바인딩부터 이어서 뗀다. 화면은 「해제가 끝나지 않았어요. 다시 해제를 눌러 주세요.」 를 보인다(phase 05)
+- `disconnect(user, connectorId)`: `ConnectorConnection` 에 인자 하나인 `disconnected(Instant now)` 를 더해 쓴다(재시작 대기는 바인딩이 갖는다). 잠금, 승인 줄 정리, 바인딩마다 떼기(아래 3의 `detach`), `deleteVault`, `connection.disconnected(now)`. 옛 바인딩은 옛 방식으로 env 를 지우고 설치를 끈다. 바인딩마다 떼기가 성공하면 그 행을 바로 지우고, 보관 파일은 바인딩이 모두 떼어진 뒤 마지막에 지운다. 중간에 실패하면 연결을 `PENDING` 으로 두고 `CONNECTOR_OPERATION_FAILED` 로 끝낸다. 남은 바인딩의 profile `.env` 에는 비밀이 남아 있다. 사용자가 해제를 다시 누르면 남은 바인딩부터 이어서 뗀다. 화면은 「해제가 끝나지 않았어요. 다시 해제를 눌러 주세요.」 를 보인다(phase 05)
 - `check(user, connectorId)`: `register` 처럼 트랜잭션을 나눈다. `@Transactional` 을 메서드에 붙이지 않는다
   1. 트랜잭션 안: 잠금 뒤 `vault_stored` 가 거짓이고 옛 커넥터 에이전트의 바인딩이 있으면 `importVault(vault, id, 그 profile)` 후 `markVaultStored()`
   2. 트랜잭션 밖: `vault_stored` 가 참이면 `callWithVault(id, verify.tool, vault)` 로 확인한다. 최대 10초가 걸려 그동안 DB 연결과 사용자 잠금을 쥐지 않는다
@@ -78,11 +78,11 @@
   4. 이미 붙어 있으면 지금 상태를 돌려준다
   5. manifest 의 스킬 이름이 그 profile 의 스킬 이름과 겹치면 `SKILL_NAME_TAKEN`. 목록은 `skill/application/SkillService.java` 가 새 스킬 이름을 확인할 때 쓰는 `publisher.list(profile)`(`SkillPublisher.list`)와 같은 것을 쓴다. 올린 스킬과 Hermes 스킬이 함께 든다. `connector` 는 `skill` 보다 위 패키지라 직접 부를 수 있다
   6. `ConnectorBinding.pending(agent, connection, manifest.mcpServer(), now)` 저장, `beginInstall`, `bindConnector(profile, id, vault)` 뒤 `installed(result.restartRequired() || result.pluginUpdated(), now)`
-  7. `skills` toolset 은 켜지 않는다. 켜면 `AgentToolService` 를 불러야 하는데 그 서비스가 phase 03 에서 이 패키지의 port 를 쓰게 되어 bean 이 서로를 기다린다. 화면이 「지침을 쓰려면 스킬 도구를 켜세요」 를 보인다(phase 05)
+  7. `skills` toolset 은 켜지 않는다. 도구 선택은 주인이 화면에서 정하는 일이고(ADR-029) 붙이기가 다른 도구를 몰래 켜지 않는다. 화면이 「지침을 쓰려면 스킬 도구를 켜세요」 를 보인다(phase 05)
   8. `ConnectorInstallConflict` 는 `CONNECTOR_BIND_CONFLICT`(새 코드, 409), `ConnectorProfileRejected` 는 `CONNECTOR_PROFILE_NOT_READY`(새 코드, 409)로 끝내고 바인딩 행을 지운다. 그 밖의 실패는 바인딩을 `PENDING` 으로 남기고 `CONNECTOR_OPERATION_FAILED`
-- `void unbind(CurrentUser user, String agentCode, String connectorId)`: 주인만. `bind` 와 같은 순서로 사용자 행과 에이전트 행을 잠근다. 옛 커넥터 에이전트의 바인딩은 떼지 않는다(그 에이전트를 지운다). 그 에이전트와 연결의 `EXECUTING` 승인 줄이 있으면 `CONNECTOR_ACTION_EXECUTING`. `PENDING` 승인 줄은 `connection_changed` 로 끝낸다. 이 일을 할 `ConnectorActionService.rejectPendingFor(ConnectorConnection connection, Long agentId, Instant now)` 를 이 phase 에서 만든다. 그 에이전트가 판정한 줄만 고른다. 상시 허락은 건드리지 않는다. 허락은 사용자와 커넥터에 묶여 있어 다른 에이전트의 바인딩에도 걸리기 때문이다. `unbindConnector(profile, id)` 뒤 행을 지운다
-- `AgentConnectionView confirmApplied(CurrentUser admin, String agentCode, String connectorId, Instant shownSince)`: 관리자이고 그 에이전트 주인이 같은 그룹이어야 한다. 붙이기와 같은 순서로 주인의 사용자 행과 에이전트 행을 잠근다. `shownSince` 는 관리자 목록이 보였던 그 바인딩의 `restartRequiredSince` 다. 바인딩의 값이 그보다 늦으면 관리자가 재시작한 뒤에 다시 설치된 것이라 대기를 풀지 않고 `CONNECTOR_RESTART_AGAIN`(새 코드, 409)으로 거절한다. 같으면 재시작 대기를 풀고 `resync` 로 `READY` 를 판정한다. 아니면 `PENDING` 과 `CONNECTOR_OPERATION_FAILED`
-- 내부 `reinstall(binding)`: 일반 바인딩은 `bindConnector`, 옛 바인딩은 지금 `apply` 의 env 쓰기와 `putConnector(profile, id, true)`. 결과의 재시작 필요를 누적하고 `PENDING`
+- `void unbind(CurrentUser user, String agentCode, String connectorId)`: 주인만. `bind` 와 같은 순서로 사용자 행과 에이전트 행을 잠근다. 옛 커넥터 에이전트의 바인딩은 떼지 않는다(그 에이전트를 지운다). 그 에이전트와 연결의 `EXECUTING` 승인 줄이 있으면 `CONNECTOR_ACTION_EXECUTING`. `PENDING` 승인 줄은 `connection_changed` 로 끝낸다. 이 일을 할 `ConnectorActionService.rejectPendingFor(ConnectorConnection connection, Long agentId, Instant now)` 를 이 phase 에서 만든다. 그 에이전트가 판정한 줄만 고른다. 고르는 쿼리는 `ConnectorActionRepository` 에 `findByUserIdAndConnectorIdAndAgentIdAndStatus` 를 더해 쓴다. 상시 허락은 건드리지 않는다. 허락은 사용자와 커넥터에 묶여 있어 다른 에이전트의 바인딩에도 걸리기 때문이다. `unbindConnector(profile, id)` 뒤 행을 지운다
+- `AgentConnectionView confirmApplied(CurrentUser admin, String agentCode, String connectorId, Instant shownSince)`: 관리자이고 그 에이전트 주인이 같은 그룹이어야 한다. 붙이기와 같은 순서로 주인의 사용자 행과 에이전트 행을 잠근다. `shownSince` 는 관리자 목록이 보였던 그 바인딩의 `restartRequiredSince` 다. 두 값이 모두 비었으면 같은 값으로 본다(마이그레이션이 채우지 못한 옛 바인딩). 바인딩의 값이 그보다 늦으면 관리자가 재시작한 뒤에 다시 설치된 것이라 대기를 풀지 않고 `CONNECTOR_RESTART_AGAIN`(새 코드, 409)으로 거절한다. 같으면 재시작 대기를 풀고 `resync` 로 `READY` 를 판정한다. 아니면 `PENDING` 과 `CONNECTOR_OPERATION_FAILED`
+- 내부 `reinstall(binding, Map<String, String> accepted)`: 일반 바인딩은 `bindConnector`(값은 보관 파일에서 온다). 옛 바인딩은 `register` 가 받은 `accepted` 로 지금 `apply` 의 env 쓰기를 하고 `putConnector(profile, id, true)`. `resync` 에서는 값이 바뀌지 않았으므로 env 를 다시 쓰지 않는다. 결과의 재시작 필요를 누적하고 `PENDING`
 - 내부 `detach(binding)`: 일반 바인딩은 `unbindConnector` 뒤 행 삭제. 옛 바인딩은 env 삭제와 `putConnector(profile, id, false)` 뒤 행 삭제와 에이전트 끄기
 - 내부 `resync(binding)`: 지금 `resyncedUsable` 을 옮긴다. 일반 바인딩은 `bindConnector` 를 다시 보내고 `readConnector` 의 `enabled`, `configured`, `policyHook`, `mode == "bind"` 와 `probe` 를 본다. 켜진 내장 도구가 manifest 의 `toolsets` 와 같은지는 보지 않는다. 옛 바인딩은 지금 판정 그대로다(사진 받기 포함). 재시작 대기인 바인딩은 사용자의 연결 확인에서 설치를 다시 보내지 않는다
 
@@ -99,7 +99,7 @@ port 를 읽기와 떼기로 나눈다. 읽기 port 를 쓰는 `AgentToolService
 ### 5. 시험
 
 - `backend/src/test/java/com/bifos/assistant/connector/ConnectorConnectionServiceTest.java`(수정): 등록이 에이전트를 만들지 않고 보관 파일을 쓰며 `READY` 다. 값 교체가 붙은 바인딩마다 다시 설치하고 그 바인딩이 재시작 대기 `PENDING` 이다. 해제가 바인딩을 모두 떼고 보관 파일을 지운다. 옛 연결의 확인이 보관 파일로 옮긴 뒤 확인 도구를 부른다. 응답과 로그 문자열에 비밀 칸의 값이 없다
-- `backend/src/test/java/com/bifos/assistant/connector/ConnectorBindingServiceTest.java`(신규): 남의 비공개 에이전트는 `AGENT_NOT_FOUND`, 읽을 수 있는 남의 에이전트와 관리자는 `FORBIDDEN` 이다. 경우마다 코드 하나를 단언한다. 붙이기가 에이전트 행 잠금을 쥔 동안 공개 범위 변경이 기다렸다가 `AGENT_CONNECTIONS_REQUIRE_PRIVATE` 로 거절되는 차례를 재현한다(본보기는 에이전트 행 잠금 아래의 동시 저장을 `CountDownLatch` 로 재현하는 `SkillServiceTest`). 그룹 공개 에이전트, 옛 커넥터 에이전트, 연결되지 않은 연결은 각 오류 코드다. 붙이면 `bindConnector` 를 한 번 부르고 바인딩이 `PENDING` 이며 재시작이 필요하다. 대시보드 409 와 401 은 새 오류 코드이고 행이 남지 않는다. 반영 완료가 `READY` 로 바꾼다. 관리자 목록을 읽은 뒤 다시 설치된 바인딩의 반영 완료는 `CONNECTOR_RESTART_AGAIN` 이고 대기가 풀리지 않는다. 해제가 두 번째 바인딩에서 실패하면 첫 바인딩 행만 지워지고 보관 파일이 남으며, 다시 해제하면 이어서 끝난다. 칸이 없는 커넥터가 빈 값으로 연결된다. 떼면 행이 지워지고 `unbindConnector` 를 부른다. 스킬 이름이 겹치면 `SKILL_NAME_TAKEN`
+- `backend/src/test/java/com/bifos/assistant/connector/ConnectorBindingServiceTest.java`(신규): 남의 비공개 에이전트는 `AGENT_NOT_FOUND`, 읽을 수 있는 남의 에이전트와 관리자는 `FORBIDDEN` 이다. 경우마다 코드 하나를 단언한다. 공개 범위 변경이 에이전트 행 잠금을 쥔 동안 붙이기가 기다렸다가, 그 변경이 커밋한 `GROUP` 을 보고 `AGENT_CONNECTIONS_REQUIRE_PRIVATE` 로 거절되는 차례를 재현한다(본보기는 에이전트 행 잠금 아래의 동시 저장을 `CountDownLatch` 로 재현하는 `SkillServiceTest`). 반대 차례(붙이기가 먼저)는 공개 범위 변경이 바인딩을 보게 되는 phase 03 이 시험한다. 그룹 공개 에이전트, 옛 커넥터 에이전트, 연결되지 않은 연결은 각 오류 코드다. 붙이면 `bindConnector` 를 한 번 부르고 바인딩이 `PENDING` 이며 재시작이 필요하다. 대시보드 409 와 401 은 새 오류 코드이고 행이 남지 않는다. 반영 완료가 `READY` 로 바꾼다. 관리자 목록을 읽은 뒤 다시 설치된 바인딩의 반영 완료는 `CONNECTOR_RESTART_AGAIN` 이고 대기가 풀리지 않는다. 해제가 두 번째 바인딩에서 실패하면 첫 바인딩 행만 지워지고 보관 파일이 남으며, 다시 해제하면 이어서 끝난다. 칸이 없는 커넥터가 빈 값으로 연결된다. 떼면 행이 지워지고 `unbindConnector` 를 부른다. 스킬 이름이 겹치면 `SKILL_NAME_TAKEN`
 - `backend/src/test/java/com/bifos/assistant/hermes/HttpHermesConnectorClientTest.java`(수정): 새 메서드의 요청 본문과 409, 401 대응, 카탈로그의 `skills`
 - `backend/src/test/java/com/bifos/assistant/connector/ConnectorConnectionTest.java`(수정): 연결의 메서드가 에이전트를 건드리지 않는다
 - `backend/src/test/java/com/bifos/assistant/connector/ConnectorConnectionControllerTest.java`(수정): 상태 응답에 `bindings` 가 있고 `agentCode` 가 없다. 응답 본문에 비밀 원문과 env 이름이 없다. 관리자 반영 완료가 새 경로로 된다
@@ -140,6 +140,7 @@ scripts/quality.sh check
 | `backend/src/main/java/com/bifos/assistant/connector/application/model/AdminConnectionSnapshot.java` | 수정 |
 | `backend/src/main/java/com/bifos/assistant/connector/application/model/ConnectorSummary.java` | 수정 |
 | `backend/src/main/java/com/bifos/assistant/connector/application/ConnectorActionService.java` | 수정 |
+| `backend/src/main/java/com/bifos/assistant/connector/infra/ConnectorActionRepository.java` | 수정 |
 | `backend/src/main/java/com/bifos/assistant/connector/domain/ConnectorConnection.java` | 수정 |
 | `backend/src/main/java/com/bifos/assistant/agent/application/AgentConnectorBindings.java` | 신규 |
 | `backend/src/main/java/com/bifos/assistant/agent/application/AgentLifecycleService.java` | 수정 |

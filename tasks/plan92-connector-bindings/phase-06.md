@@ -59,7 +59,7 @@
 
 ### 5. `agentCode` 에 기대던 시나리오 셋
 
-`delivery-retry.ts`, `notifications.ts`, `scheduled-task.ts` 가 연결 응답의 `agentCode` 로 찾던 에이전트를, 시나리오가 만든 일반 비공개 에이전트에 연결을 붙이고 반영 완료한 것으로 바꾼다. 커넥터와 무관한 단언은 그대로 둔다. 붙이기 준비는 세 시나리오와 `connector-binding.ts` 가 함께 쓰도록 `test/e2e/scenarios/` 의 기존 도움 함수 자리에 둔다.
+`delivery-retry.ts`, `notifications.ts`, `scheduled-task.ts` 가 연결 응답의 `agentCode` 로 찾던 에이전트를, 시나리오가 만든 일반 비공개 에이전트에 연결을 붙이고 반영 완료한 것으로 바꾼다. 커넥터와 무관한 단언은 그대로 둔다. 붙이기 준비(연결 등록, 비공개 에이전트 만들기, 붙이기, 관리자 반영 완료)는 세 시나리오와 `connector-binding.ts`, `connector-policy.ts`, `proactive-check.ts` 가 함께 쓰도록 새 도움 파일 `test/e2e/connector-support.ts` 에 둔다. 본보기는 같은 디렉터리의 `test/e2e/delegation-support.ts` 다.
 
 ### 6. `test/e2e/scenarios/proactive-check.ts`
 
@@ -81,6 +81,7 @@ cd backend && ./gradlew test
 | 파일 | 변경 |
 | --- | --- |
 | `test/e2e/run.ts` | 수정 |
+| `test/e2e/connector-support.ts` | 신규 |
 | `test/e2e/fake-hermes.ts` | 수정 |
 | `test/e2e/scenarios/connector.ts` | 수정 |
 | `test/e2e/scenarios/connector-binding.ts` | 신규 |
