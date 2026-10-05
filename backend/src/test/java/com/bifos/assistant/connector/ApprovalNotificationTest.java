@@ -1,6 +1,7 @@
 package com.bifos.assistant.connector;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.never;
@@ -36,6 +37,7 @@ import com.bifos.assistant.notification.domain.Notification;
 import com.bifos.assistant.notification.domain.type.NotificationKind;
 import com.bifos.assistant.notification.domain.type.NotificationTargetType;
 import com.bifos.assistant.notification.infra.NotificationRepository;
+import com.bifos.assistant.proactive.application.CheckNotificationPolicy;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.usage.domain.AgentExecution;
@@ -136,6 +138,9 @@ class ApprovalNotificationTest {
     @MockitoBean
     HermesConnectorClient connector;
 
+    @MockitoBean
+    CheckNotificationPolicy checkNotifications;
+
     private final List<NotificationEvent> received = new CopyOnWriteArrayList<>();
     private Runnable subscription = () -> {};
     private AppUser owner;
@@ -146,6 +151,7 @@ class ApprovalNotificationTest {
 
     @BeforeEach
     void setUp() {
+        when(checkNotifications.allows(any(), any())).thenReturn(true);
         jdbc.update("DELETE FROM connector_action");
         jdbc.update("DELETE FROM connector_tool_grant");
         notifications.deleteAll();
@@ -190,6 +196,22 @@ class ApprovalNotificationTest {
     void tearDown() {
         subscription.run();
         notifications.deleteAll();
+    }
+
+    @Test
+    @DisplayName("조용한 시간의 승인 요청은 승인 카드를 유지하고 알림과 알림 사건만 생략한다")
+    void quietCheckKeepsApprovalWithoutNotification() {
+        when(checkNotifications.allows(any(), any())).thenReturn(false);
+
+        ConnectorPolicyAnswer answer = ask(root, WRITE, ARGS);
+
+        assertThat(answer.actionId()).isNotNull();
+        assertThat(actions.findAll()).singleElement().satisfies(action -> {
+            assertThat(action.publicId()).isEqualTo(answer.actionId());
+            assertThat(action.status()).isEqualTo(ActionStatus.PENDING);
+        });
+        assertThat(notifications.findAll()).isEmpty();
+        assertThat(received).isEmpty();
     }
 
     @Test

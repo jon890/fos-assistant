@@ -26,6 +26,7 @@ import com.bifos.assistant.notification.domain.NotificationTarget;
 import com.bifos.assistant.notification.domain.type.NotificationKind;
 import com.bifos.assistant.notification.domain.type.NotificationTargetType;
 import com.bifos.assistant.orchestration.application.SessionOwnerResolver;
+import com.bifos.assistant.proactive.application.CheckNotificationPolicy;
 import com.bifos.assistant.proactive.application.ProactiveCheckGuard;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.util.Sha256;
@@ -102,6 +103,7 @@ public class ConnectorPolicyService {
     private final NotificationService notifications;
     private final ConversationNotices conversations;
     private final ProactiveCheckGuard checkGuard;
+    private final CheckNotificationPolicy checkNotifications;
     private final TransactionTemplate transactions;
     private final Clock clock;
 
@@ -119,6 +121,7 @@ public class ConnectorPolicyService {
             NotificationService notifications,
             ConversationNotices conversations,
             ProactiveCheckGuard checkGuard,
+            CheckNotificationPolicy checkNotifications,
             PlatformTransactionManager transactionManager) {
         this(
                 actions,
@@ -131,6 +134,7 @@ public class ConnectorPolicyService {
                 notifications,
                 conversations,
                 checkGuard,
+                checkNotifications,
                 transactionManager,
                 Clock.systemUTC());
     }
@@ -146,6 +150,7 @@ public class ConnectorPolicyService {
             NotificationService notifications,
             ConversationNotices conversations,
             ProactiveCheckGuard checkGuard,
+            CheckNotificationPolicy checkNotifications,
             PlatformTransactionManager transactionManager,
             Clock clock) {
         this.actions = actions;
@@ -158,6 +163,7 @@ public class ConnectorPolicyService {
         this.notifications = notifications;
         this.conversations = conversations;
         this.checkGuard = checkGuard;
+        this.checkNotifications = checkNotifications;
         this.transactions = new TransactionTemplate(transactionManager);
         this.clock = clock;
     }
@@ -274,7 +280,7 @@ public class ConnectorPolicyService {
             ConnectorAction saved = transactions.execute(status -> {
                 ConnectorAction stored = actions.saveAndFlush(action);
                 // 알림은 승인 줄과 한 트랜잭션이다. 알림 저장이 실패하면 승인 줄도 남지 않는다(ADR-070).
-                if (needsApproval && stored.conversationId() != null) {
+                if (needsApproval && stored.conversationId() != null && checkNotifications.allows(origin, now)) {
                     notifyApprovalRequested(stored, ConnectorActionView.titleOf(declared));
                 }
                 return stored;

@@ -1,10 +1,13 @@
 package com.bifos.assistant.proactive;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.bifos.assistant.chat.domain.Conversation;
 import com.bifos.assistant.chat.domain.type.ConversationPurpose;
 import com.bifos.assistant.chat.infra.ConversationRepository;
+import com.bifos.assistant.proactive.application.ProactiveCheckService;
+import com.bifos.assistant.proactive.domain.CheckReport;
 import com.bifos.assistant.proactive.domain.ProactiveCheck;
 import com.bifos.assistant.proactive.domain.ProactiveCheckFinding;
 import com.bifos.assistant.proactive.domain.type.CheckOutcome;
@@ -14,6 +17,10 @@ import com.bifos.assistant.proactive.domain.type.FindingKind;
 import com.bifos.assistant.proactive.domain.type.FindingReason;
 import com.bifos.assistant.proactive.infra.ProactiveCheckFindingRepository;
 import com.bifos.assistant.proactive.infra.ProactiveCheckRepository;
+import com.bifos.assistant.shared.auth.CurrentUser;
+import com.bifos.assistant.shared.domain.type.UserRole;
+import com.bifos.assistant.shared.error.ApiException;
+import com.bifos.assistant.shared.error.ErrorCode;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -57,6 +64,9 @@ class ProactiveCheckRepositoryTest {
     @Autowired
     TransactionTemplate transactions;
 
+    @Autowired
+    ProactiveCheckService service;
+
     private final List<Long> createdConversations = new ArrayList<>();
 
     @BeforeEach
@@ -68,6 +78,35 @@ class ProactiveCheckRepositoryTest {
     void tearDown() {
         clearProactiveRows();
         transactions.executeWithoutResult(status -> conversations.deleteAllById(createdConversations));
+    }
+
+    @Test
+    @DisplayName("보고 읽음 표시는 소유권을 검사하고 첫 시각과 JSON과 트리 토큰을 유지한다")
+    void reportOpeningChecksOwnershipAndKeepsFirstTimestamp() {
+        ProactiveCheck check = saveCheck(CONVERSATION, "report-session", 77L);
+        CheckReport report = new CheckReport(List.of("변화"), List.of("확인"), List.of(), List.of(), List.of("다음"));
+        transactions.executeWithoutResult(status -> checks.findById(check.id())
+                .orElseThrow()
+                .succeed(CheckOutcome.FINDINGS, 1, 0, report, 2, 0, 10, 3, 4, NOW.plusSeconds(10)));
+        CurrentUser other = new CurrentUser(OTHER_USER, "other@example.com", "다른 사용자", 1L, UserRole.MEMBER);
+        CurrentUser owner = new CurrentUser(USER, "owner@example.com", "주인", 1L, UserRole.MEMBER);
+
+        assertThatThrownBy(() -> service.openReport(other, check.id()))
+                .isInstanceOfSatisfying(
+                        ApiException.class,
+                        error -> assertThat(error.code()).isEqualTo(ErrorCode.PROACTIVE_CHECK_NOT_FOUND));
+        assertThat(checks.findById(check.id()).orElseThrow().reportOpenedAt()).isNull();
+
+        service.openReport(owner, check.id());
+        Instant opened = checks.findById(check.id()).orElseThrow().reportOpenedAt();
+        service.openReport(owner, check.id());
+
+        ProactiveCheck stored = checks.findById(check.id()).orElseThrow();
+        assertThat(stored.reportOpenedAt()).isEqualTo(opened);
+        assertThat(stored.report()).isEqualTo(report);
+        assertThat(stored.treeInputTokens()).isEqualTo(10);
+        assertThat(stored.treeCachedInputTokens()).isEqualTo(3);
+        assertThat(stored.treeOutputTokens()).isEqualTo(4);
     }
 
     @Test
@@ -123,7 +162,7 @@ class ProactiveCheckRepositoryTest {
         ProactiveCheck finished = saveCheck(CONVERSATION, "session-a", 11L);
         transactions.executeWithoutResult(status -> {
             ProactiveCheck row = checks.findById(finished.id()).orElseThrow();
-            row.succeed(CheckOutcome.NOTHING_NEW, 0, 0, 2, 0, NOW.plusSeconds(60));
+            row.succeed(CheckOutcome.NOTHING_NEW, 0, 0, null, 2, 0, 0, 0, 0, NOW.plusSeconds(60));
         });
         saveCheck(CONVERSATION, "session-a", 12L);
         saveCheck(OTHER_CONVERSATION, "session-a", 13L);

@@ -376,7 +376,7 @@ export const proactiveCheckScenario: Scenario = {
         ).json<unknown[]>();
         expect(actions.length === 0, `살펴보기 트리에서 승인 줄이 생겼다: ${JSON.stringify(actions)}`);
 
-        step("결과: 놓으면 원문 링크 하나만 「새로 알릴 것」 에 남고 나머지는 참고와 까닭으로 남는다");
+        step("결과: 놓으면 검증된 원문만 보고 근거와 「새로 알릴 것」 에 남고 나머지는 참고와 까닭으로 남는다");
         context.hermes.releaseHeldRun();
         held = false;
         await awaitEvent(firstEvents.events, (event) => event.type === "done", "살펴보기 끝");
@@ -388,10 +388,14 @@ export const proactiveCheckScenario: Scenario = {
       expect(first.status === "SUCCEEDED" && first.outcome === "FINDINGS", `마지막 살펴보기가 SUCCEEDED, FINDINGS 가 아니다: ${JSON.stringify(first)}`);
       const answer = lastAnswer(await messagesOf(context, conversationId), "정상 흐름").content;
       expect(
-        JSON.stringify(linkTargets(answer)) === JSON.stringify([STUDY.sourceUrl]),
-        `답의 링크가 원문 하나가 아니다: ${JSON.stringify(linkTargets(answer))}\n${answer}`,
+        JSON.stringify(linkTargets(answer)) === JSON.stringify([STUDY.sourceUrl, STUDY.sourceUrl]),
+        `보고 근거와 발견 상세의 링크가 검증한 원문과 다르다: ${JSON.stringify(linkTargets(answer))}\n${answer}`,
       );
       for (const expected of [
+        "**바뀐 점**",
+        "**한 일**",
+        "**근거**",
+        "**다음에 볼 것**",
         "**새로 알릴 것**",
         `1. ${STUDY.title} · study`,
         "**참고 (새 추천이 아니에요)**",
@@ -439,7 +443,8 @@ export const proactiveCheckScenario: Scenario = {
       }
       const webAnswer = lastAnswer(await messagesOf(context, conversationId), "후보 없는 살펴보기").content;
       expect(
-        webAnswer.includes("**새로 알릴 것**") && JSON.stringify(linkTargets(webAnswer)) === JSON.stringify([WEB_ONLY.sourceUrl]),
+        webAnswer.includes("**새로 알릴 것**")
+          && JSON.stringify(linkTargets(webAnswer)) === JSON.stringify([WEB_ONLY.sourceUrl, WEB_ONLY.sourceUrl]),
         `웹에서 찾은 발견이 「새로 알릴 것」 에 남지 않았다:\n${webAnswer}`,
       );
 
@@ -503,8 +508,8 @@ export const proactiveCheckScenario: Scenario = {
         expect(contextAnswer.includes(expected), `맥락 반영 답에 「${expected}」 가 없다:\n${contextAnswer}`);
       }
       expect(
-        JSON.stringify(linkTargets(contextAnswer)) === JSON.stringify([WEB_ONLY.sourceUrl]),
-        `달라진 점이 있는 발견만 링크로 남아야 한다: ${JSON.stringify(linkTargets(contextAnswer))}\n${contextAnswer}`,
+        JSON.stringify(linkTargets(contextAnswer)) === JSON.stringify([WEB_ONLY.sourceUrl, WEB_ONLY.sourceUrl]),
+        `보고 근거와 발견 상세에 달라진 발견의 링크만 남아야 한다: ${JSON.stringify(linkTargets(contextAnswer))}\n${contextAnswer}`,
       );
 
       step("다른 사용자: 이 에이전트의 상태 조회와 시작이 404 이고 대화 목록에 이 점검 대화가 없다");

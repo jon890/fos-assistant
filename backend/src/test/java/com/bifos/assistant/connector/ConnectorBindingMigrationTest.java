@@ -20,7 +20,7 @@ import org.junit.jupiter.api.Test;
  * 바인딩 표를 만든 뒤 이미 있는 연결마다 그 전용 에이전트와의 바인딩이 채워지는지 본다(ADR-083).
  *
  * <p>테스트 DB 는 엔티티로 스키마를 만들므로, 운영과 같은 Flyway 스키마는 여기서 따로 확인한다. 옛 연결에 행을 넣으려고
- * V76 까지만 올린 뒤 V78 까지 올린다.
+ * V78 까지만 올린 뒤 V80 까지 올린다.
  */
 class ConnectorBindingMigrationTest {
     private static final Timestamp CREATED_AT = Timestamp.valueOf("2026-09-01 00:00:00");
@@ -32,9 +32,9 @@ class ConnectorBindingMigrationTest {
     @BeforeEach
     void setUp() throws SQLException {
         database = createDatabase();
-        migrate("76");
-        seed();
         migrate("78");
+        seed();
+        migrate("80");
     }
 
     /** 같은 검사를 실제 MySQL 에서 돌리는 하위 클래스가 바꿔 끼운다. */

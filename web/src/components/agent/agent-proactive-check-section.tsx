@@ -16,6 +16,7 @@ import {
   startProactiveCheck,
   type ProactiveCheckStatus,
 } from "@/lib/proactive-check";
+import { AgentProactiveScheduleSection } from "./agent-proactive-schedule-section";
 
 type Props = {
   code: string;
@@ -97,8 +98,8 @@ export function AgentProactiveCheckSection({ code, initialStatus }: Props) {
     >
       <h2 className="font-semibold">먼저 살펴보기</h2>
       <p className="mt-1 text-sm text-muted-foreground">
-        묻지 않아도 에이전트가 새로 알릴 것이 있는지 살펴봐요. 읽기만 하고
-        아무것도 바꾸지 않아요.
+        묻지 않아도 에이전트가 새로 알릴 것이 있는지 살펴봐요. 필요한 할 일을
+        제안하고, 연결한 서비스에 쓰는 일은 승인을 기다려요.
       </p>
       <div className="mt-4 flex flex-wrap items-center gap-3">
         <Button
@@ -140,6 +141,7 @@ export function AgentProactiveCheckSection({ code, initialStatus }: Props) {
           {describeLastCheck(lastCheck)}
         </p>
       ) : null}
+      <AgentProactiveScheduleSection code={code} />
     </section>
   );
 }

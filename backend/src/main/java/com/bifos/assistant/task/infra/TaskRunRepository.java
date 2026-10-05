@@ -21,6 +21,9 @@ public interface TaskRunRepository extends JpaRepository<TaskRun, Long> {
     /** 그 상태의 발화를 예정 시각 순으로 읽는다. 같은 시각이면 번호가 작은 쪽이 앞이다. */
     List<TaskRun> findByStatusOrderByScheduledForAscIdAsc(TaskRunStatus status);
 
+    /** 끝난 먼저 살펴보기와 결과를 아직 맞추지 못한 깨우기 발화다. */
+    List<TaskRun> findByStatusAndProactiveCheckIdIsNotNull(TaskRunStatus status);
+
     /** 그 trigger 의 그 예정 시각 줄이 이미 있는가. 유일 제약에 닿기 전에 본다. */
     boolean existsByTriggerIdAndScheduledFor(Long triggerId, Instant scheduledFor);
 

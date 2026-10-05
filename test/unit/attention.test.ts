@@ -42,6 +42,7 @@ function item(overrides: Partial<AttentionItem>): AttentionItem {
     execution: null,
     actionId: null,
     followUp: null,
+    report: null,
     ...overrides,
   };
 }
@@ -89,13 +90,13 @@ test("모르는 trigger 는 빈 글이다", () => {
   assert.equal(reasonText(why("SOMETHING_NEW", [])), "");
 });
 
-test("네 카드가 모두 읽혔고 비었으면 모두 빈 것이다", () => {
-  const cards = (["failures", "needs_me", "delegated", "continue"] as const).map((key) => card(key));
+test("다섯 카드가 모두 읽혔고 비었으면 모두 빈 것이다", () => {
+  const cards = (["failures", "needs_me", "delegated", "continue", "reports"] as const).map((key) => card(key));
   assert.equal(allCardsEmpty(cards), true);
 });
 
 test("읽지 못한 카드가 하나라도 있으면 모두 빈 것이 아니다", () => {
-  const cards = [card("failures"), card("needs_me"), card("delegated"), card("continue", { status: "UNAVAILABLE" })];
+  const cards = [card("failures"), card("needs_me"), card("delegated"), card("continue"), card("reports", { status: "UNAVAILABLE" })];
   assert.equal(allCardsEmpty(cards), false);
 });
 

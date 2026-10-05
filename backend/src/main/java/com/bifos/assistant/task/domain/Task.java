@@ -2,6 +2,7 @@ package com.bifos.assistant.task.domain;
 
 import com.bifos.assistant.task.domain.type.ConversationMode;
 import com.bifos.assistant.task.domain.type.NotifyPolicy;
+import com.bifos.assistant.task.domain.type.TaskKind;
 import com.bifos.assistant.task.domain.type.TaskState;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -65,8 +66,12 @@ public class Task {
     @Column(name = "title", nullable = false, length = TITLE_MAX)
     private String title;
 
-    @Column(name = "instruction", nullable = false, columnDefinition = "TEXT")
+    @Column(name = "instruction", columnDefinition = "TEXT")
     private String instruction;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "kind", nullable = false, length = 16)
+    private TaskKind kind;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "state", nullable = false, length = 20)
@@ -106,10 +111,36 @@ public class Task {
             Instant now) {
         Task task = new Task();
         task.ownerUserId = Objects.requireNonNull(ownerUserId, "ownerUserId");
+        task.kind = TaskKind.TURN;
         task.state = TaskState.ACTIVE;
         task.createdAt = micros(now);
         task.apply(agentId, title, instruction, mode, notify, now);
         return task;
+    }
+
+    /** 에이전트 하나의 매일 깨우기 설정이다. */
+    public static Task check(Long ownerUserId, Long agentId, String title, Instant now) {
+        Task task = new Task();
+        task.ownerUserId = Objects.requireNonNull(ownerUserId, "ownerUserId");
+        task.agentId = Objects.requireNonNull(agentId, "agentId");
+        task.title = Objects.requireNonNull(title, "title");
+        task.kind = TaskKind.CHECK;
+        task.instruction = null;
+        task.state = TaskState.ACTIVE;
+        task.conversationMode = ConversationMode.SINGLE;
+        task.notifyPolicy = NotifyPolicy.NEVER;
+        task.createdAt = micros(now);
+        task.updatedAt = task.createdAt;
+        return task;
+    }
+
+    /** 매일 깨우기의 켜짐 상태를 바꾼다. */
+    public void changeCheckEnabled(boolean enabled, Instant now) {
+        if (kind != TaskKind.CHECK) {
+            throw new IllegalStateException("only CHECK tasks can change the proactive schedule");
+        }
+        state = enabled ? TaskState.ACTIVE : TaskState.PAUSED;
+        updatedAt = micros(now);
     }
 
     /** 에이전트, 이름, 지시, 대화 방식, 알림을 고친다. 시각은 {@link TaskTrigger} 가 고친다. */

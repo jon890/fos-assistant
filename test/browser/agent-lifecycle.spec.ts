@@ -215,7 +215,8 @@ test("그룹 공개로 바꾸면 확인 창을 거쳐 다른 사용자의 목록
   const persona = page.getByRole("textbox", { name: `${NAME} 성격` });
   await expect(persona).toBeVisible();
   await expect(persona).not.toHaveAttribute("readonly", "");
-  await expect(page.getByRole("button", { name: "저장", exact: true })).toBeVisible();
+  const personaEditor = persona.locator("..");
+  await expect(personaEditor.getByRole("button", { name: "저장", exact: true })).toBeVisible();
 
   await loginAs(context, page, otherOf(testInfo.project.name));
   expect(await listedCodes(page)).toContain(code);

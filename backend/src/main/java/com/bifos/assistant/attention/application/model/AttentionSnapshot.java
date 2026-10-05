@@ -12,7 +12,7 @@ import java.util.Set;
  * @param now 판정 시각
  * @param candidates 카드마다 모은 억제 전 후보. 숨기기와 미루기는 이 목록에 있는 항목만 받는다
  * @param unavailable 원래 기록을 읽지 못한 카드
- * @param cards 요청자의 숨기기와 미루기를 적용해 판정한 카드 넷
+ * @param cards 요청자의 숨기기와 미루기를 적용해 판정한 카드 다섯
  */
 public record AttentionSnapshot(
         Instant now,

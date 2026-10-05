@@ -56,6 +56,18 @@ public interface ConnectorActionRepository extends JpaRepository<ConnectorAction
     /** 그 사용자의 그 상태인 줄이다. 만든 순이다. 먼저 알리기가 답을 기다리는 줄을 읽는다. */
     List<ConnectorAction> findByUserIdAndStatusOrderByIdAsc(Long userId, ActionStatus status);
 
+    /** 살펴보기 트리의 실행이 만든 승인 대기 카드만 보고에 싣는다. */
+    @Query("""
+            select a.publicId from ConnectorAction a
+            where a.status = :status and exists (
+                select e.id from AgentExecution e
+                where e.id = a.originExecutionId and e.userId = a.userId
+                  and (e.id = :rootId or e.rootExecutionId = :rootId)
+            )
+            order by a.id
+            """)
+    List<UUID> findPublicIdsForTree(@Param("rootId") Long rootId, @Param("status") ActionStatus status);
+
     List<ConnectorAction> findByStatus(ActionStatus status);
 
     List<ConnectorAction> findByStatusAndDecidedAtBefore(ActionStatus status, Instant before);

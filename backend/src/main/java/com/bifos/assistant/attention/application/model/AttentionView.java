@@ -8,7 +8,7 @@ import java.util.List;
  *
  * @param readAt 판정 시각
  * @param nowCount 카드 {@code nowCount} 의 합
- * @param cards 카드 넷. {@code NOW} 가 있는 카드가 먼저다
+ * @param cards 카드 다섯. {@code NOW} 가 있는 카드가 먼저다
  */
 public record AttentionView(Instant readAt, int nowCount, List<AttentionCard> cards) {
 

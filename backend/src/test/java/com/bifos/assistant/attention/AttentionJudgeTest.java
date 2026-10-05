@@ -25,7 +25,7 @@ import java.util.stream.IntStream;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
-/** 후보와 제어로 카드 넷을 정하는 규칙을 본다. 규칙은 {@code docs/backend/attention.md} 의 「억제 신호」 와 「API」 다. */
+/** 후보와 제어로 카드 다섯을 정하는 규칙을 본다. 규칙은 {@code docs/backend/attention.md} 의 「억제 신호」 와 「API」 다. */
 class AttentionJudgeTest {
 
     private static final Instant NOW = Instant.parse("2026-10-04T09:00:00Z");
@@ -171,7 +171,8 @@ class AttentionJudgeTest {
 
         assertThat(cards)
                 .extracting(AttentionCard::key)
-                .containsExactly(CardKey.DELEGATED, CardKey.FAILURES, CardKey.NEEDS_ME, CardKey.CONTINUE);
+                .containsExactly(
+                        CardKey.DELEGATED, CardKey.FAILURES, CardKey.NEEDS_ME, CardKey.CONTINUE, CardKey.REPORTS);
     }
 
     @Test
@@ -259,7 +260,7 @@ class AttentionJudgeTest {
         assertThat(card(cards, CardKey.FAILURES).status()).isEqualTo(CardStatus.OK);
         assertThat(card(cards, CardKey.FAILURES).items()).hasSize(1);
         assertThat(card(cards, CardKey.CONTINUE).items()).hasSize(2);
-        assertThat(cards).hasSize(4);
+        assertThat(cards).hasSize(5);
     }
 
     private List<AttentionCard> judge(Map<CardKey, List<AttentionCandidate>> candidates) {

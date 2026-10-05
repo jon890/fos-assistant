@@ -7,6 +7,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.agent.domain.type.AgentVisibility;
@@ -24,6 +25,9 @@ import com.bifos.assistant.chat.infra.ChatMessageRepository;
 import com.bifos.assistant.chat.infra.ConversationRepository;
 import com.bifos.assistant.hermes.HermesRunEventStream;
 import com.bifos.assistant.hermes.HermesRunsClient;
+import com.bifos.assistant.hermes.HermesSkillClient;
+import com.bifos.assistant.hermes.HermesSkillClient.HermesSkill;
+import com.bifos.assistant.hermes.HermesToolsetClient;
 import com.bifos.assistant.hermes.StubHermesRunsClient;
 import com.bifos.assistant.hermes.dto.HermesRunResult;
 import com.bifos.assistant.hermes.dto.TokenUsage;
@@ -33,6 +37,10 @@ import com.bifos.assistant.notification.domain.type.NotificationTargetType;
 import com.bifos.assistant.notification.infra.NotificationRepository;
 import com.bifos.assistant.people.domain.AllowedPerson;
 import com.bifos.assistant.people.infra.AllowedPersonRepository;
+import com.bifos.assistant.proactive.domain.ProactiveCheck;
+import com.bifos.assistant.proactive.domain.type.CheckStatus;
+import com.bifos.assistant.proactive.domain.type.CheckTrigger;
+import com.bifos.assistant.proactive.infra.ProactiveCheckRepository;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.shared.error.ApiException;
@@ -115,6 +123,12 @@ class TaskRunStarterTest {
     @MockitoBean
     HermesRunEventStream eventStream;
 
+    @MockitoBean
+    HermesToolsetClient toolsets;
+
+    @MockitoBean
+    HermesSkillClient skillClient;
+
     /** 시작 단계가 대화를 만드는 사이에 다른 트랜잭션을 끼워 넣는다. 끼우지 않은 검사에서는 실제 메서드가 그대로 돈다. */
     @MockitoSpyBean
     ChatService chat;
@@ -167,7 +181,11 @@ class TaskRunStarterTest {
     @Autowired
     NotificationRepository notifications;
 
+    @Autowired
+    ProactiveCheckRepository checks;
+
     private final List<Long> createdUsers = new ArrayList<>();
+    private final List<Long> createdChecks = new ArrayList<>();
     private final List<TurnSlot> heldSlots = new ArrayList<>();
 
     private StubHermesRunsClient stub() {
@@ -179,6 +197,8 @@ class TaskRunStarterTest {
         stub().reset();
         stub().willReturn(HermesRunResult.of(
                 "run-task", "session", "completed", "정리한 답", "model", "provider", TokenUsage.empty()));
+        when(toolsets.readEnabled(anyString(), anyString())).thenReturn(List.of("web", "skills", "fos-assistant"));
+        when(skillClient.list(anyString())).thenReturn(List.of(new HermesSkill("proactive-check", "살펴보기", true)));
         cleanTasks();
     }
 
@@ -652,6 +672,48 @@ class TaskRunStarterTest {
     }
 
     @Test
+    @DisplayName("CHECK 발화는 점검 대화에서 SCHEDULED 살펴보기를 열고 task_run에 점검과 루트 실행을 연결한다")
+    void startsScheduledCheckAndRecoversItsResult() {
+        Fixture fixture = fixture(ConversationMode.SINGLE, NotifyPolicy.NEVER);
+        Task checkTask =
+                tasks.save(Task.check(fixture.owner().id(), fixture.task().agentId(), "매일 먼저 살펴보기", NOW));
+        TaskTrigger checkTrigger =
+                triggers.save(TaskTrigger.cron(checkTask.id(), "0 9 * * *", SEOUL, MissedPolicy.SKIP, SCHEDULED, NOW));
+        TaskRun run = runs.save(TaskRun.queued(
+                checkTask.id(), checkTrigger.id(), fixture.owner().id(), SCHEDULED, NOW));
+        stub().willReturn(HermesRunResult.of(
+                "run-check",
+                "check-session",
+                "completed",
+                "<fos-check-result>{\"version\":1,\"outcome\":\"NOTHING_NEW\"}</fos-check-result>",
+                "model",
+                "provider",
+                TokenUsage.empty()));
+
+        assertThat(starter.startQueued(NOW)).isEqualTo(1);
+
+        TaskRun linked = awaitCheckLinked(run);
+        ProactiveCheck check = checks.findById(linked.proactiveCheckId()).orElseThrow();
+        createdChecks.add(check.id());
+        assertThat(check.trigger()).isEqualTo(CheckTrigger.SCHEDULED);
+        assertThat(conversations.findById(check.conversationId()).orElseThrow().taskId())
+                .isNull();
+        assertThat(linked.conversationId()).isEqualTo(check.conversationId());
+        assertThat(service.list(currentUser(fixture.owner())))
+                .extracting(detail -> detail.task().id())
+                .doesNotContain(checkTask.id());
+
+        awaitCheckFinished(check);
+        starter.startQueued(NOW.plusSeconds(1));
+
+        TaskRun finished = awaitFinished(run);
+        assertThat(finished.status()).isEqualTo(TaskRunStatus.SUCCEEDED);
+        ProactiveCheck completed = checks.findById(check.id()).orElseThrow();
+        assertThat(completed.rootExecutionId()).isNotNull();
+        assertThat(finished.executionId()).isEqualTo(completed.rootExecutionId());
+    }
+
+    @Test
     @DisplayName("SINGLE 작업이 첫 발화로 대화를 적는 사이 사용자가 작업을 멈추고 이름을 바꿔도 그 변경이 남는다")
     void keepsUserEditCommittedWhileSingleRunRecordsConversation() {
         Fixture fixture = fixture(ConversationMode.SINGLE, NotifyPolicy.NEVER);
@@ -714,6 +776,34 @@ class TaskRunStarterTest {
         }
     }
 
+    private TaskRun awaitCheckLinked(TaskRun run) {
+        long deadline = System.nanoTime() + WAIT_LIMIT.toNanos();
+        while (true) {
+            TaskRun current = runs.findById(run.id()).orElseThrow();
+            if (current.proactiveCheckId() != null) {
+                return current;
+            }
+            if (System.nanoTime() > deadline) {
+                fail("CHECK 발화 %d 가 점검 줄에 연결되지 않았다", run.id());
+            }
+            pause();
+        }
+    }
+
+    private void awaitCheckFinished(ProactiveCheck check) {
+        long deadline = System.nanoTime() + WAIT_LIMIT.toNanos();
+        while (true) {
+            ProactiveCheck current = checks.findById(check.id()).orElseThrow();
+            if (current.status() != CheckStatus.RUNNING) {
+                return;
+            }
+            if (System.nanoTime() > deadline) {
+                fail("점검 %d 가 끝나지 않았다", check.id());
+            }
+            pause();
+        }
+    }
+
     private void awaitNoRunning() {
         runs.findAll().stream()
                 .filter(run -> run.status() == TaskRunStatus.RUNNING)
@@ -766,6 +856,8 @@ class TaskRunStarterTest {
     }
 
     private void cleanTasks() {
+        checks.deleteAllById(createdChecks);
+        createdChecks.clear();
         runs.deleteAll();
         triggers.deleteAll();
         tasks.deleteAll();

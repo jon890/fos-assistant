@@ -6,6 +6,8 @@ public enum ExecutionAdmission {
     TURN_ROOT,
     /** 흐름 단계와 위임 자식. 쥔 자리가 max-running 보다 작아야 한다 */
     CHILD,
+    /** 매일 깨우기의 위임 자식. 사용자 대화를 위해 적어도 한 자리를 남긴다. */
+    BACKGROUND_CHILD,
     /** 추천 질문과 Memory 제안. 줄을 만든 뒤에도 background-reserve 자리가 남아야 한다 */
     BACKGROUND
 }

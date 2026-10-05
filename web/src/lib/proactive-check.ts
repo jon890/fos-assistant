@@ -6,7 +6,8 @@ export type ProactiveCheckBlocker = {
     | "DISABLED"
     | "AGENT_NOT_SUPPORTED"
     | "SKILL_MISSING"
-    | "TOOLSETS_NOT_ALLOWED";
+    | "TOOLSETS_NOT_ALLOWED"
+    | "ISOLATED_EXECUTION_REQUIRED";
   toolsets: string[];
 };
 
@@ -23,6 +24,8 @@ export type ProactiveCheckLastCheck = {
     | "BAD_VERSION"
     | "BAD_OUTCOME"
     | null;
+  /** 모델을 부르지 않고 끝낸 예약 실행의 까닭이다. */
+  skippedReason?: "NO_CHANGE" | "UNREAD_REPORT" | "QUIET_HOURS" | null;
   startedAt: string;
   finishedAt: string | null;
 };
@@ -35,8 +38,38 @@ export type ProactiveCheckStatus = {
   lastCheck: ProactiveCheckLastCheck | null;
 };
 
+/** 매일 깨우기 설정이다. 시각은 해당 시간대의 `HH:mm` 형식이다. */
+export type ProactiveCheckSchedule = {
+  enabled: boolean;
+  time: string;
+  timezone: string;
+  nextRunAt: string | null;
+  /** 매일 깨우기가 마지막으로 연 살펴보기다. */
+  lastCheck: ProactiveCheckLastCheck | null;
+  /** 이 에이전트가 매일 깨우기를 쓸 수 있는지다. */
+  schedulingAvailable: boolean;
+  blockers: ProactiveCheckBlocker[];
+};
+
 export function fetchProactiveCheckStatus(code: string): Promise<Response> {
   return fetch(`/api/agents/${code}/proactive-check`, { cache: "no-store" });
+}
+
+export function fetchProactiveCheckSchedule(code: string): Promise<Response> {
+  return fetch(`/api/agents/${code}/proactive-check/schedule`, {
+    cache: "no-store",
+  });
+}
+
+export function saveProactiveCheckSchedule(
+  code: string,
+  input: Pick<ProactiveCheckSchedule, "enabled" | "time" | "timezone">,
+): Promise<Response> {
+  return fetch(`/api/agents/${code}/proactive-check/schedule`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
 }
 
 /** 살펴보기를 시작한다. 202 면 본문에 점검 대화의 공개 식별자가 있다. */
@@ -66,7 +99,22 @@ export function describeBlocker(blocker: ProactiveCheckBlocker): string {
         .join(", ");
       return `${names} 도구가 켜져 있어서 살펴볼 수 없어요. 위 도구 절에서 꺼 주세요.`;
     }
+    case "ISOLATED_EXECUTION_REQUIRED":
+      return "격리된 실행 공간이 준비되기 전에는 매일 깨우기를 켤 수 없어요.";
   }
+}
+
+/** 사람이 곁에 없는 매일 깨우기를 막는 까닭이다. */
+export function describeScheduleBlocker(
+  blocker: ProactiveCheckBlocker,
+): string {
+  if (blocker.code === "ISOLATED_EXECUTION_REQUIRED") {
+    const names = blocker.toolsets
+      .map((name) => toolsetText(name, { label: name, description: "" }).label)
+      .join(", ");
+    return `${names} 도구가 켜져 있어요. 격리된 실행 공간이 준비되기 전에는 매일 깨우기를 켤 수 없어요.`;
+  }
+  return describeBlocker(blocker);
 }
 
 /**
@@ -74,6 +122,14 @@ export function describeBlocker(blocker: ProactiveCheckBlocker): string {
  * 답이 비었을 때만 형식 탓으로 말하지 않는다.
  */
 export function describeLastCheck(check: ProactiveCheckLastCheck): string {
+  switch (check.skippedReason) {
+    case "NO_CHANGE":
+      return "바뀐 것이 없어 건너뛰었어요";
+    case "UNREAD_REPORT":
+      return "지난 보고를 아직 열지 않았어요";
+    case "QUIET_HOURS":
+      return "조용한 시간이라 건너뛰었어요";
+  }
   switch (check.status) {
     case "RUNNING":
       return "지금 살펴보는 중이에요";

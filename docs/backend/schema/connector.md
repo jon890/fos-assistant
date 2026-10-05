@@ -12,7 +12,7 @@
 | `id` | `BIGINT` 기본키 | |
 | `user_id` | `BIGINT NOT NULL` | `app_user` 참조 |
 | `connector_id` | `VARCHAR(64) NOT NULL` | manifest 의 `id` |
-| `agent_id` | `BIGINT`, 유니크 | `agent` 참조. 옛 연결 전용 에이전트. V77 부터 비어도 된다. 쓰지 않는 칸으로 남는다 |
+| `agent_id` | `BIGINT`, 유니크 | `agent` 참조. 옛 연결 전용 에이전트. V79 부터 비어도 된다. 쓰지 않는 칸으로 남는다 |
 | `status` | `VARCHAR(20) NOT NULL` | `DISCONNECTED`, `PENDING`, `READY` |
 | `fields` | `VARCHAR(4000) NOT NULL` | JSON 텍스트 `{"values": {key: 값}, "secretPrefixes": {key: 앞 4자}}`. 비밀 칸의 원문과 해시는 넣지 않는다. 앞부분은 값이 16자 이상일 때만 넣는다. 16자 미만인 값은 앞 4자가 원문의 큰 부분이기 때문이다 |
 | `restart_required` | `BOOLEAN NOT NULL` | 공유 gateway 재시작 뒤 반영 완료를 기다린다. 쓰지 않는 칸으로 남는다. 재시작 대기는 바인딩이 갖는다 |
@@ -61,7 +61,7 @@
 - `(agent_id, connection_id)` 가 유니크다(`uk_agent_connector_binding`). 한 에이전트에 같은 연결을 둘 붙이지 못한다
 - `agent_id` 는 `agent` 를, `connection_id` 는 `connector_connection` 을 FK 로 가리킨다. 연결로 바인딩을 찾으려고 `connection_id` 에 색인을 둔다
 - 떼면 행을 지운다. 떼기는 재시작을 기다리지 않아 남길 상태가 없다. 이력은 `connector_action` 이 갖는다
-- V78 이 해제되지 않은 옛 연결마다 그 연결 전용 에이전트와의 바인딩을 만들었다. 상태와 재시작 대기, 켜려는 의도, 시각은 연결의 값을 옮겼고, 재시작 대기인 바인딩의 `restart_required_since` 는 그 연결의 `updated_at` 이다. `DISCONNECTED` 연결은 그 에이전트가 이미 꺼져 있어 바인딩을 만들지 않았다
+- V80 이 해제되지 않은 옛 연결마다 그 연결 전용 에이전트와의 바인딩을 만들었다. 상태와 재시작 대기, 켜려는 의도, 시각은 연결의 값을 옮겼고, 재시작 대기인 바인딩의 `restart_required_since` 는 그 연결의 `updated_at` 이다. `DISCONNECTED` 연결은 그 에이전트가 이미 꺼져 있어 바인딩을 만들지 않았다
 - 옛 커넥터 에이전트(`agent.connector_managed` 가 참)의 바인딩만 그 에이전트를 켜고 끈다. `READY` 가 되면 켜고, `PENDING` 이 되면 끄고 사진 받기를 내린다. 다른 에이전트의 바인딩은 에이전트를 건드리지 않는다
 
 ## connector_action

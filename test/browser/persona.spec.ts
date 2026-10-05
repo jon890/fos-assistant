@@ -8,18 +8,24 @@ import {
   PERSONA_GROUP_AGENT_CODE,
 } from "./fixtures.ts";
 import { TEST_EMAIL } from "./settings.ts";
+import type { Page } from "@playwright/test";
+
+function savePersonaButton(page: Page) {
+  const editor = page.getByRole("textbox", { name: /성격$/ }).locator("..");
+  return editor.getByRole("button", { name: "저장", exact: true });
+}
 
 test("자기 에이전트의 성격 화면을 연다", async ({ page }) => {
   await page.goto(`/agents/${PERSONA_AGENT_CODE}`);
   await expect(page.getByRole("textbox", { name: "성격 비서 성격" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "저장", exact: true })).toBeVisible();
+  await expect(savePersonaButton(page)).toBeVisible();
 });
 
 test("성격을 저장한다", async ({ page }) => {
   await page.goto(`/agents/${PERSONA_AGENT_CODE}`);
   const textarea = page.getByRole("textbox", { name: "성격 비서 성격" });
   await textarea.fill("차분하고 다정하게 설명하는 성격이다");
-  await page.getByRole("button", { name: "저장", exact: true }).click();
+  await savePersonaButton(page).click();
 
   const dialog = page.getByRole("alertdialog", { name: "성격 비서의 성격을 저장할까요?" });
   await expect(dialog).toBeVisible();
@@ -40,7 +46,7 @@ test("확인에서 취소한다", async ({ page }) => {
   await page.goto(`/agents/${PERSONA_AGENT_CODE}`);
   const textarea = page.getByRole("textbox", { name: "성격 비서 성격" });
   await textarea.fill("저장하면 안 되는 성격이다");
-  await page.getByRole("button", { name: "저장", exact: true }).click();
+  await savePersonaButton(page).click();
 
   const dialog = page.getByRole("alertdialog", { name: "성격 비서의 성격을 저장할까요?" });
   await expect(dialog).toBeVisible();
@@ -61,7 +67,7 @@ test("확인 창에서 Esc 를 누르면 창이 닫히고 저장하지 않는다
   await page.goto(`/agents/${PERSONA_AGENT_CODE}`);
   const textarea = page.getByRole("textbox", { name: "성격 비서 성격" });
   await textarea.fill("Esc 로 물린 성격이다");
-  await page.getByRole("button", { name: "저장", exact: true }).click();
+  await savePersonaButton(page).click();
 
   const dialog = page.getByRole("alertdialog", { name: "성격 비서의 성격을 저장할까요?" });
   await expect(dialog).toBeVisible();
@@ -86,7 +92,7 @@ test("저장 요청이 도는 동안 저장 단추가 지금 하는 일을 보�
 
   await page.goto(`/agents/${PERSONA_AGENT_CODE}`);
   await page.getByRole("textbox", { name: "성격 비서 성격" }).fill("기다리는 동안을 보이는 성격이다");
-  await page.getByRole("button", { name: "저장", exact: true }).click();
+  await savePersonaButton(page).click();
   const dialog = page.getByRole("alertdialog", { name: "성격 비서의 성격을 저장할까요?" });
   await dialog.getByRole("button", { name: "저장" }).click();
   await expect.poll(() => saveSeen).toBe(true);
@@ -99,7 +105,7 @@ test("저장 요청이 도는 동안 저장 단추가 지금 하는 일을 보�
 
   release();
   await expect(page.getByText("저장했어요.", { exact: true })).toBeVisible();
-  await expect(page.getByRole("button", { name: "저장", exact: true })).not.toHaveAttribute("aria-busy", "true");
+  await expect(savePersonaButton(page)).not.toHaveAttribute("aria-busy", "true");
 });
 
 test("8000자를 넘겨 적는다", async ({ page }) => {
@@ -108,7 +114,7 @@ test("8000자를 넘겨 적는다", async ({ page }) => {
   await textarea.fill("가".repeat(8005));
 
   await expect(page.getByText("남은 -5자")).toBeVisible();
-  await expect(page.getByRole("button", { name: "저장", exact: true })).toBeDisabled();
+  await expect(savePersonaButton(page)).toBeDisabled();
 });
 
 test("고칠 수 없는 에이전트를 연다", async ({ context, page }) => {
@@ -122,7 +128,7 @@ test("고칠 수 없는 에이전트를 연다", async ({ context, page }) => {
     const textarea = page.getByRole("textbox", { name: "그룹 성격 비서 성격" });
     await expect(textarea).toBeVisible();
     await expect(textarea).toHaveAttribute("readonly", "");
-    await expect(page.getByRole("button", { name: "저장", exact: true })).toHaveCount(0);
+    await expect(savePersonaButton(page)).toHaveCount(0);
   } finally {
     await setAgentVisibility(PERSONA_GROUP_AGENT_CODE, "PRIVATE", TEST_EMAIL);
   }

@@ -21,6 +21,7 @@ import com.bifos.assistant.agent.infra.AgentRepository;
 import com.bifos.assistant.connector.ConnectorPolicyTestDoubles.ChangeRecorder;
 import com.bifos.assistant.connector.ConnectorPolicyTestDoubles.Seen;
 import com.bifos.assistant.connector.application.ConnectorActionService;
+import com.bifos.assistant.connector.application.ConnectorCheckReportApprovals;
 import com.bifos.assistant.connector.application.ConnectorConnectionService;
 import com.bifos.assistant.connector.application.ConnectorPolicyService;
 import com.bifos.assistant.connector.application.model.ConnectorActionChanged;
@@ -179,6 +180,9 @@ class ConnectorActionServiceTest {
     @Autowired
     ProactiveCheckRepository checks;
 
+    @Autowired
+    ConnectorCheckReportApprovals reportApprovals;
+
     @MockitoBean
     HermesConnectorClient connector;
 
@@ -233,6 +237,29 @@ class ConnectorActionServiceTest {
                 .startedAt(Instant.parse("2026-10-01T00:00:00Z"))
                 .build());
         connect(true);
+    }
+
+    @Test
+    @DisplayName("보고의 남은 승인은 같은 실행 트리와 사용자의 PENDING 공개 번호만 담는다")
+    void reportApprovalsUseActualPendingCardsInTheOwnedTree() {
+        UUID rootPending = ask(WRITE, ARGS).actionId();
+        UUID rejectedId = ask(WRITE, "{\"text\":\"다른 승인 요청\"}").actionId();
+        ConnectorAction rejected = actions.findAll().stream()
+                .filter(action -> action.publicId().equals(rejectedId))
+                .findFirst()
+                .orElseThrow();
+        rejected.reject(Instant.now());
+        actions.saveAndFlush(rejected);
+
+        UUID childPending = askInWritesAllowedCheck(WRITE, ARGS).actionId();
+        ProactiveCheck otherTree = checks.findById(createdChecks.getFirst()).orElseThrow();
+
+        assertThat(reportApprovals.pendingPublicIds(run.id())).containsExactly(rootPending);
+        assertThat(reportApprovals.pendingPublicIds(otherTree.rootExecutionId()))
+                .containsExactly(childPending);
+
+        jdbc.update("UPDATE connector_action SET user_id = ? WHERE origin_execution_id = ?", owner.id() + 1, run.id());
+        assertThat(reportApprovals.pendingPublicIds(run.id())).isEmpty();
     }
 
     @Test

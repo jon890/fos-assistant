@@ -15,7 +15,8 @@
 | 발견 | `proactive_check_finding` | 결과 블록의 `findings` 하나 |
 | 살펴보기 트리 | 루트가 살펴보기 turn 인 실행 트리 | 그 turn 과 그 turn 이 맡긴 자식 실행 |
 
-「할 일 후보」 는 결과 안의 문장이다. [할 일](follow-up.md)(`follow_up`)과 다르고, 이 기능은 할 일을 만들지 않는다.
+「할 일 후보」 는 결과 안의 문장이다. 에이전트는 `follow_up_propose` 로 [할 일](follow-up.md)을 제안할 수도 있다.
+제안은 `PROPOSED` 이며 사람이 받아들여야 챙긴다.
 
 ## 진입점
 
@@ -23,12 +24,42 @@
 | --- | --- |
 | `GET /api/v1/agents/{code}/proactive-check` | 살펴보기를 할 수 있는지, 막는 까닭, 점검 대화의 공개 식별자, 마지막 살펴보기를 준다. 마지막 살펴보기에는 상태, 결과, 읽지 못한 까닭(`invalidReason`), 시작과 끝 시각만 싣는다 |
 | `POST /api/v1/agents/{code}/proactive-check/runs` | 살펴보기를 시작하고 202 와 점검 대화의 공개 식별자를 준다. 결과는 그 대화의 SSE 와 이력으로 온다 |
+| `GET /api/v1/agents/{code}/proactive-check/schedule` | 요청자의 매일 깨우기 설정, 다음 실행, 마지막 결과와 막는 까닭을 읽는다 |
+| `PUT /api/v1/agents/{code}/proactive-check/schedule` | `{ enabled, time, timezone }` 을 저장한다. `time` 은 `HH:mm`, `timezone` 은 IANA 이름이다 |
+| `POST /api/v1/proactive-checks/{checkId}/report/open` | 요청자 소유의 보고를 읽었다고 남기고 204 를 준다. 다시 열어도 첫 시각은 유지한다 |
 
-두 경로 모두 요청자가 그 에이전트로 대화를 시작할 수 있어야 한다(`AgentService.requireStartable`). 아니면 `AGENT_NOT_FOUND` 다.
+살펴보기 상태 조회와 수동 시작, 일정 켜기는 요청자가 그 에이전트로 대화를 시작할 수 있어야 한다(`AgentService.requireStartable`).
+일정 조회와 끄기는 읽기 권한을 확인한다. 보고 열기는 보고 소유권을 확인하며 다른 사용자의 보고는 404 로 답한다.
 점검 대화는 요청자의 것만 찾고 만든다. 같은 에이전트를 쓰는 다른 사용자의 점검 대화는 따로다.
 
-두 경로 모두 `ProactiveCheckService` 를 부른다. 시작은 `ProactiveCheckService.start(CurrentUser user, String agentCode, CheckTrigger trigger)` 하나다.
-매일 깨우기가 붙으면 같은 메서드를 `CheckTrigger.SCHEDULED` 로 부른다. 지금은 `MANUAL` 만 쓴다.
+상태 조회와 수동 시작은 `ProactiveCheckService` 를, 일정 설정은 `ProactiveScheduleService` 를 부른다.
+매일 깨우기는 `ProactiveCheckService.startScheduled` 로 시작하며 `CheckTrigger.SCHEDULED` 를 남긴다.
+점검 저장과 `task_run.proactive_check_id` 연결은 Hermes 호출 전 같은 짧은 트랜잭션에서 끝낸다. 단추의 시작은 `MANUAL` 이다.
+
+### 매일 깨우기
+
+사용자 설정이며 기본은 꺼짐이다([ADR-085](../adr/ADR-085-매일-깨우기는-예약-작업을-다시-쓰고-다섯-칸-보고를-지금-화면에-올린다.md)).
+일정은 `task.kind = CHECK` 와 기존 `task_trigger`, `task_run` 에 남는다.
+같은 사용자와 에이전트의 설정은 하나이고, 일반 예약 작업 목록과 10개 상한에서는 뺀다.
+점검 대화를 이어 쓰며 `conversation.task_id` 를 채우지 않는다.
+
+발화 직전에 요청자의 권한, 에이전트 사용 가능 여부, 켜진 도구와 격리 준비를 다시 검사한다.
+`terminal`, `file`, `code_execution` 도구가 켜져 있고 `assistant.proactive-check.isolated-execution-enabled` 가 거짓이면 저장과 발화를 거절한다.
+#190 의 사용자별 실행 공간을 운영에서 확인한 뒤에만 이 설정을 켠다.
+관리자 쓰기 도구 허용만으로 이 제한을 통과하지 못한다.
+
+사용자 대화 한 자리를 남겨 두는 turn 입장을 쓰고, 위임 자식도 같은 예비 자리를 적용한다.
+자리가 없거나 점검 대화가 바쁘면 `QUEUED` 로 다음 tick 에 다시 본다.
+놓친 발화는 `SKIP` 이고, 끈 동안의 발화를 몰아 실행하지 않는다.
+
+열지 않은 보고가 있으면 Hermes 를 부르지 않고 `skipped_reason = UNREAD_REPORT` 로 끝낸다.
+이 줄은 실행 하루 48회 상한에서 뺀다.
+외부 공고와 동향의 변화를 Control Plane 이 알지 못하므로 `NO_CHANGE` 로 모델을 건너뛰지는 않는다.
+그 판정은 목표의 `next_check_after` 가 생기는 다음 단계로 미룬다.
+
+22시부터 07시까지는 실행하고 알림만 억제한다. 시각은 사용자가 고른 시간대를 따른다.
+예약 실행의 정상 `NOTHING_NEW` 는 대화 답과 무소식 알림 줄을 남기지 않는다.
+질문과 출처 장애는 무소식과 구분해 남긴다.
 
 ### 시작 응답
 
@@ -40,6 +71,29 @@
 | 점검 대화에 도는 turn 이 있다 | 409 `CONVERSATION_BUSY` |
 | 에이전트가 꺼졌다 | `AGENT_DISABLED` |
 | `assistant.proactive-check.enabled` 가 거짓이다 | 409 `PROACTIVE_CHECK_UNAVAILABLE`, 까닭 `DISABLED` |
+
+## 다섯 칸 보고
+
+버전 2는 기존 결과 블록에 `report` 객체를 더한다.
+버전 1도 읽어 발견과 요약에서 같은 보고를 만든다.
+보고 자체의 글은 사실 확인을 대신하지 않으며, 근거는 검사를 통과한 발견의 원문 주소에서만 고른다.
+
+| 칸 | 타입 | 상한 | 채우는 쪽 |
+| --- | --- | --- | --- |
+| `changed` | 문자열 배열 | 3줄, 한 줄 300자 | 모델의 결과를 검사한다 |
+| `done` | 문자열 배열 | 3줄, 한 줄 300자 | 모델의 결과를 검사한다 |
+| `evidence` | 문자열 배열 | 원문 주소 3개 | Control Plane 이 검사한 발견에서 고른다 |
+| `needsApproval` | UUID 문자열 배열 | 해당 트리의 승인 대기 카드 | Control Plane 이 실제 승인 줄에서 채운다. 모델 값은 버린다 |
+| `next` | 문자열 배열 | 2줄, 한 줄 300자 | 모델의 결과를 검사한다 |
+
+`report_json` 에 검사한 모양을 저장하고 점검 대화와 「지금 볼 것」 의 보고 카드가 같은 기록을 읽는다.
+보고 글은 신뢰하지 않는 글로 처리하며, Markdown 문법을 이스케이프하고 안전한 원문 링크만 만든다.
+`report_opened_at` 은 요청자가 자신의 보고를 열 때만 채운다.
+보고 카드는 `LATER` 이고, 실제 승인 대기는 기존 「내 차례」 에서 센다.
+
+분야 스킬은 버전 2 보고를 내도록 갱신해야 한다. 버전 1 호환이 있어 Control Plane 을 먼저 배포해도 기존 스킬은 동작한다.
+명시적으로 지켜볼 동향을 정해진 간격으로 다시 조사하는 규칙과 연속 실행 시나리오는 분야 스킬이 맡는다.
+목표와 피드백 저장, 신호 발화는 이 단계에서 추가하지 않는다.
 
 ## 시작 전 점검
 
@@ -153,6 +207,7 @@ session 을 새로 바꾼 뒤에도 최근에 알린 발견과 변화 신호는 
 - 변화 신호가 모두 그대로이고 분야의 새 후보도 없으면 조사를 줄이고 `NOTHING_NEW` 로 끝낸다
 - 최근에 알린 발견을 같은 근거로 다시 알리지 않는다. 새 원문이 있거나 마감, 적합성이 바뀌었을 때만 `changeSinceLast` 에 적고 다시 알린다
 - 사용자가 답하지 않은 것을 선호나 거절로 여기지 않는다
+- `follow_up_propose` 는 `PROPOSED` 할 일만 만든다. 사용자가 받아들여야 `OPEN` 이 되며, 이 실행은 할 일을 직접 받아들이거나 끝낼 수 없다
 - 답 끝에 아래 「결과 계약」 의 블록을 둔다
 
 ### 대화에 남는 것
@@ -182,7 +237,7 @@ session 을 새로 바꾼 뒤에도 최근에 알린 발견과 변화 신호는 
 | 자리 | 클래스 | 살펴보기 트리에서 하는 일 | 쓰기 도구를 허용한 살펴보기 |
 | --- | --- | --- | --- |
 | 커넥터 도구 판정. 살펴보기 turn 이 직접 부르거나 옛 커넥터 에이전트가 부른 커넥터 도구 | `ConnectorPolicyService.decide` | 위험도가 `READ` 이고 승인 방식이 `none` 인 도구만 허용한다. 나머지는 `READ_ONLY_RUN` 으로 거절한다. 상시 허락을 보지 않고 승인 줄을 만들지 않는다 | `READ` 이고 `none` 인 도구는 허용한다. 나머지는 상시 허락을 보지 않고 승인 필요로 판정해 승인 카드를 만든다. `DESTRUCTIVE`, `FINANCIAL` 은 `RISK_NOT_OPEN`, 16KB 를 넘는 인자는 `ARGS_TOO_LARGE` 다 |
-| Control Plane MCP | `McpController` | `memory_read`, `agent_list`, `agent_delegate`, `agent_status`, `agent_stop` 만 받는다. 나머지는 「먼저 살펴보기에서는 쓸 수 없는 도구입니다.」 오류 결과다 | 그 살펴보기의 점검 대화에 쓰는 `artifact_write` 를 더 받는다. 다른 대화로 쓰면 같은 오류 결과다. `follow_up_propose` 는 여기서도 받지 않는다 |
+| Control Plane MCP | `McpController` | `memory_read`, `agent_list`, `agent_delegate`, `agent_status`, `agent_stop`, `follow_up_propose` 를 받는다. 나머지는 「먼저 살펴보기에서는 쓸 수 없는 도구입니다.」 오류 결과다 | 그 살펴보기의 점검 대화에 쓰는 `artifact_write` 를 더 받는다. 다른 대화로 쓰면 같은 오류 결과다 |
 | 위임 | `AgentDelegationService.delegate` | 맡길 곳이 요청자의 커넥터 에이전트가 아니면 `CHECK_TARGET`, 그 트리에서 이미 맡긴 수가 `max-delegations` 이상이거나 그 살펴보기가 이미 끝났으면(`proactive_check.status` 가 `RUNNING` 이 아니면) `CHECK_LIMIT` 로 거절한다. 끝났는지는 실행 스레드가 실행을 시작하기 전에 한 번 더 본다. 이 위임은 지워지기 전까지 남은 옛 커넥터 에이전트에만 남는다. 연결이 붙은 에이전트의 지시는 위임을 권하지 않는다 | 같다 |
 
 살펴보기 트리인지는 `ProactiveCheckGuard.isCheckTree(AgentExecution)` 가, 쓰기 도구를 허용한 살펴보기인지는 `ProactiveCheckGuard.checkOf` 로 한 번 읽은 그 살펴보기 줄의 `writes_allowed` 가 정한다. 커넥터 판정과 MCP 가 이 줄 하나로 경계를 정한다.
@@ -269,7 +324,7 @@ turn 이 어떻게 끝나든 잠금을 풀기 전에 `ProactiveCheckService` 가
 
 | 칸 | 타입 | 상한 | 뜻 |
 | --- | --- | --- | --- |
-| `version` | 정수 | | 지금은 1 |
+| `version` | 정수 | | 1과 2를 읽는다. 새 스킬은 2를 쓴다 |
 | `outcome` | `FINDINGS`, `NOTHING_NEW` | | 할 말이 있는가 |
 | `summary` | 문자열, 선택 | 300자 | 한두 문장 요약 |
 | `findings` | 배열 | 5개 | 발견. `NOTHING_NEW` 면 비운다 |
@@ -305,7 +360,7 @@ turn 이 어떻게 끝나든 잠금을 풀기 전에 `ProactiveCheckService` 가
 | `EMPTY_ANSWER` | 답이 비었다 |
 | `NO_BLOCK` | 닫는 태그가 없거나 그 앞에 여는 태그가 없다 |
 | `NOT_JSON` | 태그 사이가 JSON 객체 하나가 아니다 |
-| `BAD_VERSION` | `version` 이 없거나 1 이 아니다 |
+| `BAD_VERSION` | `version` 이 없거나 1과 2가 아니다 |
 | `BAD_OUTCOME` | `outcome` 이 없거나 `FINDINGS`, `NOTHING_NEW` 가 아니다 |
 
 **태그 글자 사이에 낀 보이지 않는 서식 문자(Unicode `Cf`)는 무시한다.**

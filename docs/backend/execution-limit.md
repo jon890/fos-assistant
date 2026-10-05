@@ -92,6 +92,11 @@ turn 자리를 얻을 때와 실행 줄을 만들 때 모두 같은 잠금을 �
 | --- | --- |
 | 흐름 단계, 위임 자식 | 쥔 자리가 `max-running` 보다 작다 |
 | 추천 질문, Memory 제안 | 줄을 만든 뒤에도 `background-reserve` 만큼 자리가 남는다 |
+| 매일 깨우기와 그 위임 자식 | 자리를 얻은 뒤에도 `max(1, background-reserve)` 만큼 자리가 남는다 |
+
+매일 깨우기는 `TurnCancellation.openBackground` 로 turn 자리를 얻고, 같은 실행 트리의 위임 자식도 예비 자리를 남긴다.
+사용자 대화 한 자리를 반드시 남기므로 `max-running = 1` 일 때 매일 깨우기는 자리를 얻지 못한다.
+자리가 없으면 예약 발화는 `QUEUED` 로 남겨 다음 tick 에 다시 본다.
 
 ### 원격 종료 확인
 

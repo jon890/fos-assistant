@@ -11,12 +11,16 @@ import com.bifos.assistant.chat.application.TurnCancellation;
 import com.bifos.assistant.chat.application.TurnHandle;
 import com.bifos.assistant.chat.domain.Conversation;
 import com.bifos.assistant.chat.infra.ConversationRepository;
+import com.bifos.assistant.proactive.application.ProactiveCheckService;
+import com.bifos.assistant.proactive.domain.type.CheckStatus;
+import com.bifos.assistant.proactive.infra.ProactiveCheckRepository;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.task.domain.Task;
 import com.bifos.assistant.task.domain.TaskRun;
 import com.bifos.assistant.task.domain.type.ConversationMode;
+import com.bifos.assistant.task.domain.type.TaskKind;
 import com.bifos.assistant.task.domain.type.TaskRunReason;
 import com.bifos.assistant.task.domain.type.TaskRunStatus;
 import com.bifos.assistant.task.domain.type.TaskState;
@@ -61,6 +65,9 @@ public class TaskRunStarter {
     private final TurnCancellation turns;
     private final ConversationEventHub hub;
     private final TaskNotices notices;
+    private final ProactiveScheduleService schedules;
+    private final ProactiveCheckService proactiveChecks;
+    private final ProactiveCheckRepository checks;
     private final TaskProperties properties;
     private final TransactionTemplate transactions;
     private final Clock clock;
@@ -71,6 +78,7 @@ public class TaskRunStarter {
      * @return turn 을 연 줄 수
      */
     public int startQueued(Instant now) {
+        recoverChecks(now);
         List<TaskRun> queued = runs.findByStatusOrderByScheduledForAscIdAsc(TaskRunStatus.QUEUED);
         int started = 0;
         for (TaskRun run : queued) {
@@ -94,6 +102,9 @@ public class TaskRunStarter {
         Prepared prepared = transactions.execute(status -> prepare(runId, now));
         if (prepared == null) {
             return false;
+        }
+        if (prepared.kind() == TaskKind.CHECK) {
+            return startCheck(runId, prepared, now);
         }
         TurnHandle handle;
         try {
@@ -157,8 +168,9 @@ public class TaskRunStarter {
             skip(task, run, TaskRunReason.BUSY, now);
             return null;
         }
-        Long conversationId = conversationFor(task, run, now);
-        return new Prepared(owner, conversationId, task.title(), task.instruction());
+        String agentCode = agents.findById(task.agentId()).orElseThrow().code();
+        Long conversationId = task.kind() == TaskKind.CHECK ? null : conversationFor(task, run, now);
+        return new Prepared(owner, agentCode, task.kind(), conversationId, task.title(), task.instruction());
     }
 
     /** 주인이 그 작업의 에이전트로 대화를 시작할 수 있고 흐름이 붙지 않았는가. 지웠거나 껐으면 false 다. */
@@ -173,6 +185,87 @@ public class TaskRunStarter {
             return false;
         }
         return !flows.known(agent.get().flow());
+    }
+
+    /** 깨우기 작업은 점검 대화에서 {@code SCHEDULED} 살펴보기를 열고, 일반 예약 대화는 열지 않는다. */
+    private boolean startCheck(Long runId, Prepared prepared, Instant now) {
+        try {
+            if (!schedules.schedulingAvailable(prepared.owner(), prepared.agentCode())) {
+                skipCheck(runId, TaskRunReason.AGENT_UNAVAILABLE, now);
+                return false;
+            }
+            proactiveChecks.startScheduled(prepared.owner(), prepared.agentCode(), check -> {
+                Boolean marked = transactions.execute(
+                        status -> markCheckRunning(runId, check.id(), check.conversationId(), now));
+                if (!Boolean.TRUE.equals(marked)) {
+                    throw new IllegalStateException("scheduled proactive check could not link its task run");
+                }
+            });
+        } catch (ApiException ex) {
+            if (ex.code() == ErrorCode.USER_BUSY || ex.code() == ErrorCode.CONVERSATION_BUSY) {
+                return false;
+            }
+            skipCheck(runId, TaskRunReason.AGENT_UNAVAILABLE, now);
+            return false;
+        }
+        return true;
+    }
+
+    /** 끝난 살펴보기의 루트 실행과 결과를 {@code task_run} 에 회복한다. 재기동 뒤에도 다음 tick 이 다시 맞춘다. */
+    private void recoverChecks(Instant now) {
+        for (TaskRun run : runs.findByStatusAndProactiveCheckIdIsNotNull(TaskRunStatus.RUNNING)) {
+            try {
+                transactions.executeWithoutResult(status -> recoverCheck(run.id(), now));
+            } catch (RuntimeException ex) {
+                log.warn("매일 깨우기 결과를 회복하지 못했다 taskRunId={}", run.id(), ex);
+            }
+        }
+    }
+
+    private void recoverCheck(Long runId, Instant now) {
+        TaskRun run = runs.findByIdForUpdate(runId).orElse(null);
+        if (run == null || run.status() != TaskRunStatus.RUNNING || run.proactiveCheckId() == null) {
+            return;
+        }
+        var check = checks.findById(run.proactiveCheckId()).orElse(null);
+        if (check == null || check.status() == CheckStatus.RUNNING) {
+            return;
+        }
+        if (check.skippedReason() != null) {
+            run.skip(TaskRunReason.UNREAD_REPORT, now);
+        } else if (check.status() == CheckStatus.SUCCEEDED) {
+            run.succeed(check.rootExecutionId(), now);
+        } else {
+            run.fail(TaskRunReason.FAILED, now);
+        }
+        notices.announce(tasks.findById(run.taskId()).orElseThrow(), run);
+    }
+
+    private void skipCheck(Long runId, TaskRunReason reason, Instant now) {
+        transactions.executeWithoutResult(status -> {
+            TaskRun run = runs.findByIdForUpdate(runId).orElse(null);
+            if (run == null || run.status() != TaskRunStatus.QUEUED) {
+                return;
+            }
+            Task task = tasks.findById(run.taskId()).orElseThrow();
+            skip(task, run, reason, now);
+        });
+    }
+
+    private boolean markCheckRunning(Long runId, Long checkId, Long conversationId, Instant now) {
+        TaskRun run = runs.findByIdForUpdate(runId).orElse(null);
+        if (run == null || run.status() != TaskRunStatus.QUEUED) {
+            return false;
+        }
+        Task task = tasks.findByIdForUpdate(run.taskId()).orElseThrow();
+        if (task.state() != TaskState.ACTIVE) {
+            skip(task, run, TaskRunReason.PAUSED, now);
+            return false;
+        }
+        run.useProactiveCheck(checkId);
+        run.useConversation(conversationId);
+        run.start(now);
+        return true;
     }
 
     /**
@@ -299,5 +392,11 @@ public class TaskRunStarter {
     }
 
     /** 열 준비가 끝난 줄이다. turn 스레드가 받는다. */
-    private record Prepared(CurrentUser owner, Long conversationId, String title, String instruction) {}
+    private record Prepared(
+            CurrentUser owner,
+            String agentCode,
+            TaskKind kind,
+            Long conversationId,
+            String title,
+            String instruction) {}
 }

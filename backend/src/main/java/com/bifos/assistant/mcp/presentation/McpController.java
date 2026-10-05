@@ -50,9 +50,9 @@ public class McpController {
     private static final String FOLLOW_UP_PROPOSE = "follow_up_propose";
     private static final Set<String> FOLLOW_UP_PROPOSE_FIELDS = Set.of("title", "due_at", "waiting");
     private static final String WAIT_SECONDS = "wait_seconds";
-    /** 먼저 살펴보기 트리에서 받는 도구. 읽기와 위임뿐이다. 새 도구를 더하면 여기 넣을지 함께 정한다(ADR-080). */
+    /** 먼저 살펴보기에서 읽기, 위임과 사람이 받아들여야 하는 할 일 제안을 받는다. */
     private static final Set<String> CHECK_TREE_TOOLS =
-            Set.of(MEMORY_READ, AGENT_LIST, AGENT_DELEGATE, AGENT_STATUS, AGENT_STOP);
+            Set.of(MEMORY_READ, AGENT_LIST, AGENT_DELEGATE, AGENT_STATUS, AGENT_STOP, FOLLOW_UP_PROPOSE);
     /** 쓰기 도구를 허용한 살펴보기가 더 받는 도구. 그 살펴보기의 점검 대화에만 쓰고 결과물은 그 폴더에 남는다(ADR-082). */
     private static final Set<String> CHECK_TREE_WRITE_TOOLS = Set.of(ARTIFACT_WRITE);
 
