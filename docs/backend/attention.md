@@ -34,6 +34,7 @@
 | `DELEGATION_RUNNING` | `delegated` | 주인의 위임 실행. `delegation_key` 가 있다 | `RUNNING`. 요청자의 지우지 않은 대화에 속한다 | 시작한 지 `long-running-after` 를 넘었다 | 끝남 | `execution:<번호>` | `status` | `CONTROL_PLANE` |
 | `DELEGATION_FINISHED` | `delegated` | 주인의 위임 실행 | 끝났고 `finished_at` 이 `delegated-window` 안. 요청자의 지우지 않은 대화에 속한다 | 아니다 | 없다 | `execution:<번호>` | `status` | `CONTROL_PLANE` |
 | `CONVERSATION_RECENT` | `continue` | 주인의 대화. `deleted_at` 이 비어 있다 | `updated_at` 순으로 `continue-count` 개 | 아니다 | 없다 | `conversation:<대화 공개 식별자>` | `updated_at` | `CONTROL_PLANE` |
+| `PROACTIVE_REPORT` | `reports` | 요청자의 `proactive_check` | 검사를 거친 보고가 있고 점검 대화가 지워지지 않았다 | 아니다 | 보고 열람 | `proactive_check:<번호>` | 보고 번호와 완료 시각 | `MODEL_INFERRED` |
 
 **같은 대화에 실패한 turn 과 결과 전달 실패가 함께 있으면 한 항목으로 합친다.**
 `trigger` 는 둘 가운데 더 최근 쪽이다. 묶음의 `updated_at` 이 실행의 `finished_at` 보다 뒤면 `DELIVERY_FAILED` 이고, 같거나 앞이면 `EXECUTION_FAILED` 다.
@@ -158,7 +159,7 @@
 
 | 경로 | 하는 일 |
 | --- | --- |
-| `GET /api/v1/attention` | 카드 넷과 항목, `nowCount`, `readAt`. 응답에 실린 `NOW` 와 `LATER` 항목마다 `SHOWN` 사건을 한 번 남긴다 |
+| `GET /api/v1/attention` | 카드 다섯과 항목, `nowCount`, `readAt`. 응답에 실린 `NOW` 와 `LATER` 항목마다 `SHOWN` 사건을 한 번 남긴다 |
 | `GET /api/v1/attention/summary` | `{ "nowCount": 3 }`. 사이드바와 홈의 한 줄이 읽는다. 사건을 남기지 않는다 |
 | `POST /api/v1/attention/hide` | 본문 `{ card, itemKey, stateKey }`. 그 카드에서 그 상태가 바뀔 때까지 숨기고 `HIDDEN` 사건을 남긴다 |
 | `POST /api/v1/attention/snooze` | 본문 `{ card, itemKey, until }`. `until` 은 지금보다 뒤이고 `snooze-max` 안이어야 한다. 아니면 400 `VALIDATION_FAILED`. 받으면 `SNOOZED` 사건을 남긴다 |
@@ -220,6 +221,7 @@
 | --- | --- | --- |
 | `execution` | `DELEGATION_RUNNING`, `DELEGATION_FINISHED` | `{ id, status }`. `status` 는 `RUNNING`, `SUCCEEDED`, `FAILED`, `CANCELLED` |
 | `followUp` | `FOLLOW_UP_PROPOSED`, `FOLLOW_UP_OPEN` | `{ id, dueAt, waiting, proposed }`. `id` 는 할 일의 공개 식별자 |
+| `report` | `PROACTIVE_REPORT` | `{ checkId, agentCode, changed, done, evidence, needsApproval, next }`. 보고는 `LATER` 이며 승인 대기의 건수는 기존 `APPROVAL_PENDING` 에서 센다 |
 | `actionId` | `APPROVAL_PENDING` | 승인 줄의 공개 식별자 |
 
 ## 웹 알림과의 경계

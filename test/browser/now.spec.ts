@@ -124,7 +124,7 @@ test.describe("지금 화면", () => {
 
     await openNow(page);
     const cards = page.locator('[data-testid^="now-card-"]');
-    await expect(cards).toHaveCount(4);
+    await expect(cards).toHaveCount(5);
     const first = await cards.nth(0).boundingBox();
     const second = await cards.nth(1).boundingBox();
     expect(first && second, "카드의 자리를 읽지 못했다").toBeTruthy();
@@ -324,8 +324,8 @@ test.describe("지금 화면", () => {
     await expect(cardCount).toHaveText(String(cardBefore));
   });
 
-  test("네 카드가 모두 비어도 빈 화면 아래에서 할 일을 더할 수 있다", async ({ context, page }, testInfo) => {
-    // 아무것도 만들지 않은 사용자라 네 카드가 모두 빈다. 이 검사는 저장하지 않아 다음 실행에도 빈 채로 남는다.
+  test("다섯 카드가 모두 비어도 빈 화면 아래에서 할 일을 더할 수 있다", async ({ context, page }, testInfo) => {
+    // 아무것도 만들지 않은 사용자라 다섯 카드가 모두 빈다. 이 검사는 저장하지 않아 다음 실행에도 빈 채로 남는다.
     await setSession(context, { email: `now-empty-${testInfo.project.name}@example.com`, name: "빈 화면 사용자" });
     expect((await page.request.get("/api/me")).ok()).toBeTruthy();
 

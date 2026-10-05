@@ -24,6 +24,7 @@ import com.bifos.assistant.task.domain.type.ConversationMode;
 import com.bifos.assistant.task.domain.type.MissedPolicy;
 import com.bifos.assistant.task.domain.type.NotifyPolicy;
 import com.bifos.assistant.task.domain.type.TaskState;
+import com.bifos.assistant.task.domain.type.TaskKind;
 import com.bifos.assistant.task.domain.type.TriggerType;
 import com.bifos.assistant.task.infra.TaskRepository;
 import com.bifos.assistant.task.infra.TaskRunRepository;
@@ -162,7 +163,7 @@ class TaskServiceTest {
 
         assertCode(() -> service.create(owner, cron("2월 31일", agent, "0 9 31 2 *")), ErrorCode.TASK_SCHEDULE_INVALID);
         assertCode(() -> service.create(owner, cron("5분마다", agent, "*/5 * * * *")), ErrorCode.TASK_SCHEDULE_INVALID);
-        assertThat(tasks.countByOwnerUserIdAndStateNot(owner.id(), TaskState.ARCHIVED))
+        assertThat(tasks.countByOwnerUserIdAndKindAndStateNot(owner.id(), TaskKind.TURN, TaskState.ARCHIVED))
                 .isZero();
     }
 
@@ -235,7 +236,7 @@ class TaskServiceTest {
         assertCode(() -> service.runs(other, taskId, 20), ErrorCode.TASK_NOT_FOUND);
         assertCode(() -> service.get(owner, UUID.randomUUID()), ErrorCode.TASK_NOT_FOUND);
         assertThat(service.list(other)).isEmpty();
-        assertThat(tasks.findByPublicIdAndOwnerUserId(taskId, owner.id())
+        assertThat(tasks.findByPublicIdAndOwnerUserIdAndKind(taskId, owner.id(), TaskKind.TURN)
                         .orElseThrow()
                         .title())
                 .isEqualTo("내 작업");

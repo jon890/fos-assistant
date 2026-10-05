@@ -59,12 +59,25 @@ public class TurnCancellation {
      *     한도를 모두 쓰고 있다. 둘 다 잠금과 자리를 남기지 않는다
      */
     public TurnHandle open(Long userId, Long conversationId) {
+        return open(userId, conversationId, false);
+    }
+
+    /** 사용자 대화 자리를 남겨 두는 매일 깨우기 전용 진입점이다. */
+    public TurnHandle openBackground(Long userId, Long conversationId) {
+        return open(userId, conversationId, true);
+    }
+
+    private TurnHandle open(Long userId, Long conversationId, boolean background) {
         if (byConversation.containsKey(conversationId)) {
             throw conversationBusy();
         }
         TurnSlot slot;
         try {
-            slot = limiter.acquireTurn(userId);
+            if (background) {
+                slot = limiter.acquireBackgroundTurn(userId, conversationId);
+            } else {
+                slot = limiter.acquireTurn(userId);
+            }
         } catch (ApiException ex) {
             if (ex.code() == ErrorCode.USER_BUSY && byConversation.containsKey(conversationId)) {
                 throw conversationBusy();

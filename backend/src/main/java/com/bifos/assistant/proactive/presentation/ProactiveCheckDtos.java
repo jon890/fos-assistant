@@ -67,13 +67,14 @@ public final class ProactiveCheckDtos {
      * @param finishedAt 끝난 시각. 돌고 있으면 null
      */
     public record LastCheckView(
-            String status, String outcome, String invalidReason, Instant startedAt, Instant finishedAt) {
+            String status, String outcome, String invalidReason, String skippedReason, Instant startedAt, Instant finishedAt) {
 
         static LastCheckView from(ProactiveCheck check) {
             return new LastCheckView(
                     check.status().name(),
                     check.outcome() == null ? null : check.outcome().name(),
                     check.invalidReason() == null ? null : check.invalidReason().name(),
+                    check.skippedReason() == null ? null : check.skippedReason().name(),
                     check.startedAt(),
                     check.finishedAt());
         }

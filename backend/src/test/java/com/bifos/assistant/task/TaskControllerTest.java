@@ -22,6 +22,7 @@ import com.bifos.assistant.task.domain.Task;
 import com.bifos.assistant.task.domain.TaskRun;
 import com.bifos.assistant.task.domain.TaskTrigger;
 import com.bifos.assistant.task.domain.type.TaskRunReason;
+import com.bifos.assistant.task.domain.type.TaskKind;
 import com.bifos.assistant.task.infra.TaskRepository;
 import com.bifos.assistant.task.infra.TaskRunRepository;
 import com.bifos.assistant.task.infra.TaskTriggerRepository;
@@ -192,8 +193,8 @@ class TaskControllerTest {
         String id = body(send(post("/api/v1/tasks"), request("기록", cronSchedule("0 9 * * *"))), 200)
                 .path("id")
                 .asString();
-        Task task = tasks.findByPublicIdAndOwnerUserId(
-                        UUID.fromString(id), currentUser.require().id())
+        Task task = tasks.findByPublicIdAndOwnerUserIdAndKind(
+                        UUID.fromString(id), currentUser.require().id(), TaskKind.TURN)
                 .orElseThrow();
         TaskTrigger trigger = triggers.findByTaskId(task.id()).orElseThrow();
         Instant older = Instant.parse("2026-10-02T00:00:00Z");

@@ -48,6 +48,7 @@ public class UserExecutionLimiter {
 
     private final Map<Long, ReentrantLock> locks = new ConcurrentHashMap<>();
     private final Map<Long, Integer> turnSlots = new ConcurrentHashMap<>();
+    private final Set<Long> backgroundConversations = ConcurrentHashMap.newKeySet();
     private final Map<Long, Set<Long>> remoteEndHolds = new ConcurrentHashMap<>();
 
     /**
@@ -67,6 +68,36 @@ public class UserExecutionLimiter {
         } finally {
             lock.unlock();
         }
+    }
+
+    /** 매일 깨우기의 turn 자리를 얻으며 사용자 대화를 위한 자리를 적어도 하나 남긴다. */
+    public TurnSlot acquireBackgroundTurn(Long userId) {
+        return acquireBackgroundTurn(userId, null);
+    }
+
+    /** 점검 대화를 함께 등록해 그 실행의 위임 자식도 사용자 대화 자리를 남기게 한다. */
+    public TurnSlot acquireBackgroundTurn(Long userId, Long conversationId) {
+        ReentrantLock lock = lockOf(userId);
+        lock.lock();
+        try {
+            Usage usage = usage(userId);
+            int reserve = Math.max(1, properties.backgroundReserve());
+            if (usage.total() + 1 + reserve > properties.maxRunning()) {
+                throw reject(userId, "background-turn", usage);
+            }
+            turnSlots.merge(userId, 1, Integer::sum);
+            if (conversationId != null) {
+                backgroundConversations.add(conversationId);
+            }
+            return new TurnSlot(this, userId, conversationId);
+        } finally {
+            lock.unlock();
+        }
+    }
+
+    /** 그 대화가 현재 매일 깨우기의 turn 자리를 쥐고 있다. */
+    public boolean isBackgroundConversation(Long conversationId) {
+        return conversationId != null && backgroundConversations.contains(conversationId);
     }
 
     /** 한도를 보지 않고 turn 자리를 얻는다. 기동 정리 전용이다. 그 turn 은 이미 Hermes 에서 돌고 있어 거절할 수 없다. */
@@ -101,9 +132,15 @@ public class UserExecutionLimiter {
         lock.lock();
         try {
             Usage usage = usage(userId);
-            boolean full = admission == ExecutionAdmission.CHILD
-                    ? usage.total() >= properties.maxRunning()
-                    : usage.total() + 1 + properties.backgroundReserve() > properties.maxRunning();
+            int reserve = admission == ExecutionAdmission.BACKGROUND_CHILD
+                    ? Math.max(1, properties.backgroundReserve())
+                    : properties.backgroundReserve();
+            boolean full;
+            if (admission == ExecutionAdmission.CHILD) {
+                full = usage.total() >= properties.maxRunning();
+            } else {
+                full = usage.total() + 1 + reserve > properties.maxRunning();
+            }
             if (full) {
                 throw reject(userId, admission.name(), usage);
             }
@@ -176,11 +213,14 @@ public class UserExecutionLimiter {
     }
 
     /** {@link TurnSlot#release()} 가 부른다. 0 이 되면 맵에서 지운다. */
-    void releaseTurn(Long userId) {
+    void releaseTurn(Long userId, Long backgroundConversationId) {
         ReentrantLock lock = lockOf(userId);
         lock.lock();
         try {
             turnSlots.computeIfPresent(userId, (id, count) -> count <= 1 ? null : count - 1);
+            if (backgroundConversationId != null) {
+                backgroundConversations.remove(backgroundConversationId);
+            }
         } finally {
             lock.unlock();
         }

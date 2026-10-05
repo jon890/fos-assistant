@@ -2,6 +2,7 @@ package com.bifos.assistant.followup.application;
 
 import com.bifos.assistant.chat.application.ConversationAccess;
 import com.bifos.assistant.chat.application.ConversationPublicIdLookup;
+import com.bifos.assistant.chat.domain.type.ConversationPurpose;
 import com.bifos.assistant.followup.application.model.FollowUpPatch;
 import com.bifos.assistant.followup.application.model.FollowUpProposalOutcome;
 import com.bifos.assistant.followup.application.model.FollowUpSnapshot;
@@ -54,6 +55,9 @@ public class FollowUpService {
 
     /** 한 대화에 받아들이기를 기다리는 제안의 상한이다. */
     static final int MAX_OPEN_PROPOSALS_PER_CONVERSATION = 3;
+
+    /** 점검 대화의 오래된 제안은 남겨 두되 새 제안 상한에서는 뺀다. */
+    static final Duration CHECK_PROPOSAL_WINDOW = Duration.ofDays(7);
 
     /** 한 실행이 제안할 수 있는 줄의 상한이다. */
     static final int MAX_PROPOSALS_PER_EXECUTION = 2;
@@ -168,8 +172,7 @@ public class FollowUpService {
                         conversationId, key, FollowUpStatus.REJECTED, now.minus(REJECTED_COOLDOWN))) {
                     return FollowUpProposalOutcome.DECLINED_BEFORE;
                 }
-                if (followUps.countByConversationIdAndStatus(conversationId, FollowUpStatus.PROPOSED)
-                        >= MAX_OPEN_PROPOSALS_PER_CONVERSATION) {
+                if (openProposalCount(owner, conversationId, now) >= MAX_OPEN_PROPOSALS_PER_CONVERSATION) {
                     return FollowUpProposalOutcome.TOO_MANY_PROPOSALS;
                 }
                 if (followUps.countByProposedByExecutionId(executionId) >= MAX_PROPOSALS_PER_EXECUTION) {
@@ -192,6 +195,15 @@ public class FollowUpService {
         }
         log.info("follow-up proposal userId={} executionId={} outcome={}", owner.id(), executionId, outcome);
         return outcome;
+    }
+
+    /** 보통 대화는 모든 열린 제안, 점검 대화는 최근 7일의 제안만 센다. */
+    private long openProposalCount(CurrentUser owner, Long conversationId, Instant now) {
+        if (conversations.requireOwn(owner, conversationId).purpose() == ConversationPurpose.CHECK) {
+            return followUps.countByConversationIdAndStatusAndCreatedAtGreaterThanEqual(
+                    conversationId, FollowUpStatus.PROPOSED, now.minus(CHECK_PROPOSAL_WINDOW));
+        }
+        return followUps.countByConversationIdAndStatus(conversationId, FollowUpStatus.PROPOSED);
     }
 
     /**

@@ -18,6 +18,7 @@ import com.bifos.assistant.task.domain.type.ConversationMode;
 import com.bifos.assistant.task.domain.type.MissedPolicy;
 import com.bifos.assistant.task.domain.type.NotifyPolicy;
 import com.bifos.assistant.task.domain.type.TaskState;
+import com.bifos.assistant.task.domain.type.TaskKind;
 import com.bifos.assistant.task.domain.type.TriggerType;
 import com.bifos.assistant.task.infra.TaskRepository;
 import com.bifos.assistant.task.infra.TaskRunRepository;
@@ -74,7 +75,8 @@ public class TaskService {
         Instant now = clock.instant();
         users.findByIdForUpdate(user.id())
                 .orElseThrow(() -> new ApiException(ErrorCode.UNAUTHENTICATED, "sign in first"));
-        if (tasks.countByOwnerUserIdAndStateNot(user.id(), TaskState.ARCHIVED) >= properties.maxPerUser()) {
+        if (tasks.countByOwnerUserIdAndKindAndStateNot(user.id(), TaskKind.TURN, TaskState.ARCHIVED)
+                >= properties.maxPerUser()) {
             throw new ApiException(
                     ErrorCode.TASK_LIMIT_REACHED, "a task limit of " + properties.maxPerUser() + " was reached");
         }
@@ -149,7 +151,8 @@ public class TaskService {
     /** 내 보관하지 않은 작업을 만든 순서의 역순으로 읽는다. */
     @Transactional(readOnly = true)
     public List<TaskDetail> list(CurrentUser user) {
-        List<Task> found = tasks.findByOwnerUserIdAndStateNotOrderByIdDesc(user.id(), TaskState.ARCHIVED);
+        List<Task> found =
+                tasks.findByOwnerUserIdAndKindAndStateNotOrderByIdDesc(user.id(), TaskKind.TURN, TaskState.ARCHIVED);
         if (found.isEmpty()) {
             return List.of();
         }
@@ -194,13 +197,13 @@ public class TaskService {
     }
 
     private Task requireTask(CurrentUser user, UUID taskId) {
-        return tasks.findByPublicIdAndOwnerUserId(taskId, user.id())
+        return tasks.findByPublicIdAndOwnerUserIdAndKind(taskId, user.id(), TaskKind.TURN)
                 .filter(task -> !task.archived())
                 .orElseThrow(() -> new ApiException(ErrorCode.TASK_NOT_FOUND, NOT_FOUND_MESSAGE));
     }
 
     private Task requireTaskForUpdate(CurrentUser user, UUID taskId) {
-        return tasks.findByPublicIdAndOwnerUserIdForUpdate(taskId, user.id())
+        return tasks.findByPublicIdAndOwnerUserIdAndKindForUpdate(taskId, user.id(), TaskKind.TURN)
                 .filter(task -> !task.archived())
                 .orElseThrow(() -> new ApiException(ErrorCode.TASK_NOT_FOUND, NOT_FOUND_MESSAGE));
     }

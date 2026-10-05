@@ -1354,6 +1354,9 @@ public class ChatService {
     private ChatTurn finishCheck(PendingTurn pending, CheckTurn check, Long executionId, String output) {
         CheckAnswer checked = check.answer(executionId, output);
         Conversation conversation = pending.conversation();
+        if (checked.omit()) {
+            return new ChatTurn(conversation.id(), conversation.publicId(), executionId, "", null, false);
+        }
         ChatMessage message;
         if (checked.notice()) {
             message = messages.save(ChatMessage.fromSystem(conversation.id(), checked.text(), clock.instant()));
@@ -1491,6 +1494,9 @@ public class ChatService {
             TurnIntent intent,
             Consumer<ChatEvent> onEvent) {
         if (intent instanceof TurnIntent.ProactiveCheck proactive) {
+            if (!proactive.check().notifyStart()) {
+                return;
+            }
             // 질문 대신 시작 알림 줄 하나를 남긴다. 제목, 자동 turn 수, 대기 행은 건드리지 않는다.
             ChatMessage notice = transactions.execute(status -> messages.save(
                     ChatMessage.fromSystem(conversation.id(), proactive.check().startNotice(), clock.instant())));

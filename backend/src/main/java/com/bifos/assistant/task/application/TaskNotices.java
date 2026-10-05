@@ -9,6 +9,7 @@ import com.bifos.assistant.task.domain.Task;
 import com.bifos.assistant.task.domain.TaskRun;
 import com.bifos.assistant.task.domain.type.NotifyPolicy;
 import com.bifos.assistant.task.domain.type.TaskRunReason;
+import com.bifos.assistant.task.domain.type.TaskKind;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -43,6 +44,9 @@ public class TaskNotices {
      * @param run 상태를 막 바꾼 발화
      */
     public void announce(Task task, TaskRun run) {
+        if (task.kind() == TaskKind.CHECK) {
+            return;
+        }
         NotifyPolicy policy = task.notifyPolicy();
         if (policy == NotifyPolicy.NEVER) {
             return;

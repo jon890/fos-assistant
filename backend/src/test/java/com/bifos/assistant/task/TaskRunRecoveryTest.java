@@ -28,9 +28,14 @@ import com.bifos.assistant.task.domain.type.MissedPolicy;
 import com.bifos.assistant.task.domain.type.NotifyPolicy;
 import com.bifos.assistant.task.domain.type.TaskRunReason;
 import com.bifos.assistant.task.domain.type.TaskRunStatus;
+import com.bifos.assistant.proactive.domain.ProactiveCheck;
+import com.bifos.assistant.proactive.domain.type.CheckSkippedReason;
+import com.bifos.assistant.proactive.domain.type.CheckTrigger;
+import com.bifos.assistant.proactive.domain.type.CheckInvalidReason;
 import com.bifos.assistant.task.infra.TaskRepository;
 import com.bifos.assistant.task.infra.TaskRunRepository;
 import com.bifos.assistant.task.infra.TaskTriggerRepository;
+import com.bifos.assistant.proactive.infra.ProactiveCheckRepository;
 import com.bifos.assistant.user.domain.AppUser;
 import com.bifos.assistant.user.infra.AppUserRepository;
 import java.time.Clock;
@@ -98,7 +103,11 @@ class TaskRunRecoveryTest {
     @Autowired
     NotificationRepository notifications;
 
+    @Autowired
+    ProactiveCheckRepository checks;
+
     private final List<Long> createdUsers = new ArrayList<>();
+    private final List<Long> createdChecks = new ArrayList<>();
 
     @BeforeEach
     void setUp() {
@@ -155,7 +164,7 @@ class TaskRunRecoveryTest {
         tasks.save(pausedTask);
         TaskRun waiting =
                 runs.save(TaskRun.queued(paused.task().id(), paused.trigger().id(), paused.ownerId(), SCHEDULED, NOW));
-        TaskRunRecovery fresh = new TaskRunRecovery(runs, tasks, notices, transactions, fixedClock());
+        TaskRunRecovery fresh = new TaskRunRecovery(runs, tasks, notices, checks, transactions, fixedClock());
         TaskDispatcher dispatcher = new TaskDispatcher(firing, starter, fresh, fixedClock());
 
         dispatcher.runScheduled();
@@ -182,11 +191,64 @@ class TaskRunRecoveryTest {
     void marksFinishedEvenWhenRecoveryFails() {
         TaskRunRepository broken = mock(TaskRunRepository.class);
         when(broken.findByStatusOrderByScheduledForAscIdAsc(any())).thenThrow(new IllegalStateException("db down"));
-        TaskRunRecovery failing = new TaskRunRecovery(broken, tasks, notices, transactions, fixedClock());
+        TaskRunRecovery failing = new TaskRunRecovery(broken, tasks, notices, checks, transactions, fixedClock());
 
         failing.onReady();
 
         assertThat(failing.finished()).isTrue();
+    }
+
+    @Test
+    @DisplayName("기동 정리는 읽지 않은 보고로 끝난 CHECK 발화를 INTERRUPTED 대신 건너뜀으로 회복하고 알리지 않는다")
+    void recoversUnreadScheduledCheckWithoutCountingItAsInterrupted() {
+        Fixture fixture = fixture(NotifyPolicy.ALWAYS);
+        Task checkTask = tasks.save(Task.check(fixture.ownerId(), fixture.task().agentId(), "매일 먼저 살펴보기", NOW));
+        TaskTrigger checkTrigger = triggers.save(
+                TaskTrigger.cron(checkTask.id(), "0 9 * * *", SEOUL, MissedPolicy.SKIP, SCHEDULED, NOW));
+        ProactiveCheck check = ProactiveCheck.started(
+                fixture.ownerId(), fixture.task().agentId(), 999_999L, CheckTrigger.SCHEDULED, false, NOW);
+        check.skip(CheckSkippedReason.UNREAD_REPORT, NOW);
+        check = checks.save(check);
+        createdChecks.add(check.id());
+        TaskRun running = TaskRun.queued(checkTask.id(), checkTrigger.id(), fixture.ownerId(), SCHEDULED, NOW);
+        running.useProactiveCheck(check.id());
+        running.start(NOW);
+        running = runs.save(running);
+
+        recovery.onReady();
+
+        TaskRun recovered = runs.findById(running.id()).orElseThrow();
+        assertThat(recovered.status()).isEqualTo(TaskRunStatus.SKIPPED);
+        assertThat(recovered.reason()).isEqualTo(TaskRunReason.UNREAD_REPORT);
+        assertThat(notificationsOf(fixture.ownerId())).isEmpty();
+        assertThat(runs.countByOwnerUserIdAndCreatedAtAfterAndStatusNot(
+                        fixture.ownerId(), NOW.minusSeconds(1), TaskRunStatus.SKIPPED))
+                .isZero();
+    }
+
+    @Test
+    @DisplayName("기동 정리는 끝난 CHECK의 루트 실행 번호를 연결한 발화에 회복한다")
+    void recoversCompletedCheckWithItsRootExecution() {
+        Fixture fixture = fixture(NotifyPolicy.NEVER);
+        Task checkTask = tasks.save(Task.check(fixture.ownerId(), fixture.task().agentId(), "매일 먼저 살펴보기", NOW));
+        TaskTrigger checkTrigger = triggers.save(
+                TaskTrigger.cron(checkTask.id(), "0 9 * * *", SEOUL, MissedPolicy.SKIP, SCHEDULED, NOW));
+        ProactiveCheck check = ProactiveCheck.started(
+                fixture.ownerId(), fixture.task().agentId(), 999_998L, CheckTrigger.SCHEDULED, false, NOW);
+        check.attachRoot(7_777L, "scheduled-session");
+        check.succeedInvalid(CheckInvalidReason.EMPTY_ANSWER, 0, 0, NOW);
+        check = checks.save(check);
+        createdChecks.add(check.id());
+        TaskRun running = TaskRun.queued(checkTask.id(), checkTrigger.id(), fixture.ownerId(), SCHEDULED, NOW);
+        running.useProactiveCheck(check.id());
+        running.start(NOW);
+        running = runs.save(running);
+
+        recovery.onReady();
+
+        TaskRun recovered = runs.findById(running.id()).orElseThrow();
+        assertThat(recovered.status()).isEqualTo(TaskRunStatus.SUCCEEDED);
+        assertThat(recovered.executionId()).isEqualTo(7_777L);
     }
 
     private static Clock fixedClock() {
@@ -226,6 +288,8 @@ class TaskRunRecoveryTest {
     }
 
     private void clean() {
+        checks.deleteAllById(createdChecks);
+        createdChecks.clear();
         runs.deleteAll();
         triggers.deleteAll();
         tasks.deleteAll();

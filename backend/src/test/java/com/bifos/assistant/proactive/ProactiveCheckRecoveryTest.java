@@ -190,7 +190,7 @@ class ProactiveCheckRecoveryTest {
         ProactiveCheck withoutRoot = check(null);
         ProactiveCheck ended =
                 ProactiveCheck.started(user.id(), agent.id(), conversation.id(), CheckTrigger.MANUAL, false, STARTED);
-        ended.succeed(CheckOutcome.NOTHING_NEW, 0, 0, 3, 0, STARTED.plusSeconds(60));
+        ended.succeed(CheckOutcome.NOTHING_NEW, 0, 0, null, 3, 0, 0, 0, 0, STARTED.plusSeconds(60));
         ended = checks.save(ended);
         createdChecks.add(ended.id());
 

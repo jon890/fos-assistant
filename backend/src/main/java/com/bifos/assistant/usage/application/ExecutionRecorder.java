@@ -202,7 +202,7 @@ public class ExecutionRecorder {
                 modelTier,
                 requestReceivedAt,
                 effortSource(conversation, requested, modelTier),
-                admissionOf(conversation, parentExecutionId));
+                admissionOf(conversation, parentExecutionId, rootExecutionId));
     }
 
     /**
@@ -251,8 +251,16 @@ public class ExecutionRecorder {
     }
 
     /** 부모가 있으면 자식, 대화만 있으면 대화 turn 의 루트, 둘 다 없으면 백그라운드 실행이다. */
-    private static ExecutionAdmission admissionOf(ExecutionConversation conversation, Long parentExecutionId) {
+    private ExecutionAdmission admissionOf(
+            ExecutionConversation conversation, Long parentExecutionId, Long rootExecutionId) {
         if (parentExecutionId != null) {
+            Long rootId = rootExecutionId == null ? parentExecutionId : rootExecutionId;
+            Long rootConversationId = executions.findById(rootId)
+                    .map(AgentExecution::conversationId)
+                    .orElse(null);
+            if (limiter.isBackgroundConversation(rootConversationId)) {
+                return ExecutionAdmission.BACKGROUND_CHILD;
+            }
             return ExecutionAdmission.CHILD;
         }
         return conversation != null ? ExecutionAdmission.TURN_ROOT : ExecutionAdmission.BACKGROUND;

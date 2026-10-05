@@ -49,6 +49,18 @@ class CheckResultParserTest {
     }
 
     @Test
+    @DisplayName("버전 1에 계약 밖 보고가 섞여도 버전 1 요약과 발견 변환을 유지한다")
+    void ignoresReportInVersionOne() {
+        CheckResultBlock result = parser.read(block("""
+                {"version":1,"outcome":"FINDINGS","summary":"기존 요약",
+                 "report":{"changed":["계약 밖 글"],"done":[],"next":[]}}
+                """)).block();
+
+        assertThat(result.summary()).isEqualTo("기존 요약");
+        assertThat(result.report()).isNull();
+    }
+
+    @Test
     @DisplayName("답 끝의 정상 블록을 모든 칸까지 읽는다")
     void parsesValidBlock() {
         CheckResultBlock result = parser.read("살펴봤어요.\n\n" + block(VALID_JSON)).block();
@@ -121,11 +133,35 @@ class CheckResultParserTest {
     }
 
     @Test
-    @DisplayName("version 이 1 이 아니면 BAD_VERSION 이다")
+    @DisplayName("version 이 1 또는 2가 아니면 BAD_VERSION 이다")
     void reportsBadVersion() {
-        assertInvalid(block("{\"version\": 2, \"outcome\": \"NOTHING_NEW\"}"), CheckInvalidReason.BAD_VERSION);
+        assertInvalid(block("{\"version\": 3, \"outcome\": \"NOTHING_NEW\"}"), CheckInvalidReason.BAD_VERSION);
         assertInvalid(block("{\"version\": \"1\", \"outcome\": \"NOTHING_NEW\"}"), CheckInvalidReason.BAD_VERSION);
         assertInvalid(block("{\"outcome\": \"NOTHING_NEW\"}"), CheckInvalidReason.BAD_VERSION);
+    }
+
+    @Test
+    @DisplayName("version 2 보고에서 모델이 쓴 changed와 done과 next만 상한 안에서 읽는다")
+    void readsVersionTwoReportWithoutModelControlledEvidenceOrApprovals() {
+        CheckResultBlock result = parser
+                .read(block("""
+                        {
+                          "version": 2,
+                          "outcome": "FINDINGS",
+                          "report": {
+                            "changed": ["새 공고", "새 자료", "세 번째", "버린다"],
+                            "done": ["원문 확인"],
+                            "evidence": ["https://untrusted.example"],
+                            "needsApproval": ["fake-id"],
+                            "next": ["다음 주 확인", "지원 조건 비교", "버린다"]
+                          }
+                        }"""))
+                .block();
+
+        assertThat(result.version()).isEqualTo(2);
+        assertThat(result.report().changed()).containsExactly("새 공고", "새 자료", "세 번째");
+        assertThat(result.report().done()).containsExactly("원문 확인");
+        assertThat(result.report().next()).containsExactly("다음 주 확인", "지원 조건 비교");
     }
 
     @Test
