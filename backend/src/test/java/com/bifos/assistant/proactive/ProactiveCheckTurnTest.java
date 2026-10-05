@@ -38,6 +38,7 @@ import com.bifos.assistant.proactive.application.ProactiveCheckGuard;
 import com.bifos.assistant.proactive.application.ProactiveCheckService;
 import com.bifos.assistant.proactive.domain.ProactiveCheck;
 import com.bifos.assistant.proactive.domain.ProactiveCheckFinding;
+import com.bifos.assistant.proactive.domain.type.CheckInvalidReason;
 import com.bifos.assistant.proactive.domain.type.CheckOutcome;
 import com.bifos.assistant.proactive.domain.type.CheckStatus;
 import com.bifos.assistant.proactive.domain.type.CheckTrigger;
@@ -326,7 +327,7 @@ class ProactiveCheckTurnTest {
     }
 
     @Test
-    @DisplayName("결과 블록이 없으면 결과를 정리하지 못했다는 알림 줄과 INVALID_RESULT 가 남는다")
+    @DisplayName("결과 블록이 없으면 다시 누르라는 알림 줄과 INVALID_RESULT 와 그 까닭이 남는다")
     void leavesInvalidResultWhenBlockIsMissing() {
         stub().willAnswer(command -> answer("블록 없이 끝난 답"));
 
@@ -334,10 +335,23 @@ class ProactiveCheckTurnTest {
 
         List<ChatMessage> history = messages.findByConversationIdOrderByIdAsc(conversation.id());
         assertThat(history).extracting(ChatMessage::role).containsExactly(MessageRole.SYSTEM, MessageRole.SYSTEM);
-        assertThat(history.getLast().content()).isEqualTo("살펴봤지만 결과를 정리하지 못했어요");
+        assertThat(history.getLast().content()).isEqualTo("살펴봤지만 결과 형식이 맞지 않아 정리하지 못했어요. 다시 눌러 주세요");
         ProactiveCheck check = onlyCheckOf(conversation);
         assertThat(check.status()).isEqualTo(CheckStatus.SUCCEEDED);
         assertThat(check.outcome()).isEqualTo(CheckOutcome.INVALID_RESULT);
+        assertThat(check.invalidReason()).isEqualTo(CheckInvalidReason.NO_BLOCK);
+    }
+
+    @Test
+    @DisplayName("결과 블록을 읽으면 읽지 못한 까닭을 비워 둔다")
+    void leavesInvalidReasonEmptyWhenBlockIsRead() {
+        stub().willAnswer(command -> answer(block("{\"version\":1,\"outcome\":\"NOTHING_NEW\"}")));
+
+        Conversation conversation = runCheck();
+
+        ProactiveCheck check = onlyCheckOf(conversation);
+        assertThat(check.outcome()).isEqualTo(CheckOutcome.NOTHING_NEW);
+        assertThat(check.invalidReason()).isNull();
     }
 
     @Test

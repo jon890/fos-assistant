@@ -5,8 +5,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.bifos.assistant.proactive.application.CheckResultParser;
 import com.bifos.assistant.proactive.application.model.CheckResultBlock;
 import com.bifos.assistant.proactive.application.model.CheckResultBlock.Finding;
+import com.bifos.assistant.proactive.application.model.CheckResultRead;
+import com.bifos.assistant.proactive.domain.type.CheckInvalidReason;
 import com.bifos.assistant.proactive.domain.type.CheckOutcome;
-import java.util.Optional;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -50,7 +51,7 @@ class CheckResultParserTest {
     @Test
     @DisplayName("답 끝의 정상 블록을 모든 칸까지 읽는다")
     void parsesValidBlock() {
-        CheckResultBlock result = parser.parse("살펴봤어요.\n\n" + block(VALID_JSON)).orElseThrow();
+        CheckResultBlock result = parser.read("살펴봤어요.\n\n" + block(VALID_JSON)).block();
 
         assertThat(result.version()).isEqualTo(1);
         assertThat(result.outcome()).isEqualTo(CheckOutcome.FINDINGS);
@@ -81,7 +82,7 @@ class CheckResultParserTest {
     void parsesBlockWrappedInCodeFence() {
         String answer = block("```json\n" + VALID_JSON + "\n```");
 
-        assertThat(parser.parse(answer)).isPresent();
+        assertThat(parser.read(answer).block()).isNotNull();
     }
 
     @Test
@@ -90,53 +91,76 @@ class CheckResultParserTest {
         String first = block("{\"version\": 1, \"outcome\": \"NOTHING_NEW\"}");
         String answer = first + "\n중간 글\n" + block(VALID_JSON);
 
-        CheckResultBlock result = parser.parse(answer).orElseThrow();
+        CheckResultBlock result = parser.read(answer).block();
 
         assertThat(result.outcome()).isEqualTo(CheckOutcome.FINDINGS);
     }
 
     @Test
-    @DisplayName("블록이 없으면 빈 값이다")
-    void returnsEmptyWithoutBlock() {
-        assertThat(parser.parse("블록 없이 끝난 답")).isEmpty();
-        assertThat(parser.parse(null)).isEmpty();
-        assertThat(parser.parse(CheckResultParser.OPEN_TAG + VALID_JSON)).isEmpty();
+    @DisplayName("답이 비었으면 EMPTY_ANSWER 다")
+    void reportsEmptyAnswer() {
+        assertInvalid(null, CheckInvalidReason.EMPTY_ANSWER);
+        assertInvalid(" \n ", CheckInvalidReason.EMPTY_ANSWER);
     }
 
     @Test
-    @DisplayName("JSON 이 아니면 예외 없이 빈 값이다")
-    void returnsEmptyWhenNotJson() {
-        assertThat(parser.parse(block("이건 JSON 이 아니에요"))).isEmpty();
-        assertThat(parser.parse(block("{\"version\": 1, \"outcome\": "))).isEmpty();
-        assertThat(parser.parse(block("[1, 2]"))).isEmpty();
-        assertThat(parser.parse(block(""))).isEmpty();
+    @DisplayName("블록이 없으면 NO_BLOCK 이다")
+    void reportsNoBlock() {
+        assertInvalid("블록 없이 끝난 답", CheckInvalidReason.NO_BLOCK);
+        assertInvalid(CheckResultParser.OPEN_TAG + VALID_JSON, CheckInvalidReason.NO_BLOCK);
+        assertInvalid(VALID_JSON + CheckResultParser.CLOSE_TAG, CheckInvalidReason.NO_BLOCK);
     }
 
     @Test
-    @DisplayName("version 이 1 이 아니면 읽지 못한 것이다")
-    void returnsEmptyWhenVersionIsNotOne() {
-        assertThat(parser.parse(block("{\"version\": 2, \"outcome\": \"NOTHING_NEW\"}")))
-                .isEmpty();
-        assertThat(parser.parse(block("{\"version\": \"1\", \"outcome\": \"NOTHING_NEW\"}")))
-                .isEmpty();
-        assertThat(parser.parse(block("{\"outcome\": \"NOTHING_NEW\"}"))).isEmpty();
+    @DisplayName("JSON 이 아니면 예외 없이 NOT_JSON 이다")
+    void reportsNotJson() {
+        assertInvalid(block("이건 JSON 이 아니에요"), CheckInvalidReason.NOT_JSON);
+        assertInvalid(block("{\"version\": 1, \"outcome\": "), CheckInvalidReason.NOT_JSON);
+        assertInvalid(block("[1, 2]"), CheckInvalidReason.NOT_JSON);
+        assertInvalid(block(""), CheckInvalidReason.NOT_JSON);
     }
 
     @Test
-    @DisplayName("outcome 이 없거나 모르는 값이면 읽지 못한 것이다")
-    void returnsEmptyWhenOutcomeIsMissingOrUnknown() {
-        assertThat(parser.parse(block("{\"version\": 1}"))).isEmpty();
-        assertThat(parser.parse(block("{\"version\": 1, \"outcome\": \"MAYBE\"}")))
-                .isEmpty();
-        assertThat(parser.parse(block("{\"version\": 1, \"outcome\": \"INVALID_RESULT\"}")))
-                .isEmpty();
+    @DisplayName("version 이 1 이 아니면 BAD_VERSION 이다")
+    void reportsBadVersion() {
+        assertInvalid(block("{\"version\": 2, \"outcome\": \"NOTHING_NEW\"}"), CheckInvalidReason.BAD_VERSION);
+        assertInvalid(block("{\"version\": \"1\", \"outcome\": \"NOTHING_NEW\"}"), CheckInvalidReason.BAD_VERSION);
+        assertInvalid(block("{\"outcome\": \"NOTHING_NEW\"}"), CheckInvalidReason.BAD_VERSION);
+    }
+
+    @Test
+    @DisplayName("outcome 이 없거나 모르는 값이면 BAD_OUTCOME 이다")
+    void reportsBadOutcome() {
+        assertInvalid(block("{\"version\": 1}"), CheckInvalidReason.BAD_OUTCOME);
+        assertInvalid(block("{\"version\": 1, \"outcome\": \"MAYBE\"}"), CheckInvalidReason.BAD_OUTCOME);
+        assertInvalid(block("{\"version\": 1, \"outcome\": \"INVALID_RESULT\"}"), CheckInvalidReason.BAD_OUTCOME);
+    }
+
+    @Test
+    @DisplayName("태그 글자 사이에 낀 보이지 않는 서식 문자는 무시하고 블록을 읽는다")
+    void readsTagsWithFormatCharacters() {
+        // 운영에서 모델이 여는 태그 가운데에 U+FEFF 를 끼워 낸 답과 같은 모양이다.
+        String answer = "<f\uFEFFos-check-result>\n" + VALID_JSON + "\n</fos-check-result>";
+        String zeroWidth = "<fos-check\u200B-result>\n" + VALID_JSON + "\n</fos-\u2060check-result>";
+
+        CheckResultRead read = parser.read(answer);
+
+        assertThat(read.invalidReason()).isNull();
+        assertThat(read.block().outcome()).isEqualTo(CheckOutcome.FINDINGS);
+        assertThat(parser.read(zeroWidth).block()).isNotNull();
+    }
+
+    @Test
+    @DisplayName("태그 밖의 서식 문자는 무시하지 않는다")
+    void keepsFormatCharactersOutsideTags() {
+        assertInvalid(block("\uFEFF" + VALID_JSON), CheckInvalidReason.NOT_JSON);
+        assertInvalid("<fos-check-result >\n" + VALID_JSON + "\n" + CheckResultParser.CLOSE_TAG, CheckInvalidReason.NO_BLOCK);
     }
 
     @Test
     @DisplayName("NOTHING_NEW 는 칸이 모두 비어도 읽는다")
     void parsesNothingNewWithoutOtherFields() {
-        CheckResultBlock result = parser.parse(block("{\"version\": 1, \"outcome\": \"NOTHING_NEW\"}"))
-                .orElseThrow();
+        CheckResultBlock result = parser.read(block("{\"version\": 1, \"outcome\": \"NOTHING_NEW\"}")).block();
 
         assertThat(result.outcome()).isEqualTo(CheckOutcome.NOTHING_NEW);
         assertThat(result.summary()).isNull();
@@ -161,7 +185,7 @@ class CheckResultParserTest {
                         String.join(",", longFinding(), FINDING, FINDING, FINDING, FINDING, FINDING, FINDING, FINDING),
                         "나".repeat(301));
 
-        CheckResultBlock result = parser.parse(block(json)).orElseThrow();
+        CheckResultBlock result = parser.read(block(json)).block();
 
         assertThat(result.summary()).hasSize(300);
         assertThat(result.findings()).hasSize(5);
@@ -200,7 +224,7 @@ class CheckResultParserTest {
                   "questions": [1, "질문", ""]
                 }""";
 
-        CheckResultBlock result = parser.parse(block(json)).orElseThrow();
+        CheckResultBlock result = parser.read(block(json)).block();
 
         assertThat(result.summary()).isNull();
         assertThat(result.questions()).containsExactly("질문");
@@ -217,9 +241,7 @@ class CheckResultParserTest {
     void ignoresTextAroundBlock() {
         String answer = "앞 글\n" + block("  \n " + VALID_JSON + " \n ") + "\n뒤에 붙은 글";
 
-        Optional<CheckResultBlock> result = parser.parse(answer);
-
-        assertThat(result).isPresent();
+        assertThat(parser.read(answer).block()).isNotNull();
     }
 
     @Test
@@ -228,7 +250,7 @@ class CheckResultParserTest {
         String summary = "결과는 <fos-check-result> 와 </fos-check-result> 사이에 둔다";
         String json = "{\"version\": 1, \"outcome\": \"NOTHING_NEW\", \"summary\": \"" + summary + "\"}";
 
-        CheckResultBlock result = parser.parse("앞 글\n" + block(json)).orElseThrow();
+        CheckResultBlock result = parser.read("앞 글\n" + block(json)).block();
 
         assertThat(result.outcome()).isEqualTo(CheckOutcome.NOTHING_NEW);
         assertThat(result.summary()).isEqualTo(summary);
@@ -239,7 +261,7 @@ class CheckResultParserTest {
     void readsBlockFollowedByTextMentioningOpenTag() {
         String answer = block(VALID_JSON) + "\n위 내용은 " + CheckResultParser.OPEN_TAG + " 블록에 담았어요";
 
-        CheckResultBlock result = parser.parse(answer).orElseThrow();
+        CheckResultBlock result = parser.read(answer).block();
 
         assertThat(result.outcome()).isEqualTo(CheckOutcome.FINDINGS);
     }
@@ -249,7 +271,14 @@ class CheckResultParserTest {
     void doesNotFallBackToEarlierBlockWhenLastIsBroken() {
         String answer = block(VALID_JSON) + "\n중간 글\n" + block("{\"version\": 1, \"outcome\": ");
 
-        assertThat(parser.parse(answer)).isEmpty();
+        assertInvalid(answer, CheckInvalidReason.NOT_JSON);
+    }
+
+    private void assertInvalid(String answer, CheckInvalidReason reason) {
+        CheckResultRead read = parser.read(answer);
+
+        assertThat(read.block()).isNull();
+        assertThat(read.invalidReason()).isEqualTo(reason);
     }
 
     private static String longFinding() {
