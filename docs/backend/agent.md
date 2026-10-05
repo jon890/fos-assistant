@@ -84,6 +84,7 @@
 - 이름과 설명은 대시보드 `GET /api/tools/toolsets` 에서 읽는다. 그 응답의 `enabled` 는 CLI 기준이라 쓰지 않는다
 - Hermes 가 쓰기 없이 미분류 toolset 을 켤 수 있다. 도구 응답의 `unclassifiedEnabled` 는 listener 에서 켜진 미분류 이름이고, 화면은 관리자에게 알리라는 경고를 보인다
 - 그룹 공개에서 막는 toolset 은 `terminal`, `file`, `code_execution`, `browser`, `computer_use`, `session_search` 여섯이다. 이 문서는 이 여섯을 「셸·파일 계열」 이라 부른다. 셸·파일 계열이 켜진 에이전트는 `PRIVATE` 만 된다. `GROUP` 생성과 수정, 도구 변경 모두에서 최종 listener 주소의 현재 목록을 본다. 꺼진 에이전트의 공개 범위 변경은 검사하지 않고 켤 때 검사한다. 읽지 못하면 변경하지 않는다
+- 도구를 쓸 때마다 본문에 `sandbox_owner` 를 함께 보낸다. 에이전트 주인이 있으면 `u<사용자 번호>`, 없으면 `a<에이전트 번호>` 다. 대시보드 plugin 은 `terminal`, `file`, `code_execution` 가운데 하나라도 켜는 저장에서 그 값으로 사용자 실행 공간을 정하고 profile 의 `terminal:` 설정을 다시 쓴다. 실행 공간이 운영에 설정돼 있지 않으면 plugin 이 거절하고 Control Plane 은 `AGENT_SANDBOX_UNAVAILABLE` 로 알린다. 근거는 [ADR-084](../adr/ADR-084-셸과-파일-도구는-사용자별-docker-실행-공간에서만-돈다.md) 다
 - 도구 변경과 에이전트 접근 범위 변경은 같은 에이전트 행의 쓰기 잠금을 잡고 검사한다. 이미 잠겨 있으면 `AGENT_BUSY` 로 곧바로 알린다
 
 | 경로 | 누가 | 무엇 |
@@ -210,8 +211,17 @@ sequenceDiagram
     W->>C: PUT /api/v1/agents/{code}/tools
     C->>C: 볼 수 있는가, 바꾸는 도구마다 그 등급을 켤 수 있는가
     C->>C: 셸·파일 계열이 켜지는데 그룹 공개인가
-    C->>D: PUT /api/config (profile 하나, 도구 목록만)
+    C->>D: PUT /api/config (profile 하나, 도구 목록, sandbox_owner)
     D->>D: plugin 이 키와 profile 과 memory 를 검사한다
+    alt 셸·파일 도구(terminal, file, code_execution)를 하나라도 켠다
+        D->>D: 운영의 실행 공간 설정이 있는가
+        alt 없다
+            D-->>C: 409 sandbox_unavailable
+            C-->>U: AGENT_SANDBOX_UNAVAILABLE
+        else 있다
+            D->>D: terminal 설정을 docker 실행 공간으로 다시 쓴다
+        end
+    end
     D-->>C: 저장됐다
     C->>L: GET /p/{profile}/v1/toolsets
     L-->>C: API 실행 기준의 켜짐
@@ -235,6 +245,8 @@ sequenceDiagram
 | Hermes 가 쓰기 없이 미분류 도구를 켰다 | 도구 조회가 그 이름을 따로 알리고 화면은 관리자에게 알리라고 경고한다. Hermes 를 올릴 때 `fos-home-infra` 가 모든 profile 의 켜진 목록을 검사한다 |
 | `memory` 를 켜거나 Control Plane MCP(`fos-assistant`) 를 빼려 한다 | Control Plane 과 plugin 이 모두 거절한다 |
 | 요청한 도구가 빠지거나 분류된 도구가 예상과 다르다 | `AGENT_TOOLS_NOT_APPLIED` 로 켜지지 않은 이름을 알린다. 화면은 도구 목록을 다시 읽고, profile 설정에서 막힌 도구는 관리자에게 알리라고 안내한다. 미분류 도구만 더 켜진 것은 성공 응답의 `unclassifiedEnabled` 로 따로 알린다 |
+| `terminal`, `file`, `code_execution` 을 켜는데 운영의 실행 공간 설정이 없다 | 409 `AGENT_SANDBOX_UNAVAILABLE`. 아무것도 바뀌지 않는다. 화면은 「격리된 실행 공간이 준비되지 않아 이 도구를 켤 수 없어요」 를 보인다 |
+| 셸·파일 도구가 이미 켜진 profile 의 다른 도구를 바꾼다 | 켜진 셸·파일 도구가 저장 목록에 함께 있으므로 위와 같이 실행 공간을 다시 쓰거나 거절한다 |
 | 대시보드나 listener 가 멈춰 있다 | 도구 절만 열리지 않는다. 대화는 그대로 돈다 |
 
 ## 에이전트를 만들 때

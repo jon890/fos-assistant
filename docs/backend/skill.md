@@ -26,6 +26,7 @@ Hermes 가 스킬을 읽는 방식은 [`hermes/skills.md`](../hermes/skills.md) 
 | 파일 | `SKILL.md` 와 `references/`, `templates/` 아래 텍스트 파일. 파일 20개까지 |
 | 크기 | 파일마다 10만 자, 합계 1 MiB |
 | 앞머리 | `name` 이 스킬 이름과 같다. `description` 은 1024자까지이고, 새 스킬이면 60자까지다. 60자는 앞뒤 공백과 앞뒤 따옴표를 뺀 code point 로, 1024자는 앞뒤를 빼지 않은 code point 로 센다 |
+| 앞머리의 비밀 요청 칸 | `required_environment_variables`, `required_credential_files`, `setup.collect_secrets`, `prerequisites.env_vars` 가 없다. Hermes 는 스킬을 읽을 때 이 칸의 이름으로 profile 의 환경 값과 파일을 셸 실행 공간에 넣는다([ADR-084](../adr/ADR-084-셸과-파일-도구는-사용자별-docker-실행-공간에서만-돈다.md)) |
 | 본문 | 닫는 `---` 뒤에 공백이 아닌 글이 있어야 한다 |
 | 개수 | 에이전트마다 올린 스킬 `assistant.skill.max-per-agent` 개. 기본 30. 새 스킬을 만들 때만 에이전트 행 잠금 안에서 센다. 표식 없는 더 새 버전의 이름도 센다 |
 
@@ -131,6 +132,7 @@ sequenceDiagram
 | timeout 뒤 같은 이름으로 다시 저장한다 | 표식 없는 버전에 있는 이름은 올린 스킬로 보고 받는다. Hermes 목록에 먼저 떠 있어도 `SKILL_NAME_TAKEN` 이 아니다 |
 | 파일 경로가 `references/`, `templates/` 밖이거나 상한을 넘는다 | `VALIDATION_FAILED` |
 | 앞머리 뒤에 본문이 없다 | `VALIDATION_FAILED`. 새 스킬이든 고치는 스킬이든 같다 |
+| 앞머리에 비밀 요청 칸이 있다 | `VALIDATION_FAILED`. 새 스킬이든 고치는 스킬이든 같다. 이미 올라간 스킬은 읽기와 목록에서 그대로 보인다 |
 | 새 스킬의 설명이 60자를 넘는다 | `VALIDATION_FAILED`. 화면이 저장 전에 먼저 알린다. 이미 올린 스킬을 고칠 때는 보지 않는다 |
 | 올린 스킬이 한도(기본 30)에 닿았는데 새 스킬을 만든다 | `VALIDATION_FAILED`. 화면은 스킬을 에이전트마다 그 한도까지 만들 수 있다고 알린다. 이미 올린 스킬을 고치는 것은 된다 |
 | 한도 하나 앞에서 두 사람이 새 스킬을 함께 만든다 | 에이전트 행 잠금 안에서 세므로 하나만 저장되고 다른 하나는 `VALIDATION_FAILED` |

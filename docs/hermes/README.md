@@ -10,6 +10,7 @@
 | [위임](delegation.md) | 내장 delegation 과 Control Plane 도구 위임 |
 | [`_fos_ctx` 와 session 등록](fos-ctx.md) | MCP 호출에 실행을 잇는 서명과 하위 에이전트 session 등록 |
 | [도구 hook 과 승인](connector-policy.md) | `pre_tool_call` 로 MCP 도구를 막을 때의 계약, 등록 이름, 내장 승인 |
+| [실행 공간](sandbox.md) | 셸과 파일 도구를 profile 마다 docker 컨테이너에서 돌리는 계약과 측정 |
 | [MCP 프로세스의 환경 값](mcp-profile-credentials.md) | MCP 프로세스에 사용자별 환경 값을 전달하는 계약 |
 | [kanban](kanban.md) | 다중 에이전트 kanban 과 HTTP 호출 |
 | [버전 변경과 실측](upgrades.md) | 버전별 계약 차이와 확인 결과 |

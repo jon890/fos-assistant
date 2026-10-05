@@ -46,8 +46,50 @@ plugin 파일, 주소를 채운 `default-config.yaml.template`, 틀의 `plugins.
 | 커넥터 실행 파일 기본값 | 대시보드 프로세스의 환경 변수 `FOS_ASSISTANT_CONNECTOR_COMMAND` | 절대 경로다. 목록 항목에 `command` 가 없을 때 쓴다 |
 | 대시보드 서비스 토큰 | 환경 변수 `HERMES_DASHBOARD_PROFILE_API_SECRET` | |
 | 스킬 루트 | 대시보드 프로세스의 환경 변수 `FOS_ASSISTANT_SKILL_AGENT_ROOT` | |
+| 셸 실행 공간 | 대시보드 프로세스의 환경 변수 `FOS_ASSISTANT_SANDBOX` | 값의 모양은 아래 「셸 실행 공간」 에 있다. 없거나 읽지 못하면 `terminal`, `file`, `code_execution` 을 켜는 도구 저장을 409 로 거절한다 |
 | 커넥터 정책을 물을 주소 | gateway 프로세스의 환경 변수 `FOS_CTX_POLICY_URL` | Control Plane 의 `/internal/hermes/connector-policy` 다. 없으면 `fos-ctx` 가 연결용 profile 의 커넥터 도구를 모두 막는다 |
 | 자식 session 을 등록할 주소 | gateway 프로세스의 환경 변수 `FOS_CTX_SUBAGENT_URL` | 없으면 등록하지 않는다. 등록이 없는 자식의 호출은 Control Plane 이 거절한다 |
+
+### 셸 실행 공간
+
+`FOS_ASSISTANT_SANDBOX` 는 JSON object 다. 결정은 [ADR-084](../docs/adr/ADR-084-셸과-파일-도구는-사용자별-docker-실행-공간에서만-돈다.md), Hermes 의 동작은 [실행 공간](../docs/hermes/sandbox.md) 이 갖는다.
+
+| 키 | 필수 | 모양 |
+| --- | --- | --- |
+| `image` | 예 | 실행 공간 이미지. `execute_code` 를 쓰려면 python3 가 있어야 한다 |
+| `workspace_root` | 예 | 사용자 디렉터리를 둘 절대 경로. **Docker 호스트와 Hermes 컨테이너에서 같은 경로**여야 한다. 사용자 디렉터리 `<workspace_root>/<sandbox_owner>` 가 `/workspace` 에 붙는다 |
+| `network` | 아니오 | 실행 공간을 붙일 Docker 망 이름. 없으면 Docker 기본 망이다 |
+| `cpu` | 아니오 | 0 보다 크고 8 이하. 기본 1 |
+| `memory_mb` | 아니오 | 256 이상 16384 이하의 정수. 기본 1024 |
+| `read_only_mounts` | 아니오 | 모든 실행 공간에 붙일 `<원본 절대 경로>:<컨테이너 절대 경로>` 목록. 읽기 전용으로만 붙는다 |
+| `profile_mounts` | 아니오 | profile 이름마다 위와 같은 목록. 그 profile 의 실행 공간에만 읽기 전용으로 붙는다 |
+
+경로에 `..`, 빈 조각, `:` 셋 이상, `/workspace` 나 `/root` 로 시작하는 컨테이너 경로가 있으면 값 전체를 읽지 못한 것으로 본다.
+plugin 이 쓰는 `terminal:` 은 이렇다. 모든 칸을 통째로 바꾼다.
+
+```yaml
+terminal:
+  backend: docker
+  cwd: /workspace
+  docker_image: <image>
+  container_persistent: true
+  docker_persist_across_processes: true
+  docker_orphan_reaper: true
+  docker_mount_cwd_to_workspace: false
+  docker_run_as_host_user: false
+  docker_network: true
+  docker_extra_args: ["--network=<network>"]   # network 가 있을 때만
+  docker_volumes:
+    - <workspace_root>/<sandbox_owner>:/workspace
+    - <read_only_mounts 의 각 항목>:ro
+    - <profile_mounts[profile] 의 각 항목>:ro
+  docker_forward_env: []
+  docker_env: {}
+  env_passthrough: []
+  credential_files: []
+  container_cpu: <cpu>
+  container_memory: <memory_mb>
+```
 
 ## 검사
 
@@ -165,7 +207,7 @@ Control Plane 이 이 경로들을 부르는 순서와 뜻은 부르는 쪽 문�
 | `PUT /api/connectors` | 관리 profile 에 커넥터를 설치하고 제거한다 | `{profile, plugin, enabled}` | `{profile, plugin, enabled, changed, restart_required, plugin_updated}`. 설치는 서버 등록과 함께 그 profile 의 API 도구 목록과 `SOUL.md` 를 다시 쓴다 | |
 | `POST /api/mcp/servers/<서버>/test?profile=<p>` | 그 profile 에 설치한 커넥터의 MCP 서버만 probe 한다 | 없음 | `{ok, tools: [{name}]}` | |
 | `GET /api/tools/toolsets` | 도구 이름과 설명을 읽는다 | 없음 | 200 | |
-| `PUT /api/config` (도구) | 지정한 profile 의 API 도구 목록을 쓴다 | `{profile, config: {platform_toolsets: {api_server: [...]}}}` | 200 | [ADR-029](../docs/adr/ADR-029-에이전트-도구는-control-plane-이-등급으로-판정하고-hermes-설정-api-로-쓴다.md) 그대로 |
+| `PUT /api/config` (도구) | 지정한 profile 의 API 도구 목록을 쓴다. `terminal`, `file`, `code_execution` 가운데 하나라도 있으면 profile 의 `terminal:` 을 실행 공간 설정으로 다시 쓴다 | `{profile, config: {platform_toolsets: {api_server: [...]}}, sandbox_owner?}`. `sandbox_owner` 는 `^[a-z][a-z0-9-]{0,63}$` 이고 셸·파일 도구가 있으면 필수다 | 200 | [ADR-029](../docs/adr/ADR-029-에이전트-도구는-control-plane-이-등급으로-판정하고-hermes-설정-api-로-쓴다.md) 그대로 |
 | `PUT /api/config` (스킬 게시) | 지정한 profile 의 올린 스킬 경로를 쓴다 | `{profile, config: {skills: {external_dirs: [<Hermes 쪽 스킬 루트>/<profile>/<버전>]}}}`. 버전 이름은 `v[0-9]{13}-[a-z0-9]{4}` 다(`v` 뒤에 UTC 밀리초 13자리와 소문자 영숫자 4자). 목록은 0개나 1개. 0개는 게시 해제. 도구 목록을 같은 본문에 둘 수 있다 | 200 | 400 경로 형식, 다른 profile 의 prefix, 둘 이상, 심볼릭 링크, 없는 디렉터리, `skills` 도구가 꺼진 채 게시. 409 운영자가 넣은 다른 외부 경로가 있다. 404 없는 profile |
 | `GET /api/skills?profile=<p>` | 지정한 profile 의 스킬 목록을 읽는다 | query `profile` 하나 | 200 `[{name, description, category, enabled, usage, provenance}]`. `enabled` 는 전역 `skills.disabled` 만 반영 | 400 query 누락, 둘 이상, `default`. 404 |
 | `PUT /api/skills/toggle` | 지정한 profile 의 스킬 하나를 켜고 끈다 | `{profile, name, enabled}` | 200 `{ok, name, enabled}` | 400, 404 |
