@@ -252,6 +252,52 @@ class TaskControllerTest {
     }
 
     @Test
+    @DisplayName("100자를 넘는 cron 은 400 TASK_SCHEDULE_INVALID 다")
+    void rejectCronOverMaximumOnCreate() throws Exception {
+        String cron = "0 9 1 * " + "1,".repeat(50) + "1";
+
+        JsonNode error = body(send(post("/api/v1/tasks"), request("이름", cronSchedule(cron))), 400);
+
+        assertThat(error.path("code").asString()).isEqualTo("TASK_SCHEDULE_INVALID");
+        assertThat(tasks.count()).isZero();
+        assertThat(triggers.count()).isZero();
+    }
+
+    @Test
+    @DisplayName("고치기도 100자를 넘는 cron 을 거절한다")
+    void rejectCronOverMaximumOnUpdate() throws Exception {
+        String original = "0 9 1 * *";
+        String id = body(send(post("/api/v1/tasks"), request("이름", cronSchedule(original))), 200)
+                .path("id")
+                .asString();
+        String cron = "0 9 1 * " + "1,".repeat(50) + "1";
+
+        JsonNode error = body(send(put("/api/v1/tasks/{id}", id), request("고친 이름", cronSchedule(cron))), 400);
+
+        assertThat(error.path("code").asString()).isEqualTo("TASK_SCHEDULE_INVALID");
+        assertThat(triggers.findAll())
+                .singleElement()
+                .extracting(TaskTrigger::cronExpr)
+                .isEqualTo(original);
+        assertThat(tasks.findAll()).singleElement().extracting(Task::title).isEqualTo("이름");
+    }
+
+    @Test
+    @DisplayName("앞뒤 공백을 뗀 100자 cron 은 길이로 거절하지 않는다")
+    void acceptMaximumCronAfterStrippingWhitespace() throws Exception {
+        String cron = "00 9 1 * " + "1,".repeat(45) + "1";
+        assertThat(cron).hasSize(TaskTrigger.CRON_MAX);
+
+        JsonNode view = body(send(post("/api/v1/tasks"), request("이름", cronSchedule("  " + cron + "  "))), 200);
+
+        assertThat(view.path("schedule").path("cron").asString()).isEqualTo(cron);
+        assertThat(triggers.findAll())
+                .singleElement()
+                .extracting(TaskTrigger::cronExpr)
+                .isEqualTo(cron);
+    }
+
+    @Test
     @DisplayName("형식이 틀린 taskId 는 400 VALIDATION_FAILED 다")
     void malformedTaskIdIsValidationFailed() throws Exception {
         JsonNode error = body(

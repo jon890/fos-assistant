@@ -6,6 +6,7 @@ import { Notice } from "@/components/ui/notice";
 import { cn } from "cn";
 import { Skeleton } from "@/components/ui/skeleton";
 import { AGENT_CARD_HEIGHT, AgentPicker } from "./agent-picker";
+import { AttentionLine } from "./attention-line";
 
 /*
  * 새 대화 화면은 입력창 위와 아래 두 부품으로 나눈다. 입력창은 대화 화면이 한 자리에 두고 감싸는 요소의
@@ -35,11 +36,12 @@ export function StartScreenHeader({
   const only = agents.length === 1 ? agents[0] : undefined;
   return (
     <div className="mx-auto mt-auto w-full max-w-3xl pb-2">
-      <h1 className="mb-6 text-center text-2xl font-semibold">
+      <h1 className="mb-2 text-center text-2xl font-semibold">
         {displayName
           ? `${displayName}님, 무엇을 도와드릴까요?`
           : "무엇을 도와드릴까요?"}
       </h1>
+      <AttentionLine />
       {loading ? (
         // 뼈대는 낭독기에서 숨겨져 있다. 읽는 중이라는 것은 status 안의 글로 알린다.
         <div role="status" className="flex gap-2 overflow-hidden pb-1">

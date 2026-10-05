@@ -178,16 +178,21 @@ public class TaskRunStarter {
     /**
      * 이 줄이 결과를 남길 대화를 정하고 줄에 적는다.
      *
-     * <p>줄이 이미 대화를 가졌고 그 대화가 지워지지 않았으면 그것을 다시 쓴다. 앞 tick 에서 잠금을 얻지 못한 줄이다. 기다리는 동안
-     * 사용자가 그 대화를 지웠으면 처음 준비하는 줄처럼 다시 정한다. {@code SINGLE} 은 작업의 대화가 지워지지 않았고 에이전트가
-     * 같으면 그것을, 아니면 새로 만들어 작업에도 적는다. 대화의 에이전트는 바뀌지 않기 때문이다.
+     * <p>줄이 이미 대화를 가졌고 그 대화가 지워지지 않았고 에이전트가 같으면 그것을 다시 쓴다. 앞 tick 에서 잠금을 얻지 못한 줄이다.
+     * 기다리는 동안 대화를 지우거나 에이전트를 바꿨으면 다시 정한다. 버린 {@code NEW_PER_RUN} 대화는 메시지가 없으면 지운다.
+     * {@code SINGLE} 은 작업의 대화가 지워지지 않았고 에이전트가 같으면 그것을, 아니면 새로 만들어 작업에도 적는다.
+     * 대화의 에이전트는 바뀌지 않기 때문이다.
      */
     private Long conversationFor(Task task, TaskRun run, Instant now) {
         if (run.conversationId() != null
                 && conversations
                         .findByIdAndUserIdAndDeletedAtIsNull(run.conversationId(), task.ownerUserId())
+                        .filter(conversation -> conversation.agentId().equals(task.agentId()))
                         .isPresent()) {
             return run.conversationId();
+        }
+        if (run.conversationId() != null && task.conversationMode() == ConversationMode.NEW_PER_RUN) {
+            chat.discardEmptyTaskConversation(run.conversationId());
         }
         Long conversationId;
         if (task.conversationMode() == ConversationMode.SINGLE) {
@@ -277,7 +282,13 @@ public class TaskRunStarter {
         }
     }
 
+    /** 쓰지 않은 빈 {@code NEW_PER_RUN} 대화를 정리하고 발화를 건너뛰어 알린다. */
     private void skip(Task task, TaskRun run, TaskRunReason reason, Instant now) {
+        if (task.conversationMode() == ConversationMode.NEW_PER_RUN && run.conversationId() != null) {
+            if (chat.discardEmptyTaskConversation(run.conversationId())) {
+                run.forgetConversation();
+            }
+        }
         run.skip(reason, now);
         notices.announce(task, run);
     }

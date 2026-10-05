@@ -80,6 +80,13 @@ export function ConversationNav({
   const menuButtons = useRef(new Map<string, HTMLButtonElement>());
   const lastDeleteId = useRef<string | null>(null);
   const normalizedQuery = query.trim().toLocaleLowerCase("ko-KR");
+  /** 접은 작업을 기억할 때의 검색어다. 검색어가 바뀌면 결과를 숨기지 않도록 접은 기억을 비운다 */
+  const [collapsedForQuery, setCollapsedForQuery] = useState(normalizedQuery);
+  if (normalizedQuery !== collapsedForQuery) {
+    setCollapsedForQuery(normalizedQuery);
+    setCollapsedTasks(new Set());
+  }
+
   const visible = conversations.filter((item) =>
     (item.title || "새 대화")
       .toLocaleLowerCase("ko-KR")

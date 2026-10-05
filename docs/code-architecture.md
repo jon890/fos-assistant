@@ -104,7 +104,6 @@ profile key 와 AI credential 은 계속 홈서버 파일에 둔다.
 - 여러 Control Plane 이 함께 세는 사용자 실행 한도. 지금은 한 프로세스 안의 사용자 잠금으로 세고 만든다([`backend/execution-limit.md`](backend/execution-limit.md) 의 「서버 한 대 전제」)
 - Hermes native 하위 에이전트와 cron 을 사용자 실행 한도에 넣는 것. Control Plane 이 제출하지 않아 세지 못한다
 - `connector_action` 줄의 보관 기한과 정리. 지금은 도구 호출마다 남긴 줄을 지우지 않는다
-- 할 일([`backend/follow-up.md`](backend/follow-up.md)). 새 최상위 패키지 `followup` 을 `chat` 위, `proactive` 아래에 둔다
 - 커넥터 연결에 다시 인증이 필요하다는 알림. 연결 상태에 재인증 상태가 없고, 토큰이 거절된 것을 연결 상태로 옮기는 지점도 없다. 그 상태를 정한 뒤 알림 종류를 더한다([`backend/notification.md`](backend/notification.md))
 - 예약 작업의 실패 다시 하기와 연속 실패에 따른 일시 정지, 주인 권한을 잃었을 때의 일시 정지. 지금은 실패를 기록하고 알리기만 한다([`backend/task.md`](backend/task.md) 의 「다음 단계」)
 - 예약 작업 만들기 화면에서 흐름 에이전트를 고르기 목록에서 빼는 것. 에이전트 목록 API 에 흐름과 켜짐 칸이 없다. 지금은 저장할 때 서버가 거절한다

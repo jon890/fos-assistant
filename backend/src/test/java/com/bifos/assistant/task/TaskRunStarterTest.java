@@ -233,7 +233,7 @@ class TaskRunStarterTest {
     }
 
     @Test
-    @DisplayName("사용자 자리가 차 있으면 QUEUED 로 남고 대화는 하나뿐이며, 만든 때에서 10분이 지나면 BUSY 로 건너뛰고 알린다")
+    @DisplayName("자리를 얻지 못하고 시작 시간을 넘긴 NEW_PER_RUN 발화의 빈 대화를 지우고 BUSY 로 알린다")
     void staysQueuedWhileUserBusyThenSkipsAfterTimeout() {
         Fixture fixture = fixture(ConversationMode.NEW_PER_RUN, NotifyPolicy.ALWAYS);
         TaskRun run = queued(fixture, SCHEDULED, NOW);
@@ -254,12 +254,116 @@ class TaskRunStarterTest {
         TaskRun skipped = runs.findById(run.id()).orElseThrow();
         assertThat(skipped.status()).isEqualTo(TaskRunStatus.SKIPPED);
         assertThat(skipped.reason()).isEqualTo(TaskRunReason.BUSY);
+        assertThat(skipped.conversationId()).isNull();
+        assertThat(conversations.findById(waiting.conversationId())).isEmpty();
+        assertThat(stub().received()).isEmpty();
         assertThat(notificationsOf(fixture.owner().id())).singleElement().satisfies(notification -> {
             assertThat(notification.kind()).isEqualTo(NotificationKind.TASK_SKIPPED);
             assertThat(notification.body()).isEqualTo("다른 대화가 오래 돌고 있어 시작하지 못했어요");
             assertThat(notification.targetType()).isEqualTo(NotificationTargetType.TASK);
             assertThat(notification.targetPublicId()).isEqualTo(fixture.task().publicId());
         });
+    }
+
+    @Test
+    @DisplayName("기다리는 동안 작업을 멈추면 빈 대화를 지운다")
+    void discardsEmptyConversationWhenWaitingTaskPaused() {
+        Fixture fixture = fixture(ConversationMode.NEW_PER_RUN, NotifyPolicy.NEVER);
+        TaskRun run = queued(fixture, SCHEDULED, NOW);
+        fillSlots(fixture.owner());
+        starter.startQueued(NOW);
+        Long conversationId = runs.findById(run.id()).orElseThrow().conversationId();
+        Task task = tasks.findById(fixture.task().id()).orElseThrow();
+        task.pause(NOW);
+        tasks.save(task);
+        heldSlots.forEach(TurnSlot::release);
+        heldSlots.clear();
+
+        starter.startQueued(NOW.plusSeconds(30));
+
+        TaskRun skipped = runs.findById(run.id()).orElseThrow();
+        assertThat(skipped.status()).isEqualTo(TaskRunStatus.SKIPPED);
+        assertThat(skipped.reason()).isEqualTo(TaskRunReason.PAUSED);
+        assertThat(skipped.conversationId()).isNull();
+        assertThat(conversations.findById(conversationId)).isEmpty();
+    }
+
+    @Test
+    @DisplayName("SINGLE 발화가 건너뛰어지면 대화를 지우지 않는다")
+    void keepsSingleConversationWhenRunSkipped() {
+        Fixture fixture = fixture(ConversationMode.SINGLE, NotifyPolicy.NEVER);
+        TaskRun run = queued(fixture, SCHEDULED, NOW);
+        fillSlots(fixture.owner());
+        starter.startQueued(NOW);
+        Long conversationId = runs.findById(run.id()).orElseThrow().conversationId();
+
+        starter.startQueued(NOW.plus(Duration.ofMinutes(10)));
+
+        TaskRun skipped = runs.findById(run.id()).orElseThrow();
+        assertThat(skipped.status()).isEqualTo(TaskRunStatus.SKIPPED);
+        assertThat(skipped.reason()).isEqualTo(TaskRunReason.BUSY);
+        assertThat(skipped.conversationId()).isEqualTo(conversationId);
+        assertThat(tasks.findById(fixture.task().id()).orElseThrow().conversationId())
+                .isEqualTo(conversationId);
+        assertThat(conversations.findById(conversationId)).isPresent();
+    }
+
+    @Test
+    @DisplayName("메시지가 있는 NEW_PER_RUN 대화는 발화를 건너뛰어도 지우지 않는다")
+    void keepsConversationWithMessagesWhenRunSkipped() {
+        Fixture fixture = fixture(ConversationMode.NEW_PER_RUN, NotifyPolicy.NEVER);
+        TaskRun run = queued(fixture, SCHEDULED, NOW);
+        fillSlots(fixture.owner());
+        starter.startQueued(NOW);
+        Long conversationId = runs.findById(run.id()).orElseThrow().conversationId();
+        messages.save(ChatMessage.fromUser(conversationId, fixture.owner().id(), "남겨 둔 메시지", NOW));
+
+        starter.startQueued(NOW.plus(Duration.ofMinutes(10)));
+
+        TaskRun skipped = runs.findById(run.id()).orElseThrow();
+        assertThat(skipped.status()).isEqualTo(TaskRunStatus.SKIPPED);
+        assertThat(skipped.conversationId()).isEqualTo(conversationId);
+        assertThat(conversations.findById(conversationId)).isPresent();
+        assertThat(messages.findByConversationIdOrderByIdAsc(conversationId)).hasSize(1);
+    }
+
+    @Test
+    @DisplayName("기다리는 동안 에이전트를 바꾸면 새 에이전트의 새 대화로 돈다")
+    void replacesWaitingConversationWhenAgentChanged() {
+        Fixture fixture = fixture(ConversationMode.NEW_PER_RUN, NotifyPolicy.NEVER);
+        TaskRun run = queued(fixture, SCHEDULED, NOW);
+        fillSlots(fixture.owner());
+        starter.startQueued(NOW);
+        Long previousId = runs.findById(run.id()).orElseThrow().conversationId();
+        String code = "replacement-" + UUID.randomUUID().toString().substring(0, 8);
+        Agent replacement = agents.save(Agent.of(
+                code,
+                code,
+                code,
+                "http://agent-runtime.test/p/" + code,
+                CostMode.SUBSCRIPTION,
+                CredentialScope.SHARED_HOUSEHOLD,
+                AgentVisibility.PRIVATE,
+                fixture.owner().id(),
+                NOW));
+        Task task = tasks.findById(fixture.task().id()).orElseThrow();
+        task.edit(
+                replacement.id(), task.title(), task.instruction(), task.conversationMode(), task.notifyPolicy(), NOW);
+        tasks.save(task);
+        heldSlots.forEach(TurnSlot::release);
+        heldSlots.clear();
+
+        starter.startQueued(NOW.plusSeconds(30));
+
+        TaskRun finished = awaitFinished(run);
+        assertThat(finished.status()).isEqualTo(TaskRunStatus.SUCCEEDED);
+        assertThat(finished.conversationId()).isNotEqualTo(previousId);
+        assertThat(conversations
+                        .findById(finished.conversationId())
+                        .orElseThrow()
+                        .agentId())
+                .isEqualTo(replacement.id());
+        assertThat(conversations.findById(previousId)).isEmpty();
     }
 
     @Test

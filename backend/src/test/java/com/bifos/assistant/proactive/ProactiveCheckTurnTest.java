@@ -272,6 +272,60 @@ class ProactiveCheckTurnTest {
     }
 
     @Test
+    @DisplayName("NOTHING_NEW 에 읽지 못한 출처가 있으면 그 절을 그린 답이 남는다")
+    void rendersSourceFailuresForNothingNew() {
+        stub().willAnswer(command -> answer(block("""
+                {"version":1,"outcome":"NOTHING_NEW","findings":[],
+                 "sourceFailures":["시험 출처를 읽지 못했어요 [링크](https://example.com)"]}
+                """)));
+
+        Conversation conversation = runCheck();
+
+        List<ChatMessage> history = messages.findByConversationIdOrderByIdAsc(conversation.id());
+        assertThat(history).extracting(ChatMessage::role).containsExactly(MessageRole.SYSTEM, MessageRole.ASSISTANT);
+        assertThat(history.getLast().content())
+                .contains("새로 알릴 것은 없어요", "**확인하지 못한 출처**")
+                .contains("시험 출처를 읽지 못했어요 \\[링크\\]\\(https\\://example\\.com\\)");
+        assertThat(onlyCheckOf(conversation).outcome()).isEqualTo(CheckOutcome.NOTHING_NEW);
+        assertThat(findingsOf(conversation)).isEmpty();
+    }
+
+    @Test
+    @DisplayName("NOTHING_NEW 에 질문이 있으면 질문을 그린 답이 남는다")
+    void rendersQuestionsForNothingNew() {
+        stub().willAnswer(command -> answer(block("""
+                {"version":1,"outcome":"NOTHING_NEW","questions":["이번 달도 같은 분야를 볼까요"]}
+                """)));
+
+        Conversation conversation = runCheck();
+
+        List<ChatMessage> history = messages.findByConversationIdOrderByIdAsc(conversation.id());
+        assertThat(history).extracting(ChatMessage::role).containsExactly(MessageRole.SYSTEM, MessageRole.ASSISTANT);
+        assertThat(history.getLast().content())
+                .contains("**물어보고 싶은 것**", "이번 달도 같은 분야를 볼까요")
+                .doesNotContain("새로 알릴 것은 없어요");
+        assertThat(onlyCheckOf(conversation).outcome()).isEqualTo(CheckOutcome.NOTHING_NEW);
+        assertThat(findingsOf(conversation)).isEmpty();
+    }
+
+    @Test
+    @DisplayName("NOTHING_NEW 의 요약과 할 일 후보는 질문이 있어도 그리지 않는다")
+    void hidesUncheckedSummaryAndCandidatesForNothingNew() {
+        stub().willAnswer(command -> answer(block("""
+                {"version":1,"outcome":"NOTHING_NEW","questions":["이번 달도 같은 분야를 볼까요"],
+                 "summary":"검사하지 않은 요약","followUpCandidates":["검사하지 않은 후보"]}
+                """)));
+
+        Conversation conversation = runCheck();
+
+        List<ChatMessage> history = messages.findByConversationIdOrderByIdAsc(conversation.id());
+        assertThat(history).extracting(ChatMessage::role).containsExactly(MessageRole.SYSTEM, MessageRole.ASSISTANT);
+        assertThat(history.getLast().content())
+                .contains("**물어보고 싶은 것**", "이번 달도 같은 분야를 볼까요")
+                .doesNotContain("검사하지 않은 요약", "검사하지 않은 후보");
+    }
+
+    @Test
     @DisplayName("결과 블록이 없으면 결과를 정리하지 못했다는 알림 줄과 INVALID_RESULT 가 남는다")
     void leavesInvalidResultWhenBlockIsMissing() {
         stub().willAnswer(command -> answer("블록 없이 끝난 답"));

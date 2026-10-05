@@ -43,8 +43,8 @@ frontend 는 화면의 동작과 구조이고, hermes 는 외부 런타임인 He
 | [`backend/task.md`](backend/task.md) | 예약 작업. 작업과 시각의 규칙, 발화와 시작, 결과와 알림, 상한, 화면 |
 | [`backend/execution-limit.md`](backend/execution-limit.md) | 사용자 한 명이 Hermes 에 동시에 맡기는 실행의 한도, 세는 실행과 세지 못하는 실행, 한도끼리의 관계, 한도에 닿을 때 |
 | [`backend/context-bundle.md`](backend/context-bundle.md) | 여러 기록에서 모은 문맥의 항목 모델, 출처와 권한과 신선도, Hermes 에 넘기는 형식, 합성 시나리오 |
-| [`backend/attention.md`](backend/attention.md) | 먼저 알리기의 후보와 판정 표, 억제와 중복, 숨기기와 미루기, 지표, 지금 화면의 API. 할 일 후보는 아직 구현 전이다 |
-| [`backend/follow-up.md`](backend/follow-up.md) | 할 일의 상태, 제안 도구와 제안 억제, API. 아직 구현 전이다 |
+| [`backend/attention.md`](backend/attention.md) | 먼저 알리기의 후보와 판정 표, 억제와 중복, 숨기기와 미루기, 지표, 지금 화면의 API |
+| [`backend/follow-up.md`](backend/follow-up.md) | 할 일의 상태, 제안 도구와 제안 억제, API |
 
 ## frontend
 
@@ -54,7 +54,7 @@ frontend 는 화면의 동작과 구조이고, hermes 는 외부 런타임인 He
 | [`frontend/shell.md`](frontend/shell.md) | 대화 이력과 목록, 화면 틀, 로딩 표시, 밝기 모드 |
 | [`frontend/chat.md`](frontend/chat.md) | 대화 화면의 모델 선택, 에이전트 질문, 다시 생성, 결과 다시 전달, 메시지 동작 |
 | [`frontend/activity.md`](frontend/activity.md) | 실행 하나를 다시 보는 화면과 작업 과정 표시 |
-| [`frontend/now.md`](frontend/now.md) | 지금 화면의 카드와 이유 문구, 숨기기와 미루기, 폭별 배치. 아직 구현 전이다 |
+| [`frontend/now.md`](frontend/now.md) | 지금 화면의 카드와 이유 문구, 숨기기와 미루기, 폭별 배치 |
 
 화면에 관한 결정은 `adr/INDEX.md` 에서 층 칸이 frontend 인 것을 본다.
 

@@ -203,7 +203,6 @@ flowchart TD
 
 ## 지금 화면을 열 때
 
-**아직 구현 전이다.** 구현한 PR 이 이 줄을 지운다.
 판정 표는 [`backend/attention.md`](backend/attention.md), 화면은 [`frontend/now.md`](frontend/now.md) 가 갖는다.
 
 ```mermaid
@@ -245,7 +244,7 @@ source 하나를 읽지 못하면 그 카드만 「불러오지 못했다」 로
 
 ## 할 일을 제안할 때
 
-**아직 구현 전이다.** 구현한 PR 이 이 줄을 지운다. 계약은 [`backend/follow-up.md`](backend/follow-up.md) 가 갖는다.
+계약은 [`backend/follow-up.md`](backend/follow-up.md) 가 갖는다.
 
 ```mermaid
 sequenceDiagram

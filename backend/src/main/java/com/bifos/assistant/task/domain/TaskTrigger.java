@@ -37,6 +37,8 @@ import lombok.experimental.Accessors;
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class TaskTrigger {
 
+    public static final int CRON_MAX = 100;
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -49,7 +51,7 @@ public class TaskTrigger {
     private TriggerType type;
 
     /** {@code CRON} 일 때 5필드 cron. {@code ONCE} 는 비운다. */
-    @Column(name = "cron_expr", length = 100)
+    @Column(name = "cron_expr", length = CRON_MAX)
     private String cronExpr;
 
     /** {@code ONCE} 일 때 그 시각(UTC). {@code CRON} 은 비운다. */

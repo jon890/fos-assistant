@@ -151,7 +151,7 @@ class McpMemoryToolTest {
                 .isEqualTo(buildProperties.getVersion());
         JsonNode listed = body(mcp(dadToken, "{\"jsonrpc\":\"2.0\",\"id\":18,\"method\":\"tools/list\"}"));
         assertThat(listed.path("id").asInt()).isEqualTo(18);
-        assertThat(listed.path("result").path("tools")).hasSize(6);
+        assertThat(listed.path("result").path("tools")).hasSize(7);
         assertThat(listed.path("result").path("tools").get(0).path("name").asString())
                 .isEqualTo("memory_read");
         assertThat(listed.path("result").path("tools").get(1).path("name").asString())
@@ -164,6 +164,8 @@ class McpMemoryToolTest {
                 .isEqualTo("agent_status");
         assertThat(listed.path("result").path("tools").get(5).path("name").asString())
                 .isEqualTo("agent_stop");
+        assertThat(listed.path("result").path("tools").get(6).path("name").asString())
+                .isEqualTo("follow_up_propose");
         HttpResponse<String> notification =
                 mcp(dadToken, "{\"jsonrpc\":\"2.0\",\"method\":\"notifications/initialized\"}");
         assertThat(notification.statusCode()).isEqualTo(202);

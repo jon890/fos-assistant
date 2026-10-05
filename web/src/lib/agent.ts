@@ -30,6 +30,8 @@ export type AgentView = {
   ownedByMe: boolean;
   /** 커넥터 연결이 만든 에이전트다. 도구와 스킬 편집을 그리지 않는다 */
   connectorManaged: boolean;
+  /** 예약 작업을 돌릴 수 있다. 등록된 흐름이 붙은 에이전트는 거짓이다 */
+  runsTasks: boolean;
 };
 
 /** 한 에이전트의 성격이다. 본문은 데이터베이스가 아니라 Hermes 의 `SOUL.md` 가 갖는다 */

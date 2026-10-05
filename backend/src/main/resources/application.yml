@@ -209,6 +209,8 @@ assistant:
     delegated-window: 24h
     # 도는 위임이 이만큼 지나면 NOW 가 된다
     long-running-after: 30m
+    # 기한이 이만큼 남으면 할 일이 지금 볼 것이 된다
+    due-soon: 24h
     # 이어서 하기 카드의 항목 상한
     continue-count: 5
     # 이어서 하기를 뺀 카드 하나의 항목 상한. 넘으면 moreCount 로 센다

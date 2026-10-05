@@ -8,6 +8,7 @@ import com.bifos.assistant.mcp.application.McpCallerResolver;
 import com.bifos.assistant.mcp.application.McpPrincipal;
 import com.bifos.assistant.mcp.application.McpToolService;
 import com.bifos.assistant.mcp.presentation.McpDtos.ArtifactWriteArguments;
+import com.bifos.assistant.mcp.presentation.McpDtos.FollowUpProposeArguments;
 import com.bifos.assistant.mcp.presentation.McpDtos.MemoryReadArguments;
 import com.bifos.assistant.proactive.application.ProactiveCheckGuard;
 import com.bifos.assistant.proactive.domain.ProactiveCheck;
@@ -19,6 +20,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.function.Predicate;
 import java.util.regex.Pattern;
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.info.BuildProperties;
@@ -45,6 +47,8 @@ public class McpController {
     private static final String AGENT_STATUS = "agent_status";
     private static final String AGENT_DELEGATE = "agent_delegate";
     private static final String AGENT_STOP = "agent_stop";
+    private static final String FOLLOW_UP_PROPOSE = "follow_up_propose";
+    private static final Set<String> FOLLOW_UP_PROPOSE_FIELDS = Set.of("title", "due_at", "waiting");
     private static final String WAIT_SECONDS = "wait_seconds";
     /** 먼저 살펴보기 트리에서 받는 도구. 읽기와 위임뿐이다. 새 도구를 더하면 여기 넣을지 함께 정한다(ADR-080). */
     private static final Set<String> CHECK_TREE_TOOLS =
@@ -63,7 +67,8 @@ public class McpController {
             AGENT_LIST, this::listAgents,
             AGENT_STATUS, this::agentStatus,
             AGENT_DELEGATE, this::agentDelegate,
-            AGENT_STOP, this::agentStop);
+            AGENT_STOP, this::agentStop,
+            FOLLOW_UP_PROPOSE, this::proposeFollowUp);
 
     /** 요청자가 정해진 뒤 {@code _fos_ctx} 를 뗀 인자로 도구 하나를 처리한다. */
     @FunctionalInterface
@@ -252,6 +257,30 @@ public class McpController {
             return invalidParams(id, INVALID_ARGUMENTS);
         }
         return response(id, tools.delegate(caller, arguments.get("agent_code").asString(), task));
+    }
+
+    /**
+     * 인자는 {@code title}, {@code due_at}, {@code waiting} 셋만 받는다. 다른 키가 오면 인자 오류다.
+     *
+     * <p>사용자와 대화를 인자로 받지 않는다(ADR-032). 모델은 쓰지 않는 선택 인자에 {@code null} 을 자주 보내므로 선택 인자의
+     * {@code null} 은 없는 것으로 본다. 필수인 {@code title} 의 {@code null} 은 빠진 것이다.
+     */
+    private Map<String, Object> proposeFollowUp(McpCaller caller, JsonNode id, JsonNode arguments) {
+        if (!FOLLOW_UP_PROPOSE_FIELDS.containsAll(arguments.propertyNames())
+                || !text(arguments, "title")
+                || !nullOr(arguments, "due_at", JsonNode::isString)
+                || !nullOr(arguments, "waiting", JsonNode::isBoolean)) {
+            return invalidParams(id, INVALID_ARGUMENTS);
+        }
+        FollowUpProposeArguments value = FollowUpProposeArguments.from(arguments);
+        return response(
+                id, tools.proposeFollowUp(caller, value.title(), value.dueAt(), Boolean.TRUE.equals(value.waiting())));
+    }
+
+    /** 키가 없거나 {@code null} 이거나, 그 값이 {@code type} 을 만족한다. */
+    private static boolean nullOr(JsonNode arguments, String name, Predicate<JsonNode> type) {
+        JsonNode value = arguments.get(name);
+        return value == null || value.isNull() || type.test(value);
     }
 
     private Map<String, Object> writeArtifact(McpCaller caller, JsonNode id, JsonNode arguments) {

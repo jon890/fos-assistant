@@ -245,6 +245,7 @@ public class ProactiveCheckRun implements CheckTurn {
      * 결과 블록을 읽고 발견을 검사해 대화에 남길 글을 정한다. 발견은 들고 있다가 답 메시지를 저장한 뒤 {@link #saveFindings} 가
      * 저장하고, 결과와 셈은 {@link #record} 가 적는다. 답을 저장하지 못했는데 발견이 남으면 사용자가 보지 못한 발견이 다음 살펴보기에서
      * 이미 알린 것으로 내려가기 때문이다.
+     * NOTHING_NEW 여도 질문이나 읽지 못한 출처가 있으면 그린다.
      */
     @Override
     public CheckAnswer answer(Long executionId, String output) {
@@ -255,7 +256,10 @@ public class ProactiveCheckRun implements CheckTurn {
         }
         CheckResultBlock block = parsed.get();
         outcome = block.outcome();
-        if (block.outcome() == CheckOutcome.NOTHING_NEW && block.findings().isEmpty()) {
+        if (block.outcome() == CheckOutcome.NOTHING_NEW
+                && block.findings().isEmpty()
+                && block.questions().isEmpty()
+                && block.sourceFailures().isEmpty()) {
             return new CheckAnswer(NOTHING_NEW_NOTICE, true);
         }
         Instant now = deps.clock().instant();

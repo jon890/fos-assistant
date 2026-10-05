@@ -39,6 +39,7 @@ import { memoryScenario } from "./scenarios/memory.ts";
 import { memoryDocumentScenario } from "./scenarios/memory-document.ts";
 import { memoryImportScenario } from "./scenarios/memory-import.ts";
 import { chatScenario } from "./scenarios/chat.ts";
+import { followUpScenario } from "./scenarios/follow-up.ts";
 import { conversationHistoryScenario } from "./scenarios/conversation-history.ts";
 import { conversationManageScenario } from "./scenarios/conversation-manage.ts";
 import { usageCostScenario } from "./scenarios/usage-cost.ts";
@@ -54,6 +55,7 @@ import { chatAttachmentScenario } from "./scenarios/chat-attachment.ts";
 import { artifactScenario } from "./scenarios/artifact.ts";
 import { AGENT_TOOLS_PROFILE, agentToolsScenario } from "./scenarios/agent-tools.ts";
 import { MCP_PRINCIPAL_PROFILE, mcpPrincipalScenario } from "./scenarios/mcp-principal.ts";
+import { FOLLOW_UP_MCP_PROFILE, followUpMcpScenario } from "./scenarios/follow-up-mcp.ts";
 import { agentLifecycleScenario } from "./scenarios/agent-lifecycle.ts";
 import { NATIVE_DELEGATION_PROFILE, nativeDelegationScenario } from "./scenarios/native-delegation-mcp.ts";
 import { DELEGATION_PROFILE, delegationScenario } from "./scenarios/delegation.ts";
@@ -109,6 +111,8 @@ const SCENARIOS: readonly Scenario[] = [
   skillsScenario,
   memoryScenario,
   chatScenario,
+  // turn 을 돌리지 않는다. 바로 뒤의 사용량 시나리오가 실행 수를 앞의 대화 turn 수와 같은지 본다.
+  followUpScenario,
   usageCostScenario,
   conversationHistoryScenario,
   conversationManageScenario,
@@ -120,6 +124,7 @@ const SCENARIOS: readonly Scenario[] = [
   chatAttachmentScenario,
   artifactScenario,
   mcpPrincipalScenario,
+  followUpMcpScenario,
   nativeDelegationScenario,
   agentToolsScenario,
   // 아이의 개인 에이전트와 꺼진 에이전트가 목록에서 빠지는 것을 보므로 그 둘을 만드는 시나리오 뒤에 둔다.
@@ -194,7 +199,7 @@ async function makeSkillRoot(work: string): Promise<string> {
 async function writeProfileKeys(work: string): Promise<string> {
   const keyDir = join(work, "keys");
   await mkdir(keyDir, { recursive: true });
-  for (const profileName of [DAD_BINDING.profileName, FLOW_BINDING.profileName, AGENT_TOOLS_PROFILE, MCP_PRINCIPAL_PROFILE, NATIVE_DELEGATION_PROFILE, DELEGATION_PROFILE, CHAT_QUEUE_PROFILE]) {
+  for (const profileName of [DAD_BINDING.profileName, FLOW_BINDING.profileName, AGENT_TOOLS_PROFILE, MCP_PRINCIPAL_PROFILE, FOLLOW_UP_MCP_PROFILE, NATIVE_DELEGATION_PROFILE, DELEGATION_PROFILE, CHAT_QUEUE_PROFILE]) {
     const keyFile = join(keyDir, profileName);
     await writeFile(keyFile, PROFILE_KEY);
     await chmod(keyFile, 0o600);
@@ -345,6 +350,7 @@ async function main(): Promise<void> {
       [FLOW_BINDING.profileName]: PROFILE_KEY,
       [AGENT_TOOLS_PROFILE]: PROFILE_KEY,
       [MCP_PRINCIPAL_PROFILE]: PROFILE_KEY,
+      [FOLLOW_UP_MCP_PROFILE]: PROFILE_KEY,
       [NATIVE_DELEGATION_PROFILE]: PROFILE_KEY,
       [DELEGATION_PROFILE]: PROFILE_KEY,
       [CHAT_QUEUE_PROFILE]: PROFILE_KEY,
@@ -353,6 +359,7 @@ async function main(): Promise<void> {
       [AGENT_TOOLS_PROFILE]: ["fos-assistant"],
       // 기본 toolset 에는 shell 과 file 이 있어 GROUP 에이전트로 등록되지 않는다. MCP 서버만 켠 profile 로 둔다.
       [MCP_PRINCIPAL_PROFILE]: ["fos-assistant"],
+      [FOLLOW_UP_MCP_PROFILE]: ["fos-assistant"],
       [NATIVE_DELEGATION_PROFILE]: ["fos-assistant"],
       [DELEGATION_PROFILE]: ["fos-assistant"],
       [CHAT_QUEUE_PROFILE]: ["fos-assistant"],

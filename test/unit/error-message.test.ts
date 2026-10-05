@@ -56,3 +56,8 @@ test("결과를 다시 전하려다 거절되면 서버 원문 대신 해요체 
   assert.equal(describeError("DELIVERY_NOT_RETRYABLE", "delivery is not retryable"),
     "지금은 이 결과를 다시 전할 수 없어요.");
 });
+
+test("이미 처리한 할 일을 다시 바꾸려 하면 화면을 다시 열라고 알린다", () => {
+  assert.equal(describeError("FOLLOW_UP_STATE_CONFLICT", "follow-up is not in a state that allows this"),
+    "이미 처리했거나 같은 할 일이 있어요. 화면을 다시 열어 주세요.");
+});
