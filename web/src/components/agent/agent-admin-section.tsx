@@ -15,7 +15,7 @@ type AgentAction = "enabled" | "address" | "writes";
 
 /** 「먼저 살펴보기에 쓰기 도구 허용」 을 켰을 때 보이는 위험 안내다. 글은 docs/frontend/structure.md 의 관리 절과 같다. */
 const WRITES_RISK =
-  "켜면 먼저 살펴보기가 셸과 파일 도구를 써서, 웹 결과 속 글이 명령 실행으로 이어질 수 있어요";
+  "켜면 먼저 살펴보기가 셸, 파일, 브라우저, 외부 메시지 같은 관리자 도구를 써서, 웹 결과 속 글이 명령 실행이나 외부 연락으로 이어질 수 있어요";
 
 type Props = {
   initialAgent: AdminAgent;

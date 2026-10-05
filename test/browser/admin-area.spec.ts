@@ -134,7 +134,7 @@ test("관리자 영역의 에이전트 목록은 등록 양식을 갖고 상세 
 });
 
 test("관리 절에서 먼저 살펴보기 쓰기 허용을 켜면 위험 문구가 보이고 새로 고쳐도 남으며 끄면 사라진다", async ({ page }) => {
-  const risk = "켜면 먼저 살펴보기가 셸과 파일 도구를 써서, 웹 결과 속 글이 명령 실행으로 이어질 수 있어요";
+  const risk = "켜면 먼저 살펴보기가 셸, 파일, 브라우저, 외부 메시지 같은 관리자 도구를 써서, 웹 결과 속 글이 명령 실행이나 외부 연락으로 이어질 수 있어요";
   try {
     await page.goto("/admin/agents/browser");
     const admin = page.getByRole("region", { name: "관리" });
