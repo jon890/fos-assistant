@@ -140,6 +140,7 @@ async function bounded(response: Response, error: string): Promise<Uint8Array> {
 function plainHtml(value: string) {
   const hidden: string[] = [];
   const pieces: string[] = [];
+  let rawTextElement: "script" | "style" | undefined;
   const voidElements = new Set([
     "area",
     "base",
@@ -160,15 +161,19 @@ function plainHtml(value: string) {
     /<!--[\s\S]*?-->|<(?:"[^"]*"|'[^']*'|[^'">])*>|[^<]+/g,
   ) ?? []) {
     if (!token.startsWith("<")) {
-      if (!hidden.length) pieces.push(token);
+      if (!rawTextElement && !hidden.length) pieces.push(token);
       continue;
     }
     const closing = /^<\//.test(token);
     const name = /^<\/?\s*([a-z0-9]+)/i.exec(token)?.[1]?.toLowerCase();
     if (!name) continue;
+
+    // script/style 안의 `<...>`는 태그가 아닌 원문이다. 실제 닫는 태그만 처리한다.
+    if (rawTextElement && (!closing || name !== rawTextElement)) continue;
     if (closing) {
       const index = hidden.lastIndexOf(name);
-      if (index >= 0) hidden.splice(index);
+      if (index >= 0) hidden.splice(index, 1);
+      if (name === rawTextElement) rawTextElement = undefined;
       else if (/^(br|p|div|tr|li|h[1-6]|blockquote)$/.test(name))
         pieces.push("\n");
       continue;
@@ -179,15 +184,18 @@ function plainHtml(value: string) {
     const attributeNames = attributes.replace(/"[^"]*"|'[^']*'/g, '""');
     const hiddenAttribute = /(?:^|\s)hidden(?:\s|=|>|\/)/i.test(attributeNames);
     const canContainText = !voidElements.has(name) && !/\/\s*>$/.test(token);
+    if (canContainText && (name === "script" || name === "style")) {
+      rawTextElement = name;
+    }
     if (hidden.length && canContainText) {
       hidden.push(name);
     } else if (
       canContainText &&
       (/^(script|style|title|head|template|noscript)$/.test(name) ||
         hiddenAttribute)
-    )
+    ) {
       hidden.push(name);
-    else if (/^(br|p|div|tr|li|h[1-6]|blockquote)$/.test(name))
+    } else if (/^(br|p|div|tr|li|h[1-6]|blockquote)$/.test(name))
       pieces.push("\n");
   }
   return decodeHtmlEntities(pieces.join(""))

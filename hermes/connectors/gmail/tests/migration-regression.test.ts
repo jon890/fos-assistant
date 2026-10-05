@@ -430,6 +430,26 @@ describe("Python Gmail 회귀의 MIME 한계 이관", () => {
         body: { data: raw('<script>"<div>"</script>VISIBLE') },
       },
     });
+    fake.on("GET", "/gmail/messages/malformed-hidden", {
+      id: "malformed-hidden",
+      payload: {
+        mimeType: "text/html",
+        headers: [],
+        body: {
+          data: raw("<div hidden><span>SECRET</div>STILL_SECRET</span>VISIBLE"),
+        },
+      },
+    });
+    fake.on("GET", "/gmail/messages/hidden-script", {
+      id: "hidden-script",
+      payload: {
+        mimeType: "text/html",
+        headers: [],
+        body: {
+          data: raw('<div hidden><script>"<div>"</script></div>VISIBLE'),
+        },
+      },
+    });
     try {
       await withMcp(server, async (client) => {
         for (const index of examples.keys()) {
@@ -457,6 +477,15 @@ describe("Python Gmail 회귀의 MIME 한계 이관", () => {
           message_id: "script-tag",
         });
         expect(script.body).toMatchObject({ body: "VISIBLE" });
+        const malformed = await tool(client, "get_message", {
+          message_id: "malformed-hidden",
+        });
+        expect(malformed.body).toMatchObject({ body: "VISIBLE" });
+        expect(JSON.stringify(malformed.body)).not.toContain("SECRET");
+        const hiddenScript = await tool(client, "get_message", {
+          message_id: "hidden-script",
+        });
+        expect(hiddenScript.body).toMatchObject({ body: "VISIBLE" });
       });
     } finally {
       fake.stop();
