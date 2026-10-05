@@ -26,7 +26,7 @@ Hermes core 는 고치지 않는다.
 | `GET /api/profiles/<이름>/soul` | profile 의 SOUL.md 를 읽는다 |
 | `PUT /api/profiles/<이름>/soul` | profile 의 SOUL.md 를 쓴다 |
 | `GET /api/tools/toolsets` | 도구 이름과 설명을 읽는다 |
-| `PUT /api/config` | 지정한 profile 의 API 도구 목록과 올린 스킬 경로만 쓴다. 켠 도구는 `agent.disabled_toolsets` 에서 뺀다. `terminal`, `file`, `code_execution` 가운데 하나라도 켜면 `sandbox_owner` 를 받아 그 profile 의 `terminal:` 을 docker 실행 공간 설정으로 통째로 바꾼다. 실행 공간 설정이 없으면 409 다(ADR-086) |
+| `PUT /api/config` | 지정한 profile 의 API 도구 목록과 올린 스킬 경로만 쓴다. 켠 도구는 `agent.disabled_toolsets` 에서 뺀다. 셸 계열 도구를 켤 때 신뢰한 정책에 등록된 profile 만 `sandbox_owner` 로 docker 실행 공간 설정을 쓴다. 미등록 profile 은 local 이다. 정책이 없거나 잘못됐으면 409 다(ADR-086) |
 | `GET /api/skills` | 지정한 profile 의 스킬 목록을 읽는다 |
 | `PUT /api/skills/toggle` | 지정한 profile 의 스킬 하나를 켜고 끈다 |
 | `GET /api/profiles/<이름>/sessions/<session id>/provider` | 그 profile 의 자식 session 한 줄에서 provider 와 모델만 읽는다 |
@@ -141,6 +141,7 @@ import sqlite3
 import tempfile
 import time
 from typing import Optional
+from urllib.parse import urlsplit
 
 from hermes_cli.dashboard_auth import (
     DashboardAuthProvider,
@@ -165,7 +166,13 @@ SANDBOX_NETWORK_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$")
 SANDBOX_RESERVED_PATHS = ("/workspace", "/root")
 # hermes/README.md 의 「셸 실행 공간」 계약 표에 있는 최상위 키다. 그 밖의 키가 있으면 정책 전체를 틀린 것으로 본다.
 SANDBOX_POLICY_KEYS = frozenset({
-    "image", "workspace_root", "network", "cpu", "memory_mb", "read_only_mounts", "profile_mounts",
+    "image", "workspace_root", "network", "cpu", "memory_mb", "read_only_mounts", "profiles",
+})
+SANDBOX_PROFILE_KEYS = frozenset({"read_only_mounts", "env", "network"})
+# 비밀값은 넣지 않는다. 운영 정책이 경로와 Backend 주소만 명시한다.
+SANDBOX_PATH_ENV = frozenset({
+    "CAREER_BACKEND_TOKEN_FILE", "CLAUDE_PLUGIN_ROOT", "CAREER_EVIDENCE_DIR",
+    "CAREER_WORKSPACE_ROOT", "CAREER_DART_API_KEY_FILE",
 })
 
 # 토큰으로 인증할 요청이다. 여기 없는 것은 모두 쿠키 검사로 넘어간다.
@@ -1765,9 +1772,10 @@ def _operator_skill_dirs(saved: dict, profile: str, root: pathlib.Path) -> list:
 
 def _sandbox_path_ok(value) -> bool:
     """`:` 없는 절대 경로이고 빈 조각과 `..` 이 없는지 본다."""
-    if not isinstance(value, str) or not value.startswith("/") or ":" in value:
+    if (not isinstance(value, str) or not value.startswith("/") or ":" in value
+            or any(ord(ch) < 32 or ord(ch) == 127 for ch in value)):
         return False
-    return all(part not in ("", "..") for part in value.split("/")[1:])
+    return all(part not in ("", ".", "..") for part in value.split("/")[1:])
 
 
 def _sandbox_mount_ok(value) -> bool:
@@ -1800,10 +1808,59 @@ def _sandbox_mount_overlaps(mount: str, workspace_root: str) -> bool:
     return under(source, root) or under(root, source)
 
 
+def _sandbox_env_ok(value) -> bool:
+    """운영 정책의 환경 값은 허용한 경로와 인증정보 없는 URL 만 받는다."""
+    if not isinstance(value, dict):
+        return False
+    for name, entry in value.items():
+        if name in SANDBOX_PATH_ENV:
+            if not _sandbox_path_ok(entry):
+                return False
+        elif name == "CAREER_BACKEND_URL":
+            if (not isinstance(entry, str) or not entry
+                    or any(ch.isspace() or ord(ch) < 32 or ord(ch) == 127 for ch in entry)):
+                return False
+            try:
+                parsed = urlsplit(entry)
+                port = parsed.port
+            except ValueError:
+                return False
+            if (parsed.scheme not in {"http", "https"} or not parsed.hostname
+                    or parsed.username is not None or parsed.password is not None
+                    or parsed.query or parsed.fragment or (port is not None and port <= 0)):
+                return False
+        else:
+            return False
+    return True
+
+
+def _sandbox_profiles(value, workspace_root: str, default_network) -> Optional[dict]:
+    """정책에 등록된 profile 만 검증한다. 빈 목록은 모두 기존 실행을 유지한다."""
+    if not isinstance(value, dict):
+        return None
+    profiles = {}
+    for name, settings in value.items():
+        if (not isinstance(name, str) or name == "default" or not PROFILE_NAME_RE.fullmatch(name)
+                or not isinstance(settings, dict) or set(settings) - SANDBOX_PROFILE_KEYS):
+            return None
+        mounts = settings.get("read_only_mounts", [])
+        if (not _sandbox_mounts_ok(mounts)
+                or any(_sandbox_mount_overlaps(mount, workspace_root) for mount in mounts)):
+            return None
+        env = settings.get("env", {})
+        if not _sandbox_env_ok(env):
+            return None
+        network = settings.get("network", default_network)
+        if network is not None and not (isinstance(network, str) and SANDBOX_NETWORK_RE.fullmatch(network)):
+            return None
+        profiles[name] = {"read_only_mounts": list(mounts), "env": dict(env), "network": network}
+    return profiles
+
+
 def _sandbox_policy() -> Optional[dict]:
     """`SANDBOX_ENV` 의 JSON 을 읽어 검증한다. 없거나 하나라도 틀리면 None 이다.
 
-    None 이면 셸과 파일 도구를 켜지 않는다. 로컬 셸로 두지 않고 닫는다(ADR-086).
+    None 이면 셸과 파일 도구 저장을 거절한다. 유효한 정책의 profiles 에 없는 profile 은 기존 실행을 유지한다(ADR-086).
     """
     raw = os.environ.get(SANDBOX_ENV, "").strip()
     if not raw:
@@ -1835,7 +1892,7 @@ def _sandbox_policy() -> Optional[dict]:
     if not _sandbox_path_ok(value.get("workspace_root")):
         return invalid("workspace_root")
     network = value.get("network")
-    if network is not None and not (isinstance(network, str) and SANDBOX_NETWORK_RE.match(network)):
+    if network is not None and not (isinstance(network, str) and SANDBOX_NETWORK_RE.fullmatch(network)):
         return invalid("network")
     cpu = value.get("cpu", 1)
     if isinstance(cpu, bool) or not isinstance(cpu, (int, float)) or not 0 < cpu <= 8:
@@ -1846,16 +1903,12 @@ def _sandbox_policy() -> Optional[dict]:
     read_only_mounts = value.get("read_only_mounts", [])
     if not _sandbox_mounts_ok(read_only_mounts):
         return invalid("read_only_mounts")
-    profile_mounts = value.get("profile_mounts", {})
-    if (not isinstance(profile_mounts, dict)
-            or not all(isinstance(name, str) and _sandbox_mounts_ok(mounts) for name, mounts in profile_mounts.items())):
-        return invalid("profile_mounts")
     workspace_root = value["workspace_root"]
     if any(_sandbox_mount_overlaps(mount, workspace_root) for mount in read_only_mounts):
         return invalid("read_only_mounts")
-    if any(_sandbox_mount_overlaps(mount, workspace_root)
-           for mounts in profile_mounts.values() for mount in mounts):
-        return invalid("profile_mounts")
+    profiles = _sandbox_profiles(value.get("profiles"), workspace_root, network)
+    if profiles is None:
+        return invalid("profiles")
     return {
         "image": image,
         "workspace_root": value["workspace_root"],
@@ -1863,7 +1916,7 @@ def _sandbox_policy() -> Optional[dict]:
         "cpu": cpu,
         "memory_mb": memory_mb,
         "read_only_mounts": list(read_only_mounts),
-        "profile_mounts": {name: list(mounts) for name, mounts in profile_mounts.items()},
+        "profiles": profiles,
     }
 
 
@@ -1877,7 +1930,9 @@ def _sandbox_terminal(policy: dict, profile: str, owner: str) -> dict:
     값을 건네는 칸(`docker_forward_env`, `env_passthrough`, `credential_files`)은 비워 둔다.
     profile 의 비밀값이 실행 공간에 들어가지 않게 하려는 것이다.
     """
-    mounts = policy["read_only_mounts"] + policy["profile_mounts"].get(profile, [])
+    settings = policy["profiles"][profile]
+    mounts = policy["read_only_mounts"] + settings["read_only_mounts"]
+    network = settings["network"]
     terminal = {
         "backend": "docker",
         "cwd": "/workspace",
@@ -1888,10 +1943,10 @@ def _sandbox_terminal(policy: dict, profile: str, owner: str) -> dict:
         "docker_mount_cwd_to_workspace": False,
         "docker_run_as_host_user": False,
         "docker_network": True,
-        "docker_extra_args": ["--network=%s" % policy["network"]] if policy["network"] else [],
+        "docker_extra_args": ["--network=%s" % network] if network else [],
         "docker_volumes": ["%s:/workspace" % _sandbox_workspace(policy, owner)] + ["%s:ro" % m for m in mounts],
         "docker_forward_env": [],
-        "docker_env": {},
+        "docker_env": settings["env"],
         "env_passthrough": [],
         "credential_files": [],
         "container_cpu": policy["cpu"],
@@ -1932,12 +1987,16 @@ async def _check_config_update(request):
         if rejected is not None:
             return rejected
     sandbox = None
+    local_execution = False
     if platform is not None and SANDBOX_TOOLSETS & set(platform["api_server"]):
-        if owner is None:
-            return _rejected("셸 도구에는 sandbox_owner 가 필요하다")
         sandbox = _sandbox_policy()
         if sandbox is None:
             return _sandbox_unavailable()
+        if profile not in sandbox["profiles"]:
+            sandbox = None
+            local_execution = True
+        elif owner is None:
+            return _rejected("격리할 셸 도구에는 sandbox_owner 가 필요하다")
     skills = config.get("skills")
     skill_dirs = None
     if skills is not None:
@@ -1987,6 +2046,15 @@ async def _check_config_update(request):
         if sandbox is not None:
             # 칸 일부만 고치면 운영자가 남긴 local 설정이나 값 전달 칸이 섞인다. 통째로 바꾼다.
             updated["terminal"] = _sandbox_terminal(sandbox, profile, owner)
+        elif local_execution:
+            # 정책에서 빠진 profile 도 다음 도구 저장부터 local 로 돌아간다.
+            # 이미 local 인 설정은 유지하되 .env 의 backend 값보다 명시한 local 값이 이기게 한다.
+            previous = saved.get("terminal") or {}
+            if not isinstance(previous, dict):
+                raise ValueError("terminal 설정이 객체가 아니다")
+            terminal = dict(previous) if previous.get("backend", "local") == "local" else {}
+            terminal["backend"] = "local"
+            updated["terminal"] = terminal
         if skill_dirs is not None:
             # PUT /api/config 는 목록을 통째로 바꾼다. 운영자가 넣은 경로가 있으면 지우지 않고 멈춘다.
             if _operator_skill_dirs(saved, profile, root):

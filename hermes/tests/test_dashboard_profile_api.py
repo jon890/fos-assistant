@@ -1883,8 +1883,11 @@ class ProfileApiRouteTest(unittest.TestCase):
             "cpu": 2,
             "memory_mb": 2048,
             "read_only_mounts": ["/srv/shared:/opt/shared"],
-            "profile_mounts": {"owner": ["/srv/owner-skills:/opt/owner-skills"],
-                               "alice": ["/srv/alice-skills:/opt/alice-skills"]},
+            "profiles": {
+                "owner": {"read_only_mounts": ["/srv/owner-skills:/opt/owner-skills"]},
+                "alice": {"read_only_mounts": ["/srv/alice-skills:/opt/alice-skills"]},
+                "blog": {},
+            },
         }
         policy.update(changed)
         return {key: value for key, value in policy.items() if value is not None}
@@ -1972,7 +1975,7 @@ class ProfileApiRouteTest(unittest.TestCase):
         self.assertTrue((self.sandbox_root / "user-1").is_dir())
 
     def test_sandbox_terminal_mounts_profile_entries_only_on_that_profile(self):
-        """profile_mounts 는 그 profile 의 실행 공간에만 붙고, network 가 없으면 추가 인자가 없다."""
+        """profile 별 마운트는 그 실행 공간에만 붙고, network 가 없으면 추가 인자가 없다."""
         self.make_profile("blog")
         self.register_memory("blog")
         self.set_sandbox_policy(self.sandbox_policy(network=None, cpu=None, memory_mb=None))
@@ -2016,13 +2019,13 @@ class ProfileApiRouteTest(unittest.TestCase):
             ("three pieces", self.sandbox_policy(read_only_mounts=["/srv:/opt/x:rw"])),
             ("workspace mount", self.sandbox_policy(read_only_mounts=["/srv:/workspace"])),
             ("under workspace", self.sandbox_policy(read_only_mounts=["/srv:/workspace/x"])),
-            ("under root", self.sandbox_policy(profile_mounts={"owner": ["/srv:/root/.hermes"]})),
+            ("under root", self.sandbox_policy(profiles={"owner": {"read_only_mounts": ["/srv:/root/.hermes"]}})),
             ("mounts not list", self.sandbox_policy(read_only_mounts="/srv:/opt/x")),
             ("mount source is workspace root", self.sandbox_policy(read_only_mounts=[root + ":/opt/x"])),
             ("mount source under workspace root",
              self.sandbox_policy(read_only_mounts=[root + "/user-2:/opt/x"])),
             ("mount source above workspace root",
-             self.sandbox_policy(profile_mounts={"owner": [str(self.sandbox_root.parent) + ":/opt/x"]})),
+             self.sandbox_policy(profiles={"owner": {"read_only_mounts": [str(self.sandbox_root.parent) + ":/opt/x"]}})),
             ("unknown top-level key", dict(self.sandbox_policy(), docker_extra_args=["--privileged"])),
         ]
         path = self.root / "owner/config.yaml"
@@ -2060,6 +2063,122 @@ class ProfileApiRouteTest(unittest.TestCase):
         # 64자까지는 받는다.
         self.assertEqual(self.request("/api/config", "PUT", token="valid", body=self.file_body("a" * 64)), 200)
 
+    def test_unlisted_profile_keeps_local_terminal_and_needs_no_sandbox_owner(self):
+        """유효한 정책에 없는 profile 은 셸 저장을 허용하고 기존 local 설정을 그대로 둔다."""
+        path = self.root / "owner/config.yaml"
+        config = self.saved_config()
+        config["terminal"] = {"backend": "local", "cwd": "/tmp", "timeout": 90}
+        path.write_text(yaml.safe_dump(config), encoding="utf-8")
+        self.set_sandbox_policy(self.sandbox_policy(profiles={"alice": {}}))
+
+        self.assertEqual(self.request("/api/config", "PUT", token="valid", body=self.file_body(owner=None)), 200)
+        self.assertEqual(self.saved_config()["terminal"], config["terminal"])
+        self.assertFalse((self.sandbox_root / "user-1").exists())
+
+    def test_empty_profiles_policy_keeps_all_profiles_local(self):
+        """profiles 가 비었으면 정책 없음과 구분해 모든 profile 의 기존 실행을 유지한다."""
+        self.set_sandbox_policy(self.sandbox_policy(profiles={}))
+        self.assertEqual(self.request("/api/config", "PUT", token="valid", body=self.file_body(owner=None)), 200)
+        self.assertEqual(self.saved_config()["terminal"], {"backend": "local"})
+
+    def test_profile_removed_from_policy_returns_to_local_on_shell_save(self):
+        """정책에서 profile 을 빼면 다음 셸 저장에서 이전 docker 설정을 제거한다."""
+        self.save_sandbox_key()
+        self.set_sandbox_policy(self.sandbox_policy(profiles={}))
+
+        self.assertEqual(self.request("/api/config", "PUT", token="valid", body=self.file_body(owner=None)), 200)
+        self.assertEqual(self.saved_config()["terminal"], {"backend": "local"})
+
+    def test_profile_policy_does_not_change_another_profile_or_default_config(self):
+        """도구를 저장한 profile 만 바뀌고 기본 profile 과 다른 profile 의 설정은 그대로다."""
+        self.make_profile("alice")
+        self.register_memory("alice")
+        default = self.root / "config.yaml"
+        default.write_text("terminal:\n  backend: local\n", encoding="utf-8")
+        alice_path = self.root / "alice/config.yaml"
+        alice_before = alice_path.read_bytes()
+        default_before = default.read_bytes()
+        self.set_sandbox_policy(self.sandbox_policy(profiles={"owner": {}}))
+
+        self.assertEqual(self.request("/api/config", "PUT", token="valid", body=self.file_body()), 200)
+        self.assertEqual(self.saved_config()["terminal"]["backend"], "docker")
+        self.assertEqual(default.read_bytes(), default_before)
+        self.assertEqual(alice_path.read_bytes(), alice_before)
+
+    def test_profile_env_and_network_are_only_taken_from_policy(self):
+        """지정한 profile 에만 정책의 경로와 Backend 주소, 망을 넣고 요청 본문으로는 바꾸지 못한다."""
+        env = {
+            "CAREER_BACKEND_URL": "http://backend.test",
+            "CAREER_BACKEND_TOKEN_FILE": "/run/secrets/backend-token",
+            "CLAUDE_PLUGIN_ROOT": "/opt/plugin",
+            "CAREER_EVIDENCE_DIR": "/opt/evidence",
+            "CAREER_WORKSPACE_ROOT": "/workspace/career",
+            "CAREER_DART_API_KEY_FILE": "/run/secrets/dart-key",
+        }
+        self.set_sandbox_policy(self.sandbox_policy(profiles={
+            "owner": {"env": env, "network": "backend-test-net"},
+            "alice": {},
+        }))
+        self.save_sandbox_key()
+        terminal = self.saved_config()["terminal"]
+        self.assertEqual(terminal["docker_env"], env)
+        self.assertEqual(terminal["docker_extra_args"], ["--network=backend-test-net"])
+        self.assertEqual(terminal["docker_forward_env"], [])
+        self.assertEqual(terminal["credential_files"], [])
+        self.make_profile("alice")
+        self.register_memory("alice")
+        self.save_sandbox_key(profile="alice")
+        alice = yaml.safe_load((self.root / "alice/config.yaml").read_text(encoding="utf-8"))["terminal"]
+        self.assertEqual(alice["docker_env"], {})
+        self.assertEqual(alice["docker_extra_args"], ["--network=sandbox-net"])
+
+        original = (self.root / "owner/config.yaml").read_bytes()
+        for key, value in (("env", env), ("network", "other-net"), ("read_only_mounts", []),
+                           ("profiles", {"owner": {}})):
+            with self.subTest(key=key):
+                body = self.file_body()
+                body["config"][key] = value
+                self.assertEqual(self.request("/api/config", "PUT", token="valid", body=body), 400)
+                self.assertEqual((self.root / "owner/config.yaml").read_bytes(), original)
+
+    def test_profile_env_and_network_changes_replace_the_container_key(self):
+        """profile 의 경로와 망을 바꾸면 옛 컨테이너를 재사용하지 않는다."""
+        first = self.save_sandbox_key()
+        self.set_sandbox_policy(self.sandbox_policy(profiles={"owner": {"env": {"CLAUDE_PLUGIN_ROOT": "/opt/new"}}}))
+        env_key = self.save_sandbox_key()
+        self.assertNotEqual(env_key, first)
+        self.set_sandbox_policy(self.sandbox_policy(profiles={
+            "owner": {"env": {"CLAUDE_PLUGIN_ROOT": "/opt/new"}, "network": "new-net"},
+        }))
+        self.assertNotEqual(self.save_sandbox_key(), env_key)
+
+    def test_invalid_profile_policy_is_unavailable_even_for_unlisted_profiles(self):
+        """정책 전체가 잘못됐으면 목록에 없는 profile 도 셸 저장을 거절한다."""
+        cases = [
+            ("missing profiles", self.sandbox_policy(profiles=None)),
+            ("not object", self.sandbox_policy(profiles=[])),
+            ("default profile", self.sandbox_policy(profiles={"default": {}})),
+            ("bad name", self.sandbox_policy(profiles={"../owner": {}})),
+            ("bad settings", self.sandbox_policy(profiles={"alice": []})),
+            ("unknown key", self.sandbox_policy(profiles={"alice": {"docker_extra_args": []}})),
+            ("bad network", self.sandbox_policy(profiles={"alice": {"network": "--host"}})),
+            ("bad env", self.sandbox_policy(profiles={"alice": {"env": []}})),
+            ("secret env", self.sandbox_policy(profiles={"alice": {"env": {"CAREER_BACKEND_TOKEN": "secret"}}})),
+            ("relative path", self.sandbox_policy(profiles={"alice": {"env": {"CLAUDE_PLUGIN_ROOT": "plugin"}}})),
+            ("dot path", self.sandbox_policy(profiles={"alice": {"env": {"CLAUDE_PLUGIN_ROOT": "/opt/./plugin"}}})),
+            ("newline path", self.sandbox_policy(profiles={"alice": {"env": {"CLAUDE_PLUGIN_ROOT": "/opt/plugin\n"}}})),
+            ("authenticated url", self.sandbox_policy(profiles={"alice": {"env": {"CAREER_BACKEND_URL": "http://user:pass@backend.test"}}})),
+            ("url query", self.sandbox_policy(profiles={"alice": {"env": {"CAREER_BACKEND_URL": "http://backend.test?token=value"}}})),
+            ("bad url port", self.sandbox_policy(profiles={"alice": {"env": {"CAREER_BACKEND_URL": "http://backend.test:bad"}}})),
+            ("url scheme", self.sandbox_policy(profiles={"alice": {"env": {"CAREER_BACKEND_URL": "file:///opt/backend"}}})),
+        ]
+        path = self.root / "owner/config.yaml"
+        original = path.read_bytes()
+        for label, policy in cases:
+            with self.subTest(label=label):
+                self.set_sandbox_policy(policy)
+                self.assertEqual(self.request("/api/config", "PUT", token="valid", body=self.file_body()), 409)
+                self.assertEqual(path.read_bytes(), original)
     def test_toolset_update_without_shell_keeps_terminal_without_policy(self):
         """셸 도구가 없는 저장은 실행 공간 설정이 없어도 되고 terminal: 을 건드리지 않는다."""
         os.environ.pop("FOS_ASSISTANT_SANDBOX")

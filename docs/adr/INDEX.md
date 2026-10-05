@@ -88,4 +88,4 @@
 | [ADR-082](ADR-082-먼저-살펴보기의-쓰기-도구는-관리자가-에이전트마다-켜고-커넥터-쓰기는-승인-카드로-보낸다.md) | 먼저 살펴보기의 쓰기 도구는 관리자가 에이전트마다 켜고, 커넥터 쓰기는 승인 카드로 보낸다 | backend, frontend | Accepted. 켠 에이전트에 한해 ADR-080 의 읽기 경계를 넓힌다 |
 | [ADR-084](ADR-084-gmail-typescript-filters.md) | Gmail 커넥터는 TypeScript 묶음 파일로 실행하고 필터 권한을 따로 받는다 | hermes | Accepted. ADR-066 의 서버와 단일 scope 를 대체한다 |
 | [ADR-085](ADR-085-매일-깨우기는-예약-작업을-다시-쓰고-다섯-칸-보고를-지금-화면에-올린다.md) | 매일 깨우기는 예약 작업을 다시 쓰고 다섯 칸 보고를 지금 화면에 올린다 | backend, frontend | Accepted. ADR-074, 076, 078, 079, 080, 081, 082 의 매일 깨우기와 보고 계약을 개정한다 |
-| [ADR-086](ADR-086-셸과-파일-도구는-사용자별-docker-실행-공간에서만-돈다.md) | 셸과 파일 도구는 사용자별 docker 실행 공간에서만 돈다 | backend, frontend, hermes | Accepted. ADR-082 의 남는 위험을 사용자 실행 공간 안으로 줄인다. ADR-029 의 「파일 접근을 격리하지 않는다」 전제는 실행 공간이 적용된 profile 에서 바뀐다 |
+| [ADR-086](ADR-086-셸과-파일-도구는-사용자별-docker-실행-공간에서만-돈다.md) | 셸과 파일 도구는 사용자별 docker 실행 공간에서만 돈다 | backend, frontend, hermes | Accepted. 운영 정책에 등록한 profile 에만 적용한다. ADR-082 의 남는 위험을 사용자 실행 공간 안으로 줄인다. ADR-029 의 「파일 접근을 격리하지 않는다」 전제는 실행 공간이 적용된 profile 에서 바뀐다 |

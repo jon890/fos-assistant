@@ -5,6 +5,27 @@
 측정은 도구를 모델 없이 직접 불렀다. gateway 가 profile 하나의 turn 을 묶는 함수(`gateway/run.py` 의 `_profile_runtime_scope`)로 profile 을 묶고 그 안에서 `registry.dispatch` 로 도구를 불렀다.
 합성 비밀 파일만 썼다. 운영 Hermes 와 운영 DB 는 건드리지 않았다.
 
+## profile 별 적용
+
+대시보드 plugin 은 유효한 `FOS_ASSISTANT_SANDBOX` 정책의 `profiles` 에 등록된 profile 만 docker 실행 공간으로 보낸다.
+미등록 profile 은 셸 도구 저장을 허용하고 local 로 둔다. 정책 자체가 없거나 잘못됐으면 저장을 거절한다.
+도구 저장 때 backend 가 바뀌므로 정책만 수정해서 이미 저장된 profile 의 실행 공간이 바뀌지는 않는다.
+정책에서 profile 을 빼면 다음 셸 저장에서 local 로 돌아간다.
+정책 형식과 env, 망, 마운트 검증은 [`../../hermes/README.md`](../../hermes/README.md)의 「셸 실행 공간」이 갖는다.
+
+커리어 실행기의 경로와 Backend URL 은 그 profile 정책의 env 에만 둔다.
+Backend 와 연결할 망과 token 파일의 읽기 전용 마운트도 같은 profile 에만 둔다.
+셸은 token 파일을 읽고 Backend 의 모든 API 를 부를 수 있다. 읽기 전용 마운트는 token 유출이나 API 쓰기를 막지 않는다.
+checkout 은 필요한 코드와 근거만 읽기 전용으로 붙이고, 근거 검사는 `--no-fetch` 로 돌린다.
+작업본은 `/workspace/career`, study 실행기의 임시 자료는 `/tmp` 를 쓴다.
+
+**기존 Hermes 예약 작업은 기본 profile(local)에 남으며 아직 격리되지 않았다.**
+named profile 저장은 기본 profile 설정과 cron 저장소를 바꾸지 않는다.
+예약 작업 이름이나 지시문에 역할 이름을 넣어도 실행 profile 은 바뀌지 않는다.
+script 를 지정한 예약 작업의 subprocess 는 Hermes 프로세스에서 돈다. terminal backend 를 바꾸는 것으로 격리되지 않는다.
+Control Plane 예약 작업과 매일 깨우기는 각 에이전트의 profile 을 쓰는 별도 기능이다.
+실제 적용 순서와 확인은 `fos-home-infra` 가 갖는다.
+
 ## 무엇이 실행 공간 안에서 도는가
 
 `terminal.backend` 를 `docker` 로 두면 아래가 컨테이너 안에서 돈다.

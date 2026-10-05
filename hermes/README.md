@@ -63,12 +63,30 @@ plugin 파일, 주소를 채운 `default-config.yaml.template`, 틀의 `plugins.
 | `cpu` | 아니오 | 0 보다 크고 8 이하. 기본 1 |
 | `memory_mb` | 아니오 | 256 이상 16384 이하의 정수. 기본 1024 |
 | `read_only_mounts` | 아니오 | 모든 실행 공간에 붙일 `<원본 절대 경로>:<컨테이너 절대 경로>` 목록. 읽기 전용으로만 붙는다 |
-| `profile_mounts` | 아니오 | profile 이름마다 위와 같은 목록. 그 profile 의 실행 공간에만 읽기 전용으로 붙는다 |
+| `profiles` | 예 | 격리할 named profile 이름을 키로 둔 객체. 아래 표의 설정을 값으로 받는다. 빈 객체면 모두 local 로 둔다. `default` 는 등록할 수 없다 |
 
-경로에 `..`, 빈 조각, `:` 둘 이상, `/workspace` 나 `/root` 로 시작하는 컨테이너 경로가 있으면 값 전체를 읽지 못한 것으로 본다.
-`read_only_mounts` 와 `profile_mounts` 의 원본이 `workspace_root` 와 같거나 그 아래이거나 그 상위이면(경로 조각 기준) 값 전체를 읽지 못한 것으로 본다. 다른 사용자의 디렉터리가 보이기 때문이다.
-위 표에 없는 최상위 키가 있으면 값 전체를 읽지 못한 것으로 본다. 모르는 키를 버리고 돌면 운영자가 걸었다고 믿는 제한이 빠진다.
-plugin 이 쓰는 `terminal:` 은 이렇다. 모든 칸을 통째로 바꾼다.
+`profiles[profile]` 은 다음 세 칸만 받는다.
+
+| 키 | 필수 | 모양 |
+| --- | --- | --- |
+| `read_only_mounts` | 아니오 | 이 profile 에만 붙일 읽기 전용 마운트 목록. 공통 마운트와 같은 형식이다 |
+| `env` | 아니오 | 아래 허용 목록의 비밀이 아닌 경로와 URL 만 받는 객체. 기본은 빈 객체다 |
+| `network` | 아니오 | 이 profile 에만 적용할 Docker 망 이름. 생략하면 공통 `network` 를 쓴다. `null` 이면 Docker 기본 망이다 |
+
+`env` 에서 `CAREER_BACKEND_URL` 은 HTTP(S) URL 이며 사용자 이름, 비밀번호, query 와 fragment 를 받지 않는다.
+`CAREER_BACKEND_TOKEN_FILE`, `CLAUDE_PLUGIN_ROOT`, `CAREER_EVIDENCE_DIR`, `CAREER_WORKSPACE_ROOT`, `CAREER_DART_API_KEY_FILE` 은 절대 경로만 받는다.
+token 과 API key 값 자체는 받지 않는다. 파일을 읽게 할 경우 같은 profile 의 읽기 전용 마운트를 운영 정책에 지정한다.
+일반 API 요청은 env, 망, 마운트와 profile 정책을 쓰지 못한다.
+
+경로에 `.`, `..`, 빈 조각, 제어 문자, `:` 둘 이상, `/workspace` 나 `/root` 아래의 마운트 대상이 있으면 정책 전체를 읽지 못한 것으로 본다.
+공통 또는 profile 별 마운트 원본이 `workspace_root` 와 같거나 그 아래이거나 그 상위이면(경로 조각 기준) 정책 전체를 읽지 못한 것으로 본다. 다른 사용자의 디렉터리가 보이기 때문이다.
+표에 없는 최상위 키나 profile 설정 키, 허용 목록에 없는 env 가 있어도 정책 전체를 거절한다.
+기존 `profile_mounts` 는 `profiles[profile].read_only_mounts` 로 옮겨야 한다.
+
+정책이 유효하고 profile 이 등록돼 있으면 plugin 은 아래 `terminal:` 전체를 쓴다.
+등록되지 않은 profile 은 셸 저장을 허용하고 `backend: local` 을 명시한다. 기존 local 옵션은 유지한다.
+이미 docker 였다가 정책에서 빠지면 다음 셸 저장에서 docker 설정을 지우고 local 로 돌아간다.
+정책 자체가 없거나 잘못됐으면 등록 여부와 관계없이 셸 저장을 거절한다.
 
 ```yaml
 terminal:
@@ -81,13 +99,13 @@ terminal:
   docker_mount_cwd_to_workspace: false
   docker_run_as_host_user: false
   docker_network: true
-  docker_extra_args: ["--network=<network>"]   # network 가 없으면 빈 목록
+  docker_extra_args: ["--network=<profile 의 network>"]   # network 가 없으면 빈 목록
   docker_volumes:
     - <workspace_root>/<sandbox_owner>:/workspace
     - <read_only_mounts 의 각 항목>:ro
-    - <profile_mounts[profile] 의 각 항목>:ro
+    - <profiles[profile].read_only_mounts 의 각 항목>:ro
   docker_forward_env: []
-  docker_env: {}
+  docker_env: <profiles[profile].env>
   env_passthrough: []
   credential_files: []
   container_cpu: <cpu>
@@ -96,6 +114,11 @@ terminal:
 ```
 
 `docker_shared_container_key` 의 지문은 이 칸을 뺀 나머지 `terminal:` 을 키 정렬 JSON 으로 만든 sha256 앞 12자다. 주인이나 실행 공간 설정이 바뀌면 키가 바뀌어 Hermes 가 새 컨테이너를 만든다. 한 키는 profile 하나만 쓴다.
+
+**기존 Hermes 예약 작업은 기본 profile(local)에 남으며 아직 격리되지 않았다.**
+named profile 의 도구 저장은 기본 profile 설정과 예약 작업을 바꾸지 않는다.
+Control Plane 의 예약 작업과 매일 깨우기는 별도 기능이며 각각의 에이전트 profile 을 쓴다.
+적용과 확인, profile 별 실제 값은 `fos-home-infra` 가 갖는다.
 
 ## 검사
 
@@ -352,7 +375,8 @@ provider credential 은 이 토큰으로 쓰지 못한다.
 - 운영자 env 이름의 `PUT /api/env` 와 `DELETE /api/env` 는 성공으로 답하고 아무것도 쓰지 않는다
 
 **토큰으로 부른 `PUT /api/config` 는 본문을 검사한 뒤 Hermes 처리기에 넘긴다.**
-최상위에는 `profile` 과 `config` 를 두고, `sandbox_owner` 를 더할 수 있다. `sandbox_owner` 는 `^[a-z][a-z0-9-]{0,63}$` 이고 도구 목록에 `terminal`, `file`, `code_execution` 가운데 하나라도 있으면 필수다.
+최상위에는 `profile` 과 `config` 를 두고, `sandbox_owner` 를 더할 수 있다. 형식은 `^[a-z][a-z0-9-]{0,63}$` 이다.
+셸 계열 도구를 켜고 해당 profile 이 실행 공간 정책에 등록돼 있으면 `sandbox_owner` 가 필수다. 미등록 profile 의 local 저장에서는 생략할 수 있다.
 `terminal:` 은 plugin 이 직접 쓰므로 본문의 `config` 에 두지 않는다.
 `config` 에는 `platform_toolsets.api_server` 와 `skills.external_dirs` 가운데 하나나 둘을 둔다.
 
@@ -364,7 +388,7 @@ provider credential 은 이 토큰으로 쓰지 못한다.
 - Control Plane MCP 가 아직 등록되지 않은 profile 은 그 이름과 알려진 내장 toolset 을 함께 넣는다
 - Hermes 가 계산한 실제 API 도구에 요청 목록 밖의 이름이 있으면 저장하지 않는다
 - 다른 platform 의 계산 결과가 바뀌어도 저장하지 않는다
-- 목록에 `terminal`, `file`, `code_execution` 가운데 하나라도 있으면 `FOS_ASSISTANT_SANDBOX` 로 `terminal:` 을 통째로 다시 쓴다. 그 값이 없거나 틀리면 409 와 본문 `code: sandbox_unavailable` 이다
+- 목록에 `terminal`, `file`, `code_execution` 가운데 하나라도 있으면 `FOS_ASSISTANT_SANDBOX` 를 검사한다. 값이 없거나 틀리면 409 와 본문 `code: sandbox_unavailable` 이다. 정책에 등록된 profile 만 `terminal:` 전체를 docker 설정으로 다시 쓰고, 미등록 profile 은 local 로 둔다
 
 올린 스킬 경로는 이렇게 본다. 루트는 대시보드 프로세스의 환경 변수 `FOS_ASSISTANT_SKILL_AGENT_ROOT` 다.
 
