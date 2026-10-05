@@ -6,7 +6,7 @@
 #
 # 단계마다 로그를 따로 남기고, 처음 실패한 단계에서 멈춰 그 로그의 끝을 보인다.
 #
-# 사용법: scripts/check-local.sh [브라우저 spec ...]
+# 사용법: scripts/check-local.sh [--skip-browser] [브라우저 spec ...]
 # 인자는 브라우저 검사에만 넘긴다. 인자가 없으면 브라우저 검사 전체를 돌린다.
 # 머지 전 로컬 확인에서는 고친 화면의 spec 만 준다. 전체 브라우저 검사는 PR 의 CI 가 맡는다.
 set -Eeuo pipefail
@@ -14,6 +14,17 @@ set -Eeuo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 tmp_root="${TMPDIR:-/tmp}"
 LOG_DIR="$(mktemp -d "${tmp_root%/}/fos-assistant-check.XXXXXX")"
+trap 'rm -rf "${LOG_DIR}"' EXIT
+
+skip_browser=false
+if [ "${1:-}" = "--skip-browser" ]; then
+  skip_browser=true
+  shift
+fi
+if [ "${skip_browser}" = true ] && [ "$#" -gt 0 ]; then
+  echo "--skip-browser 와 브라우저 spec 을 함께 줄 수 없다." >&2
+  exit 2
+fi
 
 # test/e2e 와 test/unit 은 Node 의 TypeScript 실행을 쓴다.
 node_version="$(node -p 'process.versions.node')"
@@ -76,14 +87,21 @@ if [ "$#" -gt 0 ]; then
   echo "브라우저 검사는 인자로 준 spec 만 돌린다: $*"
 fi
 step web-install     pnpm --dir "${ROOT}/web" install --frozen-lockfile
-step playwright      pnpm --dir "${ROOT}/web" exec playwright install chromium
+if [ "${skip_browser}" = false ]; then
+  step playwright    pnpm --dir "${ROOT}/web" exec playwright install chromium
+fi
 step backend         bash -c "cd '${ROOT}/backend' && ./gradlew test"
 step mysql-migration "${ROOT}/scripts/check-mysql-migration.sh"
 step web-typecheck   pnpm --dir "${ROOT}/web" typecheck
 step web-build       build_web
-step browser         pnpm --dir "${ROOT}/web" test:browser "$@"
+if [ "${skip_browser}" = false ]; then
+  step browser       pnpm --dir "${ROOT}/web" test:browser "$@"
+else
+  echo "관련 화면 spec 이 없어 브라우저 검사를 생략한다. 전체 검사는 PR CI 가 확인한다."
+fi
 step e2e             bash -c "cd '${ROOT}' && node test/e2e/run.ts"
 step unit            bash -c "cd '${ROOT}' && node --test 'test/unit/**/*.test.ts'"
+step connectors      bash "${ROOT}/scripts/check-connectors.sh"
 step hermes          check_hermes
 step public-safe     "${ROOT}/scripts/check-public-safe.sh"
 step quality         bash -c "cd '${ROOT}' && scripts/quality.sh check"
