@@ -30,14 +30,6 @@ public class ProactiveCheckGuard {
         return checks.existsByRootExecutionId(execution.treeRootId());
     }
 
-    /**
-     * 그 실행의 트리가 쓰기 도구를 허용한 살펴보기인가(ADR-082). 그 살펴보기 줄에 시작할 때 옮겨 적은 값을 읽는다. 살펴보기 트리가
-     * 아니면 거짓이다.
-     */
-    public boolean writesAllowed(AgentExecution execution) {
-        return checkOf(execution).map(ProactiveCheck::writesAllowed).orElse(false);
-    }
-
     /** 그 대화가 그 살펴보기의 점검 대화인가. 쓰기 도구를 허용한 살펴보기의 결과물 쓰기를 그 대화로 묶는다(ADR-082). */
     public boolean isCheckConversation(ProactiveCheck check, UUID conversationPublicId) {
         return conversations

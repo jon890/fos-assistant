@@ -345,11 +345,11 @@ class ProactiveCheckTurnTest {
                 executions.findById(both.get(0).rootExecutionId()).orElseThrow();
         AgentExecution secondRoot =
                 executions.findById(both.get(1).rootExecutionId()).orElseThrow();
-        assertThat(guard.writesAllowed(firstRoot))
+        assertThat(guard.checkOf(firstRoot).map(ProactiveCheck::writesAllowed).orElse(false))
                 .as("켜고 시작한 살펴보기, 지금 에이전트는 꺼짐")
                 .isTrue();
         allowWrites(true);
-        assertThat(guard.writesAllowed(secondRoot))
+        assertThat(guard.checkOf(secondRoot).map(ProactiveCheck::writesAllowed).orElse(false))
                 .as("끄고 시작한 살펴보기, 지금 에이전트는 켜짐")
                 .isFalse();
         assertThat(stub().received().getLast().instructions())
