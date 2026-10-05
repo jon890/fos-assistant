@@ -1878,7 +1878,7 @@ def _sandbox_terminal(policy: dict, profile: str, owner: str) -> dict:
     profile 의 비밀값이 실행 공간에 들어가지 않게 하려는 것이다.
     """
     mounts = policy["read_only_mounts"] + policy["profile_mounts"].get(profile, [])
-    return {
+    terminal = {
         "backend": "docker",
         "cwd": "/workspace",
         "docker_image": policy["image"],
@@ -1897,6 +1897,13 @@ def _sandbox_terminal(policy: dict, profile: str, owner: str) -> dict:
         "container_cpu": policy["cpu"],
         "container_memory": policy["memory_mb"],
     }
+    # Hermes 의 docker backend 는 컨테이너를 label 로만 찾아 다시 쓰고, 프로세스 안의 캐시는
+    # 지워진 컨테이너를 옛 run 인자로 다시 만든다. 마운트나 이미지가 바뀌어도 새 컨테이너가 생기지 않는다.
+    # 이 키가 label 과 캐시 키와 /root 의 디렉터리 이름을 정하므로, 주인이나 실행 공간 설정이 바뀌면
+    # 키를 바꿔 컨테이너와 프로세스 캐시와 /root 를 새로 쓰게 한다. 한 키는 이 profile 만 쓴다.
+    fingerprint = hashlib.sha256(json.dumps(terminal, sort_keys=True).encode("utf-8")).hexdigest()[:12]
+    terminal["docker_shared_container_key"] = "%s-%s-%s" % (profile, owner, fingerprint)
+    return terminal
 
 
 async def _check_config_update(request):

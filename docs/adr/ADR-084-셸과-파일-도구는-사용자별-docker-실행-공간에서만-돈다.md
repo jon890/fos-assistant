@@ -6,7 +6,7 @@
 
   | 칸 | 값 | 까닭 |
   | --- | --- | --- |
-  | 컨테이너 | profile 마다 하나, 오래 간다(`container_persistent: true`) | 스킬 마운트가 profile 마다 정확하다. 공유 키는 첫 profile 의 마운트만 붙는다 |
+  | 컨테이너 | profile 마다 하나. profile, 주인, 설정 지문으로 만든 키로 찾는다. 오래 간다(`container_persistent: true`) | 스킬 마운트가 profile 마다 정확하다. 여러 profile 이 한 키를 함께 쓰면 첫 profile 의 마운트만 붙는다. 주인이나 실행 공간 설정이 바뀌면 옛 컨테이너를 다시 쓰지 않는다 |
   | `/workspace` | 실행 공간 루트 아래 **사용자 디렉터리**를 붙인다 | 한 사용자의 에이전트끼리는 파일을 함께 쓰고, 다른 사용자의 파일은 보이지 않는다 |
   | `/root` | profile 마다 따로(Hermes 기본) | 셸 이력과 사용자 패키지가 profile 사이에 섞이지 않는다 |
   | 망 | 운영이 정한 전용 망. 인터넷은 열어 둔다 | 같은 bridge 의 내부 서비스에 닿지 않게 한다. 밖으로 나가는 요청은 막지 않고 기록한다 |
@@ -33,7 +33,7 @@
 
 - **대안 기각**:
   - **SSH backend 로 미리 띄운 컨테이너에 붙인다.** Docker 접근 없이 된다. 그러나 profile 마다 sshd 와 key 를 운영해야 하고, 원격 홈으로 스킬과 media cache 를 동기화하는 경로를 따로 검증해야 한다. docker backend 는 Hermes 가 마운트를 읽기 전용으로 붙이고 컨테이너를 label 로 관리한다.
-  - **`docker_shared_container_key` 로 사용자마다 컨테이너 하나를 둔다.** 컨테이너 수가 가장 적다. 그러나 첫 profile 의 스킬과 `terminal.*` 만 그 컨테이너에 붙어, 같은 사용자의 다른 에이전트가 자기 스킬 스크립트를 셸에서 찾지 못한다.
+  - **`docker_shared_container_key` 로 사용자마다 컨테이너 하나를 둔다.** 컨테이너 수가 가장 적다. 그러나 여러 profile 이 한 키를 함께 쓰면 첫 profile 의 스킬과 `terminal.*` 만 그 컨테이너에 붙어, 같은 사용자의 다른 에이전트가 자기 스킬 스크립트를 셸에서 찾지 못한다.
   - **profile 마다 `/workspace` 를 따로 둔다.** Control Plane 이 사용자 키를 보낼 필요가 없다. 사용자는 사용자 단위 공간을 골랐다.
   - **egress proxy 로 허용 목록을 켠다.** 기본 목록이 AI provider 뿐이라 `pip`, `npm`, 일반 웹 조회가 모두 403 이다. 목록을 늘리면 요청 하나에 수십 ms 가 더해졌다. proxy 는 환경 변수를 따르는 프로그램만 거르고 소켓을 직접 여는 프로그램은 통과시킨다. Hermes 는 proxy 가 Docker 호스트에 있다고 가정해 우리 구성에서는 연결도 되지 않았다. 사용자 결정대로 열어 두고 기록한다.
   - **경로와 메서드만 거르는 socket proxy.** 실행 공간은 동작하지만 `--privileged -v /:/host` 컨테이너 생성이 통과했다. Hermes 프로세스나 커넥터 MCP 서버가 뚫리면 호스트를 얻는다.
@@ -51,6 +51,8 @@
     - 컨테이너는 한 번 뜨면 운영이 멈출 때까지 떠 있고, 도구 시간 초과가 컨테이너 안의 프로세스를 끝내지 않는다. 유휴 컨테이너를 멈추는 일은 운영이 한다. 멈춘 컨테이너는 다음 호출에 Hermes 가 다시 띄운다.
     - 커리어 실행기처럼 운영 비밀 파일을 읽는 스크립트는 그 profile 에 읽기 전용으로 붙여야 돈다. 그 비밀은 그 사용자의 실행 공간에서 셸로 읽힌다. 커넥터(MCP)로 옮기면 컨테이너 밖으로 뺄 수 있다.
     - 운영 반영이 이 변경의 배포보다 먼저다. 반영 전에 배포하면 셸 계열 도구를 켜는 저장이 모두 거절된다. 이미 켜진 profile 은 다음 저장이나 운영의 일괄 반영 전까지 로컬 셸로 남는다.
+    - 키가 바뀌면 이전 키의 컨테이너와 `/root` 디렉터리가 남는다. 정리는 운영이 한다.
+    - 이미 게시된 스킬에 비밀 요청 칸이 있으면 저장 검사가 걸리지 않는다. 그 스킬은 계속 값을 실행 공간에 넣는다. 운영이 한 번 점검한다.
     - Hermes 를 올릴 때 terminal backend 계약을 다시 본다. 확인 항목은 [`hermes/upgrades.md`](../hermes/upgrades.md) 가 갖는다.
 
 - **적용 범위**: 대시보드 plugin 의 `PUT /api/config`, `HermesToolsetClient`, `HermesSkillClient`, `AgentToolService`, `AgentAdminService` 와 `AgentLifecycleService` 의 주인 변경 검사, `SkillPublisher`, `Agent` 의 실행 공간 주인 키, 올린 스킬 저장 검사, 에이전트 도구 화면의 확인 문구. 흐름은 [`backend/agent.md`](../backend/agent.md) 의 「에이전트 도구를 고를 때」 가 갖는다.

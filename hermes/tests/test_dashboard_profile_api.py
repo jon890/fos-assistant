@@ -1899,9 +1899,13 @@ class ProfileApiRouteTest(unittest.TestCase):
             body["sandbox_owner"] = owner
         return body
 
-    def expected_terminal(self, owner, mounts, extra_args=("--network=sandbox-net",), cpu=2, memory=2048):
-        """`hermes/README.md` 의 「셸 실행 공간」 YAML 을 그대로 옮긴 기대값이다."""
-        return {
+    def expected_terminal(self, owner, mounts, extra_args=("--network=sandbox-net",), cpu=2, memory=2048,
+                          profile="owner"):
+        """`hermes/README.md` 의 「셸 실행 공간」 YAML 을 그대로 옮긴 기대값이다.
+
+        `docker_shared_container_key` 는 그 칸을 뺀 나머지를 키 정렬 JSON 으로 만든 sha256 앞 12자를 붙인다.
+        """
+        terminal = {
             "backend": "docker",
             "cwd": "/workspace",
             "docker_image": "sandbox-image:test",
@@ -1920,6 +1924,32 @@ class ProfileApiRouteTest(unittest.TestCase):
             "container_cpu": cpu,
             "container_memory": memory,
         }
+        fingerprint = hashlib.sha256(json.dumps(terminal, sort_keys=True).encode("utf-8")).hexdigest()[:12]
+        terminal["docker_shared_container_key"] = "%s-%s-%s" % (profile, owner, fingerprint)
+        return terminal
+
+    def save_sandbox_key(self, profile="owner", owner="user-1"):
+        """셸 도구를 켜는 저장을 보내고 저장된 컨테이너 키를 돌려준다."""
+        body = self.file_body(owner=owner)
+        body["profile"] = profile
+        self.assertEqual(self.request("/api/config", "PUT", token="valid", body=body), 200)
+        saved = yaml.safe_load((self.root / profile / "config.yaml").read_text(encoding="utf-8"))
+        return saved["terminal"]["docker_shared_container_key"]
+
+    def test_sandbox_container_key_changes_with_owner_and_policy(self):
+        """같은 입력이면 키가 같고, 주인이나 마운트나 이미지가 바뀌면 키가 바뀌며, 다른 profile 과 겹치지 않는다."""
+        first = self.save_sandbox_key()
+        self.assertEqual(self.save_sandbox_key(), first, "같은 입력인데 키가 달라졌다")
+        self.assertNotEqual(self.save_sandbox_key(owner="user-2"), first, "주인이 바뀌었는데 키가 같다")
+        self.set_sandbox_policy(self.sandbox_policy(read_only_mounts=["/srv/other:/opt/shared"]))
+        self.assertNotEqual(self.save_sandbox_key(), first, "read_only_mounts 가 바뀌었는데 키가 같다")
+        self.set_sandbox_policy(self.sandbox_policy(image="sandbox-image:next"))
+        self.assertNotEqual(self.save_sandbox_key(), first, "image 가 바뀌었는데 키가 같다")
+        self.set_sandbox_policy(self.sandbox_policy())
+        self.assertEqual(self.save_sandbox_key(), first, "설정을 되돌렸는데 키가 처음과 다르다")
+        self.make_profile("blog")
+        self.register_memory("blog")
+        self.assertNotEqual(self.save_sandbox_key(profile="blog"), first, "다른 profile 과 키가 겹친다")
 
     def test_shell_toolset_writes_the_sandbox_terminal(self):
         """셸 도구를 켜면 profile 의 terminal: 을 실행 공간 설정으로 통째로 바꾼다."""
@@ -1951,7 +1981,7 @@ class ProfileApiRouteTest(unittest.TestCase):
         self.assertEqual(self.request("/api/config", "PUT", token="valid", body=body), 200)
         saved = yaml.safe_load((self.root / "blog/config.yaml").read_text(encoding="utf-8"))
         self.assertEqual(saved["terminal"], self.expected_terminal(
-            "user-2", ["/srv/shared:/opt/shared"], extra_args=(), cpu=1, memory=1024))
+            "user-2", ["/srv/shared:/opt/shared"], extra_args=(), cpu=1, memory=1024, profile="blog"))
 
     def test_shell_toolset_without_sandbox_policy_is_unavailable(self):
         """실행 공간 설정이 없으면 셸·파일 도구를 켜는 저장을 409 sandbox_unavailable 로 거절한다."""

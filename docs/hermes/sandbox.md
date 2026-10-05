@@ -62,6 +62,11 @@
 **프로세스가 다시 떠도 label 로 같은 컨테이너를 찾아 쓴다.** 멈춘 컨테이너는 `docker start` 로 다시 띄운다.
 측정에서 멈춘 컨테이너가 다음 호출에 3.3초 만에 다시 떴고 workspace 파일이 남아 있었다.
 
+**마운트를 바꿔도 같은 label 의 컨테이너를 다시 쓴다.** 프로세스 안의 캐시는 지워진 컨테이너를 옛 run 인자로 다시 만든다(`_find_reusable_container`, `_recreate_container`).
+그래서 설정이 바뀌면 키를 바꿔야 새 컨테이너가 생긴다.
+plugin 은 `docker_shared_container_key` 를 profile, 주인, 설정 지문으로 만들어 이 키를 바꾼다. 키가 바뀌면 label 과 캐시 키와 `/root` 디렉터리가 모두 새것이 된다.
+이전 키의 컨테이너와 `/root` 디렉터리는 남는다. 정리는 운영이 한다.
+
 ### 수명
 
 **`container_persistent` 가 켜져 있으면 Hermes 는 컨테이너를 멈추지 않는다.**
@@ -148,6 +153,8 @@ profile 셋을 썼다. 사용자 A 의 profile 둘, 사용자 B 의 profile 하�
 | 사용자별 볼륨 방식에서 같은 시험 | 위와 같다. 컨테이너는 profile 마다 하나 |
 | 대시보드 plugin 이 쓰는 `terminal:` 블록을 둔 뒤 실제 `PUT /api/config` 처리기로 도구 목록을 저장 | 블록이 남는다. 값이 빈 `docker_env: {}` 만 지워지고 기본값이 같아 동작은 같다 |
 | 그 블록으로 셸과 `write_file` | `/workspace` 에서 돈다. 읽기 전용으로 붙인 경로는 읽히고 쓰기는 「Read-only file system」 이다. 전용 망에 붙는다 |
+| 한 프로세스에서 `docker_volumes` 의 `/workspace` 원본만 바꾸고 셸을 다시 부른다 | **옛 컨테이너와 옛 원본이 그대로 쓰였다.** 바꾸기 전 디렉터리의 파일이 보였다 |
+| 같은 시험에서 `docker_shared_container_key` 도 함께 바꾼다 | 같은 프로세스에서 새 컨테이너가 생기고 새 원본만 보였다 |
 
 ## 같은 프로세스에 남는 구멍
 

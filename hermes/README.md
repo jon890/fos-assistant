@@ -91,7 +91,10 @@ terminal:
   credential_files: []
   container_cpu: <cpu>
   container_memory: <memory_mb>
+  docker_shared_container_key: <profile>-<sandbox_owner>-<지문>
 ```
+
+`docker_shared_container_key` 의 지문은 이 칸을 뺀 나머지 `terminal:` 을 키 정렬 JSON 으로 만든 sha256 앞 12자다. 주인이나 실행 공간 설정이 바뀌면 키가 바뀌어 Hermes 가 새 컨테이너를 만든다. 한 키는 profile 하나만 쓴다.
 
 ## 검사
 

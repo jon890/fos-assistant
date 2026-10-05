@@ -64,7 +64,7 @@ test("관리자가 terminal 도구를 켤 때 확인 창을 거친다", async ({
 
   const dialog = page.getByRole("alertdialog", { name: "명령 실행 도구 켜기" });
   await expect(dialog).toBeVisible();
-  await expect(dialog.getByText("이 도구는 이 사용자만의 격리된 실행 공간에서 셸과 파일을 다뤄요. 다른 사용자의 파일과 서버 비밀에는 닿지 않지만 인터넷에는 나갈 수 있어요.")).toBeVisible();
+  await expect(dialog.getByText("이 도구는 이 사용자만의 격리된 실행 공간에서 셸과 파일을 다뤄요. 다른 사용자의 작업 파일과 서버 설정에는 닿지 않지만, 사진 첨부는 모든 사용자 것을 읽을 수 있고 인터넷에는 나갈 수 있어요.")).toBeVisible();
   await dialog.getByRole("button", { name: "켜기" }).click();
   await expect(terminal.getByRole("switch")).toHaveAttribute("aria-checked", "true");
 
