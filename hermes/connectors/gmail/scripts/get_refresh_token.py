@@ -19,7 +19,10 @@ import urllib.request
 
 AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth"
 TOKEN_URL = "https://oauth2.googleapis.com/token"
-SCOPE = "https://www.googleapis.com/auth/gmail.modify"
+SCOPE = " ".join((
+    "https://www.googleapis.com/auth/gmail.modify",
+    "https://www.googleapis.com/auth/gmail.settings.basic",
+))
 TIMEOUT_SECONDS = 15
 # 브라우저에서 권한을 허용하기를 기다리는 전체 시간이다.
 WAIT_SECONDS = 300

@@ -63,7 +63,7 @@ To get there, the goal is to let you connect general-purpose connectors into an 
 - **It is the source of truth for long-term knowledge about you.** Agents and outside services read only the part they are allowed to. Service tokens are read-only, and the body of a sensitive entry is encrypted at rest.
 
 General-purpose connectors live in this repository under `hermes/connectors/` and are maintained here ([ADR-064](docs/adr/ADR-064-범용-커넥터는-이-저장소의-hermes-connectors-에-두고-저장소가-유지보수한다.md)).
-The first one is Gmail: it searches and reads your mail without asking, and creates drafts, sends, replies and changes labels only after you approve. It never moves mail to the trash or deletes it.
+The first one is Gmail: it searches and reads your mail and filters without asking, and creates drafts, sends, replies, manages labels and changes filters only after you approve. It never moves mail to the trash or deletes it.
 A connector for a service that only one household or organization uses, such as the household account book attached today, stays in its own repository.
 Growing the set of general-purpose connectors is where the work is headed. It is not done yet.
 
@@ -216,7 +216,7 @@ A general-purpose connector is one directory, `hermes/connectors/<id>/`. A pull 
 - A `connector.json` with `schema: 2` that declares every tool the MCP server exposes, each with a risk and a reason for it in the connector's document.
 - Calls that write require approval. Tools that send data to people outside the account also declare `"grant": false`, so each call is approved by a person. Tools that delete are not exposed.
 - Secrets come in only through environment variables declared in `fields`, and the smallest OAuth scope or permission that works.
-- An MCP server in Python that depends on nothing beyond the `mcp` SDK, and tests that run against a local fake of the service, never the real one.
+- An MCP server in TypeScript, bundled with its dependencies into one committed JavaScript file for Bun. Connector tests live alongside the source and use a local fake of the service.
 - A setup guide under `docs/connectors/` and an owner line in `.github/CODEOWNERS`.
 
 `hermes/tests/test_connectors_contract.py` checks the contract for every directory under `hermes/connectors/`, so a new connector is checked as soon as it is added.
