@@ -599,6 +599,21 @@ export const proactiveCheckScenario: Scenario = {
         `확인하지 못한 출처가 보이지 않는다:\n${failureAnswer}`,
       );
 
+      step("무소식의 출처 실패: NOTHING_NEW 여도 확인하지 못한 출처를 답으로 남긴다");
+      context.hermes.setProactiveScript({
+        output: proactiveOutput({ version: 1, outcome: "NOTHING_NEW", findings: [], sourceFailures: [SOURCE_FAILURE] }),
+      });
+      const beforeNothingNewFailure = (await statusOf(context)).lastCheck;
+      await startCheck(context);
+      const nothingNewFailure = await awaitFinished(context, beforeNothingNewFailure, "무소식의 출처 실패");
+      expect(nothingNewFailure.outcome === "NOTHING_NEW", "출처 실패가 있는 무소식의 outcome 이 바뀌었다");
+      const nothingNewFailureAnswer = lastAnswer(await messagesOf(context, conversationId), "무소식의 출처 실패").content;
+      expect(
+        nothingNewFailureAnswer.includes("새로 알릴 것은 없어요")
+          && nothingNewFailureAnswer.includes(`**확인하지 못한 출처**\n- ${SOURCE_FAILURE}`),
+        `무소식의 확인하지 못한 출처가 보이지 않는다:\n${nothingNewFailureAnswer}`,
+      );
+
       step(`상한: max-tool-calls 를 ${TOOL_LIMIT} 으로 두고 넘게 흘리면 멈추고 STOPPED 로 남는다`);
       process.env[TOOL_LIMIT_ENV] = String(TOOL_LIMIT);
       try {
