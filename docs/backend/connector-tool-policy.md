@@ -139,6 +139,7 @@ Control Plane 의 판정 순서다.
 | `schema: 2` 인데 `tool` 이 없거나 `tools` 에 없다 | 거절 | `UNDECLARED` |
 | 위험도가 `DESTRUCTIVE` 나 `FINANCIAL` 이다 | 거절 | `RISK_NOT_OPEN` |
 | 먼저 살펴보기 트리 안의 호출이고, 위험도가 `READ` 이면서 승인 방식이 `none` 인 도구가 아니다 | 거절 | `READ_ONLY_RUN` |
+| 쓰기 도구를 허용한 먼저 살펴보기 트리 안의 호출이고, 위험도가 `READ` 이면서 승인 방식이 `none` 인 도구가 아니다 | 승인 필요(상시 허락을 보지 않는다) | |
 | `args_json` 이 16KB 를 넘는다 | 거절 | `ARGS_TOO_LARGE` |
 | `approval` 이 `none` 이다 | 허용 | |
 | `approval` 이 `required` 이고 선언이 상시 허락을 닫지 않았고 유효한 상시 허락이 있다 | 허용 | |

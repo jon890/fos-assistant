@@ -68,6 +68,7 @@
 | `deleted_at` | DATETIME(6) NULL | 지운 시각. 적히면 목록과 새 대화에서 빠지고 그 에이전트의 대화는 읽기만 된다 |
 | `flow` | VARCHAR(64) NULL | 이 에이전트를 묶어 둔 다중 에이전트 흐름의 이름. 비어 있으면 Hermes 를 한 번 부른다 |
 | `connector_managed` | BOOLEAN | 참이면 커넥터를 연결할 때 만든 연결용 에이전트다. 기본 거짓 |
+| `proactive_check_writes_allowed` | BOOLEAN NOT NULL DEFAULT FALSE | 「먼저 살펴보기에 쓰기 도구 허용」. 관리자만 바꾼다. 켜면 그 에이전트의 먼저 살펴보기가 쓰기 toolset 과 결과물 쓰기를 쓰고 커넥터 쓰기를 승인 카드로 보낸다([ADR-082](../../adr/ADR-082-먼저-살펴보기의-쓰기-도구는-관리자가-에이전트마다-켜고-커넥터-쓰기는-승인-카드로-보낸다.md)) |
 | `connector_attachments` | BOOLEAN | 참이면 이 연결용 에이전트가 사진을 받는다. 커넥터가 선언한 toolset 이 실제로 켜진 것을 확인했을 때만 참이다. 기본 거짓 |
 | `default_model_provider` | VARCHAR(64) NULL | 기본 provider. `default_model` 과 함께 채우거나 함께 비운다 |
 | `default_model` | VARCHAR(128) NULL | 기본 모델. 대화가 모델을 고르지 않았을 때 Hermes 에 명시해 보낸다 |
