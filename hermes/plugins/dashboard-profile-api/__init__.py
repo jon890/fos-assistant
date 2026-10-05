@@ -1038,6 +1038,8 @@ def _connector_tool_map(state: dict) -> dict:
 
     옛 설치는 운영 목록에서 빠졌거나 manifest 를 읽을 수 없는 커넥터를 싣지 않는다. 대응이 없는 도구는 hook 이 막는다.
     바인딩 설치는 `isolated: false` 를 싣고 소유 기록의 모든 서버를 싣는다. manifest 를 읽지 못한 서버는 빈 `tools` 다.
+    바인딩 항목의 서버 이름은 기록의 이름이다. 기록의 이름이나 실행 정의가 지금 manifest 와 다르면 그 서버도 빈 `tools` 다.
+    떼기는 남는 항목을 manifest 와 견주지 않으므로, 운영자가 manifest 를 바꾼 뒤에도 `config.yaml` 에 남은 서버가 대응에 있어야 한다.
     바인딩 profile 의 hook 은 대응에 없는 서버를 통과시키므로, 서버가 빠지면 그 도구가 판정 없이 나간다(ADR-083).
     """
     roots = _connector_roots()
@@ -1051,8 +1053,16 @@ def _connector_tool_map(state: dict) -> dict:
                 servers[name] = {"connector": plugin, "prefix": _hermes_tool_name(name, ""), "tools": {}}
             continue
         name = manifest["mcp_server"]
-        servers[name] = {"connector": plugin, "prefix": _hermes_tool_name(name, ""),
-                         "tools": {_hermes_tool_name(name, tool): tool for tool in manifest["tools"]}}
+        tools = {_hermes_tool_name(name, tool): tool for tool in manifest["tools"]}
+        if _entry_mode(entry) == BIND_MODE:
+            recorded = entry.get("mcp_server") or name
+            try:
+                matches = _server_matches(manifest, entry["server"])
+            except (KeyError, TypeError, AttributeError):
+                matches = False
+            if recorded != name or not matches:
+                name, tools = recorded, {}
+        servers[name] = {"connector": plugin, "prefix": _hermes_tool_name(name, ""), "tools": tools}
     if bound:
         return {"v": 1, "isolated": False, "servers": servers}
     return {"v": 1, "servers": servers}

@@ -255,7 +255,7 @@ Control Plane MCP 호출에는 지금처럼 `_fos_ctx` 를 붙이고, 커넥터 
 
 판정을 물을 때와 `_fos_ctx` 를 서명할 때 같은 profile 토큰을 쓴다. 그래서 바인딩 profile 에는 Control Plane MCP 의 토큰이 있어야 한다.
 옛 설치 profile 과 다른 점은 대응에 없는 도구를 통과시키는 것이다. 그 profile 에는 Control Plane MCP 와 운영자가 넣은 MCP 서버가 함께 있어 막으면 그 서버들이 모두 막힌다.
-그 대신 대응 파일에 그 profile 의 모든 커넥터 서버가 실려 있어야 한다. 바인딩 설치가 manifest 를 읽지 못한 서버도 빈 `tools` 로 싣는다.
+그 대신 대응 파일에 그 profile 의 모든 커넥터 서버가 실려 있어야 한다. 바인딩 설치와 떼기가 manifest 를 읽지 못했거나 소유 기록의 서버 이름이나 실행 정의가 지금 manifest 와 다른 서버도 소유 기록의 이름으로 빈 `tools` 와 함께 싣는다.
 
 커넥터 도구의 결과는 `transform_tool_result` hook 이 Control Plane 의 `ExternalData` 와 같은 `<external-data>` 로 감싼다.
 hook 이 무엇을 묻고 막고 감싸는지 전체 표는 [`hermes/README.md`](../../hermes/README.md) 의 「커넥터 도구 호출을 묻는다」 가, Hermes 가 그 hook 을 언제 부르는지는 [도구 hook 과 승인](connector-policy.md) 의 「도구 결과를 바꾸는 hook」 이 갖는다.

@@ -104,6 +104,7 @@ export const CONNECTION_ERROR_MESSAGES: Record<string, string> = {
     "재시작한 뒤에 다시 설치됐어요. 한 번 더 재시작한 뒤 눌러 주세요.",
   AGENT_CONNECTIONS_REQUIRE_PRIVATE: "비공개 에이전트에만 붙일 수 있어요.",
   AGENT_NOT_FOUND: "에이전트가 없거나 이 계정에서 사용할 수 없어요.",
+  AGENT_BUSY: "다른 설정 변경이 끝날 때까지 기다린 뒤 다시 시도해 주세요.",
   FORBIDDEN: "이 작업을 관리할 수 없어요.",
   UNAUTHENTICATED: "로그인이 필요해요.",
   VALIDATION_FAILED: "입력 형식을 확인해 주세요.",

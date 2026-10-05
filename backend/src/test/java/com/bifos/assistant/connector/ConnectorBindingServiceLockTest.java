@@ -236,7 +236,7 @@ class ConnectorBindingServiceLockTest {
                     .cause()
                     .isInstanceOfSatisfying(
                             ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.AGENT_BUSY));
-            assertThat(onlyBinding().status()).isEqualTo(BindingStatus.PENDING);
+            assertThat(onlyBinding().restartRequired()).as("재시작 대기가 풀리지 않았다").isTrue();
             verify(connector, never()).probe(anyString(), anyString());
         } finally {
             release.countDown();

@@ -534,6 +534,34 @@ test("승인한 동작을 실행하는 중이면 해제가 거절되고 정해 �
   await expect(page.getByTestId("connection-status")).toHaveText("연결됨");
 });
 
+test("확인할 값이 없어 연결 확인이 거절되면 연결을 다시 읽어 보이고 값을 다시 넣으라고 알린다", async ({
+  page,
+}) => {
+  // 서버는 거절하며 연결을 준비 중으로 커밋한다. 다시 읽은 값이 화면에 보여야 한다.
+  let checked = false;
+  await page.route(`**/api/connections/${DEMO_ID}`, (route) =>
+    route.fulfill({
+      json: checked ? { ...pending, values: { scope: "scope-b" } } : pending,
+    }),
+  );
+  await page.route(`**/api/connections/${DEMO_ID}/check`, (route) => {
+    checked = true;
+    return route.fulfill({
+      status: 409,
+      json: { code: "CONNECTOR_NOT_CONNECTED", message: "raw upstream" },
+    });
+  });
+  await page.goto(`/connections/${DEMO_ID}`);
+  await expect(page.getByText(`범위: ${SCOPE_ID}`)).toBeVisible();
+  await page.getByRole("button", { name: "연결 다시 확인" }).click();
+  await expect(page.getByRole("main").getByRole("alert")).toHaveText(
+    "값을 다시 입력해 연결해 주세요.",
+  );
+  await expect(page.getByText("범위: scope-b")).toBeVisible();
+  await expect(page.getByTestId("connection-status")).toHaveText("준비 중");
+  await expect(page.getByText("raw upstream")).toHaveCount(0);
+});
+
 test("허락한 동작이 있으면 제목으로 보이고 다시 묻기를 누르면 거두고 줄이 사라진다", async ({
   page,
 }) => {

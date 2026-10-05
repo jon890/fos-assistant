@@ -908,11 +908,16 @@ export function startFakeHermes(
     const toolsets = apiServerToolsets.get(profile);
     const connector = fakeConnector(plugin);
     if (!enabled) {
-      if (bind !== undefined || connector === undefined) {
+      if (bind !== undefined) {
         send(response, 400, { error: "invalid connector request" });
         return;
       }
       connectorRequests.push(`unbind ${profile}`);
+      // 카탈로그에 없는 커넥터도 실제 대시보드는 소유 기록만 보고 뗀다. 이 대역은 그 기록만 지운다.
+      if (connector === undefined) {
+        answer(bound.delete(plugin), false);
+        return;
+      }
       // 그 profile 에 붙지 않은 커넥터는 뗄 것이 없다. 실제 대시보드처럼 아무것도 바꾸지 않고 바뀐 것 없이 답한다.
       if (!bound.delete(plugin)) {
         answer(false, false);

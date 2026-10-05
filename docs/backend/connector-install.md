@@ -72,7 +72,7 @@ profile 이 어떤 요청을 받는지는 두 표식이 정한다. 판정은 요
 | `platform_toolsets.api_server` | 서버 이름을 더한다. 있던 이름은 그대로 두고 `no_mcp` 는 뺀다. manifest 의 `toolsets` 는 더하지 않는다 | 그 이름만 뺀다 |
 | 스킬 | plugin 의 스킬 디렉터리를 그 profile 의 `skills/<앞머리 name>/` 로 복사한다. `SKILL.md` 와 `references/`, `templates/` 아래 정규 파일이다 | 소유 기록의 `skills` 디렉터리를 지운다 |
 | 소유 기록 | 항목에 `mode: bind`, `vault`, `skills` 를 적는다 | 그 항목을 지운다 |
-| 이름 대응 파일 | `isolated: false` 를 싣고 소유 기록의 모든 서버를 싣는다. manifest 를 읽지 못한 서버는 빈 `tools` 다 | 남은 바인딩이 없으면 지운다 |
+| 이름 대응 파일 | `isolated: false` 를 싣고 소유 기록의 모든 서버를 싣는다. manifest 를 읽지 못했거나 소유 기록의 서버 이름이나 실행 정의가 지금 manifest 와 다른 서버는 소유 기록의 이름으로 빈 `tools` 다 | 남은 바인딩이 없으면 지운다 |
 | `fos-ctx` | 묶음에 든 판으로 맞춘다 | 건드리지 않는다 |
 | 답의 `restart_required` | 바뀐 것이 있으면 참이다. 떠 있는 profile 에 더한 MCP 서버는 gateway 를 다시 띄워야 보인다 | 거짓이다. 도구 목록에서 이름을 빼므로 다음 실행부터 막힌다 |
 
@@ -180,7 +180,7 @@ Control Plane 은 도구 목록을 직접 쓰지 않는다. 바인딩 설치가 
 ### 관리자 반영 완료
 
 1. 관리자인지 본다. 에이전트 번호와 주인은 트랜잭션 밖에서 읽는다. 트랜잭션의 첫 읽기가 잠금이어야 MySQL 의 REPEATABLE READ 에서 등록이 커밋한 재시작 시각을 보기 때문이다
-2. 주인의 사용자 행, 에이전트 행을 붙이기와 같은 차례로 잠근다. 잠근 뒤 그 에이전트의 주인이 바뀌었으면 `AGENT_BUSY` 다. 그 주인이 관리자와 같은 그룹인지 보고 바인딩을 새로 읽는다
+2. 주인의 사용자 행, 에이전트 행을 붙이기와 같은 차례로 잠근다. 잠근 뒤 그 에이전트의 주인이 바뀌었으면 `AGENT_BUSY` 다. 그다음 지금 주인이 관리자와 같은 그룹인지 보고, 아니면 `FORBIDDEN` 이다. 그 뒤 바인딩을 새로 읽는다
 3. 바인딩의 `restart_required_since` 가 요청의 `restartRequiredSince` 보다 늦거나 요청이 비었으면 `CONNECTOR_RESTART_AGAIN` 으로 거절한다. 관리자가 재시작한 뒤에 다시 설치된 바인딩이다. 바인딩에 그 시각이 없으면 요청을 보지 않는다
 4. 위 「바인딩의 반영 맞추기」 를 한다. `READY` 가 되지 않으면 `CONNECTOR_OPERATION_FAILED` 로 끝낸다
 

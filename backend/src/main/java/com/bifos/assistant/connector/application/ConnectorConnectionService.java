@@ -282,8 +282,9 @@ public class ConnectorConnectionService {
      *
      * <p>확인 도구가 실패하면 연결을 {@code PENDING} 으로 커밋하고 공통 어휘의 오류로 끝낸다. 옛 연결의 값을 옮기지
      * 못했으면 확인 도구를 부르지 않고 연결의 상태를 그대로 둔다. 그 연결은 다른 에이전트에 붙지 못한다. 보관 파일이 없고 값을
-     * 옮겨 올 옛 바인딩도 없으면 확인할 값이 없다. 연결을 {@code PENDING} 으로 커밋하고 {@code CONNECTOR_NOT_CONNECTED} 로
-     * 끝내 값을 다시 등록하게 한다. 바인딩의 외부 호출이 실패하면 그 바인딩만 {@code PENDING} 으로 커밋하고 연결 실패로 끝낸다.
+     * 옮겨 올 옛 바인딩도 없으면 확인할 값이 없다. 카탈로그에 있는 커넥터면 연결을 {@code PENDING} 으로 커밋하고
+     * {@code CONNECTOR_NOT_CONNECTED} 로 끝내 값을 다시 등록하게 한다. 바인딩의 외부 호출이 실패하면 그 바인딩만
+     * {@code PENDING} 으로 커밋하고 연결 실패로 끝낸다.
      */
     public ConnectionSnapshot check(CurrentUser user, String connectorId) {
         return limiter.call(user.id(), () -> {
@@ -355,7 +356,7 @@ public class ConnectorConnectionService {
      *
      * <p>그 사이 해제됐으면 아무것도 바꾸지 않는다. 확인 도구가 실패했으면 바인딩은 건드리지 않는다. 보관 파일이 없고 옛
      * 바인딩도 없으면 {@code PENDING} 으로 두고 {@code CONNECTOR_NOT_CONNECTED} 를 돌려준다. 카탈로그에서 빠진 커넥터는
-     * 확인할 수 없어 {@code PENDING} 이다.
+     * 확인할 수도 다시 등록할 수도 없어 보관 파일이 없어도 오류 없이 {@code PENDING} 이다.
      */
     private Checked recordCheck(
             CurrentUser user,
@@ -374,9 +375,11 @@ public class ConnectorConnectionService {
             return new Checked(snapshot(connections.save(connection)), verifyFailure);
         }
         List<ConnectorBinding> bound = bindings.findByConnectionId(connection.id());
-        if (!connection.vaultStored()
+        if (manifest.isPresent()
+                && !connection.vaultStored()
                 && bound.stream().noneMatch(binding -> binding.agent().connectorManaged())) {
             // 값이 보관 파일에도 옛 에이전트의 profile 에도 없다. 확인할 값이 없으니 다시 등록해야 쓸 수 있다.
+            // 카탈로그에서 빠진 커넥터는 다시 등록할 수도 없어 아래의 PENDING 으로 오류 없이 끝낸다.
             connection.pending(now);
             return new Checked(
                     snapshot(connections.save(connection)),

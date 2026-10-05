@@ -261,15 +261,21 @@ export function ConnectorConnectionPanel({ id }: { id: string }) {
       }
       return setError(result.message);
     }
-    setPending(null);
     if (
       !result.ok &&
       kind === "check" &&
       result.code === "CONNECTOR_NOT_CONNECTED"
     ) {
-      // 확인할 값이 남아 있지 않다. 이 화면이 연결 화면이므로 공통 문구 대신 값을 다시 넣으라고 알린다.
+      // 확인할 값이 남아 있지 않다. 서버가 연결을 준비 중으로 커밋했으므로 다시 읽어 상태를 맞춘다.
+      // 이 화면이 연결 화면이므로 공통 문구 대신 값을 다시 넣으라고 알린다.
+      const fresh = await readConnection(id);
+      setPending(null);
+      if (fresh.ok) {
+        setLoaded({ kind: "ready", connector, connection: fresh.data });
+      }
       return setError("값을 다시 입력해 연결해 주세요.");
     }
+    setPending(null);
     if (!result.ok) return setError(result.message);
     setLoaded({ kind: "ready", connector, connection: result.data });
   }

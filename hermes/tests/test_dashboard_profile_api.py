@@ -1633,6 +1633,35 @@ class ProfileApiRouteTest(unittest.TestCase):
                 self.assertEqual(self.bind(OTHER, enabled=False).status_code, 200)
                 (alice / ".env").write_text("", encoding="utf-8")
 
+    def test_detaching_keeps_another_binding_under_its_recorded_name_when_its_manifest_changed(self):
+        """다른 바인딩 항목의 서버 이름이나 실행 정의를 manifest 에서 바꾼 뒤 이 커넥터를 떼면 대응 파일에 기록의 이름이 빈 tools 로 남는다."""
+        _, other = self.bind_fixture()
+        alice = self.root / "alice"
+        original = (other / ".mcp.json").read_text(encoding="utf-8")
+        for label in ("server renamed", "run definition changed"):
+            with self.subTest(label):
+                self.assertEqual(self.bind(DEMO, "c1").status_code, 200)
+                self.assertEqual(self.bind(OTHER, "c2").status_code, 200)
+                declared = json.loads(original)
+                if label == "server renamed":
+                    declared["mcpServers"] = {"other-renamed": declared["mcpServers"]["other"]}
+                else:
+                    declared["mcpServers"]["other"]["args"].append("--verbose")
+                (other / ".mcp.json").write_text(json.dumps(declared), encoding="utf-8")
+
+                removed = self.bind(DEMO, enabled=False)
+                self.assertEqual(removed.status_code, 200, removed.body)
+                self.assertIs(removed.body["changed"], True)
+                # config.yaml 에 남은 서버는 기록의 이름이다. 대응에서 빠지면 hook 이 그 서버를 판정 없이 통과시킨다.
+                self.assertIn("other", self.alice_config()["mcp_servers"])
+                self.assertEqual(self.tool_map(), {"v": 1, "isolated": False, "servers": {
+                    "other": {"connector": OTHER, "prefix": "mcp__other__", "tools": {}}}})
+
+                # 다음 경우를 위해 되돌린다.
+                (other / ".mcp.json").write_text(original, encoding="utf-8")
+                self.assertEqual(self.bind(OTHER, enabled=False).status_code, 200)
+                self.assertFalse((alice / self.plugin.CONNECTOR_TOOL_MAP).exists())
+
     def test_detaching_refuses_a_binding_entry_whose_names_cannot_be_paths(self):
         """떼기는 기록을 모양만 보지만, 지울 서버 이름이나 스킬 이름이 경로 조각이 될 수 없으면 아무 파일도 바꾸지 않는다."""
         self.bind_fixture()

@@ -890,6 +890,23 @@ class ConnectorConnectionServiceTest {
     }
 
     @Test
+    @DisplayName("카탈로그에서 빠진 커넥터는 보관 파일과 옛 바인딩이 없어도 확인이 오류 없이 연결과 바인딩을 PENDING 으로 둔다")
+    void checkWithoutVaultOfConnectorRemovedFromCatalogEndsPendingWithoutError() {
+        CurrentUser user = user(UserRole.MEMBER, 1L);
+        legacyConnection(user);
+        readyBinding(agent(user, false), stored(user), "demo");
+        when(connector.readCatalog()).thenReturn(List.of(PIN_MANIFEST));
+
+        ConnectionSnapshot checked = service.check(user, DEMO);
+
+        verify(connector, never()).callWithVault(anyString(), anyString(), anyString());
+        verify(connector, never()).bindConnector(anyString(), anyString(), anyString());
+        assertThat(checked.status()).isEqualTo(ConnectionStatus.PENDING);
+        assertThat(stored(user).status()).isEqualTo(ConnectionStatus.PENDING);
+        assertThat(checked.bindings()).extracting(BoundAgentSummary::status).containsExactly(BindingStatus.PENDING);
+    }
+
+    @Test
     @DisplayName("다시 보낸 설치가 바뀐 것이 있다고 답하면 그 시각으로 재시작 대기가 시작된다")
     void checkStartsRestartWaitWhenReinstallChangesSomething() {
         CurrentUser user = user(UserRole.MEMBER, 1L);
