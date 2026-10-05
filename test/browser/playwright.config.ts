@@ -14,6 +14,8 @@ const { defineConfig } = playwright;
 export default defineConfig({
   testDir: ".",
   testMatch: "*.spec.ts",
+  // 모든 spec 이 globalSetup 이 띄운 Control Plane 하나와 H2 메모리 DB 를 함께 쓰고, 몇 spec 은 그 상태를 잠시 바꿨다 되돌린다
+  // (legacy-conversation-url.spec.ts 가 그렇다). 그래서 검사를 나란히 돌리지 않는다. 나눠 돌리는 것은 CI 의 shard 가 맡는다.
   fullyParallel: false,
   workers: 1,
   reporter: "list",

@@ -79,6 +79,8 @@ const TEST_RELEASE_HELD_CONFIG_PATH = "/__test/release-held-config";
 /** 마지막 실행 요청이 실어 온 provider, 모델, effort 를 돌려준다. 브라우저 검사는 대역을 다른 프로세스에서 띄워 이 길로 묻는다. */
 /** 입력 글과 그 입력에 줄 대본을 받는 경로다. `DemoScript` 를 본다. */
 const TEST_SCRIPT_PATH = "/__test/script";
+/** 다음 살펴보기 실행의 마지막 답 글을 정한다. 본문은 `{ output }` 이다. 다른 프로세스에서 도는 브라우저 검사가 쓴다. */
+const TEST_PROACTIVE_OUTPUT_PATH = "/__test/proactive-output";
 const TEST_LAST_SUBMITTED_RUNTIME_PATH = "/__test/last-submitted-runtime";
 
 /** 도구 가리기 검사만 쓰는 가짜 값이다. 실제 연결 값이 아니다. */
@@ -1458,6 +1460,12 @@ export function startFakeHermes(
       if (request.method === "POST" && path === TEST_SCRIPT_PATH) {
         const script = JSON.parse(await readBody(request)) as DemoScript;
         scripts.set(script.input, script);
+        return send(response, 204, null);
+      }
+
+      if (request.method === "POST" && path === TEST_PROACTIVE_OUTPUT_PATH) {
+        const { output } = JSON.parse(await readBody(request)) as { output: string };
+        proactiveScript = { output, tools: [] };
         return send(response, 204, null);
       }
 

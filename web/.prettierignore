@@ -3,4 +3,5 @@ out
 build
 next-env.d.ts
 pnpm-lock.yaml
+# eslint 는 이 파일을 끝 줄바꿈 없이 쓰고 Prettier 는 줄바꿈을 붙여, 두 도구가 번갈아 고친다
 eslint-suppressions.json

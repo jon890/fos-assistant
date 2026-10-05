@@ -62,14 +62,18 @@ public final class ProactiveCheckDtos {
      *
      * @param status {@code CheckStatus} 의 이름
      * @param outcome {@code CheckOutcome} 의 이름. 성공했을 때만 있고 아니면 null
+     * @param invalidReason {@code CheckInvalidReason} 의 이름. {@code outcome} 이 {@code INVALID_RESULT} 일 때만 있고 아니면
+     *     null. 그 칸을 더하기 전에 끝난 살펴보기도 null 이다
      * @param finishedAt 끝난 시각. 돌고 있으면 null
      */
-    public record LastCheckView(String status, String outcome, Instant startedAt, Instant finishedAt) {
+    public record LastCheckView(
+            String status, String outcome, String invalidReason, Instant startedAt, Instant finishedAt) {
 
         static LastCheckView from(ProactiveCheck check) {
             return new LastCheckView(
                     check.status().name(),
                     check.outcome() == null ? null : check.outcome().name(),
+                    check.invalidReason() == null ? null : check.invalidReason().name(),
                     check.startedAt(),
                     check.finishedAt());
         }
