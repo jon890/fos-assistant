@@ -98,7 +98,7 @@
 
 ### 8. 시험
 
-- `backend/src/test/java/com/bifos/assistant/connector/AgentConnectionControllerTest.java`(신규): 주인이 붙이고 떼고, 남과 관리자는 `FORBIDDEN` 이나 `AGENT_NOT_FOUND`. 응답 본문에 env 이름, 보관 파일 이름, 서버 이름이 없다
+- `backend/src/test/java/com/bifos/assistant/connector/AgentConnectionControllerTest.java`(신규): 주인이 붙이고 뗀다. 남의 비공개 에이전트는 `AGENT_NOT_FOUND`, 읽을 수 있는 남의 에이전트와 관리자는 `FORBIDDEN` 이다. 경우마다 코드 하나를 단언한다. 응답 본문에 env 이름, 보관 파일 이름, 서버 이름이 없다
 - `test/browser/connector-connection.spec.ts`(수정): 연결한 뒤 붙인 에이전트가 없다는 안내가 보인다
 - `test/browser/agent-connections.spec.ts`(신규): 비공개 에이전트에서 연결을 붙이면 확인 창의 위험 문구가 보이고 「반영 대기」 가 된다. 떼면 「붙지 않음」 이 된다. 그룹 공개 에이전트에서는 붙이기 단추 대신 까닭이 보인다
 - `test/browser/connector-agent-detail.spec.ts`(수정): 옛 커넥터 에이전트는 「예전 방식」 안내와 지우기 단추를 보인다. 이 시험은 옛 에이전트를 시험 DB 에 직접 만드는 준비가 필요하면 `test/browser/fixtures.ts` 에 함수를 더한다

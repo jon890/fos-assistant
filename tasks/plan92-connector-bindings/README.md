@@ -40,7 +40,7 @@ phase 는 앞 phase 의 결과에 기댄다. 차례로 한다.
 정본은 phase 01 과 03 이 고칠 `docs/backend/schema/connector.md` 다. 여기에는 phase 사이에 맞춰야 할 이름만 둔다.
 
 - `connector_connection`: `(user_id, connector_id)` 유일은 그대로다. `vault_stored BOOLEAN NOT NULL DEFAULT FALSE` 를 더하고 `agent_id` 를 비워도 되게 한다. `agent_id`, `restart_required`, `desired_enabled` 는 쓰지 않는 칸으로 남는다. 칸을 지우는 마이그레이션은 옛 커넥터 에이전트를 정리하는 다음 작업이 둔다. `status` 는 `DISCONNECTED`, `PENDING`, `READY` 그대로이고 뜻이 「값이 확인돼 쓸 수 있는가」 로 바뀐다
-- `agent_connector_binding`: `id`, `agent_id`, `connection_id`, `status`(`PENDING`, `READY`), `restart_required`, `desired_enabled`, `checked_at`, `created_at`, `updated_at`. `(agent_id, connection_id)` 유일. 떼면 행을 지운다
+- `agent_connector_binding`: `id`, `agent_id`, `connection_id`, `mcp_server`(붙일 때의 서버 이름, 옛 바인딩은 확인 때 채움), `status`(`PENDING`, `READY`), `restart_required`, `desired_enabled`, `checked_at`, `created_at`, `updated_at`. `(agent_id, connection_id)` 유일. 떼면 행을 지운다
 - `connector_action.agent_id` 는 「판정한 실행의 에이전트」 다. 옛 줄은 옛 커넥터 에이전트를 가리킨 채 남는다
 - `connector_tool_grant` 는 바꾸지 않는다. 상시 허락은 지금처럼 사용자와 커넥터에 묶인다
 
@@ -49,7 +49,7 @@ phase 는 앞 phase 의 결과에 기댄다. 차례로 한다.
 | 무엇 | 이름 | 만드는 phase |
 | --- | --- | --- |
 | 바인딩 엔티티와 저장소 | `ConnectorBinding`, `BindingStatus`, `ConnectorBindingRepository` | 01 |
-| 바인딩 서비스 | `ConnectorBindingService` 의 `listForAgent`, `bind`, `unbind`, `confirmApplied` | 02 |
+| 바인딩 서비스 | `ConnectorBindingService` 의 `listForAgent`, `bind`, `unbind`, `confirmApplied`. 붙이기와 떼기는 사용자 행과 에이전트 행을 차례로 잠근다 | 02 |
 | `agent` 의 읽기 port | `AgentConnectorBindings` 의 `hasBindings`, `connectorServers`, `connectorToolPrefixes`. 구현은 `ConnectorBindingLookup` | 02 |
 | `agent` 의 떼기 port | `AgentConnectorDetacher` 의 `detachAll`. 구현은 `ConnectorBindingService` | 02 |
 | 에이전트의 연결 목록 응답 | `AgentConnectionsView(connections, blockedReason)`, `AgentConnectionView` | 02 |
@@ -68,7 +68,7 @@ phase 는 앞 phase 의 결과에 기댄다. 차례로 한다.
 - 관리자는 남의 에이전트에 연결을 붙이거나 떼지 못한다. 반영 완료만 누른다
 - Flyway 번호는 머지 직전 main 의 다음 번호로 옮긴다. 이 계획서는 `V77`(표), `V78`(옛 연결의 바인딩 채우기)로 적는다. `V74` 부터 `V76` 까지는 다른 작업이 쓴다
 - 도구 저장과 스킬 게시는 붙은 커넥터 서버 이름을 함께 보낸다. 빠지면 대시보드가 409 로 거절한다
-- 머지 전에는 `scripts/check-local.sh` 의 단계를 브라우저 검사만 빼고 모두 돌린다(phase 07 의 검증). 브라우저 검사는 고친 화면의 spec 만 로컬에서 돌리고 전체는 PR 의 CI 가 맡는다
+- 머지 전에는 `scripts/check-local.sh <고친 화면의 spec>` 을 돌린다(phase 07 의 검증). 단계를 건너뛰지 않는다. 전체 브라우저 검사는 PR 의 CI 가 맡는다
 - 기능 변경과 포맷은 다른 커밋이다. 커밋 메시지는 `<type>(<범위>): <메시지>`, 범위는 `backend`, `web`, `docs`, `hermes`, `infra`
 
 ## 배포 순서와 운영 반영

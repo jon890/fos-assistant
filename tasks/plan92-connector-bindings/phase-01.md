@@ -27,6 +27,7 @@
 - 번호는 이 계획서에서 V77, V78 이다. V74 부터 V76 까지는 다른 작업이 쓴다. 머지 직전 main 의 다음 번호로 옮긴다(`docs/backend/schema/README.md` 와 AGENTS.md 의 「이미 적용된 마이그레이션 파일은 고치지 않는다」)
 - 바인딩 상태는 연결 상태와 따로 둔다. 연결은 「값이 확인됐는가」, 바인딩은 「그 profile 에 설치되고 반영됐는가」 다. 재시작 대기는 profile 마다라 바인딩에 둔다
 - 떼면 바인딩 행을 지운다. 떼기는 재시작을 기다리지 않으므로 남길 상태가 없다. 이력은 `connector_action` 이 갖는다
+- `mcp_server` 는 붙일 때의 manifest 서버 이름이다. 비밀이 아니다. 실행 기록 가림, 도구 저장, 살펴보기 점검이 turn 마다 카탈로그를 읽지 않게 하고, 운영자가 카탈로그에서 커넥터를 빼도 그 profile 에 설치된 서버 이름을 잃지 않게 하려고 둔다. 옛 연결의 바인딩은 마이그레이션이 이름을 알 수 없어 비워 두고 연결 확인과 관리자 반영 완료가 채운다
 - `DISCONNECTED` 연결은 바인딩을 만들지 않는다. 그 연결의 옛 에이전트는 이미 꺼져 있다
 
 ## 작업 항목
@@ -40,6 +41,7 @@ CREATE TABLE agent_connector_binding (
     id BIGINT NOT NULL AUTO_INCREMENT,
     agent_id BIGINT NOT NULL,
     connection_id BIGINT NOT NULL,
+    mcp_server VARCHAR(64) NULL,
     status VARCHAR(20) NOT NULL,
     restart_required BOOLEAN NOT NULL DEFAULT FALSE,
     desired_enabled BOOLEAN NOT NULL DEFAULT FALSE,
@@ -70,8 +72,8 @@ DML 만 둔다. `DISCONNECTED` 가 아닌 연결마다 그 연결의 `agent_id` 
 ### 3. `connector/domain/ConnectorBinding.java` 와 `connector/domain/type/BindingStatus.java`
 
 - `BindingStatus` 는 `PENDING`, `READY`
-- `ConnectorBinding` 은 `agent_connector_binding` 의 엔티티다. `@ManyToOne(fetch = LAZY)` 로 `Agent agent`(`agent_id`)와 `ConnectorConnection connection`(`connection_id`)을 갖는다. 표와 같은 유일 제약을 `@Table(uniqueConstraints = ...)` 에 적는다
-- 메서드: `static ConnectorBinding pending(Agent agent, ConnectorConnection connection, Instant now)`, `beginInstall(Instant now)`(`desiredEnabled` 거짓, `PENDING`), `installed(boolean restartRequired, Instant now)`(`desiredEnabled` 참, 재시작 필요는 논리 OR 로 누적, 상태는 `PENDING`), `ready(Instant now)`(`READY`, 재시작 필요 거짓), `pending(Instant now)`, `markRestartRequired(boolean)`
+- `ConnectorBinding` 은 `agent_connector_binding` 의 엔티티다. `String mcpServer` 칸(`mcp_server`)과 `recordServer(String)` 를 둔다. `@ManyToOne(fetch = LAZY)` 로 `Agent agent`(`agent_id`)와 `ConnectorConnection connection`(`connection_id`)을 갖는다. 표와 같은 유일 제약을 `@Table(uniqueConstraints = ...)` 에 적는다
+- 메서드: `static ConnectorBinding pending(Agent agent, ConnectorConnection connection, String mcpServer, Instant now)`, `beginInstall(Instant now)`(`desiredEnabled` 거짓, `PENDING`), `installed(boolean restartRequired, Instant now)`(`desiredEnabled` 참, 재시작 필요는 논리 OR 로 누적, 상태는 `PENDING`), `ready(Instant now)`(`READY`, 재시작 필요 거짓), `pending(Instant now)`, `markRestartRequired(boolean)`
 - 옛 커넥터 에이전트(`agent.connectorManaged()`)의 바인딩은 지금 `ConnectorConnection.ready`, `pending`, `disableAgent` 가 하던 것처럼 `ready` 에서 에이전트를 켜고, `pending` 에서 에이전트를 끄고 사진 받기를 내린다. 다른 에이전트의 바인딩은 에이전트를 건드리지 않는다
 - 비밀 칸의 값을 받는 메서드를 두지 않는다
 

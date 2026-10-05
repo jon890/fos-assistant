@@ -76,18 +76,10 @@ git grep -n -E "커넥터 에이전트|연결용 에이전트|연결용 profile|
 ## 검증
 
 ```bash
-node --test 'test/unit/**/*.test.ts'
-scripts/check-public-safe.sh
-cd backend && ./gradlew test --tests '*ArchitectureRules*'
-cd backend && ./gradlew test
-scripts/check-mysql-migration.sh
-pnpm --dir web typecheck
-node test/e2e/run.ts
-python3 -m unittest discover -s hermes/tests
-scripts/quality.sh check
+scripts/check-local.sh agent-connections connector-connection connector-agent-detail admin agent-tools
 ```
 
-마지막 phase 라 `scripts/check-local.sh` 의 단계를 브라우저 검사만 빼고 모두 돌린다. 브라우저 검사는 PR 의 CI 가 맡는다.
+종료 코드 0 이어야 한다. 명령과 순서는 그 스크립트가 갖는다. 인자는 브라우저 검사에만 쓰이고 나머지 단계는 모두 돈다. 전체 브라우저 검사는 PR 의 CI 가 맡는다.
 
 모두 종료 코드 0 이어야 한다. `test/unit` 에는 문서 링크와 ADR 목록을 보는 검사가 있다.
 
