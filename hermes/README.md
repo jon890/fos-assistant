@@ -78,7 +78,7 @@ terminal:
   docker_mount_cwd_to_workspace: false
   docker_run_as_host_user: false
   docker_network: true
-  docker_extra_args: ["--network=<network>"]   # network 가 있을 때만
+  docker_extra_args: ["--network=<network>"]   # network 가 없으면 빈 목록
   docker_volumes:
     - <workspace_root>/<sandbox_owner>:/workspace
     - <read_only_mounts 의 각 항목>:ro
@@ -184,7 +184,7 @@ Hermes 가 보이는 도구 이름은 `mcp__fos_assistant__<도구>` 다. 서버
 서명에는 앞부분을 뗀 서버 쪽 이름을 넣는다. 서버 이름을 바꾸면 plugin 의 `TOOL_PREFIX` 도 함께 바꾼다.
 
 **서명은 그 profile 의 모델이 셸로 파일을 읽지 못하는 동안만 위조를 막는다.**
-key 는 그 profile `.env` 의 MCP 토큰에서 나오고, terminal 도구는 Hermes 프로세스의 사용자가 읽을 수 있는 파일을 모두 읽는다.
+key 는 그 profile `.env` 의 MCP 토큰에서 나온다. terminal backend 가 `local` 이면 terminal 도구는 Hermes 프로세스의 사용자가 읽을 수 있는 파일을 모두 읽는다. docker 실행 공간이 적용된 profile 은 [실행 공간](../docs/hermes/sandbox.md) 이 갖는다. 스킬 앞머리의 비밀 요청 칸이 그 토큰을 실행 공간에 넣을 수 있어 올린 스킬은 그 칸을 거절한다.
 셸을 여는 profile 의 목록은 운영 저장소의 live 검사가 소유한다.
 그 목록에 Control Plane MCP 를 등록한 profile 을 더할 때는 이 제약을 함께 판단한다.
 
@@ -345,7 +345,8 @@ provider credential 은 이 토큰으로 쓰지 못한다.
 - 운영자 env 이름의 `PUT /api/env` 와 `DELETE /api/env` 는 성공으로 답하고 아무것도 쓰지 않는다
 
 **토큰으로 부른 `PUT /api/config` 는 본문을 검사한 뒤 Hermes 처리기에 넘긴다.**
-최상위에는 `profile` 과 `config` 만 둔다.
+최상위에는 `profile` 과 `config` 를 두고, `sandbox_owner` 를 더할 수 있다. `sandbox_owner` 는 `^[a-z][a-z0-9-]{0,63}$` 이고 도구 목록에 `terminal`, `file`, `code_execution` 가운데 하나라도 있으면 필수다.
+`terminal:` 은 plugin 이 직접 쓰므로 본문의 `config` 에 두지 않는다.
 `config` 에는 `platform_toolsets.api_server` 와 `skills.external_dirs` 가운데 하나나 둘을 둔다.
 
 도구 목록은 이렇게 본다.
@@ -356,6 +357,7 @@ provider credential 은 이 토큰으로 쓰지 못한다.
 - Control Plane MCP 가 아직 등록되지 않은 profile 은 그 이름과 알려진 내장 toolset 을 함께 넣는다
 - Hermes 가 계산한 실제 API 도구에 요청 목록 밖의 이름이 있으면 저장하지 않는다
 - 다른 platform 의 계산 결과가 바뀌어도 저장하지 않는다
+- 목록에 `terminal`, `file`, `code_execution` 가운데 하나라도 있으면 `FOS_ASSISTANT_SANDBOX` 로 `terminal:` 을 통째로 다시 쓴다. 그 값이 없거나 틀리면 409 와 본문 `code: sandbox_unavailable` 이다
 
 올린 스킬 경로는 이렇게 본다. 루트는 대시보드 프로세스의 환경 변수 `FOS_ASSISTANT_SKILL_AGENT_ROOT` 다.
 
