@@ -19,8 +19,8 @@ import org.springframework.stereotype.Service;
  * 있다.
  *
  * <p>여기가 옮겨 적는 것은 {@code tool.} 과 {@code subagent.} 계열 넷뿐이다. 실행의 시작과 끝은
- * {@code ChatService} 가 직접 적는다. 스트림을 열지 않는 경로에도 그것이 남아야 하고, 양쪽에서 적으면
- * 스트리밍 경로에만 같은 사건이 두 줄 남는다.
+ * {@code ChatService} 가 직접 적는다. 사건 스트림을 읽지 못한 실행에도 그것이 남아야 하고, 양쪽에서 적으면
+ * 스트림을 읽은 실행에만 같은 사건이 두 줄 남는다.
  *
  * <p>이 클래스는 저장하지 않고 엔티티를 만들기만 한다. 저장을 부르는 쪽이 하면 저장 실패를 감싸는
  * 자리가 한 곳으로 모인다. 예외가 하나 있다. {@code skill_view} 도구 호출의 시작 사건은 스킬 호출 이력이기도
@@ -108,7 +108,7 @@ public class ExecutionEventRecorder {
     /**
      * Hermes 사건을 기다리지 않고 우리가 직접 적는 사건이다.
      *
-     * <p>실행의 시작과 끝은 스트림을 열지 않는 경로에서도 남아야 한다.
+     * <p>실행의 시작과 끝은 사건 스트림을 읽지 못한 실행에서도 남아야 한다.
      */
     public ExecutionEvent record(AgentExecution execution, ExecutionEventType type, String detail, int sequence) {
         return ExecutionEvent.builder()
