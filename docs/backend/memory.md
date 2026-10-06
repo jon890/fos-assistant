@@ -358,7 +358,7 @@ Control Plane MCP 도구를 받는 실행의 공통 답변 지침 뒤에 「# �
 
 | 클래스 | 하는 일 |
 | --- | --- |
-| `mcp.application.McpToolService` | 인자 값 검사와 바로 저장 판정의 1부터 4 |
+| `mcp.application.McpMemoryRemember` | 도구 정의, 인자 값 검사, 바로 저장 판정의 1부터 4 |
 | `memory.application.MemoryCaptureService` | 민감도, collection, 상한, 중복, 고치기 대상 판정과 저장, 대화의 기록 목록, 되돌리기 |
 | `chat.application.TurnQuestions` | 실행에 이어 둔 질문 원문 읽기 |
 | `chat.presentation.MemoryCaptureController` | 대화의 기록 목록과 되돌리기 API |
