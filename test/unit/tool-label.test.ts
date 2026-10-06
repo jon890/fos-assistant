@@ -52,3 +52,8 @@ test("검색어와 사진 질문만 줄에 바로 보여도 되는 detail 이다
   assert.equal(isReadableDetail("mcp__ledger__query"), false);
   assert.equal(isReadableDetail(null), false);
 });
+
+test("memory_remember 는 기억해 두는 말로 보인다", () => {
+  assert.equal(toolLabel("mcp__fos_assistant__memory_remember", true), "기억해 두고 있어요");
+  assert.equal(toolLabel("mcp__fos_assistant__memory_remember", false), "기억해 뒀어요");
+});

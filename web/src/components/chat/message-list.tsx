@@ -9,6 +9,8 @@ import { AssistantRow, MessageBubble, type Turn } from "./message-bubble";
 import { ActivityBlock } from "./activity/activity-block";
 import type { ActivityState } from "./activity/activity-state";
 import { WaitingIndicator } from "./waiting-indicator";
+import { MemoryCaptureList } from "./memory-capture-list";
+import type { MemoryCapture } from "@/lib/memory-capture-api";
 import {
   foldVersions,
   isLatestView,
@@ -43,6 +45,10 @@ type Props = {
   onRetryDelivery?(deliveryId: number): void;
   /** 다시 전달을 보내는 중이다. 알림 줄의 단추를 막는다 */
   deliveryRetrying?: boolean;
+  /** 이 대화에서 에이전트가 남긴 기억 기록이다. 각 답 아래에 그 답의 실행 것만 보인다 */
+  memoryCaptures?: MemoryCapture[];
+  /** 기억 기록을 처리했다. 되돌리거나 거절한 줄의 번호를 주면 그 줄을 먼저 뺀다 */
+  onMemoryCapturesChanged?(removedId?: number): void;
 };
 
 export function MessageList({
@@ -67,6 +73,8 @@ export function MessageList({
   skillCommandChips,
   onRetryDelivery,
   deliveryRetrying,
+  memoryCaptures = [],
+  onMemoryCapturesChanged,
 }: Props) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const shouldFollow = useRef(true);
@@ -266,6 +274,17 @@ export function MessageList({
                             : undefined
                         }
                       />
+                      {turn.role === "ASSISTANT" &&
+                      typeof turn.executionId === "number" &&
+                      onMemoryCapturesChanged ? (
+                        <MemoryCaptureList
+                          captures={memoryCaptures.filter(
+                            (capture) =>
+                              capture.executionId === turn.executionId,
+                          )}
+                          onChanged={onMemoryCapturesChanged}
+                        />
+                      ) : null}
                       {isLast && hasNoAnswer ? (
                         <li
                           data-testid="no-answer"
