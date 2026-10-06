@@ -25,7 +25,11 @@ function capture(
   } as Capture;
 }
 
-/** 새 대화를 만들어 답 하나를 저장하고 그 공개 식별자와 답의 실행 번호를 돌려준다. */
+/**
+ * 새 대화를 만들어 답 하나를 저장하고 그 공개 식별자와 답의 실행 번호를 돌려준다.
+ *
+ * <p>대화 제목은 사이드바 단추의 이름에 들어간다. 다른 spec 이 이름으로 찾는 「받아들이기」, 「거절」 같은 낱말을 넣지 않는다.
+ */
 async function createConversation(page: Page, label: string) {
   const created = await page.request.post("/api/chat", {
     data: { text: `${label} ${Date.now()}`, agentCode: "browser" },
@@ -75,7 +79,7 @@ test.afterEach(async ({ page }) => {
 test("바로 저장한 기록이 답 아래에 보이고 되돌리면 사라진다", async ({
   page,
 }) => {
-  const { state } = await open(page, "기억 되돌리기 검사", [capture(0)]);
+  const { state } = await open(page, "기억 기록 검사 하나", [capture(0)]);
   const undone: string[] = [];
   await page.route("**/api/memory-captures/*/undo", (route: Route) => {
     undone.push(route.request().url());
@@ -95,7 +99,7 @@ test("바로 저장한 기록이 답 아래에 보이고 되돌리면 사라진�
 });
 
 test("제안 카드를 받아들이면 기억했어요 줄로 바뀐다", async ({ page }) => {
-  const { state } = await open(page, "제안 받아들이기 검사", [
+  const { state } = await open(page, "기억 기록 검사 둘", [
     capture(0, { kind: "PROPOSED", status: "PROPOSED" }),
   ]);
   const accepted: string[] = [];
@@ -116,7 +120,7 @@ test("제안 카드를 받아들이면 기억했어요 줄로 바뀐다", async 
 });
 
 test("제안 카드를 거절하면 카드가 사라진다", async ({ page }) => {
-  const { state } = await open(page, "제안 거절 검사", [
+  const { state } = await open(page, "기억 기록 검사 셋", [
     capture(0, { kind: "PROPOSED", status: "PROPOSED" }),
   ]);
   await page.route("**/api/memories/101/reject", (route: Route) => {

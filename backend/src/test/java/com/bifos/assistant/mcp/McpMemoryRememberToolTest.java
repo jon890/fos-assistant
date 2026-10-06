@@ -202,7 +202,8 @@ class McpMemoryRememberToolTest {
     void proposesFromRunWithoutQuestion() throws Exception {
         messages.save(ChatMessage.fromUser(conversation.id(), dad.id(), QUESTION, Instant.now()));
 
-        assertThat(text(call(remember("다른 사람", "다른 사람은 홍길동이다", "다른 사람은 홍길동이야")))).isEqualTo(PROPOSED);
+        assertThat(text(call(remember("다른 사람", "다른 사람은 홍길동이다", "다른 사람은 홍길동이야"))))
+                .isEqualTo(PROPOSED);
     }
 
     @Test
@@ -211,7 +212,8 @@ class McpMemoryRememberToolTest {
         askedInThisTurn();
         toolStarted("mcp__fos_assistant__memory_read");
 
-        assertThat(text(call(remember("다른 사람", "다른 사람은 홍길동이다", "다른 사람은 홍길동이야")))).isEqualTo(REMEMBERED);
+        assertThat(text(call(remember("다른 사람", "다른 사람은 홍길동이다", "다른 사람은 홍길동이야"))))
+                .isEqualTo(REMEMBERED);
 
         toolStarted("web_search");
         assertThat(text(call(remember("사는 곳", "서울에 산다", "홍길동이야")))).isEqualTo(PROPOSED);
@@ -229,7 +231,8 @@ class McpMemoryRememberToolTest {
         toolStarted(earlier.id(), ExecutionEventType.TOOL_STARTED, "mcp__gmail__read_message");
         askedInThisTurn();
 
-        assertThat(text(call(remember("다른 사람", "다른 사람은 홍길동이다", "다른 사람은 홍길동이야")))).isEqualTo(PROPOSED);
+        assertThat(text(call(remember("다른 사람", "다른 사람은 홍길동이다", "다른 사람은 홍길동이야"))))
+                .isEqualTo(PROPOSED);
     }
 
     @Test
@@ -238,7 +241,8 @@ class McpMemoryRememberToolTest {
         askedInThisTurn();
         toolStarted(dadRun.id(), ExecutionEventType.SUBAGENT_STARTED, null);
 
-        assertThat(text(call(remember("다른 사람", "다른 사람은 홍길동이다", "다른 사람은 홍길동이야")))).isEqualTo(PROPOSED);
+        assertThat(text(call(remember("다른 사람", "다른 사람은 홍길동이다", "다른 사람은 홍길동이야"))))
+                .isEqualTo(PROPOSED);
     }
 
     @Test
@@ -247,7 +251,8 @@ class McpMemoryRememberToolTest {
         askedInThisTurn();
         toolStarted(dadRun.id(), ExecutionEventType.TOOL_STARTED, null);
 
-        assertThat(text(call(remember("다른 사람", "다른 사람은 홍길동이다", "다른 사람은 홍길동이야")))).isEqualTo(PROPOSED);
+        assertThat(text(call(remember("다른 사람", "다른 사람은 홍길동이다", "다른 사람은 홍길동이야"))))
+                .isEqualTo(PROPOSED);
     }
 
     @Test
@@ -256,7 +261,8 @@ class McpMemoryRememberToolTest {
         askedInThisTurn();
         otherRootRun("run-delivery");
 
-        assertThat(text(call(remember("다른 사람", "다른 사람은 홍길동이다", "다른 사람은 홍길동이야")))).isEqualTo(PROPOSED);
+        assertThat(text(call(remember("다른 사람", "다른 사람은 홍길동이다", "다른 사람은 홍길동이야"))))
+                .isEqualTo(PROPOSED);
     }
 
     @Test
@@ -266,7 +272,8 @@ class McpMemoryRememberToolTest {
                 messages.save(ChatMessage.fromUser(conversation.id(), dad.id() + 100_000, QUESTION, Instant.now()));
         questions.save(ExecutionQuestion.of(dadRun.id(), foreign.id(), Instant.now()));
 
-        assertThat(text(call(remember("다른 사람", "다른 사람은 홍길동이다", "다른 사람은 홍길동이야")))).isEqualTo(PROPOSED);
+        assertThat(text(call(remember("다른 사람", "다른 사람은 홍길동이다", "다른 사람은 홍길동이야"))))
+                .isEqualTo(PROPOSED);
     }
 
     @Test
