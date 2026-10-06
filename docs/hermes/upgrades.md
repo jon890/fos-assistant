@@ -127,6 +127,20 @@ subagent 를 쓴 실행과 쓰지 않은 실행의 토큰을 견줘 확인했고
 나중에는 profile 마다 다른 노드를 가리킬 수 있어야 한다.
 그래서 Control Plane 은 API server 주소를 `hermes.base-url` 이 아니라 에이전트의 `api_base_url` 에 둔다.
 
+## 대시보드 plugin 이 기대는 내부 지점
+
+`dashboard-profile-api` 는 공개 확장점이 아닌 Hermes 내부 지점에 기댄다.
+감싸는 미들웨어, import 하는 내부 함수, session 저장소의 칸, 감싸는 대시보드 경로가 여기 해당한다.
+목록은 [`hermes/tests/hermes_contract.py`](../../hermes/tests/hermes_contract.py) 가 갖고, 왜 공개 확장점으로 바꾸지 못하는지는 [ADR-088](../adr/ADR-088-대시보드-plugin-은-감싸는-경로의-바꿔-끼우기를-두고-기대는-hermes-내부-지점을-계약-시험으로-확인한다.md) 이 갖는다.
+
+Hermes 를 올리기 전에 새 판의 tag 로 `scripts/check-hermes-contract.sh <tag>` 를 돌린다.
+실패한 항목을 plugin 에서 고치고, `HERMES_VERSION` 을 새 tag 로 바꾼 PR 의 CI 가 통과한 뒤 이미지를 올린다.
+
+2026-10-06 에 이 확인을 앞선 판에 돌렸다.
+`v2026.8.31` 에는 `reload_gateway_plugins` 와 `_config_profile_scope` 가 없었다.
+`v2026.7.30` 에는 그 둘과 `list_profile_names` 가 없었다.
+지금 plugin 을 그 판에 올리면 이 지점을 쓰는 단계가 실패한다.
+
 ## 커넥터 정책이 기대는 계약
 
 Hermes 를 올릴 때 아래가 그대로인지 본다. 하나라도 달라지면 커넥터 도구의 판정이 비켜 갈 수 있다.
