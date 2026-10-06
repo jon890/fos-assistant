@@ -304,6 +304,33 @@ sequenceDiagram
 source 하나를 읽지 못하면 그 카드만 「불러오지 못했다」 로 내고 나머지 카드는 그린다.
 판정은 Hermes 를 부르지 않고, 실행이나 커넥터 호출을 시작하지 않는다.
 
+## 기억을 남길 때
+
+계약은 [`backend/memory.md`](backend/memory.md) 의 「에이전트가 기억을 남기는 길」 이 갖는다.
+
+```mermaid
+sequenceDiagram
+    participant B as 브라우저
+    participant C as Control Plane
+    participant H as Hermes
+
+    B->>C: 질문을 보낸다
+    C->>C: 질문 메시지를 저장하고 실행 줄에 잇는다(execution_question)
+    C->>H: POST /v1/runs (지시문에 기억 지침)
+    H->>C: POST /mcp memory_remember 와 서명한 _fos_ctx
+    C->>C: 루트 실행인가, 근거가 질문 원문에 있는가, 바깥 도구 사건이 없는가, 민감하지 않은가
+    alt 모두 만족
+        C->>C: memory 를 ACCEPTED 로, memory_capture 를 CREATED 로
+        C-->>H: 기억했다
+    else 하나라도 어긋남
+        C->>C: memory 를 PROPOSED 로, memory_capture 를 PROPOSED 로
+        C-->>H: 제안으로 남겼다
+    end
+    H-->>C: 답이 끝난다
+    B->>C: 대화의 기억 기록을 읽는다
+    C-->>B: 답 아래 「기억했어요」 나 제안 카드
+```
+
 ## 할 일을 제안할 때
 
 계약은 [`backend/follow-up.md`](backend/follow-up.md) 가 갖는다.
