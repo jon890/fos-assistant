@@ -326,3 +326,26 @@ v0.21.0 의 `gateway/platforms/api_server_runs.py` 가 보내는 것을 실측�
 
 **가짜 Hermes 를 이 형태로 맞춰 둔다.**
 어긋나면 테스트는 통과하는데 운영에서 조각이 흐르지 않는다. 실측으로 그렇게 한 번 놓쳤다.
+
+### 붙은 커넥터 서버의 도구 사건
+
+붙은 커넥터 서버의 MCP 도구도 내장 도구와 같은 길로 사건을 보낸다.
+v0.21.5 의 `agent/tool_executor.py` 가 도구 하나를 실행하기 전에 `tool.started`, 끝난 뒤에 `tool.completed` 를 `tool_progress_callback` 으로 부르고,
+`gateway/platforms/api_server_runs.py` 가 그것을 위 표의 사건으로 바꿔 보낸다.
+도구 종류에 따라 다르게 보내는 곳은 없다.
+
+| 칸 | 값 |
+| --- | --- |
+| `tool` | 등록 이름 `mcp__<서버>__<도구>`. 줄이는 규칙은 [`connector-policy.md`](connector-policy.md) 의 「MCP 도구의 등록 이름」 이 갖는다 |
+| `tool.started` 의 `preview` | 인자 앞부분 |
+| `tool.completed` 의 `preview` | 비밀값을 가리고 500자로 자른 결과. 외부 서비스의 글이 실린다 |
+| 모든 사건의 `run_id`, `timestamp` | 있다 |
+
+그 결과 글이 실행 기록과 화면에 남지 않게 Control Plane 이 붙은 서버의 도구 내용을 통째로 가린다([ADR-083](../adr/ADR-083-커넥터는-사용자가-한-번-연결하고-자기-에이전트에-여럿-붙여-그-에이전트가-도구를-직접-부른다.md)).
+도구 이름, 걸린 시간, 실패 여부만 남는다.
+
+**사건은 우리가 `GET /v1/runs/{run_id}/events` 를 열어야 받는다.**
+Hermes 는 도구를 실행했다는 로그를 남기지만 사건 스트림은 구독자가 있을 때만 읽힌다. 2026-10-06 에 한 번에 받는 경로로 보낸 실행이 붙은 서버의 도구를 불렀는데 실행 기록에 도구 사건이 없었다.
+Control Plane 이 그 경로에서 스트림을 열지 않았기 때문이고, 지금은 두 경로 모두 연다([ADR-089](../adr/ADR-089-한-번에-받는-경로도-hermes-사건-스트림을-열어-도구-사건을-남긴다.md)).
+
+가짜 Hermes 는 허용된 커넥터 도구 호출을 위 모양(`run_id`, `timestamp`, 시작의 인자 `preview`, 완료의 결과 `preview`)으로 흘린다.

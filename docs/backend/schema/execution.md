@@ -97,7 +97,7 @@ Hermes 가 보낸 원래 payload 를 통째로 넣지 않는다.
 | `execution_id` | BIGINT | 어느 실행의 사건인가 |
 | `sequence` | INT | 그 실행 안에서의 순서. 1부터 센다 |
 | `event_type` | VARCHAR(40) | 아래 표의 값 중 하나 |
-| `tool_name` | VARCHAR(128) NULL | 도구 사건일 때 채운다 |
+| `tool_name` | VARCHAR(128) NULL | 도구 사건일 때 채운다. 붙은 커넥터 서버의 도구는 Hermes 등록 이름 `mcp__<서버>__<도구>` 다 |
 | `subagent_name` | VARCHAR(128) NULL | 하위 에이전트 사건일 때 채운다 |
 | `hermes_session_id` | VARCHAR(128) NULL | 하위 에이전트가 따로 session 을 가지면 적는다 |
 | `duration_ms` | BIGINT NULL | 끝난 사건에만 있다 |

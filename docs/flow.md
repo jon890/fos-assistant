@@ -81,20 +81,16 @@ sequenceDiagram
     opt 스트리밍 경로
         C-->>B: started 와 대화 식별자와 실행 번호
     end
-    alt 한 번에 받는 경로
-        loop 끝날 때까지
-            C->>H: GET {profile}/v1/runs/{id}
-        end
-    else 스트리밍 경로
-        C->>H: GET {profile}/v1/runs/{id}/events
-        loop 실행 중
-            H-->>C: 답 조각과 도구와 하위 에이전트 사건
+    C->>H: GET {profile}/v1/runs/{id}/events
+    loop 실행 중
+        H-->>C: 답 조각과 도구와 하위 에이전트 사건
+        C->>C: 도구와 하위 에이전트 사건을 execution_event 로 옮겨 적는다
+        opt 스트리밍 경로
             C-->>W: delta, tool, subagent 사건
-            C->>C: 도구와 하위 에이전트 사건을 execution_event 로 옮겨 적는다
             W-->>B: 답 조각과 도구 상태
         end
-        C->>H: GET {profile}/v1/runs/{id}
     end
+    C->>H: GET {profile}/v1/runs/{id}
     alt Hermes 실행 성공
         C->>C: 메시지를 남기고 같은 실행 줄을 SUCCEEDED 로 갱신하며 RUN_COMPLETED 를 남긴다
         opt Memory 제안 설정이 켜짐
@@ -138,8 +134,8 @@ Control Plane 은 실행이 도는 동안 `assistant.chat.stream-heartbeat`(기�
 **실행의 시작과 끝은 두 경로 모두 남는다.**
 `RUN_STARTED` 와 `RUN_COMPLETED` 와 `RUN_FAILED` 는 Hermes 사건을 옮겨 적은 것이 아니라
 Control Plane 이 직접 적는 것이다.
-그래서 스트림을 열지 않는 경로에도 실행의 시작과 끝이 남는다.
-도구와 하위 에이전트 사건은 스트리밍 경로에만 온다. 그것이 맞다.
+그래서 사건 스트림을 읽지 못한 실행에도 실행의 시작과 끝이 남는다.
+도구와 하위 에이전트 사건은 두 경로 모두 사건 스트림에서 옮겨 적는다. 한 번에 받는 경로는 화면으로 흘리지 않고 실행 기록에만 쌓으며, 답 조각 시각(`first_delta_at`)은 적지 않는다([ADR-089](adr/ADR-089-한-번에-받는-경로도-hermes-사건-스트림을-열어-도구-사건을-남긴다.md)).
 
 **사건 저장이 실패해도 대화는 성공으로 끝난다.**
 사건은 관측용이고 그것 때문에 답이 사라지면 안 된다.
