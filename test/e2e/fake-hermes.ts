@@ -469,6 +469,9 @@ export const SUBAGENT_PROVIDER_PROBE = "자식 provider 확인 검사";
  */
 export const CONNECTOR_TOOL_PROBE = "커넥터 도구 검사";
 
+/** 이 글을 보내면 도구를 부르지 않고 답만 한다. 사건 스트림에는 답 조각과 끝 사건만 온다. */
+export const NO_TOOL_CALL_PROBE = "도구 없는 실행 검사";
+
 /**
  * 허용된 커넥터 도구 호출의 완료 사건이 싣는 결과 미리보기다. 외부 서비스가 돌려준 글을 뜻하는 가짜 값이고, 실행 기록과 화면에는
  * 어디에도 남지 않아야 한다.
@@ -2113,6 +2116,12 @@ export function startFakeHermes(
             event(response, { event: "tool.started", ...common, preview: toolStartedPreview(connectorCall.argsJson) });
             event(response, { event: "tool.completed", ...common, duration: 0.05, error: false,
               preview: JSON.stringify({ result: CONNECTOR_RESULT_SAMPLE }) });
+          }
+          // 도구를 부르지 않고 답만 하는 실행이다. 실행 기록에 도구 사건이 하나도 없는 실행을 만든다.
+          if (run.input === NO_TOOL_CALL_PROBE) {
+            event(response, { event: "run.completed" });
+            response.end();
+            return;
           }
           const redactDetail = run.input === "도구 가리기 검사" || run.input === "스트림 정본 검사";
           event(response, { event: "tool.started", tool: "fake-tool",
