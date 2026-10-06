@@ -91,12 +91,12 @@ class AgentToolPolicyTest {
     void visionRequiresPrivateSandboxEvenWithoutShellTools() {
         assertThat(AgentToolPolicy.hasSandboxToolset(List.of("vision"))).isTrue();
         assertThatThrownBy(() -> AgentToolPolicy.requestedForWrite(
-                        OWNER, agent(AgentVisibility.GROUP), List.of("vision"), List.of()))
+                        OWNER, agent(AgentVisibility.GROUP), List.of("vision"), List.of(), Set.of()))
                 .isInstanceOf(ApiException.class)
                 .extracting(ex -> ((ApiException) ex).code())
                 .isEqualTo(ErrorCode.AGENT_TOOLS_REQUIRE_PRIVATE);
         assertThat(AgentToolPolicy.requestedForWrite(
-                        OWNER, agent(AgentVisibility.PRIVATE), List.of("vision"), List.of()))
+                        OWNER, agent(AgentVisibility.PRIVATE), List.of("vision"), List.of(), Set.of()))
                 .containsExactly("vision", AgentToolPolicy.CONTROL_PLANE_MCP);
     }
 
@@ -106,7 +106,7 @@ class AgentToolPolicyTest {
         for (String toolset : List.of("image_gen", "video_gen")) {
             assertThat(AgentToolPolicy.hasSandboxToolset(List.of(toolset))).isTrue();
             assertThatThrownBy(() -> AgentToolPolicy.requestedForWrite(
-                            ADMIN, agent(AgentVisibility.GROUP), List.of(toolset), List.of()))
+                            ADMIN, agent(AgentVisibility.GROUP), List.of(toolset), List.of(), Set.of()))
                     .isInstanceOf(ApiException.class)
                     .extracting(ex -> ((ApiException) ex).code())
                     .isEqualTo(ErrorCode.AGENT_TOOLS_REQUIRE_PRIVATE);
