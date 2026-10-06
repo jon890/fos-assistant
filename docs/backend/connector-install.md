@@ -68,6 +68,13 @@ plugin 을 새 판으로 바꾼 뒤 이미 설치된 연결의 지침은 다시 
 
 ### 사진과 이미지 도구
 
+설치·재설치 요청의 `sandbox_owner` 는 Control Plane 이 DB 의 연결용 에이전트 주인에서 계산한다.
+사진 도구를 여는 커넥터는 실행 공간 정책에 등록된 profile 에서만 설치된다.
+plugin 과 정책을 먼저 반영한 뒤 재등록·연결 확인·관리자 반영 완료를 실행한다.
+정책이 없거나 profile 이 미등록이면 409, 주인 키가 없거나 틀리면 400 으로 설치를 거절한다.
+실패는 `PENDING` 과 `CONNECTOR_OPERATION_FAILED` 로 남는다. 사용자별 mount 와 배포 확인은
+[사진 첨부](attachment.md)와 [ADR-087](../adr/ADR-087-사진-첨부는-사용자별로-저장하고-실행-공간에는-그-사용자만-붙인다.md)이 갖는다.
+
 연결용 에이전트는 기본으로 사진을 받지 않는다. manifest 의 `attachments` 가 참이고 연결이 `READY` 로 확인됐을 때만 받는다.
 Control Plane 은 연결 확인과 관리자 반영 완료에서 선언한 toolset 이 실제로 켜진 것을 본 뒤에만 `agent.connector_attachments` 를 참으로 두고, `Agent.acceptsAttachments()` 가 그 열을 본다.
 등록 직후, 선언한 toolset 이 켜지지 않았을 때, 확인 중 외부 호출이 실패했을 때는 거짓이다. 사진 단추는 있는데 이미지 도구가 없는 상태를 만들지 않기 위해서다.
@@ -114,7 +121,7 @@ profile 하나의 MCP 만 다시 붙이는 공식 경로는 없다. 대화의 `/
 - plugin 이 기대는 이름은 `mcp.ClientSession`, `mcp.StdioServerParameters`, `mcp.client.stdio.stdio_client`, `ToolAnnotations.read_only_hint`, `CallToolResult.structured_content`, `CallToolResult.is_error`, `CallToolResult.content` 다
 - 1.x 는 이 속성을 `readOnlyHint`, `structuredContent`, `isError` 로 둔다. 1.x 에서 `is_error` 를 기본값으로 읽으면 도구 오류가 성공으로 읽힌다. 그래서 plugin 은 속성을 직접 읽고, 이름이 없으면 실패한다
 - plugin 은 올라올 때와 `call` 마다 SDK 판과 위 속성을 확인한다. 범위 밖이거나 속성이 없으면 자식을 띄우지 않고 `unavailable` 로 답하며, 판과 까닭을 운영 로그 한 줄로 남긴다
-- `call` 이 예외로 실패하면 묶음 예외(`ExceptionGroup`)를 풀어 가장 안쪽 예외의 종류와 SDK 판을 로그에 남긴다. 예외 본문과 칸 값은 남기지 않는다
+- `call` 이 예외로 실패하면 묶음 예외(`ExceptionGroup`)를 풀어 가장 안쪽 예외의 종류와 SDK 버전을 로그에 남긴다. 예외 본문과 칸 값은 남기지 않는다
 - Hermes 는 `mcp` 를 정확한 판 하나로 고정하므로 판은 Hermes 이미지를 올릴 때만 바뀐다. 올릴 때 확인할 것은 [버전 변경과 실측](../hermes/upgrades.md) 에 있다
 
 ## 연결 상태의 흐름

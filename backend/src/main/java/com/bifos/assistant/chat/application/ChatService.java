@@ -2,6 +2,7 @@ package com.bifos.assistant.chat.application;
 
 import com.bifos.assistant.agent.application.AgentService;
 import com.bifos.assistant.agent.domain.Agent;
+import com.bifos.assistant.agent.domain.type.AgentVisibility;
 import com.bifos.assistant.chat.application.model.AutoTurnDelivery;
 import com.bifos.assistant.chat.application.model.AutoTurnResult;
 import com.bifos.assistant.chat.application.model.CheckAnswer;
@@ -1077,7 +1078,10 @@ public class ChatService {
             throw new ApiException(ErrorCode.AGENT_DISABLED, "this agent is disabled");
         }
         // 흐름은 사진 자리를 덧붙이는 경로를 거치지 않는다. 오류 없이 사진을 버리지 않게 거절한다.
-        requireAttachmentAgent(user, agent, withAttachments);
+        if (withAttachments && !agent.acceptsAttachments()) {
+            throw new ApiException(ErrorCode.VALIDATION_FAILED, "this agent does not accept attachments");
+        }
+        requireAttachmentOwner(user, agent, withAttachments);
         Flow flow = flows.find(agent.flow());
         SkillCommand command = commandOf(agent, flow, text);
         if (existing == null && !limiter.hasTurnRoom(user.id())) {
@@ -1479,19 +1483,19 @@ public class ChatService {
         if (!agent.enabled()) {
             throw new ApiException(ErrorCode.AGENT_DISABLED, "this agent is disabled");
         }
-        requireAttachmentAgent(user, agent, !attached.isEmpty());
+        requireAttachmentOwner(user, agent, !attached.isEmpty());
         Flow flow = flows.find(agent.flow());
         return new Routed(
                 conversation, agent, flow, attached, commandOf(agent, flow, question), requestReceivedAt, false);
     }
 
-    private static void requireAttachmentAgent(CurrentUser user, Agent agent, boolean withAttachments) {
+    private static void requireAttachmentOwner(CurrentUser user, Agent agent, boolean withAttachments) {
         if (!withAttachments) {
             return;
         }
-        boolean acceptsAttachments = agent.acceptsAttachments();
+        boolean privateAgent = agent.visibility() == AgentVisibility.PRIVATE;
         boolean sameOwner = Objects.equals(agent.ownerUserId(), user.id());
-        if (!acceptsAttachments || !sameOwner) {
+        if (!privateAgent || !sameOwner) {
             throw new ApiException(ErrorCode.VALIDATION_FAILED, "this agent does not accept attachments");
         }
     }
