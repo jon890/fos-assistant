@@ -7,6 +7,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -19,6 +20,12 @@ import com.bifos.assistant.agent.domain.type.AgentVisibility;
 import com.bifos.assistant.agent.domain.type.CostMode;
 import com.bifos.assistant.agent.domain.type.CredentialScope;
 import com.bifos.assistant.agent.infra.AgentRepository;
+import com.bifos.assistant.connector.domain.ConnectionFields;
+import com.bifos.assistant.connector.domain.ConnectorBinding;
+import com.bifos.assistant.connector.domain.ConnectorConnection;
+import com.bifos.assistant.connector.infra.ConnectorBindingRepository;
+import com.bifos.assistant.connector.infra.ConnectorConnectionRepository;
+import com.bifos.assistant.hermes.HermesConnectorClient;
 import com.bifos.assistant.hermes.HermesDashboardClient;
 import com.bifos.assistant.hermes.HermesProfileKeyStore;
 import com.bifos.assistant.hermes.HermesToolsetClient;
@@ -49,6 +56,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.mockito.InOrder;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
@@ -76,6 +84,8 @@ class AgentLifecycleServiceTest {
     /** {@code application-test.yml} 의 공유 listener 주소다. */
     private static final String LISTENER = "https://hermes-listener.example.com";
 
+    private static final String DEMO = "demo-notes";
+
     @Autowired
     AgentLifecycleService lifecycle;
 
@@ -93,6 +103,15 @@ class AgentLifecycleServiceTest {
 
     @Autowired
     HermesProfileKeyStore keyStore;
+
+    @Autowired
+    ConnectorBindingRepository bindingRows;
+
+    @Autowired
+    ConnectorConnectionRepository connections;
+
+    @MockitoBean
+    HermesConnectorClient connector;
 
     @MockitoBean
     HermesDashboardClient dashboard;
@@ -115,6 +134,9 @@ class AgentLifecycleServiceTest {
     @AfterEach
     void tearDown() {
         createdProfiles.forEach(keyStore::delete);
+        // 바인딩 줄이 에이전트를 가리켜 남으면 같은 컨텍스트의 다른 검사가 에이전트를 지우지 못한다.
+        bindingRows.deleteAll();
+        connections.deleteAll();
     }
 
     @Test
@@ -200,16 +222,17 @@ class AgentLifecycleServiceTest {
     }
 
     @Test
-    @DisplayName("커넥터 연결용 에이전트는 다섯이어도 만들고 상한에 세지 않는다")
-    void createsConnectorAgentsBeyondLimitWithoutCounting() {
+    @DisplayName("예전 방식의 연결 에이전트는 상한에 세지 않아 넷과 그것을 가진 사용자가 다섯째를 만든다")
+    void legacyConnectorAgentsDoNotCountTowardLimit() {
         CurrentUser kid = member();
-        seedAgents(kid, 5);
+        seedAgents(kid, 4);
+        Agent legacy = seedAgents(kid, 1).get(0);
+        legacy.markConnectorManaged();
+        agents.save(legacy);
 
-        Agent connectorAgent = lifecycle.createConnectorAgent(kid, "가계부");
-        createdProfiles.add(connectorAgent.hermesProfile());
+        Agent created = create(kid, "다섯째", null);
 
-        assertThat(connectorAgent.connectorManaged()).isTrue();
-        assertThat(connectorAgent.visibility()).isEqualTo(AgentVisibility.PRIVATE);
+        assertThat(created.connectorManaged()).isFalse();
         assertThat(agents.countByOwnerUserIdAndDeletedAtIsNullAndConnectorManagedFalse(kid.id()))
                 .isEqualTo(5);
         assertCode(() -> lifecycle.create(kid, "여섯째", null), ErrorCode.AGENT_LIMIT_REACHED);
@@ -360,6 +383,20 @@ class AgentLifecycleServiceTest {
     }
 
     @Test
+    @DisplayName("연결이 붙은 에이전트는 그룹으로 바꾸지 못하고 비공개로 남는다")
+    void cannotChangeAgentWithConnectionsToGroup() {
+        CurrentUser kid = member();
+        Agent created = create(kid, "숙제 도우미", null);
+        bind(created, readyConnection(kid));
+
+        assertCode(
+                () -> lifecycle.changeVisibility(kid, created.code(), AgentVisibility.GROUP),
+                ErrorCode.AGENT_CONNECTIONS_REQUIRE_PRIVATE);
+
+        assertThat(agents.findByCode(created.code()).orElseThrow().visibility()).isEqualTo(AgentVisibility.PRIVATE);
+    }
+
+    @Test
     @DisplayName("공개 범위가 비면 거절한다")
     void rejectsBlankVisibility() {
         CurrentUser kid = member();
@@ -489,6 +526,70 @@ class AgentLifecycleServiceTest {
     }
 
     @Test
+    @DisplayName("연결이 붙은 에이전트를 지우면 profile 을 거두기 전에 붙은 연결을 떼고 바인딩 줄을 지운다")
+    void deleteDetachesConnectionsBeforeRemovingProfile() {
+        CurrentUser kid = member();
+        Agent created = create(kid, "숙제 도우미", null);
+        bind(created, readyConnection(kid));
+
+        lifecycle.delete(kid, created.code());
+
+        InOrder order = inOrder(connector, dashboard);
+        order.verify(connector).unbindConnector(created.hermesProfile(), DEMO);
+        order.verify(dashboard).deleteProfile(created.hermesProfile());
+        assertThat(bindingRows.existsByAgentId(created.id())).isFalse();
+        assertThat(agents.findByCode(created.code()).orElseThrow().isDeleted()).isTrue();
+    }
+
+    @Test
+    @DisplayName("운영에서 만든 profile 의 에이전트도 지우면 붙은 연결을 떼고 profile 은 남긴다")
+    void deleteDetachesConnectionsOfProfileCreatedInProduction() {
+        CurrentUser kid = member();
+        Agent seeded = seedAgents(kid, 1).get(0);
+        bind(seeded, readyConnection(kid));
+
+        lifecycle.delete(kid, seeded.code());
+
+        verify(connector).unbindConnector(seeded.hermesProfile(), DEMO);
+        verify(dashboard, never()).deleteProfile(anyString());
+        assertThat(bindingRows.existsByAgentId(seeded.id())).isFalse();
+        assertThat(agents.findByCode(seeded.code()).orElseThrow().isDeleted()).isTrue();
+    }
+
+    @Test
+    @DisplayName("붙은 연결을 떼지 못하면 profile 을 거두지 않고 에이전트와 바인딩을 남긴다")
+    void keepsAgentWhenConnectionCannotBeDetached() {
+        CurrentUser kid = member();
+        Agent created = create(kid, "숙제 도우미", null);
+        bind(created, readyConnection(kid));
+        doThrow(new IllegalStateException()).when(connector).unbindConnector(anyString(), anyString());
+
+        assertCode(() -> lifecycle.delete(kid, created.code()), ErrorCode.CONNECTOR_OPERATION_FAILED);
+
+        verify(dashboard, never()).deleteProfile(anyString());
+        assertThat(bindingRows.existsByAgentId(created.id())).isTrue();
+        assertThat(agents.findByCode(created.code()).orElseThrow().isDeleted()).isFalse();
+    }
+
+    @Test
+    @DisplayName("옛 커넥터 에이전트는 고치지 못해도 주인이 지울 수 있고 지우면 그 바인딩을 뗀다")
+    void ownerDeletesLegacyConnectorAgent() {
+        CurrentUser kid = member();
+        Agent legacy = seedAgents(kid, 1).get(0);
+        legacy.markConnectorManaged();
+        legacy = agents.save(legacy);
+        bind(legacy, readyConnection(kid));
+        String code = legacy.code();
+
+        assertCode(() -> lifecycle.changeVisibility(kid, code, AgentVisibility.GROUP), ErrorCode.FORBIDDEN);
+        lifecycle.delete(kid, code);
+
+        verify(connector).putConnector(legacy.hermesProfile(), DEMO, false);
+        assertThat(bindingRows.existsByAgentId(legacy.id())).isFalse();
+        assertThat(agents.findByCode(code).orElseThrow().isDeleted()).isTrue();
+    }
+
+    @Test
     @DisplayName("이름이 공백뿐이거나 101자면 거절하고 100자는 된다")
     void rejectsBlankOr101CharNameAndAccepts100() {
         CurrentUser kid = member();
@@ -525,6 +626,19 @@ class AgentLifecycleServiceTest {
                     Instant.now())));
         }
         return seeded;
+    }
+
+    /** 값을 보관 파일에 둔 그 사용자의 READY 연결이다. */
+    private ConnectorConnection readyConnection(CurrentUser owner) {
+        ConnectorConnection connection = ConnectorConnection.pending(owner.id(), DEMO, Instant.now());
+        connection.connected(ConnectionFields.empty(), Instant.now());
+        return connections.save(connection);
+    }
+
+    private void bind(Agent agent, ConnectorConnection connection) {
+        ConnectorBinding binding = ConnectorBinding.pending(agent, connection, "demo", Instant.now());
+        binding.installed(false, Instant.now());
+        bindingRows.save(binding);
     }
 
     private CurrentUser member() {

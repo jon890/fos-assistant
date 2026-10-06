@@ -29,7 +29,7 @@ Control Plane 의 패키지마다 맡는 책임과 패키지 사이의 방향 �
 | `people` | 로그인 허용 목록과 사람을 더하는 흐름, 첫 로그인에 그 사람의 에이전트 만들기 |
 | `orchestration` | 흐름의 구현과 자식 실행, MCP `agent_*` 위임의 시작과 조회와 중지, 하위 에이전트 session 등록 |
 | `skill` | 올린 스킬의 읽기와 쓰기, 버전 디렉터리, Hermes 에 게시, 스킬 목록과 호출 이력 조회 |
-| `connector` | 커넥터 카탈로그, 사용자별 연결, 커넥터 도구 호출의 판정과 기록 |
+| `connector` | 커넥터 카탈로그, 사용자별 연결, 에이전트에 연결을 붙이는 바인딩, 커넥터 도구 호출의 판정과 기록 |
 | `task` | 예약 작업과 시각, 발화 기록, 발화기와 예약 turn 시작([`task.md`](task.md)) |
 | `notification` | 사용자에게 대화 밖에서 알리는 줄의 저장과 읽음 표시, 사용자 단위 SSE, 오래된 줄 정리([`notification.md`](notification.md)) |
 | `followup` | 할 일의 저장과 상태 전이, 사람이 쓰는 API, 에이전트의 제안 저장([`follow-up.md`](follow-up.md)) |
@@ -94,10 +94,18 @@ Control Plane 의 패키지마다 맡는 책임과 패키지 사이의 방향 �
 ### connector
 
 `connector`는 커넥터 카탈로그와 사용자별 연결의 등록, 확인, 해제와 비밀값을 제외한 상태를 소유한다.
+연결을 에이전트에 붙이고 떼는 바인딩(`agent_connector_binding`)과 관리자 반영 완료도 이 패키지가 갖는다. `ConnectorConnectionService` 가 연결을, `ConnectorBindingService` 가 바인딩을 맡는다([ADR-083](../adr/ADR-083-커넥터는-사용자가-한-번-연결하고-자기-에이전트에-여럿-붙여-그-에이전트가-도구를-직접-부른다.md)).
 특정 서비스의 이름, 주소, env 이름, 토큰 형식을 코드에 두지 않는다. 모두 대시보드 plugin 이 내는 manifest 에서 온다([ADR-043](../adr/ADR-043-커넥터는-plugin-의-connector-json-으로-선언하고-control-plane-은-범용-흐름만-갖는다.md)).
 카탈로그, 도구 호출, 설치, env, MCP probe 는 `hermes`의 `HermesConnectorClient` 가 HTTP로 호출한다.
 `connector.application` 의 `ConnectorCallLimiter` 가 선택지 조회, 등록, 연결 확인을 사용자별로 제한한다. 한도는 `ConnectorProperties`(`assistant.connector`)가 갖고 상태는 JVM 메모리에 둔다. Control Plane 이 한 대라는 전제다.
-커넥터 에이전트의 실행에는 Memory 문맥을 주지 않는다. `ChatService` 와 `AgentRunner` 가 `Agent.connectorManaged()` 를 보고 빈 문맥으로 돌린다. `AgentMemoryCollectionService` 도 커넥터 에이전트에 받는 collection 을 주지 않는다. `McpCallerResolver` 는 origin 실행의 에이전트가 커넥터 에이전트이면 Control Plane MCP 호출을 거절한다([ADR-045](../adr/ADR-045-커넥터-에이전트는-자기-mcp-서버만-받고-memory-와-control-plane-도구를-받지-않는다.md)).
+`agent` 가 바인딩을 알아야 하는 자리는 `agent.application` 에 둔 port 둘로 부른다. `connector` 가 `agent` 보다 위라서다.
+
+| port | 하는 일 | 구현 | 부르는 곳 |
+| --- | --- | --- | --- |
+| `AgentConnectorBindings` | `hasBindings`, `connectorServers`, `connectorToolPrefixes`. 저장한 바인딩만 읽고 대시보드를 부르지 않는다 | `ConnectorBindingLookup` | 공개 범위 변경과 관리자 수정(비공개 유지), 도구 저장과 스킬 게시(붙은 서버 이름을 함께 보낸다), 실행 기록의 도구 내용 가림, 먼저 살펴보기의 시작 전 점검과 지시 |
+| `AgentConnectorDetacher` | `detachAll`. 그 에이전트의 바인딩을 모두 뗀다 | `ConnectorBindingService` | 에이전트 지우기 |
+
+옛 커넥터 에이전트가 남아 있는 동안 그 실행에는 Memory 문맥을 주지 않는다. `ChatService` 와 `AgentRunner` 가 `Agent.connectorManaged()` 를 보고 빈 문맥으로 돌린다. `AgentMemoryCollectionService` 도 옛 커넥터 에이전트에 받는 collection 을 주지 않는다. `McpCallerResolver` 는 origin 실행의 에이전트가 옛 커넥터 에이전트이면 Control Plane MCP 호출을 거절한다([ADR-045](../adr/ADR-045-커넥터-에이전트는-자기-mcp-서버만-받고-memory-와-control-plane-도구를-받지-않는다.md)). 연결을 붙인 일반 에이전트에는 이 경계가 걸리지 않는다.
 웹은 `components/connector`와 `app/connections`, `app/connections/[id]`, 대응 서버 라우트가 맡는다. 입력 칸은 manifest 의 `fields` 로 그린다.
 `test/unit/connector-neutral.test.ts` 가 `backend/src/main` 과 `web/src` 와 `hermes/plugins` 에 특정 서비스 이름이 들어오지 않았는지 본다.
 예외는 셋이다. 옛 표를 만든 V36 과 그 행을 옮기는 V38 은 이관 기록이라 이름을 갖는다. `web/src/app/connections/accountbook/page.tsx` 는 전용 화면이 있던 옛 주소를 새 연결 화면으로 넘기려고 커넥터 번호를 갖는다. 이 페이지는 옛 주소로 들어오는 사용자가 없어지면 지운다.
@@ -109,12 +117,12 @@ Control Plane 의 패키지마다 맡는 책임과 패키지 사이의 방향 �
 | --- | --- |
 | `connector.presentation.ConnectorPolicyController` | `POST /internal/hermes/connector-policy`. profile 토큰으로 인증한 요청을 받아 서명을 확인하고 판정을 돌려준다 |
 | `connector.application.ConnectorPolicyRequest` | 요청 본문과 서명 검증. `_fos_ctx` 와 같은 key 를 쓰고 HMAC 은 `mcp.application.McpCallContext` 의 것을 부른다 |
-| `connector.application.ConnectorPolicyService` | 실행과 연결과 카탈로그를 찾아 판정하고 `connector_action` 한 줄을 남긴다. 승인 줄이면 같은 트랜잭션에서 `APPROVAL_REQUESTED` 알림도 남긴다 |
+| `connector.application.ConnectorPolicyService` | 실행과, 그 실행의 에이전트에 붙은 바인딩과, 카탈로그를 찾아 판정하고 `connector_action` 한 줄을 남긴다. 승인 줄이면 같은 트랜잭션에서 `APPROVAL_REQUESTED` 알림도 남긴다 |
 | `connector.application.ConnectorCatalogCache` | 판정 경로가 쓰는 카탈로그를 60초 동안 메모리에 둔다. 화면 경로는 쓰지 않는다 |
 | `connector.domain.ToolPolicyDecision` | 판정 함수. Hermes 와 DB 를 모른다 |
 | `connector.domain.ConnectorAction` | 판정 한 줄과 승인 줄. 승인 상태 전이를 갖는다 |
 
-**`attention` 밖의 패키지는 `connector` 를 import 하지 않는다.** `connector` 가 `agent`, `hermes`, `mcp`, `orchestration`, `usage`, `user` 를 부른다. 승인 줄의 대화 권한을 확인하고 알림이 가리킬 대화의 공개 식별자를 찾으려고 `chat` 도 부른다. 승인 요청과 만료의 알림을 같은 트랜잭션에서 만들려고 `notification` 도 부른다. `connector` 가 `mcp` 를 쓰므로 `mcp` 가 `connector` 를 부르면 순환이 된다. `chat` 이 승인 결과를 읽어야 할 때는 `chat` 에 port 를 두고 `connector` 가 구현한다. `attention` 은 층 순서의 맨 위라 승인 대기를 읽으려고 `connector.application` 의 읽기 메서드를 부른다.
+**`attention` 밖의 패키지는 `connector` 를 import 하지 않는다.** `connector` 가 `agent`, `hermes`, `mcp`, `orchestration`, `usage`, `user` 를 부른다. 붙일 때 스킬 이름이 겹치는지 보려고 `skill` 도 부른다. 승인 줄의 대화 권한을 확인하고 알림이 가리킬 대화의 공개 식별자를 찾으려고 `chat` 도 부른다. 승인 요청과 만료의 알림을 같은 트랜잭션에서 만들려고 `notification` 도 부른다. `connector` 가 `mcp` 를 쓰므로 `mcp` 가 `connector` 를 부르면 순환이 된다. `chat` 이 승인 결과를 읽어야 할 때는 `chat` 에 port 를 두고 `connector` 가 구현한다. `attention` 은 층 순서의 맨 위라 승인 대기를 읽으려고 `connector.application` 의 읽기 메서드를 부른다.
 검사: `ArchitectureRules.TOP_LEVEL_PACKAGES_FREE_OF_CYCLES`
 
 ## 한 번의 대화가 지나는 길

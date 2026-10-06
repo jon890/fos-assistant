@@ -11,6 +11,7 @@ import os
 import subprocess
 import sys
 import time
+import types
 import unittest
 from unittest import mock
 
@@ -72,6 +73,21 @@ class ConnectorCallTest(base.ConnectorGateCase):
     def setUp(self):
         super().setUp()
         self.addCleanup(self.assert_no_child_left)
+        # 보관 파일은 대시보드의 Hermes 루트 아래에 있다. 그 루트를 찾는 Hermes 모듈만 대역으로 둔다.
+        self.hermes_root = self.base / "hermes"
+        self.hermes_root.mkdir()
+        constants = types.ModuleType("hermes_constants")
+        constants.get_default_hermes_root = lambda: str(self.hermes_root)
+        modules = mock.patch.dict(sys.modules, {"hermes_constants": constants})
+        modules.start()
+        self.addCleanup(modules.stop)
+
+    def store_vault(self, vault, connector=base.DEMO, **values):
+        """보관 파일 하나를 대시보드가 쓰는 모양 그대로 둔다."""
+        directory = self.hermes_root / "connector-vault"
+        directory.mkdir(mode=0o700, exist_ok=True)
+        (directory / ("%s.json" % vault)).write_text(
+            json.dumps({"v": 1, "connector": connector, "values": values}), encoding="utf-8")
 
     def children(self):
         """시험 커넥터 사본의 서버를 돌리고 있는 프로세스 번호다."""
@@ -90,6 +106,44 @@ class ConnectorCallTest(base.ConnectorGateCase):
         self.assertEqual(self.call(), (200, {"ok": True, "result": SCOPES}))
         # 비운 선택 칸은 형식을 보지 않고 그대로 넘긴다.
         self.assertEqual(self.call(scope=""), (200, {"ok": True, "result": SCOPES}))
+
+    def test_vault_values_are_used_for_the_call(self):
+        """`values` 대신 `vault` 를 주면 그 보관 파일의 값으로 부른다. 응답에 값이 없다."""
+        self.store_vault("c1", token=OK_TOKEN)
+        self.assertEqual(self.request(CALL, "POST", {"tool": "list_scopes", "vault": "c1"}),
+                         (200, {"ok": True, "result": SCOPES}))
+        self.store_vault("c2", token=BAD_TOKEN)
+        status, body = self.request(CALL, "POST", {"tool": "list_scopes", "vault": "c2"})
+        self.assertEqual((status, body), (200, {"ok": False, "error": "credential_rejected"}))
+        self.assertNotIn(BAD_TOKEN, json.dumps(body))
+
+    def test_vault_call_needs_exactly_one_source_and_the_connectors_own_vault(self):
+        """`values` 와 `vault` 를 함께 보내거나, 이름이 틀리거나, 없거나, 다른 커넥터의 보관 파일이면 400 이고 자식을 띄우지 않는다."""
+        self.store_vault("c1", token=OK_TOKEN)
+        self.store_vault("c3", connector="other-notes", token=OK_TOKEN)
+        with mock.patch.object(self.plugin, "_run_connector_tool") as runner:
+            for label, body in (
+                ("both", {"tool": "list_scopes", "values": {"token": OK_TOKEN}, "vault": "c1"}),
+                ("bad name", {"tool": "list_scopes", "vault": "../c1"}),
+                ("leading zero", {"tool": "list_scopes", "vault": "c01"}),
+                ("not a string", {"tool": "list_scopes", "vault": 1}),
+                ("missing", {"tool": "list_scopes", "vault": "c9"}),
+                ("other connector", {"tool": "list_scopes", "vault": "c3"}),
+            ):
+                with self.subTest(label):
+                    self.assertEqual(self.request(CALL, "POST", body)[0], 400)
+            runner.assert_not_called()
+
+    def test_connector_without_fields_is_verified_with_an_empty_vault(self):
+        """칸이 없는 커넥터는 빈 `values` 의 보관 파일로 확인 도구를 부른다. 자식은 운영자 env 만 받는다."""
+        self.rewrite("connector.json", lambda value: value.update(fields=[], verify={"tool": "env_view"}))
+        self.rewrite(".mcp.json", lambda value: value["mcpServers"]["demo"].update(env={"DEMO_BASE": "${DEMO_BASE}"}))
+        self.store_vault("c4")
+        status, body = self.request(CALL, "POST", {"tool": "env_view", "vault": "c4"})
+        self.assertEqual(status, 200, body)
+        self.assertTrue(body["ok"], body)
+        self.assertIn("DEMO_BASE", body["result"]["names"])
+        self.assertNotIn("DEMO_TOKEN", body["result"]["names"])
 
     def test_tool_error_code_is_mapped_to_the_common_vocabulary(self):
         """도구의 오류 코드는 manifest 의 대응 표로 바꾸고, 표에 없는 코드는 unavailable 이다."""

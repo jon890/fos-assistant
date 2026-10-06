@@ -12,6 +12,7 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import com.bifos.assistant.agent.application.AgentAdminService;
+import com.bifos.assistant.agent.application.AgentConnectorBindings;
 import com.bifos.assistant.agent.application.AgentCreateCommand;
 import com.bifos.assistant.agent.application.AgentEndpointProbe;
 import com.bifos.assistant.agent.application.AgentLifecycleService;
@@ -34,7 +35,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
-/** 관리자가 에이전트를 등록하는 유스케이스의 결과와 검사 순서를 본다. */
+/** 관리자가 에이전트를 등록하고 고치는 유스케이스의 결과와 검사 순서를 본다. */
 class AgentAdminServiceTest {
 
     private static final String API_BASE_URL = "http://127.0.0.1:2/p/group";
@@ -44,9 +45,10 @@ class AgentAdminServiceTest {
     private final AgentLifecycleService lifecycle = mock(AgentLifecycleService.class);
     private final AgentEndpointProbe endpointProbe = mock(AgentEndpointProbe.class);
     private final KnownFlows flows = mock(KnownFlows.class);
+    private final AgentConnectorBindings connectorBindings = mock(AgentConnectorBindings.class);
 
     private final AgentAdminService service =
-            new AgentAdminService(agents, users, lifecycle, endpointProbe, flows, Clock.systemUTC());
+            new AgentAdminService(agents, users, lifecycle, endpointProbe, flows, connectorBindings, Clock.systemUTC());
 
     @BeforeEach
     void setUp() {
@@ -100,6 +102,24 @@ class AgentAdminServiceTest {
     }
 
     @Test
+    @DisplayName("연결이 붙은 에이전트의 주인을 바꾸면 AGENT HAS CONNECTIONS 로 거절하고 저장하지 않는다")
+    void rejectsOwnerChangeOfAgentWithConnections() {
+        Agent agent = privateAgent(1L);
+        AppUser newOwner = mock(AppUser.class);
+        when(newOwner.id()).thenReturn(2L);
+        when(users.findByEmail("new@example.com")).thenReturn(Optional.of(newOwner));
+        when(connectorBindings.hasBindings(agent.id())).thenReturn(true);
+
+        assertThatThrownBy(() -> service.update("dad", privateUpdate("new@example.com")))
+                .isInstanceOf(ApiException.class)
+                .extracting(ex -> ((ApiException) ex).code())
+                .isEqualTo(ErrorCode.AGENT_HAS_CONNECTIONS);
+
+        assertThat(agent.ownerUserId()).isEqualTo(1L);
+        verify(agents, never()).save(any(Agent.class));
+    }
+
+    @Test
     @DisplayName("셸이나 파일 도구가 켜진 에이전트의 주인을 바꾸면 거절하고 주인을 그대로 둔다")
     void rejectsOwnerChangeWhenShellToolsetEnabled() {
         Agent agent = privateAgent(1L);
@@ -117,6 +137,36 @@ class AgentAdminServiceTest {
 
         assertThat(agent.ownerUserId()).isEqualTo(1L);
         verify(agents, never()).save(any(Agent.class));
+    }
+
+    @Test
+    @DisplayName("연결이 붙은 에이전트를 그룹으로 바꾸면 AGENT CONNECTIONS REQUIRE PRIVATE 로 거절한다")
+    void rejectsGroupVisibilityOfAgentWithConnections() {
+        Agent agent = privateAgent(1L);
+        when(connectorBindings.hasBindings(agent.id())).thenReturn(true);
+
+        assertThatThrownBy(() ->
+                        service.update("dad", new AgentUpdateCommand(true, AgentVisibility.GROUP, null, null, null)))
+                .isInstanceOf(ApiException.class)
+                .extracting(ex -> ((ApiException) ex).code())
+                .isEqualTo(ErrorCode.AGENT_CONNECTIONS_REQUIRE_PRIVATE);
+
+        assertThat(agent.visibility()).isEqualTo(AgentVisibility.PRIVATE);
+        verify(agents, never()).save(any(Agent.class));
+        verifyNoInteractions(lifecycle);
+    }
+
+    @Test
+    @DisplayName("연결이 붙은 에이전트도 주인과 공개 범위를 그대로 두는 수정은 저장한다")
+    void savesUpdateKeepingOwnerOfAgentWithConnections() {
+        Agent agent = privateAgent(1L);
+        when(connectorBindings.hasBindings(agent.id())).thenReturn(true);
+
+        Agent updated = service.update("dad", new AgentUpdateCommand(false, AgentVisibility.PRIVATE, null, null, null));
+
+        assertThat(updated.enabled()).isFalse();
+        assertThat(updated.ownerUserId()).isEqualTo(1L);
+        verify(agents).save(agent);
     }
 
     @Test

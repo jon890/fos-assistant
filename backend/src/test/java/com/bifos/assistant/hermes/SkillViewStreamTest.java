@@ -160,7 +160,7 @@ class SkillViewStreamTest {
                     "run-one",
                     events::add,
                     opened -> {},
-                    connectorManaged);
+                    connectorManaged ? ToolDetailScope.ALL : ToolDetailScope.NONE);
             return events;
         } finally {
             server.stop(0);

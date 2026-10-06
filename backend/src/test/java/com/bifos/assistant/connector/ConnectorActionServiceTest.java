@@ -6,6 +6,7 @@ import static org.assertj.core.api.Assertions.tuple;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -28,6 +29,7 @@ import com.bifos.assistant.connector.application.model.ConnectorActionView;
 import com.bifos.assistant.connector.application.model.ConnectorGrantView;
 import com.bifos.assistant.connector.application.model.ConnectorPolicyAnswer;
 import com.bifos.assistant.connector.domain.ConnectorAction;
+import com.bifos.assistant.connector.domain.ConnectorBinding;
 import com.bifos.assistant.connector.domain.ConnectorConnection;
 import com.bifos.assistant.connector.domain.ConnectorToolGrant;
 import com.bifos.assistant.connector.domain.type.ActionDecision;
@@ -35,6 +37,7 @@ import com.bifos.assistant.connector.domain.type.ActionStatus;
 import com.bifos.assistant.connector.domain.type.ConnectionStatus;
 import com.bifos.assistant.connector.domain.type.GrantPeriod;
 import com.bifos.assistant.connector.infra.ConnectorActionRepository;
+import com.bifos.assistant.connector.infra.ConnectorBindingRepository;
 import com.bifos.assistant.connector.infra.ConnectorConnectionRepository;
 import com.bifos.assistant.connector.infra.ConnectorToolGrantRepository;
 import com.bifos.assistant.hermes.ConnectorExecutionUnknown;
@@ -110,6 +113,9 @@ import tools.jackson.databind.json.JsonMapper;
 class ConnectorActionServiceTest {
     private static final JsonMapper JSON = JsonMapper.builder().build();
     private static final String PROFILE = "connector-action-owner";
+    /** 같은 주인의 다른 에이전트 profile 이다. 같은 연결을 붙여 그 에이전트에서도 도구를 부른다. */
+    private static final String OTHER_PROFILE = "connector-action-other";
+
     private static final String DEMO = "demo-notes";
     private static final String WRITE = "write_note";
     private static final String MAIL = "mail_note";
@@ -143,6 +149,9 @@ class ConnectorActionServiceTest {
 
     @Autowired
     ConnectorConnectionRepository connections;
+
+    @Autowired
+    ConnectorBindingRepository bindings;
 
     @Autowired
     AppUserRepository users;
@@ -189,8 +198,9 @@ class ConnectorActionServiceTest {
     void setUp() {
         jdbc.update("DELETE FROM connector_action");
         jdbc.update("DELETE FROM connector_tool_grant");
+        bindings.deleteAll();
         connections.deleteAll();
-        McpCallSigner.clearRuns(jdbc, List.of(PROFILE));
+        McpCallSigner.clearRuns(jdbc, List.of(PROFILE, OTHER_PROFILE));
         agents.deleteAll();
         tokens.deleteAll();
         users.deleteAll();
@@ -933,6 +943,75 @@ class ConnectorActionServiceTest {
     }
 
     @Test
+    @DisplayName("같은 연결을 붙인 다른 에이전트의 실행이 만든 승인 줄은 승인하면 그 에이전트의 profile 에서 실행한다")
+    void approvalExecutesInProfileOfTheAgentThatDecided() {
+        Agent other = agents.save(Agent.of(
+                "action-other-" + UUID.randomUUID(),
+                "다른 비서",
+                OTHER_PROFILE,
+                "http://localhost",
+                CostMode.SUBSCRIPTION,
+                CredentialScope.SHARED_HOUSEHOLD,
+                AgentVisibility.PRIVATE,
+                owner.id(),
+                Instant.now()));
+        bind(other, connections.findByUserIdAndConnectorId(owner.id(), DEMO).orElseThrow(), true);
+        String otherRoot = "fos-" + UUID.randomUUID();
+        executions.save(AgentExecution.builder()
+                .userId(owner.id())
+                .agentId(other.id())
+                .conversationId(CONVERSATION)
+                .profileName(OTHER_PROFILE)
+                .hermesSessionId(otherRoot)
+                .costMode(CostMode.SUBSCRIPTION)
+                .status(ExecutionStatus.RUNNING)
+                .startedAt(Instant.parse("2026-10-01T00:00:00Z"))
+                .build());
+        UUID actionId = policies.decide(
+                        OTHER_PROFILE,
+                        otherRoot,
+                        otherRoot,
+                        "call_" + UUID.randomUUID(),
+                        "mcp__demo__" + WRITE,
+                        WRITE,
+                        ARGS)
+                .actionId();
+
+        ConnectorActionView approved = service.approve(me, actionId, null);
+
+        assertThat(onlyAction().agentId()).isEqualTo(other.id());
+        assertThat(approved.status()).isEqualTo(ActionStatus.SUCCEEDED);
+        verify(connector, times(1)).execute(OTHER_PROFILE, DEMO, "mcp__demo__write_note", ARGS);
+        verify(connector, never()).execute(eq(PROFILE), anyString(), anyString(), anyString());
+    }
+
+    @Test
+    @DisplayName("승인 줄을 만든 에이전트에서 연결을 떼었으면 승인해도 실행하지 않고 NOT_EXECUTABLE 로 끝난다")
+    void approvalAfterBindingWasDetachedIsNotExecutable() {
+        UUID actionId = ask(WRITE, ARGS).actionId();
+        bindings.deleteAll();
+
+        ConnectorActionView closed = service.approve(me, actionId, null);
+
+        assertThat(closed.status()).isEqualTo(ActionStatus.REJECTED);
+        assertThat(closed.errorCode()).isEqualTo(ConnectorAction.NOT_EXECUTABLE);
+        verify(connector, never()).execute(anyString(), anyString(), anyString(), anyString());
+    }
+
+    @Test
+    @DisplayName("승인할 때 그 에이전트의 바인딩이 반영 대기면 실행하지 않고 NOT_EXECUTABLE 로 끝난다")
+    void approvalOfPendingBindingIsNotExecutable() {
+        UUID actionId = ask(WRITE, ARGS).actionId();
+        jdbc.update("UPDATE agent_connector_binding SET status = 'PENDING'");
+
+        ConnectorActionView closed = service.approve(me, actionId, null);
+
+        assertThat(closed.status()).isEqualTo(ActionStatus.REJECTED);
+        assertThat(closed.errorCode()).isEqualTo(ConnectorAction.NOT_EXECUTABLE);
+        verify(connector, never()).execute(anyString(), anyString(), anyString(), anyString());
+    }
+
+    @Test
     @DisplayName("승인할 때 연결이 PENDING 이면 실행하지 않고 REJECTED 줄을 오류 없이 돌려준다")
     void approvalOfNotReadyConnectionRejectsTheAction() {
         UUID actionId = ask(WRITE, ARGS).actionId();
@@ -1210,14 +1289,23 @@ class ConnectorActionServiceTest {
                 .containsExactly(tuple(actionId, ConnectorActionView.UNNAMED_TITLE));
     }
 
-    /** 주인의 연결을 만든다. {@code ready} 가 거짓이면 {@code PENDING} 으로 둔다. */
+    /** 주인의 연결을 만들어 에이전트에 붙인다. {@code ready} 가 거짓이면 연결과 바인딩을 {@code PENDING} 으로 둔다. */
     private void connect(boolean ready) {
         Instant now = Instant.parse("2026-10-01T00:00:00Z");
-        ConnectorConnection connection = ConnectorConnection.pending(owner.id(), DEMO, agent, now);
+        ConnectorConnection connection = ConnectorConnection.pending(owner.id(), DEMO, now);
         if (ready) {
             connection.ready(now);
         }
-        connections.save(connection);
+        bind(agent, connections.save(connection), ready);
+    }
+
+    private ConnectorBinding bind(Agent target, ConnectorConnection connection, boolean ready) {
+        Instant now = Instant.parse("2026-10-01T00:00:00Z");
+        ConnectorBinding binding = ConnectorBinding.pending(target, connection, "demo", now);
+        if (ready) {
+            binding.ready(now);
+        }
+        return bindings.save(binding);
     }
 
     /** 루트 session 에서 부른 새 호출 하나의 판정을 묻는다. */

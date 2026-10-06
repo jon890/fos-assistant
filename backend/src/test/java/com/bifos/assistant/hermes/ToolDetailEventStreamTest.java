@@ -11,6 +11,7 @@ import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import tools.jackson.databind.json.JsonMapper;
@@ -37,6 +38,18 @@ class ToolDetailEventStreamTest {
 
             """;
 
+    /** 붙은 커넥터 서버의 도구와 다른 도구가 한 실행에서 함께 돈다. */
+    private static final String MIXED_RAW = """
+            data: {"event":"tool.started","tool":"mcp__demo__list_notes","preview":"{\\"query\\": \\"외부-글-4821\\"}"}
+
+            data: {"event":"tool.completed","tool":"mcp__demo__list_notes","result":"외부-결과-4821"}
+
+            data: {"event":"tool.completed","tool":"web_search","result":"검색-결과-1180"}
+
+            data: {"event":"tool.completed","tool":"mcp__demoother__list","result":"다른-서버-3307"}
+
+            """;
+
     private static final String OTHER_TOOL_RAW = """
             data: {"event":"tool.completed","tool":"web_search","result":"Bearer short-secret 검색 결과"}
 
@@ -47,7 +60,7 @@ class ToolDetailEventStreamTest {
     void preservesUuidLabelsAcrossStartedAndCompletedEvents() throws IOException {
         HttpServer server = startServer(RAW);
         try {
-            List<RunEvent> events = read(server, false);
+            List<RunEvent> events = read(server, ToolDetailScope.NONE);
 
             assertThat(events).extracting(RunEvent::detail).containsExactly("[항목 1] [항목 2]", "[항목 2] [항목 1] [가림]");
         } finally {
@@ -56,13 +69,45 @@ class ToolDetailEventStreamTest {
     }
 
     @Test
-    @DisplayName("연결용 스트림은 두 사건 모두 원문 전체를 가린다")
+    @DisplayName("옛 커넥터 에이전트의 스트림은 두 사건 모두 원문 전체를 가린다")
     void hidesAllDetailsForConnectorStream() throws IOException {
         HttpServer server = startServer(RAW);
         try {
-            assertThat(read(server, true))
+            assertThat(read(server, ToolDetailScope.ALL))
                     .extracting(RunEvent::detail)
                     .containsExactly("[연결 도구 내용 가림]", "[연결 도구 내용 가림]");
+        } finally {
+            server.stop(0);
+        }
+    }
+
+    @Test
+    @DisplayName("일반 에이전트의 스트림은 붙은 커넥터 서버의 도구 내용만 가리고 다른 도구는 지금처럼 남긴다")
+    void hidesOnlyAttachedConnectorToolDetailsForOrdinaryAgent() throws IOException {
+        HttpServer server = startServer(MIXED_RAW);
+        try {
+            List<RunEvent> events = read(server, ToolDetailScope.prefixes(Set.of("mcp__demo__")));
+
+            assertThat(events)
+                    .extracting(RunEvent::detail)
+                    .containsExactly("[연결 도구 내용 가림]", "[연결 도구 내용 가림]", "검색-결과-1180", "다른-서버-3307");
+            assertThat(events)
+                    .extracting(RunEvent::toolName)
+                    .containsExactly(
+                            "mcp__demo__list_notes", "mcp__demo__list_notes", "web_search", "mcp__demoother__list");
+        } finally {
+            server.stop(0);
+        }
+    }
+
+    @Test
+    @DisplayName("옛 커넥터 에이전트의 스트림은 커넥터 도구가 아닌 것도 모두 가린다")
+    void hidesEveryToolDetailForLegacyConnectorAgent() throws IOException {
+        HttpServer server = startServer(MIXED_RAW);
+        try {
+            assertThat(read(server, ToolDetailScope.ALL))
+                    .extracting(RunEvent::detail)
+                    .containsOnly("[연결 도구 내용 가림]");
         } finally {
             server.stop(0);
         }
@@ -73,7 +118,7 @@ class ToolDetailEventStreamTest {
     void keepsOnlyArgumentsOfMemoryReadEvents() throws IOException {
         HttpServer server = startServer(MEMORY_READ_RAW);
         try {
-            List<RunEvent> events = read(server, false);
+            List<RunEvent> events = read(server, ToolDetailScope.NONE);
 
             // 가리는 쪽이 JSON 인자를 다시 직렬화해 공백이 빠진다
             assertThat(events).extracting(RunEvent::detail).containsExactly("{\"id\":12}", null);
@@ -88,7 +133,7 @@ class ToolDetailEventStreamTest {
     void keepsNoDetailOfFollowUpProposeEvents() throws IOException {
         HttpServer server = startServer(FOLLOW_UP_PROPOSE_RAW);
         try {
-            List<RunEvent> events = read(server, false);
+            List<RunEvent> events = read(server, ToolDetailScope.NONE);
 
             assertThat(events).extracting(RunEvent::detail).containsExactly(null, null);
             assertThat(events).extracting(RunEvent::toolName).containsOnly("mcp__fos_assistant__follow_up_propose");
@@ -102,7 +147,9 @@ class ToolDetailEventStreamTest {
     void keepsRedactedResultOfOtherToolCompletedEvent() throws IOException {
         HttpServer server = startServer(OTHER_TOOL_RAW);
         try {
-            assertThat(read(server, false)).extracting(RunEvent::detail).containsExactly("[가림] 검색 결과");
+            assertThat(read(server, ToolDetailScope.NONE))
+                    .extracting(RunEvent::detail)
+                    .containsExactly("[가림] 검색 결과");
         } finally {
             server.stop(0);
         }
@@ -122,7 +169,7 @@ class ToolDetailEventStreamTest {
         return server;
     }
 
-    private static List<RunEvent> read(HttpServer server, boolean connectorManaged) {
+    private static List<RunEvent> read(HttpServer server, ToolDetailScope scope) {
         HermesProfileKeyStore keys = mock(HermesProfileKeyStore.class);
         when(keys.resolve("test-profile")).thenReturn("test-key");
         HermesProperties properties = new HermesProperties(null, null, null, null, null, null, null, null);
@@ -135,7 +182,7 @@ class ToolDetailEventStreamTest {
                 "run-one",
                 events::add,
                 opened -> {},
-                connectorManaged);
+                scope);
         return events;
     }
 }

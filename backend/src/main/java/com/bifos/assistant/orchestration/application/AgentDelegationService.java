@@ -282,7 +282,8 @@ public class AgentDelegationService {
         }
         boolean checkTree = checkGuard.isCheckTree(origin);
         // 다른 에이전트는 셸이나 브라우저를 가질 수 있어 읽기 경계 밖이다. 커넥터 에이전트는 자기 MCP 서버만 갖고 그 호출이
-        // 커넥터 판정의 읽기 경계에 걸린다.
+        // 커넥터 판정의 읽기 경계에 걸린다. 이 규칙은 지워지기 전까지 남은 옛 커넥터 에이전트를 위한 것이고, 연결이 붙은 일반
+        // 에이전트의 살펴보기는 맡기지 않고 그 도구를 직접 부른다(ADR-083).
         if (checkTree && !(agent.connectorManaged() && Objects.equals(agent.ownerUserId(), user.id()))) {
             return rejected(Failure.CHECK_TARGET, origin, "살펴보기 트리에서 요청자의 커넥터 에이전트가 아닌 곳에 맡기려 했다");
         }

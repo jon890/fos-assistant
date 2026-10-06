@@ -11,6 +11,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.bifos.assistant.agent.application.AgentAdminService;
+import com.bifos.assistant.agent.application.AgentConnectorBindings;
 import com.bifos.assistant.agent.application.AgentEndpointProbe;
 import com.bifos.assistant.agent.application.AgentLifecycleService;
 import com.bifos.assistant.agent.application.KnownFlows;
@@ -62,6 +63,7 @@ class AgentProactiveCheckWritesAdminTest {
                             mock(AgentLifecycleService.class),
                             mock(AgentEndpointProbe.class),
                             mock(KnownFlows.class),
+                            mock(AgentConnectorBindings.class),
                             Clock.systemUTC()),
                     new CurrentUserProvider()))
             .setControllerAdvice(new GlobalExceptionHandler())

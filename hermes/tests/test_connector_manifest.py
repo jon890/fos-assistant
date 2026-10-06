@@ -137,7 +137,7 @@ class ConnectorCatalogTest(ConnectorGateCase):
         self.assertEqual(len(body), 1)
         entry = body[0]
         self.assertEqual(set(entry), {"id", "schema", "title", "description", "fields", "verify", "mcp_server",
-                                      "toolsets", "attachments", "tools"})
+                                      "toolsets", "attachments", "tools", "skills"})
         # 두 칸이 없는 manifest 는 내장 도구를 열지 않고 사진을 받지 않는다.
         self.assertEqual(entry["toolsets"], [])
         self.assertIs(entry["attachments"], False)
@@ -176,7 +176,8 @@ class ConnectorCatalogTest(ConnectorGateCase):
             ("schema true", "connector.json", lambda value: value.update(schema=True)),
             ("id differs from the list", "connector.json", lambda value: value.update(id="other")),
             ("no title", "connector.json", lambda value: value.pop("title")),
-            ("no fields", "connector.json", lambda value: value.update(fields=[])),
+            ("no fields while .mcp.json still references the field env", "connector.json",
+             lambda value: value.update(fields=[])),
             ("field env differs from .mcp.json", "connector.json",
              lambda value: field(0)(value).update(env="DEMO_KEY")),
             ("field key repeated", "connector.json", lambda value: field(1)(value).update(key="token")),
@@ -411,6 +412,120 @@ class ConnectorCatalogTest(ConnectorGateCase):
         # 운영자 env 는 참조가 아니라 운영 목록의 값이 서버 정의에 직접 들어간다.
         demo = self.plugin._connector_manifest(DEMO)
         self.assertEqual(demo["server"]["env"]["DEMO_BASE"], DEMO_BASE)
+
+
+class ConnectorFieldlessAndSkillTest(ConnectorGateCase):
+    """입력 칸이 없는 커넥터와, 바인딩 설치가 복사할 스킬을 카탈로그로 내는 규칙을 검사한다(ADR-083)."""
+
+    def without_fields(self):
+        """시험 커넥터의 칸을 모두 뺀다. `.mcp.json` 의 env 에는 운영자 env 만 남는다."""
+        self.rewrite("connector.json", lambda value: value.update(fields=[]))
+        self.rewrite(".mcp.json", lambda value: value["mcpServers"]["demo"].update(env={"DEMO_BASE": "${DEMO_BASE}"}))
+
+    def test_connector_without_fields_reaches_the_catalog(self):
+        """빈 `fields` 는 받는다. 확인 도구와 운영자 env 규칙은 그대로 걸린다."""
+        self.without_fields()
+        entry = self.catalog()[0]
+        self.assertEqual(entry["fields"], [])
+        self.assertEqual(entry["verify"], {"tool": "list_scopes"})
+        manifest = self.plugin._connector_manifest(DEMO)
+        self.assertEqual(manifest["server"]["env"], {"DEMO_BASE": DEMO_BASE})
+        self.assertEqual(manifest["call_tools"], frozenset({"list_scopes"}))
+        # 확인 도구가 없거나 운영자 env 가 `.mcp.json` 과 다르면 칸이 없어도 거절한다.
+        self.rewrite("connector.json", lambda value: value.pop("verify"))
+        self.assertEqual(self.catalog(), [])
+        self.rewrite("connector.json", lambda value: value.update(verify={"tool": "list_scopes"}, operator_env=[]))
+        self.assertEqual(self.catalog(), [])
+        # `fields` 가 목록이 아니면 받지 않는다.
+        self.rewrite("connector.json", lambda value: value.update(operator_env=["DEMO_BASE"], fields={}))
+        self.assertEqual(self.catalog(), [])
+
+    def test_catalog_lists_skill_names_from_the_front_matter_without_bodies(self):
+        """카탈로그의 `skills` 는 앞머리 `name` 의 이름 순 목록이고, 앞머리에 이름이 없으면 디렉터리 이름이다."""
+        self.assertEqual(self.catalog()[0]["skills"], ["demo"])
+        other = self.connector_root / "skills/zz-dir"
+        other.mkdir()
+        (other / "SKILL.md").write_text("---\nname: alpha-notes\ndescription: 다른 스킬\n---\n본문\n", encoding="utf-8")
+        plain = self.connector_root / "skills/plain-dir"
+        plain.mkdir()
+        (plain / "SKILL.md").write_text("앞머리 없는 본문\n", encoding="utf-8")
+        self.assertEqual(self.catalog()[0]["skills"], ["alpha-notes", "demo", "plain-dir"])
+        text = json.dumps(self.catalog(), ensure_ascii=False)
+        self.assertNotIn("앞머리 없는 본문", text)
+        self.assertNotIn("다른 스킬", text)
+
+    def test_skill_files_are_read_from_skill_md_references_and_templates_only(self):
+        """복사할 파일은 `SKILL.md` 와 `references/`, `templates/` 아래 정규 파일이고 바이트 그대로다."""
+        skill = self.connector_root / "skills/demo"
+        (skill / "references/deep").mkdir(parents=True)
+        (skill / "references/deep/guide.md").write_bytes("안내\r\n".encode("utf-8"))
+        (skill / "templates").mkdir()
+        (skill / "templates/reply.txt").write_text("답장 틀\n", encoding="utf-8")
+        (skill / "NOTES.md").write_text("복사하지 않는 파일\n", encoding="utf-8")
+        files = self.plugin._connector_manifest(DEMO)["skills"]["demo"]
+        self.assertEqual(sorted(files), ["SKILL.md", "references/deep/guide.md", "templates/reply.txt"])
+        self.assertEqual(files["references/deep/guide.md"], "안내\r\n".encode("utf-8"))
+        self.assertEqual(files["SKILL.md"], (DEMO_CONNECTOR / "skills/demo/SKILL.md").read_bytes())
+
+    def test_skill_that_cannot_be_copied_safely_leaves_the_connector_out(self):
+        """스킬 아래 링크, UTF-8 이 아닌 파일, 상한을 넘는 스킬, 경로로 쓸 수 없거나 겹치는 이름은 카탈로그에서 뺀다."""
+        skill = self.connector_root / "skills/demo"
+        skill_md = (skill / "SKILL.md").read_text(encoding="utf-8")
+        outside = self.base / "outside.md"
+        outside.write_text("밖의 비밀", encoding="utf-8")
+        (skill / "references").mkdir()
+
+        def link_in_references():
+            (skill / "references/link.md").symlink_to(outside)
+
+        def link_outside_copied_parts():
+            # 복사하지 않는 자리의 링크도 거절한다. 그 아래 어느 항목이든 링크이면 그 커넥터를 내지 않는다.
+            (skill / "notes.md").symlink_to(outside)
+
+        def name(value):
+            return lambda: (skill / "SKILL.md").write_text(
+                "---\nname: %s\ndescription: 검사\n---\n본문\n" % value, encoding="utf-8")
+
+        def duplicate():
+            twin = self.connector_root / "skills/twin"
+            twin.mkdir()
+            (twin / "SKILL.md").write_text("---\nname: demo\n---\n본문\n", encoding="utf-8")
+
+        def too_many_files():
+            for index in range(self.plugin.CONNECTOR_SKILL_MAX_FILES):
+                (skill / ("references/%02d.md" % index)).write_text("x", encoding="utf-8")
+
+        cases = (
+            ("link in references", link_in_references),
+            ("link outside the copied parts", link_outside_copied_parts),
+            ("file that is not UTF-8", lambda: (skill / "references/bin.md").write_bytes(b"\xff\xfe\x00")),
+            ("file over the size limit", lambda: (skill / "references/big.md").write_text(
+                "가" * (self.plugin.CONNECTOR_SKILL_MAX_CHARS + 1), encoding="utf-8")),
+            ("more files than the limit", too_many_files),
+            ("name with a slash", name("a/b")),
+            ("name with two dots", name("a..b")),
+            ("name of two dots", name("'..'")),
+            ("upper-case name", name("Demo")),
+            ("name that is not a string", name("[demo]")),
+            ("two skills with one name", duplicate),
+        )
+        for label, apply in cases:
+            with self.subTest(label):
+                apply()
+                self.assertEqual(self.catalog(), [])
+                self.assertIsNone(self.plugin._connector_manifest(DEMO))
+                shutil.rmtree(skill / "references")
+                (skill / "references").mkdir()
+                (skill / "notes.md").unlink(missing_ok=True)
+                shutil.rmtree(self.connector_root / "skills/twin", ignore_errors=True)
+                (skill / "SKILL.md").write_text(skill_md, encoding="utf-8")
+        # 경계 안쪽은 받는다. 파일 20개(SKILL.md 포함)와 파일마다 10만 자다.
+        for index in range(self.plugin.CONNECTOR_SKILL_MAX_FILES - 1):
+            (skill / ("references/%02d.md" % index)).write_text("x", encoding="utf-8")
+        (skill / "references/00.md").write_text("가" * self.plugin.CONNECTOR_SKILL_MAX_CHARS, encoding="utf-8")
+        self.assertEqual(self.catalog()[0]["skills"], ["demo"])
+        self.assertEqual(len(self.plugin._connector_manifest(DEMO)["skills"]["demo"]),
+                         self.plugin.CONNECTOR_SKILL_MAX_FILES)
 
 
 class ConnectorToolPolicyTest(ConnectorGateCase):

@@ -8,6 +8,7 @@ import com.bifos.assistant.connector.application.model.ConnectorGrantView;
 import com.bifos.assistant.connector.application.model.PendingApproval;
 import com.bifos.assistant.connector.domain.ActionDelivery;
 import com.bifos.assistant.connector.domain.ConnectorAction;
+import com.bifos.assistant.connector.domain.ConnectorBinding;
 import com.bifos.assistant.connector.domain.ConnectorConnection;
 import com.bifos.assistant.connector.domain.ConnectorToolGrant;
 import com.bifos.assistant.connector.domain.ToolPolicy;
@@ -15,10 +16,10 @@ import com.bifos.assistant.connector.domain.ToolPolicyDecision;
 import com.bifos.assistant.connector.domain.ToolPolicyDecision.CheckBoundary;
 import com.bifos.assistant.connector.domain.type.ActionDecision;
 import com.bifos.assistant.connector.domain.type.ActionStatus;
-import com.bifos.assistant.connector.domain.type.ConnectionStatus;
 import com.bifos.assistant.connector.domain.type.GrantPeriod;
 import com.bifos.assistant.connector.domain.type.ToolApproval;
 import com.bifos.assistant.connector.infra.ConnectorActionRepository;
+import com.bifos.assistant.connector.infra.ConnectorBindingRepository;
 import com.bifos.assistant.connector.infra.ConnectorConnectionRepository;
 import com.bifos.assistant.connector.infra.ConnectorToolGrantRepository;
 import com.bifos.assistant.hermes.ConnectorExecutionUnknown;
@@ -103,6 +104,7 @@ public class ConnectorActionService {
     private final ConnectorActionRepository actions;
     private final ConnectorToolGrantRepository grants;
     private final ConnectorConnectionRepository connections;
+    private final ConnectorBindingRepository bindings;
     private final AppUserRepository users;
     private final ConnectorCatalogCache catalog;
     private final HermesConnectorClient connector;
@@ -120,6 +122,7 @@ public class ConnectorActionService {
             ConnectorActionRepository actions,
             ConnectorToolGrantRepository grants,
             ConnectorConnectionRepository connections,
+            ConnectorBindingRepository bindings,
             AppUserRepository users,
             ConnectorCatalogCache catalog,
             HermesConnectorClient connector,
@@ -132,6 +135,7 @@ public class ConnectorActionService {
                 actions,
                 grants,
                 connections,
+                bindings,
                 users,
                 catalog,
                 connector,
@@ -147,6 +151,7 @@ public class ConnectorActionService {
             ConnectorActionRepository actions,
             ConnectorToolGrantRepository grants,
             ConnectorConnectionRepository connections,
+            ConnectorBindingRepository bindings,
             AppUserRepository users,
             ConnectorCatalogCache catalog,
             HermesConnectorClient connector,
@@ -159,6 +164,7 @@ public class ConnectorActionService {
         this.actions = actions;
         this.grants = grants;
         this.connections = connections;
+        this.bindings = bindings;
         this.users = users;
         this.catalog = catalog;
         this.connector = connector;
@@ -537,6 +543,31 @@ public class ConnectorActionService {
                 grants.findActiveByUserIdAndConnectorId(connection.userId(), connection.connectorId(), now);
         active.forEach(grant -> grant.revoke(now));
         grants.saveAll(active);
+        publishAfterCommit(rejected);
+    }
+
+    /**
+     * 그 에이전트에서 연결을 뗄 때 그 에이전트의 실행이 판정한 줄만 거절한다. 트랜잭션 안에서 부른다.
+     *
+     * <p>상시 허락은 건드리지 않는다. 허락은 사용자와 커넥터에 묶여 같은 연결을 붙인 다른 에이전트에도 걸린다.
+     * {@code EXECUTING} 이 남은 줄이 있으면 {@code CONNECTOR_ACTION_EXECUTING} 으로 거절한다. 실행이 그 profile 의 값으로
+     * 돌고 있어 그 사이 떼면 결과를 알 수 없다. 부르는 쪽이 사용자 행을 잠근 채 부르고 승인도 같은 행을 먼저 잠그므로
+     * 줄을 따로 잠그지 않는다.
+     */
+    public void rejectPendingFor(ConnectorConnection connection, Long agentId, Instant now) {
+        if (!actions.findByUserIdAndConnectorIdAndAgentIdAndStatus(
+                        connection.userId(), connection.connectorId(), agentId, ActionStatus.EXECUTING)
+                .isEmpty()) {
+            throw new ApiException(ErrorCode.CONNECTOR_ACTION_EXECUTING, EXECUTING_MESSAGE);
+        }
+        List<ConnectorAction> pending = actions.findByUserIdAndConnectorIdAndAgentIdAndStatus(
+                connection.userId(), connection.connectorId(), agentId, ActionStatus.PENDING);
+        pending.forEach(action -> action.refuse(ConnectorAction.CONNECTION_CHANGED, now));
+        publishAfterCommit(actions.saveAll(pending));
+    }
+
+    /** 거절한 줄의 사건을 트랜잭션이 커밋한 뒤에 낸다. 트랜잭션 밖이면 바로 낸다. */
+    private void publishAfterCommit(List<ConnectorAction> rejected) {
         if (rejected.isEmpty()) {
             return;
         }
@@ -555,8 +586,8 @@ public class ConnectorActionService {
     /**
      * 줄을 잠그고 승인할 수 있는지 본 뒤 {@code EXECUTING} 으로 바꾼다. 트랜잭션 안에서만 부른다.
      *
-     * <p>기다리는 시간이 지났거나, 연결이 준비되지 않았거나, 지금 정책으로는 실행할 수 없는 줄은 실행하지 않고
-     * 끝낸다. 그 상태를 커밋해야 하므로 예외로 알리지 않고 profile 없는 결과로 돌려준다. 정책은 요청을 만들 때가
+     * <p>기다리는 시간이 지났거나, 연결이 준비되지 않았거나, 판정한 실행의 에이전트에서 그 연결을 떼었거나, 지금 정책으로는
+     * 실행할 수 없는 줄은 실행하지 않고 끝낸다. 실행은 그 줄의 에이전트에 붙은 바인딩의 profile 에서 한다(ADR-083). 그 상태를 커밋해야 하므로 예외로 알리지 않고 profile 없는 결과로 돌려준다. 정책은 요청을 만들 때가
      * 아니라 지금 것으로 다시 본다. 그 사이 운영자가 도구를 선언에서 뺐거나 위험도를 올렸을 수 있다.
      */
     private Approval beginApproval(CurrentUser user, UUID actionId, GrantPeriod grant) {
@@ -582,11 +613,12 @@ public class ConnectorActionService {
         if (grant != null && !(action.grantAllowed() && grantable(manifest, action))) {
             throw grantNotAllowed();
         }
-        Optional<ConnectorConnection> connection =
-                connections.findByUserIdAndConnectorId(action.userId(), action.connectorId());
-        Optional<ToolPolicyDecision> decision = connection
-                .filter(found -> found.status() == ConnectionStatus.READY)
-                .flatMap(found -> manifest.map(declared -> redecide(found, declared, action)));
+        // 붙이고 떼는 쪽도 사용자 행을 먼저 잠그므로 여기서 본 바인딩은 커밋할 때까지 떼어지지 않는다.
+        Optional<ConnectorBinding> binding = connections
+                .findByUserIdAndConnectorId(action.userId(), action.connectorId())
+                .flatMap(found -> bindings.findByAgentIdAndConnectionId(action.agentId(), found.id()));
+        Optional<ToolPolicyDecision> decision =
+                binding.flatMap(found -> manifest.map(declared -> redecide(found, declared, action)));
         if (decision.isEmpty() || decision.get().decision() == ActionDecision.DENIED) {
             action.refuse(ConnectorAction.NOT_EXECUTABLE, now);
             return Approval.refused(actions.save(action));
@@ -605,19 +637,21 @@ public class ConnectorActionService {
                     now));
         }
         action.beginExecution(now);
-        return new Approval(actions.save(action), connection.get().agent().hermesProfile());
+        return new Approval(actions.save(action), binding.get().agent().hermesProfile());
     }
 
     /**
      * 상시 허락은 없는 것으로 두고 지금 정책으로 다시 판정한다. 허락이 있어 통과하는 호출은 승인 줄이 되지 않는다.
      *
+     * <p>연결 상태는 판정과 같은 규칙이다. 연결과 바인딩이 모두 {@code READY} 가 아니면 준비되지 않은 연결로 판정해 막는다.
+     *
      * <p>살펴보기의 경계는 보지 않는다. 읽기 경계의 살펴보기는 승인 줄을 만들지 않고, 쓰기 도구를 허용한 살펴보기(ADR-082)의 승인
      * 줄은 사람이 승인한 것이라 보통 실행의 줄과 같게 판정한다.
      */
     private static ToolPolicyDecision redecide(
-            ConnectorConnection connection, ConnectorManifest manifest, ConnectorAction action) {
+            ConnectorBinding binding, ConnectorManifest manifest, ConnectorAction action) {
         return ToolPolicyDecision.decide(
-                connection.status(),
+                ConnectorPolicyService.usableStatus(binding.connection(), binding),
                 ConnectorPolicyService.ownServerTool(manifest, action.hermesTool()),
                 manifest.schema(),
                 ConnectorToolPolicies.find(manifest, action.toolName()),

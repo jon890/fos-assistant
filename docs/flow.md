@@ -170,6 +170,72 @@ flowchart TD
 
 흐름의 세부와 경계는 [`backend/proactive-check.md`](backend/proactive-check.md) 가 갖는다.
 
+## 커넥터를 붙일 때
+
+커넥터는 에이전트에게 쥐어 주는 도구 묶음이다. 계정은 「연결」 화면에서 한 번 연결하고, 그 연결을 에이전트 상세에서 붙인다.
+순서와 실패 처리는 [`backend/connector-install.md`](backend/connector-install.md) 의 「설치와 실패 처리」, 판정은 [`backend/connector-tool-policy.md`](backend/connector-tool-policy.md) 의 「도구 호출 판정」 이 갖는다.
+
+```mermaid
+sequenceDiagram
+    participant B as 브라우저
+    participant C as Control Plane
+    participant D as 대시보드 plugin
+    participant A as 관리자
+    participant G as 공유 gateway
+    participant H as fos-ctx hook
+
+    B->>C: POST /api/v1/connections/{id} (칸 값)
+    C->>D: call verify.tool (트랜잭션 밖)
+    D-->>C: 통과
+    C->>C: 사용자 행 잠금
+    C->>D: PUT /api/connector-vault
+    C->>C: 연결 READY, 비밀 앞부분만 저장
+
+    B->>C: PUT /api/v1/agents/{code}/connections/{connectorId}
+    C->>C: 사용자 행, 에이전트 행 차례로 잠금. 주인, PRIVATE, 연결 READY 확인
+    alt 비공개가 아니다
+        C-->>B: 409 AGENT_CONNECTIONS_REQUIRE_PRIVATE
+    else 연결이 READY 가 아니거나 보관 파일에 값이 없다
+        C-->>B: 409 CONNECTOR_NOT_CONNECTED
+    else 붙일 수 있다
+        C->>D: PUT /api/connectors (bind: vault)
+        alt 대시보드 409. 운영자 설정이나 다른 커넥터와 충돌
+            D-->>C: 409
+            C-->>B: 409 CONNECTOR_BIND_CONFLICT. 바인딩 행이 남지 않는다
+        else 대시보드 401. 표식 없는 profile
+            D-->>C: 401
+            C-->>B: 409 CONNECTOR_PROFILE_NOT_READY. 바인딩 행이 남지 않는다
+        else 붙였다
+            D-->>C: restart_required
+            C-->>B: 바인딩 PENDING. 화면은 「반영 대기」
+        end
+    end
+
+    A->>G: 공유 gateway 재시작
+    A->>C: POST /api/v1/admin/agents/{code}/connections/{connectorId}/confirm (restartRequiredSince)
+    alt 재시작 뒤에 다시 설치됐다
+        C-->>A: 409 CONNECTOR_RESTART_AGAIN
+    else
+        C->>D: 설치를 다시 보내고 상태와 policy_hook 을 읽고 MCP probe
+        C-->>A: 바인딩 READY
+    end
+
+    Note over G,H: 대화 turn 안에서 모델이 커넥터 도구를 부른다
+    H->>C: POST /internal/hermes/connector-policy
+    C->>C: 실행의 에이전트에 붙은 바인딩에서 서버 이름으로 연결을 고르고 판정
+    C-->>H: allow, 거절, 승인 필요
+    H-->>G: 허용이면 통과하고 결과를 external-data 로 감싼다
+
+    B->>C: DELETE /api/v1/agents/{code}/connections/{connectorId}
+    C->>C: 그 에이전트가 판정한 PENDING 승인 줄을 끝낸다
+    C->>D: PUT /api/connectors (enabled: false)
+    C-->>B: 204. 다음 실행부터 그 도구가 막힌다
+```
+
+- 같은 사용자의 등록, 확인, 해제, 붙이기, 떼기, 승인은 사용자 행 잠금으로 줄을 선다. 붙이기, 떼기, 반영 완료, 지우기는 그다음 에이전트 행을 잠근다. 공개 범위 변경도 같은 에이전트 행을 기다려 잠그므로 붙이기와 동시에 와도 한쪽이 다른 쪽의 커밋을 보고 판정한다
+- 대시보드의 그 밖의 실패는 바인딩을 `PENDING` 으로 남기고 502 `CONNECTOR_OPERATION_FAILED` 다. 다음 연결 확인이 설치를 다시 보낸다
+- 반영 완료 전이나 연결이 확인되지 않은 동안의 호출은 판정이 `NOT_READY` 로 막는다. 그 에이전트의 다른 도구는 그대로 돈다
+
 ## 실행이 실패할 때
 
 | 오류 코드 | 원인 | 화면이 하는 일 |

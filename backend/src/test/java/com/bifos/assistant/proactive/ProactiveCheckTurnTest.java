@@ -4,13 +4,13 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.fail;
 import static org.assertj.core.api.Assertions.tuple;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.when;
 
+import com.bifos.assistant.agent.application.AgentConnectorBindings;
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.agent.domain.type.AgentVisibility;
 import com.bifos.assistant.agent.domain.type.CostMode;
@@ -30,6 +30,7 @@ import com.bifos.assistant.hermes.HermesSkillClient;
 import com.bifos.assistant.hermes.HermesSkillClient.HermesSkill;
 import com.bifos.assistant.hermes.HermesToolsetClient;
 import com.bifos.assistant.hermes.StubHermesRunsClient;
+import com.bifos.assistant.hermes.ToolDetailScope;
 import com.bifos.assistant.hermes.dto.HermesRunCommand;
 import com.bifos.assistant.hermes.dto.HermesRunResult;
 import com.bifos.assistant.hermes.dto.RunEvent;
@@ -59,6 +60,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.Consumer;
@@ -153,6 +155,10 @@ class ProactiveCheckTurnTest {
     /** 실제 Hermes 를 부르지 않도록 켜진 toolset 을 대역으로 둔다. */
     @MockitoBean
     HermesToolsetClient toolsets;
+
+    /** 에이전트에 붙은 커넥터 서버를 대역으로 둔다. 연결을 붙이는 검사만 값을 정하고 나머지는 붙은 연결이 없다. */
+    @MockitoBean
+    AgentConnectorBindings connectorBindings;
 
     /** 켜진 스킬 목록을 대역으로 둔다. */
     @MockitoBean
@@ -388,6 +394,35 @@ class ProactiveCheckTurnTest {
                 .contains("</external-data>");
         String wrapped = second.input().substring(second.input().indexOf("<external-data>"));
         assertThat(wrapped).as("감싼 단락 안의 최근 발견").contains(TOPIC_KEY).contains(SOURCE_URL);
+    }
+
+    @Test
+    @DisplayName("연결이 붙은 에이전트의 살펴보기 지시는 연결한 서비스의 도구를 직접 부르게 하고 위임 줄을 싣지 않는다")
+    void instructsDirectCallsWhenConnectorsAreBound() {
+        when(connectorBindings.connectorServers(agent.id())).thenReturn(Set.of("career"));
+        when(toolsets.readEnabled(anyString(), anyString()))
+                .thenReturn(List.of("web", "skills", "fos-assistant", "career"));
+        stub().willAnswer(command -> answer(block("{\"version\":1,\"outcome\":\"NOTHING_NEW\"}")));
+
+        runCheck();
+
+        assertThat(stub().received().getLast().instructions())
+                .contains("- 연결한 서비스의 도구는 직접 부른다. 읽기만 하는 실행에서는 조회 도구만 쓸 수 있다.")
+                .doesNotContain("agent_status")
+                .doesNotContain("wait_seconds")
+                .contains("이번 실행은 읽기만 한다");
+    }
+
+    @Test
+    @DisplayName("붙은 연결이 없는 에이전트의 살펴보기 지시는 지금의 위임 줄 그대로다")
+    void keepsDelegationLineWhenNoConnectorIsBound() {
+        stub().willAnswer(command -> answer(block("{\"version\":1,\"outcome\":\"NOTHING_NEW\"}")));
+
+        runCheck();
+
+        assertThat(stub().received().getLast().instructions())
+                .contains("- 다른 에이전트에는 연결한 서비스의 에이전트에만 필요한 질의를 맡기고, agent_status 의 wait_seconds 로 기다린다.")
+                .doesNotContain("연결한 서비스의 도구는 직접 부른다");
     }
 
     @Test
@@ -691,7 +726,7 @@ class ProactiveCheckTurnTest {
                     return null;
                 })
                 .when(eventStream)
-                .open(any(), any(), any(), any(), any(), anyBoolean());
+                .open(any(), any(), any(), any(), any(), any(ToolDetailScope.class));
     }
 
     /** 그 대화에 도는 turn 이 없어질 때까지 기다린다. 제한 시간을 넘으면 실패한다. */

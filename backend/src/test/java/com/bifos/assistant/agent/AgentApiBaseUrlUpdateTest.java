@@ -12,6 +12,8 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import com.bifos.assistant.agent.application.AgentAdminService;
+import com.bifos.assistant.agent.application.AgentConnectorBindings;
+import com.bifos.assistant.agent.application.AgentConnectorDetacher;
 import com.bifos.assistant.agent.application.AgentEndpointProbe;
 import com.bifos.assistant.agent.application.AgentLifecycleService;
 import com.bifos.assistant.agent.application.AgentProperties;
@@ -44,6 +46,7 @@ import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.springframework.transaction.support.TransactionTemplate;
 
 /** 관리 화면이 에이전트를 등록하고 Hermes 주소를 고치는 길을 검사한다. */
 class AgentApiBaseUrlUpdateTest {
@@ -69,10 +72,21 @@ class AgentApiBaseUrlUpdateTest {
             mock(PeopleProperties.class),
             mock(AgentProperties.class),
             mock(ProfileSkillFiles.class),
+            mock(AgentConnectorBindings.class),
+            mock(AgentConnectorDetacher.class),
+            mock(TransactionTemplate.class),
             Clock.systemUTC());
 
     private final AgentAdminController controller = new AgentAdminController(
-            new AgentAdminService(agents, users, lifecycle, endpointProbe, flows, Clock.systemUTC()), currentUser);
+            new AgentAdminService(
+                    agents,
+                    users,
+                    lifecycle,
+                    endpointProbe,
+                    flows,
+                    mock(AgentConnectorBindings.class),
+                    Clock.systemUTC()),
+            currentUser);
 
     private Agent agent;
 

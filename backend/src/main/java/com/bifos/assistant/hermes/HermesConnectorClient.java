@@ -12,13 +12,26 @@ import java.util.Map;
  * 응답 모양이 틀리거나 호출이 실패하면 원문 없는 {@link IllegalStateException} 을 던진다.
  */
 public interface HermesConnectorClient {
+    /** 바인딩 설치의 방식 이름이다. 소유 기록의 {@code mode} 와 같다. */
+    String MODE_BIND = "bind";
+
+    /** 커넥터 전용 profile 에 한 옛 설치의 방식 이름이다. 대시보드가 방식을 내지 않으면 이것으로 읽는다. */
+    String MODE_ISOLATED = "isolated";
+
     /**
      * 그 profile 의 설치 상태다.
      *
      * @param policyHook 그 profile 의 도구 호출이 정책 판정을 거치는가. 대시보드가 참이라고 답했을 때만 참이다
+     * @param mode 설치 방식. {@link #MODE_BIND} 나 {@link #MODE_ISOLATED} 다. 설치하지 않았거나 옛 대시보드 plugin 이
+     *     내지 않았으면 {@link #MODE_ISOLATED} 다
      */
     record ConnectorState(
-            String profile, boolean enabled, boolean configured, boolean restartRequired, boolean policyHook) {}
+            String profile,
+            boolean enabled,
+            boolean configured,
+            boolean restartRequired,
+            boolean policyHook,
+            String mode) {}
 
     /**
      * 설치 요청의 결과다.
@@ -37,6 +50,26 @@ public interface HermesConnectorClient {
     /** 후보 값으로 선택지 도구나 확인 도구를 한 번 부른다. 대시보드는 값을 저장하지 않는다. */
     CallResult call(String connectorId, String tool, Map<String, String> values);
 
+    /** 보관 파일의 값으로 선택지 도구나 확인 도구를 한 번 부른다. 값은 Control Plane 을 거치지 않는다. */
+    CallResult callWithVault(String connectorId, String tool, String vault);
+
+    /**
+     * 연결의 칸 값을 보관 파일에 쓴다. 같은 이름의 보관 파일이 있으면 바꾼다.
+     *
+     * @param values 칸 key 를 키로 한 값. 칸이 없는 커넥터는 빈 값이다
+     */
+    void putVault(String vault, String connectorId, Map<String, String> values);
+
+    /**
+     * 보관 파일을 지운다.
+     *
+     * @return 지운 것이 있었는가. 없었으면 거짓이다
+     */
+    boolean deleteVault(String vault);
+
+    /** 그 커넥터를 옛 설치한 profile 의 {@code .env} 에서 칸 값을 읽어 보관 파일에 쓴다. */
+    void importVault(String vault, String connectorId, String profile);
+
     /**
      * 승인한 호출을 한 번 실행한다. 결과를 알 수 없으면 {@link ConnectorExecutionUnknown} 을 던진다.
      *
@@ -47,7 +80,24 @@ public interface HermesConnectorClient {
      */
     CallResult execute(String profile, String connectorId, String hermesTool, String argsJson);
 
+    /** 커넥터 전용 profile 에 옛 방식으로 설치하거나 끈다. 바인딩 칸 없이 보낸다. */
     InstallResult putConnector(String profile, String connectorId, boolean enabled);
+
+    /**
+     * 보관 파일의 값으로 그 profile 에 커넥터를 붙인다.
+     *
+     * @throws ConnectorInstallConflict 대시보드가 409 로 답했을 때. 그 profile 의 설정과 충돌한다
+     * @throws ConnectorProfileRejected 대시보드가 401 로 답했을 때. 그 profile 이 커넥터를 받지 않는다
+     */
+    InstallResult bindConnector(String profile, String connectorId, String vault);
+
+    /**
+     * 그 profile 에 붙인 커넥터를 뗀다. 요청은 옛 설치를 끄는 것과 같다. 대시보드가 소유 기록의 방식으로 떼는 법을 고른다.
+     *
+     * @throws ConnectorInstallConflict 대시보드가 409 로 답했을 때
+     * @throws ConnectorProfileRejected 대시보드가 401 로 답했을 때
+     */
+    InstallResult unbindConnector(String profile, String connectorId);
 
     /** 그 profile 의 설치 상태다. 대시보드의 목록에 그 커넥터가 없으면 설치되지 않은 것으로 돌려준다. */
     ConnectorState readConnector(String profile, String connectorId);

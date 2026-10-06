@@ -1,5 +1,16 @@
 export type ConnectionStatus = "DISCONNECTED" | "PENDING" | "READY";
 
+/** 에이전트에 붙인 연결의 상태다. 붙인 직후는 관리자 반영 완료 전까지 `PENDING` 이다. */
+export type BindingStatus = "PENDING" | "READY";
+
+/** 연결이 붙은 에이전트 하나다. `restartRequired` 면 관리자 반영을 기다린다. */
+export type BoundAgent = {
+  agentCode: string;
+  agentName: string;
+  status: BindingStatus;
+  restartRequired: boolean;
+};
+
 /** 커넥터 manifest 의 칸 한 개다. 입력 칸은 이 목록으로 그린다. */
 export type ConnectorField = {
   key: string;
@@ -37,6 +48,8 @@ export type ConnectorSummary = {
   tools: ConnectorTool[];
   myStatus: ConnectionStatus;
   available: boolean;
+  /** 이 연결을 붙인 내 에이전트들이다. */
+  bindings: BoundAgent[];
 };
 
 export type ConnectorOption = { value: string; label: string };
@@ -48,20 +61,24 @@ export type ConnectorConnection = {
   secretPrefixes: Record<string, string>;
   values: Record<string, string>;
   checkedAt: string | null;
-  agentCode: string | null;
-  restartRequired: boolean;
+  /** 이 연결을 붙인 에이전트들이다. 재시작 대기는 연결이 아니라 붙은 에이전트마다 있다. */
+  bindings: BoundAgent[];
   /** 커넥터가 선언하지 않아 쓰지 않는 도구의 수다. */
   undeclaredTools: number;
 };
 
-/** 관리자가 반영 완료를 확인할 수 있는 다른 사용자의 연결이다. */
+/**
+ * 관리자가 반영 완료를 누를 수 있는 같은 그룹 사용자의 바인딩 한 줄이다.
+ * `restartRequiredSince` 는 반영 완료 요청에 그대로 돌려보낸다.
+ */
 export type AdminConnection = {
   connectorId: string;
   userId: number;
   displayName: string | null;
-  status: ConnectionStatus;
-  agentCode: string | null;
+  agentCode: string;
+  status: BindingStatus;
   restartRequired: boolean;
+  restartRequiredSince: string | null;
   undeclaredTools: number;
 };
 
@@ -78,6 +95,16 @@ export const CONNECTION_ERROR_MESSAGES: Record<string, string> = {
   CONNECTOR_RATE_LIMITED: "요청이 많아요. 잠시 뒤 다시 해 주세요.",
   CONNECTOR_ACTION_EXECUTING:
     "승인한 동작을 실행하는 중이에요. 끝난 뒤 다시 시도해 주세요.",
+  CONNECTOR_NOT_CONNECTED: "연결 화면에서 연결을 확인해 주세요.",
+  CONNECTOR_PROFILE_NOT_READY:
+    "이 에이전트는 아직 연결을 받을 준비가 되지 않았어요. 관리자에게 알려 주세요.",
+  CONNECTOR_BIND_CONFLICT: "이 에이전트의 다른 연결이나 스킬과 이름이 겹쳐요.",
+  SKILL_NAME_TAKEN: "이 에이전트의 다른 연결이나 스킬과 이름이 겹쳐요.",
+  CONNECTOR_RESTART_AGAIN:
+    "재시작한 뒤에 다시 설치됐어요. 한 번 더 재시작한 뒤 눌러 주세요.",
+  AGENT_CONNECTIONS_REQUIRE_PRIVATE: "비공개 에이전트에만 붙일 수 있어요.",
+  AGENT_NOT_FOUND: "에이전트가 없거나 이 계정에서 사용할 수 없어요.",
+  AGENT_BUSY: "다른 설정 변경이 끝날 때까지 기다린 뒤 다시 시도해 주세요.",
   FORBIDDEN: "이 작업을 관리할 수 없어요.",
   UNAUTHENTICATED: "로그인이 필요해요.",
   VALIDATION_FAILED: "입력 형식을 확인해 주세요.",
@@ -94,7 +121,7 @@ export function connectionErrorMessage(code: string): string {
 export type ConnectionCallResult<T> =
   { ok: true; data: T } | { ok: false; code: string; message: string };
 
-async function call<T>(
+export async function connectionCall<T>(
   path: string,
   init?: { method: string; body?: unknown },
 ): Promise<ConnectionCallResult<T>> {
@@ -127,43 +154,56 @@ async function call<T>(
   }
 }
 
-export const readConnectors = () => call<ConnectorSummary[]>("/api/connectors");
+export const readConnectors = () =>
+  connectionCall<ConnectorSummary[]>("/api/connectors");
 
 export const readConnection = (id: string) =>
-  call<ConnectorConnection>(`/api/connections/${id}`);
+  connectionCall<ConnectorConnection>(`/api/connections/${id}`);
 
 export const readOptions = (
   id: string,
   fieldKey: string,
   values: Record<string, string>,
 ) =>
-  call<ConnectorOption[]>(`/api/connections/${id}/options/${fieldKey}`, {
-    method: "POST",
-    body: { values },
-  });
+  connectionCall<ConnectorOption[]>(
+    `/api/connections/${id}/options/${fieldKey}`,
+    {
+      method: "POST",
+      body: { values },
+    },
+  );
 
 export const registerConnection = (
   id: string,
   values: Record<string, string>,
 ) =>
-  call<ConnectorConnection>(`/api/connections/${id}`, {
+  connectionCall<ConnectorConnection>(`/api/connections/${id}`, {
     method: "POST",
     body: { values },
   });
 
 export const checkConnection = (id: string) =>
-  call<ConnectorConnection>(`/api/connections/${id}/check`, { method: "POST" });
-
-export const disconnectConnection = (id: string) =>
-  call<ConnectorConnection>(`/api/connections/${id}`, { method: "DELETE" });
-
-export const readAdminConnections = () =>
-  call<AdminConnection[]>("/api/admin/connections");
-
-export const confirmAdminConnection = (id: string, userId: number) =>
-  call<AdminConnection>(`/api/admin/connections/${id}/${userId}/confirm`, {
+  connectionCall<ConnectorConnection>(`/api/connections/${id}/check`, {
     method: "POST",
   });
+
+export const disconnectConnection = (id: string) =>
+  connectionCall<ConnectorConnection>(`/api/connections/${id}`, {
+    method: "DELETE",
+  });
+
+export const readAdminConnections = () =>
+  connectionCall<AdminConnection[]>("/api/admin/connections");
+
+/** 관리자 반영 완료다. 목록에서 받은 재시작 대기 시작 시각을 그대로 돌려보낸다. */
+export const confirmAdminConnection = (connection: AdminConnection) =>
+  connectionCall<unknown>(
+    `/api/admin/agents/${connection.agentCode}/connections/${connection.connectorId}/confirm`,
+    {
+      method: "POST",
+      body: { restartRequiredSince: connection.restartRequiredSince },
+    },
+  );
 
 /** 연결 상태를 화면에 보이는 말로 바꾼다. 재시작 대기는 상태보다 앞선다. */
 export function connectionStatusLabel(

@@ -12,7 +12,7 @@ frontend 는 화면의 동작과 구조이고, hermes 는 외부 런타임인 He
 | [`prd.md`](prd.md) | 제품의 목적과 범위, 범위 밖, 아직 정하지 않은 것 |
 | [`code-architecture.md`](code-architecture.md) | 패키지 경계, 사용자와 profile, 에이전트, 대화의 층, Hermes 쪽 코드의 배치, 비밀값을 두는 곳, 아직 만들지 않은 것 |
 | [`flow.md`](flow.md) | 화면 전환과 호출 순서, 두 방향의 토큰, 실행이 실패할 때의 흐름 |
-| [`connectors.md`](connectors.md) | 커넥터 선언 파일, 연결 API, 승인, 토큰 저장 |
+| [`connectors.md`](connectors.md) | 커넥터의 정의, 언제 에이전트를 나누는가, 커넥터 선언 파일, 연결과 붙이기 API, 승인, 토큰 저장 |
 | [`connector-authoring.md`](connector-authoring.md) | 범용 커넥터를 만드는 방법, 갖출 것, PR 에 필요한 것, 공통 검사 |
 | [`connectors/gmail.md`](connectors/gmail.md) | Gmail 커넥터의 도구와 정책, 보안, 설정 안내, 실제 계정 확인 |
 | [`self-hosting.md`](self-hosting.md) | 기술 스택, 개별 실행, 주요 환경 변수 |
@@ -31,7 +31,7 @@ frontend 는 화면의 동작과 구조이고, hermes 는 외부 런타임인 He
 | [`backend/agent-delegation.md`](backend/agent-delegation.md) | `agent_*` 도구로 다른 에이전트에게 맡기는 경로와 결과 도착, 끝나지 않은 결과 전달과 다시 전달 |
 | [`backend/artifact.md`](backend/artifact.md) | 에이전트가 만든 결과물 파일의 저장과 조회 |
 | [`backend/attachment.md`](backend/attachment.md) | 대화에 올린 사진의 저장과 전달 |
-| [`backend/connector-install.md`](backend/connector-install.md) | 대시보드 plugin 의 커넥터 경로를 쓰는 방법, 커넥터 설치와 실패 처리, 커넥터 에이전트의 경계 |
+| [`backend/connector-install.md`](backend/connector-install.md) | 대시보드 plugin 의 커넥터 경로를 쓰는 방법, 연결 등록과 바인딩 설치와 실패 처리, 옛 커넥터 에이전트와 옮겨 가기 |
 | [`backend/connector-tool-policy.md`](backend/connector-tool-policy.md) | 커넥터 도구의 위험도와 승인 방식, 도구 호출 판정, 승인이 필요한 호출의 흐름, 사용자별 호출 제한 |
 | [`backend/conversation.md`](backend/conversation.md) | 대화와 실행 사건, 모델 단계와 자식 기록, 도구 내용 가리기 |
 | [`backend/mcp-caller.md`](backend/mcp-caller.md) | Control Plane MCP 호출의 요청자를 정하는 방법, MCP 서버와 결과물 쓰기 도구의 계약, 도구 호출의 입력 비용 |

@@ -83,14 +83,28 @@ public final class AgentToolPolicy {
                 : user.isAdmin();
     }
 
-    /** 요청자가 보낸 전체 목록을 검사하고 Hermes에 저장할 목록을 계산한다. */
+    /**
+     * 요청자가 보낸 전체 목록을 검사하고 Hermes에 저장할 목록을 계산한다.
+     *
+     * <p>그 에이전트에 붙은 커넥터의 MCP 서버 이름은 목록 끝에 늘 더한다(ADR-083). 대시보드는 그 이름이 빠진 목록을 거절한다.
+     * 요청에 그 이름이 들어와도 모르는 이름으로 거절하지 않는다. 화면이 읽은 목록을 그대로 돌려보낼 수 있다.
+     *
+     * @param connectorServers 그 에이전트에 붙은 커넥터의 MCP 서버 이름
+     */
     public static List<String> requestedForWrite(
-            CurrentUser user, Agent agent, List<String> requested, List<String> currentlyEnabled) {
+            CurrentUser user,
+            Agent agent,
+            List<String> requested,
+            List<String> currentlyEnabled,
+            Set<String> connectorServers) {
         if (requested == null) {
             throw new ApiException(ErrorCode.VALIDATION_FAILED, "enabled toolsets are required");
         }
         LinkedHashSet<String> requestedSet = new LinkedHashSet<>();
         for (String name : requested) {
+            if (name != null && connectorServers.contains(name)) {
+                continue;
+            }
             if (name == null
                     || name.isBlank()
                     || MEMORY.equals(name)
@@ -126,6 +140,7 @@ public final class AgentToolPolicy {
                     ErrorCode.AGENT_TOOLS_REQUIRE_PRIVATE, "shell and file toolsets require a private agent");
         }
         result.add(CONTROL_PLANE_MCP);
+        result.addAll(connectorServers);
         return List.copyOf(result);
     }
 

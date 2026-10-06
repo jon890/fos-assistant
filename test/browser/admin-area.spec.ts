@@ -1,4 +1,11 @@
-import { expect, setSession, test } from "./fixtures.ts";
+import {
+  bindDemoConnector,
+  connectDemoConnector,
+  disconnectDemoConnector,
+  expect,
+  setSession,
+  test,
+} from "./fixtures.ts";
 import { FAKE_USAGE } from "../e2e/fake-hermes.ts";
 import type { Page, TestInfo } from "../../web/node_modules/@playwright/test/index.js";
 
@@ -178,6 +185,49 @@ test("연결 반영 확인은 관리자 영역에 있고 일반 연결 화면에
   await page.goto("/connections");
   await expect(page.getByRole("heading", { name: "연결", exact: true })).toBeVisible();
   await expect(page.getByTestId("connector-admin-panel")).toHaveCount(0);
+});
+
+test("관리자 연결 목록은 붙인 에이전트마다 한 줄이고 한 줄의 반영 완료는 그 줄만 바꾼다", async ({ context, page }, testInfo) => {
+  // mobile 과 desktop 이 같은 Control Plane 을 쓰므로 project 마다 다른 사용자를 둔다.
+  const owner = { email: `admin-bindings-${testInfo.project.name}@example.com`, name: `반영 확인 사용자 ${testInfo.project.name}` };
+  await setSession(context, owner);
+  expect((await page.request.get("/api/me")).ok()).toBeTruthy();
+  await connectDemoConnector(owner.email);
+  const codes: string[] = [];
+  try {
+    for (const name of ["첫째 비서", "둘째 비서"]) {
+      const created = await page.request.post("/api/agents", { data: { name } });
+      expect(created.status(), `에이전트를 만들지 못했다: ${created.status()}`).toBe(201);
+      const { code } = (await created.json()) as { code: string };
+      codes.push(code);
+      const bound = await bindDemoConnector(owner.email, code);
+      expect(bound).toMatchObject({ bound: true, status: "PENDING", restartRequired: true });
+    }
+
+    await setSession(context, { email: "browser@example.com", name: "브라우저 테스트" });
+    await page.goto("/admin/connections");
+    const rows = page.getByTestId("connector-admin-panel").getByRole("listitem").filter({ hasText: owner.name });
+    await expect(rows).toHaveCount(2);
+    const first = rows.filter({ hasText: `에이전트 ${codes[0]}` });
+    const second = rows.filter({ hasText: `에이전트 ${codes[1]}` });
+    await expect(first).toContainText("반영 대기");
+    await expect(second).toContainText("반영 대기");
+
+    await first.getByRole("button", { name: "반영 완료" }).click();
+
+    // 반영된 줄은 단추가 사라진다. 시험 서버가 선언하지 않은 도구를 하나 내므로 그 표시와 함께 목록에 남는다.
+    await expect(first).toContainText("붙음");
+    await expect(first.getByRole("button", { name: "반영 완료" })).toHaveCount(0);
+    await expect(second).toContainText("반영 대기");
+    await expect(second.getByRole("button", { name: "반영 완료" })).toBeVisible();
+  } finally {
+    await setSession(context, owner);
+    for (const code of codes) {
+      const deleted = await page.request.delete(`/api/agents/${code}`);
+      expect(deleted.status(), `검사가 만든 에이전트 ${code} 를 지우지 못했다`).toBe(204);
+    }
+    await disconnectDemoConnector(owner.email);
+  }
 });
 
 test("MEMBER 역할이 관리자 영역의 에이전트 주소를 열면 홈으로 넘어간다", async ({ context, page }) => {
