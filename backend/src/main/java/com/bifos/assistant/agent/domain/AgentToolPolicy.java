@@ -39,10 +39,19 @@ public final class AgentToolPolicy {
             "discord",
             "session_search");
     // session_search 는 그 profile 의 모든 플랫폼 대화와, `profile` 인자로 다른 profile 의 대화까지 읽는다.
-    private static final Set<String> PRIVATE_ONLY_TOOLSETS =
-            Set.of("terminal", "file", "code_execution", "browser", "computer_use", "session_search");
+    private static final Set<String> PRIVATE_ONLY_TOOLSETS = Set.of(
+            "terminal",
+            "file",
+            "code_execution",
+            "vision",
+            "image_gen",
+            "video_gen",
+            "browser",
+            "computer_use",
+            "session_search");
     /** 사용자별 실행 공간에서 도는 toolset 이다. 켜진 동안은 주인을 바꾸지 못한다(ADR-086). */
-    private static final Set<String> SANDBOX_TOOLSETS = Set.of("terminal", "file", "code_execution");
+    private static final Set<String> SANDBOX_TOOLSETS =
+            Set.of("terminal", "file", "code_execution", "vision", "image_gen", "video_gen");
     /** 커넥터 manifest 가 연결용 에이전트에 열 수 있는 내장 toolset 이다. 읽기 전용 이미지 도구뿐이다(ADR-044). */
     private static final Set<String> CONNECTOR_TOOLSETS = Set.of(AgentToolPolicy.VISION);
 
@@ -153,7 +162,7 @@ public final class AgentToolPolicy {
         return enabled.stream().anyMatch(AgentToolPolicy::requiresPrivate);
     }
 
-    /** 사용자별 실행 공간에서 도는 toolset(terminal, file, code_execution)이 하나라도 켜졌는가(ADR-086). */
+    /** 사용자별 실행 공간에서 도는 셸·파일·사진 toolset 이 하나라도 켜졌는가(ADR-091). */
     public static boolean hasSandboxToolset(List<String> enabled) {
         return enabled.stream().anyMatch(SANDBOX_TOOLSETS::contains);
     }

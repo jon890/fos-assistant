@@ -174,7 +174,7 @@ class ConnectorBindingServiceTest {
                 .thenReturn(CallResult.success(MAPPER.readTree("{\"ok\":true}")));
         when(connector.bindConnector(anyString(), anyString(), anyString())).thenReturn(new InstallResult(true, false));
         when(connector.unbindConnector(anyString(), anyString())).thenReturn(new InstallResult(false, false));
-        when(connector.putConnector(anyString(), anyString(), anyBoolean()))
+        when(connector.putConnector(anyString(), anyString(), anyBoolean(), anyString()))
                 .thenReturn(new InstallResult(false, false));
         when(connector.readConnector(anyString(), anyString()))
                 .thenReturn(new ConnectorState("p", true, true, false, true, HermesConnectorClient.MODE_BIND));
@@ -648,7 +648,7 @@ class ConnectorBindingServiceTest {
         assertThatThrownBy(() -> service.detachAll(legacy)).isInstanceOf(ConnectorOperationFailure.class);
 
         assertThat(bindings.count()).isEqualTo(1);
-        verify(connector, never()).putConnector(anyString(), anyString(), anyBoolean());
+        verify(connector, never()).putConnector(anyString(), anyString(), anyBoolean(), anyString());
 
         clearInvocations(connector);
         doNothing().when(connector).importVault(anyString(), anyString(), anyString());
@@ -657,7 +657,7 @@ class ConnectorBindingServiceTest {
         InOrder order = inOrder(connector);
         order.verify(connector).importVault(connection.vault(), DEMO, legacy.hermesProfile());
         order.verify(connector).deleteEnv(legacy.hermesProfile(), "DEMO_TOKEN");
-        order.verify(connector).putConnector(legacy.hermesProfile(), DEMO, false);
+        order.verify(connector).putConnector(legacy.hermesProfile(), DEMO, false, legacy.sandboxOwner());
         assertThat(bindings.count()).isZero();
         assertThat(connections.findById(connection.id()).orElseThrow().vaultStored())
                 .isTrue();

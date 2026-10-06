@@ -5,6 +5,8 @@ import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -25,6 +27,9 @@ public interface ChatAttachmentRepository extends JpaRepository<ChatAttachment, 
     long countByConversationIdAndMessageIdIsNullAndDeletedAtIsNull(Long conversationId);
 
     List<ChatAttachment> findByExpiresAtBeforeAndDeletedAtIsNullOrderByIdAsc(Instant now);
+
+    /** 기동 복사는 살아 있는 파일 행만 읽는다. 계속 쌓이는 삭제 행은 조회하지 않는다. */
+    Page<ChatAttachment> findByDeletedAtIsNullAndStoredNameIsNotNull(Pageable pageable);
 
     /** 아직 묶이지 않았고 지워지지 않은 첨부 하나를 지정한 자리로 묶는다. */
     @Modifying(flushAutomatically = true, clearAutomatically = true)

@@ -198,7 +198,7 @@ class ConnectorConnectionServiceTest {
                         "{\"scopes\":[{\"id\":\"a\",\"name\":\"범위 A\"},{\"id\":\"b\",\"name\":\"범위 B\"}]}")));
         when(connector.callWithVault(anyString(), anyString(), anyString()))
                 .thenReturn(CallResult.success(MAPPER.readTree("{\"scopes\":[]}")));
-        when(connector.putConnector(anyString(), anyString(), anyBoolean()))
+        when(connector.putConnector(anyString(), anyString(), anyBoolean(), anyString()))
                 .thenReturn(new InstallResult(false, false));
         when(connector.bindConnector(anyString(), anyString(), anyString()))
                 .thenReturn(new InstallResult(false, false));
@@ -231,7 +231,7 @@ class ConnectorConnectionServiceTest {
         assertThat(stored(user).vaultStored()).isTrue();
         assertThat(agents.count()).isZero();
         verify(connector, never()).putEnv(anyString(), anyString(), anyString());
-        verify(connector, never()).putConnector(anyString(), anyString(), anyBoolean());
+        verify(connector, never()).putConnector(anyString(), anyString(), anyBoolean(), anyString());
         verify(toolsets, never()).writeApiServer(any(), any(), any());
     }
 
@@ -278,7 +278,8 @@ class ConnectorConnectionServiceTest {
         Agent legacy = agent(user, true);
         ConnectorBinding legacyBound = readyBinding(legacy, connection, null);
         when(connector.bindConnector(anyString(), anyString(), anyString())).thenReturn(new InstallResult(true, false));
-        when(connector.putConnector(anyString(), anyString(), anyBoolean())).thenReturn(new InstallResult(true, false));
+        when(connector.putConnector(anyString(), anyString(), anyBoolean(), anyString()))
+                .thenReturn(new InstallResult(true, false));
         Map<String, String> replaced = Map.of("token", OTHER_TOKEN);
 
         ConnectionSnapshot registered = service.register(user, DEMO, replaced);
@@ -288,7 +289,7 @@ class ConnectorConnectionServiceTest {
         // 옛 바인딩은 받은 값을 지금처럼 그 profile 의 env 에 쓴다.
         verify(connector).putEnv(legacy.hermesProfile(), "DEMO_TOKEN", OTHER_TOKEN);
         verify(connector).deleteEnv(legacy.hermesProfile(), "DEMO_SCOPE");
-        verify(connector).putConnector(legacy.hermesProfile(), DEMO, true);
+        verify(connector).putConnector(legacy.hermesProfile(), DEMO, true, legacy.sandboxOwner());
         assertThat(registered.status()).isEqualTo(ConnectionStatus.READY);
         assertThat(registered.bindings())
                 .extracting(BoundAgentSummary::agentCode, BoundAgentSummary::status, BoundAgentSummary::restartRequired)
@@ -674,7 +675,7 @@ class ConnectorConnectionServiceTest {
         InOrder legacyOrder = inOrder(connector);
         legacyOrder.verify(connector).deleteEnv(legacy.hermesProfile(), "DEMO_TOKEN");
         legacyOrder.verify(connector).deleteEnv(legacy.hermesProfile(), "DEMO_SCOPE");
-        legacyOrder.verify(connector).putConnector(legacy.hermesProfile(), DEMO, false);
+        legacyOrder.verify(connector).putConnector(legacy.hermesProfile(), DEMO, false, legacy.sandboxOwner());
         legacyOrder.verify(connector).deleteVault(connection.vault());
         assertThat(bindings.count()).isZero();
         assertThat(disconnected.status()).isEqualTo(ConnectionStatus.DISCONNECTED);
@@ -704,7 +705,7 @@ class ConnectorConnectionServiceTest {
         ConnectionSnapshot disconnected = service.disconnect(user, DEMO);
 
         verify(connector, never()).deleteEnv(anyString(), anyString());
-        verify(connector).putConnector(legacy.hermesProfile(), DEMO, false);
+        verify(connector).putConnector(legacy.hermesProfile(), DEMO, false, legacy.sandboxOwner());
         assertThat(disconnected.status()).isEqualTo(ConnectionStatus.DISCONNECTED);
         assertThat(service.read(user, DEMO).status()).isEqualTo(ConnectionStatus.DISCONNECTED);
     }
@@ -778,7 +779,7 @@ class ConnectorConnectionServiceTest {
         InOrder order = inOrder(connector);
         order.verify(connector).importVault(connection.vault(), DEMO, legacy.hermesProfile());
         order.verify(connector).callWithVault(DEMO, "list_scopes", connection.vault());
-        order.verify(connector).putConnector(legacy.hermesProfile(), DEMO, true);
+        order.verify(connector).putConnector(legacy.hermesProfile(), DEMO, true, legacy.sandboxOwner());
         assertThat(checked.status()).isEqualTo(ConnectionStatus.READY);
         assertThat(stored(user).vaultStored()).isTrue();
         ConnectorBinding resynced = bindings.findById(binding.id()).orElseThrow();

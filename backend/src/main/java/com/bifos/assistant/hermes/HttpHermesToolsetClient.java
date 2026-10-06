@@ -23,8 +23,12 @@ public class HttpHermesToolsetClient implements HermesToolsetClient {
     private final HermesProfileKeyStore keyStore;
     private final String dashboardBaseUrl;
     private final String dashboardToken;
+    private final SandboxAttachmentDirectory attachmentDirectory;
 
-    public HttpHermesToolsetClient(HermesProfileKeyStore keyStore, HermesProperties properties) {
+    public HttpHermesToolsetClient(
+            HermesProfileKeyStore keyStore,
+            HermesProperties properties,
+            SandboxAttachmentDirectory attachmentDirectory) {
         SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
         factory.setConnectTimeout(properties.connectTimeout());
         factory.setReadTimeout(properties.readTimeout());
@@ -32,6 +36,7 @@ public class HttpHermesToolsetClient implements HermesToolsetClient {
         this.keyStore = keyStore;
         this.dashboardBaseUrl = stripTrailingSlash(properties.dashboardBaseUrl());
         this.dashboardToken = properties.dashboardToken();
+        this.attachmentDirectory = attachmentDirectory;
     }
 
     @Override
@@ -91,6 +96,7 @@ public class HttpHermesToolsetClient implements HermesToolsetClient {
 
     @Override
     public void writeApiServer(String profileName, List<String> toolsets, String sandboxOwner) {
+        attachmentDirectory.ensure(sandboxOwner);
         try {
             restClient
                     .put()

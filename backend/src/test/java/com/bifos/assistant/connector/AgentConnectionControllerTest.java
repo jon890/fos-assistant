@@ -128,7 +128,7 @@ class AgentConnectionControllerTest {
                 .thenReturn(CallResult.success(MAPPER.readTree("{\"ok\":true}")));
         when(connector.bindConnector(anyString(), anyString(), anyString())).thenReturn(new InstallResult(true, false));
         when(connector.unbindConnector(anyString(), anyString())).thenReturn(new InstallResult(false, false));
-        when(connector.putConnector(anyString(), anyString(), anyBoolean()))
+        when(connector.putConnector(anyString(), anyString(), anyBoolean(), anyString()))
                 .thenReturn(new InstallResult(false, false));
         when(connector.readConnector(anyString(), anyString()))
                 .thenReturn(new ConnectorState("p", true, true, false, true, HermesConnectorClient.MODE_BIND));
