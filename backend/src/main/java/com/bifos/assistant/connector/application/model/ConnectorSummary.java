@@ -9,6 +9,7 @@ import java.util.List;
  * @param tools 도구마다의 위험도와 승인 방식. 도구를 선언하지 않는 판의 커넥터와 카탈로그에서 빠진 커넥터는 빈 목록
  * @param myStatus 등록한 적이 없으면 {@code DISCONNECTED}
  * @param available 지금 카탈로그에 있는가. 거짓이면 읽기와 해제만 되고 {@code fields} 와 {@code description} 이 비어 있다
+ * @param bindings 내 연결이 붙은 에이전트들. 연결이 없으면 빈 목록
  */
 public record ConnectorSummary(
         String id,
@@ -17,4 +18,10 @@ public record ConnectorSummary(
         List<ConnectorFieldSummary> fields,
         List<ConnectorToolSummary> tools,
         ConnectionStatus myStatus,
-        boolean available) {}
+        boolean available,
+        List<BoundAgentSummary> bindings) {
+
+    public ConnectorSummary {
+        bindings = List.copyOf(bindings);
+    }
+}

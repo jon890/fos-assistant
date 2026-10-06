@@ -26,6 +26,7 @@ public class AgentAdminService {
     private final AgentLifecycleService lifecycle;
     private final AgentEndpointProbe endpointProbe;
     private final KnownFlows flows;
+    private final AgentConnectorBindings connectorBindings;
     private final Clock clock;
 
     @Transactional
@@ -58,6 +59,14 @@ public class AgentAdminService {
         return agents.findAll().stream().filter(agent -> !agent.isDeleted()).toList();
     }
 
+    /**
+     * 관리자가 에이전트의 사용 여부와 공개 범위, 주인, 주소를 고친다.
+     *
+     * <p>연결이 붙은 에이전트는 그룹으로 바꾸지 못하고 주인도 바꾸지 못한다(ADR-083). 주인을 바꾸면 남의 값이 든 profile 이 새
+     * 주인에게 넘어가고, 새 주인은 남의 연결이라 떼지도 못한다. 바인딩은 에이전트 행을 잠근 뒤에 읽는다. 잠금은 경합하면 곧바로
+     * {@code AGENT_BUSY} 로 거절하므로 붙이기가 잠금을 쥔 동안에는 이 수정이 거절되고, 이 수정이 먼저 잠그면 붙이기가 기다렸다가
+     * 이 커밋을 보고 판정한다. 트랜잭션의 첫 읽기가 이 잠금 읽기라 뒤의 바인딩 조회는 잠금을 얻기 전에 커밋된 바인딩을 본다.
+     */
     @Transactional
     public Agent update(String code, AgentUpdateCommand command) {
         Agent agent = requireAgentForUpdate(code);
@@ -70,6 +79,16 @@ public class AgentAdminService {
                 : ownerId(command.visibility(), command.ownerEmail());
         if (command.visibility() == AgentVisibility.PRIVATE && ownerId == null) {
             throw new ApiException(ErrorCode.VALIDATION_FAILED, "a private agent needs an owner");
+        }
+        boolean ownerChanges = !Objects.equals(ownerId, agent.ownerUserId());
+        if ((ownerChanges || command.visibility() == AgentVisibility.GROUP)
+                && connectorBindings.hasBindings(agent.id())) {
+            if (ownerChanges) {
+                throw new ApiException(
+                        ErrorCode.AGENT_HAS_CONNECTIONS, "detach the connections before changing the owner");
+            }
+            throw new ApiException(
+                    ErrorCode.AGENT_CONNECTIONS_REQUIRE_PRIVATE, "an agent with connections must stay private");
         }
         String apiBaseUrl = effectiveApiBaseUrl(agent, command.apiBaseUrl());
         if (command.enabled() && command.visibility() == AgentVisibility.GROUP) {

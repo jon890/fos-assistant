@@ -57,7 +57,7 @@ Control Plane MCP 서버가 `follow_up_propose` 를 둔다.
 
 - **주인과 대화는 호출의 origin 실행에서 정한다.** `McpCallerResolver` 가 찾은 origin 실행의 `user_id` 가 주인이고 `conversation_id` 가 대화다. 인자로 받지 않는다
 - 대화가 없는 실행(추천 질문 같은 것)에서 부르면 거절한다. 글은 「대화 밖의 실행에서는 할 일을 제안할 수 없다.」 다
-- 커넥터 에이전트는 Control Plane MCP 도구를 받지 못한다. 지금 `McpCallerResolver` 의 거절이 그대로 막는다(ADR-045)
+- 옛 커넥터 에이전트는 Control Plane MCP 도구를 받지 못한다. 지금 `McpCallerResolver` 의 거절이 그대로 막는다(ADR-045). 연결을 붙인 일반 에이전트는 이 도구를 부를 수 있다
 - **fos-ctx 가 이 도구를 서명 필수로 안다.** `hermes/plugins/fos-ctx/__init__.py` 의 `REQUIRED_TOOLS` 에 넣는다. plugin 을 먼저 배포한다
 - **실행 사건에 이 도구의 인자와 결과를 남기지 않는다.** `HermesRunEventStream` 이 시작 사건(`tool.started` 의 `preview`)과 끝 사건의 `detail` 을 비운다. 인자에 할 일 제목이 실려, 남기면 관리자가 실행 기록에서 남의 할 일 제목을 읽는다
 

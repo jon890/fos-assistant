@@ -14,17 +14,22 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.bifos.assistant.connector.application.ConnectorBindingService;
 import com.bifos.assistant.connector.application.ConnectorConnectionService;
 import com.bifos.assistant.connector.application.model.AdminConnectionSnapshot;
+import com.bifos.assistant.connector.application.model.AgentConnectionView;
+import com.bifos.assistant.connector.application.model.BoundAgentSummary;
 import com.bifos.assistant.connector.application.model.ConnectionSnapshot;
 import com.bifos.assistant.connector.application.model.ConnectorFieldSummary;
 import com.bifos.assistant.connector.application.model.ConnectorOperationFailure;
 import com.bifos.assistant.connector.application.model.ConnectorOption;
 import com.bifos.assistant.connector.application.model.ConnectorSummary;
 import com.bifos.assistant.connector.application.model.ConnectorToolSummary;
+import com.bifos.assistant.connector.domain.type.BindingStatus;
 import com.bifos.assistant.connector.domain.type.ConnectionStatus;
 import com.bifos.assistant.connector.domain.type.ToolApproval;
 import com.bifos.assistant.connector.domain.type.ToolRisk;
+import com.bifos.assistant.connector.presentation.AdminAgentConnectionController;
 import com.bifos.assistant.connector.presentation.ConnectionDtos;
 import com.bifos.assistant.connector.presentation.ConnectorConnectionAdminController;
 import com.bifos.assistant.connector.presentation.ConnectorConnectionController;
@@ -34,6 +39,7 @@ import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.shared.error.GlobalExceptionHandler;
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
@@ -51,11 +57,18 @@ class ConnectorConnectionControllerTest {
     private static final CurrentUser MEMBER = new CurrentUser(7L, "member@example.com", "사용자", 1L, UserRole.MEMBER);
     private static final CurrentUser ADMIN = new CurrentUser(8L, "admin@example.com", "관리자", 1L, UserRole.ADMIN);
 
+    private static final String AGENT = "a-owned";
+    private static final Instant SHOWN = Instant.parse("2026-10-01T00:00:00Z");
+    private static final List<BoundAgentSummary> BINDINGS =
+            List.of(new BoundAgentSummary(AGENT, "비서", BindingStatus.PENDING, true));
+
     private final ConnectorConnectionService service = mock(ConnectorConnectionService.class);
+    private final ConnectorBindingService bindingService = mock(ConnectorBindingService.class);
     private final CurrentUserProvider currentUser = mock(CurrentUserProvider.class);
     private final MockMvc mvc = MockMvcBuilders.standaloneSetup(
                     new ConnectorConnectionController(service, currentUser),
-                    new ConnectorConnectionAdminController(service, currentUser))
+                    new ConnectorConnectionAdminController(service, currentUser),
+                    new AdminAgentConnectionController(bindingService, currentUser))
             .setControllerAdvice(new GlobalExceptionHandler())
             .build();
 
@@ -79,7 +92,8 @@ class ConnectorConnectionControllerTest {
                         List.of(new ConnectorToolSummary(
                                 "write_note", "메모 쓰기", ToolRisk.WRITE, ToolApproval.REQUIRED, true)),
                         ConnectionStatus.PENDING,
-                        true)));
+                        true,
+                        BINDINGS)));
 
         MvcResult result = mvc.perform(get("/api/v1/connectors"))
                 .andExpect(status().isOk())
@@ -97,6 +111,10 @@ class ConnectorConnectionControllerTest {
                 .andExpect(jsonPath("$[0].tools[0].risk").value("WRITE"))
                 .andExpect(jsonPath("$[0].tools[0].approval").value("REQUIRED"))
                 .andExpect(jsonPath("$[0].tools[0].grant").value(true))
+                .andExpect(jsonPath("$[0].bindings[0].agentCode").value(AGENT))
+                .andExpect(jsonPath("$[0].bindings[0].agentName").value("비서"))
+                .andExpect(jsonPath("$[0].bindings[0].status").value("PENDING"))
+                .andExpect(jsonPath("$[0].bindings[0].restartRequired").value(true))
                 .andExpect(jsonPath("$[0].fields[0].env").doesNotExist())
                 .andExpect(jsonPath("$[0].fields[1].options").doesNotExist())
                 .andReturn();
@@ -107,13 +125,13 @@ class ConnectorConnectionControllerTest {
     @DisplayName("카탈로그에서 빠진 내 연결은 available 거짓과 빈 칸으로 나간다")
     void catalogMarksRemovedConnectorAsUnavailableWithEmptyFields() throws Exception {
         when(service.catalog(MEMBER))
-                .thenReturn(List.of(
-                        new ConnectorSummary(DEMO, "검사용 메모", "", List.of(), List.of(), ConnectionStatus.READY, false)));
+                .thenReturn(List.of(new ConnectorSummary(
+                        DEMO, DEMO, "", List.of(), List.of(), ConnectionStatus.READY, false, List.of())));
 
         mvc.perform(get("/api/v1/connectors"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].id").value(DEMO))
-                .andExpect(jsonPath("$[0].title").value("검사용 메모"))
+                .andExpect(jsonPath("$[0].title").value(DEMO))
                 .andExpect(jsonPath("$[0].description").value(""))
                 .andExpect(jsonPath("$[0].myStatus").value("READY"))
                 .andExpect(jsonPath("$[0].available").value(false))
@@ -122,7 +140,7 @@ class ConnectorConnectionControllerTest {
     }
 
     @Test
-    @DisplayName("등록 본문의 profile은 무시하고 로그인 사용자로 등록하며 응답에 비밀 원문이 없다")
+    @DisplayName("등록 본문의 profile은 무시하고 로그인 사용자로 등록하며 응답에 비밀 원문과 env 이름과 agentCode 가 없다")
     void registersForLoggedInUserIgnoringProfileInBody() throws Exception {
         when(service.register(any(), any(), any())).thenReturn(snapshot(ConnectionStatus.PENDING));
 
@@ -134,11 +152,14 @@ class ConnectorConnectionControllerTest {
                 .andExpect(jsonPath("$.status").value("PENDING"))
                 .andExpect(jsonPath("$.secretPrefixes.token").value("demo"))
                 .andExpect(jsonPath("$.values.scope").value("a"))
-                .andExpect(jsonPath("$.agentCode").value("agent-code"))
-                .andExpect(jsonPath("$.restartRequired").value(false))
+                .andExpect(jsonPath("$.bindings[0].agentCode").value(AGENT))
+                .andExpect(jsonPath("$.bindings[0].status").value("PENDING"))
+                .andExpect(jsonPath("$.bindings[0].restartRequired").value(true))
+                .andExpect(jsonPath("$.agentCode").doesNotExist())
+                .andExpect(jsonPath("$.restartRequired").doesNotExist())
                 .andReturn();
 
-        assertThat(result.getResponse().getContentAsString()).doesNotContain(TOKEN);
+        assertThat(result.getResponse().getContentAsString()).doesNotContain(TOKEN, "DEMO_TOKEN");
         verify(service).register(MEMBER, DEMO, Map.of("token", TOKEN));
     }
 
@@ -204,7 +225,7 @@ class ConnectorConnectionControllerTest {
         when(service.check(MEMBER, DEMO)).thenReturn(snapshot(ConnectionStatus.PENDING));
         when(service.disconnect(MEMBER, DEMO))
                 .thenReturn(new ConnectionSnapshot(
-                        DEMO, ConnectionStatus.DISCONNECTED, Map.of(), Map.of(), true, null, "agent-code", 0));
+                        DEMO, ConnectionStatus.DISCONNECTED, Map.of(), Map.of(), null, List.of(), 0));
 
         mvc.perform(post("/api/v1/connections/" + DEMO + "/check"))
                 .andExpect(status().isOk())
@@ -213,7 +234,7 @@ class ConnectorConnectionControllerTest {
         mvc.perform(delete("/api/v1/connections/" + DEMO))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("DISCONNECTED"))
-                .andExpect(jsonPath("$.restartRequired").value(true))
+                .andExpect(jsonPath("$.bindings").isEmpty())
                 .andExpect(jsonPath("$.secretPrefixes").isEmpty());
 
         verify(service).check(MEMBER, DEMO);
@@ -261,35 +282,58 @@ class ConnectorConnectionControllerTest {
     }
 
     @Test
-    @DisplayName("관리자 목록은 다른 사용자의 비밀 앞부분과 칸 값을 내보내지 않는다")
+    @DisplayName("관리자 목록은 바인딩마다 재시작 대기 시각을 주고 다른 사용자의 비밀 앞부분과 칸 값을 내보내지 않는다")
     void adminListHidesOtherUsersPrefixesAndValues() throws Exception {
         when(service.listForAdmin(ADMIN))
                 .thenReturn(List.of(
-                        new AdminConnectionSnapshot(DEMO, 7L, "사용자", ConnectionStatus.PENDING, "agent-code", true, 3)));
+                        new AdminConnectionSnapshot(DEMO, 7L, "사용자", AGENT, BindingStatus.PENDING, true, SHOWN, 3)));
 
         mvc.perform(get("/api/v1/admin/connections"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].connectorId").value(DEMO))
                 .andExpect(jsonPath("$[0].userId").value(7))
                 .andExpect(jsonPath("$[0].displayName").value("사용자"))
+                .andExpect(jsonPath("$[0].agentCode").value(AGENT))
+                .andExpect(jsonPath("$[0].status").value("PENDING"))
                 .andExpect(jsonPath("$[0].restartRequired").value(true))
+                .andExpect(jsonPath("$[0].restartRequiredSince").value("2026-10-01T00:00:00Z"))
                 .andExpect(jsonPath("$[0].undeclaredTools").value(3))
                 .andExpect(jsonPath("$[0].secretPrefixes").doesNotExist())
                 .andExpect(jsonPath("$[0].values").doesNotExist());
     }
 
     @Test
-    @DisplayName("관리자 반영 확인 응답은 비밀 앞부분과 칸 값을 내보내지 않는다")
-    void adminConfirmResponseHidesPrefixesAndValues() throws Exception {
-        when(service.confirmApplied(ADMIN, DEMO, 7L)).thenReturn(snapshot(ConnectionStatus.READY));
+    @DisplayName("관리자 반영 완료는 에이전트와 커넥터의 경로로 본 시각을 넘기고 응답에 비밀 앞부분과 칸 값이 없다")
+    void adminConfirmUsesAgentPathAndHidesPrefixesAndValues() throws Exception {
+        when(bindingService.confirmApplied(ADMIN, AGENT, DEMO, SHOWN))
+                .thenReturn(new AgentConnectionView(
+                        DEMO, "검사용 메모", ConnectionStatus.READY, true, BindingStatus.READY, false, 3, List.of()));
 
-        mvc.perform(post("/api/v1/admin/connections/" + DEMO + "/7/confirm"))
+        mvc.perform(post("/api/v1/admin/agents/" + AGENT + "/connections/" + DEMO + "/confirm")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"restartRequiredSince\":\"2026-10-01T00:00:00Z\"}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.connectorId").value(DEMO))
-                .andExpect(jsonPath("$.userId").value(7))
+                .andExpect(jsonPath("$.bound").value(true))
                 .andExpect(jsonPath("$.status").value("READY"))
+                .andExpect(jsonPath("$.restartRequired").value(false))
                 .andExpect(jsonPath("$.secretPrefixes").doesNotExist())
                 .andExpect(jsonPath("$.values").doesNotExist());
+
+        verify(bindingService).confirmApplied(ADMIN, AGENT, DEMO, SHOWN);
+    }
+
+    @Test
+    @DisplayName("관리자 반영 완료의 다시 재시작 거절은 409 와 CONNECTOR_RESTART_AGAIN 이고 본 시각이 없으면 null 로 넘긴다")
+    void adminConfirmRestartAgainIsConflict() throws Exception {
+        when(bindingService.confirmApplied(ADMIN, AGENT, DEMO, null))
+                .thenThrow(new ApiException(ErrorCode.CONNECTOR_RESTART_AGAIN, "again"));
+
+        mvc.perform(post("/api/v1/admin/agents/" + AGENT + "/connections/" + DEMO + "/confirm")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("CONNECTOR_RESTART_AGAIN"));
     }
 
     private void expectRegisterFailure(ApiException failure, int status) throws Exception {
@@ -305,7 +349,6 @@ class ConnectorConnectionControllerTest {
     }
 
     private static ConnectionSnapshot snapshot(ConnectionStatus status) {
-        return new ConnectionSnapshot(
-                DEMO, status, Map.of("token", "demo"), Map.of("scope", "a"), false, null, "agent-code", 2);
+        return new ConnectionSnapshot(DEMO, status, Map.of("token", "demo"), Map.of("scope", "a"), null, BINDINGS, 2);
     }
 }

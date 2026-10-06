@@ -28,7 +28,9 @@ import com.bifos.assistant.chat.infra.ResultDeliveryRepository;
 import com.bifos.assistant.connector.application.ConnectorActionResultSource;
 import com.bifos.assistant.connector.application.ConnectorActionService;
 import com.bifos.assistant.connector.application.ConnectorCatalogCache;
+import com.bifos.assistant.connector.domain.ConnectorBinding;
 import com.bifos.assistant.connector.domain.ConnectorConnection;
+import com.bifos.assistant.connector.infra.ConnectorBindingRepository;
 import com.bifos.assistant.connector.infra.ConnectorConnectionRepository;
 import com.bifos.assistant.hermes.ConnectorExecutionUnknown;
 import com.bifos.assistant.hermes.HermesConnectorClient;
@@ -159,6 +161,9 @@ class ConnectorDeliveryRetryTest {
     ConnectorConnectionRepository connections;
 
     @Autowired
+    ConnectorBindingRepository bindings;
+
+    @Autowired
     ResultDeliveryRepository deliveries;
 
     @Autowired
@@ -187,6 +192,7 @@ class ConnectorDeliveryRetryTest {
         awaitAllIdle();
         stub().reset();
         jdbc.update("DELETE FROM connector_action");
+        bindings.deleteAll();
         connections.deleteAll();
         deliveryItems.deleteAll();
         attempts.deleteAll();
@@ -207,12 +213,13 @@ class ConnectorDeliveryRetryTest {
         AppUser user = users.save(AppUser.of("dad@example.com", "dad", 1L, UserRole.MEMBER, Instant.now()));
         dad = new CurrentUser(user.id(), user.email(), user.displayName(), user.groupId(), user.role());
         chief = agents.save(agent("dad", "비서", user.id()));
-        Agent notes = agent("retry-notes-agent", "메모 연결", user.id());
-        notes.markConnectorManaged();
-        notes = agents.save(notes);
-        ConnectorConnection connection = ConnectorConnection.pending(user.id(), CONNECTOR, notes, Instant.now());
+        // 승인 줄은 판정한 실행의 에이전트(chief)에 붙은 바인딩의 profile 에서 실행한다.
+        ConnectorConnection connection = ConnectorConnection.pending(user.id(), CONNECTOR, Instant.now());
         connection.ready(Instant.now());
-        connections.save(connection);
+        connection = connections.save(connection);
+        ConnectorBinding binding = ConnectorBinding.pending(chief, connection, "demo", Instant.now());
+        binding.ready(Instant.now());
+        bindings.save(binding);
         conversation = conversations.save(Conversation.startedBy(dad.id(), "대화", chief.id(), Instant.now()));
         root = executions.save(AgentExecution.builder()
                 .userId(dad.id())
@@ -229,7 +236,8 @@ class ConnectorDeliveryRetryTest {
     void tearDown() {
         awaitAllIdle();
         jdbc.update("DELETE FROM connector_action");
-        // 연결 줄이 에이전트를 가리켜 남겨 두면 같은 컨텍스트의 다른 검사가 에이전트를 지우지 못한다.
+        // 바인딩 줄이 에이전트를 가리켜 남겨 두면 같은 컨텍스트의 다른 검사가 에이전트를 지우지 못한다.
+        bindings.deleteAll();
         connections.deleteAll();
     }
 

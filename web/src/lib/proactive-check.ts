@@ -7,7 +7,8 @@ export type ProactiveCheckBlocker = {
     | "AGENT_NOT_SUPPORTED"
     | "SKILL_MISSING"
     | "TOOLSETS_NOT_ALLOWED"
-    | "ISOLATED_EXECUTION_REQUIRED";
+    | "ISOLATED_EXECUTION_REQUIRED"
+    | "READINESS_UNKNOWN";
   toolsets: string[];
 };
 
@@ -87,6 +88,8 @@ export function describeBlocker(blocker: ProactiveCheckBlocker): string {
   switch (blocker.code) {
     case "DISABLED":
       return "지금은 먼저 살펴보기를 쓸 수 없어요.";
+    case "READINESS_UNKNOWN":
+      return "지금 준비 상태를 확인하지 못했어요. 매일 깨우기는 끌 수 있어요. 다시 켜려면 설정 화면을 새로 열어 주세요.";
     case "AGENT_NOT_SUPPORTED":
       return "이 에이전트는 먼저 살펴보기를 하지 않아요.";
     case "SKILL_MISSING":

@@ -31,7 +31,10 @@ export function ConnectorCatalog() {
 
   return (
     <div className="mx-auto w-full max-w-2xl">
-      <h1 className="mb-4 text-xl font-semibold">연결</h1>
+      <h1 className="text-xl font-semibold">연결</h1>
+      <p className="mt-1 mb-4 text-sm text-muted-foreground">
+        계정을 한 번 연결하고, 에이전트 화면에서 그 에이전트가 쓸 연결을 붙여요.
+      </p>
       {error ? (
         <Notice variant="error" role="alert">
           연결 목록을 읽지 못했어요. {error}
@@ -65,11 +68,22 @@ export function ConnectorCatalog() {
                       <CardDescription>{connector.description}</CardDescription>
                     ) : null}
                   </CardHeader>
-                  {connector.available ? null : (
-                    <CardContent>
-                      <p className="text-sm text-muted-foreground">
-                        지금은 쓸 수 없어요.
-                      </p>
+                  {connector.available &&
+                  connector.myStatus === "DISCONNECTED" ? null : (
+                    <CardContent className="space-y-1">
+                      {connector.available ? null : (
+                        <p className="text-sm text-muted-foreground">
+                          지금은 쓸 수 없어요.
+                        </p>
+                      )}
+                      {connector.myStatus === "DISCONNECTED" ? null : (
+                        <p
+                          className="text-sm text-muted-foreground"
+                          data-testid="connector-binding-count"
+                        >
+                          붙인 에이전트 {connector.bindings.length}개
+                        </p>
+                      )}
                     </CardContent>
                   )}
                 </Card>

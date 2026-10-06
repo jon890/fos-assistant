@@ -11,5 +11,7 @@ public enum CheckBlockerCode {
     /** 켜진 toolset 에 허용 목록 밖의 것이 있다. */
     TOOLSETS_NOT_ALLOWED,
     /** 사용자별 격리 실행 공간이 없는 동안 셸, 파일, 코드 실행 도구가 켜져 있다. */
-    ISOLATED_EXECUTION_REQUIRED
+    ISOLATED_EXECUTION_REQUIRED,
+    /** 준비 상태를 조회하지 않았거나 Hermes 장애로 확인하지 못했다. */
+    READINESS_UNKNOWN
 }

@@ -42,7 +42,7 @@ token provider 등록, profile 생성의 `name`, 환경 쓰기의 `profile/key/v
 - 공유 listener 가 turn 마다 profile 의 `terminal.*` 를 scope 로 묶는다(`_profile_runtime_scope`, `install_and_reset_profile_terminal_scope`)
 - `_get_file_ops` 와 `execute_code` 가 terminal 과 같은 환경을 쓴다
 - `docker_volumes`, `docker_extra_args`, `env_passthrough`, `credential_files` 의 이름과 뜻
-- 스킬 앞머리에서 환경 값과 파일을 실행 공간에 넣는 칸의 이름(`tools/skills_tool_setup.py` 의 `_get_required_environment_variables`, `required_credential_files`). 칸이 늘면 올린 스킬 저장 검사에도 더한다
+- 스킬 앞머리에서 환경 값과 파일을 실행 공간에 넣는 칸의 이름(`tools/skills_tool_setup.py` 의 `_get_required_environment_variables`, `required_credential_files`). 칸이 늘면 올린 스킬 저장 검사(`SkillFrontmatter`)와 대시보드 plugin 의 커넥터 스킬 검사(`_skill_name`)에 함께 더한다
 - `HERMES_WRITE_SAFE_ROOT` 를 docker backend 의 파일 쓰기에도 경로 문자열로 적용한다
 
 **올린 스킬과 이름이 겹치는 스킬이 새로 생기지 않았는지 본다.**
@@ -51,7 +51,7 @@ Hermes 를 올리면 번들 스킬이 늘 수 있다. 같은 이름이면 profil
 업그레이드와 배포 확인은 profile 마다 올린 스킬 이름과 Hermes 가 더 앞서 고르는 스킬 이름이 겹치지 않는지 보고, 겹치면 배포를 멈춘다.
 그 검사의 절차는 `fos-home-infra` 가 갖는다. 까닭은 [ADR-034](../adr/ADR-034-올린-스킬은-control-plane-이-버전-디렉터리에-쓰고-hermes-는-읽기만-한다.md) 의 「Hermes 를 올릴 때 이름 충돌을 본다」 에 있다.
 
-**올린 Hermes 이미지의 `mcp` SDK 판을 본다.**
+**올린 Hermes 이미지의 `mcp` SDK 버전을 본다.**
 대시보드 plugin 의 커넥터 도구 호출은 Hermes 가 설치한 `mcp` Python SDK 를 쓰고, 지원 범위는 `mcp>=2.0,<3` 이다([커넥터 설치](../backend/connector-install.md) 의 「MCP SDK 계약」).
 Hermes 는 `mcp` 를 정확한 판 하나로 고정한다. v0.19.0 은 1.26.0, v0.20.0 부터 v0.20.2 까지는 1.28.1, v0.20.3 부터 v0.21.5 까지는 2.0.0 이다. 그래서 판은 이미지를 올릴 때만 바뀐다.
 1.x 는 속성 이름이 camelCase(`readOnlyHint`, `structuredContent`, `isError`)라 plugin 의 모든 커넥터 도구 호출이 `unavailable` 이 된다. 2.0.0, 2.0.1, 2.1.1, 2.2.0 에서는 plugin 의 호출 순서가 같게 동작함을 2026-10-01 에 확인했다.
@@ -136,7 +136,8 @@ Hermes 를 올릴 때 아래가 그대로인지 본다. 하나라도 달라지�
 | --- | --- |
 | MCP 도구의 등록 이름 규칙(`mcp_prefixed_tool_name`) | 대시보드 plugin 의 `_hermes_tool_name` 을 같은 규칙으로 고친다. 다르면 hook 이 도구를 대응 파일에서 찾지 못해 모두 막는다 |
 | 글이 있는 `block` 이 MCP 요청을 막는다 | hook 으로 강제할 수 없다. wrapper 가 필요하다 |
-| 중계 도구 `tool_call` 이 hook 에 안쪽 등록 이름을 준다 | 중계 도구를 연결용 profile 에서 막는다 |
+| 중계 도구 `tool_call` 이 hook 에 안쪽 등록 이름을 준다 | 중계 도구를 커넥터를 설치한 profile 에서 막는다 |
 | `mcp_servers.<서버>.tools.exclude` | `approval: always` 인 도구가 모델에게 보인다. 호출은 여전히 Control Plane 이 거절한다 |
 | `PluginContext.call_mcp` 가 `mcp_allowlist` 없는 서버를 부르지 못한다 | plugin 의 직접 호출이 판정 없이 나간다 |
+| `transform_tool_result` hook 은 처음 돌려준 글이 결과를 바꾸고, hook 이 실패하면 원래 결과가 가며, 판정이 막은 호출에는 닿지 않는다 | 바인딩 profile 의 커넥터 결과가 `<external-data>` 없이 들어가거나, 판정이 막은 안내 글까지 외부 글로 감싸져 모델이 승인을 기다리라는 안내를 따르지 않을 수 있다. 결과 hook 이 도는 자리를 다시 확인하고 `fos-ctx` 를 고친다 |
 

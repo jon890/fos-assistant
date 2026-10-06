@@ -7,6 +7,7 @@ import com.bifos.assistant.agent.domain.type.CostMode;
 import com.bifos.assistant.agent.domain.type.CredentialScope;
 import com.bifos.assistant.chat.domain.type.ConversationPurpose;
 import com.bifos.assistant.chat.domain.type.MessageRole;
+import com.bifos.assistant.connector.domain.type.BindingStatus;
 import com.bifos.assistant.model.domain.type.ModelTier;
 import com.bifos.assistant.proactive.domain.type.CheckInvalidReason;
 import com.bifos.assistant.proactive.domain.type.CheckOutcome;
@@ -39,6 +40,7 @@ class StoredEnumNamesTest {
             Map.entry(MessageRole.class, List.of("USER", "ASSISTANT", "SYSTEM")),
             Map.entry(ConversationPurpose.class, List.of("CHAT", "CHECK")),
             Map.entry(SkillUseSource.class, List.of("COMMAND", "MODEL")),
+            Map.entry(BindingStatus.class, List.of("PENDING", "READY")),
             Map.entry(UserRole.class, List.of("ADMIN", "MEMBER")),
             Map.entry(ExecutionStatus.class, List.of("RUNNING", "SUCCEEDED", "FAILED", "CANCELLED")),
             Map.entry(ModelTier.class, List.of("FAST", "BALANCED", "DEEP")),

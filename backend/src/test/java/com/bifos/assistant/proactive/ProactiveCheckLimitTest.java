@@ -4,7 +4,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.fail;
 import static org.assertj.core.api.Assertions.tuple;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doThrow;
@@ -30,6 +29,7 @@ import com.bifos.assistant.hermes.HermesSkillClient;
 import com.bifos.assistant.hermes.HermesSkillClient.HermesSkill;
 import com.bifos.assistant.hermes.HermesToolsetClient;
 import com.bifos.assistant.hermes.StubHermesRunsClient;
+import com.bifos.assistant.hermes.ToolDetailScope;
 import com.bifos.assistant.hermes.dto.HermesRunResult;
 import com.bifos.assistant.hermes.dto.RunEvent;
 import com.bifos.assistant.hermes.dto.TokenUsage;
@@ -482,7 +482,7 @@ class ProactiveCheckLimitTest {
                     return null;
                 })
                 .when(eventStream)
-                .open(any(), any(), any(), any(), any(), anyBoolean());
+                .open(any(), any(), any(), any(), any(), any(ToolDetailScope.class));
     }
 
     private void awaitIdle(Long conversationId) {

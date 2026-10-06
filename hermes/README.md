@@ -6,7 +6,7 @@ Control Plane 이 기대는 Hermes 쪽 코드다. Hermes 에 설치하는 plugin
 | plugin | 하는 일 | 두는 곳 | 읽는 프로세스 |
 | --- | --- | --- | --- |
 | `dashboard-profile-api` | 대시보드의 profile 관리와 도구 목록 경로를 `Authorization: Bearer` 로 연다 | Hermes 기본 루트의 `plugins/` | 대시보드 |
-| `fos-ctx` | Control Plane MCP 호출에 서명한 `_fos_ctx` 를 붙이고, 스킬 수정과 자식의 로컬 이미지 전달을 막고, 자식 session 등록과 커넥터 호출 판정을 한다 | Control Plane MCP 를 등록한 profile 마다 | gateway |
+| `fos-ctx` | Control Plane MCP 호출 인자에 서명한 run 맥락 `_fos_ctx` 를 덮어쓰고, `skill_manage` 와 자식의 로컬 이미지 전달을 막고, 자식 session 을 등록하고, 커넥터를 설치한 profile 의 커넥터 도구 호출을 Control Plane 에 묻고, 바인딩 profile 의 커넥터 도구 결과를 `<external-data>` 로 감싼다 | Control Plane MCP 를 등록한 profile 과 커넥터를 설치한 profile 마다 | gateway |
 
 ## 범용 커넥터
 
@@ -48,7 +48,7 @@ plugin 파일, 주소를 채운 `default-config.yaml.template`, 틀의 `plugins.
 | 대시보드 서비스 토큰 | 환경 변수 `HERMES_DASHBOARD_PROFILE_API_SECRET` | |
 | 스킬 루트 | 대시보드 프로세스의 환경 변수 `FOS_ASSISTANT_SKILL_AGENT_ROOT` | |
 | 셸 실행 공간 | 대시보드 프로세스의 환경 변수 `FOS_ASSISTANT_SANDBOX` | 값의 모양은 아래 「셸 실행 공간」 에 있다. 없거나 읽지 못하면 `terminal`, `file`, `code_execution`, `vision`, `image_gen`, `video_gen` 을 켜는 도구 저장을 409 로 거절한다 |
-| 커넥터 정책을 물을 주소 | gateway 프로세스의 환경 변수 `FOS_CTX_POLICY_URL` | Control Plane 의 `/internal/hermes/connector-policy` 다. 없으면 `fos-ctx` 가 연결용 profile 의 커넥터 도구를 모두 막는다 |
+| 커넥터 정책을 물을 주소 | gateway 프로세스의 환경 변수 `FOS_CTX_POLICY_URL` | Control Plane 의 `/internal/hermes/connector-policy` 다. 없으면 `fos-ctx` 가 커넥터를 설치한 profile 의 커넥터 도구를 모두 막는다 |
 | 자식 session 을 등록할 주소 | gateway 프로세스의 환경 변수 `FOS_CTX_SUBAGENT_URL` | 없으면 등록하지 않는다. 등록이 없는 자식의 호출은 Control Plane 이 거절한다 |
 
 ### 셸 실행 공간
@@ -153,7 +153,7 @@ Python 3.13 과 PyYAML 과 `mcp` SDK, 커넥터를 실행할 Bun 이 있어야 �
 
 `delegate_task` 의 `images` 와 `tasks[].images` 는 HTTP(S) 주소와 이미지 data URL 만 받는다.
 로컬 파일 경로는 Docker 밖에서 읽히므로 hook 이 파일 읽기 전에 막는다. 이미지 없는 자식 실행은 유지한다.
-이 제한은 `fos-ctx` 1.3.0 이 켜진 profile 에 적용한다. 기존 일반 profile 은 파일 갱신과 gateway reload 를,
+이 제한은 `fos-ctx` 1.4.0 이 켜진 profile 에 적용한다. 기존 일반 profile 은 파일 갱신과 gateway reload 를,
 커넥터는 재설치를 끝낸 뒤 로컬 이미지 거절을 확인해야 한다. hook 이 꺼진 profile 은 막지 못한다.
 
 Control Plane 의 `agent_*` 도구는 이 값으로 부모 실행을 찾고, 서명이 없거나 틀리면 거절한다.
@@ -194,28 +194,46 @@ Hermes 는 자식을 만드는 자리에서 부모 스레드로 이 hook 을 동
 일회용 컨테이너에서 부모 run 이 0.25초에 끝나고 등록이 0.12초에 도착했다.
 등록 로그는 `fos-ctx: 자식 session 을 등록했다 (시도 N)` 이고, 실패하면 상태 코드나 예외 종류만 남는다.
 
-### 연결용 profile 의 커넥터 도구 호출을 묻는다
+### 커넥터 도구 호출을 묻는다
 
-profile 디렉터리에 이름 대응 파일 `.fos-connector-tools.json` 이 있으면 fos-ctx 는 그 profile 을 연결용 profile 로 읽는다.
-그 profile 에서는 커넥터 MCP 도구 호출마다 Control Plane 에 묻고 답대로 한다.
+profile 디렉터리에 이름 대응 파일 `.fos-connector-tools.json` 이 있으면 fos-ctx 는 그 profile 의 커넥터 MCP 도구 호출마다 Control Plane 에 묻고 답대로 한다.
 경로, 본문, 서명, 응답은 [`../docs/backend/connector-tool-policy.md`](../docs/backend/connector-tool-policy.md) 의 「도구 호출 판정」 이 소유한다.
 대응 파일이 없는 profile 에서는 아래 처리를 하지 않는다.
 
-| hook 이 본 것 | 처리 |
-| --- | --- |
-| `skill_manage` | 위와 같이 막는다 |
-| 대응 파일을 읽지 못한다 | `mcp__` 도구와 `execute_code` 를 모두 막는다. Control Plane MCP 의 도구도 막는다. 연결용 profile 일 수 있고, 연결용 profile 에는 Control Plane MCP 가 없기 때문이다. 그 밖의 도구는 건드리지 않는다 |
-| 대응 파일의 서버와 맞는 도구 | 등록 이름이 Control Plane MCP 의 접두사로 시작해도 Control Plane 에 묻는다. `_fos_ctx` 를 붙이지 않는다 |
-| 대응 파일의 어느 서버와도 맞지 않는 Control Plane MCP 의 도구 | 위와 같이 `_fos_ctx` 를 붙인다 |
-| `execute_code` | 막는다. 실행 맥락 없이 도구를 부르는 경로다 |
-| `mcp__` 로 시작하지 않는 도구 | 건드리지 않는다 |
-| `prefix` 가 맞는 서버가 없는 `mcp__` 도구 | 막는다. Control Plane 에 묻지 않는다 |
-| `session_id` 나 `tool_call_id` 가 없거나 인자가 객체가 아니다 | 막는다. Control Plane 에 묻지 않는다 |
-| 직렬화한 인자 글이 UTF-8 로 60KB 를 넘는다 | 막는다. Control Plane 에 묻지 않는다 |
-| 대응 파일에 없는 도구 | `tool` 을 `null` 로 묻는다 |
-| 답이 200 의 `allow` | 통과한다 |
-| 답이 200 의 `block` 이고 글이 있다 | 그 글로 막는다 |
-| 주소나 토큰이 없다, 제한 시간 안에 답이 없다, 200 이 아니다, 답을 읽지 못한다, 예외가 났다 | 정해 둔 글로 막는다 |
+대응 파일의 `isolated` 칸이 profile 의 방식을 정한다. 칸의 뜻은 같은 문서의 「이름 대응」 이 갖는다.
+
+| 방식 | `isolated` | 어떤 profile 인가 |
+| --- | --- | --- |
+| 옛 설치 profile | 없거나 `true` | 커넥터마다 만든 전용 profile. Control Plane MCP 가 없고 커넥터 서버만 있다 |
+| 바인딩 profile | `false` | 일반 에이전트의 profile 에 커넥터를 붙인 것. Control Plane MCP, 내장 도구, 운영자가 넣은 다른 MCP 서버가 함께 있다 |
+
+| hook 이 본 것 | 옛 설치 profile | 바인딩 profile |
+| --- | --- | --- |
+| `skill_manage` | 위와 같이 막는다 | 같다 |
+| 대응 파일을 읽지 못한다. `isolated` 가 boolean 이 아닌 것도 같다 | `mcp__` 도구와 `execute_code` 를 모두 막는다. Control Plane MCP 의 도구도 막는다. 옛 설치 profile 일 수 있고, 그 profile 에는 Control Plane MCP 가 없기 때문이다. 그 밖의 도구는 건드리지 않는다 | 같다 |
+| 대응 파일의 서버와 맞는 도구 | 등록 이름이 Control Plane MCP 의 접두사로 시작해도 Control Plane 에 묻는다. `_fos_ctx` 를 붙이지 않는다 | 같다 |
+| 대응 파일의 어느 서버와도 맞지 않는 Control Plane MCP 의 도구 | 위와 같이 `_fos_ctx` 를 붙인다 | 같다 |
+| `execute_code` | 막는다. 실행 맥락 없이 도구를 부르는 경로다 | 건드리지 않는다. 그 안에서 부른 커넥터 도구는 session 이 없어 아래 규칙으로 막힌다 |
+| `mcp__` 로 시작하지 않는 도구 | 건드리지 않는다 | 같다 |
+| `prefix` 가 맞는 서버가 없는 `mcp__` 도구 | 막는다. Control Plane 에 묻지 않는다 | 건드리지 않는다. 운영자가 넣은 다른 MCP 서버의 도구다 |
+| `session_id` 나 `tool_call_id` 가 없거나 인자가 객체가 아니다 | 막는다. Control Plane 에 묻지 않는다 | 같다 |
+| 직렬화한 인자 글이 UTF-8 로 60KB 를 넘는다 | 막는다. Control Plane 에 묻지 않는다 | 같다 |
+| 대응 파일에 없는 도구 | `tool` 을 `null` 로 묻는다 | 같다. manifest 를 읽지 못해 `tools` 가 빈 서버의 도구도 여기 온다 |
+| 답이 200 의 `allow` | 통과한다 | 같다 |
+| 답이 200 의 `block` 이고 글이 있다 | 그 글로 막는다 | 같다 |
+| 주소나 토큰이 없다, 제한 시간 안에 답이 없다, 200 이 아니다, 답을 읽지 못한다, 예외가 났다 | 정해 둔 글로 막는다 | 같다 |
+
+**바인딩 profile 은 대응 파일에 그 profile 의 모든 커넥터 서버가 실려 있다는 데 기댄다.**
+대응에 없는 `mcp__` 도구를 통과시키므로, 실리지 않은 커넥터 서버가 있으면 그 서버의 도구가 판정 없이 나간다.
+대시보드 plugin 의 바인딩 설치와 떼기가 소유 기록의 모든 서버를 싣고, manifest 를 읽지 못했거나 소유 기록의 서버 이름이나 실행 정의가 지금 manifest 와 다른 서버는 소유 기록의 이름으로 빈 `tools` 와 함께 싣는다.
+뗀 서버도 빈 `tools` 로 남긴다. 떼기 전에 시작한 실행이 그 서버를 쥐고 있어도 그 호출을 묻는다.
+
+**바인딩 profile 의 커넥터 도구 결과는 `<external-data>` 로 감싼다.**
+fos-ctx 의 `transform_tool_result` hook 이 대응 파일의 서버와 맞는 도구의 결과가 글이면 Control Plane 의 `ExternalData` 와 같은 모양으로 바꾼다.
+안내 문장 한 줄, `<external-data>` 줄, 본문, `</external-data>` 줄이다. 본문 안의 닫는 표시는 대소문자와 안쪽 공백에 상관없이 `<\/external-data>` 로 바꾼다.
+오류 글도 감싼다. 판정이 막은 호출은 이 hook 에 닿지 않으므로 여기 닿은 오류 글은 커넥터 서버가 낸 것이다.
+글이 아닌 결과, 다른 도구, 옛 설치 profile 은 바꾸지 않는다. 대응 파일을 읽지 못하거나 예외가 나면 바꾸지 않고, Hermes 의 `<untrusted_tool_result>` 감싸기만 남는다.
+Hermes 가 이 hook 을 언제 부르는지는 [`../docs/hermes/connector-policy.md`](../docs/hermes/connector-policy.md) 의 「도구 결과를 바꾸는 hook」 이 갖는다.
 
 hook 은 등록 이름이 대응 파일의 `tools` 에 있는 서버를 먼저 고르고, 없을 때만 `prefix` 가 맞는 서버를 고른다. `prefix` 가 여럿 맞으면 가장 긴 것을 고른다.
 서버 이름이 다른 서버 이름의 앞부분일 때 원래 도구 이름을 엉뚱한 서버에서 찾지 않게 한다.
@@ -234,7 +252,7 @@ Hermes 가 보이는 도구 이름은 `mcp__fos_assistant__<도구>` 다. 서버
 서명에는 앞부분을 뗀 서버 쪽 이름을 넣는다. 서버 이름을 바꾸면 plugin 의 `TOOL_PREFIX` 도 함께 바꾼다.
 
 **서명은 그 profile 의 모델이 셸로 파일을 읽지 못하는 동안만 위조를 막는다.**
-key 는 그 profile `.env` 의 MCP 토큰에서 나온다. terminal backend 가 `local` 이면 terminal 도구는 Hermes 프로세스의 사용자가 읽을 수 있는 파일을 모두 읽는다. docker 실행 공간이 적용된 profile 은 [실행 공간](../docs/hermes/sandbox.md) 이 갖는다. 스킬 앞머리의 비밀 요청 칸이 그 토큰을 실행 공간에 넣을 수 있어 올린 스킬은 그 칸을 거절한다.
+key 는 그 profile `.env` 의 MCP 토큰에서 나온다. terminal backend 가 `local` 이면 terminal 도구는 Hermes 프로세스의 사용자가 읽을 수 있는 파일을 모두 읽는다. docker 실행 공간이 적용된 profile 은 [실행 공간](../docs/hermes/sandbox.md) 이 갖는다. 스킬 앞머리의 비밀 요청 칸이 그 토큰을 실행 공간에 넣을 수 있어 올린 스킬과 커넥터 스킬은 그 칸을 거절한다.
 셸을 여는 profile 의 목록은 운영 저장소의 live 검사가 소유한다.
 그 목록에 Control Plane MCP 를 등록한 profile 을 더할 때는 이 제약을 함께 판단한다.
 
@@ -250,14 +268,17 @@ Control Plane 이 이 경로들을 부르는 순서와 뜻은 부르는 쪽 문�
 | `DELETE /api/profiles/<이름>` | 관리 표식이 있는 profile 을 지운다 | 없음 | 200 | 401 관리 표식이 없는 profile. 404 없는 profile. 두 번째 호출의 404 는 「이미 지움」 으로 읽는다 |
 | `PUT /api/env` | 그 profile 의 `.env` 에 정해 둔 key 한 줄을 쓴다 | `{profile, key, value}`. key 는 `API_SERVER_KEY`, `API_SERVER_MODEL_NAME`, `MCP_FOS_ASSISTANT_API_KEY` 와 카탈로그 커넥터의 `fields[].env` 뿐 | 200. 커넥터 key 는 `{profile, key, restart_required}` | 400 다른 key, `default`, 형식. 404 없는 profile |
 | `DELETE /api/env` | 관리 profile 의 커넥터 칸 key 만 지운다 | `{profile, key}` | `{profile, key, restart_required}` | |
-| `GET /api/connectors/catalog` | 운영 목록에 있고 검증을 통과한 커넥터의 manifest 를 낸다 | 없음 | `[{id, schema, title, description, fields[], verify, mcp_server, toolsets, attachments, tools}]`. 아래 「카탈로그 응답」 이 칸을 갖는다 | |
-| `POST /api/connectors/<id>/call` | 후보 값으로 그 커넥터의 선택지 도구나 확인 도구를 한 번 부른다 | `{tool, values}` | `{ok: true, result}` 또는 `{ok: false, error: <공통 어휘>}` | |
+| `GET /api/connectors/catalog` | 운영 목록에 있고 검증을 통과한 커넥터의 manifest 를 낸다 | 없음 | `[{id, schema, title, description, fields[], verify, mcp_server, toolsets, attachments, tools, skills}]`. 아래 「카탈로그 응답」 이 칸을 갖는다 | |
+| `POST /api/connectors/<id>/call` | 후보 값이나 보관 파일의 값으로 그 커넥터의 선택지 도구나 확인 도구를 한 번 부른다 | `{tool, values}` 또는 `{tool, vault}`. 둘 가운데 정확히 하나다 | `{ok: true, result}` 또는 `{ok: false, error: <공통 어휘>}` | 400 그 커넥터의 보관 파일이 없다 |
 | `POST /api/connectors/<id>/execute` | Control Plane 이 승인한 호출을 그 profile 의 값과 받은 인자로 한 번 실행한다 | `{profile, hermes_tool, args}` | `{ok: true, result}` 또는 `{ok: false, error: <공통 어휘>}` | 504 실행됐는지 모른다 |
-| `GET /api/connectors?profile=<p>` | 커넥터의 상태를 읽는다 | query `profile` | `{profile, policy_hook, connectors: [{plugin, enabled, configured}]}` | |
-| `PUT /api/connectors` | 관리 profile 에 커넥터를 설치하고 제거한다 | `{profile, plugin, enabled, sandbox_owner?}`. 사진 도구를 여는 설치는 정책 profile 의 `sandbox_owner` 가 필요하다 | `{profile, plugin, enabled, changed, restart_required, plugin_updated}`. 설치는 서버 등록과 함께 그 profile 의 API 도구 목록과 `SOUL.md` 를 다시 쓴다 | 409 사진 도구에 실행 공간 정책이나 등록 profile 이 없다 |
+| `GET /api/connectors?profile=<p>` | 커넥터의 상태를 읽는다 | query `profile` | `{profile, policy_hook, connectors: [{plugin, enabled, configured, mode}]}`. `mode` 는 `bind` 나 `isolated` 다 | 401 관리 표식과 커넥터 표식이 모두 없다 |
+| `PUT /api/connectors` | profile 에 커넥터를 설치하고 제거한다 | `{profile, plugin, enabled, sandbox_owner?}`. 바인딩 설치는 `bind: {vault}` 를 더한다. 사진 도구를 여는 옛 설치는 정책 profile 의 `sandbox_owner` 가 필요하다 | `{profile, plugin, enabled, changed, restart_required, plugin_updated}`. 옛 설치는 서버 등록과 함께 그 profile 의 API 도구 목록과 `SOUL.md` 를 다시 쓴다. 바인딩 설치는 서버 이름만 더하고 뺀다 | 400 보관 파일이 없거나 다른 커넥터의 것이다. 401 표식. 409 운영자 설정과 충돌한다, 사진 도구에 실행 공간 정책이나 등록 profile 이 없다 |
+| `PUT /api/connector-vault` | 연결의 칸 값을 보관 파일 하나에 쓴다 | `{vault, connector, values}`. `values` 는 `fields[].key` 를 키로 한 값이다 | `{ok: true}` | 400 형식, 운영 목록에 없는 커넥터, 칸 선언과 맞지 않는 값. 409 같은 이름의 보관 파일이 다른 커넥터의 것이다 |
+| `DELETE /api/connector-vault` | 보관 파일 하나를 지운다 | `{vault}` | `{changed}`. 없었으면 `false` 다 | 400 형식 |
+| `POST /api/connector-vault/import` | 그 커넥터를 옛 설치한 관리 profile 의 `.env` 에서 칸 값을 보관 파일로 옮긴다 | `{vault, connector, profile}` | `{ok: true}` | 400 필수 칸이 비었다. 401 관리 표식이 없다. 404 없는 profile, 설치하지 않은 커넥터. 409 다른 커넥터의 보관 파일 |
 | `POST /api/mcp/servers/<서버>/test?profile=<p>` | 그 profile 에 설치한 커넥터의 MCP 서버만 probe 한다 | 없음 | `{ok, tools: [{name}]}` | |
 | `GET /api/tools/toolsets` | 도구 이름과 설명을 읽는다 | 없음 | 200 | |
-| `PUT /api/config` (도구) | 지정한 profile 의 API 도구 목록을 쓴다. `terminal`, `file`, `code_execution`, `vision`, `image_gen`, `video_gen` 가운데 하나라도 있으면 profile 의 `terminal:` 을 실행 공간 설정으로 다시 쓴다 | `{profile, config: {platform_toolsets: {api_server: [...]}}, sandbox_owner?}`. `sandbox_owner` 는 `^[a-z][a-z0-9-]{0,63}$` 이고 실행 공간 도구를 켜는 등록 profile 에서 필수다 | 200 | [ADR-029](../docs/adr/ADR-029-에이전트-도구는-control-plane-이-등급으로-판정하고-hermes-설정-api-로-쓴다.md) 그대로 |
+| `PUT /api/config` (도구) | 지정한 profile 의 API 도구 목록을 쓴다. `terminal`, `file`, `code_execution`, `vision`, `image_gen`, `video_gen` 가운데 하나라도 있으면 profile 의 `terminal:` 을 실행 공간 설정으로 다시 쓴다 | `{profile, config: {platform_toolsets: {api_server: [...]}}, sandbox_owner?}`. `sandbox_owner` 는 `^[a-z][a-z0-9-]{0,63}$` 이고 실행 공간 도구를 켜는 등록 profile 에서 필수다 | 200 | [ADR-029](../docs/adr/ADR-029-에이전트-도구는-control-plane-이-등급으로-판정하고-hermes-설정-api-로-쓴다.md) 그대로. 409 소유 기록의 바인딩 서버 이름이 목록에 빠졌다 |
 | `PUT /api/config` (스킬 게시) | 지정한 profile 의 올린 스킬 경로를 쓴다 | `{profile, config: {skills: {external_dirs: [<Hermes 쪽 스킬 루트>/<profile>/<버전>]}}}`. 버전 이름은 `v[0-9]{13}-[a-z0-9]{4}` 다(`v` 뒤에 UTC 밀리초 13자리와 소문자 영숫자 4자). 목록은 0개나 1개. 0개는 게시 해제. 도구 목록을 같은 본문에 둘 수 있다 | 200 | 400 경로 형식, 다른 profile 의 prefix, 둘 이상, 심볼릭 링크, 없는 디렉터리, `skills` 도구가 꺼진 채 게시. 409 운영자가 넣은 다른 외부 경로가 있다. 404 없는 profile |
 | `GET /api/skills?profile=<p>` | 지정한 profile 의 스킬 목록을 읽는다 | query `profile` 하나 | 200 `[{name, description, category, enabled, usage, provenance}]`. `enabled` 는 전역 `skills.disabled` 만 반영 | 400 query 누락, 둘 이상, `default`. 404 |
 | `PUT /api/skills/toggle` | 지정한 profile 의 스킬 하나를 켜고 끈다 | `{profile, name, enabled}` | 200 `{ok, name, enabled}` | 400, 404 |
@@ -297,6 +318,8 @@ API server 의 session 응답은 provider 를 주지 않는다. 그 값은 Herme
 `toolsets` 와 `attachments` 는 manifest 에 없으면 빈 목록과 거짓이다. 옛 대시보드 plugin 은 두 칸을 내지 않고, Control Plane 은 없는 칸을 같은 기본값으로 읽는다.
 `tools` 는 `{<이름>: {risk, approval, title, grant, outbound}}` 이고 `approval`, `grant`, `outbound` 는 기본값을 채운 값이다. `schema: 1` 은 `verify.tool` 과 `options.tool` 만 `READ` 로 담는다.
 `schema` 가 없는 응답은 `1` 로 읽는다. `operator_env` 의 이름과 값, `errors` 는 담지 않는다.
+`skills` 는 바인딩 설치가 profile 에 복사할 스킬의 이름 목록이고 이름 순이다. 이름은 `SKILL.md` 앞머리의 `name` 이고, 없으면 디렉터리 이름이다. 본문은 담지 않는다.
+`fields` 가 빈 목록인 커넥터도 받는다. 값을 받지 않는 일반 MCP 서버다.
 
 **`POST /api/profiles` 는 틀을 쓰지 못하면 만든 것을 지운다.**
 본문은 `name`, `no_skills`, `description` 만 받는다. `clone_from` 은 다른 profile 의 `.env` 를 끌어오므로 400 이다.
@@ -368,7 +391,7 @@ provider credential 은 이 토큰으로 쓰지 못한다.
 
 **`POST /api/connectors/<id>/execute` 는 Control Plane 이 승인한 호출만 부른다. 대시보드는 승인 여부를 다시 확인하지 않는다.**
 
-- 그 profile 에 관리 표식과 그 커넥터의 소유 기록이 있어야 한다. 자식의 env 는 그 profile `.env` 의 칸 값과 운영 목록의 `env` 다
+- 그 profile 에 관리 표식이나 커넥터 표식과 그 커넥터의 소유 기록이 있어야 한다. 커넥터 표식만 있는 profile 은 소유 기록의 그 항목이 바인딩 설치여야 한다. 자식의 env 는 그 profile `.env` 의 칸 값과 운영 목록의 `env` 다
 - 인자와 결과를 로그에 싣지 않는다
 - 실행되지 않은 것이 분명한 실패는 `{ok: false}` 로, 시간 초과와 도구 호출을 보낸 뒤의 실패는 504 로 답한다. 504 는 실행됐는지 모른다는 뜻이다
 - 도구가 `errors` 표에서 `outcome_unknown` 인 코드로 실패해도 504 로 답한다. `call` 에서는 그 코드를 `unavailable` 로 돌려준다
@@ -384,7 +407,31 @@ provider credential 은 이 토큰으로 쓰지 못한다.
 
 운영 목록에서 빠진 커넥터를 제거하면 plugin 이 그 기록의 서버 env 가 `${이름}` 으로 참조하던 key 를 profile `.env` 에서 함께 지운다. Control Plane 이 그 이름을 더는 알 수 없기 때문이다.
 값이 바뀌어 503 이 된 profile 은 값을 되돌리면 다시 읽힌다.
+바인딩 항목은 요청이 가리키는 커넥터의 것만 견준다. 상태 조회는 바뀐 바인딩 항목만 `configured: false` 로 답하고, 같은 profile 의 다른 커넥터는 probe 와 실행과 붙이기가 그대로 된다. 떼기는 바인딩 항목을 견주지 않는다.
 **운영은 환경 변수를 먼저 준 뒤 plugin 을 올린다.** 값을 바꿔야 하면 바꾸기 전에 설치한 커넥터를 제거한다.
+
+**설치는 두 가지다.** 소유 기록 항목의 `mode` 가 방식을 적는다. 칸이 없으면 옛 설치다.
+한 profile 에 두 방식을 섞지 않는다. 섞으려는 설치는 409 다. 옛 설치는 Control Plane MCP 등록을 지우는데 바인딩 설치는 그 등록이 있어야 하기 때문이다.
+
+| | 옛 설치(`isolated`) | 바인딩 설치(`bind`) |
+| --- | --- | --- |
+| 받는 profile | 관리 표식이 있는 profile | 관리 표식이나 커넥터 표식이 있고, `platform_toolsets.api_server` 목록에 Control Plane MCP 가 있고, `fos-ctx` 가 켜진 profile |
+| 칸 값 | Control Plane 이 `PUT /api/env` 로 그 profile `.env` 에 쓴다 | 설치가 보관 파일의 값을 그 profile `.env` 로 복사한다 |
+| API 도구 목록 | 설치한 커넥터의 서버 이름과 선언한 `toolsets` 로 통째로 다시 쓴다 | 서버 이름만 더하고 뺀다. 다른 이름은 그대로 둔다 |
+| Control Plane MCP 등록 | 지운다 | 그대로 둔다 |
+| 지침 | 스킬 본문을 `SOUL.md` 에 쓴다 | 스킬 디렉터리를 그 profile 의 `skills/` 로 복사한다. `SOUL.md` 는 읽지도 쓰지도 않는다 |
+| 대응 파일 | `isolated` 칸 없이 쓴다 | `isolated: false` 를 싣고 소유 기록의 모든 서버와 뗀 서버 기록 `.fos-connector-detached.json` 의 서버를 싣는다 |
+| 설치의 `restart_required` | 지금과 같다 | 바뀐 것이 있으면 참이다. 떠 있는 profile 에 더한 MCP 서버는 gateway 를 다시 띄워야 보인다 |
+| 떼기의 `restart_required` | 지금과 같다 | 거짓이다. 도구 목록에서 이름을 빼므로 다음 실행부터 막힌다. 떼기 전에 시작한 실행의 호출은 대응에 남은 서버로 판정이 막는다 |
+
+**보관 파일은 연결의 칸 값을 연결마다 하나씩 둔다.**
+대시보드의 HERMES_HOME 아래 `connector-vault/<vault>.json` 이고, 디렉터리는 700, 파일은 600 이다.
+`vault` 는 `^c[1-9][0-9]{0,18}$` 이다. Control Plane 의 연결 번호 앞에 `c` 를 붙인 것이다.
+본문은 `{"v": 1, "connector": "<id>", "values": {"<field key>": "<값>"}}` 이고, 빈 선택 칸은 넣지 않는다. 칸이 없는 커넥터는 빈 `values` 다.
+값과 경로는 응답, 로그, 예외 메시지, 설정 백업에 싣지 않는다. 쓰기와 지우기는 profile 쓰기 잠금 안에서 하고, 바인딩 설치도 같은 잠금 안에서 보관 파일을 읽는다.
+
+**커넥터 표식 `.fos-connector-host` 는 사람이 만든 profile 이 바인딩 설치를 받는다는 표시다.**
+운영자가 그 profile 에 두고 plugin 은 쓰지 않는다. 표식만 있는 profile 은 바인딩 설치와 떼기, 상태 조회, probe, 바인딩 항목의 실행만 받는다. 소유 기록에 없는 커넥터의 떼기도 바인딩 떼기로 받아 `changed: false` 로 답한다. 옛 설치와 커넥터 칸 key 의 `PUT /api/env`, `DELETE /api/env` 는 401 이다. 바인딩의 env 는 설치와 떼기가 쓰고 지운다.
 
 설치와 제거는 Hermes 등록 이름과 원래 도구 이름의 대응을 그 profile 의 `.fos-connector-tools.json` 에 다시 쓰고, 설치는 `approval: always` 인 도구를 서버 정의의 `tools.exclude` 에 넣고 profile 의 `fos-ctx` 를 묶음의 판으로 맞춘 뒤 파일이 바뀌었는지를 `plugin_updated` 로 답한다.
 `GET /api/connectors` 는 `policy_hook` 을 함께 낸다. `fos-ctx` 가 켜져 있고 묶음의 판과 같고 대응 파일과 `tools.exclude` 가 지금 manifest 와 맞을 때만 참이며, 조건은 [커넥터 도구 정책](../docs/backend/connector-tool-policy.md) 의 「hook 이 켜져 있는지」 가 갖는다.

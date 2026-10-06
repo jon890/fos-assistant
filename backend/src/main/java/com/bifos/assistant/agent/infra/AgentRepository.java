@@ -26,6 +26,15 @@ public interface AgentRepository extends JpaRepository<Agent, Long> {
     @Query("select a from Agent a where a.id = :id")
     Optional<Agent> findByIdForUpdate(@Param("id") Long id);
 
+    /**
+     * 번호로 에이전트의 id 만 읽는다. 행을 영속성 문맥에 올리지 않는다.
+     *
+     * <p>{@link #findByIdForUpdate} 로 잠금을 기다려 처음 읽어야 할 때 쓴다. 엔티티를 먼저 읽어 두면 잠금을 기다린 뒤에도
+     * 그 앞에 읽은 값이 남아 다른 요청이 커밋한 값을 보지 못한다.
+     */
+    @Query("select a.id from Agent a where a.code = :code")
+    Optional<Long> findIdByCode(@Param("code") String code);
+
     /** 도구와 공개 범위 변경은 경합하면 곧바로 거절해 오래 기다리지 않는다. */
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @QueryHints(@QueryHint(name = "jakarta.persistence.lock.timeout", value = "0"))

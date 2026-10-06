@@ -109,6 +109,10 @@ export type FakeHermesControl = {
   /** 동시 실행 한도에 닿아 실행 제출을 429 로 거절하게 한다. */
   busy(): Promise<void>;
   clearBusy(): Promise<void>;
+  /** 준비 상태의 toolset 조회를 실제 Hermes 장애처럼 실패하게 한다. */
+  setReadinessOutage(
+    outage: "busy" | "unavailable" | "timeout" | undefined,
+  ): Promise<void>;
   /** 다음 살펴보기 실행의 마지막 답 글을 정한다. 한 번 쓰면 그 뒤 살펴보기는 기본 답으로 돌아간다. */
   setProactiveOutput(output: string): Promise<void>;
   /** 마지막 실행 요청이 실어 온 provider, 모델, effort 다. 싣지 않은 칸은 빠진다. */
@@ -139,6 +143,14 @@ async function fakeHermesControl(): Promise<FakeHermesControl> {
       call("/__test/clear-blocked-providers", "POST"),
     busy: () => call("/__test/busy", "POST"),
     clearBusy: () => call("/__test/clear-busy", "POST"),
+    setReadinessOutage: async (outage) => {
+      const response = await fetch(`${baseUrl}/__test/readiness-outage`, {
+        method: "POST",
+        body: JSON.stringify(outage === undefined ? {} : { outage }),
+      });
+      if (!response.ok)
+        throw new Error(`가짜 Hermes 제어 요청이 실패했다: ${response.status}`);
+    },
     setProactiveOutput: async (output: string) => {
       const response = await fetch(`${baseUrl}/__test/proactive-output`, {
         method: "POST",
@@ -200,9 +212,10 @@ export async function setAgentVisibility(
   }
 }
 
-async function connectorCall(
+/** 그 사용자의 메일로 서명한 Control Plane 토큰으로 경로 하나를 부른다. */
+async function callAs(
   email: string,
-  method: "POST" | "DELETE",
+  method: "POST" | "PUT" | "DELETE",
   path: string,
   body?: unknown,
 ): Promise<Response> {
@@ -212,23 +225,35 @@ async function connectorCall(
     .setIssuedAt()
     .setExpirationTime("2m")
     .sign(new TextEncoder().encode(JWT_SECRET));
-  return fetch(
-    `${CONTROL_PLANE_BASE_URL}/api/v1/connections/${DEMO_CONNECTOR.id}${path}`,
-    {
-      method,
-      headers: {
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "application/json",
-      },
-      body: body === undefined ? undefined : JSON.stringify(body),
+  return fetch(`${CONTROL_PLANE_BASE_URL}${path}`, {
+    method,
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
     },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
+}
+
+function connectorCall(
+  email: string,
+  method: "POST" | "DELETE",
+  path: string,
+  body?: unknown,
+): Promise<Response> {
+  return callAs(
+    email,
+    method,
+    `/api/v1/connections/${DEMO_CONNECTOR.id}${path}`,
+    body,
   );
 }
 
 /**
- * 그 사용자로 시험 커넥터를 등록하고 확인해 `READY` 로 만든다. 만들어진 커넥터 에이전트의 코드를 돌려준다.
+ * 그 사용자로 시험 커넥터를 등록하고 확인해 `READY` 로 만든다. 연결의 상태를 돌려준다.
  *
- * <p>커넥터 호출에는 사용자별 동시 1개 제한이 있어 등록과 확인을 차례로 보낸다.
+ * <p>연결 등록은 에이전트를 만들지 않는다. 에이전트에 붙이는 것은 `bindDemoConnector` 가 한다.
+ * 커넥터 호출에는 사용자별 동시 1개 제한이 있어 등록과 확인을 차례로 보낸다.
  */
 export async function connectDemoConnector(email: string): Promise<string> {
   const registered = await connectorCall(email, "POST", "", {
@@ -243,23 +268,64 @@ export async function connectDemoConnector(email: string): Promise<string> {
     throw new Error(
       `시험 커넥터를 확인하지 못했다: ${checked.status} ${await checked.text()}`,
     );
-  const view = (await checked.json()) as {
-    status: string;
-    agentCode: string | null;
-  };
-  if (view.status !== "READY" || !view.agentCode) {
+  const view = (await checked.json()) as { status: string };
+  if (view.status !== "READY") {
     throw new Error(`시험 커넥터가 READY 가 아니다: ${view.status}`);
   }
-  return view.agentCode;
+  return view.status;
 }
 
-/** 그 사용자의 시험 커넥터 연결을 해제한다. */
+/** 그 사용자의 시험 커넥터 연결을 해제한다. 붙은 에이전트에서도 모두 뗀다. */
 export async function disconnectDemoConnector(email: string): Promise<void> {
   const response = await connectorCall(email, "DELETE", "");
   if (!response.ok)
     throw new Error(
       `시험 커넥터를 해제하지 못했다: ${response.status} ${await response.text()}`,
     );
+}
+
+/** 그 사용자의 시험 커넥터 연결을 그 사용자의 에이전트에 붙인다. 붙인 줄의 상태를 돌려준다. */
+export async function bindDemoConnector(
+  email: string,
+  agentCode: string,
+): Promise<{ bound: boolean; status: string | null; restartRequired: boolean }> {
+  const response = await callAs(
+    email,
+    "PUT",
+    `/api/v1/agents/${agentCode}/connections/${DEMO_CONNECTOR.id}`,
+  );
+  if (!response.ok)
+    throw new Error(
+      `시험 커넥터를 붙이지 못했다: ${agentCode} ${response.status} ${await response.text()}`,
+    );
+  return (await response.json()) as {
+    bound: boolean;
+    status: string | null;
+    restartRequired: boolean;
+  };
+}
+
+/**
+ * 그 사용자의 예전 방식 연결 에이전트를 만들고 에이전트 번호(화면 주소의 코드)를 돌려준다.
+ *
+ * <p>연결 등록은 더는 이런 에이전트를 만들지 않으므로 검사에서만 뜨는 경로로 만든다. 그 사용자의 시험 커넥터 연결도
+ * `READY` 가 된다. 검사가 끝나면 에이전트를 지우고 연결을 해제한다.
+ */
+export async function createLegacyConnectorAgent(email: string): Promise<string> {
+  const response = await callAs(
+    email,
+    "POST",
+    "/api/v1/test-support/connector/legacy-agent",
+    { email, connectorId: DEMO_CONNECTOR.id },
+  );
+  if (!response.ok)
+    throw new Error(
+      `예전 방식의 연결 에이전트를 만들지 못했다: ${response.status} ${await response.text()}`,
+    );
+  const { code } = (await response.json()) as { code?: unknown };
+  if (typeof code !== "string")
+    throw new Error("예전 방식의 연결 에이전트 번호가 없다");
+  return code;
 }
 
 export async function setSession(
@@ -554,6 +620,8 @@ function startControlPlane(
       ASSISTANT_SKILL_AGENT_ROOT: skillRoot,
       HERMES_DASHBOARD_BASE_URL: dashboardBaseUrl,
       HERMES_DASHBOARD_TOKEN: FAKE_DASHBOARD_TOKEN,
+      // 장애 시험의 11초 지연이 실제 읽기 timeout 을 넘도록 시험 서버의 한도를 명시한다.
+      HERMES_READ_TIMEOUT: "10s",
       // 띄운 대역이 실행마다 빈 포트를 받아 쓰므로 고정값으로 적을 수 없다. 실제 주소를 넘긴다.
       HERMES_SHARED_LISTENER_BASE_URL: dashboardBaseUrl,
       ASSISTANT_PRICING_CATALOG: join(

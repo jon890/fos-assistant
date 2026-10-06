@@ -42,6 +42,10 @@ const CONNECTOR_CATALOG_PATH = "/api/connectors/catalog";
 const CONNECTOR_CALL_PATH = /^\/api\/connectors\/([a-z0-9-]+)\/call$/;
 const CONNECTOR_EXECUTE_PATH = /^\/api\/connectors\/([a-z0-9-]+)\/execute$/;
 const CONNECTORS_PATH = "/api/connectors";
+/** 연결의 칸 값을 연결마다 하나씩 두는 보관 파일 경로다. 이름 규칙은 plugin 과 같다. */
+const CONNECTOR_VAULT_PATH = "/api/connector-vault";
+const CONNECTOR_VAULT_IMPORT_PATH = "/api/connector-vault/import";
+const VAULT_NAME = /^c[1-9][0-9]{0,18}$/;
 const MCP_SERVER_TEST_PATH = /^\/api\/mcp\/servers\/([a-z0-9-]+)\/test$/;
 /** 대시보드의 스킬 목록과 전역 켜고 끄기 경로다. */
 const SKILLS_PATH = "/api/skills";
@@ -74,6 +78,8 @@ const TEST_HOLD_NEXT_SOUL_PATH = "/__test/hold-next-soul";
 const TEST_RELEASE_HELD_SOUL_PATH = "/__test/release-held-soul";
 const TEST_BUSY_PATH = "/__test/busy";
 const TEST_CLEAR_BUSY_PATH = "/__test/clear-busy";
+/** 준비 상태가 읽는 API 실행 toolset 조회를 Hermes 장애처럼 실패하게 한다. */
+const TEST_READINESS_OUTAGE_PATH = "/__test/readiness-outage";
 const TEST_HOLD_NEXT_CONFIG_PATH = "/__test/hold-next-config";
 const TEST_RELEASE_HELD_CONFIG_PATH = "/__test/release-held-config";
 /** 켜면 셸 도구가 든 설정 쓰기를 plugin 처럼 409 `sandbox_unavailable` 로 거절한다. 본문은 `{ unavailable: boolean }` 이다. */
@@ -137,10 +143,69 @@ export const DEMO_CONNECTOR = {
     purge_notes: { risk: "DESTRUCTIVE", approval: "always", grant: false, outbound: false },
   },
 };
-/** MCP 서버가 실제로 내는 도구다. `hidden_tool` 은 manifest 가 선언하지 않은 도구다. */
-const DEMO_SERVER_TOOLS = ["list_scopes", "write_note", "purge_notes", "hidden_tool"];
 export const DEMO_TOKEN_OK = "demo_ok_0123456789";
 export const DEMO_TOKEN_BAD = "demo_bad_0123456789";
+
+/**
+ * 대역이 카탈로그로 내는 둘째 시험 커넥터다. 입력 칸이 없어 연결에 값을 받지 않고 확인 도구는 늘 통과한다.
+ *
+ * <p>한 에이전트에 연결 둘을 붙였을 때 도구마다 제 연결로 판정하는지 보는 데 쓴다. 서버 이름이 첫째 커넥터와 다르다.
+ */
+export const AGENDA_CONNECTOR = {
+  id: "demo-agenda",
+  schema: 2,
+  title: "검사용 일정",
+  description: "검사에서만 쓰는 입력 칸 없는 커넥터입니다.",
+  fields: [] as FakeConnectorField[],
+  verify: { tool: "list_events" },
+  mcp_server: "agenda",
+  toolsets: [] as string[],
+  attachments: false,
+  tools: {
+    list_events: { risk: "READ", approval: "none", grant: false, outbound: false },
+    add_event: { risk: "WRITE", approval: "required", title: "일정 쓰기", grant: true, outbound: false },
+  },
+};
+
+/** 대역이 흉내 내는 커넥터 칸이다. 두 시험 커넥터의 선언이 함께 맞는 모양이다. */
+type FakeConnectorField = {
+  key: string;
+  env: string;
+  required: boolean;
+  secret?: boolean;
+  pattern?: string;
+};
+
+/** 대역이 흉내 내는 커넥터 선언이다. 칸, 확인 도구, 서버 이름, 도구 이름만 본다. */
+type FakeConnector = {
+  id: string;
+  fields: readonly FakeConnectorField[];
+  verify: { tool: string };
+  mcp_server: string;
+  toolsets: readonly string[];
+  tools: Record<string, unknown>;
+};
+
+/** 카탈로그에 내는 커넥터들이다. 옛 설치(`isolated`)와 보관 파일 가져오기는 첫째 커넥터만 흉내 낸다. */
+const FAKE_CONNECTORS: readonly FakeConnector[] = [DEMO_CONNECTOR, AGENDA_CONNECTOR];
+
+/** MCP 서버가 실제로 내는 도구다. `hidden_tool` 은 manifest 가 선언하지 않은 도구다. */
+const SERVER_TOOLS: Record<string, string[]> = {
+  [DEMO_CONNECTOR.mcp_server]: ["list_scopes", "write_note", "purge_notes", "hidden_tool"],
+  [AGENDA_CONNECTOR.mcp_server]: ["list_events", "add_event"],
+};
+
+function fakeConnector(id: string | undefined): FakeConnector | undefined {
+  return FAKE_CONNECTORS.find((connector) => connector.id === id);
+}
+
+/** 확인 도구의 답이다. 첫째 커넥터는 토큰을 보고, 칸이 없는 둘째 커넥터는 늘 통과한다. */
+function verifyAnswer(connector: FakeConnector, values: Record<string, string> | undefined): unknown {
+  if (connector.id === AGENDA_CONNECTOR.id) return { ok: true, result: { events: [] } };
+  return values?.token === DEMO_TOKEN_OK
+    ? { ok: true, result: { scopes: [{ id: "a", name: "A" }] } }
+    : { ok: false, error: "credential_rejected" };
+}
 
 /**
  * 대시보드가 기계에게 여는 토큰이다.
@@ -642,6 +707,8 @@ export type FakeHermes = {
   /** 실행 제출을 429 로 거절하게 한다. 공유 gateway 가 한도에 닿은 상태를 흉내 낸다. */
   busy(): void;
   clearBusy(): void;
+  /** 준비 상태의 API 실행 toolset 조회를 429, 503, 또는 읽기 timeout 으로 실패시킨다. */
+  setReadinessOutage(outage: "busy" | "unavailable" | "timeout" | undefined): void;
   /** 실행 제출을 받은 횟수다. 429 뒤에 다시 보내지 않는 것을 이 수로 본다. */
   submitCount(): number;
   /** 대시보드로 만들어져 아직 남아 있는 profile 이름들 */
@@ -656,8 +723,9 @@ export type FakeHermes = {
   apiServerToolsetsOf(name: string): string[] | undefined;
   /**
    * 커넥터 경로로 받은 요청을 받은 순서대로 적은 줄이다. `call <도구>`, `env put <profile> <key>`,
-   * `env delete <profile> <key>`, `toolsets <profile>`, `install <profile> <on|off>`, `probe <profile>` 이다.
-   * 비밀 값은 적지 않는다.
+   * `env delete <profile> <key>`, `toolsets <profile>`, `install <profile> <on|off>`, `probe <profile>`,
+   * `bind <profile>`, `unbind <profile>`, `vault put`, `vault delete`, `vault import <profile>` 이다.
+   * 비밀 값과 보관 파일 이름은 적지 않는다.
    */
   connectorRequests(): readonly string[];
   /**
@@ -673,6 +741,14 @@ export type FakeHermes = {
    * `args` 를 다시 직렬화한 글이다.
    */
   connectorToolCalls(): readonly ConnectorToolCall[];
+  /**
+   * 그 profile 의 실행이 커넥터 도구를 직접 부른 것처럼 줄마다 Control Plane 에 판정을 묻고 답 줄을 돌려준다. 줄과 답의 모양은
+   * `CONNECTOR_TOOL_PROBE` 와 같다. 살펴보기처럼 입력을 정할 수 없는 실행을 붙잡아 둔 동안 시나리오가 그 실행의 모델 역할을
+   * 할 때 쓴다. 사람이 만든 profile 의 `.env` 에는 대역이 아는 MCP 토큰이 없으므로 운영자가 넣었을 토큰을 받는다.
+   */
+  callConnectorTools(profile: string, sessionId: string, lines: readonly string[], token: string): Promise<string>;
+  /** 그 profile 에 바인딩 설치로 붙은 커넥터 id 들이다. 옛 설치는 담지 않는다. */
+  boundConnectorsOf(profile: string): string[];
   holdNextRun(): void;
   /**
    * 값이 있으면 추천 질문이 아닌 새 실행을 제출 시각에서 `ms` 가 지날 때까지 `running` 으로 답하고 그 뒤 `completed`
@@ -780,13 +856,139 @@ export function startFakeHermes(
   const policyHookInstalled = new Set<string>();
   /** 설치해도 정책 hook 이 고쳐지지 않게 둔 profile 이다. */
   const policyHookOff = new Set<string>();
-  const connectorEnvNames = new Set(DEMO_CONNECTOR.fields.map((field) => field.env));
+  const connectorEnvNames = new Set(FAKE_CONNECTORS.flatMap((connector) => connector.fields.map((field) => field.env)));
+  /** 보관 파일 이름과 그 커넥터와 칸 값이다. 값은 메모리에만 두고 어느 응답에도 싣지 않는다. */
+  const vaults = new Map<string, { connector: string; values: Record<string, string> }>();
+  /**
+   * profile 이름과 그 profile 에 바인딩 설치한 커넥터 id 와 보관 파일 이름이다.
+   *
+   * <p>`installedConnectors` 는 옛 설치(소유 기록의 `isolated`)만 갖는다. 한 profile 에 두 방식이 함께 있지 않다.
+   */
+  const boundConnectors = new Map<string, Map<string, string>>();
+  /** 대시보드로 만들지 않은 profile 의 `.env` 다. 바인딩 설치가 칸 값을 여기 쓴다. */
+  const hostEnv = new Map<string, Record<string, string>>();
+  /** 그 profile 의 `.env` 다. 대시보드로 만든 profile 은 `profiles` 의 것을 쓴다. */
+  const envOf = (profile: string): Record<string, string> => {
+    const managed = profiles.get(profile);
+    if (managed !== undefined) return managed;
+    const host = hostEnv.get(profile) ?? {};
+    hostEnv.set(profile, host);
+    return host;
+  };
+  /** 그 profile 에 바인딩 설치한 커넥터의 MCP 서버 이름이다. 도구 목록을 쓰는 요청이 이 이름을 모두 실어야 한다. */
+  const boundServers = (profile: string): string[] =>
+    [...(boundConnectors.get(profile)?.keys() ?? [])].flatMap((id) => fakeConnector(id)?.mcp_server ?? []);
+  /** 그 커넥터의 칸 선언과 맞는 값인가. 모르는 키, 필수 칸 누락, `pattern` 위반, 두 줄 이상인 값은 받지 않는다. */
+  const vaultValuesValid = (connector: FakeConnector, values: unknown): values is Record<string, string> => {
+    if (typeof values !== "object" || values === null || Array.isArray(values)) return false;
+    const given = values as Record<string, unknown>;
+    const declared = new Set(connector.fields.map((field) => field.key));
+    if (Object.entries(given).some(([key, value]) =>
+      !declared.has(key) || typeof value !== "string" || value === "" || value.includes("\n"))) {
+      return false;
+    }
+    return connector.fields.every((field) => {
+      const value = given[field.key] as string | undefined;
+      if (value === undefined) return !field.required;
+      return field.pattern === undefined || new RegExp(field.pattern).test(value);
+    });
+  };
+
+  /**
+   * `PUT /api/connectors` 의 바인딩 설치와 그 떼기다. 받는 조건과 바꾸는 것은 `docs/backend/connector-install.md` 의
+   * 「바인딩 설치」 를 따른다.
+   *
+   * <p>붙이기는 보관 파일의 값을 그 profile 의 `.env` 에 쓰고 서버 이름을 API 도구 목록에 더한다. 있던 이름은 그대로 둔다.
+   * 바뀐 것이 있으면 `restart_required` 가 참이다. 떠 있는 profile 에 더한 MCP 서버는 재시작해야 보이기 때문이다. 떼기는 그
+   * 이름만 빼고 env 를 지우며 재시작을 요구하지 않는다. 스킬 복사는 흉내 내지 않는다. 시험 커넥터에 스킬이 없다.
+   */
+  const bindingInstall = (
+    response: ServerResponse,
+    profile: string,
+    plugin: string,
+    enabled: boolean,
+    bind: { vault?: unknown } | undefined,
+  ) => {
+    if (!profiles.has(profile) && keys[profile] === undefined) {
+      send(response, 401, { reason: "not_marked" });
+      return;
+    }
+    const answer = (changed: boolean, restartRequired: boolean) => send(response, 200, {
+      profile, plugin, enabled, changed, restart_required: restartRequired, plugin_updated: false,
+    });
+    const bound = boundConnectors.get(profile) ?? new Map<string, string>();
+    const toolsets = apiServerToolsets.get(profile);
+    const connector = fakeConnector(plugin);
+    if (!enabled) {
+      if (bind !== undefined) {
+        send(response, 400, { error: "invalid connector request" });
+        return;
+      }
+      connectorRequests.push(`unbind ${profile}`);
+      // 카탈로그에 없는 커넥터도 실제 대시보드는 소유 기록만 보고 뗀다. 이 대역은 그 기록만 지운다.
+      if (connector === undefined) {
+        answer(bound.delete(plugin), false);
+        return;
+      }
+      // 그 profile 에 붙지 않은 커넥터는 뗄 것이 없다. 실제 대시보드처럼 아무것도 바꾸지 않고 바뀐 것 없이 답한다.
+      if (!bound.delete(plugin)) {
+        answer(false, false);
+        return;
+      }
+      const env = envOf(profile);
+      for (const field of connector.fields) delete env[field.env];
+      if (toolsets !== undefined) {
+        apiServerToolsets.set(profile, toolsets.filter((name) => name !== connector.mcp_server));
+      }
+      answer(true, false);
+      return;
+    }
+    // 바인딩 항목이 있는 profile 은 옛 설치를 받지 않는다.
+    if (bind === undefined) {
+      send(response, 409, { error: "this profile has bound connectors" });
+      return;
+    }
+    const stored = typeof bind.vault === "string" ? vaults.get(bind.vault) : undefined;
+    if (connector === undefined || stored === undefined || stored.connector !== plugin) {
+      send(response, 400, { error: "no such vault for this connector" });
+      return;
+    }
+    // 도구 목록이 없거나 Control Plane MCP 가 없는 목록, 어느 커넥터든 옛 설치가 있는 profile 은 파일을 하나도 바꾸지 않고 거절한다.
+    if (toolsets === undefined || !toolsets.includes(CONTROL_PLANE_MCP)
+        || (installedConnectors.get(profile)?.size ?? 0) > 0) {
+      send(response, 409, { error: "the profile conflicts with this connector" });
+      return;
+    }
+    // 정책 hook 이 꺼진 profile 에는 새로 붙이지 않는다. 이미 붙은 커넥터를 다시 설치하는 것은 받고 hook 상태로 PENDING 에 남는다.
+    if (!bound.has(plugin) && policyHookOff.has(profile)) {
+      send(response, 409, { error: "the policy hook plugin is not enabled" });
+      return;
+    }
+    const env = envOf(profile);
+    let changed = bound.get(plugin) !== bind.vault;
+    for (const field of connector.fields) {
+      const value = stored.values[field.key];
+      if (env[field.env] !== value) changed = true;
+      if (value === undefined) delete env[field.env];
+      else env[field.env] = value;
+    }
+    const next = toolsets.filter((name) => name !== "no_mcp");
+    if (!next.includes(connector.mcp_server)) next.push(connector.mcp_server);
+    if (next.join() !== toolsets.join()) changed = true;
+    apiServerToolsets.set(profile, next);
+    bound.set(plugin, bind.vault as string);
+    boundConnectors.set(profile, bound);
+    policyHookInstalled.add(profile);
+    connectorRequests.push(`bind ${profile}`);
+    answer(changed, changed);
+  };
   /** profile 이름과 전역으로 끈 스킬 이름들이다. */
   const disabledSkills = new Map<string, Set<string>>();
   const blockedProviders = new Set<string>();
   /** 입력 글과 그 입력의 대본이다. */
   const scripts = new Map<string, DemoScript>();
   let busy = false;
+  let readinessOutage: "busy" | "unavailable" | "timeout" | undefined;
   let submitCount = 0;
   let modelOptionsCalls = 0;
   let lastSubmittedRuntime: { provider?: string; model?: string; reasoningEffort?: string } = {};
@@ -830,6 +1032,8 @@ export function startFakeHermes(
   const subagentRegistrations: { childSessionId: string; rootSessionId: string; status: number }[] = [];
   let connectorPolicyEndpoint: string | undefined;
   const connectorToolCalls: ConnectorToolCall[] = [];
+  /** `callConnectorTools` 를 부른 횟수다. 도구 호출 id 를 부를 때마다 다르게 만든다. */
+  let directConnectorCalls = 0;
   /** 다음 살펴보기 실행의 각본이다. 살펴보기 실행 하나가 가져간다. */
   let proactiveScript: ProactiveScript | undefined;
   /** `waitBeforeEvents` 각본이 기다리는 자리와 그것을 푸는 함수다. 각본을 넣을 때 만든다. */
@@ -843,30 +1047,32 @@ export function startFakeHermes(
    * <p>토큰은 그 profile 의 `.env` 에 든 MCP 토큰이고, 제출받은 run 의 session 이 곧 루트 session 이다.
    * 실제 hook 과 같이 주소나 토큰이 없거나 답이 200 의 `allow` 가 아니면 막는다. `block` 에 글이 없어도 막는다.
    * 인자는 입력의 글을 그대로 보낸다. 실제 hook 은 키를 정렬해 직렬화하지만 서버는 받은 글을 그대로 해시한다.
+   * 원래 도구 이름은 등록 이름의 서버 앞부분으로 고른 커넥터가 선언한 도구일 때만 싣는다.
+   *
+   * @param callIdPrefix 도구 호출 id 의 앞부분. 한 session 에서 같은 id 를 다시 쓰면 앞선 판정이 되풀이되므로 부를 때마다 다르게 준다
    */
-  const callConnectorTools = async (
+  const judgeConnectorCalls = async (
     profile: string,
-    input: string,
+    token: string | undefined,
     sessionId: string | undefined,
-    runNumber: number,
+    lines: readonly string[],
+    callIdPrefix: string,
   ): Promise<string> => {
-    const token = profiles.get(profile)?.MCP_FOS_ASSISTANT_API_KEY;
-    const prefix = `mcp__${DEMO_CONNECTOR.mcp_server}__`;
-    const lines = input.split("\n").slice(1).map((line) => line.trim()).filter((line) => line.length > 0);
     const output: string[] = [];
     for (const [index, line] of lines.entries()) {
       const space = line.indexOf(" ");
       const hermesTool = space < 0 ? line : line.slice(0, space);
       const argsJson = space < 0 ? "{}" : line.slice(space + 1).trim();
-      const original = hermesTool.startsWith(prefix) ? hermesTool.slice(prefix.length) : "";
-      const tool = Object.hasOwn(DEMO_CONNECTOR.tools, original) ? original : null;
+      const connector = FAKE_CONNECTORS.find((candidate) => hermesTool.startsWith(`mcp__${candidate.mcp_server}__`));
+      const original = connector === undefined ? "" : hermesTool.slice(`mcp__${connector.mcp_server}__`.length);
+      const tool = connector !== undefined && Object.hasOwn(connector.tools, original) ? original : null;
       let blocked = "정책을 확인하지 못했다";
       if (token !== undefined && connectorPolicyEndpoint !== undefined && sessionId !== undefined) {
         const response = await fetch(connectorPolicyEndpoint, {
           method: "POST",
           headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
           body: JSON.stringify(signedPolicyRequest(
-            token, hermesTool, tool, sessionId, sessionId, `connector-call-${runNumber}-${index + 1}`, argsJson,
+            token, hermesTool, tool, sessionId, sessionId, `${callIdPrefix}-${index + 1}`, argsJson,
           )),
         });
         if (response.status === 200) {
@@ -1033,6 +1239,7 @@ export function startFakeHermes(
     const isDashboardPath = path === PROFILES_PATH || path === ENV_PATH || path === TOOLSET_CATALOG_PATH
       || path === CONFIG_PATH || path === SKILLS_PATH || path === SKILL_TOGGLE_PATH || profileMatch !== null
       || path === CONNECTORS_PATH || path === CONNECTOR_CATALOG_PATH
+      || path === CONNECTOR_VAULT_PATH || path === CONNECTOR_VAULT_IMPORT_PATH
       || CONNECTOR_CALL_PATH.test(path) || CONNECTOR_EXECUTE_PATH.test(path) || MCP_SERVER_TEST_PATH.test(path);
     if (!isDashboardPath) return false;
 
@@ -1042,27 +1249,37 @@ export function startFakeHermes(
     }
 
     if (request.method === "GET" && path === CONNECTOR_CATALOG_PATH) {
-      send(response, 200, [DEMO_CONNECTOR]);
+      send(response, 200, FAKE_CONNECTORS);
       return true;
     }
 
     const callMatch = CONNECTOR_CALL_PATH.exec(path);
     if (request.method === "POST" && callMatch !== null) {
-      if (callMatch[1] !== DEMO_CONNECTOR.id) {
+      const connector = fakeConnector(callMatch[1]);
+      if (connector === undefined) {
         send(response, 404, { error: "no such connector" });
         return true;
       }
-      const body = JSON.parse((await readBody(request)) || "{}") as { tool?: string; values?: Record<string, string> };
-      if (body.tool !== DEMO_CONNECTOR.verify.tool) {
+      const body = JSON.parse((await readBody(request)) || "{}") as {
+        tool?: string; values?: Record<string, string>; vault?: string;
+      };
+      // 칸 값은 본문의 `values` 나 보관 파일 가운데 정확히 하나에서 온다.
+      if ((body.values === undefined) === (body.vault === undefined)) {
+        send(response, 400, { error: "values or vault is required" });
+        return true;
+      }
+      const stored = body.vault === undefined ? undefined : vaults.get(body.vault);
+      if (body.vault !== undefined && stored?.connector !== callMatch[1]) {
+        send(response, 400, { error: "no such vault for this connector" });
+        return true;
+      }
+      const values = stored?.values ?? body.values;
+      if (body.tool !== connector.verify.tool) {
         send(response, 200, { ok: false, error: "invalid_input" });
         return true;
       }
       connectorRequests.push(`call ${body.tool}`);
-      if (body.values?.token === DEMO_TOKEN_OK) {
-        send(response, 200, { ok: true, result: { scopes: [{ id: "a", name: "A" }] } });
-      } else {
-        send(response, 200, { ok: false, error: "credential_rejected" });
-      }
+      send(response, 200, verifyAnswer(connector, values));
       return true;
     }
 
@@ -1072,8 +1289,11 @@ export function startFakeHermes(
       const body = JSON.parse((await readBody(request)) || "{}") as {
         profile?: string; hermes_tool?: string; args?: unknown;
       };
-      const installed = body.profile === undefined ? undefined : installedConnectors.get(body.profile);
-      if (executeMatch[1] !== DEMO_CONNECTOR.id || installed === undefined || !installed.has(DEMO_CONNECTOR.id)) {
+      const connectorId = executeMatch[1]!;
+      const installed = body.profile !== undefined
+        && (installedConnectors.get(body.profile)?.has(connectorId) === true
+          || boundConnectors.get(body.profile)?.has(connectorId) === true);
+      if (fakeConnector(connectorId) === undefined || !installed) {
         send(response, 404, { error: "no such connector" });
         return true;
       }
@@ -1089,29 +1309,65 @@ export function startFakeHermes(
     }
 
     if (request.method === "GET" && path === CONNECTORS_PATH) {
-      const env = queryProfile === null ? undefined : profiles.get(queryProfile);
-      if (queryProfile === null || env === undefined) {
+      // 대시보드로 만든 profile 은 관리 표식이, 미리 심어 둔 profile 은 운영자가 둔 커넥터 표식이 있는 것으로 친다.
+      if (queryProfile === null || (!profiles.has(queryProfile) && keys[queryProfile] === undefined)) {
         send(response, 404, { error: "no such profile" });
         return true;
       }
+      const env = profiles.get(queryProfile) ?? hostEnv.get(queryProfile) ?? {};
       const installed = installedConnectors.get(queryProfile) ?? new Set<string>();
-      // 도구 목록이 설치가 쓰는 목록과 같을 때만 configured 다. 다른 내장 도구나 Control Plane MCP 가 남으면 아니다.
       const toolsets = apiServerToolsets.get(queryProfile) ?? [];
-      const configured = DEMO_CONNECTOR.fields.every((field) => !field.required || env[field.env] !== undefined)
-        && toolsets.join() === [DEMO_CONNECTOR.mcp_server, ...DEMO_CONNECTOR.toolsets].join();
+      const states = FAKE_CONNECTORS.map((connector) => {
+        const bound = boundConnectors.get(queryProfile)?.has(connector.id) === true;
+        const filled = connector.fields.every((field) => !field.required || env[field.env] !== undefined);
+        // 옛 설치는 도구 목록이 설치가 쓰는 목록과 같을 때만 configured 다. 다른 내장 도구나 Control Plane MCP 가 남으면 아니다.
+        // 바인딩 설치는 서버 이름이 목록에 있으면 된다. Control Plane MCP 와 다른 도구가 함께 있어도 된다.
+        const configured = filled && (bound
+          ? toolsets.includes(connector.mcp_server)
+          : toolsets.join() === [connector.mcp_server, ...connector.toolsets].join());
+        return {
+          plugin: connector.id,
+          enabled: bound || installed.has(connector.id),
+          configured,
+          mode: bound ? "bind" : "isolated",
+        };
+      });
       send(response, 200, {
         profile: queryProfile,
         policy_hook: policyHookInstalled.has(queryProfile) && !policyHookOff.has(queryProfile),
-        connectors: [{ plugin: DEMO_CONNECTOR.id, enabled: installed.has(DEMO_CONNECTOR.id), configured }],
+        connectors: states,
       });
       return true;
     }
 
     if (request.method === "PUT" && path === CONNECTORS_PATH) {
-      const body = JSON.parse((await readBody(request)) || "{}") as { profile?: string; plugin?: string; enabled?: unknown };
-      if (body.profile === undefined || !profiles.has(body.profile) || typeof body.plugin !== "string"
-          || typeof body.enabled !== "boolean") {
+      const body = JSON.parse((await readBody(request)) || "{}") as {
+        profile?: string; plugin?: string; enabled?: unknown; bind?: { vault?: unknown };
+      };
+      if (body.profile === undefined || typeof body.plugin !== "string" || typeof body.enabled !== "boolean") {
         send(response, 400, { error: "invalid connector request" });
+        return true;
+      }
+      const boundHere = boundConnectors.get(body.profile);
+      if (body.bind !== undefined || boundHere?.has(body.plugin) === true) {
+        bindingInstall(response, body.profile, body.plugin, body.enabled, body.bind);
+        return true;
+      }
+      // 어느 커넥터든 바인딩 항목이 있는 profile 은 옛 설치를 받지 않는다.
+      if (body.enabled && (boundHere?.size ?? 0) > 0) {
+        send(response, 409, { error: "this profile has bound connectors" });
+        return true;
+      }
+      if (!profiles.has(body.profile)) {
+        // 커넥터 표식만 있는 profile 은 옛 설치를 받지 않는다. 붙은 것이 없는 떼기는 끌 것이 없으므로 바뀐 것 없이 성공한다.
+        if (keys[body.profile] !== undefined && !body.enabled) {
+          send(response, 200, {
+            profile: body.profile, plugin: body.plugin, enabled: false, changed: false, restart_required: false,
+            plugin_updated: false,
+          });
+        } else {
+          send(response, 400, { error: "invalid connector request" });
+        }
         return true;
       }
       if (body.plugin !== DEMO_CONNECTOR.id) {
@@ -1149,16 +1405,86 @@ export function startFakeHermes(
       return true;
     }
 
+    // 보관 파일 경로다. 값과 이름은 응답과 요청 기록에 싣지 않는다.
+    if (request.method === "PUT" && path === CONNECTOR_VAULT_PATH) {
+      const body = JSON.parse((await readBody(request)) || "{}") as { vault?: unknown; connector?: unknown; values?: unknown };
+      const connector = typeof body.connector === "string" ? fakeConnector(body.connector) : undefined;
+      if (typeof body.vault !== "string" || !VAULT_NAME.test(body.vault) || connector === undefined
+          || !vaultValuesValid(connector, body.values)) {
+        send(response, 400, { error: "invalid vault request" });
+        return true;
+      }
+      if (vaults.has(body.vault) && vaults.get(body.vault)!.connector !== connector.id) {
+        send(response, 409, { error: "the vault belongs to another connector" });
+        return true;
+      }
+      vaults.set(body.vault, { connector: connector.id, values: { ...body.values } });
+      connectorRequests.push("vault put");
+      send(response, 200, { ok: true });
+      return true;
+    }
+
+    if (request.method === "DELETE" && path === CONNECTOR_VAULT_PATH) {
+      const body = JSON.parse((await readBody(request)) || "{}") as { vault?: unknown };
+      if (typeof body.vault !== "string" || !VAULT_NAME.test(body.vault)) {
+        send(response, 400, { error: "invalid vault request" });
+        return true;
+      }
+      connectorRequests.push("vault delete");
+      send(response, 200, { changed: vaults.delete(body.vault) });
+      return true;
+    }
+
+    if (request.method === "POST" && path === CONNECTOR_VAULT_IMPORT_PATH) {
+      const body = JSON.parse((await readBody(request)) || "{}") as {
+        vault?: unknown; connector?: unknown; profile?: unknown;
+      };
+      if (typeof body.vault !== "string" || !VAULT_NAME.test(body.vault) || body.connector !== DEMO_CONNECTOR.id
+          || typeof body.profile !== "string") {
+        send(response, 400, { error: "invalid vault request" });
+        return true;
+      }
+      // 옛 설치는 관리 표식이 있는 profile 에만 있다.
+      const env = profiles.get(body.profile);
+      if (env === undefined) {
+        send(response, keys[body.profile] === undefined ? 404 : 401, { error: "no managed profile" });
+        return true;
+      }
+      if (!installedConnectors.get(body.profile)?.has(DEMO_CONNECTOR.id)) {
+        send(response, 404, { error: "the connector is not installed in this profile" });
+        return true;
+      }
+      if (vaults.has(body.vault) && vaults.get(body.vault)!.connector !== DEMO_CONNECTOR.id) {
+        send(response, 409, { error: "the vault belongs to another connector" });
+        return true;
+      }
+      const values: Record<string, string> = {};
+      for (const field of DEMO_CONNECTOR.fields) {
+        const value = env[field.env];
+        if (value !== undefined && value !== "") values[field.key] = value;
+      }
+      if (!vaultValuesValid(DEMO_CONNECTOR, values)) {
+        send(response, 400, { error: "a required field is empty" });
+        return true;
+      }
+      vaults.set(body.vault, { connector: DEMO_CONNECTOR.id, values });
+      connectorRequests.push(`vault import ${body.profile}`);
+      send(response, 200, { ok: true });
+      return true;
+    }
+
     const probeMatch = MCP_SERVER_TEST_PATH.exec(path);
     if (request.method === "POST" && probeMatch !== null) {
-      // 그 profile 에 설치된 커넥터의 서버만 시험한다.
-      if (probeMatch[1] !== DEMO_CONNECTOR.mcp_server || queryProfile === null
-          || !installedConnectors.get(queryProfile)?.has(DEMO_CONNECTOR.id)) {
+      // 그 profile 에 설치하거나 붙인 커넥터의 서버만 시험한다.
+      const connector = FAKE_CONNECTORS.find((candidate) => candidate.mcp_server === probeMatch[1]);
+      if (connector === undefined || queryProfile === null
+          || (!installedConnectors.get(queryProfile)?.has(connector.id)
+            && !boundConnectors.get(queryProfile)?.has(connector.id))) {
         send(response, 404, { error: "no such mcp server" });
         return true;
       }
       connectorRequests.push(`probe ${queryProfile}`);
-      send(response, 200, { ok: true, tools: DEMO_SERVER_TOOLS.map((name) => ({ name })) });
+      send(response, 200, { ok: true, tools: (SERVER_TOOLS[connector.mcp_server] ?? []).map((name) => ({ name })) });
       return true;
     }
 
@@ -1241,7 +1567,8 @@ export function startFakeHermes(
       let nextToolsets: string[] | undefined;
       if (configKeys.includes("platform_toolsets")) {
         const toolsets = body.config?.platform_toolsets?.api_server;
-        const validNames = new Set([...TOOLSET_CATALOG.map((entry) => entry.name), CONTROL_PLANE_MCP]);
+        const bound = boundServers(profile);
+        const validNames = new Set([...TOOLSET_CATALOG.map((entry) => entry.name), CONTROL_PLANE_MCP, ...bound]);
         if (Object.keys(body.config?.platform_toolsets ?? {}).length !== 1 || !Array.isArray(toolsets)
             || !toolsets.includes(CONTROL_PLANE_MCP)
             || !toolsets.every((name) => typeof name === "string" && validNames.has(name))) {
@@ -1259,6 +1586,12 @@ export function startFakeHermes(
             send(response, 409, { detail: "the isolated shell workspace is not configured", code: "sandbox_unavailable" });
             return true;
           }
+        }
+        // 처리기가 목록을 통째로 바꾸므로 붙은 커넥터의 서버 이름이 빠진 목록은 조용히 지우지 않고 거절한다.
+        // plugin 처럼 실행 공간 검사 뒤에 본다. 둘 다 409 라 순서가 다르면 Control Plane 이 다른 오류로 읽는다.
+        if (!bound.every((name) => toolsets.includes(name))) {
+          send(response, 409, { error: "연결된 커넥터의 도구 이름이 빠졌다" });
+          return true;
         }
       }
       let nextDirs: string[] | undefined;
@@ -1417,6 +1750,9 @@ export function startFakeHermes(
         return true;
       }
       delete keys[name];
+      // 붙인 커넥터의 소유 기록과 `.env` 는 profile 디렉터리에 있어 함께 사라진다.
+      boundConnectors.delete(name);
+      hostEnv.delete(name);
       send(response, 200, { name });
       return true;
     }
@@ -1448,6 +1784,15 @@ export function startFakeHermes(
 
       if (request.method === "POST" && path === TEST_CLEAR_BUSY_PATH) {
         busy = false;
+        return send(response, 204, null);
+      }
+
+      if (request.method === "POST" && path === TEST_READINESS_OUTAGE_PATH) {
+        const { outage } = JSON.parse((await readBody(request)) || "{}") as { outage?: unknown };
+        if (outage !== undefined && outage !== "busy" && outage !== "unavailable" && outage !== "timeout") {
+          return send(response, 400, { error: "outage must be busy, unavailable, timeout, or omitted" });
+        }
+        readinessOutage = outage;
         return send(response, 204, null);
       }
 
@@ -1533,6 +1878,10 @@ export function startFakeHermes(
         if (enabledToolsetsMatch) {
           const profile = enabledToolsetsMatch[1]!;
           if (!authorized(request, profile)) return send(response, 401, { error: "bad key for this profile" });
+          if (readinessOutage === "busy") return send(response, 429, RATE_LIMITED);
+          if (readinessOutage === "unavailable") return send(response, 503, { error: "Hermes is unavailable" });
+          // Control Plane 의 Hermes read timeout(10초)보다 길게 기다려 실제 timeout 경로를 탄다.
+          if (readinessOutage === "timeout") await wait(11_000);
           const enabled = new Set(apiServerToolsets.get(profile) ?? DEFAULT_API_SERVER_TOOLSETS);
           // 실제 listener 는 목록을 `data` 로 감싼다(v0.21.3 `gateway/platforms/api_server.py` 의 `_handle_toolsets`).
           return send(response, 200, {
@@ -1853,7 +2202,13 @@ export function startFakeHermes(
           )
           : undefined;
         const connectorOutput = input.startsWith(CONNECTOR_TOOL_PROBE)
-          ? await callConnectorTools(profile!, input, submitted.session_id, submitCount)
+          ? await judgeConnectorCalls(
+            profile!,
+            profiles.get(profile!)?.MCP_FOS_ASSISTANT_API_KEY,
+            submitted.session_id,
+            input.split("\n").slice(1).map((line) => line.trim()).filter((line) => line.length > 0),
+            `connector-call-${submitCount}`,
+          )
           : undefined;
         if (!starterRun) {
           lastSubmittedRuntime = {
@@ -1994,9 +2349,12 @@ export function startFakeHermes(
         clearBusy: () => {
           busy = false;
         },
+        setReadinessOutage: (outage) => {
+          readinessOutage = outage;
+        },
         submitCount: () => submitCount,
         profiles: () => [...profiles.keys()],
-        profileEnv: (name: string) => ({ ...(profiles.get(name) ?? {}) }),
+        profileEnv: (name: string) => ({ ...(profiles.get(name) ?? hostEnv.get(name) ?? {}) }),
         soulOf: (name: string) => souls.get(name),
         skillDirsOf: (name: string) => [...(externalDirs.get(name) ?? [])],
         apiServerToolsetsOf: (name: string) => {
@@ -2012,6 +2370,11 @@ export function startFakeHermes(
           connectorPolicyEndpoint = endpoint;
         },
         connectorToolCalls: () => connectorToolCalls.map((entry) => ({ ...entry })),
+        callConnectorTools: (profile: string, sessionId: string, lines: readonly string[], token: string) => {
+          directConnectorCalls += 1;
+          return judgeConnectorCalls(profile, token, sessionId, lines, `connector-direct-${directConnectorCalls}`);
+        },
+        boundConnectorsOf: (profile: string) => [...(boundConnectors.get(profile)?.keys() ?? [])],
         holdNextRun: () => {
           holdNextRun = true;
           heldRunReady = new Promise<void>((done) => {

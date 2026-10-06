@@ -613,4 +613,173 @@ class HttpHermesConnectorClientTest {
                 });
         server.verify();
     }
+
+    @DisplayName("카탈로그의 skills 를 읽고, 칸이 없는 옛 카탈로그는 빈 목록이다")
+    @Test
+    void readsSkillNamesAndDefaultsToEmpty() {
+        String tail = "\"mcp_server\":\"demo\"";
+        server.expect(requestTo(BASE + "/api/connectors/catalog"))
+                .andRespond(withSuccess(
+                        CATALOG.replace(tail, tail + ",\"skills\":[\"demo-notes-guide\"]"),
+                        MediaType.APPLICATION_JSON));
+        server.expect(requestTo(BASE + "/api/connectors/catalog"))
+                .andRespond(withSuccess(CATALOG, MediaType.APPLICATION_JSON));
+
+        assertThat(client.readCatalog().get(0).skills()).containsExactly("demo-notes-guide");
+        assertThat(client.readCatalog().get(0).skills()).isEmpty();
+        server.verify();
+    }
+
+    @DisplayName("보관 파일의 쓰기, 지우기, 옮기기는 정해진 본문을 보내고 답을 읽는다")
+    @Test
+    void writesDeletesAndImportsVaultWithDocumentedBodies() {
+        server.expect(requestTo(BASE + "/api/connector-vault"))
+                .andExpect(method(HttpMethod.PUT))
+                .andExpect(header("Authorization", "Bearer test-dashboard-token"))
+                .andExpect(content()
+                        .json(
+                                "{\"vault\":\"c7\",\"connector\":\"demo-notes\",\"values\":{\"token\":\"" + TOKEN
+                                        + "\"}}",
+                                JsonCompareMode.STRICT))
+                .andRespond(withSuccess("{\"ok\":true}", MediaType.APPLICATION_JSON));
+        server.expect(requestTo(BASE + "/api/connector-vault"))
+                .andExpect(method(HttpMethod.DELETE))
+                .andExpect(content().json("{\"vault\":\"c7\"}", JsonCompareMode.STRICT))
+                .andRespond(withSuccess("{\"changed\":false}", MediaType.APPLICATION_JSON));
+        server.expect(requestTo(BASE + "/api/connector-vault/import"))
+                .andExpect(method(HttpMethod.POST))
+                .andExpect(content()
+                        .json(
+                                "{\"vault\":\"c7\",\"connector\":\"demo-notes\",\"profile\":\"user-demo\"}",
+                                JsonCompareMode.STRICT))
+                .andRespond(withSuccess("{\"ok\":true}", MediaType.APPLICATION_JSON));
+
+        client.putVault("c7", DEMO, Map.of("token", TOKEN));
+        assertThat(client.deleteVault("c7")).isFalse();
+        client.importVault("c7", DEMO, PROFILE);
+        server.verify();
+    }
+
+    @DisplayName("보관 파일 경로의 거절과 모양이 틀린 답은 원문 없는 예외다")
+    @Test
+    void vaultRefusalsAndMalformedAnswersFailWithoutLeakingValues() {
+        server.expect(requestTo(BASE + "/api/connector-vault"))
+                .andRespond(withStatus(HttpStatus.BAD_REQUEST).body(TOKEN).contentType(MediaType.TEXT_PLAIN));
+        server.expect(requestTo(BASE + "/api/connector-vault"))
+                .andRespond(withSuccess("{\"ok\":false}", MediaType.APPLICATION_JSON));
+        server.expect(requestTo(BASE + "/api/connector-vault"))
+                .andRespond(withSuccess("{}", MediaType.APPLICATION_JSON));
+        server.expect(requestTo(BASE + "/api/connector-vault/import"))
+                .andRespond(withStatus(HttpStatus.UNAUTHORIZED).body(TOKEN).contentType(MediaType.TEXT_PLAIN));
+
+        List<Runnable> calls = List.of(
+                () -> client.putVault("c7", DEMO, Map.of("token", TOKEN)),
+                () -> client.putVault("c7", DEMO, Map.of("token", TOKEN)),
+                () -> client.deleteVault("c7"),
+                () -> client.importVault("c7", DEMO, PROFILE));
+        for (Runnable call : calls) {
+            assertThatThrownBy(call::run)
+                    .isInstanceOf(IllegalStateException.class)
+                    .satisfies(error -> {
+                        assertThat(error.getCause()).isNull();
+                        assertThat(error.toString()).doesNotContain(TOKEN);
+                    });
+        }
+        server.verify();
+    }
+
+    @DisplayName("보관 파일로 부르는 도구 호출은 값 대신 보관 파일 이름을 보낸다")
+    @Test
+    void callWithVaultSendsVaultNameInsteadOfValues() {
+        server.expect(requestTo(BASE + "/api/connectors/demo-notes/call"))
+                .andExpect(method(HttpMethod.POST))
+                .andExpect(content().json("{\"tool\":\"list_scopes\",\"vault\":\"c7\"}", JsonCompareMode.STRICT))
+                .andRespond(withSuccess("{\"ok\":true,\"result\":{\"scopes\":[]}}", MediaType.APPLICATION_JSON));
+        server.expect(requestTo(BASE + "/api/connectors/demo-notes/call"))
+                .andRespond(
+                        withSuccess("{\"ok\":false,\"error\":\"credential_rejected\"}", MediaType.APPLICATION_JSON));
+
+        assertThat(client.callWithVault(DEMO, "list_scopes", "c7").ok()).isTrue();
+        assertThat(client.callWithVault(DEMO, "list_scopes", "c7").error())
+                .isEqualTo(ConnectorCallError.CREDENTIAL_REJECTED);
+        server.verify();
+    }
+
+    @DisplayName("바인딩 설치는 bind 칸에 보관 파일 이름을 싣고 떼기는 bind 칸 없이 끈다")
+    @Test
+    void bindsWithVaultAndUnbindsWithoutBindField() {
+        server.expect(requestTo(BASE + "/api/connectors"))
+                .andExpect(method(HttpMethod.PUT))
+                .andExpect(content()
+                        .json(
+                                "{\"profile\":\"user-demo\",\"plugin\":\"demo-notes\",\"enabled\":true,"
+                                        + "\"bind\":{\"vault\":\"c7\"}}",
+                                JsonCompareMode.STRICT))
+                .andRespond(withSuccess(
+                        "{\"profile\":\"user-demo\",\"plugin\":\"demo-notes\",\"enabled\":true,"
+                                + "\"restart_required\":true,\"plugin_updated\":false}",
+                        MediaType.APPLICATION_JSON));
+        server.expect(requestTo(BASE + "/api/connectors"))
+                .andExpect(method(HttpMethod.PUT))
+                .andExpect(content()
+                        .json(
+                                "{\"profile\":\"user-demo\",\"plugin\":\"demo-notes\",\"enabled\":false}",
+                                JsonCompareMode.STRICT))
+                .andRespond(withSuccess(
+                        "{\"profile\":\"user-demo\",\"plugin\":\"demo-notes\",\"enabled\":false,"
+                                + "\"restart_required\":false}",
+                        MediaType.APPLICATION_JSON));
+
+        assertThat(client.bindConnector(PROFILE, DEMO, "c7")).isEqualTo(new InstallResult(true, false));
+        assertThat(client.unbindConnector(PROFILE, DEMO)).isEqualTo(new InstallResult(false, false));
+        server.verify();
+    }
+
+    @DisplayName("바인딩 설치의 409 와 401 은 각자의 예외이고 응답 본문을 싣지 않는다")
+    @Test
+    void mapsBindConflictAndProfileRefusalWithoutBody() {
+        String detail = "{\"detail\":\"conflicts with MY_SECRET_ENV\"}";
+        server.expect(requestTo(BASE + "/api/connectors"))
+                .andRespond(withStatus(HttpStatus.CONFLICT).body(detail).contentType(MediaType.APPLICATION_JSON));
+        server.expect(requestTo(BASE + "/api/connectors"))
+                .andRespond(withStatus(HttpStatus.UNAUTHORIZED).body(detail).contentType(MediaType.APPLICATION_JSON));
+        server.expect(requestTo(BASE + "/api/connectors"))
+                .andRespond(withStatus(HttpStatus.CONFLICT).body(detail).contentType(MediaType.APPLICATION_JSON));
+        server.expect(requestTo(BASE + "/api/connectors"))
+                .andRespond(withStatus(HttpStatus.BAD_REQUEST).body(detail).contentType(MediaType.APPLICATION_JSON));
+
+        assertThatThrownBy(() -> client.bindConnector(PROFILE, DEMO, "c7"))
+                .isInstanceOfSatisfying(ConnectorInstallConflict.class, ex -> assertNoDetail(ex));
+        assertThatThrownBy(() -> client.bindConnector(PROFILE, DEMO, "c7"))
+                .isInstanceOfSatisfying(ConnectorProfileRejected.class, ex -> assertNoDetail(ex));
+        assertThatThrownBy(() -> client.unbindConnector(PROFILE, DEMO))
+                .isInstanceOfSatisfying(ConnectorInstallConflict.class, ex -> assertNoDetail(ex));
+        assertThatThrownBy(() -> client.bindConnector(PROFILE, DEMO, "c7"))
+                .isInstanceOfSatisfying(IllegalStateException.class, ex -> assertNoDetail(ex));
+        server.verify();
+    }
+
+    @DisplayName("설치 목록의 mode 를 읽고, 칸이 없거나 설치되지 않았으면 isolated 다")
+    @Test
+    void readsInstallModeAndDefaultsToIsolated() {
+        String url = BASE + "/api/connectors?profile=user-demo";
+        String head = "{\"profile\":\"user-demo\",\"connectors\":[{\"plugin\":\"demo-notes\",\"enabled\":true,"
+                + "\"configured\":true";
+        server.expect(requestTo(url))
+                .andRespond(withSuccess(head + ",\"mode\":\"bind\"}]}", MediaType.APPLICATION_JSON));
+        server.expect(requestTo(url)).andRespond(withSuccess(head + "}]}", MediaType.APPLICATION_JSON));
+        server.expect(requestTo(url))
+                .andRespond(withSuccess("{\"profile\":\"user-demo\",\"connectors\":[]}", MediaType.APPLICATION_JSON));
+
+        assertThat(client.readConnector(PROFILE, DEMO).mode()).isEqualTo(HermesConnectorClient.MODE_BIND);
+        assertThat(client.readConnector(PROFILE, DEMO).mode()).isEqualTo(HermesConnectorClient.MODE_ISOLATED);
+        assertThat(client.readConnector(PROFILE, DEMO).mode()).isEqualTo(HermesConnectorClient.MODE_ISOLATED);
+        server.verify();
+    }
+
+    private static void assertNoDetail(RuntimeException ex) {
+        assertThat(ex.getMessage()).isNull();
+        assertThat(ex.getCause()).isNull();
+        assertThat(ex.toString()).doesNotContain("MY_SECRET_ENV");
+    }
 }

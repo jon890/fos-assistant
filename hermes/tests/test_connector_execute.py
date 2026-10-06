@@ -50,19 +50,42 @@ class ConnectorExecuteTest(base.ConnectorGateCase):
         self.install(PROFILE)
         self.addCleanup(self.assert_no_child_left)
 
-    def install(self, name, token=call_base.OK_TOKEN, managed=True, installed=True):
-        """커넥터를 설치한 관리 profile 의 파일을 만든다. 표식과 소유 기록은 빼고 만들 수 있다."""
+    def install(self, name, token=call_base.OK_TOKEN, managed=True, installed=True, host=False, bind=False):
+        """커넥터를 설치한 profile 의 파일을 만든다. 표식과 소유 기록은 빼고 만들 수 있다.
+
+        `host` 는 운영자가 사람이 만든 profile 에 두는 커넥터 표식이고, `bind` 는 소유 기록을 바인딩 항목으로 둔다.
+        """
         profile = self.profile_root / name
         profile.mkdir()
         lines = ["%s=%s" % item for item in {"DEMO_TOKEN": token, **PROFILE_ONLY}.items()]
         (profile / ".env").write_text("\n".join(lines) + "\n", encoding="utf-8")
         if managed:
             (profile / self.plugin.MANAGED_MARKER).write_text("", encoding="utf-8")
+        if host:
+            (profile / self.plugin.CONNECTOR_HOST_MARKER).write_text("", encoding="utf-8")
         if installed:
             manifest = self.plugin._connector_manifest(base.DEMO)
-            record = {base.DEMO: {"server": self.plugin._connector_server(manifest), "allowlist_added": True,
-                                  "mcp_server": manifest["mcp_server"]}}
-            (profile / self.plugin.CONNECTOR_STATE).write_text(json.dumps(record), encoding="utf-8")
+            entry = {"server": self.plugin._connector_server(manifest), "allowlist_added": True,
+                     "mcp_server": manifest["mcp_server"]}
+            if bind:
+                entry.update(mode="bind", vault="c1", skills=["demo"])
+            (profile / self.plugin.CONNECTOR_STATE).write_text(json.dumps({base.DEMO: entry}), encoding="utf-8")
+
+    def test_binding_on_a_profile_with_only_the_connector_marker_runs(self):
+        """커넥터 표식만 있는 profile 에서 바인딩 항목은 실행하고, 옛 항목이나 표식 없는 profile 은 401 이다."""
+        self.install("human", managed=False, host=True, bind=True)
+        self.install("human-old", managed=False, host=True)
+        self.install("plain", managed=False, bind=True)
+        status, body = self.execute(args={"text": "안녕"}, profile="human")
+        self.assertEqual(status, 200, body)
+        self.assertEqual(body, {"ok": True, "result": {"written": True, "text": "안녕", "token": "demo"}})
+        with mock.patch.object(self.plugin, "_run_connector_execute") as runner:
+            self.assertEqual(self.execute(profile="human-old")[0], 401)
+            self.assertEqual(self.execute(profile="plain")[0], 401)
+            runner.assert_not_called()
+        # 관리 표식이 있는 profile 은 바인딩 항목도 실행한다.
+        self.install("managed-bind", bind=True)
+        self.assertEqual(self.execute(args={"text": "a"}, profile="managed-bind")[0], 200)
 
     def children(self):
         """시험 커넥터 사본의 서버를 돌리고 있는 프로세스 번호다."""

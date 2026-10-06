@@ -70,6 +70,7 @@ public class ConnectorAction {
     @Column(name = "user_id", nullable = false)
     private Long userId;
 
+    /** 판정한 실행의 에이전트다. 승인한 호출은 이 에이전트의 profile 에서 실행한다. 옛 줄은 옛 커넥터 에이전트를 가리킨다. */
     @Column(name = "agent_id", nullable = false)
     private Long agentId;
 
@@ -151,11 +152,13 @@ public class ConnectorAction {
     /**
      * 판정 한 줄이다. 인자 원문과 승인 상태는 담지 않는다.
      *
+     * @param agentId 판정한 실행의 에이전트. 그 에이전트에 붙은 연결로 판정했다
      * @param toolName 등록 이름과 맞는 것을 확인한 원래 도구 이름. 확인하지 못했으면 null
      * @param passed hook 에 통과로 답했는가
      */
     public static ConnectorAction decided(
             ConnectorConnection connection,
+            Long agentId,
             AgentExecution origin,
             String hermesTool,
             String toolName,
@@ -166,7 +169,7 @@ public class ConnectorAction {
             Instant now) {
         ConnectorAction action = new ConnectorAction();
         action.userId = connection.userId();
-        action.agentId = connection.agent().id();
+        action.agentId = agentId;
         action.connectorId = connection.connectorId();
         action.toolName = toolName;
         action.hermesTool = hermesTool;

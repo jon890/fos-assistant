@@ -249,3 +249,24 @@ profile 플러그인이 `subagent_start` hook 에서 부른다. 모델 도구가
 | 7 | 자식이 도는 동안 사용자가 부모 turn 을 중지하고, 그 뒤 자식이 `memory_read` 를 부른다 | origin 실행이 `CANCELLED` 이고 「호출 맥락을 확인할 수 없습니다」 로 끝난다 |
 
 Hermes 를 올릴 때도 이 표를 다시 돌린다. `subagent_start` 가 사라지거나 인자 이름이 바뀌면 하위 에이전트의 MCP 호출이 모두 거절된다.
+
+## 바인딩 profile 의 판정
+
+일반 에이전트의 profile 에 커넥터를 붙이면 그 profile 에서 `fos-ctx` 가 두 가지 일을 함께 한다([ADR-083](../adr/ADR-083-커넥터는-사용자가-한-번-연결하고-자기-에이전트에-여럿-붙여-그-에이전트가-도구를-직접-부른다.md)).
+Control Plane MCP 호출에는 지금처럼 `_fos_ctx` 를 붙이고, 커넥터 MCP 도구 호출은 Control Plane 에 판정을 묻는다.
+이름 대응 파일의 `isolated` 가 `false` 인 profile 이 바인딩 profile 이다. 칸의 뜻은 [`backend/connector-tool-policy.md`](../backend/connector-tool-policy.md) 의 「이름 대응」 이 갖는다.
+
+| 도구 | 바인딩 profile 에서 하는 것 |
+| --- | --- |
+| 대응 파일의 서버와 맞는 도구 | Control Plane 에 묻는다. 등록 이름이 Control Plane MCP 의 접두사로 시작해도 묻고 `_fos_ctx` 를 붙이지 않는다 |
+| 그 밖의 Control Plane MCP 도구 | 대응 파일이 없는 profile 과 같이 `_fos_ctx` 를 붙인다 |
+| `execute_code`, 다른 MCP 서버의 도구, 내장 도구 | 건드리지 않는다. `skill_manage` 만 지금처럼 막는다 |
+| `execute_code` 안에서 부른 커넥터 도구 | hook 에 `session_id` 가 오지 않아 묻지 않고 막는다 |
+
+판정을 물을 때와 `_fos_ctx` 를 서명할 때 같은 profile 토큰을 쓴다. 그래서 바인딩 profile 에는 Control Plane MCP 의 토큰이 있어야 한다.
+옛 설치 profile 과 다른 점은 대응에 없는 도구를 통과시키는 것이다. 그 profile 에는 Control Plane MCP 와 운영자가 넣은 MCP 서버가 함께 있어 막으면 그 서버들이 모두 막힌다.
+그 대신 대응 파일에 그 profile 의 모든 커넥터 서버가 실려 있어야 한다. 바인딩 설치와 떼기가 manifest 를 읽지 못했거나 소유 기록의 서버 이름이나 실행 정의가 지금 manifest 와 다른 서버도 소유 기록의 이름으로 빈 `tools` 와 함께 싣는다.
+뗀 서버도 빈 `tools` 로 남는다. 떼기 전에 시작한 실행이 그 서버를 쥐고 있기 때문이다.
+
+커넥터 도구의 결과는 `transform_tool_result` hook 이 Control Plane 의 `ExternalData` 와 같은 `<external-data>` 로 감싼다.
+hook 이 무엇을 묻고 막고 감싸는지 전체 표는 [`hermes/README.md`](../../hermes/README.md) 의 「커넥터 도구 호출을 묻는다」 가, Hermes 가 그 hook 을 언제 부르는지는 [도구 hook 과 승인](connector-policy.md) 의 「도구 결과를 바꾸는 hook」 이 갖는다.

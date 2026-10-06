@@ -2,7 +2,6 @@ package com.bifos.assistant.chat;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -27,6 +26,7 @@ import com.bifos.assistant.chat.presentation.ChatEventStreams;
 import com.bifos.assistant.hermes.HermesRunEventStream;
 import com.bifos.assistant.hermes.HermesRunsClient;
 import com.bifos.assistant.hermes.StubHermesRunsClient;
+import com.bifos.assistant.hermes.ToolDetailScope;
 import com.bifos.assistant.hermes.dto.HermesRunResult;
 import com.bifos.assistant.hermes.dto.RunEvent;
 import com.bifos.assistant.hermes.dto.TokenUsage;
@@ -348,7 +348,7 @@ class ToolDetailStreamTest {
                     return null;
                 })
                 .when(eventStream)
-                .open(any(), any(), any(), any(), any(), anyBoolean());
+                .open(any(), any(), any(), any(), any(), any(ToolDetailScope.class));
     }
 
     /** 이 역할의 사용자와 그 사람의 에이전트를 만들고 로그인한 것으로 둔다. */

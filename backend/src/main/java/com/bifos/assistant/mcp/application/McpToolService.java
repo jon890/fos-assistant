@@ -387,7 +387,7 @@ public class McpToolService {
             case TOO_MANY_CHILDREN -> "이미 맡긴 일이 많습니다. 앞의 일이 끝난 뒤 다시 맡겨 주세요.";
             case BUSY -> "지금은 맡길 수 없습니다. 직접 처리하거나 앞의 작업이 끝난 뒤 다시 맡겨 주세요.";
             case SUBMIT_FAILED -> "실행을 시작하지 못했습니다.";
-            case CHECK_TARGET -> "먼저 살펴보기에서는 연결한 서비스의 에이전트에만 맡길 수 있습니다.";
+            case CHECK_TARGET -> "먼저 살펴보기에서는 연결한 서비스의 도구를 직접 부르거나, 연결한 서비스의 에이전트에만 맡길 수 있습니다.";
             case CHECK_LIMIT -> "이번 살펴보기에서는 더 맡길 수 없습니다.";
         };
     }

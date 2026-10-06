@@ -4,10 +4,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.tuple;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.timeout;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -34,10 +35,15 @@ import com.bifos.assistant.chat.infra.ChatMessageRepository;
 import com.bifos.assistant.chat.infra.ConversationRepository;
 import com.bifos.assistant.chat.infra.ModelTierDefinitionRepository;
 import com.bifos.assistant.chat.presentation.ChatController;
+import com.bifos.assistant.connector.domain.ConnectorBinding;
+import com.bifos.assistant.connector.domain.ConnectorConnection;
+import com.bifos.assistant.connector.infra.ConnectorBindingRepository;
+import com.bifos.assistant.connector.infra.ConnectorConnectionRepository;
 import com.bifos.assistant.context.AssembledContext;
 import com.bifos.assistant.hermes.HermesRunEventStream;
 import com.bifos.assistant.hermes.HermesRunsClient;
 import com.bifos.assistant.hermes.StubHermesRunsClient;
+import com.bifos.assistant.hermes.ToolDetailScope;
 import com.bifos.assistant.hermes.dto.HermesRunResult;
 import com.bifos.assistant.hermes.dto.RunEvent;
 import com.bifos.assistant.hermes.dto.SessionRuntime;
@@ -80,6 +86,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import org.assertj.core.api.ThrowableAssert.ThrowingCallable;
@@ -224,6 +231,12 @@ class ChatServiceTest {
     @Autowired
     JdbcTemplate jdbc;
 
+    @Autowired
+    ConnectorConnectionRepository connections;
+
+    @Autowired
+    ConnectorBindingRepository bindings;
+
     private StubHermesRunsClient stub() {
         return (StubHermesRunsClient) hermes;
     }
@@ -257,7 +270,7 @@ class ChatServiceTest {
                     return null;
                 })
                 .when(eventStream)
-                .open(any(), any(), any(), any(), any(), anyBoolean());
+                .open(any(), any(), any(), any(), any(), any(ToolDetailScope.class));
     }
 
     private List<ExecutionEvent> eventsOf(Long executionId) {
@@ -283,6 +296,8 @@ class ChatServiceTest {
         executions.deleteAll();
         messages.deleteAll();
         tierDefinitions.deleteAll();
+        bindings.deleteAll();
+        connections.deleteAll();
         agents.deleteAll();
         memoryRepository.deleteAll();
         users.deleteAll();
@@ -476,6 +491,38 @@ class ChatServiceTest {
         assertThat(execution.contextChars()).isEqualTo(commonInstructions.length());
         assertThat(execution.instructionsHash())
                 .isEqualTo(new AssembledContext(commonInstructions, commonInstructions.length()).instructionsHash());
+    }
+
+    @Test
+    @DisplayName("일반 에이전트의 turn 은 붙은 커넥터 서버의 도구만 가리는 범위로 사건 스트림을 연다")
+    void opensEventStreamHidingOnlyAttachedConnectorTools() {
+        CurrentUser dad = member("dad@example.com", "dad");
+        Agent agent = agents.findByCode("dad").orElseThrow();
+        ConnectorConnection connection =
+                connections.save(ConnectorConnection.pending(dad.id(), "demo-notes", Instant.now()));
+        bindings.save(ConnectorBinding.pending(agent, connection, "demo", Instant.now()));
+        stub().willReturn(HermesRunResult.of("run-1", "sess-1", "completed", "네", "dad", null, TokenUsage.empty()));
+        hermesStreams(new RunEvent("run.completed", null, null, null, null, null));
+
+        chat.stream(dad, null, "메모 찾아 줘", "dad", event -> {});
+
+        verify(eventStream, timeout(5000))
+                .open(any(), any(), any(), any(), any(), eq(ToolDetailScope.prefixes(Set.of("mcp__demo__"))));
+    }
+
+    @Test
+    @DisplayName("옛 커넥터 에이전트의 turn 은 모든 도구를 가리는 범위로 사건 스트림을 연다")
+    void opensEventStreamHidingAllToolsForLegacyConnectorAgent() {
+        CurrentUser dad = member("dad@example.com", "dad");
+        Agent legacy = agents.findByCode("dad").orElseThrow();
+        legacy.markConnectorManaged();
+        agents.save(legacy);
+        stub().willReturn(HermesRunResult.of("run-1", "sess-1", "completed", "네", "dad", null, TokenUsage.empty()));
+        hermesStreams(new RunEvent("run.completed", null, null, null, null, null));
+
+        chat.stream(dad, null, "메모 찾아 줘", "dad", event -> {});
+
+        verify(eventStream, timeout(5000)).open(any(), any(), any(), any(), any(), eq(ToolDetailScope.ALL));
     }
 
     @Test

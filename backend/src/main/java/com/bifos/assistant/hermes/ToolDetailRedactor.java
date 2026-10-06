@@ -20,6 +20,9 @@ public final class ToolDetailRedactor {
 
     private static final String HIDDEN = "[가림]";
 
+    /** 커넥터 도구의 내용을 통째로 가린 자리에 남기는 글이다. */
+    private static final String CONNECTOR_HIDDEN = "[연결 도구 내용 가림]";
+
     /** 식별자를 번호표로 바꾸지 않고 남기라는 표식이다. 같은 객체인지로 견준다. */
     private static final Map<String, String> KEEP_IDENTIFIERS = new LinkedHashMap<>();
 
@@ -55,13 +58,28 @@ public final class ToolDetailRedactor {
         return redact(detail, connectorManaged, new LinkedHashMap<>());
     }
 
-    /** 번호표는 실행 하나 동안만 메모리에 두고 저장하거나 다른 실행과 공유하지 않는다. */
+    /**
+     * 옛 커넥터 에이전트의 실행이면 모두 가리고 아니면 비밀값과 식별자만 가린다. 도구 이름을 모르는 자리가 쓴다.
+     *
+     * <p>이미 적용된 Java 마이그레이션이 이 메서드를 부른다. 모양을 바꾸지 않는다.
+     */
     public static String redact(String detail, boolean connectorManaged, Map<String, String> identifiers) {
+        return redact(detail, null, connectorManaged ? ToolDetailScope.ALL : ToolDetailScope.NONE, identifiers);
+    }
+
+    /**
+     * 번호표는 실행 하나 동안만 메모리에 두고 저장하거나 다른 실행과 공유하지 않는다.
+     *
+     * @param toolName 그 사건의 도구 등록 이름. 모르면 null
+     * @param scope 내용을 통째로 가릴 도구의 범위
+     */
+    public static String redact(
+            String detail, String toolName, ToolDetailScope scope, Map<String, String> identifiers) {
         if (detail == null) {
             return null;
         }
-        if (connectorManaged) {
-            return "[연결 도구 내용 가림]";
+        if (scope.hides(toolName)) {
+            return CONNECTOR_HIDDEN;
         }
         if (detail.length() > INPUT_LIMIT) {
             return "[긴 도구 내용 가림]";

@@ -19,6 +19,7 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
+import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
 import tools.jackson.core.JacksonException;
@@ -35,6 +36,11 @@ public class HttpHermesConnectorClient implements HermesConnectorClient {
     private static final String PLUGIN = "plugin";
     private static final String ENABLED = "enabled";
     private static final String RESTART_REQUIRED = "restart_required";
+    private static final String VAULT = "vault";
+    private static final String CONNECTOR = "connector";
+    private static final String VAULT_PATH = "/api/connector-vault";
+    private static final int HTTP_CONFLICT = 409;
+    private static final int HTTP_UNAUTHORIZED = 401;
     private static final int SCHEMA_WITHOUT_TOOLS = 1;
     /** 읽을 수 없는 선언에 주는 판이다. 받는 쪽이 아는 판이 아니라 그 커넥터만 카탈로그에서 빠진다. */
     private static final int SCHEMA_UNREADABLE = 0;
@@ -88,6 +94,22 @@ public class HttpHermesConnectorClient implements HermesConnectorClient {
                 .body(Map.of("tool", tool, "values", values))
                 .retrieve()
                 .body(JsonNode.class));
+        return callResult(body);
+    }
+
+    @Override
+    public CallResult callWithVault(String connectorId, String tool, String vault) {
+        JsonNode body = request(() -> client.post()
+                .uri(baseUrl + "/api/connectors/{id}/call", connectorId)
+                .header(AUTHORIZATION, bearer())
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(Map.of("tool", tool, VAULT, vault))
+                .retrieve()
+                .body(JsonNode.class));
+        return callResult(body);
+    }
+
+    private static CallResult callResult(JsonNode body) {
         if (requiredBoolean(body, "ok")) {
             JsonNode result = body.get("result");
             if (result == null || result.isNull()) {
@@ -97,6 +119,46 @@ public class HttpHermesConnectorClient implements HermesConnectorClient {
         }
         return CallResult.failure(
                 ConnectorCallError.fromWord(text(body, "error")).orElseThrow(IllegalStateException::new));
+    }
+
+    @Override
+    public void putVault(String vault, String connectorId, Map<String, String> values) {
+        JsonNode body = request(() -> client.put()
+                .uri(baseUrl + VAULT_PATH)
+                .header(AUTHORIZATION, bearer())
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(Map.of(VAULT, vault, CONNECTOR, connectorId, "values", values))
+                .retrieve()
+                .body(JsonNode.class));
+        if (!requiredBoolean(body, "ok")) {
+            throw new IllegalStateException();
+        }
+    }
+
+    @Override
+    public boolean deleteVault(String vault) {
+        JsonNode body = request(() -> client.method(HttpMethod.DELETE)
+                .uri(baseUrl + VAULT_PATH)
+                .header(AUTHORIZATION, bearer())
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(Map.of(VAULT, vault))
+                .retrieve()
+                .body(JsonNode.class));
+        return requiredBoolean(body, "changed");
+    }
+
+    @Override
+    public void importVault(String vault, String connectorId, String profile) {
+        JsonNode body = request(() -> client.post()
+                .uri(baseUrl + VAULT_PATH + "/import")
+                .header(AUTHORIZATION, bearer())
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(Map.of(VAULT, vault, CONNECTOR, connectorId, PROFILE, profile))
+                .retrieve()
+                .body(JsonNode.class));
+        if (!requiredBoolean(body, "ok")) {
+            throw new IllegalStateException();
+        }
     }
 
     /**
@@ -171,6 +233,57 @@ public class HttpHermesConnectorClient implements HermesConnectorClient {
                 .body(Map.of(PROFILE, profile, PLUGIN, connectorId, ENABLED, enabled, "sandbox_owner", sandboxOwner))
                 .retrieve()
                 .body(JsonNode.class));
+        return installResult(body, profile, connectorId, enabled);
+    }
+
+    @Override
+    public InstallResult bindConnector(String profile, String connectorId, String vault) {
+        return refusable(
+                Map.of(PROFILE, profile, PLUGIN, connectorId, ENABLED, true, "bind", Map.of(VAULT, vault)),
+                profile,
+                connectorId,
+                true);
+    }
+
+    @Override
+    public InstallResult unbindConnector(String profile, String connectorId) {
+        return refusable(Map.of(PROFILE, profile, PLUGIN, connectorId, ENABLED, false), profile, connectorId, false);
+    }
+
+    /**
+     * 설치 요청을 보내고 409 와 401 을 각자의 예외로 바꾼다. 그 밖의 실패는 원문 없는 {@link IllegalStateException} 이다.
+     *
+     * <p>두 거절은 부르는 쪽이 사용자에게 다른 안내를 하므로 나눈다. 응답 본문은 읽지 않는다.
+     */
+    private InstallResult refusable(Map<String, Object> request, String profile, String connectorId, boolean enabled) {
+        final JsonNode body;
+        try {
+            body = client.put()
+                    .uri(baseUrl + "/api/connectors")
+                    .header(AUTHORIZATION, bearer())
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .body(request)
+                    .retrieve()
+                    .body(JsonNode.class);
+        } catch (HttpClientErrorException ex) {
+            int status = ex.getStatusCode().value();
+            if (status == HTTP_CONFLICT) {
+                throw new ConnectorInstallConflict();
+            }
+            if (status == HTTP_UNAUTHORIZED) {
+                throw new ConnectorProfileRejected();
+            }
+            throw new IllegalStateException();
+        } catch (RestClientException ex) {
+            throw new IllegalStateException();
+        }
+        if (body == null) {
+            throw new IllegalStateException();
+        }
+        return installResult(body, profile, connectorId, enabled);
+    }
+
+    private static InstallResult installResult(JsonNode body, String profile, String connectorId, boolean enabled) {
         requireText(body, PROFILE, profile);
         requireText(body, PLUGIN, connectorId);
         if (requiredBoolean(body, ENABLED) != enabled) {
@@ -197,17 +310,20 @@ public class HttpHermesConnectorClient implements HermesConnectorClient {
         boolean policyHook = hook != null && hook.isBoolean() && hook.asBoolean();
         for (JsonNode item : connectors) {
             if (connectorId.equals(text(item, PLUGIN))) {
+                // 옛 대시보드 plugin 은 방식을 내지 않는다. 그때는 옛 설치뿐이었다.
+                String mode = text(item, "mode");
                 return new ConnectorState(
                         profile,
                         requiredBoolean(item, ENABLED),
                         requiredBoolean(item, "configured"),
                         false,
-                        policyHook);
+                        policyHook,
+                        mode == null ? MODE_ISOLATED : mode);
             }
         }
         // 대시보드는 운영 목록에도 없고 소유 기록도 없는 plugin 을 목록에 넣지 않는다. 설치되지 않은 것이다.
         // 응답 모양이 틀린 것은 위에서 예외로 끝났으므로 여기 오는 것은 모양이 맞는 응답뿐이다.
-        return new ConnectorState(profile, false, false, false, policyHook);
+        return new ConnectorState(profile, false, false, false, policyHook, MODE_ISOLATED);
     }
 
     @Override
@@ -293,10 +409,11 @@ public class HttpHermesConnectorClient implements HermesConnectorClient {
                 fields,
                 requiredText(item.get("verify"), "tool"),
                 requiredText(item, "mcp_server"),
-                toolsets(item.get("toolsets")),
+                names(item.get("toolsets")),
                 optionalBoolean(item, "attachments", false),
                 readable ? schema(schema) : SCHEMA_UNREADABLE,
-                readable ? tools(tools) : List.of());
+                readable ? tools(tools) : List.of(),
+                names(item.get("skills")));
     }
 
     private static boolean readableSchema(JsonNode declared) {
@@ -349,8 +466,8 @@ public class HttpHermesConnectorClient implements HermesConnectorClient {
         return value.isBoolean() && value.asBoolean();
     }
 
-    /** 옛 대시보드 plugin 은 이 칸을 내지 않는다. 없으면 빈 목록이다. */
-    private static List<String> toolsets(JsonNode declared) {
+    /** 이름 목록 칸({@code toolsets}, {@code skills})을 읽는다. 옛 대시보드 plugin 은 이 칸을 내지 않고, 없으면 빈 목록이다. */
+    private static List<String> names(JsonNode declared) {
         if (declared == null || declared.isNull()) {
             return List.of();
         }

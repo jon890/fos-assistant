@@ -40,7 +40,7 @@ class HermesRunEventStreamTest {
     void hidesConnectorDetailAndPreservesToolMetadata() {
         RunEvent event = HermesRunEventStream.toRunEvent(mapper.readTree("""
                 {"event":"tool.completed","tool":"lookup","detail":"tiny secret","duration":0.5,"error":false}
-                """), true);
+                """), ToolDetailScope.ALL);
 
         assertThat(event.detail()).isEqualTo("[연결 도구 내용 가림]");
         assertThat(event.toolName()).isEqualTo("lookup");
@@ -83,7 +83,8 @@ class HermesRunEventStreamTest {
         RunEvent completed = parse("{\"event\":\"tool.completed\",\"tool\":\"skill_view\",\"detail\":\"shopping\"}");
         RunEvent subagent = parse("{\"event\":\"subagent.start\",\"tool\":\"skill_view\",\"preview\":\"shopping\"}");
         RunEvent connector = HermesRunEventStream.toRunEvent(
-                mapper.readTree("{\"event\":\"tool.started\",\"tool\":\"skill_view\",\"preview\":\"shopping\"}"), true);
+                mapper.readTree("{\"event\":\"tool.started\",\"tool\":\"skill_view\",\"preview\":\"shopping\"}"),
+                ToolDetailScope.ALL);
 
         assertThat(otherTool.skillName()).isNull();
         assertThat(completed.skillName()).isNull();

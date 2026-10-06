@@ -1,24 +1,31 @@
 /**
- * 연결용 에이전트의 커넥터 도구 호출이 Control Plane 의 판정을 거치는지 전체 흐름으로 본다.
+ * 연결을 붙인 일반 에이전트의 커넥터 도구 호출이 Control Plane 의 판정을 거치는지 전체 흐름으로 본다.
  *
- * <p>대역이 profile 플러그인의 hook 처럼 도구 호출마다 판정을 묻고, 허용된 호출만 커넥터 서버에 닿은 것으로 친다.
- * 앞의 커넥터 연결 시나리오가 해제로 끝나므로 여기서 다시 등록하고 끝에서 해제한다.
+ * <p>대역이 그 에이전트 profile 의 hook 처럼 도구 호출마다 판정을 묻고, 허용된 호출만 커넥터 서버에 닿은 것으로 친다.
+ * 시작에서 연결을 등록하고 비공개 에이전트에 붙여 반영 완료까지 한 뒤, 끝에서 그 에이전트를 지우고 연결을 해제한다.
  */
 import { call, expect, expectStatus, fail, step, type Context, type Scenario } from "../harness.ts";
-import { CONNECTOR_TOOL_PROBE, DEMO_CONNECTOR, DEMO_TOKEN_OK, type ConnectorToolCall } from "../fake-hermes.ts";
+import {
+  AGENDA_CONNECTOR,
+  CONNECTOR_TOOL_PROBE,
+  DEMO_CONNECTOR,
+  type ConnectorToolCall,
+} from "../fake-hermes.ts";
+import { attach, ConnectorSetup, connectionPath, useConnectorPolicy } from "../connector-support.ts";
 
-type ConnectionView = { status: string; agentCode: string | null };
 type Turn = { conversationId: string; assistantText: string };
-type ActionView = { actionId: string; status: string; resultText: string | null };
+type ActionView = { actionId: string; connectorId: string; status: string; resultText: string | null };
 type Message = { id: number; role: "USER" | "ASSISTANT" | "SYSTEM"; content: string };
 type Probe = { answer: string; conversationId: string };
 
-const CONNECTION = `/connections/${DEMO_CONNECTOR.id}`;
 /** `run.ts` 가 Control Plane 에 준 승인 대기 시간과 같아야 한다. */
 const APPROVAL_TTL_MS = 15_000;
 const PREFIX = `mcp__${DEMO_CONNECTOR.mcp_server}__`;
+const AGENDA_PREFIX = `mcp__${AGENDA_CONNECTOR.mcp_server}__`;
+/** 그 실행의 에이전트에 그 서버를 붙인 연결이 없어 줄을 남기지 않고 막은 호출의 글이다. */
+const NO_CONTEXT = "이 도구 호출의 실행 맥락을 확인하지 못해 실행하지 않았다.";
 
-/** 연결용 에이전트에게 도구 호출 한 줄을 보내고 대역이 답한 판정 줄을 돌려준다. */
+/** 연결을 붙인 에이전트에게 도구 호출 한 줄을 보내고 대역이 답한 판정 줄을 돌려준다. */
 async function probe(context: Context, agentCode: string, hermesTool: string, argsJson: string): Promise<string> {
   return (await probeIn(context, agentCode, hermesTool, argsJson)).answer;
 }
@@ -73,31 +80,17 @@ export const connectorPolicyScenario: Scenario = {
   name: "커넥터 도구 정책",
 
   async run(context) {
-    context.hermes.setConnectorPolicy(`${context.api.replace(/\/api\/v1$/, "")}/internal/hermes/connector-policy`);
-    let profile: string | undefined;
+    useConnectorPolicy(context);
+    const setup = new ConnectorSetup(context, context.tokens.dad);
     let failed = false;
     try {
-      step("시험 커넥터를 다시 등록하고 연결을 확인해 READY 로 만든다");
-      const requestsAtRegister = context.hermes.connectorRequests().length;
-      expectStatus(
-        await call(context, CONNECTION, {
-          method: "POST", token: context.tokens.dad, body: { values: { token: DEMO_TOKEN_OK, scope: "a" } },
-        }),
-        200,
-        "등록",
-      );
-      const installLine = context.hermes.connectorRequests().slice(requestsAtRegister)
-        .find((line) => /^install \S+ on$/.test(line));
-      expect(installLine !== undefined, "등록 동안 설치 요청이 없었다");
-      profile = installLine!.split(" ")[1]!;
-      const ready = expectStatus(
-        await call(context, `${CONNECTION}/check`, { method: "POST", token: context.tokens.dad }), 200, "연결 확인",
-      ).json<ConnectionView>();
-      expect(ready.status === "READY" && ready.agentCode !== null, `READY 가 아니다: ${JSON.stringify(ready)}`);
-      const agentCode = ready.agentCode!;
+      step("시험 커넥터를 등록하고 비공개 에이전트에 붙여 반영 완료까지 한다");
+      const agent = await setup.attachedAgent("메모 정책 비서");
+      const agentCode = agent.code;
+      const profile = agent.profile;
       expect(
         (context.hermes.profileEnv(profile).MCP_FOS_ASSISTANT_API_KEY ?? "") !== "",
-        "연결용 profile 의 env 에 MCP 토큰이 없다. hook 이 판정을 물을 때 쓰는 토큰이다",
+        "붙인 에이전트 profile 의 env 에 MCP 토큰이 없다. hook 이 판정을 물을 때 쓰는 토큰이다",
       );
       const mine = (): ConnectorToolCall[] =>
         context.hermes.connectorToolCalls().filter((entry) => entry.profile === profile);
@@ -270,36 +263,72 @@ export const connectorPolicyScenario: Scenario = {
       expect(foreign.startsWith("block "), `다른 서버의 도구가 막히지 않았다: ${foreign}`);
       expect(mine().length === 2, `다른 서버의 호출이 커넥터 서버에 닿았다: ${JSON.stringify(mine())}`);
 
-      step("정책 hook 이 꺼져 PENDING 이 되면 연결용 에이전트가 꺼져 대화가 거절되고 도구 호출이 없다");
-      context.hermes.setPolicyHook(profile, false);
-      const hookOff = expectStatus(
-        await call(context, `${CONNECTION}/check`, { method: "POST", token: context.tokens.dad }), 200, "hook 이 꺼진 연결 확인",
-      ).json<ConnectionView>();
-      expect(hookOff.status === "PENDING", `hook 이 꺼졌는데 PENDING 이 아니다: ${JSON.stringify(hookOff)}`);
-      const submitsBefore = context.hermes.submitCount();
-      const refused = expectStatus(
-        await call(context, "/chat/messages", {
-          method: "POST",
-          token: context.tokens.dad,
-          body: { text: `${CONNECTOR_TOOL_PROBE}\n${PREFIX}list_scopes {}`, agentCode },
-        }),
-        409,
-        "꺼진 연결용 에이전트와의 대화",
+      step("연결 둘을 붙이면 두 서버의 도구가 각자의 연결로 판정된다");
+      await setup.connect(AGENDA_CONNECTOR.id);
+      await attach(context, context.tokens.dad, agentCode, AGENDA_CONNECTOR.id);
+      const reachedBeforeAgenda = mine().length;
+      const agendaRead = await probe(context, agentCode, `${AGENDA_PREFIX}list_events`, "{}");
+      const demoRead = await probe(context, agentCode, `${PREFIX}list_scopes`, "{}");
+      expect(agendaRead === "allow" && demoRead === "allow", `두 서버의 읽기 도구가 모두 허용되지 않았다: ${agendaRead} / ${demoRead}`);
+      const agendaAsk = await probeIn(context, agentCode, `${AGENDA_PREFIX}add_event`, JSON.stringify({ title: "검사 일정" }));
+      const agendaActionId = requestNumber(agendaAsk.answer);
+      expect(
+        agendaAsk.answer.startsWith("block ") && agendaActionId !== undefined,
+        `둘째 연결의 쓰기 도구가 승인 요청 번호와 함께 막히지 않았다: ${agendaAsk.answer}`,
       );
-      expect(refused.json<{ code: string }>().code === "AGENT_DISABLED", `오류 코드가 다르다\n${refused.body}`);
-      expect(context.hermes.submitCount() === submitsBefore, "꺼진 에이전트의 대화가 Hermes 에 제출됐다");
-      expect(mine().length === 2, `PENDING 인 연결의 호출이 커넥터 서버에 닿았다: ${JSON.stringify(mine())}`);
+      const agendaApproved = expectStatus(
+        await call(context, `/connector-actions/${agendaActionId}/approve`, {
+          method: "POST", token: context.tokens.dad, body: { grant: null },
+        }),
+        200,
+        "둘째 연결의 승인",
+      ).json<ActionView>();
+      expect(
+        agendaApproved.status === "SUCCEEDED" && agendaApproved.connectorId === AGENDA_CONNECTOR.id,
+        `둘째 연결의 승인 줄이 그 커넥터의 SUCCEEDED 가 아니다: ${JSON.stringify(agendaApproved)}`,
+      );
+      expect(
+        JSON.stringify(mine().slice(reachedBeforeAgenda).map((entry) => [entry.hermesTool, entry.via]))
+          === JSON.stringify([
+            [`${AGENDA_PREFIX}list_events`, "hook"],
+            [`${PREFIX}list_scopes`, "hook"],
+            [`${AGENDA_PREFIX}add_event`, "execute"],
+          ]),
+        `두 서버의 호출이 각자의 서버에 닿지 않았다: ${JSON.stringify(mine().slice(reachedBeforeAgenda))}`,
+      );
+      // 승인한 결과를 잇는 자동 turn 이 끝나야 뒤에서 에이전트를 지울 수 있다.
+      await awaitMessages(
+        context,
+        agendaAsk.conversationId,
+        (messages) => messages.length >= 2
+          && messages.at(-2)!.role === "SYSTEM" && messages.at(-1)!.role === "ASSISTANT",
+        10_000,
+        "둘째 연결의 승인 결과",
+      );
+
+      step("둘째 연결을 해제하면 그 서버의 도구만 줄 없이 막히고 첫째 서버의 도구는 그대로 허용된다");
+      expectStatus(
+        await call(context, connectionPath(AGENDA_CONNECTOR.id), { method: "DELETE", token: context.tokens.dad }),
+        200,
+        "둘째 연결 해제",
+      );
+      setup.forget(AGENDA_CONNECTOR.id);
+      const reachedAfterAgenda = mine().length;
+      const agendaGone = await probe(context, agentCode, `${AGENDA_PREFIX}list_events`, "{}");
+      expect(agendaGone === `block ${NO_CONTEXT}`, `해제한 연결의 도구가 줄 없이 막히지 않았다: ${agendaGone}`);
+      const demoStill = await probe(context, agentCode, `${PREFIX}list_scopes`, "{}");
+      expect(demoStill === "allow", `남은 연결의 도구가 허용되지 않았다: ${demoStill}`);
+      expect(
+        JSON.stringify(mine().slice(reachedAfterAgenda).map((entry) => entry.hermesTool))
+          === JSON.stringify([`${PREFIX}list_scopes`]),
+        `해제한 연결의 호출이 커넥터 서버에 닿았다: ${JSON.stringify(mine().slice(reachedAfterAgenda))}`,
+      );
     } catch (error) {
       failed = true;
       throw error;
     } finally {
-      // 어디서 실패해도 대역과 연결을 되돌린다. 정리가 실패해도 원래 실패를 가리지 않는다.
-      if (profile !== undefined) context.hermes.setPolicyHook(profile, true);
-      try {
-        expectStatus(await call(context, CONNECTION, { method: "DELETE", token: context.tokens.dad }), 200, "해제");
-      } catch (cleanupError) {
-        if (!failed) throw cleanupError;
-      }
+      // 어디서 실패해도 에이전트와 연결을 되돌린다. 정리가 실패해도 원래 실패를 가리지 않는다.
+      await setup.cleanUp(failed);
     }
   },
 };

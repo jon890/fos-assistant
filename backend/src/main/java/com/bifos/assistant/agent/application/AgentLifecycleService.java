@@ -13,10 +13,12 @@ import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.user.infra.AppUserRepository;
 import java.security.SecureRandom;
 import java.time.Clock;
+import java.util.Objects;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 /**
  * 사용자가 에이전트를 만들고, 공개 범위를 바꾸고, 지우는 순서를 안다.
@@ -25,6 +27,10 @@ import org.springframework.transaction.annotation.Transactional;
  * Control Plane 이 만든 profile 만 profile 까지 거둔다. 근거는 ADR-033 이다.
  *
  * <p>그룹 공개 검사도 여기 둔다. 관리자 경로와 사용자 경로가 같은 코드를 불러야 한쪽만 느슨해지지 않는다.
+ *
+ * <p>공개 범위 변경과 지우기는 에이전트 번호를 트랜잭션 밖에서 읽고, 트랜잭션은 잠금 읽기로 시작한다. MySQL 의 REPEATABLE READ
+ * 는 트랜잭션의 첫 일반 읽기에서 읽는 시점을 정한다. 잠금을 기다리기 전에 일반 읽기를 하면 기다린 뒤의 바인딩 조회가 붙이기가
+ * 그 사이 커밋한 바인딩을 보지 못한다(ADR-083).
  */
 @Service
 @Slf4j
@@ -57,6 +63,9 @@ public class AgentLifecycleService {
     private final PeopleProperties peopleProperties;
     private final AgentProperties properties;
     private final ProfileSkillFiles skillFiles;
+    private final AgentConnectorBindings connectorBindings;
+    private final AgentConnectorDetacher connectorDetacher;
+    private final TransactionTemplate transactions;
     private final Clock clock;
 
     /**
@@ -87,20 +96,10 @@ public class AgentLifecycleService {
         if (!user.isAdmin()) {
             requireBelowLimit(user);
         }
-        return provisionAgent(user, name, visibility, false);
+        return provisionAgent(user, name, visibility);
     }
 
-    /**
-     * 커넥터 연결용 비공개 에이전트를 만든다.
-     *
-     * <p>사용자가 지울 수 없는 에이전트라 사용자당 상한을 거치지 않고, 상한 계산에서도 빠진다.
-     */
-    @Transactional
-    public Agent createConnectorAgent(CurrentUser user, String name) {
-        return provisionAgent(user, name, AgentVisibility.PRIVATE, true);
-    }
-
-    private Agent provisionAgent(CurrentUser user, String name, AgentVisibility visibility, boolean connectorManaged) {
+    private Agent provisionAgent(CurrentUser user, String name, AgentVisibility visibility) {
         String agentName = requireName(name);
         AgentVisibility effectiveVisibility = visibility == null ? AgentVisibility.PRIVATE : visibility;
 
@@ -133,9 +132,6 @@ public class AgentLifecycleService {
                     user.id(),
                     clock.instant());
             agent.markManagedProfile();
-            if (connectorManaged) {
-                agent.markConnectorManaged();
-            }
             // 제약 위반이 커밋 때가 아니라 여기서 드러나야 profile 을 거둘 수 있다.
             return agents.saveAndFlush(agent);
         } catch (RuntimeException failure) {
@@ -153,15 +149,28 @@ public class AgentLifecycleService {
      * 두는 요청은 주인을 비운 채 둔다.
      *
      * <p>켜진 에이전트를 그룹으로 바꿀 때만 도구를 검사한다. 관리자 경로의 수정과 같은 기준이다.
+     *
+     * <p>연결이 붙은 에이전트는 그룹으로 바꾸지 못한다(ADR-083). 붙이기와 같은 에이전트 행을 기다려 잠그므로, 붙이기가 그 잠금을
+     * 쥔 동안 온 요청은 붙이기가 커밋한 바인딩을 보고 거절된다.
      */
-    @Transactional
     public Agent changeVisibility(CurrentUser user, String code, AgentVisibility visibility) {
         if (visibility == null) {
             throw new ApiException(ErrorCode.VALIDATION_FAILED, "a visibility is required");
         }
-        Agent agent = requireManageable(user, code);
+        Long agentId = agents.findIdByCode(code).orElseThrow(AgentLifecycleService::notFound);
+        return transactions.execute(status -> changeVisibilityLocked(user, agentId, visibility));
+    }
+
+    private Agent changeVisibilityLocked(CurrentUser user, Long agentId, AgentVisibility visibility) {
+        Agent agent = requireManageable(user, lockById(agentId));
         Long ownerId =
                 visibility == AgentVisibility.PRIVATE && agent.ownerUserId() == null ? user.id() : agent.ownerUserId();
+        // 바인딩은 에이전트 행을 잠근 읽기를 마친 뒤에 읽는다. 앞으로 옮기면 붙이기가 커밋한 바인딩을 보지 못해 그룹 공개와
+        // 바인딩이 함께 남는다.
+        if (visibility == AgentVisibility.GROUP && connectorBindings.hasBindings(agent.id())) {
+            throw new ApiException(
+                    ErrorCode.AGENT_CONNECTIONS_REQUIRE_PRIVATE, "an agent with connections must stay private");
+        }
         // 꺼진 에이전트는 여기서 검사하지 않는다. 켤 때 관리자 경로의 수정이 같은 검사를 한다.
         if (agent.enabled() && visibility == AgentVisibility.GROUP) {
             requireGroupSafe(agent.apiBaseUrl(), agent.hermesProfile());
@@ -173,16 +182,37 @@ public class AgentLifecycleService {
     /**
      * 에이전트를 지운다. 행은 남기고 지운 시각을 적는다.
      *
-     * <p>Control Plane 이 만든 profile 이면 profile 을 먼저 거둔다. 거두다 실패하면 지우지 않고 그 오류를
-     * 올린다. 지운 것으로 적은 뒤에는 다시 거둘 길이 없기 때문이다. 운영에서 만든 profile 과 사용자의 기본
-     * profile 은 남긴다.
+     * <p>붙은 연결을 먼저 모두 뗀다(ADR-083). 사람이 만든 profile 은 거두지 않으므로 떼지 않으면 그 profile 에 커넥터 서버와
+     * 값이 남는다. 그 뒤 Control Plane 이 만든 profile 이면 profile 을 거둔다. 떼거나 거두다 실패하면 지우지 않고 그 오류를
+     * 올린다. 지운 것으로 적은 뒤에는 다시 거둘 길이 없기 때문이다. 운영에서 만든 profile 과 사용자의 기본 profile 은 남긴다.
      *
      * <p>profile 을 거둔 뒤 그 profile 의 스킬 디렉터리를 지운다. 이것이 실패해도 삭제는 성공으로 둔다.
      * profile 은 이미 지워져 되돌릴 수 없고, 남은 디렉터리는 아무것도 가리키지 않는다.
+     *
+     * <p>지우기는 주인과 {@code ADMIN} 이 한다. 옛 커넥터 에이전트도 지운다. 사용자가 새 방식으로 옮긴 뒤 그 에이전트를 지울
+     * 길이 이것뿐이다.
+     *
+     * <p>붙이기와 같은 차례로 주인의 사용자 행 다음에 에이전트 행을 잠근다. 떼기가 거절하는 승인 줄을 승인이 같은 사용자 행을
+     * 먼저 잠그고 실행으로 바꾸므로, 주인의 행을 잠가야 그 사이 실행으로 바뀌는 줄이 없다. 주인은 트랜잭션 밖에서 읽고 잠근 뒤
+     * 다시 견준다.
      */
-    @Transactional
     public void delete(CurrentUser user, String code) {
-        Agent agent = requireManageable(user, code);
+        Agent found = agents.findByCode(code).orElseThrow(AgentLifecycleService::notFound);
+        requireDeletable(user, found);
+        Long ownerId = found.ownerUserId();
+        transactions.executeWithoutResult(status -> deleteLocked(user, found.id(), ownerId));
+    }
+
+    private void deleteLocked(CurrentUser user, Long agentId, Long ownerId) {
+        if (ownerId != null) {
+            users.findByIdForUpdate(ownerId);
+        }
+        Agent agent = requireDeletable(user, lockById(agentId));
+        if (!Objects.equals(agent.ownerUserId(), ownerId)) {
+            // 주인을 읽은 뒤 바뀌었다. 잠근 사용자 행이 지금 주인의 것이 아니다.
+            throw new ApiException(ErrorCode.AGENT_BUSY, "the agent owner changed while deleting");
+        }
+        connectorDetacher.detachAll(agent);
         if (agent.profileManaged()) {
             provisioner.deprovision(agent.hermesProfile());
             removeSkillDirectory(agent.hermesProfile());
@@ -258,21 +288,50 @@ public class AgentLifecycleService {
     }
 
     /**
-     * 고칠 에이전트를 잠그고 읽는다. 주인과 {@code ADMIN} 만 통과한다.
+     * 에이전트 행을 잠그고 읽는다. 다른 요청이 잠금을 쥐고 있으면 풀릴 때까지 기다린다.
+     *
+     * <p>트랜잭션에서 그 에이전트를 처음 읽는 자리여야 한다. 먼저 읽어 둔 엔티티가 있으면 기다린 뒤에도 앞의 값이 남는다.
+     */
+    private Agent lockById(Long agentId) {
+        return agents.findByIdForUpdate(agentId).orElseThrow(AgentLifecycleService::notFound);
+    }
+
+    /**
+     * 고칠 에이전트인지 본다. 주인과 {@code ADMIN} 만 통과한다.
      *
      * <p>{@code ADMIN} 은 읽을 수 없는 남의 비공개 에이전트도 번호로 찾는다. 다른 사용자는 읽을 수 없으면
      * 없는 에이전트와 같게 {@code AGENT_NOT_FOUND}, 읽을 수 있지만 주인이 아니면 {@code FORBIDDEN} 이다.
      */
-    private Agent requireManageable(CurrentUser user, String code) {
-        Agent agent = user.isAdmin()
-                ? agents.findByCodeForUpdate(code)
-                        .filter(found -> !found.isDeleted())
-                        .orElseThrow(() -> new ApiException(ErrorCode.AGENT_NOT_FOUND, "no such agent"))
-                : agentService.requireReadableForUpdate(user, code);
+    private Agent requireManageable(CurrentUser user, Agent agent) {
+        requireVisible(user, agent);
         if (!agentService.isEditableBy(user, agent)) {
             throw new ApiException(ErrorCode.FORBIDDEN, "only the owner or an admin can manage this agent");
         }
         return agent;
+    }
+
+    /**
+     * 지울 에이전트인지 본다. {@link #requireManageable} 과 같되 옛 커넥터 에이전트도 통과한다.
+     *
+     * <p>{@link AgentService#isEditableBy} 가 옛 커넥터 에이전트를 막는 것은 성격, 스킬, 도구, 공개 범위를 고치지 못하게 하려는
+     * 것이다. 지우기에는 적용하지 않는다.
+     */
+    private static Agent requireDeletable(CurrentUser user, Agent agent) {
+        requireVisible(user, agent);
+        if (!user.isAdmin() && !Objects.equals(agent.ownerUserId(), user.id())) {
+            throw new ApiException(ErrorCode.FORBIDDEN, "only the owner or an admin can manage this agent");
+        }
+        return agent;
+    }
+
+    private static void requireVisible(CurrentUser user, Agent agent) {
+        if (agent.isDeleted() || !(user.isAdmin() || agent.isReadableBy(user.id()))) {
+            throw notFound();
+        }
+    }
+
+    private static ApiException notFound() {
+        return new ApiException(ErrorCode.AGENT_NOT_FOUND, "no such agent");
     }
 
     /**
