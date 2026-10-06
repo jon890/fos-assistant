@@ -32,6 +32,7 @@ import com.bifos.assistant.context.ContextProperties;
 import com.bifos.assistant.context.ContextSource;
 import com.bifos.assistant.context.ContextTrust;
 import com.bifos.assistant.context.ResultHeader;
+import com.bifos.assistant.hermes.HermesProperties;
 import com.bifos.assistant.hermes.HermesRunEventStream;
 import com.bifos.assistant.hermes.HermesRunsClient;
 import com.bifos.assistant.hermes.ToolDetailScope;
@@ -120,6 +121,7 @@ public class ChatService {
     private final AgentConnectorBindings connectorBindings;
     private final HermesRunsClient hermes;
     private final HermesRunEventStream eventStream;
+    private final HermesProperties hermesProperties;
     private final ExecutionRecorder executions;
     private final ExecutionEventRecorder eventRecorder;
     private final ExecutionEventRepository executionEvents;
@@ -1270,9 +1272,10 @@ public class ChatService {
     }
 
     /**
-     * Hermes 사건 스트림을 끝까지 읽는다.
+     * Hermes 사건 스트림이 닫히거나 중지 유예가 끝날 때까지 읽는다.
      *
-     * @param onEvent 사건을 화면으로 흘릴 곳. null 이면 한 번에 받는 경로라 실행 기록에만 남기고 답 조각 시각도 적지 않는다
+     * @param onEvent 사건을 화면으로 흘릴 곳. null 이면 한 번에 받는 경로라 실행 기록에만 남기고 답 조각 시각도 적지 않는다.
+     *     이 경로는 스트림을 기다리는 시간에도 {@code hermes.run-timeout} 상한을 두고, 넘으면 스트림을 닫은 채 결과 조회로 넘어간다
      */
     private void relay(PendingTurn pending, String runId, TurnHandle handle, Consumer<ChatEvent> onEvent) {
         // 일부 HTTP 스트림은 다른 스레드의 close 중에도 readLine 을 놓지 않는다.
@@ -1308,7 +1311,11 @@ public class ChatService {
                 streamDone.complete(null);
             }
         });
-        turns.awaitStreamOrGrace(handle, streamDone);
+        if (onEvent == null) {
+            turns.awaitStreamOrGrace(handle, streamDone, hermesProperties.runTimeout());
+        } else {
+            turns.awaitStreamOrGrace(handle, streamDone);
+        }
     }
 
     /**

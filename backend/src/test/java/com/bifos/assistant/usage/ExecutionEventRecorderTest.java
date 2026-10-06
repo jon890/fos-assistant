@@ -180,7 +180,7 @@ class ExecutionEventRecorderTest {
     }
 
     /**
-     * 실행의 시작과 끝은 {@code ChatService} 가 직접 적는다. 여기서도 옮기면 스트리밍 경로에만 같은
+     * 실행의 시작과 끝은 {@code ChatService} 가 직접 적는다. 여기서도 옮기면 사건 스트림을 읽은 실행에만 같은
      * 사건이 두 줄 남는다.
      */
     @Test

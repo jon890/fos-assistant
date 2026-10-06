@@ -87,6 +87,8 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import org.assertj.core.api.ThrowableAssert.ThrowingCallable;
@@ -528,7 +530,7 @@ class ChatServiceTest {
 
         ChatTurn turn = chat.send(dad, null, "메모 찾아 줘", "dad");
 
-        verify(eventStream, timeout(5000))
+        verify(eventStream)
                 .open(any(), any(), any(), any(), any(), eq(ToolDetailScope.prefixes(Set.of("mcp__demo__"))));
         List<ExecutionEvent> recorded = eventsOf(turn.executionId());
         assertThat(typesOf(recorded))
@@ -545,6 +547,31 @@ class ChatServiceTest {
         assertThat(executions.findById(turn.executionId()).orElseThrow().firstDeltaAt())
                 .as("한 번에 받는 경로는 첫 반응 시간 통계에 들지 않는다")
                 .isNull();
+    }
+
+    @Test
+    @DisplayName("한 번에 받는 경로에서 사건 스트림이 닫히지 않아도 실행 한도 뒤에는 결과 조회로 넘어가 답을 남긴다")
+    void sendMovesOnToResultLookupWhenEventStreamStaysOpen() throws Exception {
+        CurrentUser dad = member("dad@example.com", "dad");
+        stub().willReturn(HermesRunResult.of("run-1", "sess-1", "completed", "네", "dad", null, TokenUsage.empty()));
+        CountDownLatch neverClosed = new CountDownLatch(1);
+        doAnswer(invocation -> {
+                    neverClosed.await(30, TimeUnit.SECONDS);
+                    return null;
+                })
+                .when(eventStream)
+                .open(any(), any(), any(), any(), any(), any(ToolDetailScope.class));
+        try {
+            long startedAt = System.nanoTime();
+
+            ChatTurn turn = chat.send(dad, null, "안녕", "dad");
+
+            // 시험 설정의 hermes.run-timeout 은 1초다. 스트림을 끝까지 기다렸다면 30초가 걸린다.
+            assertThat(Duration.ofNanos(System.nanoTime() - startedAt)).isLessThan(Duration.ofSeconds(10));
+            assertThat(turn.assistantText()).isEqualTo("네");
+        } finally {
+            neverClosed.countDown();
+        }
     }
 
     @Test
@@ -959,8 +986,8 @@ class ChatServiceTest {
     }
 
     @Test
-    @DisplayName("한 번에 받는 경로는 RUN STARTED와 RUN COMPLETED 둘만 남긴다")
-    void nonStreamPathLeavesOnlyRunStartedAndRunCompleted() {
+    @DisplayName("한 번에 받는 경로로 돈 실행이 도구를 부르지 않았으면 RUN STARTED와 RUN COMPLETED 둘만 남긴다")
+    void nonStreamPathWithoutToolCallsLeavesOnlyRunStartedAndRunCompleted() {
         CurrentUser dad = member("dad@example.com", "dad");
         stub().willReturn(HermesRunResult.of("run-1", "sess-1", "completed", "네", "dad", null, TokenUsage.empty()));
 
