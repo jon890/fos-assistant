@@ -136,8 +136,8 @@ class ProfileSkillFilesAdapterTest {
     }
 
     private static void writeWeeklyPlan(SkillStore store, String skillMd, boolean published) {
-        String version = store.writeVersion(
-                PROFILE, Map.of("weekly-plan", new SkillBundle("weekly-plan", skillMd, List.of())));
+        String version =
+                store.writeVersion(PROFILE, Map.of("weekly-plan", new SkillBundle("weekly-plan", skillMd, List.of())));
         if (published) {
             store.markPublished(PROFILE, version);
         }

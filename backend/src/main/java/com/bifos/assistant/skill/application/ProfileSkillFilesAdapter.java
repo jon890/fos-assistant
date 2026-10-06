@@ -24,8 +24,7 @@ public class ProfileSkillFilesAdapter implements ProfileSkillFiles {
     @Override
     public List<String> uploadedRequestingSecrets(String profile) {
         return Stream.concat(
-                        skillStore.readCurrent(profile).values().stream(),
-                        skillStore.readAllPending(profile).stream())
+                        skillStore.readCurrent(profile).values().stream(), skillStore.readAllPending(profile).stream())
                 .filter(bundle -> SkillFrontmatter.storedRequestsSecrets(bundle.skillMd()))
                 .map(SkillBundle::name)
                 .distinct()
