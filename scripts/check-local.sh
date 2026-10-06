@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# 머지 전 로컬 검사를 차례로 돌린다. 돌리는 명령과 순서, 작업 폴더는 이 스크립트가 정본이다.
+# push 전 로컬 검사를 차례로 돌린다. 돌리는 명령과 순서, 작업 폴더는 이 스크립트가 정본이다.
 #
 # 처음 받은 checkout 에서도 돌도록 웹 의존성과 Playwright 의 chromium 을 먼저 설치한다.
 # 둘 다 이미 있으면 바로 끝난다. `pnpm build` 에는 web/Dockerfile 과 같은 자리표시자 환경 변수를 준다.
@@ -9,7 +9,7 @@
 #
 # 사용법: scripts/check-local.sh [--skip-browser] [브라우저 spec ...]
 # 인자는 브라우저 검사에만 넘긴다. 인자가 없으면 브라우저 검사 전체를 돌린다.
-# 머지 전 로컬 확인에서는 고친 화면의 spec 만 준다. 전체 브라우저 검사는 PR 의 CI 가 맡는다.
+# push 전 로컬 확인에서는 고친 화면의 spec 만 준다. CI 가 돌지 못하면 머지 전에 인자 없이 전체를 돌린다.
 set -Eeuo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
