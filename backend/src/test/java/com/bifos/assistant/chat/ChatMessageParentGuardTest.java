@@ -16,8 +16,8 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -67,7 +67,8 @@ class ChatMessageParentGuardTest {
         assertThat(conversations.discardEmptyTaskConversation(conversationId)).isEqualTo(1);
 
         assertThatThrownBy(() -> saveWith(method, message(conversationId)))
-                .isInstanceOfSatisfying(ApiException.class,
+                .isInstanceOfSatisfying(
+                        ApiException.class,
                         error -> assertThat(error.code()).isEqualTo(ErrorCode.CONVERSATION_NOT_FOUND));
 
         assertThat(messages.findByConversationIdOrderByIdAsc(conversationId)).isEmpty();
@@ -116,13 +117,13 @@ class ChatMessageParentGuardTest {
     @Test
     @DisplayName("목록에서 숨겼지만 물리적으로 남은 대화에는 늦은 실행 결과를 저장한다")
     void savesResultsForSoftDeletedConversation() {
-        transaction().executeWithoutResult(status ->
-                conversations.deleteIfActive(conversationId, 1L, Instant.now()));
+        transaction().executeWithoutResult(status -> conversations.deleteIfActive(conversationId, 1L, Instant.now()));
 
         ChatMessage saved = messages.save(message(conversationId));
 
         assertThat(saved.id()).isNotNull();
-        assertThat(conversations.findById(conversationId).orElseThrow().deletedAt()).isNotNull();
+        assertThat(conversations.findById(conversationId).orElseThrow().deletedAt())
+                .isNotNull();
     }
 
     @Test
@@ -133,12 +134,12 @@ class ChatMessageParentGuardTest {
                 assertThat(conversations.findById(conversationId)).isPresent();
                 try {
                     assertThat(executor.submit(() -> conversations.discardEmptyTaskConversation(conversationId))
-                            .get(10, TimeUnit.SECONDS)).isEqualTo(1);
+                                    .get(10, TimeUnit.SECONDS))
+                            .isEqualTo(1);
                 } catch (Exception error) {
                     throw new AssertionError(error);
                 }
-                assertThatThrownBy(() -> messages.save(message(conversationId)))
-                        .isInstanceOf(ApiException.class);
+                assertThatThrownBy(() -> messages.save(message(conversationId))).isInstanceOf(ApiException.class);
                 status.setRollbackOnly();
             });
         }
@@ -162,7 +163,8 @@ class ChatMessageParentGuardTest {
                 await(saved);
                 var cleanup = executor.submit(() -> transaction().execute(status -> {
                     // MySQL REPEATABLE READ 에서 메시지 커밋 전의 조회 시점을 먼저 만든다.
-                    assertThat(messages.findByConversationIdOrderByIdAsc(conversationId)).isEmpty();
+                    assertThat(messages.findByConversationIdOrderByIdAsc(conversationId))
+                            .isEmpty();
                     deleting.countDown();
                     return conversations.discardEmptyTaskConversation(conversationId);
                 }));
@@ -202,8 +204,7 @@ class ChatMessageParentGuardTest {
                             .isInstanceOf(ApiException.class);
                 });
                 await(writing);
-                assertThatThrownBy(() -> writer.get(200, TimeUnit.MILLISECONDS))
-                        .isInstanceOf(TimeoutException.class);
+                assertThatThrownBy(() -> writer.get(200, TimeUnit.MILLISECONDS)).isInstanceOf(TimeoutException.class);
                 release.countDown();
 
                 assertThat(cleanup.get(10, TimeUnit.SECONDS)).isEqualTo(1);
@@ -217,8 +218,8 @@ class ChatMessageParentGuardTest {
     }
 
     private Conversation taskConversation() {
-        Conversation conversation = conversations.save(
-                Conversation.startedForTask(1L, "합성 작업 대화", null, 1L, Instant.now()));
+        Conversation conversation =
+                conversations.save(Conversation.startedForTask(1L, "합성 작업 대화", null, 1L, Instant.now()));
         createdIds.add(conversation.id());
         return conversation;
     }
