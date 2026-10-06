@@ -236,8 +236,7 @@ test("새 보고는 다섯 칸 카드로 보이고 열면 점검 대화로 간�
         expect(response.ok()).toBeTruthy();
         const { lastCheck } = await response.json();
         const isNewCheck =
-          lastCheck != null &&
-          lastCheck.startedAt !== previousCheck?.startedAt;
+          lastCheck != null && lastCheck.startedAt !== previousCheck?.startedAt;
         return (
           isNewCheck &&
           lastCheck.status === "SUCCEEDED" &&
