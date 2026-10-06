@@ -274,6 +274,14 @@ SERVER_NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$")
 ERROR_WORDS = frozenset({"credential_rejected", "forbidden", "invalid_input", "unavailable", "outcome_unknown"})
 # 쓰기를 보냈는데 됐는지 모른다는 어휘다. 실행 경로만 504 로 답하고 `call` 은 `unavailable` 로 읽는다.
 OUTCOME_UNKNOWN = "outcome_unknown"
+# `errors` 표의 오류 코드 형식이다. 승인한 호출의 실행 경로가 이 코드를 Control Plane 에 그대로 넘긴다(ADR-092).
+ERROR_CODE_RE = re.compile(r"[A-Z][A-Z0-9_]{0,63}")
+# `errors` 표의 객체 항목이 고를 수 있는 복구 어휘다. 커넥터는 글을 쓰지 않고 어휘만 고른다.
+# Control Plane 의 `ConnectorRecovery` 와 같다. 한쪽을 바꾸면 다른 쪽도 바꾼다.
+ERROR_RECOVERIES = frozenset({"recheck", "reconnect", "fix_input", "retry_later"})
+# 오류 하나가 넘길 수 있는 세부 칸의 수와 정수 값의 절댓값 상한이다. Control Plane 이 같은 상한으로 다시 본다.
+ERROR_DETAILS_MAX = 4
+ERROR_DETAIL_INT_MAX = 1_000_000_000
 # `connector.json` 의 `toolsets` 가 열 수 있는 내장 toolset 이다. 읽기 전용 이미지 도구만 둔다(ADR-044).
 # 셸, 파일, 기억, 스킬, 위임 도구는 manifest 로 열리지 않는다.
 CONNECTOR_TOOLSETS = frozenset({"vision"})
@@ -966,11 +974,7 @@ def _load_connector(connector_id: str, entry: dict) -> dict:
     if operator_secrets:
         # 조용히 무시하면 비밀이 필요한 커넥터의 확인이 까닭 없이 실패한다. 받지 못하는 칸임을 밝힌다(ADR-046).
         raise ValueError("operator_secrets 는 아직 지원하지 않는다")
-    errors = declared.get("errors", {})
-    if not isinstance(errors, dict) or any(
-            not isinstance(code, str) or not isinstance(word, str) or word not in ERROR_WORDS
-            for code, word in errors.items()):
-        raise ValueError("errors 의 값은 공통 어휘 다섯 가운데 하나다")
+    errors, error_contracts = _connector_errors(declared.get("errors", {}))
     toolsets = declared.get("toolsets", [])
     if (not isinstance(toolsets, list) or any(not isinstance(name, str) for name in toolsets)
             or len(set(toolsets)) != len(toolsets) or set(toolsets) - CONNECTOR_TOOLSETS):
@@ -1060,6 +1064,7 @@ def _load_connector(connector_id: str, entry: dict) -> dict:
         "operator_env": frozenset(operator_env),
         "optional_env": optional_env,
         "errors": errors,
+        "error_contracts": error_contracts,
         "toolsets": list(toolsets),
         "attachments": attachments,
         "persona": persona,
@@ -1069,6 +1074,40 @@ def _load_connector(connector_id: str, entry: dict) -> dict:
         "tools": tools,
         "server": definition,
     }
+
+
+def _connector_errors(declared) -> tuple:
+    """`errors` 표를 `{코드: 공통 어휘}` 와 `{코드: 복구 계약}` 으로 나눠 검증한다(ADR-092).
+
+    항목은 공통 어휘 글이거나 `{category, recovery, details}` 객체다. 객체의 `recovery` 는 복구 어휘 하나이고
+    `details` 는 도구 오류에서 넘길 칸 이름의 목록이다. 칸 값의 모양은 실행 경로가 본다.
+    """
+    if not isinstance(declared, dict):
+        raise ValueError("errors 는 객체다")
+    words, contracts = {}, {}
+    for code, entry in declared.items():
+        if not isinstance(code, str) or not ERROR_CODE_RE.fullmatch(code):
+            raise ValueError("errors 의 코드는 대문자, 숫자, 밑줄로 64자까지다")
+        if isinstance(entry, dict):
+            if "category" not in entry or set(entry) - {"category", "recovery", "details"}:
+                raise ValueError("errors 의 객체 항목은 category 와 선택 칸 recovery, details 만 갖는다")
+            recovery = entry.get("recovery")
+            details = entry.get("details", [])
+            if recovery is not None and recovery not in ERROR_RECOVERIES:
+                raise ValueError("errors 의 recovery 는 복구 어휘 가운데 하나다")
+            if (not isinstance(details, list) or len(details) > ERROR_DETAILS_MAX
+                    or any(not isinstance(key, str) or not FIELD_KEY_RE.fullmatch(key) for key in details)
+                    or len(set(details)) != len(details)):
+                raise ValueError("errors 의 details 는 겹치지 않는 칸 이름 %d개까지다" % ERROR_DETAILS_MAX)
+            entry = entry["category"]
+            if entry == OUTCOME_UNKNOWN:
+                # 실행 경로가 504 로 답하는 코드다. 실패로 기록되지 않으므로 복구 정보를 실을 자리가 없다.
+                raise ValueError("outcome_unknown 인 코드는 복구 계약을 갖지 않는다")
+            contracts[code] = {"recovery": recovery, "details": tuple(details)}
+        if not isinstance(entry, str) or entry not in ERROR_WORDS:
+            raise ValueError("errors 의 값은 공통 어휘 다섯 가운데 하나다")
+        words[code] = entry
+    return words, contracts
 
 
 def _connector_manifest(connector_id: str) -> dict | None:
@@ -2209,21 +2248,67 @@ def _leaf_error_types(error) -> list:
     return [name for item in inner for name in _leaf_error_types(item)]
 
 
+_UNREADABLE = object()
+
+
+def _tool_payload(result):
+    """도구 결과의 구조화 값이나 첫 텍스트 칸의 JSON 이다. 둘 다 읽지 못하면 `_UNREADABLE` 이다."""
+    if result.structured_content is not None:
+        return result.structured_content
+    try:
+        text = next(item.text for item in result.content if item.type == "text")
+        return json.loads(text)
+    except (StopIteration, ValueError, TypeError):
+        return _UNREADABLE
+
+
+def _tool_error(payload) -> tuple:
+    """오류 결과의 `error` 객체와 그 코드다. 모양이 맞지 않으면 빈 객체와 None 이다."""
+    error = payload.get("error") if isinstance(payload, dict) else None
+    if not isinstance(error, dict):
+        return {}, None
+    code = error.get("code")
+    return error, code if isinstance(code, str) else None
+
+
 def _connector_call_answer(manifest: dict, result) -> dict:
     """도구 결과를 `{ok, result}` 나 `{ok, error}` 로 바꾼다. 읽지 못한 결과는 `unavailable` 이다."""
-    payload = result.structured_content
-    if payload is None:
-        try:
-            text = next(item.text for item in result.content if item.type == "text")
-            payload = json.loads(text)
-        except (StopIteration, ValueError, TypeError):
-            return {"ok": False, "error": "unavailable"}
+    payload = _tool_payload(result)
+    if payload is _UNREADABLE:
+        return {"ok": False, "error": "unavailable"}
     if result.is_error:
-        error = payload.get("error") if isinstance(payload, dict) else None
-        code = error.get("code") if isinstance(error, dict) else None
-        word = manifest["errors"].get(code, "unavailable") if isinstance(code, str) else "unavailable"
-        return {"ok": False, "error": word}
+        _, code = _tool_error(payload)
+        return {"ok": False, "error": manifest["errors"].get(code, "unavailable") if code else "unavailable"}
     return {"ok": True, "result": payload}
+
+
+def _safe_error_detail(value) -> bool:
+    """오류 세부 칸으로 넘길 수 있는 값인가. 상한 안의 정수와 boolean 만이다. 글과 실수, 배열, 객체는 넘기지 않는다."""
+    if isinstance(value, bool):
+        return True
+    return type(value) is int and abs(value) <= ERROR_DETAIL_INT_MAX
+
+
+def _connector_error_answer(manifest: dict, result, answer: dict) -> dict:
+    """실패 답에 커넥터가 선언한 오류 코드와 복구 계약을 더한다(ADR-092).
+
+    `errors` 표에 있는 코드만 더한다. 세부 칸은 그 코드의 `details` 가 적은 이름이고 값이 정수나 boolean 인 것만 옮긴다.
+    도구 오류의 다른 칸, 원문 메시지, 중첩 값은 옮기지 않는다. 복구 어휘는 도구 결과가 아니라 manifest 에서 꺼낸다.
+    """
+    payload = _tool_payload(result)
+    error, code = _tool_error(payload) if payload is not _UNREADABLE else ({}, None)
+    if code is None or code not in manifest["errors"]:
+        return answer
+    answer = {**answer, "code": code}
+    contract = manifest["error_contracts"].get(code)
+    if contract is None:
+        return answer
+    if contract["recovery"] is not None:
+        answer["recovery"] = contract["recovery"]
+    details = {key: error[key] for key in contract["details"] if key in error and _safe_error_detail(error[key])}
+    if details:
+        answer["details"] = details
+    return answer
 
 
 async def _connector_call_request(request, connector_id: str):
@@ -2343,7 +2428,9 @@ def _connector_execute_answer(manifest: dict, result) -> dict:
     `call` 처럼 `unavailable` 로 답하면 이미 실행된 쓰기가 실패로 기록된다.
     """
     answer = _connector_call_answer(manifest, result)
-    if result.is_error or answer["ok"]:
+    if result.is_error:
+        return _connector_error_answer(manifest, result, answer)
+    if answer["ok"]:
         return answer
     text = next((item.text for item in result.content if item.type == "text"), "")
     return {"ok": True, "result": {"text": text if isinstance(text, str) else ""}}
