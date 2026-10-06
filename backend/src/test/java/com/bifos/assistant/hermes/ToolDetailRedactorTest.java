@@ -157,6 +157,12 @@ class ToolDetailRedactorTest {
                 .isEqualTo("{\"filter_id\":\"[가림]\"}");
         assertThat(ToolDetailRedactor.redactArguments("{\"filter_id\":\"sk-" + id + "\"}", declared))
                 .isEqualTo("{\"filter_id\":\"[가림]\"}");
+        assertThat(ToolDetailRedactor.redactArguments("{\"filter_id\":\"AIza" + id + "\"}", declared))
+                .as("Google API key 접두사")
+                .isEqualTo("{\"filter_id\":\"[가림]\"}");
+        assertThat(ToolDetailRedactor.hidesArguments("{\"filter_id\":[\"ok_id\",\"ghp_" + id + "\"]}", declared))
+                .as("배열 항목의 접두사 key")
+                .isTrue();
         assertThat(ToolDetailRedactor.redactArguments("{\"filter_id\":\"desk-" + id + "\"}", declared))
                 .as("값 중간의 sk- 는 식별자의 일부다")
                 .isEqualTo("{\"filter_id\":\"desk-" + id + "\"}");

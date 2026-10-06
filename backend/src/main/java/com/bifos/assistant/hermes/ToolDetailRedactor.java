@@ -48,7 +48,7 @@ public final class ToolDetailRedactor {
     private static final Pattern JWT =
             Pattern.compile("(?<![A-Za-z0-9_-])([A-Za-z0-9_-]+)\\.[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+(?![A-Za-z0-9_-])");
     /** 서비스가 정한 접두사로 비밀이라고 알 수 있는 key 다. 식별자로 선언한 칸에서도 가린다(ADR-089). */
-    private static final String PREFIXED_SECRET = "(?i)(?:sk-|gh[pousr]_|github_pat_|xox[a-z]*-)[A-Za-z0-9_-]+";
+    private static final String PREFIXED_SECRET = "(?i)(?:sk-|gh[pousr]_|github_pat_|xox[a-z]*-|AIza)[A-Za-z0-9_-]+";
 
     /** 식별자 칸의 값이 알려진 접두사의 key 로 시작하는가. 값 중간의 {@code sk-} 같은 글자는 식별자의 일부다. */
     private static final Pattern PREFIXED = Pattern.compile("^" + PREFIXED_SECRET);
