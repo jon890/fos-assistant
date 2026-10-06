@@ -1918,7 +1918,7 @@ class ProfileApiRouteTest(unittest.TestCase):
             "docker_mount_cwd_to_workspace": False,
             "docker_run_as_host_user": False,
             "docker_network": True,
-            "docker_extra_args": list(extra_args),
+            "docker_extra_args": list(extra_args) + ["--label=fos-sandbox-profile=%s" % profile],
             "docker_volumes": ["%s/%s:/workspace" % (self.sandbox_root, owner)] + [m + ":ro" for m in mounts],
             "docker_forward_env": [],
             "docker_env": {},
@@ -1975,7 +1975,7 @@ class ProfileApiRouteTest(unittest.TestCase):
         self.assertTrue((self.sandbox_root / "user-1").is_dir())
 
     def test_sandbox_terminal_mounts_profile_entries_only_on_that_profile(self):
-        """profile 별 마운트는 그 실행 공간에만 붙고, network 가 없으면 추가 인자가 없다."""
+        """profile 별 마운트와 label 은 그 실행 공간에만 붙고, network 가 없으면 망 인자가 없다."""
         self.make_profile("blog")
         self.register_memory("blog")
         self.set_sandbox_policy(self.sandbox_policy(network=None, cpu=None, memory_mb=None))
@@ -2122,7 +2122,7 @@ class ProfileApiRouteTest(unittest.TestCase):
         self.save_sandbox_key()
         terminal = self.saved_config()["terminal"]
         self.assertEqual(terminal["docker_env"], env)
-        self.assertEqual(terminal["docker_extra_args"], ["--network=backend-test-net"])
+        self.assertEqual(terminal["docker_extra_args"], ["--network=backend-test-net", "--label=fos-sandbox-profile=owner"])
         self.assertEqual(terminal["docker_forward_env"], [])
         self.assertEqual(terminal["credential_files"], [])
         self.make_profile("alice")
@@ -2130,11 +2130,11 @@ class ProfileApiRouteTest(unittest.TestCase):
         self.save_sandbox_key(profile="alice")
         alice = yaml.safe_load((self.root / "alice/config.yaml").read_text(encoding="utf-8"))["terminal"]
         self.assertEqual(alice["docker_env"], {})
-        self.assertEqual(alice["docker_extra_args"], ["--network=sandbox-net"])
+        self.assertEqual(alice["docker_extra_args"], ["--network=sandbox-net", "--label=fos-sandbox-profile=alice"])
 
         original = (self.root / "owner/config.yaml").read_bytes()
         for key, value in (("env", env), ("network", "other-net"), ("read_only_mounts", []),
-                           ("profiles", {"owner": {}})):
+                           ("profiles", {"owner": {}}), ("docker_extra_args", ["--label=fos-sandbox-profile=alice"])):
             with self.subTest(key=key):
                 body = self.file_body()
                 body["config"][key] = value

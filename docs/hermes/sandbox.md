@@ -86,6 +86,9 @@ Control Plane 예약 작업과 매일 깨우기는 각 에이전트의 profile �
 **마운트를 바꿔도 같은 label 의 컨테이너를 다시 쓴다.** 프로세스 안의 캐시는 지워진 컨테이너를 옛 run 인자로 다시 만든다(`_find_reusable_container`, `_recreate_container`).
 그래서 설정이 바뀌면 키를 바꿔야 새 컨테이너가 생긴다.
 plugin 은 `docker_shared_container_key` 를 profile, 주인, 설정 지문으로 만들어 이 키를 바꾼다. 키가 바뀌면 label 과 캐시 키와 `/root` 디렉터리가 모두 새것이 된다.
+Hermes 의 `hermes-profile` label 은 공유 키를 쓸 때 profile 이름을 그대로 담지 않는다.
+plugin 은 정책에 등록된 profile 이름으로 `--label=fos-sandbox-profile=<profile>` 을 추가한다.
+proxy 검사와 유휴 정리, 복구는 이 label 로 정책의 profile 을 식별하며 API 요청에서 임의 label 을 받지 않는다.
 이전 키의 컨테이너와 `/root` 디렉터리는 남는다. 정리는 운영이 한다.
 
 ### 수명

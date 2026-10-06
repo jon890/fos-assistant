@@ -99,7 +99,8 @@ terminal:
   docker_mount_cwd_to_workspace: false
   docker_run_as_host_user: false
   docker_network: true
-  docker_extra_args: ["--network=<profile 의 network>"]   # network 가 없으면 빈 목록
+  # network 가 없으면 망 인자만 뺀다. label 은 정책에 등록된 profile 이름으로 만든다.
+  docker_extra_args: ["--network=<profile 의 network>", "--label=fos-sandbox-profile=<profile>"]
   docker_volumes:
     - <workspace_root>/<sandbox_owner>:/workspace
     - <read_only_mounts 의 각 항목>:ro
@@ -114,6 +115,7 @@ terminal:
 ```
 
 `docker_shared_container_key` 의 지문은 이 칸을 뺀 나머지 `terminal:` 을 키 정렬 JSON 으로 만든 sha256 앞 12자다. 주인이나 실행 공간 설정이 바뀌면 키가 바뀌어 Hermes 가 새 컨테이너를 만든다. 한 키는 profile 하나만 쓴다.
+`fos-sandbox-profile` label 은 proxy 검사와 유휴 정리, 복구에서 정책의 profile 을 식별한다. API 요청으로 label 을 지정하지 못한다.
 
 **기존 Hermes 예약 작업은 기본 profile(local)에 남으며 아직 격리되지 않았다.**
 named profile 의 도구 저장은 기본 profile 설정과 예약 작업을 바꾸지 않는다.

@@ -1933,6 +1933,9 @@ def _sandbox_terminal(policy: dict, profile: str, owner: str) -> dict:
     settings = policy["profiles"][profile]
     mounts = policy["read_only_mounts"] + settings["read_only_mounts"]
     network = settings["network"]
+    extra_args = ["--label=fos-sandbox-profile=%s" % profile]
+    if network:
+        extra_args.insert(0, "--network=%s" % network)
     terminal = {
         "backend": "docker",
         "cwd": "/workspace",
@@ -1943,7 +1946,7 @@ def _sandbox_terminal(policy: dict, profile: str, owner: str) -> dict:
         "docker_mount_cwd_to_workspace": False,
         "docker_run_as_host_user": False,
         "docker_network": True,
-        "docker_extra_args": ["--network=%s" % network] if network else [],
+        "docker_extra_args": extra_args,
         "docker_volumes": ["%s:/workspace" % _sandbox_workspace(policy, owner)] + ["%s:ro" % m for m in mounts],
         "docker_forward_env": [],
         "docker_env": settings["env"],
