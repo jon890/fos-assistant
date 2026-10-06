@@ -74,6 +74,8 @@ const TEST_HOLD_NEXT_SOUL_PATH = "/__test/hold-next-soul";
 const TEST_RELEASE_HELD_SOUL_PATH = "/__test/release-held-soul";
 const TEST_BUSY_PATH = "/__test/busy";
 const TEST_CLEAR_BUSY_PATH = "/__test/clear-busy";
+/** 준비 상태가 읽는 API 실행 toolset 조회를 Hermes 장애처럼 실패하게 한다. */
+const TEST_READINESS_OUTAGE_PATH = "/__test/readiness-outage";
 const TEST_HOLD_NEXT_CONFIG_PATH = "/__test/hold-next-config";
 const TEST_RELEASE_HELD_CONFIG_PATH = "/__test/release-held-config";
 /** 켜면 셸 도구가 든 설정 쓰기를 plugin 처럼 409 `sandbox_unavailable` 로 거절한다. 본문은 `{ unavailable: boolean }` 이다. */
@@ -642,6 +644,8 @@ export type FakeHermes = {
   /** 실행 제출을 429 로 거절하게 한다. 공유 gateway 가 한도에 닿은 상태를 흉내 낸다. */
   busy(): void;
   clearBusy(): void;
+  /** 준비 상태의 API 실행 toolset 조회를 429, 503, 또는 읽기 timeout 으로 실패시킨다. */
+  setReadinessOutage(outage: "busy" | "unavailable" | "timeout" | undefined): void;
   /** 실행 제출을 받은 횟수다. 429 뒤에 다시 보내지 않는 것을 이 수로 본다. */
   submitCount(): number;
   /** 대시보드로 만들어져 아직 남아 있는 profile 이름들 */
@@ -787,6 +791,7 @@ export function startFakeHermes(
   /** 입력 글과 그 입력의 대본이다. */
   const scripts = new Map<string, DemoScript>();
   let busy = false;
+  let readinessOutage: "busy" | "unavailable" | "timeout" | undefined;
   let submitCount = 0;
   let modelOptionsCalls = 0;
   let lastSubmittedRuntime: { provider?: string; model?: string; reasoningEffort?: string } = {};
@@ -1451,6 +1456,15 @@ export function startFakeHermes(
         return send(response, 204, null);
       }
 
+      if (request.method === "POST" && path === TEST_READINESS_OUTAGE_PATH) {
+        const { outage } = JSON.parse((await readBody(request)) || "{}") as { outage?: unknown };
+        if (outage !== undefined && outage !== "busy" && outage !== "unavailable" && outage !== "timeout") {
+          return send(response, 400, { error: "outage must be busy, unavailable, timeout, or omitted" });
+        }
+        readinessOutage = outage;
+        return send(response, 204, null);
+      }
+
       if (request.method === "POST" && path === TEST_HOLD_NEXT_CONFIG_PATH) {
         holdNextConfig = true;
         heldConfigReady = new Promise<void>((done) => { heldConfigWaiter = done; });
@@ -1533,6 +1547,10 @@ export function startFakeHermes(
         if (enabledToolsetsMatch) {
           const profile = enabledToolsetsMatch[1]!;
           if (!authorized(request, profile)) return send(response, 401, { error: "bad key for this profile" });
+          if (readinessOutage === "busy") return send(response, 429, RATE_LIMITED);
+          if (readinessOutage === "unavailable") return send(response, 503, { error: "Hermes is unavailable" });
+          // Control Plane 의 Hermes read timeout(10초)보다 길게 기다려 실제 timeout 경로를 탄다.
+          if (readinessOutage === "timeout") await wait(11_000);
           const enabled = new Set(apiServerToolsets.get(profile) ?? DEFAULT_API_SERVER_TOOLSETS);
           // 실제 listener 는 목록을 `data` 로 감싼다(v0.21.3 `gateway/platforms/api_server.py` 의 `_handle_toolsets`).
           return send(response, 200, {
@@ -1993,6 +2011,9 @@ export function startFakeHermes(
         },
         clearBusy: () => {
           busy = false;
+        },
+        setReadinessOutage: (outage) => {
+          readinessOutage = outage;
         },
         submitCount: () => submitCount,
         profiles: () => [...profiles.keys()],
