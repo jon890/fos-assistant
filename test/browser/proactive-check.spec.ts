@@ -212,6 +212,91 @@ test("켜진 깨우기가 도구 변경으로 막혀도 사용자가 끌 수 있
   }
 });
 
+for (const outage of ["busy", "unavailable", "timeout"] as const) {
+  test(`Hermes ${outage} 장애 중에도 켜진 매일 깨우기를 읽고 끌 수 있다`, async ({
+    page,
+    hermes,
+  }) => {
+    test.setTimeout(90_000);
+    try {
+      await prepare(page);
+      const enabled = await page.request.put(
+        `/api/agents/${AGENT_CODE}/proactive-check/schedule`,
+        { data: { enabled: true, time: "08:30", timezone: "Asia/Seoul" } },
+      );
+      expect(enabled.ok()).toBeTruthy();
+
+      await hermes.setReadinessOutage(outage);
+      await page.goto(`/agents/${AGENT_CODE}`);
+
+      const check = section(page);
+      const toggle = check.getByRole("switch", { name: "매일 깨우기 사용" });
+      await expect(toggle).toHaveAttribute("aria-checked", "true", {
+        timeout: 15_000,
+      });
+      await expect(check.getByLabel("시각", { exact: true })).toHaveValue(
+        "08:30",
+      );
+      await expect(check.getByLabel("시간대", { exact: true })).toHaveValue(
+        "Asia/Seoul",
+      );
+      await expect(
+        check.getByText(
+          "지금 준비 상태를 확인하지 못했어요. 매일 깨우기는 끌 수 있어요. 다시 켜려면 설정 화면을 새로 열어 주세요.",
+        ),
+      ).toBeVisible();
+
+      await toggle.click();
+      await expect(toggle).toHaveAttribute("aria-checked", "false");
+      await expect(check.getByRole("button", { name: "저장" })).toBeEnabled();
+      const saved = page.waitForResponse(
+        (response) =>
+          response.request().method() === "PUT" &&
+          new URL(response.url()).pathname ===
+            `/api/agents/${AGENT_CODE}/proactive-check/schedule`,
+      );
+      await check.getByRole("button", { name: "저장" }).click();
+      const savedResponse = await saved;
+      expect(savedResponse.ok()).toBeTruthy();
+      expect(await savedResponse.json()).toMatchObject({
+        enabled: false,
+        time: "08:30",
+        timezone: "Asia/Seoul",
+        schedulingAvailable: false,
+        blockers: [{ code: "READINESS_UNKNOWN" }],
+      });
+      await expect(toggle).toHaveAttribute("aria-checked", "false");
+      await expect(toggle).toBeDisabled();
+
+      const whileOutage = await page.request.get(
+        `/api/agents/${AGENT_CODE}/proactive-check/schedule`,
+      );
+      expect(whileOutage.ok()).toBeTruthy();
+      expect(await whileOutage.json()).toMatchObject({
+        enabled: false,
+        time: "08:30",
+        timezone: "Asia/Seoul",
+        schedulingAvailable: false,
+        blockers: [{ code: "READINESS_UNKNOWN" }],
+      });
+
+      await hermes.setReadinessOutage(undefined);
+      const persisted = await page.request.get(
+        `/api/agents/${AGENT_CODE}/proactive-check/schedule`,
+      );
+      expect(persisted.ok()).toBeTruthy();
+      expect(await persisted.json()).toMatchObject({
+        enabled: false,
+        time: "08:30",
+        timezone: "Asia/Seoul",
+      });
+    } finally {
+      await hermes.setReadinessOutage(undefined);
+      await restore(page);
+    }
+  });
+}
+
 test("새 보고는 다섯 칸 카드로 보이고 열면 점검 대화로 간다", async ({
   page,
   hermes,

@@ -46,6 +46,28 @@ class ProactiveScheduleServiceTest {
     private final CurrentUser user = new CurrentUser(10L, "owner@example.com", "주인", 1L, UserRole.MEMBER);
 
     @Test
+    @DisplayName("Hermes 준비 조회가 실패해도 일정 조회는 확인 불가 상태로 응답한다")
+    void returnsUnknownReadinessWhenHermesIsUnavailable() {
+        when(agents.requireReadable(user, "career")).thenReturn(agent);
+        when(readiness.check(agent)).thenThrow(new ApiException(ErrorCode.HERMES_UNAVAILABLE, "unavailable"));
+
+        var schedule = service(false).get(user, "career");
+
+        assertThat(schedule.enabled()).isFalse();
+        assertThat(schedule.schedulingAvailable()).isFalse();
+        assertThat(schedule.blockers()).containsExactly(CheckBlocker.of(CheckBlockerCode.READINESS_UNKNOWN));
+    }
+
+    @Test
+    @DisplayName("일정 조회는 Hermes 장애와 관계없는 오류를 숨기지 않는다")
+    void propagatesUnrelatedReadinessFailure() {
+        when(agents.requireReadable(user, "career")).thenReturn(agent);
+        when(readiness.check(agent)).thenThrow(new ApiException(ErrorCode.AGENT_NOT_FOUND, "missing"));
+
+        assertThatThrownBy(() -> service(false).get(user, "career")).isInstanceOf(ApiException.class);
+    }
+
+    @Test
     @DisplayName("지원하지 않는 에이전트의 일정 조회는 Hermes 도구 목록을 호출하지 않는다")
     void unsupportedAgentReturnsBlockerWithoutHermesCalls() {
         when(agents.requireReadable(user, "connector")).thenReturn(agent);

@@ -109,6 +109,10 @@ export type FakeHermesControl = {
   /** 동시 실행 한도에 닿아 실행 제출을 429 로 거절하게 한다. */
   busy(): Promise<void>;
   clearBusy(): Promise<void>;
+  /** 준비 상태의 toolset 조회를 실제 Hermes 장애처럼 실패하게 한다. */
+  setReadinessOutage(
+    outage: "busy" | "unavailable" | "timeout" | undefined,
+  ): Promise<void>;
   /** 다음 살펴보기 실행의 마지막 답 글을 정한다. 한 번 쓰면 그 뒤 살펴보기는 기본 답으로 돌아간다. */
   setProactiveOutput(output: string): Promise<void>;
   /** 마지막 실행 요청이 실어 온 provider, 모델, effort 다. 싣지 않은 칸은 빠진다. */
@@ -139,6 +143,14 @@ async function fakeHermesControl(): Promise<FakeHermesControl> {
       call("/__test/clear-blocked-providers", "POST"),
     busy: () => call("/__test/busy", "POST"),
     clearBusy: () => call("/__test/clear-busy", "POST"),
+    setReadinessOutage: async (outage) => {
+      const response = await fetch(`${baseUrl}/__test/readiness-outage`, {
+        method: "POST",
+        body: JSON.stringify(outage === undefined ? {} : { outage }),
+      });
+      if (!response.ok)
+        throw new Error(`가짜 Hermes 제어 요청이 실패했다: ${response.status}`);
+    },
     setProactiveOutput: async (output: string) => {
       const response = await fetch(`${baseUrl}/__test/proactive-output`, {
         method: "POST",
@@ -554,6 +566,8 @@ function startControlPlane(
       ASSISTANT_SKILL_AGENT_ROOT: skillRoot,
       HERMES_DASHBOARD_BASE_URL: dashboardBaseUrl,
       HERMES_DASHBOARD_TOKEN: FAKE_DASHBOARD_TOKEN,
+      // 장애 시험의 11초 지연이 실제 읽기 timeout 을 넘도록 시험 서버의 한도를 명시한다.
+      HERMES_READ_TIMEOUT: "10s",
       // 띄운 대역이 실행마다 빈 포트를 받아 쓰므로 고정값으로 적을 수 없다. 실제 주소를 넘긴다.
       HERMES_SHARED_LISTENER_BASE_URL: dashboardBaseUrl,
       ASSISTANT_PRICING_CATALOG: join(

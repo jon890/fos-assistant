@@ -58,7 +58,7 @@ public class ProactiveScheduleService {
                 .orElse(null);
         TaskTrigger trigger =
                 task == null ? null : triggers.findByTaskId(task.id()).orElse(null);
-        return view(user, agent, task, trigger);
+        return view(user, agent, task, trigger, displayBlockers(agent));
     }
 
     /** 발화 직전에 현재 toolset과 격리 실행 공간 조건을 다시 확인한다. */
@@ -77,7 +77,8 @@ public class ProactiveScheduleService {
         Instant now = clock.instant();
         String cron = cron(localTime);
         Instant next = TaskSchedule.nextAfter(TaskSchedule.parseCron(cron), zone, now);
-        if (enabled && !blockers(agent).isEmpty()) {
+        List<CheckBlocker> checkedBlockers = enabled ? blockers(agent) : unknownReadiness();
+        if (enabled && !checkedBlockers.isEmpty()) {
             throw new ApiException(
                     ErrorCode.PROACTIVE_CHECK_UNAVAILABLE, "this agent cannot schedule a proactive check now");
         }
@@ -95,11 +96,11 @@ public class ProactiveScheduleService {
             task.changeCheckEnabled(false, now);
         }
         TaskTrigger trigger = task == null ? null : requireTrigger(task);
-        return view(user, agent, task, trigger);
+        return view(user, agent, task, trigger, checkedBlockers);
     }
 
-    private ProactiveSchedule view(CurrentUser user, Agent agent, Task task, TaskTrigger trigger) {
-        List<CheckBlocker> blockers = blockers(agent);
+    private ProactiveSchedule view(
+            CurrentUser user, Agent agent, Task task, TaskTrigger trigger, List<CheckBlocker> blockers) {
         ProactiveCheck last = checks.findFirstByUserIdAndAgentIdOrderByIdDesc(user.id(), agent.id())
                 .orElse(null);
         return new ProactiveSchedule(
@@ -118,6 +119,25 @@ public class ProactiveScheduleService {
                                 last.finishedAt()),
                 blockers.isEmpty(),
                 blockers);
+    }
+
+    /** 저장된 설정은 Hermes 장애 중에도 읽도록 준비 상태 조회 실패만 화면용 차단 사유로 바꾼다. */
+    private List<CheckBlocker> displayBlockers(Agent agent) {
+        try {
+            return blockers(agent);
+        } catch (ApiException ex) {
+            boolean runtimeUnavailable = ex.code() == ErrorCode.HERMES_UNAVAILABLE
+                    || ex.code() == ErrorCode.HERMES_BUSY
+                    || ex.code() == ErrorCode.HERMES_PROFILE_KEY_MISSING;
+            if (!runtimeUnavailable) {
+                throw ex;
+            }
+            return unknownReadiness();
+        }
+    }
+
+    private static List<CheckBlocker> unknownReadiness() {
+        return List.of(CheckBlocker.of(CheckBlockerCode.READINESS_UNKNOWN));
     }
 
     private List<CheckBlocker> blockers(Agent agent) {

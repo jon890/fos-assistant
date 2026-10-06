@@ -43,8 +43,17 @@
 같은 사용자와 에이전트의 설정은 하나이고, 일반 예약 작업 목록과 10개 상한에서는 뺀다.
 점검 대화를 이어 쓰며 `conversation.task_id` 를 채우지 않는다.
 
+저장된 일정 조회와 끄기는 Hermes 가용성과 분리한다.
+조회 중 Hermes 준비 상태를 확인하지 못하면 저장된 켜짐 여부, 시각, 시간대와 마지막 결과를 그대로 준다.
+이때 `schedulingAvailable = false`, `blockers = [READINESS_UNKNOWN]` 이며 실행 가능으로 취급하지 않는다.
+끄기 트랜잭션에서는 Hermes 를 호출하지 않고 `PAUSED` 를 커밋한다.
+끄기 응답도 준비 조회를 생략하므로 같은 확인 불가 상태를 준다.
+화면에서는 확인 불가 사유를 보여 주고 켜기를 막되, 켜져 있는 일정은 끌 수 있다.
+다시 켜려면 화면을 새로 열어 준비 상태를 확인한다.
+Hermes 가 복구돼도 꺼진 일정은 발화하지 않으며, 이미 대기 중인 발화도 시작 단계에서 작업 상태를 다시 확인한다.
+
 발화 직전에 요청자의 권한, 에이전트 사용 가능 여부, 켜진 도구와 격리 준비를 다시 검사한다.
-`terminal`, `file`, `code_execution` 도구가 켜져 있고 `assistant.proactive-check.isolated-execution-enabled` 가 거짓이면 저장과 발화를 거절한다.
+`terminal`, `file`, `code_execution` 도구가 켜져 있고 `assistant.proactive-check.isolated-execution-enabled` 가 거짓이면 켜기 저장과 발화를 거절한다.
 [ADR-086](../adr/ADR-086-셸과-파일-도구는-사용자별-docker-실행-공간에서만-돈다.md)의 사용자별 실행 공간을 운영에서 확인한 뒤에만 이 설정을 켠다.
 이미 셸 계열 도구가 켜진 profile 에도 실행 공간 설정을 반영하고 기존 스킬을 점검해야 한다.
 이 설정은 전역이다. 일부 profile 만 격리했으면 기본값 `false` 를 유지해 local 에이전트의 깨우기를 열지 않는다.
