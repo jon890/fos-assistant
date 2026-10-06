@@ -39,13 +39,6 @@ function ArgRows({ rows }: { rows: { key: string; value: string }[] }) {
 }
 
 /**
- * 승인 줄의 인자를 그린다.
- *
- * <p>값이 빈 인자는 이름만 남긴다. 상시 허락을 줄 수 있는 줄은 짧은 인자 둘만 위에 보이고 나머지와 빈 인자를
- * 「자세히」 로 접는다. 상시 허락을 닫은 줄은 사람이 원문을 다 읽어야 하므로 접지 않고, 빈 인자의 이름도 그 아래에
- * 그대로 보인다(ADR-065).
- */
-/**
  * 가려진 인자가 있어 승인할 수 없는 줄의 안내다. 왜 막혔는지와 사용자가 할 일을 카드에서 바로 읽게 한다(ADR-088).
  */
 function HiddenArgsNotice({ argsJson }: { argsJson: string | null }) {
@@ -68,6 +61,13 @@ function HiddenArgsNotice({ argsJson }: { argsJson: string | null }) {
   );
 }
 
+/**
+ * 승인 줄의 인자를 그린다.
+ *
+ * <p>값이 빈 인자는 이름만 남긴다. 상시 허락을 줄 수 있는 줄은 짧은 인자 둘만 위에 보이고 나머지와 빈 인자를
+ * 「자세히」 로 접는다. 상시 허락을 닫은 줄은 사람이 원문을 다 읽어야 하므로 접지 않고, 빈 인자의 이름도 그 아래에
+ * 그대로 보인다(ADR-065).
+ */
 function ApprovalArgsView({ action }: { action: ConnectorAction }) {
   const args = approvalArgs(action.argsJson);
   // 상시 허락을 줄 수 없는 줄은 인자를 모두 펼친다. 스크롤 영역 아래로 밀리거나 접힌 인자를 읽지 않고 승인하지 않게 한다.
