@@ -208,7 +208,7 @@ hermes/bundle.sh --out <디렉터리> --mcp-url <Control Plane MCP 주소>
 - [`AGENTS.md`](AGENTS.md) 에 저장소의 규칙이 있다. 공개 저장소에 적으면 안 되는 것도 거기 있다.
 - [`docs/README.md`](docs/README.md) 는 문서 전체의 색인이다.
 - [`docs/adr/INDEX.md`](docs/adr/INDEX.md) 는 되돌리기 어려운 결정의 목록이다.
-- `scripts/check-local.sh` 는 CI 가 돌리는 검사를 돌린다. PR 을 열기 전에 고친 화면의 브라우저 spec 을 인자로 주어 돌린다. 인자가 없으면 브라우저 검사 전체를 돌린다. 자세한 것은 [`AGENTS.md`](AGENTS.md) 의 「확인」 절에 있다.
+- `scripts/check-local.sh` 는 push 전에 고친 화면의 브라우저 spec 을 인자로 주어 돌린다. 인자가 없으면 브라우저 검사 전체를 돌린다. 머지는 지금 main 과 합친 상태에서 실행한 PR CI 의 필수 검사 통과로 판정한다. CI 가 돌지 못하면 로컬에서 전체 검사를 돌린다. 자세한 것은 [`AGENTS.md`](AGENTS.md) 의 「확인」 절에 있다.
 
 ### 커넥터 기여
 
