@@ -255,7 +255,7 @@ public class ConnectorBindingService implements AgentConnectorDetacher {
      * <p>붙이기와 같은 차례로 주인의 사용자 행 다음에 에이전트 행을 잠근다. 에이전트 id 와 주인 id 는 트랜잭션 밖에서 읽고,
      * 트랜잭션의 첫 문장이 주인의 사용자 행 잠금이다. MySQL 의 REPEATABLE READ 는 첫 일반 읽기에서 읽기 시점을 정하므로,
      * 잠금 없는 읽기가 먼저 오면 사용자 행 잠금을 기다린 뒤에도 등록이 커밋한 새 재시작 대기 시각을 보지 못한다. 잠근 뒤 주인이
-     * 바뀌었으면 {@code AGENT_BUSY} 다. 그다음 지금 주인의 그룹이 관리자와 다르면 {@code FORBIDDEN} 이다.
+     * 바뀌었으면 {@code AGENT_BUSY} 다. 그다음 지금 주인의 그룹이 관리자와 다르면 {@code AGENT_NOT_FOUND} 다.
      */
     public AgentConnectionView confirmApplied(
             CurrentUser admin, String agentCode, String connectorId, Instant shownSince) {
@@ -294,8 +294,9 @@ public class ConnectorBindingService implements AgentConnectorDetacher {
             throw new ApiException(ErrorCode.AGENT_BUSY, "the agent owner changed while confirming");
         }
         // 그룹은 잠근 뒤의 지금 주인으로 본다. 잠그기 전에 보면 주인이 바뀐 요청도 옛 주인의 그룹으로 거절된다.
+        // 다른 그룹의 에이전트는 없는 것으로 답한다. 403 과 404 가 갈리면 다른 그룹의 에이전트 코드가 있는지 드러난다.
         if (owner == null || !owner.groupId().equals(admin.groupId())) {
-            throw new ApiException(ErrorCode.FORBIDDEN, "no such user");
+            throw agentNotFound();
         }
         ConnectorConnection connection = connections
                 .findByUserIdAndConnectorId(ownerId, connectorId)

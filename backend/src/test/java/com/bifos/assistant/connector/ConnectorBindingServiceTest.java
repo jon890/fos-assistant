@@ -562,8 +562,8 @@ class ConnectorBindingServiceTest {
     }
 
     @Test
-    @DisplayName("MEMBER 와 다른 그룹의 관리자는 반영 완료를 누를 수 없다")
-    void forbidsMemberAndOtherGroupAdminFromConfirming() {
+    @DisplayName("MEMBER 는 반영 완료를 누를 수 없고, 다른 그룹의 관리자에게는 그 에이전트가 없는 것으로 답한다")
+    void forbidsMemberAndHidesAgentFromOtherGroupAdminWhenConfirming() {
         CurrentUser owner = user(UserRole.MEMBER, 1L);
         CurrentUser outsider = user(UserRole.ADMIN, 2L);
         connect(owner, DEMO, VALUES);
@@ -571,7 +571,7 @@ class ConnectorBindingServiceTest {
         service.bind(owner, agent.code(), DEMO);
 
         assertCode(() -> service.confirmApplied(owner, agent.code(), DEMO, null), ErrorCode.FORBIDDEN);
-        assertCode(() -> service.confirmApplied(outsider, agent.code(), DEMO, null), ErrorCode.FORBIDDEN);
+        assertCode(() -> service.confirmApplied(outsider, agent.code(), DEMO, null), ErrorCode.AGENT_NOT_FOUND);
         assertThat(onlyBinding().status()).isEqualTo(BindingStatus.PENDING);
     }
 

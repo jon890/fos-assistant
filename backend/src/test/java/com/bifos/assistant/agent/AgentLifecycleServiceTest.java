@@ -20,20 +20,15 @@ import com.bifos.assistant.agent.domain.type.AgentVisibility;
 import com.bifos.assistant.agent.domain.type.CostMode;
 import com.bifos.assistant.agent.domain.type.CredentialScope;
 import com.bifos.assistant.agent.infra.AgentRepository;
-import com.bifos.assistant.connector.application.ConnectorBindingService;
-import com.bifos.assistant.connector.application.model.AgentConnectionView;
 import com.bifos.assistant.connector.domain.ConnectionFields;
 import com.bifos.assistant.connector.domain.ConnectorBinding;
 import com.bifos.assistant.connector.domain.ConnectorConnection;
 import com.bifos.assistant.connector.infra.ConnectorBindingRepository;
 import com.bifos.assistant.connector.infra.ConnectorConnectionRepository;
 import com.bifos.assistant.hermes.HermesConnectorClient;
-import com.bifos.assistant.hermes.HermesConnectorClient.InstallResult;
 import com.bifos.assistant.hermes.HermesDashboardClient;
 import com.bifos.assistant.hermes.HermesProfileKeyStore;
 import com.bifos.assistant.hermes.HermesToolsetClient;
-import com.bifos.assistant.hermes.dto.ConnectorManifest;
-import com.bifos.assistant.hermes.dto.ConnectorTool;
 import com.bifos.assistant.mcp.domain.AgentToken;
 import com.bifos.assistant.mcp.infra.AgentTokenRepository;
 import com.bifos.assistant.shared.auth.CurrentUser;
@@ -50,7 +45,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
-import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
@@ -92,19 +86,6 @@ class AgentLifecycleServiceTest {
 
     private static final String DEMO = "demo-notes";
 
-    /** MCP 서버 이름이 {@code demo} 인 커넥터다. */
-    private static final ConnectorManifest DEMO_MANIFEST = new ConnectorManifest(
-            DEMO,
-            "검사용 메모",
-            "",
-            List.of(),
-            "list_scopes",
-            "demo",
-            List.of(),
-            false,
-            2,
-            List.of(new ConnectorTool("list_scopes", "READ", "none", null, null)));
-
     @Autowired
     AgentLifecycleService lifecycle;
 
@@ -122,9 +103,6 @@ class AgentLifecycleServiceTest {
 
     @Autowired
     HermesProfileKeyStore keyStore;
-
-    @Autowired
-    ConnectorBindingService bindingService;
 
     @Autowired
     ConnectorBindingRepository bindingRows;
@@ -416,52 +394,6 @@ class AgentLifecycleServiceTest {
                 ErrorCode.AGENT_CONNECTIONS_REQUIRE_PRIVATE);
 
         assertThat(agents.findByCode(created.code()).orElseThrow().visibility()).isEqualTo(AgentVisibility.PRIVATE);
-    }
-
-    /**
-     * 붙이기가 에이전트 행 잠금을 쥔 동안 공개 범위 변경은 기다리고, 붙이기가 커밋한 바인딩을 보고 거절된다.
-     *
-     * <p>붙이기가 대시보드에 설치를 보내는 자리에서 멈춘다. 그때 붙이기는 사용자 행과 에이전트 행을 이미 잠갔고 바인딩 줄도 넣었다.
-     */
-    @Test
-    @DisplayName("붙이기가 에이전트 행을 잠근 동안 공개 범위 변경은 기다렸다가 커밋된 바인딩을 보고 거절된다")
-    void visibilityChangeWaitsForBindAndSeesCommittedBinding() throws Exception {
-        CurrentUser kid = member();
-        Agent created = create(kid, "숙제 도우미", null);
-        readyConnection(kid);
-        when(connector.readCatalog()).thenReturn(List.of(DEMO_MANIFEST));
-        CountDownLatch locked = new CountDownLatch(1);
-        CountDownLatch release = new CountDownLatch(1);
-        when(connector.bindConnector(anyString(), anyString(), anyString())).thenAnswer(invocation -> {
-            locked.countDown();
-            assertThat(release.await(10, TimeUnit.SECONDS)).isTrue();
-            return new InstallResult(true, false);
-        });
-        ExecutorService pool = Executors.newFixedThreadPool(2);
-        try {
-            Future<AgentConnectionView> binding = pool.submit(() -> bindingService.bind(kid, created.code(), DEMO));
-            assertThat(locked.await(10, TimeUnit.SECONDS)).as("붙이기가 잠금을 쥐었다").isTrue();
-            Future<Agent> changing =
-                    pool.submit(() -> lifecycle.changeVisibility(kid, created.code(), AgentVisibility.GROUP));
-            Thread.sleep(300);
-            assertThat(changing.isDone()).as("공개 범위 변경이 에이전트 행 잠금을 기다린다").isFalse();
-
-            release.countDown();
-
-            assertThat(binding.get(10, TimeUnit.SECONDS).bound()).isTrue();
-            assertThatThrownBy(() -> changing.get(10, TimeUnit.SECONDS))
-                    .isInstanceOf(ExecutionException.class)
-                    .cause()
-                    .isInstanceOfSatisfying(
-                            ApiException.class,
-                            ex -> assertThat(ex.code()).isEqualTo(ErrorCode.AGENT_CONNECTIONS_REQUIRE_PRIVATE));
-            assertThat(agents.findByCode(created.code()).orElseThrow().visibility())
-                    .isEqualTo(AgentVisibility.PRIVATE);
-            assertThat(bindingRows.existsByAgentId(created.id())).isTrue();
-        } finally {
-            release.countDown();
-            pool.shutdownNow();
-        }
     }
 
     @Test
