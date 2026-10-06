@@ -2145,7 +2145,7 @@ async def _connector_request(request):
         if unbind:
             result = await asyncio.to_thread(_connector_bind_config, profile_dir, body["plugin"], False)
             return JSONResponse({**response, **result}, status_code=200)
-        # 옛 설치가 사진 도구를 열면 그 에이전트 주인의 격리 실행 공간을 쓴다(ADR-090).
+        # 옛 설치가 사진 도구를 열면 그 에이전트 주인의 격리 실행 공간을 쓴다(ADR-091).
         sandbox_terminal = None
         attachment_guard = None
         local_execution = False
@@ -2865,7 +2865,7 @@ def _sandbox_attachment_path_identity(root: pathlib.Path, owner: str) -> tuple:
     """경로를 fd 기준으로 내려가며 모든 중간 링크를 거절하고 디렉터리 식별자를 기록한다.
 
     사용자 디렉터리는 Control Plane 이 이 요청 전에 만든다. Hermes 는 첨부 루트를 읽기 전용으로 보므로
-    여기서는 만들지 않고, 없으면 거절한다(ADR-090).
+    여기서는 만들지 않고, 없으면 거절한다(ADR-091).
     """
     directory = root / "users" / _sandbox_attachment_key(owner)
     flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW

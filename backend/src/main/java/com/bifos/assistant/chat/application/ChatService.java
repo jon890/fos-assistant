@@ -33,6 +33,7 @@ import com.bifos.assistant.context.ContextProperties;
 import com.bifos.assistant.context.ContextSource;
 import com.bifos.assistant.context.ContextTrust;
 import com.bifos.assistant.context.ResultHeader;
+import com.bifos.assistant.hermes.HermesProperties;
 import com.bifos.assistant.hermes.HermesRunEventStream;
 import com.bifos.assistant.hermes.HermesRunsClient;
 import com.bifos.assistant.hermes.ToolDetailScope;
@@ -121,6 +122,7 @@ public class ChatService {
     private final AgentConnectorBindings connectorBindings;
     private final HermesRunsClient hermes;
     private final HermesRunEventStream eventStream;
+    private final HermesProperties hermesProperties;
     private final ExecutionRecorder executions;
     private final ExecutionEventRecorder eventRecorder;
     private final ExecutionEventRepository executionEvents;
@@ -929,9 +931,8 @@ public class ChatService {
             HermesRunResult result;
             try {
                 runId = submit(pending);
-                if (streaming) {
-                    relay(pending, runId, handle, onEvent);
-                }
+                // 한 번에 받는 경로도 사건 스트림을 연다. 화면으로 흘릴 곳은 없고 도구 사건을 실행 기록에 남기려는 것이다(ADR-090).
+                relay(pending, runId, handle, streaming ? onEvent : null);
                 result = awaitCompletion(pending, runId);
             } catch (RuntimeException ex) {
                 cancelAndHoldIfStopConfirmed(handle, pending, choice);
@@ -1272,6 +1273,12 @@ public class ChatService {
         }
     }
 
+    /**
+     * Hermes 사건 스트림이 닫히거나 중지 유예가 끝날 때까지 읽는다.
+     *
+     * @param onEvent 사건을 화면으로 흘릴 곳. null 이면 한 번에 받는 경로라 실행 기록에만 남기고 답 조각 시각도 적지 않는다.
+     *     이 경로는 스트림을 기다리는 시간에도 {@code hermes.run-timeout} 상한을 두고, 넘으면 스트림을 닫은 채 결과 조회로 넘어간다
+     */
     private void relay(PendingTurn pending, String runId, TurnHandle handle, Consumer<ChatEvent> onEvent) {
         // 일부 HTTP 스트림은 다른 스레드의 close 중에도 readLine 을 놓지 않는다.
         // 중지 유예 시간이 지나면 요청 스레드를 먼저 풀어 상태 조회와 stopped 사건으로 진행한다.
@@ -1286,7 +1293,11 @@ public class ChatService {
                         event -> {
                             synchronized (pending) {
                                 if (!handle.cancelled().get() || !turns.isStopConfirmed(handle)) {
-                                    forward(pending, event, onEvent);
+                                    if (onEvent == null) {
+                                        append(pending, event);
+                                    } else {
+                                        forward(pending, event, onEvent);
+                                    }
                                 }
                             }
                         },
@@ -1294,12 +1305,19 @@ public class ChatService {
                         detailScope);
             } catch (ApiException ex) {
                 log.warn("Hermes event stream ended before final status runId={}", runId, ex);
+            } catch (RuntimeException ex) {
+                // 사건은 관측용이다. 읽다가 예기치 못한 오류가 나도 가려진 스레드 오류로 두지 않고 남긴다
+                log.warn("Hermes event stream failed runId={}", runId, ex);
             } finally {
                 turns.detachStream(handle);
                 streamDone.complete(null);
             }
         });
-        turns.awaitStreamOrGrace(handle, streamDone);
+        if (onEvent == null) {
+            turns.awaitStreamOrGrace(handle, streamDone, hermesProperties.runTimeout());
+        } else {
+            turns.awaitStreamOrGrace(handle, streamDone);
+        }
     }
 
     /**

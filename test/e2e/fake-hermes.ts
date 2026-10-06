@@ -305,7 +305,12 @@ type Run = {
   runtime?: { provider: string; model: string; route_source: string };
   /** 살펴보기 실행이면 사건 스트림이 흘릴 도구 사건과 기다릴 자리다. */
   proactive?: { tools: string[]; gate?: Promise<void> };
+  /** 정책이 허용해 커넥터 서버에 닿은 호출이다. 사건 스트림이 호출마다 시작과 완료 사건을 실제 Hermes 의 모양으로 흘린다. */
+  connectorCalls?: ConnectorCall[];
 };
+
+/** 허용된 커넥터 도구 호출 하나다. `hermesTool` 은 등록 이름이다. */
+type ConnectorCall = { hermesTool: string; argsJson: string };
 
 /**
  * 세션 하나가 마지막으로 실제로 쓴 provider 와 모델이다.
@@ -463,6 +468,17 @@ export const SUBAGENT_PROVIDER_PROBE = "자식 provider 확인 검사";
  * `allow` 인 호출만 커넥터 서버에 닿은 것으로 치고 `connectorToolCalls` 에 남긴다.
  */
 export const CONNECTOR_TOOL_PROBE = "커넥터 도구 검사";
+
+/** 이 글을 보내면 도구를 부르지 않고 답만 한다. 사건 스트림에는 답 조각과 끝 사건만 온다. */
+export const NO_TOOL_CALL_PROBE = "도구 없는 실행 검사";
+
+/**
+ * 허용된 커넥터 도구 호출의 완료 사건이 싣는 결과 미리보기다. 외부 서비스가 돌려준 글을 뜻하는 가짜 값이고, 실행 기록과 화면에는
+ * 어디에도 남지 않아야 한다.
+ */
+export const CONNECTOR_RESULT_SAMPLE = "외부-결과-4821";
+/** 허용된 커넥터 도구 호출의 `query` 인자로 보내 시작 사건의 미리보기에 실리는 가짜 값이다. 실행 기록과 화면에는 남지 않아야 한다. */
+export const CONNECTOR_ARGUMENT_SAMPLE = "외부-인자-4821";
 
 export type ConnectorToolCall = { profile: string; hermesTool: string; argsJson: string; via: "hook" | "execute" };
 
@@ -692,6 +708,16 @@ function send(response: ServerResponse, status: number, payload: unknown): void 
     "Content-Length": Buffer.byteLength(body),
   });
   response.end(body);
+}
+
+/**
+ * 실제 Hermes 가 MCP 도구의 `tool.started` 에 싣는 `preview` 다. 인자 전체가 아니라 `query`, `text`, `command`, `path`, `name`,
+ * `prompt`, `code`, `goal` 중 처음 있는 인자 하나의 값이고, 그 인자가 없으면 null 이다(`agent/display.py` 의 `_primary_arg_preview`).
+ */
+function toolStartedPreview(argsJson: string): string | null {
+  const args = JSON.parse(argsJson) as Record<string, unknown>;
+  const key = ["query", "text", "command", "path", "name", "prompt", "code", "goal"].find((candidate) => candidate in args);
+  return key === undefined ? null : String(args[key]);
 }
 
 function event(response: ServerResponse, payload: unknown): void {
@@ -1055,6 +1081,7 @@ export function startFakeHermes(
    * 원래 도구 이름은 등록 이름의 서버 앞부분으로 고른 커넥터가 선언한 도구일 때만 싣는다.
    *
    * @param callIdPrefix 도구 호출 id 의 앞부분. 한 session 에서 같은 id 를 다시 쓰면 앞선 판정이 되풀이되므로 부를 때마다 다르게 준다
+   * @param allowed 주면 허용된 호출을 여기에 더한다. 실행의 사건 스트림이 그 호출을 도구 사건으로 흘린다
    */
   const judgeConnectorCalls = async (
     profile: string,
@@ -1062,6 +1089,7 @@ export function startFakeHermes(
     sessionId: string | undefined,
     lines: readonly string[],
     callIdPrefix: string,
+    allowed?: ConnectorCall[],
   ): Promise<string> => {
     const output: string[] = [];
     for (const [index, line] of lines.entries()) {
@@ -1084,6 +1112,7 @@ export function startFakeHermes(
           const answer = await response.json() as { decision?: unknown; message?: unknown };
           if (answer.decision === "allow") {
             connectorToolCalls.push({ profile, hermesTool, argsJson, via: "hook" });
+            allowed?.push({ hermesTool, argsJson });
             output.push(`${hermesTool}: allow`);
             continue;
           }
@@ -2079,6 +2108,21 @@ export function startFakeHermes(
               event(response, { event: "message.delta", delta: streamedOutput.slice(offset, offset + 80) });
             }
           }
+          // 정책이 허용한 커넥터 도구 호출이다. 실제 Hermes(v0.21.5)가 붙은 서버의 도구에 보내는 모양이다. 모든 사건에 `run_id` 와
+          // `timestamp` 가 있다. 시작 사건의 `preview` 는 인자 하나의 값이고, 완료 사건의 `preview` 는 결과다.
+          // 정책 hook 이 막은 호출은 시작도 완료도 보내지 않으므로 허용된 호출만 여기에 온다.
+          for (const connectorCall of run.connectorCalls ?? []) {
+            const common = { run_id: runId, timestamp: Date.now() / 1000, tool: connectorCall.hermesTool };
+            event(response, { event: "tool.started", ...common, preview: toolStartedPreview(connectorCall.argsJson) });
+            event(response, { event: "tool.completed", ...common, duration: 0.05, error: false,
+              preview: JSON.stringify({ result: CONNECTOR_RESULT_SAMPLE }) });
+          }
+          // 도구를 부르지 않고 답만 하는 실행이다. 실행 기록에 도구 사건이 하나도 없는 실행을 만든다.
+          if (run.input === NO_TOOL_CALL_PROBE) {
+            event(response, { event: "run.completed" });
+            response.end();
+            return;
+          }
           const redactDetail = run.input === "도구 가리기 검사" || run.input === "스트림 정본 검사";
           event(response, { event: "tool.started", tool: "fake-tool",
             preview: redactDetail ? TOOL_DETAIL_SAMPLE : "started" });
@@ -2206,6 +2250,7 @@ export function startFakeHermes(
             submitted.session_id,
           )
           : undefined;
+        const connectorCalls: ConnectorCall[] = [];
         const connectorOutput = input.startsWith(CONNECTOR_TOOL_PROBE)
           ? await judgeConnectorCalls(
             profile!,
@@ -2213,6 +2258,7 @@ export function startFakeHermes(
             submitted.session_id,
             input.split("\n").slice(1).map((line) => line.trim()).filter((line) => line.length > 0),
             `connector-call-${submitCount}`,
+            connectorCalls,
           )
           : undefined;
         if (!starterRun) {
@@ -2289,6 +2335,7 @@ export function startFakeHermes(
           provider: submitted.provider ?? null,
           interruptEvents: input === "스트림 중단 검사",
           usage: FAKE_USAGE,
+          connectorCalls,
           proactive: proactiveRun
             ? {
                 tools: script === undefined ? DEFAULT_PROACTIVE_TOOLS : script.tools ?? [],

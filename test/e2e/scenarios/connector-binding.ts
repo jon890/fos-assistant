@@ -6,7 +6,15 @@
  * 관리자가 아닌 kid 다. 관리자인 dad 가 남의 에이전트에 붙이거나 떼지 못하는 것을 함께 보기 위해서다.
  */
 import { call, expect, expectStatus, fail, step, type Context, type Scenario } from "../harness.ts";
-import { DEMO_CONNECTOR, DEMO_TOKEN_OK, type ConnectorToolCall } from "../fake-hermes.ts";
+import {
+  CONNECTOR_ARGUMENT_SAMPLE,
+  CONNECTOR_RESULT_SAMPLE,
+  CONNECTOR_TOOL_PROBE,
+  DEMO_CONNECTOR,
+  DEMO_TOKEN_OK,
+  type ConnectorToolCall,
+} from "../fake-hermes.ts";
+import { readEventStream } from "../../../web/src/lib/stream.ts";
 import {
   bind,
   confirm,
@@ -20,7 +28,17 @@ import {
 } from "../connector-support.ts";
 
 type ActionView = { actionId: string; connectorId: string; status: string };
-type Message = { role: "USER" | "ASSISTANT" | "SYSTEM"; content: string };
+type Message = { role: "USER" | "ASSISTANT" | "SYSTEM"; content: string; executionId: number | null;
+  activity: { toolCount: number } | null };
+type ToolEventView = {
+  eventType: string;
+  toolName: string | null;
+  durationMs: number | null;
+  failed: boolean | null;
+  detail: string | null;
+};
+type ExecutionTree = { root: { events: ToolEventView[] } };
+type StreamEvent = { type: string; toolName?: string; detail?: string; executionId?: number };
 
 const CONNECTION = connectionPath(DEMO_CONNECTOR.id);
 const PREFIX = `mcp__${DEMO_CONNECTOR.mcp_server}__`;
@@ -57,6 +75,31 @@ async function awaitDelivered(context: Context, token: string, conversationId: s
 
 function expectCode(response: { body: string; json<T>(): T }, code: string, what: string): void {
   expect(response.json<{ code: string }>().code === code, `${what} 의 오류 코드가 ${code} 가 아니다\n${response.body}`);
+}
+
+/** 붙은 서버의 도구 호출 하나를 정책이 허용하는 입력이다. 인자와 결과의 가짜 값이 사건에 실린다. */
+function boundToolInput(): string {
+  return `${CONNECTOR_TOOL_PROBE}\n${PREFIX}list_scopes ${JSON.stringify({ query: CONNECTOR_ARGUMENT_SAMPLE })}`;
+}
+
+/**
+ * 그 실행의 도구 사건에 붙은 서버의 도구 호출이 시작과 완료로 남았는지 본다. 요청자가 `MEMBER` 라 `detail` 은 비어 있고(ADR-038),
+ * 응답 전체에 외부 서비스의 가짜 값이 없어야 한다. 저장하는 쪽의 가리기는 사건 스트림 시험이 본다.
+ */
+async function expectBoundToolRecorded(context: Context, token: string, executionId: number, what: string): Promise<void> {
+  const treeResponse = expectStatus(
+    await call(context, `/usage/executions/${executionId}/tree`, { token }), 200, `${what} 의 실행 트리`,
+  );
+  const bound = treeResponse.json<ExecutionTree>().root.events.filter((event) => event.toolName === `${PREFIX}list_scopes`);
+  expect(
+    JSON.stringify(bound.map((event) => [event.eventType, event.detail, event.failed]))
+      === JSON.stringify([["TOOL_STARTED", null, null], ["TOOL_COMPLETED", null, false]]),
+    `${what}: 붙은 서버의 도구 호출이 시작과 완료로 남지 않았거나 내용이 실렸다: ${JSON.stringify(bound)}`,
+  );
+  expect(bound[1]!.durationMs === 50, `${what}: 완료 사건의 걸린 시간이 대역이 보낸 50ms 가 아니다: ${bound[1]!.durationMs}`);
+  for (const sample of [CONNECTOR_ARGUMENT_SAMPLE, CONNECTOR_RESULT_SAMPLE]) {
+    expect(!treeResponse.body.includes(sample), `${what}: 실행 트리 응답에 외부 서비스의 값이 있다`);
+  }
 }
 
 export const connectorBindingScenario: Scenario = {
@@ -225,6 +268,51 @@ export const connectorBindingScenario: Scenario = {
         onCheck.bindings.find((binding) => binding.agentCode === agent.code)?.status === "READY",
         `hook 이 켜졌는데 바인딩이 READY 로 돌아오지 않았다: ${JSON.stringify(onCheck)}`,
       );
+
+      step("붙은 에이전트가 한 번에 받는 경로로 도구를 부르면 작업 과정에 그 호출이 남고 내용은 실리지 않는다");
+      const once = expectStatus(
+        await call(context, "/chat/messages", {
+          method: "POST", token: owner, body: { text: boundToolInput(), agentCode: agent.code },
+        }),
+        200,
+        "한 번에 받는 도구 호출 대화",
+      ).json<{ conversationId: string; executionId: number }>();
+      await expectBoundToolRecorded(context, owner, once.executionId, "한 번에 받는 경로");
+      const onceMessages = expectStatus(
+        await call(context, `/chat/conversations/${once.conversationId}/messages`, { token: owner }),
+        200,
+        "한 번에 받은 대화의 이력",
+      ).json<Message[]>();
+      expect(
+        (onceMessages.find((message) => message.executionId === once.executionId)?.activity?.toolCount ?? 0) >= 1,
+        "한 번에 받은 답에 작업 과정 요약이 붙지 않았다",
+      );
+
+      step("스트림으로 받는 경로도 같은 호출을 같은 모양으로 남기고 외부 서비스의 값을 보내지 않는다");
+      const streamed = expectStatus(
+        await call(context, "/chat/messages/stream", {
+          method: "POST", token: owner, body: { text: boundToolInput(), agentCode: agent.code },
+        }),
+        200,
+        "스트림 도구 호출 대화",
+      );
+      const received: StreamEvent[] = [];
+      await readEventStream<StreamEvent>(
+        new globalThis.Response(streamed.body, { headers: { "Content-Type": "text/event-stream" } }),
+        (event) => received.push(event),
+      );
+      const streamedDone = received.find((event) => event.type === "done");
+      expect(streamedDone?.executionId !== undefined, `스트림에 done 이 없다: ${streamed.body}`);
+      expect(
+        received.some((event) => event.type === "tool" && event.toolName === `${PREFIX}list_scopes`),
+        "스트림에 붙은 서버의 도구 사건이 없다",
+      );
+      // 답 조각은 대역이 보낸 입력을 되풀이하므로 인자의 가짜 값이 들어 있다. 도구 사건에는 어느 값도 없어야 한다.
+      const toolEvents = JSON.stringify(received.filter((event) => event.type === "tool"));
+      for (const sample of [CONNECTOR_ARGUMENT_SAMPLE, CONNECTOR_RESULT_SAMPLE]) {
+        expect(!toolEvents.includes(sample), "스트림의 도구 사건에 외부 서비스의 값이 있다");
+      }
+      await expectBoundToolRecorded(context, owner, streamedDone!.executionId!, "스트림 경로");
 
       step("떼면 바인딩이 사라지고 그 profile 에서 서버 이름과 값이 빠지며 같은 도구 호출이 줄 없이 막힌다");
       const reachedBeforeUnbind = mine().length;

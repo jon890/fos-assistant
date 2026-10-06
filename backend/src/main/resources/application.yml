@@ -156,7 +156,7 @@ assistant:
     max-files: 30
     max-bytes: 10485760
     retention-days: 30
-    # 다음 배포가 안정된 뒤 옛 경로 사본 쓰기를 끄고 별도 운영 작업으로 옛 파일을 정리한다(ADR-090)
+    # 다음 배포가 안정된 뒤 옛 경로 사본 쓰기를 끄고 별도 운영 작업으로 옛 파일을 정리한다(ADR-091)
     legacy-write-enabled: ${ASSISTANT_ATTACHMENT_LEGACY_WRITE_ENABLED:true}
     # 보관 기간이 지난 사진을 지우는 시각. Control Plane 의 시간대를 따른다
     cleanup-cron: "0 0 4 * * *"

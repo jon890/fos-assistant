@@ -50,6 +50,21 @@ class ToolDetailEventStreamTest {
 
             """;
 
+    /**
+     * Hermes v0.21.5 가 붙은 커넥터 서버의 도구에 실제로 보내는 모양이다. 모든 사건에 {@code run_id} 와 {@code timestamp} 가 있고, 완료
+     * 사건은 {@code result} 가 아니라 비밀값을 가리고 500자로 자른 결과 {@code preview} 를 싣는다. 값은 가짜다.
+     */
+    private static final String BOUND_TOOL_RAW = """
+            data: {"event": "tool.started", "run_id": "run_one", "timestamp": 1790000000.1, "tool": "mcp__demo__list_notes", "preview": "외부-글-4821"}
+
+            data: {"event": "tool.completed", "run_id": "run_one", "timestamp": 1790000000.2, "tool": "mcp__demo__list_notes", "duration": 0.05, "error": false, "preview": "{\\"note\\": \\"외부-결과-4821\\"}"}
+
+            data: {"event": "tool.started", "run_id": "run_one", "timestamp": 1790000000.3, "tool": "terminal", "preview": "ls"}
+
+            data: {"event": "tool.completed", "run_id": "run_one", "timestamp": 1790000000.4, "tool": "terminal", "duration": 0.1, "error": true, "preview": "없다"}
+
+            """;
+
     private static final String OTHER_TOOL_RAW = """
             data: {"event":"tool.completed","tool":"web_search","result":"Bearer short-secret 검색 결과"}
 
@@ -95,6 +110,29 @@ class ToolDetailEventStreamTest {
                     .extracting(RunEvent::toolName)
                     .containsExactly(
                             "mcp__demo__list_notes", "mcp__demo__list_notes", "web_search", "mcp__demoother__list");
+        } finally {
+            server.stop(0);
+        }
+    }
+
+    @Test
+    @DisplayName("붙은 커넥터 서버의 도구가 실제 모양으로 오면 이름과 시간과 실패는 남기고 내용만 가린다")
+    void keepsNameDurationAndFailureOfBoundConnectorToolInRealShape() throws IOException {
+        HttpServer server = startServer(BOUND_TOOL_RAW);
+        try {
+            List<RunEvent> events = read(server, ToolDetailScope.prefixes(Set.of("mcp__demo__")));
+
+            assertThat(events)
+                    .extracting(RunEvent::type)
+                    .containsExactly("tool.started", "tool.completed", "tool.started", "tool.completed");
+            assertThat(events)
+                    .extracting(RunEvent::toolName)
+                    .containsExactly("mcp__demo__list_notes", "mcp__demo__list_notes", "terminal", "terminal");
+            assertThat(events)
+                    .extracting(RunEvent::detail)
+                    .containsExactly("[연결 도구 내용 가림]", "[연결 도구 내용 가림]", "ls", "없다");
+            assertThat(events).extracting(RunEvent::durationMs).containsExactly(null, 50L, null, 100L);
+            assertThat(events).extracting(RunEvent::failed).containsExactly(null, false, null, true);
         } finally {
             server.stop(0);
         }

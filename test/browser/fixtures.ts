@@ -413,7 +413,7 @@ async function makeArtifactRoot(work: string): Promise<string> {
   return artifactRoot;
 }
 
-/** 첨부 루트다. 없으면 Control Plane 이 도구 설정 쓰기를 409 로 멈춘다(ADR-090). */
+/** 첨부 루트다. 없으면 Control Plane 이 도구 설정 쓰기를 409 로 멈춘다(ADR-091). */
 async function makeAttachmentRoot(work: string): Promise<string> {
   const attachmentRoot = join(work, "attachments");
   await mkdir(attachmentRoot, { recursive: true });

@@ -12,7 +12,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Component;
 
-/** 기동할 때 옛 첨부를 사용자별 디렉터리에 복사한다. 실패하면 준비 완료로 알리지 않는다(ADR-090). */
+/** 기동할 때 옛 첨부를 사용자별 디렉터리에 복사한다. 실패하면 준비 완료로 알리지 않는다(ADR-091). */
 @Component
 @RequiredArgsConstructor
 @Slf4j
