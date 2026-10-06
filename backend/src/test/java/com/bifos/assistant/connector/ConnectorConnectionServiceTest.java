@@ -278,7 +278,8 @@ class ConnectorConnectionServiceTest {
         Agent legacy = agent(user, true);
         ConnectorBinding legacyBound = readyBinding(legacy, connection, null);
         when(connector.bindConnector(anyString(), anyString(), anyString())).thenReturn(new InstallResult(true, false));
-        when(connector.putConnector(anyString(), anyString(), anyBoolean(), anyString())).thenReturn(new InstallResult(true, false));
+        when(connector.putConnector(anyString(), anyString(), anyBoolean(), anyString()))
+                .thenReturn(new InstallResult(true, false));
         Map<String, String> replaced = Map.of("token", OTHER_TOKEN);
 
         ConnectionSnapshot registered = service.register(user, DEMO, replaced);

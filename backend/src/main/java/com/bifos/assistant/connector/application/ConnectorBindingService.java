@@ -509,7 +509,9 @@ public class ConnectorBindingService implements AgentConnectorDetacher {
     private boolean reinstallNeedsRestart(ConnectorBinding binding, String connectorId, boolean legacy) {
         String profile = binding.agent().hermesProfile();
         if (legacy) {
-            return connector.putConnector(profile, connectorId, true, binding.agent().sandboxOwner()).pluginUpdated();
+            return connector
+                    .putConnector(profile, connectorId, true, binding.agent().sandboxOwner())
+                    .pluginUpdated();
         }
         InstallResult installed = connector.bindConnector(
                 profile, connectorId, binding.connection().vault());
