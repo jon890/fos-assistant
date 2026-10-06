@@ -113,22 +113,27 @@ key 값 자체를 적지 않는 것은 당연하고, **그것이 어디 있고 �
 
 ## 확인
 
-로컬 검사는 `scripts/check-local.sh` 하나로 돌린다. 돌리는 명령과 순서, 작업 폴더, `pnpm build` 의 자리표시자 환경 변수는 그 스크립트가 갖는다.
+구현자는 push 전에 `scripts/check-local.sh` 로 로컬 검사를 돌린다. 브라우저 검사는 고친 화면의 spec 만 인자로 준다.
+돌리는 명령과 순서, 작업 폴더, `pnpm build` 의 자리표시자 환경 변수는 그 스크립트가 갖는다.
 
 ```bash
 # cwd: 저장소 root
-# 머지 전 확인. 브라우저 검사는 고친 화면의 spec 만 돌린다
+# push 전 확인. 브라우저 검사는 고친 화면의 spec 만 돌린다
 scripts/check-local.sh usage-breakdown memory-document
 # 인자가 없으면 브라우저 검사까지 전체를 돌린다
 scripts/check-local.sh
 ```
 
-**스크립트의 모든 단계가 통과하면 머지한다. 머지마다 승인을 받지 않는다.** 브라우저 검사의 범위만 인자로 정한다.
-다만 통과를 **직접 돌려 확인한 것**이라야 한다. 브라우저 검사만은 PR 의 CI(`browser-mobile`, `browser-desktop`)가 통과한 것을 확인으로 본다.
-그래서 로컬에서는 위처럼 고친 화면과 관련된 spec 만 인자로 준다. 전체 브라우저 검사는 한 번에 10분 가까이 걸리고 여러 작업이 나란히 돌면 이 머신의 자원이 모자라 흔들린다.
-워커의 보고를 읽는 것은 확인이 아니다.
+**머지 판정은 PR 의 CI 결과로 한다. 머지마다 승인을 받지 않는다.** 다음 순서로 확인한다.
 
-GitHub Actions 의 [CI](.github/workflows/ci.yml) 도 위 검사를 돌린다. job 구조와 shard, 매일 실행, 실패 이슈는 그 파일이 갖는다.
+1. CI 가 PR 을 **지금 main 과 합친 상태**에서 실행했는지 확인한다. CI 가 시작된 뒤 main 이 바뀌었으면 `gh pr update-branch` 로 갱신하고 새 CI 가 끝날 때까지 기다린다.
+2. main 브랜치 보호가 정한 필수 검사의 통과를 직접 확인한다. 브랜치 보호의 `strict` 는 켜지 않는다.
+3. 아래 리뷰 규칙을 충족하면 머지한다. GitHub Actions 장애 등으로 CI 가 돌지 못하면 머지 전에 로컬에서 `scripts/check-local.sh` 전체를 직접 돌려 통과를 확인한다.
+
+워커의 보고를 읽는 것은 확인이 아니다. PR 의 CI 결과는 직접 확인할 수 있는 검사 결과다.
+
+GitHub Actions 의 [CI](.github/workflows/ci.yml) 는 backend(MySQL 마이그레이션 검사 포함), web, e2e, unit, hermes(커넥터 검사 포함), quality, public-safe 와 전체 브라우저 검사를 돌린다.
+job 구조와 shard, 매일 실행, 실패 이슈는 그 파일이 갖는다.
 PR 실패는 그 PR 에서 고친다. 모인 실패 이슈는 고치거나 까닭을 적어 닫는다.
 
 공개 정보 검사의 값 목록은 repository secret `PUBLIC_REPO_DENYLIST` 다. `fos-home-infra` 의 목록이 바뀌면 secret 도 다시 넣는다.
@@ -151,7 +156,7 @@ PR 을 열면 Claude 코드 리뷰가 돈다. 리뷰 기준은 `.github/workflow
 | 🟡 P3 부터 ⚪ P5 까지만 남았다 | 반영할지 판단해 머지해도 된다 |
 | 머지 방식 | `gh pr merge --merge`. 이력을 한 줄로 합치지 않는다 |
 
-리뷰는 읽기만 하고 실행하지 않는다. 리뷰가 도는 동안 「확인」 절의 검사를 직접 돌린다.
+리뷰는 읽기만 하고 실행하지 않는다. 리뷰가 도는 동안 「확인」 절에 따라 PR 의 CI 결과를 확인한다.
 
 `scripts/pr-risk-labels.sh` 가 위험 라벨을 단다. 2026-10-11 까지는 라벨만 달고 머지 규칙은 바꾸지 않는다.
 그 뒤 라벨이 실제 위험과 맞았는지 보고, 라벨이 붙은 PR 의 머지 전에 사람 확인을 받을지 정한다.
