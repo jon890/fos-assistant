@@ -133,8 +133,7 @@ class ChatMessageParentGuardTest {
             transaction().executeWithoutResult(status -> {
                 assertThat(conversations.findById(conversationId)).isPresent();
                 try {
-                    assertThat(executor.submit(() -> discard(conversationId))
-                                    .get(10, TimeUnit.SECONDS))
+                    assertThat(executor.submit(() -> discard(conversationId)).get(10, TimeUnit.SECONDS))
                             .isEqualTo(1);
                 } catch (Exception error) {
                     throw new AssertionError(error);
