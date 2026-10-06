@@ -44,8 +44,10 @@ plugin 디렉터리 root 에 둔다. 소유는 그 plugin 의 저장소다. 같�
   "toolsets": ["vision"],
   "attachments": true,
   "operator_env": ["ACCOUNTBOOK_API_BASE_URL"],
-  "errors": { "ACCOUNTBOOK_UNAUTHORIZED": "credential_rejected",
+  "errors": { "ACCOUNTBOOK_UNAUTHORIZED": { "category": "credential_rejected", "recovery": "reconnect" },
               "ACCOUNTBOOK_FORBIDDEN": "forbidden",
+              "ACCOUNTBOOK_BALANCE_CHANGED": { "category": "invalid_input", "recovery": "recheck",
+                                               "details": ["actual_balance"] },
               "ACCOUNTBOOK_NETWORK": "unavailable",
               "ACCOUNTBOOK_UNAVAILABLE": "unavailable" }
 }
@@ -67,7 +69,7 @@ plugin 디렉터리 root 에 둔다. 소유는 그 plugin 의 저장소다. 같�
 | `attachments` | 선택 boolean. 참이면 옛 커넥터 에이전트의 대화가 사진을 받는다. 없으면 거짓이다. 연결을 붙인 에이전트가 사진을 받는지는 그 에이전트의 설정이 정한다 |
 | `operator_env` | 사용자가 넣지 않고 운영자가 주는 env 이름. 값은 운영 설정이 갖는다. **비밀이 아닌 운영 설정만 둔다.** 값이 profile 설정과 소유 기록에 그대로 복제된다 |
 | `operator_secrets` | 운영자가 주는 비밀의 env 이름 목록. 지금은 지원하지 않는다. 비어 있지 않으면 그 커넥터를 카탈로그에 내지 않는다([ADR-046](adr/ADR-046-운영-비밀은-operator-env-와-다른-칸으로-선언하고-자식-mcp-프로세스에만-넣는다.md)) |
-| `errors` | 도구 오류 코드를 공통 어휘로 바꾸는 표. 표에 없는 코드는 `unavailable` 이다. `outcome_unknown` 은 쓰기를 보냈는데 됐는지 모른다는 뜻이다 |
+| `errors` | 도구 오류 코드를 공통 어휘로 바꾸는 표. 키는 `^[A-Z][A-Z0-9_]{0,63}$` 이다. 값은 공통 어휘 글이거나 아래 「오류 복구 계약」 의 객체다. 표에 없는 코드는 `unavailable` 이다. `outcome_unknown` 은 쓰기를 보냈는데 됐는지 모른다는 뜻이다 |
 
 - `options.tool` 과 `verify.tool` 은 `.mcp.json` 서버의 도구 가운데 `readOnlyHint: true` 인 것만 된다. 대시보드가 도구를 부를 때 `tools/list` 로 확인한다. manifest 를 읽을 때는 도구 이름의 형식만 본다. 카탈로그는 요청마다 읽으므로 읽을 때마다 MCP 서버를 띄우지 않는다
 - `.mcp.json` 서버 env 는 `fields[].env` 와 `operator_env` 의 합과 같아야 한다. 하나라도 다르면 그 커넥터를 카탈로그에 내지 않는다
@@ -86,6 +88,22 @@ plugin 디렉터리 root 에 둔다. 소유는 그 plugin 의 저장소다. 같�
 | `outcome_unknown` | `CONNECTOR_UNAVAILABLE` | 503 |
 
 `outcome_unknown` 은 승인한 호출의 실행 경로에서만 다르게 읽는다. 대시보드가 `{ok: false}` 대신 504 로 답하고 Control Plane 이 그 줄을 `UNKNOWN` 으로 둔다. 선택지와 확인 도구의 호출에서는 `unavailable` 과 같다.
+
+### 오류 복구 계약
+
+`errors` 의 값을 객체로 쓰면 승인한 실행이 그 코드로 실패할 때 코드와 복구 정보가 에이전트까지 간다([ADR-092](adr/ADR-092-승인한-실행의-실패는-커넥터가-선언한-오류-코드와-복구-어휘와-정수-세부만-에이전트까지-전한다.md)).
+
+| 칸 | 뜻 |
+| --- | --- |
+| `category` | 필수. 공통 어휘 하나. `outcome_unknown` 은 객체로 쓸 수 없다 |
+| `recovery` | 선택. `recheck`(대상이 바뀌었다. 다시 조회해 보이고 다시 묻는다), `reconnect`(연결의 권한이나 값이 모자라다), `fix_input`(인자를 고쳐 새로 승인을 받는다), `retry_later`(서비스가 응답하지 않았다) 가운데 하나 |
+| `details` | 선택. 도구 오류 객체의 맨 위 칸 가운데 옮길 이름. 넷까지, `^[a-z][a-z0-9_]{0,31}$`, 겹치지 않는다 |
+
+- 세부 값은 절댓값 10억 이하의 정수와 boolean 만 옮긴다. 글, 실수, 배열, 객체, null 은 그 칸만 버린다. 외부 서비스의 오류 원문은 이 길로 가지 않는다
+- 복구 어휘의 안내 글은 Control Plane 이 정한다. 커넥터는 글을 쓰지 않는다
+- 글로 선언한 코드도 승인한 실행의 실패 답에 코드는 실린다. 복구 어휘와 세부는 없다
+- 선택지와 확인 도구의 `call` 은 공통 어휘만 준다
+- 이 형식을 모르는 옛 대시보드 plugin 은 객체 항목이 있는 커넥터를 카탈로그에서 뺀다. plugin 과 커넥터를 함께 배포한다
 
 사용자별 호출 제한에 걸린 요청은 공통 어휘가 아니라 `CONNECTOR_RATE_LIMITED`(429) 로 끝난다. [커넥터 도구 정책](backend/connector-tool-policy.md) 의 「사용자별 호출 제한」 이 갖는다.
 
@@ -222,7 +240,7 @@ plugin 디렉터리 root 에 둔다. 소유는 그 plugin 의 저장소다. 같�
 - 대화가 있는 새 승인 줄이면 같은 트랜잭션에서 `APPROVAL_REQUESTED` 알림을 만든다([`backend/notification.md`](backend/notification.md))
 - 대화에는 `approval` 사건을 낸다. 사건은 승인 요청 번호만 싣고 줄의 내용을 싣지 않는다. 화면은 그 사건을 받으면 승인 줄을 다시 읽는다. 승인 카드는 이 응답으로만 그린다. 깨우기(`assistant.delegation-wake.enabled`)가 꺼져 있어도 이 사건과 아래의 거절, 만료 알림 줄은 나간다
 - 결과가 `SUCCEEDED`, `FAILED`, `UNKNOWN` 이면 그 대화에 알림 줄을 남기고 자동 turn 을 열어 결과를 전한다. 위임 결과와 같은 잠금과 같은 연속 상한을 쓴다([ADR-040](adr/ADR-040-위임-결과는-control-plane-이-부모-대화의-다음-turn-을-열어-전한다.md)). 위임 결과가 함께 있으면 한 turn 에 모아 전한다. 사건은 다음 turn 을 정하는 자리를 지나므로 보낼 대기 메시지가 있으면 그것이 먼저 간다([대기열과 중지](backend/turn-control.md) 의 「응답 중 대기열」)
-- 알림 줄은 결과마다 한 줄이고 이름과 상태만 쓴다. 결과 본문은 모델 입력에만 넣고 `<external-data>` 로 감싼다. 입력의 머리줄은 `[출처: 승인한 동작, 동작: <title>, 상태: <상태>, 끝난 시각: <시각>]` 이고, 오래된 결과에는 신선도와 안내 한 줄이 붙는다. 형식은 [`backend/context-bundle.md`](backend/context-bundle.md) 의 「Hermes 에 넘기는 형식」 이 갖는다. 요청 번호와 도구의 원래 이름은 모델이 답에 옮겨 화면에 나오지 않게 입력에 싣지 않는다. `UNKNOWN` 은 본문 대신 다시 실행하지 말고 사용자에게 확인을 부탁하라는 글을 넣는다
+- 알림 줄은 결과마다 한 줄이고 이름과 상태만 쓴다. 결과 본문은 모델 입력에만 넣고 `<external-data>` 로 감싼다. `FAILED` 는 본문을 싣지 않는다. 저장한 오류 계약이 있으면 머리줄에 `오류 코드` 와 `세부` 를 더하고 다음 줄에 `복구: <안내>` 를 붙인다(「오류 복구 계약」). 입력의 머리줄은 `[출처: 승인한 동작, 동작: <title>, 상태: <상태>, 끝난 시각: <시각>]` 이고, 오래된 결과에는 신선도와 안내 한 줄이 붙는다. 형식은 [`backend/context-bundle.md`](backend/context-bundle.md) 의 「Hermes 에 넘기는 형식」 이 갖는다. 요청 번호와 도구의 원래 이름은 모델이 답에 옮겨 화면에 나오지 않게 입력에 싣지 않는다. `UNKNOWN` 은 본문 대신 다시 실행하지 말고 사용자에게 확인을 부탁하라는 글을 넣는다
 - 알림 줄 저장, 줄의 `result_delivered_at`, 자동 turn 수 증가는 한 트랜잭션이다. 연속 상한에 닿아 turn 을 열지 못한 결과는 전하지 않은 채 남고, 사용자가 메시지를 보낸 뒤의 turn 이 닫힐 때 전해진다
 - 거절과 만료는 대화의 알림 줄만 남기고 자동 turn 을 열지 않는다. 만료는 `APPROVAL_EXPIRED` 알림도 만든다. 시스템이 실행하지 않고 끝낸 줄(`errorCode` 가 `not_executable`, `connection_changed`, `hidden_args`)은 거절이 아니라 취소했다는 글로 알린다. `hidden_args` 는 가려지는 내용이 있어 취소했다는 것과 에이전트에게 그 부분을 빼거나 다시 쓰게 하라는 것을 말한다. 전했다는 표시와 알림 줄을 새 트랜잭션 하나에 넣고 표시를 먼저 적으므로, 같은 줄의 사건이 겹쳐도 알림 줄은 하나다. 그 대화의 turn 이 도는 동안에는 남기지 않고 turn 이 닫힐 때 남긴다. 도는 turn 이 없는지 보는 것과 저장하는 것 사이에 turn 이 열리지 않도록 turn 잠금을 잡은 채 저장하고, 잠금을 못 잡으면 닫힐 때로 미룬다. 답보다 먼저 알림 줄이 끼면 그 답이 알림 줄에 이어진 자동 turn 의 답으로 읽히기 때문이다
 - 만료 정리는 1분마다 돈다. 같은 일정이 승인한 지 5분이 넘도록 `EXECUTING` 인 줄을 `UNKNOWN` 으로 바꾼다. 실행의 시간 제한은 60초라 그보다 오래 남은 줄은 결과를 적지 못한 것이다. 서버가 다시 뜨면 `EXECUTING` 을 모두 `UNKNOWN` 으로 바꾼다
@@ -236,13 +254,14 @@ plugin 디렉터리 root 에 둔다. 소유는 그 plugin 의 저장소다. 같�
 
 | 요청 | 성공 |
 | --- | --- |
-| `{profile, hermes_tool, args}` | `{ok: true, result}` 또는 `{ok: false, error: <공통 어휘>}` |
+| `{profile, hermes_tool, args}` | `{ok: true, result}` 또는 `{ok: false, error: <공통 어휘>, code?, recovery?, details?}` |
 
 - Control Plane 은 승인 줄의 에이전트(판정한 실행의 에이전트)에 붙은 바인딩의 profile 로 보낸다([ADR-083](adr/ADR-083-커넥터는-사용자가-한-번-연결하고-자기-에이전트에-여럿-붙여-그-에이전트가-도구를-직접-부른다.md))
 - 그 profile 에 그 커넥터의 소유 기록이 있어야 한다. 관리 표식이 있거나, 커넥터 표식만 있으면 그 항목이 바인딩 설치여야 한다
 - 커넥터 MCP 서버를 자식으로 한 번 띄워 `tools/list` 를 읽고, 등록 이름이 `hermes_tool` 과 같은 도구가 정확히 하나일 때 그 도구를 `args` 로 부른다. `schema: 2` 는 그 도구가 `tools` 에 있어야 한다
 - 자식의 env 는 그 profile `.env` 에서 manifest 의 `fields[].env` 만 꺼내고 운영 목록의 `env` 를 더한다. 나머지 값은 넘기지 않는다
 - 시간 제한은 60초, 동시 실행은 `call` 과 같은 한도를 함께 쓴다
+- 도구가 `errors` 표에 있는 코드로 실패하면 `code` 에 그 코드를 싣는다. 객체 항목이면 `recovery` 와 `details` 도 싣는다(「오류 복구 계약」). Control Plane 은 같은 규칙으로 다시 검증해 `FAILED` 줄의 `result_text` 에 `{"kind": "connector_error", "code", "details", "recovery"}` 로 저장한다
 - 도구가 `errors` 표에서 `outcome_unknown` 인 코드로 실패하면 504 로 답한다. 시간 초과와 같이 실행됐는지 모른다는 뜻이다
 - 대시보드는 승인 여부를 다시 확인하지 않는다. Control Plane 이 승인한 줄로만 부른다
 - 결과 본문은 Control Plane 으로 돌려주되 로그에 싣지 않는다
