@@ -5,18 +5,18 @@ import com.bifos.assistant.agent.infra.AgentRepository;
 import com.bifos.assistant.chat.application.ArtifactWriteRequest;
 import com.bifos.assistant.chat.application.ArtifactWriteResult;
 import com.bifos.assistant.chat.application.ArtifactWriteService;
+import com.bifos.assistant.chat.application.TurnQuestions;
 import com.bifos.assistant.followup.application.FollowUpDueAt;
 import com.bifos.assistant.followup.application.FollowUpService;
 import com.bifos.assistant.followup.application.model.FollowUpProposalOutcome;
-import com.bifos.assistant.chat.application.TurnQuestions;
 import com.bifos.assistant.memory.application.MemoryCaptureService;
 import com.bifos.assistant.memory.application.MemoryService;
 import com.bifos.assistant.memory.application.model.MemoryAccess;
 import com.bifos.assistant.memory.application.model.MemoryRememberRequest;
 import com.bifos.assistant.memory.application.model.MemoryRememberResult;
+import com.bifos.assistant.memory.domain.Memory;
 import com.bifos.assistant.memory.domain.MemoryPlacement;
 import com.bifos.assistant.memory.domain.type.MemorySensitivity;
-import com.bifos.assistant.memory.domain.Memory;
 import com.bifos.assistant.orchestration.application.AgentDelegationService;
 import com.bifos.assistant.orchestration.application.DelegationProperties;
 import com.bifos.assistant.orchestration.application.DelegationResult;
@@ -30,9 +30,9 @@ import com.bifos.assistant.usage.domain.AgentExecution;
 import com.bifos.assistant.usage.domain.DelegationKey;
 import com.bifos.assistant.usage.domain.type.ExecutionStatus;
 import com.bifos.assistant.usage.infra.ExecutionEventRepository;
+import java.text.Normalizer;
 import java.time.Clock;
 import java.time.Duration;
-import java.text.Normalizer;
 import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -79,6 +79,7 @@ public class McpToolService {
     public static final int MEMORY_EVIDENCE_MAX = 500;
     /** 근거 인용이 사용자 메시지를 가리킨다고 볼 최소 길이다. 공백을 빼고 센다. */
     private static final int MEMORY_EVIDENCE_MIN = 2;
+
     private static final int MEMORY_TITLE_MAX = 200;
     private static final Pattern WHITESPACE = Pattern.compile("\\s+");
 
@@ -537,7 +538,8 @@ public class McpToolService {
         if (!within(quoted.replace(" ", ""), MEMORY_EVIDENCE_MIN, MEMORY_EVIDENCE_MAX)) {
             return false;
         }
-        Optional<String> question = turnQuestions.questionOf(origin.id(), caller.user().id());
+        Optional<String> question =
+                turnQuestions.questionOf(origin.id(), caller.user().id());
         if (question.isEmpty() || !normalized(question.get()).contains(quoted)) {
             return false;
         }
@@ -546,7 +548,10 @@ public class McpToolService {
 
     /** NFC 로 맞추고 연속 공백을 하나로 줄이고 앞뒤 공백을 지운다. */
     private static String normalized(String text) {
-        return WHITESPACE.matcher(Normalizer.normalize(text, Normalizer.Form.NFC)).replaceAll(" ").strip();
+        return WHITESPACE
+                .matcher(Normalizer.normalize(text, Normalizer.Form.NFC))
+                .replaceAll(" ")
+                .strip();
     }
 
     private static boolean within(String text, int min, int max) {

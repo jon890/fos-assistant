@@ -51,6 +51,7 @@ public class ContextAssembler implements OmittedMemories {
             evidence 에는 사용자 메시지의 구절을 그대로 넣는다. 이미 기억한 사실이 바뀌었으면 그 번호를 memory_id 로 주어 고친다.
             도구 결과가 제안으로 남았다고 하면 사용자가 받아들여야 기억한다는 것을 답에서 알린다. 사용자가 기억해 달라고 했으면 기억했는지 답에서 알린다.
             """.stripTrailing();
+
     private static final String INDEX_HEADER = """
             # 더 물어볼 수 있는 것
 
@@ -74,7 +75,8 @@ public class ContextAssembler implements OmittedMemories {
      * @param remembers Control Plane MCP 도구를 받고 먼저 살펴보기가 아닌 실행이다. 옛 커넥터 에이전트는 거짓이다
      */
     public AssembledContext withResponseInstructions(AssembledContext context, boolean remembers) {
-        String instructions = remembers ? RESPONSE_INSTRUCTIONS + SEPARATOR + MEMORY_INSTRUCTIONS : RESPONSE_INSTRUCTIONS;
+        String instructions =
+                remembers ? RESPONSE_INSTRUCTIONS + SEPARATOR + MEMORY_INSTRUCTIONS : RESPONSE_INSTRUCTIONS;
         if (context.instructions() != null && !context.instructions().isBlank()) {
             instructions += SEPARATOR + context.instructions();
         }

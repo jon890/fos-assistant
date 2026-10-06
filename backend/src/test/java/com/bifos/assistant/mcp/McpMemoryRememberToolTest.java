@@ -196,8 +196,7 @@ class McpMemoryRememberToolTest {
     void proposesFromRunWithoutQuestion() throws Exception {
         messages.save(ChatMessage.fromUser(conversation.id(), dad.id(), QUESTION, Instant.now()));
 
-        assertThat(text(call(remember("다른 사람", "다른 사람은 홍길동이다", "다른 사람은 홍길동이야"))))
-                .isEqualTo(PROPOSED);
+        assertThat(text(call(remember("다른 사람", "다른 사람은 홍길동이다", "다른 사람은 홍길동이야")))).isEqualTo(PROPOSED);
     }
 
     @Test
@@ -206,8 +205,7 @@ class McpMemoryRememberToolTest {
         askedInThisTurn();
         toolStarted("mcp__fos_assistant__memory_read");
 
-        assertThat(text(call(remember("다른 사람", "다른 사람은 홍길동이다", "다른 사람은 홍길동이야"))))
-                .isEqualTo(REMEMBERED);
+        assertThat(text(call(remember("다른 사람", "다른 사람은 홍길동이다", "다른 사람은 홍길동이야")))).isEqualTo(REMEMBERED);
 
         toolStarted("web_search");
         assertThat(text(call(remember("사는 곳", "서울에 산다", "홍길동이야")))).isEqualTo(PROPOSED);
@@ -321,7 +319,8 @@ class McpMemoryRememberToolTest {
         call(remember("취미", "등산을 좋아한다", null));
 
         List<CapturedMemory> listed = captureService.capturesOf(currentDad(), conversation.id());
-        assertThat(listed).extracting(captured -> captured.capture().kind())
+        assertThat(listed)
+                .extracting(captured -> captured.capture().kind())
                 .containsExactly(MemoryCaptureKind.CREATED, MemoryCaptureKind.PROPOSED);
 
         CapturedMemory created = listed.getFirst();
@@ -331,11 +330,12 @@ class McpMemoryRememberToolTest {
         assertThat(captureService.capturesOf(currentDad(), conversation.id()))
                 .extracting(captured -> captured.capture().kind())
                 .containsExactly(MemoryCaptureKind.PROPOSED);
-        CapturedMemory proposal = captureService.capturesOf(currentDad(), conversation.id()).getFirst();
-        assertThatThrownBy(() -> captureService.undo(currentDad(), proposal.capture().id()))
+        CapturedMemory proposal =
+                captureService.capturesOf(currentDad(), conversation.id()).getFirst();
+        assertThatThrownBy(() ->
+                        captureService.undo(currentDad(), proposal.capture().id()))
                 .isInstanceOfSatisfying(
-                        ApiException.class,
-                        ex -> assertThat(ex.code()).isEqualTo(ErrorCode.MEMORY_REVISION_CONFLICT));
+                        ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.MEMORY_REVISION_CONFLICT));
     }
 
     @Test
@@ -364,7 +364,8 @@ class McpMemoryRememberToolTest {
     }
 
     private void askedInThisTurn() {
-        ChatMessage question = messages.save(ChatMessage.fromUser(conversation.id(), dad.id(), QUESTION, Instant.now()));
+        ChatMessage question =
+                messages.save(ChatMessage.fromUser(conversation.id(), dad.id(), QUESTION, Instant.now()));
         questions.save(ExecutionQuestion.of(dadRun.id(), question.id(), Instant.now()));
     }
 

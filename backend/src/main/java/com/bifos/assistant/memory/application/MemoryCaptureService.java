@@ -127,11 +127,15 @@ public class MemoryCaptureService {
         if (rows.isEmpty()) {
             return List.of();
         }
-        Map<Long, Memory> byId = memories.findAllById(
-                        rows.stream().map(MemoryCapture::memoryId).distinct().toList())
-                .stream()
-                .filter(memory -> memory.isReadableBy(user.id(), user.groupId()))
-                .collect(Collectors.toMap(Memory::id, Function.identity()));
+        Map<Long, Memory> byId =
+                memories
+                        .findAllById(rows.stream()
+                                .map(MemoryCapture::memoryId)
+                                .distinct()
+                                .toList())
+                        .stream()
+                        .filter(memory -> memory.isReadableBy(user.id(), user.groupId()))
+                        .collect(Collectors.toMap(Memory::id, Function.identity()));
         return rows.stream()
                 .filter(row -> byId.containsKey(row.memoryId()))
                 .map(row -> new CapturedMemory(row, byId.get(row.memoryId())))

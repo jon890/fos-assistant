@@ -13,18 +13,18 @@ import com.bifos.assistant.chat.application.model.ResultDeliveryStart;
 import com.bifos.assistant.chat.domain.ChatArtifact;
 import com.bifos.assistant.chat.domain.ChatAttachment;
 import com.bifos.assistant.chat.domain.ChatMessage;
-import com.bifos.assistant.chat.domain.ExecutionQuestion;
 import com.bifos.assistant.chat.domain.ChatPendingMessage;
 import com.bifos.assistant.chat.domain.Conversation;
+import com.bifos.assistant.chat.domain.ExecutionQuestion;
 import com.bifos.assistant.chat.domain.RunSession;
 import com.bifos.assistant.chat.domain.type.DeliveryAttemptStatus;
 import com.bifos.assistant.chat.domain.type.MessageRole;
 import com.bifos.assistant.chat.domain.type.ModelSelectionMode;
 import com.bifos.assistant.chat.infra.ArtifactStore;
 import com.bifos.assistant.chat.infra.ChatMessageRepository;
-import com.bifos.assistant.chat.infra.ExecutionQuestionRepository;
 import com.bifos.assistant.chat.infra.ChatPendingMessageRepository;
 import com.bifos.assistant.chat.infra.ConversationRepository;
+import com.bifos.assistant.chat.infra.ExecutionQuestionRepository;
 import com.bifos.assistant.context.AssembledContext;
 import com.bifos.assistant.context.ContextAssembler;
 import com.bifos.assistant.context.ContextBodyMode;
@@ -875,8 +875,7 @@ public class ChatService {
                     : contextAssembler.assemble(user, routed.agent().id());
             // 먼저 살펴보기는 memory_remember 를 받지 않으므로 기억 지침도 싣지 않는다(ADR-080, ADR-091)
             context = contextAssembler.withResponseInstructions(
-                    context,
-                    !routed.agent().connectorManaged() && !(intent instanceof TurnIntent.ProactiveCheck));
+                    context, !routed.agent().connectorManaged() && !(intent instanceof TurnIntent.ProactiveCheck));
             ExecutionContextSnapshot snapshot = new ExecutionContextSnapshot(
                     context.chars(),
                     null,

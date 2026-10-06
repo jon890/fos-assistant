@@ -275,8 +275,7 @@ public class Memory {
         if (placement.sensitivity() == MemorySensitivity.SENSITIVE) {
             throw new IllegalArgumentException("a sensitive memory cannot be remembered without review");
         }
-        Memory memory =
-                accepted(MemoryScope.USER, ownerUserId, null, title, body, placement, ownerUserId, now);
+        Memory memory = accepted(MemoryScope.USER, ownerUserId, null, title, body, placement, ownerUserId, now);
         memory.proposedByExecutionId = proposedByExecutionId;
         memory.proposalDedupKey = proposalDedupKey;
         return memory;

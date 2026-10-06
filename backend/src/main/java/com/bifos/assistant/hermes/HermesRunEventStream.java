@@ -163,7 +163,8 @@ public class HermesRunEventStream {
             detail = null;
         }
         if (toolName != null
-                && (toolName.endsWith(FOLLOW_UP_PROPOSE_TOOL_SUFFIX) || toolName.endsWith(MEMORY_REMEMBER_TOOL_SUFFIX))) {
+                && (toolName.endsWith(FOLLOW_UP_PROPOSE_TOOL_SUFFIX)
+                        || toolName.endsWith(MEMORY_REMEMBER_TOOL_SUFFIX))) {
             // 시작의 preview 에 할 일 제목이나 기억할 사실이 실린다. 관리자가 실행 기록에서 남의 글을 읽지 못하게
             // 시작과 끝 모두 남기지 않는다
             detail = null;
