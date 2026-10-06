@@ -41,7 +41,7 @@ public class ContextAssembler implements OmittedMemories {
             | 예시 | 내용 |
             """.stripTrailing();
     /**
-     * {@code memory_remember} 을 받는 에이전트에 싣는 기억 지침이다(ADR-091). 기준과 예시는 도구 설명과 같은 뜻이다.
+     * {@code memory_remember} 을 받는 에이전트에 싣는 기억 지침이다(ADR-092). 기준과 예시는 도구 설명과 같은 뜻이다.
      */
     static final String MEMORY_INSTRUCTIONS = """
             # 기억
@@ -70,7 +70,7 @@ public class ContextAssembler implements OmittedMemories {
     }
 
     /**
-     * 공통 답변 지침을 넣는다. {@code memory_remember} 를 받는 실행이면 기억 지침을 그 뒤에 더한다(ADR-091).
+     * 공통 답변 지침을 넣는다. {@code memory_remember} 를 받는 실행이면 기억 지침을 그 뒤에 더한다(ADR-092).
      *
      * @param remembers Control Plane MCP 도구를 받고 먼저 살펴보기가 아닌 실행이다. 옛 커넥터 에이전트는 거짓이다
      */

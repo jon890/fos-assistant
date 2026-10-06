@@ -10,7 +10,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/** 사람이 보낸 turn 의 실행에서 그 질문을 읽는다(ADR-091). */
+/** 사람이 보낸 turn 의 실행에서 그 질문을 읽는다(ADR-092). */
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)

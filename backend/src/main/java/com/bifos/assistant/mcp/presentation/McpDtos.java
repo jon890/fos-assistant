@@ -50,7 +50,7 @@ public final class McpDtos {
     }
 
     /**
-     * {@code memory_remember} 의 인자다. 모양 검사를 마친 인자에서 만든다(ADR-091).
+     * {@code memory_remember} 의 인자다. 모양 검사를 마친 인자에서 만든다(ADR-092).
      *
      * @param evidence 사용자 메시지에서 옮긴 구절. 없거나 {@code null} 이면 null
      * @param memoryId 고칠 항목 번호. 없거나 {@code null} 이면 null

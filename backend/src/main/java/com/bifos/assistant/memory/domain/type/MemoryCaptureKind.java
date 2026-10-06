@@ -1,6 +1,6 @@
 package com.bifos.assistant.memory.domain.type;
 
-/** 에이전트가 {@code memory_remember} 로 남긴 기록이 무엇을 했는지다(ADR-091). */
+/** 에이전트가 {@code memory_remember} 로 남긴 기록이 무엇을 했는지다(ADR-092). */
 public enum MemoryCaptureKind {
     /** 바로 저장해 새 항목을 만들었다. 되돌리면 그 항목을 지운다. */
     CREATED,

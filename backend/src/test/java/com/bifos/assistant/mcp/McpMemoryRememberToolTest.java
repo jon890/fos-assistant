@@ -59,7 +59,7 @@ import tools.jackson.databind.node.ObjectNode;
 
 /**
  * 실제 HTTP 경계에서 {@code memory_remember} 의 계약을 확인한다. 계약은 {@code docs/backend/memory.md} 의 「에이전트가 기억을
- * 남기는 길」 이 갖는다(ADR-091).
+ * 남기는 길」 이 갖는다(ADR-092).
  *
  * <p>바로 저장은 사람이 보낸 turn 의 루트 실행이고, 근거 인용이 질문 원문에 있고, 그 실행이 바깥 도구를 부르지 않았을 때만이다.
  */
