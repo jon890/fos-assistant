@@ -186,7 +186,7 @@ docker 백엔드는 셸과 파일 도구만 옮긴다. 아래는 Hermes 프로�
 
 | 도구나 경로 | 남는 것 | 지금 상태 |
 | --- | --- | --- |
-| 스킬 앞머리의 `required_environment_variables`(`setup.collect_secrets`, `prerequisites.env_vars` 포함) | 스킬을 읽으면 그 이름의 값을 profile `.env` 에서 꺼내 컨테이너 환경에 넣는다. **측정에서 Control Plane MCP 토큰과 커넥터 토큰이 컨테이너 환경에 들어왔다.** `API_SERVER_KEY` 같은 provider 차단 목록만 막힌다 | 올린 스킬은 Control Plane 이 이 칸을 거절한다 |
+| 스킬 앞머리의 `required_environment_variables`(`setup.collect_secrets`, `prerequisites.env_vars` 포함) | 스킬을 읽으면 그 이름의 값을 profile `.env` 에서 꺼내 컨테이너 환경에 넣는다. **측정에서 Control Plane MCP 토큰과 커넥터 토큰이 컨테이너 환경에 들어왔다.** `API_SERVER_KEY` 같은 provider 차단 목록만 막힌다 | 올린 스킬은 Control Plane 이, 커넥터 스킬은 대시보드 plugin 의 manifest 검증이 이 칸을 거절한다 |
 | 스킬 앞머리의 `required_credential_files` | profile 디렉터리 안의 파일을 컨테이너 `/root/.hermes/` 아래에 붙인다. `.env` 와 `auth.json` 은 거절하지만 **커넥터 값 파일(`.fos-connectors.json`)은 붙었다** | 위와 같다 |
 | `skill_manage` | profile 의 스킬 디렉터리에 쓴다 | `fos-ctx` 의 `pre_tool_call` 이 막는다(ADR-034) |
 | `skill_view` 의 `` !`cmd` `` 전처리 | Hermes 호스트에서 명령을 돌린다 | `skills.inline_shell` 기본값 false 로 꺼져 있다 |

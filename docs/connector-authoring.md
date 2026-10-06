@@ -82,6 +82,8 @@ docs/connectors/<id>.md                 도구와 정책, 보안, 설정 안내,
 
 연결을 에이전트에 붙이면 `skills/<이름>/` 이 그 에이전트 profile 의 스킬로 설치된다. `SKILL.md` 와 `references/`, `templates/` 아래 파일을 복사한다.
 스킬 하나는 파일 20개, 파일마다 10만 자까지다. Control Plane 이 올린 스킬에 거는 제한과 같다.
+`SKILL.md` 앞머리에 `required_environment_variables`, `required_credential_files`, `setup.collect_secrets`, `prerequisites.env_vars` 가 있으면 그 커넥터를 카탈로그에 내지 않는다.
+Hermes 는 스킬을 읽을 때 그 칸의 이름으로 profile 의 값과 파일을 셸 실행 공간에 넣는다. 붙인 profile 의 `.env` 에는 커넥터 값이 있다([ADR-086](adr/ADR-086-셸과-파일-도구는-사용자별-docker-실행-공간에서만-돈다.md)).
 지침은 매 turn 실리지 않고 모델이 그 스킬을 읽을 때 들어간다. `skills` 도구가 꺼진 에이전트는 읽지 못한다.
 스킬 이름이 그 에이전트의 다른 스킬이나 함께 붙은 커넥터의 스킬과 겹치면 붙이지 못하므로, 서비스를 알 수 있는 이름을 쓴다.
 
