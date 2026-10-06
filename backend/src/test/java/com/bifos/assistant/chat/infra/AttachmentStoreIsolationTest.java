@@ -54,7 +54,8 @@ class AttachmentStoreIsolationTest {
         Path bobDirectory = root.resolve("users").resolve(AttachmentStore.userDirectoryKey(22L));
         assertThat(aliceDirectory.resolve("202/2.png")).doesNotExist();
         assertThat(bobDirectory.resolve("101/1.png")).doesNotExist();
-        try (InputStream aliceBody = store.open(alice); InputStream bobBody = store.open(bob)) {
+        try (InputStream aliceBody = store.open(alice);
+                InputStream bobBody = store.open(bob)) {
             assertThat(aliceBody.readAllBytes()).containsExactly((byte) 1);
             assertThat(bobBody.readAllBytes()).containsExactly((byte) 2);
         }
@@ -92,8 +93,8 @@ class AttachmentStoreIsolationTest {
     @Test
     @DisplayName("이전 기간이 끝나면 새 사진은 사용자 경로에만 쓰되 기존 옛 사진은 계속 복사한다")
     void stopsLegacyWritesWhileStillSupportingLegacyReads() throws IOException {
-        AttachmentStore afterTransition = new AttachmentStore(
-                new AttachmentProperties(root.toString(), "/images", null, null, null, false));
+        AttachmentStore afterTransition =
+                new AttachmentStore(new AttachmentProperties(root.toString(), "/images", null, null, null, false));
         ChatAttachment newPhoto = attachment(1L, 11L, 101L);
         afterTransition.save(newPhoto, new ByteArrayInputStream(new byte[] {1}));
         assertThat(fileOf(newPhoto)).exists();
@@ -174,7 +175,8 @@ class AttachmentStoreIsolationTest {
         ChatAttachment bob = attachment(2L, 22L, 202L);
         store.save(bob, new ByteArrayInputStream(new byte[] {2}));
         Path users = root.resolve("users");
-        Files.createSymbolicLink(users.resolve(AttachmentStore.userDirectoryKey(11L)),
+        Files.createSymbolicLink(
+                users.resolve(AttachmentStore.userDirectoryKey(11L)),
                 users.resolve(AttachmentStore.userDirectoryKey(22L)));
 
         assertThatThrownBy(() -> store.save(alice, new ByteArrayInputStream(new byte[] {1})))
@@ -184,8 +186,10 @@ class AttachmentStoreIsolationTest {
     }
 
     private Path fileOf(ChatAttachment attachment) {
-        return root.resolve("users").resolve(AttachmentStore.userDirectoryKey(attachment.uploadedByUserId()))
-                .resolve(attachment.conversationId().toString()).resolve(attachment.storedName());
+        return root.resolve("users")
+                .resolve(AttachmentStore.userDirectoryKey(attachment.uploadedByUserId()))
+                .resolve(attachment.conversationId().toString())
+                .resolve(attachment.storedName());
     }
 
     private Path legacyOf(ChatAttachment attachment) {
@@ -194,7 +198,13 @@ class AttachmentStoreIsolationTest {
 
     private static ChatAttachment attachment(Long id, Long userId, Long conversationId) {
         ChatAttachment attachment = ChatAttachment.of(
-                conversationId, userId, "photo.png", "image/png", 1, Instant.now().plusSeconds(3600), Instant.now());
+                conversationId,
+                userId,
+                "photo.png",
+                "image/png",
+                1,
+                Instant.now().plusSeconds(3600),
+                Instant.now());
         ReflectionTestUtils.setField(attachment, "id", id);
         attachment.nameStoredFile(id + ".png");
         return attachment;

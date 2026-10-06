@@ -178,14 +178,15 @@ public class AttachmentService {
             return text;
         }
         Long ownerUserId = attached.getFirst().uploadedByUserId();
-        boolean sameOwnerAndConversation = attached.stream().allMatch(attachment ->
-                ownerUserId.equals(attachment.uploadedByUserId()) && conversationId.equals(attachment.conversationId()));
+        boolean sameOwnerAndConversation = attached.stream()
+                .allMatch(attachment -> ownerUserId.equals(attachment.uploadedByUserId())
+                        && conversationId.equals(attachment.conversationId()));
         if (!sameOwnerAndConversation) {
             throw notAttachable();
         }
         attached.forEach(store::prepare);
-        String directory = stripTrailingSlash(properties.agentRoot())
-                + "/users/" + AttachmentStore.userDirectoryKey(ownerUserId) + "/" + conversationId;
+        String directory = stripTrailingSlash(properties.agentRoot()) + "/users/"
+                + AttachmentStore.userDirectoryKey(ownerUserId) + "/" + conversationId;
         Map<Long, Integer> order = orderInConversation(conversationId);
         String files = attached.stream()
                 .map(it ->

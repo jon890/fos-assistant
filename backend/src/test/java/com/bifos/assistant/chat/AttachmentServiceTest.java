@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.groups.Tuple.tuple;
 
+import com.bifos.assistant.chat.application.AttachmentBackfill;
 import com.bifos.assistant.chat.application.AttachmentContent;
 import com.bifos.assistant.chat.application.AttachmentService;
 import com.bifos.assistant.chat.application.ConversationWriter;
@@ -11,7 +12,6 @@ import com.bifos.assistant.chat.domain.ChatAttachment;
 import com.bifos.assistant.chat.domain.Conversation;
 import com.bifos.assistant.chat.infra.AttachmentProperties;
 import com.bifos.assistant.chat.infra.AttachmentStore;
-import com.bifos.assistant.chat.application.AttachmentBackfill;
 import com.bifos.assistant.chat.infra.ChatAttachmentRepository;
 import com.bifos.assistant.chat.infra.ConversationRepository;
 import com.bifos.assistant.shared.auth.CurrentUser;
@@ -359,8 +359,9 @@ class AttachmentServiceTest {
 
         String input = service.agentInput(mine, service.allOf(mine), "사진 설명");
 
-        assertThat(input).contains(properties.agentRoot() + "/users/"
-                + AttachmentStore.userDirectoryKey(OWNER.id()) + "/" + mine);
+        assertThat(input)
+                .contains(
+                        properties.agentRoot() + "/users/" + AttachmentStore.userDirectoryKey(OWNER.id()) + "/" + mine);
         assertThat(input).contains("vision_analyze");
         assertThat(fileOf(photo)).exists();
         assertThat(legacy).exists();
@@ -389,8 +390,13 @@ class AttachmentServiceTest {
         Files.createDirectories(legacyDirectory);
         for (int i = 0; i < 260; i++) {
             ChatAttachment attachment = attachments.save(ChatAttachment.of(
-                    mine, OWNER.id(), "image.png", "image/png", IMAGE.length,
-                    Instant.now().plusSeconds(3600), Instant.now()));
+                    mine,
+                    OWNER.id(),
+                    "image.png",
+                    "image/png",
+                    IMAGE.length,
+                    Instant.now().plusSeconds(3600),
+                    Instant.now()));
             attachment.nameStoredFile(AttachmentStore.storedName(attachment.id(), "png"));
             rows.add(attachments.save(attachment));
             Files.write(legacyDirectory.resolve(attachment.storedName()), IMAGE);

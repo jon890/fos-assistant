@@ -24,7 +24,12 @@ import org.springframework.validation.annotation.Validated;
 @Validated
 @ConfigurationProperties(prefix = "assistant.attachment")
 public record AttachmentProperties(
-        String root, String agentRoot, Integer maxFiles, Long maxBytes, Integer retentionDays, Boolean legacyWriteEnabled) {
+        String root,
+        String agentRoot,
+        Integer maxFiles,
+        Long maxBytes,
+        Integer retentionDays,
+        Boolean legacyWriteEnabled) {
 
     private static final int DEFAULT_MAX_FILES = 30;
     private static final long DEFAULT_MAX_BYTES = 10L * 1024 * 1024;
