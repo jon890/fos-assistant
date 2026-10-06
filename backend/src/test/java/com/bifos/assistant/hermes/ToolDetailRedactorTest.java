@@ -172,7 +172,8 @@ class ToolDetailRedactorTest {
         assertThat(ToolDetailRedactor.hidesArguments("{\"filter_id\":[\"" + id + "\",\"a b\"]}", declared))
                 .as("배열의 한 항목이라도 식별자 모양이 아니면 배열 전체를 평소대로 가린다")
                 .isTrue();
-        assertThat(ToolDetailRedactor.hidesArguments("{\"filter_id\":\"끝나지 않은", declared)).isTrue();
+        assertThat(ToolDetailRedactor.hidesArguments("{\"filter_id\":\"끝나지 않은", declared))
+                .isTrue();
         assertThat(ToolDetailRedactor.hidesArguments("[\"" + id + "\"]", declared))
                 .as("맨 위가 객체가 아니면 선언을 쓰지 않는다")
                 .isTrue();

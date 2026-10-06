@@ -50,6 +50,7 @@ public final class ToolDetailRedactor {
 
     /** 식별자 칸의 값이 알려진 접두사의 key 로 시작하는가. 값 중간의 {@code sk-} 같은 글자는 식별자의 일부다. */
     private static final Pattern PREFIXED = Pattern.compile("^" + PREFIXED_SECRET);
+
     private static final Pattern TOKEN = Pattern.compile("(?i)Bearer\\s+[^\\s\"'`,;<>}\\]]+"
             + "|" + PREFIXED_SECRET
             + "|(?<![A-Za-z0-9])[A-Fa-f0-9]{32,}(?![A-Za-z0-9])"
@@ -214,7 +215,9 @@ public final class ToolDetailRedactor {
             value.forEach(item -> result.add(redactIdentifier(item)));
             return result;
         }
-        return PREFIXED.matcher(value.asString()).find() ? MAPPER.getNodeFactory().stringNode(HIDDEN) : value;
+        return PREFIXED.matcher(value.asString()).find()
+                ? MAPPER.getNodeFactory().stringNode(HIDDEN)
+                : value;
     }
 
     private static String redactContent(String detail, Map<String, String> identifiers) {

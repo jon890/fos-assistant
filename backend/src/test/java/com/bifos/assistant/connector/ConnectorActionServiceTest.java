@@ -759,7 +759,8 @@ class ConnectorActionServiceTest {
         String args = "{\"note_id\":\"" + LONG_ID + "\",\"text\":\"지울 메모\"}";
         UUID actionId = ask(MAIL, args).actionId();
 
-        ConnectorActionView listed = service.listForConversation(me, CONVERSATION).getFirst();
+        ConnectorActionView listed =
+                service.listForConversation(me, CONVERSATION).getFirst();
         assertThat(listed.hiddenArgs()).isFalse();
         assertThat(listed.argsJson()).contains(LONG_ID).doesNotContain("[가림]");
         ConnectorActionView approved = service.approve(me, actionId, null);
@@ -791,8 +792,8 @@ class ConnectorActionServiceTest {
                 Arguments.of("식별자 칸 안의 공백 섞인 글", "{\"note_id\":\"본문 " + HIDDEN_TOKEN + "\"}"),
                 Arguments.of("식별자 칸의 base64 + 와 / 글", "{\"note_id\":\"" + HIDDEN_TOKEN + "+/==\"}"),
                 Arguments.of("식별자 칸의 알려진 접두사 key", "{\"note_id\":\"ghp_" + LONG_ID + "\"}"),
-                Arguments.of("식별자 칸 밖 본문의 긴 덩어리",
-                        "{\"note_id\":\"" + LONG_ID + "\",\"text\":\"" + HIDDEN_TOKEN + "\"}"));
+                Arguments.of(
+                        "식별자 칸 밖 본문의 긴 덩어리", "{\"note_id\":\"" + LONG_ID + "\",\"text\":\"" + HIDDEN_TOKEN + "\"}"));
     }
 
     @Test
