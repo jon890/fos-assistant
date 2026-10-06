@@ -287,7 +287,7 @@ TOOL_RISK_DEFAULTS = {"READ": ("none", "none"), "SENSITIVE": ("required", "requi
                       "WRITE": ("required", "required"), "DESTRUCTIVE": ("always", "always"),
                       "FINANCIAL": ("always", "always")}
 TOOL_TITLE_MAX_CHARS = 80
-# `tools.<이름>.identifiers` 가 가리키는 인자 이름이다(ADR-088). 도구 인자 객체의 맨 위 칸만 가리킨다.
+# `tools.<이름>.identifiers` 가 가리키는 인자 이름이다(ADR-089). 도구 인자 객체의 맨 위 칸만 가리킨다.
 # 31자까지다. 32자 이상인 이름은 Control Plane 이 키 이름 자체를 긴 덩어리로 보고 가린다.
 TOOL_IDENTIFIER_RE = re.compile(r"[A-Za-z_][A-Za-z0-9_]{0,30}")
 # 비밀 키로 읽히는 인자 이름이다. Control Plane 의 `ToolDetailRedactor` 의 `SECRET_KEYS` 와 `isSecretKey` 와 같다.
@@ -748,7 +748,7 @@ def _connector_tools(declared: dict, verify_tool: str, option_tools: set, mcp_se
     `grant` 는 그 도구에 상시 허락을 줄 수 있는지다(ADR-065). 기본값을 채운 값이고,
     `approval` 이 `required` 이고 선언이 닫지 않았을 때만 참이다.
     `outbound` 는 그 도구가 데이터를 계정 밖의 사람에게 보낸다는 선언이다. 참인 도구는 상시 허락이 닫혀 있어야 한다.
-    `identifiers` 는 승인 카드가 길이로 가리지 않을 식별자 인자의 이름이다(ADR-088). 기본값은 빈 배열이다.
+    `identifiers` 는 승인 카드가 길이로 가리지 않을 식별자 인자의 이름이다(ADR-089). 기본값은 빈 배열이다.
     """
     call_tools = {verify_tool} | set(option_tools)
     if declared["schema"] == 1:

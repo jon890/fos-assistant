@@ -39,7 +39,7 @@ function ArgRows({ rows }: { rows: { key: string; value: string }[] }) {
 }
 
 /**
- * 가려진 인자가 있어 승인할 수 없는 줄의 안내다. 왜 막혔는지와 사용자가 할 일을 카드에서 바로 읽게 한다(ADR-088).
+ * 가려진 인자가 있어 승인할 수 없는 줄의 안내다. 왜 막혔는지와 사용자가 할 일을 카드에서 바로 읽게 한다(ADR-089).
  */
 function HiddenArgsNotice({ argsJson }: { argsJson: string | null }) {
   const keys = hiddenArgKeys(argsJson);

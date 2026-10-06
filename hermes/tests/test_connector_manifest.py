@@ -626,7 +626,7 @@ class ConnectorToolPolicyTest(ConnectorGateCase):
         self.assertIs(tools["env_view"]["outbound"], False)
 
     def test_identifiers_reach_the_catalog_in_declared_order(self):
-        """`identifiers` 는 승인을 받는 도구에서 받고 선언한 순서 그대로 나온다(ADR-088)."""
+        """`identifiers` 는 승인을 받는 도구에서 받고 선언한 순서 그대로 나온다(ADR-089)."""
         self.declare(lambda tools: tools.update(
             write_note={"risk": "WRITE", "grant": False, "identifiers": ["note_id", "folder_id", "a" * 31]}))
         tools = self.catalog()[0]["tools"]
@@ -634,7 +634,7 @@ class ConnectorToolPolicyTest(ConnectorGateCase):
         self.assertEqual(tools["env_view"]["identifiers"], [])
 
     def test_invalid_identifiers_leave_the_connector_out(self):
-        """틀린 `identifiers` 는 고쳐 읽지 않고 그 커넥터를 카탈로그에서 뺀다(ADR-088)."""
+        """틀린 `identifiers` 는 고쳐 읽지 않고 그 커넥터를 카탈로그에서 뺀다(ADR-089)."""
         cases = (
             ("not a list", "note_id"),
             ("not a string item", [1]),

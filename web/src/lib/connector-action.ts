@@ -96,7 +96,7 @@ function argsObject(argsJson: string | null): Record<string, unknown> | null {
 const HIDDEN_MARK = "[가림]";
 
 /**
- * 가려진 글이 든 맨 위 인자의 키다. 승인할 수 없는 까닭으로 어느 칸이 가려졌는지 보인다(ADR-088).
+ * 가려진 글이 든 맨 위 인자의 키다. 승인할 수 없는 까닭으로 어느 칸이 가려졌는지 보인다(ADR-089).
  *
  * <p>가렸는지는 Control Plane 이 정하고 화면은 그 표시만 찾는다. 키가 가려진 칸은 가려진 이름 그대로 낸다.
  */

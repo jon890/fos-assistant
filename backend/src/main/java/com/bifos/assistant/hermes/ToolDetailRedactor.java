@@ -47,7 +47,7 @@ public final class ToolDetailRedactor {
             Pattern.compile("(?i)[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}");
     private static final Pattern JWT =
             Pattern.compile("(?<![A-Za-z0-9_-])([A-Za-z0-9_-]+)\\.[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+(?![A-Za-z0-9_-])");
-    /** 서비스가 정한 접두사로 비밀이라고 알 수 있는 key 다. 식별자로 선언한 칸에서도 가린다(ADR-088). */
+    /** 서비스가 정한 접두사로 비밀이라고 알 수 있는 key 다. 식별자로 선언한 칸에서도 가린다(ADR-089). */
     private static final String PREFIXED_SECRET = "(?i)(?:sk-|gh[pousr]_|github_pat_|xox[a-z]*-)[A-Za-z0-9_-]+";
 
     /** 식별자 칸의 값이 알려진 접두사의 key 로 시작하는가. 값 중간의 {@code sk-} 같은 글자는 식별자의 일부다. */
@@ -60,7 +60,7 @@ public final class ToolDetailRedactor {
             + "|(?<![A-Za-z0-9_+/=-])[A-Za-z0-9_-]{32,}={0,2}(?![A-Za-z0-9_+/=-])");
     private static final Pattern ASSIGNMENT = Pattern.compile("(?i)([\"']?[A-Za-z][A-Za-z0-9_-]*[\"']?\\s*[:=]\\s*)"
             + "(\"(?:\\\\.|[^\"\\\\])*\"|'(?:\\\\.|[^'\\\\])*'|[^\\s,;}&]+)");
-    /** 식별자로 선언한 칸에서 길이 규칙을 면제받는 값의 모양이다(ADR-088). */
+    /** 식별자로 선언한 칸에서 길이 규칙을 면제받는 값의 모양이다(ADR-089). */
     private static final Pattern IDENTIFIER_VALUE = Pattern.compile("[A-Za-z0-9_-]{1,256}");
 
     private static final Pattern AUTH_HEADER = Pattern.compile("(?im)\\b(authorization|cookie)\\s*[:=]\\s*[^\\r\\n]+");
@@ -119,7 +119,7 @@ public final class ToolDetailRedactor {
 
     /**
      * {@link #redactArguments(String)} 와 같고, 커넥터가 식별자로 선언한 맨 위 칸의 값은 길이와 모양으로 가리지
-     * 않는다(ADR-088).
+     * 않는다(ADR-089).
      *
      * <p>그 칸의 값이 문자열이거나 문자열 배열이고 문자열마다 영숫자와 {@code _}, {@code -} 로 256자까지일 때만
      * 면제한다. 알려진 접두사의 key 는 그 칸에서도 가린다. 비밀 키 이름의 칸은 선언과 상관없이 가린다.

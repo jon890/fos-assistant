@@ -142,7 +142,7 @@ export const DEMO_CONNECTOR = {
     list_scopes: { risk: "READ", approval: "none", grant: false, outbound: false },
     write_note: { risk: "WRITE", approval: "required", title: "메모 쓰기", grant: true, outbound: false },
     purge_notes: { risk: "DESTRUCTIVE", approval: "always", grant: false, outbound: false },
-    // 상시 허락을 닫고 `note_id` 를 식별자로 선언한 도구다(ADR-088). Gmail 의 필터 지우기와 같은 모양이다.
+    // 상시 허락을 닫고 `note_id` 를 식별자로 선언한 도구다(ADR-089). Gmail 의 필터 지우기와 같은 모양이다.
     delete_note: {
       risk: "WRITE", approval: "required", title: "메모 지우기", grant: false, outbound: false, identifiers: ["note_id"],
     },

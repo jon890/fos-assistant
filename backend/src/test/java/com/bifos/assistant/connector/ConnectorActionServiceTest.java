@@ -1441,7 +1441,7 @@ class ConnectorActionServiceTest {
                 List.of(new ConnectorTool("list_scopes", "READ", "none", null, null)));
     }
 
-    /** {@link #DECLARING} 에서 상시 허락을 닫은 도구가 식별자 인자를 선언한 커넥터다(ADR-088). */
+    /** {@link #DECLARING} 에서 상시 허락을 닫은 도구가 식별자 인자를 선언한 커넥터다(ADR-089). */
     private static ConnectorManifest withMailIdentifiers(List<String> identifiers) {
         return manifest(List.of(
                 new ConnectorTool("list_scopes", "READ", "none", null, null),

@@ -468,7 +468,7 @@ public class HttpHermesConnectorClient implements HermesConnectorClient {
     }
 
     /**
-     * 식별자 인자의 선언이다(ADR-088). 칸이 없으면 빈 목록이다.
+     * 식별자 인자의 선언이다(ADR-089). 칸이 없으면 빈 목록이다.
      *
      * <p>문자열 배열이 아니면 거절하지 않고 빈 목록으로 읽는다. 형식은 대시보드 plugin 이 검사하고, 여기서는 읽을 수
      * 없는 선언이 가림을 푸는 쪽으로 읽히지 않게만 한다.
