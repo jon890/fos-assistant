@@ -87,6 +87,8 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import org.assertj.core.api.ThrowableAssert.ThrowingCallable;
@@ -511,6 +513,84 @@ class ChatServiceTest {
     }
 
     @Test
+    @DisplayName("한 번에 받는 경로도 붙은 커넥터 서버의 도구 사건을 실행 기록에 남기되 첫 조각 시각은 비운다")
+    void sendRecordsBoundConnectorToolEventsWithoutFirstDelta() {
+        CurrentUser dad = member("dad@example.com", "dad");
+        Agent agent = agents.findByCode("dad").orElseThrow();
+        ConnectorConnection connection =
+                connections.save(ConnectorConnection.pending(dad.id(), "demo-notes", Instant.now()));
+        bindings.save(ConnectorBinding.pending(agent, connection, "demo", Instant.now()));
+        stub().willReturn(HermesRunResult.of("run-1", "sess-1", "completed", "네", "dad", null, TokenUsage.empty()));
+        // 사건 스트림이 붙은 서버의 도구 내용을 이미 가린 채로 넘기는 모양이다. 가리는 판정은 스트림 쪽 시험이 본다.
+        hermesStreams(
+                new RunEvent("message.delta", "조각", null, null, null, null),
+                new RunEvent("tool.started", null, "mcp__demo__list_notes", "[연결 도구 내용 가림]", null, null),
+                new RunEvent("tool.completed", null, "mcp__demo__list_notes", "[연결 도구 내용 가림]", 50L, false),
+                new RunEvent("run.completed", null, null, null, null, null));
+
+        ChatTurn turn = chat.send(dad, null, "메모 찾아 줘", "dad");
+
+        verify(eventStream)
+                .open(any(), any(), any(), any(), any(), eq(ToolDetailScope.prefixes(Set.of("mcp__demo__"))));
+        List<ExecutionEvent> recorded = eventsOf(turn.executionId());
+        assertThat(typesOf(recorded))
+                .containsExactly(
+                        ExecutionEventType.RUN_STARTED,
+                        ExecutionEventType.TOOL_STARTED,
+                        ExecutionEventType.TOOL_COMPLETED,
+                        ExecutionEventType.RUN_COMPLETED);
+        assertThat(recorded).extracting(ExecutionEvent::sequence).containsExactly(1, 2, 3, 4);
+        assertThat(recorded.get(1).toolName()).isEqualTo("mcp__demo__list_notes");
+        assertThat(recorded.get(2).durationMs()).isEqualTo(50L);
+        assertThat(recorded.get(2).failed()).isFalse();
+        assertThat(recorded).extracting(ExecutionEvent::detail).containsSequence("[연결 도구 내용 가림]", "[연결 도구 내용 가림]");
+        assertThat(executions.findById(turn.executionId()).orElseThrow().firstDeltaAt())
+                .as("한 번에 받는 경로는 첫 반응 시간 통계에 들지 않는다")
+                .isNull();
+    }
+
+    @Test
+    @DisplayName("한 번에 받는 경로에서 사건 스트림이 닫히지 않아도 실행 한도 뒤에는 결과 조회로 넘어가 답을 남긴다")
+    void sendMovesOnToResultLookupWhenEventStreamStaysOpen() throws Exception {
+        CurrentUser dad = member("dad@example.com", "dad");
+        stub().willReturn(HermesRunResult.of("run-1", "sess-1", "completed", "네", "dad", null, TokenUsage.empty()));
+        CountDownLatch neverClosed = new CountDownLatch(1);
+        doAnswer(invocation -> {
+                    neverClosed.await(30, TimeUnit.SECONDS);
+                    return null;
+                })
+                .when(eventStream)
+                .open(any(), any(), any(), any(), any(), any(ToolDetailScope.class));
+        try {
+            long startedAt = System.nanoTime();
+
+            ChatTurn turn = chat.send(dad, null, "안녕", "dad");
+
+            // 시험 설정의 hermes.run-timeout 은 1초다. 스트림을 끝까지 기다렸다면 30초가 걸린다.
+            assertThat(Duration.ofNanos(System.nanoTime() - startedAt)).isLessThan(Duration.ofSeconds(10));
+            assertThat(turn.assistantText()).isEqualTo("네");
+        } finally {
+            neverClosed.countDown();
+        }
+    }
+
+    @Test
+    @DisplayName("한 번에 받는 경로에서 사건 스트림을 읽지 못해도 답은 남고 시작과 끝 사건은 남는다")
+    void sendSucceedsWhenEventStreamCannotBeRead() {
+        CurrentUser dad = member("dad@example.com", "dad");
+        stub().willReturn(HermesRunResult.of("run-1", "sess-1", "completed", "네", "dad", null, TokenUsage.empty()));
+        doThrow(new ApiException(ErrorCode.HERMES_UNAVAILABLE, "stream down"))
+                .when(eventStream)
+                .open(any(), any(), any(), any(), any(), any(ToolDetailScope.class));
+
+        ChatTurn turn = chat.send(dad, null, "안녕", "dad");
+
+        assertThat(turn.assistantText()).isEqualTo("네");
+        assertThat(typesOf(eventsOf(turn.executionId())))
+                .containsExactly(ExecutionEventType.RUN_STARTED, ExecutionEventType.RUN_COMPLETED);
+    }
+
+    @Test
     @DisplayName("옛 커넥터 에이전트의 turn 은 모든 도구를 가리는 범위로 사건 스트림을 연다")
     void opensEventStreamHidingAllToolsForLegacyConnectorAgent() {
         CurrentUser dad = member("dad@example.com", "dad");
@@ -906,8 +986,8 @@ class ChatServiceTest {
     }
 
     @Test
-    @DisplayName("한 번에 받는 경로는 RUN STARTED와 RUN COMPLETED 둘만 남긴다")
-    void nonStreamPathLeavesOnlyRunStartedAndRunCompleted() {
+    @DisplayName("한 번에 받는 경로로 돈 실행이 도구를 부르지 않았으면 RUN STARTED와 RUN COMPLETED 둘만 남긴다")
+    void nonStreamPathWithoutToolCallsLeavesOnlyRunStartedAndRunCompleted() {
         CurrentUser dad = member("dad@example.com", "dad");
         stub().willReturn(HermesRunResult.of("run-1", "sess-1", "completed", "네", "dad", null, TokenUsage.empty()));
 

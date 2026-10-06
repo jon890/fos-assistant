@@ -1,5 +1,6 @@
 import { SignJWT } from "../../web/node_modules/jose/dist/webapi/index.js";
 import { expect, setSession, test } from "./fixtures.ts";
+import { NO_TOOL_CALL_PROBE } from "../e2e/fake-hermes.ts";
 import { CONTROL_PLANE_BASE_URL, JWT_SECRET, TEST_EMAIL } from "./settings.ts";
 
 async function controlPlaneToken(email = TEST_EMAIL): Promise<string> {
@@ -330,11 +331,27 @@ test("도구 사건 둘과 하위 에이전트 사건이 각각 한 줄로 보�
   await expect(tree.getByText("끝나지 않음")).toHaveCount(0);
 });
 
+test("한 번에 받는 경로로 돈 실행도 도구 사건이 각각 한 줄로 보인다", async ({
+  page,
+}) => {
+  const response = await page.request.post("/api/chat", {
+    data: { text: "실행 트리 검사", agentCode: "browser" },
+  });
+  expect(response.ok()).toBeTruthy();
+  const id = await lastExecutionId(page);
+
+  await page.goto(`/admin/executions/${id}`);
+  const tree = page.getByTestId("execution-tree");
+  await expect(tree).toBeVisible();
+  await expect(tree.locator('[data-tool="fake-tool"]')).toHaveCount(1);
+  await expect(tree.locator('[data-tool="fake-reader"]')).toHaveCount(1);
+});
+
 test("사건이 없는 실행을 열면 기록된 작업이 없어요고 보이고 요약은 그대로 보인다", async ({
   page,
 }) => {
   const response = await page.request.post("/api/chat", {
-    data: { text: "실행 트리 빈 사건 검사", agentCode: "browser" },
+    data: { text: NO_TOOL_CALL_PROBE, agentCode: "browser" },
   });
   expect(response.ok()).toBeTruthy();
   const id = await lastExecutionId(page);

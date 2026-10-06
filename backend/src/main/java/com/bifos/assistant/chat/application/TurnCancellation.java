@@ -363,6 +363,24 @@ public class TurnCancellation {
         CompletableFuture.anyOf(streamDone, handle.streamGraceExpired).join();
     }
 
+    /**
+     * 스트림이 닫히거나 중지 유예가 끝나기를 기다리되 {@code maxWait} 를 넘기면 스트림을 닫고 돌아온다.
+     *
+     * <p>한 번에 받는 경로가 쓴다. 그 경로는 스트림이 없어도 결과 조회가 {@code hermes.run-timeout} 에서 끊으므로, 스트림을 기다리는
+     * 동안에도 같은 한도를 둔다.
+     */
+    public void awaitStreamOrGrace(TurnHandle handle, CompletableFuture<Void> streamDone, Duration maxWait) {
+        try {
+            CompletableFuture.anyOf(streamDone, handle.streamGraceExpired).get(maxWait.toNanos(), TimeUnit.NANOSECONDS);
+        } catch (TimeoutException ex) {
+            closeStream(handle);
+        } catch (InterruptedException ex) {
+            Thread.currentThread().interrupt();
+        } catch (ExecutionException ex) {
+            throw new IllegalStateException(ex.getCause());
+        }
+    }
+
     @PreDestroy
     public void shutdown() {
         scheduler.shutdownNow();
