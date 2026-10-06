@@ -64,7 +64,7 @@ class ChatMessageParentGuardTest {
     @ValueSource(strings = {"save", "saveAndFlush", "saveAll", "saveAllAndFlush"})
     @DisplayName("모든 저장 경로가 이미 지운 작업 대화의 늦은 메시지를 거절한다")
     void rejectsMessagesAfterConversationDeletion(String method) {
-        assertThat(conversations.discardEmptyTaskConversation(conversationId)).isEqualTo(1);
+        assertThat(discard(conversationId)).isEqualTo(1);
 
         assertThatThrownBy(() -> saveWith(method, message(conversationId)))
                 .isInstanceOfSatisfying(
@@ -92,7 +92,7 @@ class ChatMessageParentGuardTest {
     @DisplayName("한 묶음에 지운 대화가 있으면 다른 대화의 메시지도 저장하지 않는다")
     void rejectsWholeBatchWhenOneParentIsMissing(String method) {
         Long missing = taskConversation().id();
-        assertThat(conversations.discardEmptyTaskConversation(missing)).isEqualTo(1);
+        assertThat(discard(missing)).isEqualTo(1);
         List<ChatMessage> batch = List.of(message(conversationId), message(missing));
 
         assertThatThrownBy(() -> saveBatchWith(method, batch)).isInstanceOf(ApiException.class);
@@ -133,7 +133,7 @@ class ChatMessageParentGuardTest {
             transaction().executeWithoutResult(status -> {
                 assertThat(conversations.findById(conversationId)).isPresent();
                 try {
-                    assertThat(executor.submit(() -> conversations.discardEmptyTaskConversation(conversationId))
+                    assertThat(executor.submit(() -> discard(conversationId))
                                     .get(10, TimeUnit.SECONDS))
                             .isEqualTo(1);
                 } catch (Exception error) {
@@ -166,7 +166,7 @@ class ChatMessageParentGuardTest {
                     assertThat(messages.findByConversationIdOrderByIdAsc(conversationId))
                             .isEmpty();
                     deleting.countDown();
-                    return conversations.discardEmptyTaskConversation(conversationId);
+                    return discard(conversationId);
                 }));
                 await(deleting);
                 assertThatThrownBy(() -> cleanup.get(200, TimeUnit.MILLISECONDS))
@@ -191,7 +191,7 @@ class ChatMessageParentGuardTest {
         CountDownLatch writing = new CountDownLatch(1);
         try (var executor = Executors.newFixedThreadPool(2)) {
             var cleanup = executor.submit(() -> transaction().execute(status -> {
-                int count = conversations.discardEmptyTaskConversation(conversationId);
+                int count = discard(conversationId);
                 deleted.countDown();
                 await(release);
                 return count;
@@ -215,6 +215,10 @@ class ChatMessageParentGuardTest {
         }
         assertThat(conversations.findById(conversationId)).isEmpty();
         assertThat(messages.findByConversationIdOrderByIdAsc(conversationId)).isEmpty();
+    }
+
+    private int discard(Long id) {
+        return transaction().execute(status -> conversations.discardEmptyTaskConversation(id));
     }
 
     private Conversation taskConversation() {

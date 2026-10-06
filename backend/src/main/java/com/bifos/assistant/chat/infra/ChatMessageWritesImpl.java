@@ -7,15 +7,13 @@ import jakarta.persistence.EntityManager;
 import java.util.ArrayList;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
-import org.springframework.transaction.annotation.Transactional;
 
 /**
- * 대화 존재 확인부터 메시지 저장까지 같은 트랜잭션에서 대화 줄을 잠근다.
+ * JpaRepository 저장 메서드의 기존 트랜잭션에서 대화 존재 확인부터 메시지 저장까지 대화 줄을 잠근다.
  *
  * <p>외래 키가 없는 메시지 표에 빈 작업 대화 삭제 뒤 늦게 온 메시지가 남지 않게 한다. 공유 잠금은 같은 트랜잭션의
  * 대화 갱신 때 잠금 승격끼리 막힐 수 있어 쓰기 잠금을 쓴다. 이미 숨긴 대화에 실행 결과를 남기는 동작은 유지한다.
  */
-@Transactional
 @RequiredArgsConstructor
 public class ChatMessageWritesImpl implements ChatMessageWrites<ChatMessage> {
 

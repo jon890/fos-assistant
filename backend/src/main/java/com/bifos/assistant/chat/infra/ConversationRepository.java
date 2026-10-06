@@ -15,7 +15,6 @@ import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
-import org.springframework.transaction.annotation.Transactional;
 
 public interface ConversationRepository extends JpaRepository<Conversation, Long> {
 
@@ -34,8 +33,7 @@ public interface ConversationRepository extends JpaRepository<Conversation, Long
     @Query("select c from Conversation c where c.id = :id")
     Optional<Conversation> findByIdForMessageWrite(@Param("id") Long id);
 
-    /** 메시지 저장이 끝나기를 기다린 뒤 비어 있는 예약 작업 대화만 지운다. */
-    @Transactional
+    /** 메시지 저장이 끝나기를 기다린 뒤 빈 작업 대화만 지운다. 트랜잭션은 ChatService 가 연다. */
     default int discardEmptyTaskConversation(Long id) {
         if (findByIdForMessageWrite(id).isEmpty()) {
             return 0;
