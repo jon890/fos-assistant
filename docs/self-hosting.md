@@ -49,6 +49,7 @@ Hermes 에 설치하는 묶음과 그때 받는 값은 [`hermes/README.md`](../h
 | `ASSISTANT_PRICING_CATALOG` | Backend | models.dev 가격표를 복사해 둔 파일. 없으면 비용을 비워 둔다 |
 | `ASSISTANT_ATTACHMENT_ROOT` | Backend | 대화에 올린 사진을 두는 디렉터리. Control Plane 이 쓴다. 비면 기동이 실패한다 |
 | `ASSISTANT_ATTACHMENT_AGENT_ROOT` | Backend | 같은 디렉터리를 Hermes 컨테이너에서 보는 경로. 실행 입력에 적는다. 비면 기동이 실패한다 |
+| `ASSISTANT_ATTACHMENT_LEGACY_WRITE_ENABLED` | Backend | 이전 기간의 신규 사진을 옛 경로에도 저장한다. 기본 `true`. 다음 배포가 안정되고 되돌리기가 필요 없어진 뒤 `false` 로 끈다 |
 | `ASSISTANT_ARTIFACT_ROOT` | Backend | 에이전트가 만든 결과물 파일을 두는 디렉터리. Control Plane 이 읽고 오래된 것을 지운다. 비면 기동이 실패한다 |
 | `ASSISTANT_ARTIFACT_AGENT_ROOT` | Backend | 같은 디렉터리를 Hermes 컨테이너에서 보는 경로. 실행 입력에 적는다. 비면 기동이 실패한다 |
 | `ASSISTANT_SKILL_ROOT` | Backend | 에이전트에 올린 스킬을 profile 별 버전 디렉터리로 두는 디렉터리. Control Plane 이 쓴다. 비면 기동이 실패한다 |

@@ -50,8 +50,8 @@ export const chatAttachmentScenario: Scenario = {
     );
     const input = context.hermes.lastSubmittedInput() ?? "";
     expect(
-      // 사진이 놓이는 디렉터리 이름은 공개 식별자가 아니라 대화 번호 그대로다(ADR-025).
-      new RegExp(`${AGENT_ROOT}/\\d+$`, "m").test(input) && input.includes(`${photo.id}.png`),
+      // 사용자 디렉터리 아래 대화 번호다. 사용자 번호와 올린 이름을 경로로 쓰지 않는다.
+      new RegExp(`${AGENT_ROOT}/users/[a-f0-9]{64}/\\d+$`, "m").test(input) && input.includes(`${photo.id}.png`),
       `Hermes 입력에 사진 자리나 파일 이름이 없다: ${input}`,
     );
     expect(input.endsWith(text), `Hermes 입력이 사용자가 쓴 글로 끝나지 않는다: ${input}`);

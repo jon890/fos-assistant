@@ -30,6 +30,7 @@ import com.bifos.assistant.chat.domain.Conversation;
 import com.bifos.assistant.chat.domain.type.MessageRole;
 import com.bifos.assistant.chat.infra.AttachmentProperties;
 import com.bifos.assistant.chat.infra.ChatAttachmentRepository;
+import com.bifos.assistant.chat.infra.AttachmentStore;
 import com.bifos.assistant.chat.infra.ChatMessageRepository;
 import com.bifos.assistant.chat.infra.ConversationRepository;
 import com.bifos.assistant.chat.presentation.ChatController;
@@ -214,6 +215,8 @@ class ChatAttachmentTurnTest {
         StringBuilder expected = new StringBuilder(artifactPreamble(conversationId))
                 .append("[이번 메시지에 올린 사진]\n")
                 .append(AGENT_ROOT)
+                .append("/users/")
+                .append(AttachmentStore.userDirectoryKey(dad.id()))
                 .append("/")
                 .append(conversationId)
                 .append("\n");

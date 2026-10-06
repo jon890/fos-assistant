@@ -1,6 +1,7 @@
 package com.bifos.assistant.chat.infra;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.boot.context.properties.bind.ConstructorBinding;
 import org.springframework.validation.annotation.Validated;
 
 /**
@@ -11,22 +12,25 @@ import org.springframework.validation.annotation.Validated;
  *
  * @param root 사진을 두는 디렉터리 루트. Control Plane 컨테이너에서 보이는 경로다. 비어 있으면 기동을
  *     멈춘다
- * @param agentRoot 같은 디렉터리를 Hermes 컨테이너에서 보는 경로. 두 컨테이너가 같은 디렉터리를 다른
+ * @param agentRoot 같은 디렉터리를 Hermes 와 실행 컨테이너에서 보는 루트. 정책의 attachment_agent_root 와
+ *     같아야 한다. 두 컨테이너가 같은 디렉터리를 다른
  *     마운트 지점으로 볼 수 있어 따로 받는다. 에이전트에게 사진 자리를 알릴 때 이것을 적는다. 비어 있으면
  *     기동을 멈춘다
  * @param maxFiles 한 번에 보낼 수 있는 장수
  * @param maxBytes 한 장의 상한
  * @param retentionDays 올린 뒤 파일을 두는 날 수
+ * @param legacyWriteEnabled 이전 기간에 신규 사진의 옛 경로 사본도 남기는지. 다음 배포가 안정된 뒤 끈다
  */
 @Validated
 @ConfigurationProperties(prefix = "assistant.attachment")
 public record AttachmentProperties(
-        String root, String agentRoot, Integer maxFiles, Long maxBytes, Integer retentionDays) {
+        String root, String agentRoot, Integer maxFiles, Long maxBytes, Integer retentionDays, Boolean legacyWriteEnabled) {
 
     private static final int DEFAULT_MAX_FILES = 30;
     private static final long DEFAULT_MAX_BYTES = 10L * 1024 * 1024;
     private static final int DEFAULT_RETENTION_DAYS = 30;
 
+    @ConstructorBinding
     public AttachmentProperties {
         // 설정의 자리표시자는 환경 변수가 아예 없을 때만 기동을 멈춘다. 빈 문자열은 여기서 막는다.
         if (root == null || root.isBlank()) {
@@ -38,5 +42,10 @@ public record AttachmentProperties(
         maxFiles = maxFiles == null ? DEFAULT_MAX_FILES : maxFiles;
         maxBytes = maxBytes == null ? DEFAULT_MAX_BYTES : maxBytes;
         retentionDays = retentionDays == null ? DEFAULT_RETENTION_DAYS : retentionDays;
+        legacyWriteEnabled = legacyWriteEnabled == null ? Boolean.TRUE : legacyWriteEnabled;
+    }
+
+    public AttachmentProperties(String root, String agentRoot, Integer maxFiles, Long maxBytes, Integer retentionDays) {
+        this(root, agentRoot, maxFiles, maxBytes, retentionDays, true);
     }
 }

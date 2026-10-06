@@ -80,8 +80,10 @@ class AttachmentCleanerTest {
 
         assertThat(deleted).isEqualTo(1);
         assertThat(fileOf(expired)).doesNotExist();
+        assertThat(root.resolve(conversationId.toString()).resolve(expired.storedName())).doesNotExist();
         assertThat(reload(expired).deletedAt()).isEqualTo(NOW);
         assertThat(fileOf(live)).exists();
+        assertThat(root.resolve(conversationId.toString()).resolve(live.storedName())).exists();
         assertThat(reload(live).deletedAt()).isNull();
     }
 
@@ -152,7 +154,7 @@ class AttachmentCleanerTest {
                 ChatAttachment.of(conversationId, 9201L, "photo.png", "image/png", 3, expiresAt, Instant.now()));
         attachment.nameStoredFile(AttachmentStore.storedName(attachment.id(), "png"));
         attachments.save(attachment);
-        store.save(conversationId, attachment.id(), "png", new ByteArrayInputStream(new byte[] {1, 2, 3}));
+        store.save(attachment, new ByteArrayInputStream(new byte[] {1, 2, 3}));
         return attachment;
     }
 
@@ -161,7 +163,10 @@ class AttachmentCleanerTest {
     }
 
     private Path fileOf(ChatAttachment attachment) {
-        return root.resolve(String.valueOf(conversationId)).resolve(attachment.id() + ".png");
+        return root.resolve("users")
+                .resolve(AttachmentStore.userDirectoryKey(attachment.uploadedByUserId()))
+                .resolve(String.valueOf(conversationId))
+                .resolve(attachment.id() + ".png");
     }
 
     private static void deleteTree(Path path) throws IOException {
