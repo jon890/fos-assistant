@@ -23,14 +23,16 @@ public class HttpHermesSkillClient implements HermesSkillClient {
     private final RestClient restClient;
     private final String baseUrl;
     private final String token;
+    private final SandboxAttachmentDirectory attachmentDirectory;
 
-    public HttpHermesSkillClient(HermesProperties properties) {
+    public HttpHermesSkillClient(HermesProperties properties, SandboxAttachmentDirectory attachmentDirectory) {
         SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
         factory.setConnectTimeout(properties.connectTimeout());
         factory.setReadTimeout(properties.readTimeout());
         this.restClient = RestClient.builder().requestFactory(factory).build();
         this.baseUrl = stripTrailingSlash(properties.dashboardBaseUrl());
         this.token = properties.dashboardToken();
+        this.attachmentDirectory = attachmentDirectory;
     }
 
     @Override
@@ -94,6 +96,10 @@ public class HttpHermesSkillClient implements HermesSkillClient {
         config.put("skills", Map.of("external_dirs", List.copyOf(externalDirs)));
         if (apiServerToolsets != null) {
             config.put("platform_toolsets", Map.of("api_server", List.copyOf(apiServerToolsets)));
+        }
+        // 도구 목록을 함께 쓸 때만 plugin 이 실행 공간 설정을 다시 쓴다. 스킬 경로만 바꾸는 게시는 막지 않는다.
+        if (apiServerToolsets != null) {
+            attachmentDirectory.ensure(sandboxOwner);
         }
         try {
             restClient

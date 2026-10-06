@@ -383,7 +383,7 @@ public class ConnectorBindingService implements AgentConnectorDetacher {
                             : connector.putEnv(profile, field.env(), value);
                 }
                 step = STEP_INSTALL;
-                InstallResult installed = connector.putConnector(profile, manifest.id(), true);
+                InstallResult installed = connector.putConnector(profile, manifest.id(), true, agent.sandboxOwner());
                 binding.installed(restart || installed.restartRequired() || installed.pluginUpdated(), now);
             } else {
                 InstallResult installed = connector.bindConnector(
@@ -415,7 +415,7 @@ public class ConnectorBindingService implements AgentConnectorDetacher {
             for (ConnectorField field : manifest.map(ConnectorManifest::fields).orElse(List.of())) {
                 connector.deleteEnv(profile, field.env());
             }
-            connector.putConnector(profile, connectorId, false);
+            connector.putConnector(profile, connectorId, false, agent.sandboxOwner());
             // 옛 에이전트는 이 바인딩 하나로 돈다. 끄고 사진 받기를 내린다.
             binding.pending(now());
         } else {
@@ -509,7 +509,9 @@ public class ConnectorBindingService implements AgentConnectorDetacher {
     private boolean reinstallNeedsRestart(ConnectorBinding binding, String connectorId, boolean legacy) {
         String profile = binding.agent().hermesProfile();
         if (legacy) {
-            return connector.putConnector(profile, connectorId, true).pluginUpdated();
+            return connector
+                    .putConnector(profile, connectorId, true, binding.agent().sandboxOwner())
+                    .pluginUpdated();
         }
         InstallResult installed = connector.bindConnector(
                 profile, connectorId, binding.connection().vault());

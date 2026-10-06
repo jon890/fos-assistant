@@ -11,6 +11,8 @@ import com.sun.net.httpserver.HttpServer;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
@@ -19,6 +21,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import tools.jackson.databind.ObjectMapper;
 
 /** Hermes toolset 경로의 메서드, 인증, 본문 모양을 확인한다. */
@@ -31,6 +34,9 @@ class HermesToolsetRequestTest {
     private HttpHermesToolsetClient client;
     private int status = 200;
     private String response = "[]";
+
+    @TempDir
+    Path attachmentRoot;
 
     private record Call(String method, String path, String authorization, String body) {}
 
@@ -61,7 +67,8 @@ class HermesToolsetRequestTest {
                 Duration.ofSeconds(1));
         HermesProfileKeyStore keyStore = mock(HermesProfileKeyStore.class);
         when(keyStore.resolve("kid")).thenReturn(PROFILE_KEY);
-        client = new HttpHermesToolsetClient(keyStore, properties);
+        client = new HttpHermesToolsetClient(
+                keyStore, properties, new SandboxAttachmentDirectory(attachmentRoot.toString()));
     }
 
     @AfterEach
@@ -128,6 +135,31 @@ class HermesToolsetRequestTest {
         assertThatThrownBy(() -> client.writeApiServer("kid", List.of("terminal"), "u7"))
                 .isInstanceOfSatisfying(
                         ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.AGENT_SANDBOX_UNAVAILABLE));
+    }
+
+    @Test
+    @DisplayName("첨부를 올린 적 없는 주인도 보내기 전에 첨부 디렉터리를 만들어 도구를 저장한다")
+    void createsTheOwnersAttachmentDirectoryBeforeWriting() {
+        client.writeApiServer("kid", List.of("vision", "fos-assistant"), "u7");
+
+        assertThat(attachmentRoot.resolve("users").resolve(SandboxAttachmentDirectory.key("u7")))
+                .isDirectory();
+        assertThat(calls).hasSize(1);
+    }
+
+    @Test
+    @DisplayName("주인의 첨부 디렉터리가 링크이면 Hermes 에 보내지 않고 실행 공간 거절로 멈춘다")
+    void linkedAttachmentDirectoryStopsBeforeWriting() throws IOException {
+        Path users = Files.createDirectories(attachmentRoot.resolve("users"));
+        Path other = Files.createDirectory(users.resolve(SandboxAttachmentDirectory.key("u8")));
+        Files.createSymbolicLink(users.resolve(SandboxAttachmentDirectory.key("u7")), other);
+
+        assertThatThrownBy(() -> client.writeApiServer("kid", List.of("vision"), "u7"))
+                .isInstanceOfSatisfying(HermesRequestRejected.class, ex -> {
+                    assertThat(ex.code()).isEqualTo(ErrorCode.AGENT_SANDBOX_UNAVAILABLE);
+                    assertThat(ex.status()).isEqualTo(409);
+                });
+        assertThat(calls).isEmpty();
     }
 
     @Test

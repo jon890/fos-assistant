@@ -3,6 +3,7 @@ package com.bifos.assistant.chat.application;
 import com.bifos.assistant.agent.application.AgentConnectorBindings;
 import com.bifos.assistant.agent.application.AgentService;
 import com.bifos.assistant.agent.domain.Agent;
+import com.bifos.assistant.agent.domain.type.AgentVisibility;
 import com.bifos.assistant.chat.application.model.AutoTurnDelivery;
 import com.bifos.assistant.chat.application.model.AutoTurnResult;
 import com.bifos.assistant.chat.application.model.CheckAnswer;
@@ -1090,6 +1091,7 @@ public class ChatService {
         if (withAttachments && !agent.acceptsAttachments()) {
             throw new ApiException(ErrorCode.VALIDATION_FAILED, "this agent does not accept attachments");
         }
+        requireAttachmentOwner(user, agent, withAttachments);
         Flow flow = flows.find(agent.flow());
         SkillCommand command = commandOf(agent, flow, text);
         if (existing == null && !limiter.hasTurnRoom(user.id())) {
@@ -1121,6 +1123,7 @@ public class ChatService {
     }
 
     /** 예약 작업 발화가 미리 만들었다가 쓰지 않은 대화만 부른다. 메시지가 있으면 지우지 않는다. */
+    @Transactional
     public boolean discardEmptyTaskConversation(Long conversationId) {
         return conversations.discardEmptyTaskConversation(conversationId) == 1;
     }
@@ -1520,9 +1523,21 @@ public class ChatService {
         if (!agent.enabled()) {
             throw new ApiException(ErrorCode.AGENT_DISABLED, "this agent is disabled");
         }
+        requireAttachmentOwner(user, agent, !attached.isEmpty());
         Flow flow = flows.find(agent.flow());
         return new Routed(
                 conversation, agent, flow, attached, commandOf(agent, flow, question), requestReceivedAt, false);
+    }
+
+    private static void requireAttachmentOwner(CurrentUser user, Agent agent, boolean withAttachments) {
+        if (!withAttachments) {
+            return;
+        }
+        boolean privateAgent = agent.visibility() == AgentVisibility.PRIVATE;
+        boolean sameOwner = Objects.equals(agent.ownerUserId(), user.id());
+        if (!privateAgent || !sameOwner) {
+            throw new ApiException(ErrorCode.VALIDATION_FAILED, "this agent does not accept attachments");
+        }
     }
 
     /**

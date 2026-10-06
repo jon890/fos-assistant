@@ -1134,7 +1134,7 @@ class ConnectorActionServiceTest {
     @Test
     @DisplayName("연결을 해제하면 그 연결의 PENDING 이 REJECTED 가 되고 허락이 거두어지며 사건이 나간다")
     void disconnectRejectsPendingActionsAndRevokesGrants() {
-        when(connector.putConnector(anyString(), anyString(), anyBoolean()))
+        when(connector.putConnector(anyString(), anyString(), anyBoolean(), anyString()))
                 .thenReturn(new InstallResult(false, false));
         service.approve(me, ask(WRITE, ARGS).actionId(), GrantPeriod.DAYS_30);
         UUID waiting = ask("send_note", ARGS).actionId();
@@ -1162,7 +1162,7 @@ class ConnectorActionServiceTest {
     @Test
     @DisplayName("값을 다시 등록하면 앞선 값에 한 승인 요청이 REJECTED 가 되고 허락이 거두어진다")
     void registeringAgainRejectsPendingActionsAndRevokesGrants() {
-        when(connector.putConnector(anyString(), anyString(), anyBoolean()))
+        when(connector.putConnector(anyString(), anyString(), anyBoolean(), anyString()))
                 .thenReturn(new InstallResult(false, false));
         when(connector.call(anyString(), anyString(), anyMap()))
                 .thenReturn(CallResult.success(JSON.readTree("{\"scopes\":[]}")));
@@ -1208,7 +1208,7 @@ class ConnectorActionServiceTest {
 
             verify(connector, never()).putEnv(anyString(), anyString(), anyString());
             verify(connector, never()).deleteEnv(anyString(), anyString());
-            verify(connector, never()).putConnector(anyString(), anyString(), anyBoolean());
+            verify(connector, never()).putConnector(anyString(), anyString(), anyBoolean(), anyString());
             assertThat(connections.findAll())
                     .extracting(ConnectorConnection::status)
                     .containsExactly(ConnectionStatus.READY);
@@ -1223,7 +1223,7 @@ class ConnectorActionServiceTest {
     @Test
     @DisplayName("실행이 끝난 뒤에는 값을 다시 등록할 수 있다")
     void registeringAfterTheApprovedCallFinishedIsAccepted() {
-        when(connector.putConnector(anyString(), anyString(), anyBoolean()))
+        when(connector.putConnector(anyString(), anyString(), anyBoolean(), anyString()))
                 .thenReturn(new InstallResult(false, false));
         when(connector.call(anyString(), anyString(), anyMap()))
                 .thenReturn(CallResult.success(JSON.readTree("{\"scopes\":[]}")));
@@ -1249,7 +1249,7 @@ class ConnectorActionServiceTest {
     @Test
     @DisplayName("오래 EXECUTING 으로 남은 줄만 UNKNOWN 으로 바꿔 그 연결의 다시 등록이 다시 열린다")
     void staleExecutionBecomesUnknown() {
-        when(connector.putConnector(anyString(), anyString(), anyBoolean()))
+        when(connector.putConnector(anyString(), anyString(), anyBoolean(), anyString()))
                 .thenReturn(new InstallResult(false, false));
         when(connector.call(anyString(), anyString(), anyMap()))
                 .thenReturn(CallResult.success(JSON.readTree("{\"scopes\":[]}")));
