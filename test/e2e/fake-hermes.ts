@@ -300,7 +300,12 @@ type Run = {
   runtime?: { provider: string; model: string; route_source: string };
   /** 살펴보기 실행이면 사건 스트림이 흘릴 도구 사건과 기다릴 자리다. */
   proactive?: { tools: string[]; gate?: Promise<void> };
+  /** 정책이 허용해 커넥터 서버에 닿은 호출이다. 사건 스트림이 호출마다 시작과 완료 사건을 실제 Hermes 의 모양으로 흘린다. */
+  connectorCalls?: ConnectorCall[];
 };
+
+/** 허용된 커넥터 도구 호출 하나다. `hermesTool` 은 등록 이름이다. */
+type ConnectorCall = { hermesTool: string; argsJson: string };
 
 /**
  * 세션 하나가 마지막으로 실제로 쓴 provider 와 모델이다.
@@ -458,6 +463,14 @@ export const SUBAGENT_PROVIDER_PROBE = "자식 provider 확인 검사";
  * `allow` 인 호출만 커넥터 서버에 닿은 것으로 치고 `connectorToolCalls` 에 남긴다.
  */
 export const CONNECTOR_TOOL_PROBE = "커넥터 도구 검사";
+
+/**
+ * 허용된 커넥터 도구 호출의 완료 사건이 싣는 결과 미리보기다. 외부 서비스가 돌려준 글을 뜻하는 가짜 값이고, 실행 기록과 화면에는
+ * 어디에도 남지 않아야 한다.
+ */
+export const CONNECTOR_RESULT_SAMPLE = "외부-결과-4821";
+/** 허용된 커넥터 도구 호출의 인자로 보내 시작 사건의 미리보기에 실리는 가짜 값이다. 실행 기록과 화면에는 남지 않아야 한다. */
+export const CONNECTOR_ARGUMENT_SAMPLE = "외부-인자-4821";
 
 export type ConnectorToolCall = { profile: string; hermesTool: string; argsJson: string; via: "hook" | "execute" };
 
@@ -1050,6 +1063,7 @@ export function startFakeHermes(
    * 원래 도구 이름은 등록 이름의 서버 앞부분으로 고른 커넥터가 선언한 도구일 때만 싣는다.
    *
    * @param callIdPrefix 도구 호출 id 의 앞부분. 한 session 에서 같은 id 를 다시 쓰면 앞선 판정이 되풀이되므로 부를 때마다 다르게 준다
+   * @param allowed 주면 허용된 호출을 여기에 더한다. 실행의 사건 스트림이 그 호출을 도구 사건으로 흘린다
    */
   const judgeConnectorCalls = async (
     profile: string,
@@ -1057,6 +1071,7 @@ export function startFakeHermes(
     sessionId: string | undefined,
     lines: readonly string[],
     callIdPrefix: string,
+    allowed?: ConnectorCall[],
   ): Promise<string> => {
     const output: string[] = [];
     for (const [index, line] of lines.entries()) {
@@ -1079,6 +1094,7 @@ export function startFakeHermes(
           const answer = await response.json() as { decision?: unknown; message?: unknown };
           if (answer.decision === "allow") {
             connectorToolCalls.push({ profile, hermesTool, argsJson, via: "hook" });
+            allowed?.push({ hermesTool, argsJson });
             output.push(`${hermesTool}: allow`);
             continue;
           }
@@ -2074,6 +2090,14 @@ export function startFakeHermes(
               event(response, { event: "message.delta", delta: streamedOutput.slice(offset, offset + 80) });
             }
           }
+          // 정책이 허용한 커넥터 도구 호출이다. 실제 Hermes(v0.21.5)가 붙은 서버의 도구에 보내는 모양이다. 모든 사건에 `run_id` 와
+          // `timestamp` 가 있고, 시작 사건의 `preview` 는 인자이며, 완료 사건의 `preview` 는 결과다.
+          for (const connectorCall of run.connectorCalls ?? []) {
+            const common = { run_id: runId, timestamp: Date.now() / 1000, tool: connectorCall.hermesTool };
+            event(response, { event: "tool.started", ...common, preview: connectorCall.argsJson });
+            event(response, { event: "tool.completed", ...common, duration: 0.05, error: false,
+              preview: JSON.stringify({ result: CONNECTOR_RESULT_SAMPLE }) });
+          }
           const redactDetail = run.input === "도구 가리기 검사" || run.input === "스트림 정본 검사";
           event(response, { event: "tool.started", tool: "fake-tool",
             preview: redactDetail ? TOOL_DETAIL_SAMPLE : "started" });
@@ -2201,6 +2225,7 @@ export function startFakeHermes(
             submitted.session_id,
           )
           : undefined;
+        const connectorCalls: ConnectorCall[] = [];
         const connectorOutput = input.startsWith(CONNECTOR_TOOL_PROBE)
           ? await judgeConnectorCalls(
             profile!,
@@ -2208,6 +2233,7 @@ export function startFakeHermes(
             submitted.session_id,
             input.split("\n").slice(1).map((line) => line.trim()).filter((line) => line.length > 0),
             `connector-call-${submitCount}`,
+            connectorCalls,
           )
           : undefined;
         if (!starterRun) {
@@ -2284,6 +2310,7 @@ export function startFakeHermes(
           provider: submitted.provider ?? null,
           interruptEvents: input === "스트림 중단 검사",
           usage: FAKE_USAGE,
+          connectorCalls,
           proactive: proactiveRun
             ? {
                 tools: script === undefined ? DEFAULT_PROACTIVE_TOOLS : script.tools ?? [],
