@@ -75,6 +75,7 @@ import logging
 import os
 import sqlite3
 import urllib.error
+import urllib.parse
 import urllib.request
 
 logger = logging.getLogger(__name__)
@@ -93,6 +94,7 @@ MAX_DEPTH = 16
 # 모델이 스킬을 만들고 고치는 도구다. Hermes `tools/skill_manager_tool.py` 가 이 이름으로 등록한다.
 SKILL_MANAGE_TOOL = "skill_manage"
 SKILL_MANAGE_MESSAGE = "이 환경에서는 스킬을 대화로 만들거나 고칠 수 없다. 에이전트 관리 화면에서 올린다"
+DELEGATE_IMAGE_MESSAGE = "하위 에이전트에는 로컬 사진 경로를 넘길 수 없다. HTTP(S) 주소나 이미지 data URL 을 쓴다"
 
 # 자식 session 을 등록할 Control Plane 주소다. 경로는 fos-assistant 가 정한다.
 REGISTER_URL_ENV = "FOS_CTX_SUBAGENT_URL"
@@ -325,11 +327,48 @@ def connector_policy(tool_name: str, args, session_id: str, tool_call_id: str, s
     return _block(POLICY_BLOCK_MESSAGE)
 
 
+def _remote_images_only(images):
+    """자식 이미지 전달은 Hermes 호스트 파일을 읽으므로 원격 주소와 직접 실은 이미지만 받는다."""
+    if images is None:
+        return True
+    if not isinstance(images, list):
+        return False
+    for source in images:
+        if not isinstance(source, str) or source != source.strip():
+            return False
+        if source.startswith("data:image/"):
+            continue
+        if not source.startswith(("http://", "https://")):
+            return False
+        try:
+            url = urllib.parse.urlsplit(source)
+        except ValueError:
+            return False
+        if url.scheme not in {"http", "https"} or not url.netloc:
+            return False
+    return True
+
+
+def _delegate_images_allowed(args):
+    if args is None:
+        return True
+    if not isinstance(args, dict) or not _remote_images_only(args.get("images")):
+        return False
+    tasks = args.get("tasks")
+    if tasks is None:
+        return True
+    if not isinstance(tasks, list):
+        return False
+    return all(isinstance(task, dict) and _remote_images_only(task.get("images")) for task in tasks)
+
+
 def pre_tool_call(tool_name="", args=None, session_id="", tool_call_id="", **_):
     if tool_name == SKILL_MANAGE_TOOL:
         return {"action": "block", "message": SKILL_MANAGE_MESSAGE}
     if not isinstance(tool_name, str):
         return None
+    if tool_name == "delegate_task" and not _delegate_images_allowed(args):
+        return _block(DELEGATE_IMAGE_MESSAGE)
     control_plane = tool_name.startswith(TOOL_PREFIX)
     guarded = tool_name.startswith(MCP_PREFIX) or tool_name == CODE_EXECUTION_TOOL
     # 대응 파일을 Control Plane MCP 의 접두사보다 먼저 본다. 접두사를 먼저 보면 등록 이름이 그 접두사로 시작하는

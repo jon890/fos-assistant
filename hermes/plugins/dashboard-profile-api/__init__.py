@@ -157,8 +157,10 @@ ENV_VAR = "HERMES_DASHBOARD_PROFILE_API_SECRET"
 SKILL_ROOT_ENV = "FOS_ASSISTANT_SKILL_AGENT_ROOT"
 # 셸과 파일 도구를 돌릴 docker 실행 공간 설정 JSON 이다. 모양은 `hermes/README.md` 의 「셸 실행 공간」 이 갖는다(ADR-086).
 SANDBOX_ENV = "FOS_ASSISTANT_SANDBOX"
+# 사진과 영상 파일을 Hermes host에서 직접 읽으면 다른 사용자의 첨부가 보일 수 있다. 실행 공간에서만 연다.
+IMAGE_FILE_TOOLSETS = frozenset({"vision", "image_gen", "video_gen"})
 # 켜면 profile 의 `terminal:` 을 실행 공간 설정으로 바꿔야 하는 도구다. 설정이 없으면 켜지 않는다.
-SANDBOX_TOOLSETS = frozenset({"terminal", "file", "code_execution"})
+SANDBOX_TOOLSETS = frozenset({"terminal", "file", "code_execution"}) | IMAGE_FILE_TOOLSETS
 # 실행 공간 사용자 디렉터리 이름이다. Control Plane 이 사용자마다 정해 보낸다.
 SANDBOX_OWNER_RE = re.compile(r"^[a-z][a-z0-9-]{0,63}$")
 SANDBOX_NETWORK_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$")
@@ -166,7 +168,8 @@ SANDBOX_NETWORK_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$")
 SANDBOX_RESERVED_PATHS = ("/workspace", "/root")
 # hermes/README.md 의 「셸 실행 공간」 계약 표에 있는 최상위 키다. 그 밖의 키가 있으면 정책 전체를 틀린 것으로 본다.
 SANDBOX_POLICY_KEYS = frozenset({
-    "image", "workspace_root", "network", "cpu", "memory_mb", "read_only_mounts", "profiles",
+    "image", "workspace_root", "attachment_root", "attachment_agent_root", "network", "cpu",
+    "memory_mb", "read_only_mounts", "profiles",
 })
 SANDBOX_PROFILE_KEYS = frozenset({"read_only_mounts", "env", "network"})
 # 비밀값은 넣지 않는다. 운영 정책이 경로와 Backend 주소만 명시한다.
@@ -1098,7 +1101,8 @@ def _remove_backup_env_copies(profile_dir: pathlib.Path) -> None:
             logger.warning("dashboard-profile-api: 백업의 옛 env 사본을 지우지 못했다: %s", type(error).__name__)
 
 
-def _connector_config(profile_dir: pathlib.Path, plugin: str, enabled: bool) -> dict:
+def _connector_config(profile_dir: pathlib.Path, plugin: str, enabled: bool,
+                      sandbox_terminal: Optional[dict] = None, local_execution: bool = False) -> dict:
     """관리 표식 profile 의 설정을 바꾸고 실패하면 같은 요청 안에서 되돌린다.
 
     설치와 제거는 API 도구 목록을 커넥터 서버 이름과 manifest 가 선언한 내장 toolset 으로 다시 쓰고,
@@ -1186,6 +1190,15 @@ def _connector_config(profile_dir: pathlib.Path, plugin: str, enabled: bool) -> 
             values[env_path] = "".join(kept).encode("utf-8")
     updated = {**saved, "mcp_servers": servers,
                "platform_toolsets": {**(saved.get("platform_toolsets") or {}), "api_server": allowed}}
+    if sandbox_terminal is not None:
+        updated["terminal"] = sandbox_terminal
+    elif local_execution:
+        previous = saved.get("terminal") or {}
+        if not isinstance(previous, dict):
+            raise ValueError("terminal 설정이 객체가 아니다")
+        terminal = dict(previous) if previous.get("backend", "local") == "local" else {}
+        terminal["backend"] = "local"
+        updated["terminal"] = terminal
     values = {config_path: yaml.safe_dump(updated, sort_keys=False, allow_unicode=True).encode(),
               state_path: (json.dumps(state) + "\n").encode(), **values}
     if enabled or owned:
@@ -1295,12 +1308,17 @@ async def _connector_request(request):
     else:
         body = await _json_object(request)
         # 운영 목록에 없는 이름은 끄기만 받는다. 소유 기록이 있으면 설치를 끄고, 없으면 바꾸지 않고 성공이다.
-        if (body is None or set(body) != {"profile", "plugin", "enabled"}
+        if (body is None or set(body) - {"profile", "plugin", "enabled", "sandbox_owner"}
+                or not {"profile", "plugin", "enabled"} <= set(body)
                 or not isinstance(body["plugin"], str) or not CONNECTOR_ID_RE.match(body["plugin"])
                 or not isinstance(body["enabled"], bool)
                 or (body["enabled"] and body["plugin"] not in roots)):
-            return _rejected("profile, 알려진 plugin, enabled 만 필요하다")
-    rejected = _profile_rejection(body["profile"], request)
+            return _rejected("profile, 알려진 plugin, enabled, sandbox_owner 만 필요하다")
+        owner = body.get("sandbox_owner")
+        if owner is not None and not (isinstance(owner, str) and SANDBOX_OWNER_RE.match(owner)):
+            return _rejected("sandbox_owner 형식이 올바르지 않다")
+    profile = body["profile"]
+    rejected = _profile_rejection(profile, request)
     if rejected is not None:
         return rejected
     missing = _missing_profile(body["profile"])
@@ -1337,8 +1355,29 @@ async def _connector_request(request):
                               for plugin in state if plugin not in roots)
             return JSONResponse({"profile": body["profile"], "connectors": connectors,
                                  "policy_hook": _policy_hook_active(profile_dir, config, state)}, status_code=200)
-        result = await asyncio.to_thread(_connector_config, profile_dir, body["plugin"], body["enabled"])
-        return JSONResponse({**body, **result}, status_code=200)
+        sandbox_terminal = None
+        local_execution = False
+        manifest = _connector_manifest(body["plugin"])
+        if body["enabled"] and manifest is not None and SANDBOX_TOOLSETS & set(manifest["toolsets"]):
+            sandbox = _sandbox_policy()
+            if sandbox is None:
+                return _sandbox_unavailable()
+            if profile in sandbox["profiles"]:
+                if owner is None:
+                    return _rejected("격리할 사진 도구에는 sandbox_owner 가 필요하다")
+                sandbox_terminal = _sandbox_terminal(sandbox, profile, owner)
+            else:
+                return _sandbox_unavailable()
+        if sandbox_terminal is not None:
+            try:
+                os.makedirs(_sandbox_workspace(sandbox, owner), exist_ok=True)
+                _sandbox_ensure_attachment_agent_directory(sandbox, owner)
+            except OSError:
+                logger.warning("dashboard-profile-api: 실행 공간 또는 첨부 사용자 디렉터리를 만들지 못했다", exc_info=True)
+        result = await asyncio.to_thread(
+            _connector_config, profile_dir, body["plugin"], body["enabled"], sandbox_terminal, local_execution)
+        response = {key: body[key] for key in ("profile", "plugin", "enabled")}
+        return JSONResponse({**response, **result}, status_code=200)
     except FileExistsError:
         return _rejected("운영자 설정과 충돌한다", 409)
     except Exception:
@@ -1794,18 +1833,39 @@ def _sandbox_mounts_ok(value) -> bool:
     return isinstance(value, list) and all(_sandbox_mount_ok(entry) for entry in value)
 
 
-def _sandbox_mount_overlaps(mount: str, workspace_root: str) -> bool:
-    """마운트 원본이 `workspace_root` 와 같거나 그 아래이거나 그 상위인가. 경로 조각 기준으로 본다.
-
-    겹치면 다른 사용자의 `/workspace` 가 읽기 전용 마운트로 함께 보인다.
-    """
-    source = mount.split(":")[0].rstrip("/") or "/"
-    root = workspace_root.rstrip("/") or "/"
+def _sandbox_paths_overlap(first: str, second: str) -> bool:
+    """두 절대 경로가 같거나 한쪽이 다른 쪽 아래인지 경로 조각 기준으로 본다."""
+    first = first.rstrip("/") or "/"
+    second = second.rstrip("/") or "/"
 
     def under(child, parent):
         return child == parent or parent == "/" or child.startswith(parent + "/")
 
-    return under(source, root) or under(root, source)
+    return under(first, second) or under(second, first)
+
+
+def _sandbox_mount_overlaps(mount: str, workspace_root: str) -> bool:
+    """마운트 원본이 `workspace_root` 와 겹치는지 경로 조각 기준으로 본다.
+
+    겹치면 다른 사용자의 `/workspace` 가 읽기 전용 마운트로 함께 보인다.
+    """
+    source = mount.split(":")[0]
+    return _sandbox_paths_overlap(source, workspace_root)
+
+
+def _sandbox_attachment_mount_overlaps(mount: str, attachment_root: str, attachment_agent_root: str) -> bool:
+    """운영 마운트가 첨부 원본이나 실행 공간 안의 첨부 경로 전체를 보이게 하는지 본다."""
+    source, target = mount.split(":")
+    return (_sandbox_paths_overlap(source, attachment_root)
+            or _sandbox_paths_overlap(target, attachment_agent_root))
+
+
+def _sandbox_attachment_roots_ok(attachment_root: str, attachment_agent_root: str, workspace_root: str) -> bool:
+    """첨부 원본과 실행 공간 경로가 사용자 workspace 나 예약 경로와 겹치지 않는지 본다."""
+    if _sandbox_paths_overlap(attachment_root, workspace_root):
+        return False
+    return not any(_sandbox_paths_overlap(attachment_agent_root, reserved)
+                   for reserved in SANDBOX_RESERVED_PATHS)
 
 
 def _sandbox_env_ok(value) -> bool:
@@ -1834,7 +1894,8 @@ def _sandbox_env_ok(value) -> bool:
     return True
 
 
-def _sandbox_profiles(value, workspace_root: str, default_network) -> Optional[dict]:
+def _sandbox_profiles(value, workspace_root: str, attachment_root: str, attachment_agent_root: str,
+                      default_network) -> Optional[dict]:
     """정책에 등록된 profile 만 검증한다. 빈 목록은 모두 기존 실행을 유지한다."""
     if not isinstance(value, dict):
         return None
@@ -1845,7 +1906,9 @@ def _sandbox_profiles(value, workspace_root: str, default_network) -> Optional[d
             return None
         mounts = settings.get("read_only_mounts", [])
         if (not _sandbox_mounts_ok(mounts)
-                or any(_sandbox_mount_overlaps(mount, workspace_root) for mount in mounts)):
+                or any(_sandbox_mount_overlaps(mount, workspace_root)
+                       or _sandbox_attachment_mount_overlaps(mount, attachment_root, attachment_agent_root)
+                       for mount in mounts)):
             return None
         env = settings.get("env", {})
         if not _sandbox_env_ok(env):
@@ -1891,6 +1954,10 @@ def _sandbox_policy() -> Optional[dict]:
         return invalid("image")
     if not _sandbox_path_ok(value.get("workspace_root")):
         return invalid("workspace_root")
+    if not _sandbox_path_ok(value.get("attachment_root")):
+        return invalid("attachment_root")
+    if not _sandbox_path_ok(value.get("attachment_agent_root")):
+        return invalid("attachment_agent_root")
     network = value.get("network")
     if network is not None and not (isinstance(network, str) and SANDBOX_NETWORK_RE.fullmatch(network)):
         return invalid("network")
@@ -1904,14 +1971,23 @@ def _sandbox_policy() -> Optional[dict]:
     if not _sandbox_mounts_ok(read_only_mounts):
         return invalid("read_only_mounts")
     workspace_root = value["workspace_root"]
-    if any(_sandbox_mount_overlaps(mount, workspace_root) for mount in read_only_mounts):
+    attachment_root = value["attachment_root"]
+    attachment_agent_root = value["attachment_agent_root"]
+    if not _sandbox_attachment_roots_ok(attachment_root, attachment_agent_root, workspace_root):
+        return invalid("attachment_root 또는 attachment_agent_root")
+    if any(_sandbox_mount_overlaps(mount, workspace_root)
+           or _sandbox_attachment_mount_overlaps(mount, attachment_root, attachment_agent_root)
+           for mount in read_only_mounts):
         return invalid("read_only_mounts")
-    profiles = _sandbox_profiles(value.get("profiles"), workspace_root, network)
+    profiles = _sandbox_profiles(value.get("profiles"), workspace_root, attachment_root,
+                                 attachment_agent_root, network)
     if profiles is None:
         return invalid("profiles")
     return {
         "image": image,
         "workspace_root": value["workspace_root"],
+        "attachment_root": attachment_root,
+        "attachment_agent_root": attachment_agent_root,
         "network": network,
         "cpu": cpu,
         "memory_mb": memory_mb,
@@ -1922,6 +1998,36 @@ def _sandbox_policy() -> Optional[dict]:
 
 def _sandbox_workspace(policy: dict, owner: str) -> str:
     return "%s/%s" % (policy["workspace_root"].rstrip("/"), owner)
+
+
+def _sandbox_attachment_key(owner: str) -> str:
+    """실행 주인을 디스크 경로에 드러내지 않는 안정된 사용자 디렉터리 이름이다."""
+    return hashlib.sha256(owner.encode("utf-8")).hexdigest()
+
+
+def _sandbox_attachment_directory(policy: dict, owner: str) -> str:
+    return "%s/users/%s" % (policy["attachment_root"].rstrip("/"), _sandbox_attachment_key(owner))
+
+
+def _sandbox_attachment_agent_directory(policy: dict, owner: str) -> str:
+    return "%s/users/%s" % (policy["attachment_agent_root"].rstrip("/"), _sandbox_attachment_key(owner))
+
+
+def _sandbox_ensure_attachment_agent_directory(policy: dict, owner: str) -> None:
+    """Hermes와 실행 컨테이너가 함께 보는 첨부 사용자 디렉터리를 만든다.
+
+    Docker 호스트 원본 경로는 Hermes에서 보이지 않을 수 있다.
+    운영자가 지정한 agent root 아래의 `users`와 사용자 키 디렉터리에 링크가 있으면 밖으로 나갈 수 있으므로 만들지 않는다.
+    """
+    root = pathlib.Path(policy["attachment_agent_root"])
+    users = root / "users"
+    directory = users / _sandbox_attachment_key(owner)
+    for index, path in enumerate((root, users, directory)):
+        if path.is_symlink():
+            raise OSError("attachment agent directory contains a symbolic link")
+        path.mkdir(parents=index == 0, exist_ok=True)
+        if not path.is_dir() or path.is_symlink():
+            raise OSError("attachment agent directory is not a directory")
 
 
 def _sandbox_terminal(policy: dict, profile: str, owner: str) -> dict:
@@ -1947,7 +2053,11 @@ def _sandbox_terminal(policy: dict, profile: str, owner: str) -> dict:
         "docker_run_as_host_user": False,
         "docker_network": True,
         "docker_extra_args": extra_args,
-        "docker_volumes": ["%s:/workspace" % _sandbox_workspace(policy, owner)] + ["%s:ro" % m for m in mounts],
+        "docker_volumes": [
+            "%s:/workspace" % _sandbox_workspace(policy, owner),
+            "%s:%s:ro" % (_sandbox_attachment_directory(policy, owner),
+                            _sandbox_attachment_agent_directory(policy, owner)),
+        ] + ["%s:ro" % m for m in mounts],
         "docker_forward_env": [],
         "docker_env": settings["env"],
         "env_passthrough": [],
@@ -1996,6 +2106,8 @@ async def _check_config_update(request):
         if sandbox is None:
             return _sandbox_unavailable()
         if profile not in sandbox["profiles"]:
+            if IMAGE_FILE_TOOLSETS & set(platform["api_server"]):
+                return _sandbox_unavailable()
             sandbox = None
             local_execution = True
         elif owner is None:
@@ -2087,8 +2199,9 @@ async def _check_config_update(request):
             # 처리기가 실패해도 지우지 않는다. 빈 디렉터리만 남는다.
             try:
                 os.makedirs(_sandbox_workspace(sandbox, owner), exist_ok=True)
+                _sandbox_ensure_attachment_agent_directory(sandbox, owner)
             except OSError:
-                logger.warning("dashboard-profile-api: 실행 공간 사용자 디렉터리를 만들지 못했다", exc_info=True)
+                logger.warning("dashboard-profile-api: 실행 공간 또는 첨부 사용자 디렉터리를 만들지 못했다", exc_info=True)
         # 처리기의 병합은 본문의 키만 쓴다. 본문에 없는 disabled_toolsets, 고정 목록, terminal 은 plugin 이 먼저 쓴다.
         if updated.get("agent") != saved.get("agent") or updated.get("terminal") != saved.get("terminal"):
             request.state.fos_checked_config = (config_path, original, updated)

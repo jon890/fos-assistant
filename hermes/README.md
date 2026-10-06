@@ -6,7 +6,7 @@ Control Plane 이 기대는 Hermes 쪽 코드다. Hermes 에 설치하는 plugin
 | plugin | 하는 일 | 두는 곳 | 읽는 프로세스 |
 | --- | --- | --- | --- |
 | `dashboard-profile-api` | 대시보드의 profile 관리와 도구 목록 경로를 `Authorization: Bearer` 로 연다 | Hermes 기본 루트의 `plugins/` | 대시보드 |
-| `fos-ctx` | Control Plane MCP 호출 인자에 서명한 run 맥락 `_fos_ctx` 를 덮어쓰고, `skill_manage` 를 막고, 자식 session 을 등록하고, 연결용 profile 의 커넥터 도구 호출을 Control Plane 에 묻는다 | Control Plane MCP 를 등록한 profile 마다 | gateway |
+| `fos-ctx` | Control Plane MCP 호출에 서명한 `_fos_ctx` 를 붙이고, 스킬 수정과 자식의 로컬 이미지 전달을 막고, 자식 session 등록과 커넥터 호출 판정을 한다 | Control Plane MCP 를 등록한 profile 마다 | gateway |
 
 ## 범용 커넥터
 
@@ -47,7 +47,7 @@ plugin 파일, 주소를 채운 `default-config.yaml.template`, 틀의 `plugins.
 | 커넥터 실행 파일 기본값 | 대시보드 프로세스의 환경 변수 `FOS_ASSISTANT_CONNECTOR_COMMAND` | 절대 경로다. 목록 항목에 `command` 가 없을 때 쓴다 |
 | 대시보드 서비스 토큰 | 환경 변수 `HERMES_DASHBOARD_PROFILE_API_SECRET` | |
 | 스킬 루트 | 대시보드 프로세스의 환경 변수 `FOS_ASSISTANT_SKILL_AGENT_ROOT` | |
-| 셸 실행 공간 | 대시보드 프로세스의 환경 변수 `FOS_ASSISTANT_SANDBOX` | 값의 모양은 아래 「셸 실행 공간」 에 있다. 없거나 읽지 못하면 `terminal`, `file`, `code_execution` 을 켜는 도구 저장을 409 로 거절한다 |
+| 셸 실행 공간 | 대시보드 프로세스의 환경 변수 `FOS_ASSISTANT_SANDBOX` | 값의 모양은 아래 「셸 실행 공간」 에 있다. 없거나 읽지 못하면 `terminal`, `file`, `code_execution`, `vision`, `image_gen`, `video_gen` 을 켜는 도구 저장을 409 로 거절한다 |
 | 커넥터 정책을 물을 주소 | gateway 프로세스의 환경 변수 `FOS_CTX_POLICY_URL` | Control Plane 의 `/internal/hermes/connector-policy` 다. 없으면 `fos-ctx` 가 연결용 profile 의 커넥터 도구를 모두 막는다 |
 | 자식 session 을 등록할 주소 | gateway 프로세스의 환경 변수 `FOS_CTX_SUBAGENT_URL` | 없으면 등록하지 않는다. 등록이 없는 자식의 호출은 Control Plane 이 거절한다 |
 
@@ -59,6 +59,8 @@ plugin 파일, 주소를 채운 `default-config.yaml.template`, 틀의 `plugins.
 | --- | --- | --- |
 | `image` | 예 | 실행 공간 이미지. `execute_code` 를 쓰려면 python3 가 있어야 한다 |
 | `workspace_root` | 예 | 사용자 디렉터리를 둘 절대 경로. **Docker 호스트와 Hermes 컨테이너에서 같은 경로**여야 한다. 사용자 디렉터리 `<workspace_root>/<sandbox_owner>` 가 `/workspace` 에 붙는다 |
+| `attachment_root` | 예 | Docker 호스트에서 첨부를 사용자별로 둔 절대 경로. `<attachment_root>/users/<sha256(sandbox_owner UTF-8)>` 만 읽기 전용으로 붙는다 |
+| `attachment_agent_root` | 예 | Hermes와 실행 컨테이너가 함께 보는 첨부 절대 경로. `<attachment_agent_root>/users/<sha256(sandbox_owner UTF-8)>` 가 위 원본의 실행 공간 경로다. Docker 호스트와 Hermes의 경로는 달라도 된다 |
 | `network` | 아니오 | 실행 공간을 붙일 Docker 망 이름. 없으면 Docker 기본 망이다 |
 | `cpu` | 아니오 | 0 보다 크고 8 이하. 기본 1 |
 | `memory_mb` | 아니오 | 256 이상 16384 이하의 정수. 기본 1024 |
@@ -79,7 +81,11 @@ token 과 API key 값 자체는 받지 않는다. 파일을 읽게 할 경우 �
 일반 API 요청은 env, 망, 마운트와 profile 정책을 쓰지 못한다.
 
 경로에 `.`, `..`, 빈 조각, 제어 문자, `:` 둘 이상, `/workspace` 나 `/root` 아래의 마운트 대상이 있으면 정책 전체를 읽지 못한 것으로 본다.
-공통 또는 profile 별 마운트 원본이 `workspace_root` 와 같거나 그 아래이거나 그 상위이면(경로 조각 기준) 정책 전체를 읽지 못한 것으로 본다. 다른 사용자의 디렉터리가 보이기 때문이다.
+`attachment_root` 는 `workspace_root` 와 같거나 그 아래이거나 그 상위일 수 없다.
+`attachment_agent_root` 는 `/workspace` 나 `/root` 와 겹칠 수 없다.
+공통 또는 profile 별 마운트 원본이 `workspace_root` 또는 `attachment_root` 와 같거나 그 아래이거나 그 상위이면 정책 전체를 읽지 못한 것으로 본다.
+마운트 대상이 `attachment_agent_root` 와 같거나 그 아래이거나 그 상위여도 정책 전체를 읽지 못한 것으로 본다.
+이 검사는 경로 조각 기준으로 한다. 다른 사용자의 workspace나 첨부를 공통 마운트로 보이게 하면 안 되기 때문이다.
 표에 없는 최상위 키나 profile 설정 키, 허용 목록에 없는 env 가 있어도 정책 전체를 거절한다.
 기존 `profile_mounts` 는 `profiles[profile].read_only_mounts` 로 옮겨야 한다.
 
@@ -103,6 +109,7 @@ terminal:
   docker_extra_args: ["--network=<profile 의 network>", "--label=fos-sandbox-profile=<profile>"]
   docker_volumes:
     - <workspace_root>/<sandbox_owner>:/workspace
+    - <attachment_root>/users/<sha256(sandbox_owner UTF-8)>:<attachment_agent_root>/users/<sha256(sandbox_owner UTF-8)>:ro
     - <read_only_mounts 의 각 항목>:ro
     - <profiles[profile].read_only_mounts 의 각 항목>:ro
   docker_forward_env: []
@@ -137,6 +144,11 @@ Python 3.13 과 PyYAML 과 `mcp` SDK, 커넥터를 실행할 Bun 이 있어야 �
 타입 검사와 전용 시험, 묶음 파일 비교는 저장소 루트의 `bash scripts/check-connectors.sh` 로 돌린다.
 
 ## fos-ctx 가 붙이는 것
+
+`delegate_task` 의 `images` 와 `tasks[].images` 는 HTTP(S) 주소와 이미지 data URL 만 받는다.
+로컬 파일 경로는 Docker 밖에서 읽히므로 hook 이 파일 읽기 전에 막는다. 이미지 없는 자식 실행은 유지한다.
+이 제한은 `fos-ctx` 1.3.0 이 켜진 profile 에 적용한다. 기존 일반 profile 은 파일 갱신과 gateway reload 를,
+커넥터는 재설치를 끝낸 뒤 로컬 이미지 거절을 확인해야 한다. hook 이 꺼진 profile 은 막지 못한다.
 
 Control Plane 의 `agent_*` 도구는 이 값으로 부모 실행을 찾고, 서명이 없거나 틀리면 거절한다.
 키와 서명 규칙은 [`../docs/hermes/fos-ctx.md`](../docs/hermes/fos-ctx.md) 의 「`_fos_ctx` 계약」 이 소유한다.
@@ -236,10 +248,10 @@ Control Plane 이 이 경로들을 부르는 순서와 뜻은 부르는 쪽 문�
 | `POST /api/connectors/<id>/call` | 후보 값으로 그 커넥터의 선택지 도구나 확인 도구를 한 번 부른다 | `{tool, values}` | `{ok: true, result}` 또는 `{ok: false, error: <공통 어휘>}` | |
 | `POST /api/connectors/<id>/execute` | Control Plane 이 승인한 호출을 그 profile 의 값과 받은 인자로 한 번 실행한다 | `{profile, hermes_tool, args}` | `{ok: true, result}` 또는 `{ok: false, error: <공통 어휘>}` | 504 실행됐는지 모른다 |
 | `GET /api/connectors?profile=<p>` | 커넥터의 상태를 읽는다 | query `profile` | `{profile, policy_hook, connectors: [{plugin, enabled, configured}]}` | |
-| `PUT /api/connectors` | 관리 profile 에 커넥터를 설치하고 제거한다 | `{profile, plugin, enabled}` | `{profile, plugin, enabled, changed, restart_required, plugin_updated}`. 설치는 서버 등록과 함께 그 profile 의 API 도구 목록과 `SOUL.md` 를 다시 쓴다 | |
+| `PUT /api/connectors` | 관리 profile 에 커넥터를 설치하고 제거한다 | `{profile, plugin, enabled, sandbox_owner?}`. 사진 도구를 여는 설치는 정책 profile 의 `sandbox_owner` 가 필요하다 | `{profile, plugin, enabled, changed, restart_required, plugin_updated}`. 설치는 서버 등록과 함께 그 profile 의 API 도구 목록과 `SOUL.md` 를 다시 쓴다 | 409 사진 도구에 실행 공간 정책이나 등록 profile 이 없다 |
 | `POST /api/mcp/servers/<서버>/test?profile=<p>` | 그 profile 에 설치한 커넥터의 MCP 서버만 probe 한다 | 없음 | `{ok, tools: [{name}]}` | |
 | `GET /api/tools/toolsets` | 도구 이름과 설명을 읽는다 | 없음 | 200 | |
-| `PUT /api/config` (도구) | 지정한 profile 의 API 도구 목록을 쓴다. `terminal`, `file`, `code_execution` 가운데 하나라도 있으면 profile 의 `terminal:` 을 실행 공간 설정으로 다시 쓴다 | `{profile, config: {platform_toolsets: {api_server: [...]}}, sandbox_owner?}`. `sandbox_owner` 는 `^[a-z][a-z0-9-]{0,63}$` 이고 셸·파일 도구가 있으면 필수다 | 200 | [ADR-029](../docs/adr/ADR-029-에이전트-도구는-control-plane-이-등급으로-판정하고-hermes-설정-api-로-쓴다.md) 그대로 |
+| `PUT /api/config` (도구) | 지정한 profile 의 API 도구 목록을 쓴다. `terminal`, `file`, `code_execution`, `vision`, `image_gen`, `video_gen` 가운데 하나라도 있으면 profile 의 `terminal:` 을 실행 공간 설정으로 다시 쓴다 | `{profile, config: {platform_toolsets: {api_server: [...]}}, sandbox_owner?}`. `sandbox_owner` 는 `^[a-z][a-z0-9-]{0,63}$` 이고 실행 공간 도구를 켜는 등록 profile 에서 필수다 | 200 | [ADR-029](../docs/adr/ADR-029-에이전트-도구는-control-plane-이-등급으로-판정하고-hermes-설정-api-로-쓴다.md) 그대로 |
 | `PUT /api/config` (스킬 게시) | 지정한 profile 의 올린 스킬 경로를 쓴다 | `{profile, config: {skills: {external_dirs: [<Hermes 쪽 스킬 루트>/<profile>/<버전>]}}}`. 버전 이름은 `v[0-9]{13}-[a-z0-9]{4}` 다(`v` 뒤에 UTC 밀리초 13자리와 소문자 영숫자 4자). 목록은 0개나 1개. 0개는 게시 해제. 도구 목록을 같은 본문에 둘 수 있다 | 200 | 400 경로 형식, 다른 profile 의 prefix, 둘 이상, 심볼릭 링크, 없는 디렉터리, `skills` 도구가 꺼진 채 게시. 409 운영자가 넣은 다른 외부 경로가 있다. 404 없는 profile |
 | `GET /api/skills?profile=<p>` | 지정한 profile 의 스킬 목록을 읽는다 | query `profile` 하나 | 200 `[{name, description, category, enabled, usage, provenance}]`. `enabled` 는 전역 `skills.disabled` 만 반영 | 400 query 누락, 둘 이상, `default`. 404 |
 | `PUT /api/skills/toggle` | 지정한 profile 의 스킬 하나를 켜고 끈다 | `{profile, name, enabled}` | 200 `{ok, name, enabled}` | 400, 404 |
@@ -378,7 +390,8 @@ provider credential 은 이 토큰으로 쓰지 못한다.
 
 **토큰으로 부른 `PUT /api/config` 는 본문을 검사한 뒤 Hermes 처리기에 넘긴다.**
 최상위에는 `profile` 과 `config` 를 두고, `sandbox_owner` 를 더할 수 있다. 형식은 `^[a-z][a-z0-9-]{0,63}$` 이다.
-셸 계열 도구를 켜고 해당 profile 이 실행 공간 정책에 등록돼 있으면 `sandbox_owner` 가 필수다. 미등록 profile 의 local 저장에서는 생략할 수 있다.
+`terminal`, `file`, `code_execution` 을 켜고 해당 profile 이 실행 공간 정책에 등록돼 있으면 `sandbox_owner` 가 필수다. 미등록 profile 의 local 저장에서는 생략할 수 있다.
+`vision`, `image_gen`, `video_gen` 은 미등록 profile 에서 local 로 저장하지 않고 409 로 거절한다. Hermes host에서 다른 사용자의 첨부를 직접 읽지 않게 하려는 것이다.
 `terminal:` 은 plugin 이 직접 쓰므로 본문의 `config` 에 두지 않는다.
 `config` 에는 `platform_toolsets.api_server` 와 `skills.external_dirs` 가운데 하나나 둘을 둔다.
 
@@ -390,7 +403,7 @@ provider credential 은 이 토큰으로 쓰지 못한다.
 - Control Plane MCP 가 아직 등록되지 않은 profile 은 그 이름과 알려진 내장 toolset 을 함께 넣는다
 - Hermes 가 계산한 실제 API 도구에 요청 목록 밖의 이름이 있으면 저장하지 않는다
 - 다른 platform 의 계산 결과가 바뀌어도 저장하지 않는다
-- 목록에 `terminal`, `file`, `code_execution` 가운데 하나라도 있으면 `FOS_ASSISTANT_SANDBOX` 를 검사한다. 값이 없거나 틀리면 409 와 본문 `code: sandbox_unavailable` 이다. 정책에 등록된 profile 만 `terminal:` 전체를 docker 설정으로 다시 쓰고, 미등록 profile 은 local 로 둔다
+- 목록에 `terminal`, `file`, `code_execution`, `vision`, `image_gen`, `video_gen` 가운데 하나라도 있으면 `FOS_ASSISTANT_SANDBOX` 를 검사한다. 값이 없거나 틀리면 409 와 본문 `code: sandbox_unavailable` 이다. 정책에 등록된 profile 만 `terminal:` 전체를 docker 설정으로 다시 쓴다. 미등록 profile 은 `terminal`, `file`, `code_execution` 만 local 로 둘 수 있고 `vision`, `image_gen`, `video_gen` 은 409 로 거절한다
 
 올린 스킬 경로는 이렇게 본다. 루트는 대시보드 프로세스의 환경 변수 `FOS_ASSISTANT_SKILL_AGENT_ROOT` 다.
 

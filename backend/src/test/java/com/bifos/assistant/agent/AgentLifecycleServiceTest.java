@@ -331,6 +331,18 @@ class AgentLifecycleServiceTest {
     }
 
     @Test
+    @DisplayName("사진을 읽는 도구가 켜졌으면 주인을 바꾸기 전에 꺼야 한다")
+    void cannotChangeOwnerWhilePhotoToolsAreEnabled() {
+        for (String toolset : List.of("vision", "image_gen", "video_gen")) {
+            when(toolsets.readEnabled(LISTENER, "photo-profile")).thenReturn(List.of(toolset));
+
+            assertCode(
+                    () -> lifecycle.requireOwnerChangeSafe(LISTENER, "photo-profile"),
+                    ErrorCode.AGENT_OWNER_CHANGE_REQUIRES_SHELL_OFF);
+        }
+    }
+
+    @Test
     @DisplayName("꺼진 에이전트는 Hermes 를 부르지 않고 그룹으로 바꾼다")
     void changesDisabledAgentToGroupWithoutCallingHermes() {
         CurrentUser kid = member();

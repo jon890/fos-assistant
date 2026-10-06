@@ -100,6 +100,19 @@ class AgentToolPolicyTest {
     }
 
     @Test
+    @DisplayName("이미지 만들기도 원본 사진을 읽으므로 비공개 실행 공간을 요구한다")
+    void imageGenerationRequiresPrivateSandbox() {
+        for (String toolset : List.of("image_gen", "video_gen")) {
+            assertThat(AgentToolPolicy.hasSandboxToolset(List.of(toolset))).isTrue();
+            assertThatThrownBy(() -> AgentToolPolicy.requestedForWrite(
+                            ADMIN, agent(AgentVisibility.GROUP), List.of(toolset), List.of()))
+                    .isInstanceOf(ApiException.class)
+                    .extracting(ex -> ((ApiException) ex).code())
+                    .isEqualTo(ErrorCode.AGENT_TOOLS_REQUIRE_PRIVATE);
+        }
+    }
+
+    @Test
     @DisplayName("지난 대화 검색은 관리자만 켜고 그룹 에이전트에는 둘 수 없다")
     void pastConversationSearchIsAdminOnlyAndNotAllowedForGroupAgent() {
         assertThatThrownBy(() -> AgentToolPolicy.requestedForWrite(

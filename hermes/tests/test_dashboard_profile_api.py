@@ -76,7 +76,7 @@ class ProfileApiRouteTest(unittest.TestCase):
         toolsets = types.ModuleType("toolsets")
         toolsets.TOOLSETS = {name: {} for name in
                             ("delegation", "memory", "web", "terminal", "file", "skills", "code_execution",
-                             "hermes-api-server")}
+                             "vision", "image_gen", "video_gen", "hermes-api-server")}
         cls.web_profiles = types.ModuleType("hermes_cli.web_server_profiles")
         constants = types.ModuleType("hermes_constants")
         gateway = types.ModuleType("gateway")
@@ -202,6 +202,9 @@ class ProfileApiRouteTest(unittest.TestCase):
         self.skill_root.mkdir()
         self.sandbox_root = base / "sandbox"
         self.sandbox_root.mkdir()
+        self.attachment_root = base / "attachments"
+        self.attachment_root.mkdir()
+        self.attachment_agent_root = str(base / "agent-attachments")
         # 커넥터 검사도 환경 변수를 바꿔 끼운다. 되돌리는 순서가 엇갈리지 않게 같은 방식으로 건다.
         skill_env = mock.patch.dict(os.environ, {"FOS_ASSISTANT_SKILL_AGENT_ROOT": str(self.skill_root),
                                                  "FOS_ASSISTANT_SANDBOX": json.dumps(self.sandbox_policy())})
@@ -411,7 +414,7 @@ class ProfileApiRouteTest(unittest.TestCase):
 
     def connector(self, enabled=True, **overrides):
         return self.request("/api/connectors", "PUT", token="valid", full_response=True, body={
-            "profile": "alice", "plugin": DEMO, "enabled": enabled, **overrides})
+            "profile": "alice", "plugin": DEMO, "enabled": enabled, "sandbox_owner": "user-1", **overrides})
 
     def connector_status(self):
         return self.request("/api/connectors", "GET", token="valid", query_profiles=["alice"], full_response=True)
@@ -709,6 +712,46 @@ class ProfileApiRouteTest(unittest.TestCase):
         self.assertEqual(self.connector().status_code, 200)
         self.assertEqual(self.connector(False).status_code, 200)
         self.assertEqual(self.alice_config()["platform_toolsets"]["api_server"], ["no_mcp"])
+
+    def test_vision_connector_uses_the_trusted_owners_sandbox_terminal(self):
+        """사진 도구를 여는 connector는 요청한 주인에게만 보이는 Docker 실행 공간을 쓴다."""
+        root = self.connector_fixture()
+        manifest = root / "connector.json"
+        declared = json.loads(manifest.read_text(encoding="utf-8"))
+        declared["toolsets"] = ["vision"]
+        manifest.write_text(json.dumps(declared), encoding="utf-8")
+
+        response = self.connector()
+
+        self.assertEqual(response.status_code, 200)
+        self.assertNotIn("sandbox_owner", response.body)
+        self.assertEqual(self.alice_config()["terminal"], self.expected_terminal(
+            "user-1", ["/srv/shared:/opt/shared", "/srv/alice-skills:/opt/alice-skills"], profile="alice"))
+        attachment_key = hashlib.sha256(b"user-1").hexdigest()
+        self.assertTrue(pathlib.Path(self.attachment_agent_root, "users", attachment_key).is_dir())
+
+    def test_vision_connector_requires_a_trusted_sandbox_owner_and_policy(self):
+        """사진 도구는 주인이나 실행 공간 정책이 없으면 설치하지 않는다."""
+        root = self.connector_fixture()
+        manifest = root / "connector.json"
+        declared = json.loads(manifest.read_text(encoding="utf-8"))
+        declared["toolsets"] = ["vision"]
+        manifest.write_text(json.dumps(declared), encoding="utf-8")
+        before = (self.root / "alice/config.yaml").read_bytes()
+
+        self.assertEqual(self.connector(sandbox_owner=None).status_code, 400)
+        self.assertEqual((self.root / "alice/config.yaml").read_bytes(), before)
+        os.environ.pop("FOS_ASSISTANT_SANDBOX")
+        unavailable = self.connector()
+        self.assertEqual(unavailable.status_code, 409)
+        self.assertEqual(unavailable.body["code"], "sandbox_unavailable")
+        self.assertEqual((self.root / "alice/config.yaml").read_bytes(), before)
+
+        self.set_sandbox_policy(self.sandbox_policy(profiles={"owner": {}}))
+        unlisted = self.connector()
+        self.assertEqual(unlisted.status_code, 409)
+        self.assertEqual(unlisted.body["code"], "sandbox_unavailable")
+        self.assertEqual((self.root / "alice/config.yaml").read_bytes(), before)
 
     def test_connector_install_writes_skill_body_as_persona(self):
         """설치는 스킬 본문을 앞머리 없이 그 profile 의 SOUL.md 에 쓰고, 본문이 바뀌면 다시 설치할 때 다시 쓴다."""
@@ -1879,6 +1922,8 @@ class ProfileApiRouteTest(unittest.TestCase):
         policy = {
             "image": "sandbox-image:test",
             "workspace_root": str(self.sandbox_root),
+            "attachment_root": str(self.attachment_root),
+            "attachment_agent_root": self.attachment_agent_root,
             "network": "sandbox-net",
             "cpu": 2,
             "memory_mb": 2048,
@@ -1919,7 +1964,15 @@ class ProfileApiRouteTest(unittest.TestCase):
             "docker_run_as_host_user": False,
             "docker_network": True,
             "docker_extra_args": list(extra_args) + ["--label=fos-sandbox-profile=%s" % profile],
-            "docker_volumes": ["%s/%s:/workspace" % (self.sandbox_root, owner)] + [m + ":ro" for m in mounts],
+            "docker_volumes": [
+                "%s/%s:/workspace" % (self.sandbox_root, owner),
+                "%s/users/%s:%s/users/%s:ro" % (
+                    self.attachment_root,
+                    hashlib.sha256(owner.encode("utf-8")).hexdigest(),
+                    self.attachment_agent_root,
+                    hashlib.sha256(owner.encode("utf-8")).hexdigest(),
+                ),
+            ] + [m + ":ro" for m in mounts],
             "docker_forward_env": [],
             "docker_env": {},
             "env_passthrough": [],
@@ -1973,6 +2026,144 @@ class ProfileApiRouteTest(unittest.TestCase):
         for key in ("docker_forward_env: []", "env_passthrough: []", "credential_files: []"):
             self.assertIn(key, raw)
         self.assertTrue((self.sandbox_root / "user-1").is_dir())
+        attachment_key = hashlib.sha256(b"user-1").hexdigest()
+        self.assertTrue(pathlib.Path(self.attachment_agent_root, "users", attachment_key).is_dir())
+        self.assertFalse((self.attachment_root / "users" / attachment_key).exists())
+
+    def test_sandbox_terminal_mounts_only_the_execution_owners_attachments(self):
+        """사용자 A와 B의 실행 공간에는 각각의 해시 디렉터리만 읽기 전용으로 붙는다."""
+        self.save_sandbox_key(owner="user-a")
+        first = self.saved_config()["terminal"]["docker_volumes"]
+        self.save_sandbox_key(owner="user-b")
+        second = self.saved_config()["terminal"]["docker_volumes"]
+
+        first_key = hashlib.sha256(b"user-a").hexdigest()
+        second_key = hashlib.sha256(b"user-b").hexdigest()
+        first_mount = "%s/users/%s:%s/users/%s:ro" % (
+            self.attachment_root, first_key, self.attachment_agent_root, first_key)
+        second_mount = "%s/users/%s:%s/users/%s:ro" % (
+            self.attachment_root, second_key, self.attachment_agent_root, second_key)
+
+        self.assertIn(first_mount, first)
+        self.assertNotIn(second_key, "\n".join(first))
+        self.assertIn(second_mount, second)
+        self.assertNotIn(first_key, "\n".join(second))
+        self.assertNotIn(str(self.attachment_root) + ":", "\n".join(first + second))
+        first_attachment_mounts = [
+            volume for volume in first if volume.startswith(str(self.attachment_root) + "/")
+        ]
+        second_attachment_mounts = [
+            volume for volume in second if volume.startswith(str(self.attachment_root) + "/")
+        ]
+        self.assertEqual(first_attachment_mounts, [first_mount])
+        self.assertEqual(second_attachment_mounts, [second_mount])
+        self.assertTrue(pathlib.Path(self.attachment_agent_root, "users", first_key).is_dir())
+        self.assertTrue(pathlib.Path(self.attachment_agent_root, "users", second_key).is_dir())
+
+    def test_sandbox_attachment_key_matches_the_control_plane_golden_vector(self):
+        """Control Plane과 Hermes가 같은 UTF-8 SHA-256 사용자 디렉터리 키를 만든다."""
+        self.assertEqual(
+            self.plugin._sandbox_attachment_key("u11"),
+            "92ec86fa88925dabc1026bfc9335f5f6848886c98586c005f4a0c02716e3bbab",
+        )
+
+    def test_sandbox_attachment_directory_does_not_follow_a_users_symlink(self):
+        """agent root의 users가 링크이면 대상 밖에 사용자 디렉터리를 만들지 않는다."""
+        agent_root = pathlib.Path(self.attachment_agent_root)
+        agent_root.mkdir()
+        outside = pathlib.Path(self.tmp.name) / "outside"
+        outside.mkdir()
+        (agent_root / "users").symlink_to(outside, target_is_directory=True)
+
+        self.save_sandbox_key(owner="user-a")
+
+        key = hashlib.sha256(b"user-a").hexdigest()
+        self.assertFalse((outside / key).exists())
+
+    def test_sandbox_attachment_mounts_block_other_users_in_docker(self):
+        """Docker가 있으면 A와 B의 bind mount가 상대 파일과 상위 경로 탐색을 모두 막는지 확인한다."""
+        if shutil.which("docker") is None:
+            self.skipTest("docker 명령이 없다")
+        available = subprocess.run(
+            ["docker", "image", "inspect", "alpine:latest"],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            check=False,
+        )
+        if available.returncode != 0:
+            self.skipTest("검사에 쓸 Docker 이미지가 없다")
+
+        # Docker Desktop은 macOS의 시스템 임시 디렉터리를 파일 공유 대상으로 두지 않을 수 있다.
+        # `/tmp`는 Docker가 보는 `/private/tmp`와 이어진다. context manager가 끝나면 시험 원본을 지운다.
+        with tempfile.TemporaryDirectory(dir="/tmp") as shared_root:
+            attachment_root = pathlib.Path(shared_root).resolve() / "attachments"
+            attachment_root.mkdir()
+            self.set_sandbox_policy(self.sandbox_policy(
+                attachment_root=str(attachment_root), attachment_agent_root="/agent/attachments"))
+            self.save_sandbox_key(owner="user-a")
+            first_mount = self.saved_config()["terminal"]["docker_volumes"][1]
+            self.save_sandbox_key(owner="user-b")
+            second_mount = self.saved_config()["terminal"]["docker_volumes"][1]
+            first_key = hashlib.sha256(b"user-a").hexdigest()
+            second_key = hashlib.sha256(b"user-b").hexdigest()
+            seeded = subprocess.run(
+                ["docker", "run", "--rm", "--volume", "%s:/seed" % attachment_root,
+                 "alpine:latest", "sh", "-ec",
+                 "mkdir -p /seed/users/%s /seed/users/%s /seed/123; "
+                 "printf A-only > /seed/users/%s/a.txt; "
+                 "printf B-only > /seed/users/%s/b.txt; "
+                 "printf old > /seed/123/old.txt"
+                 % (first_key, second_key, first_key, second_key)],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                check=False,
+            )
+            self.assertEqual(seeded.returncode, 0, seeded.stderr)
+
+            def remove_seeded_files():
+                subprocess.run(
+                    ["docker", "run", "--rm", "--volume", "%s:/seed" % attachment_root,
+                     "alpine:latest", "sh", "-ec",
+                     "rm /seed/users/%s/a.txt /seed/users/%s/b.txt /seed/123/old.txt; "
+                     "rmdir /seed/users/%s /seed/users/%s /seed/123 /seed/users"
+                     % (first_key, second_key, first_key, second_key)],
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                    check=False,
+                )
+
+            try:
+                commands = [
+                    (first_mount, "test \"$(cat /agent/attachments/users/%s/a.txt)\" = A-only; "
+                     "test ! -e /agent/attachments/users/%s/b.txt; "
+                     "test ! -e /agent/attachments/users/%s/../%s/b.txt; "
+                     "test ! -e /agent/attachments/users/%s/../../%s/b.txt; "
+                     "test ! -e /agent/attachments/123/old.txt; "
+                     "! sh -c 'printf changed > /agent/attachments/users/%s/a.txt'; "
+                     "test \"$(cat /agent/attachments/users/%s/a.txt)\" = A-only"
+                     % (first_key, second_key, first_key, second_key, first_key, second_key, first_key, first_key)),
+                    (second_mount, "test \"$(cat /agent/attachments/users/%s/b.txt)\" = B-only; "
+                     "test ! -e /agent/attachments/users/%s/a.txt; "
+                     "test ! -e /agent/attachments/users/%s/../%s/a.txt; "
+                     "test ! -e /agent/attachments/users/%s/../../%s/a.txt; "
+                     "test ! -e /agent/attachments/123/old.txt; "
+                     "! sh -c 'printf changed > /agent/attachments/users/%s/b.txt'; "
+                     "test \"$(cat /agent/attachments/users/%s/b.txt)\" = B-only"
+                     % (second_key, first_key, second_key, first_key, second_key, first_key, second_key, second_key)),
+                ]
+                for mount, command in commands:
+                    with self.subTest(mount=mount):
+                        completed = subprocess.run(
+                            ["docker", "run", "--rm", "--volume", mount, "alpine:latest", "sh", "-ec", command],
+                            stdout=subprocess.PIPE,
+                            stderr=subprocess.PIPE,
+                            text=True,
+                            check=False,
+                        )
+                        self.assertEqual(completed.returncode, 0, completed.stderr)
+            finally:
+                remove_seeded_files()
 
     def test_sandbox_terminal_mounts_profile_entries_only_on_that_profile(self):
         """profile 별 마운트와 label 은 그 실행 공간에만 붙고, network 가 없으면 망 인자가 없다."""
@@ -2003,11 +2194,20 @@ class ProfileApiRouteTest(unittest.TestCase):
             ("not json", "{"),
             ("not object", []),
             ("missing image", self.sandbox_policy(image=None)),
+            ("missing attachment root", self.sandbox_policy(attachment_root=None)),
+            ("missing attachment agent root", self.sandbox_policy(attachment_agent_root=None)),
             ("image with space", self.sandbox_policy(image="bad image")),
             ("relative root", self.sandbox_policy(workspace_root="sandbox")),
             ("dotdot root", self.sandbox_policy(workspace_root=root + "/../sandbox")),
             ("empty piece root", self.sandbox_policy(workspace_root=root + "//x")),
             ("colon root", self.sandbox_policy(workspace_root=root + ":x")),
+            ("relative attachment root", self.sandbox_policy(attachment_root="attachments")),
+            ("dotdot attachment root", self.sandbox_policy(attachment_root=root + "/../attachments")),
+            ("empty piece attachment agent root", self.sandbox_policy(attachment_agent_root="/agent//attachments")),
+            ("attachment root is workspace root", self.sandbox_policy(attachment_root=root)),
+            ("attachment root under workspace root", self.sandbox_policy(attachment_root=root + "/attachments")),
+            ("attachment agent root is workspace", self.sandbox_policy(attachment_agent_root="/workspace/attachments")),
+            ("attachment agent root is root", self.sandbox_policy(attachment_agent_root="/root/attachments")),
             ("bad network", self.sandbox_policy(network="-net")),
             ("zero cpu", self.sandbox_policy(cpu=0)),
             ("too much cpu", self.sandbox_policy(cpu=8.5)),
@@ -2026,6 +2226,18 @@ class ProfileApiRouteTest(unittest.TestCase):
              self.sandbox_policy(read_only_mounts=[root + "/user-2:/opt/x"])),
             ("mount source above workspace root",
              self.sandbox_policy(profiles={"owner": {"read_only_mounts": [str(self.sandbox_root.parent) + ":/opt/x"]}})),
+            ("mount source is attachment root",
+             self.sandbox_policy(read_only_mounts=[str(self.attachment_root) + ":/opt/x"])),
+            ("mount source under attachment root",
+             self.sandbox_policy(profiles={"owner": {"read_only_mounts": [str(self.attachment_root / "users") + ":/opt/x"]}})),
+            ("mount source above attachment root",
+             self.sandbox_policy(read_only_mounts=[str(self.attachment_root.parent) + ":/opt/x"])),
+            ("mount target is attachment agent root",
+             self.sandbox_policy(read_only_mounts=["/srv/x:%s" % self.attachment_agent_root])),
+            ("mount target under attachment agent root",
+             self.sandbox_policy(profiles={"owner": {"read_only_mounts": ["/srv/x:%s/users" % self.attachment_agent_root]}})),
+            ("mount target above attachment agent root",
+             self.sandbox_policy(read_only_mounts=["/srv/x:%s" % pathlib.Path(self.attachment_agent_root).parent])),
             ("unknown top-level key", dict(self.sandbox_policy(), docker_extra_args=["--privileged"])),
         ]
         path = self.root / "owner/config.yaml"
@@ -2039,12 +2251,18 @@ class ProfileApiRouteTest(unittest.TestCase):
                 self.assertEqual(path.read_bytes(), original)
 
     def test_sandbox_policy_accepts_paths_that_only_share_a_prefix(self):
-        """`/rootfs` 와 `/workspaces` 는 `/root`, `/workspace` 아래가 아니다. `<root>-other` 도 `workspace_root` 아래가 아니다."""
+        """경로 조각이 다른 prefix는 workspace, 첨부 원본, 첨부 실행 경로와 겹치지 않는다."""
         self.set_sandbox_policy(self.sandbox_policy(read_only_mounts=[
-            "/srv/a:/rootfs", "/srv/b:/workspaces/x", str(self.sandbox_root) + "-other:/opt/other"]))
+            "/srv/a:/rootfs", "/srv/b:/workspaces/x", str(self.sandbox_root) + "-other:/opt/other",
+            str(self.attachment_root) + "-other:/agent/attachments-other",
+        ]))
         self.assertEqual(self.request("/api/config", "PUT", token="valid", body=self.file_body()), 200)
-        self.assertEqual(self.saved_config()["terminal"]["docker_volumes"][1:3],
-                         ["/srv/a:/rootfs:ro", "/srv/b:/workspaces/x:ro"])
+        self.assertEqual(self.saved_config()["terminal"]["docker_volumes"][2:6], [
+            "/srv/a:/rootfs:ro",
+            "/srv/b:/workspaces/x:ro",
+            str(self.sandbox_root) + "-other:/opt/other:ro",
+            str(self.attachment_root) + "-other:/agent/attachments-other:ro",
+        ])
 
     def test_shell_toolset_needs_a_valid_sandbox_owner(self):
         """셸 도구를 켜는데 sandbox_owner 가 없거나 형식이 틀리면 400 이다."""
@@ -2074,6 +2292,28 @@ class ProfileApiRouteTest(unittest.TestCase):
         self.assertEqual(self.request("/api/config", "PUT", token="valid", body=self.file_body(owner=None)), 200)
         self.assertEqual(self.saved_config()["terminal"], config["terminal"])
         self.assertFalse((self.sandbox_root / "user-1").exists())
+
+    def test_unlisted_profile_cannot_enable_media_file_tools_locally(self):
+        """사진과 영상 파일 도구는 정책 profile 밖에서 host 실행으로 돌아가지 않고 409로 거절한다."""
+        self.set_sandbox_policy(self.sandbox_policy(profiles={"alice": {}}))
+        for toolset in ("vision", "image_gen", "video_gen"):
+            with self.subTest(toolset=toolset):
+                body = self.file_body()
+                body["config"]["platform_toolsets"]["api_server"].append(toolset)
+                response = self.request("/api/config", "PUT", token="valid", body=body, full_response=True)
+
+                self.assertEqual(response.status_code, 409)
+                self.assertEqual(response.body["code"], "sandbox_unavailable")
+
+    def test_video_gen_alone_uses_the_sandbox_terminal(self):
+        """다른 실행 도구 없이 video_gen만 켜도 사용자별 Docker 실행 공간을 쓴다."""
+        body = self.toolset_body()
+        body["config"]["platform_toolsets"]["api_server"] = ["delegation", "fos-assistant", "video_gen"]
+        body["sandbox_owner"] = "user-1"
+
+        self.assertEqual(self.request("/api/config", "PUT", token="valid", body=body), 200)
+        self.assertEqual(self.saved_config()["terminal"], self.expected_terminal(
+            "user-1", ["/srv/shared:/opt/shared", "/srv/owner-skills:/opt/owner-skills"]))
 
     def test_empty_profiles_policy_keeps_all_profiles_local(self):
         """profiles 가 비었으면 정책 없음과 구분해 모든 profile 의 기존 실행을 유지한다."""

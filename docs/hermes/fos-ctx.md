@@ -4,6 +4,16 @@ Hermes 의 MCP 도구 호출에 실행을 가리키는 값을 싣는 방법과 �
 profile 플러그인이 붙이는 `_fos_ctx` 의 서명 계약과 하위 에이전트 session 등록 계약이 여기 있다.
 Control Plane 이 그 값으로 요청자를 정하는 순서는 [`backend/mcp-caller.md`](../backend/mcp-caller.md) 가 갖는다.
 
+## 하위 에이전트에 사진을 넘길 때
+
+`delegate_task` 의 `images` 와 `tasks[].images` 에는 HTTP(S) 주소와 `data:image/` URL 만 받는다.
+로컬 절대·상대 경로와 `file:` 주소, 잘못된 목록은 `pre_tool_call` 에서 비지 않은 안내와 함께 막는다.
+이미지 없는 호출은 그대로 통과한다. Hermes 의 자식 이미지 전달은 Docker 설정과 관계없이 호스트 파일을
+직접 읽기 때문에 사용자별 첨부 mount 만으로는 막을 수 없다. 결정은 [ADR-087](../adr/ADR-087-사진-첨부는-사용자별로-저장하고-실행-공간에는-그-사용자만-붙인다.md) 이 갖는다.
+
+이 제한은 새 판 `fos-ctx` 가 켜진 profile 에만 적용된다. 기존 일반 profile 도 파일을 갱신하고 gateway 에서
+다시 읽어야 하며, 커넥터는 재설치 때 갱신된다. hook 이 꺼진 profile 은 막지 못한다.
+
 ## Control Plane 의 MCP 도구로 다른 실행을 부를 때
 
 `memory_read` 를 두고 있는 그 자리에 실행을 시작하는 도구를 하나 더 두는 구조를

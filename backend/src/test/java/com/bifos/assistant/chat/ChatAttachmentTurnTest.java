@@ -419,6 +419,22 @@ class ChatAttachmentTurnTest {
     }
 
     @Test
+    @DisplayName("사진을 보낸 뒤 에이전트 주인이 바뀌면 다시 생성도 거절한다")
+    void regenerationRejectsAttachmentOwnerMismatch() {
+        Long conversationId = chat.startEmpty(dad, "dad").id();
+        ChatAttachment photo = upload(dad, conversationId, "a.png");
+        chat.send(dad, conversationId, "사진 봐", null, List.of(photo.id()));
+        Agent changed = agents.findByCode("dad").orElseThrow();
+        CurrentUser mom = member("mom@example.com");
+        changed.changeAccess(true, AgentVisibility.PRIVATE, mom.id());
+        agents.save(changed);
+
+        assertRejected(() -> chat.regenerate(dad, conversationId, event -> {}));
+
+        assertThat(stub().received()).hasSize(1);
+    }
+
+    @Test
     @DisplayName("대화 이력의 메시지마다 그 첨부가 달리고 없는 메시지는 빈 목록이다")
     void attachesAttachmentsPerMessageInHistoryAndEmptyListForOthers() {
         Long conversationId = chat.startEmpty(dad, "dad").id();

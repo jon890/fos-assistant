@@ -190,7 +190,7 @@ const DEFAULT_API_SERVER_TOOLSETS = [
  *
  * <p>셸과 파일 등급이 없다. 미리 심어 둔 profile 은 이 경로를 거치지 않으므로 그대로 기본 목록으로 답한다.
  */
-const PLUGIN_TEMPLATE_TOOLSETS = ["web", "skills", "todo", "vision", CONTROL_PLANE_MCP];
+const PLUGIN_TEMPLATE_TOOLSETS = ["web", "skills", "todo", CONTROL_PLANE_MCP];
 
 /**
  * 동시 실행 한도를 넘겼을 때 실제 Hermes 가 내는 본문이다.

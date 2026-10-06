@@ -156,6 +156,32 @@ class PluginFixture(unittest.TestCase):
 
 class HookTest(PluginFixture):
 
+    def test_delegate_local_images_are_blocked_before_host_read(self):
+        """공개 tasks schema 와 이전 top-level images 모두 로컬 첨부를 읽기 전에 막는다."""
+        forbidden = ["/attachments/123/1.png", "../b/1.png", "file:///attachments/1.png",
+                     "photo.png", "//host/photo.png", "", 1, {"path": "/photo.png"}]
+        for source in forbidden:
+            for args in ({"images": [source]}, {"tasks": [{"prompt": "사진", "images": [source]}]}):
+                with self.subTest(args=args):
+                    self.assertEqual(self.call("delegate_task", args=args),
+                                     {"action": "block", "message": self.plugin.DELEGATE_IMAGE_MESSAGE})
+
+    def test_delegate_remote_and_inline_images_stay_available(self):
+        """이미지 없는 호출과 HTTP(S), image data URL 은 원래 도구로 전달한다."""
+        images = ["https://images.example/photo.png", "http://images.example/photo.png",
+                  "data:image/png;base64,cGhvdG8="]
+        for args in ({}, {"images": []}, {"images": images},
+                     {"tasks": [{"prompt": "사진", "images": images}, {"prompt": "글"}]}):
+            with self.subTest(args=args):
+                self.assertIsNone(self.call("delegate_task", args=args))
+
+    def test_delegate_invalid_image_shapes_fail_closed(self):
+        for args in ({"images": "/photo.png"}, {"tasks": "invalid"}, {"tasks": ["invalid"]},
+                     {"tasks": [{"images": "photo.png"}]}, {"images": ["https://[broken"]}):
+            with self.subTest(args=args):
+                self.assertEqual(self.call("delegate_task", args=args),
+                                 {"action": "block", "message": self.plugin.DELEGATE_IMAGE_MESSAGE})
+
     def test_other_tools_are_untouched(self):
         """대상이 아닌 도구의 호출은 건드리지 않는다."""
         for tool in ("terminal", "mcp__other__agent_delegate", "mcp__fos_assistant_memory__memory_read"):
