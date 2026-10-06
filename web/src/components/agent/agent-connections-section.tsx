@@ -19,6 +19,7 @@ import {
   agentConnectionLabel,
   bindAgentConnection,
   hasShellOrFileTool,
+  listAgentConnections,
   unbindAgentConnection,
   type AgentConnectionBlock,
   type AgentConnectionView,
@@ -226,11 +227,19 @@ export function AgentConnectionsSection({
     setPending(view.connectorId);
     setError(null);
     const result = await bindAgentConnection(code, view.connectorId);
-    setPending(null);
     if (!result.ok) {
+      // 실패해도 서버에는 바인딩이 남았을 수 있다(대시보드가 실패해 반영 대기로 남는 경우).
+      // 목록을 다시 읽어 화면과 도구 절의 위험 안내를 서버 상태에 맞춘다. 다시 읽기도 실패하면 지금 화면을 둔다.
+      const reloaded = await listAgentConnections(code);
+      setPending(null);
       setError(result.message);
+      if (reloaded.ok) {
+        setConnections(reloaded.data.connections);
+        onBoundChange(reloaded.data.connections.some((item) => item.bound));
+      }
       return;
     }
+    setPending(null);
     setConfirming(null);
     replace(result.data);
   }
