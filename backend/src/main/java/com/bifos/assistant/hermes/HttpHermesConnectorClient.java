@@ -53,8 +53,9 @@ public class HttpHermesConnectorClient implements HermesConnectorClient {
     private final RestClient executeClient;
     private final String baseUrl;
     private final String token;
+    private final SandboxAttachmentDirectory attachmentDirectory;
 
-    public HttpHermesConnectorClient(HermesProperties properties) {
+    public HttpHermesConnectorClient(HermesProperties properties, SandboxAttachmentDirectory attachmentDirectory) {
         SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
         factory.setConnectTimeout(properties.connectTimeout());
         factory.setReadTimeout(properties.readTimeout());
@@ -66,6 +67,7 @@ public class HttpHermesConnectorClient implements HermesConnectorClient {
         this.executeClient = client.mutate().requestFactory(executeFactory).build();
         this.baseUrl = properties.dashboardBaseUrl().replaceAll("/$", "");
         this.token = properties.dashboardToken();
+        this.attachmentDirectory = attachmentDirectory;
     }
 
     @Override
@@ -226,6 +228,7 @@ public class HttpHermesConnectorClient implements HermesConnectorClient {
 
     @Override
     public InstallResult putConnector(String profile, String connectorId, boolean enabled, String sandboxOwner) {
+        attachmentDirectory.ensure(sandboxOwner);
         JsonNode body = request(() -> client.put()
                 .uri(baseUrl + "/api/connectors")
                 .header(AUTHORIZATION, bearer())

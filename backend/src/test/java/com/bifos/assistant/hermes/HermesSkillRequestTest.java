@@ -10,6 +10,8 @@ import com.sun.net.httpserver.HttpServer;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
@@ -18,6 +20,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import tools.jackson.databind.ObjectMapper;
 
 /** Hermes 스킬 경로의 메서드, 인증, 본문 모양과 거절을 가르는 규칙을 본다. */
@@ -30,6 +33,9 @@ class HermesSkillRequestTest {
     private HttpHermesSkillClient client;
     private int status = 200;
     private String response = "{}";
+
+    @TempDir
+    Path attachmentRoot;
 
     private record Call(String method, String path, String query, String authorization, String body) {}
 
@@ -50,15 +56,17 @@ class HermesSkillRequestTest {
             exchange.close();
         });
         server.start();
-        client = new HttpHermesSkillClient(new HermesProperties(
-                "keys",
-                "http://127.0.0.1:" + server.getAddress().getPort() + "/",
-                TOKEN,
-                "http://listener.test",
-                Duration.ofMillis(10),
-                Duration.ofSeconds(1),
-                Duration.ofSeconds(1),
-                Duration.ofSeconds(1)));
+        client = new HttpHermesSkillClient(
+                new HermesProperties(
+                        "keys",
+                        "http://127.0.0.1:" + server.getAddress().getPort() + "/",
+                        TOKEN,
+                        "http://listener.test",
+                        Duration.ofMillis(10),
+                        Duration.ofSeconds(1),
+                        Duration.ofSeconds(1),
+                        Duration.ofSeconds(1)),
+                new SandboxAttachmentDirectory(attachmentRoot.toString()));
     }
 
     @AfterEach
@@ -157,6 +165,31 @@ class HermesSkillRequestTest {
             assertThat(new ObjectMapper().readValue(call.body(), Map.class))
                     .isEqualTo(Map.of("profile", "kid", "name", "weekly-plan", "enabled", false));
         });
+    }
+
+    @Test
+    @DisplayName("첨부를 올린 적 없는 주인의 스킬도 보내기 전에 첨부 디렉터리를 만들어 게시한다")
+    void publishCreatesTheOwnersAttachmentDirectoryFirst() {
+        client.publish("kid", List.of("/skills/kid/v1790661162144-a1b2"), List.of("vision"), "a12");
+
+        assertThat(attachmentRoot.resolve("users").resolve(SandboxAttachmentDirectory.key("a12")))
+                .isDirectory();
+        assertThat(calls).hasSize(1);
+    }
+
+    @Test
+    @DisplayName("첨부 디렉터리 자리에 링크가 있으면 게시하지 않고 거절 예외를 던진다")
+    void publishStopsOnALinkedUsersDirectory() throws IOException {
+        Path outside = Files.createDirectory(attachmentRoot.resolveSibling(attachmentRoot.getFileName() + "-outside"));
+        Files.createSymbolicLink(attachmentRoot.resolve("users"), outside);
+
+        assertThatThrownBy(() -> client.publish("kid", List.of("/skills/kid/v1790661162144-a1b2"), null, "u7"))
+                .isInstanceOfSatisfying(HermesRequestRejected.class, ex -> {
+                    assertThat(ex.status()).isEqualTo(409);
+                    assertThat(ex.code()).isEqualTo(ErrorCode.AGENT_SANDBOX_UNAVAILABLE);
+                });
+        assertThat(calls).isEmpty();
+        assertThat(outside.resolve(SandboxAttachmentDirectory.key("u7"))).doesNotExist();
     }
 
     @Test

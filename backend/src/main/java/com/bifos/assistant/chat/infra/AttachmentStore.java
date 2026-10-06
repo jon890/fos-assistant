@@ -1,9 +1,9 @@
 package com.bifos.assistant.chat.infra;
 
 import com.bifos.assistant.chat.domain.ChatAttachment;
+import com.bifos.assistant.hermes.SandboxAttachmentDirectory;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
-import com.bifos.assistant.shared.util.Sha256;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
@@ -53,10 +53,10 @@ public class AttachmentStore {
         return attachmentId + "." + extension;
     }
 
-    /** Hermes 정책도 신뢰한 {@code sandbox_owner} 의 UTF-8 SHA-256 을 같은 규칙으로 계산한다. */
+    /** 실행 주인 {@code u<사용자 번호>} 의 디렉터리 키다. Hermes 를 부르기 전에 만드는 디렉터리와 같은 규칙을 쓴다. */
     public static String userDirectoryKey(Long userId) {
         requirePositive(userId);
-        return Sha256.hex("u" + userId);
+        return SandboxAttachmentDirectory.key("u" + userId);
     }
 
     public synchronized void save(ChatAttachment attachment, InputStream body) {

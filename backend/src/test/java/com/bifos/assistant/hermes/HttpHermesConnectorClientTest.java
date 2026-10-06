@@ -17,11 +17,13 @@ import com.bifos.assistant.hermes.dto.ConnectorField;
 import com.bifos.assistant.hermes.dto.ConnectorFieldOptions;
 import com.bifos.assistant.hermes.dto.ConnectorManifest;
 import com.bifos.assistant.hermes.dto.ConnectorTool;
+import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -48,12 +50,16 @@ class HttpHermesConnectorClientTest {
     private HttpHermesConnectorClient client;
     private MockRestServiceServer server;
 
+    @TempDir
+    Path attachmentRoot;
+
     @BeforeEach
     void setUp() {
         var builder = RestClient.builder();
         server = MockRestServiceServer.bindTo(builder).build();
         client = new HttpHermesConnectorClient(
-                new HermesProperties("unused", BASE, "test-dashboard-token", BASE, null, null, null, null));
+                new HermesProperties("unused", BASE, "test-dashboard-token", BASE, null, null, null, null),
+                new SandboxAttachmentDirectory(attachmentRoot.toString()));
         ReflectionTestUtils.setField(client, "client", builder.build());
         // 실행 경로는 읽기 제한이 다른 클라이언트를 쓴다. 같은 대역 서버에 붙인다.
         ReflectionTestUtils.setField(client, "executeClient", builder.build());
@@ -267,6 +273,22 @@ class HttpHermesConnectorClientTest {
 
         assertThat(client.putConnector(PROFILE, DEMO, true, "u1")).isEqualTo(new InstallResult(true, true));
         assertThat(client.putConnector(PROFILE, DEMO, true, "u1")).isEqualTo(new InstallResult(true, false));
+        server.verify();
+    }
+
+    @DisplayName("첨부를 올린 적 없는 주인의 커넥터도 보내기 전에 첨부 디렉터리를 만들어 설치한다")
+    @Test
+    void putConnectorCreatesTheOwnersAttachmentDirectoryFirst() {
+        server.expect(requestTo(BASE + "/api/connectors"))
+                .andRespond(withSuccess(
+                        "{\"profile\":\"user-demo\",\"plugin\":\"demo-notes\",\"enabled\":true,"
+                                + "\"restart_required\":true}",
+                        MediaType.APPLICATION_JSON));
+
+        assertThat(client.putConnector(PROFILE, DEMO, true, "u3")).isEqualTo(new InstallResult(true, false));
+
+        assertThat(attachmentRoot.resolve("users").resolve(SandboxAttachmentDirectory.key("u3")))
+                .isDirectory();
         server.verify();
     }
 

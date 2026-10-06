@@ -20,6 +20,12 @@ public class HermesRequestRejected extends ApiException {
         this.status = cause.getStatusCode().value();
     }
 
+    /** 대시보드에 보내기 전에 Control Plane 이 같은 뜻으로 멈춘 경우다. 설정은 바뀌지 않았다. */
+    public HermesRequestRejected(ErrorCode code, String message, int status, Throwable cause) {
+        super(code, message, cause);
+        this.status = status;
+    }
+
     /** 대시보드가 돌려준 상태 코드다. */
     public int status() {
         return status;
