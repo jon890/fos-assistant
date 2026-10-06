@@ -4,6 +4,7 @@ import {
   approvalArgs,
   bulkApprovable,
   type ConnectorAction,
+  hiddenArgKeys,
   readableArgs,
 } from "../../web/src/lib/connector-action.ts";
 
@@ -153,4 +154,19 @@ test("줄바꿈 문자(\\r)가 든 값은 위에 두지 않는다", () => {
       ["name", true],
     ],
   );
+});
+
+test("가려진 글이 든 맨 위 인자의 키만 원래 순서로 낸다", () => {
+  const args = JSON.stringify({
+    to: "friend@example.com",
+    filter_id: "[가림]",
+    nested: { token: "[가림]" },
+    body: "회의록 [가림] 끝",
+    "[가림]": "값",
+  });
+
+  assert.deepEqual(hiddenArgKeys(args), ["filter_id", "nested", "body", "[가림]"]);
+  assert.deepEqual(hiddenArgKeys(JSON.stringify({ to: "friend@example.com" })), []);
+  assert.deepEqual(hiddenArgKeys("[가림]"), []);
+  assert.deepEqual(hiddenArgKeys(null), []);
 });
