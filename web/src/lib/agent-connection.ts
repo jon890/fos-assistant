@@ -28,7 +28,8 @@ export type AgentConnectionsList = {
 };
 
 /**
- * 셸이나 파일에 닿는 도구다. 켜진 에이전트는 붙인 연결의 비밀값을 읽고 연결 도구의 승인 없이 그 서비스를 부를 수 있다.
+ * 셸이나 파일에 닿는 도구다. 실행 공간 격리를 적용하지 않은 profile 에서 켜면 붙인 연결의 비밀값을 읽고 연결 도구의 승인 없이 그
+ * 서비스를 부를 수 있다. 격리한 profile 에서도 읽은 내용을 인터넷으로 보낼 수 있다(ADR-086).
  */
 export const SHELL_OR_FILE_TOOLSETS = ["terminal", "file", "code_execution"];
 

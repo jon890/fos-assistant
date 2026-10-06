@@ -25,7 +25,7 @@ import { SHELL_OR_FILE_TOOLSETS } from "@/lib/agent-connection";
 import { toolsetText } from "@/lib/toolset-label";
 
 const CONNECTION_RISK_MESSAGE =
-  "이 에이전트에 붙은 연결의 비밀값을 이 도구로 읽을 수 있고, 연결 도구의 승인 없이 그 서비스를 부를 수 있어요.";
+  "격리를 적용하지 않은 에이전트는 붙은 연결의 비밀값을 이 도구로 읽고, 연결 도구의 승인 없이 그 서비스를 부를 수 있어요. 격리한 에이전트도 연결 도구로 읽은 내용을 인터넷으로 보낼 수 있어요.";
 
 type ErrorPayload = {
   code: string;
