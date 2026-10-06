@@ -1570,11 +1570,6 @@ export function startFakeHermes(
           send(response, 400, { error: "invalid toolset configuration" });
           return true;
         }
-        // 처리기가 목록을 통째로 바꾸므로 붙은 커넥터의 서버 이름이 빠진 목록은 조용히 지우지 않고 거절한다.
-        if (!bound.every((name) => toolsets.includes(name))) {
-          send(response, 409, { error: "연결된 커넥터의 도구 이름이 빠졌다" });
-          return true;
-        }
         nextToolsets = toolsets as string[];
         // plugin 처럼 셸 도구가 있을 때만 주인을 읽는다. 없거나 모양이 틀리면 설정을 바꾸지 않고 거절한다.
         if (nextToolsets.some((name) => SANDBOX_TOOLSETS.includes(name))) {
@@ -1586,6 +1581,12 @@ export function startFakeHermes(
             send(response, 409, { detail: "the isolated shell workspace is not configured", code: "sandbox_unavailable" });
             return true;
           }
+        }
+        // 처리기가 목록을 통째로 바꾸므로 붙은 커넥터의 서버 이름이 빠진 목록은 조용히 지우지 않고 거절한다.
+        // plugin 처럼 실행 공간 검사 뒤에 본다. 둘 다 409 라 순서가 다르면 Control Plane 이 다른 오류로 읽는다.
+        if (!bound.every((name) => toolsets.includes(name))) {
+          send(response, 409, { error: "연결된 커넥터의 도구 이름이 빠졌다" });
+          return true;
         }
       }
       let nextDirs: string[] | undefined;
