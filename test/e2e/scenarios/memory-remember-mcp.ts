@@ -21,6 +21,7 @@ const DIRECT_TEXT = "다른 사람은 홍길동이야. 기억해 줘";
 const DIRECT_TITLE = "기억 검사 별칭 홍길동";
 const UNQUOTED_TEXT = "우리 집 강아지에 대한 이야기를 하나 할게";
 const UNQUOTED_TITLE = "기억 검사 강아지 이름";
+const OUTSIDE_SEARCH_TEXT = "기억 검사 날씨 찾아 줘";
 const OUTSIDE_TEXT = "고모 생일은 3월 5일이야";
 const OUTSIDE_TITLE = "기억 검사 고모 생일";
 
@@ -174,10 +175,12 @@ export const memoryRememberMcpScenario: Scenario = {
       expect((context.hermes.lastSubmittedInstructions() ?? "").includes(indexLine(proposedMemory)),
         "받아들인 제안이 색인에 실리지 않았다");
 
-      step("같은 turn 에서 바깥 도구를 먼저 시작했으면 근거가 있어도 제안으로 내려간다");
+      step("같은 대화의 앞 turn 이 바깥 도구를 썼으면 근거가 있어도 제안으로 내려간다");
+      context.hermes.setOutsideToolRun(OUTSIDE_SEARCH_TEXT);
+      const searched = await send(context, OUTSIDE_SEARCH_TEXT);
       context.hermes.setMemoryRememberCall(OUTSIDE_TEXT,
-        { title: OUTSIDE_TITLE, content: "고모 생일은 3월 5일이다", evidence: "고모 생일은 3월 5일이야" }, true);
-      const outside = await send(context, OUTSIDE_TEXT);
+        { title: OUTSIDE_TITLE, content: "고모 생일은 3월 5일이다", evidence: "고모 생일은 3월 5일이야" });
+      const outside = await send(context, OUTSIDE_TEXT, searched.conversationId);
       expect(outside.assistantText.startsWith(PROPOSED), `바깥 도구 뒤 호출의 답이 다르다: ${outside.assistantText}`);
       const outsideSaved = (await memories(context)).filter((m) => m.title === OUTSIDE_TITLE);
       expect(outsideSaved.length === 1 && outsideSaved[0]!.status === "PROPOSED",

@@ -44,6 +44,7 @@ public class McpMemoryRemember {
      * 바깥 글을 읽지 않는다고 보는 도구다. 실행이 이 밖의 도구를 시작했으면 {@code memory_remember} 를 바로 저장하지 않는다(ADR-091).
      *
      * <p>{@code agent_status} 와 {@code agent_stop} 은 맡긴 실행의 답을 돌려주므로 넣지 않는다. 그 답에 바깥 글이 실릴 수 있다.
+     * {@code skill_view} 도 넣지 않는다. 같은 toolset 의 {@code skill_manage} 가 다른 대화에서 읽은 글을 스킬에 써 둘 수 있다.
      */
     static final Set<String> INTERNAL_TOOLS = Set.of(
             "mcp__fos_assistant__memory_read",
@@ -52,8 +53,6 @@ public class McpMemoryRemember {
             "mcp__fos_assistant__agent_list",
             "mcp__fos_assistant__agent_delegate",
             "mcp__fos_assistant__artifact_write",
-            "skill_view",
-            "skills_list",
             "todo");
 
     static final String MEMORY_REMEMBER_DESCRIPTION = "사용자에 관한 오래 쓰일 사실을 기억으로 남긴다. "

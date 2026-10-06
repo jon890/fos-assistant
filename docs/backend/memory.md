@@ -305,8 +305,9 @@ sequenceDiagram
 | 5 | 그 대화에 사람의 질문 없이 Hermes 로 보낸 루트 실행이 없다. 맡긴 일의 결과를 전하는 turn 과 예약 작업 turn 이 여기 걸린다. 그 대화의 첫 `execution_question` 보다 앞선 실행은 보지 않는다 | `agent_execution` 과 `execution_question` |
 | 6 | 민감하지 않다 | 인자 `sensitive` |
 
-안쪽 도구는 바깥 글을 읽지 않는다고 보는 도구다. `mcp__fos_assistant__` 의 `memory_read`, `memory_remember`, `follow_up_propose`, `agent_list`, `agent_delegate`, `artifact_write` 와 Hermes 의 `skill_view`, `skills_list`, `todo` 다.
-`agent_status` 와 `agent_stop` 은 맡긴 실행의 답을 돌려주므로 넣지 않는다.
+안쪽 도구는 바깥 글을 읽지 않는다고 보는 도구다. `mcp__fos_assistant__` 의 `memory_read`, `memory_remember`, `follow_up_propose`, `agent_list`, `agent_delegate`, `artifact_write` 와 Hermes 의 `todo` 다.
+`agent_status` 와 `agent_stop` 은 맡긴 실행의 답을 돌려주므로 넣지 않는다. `skill_view` 도 넣지 않는다. 같은 toolset 의 `skill_manage` 가 다른 대화에서 읽은 글을 스킬에 써 둘 수 있다.
+한 실행 3개 상한과 같은 글의 중복 확인은 잠그지 않는다. 한 실행이 도구를 나란히 부르면 상한을 넘거나 도구 오류가 날 수 있다. 할 일 제안과 같은 수준으로 둔다.
 
 이 판정 뒤에 공통으로 본다.
 

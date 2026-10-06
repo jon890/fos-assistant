@@ -307,8 +307,8 @@ type Run = {
   proactive?: { tools: string[]; gate?: Promise<void> };
   /** 정책이 허용해 커넥터 서버에 닿은 호출이다. 사건 스트림이 호출마다 시작과 완료 사건을 실제 Hermes 의 모양으로 흘린다. */
   connectorCalls?: ConnectorCall[];
-  /** 바깥 도구를 먼저 시작한 뒤에 부를 `memory_remember` 의 인자다. 사건 스트림이 도구 사건을 흘린 뒤 부르고 그 결과를 답으로 쓴다. */
-  lateRemember?: Record<string, unknown>;
+  /** 바깥 도구를 쓰는 run 이다. 사건 스트림이 `web_search` 도구 사건을 흘린 뒤 끝난다. */
+  outsideTool?: boolean;
 };
 
 /** 허용된 커넥터 도구 호출 하나다. `hermesTool` 은 등록 이름이다. */
@@ -832,10 +832,11 @@ export type FakeHermes = {
   /**
    * 이 입력을 받은 run 이 `memory_remember` 를 서명해 부르고 도구 결과의 text 를 답으로 돌려주게 한다.
    *
-   * <p>`afterOutsideTool` 이 참이면 사건 스트림이 `web_search` 시작 사건을 먼저 흘려 Control Plane 이 저장한 뒤에 부른다.
-   * 사용자가 말한 입력 그대로를 질문으로 보내야 하므로 입력에 인자를 싣지 않고 따로 등록한다.
+   * <p>사용자가 말한 입력 그대로를 질문으로 보내야 하므로 입력에 인자를 싣지 않고 따로 등록한다.
    */
-  setMemoryRememberCall(input: string, args: Record<string, unknown>, afterOutsideTool?: boolean): void;
+  setMemoryRememberCall(input: string, args: Record<string, unknown>): void;
+  /** 이 입력을 받은 run 의 사건 스트림이 `web_search` 도구 사건을 흘린 뒤 끝나게 한다. 바깥 글을 읽은 대화를 만든다. */
+  setOutsideToolRun(input: string): void;
   /** 하위 에이전트 검사 입력으로 등록한 자식 session 과 그 응답 상태다. 등록이 거절돼도 run 은 실패하지 않고 여기에만 남는다. */
   subagentRegistrations(): readonly { childSessionId: string; rootSessionId: string; status: number }[];
   /** 등록한 자식 session 이 부모의 루트로 서명해 `memory_read` 를 부르고 도구 결과의 text 를 돌려준다. */
@@ -1077,7 +1078,8 @@ export function startFakeHermes(
   let droppedToolset: string | undefined;
   let artifactWriteMcp: { endpoint: string; token: string } | undefined;
   let memoryReadMcp: { endpoint: string; token: string } | undefined;
-  const memoryRememberCalls = new Map<string, { args: Record<string, unknown>; afterOutsideTool: boolean }>();
+  const memoryRememberCalls = new Map<string, Record<string, unknown>>();
+  const outsideToolInputs = new Set<string>();
   const subagentRegistrations: { childSessionId: string; rootSessionId: string; status: number }[] = [];
   let connectorPolicyEndpoint: string | undefined;
   const connectorToolCalls: ConnectorToolCall[] = [];
@@ -2048,12 +2050,10 @@ export function startFakeHermes(
             }
             return;
           }
-          // 바깥 도구를 먼저 시작한 run 이다. 시작 사건이 저장될 시간을 둔 뒤 `memory_remember` 를 부른다.
-          if (run.lateRemember !== undefined) {
+          // 바깥 도구를 쓰는 run 이다. 도구 사건을 흘린 뒤에 끝나므로, 답을 받은 때에는 그 사건이 저장돼 있다.
+          if (run.outsideTool === true) {
             event(response, { event: "tool.started", tool: "web_search", preview: "web_search" });
             event(response, { event: "tool.completed", tool: "web_search", duration: 0.1, error: false });
-            await wait(1500);
-            run.output = await callControlPlaneToolViaMcp("memory_remember", run.lateRemember, run.session_id);
             event(response, { event: "message.delta", delta: run.output });
             run.status = "completed";
             event(response, { event: "run.completed" });
@@ -2281,8 +2281,8 @@ export function startFakeHermes(
           )
           : undefined;
         const rememberCall = memoryRememberCalls.get(input);
-        const rememberOutput = rememberCall !== undefined && !rememberCall.afterOutsideTool
-          ? await callControlPlaneToolViaMcp("memory_remember", rememberCall.args, submitted.session_id)
+        const rememberOutput = rememberCall !== undefined
+          ? await callControlPlaneToolViaMcp("memory_remember", rememberCall, submitted.session_id)
           : undefined;
         const connectorCalls: ConnectorCall[] = [];
         const connectorOutput = input.startsWith(CONNECTOR_TOOL_PROBE)
@@ -2353,7 +2353,7 @@ export function startFakeHermes(
         const slow = !held && !starterRun && slowRunMs !== undefined;
         runs.set(runId, {
           run_id: runId,
-          status: held || slow || rememberCall?.afterOutsideTool === true ? "running" : "completed",
+          status: held || slow || outsideToolInputs.has(input) ? "running" : "completed",
           session_id: sessionId,
                   // 실제 Hermes 와 같이 요청 본문의 값을 그대로 되돌려 준다. 실제로 돈 모델이 아니다.
           model: submitted.model ?? profile!,
@@ -2371,7 +2371,7 @@ export function startFakeHermes(
           interruptEvents: input === "스트림 중단 검사",
           usage: FAKE_USAGE,
           connectorCalls,
-          lateRemember: rememberCall?.afterOutsideTool === true ? rememberCall.args : undefined,
+          outsideTool: outsideToolInputs.has(input),
           proactive: proactiveRun
             ? {
                 tools: script === undefined ? DEFAULT_PROACTIVE_TOOLS : script.tools ?? [],
@@ -2520,8 +2520,11 @@ export function startFakeHermes(
         setMemoryReadMcp: (endpoint: string, token: string) => {
           memoryReadMcp = { endpoint, token };
         },
-        setMemoryRememberCall: (input, args, afterOutsideTool = false) => {
-          memoryRememberCalls.set(input, { args, afterOutsideTool });
+        setMemoryRememberCall: (input, args) => {
+          memoryRememberCalls.set(input, args);
+        },
+        setOutsideToolRun: (input) => {
+          outsideToolInputs.add(input);
         },
         subagentRegistrations: () => [...subagentRegistrations],
         readMemoryAsSubagent: (childSessionId, memoryId) => {
