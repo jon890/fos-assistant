@@ -33,4 +33,9 @@ public class TurnQuestions {
                 .filter(message -> Objects.equals(message.senderUserId(), userId))
                 .map(ChatMessage::content);
     }
+
+    /** 그 대화에 사람의 질문 없이 Hermes 로 보낸 루트 실행이 있는가. 그 실행의 입력은 이력으로 같은 session 에 남는다. */
+    public boolean hasRunWithoutQuestion(Long conversationId) {
+        return questions.existsRunWithoutQuestion(conversationId);
+    }
 }

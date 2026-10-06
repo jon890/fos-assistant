@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.bifos.assistant.agent.domain.Agent;
+import com.bifos.assistant.agent.domain.type.CostMode;
 import com.bifos.assistant.agent.infra.AgentRepository;
 import com.bifos.assistant.chat.domain.ChatMessage;
 import com.bifos.assistant.chat.domain.Conversation;
@@ -13,6 +14,7 @@ import com.bifos.assistant.chat.infra.ConversationRepository;
 import com.bifos.assistant.chat.infra.ExecutionQuestionRepository;
 import com.bifos.assistant.mcp.application.AgentTokenService;
 import com.bifos.assistant.memory.application.MemoryCaptureService;
+import com.bifos.assistant.memory.application.MemoryService;
 import com.bifos.assistant.memory.application.model.CapturedMemory;
 import com.bifos.assistant.memory.domain.Memory;
 import com.bifos.assistant.memory.domain.MemoryCapture;
@@ -30,6 +32,7 @@ import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.usage.domain.AgentExecution;
 import com.bifos.assistant.usage.domain.ExecutionEvent;
 import com.bifos.assistant.usage.domain.type.ExecutionEventType;
+import com.bifos.assistant.usage.domain.type.ExecutionStatus;
 import com.bifos.assistant.usage.infra.AgentExecutionRepository;
 import com.bifos.assistant.usage.infra.ExecutionEventRepository;
 import com.bifos.assistant.user.domain.AppUser;
@@ -104,6 +107,9 @@ class McpMemoryRememberToolTest {
 
     @Autowired
     MemoryCaptureService captureService;
+
+    @Autowired
+    MemoryService memoryService;
 
     @Autowired
     JdbcTemplate jdbc;
@@ -209,6 +215,72 @@ class McpMemoryRememberToolTest {
 
         toolStarted("web_search");
         assertThat(text(call(remember("사는 곳", "서울에 산다", "홍길동이야")))).isEqualTo(PROPOSED);
+    }
+
+    @Test
+    @DisplayName("같은 대화의 앞 실행이 바깥 도구를 썼으면 지금 실행이 쓰지 않았어도 제안이다")
+    void proposesWhenEarlierRunReadOutsideText() throws Exception {
+        AgentExecution earlier = otherRootRun("run-earlier");
+        questions.save(ExecutionQuestion.of(
+                earlier.id(),
+                messages.save(ChatMessage.fromUser(conversation.id(), dad.id(), "메일 읽어 줘", Instant.now()))
+                        .id(),
+                Instant.now()));
+        toolStarted(earlier.id(), ExecutionEventType.TOOL_STARTED, "mcp__gmail__read_message");
+        askedInThisTurn();
+
+        assertThat(text(call(remember("다른 사람", "다른 사람은 홍길동이다", "다른 사람은 홍길동이야")))).isEqualTo(PROPOSED);
+    }
+
+    @Test
+    @DisplayName("하위 에이전트를 시작한 실행은 제안이다")
+    void proposesAfterSubagent() throws Exception {
+        askedInThisTurn();
+        toolStarted(dadRun.id(), ExecutionEventType.SUBAGENT_STARTED, null);
+
+        assertThat(text(call(remember("다른 사람", "다른 사람은 홍길동이다", "다른 사람은 홍길동이야")))).isEqualTo(PROPOSED);
+    }
+
+    @Test
+    @DisplayName("이름이 없는 도구 시작 사건도 바깥 도구로 본다")
+    void proposesAfterNamelessTool() throws Exception {
+        askedInThisTurn();
+        toolStarted(dadRun.id(), ExecutionEventType.TOOL_STARTED, null);
+
+        assertThat(text(call(remember("다른 사람", "다른 사람은 홍길동이다", "다른 사람은 홍길동이야")))).isEqualTo(PROPOSED);
+    }
+
+    @Test
+    @DisplayName("같은 대화에 사람의 질문 없이 보낸 루트 실행(맡긴 일의 결과 turn)이 있으면 제안이다")
+    void proposesAfterRunWithoutQuestion() throws Exception {
+        askedInThisTurn();
+        otherRootRun("run-delivery");
+
+        assertThat(text(call(remember("다른 사람", "다른 사람은 홍길동이다", "다른 사람은 홍길동이야")))).isEqualTo(PROPOSED);
+    }
+
+    @Test
+    @DisplayName("질문 줄이 다른 사람의 메시지를 가리키면 없는 줄로 보고 제안이다")
+    void proposesWhenQuestionIsOthers() throws Exception {
+        ChatMessage foreign =
+                messages.save(ChatMessage.fromUser(conversation.id(), dad.id() + 100_000, QUESTION, Instant.now()));
+        questions.save(ExecutionQuestion.of(dadRun.id(), foreign.id(), Instant.now()));
+
+        assertThat(text(call(remember("다른 사람", "다른 사람은 홍길동이다", "다른 사람은 홍길동이야")))).isEqualTo(PROPOSED);
+    }
+
+    @Test
+    @DisplayName("바로 저장한 항목을 사람이 고친 뒤에는 되돌리지 않는다")
+    void refusesUndoAfterHumanEdit() throws Exception {
+        askedInThisTurn();
+        call(remember("다른 사람", "다른 사람은 홍길동이다", "다른 사람은 홍길동이야"));
+        MemoryCapture capture = onlyCapture();
+        memoryService.update(currentDad(), capture.memoryId(), "다른 사람은 홍길동이고 열 살이다", false);
+
+        assertThatThrownBy(() -> captureService.undo(currentDad(), capture.id()))
+                .isInstanceOfSatisfying(
+                        ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.MEMORY_REVISION_CONFLICT));
+        assertThat(memories.findById(capture.memoryId())).isPresent();
     }
 
     @Test
@@ -370,12 +442,31 @@ class McpMemoryRememberToolTest {
     }
 
     private void toolStarted(String toolName) {
+        toolStarted(dadRun.id(), ExecutionEventType.TOOL_STARTED, toolName);
+    }
+
+    private void toolStarted(Long executionId, ExecutionEventType type, String toolName) {
         events.save(ExecutionEvent.builder()
-                .executionId(dadRun.id())
+                .executionId(executionId)
                 .sequence((int) events.count() + 1000)
-                .eventType(ExecutionEventType.TOOL_STARTED)
+                .eventType(type)
                 .toolName(toolName)
                 .occurredAt(Instant.now())
+                .build());
+    }
+
+    /** 같은 대화에서 Hermes 로 보낸 다른 루트 실행이다. 질문 줄은 잇지 않는다. */
+    private AgentExecution otherRootRun(String runId) {
+        return executions.save(AgentExecution.builder()
+                .userId(dad.id())
+                .agentId(dadRun.agentId())
+                .conversationId(conversation.id())
+                .profileName(PROFILE)
+                .hermesSessionId(McpCallSigner.newRoot())
+                .hermesRunId(runId)
+                .costMode(CostMode.SUBSCRIPTION)
+                .status(ExecutionStatus.SUCCEEDED)
+                .startedAt(Instant.now())
                 .build());
     }
 

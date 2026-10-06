@@ -111,7 +111,7 @@ public class MemoryCaptureService {
                                 dedupKey,
                                 clock.instant()));
         MemoryCaptureKind kind = direct ? MemoryCaptureKind.CREATED : MemoryCaptureKind.PROPOSED;
-        record(saved.id(), user, request, kind, null);
+        record(saved.id(), user, request, kind, direct ? saved.revision() : null);
         return new MemoryRememberResult(
                 direct ? MemoryRememberOutcome.REMEMBERED : MemoryRememberOutcome.PROPOSED, saved.id());
     }
@@ -159,16 +159,24 @@ public class MemoryCaptureService {
         }
         switch (capture.kind()) {
             case PROPOSED -> throw conflict("a proposal is decided, not undone");
-            case CREATED -> {
-                if (memories.existsById(capture.memoryId())) {
-                    memoryService.delete(user, capture.memoryId());
-                }
-            }
+            case CREATED -> removeCreated(user, capture);
             case UPDATED -> restore(user, capture);
         }
         capture.undo(clock.instant());
         captures.save(capture);
         log.info("memory capture undone userId={} captureId={} kind={}", user.id(), captureId, capture.kind());
+    }
+
+    /** 바로 저장한 항목을 지운다. 그 뒤에 사람이 고쳤으면 지우지 않는다. 이미 없으면 기록만 되돌린다. */
+    private void removeCreated(CurrentUser user, MemoryCapture capture) {
+        Optional<Memory> found = memories.findByIdForUpdate(capture.memoryId());
+        if (found.isEmpty()) {
+            return;
+        }
+        if (capture.baseRevision() != null && found.get().revision() != capture.baseRevision()) {
+            throw conflict("the memory has changed after it was remembered");
+        }
+        memoryService.delete(user, capture.memoryId());
     }
 
     private void restore(CurrentUser user, MemoryCapture capture) {
@@ -232,7 +240,7 @@ public class MemoryCaptureService {
                     yield new MemoryRememberResult(MemoryRememberOutcome.ALREADY_PROPOSED, existing.id());
                 }
                 Memory memory = memoryService.accept(user, existing.id());
-                record(memory.id(), user, request, MemoryCaptureKind.CREATED, null);
+                record(memory.id(), user, request, MemoryCaptureKind.CREATED, memory.revision());
                 yield new MemoryRememberResult(MemoryRememberOutcome.REMEMBERED, memory.id());
             }
         };

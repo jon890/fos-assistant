@@ -293,15 +293,17 @@ sequenceDiagram
 
 ### 바로 저장 판정
 
-다섯 조건을 모두 만족하면 바로 저장하고, 하나라도 어긋나면 제안으로 내린다. 거절하지 않는다.
+여섯 조건을 모두 만족하면 바로 저장하고, 하나라도 어긋나면 제안으로 내린다. 거절하지 않는다.
+4 와 5 는 지금 실행 하나가 아니라 대화 전체를 본다. Hermes session 이 앞 turn 의 도구 결과와 맡긴 일의 결과를 이력으로 이어 가므로, 앞 turn 에서 읽은 바깥 글이 뒤 turn 의 짧은 대답(「응 그래」)을 근거로 저장을 시킬 수 있다.
 
 | 순서 | 조건 | 어디서 본다 |
 | --- | --- | --- |
 | 1 | origin 실행이 루트 실행이다(`parent_execution_id` 가 없다) | `agent_execution` |
 | 2 | 그 실행이 사람이 보낸 turn 이다. 새 질문과 다시 생성만 해당한다 | `execution_question` 의 줄과 그 줄이 가리키는 그 사용자의 `USER` 메시지 |
 | 3 | `evidence` 를 NFC 로 맞추고 연속 공백을 하나로 줄인 글이 같은 방식으로 맞춘 질문 원문에 들어 있다. 공백을 뺀 길이가 2자 이상이다 | `chat_message.content` |
-| 4 | 그 실행에 아래 「안쪽 도구」 밖의 `TOOL_STARTED` 사건이나 `SUBAGENT_STARTED` 사건이 아직 없다 | `execution_event` |
-| 5 | 민감하지 않다 | 인자 `sensitive` |
+| 4 | 그 대화의 어느 실행에도 아래 「안쪽 도구」 밖의 `TOOL_STARTED` 사건이나 `SUBAGENT_STARTED` 사건이 없다 | `execution_event` 와 `agent_execution.conversation_id` |
+| 5 | 그 대화에 사람의 질문 없이 Hermes 로 보낸 루트 실행이 없다. 맡긴 일의 결과를 전하는 turn 과 예약 작업 turn 이 여기 걸린다. 그 대화의 첫 `execution_question` 보다 앞선 실행은 보지 않는다 | `agent_execution` 과 `execution_question` |
+| 6 | 민감하지 않다 | 인자 `sensitive` |
 
 안쪽 도구는 바깥 글을 읽지 않는다고 보는 도구다. `mcp__fos_assistant__` 의 `memory_read`, `memory_remember`, `follow_up_propose`, `agent_list`, `agent_delegate`, `artifact_write` 와 Hermes 의 `skill_view`, `skills_list`, `todo` 다.
 `agent_status` 와 `agent_stop` 은 맡긴 실행의 답을 돌려주므로 넣지 않는다.
@@ -341,10 +343,11 @@ Control Plane MCP 도구를 받는 실행의 공통 답변 지침 뒤에 「# �
 ### 대화에 보이는 것
 
 기록 한 줄이 `memory_capture` 에 남는다. 대화는 그 기록을 만든 실행의 답 아래에 그린다.
+맡겨서 도는 실행이 남긴 제안은 그 대화에 그 실행의 답 줄이 없어 `/memory` 의 제안 목록에서만 보인다.
 
 | 기록 | 화면 | 누르면 |
 | --- | --- | --- |
-| `CREATED`, 항목이 `ACCEPTED` | 「기억했어요: 제목」 [고치기] [되돌리기] | 고치기는 `PATCH /api/v1/memories/{id}`, 되돌리기는 항목을 지운다 |
+| `CREATED`, 항목이 `ACCEPTED` | 「기억했어요: 제목」 [고치기] [되돌리기] | 고치기는 `PATCH /api/v1/memories/{id}`, 되돌리기는 항목을 지운다. 그 뒤에 고쳤으면 409 `MEMORY_REVISION_CONFLICT` 다 |
 | `UPDATED`, 항목이 `ACCEPTED` | 「기억을 고쳤어요: 제목」 [고치기] [되돌리기] | 되돌리기는 고치기 전의 판으로 돌린다. 그 뒤에 다시 바뀌었으면 409 `MEMORY_REVISION_CONFLICT` 다 |
 | `PROPOSED`, 항목이 `PROPOSED` | 제안 카드 [받아들이기] [고쳐서 받아들이기] [거절] | `/accept`, `PATCH` 뒤 `/accept`, `/reject`. `/memory` 의 제안 목록에도 보인다 |
 
@@ -358,7 +361,7 @@ Control Plane MCP 도구를 받는 실행의 공통 답변 지침 뒤에 「# �
 
 | 클래스 | 하는 일 |
 | --- | --- |
-| `mcp.application.McpMemoryRemember` | 도구 정의, 인자 값 검사, 바로 저장 판정의 1부터 4 |
+| `mcp.application.McpMemoryRemember` | 도구 정의, 인자 값 검사, 바로 저장 판정의 1부터 5 |
 | `memory.application.MemoryCaptureService` | 민감도, collection, 상한, 중복, 고치기 대상 판정과 저장, 대화의 기록 목록, 되돌리기 |
-| `chat.application.TurnQuestions` | 실행에 이어 둔 질문 원문 읽기 |
+| `chat.application.TurnQuestions` | 실행에 이어 둔 질문 원문 읽기, 질문 없이 보낸 루트 실행이 있는지 보기 |
 | `chat.presentation.MemoryCaptureController` | 대화의 기록 목록과 되돌리기 API |

@@ -49,7 +49,10 @@ public class MemoryCapture {
     @Column(nullable = false, length = 20)
     private MemoryCaptureKind kind;
 
-    /** {@code UPDATED} 일 때 고치기 전의 판 번호다. 다른 종류는 null 이다. */
+    /**
+     * 되돌릴 때 견주는 판 번호다. {@code CREATED} 는 저장한 때의 판, {@code UPDATED} 는 고치기 전의 판이다. {@code PROPOSED}
+     * 는 null 이다.
+     */
     @Column(name = "base_revision")
     private Integer baseRevision;
 

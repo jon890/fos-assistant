@@ -174,11 +174,14 @@ public class McpMemoryRemember {
     }
 
     /**
-     * 바로 저장 조건 가운데 실행의 출처로 정하는 셋이다(ADR-091). 민감도와 collection 과 상한은 {@link MemoryCaptureService} 가
+     * 바로 저장 조건 가운데 실행의 출처로 정하는 것이다(ADR-091). 민감도와 collection 과 상한은 {@link MemoryCaptureService} 가
      * 본다.
+     *
+     * <p>바깥 글은 대화 단위로 본다. Hermes session 이 앞 turn 의 도구 결과와 맡긴 일의 결과를 이력으로 이어 가므로, 지금
+     * 실행이 바깥 도구를 부르지 않았어도 앞 turn 에서 읽은 글이 이 호출을 시킬 수 있다.
      */
     private boolean directAllowed(McpCaller caller, AgentExecution origin, String evidence) {
-        if (evidence == null || origin.parentExecutionId() != null) {
+        if (evidence == null || origin.parentExecutionId() != null || origin.conversationId() == null) {
             return false;
         }
         String quoted = normalized(evidence);
@@ -190,7 +193,8 @@ public class McpMemoryRemember {
         if (question.isEmpty() || !normalized(question.get()).contains(quoted)) {
             return false;
         }
-        return !executionEvents.existsOutsideToolStart(origin.id(), INTERNAL_TOOLS);
+        return !executionEvents.existsOutsideToolStartInConversation(origin.conversationId(), INTERNAL_TOOLS)
+                && !turnQuestions.hasRunWithoutQuestion(origin.conversationId());
     }
 
     /** NFC 로 맞추고 연속 공백을 하나로 줄이고 앞뒤 공백을 지운다. */
