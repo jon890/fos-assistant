@@ -28,6 +28,7 @@ public final class ToolDetailRedactor {
 
     private static final int INPUT_LIMIT = 65_536;
     private static final JsonMapper MAPPER = JsonMapper.builder().build();
+    /** 대시보드 plugin 의 {@code SECRET_ARGUMENT_NAMES} 와 같다. 한쪽을 바꾸면 다른 쪽도 바꾼다. */
     private static final Set<String> SECRET_KEYS = Set.of(
             "token",
             "secret",

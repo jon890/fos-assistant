@@ -122,7 +122,7 @@ class ConnectorActionServiceTest {
     private static final String ARGS = "{\"text\":\"안녕\",  \"count\":2}";
     private static final long CONVERSATION = 7L;
 
-    /** Gmail 필터 id 처럼 32자 넘는 영숫자 식별자다. 선언하지 않은 칸에서는 가려진다. */
+    /** Gmail 필터 id 처럼 32자 이상의 영숫자 식별자다. 선언하지 않은 칸에서는 가려진다. */
     private static final String LONG_ID = "ANe1BmhXxP8kq3Lr0sT9vUwYzA2bC4dE6fG8hJ";
 
     /** 화면에서 가려지는 32자 넘는 base64 모양 글이다. */

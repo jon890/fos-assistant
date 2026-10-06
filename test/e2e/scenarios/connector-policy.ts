@@ -23,7 +23,7 @@ type PendingView = { actionId: string; argsJson: string; hiddenArgs: boolean; gr
 const APPROVAL_TTL_MS = 15_000;
 const PREFIX = `mcp__${DEMO_CONNECTOR.mcp_server}__`;
 const AGENDA_PREFIX = `mcp__${AGENDA_CONNECTOR.mcp_server}__`;
-/** Gmail 필터 id 처럼 32자 넘는 영숫자 식별자다. 식별자로 선언하지 않은 칸에서는 가려진다. */
+/** Gmail 필터 id 처럼 32자 이상의 영숫자 식별자다. 식별자로 선언하지 않은 칸에서는 가려진다. */
 const LONG_ID = "ANe1BmhXxP8kq3Lr0sT9vUwYzA2bC4dE6fG8hJ";
 /** 그 실행의 에이전트에 그 서버를 붙인 연결이 없어 줄을 남기지 않고 막은 호출의 글이다. */
 const NO_CONTEXT = "이 도구 호출의 실행 맥락을 확인하지 못해 실행하지 않았다.";

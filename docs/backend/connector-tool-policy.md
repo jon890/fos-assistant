@@ -54,7 +54,7 @@
 - 카탈로그 응답의 `grant` 는 기본값을 채운 값이다. `approval` 이 `required` 이고 선언이 닫지 않았을 때만 참이다. Control Plane 은 이 칸이 없으면 `approval` 이 `required` 인 도구를 참으로 읽고, boolean 이 아닌 값은 거짓으로 읽는다. 옛 대시보드 plugin 은 이 칸을 내지 않는다
 - `"grant": false` 인 도구는 모델에게 보인다. 설치가 `tools.exclude` 에 넣는 것은 `approval: always` 인 도구뿐이다
 - 데이터를 계정 밖의 사람에게 보내는 도구는 `"grant": false` 로 선언한다. 메일 보내기와 게시와 공유가 그 예다
-- `identifiers` 가 문자열 배열이 아니거나, 이름이 `^[A-Za-z_][A-Za-z0-9_]{0,63}$` 가 아니거나, 같은 이름이 두 번 있거나, 비밀 키로 읽히는 이름(`token`, `secret`, `password`, `privatekey` 로 끝나는 이름 등)이 있거나, `approval` 이 `required` 가 아닌 도구에 선언했으면 그 커넥터를 카탈로그에 내지 않는다
+- `identifiers` 가 문자열 배열이 아니거나, 이름이 `^[A-Za-z_][A-Za-z0-9_]{0,30}$` 가 아니거나, 같은 이름이 두 번 있거나, 비밀 키로 읽히는 이름(`token`, `secret`, `password`, `privatekey` 로 끝나는 이름 등)이 있거나, `approval` 이 `required` 가 아닌 도구에 선언했으면 그 커넥터를 카탈로그에 내지 않는다
 - 카탈로그 응답의 `identifiers` 는 기본값을 채운 값이다. Control Plane 은 이 칸이 없거나 문자열 배열이 아니면 빈 목록으로 읽고, `approval` 이 `required` 가 아닌 도구의 값은 버린다. 어떤 값이 가림에서 빠지는지는 [커넥터 연결](../connectors.md) 의 「승인」 이 갖는다
 - `verify.tool` 과 `options.tool` 은 `tools` 에 있고 `risk: READ`, `approval: none` 이어야 한다. 아니면 카탈로그에 내지 않는다
 - `schema: 2` 인데 `tools` 가 없거나 비었으면 카탈로그에 내지 않는다
