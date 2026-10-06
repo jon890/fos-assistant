@@ -10,7 +10,9 @@ import com.bifos.assistant.agent.domain.type.CostMode;
 import com.bifos.assistant.chat.application.FirstResponseLatencyService;
 import com.bifos.assistant.chat.application.ScheduledTurnExecutions;
 import com.bifos.assistant.chat.domain.ChatMessage;
+import com.bifos.assistant.chat.domain.Conversation;
 import com.bifos.assistant.chat.infra.ChatMessageRepository;
+import com.bifos.assistant.chat.infra.ConversationRepository;
 import com.bifos.assistant.chat.presentation.ChatDtos.LatencyRowView;
 import com.bifos.assistant.chat.presentation.LatencyAdminController;
 import com.bifos.assistant.model.domain.type.ModelTier;
@@ -62,6 +64,9 @@ class FirstResponseLatencyTest {
     ChatMessageRepository messages;
 
     @Autowired
+    ConversationRepository conversations;
+
+    @Autowired
     TaskRunRepository taskRuns;
 
     @Autowired
@@ -72,7 +77,7 @@ class FirstResponseLatencyTest {
     private final List<ChatMessage> savedMessages = new ArrayList<>();
     private final List<TaskRun> savedRuns = new ArrayList<>();
     private LatencyAdminController controller;
-    private long nextConversationId = 9_100L;
+    private final List<Conversation> savedConversations = new ArrayList<>();
 
     @BeforeEach
     void setUp() {
@@ -89,6 +94,7 @@ class FirstResponseLatencyTest {
         taskRuns.deleteAll(savedRuns);
         messages.deleteAll(savedMessages);
         executions.deleteAll(savedExecutions);
+        conversations.deleteAll(savedConversations);
     }
 
     @Test
@@ -124,7 +130,7 @@ class FirstResponseLatencyTest {
     @Test
     @DisplayName("SYSTEM 알림 줄 뒤에 답한 자동 turn 은 세지 않는다")
     void doesNotCountAutoTurnAnsweredAfterSystemNotice() {
-        long conversationId = nextConversationId++;
+        long conversationId = conversation(ADMIN_ID).id();
         AgentExecution auto = execution(conversationId, ADMIN_ID, ModelTier.FAST, YESTERDAY_NOON, 100L, 1_000L, null);
         message(ChatMessage.fromSystem(conversationId, "위임 결과가 도착했어요", YESTERDAY_NOON));
         message(ChatMessage.fromAssistant(conversationId, "결과를 전해요", auto.id(), YESTERDAY_NOON));
@@ -141,7 +147,7 @@ class FirstResponseLatencyTest {
     @Test
     @DisplayName("다시 생성한 두 번째 답의 실행도 사용자 turn 으로 센다")
     void countsExecutionOfRegeneratedAnswerAsUserTurn() {
-        long conversationId = nextConversationId++;
+        long conversationId = conversation(ADMIN_ID).id();
         AgentExecution first = execution(conversationId, ADMIN_ID, ModelTier.FAST, YESTERDAY_NOON, 100L, 1_000L, null);
         AgentExecution second =
                 execution(conversationId, ADMIN_ID, ModelTier.FAST, YESTERDAY_NOON.plusSeconds(30), 100L, 3_000L, null);
@@ -193,7 +199,7 @@ class FirstResponseLatencyTest {
     @Test
     @DisplayName("예약 작업 발화가 연 turn 은 지시가 USER 메시지로 남아도 세지 않는다")
     void doesNotCountScheduledTaskTurnEvenThoughInstructionIsUserMessage() {
-        long conversationId = nextConversationId++;
+        long conversationId = conversation(ADMIN_ID).id();
         AgentExecution scheduled =
                 execution(conversationId, ADMIN_ID, ModelTier.FAST, YESTERDAY_NOON, 100L, 1_000L, null);
         message(ChatMessage.fromSystem(conversationId, "예약 작업이 시작됐어요", YESTERDAY_NOON));
@@ -299,7 +305,7 @@ class FirstResponseLatencyTest {
     /** 새 대화에 {@code USER} 질문과 그 실행이 낸 {@code ASSISTANT} 답을 심는다. */
     private AgentExecution userTurn(
             Long userId, ModelTier tier, Instant received, Long submitMs, Long firstDeltaMs, Long parentId) {
-        long conversationId = nextConversationId++;
+        long conversationId = conversation(userId).id();
         AgentExecution execution = execution(conversationId, userId, tier, received, submitMs, firstDeltaMs, parentId);
         message(ChatMessage.fromUser(conversationId, userId, "이번 주 일정이 어떻게 돼?", received));
         message(ChatMessage.fromAssistant(conversationId, "주간 회의는 화요일 10시예요", execution.id(), received));
@@ -334,6 +340,12 @@ class FirstResponseLatencyTest {
         }
         AgentExecution saved = executions.save(execution);
         savedExecutions.add(saved);
+        return saved;
+    }
+
+    private Conversation conversation(Long userId) {
+        Conversation saved = conversations.save(Conversation.startedBy(userId, "합성 응답 시간 대화", null, NOW));
+        savedConversations.add(saved);
         return saved;
     }
 

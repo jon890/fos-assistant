@@ -1117,6 +1117,7 @@ public class ChatService {
     }
 
     /** 예약 작업 발화가 미리 만들었다가 쓰지 않은 대화만 부른다. 메시지가 있으면 지우지 않는다. */
+    @Transactional
     public boolean discardEmptyTaskConversation(Long conversationId) {
         return conversations.discardEmptyTaskConversation(conversationId) == 1;
     }
