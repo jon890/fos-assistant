@@ -37,6 +37,7 @@ profile 이 어떤 요청을 받는지는 두 표식이 정한다. 판정은 요
 - `GET /api/connectors` 는 두 표식 가운데 하나가 있으면 받는다
 - `PUT /api/connectors` 의 설치는 `bind` 칸이 있으면 두 표식 가운데 하나, 없으면 관리 표식만 받는다
 - `PUT /api/connectors` 의 떼기는 소유 기록의 그 항목이 `bind` 면 두 표식 가운데 하나, 아니면 관리 표식만 받는다
+- 커넥터 표식만 있는 profile 의 떼기는 소유 기록에 그 항목이 없어도 바인딩 떼기로 다룬다. 아무것도 바꾸지 않고 `changed: false` 로 답한다. 다시 보낸 떼기가 401 로 실패하면 Control Plane 의 바인딩 행이 지워지지 않기 때문이다
 - `POST /api/mcp/servers/<서버>/test` 와 `POST /api/connectors/<id>/execute` 는 커넥터 표식만 있는 profile 에서 소유 기록의 그 항목이 `bind` 여야 한다
 - 표식이 맞지 않으면 401 이다
 
@@ -58,7 +59,8 @@ profile 이 어떤 요청을 받는지는 두 표식이 정한다. 판정은 요
 
 - 관리 표식이나 커넥터 표식이 있다. 없으면 401 이다
 - `platform_toolsets.api_server` 목록이 있고 그 안에 Control Plane MCP 가 있다. 목록이 없는 profile 에 이름 하나만 든 목록을 만들면 내장 도구와 Control Plane MCP 가 모두 닫히고, MCP 이름이 없던 목록에 이름을 더하면 운영자의 다른 MCP 서버가 막히기 때문이다
-- 소유 기록에 옛 설치 항목이 없다. 반대로 바인딩 항목이 있는 profile 은 옛 설치를 받지 않는다
+- `fos-ctx` 가 켜져 있다. `plugins.enabled` 에 있고 `plugins.disabled` 에 없으며 `plugins.entries.fos-ctx.allow_tool_override` 가 `false` 여야 한다. 설치는 plugin 파일만 맞추고 profile 의 plugin 설정은 쓰지 않으므로, 꺼진 profile 에 붙이면 도구 호출이 판정 없이 나간다. 이 조건은 새로 붙일 때만 본다. 이미 붙은 커넥터를 다시 설치하는 것(연결 확인, 반영 완료)은 받고, 그 바인딩은 hook 상태가 거짓이라 `PENDING` 에 남는다
+- 소유 기록에 옛 설치 항목이 없다. 반대로 바인딩 항목이나 뗀 서버 기록이 있는 profile 은 옛 설치를 받지 않는다
 - 커넥터의 env 이름이 그 커넥터의 소유 기록 없이 이미 `.env` 에 있지 않고, 기본 key 나 다른 바인딩 커넥터의 env 이름과 겹치지 않는다
 - 서버 이름이 운영자가 등록한 서버와 겹치지 않는다
 - 복사할 스킬 디렉터리가 그 커넥터의 소유 기록 없이 이미 있지 않다
@@ -72,14 +74,16 @@ profile 이 어떤 요청을 받는지는 두 표식이 정한다. 판정은 요
 | `platform_toolsets.api_server` | 서버 이름을 더한다. 있던 이름은 그대로 두고 `no_mcp` 는 뺀다. manifest 의 `toolsets` 는 더하지 않는다 | 그 이름만 뺀다 |
 | 스킬 | plugin 의 스킬 디렉터리를 그 profile 의 `skills/<앞머리 name>/` 로 복사한다. `SKILL.md` 와 `references/`, `templates/` 아래 정규 파일이다 | 소유 기록의 `skills` 디렉터리를 지운다 |
 | 소유 기록 | 항목에 `mode: bind`, `vault`, `skills` 를 적는다 | 그 항목을 지운다 |
-| 이름 대응 파일 | `isolated: false` 를 싣고 소유 기록의 모든 서버를 싣는다. manifest 를 읽지 못했거나 소유 기록의 서버 이름이나 실행 정의가 지금 manifest 와 다른 서버는 소유 기록의 이름으로 빈 `tools` 다 | 남은 바인딩이 없으면 지운다 |
+| 이름 대응 파일 | `isolated: false` 를 싣고 소유 기록의 모든 서버를 싣는다. manifest 를 읽지 못했거나 소유 기록의 서버 이름이나 실행 정의가 지금 manifest 와 다른 서버는 소유 기록의 이름으로 빈 `tools` 다. 뗀 서버 기록의 서버도 빈 `tools` 로 싣는다 | 뗀 서버를 빈 `tools` 로 남긴다. 마지막 바인딩을 떼도 지우지 않는다 |
+| 뗀 서버 기록 `.fos-connector-detached.json` | 그 커넥터의 항목을 지운다. 남은 항목이 없으면 파일을 지운다 | `{커넥터 id: 서버 이름}` 으로 그 서버 이름을 남긴다 |
 | `fos-ctx` | 묶음에 든 판으로 맞춘다 | 건드리지 않는다 |
-| 답의 `restart_required` | 바뀐 것이 있으면 참이다. 떠 있는 profile 에 더한 MCP 서버는 gateway 를 다시 띄워야 보인다 | 거짓이다. 도구 목록에서 이름을 빼므로 다음 실행부터 막힌다 |
+| 답의 `restart_required` | 바뀐 것이 있으면 참이다. 떠 있는 profile 에 더한 MCP 서버는 gateway 를 다시 띄워야 보인다 | 거짓이다. 도구 목록에서 이름을 빼므로 다음 실행은 그 서버를 받지 않는다. 떼기 전에 시작한 실행의 호출은 대응에 남은 서버를 보고 판정이 막는다 |
 
 - 붙이기는 한 묶음으로 쓴다. 실패하면 이 요청이 쓴 파일만 되돌린다
 - 떼기는 소유 기록을 지금 manifest 와 견주지 않는다. 그 항목이 객체이고 `mode` 가 `bind` 인지와 서버 이름과 스킬 이름이 경로 조각이 될 수 있는지만 본다. 운영자가 커넥터의 실행 정의를 바꾼 뒤에도 떼어야 `.env` 에 비밀이 남지 않는다
-- 쓰기 전에 `config.yaml`, 소유 기록, 이름 대응 파일을 `connector-backups/` 에 떠 둔다. `.env` 와 스킬 파일은 떠 두지 않는다
-- `GET /api/connectors` 의 바인딩 항목 `configured` 는 서버 정의가 소유 기록과 같고, 서버 이름이 API 도구 목록에 있고, 소유 기록의 스킬 파일이 plugin 의 본문과 같을 때 참이다. Control Plane MCP 등록이 있어도 된다
+- 쓰기 전에 `config.yaml`, 소유 기록, 이름 대응 파일, 뗀 서버 기록을 `connector-backups/` 에 떠 둔다. `.env` 와 스킬 파일은 떠 두지 않는다
+- `GET /api/connectors` 의 바인딩 항목 `configured` 는 서버 정의가 소유 기록과 같고, 서버 이름이 API 도구 목록에 있고, 소유 기록의 서버 이름과 실행 정의가 지금 manifest 와 같고, 소유 기록의 스킬 파일이 plugin 의 본문과 같을 때 참이다. Control Plane MCP 등록이 있어도 된다
+- 바인딩 항목은 요청이 가리키는 커넥터의 것만 지금 manifest 와 견주고 나머지는 모양만 본다. 운영자가 커넥터 하나의 실행 정의를 바꿔도 같은 profile 에 붙은 다른 커넥터의 붙이기, probe, 실행은 그대로 된다. 상태 조회는 바뀐 항목만 `configured: false` 다
 - 떼어도 gateway 의 스킬 색인은 재시작 전까지 그 스킬 이름을 남긴다. 모델이 그 스킬을 읽으려 하면 파일이 없어 실패할 뿐이다
 
 **도구 목록은 설치와 Control Plane 의 도구 저장이 나눠 쓴다.**
@@ -163,6 +167,7 @@ Control Plane 은 도구 목록을 직접 쓰지 않는다. 바인딩 설치가 
 
 외부 호출이 실패하면 `CONNECTOR_OPERATION_FAILED` 로 끝나고 트랜잭션이 되돌려져 행이 남는다.
 떼기는 도구 목록에서 서버 이름을 빼므로 재시작을 기다리지 않고 다음 실행부터 그 도구가 막힌다.
+떼기 전에 시작한 실행은 그 서버를 쥔 채 돈다. 떼기가 그 서버를 이름 대응에 빈 `tools` 로 남기므로 그 실행의 호출도 판정이 막는다.
 
 ### 바인딩의 반영 맞추기
 
@@ -294,7 +299,7 @@ Control Plane 은 연결 확인과 관리자 반영 완료에서 선언한 tools
 - plugin 이 기대는 이름은 `mcp.ClientSession`, `mcp.StdioServerParameters`, `mcp.client.stdio.stdio_client`, `ToolAnnotations.read_only_hint`, `CallToolResult.structured_content`, `CallToolResult.is_error`, `CallToolResult.content` 다
 - 1.x 는 이 속성을 `readOnlyHint`, `structuredContent`, `isError` 로 둔다. 1.x 에서 `is_error` 를 기본값으로 읽으면 도구 오류가 성공으로 읽힌다. 그래서 plugin 은 속성을 직접 읽고, 이름이 없으면 실패한다
 - plugin 은 올라올 때와 `call` 마다 SDK 판과 위 속성을 확인한다. 범위 밖이거나 속성이 없으면 자식을 띄우지 않고 `unavailable` 로 답하며, 판과 까닭을 운영 로그 한 줄로 남긴다
-- `call` 이 예외로 실패하면 묶음 예외(`ExceptionGroup`)를 풀어 가장 안쪽 예외의 종류와 SDK 판을 로그에 남긴다. 예외 본문과 칸 값은 남기지 않는다
+- `call` 이 예외로 실패하면 묶음 예외(`ExceptionGroup`)를 풀어 가장 안쪽 예외의 종류와 SDK 버전을 로그에 남긴다. 예외 본문과 칸 값은 남기지 않는다
 - Hermes 는 `mcp` 를 정확한 판 하나로 고정하므로 판은 Hermes 이미지를 올릴 때만 바뀐다. 올릴 때 확인할 것은 [버전 변경과 실측](../hermes/upgrades.md) 에 있다
 
 ## 연결 상태의 흐름

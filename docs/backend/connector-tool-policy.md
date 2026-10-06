@@ -88,7 +88,7 @@ Hermes 는 MCP 도구를 `mcp__<서버>__<도구>` 로 등록하면서 글자를
 
 - `prefix` 는 서버 이름으로 계산한 등록 이름의 앞부분이다. hook 은 이 값으로 그 호출이 어느 커넥터 서버의 것인지만 안다. 원래 도구 이름은 `tools` 에서만 찾는다
 - `tools` 는 manifest 가 선언한 도구다. `schema: 1` 은 `verify.tool` 과 `options.tool` 만 든다
-- 설정, 소유 기록과 한 묶음으로 쓰고 실패하면 함께 되돌린다. 해제하면 그 서버의 항목을 뺀다
+- 설정, 소유 기록과 한 묶음으로 쓰고 실패하면 함께 되돌린다. 옛 설치를 해제하면 그 서버의 항목을 뺀다. 바인딩 떼기는 아래 표처럼 빈 `tools` 로 남긴다
 - 이 파일이 있는 profile 에서 `fos-ctx` hook 이 커넥터 도구 호출을 묻는다
 
 `isolated` 칸이 그 profile 의 설치 방식을 적는다([ADR-083](../adr/ADR-083-커넥터는-사용자가-한-번-연결하고-자기-에이전트에-여럿-붙여-그-에이전트가-도구를-직접-부른다.md)).
@@ -97,7 +97,7 @@ Hermes 는 MCP 도구를 `mcp__<서버>__<도구>` 로 등록하면서 글자를
 | `isolated` | 쓰는 설치 | `servers` 에 싣는 것 |
 | --- | --- | --- |
 | 없음(`true` 와 같다) | 옛 설치. 커넥터마다 만든 전용 profile 이다 | 운영 목록에 있고 manifest 를 읽을 수 있는 커넥터의 서버 |
-| `false` | 바인딩 설치. 일반 에이전트의 profile 에 커넥터를 붙인 것이다 | 소유 기록의 모든 서버. manifest 를 읽지 못한 서버는 `tools` 를 빈 객체로 싣는다 |
+| `false` | 바인딩 설치. 일반 에이전트의 profile 에 커넥터를 붙인 것이다 | 소유 기록의 모든 서버. manifest 를 읽지 못한 서버는 `tools` 를 빈 객체로 싣는다. 뗀 서버 기록의 서버도 빈 `tools` 로 싣는다 |
 
 두 방식은 대응에 없는 도구를 다르게 다룬다.
 
@@ -110,6 +110,13 @@ Hermes 는 MCP 도구를 `mcp__<서버>__<도구>` 로 등록하면서 글자를
 
 **바인딩 profile 에서 대응에 실리지 않은 커넥터 서버는 판정 없이 나간다.**
 그래서 바인딩 설치와 떼기는 manifest 를 읽지 못했거나 소유 기록의 서버 이름이나 실행 정의가 지금 manifest 와 다른 서버도 소유 기록의 이름으로 빈 `tools` 와 함께 싣는다. Control Plane 은 그 서버의 도구를 선언 없는 도구로 막는다.
+
+**떼기는 뗀 서버를 대응에서 빼지 않는다.**
+떼기 전에 시작한 실행은 그 서버를 쥔 채 돌고, 대응에서 서버가 빠지면 그 실행의 호출이 판정 없이 나가기 때문이다.
+떼기는 서버 이름을 소유 기록 곁의 뗀 서버 기록 `.fos-connector-detached.json` 에 `{커넥터 id: 서버 이름}` 으로 남기고, 대응에 그 서버를 빈 `tools` 로 싣는다.
+그 실행의 호출은 hook 이 묻고, Control Plane 은 그 에이전트에 그 서버를 붙인 연결이 없어 막는다.
+같은 커넥터를 다시 붙이면 그 기록에서 지운다. 같은 서버 이름을 지금 붙은 커넥터가 쓰면 붙은 쪽의 도구를 싣는다.
+마지막 바인딩을 떼도 대응 파일은 뗀 서버를 싣고 남는다. 뗀 서버 기록만 남은 profile 도 바인딩 profile 이라 옛 설치를 받지 않는다.
 터미널이나 파일 도구를 가진 에이전트는 이 파일을 고칠 수 있다. 이 위험은 ADR-083 의 「감당할 것」 에 있다.
 
 ### 도구 호출 판정
@@ -189,12 +196,13 @@ manifest 를 읽지 못해 바인딩의 서버 이름으로 고른 호출은 아
 - 그 profile 설정의 `plugins.enabled` 에 `fos-ctx` 가 있고 `plugins.disabled` 에 없다
 - `plugins.entries.fos-ctx.allow_tool_override` 가 `false` 다
 - 그 profile 의 `plugins/fos-ctx/` 파일이 대시보드 묶음의 것과 바이트까지 같다
-- `.fos-connector-tools.json` 이 지금 설치된 커넥터와 manifest 로 계산한 것과 같다
+- `.fos-connector-tools.json` 이 지금 소유 기록과 뗀 서버 기록, manifest 로 계산한 것과 같다
 
 설치는 그 profile 의 `fos-ctx` 를 묶음의 판으로 바꾼다. 파일이 바뀌었으면 `plugin_updated: true` 로 답한다. 떠 있는 gateway 가 옛 코드를 쥐고 있을 수 있기 때문이다.
 옛 설치에서는 선택 칸의 `PUT /api/env` 와 `DELETE /api/env` 도 설치를 다시 쓰고 `fos-ctx` 를 묶음의 판으로 맞춘다. 옛 설치된 커넥터의 env 응답은 늘 `restart_required` 가 참이라 이 경우도 재시작 대기가 된다.
 Control Plane 은 `plugin_updated` 가 참인 바인딩을 재시작 대기로 둔다. 관리자가 공유 gateway 를 재시작하고 반영 완료를 누르면 풀린다. 옛 설치의 `restart_required` 는 늘 참이라 옛 커넥터 에이전트의 바인딩에는 이 신호로 쓰지 못한다. 바인딩 설치는 바뀐 것이 있을 때만 `restart_required` 가 참이다.
 서버 정의의 `tools.exclude` 가 manifest 로 계산한 것과 다를 때도 `policy_hook` 은 거짓이다. 소유 기록과 지금 manifest 의 같음 판정은 `tools` 를 보지 않는다. 옛 기록을 가진 연결이 끊기지 않고, 다시 보낸 설치가 덮어쓴다.
+서버 이름이나 실행 정의가 지금 manifest 와 다른 바인딩 항목은 이 `tools.exclude` 비교에서 뺀다. 그 서버는 대응에 빈 `tools` 로 실려 모든 호출이 막히고, 그 항목만 `configured` 가 거짓이다.
 연결 확인과 관리자 반영 완료는 설치를 다시 보낸 뒤에 `policy_hook` 을 읽는다. 옛 판의 `fos-ctx` 를 가진 바인딩은 연결 확인 한 번으로 새 판이 되고 재시작 대기가 된다.
 Control Plane 은 `policy_hook` 이 참이 아니면 그 바인딩을 `READY` 로 두지 않는다. 옛 대시보드 plugin 은 이 칸을 내지 않고, 없는 칸은 거짓으로 읽는다.
 이 확인은 확인한 시점의 파일만 본다. 그 뒤 누가 설정을 바꾸면 다음 연결 확인 때 안다.

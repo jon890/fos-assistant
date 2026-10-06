@@ -133,7 +133,7 @@ plugin 디렉터리 root 에 둔다. 소유는 그 plugin 의 저장소다. 같�
 | 내 연결이 `READY` 가 아니거나 값이 보관 파일에 없다 | `CONNECTOR_NOT_CONNECTED`(409) |
 | 커넥터가 카탈로그에 없다 | `CONNECTOR_NOT_FOUND`(404) |
 | 커넥터의 스킬 이름이 그 에이전트의 스킬과 겹친다 | `SKILL_NAME_TAKEN`(409) |
-| 대시보드가 그 profile 의 설정이나 이미 붙은 다른 커넥터와 충돌한다고 거절했다 | `CONNECTOR_BIND_CONFLICT`(409) |
+| 대시보드가 그 profile 의 설정이나 이미 붙은 다른 커넥터와 충돌한다고 거절했다. 그 profile 에서 `fos-ctx` 가 꺼져 있는 것도 여기 든다 | `CONNECTOR_BIND_CONFLICT`(409) |
 | 그 profile 이 아직 커넥터를 받을 준비가 되지 않았다. 표식이 없다 | `CONNECTOR_PROFILE_NOT_READY`(409) |
 | 그 밖의 외부 실패 | `CONNECTOR_OPERATION_FAILED`(502) |
 
@@ -141,7 +141,7 @@ plugin 디렉터리 root 에 둔다. 소유는 그 plugin 의 저장소다. 같�
 - 붙인 바인딩은 늘 `PENDING` 이고 대개 재시작 대기다. 관리자가 공유 gateway 를 재시작하고 반영 완료를 누르면 `READY` 가 된다
 - 붙이기는 `skills` toolset 을 켜지 않는다. 그 에이전트의 도구는 주인이 정한다([ADR-029](adr/ADR-029-에이전트-도구는-control-plane-이-등급으로-판정하고-hermes-설정-api-로-쓴다.md)). `skills` 가 꺼진 에이전트는 커넥터의 지침을 읽지 못하고, 화면이 그것을 안내한다
 - 떼기는 그 에이전트의 실행이 판정한 `PENDING` 승인 줄을 `REJECTED`(`errorCode: connection_changed`)로 끝낸다. 상시 허락은 사용자와 커넥터에 묶여 같은 연결을 붙인 다른 에이전트에도 걸리므로 그대로 둔다. 그 에이전트의 승인 줄이 `EXECUTING` 이면 `CONNECTOR_ACTION_EXECUTING`(409)으로 거절한다
-- 떼기는 도구 목록에서 서버 이름을 빼므로 재시작을 기다리지 않고 다음 실행부터 막힌다
+- 떼기는 도구 목록에서 서버 이름을 빼므로 재시작을 기다리지 않고 다음 실행부터 막힌다. 떼기 전에 시작한 실행이 그 도구를 불러도 판정이 막는다
 - 옛 커넥터 에이전트에서는 떼지 않는다. `VALIDATION_FAILED` 로 거절하고, 그 에이전트를 지우면 바인딩이 함께 떨어진다
 
 **연결이 붙은 에이전트는 비공개로 남는다.** 남이 주인의 계정으로 외부 서비스를 쓰지 못하게 하기 위해서다.
@@ -159,7 +159,7 @@ plugin 디렉터리 root 에 둔다. 소유는 그 plugin 의 저장소다. 같�
 관리자는 공유 gateway 를 재시작한 뒤 관리자 목록에서 바인딩마다 반영 완료를 누른다.
 
 - 잠근 뒤 그 에이전트의 주인이 바뀌었으면 `AGENT_BUSY`(409)다
-- 그다음 지금 주인이 관리자와 같은 그룹이어야 한다. 아니면 `FORBIDDEN`(403)이다
+- 그다음 지금 주인이 관리자와 같은 그룹이어야 한다. 아니면 `AGENT_NOT_FOUND`(404)다. 다른 그룹의 에이전트가 있는지 드러내지 않는다
 - 바인딩의 재시작 대기 시각이 본문의 `restartRequiredSince` 보다 늦거나 본문이 비었으면 `CONNECTOR_RESTART_AGAIN`(409)으로 거절한다. 관리자가 목록을 본 뒤에 다시 설치된 바인딩이라 재시작한 gateway 가 아직 보지 못했을 수 있기 때문이다. 화면은 성공하든 거절되든 목록을 다시 읽어 바뀐 값을 받는다
 - 바인딩에 재시작 대기 시각이 없으면 본문을 보지 않는다
 - 받으면 설치를 한 번 다시 보내 반영됐는지 본다. 그래도 `READY` 가 되지 않으면 `CONNECTOR_OPERATION_FAILED`(502)다

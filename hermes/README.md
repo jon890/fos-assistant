@@ -136,6 +136,7 @@ profile 디렉터리에 이름 대응 파일 `.fos-connector-tools.json` 이 있
 **바인딩 profile 은 대응 파일에 그 profile 의 모든 커넥터 서버가 실려 있다는 데 기댄다.**
 대응에 없는 `mcp__` 도구를 통과시키므로, 실리지 않은 커넥터 서버가 있으면 그 서버의 도구가 판정 없이 나간다.
 대시보드 plugin 의 바인딩 설치와 떼기가 소유 기록의 모든 서버를 싣고, manifest 를 읽지 못했거나 소유 기록의 서버 이름이나 실행 정의가 지금 manifest 와 다른 서버는 소유 기록의 이름으로 빈 `tools` 와 함께 싣는다.
+뗀 서버도 빈 `tools` 로 남긴다. 떼기 전에 시작한 실행이 그 서버를 쥐고 있어도 그 호출을 묻는다.
 
 **바인딩 profile 의 커넥터 도구 결과는 `<external-data>` 로 감싼다.**
 fos-ctx 의 `transform_tool_result` hook 이 대응 파일의 서버와 맞는 도구의 결과가 글이면 Control Plane 의 `ExternalData` 와 같은 모양으로 바꾼다.
@@ -316,6 +317,7 @@ provider credential 은 이 토큰으로 쓰지 못한다.
 
 운영 목록에서 빠진 커넥터를 제거하면 plugin 이 그 기록의 서버 env 가 `${이름}` 으로 참조하던 key 를 profile `.env` 에서 함께 지운다. Control Plane 이 그 이름을 더는 알 수 없기 때문이다.
 값이 바뀌어 503 이 된 profile 은 값을 되돌리면 다시 읽힌다.
+바인딩 항목은 요청이 가리키는 커넥터의 것만 견준다. 상태 조회는 바뀐 바인딩 항목만 `configured: false` 로 답하고, 같은 profile 의 다른 커넥터는 probe 와 실행과 붙이기가 그대로 된다. 떼기는 바인딩 항목을 견주지 않는다.
 **운영은 환경 변수를 먼저 준 뒤 plugin 을 올린다.** 값을 바꿔야 하면 바꾸기 전에 설치한 커넥터를 제거한다.
 
 **설치는 두 가지다.** 소유 기록 항목의 `mode` 가 방식을 적는다. 칸이 없으면 옛 설치다.
@@ -323,14 +325,14 @@ provider credential 은 이 토큰으로 쓰지 못한다.
 
 | | 옛 설치(`isolated`) | 바인딩 설치(`bind`) |
 | --- | --- | --- |
-| 받는 profile | 관리 표식이 있는 profile | 관리 표식이나 커넥터 표식이 있고, `platform_toolsets.api_server` 목록에 Control Plane MCP 가 있는 profile |
+| 받는 profile | 관리 표식이 있는 profile | 관리 표식이나 커넥터 표식이 있고, `platform_toolsets.api_server` 목록에 Control Plane MCP 가 있고, `fos-ctx` 가 켜진 profile |
 | 칸 값 | Control Plane 이 `PUT /api/env` 로 그 profile `.env` 에 쓴다 | 설치가 보관 파일의 값을 그 profile `.env` 로 복사한다 |
 | API 도구 목록 | 설치한 커넥터의 서버 이름과 선언한 `toolsets` 로 통째로 다시 쓴다 | 서버 이름만 더하고 뺀다. 다른 이름은 그대로 둔다 |
 | Control Plane MCP 등록 | 지운다 | 그대로 둔다 |
 | 지침 | 스킬 본문을 `SOUL.md` 에 쓴다 | 스킬 디렉터리를 그 profile 의 `skills/` 로 복사한다. `SOUL.md` 는 읽지도 쓰지도 않는다 |
-| 대응 파일 | `isolated` 칸 없이 쓴다 | `isolated: false` 를 싣고 소유 기록의 모든 서버를 싣는다 |
+| 대응 파일 | `isolated` 칸 없이 쓴다 | `isolated: false` 를 싣고 소유 기록의 모든 서버와 뗀 서버 기록 `.fos-connector-detached.json` 의 서버를 싣는다 |
 | 설치의 `restart_required` | 지금과 같다 | 바뀐 것이 있으면 참이다. 떠 있는 profile 에 더한 MCP 서버는 gateway 를 다시 띄워야 보인다 |
-| 떼기의 `restart_required` | 지금과 같다 | 거짓이다. 도구 목록에서 이름을 빼므로 다음 실행부터 막힌다 |
+| 떼기의 `restart_required` | 지금과 같다 | 거짓이다. 도구 목록에서 이름을 빼므로 다음 실행부터 막힌다. 떼기 전에 시작한 실행의 호출은 대응에 남은 서버로 판정이 막는다 |
 
 **보관 파일은 연결의 칸 값을 연결마다 하나씩 둔다.**
 대시보드의 HERMES_HOME 아래 `connector-vault/<vault>.json` 이고, 디렉터리는 700, 파일은 600 이다.
@@ -339,7 +341,7 @@ provider credential 은 이 토큰으로 쓰지 못한다.
 값과 경로는 응답, 로그, 예외 메시지, 설정 백업에 싣지 않는다. 쓰기와 지우기는 profile 쓰기 잠금 안에서 하고, 바인딩 설치도 같은 잠금 안에서 보관 파일을 읽는다.
 
 **커넥터 표식 `.fos-connector-host` 는 사람이 만든 profile 이 바인딩 설치를 받는다는 표시다.**
-운영자가 그 profile 에 두고 plugin 은 쓰지 않는다. 표식만 있는 profile 은 바인딩 설치와 떼기, 상태 조회, probe, 바인딩 항목의 실행만 받는다. 옛 설치와 커넥터 칸 key 의 `PUT /api/env`, `DELETE /api/env` 는 401 이다. 바인딩의 env 는 설치와 떼기가 쓰고 지운다.
+운영자가 그 profile 에 두고 plugin 은 쓰지 않는다. 표식만 있는 profile 은 바인딩 설치와 떼기, 상태 조회, probe, 바인딩 항목의 실행만 받는다. 소유 기록에 없는 커넥터의 떼기도 바인딩 떼기로 받아 `changed: false` 로 답한다. 옛 설치와 커넥터 칸 key 의 `PUT /api/env`, `DELETE /api/env` 는 401 이다. 바인딩의 env 는 설치와 떼기가 쓰고 지운다.
 
 설치와 제거는 Hermes 등록 이름과 원래 도구 이름의 대응을 그 profile 의 `.fos-connector-tools.json` 에 다시 쓰고, 설치는 `approval: always` 인 도구를 서버 정의의 `tools.exclude` 에 넣고 profile 의 `fos-ctx` 를 묶음의 판으로 맞춘 뒤 파일이 바뀌었는지를 `plugin_updated` 로 답한다.
 `GET /api/connectors` 는 `policy_hook` 을 함께 낸다. `fos-ctx` 가 켜져 있고 묶음의 판과 같고 대응 파일과 `tools.exclude` 가 지금 manifest 와 맞을 때만 참이며, 조건은 [커넥터 도구 정책](../docs/backend/connector-tool-policy.md) 의 「hook 이 켜져 있는지」 가 갖는다.
