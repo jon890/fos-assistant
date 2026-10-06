@@ -234,6 +234,54 @@ public class Memory {
         return memory;
     }
 
+    /**
+     * 에이전트가 {@code memory_remember} 로 제안한 개인 항목이다(ADR-091). 민감 항목이면 중복 키를 비운다. 키가 본문의 해시라
+     * 평문 칸에 지문이 남기 때문이다.
+     */
+    public static Memory proposed(
+            Long ownerUserId,
+            String title,
+            StoredContent body,
+            MemoryPlacement placement,
+            Long proposedByExecutionId,
+            String proposalDedupKey,
+            Instant now) {
+        Memory memory = new Memory(
+                MemoryScope.USER,
+                ownerUserId,
+                null,
+                title,
+                body,
+                placement,
+                MemoryStatus.PROPOSED,
+                proposedByExecutionId,
+                now);
+        memory.proposalDedupKey = placement.sensitivity() == MemorySensitivity.SENSITIVE ? null : proposalDedupKey;
+        return memory;
+    }
+
+    /**
+     * 사용자가 대화에서 직접 말해 바로 저장한 개인 항목이다(ADR-091). 그 말을 승인으로 보아 곧 ACCEPTED 이고 승인한 사람은
+     * 주인이다. 민감 항목은 이 길로 오지 않는다.
+     */
+    public static Memory remembered(
+            Long ownerUserId,
+            String title,
+            StoredContent body,
+            MemoryPlacement placement,
+            Long proposedByExecutionId,
+            String proposalDedupKey,
+            Instant now) {
+        if (placement.sensitivity() == MemorySensitivity.SENSITIVE) {
+            throw new IllegalArgumentException("a sensitive memory cannot be remembered without review");
+        }
+        Memory memory =
+                accepted(MemoryScope.USER, ownerUserId, null, title, body, placement, ownerUserId, now);
+        memory.proposedByExecutionId = proposedByExecutionId;
+        memory.proposalDedupKey = proposalDedupKey;
+        return memory;
+    }
+
     /** 사람이 받아들인다. 이때부터 주입 대상이 된다. */
     public void accept(Long userId, Instant at) {
         status = MemoryStatus.ACCEPTED;

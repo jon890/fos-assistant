@@ -10,6 +10,7 @@ import com.bifos.assistant.mcp.application.McpToolService;
 import com.bifos.assistant.mcp.presentation.McpDtos.ArtifactWriteArguments;
 import com.bifos.assistant.mcp.presentation.McpDtos.FollowUpProposeArguments;
 import com.bifos.assistant.mcp.presentation.McpDtos.MemoryReadArguments;
+import com.bifos.assistant.mcp.presentation.McpDtos.MemoryRememberArguments;
 import com.bifos.assistant.proactive.application.ProactiveCheckGuard;
 import com.bifos.assistant.proactive.domain.ProactiveCheck;
 import com.bifos.assistant.shared.error.ApiException;
@@ -49,6 +50,9 @@ public class McpController {
     private static final String AGENT_STOP = "agent_stop";
     private static final String FOLLOW_UP_PROPOSE = "follow_up_propose";
     private static final Set<String> FOLLOW_UP_PROPOSE_FIELDS = Set.of("title", "due_at", "waiting");
+    private static final String MEMORY_REMEMBER = "memory_remember";
+    private static final Set<String> MEMORY_REMEMBER_FIELDS =
+            Set.of("title", "content", "evidence", "memory_id", "collection", "sensitive");
     private static final String WAIT_SECONDS = "wait_seconds";
     /** 먼저 살펴보기에서 읽기, 위임과 사람이 받아들여야 하는 할 일 제안을 받는다. */
     private static final Set<String> CHECK_TREE_TOOLS =
@@ -68,7 +72,8 @@ public class McpController {
             AGENT_STATUS, this::agentStatus,
             AGENT_DELEGATE, this::agentDelegate,
             AGENT_STOP, this::agentStop,
-            FOLLOW_UP_PROPOSE, this::proposeFollowUp);
+            FOLLOW_UP_PROPOSE, this::proposeFollowUp,
+            MEMORY_REMEMBER, this::remember);
 
     /** 요청자가 정해진 뒤 {@code _fos_ctx} 를 뗀 인자로 도구 하나를 처리한다. */
     @FunctionalInterface
@@ -275,6 +280,36 @@ public class McpController {
         FollowUpProposeArguments value = FollowUpProposeArguments.from(arguments);
         return response(
                 id, tools.proposeFollowUp(caller, value.title(), value.dueAt(), Boolean.TRUE.equals(value.waiting())));
+    }
+
+    /**
+     * 인자는 {@code title}, {@code content}, {@code evidence}, {@code memory_id}, {@code collection}, {@code sensitive} 만
+     * 받는다. 다른 키가 오면 인자 오류다(ADR-091).
+     *
+     * <p>사용자와 범위를 인자로 받지 않는다. 바로 저장할지를 정하는 인자도 없다. 그 판정은 실행의 출처로 한다. 선택 인자의
+     * {@code null} 은 없는 것으로 본다.
+     */
+    private Map<String, Object> remember(McpCaller caller, JsonNode id, JsonNode arguments) {
+        if (!MEMORY_REMEMBER_FIELDS.containsAll(arguments.propertyNames())
+                || !text(arguments, "title")
+                || !text(arguments, "content")
+                || !nullOr(arguments, "evidence", JsonNode::isString)
+                || !nullOr(arguments, "collection", JsonNode::isString)
+                || !nullOr(arguments, "sensitive", JsonNode::isBoolean)
+                || !nullOr(arguments, "memory_id", node -> node.isIntegralNumber() && node.canConvertToLong())) {
+            return invalidParams(id, INVALID_ARGUMENTS);
+        }
+        MemoryRememberArguments value = MemoryRememberArguments.from(arguments);
+        return response(
+                id,
+                tools.remember(
+                        caller,
+                        value.title(),
+                        value.content(),
+                        value.evidence(),
+                        value.memoryId(),
+                        value.collection(),
+                        Boolean.TRUE.equals(value.sensitive())));
     }
 
     /** 키가 없거나 {@code null} 이거나, 그 값이 {@code type} 을 만족한다. */

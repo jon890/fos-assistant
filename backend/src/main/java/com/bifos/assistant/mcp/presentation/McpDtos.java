@@ -49,6 +49,42 @@ public final class McpDtos {
         }
     }
 
+    /**
+     * {@code memory_remember} 의 인자다. 모양 검사를 마친 인자에서 만든다(ADR-091).
+     *
+     * @param evidence 사용자 메시지에서 옮긴 구절. 없거나 {@code null} 이면 null
+     * @param memoryId 고칠 항목 번호. 없거나 {@code null} 이면 null
+     * @param collection 둘 collection. 없거나 {@code null} 이면 null
+     * @param sensitive 민감한 내용인가. 없거나 {@code null} 이면 null
+     */
+    public record MemoryRememberArguments(
+            String title, String content, String evidence, Long memoryId, String collection, Boolean sensitive) {
+        /** JSON 의 snake_case 이름을 Java record 의 이름으로 바꾼다. {@code null} 값은 없는 것으로 본다. */
+        static MemoryRememberArguments from(JsonNode arguments) {
+            JsonNode memoryId = arguments.get("memory_id");
+            JsonNode sensitive = arguments.get("sensitive");
+            return new MemoryRememberArguments(
+                    arguments.get("title").asString(),
+                    arguments.get("content").asString(),
+                    optionalText(arguments, "evidence"),
+                    memoryId == null || memoryId.isNull() ? null : memoryId.longValue(),
+                    optionalText(arguments, "collection"),
+                    sensitive == null || sensitive.isNull() ? null : sensitive.booleanValue());
+        }
+
+        private static String optionalText(JsonNode arguments, String name) {
+            JsonNode value = arguments.get(name);
+            return value == null || value.isNull() ? null : value.asString();
+        }
+
+        /** 제목, 본문, 근거를 빼고 낸다. 로그에 남기지 않는다. */
+        @Override
+        public String toString() {
+            return "MemoryRememberArguments[memoryId=" + memoryId + ", collection=" + collection + ", sensitive="
+                    + sensitive + "]";
+        }
+    }
+
     /** 하위 에이전트 session 등록의 응답이다. {@code created} 나 {@code exists} 다. */
     public record SubagentRegistrationResponse(String result) {}
 }

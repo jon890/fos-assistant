@@ -76,4 +76,19 @@ public interface ExecutionEventRepository extends JpaRepository<ExecutionEvent, 
      * {@code in} 절은 데이터베이스마다 다르게 동작한다.
      */
     List<ExecutionEvent> findByExecutionIdInOrderByExecutionIdAscSequenceAsc(Collection<Long> executionIds);
+
+    /**
+     * 그 실행이 지금까지 바깥 글을 읽었을 수 있는 도구나 하위 에이전트를 시작했는가(ADR-091).
+     *
+     * <p>{@code internalTools} 에 든 도구의 시작 사건만 빼고 센다. 이름이 없는 도구 시작 사건도 바깥 도구로 본다.
+     */
+    @Query("""
+            select case when count(event) > 0 then true else false end from ExecutionEvent event
+            where event.executionId = :executionId
+                and (event.eventType = 'SUBAGENT_STARTED'
+                    or (event.eventType = 'TOOL_STARTED'
+                        and (event.toolName is null or event.toolName not in :internalTools)))
+            """)
+    boolean existsOutsideToolStart(
+            @Param("executionId") Long executionId, @Param("internalTools") Collection<String> internalTools);
 }

@@ -13,6 +13,7 @@ import com.bifos.assistant.chat.application.model.ResultDeliveryStart;
 import com.bifos.assistant.chat.domain.ChatArtifact;
 import com.bifos.assistant.chat.domain.ChatAttachment;
 import com.bifos.assistant.chat.domain.ChatMessage;
+import com.bifos.assistant.chat.domain.ExecutionQuestion;
 import com.bifos.assistant.chat.domain.ChatPendingMessage;
 import com.bifos.assistant.chat.domain.Conversation;
 import com.bifos.assistant.chat.domain.RunSession;
@@ -21,6 +22,7 @@ import com.bifos.assistant.chat.domain.type.MessageRole;
 import com.bifos.assistant.chat.domain.type.ModelSelectionMode;
 import com.bifos.assistant.chat.infra.ArtifactStore;
 import com.bifos.assistant.chat.infra.ChatMessageRepository;
+import com.bifos.assistant.chat.infra.ExecutionQuestionRepository;
 import com.bifos.assistant.chat.infra.ChatPendingMessageRepository;
 import com.bifos.assistant.chat.infra.ConversationRepository;
 import com.bifos.assistant.context.AssembledContext;
@@ -117,6 +119,7 @@ public class ChatService {
     private final ConversationSessions sessions;
     private final ConversationAccess access;
     private final ChatMessageRepository messages;
+    private final ExecutionQuestionRepository executionQuestions;
     private final AgentService agents;
     private final AgentConnectorBindings connectorBindings;
     private final HermesRunsClient hermes;
@@ -858,7 +861,7 @@ public class ChatService {
         TurnHandle handle = existingHandle == null ? openTurn(user, routed) : existingHandle;
         boolean closesHandle = existingHandle == null;
         try {
-            saveQuestion(user, conversation, text, attachmentIds, intent, onEvent);
+            Long questionId = saveQuestion(user, conversation, text, attachmentIds, intent, onEvent);
             // 폴더를 만들기 전에 잡는다. 이 시각 뒤에 바뀐 HTML 이 이 turn 의 결과물이다.
             Instant startedAt = clock.instant();
             artifactStore.ensureFolder(conversation.id());
@@ -870,7 +873,10 @@ public class ChatService {
             AssembledContext context = routed.agent().connectorManaged()
                     ? AssembledContext.empty()
                     : contextAssembler.assemble(user, routed.agent().id());
-            context = contextAssembler.withResponseInstructions(context);
+            // 먼저 살펴보기는 memory_remember 를 받지 않으므로 기억 지침도 싣지 않는다(ADR-080, ADR-091)
+            context = contextAssembler.withResponseInstructions(
+                    context,
+                    !routed.agent().connectorManaged() && !(intent instanceof TurnIntent.ProactiveCheck));
             ExecutionContextSnapshot snapshot = new ExecutionContextSnapshot(
                     context.chars(),
                     null,
@@ -913,6 +919,7 @@ public class ChatService {
             if (command != null) {
                 skillUses.recordCommand(pending.execution().id(), command.name());
             }
+            recordQuestion(pending.execution().id(), questionId);
             turns.rekey(handle, pending.execution().id());
             if (intent instanceof TurnIntent.ProactiveCheck proactive) {
                 startCheck(proactive.check(), pending);
@@ -1519,7 +1526,12 @@ public class ChatService {
                 conversation, agent, flow, attached, commandOf(agent, flow, question), requestReceivedAt, false);
     }
 
-    private void saveQuestion(
+    /**
+     * 이 turn 의 질문을 남기고, 사람이 보낸 질문이면 그 메시지 번호를 돌려준다.
+     *
+     * @return 새 질문이면 방금 저장한 메시지, 다시 생성이면 이미 있는 질문의 번호. 사람 없이 열린 turn 이면 null 이다
+     */
+    private Long saveQuestion(
             CurrentUser user,
             Conversation conversation,
             String text,
@@ -1528,13 +1540,13 @@ public class ChatService {
             Consumer<ChatEvent> onEvent) {
         if (intent instanceof TurnIntent.ProactiveCheck proactive) {
             if (!proactive.check().notifyStart()) {
-                return;
+                return null;
             }
             // 질문 대신 시작 알림 줄 하나를 남긴다. 제목, 자동 turn 수, 대기 행은 건드리지 않는다.
             ChatMessage notice = transactions.execute(status -> messages.save(
                     ChatMessage.fromSystem(conversation.id(), proactive.check().startNotice(), clock.instant())));
             onEvent.accept(ChatEvent.system(conversation.publicId(), notice.id(), notice.content()));
-            return;
+            return null;
         }
         // 다시 생성은 질문을 이미 저장했다. 자동 turn 의 알림 줄은 이 turn 을 열기 전에 저장했다.
         if (intent instanceof TurnIntent.Scheduled scheduled) {
@@ -1552,10 +1564,13 @@ public class ChatService {
             ChatMessage question = saved.get(1);
             onEvent.accept(ChatEvent.system(conversation.publicId(), line.id(), line.content()));
             onEvent.accept(ChatEvent.user(conversation.publicId(), question.id(), text));
-            return;
+            return null;
+        }
+        if (intent instanceof TurnIntent.Regenerate regenerate) {
+            return regenerate.question() == null ? null : regenerate.question().id();
         }
         if (!(intent instanceof TurnIntent.Fresh fresh)) {
-            return;
+            return null;
         }
         List<Long> pendingIds = fresh.pendingIds();
         ChatMessage question = transactions.execute(status -> {
@@ -1575,6 +1590,22 @@ public class ChatService {
         if (!pendingIds.isEmpty()) {
             onEvent.accept(ChatEvent.user(conversation.publicId(), question.id(), text));
             onEvent.accept(ChatEvent.pending(conversation.publicId()));
+        }
+        return question.id();
+    }
+
+    /**
+     * 사람이 보낸 turn 의 실행에 질문을 잇는다(ADR-091). 잇지 못해도 turn 은 잇는다. 그 실행의 {@code memory_remember} 는 제안으로만
+     * 남는다.
+     */
+    private void recordQuestion(Long executionId, Long questionId) {
+        if (questionId == null) {
+            return;
+        }
+        try {
+            executionQuestions.save(ExecutionQuestion.of(executionId, questionId, clock.instant()));
+        } catch (RuntimeException ex) {
+            log.warn("could not link the turn question executionId={}", executionId, ex);
         }
     }
 

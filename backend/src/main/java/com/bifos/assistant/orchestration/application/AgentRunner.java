@@ -140,7 +140,7 @@ public class AgentRunner {
         Instant requestReceivedAt = clock.instant();
         AssembledContext context =
                 agent.connectorManaged() ? AssembledContext.empty() : contextAssembler.assemble(user, agent.id());
-        context = contextAssembler.withResponseInstructions(context);
+        context = contextAssembler.withResponseInstructions(context, !agent.connectorManaged());
         ExecutionContextSnapshot snapshot = new ExecutionContextSnapshot(
                 context.chars(),
                 null,
