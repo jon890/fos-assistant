@@ -15,6 +15,8 @@ import java.util.Map;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 /** agent 가 묻는 동작이 SkillStore 로 넘어가는지 본다. */
 class ProfileSkillFilesAdapterTest {
@@ -77,5 +79,71 @@ class ProfileSkillFilesAdapterTest {
                         "legacy-env", new SkillBundle("legacy-env", requestsEnv, List.of())));
 
         assertThat(adapter.uploadedRequestingSecrets(PROFILE)).containsExactly("legacy-env");
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"required_environment_variables", "required_credential_files"})
+    @DisplayName("같은 이름의 안전한 게시 완료 버전이 비밀 요청 pending 버전을 가리지 않는다")
+    void detectsSecretPendingAfterSafeCurrent(String field, @TempDir Path root) {
+        SkillStore store = storeAt(root);
+        writeWeeklyPlan(store, SKILL_MD, true);
+        writeWeeklyPlan(store, requestingSecret(field), false);
+
+        assertThat(new ProfileSkillFilesAdapter(store).uploadedRequestingSecrets(PROFILE))
+                .containsExactly("weekly-plan");
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"required_environment_variables", "required_credential_files"})
+    @DisplayName("같은 이름의 안전한 pending 버전이 비밀 요청 게시 완료 버전을 가리지 않는다")
+    void detectsSecretCurrentBeforeSafePending(String field, @TempDir Path root) {
+        SkillStore store = storeAt(root);
+        writeWeeklyPlan(store, requestingSecret(field), true);
+        writeWeeklyPlan(store, SKILL_MD, false);
+
+        assertThat(new ProfileSkillFilesAdapter(store).uploadedRequestingSecrets(PROFILE))
+                .containsExactly("weekly-plan");
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"required_environment_variables", "required_credential_files"})
+    @DisplayName("최신 pending 버전이 안전해도 같은 이름의 이전 pending 비밀 요청을 검사한다")
+    void detectsSecretInOlderPendingVersion(String field, @TempDir Path root) {
+        SkillStore store = storeAt(root);
+        writeWeeklyPlan(store, SKILL_MD, true);
+        writeWeeklyPlan(store, requestingSecret(field), false);
+        writeWeeklyPlan(store, SKILL_MD, false);
+
+        assertThat(store.readPending(PROFILE).get("weekly-plan").skillMd()).isEqualTo(SKILL_MD);
+        assertThat(new ProfileSkillFilesAdapter(store).uploadedRequestingSecrets(PROFILE))
+                .containsExactly("weekly-plan");
+    }
+
+    @Test
+    @DisplayName("여러 버전의 비밀 요청 이름은 한 번만 돌리고 새 게시가 성공하면 이전 요청을 제외한다")
+    void deduplicatesSecretsAndExcludesSupersededVersions(@TempDir Path root) {
+        SkillStore store = storeAt(root);
+        writeWeeklyPlan(store, requestingSecret("required_environment_variables"), true);
+        writeWeeklyPlan(store, requestingSecret("required_credential_files"), false);
+        writeWeeklyPlan(store, requestingSecret("required_environment_variables"), false);
+        ProfileSkillFilesAdapter adapter = new ProfileSkillFilesAdapter(store);
+
+        assertThat(adapter.uploadedRequestingSecrets(PROFILE)).containsExactly("weekly-plan");
+
+        writeWeeklyPlan(store, SKILL_MD, true);
+
+        assertThat(adapter.uploadedRequestingSecrets(PROFILE)).isEmpty();
+    }
+
+    private static void writeWeeklyPlan(SkillStore store, String skillMd, boolean published) {
+        String version = store.writeVersion(
+                PROFILE, Map.of("weekly-plan", new SkillBundle("weekly-plan", skillMd, List.of())));
+        if (published) {
+            store.markPublished(PROFILE, version);
+        }
+    }
+
+    private static String requestingSecret(String field) {
+        return "---\nname: weekly-plan\ndescription: 이번 주 계획\n" + field + ": []\n---\n# 주간 계획\n";
     }
 }

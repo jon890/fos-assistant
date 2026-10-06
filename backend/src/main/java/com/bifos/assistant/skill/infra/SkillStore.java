@@ -127,9 +127,18 @@ public class SkillStore {
      * 게시로 넘어간 것이라 보지 않는다.
      */
     public Map<String, SkillBundle> readPending(String profile) {
+        Map<String, SkillBundle> bundles = new TreeMap<>();
+        for (SkillBundle bundle : readAllPending(profile)) {
+            bundles.put(bundle.name(), bundle);
+        }
+        return new LinkedHashMap<>(bundles);
+    }
+
+    /** 표식 없는 더 새 버전의 스킬을 모두 읽는다. 비밀 요청 검사가 같은 이름의 어느 버전도 빠뜨리지 않게 한다. */
+    public List<SkillBundle> readAllPending(String profile) {
         Path profileDir = profileDir(profile);
         if (!Files.isDirectory(profileDir, LinkOption.NOFOLLOW_LINKS)) {
-            return new LinkedHashMap<>();
+            return List.of();
         }
         String current = currentVersion(profile).orElse("");
         List<String> pending = versionNames(profileDir).stream()
@@ -137,11 +146,11 @@ public class SkillStore {
                 .filter(version -> !isPublished(profileDir.resolve(version)))
                 .sorted()
                 .toList();
-        Map<String, SkillBundle> bundles = new TreeMap<>();
+        List<SkillBundle> bundles = new ArrayList<>();
         for (String version : pending) {
-            bundles.putAll(readVersion(profile, version));
+            bundles.addAll(readVersion(profile, version).values());
         }
-        return new LinkedHashMap<>(bundles);
+        return List.copyOf(bundles);
     }
 
     /**
