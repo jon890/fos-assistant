@@ -308,6 +308,52 @@ describe("Gmail 라벨과 필터", () => {
     },
   );
 
+  test.each([200, 204])(
+    "필터 목록의 본문 없는 %s 성공은 빈 목록이다",
+    async (status) => {
+      const { fake, server } = setup();
+      fake.routes.set(
+        "GET /gmail/settings/filters",
+        new Response(null, { status }),
+      );
+      try {
+        await withMcp(server, async (client) => {
+          const result = await tool(client, "list_filters");
+          expect(result.result.isError).not.toBe(true);
+          expect(result.body).toEqual({ filters: [] });
+        });
+      } finally {
+        fake.stop();
+      }
+    },
+  );
+
+  test.each([401, 403, 400, 404, 429, 500])(
+    "필터 목록의 본문 없는 %s 실패는 오류다",
+    async (status) => {
+      const { fake, server } = setup();
+      fake.routes.set(
+        "GET /gmail/settings/filters",
+        new Response(null, { status }),
+      );
+      let expected = "GMAIL_UNAVAILABLE";
+      if (status === 401) {
+        expected = "GMAIL_UNAUTHORIZED";
+      } else if (status === 403) {
+        expected = "GMAIL_FILTER_SCOPE_REQUIRED";
+      } else if (status === 400 || status === 404) {
+        expected = "GMAIL_INVALID_INPUT";
+      }
+      try {
+        await withMcp(server, (client) =>
+          expectFailure(client, expected, "list_filters"),
+        );
+      } finally {
+        fake.stop();
+      }
+    },
+  );
+
   test("필터 목록과 삭제는 Gmail settings endpoint만 사용하고 빈 성공 응답도 성공이다", async () => {
     const { fake, server } = setup();
     fake.on("GET", "/gmail/settings/filters", { filter: [{ id: "filter-1" }] });
@@ -320,10 +366,11 @@ describe("Gmail 라벨과 필터", () => {
         expect((await tool(client, "list_filters")).body).toEqual({
           filters: [{ id: "filter-1" }],
         });
-        expect(
-          (await tool(client, "delete_filter", { filter_id: "filter-1" }))
-            .result.isError,
-        ).not.toBe(true);
+        const deleted = await tool(client, "delete_filter", {
+          filter_id: "filter-1",
+        });
+        expect(deleted.result.isError).not.toBe(true);
+        expect(deleted.body).toEqual({ deleted: true, filter_id: "filter-1" });
       });
     } finally {
       fake.stop();
@@ -383,6 +430,12 @@ describe("Gmail 라벨과 필터", () => {
           expected_count: "3",
         });
         expect(result.result.isError).not.toBe(true);
+        expect(result.body).toEqual({
+          count: 3,
+          query: "from:news@example.com",
+          add_label_ids: ["Label_7"],
+          remove_label_ids: ["INBOX"],
+        });
       });
       expect(
         JSON.parse(fake.seen("POST", "/gmail/messages/batchModify")[0]!.body),
