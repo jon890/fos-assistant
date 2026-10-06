@@ -47,8 +47,80 @@ plugin 파일, 주소를 채운 `default-config.yaml.template`, 틀의 `plugins.
 | 커넥터 실행 파일 기본값 | 대시보드 프로세스의 환경 변수 `FOS_ASSISTANT_CONNECTOR_COMMAND` | 절대 경로다. 목록 항목에 `command` 가 없을 때 쓴다 |
 | 대시보드 서비스 토큰 | 환경 변수 `HERMES_DASHBOARD_PROFILE_API_SECRET` | |
 | 스킬 루트 | 대시보드 프로세스의 환경 변수 `FOS_ASSISTANT_SKILL_AGENT_ROOT` | |
+| 셸 실행 공간 | 대시보드 프로세스의 환경 변수 `FOS_ASSISTANT_SANDBOX` | 값의 모양은 아래 「셸 실행 공간」 에 있다. 없거나 읽지 못하면 `terminal`, `file`, `code_execution` 을 켜는 도구 저장을 409 로 거절한다 |
 | 커넥터 정책을 물을 주소 | gateway 프로세스의 환경 변수 `FOS_CTX_POLICY_URL` | Control Plane 의 `/internal/hermes/connector-policy` 다. 없으면 `fos-ctx` 가 커넥터를 설치한 profile 의 커넥터 도구를 모두 막는다 |
 | 자식 session 을 등록할 주소 | gateway 프로세스의 환경 변수 `FOS_CTX_SUBAGENT_URL` | 없으면 등록하지 않는다. 등록이 없는 자식의 호출은 Control Plane 이 거절한다 |
+
+### 셸 실행 공간
+
+`FOS_ASSISTANT_SANDBOX` 는 JSON object 다. 결정은 [ADR-086](../docs/adr/ADR-086-셸과-파일-도구는-사용자별-docker-실행-공간에서만-돈다.md), Hermes 의 동작은 [실행 공간](../docs/hermes/sandbox.md) 이 갖는다.
+
+| 키 | 필수 | 모양 |
+| --- | --- | --- |
+| `image` | 예 | 실행 공간 이미지. `execute_code` 를 쓰려면 python3 가 있어야 한다 |
+| `workspace_root` | 예 | 사용자 디렉터리를 둘 절대 경로. **Docker 호스트와 Hermes 컨테이너에서 같은 경로**여야 한다. 사용자 디렉터리 `<workspace_root>/<sandbox_owner>` 가 `/workspace` 에 붙는다 |
+| `network` | 아니오 | 실행 공간을 붙일 Docker 망 이름. 없으면 Docker 기본 망이다 |
+| `cpu` | 아니오 | 0 보다 크고 8 이하. 기본 1 |
+| `memory_mb` | 아니오 | 256 이상 16384 이하의 정수. 기본 1024 |
+| `read_only_mounts` | 아니오 | 모든 실행 공간에 붙일 `<원본 절대 경로>:<컨테이너 절대 경로>` 목록. 읽기 전용으로만 붙는다 |
+| `profiles` | 예 | 격리할 named profile 이름을 키로 둔 객체. 아래 표의 설정을 값으로 받는다. 빈 객체면 모두 local 로 둔다. `default` 는 등록할 수 없다 |
+
+`profiles[profile]` 은 다음 세 칸만 받는다.
+
+| 키 | 필수 | 모양 |
+| --- | --- | --- |
+| `read_only_mounts` | 아니오 | 이 profile 에만 붙일 읽기 전용 마운트 목록. 공통 마운트와 같은 형식이다 |
+| `env` | 아니오 | 아래 허용 목록의 비밀이 아닌 경로와 URL 만 받는 객체. 기본은 빈 객체다 |
+| `network` | 아니오 | 이 profile 에만 적용할 Docker 망 이름. 생략하면 공통 `network` 를 쓴다. `null` 이면 Docker 기본 망이다 |
+
+`env` 에서 `CAREER_BACKEND_URL` 은 HTTP(S) URL 이며 사용자 이름, 비밀번호, query 와 fragment 를 받지 않는다.
+`CAREER_BACKEND_TOKEN_FILE`, `CLAUDE_PLUGIN_ROOT`, `CAREER_EVIDENCE_DIR`, `CAREER_WORKSPACE_ROOT`, `CAREER_DART_API_KEY_FILE` 은 절대 경로만 받는다.
+token 과 API key 값 자체는 받지 않는다. 파일을 읽게 할 경우 같은 profile 의 읽기 전용 마운트를 운영 정책에 지정한다.
+일반 API 요청은 env, 망, 마운트와 profile 정책을 쓰지 못한다.
+
+경로에 `.`, `..`, 빈 조각, 제어 문자, `:` 둘 이상, `/workspace` 나 `/root` 아래의 마운트 대상이 있으면 정책 전체를 읽지 못한 것으로 본다.
+공통 또는 profile 별 마운트 원본이 `workspace_root` 와 같거나 그 아래이거나 그 상위이면(경로 조각 기준) 정책 전체를 읽지 못한 것으로 본다. 다른 사용자의 디렉터리가 보이기 때문이다.
+표에 없는 최상위 키나 profile 설정 키, 허용 목록에 없는 env 가 있어도 정책 전체를 거절한다.
+기존 `profile_mounts` 는 `profiles[profile].read_only_mounts` 로 옮겨야 한다.
+
+정책이 유효하고 profile 이 등록돼 있으면 plugin 은 아래 `terminal:` 전체를 쓴다.
+등록되지 않은 profile 은 셸 저장을 허용하고 `backend: local` 을 명시한다. 기존 local 옵션은 유지한다.
+이미 docker 였다가 정책에서 빠지면 다음 셸 저장에서 docker 설정을 지우고 local 로 돌아간다.
+정책 자체가 없거나 잘못됐으면 등록 여부와 관계없이 셸 저장을 거절한다.
+
+```yaml
+terminal:
+  backend: docker
+  cwd: /workspace
+  docker_image: <image>
+  container_persistent: true
+  docker_persist_across_processes: true
+  docker_orphan_reaper: true
+  docker_mount_cwd_to_workspace: false
+  docker_run_as_host_user: false
+  docker_network: true
+  # network 가 없으면 망 인자만 뺀다. label 은 정책에 등록된 profile 이름으로 만든다.
+  docker_extra_args: ["--network=<profile 의 network>", "--label=fos-sandbox-profile=<profile>"]
+  docker_volumes:
+    - <workspace_root>/<sandbox_owner>:/workspace
+    - <read_only_mounts 의 각 항목>:ro
+    - <profiles[profile].read_only_mounts 의 각 항목>:ro
+  docker_forward_env: []
+  docker_env: <profiles[profile].env>
+  env_passthrough: []
+  credential_files: []
+  container_cpu: <cpu>
+  container_memory: <memory_mb>
+  docker_shared_container_key: <profile>-<sandbox_owner>-<지문>
+```
+
+`docker_shared_container_key` 의 지문은 이 칸을 뺀 나머지 `terminal:` 을 키 정렬 JSON 으로 만든 sha256 앞 12자다. 주인이나 실행 공간 설정이 바뀌면 키가 바뀌어 Hermes 가 새 컨테이너를 만든다. 한 키는 profile 하나만 쓴다.
+`fos-sandbox-profile` label 은 proxy 검사와 유휴 정리, 복구에서 정책의 profile 을 식별한다. API 요청으로 label 을 지정하지 못한다.
+
+**기존 Hermes 예약 작업은 기본 profile(local)에 남으며 아직 격리되지 않았다.**
+named profile 의 도구 저장은 기본 profile 설정과 예약 작업을 바꾸지 않는다.
+Control Plane 의 예약 작업과 매일 깨우기는 별도 기능이며 각각의 에이전트 profile 을 쓴다.
+적용과 확인, profile 별 실제 값은 `fos-home-infra` 가 갖는다.
 
 ## 검사
 
@@ -162,7 +234,7 @@ Hermes 가 보이는 도구 이름은 `mcp__fos_assistant__<도구>` 다. 서버
 서명에는 앞부분을 뗀 서버 쪽 이름을 넣는다. 서버 이름을 바꾸면 plugin 의 `TOOL_PREFIX` 도 함께 바꾼다.
 
 **서명은 그 profile 의 모델이 셸로 파일을 읽지 못하는 동안만 위조를 막는다.**
-key 는 그 profile `.env` 의 MCP 토큰에서 나오고, terminal 도구는 Hermes 프로세스의 사용자가 읽을 수 있는 파일을 모두 읽는다.
+key 는 그 profile `.env` 의 MCP 토큰에서 나온다. terminal backend 가 `local` 이면 terminal 도구는 Hermes 프로세스의 사용자가 읽을 수 있는 파일을 모두 읽는다. docker 실행 공간이 적용된 profile 은 [실행 공간](../docs/hermes/sandbox.md) 이 갖는다. 스킬 앞머리의 비밀 요청 칸이 그 토큰을 실행 공간에 넣을 수 있어 올린 스킬은 그 칸을 거절한다.
 셸을 여는 profile 의 목록은 운영 저장소의 live 검사가 소유한다.
 그 목록에 Control Plane MCP 를 등록한 profile 을 더할 때는 이 제약을 함께 판단한다.
 
@@ -188,7 +260,7 @@ Control Plane 이 이 경로들을 부르는 순서와 뜻은 부르는 쪽 문�
 | `POST /api/connector-vault/import` | 그 커넥터를 옛 설치한 관리 profile 의 `.env` 에서 칸 값을 보관 파일로 옮긴다 | `{vault, connector, profile}` | `{ok: true}` | 400 필수 칸이 비었다. 401 관리 표식이 없다. 404 없는 profile, 설치하지 않은 커넥터. 409 다른 커넥터의 보관 파일 |
 | `POST /api/mcp/servers/<서버>/test?profile=<p>` | 그 profile 에 설치한 커넥터의 MCP 서버만 probe 한다 | 없음 | `{ok, tools: [{name}]}` | |
 | `GET /api/tools/toolsets` | 도구 이름과 설명을 읽는다 | 없음 | 200 | |
-| `PUT /api/config` (도구) | 지정한 profile 의 API 도구 목록을 쓴다 | `{profile, config: {platform_toolsets: {api_server: [...]}}}` | 200 | [ADR-029](../docs/adr/ADR-029-에이전트-도구는-control-plane-이-등급으로-판정하고-hermes-설정-api-로-쓴다.md) 그대로. 409 소유 기록의 바인딩 서버 이름이 목록에 빠졌다 |
+| `PUT /api/config` (도구) | 지정한 profile 의 API 도구 목록을 쓴다. `terminal`, `file`, `code_execution` 가운데 하나라도 있으면 profile 의 `terminal:` 을 실행 공간 설정으로 다시 쓴다 | `{profile, config: {platform_toolsets: {api_server: [...]}}, sandbox_owner?}`. `sandbox_owner` 는 `^[a-z][a-z0-9-]{0,63}$` 이고 셸·파일 도구가 있으면 필수다 | 200 | [ADR-029](../docs/adr/ADR-029-에이전트-도구는-control-plane-이-등급으로-판정하고-hermes-설정-api-로-쓴다.md) 그대로. 409 소유 기록의 바인딩 서버 이름이 목록에 빠졌다 |
 | `PUT /api/config` (스킬 게시) | 지정한 profile 의 올린 스킬 경로를 쓴다 | `{profile, config: {skills: {external_dirs: [<Hermes 쪽 스킬 루트>/<profile>/<버전>]}}}`. 버전 이름은 `v[0-9]{13}-[a-z0-9]{4}` 다(`v` 뒤에 UTC 밀리초 13자리와 소문자 영숫자 4자). 목록은 0개나 1개. 0개는 게시 해제. 도구 목록을 같은 본문에 둘 수 있다 | 200 | 400 경로 형식, 다른 profile 의 prefix, 둘 이상, 심볼릭 링크, 없는 디렉터리, `skills` 도구가 꺼진 채 게시. 409 운영자가 넣은 다른 외부 경로가 있다. 404 없는 profile |
 | `GET /api/skills?profile=<p>` | 지정한 profile 의 스킬 목록을 읽는다 | query `profile` 하나 | 200 `[{name, description, category, enabled, usage, provenance}]`. `enabled` 는 전역 `skills.disabled` 만 반영 | 400 query 누락, 둘 이상, `default`. 404 |
 | `PUT /api/skills/toggle` | 지정한 profile 의 스킬 하나를 켜고 끈다 | `{profile, name, enabled}` | 200 `{ok, name, enabled}` | 400, 404 |
@@ -352,7 +424,9 @@ provider credential 은 이 토큰으로 쓰지 못한다.
 - 운영자 env 이름의 `PUT /api/env` 와 `DELETE /api/env` 는 성공으로 답하고 아무것도 쓰지 않는다
 
 **토큰으로 부른 `PUT /api/config` 는 본문을 검사한 뒤 Hermes 처리기에 넘긴다.**
-최상위에는 `profile` 과 `config` 만 둔다.
+최상위에는 `profile` 과 `config` 를 두고, `sandbox_owner` 를 더할 수 있다. 형식은 `^[a-z][a-z0-9-]{0,63}$` 이다.
+셸 계열 도구를 켜고 해당 profile 이 실행 공간 정책에 등록돼 있으면 `sandbox_owner` 가 필수다. 미등록 profile 의 local 저장에서는 생략할 수 있다.
+`terminal:` 은 plugin 이 직접 쓰므로 본문의 `config` 에 두지 않는다.
 `config` 에는 `platform_toolsets.api_server` 와 `skills.external_dirs` 가운데 하나나 둘을 둔다.
 
 도구 목록은 이렇게 본다.
@@ -363,6 +437,7 @@ provider credential 은 이 토큰으로 쓰지 못한다.
 - Control Plane MCP 가 아직 등록되지 않은 profile 은 그 이름과 알려진 내장 toolset 을 함께 넣는다
 - Hermes 가 계산한 실제 API 도구에 요청 목록 밖의 이름이 있으면 저장하지 않는다
 - 다른 platform 의 계산 결과가 바뀌어도 저장하지 않는다
+- 목록에 `terminal`, `file`, `code_execution` 가운데 하나라도 있으면 `FOS_ASSISTANT_SANDBOX` 를 검사한다. 값이 없거나 틀리면 409 와 본문 `code: sandbox_unavailable` 이다. 정책에 등록된 profile 만 `terminal:` 전체를 docker 설정으로 다시 쓰고, 미등록 profile 은 local 로 둔다
 
 올린 스킬 경로는 이렇게 본다. 루트는 대시보드 프로세스의 환경 변수 `FOS_ASSISTANT_SKILL_AGENT_ROOT` 다.
 

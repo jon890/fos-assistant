@@ -574,7 +574,6 @@ class Gmail {
     init: RequestInit,
     tokenEndpoint = false,
     unavailable = "GMAIL_UNAVAILABLE",
-    allowEmptySuccess = false,
   ): Promise<any> {
     let response: Response;
     clearProxyEnvironment();
@@ -614,10 +613,7 @@ class Gmail {
         response.status >= 500 ? unavailable : "GMAIL_UNAVAILABLE",
       );
     }
-    if (raw.length === 0) {
-      if (allowEmptySuccess) return {};
-      throw new GmailError(unavailable);
-    }
+    if (raw.length === 0) return {};
     if (!data || typeof data !== "object" || Array.isArray(data))
       throw new GmailError(unavailable);
     return data;
@@ -674,7 +670,6 @@ class Gmail {
       method === "POST" && path === "/messages/send"
         ? "GMAIL_SEND_UNKNOWN"
         : "GMAIL_UNAVAILABLE",
-      method === "DELETE" || path === "/messages/batchModify",
     );
   }
   async labelList(accessToken?: string) {

@@ -264,6 +264,17 @@ public class Agent {
         return (!connectorManaged || connectorAttachments) && (flow == null || flow.isBlank());
     }
 
+    /**
+     * Hermes 가 셸과 파일 도구를 돌릴 격리 실행 공간의 주인 키다(ADR-086).
+     *
+     * <p>주인이 있으면 {@code u<사용자 번호>} 로 그 사용자의 에이전트들이 한 공간을 나눠 쓴다. 주인이 없는 에이전트는
+     * {@code a<에이전트 번호>} 로 그 에이전트만의 공간을 쓴다. 도구 저장과 스킬 게시가 같은 값을 보내야 하므로
+     * 규칙을 여기 한 곳에 둔다.
+     */
+    public String sandboxOwner() {
+        return ownerUserId != null ? "u" + ownerUserId : "a" + id;
+    }
+
     public boolean isReadableBy(Long userId) {
         return visibility == AgentVisibility.GROUP || Objects.equals(ownerUserId, userId);
     }

@@ -209,8 +209,8 @@ class ConnectorBindingServiceTest {
         ConnectorBinding stored = onlyBinding();
         assertThat(stored.mcpServer()).isEqualTo("demo");
         assertThat(stored.restartRequiredSince()).isNotNull();
-        verify(toolsets, never()).writeApiServer(anyString(), anyList());
-        verify(skills, never()).publish(anyString(), anyList(), any());
+        verify(toolsets, never()).writeApiServer(anyString(), anyList(), anyString());
+        verify(skills, never()).publish(anyString(), anyList(), any(), anyString());
 
         assertThat(service.bind(owner, agent.code(), DEMO).status())
                 .as("다시 붙이기")

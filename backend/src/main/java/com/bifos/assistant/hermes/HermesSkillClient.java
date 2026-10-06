@@ -30,7 +30,10 @@ public interface HermesSkillClient {
      * @param externalDirs Hermes 쪽 경로 목록. 비어 있으면 게시 해제다
      * @param apiServerToolsets {@code null} 이 아니면 {@code platform_toolsets.api_server} 를 같은 본문에
      *     함께 쓴다. {@code null} 이면 도구를 건드리지 않는다
-     * @throws HermesRequestRejected 대시보드가 4xx 로 분명히 거절했다. 설정은 바뀌지 않았다
+     * @param sandboxOwner 셸과 파일 도구를 돌릴 격리 실행 공간의 주인 키. 늘 싣고, 도구 목록에 셸 도구가 있을 때만
+     *     Hermes 가 쓴다
+     * @throws HermesRequestRejected 대시보드가 4xx 로 분명히 거절했다. 설정은 바뀌지 않았다. 실행 공간이 준비되지
+     *     않아 거절했으면 오류 코드가 {@code AGENT_SANDBOX_UNAVAILABLE} 이다
      */
-    void publish(String profile, List<String> externalDirs, List<String> apiServerToolsets);
+    void publish(String profile, List<String> externalDirs, List<String> apiServerToolsets, String sandboxOwner);
 }

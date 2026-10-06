@@ -232,7 +232,7 @@ class ConnectorConnectionServiceTest {
         assertThat(agents.count()).isZero();
         verify(connector, never()).putEnv(anyString(), anyString(), anyString());
         verify(connector, never()).putConnector(anyString(), anyString(), anyBoolean());
-        verify(toolsets, never()).writeApiServer(any(), any());
+        verify(toolsets, never()).writeApiServer(any(), any(), any());
     }
 
     @Test
@@ -1075,7 +1075,7 @@ class ConnectorConnectionServiceTest {
             assertThat(service.catalog(user)).extracting(ConnectorSummary::id).containsExactly(PIN);
             assertCode(() -> service.register(user, DEMO, VALUES), ErrorCode.CONNECTOR_NOT_FOUND);
         }
-        verify(toolsets, never()).writeApiServer(anyString(), anyList());
+        verify(toolsets, never()).writeApiServer(anyString(), anyList(), anyString());
     }
 
     @Test

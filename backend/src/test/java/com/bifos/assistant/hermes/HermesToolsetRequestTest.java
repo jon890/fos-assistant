@@ -29,6 +29,7 @@ class HermesToolsetRequestTest {
     private final List<Call> calls = new ArrayList<>();
     private HttpServer server;
     private HttpHermesToolsetClient client;
+    private int status = 200;
     private String response = "[]";
 
     private record Call(String method, String path, String authorization, String body) {}
@@ -44,7 +45,7 @@ class HermesToolsetRequestTest {
                     new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8)));
             byte[] body = response.getBytes(StandardCharsets.UTF_8);
             exchange.getResponseHeaders().set("Content-Type", "application/json");
-            exchange.sendResponseHeaders(200, body.length);
+            exchange.sendResponseHeaders(status, body.length);
             exchange.getResponseBody().write(body);
             exchange.close();
         });
@@ -99,9 +100,9 @@ class HermesToolsetRequestTest {
     }
 
     @Test
-    @DisplayName("API server 목록만 설정으로 쓴다")
-    void usesOnlyApiServerListAsSetting() throws Exception {
-        client.writeApiServer("kid", List.of("web", "fos-assistant"));
+    @DisplayName("API server 목록과 실행 공간 주인을 설정으로 쓴다")
+    void usesApiServerListAndSandboxOwnerAsSetting() throws Exception {
+        client.writeApiServer("kid", List.of("web", "fos-assistant"), "u7");
 
         assertThat(calls).singleElement().satisfies(call -> {
             assertThat(call.method()).isEqualTo("PUT");
@@ -112,8 +113,37 @@ class HermesToolsetRequestTest {
                             "profile",
                             "kid",
                             "config",
-                            Map.of("platform_toolsets", Map.of("api_server", List.of("web", "fos-assistant")))));
+                            Map.of("platform_toolsets", Map.of("api_server", List.of("web", "fos-assistant"))),
+                            "sandbox_owner",
+                            "u7"));
         });
+    }
+
+    @Test
+    @DisplayName("409 의 code 가 sandbox_unavailable 이면 실행 공간이 없다는 오류다")
+    void conflictWithSandboxUnavailableCodeIsSandboxUnavailable() {
+        status = 409;
+        response = "{\"detail\":\"sandbox is not configured\",\"code\":\"sandbox_unavailable\"}";
+
+        assertThatThrownBy(() -> client.writeApiServer("kid", List.of("terminal"), "u7"))
+                .isInstanceOfSatisfying(
+                        ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.AGENT_SANDBOX_UNAVAILABLE));
+    }
+
+    @Test
+    @DisplayName("다른 409 는 detail 에 같은 낱말이 있어도 Hermes 에 닿지 못한 것과 같다")
+    void otherConflictStaysHermesUnavailable() {
+        status = 409;
+        response = "{\"detail\":\"sandbox_unavailable\",\"code\":\"profile_busy\"}";
+
+        assertThatThrownBy(() -> client.writeApiServer("kid", List.of("terminal"), "u7"))
+                .isInstanceOfSatisfying(
+                        ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.HERMES_UNAVAILABLE));
+
+        response = "not json";
+        assertThatThrownBy(() -> client.writeApiServer("kid", List.of("terminal"), "u7"))
+                .isInstanceOfSatisfying(
+                        ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.HERMES_UNAVAILABLE));
     }
 
     @Test

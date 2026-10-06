@@ -50,7 +50,7 @@ public class SkillPublisher {
     public void publish(CurrentUser user, Agent agent, List<String> externalDirs, Set<String> connectorServers) {
         List<String> apiServerToolsets =
                 externalDirs.isEmpty() ? null : toolsetsWithSkills(user, agent, connectorServers);
-        skills.publish(agent.hermesProfile(), externalDirs, apiServerToolsets);
+        skills.publish(agent.hermesProfile(), externalDirs, apiServerToolsets, agent.sandboxOwner());
     }
 
     private List<String> toolsetsWithSkills(CurrentUser user, Agent agent, Set<String> connectorServers) {

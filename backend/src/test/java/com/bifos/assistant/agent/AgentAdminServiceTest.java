@@ -3,6 +3,8 @@ package com.bifos.assistant.agent;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -103,14 +105,12 @@ class AgentAdminServiceTest {
     @DisplayName("연결이 붙은 에이전트의 주인을 바꾸면 AGENT HAS CONNECTIONS 로 거절하고 저장하지 않는다")
     void rejectsOwnerChangeOfAgentWithConnections() {
         Agent agent = privateAgent(1L);
-        when(agents.findByCodeForUpdate("mine")).thenReturn(Optional.of(agent));
         AppUser newOwner = mock(AppUser.class);
         when(newOwner.id()).thenReturn(2L);
         when(users.findByEmail("new@example.com")).thenReturn(Optional.of(newOwner));
         when(connectorBindings.hasBindings(agent.id())).thenReturn(true);
 
-        assertThatThrownBy(() -> service.update(
-                        "mine", new AgentUpdateCommand(true, AgentVisibility.PRIVATE, "new@example.com", null, null)))
+        assertThatThrownBy(() -> service.update("dad", privateUpdate("new@example.com")))
                 .isInstanceOf(ApiException.class)
                 .extracting(ex -> ((ApiException) ex).code())
                 .isEqualTo(ErrorCode.AGENT_HAS_CONNECTIONS);
@@ -120,14 +120,33 @@ class AgentAdminServiceTest {
     }
 
     @Test
+    @DisplayName("셸이나 파일 도구가 켜진 에이전트의 주인을 바꾸면 거절하고 주인을 그대로 둔다")
+    void rejectsOwnerChangeWhenShellToolsetEnabled() {
+        Agent agent = privateAgent(1L);
+        AppUser next = mock(AppUser.class);
+        when(next.id()).thenReturn(2L);
+        when(users.findByEmail("next@example.com")).thenReturn(Optional.of(next));
+        doThrow(new ApiException(ErrorCode.AGENT_OWNER_CHANGE_REQUIRES_SHELL_OFF, "shell is on"))
+                .when(lifecycle)
+                .requireOwnerChangeSafe(API_BASE_URL, "dad-profile");
+
+        assertThatThrownBy(() -> service.update("dad", privateUpdate("next@example.com")))
+                .isInstanceOf(ApiException.class)
+                .extracting(ex -> ((ApiException) ex).code())
+                .isEqualTo(ErrorCode.AGENT_OWNER_CHANGE_REQUIRES_SHELL_OFF);
+
+        assertThat(agent.ownerUserId()).isEqualTo(1L);
+        verify(agents, never()).save(any(Agent.class));
+    }
+
+    @Test
     @DisplayName("연결이 붙은 에이전트를 그룹으로 바꾸면 AGENT CONNECTIONS REQUIRE PRIVATE 로 거절한다")
     void rejectsGroupVisibilityOfAgentWithConnections() {
         Agent agent = privateAgent(1L);
-        when(agents.findByCodeForUpdate("mine")).thenReturn(Optional.of(agent));
         when(connectorBindings.hasBindings(agent.id())).thenReturn(true);
 
         assertThatThrownBy(() ->
-                        service.update("mine", new AgentUpdateCommand(true, AgentVisibility.GROUP, null, null, null)))
+                        service.update("dad", new AgentUpdateCommand(true, AgentVisibility.GROUP, null, null, null)))
                 .isInstanceOf(ApiException.class)
                 .extracting(ex -> ((ApiException) ex).code())
                 .isEqualTo(ErrorCode.AGENT_CONNECTIONS_REQUIRE_PRIVATE);
@@ -141,28 +160,47 @@ class AgentAdminServiceTest {
     @DisplayName("연결이 붙은 에이전트도 주인과 공개 범위를 그대로 두는 수정은 저장한다")
     void savesUpdateKeepingOwnerOfAgentWithConnections() {
         Agent agent = privateAgent(1L);
-        when(agents.findByCodeForUpdate("mine")).thenReturn(Optional.of(agent));
         when(connectorBindings.hasBindings(agent.id())).thenReturn(true);
 
-        Agent updated =
-                service.update("mine", new AgentUpdateCommand(false, AgentVisibility.PRIVATE, null, null, null));
+        Agent updated = service.update("dad", new AgentUpdateCommand(false, AgentVisibility.PRIVATE, null, null, null));
 
         assertThat(updated.enabled()).isFalse();
         assertThat(updated.ownerUserId()).isEqualTo(1L);
         verify(agents).save(agent);
     }
 
-    private static Agent privateAgent(Long ownerId) {
-        return Agent.of(
-                "mine",
-                "Mine",
-                "mine-profile",
+    @Test
+    @DisplayName("주인이 그대로인 접근 변경은 셸 도구가 켜져 있어도 저장한다")
+    void keepsAccessChangeWithSameOwner() {
+        Agent agent = privateAgent(1L);
+        doThrow(new ApiException(ErrorCode.AGENT_OWNER_CHANGE_REQUIRES_SHELL_OFF, "shell is on"))
+                .when(lifecycle)
+                .requireOwnerChangeSafe(anyString(), anyString());
+
+        Agent saved = service.update("dad", new AgentUpdateCommand(false, AgentVisibility.PRIVATE, null, null, null));
+
+        assertThat(saved.enabled()).isFalse();
+        assertThat(saved.ownerUserId()).isEqualTo(1L);
+        verify(agents).save(agent);
+    }
+
+    private Agent privateAgent(Long ownerId) {
+        Agent agent = Agent.of(
+                "dad",
+                "Dad",
+                "dad-profile",
                 API_BASE_URL,
                 CostMode.SUBSCRIPTION,
                 CredentialScope.SHARED_HOUSEHOLD,
                 AgentVisibility.PRIVATE,
                 ownerId,
                 Instant.now());
+        when(agents.findByCodeForUpdate("dad")).thenReturn(Optional.of(agent));
+        return agent;
+    }
+
+    private static AgentUpdateCommand privateUpdate(String ownerEmail) {
+        return new AgentUpdateCommand(true, AgentVisibility.PRIVATE, ownerEmail, null, null);
     }
 
     private static AgentCreateCommand groupCommand() {

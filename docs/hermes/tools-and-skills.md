@@ -86,7 +86,8 @@ contextvar 를 통해 작업 스레드로 전달된다.
 v0.21.0 의 `toolsets.py` 의 `TOOLSETS` 와
 `hermes_cli/tools_config.py` 의 `CONFIGURABLE_TOOLSETS` 를 대조한 결과다.
 **profile 분리는 셸이나 파일 도구의 파일 접근을 격리하지 않는다.**
-이 도구를 주면 같은 컨테이너 안의 다른 profile 파일에도 닿을 수 있다.
+terminal backend 가 `local` 이면 이 도구는 같은 컨테이너 안의 다른 profile 파일에도 닿는다.
+`terminal`, `file`, `code_execution` 을 docker 실행 공간으로 옮기는 계약과 남는 구멍은 [실행 공간](sandbox.md) 이 갖는다.
 
 | toolset | 대표 도구 | 접근 범위 | 설정 목록 |
 | --- | --- | --- | --- |
@@ -229,7 +230,7 @@ Control Plane 이 저장 규칙을 이 검사에 맞추는 까닭은 [ADR-034](.
 공식 `POST /api/files/upload`는 data URL로 파일 하나를 올리고, `POST /api/files/upload-stream`은 multipart로 올린다.
 둘 다 하위 디렉터리를 만들 수 있고 개별 파일의 Hermes 한도는 100 MiB다.
 이 경로 자체는 스킬 전용도 profile 전용도 아니므로 plugin에서 대상 경로를 profile의 승인된 업로드 디렉터리로 제한해야 한다.
-업로드 경로를 분리해도 같은 컨테이너에서 `file`이나 `terminal` 도구가 다른 경로를 읽을 수 있으면 파일 자체는 profile 간에 격리되지 않는다.
+업로드 경로를 분리해도 `file`이나 `terminal` 도구가 같은 컨테이너에서 돌면 파일 자체는 profile 간에 격리되지 않는다. 이 도구를 실행 공간으로 옮기는 것은 [실행 공간](sandbox.md) 이 갖는다.
 제품에는 더 작은 파일 및 전체 묶음 한도를 둘 수 있다.
 `DELETE /api/skills`는 없으므로 삭제는 `skills.external_dirs`에서 경로를 빼고 파일 경로를 제한한 `DELETE /api/files`로 정리하는 흐름이 필요하다.
 근거는 [파일 HTTP 경로](https://github.com/NousResearch/hermes-agent/blob/v2026.9.14/hermes_cli/web_routers/files.py), [파일 루트 제한](https://github.com/NousResearch/hermes-agent/blob/v2026.9.14/hermes_cli/web_server_files.py)이다.

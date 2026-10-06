@@ -2,6 +2,8 @@ package com.bifos.assistant.agent;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -132,7 +134,9 @@ class AgentToolServiceAccessTest {
                 .filteredOn(AgentToolView::enabled)
                 .extracting(AgentToolView::name)
                 .containsExactly("web");
-        verify(hermesToolsets).writeApiServer(agent.hermesProfile(), List.of("web", AgentToolPolicy.CONTROL_PLANE_MCP));
+        verify(hermesToolsets)
+                .writeApiServer(
+                        agent.hermesProfile(), List.of("web", AgentToolPolicy.CONTROL_PLANE_MCP), "u" + owner.id());
     }
 
     @Test
@@ -147,7 +151,30 @@ class AgentToolServiceAccessTest {
                 .filteredOn(AgentToolView::enabled)
                 .extracting(AgentToolView::name)
                 .containsExactly("web");
-        verify(hermesToolsets).writeApiServer(agent.hermesProfile(), List.of("web", AgentToolPolicy.CONTROL_PLANE_MCP));
+        verify(hermesToolsets)
+                .writeApiServer(
+                        agent.hermesProfile(), List.of("web", AgentToolPolicy.CONTROL_PLANE_MCP), "u" + owner.id());
+    }
+
+    @Test
+    @DisplayName("주인이 없는 그룹 에이전트의 도구를 바꾸면 그 에이전트만의 실행 공간 주인을 보낸다")
+    void writeOnOwnerlessGroupAgentSendsAgentSandboxOwner() {
+        String code = randomCode("group-tools");
+        Agent agent = saved(Agent.of(
+                code,
+                code,
+                code,
+                "http://agent-runtime.test/p/" + code,
+                CostMode.SUBSCRIPTION,
+                CredentialScope.SHARED_HOUSEHOLD,
+                AgentVisibility.GROUP,
+                null,
+                Instant.now()));
+        stubHermesApplying(agent, "web");
+
+        agentTools.writeAsAdmin(administrator, agent.code(), List.of("web"));
+
+        verify(hermesToolsets).writeApiServer(eq(agent.hermesProfile()), anyList(), eq("a" + agent.id()));
     }
 
     /** 위 검사들이 트랜잭션을 보는 근거다. 이 검사가 실패하면 위 검사는 트랜잭션이 없어도 통과한다. */
