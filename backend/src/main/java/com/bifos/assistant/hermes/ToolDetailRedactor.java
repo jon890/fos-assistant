@@ -42,6 +42,7 @@ public final class ToolDetailRedactor {
             "privatekey",
             "accesskey",
             "clientsecret");
+
     private static final Pattern UUID =
             Pattern.compile("(?i)[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}");
     private static final Pattern JWT =
