@@ -186,6 +186,18 @@ async function makeArtifactRoot(work: string): Promise<string> {
 }
 
 /**
+ * 첨부 루트를 실행마다 만든다.
+ *
+ * <p>운영에서는 붙여 둔 디렉터리다. Control Plane 은 Hermes 에 도구 설정을 보내기 전에 이 아래에 주인의 디렉터리를 만들고,
+ * 루트가 없으면 설정 쓰기를 409 로 멈춘다(ADR-089).
+ */
+async function makeAttachmentRoot(work: string): Promise<string> {
+  const attachmentRoot = join(work, "attachments");
+  await mkdir(attachmentRoot, { recursive: true });
+  return attachmentRoot;
+}
+
+/**
  * 스킬 버전 디렉터리의 루트를 실행마다 만든다.
  *
  * <p>Control Plane 이 쓰는 경로와 Hermes 가 보는 경로가 같은 기계의 같은 디렉터리다. 대역이 게시된 경로에서 `SKILL.md` 를 읽는다.
@@ -370,6 +382,7 @@ async function main(): Promise<void> {
     console.log("== Control Plane 기동");
     const keyDir = await writeProfileKeys(work);
     const artifactRoot = await makeArtifactRoot(work);
+    const attachmentRoot = await makeAttachmentRoot(work);
     const hermesBaseUrl = hermes.baseUrl;
     const healthUrl = `http://127.0.0.1:${APP_PORT}/actuator/health`;
     const launch = (): ChildProcess =>
@@ -377,7 +390,7 @@ async function main(): Promise<void> {
         keyDir,
         hermesBaseUrl,
         logPath,
-        join(work, "attachments"),
+        attachmentRoot,
         artifactRoot,
         skillRoot,
         join(work, "smoke"),

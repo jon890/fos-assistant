@@ -413,6 +413,13 @@ async function makeArtifactRoot(work: string): Promise<string> {
   return artifactRoot;
 }
 
+/** 첨부 루트다. 없으면 Control Plane 이 도구 설정 쓰기를 409 로 멈춘다(ADR-089). */
+async function makeAttachmentRoot(work: string): Promise<string> {
+  const attachmentRoot = join(work, "attachments");
+  await mkdir(attachmentRoot, { recursive: true });
+  return attachmentRoot;
+}
+
 /** 스킬 버전 디렉터리의 루트다. 결과물 폴더와 같이 두 루트에 같은 경로를 준다. */
 async function makeSkillRoot(work: string): Promise<string> {
   const skillRoot = join(work, "skills");
@@ -665,7 +672,7 @@ export default async function setupServices(): Promise<() => Promise<void>> {
       await writeProfileKeys(work),
       hermes.baseUrl,
       logPath,
-      join(work, "attachments"),
+      await makeAttachmentRoot(work),
       await makeArtifactRoot(work),
       skillRoot,
     );
