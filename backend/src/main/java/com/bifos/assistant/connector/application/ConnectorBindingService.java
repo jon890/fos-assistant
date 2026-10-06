@@ -268,7 +268,8 @@ public class ConnectorBindingService implements AgentConnectorDetacher {
         Long agentId = found.id();
         Long ownerId = found.ownerUserId();
         if (ownerId == null) {
-            throw new ApiException(ErrorCode.FORBIDDEN, "no such user");
+            // 주인 없는 에이전트에는 바인딩이 없다. 다른 그룹 관리자에게 그 에이전트가 있는지 드러내지 않게 같은 404 로 답한다.
+            throw agentNotFound();
         }
         Confirmed confirmed =
                 transactions.execute(status -> confirmLocked(admin, agentId, ownerId, connectorId, shownSince));

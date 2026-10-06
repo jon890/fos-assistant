@@ -576,6 +576,25 @@ class ConnectorBindingServiceTest {
     }
 
     @Test
+    @DisplayName("주인 없는 에이전트의 반영 완료는 없는 에이전트와 같은 404 다")
+    void answersOwnerlessAgentAsNotFoundWhenConfirming() {
+        CurrentUser administrator = user(UserRole.ADMIN, 1L);
+        String code = "ownerless-" + UUID.randomUUID().toString().substring(0, 13);
+        agents.save(Agent.of(
+                code,
+                code,
+                "profile-" + code,
+                "http://agent-runtime.test/p/" + code,
+                CostMode.SUBSCRIPTION,
+                CredentialScope.SHARED_HOUSEHOLD,
+                AgentVisibility.GROUP,
+                null,
+                Instant.now()));
+
+        assertCode(() -> service.confirmApplied(administrator, code, DEMO, null), ErrorCode.AGENT_NOT_FOUND);
+    }
+
+    @Test
     @DisplayName("해제가 두 번째 바인딩에서 실패하면 첫 바인딩 행만 지워지고 보관 파일이 남으며, 다시 해제하면 이어서 끝난다")
     void disconnectResumesAfterFailingOnSecondBinding() {
         CurrentUser owner = user(UserRole.MEMBER, 1L);
