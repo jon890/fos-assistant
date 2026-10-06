@@ -488,3 +488,213 @@ test("390px 폭에서 긴 인자도 가로로 넘치지 않는다", async ({ pag
     ),
   ).toBe(true);
 });
+
+/** 라벨 만들기 승인 줄이다. 운영에서 본 모양처럼 값이 빈 인자와 원 이름 인자를 함께 싣는다. */
+function labelAction(index: number, name: string, overrides: Record<string, unknown> = {}): Action {
+  return action({
+    actionId: `0f0e0d0c-0b0a-4908-8706-0504030201${String(index).padStart(2, "0")}`,
+    connectorId: "gmail",
+    toolName: "create_label",
+    title: "라벨 만들기",
+    argsJson: JSON.stringify({
+      name,
+      label_list_visibility: "labelShow",
+      message_list_visibility: "show",
+      background_color: "",
+      text_color: "",
+    }),
+    ...overrides,
+  });
+}
+
+const LABELS = ["업무", "가족", "영수증", "뉴스레터"];
+
+/** 승인 줄 여럿이 있는 대화를 연다. `turns` 만큼 질문을 더 보내 메시지 목록이 넘치게 한다. */
+async function openWithMany(page: Page, label: string, actions: Action[], turns = 0) {
+  const conversationId = await createConversation(page, label);
+  for (let index = 0; index < turns; index += 1) {
+    const sent = await page.request.post("/api/chat", {
+      data: { conversationId, text: `${label} ${index}번째 물음`, agentCode: "browser" },
+    });
+    expect(sent.ok()).toBeTruthy();
+  }
+  const state = { actions };
+  await holdEvents(page, conversationId);
+  const reads = await routeActions(page, conversationId, () => state.actions);
+  await page.goto(`/chat/${conversationId}`);
+  return { conversationId, state, reads };
+}
+
+/** 승인과 거절 요청을 대역한다. 받은 줄은 끝난 상태로 바꿔 돌려주고, 요청의 순서와 본문을 남긴다. */
+async function routeDecisions(page: Page, state: { actions: Action[] }) {
+  const calls: { actionId: string; kind: string; body: unknown }[] = [];
+  await page.route("**/api/connector-actions/*/*", (route: Route) => {
+    const [actionId, kind] = new URL(route.request().url()).pathname.split("/").slice(-2);
+    calls.push({ actionId, kind, body: route.request().postDataJSON() });
+    const status = kind === "approve" ? "SUCCEEDED" : "REJECTED";
+    state.actions = state.actions.map((item) => (item.actionId === actionId ? { ...item, status } : item));
+    return route.fulfill({ json: state.actions.find((item) => item.actionId === actionId) });
+  });
+  return calls;
+}
+
+for (const [project, size] of [
+  ["desktop", { width: 1040, height: 600 }],
+  ["mobile", { width: 390, height: 844 }],
+] as const) {
+  test(`${size.width}px 에서 승인 줄이 넷 이상이어도 메시지 목록이 보이고 스크롤된다`, async ({ page }, testInfo) => {
+    test.skip(testInfo.project.name !== project, `${project} 에서만 돈다`);
+    await page.setViewportSize(size);
+    await openWithMany(
+      page,
+      "승인 여럿 화면 검사",
+      [...LABELS.map((name, index) => labelAction(index, name)), action({ title: "메모 쓰기" })],
+      4,
+    );
+
+    const dock = page.getByTestId("approval-list");
+    await expect(dock).toBeVisible();
+    await expect(page.getByTestId("assistant-message")).toHaveCount(5);
+    const list = page.getByTestId("message-scroll");
+    const measured = await list.evaluate((element) => ({
+      scrollHeight: element.scrollHeight,
+      clientHeight: element.clientHeight,
+    }));
+    // 메시지 목록이 화면 높이의 4분의 1 이상을 갖고, 그 안이 넘쳐 스크롤된다.
+    expect(measured.clientHeight).toBeGreaterThanOrEqual(size.height / 4);
+    expect(measured.scrollHeight).toBeGreaterThan(measured.clientHeight);
+    const dockBox = await dock.boundingBox();
+    expect(dockBox!.height).toBeLessThanOrEqual(size.height * 0.4 + 1);
+
+    await list.evaluate((element) => {
+      element.scrollTop = 0;
+    });
+    await expect(page.getByTestId("assistant-message").first()).toBeInViewport();
+    await expect(page.getByRole("textbox", { name: "메시지" })).toBeInViewport();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  });
+}
+
+test("같은 도구의 승인 줄은 한 묶음으로 접혀 보이고 펼치면 건마다 인자가 보인다", async ({ page }) => {
+  await openWithMany(
+    page,
+    "승인 묶음 검사",
+    [...LABELS.map((name, index) => labelAction(index, name)), action({ title: "메모 쓰기" })],
+  );
+
+  const group = page.getByTestId("approval-group");
+  await expect(group).toHaveCount(1);
+  await expect(group).toHaveAttribute("data-count", "4");
+  await expect(group).toContainText("라벨 만들기");
+  await expect(group).toContainText("4건");
+  await expect(group.getByTestId("approval-group-summary")).toHaveText("업무, 가족, 영수증, 뉴스레터");
+  await expect(group.getByTestId("approval-card")).toHaveCount(0);
+  await expect(group.getByTestId("approval-approve-all")).toHaveCount(0);
+  // 다른 도구의 줄은 묶음 밖에 한 장으로 남는다.
+  await expect(page.getByTestId("approval-list").getByTestId("approval-card")).toHaveCount(1);
+
+  const toggle = group.getByTestId("approval-group-toggle");
+  await expect(toggle).toHaveAttribute("aria-expanded", "false");
+  await toggle.click();
+  await expect(toggle).toHaveAttribute("aria-expanded", "true");
+  const items = group.getByTestId("approval-card");
+  await expect(items).toHaveCount(4);
+  for (const [index, name] of LABELS.entries()) {
+    await expect(items.nth(index).getByTestId("approval-args").locator("dd").first()).toHaveText(name);
+  }
+  await expect(group.getByTestId("approval-group-summary")).toHaveCount(0);
+
+  await toggle.click();
+  await expect(group.getByTestId("approval-card")).toHaveCount(0);
+});
+
+test("묶음 안에서 건마다 승인하고 거절하며 펼친 상태가 남는다", async ({ page }) => {
+  const { state } = await openWithMany(
+    page,
+    "묶음 한 건씩 검사",
+    LABELS.map((name, index) => labelAction(index, name)),
+  );
+  const ids = state.actions.map((item) => item.actionId);
+  const calls = await routeDecisions(page, state);
+  const group = page.getByTestId("approval-group");
+  await group.getByTestId("approval-group-toggle").click();
+
+  await group.getByTestId("approval-card").nth(1).getByTestId("approval-approve").click();
+  await expect(group).toHaveAttribute("data-count", "3");
+  await expect(group.getByTestId("approval-card")).toHaveCount(3);
+  await group.getByTestId("approval-card").nth(1).getByTestId("approval-reject").click();
+  await expect(group).toHaveAttribute("data-count", "2");
+
+  expect(calls).toEqual([
+    { actionId: ids[1], kind: "approve", body: { grant: null } },
+    { actionId: ids[2], kind: "reject", body: null },
+  ]);
+  await expect(group.getByTestId("approval-args").locator("dd").first()).toHaveText("업무");
+  await expect(group.getByTestId("approval-args").nth(1).locator("dd").first()).toHaveText("뉴스레터");
+});
+
+test("모두 승인은 펼친 묶음에서 건마다 차례로 승인하고 카드를 치운다", async ({ page }) => {
+  const { state } = await openWithMany(
+    page,
+    "모두 승인 검사",
+    LABELS.map((name, index) => labelAction(index, name)),
+  );
+  const ids = state.actions.map((item) => item.actionId);
+  const calls = await routeDecisions(page, state);
+  const group = page.getByTestId("approval-group");
+  await group.getByTestId("approval-group-toggle").click();
+
+  await group.getByTestId("approval-approve-all").click();
+
+  await expect(page.getByTestId("approval-list")).toHaveCount(0);
+  expect(calls).toEqual(ids.map((actionId) => ({ actionId, kind: "approve", body: { grant: null } })));
+});
+
+for (const [name, overrides] of [
+  ["상시 허락을 닫은 도구가", { grantAllowed: false }],
+  ["되돌리기 어려운 도구가", { risk: "DESTRUCTIVE" }],
+  ["위험도를 모르는 줄이", { risk: null }],
+  ["가려진 인자가 있는 줄이", { hiddenArgs: true }],
+] as const) {
+  test(`${name} 섞인 묶음에는 모두 승인이 없다`, async ({ page }) => {
+    await openWithMany(page, `모두 승인 제외 검사 ${name}`, [
+      labelAction(0, "업무"),
+      labelAction(1, "가족", overrides),
+    ]);
+    const group = page.getByTestId("approval-group");
+    await group.getByTestId("approval-group-toggle").click();
+
+    await expect(group.getByTestId("approval-card")).toHaveCount(2);
+    await expect(group.getByTestId("approval-approve-all")).toHaveCount(0);
+  });
+}
+
+test("값이 빈 인자는 숨기고 짧은 인자 둘만 위에 보이며 나머지는 자세히에 접는다", async ({ page }) => {
+  await openWith(page, "빈 인자 숨김 검사", labelAction(0, "업무"));
+
+  const card = page.getByTestId("approval-card");
+  await expect(card.getByTestId("approval-args").locator("dt")).toHaveText(["name", "label_list_visibility"]);
+  await expect(card.getByTestId("approval-args").locator("dd")).toHaveText(["업무", "labelShow"]);
+  const more = card.getByTestId("approval-args-more");
+  await expect(more.locator("summary")).toHaveText("자세히 (3개)");
+  await expect(card.getByTestId("approval-args-folded")).toBeHidden();
+  await expect(card.getByTestId("approval-args-empty")).toBeHidden();
+
+  await more.locator("summary").click();
+  await expect(card.getByTestId("approval-args-folded").locator("dt")).toHaveText(["message_list_visibility"]);
+  await expect(card.getByTestId("approval-args-empty")).toHaveText("비어 있는 항목: background_color, text_color");
+});
+
+test("상시 허락을 닫은 줄은 빈 인자를 빼고 나머지를 모두 펼치며 빈 인자의 이름도 보인다", async ({ page }) => {
+  await openWith(page, "닫은 도구 빈 인자 검사", labelAction(0, "업무", { grantAllowed: false }));
+
+  const card = page.getByTestId("approval-card");
+  await expect(card.getByTestId("approval-args").locator("dt")).toHaveText([
+    "name",
+    "label_list_visibility",
+    "message_list_visibility",
+  ]);
+  await expect(card.getByTestId("approval-args-more")).toHaveCount(0);
+  await expect(card.getByTestId("approval-args-empty")).toBeVisible();
+  await expect(card.getByTestId("approval-args-empty")).toHaveText("비어 있는 항목: background_color, text_color");
+});

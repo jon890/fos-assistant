@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { ApprovalCard } from "@/components/chat/approval-card";
+import { ApprovalGroup } from "@/components/chat/approval-group";
 import {
   readConnectorActions,
   type ConnectorAction,
@@ -13,7 +14,38 @@ const SHOWN = ["PENDING", "EXECUTING", "UNKNOWN"];
 type Loaded = { conversationId: string; actions: ConnectorAction[] };
 
 /**
+ * 기다리는 줄은 같은 커넥터의 같은 도구끼리 묶는다. 묶음의 자리는 그 도구가 처음 나온 자리다.
+ * 실행 중이거나 결과를 모르는 줄은 한 장씩 둔다.
+ */
+function grouped(
+  actions: ConnectorAction[],
+): { key: string; actions: ConnectorAction[] }[] {
+  const groups = new Map<string, ConnectorAction[]>();
+  const order: { key: string; actions: ConnectorAction[] }[] = [];
+  for (const action of actions) {
+    if (action.status !== "PENDING") {
+      order.push({ key: action.actionId, actions: [action] });
+      continue;
+    }
+    const key = `${action.connectorId}\u0000${action.toolName ?? action.title}`;
+    const group = groups.get(key);
+    if (group) {
+      group.push(action);
+      continue;
+    }
+    const created = [action];
+    groups.set(key, created);
+    // 묶음의 key 는 도구로 둔다. 앞 건을 처리해도 펼친 상태가 남는다.
+    order.push({ key, actions: created });
+  }
+  return order;
+}
+
+/**
  * 입력창 위에 그 대화의 승인 카드를 모아 보인다.
+ *
+ * <p>승인을 기다리는 동안에도 대화를 읽을 수 있게 이 영역은 화면 높이의 40% 까지만 차지하고 안에서 스크롤한다.
+ * 같은 도구로 기다리는 줄이 여럿이면 `ApprovalGroup` 한 묶음으로 보인다.
  *
  * <p>대화나 `refreshKey` 가 바뀌면 다시 읽는다. 보일 줄이 없으면 아무것도 그리지 않는다. 읽지 못해도 대화를
  * 막지 않게 조용히 비운다.
@@ -73,23 +105,38 @@ export function ApprovalList({
     );
   }
 
+  function changed(next: ConnectorAction | null) {
+    if (next) replace(next);
+    else setReloads((count) => count + 1);
+  }
+
+  function dismiss(actionId: string) {
+    setDismissed((current) => [...current, actionId]);
+  }
+
   return (
     <div
       data-testid="approval-list"
-      className="mx-auto mb-2 flex w-full max-w-3xl flex-col gap-3 px-1"
+      // 카드가 많아도 메시지 목록의 자리를 남긴다. 높이는 화면에 따라 이어지는 값이라 임의 값으로 둔다.
+      className="mx-auto mb-2 flex max-h-[40dvh] w-full max-w-3xl flex-col gap-3 overflow-y-auto px-1"
     >
-      {actions.map((action) => (
-        <ApprovalCard
-          key={action.actionId}
-          action={action}
-          onChanged={(next) =>
-            next ? replace(next) : setReloads((count) => count + 1)
-          }
-          onDismiss={() =>
-            setDismissed((current) => [...current, action.actionId])
-          }
-        />
-      ))}
+      {grouped(actions).map(({ key, actions: group }) =>
+        group.length === 1 ? (
+          <ApprovalCard
+            key={group[0].actionId}
+            action={group[0]}
+            onChanged={changed}
+            onDismiss={() => dismiss(group[0].actionId)}
+          />
+        ) : (
+          <ApprovalGroup
+            key={key}
+            actions={group}
+            onChanged={changed}
+            onDismiss={dismiss}
+          />
+        ),
+      )}
     </div>
   );
 }

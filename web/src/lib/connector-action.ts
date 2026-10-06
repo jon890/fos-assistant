@@ -78,6 +78,20 @@ function readableValue(value: unknown): string {
   return JSON.stringify(value, null, 2);
 }
 
+/** JSON 객체로 읽히는 인자만 꺼낸다. 객체가 아니면 `null` 이다. */
+function argsObject(argsJson: string | null): Record<string, unknown> | null {
+  if (argsJson === null) return null;
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(argsJson);
+  } catch {
+    return null;
+  }
+  if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed))
+    return null;
+  return parsed as Record<string, unknown>;
+}
+
 /**
  * 승인 줄의 인자를 사람이 읽을 키와 값으로 바꾼다.
  *
@@ -90,19 +104,81 @@ function readableValue(value: unknown): string {
 export function readableArgs(
   argsJson: string | null,
 ): { key: string; value: string }[] | null {
-  if (argsJson === null) return null;
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(argsJson);
-  } catch {
-    return null;
-  }
-  if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed))
-    return null;
+  const parsed = argsObject(argsJson);
+  if (parsed === null) return null;
   return Object.entries(parsed).map(([key, value]) => ({
     key,
     value: readableValue(value),
   }));
+}
+
+/** 카드 위에 바로 보이는 인자의 최대 수다. */
+const CORE_LIMIT = 2;
+/** 위에 바로 보일 수 있는 값의 최대 글자 수다. 넘으면 「자세히」 로 접는다. */
+const CORE_LENGTH = 80;
+
+function emptyValue(value: unknown): boolean {
+  if (value === null || value === "") return true;
+  if (Array.isArray(value)) return value.length === 0;
+  return typeof value === "object" && Object.keys(value).length === 0;
+}
+
+function shortValue(value: unknown): boolean {
+  if (typeof value === "number" || typeof value === "boolean") return true;
+  return (
+    typeof value === "string" &&
+    !value.includes("\n") &&
+    value.length <= CORE_LENGTH
+  );
+}
+
+/** 승인 카드에 그릴 인자다. `rows` 는 원래 순서이고 `core` 가 참인 줄을 카드 위에 바로 보인다. */
+export type ApprovalArgs = {
+  rows: { key: string; value: string; core: boolean }[];
+  /** 값이 비어 있는(`null`, 빈 글, 빈 배열, 빈 객체) 인자의 키다. 값을 보일 것이 없어 이름만 보인다. */
+  emptyKeys: string[];
+};
+
+/**
+ * 승인 카드가 위에 보일 인자와 「자세히」 로 접을 인자를 나눈다.
+ *
+ * <p>커넥터 선언에는 인자의 표시 이름이나 중요도가 없다. 그래서 키는 원래 이름 그대로 두고, 값이 비어 있지 않은
+ * 인자 가운데 앞에서부터 한 줄로 짧게 읽히는 값 둘을 위에 보인다. 그런 값이 없으면 모든 인자를 위에 보인다.
+ * 무엇을 접을지는 화면이 정하고, 상시 허락을 닫은 도구는 접지 않는다(ADR-065).
+ */
+export function approvalArgs(argsJson: string | null): ApprovalArgs | null {
+  const parsed = argsObject(argsJson);
+  if (parsed === null) return null;
+  const emptyKeys: string[] = [];
+  const rows: ApprovalArgs["rows"] = [];
+  let cores = 0;
+  for (const [key, value] of Object.entries(parsed)) {
+    if (emptyValue(value)) {
+      emptyKeys.push(key);
+      continue;
+    }
+    const core = cores < CORE_LIMIT && shortValue(value);
+    if (core) cores += 1;
+    rows.push({ key, value: readableValue(value), core });
+  }
+  if (cores === 0) for (const row of rows) row.core = true;
+  return { rows, emptyKeys };
+}
+
+/**
+ * 묶음의 「모두 승인」 에 넣을 수 있는 줄인가.
+ *
+ * <p>상시 허락을 줄 수 있는 `WRITE` 도구의 기다리는 줄만 넣는다. 그 도구는 이미 기간을 정해 묻지 않게 할 수
+ * 있으므로, 화면에 펼친 줄을 한 번에 승인해도 승인의 뜻이 약해지지 않는다. 상시 허락을 닫은 도구, 되돌리기
+ * 어렵거나 결제인 위험도, 위험도를 모르는 줄, 가려진 인자가 있는 줄은 한 건씩 승인한다(ADR-087).
+ */
+export function bulkApprovable(action: ConnectorAction): boolean {
+  return (
+    action.status === "PENDING" &&
+    action.risk === "WRITE" &&
+    action.grantAllowed &&
+    !action.hiddenArgs
+  );
 }
 
 export type ConnectorActionCallResult<T> =
