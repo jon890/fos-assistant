@@ -17,10 +17,15 @@ from dataclasses import dataclass
 
 # 운영이 쓰는 Hermes 판이다. 상류 저장소의 tag 이름이다. CI 가 이 판의 소스로 계약을 확인한다.
 HERMES_VERSION = "v2026.9.24"
+# 그 tag 가 가리키는 commit 이다. 상류가 tag 를 옮기면 확인이 실패한다.
+HERMES_COMMIT = "f97608f178d1ffeca59860195ab7da295f7c8e5f"
 HERMES_REPOSITORY = "https://github.com/NousResearch/hermes-agent"
 
 # plugin 이 import 하는 최상위 이름 중 Hermes 의 것이다. 이 이름으로 시작하는 import 는 모두 아래 표에 있어야 한다.
 HERMES_PACKAGES = frozenset({"hermes_cli", "hermes_constants", "hermes_state", "gateway", "toolsets", "plugins"})
+# plugin 이 import 해도 되는 제3자 패키지다. 표준 라이브러리와 이것과 Hermes 밖의 import 가 생기면 시험이 실패한다.
+# Hermes 의 다른 최상위 패키지(`agent`, `tools` 등)를 쓰기 시작하면 HERMES_PACKAGES 에 더하고 지점을 선언한다.
+THIRD_PARTY_PACKAGES = frozenset({"yaml", "mcp", "starlette"})
 
 
 @dataclass(frozen=True)
@@ -30,6 +35,10 @@ class Call:
     positional: int = 0
     keywords: tuple = ()
     is_async: bool = False
+    # plugin 이 돌려받은 값의 모양에 기대면 반환 annotation 을 적는다. 바뀌면 plugin 의 쓰는 곳을 다시 본다.
+    returns: str = None
+    # plugin 이 이 함수를 바꿔 끼우면 Hermes 정의의 인자가 정확히 이 모양이어야 한다.
+    exact: bool = False
 
 
 @dataclass(frozen=True)
@@ -68,8 +77,9 @@ SYMBOLS = {
     ("hermes_cli.dashboard_auth", "TokenPrincipal"): Call(keywords=("principal", "provider", "scopes")),
     ("hermes_cli.dashboard_auth", "LoginStart"): Value(),
     ("hermes_cli.dashboard_auth", "Session"): Value(),
-    ("hermes_cli.dashboard_auth.token_auth", "token_auth_middleware"): Call(positional=2, is_async=True),
-    ("hermes_cli.dashboard_auth.token_auth", "authenticate_token"): Call(positional=1),
+    ("hermes_cli.dashboard_auth.token_auth", "token_auth_middleware"): Call(positional=2, is_async=True, exact=True),
+    ("hermes_cli.dashboard_auth.token_auth", "authenticate_token"): Call(
+        positional=1, returns="Tuple[Optional[TokenPrincipal], Optional[str]]"),
     ("hermes_cli.plugins", "PluginContext.register_dashboard_auth_provider"): Call(positional=1),
     ("plugins.dashboard_auth.drain", "assess_secret_strength"): Call(positional=1),
     # profile
@@ -82,9 +92,10 @@ SYMBOLS = {
     ("hermes_constants", "get_default_hermes_root"): Call(),
     ("hermes_constants", "set_hermes_home_override"): Call(positional=1),
     ("hermes_constants", "reset_hermes_home_override"): Call(positional=1),
-    ("gateway.control_socket", "reload_gateway_plugins"): Call(positional=1, keywords=("profile_home",)),
+    ("gateway.control_socket", "reload_gateway_plugins"): Call(
+        positional=1, keywords=("profile_home",), returns="Optional[dict[str, Any]]"),
     # 도구와 실행 공간 설정
-    ("hermes_cli.tools_config", "_get_platform_tools"): Call(positional=2),
+    ("hermes_cli.tools_config", "_get_platform_tools"): Call(positional=2, returns="Set[str]"),
     ("hermes_cli.tools_config", "_get_plugin_toolset_keys"): Call(),
     ("hermes_cli.tools_config", "PLATFORMS"): Value(),
     ("hermes_cli.web_server_profiles", "_config_profile_scope"): Call(positional=1),
@@ -93,14 +104,17 @@ SYMBOLS = {
 
 # 대시보드가 요청마다 이 import 를 다시 해야 바꿔 끼운 함수가 쓰인다.
 # 모듈 머리에서 한 번만 import 하게 바뀌면 plugin 이 감싼 것이 쓰이지 않고 토큰 경로가 모두 닫힌다.
+# 이 import 를 하는 미들웨어는 `token_authenticated` 를 읽는 미들웨어보다 바깥(나중 등록)이어야 한다.
 PER_REQUEST_IMPORT = ("hermes_cli/web_server.py", "hermes_cli.dashboard_auth.token_auth", "token_auth_middleware")
 
 # plugin 이 토큰 요청에 다는 `request.state` 칸이다. 대시보드의 쿠키 검사가 이 칸을 보고 넘어가야 한다.
 STATE_FLAG = ("token_authenticated", ("hermes_cli/dashboard_auth/middleware.py", "hermes_cli/web_server.py"))
 
 # 자식 session 의 provider 를 읽는 표와 칸이다(ADR-067). profile 디렉터리 아래 `SESSION_DB_FILE` 에 있다.
+# Hermes 는 `SESSION_DB_MODULE` 에서 `<SESSION_DB_HOME>() / SESSION_DB_FILE` 로 그 경로를 만든다.
 SESSION_DB_FILE = "state.db"
 SESSION_DB_MODULE = "hermes_state.py"
+SESSION_DB_HOME = "get_hermes_home"
 SESSION_COLUMNS = {
     "sessions": ("id", "source", "model", "billing_provider"),
     "session_model_usage": ("session_id", "model", "billing_provider", "task"),
@@ -124,6 +138,19 @@ HERMES_ROUTES = frozenset({
     ("PUT", "/api/skills/toggle"),
     ("POST", "/api/mcp/servers/{}/test"),
 })
+
+# 감싸는 경로마다 plugin 이 검사하고 보내는 칸이다. 처리기의 인자나 본문 model 의 칸에 있어야 한다.
+# 이름이 바뀌면 pydantic 이 모르는 칸을 버려, plugin 이 검사한 profile 과 처리기가 쓰는 profile 이 갈라진다.
+HANDLER_FIELDS = {
+    ("POST", "/api/profiles"): ("name", "no_skills", "description"),
+    ("PUT", "/api/profiles/{}/soul"): ("name", "content"),
+    ("PUT", "/api/env"): ("profile", "key", "value"),
+    ("DELETE", "/api/env"): ("profile", "key"),
+    ("PUT", "/api/config"): ("profile", "config"),
+    ("GET", "/api/skills"): ("profile",),
+    ("PUT", "/api/skills/toggle"): ("profile", "name", "enabled"),
+    ("POST", "/api/mcp/servers/{}/test"): ("name", "profile"),
+}
 
 # plugin 이 처리기 없이 직접 답하는 경로다. Hermes 가 같은 경로를 만들면 그 기능이 plugin 에 가려진다.
 OWN_ROUTES = frozenset({

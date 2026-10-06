@@ -30,6 +30,7 @@ import hermes_contract as contract  # noqa: E402
 
 PLUGIN_DIR = pathlib.Path(__file__).resolve().parents[1] / "plugins" / "dashboard-profile-api"
 SOURCE_ENV = "HERMES_SOURCE"
+REQUIRED_ENV = "HERMES_CONTRACT_REQUIRED"
 ROUTE_METHODS = frozenset({"get", "post", "put", "delete", "patch"})
 PATH_PARAM_RE = re.compile(r"\{[^}]*\}")
 
@@ -46,15 +47,26 @@ def _plugin_trees():
     return {path.name: _parse(path) for path in sorted(PLUGIN_DIR.glob("*.py"))}
 
 
-def _is_hermes(node):
-    """Hermes 의 이름을 가져오는 import 인지 본다. plugin 안의 상대 import(`from .x import y`)는 세지 않는다."""
-    return node.level == 0 and node.module is not None and node.module.split(".")[0] in contract.HERMES_PACKAGES
+def _is_hermes(module):
+    return module.split(".")[0] in contract.HERMES_PACKAGES
+
+
+def _absolute_imports(tree):
+    """plugin 의 절대 import 를 `(모듈, 가져온 이름, 지역 이름)` 으로 돌려준다. 상대 import 는 plugin 안의 것이라 뺀다."""
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            for alias in node.names:
+                yield alias.name, None, alias.asname or alias.name.split(".")[0]
+        elif isinstance(node, ast.ImportFrom) and node.level == 0 and node.module:
+            for alias in node.names:
+                yield node.module, alias.name, alias.asname or alias.name
 
 
 def _plugin_uses(tree):
     """plugin 이 쓰는 Hermes 이름과, 그 이름을 부른 모양의 목록을 돌려준다.
 
-    `from a import b as c` 에서 `c.x` 로 쓰면 `b` 는 모듈로 보고 `(a.b, x)` 를 쓴 것으로 센다.
+    `from a import b as c` 에서 `b` 가 소문자로 시작하고 `c.x` 로 쓰면 `b` 는 모듈로 보고 `(a.b, x)` 를 쓴 것으로 센다.
+    `import a.b as c` 는 `c.x` 를 `(a.b, x)` 로 센다. 속성을 쓰지 않으면 `(a.b, "*")` 로 남겨 선언에 없다고 실패한다.
     """
     attrs = {}
     for node in ast.walk(tree):
@@ -62,16 +74,17 @@ def _plugin_uses(tree):
             attrs.setdefault(node.value.id, set()).add(node.attr)
 
     bound = {}
-    for node in ast.walk(tree):
-        if not isinstance(node, ast.ImportFrom) or not _is_hermes(node):
+    for module, name, local in _absolute_imports(tree):
+        if not _is_hermes(module):
             continue
-        for alias in node.names:
-            local = alias.asname or alias.name
-            if local in attrs:
-                for attr in attrs[local]:
-                    bound[(local, attr)] = ("%s.%s" % (node.module, alias.name), attr)
-            else:
-                bound[(local, None)] = (node.module, alias.name)
+        if name is None:
+            for attr in attrs.get(local, ()) or ("*",):
+                bound[(local, attr)] = (module, attr)
+        elif name[0].islower() and local in attrs:
+            for attr in attrs[local]:
+                bound[(local, attr)] = ("%s.%s" % (module, name), attr)
+        else:
+            bound[(local, None)] = (module, name)
 
     calls = {}
     for node in ast.walk(tree):
@@ -91,12 +104,14 @@ def _plugin_uses(tree):
 
 
 def _provider_methods(tree):
-    """`DashboardAuthProvider` 를 상속한 class 의 메서드와 키워드 인자를 읽는다."""
+    """`DashboardAuthProvider` 를 상속한 class 의 메서드와 키워드 인자를 읽는다. async 메서드는 이름 앞에 `async ` 를 붙인다."""
     for node in ast.walk(tree):
         if (isinstance(node, ast.ClassDef)
                 and any(isinstance(base, ast.Name) and base.id == "DashboardAuthProvider" for base in node.bases)):
-            return {item.name: tuple(arg.arg for arg in item.args.kwonlyargs)
-                    for item in node.body if isinstance(item, ast.FunctionDef) and not item.name.startswith("_")}
+            return {("async " if isinstance(item, ast.AsyncFunctionDef) else "") + item.name:
+                    tuple(arg.arg for arg in item.args.kwonlyargs)
+                    for item in node.body
+                    if isinstance(item, (ast.FunctionDef, ast.AsyncFunctionDef)) and not item.name.startswith("_")}
     return None
 
 
@@ -124,6 +139,15 @@ class PluginDeclarationTest(unittest.TestCase):
                 cls.calls.setdefault(key, set()).update(shapes)
             for name, values in attrs.items():
                 cls.attrs.setdefault(name, set()).update(values)
+
+    def test_imports_are_known(self):
+        known = set(sys.stdlib_module_names) | contract.HERMES_PACKAGES | contract.THIRD_PARTY_PACKAGES
+        found = {module.split(".")[0] for tree in self.trees.values() for module, _, _ in _absolute_imports(tree)}
+        self.assertEqual(set(), found - known, "Hermes 의 다른 패키지면 HERMES_PACKAGES 에 더하고 지점을 선언한다")
+
+    def test_context_methods_are_declared(self):
+        declared = {name.split(".")[1] for module, name in contract.SYMBOLS if name.startswith("PluginContext.")}
+        self.assertEqual(set(), self.attrs.get("ctx", set()) - declared)
 
     def test_every_hermes_name_is_declared(self):
         missing = sorted(self.used - set(contract.SYMBOLS))
@@ -169,11 +193,22 @@ class PluginDeclarationTest(unittest.TestCase):
         self.assertEqual({contract.SESSION_DB_FILE}, values)
 
 
+def _is_type_checking(node):
+    test = node.test
+    return ((isinstance(test, ast.Name) and test.id == "TYPE_CHECKING")
+            or (isinstance(test, ast.Attribute) and test.attr == "TYPE_CHECKING"))
+
+
 def _top_statements(body):
-    """모듈이나 class 머리의 문장을 돌려준다. `if`, `try` 안은 들어가고 함수 안은 들어가지 않는다."""
+    """모듈이나 class 머리의 문장을 돌려준다. `if`, `try` 안은 들어가고 함수 안은 들어가지 않는다.
+
+    `if TYPE_CHECKING:` 안은 실행 때 없는 이름이라 들어가지 않는다.
+    """
     for node in body:
         yield node
-        if isinstance(node, (ast.If, ast.Try)):
+        if isinstance(node, ast.If) and _is_type_checking(node):
+            yield from _top_statements(node.orelse)
+        elif isinstance(node, (ast.If, ast.Try)):
             for part in (node.body, node.orelse, getattr(node, "finalbody", []),
                          *[handler.body for handler in getattr(node, "handlers", [])]):
                 yield from _top_statements(part)
@@ -190,23 +225,29 @@ def _defined_names(node):
 
 
 def _params(func, method):
+    """위치 인자와, 그중 키워드로도 줄 수 있는 인자를 돌려준다. 메서드는 첫 인자(self)를 뺀다."""
     args = func.args
-    positional = list(args.posonlyargs) + list(args.args)
-    if method and positional:
-        positional = positional[1:]
-    return positional, args
+    posonly = list(args.posonlyargs)
+    regular = list(args.args)
+    if method:
+        if posonly:
+            posonly = posonly[1:]
+        elif regular:
+            regular = regular[1:]
+    return posonly + regular, regular, args
 
 
 def _accepts(func, call, method=False):
     """Hermes 함수가 plugin 의 호출 모양을 받는지 본다. 받지 못하면 까닭을 돌려준다."""
-    positional, args = _params(func, method)
+    positional, regular, args = _params(func, method)
     if call.is_async != isinstance(func, ast.AsyncFunctionDef):
         return "async 여부가 다르다"
+    if call.exact and (len(positional) != call.positional or args.kwonlyargs or args.vararg or args.kwarg):
+        return "바꿔 끼우는 함수의 인자가 위치 인자 %d 개가 아니다" % call.positional
     if call.positional > len(positional) and args.vararg is None:
         return "위치 인자 %d 개를 받지 못한다" % call.positional
-    keyword_names = {arg.arg for arg in args.args} | {arg.arg for arg in args.kwonlyargs}
-    if method and args.args:
-        keyword_names.discard(args.args[0].arg)
+    keyword_names = {arg.arg for arg in regular[max(0, call.positional - (len(positional) - len(regular))):]}
+    keyword_names |= {arg.arg for arg in args.kwonlyargs}
     for keyword in call.keywords:
         if keyword not in keyword_names and args.kwarg is None:
             return "키워드 인자 %s 를 받지 못한다" % keyword
@@ -220,12 +261,18 @@ def _accepts(func, call, method=False):
     return None
 
 
-@unittest.skipUnless(os.environ.get(SOURCE_ENV), "%s 가 없어 Hermes 소스 계약을 확인하지 않는다" % SOURCE_ENV)
 class HermesSourceTest(unittest.TestCase):
-    """`HERMES_SOURCE` 의 Hermes 소스에서 선언한 지점이 그대로인지 본다."""
+    """`HERMES_SOURCE` 의 Hermes 소스에서 선언한 지점이 그대로인지 본다.
+
+    `HERMES_CONTRACT_REQUIRED` 가 있으면 소스가 없을 때 건너뛰지 않고 실패한다. 확인 스크립트가 이 값을 준다.
+    """
 
     @classmethod
     def setUpClass(cls):
+        if not os.environ.get(SOURCE_ENV):
+            if os.environ.get(REQUIRED_ENV):
+                raise AssertionError("%s 가 없다" % SOURCE_ENV)
+            raise unittest.SkipTest("%s 가 없어 Hermes 소스 계약을 확인하지 않는다" % SOURCE_ENV)
         cls.root = pathlib.Path(os.environ[SOURCE_ENV]).resolve()
         if not (cls.root / "hermes_cli").is_dir():
             raise AssertionError("%s 에 hermes_cli 가 없다. Hermes 소스 디렉터리를 준다" % cls.root)
@@ -294,14 +341,27 @@ class HermesSourceTest(unittest.TestCase):
                     continue
                 self.assertIsInstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
                 self.assertIsNone(_accepts(node, shape, method="." in name))
+                if shape.returns is not None:
+                    self.assertEqual(shape.returns, node.returns and ast.unparse(node.returns), "반환 모양이 바뀌었다")
 
     def check_constructor(self, node, call):
         init = [item for item in node.body if isinstance(item, ast.FunctionDef) and item.name == "__init__"]
         if init:
             self.assertIsNone(_accepts(init[0], call, method=True))
             return
-        # dataclass 다. 주석이 달린 칸이 생성자 인자다.
-        fields = [item for item in node.body if isinstance(item, ast.AnnAssign) and isinstance(item.target, ast.Name)]
+        # dataclass 다. 주석이 달린 칸이 생성자 인자다. `ClassVar` 와 `field(init=False)` 는 뺀다.
+        self.assertTrue(any("dataclass" in ast.unparse(decorator) for decorator in node.decorator_list),
+                        "%s 에 생성자가 없고 dataclass 도 아니다" % node.name)
+
+        def init_field(item):
+            if "ClassVar" in ast.unparse(item.annotation):
+                return False
+            return not (isinstance(item.value, ast.Call) and any(
+                keyword.arg == "init" and isinstance(keyword.value, ast.Constant) and keyword.value.value is False
+                for keyword in item.value.keywords))
+
+        fields = [item for item in node.body
+                  if isinstance(item, ast.AnnAssign) and isinstance(item.target, ast.Name) and init_field(item)]
         names = {item.target.id for item in fields}
         self.assertEqual(set(), set(call.keywords) - names)
         required = {item.target.id for item in fields if item.value is None}
@@ -319,6 +379,7 @@ class HermesSourceTest(unittest.TestCase):
             if name in methods:
                 self.assertEqual(keywords, tuple(arg.arg for arg in methods[name].args.kwonlyargs),
                                  "%s 의 키워드 인자가 바뀌었다" % name)
+                self.assertNotIsInstance(methods[name], ast.AsyncFunctionDef, "%s 가 async 가 됐다" % name)
         attributes = set()
         for item in node.body:
             attributes |= _defined_names(item) if isinstance(item, (ast.Assign, ast.AnnAssign)) else set()
@@ -334,9 +395,23 @@ class HermesSourceTest(unittest.TestCase):
 
         self.assertEqual([], imports(_top_statements(tree.body)),
                          "모듈 머리에서 import 하면 바꿔 끼운 함수가 쓰이지 않는다")
-        inside = [node for function in ast.walk(tree) if isinstance(function, (ast.FunctionDef, ast.AsyncFunctionDef))
-                  for node in imports(ast.walk(function))]
-        self.assertTrue(inside, "요청마다 %s 를 import 하는 곳이 없다" % name)
+        # `@app.middleware("http")` 는 나중에 등록한 것이 바깥에서 먼저 돈다.
+        middlewares = [node for node in _top_statements(tree.body)
+                       if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+                       and any(isinstance(decorator, ast.Call) and isinstance(decorator.func, ast.Attribute)
+                               and decorator.func.attr == "middleware" for decorator in node.decorator_list)]
+        seams = [index for index, function in enumerate(middlewares) if imports(ast.walk(function))]
+        self.assertEqual(1, len(seams), "요청마다 %s 를 import 하는 미들웨어가 하나가 아니다" % name)
+        seam = middlewares[seams[0]]
+        calls = [node for node in ast.walk(seam) if isinstance(node, ast.Call)
+                 and isinstance(node.func, ast.Name) and node.func.id == name]
+        self.assertEqual([(2, [])], [(len(node.args), node.keywords) for node in calls],
+                         "%s 를 위치 인자 둘로만 불러야 바꿔 끼운 함수가 받는다" % name)
+        flag = contract.STATE_FLAG[0]
+        readers = [index for index, function in enumerate(middlewares)
+                   if any(isinstance(node, ast.Constant) and node.value == flag for node in ast.walk(function))]
+        self.assertTrue(readers, "%s 를 읽는 미들웨어가 없다" % flag)
+        self.assertLess(max(readers), seams[0], "%s 를 읽는 미들웨어가 토큰 판정보다 먼저 돈다" % flag)
 
     def test_state_flag_is_read(self):
         flag, files = contract.STATE_FLAG
@@ -347,9 +422,12 @@ class HermesSourceTest(unittest.TestCase):
                 self.assertIn(flag, constants)
 
     def test_session_store(self):
-        constants = {node.value for node in ast.walk(self.tree(self.root / contract.SESSION_DB_MODULE))
-                     if isinstance(node, ast.Constant) and isinstance(node.value, str)}
-        self.assertTrue(contract.SESSION_DB_FILE in constants, "session 저장소 파일 이름이 바뀌었다")
+        paths = [node for node in ast.walk(self.tree(self.root / contract.SESSION_DB_MODULE))
+                 if isinstance(node, ast.BinOp) and isinstance(node.op, ast.Div)
+                 and isinstance(node.right, ast.Constant) and node.right.value == contract.SESSION_DB_FILE
+                 and isinstance(node.left, ast.Call) and isinstance(node.left.func, ast.Name)
+                 and node.left.func.id == contract.SESSION_DB_HOME]
+        self.assertTrue(paths, "session 저장소가 %s() / %r 가 아니다" % (contract.SESSION_DB_HOME, contract.SESSION_DB_FILE))
         value, relative = contract.SUBAGENT_SOURCE
         platforms = {keyword.value.value for keyword in ast.walk(self.tree(self.root / relative))
                      if isinstance(keyword, ast.keyword) and keyword.arg == "platform"
@@ -375,9 +453,11 @@ class HermesSourceTest(unittest.TestCase):
                         connection.close()
                     self.assertEqual(set(), set(columns) - found)
 
-    def test_routes(self):
-        found = set()
+    def handlers(self):
+        """`hermes_cli` 의 경로 decorator 를 모아 `{(메서드, 경로): (처리기, 모듈)}` 로 돌려준다."""
+        found = {}
         for path in sorted((self.root / "hermes_cli").rglob("*.py")):
+            module = ".".join(path.relative_to(self.root).with_suffix("").parts)
             for node in ast.walk(self.tree(path)):
                 if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
                     continue
@@ -386,15 +466,36 @@ class HermesSourceTest(unittest.TestCase):
                             and decorator.func.attr in ROUTE_METHODS and decorator.args
                             and isinstance(decorator.args[0], ast.Constant)
                             and isinstance(decorator.args[0].value, str)):
-                        found.add((decorator.func.attr.upper(), PATH_PARAM_RE.sub("{}", decorator.args[0].value)))
-        self.assertEqual(set(), contract.HERMES_ROUTES - found, "plugin 이 감싸는 대시보드 경로가 없어졌다")
-        self.assertEqual(set(), contract.OWN_ROUTES & found, "plugin 이 직접 답하는 경로를 Hermes 가 만들었다")
+                        route = (decorator.func.attr.upper(), PATH_PARAM_RE.sub("{}", decorator.args[0].value))
+                        found[route] = (node, module)
+        return found
+
+    def test_routes(self):
+        found = self.handlers()
+        self.assertEqual(set(), contract.HERMES_ROUTES - set(found), "plugin 이 감싸는 대시보드 경로가 없어졌다")
+        self.assertEqual(set(), contract.OWN_ROUTES & set(found), "plugin 이 직접 답하는 경로를 Hermes 가 만들었다")
+
+    def test_handler_fields(self):
+        found = self.handlers()
+        for route, fields in contract.HANDLER_FIELDS.items():
+            with self.subTest(route=route):
+                self.assertIn(route, found)
+                handler, module = found[route]
+                names = set()
+                for arg in handler.args.args + handler.args.kwonlyargs:
+                    names.add(arg.arg)
+                    if isinstance(arg.annotation, ast.Name):
+                        model = self.resolve(module, arg.annotation.id)
+                        if isinstance(model, ast.ClassDef):
+                            names |= {item.target.id for item in model.body
+                                      if isinstance(item, ast.AnnAssign) and isinstance(item.target, ast.Name)}
+                self.assertEqual(set(), set(fields) - names, "처리기가 받는 칸이 바뀌었다")
 
     def test_revisit_signals(self):
         for (module, name), params in contract.REVISIT_SIGNALS.items():
             with self.subTest(symbol="%s.%s" % (module, name)):
                 node = self.definition(module, name)
-                positional, args = _params(node, False)
+                positional, _, args = _params(node, False)
                 found = tuple(arg.arg for arg in positional + list(args.kwonlyargs))
                 self.assertEqual(params, found, "확장점이 바뀌었다. ADR-088 의 판정을 다시 본다")
 
