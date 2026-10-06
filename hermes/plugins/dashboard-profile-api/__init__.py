@@ -239,6 +239,9 @@ CONNECTOR_SKILL_MAX_FILES = 20
 CONNECTOR_SKILL_MAX_CHARS = 100_000
 # 설치가 profile 에 쓰는 이름 대응 파일이다. 정책 hook 이 Hermes 등록 이름으로 원래 도구 이름을 찾는다(ADR-049).
 CONNECTOR_TOOL_MAP = ".fos-connector-tools.json"
+# 바인딩 떼기가 뗀 서버 이름을 남기는 기록이다. `{커넥터 id: 서버 이름}` 이다. 소유 기록 곁에 두고 이름 대응을 만들 때 함께 읽는다.
+# 떼기 전에 시작한 실행은 그 서버를 쥔 채 돌므로, 대응에서 서버가 빠지면 그 호출이 판정 없이 나간다.
+CONNECTOR_DETACHED = ".fos-connector-detached.json"
 # 커넥터 도구 호출을 판정하는 hook 을 가진 profile plugin 과, 묶음의 판과 견주는 그 파일들이다.
 POLICY_PLUGIN = "fos-ctx"
 PROFILE_PLUGIN_FILES = ("plugin.yaml", "__init__.py")
@@ -1033,18 +1036,22 @@ def _connector_server(manifest: dict) -> dict:
     return copied
 
 
-def _connector_tool_map(state: dict) -> dict:
-    """소유 기록의 커넥터로 만든 이름 대응이다. 형식은 `docs/backend/connector-tool-policy.md` 의 「이름 대응」 이 갖는다.
+def _connector_tool_map(state: dict, detached: dict | None = None) -> dict:
+    """소유 기록의 커넥터와 뗀 서버 기록으로 만든 이름 대응이다. 형식은 `docs/backend/connector-tool-policy.md` 의 「이름 대응」 이 갖는다.
 
     옛 설치는 운영 목록에서 빠졌거나 manifest 를 읽을 수 없는 커넥터를 싣지 않는다. 대응이 없는 도구는 hook 이 막는다.
     바인딩 설치는 `isolated: false` 를 싣고 소유 기록의 모든 서버를 싣는다. manifest 를 읽지 못한 서버는 빈 `tools` 다.
     바인딩 항목의 서버 이름은 기록의 이름이다. 기록의 이름이나 실행 정의가 지금 manifest 와 다르면 그 서버도 빈 `tools` 다.
     떼기는 남는 항목을 manifest 와 견주지 않으므로, 운영자가 manifest 를 바꾼 뒤에도 `config.yaml` 에 남은 서버가 대응에 있어야 한다.
+    뗀 서버(`detached`)도 빈 `tools` 로 싣는다. 떼기 전에 시작한 실행이 그 서버를 쥐고 있어도 그 호출을 판정이 막는다.
+    같은 이름을 지금 붙은 커넥터가 쓰면 붙은 쪽이 이긴다. 뗀 서버만 남아도 바인딩 profile 이다.
     바인딩 profile 의 hook 은 대응에 없는 서버를 통과시키므로, 서버가 빠지면 그 도구가 판정 없이 나간다(ADR-083).
     """
     roots = _connector_roots()
-    bound = any(_entry_mode(entry) == BIND_MODE for entry in state.values())
-    servers = {}
+    detached = detached or {}
+    bound = bool(detached) or any(_entry_mode(entry) == BIND_MODE for entry in state.values())
+    servers = {name: {"connector": plugin, "prefix": _hermes_tool_name(name, ""), "tools": {}}
+               for plugin, name in detached.items()}
     for plugin, entry in state.items():
         manifest = _connector_manifest(plugin) if plugin in roots else None
         if manifest is None:
@@ -1066,6 +1073,26 @@ def _connector_tool_map(state: dict) -> dict:
     if bound:
         return {"v": 1, "isolated": False, "servers": servers}
     return {"v": 1, "servers": servers}
+
+
+def _detached_servers(raw: bytes | None) -> dict:
+    """뗀 서버 기록의 본문을 읽는다. 파일이 없으면(`None`) 빈 객체다. 모양이 틀리면 ValueError 다.
+
+    서버 이름은 대응 파일의 접두사가 되므로 `_connector_state` 의 서버 이름 규칙으로 본다.
+    """
+    if raw is None:
+        return {}
+    value = json.loads(raw)
+    if not isinstance(value, dict) or any(
+            not isinstance(plugin, str) or not CONNECTOR_ID_RE.match(plugin)
+            or not isinstance(name, str) or not SERVER_NAME_RE.match(name) for plugin, name in value.items()):
+        raise ValueError("뗀 서버 기록이 올바르지 않다")
+    return value
+
+
+def _detached_bytes(detached: dict) -> bytes | None:
+    """뗀 서버 기록 파일의 본문이다. 남은 것이 없으면 None 이고 파일을 지운다."""
+    return (json.dumps(detached, sort_keys=True) + "\n").encode("utf-8") if detached else None
 
 
 def _entry_mode(entry) -> str:
@@ -1137,12 +1164,15 @@ def _server_matches(manifest: dict, server: dict) -> bool:
     return True
 
 
-def _connector_state(value) -> dict:
+def _connector_state(value, target: str | None = None) -> dict:
     """소유 기록의 모양을 보고, 운영 목록의 커넥터는 지금 manifest 의 실행 정의와 맞는지 본다.
 
     운영 목록에서 빠진 커넥터의 기록은 모양만 본다. 그 기록으로는 설치를 끄는 것만 한다.
     바인딩 항목(`mode: bind`)은 서버 이름, 보관 파일 이름, 설치한 스킬 이름을 갖는다.
     스킬 이름은 떼기가 지울 디렉터리 이름이라 경로 조각으로 쓸 수 있는지 여기서 본다.
+    바인딩 항목은 요청이 가리키는 커넥터(`target`)의 것만 manifest 와 견주고 나머지는 모양만 본다.
+    운영자가 커넥터 하나를 바꿔도 같은 profile 에 붙은 다른 커넥터의 실행, probe, 조회, 붙이기가 실패하지 않게 한다.
+    맞지 않는 다른 항목은 이름 대응이 빈 `tools` 로 싣는다. 옛 설치 항목은 지금처럼 모두 견준다.
     """
     if not isinstance(value, dict):
         raise ValueError("connector 소유 기록이 올바르지 않다")
@@ -1177,13 +1207,18 @@ def _connector_state(value) -> dict:
                 or any(not isinstance(name, str) or not isinstance(item, str)
                        for name, item in server["env"].items())):
             raise ValueError("소유 기록의 실행 정의 모양이 올바르지 않다")
-        if plugin not in roots:
+        if plugin not in roots or (entry.get("mode") == BIND_MODE and plugin != target):
             continue
-        manifest = _connector_manifest(plugin)
-        if (manifest is None or not _server_matches(manifest, server)
-                or entry.get("mcp_server", manifest["mcp_server"]) != manifest["mcp_server"]):
+        if not _entry_matches_manifest(plugin, entry):
             raise ValueError("소유 기록의 실행 정의가 지금 connector 와 다르다")
     return value
+
+
+def _entry_matches_manifest(plugin: str, entry: dict) -> bool:
+    """모양을 본 소유 기록 항목이 지금 manifest 의 서버 이름과 실행 정의와 맞는지 본다. manifest 가 없으면 거짓이다."""
+    manifest = _connector_manifest(plugin)
+    return (manifest is not None and _server_matches(manifest, entry["server"])
+            and entry.get("mcp_server", manifest["mcp_server"]) == manifest["mcp_server"])
 
 
 def _connector_allowlist(state: dict, servers: dict) -> list:
@@ -1257,9 +1292,12 @@ def _connector_config(profile_dir: pathlib.Path, plugin: str, enabled: bool) -> 
     originals = {path: path.read_bytes() if path.exists() else None
                  for path in (config_path, state_path, env_path, soul_path, tool_map_path, *plugin_values)}
     saved = yaml.safe_load(originals[config_path]) or {}
-    state = _connector_state(json.loads(originals[state_path])) if originals[state_path] else {}
-    if enabled and any(_entry_mode(entry) == BIND_MODE for entry in state.values()):
+    state = _connector_state(json.loads(originals[state_path]), plugin) if originals[state_path] else {}
+    detached_path = profile_dir / CONNECTOR_DETACHED
+    if enabled and (any(_entry_mode(entry) == BIND_MODE for entry in state.values())
+                    or detached_path.exists() or detached_path.is_symlink()):
         # 두 설치를 섞으면 이 설치가 지우는 Control Plane MCP 등록을 바인딩 설치가 전제하므로 서로를 깬다.
+        # 뗀 서버 기록이 남은 profile 은 바인딩 profile 이다. 옛 설치의 이름 대응이 그 기록을 싣지 않는다.
         raise FileExistsError("바인딩 설치가 있는 profile 에 옛 설치를 하지 않는다")
     servers = dict(saved.get("mcp_servers") or {})
     owned = state.get(plugin)
@@ -1605,9 +1643,14 @@ def _connector_bind_config(profile_dir: pathlib.Path, plugin: str, enabled: bool
 
     붙이기는 보관 파일의 값(`values`)을 그 profile `.env` 에 쓰고, 서버를 더하고, API 도구 목록에 서버 이름을 더하고,
     plugin 의 스킬을 그 profile 의 스킬로 복사한다. Control Plane MCP 등록, 다른 도구 이름, `SOUL.md` 는 건드리지 않는다.
+    새로 붙이기는 그 profile 에서 정책 hook plugin 이 켜져 있어야 한다. 꺼진 profile 에 붙이면 도구 호출이 판정 없이 나간다.
+    이미 붙은 커넥터를 다시 설치하는 것은 hook 이 꺼져 있어도 받는다. 그때 그 바인딩은 hook 상태로 `PENDING` 에 남는다.
     떼기는 그 서버와 이름과 env 와 스킬만 지운다(ADR-083).
+    떼기는 서버 이름을 뗀 서버 기록에 남기고 이름 대응에 빈 `tools` 로 남긴다. 대응 파일은 지우지 않는다.
+    같은 커넥터를 다시 붙이면 그 기록을 지운다.
     떠 있는 profile 에 더한 서버는 gateway 를 다시 띄워야 보이므로 붙이기는 바뀐 것이 있으면 재시작이 필요하다고 답한다.
-    떼기는 도구 목록에서 이름을 빼 다음 실행부터 막히므로 재시작이 필요 없다고 답한다.
+    떼기는 재시작이 필요 없다고 답한다. 다음 실행은 도구 목록에서 이름이 빠져 그 서버를 받지 않고,
+    떼기 전에 시작해 그 서버를 쥔 실행의 호출은 대응에 남은 서버를 보고 hook 이 묻고 판정이 막는다.
     """
     import yaml
     if profile_dir.resolve() != profile_dir:
@@ -1616,22 +1659,25 @@ def _connector_bind_config(profile_dir: pathlib.Path, plugin: str, enabled: bool
     state_path = profile_dir / CONNECTOR_STATE
     env_path = profile_dir / ".env"
     tool_map_path = profile_dir / CONNECTOR_TOOL_MAP
+    detached_path = profile_dir / CONNECTOR_DETACHED
     skills_dir = profile_dir / PROFILE_SKILLS_DIR
     plugin_dir = profile_dir / "plugins" / POLICY_PLUGIN
     bundled = (_profile_plugin_files(POLICY_PLUGIN) if enabled else None) or {}
     plugin_values = {plugin_dir / file_name: value for file_name, value in bundled.items()}
     plugin_dirs = (plugin_dir.parent, plugin_dir) if plugin_values else ()
-    for path in (config_path, state_path, env_path, tool_map_path, skills_dir, *plugin_dirs, *plugin_values):
+    for path in (config_path, state_path, env_path, tool_map_path, detached_path, skills_dir, *plugin_dirs,
+                 *plugin_values):
         if path.is_symlink():
             raise ValueError("profile 설정에 심볼릭 링크가 있다")
     _remove_backup_env_copies(profile_dir)
     originals = {path: path.read_bytes() if path.exists() else None
-                 for path in (config_path, state_path, env_path, tool_map_path, *plugin_values)}
+                 for path in (config_path, state_path, env_path, tool_map_path, detached_path, *plugin_values)}
     saved = yaml.safe_load(originals[config_path]) or {}
+    detached = _detached_servers(originals[detached_path])
     if not originals[state_path]:
         state = {}
     elif enabled:
-        state = _connector_state(json.loads(originals[state_path]))
+        state = _connector_state(json.loads(originals[state_path]), plugin)
     else:
         # 떼기는 기록 전체를 지금 manifest 와 견주지 않는다. 운영자가 실행 정의를 바꾼 뒤에도 떼야 `.env` 의 비밀이 남지 않는다.
         state = json.loads(originals[state_path])
@@ -1656,6 +1702,10 @@ def _connector_bind_config(profile_dir: pathlib.Path, plugin: str, enabled: bool
         # MCP 이름이 하나도 없던 목록에 이름을 더하면 운영자의 다른 MCP 서버가 막힌다.
         if not isinstance(allowed, list) or CONTROL_PLANE_MCP not in allowed:
             raise FileExistsError("API 도구 목록에 Control Plane MCP 가 없는 profile 이다")
+        # 이 설치는 plugin 파일만 맞추고 profile 의 plugin 설정은 쓰지 않는다. 운영자가 끈 hook 을 대신 켜지 않는다.
+        # 이미 붙은 커넥터를 다시 설치하는 것은 받는다. 연결 확인이 다시 설치하고, hook 상태가 거짓이라 반영 완료가 `READY` 로 두지 않는다.
+        if not owned and not _policy_plugin_enabled(saved):
+            raise FileExistsError("정책 hook plugin 이 켜져 있지 않은 profile 이다")
         name = manifest["mcp_server"]
         if name in servers and (not owned or servers[name] != owned["server"]):
             raise FileExistsError("운영자가 등록하거나 바꾼 MCP 서버가 있다")
@@ -1699,6 +1749,7 @@ def _connector_bind_config(profile_dir: pathlib.Path, plugin: str, enabled: bool
                 raise FileExistsError("이미 있는 스킬 디렉터리와 이름이 겹친다")
         state[plugin] = {"server": server, "allowlist_added": True, "mcp_server": name,
                          "mode": BIND_MODE, "vault": vault, "skills": skills}
+        detached.pop(plugin, None)
         desired = {skills_dir / skill / relative: data
                    for skill in skills for relative, data in manifest["skills"][skill].items()}
     else:
@@ -1715,6 +1766,7 @@ def _connector_bind_config(profile_dir: pathlib.Path, plugin: str, enabled: bool
         kept = [line for line in env_lines if _env_line_key(line) not in field_env]
         new_env = "".join(kept).encode("utf-8") if originals[env_path] is not None else None
         state.pop(plugin)
+        detached[plugin] = name
         skills = []
         desired = {}
 
@@ -1737,8 +1789,9 @@ def _connector_bind_config(profile_dir: pathlib.Path, plugin: str, enabled: bool
     updated = {**saved, "mcp_servers": servers, "platform_toolsets": platform}
     targets = {config_path: yaml.safe_dump(updated, sort_keys=False, allow_unicode=True).encode(),
                state_path: (json.dumps(state) + "\n").encode(), env_path: new_env,
-               # 붙은 커넥터가 남지 않으면 대응 파일을 지운다. hook 이 판정할 서버가 없다.
-               tool_map_path: _tool_map_bytes(_connector_tool_map(state)) if state else None,
+               detached_path: _detached_bytes(detached),
+               # 마지막 바인딩을 떼도 대응 파일은 뗀 서버를 싣고 남는다. 떼기 전에 시작한 실행이 그 서버를 쥐고 있다.
+               tool_map_path: _tool_map_bytes(_connector_tool_map(state, detached)) if state or detached else None,
                **desired, **{path: None for path in stale}}
     # plugin 파일은 맨 뒤에 쓴다. 앞의 쓰기가 실패하면 plugin 은 손대지 않은 채 남는다.
     targets.update(plugin_values)
@@ -1748,7 +1801,7 @@ def _connector_bind_config(profile_dir: pathlib.Path, plugin: str, enabled: bool
     backup = profile_dir / "connector-backups" / str(time.time_ns())
     backup.mkdir(parents=True, mode=0o700)
     os.chmod(backup.parent, 0o700)
-    for path in (config_path, state_path, tool_map_path):
+    for path in (config_path, state_path, tool_map_path, detached_path):
         # `.env` 와 스킬 파일은 뜨지 않는다. `.env` 에는 사용자의 비밀 원문이 있다.
         if originals[path] is not None:
             _atomic_private_write(backup / path.name, originals[path])
@@ -1830,17 +1883,28 @@ def _bind_skills_installed(profile_dir: pathlib.Path, manifest: dict, entry: dic
         return False
 
 
+def _policy_plugin_enabled(config: dict) -> bool:
+    """profile 설정이 정책 hook plugin 을 켜고 도구 덮어쓰기를 막는지 본다. 읽다가 예외가 나면 거짓이다.
+
+    `plugins.enabled` 에 있고 `plugins.disabled` 에 없으며 `plugins.entries.fos-ctx.allow_tool_override` 가 `false` 여야 한다.
+    """
+    try:
+        plugins = config["plugins"]
+        disabled = plugins.get("disabled") or []
+        return (isinstance(plugins["enabled"], list) and POLICY_PLUGIN in plugins["enabled"]
+                and isinstance(disabled, list) and POLICY_PLUGIN not in disabled
+                and plugins["entries"][POLICY_PLUGIN]["allow_tool_override"] is False)
+    except Exception:
+        return False
+
+
 def _policy_hook_active(profile_dir: pathlib.Path, config: dict, state: dict) -> bool:
     """그 profile 에서 커넥터 도구 호출이 정책 hook 을 거치는지 본다. 읽다가 예외가 나면 거짓이다.
 
     조건은 `docs/backend/connector-tool-policy.md` 의 「hook 이 켜져 있는지」 가 갖는다. 확인한 시점의 파일만 본다.
     """
     try:
-        plugins = config["plugins"]
-        disabled = plugins.get("disabled") or []
-        if (not isinstance(plugins["enabled"], list) or POLICY_PLUGIN not in plugins["enabled"]
-                or not isinstance(disabled, list) or POLICY_PLUGIN in disabled
-                or plugins["entries"][POLICY_PLUGIN]["allow_tool_override"] is not False):
+        if not _policy_plugin_enabled(config):
             return False
         bundled = _profile_plugin_files(POLICY_PLUGIN)
         if bundled is None:
@@ -1849,14 +1913,19 @@ def _policy_hook_active(profile_dir: pathlib.Path, config: dict, state: dict) ->
             installed = profile_dir / "plugins" / POLICY_PLUGIN / file_name
             if installed.is_symlink() or installed.read_bytes() != value:
                 return False
-        if (profile_dir / CONNECTOR_TOOL_MAP).read_bytes() != _tool_map_bytes(_connector_tool_map(state)):
+        detached_path = profile_dir / CONNECTOR_DETACHED
+        if detached_path.is_symlink():
+            return False
+        detached = _detached_servers(detached_path.read_bytes() if detached_path.exists() else None)
+        if (profile_dir / CONNECTOR_TOOL_MAP).read_bytes() != _tool_map_bytes(_connector_tool_map(state, detached)):
             return False
         roots = _connector_roots()
         servers = config.get("mcp_servers") or {}
-        for plugin in state:
+        for plugin, entry in state.items():
             manifest = _connector_manifest(plugin) if plugin in roots else None
             # 늘 승인이 필요한 도구가 모델에 등록된 채이면 hook 이 켜져 있어도 설치가 덜 된 것이다.
-            if manifest is None:
+            # manifest 와 맞지 않는 바인딩 항목은 대응에 빈 `tools` 로 실려 모든 호출을 묻는다. 그 항목만 쓸 수 없다.
+            if manifest is None or (_entry_mode(entry) == BIND_MODE and not _entry_matches_manifest(plugin, entry)):
                 continue
             if servers[manifest["mcp_server"]].get("tools") != manifest["server"].get("tools"):
                 return False
@@ -1910,8 +1979,11 @@ async def _connector_request(request):
     # 표식은 대상의 방식으로 판정한다. 커넥터 표식만 있는 사람이 만든 profile 은 바인딩 설치만 받는다.
     managed = (profile_dir / MANAGED_MARKER).is_file()
     host = (profile_dir / CONNECTOR_HOST_MARKER).is_file()
-    bind_target = request.method.upper() == "GET" or (
-        "bind" in body if body["enabled"] else _owned_mode(profile_dir, body["plugin"]) == BIND_MODE)
+    owned_mode = None if request.method.upper() == "GET" else _owned_mode(profile_dir, body["plugin"])
+    # 커넥터 표식만 있는 profile 의 떼기는 그 항목이 없어도 바인딩 떼기로 다룬다. 다시 보낸 떼기가 바꾸지 않고 성공한다.
+    unbind = (request.method.upper() != "GET" and not body["enabled"]
+              and (owned_mode == BIND_MODE or (owned_mode is None and not managed)))
+    bind_target = request.method.upper() == "GET" or ("bind" in body if body["enabled"] else unbind)
     if not (managed or (host and bind_target)):
         return _rejected("관리 표식이 없는 profile 이다", 401)
     try:
@@ -1919,6 +1991,7 @@ async def _connector_request(request):
             import yaml
             config = yaml.safe_load((profile_dir / "config.yaml").read_text(encoding="utf-8")) or {}
             state_path = profile_dir / CONNECTOR_STATE
+            # 바인딩 항목은 모양만 보고, manifest 와 맞는지는 아래에서 항목마다 따로 판정한다.
             state = _connector_state(json.loads(state_path.read_text(encoding="utf-8"))) if state_path.exists() else {}
             servers = config.get("mcp_servers") or {}
             try:
@@ -1940,7 +2013,9 @@ async def _connector_request(request):
                     configured = False
                 elif mode == BIND_MODE:
                     # Control Plane MCP 등록이 있어도 된다. 바인딩 설치는 그 등록과 다른 도구 이름을 그대로 둔다.
+                    # 기록이 지금 manifest 와 다르면 그 항목만 거짓이다. 같은 profile 의 다른 항목은 따로 판정한다.
                     configured = (isinstance(allowed, list) and manifest["mcp_server"] in allowed
+                                  and _entry_matches_manifest(plugin, entry)
                                   and _bind_skills_installed(profile_dir, manifest, entry))
                 else:
                     configured = isolated
@@ -1965,7 +2040,7 @@ async def _connector_request(request):
                 return _rejected("보관 파일의 값이 지금 칸 선언과 맞지 않는다")
             result = await asyncio.to_thread(_connector_bind_config, profile_dir, body["plugin"], True,
                                              body["bind"]["vault"], values)
-        elif not body["enabled"] and _owned_mode(profile_dir, body["plugin"]) == BIND_MODE:
+        elif unbind:
             result = await asyncio.to_thread(_connector_bind_config, profile_dir, body["plugin"], False)
         else:
             result = await asyncio.to_thread(_connector_config, profile_dir, body["plugin"], body["enabled"])
@@ -2234,8 +2309,9 @@ async def _connector_execute_request(request, connector_id: str):
         if not managed and not (profile_dir / CONNECTOR_HOST_MARKER).is_file():
             return _rejected("관리 표식이 없는 profile 이다", 401)
         state_path = profile_dir / CONNECTOR_STATE
-        # 기록을 검증하면서 지금 manifest 의 실행 정의와 맞는지도 함께 본다.
-        state = _connector_state(json.loads(state_path.read_text(encoding="utf-8"))) if state_path.is_file() else {}
+        # 기록을 검증하면서 이 커넥터의 항목이 지금 manifest 의 실행 정의와 맞는지도 함께 본다.
+        state = (_connector_state(json.loads(state_path.read_text(encoding="utf-8")), connector_id)
+                 if state_path.is_file() else {})
         if connector_id not in state:
             return _rejected("설치하지 않은 connector 다", 404)
         # 커넥터 표식만 있는 profile 은 바인딩 설치만 받는다. 그 밖의 항목으로는 실행하지 않는다.
@@ -2313,13 +2389,14 @@ async def _check_connector_probe(request):
         import yaml
         if not state_path.is_file():
             return _rejected("설치하지 않은 connector 다", 404)
-        # 기록을 검증하면서 지금 manifest 의 실행 정의와 맞는지도 함께 본다.
         state = _connector_state(json.loads(state_path.read_text(encoding="utf-8")))
         roots = _connector_roots()
-        owned = next((entry for plugin, entry in state.items() if plugin in roots
-                      and (_connector_manifest(plugin) or {}).get("mcp_server") == server), None)
-        if not owned:
+        target = next((plugin for plugin in state if plugin in roots
+                       and (_connector_manifest(plugin) or {}).get("mcp_server") == server), None)
+        if target is None:
             return _rejected("설치하지 않은 connector 다", 404)
+        # 이 서버의 커넥터 항목만 지금 manifest 의 실행 정의와 맞는지 본다.
+        owned = _connector_state(state, target)[target]
         # 커넥터 표식만 있는 profile 은 바인딩 설치만 받는다.
         if not managed and _entry_mode(owned) != BIND_MODE:
             return _rejected("관리 표식이 없는 profile 이다", 401)

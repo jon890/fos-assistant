@@ -941,9 +941,9 @@ export function startFakeHermes(
       send(response, 400, { error: "no such vault for this connector" });
       return;
     }
-    // 도구 목록이 없거나 Control Plane MCP 가 없는 목록, 옛 설치가 있는 profile 은 파일을 하나도 바꾸지 않고 거절한다.
+    // 도구 목록이 없거나 Control Plane MCP 가 없는 목록, 어느 커넥터든 옛 설치가 있는 profile 은 파일을 하나도 바꾸지 않고 거절한다.
     if (toolsets === undefined || !toolsets.includes(CONTROL_PLANE_MCP)
-        || installedConnectors.get(profile)?.has(plugin) === true) {
+        || (installedConnectors.get(profile)?.size ?? 0) > 0) {
       send(response, 409, { error: "the profile conflicts with this connector" });
       return;
     }
@@ -1331,6 +1331,11 @@ export function startFakeHermes(
       const boundHere = boundConnectors.get(body.profile);
       if (body.bind !== undefined || boundHere?.has(body.plugin) === true) {
         bindingInstall(response, body.profile, body.plugin, body.enabled, body.bind);
+        return true;
+      }
+      // 어느 커넥터든 바인딩 항목이 있는 profile 은 옛 설치를 받지 않는다.
+      if (body.enabled && (boundHere?.size ?? 0) > 0) {
+        send(response, 409, { error: "this profile has bound connectors" });
         return true;
       }
       if (!profiles.has(body.profile)) {

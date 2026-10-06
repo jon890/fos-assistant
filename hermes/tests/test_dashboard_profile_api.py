@@ -1566,17 +1566,21 @@ class ProfileApiRouteTest(unittest.TestCase):
         self.assertFalse((self.root / "alice/skills/demo").exists())
         self.assertTrue((self.root / "alice/skills/other/SKILL.md").is_file())
         self.assertEqual(sorted(json.loads((self.root / "alice/.fos-connectors.json").read_text())), [OTHER])
-        self.assertEqual(list(self.tool_map()["servers"]), ["other"])
+        # 뗀 서버는 빈 `tools` 로 대응에 남는다. 떼기 전에 시작한 실행이 그 서버를 쥐고 있어도 hook 이 묻는다.
+        self.assertEqual(self.tool_map()["servers"]["demo"], {"connector": DEMO, "prefix": "mcp__demo__", "tools": {}})
+        self.assertIn("mcp__other__list_scopes", self.tool_map()["servers"]["other"]["tools"])
         self.assertEqual((self.root / "alice/SOUL.md").read_text(encoding="utf-8"), "사용자의 성격\n")
         self.assertEqual(self.status_of()["connectors"], [
             {"plugin": DEMO, "enabled": False, "configured": False, "mode": "isolated"},
             {"plugin": OTHER, "enabled": True, "configured": True, "mode": "bind"}])
 
-        # 마지막 바인딩을 떼면 대응 파일이 없어지고 목록은 붙이기 전으로 돌아간다.
+        # 마지막 바인딩을 떼도 대응 파일은 뗀 서버를 빈 `tools` 로 싣고 남는다. 목록은 붙이기 전으로 돌아간다.
         last = self.bind(OTHER, enabled=False)
         self.assertEqual(last.status_code, 200)
         self.assertIs(last.body["restart_required"], False)
-        self.assertFalse((self.root / "alice" / self.plugin.CONNECTOR_TOOL_MAP).exists())
+        self.assertEqual(self.tool_map(), {"v": 1, "isolated": False, "servers": {
+            "demo": {"connector": DEMO, "prefix": "mcp__demo__", "tools": {}},
+            "other": {"connector": OTHER, "prefix": "mcp__other__", "tools": {}}}})
         self.assertEqual(json.loads((self.root / "alice/.fos-connectors.json").read_text()), {})
         self.assertEqual(self.alice_config()["platform_toolsets"]["api_server"],
                          ["delegation", "fos-assistant", "terminal"])
@@ -1653,14 +1657,17 @@ class ProfileApiRouteTest(unittest.TestCase):
                 self.assertEqual(removed.status_code, 200, removed.body)
                 self.assertIs(removed.body["changed"], True)
                 # config.yaml 에 남은 서버는 기록의 이름이다. 대응에서 빠지면 hook 이 그 서버를 판정 없이 통과시킨다.
+                # 뗀 서버도 빈 `tools` 로 남는다.
                 self.assertIn("other", self.alice_config()["mcp_servers"])
                 self.assertEqual(self.tool_map(), {"v": 1, "isolated": False, "servers": {
+                    "demo": {"connector": DEMO, "prefix": "mcp__demo__", "tools": {}},
                     "other": {"connector": OTHER, "prefix": "mcp__other__", "tools": {}}}})
 
-                # 다음 경우를 위해 되돌린다.
+                # 다음 경우를 위해 되돌린다. 뗀 서버는 대응에 빈 `tools` 로 남는다.
                 (other / ".mcp.json").write_text(original, encoding="utf-8")
                 self.assertEqual(self.bind(OTHER, enabled=False).status_code, 200)
-                self.assertFalse((alice / self.plugin.CONNECTOR_TOOL_MAP).exists())
+                self.assertEqual({name: server["tools"] for name, server in self.tool_map()["servers"].items()},
+                                 {"demo": {}, "other": {}})
 
     def test_detaching_refuses_a_binding_entry_whose_names_cannot_be_paths(self):
         """떼기는 기록을 모양만 보지만, 지울 서버 이름이나 스킬 이름이 경로 조각이 될 수 없으면 아무 파일도 바꾸지 않는다."""
@@ -1675,6 +1682,125 @@ class ProfileApiRouteTest(unittest.TestCase):
         self.assertEqual(self.bind(DEMO, enabled=False).status_code, 503)
 
         self.assertEqual(self.tree("alice"), before)
+
+    def test_detached_server_stays_in_the_tool_map_so_a_running_run_is_still_judged(self):
+        """뗀 서버는 대응에 빈 `tools` 로 남아 fos-ctx 가 그 도구를 정책에 묻는다. 다시 붙이면 뗀 기록이 지워진다."""
+        self.bind_fixture()
+        alice = self.root / "alice"
+        detached = alice / self.plugin.CONNECTOR_DETACHED
+        self.assertEqual(self.bind(DEMO, "c1").status_code, 200)
+
+        removed = self.bind(DEMO, enabled=False)
+        self.assertEqual(removed.status_code, 200, removed.body)
+        self.assertNotIn("demo", self.alice_config()["mcp_servers"])
+        self.assertEqual(self.tool_map(), {"v": 1, "isolated": False, "servers": {
+            "demo": {"connector": DEMO, "prefix": "mcp__demo__", "tools": {}}}})
+        self.assertEqual(json.loads(detached.read_text(encoding="utf-8")), {DEMO: "demo"})
+        # 대응 파일이 소유 기록과 뗀 기록으로 계산한 것과 같으므로 hook 상태는 참이다.
+        self.assertIs(self.status_of()["policy_hook"], True)
+
+        # 떼기 전에 시작한 실행은 그 서버를 쥐고 있다. 그 profile 에 설치된 fos-ctx 가 쓰기 도구를 정책에 묻는다.
+        spec = importlib.util.spec_from_file_location("fos_ctx_installed", alice / "plugins/fos-ctx/__init__.py")
+        ctx = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(ctx)
+        asked = []
+
+        def policy(tool_name, args, session_id, tool_call_id, servers):
+            asked.append((tool_name, ctx._connector_server(tool_name, servers)["connector"]))
+            return {"action": "block", "message": "붙은 연결이 없다"}
+
+        read_tool_map = ctx.read_tool_map
+        with mock.patch.object(ctx, "read_tool_map", lambda: read_tool_map(alice)), \
+                mock.patch.object(ctx, "connector_policy", side_effect=policy):
+            result = ctx.pre_tool_call(tool_name="mcp__demo__write_note", args={"text": "x"},
+                                       session_id="session-1", tool_call_id="call-1")
+        self.assertEqual(result, {"action": "block", "message": "붙은 연결이 없다"})
+        self.assertEqual(asked, [("mcp__demo__write_note", DEMO)])
+
+        # 다시 보낸 떼기는 바꾸지 않고, 뗀 기록이 남은 profile 에는 옛 설치를 하지 않는다.
+        before = self.tree("alice")
+        self.assertIs(self.bind(DEMO, enabled=False).body["changed"], False)
+        self.assertEqual(self.connector().status_code, 409)
+        self.assertEqual(self.tree("alice"), before)
+
+        # 같은 커넥터를 다시 붙이면 뗀 기록이 지워지고 대응이 manifest 의 도구를 싣는다.
+        self.assertEqual(self.bind(DEMO, "c1").status_code, 200)
+        self.assertFalse(detached.exists())
+        self.assertEqual(self.tool_map()["servers"]["demo"]["tools"], {"mcp__demo__list_scopes": "list_scopes"})
+        self.assertIs(self.status_of()["policy_hook"], True)
+
+    def test_changing_one_connector_leaves_the_other_binding_of_the_profile_usable(self):
+        """한 커넥터의 실행 정의가 바뀌어도 같은 profile 의 다른 바인딩은 조회, probe, 실행, 다시 붙이기가 되고 바뀐 항목만 쓸 수 없다."""
+        _, other = self.bind_fixture()
+        self.assertEqual(self.bind(DEMO, "c1").status_code, 200)
+        self.assertEqual(self.bind(OTHER, "c2").status_code, 200)
+        declared = json.loads((other / ".mcp.json").read_text(encoding="utf-8"))
+        declared["mcpServers"]["other"]["args"].append("--verbose")
+        (other / ".mcp.json").write_text(json.dumps(declared), encoding="utf-8")
+
+        expected = [{"plugin": DEMO, "enabled": True, "configured": True, "mode": "bind"},
+                    {"plugin": OTHER, "enabled": True, "configured": False, "mode": "bind"}]
+        self.assertEqual(self.status_of()["connectors"], expected)
+        self.assertEqual(self.connector_probe("demo"), 204)
+        self.assertEqual(self.connector_probe("other"), 503)
+
+        ran = []
+
+        async def runner(manifest, hermes_tool, args, env, progress):
+            ran.append(manifest["id"])
+            return None
+
+        with mock.patch.object(self.plugin, "_mcp_sdk_problem", return_value=None), \
+                mock.patch.object(self.plugin, "_run_connector_execute", side_effect=runner):
+            for plugin, tool in ((DEMO, "mcp__demo__write_note"), (OTHER, "mcp__other__write_note")):
+                self.request("/api/connectors/%s/execute" % plugin, "POST", token="valid", full_response=True,
+                             body={"profile": "alice", "hermes_tool": tool, "args": {}})
+        # 바뀐 커넥터는 자식을 띄우기 전에 멈춘다.
+        self.assertEqual(ran, [DEMO])
+
+        self.assertEqual(self.vault("PUT", vault="c1", connector=DEMO,
+                                    values={"token": "demo_new_0123456789"}).status_code, 200)
+        rebound = self.bind(DEMO, "c1")
+        self.assertEqual(rebound.status_code, 200, rebound.body)
+        self.assertIs(rebound.body["changed"], True)
+        # 바뀐 항목은 대응에 빈 `tools` 로 남아 모든 호출을 묻는다. 다시 쓴 대응으로 hook 상태가 참이 된다.
+        self.assertEqual(self.tool_map()["servers"]["other"]["tools"], {})
+        status = self.status_of()
+        self.assertEqual(status["connectors"], expected)
+        self.assertIs(status["policy_hook"], True)
+
+    def test_binding_needs_the_policy_hook_plugin_turned_on(self):
+        """profile 설정에서 fos-ctx 가 켜져 있지 않거나 도구 덮어쓰기를 허용하면 바인딩 설치는 409 이고 아무것도 바꾸지 않는다."""
+        self.bind_fixture()
+        original = self.alice_config()
+        for label, change in (
+            ("not enabled", lambda plugins: plugins.update(enabled=[])),
+            ("disabled", lambda plugins: plugins.update(disabled=["fos-ctx"])),
+            ("override allowed", lambda plugins: plugins["entries"]["fos-ctx"].update(allow_tool_override=True)),
+            ("no plugins", None),
+        ):
+            with self.subTest(label):
+                config = json.loads(json.dumps(original))
+                if change is None:
+                    config.pop("plugins")
+                else:
+                    change(config["plugins"])
+                self.write_config("alice", config)
+                before = self.tree("alice")
+                self.assertEqual(self.bind().status_code, 409)
+                self.assertEqual(self.tree("alice"), before)
+        self.write_config("alice", original)
+        self.assertEqual(self.bind().status_code, 200)
+
+    def test_rebinding_an_owned_connector_is_accepted_while_the_policy_hook_is_off(self):
+        """이미 붙은 커넥터를 다시 설치하는 것은 fos-ctx 가 꺼져 있어도 받고, hook 상태는 거짓으로 남는다."""
+        self.bind_fixture()
+        self.assertEqual(self.bind().status_code, 200)
+        config = self.alice_config()
+        config["plugins"]["disabled"] = ["fos-ctx"]
+        self.write_config("alice", config)
+        self.assertEqual(self.bind().status_code, 200)
+        self.assertIs(self.status_of()["policy_hook"], False)
 
     def test_values_with_quotes_and_backslashes_round_trip_through_vault_binding_and_import(self):
         """`"` 와 `\\` 가 든 값은 보관 파일에서 바인딩 `.env` 로 쓰인 뒤 실행과 옮기기가 같은 값으로 읽는다."""
@@ -1846,9 +1972,8 @@ class ProfileApiRouteTest(unittest.TestCase):
         self.assertFalse((self.root / "alice/skills/other").exists())
         self.assertNotIn("other", self.alice_config()["platform_toolsets"]["api_server"])
 
-    def test_profile_with_only_the_connector_marker_takes_bindings_only(self):
-        """커넥터 표식만 있는 사람이 만든 profile 은 조회, 바인딩 설치, 떼기가 되고 옛 설치는 401 이다."""
-        self.bind_fixture()
+    def host_profile(self):
+        """커넥터 표식만 있는 사람이 만든 profile `human` 을 만든다. Control Plane MCP 와 정책 hook 이 켜져 있다."""
         self.make_profile("human")
         config = yaml.safe_load((self.root / "human/config.yaml").read_text(encoding="utf-8"))
         config.update(
@@ -1857,6 +1982,28 @@ class ProfileApiRouteTest(unittest.TestCase):
             plugins={"enabled": ["fos-ctx"], "disabled": [], "entries": {"fos-ctx": {"allow_tool_override": False}}})
         self.write_config("human", config)
         (self.root / "human" / self.plugin.CONNECTOR_HOST_MARKER).write_text("", encoding="utf-8")
+
+    def test_detaching_again_on_a_profile_with_only_the_connector_marker_succeeds(self):
+        """커넥터 표식만 있는 profile 에서 떼기를 다시 보내거나 붙인 적 없는 커넥터를 떼면 바꾸지 않고 200 이다."""
+        self.bind_fixture()
+        self.host_profile()
+        self.assertEqual(self.bind(profile="human").status_code, 200)
+
+        first = self.bind(profile="human", enabled=False)
+        self.assertEqual(first.status_code, 200, first.body)
+        self.assertIs(first.body["changed"], True)
+        before = self.tree("human")
+        for plugin in (DEMO, OTHER):
+            with self.subTest(plugin):
+                again = self.bind(plugin, profile="human", enabled=False)
+                self.assertEqual(again.status_code, 200, again.body)
+                self.assertIs(again.body["changed"], False)
+                self.assertEqual(self.tree("human"), before)
+
+    def test_profile_with_only_the_connector_marker_takes_bindings_only(self):
+        """커넥터 표식만 있는 사람이 만든 profile 은 조회, 바인딩 설치, 떼기가 되고 옛 설치는 401 이다."""
+        self.bind_fixture()
+        self.host_profile()
 
         self.assertEqual(self.status_of("human")["connectors"][0],
                          {"plugin": DEMO, "enabled": False, "configured": False, "mode": "isolated"})
