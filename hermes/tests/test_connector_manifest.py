@@ -628,9 +628,9 @@ class ConnectorToolPolicyTest(ConnectorGateCase):
     def test_identifiers_reach_the_catalog_in_declared_order(self):
         """`identifiers` 는 승인을 받는 도구에서 받고 선언한 순서 그대로 나온다(ADR-088)."""
         self.declare(lambda tools: tools.update(
-            write_note={"risk": "WRITE", "grant": False, "identifiers": ["note_id", "folder_id"]}))
+            write_note={"risk": "WRITE", "grant": False, "identifiers": ["note_id", "folder_id", "a" * 31]}))
         tools = self.catalog()[0]["tools"]
-        self.assertEqual(tools["write_note"]["identifiers"], ["note_id", "folder_id"])
+        self.assertEqual(tools["write_note"]["identifiers"], ["note_id", "folder_id", "a" * 31])
         self.assertEqual(tools["env_view"]["identifiers"], [])
 
     def test_invalid_identifiers_leave_the_connector_out(self):
@@ -641,7 +641,8 @@ class ConnectorToolPolicyTest(ConnectorGateCase):
             ("empty name", [""]),
             ("nested path", ["note.id"]),
             ("starts with a digit", ["1id"]),
-            ("too long", ["a" * 65]),
+            ("32 chars", ["a" * 32]),
+            ("trailing newline", ["note_id\n"]),
             ("duplicate", ["note_id", "note_id"]),
             ("secret key", ["api_token"]),
             ("secret key with mixed case", ["ClientSecret"]),

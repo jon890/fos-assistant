@@ -288,8 +288,10 @@ TOOL_RISK_DEFAULTS = {"READ": ("none", "none"), "SENSITIVE": ("required", "requi
                       "FINANCIAL": ("always", "always")}
 TOOL_TITLE_MAX_CHARS = 80
 # `tools.<이름>.identifiers` 가 가리키는 인자 이름이다(ADR-088). 도구 인자 객체의 맨 위 칸만 가리킨다.
-TOOL_IDENTIFIER_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]{0,63}$")
-# 비밀 키로 읽히는 인자 이름이다. Control Plane 의 `ToolDetailRedactor` 가 값을 늘 가리는 이름과 같다.
+# 31자까지다. 32자 이상인 이름은 Control Plane 이 키 이름 자체를 긴 덩어리로 보고 가린다.
+TOOL_IDENTIFIER_RE = re.compile(r"[A-Za-z_][A-Za-z0-9_]{0,30}")
+# 비밀 키로 읽히는 인자 이름이다. Control Plane 의 `ToolDetailRedactor` 의 `SECRET_KEYS` 와 `isSecretKey` 와 같다.
+# 한쪽을 바꾸면 다른 쪽도 바꾼다. 어긋나도 Control Plane 이 그 칸을 다시 가리므로 비밀이 보이지는 않는다.
 SECRET_ARGUMENT_NAMES = frozenset({"token", "secret", "password", "passwd", "apikey", "authorization", "cookie",
                                    "credential", "credentials", "privatekey", "accesskey", "clientsecret"})
 SECRET_ARGUMENT_SUFFIXES = ("token", "secret", "password", "privatekey")
@@ -725,7 +727,7 @@ def _tool_identifiers(declared_tool: dict, approval: str) -> list:
     if approval != "required":
         raise ValueError("identifiers 는 approval 이 required 인 도구에만 선언한다")
     if not isinstance(identifiers, list) or not all(
-            isinstance(item, str) and TOOL_IDENTIFIER_RE.match(item) for item in identifiers):
+            isinstance(item, str) and TOOL_IDENTIFIER_RE.fullmatch(item) for item in identifiers):
         raise ValueError("identifiers 는 인자 이름의 배열이다")
     if len(set(identifiers)) != len(identifiers):
         raise ValueError("identifiers 에 같은 이름이 두 번 있다")
