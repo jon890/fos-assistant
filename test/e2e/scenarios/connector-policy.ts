@@ -17,11 +17,14 @@ type Turn = { conversationId: string; assistantText: string };
 type ActionView = { actionId: string; connectorId: string; status: string; resultText: string | null };
 type Message = { id: number; role: "USER" | "ASSISTANT" | "SYSTEM"; content: string };
 type Probe = { answer: string; conversationId: string };
+type PendingView = { actionId: string; argsJson: string; hiddenArgs: boolean; grantAllowed: boolean };
 
 /** `run.ts` 가 Control Plane 에 준 승인 대기 시간과 같아야 한다. */
 const APPROVAL_TTL_MS = 15_000;
 const PREFIX = `mcp__${DEMO_CONNECTOR.mcp_server}__`;
 const AGENDA_PREFIX = `mcp__${AGENDA_CONNECTOR.mcp_server}__`;
+/** Gmail 필터 id 처럼 32자 넘는 영숫자 식별자다. 식별자로 선언하지 않은 칸에서는 가려진다. */
+const LONG_ID = "ANe1BmhXxP8kq3Lr0sT9vUwYzA2bC4dE6fG8hJ";
 /** 그 실행의 에이전트에 그 서버를 붙인 연결이 없어 줄을 남기지 않고 막은 호출의 글이다. */
 const NO_CONTEXT = "이 도구 호출의 실행 맥락을 확인하지 못해 실행하지 않았다.";
 
@@ -70,6 +73,15 @@ async function awaitMessages(
     await new Promise((resolve) => setTimeout(resolve, 100));
   }
   fail(`${what}: ${timeoutMs / 1000}초 안에 기대한 메시지가 오지 않았다. 마지막 목록: ${JSON.stringify(last.map((m) => [m.role, m.content]))}`);
+}
+
+/** 대화에서 나온 승인 줄 목록이다. 화면이 읽는 것과 같은 응답이다. */
+async function actionsOf(context: Context, conversationId: string): Promise<PendingView[]> {
+  return expectStatus(
+    await call(context, `/chat/conversations/${conversationId}/connector-actions`, { token: context.tokens.dad }),
+    200,
+    "승인 줄 목록 조회",
+  ).json<PendingView[]>();
 }
 
 function requestNumber(answer: string): string | undefined {
@@ -262,6 +274,77 @@ export const connectorPolicyScenario: Scenario = {
       const foreign = await probe(context, agentCode, "mcp__other__list_scopes", "{}");
       expect(foreign.startsWith("block "), `다른 서버의 도구가 막히지 않았다: ${foreign}`);
       expect(mine().length === 2, `다른 서버의 호출이 커넥터 서버에 닿았다: ${JSON.stringify(mine())}`);
+
+      step("상시 허락을 닫은 도구가 식별자로 선언한 칸의 긴 id 는 승인 줄에 그대로 보이고 승인하면 실행한다");
+      const reachedBeforeDelete = mine().length;
+      const deleteArgs = JSON.stringify({ note_id: LONG_ID });
+      const deleteAsk = await probeIn(context, agentCode, `${PREFIX}delete_note`, deleteArgs);
+      const deleteId = requestNumber(deleteAsk.answer);
+      expect(deleteAsk.answer.startsWith("block ") && deleteId !== undefined,
+        `delete_note 가 승인 요청 번호와 함께 막히지 않았다: ${deleteAsk.answer}`);
+      const pendingDelete = (await actionsOf(context, deleteAsk.conversationId)).find((row) => row.actionId === deleteId);
+      expect(
+        pendingDelete !== undefined && !pendingDelete.hiddenArgs && pendingDelete.argsJson.includes(LONG_ID)
+          && !pendingDelete.argsJson.includes("[가림]") && !pendingDelete.grantAllowed,
+        `식별자 칸이 가려졌거나 승인할 수 없는 줄로 왔다: ${JSON.stringify(pendingDelete)}`,
+      );
+      const deleted = expectStatus(
+        await call(context, `/connector-actions/${deleteId}/approve`, {
+          method: "POST", token: context.tokens.dad, body: { grant: null },
+        }),
+        200,
+        "식별자 칸이 있는 줄의 승인",
+      ).json<ActionView>();
+      expect(deleted.status === "SUCCEEDED", `식별자 칸이 있는 줄이 실행되지 않았다: ${JSON.stringify(deleted)}`);
+      const deleteExecuted = mine().slice(reachedBeforeDelete);
+      expect(
+        deleteExecuted.length === 1 && deleteExecuted[0]!.via === "execute"
+          && deleteExecuted[0]!.hermesTool === `${PREFIX}delete_note` && deleteExecuted[0]!.argsJson === deleteArgs,
+        `승인한 인자 그대로 실행 경로를 한 번 부르지 않았다: ${JSON.stringify(deleteExecuted)}`,
+      );
+      // 승인한 결과를 잇는 자동 turn 이 끝나야 뒤의 단계가 대화를 섞지 않는다.
+      await awaitMessages(
+        context,
+        deleteAsk.conversationId,
+        (messages) => messages.length >= 2
+          && messages.at(-2)!.role === "SYSTEM" && messages.at(-1)!.role === "ASSISTANT",
+        10_000,
+        "식별자 칸이 있는 줄의 승인 결과",
+      );
+
+      step("같은 도구라도 식별자로 선언하지 않은 칸의 긴 글은 가려 승인할 수 없고, 승인해도 실행하지 않는다");
+      const reachedBeforeHidden = mine().length;
+      const hiddenAsk = await probeIn(
+        context, agentCode, `${PREFIX}delete_note`, JSON.stringify({ note_id: LONG_ID, memo: LONG_ID }),
+      );
+      const hiddenId = requestNumber(hiddenAsk.answer);
+      expect(hiddenAsk.answer.startsWith("block ") && hiddenId !== undefined,
+        `둘째 delete_note 가 승인 요청 번호와 함께 막히지 않았다: ${hiddenAsk.answer}`);
+      const pendingHidden = (await actionsOf(context, hiddenAsk.conversationId)).find((row) => row.actionId === hiddenId);
+      expect(
+        pendingHidden !== undefined && pendingHidden.hiddenArgs
+          && JSON.parse(pendingHidden.argsJson).note_id === LONG_ID && JSON.parse(pendingHidden.argsJson).memo === "[가림]",
+        `선언하지 않은 칸이 가려지지 않았거나 승인할 수 있는 줄로 왔다: ${JSON.stringify(pendingHidden)}`,
+      );
+      const refusedHidden = expectStatus(
+        await call(context, `/connector-actions/${hiddenId}/approve`, {
+          method: "POST", token: context.tokens.dad, body: { grant: null },
+        }),
+        200,
+        "가려진 칸이 있는 줄의 승인",
+      ).json<ActionView & { errorCode: string | null }>();
+      expect(
+        refusedHidden.status === "REJECTED" && refusedHidden.errorCode === "hidden_args",
+        `가려진 칸이 있는 줄이 hidden_args 로 끝나지 않았다: ${JSON.stringify(refusedHidden)}`,
+      );
+      expect(mine().length === reachedBeforeHidden, `가려진 칸이 있는 호출이 커넥터 서버에 닿았다: ${JSON.stringify(mine())}`);
+      await awaitMessages(
+        context,
+        hiddenAsk.conversationId,
+        (messages) => messages.at(-1)?.role === "SYSTEM",
+        10_000,
+        "가려진 칸이 있는 줄의 취소 알림 줄",
+      );
 
       step("연결 둘을 붙이면 두 서버의 도구가 각자의 연결로 판정된다");
       await setup.connect(AGENDA_CONNECTOR.id);
