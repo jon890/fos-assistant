@@ -31,8 +31,8 @@ def read_json(path: pathlib.Path):
     return json.loads(path.read_text(encoding="utf-8"))
 
 
-async def _list_tools(command: str, args: list[str], env: dict[str, str]) -> dict[str, bool]:
-    """서버를 띄워 `{도구 이름: read_only_hint 가 참인가}` 를 돌려준다."""
+async def _list_tools(command: str, args: list[str], env: dict[str, str]) -> dict[str, tuple[bool, set[str]]]:
+    """서버를 띄워 `{도구 이름: (read_only_hint 가 참인가, 입력 스키마의 맨 위 인자 이름)}` 을 돌려준다."""
     from mcp import ClientSession, StdioServerParameters
     from mcp.client.stdio import stdio_client
 
@@ -41,10 +41,12 @@ async def _list_tools(command: str, args: list[str], env: dict[str, str]) -> dic
         async with ClientSession(read, write) as session:
             await session.initialize()
             result = await session.list_tools()
-    return {tool.name: bool(tool.annotations and tool.annotations.read_only_hint is True) for tool in result.tools}
+    return {tool.name: (bool(tool.annotations and tool.annotations.read_only_hint is True),
+                        set((tool.input_schema or {}).get("properties", {})))
+            for tool in result.tools}
 
 
-def server_tools(server: dict, root: pathlib.Path) -> dict[str, bool]:
+def server_tools(server: dict, root: pathlib.Path) -> dict[str, tuple[bool, set[str]]]:
     args = [str(a).replace("${CLAUDE_PLUGIN_ROOT}", str(root)) for a in server.get("args", [])]
     # 칸마다 뜻 없는 글을 준다. 실제 값이 아니므로 서비스는 거절하고, 도구 목록만 읽는다.
     env = {name: "placeholder" for name in server.get("env", {})}
@@ -130,10 +132,15 @@ def check_connector(root: pathlib.Path, repo: pathlib.Path, load_connector) -> l
                 problems.append("서버 도구와 선언이 다르다: 선언에 없는 도구 %s, 서버에 없는 선언 %s" % (
                     sorted(set(served) - declared_names), sorted(declared_names - set(served))))
             read_declared = {t for t, spec in tools.items() if spec.get("risk") == "READ"}
-            read_served = {t for t, read_only in served.items() if read_only}
+            read_served = {t for t, (read_only, _) in served.items() if read_only}
             if read_served != read_declared:
                 problems.append("읽기 전용 표시와 READ 선언이 다르다: 서버만 읽기 전용 %s, 선언만 READ %s" % (
                     sorted(read_served - read_declared), sorted(read_declared - read_served)))
+            # 식별자로 선언한 인자는 서버가 받는 인자여야 한다. 없는 이름의 선언은 아무것도 남기지 않는 죽은 글이다.
+            for tool, spec in tools.items():
+                missing = sorted(set(spec.get("identifiers", [])) - served.get(tool, (False, set()))[1])
+                if missing:
+                    problems.append("identifiers 에 서버의 입력 스키마에 없는 인자가 있다: %s %s" % (tool, missing))
 
     allowed = set(sys.stdlib_module_names) | ALLOWED_IMPORTS
     for source in sorted(root.rglob("*.py")):
@@ -249,6 +256,11 @@ class ContractCatchesViolationsTest(base.ConnectorGateCase):
         self.assert_reported(problems, "grant 가 false 가 아니다: send_message")
         # plugin 의 검증도 같은 선언을 거절한다. 그 까닭이 위반 글에 든다.
         self.assert_reported(problems, "manifest 검증 실패: outbound 가 참인 도구")
+
+    def test_identifier_missing_from_the_server_schema_is_reported(self):
+        problems = self.broken_copy(self.edit_declaration(
+            lambda v: v["tools"]["delete_filter"].update(identifiers=["filter_id", "rule_id"])))
+        self.assert_reported(problems, "입력 스키마에 없는 인자가 있다: delete_filter ['rule_id']")
 
     def test_secret_field_not_marked_secret_is_reported(self):
         def mutate(value):

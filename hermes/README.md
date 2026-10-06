@@ -314,7 +314,7 @@ API server 의 session 응답은 provider 를 주지 않는다. 그 값은 Herme
 
 **카탈로그 응답.** `fields[]` 는 manifest 의 칸 그대로(`env`, `options` 포함)이고 `verify` 는 `{tool}` 이다.
 `toolsets` 와 `attachments` 는 manifest 에 없으면 빈 목록과 거짓이다. 옛 대시보드 plugin 은 두 칸을 내지 않고, Control Plane 은 없는 칸을 같은 기본값으로 읽는다.
-`tools` 는 `{<이름>: {risk, approval, title, grant, outbound}}` 이고 `approval`, `grant`, `outbound` 는 기본값을 채운 값이다. `schema: 1` 은 `verify.tool` 과 `options.tool` 만 `READ` 로 담는다.
+`tools` 는 `{<이름>: {risk, approval, title, grant, outbound, identifiers}}` 이고 `approval`, `grant`, `outbound`, `identifiers` 는 기본값을 채운 값이다. `schema: 1` 은 `verify.tool` 과 `options.tool` 만 `READ` 로 담는다.
 `schema` 가 없는 응답은 `1` 로 읽는다. `operator_env` 의 이름과 값, `errors` 는 담지 않는다.
 `skills` 는 바인딩 설치가 profile 에 복사할 스킬의 이름 목록이고 이름 순이다. 이름은 `SKILL.md` 앞머리의 `name` 이고, 없으면 디렉터리 이름이다. 본문은 담지 않는다.
 `fields` 가 빈 목록인 커넥터도 받는다. 값을 받지 않는 일반 MCP 서버다.
