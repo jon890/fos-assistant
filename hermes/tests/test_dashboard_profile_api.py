@@ -1892,10 +1892,12 @@ class ProfileApiRouteTest(unittest.TestCase):
         for field in ("required_environment_variables: [DEMO_TOKEN]", "required_credential_files: [.env]",
                       "setup:\n  collect_secrets: [DEMO_TOKEN]", "prerequisites:\n  env_vars: [DEMO_TOKEN]"):
             with self.subTest(field=field):
-                skill.write_text(original.replace("---\n", "---\n%s\n" % field, 1), encoding="utf-8")
-                response = self.bind()
-                self.assertNotEqual(response.status_code, 200, response.body)
-                self.assertEqual(self.tree("alice"), before)
+                # 첫 줄 뒤에 공백이 붙어도 Hermes 는 앞머리로 읽으므로 같은 검사를 받는다.
+                for opening in ("---\n", "--- \n"):
+                    skill.write_text(original.replace("---\n", opening + "%s\n" % field, 1), encoding="utf-8")
+                    response = self.bind()
+                    self.assertNotEqual(response.status_code, 200, response.body)
+                    self.assertEqual(self.tree("alice"), before)
         skill.write_text(original, encoding="utf-8")
         self.assertEqual(self.bind().status_code, 200)
 

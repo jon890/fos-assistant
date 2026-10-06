@@ -819,10 +819,13 @@ def _skill_name(skill_md: str, fallback: str) -> str:
     import yaml
     text = skill_md.lstrip("﻿").replace("\r\n", "\n")
     name = fallback
-    if text.startswith("---\n"):
-        head, separator, _ = text[4:].partition("\n---\n")
-        if not separator:
+    # 앞머리를 알아보는 규칙도 Hermes 와 같게 둔다(`agent/skill_utils.py` 의 `parse_frontmatter`).
+    # 첫 줄이 `--- ` 처럼 정확히 `---` 가 아니어도 Hermes 는 앞머리로 읽으므로 여기서도 읽어 검사한다.
+    if text.startswith("---"):
+        closing = re.search(r"\n---\s*\n", text[3:])
+        if closing is None:
             raise ValueError("SKILL.md 의 앞머리가 닫히지 않았다")
+        head = text[3:3 + closing.start()]
         front = yaml.safe_load(head) if head.strip() else {}
         if not isinstance(front, dict):
             raise ValueError("SKILL.md 의 앞머리가 객체가 아니다")
