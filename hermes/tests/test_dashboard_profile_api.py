@@ -1883,6 +1883,22 @@ class ProfileApiRouteTest(unittest.TestCase):
         before = self.tree("owner")
         refused(self.bind(profile="owner"), 401, "owner")
 
+    def test_binding_refuses_a_connector_skill_that_requests_secrets(self):
+        """커넥터 스킬의 앞머리가 환경 값이나 자격 증명 파일을 요청하면 붙이지 않고 아무 파일도 바꾸지 않는다(ADR-086)."""
+        self.bind_fixture()
+        skill = self.root.parent / "demo-connector/skills/demo/SKILL.md"
+        original = skill.read_text(encoding="utf-8")
+        before = self.tree("alice")
+        for field in ("required_environment_variables: [DEMO_TOKEN]", "required_credential_files: [.env]",
+                      "setup:\n  collect_secrets: [DEMO_TOKEN]", "prerequisites:\n  env_vars: [DEMO_TOKEN]"):
+            with self.subTest(field=field):
+                skill.write_text(original.replace("---\n", "---\n%s\n" % field, 1), encoding="utf-8")
+                response = self.bind()
+                self.assertNotEqual(response.status_code, 200, response.body)
+                self.assertEqual(self.tree("alice"), before)
+        skill.write_text(original, encoding="utf-8")
+        self.assertEqual(self.bind().status_code, 200)
+
     def test_binding_rolls_back_every_file_it_wrote_when_the_last_write_fails(self):
         """마지막 파일의 쓰기가 실패하면 먼저 쓴 설정, 소유 기록, 대응 파일, `.env`, 스킬을 되돌리고 만든 디렉터리를 지운다."""
         self.bind_fixture()

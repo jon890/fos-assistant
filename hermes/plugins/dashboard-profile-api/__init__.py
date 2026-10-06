@@ -811,6 +811,10 @@ def _skill_name(skill_md: str, fallback: str) -> str:
     """`SKILL.md` 앞머리의 `name` 이다. 없으면 디렉터리 이름이다. 경로 조각으로 쓸 수 없는 이름이면 예외다.
 
     Hermes 가 스킬 목록을 만들 때 같은 규칙으로 이름을 정한다(`tools/skills_tool.py` 의 `_find_all_skills`).
+
+    앞머리가 환경 값이나 자격 증명 파일을 요청하면 예외다. Hermes 는 스킬을 읽을 때 그 칸의 이름으로
+    profile `.env` 의 값과 profile 안의 파일을 셸 실행 공간에 넣는다. 바인딩 설치는 커넥터 값을 그 `.env` 에
+    복사하므로 실행 공간이 커넥터 비밀을 받게 된다. 칸 목록은 Control Plane 이 올린 스킬에 거는 것과 같다(ADR-086).
     """
     import yaml
     text = skill_md.lstrip("﻿").replace("\r\n", "\n")
@@ -822,6 +826,12 @@ def _skill_name(skill_md: str, fallback: str) -> str:
         front = yaml.safe_load(head) if head.strip() else {}
         if not isinstance(front, dict):
             raise ValueError("SKILL.md 의 앞머리가 객체가 아니다")
+        setup = front.get("setup")
+        prerequisites = front.get("prerequisites")
+        if ("required_environment_variables" in front or "required_credential_files" in front
+                or (isinstance(setup, dict) and "collect_secrets" in setup)
+                or (isinstance(prerequisites, dict) and "env_vars" in prerequisites)):
+            raise ValueError("SKILL.md 의 앞머리가 환경 값이나 자격 증명 파일을 요청한다")
         name = front.get("name", fallback)
     # 설치와 떼기가 이 이름을 profile 의 스킬 디렉터리 이름으로 쓴다.
     if not isinstance(name, str) or not SKILL_NAME_RE.match(name) or ".." in name:
