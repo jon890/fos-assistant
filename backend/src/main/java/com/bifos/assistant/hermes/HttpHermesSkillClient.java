@@ -97,7 +97,10 @@ public class HttpHermesSkillClient implements HermesSkillClient {
         if (apiServerToolsets != null) {
             config.put("platform_toolsets", Map.of("api_server", List.copyOf(apiServerToolsets)));
         }
-        attachmentDirectory.ensure(sandboxOwner);
+        // 도구 목록을 함께 쓸 때만 plugin 이 실행 공간 설정을 다시 쓴다. 스킬 경로만 바꾸는 게시는 막지 않는다.
+        if (apiServerToolsets != null) {
+            attachmentDirectory.ensure(sandboxOwner);
+        }
         try {
             restClient
                     .put()

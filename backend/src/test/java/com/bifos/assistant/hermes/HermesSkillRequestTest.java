@@ -178,12 +178,22 @@ class HermesSkillRequestTest {
     }
 
     @Test
-    @DisplayName("첨부 디렉터리 자리에 링크가 있으면 게시하지 않고 거절 예외를 던진다")
+    @DisplayName("스킬 경로만 바꾸는 게시는 첨부 디렉터리를 만들지도 검사하지도 않는다")
+    void publishWithoutToolsetsLeavesAttachmentsAlone() {
+        client.publish("kid", List.of(), null, "u7");
+
+        assertThat(attachmentRoot.resolve("users")).doesNotExist();
+        assertThat(calls).hasSize(1);
+    }
+
+    @Test
+    @DisplayName("도구 목록을 함께 쓰는 게시는 첨부 디렉터리 자리에 링크가 있으면 보내지 않고 거절 예외를 던진다")
     void publishStopsOnALinkedUsersDirectory() throws IOException {
         Path outside = Files.createDirectory(attachmentRoot.resolveSibling(attachmentRoot.getFileName() + "-outside"));
         Files.createSymbolicLink(attachmentRoot.resolve("users"), outside);
 
-        assertThatThrownBy(() -> client.publish("kid", List.of("/skills/kid/v1790661162144-a1b2"), null, "u7"))
+        assertThatThrownBy(() ->
+                        client.publish("kid", List.of("/skills/kid/v1790661162144-a1b2"), List.of("vision"), "u7"))
                 .isInstanceOfSatisfying(HermesRequestRejected.class, ex -> {
                     assertThat(ex.status()).isEqualTo(409);
                     assertThat(ex.code()).isEqualTo(ErrorCode.AGENT_SANDBOX_UNAVAILABLE);

@@ -26,7 +26,7 @@ public class HermesRequestRejected extends ApiException {
         this.status = status;
     }
 
-    /** 대시보드가 돌려준 상태 코드다. */
+    /** 대시보드가 돌려준 상태 코드다. 보내기 전에 멈췄으면 같은 뜻으로 정한 상태 코드다. */
     public int status() {
         return status;
     }

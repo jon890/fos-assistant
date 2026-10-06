@@ -17,6 +17,7 @@ import com.bifos.assistant.hermes.dto.ConnectorField;
 import com.bifos.assistant.hermes.dto.ConnectorFieldOptions;
 import com.bifos.assistant.hermes.dto.ConnectorManifest;
 import com.bifos.assistant.hermes.dto.ConnectorTool;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
@@ -289,6 +290,27 @@ class HttpHermesConnectorClientTest {
 
         assertThat(attachmentRoot.resolve("users").resolve(SandboxAttachmentDirectory.key("u3")))
                 .isDirectory();
+        server.verify();
+    }
+
+    @DisplayName("켜는 설치는 첨부 디렉터리가 링크이면 보내지 않고, 끄는 설치는 막지 않는다")
+    @Test
+    void linkedAttachmentDirectoryBlocksOnlyEnablingInstalls() throws Exception {
+        Path users = Files.createDirectory(attachmentRoot.resolve("users"));
+        Path other = Files.createDirectory(users.resolve(SandboxAttachmentDirectory.key("u4")));
+        Files.createSymbolicLink(users.resolve(SandboxAttachmentDirectory.key("u3")), other);
+        server.expect(requestTo(BASE + "/api/connectors"))
+                .andExpect(content().json("{\"enabled\":false,\"sandbox_owner\":\"u3\"}"))
+                .andRespond(withSuccess(
+                        "{\"profile\":\"user-demo\",\"plugin\":\"demo-notes\",\"enabled\":false,"
+                                + "\"restart_required\":true}",
+                        MediaType.APPLICATION_JSON));
+
+        assertThatThrownBy(() -> client.putConnector(PROFILE, DEMO, true, "u3"))
+                .isInstanceOfSatisfying(
+                        HermesRequestRejected.class,
+                        ex -> assertThat(ex.status()).isEqualTo(409));
+        assertThat(client.putConnector(PROFILE, DEMO, false, "u3")).isEqualTo(new InstallResult(true, false));
         server.verify();
     }
 

@@ -228,7 +228,10 @@ public class HttpHermesConnectorClient implements HermesConnectorClient {
 
     @Override
     public InstallResult putConnector(String profile, String connectorId, boolean enabled, String sandboxOwner) {
-        attachmentDirectory.ensure(sandboxOwner);
+        // 끄는 요청은 실행 공간을 열지 않으므로 첨부 디렉터리 문제로 막지 않는다.
+        if (enabled) {
+            attachmentDirectory.ensure(sandboxOwner);
+        }
         JsonNode body = request(() -> client.put()
                 .uri(baseUrl + "/api/connectors")
                 .header(AUTHORIZATION, bearer())
