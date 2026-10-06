@@ -79,7 +79,7 @@ function expectCode(response: { body: string; json<T>(): T }, code: string, what
 
 /** 붙은 서버의 도구 호출 하나를 정책이 허용하는 입력이다. 인자와 결과의 가짜 값이 사건에 실린다. */
 function boundToolInput(): string {
-  return `${CONNECTOR_TOOL_PROBE}\n${PREFIX}list_scopes ${JSON.stringify({ scope: CONNECTOR_ARGUMENT_SAMPLE })}`;
+  return `${CONNECTOR_TOOL_PROBE}\n${PREFIX}list_scopes ${JSON.stringify({ query: CONNECTOR_ARGUMENT_SAMPLE })}`;
 }
 
 /**

@@ -474,7 +474,7 @@ export const CONNECTOR_TOOL_PROBE = "커넥터 도구 검사";
  * 어디에도 남지 않아야 한다.
  */
 export const CONNECTOR_RESULT_SAMPLE = "외부-결과-4821";
-/** 허용된 커넥터 도구 호출의 인자로 보내 시작 사건의 미리보기에 실리는 가짜 값이다. 실행 기록과 화면에는 남지 않아야 한다. */
+/** 허용된 커넥터 도구 호출의 `query` 인자로 보내 시작 사건의 미리보기에 실리는 가짜 값이다. 실행 기록과 화면에는 남지 않아야 한다. */
 export const CONNECTOR_ARGUMENT_SAMPLE = "외부-인자-4821";
 
 export type ConnectorToolCall = { profile: string; hermesTool: string; argsJson: string; via: "hook" | "execute" };
@@ -705,6 +705,16 @@ function send(response: ServerResponse, status: number, payload: unknown): void 
     "Content-Length": Buffer.byteLength(body),
   });
   response.end(body);
+}
+
+/**
+ * 실제 Hermes 가 MCP 도구의 `tool.started` 에 싣는 `preview` 다. 인자 전체가 아니라 `query`, `text`, `command`, `path`, `name`,
+ * `prompt`, `code`, `goal` 중 처음 있는 인자 하나의 값이고, 그 인자가 없으면 null 이다(`agent/display.py` 의 `_primary_arg_preview`).
+ */
+function toolStartedPreview(argsJson: string): string | null {
+  const args = JSON.parse(argsJson) as Record<string, unknown>;
+  const key = ["query", "text", "command", "path", "name", "prompt", "code", "goal"].find((candidate) => candidate in args);
+  return key === undefined ? null : String(args[key]);
 }
 
 function event(response: ServerResponse, payload: unknown): void {
@@ -2096,10 +2106,11 @@ export function startFakeHermes(
             }
           }
           // 정책이 허용한 커넥터 도구 호출이다. 실제 Hermes(v0.21.5)가 붙은 서버의 도구에 보내는 모양이다. 모든 사건에 `run_id` 와
-          // `timestamp` 가 있고, 시작 사건의 `preview` 는 인자이며, 완료 사건의 `preview` 는 결과다.
+          // `timestamp` 가 있다. 시작 사건의 `preview` 는 인자 하나의 값이고, 완료 사건의 `preview` 는 결과다.
+          // 정책 hook 이 막은 호출은 시작도 완료도 보내지 않으므로 허용된 호출만 여기에 온다.
           for (const connectorCall of run.connectorCalls ?? []) {
             const common = { run_id: runId, timestamp: Date.now() / 1000, tool: connectorCall.hermesTool };
-            event(response, { event: "tool.started", ...common, preview: connectorCall.argsJson });
+            event(response, { event: "tool.started", ...common, preview: toolStartedPreview(connectorCall.argsJson) });
             event(response, { event: "tool.completed", ...common, duration: 0.05, error: false,
               preview: JSON.stringify({ result: CONNECTOR_RESULT_SAMPLE }) });
           }
