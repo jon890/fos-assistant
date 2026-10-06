@@ -2028,7 +2028,7 @@ class ProfileApiRouteTest(unittest.TestCase):
         self.assertTrue((self.sandbox_root / "user-1").is_dir())
         attachment_key = hashlib.sha256(b"user-1").hexdigest()
         self.assertTrue(pathlib.Path(self.attachment_agent_root, "users", attachment_key).is_dir())
-        self.assertFalse((self.attachment_root / "users" / attachment_key).exists())
+        self.assertTrue((self.attachment_root / "users" / attachment_key).is_dir())
 
     def test_sandbox_terminal_mounts_only_the_execution_owners_attachments(self):
         """사용자 A와 B의 실행 공간에는 각각의 해시 디렉터리만 읽기 전용으로 붙는다."""
@@ -2075,10 +2075,140 @@ class ProfileApiRouteTest(unittest.TestCase):
         outside.mkdir()
         (agent_root / "users").symlink_to(outside, target_is_directory=True)
 
-        self.save_sandbox_key(owner="user-a")
+        original = (self.root / "owner/config.yaml").read_bytes()
+        self.assertEqual(self.request("/api/config", "PUT", token="valid", body=self.file_body("user-a")), 409)
+        self.assertEqual((self.root / "owner/config.yaml").read_bytes(), original)
 
         key = hashlib.sha256(b"user-a").hexdigest()
         self.assertFalse((outside / key).exists())
+
+    def test_sandbox_attachment_source_user_symlink_preserves_config(self):
+        """같은 첨부 루트의 다른 사용자로 연결한 링크도 설정 저장 전에 거절한다."""
+        self.set_sandbox_policy(self.sandbox_policy(attachment_agent_root=str(self.attachment_root)))
+        users = self.attachment_root / "users"
+        users.mkdir()
+        other = users / hashlib.sha256(b"user-b").hexdigest()
+        other.mkdir()
+        (users / hashlib.sha256(b"user-a").hexdigest()).symlink_to(other, target_is_directory=True)
+        original = (self.root / "owner/config.yaml").read_bytes()
+
+        self.assertEqual(self.request("/api/config", "PUT", token="valid", body=self.file_body("user-a")), 409)
+
+        self.assertEqual((self.root / "owner/config.yaml").read_bytes(), original)
+
+    def test_sandbox_attachment_source_intermediate_symlink_preserves_config(self):
+        outside = self.attachment_root.parent / "other-users"
+        outside.mkdir()
+        (self.attachment_root / "users").symlink_to(outside, target_is_directory=True)
+        original = (self.root / "owner/config.yaml").read_bytes()
+
+        self.assertEqual(self.request("/api/config", "PUT", token="valid", body=self.file_body()), 409)
+
+        self.assertEqual((self.root / "owner/config.yaml").read_bytes(), original)
+
+    def test_sandbox_attachment_root_parent_symlink_preserves_config(self):
+        alias = self.attachment_root.parent / "alias"
+        alias.symlink_to(self.attachment_root.parent, target_is_directory=True)
+        self.set_sandbox_policy(self.sandbox_policy(attachment_root=str(alias / self.attachment_root.name)))
+        original = (self.root / "owner/config.yaml").read_bytes()
+
+        self.assertEqual(self.request("/api/config", "PUT", token="valid", body=self.file_body()), 409)
+
+        self.assertEqual((self.root / "owner/config.yaml").read_bytes(), original)
+
+    def test_sandbox_attachment_preparation_failure_preserves_config(self):
+        original = (self.root / "owner/config.yaml").read_bytes()
+        with mock.patch.object(self.plugin, "_sandbox_ensure_attachment_agent_directory", side_effect=OSError("denied")):
+            self.assertEqual(self.request("/api/config", "PUT", token="valid", body=self.file_body()), 409)
+        self.assertEqual((self.root / "owner/config.yaml").read_bytes(), original)
+
+    def test_sandbox_attachment_target_user_symlink_preserves_config(self):
+        agent_root = pathlib.Path(self.attachment_agent_root)
+        users = agent_root / "users"
+        users.mkdir(parents=True)
+        other = users / hashlib.sha256(b"user-b").hexdigest()
+        other.mkdir()
+        (users / hashlib.sha256(b"user-a").hexdigest()).symlink_to(other, target_is_directory=True)
+        original = (self.root / "owner/config.yaml").read_bytes()
+
+        self.assertEqual(self.request("/api/config", "PUT", token="valid", body=self.file_body("user-a")), 409)
+
+        self.assertEqual((self.root / "owner/config.yaml").read_bytes(), original)
+
+    def test_sandbox_attachment_unavailable_source_preserves_config(self):
+        self.set_sandbox_policy(self.sandbox_policy(attachment_root=str(self.attachment_root / "not-visible")))
+        original = (self.root / "owner/config.yaml").read_bytes()
+
+        self.assertEqual(self.request("/api/config", "PUT", token="valid", body=self.file_body()), 409)
+
+        self.assertEqual((self.root / "owner/config.yaml").read_bytes(), original)
+
+    def test_sandbox_attachment_change_after_mount_generation_preserves_config(self):
+        """mount 문자열을 만든 뒤 경로가 바뀌어도 실제 설정 쓰기 전에 거절한다."""
+        original = (self.root / "owner/config.yaml").read_bytes()
+        build_terminal = self.plugin._sandbox_terminal
+
+        def replace_source(*args, **kwargs):
+            terminal = build_terminal(*args, **kwargs)
+            directory = self.attachment_root / "users" / hashlib.sha256(b"user-1").hexdigest()
+            directory.rename(directory.with_name("old-user"))
+            directory.symlink_to(directory.with_name("old-user"), target_is_directory=True)
+            return terminal
+
+        with mock.patch.object(self.plugin, "_sandbox_terminal", side_effect=replace_source):
+            self.assertEqual(self.request("/api/config", "PUT", token="valid", body=self.file_body()), 409)
+        self.assertEqual((self.root / "owner/config.yaml").read_bytes(), original)
+
+    def test_sandbox_attachment_change_before_config_write_preserves_config(self):
+        """같은 이름의 일반 디렉터리로 바꾼 경우도 inode를 대조해 거절한다."""
+        original = (self.root / "owner/config.yaml").read_bytes()
+        write_config = self.plugin._write_checked_config
+
+        def replace_target(*args, **kwargs):
+            directory = pathlib.Path(self.attachment_agent_root, "users", hashlib.sha256(b"user-1").hexdigest())
+            directory.rename(directory.with_name("old-user"))
+            directory.mkdir()
+            return write_config(*args, **kwargs)
+
+        with mock.patch.object(self.plugin, "_write_checked_config", side_effect=replace_target):
+            self.assertEqual(self.request("/api/config", "PUT", token="valid", body=self.file_body()), 409)
+        self.assertEqual((self.root / "owner/config.yaml").read_bytes(), original)
+
+    def test_sandbox_attachment_change_after_preparation_preserves_config(self):
+        original = (self.root / "owner/config.yaml").read_bytes()
+        prepare = self.plugin._sandbox_ensure_attachment_agent_directory
+
+        def replace_source(*args, **kwargs):
+            snapshot = prepare(*args, **kwargs)
+            directory = self.attachment_root / "users" / hashlib.sha256(b"user-1").hexdigest()
+            directory.rename(directory.with_name("old-user"))
+            directory.symlink_to(directory.with_name("old-user"), target_is_directory=True)
+            return snapshot
+
+        with mock.patch.object(self.plugin, "_sandbox_ensure_attachment_agent_directory", side_effect=replace_source):
+            self.assertEqual(self.request("/api/config", "PUT", token="valid", body=self.file_body()), 409)
+        self.assertEqual((self.root / "owner/config.yaml").read_bytes(), original)
+
+    def test_vision_connector_attachment_change_before_write_preserves_config(self):
+        root = self.connector_fixture()
+        manifest = root / "connector.json"
+        declared = json.loads(manifest.read_text(encoding="utf-8"))
+        declared["toolsets"] = ["vision"]
+        manifest.write_text(json.dumps(declared), encoding="utf-8")
+        path = self.root / "alice/config.yaml"
+        original = path.read_bytes()
+        install = self.plugin._connector_config
+
+        def replace_source(*args, **kwargs):
+            directory = self.attachment_root / "users" / hashlib.sha256(b"user-1").hexdigest()
+            directory.rename(directory.with_name("old-user"))
+            directory.symlink_to(directory.with_name("old-user"), target_is_directory=True)
+            return install(*args, **kwargs)
+
+        with mock.patch.object(self.plugin, "_connector_config", side_effect=replace_source):
+            self.assertEqual(self.connector().status_code, 409)
+        self.assertEqual(path.read_bytes(), original)
+        self.assertFalse((path.parent / self.plugin.CONNECTOR_STATE).exists())
 
     def test_sandbox_attachment_mounts_block_other_users_in_docker(self):
         """Docker가 있으면 A와 B의 bind mount가 상대 파일과 상위 경로 탐색을 모두 막는지 확인한다."""
@@ -2099,7 +2229,7 @@ class ProfileApiRouteTest(unittest.TestCase):
             attachment_root = pathlib.Path(shared_root).resolve() / "attachments"
             attachment_root.mkdir()
             self.set_sandbox_policy(self.sandbox_policy(
-                attachment_root=str(attachment_root), attachment_agent_root="/agent/attachments"))
+                attachment_root=str(attachment_root), attachment_agent_root=self.attachment_agent_root))
             self.save_sandbox_key(owner="user-a")
             first_mount = self.saved_config()["terminal"]["docker_volumes"][1]
             self.save_sandbox_key(owner="user-b")
@@ -2155,7 +2285,8 @@ class ProfileApiRouteTest(unittest.TestCase):
                 for mount, command in commands:
                     with self.subTest(mount=mount):
                         completed = subprocess.run(
-                            ["docker", "run", "--rm", "--volume", mount, "alpine:latest", "sh", "-ec", command],
+                            ["docker", "run", "--rm", "--volume", mount, "alpine:latest", "sh", "-ec",
+                             command.replace("/agent/attachments", self.attachment_agent_root)],
                             stdout=subprocess.PIPE,
                             stderr=subprocess.PIPE,
                             text=True,

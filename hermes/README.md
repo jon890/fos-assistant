@@ -59,7 +59,7 @@ plugin 파일, 주소를 채운 `default-config.yaml.template`, 틀의 `plugins.
 | --- | --- | --- |
 | `image` | 예 | 실행 공간 이미지. `execute_code` 를 쓰려면 python3 가 있어야 한다 |
 | `workspace_root` | 예 | 사용자 디렉터리를 둘 절대 경로. **Docker 호스트와 Hermes 컨테이너에서 같은 경로**여야 한다. 사용자 디렉터리 `<workspace_root>/<sandbox_owner>` 가 `/workspace` 에 붙는다 |
-| `attachment_root` | 예 | Docker 호스트에서 첨부를 사용자별로 둔 절대 경로. `<attachment_root>/users/<sha256(sandbox_owner UTF-8)>` 만 읽기 전용으로 붙는다 |
+| `attachment_root` | 예 | Docker 호스트에서 첨부를 사용자별로 둔 절대 경로. Hermes에서도 그 경로를 검증할 수 있어야 한다. `<attachment_root>/users/<sha256(sandbox_owner UTF-8)>` 만 읽기 전용으로 붙는다 |
 | `attachment_agent_root` | 예 | Hermes와 실행 컨테이너가 함께 보는 첨부 절대 경로. `<attachment_agent_root>/users/<sha256(sandbox_owner UTF-8)>` 가 위 원본의 실행 공간 경로다. Docker 호스트와 Hermes의 경로는 달라도 된다 |
 | `network` | 아니오 | 실행 공간을 붙일 Docker 망 이름. 없으면 Docker 기본 망이다 |
 | `cpu` | 아니오 | 0 보다 크고 8 이하. 기본 1 |
@@ -88,6 +88,12 @@ token 과 API key 값 자체는 받지 않는다. 파일을 읽게 할 경우 �
 이 검사는 경로 조각 기준으로 한다. 다른 사용자의 workspace나 첨부를 공통 마운트로 보이게 하면 안 되기 때문이다.
 표에 없는 최상위 키나 profile 설정 키, 허용 목록에 없는 env 가 있어도 정책 전체를 거절한다.
 기존 `profile_mounts` 는 `profiles[profile].read_only_mounts` 로 옮겨야 한다.
+
+첨부 source와 target의 경로는 Hermes에서 모두 검증할 수 있어야 한다. source 루트가 없거나 접근할 수 없으면 409다.
+중간 경로를 포함한 링크를 따라가지 않고 디렉터리를 열며, 실제 경로가 허용 루트 아래의 그 사용자 디렉터리인지 확인한다.
+준비 후와 mount 문자열 생성 직전, 설정 저장 직전에 경로와 디렉터리 식별자를 다시 대조한다.
+준비·검증이 실패하거나 검사 뒤 디렉터리가 바뀌면 409로 중단하고 기존 terminal 설정을 보존한다. 사진 커넥터 설치에도 같은 검사를 적용한다.
+API 완료 뒤 Docker 생성까지의 변경은 운영 파일 권한으로 막아야 한다. 실제 생성 시점의 검증은 Docker socket proxy가 맡는다.
 
 정책이 유효하고 profile 이 등록돼 있으면 plugin 은 아래 `terminal:` 전체를 쓴다.
 등록되지 않은 profile 은 셸 저장을 허용하고 `backend: local` 을 명시한다. 기존 local 옵션은 유지한다.

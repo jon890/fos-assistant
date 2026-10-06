@@ -1102,7 +1102,8 @@ def _remove_backup_env_copies(profile_dir: pathlib.Path) -> None:
 
 
 def _connector_config(profile_dir: pathlib.Path, plugin: str, enabled: bool,
-                      sandbox_terminal: Optional[dict] = None, local_execution: bool = False) -> dict:
+                      sandbox_terminal: Optional[dict] = None, local_execution: bool = False,
+                      attachment_guard: Optional[tuple] = None) -> dict:
     """관리 표식 profile 의 설정을 바꾸고 실패하면 같은 요청 안에서 되돌린다.
 
     설치와 제거는 API 도구 목록을 커넥터 서버 이름과 manifest 가 선언한 내장 toolset 으로 다시 쓰고,
@@ -1113,6 +1114,8 @@ def _connector_config(profile_dir: pathlib.Path, plugin: str, enabled: bool,
     일반 에이전트의 profile 에 설치하면 그 profile 의 Control Plane MCP 등록과 도구 목록이 사라지고 제거해도 돌아오지 않는다.
     """
     import yaml
+    if attachment_guard is not None:
+        _sandbox_validate_attachment_snapshot(*attachment_guard)
     if profile_dir.resolve() != profile_dir:
         raise ValueError("profile 경로에 심볼릭 링크가 있다")
     config_path = profile_dir / "config.yaml"
@@ -1234,6 +1237,8 @@ def _connector_config(profile_dir: pathlib.Path, plugin: str, enabled: bool,
         for path, value in values.items():
             if (path.read_bytes() if path.exists() else None) != originals[path]:
                 raise FileExistsError("profile 설정이 밖에서 바뀌었다")
+            if path == config_path and attachment_guard is not None:
+                _sandbox_validate_attachment_snapshot(*attachment_guard)
             _atomic_private_write(path, value)
             written.append(path)
             if path in plugin_values:
@@ -1356,6 +1361,7 @@ async def _connector_request(request):
             return JSONResponse({"profile": body["profile"], "connectors": connectors,
                                  "policy_hook": _policy_hook_active(profile_dir, config, state)}, status_code=200)
         sandbox_terminal = None
+        attachment_guard = None
         local_execution = False
         manifest = _connector_manifest(body["plugin"])
         if body["enabled"] and manifest is not None and SANDBOX_TOOLSETS & set(manifest["toolsets"]):
@@ -1365,19 +1371,22 @@ async def _connector_request(request):
             if profile in sandbox["profiles"]:
                 if owner is None:
                     return _rejected("격리할 사진 도구에는 sandbox_owner 가 필요하다")
-                sandbox_terminal = _sandbox_terminal(sandbox, profile, owner)
+                try:
+                    os.makedirs(_sandbox_workspace(sandbox, owner), exist_ok=True)
+                    prepared = _sandbox_ensure_attachment_agent_directory(sandbox, owner)
+                    sandbox_terminal = _sandbox_terminal(sandbox, profile, owner, prepared)
+                    attachment_guard = (sandbox, owner, prepared)
+                except OSError:
+                    return _sandbox_unavailable()
             else:
                 return _sandbox_unavailable()
-        if sandbox_terminal is not None:
-            try:
-                os.makedirs(_sandbox_workspace(sandbox, owner), exist_ok=True)
-                _sandbox_ensure_attachment_agent_directory(sandbox, owner)
-            except OSError:
-                logger.warning("dashboard-profile-api: 실행 공간 또는 첨부 사용자 디렉터리를 만들지 못했다", exc_info=True)
         result = await asyncio.to_thread(
-            _connector_config, profile_dir, body["plugin"], body["enabled"], sandbox_terminal, local_execution)
+            _connector_config, profile_dir, body["plugin"], body["enabled"], sandbox_terminal, local_execution,
+            attachment_guard)
         response = {key: body[key] for key in ("profile", "plugin", "enabled")}
         return JSONResponse({**response, **result}, status_code=200)
+    except SandboxAttachmentError:
+        return _sandbox_unavailable()
     except FileExistsError:
         return _rejected("운영자 설정과 충돌한다", 409)
     except Exception:
@@ -1734,12 +1743,15 @@ def _unlock_api_toolsets(config: dict, allowed: list, platforms: set, calculate)
     return unlocked
 
 
-def _write_checked_config(path: pathlib.Path, original: bytes, config: dict) -> bytes:
+def _write_checked_config(path: pathlib.Path, original: bytes, config: dict,
+                          attachment_guard: Optional[tuple] = None) -> bytes:
     """검사를 마친 설정을 처리기보다 먼저 쓴다. 읽은 뒤 파일이 바뀌었으면 쓰지 않는다."""
     import yaml
     if path.is_symlink() or path.read_bytes() != original:
         raise FileExistsError("검사 뒤 profile 설정이 밖에서 바뀌었다")
     value = yaml.safe_dump(config, sort_keys=False, allow_unicode=True).encode()
+    if attachment_guard is not None:
+        _sandbox_validate_attachment_snapshot(*attachment_guard)
     _atomic_private_write(path, value)
     return value
 
@@ -2013,29 +2025,81 @@ def _sandbox_attachment_agent_directory(policy: dict, owner: str) -> str:
     return "%s/users/%s" % (policy["attachment_agent_root"].rstrip("/"), _sandbox_attachment_key(owner))
 
 
-def _sandbox_ensure_attachment_agent_directory(policy: dict, owner: str) -> None:
-    """Hermes와 실행 컨테이너가 함께 보는 첨부 사용자 디렉터리를 만든다.
-
-    Docker 호스트 원본 경로는 Hermes에서 보이지 않을 수 있다.
-    운영자가 지정한 agent root 아래의 `users`와 사용자 키 디렉터리에 링크가 있으면 밖으로 나갈 수 있으므로 만들지 않는다.
-    """
-    root = pathlib.Path(policy["attachment_agent_root"])
-    users = root / "users"
-    directory = users / _sandbox_attachment_key(owner)
-    for index, path in enumerate((root, users, directory)):
-        if path.is_symlink():
-            raise OSError("attachment agent directory contains a symbolic link")
-        path.mkdir(parents=index == 0, exist_ok=True)
-        if not path.is_dir() or path.is_symlink():
-            raise OSError("attachment agent directory is not a directory")
+class SandboxAttachmentError(OSError):
+    """첨부 mount를 안전하게 준비하거나 다시 검증하지 못했다."""
 
 
-def _sandbox_terminal(policy: dict, profile: str, owner: str) -> dict:
+def _sandbox_attachment_path_identity(root: pathlib.Path, owner: str, create: bool, create_root: bool) -> tuple:
+    """경로를 fd 기준으로 내려가며 모든 중간 링크를 거절하고 디렉터리 식별자를 기록한다."""
+    directory = root / "users" / _sandbox_attachment_key(owner)
+    flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW
+    descriptor = os.open("/", flags)
+    identities = []
+    root_component = len(root.parts) - 2
+    try:
+        for index, component in enumerate(directory.parts[1:]):
+            try:
+                child = os.open(component, flags, dir_fd=descriptor)
+            except FileNotFoundError:
+                is_user_directory = index > root_component
+                is_target_root = create_root and index == root_component
+                may_create = create and (is_user_directory or is_target_root)
+                if not may_create:
+                    raise
+                try:
+                    os.mkdir(component, mode=0o755, dir_fd=descriptor)
+                except FileExistsError:
+                    # 검사 뒤 생긴 디렉터리도 NOFOLLOW로 다시 연다.
+                    pass
+                child = os.open(component, flags, dir_fd=descriptor)
+            os.close(descriptor)
+            descriptor = child
+            metadata = os.fstat(descriptor)
+            identities.append((metadata.st_dev, metadata.st_ino))
+
+        resolved_root = root.resolve(strict=True)
+        resolved_directory = directory.resolve(strict=True)
+        if resolved_root != root or resolved_directory != resolved_root / "users" / _sandbox_attachment_key(owner):
+            raise SandboxAttachmentError("attachment directory resolves outside the execution owner")
+        return tuple(identities)
+    finally:
+        os.close(descriptor)
+
+
+def _sandbox_attachment_snapshot(policy: dict, owner: str, create: bool = False) -> dict:
+    """source와 target이 모두 보이고 허용된 사용자 경로 그대로인지 확인한다."""
+    try:
+        snapshots = {}
+        for key in ("attachment_root", "attachment_agent_root"):
+            root = pathlib.Path(policy[key])
+            create_root = key == "attachment_agent_root"
+            snapshots[key] = _sandbox_attachment_path_identity(root, owner, create, create_root)
+        return snapshots
+    except (OSError, ValueError, RuntimeError) as error:
+        raise SandboxAttachmentError("attachment mount paths cannot be verified") from error
+
+
+def _sandbox_validate_attachment_snapshot(policy: dict, owner: str, expected: dict) -> None:
+    if _sandbox_attachment_snapshot(policy, owner) != expected:
+        raise SandboxAttachmentError("attachment directories changed after validation")
+
+
+def _sandbox_ensure_attachment_agent_directory(policy: dict, owner: str) -> dict:
+    """source 루트를 확인하고 양쪽 사용자 디렉터리를 안전하게 준비한다."""
+    prepared = _sandbox_attachment_snapshot(policy, owner, create=True)
+    _sandbox_validate_attachment_snapshot(policy, owner, prepared)
+    return prepared
+
+
+def _sandbox_terminal(policy: dict, profile: str, owner: str, attachment_snapshot: Optional[dict] = None) -> dict:
     """profile 의 `terminal:` 전체다. 모양은 `hermes/README.md` 의 「셸 실행 공간」 과 같다.
 
     값을 건네는 칸(`docker_forward_env`, `env_passthrough`, `credential_files`)은 비워 둔다.
     profile 의 비밀값이 실행 공간에 들어가지 않게 하려는 것이다.
     """
+    if attachment_snapshot is None:
+        attachment_snapshot = _sandbox_ensure_attachment_agent_directory(policy, owner)
+    _sandbox_validate_attachment_snapshot(policy, owner, attachment_snapshot)
     settings = policy["profiles"][profile]
     mounts = policy["read_only_mounts"] + settings["read_only_mounts"]
     network = settings["network"]
@@ -2160,7 +2224,13 @@ async def _check_config_update(request):
             updated["platform_toolsets"] = {**(saved.get("platform_toolsets") or {}), **platform}
         if sandbox is not None:
             # 칸 일부만 고치면 운영자가 남긴 local 설정이나 값 전달 칸이 섞인다. 통째로 바꾼다.
-            updated["terminal"] = _sandbox_terminal(sandbox, profile, owner)
+            try:
+                os.makedirs(_sandbox_workspace(sandbox, owner), exist_ok=True)
+                prepared = _sandbox_ensure_attachment_agent_directory(sandbox, owner)
+                updated["terminal"] = _sandbox_terminal(sandbox, profile, owner, prepared)
+                request.state.fos_checked_attachments = (sandbox, owner, prepared)
+            except OSError:
+                return _sandbox_unavailable()
         elif local_execution:
             # 정책에서 빠진 profile 도 다음 도구 저장부터 local 로 돌아간다.
             # 이미 local 인 설정은 유지하되 .env 의 backend 값보다 명시한 local 값이 이기게 한다.
@@ -2194,14 +2264,6 @@ async def _check_config_update(request):
             return _rejected("다른 platform 의 도구 목록이 바뀐다")
         if skill_dirs and "skills" not in effective:
             return _rejected("skills 도구가 꺼진 채로 스킬을 게시할 수 없다")
-        if sandbox is not None:
-            # Docker 는 없는 원본 디렉터리를 스스로 만든다. 여기서는 권한을 미리 맞춰 보는 것뿐이라 실패해도 거절하지 않는다.
-            # 처리기가 실패해도 지우지 않는다. 빈 디렉터리만 남는다.
-            try:
-                os.makedirs(_sandbox_workspace(sandbox, owner), exist_ok=True)
-                _sandbox_ensure_attachment_agent_directory(sandbox, owner)
-            except OSError:
-                logger.warning("dashboard-profile-api: 실행 공간 또는 첨부 사용자 디렉터리를 만들지 못했다", exc_info=True)
         # 처리기의 병합은 본문의 키만 쓴다. 본문에 없는 disabled_toolsets, 고정 목록, terminal 은 plugin 이 먼저 쓴다.
         if updated.get("agent") != saved.get("agent") or updated.get("terminal") != saved.get("terminal"):
             request.state.fos_checked_config = (config_path, original, updated)
@@ -2432,10 +2494,18 @@ def _install_gate() -> bool:
                 return rejected
 
         checked = getattr(request.state, "fos_checked_config", None)
+        attachment_guard = getattr(request.state, "fos_checked_attachments", None)
         written = None
+        if attachment_guard is not None:
+            try:
+                _sandbox_validate_attachment_snapshot(*attachment_guard)
+            except SandboxAttachmentError:
+                return _sandbox_unavailable()
         if checked is not None:
             try:
-                written = await asyncio.to_thread(_write_checked_config, *checked)
+                written = await asyncio.to_thread(_write_checked_config, *checked, attachment_guard)
+            except SandboxAttachmentError:
+                return _sandbox_unavailable()
             except FileExistsError:
                 return _rejected("검사 뒤 profile 설정이 밖에서 바뀌었다", 409)
             except Exception:
