@@ -91,7 +91,7 @@ token 과 API key 값 자체는 받지 않는다. 파일을 읽게 할 경우 �
 
 첨부 source와 target의 경로는 Hermes에서 모두 검증할 수 있어야 한다. source 루트가 없거나 접근할 수 없으면 409다.
 **사용자 디렉터리는 Control Plane 이 이 요청 전에 만든다. plugin 은 만들지 않는다.** Hermes 는 첨부 루트를 읽기 전용으로 볼 수 있다.
-양쪽 루트에 `users/<sha256(sandbox_owner UTF-8)>` 가 없으면 409다.
+양쪽 루트에 `users/<sha256(sandbox_owner UTF-8)>` 가 없으면 409다. 두 루트는 Control Plane 의 `assistant.attachment.root` 와 같은 디렉터리여야 한다.
 중간 경로를 포함한 링크를 따라가지 않고 디렉터리를 열며, 실제 경로가 허용 루트 아래의 그 사용자 디렉터리인지 확인한다.
 처음 확인한 뒤 mount 문자열 생성 직전, 설정 저장 직전에 경로와 디렉터리 식별자를 다시 대조한다.
 검증이 실패하거나 검사 뒤 디렉터리가 바뀌면 409로 중단하고 기존 terminal 설정을 보존한다. 사진 커넥터 설치에도 같은 검사를 적용한다.
