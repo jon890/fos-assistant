@@ -83,7 +83,7 @@ public interface HermesConnectorClient {
     /**
      * 커넥터 전용 profile 에 옛 방식으로 설치하거나 끈다. 바인딩 칸 없이 보낸다.
      *
-     * <p>설치하는 사진 도구도 신뢰한 에이전트 주인의 격리 실행 공간을 쓴다(ADR-087).
+     * <p>설치하는 사진 도구도 신뢰한 에이전트 주인의 격리 실행 공간을 쓴다(ADR-088).
      */
     InstallResult putConnector(String profile, String connectorId, boolean enabled, String sandboxOwner);
 

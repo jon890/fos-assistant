@@ -1,6 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { readableArgs } from "../../web/src/lib/connector-action.ts";
+import {
+  approvalArgs,
+  bulkApprovable,
+  type ConnectorAction,
+  readableArgs,
+} from "../../web/src/lib/connector-action.ts";
 
 test("JSON 객체는 최상위 키마다 한 줄로 바뀐다", () => {
   const rows = readableArgs(JSON.stringify({ title: "장보기", count: 3, done: false, note: null }));
@@ -64,4 +69,88 @@ test("객체로 읽히지 않는 인자는 null 이다", () => {
 
 test("빈 객체는 빈 목록이다", () => {
   assert.deepEqual(readableArgs("{}"), []);
+});
+
+test("승인 카드 인자는 빈 값을 빼고 앞에서부터 짧은 값 둘을 위에 둔다", () => {
+  const args = approvalArgs(
+    JSON.stringify({
+      name: "업무",
+      body: "첫 줄\n둘째 줄",
+      background_color: "",
+      tags: [],
+      place: {},
+      note: null,
+      count: 0,
+      visible: false,
+      extra: "넷째",
+    }),
+  );
+
+  assert.deepEqual(args, {
+    rows: [
+      { key: "name", value: "업무", core: true },
+      { key: "body", value: "첫 줄\n둘째 줄", core: false },
+      { key: "count", value: "0", core: true },
+      { key: "visible", value: "false", core: false },
+      { key: "extra", value: "넷째", core: false },
+    ],
+    emptyKeys: ["background_color", "tags", "place", "note"],
+  });
+});
+
+test("짧은 값이 없으면 모든 인자를 위에 둔다", () => {
+  const args = approvalArgs(JSON.stringify({ body: "가".repeat(81), list: ["a"] }));
+
+  assert.deepEqual(
+    args?.rows.map((row) => row.core),
+    [true, true],
+  );
+});
+
+test("객체로 읽히지 않는 인자는 승인 카드 인자도 null 이다", () => {
+  assert.equal(approvalArgs(null), null);
+  assert.equal(approvalArgs('["a"]'), null);
+  assert.equal(approvalArgs('{"title":"잘린 글…'), null);
+});
+
+test("모두 승인에는 상시 허락을 줄 수 있는 WRITE 도구의 기다리는 줄만 든다", () => {
+  const base: ConnectorAction = {
+    actionId: "0f0e0d0c-0b0a-4908-8706-050403020100",
+    connectorId: "gmail",
+    toolName: "create_label",
+    title: "라벨 만들기",
+    risk: "WRITE",
+    status: "PENDING",
+    argsJson: "{}",
+    resultText: null,
+    errorCode: null,
+    createdAt: "2026-10-06T00:00:00Z",
+    expiresAt: null,
+    grantAllowed: true,
+    hiddenArgs: false,
+  };
+
+  assert.equal(bulkApprovable(base), true);
+  for (const change of [
+    { grantAllowed: false },
+    { risk: "DESTRUCTIVE" as const },
+    { risk: "FINANCIAL" as const },
+    { risk: null },
+    { hiddenArgs: true },
+    { status: "EXECUTING" as const },
+  ]) {
+    assert.equal(bulkApprovable({ ...base, ...change }), false, JSON.stringify(change));
+  }
+});
+
+test("줄바꿈 문자(\\r)가 든 값은 위에 두지 않는다", () => {
+  const args = approvalArgs(JSON.stringify({ subject: "제목\r숨은 줄", name: "업무" }));
+
+  assert.deepEqual(
+    args?.rows.map((row) => [row.key, row.core]),
+    [
+      ["subject", false],
+      ["name", true],
+    ],
+  );
 });

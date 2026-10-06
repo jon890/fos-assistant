@@ -162,7 +162,7 @@ public final class AgentToolPolicy {
         return enabled.stream().anyMatch(AgentToolPolicy::requiresPrivate);
     }
 
-    /** 사용자별 실행 공간에서 도는 셸·파일·사진 toolset 이 하나라도 켜졌는가(ADR-087). */
+    /** 사용자별 실행 공간에서 도는 셸·파일·사진 toolset 이 하나라도 켜졌는가(ADR-088). */
     public static boolean hasSandboxToolset(List<String> enabled) {
         return enabled.stream().anyMatch(SANDBOX_TOOLSETS::contains);
     }
