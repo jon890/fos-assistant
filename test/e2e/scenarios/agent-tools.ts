@@ -98,6 +98,36 @@ export const agentToolsScenario: Scenario = {
     expect(refusedBody.code === "FORBIDDEN", `기대한 오류 코드가 아니다: ${refused.body}`);
     expect(refusedBody.missingToolsets === undefined, "일반 오류에 missingToolsets가 실렸다");
 
+    step("실행 공간이 준비되지 않았으면 terminal 켜기를 거절하고 목록을 바꾸지 않는다");
+    await setSandboxUnavailable(context.hermesBaseUrl, true);
+    try {
+      const sandboxRefused = expectStatus(
+        await call(context, "/admin/agents/kid-tools/tools", {
+          method: "PUT",
+          token: context.tokens.dad,
+          body: { enabled: ["web", "terminal"] },
+        }),
+        409,
+        "실행 공간 없이 terminal 켜기",
+      );
+      expect(
+        sandboxRefused.json<{ code: string }>().code === "AGENT_SANDBOX_UNAVAILABLE",
+        `기대한 오류 코드가 아니다: ${sandboxRefused.body}`,
+      );
+      const afterRefusal = expectStatus(
+        await call(context, "/agents/kid-tools/tools", { token: context.tokens.kid }),
+        200,
+        "거절 뒤 도구 목록 조회",
+      ).json<ToolsetsView>().toolsets;
+      expect(
+        afterRefusal.some((tool) => tool.name === "web" && tool.enabled)
+          && afterRefusal.some((tool) => tool.name === "terminal" && !tool.enabled),
+        `거절 뒤 도구 목록이 바뀌었다: ${JSON.stringify(afterRefusal)}`,
+      );
+    } finally {
+      await setSandboxUnavailable(context.hermesBaseUrl, false);
+    }
+
     step("관리자는 개인 에이전트에 terminal을 켤 수 있다");
     expectStatus(
       await call(context, "/admin/agents/kid-tools/tools", {
@@ -108,6 +138,10 @@ export const agentToolsScenario: Scenario = {
       200,
       "관리자의 terminal 켜기",
     );
+    const ownerResponse = await fetch(`${context.hermesBaseUrl}/__test/last-sandbox-owner`);
+    expect(ownerResponse.status === 200, "마지막 실행 공간 주인을 읽지 못했다");
+    const { sandboxOwner } = await ownerResponse.json() as { sandboxOwner: string | null };
+    expect(sandboxOwner?.startsWith("u") === true, `주인이 있는 에이전트의 실행 공간 주인이 사용자 키가 아니다: ${sandboxOwner}`);
 
     step("terminal이 켜진 에이전트는 그룹 공개로 바꿀 수 없다");
     const groupRefused = expectStatus(
@@ -156,3 +190,13 @@ export const agentToolsScenario: Scenario = {
     expect(groupResult.json<{ code: string }>().code === "AGENT_BUSY", `기대한 오류 코드가 아니다: ${groupResult.body}`);
   },
 };
+
+/** 가짜 Hermes 가 셸 도구가 든 설정 쓰기를 실행 공간 없음으로 거절할지 정한다. */
+async function setSandboxUnavailable(hermesBaseUrl: string, unavailable: boolean): Promise<void> {
+  const response = await fetch(`${hermesBaseUrl}/__test/sandbox-unavailable`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ unavailable }),
+  });
+  expect(response.status === 204, `실행 공간 상태를 바꾸지 못했다: ${response.status}`);
+}

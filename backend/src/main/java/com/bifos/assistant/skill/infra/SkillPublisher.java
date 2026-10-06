@@ -45,7 +45,7 @@ public class SkillPublisher {
      */
     public void publish(CurrentUser user, Agent agent, List<String> externalDirs) {
         List<String> apiServerToolsets = externalDirs.isEmpty() ? null : toolsetsWithSkills(user, agent);
-        skills.publish(agent.hermesProfile(), externalDirs, apiServerToolsets);
+        skills.publish(agent.hermesProfile(), externalDirs, apiServerToolsets, agent.sandboxOwner());
     }
 
     private List<String> toolsetsWithSkills(CurrentUser user, Agent agent) {
@@ -53,7 +53,8 @@ public class SkillPublisher {
         if (enabled.contains(AgentToolPolicy.SKILLS)) {
             return null;
         }
-        List<String> requested = new ArrayList<>(enabled.stream().filter(AgentToolPolicy::isKnown).toList());
+        List<String> requested = new ArrayList<>(
+                enabled.stream().filter(AgentToolPolicy::isKnown).toList());
         requested.add(AgentToolPolicy.SKILLS);
         return AgentToolPolicy.requestedForWrite(user, agent, requested, enabled);
     }

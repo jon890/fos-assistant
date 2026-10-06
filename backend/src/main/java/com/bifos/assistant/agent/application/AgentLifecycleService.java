@@ -212,6 +212,20 @@ public class AgentLifecycleService {
         }
     }
 
+    /**
+     * 그 profile 의 주인을 바꿔도 되는지 본다. 셸이나 파일 등급의 도구가 켜져 있으면 거절한다(ADR-086).
+     *
+     * <p>도구를 켤 때 profile 의 실행 공간이 그때 주인의 디렉터리로 정해지고, 오래 가는 컨테이너도 재사용된다. 주인만 바꾸면 새
+     * 주인의 에이전트가 옛 주인의 파일을 읽고 쓴다. 그룹 공개 검사와 같은 목록을 읽는다.
+     */
+    public void requireOwnerChangeSafe(String apiBaseUrl, String profileName) {
+        if (AgentToolPolicy.hasSandboxToolset(hermesToolsets.readEnabled(apiBaseUrl, profileName))) {
+            throw new ApiException(
+                    ErrorCode.AGENT_OWNER_CHANGE_REQUIRES_SHELL_OFF,
+                    "turn off shell and file toolsets before changing the owner");
+        }
+    }
+
     private static String requireName(String name) {
         String stripped = name == null ? "" : name.strip();
         if (stripped.isEmpty() || stripped.length() > MAX_NAME_CHARS) {

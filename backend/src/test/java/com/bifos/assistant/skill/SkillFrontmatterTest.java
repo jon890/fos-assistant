@@ -105,6 +105,41 @@ class SkillFrontmatterTest {
         assertThat(blankAfter.description()).isEqualTo("계획");
     }
 
+    @Test
+    @DisplayName("비밀 요청 칸 네 가지는 값이 비어 있어도 각각 비밀을 요청한 것으로 읽는다")
+    void eachSecretRequestFieldCountsEvenWithEmptyValue() {
+        assertThat(SkillFrontmatter.parse(skillMd("description: 계획\nrequired_environment_variables: []", "# 본문"))
+                        .requestsSecrets())
+                .as("최상위 required_environment_variables 가 빈 목록이다")
+                .isTrue();
+        assertThat(SkillFrontmatter.parse(skillMd("description: 계획\nrequired_credential_files:", "# 본문"))
+                        .requestsSecrets())
+                .as("최상위 required_credential_files 가 null 이다")
+                .isTrue();
+        assertThat(SkillFrontmatter.parse(skillMd("description: 계획\nsetup:\n  collect_secrets: []", "# 본문"))
+                        .requestsSecrets())
+                .as("setup map 의 collect_secrets")
+                .isTrue();
+        assertThat(SkillFrontmatter.parse(
+                                skillMd("description: 계획\nprerequisites:\n  env_vars:\n    - API_KEY", "# 본문"))
+                        .requestsSecrets())
+                .as("prerequisites map 의 env_vars")
+                .isTrue();
+    }
+
+    @Test
+    @DisplayName("비밀 요청 칸이 없거나 setup 과 prerequisites 에 그 키가 없으면 비밀을 요청하지 않는다")
+    void doesNotRequestSecretsWithoutThoseFields() {
+        assertThat(SkillFrontmatter.parse(skillMd("description: 계획", "# 본문")).requestsSecrets())
+                .as("이름과 설명만 있다")
+                .isFalse();
+        assertThat(SkillFrontmatter.parse(skillMd(
+                                "description: 계획\nsetup: collect_secrets\nprerequisites:\n  commands: [curl]", "# 본문"))
+                        .requestsSecrets())
+                .as("setup 이 map 이 아니고 prerequisites 에 env_vars 가 없다")
+                .isFalse();
+    }
+
     private static String skillMd(String descriptionLine, String body) {
         return "---\nname: weekly-plan\n" + descriptionLine + "\n---\n" + body;
     }

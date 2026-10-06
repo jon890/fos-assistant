@@ -34,6 +34,17 @@ token provider 등록, profile 생성의 `name`, 환경 쓰기의 `profile/key/v
 관련 코드 경로도 남아 있다.
 함수 이름과 인자 유지가 plugin 의 실제 HTTP 동작 검증을 대신하지 않는다.
 
+**셸 계열 도구의 실행 공간 계약이 그대로인지 본다.**
+[ADR-086](../adr/ADR-086-셸과-파일-도구는-사용자별-docker-실행-공간에서만-돈다.md) 는 docker backend 의 아래 동작에 기댄다.
+하나라도 바뀌면 셸 계열 도구가 다시 Hermes 컨테이너로 새거나 실행 공간이 동작하지 않는다.
+[실행 공간](sandbox.md) 의 「측정 결과」 시험을 새 이미지에서 다시 돌린다.
+
+- 공유 listener 가 turn 마다 profile 의 `terminal.*` 를 scope 로 묶는다(`_profile_runtime_scope`, `install_and_reset_profile_terminal_scope`)
+- `_get_file_ops` 와 `execute_code` 가 terminal 과 같은 환경을 쓴다
+- `docker_volumes`, `docker_extra_args`, `env_passthrough`, `credential_files` 의 이름과 뜻
+- 스킬 앞머리에서 환경 값과 파일을 실행 공간에 넣는 칸의 이름(`tools/skills_tool_setup.py` 의 `_get_required_environment_variables`, `required_credential_files`). 칸이 늘면 올린 스킬 저장 검사에도 더한다
+- `HERMES_WRITE_SAFE_ROOT` 를 docker backend 의 파일 쓰기에도 경로 문자열로 적용한다
+
 **올린 스킬과 이름이 겹치는 스킬이 새로 생기지 않았는지 본다.**
 Hermes 를 올리면 번들 스킬이 늘 수 있다. 같은 이름이면 profile 로컬 스킬이 외부 디렉터리의 올린 스킬보다 먼저 선택되어,
 화면에 보이는 스킬과 실제로 도는 스킬이 달라진다.

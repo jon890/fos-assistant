@@ -67,10 +67,10 @@ class HermesSkillRequestTest {
     }
 
     @Test
-    @DisplayName("게시는 profile 과 external dirs 만 싣고 도구 목록이 있으면 함께 싣는다")
-    void publishCarriesOnlyProfileAndExternalDirsPlusToolListIfPresent() throws Exception {
-        client.publish("kid", List.of("/skills/kid/v1790661162144-a1b2"), null);
-        client.publish("kid", List.of(), List.of("web", "skills", "fos-assistant"));
+    @DisplayName("게시는 profile 과 external dirs, 실행 공간 주인을 싣고 도구 목록이 있으면 함께 싣는다")
+    void publishCarriesProfileExternalDirsAndSandboxOwnerPlusToolListIfPresent() throws Exception {
+        client.publish("kid", List.of("/skills/kid/v1790661162144-a1b2"), null, "u7");
+        client.publish("kid", List.of(), List.of("web", "skills", "fos-assistant"), "a12");
 
         assertThat(calls).hasSize(2).allSatisfy(call -> {
             assertThat(call.method()).isEqualTo("PUT");
@@ -82,7 +82,9 @@ class HermesSkillRequestTest {
                         "profile",
                         "kid",
                         "config",
-                        Map.of("skills", Map.of("external_dirs", List.of("/skills/kid/v1790661162144-a1b2")))));
+                        Map.of("skills", Map.of("external_dirs", List.of("/skills/kid/v1790661162144-a1b2"))),
+                        "sandbox_owner",
+                        "u7"));
         assertThat(new ObjectMapper().readValue(calls.get(1).body(), Map.class))
                 .isEqualTo(Map.of(
                         "profile",
@@ -90,7 +92,30 @@ class HermesSkillRequestTest {
                         "config",
                         Map.of(
                                 "skills", Map.of("external_dirs", List.of()),
-                                "platform_toolsets", Map.of("api_server", List.of("web", "skills", "fos-assistant")))));
+                                "platform_toolsets", Map.of("api_server", List.of("web", "skills", "fos-assistant"))),
+                        "sandbox_owner",
+                        "a12"));
+    }
+
+    @Test
+    @DisplayName("게시가 409 sandbox_unavailable 이면 실행 공간 오류 코드의 거절 예외다")
+    void publishConflictWithSandboxUnavailableIsRejectionWithSandboxCode() {
+        status = 409;
+        response = "{\"detail\":\"sandbox is not configured\",\"code\":\"sandbox_unavailable\"}";
+
+        assertThatThrownBy(() -> client.publish(
+                        "kid", List.of("/skills/kid/v1790661162144-a1b2"), List.of("terminal", "skills"), "u7"))
+                .isInstanceOfSatisfying(HermesRequestRejected.class, ex -> {
+                    assertThat(ex.status()).isEqualTo(409);
+                    assertThat(ex.code()).isEqualTo(ErrorCode.AGENT_SANDBOX_UNAVAILABLE);
+                });
+
+        response = "{\"code\":\"profile_busy\"}";
+        assertThatThrownBy(() -> client.publish(
+                        "kid", List.of("/skills/kid/v1790661162144-a1b2"), List.of("terminal", "skills"), "u7"))
+                .isInstanceOfSatisfying(
+                        HermesRequestRejected.class,
+                        ex -> assertThat(ex.code()).isEqualTo(ErrorCode.HERMES_UNAVAILABLE));
     }
 
     @Test
@@ -139,14 +164,14 @@ class HermesSkillRequestTest {
     void publishGives4xxRejectionExceptionAnd5xxSameAsUnreachable() {
         status = 400;
         response = "{\"error\":\"directory does not exist\"}";
-        assertThatThrownBy(() -> client.publish("kid", List.of("/skills/kid/v1790661162144-a1b2"), null))
+        assertThatThrownBy(() -> client.publish("kid", List.of("/skills/kid/v1790661162144-a1b2"), null, "u7"))
                 .isInstanceOfSatisfying(HermesRequestRejected.class, ex -> {
                     assertThat(ex.status()).isEqualTo(400);
                     assertThat(ex.code()).isEqualTo(ErrorCode.HERMES_UNAVAILABLE);
                 });
 
         status = 500;
-        assertThatThrownBy(() -> client.publish("kid", List.of("/skills/kid/v1790661162144-a1b2"), null))
+        assertThatThrownBy(() -> client.publish("kid", List.of("/skills/kid/v1790661162144-a1b2"), null, "u7"))
                 .isInstanceOf(ApiException.class)
                 .isNotInstanceOf(HermesRequestRejected.class)
                 .extracting(ex -> ((ApiException) ex).code())

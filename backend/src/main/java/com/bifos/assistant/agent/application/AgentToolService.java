@@ -48,7 +48,17 @@ public class AgentToolService {
         }
         List<String> current = toolsets.readEnabled(agent.apiBaseUrl(), agent.hermesProfile());
         List<String> desired = AgentToolPolicy.requestedForWrite(user, agent, requested, current);
-        toolsets.writeApiServer(agent.hermesProfile(), desired);
+        // 셸 도구가 켜지면 Hermes 가 스킬이 요청한 profile 의 환경 값과 파일을 실행 공간에 넣는다(ADR-086).
+        if (AgentToolPolicy.hasSandboxToolset(desired)) {
+            List<String> requesting = skillFiles.uploadedRequestingSecrets(agent.hermesProfile());
+            if (!requesting.isEmpty()) {
+                throw new ApiException(
+                        ErrorCode.AGENT_SKILL_REQUESTS_SECRETS,
+                        "uploaded skills request environment values or credential files: "
+                                + String.join(", ", requesting));
+            }
+        }
+        toolsets.writeApiServer(agent.hermesProfile(), desired, agent.sandboxOwner());
         List<String> applied = toolsets.readEnabled(agent.apiBaseUrl(), agent.hermesProfile());
         List<String> desiredBuiltin = desired.stream()
                 .filter(name -> !AgentToolPolicy.CONTROL_PLANE_MCP.equals(name))

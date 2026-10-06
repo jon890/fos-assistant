@@ -42,7 +42,7 @@ function confirmationDescription(name: string): string {
     case "terminal":
     case "file":
     case "code_execution":
-      return "이 도구는 홈서버 파일과 셸에 닿을 수 있어요.";
+      return "운영에서 격리를 적용한 에이전트는 사용자별 실행 공간에서 셸과 파일을 다뤄요. 적용하지 않은 에이전트는 서버에서 실행돼 다른 사용자의 파일과 설정에 닿을 수 있어요. 격리한 공간도 허용된 비밀 파일과 연결된 서비스, 사진 첨부를 읽거나 인터넷에 나갈 수 있어요.";
     case "browser":
       return "이 도구는 웹 브라우저를 조작할 수 있어요.";
     case "session_search":

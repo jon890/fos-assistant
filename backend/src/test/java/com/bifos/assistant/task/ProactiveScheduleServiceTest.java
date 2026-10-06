@@ -93,6 +93,27 @@ class ProactiveScheduleServiceTest {
         });
     }
 
+    @Test
+    @DisplayName("격리 실행 공간을 확인한 설정이 켜지면 매일 깨우기 발화가 격리 제한을 통과한다")
+    void allowsScheduledCheckWhenIsolationIsConfirmed() {
+        when(agents.requireStartable(user, "career")).thenReturn(agent);
+        when(readiness.check(agent)).thenReturn(new CheckReadiness(List.of()));
+
+        assertThat(service(true).schedulingAvailable(user, "career")).isTrue();
+        verifyNoInteractions(toolsets);
+    }
+
+    @Test
+    @DisplayName("격리 설정을 켜도 다른 매일 깨우기 차단 사유는 유지한다")
+    void retainsReadinessBlockerWhenIsolationIsConfirmed() {
+        when(agents.requireStartable(user, "career")).thenReturn(agent);
+        when(readiness.check(agent))
+                .thenReturn(new CheckReadiness(List.of(CheckBlocker.of(CheckBlockerCode.AGENT_NOT_SUPPORTED))));
+
+        assertThat(service(true).schedulingAvailable(user, "career")).isFalse();
+        verifyNoInteractions(toolsets);
+    }
+
     private ProactiveScheduleService service(boolean isolatedExecutionEnabled) {
         return new ProactiveScheduleService(
                 agents,

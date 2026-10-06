@@ -76,6 +76,14 @@ const TEST_BUSY_PATH = "/__test/busy";
 const TEST_CLEAR_BUSY_PATH = "/__test/clear-busy";
 const TEST_HOLD_NEXT_CONFIG_PATH = "/__test/hold-next-config";
 const TEST_RELEASE_HELD_CONFIG_PATH = "/__test/release-held-config";
+/** 켜면 셸 도구가 든 설정 쓰기를 plugin 처럼 409 `sandbox_unavailable` 로 거절한다. 본문은 `{ unavailable: boolean }` 이다. */
+const TEST_SANDBOX_UNAVAILABLE_PATH = "/__test/sandbox-unavailable";
+/** 마지막으로 받은 설정 쓰기의 `sandbox_owner` 를 돌려준다. */
+const TEST_LAST_SANDBOX_OWNER_PATH = "/__test/last-sandbox-owner";
+/** plugin 이 셸 도구가 있는 설정 쓰기에서 실행 공간을 띄우는 도구들이다(ADR-086). */
+const SANDBOX_TOOLSETS = ["terminal", "file", "code_execution"];
+/** plugin 이 받는 `sandbox_owner` 의 모양이다. */
+const SANDBOX_OWNER_PATTERN = /^[a-z][a-z0-9-]{0,63}$/;
 /** 마지막 실행 요청이 실어 온 provider, 모델, effort 를 돌려준다. 브라우저 검사는 대역을 다른 프로세스에서 띄워 이 길로 묻는다. */
 /** 입력 글과 그 입력에 줄 대본을 받는 경로다. `DemoScript` 를 본다. */
 const TEST_SCRIPT_PATH = "/__test/script";
@@ -811,6 +819,8 @@ export function startFakeHermes(
   let lastSubmittedInstructions: string | undefined;
   let lastSubmittedInput: string | undefined;
   let holdNextConfig = false;
+  let sandboxUnavailable = false;
+  let lastSandboxOwner: string | null = null;
   let heldConfigWaiter: (() => void) | undefined;
   let heldConfigReady: Promise<void> | undefined;
   let releaseConfig: (() => void) | undefined;
@@ -1206,15 +1216,25 @@ export function startFakeHermes(
           platform_toolsets?: { api_server?: unknown };
           skills?: { external_dirs?: unknown };
         };
+        sandbox_owner?: unknown;
       };
       const configKeys = Object.keys(body.config ?? {});
       // 도구와 스킬 게시만 받는다. 둘을 한 본문에 함께 둘 수 있고, 그 밖의 키는 거절한다.
-      const exactKeys = Object.keys(body).length === 2 && Object.keys(body).every((key) => key === "profile" || key === "config")
+      // 최상위에는 profile 과 config 가 있어야 하고 실행 공간 주인 sandbox_owner 만 더 둘 수 있다.
+      const bodyKeys = Object.keys(body);
+      const exactKeys = bodyKeys.includes("profile") && bodyKeys.includes("config")
+        && bodyKeys.every((key) => key === "profile" || key === "config" || key === "sandbox_owner")
         && configKeys.length >= 1
         && configKeys.every((key) => key === "platform_toolsets" || key === "skills");
       if (body.profile === undefined || queryProfile !== null && queryProfile !== body.profile
           || !keys[body.profile] || !exactKeys) {
         send(response, 400, { error: "invalid configuration" });
+        return true;
+      }
+      // plugin 처럼 칸이 있으면 셸 도구가 없어도 모양을 본다.
+      if (body.sandbox_owner !== undefined
+          && (typeof body.sandbox_owner !== "string" || !SANDBOX_OWNER_PATTERN.test(body.sandbox_owner))) {
+        send(response, 400, { error: "sandbox_owner has an invalid shape" });
         return true;
       }
       const profile = body.profile;
@@ -1229,6 +1249,17 @@ export function startFakeHermes(
           return true;
         }
         nextToolsets = toolsets as string[];
+        // plugin 처럼 셸 도구가 있을 때만 주인을 읽는다. 없거나 모양이 틀리면 설정을 바꾸지 않고 거절한다.
+        if (nextToolsets.some((name) => SANDBOX_TOOLSETS.includes(name))) {
+          if (typeof body.sandbox_owner !== "string" || !SANDBOX_OWNER_PATTERN.test(body.sandbox_owner)) {
+            send(response, 400, { error: "sandbox_owner is required for shell toolsets" });
+            return true;
+          }
+          if (sandboxUnavailable) {
+            send(response, 409, { detail: "the isolated shell workspace is not configured", code: "sandbox_unavailable" });
+            return true;
+          }
+        }
       }
       let nextDirs: string[] | undefined;
       if (configKeys.includes("skills")) {
@@ -1271,6 +1302,7 @@ export function startFakeHermes(
         await new Promise<void>((done) => { releaseConfig = done; });
         releaseConfig = undefined;
       }
+      lastSandboxOwner = typeof body.sandbox_owner === "string" ? body.sandbox_owner : null;
       if (nextToolsets !== undefined) {
         connectorRequests.push(`toolsets ${profile}`);
         apiServerToolsets.set(profile, nextToolsets.filter((name) => name !== droppedToolset));
@@ -1427,6 +1459,15 @@ export function startFakeHermes(
       if (request.method === "POST" && path === TEST_RELEASE_HELD_CONFIG_PATH) {
         releaseConfig?.();
         return send(response, 204, null);
+      }
+      if (request.method === "POST" && path === TEST_SANDBOX_UNAVAILABLE_PATH) {
+        const { unavailable } = JSON.parse((await readBody(request)) || "{}") as { unavailable?: unknown };
+        if (typeof unavailable !== "boolean") return send(response, 400, { error: "unavailable must be a boolean" });
+        sandboxUnavailable = unavailable;
+        return send(response, 204, null);
+      }
+      if (request.method === "GET" && path === TEST_LAST_SANDBOX_OWNER_PATH) {
+        return send(response, 200, { sandboxOwner: lastSandboxOwner });
       }
 
       if (request.method === "POST" && path === TEST_HOLD_NEXT_RUN_PATH) {

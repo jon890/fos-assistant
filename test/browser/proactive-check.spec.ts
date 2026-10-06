@@ -180,7 +180,9 @@ test("격리 실행 공간이 필요한 도구를 켜면 매일 깨우기 저장
   }
 });
 
-test("켜진 깨우기가 도구 변경으로 막혀도 사용자가 끌 수 있다", async ({ page }) => {
+test("켜진 깨우기가 도구 변경으로 막혀도 사용자가 끌 수 있다", async ({
+  page,
+}) => {
   try {
     await prepare(page);
     const enabled = await page.request.put(
@@ -197,8 +199,10 @@ test("켜진 깨우기가 도구 변경으로 막혀도 사용자가 끌 수 있
     await expect(toggle).toBeEnabled();
     await toggle.click();
     const saved = page.waitForResponse(
-      (response) => response.request().method() === "PUT" &&
-        new URL(response.url()).pathname === `/api/agents/${AGENT_CODE}/proactive-check/schedule`,
+      (response) =>
+        response.request().method() === "PUT" &&
+        new URL(response.url()).pathname ===
+          `/api/agents/${AGENT_CODE}/proactive-check/schedule`,
     );
     await check.getByRole("button", { name: "저장" }).click();
     expect((await saved).ok()).toBeTruthy();
@@ -216,8 +220,30 @@ test("새 보고는 다섯 칸 카드로 보이고 열면 점검 대화로 간�
     await prepare(page);
     await hermes.setProactiveOutput(reportOutput());
     await page.goto(`/agents/${AGENT_CODE}`);
+    const previousResponse = await page.request.get(
+      `/api/agents/${AGENT_CODE}/proactive-check`,
+    );
+    expect(previousResponse.ok()).toBeTruthy();
+    const { lastCheck: previousCheck } = await previousResponse.json();
     await section(page).getByRole("button", { name: "지금 살펴보기" }).click();
     await expect(page).toHaveURL(CONVERSATION_URL);
+    // 시작 응답은 202 다. 보고를 저장하기 전에 지금 화면을 열면 빈 응답을 한 번 읽고 검사가 끝난다.
+    await expect
+      .poll(async () => {
+        const response = await page.request.get(
+          `/api/agents/${AGENT_CODE}/proactive-check`,
+        );
+        expect(response.ok()).toBeTruthy();
+        const { lastCheck } = await response.json();
+        const isNewCheck =
+          lastCheck != null && lastCheck.startedAt !== previousCheck?.startedAt;
+        return (
+          isNewCheck &&
+          lastCheck.status === "SUCCEEDED" &&
+          lastCheck.outcome === "FINDINGS"
+        );
+      })
+      .toBe(true);
     await page.goto("/now");
 
     const card = page.getByTestId("now-card-reports");
@@ -267,7 +293,10 @@ test("단추 하나로 살펴보기를 시작하고 결과와 배지를 보며 �
       "href",
       "https://example.com/e2e/study",
     );
-    await expect(source.nth(1)).toHaveAttribute("href", "https://example.com/e2e/study");
+    await expect(source.nth(1)).toHaveAttribute(
+      "href",
+      "https://example.com/e2e/study",
+    );
 
     // 대화 목록의 점검 대화 줄에 「살펴보기」 배지가 붙는다.
     const mobile = testInfo.project.name === "mobile";
@@ -326,7 +355,9 @@ test("결과를 읽지 못한 살펴보기는 점검 대화와 마지막 살펴�
     ).toBeVisible();
     await page.goto(`/agents/${AGENT_CODE}`);
     await expect(
-      section(page).getByText(/^마지막 살펴보기.*결과 형식이 맞지 않아 정리하지 못했어요/),
+      section(page).getByText(
+        /^마지막 살펴보기.*결과 형식이 맞지 않아 정리하지 못했어요/,
+      ),
     ).toBeVisible();
   } finally {
     await restore(page);

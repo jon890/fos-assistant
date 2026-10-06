@@ -5,6 +5,7 @@ import com.bifos.assistant.shared.error.ErrorCode;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.MediaType;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
@@ -89,7 +90,7 @@ public class HttpHermesToolsetClient implements HermesToolsetClient {
     }
 
     @Override
-    public void writeApiServer(String profileName, List<String> toolsets) {
+    public void writeApiServer(String profileName, List<String> toolsets, String sandboxOwner) {
         try {
             restClient
                     .put()
@@ -100,11 +101,17 @@ public class HttpHermesToolsetClient implements HermesToolsetClient {
                             "profile",
                             profileName,
                             "config",
-                            Map.of("platform_toolsets", Map.of("api_server", toolsets))))
+                            Map.of("platform_toolsets", Map.of("api_server", toolsets)),
+                            "sandbox_owner",
+                            sandboxOwner))
                     .retrieve()
                     .toBodilessEntity();
         } catch (RestClientException ex) {
             log.warn("Hermes API 실행 toolset을 쓰지 못했다 profile={}", profileName, ex);
+            Optional<HermesRequestRejected> sandboxRejection = HermesCallFailure.sandboxRejection(ex);
+            if (sandboxRejection.isPresent()) {
+                throw sandboxRejection.get();
+            }
             throw HermesCallFailure.of(ex, "could not write Hermes toolsets");
         }
     }
