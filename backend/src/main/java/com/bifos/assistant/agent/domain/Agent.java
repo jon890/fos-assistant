@@ -256,16 +256,20 @@ public class Agent {
     /**
      * 이 에이전트의 대화에 사진을 붙일 수 있다.
      *
-     * <p>흐름은 Hermes 를 한 번 부르는 경로를 거치지 않아 사진이 놓인 자리를 입력에 덧붙일 수 없다. 그래서
+     * <p>주인이 있는 비공개 에이전트만 받는다. 공유 에이전트는 실행 요청자와 고정 첨부 mount 의 주인이 다를 수 있다.
+     * 흐름은 Hermes 를 한 번 부르는 경로를 거치지 않아 사진이 놓인 자리를 입력에 덧붙일 수 없다. 그래서
      * 흐름이 붙은 에이전트는 받지 않는다. 연결용 에이전트는 그 커넥터가 사진을 받는다고 선언했고 선언한 toolset 이 켜진 것이 확인됐을 때만 받는다.
      * 받을지 판정하는 곳은 모두 이 메서드를 부른다.
      */
     public boolean acceptsAttachments() {
-        return (!connectorManaged || connectorAttachments) && (flow == null || flow.isBlank());
+        return visibility == AgentVisibility.PRIVATE
+                && ownerUserId != null
+                && (!connectorManaged || connectorAttachments)
+                && (flow == null || flow.isBlank());
     }
 
     /**
-     * Hermes 가 셸과 파일 도구를 돌릴 격리 실행 공간의 주인 키다(ADR-086).
+     * Hermes 가 셸·파일·사진 도구를 돌릴 격리 실행 공간의 주인 키다(ADR-087).
      *
      * <p>주인이 있으면 {@code u<사용자 번호>} 로 그 사용자의 에이전트들이 한 공간을 나눠 쓴다. 주인이 없는 에이전트는
      * {@code a<에이전트 번호>} 로 그 에이전트만의 공간을 쓴다. 도구 저장과 스킬 게시가 같은 값을 보내야 하므로

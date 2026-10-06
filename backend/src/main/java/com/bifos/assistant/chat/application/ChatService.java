@@ -1077,7 +1077,7 @@ public class ChatService {
             throw new ApiException(ErrorCode.AGENT_DISABLED, "this agent is disabled");
         }
         // 흐름은 사진 자리를 덧붙이는 경로를 거치지 않는다. 오류 없이 사진을 버리지 않게 거절한다.
-        if (withAttachments && !agent.acceptsAttachments()) {
+        if (withAttachments && (!agent.acceptsAttachments() || !Objects.equals(agent.ownerUserId(), user.id()))) {
             throw new ApiException(ErrorCode.VALIDATION_FAILED, "this agent does not accept attachments");
         }
         Flow flow = flows.find(agent.flow());

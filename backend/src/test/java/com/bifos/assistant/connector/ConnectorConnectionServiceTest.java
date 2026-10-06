@@ -179,7 +179,7 @@ class ConnectorConnectionServiceTest {
     @BeforeEach
     void setUp() {
         when(toolsets.readEnabled(anyString(), anyString())).thenReturn(List.of());
-        when(connector.putConnector(anyString(), anyString(), anyBoolean()))
+        when(connector.putConnector(anyString(), anyString(), anyBoolean(), anyString()))
                 .thenReturn(new InstallResult(false, false));
         when(connector.readCatalog()).thenReturn(List.of(DEMO_MANIFEST, PIN_MANIFEST));
         when(connector.call(anyString(), anyString(), anyMap()))
@@ -208,7 +208,7 @@ class ConnectorConnectionServiceTest {
         order.verify(users).findByIdForUpdate(user.id());
         order.verify(connector).putEnv(profile, "DEMO_TOKEN", TOKEN);
         order.verify(connector).deleteEnv(profile, "DEMO_SCOPE");
-        order.verify(connector).putConnector(profile, DEMO, true);
+        order.verify(connector).putConnector(profile, DEMO, true, "u" + user.id());
         verify(toolsets, never()).writeApiServer(any(), any(), any());
         assertThat(registered.status()).isEqualTo(ConnectionStatus.PENDING);
         assertThat(stored(user).desiredEnabled()).isTrue();
@@ -228,7 +228,7 @@ class ConnectorConnectionServiceTest {
 
         String profile = profileOf(registered);
         // 목록은 설치가 커넥터의 MCP 서버와 선언한 toolset 으로 쓴다.
-        verify(connector).putConnector(profile, DEMO, true);
+        verify(connector).putConnector(profile, DEMO, true, "u" + user.id());
         verify(toolsets, never()).writeApiServer(any(), any(), any());
         assertThat(agents.findByCode(registered.agentCode()).orElseThrow().acceptsAttachments())
                 .isFalse();
@@ -253,7 +253,7 @@ class ConnectorConnectionServiceTest {
         ConnectionSnapshot checked = service.check(user, DEMO);
 
         // 등록의 설치와 연결 확인마다 다시 보낸 설치다.
-        verify(connector, times(3)).putConnector(profile, DEMO, true);
+        verify(connector, times(3)).putConnector(eq(profile), eq(DEMO), eq(true), anyString());
         verify(toolsets, never()).writeApiServer(any(), any(), any());
         assertThat(checked.status()).isEqualTo(ConnectionStatus.READY);
         assertThat(agents.findByCode(registered.agentCode()).orElseThrow().acceptsAttachments())
@@ -275,7 +275,7 @@ class ConnectorConnectionServiceTest {
         ConnectionSnapshot confirmed = service.confirmApplied(admin, DEMO, member.id());
 
         // 등록의 설치와 다시 보낸 설치다.
-        verify(connector, times(2)).putConnector(profile, DEMO, true);
+        verify(connector, times(2)).putConnector(eq(profile), eq(DEMO), eq(true), anyString());
         verify(toolsets, never()).writeApiServer(any(), any(), any());
         assertThat(confirmed.status()).isEqualTo(ConnectionStatus.READY);
         assertThat(agents.findByCode(registered.agentCode()).orElseThrow().acceptsAttachments())
@@ -293,7 +293,7 @@ class ConnectorConnectionServiceTest {
 
         ConnectionSnapshot checked = service.check(user, DEMO);
 
-        verify(connector, times(2)).putConnector(profile, DEMO, true);
+        verify(connector, times(2)).putConnector(eq(profile), eq(DEMO), eq(true), anyString());
         verify(toolsets, never()).writeApiServer(any(), any(), any());
         assertThat(checked.status()).isEqualTo(ConnectionStatus.PENDING);
         assertThat(agentEnabled(user)).isFalse();
@@ -368,7 +368,7 @@ class ConnectorConnectionServiceTest {
 
         // 해제의 실패.
         makeReady.run();
-        doThrow(new IllegalStateException()).when(connector).putConnector(profile, DEMO, false);
+        doThrow(new IllegalStateException()).when(connector).putConnector(eq(profile), eq(DEMO), eq(false), anyString());
         assertThatThrownBy(() -> service.disconnect(member, DEMO)).isInstanceOf(ConnectorOperationFailure.class);
         assertOff.run();
     }
@@ -458,13 +458,13 @@ class ConnectorConnectionServiceTest {
         String profile = profileOf(service.register(user, DEMO, VALUES));
         installed(true, true);
         when(connector.probe(profile, "demo")).thenReturn(new ProbeResult(true, List.of("list_scopes")));
-        when(connector.putConnector(profile, DEMO, true)).thenReturn(new InstallResult(true, false));
+        when(connector.putConnector(eq(profile), eq(DEMO), eq(true), anyString())).thenReturn(new InstallResult(true, false));
 
         ConnectionSnapshot checked = service.check(user, DEMO);
 
         InOrder order = inOrder(connector);
         order.verify(connector).readConnector(profile, DEMO);
-        order.verify(connector).putConnector(profile, DEMO, true);
+        order.verify(connector).putConnector(eq(profile), eq(DEMO), eq(true), anyString());
         // 다시 보낸 뒤의 설치 상태를 읽고 나서 probe 한다.
         order.verify(connector).readConnector(profile, DEMO);
         order.verify(connector).probe(profile, "demo");
@@ -479,7 +479,7 @@ class ConnectorConnectionServiceTest {
         CurrentUser user = user(UserRole.MEMBER, 1L);
         String profile = profileOf(service.register(user, DEMO, VALUES));
         installed(true, true);
-        doThrow(new IllegalStateException()).when(connector).putConnector(profile, DEMO, true);
+        doThrow(new IllegalStateException()).when(connector).putConnector(eq(profile), eq(DEMO), eq(true), anyString());
 
         assertThatThrownBy(() -> service.check(user, DEMO)).isInstanceOf(ConnectorOperationFailure.class);
 
@@ -518,7 +518,7 @@ class ConnectorConnectionServiceTest {
         assertThat(agents.count()).isZero();
         verify(users, never()).findByIdForUpdate(anyLong());
         verify(connector, never()).putEnv(anyString(), anyString(), anyString());
-        verify(connector, never()).putConnector(anyString(), anyString(), anyBoolean());
+        verify(connector, never()).putConnector(anyString(), anyString(), anyBoolean(), anyString());
     }
 
     @Test
@@ -617,7 +617,7 @@ class ConnectorConnectionServiceTest {
         when(connector.putEnv(anyString(), eq("DEMO_TOKEN"), anyString())).thenReturn(true);
         doThrow(new IllegalStateException("dashboard unavailable"))
                 .when(connector)
-                .putConnector(anyString(), anyString(), anyBoolean());
+                .putConnector(anyString(), anyString(), anyBoolean(), anyString());
 
         assertThatThrownBy(() -> service.register(user, DEMO, VALUES))
                 .isInstanceOf(ConnectorOperationFailure.class)
@@ -862,7 +862,7 @@ class ConnectorConnectionServiceTest {
         InOrder order = inOrder(connector);
         order.verify(connector).deleteEnv(profile, "DEMO_TOKEN");
         order.verify(connector).deleteEnv(profile, "DEMO_SCOPE");
-        order.verify(connector).putConnector(profile, DEMO, false);
+        order.verify(connector).putConnector(eq(profile), eq(DEMO), eq(false), anyString());
         assertThat(disconnected.status()).isEqualTo(ConnectionStatus.DISCONNECTED);
         assertThat(disconnected.restartRequired()).isTrue();
         assertThat(disconnected.secretPrefixes()).isEmpty();
@@ -886,7 +886,7 @@ class ConnectorConnectionServiceTest {
         ConnectionSnapshot disconnected = service.disconnect(user, DEMO);
 
         verify(connector, never()).deleteEnv(profile, "DEMO_TOKEN");
-        verify(connector).putConnector(profile, DEMO, false);
+        verify(connector).putConnector(eq(profile), eq(DEMO), eq(false), anyString());
         assertThat(disconnected.status()).isEqualTo(ConnectionStatus.DISCONNECTED);
         assertThat(disconnected.restartRequired()).isTrue();
         assertThat(disconnected.secretPrefixes()).isEmpty();
@@ -919,10 +919,10 @@ class ConnectorConnectionServiceTest {
         doThrow(new IllegalStateException()).when(connector).putEnv(anyString(), eq("DEMO_TOKEN"), anyString());
         assertThatThrownBy(() -> service.register(member, DEMO, VALUES)).isInstanceOf(ConnectorOperationFailure.class);
         String profile = agents.findAll().get(0).hermesProfile();
-        verify(connector, never()).putConnector(anyString(), anyString(), anyBoolean());
+        verify(connector, never()).putConnector(anyString(), anyString(), anyBoolean(), anyString());
         when(connector.readCatalog()).thenReturn(List.of());
         // 대시보드는 모르는 plugin 의 해제를 바뀐 것 없는 성공으로 답한다.
-        when(connector.putConnector(profile, DEMO, false)).thenReturn(new InstallResult(false, false));
+        when(connector.putConnector(eq(profile), eq(DEMO), eq(false), anyString())).thenReturn(new InstallResult(false, false));
         when(connector.readConnector(profile, DEMO)).thenReturn(new ConnectorState(profile, false, false, false, true));
 
         ConnectionSnapshot disconnected = service.disconnect(member, DEMO);
@@ -1101,7 +1101,7 @@ class ConnectorConnectionServiceTest {
 
         verify(toolsets, never()).writeApiServer(any(), any(), any());
         // 등록의 설치와 다시 보낸 설치다.
-        verify(connector, times(2)).putConnector(profile, DEMO, true);
+        verify(connector, times(2)).putConnector(eq(profile), eq(DEMO), eq(true), anyString());
         assertThat(checked.status()).isEqualTo(ConnectionStatus.PENDING);
         assertThat(agentEnabled(user)).isFalse();
     }
@@ -1135,7 +1135,7 @@ class ConnectorConnectionServiceTest {
         ConnectionSnapshot checked = service.check(user, DEMO);
 
         // 등록의 설치와 다시 보낸 설치다.
-        verify(connector, times(2)).putConnector(profile, DEMO, true);
+        verify(connector, times(2)).putConnector(eq(profile), eq(DEMO), eq(true), anyString());
         verify(toolsets, never()).writeApiServer(any(), any(), any());
         assertThat(checked.status()).isEqualTo(ConnectionStatus.READY);
         assertThat(checked.restartRequired()).isFalse();
@@ -1152,7 +1152,7 @@ class ConnectorConnectionServiceTest {
 
         ConnectionSnapshot checked = service.check(user, DEMO);
 
-        verify(connector, times(1)).putConnector(anyString(), anyString(), anyBoolean());
+        verify(connector, times(1)).putConnector(anyString(), anyString(), anyBoolean(), anyString());
         assertThat(checked.status()).isEqualTo(ConnectionStatus.PENDING);
     }
 
@@ -1171,7 +1171,7 @@ class ConnectorConnectionServiceTest {
         assertThat(stored(user).status()).isEqualTo(ConnectionStatus.PENDING);
         assertThat(agentEnabled(user)).isFalse();
         // 등록의 설치 한 번뿐이다.
-        verify(connector, times(1)).putConnector(anyString(), anyString(), anyBoolean());
+        verify(connector, times(1)).putConnector(anyString(), anyString(), anyBoolean(), anyString());
         verify(connector, never()).probe(anyString(), anyString());
     }
 
@@ -1183,7 +1183,7 @@ class ConnectorConnectionServiceTest {
         installed(true, false);
         doThrow(new IllegalStateException("dashboard unavailable"))
                 .when(connector)
-                .putConnector(anyString(), anyString(), anyBoolean());
+                .putConnector(anyString(), anyString(), anyBoolean(), anyString());
 
         assertThatThrownBy(() -> service.check(user, DEMO)).isInstanceOf(ConnectorOperationFailure.class);
 
@@ -1203,13 +1203,13 @@ class ConnectorConnectionServiceTest {
                 .thenReturn(
                         new ConnectorState("p", true, false, false, true),
                         new ConnectorState("p", true, true, false, true));
-        when(connector.putConnector(profile, DEMO, true)).thenReturn(new InstallResult(true, false));
+        when(connector.putConnector(eq(profile), eq(DEMO), eq(true), anyString())).thenReturn(new InstallResult(true, false));
         when(connector.probe(profile, "demo")).thenReturn(new ProbeResult(true, List.of("list_scopes")));
 
         ConnectionSnapshot confirmed = service.confirmApplied(admin, DEMO, member.id());
 
         // 등록의 설치와 다시 보낸 설치다.
-        verify(connector, times(2)).putConnector(profile, DEMO, true);
+        verify(connector, times(2)).putConnector(eq(profile), eq(DEMO), eq(true), anyString());
         verify(toolsets, never()).writeApiServer(any(), any(), any());
         assertThat(confirmed.status()).isEqualTo(ConnectionStatus.READY);
         assertThat(confirmed.restartRequired()).isFalse();
@@ -1237,7 +1237,7 @@ class ConnectorConnectionServiceTest {
 
         ConnectionSnapshot checked = service.check(user, DEMO);
 
-        verify(connector, times(1)).putConnector(anyString(), anyString(), anyBoolean());
+        verify(connector, times(1)).putConnector(anyString(), anyString(), anyBoolean(), anyString());
         assertThat(checked.status()).isEqualTo(ConnectionStatus.PENDING);
         assertThat(checked.restartRequired()).isTrue();
     }
@@ -1283,7 +1283,7 @@ class ConnectorConnectionServiceTest {
                 .isInstanceOf(ConnectorOperationFailure.class);
 
         // 등록의 설치와 다시 설치다.
-        verify(connector, times(2)).putConnector(profile, DEMO, true);
+        verify(connector, times(2)).putConnector(eq(profile), eq(DEMO), eq(true), anyString());
         verify(toolsets, never()).writeApiServer(any(), any(), any());
         assertThat(stored(member).status()).isEqualTo(ConnectionStatus.PENDING);
     }
@@ -1334,7 +1334,7 @@ class ConnectorConnectionServiceTest {
         assertThat(checked.status()).isEqualTo(ConnectionStatus.PENDING);
         assertThat(agentEnabled(user)).isFalse();
         // hook 을 판정하기 전에 설치를 다시 보냈다. 등록의 설치와 다시 보낸 설치다.
-        verify(connector, times(2)).putConnector(profile, DEMO, true);
+        verify(connector, times(2)).putConnector(eq(profile), eq(DEMO), eq(true), anyString());
         verify(connector, never()).probe(anyString(), anyString());
     }
 
@@ -1491,7 +1491,7 @@ class ConnectorConnectionServiceTest {
         String profile = profileOf(service.register(member, DEMO, VALUES));
         installed(true, true);
         when(connector.probe(profile, "demo")).thenReturn(new ProbeResult(true, List.of("list_scopes")));
-        when(connector.putConnector(profile, DEMO, true)).thenReturn(new InstallResult(true, true));
+        when(connector.putConnector(eq(profile), eq(DEMO), eq(true), anyString())).thenReturn(new InstallResult(true, true));
 
         ConnectionSnapshot checked = service.check(member, DEMO);
 
@@ -1501,7 +1501,7 @@ class ConnectorConnectionServiceTest {
         verify(connector, never()).probe(anyString(), anyString());
 
         // 재시작한 뒤에는 파일이 이미 새 판이라 설치가 바꾼 것이 없다.
-        when(connector.putConnector(profile, DEMO, true)).thenReturn(new InstallResult(true, false));
+        when(connector.putConnector(eq(profile), eq(DEMO), eq(true), anyString())).thenReturn(new InstallResult(true, false));
 
         ConnectionSnapshot confirmed = service.confirmApplied(admin, DEMO, member.id());
 
@@ -1517,7 +1517,7 @@ class ConnectorConnectionServiceTest {
         CurrentUser admin = user(UserRole.ADMIN, 1L);
         String profile = profileOf(service.register(member, DEMO, VALUES));
         installed(true, true);
-        when(connector.putConnector(profile, DEMO, true)).thenReturn(new InstallResult(true, true));
+        when(connector.putConnector(eq(profile), eq(DEMO), eq(true), anyString())).thenReturn(new InstallResult(true, true));
 
         assertThatThrownBy(() -> service.confirmApplied(admin, DEMO, member.id()))
                 .isInstanceOf(ConnectorOperationFailure.class);
@@ -1530,7 +1530,7 @@ class ConnectorConnectionServiceTest {
     @DisplayName("등록의 설치가 hook plugin 을 바꿨으면 재시작 대기로 등록된다")
     void registrationMarksRestartWhenInstallUpdatesPlugin() {
         CurrentUser user = user(UserRole.MEMBER, 1L);
-        when(connector.putConnector(anyString(), eq(DEMO), eq(true))).thenReturn(new InstallResult(false, true));
+        when(connector.putConnector(anyString(), eq(DEMO), eq(true), anyString())).thenReturn(new InstallResult(false, true));
 
         assertThat(service.register(user, DEMO, VALUES).restartRequired()).isTrue();
     }
@@ -1554,7 +1554,7 @@ class ConnectorConnectionServiceTest {
         assertThat(lowered.restartRequired()).isFalse();
         assertThat(agentEnabled(member)).isFalse();
         // 옛 판의 hook 을 가진 profile 이라 다시 보낸 설치가 파일을 바꾼다.
-        when(connector.putConnector(profile, DEMO, true)).thenReturn(new InstallResult(true, true));
+        when(connector.putConnector(eq(profile), eq(DEMO), eq(true), anyString())).thenReturn(new InstallResult(true, true));
 
         ConnectionSnapshot checked = service.check(member, DEMO);
 
@@ -1562,7 +1562,7 @@ class ConnectorConnectionServiceTest {
         assertThat(checked.restartRequired()).isTrue();
         assertThat(agentEnabled(member)).isFalse();
 
-        when(connector.putConnector(profile, DEMO, true)).thenReturn(new InstallResult(true, false));
+        when(connector.putConnector(eq(profile), eq(DEMO), eq(true), anyString())).thenReturn(new InstallResult(true, false));
 
         ConnectionSnapshot confirmed = service.confirmApplied(admin, DEMO, member.id());
 

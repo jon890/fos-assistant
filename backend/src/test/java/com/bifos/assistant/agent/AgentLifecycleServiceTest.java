@@ -67,7 +67,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 class AgentLifecycleServiceTest {
 
     /** plugin 틀이 붙이는 안전한 기본 도구다. 셸과 파일 등급이 없다. */
-    private static final List<String> SAFE_TOOLSETS = List.of("web", "skills", "todo", "vision");
+    private static final List<String> SAFE_TOOLSETS = List.of("web", "skills", "todo");
 
     private static final List<String> WITH_TERMINAL = List.of("web", "terminal");
 
@@ -315,6 +315,19 @@ class AgentLifecycleServiceTest {
                 ErrorCode.AGENT_TOOLS_REQUIRE_PRIVATE);
 
         assertThat(agents.findByCode(created.code()).orElseThrow().visibility()).isEqualTo(AgentVisibility.PRIVATE);
+    }
+
+    @Test
+    @DisplayName("사진 보기만 켜진 에이전트도 그룹으로 바꿀 수 없다")
+    void cannotChangeToGroupWhenVisionOnlyEnabled() {
+        CurrentUser kid = member();
+        Agent created = create(kid, "사진 도우미", null);
+        when(toolsets.readEnabled(created.apiBaseUrl(), created.hermesProfile()))
+                .thenReturn(List.of("vision", "fos-assistant"));
+
+        assertCode(
+                () -> lifecycle.changeVisibility(kid, created.code(), AgentVisibility.GROUP),
+                ErrorCode.AGENT_TOOLS_REQUIRE_PRIVATE);
     }
 
     @Test

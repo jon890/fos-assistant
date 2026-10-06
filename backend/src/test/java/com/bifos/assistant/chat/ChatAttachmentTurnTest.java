@@ -401,6 +401,23 @@ class ChatAttachmentTurnTest {
     }
 
     @Test
+    @DisplayName("다른 사용자 소유 그룹 에이전트는 사진을 받지 않고 실행도 시작하지 않는다")
+    void groupAgentOwnedByAnotherUserRejectsPhotos() {
+        CurrentUser mom = member("mom@example.com");
+        Agent shared = agentOf(dad, "shared");
+        shared.changeAccess(true, AgentVisibility.GROUP, dad.id());
+        agents.save(shared);
+        assertThat(shared.acceptsAttachments()).isFalse();
+        Long conversationId = chat.startEmpty(mom, "shared").id();
+        ChatAttachment photo = upload(mom, conversationId, "b.png");
+
+        assertRejected(() -> chat.send(mom, conversationId, "사진 봐", null, List.of(photo.id())));
+
+        assertThat(userContentsOf(conversationId)).isEmpty();
+        assertThat(attachmentRows.findById(photo.id()).orElseThrow().messageId()).isNull();
+    }
+
+    @Test
     @DisplayName("대화 이력의 메시지마다 그 첨부가 달리고 없는 메시지는 빈 목록이다")
     void attachesAttachmentsPerMessageInHistoryAndEmptyListForOthers() {
         Long conversationId = chat.startEmpty(dad, "dad").id();

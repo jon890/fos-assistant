@@ -47,7 +47,8 @@ public interface HermesConnectorClient {
      */
     CallResult execute(String profile, String connectorId, String hermesTool, String argsJson);
 
-    InstallResult putConnector(String profile, String connectorId, boolean enabled);
+    /** 설치하는 사진 도구도 신뢰한 에이전트 주인의 격리 실행 공간을 쓴다(ADR-087). */
+    InstallResult putConnector(String profile, String connectorId, boolean enabled, String sandboxOwner);
 
     /** 그 profile 의 설치 상태다. 대시보드의 목록에 그 커넥터가 없으면 설치되지 않은 것으로 돌려준다. */
     ConnectorState readConnector(String profile, String connectorId);

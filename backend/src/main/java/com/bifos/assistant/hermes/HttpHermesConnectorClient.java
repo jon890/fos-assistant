@@ -163,12 +163,12 @@ public class HttpHermesConnectorClient implements HermesConnectorClient {
     }
 
     @Override
-    public InstallResult putConnector(String profile, String connectorId, boolean enabled) {
+    public InstallResult putConnector(String profile, String connectorId, boolean enabled, String sandboxOwner) {
         JsonNode body = request(() -> client.put()
                 .uri(baseUrl + "/api/connectors")
                 .header(AUTHORIZATION, bearer())
                 .contentType(MediaType.APPLICATION_JSON)
-                .body(Map.of(PROFILE, profile, PLUGIN, connectorId, ENABLED, enabled))
+                .body(Map.of(PROFILE, profile, PLUGIN, connectorId, ENABLED, enabled, "sandbox_owner", sandboxOwner))
                 .retrieve()
                 .body(JsonNode.class));
         requireText(body, PROFILE, profile);

@@ -86,6 +86,20 @@ class AgentToolPolicyTest {
     }
 
     @Test
+    @DisplayName("사진 보기만 켜도 비공개 실행 공간을 요구한다")
+    void visionRequiresPrivateSandboxEvenWithoutShellTools() {
+        assertThat(AgentToolPolicy.hasSandboxToolset(List.of("vision"))).isTrue();
+        assertThatThrownBy(() -> AgentToolPolicy.requestedForWrite(
+                        OWNER, agent(AgentVisibility.GROUP), List.of("vision"), List.of()))
+                .isInstanceOf(ApiException.class)
+                .extracting(ex -> ((ApiException) ex).code())
+                .isEqualTo(ErrorCode.AGENT_TOOLS_REQUIRE_PRIVATE);
+        assertThat(AgentToolPolicy.requestedForWrite(
+                        OWNER, agent(AgentVisibility.PRIVATE), List.of("vision"), List.of()))
+                .containsExactly("vision", AgentToolPolicy.CONTROL_PLANE_MCP);
+    }
+
+    @Test
     @DisplayName("지난 대화 검색은 관리자만 켜고 그룹 에이전트에는 둘 수 없다")
     void pastConversationSearchIsAdminOnlyAndNotAllowedForGroupAgent() {
         assertThatThrownBy(() -> AgentToolPolicy.requestedForWrite(

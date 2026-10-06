@@ -265,8 +265,8 @@ class HttpHermesConnectorClientTest {
         server.expect(requestTo(BASE + "/api/connectors"))
                 .andRespond(withSuccess(body + "}", MediaType.APPLICATION_JSON));
 
-        assertThat(client.putConnector(PROFILE, DEMO, true)).isEqualTo(new InstallResult(true, true));
-        assertThat(client.putConnector(PROFILE, DEMO, true)).isEqualTo(new InstallResult(true, false));
+        assertThat(client.putConnector(PROFILE, DEMO, true, "u1")).isEqualTo(new InstallResult(true, true));
+        assertThat(client.putConnector(PROFILE, DEMO, true, "u1")).isEqualTo(new InstallResult(true, false));
         server.verify();
     }
 
@@ -455,7 +455,7 @@ class HttpHermesConnectorClientTest {
         server.expect(requestTo(BASE + "/api/connectors"))
                 .andExpect(method(HttpMethod.PUT))
                 .andExpect(header("Authorization", "Bearer test-dashboard-token"))
-                .andExpect(content().json("{\"profile\":\"user-demo\",\"plugin\":\"demo-notes\",\"enabled\":true}"))
+                .andExpect(content().json("{\"profile\":\"user-demo\",\"plugin\":\"demo-notes\",\"enabled\":true,\"sandbox_owner\":\"u1\"}"))
                 .andRespond(withSuccess(
                         "{\"profile\":\"user-demo\",\"plugin\":\"demo-notes\",\"enabled\":true,\"restart_required\":true}",
                         MediaType.APPLICATION_JSON));
@@ -465,7 +465,7 @@ class HttpHermesConnectorClientTest {
                                 + "{\"plugin\":\"other\",\"enabled\":false,\"configured\":false},"
                                 + "{\"plugin\":\"demo-notes\",\"enabled\":true,\"configured\":true}]}",
                         MediaType.APPLICATION_JSON));
-        assertThat(client.putConnector(PROFILE, DEMO, true)).isEqualTo(new InstallResult(true, false));
+        assertThat(client.putConnector(PROFILE, DEMO, true, "u1")).isEqualTo(new InstallResult(true, false));
         var state = client.readConnector(PROFILE, DEMO);
         assertThat(state.enabled()).isTrue();
         assertThat(state.configured()).isTrue();
@@ -485,8 +485,8 @@ class HttpHermesConnectorClientTest {
                 .andRespond(withSuccess(
                         "{\"profile\":\"user-demo\",\"plugin\":\"demo-notes\",\"enabled\":false,\"restart_required\":false}",
                         MediaType.APPLICATION_JSON));
-        assertThatThrownBy(() -> client.putConnector(PROFILE, DEMO, true)).isInstanceOf(IllegalStateException.class);
-        assertThatThrownBy(() -> client.putConnector(PROFILE, DEMO, true)).isInstanceOf(IllegalStateException.class);
+        assertThatThrownBy(() -> client.putConnector(PROFILE, DEMO, true, "u1")).isInstanceOf(IllegalStateException.class);
+        assertThatThrownBy(() -> client.putConnector(PROFILE, DEMO, true, "u1")).isInstanceOf(IllegalStateException.class);
         server.verify();
     }
 
