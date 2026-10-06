@@ -234,7 +234,7 @@ Hermes 가 보이는 도구 이름은 `mcp__fos_assistant__<도구>` 다. 서버
 서명에는 앞부분을 뗀 서버 쪽 이름을 넣는다. 서버 이름을 바꾸면 plugin 의 `TOOL_PREFIX` 도 함께 바꾼다.
 
 **서명은 그 profile 의 모델이 셸로 파일을 읽지 못하는 동안만 위조를 막는다.**
-key 는 그 profile `.env` 의 MCP 토큰에서 나온다. terminal backend 가 `local` 이면 terminal 도구는 Hermes 프로세스의 사용자가 읽을 수 있는 파일을 모두 읽는다. docker 실행 공간이 적용된 profile 은 [실행 공간](../docs/hermes/sandbox.md) 이 갖는다. 스킬 앞머리의 비밀 요청 칸이 그 토큰을 실행 공간에 넣을 수 있어 올린 스킬은 그 칸을 거절한다.
+key 는 그 profile `.env` 의 MCP 토큰에서 나온다. terminal backend 가 `local` 이면 terminal 도구는 Hermes 프로세스의 사용자가 읽을 수 있는 파일을 모두 읽는다. docker 실행 공간이 적용된 profile 은 [실행 공간](../docs/hermes/sandbox.md) 이 갖는다. 스킬 앞머리의 비밀 요청 칸이 그 토큰을 실행 공간에 넣을 수 있어 올린 스킬과 커넥터 스킬은 그 칸을 거절한다.
 셸을 여는 profile 의 목록은 운영 저장소의 live 검사가 소유한다.
 그 목록에 Control Plane MCP 를 등록한 profile 을 더할 때는 이 제약을 함께 판단한다.
 
