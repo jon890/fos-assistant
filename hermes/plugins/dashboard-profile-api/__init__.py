@@ -1749,7 +1749,9 @@ def _connector_bind_config(profile_dir: pathlib.Path, plugin: str, enabled: bool
                 raise FileExistsError("이미 있는 스킬 디렉터리와 이름이 겹친다")
         state[plugin] = {"server": server, "allowlist_added": True, "mcp_server": name,
                          "mode": BIND_MODE, "vault": vault, "skills": skills}
-        detached.pop(plugin, None)
+        # 뗀 기록은 같은 이름일 때만 지운다. 그 사이 서버 이름이 바뀌었으면 옛 이름을 쥔 실행이 아직 있을 수 있다.
+        if detached.get(plugin) == name:
+            detached.pop(plugin)
         desired = {skills_dir / skill / relative: data
                    for skill in skills for relative, data in manifest["skills"][skill].items()}
     else:

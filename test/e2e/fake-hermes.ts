@@ -947,6 +947,11 @@ export function startFakeHermes(
       send(response, 409, { error: "the profile conflicts with this connector" });
       return;
     }
+    // 정책 hook 이 꺼진 profile 에는 새로 붙이지 않는다. 이미 붙은 커넥터를 다시 설치하는 것은 받고 hook 상태로 PENDING 에 남는다.
+    if (!bound.has(plugin) && policyHookOff.has(profile)) {
+      send(response, 409, { error: "the policy hook plugin is not enabled" });
+      return;
+    }
     const env = envOf(profile);
     let changed = bound.get(plugin) !== bind.vault;
     for (const field of connector.fields) {
