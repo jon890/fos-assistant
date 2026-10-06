@@ -2,6 +2,7 @@ package com.bifos.assistant.orchestration;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.same;
 import static org.mockito.Mockito.inOrder;
@@ -74,7 +75,7 @@ class AgentRunnerConnectorContextTest {
     @BeforeEach
     void setUp() {
         when(contextAssembler.assemble(eq(user), any())).thenReturn(new AssembledContext(MEMORY, MEMORY.length()));
-        when(contextAssembler.withResponseInstructions(any())).thenCallRealMethod();
+        when(contextAssembler.withResponseInstructions(any(), anyBoolean())).thenCallRealMethod();
         when(started.id()).thenReturn(3L);
         when(completed.id()).thenReturn(3L);
         when(modelTiers.resolve(any(), any(), any())).thenReturn(new ResolvedModelTier(ModelChoice.defaults(), null));
