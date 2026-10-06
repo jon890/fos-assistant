@@ -232,7 +232,8 @@ public class ConnectorConnectionService {
             // 내장 toolset 으로 다시 쓴다.
             step = STEP_INSTALL;
             // hook plugin 파일이 바뀌었으면 떠 있는 gateway 가 옛 코드를 쥐고 있을 수 있다. 재시작 대기로 둔다.
-            InstallResult installed = connector.putConnector(profile, manifest.id(), true, connection.agent().sandboxOwner());
+            InstallResult installed = connector.putConnector(
+                    profile, manifest.id(), true, connection.agent().sandboxOwner());
             connection.markRestartRequired(installed.restartRequired() || installed.pluginUpdated());
         } catch (RuntimeException ex) {
             warn(step, manifest.id(), ex);
@@ -265,8 +266,10 @@ public class ConnectorConnectionService {
                 connection.markRestartRequired(connector.deleteEnv(profile, field.env()));
             }
             step = STEP_INSTALL;
-            connection.markRestartRequired(
-                    connector.putConnector(profile, connectorId, false, connection.agent().sandboxOwner()).restartRequired());
+            connection.markRestartRequired(connector
+                    .putConnector(
+                            profile, connectorId, false, connection.agent().sandboxOwner())
+                    .restartRequired());
         } catch (RuntimeException ex) {
             warn(step, connectorId, ex);
             throw new ConnectorOperationFailure();
@@ -377,7 +380,13 @@ public class ConnectorConnectionService {
         try {
             // 설치 요청은 같은 값이면 아무것도 바꾸지 않는다. 설치된 연결에는 늘 재시작 필요로 답하므로 그 값은
             // 쓰지 않는다. 실행 정의가 바뀌었으면 요청이 실패한다.
-            if (connector.putConnector(profile, connection.connectorId(), true, connection.agent().sandboxOwner()).pluginUpdated()) {
+            if (connector
+                    .putConnector(
+                            profile,
+                            connection.connectorId(),
+                            true,
+                            connection.agent().sandboxOwner())
+                    .pluginUpdated()) {
                 connection.markRestartRequired(true);
                 return false;
             }

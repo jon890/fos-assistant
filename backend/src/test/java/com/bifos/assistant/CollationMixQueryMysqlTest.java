@@ -2,8 +2,8 @@ package com.bifos.assistant;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.bifos.assistant.chat.application.FlowRegistry;
 import com.bifos.assistant.chat.application.AttachmentBackfill;
+import com.bifos.assistant.chat.application.FlowRegistry;
 import com.bifos.assistant.testsupport.MysqlTestDatabase;
 import com.bifos.assistant.testsupport.RepositoryQuerySweep;
 import java.sql.SQLException;

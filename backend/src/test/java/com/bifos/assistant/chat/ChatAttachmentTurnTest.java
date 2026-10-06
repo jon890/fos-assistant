@@ -414,7 +414,8 @@ class ChatAttachmentTurnTest {
         assertRejected(() -> chat.send(mom, conversationId, "사진 봐", null, List.of(photo.id())));
 
         assertThat(userContentsOf(conversationId)).isEmpty();
-        assertThat(attachmentRows.findById(photo.id()).orElseThrow().messageId()).isNull();
+        assertThat(attachmentRows.findById(photo.id()).orElseThrow().messageId())
+                .isNull();
     }
 
     @Test

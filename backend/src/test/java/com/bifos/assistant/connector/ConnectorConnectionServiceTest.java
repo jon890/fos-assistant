@@ -368,7 +368,9 @@ class ConnectorConnectionServiceTest {
 
         // 해제의 실패.
         makeReady.run();
-        doThrow(new IllegalStateException()).when(connector).putConnector(eq(profile), eq(DEMO), eq(false), anyString());
+        doThrow(new IllegalStateException())
+                .when(connector)
+                .putConnector(eq(profile), eq(DEMO), eq(false), anyString());
         assertThatThrownBy(() -> service.disconnect(member, DEMO)).isInstanceOf(ConnectorOperationFailure.class);
         assertOff.run();
     }
@@ -458,7 +460,8 @@ class ConnectorConnectionServiceTest {
         String profile = profileOf(service.register(user, DEMO, VALUES));
         installed(true, true);
         when(connector.probe(profile, "demo")).thenReturn(new ProbeResult(true, List.of("list_scopes")));
-        when(connector.putConnector(eq(profile), eq(DEMO), eq(true), anyString())).thenReturn(new InstallResult(true, false));
+        when(connector.putConnector(eq(profile), eq(DEMO), eq(true), anyString()))
+                .thenReturn(new InstallResult(true, false));
 
         ConnectionSnapshot checked = service.check(user, DEMO);
 
@@ -922,7 +925,8 @@ class ConnectorConnectionServiceTest {
         verify(connector, never()).putConnector(anyString(), anyString(), anyBoolean(), anyString());
         when(connector.readCatalog()).thenReturn(List.of());
         // 대시보드는 모르는 plugin 의 해제를 바뀐 것 없는 성공으로 답한다.
-        when(connector.putConnector(eq(profile), eq(DEMO), eq(false), anyString())).thenReturn(new InstallResult(false, false));
+        when(connector.putConnector(eq(profile), eq(DEMO), eq(false), anyString()))
+                .thenReturn(new InstallResult(false, false));
         when(connector.readConnector(profile, DEMO)).thenReturn(new ConnectorState(profile, false, false, false, true));
 
         ConnectionSnapshot disconnected = service.disconnect(member, DEMO);
@@ -1203,7 +1207,8 @@ class ConnectorConnectionServiceTest {
                 .thenReturn(
                         new ConnectorState("p", true, false, false, true),
                         new ConnectorState("p", true, true, false, true));
-        when(connector.putConnector(eq(profile), eq(DEMO), eq(true), anyString())).thenReturn(new InstallResult(true, false));
+        when(connector.putConnector(eq(profile), eq(DEMO), eq(true), anyString()))
+                .thenReturn(new InstallResult(true, false));
         when(connector.probe(profile, "demo")).thenReturn(new ProbeResult(true, List.of("list_scopes")));
 
         ConnectionSnapshot confirmed = service.confirmApplied(admin, DEMO, member.id());
@@ -1491,7 +1496,8 @@ class ConnectorConnectionServiceTest {
         String profile = profileOf(service.register(member, DEMO, VALUES));
         installed(true, true);
         when(connector.probe(profile, "demo")).thenReturn(new ProbeResult(true, List.of("list_scopes")));
-        when(connector.putConnector(eq(profile), eq(DEMO), eq(true), anyString())).thenReturn(new InstallResult(true, true));
+        when(connector.putConnector(eq(profile), eq(DEMO), eq(true), anyString()))
+                .thenReturn(new InstallResult(true, true));
 
         ConnectionSnapshot checked = service.check(member, DEMO);
 
@@ -1501,7 +1507,8 @@ class ConnectorConnectionServiceTest {
         verify(connector, never()).probe(anyString(), anyString());
 
         // 재시작한 뒤에는 파일이 이미 새 판이라 설치가 바꾼 것이 없다.
-        when(connector.putConnector(eq(profile), eq(DEMO), eq(true), anyString())).thenReturn(new InstallResult(true, false));
+        when(connector.putConnector(eq(profile), eq(DEMO), eq(true), anyString()))
+                .thenReturn(new InstallResult(true, false));
 
         ConnectionSnapshot confirmed = service.confirmApplied(admin, DEMO, member.id());
 
@@ -1517,7 +1524,8 @@ class ConnectorConnectionServiceTest {
         CurrentUser admin = user(UserRole.ADMIN, 1L);
         String profile = profileOf(service.register(member, DEMO, VALUES));
         installed(true, true);
-        when(connector.putConnector(eq(profile), eq(DEMO), eq(true), anyString())).thenReturn(new InstallResult(true, true));
+        when(connector.putConnector(eq(profile), eq(DEMO), eq(true), anyString()))
+                .thenReturn(new InstallResult(true, true));
 
         assertThatThrownBy(() -> service.confirmApplied(admin, DEMO, member.id()))
                 .isInstanceOf(ConnectorOperationFailure.class);
@@ -1530,7 +1538,8 @@ class ConnectorConnectionServiceTest {
     @DisplayName("등록의 설치가 hook plugin 을 바꿨으면 재시작 대기로 등록된다")
     void registrationMarksRestartWhenInstallUpdatesPlugin() {
         CurrentUser user = user(UserRole.MEMBER, 1L);
-        when(connector.putConnector(anyString(), eq(DEMO), eq(true), anyString())).thenReturn(new InstallResult(false, true));
+        when(connector.putConnector(anyString(), eq(DEMO), eq(true), anyString()))
+                .thenReturn(new InstallResult(false, true));
 
         assertThat(service.register(user, DEMO, VALUES).restartRequired()).isTrue();
     }
@@ -1554,7 +1563,8 @@ class ConnectorConnectionServiceTest {
         assertThat(lowered.restartRequired()).isFalse();
         assertThat(agentEnabled(member)).isFalse();
         // 옛 판의 hook 을 가진 profile 이라 다시 보낸 설치가 파일을 바꾼다.
-        when(connector.putConnector(eq(profile), eq(DEMO), eq(true), anyString())).thenReturn(new InstallResult(true, true));
+        when(connector.putConnector(eq(profile), eq(DEMO), eq(true), anyString()))
+                .thenReturn(new InstallResult(true, true));
 
         ConnectionSnapshot checked = service.check(member, DEMO);
 
@@ -1562,7 +1572,8 @@ class ConnectorConnectionServiceTest {
         assertThat(checked.restartRequired()).isTrue();
         assertThat(agentEnabled(member)).isFalse();
 
-        when(connector.putConnector(eq(profile), eq(DEMO), eq(true), anyString())).thenReturn(new InstallResult(true, false));
+        when(connector.putConnector(eq(profile), eq(DEMO), eq(true), anyString()))
+                .thenReturn(new InstallResult(true, false));
 
         ConnectionSnapshot confirmed = service.confirmApplied(admin, DEMO, member.id());
 

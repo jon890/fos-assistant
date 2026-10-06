@@ -455,7 +455,10 @@ class HttpHermesConnectorClientTest {
         server.expect(requestTo(BASE + "/api/connectors"))
                 .andExpect(method(HttpMethod.PUT))
                 .andExpect(header("Authorization", "Bearer test-dashboard-token"))
-                .andExpect(content().json("{\"profile\":\"user-demo\",\"plugin\":\"demo-notes\",\"enabled\":true,\"sandbox_owner\":\"u1\"}"))
+                .andExpect(
+                        content()
+                                .json(
+                                        "{\"profile\":\"user-demo\",\"plugin\":\"demo-notes\",\"enabled\":true,\"sandbox_owner\":\"u1\"}"))
                 .andRespond(withSuccess(
                         "{\"profile\":\"user-demo\",\"plugin\":\"demo-notes\",\"enabled\":true,\"restart_required\":true}",
                         MediaType.APPLICATION_JSON));
@@ -485,8 +488,10 @@ class HttpHermesConnectorClientTest {
                 .andRespond(withSuccess(
                         "{\"profile\":\"user-demo\",\"plugin\":\"demo-notes\",\"enabled\":false,\"restart_required\":false}",
                         MediaType.APPLICATION_JSON));
-        assertThatThrownBy(() -> client.putConnector(PROFILE, DEMO, true, "u1")).isInstanceOf(IllegalStateException.class);
-        assertThatThrownBy(() -> client.putConnector(PROFILE, DEMO, true, "u1")).isInstanceOf(IllegalStateException.class);
+        assertThatThrownBy(() -> client.putConnector(PROFILE, DEMO, true, "u1"))
+                .isInstanceOf(IllegalStateException.class);
+        assertThatThrownBy(() -> client.putConnector(PROFILE, DEMO, true, "u1"))
+                .isInstanceOf(IllegalStateException.class);
         server.verify();
     }
 
