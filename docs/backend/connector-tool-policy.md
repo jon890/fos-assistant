@@ -29,6 +29,7 @@
 | `tools.<이름>.title` | 승인 카드와 알림 줄에 보일 사람 말. 80자까지. 없으면 승인 카드와 알림 줄은 `이름 없는 동작` 으로 보인다 |
 | `tools.<이름>.grant` | boolean. 거짓이면 그 도구에 상시 허락을 줄 수 없고 호출마다 승인을 받는다. 없으면 참이다. `approval` 이 `required` 인 도구에만 선언한다([ADR-065](../adr/ADR-065-외부로-나가는-도구는-상시-허락을-닫는-선언을-둔다.md)) |
 | `tools.<이름>.outbound` | boolean. 참이면 그 도구가 데이터를 계정 밖의 사람에게 보낸다는 선언이다. 참인 도구는 `approval` 이 `required` 이고 `grant` 가 거짓이어야 한다. 아니면 그 커넥터를 카탈로그에 내지 않는다. 없으면 거짓이다 |
+| `tools.<이름>.identifiers` | 인자 이름의 배열. 거기 적은 맨 위 인자의 값은 승인 카드가 길이와 모양으로 가리지 않는다. 없으면 빈 배열이다. `approval` 이 `required` 인 도구에만 선언한다([ADR-089](../adr/ADR-089-커넥터는-식별자-인자를-선언하고-승인-카드는-그-값을-길이로-가리지-않는다.md)) |
 | `default_tool_policy` | `tools` 에 없는 도구의 처리. `deny` 만 받는다. 없으면 `deny` 다 |
 
 | 위험도 | 뜻 | 기본 `approval` | 하한 |
@@ -53,6 +54,8 @@
 - 카탈로그 응답의 `grant` 는 기본값을 채운 값이다. `approval` 이 `required` 이고 선언이 닫지 않았을 때만 참이다. Control Plane 은 이 칸이 없으면 `approval` 이 `required` 인 도구를 참으로 읽고, boolean 이 아닌 값은 거짓으로 읽는다. 옛 대시보드 plugin 은 이 칸을 내지 않는다
 - `"grant": false` 인 도구는 모델에게 보인다. 설치가 `tools.exclude` 에 넣는 것은 `approval: always` 인 도구뿐이다
 - 데이터를 계정 밖의 사람에게 보내는 도구는 `"grant": false` 로 선언한다. 메일 보내기와 게시와 공유가 그 예다
+- `identifiers` 가 문자열 배열이 아니거나, 이름이 `^[A-Za-z_][A-Za-z0-9_]{0,30}$` 가 아니거나, 같은 이름이 두 번 있거나, 비밀 키로 읽히는 이름(`token`, `secret`, `password`, `privatekey` 로 끝나는 이름 등)이 있거나, `approval` 이 `required` 가 아닌 도구에 선언했으면 그 커넥터를 카탈로그에 내지 않는다
+- 카탈로그 응답의 `identifiers` 는 기본값을 채운 값이다. Control Plane 은 이 칸이 없거나 문자열 배열이 아니면 빈 목록으로 읽고, `approval` 이 `required` 가 아닌 도구의 값은 버린다. 어떤 값이 가림에서 빠지는지는 [커넥터 연결](../connectors.md) 의 「승인」 이 갖는다
 - `verify.tool` 과 `options.tool` 은 `tools` 에 있고 `risk: READ`, `approval: none` 이어야 한다. 아니면 카탈로그에 내지 않는다
 - `schema: 2` 인데 `tools` 가 없거나 비었으면 카탈로그에 내지 않는다
 - MCP 서버 이름을 등록 규칙으로 바꾸고 소문자로 맞춘 값이 Control Plane MCP 의 것과 같으면 카탈로그에 내지 않는다. `fos_assistant` 와 `FOS-Assistant` 가 그 예다. 그 커넥터의 도구가 Control Plane 도구와 같은 이름으로 읽힐 수 있기 때문이다. hook 도 대응 파일의 서버를 Control Plane MCP 의 접두사보다 먼저 봐서, 그런 서버가 대응 파일에 들어와도 판정을 건너뛰지 않는다

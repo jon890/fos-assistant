@@ -287,6 +287,14 @@ TOOL_RISK_DEFAULTS = {"READ": ("none", "none"), "SENSITIVE": ("required", "requi
                       "WRITE": ("required", "required"), "DESTRUCTIVE": ("always", "always"),
                       "FINANCIAL": ("always", "always")}
 TOOL_TITLE_MAX_CHARS = 80
+# `tools.<이름>.identifiers` 가 가리키는 인자 이름이다(ADR-089). 도구 인자 객체의 맨 위 칸만 가리킨다.
+# 31자까지다. 32자 이상인 이름은 Control Plane 이 키 이름 자체를 긴 덩어리로 보고 가린다.
+TOOL_IDENTIFIER_RE = re.compile(r"[A-Za-z_][A-Za-z0-9_]{0,30}")
+# 비밀 키로 읽히는 인자 이름이다. Control Plane 의 `ToolDetailRedactor` 의 `SECRET_KEYS` 와 `isSecretKey` 와 같다.
+# 한쪽을 바꾸면 다른 쪽도 바꾼다. 어긋나도 Control Plane 이 그 칸을 다시 가리므로 비밀이 보이지는 않는다.
+SECRET_ARGUMENT_NAMES = frozenset({"token", "secret", "password", "passwd", "apikey", "authorization", "cookie",
+                                   "credential", "credentials", "privatekey", "accesskey", "clientsecret"})
+SECRET_ARGUMENT_SUFFIXES = ("token", "secret", "password", "privatekey")
 # Hermes 가 MCP 도구의 등록 이름에 허용하는 길이다. 넘으면 앞부분에 해시를 붙여 줄인다.
 HERMES_TOOL_NAME_MAX_CHARS = 64
 # 서버 이름으로 계산한 등록 이름의 앞부분(`mcp__<서버>__`)이 넘지 못하는 길이다.
@@ -707,8 +715,31 @@ def _hermes_tool_name(server: str, tool: str) -> str:
     return full[:HERMES_TOOL_NAME_MAX_CHARS - 9] + "_" + hashlib.sha256(full.encode("utf-8")).hexdigest()[:8]
 
 
+def _tool_identifiers(declared_tool: dict, approval: str) -> list:
+    """`tools.<이름>.identifiers` 를 검증해 선언한 순서대로 낸다. 틀리면 예외다.
+
+    승인 카드가 있는 도구에만 뜻이 있어 `approval` 이 `required` 인 도구에만 받는다.
+    비밀 키로 읽히는 이름은 Control Plane 이 어차피 가리므로, 선언한 사람이 잘못 안 것으로 보고 거절한다.
+    """
+    if "identifiers" not in declared_tool:
+        return []
+    identifiers = declared_tool["identifiers"]
+    if approval != "required":
+        raise ValueError("identifiers 는 approval 이 required 인 도구에만 선언한다")
+    if not isinstance(identifiers, list) or not all(
+            isinstance(item, str) and TOOL_IDENTIFIER_RE.fullmatch(item) for item in identifiers):
+        raise ValueError("identifiers 는 인자 이름의 배열이다")
+    if len(set(identifiers)) != len(identifiers):
+        raise ValueError("identifiers 에 같은 이름이 두 번 있다")
+    for item in identifiers:
+        normalized = item.replace("_", "").lower()
+        if normalized in SECRET_ARGUMENT_NAMES or normalized.endswith(SECRET_ARGUMENT_SUFFIXES):
+            raise ValueError("identifiers 에 비밀 키로 읽히는 이름을 둘 수 없다")
+    return list(identifiers)
+
+
 def _connector_tools(declared: dict, verify_tool: str, option_tools: set, mcp_server: str) -> dict:
-    """`connector.json` 의 도구 정책을 검증해 `{도구 이름: {"risk", "approval", "title", "grant", "outbound"}}` 로 낸다.
+    """`connector.json` 의 도구 정책을 검증해 `{도구 이름: {"risk", "approval", "title", "grant", "outbound", "identifiers"}}` 로 낸다.
 
     틀리면 예외다.
 
@@ -717,12 +748,14 @@ def _connector_tools(declared: dict, verify_tool: str, option_tools: set, mcp_se
     `grant` 는 그 도구에 상시 허락을 줄 수 있는지다(ADR-065). 기본값을 채운 값이고,
     `approval` 이 `required` 이고 선언이 닫지 않았을 때만 참이다.
     `outbound` 는 그 도구가 데이터를 계정 밖의 사람에게 보낸다는 선언이다. 참인 도구는 상시 허락이 닫혀 있어야 한다.
+    `identifiers` 는 승인 카드가 길이로 가리지 않을 식별자 인자의 이름이다(ADR-089). 기본값은 빈 배열이다.
     """
     call_tools = {verify_tool} | set(option_tools)
     if declared["schema"] == 1:
         if "tools" in declared or "default_tool_policy" in declared:
             raise ValueError("tools 와 default_tool_policy 는 schema 2 에서만 선언한다")
-        return {name: {"risk": "READ", "approval": "none", "title": None, "grant": False, "outbound": False}
+        return {name: {"risk": "READ", "approval": "none", "title": None, "grant": False, "outbound": False,
+                       "identifiers": []}
                 for name in sorted(call_tools)}
     if declared["schema"] != 2:
         raise ValueError("schema 는 1 이나 2 만 받는다")
@@ -737,8 +770,8 @@ def _connector_tools(declared: dict, verify_tool: str, option_tools: set, mcp_se
         if not isinstance(name, str) or not TOOL_NAME_RE.match(name):
             raise ValueError("tools 의 키는 도구 이름이다")
         if not isinstance(declared_tool, dict) or set(declared_tool) - {
-                "risk", "approval", "title", "grant", "outbound"}:
-            raise ValueError("tools 의 값은 risk, approval, title, grant, outbound 만 갖는 객체다")
+                "risk", "approval", "title", "grant", "outbound", "identifiers"}:
+            raise ValueError("tools 의 값은 risk, approval, title, grant, outbound, identifiers 만 갖는 객체다")
         risk = declared_tool.get("risk")
         if not isinstance(risk, str) or risk not in TOOL_RISKS:
             raise ValueError("risk 는 정해 둔 위험도 가운데 하나다")
@@ -764,7 +797,9 @@ def _connector_tools(declared: dict, verify_tool: str, option_tools: set, mcp_se
         # 밖으로 나가는 도구는 호출마다 사람이 본다. 상시 허락이 열려 있으면 고쳐 읽지 않고 거절한다.
         if outbound and (approval != "required" or grant):
             raise ValueError("outbound 가 참인 도구는 approval 이 required 이고 grant 가 false 여야 한다")
-        policies[name] = {"risk": risk, "approval": approval, "title": title, "grant": grant, "outbound": outbound}
+        identifiers = _tool_identifiers(declared_tool, approval)
+        policies[name] = {"risk": risk, "approval": approval, "title": title, "grant": grant, "outbound": outbound,
+                          "identifiers": identifiers}
     for name in call_tools:
         # 대시보드가 승인 없이 부르는 도구다. 읽기 전용이고 승인이 없는 선언만 맞는다.
         if policies.get(name, {}).get("risk") != "READ" or policies[name]["approval"] != "none":

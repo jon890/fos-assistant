@@ -48,6 +48,7 @@ MCP 서버 이름은 `gmail` 이다. 인자는 `search_messages` 의 `max_result
 - 밖으로 나간다는 선언(`"outbound": true`)은 보내기와 답장 둘이다.
 - 보내기와 답장은 계정 밖의 사람에게 나간다. `"grant": false` 로 상시 허락을 닫아 호출마다 사람이 받는 사람과 제목과 본문을 본다([ADR-065](../adr/ADR-065-외부로-나가는-도구는-상시-허락을-닫는-선언을-둔다.md)).
 - 휴지통과 영구 삭제는 도구가 없다. 선언에 없는 도구는 거절된다.
+- 쓰는 도구가 받는 메일, 라벨, 필터의 id 는 `identifiers` 로 선언했다. 필터 id 처럼 긴 영숫자라도 승인 카드에 그대로 보이고 승인할 수 있다([ADR-089](../adr/ADR-089-커넥터는-식별자-인자를-선언하고-승인-카드는-그-값을-길이로-가리지-않는다.md)). `create_draft` 의 `reply_to_message_id`, `modify_labels` 와 `reply_to_message` 의 `message_id`, `update_label` 의 `label`, `delete_filter` 의 `filter_id` 다. 라벨 이름을 쉼표로 이어 받는 `add_labels` 와 `remove_labels` 는 식별자 모양이 아니라 선언하지 않았다.
 
 ### 도구의 인자와 결과
 

@@ -3,6 +3,7 @@ package com.bifos.assistant.hermes;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.bifos.assistant.usage.domain.ExecutionEvent;
+import java.util.Set;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import tools.jackson.databind.JsonNode;
@@ -122,6 +123,66 @@ class ToolDetailRedactorTest {
                 .isTrue();
         assertThat(ToolDetailRedactor.hidesArguments("{\"body\":\"끝나지 않은 글")).isTrue();
         assertThat(ToolDetailRedactor.hidesArguments("실행 password=hunter2")).isTrue();
+    }
+
+    @Test
+    @DisplayName("식별자로 선언한 맨 위 칸의 식별자 모양 값은 길이로 가리지 않고 나머지 칸은 그대로 가린다")
+    void declaredIdentifiersAreNotHiddenByLength() {
+        String id = "ANe1BmhXxP8kq3Lr0sT9vUwYzA2bC4dE6fG8hJ";
+        String token = "QUJDREVGR0hJSktMTU5PUFFSU1RVVldYWVowMTIzNDU2Nzg5";
+        String args = "{\"filter_id\":\"" + id + "\",\"ids\":[\"" + id + "\",\"Label_1\"],\"body\":\"" + token
+                + "\",\"nested\":{\"filter_id\":\"" + id + "\"}}";
+
+        String redacted = ToolDetailRedactor.redactArguments(args, Set.of("filter_id", "ids"));
+
+        assertThat(redacted)
+                .isEqualTo("{\"filter_id\":\"" + id + "\",\"ids\":[\"" + id + "\",\"Label_1\"],"
+                        + "\"body\":\"[가림]\",\"nested\":{\"filter_id\":\"[가림]\"}}");
+        assertThat(ToolDetailRedactor.hidesArguments("{\"filter_id\":\"" + id + "\"}", Set.of("filter_id")))
+                .isFalse();
+        assertThat(ToolDetailRedactor.hidesArguments("{\"filter_id\":\"" + id + "\"}", Set.of()))
+                .as("선언이 없으면 지금처럼 가린다")
+                .isTrue();
+    }
+
+    @Test
+    @DisplayName("식별자 칸이어도 비밀 키 이름, 알려진 접두사, 식별자 모양이 아닌 값은 가린다")
+    void declaredIdentifiersStillHideSecrets() {
+        String id = "ANe1BmhXxP8kq3Lr0sT9vUwYzA2bC4dE6fG8hJ";
+        Set<String> declared = Set.of("filter_id", "api_token");
+
+        assertThat(ToolDetailRedactor.redactArguments("{\"api_token\":\"abc\"}", declared))
+                .isEqualTo("{\"api_token\":\"[가림]\"}");
+        assertThat(ToolDetailRedactor.redactArguments("{\"filter_id\":\"ghp_" + id + "\"}", declared))
+                .isEqualTo("{\"filter_id\":\"[가림]\"}");
+        assertThat(ToolDetailRedactor.redactArguments("{\"filter_id\":\"sk-" + id + "\"}", declared))
+                .isEqualTo("{\"filter_id\":\"[가림]\"}");
+        assertThat(ToolDetailRedactor.redactArguments("{\"filter_id\":\"AIza" + id + "\"}", declared))
+                .as("Google API key 접두사")
+                .isEqualTo("{\"filter_id\":\"[가림]\"}");
+        assertThat(ToolDetailRedactor.hidesArguments("{\"filter_id\":[\"ok_id\",\"ghp_" + id + "\"]}", declared))
+                .as("배열 항목의 접두사 key")
+                .isTrue();
+        assertThat(ToolDetailRedactor.redactArguments("{\"filter_id\":\"desk-" + id + "\"}", declared))
+                .as("값 중간의 sk- 는 식별자의 일부다")
+                .isEqualTo("{\"filter_id\":\"desk-" + id + "\"}");
+        assertThat(ToolDetailRedactor.hidesArguments("{\"filter_id\":\"본문 " + id + "\"}", declared))
+                .as("공백이 섞인 값")
+                .isTrue();
+        assertThat(ToolDetailRedactor.hidesArguments("{\"filter_id\":\"" + "a".repeat(257) + "\"}", declared))
+                .as("256자를 넘는 값")
+                .isTrue();
+        assertThat(ToolDetailRedactor.hidesArguments("{\"filter_id\":[\"" + id + "\",{\"x\":1}]}", declared))
+                .as("문자열이 아닌 항목이 섞인 배열은 평소대로 가린다")
+                .isTrue();
+        assertThat(ToolDetailRedactor.hidesArguments("{\"filter_id\":[\"" + id + "\",\"a b\"]}", declared))
+                .as("배열의 한 항목이라도 식별자 모양이 아니면 배열 전체를 평소대로 가린다")
+                .isTrue();
+        assertThat(ToolDetailRedactor.hidesArguments("{\"filter_id\":\"끝나지 않은", declared))
+                .isTrue();
+        assertThat(ToolDetailRedactor.hidesArguments("[\"" + id + "\"]", declared))
+                .as("맨 위가 객체가 아니면 선언을 쓰지 않는다")
+                .isTrue();
     }
 
     @Test
