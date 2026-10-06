@@ -90,7 +90,7 @@ sequenceDiagram
             W-->>B: 답 조각과 도구 상태
         end
     end
-    C->>H: GET {profile}/v1/runs/{id}
+    C->>H: GET {profile}/v1/runs/{id} (종료 상태가 올 때까지 되풀이)
     alt Hermes 실행 성공
         C->>C: 메시지를 남기고 같은 실행 줄을 SUCCEEDED 로 갱신하며 RUN_COMPLETED 를 남긴다
         opt Memory 제안 설정이 켜짐

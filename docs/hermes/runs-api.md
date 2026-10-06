@@ -314,8 +314,8 @@ v0.21.0 의 `gateway/platforms/api_server_runs.py` 가 보내는 것을 실측�
 | `event` | 함께 오는 칸 |
 | --- | --- |
 | `message.delta` | `delta` 에 답의 조각 |
-| `tool.started` | `tool` 에 도구 이름, `preview` 에 인자 앞부분 |
-| `tool.completed` | `tool`, `duration` 초, `error` 참거짓 |
+| `tool.started` | `tool` 에 도구 이름, `preview` 에 주요 인자 하나의 값. 아래 「붙은 커넥터 서버의 도구 사건」 을 본다 |
+| `tool.completed` | `tool`, `duration` 초, `error` 참거짓. v0.21.5 는 `preview` 에 결과를 더한다 |
 | `subagent.start`, `subagent.complete` | [「자식 토큰을 SSE 로 받을 수 있다」](delegation.md#자식-토큰을-sse-로-받을-수-있다) 의 식별자와 작업·사용량 필드 |
 | `reasoning.available` | `text` 에 그때까지의 답 전체 |
 | `run.completed` | `output` 과 `usage` |
@@ -337,9 +337,10 @@ v0.21.5 의 `agent/tool_executor.py` 가 도구 하나를 실행하기 전에 `t
 | 칸 | 값 |
 | --- | --- |
 | `tool` | 등록 이름 `mcp__<서버>__<도구>`. 줄이는 규칙은 [`connector-policy.md`](connector-policy.md) 의 「MCP 도구의 등록 이름」 이 갖는다 |
-| `tool.started` 의 `preview` | 인자 앞부분 |
+| `tool.started` 의 `preview` | 주요 인자 하나의 값. 도구마다 정한 인자가 있고, 모르는 도구는 `query`, `text`, `command`, `path`, `name`, `prompt`, `code`, `goal` 중 처음 있는 인자다. 그것이 없으면 null 이다. 비밀값을 가리지 않고 `tool_preview_length` 로만 자른다 |
 | `tool.completed` 의 `preview` | 비밀값을 가리고 500자로 자른 결과. 외부 서비스의 글이 실린다 |
 | 모든 사건의 `run_id`, `timestamp` | 있다 |
+| 정책 hook 이 막은 호출 | 시작도 완료도 오지 않는다 |
 
 그 결과 글이 실행 기록과 화면에 남지 않게 Control Plane 이 붙은 서버의 도구 내용을 통째로 가린다([ADR-083](../adr/ADR-083-커넥터는-사용자가-한-번-연결하고-자기-에이전트에-여럿-붙여-그-에이전트가-도구를-직접-부른다.md)).
 도구 이름, 걸린 시간, 실패 여부만 남는다.
