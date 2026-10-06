@@ -116,6 +116,44 @@ function ApprovalArgsView({ action }: { action: ConnectorAction }) {
   );
 }
 
+/** 「승인하고 묻지 않기」 단추와 기간 메뉴다. */
+function GrantMenu({
+  disabled,
+  loading,
+  onPick,
+}: {
+  disabled: boolean;
+  loading: boolean;
+  onPick(period: GrantPeriod): void;
+}) {
+  return (
+    // 모달로 두면 열린 동안 메뉴 바깥을 누른 첫 클릭이 그 자리에 닿지 않는다.
+    <DropdownMenu modal={false}>
+      <DropdownMenuTrigger asChild>
+        <Button
+          size="sm"
+          variant="ghost"
+          data-testid="approval-grant"
+          disabled={disabled}
+          loading={loading}
+        >
+          승인하고 묻지 않기
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="start" aria-label="묻지 않을 기간">
+        {GRANT_CHOICES.map((choice) => (
+          <DropdownMenuItem
+            key={choice.period}
+            onSelect={() => onPick(choice.period)}
+          >
+            {choice.label}
+          </DropdownMenuItem>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
 /**
  * 에이전트가 하려는 동작 하나를 보이고 승인이나 거절을 받는다.
  *
@@ -123,8 +161,8 @@ function ApprovalArgsView({ action }: { action: ConnectorAction }) {
  * 그대로 보인다. 도구의 원래 이름과 요청 번호 같은 내부 값은 그리지 않는다.
  *
  * <p>`onChanged` 에 바뀐 줄을 넘긴다. 이미 처리된 요청이면 `null` 을 넘겨 목록을 다시 읽게 한다. `grouped` 면 묶음
- * 안의 한 건이라 제목과 안내를 묶음 머리에 맡기고 테두리 없이 그린다. `locked` 면 묶음이 승인을 보내는 중이라
- * 단추를 막는다.
+ * 안의 한 건이라 제목과 안내를 묶음 머리에 맡기고 테두리 없이 그린다. `locked` 면 그 줄이 든 묶음의 「모두
+ * 승인」 을 보내는 중이라 단추를 막는다.
  */
 export function ApprovalCard({
   action,
@@ -132,12 +170,15 @@ export function ApprovalCard({
   onDismiss,
   grouped = false,
   locked = false,
+  onSendingChange,
 }: {
   action: ConnectorAction;
   onChanged(next: ConnectorAction | null): void;
   onDismiss(): void;
   grouped?: boolean;
   locked?: boolean;
+  /** 이 카드가 승인이나 거절을 보내기 시작하고 끝낼 때 부른다 */
+  onSendingChange?(sending: boolean): void;
 }) {
   const [sending, setSending] = useState<Sending>(null);
   const [error, setError] = useState<string | null>(null);
@@ -146,12 +187,14 @@ export function ApprovalCard({
   async function send(kind: Exclude<Sending, null>, grant: GrantPeriod | null) {
     if (busy) return;
     setSending(kind);
+    onSendingChange?.(true);
     setError(null);
     const result =
       kind === "reject"
         ? await rejectConnectorAction(action.actionId)
         : await approveConnectorAction(action.actionId, grant);
     setSending(null);
+    onSendingChange?.(false);
     if (result.ok) return onChanged(result.data);
     setError(result.message);
     // 실패해도 서버의 줄은 이미 실행 중이거나 끝났을 수 있다. 다시 읽어 지금 상태로 그린다.
@@ -222,30 +265,11 @@ export function ApprovalCard({
             거절
           </Button>
           {action.grantAllowed && !blocked ? (
-            // 모달로 두면 열린 동안 메뉴 바깥을 누른 첫 클릭이 그 자리에 닿지 않는다.
-            <DropdownMenu modal={false}>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  data-testid="approval-grant"
-                  disabled={busy}
-                  loading={sending === "grant"}
-                >
-                  승인하고 묻지 않기
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="start" aria-label="묻지 않을 기간">
-                {GRANT_CHOICES.map((choice) => (
-                  <DropdownMenuItem
-                    key={choice.period}
-                    onSelect={() => void send("grant", choice.period)}
-                  >
-                    {choice.label}
-                  </DropdownMenuItem>
-                ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
+            <GrantMenu
+              disabled={busy}
+              loading={sending === "grant"}
+              onPick={(period) => void send("grant", period)}
+            />
           ) : null}
         </div>
       ) : null}

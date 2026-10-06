@@ -142,3 +142,15 @@ test("모두 승인에는 상시 허락을 줄 수 있는 WRITE 도구의 기다
     assert.equal(bulkApprovable({ ...base, ...change }), false, JSON.stringify(change));
   }
 });
+
+test("줄바꿈 문자(\\r)가 든 값은 위에 두지 않는다", () => {
+  const args = approvalArgs(JSON.stringify({ subject: "제목\r숨은 줄", name: "업무" }));
+
+  assert.deepEqual(
+    args?.rows.map((row) => [row.key, row.core]),
+    [
+      ["subject", false],
+      ["name", true],
+    ],
+  );
+});

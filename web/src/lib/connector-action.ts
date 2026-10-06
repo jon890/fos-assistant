@@ -127,7 +127,7 @@ function shortValue(value: unknown): boolean {
   if (typeof value === "number" || typeof value === "boolean") return true;
   return (
     typeof value === "string" &&
-    !value.includes("\n") &&
+    !/[\r\n]/.test(value) &&
     value.length <= CORE_LENGTH
   );
 }
