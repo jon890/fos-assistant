@@ -12,7 +12,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 /**
- * 실행 주인의 첨부 디렉터리 {@code {root}/users/{sha256(주인)}} 를 Hermes 를 부르기 전에 만든다(ADR-089).
+ * 실행 주인의 첨부 디렉터리 {@code {root}/users/{sha256(주인)}} 를 Hermes 를 부르기 전에 만든다(ADR-090).
  *
  * <p>Hermes 는 첨부 루트를 읽기 전용으로 보므로 이 디렉터리를 만들지 못한다. 사진을 한 번도 올리지 않은 주인도 실행 공간을
  * 쓰므로, 실행 공간 설정을 쓰는 세 호출(도구 저장, 옛 커넥터 설치, 스킬 게시)이 보내기 전에 이것을 부른다. plugin 은 존재와

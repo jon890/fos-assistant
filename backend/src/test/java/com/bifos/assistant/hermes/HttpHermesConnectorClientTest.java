@@ -197,6 +197,35 @@ class HttpHermesConnectorClientTest {
         server.verify();
     }
 
+    @DisplayName("도구의 identifiers 는 문자열 배열이면 그 순서대로 읽고, 칸이 없거나 그 밖의 모양이면 빈 목록으로 읽는다")
+    @Test
+    void readsIdentifiersOfToolPolicies() {
+        String tail = "\"mcp_server\":\"demo\"";
+        String required = "{\"risk\":\"WRITE\",\"approval\":\"required\"";
+        server.expect(requestTo(BASE + "/api/connectors/catalog"))
+                .andRespond(withSuccess(
+                        CATALOG.replace(
+                                tail,
+                                tail + ",\"schema\":2,\"tools\":{"
+                                        + "\"absent\":" + required + "},"
+                                        + "\"listed\":" + required + ",\"identifiers\":[\"filter_id\",\"label\"]},"
+                                        + "\"word\":" + required + ",\"identifiers\":\"filter_id\"},"
+                                        + "\"mixed\":" + required + ",\"identifiers\":[\"filter_id\",1]}}"),
+                        MediaType.APPLICATION_JSON));
+
+        ConnectorManifest declared = client.readCatalog().get(0);
+
+        assertThat(declared.tools())
+                .extracting(ConnectorTool::name, ConnectorTool::identifiers)
+                .containsExactly(
+                        tuple("absent", List.of()),
+                        tuple("listed", List.of("filter_id", "label")),
+                        // 읽을 수 없는 선언은 가림을 푸는 쪽으로 읽지 않는다.
+                        tuple("word", List.of()),
+                        tuple("mixed", List.of()));
+        server.verify();
+    }
+
     @DisplayName("schema 가 정수가 아니거나 tools 가 객체가 아닌 커넥터는 받는 쪽이 거르는 값으로 읽고 다른 커넥터는 그대로 읽는다")
     @Test
     void readsMalformedSchemaOrToolsAsUnjudgeableWithoutFailingCatalog() {

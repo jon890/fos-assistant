@@ -84,7 +84,7 @@
 - 이름과 설명은 대시보드 `GET /api/tools/toolsets` 에서 읽는다. 그 응답의 `enabled` 는 CLI 기준이라 쓰지 않는다
 - Hermes 가 쓰기 없이 미분류 toolset 을 켤 수 있다. 도구 응답의 `unclassifiedEnabled` 는 listener 에서 켜진 미분류 이름이고, 화면은 관리자에게 알리라는 경고를 보인다
 - 그룹 공개에서 막는 toolset 은 `terminal`, `file`, `code_execution`, `vision`, `image_gen`, `video_gen`, `browser`, `computer_use`, `session_search` 아홉이다. 이 문서는 이 아홉을 「셸·파일·사진 계열」 이라 부른다. 셸·파일·사진 계열이 켜진 에이전트는 `PRIVATE` 만 된다. `GROUP` 생성과 수정, 도구 변경 모두에서 최종 listener 주소의 현재 목록을 본다. 꺼진 에이전트의 공개 범위 변경은 검사하지 않고 켤 때 검사한다. 읽지 못하면 변경하지 않는다
-- 도구를 쓸 때마다(스킬 게시가 `skills` 를 함께 켤 때 포함) 본문에 `sandbox_owner` 를 함께 보낸다. 에이전트 주인이 있으면 `u<사용자 번호>`, 없으면 `a<에이전트 번호>` 다. 보내기 전에 그 주인의 첨부 사용자 디렉터리를 만든다([ADR-089](../adr/ADR-089-사진-첨부는-사용자별로-저장하고-실행-공간에는-그-사용자만-붙인다.md)). 대시보드 plugin 은 셸 계열 도구 저장에서 신뢰한 운영 정책을 검사한다. 정책에 등록된 profile 만 사용자 실행 공간 설정을 쓰고, 미등록 profile 은 사진 없는 셸 도구만 local 로 둔다. `vision`, `image_gen`, `video_gen` 이 있으면 저장을 거절한다. 정책이 없거나 잘못됐으면 plugin 이 거절하고 Control Plane 은 `AGENT_SANDBOX_UNAVAILABLE` 로 알린다. 근거는 [ADR-086](../adr/ADR-086-셸과-파일-도구는-사용자별-docker-실행-공간에서만-돈다.md) 다
+- 도구를 쓸 때마다(스킬 게시가 `skills` 를 함께 켤 때 포함) 본문에 `sandbox_owner` 를 함께 보낸다. 에이전트 주인이 있으면 `u<사용자 번호>`, 없으면 `a<에이전트 번호>` 다. 보내기 전에 그 주인의 첨부 사용자 디렉터리를 만든다([ADR-090](../adr/ADR-090-사진-첨부는-사용자별로-저장하고-실행-공간에는-그-사용자만-붙인다.md)). 대시보드 plugin 은 셸 계열 도구 저장에서 신뢰한 운영 정책을 검사한다. 정책에 등록된 profile 만 사용자 실행 공간 설정을 쓰고, 미등록 profile 은 사진 없는 셸 도구만 local 로 둔다. `vision`, `image_gen`, `video_gen` 이 있으면 저장을 거절한다. 정책이 없거나 잘못됐으면 plugin 이 거절하고 Control Plane 은 `AGENT_SANDBOX_UNAVAILABLE` 로 알린다. 근거는 [ADR-086](../adr/ADR-086-셸과-파일-도구는-사용자별-docker-실행-공간에서만-돈다.md) 다
 - 도구 변경과 에이전트 접근 범위 변경은 같은 에이전트 행의 쓰기 잠금을 잡고 검사한다. 도구 변경은 이미 잠겨 있으면 `AGENT_BUSY` 로 곧바로 알린다. 공개 범위 변경은 잠금을 기다린다. 연결 붙이기와 같은 잠금을 기다려야 붙이기가 커밋한 바인딩을 보고 판정하기 때문이다
 
 | 경로 | 누가 | 무엇 |

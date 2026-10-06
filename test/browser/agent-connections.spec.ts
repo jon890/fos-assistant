@@ -88,7 +88,7 @@ test("비공개 에이전트에 연결을 붙이면 위험을 알리고 반영 �
   const row = section(page).getByTestId("agent-connection");
   await expect(row).toHaveCount(1);
   await expect(row).toContainText(TITLE);
-  await expect(row).toContainText("도구 3개");
+  await expect(row).toContainText("도구 4개");
   await expect(row.getByTestId("agent-connection-state")).toHaveText(
     "붙지 않음",
   );

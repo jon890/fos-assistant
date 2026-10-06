@@ -542,7 +542,7 @@ class ConnectorToolPolicyTest(ConnectorGateCase):
         entry = self.catalog()[0]
         self.assertEqual(entry["schema"], 1)
         self.assertEqual(entry["tools"], {
-            "list_scopes": {"risk": "READ", "approval": "none", "grant": False, "outbound": False}})
+            "list_scopes": {"risk": "READ", "approval": "none", "grant": False, "outbound": False, "identifiers": []}})
 
     def test_schema_two_fills_the_default_approval(self):
         """`approval` 을 적지 않은 도구는 그 위험도의 기본값으로 채워 낸다. 제목이 없으면 `title` 을 내지 않는다."""
@@ -550,9 +550,9 @@ class ConnectorToolPolicyTest(ConnectorGateCase):
         entry = self.catalog()[0]
         self.assertEqual(entry["schema"], 2)
         self.assertEqual(entry["tools"], {
-            "list_scopes": {"risk": "READ", "approval": "none", "grant": False, "outbound": False},
-            "env_view": {"risk": "READ", "approval": "none", "grant": False, "outbound": False},
-            "write_note": {"risk": "WRITE", "approval": "required", "grant": True, "outbound": False},
+            "list_scopes": {"risk": "READ", "approval": "none", "grant": False, "outbound": False, "identifiers": []},
+            "env_view": {"risk": "READ", "approval": "none", "grant": False, "outbound": False, "identifiers": []},
+            "write_note": {"risk": "WRITE", "approval": "required", "grant": True, "outbound": False, "identifiers": []},
         })
 
     def test_default_approval_of_every_risk(self):
@@ -564,7 +564,7 @@ class ConnectorToolPolicyTest(ConnectorGateCase):
                 self.declare(lambda tools: tools.update(probe={"risk": risk}))
                 self.assertEqual(self.catalog()[0]["tools"]["probe"],
                                  {"risk": risk, "approval": approval, "grant": approval == "required",
-                                  "outbound": False})
+                                  "outbound": False, "identifiers": []})
 
     def test_stricter_approval_and_title_reach_the_catalog(self):
         """하한보다 엄격한 `approval` 과 사람 말 제목은 선언한 그대로 낸다."""
@@ -574,9 +574,9 @@ class ConnectorToolPolicyTest(ConnectorGateCase):
         tools = self.catalog()[0]["tools"]
         self.assertEqual(tools["write_note"],
                          {"risk": "WRITE", "approval": "always", "title": "메모 쓰기", "grant": False,
-                          "outbound": False})
+                          "outbound": False, "identifiers": []})
         self.assertEqual(tools["env_view"],
-                         {"risk": "READ", "approval": "required", "grant": True, "outbound": False})
+                         {"risk": "READ", "approval": "required", "grant": True, "outbound": False, "identifiers": []})
 
     def test_title_length_boundary(self):
         """제목은 80자까지 받는다. 81자와 빈 문자열은 받지 않는다."""
@@ -591,7 +591,7 @@ class ConnectorToolPolicyTest(ConnectorGateCase):
         """`DESTRUCTIVE` 는 받고 `approval` 이 `always` 다. `required` 로 내려 선언하면 빠진다."""
         self.declare(lambda tools: tools.update(purge={"risk": "DESTRUCTIVE"}))
         self.assertEqual(self.catalog()[0]["tools"]["purge"],
-                         {"risk": "DESTRUCTIVE", "approval": "always", "grant": False, "outbound": False})
+                         {"risk": "DESTRUCTIVE", "approval": "always", "grant": False, "outbound": False, "identifiers": []})
         self.declare(lambda tools: tools.update(purge={"risk": "DESTRUCTIVE", "approval": "required"}))
         self.assertEqual(self.catalog(), [])
 
@@ -600,7 +600,7 @@ class ConnectorToolPolicyTest(ConnectorGateCase):
         self.declare(lambda tools: tools.update(send_note={"risk": "WRITE", "grant": False}))
         tools = self.catalog()[0]["tools"]
         self.assertEqual(tools["send_note"],
-                         {"risk": "WRITE", "approval": "required", "grant": False, "outbound": False})
+                         {"risk": "WRITE", "approval": "required", "grant": False, "outbound": False, "identifiers": []})
         # 선언하지 않은 쓰기 도구는 상시 허락을 줄 수 있고, 승인이 없는 읽기 도구는 줄 것이 없다.
         self.assertIs(tools["write_note"]["grant"], True)
         self.assertIs(tools["env_view"]["grant"], False)
@@ -610,20 +610,56 @@ class ConnectorToolPolicyTest(ConnectorGateCase):
         """`"grant": true` 는 선언하지 않은 것과 같은 값을 낸다."""
         self.declare(lambda tools: tools.update(write_note={"risk": "WRITE", "grant": True}))
         self.assertEqual(self.catalog()[0]["tools"]["write_note"],
-                         {"risk": "WRITE", "approval": "required", "grant": True, "outbound": False})
+                         {"risk": "WRITE", "approval": "required", "grant": True, "outbound": False, "identifiers": []})
 
     def test_outbound_tool_with_closed_grant_reaches_the_catalog(self):
         """`"outbound": true` 는 상시 허락을 닫은 도구에서만 받고 카탈로그에 그대로 나온다."""
         self.declare(lambda tools: tools.update(
-            send_note={"risk": "WRITE", "grant": False, "outbound": True},
-            write_note={"risk": "WRITE", "outbound": False}))
+            send_note={"risk": "WRITE", "grant": False, "outbound": True, "identifiers": []},
+            write_note={"risk": "WRITE", "outbound": False, "identifiers": []}))
         tools = self.catalog()[0]["tools"]
         self.assertEqual(tools["send_note"],
-                         {"risk": "WRITE", "approval": "required", "grant": False, "outbound": True})
+                         {"risk": "WRITE", "approval": "required", "grant": False, "outbound": True, "identifiers": []})
         # 거짓으로 적은 것은 적지 않은 것과 같다. 상시 허락은 그대로 열려 있다.
         self.assertEqual(tools["write_note"],
-                         {"risk": "WRITE", "approval": "required", "grant": True, "outbound": False})
+                         {"risk": "WRITE", "approval": "required", "grant": True, "outbound": False, "identifiers": []})
         self.assertIs(tools["env_view"]["outbound"], False)
+
+    def test_identifiers_reach_the_catalog_in_declared_order(self):
+        """`identifiers` 는 승인을 받는 도구에서 받고 선언한 순서 그대로 나온다(ADR-089)."""
+        self.declare(lambda tools: tools.update(
+            write_note={"risk": "WRITE", "grant": False, "identifiers": ["note_id", "folder_id", "a" * 31]}))
+        tools = self.catalog()[0]["tools"]
+        self.assertEqual(tools["write_note"]["identifiers"], ["note_id", "folder_id", "a" * 31])
+        self.assertEqual(tools["env_view"]["identifiers"], [])
+
+    def test_invalid_identifiers_leave_the_connector_out(self):
+        """틀린 `identifiers` 는 고쳐 읽지 않고 그 커넥터를 카탈로그에서 뺀다(ADR-089)."""
+        cases = (
+            ("not a list", "note_id"),
+            ("not a string item", [1]),
+            ("empty name", [""]),
+            ("nested path", ["note.id"]),
+            ("starts with a digit", ["1id"]),
+            ("32 chars", ["a" * 32]),
+            ("trailing newline", ["note_id\n"]),
+            ("duplicate", ["note_id", "note_id"]),
+            ("secret key", ["api_token"]),
+            ("secret key with mixed case", ["ClientSecret"]),
+            ("password suffix", ["user_password"]),
+        )
+        original = (self.connector_root / "connector.json").read_bytes()
+        for label, identifiers in cases:
+            with self.subTest(label):
+                self.declare(lambda tools: tools.update(write_note={"risk": "WRITE", "identifiers": identifiers}))
+                self.assertEqual(self.catalog(), [])
+                (self.connector_root / "connector.json").write_bytes(original)
+        for label, tool in (("read tool", {"risk": "READ", "identifiers": ["id"]}),
+                            ("always tool", {"risk": "WRITE", "approval": "always", "identifiers": ["id"]})):
+            with self.subTest(label):
+                self.declare(lambda tools: tools.update(probe=tool))
+                self.assertEqual(self.catalog(), [])
+                (self.connector_root / "connector.json").write_bytes(original)
 
     def test_explicit_deny_default_policy_is_accepted(self):
         """`default_tool_policy` 는 `deny` 만 받는다."""

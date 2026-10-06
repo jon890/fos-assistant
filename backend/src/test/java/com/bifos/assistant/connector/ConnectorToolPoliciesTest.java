@@ -11,6 +11,7 @@ import com.bifos.assistant.hermes.dto.ConnectorFieldOptions;
 import com.bifos.assistant.hermes.dto.ConnectorManifest;
 import com.bifos.assistant.hermes.dto.ConnectorTool;
 import java.util.List;
+import java.util.Set;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -143,6 +144,26 @@ class ConnectorToolPoliciesTest {
         assertThat(ConnectorToolPolicies.find(manifest, "read_note"))
                 .contains(new ToolPolicy(ToolRisk.READ, ToolApproval.NONE, null, false));
         assertThat(ConnectorToolPolicies.find(manifest, "send_note"))
+                .contains(new ToolPolicy(ToolRisk.WRITE, ToolApproval.ALWAYS, null, false));
+    }
+
+    @Test
+    @DisplayName("식별자 인자는 required 도구에서만 정책에 담고 none 이나 always 도구의 선언은 버린다")
+    void keepsIdentifiersOnlyForRequiredTools() {
+        List<String> ids = List.of("filter_id");
+        ConnectorManifest manifest = manifest(
+                2,
+                VERIFY,
+                OPTIONS,
+                new ConnectorTool("delete_filter", "WRITE", "required", null, Boolean.FALSE, ids),
+                new ConnectorTool("read_filter", "READ", "none", null, null, ids),
+                new ConnectorTool("purge_filters", "WRITE", "always", null, null, ids));
+
+        assertThat(ConnectorToolPolicies.find(manifest, "delete_filter"))
+                .contains(new ToolPolicy(ToolRisk.WRITE, ToolApproval.REQUIRED, null, false, Set.of("filter_id")));
+        assertThat(ConnectorToolPolicies.find(manifest, "read_filter"))
+                .contains(new ToolPolicy(ToolRisk.READ, ToolApproval.NONE, null, false));
+        assertThat(ConnectorToolPolicies.find(manifest, "purge_filters"))
                 .contains(new ToolPolicy(ToolRisk.WRITE, ToolApproval.ALWAYS, null, false));
     }
 

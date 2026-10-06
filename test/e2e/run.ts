@@ -189,7 +189,7 @@ async function makeArtifactRoot(work: string): Promise<string> {
  * 첨부 루트를 실행마다 만든다.
  *
  * <p>운영에서는 붙여 둔 디렉터리다. Control Plane 은 Hermes 에 도구 설정을 보내기 전에 이 아래에 주인의 디렉터리를 만들고,
- * 루트가 없으면 설정 쓰기를 409 로 멈춘다(ADR-089).
+ * 루트가 없으면 설정 쓰기를 409 로 멈춘다(ADR-090).
  */
 async function makeAttachmentRoot(work: string): Promise<string> {
   const attachmentRoot = join(work, "attachments");

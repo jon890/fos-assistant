@@ -122,6 +122,9 @@ class ConnectorActionServiceTest {
     private static final String ARGS = "{\"text\":\"안녕\",  \"count\":2}";
     private static final long CONVERSATION = 7L;
 
+    /** Gmail 필터 id 처럼 32자 이상의 영숫자 식별자다. 선언하지 않은 칸에서는 가려진다. */
+    private static final String LONG_ID = "ANe1BmhXxP8kq3Lr0sT9vUwYzA2bC4dE6fG8hJ";
+
     /** 화면에서 가려지는 32자 넘는 base64 모양 글이다. */
     private static final String HIDDEN_TOKEN = "QUJDREVGR0hJSktMTU5PUFFSU1RVVldYWVowMTIzNDU2Nzg5";
 
@@ -747,6 +750,50 @@ class ConnectorActionServiceTest {
 
         assertThat(approved.status()).isEqualTo(ActionStatus.SUCCEEDED);
         verify(connector, times(1)).execute(PROFILE, DEMO, "mcp__demo__mail_note", args);
+    }
+
+    @Test
+    @DisplayName("상시 허락을 닫은 도구가 식별자로 선언한 칸의 긴 id 는 가리지 않고 hiddenArgs 가 거짓이며 승인하면 실행한다")
+    void declaredIdentifierIsShownAndApproved() {
+        catalogBecomes(withMailIdentifiers(List.of("note_id")));
+        String args = "{\"note_id\":\"" + LONG_ID + "\",\"text\":\"지울 메모\"}";
+        UUID actionId = ask(MAIL, args).actionId();
+
+        ConnectorActionView listed =
+                service.listForConversation(me, CONVERSATION).getFirst();
+        assertThat(listed.hiddenArgs()).isFalse();
+        assertThat(listed.argsJson()).contains(LONG_ID).doesNotContain("[가림]");
+        ConnectorActionView approved = service.approve(me, actionId, null);
+
+        assertThat(approved.status()).isEqualTo(ActionStatus.SUCCEEDED);
+        verify(connector, times(1)).execute(PROFILE, DEMO, "mcp__demo__mail_note", args);
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("argumentsHiddenDespiteIdentifiers")
+    @DisplayName("식별자로 선언하지 않은 칸이나 식별자 모양이 아닌 값은 계속 가려 hiddenArgs 가 참이고 승인해도 실행하지 않는다")
+    void undeclaredOrMalformedIdentifierStaysHidden(String name, String args) {
+        catalogBecomes(withMailIdentifiers(List.of("note_id")));
+        UUID actionId = ask(MAIL, args).actionId();
+
+        assertThat(service.listForConversation(me, CONVERSATION))
+                .extracting(ConnectorActionView::actionId, ConnectorActionView::hiddenArgs)
+                .containsExactly(tuple(actionId, true));
+        ConnectorActionView closed = service.approve(me, actionId, null);
+
+        assertThat(closed.status()).isEqualTo(ActionStatus.REJECTED);
+        assertThat(closed.errorCode()).isEqualTo(ConnectorAction.HIDDEN_ARGS);
+        verify(connector, never()).execute(anyString(), anyString(), anyString(), anyString());
+    }
+
+    static Stream<Arguments> argumentsHiddenDespiteIdentifiers() {
+        return Stream.of(
+                Arguments.of("선언하지 않은 칸의 긴 id", "{\"other_id\":\"" + LONG_ID + "\"}"),
+                Arguments.of("식별자 칸 안의 공백 섞인 글", "{\"note_id\":\"본문 " + HIDDEN_TOKEN + "\"}"),
+                Arguments.of("식별자 칸의 base64 + 와 / 글", "{\"note_id\":\"" + HIDDEN_TOKEN + "+/==\"}"),
+                Arguments.of("식별자 칸의 알려진 접두사 key", "{\"note_id\":\"ghp_" + LONG_ID + "\"}"),
+                Arguments.of(
+                        "식별자 칸 밖 본문의 긴 덩어리", "{\"note_id\":\"" + LONG_ID + "\",\"text\":\"" + HIDDEN_TOKEN + "\"}"));
     }
 
     @Test
@@ -1392,6 +1439,15 @@ class ConnectorActionServiceTest {
                 false,
                 1,
                 List.of(new ConnectorTool("list_scopes", "READ", "none", null, null)));
+    }
+
+    /** {@link #DECLARING} 에서 상시 허락을 닫은 도구가 식별자 인자를 선언한 커넥터다(ADR-089). */
+    private static ConnectorManifest withMailIdentifiers(List<String> identifiers) {
+        return manifest(List.of(
+                new ConnectorTool("list_scopes", "READ", "none", null, null),
+                new ConnectorTool(WRITE, "WRITE", "required", "메모 쓰기", null),
+                new ConnectorTool("send_note", "WRITE", "always", null, null),
+                new ConnectorTool(MAIL, "WRITE", "required", "메모 보내기", Boolean.FALSE, identifiers)));
     }
 
     private static ConnectorManifest manifest(List<ConnectorTool> tools) {

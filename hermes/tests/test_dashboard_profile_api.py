@@ -214,7 +214,7 @@ class ProfileApiRouteTest(unittest.TestCase):
         self.attachment_root.mkdir()
         self.attachment_agent_root = str(base / "agent-attachments")
         pathlib.Path(self.attachment_agent_root).mkdir()
-        # Control Plane 이 Hermes 를 부르기 전에 주인의 첨부 디렉터리를 만든다. plugin 은 만들지 않는다(ADR-089).
+        # Control Plane 이 Hermes 를 부르기 전에 주인의 첨부 디렉터리를 만든다. plugin 은 만들지 않는다(ADR-090).
         for owner in ("user-1", "user-2", "user-a", "user-b"):
             self.prepare_attachment_directory(owner)
         # 커넥터 검사도 환경 변수를 바꿔 끼운다. 되돌리는 순서가 엇갈리지 않게 같은 방식으로 건다.

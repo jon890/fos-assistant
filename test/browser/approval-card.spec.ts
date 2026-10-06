@@ -309,7 +309,7 @@ test("허락을 줄 수 없는 동작에는 묻지 않기 단추가 없다", asy
   await expect(page.getByTestId("approval-grant")).toHaveCount(0);
 });
 
-test("가려진 내용이 있는 줄은 경고를 보이고 승인 단추 없이 거절만 남긴다", async ({
+test("가려진 내용이 있는 줄은 가려진 칸과 할 일을 보이고 승인 단추 없이 거절만 남긴다", async ({
   page,
 }) => {
   await openWith(
@@ -318,17 +318,44 @@ test("가려진 내용이 있는 줄은 경고를 보이고 승인 단추 없이
     action({
       grantAllowed: true,
       hiddenArgs: true,
-      argsJson: JSON.stringify({ body: "회의록입니다 [가림]" }),
+      argsJson: JSON.stringify({
+        filter_id: "[가림]",
+        body: "회의록입니다 [가림]",
+        to: "friend@example.com",
+      }),
     }),
   );
 
   const card = page.getByTestId("approval-card");
-  await expect(card.getByTestId("approval-hidden-args")).toHaveText(
-    "가려진 내용이 있어 승인할 수 없어요. 에이전트에게 그 부분을 빼거나 다시 쓰게 해 주세요.",
+  await expect(card.getByTestId("approval-hidden-args-reason")).toHaveText(
+    "가려진 칸(filter_id, body)이 있어 승인할 수 없어요. 비밀값처럼 보이는 글은 [가림] 으로 바뀌고, 사람이 다 읽지 못한 요청은 실행하지 않아요.",
+  );
+  await expect(card.getByTestId("approval-hidden-args-next")).toHaveText(
+    "거절한 뒤 에이전트에게 그 부분을 빼거나 풀어 쓰게 해 주세요. 가려진 것이 지우거나 바꿀 대상의 id 라면 커넥터가 그 칸을 식별자로 선언해야 하니 관리자에게 알려 주세요.",
   );
   await expect(card.getByTestId("approval-approve")).toHaveCount(0);
   await expect(card.getByTestId("approval-grant")).toHaveCount(0);
   await expect(card.getByTestId("approval-reject")).toBeEnabled();
+});
+
+test("커넥터가 식별자로 선언해 가리지 않은 긴 id 는 그대로 보이고 승인 단추가 있다", async ({
+  page,
+}) => {
+  const filterId = "ANe1BmhXxP8kq3Lr0sT9vUwYzA2bC4dE6fG8hJ";
+  await openWith(
+    page,
+    "식별자 인자 검사",
+    action({
+      grantAllowed: false,
+      hiddenArgs: false,
+      argsJson: JSON.stringify({ filter_id: filterId }),
+    }),
+  );
+
+  const card = page.getByTestId("approval-card");
+  await expect(card.getByTestId("approval-args")).toContainText(filterId);
+  await expect(card.getByTestId("approval-hidden-args")).toHaveCount(0);
+  await expect(card.getByTestId("approval-approve")).toBeEnabled();
 });
 
 test("가려진 내용이 없는 줄에는 경고가 없고 승인 단추가 있다", async ({

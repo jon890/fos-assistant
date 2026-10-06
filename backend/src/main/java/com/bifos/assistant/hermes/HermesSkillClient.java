@@ -34,7 +34,7 @@ public interface HermesSkillClient {
      *     Hermes 가 쓴다
      * @throws HermesRequestRejected 대시보드가 4xx 로 분명히 거절했다. 설정은 바뀌지 않았다. 실행 공간이 준비되지
      *     않아 거절했으면 오류 코드가 {@code AGENT_SANDBOX_UNAVAILABLE} 이다. 도구 목록을 함께 쓰면 보내기 전에 주인의 첨부
-     *     디렉터리를 만들고, 만들지 못하면 같은 코드로 보내지 않고 던진다(ADR-089)
+     *     디렉터리를 만들고, 만들지 못하면 같은 코드로 보내지 않고 던진다(ADR-090)
      */
     void publish(String profile, List<String> externalDirs, List<String> apiServerToolsets, String sandboxOwner);
 }
