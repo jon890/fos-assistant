@@ -143,11 +143,27 @@ python3 -m unittest discover -s hermes/tests
 ```
 
 Hermes 모듈은 가짜로 끼우므로 Hermes 를 설치하지 않아도 돈다. 실제 Hermes 와 맞는지는 운영 저장소의 live 검사가 본다.
+
 Python 3.13 과 PyYAML 과 `mcp` SDK, 커넥터를 실행할 Bun 이 있어야 한다. Hermes 이미지와 같은 버전이다.
 검사는 `mcp==2.0.0` 으로 돌고 plugin 의 지원 범위는 `mcp>=2.0,<3` 이다. SDK 계약은 [커넥터 설치](../docs/backend/connector-install.md) 의 「MCP SDK 계약」 이 갖는다.
 커넥터 도구 호출 검사는 `tests/fixtures/demo-connector/` 의 시험 커넥터를 자식 프로세스로 띄운다.
 `tests/test_connectors_contract.py` 는 `connectors/` 아래 커넥터를 모두 찾아 계약을 본다. 커넥터 전용 시험은 각 커넥터의 `tests/` 에 있다.
 타입 검사와 전용 시험, 묶음 파일 비교는 저장소 루트의 `bash scripts/check-connectors.sh` 로 돌린다.
+
+`dashboard-profile-api` 가 기대는 Hermes 내부 지점은 `tests/hermes_contract.py` 가 한곳에 선언한다([ADR-088](../docs/adr/ADR-088-대시보드-plugin-은-감싸는-경로의-바꿔-끼우기를-두고-기대는-hermes-내부-지점을-계약-시험으로-확인한다.md)).
+이 절 첫 명령의 시험은 plugin 이 쓰는 Hermes 이름이 모두 선언에 있는지만 본다.
+선언한 지점이 실제 Hermes 소스에 그대로인지는 아래 명령이 본다. CI 의 hermes job 이 계약의 판으로 돌린다.
+상류 저장소에서 tag 하나를 받으므로 네트워크가 필요하다. 계약의 판이면 tag 가 `HERMES_COMMIT` 을 가리키는지도 본다.
+
+```bash
+# cwd: 저장소 root
+# 인자가 없으면 hermes_contract.py 의 HERMES_VERSION tag 를 상류에서 받는다
+scripts/check-hermes-contract.sh
+# 올릴 판의 tag 나, 이미 받아 둔 Hermes 소스 디렉터리를 준다
+scripts/check-hermes-contract.sh <tag 또는 디렉터리>
+```
+
+소스는 import 하지 않고 구문만 읽으므로 Hermes 의 의존성이 필요 없다. 실패한 항목이 Hermes 를 올리면 깨질 곳이다.
 
 ## fos-ctx 가 붙이는 것
 

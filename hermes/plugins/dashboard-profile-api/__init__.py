@@ -2110,7 +2110,7 @@ async def _connector_request(request):
         if unbind:
             result = await asyncio.to_thread(_connector_bind_config, profile_dir, body["plugin"], False)
             return JSONResponse({**response, **result}, status_code=200)
-        # 옛 설치가 사진 도구를 열면 그 에이전트 주인의 격리 실행 공간을 쓴다(ADR-088).
+        # 옛 설치가 사진 도구를 열면 그 에이전트 주인의 격리 실행 공간을 쓴다(ADR-089).
         sandbox_terminal = None
         attachment_guard = None
         local_execution = False
