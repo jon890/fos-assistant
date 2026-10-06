@@ -7,6 +7,7 @@ import { AgentAccessSection } from "./agent-access-section";
 import { AgentAdminSection } from "./agent-admin-section";
 import { AgentModelSection } from "./agent-model-section";
 import { AgentProactiveCheckSection } from "./agent-proactive-check-section";
+import { AgentProactiveScheduleSection } from "./agent-proactive-schedule-section";
 import { AgentSkillsSection } from "./agent-skills-section";
 import { AgentToolsSection } from "./agent-tools-section";
 import { PersonaEditor } from "./persona-editor";
@@ -183,6 +184,7 @@ export function AgentDetailBody({
           <Notice variant="error" role="alert" className="mt-3">
             {proactiveCheck.message}
           </Notice>
+          <AgentProactiveScheduleSection code={code} />
         </section>
       )}
       {adminAgent ? <AgentModelSection code={code} /> : null}
