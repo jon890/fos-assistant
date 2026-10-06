@@ -213,6 +213,10 @@ class ProfileApiRouteTest(unittest.TestCase):
         self.attachment_root = base / "attachments"
         self.attachment_root.mkdir()
         self.attachment_agent_root = str(base / "agent-attachments")
+        pathlib.Path(self.attachment_agent_root).mkdir()
+        # Control Plane 이 Hermes 를 부르기 전에 주인의 첨부 디렉터리를 만든다. plugin 은 만들지 않는다(ADR-089).
+        for owner in ("user-1", "user-2", "user-a", "user-b"):
+            self.prepare_attachment_directory(owner)
         # 커넥터 검사도 환경 변수를 바꿔 끼운다. 되돌리는 순서가 엇갈리지 않게 같은 방식으로 건다.
         skill_env = mock.patch.dict(os.environ, {"FOS_ASSISTANT_SKILL_AGENT_ROOT": str(self.skill_root),
                                                  "FOS_ASSISTANT_SANDBOX": json.dumps(self.sandbox_policy())})
@@ -231,6 +235,12 @@ class ProfileApiRouteTest(unittest.TestCase):
 
     def tearDown(self):
         self.tmp.cleanup()
+
+    def prepare_attachment_directory(self, owner):
+        """Control Plane 이 하는 것처럼 양쪽 첨부 루트에 주인의 사용자 디렉터리를 만든다."""
+        key = hashlib.sha256(owner.encode("utf-8")).hexdigest()
+        for root in (self.attachment_root, pathlib.Path(self.attachment_agent_root)):
+            (root / "users" / key).mkdir(parents=True, exist_ok=True)
 
     def make_profile(self, name):
         # clone 없이 만든 profile 처럼 model 블록만 둔다.
@@ -2829,10 +2839,53 @@ class ProfileApiRouteTest(unittest.TestCase):
             "92ec86fa88925dabc1026bfc9335f5f6848886c98586c005f4a0c02716e3bbab",
         )
 
+    def test_sandbox_attachment_directory_is_not_created_by_the_plugin(self):
+        """첨부 디렉터리가 없는 주인은 거절하고, plugin 은 어느 루트에도 디렉터리를 만들지 않는다."""
+        original = (self.root / "owner/config.yaml").read_bytes()
+
+        self.assertEqual(self.request("/api/config", "PUT", token="valid", body=self.file_body("user-new")), 409)
+
+        self.assertEqual((self.root / "owner/config.yaml").read_bytes(), original)
+        key = hashlib.sha256(b"user-new").hexdigest()
+        self.assertFalse((self.attachment_root / "users" / key).exists())
+        self.assertFalse(pathlib.Path(self.attachment_agent_root, "users", key).exists())
+
+    def test_vision_connector_is_not_installed_without_the_owners_attachment_directory(self):
+        """사진 커넥터 설치도 Control Plane 이 만든 디렉터리가 없으면 거절하고 만들지 않는다."""
+        root = self.connector_fixture()
+        manifest = root / "connector.json"
+        declared = json.loads(manifest.read_text(encoding="utf-8"))
+        declared["toolsets"] = ["vision"]
+        manifest.write_text(json.dumps(declared), encoding="utf-8")
+        path = self.root / "alice/config.yaml"
+        original = path.read_bytes()
+
+        self.assertEqual(self.connector(sandbox_owner="user-new").status_code, 409)
+
+        self.assertEqual(path.read_bytes(), original)
+        key = hashlib.sha256(b"user-new").hexdigest()
+        self.assertFalse((self.attachment_root / "users" / key).exists())
+        self.assertFalse(pathlib.Path(self.attachment_agent_root, "users", key).exists())
+
+    def test_sandbox_terminal_is_saved_with_read_only_attachment_roots(self):
+        """첨부 루트를 쓸 수 없어도 Control Plane 이 만든 디렉터리가 있으면 저장한다."""
+        roots = [self.attachment_root, pathlib.Path(self.attachment_agent_root)]
+        for root in roots:
+            for directory in (root, root / "users"):
+                directory.chmod(0o555)
+        try:
+            self.assertEqual(self.request("/api/config", "PUT", token="valid", body=self.file_body()), 200)
+        finally:
+            for root in roots:
+                for directory in (root / "users", root):
+                    directory.chmod(0o755)
+        self.assertEqual(self.saved_config()["terminal"], self.expected_terminal(
+            "user-1", ["/srv/shared:/opt/shared", "/srv/owner-skills:/opt/owner-skills"]))
+
     def test_sandbox_attachment_directory_does_not_follow_a_users_symlink(self):
-        """agent root의 users가 링크이면 대상 밖에 사용자 디렉터리를 만들지 않는다."""
+        """agent root의 users가 링크이면 거절하고 대상 밖에 사용자 디렉터리를 만들지 않는다."""
         agent_root = pathlib.Path(self.attachment_agent_root)
-        agent_root.mkdir()
+        shutil.rmtree(agent_root / "users")
         outside = pathlib.Path(self.tmp.name) / "outside"
         outside.mkdir()
         (agent_root / "users").symlink_to(outside, target_is_directory=True)
@@ -2848,9 +2901,8 @@ class ProfileApiRouteTest(unittest.TestCase):
         """같은 첨부 루트의 다른 사용자로 연결한 링크도 설정 저장 전에 거절한다."""
         self.set_sandbox_policy(self.sandbox_policy(attachment_agent_root=str(self.attachment_root)))
         users = self.attachment_root / "users"
-        users.mkdir()
         other = users / hashlib.sha256(b"user-b").hexdigest()
-        other.mkdir()
+        (users / hashlib.sha256(b"user-a").hexdigest()).rmdir()
         (users / hashlib.sha256(b"user-a").hexdigest()).symlink_to(other, target_is_directory=True)
         original = (self.root / "owner/config.yaml").read_bytes()
 
@@ -2860,7 +2912,7 @@ class ProfileApiRouteTest(unittest.TestCase):
 
     def test_sandbox_attachment_source_intermediate_symlink_preserves_config(self):
         outside = self.attachment_root.parent / "other-users"
-        outside.mkdir()
+        (self.attachment_root / "users").rename(outside)
         (self.attachment_root / "users").symlink_to(outside, target_is_directory=True)
         original = (self.root / "owner/config.yaml").read_bytes()
 
@@ -2880,16 +2932,15 @@ class ProfileApiRouteTest(unittest.TestCase):
 
     def test_sandbox_attachment_preparation_failure_preserves_config(self):
         original = (self.root / "owner/config.yaml").read_bytes()
-        with mock.patch.object(self.plugin, "_sandbox_ensure_attachment_agent_directory", side_effect=OSError("denied")):
+        with mock.patch.object(self.plugin, "_sandbox_verify_attachment_directories", side_effect=OSError("denied")):
             self.assertEqual(self.request("/api/config", "PUT", token="valid", body=self.file_body()), 409)
         self.assertEqual((self.root / "owner/config.yaml").read_bytes(), original)
 
     def test_sandbox_attachment_target_user_symlink_preserves_config(self):
         agent_root = pathlib.Path(self.attachment_agent_root)
         users = agent_root / "users"
-        users.mkdir(parents=True)
         other = users / hashlib.sha256(b"user-b").hexdigest()
-        other.mkdir()
+        (users / hashlib.sha256(b"user-a").hexdigest()).rmdir()
         (users / hashlib.sha256(b"user-a").hexdigest()).symlink_to(other, target_is_directory=True)
         original = (self.root / "owner/config.yaml").read_bytes()
 
@@ -2938,7 +2989,7 @@ class ProfileApiRouteTest(unittest.TestCase):
 
     def test_sandbox_attachment_change_after_preparation_preserves_config(self):
         original = (self.root / "owner/config.yaml").read_bytes()
-        prepare = self.plugin._sandbox_ensure_attachment_agent_directory
+        prepare = self.plugin._sandbox_verify_attachment_directories
 
         def replace_source(*args, **kwargs):
             snapshot = prepare(*args, **kwargs)
@@ -2947,7 +2998,7 @@ class ProfileApiRouteTest(unittest.TestCase):
             directory.symlink_to(directory.with_name("old-user"), target_is_directory=True)
             return snapshot
 
-        with mock.patch.object(self.plugin, "_sandbox_ensure_attachment_agent_directory", side_effect=replace_source):
+        with mock.patch.object(self.plugin, "_sandbox_verify_attachment_directories", side_effect=replace_source):
             self.assertEqual(self.request("/api/config", "PUT", token="valid", body=self.file_body()), 409)
         self.assertEqual((self.root / "owner/config.yaml").read_bytes(), original)
 
@@ -2992,6 +3043,9 @@ class ProfileApiRouteTest(unittest.TestCase):
             attachment_root.mkdir()
             self.set_sandbox_policy(self.sandbox_policy(
                 attachment_root=str(attachment_root), attachment_agent_root=self.attachment_agent_root))
+            # Control Plane 이 만드는 사용자 디렉터리다. plugin 은 만들지 않는다.
+            for owner in (b"user-a", b"user-b"):
+                (attachment_root / "users" / hashlib.sha256(owner).hexdigest()).mkdir(parents=True)
             self.save_sandbox_key(owner="user-a")
             first_mount = self.saved_config()["terminal"]["docker_volumes"][1]
             self.save_sandbox_key(owner="user-b")
@@ -3172,6 +3226,7 @@ class ProfileApiRouteTest(unittest.TestCase):
         self.assertEqual(self.request("/api/config", "PUT", token="valid", body=body), 400)
         self.assertEqual(path.read_bytes(), original)
         # 64자까지는 받는다.
+        self.prepare_attachment_directory("a" * 64)
         self.assertEqual(self.request("/api/config", "PUT", token="valid", body=self.file_body("a" * 64)), 200)
 
     def test_unlisted_profile_keeps_local_terminal_and_needs_no_sandbox_owner(self):

@@ -2124,7 +2124,7 @@ async def _connector_request(request):
                     return _rejected("격리할 사진 도구에는 sandbox_owner 가 필요하다")
                 try:
                     os.makedirs(_sandbox_workspace(sandbox, owner), exist_ok=True)
-                    prepared = _sandbox_ensure_attachment_agent_directory(sandbox, owner)
+                    prepared = _sandbox_verify_attachment_directories(sandbox, owner)
                     sandbox_terminal = _sandbox_terminal(sandbox, profile, owner, prepared)
                     attachment_guard = (sandbox, owner, prepared)
                 except OSError:
@@ -2826,29 +2826,19 @@ class SandboxAttachmentError(OSError):
     """첨부 mount를 안전하게 준비하거나 다시 검증하지 못했다."""
 
 
-def _sandbox_attachment_path_identity(root: pathlib.Path, owner: str, create: bool, create_root: bool) -> tuple:
-    """경로를 fd 기준으로 내려가며 모든 중간 링크를 거절하고 디렉터리 식별자를 기록한다."""
+def _sandbox_attachment_path_identity(root: pathlib.Path, owner: str) -> tuple:
+    """경로를 fd 기준으로 내려가며 모든 중간 링크를 거절하고 디렉터리 식별자를 기록한다.
+
+    사용자 디렉터리는 Control Plane 이 이 요청 전에 만든다. Hermes 는 첨부 루트를 읽기 전용으로 보므로
+    여기서는 만들지 않고, 없으면 거절한다(ADR-089).
+    """
     directory = root / "users" / _sandbox_attachment_key(owner)
     flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW
     descriptor = os.open("/", flags)
     identities = []
-    root_component = len(root.parts) - 2
     try:
-        for index, component in enumerate(directory.parts[1:]):
-            try:
-                child = os.open(component, flags, dir_fd=descriptor)
-            except FileNotFoundError:
-                is_user_directory = index > root_component
-                is_target_root = create_root and index == root_component
-                may_create = create and (is_user_directory or is_target_root)
-                if not may_create:
-                    raise
-                try:
-                    os.mkdir(component, mode=0o755, dir_fd=descriptor)
-                except FileExistsError:
-                    # 검사 뒤 생긴 디렉터리도 NOFOLLOW로 다시 연다.
-                    pass
-                child = os.open(component, flags, dir_fd=descriptor)
+        for component in directory.parts[1:]:
+            child = os.open(component, flags, dir_fd=descriptor)
             os.close(descriptor)
             descriptor = child
             metadata = os.fstat(descriptor)
@@ -2863,15 +2853,13 @@ def _sandbox_attachment_path_identity(root: pathlib.Path, owner: str, create: bo
         os.close(descriptor)
 
 
-def _sandbox_attachment_snapshot(policy: dict, owner: str, create: bool = False) -> dict:
+def _sandbox_attachment_snapshot(policy: dict, owner: str) -> dict:
     """source와 target이 모두 보이고 허용된 사용자 경로 그대로인지 확인한다."""
     try:
-        snapshots = {}
-        for key in ("attachment_root", "attachment_agent_root"):
-            root = pathlib.Path(policy[key])
-            create_root = key == "attachment_agent_root"
-            snapshots[key] = _sandbox_attachment_path_identity(root, owner, create, create_root)
-        return snapshots
+        return {
+            key: _sandbox_attachment_path_identity(pathlib.Path(policy[key]), owner)
+            for key in ("attachment_root", "attachment_agent_root")
+        }
     except (OSError, ValueError, RuntimeError) as error:
         raise SandboxAttachmentError("attachment mount paths cannot be verified") from error
 
@@ -2881,11 +2869,9 @@ def _sandbox_validate_attachment_snapshot(policy: dict, owner: str, expected: di
         raise SandboxAttachmentError("attachment directories changed after validation")
 
 
-def _sandbox_ensure_attachment_agent_directory(policy: dict, owner: str) -> dict:
-    """source 루트를 확인하고 양쪽 사용자 디렉터리를 안전하게 준비한다."""
-    prepared = _sandbox_attachment_snapshot(policy, owner, create=True)
-    _sandbox_validate_attachment_snapshot(policy, owner, prepared)
-    return prepared
+def _sandbox_verify_attachment_directories(policy: dict, owner: str) -> dict:
+    """Control Plane 이 만든 양쪽 사용자 디렉터리를 확인하고 그 식별자를 돌려준다."""
+    return _sandbox_attachment_snapshot(policy, owner)
 
 
 def _sandbox_terminal(policy: dict, profile: str, owner: str, attachment_snapshot: Optional[dict] = None) -> dict:
@@ -2895,7 +2881,7 @@ def _sandbox_terminal(policy: dict, profile: str, owner: str, attachment_snapsho
     profile 의 비밀값이 실행 공간에 들어가지 않게 하려는 것이다.
     """
     if attachment_snapshot is None:
-        attachment_snapshot = _sandbox_ensure_attachment_agent_directory(policy, owner)
+        attachment_snapshot = _sandbox_verify_attachment_directories(policy, owner)
     _sandbox_validate_attachment_snapshot(policy, owner, attachment_snapshot)
     settings = policy["profiles"][profile]
     mounts = policy["read_only_mounts"] + settings["read_only_mounts"]
@@ -3030,7 +3016,7 @@ async def _check_config_update(request):
             # 칸 일부만 고치면 운영자가 남긴 local 설정이나 값 전달 칸이 섞인다. 통째로 바꾼다.
             try:
                 os.makedirs(_sandbox_workspace(sandbox, owner), exist_ok=True)
-                prepared = _sandbox_ensure_attachment_agent_directory(sandbox, owner)
+                prepared = _sandbox_verify_attachment_directories(sandbox, owner)
                 updated["terminal"] = _sandbox_terminal(sandbox, profile, owner, prepared)
                 request.state.fos_checked_attachments = (sandbox, owner, prepared)
             except OSError:
