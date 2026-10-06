@@ -928,7 +928,7 @@ public class ChatService {
             HermesRunResult result;
             try {
                 runId = submit(pending);
-                // 한 번에 받는 경로도 사건 스트림을 연다. 화면으로 흘릴 곳은 없고 도구 사건을 실행 기록에 남기려는 것이다(ADR-089).
+                // 한 번에 받는 경로도 사건 스트림을 연다. 화면으로 흘릴 곳은 없고 도구 사건을 실행 기록에 남기려는 것이다(ADR-090).
                 relay(pending, runId, handle, streaming ? onEvent : null);
                 result = awaitCompletion(pending, runId);
             } catch (RuntimeException ex) {
