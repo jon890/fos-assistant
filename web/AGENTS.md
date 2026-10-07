@@ -142,6 +142,9 @@ BROWSER_WEB_SERVER=dev pnpm test:browser
 기본값으로 두면 빌드한 서버가 보이는 링크마다 화면을 미리 읽어, 한 화면에서 요청이 수십 개 한꺼번에 나간다.
 `test/browser/conversation-requests.spec.ts` 가 대화가 많은 사이드바의 미리 읽기가 0건인지 센다.
 
+사용량 탭도 `prefetch={false}`를 쓴다. 탭마다 집계를 다시 읽으므로 고른 탭만 요청한다.
+`usage.spec.ts`가 탭 미리 읽기 없이 주소와 선택 표시가 함께 바뀌는지 확인한다.
+
 브라우저 검사의 포트를 고정하고 싶으면 `BROWSER_WEB_PORT` 와 `BROWSER_CONTROL_PLANE_PORT` 를 준다.
 
 ### 브라우저 시험의 독립성과 대기
