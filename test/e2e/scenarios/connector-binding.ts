@@ -23,6 +23,7 @@ import {
   connect,
   ConnectorSetup,
   connectionPath,
+  DEMO_VALUES,
   probeTool,
   requestNumber,
   useConnectorPolicy,
@@ -181,8 +182,10 @@ export const connectorBindingScenario: Scenario = {
         `연결 상태의 붙인 에이전트가 다르다: ${JSON.stringify(connection.bindings)}`,
       );
 
-      step("붙은 연결의 값을 바꿔 다시 등록하면 재시작 대기가 되고 관리자가 반영 완료를 눌러야 READY 로 돌아온다");
-      await connect(context, owner, DEMO_CONNECTOR.id, { token: DEMO_TOKEN_OK });
+      step("붙은 연결의 scope 를 비워 다시 등록하면 재시작 대기가 되고 관리자가 반영 완료를 눌러야 READY 로 돌아온다");
+      // 처음 등록한 DEMO_VALUES 에서 토큰은 그대로 두고 선택 칸인 scope 만 비운다. 대역의 scope 선택지가 "a" 하나뿐이라
+      // 다른 선택지로는 바꿀 수 없다. 이미 있던 서버의 env 가 바뀌는 값 교체이므로 떠 있는 MCP 프로세스가 옛 값을 쥐어 재시작이 필요하다.
+      await connect(context, owner, DEMO_CONNECTOR.id, { token: DEMO_VALUES.token });
       const restartRow = (await connectionsOf(context, owner, agent.code)).connections
         .find((row) => row.connectorId === DEMO_CONNECTOR.id);
       expect(

@@ -365,6 +365,51 @@ class ConnectorBindingServiceTest {
     }
 
     @Test
+    @DisplayName("에이전트가 지워진 바인딩은 예정이 비워지고 다시 집히지 않는다")
+    void applyDueClearsScheduleOfDeletedAgentsBinding() {
+        CurrentUser owner = user(UserRole.MEMBER, 1L);
+        connect(owner, DEMO, VALUES);
+        Agent agent = agent(owner, AgentVisibility.PRIVATE);
+        when(connector.bindConnector(anyString(), anyString(), anyString(), anyString()))
+                .thenReturn(new InstallResult(false, false, true));
+        service.bind(owner, agent.code(), DEMO);
+        jdbc.update("UPDATE agent_connector_binding SET apply_due_at = ?", Timestamp.from(LONG_AGO));
+        jdbc.update("UPDATE agent SET deleted_at = ? WHERE id = ?", Timestamp.from(Instant.now()), agent.id());
+        clearInvocations(connector);
+
+        assertThat(service.applyDue()).as("지워진 에이전트는 대상이 아니다").isZero();
+
+        verify(connector, never()).bindConnector(anyString(), anyString(), anyString(), anyString());
+        verify(connector, never()).probe(anyString(), anyString());
+        ConnectorBinding stored = onlyBinding();
+        assertThat(stored.applyDueAt()).as("비운 예정").isNull();
+        assertThat(stored.status()).isEqualTo(BindingStatus.PENDING);
+        assertThat(bindings.findApplyDue(Instant.now())).as("다시 집을 대상").isEmpty();
+    }
+
+    @Test
+    @DisplayName("예약 확인에서 카탈로그를 읽지 못하면 PENDING 이고 예정이 비워진 채 남아 다시 집히지 않는다")
+    void applyDueClearsScheduleWhenCatalogFails() {
+        CurrentUser owner = user(UserRole.MEMBER, 1L);
+        connect(owner, DEMO, VALUES);
+        Agent agent = agent(owner, AgentVisibility.PRIVATE);
+        when(connector.bindConnector(anyString(), anyString(), anyString(), anyString()))
+                .thenReturn(new InstallResult(false, false, true));
+        service.bind(owner, agent.code(), DEMO);
+        jdbc.update("UPDATE agent_connector_binding SET apply_due_at = ?", Timestamp.from(LONG_AGO));
+        when(connector.readCatalog()).thenThrow(new IllegalStateException("catalog down"));
+        clearInvocations(connector);
+
+        assertThat(service.applyDue()).isZero();
+
+        verify(connector, never()).bindConnector(anyString(), anyString(), anyString(), anyString());
+        ConnectorBinding stored = onlyBinding();
+        assertThat(stored.status()).isEqualTo(BindingStatus.PENDING);
+        assertThat(stored.applyDueAt()).as("커밋된 비운 예정").isNull();
+        assertThat(bindings.findApplyDue(Instant.now())).as("다시 집을 대상").isEmpty();
+    }
+
+    @Test
     @DisplayName("붙이기와 다시 설치는 그 에이전트 주인의 sandboxOwner 를 보내고, 다른 사용자의 에이전트에 붙이면 그 사용자의 값이다")
     void bindAndReinstallSendTheAgentOwnersSandboxOwner() {
         CurrentUser first = user(UserRole.MEMBER, 1L);

@@ -434,7 +434,7 @@ test("관리자는 바인딩마다 한 줄을 보고 반영 완료에 목록에�
   ).toBe(true);
 });
 
-test("재시작 대기가 아닌 PENDING 바인딩은 반영 중으로 보이고 반영 완료 단추가 없다", async ({
+test("재시작 대기가 아닌 PENDING 바인딩은 반영 중으로 보이고 다시 확인하는 반영 완료 단추가 있다", async ({
   page,
 }) => {
   await page.route("**/api/admin/connections", (route) =>
@@ -456,7 +456,10 @@ test("재시작 대기가 아닌 PENDING 바인딩은 반영 중으로 보이고
   const live = rows.filter({ hasText: "에이전트 agent-live" });
   const restart = rows.filter({ hasText: "에이전트 agent-restart" });
   await expect(live).toContainText("반영 중");
-  await expect(live.getByRole("button", { name: "반영 완료" })).toHaveCount(0);
+  await expect(live.getByRole("button", { name: "반영 완료" })).toBeVisible();
+  await expect(live).toContainText(
+    "몇 분이 지나도 남아 있으면 눌러 다시 확인해요.",
+  );
   await expect(live).not.toContainText("재시작한 뒤 눌러 주세요");
   await expect(restart).toContainText("반영 대기");
   await expect(
