@@ -179,6 +179,22 @@ class RecoveredRunRecorderTest {
     }
 
     @Test
+    @DisplayName("수집 중 재기동된 실행은 답을 복구하면서 관측 누락을 남긴다")
+    void marksInterruptedObservationIncompleteWhenRecoveringAnswer() {
+        AgentExecution row = chatTurn(conversation, chief);
+        row.beginEventObservation();
+        executions.save(row);
+
+        assertThat(recorder.settle(row.id(), result("completed", "복구한 답"))).isTrue();
+
+        AgentExecution saved = executions.findById(row.id()).orElseThrow();
+        assertThat(saved.status()).isEqualTo(ExecutionStatus.SUCCEEDED);
+        assertThat(saved.eventObservation().name()).isEqualTo("INCOMPLETE");
+        assertThat(messages.findByConversationIdOrderByIdAsc(conversation.id()))
+                .extracting(ChatMessage::content).contains("복구한 답");
+    }
+
+    @Test
     @DisplayName("성공으로 끝난 대화 turn 은 사용량과 답과 session 을 적고 done 을 낸다")
     void completedChatTurnRecordsUsageAnswerSessionAndPublishesDone() {
         messages.save(ChatMessage.fromUser(conversation.id(), dad.id(), "질문", Instant.now()));

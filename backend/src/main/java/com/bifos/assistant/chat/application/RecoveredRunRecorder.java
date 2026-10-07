@@ -139,6 +139,12 @@ public class RecoveredRunRecorder {
             Written locked = executionRepository
                     .lockById(executionId)
                     .filter(row -> row.status() == ExecutionStatus.RUNNING)
+                    .map(row -> {
+                        if (row.eventObservation() == com.bifos.assistant.usage.domain.type.EventObservation.OBSERVING) {
+                            row.finishEventObservation(false);
+                        }
+                        return row;
+                    })
                     .map(write)
                     .orElse(null);
             if (locked != null) {

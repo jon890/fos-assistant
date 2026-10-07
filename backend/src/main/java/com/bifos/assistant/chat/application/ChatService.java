@@ -1260,6 +1260,7 @@ public class ChatService {
     private String submit(PendingTurn pending) {
         try {
             executions.markSubmitted(pending.execution());
+            executions.beginEventObservation(pending.execution());
             String runId = hermes.submit(pending.command());
             executions.attachRunId(pending.execution(), runId);
             append(pending, ExecutionEventType.RUN_STARTED, null);
@@ -1307,11 +1308,20 @@ public class ChatService {
                         stream -> turns.attachStream(handle, stream),
                         detailScope);
             } catch (ApiException ex) {
+                synchronized (pending) {
+                    executions.finishEventObservation(pending.execution(), false);
+                }
                 log.warn("Hermes event stream ended before final status runId={}", runId, ex);
             } catch (RuntimeException ex) {
+                synchronized (pending) {
+                    executions.finishEventObservation(pending.execution(), false);
+                }
                 // 사건은 관측용이다. 읽다가 예기치 못한 오류가 나도 가려진 스레드 오류로 두지 않고 남긴다
                 log.warn("Hermes event stream failed runId={}", runId, ex);
             } finally {
+                synchronized (pending) {
+                    executions.finishEventObservation(pending.execution(), true);
+                }
                 turns.detachStream(handle);
                 streamDone.complete(null);
             }
@@ -1320,6 +1330,11 @@ public class ChatService {
             turns.awaitStreamOrGrace(handle, streamDone, hermesProperties.runTimeout());
         } else {
             turns.awaitStreamOrGrace(handle, streamDone);
+        }
+        synchronized (pending) {
+            if (!streamDone.isDone()) {
+                executions.finishEventObservation(pending.execution(), false);
+            }
         }
     }
 
@@ -2066,6 +2081,7 @@ public class ChatService {
                     "could not record an execution event executionId={}",
                     pending.execution().id(),
                     ex);
+            executions.finishEventObservation(pending.execution(), false);
         }
     }
 

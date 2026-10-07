@@ -1,4 +1,5 @@
 import { Stat } from "@/components/ui/stat";
+import { Notice } from "@/components/ui/notice";
 import { formatAmount } from "@/lib/format";
 import { subagentGapDetail, subagentGapTotal } from "@/lib/subagent-gap";
 
@@ -19,6 +20,7 @@ export type MonthlyCost = {
   pendingSubagents: number | null;
   unconfirmedSubagents: number | null;
   unpricedSubagents: number | null;
+  observationIncompleteExecutions: number | null;
   /** 그 달 실행 건수. 모두에게 온다 */
   totalExecutions: number;
 };
@@ -83,9 +85,18 @@ export function MonthlySummary({ monthly, isAdmin }: Props) {
         />
       ) : null}
       <div className="sm:col-span-2 md:col-span-3">
+        {(monthly.observationIncompleteExecutions ?? 0) > 0 ? (
+          <Notice variant="warning" className="mb-2">
+            관측 범위 미확인 · {monthly.observationIncompleteExecutions?.toLocaleString("ko-KR")}건의 실행에서
+            도우미를 관측하지 못했어요. 도우미 수와 빠진 금액은 알 수 없어요.
+          </Notice>
+        ) : (monthly.pricedSubagents ?? 0) + gapTotal === 0 ? (
+          <p className="mb-2 text-sm text-muted-foreground">관측된 도우미가 없어요.</p>
+        ) : null}
         <p className="text-xs text-muted-foreground">
           두 금액은 공개 가격표를 이용한 계산값이에요. 실제 청구 금액과 다를 수
           있어요.
+          과거 실행의 관측 범위는 확인하지 않았어요.
         </p>
       </div>
     </dl>

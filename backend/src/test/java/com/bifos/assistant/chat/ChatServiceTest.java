@@ -72,6 +72,7 @@ import com.bifos.assistant.usage.domain.ExecutionContextSource;
 import com.bifos.assistant.usage.domain.ExecutionEvent;
 import com.bifos.assistant.usage.domain.type.ExecutionEventType;
 import com.bifos.assistant.usage.domain.type.ExecutionStatus;
+import com.bifos.assistant.usage.domain.type.EventObservation;
 import com.bifos.assistant.usage.infra.AgentExecutionRepository;
 import com.bifos.assistant.usage.infra.ExecutionContextSourceRepository;
 import com.bifos.assistant.usage.infra.ExecutionEventRepository;
@@ -569,6 +570,8 @@ class ChatServiceTest {
             // 시험 설정의 hermes.run-timeout 은 1초다. 스트림을 끝까지 기다렸다면 30초가 걸린다.
             assertThat(Duration.ofNanos(System.nanoTime() - startedAt)).isLessThan(Duration.ofSeconds(10));
             assertThat(turn.assistantText()).isEqualTo("네");
+            assertThat(executions.findById(turn.executionId()).orElseThrow().eventObservation())
+                    .isEqualTo(EventObservation.INCOMPLETE);
         } finally {
             neverClosed.countDown();
         }
@@ -586,6 +589,8 @@ class ChatServiceTest {
         ChatTurn turn = chat.send(dad, null, "안녕", "dad");
 
         assertThat(turn.assistantText()).isEqualTo("네");
+        assertThat(executions.findById(turn.executionId()).orElseThrow().eventObservation())
+                .isEqualTo(EventObservation.INCOMPLETE);
         assertThat(typesOf(eventsOf(turn.executionId())))
                 .containsExactly(ExecutionEventType.RUN_STARTED, ExecutionEventType.RUN_COMPLETED);
     }
@@ -960,6 +965,26 @@ class ChatServiceTest {
     }
 
     @Test
+    @DisplayName("자식 시작 사건만 저장하지 못해도 답은 남고 관측 누락 표시가 정상 종료 뒤에도 남는다")
+    void keepsObservationGapWhenOnlyChildStartCannotBeSaved() {
+        CurrentUser user = member("observer@example.com", "dad");
+        stub().willReturn(HermesRunResult.of("run-1", "sess-1", "completed", "네", "dad", null, TokenUsage.empty()));
+        hermesStreams(new RunEvent("subagent.start", null, null, "도우미 시작", null, null, "child-1", null, null, "child-session", null, null, null, null));
+        doThrow(new DataIntegrityViolationException("시작 사건 저장 실패"))
+                .when(executionEvents)
+                .save(org.mockito.ArgumentMatchers.argThat(event -> event.eventType() == ExecutionEventType.SUBAGENT_STARTED));
+
+        ChatTurn turn = chat.send(user, null, "안녕", "dad");
+
+        assertThat(turn.assistantText()).isEqualTo("네");
+        AgentExecution execution = executions.findById(turn.executionId()).orElseThrow();
+        assertThat(execution.status()).isEqualTo(ExecutionStatus.SUCCEEDED);
+        assertThat(execution.eventObservation()).isEqualTo(EventObservation.INCOMPLETE);
+        assertThat(typesOf(eventsOf(turn.executionId())))
+                .containsExactly(ExecutionEventType.RUN_STARTED, ExecutionEventType.RUN_COMPLETED);
+    }
+
+    @Test
     @DisplayName("사건 저장이 예외를 던져도 대화는 성공하고 중계도 이어진다")
     void conversationSucceedsAndRelayContinuesEvenIfEventSaveThrows() {
         CurrentUser dad = member("dad@example.com", "dad");
@@ -996,6 +1021,8 @@ class ChatServiceTest {
         List<ExecutionEvent> recorded = eventsOf(turn.executionId());
         assertThat(typesOf(recorded)).containsExactly(ExecutionEventType.RUN_STARTED, ExecutionEventType.RUN_COMPLETED);
         assertThat(recorded).extracting(ExecutionEvent::sequence).containsExactly(1, 2);
+        assertThat(executions.findById(turn.executionId()).orElseThrow().eventObservation())
+                .isEqualTo(EventObservation.OBSERVED);
     }
 
     @Test

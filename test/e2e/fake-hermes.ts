@@ -2033,6 +2033,9 @@ export function startFakeHermes(
           eventsWaiters.delete(runId!);
           const run = runs.get(runId);
           if (!run) return send(response, 404, runNotFound(runId!));
+          if (run.input === "사건 스트림 실패 검사") {
+            return send(response, 503, { error: "event stream unavailable" });
+          }
           response.writeHead(200, {
             "Content-Type": "text/event-stream; charset=utf-8",
             "Cache-Control": "no-cache",

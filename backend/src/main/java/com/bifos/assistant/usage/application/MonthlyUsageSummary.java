@@ -25,4 +25,5 @@ public record MonthlyUsageSummary(
         long pricedSubagents,
         long pendingSubagents,
         long unconfirmedSubagents,
-        long unpricedSubagents) {}
+        long unpricedSubagents,
+        long observationIncompleteExecutions) {}

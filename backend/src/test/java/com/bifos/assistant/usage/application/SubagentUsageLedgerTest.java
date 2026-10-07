@@ -152,12 +152,40 @@ class SubagentUsageLedgerTest {
     }
 
     @Test
+    @DisplayName("관측 누락은 자식 수와 금액을 만들지 않고 실행 수로만 세며 과거 실행과 다른 사용자는 뺀다")
+    void countsObservationGapsWithoutInventingChildrenOrCosts() {
+        AgentExecution parent = finishedParent(USER_ID, justFinished());
+        parent.beginEventObservation();
+        parent.finishEventObservation(false);
+        parent.finishEventObservation(true);
+        executions.save(parent);
+        AgentExecution historical = finishedParent(USER_ID, justFinished());
+        assertThat(historical.eventObservation().name()).isEqualTo("UNKNOWN");
+        AgentExecution other = finishedParent(OTHER_USER_ID, justFinished());
+        other.finishEventObservation(false);
+        executions.save(other);
+
+        MonthlyUsageSummary summary = summaries.monthly(USER_ID, from, to);
+
+        assertThat(summary.observationIncompleteExecutions()).isOne();
+        assertThat(summary.estimatedMicros()).isEqualTo(PARENT_MICROS * 2);
+        assertThat(summary.pricedSubagents()).isZero();
+        assertThat(summary.pendingSubagents()).isZero();
+        assertThat(summary.unconfirmedSubagents()).isZero();
+        assertThat(summary.unpricedSubagents()).isZero();
+        parent.beginEventObservation();
+        parent.finishEventObservation(true);
+        executions.save(parent);
+        assertThat(summaries.monthly(USER_ID, from, to).observationIncompleteExecutions()).isZero();
+    }
+
+    @Test
     @DisplayName("자식이 없으면 합계는 실행만이고 자식 건수는 모두 0 이다")
     void countsNoSubagentsWhenThereAreNoChildren() {
         finishedParent(USER_ID, justFinished());
 
         assertThat(summaries.monthly(USER_ID, from, to))
-                .isEqualTo(new MonthlyUsageSummary(PARENT_MICROS, PARENT_MICROS, 1, 0, 0, 0, 0, 0, 0));
+                .isEqualTo(new MonthlyUsageSummary(PARENT_MICROS, PARENT_MICROS, 1, 0, 0, 0, 0, 0, 0, 0));
         assertThat(summaries.byAgent(USER_ID, from, to))
                 .singleElement()
                 .satisfies(line -> assertThat(line.subagents()).isZero());
@@ -439,7 +467,7 @@ class SubagentUsageLedgerTest {
         startEvent(running, 1, CHILD);
         startEvent(running, 2, null);
 
-        assertThat(summaries.monthly(USER_ID, from, to)).isEqualTo(new MonthlyUsageSummary(0, 0, 0, 0, 0, 0, 0, 0, 0));
+        assertThat(summaries.monthly(USER_ID, from, to)).isEqualTo(new MonthlyUsageSummary(0, 0, 0, 0, 0, 0, 0, 0, 0, 0));
     }
 
     @Test
@@ -476,7 +504,7 @@ class SubagentUsageLedgerTest {
         startEvent(others, 3, null);
 
         assertThat(summaries.monthly(USER_ID, from, to))
-                .isEqualTo(new MonthlyUsageSummary(PARENT_MICROS, PARENT_MICROS, 1, 0, 0, 0, 0, 0, 0));
+                .isEqualTo(new MonthlyUsageSummary(PARENT_MICROS, PARENT_MICROS, 1, 0, 0, 0, 0, 0, 0, 0));
         assertThat(summaries.byModel(USER_ID, from, to))
                 .singleElement()
                 .satisfies(line -> assertThat(line.subagents()).isZero());

@@ -55,6 +55,7 @@ public final class UsageDtos {
             Long pendingSubagents,
             Long unconfirmedSubagents,
             Long unpricedSubagents,
+            Long observationIncompleteExecutions,
             long totalExecutions) {
 
         /**
@@ -65,7 +66,7 @@ public final class UsageDtos {
         static MonthlyCostView from(String month, MonthlyUsageSummary cost, boolean internal) {
             long total = cost.pricedExecutions() + cost.unpricedExecutions();
             if (!internal) {
-                return new MonthlyCostView(month, null, null, null, null, null, null, null, null, null, null, total);
+                return new MonthlyCostView(month, null, null, null, null, null, null, null, null, null, null, null, total);
             }
             return new MonthlyCostView(
                     month,
@@ -79,6 +80,7 @@ public final class UsageDtos {
                     cost.pendingSubagents(),
                     cost.unconfirmedSubagents(),
                     cost.unpricedSubagents(),
+                    cost.observationIncompleteExecutions(),
                     total);
         }
     }

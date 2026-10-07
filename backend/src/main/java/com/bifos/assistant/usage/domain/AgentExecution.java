@@ -4,6 +4,7 @@ import com.bifos.assistant.agent.domain.type.CostMode;
 import com.bifos.assistant.hermes.dto.TokenUsage;
 import com.bifos.assistant.model.domain.type.ModelTier;
 import com.bifos.assistant.usage.domain.type.ExecutionStatus;
+import com.bifos.assistant.usage.domain.type.EventObservation;
 import com.bifos.assistant.usage.domain.type.ReasoningEffortSource;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -32,6 +33,32 @@ import lombok.experimental.Accessors;
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @Accessors(fluent = true)
 public class AgentExecution {
+
+    /** 과거 실행은 UNKNOWN 이다. 새 제출은 비수집을 먼저 표시하고 수집 경로가 OBSERVING 으로 바꾼다. */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "event_observation", nullable = false, length = 20)
+    private EventObservation eventObservation = EventObservation.UNKNOWN;
+
+    private void closeInterruptedObservation() {
+        if (eventObservation == EventObservation.OBSERVING) {
+            eventObservation = EventObservation.INCOMPLETE;
+        }
+    }
+
+    public void beginEventObservation() {
+        eventObservation = EventObservation.OBSERVING;
+    }
+
+    /** 실패 표시는 뒤늦은 정상 스트림 종료로 지우지 않는다. */
+    public boolean finishEventObservation(boolean complete) {
+        EventObservation next = complete && eventObservation == EventObservation.OBSERVING
+                ? EventObservation.OBSERVED : EventObservation.INCOMPLETE;
+        if (complete && eventObservation != EventObservation.OBSERVING || eventObservation == next) {
+            return false;
+        }
+        eventObservation = next;
+        return true;
+    }
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -300,12 +327,16 @@ public class AgentExecution {
     /** 실행을 제출한 직후 Hermes 가 준 run 번호를 적는다. */
     public void attachRunId(String hermesRunId) {
         this.hermesRunId = hermesRunId;
+        if (hermesRunId != null && eventObservation == EventObservation.UNKNOWN) {
+            eventObservation = EventObservation.INCOMPLETE;
+        }
     }
 
     /** Hermes 에 제출하기 직전 시각은 한 번만 적는다. */
     public void markSubmitted(Instant at) {
         if (submittedAt == null) {
             submittedAt = at;
+            eventObservation = EventObservation.INCOMPLETE;
         }
     }
 
@@ -361,6 +392,7 @@ public class AgentExecution {
         this.pricingVersion = cost.pricingVersion();
         this.finishedAt = finishedAt;
         this.latencyMs = finishedAt.toEpochMilli() - startedAt.toEpochMilli();
+        closeInterruptedObservation();
         this.status = ExecutionStatus.SUCCEEDED;
     }
 
@@ -378,6 +410,7 @@ public class AgentExecution {
         this.pricingVersion = cost.pricingVersion();
         this.finishedAt = finishedAt;
         this.latencyMs = finishedAt.toEpochMilli() - startedAt.toEpochMilli();
+        closeInterruptedObservation();
         this.status = ExecutionStatus.SUCCEEDED;
     }
 
@@ -402,6 +435,7 @@ public class AgentExecution {
         this.errorCode = errorCode;
         this.finishedAt = finishedAt;
         this.latencyMs = finishedAt.toEpochMilli() - startedAt.toEpochMilli();
+        closeInterruptedObservation();
         this.status = ExecutionStatus.FAILED;
     }
 
@@ -428,6 +462,7 @@ public class AgentExecution {
             this.finishedAt = finishedAt;
             this.latencyMs = finishedAt.toEpochMilli() - startedAt.toEpochMilli();
         }
+        closeInterruptedObservation();
         this.status = ExecutionStatus.CANCELLED;
     }
 
