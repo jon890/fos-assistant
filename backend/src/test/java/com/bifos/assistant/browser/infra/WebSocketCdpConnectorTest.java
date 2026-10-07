@@ -30,6 +30,8 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -49,7 +51,7 @@ class WebSocketCdpConnectorTest {
     @BeforeEach
     void setUp() throws IOException {
         server = new FakeCdpServer();
-        connector = new WebSocketCdpConnector(Duration.ofMillis(300));
+        connector = new WebSocketCdpConnector(Duration.ofMillis(300), 1_000_000);
     }
 
     @AfterEach
@@ -144,6 +146,161 @@ class WebSocketCdpConnectorTest {
     }
 
     @Test
+    @DisplayName("상한을 넘는 메시지가 오면 연결을 끊고 기다리던 명령을 실패로 끝내며 닫힘을 알린다")
+    void closesOnOversizedMessage() throws Exception {
+        CountDownLatch closed = new CountDownLatch(1);
+        try (WebSocketCdpConnector small = new WebSocketCdpConnector(Duration.ofSeconds(5), 1_000)) {
+            CompletableFuture<Void> accepted = server.acceptAsync();
+            CdpConnection connection = small.connect(server.address(), TARGET, event -> {}, closed::countDown);
+            accepted.get(2, TimeUnit.SECONDS);
+            CompletableFuture<JsonNode> result = connection.send("Page.enable", Map.of());
+            server.nextMessage();
+
+            server.sendFragmented(
+                    "{\"method\":\"Page.screencastFrame\",\"params\":{\"data\":\"" + "a".repeat(2_000) + "\"}}", 4);
+
+            assertThat(closed.await(2, TimeUnit.SECONDS)).isTrue();
+            assertThatThrownBy(() -> result.get(2, TimeUnit.SECONDS)).isInstanceOf(ExecutionException.class);
+            assertThat(server.awaitDisconnected()).isTrue();
+        }
+    }
+
+    @Test
+    @DisplayName("close 로 닫으면 기다리던 명령을 실패로 끝내고 닫힘은 알리지 않는다")
+    void closeFailsPendingWithoutNotifying() throws Exception {
+        CountDownLatch closed = new CountDownLatch(1);
+        CdpConnection connection = connect(event -> {}, closed::countDown);
+        CompletableFuture<JsonNode> result = connection.send("Page.enable", Map.of());
+        server.nextMessage();
+
+        connection.close();
+
+        assertThatThrownBy(() -> result.get(2, TimeUnit.SECONDS))
+                .isInstanceOf(ExecutionException.class)
+                .hasCauseInstanceOf(IllegalStateException.class);
+        assertThat(server.awaitDisconnected()).isTrue();
+        assertThat(closed.await(300, TimeUnit.MILLISECONDS)).isFalse();
+    }
+
+    @Test
+    @DisplayName("두 스레드가 동시에 여러 번 보내도 응답이 모두 제 명령과 짝지어진다")
+    void pairsConcurrentSends() throws Exception {
+        int perThread = 50;
+        try (CdpConnection connection = connect(event -> {}, () -> {})) {
+            Thread echo = new Thread(() -> {
+                try {
+                    for (int i = 0; i < perThread * 2; i++) {
+                        JsonNode sent = server.nextMessage();
+                        server.sendText("{\"id\":" + sent.path("id").asLong() + ",\"result\":{\"n\":"
+                                + sent.path("params").path("n").asInt() + "}}");
+                    }
+                } catch (InterruptedException | IOException ex) {
+                    throw new IllegalStateException(ex);
+                }
+            });
+            echo.setDaemon(true);
+            echo.start();
+            List<List<CompletableFuture<JsonNode>>> results = new ArrayList<>();
+            List<Thread> senders = new ArrayList<>();
+            for (int t = 0; t < 2; t++) {
+                List<CompletableFuture<JsonNode>> mine = new ArrayList<>();
+                results.add(mine);
+                int base = t * 1_000;
+                Thread sender = new Thread(() -> {
+                    for (int i = 0; i < perThread; i++) {
+                        mine.add(connection.send("Runtime.evaluate", Map.of("n", base + i)));
+                    }
+                });
+                senders.add(sender);
+                sender.start();
+            }
+            for (Thread sender : senders) {
+                sender.join(2_000);
+            }
+
+            for (int t = 0; t < 2; t++) {
+                for (int i = 0; i < perThread; i++) {
+                    assertThat(results.get(t)
+                                    .get(i)
+                                    .get(2, TimeUnit.SECONDS)
+                                    .path("n")
+                                    .asInt())
+                            .isEqualTo(t * 1_000 + i);
+                }
+            }
+        }
+    }
+
+    @Test
+    @DisplayName("사건 처리기가 막혀 있어도 명령 응답은 오고, 처리기는 읽는 스레드가 아닌 한 스레드에서 차례대로 불린다")
+    void answersCommandsWhileEventHandlerBlocks() throws Exception {
+        CountDownLatch entered = new CountDownLatch(1);
+        CountDownLatch release = new CountDownLatch(1);
+        BlockingQueue<String> handled = new LinkedBlockingQueue<>();
+        AtomicReference<String> firstThread = new AtomicReference<>();
+        AtomicInteger otherThreads = new AtomicInteger();
+        Consumer<CdpEvent> events = event -> {
+            String name = Thread.currentThread().getName();
+            if (!firstThread.compareAndSet(null, name) && !firstThread.get().equals(name)) {
+                otherThreads.incrementAndGet();
+            }
+            handled.add(event.method());
+            if (event.method().equals("Page.first")) {
+                entered.countDown();
+                try {
+                    release.await(5, TimeUnit.SECONDS);
+                } catch (InterruptedException ex) {
+                    Thread.currentThread().interrupt();
+                }
+            }
+        };
+        try (CdpConnection connection = connect(events, () -> {})) {
+            server.sendText("{\"method\":\"Page.first\"}");
+            assertThat(entered.await(2, TimeUnit.SECONDS)).isTrue();
+            server.sendText("{\"method\":\"Page.second\"}");
+            CompletableFuture<JsonNode> result = connection.send("Page.enable", Map.of());
+            JsonNode sent = server.nextMessage();
+
+            server.sendText("{\"id\":" + sent.path("id").asLong() + ",\"result\":{\"ok\":true}}");
+
+            assertThat(result.get(2, TimeUnit.SECONDS).path("ok").asBoolean()).isTrue();
+            release.countDown();
+            assertThat(handled.poll(2, TimeUnit.SECONDS)).isEqualTo("Page.first");
+            assertThat(handled.poll(2, TimeUnit.SECONDS)).isEqualTo("Page.second");
+            assertThat(firstThread.get()).startsWith("cdp-events-");
+            assertThat(otherThreads.get()).isZero();
+        }
+    }
+
+    @Test
+    @DisplayName("붙는 중에 끊기면 늦게 열린 소켓을 닫고 사건과 닫힘 알림을 부르지 않는다")
+    void abortsLateSocketAfterInterruptedConnect() throws Exception {
+        CountDownLatch gate = new CountDownLatch(1);
+        BlockingQueue<CdpEvent> events = new LinkedBlockingQueue<>();
+        CountDownLatch closed = new CountDownLatch(1);
+        AtomicReference<Throwable> failure = new AtomicReference<>();
+        server.acceptAsync(gate);
+        Thread caller = new Thread(() -> {
+            try {
+                connector.connect(server.address(), TARGET, events::add, closed::countDown);
+            } catch (RuntimeException ex) {
+                failure.set(ex);
+            }
+        });
+        caller.start();
+        assertThat(server.awaitConnected()).isTrue();
+
+        caller.interrupt();
+        caller.join(2_000);
+        gate.countDown();
+
+        assertThat(failure.get()).isInstanceOf(IllegalStateException.class);
+        assertThat(server.awaitDisconnected()).isTrue();
+        assertThat(events.poll(300, TimeUnit.MILLISECONDS)).isNull();
+        assertThat(closed.getCount()).isEqualTo(1);
+    }
+
+    @Test
     @DisplayName("대상 번호가 영문자와 숫자가 아니면 붙지 않고 거절한다")
     void rejectsMalformedTargetId() {
         URI cdp = server.address();
@@ -168,6 +325,8 @@ class WebSocketCdpConnectorTest {
         private final ServerSocket server;
         private final BlockingQueue<JsonNode> received = new LinkedBlockingQueue<>();
         private final List<String> headers = new ArrayList<>();
+        private final CountDownLatch connected = new CountDownLatch(1);
+        private final CountDownLatch disconnected = new CountDownLatch(1);
         private volatile Socket socket;
         private volatile Thread reader;
 
@@ -180,15 +339,28 @@ class WebSocketCdpConnectorTest {
         }
 
         CompletableFuture<Void> acceptAsync() {
+            return acceptAsync(new CountDownLatch(0));
+        }
+
+        /** 연결을 받은 뒤 {@code gate} 가 열릴 때까지 핸드셰이크 응답을 미룬다. 응답한 뒤에는 사건 하나를 보낸다. */
+        CompletableFuture<Void> acceptAsync(CountDownLatch gate) {
             CompletableFuture<Void> accepted = new CompletableFuture<>();
+            boolean delayed = gate.getCount() > 0;
             Thread thread = new Thread(() -> {
                 try {
                     socket = server.accept();
+                    connected.countDown();
+                    gate.await(5, TimeUnit.SECONDS);
                     handshake();
                     accepted.complete(null);
+                    if (delayed) {
+                        sendText("{\"method\":\"Page.late\"}");
+                    }
                     readFrames();
-                } catch (IOException | RuntimeException ex) {
+                } catch (IOException | RuntimeException | InterruptedException ex) {
                     accepted.completeExceptionally(ex);
+                } finally {
+                    disconnected.countDown();
                 }
             });
             thread.setDaemon(true);
@@ -203,6 +375,15 @@ class WebSocketCdpConnectorTest {
 
         List<String> headers() {
             return headers;
+        }
+
+        boolean awaitConnected() throws InterruptedException {
+            return connected.await(2, TimeUnit.SECONDS);
+        }
+
+        /** 상대가 연결을 닫아 읽기를 마칠 때까지 기다린다. */
+        boolean awaitDisconnected() throws InterruptedException {
+            return disconnected.await(2, TimeUnit.SECONDS);
         }
 
         JsonNode nextMessage() throws InterruptedException {

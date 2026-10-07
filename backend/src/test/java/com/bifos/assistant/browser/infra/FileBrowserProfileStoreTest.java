@@ -9,6 +9,13 @@ import java.nio.file.LinkOption;
 import java.nio.file.Path;
 import java.nio.file.attribute.PosixFilePermissions;
 import java.time.Duration;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.CyclicBarrier;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -103,6 +110,44 @@ class FileBrowserProfileStoreTest {
         store.ensure(KEY);
 
         assertThat(outside.resolve("target")).hasContent("keep");
+    }
+
+    @Test
+    @DisplayName("Default 자리가 링크면 만들기를 거절하고 링크가 가리키는 곳에 쓰지 않는다")
+    void doesNotWriteThroughLinkedDefault() throws Exception {
+        Path outside = Files.createDirectories(temp.resolve("outside"));
+        Files.createDirectories(root.resolve(KEY));
+        Files.createSymbolicLink(root.resolve(KEY).resolve("Default"), outside);
+
+        assertThatThrownBy(() -> store.ensure(KEY)).isInstanceOf(IllegalStateException.class);
+
+        assertThat(outside.resolve("Preferences")).doesNotExist();
+    }
+
+    @Test
+    @DisplayName("같은 프로필을 동시에 만들어도 모두 성공하고 설정 파일은 하나다")
+    void ensuresConcurrently() throws Exception {
+        int threads = 8;
+        ExecutorService pool = Executors.newFixedThreadPool(threads);
+        try {
+            CyclicBarrier start = new CyclicBarrier(threads);
+            List<Future<?>> results = new ArrayList<>();
+            for (int i = 0; i < threads; i++) {
+                results.add(pool.submit(() -> {
+                    start.await(5, TimeUnit.SECONDS);
+                    store.ensure(KEY);
+                    return null;
+                }));
+            }
+            for (Future<?> result : results) {
+                result.get(5, TimeUnit.SECONDS);
+            }
+        } finally {
+            pool.shutdownNow();
+        }
+
+        assertThat(root.resolve(KEY).resolve("Default/Preferences"))
+                .hasContent("{\"session\":{\"restore_on_startup\":1}}");
     }
 
     @Test
