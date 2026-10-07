@@ -43,7 +43,8 @@
 | | `EXECUTION_SUCCEEDED` | `done` |
 | | `DISMISSED` | `drop` |
 | Memory 제안(`memory:<번호>`) | `SURFACED` | `MemoryService.proposeUser` 나 `memory_remember` 의 `MemoryCaptureService.remember` 가 새 제안을 저장했을 때. 바로 저장한 기억은 사용자 본인의 말이라 제안이 아니고 남기지 않는다 |
-| | `ACCEPTED`, `REJECTED` | `PROPOSED` 줄의 `accept`, `reject`. 사용자가 대화에서 같은 사실을 직접 말해 `memory_remember` 가 제안을 받아들인 것도 `ACCEPTED` 다. 되돌리기로 제안 상태로 돌아간 것은 남기지 않는다 |
+| | `ACCEPTED`, `REJECTED` | `PROPOSED` 줄의 `accept`, `reject`. 사용자가 대화에서 같은 사실을 직접 말해 `memory_remember` 가 제안을 받아들인 것도 `ACCEPTED` 다 |
+| | `DISMISSED` | 사용자가 그 `memory_remember` 기록을 되돌려 제안 상태로 돌아갔을 때. `reason_code` 는 `MEMORY_UNDO` 다. 받아들임을 무른 마지막 결정이다 |
 | 승인 줄(`connector_action:<공개 식별자>`) | `SURFACED` | 정책 판정이 `PENDING` 줄을 저장했을 때. 살펴보기 트리면 `source_check_id` 를 채운다 |
 | | `APPROVED` | `approve`. 누른 때 이미 만료됐거나 그 뒤 실행하지 못하고 끝나도 사용자의 반응이라 남긴다 |
 | | `REJECTED` | `reject` |
@@ -94,7 +95,8 @@
 - 거절은 그 제안 하나에 대한 일회성 반응이다. 같은 주제가 여러 번 거절돼도 읽기 모델은 오래 가는 선호를 만들지 않는다
 - 지금 화면의 숨기기는 상태가 바뀔 때까지만 가리므로 거절이 아니라 미루기로 읽는다. 숨긴 뒤 받아들이면 `ACCEPTED` 다
 - 첫 반응을 나중 사건이 덮지 않는다. 받아들인 뒤 그만둔 할 일은 `ACCEPTED` 이고 그만둠은 사건으로만 남는다
-- `persistentPreference` 는 사용자가 받아들인 사건이 있는 Memory 제안만 참이다. 오래 가는 선호는 Memory 에만 남는다([ADR-012](../adr/ADR-012-memory-는-사람이-승인한-것만-남는다.md), [ADR-20261007 / memory-remember](../adr/ADR-20261007-memory-remember.md))
+- `persistentPreference` 는 사용자의 마지막 결정(받아들임, 거절, 되돌림)이 받아들임인 Memory 제안만 참이다. 첫 반응은 그대로 `ACCEPTED` 로 읽되, 받아들인 뒤 되돌리거나 거절했으면 오래 가는 선호가 아니다. 오래 가는 선호는 Memory 에만 남는다([ADR-012](../adr/ADR-012-memory-는-사람이-승인한-것만-남는다.md), [ADR-20261007 / memory-remember](../adr/ADR-20261007-memory-remember.md))
+- 규칙 버전 2 에서 `persistentPreference` 를 마지막 결정 기준으로 바꿨다. 버전 1 은 받아들인 사건이 하나라도 있으면 참이었다
 - 에이전트와 시스템의 사건은 사용자 반응이 아니다
 
 ## replay 읽기 모델
