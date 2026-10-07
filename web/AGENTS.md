@@ -174,7 +174,9 @@ CI shard마다 웹 서버, Control Plane, H2 DB와 임시 파일을 따로 만�
 CI는 전체 shard 검사 뒤 새 spec과 수정 spec을 재시도 없이 3회 반복한다.
 공통 fixture, 프레임워크 설정이나 화면 틀을 바꾸거나 매일 실행할 때는 `browser-stability.mjs`의 공유 상태 회귀 묶음도 반복한다.
 한 번이라도 실패하면 `browser-mobile` 또는 `browser-desktop` 필수 검사가 실패한다.
+반복 단계는 앞 단계의 데이터에 기대지 않도록 서버와 DB를 새로 띄운다. 빌드와 기동 시간이 한 번 더 들므로 PR에 반복 단계의 실제 소요 시간을 적는다.
 로컬에서도 관련 spec에 `--repeat-each=3 --retries=0`을 주어 반복과 두 폭을 확인한다.
+인자는 `persona.spec.ts`처럼 확장자까지 쓴다. Playwright는 전체 경로를 정규식으로 비교하므로 `persona`처럼 줄이면 작업 폴더 이름까지 매칭할 수 있다.
 
 App Router는 Next.js가 묶어 넣은 React를 쓴다. `package.json`의 React만 올렸다고 런타임 결함이 고쳐졌다고 판단하지 않는다.
 서버가 답했는데 화면 갱신이 멎으면 빌드한 서버에서 재현하고, 응답 도착과 화면 반영을 나눠 확인한다.
