@@ -293,9 +293,7 @@ test("끄기를 고른 채 끄기를 받지 않는 모델로 바꾸면 effort �
 
   await modelSelect(page).selectOption({ label: "example-deep" });
   await expect(effortSelect(page)).toHaveValue("");
-  await expect(effortSelect(page).locator("option:checked")).toHaveText(
-    "기본",
-  );
+  await expect(effortSelect(page).locator("option:checked")).toHaveText("기본");
   await dialog(page).getByRole("button", { name: "적용" }).click();
 
   await expect(page).toHaveURL(CONVERSATION_URL);
