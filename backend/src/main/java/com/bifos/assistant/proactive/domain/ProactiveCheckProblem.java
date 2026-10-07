@@ -17,6 +17,8 @@ import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.experimental.Accessors;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 /**
  * 살펴보기 결과 버전 3의 문제 후보 하나다(ADR-093).
@@ -93,6 +95,7 @@ public class ProactiveCheckProblem {
 
     /** 근거로 받아들인 발견의 참조. 근거가 없으면 빈 목록이다. */
     @Convert(converter = ProblemEvidenceJsonConverter.class)
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "evidence_json", nullable = false, columnDefinition = "JSON")
     private List<ProblemEvidence> evidence;
 
