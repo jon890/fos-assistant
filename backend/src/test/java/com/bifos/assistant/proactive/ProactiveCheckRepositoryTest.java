@@ -11,6 +11,7 @@ import com.bifos.assistant.proactive.domain.CheckReport;
 import com.bifos.assistant.proactive.domain.ProactiveCheck;
 import com.bifos.assistant.proactive.domain.ProactiveCheckFinding;
 import com.bifos.assistant.proactive.domain.type.CheckOutcome;
+import com.bifos.assistant.proactive.domain.type.CheckSkippedReason;
 import com.bifos.assistant.proactive.domain.type.CheckStatus;
 import com.bifos.assistant.proactive.domain.type.CheckTrigger;
 import com.bifos.assistant.proactive.domain.type.FindingKind;
@@ -157,18 +158,24 @@ class ProactiveCheckRepositoryTest {
     }
 
     @Test
-    @DisplayName("지난 살펴보기는 그 대화에서 넘긴 상태가 아닌 마지막 줄이다")
+    @DisplayName("지난 살펴보기는 그 대화에서 넘긴 상태가 아니고 모델 없이 건너뛰지 않은 마지막 줄이다")
     void findsLastCheckOfConversationWhoseStatusIsNotGiven() {
         ProactiveCheck finished = saveCheck(CONVERSATION, "session-a", 11L);
         transactions.executeWithoutResult(status -> {
             ProactiveCheck row = checks.findById(finished.id()).orElseThrow();
             row.succeed(CheckOutcome.NOTHING_NEW, 0, 0, null, 2, 0, 0, 0, 0, NOW.plusSeconds(60));
         });
+        ProactiveCheck skipped = saveCheck(CONVERSATION, null, null);
+        transactions.executeWithoutResult(status -> {
+            ProactiveCheck row = checks.findById(skipped.id()).orElseThrow();
+            row.skip(CheckSkippedReason.UNREAD_REPORT, NOW.plusSeconds(120));
+        });
         saveCheck(CONVERSATION, "session-a", 12L);
         saveCheck(OTHER_CONVERSATION, "session-a", 13L);
 
         Optional<ProactiveCheck> last = transactions.execute(
-                status -> checks.findFirstByConversationIdAndStatusNotOrderByIdDesc(CONVERSATION, CheckStatus.RUNNING));
+                status -> checks.findFirstByConversationIdAndStatusNotAndSkippedReasonIsNullOrderByIdDesc(
+                        CONVERSATION, CheckStatus.RUNNING));
 
         assertThat(last).map(ProactiveCheck::id).contains(finished.id());
         assertThat(last.orElseThrow().outcome()).isEqualTo(CheckOutcome.NOTHING_NEW);
@@ -249,7 +256,7 @@ class ProactiveCheckRepositoryTest {
         return saved;
     }
 
-    private ProactiveCheck saveCheck(long conversationId, String rootSessionId, long rootExecutionId) {
+    private ProactiveCheck saveCheck(long conversationId, String rootSessionId, Long rootExecutionId) {
         ProactiveCheck check = ProactiveCheck.started(USER, AGENT, conversationId, CheckTrigger.MANUAL, false, NOW);
         check.attachRoot(rootExecutionId, rootSessionId);
         return transactions.execute(status -> checks.save(check));

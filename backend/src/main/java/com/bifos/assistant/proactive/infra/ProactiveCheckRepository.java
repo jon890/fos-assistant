@@ -24,6 +24,10 @@ public interface ProactiveCheckRepository extends JpaRepository<ProactiveCheck, 
 
     List<ProactiveCheck> findByUserIdAndReportIsNotNullAndReportOpenedAtIsNullOrderByStartedAtDesc(Long userId);
 
+    /** 그 사용자가 그 점검 대화에서 아직 열지 않은 보고. 점검 대화를 읽으면 모두 연 것으로 적는다. */
+    List<ProactiveCheck> findByUserIdAndConversationIdAndReportIsNotNullAndReportOpenedAtIsNull(
+            Long userId, Long conversationId);
+
     /** 그 실행 줄이 살펴보기 turn 인지. 살펴보기 트리를 가리는 데 쓴다. */
     boolean existsByRootExecutionId(Long rootExecutionId);
 
@@ -35,7 +39,10 @@ public interface ProactiveCheckRepository extends JpaRepository<ProactiveCheck, 
     /** 그 상태의 살펴보기. 기동할 때 {@code RUNNING} 으로 남은 줄을 찾는다. */
     List<ProactiveCheck> findByStatus(CheckStatus status);
 
-    /** 그 점검 대화에서 그 상태가 아닌 마지막 살펴보기. 변화 신호의 「지난 살펴보기」 를 읽는다. */
-    Optional<ProactiveCheck> findFirstByConversationIdAndStatusNotOrderByIdDesc(
+    /**
+     * 그 점검 대화에서 그 상태가 아니고 모델을 부른 마지막 살펴보기. 변화 신호의 「지난 살펴보기」 를 읽는다. 모델 없이 건너뛴 줄은 지난
+     * 결과도 루트 실행도 없으므로 뺀다.
+     */
+    Optional<ProactiveCheck> findFirstByConversationIdAndStatusNotAndSkippedReasonIsNullOrderByIdDesc(
             Long conversationId, CheckStatus status);
 }

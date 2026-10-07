@@ -310,8 +310,12 @@ test("새 보고는 다섯 칸 카드로 보이고 열면 점검 대화로 간�
     );
     expect(previousResponse.ok()).toBeTruthy();
     const { lastCheck: previousCheck } = await previousResponse.json();
-    await section(page).getByRole("button", { name: "지금 살펴보기" }).click();
-    await expect(page).toHaveURL(CONVERSATION_URL);
+    // 점검 대화를 열어 두면 그 화면이 메시지를 다시 읽을 때 보고를 연 것으로 기록돼 카드가 사라진다.
+    // 카드를 보려고 단추 대신 API 로 시작하고 점검 대화는 열지 않는다.
+    const started = await page.request.post(
+      `/api/agents/${AGENT_CODE}/proactive-check/runs`,
+    );
+    expect(started.status()).toBe(202);
     // 시작 응답은 202 다. 보고를 저장하기 전에 지금 화면을 열면 빈 응답을 한 번 읽고 검사가 끝난다.
     await expect
       .poll(async () => {

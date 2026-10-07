@@ -32,7 +32,7 @@
 | `tree_cached_input_tokens` | BIGINT NULL | 같은 트리의 캐시 입력 토큰 합계 |
 | `tree_output_tokens` | BIGINT NULL | 같은 트리의 출력 토큰 합계 |
 | `skipped_reason` | VARCHAR(32) NULL | 모델 없이 끝낸 까닭. 지금은 `UNREAD_REPORT` 를 쓴다 |
-| `report_opened_at` | DATETIME(6) NULL | 요청자가 보고를 연 시각 |
+| `report_opened_at` | DATETIME(6) NULL | 요청자가 보고를 연 시각. 「보고 열기」 나 점검 대화를 처음 읽거나 그 대화에 메시지를 보낸 때다 |
 | `started_at` | DATETIME(6) | |
 | `finished_at` | DATETIME(6) NULL | 끝나면 채운다 |
 
