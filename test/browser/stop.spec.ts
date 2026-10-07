@@ -141,6 +141,7 @@ test("중지에 마우스를 올려 풀이가 열려 있어도 첫 Esc 로 답�
 
 test("닫히는 중인 풀이가 남아 있어도 Esc 로 답을 중지한다", async ({ page, hermes }, testInfo) => {
   test.skip(testInfo.project.name !== "desktop", "마우스를 올려 여는 풀이는 넓은 화면에서만 확인한다");
+  await page.emulateMedia({ reducedMotion: "no-preference" });
   await hermes.holdNextRun();
   await beginHeldTurn(page, "닫히는 풀이 Esc 검사");
   await hermes.waitForHeldRun();

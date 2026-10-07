@@ -1,41 +1,50 @@
 import { parseRgb } from "./color.ts";
-import { CONVERSATION_URL, expect, test, SWITCH_AGENT_CODE } from "./fixtures.ts";
+import { CONVERSATION_URL, expect, test, setSession, SWITCH_AGENT_CODE } from "./fixtures.ts";
 
 test("mobile에서 입력창을 유지하고 대화 목록을 서랍으로 쓴다", async ({
-  page,
+  page, context, isolatedMember,
 }, testInfo) => {
   test.skip(testInfo.project.name !== "mobile");
-  await page.goto("/");
+  await setSession(context, isolatedMember);
+  const created = await page.request.post("/api/agents", { data: { name: "대화 검사 비서" } });
+  expect(created.status()).toBe(201);
+  const agent = await created.json() as { code: string };
+  try {
+    await page.goto("/");
 
-  for (let index = 1; index <= 10; index += 1) {
-    const response = await page.request.post("/api/chat", {
-      data: { text: `모바일 대화 ${index}`, agentCode: "browser" },
-    });
-    expect(response.ok()).toBeTruthy();
+    for (let index = 1; index <= 10; index += 1) {
+      const response = await page.request.post("/api/chat", {
+        data: { text: `모바일 대화 ${index}`, agentCode: agent.code },
+      });
+      expect(response.ok()).toBeTruthy();
+    }
+    await page.reload();
+
+    const composer = page.getByRole("textbox", { name: "메시지" });
+    const box = await composer.boundingBox();
+    expect(box).not.toBeNull();
+    expect((box?.y ?? 0) + (box?.height ?? 0)).toBeLessThanOrEqual(844);
+
+    await page.getByRole("button", { name: "사이드바 열기" }).click();
+    const drawer = page.getByRole("complementary", { name: "사이드바" });
+    await expect(drawer).toBeInViewport();
+    await drawer.getByRole("link", { name: /모바일 대화 5/ }).click();
+    await expect(page).toHaveURL(CONVERSATION_URL);
+    await expect(drawer).toBeHidden();
+
+    await page.getByRole("button", { name: "사이드바 열기" }).click();
+    await page.getByRole("button", { name: "사이드바 닫기" }).click();
+    await expect(drawer).toBeHidden();
+
+    // 서랍 오른쪽 바깥의 덮개를 눌러도 닫힌다.
+    await page.getByRole("button", { name: "사이드바 열기" }).click();
+    await expect(drawer).toBeInViewport();
+    await page.mouse.click(370, 400);
+    await expect(drawer).toBeHidden();
+  } finally {
+    const removed = await page.request.delete(`/api/agents/${agent.code}`);
+    expect(removed.status()).toBe(204);
   }
-  await page.reload();
-
-  const composer = page.getByRole("textbox", { name: "메시지" });
-  const box = await composer.boundingBox();
-  expect(box).not.toBeNull();
-  expect((box?.y ?? 0) + (box?.height ?? 0)).toBeLessThanOrEqual(844);
-
-  await page.getByRole("button", { name: "사이드바 열기" }).click();
-  const drawer = page.getByRole("complementary", { name: "사이드바" });
-  await expect(drawer).toBeInViewport();
-  await drawer.getByRole("link", { name: /모바일 대화 5/ }).click();
-  await expect(page).toHaveURL(CONVERSATION_URL);
-  await expect(drawer).toBeHidden();
-
-  await page.getByRole("button", { name: "사이드바 열기" }).click();
-  await page.getByRole("button", { name: "사이드바 닫기" }).click();
-  await expect(drawer).toBeHidden();
-
-  // 서랍 오른쪽 바깥의 덮개를 눌러도 닫힌다.
-  await page.getByRole("button", { name: "사이드바 열기" }).click();
-  await expect(drawer).toBeInViewport();
-  await page.mouse.click(370, 400);
-  await expect(drawer).toBeHidden();
 });
 
 test("desktop에서 대화 목록을 고정 칸으로 보인다", async ({
@@ -205,24 +214,22 @@ test("코드 블록의 역할별 색을 밝음과 어두움에서 구분한다",
   }
 
   async function colors(dark: boolean) {
-    await page
-      .locator("html")
-      .evaluate(
-        (html, enabled) => html.classList.toggle("dark", enabled),
-        dark,
+    const tokens = await page.locator("html").evaluate((html, { enabled, names }) => {
+      html.classList.toggle("dark", enabled);
+      const styles = getComputedStyle(html);
+      return Object.fromEntries(names.map((name) => [name, styles.getPropertyValue(`--code-${name}`).trim()]));
+    }, { enabled: dark, names: classes });
+    // 줄인 움직임에도 색 전환은 남는다. 시작 색을 읽지 않고 해당 모드의 토큰까지 기다린다.
+    for (const name of classes) {
+      await expect(page.locator(`.text-code-${name}`).first()).toHaveCSS(
+        "color", `rgb(${parseRgb(tokens[name]).join(", ")})`,
       );
-    return page.evaluate(
-      (names) =>
-        Object.fromEntries(
-          names.map((name) => {
-            const element = document.querySelector(`.text-code-${name}`);
-            return [name, element ? getComputedStyle(element).color : null];
-          }),
-        ),
-      classes,
-    );
+    }
+    return page.evaluate((names) => Object.fromEntries(names.map((name) => {
+      const element = document.querySelector(`.text-code-${name}`);
+      return [name, element ? getComputedStyle(element).color : null];
+    })), classes);
   }
-
   const light = await colors(false);
   const dark = await colors(true);
   expect(new Set(Object.values(light)).size).toBe(classes.length);

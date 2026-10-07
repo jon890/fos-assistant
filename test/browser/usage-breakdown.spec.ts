@@ -28,8 +28,13 @@ async function controlPlaneToken(): Promise<string> {
 
 /** 이번 달 1일의 이른 시각이다. 달 경계를 넘지 않아 어느 날 돌려도 이번 달 합계에 들어간다. */
 function thisMonthAt(hour: number): string {
-  const now = new Date();
-  return new Date(now.getFullYear(), now.getMonth(), 1, hour, 0, 0).toISOString();
+  // 러너의 시간대가 UTC여도 집계가 쓰는 서울 달력의 첫날에 넣는다.
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Seoul", year: "numeric", month: "2-digit",
+  }).formatToParts(new Date());
+  const year = parts.find((part) => part.type === "year")!.value;
+  const month = parts.find((part) => part.type === "month")!.value;
+  return new Date(`${year}-${month}-01T${String(hour).padStart(2, "0")}:00:00+09:00`).toISOString();
 }
 
 async function replaceExecutions(page: Page, seeds: Seed[]): Promise<void> {

@@ -50,7 +50,13 @@ function subscribeNothing(): () => void {
  *
  * <p>넓은 화면은 메뉴가 왼쪽에 세로로 서고, 좁은 화면은 머리 아래에서 가로로 밀리는 한 줄이다.
  */
-export function AdminShell({ children }: { children: React.ReactNode }) {
+export function AdminShell({
+  children,
+  ready,
+}: {
+  children: React.ReactNode;
+  ready: boolean;
+}) {
   const pathname = usePathname();
   const backHref = useSyncExternalStore(
     subscribeNothing,
@@ -97,7 +103,10 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
             );
           })}
         </nav>
-        <main className="mx-auto min-h-0 w-full min-w-0 flex-1 overflow-y-auto px-4 py-5">
+        <main
+          aria-busy={!ready}
+          className="mx-auto min-h-0 w-full min-w-0 flex-1 overflow-y-auto px-4 py-5"
+        >
           <ScreenTransition>{children}</ScreenTransition>
         </main>
       </div>
