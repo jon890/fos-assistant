@@ -1,5 +1,5 @@
 import { conversationIdOf, expect, test } from "./fixtures.ts";
-import { cleanupMemories, createMemory, memoryRow, openRow, reloadMemoryLists } from "./memory-page.ts";
+import { cleanupMemories, confirmDelete, createMemory, memoryRow, openRow, reloadMemoryLists } from "./memory-page.ts";
 import type { Locator, Page, TestInfo } from "../../web/node_modules/@playwright/test/index.js";
 
 // 움직임 자체를 검사하므로 공통 fixture의 움직임 줄이기를 여기서는 쓰지 않는다.
@@ -337,8 +337,7 @@ test("새 기억은 등장 움직임을 갖고 지운 기억은 나가는 움직
   expect((await animationOf(item)).name, "처음부터 있던 기억").toBe("none");
 
   await openRow(page, title);
-  await item.getByRole("button", { name: "지우기" }).click();
-  await page.getByRole("alertdialog").getByRole("button", { name: "지우기" }).click();
+  await confirmDelete(page, title);
   await expect(item).toHaveCount(0);
   expect((await leavingSeen(page)).length, "사라지기 전에 data-leaving 이 붙은 기억 수").toBe(1);
 });

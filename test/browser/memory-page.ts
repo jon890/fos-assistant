@@ -17,6 +17,19 @@ export async function openRow(page: Page, title: string) {
   await expect(toggle).toHaveAttribute("aria-expanded", "true");
 }
 
+/**
+ * 펼친 줄의 「지우기」 를 누르고 확인 창에서 지운다. 지우기 요청이 끝나고 확인 창이 닫힐 때까지 기다린다.
+ *
+ * <p>확인 창이 열린 동안에는 나머지 화면이 접근성 트리에서 빠진다. 닫히기 전에 줄 수를 세면 지우지 않은 줄도 0 으로 센다.
+ */
+export async function confirmDelete(page: Page, title: string) {
+  const removed = page.waitForResponse((response) => response.request().method() === "DELETE");
+  await memoryRow(page, title).getByRole("button", { name: "지우기" }).click();
+  await page.getByRole("alertdialog").getByRole("button", { name: "지우기" }).click();
+  await removed;
+  await expect(page.getByRole("alertdialog")).toHaveCount(0);
+}
+
 export async function createMemory(
   page: Page,
   input: { scope: "USER" | "GROUP"; title: string; content: string; alwaysInject?: boolean },

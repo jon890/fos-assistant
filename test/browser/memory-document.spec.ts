@@ -1,6 +1,7 @@
 import { expect, test } from "./fixtures.ts";
 import {
   cleanupMemories,
+  confirmDelete,
   createDocument,
   expectNoHorizontalOverflow,
   memoryRow,
@@ -43,7 +44,9 @@ test("문서 탭에서 민감 문서를 눌러 열고 고치고 지운다", asyn
     await openRow(page, title);
     await memoryRow(page, title).getByRole("button", { name: "지우기" }).click();
     await expect(page.getByText("이 문서를 지울까요?")).toBeVisible();
-    await page.getByRole("alertdialog").getByRole("button", { name: "지우기" }).click();
+    await page.getByRole("alertdialog").getByRole("button", { name: "취소" }).click();
+    await expect(page.getByRole("alertdialog")).toHaveCount(0);
+    await confirmDelete(page, title);
     await expect(memoryRow(page, title)).toHaveCount(0);
   } finally {
     await cleanupMemories(page, [title]);

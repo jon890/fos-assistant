@@ -3,6 +3,7 @@ import { expect, setSession, test } from "./fixtures.ts";
 import { TEST_EMAIL } from "./settings.ts";
 import {
   cleanupMemories,
+  confirmDelete,
   createMemory,
   expectNoHorizontalOverflow,
   memoryRow,
@@ -81,10 +82,10 @@ test("목록에서 기억을 눌러 열고 고치고 지운다", async ({ page }
     const dialog = page.getByRole("alertdialog");
     await expect(dialog.getByText("이 기억을 지울까요?")).toBeVisible();
     await dialog.getByRole("button", { name: "취소" }).click();
+    await expect(page.getByRole("alertdialog")).toHaveCount(0);
     await expect(row).toBeVisible();
 
-    await row.getByRole("button", { name: "지우기" }).click();
-    await page.getByRole("alertdialog").getByRole("button", { name: "지우기" }).click();
+    await confirmDelete(page, title);
     await expect(memoryRow(page, title)).toHaveCount(0);
   } finally {
     await cleanupMemories(page, [title]);
@@ -171,7 +172,7 @@ test("제안을 거절하면 제안 절과 머리의 미처리 수가 사라진�
   await showStubMemories(page, () => state);
   await expect(page.getByTestId("memory-proposal-count")).toHaveText("1");
   await openRow(page, "거절할 제안");
-  await page.getByRole("button", { name: "거절" }).click();
+  await page.getByRole("button", { name: "거절", exact: true }).click();
   await expect(page.getByRole("heading", { name: "검토할 기억" })).toHaveCount(0);
   await expect(page.getByTestId("memory-proposal-count")).toHaveCount(0);
 });

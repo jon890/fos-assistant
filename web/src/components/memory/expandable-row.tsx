@@ -31,7 +31,8 @@ export function ExpandableRow({
   tone?: "plain" | "review";
   children: React.ReactNode;
 }) {
-  const panelId = useId();
+  const id = useId();
+  const panelId = `${id}-panel`;
   return (
     <li
       data-leaving={leaving || undefined}
@@ -47,14 +48,23 @@ export function ExpandableRow({
           type="button"
           aria-expanded={open}
           aria-controls={panelId}
+          // 줄 이름은 제목만이다. 짧은 표시는 설명으로 읽힌다.
+          aria-labelledby={`${id}-title`}
+          aria-describedby={`${id}-meta`}
           onClick={onToggle}
           className="flex w-full items-start gap-3 px-4 py-3 text-left transition-colors duration-fast ease-out outline-none hover:bg-muted focus-visible:ring-3 focus-visible:ring-inset focus-visible:ring-ring/50"
         >
           <span className="min-w-0 flex-1">
-            <span className="line-clamp-2 break-words font-semibold">
+            <span
+              id={`${id}-title`}
+              className="line-clamp-2 break-words font-semibold"
+            >
               {title}
             </span>
-            <span className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
+            <span
+              id={`${id}-meta`}
+              className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground"
+            >
               {meta}
             </span>
           </span>
