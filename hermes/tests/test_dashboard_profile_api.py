@@ -1233,6 +1233,38 @@ class ProfileApiRouteTest(unittest.TestCase):
                     self.assertEqual(target.read_bytes(), original)
                     self.assertIs(self.policy_hook(), True)
 
+    def assert_profile_entrypoint_is_written_last(self, install):
+        """단일 파일 plugin 을 갱신할 때 진입점 교체 전에 하위 모듈이 모두 있어야 한다."""
+        installed = self.root / "alice/plugins/fos-ctx"
+        modules = {module.name for module in (self.profile_plugins / "fos-ctx").glob("*.py")}
+        modules.remove("__init__.py")
+        for name in modules:
+            (installed / name).unlink()
+        (installed / "__init__.py").write_bytes(b"# previous plugin\n")
+        original_write = self.plugin._atomic_private_write
+        written = []
+
+        def write(target, value):
+            if target.parent == installed:
+                if target.name == "__init__.py":
+                    self.assertTrue(all((installed / name).is_file() for name in modules))
+                written.append(target.name)
+            return original_write(target, value)
+
+        with patch_plugin(self.plugin, "_atomic_private_write", side_effect=write):
+            response = install()
+        self.assertEqual(response.status_code, 200)
+        self.assertIs(response.body["plugin_updated"], True)
+        self.assertEqual(written[-1], "__init__.py")
+
+    def test_connector_install_writes_profile_entrypoint_after_modules(self):
+        self.connector_fixture()
+        self.assert_profile_entrypoint_is_written_last(self.connector)
+
+    def test_binding_install_writes_profile_entrypoint_after_modules(self):
+        self.bind_fixture()
+        self.assert_profile_entrypoint_is_written_last(self.bind)
+
     def test_connector_install_restores_a_missing_profile_plugin(self):
         """profile 에 hook plugin 디렉터리가 없으면 설치가 묶음의 판으로 만든다."""
         self.connector_fixture()
