@@ -32,7 +32,7 @@ hermes/bundle.sh --out <디렉터리> --mcp-url <Control Plane MCP 주소>
 
 `--out` 은 없거나 비어 있는 디렉터리여야 하고, `--mcp-url` 은 `http://` 나 `https://` 로 시작해야 한다.
 묶음은 Hermes 의 `plugins/dashboard-profile-api/` 자리에 그대로 들어갈 모양이다.
-plugin 파일, 주소를 채운 `default-config.yaml.template`, 틀의 `plugins.enabled` 가 켜는 profile plugin 을 담은 `profile-plugins/<이름>/` 이다.
+plugin 디렉터리의 모든 `*.py` 와 `plugin.yaml`, 주소를 채운 `default-config.yaml.template`, 틀의 `plugins.enabled` 가 켜는 profile plugin 을 담은 `profile-plugins/<이름>/` 이다.
 틀의 MCP 주소 자리는 `__FOS_ASSISTANT_MCP_URL__` 이다. 주소를 주지 않거나 자리가 남으면 묶음을 만들지 않고 실패한다.
 묶음을 Hermes 에 넣고 대시보드를 다시 띄우는 것은 운영 저장소가 한다.
 디렉터리 배치와 배포 순서는 [`../docs/code-architecture.md`](../docs/code-architecture.md) 의 「Hermes 쪽 코드 (`hermes/`)」 절이 갖는다.

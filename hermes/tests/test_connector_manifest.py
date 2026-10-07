@@ -2,7 +2,6 @@
 
 import asyncio
 import hashlib
-import importlib.util
 import json
 import logging
 import os
@@ -13,6 +12,8 @@ import tempfile
 import types
 import unittest
 from unittest import mock
+
+from plugin_loading import load_plugin
 
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
@@ -69,9 +70,7 @@ class ConnectorGateCase(unittest.TestCase):
         seam.authenticate_token = lambda request: (
             (types.SimpleNamespace(provider="fos-profile-api"), None) if request.token == "valid" else (None, None)
         )
-        spec = importlib.util.spec_from_file_location("connector_gate_test", PLUGIN)
-        cls.plugin = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(cls.plugin)
+        cls.plugin = load_plugin("connector_gate_test", PLUGIN, cls.addClassCleanup)
         assert cls.plugin._install_gate()
         cls.gate = staticmethod(seam.token_auth_middleware)
 
