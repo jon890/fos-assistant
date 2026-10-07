@@ -40,6 +40,18 @@ public class ContextAssembler implements OmittedMemories {
             | --- | --- |
             | 예시 | 내용 |
             """.stripTrailing();
+    /**
+     * {@code memory_remember} 을 받는 에이전트에 싣는 기억 지침이다(ADR-20261007 / memory-remember). 기준과 예시는 도구 설명과 같은 뜻이다.
+     */
+    static final String MEMORY_INSTRUCTIONS = """
+            # 기억
+
+            사용자가 이번 메시지에서 자기에 관한 오래 쓰일 사실을 말하면 memory_remember 로 남긴다. 기억해 달라고 하지 않아도 남긴다.
+            남길 것은 가족 구성, 이름과 관계, 선호, 상황, 결정이다. 작업 기록, 한 번만 쓰일 요청, 대화 요약은 남기지 않는다.
+            evidence 에는 사용자 메시지의 구절을 그대로 넣는다. 이미 기억한 사실이 바뀌었으면 그 번호를 memory_id 로 주어 고친다.
+            도구 결과가 제안으로 남았다고 하면 사용자가 받아들여야 기억한다는 것을 답에서 알린다. 사용자가 기억해 달라고 했으면 기억했는지 답에서 알린다.
+            """.stripTrailing();
+
     private static final String INDEX_HEADER = """
             # 더 물어볼 수 있는 것
 
@@ -54,7 +66,17 @@ public class ContextAssembler implements OmittedMemories {
 
     /** Memory 예산과 관계없이 모든 에이전트 실행에 공통 답변 지침을 넣는다. */
     public AssembledContext withResponseInstructions(AssembledContext context) {
-        String instructions = RESPONSE_INSTRUCTIONS;
+        return withResponseInstructions(context, false);
+    }
+
+    /**
+     * 공통 답변 지침을 넣는다. {@code memory_remember} 를 받는 실행이면 기억 지침을 그 뒤에 더한다(ADR-20261007 / memory-remember).
+     *
+     * @param remembers Control Plane MCP 도구를 받고 먼저 살펴보기가 아닌 실행이다. 옛 커넥터 에이전트는 거짓이다
+     */
+    public AssembledContext withResponseInstructions(AssembledContext context, boolean remembers) {
+        String instructions =
+                remembers ? RESPONSE_INSTRUCTIONS + SEPARATOR + MEMORY_INSTRUCTIONS : RESPONSE_INSTRUCTIONS;
         if (context.instructions() != null && !context.instructions().isBlank()) {
             instructions += SEPARATOR + context.instructions();
         }

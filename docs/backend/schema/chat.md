@@ -1,6 +1,6 @@
 # 대화
 
-대화와 메시지, 대기 메시지, 사진 첨부, 결과물, 결과 전달 기록을 저장하는 표 여덟의 칸과 제약을 갖는다.
+대화와 메시지, 대기 메시지, 사진 첨부, 결과물, 결과 전달 기록, 실행과 질문의 연결을 저장하는 표 아홉의 칸과 제약을 갖는다.
 이 표들을 읽고 쓰는 경로는 [`backend/conversation.md`](../conversation.md) 와 그 옆의 문서들이 갖는다.
 
 ## conversation
@@ -226,3 +226,18 @@ turn 이 도는 동안 사용자가 보낸 메시지 하나가 한 행이다. �
 기동할 때 앞 프로세스가 남긴 `RUNNING` 시도를 `started_at` 으로 고르고, 기동 정리가 실행 줄을 적을 때 `execution_id` 로 찾는다.
 
 `execution_id` 와 `notice_message_id` 에는 외래 키를 두지 않는다. 그 줄이 지워져도 시도의 끝은 남는다.
+
+## execution_question
+
+사람이 보낸 대화 turn 의 실행과 그 질문 메시지를 잇는다. 한 실행이 한 줄이다.
+`memory_remember` 가 바로 저장할 수 있는 실행인지 이 줄로 판정한다([ADR-20261007 / memory-remember](../../adr/ADR-20261007-memory-remember.md)).
+
+| 칸 | 타입 | 뜻 |
+| --- | --- | --- |
+| `execution_id` | BIGINT | 기본 키. turn 의 루트 실행 |
+| `message_id` | BIGINT | 그 turn 의 질문(`USER` 메시지). 새 질문이면 방금 저장한 메시지, 다시 생성이면 이미 있던 질문 |
+| `created_at` | DATETIME(6) | |
+
+- 새 질문과 다시 생성의 실행에만 남긴다. 예약 작업, 먼저 살펴보기, 맡긴 일의 결과를 전하는 turn, 맡겨서 도는 실행은 줄이 없다
+- 외래 키를 걸지 않는다. 읽는 쪽(`TurnQuestions`)은 메시지가 없거나, `USER` 가 아니거나, 그 실행의 사용자가 보낸 것이 아니면 없는 줄로 본다
+- 줄을 남기지 못해도 turn 은 잇는다. 그 실행의 `memory_remember` 는 제안으로만 남는다

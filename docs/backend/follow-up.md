@@ -41,7 +41,7 @@ Control Plane MCP 서버가 `follow_up_propose` 를 둔다.
 | `due_at` | 문자열, 선택 | `2026-10-05` 나 `2026-10-05T18:00` 형식. 시간대가 없으면 `Asia/Seoul` 로 읽는다. 날짜만 주면 그날 23:59 다 |
 | `waiting` | 참거짓, 선택 | 기다리는 중이면 참 |
 
-도구 정의는 아래와 같다. `tools/list` 에서 Control Plane 도구 가운데 마지막이다.
+도구 정의는 아래와 같다. `tools/list` 에서 Control Plane 도구 가운데 일곱째이고 `memory_remember` 가 그 뒤에 온다.
 
 | 칸 | 값 |
 | --- | --- |

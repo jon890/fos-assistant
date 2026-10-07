@@ -12,7 +12,7 @@ Hermes 는 hook 이 돌려준 `args` 를 원래 인자에 얕게 병합하고 ho
 그래서 모델이 같은 키를 넣어도 이 값이 이긴다. hook 이 `None` 을 돌려주면 서명 없이 나가고,
 hook 이 예외를 던지면 호출이 막힌다.
 
-`agent_*` 와 `memory_read`, `artifact_write`, `follow_up_propose` 는 서명하지 못하면 막는다.
+`agent_*` 와 `memory_read`, `artifact_write`, `follow_up_propose`, `memory_remember` 는 서명하지 못하면 막는다.
 서버도 서명 없는 호출을 거절하지만, 여기서 막으면 모델이 받는 오류가 원인을 말한다.
 그 밖의 Control Plane 도구는 서명할 수 있으면 붙이고 없으면 원래 인자 그대로 보낸다.
 
@@ -110,7 +110,7 @@ TOOL_PREFIX = "mcp__fos_assistant__"
 KEY_NAME = "MCP_FOS_ASSISTANT_API_KEY"
 # 서명이 없으면 막는 도구다.
 REQUIRED_PREFIX = "agent_"
-REQUIRED_TOOLS = frozenset({"memory_read", "artifact_write", "follow_up_propose"})
+REQUIRED_TOOLS = frozenset({"memory_read", "artifact_write", "follow_up_propose", "memory_remember"})
 CTX_VERSION = 1
 # parent_session_id 사슬을 따라가는 한도다. 하위 에이전트와 압축 교체가 겹쳐도 이만큼 깊지 않다.
 MAX_DEPTH = 16

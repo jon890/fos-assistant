@@ -121,11 +121,11 @@ class McpFollowUpToolTest {
 
     @Test
     @DisplayName("도구 목록의 일곱째가 follow_up_propose 이고 title 만 필수이며 모르는 키를 받지 않는다")
-    void listsFollowUpProposeLast() throws Exception {
+    void listsFollowUpProposeSeventh() throws Exception {
         JsonNode listed = body(send("{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/list\"}"));
 
         JsonNode tools = listed.path("result").path("tools");
-        assertThat(tools).hasSize(7);
+        assertThat(tools).hasSize(8);
         JsonNode tool = tools.get(6);
         assertThat(tool.path("name").asString()).isEqualTo(TOOL);
         JsonNode schema = tool.path("inputSchema");

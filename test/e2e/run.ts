@@ -56,6 +56,7 @@ import { artifactScenario } from "./scenarios/artifact.ts";
 import { AGENT_TOOLS_PROFILE, agentToolsScenario } from "./scenarios/agent-tools.ts";
 import { MCP_PRINCIPAL_PROFILE, mcpPrincipalScenario } from "./scenarios/mcp-principal.ts";
 import { FOLLOW_UP_MCP_PROFILE, followUpMcpScenario } from "./scenarios/follow-up-mcp.ts";
+import { MEMORY_REMEMBER_MCP_PROFILE, memoryRememberMcpScenario } from "./scenarios/memory-remember-mcp.ts";
 import { agentLifecycleScenario } from "./scenarios/agent-lifecycle.ts";
 import { NATIVE_DELEGATION_PROFILE, nativeDelegationScenario } from "./scenarios/native-delegation-mcp.ts";
 import { DELEGATION_PROFILE, delegationScenario } from "./scenarios/delegation.ts";
@@ -125,6 +126,7 @@ const SCENARIOS: readonly Scenario[] = [
   artifactScenario,
   mcpPrincipalScenario,
   followUpMcpScenario,
+  memoryRememberMcpScenario,
   nativeDelegationScenario,
   agentToolsScenario,
   // 아이의 개인 에이전트와 꺼진 에이전트가 목록에서 빠지는 것을 보므로 그 둘을 만드는 시나리오 뒤에 둔다.
@@ -212,7 +214,7 @@ async function makeSkillRoot(work: string): Promise<string> {
 async function writeProfileKeys(work: string): Promise<string> {
   const keyDir = join(work, "keys");
   await mkdir(keyDir, { recursive: true });
-  for (const profileName of [DAD_BINDING.profileName, FLOW_BINDING.profileName, AGENT_TOOLS_PROFILE, MCP_PRINCIPAL_PROFILE, FOLLOW_UP_MCP_PROFILE, NATIVE_DELEGATION_PROFILE, DELEGATION_PROFILE, CHAT_QUEUE_PROFILE]) {
+  for (const profileName of [DAD_BINDING.profileName, FLOW_BINDING.profileName, AGENT_TOOLS_PROFILE, MCP_PRINCIPAL_PROFILE, FOLLOW_UP_MCP_PROFILE, MEMORY_REMEMBER_MCP_PROFILE, NATIVE_DELEGATION_PROFILE, DELEGATION_PROFILE, CHAT_QUEUE_PROFILE]) {
     const keyFile = join(keyDir, profileName);
     await writeFile(keyFile, PROFILE_KEY);
     await chmod(keyFile, 0o600);
@@ -364,6 +366,7 @@ async function main(): Promise<void> {
       [AGENT_TOOLS_PROFILE]: PROFILE_KEY,
       [MCP_PRINCIPAL_PROFILE]: PROFILE_KEY,
       [FOLLOW_UP_MCP_PROFILE]: PROFILE_KEY,
+      [MEMORY_REMEMBER_MCP_PROFILE]: PROFILE_KEY,
       [NATIVE_DELEGATION_PROFILE]: PROFILE_KEY,
       [DELEGATION_PROFILE]: PROFILE_KEY,
       [CHAT_QUEUE_PROFILE]: PROFILE_KEY,
@@ -373,6 +376,7 @@ async function main(): Promise<void> {
       // 기본 toolset 에는 shell 과 file 이 있어 GROUP 에이전트로 등록되지 않는다. MCP 서버만 켠 profile 로 둔다.
       [MCP_PRINCIPAL_PROFILE]: ["fos-assistant"],
       [FOLLOW_UP_MCP_PROFILE]: ["fos-assistant"],
+      [MEMORY_REMEMBER_MCP_PROFILE]: ["fos-assistant"],
       [NATIVE_DELEGATION_PROFILE]: ["fos-assistant"],
       [DELEGATION_PROFILE]: ["fos-assistant"],
       [CHAT_QUEUE_PROFILE]: ["fos-assistant"],
