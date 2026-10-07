@@ -8,6 +8,7 @@ import com.bifos.assistant.proactive.application.model.CheckBlocker;
 import com.bifos.assistant.proactive.application.model.CheckBlockerCode;
 import com.bifos.assistant.proactive.application.model.CheckReadiness;
 import com.bifos.assistant.proactive.domain.ProactiveCheck;
+import com.bifos.assistant.proactive.domain.type.CheckTrigger;
 import com.bifos.assistant.proactive.infra.ProactiveCheckRepository;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.error.ApiException;
@@ -101,7 +102,8 @@ public class ProactiveScheduleService {
 
     private ProactiveSchedule view(
             CurrentUser user, Agent agent, Task task, TaskTrigger trigger, List<CheckBlocker> blockers) {
-        ProactiveCheck last = checks.findFirstByUserIdAndAgentIdOrderByIdDesc(user.id(), agent.id())
+        ProactiveCheck last = checks.findFirstByUserIdAndAgentIdAndTriggerNotOrderByIdDesc(
+                        user.id(), agent.id(), CheckTrigger.AUTONOMY)
                 .orElse(null);
         return new ProactiveSchedule(
                 task != null && task.state() == TaskState.ACTIVE,

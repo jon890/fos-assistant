@@ -1,6 +1,7 @@
 package com.bifos.assistant.proactive.infra;
 
 import com.bifos.assistant.proactive.domain.ProactiveCheck;
+import com.bifos.assistant.proactive.domain.type.CheckTrigger;
 import com.bifos.assistant.proactive.domain.type.CheckStatus;
 import jakarta.persistence.LockModeType;
 import java.util.List;
@@ -14,6 +15,10 @@ public interface ProactiveCheckRepository extends JpaRepository<ProactiveCheck, 
 
     /** 그 사용자가 그 에이전트로 연 마지막 살펴보기. */
     Optional<ProactiveCheck> findFirstByUserIdAndAgentIdOrderByIdDesc(Long userId, Long agentId);
+
+    /** 마지막 살펴보기를 보일 때 자동 실행으로 시작한 줄은 뺀다. 그 결과는 사용자에게 바로 알리지 않는다. */
+    Optional<ProactiveCheck> findFirstByUserIdAndAgentIdAndTriggerNotOrderByIdDesc(
+            Long userId, Long agentId, CheckTrigger trigger);
 
     boolean existsByUserIdAndAgentIdAndReportIsNotNullAndReportOpenedAtIsNull(Long userId, Long agentId);
 

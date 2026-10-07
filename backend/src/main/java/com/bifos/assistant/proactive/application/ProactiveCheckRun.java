@@ -317,6 +317,24 @@ public class ProactiveCheckRun implements CheckTurn {
      */
     @Override
     public CheckAnswer answer(Long executionId, String output) {
+        CheckAnswer answer = judge(executionId, output);
+        if (!silent()) {
+            return answer;
+        }
+        // 자동 실행한 살펴보기는 사용자에게 바로 알리지 않는다. 문제 후보만 남겨 다시 가치 평가와 행동 정책을 거치게 한다.
+        // 발견을 남기면 사용자가 보지 못한 발견이 다음 살펴보기에서 이미 알린 것으로 내려가므로 남기지 않는다.
+        pendingFindings = List.of();
+        pendingReport = null;
+        return new CheckAnswer("", false, true);
+    }
+
+    /** 자동 실행으로 시작해 답, 보고, 발견, 알림 줄을 남기지 않는 살펴보기인가. */
+    @Override
+    public boolean silent() {
+        return check.trigger() == CheckTrigger.AUTONOMY;
+    }
+
+    private CheckAnswer judge(Long executionId, String output) {
         CheckResultRead read = deps.parser().read(output);
         if (read.block() == null) {
             outcome = CheckOutcome.INVALID_RESULT;
