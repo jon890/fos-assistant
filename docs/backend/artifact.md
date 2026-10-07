@@ -114,13 +114,15 @@ Hermes 기본 스킬만 있어도 색인 안내문이 `skill_manage` 를 권하�
 | `chat/application/ArtifactWriteRequest`, `ArtifactWriteResult` | 각각 UUID, 상대 경로와 입력 방식, 저장된 경로와 바이트 수를 전달한다 |
 | `chat/application/ArtifactWriteService` | `ConversationAccess.requireOwn` 으로 주인을 확인한 뒤 본문 또는 내려받은 이미지를 저장한다 |
 | `chat/infra/ArtifactSourceProperties` | 허용 호스트와 연결, 읽기, 호출 전체 제한 시간을 받는다 |
-| `chat/infra/ArtifactStore` | 쓰기용 경로 판정, 부모 폴더 생성, 임시 파일 저장과 교체를 기존 경로 규칙과 함께 갖는다 |
+| `chat/infra/ArtifactStore` | 대화별 잠금과 결과물 저장, 파일 훑기, 보관 기간 정리를 조정한다 |
+| `chat/infra/ArtifactPathPolicy` | 읽기·쓰기 경로와 확장자, 대화 폴더 경계와 링크를 판정하고 쓰기에 필요한 부모 폴더를 만든다 |
 | `chat/infra/ArtifactSourceFetcher` | URL 과 DNS 를 검사하고 검증한 IP 에 HTTPS 로 연결해 제한된 이미지 본문만 반환한다 |
 
 `ArtifactWriteService.write(CurrentUser, ArtifactWriteRequest)` 는 대화 주인을 확인하기 전에는
 폴더 생성이나 URL 조회를 하지 않는다.
 `ArtifactStore.ensureFolder` 가 실패를 경고 로그로만 남기므로 쓰기 경로는 실제 폴더 생성 여부를 확인하고 오류로 돌려준다.
-`resolveInside` 는 기존 파일을 읽을 때 쓰고, 쓰기용 판정은 같은 클래스에 따로 있다.
+`ArtifactStore.resolveInside` 는 기존 파일을 읽을 때 쓰고, 쓰기용 판정은 `resolveForWrite` 로 받는다.
+두 경로의 판정은 `ArtifactPathPolicy` 에 모여 있다.
 부모 생성 전후의 실제 경로, 대화 폴더 자체의 링크, 최종 대상의 링크를 검사한다.
 같은 폴더에 임시 파일을 완성한 뒤 교체하고 실패하면 임시 파일을 지운다.
 
@@ -216,7 +218,8 @@ web 의 서버 라우트는 브라우저의 `If-None-Match` 와 `If-Modified-Sin
 | turn 이 끝나면 행을 만들고, 파일을 줄 때 판정한다 | `chat/application` 의 `ArtifactService` |
 | 보관 기간이 지난 것을 지우고 지운 표시를 다시 맞춘다 | `chat/application` 의 `ArtifactCleaner`. 첨부의 정리와 같은 시각에 돈다 |
 
-**경로를 만드는 규칙이 `ArtifactStore` 한 곳에 있다.** 대화 폴더 밖인지 판정하는 것도 거기서 한다.
+**경로를 만드는 규칙이 `ArtifactPathPolicy` 한 곳에 있다.** 대화 폴더 밖인지 판정하는 것도 거기서 한다.
+`ArtifactStore` 의 기존 공개 메서드는 이 판정을 위임한다.
 
 ## 결과물을 MCP 로 쓸 때
 
