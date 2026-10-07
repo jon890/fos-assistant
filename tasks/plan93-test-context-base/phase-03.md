@@ -81,3 +81,5 @@ git grep -ln "@DynamicPropertySource" -- backend/src/test
 | `backend/src/test/java/com/bifos/assistant/testsupport/VariantAnnotationsTest.java` | 신규 |
 | `backend/src/test/java/com/bifos/assistant/attention/AttentionTestCandidates.java` | 신규 |
 | `backend/src/test/java/com/bifos/assistant/**/*Test.java` | 수정 |
+| `backend/src/test/resources/application-test.yml` | 수정 |
+| `docs/backend/testing.md` | 수정 |
