@@ -24,10 +24,11 @@ public final class FeedbackLabeler {
     /** 반응 읽기 규칙의 버전이다. 규칙이 바뀌면 올린다. */
     public static final int VERSION = 1;
 
+    /** 지금 화면의 숨기기다. 상태가 바뀔 때까지만 가리므로 거절이 아니라 미루기처럼 읽는다. */
+    public static final String ATTENTION_HIDE = "ATTENTION_HIDE";
+
     private static final Set<FeedbackEventType> POSITIVE =
             Set.of(FeedbackEventType.ACCEPTED, FeedbackEventType.APPROVED);
-    private static final Set<FeedbackEventType> NEGATIVE =
-            Set.of(FeedbackEventType.REJECTED, FeedbackEventType.DISMISSED);
     private static final Set<FeedbackEventType> OUTCOMES =
             Set.of(FeedbackEventType.EXECUTION_SUCCEEDED, FeedbackEventType.EXECUTION_FAILED);
 
@@ -39,14 +40,14 @@ public final class FeedbackLabeler {
                 .toList();
         FeedbackEventType decisive = ordered.stream()
                 .filter(event -> event.actor() == FeedbackActor.USER)
+                .filter(event -> POSITIVE.contains(event.eventType()) || declines(event))
                 .map(FeedbackEvent::eventType)
-                .filter(type -> POSITIVE.contains(type) || NEGATIVE.contains(type))
                 .findFirst()
                 .orElse(null);
         boolean surfaced = ordered.stream().anyMatch(event -> event.eventType() == FeedbackEventType.SURFACED);
         boolean postponed = ordered.stream()
-                .anyMatch(event ->
-                        event.actor() == FeedbackActor.USER && event.eventType() == FeedbackEventType.POSTPONED);
+                .anyMatch(event -> event.actor() == FeedbackActor.USER
+                        && (event.eventType() == FeedbackEventType.POSTPONED || hidden(event)));
         FeedbackLabel label;
         if (decisive != null) {
             label = POSITIVE.contains(decisive) ? FeedbackLabel.ACCEPTED : FeedbackLabel.DECLINED;
@@ -65,12 +66,21 @@ public final class FeedbackLabeler {
                 .filter(OUTCOMES::contains)
                 .reduce((first, second) -> second)
                 .orElse(null);
+        boolean accepted = ordered.stream()
+                .anyMatch(event ->
+                        event.actor() == FeedbackActor.USER && event.eventType() == FeedbackEventType.ACCEPTED);
         return new SubjectLabel(
-                label,
-                wantsNow(label),
-                edited,
-                outcome,
-                subject == FeedbackSubjectType.MEMORY && label == FeedbackLabel.ACCEPTED);
+                label, wantsNow(label), edited, outcome, subject == FeedbackSubjectType.MEMORY && accepted);
+    }
+
+    /** 거절과, 받아들인 할 일을 그만둔 것이다. 지금 화면의 숨기기는 빼고 미루기로 읽는다. */
+    private static boolean declines(FeedbackEvent event) {
+        return event.eventType() == FeedbackEventType.REJECTED
+                || (event.eventType() == FeedbackEventType.DISMISSED && !hidden(event));
+    }
+
+    private static boolean hidden(FeedbackEvent event) {
+        return event.eventType() == FeedbackEventType.DISMISSED && ATTENTION_HIDE.equals(event.reasonCode());
     }
 
     /** 미루기는 「지금은 아니다」 라서 거짓이다. 반응이 없거나 보인 적이 없으면 표본이 아니다. */

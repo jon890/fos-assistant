@@ -29,7 +29,8 @@ class FeedbackEventWriter {
     private FeedbackEvent toEvent(FeedbackEntry entry) {
         Optional<AgentExecution> origin =
                 entry.originExecutionId() == null ? Optional.empty() : executions.findById(entry.originExecutionId());
-        Long rootExecutionId = origin.map(AgentExecution::treeRootId).orElse(entry.originExecutionId());
+        // 실행 줄이 없으면 비운다. 없는 번호를 넣으면 FK 에 걸려 사건을 잃는다.
+        Long rootExecutionId = origin.map(AgentExecution::treeRootId).orElse(null);
         Long conversationId = entry.conversationId() != null
                 ? entry.conversationId()
                 : origin.map(AgentExecution::conversationId).orElse(null);

@@ -13,6 +13,7 @@ import com.bifos.assistant.attention.domain.type.CardKey;
 import com.bifos.assistant.attention.infra.AttentionControlRepository;
 import com.bifos.assistant.attention.infra.AttentionEventRepository;
 import com.bifos.assistant.feedback.application.DecisionFeedbackRecorder;
+import com.bifos.assistant.feedback.application.FeedbackLabeler;
 import com.bifos.assistant.feedback.application.model.FeedbackEntry;
 import com.bifos.assistant.feedback.domain.type.FeedbackActor;
 import com.bifos.assistant.feedback.domain.type.FeedbackEventType;
@@ -99,7 +100,7 @@ public class AttentionControlService {
                 entry -> entry.rehide(stateKey, now),
                 () -> AttentionControlEntry.hide(user.id(), card, itemKey, stateKey, now));
         recordInCard(user, snapshot, card, itemKey, stateKey, AttentionEventType.HIDDEN);
-        recordFeedback(user, candidate, FeedbackEventType.DISMISSED, "ATTENTION_HIDE", now);
+        recordFeedback(user, candidate, FeedbackEventType.DISMISSED, FeedbackLabeler.ATTENTION_HIDE, now);
     }
 
     /**

@@ -158,6 +158,48 @@ class FeedbackLabelerTest {
         assertThat(label.label()).isEqualTo(FeedbackLabel.NO_RESPONSE);
     }
 
+    @Test
+    @DisplayName("지금 화면에서 숨겼다가 나중에 받아들인 Memory 제안은 ACCEPTED 이고 오래 가는 선호의 근거다")
+    void hideThenAcceptIsAccepted() {
+        List<FeedbackEvent> history = new ArrayList<>(events(FeedbackActor.AGENT, FeedbackEventType.SURFACED));
+        history.add(event(FeedbackActor.USER, FeedbackEventType.DISMISSED, "ATTENTION_HIDE", 1));
+        history.add(event(FeedbackActor.USER, FeedbackEventType.ACCEPTED, null, 2));
+
+        SubjectLabel label = FeedbackLabeler.label(FeedbackSubjectType.MEMORY, history);
+
+        assertThat(label.label()).isEqualTo(FeedbackLabel.ACCEPTED);
+        assertThat(label.persistentPreference()).isTrue();
+    }
+
+    @Test
+    @DisplayName("지금 화면에서 숨기기만 한 제안은 거절이 아니라 DEFERRED 다")
+    void hideOnlyIsDeferred() {
+        List<FeedbackEvent> history = new ArrayList<>(events(FeedbackActor.AGENT, FeedbackEventType.SURFACED));
+        history.add(event(FeedbackActor.USER, FeedbackEventType.DISMISSED, "ATTENTION_HIDE", 1));
+
+        SubjectLabel label = FeedbackLabeler.label(FeedbackSubjectType.FOLLOW_UP, history);
+
+        assertThat(label.label()).isEqualTo(FeedbackLabel.DEFERRED);
+        assertThat(label.wantsNow()).isFalse();
+    }
+
+    private static FeedbackEvent event(FeedbackActor actor, FeedbackEventType type, String reason, int minute) {
+        return FeedbackEvent.of(
+                1L,
+                FeedbackSubjectType.FOLLOW_UP,
+                "follow_up:fixture",
+                type,
+                actor,
+                null,
+                null,
+                null,
+                null,
+                null,
+                reason,
+                List.of(),
+                T0.plusSeconds(60L * minute));
+    }
+
     /** 주체와 종류를 번갈아 받아 1분 간격의 사건을 만든다. */
     private static List<FeedbackEvent> events(Object... actorAndType) {
         List<FeedbackEvent> events = new ArrayList<>();

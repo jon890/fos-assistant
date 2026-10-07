@@ -10,8 +10,12 @@ import com.bifos.assistant.agent.infra.AgentRepository;
 import com.bifos.assistant.chat.application.ChatService;
 import com.bifos.assistant.chat.domain.Conversation;
 import com.bifos.assistant.chat.infra.ConversationRepository;
+import com.bifos.assistant.feedback.application.DecisionFeedbackCleaner;
+import com.bifos.assistant.feedback.application.DecisionFeedbackRecorder;
+import com.bifos.assistant.feedback.application.model.FeedbackEntry;
 import com.bifos.assistant.feedback.application.model.FeedbackLabel;
 import com.bifos.assistant.feedback.domain.FeedbackEvent;
+import com.bifos.assistant.feedback.domain.type.FeedbackActor;
 import com.bifos.assistant.feedback.domain.type.FeedbackEventType;
 import com.bifos.assistant.feedback.domain.type.FeedbackSubjectType;
 import com.bifos.assistant.feedback.infra.FeedbackEventRepository;
@@ -25,11 +29,20 @@ import com.bifos.assistant.proactive.application.DecisionFeedbackExporter;
 import com.bifos.assistant.proactive.application.model.DecisionFeedbackExport;
 import com.bifos.assistant.proactive.application.model.DecisionFeedbackExport.DecisionRecord;
 import com.bifos.assistant.proactive.application.model.DecisionFeedbackExport.Subject;
+import com.bifos.assistant.proactive.domain.AutonomyDecision;
 import com.bifos.assistant.proactive.domain.CheckReport;
+import com.bifos.assistant.proactive.domain.DecisionEvidence;
+import com.bifos.assistant.proactive.domain.DecisionProviderInfo;
+import com.bifos.assistant.proactive.domain.DecisionState;
 import com.bifos.assistant.proactive.domain.ProactiveCheck;
+import com.bifos.assistant.proactive.domain.ValueEvaluation;
+import com.bifos.assistant.proactive.domain.type.AutonomyLevel;
+import com.bifos.assistant.proactive.domain.type.AutonomyReason;
 import com.bifos.assistant.proactive.domain.type.CheckOutcome;
 import com.bifos.assistant.proactive.domain.type.CheckTrigger;
+import com.bifos.assistant.proactive.infra.AutonomyDecisionRepository;
 import com.bifos.assistant.proactive.infra.ProactiveCheckRepository;
+import com.bifos.assistant.proactive.infra.ValueEvaluationRepository;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.usage.domain.AgentExecution;
@@ -53,6 +66,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.transaction.support.TransactionTemplate;
 
 /**
  * 커리어 매일 깨우기의 합성 시나리오로 판단 피드백의 기록 지점과 replay 읽기 모델을 본다. 보고를 보인 살펴보기, 알릴 것이 없던 침묵, 그
@@ -100,6 +114,21 @@ class DecisionFeedbackFlowTest {
 
     @Autowired
     JdbcTemplate jdbc;
+
+    @Autowired
+    ValueEvaluationRepository evaluations;
+
+    @Autowired
+    AutonomyDecisionRepository decisions;
+
+    @Autowired
+    DecisionFeedbackRecorder recorder;
+
+    @Autowired
+    DecisionFeedbackCleaner cleaner;
+
+    @Autowired
+    TransactionTemplate transactions;
 
     private CurrentUser owner;
     private CurrentUser other;
@@ -153,6 +182,8 @@ class DecisionFeedbackFlowTest {
         for (Long userId : List.of(owner.id(), other.id())) {
             jdbc.update("DELETE FROM decision_feedback_event WHERE user_id = ?", userId);
             jdbc.update("DELETE FROM follow_up WHERE user_id = ?", userId);
+            jdbc.update("DELETE FROM proactive_autonomy_decision WHERE user_id = ?", userId);
+            jdbc.update("DELETE FROM proactive_value_evaluation WHERE user_id = ?", userId);
             jdbc.update(
                     "DELETE FROM memory_revision WHERE memory_id IN (SELECT id FROM memory WHERE owner_user_id = ?)",
                     userId);
@@ -264,6 +295,114 @@ class DecisionFeedbackFlowTest {
         assertThat(jdbc.queryForObject(
                         "SELECT COUNT(*) FROM decision_feedback_event WHERE user_id = ?", Long.class, owner.id()))
                 .isZero();
+    }
+
+    @Test
+    @DisplayName("자동 실행한 살펴보기의 결과는 그 실행을 허락한 판정의 원천 살펴보기 결정에 판단, 정책과 함께 묶인다")
+    void movesAutonomousOutcomeToSourceDecision() {
+        Instant now = Instant.now().truncatedTo(ChronoUnit.MICROS);
+        DecisionState state = DecisionFixtures.state();
+        ValueEvaluation evaluation = evaluations.save(ValueEvaluation.of(
+                reported.id(),
+                owner.id(),
+                null,
+                new DecisionEvidence(
+                        state,
+                        List.of(),
+                        new DecisionProviderInfo("fixture", "1", null, "fixture-model", null, null, null),
+                        DecisionFixtures.ordered(state)),
+                now));
+        ProactiveCheck autonomous = ProactiveCheck.started(
+                owner.id(), career.id(), checkConversation.id(), CheckTrigger.AUTONOMY, false, now);
+        autonomous.succeed(CheckOutcome.NOTHING_NEW, 0, 0, null, 0, 0, 0, 0, 0, now);
+        ProactiveCheck savedAutonomous = checks.save(autonomous);
+        AutonomyDecision decision = AutonomyDecision.of(
+                owner.id(),
+                evaluation.id(),
+                11L,
+                reported.id(),
+                AutonomyLevel.EXECUTE,
+                List.of(AutonomyReason.READ_ONLY_SAFE),
+                AutonomyFixtures.safe().build(),
+                1,
+                now);
+        decision.started(savedAutonomous.id());
+        decisions.save(decision);
+
+        checkFeedback.ended(savedAutonomous);
+        DecisionFeedbackExport export = exporter.export(owner, Duration.ofDays(30));
+
+        DecisionRecord source = record(export, "check:" + reported.id());
+        assertThat(source.subjects()).singleElement().satisfies(subject -> {
+            assertThat(subject.subjectKey()).isEqualTo("proactive_check:" + savedAutonomous.id());
+            assertThat(subject.label()).isEqualTo(FeedbackLabel.NOT_SURFACED);
+            assertThat(subject.outcome()).isEqualTo(FeedbackEventType.EXECUTION_SUCCEEDED);
+        });
+        assertThat(source.judgments()).singleElement().satisfies(judgment -> {
+            assertThat(judgment.requestedModel()).isEqualTo("fixture-model");
+            assertThat(judgment.orderedCandidateIds()).containsExactly(11L, 12L);
+        });
+        assertThat(source.policies()).singleElement().satisfies(policy -> {
+            assertThat(policy.level()).isEqualTo(AutonomyLevel.EXECUTE);
+            assertThat(policy.executionCheckId()).isEqualTo(savedAutonomous.id());
+        });
+        assertThat(record(export, "check:" + savedAutonomous.id()).situation().reportSurfaced())
+                .isFalse();
+        assertThat(export.toString()).doesNotContain("마감 전에 지원 의사를 확인할 가치가 크다", "관심 공고가 이틀 뒤");
+    }
+
+    @Test
+    @DisplayName("부르는 쪽 트랜잭션이 되돌려지면 사건을 남기지 않는다")
+    void dropsEventWhenCallerRollsBack() {
+        transactions.executeWithoutResult(status -> {
+            recorder.record(FeedbackEntry.of(
+                    owner.id(),
+                    FeedbackSubjectType.MEMORY,
+                    1L,
+                    FeedbackEventType.SURFACED,
+                    FeedbackActor.AGENT,
+                    Instant.now()));
+            status.setRollbackOnly();
+        });
+
+        assertThat(jdbc.queryForObject(
+                        "SELECT COUNT(*) FROM decision_feedback_event WHERE user_id = ?", Long.class, owner.id()))
+                .isZero();
+    }
+
+    @Test
+    @DisplayName("보관 기간 정리는 마지막 사건이 기간 앞인 제안만 통째로 지우고 최근 사건이 있는 제안은 첫 사건까지 남긴다")
+    void cleansWholeSubjectsByLastEvent() {
+        Instant now = Instant.now().truncatedTo(ChronoUnit.MICROS);
+        Instant old = now.minus(Duration.ofDays(400));
+        saveEvent("follow_up:expired", FeedbackEventType.SURFACED, old);
+        saveEvent("follow_up:expired", FeedbackEventType.ACCEPTED, old.plusSeconds(60));
+        saveEvent("follow_up:alive", FeedbackEventType.ACCEPTED, old);
+        saveEvent("follow_up:alive", FeedbackEventType.DISMISSED, now);
+
+        cleaner.clean(now);
+
+        assertThat(subjectEvents("follow_up:expired")).isEmpty();
+        assertThat(subjectEvents("follow_up:alive"))
+                .extracting(FeedbackEvent::eventType)
+                .containsExactly(FeedbackEventType.ACCEPTED, FeedbackEventType.DISMISSED);
+    }
+
+    private void saveEvent(String key, FeedbackEventType type, Instant at) {
+        events.save(FeedbackEvent.of(
+                owner.id(),
+                FeedbackSubjectType.FOLLOW_UP,
+                key,
+                type,
+                FeedbackActor.USER,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                List.of(),
+                at));
     }
 
     private List<FeedbackEvent> subjectEvents(String key) {

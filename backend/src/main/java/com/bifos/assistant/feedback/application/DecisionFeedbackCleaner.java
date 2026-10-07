@@ -3,6 +3,9 @@ package com.bifos.assistant.feedback.application;
 import com.bifos.assistant.feedback.infra.FeedbackEventRepository;
 import java.time.Clock;
 import java.time.Instant;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -27,13 +30,19 @@ public class DecisionFeedbackCleaner {
     }
 
     /**
-     * {@code now} 에서 보관 기간보다 먼저 일어난 사건을 지운다.
+     * {@code now} 에서 보관 기간보다 먼저 마지막 사건이 일어난 제안의 사건을 모두 지운다. 사건 단위로 지우면 나중 사건만 남아 첫 반응을 잘못 읽는다.
      *
      * @return 지운 줄 수
      */
     @Transactional
     public int clean(Instant now) {
-        int deleted = events.deleteOccurredBefore(now.minus(properties.retention()));
+        Map<Long, List<String>> expired =
+                events.findSubjectsLastOccurredBefore(now.minus(properties.retention())).stream()
+                        .collect(Collectors.groupingBy(
+                                row -> (Long) row[0], Collectors.mapping(row -> (String) row[1], Collectors.toList())));
+        int deleted = expired.entrySet().stream()
+                .mapToInt(entry -> events.deleteOfSubjects(entry.getKey(), entry.getValue()))
+                .sum();
         log.info("expired decision feedback events cleaned deleted={}", deleted);
         return deleted;
     }

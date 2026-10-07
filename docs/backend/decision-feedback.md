@@ -45,7 +45,7 @@
 | Memory 제안(`memory:<번호>`) | `SURFACED` | `MemoryService.proposeUser` 가 새 제안을 저장했을 때 |
 | | `ACCEPTED`, `REJECTED` | `PROPOSED` 줄의 `accept`, `reject` |
 | 승인 줄(`connector_action:<공개 식별자>`) | `SURFACED` | 정책 판정이 `PENDING` 줄을 저장했을 때. 살펴보기 트리면 `source_check_id` 를 채운다 |
-| | `APPROVED` | `approve`. 그 뒤 실행하지 못하고 끝나도 남긴다 |
+| | `APPROVED` | `approve`. 누른 때 이미 만료됐거나 그 뒤 실행하지 못하고 끝나도 사용자의 반응이라 남긴다 |
 | | `REJECTED` | `reject` |
 | | `EXECUTION_SUCCEEDED`, `EXECUTION_FAILED` | 실행 결과가 `SUCCEEDED`, `FAILED` 일 때. 실패는 커넥터가 선언한 오류 코드를 `reason_code` 에 둔다 |
 | 지금 화면의 제안 항목 | `DISMISSED`, `POSTPONED` | `NEEDS_ME` 카드의 `FOLLOW_UP_PROPOSED`, `MEMORY_PROPOSED`, `APPROVAL_PENDING` 항목을 숨기거나 미뤘을 때. 열쇠는 그 `itemKey` 다 |
@@ -60,8 +60,9 @@
 ### 남기는 방법
 
 `DecisionFeedbackRecorder.record` 가 부르는 쪽의 트랜잭션이 커밋한 뒤 새 트랜잭션으로 한 줄을 넣는다.
+살펴보기의 끝은 저장된 줄을 다시 읽어 판정한다. 끝난 상태를 저장하지 못했으면 남기지 않고 기동 정리가 닫을 때 남긴다.
 되돌려진 동작의 사건은 남지 않는다. 기록이 실패해도 부르는 쪽으로 던지지 않고 사용자 번호와 종류, 예외 이름만 로그에 낸다.
-실행 번호를 받으면 그 실행의 트리 루트와 대화를 채운다.
+실행 번호를 받으면 그 실행의 트리 루트와 대화를 채운다. 실행 줄이 없으면 그 칸을 비운다.
 
 제목, 본문, 인자, 결과 글, 모델이 쓴 글은 받지 않는다.
 판(`subject_version`)은 할 일이면 `title_key`, Memory 면 판 번호, 승인 줄이면 인자 해시다. 고친 칸은 `TITLE`, `DUE_AT`, `WAITING` 같은 이름만 남긴다.
@@ -70,8 +71,8 @@
 
 반응은 저장하지 않는다. replay 읽기 모델이 제안 하나의 사건을 그때마다 읽는다. 규칙 버전은 `FeedbackLabeler.VERSION` 이고 지금은 1이다.
 
-1. 사용자 사건 가운데 처음 나온 `ACCEPTED`, `APPROVED` 는 `ACCEPTED`, 처음 나온 `REJECTED`, `DISMISSED` 는 `DECLINED` 다
-2. 그런 사건이 없고 `POSTPONED` 가 있으면 `DEFERRED` 다
+1. 사용자 사건 가운데 처음 나온 `ACCEPTED`, `APPROVED` 는 `ACCEPTED`, 처음 나온 `REJECTED` 와 할 일의 그만둠(`DISMISSED`)은 `DECLINED` 다
+2. 그런 사건이 없고 `POSTPONED` 나 지금 화면의 숨기기(`DISMISSED`, `ATTENTION_HIDE`)가 있으면 `DEFERRED` 다
 3. 그것도 없고 `SURFACED` 가 있으면 `NO_RESPONSE` 다
 4. 보인 기록이 없으면 `NOT_SURFACED` 다
 
@@ -88,14 +89,16 @@
 **잘못된 학습을 막는 규칙**
 
 - 무응답을 싫어함으로 읽지 않는다
-- 거절과 숨기기는 그 제안 하나에 대한 일회성 반응이다. 같은 주제가 여러 번 거절돼도 읽기 모델은 오래 가는 선호를 만들지 않는다
+- 거절은 그 제안 하나에 대한 일회성 반응이다. 같은 주제가 여러 번 거절돼도 읽기 모델은 오래 가는 선호를 만들지 않는다
+- 지금 화면의 숨기기는 상태가 바뀔 때까지만 가리므로 거절이 아니라 미루기로 읽는다. 숨긴 뒤 받아들이면 `ACCEPTED` 다
 - 첫 반응을 나중 사건이 덮지 않는다. 받아들인 뒤 그만둔 할 일은 `ACCEPTED` 이고 그만둠은 사건으로만 남는다
-- `persistentPreference` 는 사용자가 받아들인 Memory 제안만 참이다. 오래 가는 선호는 Memory 의 제안과 수락 경로로만 생긴다([ADR-012](../adr/ADR-012-memory-는-사람이-승인한-것만-남는다.md))
+- `persistentPreference` 는 사용자가 받아들인 사건이 있는 Memory 제안만 참이다. 오래 가는 선호는 Memory 의 제안과 수락 경로로만 생긴다([ADR-012](../adr/ADR-012-memory-는-사람이-승인한-것만-남는다.md))
 - 에이전트와 시스템의 사건은 사용자 반응이 아니다
 
 ## replay 읽기 모델
 
 `GET /api/v1/decision-feedback/export?days=30` 이 요청자의 기록을 `DecisionFeedbackExport` 로 낸다. 화면은 없다.
+이 모양이 그대로 API 계약이다. offline replay 도구와 모양을 함께 맞추려고 별도 응답 DTO 를 두지 않고 `version` 으로 바뀜을 알린다.
 `days` 는 1부터 365까지이고 기본 30이다. 벗어나면 400 `VALIDATION_FAILED` 다. 관리자도 남의 기록을 읽지 못한다.
 
 | 칸 | 뜻 |
@@ -119,6 +122,7 @@
 지운 대화에 묶인 사건이 하나라도 있는 제안과, 점검 대화를 지운 살펴보기의 결정은 싣지 않는다.
 
 후보의 문제와 행동 글, 축의 설명, 비교 설명, 할 일 제목, Memory 본문, 커넥터 인자와 결과는 싣지 않는다.
+후보의 문제 키, 행동 종류, 부작용 힌트, 확신은 모델이 쓴 값을 정규화해 저장한 짧은 열쇠라 싣는다. 요청자 자신에게만 나간다.
 
 ### offline replay 로 할 수 있는 것
 
@@ -146,11 +150,14 @@
 | --- | --- |
 | 사용자 줄을 지움 | FK `ON DELETE CASCADE` 로 함께 지운다 |
 | 대화를 지움 | `ChatService.delete` 가 같은 트랜잭션에서 그 대화의 사건과, 그 사건이 가리키는 제안의 다른 사건을 지운다 |
-| 보관 기간이 지남 | `assistant.decision-feedback.retention`(기본 365일)이 지난 사건을 `cleanup-cron`(기본 매일 04:45)에 지운다. 검사에서는 `-` 로 끈다 |
+| 보관 기간이 지남 | 마지막 사건이 `assistant.decision-feedback.retention`(기본 365일)보다 오래된 제안의 사건을 `cleanup-cron`(기본 매일 04:45)에 모두 지운다. 사건 단위로 지우면 나중 사건만 남아 첫 반응을 잘못 읽는다. 검사에서는 `-` 로 끈다 |
 | 살펴보기, 판정, 실행 줄을 지움 | 그 번호 칸만 비운다(`ON DELETE SET NULL`) |
+
+대화 삭제의 정리는 같은 트랜잭션이라 실패하면 대화 삭제도 실패한다. 「기록이 사용자의 동작을 막지 않는다」 의 유일한 예외다. 지운 대화에 사건이 남지 않게 하려는 선택이다.
+행동 정책 판정의 사건은 원천 살펴보기의 점검 대화를 `conversation_id` 로 채워 점검 대화를 지울 때 함께 지운다.
 
 ## 검증
 
-`FeedbackLabelerTest` 가 사용자 반응 fixture 열 가지로 읽기 규칙을 본다.
-`DecisionFeedbackFlowTest` 가 매일 깨우기의 보고, 침묵, 트리의 할 일과 Memory 제안, 반응, 대화 삭제를 실제 DB 로 잇는다.
+`FeedbackLabelerTest` 가 사용자 반응 fixture 열두 가지로 읽기 규칙을 본다.
+`DecisionFeedbackFlowTest` 가 매일 깨우기의 보고, 침묵, 트리의 할 일과 Memory 제안, 반응, 대화 삭제, 자동 실행 결과의 묶기, 되돌림, 보관 정리를 실제 DB 로 잇는다.
 할 일, 승인 줄, 지금 화면, 자동 실행 시험이 각 기록 지점의 사건을 확인한다.

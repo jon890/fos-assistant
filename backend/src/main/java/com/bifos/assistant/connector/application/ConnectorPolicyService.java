@@ -317,6 +317,14 @@ public class ConnectorPolicyService {
 
     /** 승인 줄을 보인 판단 피드백 사건이다. 커밋한 뒤에 부르므로 바로 남는다. 살펴보기 트리의 승인 줄이면 그 살펴보기로 잇는다. */
     private void recordSurfaced(ConnectorAction saved, AgentExecution origin, Instant now) {
+        Long checkId;
+        try {
+            checkId = checkGuard.checkOf(origin).map(ProactiveCheck::id).orElse(null);
+        } catch (RuntimeException ex) {
+            // 기록은 관측용이다. 살펴보기를 읽지 못해도 승인 줄의 답과 사건을 막지 않는다.
+            log.warn("승인 줄의 살펴보기를 읽지 못했다 actionId={}", saved.publicId());
+            checkId = null;
+        }
         feedback.record(FeedbackEntry.of(
                         saved.userId(),
                         FeedbackSubjectType.CONNECTOR_ACTION,
@@ -326,7 +334,7 @@ public class ConnectorPolicyService {
                         now)
                 .conversation(saved.conversationId())
                 .originExecution(saved.originExecutionId())
-                .sourceCheck(checkGuard.checkOf(origin).map(ProactiveCheck::id).orElse(null))
+                .sourceCheck(checkId)
                 .version(saved.argsSha256()));
     }
 

@@ -32,7 +32,8 @@ public interface FeedbackEventRepository extends JpaRepository<FeedbackEvent, Lo
     @Query("delete from FeedbackEvent e where e.userId = :userId and e.subjectKey in :subjectKeys")
     int deleteOfSubjects(@Param("userId") Long userId, @Param("subjectKeys") Collection<String> subjectKeys);
 
-    @Modifying(flushAutomatically = true, clearAutomatically = true)
-    @Query("delete from FeedbackEvent e where e.occurredAt < :before")
-    int deleteOccurredBefore(@Param("before") Instant before);
+    /** 마지막 사건이 그때보다 앞선 제안의 사용자와 열쇠다. 보관 기간 정리가 제안 단위로 지우려고 읽는다. */
+    @Query("select e.userId, e.subjectKey from FeedbackEvent e group by e.userId, e.subjectKey"
+            + " having max(e.occurredAt) < :before")
+    List<Object[]> findSubjectsLastOccurredBefore(@Param("before") Instant before);
 }

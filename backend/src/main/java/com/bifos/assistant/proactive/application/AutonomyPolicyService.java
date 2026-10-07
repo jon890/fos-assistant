@@ -277,6 +277,9 @@ public class AutonomyPolicyService {
                             FeedbackEventType.EXECUTION_FAILED,
                             FeedbackActor.SYSTEM,
                             clock.instant())
+                    .conversation(checks.findById(row.sourceCheckId())
+                            .map(ProactiveCheck::conversationId)
+                            .orElse(null))
                     .sourceCheck(row.sourceCheckId())
                     .autonomyDecision(row.id())
                     .reason(failure));
