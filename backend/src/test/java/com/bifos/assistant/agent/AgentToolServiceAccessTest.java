@@ -23,6 +23,7 @@ import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
+import com.bifos.assistant.testsupport.BackendIntegrationTest;
 import com.bifos.assistant.user.domain.AppUser;
 import com.bifos.assistant.user.infra.AppUserRepository;
 import java.time.Instant;
@@ -34,10 +35,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.dao.InvalidDataAccessApiUsageException;
-import org.springframework.test.context.ActiveProfiles;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 /**
  * 에이전트를 코드로 찾아 도구를 읽고 바꾸는 서비스 메서드가 접근 범위를 지키는지와, 잠금 조회에 필요한
@@ -46,8 +44,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
  * <p>이 클래스의 검사는 트랜잭션 밖에서 돈다. 잠금 조회는 트랜잭션이 없으면 저장소가 거절하므로, 서비스
  * 메서드가 트랜잭션을 열지 않으면 아래 검사는 기대한 오류나 결과 대신 저장소의 예외로 실패한다.
  */
-@SpringBootTest
-@ActiveProfiles("test")
+@BackendIntegrationTest
 class AgentToolServiceAccessTest {
 
     private static final Instant DELETED_AT = Instant.parse("2026-09-29T00:00:00Z");
@@ -62,7 +59,7 @@ class AgentToolServiceAccessTest {
     AppUserRepository users;
 
     /** 실제 Hermes 를 부르지 않도록 도구 목록과 설정 저장을 대역으로 둔다. */
-    @MockitoBean
+    @Autowired
     HermesToolsetClient hermesToolsets;
 
     private final List<Long> createdUserIds = new ArrayList<>();

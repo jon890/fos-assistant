@@ -33,6 +33,7 @@ import com.bifos.assistant.orchestration.application.ResearchAndBuildFlow;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.skill.application.SkillAgentNotice;
+import com.bifos.assistant.testsupport.BackendIntegrationTest;
 import com.bifos.assistant.usage.infra.AgentExecutionRepository;
 import com.bifos.assistant.usage.infra.ExecutionEventRepository;
 import com.bifos.assistant.user.domain.AppUser;
@@ -71,14 +72,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.boot.test.web.server.LocalServerPort;
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Import;
-import org.springframework.context.annotation.Primary;
-import org.springframework.test.context.ActiveProfiles;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
@@ -89,9 +83,7 @@ import tools.jackson.databind.json.JsonMapper;
  * <p>폴더 밖 판정과 머리글은 실제 서버와 HTTP 클라이언트로 본다. 정규화되지 않은 경로는 컨트롤러 앞의 방화벽이
  * 거절하는데, 그 층은 실제 요청이 지나야 확인된다.
  */
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
-@ActiveProfiles("test")
-@Import(ArtifactTest.StubRuntime.class)
+@BackendIntegrationTest
 class ArtifactTest {
 
     private static final String JWT_SECRET = "test-secret-test-secret-test-secret-test-secret";
@@ -108,15 +100,6 @@ class ArtifactTest {
             + "form-action 'none'";
     private static final String CHIEF_MARK = "조사할 것과 만들 것을 나눈다";
     private static final String HTML = "<!doctype html><title>초안</title><p>초안</p>";
-
-    @TestConfiguration
-    static class StubRuntime {
-        @Bean
-        @Primary
-        StubHermesRunsClient stubHermesRunsClient() {
-            return new StubHermesRunsClient();
-        }
-    }
 
     @LocalServerPort
     int port;
@@ -167,7 +150,7 @@ class ArtifactTest {
     HermesRunsClient hermes;
 
     /** 스트림 경로의 사건 중계는 이 검사가 보는 것이 아니다. 열자마자 끝나게 둔다. */
-    @MockitoBean
+    @Autowired
     HermesRunEventStream eventStream;
 
     private final HttpClient client = HttpClient.newHttpClient();

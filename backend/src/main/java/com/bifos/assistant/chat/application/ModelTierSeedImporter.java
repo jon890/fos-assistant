@@ -3,6 +3,7 @@ package com.bifos.assistant.chat.application;
 import com.bifos.assistant.chat.domain.ModelTierDefinition;
 import com.bifos.assistant.chat.infra.ModelTierDefinitionRepository;
 import com.bifos.assistant.model.domain.type.ModelTier;
+import com.bifos.assistant.shared.config.LiveProperties;
 import com.bifos.assistant.user.infra.AppUserRepository;
 import java.util.Arrays;
 import lombok.RequiredArgsConstructor;
@@ -23,14 +24,15 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class ModelTierSeedImporter implements ApplicationRunner {
 
-    private final ModelTierProperties properties;
+    private final LiveProperties<ModelTierProperties> properties;
     private final ModelTierDefinitionRepository definitions;
     private final AppUserRepository users;
 
     @Override
     @Transactional
     public void run(ApplicationArguments args) {
-        if (!properties.hasAnyMapping()) {
+        ModelTierProperties settings = properties.current();
+        if (!settings.hasAnyMapping()) {
             return;
         }
         for (Long groupId : users.findDistinctGroupIds()) {
@@ -39,7 +41,7 @@ public class ModelTierSeedImporter implements ApplicationRunner {
             }
             definitions.saveAll(Arrays.stream(ModelTier.values())
                     .map(tier -> {
-                        ModelTierProperties.Tier mapping = properties.forTier(tier);
+                        ModelTierProperties.Tier mapping = settings.forTier(tier);
                         return ModelTierDefinition.of(
                                 groupId, tier, mapping.provider(), mapping.model(), mapping.reasoningEffort());
                     })

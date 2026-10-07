@@ -8,6 +8,8 @@ import com.bifos.assistant.chat.domain.type.MessageRole;
 import com.bifos.assistant.chat.infra.ChatMessageRepository;
 import com.bifos.assistant.chat.infra.ConversationRepository;
 import com.bifos.assistant.shared.auth.CurrentUser;
+import com.bifos.assistant.shared.concurrent.BackgroundTasks;
+import com.bifos.assistant.shared.config.LiveProperties;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.usage.infra.AgentExecutionRepository;
@@ -66,7 +68,7 @@ public class DelegationWakeService {
     /** 재시도를 {@link #FAILURE_BACKOFF} 에서 이만큼 더 늦춘다. 실패 시각이 지워지기 전에 사건이 닿지 않게 한다. */
     private static final Duration BUSY_RETRY_MARGIN = Duration.ofSeconds(1);
 
-    private final DelegationWakeProperties properties;
+    private final LiveProperties<DelegationWakeProperties> properties;
     private final TurnCancellation turns;
     private final ChatService chat;
     private final ConversationEventHub hub;
@@ -79,6 +81,7 @@ public class DelegationWakeService {
     private final List<AutoTurnResultSource> sources;
     private final TaskScheduler scheduler;
     private final ApplicationEventPublisher events;
+    private final BackgroundTasks backgroundTasks;
     private final Clock clock = Clock.systemUTC();
     /** 결과를 전하기 전에 자동 turn 이 실패한 대화와 그 시각이다. */
     private final Map<Long, Instant> lastFailures = new ConcurrentHashMap<>();
@@ -88,7 +91,7 @@ public class DelegationWakeService {
     private final Set<Long> pendingBusyRetries = ConcurrentHashMap.newKeySet();
 
     public DelegationWakeService(
-            DelegationWakeProperties properties,
+            LiveProperties<DelegationWakeProperties> properties,
             TurnCancellation turns,
             ChatService chat,
             ConversationEventHub hub,
@@ -100,7 +103,8 @@ public class DelegationWakeService {
             AppUserRepository users,
             List<AutoTurnResultSource> sources,
             TaskScheduler scheduler,
-            ApplicationEventPublisher events) {
+            ApplicationEventPublisher events,
+            BackgroundTasks backgroundTasks) {
         this.properties = properties;
         this.turns = turns;
         this.chat = chat;
@@ -114,11 +118,12 @@ public class DelegationWakeService {
         this.sources = List.copyOf(sources);
         this.scheduler = scheduler;
         this.events = events;
+        this.backgroundTasks = backgroundTasks;
     }
 
     /** 기동 전에 끝났지만 전하지 못한 결과가 있는 대화를 돌려준다. 이 기능이 꺼져 있으면 비어 있다. */
     public List<Long> conversationsToWake() {
-        if (!properties.enabled()) {
+        if (!properties.current().enabled()) {
             return List.of();
         }
         Set<Long> found = new LinkedHashSet<>(executions.findConversationsWithUndeliveredResults());
@@ -134,7 +139,8 @@ public class DelegationWakeService {
      * 닫기 리스너가 곧바로 다시 불러 끝없이 돈다. 거른 결과는 실행 줄에 그대로 남는다.
      */
     public void tryWake(Long conversationId) {
-        if (!properties.enabled() || undeliveredMarks(conversationId).isEmpty()) {
+        DelegationWakeProperties settings = properties.current();
+        if (!settings.enabled() || undeliveredMarks(conversationId).isEmpty()) {
             return;
         }
         if (inFailureBackoff(conversationId)) {
@@ -157,7 +163,7 @@ public class DelegationWakeService {
             log.warn("대화 주인이 없어 맡긴 일의 결과를 전하지 않는다 conversationId={}", conversationId);
             return;
         }
-        if (conversation.autoTurnCount() >= properties.maxAutoTurns()) {
+        if (conversation.autoTurnCount() >= settings.maxAutoTurns()) {
             noticeLimitReached(conversation);
             return;
         }
@@ -181,9 +187,8 @@ public class DelegationWakeService {
         CurrentUser current =
                 new CurrentUser(owner.id(), owner.email(), owner.displayName(), owner.groupId(), owner.role());
         try {
-            Thread.ofVirtual()
-                    .name("delegation-wake-" + conversationId)
-                    .start(() -> runAutoTurn(current, conversationId, handle));
+            backgroundTasks.start(
+                    "delegation-wake-" + conversationId, () -> runAutoTurn(current, conversationId, handle));
         } catch (RuntimeException | Error ex) {
             log.warn("자동 turn 스레드를 띄우지 못했다 conversationId={}", conversationId, ex);
             turns.close(handle);
@@ -255,9 +260,8 @@ public class DelegationWakeService {
      */
     private void dueAfterUserBusy(Long conversationId, Instant scheduledAt) {
         try {
-            Thread.ofVirtual()
-                    .name("delegation-wake-retry-" + conversationId)
-                    .start(() -> retryAfterUserBusy(conversationId, scheduledAt));
+            backgroundTasks.start(
+                    "delegation-wake-retry-" + conversationId, () -> retryAfterUserBusy(conversationId, scheduledAt));
         } catch (RuntimeException | Error ex) {
             pendingBusyRetries.remove(conversationId);
             log.warn("사용자 실행 한도로 미룬 자동 turn 의 재시도 스레드를 띄우지 못했다 conversationId={}", conversationId, ex);

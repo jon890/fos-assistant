@@ -8,6 +8,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.when;
 
@@ -56,6 +57,9 @@ import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
+import com.bifos.assistant.testsupport.BackendIntegrationTest;
+import com.bifos.assistant.testsupport.LongProactiveCheckTimeouts;
+import com.bifos.assistant.testsupport.OverrideProperties;
 import com.bifos.assistant.usage.domain.AgentExecution;
 import com.bifos.assistant.usage.infra.AgentExecutionRepository;
 import com.bifos.assistant.usage.infra.ExecutionEventRepository;
@@ -74,15 +78,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.context.TestConfiguration;
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Import;
-import org.springframework.context.annotation.Primary;
 import org.springframework.dao.DataAccessResourceFailureException;
-import org.springframework.test.context.ActiveProfiles;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
-import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /**
@@ -91,14 +87,9 @@ import org.springframework.transaction.support.TransactionTemplate;
  * <p>turn 은 가상 스레드에서 돈다. 검사마다 그 대화의 잠금이 풀릴 때까지 기다린 뒤 단언한다. Hermes 의 실행, 스트림, toolset, 스킬
  * 목록은 대역이고 모든 데이터는 합성이다.
  */
-@SpringBootTest(
-        properties = {
-            "hermes.run-timeout=30s",
-            "assistant.proactive-check.max-duration=20s",
-            "assistant.proactive-check.session-max-checks=2"
-        })
-@ActiveProfiles("test")
-@Import(ProactiveCheckTurnTest.StubRuntime.class)
+@BackendIntegrationTest
+@LongProactiveCheckTimeouts
+@OverrideProperties({"assistant.proactive-check.session-max-checks=2"})
 class ProactiveCheckTurnTest {
 
     private static final Duration WAIT_LIMIT = Duration.ofSeconds(10);
@@ -106,15 +97,6 @@ class ProactiveCheckTurnTest {
     private static final String SOURCE_URL = "https://docs.example.test/kafka/exactly-once";
     private static final String PROBLEM_KEY = "study:exactly-once-gap";
     private static final String PROBLEM_TEXT = "정확히 한 번 처리를 설명할 근거가 부족하다";
-
-    @TestConfiguration
-    static class StubRuntime {
-        @Bean
-        @Primary
-        StubHermesRunsClient stubHermesRunsClient() {
-            return new StubHermesRunsClient();
-        }
-    }
 
     @Autowired
     ProactiveCheckService service;
@@ -141,7 +123,7 @@ class ProactiveCheckTurnTest {
     ConversationRepository conversations;
 
     /** 답 메시지 저장이 실패하는 검사만 바꾼다. 그 밖의 검사에서는 실제 동작 그대로다. */
-    @MockitoSpyBean
+    @Autowired
     ChatMessageRepository messages;
 
     @Autowired
@@ -163,19 +145,19 @@ class ProactiveCheckTurnTest {
     TransactionTemplate transactions;
 
     /** 실제 Hermes 를 부르지 않도록 켜진 toolset 을 대역으로 둔다. */
-    @MockitoBean
+    @Autowired
     HermesToolsetClient toolsets;
 
     /** 에이전트에 붙은 커넥터 서버를 대역으로 둔다. 연결을 붙이는 검사만 값을 정하고 나머지는 붙은 연결이 없다. */
-    @MockitoBean
+    @Autowired
     AgentConnectorBindings connectorBindings;
 
     /** 켜진 스킬 목록을 대역으로 둔다. */
-    @MockitoBean
+    @Autowired
     HermesSkillClient skillClient;
 
     /** 실제 스트림 주소로 연결하지 않게 대역으로 둔다. 사건을 흘리는 검사만 답을 정한다. */
-    @MockitoBean
+    @Autowired
     HermesRunEventStream eventStream;
 
     private CurrentUser owner;
@@ -188,6 +170,9 @@ class ProactiveCheckTurnTest {
     @BeforeEach
     void setUp() {
         stub().reset();
+        doReturn(false).when(connectorBindings).hasBindings(any());
+        doReturn(Set.of()).when(connectorBindings).connectorServers(any());
+        doReturn(Set.of()).when(connectorBindings).connectorToolPrefixes(any());
         when(toolsets.readEnabled(anyString(), anyString())).thenReturn(List.of("web", "skills", "fos-assistant"));
         when(skillClient.list(anyString())).thenReturn(List.of(new HermesSkill("proactive-check", "살펴보기", true)));
         String suffix = UUID.randomUUID().toString().substring(0, 8);
@@ -414,7 +399,7 @@ class ProactiveCheckTurnTest {
     @Test
     @DisplayName("연결이 붙은 에이전트의 살펴보기 지시는 연결한 서비스의 도구를 직접 부르게 하고 위임 줄을 싣지 않는다")
     void instructsDirectCallsWhenConnectorsAreBound() {
-        when(connectorBindings.connectorServers(agent.id())).thenReturn(Set.of("career"));
+        doReturn(Set.of("career")).when(connectorBindings).connectorServers(agent.id());
         when(toolsets.readEnabled(anyString(), anyString()))
                 .thenReturn(List.of("web", "skills", "fos-assistant", "career"));
         stub().willAnswer(command -> answer(block("{\"version\":1,\"outcome\":\"NOTHING_NEW\"}")));

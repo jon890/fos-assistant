@@ -29,13 +29,13 @@ import com.bifos.assistant.task.domain.type.TriggerType;
 import com.bifos.assistant.task.infra.TaskRepository;
 import com.bifos.assistant.task.infra.TaskRunRepository;
 import com.bifos.assistant.task.infra.TaskTriggerRepository;
+import com.bifos.assistant.testsupport.BackendIntegrationTest;
+import com.bifos.assistant.testsupport.TestClock;
 import com.bifos.assistant.user.domain.AppUser;
 import com.bifos.assistant.user.infra.AppUserRepository;
-import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
-import java.time.ZoneOffset;
 import java.time.temporal.ChronoUnit;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
@@ -47,12 +47,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.context.TestConfiguration;
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Import;
-import org.springframework.context.annotation.Primary;
-import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
@@ -61,25 +55,16 @@ import org.springframework.transaction.support.TransactionTemplate;
  *
  * <p>시각은 이 검사의 시계가 정한다. 사용자와 에이전트는 검사마다 새로 만들어 다른 검사의 줄과 섞이지 않게 한다.
  */
-@SpringBootTest
-@ActiveProfiles("test")
-@Import(TaskServiceTest.FixedClock.class)
+@BackendIntegrationTest
 class TaskServiceTest {
 
     /** 2026-10-04 서울 9시다. 나노초를 붙여 저장한 시각이 마이크로초로 잘리는지 본다. */
     private static final Instant NOW = Instant.parse("2026-10-04T00:00:00.123456789Z");
 
-    private static final TestClock CLOCK = new TestClock(NOW);
     private static final ZoneId SEOUL = ZoneId.of("Asia/Seoul");
 
-    @TestConfiguration
-    static class FixedClock {
-        @Bean
-        @Primary
-        Clock taskTestClock() {
-            return CLOCK;
-        }
-    }
+    @Autowired
+    TestClock clock;
 
     @Autowired
     PlatformTransactionManager transactionManager;
@@ -107,7 +92,7 @@ class TaskServiceTest {
 
     @BeforeEach
     void setUp() {
-        CLOCK.set(NOW);
+        clock.set(NOW);
         clean();
     }
 
@@ -271,7 +256,7 @@ class TaskServiceTest {
         assertThat(paused.task().state()).isEqualTo(TaskState.PAUSED);
         assertThat(service.pause(owner, taskId).task().state()).isEqualTo(TaskState.PAUSED);
 
-        CLOCK.set(Instant.parse("2026-10-07T03:00:00Z")); // 서울 10월 7일 12시
+        clock.set(Instant.parse("2026-10-07T03:00:00Z")); // 서울 10월 7일 12시
         TaskDetail resumed = service.resume(owner, taskId);
 
         assertThat(resumed.task().state()).isEqualTo(TaskState.ACTIVE);
@@ -287,7 +272,7 @@ class TaskServiceTest {
         Agent agent = agentOf(owner, AgentVisibility.PRIVATE);
         UUID taskId =
                 service.create(owner, cron("매일 9시", agent, "0 9 * * *")).task().publicId();
-        CLOCK.set(Instant.parse("2026-10-06T03:00:00Z"));
+        clock.set(Instant.parse("2026-10-06T03:00:00Z"));
 
         TaskDetail renamed = service.update(owner, taskId, cron("새 이름", agent, "0 9 * * *"));
 
@@ -311,7 +296,7 @@ class TaskServiceTest {
         TaskTrigger trigger = triggers.findByTaskId(created.task().id()).orElseThrow();
         trigger.advance(trigger.fireAt(), null, Instant.parse("2026-10-04T03:00:00Z"));
         triggers.save(trigger);
-        CLOCK.set(Instant.parse("2026-10-05T00:00:00Z"));
+        clock.set(Instant.parse("2026-10-05T00:00:00Z"));
 
         TaskDetail renamed = service.update(owner, created.task().publicId(), once("고친 이름", agent, fireAt));
 
@@ -445,33 +430,5 @@ class TaskServiceTest {
         assertThatThrownBy(call)
                 .isInstanceOfSatisfying(
                         ApiException.class, ex -> assertThat(ex.code()).isEqualTo(expected));
-    }
-
-    /** 검사가 정한 시각만 주는 시계다. */
-    static final class TestClock extends Clock {
-        private volatile Instant now;
-
-        TestClock(Instant now) {
-            this.now = now;
-        }
-
-        void set(Instant instant) {
-            now = instant;
-        }
-
-        @Override
-        public Instant instant() {
-            return now;
-        }
-
-        @Override
-        public ZoneId getZone() {
-            return ZoneOffset.UTC;
-        }
-
-        @Override
-        public Clock withZone(ZoneId zone) {
-            return this;
-        }
     }
 }

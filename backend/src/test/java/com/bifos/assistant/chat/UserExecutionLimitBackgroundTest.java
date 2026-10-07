@@ -26,7 +26,12 @@ import com.bifos.assistant.memory.application.MemoryProposer;
 import com.bifos.assistant.memory.infra.MemoryRepository;
 import com.bifos.assistant.model.domain.ModelChoice;
 import com.bifos.assistant.shared.auth.CurrentUser;
+import com.bifos.assistant.shared.config.LiveProperties;
 import com.bifos.assistant.shared.domain.type.UserRole;
+import com.bifos.assistant.testsupport.BackendIntegrationTest;
+import com.bifos.assistant.testsupport.MemoryProposeEnabled;
+import com.bifos.assistant.testsupport.OverrideProperties;
+import com.bifos.assistant.testsupport.SmallExecutionLimit;
 import com.bifos.assistant.usage.application.ExecutionRecorder;
 import com.bifos.assistant.usage.application.UserExecutionLimiter;
 import com.bifos.assistant.usage.domain.AgentExecution;
@@ -47,9 +52,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.context.annotation.Import;
-import org.springframework.test.context.ActiveProfiles;
 import tools.jackson.databind.ObjectMapper;
 
 /**
@@ -58,22 +60,20 @@ import tools.jackson.databind.ObjectMapper;
  * <p>한도 2 에 예비 자리 1 이다. turn 자리 하나를 쥔 사용자의 백그라운드 실행은 줄을 만든 뒤 남는 자리가 0 이라 돌지
  * 않는다. 추천 서비스는 {@code StarterSuggestionServiceTest} 처럼 시각과 실행기를 바꿔 끼워 직접 만든다.
  */
-@SpringBootTest(
-        properties = {
-            "assistant.user-execution.max-running=2",
-            "assistant.user-execution.background-reserve=1",
-            "assistant.starters.enabled=true",
-            "assistant.starters.retry-after-failure=10m",
-            "assistant.memory.propose.enabled=true"
-        })
-@ActiveProfiles("test")
-@Import(ChatServiceTest.StubRuntime.class)
+@BackendIntegrationTest
+@SmallExecutionLimit
+@MemoryProposeEnabled
+@OverrideProperties({
+    "assistant.user-execution.background-reserve=1",
+    "assistant.starters.enabled=true",
+    "assistant.starters.retry-after-failure=10m"
+})
 class UserExecutionLimitBackgroundTest {
 
     private static final String PROMPTS = "[\"일정 정리해 줘\",\"장보기 목록 만들어 줘\"]";
 
     @Autowired
-    StarterProperties starterProperties;
+    LiveProperties<StarterProperties> starterProperties;
 
     @Autowired
     AgentService agentService;

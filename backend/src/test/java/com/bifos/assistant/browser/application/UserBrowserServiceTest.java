@@ -12,8 +12,11 @@ import com.bifos.assistant.browser.domain.BrowserProfileStore;
 import com.bifos.assistant.browser.domain.type.UserBrowserStatus;
 import com.bifos.assistant.browser.infra.BrowserProperties;
 import com.bifos.assistant.browser.infra.UserBrowserRepository;
+import com.bifos.assistant.shared.config.LiveProperties;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
+import com.bifos.assistant.testsupport.BackendIntegrationTest;
+import com.bifos.assistant.testsupport.FakeBrowserRuntime;
 import java.time.Clock;
 import java.time.Duration;
 import java.util.ArrayList;
@@ -27,16 +30,13 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.test.context.ActiveProfiles;
 
 /**
  * 켜기, 끄기, 지우기의 순서와 동시 수, 실패 처리를 실제 DB 와 대역 proxy 로 본다. 규칙은 {@code docs/backend/user-browser.md} 의
  * 「상태 전이」 다.
  */
-@SpringBootTest
-@ActiveProfiles("test")
+@BackendIntegrationTest
 class UserBrowserServiceTest {
 
     @Autowired
@@ -87,8 +87,8 @@ class UserBrowserServiceTest {
 
         assertThat(started.status()).isEqualTo(UserBrowserStatus.RUNNING);
         assertThat(started.startedAt()).isNotNull();
-        assertThat(runtime.containers).hasSize(1);
-        assertThat(runtime.containers.values().iterator().next().running()).isTrue();
+        assertThat(runtime.containers()).hasSize(1);
+        assertThat(runtime.containers().values().iterator().next().running()).isTrue();
         assertThat(repository.findByUserId(101L).orElseThrow().containerId()).isEqualTo("c1");
     }
 
@@ -102,7 +102,7 @@ class UserBrowserServiceTest {
         UserBrowserSnapshot again = service.start(101L);
 
         assertThat(again.status()).isEqualTo(UserBrowserStatus.RUNNING);
-        assertThat(runtime.containers).hasSize(1);
+        assertThat(runtime.containers()).hasSize(1);
     }
 
     @Test
@@ -131,8 +131,8 @@ class UserBrowserServiceTest {
         var saved = repository.findByUserId(101L).orElseThrow();
         assertThat(saved.status()).isEqualTo(UserBrowserStatus.FAILED);
         assertThat(saved.lastError()).isEqualTo(UserBrowserService.START_TIMEOUT);
-        assertThat(runtime.removed).containsExactly("c1");
-        assertThat(runtime.containers).isEmpty();
+        assertThat(runtime.removed()).containsExactly("c1");
+        assertThat(runtime.containers()).isEmpty();
     }
 
     @Test
@@ -140,13 +140,13 @@ class UserBrowserServiceTest {
     void failsOnProxyErrorAndAllowsRetry() {
         UserBrowserService service = service(true, 2);
         service.create(101L);
-        runtime.failingActions.add("start");
+        runtime.failingActions().add("start");
 
         assertCode(() -> service.start(101L), ErrorCode.BROWSER_START_FAILED);
         assertThat(repository.findByUserId(101L).orElseThrow().lastError()).isEqualTo(UserBrowserService.START_FAILED);
-        assertThat(runtime.containers).isEmpty();
+        assertThat(runtime.containers()).isEmpty();
 
-        runtime.failingActions.clear();
+        runtime.failingActions().clear();
         assertThat(service.start(101L).status()).isEqualTo(UserBrowserStatus.RUNNING);
     }
 
@@ -160,7 +160,7 @@ class UserBrowserServiceTest {
         UserBrowserSnapshot stopped = service.stop(101L);
 
         assertThat(stopped.status()).isEqualTo(UserBrowserStatus.STOPPED);
-        assertThat(runtime.containers).isEmpty();
+        assertThat(runtime.containers()).isEmpty();
         assertThat(repository.findByUserId(101L).orElseThrow().containerId()).isNull();
         assertThat(service.stop(101L).status()).isEqualTo(UserBrowserStatus.STOPPED);
     }
@@ -171,12 +171,12 @@ class UserBrowserServiceTest {
         UserBrowserService service = service(true, 2);
         service.create(101L);
         service.start(101L);
-        runtime.failingActions.add("stop");
+        runtime.failingActions().add("stop");
 
         assertCode(() -> service.stop(101L), ErrorCode.BROWSER_STOP_FAILED);
         assertThat(repository.findByUserId(101L).orElseThrow().lastError()).isEqualTo(UserBrowserService.STOP_FAILED);
 
-        runtime.failingActions.clear();
+        runtime.failingActions().clear();
         assertThat(service.stop(101L).status()).isEqualTo(UserBrowserStatus.STOPPED);
     }
 
@@ -187,9 +187,9 @@ class UserBrowserServiceTest {
         service.create(101L);
         service.create(102L);
         service.start(101L);
-        runtime.failingActions.add("stop");
+        runtime.failingActions().add("stop");
         assertCode(() -> service.stop(101L), ErrorCode.BROWSER_STOP_FAILED);
-        runtime.failingActions.clear();
+        runtime.failingActions().clear();
 
         assertCode(() -> service.start(102L), ErrorCode.BROWSER_CAPACITY);
     }
@@ -200,9 +200,9 @@ class UserBrowserServiceTest {
         UserBrowserService service = service(true, 1);
         service.create(101L);
         service.start(101L);
-        runtime.failingActions.add("stop");
+        runtime.failingActions().add("stop");
         assertCode(() -> service.stop(101L), ErrorCode.BROWSER_STOP_FAILED);
-        runtime.failingActions.clear();
+        runtime.failingActions().clear();
 
         assertThat(service.start(101L).status()).isEqualTo(UserBrowserStatus.RUNNING);
     }
@@ -228,7 +228,7 @@ class UserBrowserServiceTest {
 
         assertThat(repository.findByUserId(101L)).isEmpty();
         assertThat(profileDirs).isEmpty();
-        assertThat(runtime.containers).isEmpty();
+        assertThat(runtime.containers()).isEmpty();
     }
 
     @Test
@@ -237,15 +237,15 @@ class UserBrowserServiceTest {
         UserBrowserService service = service(true, 2);
         service.create(101L);
         service.start(101L);
-        runtime.failingActions.add("stop");
+        runtime.failingActions().add("stop");
         assertCode(() -> service.stop(101L), ErrorCode.BROWSER_STOP_FAILED);
         assertThat(repository.findByUserId(101L).orElseThrow().containerId()).isEqualTo("c1");
-        runtime.failingActions.clear();
+        runtime.failingActions().clear();
 
         assertThat(service.start(101L).status()).isEqualTo(UserBrowserStatus.RUNNING);
 
-        assertThat(runtime.removed).containsExactly("c1");
-        assertThat(runtime.containers).containsOnlyKeys("c2");
+        assertThat(runtime.removed()).containsExactly("c1");
+        assertThat(runtime.containers()).containsOnlyKeys("c2");
     }
 
     @Test
@@ -254,17 +254,17 @@ class UserBrowserServiceTest {
         UserBrowserService service = service(true, 2);
         service.create(101L);
         service.start(101L);
-        runtime.failingActions.add("stop");
+        runtime.failingActions().add("stop");
         assertCode(() -> service.stop(101L), ErrorCode.BROWSER_STOP_FAILED);
-        runtime.failingActions.clear();
-        runtime.failingActions.add("remove");
+        runtime.failingActions().clear();
+        runtime.failingActions().add("remove");
 
         assertCode(() -> service.start(101L), ErrorCode.BROWSER_STOP_FAILED);
 
         var saved = repository.findByUserId(101L).orElseThrow();
         assertThat(saved.status()).isEqualTo(UserBrowserStatus.FAILED);
         assertThat(saved.containerId()).isEqualTo("c1");
-        assertThat(runtime.containers).containsOnlyKeys("c1");
+        assertThat(runtime.containers()).containsOnlyKeys("c1");
     }
 
     @Test
@@ -320,7 +320,7 @@ class UserBrowserServiceTest {
         assertCode(() -> service.stopById(1L), ErrorCode.BROWSER_DISABLED);
         assertCode(() -> service.deleteById(1L), ErrorCode.BROWSER_DISABLED);
         assertThat(service.get(101L)).isEmpty();
-        assertThat(runtime.containers).isEmpty();
+        assertThat(runtime.containers()).isEmpty();
     }
 
     @Test
@@ -372,7 +372,12 @@ class UserBrowserServiceTest {
             }
         };
         return new UserBrowserService(
-                browsers, runtime, profiles, address -> cdpReady.get(), properties, Clock.systemUTC());
+                browsers,
+                runtime,
+                profiles,
+                address -> cdpReady.get(),
+                LiveProperties.fixed(BrowserProperties.class, properties),
+                Clock.systemUTC());
     }
 
     private static void assertCode(ThrowingCallable call, ErrorCode code) {

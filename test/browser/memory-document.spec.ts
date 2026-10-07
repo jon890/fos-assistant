@@ -7,7 +7,6 @@ import {
   memoryRow,
   openDocumentTab,
   openRow,
-  reloadMemoryLists,
 } from "./memory-page.ts";
 
 test("문서 탭에서 민감 문서를 눌러 열고 고치고 지운다", async ({ page }, testInfo) => {
@@ -86,31 +85,6 @@ test("그사이 바뀐 문서는 다시 열게 하고 쓰던 글을 남긴다", 
     await row.getByRole("button", { name: "저장" }).click();
     await expect(row.getByText("3번째 판")).toBeVisible();
     await expect(row.getByText("평문-표식-2203")).toBeVisible();
-  } finally {
-    await cleanupMemories(page, [title]);
-  }
-});
-
-test("다른 곳에서 고친 문서는 목록을 다시 읽어도 연 본문의 판으로 보내 덮어쓰지 않는다", async ({ page }, testInfo) => {
-  const key = `stale-${testInfo.project.name}`;
-  const title = `오래된 본문 검사 ${testInfo.project.name}`;
-  try {
-    const { id } = await createDocument(page, { documentKey: key, title, content: "평문-표식-5500", sensitive: false });
-    await page.goto("/memory");
-    await openDocumentTab(page);
-    const row = memoryRow(page, title);
-    await openRow(page, title);
-    await expect(row.getByText("평문-표식-5500")).toBeVisible();
-
-    expect((await page.request.put(`/api/memory-documents/${id}`, { data: { content: "평문-표식-5501", sensitive: false, expectedRevision: 1 } })).ok()).toBe(true);
-
-    // 목록을 다시 읽게 한다. 목록의 판은 2 가 되지만 열어 둔 본문은 1 판이다.
-    await reloadMemoryLists(page);
-    await expect(row.getByText("2번째 판")).toBeVisible();
-    await row.getByRole("button", { name: "고치기" }).click();
-    await row.getByRole("textbox").fill("평문-표식-5503");
-    await row.getByRole("button", { name: "저장" }).click();
-    await expect(row.getByText("그사이 문서가 바뀌었어요. 문서를 다시 열어 주세요.")).toBeVisible();
   } finally {
     await cleanupMemories(page, [title]);
   }

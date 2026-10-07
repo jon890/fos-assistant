@@ -6,17 +6,15 @@ import com.bifos.assistant.chat.application.ConversationPublicIdLookup;
 import com.bifos.assistant.chat.application.ConversationWriter;
 import com.bifos.assistant.chat.domain.Conversation;
 import com.bifos.assistant.chat.infra.ConversationRepository;
+import com.bifos.assistant.testsupport.BackendIntegrationTest;
 import java.time.Instant;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.test.context.ActiveProfiles;
 
 /** 대화 번호를 공개 식별자로 바꾸는 조회가 지운 대화를 두 port 에서 다르게 다루는 것을 고정한다. */
-@SpringBootTest
-@ActiveProfiles("test")
+@BackendIntegrationTest
 class ConversationPublicIdLookupTest {
 
     private static final long LOOKUP_USER_ID = 9204L;

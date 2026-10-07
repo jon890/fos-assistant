@@ -11,17 +11,15 @@ import com.bifos.assistant.agent.domain.type.CostMode;
 import com.bifos.assistant.agent.domain.type.CredentialScope;
 import com.bifos.assistant.agent.infra.AgentMemoryCollectionRepository;
 import com.bifos.assistant.agent.infra.AgentRepository;
+import com.bifos.assistant.testsupport.BackendIntegrationTest;
 import java.time.Instant;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.test.context.ActiveProfiles;
 
 /** 에이전트가 받는 Memory collection 과 새 에이전트의 기본 부여를 확인한다(ADR-053). */
-@SpringBootTest
-@ActiveProfiles("test")
+@BackendIntegrationTest
 class AgentMemoryCollectionServiceTest {
 
     private static final Instant NOW = Instant.parse("2026-10-02T00:00:00Z");

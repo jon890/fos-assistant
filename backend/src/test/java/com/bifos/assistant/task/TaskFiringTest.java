@@ -24,6 +24,7 @@ import com.bifos.assistant.task.domain.type.TaskRunStatus;
 import com.bifos.assistant.task.infra.TaskRepository;
 import com.bifos.assistant.task.infra.TaskRunRepository;
 import com.bifos.assistant.task.infra.TaskTriggerRepository;
+import com.bifos.assistant.testsupport.BackendIntegrationTest;
 import com.bifos.assistant.user.domain.AppUser;
 import com.bifos.assistant.user.infra.AppUserRepository;
 import java.time.Duration;
@@ -37,10 +38,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.test.context.ActiveProfiles;
 
 /**
  * 발화기가 예정 시각이 된 작업의 발화를 한 번만 만드는지 실제 DB 로 본다. 규칙은 {@code docs/backend/task.md} 의 「발화」 다.
@@ -48,8 +47,7 @@ import org.springframework.test.context.ActiveProfiles;
  * <p>시각은 검사가 {@link TaskFiring#fireDue} 에 넘기는 값이 정한다. 사용자는 검사마다 새로 만들어 다른 검사의 줄과 섞이지
  * 않게 한다.
  */
-@SpringBootTest
-@ActiveProfiles("test")
+@BackendIntegrationTest
 class TaskFiringTest {
 
     /** 매달 1일 서울 9시 예정 시각에서 30초 뒤다. 늦은 것으로 보지 않는 범위 안이다. */

@@ -15,6 +15,7 @@ import com.bifos.assistant.proactive.application.ProactiveCheckService;
 import com.bifos.assistant.proactive.domain.type.CheckStatus;
 import com.bifos.assistant.proactive.infra.ProactiveCheckRepository;
 import com.bifos.assistant.shared.auth.CurrentUser;
+import com.bifos.assistant.shared.concurrent.BackgroundTasks;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.task.domain.Task;
@@ -71,6 +72,7 @@ public class TaskRunStarter {
     private final TaskProperties properties;
     private final TransactionTemplate transactions;
     private final Clock clock;
+    private final BackgroundTasks backgroundTasks;
 
     /**
      * {@code QUEUED} 줄을 예정 시각 순으로 열어 본다. 한 줄의 실패는 그 줄에서 멈추고 다음 줄로 간다.
@@ -128,7 +130,7 @@ public class TaskRunStarter {
             return false;
         }
         try {
-            Thread.ofVirtual().name("task-run-" + runId).start(() -> runTurn(runId, prepared, handle));
+            backgroundTasks.start("task-run-" + runId, () -> runTurn(runId, prepared, handle));
         } catch (RuntimeException | Error ex) {
             log.warn("예약 작업의 turn 스레드를 띄우지 못했다 taskRunId={}", runId, ex);
             finishSafely(runId, null, false, true);

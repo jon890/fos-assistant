@@ -26,21 +26,20 @@ import com.bifos.assistant.shared.auth.CurrentUserProvider;
 import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
+import com.bifos.assistant.testsupport.BackendIntegrationTest;
 import jakarta.validation.Validation;
 import jakarta.validation.Validator;
+import java.sql.Date;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.test.context.ActiveProfiles;
 
 /** 사용자가 문서를 쓰고 고치는 API 와 문서를 기존 Memory 경로에서 떼어 두는 것을 확인한다(ADR-057). */
-@SpringBootTest
-@ActiveProfiles("test")
+@BackendIntegrationTest
 class MemoryDocumentTest {
 
     private static final CurrentUser DAD = new CurrentUser(1L, "dad@example.com", "dad", 1L, UserRole.ADMIN);
@@ -93,6 +92,33 @@ class MemoryDocumentTest {
         assertThatThrownBy(action::run)
                 .isInstanceOfSatisfying(
                         ApiException.class, e -> assertThat(e.code()).isEqualTo(code));
+    }
+
+    @Test
+    @DisplayName("이관한 문서는 읽고 고쳐도 기존 출처가 남고 다른 사용자에게 보이지 않는다")
+    void preservesMigratedDocumentProvenance() {
+        Long id = controller
+                .create(new CreateDocumentRequest("core", "legacy-document", "이관 문서", "기존 본문", false))
+                .id();
+        jdbc.update(
+                "UPDATE memory SET source_type = ?, source_ref = ?, source_date = ? WHERE id = ?",
+                "brain",
+                "legacy/example.md",
+                Date.valueOf("2026-01-02"),
+                id);
+
+        assertThat(controller.get(id).content()).isEqualTo("기존 본문");
+        assertThat(controller.list()).extracting(DocumentSummaryView::id).contains(id);
+        controller.update(id, new UpdateDocumentRequest("고친 본문", false, 1));
+        assertThat(controller.get(id).content()).isEqualTo("고친 본문");
+        Map<String, Object> stored = row(id);
+        assertThat(stored.get("SOURCE_TYPE")).isEqualTo("brain");
+        assertThat(stored.get("SOURCE_REF")).isEqualTo("legacy/example.md");
+        assertThat(stored.get("SOURCE_DATE")).isEqualTo(Date.valueOf("2026-01-02"));
+
+        as(KID);
+        assertCode(() -> controller.get(id), ErrorCode.MEMORY_NOT_FOUND);
+        assertThat(controller.list()).extracting(DocumentSummaryView::id).doesNotContain(id);
     }
 
     @Test

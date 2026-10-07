@@ -60,7 +60,8 @@ Hermes 가 Control Plane MCP 의 `agent_list`, `agent_delegate`, `agent_status`,
 | `chat.presentation.ConversationEventController` | `GET /api/v1/chat/conversations/{conversationId}/events` 로 대화 단위 SSE 를 연다. 보내기 전에 `forViewer` 를 적용한다(ADR-038) |
 | `mcp.application.McpToolService` | `agent_status` 와 `agent_stop` 이 끝난 상태를 돌려주면 `result_delivered_at` 을 적는다. `agent_delegate` 가 줄을 만든 뒤 `SUBMIT_FAILED` 를 돌려줄 때도 위임 서비스가 적는다 |
 | 웹 `app/api/chat/conversations/[conversationId]/events/route.ts` | 대화 단위 SSE 를 그대로 넘긴다 |
-| 웹 `components/chat/conversation-session.tsx` | 대화를 열면 그 SSE 를 구독한다. `system` 사건은 알림 줄로, 자동 turn 의 답 조각은 보통 답과 같이 그린다. 대기 메시지 쪽 사건은 [`turn-control.md`](turn-control.md) 의 「응답 중 대기열」 이 갖는다 |
+| 웹 `components/chat/use-conversation-effects.ts` | 대화를 열면 그 SSE 를 구독한다 |
+| 웹 `components/chat/use-conversation-events.ts` | `system` 사건은 알림 줄로, 자동 turn 의 답 조각은 보통 답과 같이 그린다. 대기 메시지 쪽 사건은 [`turn-control.md`](turn-control.md) 의 「응답 중 대기열」 이 갖는다 |
 
 **`orchestration` 은 깨우기 서비스를 직접 부르지 않고 Spring 사건만 낸다.** 사건 `DelegationFinished` 는 `chat` 이 갖고 `orchestration` 이 낸다. `chat` 은 `orchestration` 을 import 하지 않는다. 위임 서비스가 `ChatService` 를 부르면 위임이 turn 실행에 얽힌다.
 

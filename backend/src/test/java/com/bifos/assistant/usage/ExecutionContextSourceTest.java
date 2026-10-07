@@ -15,6 +15,7 @@ import com.bifos.assistant.chat.infra.ConversationRepository;
 import com.bifos.assistant.hermes.HermesRunsClient;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.domain.type.UserRole;
+import com.bifos.assistant.testsupport.BackendIntegrationTest;
 import com.bifos.assistant.usage.application.ContextSourceRef;
 import com.bifos.assistant.usage.application.CostEstimator;
 import com.bifos.assistant.usage.application.ExecutionContextSnapshot;
@@ -34,16 +35,12 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.dao.DataAccessResourceFailureException;
-import org.springframework.test.context.ActiveProfiles;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /** 실행마다 실은 문맥 항목의 참조를 남기고 관리자에게만 실행 트리로 보이는지 확인한다(ADR-071). */
-@SpringBootTest
-@ActiveProfiles("test")
+@BackendIntegrationTest
 class ExecutionContextSourceTest {
 
     private static final Long USER_ID = 4_711L;
@@ -81,8 +78,8 @@ class ExecutionContextSourceTest {
     @Autowired
     PlatformTransactionManager transactionManager;
 
-    /** 실제로 돈 모델을 읽는 세션 조회를 여기서는 하지 않는다. 기록 규칙만 보는 검사다. */
-    @MockitoBean
+    /** 실제로 돈 모델을 읽는 세션 조회는 대역이 받는다. 기록 규칙만 보는 검사다. */
+    @Autowired
     HermesRunsClient hermes;
 
     private Conversation conversation;

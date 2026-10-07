@@ -11,6 +11,7 @@ import com.bifos.assistant.chat.infra.AttachmentProperties;
 import com.bifos.assistant.chat.infra.AttachmentStore;
 import com.bifos.assistant.chat.infra.ChatAttachmentRepository;
 import com.bifos.assistant.chat.infra.ConversationRepository;
+import com.bifos.assistant.testsupport.BackendIntegrationTest;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -24,12 +25,9 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.test.context.ActiveProfiles;
 
 /** 보관 기간이 지난 첨부의 파일만 지우고 행은 남기는지 확인한다. 일정을 기다리지 않고 직접 부른다. */
-@SpringBootTest
-@ActiveProfiles("test")
+@BackendIntegrationTest
 class AttachmentCleanerTest {
 
     private static final Instant NOW = Instant.parse("2026-03-01T04:00:00Z");

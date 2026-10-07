@@ -11,6 +11,8 @@ import com.bifos.assistant.orchestration.application.DelegationResult.Failure;
 import com.bifos.assistant.proactive.application.ProactiveCheckGuard;
 import com.bifos.assistant.proactive.domain.type.CheckStatus;
 import com.bifos.assistant.shared.auth.CurrentUser;
+import com.bifos.assistant.shared.concurrent.BackgroundTasks;
+import com.bifos.assistant.shared.config.LiveProperties;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.usage.application.ExecutionDeliveryWriter;
@@ -24,7 +26,6 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.ReentrantLock;
 import lombok.extern.slf4j.Slf4j;
@@ -59,18 +60,18 @@ public class AgentDelegationService {
     private final ExecutionDeliveryWriter deliveryWriter;
     private final ChildExecutionRunner children;
     private final ConversationRepository conversations;
-    private final DelegationProperties properties;
+    private final LiveProperties<DelegationProperties> properties;
     private final TurnCancellation turns;
     private final HermesRunsClient hermes;
     private final ApplicationEventPublisher events;
     private final ProactiveCheckGuard checkGuard;
     private final Clock clock;
+    private final BackgroundTasks backgroundTasks;
 
     /**
      * 이 프로세스에서 도는 위임 실행의 중지 표시와 run 참조다. 실행 번호가 열쇠다.
      *
-     * <p>실행 줄이 생긴 직후 넣고 그 실행이 끝나 상태를 적은 뒤 뺀다. 서버가 다시 뜨면 비고, 그때 남은 RUNNING 줄은
-     * 기동 정리가 Hermes 에 물어 정한다(ADR-061).
+     * <p>실행 줄이 생긴 직후 넣고 그 실행이 끝나 상태를 적은 뒤 뺀다. 서버가 다시 뜨면 비고, 그때 남은 RUNNING 줄은 기동 정리가 Hermes 에 물어 정한다(ADR-061).
      */
     private final ConcurrentHashMap<Long, RunningDelegation> running = new ConcurrentHashMap<>();
 
@@ -82,7 +83,7 @@ public class AgentDelegationService {
     private final ReentrantLock[] rootLocks = new ReentrantLock[ROOT_LOCK_STRIPES];
 
     /** 서버 전체에서 동시에 도는 위임의 자리다. 실행을 끝까지 돈 가상 스레드가 돌려준다. */
-    private final Semaphore activeDelegations;
+    private final DelegationSlots activeDelegations = new DelegationSlots();
 
     public AgentDelegationService(
             AgentService agents,
@@ -90,12 +91,13 @@ public class AgentDelegationService {
             ExecutionDeliveryWriter deliveryWriter,
             ChildExecutionRunner children,
             ConversationRepository conversations,
-            DelegationProperties properties,
+            LiveProperties<DelegationProperties> properties,
             TurnCancellation turns,
             HermesRunsClient hermes,
             ApplicationEventPublisher events,
             ProactiveCheckGuard checkGuard,
-            Clock clock) {
+            Clock clock,
+            BackgroundTasks backgroundTasks) {
         this.agents = agents;
         this.executions = executions;
         this.deliveryWriter = deliveryWriter;
@@ -107,7 +109,7 @@ public class AgentDelegationService {
         this.events = events;
         this.checkGuard = checkGuard;
         this.clock = clock;
-        this.activeDelegations = new Semaphore(properties.maxActive());
+        this.backgroundTasks = backgroundTasks;
         for (int i = 0; i < ROOT_LOCK_STRIPES; i++) {
             rootLocks[i] = new ReentrantLock();
         }
@@ -137,11 +139,9 @@ public class AgentDelegationService {
      * 기다리지 않고 끝난 결과는 다음 turn 에 전해지기 때문이다(ADR-040).
      *
      * <p>기다리는 시간은 {@code wait} 와 {@link DelegationProperties#statusWaitMax()} 가운데 짧은 쪽이다. 0 이하이면 기다리지
-     * 않는다. 이 서버가 돌리지 않는 {@code RUNNING} 실행은 끝나도 알 길이 없어 기다리지 않는다. 처음 읽은 뒤 그 사이 끝나 도는
-     * 표시가 없어졌으면 한 번 다시 읽어 끝난 상태를 준다.
+     * 않는다. 이 서버가 돌리지 않는 {@code RUNNING} 실행은 끝나도 알 길이 없어 기다리지 않는다. 처음 읽은 뒤 그 사이 끝나 도는 표시가 없어졌으면 한 번 다시 읽어 끝난 상태를 준다.
      *
-     * <p>트랜잭션을 걸지 않는다. 한 트랜잭션 안에서 기다리면 다시 읽어도 같은 영속 컨텍스트의 엔티티가 나오고, 기다리는 동안 DB
-     * 연결도 쥔다. {@link #stop} 과 같은 형태다.
+     * <p>트랜잭션을 걸지 않는다. 한 트랜잭션 안에서 기다리면 다시 읽어도 같은 영속 컨텍스트의 엔티티가 나오고, 기다리는 동안 DB 연결도 쥔다. {@link #stop} 과 같은 형태다.
      */
     public Optional<AgentExecution> status(CurrentUser user, AgentExecution origin, Long executionId, Duration wait) {
         Optional<AgentExecution> found = status(user, origin, executionId);
@@ -156,15 +156,15 @@ public class AgentDelegationService {
         if (delegation == null) {
             return executions.findById(executionId);
         }
-        delegation.awaitEnded(wait.compareTo(properties.statusWaitMax()) < 0 ? wait : properties.statusWaitMax());
+        Duration waitMax = properties.current().statusWaitMax();
+        delegation.awaitEnded(wait.compareTo(waitMax) < 0 ? wait : waitMax);
         return executions.findById(executionId);
     }
 
     /**
      * 요청자가 물을 수 있는 위임 실행 하나를 멈추고 그 뒤의 상태를 돌려준다. 그 실행이 다시 맡긴 실행은 멈추지 않는다.
      *
-     * <p>권한은 {@link #status} 와 같이 {@link #canQuery} 가 정한다. 아니면 없는 실행과 같게 빈 값이다. 이미 끝난 실행은
-     * 멈추지 않고 끝난 상태를 그대로 돌려준다.
+     * <p>권한은 {@link #status} 와 같이 {@link #canQuery} 가 정한다. 아니면 없는 실행과 같게 빈 값이다. 이미 끝난 실행은 멈추지 않고 끝난 상태를 그대로 돌려준다.
      *
      * <p>도는 실행이면 중지 표시를 켜고, run 번호가 있으면 Hermes 에 중지를 보낸다. 상태는 그 실행을 돌리는 가상 스레드만
      * 적는다. 그래서 멈추기와 끝나기가 겹치면 먼저 적힌 상태가 남는다. CANCELLED 가 적히기를 {@link #STOP_WAIT} 까지
@@ -261,11 +261,12 @@ public class AgentDelegationService {
      */
     public DelegationResult delegate(
             CurrentUser user, AgentExecution origin, DelegationKey delegationKey, String agentCode, String task) {
+        DelegationProperties settings = properties.current();
         Optional<Conversation> conversation = conversationOf(user, origin);
         if (conversation.isEmpty()) {
             return rejected(Failure.SUBMIT_FAILED, origin, "부모 실행에 대화가 없다");
         }
-        if (depthOfChild(origin) > properties.maxDepth()) {
+        if (depthOfChild(origin, settings.maxDepth()) > settings.maxDepth()) {
             return rejected(Failure.DEPTH_EXCEEDED, origin, "깊이 한도를 넘는다");
         }
         Agent agent;
@@ -289,7 +290,7 @@ public class AgentDelegationService {
         }
 
         Long rootId = origin.treeRootId();
-        long deadline = System.nanoTime() + properties.submitTimeout().toNanos();
+        long deadline = System.nanoTime() + settings.submitTimeout().toNanos();
         Handoff handoff;
         ReentrantLock lock = lockOf(rootId);
         // 잠금도 제출 대기 시간 안에서만 기다린다. 못 잡으면 스레드도 줄도 만들지 않아, 같은 키로 다시 불러도 새로 시작한다.
@@ -306,23 +307,22 @@ public class AgentDelegationService {
                 return rejected(Failure.CHECK_LIMIT, origin, "살펴보기가 끝났거나 위임 상한에 닿았다");
             }
             if (executions.countByRootExecutionIdAndStatusAndDelegationKeyIsNotNull(rootId, ExecutionStatus.RUNNING)
-                    >= properties.maxConcurrentChildren()) {
+                    >= settings.maxConcurrentChildren()) {
                 return rejected(Failure.TOO_MANY_CHILDREN, origin, "루트당 동시 위임 한도에 닿았다");
             }
             // 남은 시간이 없으면 실행 스레드를 띄우지 않는다. 띄우면 곧바로 포기하게 되고 CANCELLED 줄만 남는다.
             if (deadline - System.nanoTime() <= 0) {
                 return rejected(Failure.SUBMIT_FAILED, origin, "실행을 시작하기 전에 제한 시간이 지났다");
             }
-            if (!activeDelegations.tryAcquire()) {
+            if (!activeDelegations.tryAcquire(settings.maxActive())) {
                 return rejected(Failure.BUSY, origin, "서버 전체 동시 위임 한도에 닿았다");
             }
             handoff = new Handoff();
             Handoff started = handoff;
             try {
-                Thread.ofVirtual()
-                        .name("agent-delegate-" + rootId)
-                        .start(() ->
-                                run(user, conversation.get(), origin, agent, task, delegationKey, checkTree, started));
+                backgroundTasks.start(
+                        "agent-delegate-" + rootId,
+                        () -> run(user, conversation.get(), origin, agent, task, delegationKey, checkTree, started));
             } catch (RuntimeException | Error ex) {
                 activeDelegations.release();
                 log.warn("위임 실행 스레드를 띄우지 못했다 originExecutionId={}", origin.id(), ex);
@@ -540,10 +540,10 @@ public class AgentDelegationService {
      *
      * <p>한도를 넘는 것이 정해지면 더 따라가지 않는다. 부모 사슬이 순환하는 데이터에서도 멈춘다.
      */
-    private int depthOfChild(AgentExecution origin) {
+    private int depthOfChild(AgentExecution origin, int maxDepth) {
         int depth = 1;
         Long parentId = origin.parentExecutionId();
-        while (parentId != null && depth <= properties.maxDepth()) {
+        while (parentId != null && depth <= maxDepth) {
             depth++;
             parentId = executions
                     .findById(parentId)

@@ -1,6 +1,7 @@
 package com.bifos.assistant.orchestration.application;
 
 import com.bifos.assistant.chat.application.DelegationOutputClip;
+import com.bifos.assistant.shared.config.LiveProperties;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
@@ -17,7 +18,7 @@ public class DelegationOutput implements DelegationOutputClip {
     /** 위임 답을 잘랐을 때 끝에 붙이는 한 줄이다. 읽는 쪽은 모델이다. */
     static final String TRUNCATED_NOTICE = "[답이 %d자를 넘어 뒷부분을 잘랐다]";
 
-    private final DelegationProperties delegation;
+    private final LiveProperties<DelegationProperties> delegation;
 
     /**
      * 위임 답을 상한까지 자르고 잘렸다는 한 줄을 붙인다. 답이 null 이면 빈 글이다.
@@ -29,7 +30,7 @@ public class DelegationOutput implements DelegationOutputClip {
         if (output == null) {
             return "";
         }
-        int max = delegation.outputMaxChars();
+        int max = delegation.current().outputMaxChars();
         if (output.length() <= max) {
             return output;
         }

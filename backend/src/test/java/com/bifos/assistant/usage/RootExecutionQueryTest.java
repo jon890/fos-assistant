@@ -9,6 +9,7 @@ import com.bifos.assistant.agent.domain.type.CredentialScope;
 import com.bifos.assistant.agent.infra.AgentRepository;
 import com.bifos.assistant.chat.domain.Conversation;
 import com.bifos.assistant.chat.infra.ConversationRepository;
+import com.bifos.assistant.testsupport.BackendIntegrationTest;
 import com.bifos.assistant.usage.application.RootExecutionPage;
 import com.bifos.assistant.usage.application.RootExecutionQuery;
 import com.bifos.assistant.usage.domain.AgentExecution;
@@ -19,12 +20,9 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.test.context.ActiveProfiles;
 
 /** 루트 실행 목록 조회가 자식 여부와 대화의 공개 식별자를 함께 싣는지 본다. */
-@SpringBootTest
-@ActiveProfiles("test")
+@BackendIntegrationTest
 class RootExecutionQueryTest {
 
     private static final Long USER_ID = 4_402L;
@@ -51,7 +49,8 @@ class RootExecutionQueryTest {
                 .orElseGet(() -> agents.save(Agent.of(
                         "root-query-dad",
                         "루트 조회 아빠",
-                        "dad",
+                        // profile 이름은 유일하다. 다른 검사가 남긴 dad 에이전트와 겹치지 않게 이 검사만의 이름을 쓴다
+                        "root-query-dad",
                         "http://127.0.0.1:1/p/dad",
                         CostMode.SUBSCRIPTION,
                         CredentialScope.SHARED_HOUSEHOLD,

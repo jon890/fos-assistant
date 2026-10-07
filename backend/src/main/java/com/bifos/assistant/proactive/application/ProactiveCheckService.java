@@ -24,6 +24,8 @@ import com.bifos.assistant.proactive.infra.ProactiveCheckFindingRepository;
 import com.bifos.assistant.proactive.infra.ProactiveCheckProblemRepository;
 import com.bifos.assistant.proactive.infra.ProactiveCheckRepository;
 import com.bifos.assistant.shared.auth.CurrentUser;
+import com.bifos.assistant.shared.concurrent.BackgroundTasks;
+import com.bifos.assistant.shared.config.LiveProperties;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.usage.application.ExecutionDeliveryWriter;
@@ -59,7 +61,7 @@ public class ProactiveCheckService {
     private final ProactiveCheckFindingRepository findings;
     private final ProactiveCheckProblemRepository problems;
     private final FollowUpService followUps;
-    private final ProactiveCheckProperties properties;
+    private final LiveProperties<ProactiveCheckProperties> properties;
     private final TurnCancellation turns;
     private final ChatService chat;
     private final ConversationEventHub hub;
@@ -75,6 +77,7 @@ public class ProactiveCheckService {
     private final CheckFeedback feedback;
     private final Clock clock;
     private final TransactionTemplate transactions;
+    private final BackgroundTasks backgroundTasks;
 
     /**
      * 살펴보기를 할 수 있는지, 요청자의 점검 대화, 요청자의 마지막 살펴보기를 읽는다.
@@ -172,9 +175,8 @@ public class ProactiveCheckService {
                     !connectorBindings.connectorServers(agent.id()).isEmpty();
             ProactiveCheckRun run = new ProactiveCheckRun(
                     user, agent.id(), check, renewsSession(conversation), directConnectors, deps());
-            Thread.ofVirtual()
-                    .name("proactive-check-" + conversation.id())
-                    .start(() -> runCheck(user, conversation.id(), handle, run));
+            backgroundTasks.start(
+                    "proactive-check-" + conversation.id(), () -> runCheck(user, conversation.id(), handle, run));
         } catch (RuntimeException | Error ex) {
             log.warn("살펴보기를 시작하지 못했다 conversationId={}", conversation.id(), ex);
             if (check != null) {
@@ -244,7 +246,7 @@ public class ProactiveCheckService {
         String rootSession = conversation.hermesRootSessionId();
         return rootSession != null
                 && checks.countByConversationIdAndHermesRootSessionId(conversation.id(), rootSession)
-                        >= properties.sessionMaxChecks();
+                        >= properties.current().sessionMaxChecks();
     }
 
     /**
@@ -360,6 +362,7 @@ public class ProactiveCheckService {
                 renderer,
                 reportFactory,
                 chat,
-                clock);
+                clock,
+                backgroundTasks);
     }
 }

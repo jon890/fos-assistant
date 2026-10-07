@@ -16,6 +16,7 @@ import com.bifos.assistant.proactive.application.ProactiveCheckReadiness;
 import com.bifos.assistant.proactive.application.model.CheckBlocker;
 import com.bifos.assistant.proactive.application.model.CheckBlockerCode;
 import com.bifos.assistant.proactive.application.model.CheckReadiness;
+import com.bifos.assistant.shared.config.LiveProperties;
 import com.bifos.assistant.skill.application.SkillCommandCatalog;
 import java.time.Duration;
 import java.time.Instant;
@@ -37,7 +38,9 @@ class ProactiveCheckReadinessTest {
 
     private ProactiveCheckReadiness readiness(boolean enabled) {
         return new ProactiveCheckReadiness(
-                new ProactiveCheckProperties(enabled, MINUTE, 40, 3, 14, MINUTE, 20),
+                LiveProperties.fixed(
+                        ProactiveCheckProperties.class,
+                        new ProactiveCheckProperties(enabled, MINUTE, 40, 3, 14, MINUTE, 20)),
                 skills,
                 toolsets,
                 connectorBindings);

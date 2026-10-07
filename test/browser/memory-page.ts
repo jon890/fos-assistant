@@ -61,32 +61,26 @@ export async function cleanupMemories(page: Page, titles: string[]) {
   }
 }
 
-/**
- * 화면이 기억과 문서 목록을 다시 읽게 한다.
- *
- * <p>가져오기가 끝났을 때 보내는 알림을 그대로 쓴다. 서버가 그린 첫 목록은 `page.route` 로 바꿀 수 없어서,
- * 가짜 목록을 보이려면 화면이 브라우저에서 다시 읽게 해야 한다.
- */
-export async function reloadMemoryLists(page: Page) {
-  // 화면이 알림을 받을 준비가 되기 전에 보내면 아무 일도 없다. 기억 목록을 다시 읽는 요청이 나갈 때까지 다시 보낸다.
-  await expect(async () => {
-    const reloaded = page.waitForResponse(
-      (response) => response.request().method() === "GET" && new URL(response.url()).pathname === "/api/memories",
-      { timeout: 1_000 },
-    );
-    await page.evaluate(() => window.dispatchEvent(new Event("memory-imported")));
-    await reloaded;
-  }).toPass({ timeout: 10_000 });
+/** 기존 기억을 저장해 화면의 실제 목록 다시 읽기를 실행한다. */
+export async function reloadMemoryListBySaving(page: Page, title: string) {
+  await openRow(page, title);
+  const row = memoryRow(page, title);
+  await row.getByRole("button", { name: "고치기" }).click();
+  const reloaded = page.waitForResponse(
+    (response) => response.request().method() === "GET" && new URL(response.url()).pathname === "/api/memories",
+  );
+  await row.getByRole("button", { name: "저장" }).click();
+  await reloaded;
 }
 
 export async function openDocumentTab(page: Page) {
   await page.getByRole("tab", { name: "문서" }).click();
 }
 
-/** 기억 화면을 열고 아래에 접어 둔 「가져오기와 외부 서비스 연결」 을 펼친다. */
+/** 기억 화면을 열고 아래에 접어 둔 「외부 서비스 연결」 을 펼친다. */
 export async function openMemoryAdvanced(page: Page) {
   await page.goto("/memory");
-  await page.getByText("가져오기와 외부 서비스 연결").click();
+  await page.locator("summary", { hasText: "외부 서비스 연결" }).click();
 }
 
 export async function expectNoHorizontalOverflow(page: Page) {

@@ -8,6 +8,8 @@ import com.bifos.assistant.hermes.HermesRunsClient;
 import com.bifos.assistant.hermes.ToolDetailScope;
 import com.bifos.assistant.hermes.dto.HermesRunResult;
 import com.bifos.assistant.hermes.dto.RunEvent;
+import com.bifos.assistant.shared.concurrent.BackgroundTasks;
+import com.bifos.assistant.shared.config.LiveProperties;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.usage.application.ExecutionEventRecorder;
 import com.bifos.assistant.usage.application.ExecutionRecorder;
@@ -35,12 +37,13 @@ class ChatRunEvents {
     private final AgentConnectorBindings connectorBindings;
     private final HermesRunsClient hermes;
     private final HermesRunEventStream eventStream;
-    private final HermesProperties hermesProperties;
+    private final LiveProperties<HermesProperties> hermesProperties;
     private final ExecutionRecorder executions;
     private final ExecutionEventRecorder eventRecorder;
     private final ExecutionEventRepository executionEvents;
     private final TurnCancellation turns;
     private final UserExecutionLimiter limiter;
+    private final BackgroundTasks backgroundTasks;
 
     String submit(PendingTurn pending) {
         try {
@@ -74,7 +77,7 @@ class ChatRunEvents {
         CompletableFuture<Void> streamDone = new CompletableFuture<>();
         AtomicBoolean terminalSeen = new AtomicBoolean();
         ToolDetailScope detailScope = toolDetailScope(pending.agent());
-        Thread.startVirtualThread(() -> {
+        backgroundTasks.start("turn-event-stream-" + runId, () -> {
             try {
                 eventStream.open(
                         pending.command().apiBaseUrl(),
@@ -116,7 +119,8 @@ class ChatRunEvents {
             }
         });
         if (onEvent == null) {
-            turns.awaitStreamOrGrace(handle, streamDone, hermesProperties.runTimeout());
+            turns.awaitStreamOrGrace(
+                    handle, streamDone, hermesProperties.current().runTimeout());
         } else {
             turns.awaitStreamOrGrace(handle, streamDone);
         }
