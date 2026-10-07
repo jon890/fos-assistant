@@ -47,7 +47,7 @@ export function ExpandableRow({
         <button
           type="button"
           aria-expanded={open}
-          aria-controls={panelId}
+          aria-controls={open ? panelId : undefined}
           // 줄 이름은 제목만이다. 짧은 표시는 설명으로 읽힌다.
           aria-labelledby={`${id}-title`}
           aria-describedby={`${id}-meta`}

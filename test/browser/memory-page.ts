@@ -68,7 +68,15 @@ export async function cleanupMemories(page: Page, titles: string[]) {
  * 가짜 목록을 보이려면 화면이 브라우저에서 다시 읽게 해야 한다.
  */
 export async function reloadMemoryLists(page: Page) {
-  await page.evaluate(() => window.dispatchEvent(new Event("memory-imported")));
+  // 화면이 알림을 받을 준비가 되기 전에 보내면 아무 일도 없다. 기억 목록을 다시 읽는 요청이 나갈 때까지 다시 보낸다.
+  await expect(async () => {
+    const reloaded = page.waitForResponse(
+      (response) => response.request().method() === "GET" && new URL(response.url()).pathname === "/api/memories",
+      { timeout: 1_000 },
+    );
+    await page.evaluate(() => window.dispatchEvent(new Event("memory-imported")));
+    await reloaded;
+  }).toPass({ timeout: 10_000 });
 }
 
 export async function openDocumentTab(page: Page) {
