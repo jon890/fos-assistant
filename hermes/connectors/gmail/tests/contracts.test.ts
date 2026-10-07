@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { createGmailServer, isSupportedBunVersion } from "../src/server.ts";
 import { withMcp } from "./support.ts";
@@ -47,10 +47,35 @@ test("모든 MCP 도구는 사용자가 판단할 수 있는 설명을 제공한
 });
 
 test("Gmail 서버 소스에는 메일 삭제·trash·attachment download endpoint가 없다", () => {
-  const source = readFileSync(join(root, "src/server.ts"), "utf8");
+  const source = readdirSync(join(root, "src"))
+    .filter((name) => name.endsWith(".ts"))
+    .map((name) => readFileSync(join(root, "src", name), "utf8"))
+    .join("\n");
   for (const blocked of ["batchDelete", "/trash", "/attachments/"])
     expect(source).not.toContain(blocked);
   expect(source).not.toMatch(/\/messages[^\n]*"DELETE"/);
+});
+
+test("도구를 나누어도 MCP 목록의 등록 순서를 유지한다", async () => {
+  await withMcp(createGmailServer({ env: {} }), async (client) => {
+    expect((await client.listTools()).tools.map((tool) => tool.name)).toEqual([
+      "get_profile",
+      "list_labels",
+      "search_messages",
+      "get_message",
+      "get_thread",
+      "create_draft",
+      "modify_labels",
+      "send_message",
+      "reply_to_message",
+      "create_label",
+      "update_label",
+      "list_filters",
+      "create_filter",
+      "delete_filter",
+      "apply_labels_to_query",
+    ]);
+  });
 });
 
 test.each([
