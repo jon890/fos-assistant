@@ -77,18 +77,18 @@ manifest 가 `owner_attachments_env` 를 선언했으면 plugin 은 운영 정�
 | `mcp_servers` | 그 커넥터의 서버 정의를 둔다. 값이 없는 선택 칸은 정의의 `env` 에 빈 글을 명시한다 | 그 서버 정의를 지운다 |
 | `platform_toolsets.api_server` | 서버 이름을 더한다. 있던 이름은 그대로 두고 `no_mcp` 는 뺀다. manifest 의 `toolsets` 는 더하지 않는다 | 그 이름만 뺀다 |
 | 스킬 | plugin 의 스킬 디렉터리를 그 profile 의 `skills/<앞머리 name>/` 로 복사한다. `SKILL.md` 와 `references/`, `templates/` 아래 정규 파일이다. 앞머리가 환경 값이나 자격 증명 파일을 요청하는 스킬이 있으면 그 커넥터를 카탈로그에 내지 않는다([ADR-086](../adr/ADR-086-셸과-파일-도구는-사용자별-docker-실행-공간에서만-돈다.md)). 칸 목록은 [커넥터 만들기](../connector-authoring.md) 의 「스킬」 이 갖는다 | 소유 기록의 `skills` 디렉터리를 지운다 |
+| 스킬 색인 표식 | 스킬 파일이 바뀌면 같은 쓰기에서 `skills.disabled` 의 `fos-skill-index-` 로 시작하는 항목을 빼고 새 표식 하나를 더한다. 공유 gateway 의 스킬 색인 캐시 키에 `skills.disabled` 가 들어 있어 그 profile 의 다음 실행이 색인을 새로 만든다. 운영자가 넣은 다른 이름은 그대로 둔다. 값이 문자열이면 Hermes 가 읽는 대로 목록으로 바꿔 쓰고, 사전이나 숫자처럼 고칠 수 없는 모양이면 409 로 거절한다 | 스킬 파일을 지웠으면 붙일 때처럼 표식을 바꾼다. 고칠 수 없는 모양이면 표식 없이 뗀다 |
 | 소유 기록 | 항목에 `mode: bind`, `vault`, `skills` 를 적는다 | 그 항목을 지운다 |
 | 이름 대응 파일 | `isolated: false` 를 싣고 소유 기록의 모든 서버를 싣는다. manifest 를 읽지 못했거나 소유 기록의 서버 이름이나 실행 정의가 지금 manifest 와 다른 서버는 소유 기록의 이름으로 빈 `tools` 다. 뗀 서버 기록의 서버도 빈 `tools` 로 싣는다 | 뗀 서버를 빈 `tools` 로 남긴다. 마지막 바인딩을 떼도 지우지 않는다 |
 | 뗀 서버 기록 `.fos-connector-detached.json` | 그 커넥터의 항목을 지운다. 남은 항목이 없으면 파일을 지운다 | `{커넥터 id: 서버 이름}` 으로 그 서버 이름을 남긴다 |
 | `fos-ctx` | 묶음에 든 판으로 맞춘다 | 건드리지 않는다 |
-| 답의 `restart_required` | 바뀐 것이 있으면 참이다. 떠 있는 profile 에 더한 MCP 서버는 gateway 를 다시 띄워야 보인다. 이름 대응 파일만 바뀌어도 참이므로, 운영자가 다른 커넥터의 실행 정의를 바꾼 profile 에서는 연결 확인이 그 profile 의 바인딩을 한 번 재시작 대기로 둔다 | 거짓이다. 도구 목록에서 이름을 빼므로 다음 실행은 그 서버를 받지 않는다. 떼기 전에 시작한 실행의 호출은 대응에 남은 서버를 보고 판정이 막는다 |
+| 답의 `restart_required` 와 `reload_pending` | 이미 있던 서버의 정의나 그 서버의 `.env` 값이 바뀌었으면 `restart_required` 가 참이다. 공유 gateway 의 MCP 설정 맞추기는 이름만 비교해 같은 이름을 다시 연결하지 않는다. 새 서버를 더했거나 스킬이나 이름 대응 파일만 바뀌었으면 `restart_required` 는 거짓이고 `reload_pending` 이 참이다. 새 이름은 맞추기 주기가 연결하고, 이름 대응 파일은 `fos-ctx` 가 호출마다 읽는다. `plugin_updated` 가 참이면 `reload_pending` 은 거짓이다. 바뀐 것이 없으면 모든 칸이 거짓이다([ADR-20261007 / connector-live-reload](../adr/ADR-20261007-connector-live-reload.md)) | `restart_required` 는 거짓이고, 바뀐 것이 있으면 `reload_pending` 이 참이다. 도구 목록에서 이름을 빼므로 다음 실행은 그 서버를 받지 않는다. 떼기 전에 시작한 실행의 호출은 대응에 남은 서버를 보고 판정이 막는다 |
 
 - 붙이기는 한 묶음으로 쓴다. 실패하면 이 요청이 쓴 파일만 되돌린다
 - 떼기는 소유 기록을 지금 manifest 와 견주지 않는다. 그 항목이 객체이고 `mode` 가 `bind` 인지와 서버 이름과 스킬 이름이 경로 조각이 될 수 있는지만 본다. 운영자가 커넥터의 실행 정의를 바꾼 뒤에도 떼어야 `.env` 에 비밀이 남지 않는다
 - 쓰기 전에 `config.yaml`, 소유 기록, 이름 대응 파일, 뗀 서버 기록을 `connector-backups/` 에 떠 둔다. `.env` 와 스킬 파일은 떠 두지 않는다
 - `GET /api/connectors` 의 바인딩 항목 `configured` 는 서버 정의가 소유 기록과 같고, 서버 이름이 API 도구 목록에 있고, 소유 기록의 서버 이름과 실행 정의가 지금 manifest 와 같고, 소유 기록의 스킬 파일이 plugin 의 본문과 같을 때 참이다. Control Plane MCP 등록이 있어도 된다
 - 바인딩 항목은 요청이 가리키는 커넥터의 것만 지금 manifest 와 견주고 나머지는 모양만 본다. 운영자가 커넥터 하나의 실행 정의를 바꿔도 같은 profile 에 붙은 다른 커넥터의 붙이기, probe, 실행은 그대로 된다. 상태 조회는 바뀐 항목만 `configured: false` 다
-- 떼어도 gateway 의 스킬 색인은 재시작 전까지 그 스킬 이름을 남긴다. 모델이 그 스킬을 읽으려 하면 파일이 없어 실패할 뿐이다
 
 **도구 목록은 설치와 Control Plane 의 도구 저장이 나눠 쓴다.**
 토큰으로 부른 `PUT /api/config` 가 `platform_toolsets` 를 보내면, 소유 기록의 바인딩 항목이 설치한 서버 이름이 요청의 `api_server` 목록에 모두 있어야 한다.

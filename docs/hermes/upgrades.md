@@ -141,6 +141,16 @@ Hermes 를 올리기 전에 새 판의 tag 로 `scripts/check-hermes-contract.sh
 `v2026.7.30` 에는 그 둘과 `list_profile_names` 가 없었다.
 지금 plugin 을 그 판에 올리면 이 지점을 쓰는 단계가 실패한다.
 
+### MCP 설정 맞추기와 스킬 색인 캐시 키
+
+바인딩 설치가 재시작 없이 반영되는 것은 두 내부 동작에 기댄다([ADR-20261007 / connector-live-reload](../adr/ADR-20261007-connector-live-reload.md)).
+
+- 공유 gateway 의 housekeeping 에 MCP 설정 맞추기 작업이 있고, 그 작업이 profile 마다 `reconcile_mcp_servers_with_config` 를 부른다
+- 스킬 색인 캐시 키에 `skills.disabled` 에서 읽은 이름이 들어 있다. plugin 이 바꾼 색인 표식이 그 profile 의 색인을 새로 만들게 한다
+
+[`hermes/tests/hermes_contract.py`](../../hermes/tests/hermes_contract.py) 의 `LIVE_RELOAD` 가 이 지점을 선언하고, `HermesSourceTest.test_live_reload_points` 가 소스에서 확인한다.
+실패하면 붙인 커넥터가 재시작 전까지 보이지 않는데 Control Plane 은 반영됐다고 판정할 수 있다. ADR 의 판정을 다시 본다.
+
 ## 커넥터 정책이 기대는 계약
 
 Hermes 를 올릴 때 아래가 그대로인지 본다. 하나라도 달라지면 커넥터 도구의 판정이 비켜 갈 수 있다.

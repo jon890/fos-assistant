@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import ast
 import json
 import os
 import pathlib
@@ -54,6 +55,44 @@ from .profiles import (
 )
 
 
+# 스킬 색인 표식의 앞머리다. 공유 gateway 의 스킬 색인 캐시 키에는 스킬 디렉터리 내용이 없고 `skills.disabled` 가 있다.
+# 바인딩 설치가 스킬 파일을 바꾸면 없는 스킬 이름인 표식을 새 값으로 바꿔 그 profile 의 색인만 새로 만들게 한다(ADR-20261007 connector-live-reload).
+# 앞머리로만 판정한다. 운영자가 넣은 다른 이름은 건드리지 않는다.
+SKILL_INDEX_MARKER_PREFIX = "fos-skill-index-"
+
+
+def _skills_with_index_marker(skills_config) -> dict | None:
+    """`skills` 설정의 `disabled` 에서 옛 색인 표식을 빼고 새 표식 하나를 더한 사본이다. 고칠 수 없는 모양이면 None 이다.
+
+    표식은 매번 새 값이다. 같은 스킬 상태로 돌아와도 gateway 가 옛 캐시 항목을 다시 쓰지 않는다.
+    `disabled` 가 문자열이면 Hermes 의 `parse_config_string_list` 처럼 읽어 목록으로 쓴다.
+    `[` 로 시작해 목록 리터럴로 읽히면 그 이름들이고, 아니면 그 문자열 하나가 이름 하나다. 쉼표로 나누지 않는다.
+    """
+    if skills_config is None:
+        skills_config = {}
+    if not isinstance(skills_config, dict):
+        return None
+    disabled = skills_config.get("disabled")
+    if disabled is None:
+        names = []
+    elif isinstance(disabled, list):
+        names = list(disabled)
+    elif isinstance(disabled, str):
+        names = [disabled]
+        if disabled.strip().startswith("["):
+            try:
+                parsed = ast.literal_eval(disabled.strip())
+            except (ValueError, SyntaxError, TypeError, MemoryError, RecursionError):
+                parsed = None
+            if isinstance(parsed, list):
+                names = [str(item) for item in parsed]
+    else:
+        return None
+    names = [item for item in names if not (isinstance(item, str) and item.startswith(SKILL_INDEX_MARKER_PREFIX))]
+    names.append("%s%d" % (SKILL_INDEX_MARKER_PREFIX, time.time_ns()))
+    return {**skills_config, "disabled": names}
+
+
 def _connector_bind_config(profile_dir: pathlib.Path, plugin: str, enabled: bool,
                            vault: str | None = None, values: dict | None = None,
                            owner_attachments: str | None = None) -> dict:
@@ -66,9 +105,14 @@ def _connector_bind_config(profile_dir: pathlib.Path, plugin: str, enabled: bool
     떼기는 그 서버와 이름과 env 와 스킬만 지운다(ADR-083).
     떼기는 서버 이름을 뗀 서버 기록에 남기고 이름 대응에 빈 `tools` 로 남긴다. 대응 파일은 지우지 않는다.
     같은 커넥터를 다시 붙이면 그 기록을 지운다.
-    떠 있는 profile 에 더한 서버는 gateway 를 다시 띄워야 보이므로 붙이기는 바뀐 것이 있으면 재시작이 필요하다고 답한다.
+    공유 gateway 는 주기마다 profile 의 `mcp_servers` 이름과 살아 있는 연결을 맞춘다. 새 이름은 연결하고 빠진 이름은 끊는다.
+    그래서 새 서버를 더하거나 스킬, 이름 대응만 바꾼 설치는 재시작 없이 반영되므로 `reload_pending` 을 참으로 답한다.
+    이름만 비교하므로 이미 있던 서버의 정의나 그 서버의 `.env` 값을 바꾼 붙이기는 `restart_required` 를 참으로 답한다.
+    `fos-ctx` plugin 파일을 바꾸면 `plugin_updated` 가 참이고 `reload_pending` 은 거짓이다. 그것만으로 재시작을 기다린다.
     떼기는 재시작이 필요 없다고 답한다. 다음 실행은 도구 목록에서 이름이 빠져 그 서버를 받지 않고,
     떼기 전에 시작해 그 서버를 쥔 실행의 호출은 대응에 남은 서버를 보고 hook 이 묻고 판정이 막는다.
+    스킬 파일을 바꾸면 같은 쓰기에서 `skills.disabled` 의 색인 표식을 새 값으로 바꿔 gateway 가 그 profile 의 스킬 색인을 새로 만들게 한다.
+    `skills.disabled` 가 고칠 수 없는 모양이면 붙이기는 거절하고, 떼기는 표식 없이 뗀다(ADR-20261007 connector-live-reload).
     manifest 가 `owner_attachments_env` 를 선언했으면 `owner_attachments` 를 그 이름으로 서버 정의에 직접 넣는다.
     다시 설치할 때마다 받은 주인의 값으로 다시 쓴다(ADR-20261007 connector-owner-attachments).
     """
@@ -150,6 +194,8 @@ def _connector_bind_config(profile_dir: pathlib.Path, plugin: str, enabled: bool
             if not isinstance(owner_attachments, str) or not OWNER_ATTACHMENTS_VALUE_RE.match(owner_attachments):
                 raise ValueError("주인의 첨부 디렉터리 없이 사용자 첨부를 읽는 connector 를 설치하지 않는다")
             server["env"][manifest["owner_attachments_env"]] = owner_attachments
+        # 바꾸기 전의 정의다. gateway 는 같은 이름의 서버를 다시 연결하지 않으므로 정의가 바뀌면 재시작해야 한다.
+        previous = servers.get(name)
         servers[name] = server
         allowed = [item for item in allowed if item != "no_mcp"]
         if name not in allowed:
@@ -168,6 +214,10 @@ def _connector_bind_config(profile_dir: pathlib.Path, plugin: str, enabled: bool
             kept[-1] += "\n"
         kept.extend(wanted.values())
         new_env = "".join(kept).encode("utf-8") if kept or originals[env_path] is not None else None
+        # 이 커넥터 칸의 값이 바뀌었는지다. 떠 있는 서버 프로세스는 옛 값을 쥐고 있다.
+        env_changed = ([line for line in env_lines if _env_line_key(line) in field_env]
+                       != [line for line in kept if _env_line_key(line) in field_env])
+        restart = previous is not None and (previous != server or env_changed)
         skills = sorted(manifest["skills"])
         for skill in skills:
             if (skills_dir / skill).exists() and skill not in previous_skills:
@@ -181,7 +231,8 @@ def _connector_bind_config(profile_dir: pathlib.Path, plugin: str, enabled: bool
                    for skill in skills for relative, data in manifest["skills"][skill].items()}
     else:
         if not owned:
-            return {"changed": False, "restart_required": False, "plugin_updated": False}
+            return {"changed": False, "restart_required": False, "plugin_updated": False, "reload_pending": False}
+        restart = False
         name = owned["mcp_server"]
         # 기록과 다른 정의는 이 설치가 쓴 것이 아니다. 지우지 않고 멈춘다. 밖에서 이미 지워졌으면 지울 것이 없다.
         if name in servers and servers[name] != owned["server"]:
@@ -214,6 +265,13 @@ def _connector_bind_config(profile_dir: pathlib.Path, plugin: str, enabled: bool
     if isinstance(allowed, list):
         platform["api_server"] = allowed
     updated = {**saved, "mcp_servers": servers, "platform_toolsets": platform}
+    if stale or any(originals[path] != data for path, data in desired.items()):
+        marked = _skills_with_index_marker(saved.get("skills"))
+        if marked is not None:
+            updated["skills"] = marked
+        elif enabled:
+            raise FileExistsError("skills.disabled 를 고칠 수 없는 profile 이다")
+        # 떼기는 표식 없이 뗀다. 운영자가 설정을 바꿔도 떼야 `.env` 에 비밀이 남지 않는다.
     targets = {config_path: yaml.safe_dump(updated, sort_keys=False, allow_unicode=True).encode(),
                state_path: (json.dumps(state) + "\n").encode(), env_path: new_env,
                detached_path: _detached_bytes(detached),
@@ -224,7 +282,7 @@ def _connector_bind_config(profile_dir: pathlib.Path, plugin: str, enabled: bool
     targets.update(plugin_values)
     plugin_updated = any(originals[path] != value for path, value in plugin_values.items())
     if all(originals[path] == value for path, value in targets.items()):
-        return {"changed": False, "restart_required": False, "plugin_updated": False}
+        return {"changed": False, "restart_required": False, "plugin_updated": False, "reload_pending": False}
     backup = profile_dir / "connector-backups" / str(time.time_ns())
     backup.mkdir(parents=True, mode=0o700)
     os.chmod(backup.parent, 0o700)
@@ -290,4 +348,5 @@ def _connector_bind_config(profile_dir: pathlib.Path, plugin: str, enabled: bool
                 os.rmdir(current)
             except OSError:
                 pass
-    return {"changed": True, "restart_required": enabled, "plugin_updated": plugin_updated}
+    return {"changed": True, "restart_required": restart, "plugin_updated": plugin_updated,
+            "reload_pending": not restart and not plugin_updated}

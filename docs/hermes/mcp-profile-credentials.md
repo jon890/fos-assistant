@@ -57,6 +57,11 @@ MCP 설정 감시는 `config.yaml`의 수정 시각과 크기를 보며 `.env` �
 [MCP 설정 감시](https://github.com/NousResearch/hermes-agent/blob/v2026.9.14/gateway/run_profile_reconcile.py)와
 [기존 연결 재사용](https://github.com/NousResearch/hermes-agent/blob/v2026.9.14/tools/mcp_tool_discovery.py)이 근거다.
 토큰 교체와 해제는 해당 profile MCP 연결을 명시적으로 종료한 뒤 다시 발견하거나 gateway를 재시작해야 한다.
+
+공유 gateway는 60초마다 profile마다 `mcp_servers`의 이름과 살아 있는 연결을 맞춘다.
+`config.yaml`에 새 이름을 더하면 다음 맞추기 주기가 그 서버를 연결하고, 이름을 빼면 그 서버만 끊는다.
+같은 이름의 정의나 `.env` 값을 바꾼 것은 이름이 같아 다시 연결하지 않는다. 이 교체는 여전히 재시작을 기다린다.
+바인딩 설치는 이 차이로 `reload_pending`과 `restart_required`를 나눠 답한다([ADR-20261007 / connector-live-reload](../adr/ADR-20261007-connector-live-reload.md)).
 재시작이 필요한 동안에는 에이전트를 활성화하지 않는다.
 
 ## 환경 항목 제거
