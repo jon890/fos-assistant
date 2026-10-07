@@ -28,6 +28,7 @@ class ConversationPagingTest {
 | 운영 빈 몇 개의 Mockito spy | `@Autowired` 로 받아 `doReturn(...)`, `verify(...)` 를 쓴다 | Spring 이 초기화한다 |
 | 스케줄러 `CapturingTaskScheduler`. 자동 설정 스케줄러 자리에 들어가 `@Scheduled` 실행도 맡는다 | `capture()` 로 켜면 예약을 실행하지 않고 모은다. `drain()` 으로 꺼낸다 | 공통 확장이 `reset()` 해 다시 실제로 예약한다 |
 | 꺼 둔 대역(후보 출처, 권한 회수 실패, 결과 출처, 깨우기 재시도, 커넥터 변경 기록) | `@Autowired` 로 받아 켠다 | 공통 확장이 끈다 |
+| 브라우저 proxy 대역 `FakeBrowserRuntime` 과 늘 답하는 CDP 대역. 운영 코드는 브라우저 기능이 켜져 있을 때만 부른다 | `@OverrideProperties("assistant.browser.enabled=true")` 로 기능을 켜고 `@Autowired FakeBrowserRuntime` 으로 받는다 | 공통 확장이 `reset()` 한다 |
 
 MySQL 태그 검사의 기준 클래스만 `@SpringBootTest` 로 따로 둔다.
 
@@ -52,6 +53,7 @@ class UserExecutionLimitBackgroundTest { ... }
 - 공통 확장이 검사마다 시작 전에 적용하고, 끝난 뒤 기동 값으로 되돌린다. 컨텍스트는 새로 뜨지 않는다.
 - 바꾼 값도 운영 record 의 생성자를 거쳐 같은 검증을 받는다.
 - `LiveProperties` 로 읽지 않는 설정을 적으면 검사가 실패한다. 그 값을 바꾸려면 먼저 운영 사용처를 `LiveProperties` 로 옮긴다.
+  prefix 아래에 있어도 설정 record 의 칸이 아닌 키(`assistant.browser.sweep-interval` 처럼 `@Scheduled` 가 기동 때 읽는 값)도 실패한다.
 - 여럿이 쓰는 묶음은 이름 있는 주석으로 둔다. `@OverrideProperties` 를 메타 주석으로 갖는다.
 
 | 주석 | 바꾸는 설정 |

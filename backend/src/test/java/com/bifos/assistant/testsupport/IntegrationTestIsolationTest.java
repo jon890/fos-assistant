@@ -29,6 +29,7 @@ class IntegrationTestIsolationTest {
     private final TestClock clock = new TestClock();
     private final FailingAccessRevoker revoker = new FailingAccessRevoker();
     private final ConnectorChangeRecorder recorder = new ConnectorChangeRecorder();
+    private final FakeBrowserRuntime browsers = new FakeBrowserRuntime();
     private final StaticApplicationContext context = new StaticApplicationContext();
 
     @BeforeEach
@@ -43,11 +44,14 @@ class IntegrationTestIsolationTest {
         context.getBeanFactory().registerSingleton("results", new TestAutoTurnResultSource());
         context.getBeanFactory().registerSingleton("failing", new AttentionTestCandidates.FailingCandidates());
         context.getBeanFactory().registerSingleton("counting", new AttentionTestCandidates.ReadCountingCandidates());
+        context.getBeanFactory().registerSingleton("browsers", browsers);
         context.refresh();
         stub.willReportSessionRuntime(new SessionRuntime("model", "provider"));
         clock.set(FIXED);
         revoker.fail();
         recorder.start();
+        browsers.create("profile");
+        browsers.failingActions().add("list");
     }
 
     @AfterEach
@@ -73,6 +77,9 @@ class IntegrationTestIsolationTest {
                 .doesNotThrowAnyException();
         recorder.on(new ConnectorActionChanged(1L, UUID.randomUUID()));
         assertThat(recorder.seen()).as("켜 둔 사건 기록 대역이 꺼져야 한다").isEmpty();
+        assertThat(browsers.containers()).as("브라우저 대역의 컨테이너가 비워져야 한다").isEmpty();
+        assertThatCode(browsers::list).as("브라우저 대역에 넣어 둔 실패가 비워져야 한다").doesNotThrowAnyException();
+        assertThat(browsers.create("profile")).as("컨테이너 번호를 처음부터 세야 한다").isEqualTo("c1");
     }
 
     @Test
@@ -124,6 +131,7 @@ class IntegrationTestIsolationTest {
             broken.getBeanFactory().registerSingleton("results", new TestAutoTurnResultSource());
             broken.getBeanFactory().registerSingleton("failing", new AttentionTestCandidates.FailingCandidates());
             broken.getBeanFactory().registerSingleton("counting", new AttentionTestCandidates.ReadCountingCandidates());
+            broken.getBeanFactory().registerSingleton("browsers", browsers);
             broken.refresh();
 
             assertThatThrownBy(() -> IntegrationTestIsolation.afterTest(broken, Duration.ofSeconds(5)))

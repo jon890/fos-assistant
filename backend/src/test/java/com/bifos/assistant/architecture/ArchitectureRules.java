@@ -11,6 +11,7 @@ import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noMethods;
 import static com.tngtech.archunit.library.Architectures.layeredArchitecture;
 
+import com.bifos.assistant.browser.infra.BrowserProperties;
 import com.bifos.assistant.chat.application.DelegationWakeProperties;
 import com.bifos.assistant.chat.application.ModelTierProperties;
 import com.bifos.assistant.chat.application.StarterProperties;
@@ -493,7 +494,8 @@ public final class ArchitectureRules {
             MemoryEncryptionProperties.class,
             ModelTierProperties.class,
             ConnectorPolicyProperties.class,
-            MemoryProposalProperties.class);
+            MemoryProposalProperties.class,
+            BrowserProperties.class);
 
     /** {@code HermesProperties} 가운데 {@code LiveProperties} 로 읽는 칸이다. */
     private static final Set<String> HERMES_LIVE_ACCESSORS = Set.of("runTimeout", "pollInterval");

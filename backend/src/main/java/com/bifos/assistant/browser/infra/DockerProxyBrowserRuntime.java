@@ -2,6 +2,7 @@ package com.bifos.assistant.browser.infra;
 
 import com.bifos.assistant.browser.domain.BrowserRuntime;
 import com.bifos.assistant.browser.domain.RuntimeContainer;
+import com.bifos.assistant.shared.config.LiveProperties;
 import java.net.URI;
 import java.time.Duration;
 import java.util.ArrayList;
@@ -44,15 +45,15 @@ public class DockerProxyBrowserRuntime implements BrowserRuntime {
     private static final int NOT_FOUND = 404;
     private static final String LABEL_FILTER = "{\"label\":[\"" + BROWSER_LABEL + "=1\"]}";
 
-    private final BrowserProperties properties;
+    private final LiveProperties<BrowserProperties> properties;
     private final RestClient client;
 
     @Autowired
-    public DockerProxyBrowserRuntime(BrowserProperties properties) {
+    public DockerProxyBrowserRuntime(LiveProperties<BrowserProperties> properties) {
         this(properties, RestClient.builder().requestFactory(requestFactory()));
     }
 
-    DockerProxyBrowserRuntime(BrowserProperties properties, RestClient.Builder builder) {
+    DockerProxyBrowserRuntime(LiveProperties<BrowserProperties> properties, RestClient.Builder builder) {
         this.properties = properties;
         this.client = builder.build();
     }
@@ -116,17 +117,18 @@ public class DockerProxyBrowserRuntime implements BrowserRuntime {
         } catch (MissingContainer ex) {
             return Optional.empty();
         }
+        BrowserProperties settings = properties.current();
         String ip = body == null
                 ? ""
                 : body.path("NetworkSettings")
                         .path("Networks")
-                        .path(properties.network())
+                        .path(settings.network())
                         .path("IPAddress")
                         .asString("");
         if (ip.isBlank()) {
             return Optional.empty();
         }
-        return Optional.of(URI.create("http://" + ip + ":" + properties.cdpPort()));
+        return Optional.of(URI.create("http://" + ip + ":" + settings.cdpPort()));
     }
 
     @Override
@@ -154,31 +156,32 @@ public class DockerProxyBrowserRuntime implements BrowserRuntime {
 
     /** proxy 정책과 맞춘 생성 본문이다. 칸의 순서는 뜻이 없다. */
     Map<String, Object> createBody(String profileKey) {
-        long memory = properties.memoryMb() * MIB;
+        BrowserProperties settings = properties.current();
+        long memory = settings.memoryMb() * MIB;
         Map<String, Object> hostConfig = new LinkedHashMap<>();
         hostConfig.put(
                 "Binds",
-                List.of(trimSlash(properties.profileHostRoot()) + "/" + profileKey + ":" + properties.profileMount()
+                List.of(trimSlash(settings.profileHostRoot()) + "/" + profileKey + ":" + settings.profileMount()
                         + ":rw"));
-        hostConfig.put("NetworkMode", properties.network());
+        hostConfig.put("NetworkMode", settings.network());
         hostConfig.put("Memory", memory);
         hostConfig.put("MemorySwap", memory);
-        hostConfig.put("NanoCpus", Math.round(properties.cpu() * NANOS_PER_CPU));
-        hostConfig.put("PidsLimit", properties.pidsLimit());
-        hostConfig.put("ShmSize", properties.shmMb() * MIB);
+        hostConfig.put("NanoCpus", Math.round(settings.cpu() * NANOS_PER_CPU));
+        hostConfig.put("PidsLimit", settings.pidsLimit());
+        hostConfig.put("ShmSize", settings.shmMb() * MIB);
         hostConfig.put("CapDrop", List.of("ALL"));
         hostConfig.put("SecurityOpt", List.of("no-new-privileges"));
         hostConfig.put("Init", true);
         hostConfig.put("RestartPolicy", Map.of("Name", "no"));
         Map<String, Object> body = new LinkedHashMap<>();
-        body.put("Image", properties.image());
+        body.put("Image", settings.image());
         body.put("Labels", Map.of(BROWSER_LABEL, "1", USER_LABEL, profileKey));
         body.put("HostConfig", hostConfig);
         return body;
     }
 
     private String path(String path) {
-        String base = properties.proxyUrl();
+        String base = properties.current().proxyUrl();
         if (base == null || base.isBlank()) {
             throw new IllegalStateException("assistant.browser.proxy-url is not configured");
         }

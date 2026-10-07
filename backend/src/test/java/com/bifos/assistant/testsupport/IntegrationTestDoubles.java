@@ -1,5 +1,6 @@
 package com.bifos.assistant.testsupport;
 
+import com.bifos.assistant.browser.domain.CdpProbe;
 import com.bifos.assistant.hermes.StubHermesRunsClient;
 import com.bifos.assistant.shared.config.LiveProperties;
 import java.io.IOException;
@@ -97,6 +98,20 @@ public class IntegrationTestDoubles {
     @Bean
     AttentionTestCandidates.ReadCountingCandidates readCountingAttentionCandidates() {
         return new AttentionTestCandidates.ReadCountingCandidates();
+    }
+
+    /** 운영 proxy 자리에 들어간다. 운영 코드는 브라우저 기능이 켜져 있을 때만 부른다. */
+    @Bean
+    @Primary
+    FakeBrowserRuntime fakeBrowserRuntime() {
+        return new FakeBrowserRuntime();
+    }
+
+    /** 늘 답하는 CDP 다. 상태가 없다. 운영 코드는 브라우저 기능이 켜져 있을 때만 부른다. */
+    @Bean
+    @Primary
+    CdpProbe readyCdpProbe() {
+        return address -> true;
     }
 
     /**

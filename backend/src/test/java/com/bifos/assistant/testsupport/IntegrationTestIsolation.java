@@ -5,11 +5,14 @@ import com.bifos.assistant.hermes.HermesProperties;
 import com.bifos.assistant.hermes.StubHermesRunsClient;
 import com.bifos.assistant.proactive.application.ProactiveCheckProperties;
 import com.bifos.assistant.shared.config.LiveProperties;
+import java.lang.reflect.RecordComponent;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import org.junit.jupiter.api.extension.AfterEachCallback;
@@ -126,7 +129,9 @@ public class IntegrationTestIsolation implements BeforeEachCallback, AfterEachCa
             }
             for (OverridableLiveProperties<?> owner : owners) {
                 Set<ConfigurationPropertyName> allowed = PARTIAL.get(owner.type());
-                if (allowed != null && !allowed.contains(name)) {
+                boolean field =
+                        namesField(owner.type(), name, prefixOf(owner.type()).getNumberOfElements());
+                if (!field || (allowed != null && !allowed.contains(name))) {
                     throw new IllegalArgumentException("LiveProperties 로 읽지 않는 설정이다: " + key);
                 }
                 grouped.computeIfAbsent(owner, ignored -> new LinkedHashMap<>()).putIfAbsent(key, value);
@@ -155,6 +160,7 @@ public class IntegrationTestIsolation implements BeforeEachCallback, AfterEachCa
         attempt(failures, () -> context.getBean(ConnectorChangeRecorder.class).reset());
         attempt(failures, () -> context.getBean(FailingAccessRevoker.class).reset());
         attempt(failures, () -> context.getBean(TestAutoTurnResultSource.class).reset());
+        attempt(failures, () -> context.getBean(FakeBrowserRuntime.class).reset());
         attempt(
                 failures,
                 () -> context.getBean(AttentionTestCandidates.FailingCandidates.class)
@@ -181,6 +187,44 @@ public class IntegrationTestIsolation implements BeforeEachCallback, AfterEachCa
         } catch (RuntimeException | Error ex) {
             failures.add(ex);
         }
+    }
+
+    /**
+     * {@code name} 의 {@code from} 번째 요소부터가 record {@code type} 의 칸을 가리키는가. 칸 이름은 record component 이름을
+     * kebab-case 로 바꾼 것이다. 칸이 record 면 그 아래 칸까지 따라가고, {@link Map} 이나 {@link Collection}, 배열이면 그 아래
+     * 하위 키를 모두 받는다.
+     *
+     * <p>prefix 아래에 있지만 record 의 칸이 아닌 키(기동 때 {@code @Scheduled} 가 읽는 간격 등)는 바인딩에서 버려져 값이 바뀌지 않는다.
+     * 그런 키를 적은 검사가 알리지 않고 통과하지 않게 막는다.
+     */
+    private static boolean namesField(Class<?> type, ConfigurationPropertyName name, int from) {
+        if (!type.isRecord() || from >= name.getNumberOfElements()) {
+            return false;
+        }
+        String element = name.getElement(from, ConfigurationPropertyName.Form.UNIFORM);
+        for (RecordComponent component : type.getRecordComponents()) {
+            String field = ConfigurationPropertyName.of(kebab(component.getName()))
+                    .getElement(0, ConfigurationPropertyName.Form.UNIFORM);
+            if (!field.equals(element)) {
+                continue;
+            }
+            Class<?> fieldType = component.getType();
+            boolean last = from + 1 == name.getNumberOfElements();
+            if (Map.class.isAssignableFrom(fieldType)
+                    || Collection.class.isAssignableFrom(fieldType)
+                    || fieldType.isArray()) {
+                return true;
+            }
+            if (fieldType.isRecord() && !last) {
+                return namesField(fieldType, name, from + 1);
+            }
+            return last;
+        }
+        return false;
+    }
+
+    private static String kebab(String camel) {
+        return camel.replaceAll("([a-z0-9])([A-Z])", "$1-$2").toLowerCase(Locale.ROOT);
     }
 
     private static List<OverridableLiveProperties<?>> overridables(ApplicationContext context) {

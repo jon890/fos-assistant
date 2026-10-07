@@ -1,5 +1,6 @@
 package com.bifos.assistant;
 
+import com.bifos.assistant.browser.infra.BrowserProperties;
 import com.bifos.assistant.chat.application.DelegationWakeProperties;
 import com.bifos.assistant.chat.application.ModelTierProperties;
 import com.bifos.assistant.chat.application.StarterProperties;
@@ -81,6 +82,11 @@ public class LivePropertiesConfig {
     @Bean
     public LiveProperties<MemoryProposalProperties> memoryProposalPropertiesLive(MemoryProposalProperties value) {
         return LiveProperties.fixed(MemoryProposalProperties.class, value);
+    }
+
+    @Bean
+    public LiveProperties<BrowserProperties> browserPropertiesLive(BrowserProperties value) {
+        return LiveProperties.fixed(BrowserProperties.class, value);
     }
 
     /** {@code runTimeout()} 과 {@code pollInterval()} 을 읽는 곳만 쓴다. 나머지 칸은 {@link HermesProperties} 를 그대로 주입받는다. */
