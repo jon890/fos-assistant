@@ -1,13 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import {
   listDocuments,
   type MemoryCollectionOption,
   type MemoryDocument,
 } from "@/lib/memory-document";
 import { MEMORY_MANUAL_CREATE } from "@/lib/memory-features";
-import { MEMORY_IMPORTED_EVENT } from "@/lib/memory-import";
 import { DocumentForm } from "./document-form";
 import { DocumentItem } from "./document-item";
 
@@ -34,12 +33,6 @@ export function DocumentSection({
     const result = await listDocuments();
     if (result.ok) setDocuments(result.data);
   }
-
-  // 가져오기 절이 끝났다고 알리면 새로 들어온 문서를 다시 읽는다.
-  useEffect(() => {
-    window.addEventListener(MEMORY_IMPORTED_EVENT, reload);
-    return () => window.removeEventListener(MEMORY_IMPORTED_EVENT, reload);
-  });
 
   return (
     <section className="mb-8" aria-labelledby="memory-documents-heading">

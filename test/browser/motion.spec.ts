@@ -1,5 +1,5 @@
 import { conversationIdOf, expect, test } from "./fixtures.ts";
-import { cleanupMemories, confirmDelete, createMemory, memoryRow, openRow, reloadMemoryLists } from "./memory-page.ts";
+import { cleanupMemories, confirmDelete, createMemory, memoryRow, openRow, reloadMemoryListBySaving } from "./memory-page.ts";
 import type { Locator, Page, TestInfo } from "../../web/node_modules/@playwright/test/index.js";
 
 // 움직임 자체를 검사하므로 공통 fixture의 움직임 줄이기를 여기서는 쓰지 않는다.
@@ -324,10 +324,12 @@ test("지우기가 실패하면 줄이 나가는 움직임 없이 남는다", as
 test("새 기억은 등장 움직임을 갖고 지운 기억은 나가는 움직임을 거쳐 사라진다", async ({ page }, testInfo) => {
   const title = `움직임 기억 ${testInfo.project.name} ${Date.now()}`;
   await recordLeavingRows(page);
+  const refreshTitle = `목록 갱신 ${testInfo.project.name} ${Date.now()}`;
+  await createMemory(page, { scope: "USER", title: refreshTitle, content: "목록 갱신용 기억" });
   await page.goto("/memory");
   // 화면을 연 뒤에 생긴 기억이 되도록 연 다음 만들고 목록을 다시 읽게 한다.
   await createMemory(page, { scope: "USER", title, content: "움직임을 검사하는 기억" });
-  await reloadMemoryLists(page);
+  await reloadMemoryListBySaving(page, refreshTitle);
   const item = memoryRow(page, title);
   await expect(item).toBeVisible();
   expect(await animationOf(item), "화면을 연 뒤에 생긴 기억").toEqual({ name: "message-assistant", duration: "0.2s" });
@@ -340,6 +342,7 @@ test("새 기억은 등장 움직임을 갖고 지운 기억은 나가는 움직
   await confirmDelete(page, title);
   await expect(item).toHaveCount(0);
   expect((await leavingSeen(page)).length, "사라지기 전에 data-leaving 이 붙은 기억 수").toBe(1);
+  await cleanupMemories(page, [title, refreshTitle]);
 });
 
 test("기억을 지운 뒤 목록을 다시 읽지 못해도 남은 줄이 투명한 채로 있지 않다", async ({ page }, testInfo) => {
