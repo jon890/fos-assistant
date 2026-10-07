@@ -7,23 +7,23 @@
 ## 세는 실행
 
 Control Plane 이 Hermes 에 실행을 맡기는 길은 `HermesRunsClient.submit`(`POST /v1/runs`) 하나다.
-그 메서드는 `ChatService`, `AgentRunner`, `MemoryProposer`, `StarterSuggestionService`, `HermesDecisionProvider`가 부른다.
+그 메서드는 `ChatRunEvents`, `AgentRunner`, `MemoryProposer`, `StarterSuggestionService`, `HermesDecisionProvider`가 부른다.
 다른 진입점은 모두 이 다섯 곳을 거친다.
 
 | 진입점 | 지나는 길 | 자리의 종류 |
 | --- | --- | --- |
-| 보내기(`POST /api/v1/chat/messages`, `.../messages/stream`) | `ChatService.send`, `stream` 에서 `runTurn` | turn 자리 |
+| 보내기(`POST /api/v1/chat/messages`, `.../messages/stream`) | `ChatService.send`, `stream` 에서 `ChatTurnRunner.runTurn` | turn 자리 |
 | 다시 생성(`.../regenerate/stream`) | `ChatService.regenerate` | turn 자리 |
-| 결과 다시 전달(`.../deliveries/{deliveryId}/retry/stream`) | `ChatService.retryDelivery` 에서 `runTurn` | turn 자리 |
-| 스킬 커맨드 | 보내기와 같은 `runTurn` | turn 자리 |
+| 결과 다시 전달(`.../deliveries/{deliveryId}/retry/stream`) | `ChatService.retryDelivery` 에서 `ChatDeliveryTurns.retryDelivery`, `ChatTurnRunner.runTurn` | turn 자리 |
+| 스킬 커맨드 | 보내기와 같은 `ChatTurnRunner.runTurn` | turn 자리 |
 | 대기 메시지 turn | `NextTurnDispatcher.tryPending` 에서 `ChatService.runPendingMessages` | turn 자리 |
 | 위임 결과와 커넥터 결과의 자동 turn | `DelegationWakeService.tryWake` 에서 `ChatService.runDelegationResults` | turn 자리 |
-| 흐름의 Chief | `ChatService.runFlow` 에서 `ResearchAndBuildFlow`, `AgentRunner.run` | turn 자리 |
+| 흐름의 Chief | `ChatTurnRunner.runFlow` 에서 `ResearchAndBuildFlow`, `AgentRunner.run` | turn 자리 |
 | 먼저 살펴보기 | `ProactiveCheckService.start` 가 잠금을 잡고 가상 스레드에서 `ChatService.runProactiveCheck` | turn 자리 |
 | 행동 정책의 자동 실행 | `AutonomyPolicyService.decide` 에서 `ProactiveCheckService.startAutonomous`. 매일 깨우기와 같은 백그라운드 자리다 | turn 자리 |
 | 흐름의 Researcher, Engineer, Synthesizer | `ChildExecutionRunner.run` 에서 `AgentRunner.run` | 실행 줄 |
 | `agent_delegate` 로 맡긴 자식 | `AgentDelegationService.delegate` 에서 `ChildExecutionRunner.delegate`, `AgentRunner.run` | 실행 줄 |
-| Memory 제안 | `ChatService.finish` 에서 `MemoryProposer.proposeFrom` | 실행 줄, 백그라운드 |
+| Memory 제안 | `ChatTurnLifecycle.finish` 에서 `MemoryProposer.proposeFrom` | 실행 줄, 백그라운드 |
 | 추천 질문 | `StarterSuggestionService.generate`. 추천 읽기와 turn 완료 뒤 갱신이 띄운다 | 실행 줄, 백그라운드 |
 | 문제 후보의 가치 평가와 replay | `ValueEvaluationService`에서 `HermesDecisionProvider.evaluate`, `ExecutionRecorder.startSystem` | 실행 줄, 백그라운드 |
 | 기동 정리가 다시 잡은 대화 turn 과 흐름 turn | `RestartReconciler` | turn 자리. 한도를 보지 않고 얻는다 |
@@ -86,7 +86,7 @@ OS 격리나 CPU, 메모리, 비용의 상한을 보장하지 않는다.
 turn 자리를 얻을 때와 실행 줄을 만들 때 모두 같은 잠금을 잡고, 셋을 더해 판정하고, 통과하면 그 안에서 자리를 만든다.
 두 경로가 각자 세고 각자 만들면 합이 한도를 넘는다.
 실행 줄의 저장은 그 잠금 안에서 커밋까지 끝난다.
-부르는 쪽(`ChatService.runTurn`, `AgentRunner.run`, `MemoryProposer`, `StarterSuggestionService`, `HermesDecisionProvider`)은 트랜잭션을 열지 않는다.
+부르는 쪽(`ChatTurnRunner.runTurn`, `AgentRunner.run`, `MemoryProposer`, `StarterSuggestionService`, `HermesDecisionProvider`)은 트랜잭션을 열지 않는다.
 트랜잭션 안에서 부르면 잠금을 푼 뒤에 커밋되어 다른 스레드가 그 줄을 세지 못한다. `UserExecutionLimiter` 는 그 경우 예외를 던진다.
 
 **대화 turn 의 루트 줄은 사용자 한도를 다시 보지 않는다.** turn 자리가 이미 그 turn 을 세었다.
@@ -108,7 +108,7 @@ turn 자리를 얻을 때와 실행 줄을 만들 때 모두 같은 잠금을 �
 
 | 경우 | 자리 |
 | --- | --- |
-| `awaitCompletion` 이 시간 초과(`HERMES_RUN_TIMEOUT`)나 조회 실패로 끝났다 | `ChatService`, `AgentRunner`, `MemoryProposer`, `StarterSuggestionService` |
+| `awaitCompletion` 이 시간 초과(`HERMES_RUN_TIMEOUT`)나 조회 실패로 끝났다 | `ChatRunEvents`, `AgentRunner`, `MemoryProposer`, `StarterSuggestionService` |
 | 제출은 됐는데 run 번호나 시작 사건을 적지 못해 실패로 끝냈다 | `AgentRunner`. 이미 중지를 보냈으므로 다시 보내지 않는다 |
 | 기동 정리가 상한을 넘겨 중지를 보내고 `FAILED` 로 적었다 | `RestartReconciler`. 이미 중지를 보냈으므로 다시 보내지 않는다 |
 

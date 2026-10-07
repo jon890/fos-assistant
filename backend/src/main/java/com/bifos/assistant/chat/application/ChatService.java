@@ -46,7 +46,7 @@ public class ChatService {
     /** 대화 목록 한 쪽의 상한이다. 웹이 더 크게 요청해도 이만큼만 읽는다. */
     public static final int MAX_CONVERSATION_PAGE = 100;
 
-    /** 다시 전달할 때 남기는 알림 줄이다(ADR-075). */
+    /** 다시 전달할 때 남기는 알림 줄이다. 결과마다 알림 줄을 다시 남기지 않고 이 한 줄만 남긴다(ADR-075). */
     static final String RETRY_NOTICE = "맡긴 일의 결과를 다시 전해요";
 
     /** 읽은 대기 행이 저장 전에 취소돼 다시 읽는 횟수의 상한이다. */

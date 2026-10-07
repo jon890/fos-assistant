@@ -250,7 +250,7 @@ class ChatConversationQueries {
      * 사용자의 대화를 최근에 바뀐 것부터 한 쪽 읽는다.
      *
      * @param cursor 앞 쪽이 돌려준 {@code nextCursor}. 처음이면 null
-     * @param limit 한 쪽의 최대 개수. {@link #ChatService.MAX_CONVERSATION_PAGE} 를 넘으면 그 값으로 줄인다
+     * @param limit 한 쪽의 최대 개수. {@link ChatService#MAX_CONVERSATION_PAGE} 를 넘으면 그 값으로 줄인다
      */
     ConversationPage conversationsOf(CurrentUser user, String cursor, int limit) {
         int size = Math.clamp(limit, 1, ChatService.MAX_CONVERSATION_PAGE);
