@@ -141,6 +141,21 @@ class ProactiveCheckRecoveredAnswerTest {
     }
 
     @Test
+    @DisplayName("기동 정리가 끝낸 자동 실행 살펴보기는 성공이든 취소든 답도 알림 줄도 남기지 않는다")
+    void leavesNothingForRecoveredAutonomousCheck() {
+        AgentExecution completed = checkRoot(CheckTrigger.AUTONOMY);
+        AgentExecution cancelled = checkRoot(CheckTrigger.AUTONOMY);
+
+        assertThat(recorder.settle(completed.id(), ended("completed", CHECK_ANSWER)))
+                .isTrue();
+        assertThat(recorder.settle(cancelled.id(), ended("cancelled", CHECK_ANSWER)))
+                .isTrue();
+
+        assertThat(executions.findById(completed.id()).orElseThrow().status()).isEqualTo(ExecutionStatus.SUCCEEDED);
+        assertThat(messages.findByConversationIdOrderByIdAsc(conversation.id())).isEmpty();
+    }
+
+    @Test
     @DisplayName("기동 정리가 끝낸 살펴보기 turn 이 취소로 끝났으면 그때까지의 답 대신 멈춤 알림 줄 하나만 남는다")
     void leavesOnlyStoppedNoticeForCancelledCheckTurn() {
         AgentExecution root = checkRoot();
@@ -190,9 +205,13 @@ class ProactiveCheckRecoveredAnswerTest {
 
     /** 점검 대화에서 돌던 살펴보기 turn 의 실행 줄이다. 살펴보기 줄이 그 실행을 루트로 가리킨다. */
     private AgentExecution checkRoot() {
+        return checkRoot(CheckTrigger.MANUAL);
+    }
+
+    private AgentExecution checkRoot(CheckTrigger trigger) {
         AgentExecution root = turn();
         ProactiveCheck check =
-                ProactiveCheck.started(user.id(), agent.id(), conversation.id(), CheckTrigger.MANUAL, false, STARTED);
+                ProactiveCheck.started(user.id(), agent.id(), conversation.id(), trigger, false, STARTED);
         check.attachRoot(root.id(), root.hermesSessionId());
         createdChecks.add(checks.save(check).id());
         return root;

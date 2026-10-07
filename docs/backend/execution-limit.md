@@ -20,6 +20,7 @@ Control Plane 이 Hermes 에 실행을 맡기는 길은 `HermesRunsClient.submit
 | 위임 결과와 커넥터 결과의 자동 turn | `DelegationWakeService.tryWake` 에서 `ChatService.runDelegationResults` | turn 자리 |
 | 흐름의 Chief | `ChatService.runFlow` 에서 `ResearchAndBuildFlow`, `AgentRunner.run` | turn 자리 |
 | 먼저 살펴보기 | `ProactiveCheckService.start` 가 잠금을 잡고 가상 스레드에서 `ChatService.runProactiveCheck` | turn 자리 |
+| 행동 정책의 자동 실행 | `AutonomyPolicyService.decide` 에서 `ProactiveCheckService.startAutonomous`. 매일 깨우기와 같은 백그라운드 자리다 | turn 자리 |
 | 흐름의 Researcher, Engineer, Synthesizer | `ChildExecutionRunner.run` 에서 `AgentRunner.run` | 실행 줄 |
 | `agent_delegate` 로 맡긴 자식 | `AgentDelegationService.delegate` 에서 `ChildExecutionRunner.delegate`, `AgentRunner.run` | 실행 줄 |
 | Memory 제안 | `ChatService.finish` 에서 `MemoryProposer.proposeFrom` | 실행 줄, 백그라운드 |

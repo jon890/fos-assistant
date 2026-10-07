@@ -9,6 +9,8 @@ import com.bifos.assistant.chat.domain.type.ConversationPurpose;
 import com.bifos.assistant.chat.domain.type.MessageRole;
 import com.bifos.assistant.connector.domain.type.BindingStatus;
 import com.bifos.assistant.model.domain.type.ModelTier;
+import com.bifos.assistant.proactive.domain.type.AutonomyExecutionStatus;
+import com.bifos.assistant.proactive.domain.type.AutonomyLevel;
 import com.bifos.assistant.proactive.domain.type.CheckInvalidReason;
 import com.bifos.assistant.proactive.domain.type.CheckOutcome;
 import com.bifos.assistant.proactive.domain.type.CheckStatus;
@@ -56,7 +58,9 @@ class StoredEnumNamesTest {
                             "SUBAGENT_STARTED",
                             "SUBAGENT_COMPLETED",
                             "PROVIDER_SWITCHED")),
-            Map.entry(CheckTrigger.class, List.of("MANUAL", "SCHEDULED")),
+            Map.entry(CheckTrigger.class, List.of("MANUAL", "SCHEDULED", "AUTONOMY")),
+            Map.entry(AutonomyLevel.class, List.of("IGNORE", "SURFACE", "ASK_APPROVAL", "EXECUTE")),
+            Map.entry(AutonomyExecutionStatus.class, List.of("PENDING", "STARTED", "FAILED")),
             Map.entry(CheckStatus.class, List.of("RUNNING", "SUCCEEDED", "FAILED", "STOPPED")),
             Map.entry(CheckOutcome.class, List.of("FINDINGS", "NOTHING_NEW", "INVALID_RESULT")),
             Map.entry(

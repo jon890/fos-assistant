@@ -35,6 +35,7 @@
 
 상태 조회와 수동 시작은 `ProactiveCheckService` 를, 일정 설정은 `ProactiveScheduleService` 를 부른다.
 매일 깨우기는 `ProactiveCheckService.startScheduled` 로 시작하며 `CheckTrigger.SCHEDULED` 를 남긴다.
+행동 정책의 자동 실행은 `ProactiveCheckService.startAutonomous` 로 시작하며 `CheckTrigger.AUTONOMY` 를 남긴다. 결과를 사용자에게 바로 알리지 않는다([행동 정책](autonomy-policy.md)의 「자동 실행한 살펴보기의 결과」).
 점검 저장과 `task_run.proactive_check_id` 연결은 Hermes 호출 전 같은 짧은 트랜잭션에서 끝낸다. 단추의 시작은 `MANUAL` 이다.
 
 ### 매일 깨우기
@@ -503,7 +504,7 @@ turn 이 어떻게 끝나든 잠금을 풀기 전에 `ProactiveCheckService` 가
 근거는 발견의 주제 키, 검사를 통과한 원문 주소, 확인 시각만 남긴다. 원문 본문과 커넥터 응답은 남기지 않는다.
 
 후보는 대화와 보고에 그리지 않는다. 사용자에게 올릴지는 우선순위와 자율 수준을 정하는 다음 단계가 정한다.
-받아들인 후보의 가치 판단과 replay는 [가치 평가](value-evaluation.md)가 맡는다. 살펴보기에서 자동으로 부르지는 않는다.
+받아들인 후보의 가치 판단과 replay는 [가치 평가](value-evaluation.md)가, 행동 수준은 [행동 정책](autonomy-policy.md)이 맡는다. 살펴보기에서 자동으로 부르지는 않는다.
 다음 살펴보기는 최근에 받아들인 후보를 입력에 실어, 모델이 같은 문제 키를 다시 내지 않게 한다.
 
 예약 실행의 `NOTHING_NEW` 침묵, 「새로 알릴 것이 없어요」 알림 줄, 다섯 칸 보고는 후보와 상관없이 지금 그대로다.

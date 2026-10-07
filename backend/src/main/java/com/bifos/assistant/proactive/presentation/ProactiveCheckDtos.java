@@ -2,11 +2,16 @@ package com.bifos.assistant.proactive.presentation;
 
 import com.bifos.assistant.proactive.application.model.CheckBlocker;
 import com.bifos.assistant.proactive.application.model.CheckStatusView;
+import com.bifos.assistant.proactive.domain.AutonomyDecision;
 import com.bifos.assistant.proactive.domain.CandidateJudgement;
 import com.bifos.assistant.proactive.domain.ProactiveCheck;
 import com.bifos.assistant.proactive.domain.ValueEvaluation;
+import com.bifos.assistant.proactive.domain.type.AutonomyExecutionStatus;
+import com.bifos.assistant.proactive.domain.type.AutonomyLevel;
+import com.bifos.assistant.proactive.domain.type.AutonomyReason;
 import com.bifos.assistant.proactive.domain.type.DecisionOutcome;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import java.time.Instant;
 import java.util.List;
@@ -46,6 +51,27 @@ public final class ProactiveCheckDtos {
                     result.explanation());
         }
     }
+
+    /**
+     * 후보 하나의 행동 정책 판정이다. 시작한 살펴보기 식별자와 판정 입력 원문은 싣지 않는다.
+     *
+     * @param executionStatus {@code EXECUTE} 가 아니면 null
+     */
+    public record AutonomyDecisionResponse(
+            Long id,
+            Long candidateId,
+            AutonomyLevel level,
+            List<AutonomyReason> reasons,
+            AutonomyExecutionStatus executionStatus) {
+
+        static AutonomyDecisionResponse from(AutonomyDecision row) {
+            return new AutonomyDecisionResponse(
+                    row.id(), row.candidateId(), row.level(), row.reasons(), row.executionStatus());
+        }
+    }
+
+    /** 사용자의 자동 실행 동의다. */
+    public record AutonomyPreferenceBody(@NotNull Boolean readOnlyExecution) {}
 
     /**
      * 살펴보기 상태다.
