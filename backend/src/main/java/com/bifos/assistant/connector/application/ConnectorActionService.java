@@ -857,7 +857,7 @@ public class ConnectorActionService {
         return Instant.now(clock);
     }
 
-    private static ApiException notFound() {
+    static ApiException notFound() {
         return new ApiException(ErrorCode.CONNECTOR_ACTION_NOT_FOUND, NOT_FOUND_MESSAGE);
     }
 
