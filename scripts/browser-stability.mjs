@@ -16,6 +16,12 @@ const SHARED_FILES = new Set([
   "test/browser/playwright.config.ts",
   "test/browser/web-server.ts",
   "test/e2e/fake-hermes.ts",
+  "web/package.json",
+  "web/pnpm-lock.yaml",
+  "web/next.config.ts",
+  "web/src/components/shell/app-shell.tsx",
+  "web/src/components/shell/admin-shell.tsx",
+  "web/src/components/shell/screen-transition.tsx",
 ]);
 
 /** 바뀐 spec은 모두, 공통 환경을 바꿨으면 회귀 묶음도 반복한다. 파일을 지운 것은 실행하지 않는다. */
