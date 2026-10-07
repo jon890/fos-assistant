@@ -874,7 +874,7 @@ public class ChatService {
             AssembledContext context = routed.agent().connectorManaged()
                     ? AssembledContext.empty()
                     : contextAssembler.assemble(user, routed.agent().id());
-            // 먼저 살펴보기는 memory_remember 를 받지 않으므로 기억 지침도 싣지 않는다(ADR-080, ADR-093)
+            // 먼저 살펴보기는 memory_remember 를 받지 않으므로 기억 지침도 싣지 않는다(ADR-080, ADR-094)
             context = contextAssembler.withResponseInstructions(
                     context, !routed.agent().connectorManaged() && !(intent instanceof TurnIntent.ProactiveCheck));
             ExecutionContextSnapshot snapshot = new ExecutionContextSnapshot(
@@ -1609,7 +1609,7 @@ public class ChatService {
     }
 
     /**
-     * 사람이 보낸 turn 의 실행에 질문을 잇는다(ADR-093). 잇지 못해도 turn 은 잇는다. 그 실행의 {@code memory_remember} 는 제안으로만
+     * 사람이 보낸 turn 의 실행에 질문을 잇는다(ADR-094). 잇지 못해도 turn 은 잇는다. 그 실행의 {@code memory_remember} 는 제안으로만
      * 남는다.
      */
     private void recordQuestion(Long executionId, Long questionId) {

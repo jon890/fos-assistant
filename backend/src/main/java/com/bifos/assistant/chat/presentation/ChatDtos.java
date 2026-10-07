@@ -392,7 +392,7 @@ public final class ChatDtos {
     }
 
     /**
-     * 대화의 답 아래에 그릴 기억 기록 하나다(ADR-093).
+     * 대화의 답 아래에 그릴 기억 기록 하나다(ADR-094).
      *
      * <p>{@code kind} 는 {@code CREATED}, {@code UPDATED}, {@code PROPOSED} 이고 {@code status} 는 항목의 지금 승인 상태다. 민감
      * 항목은 본문을 싣지 않는다.

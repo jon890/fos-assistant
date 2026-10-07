@@ -23,7 +23,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 /**
- * Control Plane MCP 도구 {@code memory_remember} 의 정의와 처리다(ADR-093). 계약은 {@code docs/backend/memory.md} 의
+ * Control Plane MCP 도구 {@code memory_remember} 의 정의와 처리다(ADR-094). 계약은 {@code docs/backend/memory.md} 의
  * 「에이전트가 기억을 남기는 길」 이 갖는다.
  */
 @Service
@@ -41,7 +41,7 @@ public class McpMemoryRemember {
     private static final Pattern WHITESPACE = Pattern.compile("\\s+");
 
     /**
-     * 바깥 글을 읽지 않는다고 보는 도구다. 실행이 이 밖의 도구를 시작했으면 {@code memory_remember} 를 바로 저장하지 않는다(ADR-093).
+     * 바깥 글을 읽지 않는다고 보는 도구다. 실행이 이 밖의 도구를 시작했으면 {@code memory_remember} 를 바로 저장하지 않는다(ADR-094).
      *
      * <p>{@code agent_status} 와 {@code agent_stop} 은 맡긴 실행의 답을 돌려주므로 넣지 않는다. 그 답에 바깥 글이 실릴 수 있다.
      * {@code skill_view} 도 넣지 않는다. 같은 toolset 의 {@code skill_manage} 가 다른 대화에서 읽은 글을 스킬에 써 둘 수 있다.
@@ -100,7 +100,7 @@ public class McpMemoryRemember {
     }
 
     /**
-     * 사람에 관한 사실 하나를 바로 저장하거나 제안으로 남기고 그 결과를 한 줄 글로 돌려준다(ADR-093). 글은
+     * 사람에 관한 사실 하나를 바로 저장하거나 제안으로 남기고 그 결과를 한 줄 글로 돌려준다(ADR-094). 글은
      * {@code docs/backend/memory.md} 의 「에이전트가 기억을 남기는 길」 표가 갖는다.
      *
      * <p>주인은 origin 실행의 사용자다. 바로 저장할지는 모델의 인자가 아니라 실행의 출처로 정한다. 사람이 보낸 turn 의 루트
@@ -173,7 +173,7 @@ public class McpMemoryRemember {
     }
 
     /**
-     * 바로 저장 조건 가운데 실행의 출처로 정하는 것이다(ADR-093). 민감도와 collection 과 상한은 {@link MemoryCaptureService} 가
+     * 바로 저장 조건 가운데 실행의 출처로 정하는 것이다(ADR-094). 민감도와 collection 과 상한은 {@link MemoryCaptureService} 가
      * 본다.
      *
      * <p>바깥 글은 대화 단위로 본다. Hermes session 이 앞 turn 의 도구 결과와 맡긴 일의 결과를 이력으로 이어 가므로, 지금

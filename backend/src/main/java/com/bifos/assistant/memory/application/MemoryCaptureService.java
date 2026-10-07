@@ -36,7 +36,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * 에이전트가 {@code memory_remember} 로 남기는 기록을 저장하고, 대화에 그릴 기록을 내고, 사람이 되돌린다(ADR-093).
+ * 에이전트가 {@code memory_remember} 로 남기는 기록을 저장하고, 대화에 그릴 기록을 내고, 사람이 되돌린다(ADR-094).
  *
  * <p>바로 저장할지는 부르는 쪽이 실행의 출처로 판정해 {@link MemoryRememberRequest#direct()} 로 넘긴다. 이 클래스는 그 위에
  * 민감도와 collection 과 한 실행의 상한을 다시 본다. 민감 항목은 바로 저장 조건이어도 제안이다.
