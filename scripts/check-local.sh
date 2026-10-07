@@ -92,6 +92,7 @@ if [ "${skip_browser}" = false ]; then
   step playwright    pnpm --dir "${ROOT}/web" exec playwright install chromium
 fi
 step backend         bash -c "cd '${ROOT}/backend' && ./gradlew test"
+step migration-versions bash -c "cd '${ROOT}' && node scripts/check-migration-versions.mjs"
 step mysql-migration "${ROOT}/scripts/check-mysql-migration.sh"
 step web-typecheck   pnpm --dir "${ROOT}/web" typecheck
 step web-build       build_web

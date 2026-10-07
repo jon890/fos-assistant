@@ -3,11 +3,17 @@ package com.bifos.assistant;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.bifos.assistant.testsupport.MysqlTestDatabase;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.sql.DriverManager;
+import java.sql.SQLException;
 import java.util.List;
 import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -50,6 +56,48 @@ class MysqlMigrationTest {
     void appliesEveryMigration() {
         assertThat(flyway.info().pending()).isEmpty();
         assertThat(flyway.info().applied()).isNotEmpty();
+    }
+
+    @Test
+    @DisplayName("높은 시각 버전 적용 뒤 늦게 들어온 낮은 시각 버전도 실제 MySQL 에 적용한다")
+    void appliesLateTimestampMigration(@TempDir Path directory) throws IOException, SQLException {
+        assertThat(flyway.getConfiguration().isOutOfOrder()).isTrue();
+        MysqlTestDatabase database = MysqlTestDatabase.create();
+        Path later = directory.resolve("V20261007000002__later.sql");
+        Path earlier = directory.resolve("V20261007000001__earlier.sql");
+        try {
+            Files.writeString(later, """
+                    CREATE TABLE timestamp_later (id INT PRIMARY KEY)
+                    ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci;
+                    """);
+            Flyway probe = Flyway.configure()
+                    .configuration(flyway.getConfiguration())
+                    .dataSource(database.url(), database.username(), database.password())
+                    // 기존 스키마 검사는 위의 실제 기동이 맡는다. 임시 버전은 미래의 main 버전과도 독립이다.
+                    .locations("filesystem:" + directory)
+                    .load();
+            probe.migrate();
+            assertThat(probe.info().current().getVersion().getVersion()).isEqualTo("20261007000002");
+
+            // SQL 은 서로 독립이다. 두 번째 호출 때 낮은 버전이 처음 보이게 한다.
+            Files.writeString(earlier, """
+                    CREATE TABLE timestamp_earlier (id INT PRIMARY KEY)
+                    ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci;
+                    """);
+            assertThat(probe.migrate().migrationsExecuted).isEqualTo(1);
+            probe.validate();
+            assertThat(probe.info().pending()).isEmpty();
+            try (var connection =
+                            DriverManager.getConnection(database.url(), database.username(), database.password());
+                    var statement = connection.createStatement();
+                    var rows = statement.executeQuery("SELECT COUNT(*) FROM timestamp_earlier")) {
+                assertThat(rows.next()).isTrue();
+                assertThat(rows.getInt(1)).isZero();
+            }
+        } finally {
+            Files.deleteIfExists(earlier);
+            Files.deleteIfExists(later);
+        }
     }
 
     @Test

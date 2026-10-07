@@ -113,6 +113,19 @@ key 값 자체를 적지 않는 것은 당연하고, **그것이 어디 있고 �
 
 ## 확인
 
+### Flyway 버전과 ADR 식별자
+
+새 마이그레이션은 UTC 작성 시각으로 `V<YYYYMMDDHHMMSS>__<설명>.sql` 을 만든다.
+이미 main 에 있는 숫자 버전은 그대로 두며, 합칠 때 다음 숫자로 옮기지 않는다.
+같은 시각이 겹치면 아직 적용하지 않은 새 파일의 시각을 다시 정한다.
+서로 의존하는 마이그레이션은 한 PR 에 두고 시각 순서로 적용되게 한다.
+`spring.flyway.out-of-order=true` 로 낮은 시각 버전이 나중에 머지되어도 적용한다.
+작성 규칙은 [`docs/backend/schema/README.md`](docs/backend/schema/README.md) 가 갖는다.
+
+새 ADR 은 `docs/adr/ADR-<YYYYMMDD>-<슬러그>.md` 로 만든다.
+기존 숫자 ADR 은 그대로 두며, 같은 날의 새 ADR 은 슬러그로 구분한다.
+제목과 링크, 목록 정렬은 [`docs/adr/INDEX.md`](docs/adr/INDEX.md) 의 작성 규칙을 따른다.
+
 구현자는 push 전에 `scripts/check-local.sh` 로 로컬 검사를 돌린다. 브라우저 검사는 고친 화면의 spec 만 인자로 준다.
 돌리는 명령과 순서, 작업 폴더, `pnpm build` 의 자리표시자 환경 변수는 그 스크립트가 갖는다.
 
