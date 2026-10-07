@@ -9,6 +9,7 @@ import com.bifos.assistant.connector.application.model.AgentConnectionsView;
 import com.bifos.assistant.connector.application.model.ConnectorOperationFailure;
 import com.bifos.assistant.connector.domain.ConnectorBinding;
 import com.bifos.assistant.connector.domain.ConnectorConnection;
+import com.bifos.assistant.connector.domain.DueBinding;
 import com.bifos.assistant.connector.domain.type.BindingStatus;
 import com.bifos.assistant.connector.domain.type.ConnectionStatus;
 import com.bifos.assistant.connector.infra.ConnectorBindingRepository;
@@ -49,9 +50,11 @@ import org.springframework.transaction.support.TransactionTemplate;
 /**
  * 연결을 에이전트에 붙이고 떼고, 붙인 바인딩을 그 profile 의 설치와 맞춘다(ADR-083).
  *
- * <p>붙이고 떼는 사람은 그 에이전트의 주인이고 자기 연결만 붙인다. 관리자도 남의 에이전트에는 붙이거나 떼지 못하고, 공유
- * gateway 를 재시작한 뒤 반영 완료만 누른다. 붙이기와 떼기와 반영 완료는 사용자 행을 먼저, 에이전트 행을 다음에 잠근다.
- * 공개 범위 변경과 관리자 수정도 같은 에이전트 행을 잠그므로 동시에 와도 한쪽이 다른 쪽의 커밋을 보고 판정한다.
+ * <p>붙이고 떼는 사람은 그 에이전트의 주인이고 자기 연결만 붙인다. 관리자도 남의 에이전트에는 붙이거나 떼지 못한다.
+ * 재시작 없이 반영될 설치는 반영 예정 시각이 지나면 {@link #applyDue()} 가 스스로 확인한다(ADR-20261007 /
+ * connector-live-reload). 관리자는 재시작이 필요한 바인딩만 공유 gateway 를 재시작한 뒤 반영 완료를 누른다. 붙이기와 떼기,
+ * 반영 완료, 예약 확인은 사용자 행을 먼저, 에이전트 행을 다음에 잠근다. 공개 범위 변경과 관리자 수정도 같은 에이전트 행을
+ * 잠그므로 동시에 와도 한쪽이 다른 쪽의 커밋을 보고 판정한다.
  *
  * <p>옛 커넥터 에이전트({@link Agent#connectorManaged()})의 바인딩은 그 에이전트가 지워질 때까지 옛 방식으로 다룬다. 값은
  * 그 profile 의 {@code .env} 에 직접 쓰고 설치는 바인딩 칸 없이 보내며 사진 받기와 내장 도구 선언도 그대로 본다. 외부 호출은
@@ -79,6 +82,7 @@ public class ConnectorBindingService implements AgentConnectorDetacher {
     private final SkillPublisher skills;
     private final ConnectorActionService approvals;
     private final TransactionTemplate transactions;
+    private final ConnectorBindingProperties properties;
     private final Clock clock;
 
     /**
@@ -99,7 +103,8 @@ public class ConnectorBindingService implements AgentConnectorDetacher {
             HermesToolsetClient toolsets,
             SkillPublisher skills,
             ConnectorActionService approvals,
-            PlatformTransactionManager transactionManager) {
+            PlatformTransactionManager transactionManager,
+            ConnectorBindingProperties properties) {
         this(
                 bindings,
                 connections,
@@ -110,6 +115,7 @@ public class ConnectorBindingService implements AgentConnectorDetacher {
                 skills,
                 approvals,
                 transactionManager,
+                properties,
                 Clock.systemUTC());
     }
 
@@ -123,6 +129,7 @@ public class ConnectorBindingService implements AgentConnectorDetacher {
             SkillPublisher skills,
             ConnectorActionService approvals,
             PlatformTransactionManager transactionManager,
+            ConnectorBindingProperties properties,
             Clock clock) {
         this.bindings = bindings;
         this.connections = connections;
@@ -133,6 +140,7 @@ public class ConnectorBindingService implements AgentConnectorDetacher {
         this.skills = skills;
         this.approvals = approvals;
         this.transactions = new TransactionTemplate(transactionManager);
+        this.properties = properties;
         this.clock = clock;
     }
 
@@ -160,9 +168,11 @@ public class ConnectorBindingService implements AgentConnectorDetacher {
     /**
      * 내 연결을 내 에이전트에 붙인다. 이미 붙어 있으면 지금 상태를 돌려준다.
      *
-     * <p>붙인 바인딩은 늘 {@code PENDING} 이다. 떠 있는 profile 에 더한 MCP 서버는 공유 gateway 를 재시작해야 보이므로
-     * 관리자 반영 완료가 {@code READY} 로 바꾼다. {@code skills} toolset 은 켜지 않는다. 도구 선택은 주인이 화면에서 정하고
-     * (ADR-029) 붙이기가 다른 도구를 몰래 켜지 않는다.
+     * <p>붙인 바인딩은 늘 {@code PENDING} 이다. 대시보드가 {@code reload_pending} 으로 답하면 공유 gateway 의 MCP 설정
+     * 맞추기 주기가 새 서버를 연결하므로 반영 예정 시각을 적고, 그 시각이 지나면 {@link #applyDue()} 가 {@code READY} 로
+     * 바꾼다(ADR-20261007 / connector-live-reload). 재시작이 필요하다고 답하면 재시작 대기로 두고 관리자 반영 완료가 바꾼다.
+     * {@code skills} toolset 은 켜지 않는다. 도구 선택은 주인이 화면에서 정하고 (ADR-029) 붙이기가 다른 도구를 몰래 켜지
+     * 않는다.
      *
      * <p>대시보드가 409 나 401 로 거절하면 대시보드는 아무것도 바꾸지 않았고, 이 트랜잭션이 되돌려져 바인딩 행도 남지 않는다.
      * 그 밖의 외부 실패는 바인딩을 {@code PENDING} 으로 남기고 연결 실패로 끝낸다. 대시보드가 반쯤 반영했을 수 있어 다음 연결
@@ -198,7 +208,7 @@ public class ConnectorBindingService implements AgentConnectorDetacher {
         try {
             InstallResult installed = connector.bindConnector(
                     agent.hermesProfile(), connectorId, connection.vault(), agent.sandboxOwner());
-            binding.installed(installed.restartRequired() || installed.pluginUpdated(), now);
+            recordInstall(binding, installed, false, now);
         } catch (ConnectorInstallConflict ex) {
             throw new ApiException(
                     ErrorCode.CONNECTOR_BIND_CONFLICT, "the agent profile conflicts with this connector");
@@ -389,7 +399,7 @@ public class ConnectorBindingService implements AgentConnectorDetacher {
             } else {
                 InstallResult installed = connector.bindConnector(
                         profile, manifest.id(), binding.connection().vault(), agent.sandboxOwner());
-                binding.installed(installed.restartRequired() || installed.pluginUpdated(), now);
+                recordInstall(binding, installed, false, now);
             }
             if (binding.mcpServer() == null) {
                 binding.recordServer(manifest.mcpServer());
@@ -428,9 +438,11 @@ public class ConnectorBindingService implements AgentConnectorDetacher {
     /**
      * 설치를 한 번 다시 보내고 그 profile 에 반영됐는지 본다. 쓸 수 있으면 {@code READY}, 아니면 {@code PENDING} 이다.
      *
-     * <p>사용자의 연결 확인({@code afterRestart} 거짓)에서는 재시작 대기인 바인딩에 설치를 다시 보내지 않는다. 관리자 반영
-     * 완료({@code afterRestart} 참)는 재시작이 끝났다고 보고 다시 보낸다. 다시 보낸 설치가 재시작을 요구하면 그 시각으로 대기를
-     * 새로 시작한다. 카탈로그에서 빠진 커넥터는 서버를 확인할 수 없어 다시 보내지 않고 {@code PENDING} 이다.
+     * <p>사용자의 연결 확인과 예약 확인({@code afterRestart} 거짓)에서는 재시작 대기인 바인딩과 반영 예정 시각이 아직 오지
+     * 않은 바인딩에 설치를 다시 보내지 않는다. 관리자 반영 완료({@code afterRestart} 참)는 재시작이 끝났다고 보고 다시 보낸다.
+     * 다시 보낸 설치가 재시작을 요구하면 그 시각으로 대기를 새로 시작하고, {@code reload_pending} 이면 반영 예정 시각을 새로
+     * 적는다. 둘 다 {@code PENDING} 으로 돌아간다. 카탈로그에서 빠진 커넥터는 서버를 확인할 수 없어 다시 보내지 않고
+     * {@code PENDING} 이다.
      *
      * <p>일반 바인딩은 설치가 켜져 있고 configured 이며 정책 hook 이 켜져 있고 바인딩 방식이며 probe 가 도구를 낼 때 쓸 수 있다.
      * 켜진 내장 도구는 보지 않는다. 그 에이전트의 도구는 주인이 정한다. 바인딩 설치는 바뀐 것이 있을 때만 재시작이 필요하다고
@@ -448,7 +460,9 @@ public class ConnectorBindingService implements AgentConnectorDetacher {
         if (binding.mcpServer() == null && manifest.isPresent()) {
             binding.recordServer(manifest.get().mcpServer());
         }
-        if ((!afterRestart && binding.restartRequired()) || manifest.isEmpty()) {
+        boolean waiting = binding.restartRequired()
+                || (binding.applyDueAt() != null && binding.applyDueAt().isAfter(now));
+        if ((!afterRestart && waiting) || manifest.isEmpty()) {
             binding.pending(now);
             return false;
         }
@@ -466,9 +480,7 @@ public class ConnectorBindingService implements AgentConnectorDetacher {
                 return false;
             }
             step = STEP_INSTALL;
-            boolean restart = reinstallNeedsRestart(binding, declared.id(), legacy);
-            binding.installed(restart, now);
-            if (restart) {
+            if (recordInstall(binding, installAgain(binding, declared.id(), legacy), legacy, now)) {
                 return false;
             }
             step = STEP_INSTALL_STATE;
@@ -501,25 +513,95 @@ public class ConnectorBindingService implements AgentConnectorDetacher {
         }
     }
 
-    /**
-     * 설치를 한 번 다시 보내고 재시작이 필요한지 돌려준다.
-     *
-     * <p>바인딩 설치는 바뀐 것이 있을 때만 재시작이 필요하다고 답한다. 옛 설치는 설치된 커넥터에 늘 필요하다고 답하므로 그 값은
-     * 쓰지 않고 hook plugin 파일이 바뀌었는지만 본다.
-     */
-    private boolean reinstallNeedsRestart(ConnectorBinding binding, String connectorId, boolean legacy) {
+    /** 설치를 그 방식대로 한 번 다시 보내고 대시보드의 답을 돌려준다. 답을 읽는 규칙은 {@link #recordInstall} 이 갖는다. */
+    private InstallResult installAgain(ConnectorBinding binding, String connectorId, boolean legacy) {
         String profile = binding.agent().hermesProfile();
         if (legacy) {
-            return connector
-                    .putConnector(profile, connectorId, true, binding.agent().sandboxOwner())
-                    .pluginUpdated();
+            return connector.putConnector(profile, connectorId, true, binding.agent().sandboxOwner());
         }
-        InstallResult installed = connector.bindConnector(
+        return connector.bindConnector(
                 profile,
                 connectorId,
                 binding.connection().vault(),
                 binding.agent().sandboxOwner());
-        return installed.restartRequired() || installed.pluginUpdated();
+    }
+
+    /**
+     * 설치 결과를 바인딩에 적는다. 바인딩은 {@code PENDING} 이 된다.
+     *
+     * <p>바인딩 설치는 바뀐 것이 있을 때만 재시작이 필요하다고 답한다. 옛 설치는 설치된 커넥터에 늘 필요하다고 답하므로 그 값은
+     * 쓰지 않고 hook plugin 파일이 바뀌었는지만 본다. 재시작이 필요 없는 바인딩 설치가 {@code reload_pending} 이면 반영 예정
+     * 시각을 지금에서 {@code assistant.connector.binding.apply-delay} 뒤로 적는다(ADR-20261007 / connector-live-reload).
+     * 옛 설치의 판정은 바꾸지 않는다.
+     *
+     * @return 재시작이나 반영 예정을 기다려야 해 지금 반영을 확인할 수 없는가
+     */
+    private boolean recordInstall(ConnectorBinding binding, InstallResult installed, boolean legacy, Instant now) {
+        boolean restart = legacy ? installed.pluginUpdated() : installed.restartRequired() || installed.pluginUpdated();
+        binding.installed(restart, now);
+        boolean scheduled = !legacy && !restart && installed.reloadPending();
+        if (scheduled) {
+            binding.scheduleApply(now.plus(properties.applyDelay()));
+        }
+        return restart || scheduled;
+    }
+
+    /**
+     * 반영 예정 시각이 지난 바인딩마다 반영 맞추기를 한 번 돌린다(ADR-20261007 / connector-live-reload). 일정이 부른다.
+     *
+     * <p>대상의 번호는 트랜잭션 밖에서 읽는다. 바인딩마다 트랜잭션을 열고 연결 사용자 행 다음에 에이전트 행을 잠근 뒤 바인딩을
+     * 다시 읽는다. 첫 읽기가 잠금이어야 하는 까닭은 {@link #confirmApplied} 가 적는다. 바인딩이 지워졌거나, 에이전트가
+     * 지워졌거나, 에이전트 주인이 연결 사용자와 다르거나, 그 사이 재시작 대기가 됐거나 예정 시각이 바뀌었으면 건너뛴다.
+     *
+     * <p>시도하기 전에 예정 시각을 비운다. 확인은 한 번만 한다. 다시 보낸 설치가 또 {@code reload_pending} 이면
+     * {@link #resync} 가 새 시각을 적고, probe 가 실패해 {@code PENDING} 이 되면 사용자의 연결 확인이 다시 맞춘다. 한 바인딩의
+     * 실패는 경고로 남기고 다음 바인딩으로 간다.
+     *
+     * @return 반영 맞추기를 돌린 바인딩 수
+     */
+    public int applyDue() {
+        int applied = 0;
+        for (DueBinding due : bindings.findApplyDue(now())) {
+            try {
+                if (Boolean.TRUE.equals(transactions.execute(status -> applyDueLocked(due)))) {
+                    applied++;
+                }
+            } catch (RuntimeException ex) {
+                log.warn(
+                        "connector binding {} failed at apply-due: {}",
+                        due.bindingId(),
+                        ex.getClass().getSimpleName());
+            }
+        }
+        return applied;
+    }
+
+    /**
+     * 예약 확인 하나의 트랜잭션이다. 트랜잭션 안에서만 부른다.
+     *
+     * @return 반영 맞추기를 돌렸는가. 건너뛰었으면 거짓이다
+     */
+    private boolean applyDueLocked(DueBinding due) {
+        if (users.findByIdForUpdate(due.userId()).isEmpty()) {
+            return false;
+        }
+        Optional<Agent> agent =
+                agents.findByIdForUpdate(due.agentId()).filter(candidate -> !candidate.isDeleted());
+        if (agent.isEmpty() || !Objects.equals(agent.get().ownerUserId(), due.userId())) {
+            return false;
+        }
+        ConnectorBinding binding = bindings.findById(due.bindingId()).orElse(null);
+        Instant now = now();
+        if (binding == null
+                || binding.restartRequired()
+                || binding.applyDueAt() == null
+                || binding.applyDueAt().isAfter(now)) {
+            return false;
+        }
+        binding.clearApplyDue();
+        resync(binding, ConnectorManifests.find(connector, binding.connection().connectorId()), false);
+        bindings.save(binding);
+        return true;
     }
 
     /** 다시 보낸 뒤 읽은 설치가 그 방식대로 반영됐는가. 일반 바인딩은 바인딩 방식으로 켜져 있어야 한다. */

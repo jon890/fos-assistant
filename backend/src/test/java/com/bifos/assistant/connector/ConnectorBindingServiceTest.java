@@ -58,6 +58,7 @@ import com.bifos.assistant.user.domain.AppUser;
 import com.bifos.assistant.user.infra.AppUserRepository;
 import java.nio.ByteBuffer;
 import java.sql.Timestamp;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
@@ -128,6 +129,8 @@ class ConnectorBindingServiceTest {
             1,
             List.of(),
             List.of("demo-guide"));
+    /** 설정의 반영 예정 지연 기본값이다. gateway 의 MCP 설정 맞추기 60초 두 주기와 연결 시간이다. */
+    private static final Duration APPLY_DELAY = Duration.ofSeconds(150);
     /** 이 시각 뒤의 설치는 모두 관리자가 본 뒤의 설치다. */
     private static final Instant LONG_AGO = Instant.parse("2020-01-01T00:00:00Z");
 
@@ -218,6 +221,144 @@ class ConnectorBindingServiceTest {
                 .as("다시 붙이기")
                 .isEqualTo(BindingStatus.PENDING);
         verify(connector, times(1)).bindConnector(anyString(), anyString(), anyString(), anyString());
+    }
+
+    @Test
+    @DisplayName("붙이기 설치가 reload_pending 이면 재시작 대기가 아니고 반영 예정 시각이 지금 더하기 지연이다")
+    void bindWithReloadPendingSchedulesApplyInsteadOfRestart() {
+        CurrentUser owner = user(UserRole.MEMBER, 1L);
+        connect(owner, DEMO, VALUES);
+        Agent agent = agent(owner, AgentVisibility.PRIVATE);
+        when(connector.bindConnector(anyString(), anyString(), anyString(), anyString()))
+                .thenReturn(new InstallResult(false, false, true));
+
+        Instant before = Instant.now();
+        AgentConnectionView bound = service.bind(owner, agent.code(), DEMO);
+        Instant after = Instant.now();
+
+        assertThat(bound.status()).isEqualTo(BindingStatus.PENDING);
+        assertThat(bound.restartRequired()).isFalse();
+        ConnectorBinding stored = onlyBinding();
+        assertThat(stored.restartRequired()).isFalse();
+        assertThat(stored.restartRequiredSince()).isNull();
+        assertThat(stored.applyDueAt())
+                .isBetween(before.plus(APPLY_DELAY).minusMillis(1), after.plus(APPLY_DELAY).plusMillis(1));
+        verify(connector, never()).probe(anyString(), anyString());
+    }
+
+    @Test
+    @DisplayName("반영 예정 시각 전의 연결 확인은 설치를 다시 보내지 않고 바인딩을 PENDING 으로 둔다")
+    void checkBeforeApplyDueDoesNotReinstall() {
+        CurrentUser owner = user(UserRole.MEMBER, 1L);
+        connect(owner, DEMO, VALUES);
+        Agent agent = agent(owner, AgentVisibility.PRIVATE);
+        when(connector.bindConnector(anyString(), anyString(), anyString(), anyString()))
+                .thenReturn(new InstallResult(false, false, true));
+        service.bind(owner, agent.code(), DEMO);
+        Instant due = onlyBinding().applyDueAt();
+        when(connector.callWithVault(anyString(), anyString(), anyString()))
+                .thenReturn(CallResult.success(MAPPER.readTree("{\"ok\":true}")));
+        clearInvocations(connector);
+
+        connectionService.check(owner, DEMO);
+
+        verify(connector, never()).bindConnector(anyString(), anyString(), anyString(), anyString());
+        verify(connector, never()).probe(anyString(), anyString());
+        ConnectorBinding stored = onlyBinding();
+        assertThat(stored.status()).isEqualTo(BindingStatus.PENDING);
+        assertThat(stored.applyDueAt()).isEqualTo(due);
+    }
+
+    @Test
+    @DisplayName("반영 예정 시각이 지나면 applyDue 가 설치를 다시 보내 probe 로 확인하고 READY 로 두며 예정을 비운다")
+    void applyDueMakesBindingReadyAfterDue() {
+        CurrentUser owner = user(UserRole.MEMBER, 1L);
+        connect(owner, DEMO, VALUES);
+        Agent agent = agent(owner, AgentVisibility.PRIVATE);
+        when(connector.bindConnector(anyString(), anyString(), anyString(), anyString()))
+                .thenReturn(new InstallResult(false, false, true));
+        service.bind(owner, agent.code(), DEMO);
+        assertThat(service.applyDue()).as("예정 시각 전").isZero();
+        jdbc.update("UPDATE agent_connector_binding SET apply_due_at = ?", Timestamp.from(LONG_AGO));
+        // gateway 가 이미 연결했으므로 다시 보낸 설치는 바뀐 것이 없다.
+        when(connector.bindConnector(anyString(), anyString(), anyString(), anyString()))
+                .thenReturn(new InstallResult(false, false));
+        clearInvocations(connector);
+
+        assertThat(service.applyDue()).isEqualTo(1);
+
+        InOrder order = inOrder(connector);
+        order.verify(connector).bindConnector(anyString(), eq(DEMO), anyString(), anyString());
+        order.verify(connector).readConnector(agent.hermesProfile(), DEMO);
+        order.verify(connector).probe(agent.hermesProfile(), "demo");
+        ConnectorBinding stored = onlyBinding();
+        assertThat(stored.status()).isEqualTo(BindingStatus.READY);
+        assertThat(stored.applyDueAt()).isNull();
+        assertThat(service.applyDue()).as("다시 부르기").isZero();
+    }
+
+    @Test
+    @DisplayName("예약 확인의 probe 가 실패하면 PENDING 이고 예정이 비어 다음 applyDue 가 다시 집지 않는다")
+    void applyDueTriesOnceWhenProbeFails() {
+        CurrentUser owner = user(UserRole.MEMBER, 1L);
+        connect(owner, DEMO, VALUES);
+        Agent agent = agent(owner, AgentVisibility.PRIVATE);
+        when(connector.bindConnector(anyString(), anyString(), anyString(), anyString()))
+                .thenReturn(new InstallResult(false, false, true));
+        service.bind(owner, agent.code(), DEMO);
+        jdbc.update("UPDATE agent_connector_binding SET apply_due_at = ?", Timestamp.from(LONG_AGO));
+        when(connector.bindConnector(anyString(), anyString(), anyString(), anyString()))
+                .thenReturn(new InstallResult(false, false));
+        when(connector.probe(anyString(), anyString())).thenReturn(new ProbeResult(false, List.of()));
+
+        assertThat(service.applyDue()).isEqualTo(1);
+
+        ConnectorBinding stored = onlyBinding();
+        assertThat(stored.status()).isEqualTo(BindingStatus.PENDING);
+        assertThat(stored.applyDueAt()).isNull();
+        clearInvocations(connector);
+        assertThat(service.applyDue()).as("다시 부르기").isZero();
+        verify(connector, never()).bindConnector(anyString(), anyString(), anyString(), anyString());
+    }
+
+    @Test
+    @DisplayName("예약 확인에서 다시 보낸 설치가 또 reload_pending 이면 probe 없이 새 예정 시각을 적고 PENDING 이다")
+    void applyDueReschedulesWhenReinstallIsPendingAgain() {
+        CurrentUser owner = user(UserRole.MEMBER, 1L);
+        connect(owner, DEMO, VALUES);
+        Agent agent = agent(owner, AgentVisibility.PRIVATE);
+        when(connector.bindConnector(anyString(), anyString(), anyString(), anyString()))
+                .thenReturn(new InstallResult(false, false, true));
+        service.bind(owner, agent.code(), DEMO);
+        jdbc.update("UPDATE agent_connector_binding SET apply_due_at = ?", Timestamp.from(LONG_AGO));
+        clearInvocations(connector);
+
+        Instant before = Instant.now();
+        assertThat(service.applyDue()).isEqualTo(1);
+
+        verify(connector, never()).probe(anyString(), anyString());
+        ConnectorBinding stored = onlyBinding();
+        assertThat(stored.status()).isEqualTo(BindingStatus.PENDING);
+        assertThat(stored.restartRequired()).isFalse();
+        assertThat(stored.applyDueAt()).isAfterOrEqualTo(before.plus(APPLY_DELAY).minusMillis(1));
+    }
+
+    @Test
+    @DisplayName("재시작 대기 바인딩은 반영 예정 시각이 지났어도 applyDue 가 집지 않는다")
+    void applyDueSkipsBindingWaitingForRestart() {
+        CurrentUser owner = user(UserRole.MEMBER, 1L);
+        connect(owner, DEMO, VALUES);
+        Agent agent = agent(owner, AgentVisibility.PRIVATE);
+        service.bind(owner, agent.code(), DEMO);
+        jdbc.update("UPDATE agent_connector_binding SET apply_due_at = ?", Timestamp.from(LONG_AGO));
+        clearInvocations(connector);
+
+        assertThat(service.applyDue()).isZero();
+
+        verify(connector, never()).bindConnector(anyString(), anyString(), anyString(), anyString());
+        ConnectorBinding stored = onlyBinding();
+        assertThat(stored.status()).isEqualTo(BindingStatus.PENDING);
+        assertThat(stored.restartRequired()).isTrue();
     }
 
     @Test

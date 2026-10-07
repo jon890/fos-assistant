@@ -107,6 +107,31 @@ class ConnectorBindingTest {
     }
 
     @Test
+    @DisplayName("반영 예정 시각은 더 늦은 값을 지키고 clearApplyDue 와 ready 가 비운다")
+    void scheduleApplyKeepsLaterDueAndReadyClearsIt() {
+        ConnectorBinding binding = ConnectorBinding.pending(agent(false), connection(), "demo", CREATED);
+        assertThat(binding.applyDueAt()).isNull();
+
+        binding.scheduleApply(LATER);
+        assertThat(binding.applyDueAt()).as("빈 예정에 적는다").isEqualTo(LATER);
+
+        binding.scheduleApply(LATEST);
+        assertThat(binding.applyDueAt()).as("더 늦은 예정으로 바꾼다").isEqualTo(LATEST);
+
+        binding.scheduleApply(LATER);
+        assertThat(binding.applyDueAt()).as("더 이른 예정이 늦은 예정을 당기지 않는다").isEqualTo(LATEST);
+
+        binding.clearApplyDue();
+        assertThat(binding.applyDueAt()).as("확인을 시작하면 비운다").isNull();
+
+        binding.scheduleApply(LATER);
+        binding.ready(LATEST);
+
+        assertThat(binding.applyDueAt()).as("반영되면 예정이 풀린다").isNull();
+        assertThat(binding.status()).isEqualTo(BindingStatus.READY);
+    }
+
+    @Test
     @DisplayName("서버 이름이 빈 옛 바인딩에 서버 이름을 적는다")
     void recordServerFillsServerName() {
         ConnectorBinding binding = ConnectorBinding.pending(agent(false), connection(), null, CREATED);

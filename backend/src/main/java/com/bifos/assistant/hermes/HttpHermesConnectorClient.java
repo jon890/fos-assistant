@@ -318,7 +318,9 @@ public class HttpHermesConnectorClient implements HermesConnectorClient {
             throw new IllegalStateException();
         }
         return new InstallResult(
-                requiredBoolean(body, RESTART_REQUIRED), optionalBoolean(body, "plugin_updated", false));
+                requiredBoolean(body, RESTART_REQUIRED),
+                optionalBoolean(body, "plugin_updated", false),
+                optionalBoolean(body, "reload_pending", false));
     }
 
     @Override

@@ -74,8 +74,12 @@ public class ConnectorPolicyService {
     private static final String POLICY_UNAVAILABLE_MESSAGE =
             "이 도구의 사용 정책을 지금 확인하지 못해 실행하지 않았다. 잠시 뒤 다시 시도하라고 사용자에게 알린다.";
     private static final String NOT_READY_MESSAGE = "이 연결이 준비되지 않아 실행하지 않았다. 사용자에게 연결 화면에서 연결을 확인하라고 알린다.";
-    /** 연결은 쓸 수 있는데 이 에이전트에 붙인 것이 아직 반영되지 않았다. 연결 확인을 다시 해도 풀리지 않는다. */
-    static final String BINDING_PENDING_MESSAGE = "관리자가 반영을 마치면 이 연결을 쓸 수 있다. 지금은 실행하지 않았으니 사용자에게 반영을 기다리라고 알린다.";
+    /**
+     * 연결은 쓸 수 있는데 이 에이전트에 붙인 것이 아직 반영되지 않았다. 대개 반영 예정 시각이 지나면 Control Plane 이 스스로
+     * 확인해 풀린다(ADR-20261007 / connector-live-reload). 재시작이 필요한 바인딩은 관리자 반영 완료가 푼다.
+     */
+    static final String BINDING_PENDING_MESSAGE =
+            "이 에이전트에 붙인 연결이 아직 반영되지 않았다. 대개 몇 분 안에 저절로 반영되니 사용자에게 잠시 뒤 다시 시도하라고 알린다.";
 
     private static final String UNDECLARED_MESSAGE = "이 도구는 사용이 허락되지 않아 실행하지 않았다. 다시 부르지 않는다.";
     private static final String RISK_NOT_OPEN_MESSAGE = "이 도구는 아직 열리지 않아 실행하지 않았다. 다시 부르지 않는다.";

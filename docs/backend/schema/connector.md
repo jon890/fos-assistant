@@ -54,6 +54,7 @@
 | `status` | `VARCHAR(20) NOT NULL` | `PENDING`, `READY` |
 | `restart_required` | `BOOLEAN NOT NULL` 기본 거짓 | 공유 gateway 재시작 뒤 반영 완료를 기다린다. 재시작은 profile 마다 필요하므로 연결이 아니라 여기에 둔다 |
 | `restart_required_since` | `DATETIME(6)` | 재시작이 필요해진 가장 늦은 설치 시각. 관리자가 재시작한 뒤에 다시 설치가 있었으면 반영 완료가 대기를 풀지 않게 하려고 둔다 |
+| `apply_due_at` | `DATETIME(6)` | 반영 예정 시각. 재시작 없이 공유 gateway 의 MCP 설정 맞추기 주기가 반영할 설치(`reload_pending`)를 보냈을 때 적는다. 이 시각이 지나면 Control Plane 이 반영 맞추기를 스스로 한 번 돌리고, 돌리기 전에 비운다. `READY` 가 되면 비운다. 예정이 없으면 비어 있다([ADR-20261007 / connector-live-reload](../../adr/ADR-20261007-connector-live-reload.md)) |
 | `desired_enabled` | `BOOLEAN NOT NULL` 기본 거짓 | 그 profile 에 설치가 성공해 반영 후보가 되었는가. 설치를 시작하면 false. true 여도 반영 확인 전에는 `PENDING` |
 | `checked_at` | `DATETIME(6)` | 마지막 확인 시각. 비어도 된다 |
 | `created_at`, `updated_at` | `DATETIME(6) NOT NULL` | |
