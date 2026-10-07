@@ -6,5 +6,4 @@ package com.bifos.assistant.usage.domain;
  * @param executionId 실행 번호
  * @param agentId 에이전트 번호. 에이전트에 묶이지 않은 시스템 실행이면 null
  */
-public record ExecutionAgentRef(Long executionId, Long agentId) {
-}
+public record ExecutionAgentRef(Long executionId, Long agentId) {}

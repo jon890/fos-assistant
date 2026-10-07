@@ -43,8 +43,7 @@ class MemorySourcesTest {
         byId.put(400L, agent("옛 비서", true, true));
         when(agents.byIds(any())).thenReturn(byId);
 
-        Map<Long, MemorySource> result =
-                sources.of(USER, List.of(direct, visible, hidden, deleted, unknownExecution));
+        Map<Long, MemorySource> result = sources.of(USER, List.of(direct, visible, hidden, deleted, unknownExecution));
 
         assertThat(result).doesNotContainKey(1L);
         assertThat(result.get(2L)).isEqualTo(new MemorySource("집안일 도우미", false));
