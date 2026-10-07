@@ -17,7 +17,7 @@
 | `conversation_id` | BIGINT FK `conversation` | 결과가 남는 점검 대화 |
 | `root_execution_id` | BIGINT NULL UNIQUE FK `agent_execution` | 살펴보기 turn 의 실행 줄. 실행 줄을 만들기 전에 실패하면 비어 있다. 살펴보기 트리를 가리는 기준이다 |
 | `hermes_root_session_id` | VARCHAR(128) NULL | 이 살펴보기를 보낸 점검 대화의 루트 session. session 을 바꿀지 셀 때 쓴다 |
-| `trigger_type` | VARCHAR(16) | `MANUAL`(단추), `SCHEDULED`(매일 깨우기) |
+| `trigger_type` | VARCHAR(16) | `MANUAL`(단추), `SCHEDULED`(매일 깨우기), `AUTONOMY`(행동 정책의 자동 실행) |
 | `status` | VARCHAR(16) | `RUNNING`, `SUCCEEDED`, `FAILED`, `STOPPED` |
 | `outcome` | VARCHAR(16) NULL | `FINDINGS`, `NOTHING_NEW`, `INVALID_RESULT`. `SUCCEEDED` 일 때만 채운다 |
 | `invalid_reason` | VARCHAR(32) NULL | 결과 블록을 읽지 못한 까닭. `outcome` 이 `INVALID_RESULT` 일 때만 채운다. `EMPTY_ANSWER`, `NO_BLOCK`, `NOT_JSON`, `BAD_VERSION`, `BAD_OUTCOME`. 뜻은 [`proactive-check.md`](../proactive-check.md) 의 「결과 계약」 이 갖는다. 이 칸을 더하기 전에 끝난 줄은 비어 있다 |
@@ -109,3 +109,36 @@
 | `created_at` | DATETIME(6) | 평가 시도를 시작한 시각 |
 
 사용자와 시작 시각, 상태에 색인이 있다. 전체 개인 문맥과 원시 모델 응답을 저장하지 않는다.
+
+## `proactive_autonomy_decision`
+
+행동 정책의 판정 하나다. [행동 정책](../autonomy-policy.md)이 수준과 까닭, 실행 키 계약을 갖는다.
+
+| 칸 | 타입 | 뜻 |
+| --- | --- | --- |
+| `id` | BIGINT PK | |
+| `user_id` | BIGINT FK `app_user` ON DELETE CASCADE | 요청자 |
+| `evaluation_id` | BIGINT FK `proactive_value_evaluation` ON DELETE CASCADE | 판정한 평가 |
+| `candidate_id` | BIGINT | 평가 스냅샷의 후보 식별자. 지금의 후보 줄이 지워졌어도 남는다 |
+| `source_check_id` | BIGINT FK `proactive_check` ON DELETE CASCADE | 후보가 나온 살펴보기 |
+| `action_level` | VARCHAR(16) | `IGNORE`, `SURFACE`, `ASK_APPROVAL`, `EXECUTE` |
+| `reasons_json` | JSON | 까닭 코드 배열. `AutonomyReason` 의 선언 순서다 |
+| `inputs_json` | JSON | 판정에 쓴 값. 축 설명과 후보 글은 두지 않는다 |
+| `policy_version` | INT | 규칙 버전. 지금은 1 |
+| `execution_key` | VARCHAR(64) NULL UNIQUE | `EXECUTE` 만 채운다 |
+| `execution_status` | VARCHAR(16) NULL | `PENDING`, `STARTED`, `FAILED` |
+| `execution_check_id` | BIGINT NULL FK `proactive_check` ON DELETE SET NULL | 시작한 살펴보기 |
+| `execution_error` | VARCHAR(64) NULL | 시작하지 못한 오류 코드 |
+| `created_at` | DATETIME(6) | 판정 시각 |
+
+사용자와 판정 시각, 평가에 색인이 있다. 실행 키는 유일하다.
+
+## `user_autonomy_preference`
+
+| 칸 | 타입 | 뜻 |
+| --- | --- | --- |
+| `user_id` | BIGINT PK FK `app_user` ON DELETE CASCADE | 줄이 없으면 모두 꺼짐이다 |
+| `read_only_execution` | BOOLEAN | 읽기 전용 자동 실행에 동의했다 |
+| `updated_at` | DATETIME(6) | |
+
+다른 종류의 자동 실행을 열 때 칸을 더한다. 한 칸이 여러 종류의 허락을 뜻하지 않게 한다.

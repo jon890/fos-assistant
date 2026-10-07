@@ -1,21 +1,29 @@
 import { SignJWT } from "../../web/node_modules/jose/dist/webapi/index.js";
-import type { Locator, Page, Route, TestInfo } from "../../web/node_modules/@playwright/test/index.js";
+import type { Page, Route, TestInfo } from "../../web/node_modules/@playwright/test/index.js";
 import { isoToSeoulInput } from "../../web/src/lib/attention.ts";
 import { expect, setSession, test, type FakeHermesControl } from "./fixtures.ts";
-import { CONTROL_PLANE_BASE_URL, JWT_SECRET, WEB_BASE_URL } from "./settings.ts";
+import { CONTROL_PLANE_BASE_URL, JWT_SECRET } from "./settings.ts";
+
+import { clickAndWaitForResponse } from "./helpers.ts";
 
 const HOUR_MS = 60 * 60 * 1000;
 // 할 일 동작 뒤에는 router.refresh() 가 서버 화면을 다시 받아야 바뀐다. CI 부하 아래에서는 기본 대기 5초를 넘은 적이 있다.
 const REFRESHED = { timeout: 15_000 };
 
 test.describe("지금 화면", () => {
-  function memberOf(projectName: string) {
-    return { email: `now-member-${projectName}@example.com`, name: "지금 화면 보는 사용자" };
-  }
-
-  test.beforeEach(async ({ context, page }, testInfo) => {
-    await setSession(context, memberOf(testInfo.project.name));
+  test.beforeEach(async ({ context, page, isolatedMember }) => {
+    await setSession(context, isolatedMember);
     expect((await page.request.get("/api/me")).ok()).toBeTruthy();
+  });
+
+  test.afterEach(async ({ context, page, isolatedMember }) => {
+    await setSession(context, isolatedMember);
+    const listed = await page.request.get("/api/agents");
+    expect(listed.ok()).toBeTruthy();
+    const mine = ((await listed.json()) as { code: string; ownedByMe: boolean }[]).filter((agent) => agent.ownedByMe);
+    for (const agent of mine) {
+      expect((await page.request.delete(`/api/agents/${agent.code}`)).status()).toBe(204);
+    }
   });
 
   /** 이 사용자가 가진 에이전트의 코드다. 없으면 하나 만든다. 씨 뿌린 에이전트는 관리자 것이라 쓰지 못한다. */
@@ -52,15 +60,7 @@ test.describe("지금 화면", () => {
   }
 
   /** 상태를 바꾸는 단추를 누르고, 그 요청이 실제로 나가 성공했는지까지 확인한다. */
-  async function clickSending(page: Page, target: Locator, method: string, pathname: RegExp) {
-    const [response] = await Promise.all([
-      page.waitForResponse(
-        (candidate) => candidate.request().method() === method && pathname.test(new URL(candidate.url()).pathname),
-      ),
-      target.click(),
-    ]);
-    expect(response.ok(), `${method} ${response.url()} 가 실패했다: ${response.status()}`).toBeTruthy();
-  }
+  const clickSending = clickAndWaitForResponse;
 
   async function openSidebar(page: Page, testInfo: TestInfo) {
     if (testInfo.project.name === "mobile") {
@@ -384,8 +384,9 @@ test.describe("지금 화면", () => {
   test("에이전트가 제안한 할 일은 건수에 세지 않고 고쳐서 받아들이거나 거절할 수 있다", async ({
     page,
     hermes,
+    isolatedMember,
   }, testInfo) => {
-    const email = memberOf(testInfo.project.name).email;
+    const email = isolatedMember.email;
     await openNow(page);
     const failed = page.getByTestId("now-card-failures").getByTestId("now-item").getByRole("link");
     if ((await failed.count()) === 0) {
@@ -512,19 +513,4 @@ test.describe("지금 화면", () => {
     }
   });
 
-  // 이 파일의 검사들이 같은 사용자와 에이전트를 함께 쓰므로 검사마다 지우지 않고 끝에 한 번 지운다.
-  test.afterAll(async ({ browser }, testInfo) => {
-    const context = await browser.newContext({ baseURL: WEB_BASE_URL });
-    try {
-      await setSession(context, memberOf(testInfo.project.name));
-      const listed = await context.request.get("/api/agents");
-      const mine = ((await listed.json()) as { code: string; ownedByMe: boolean }[]).filter((agent) => agent.ownedByMe);
-      for (const agent of mine) {
-        const deleted = await context.request.delete(`/api/agents/${agent.code}`);
-        expect(deleted.status(), `검사가 만든 에이전트 ${agent.code} 를 지우지 못했다`).toBe(204);
-      }
-    } finally {
-      await context.close();
-    }
-  });
 });

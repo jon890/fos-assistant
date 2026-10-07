@@ -203,6 +203,23 @@ class ValueEvaluationStoreTest {
     }
 
     @Test
+    @DisplayName("판단 중 대화를 지워도 완료 기록은 닫고 응답과 조회는 감춘다")
+    void closesAttemptEvenIfConversationIsDeletedDuringProviderCall() {
+        DecisionProvider deleting = provider(
+                "deleting",
+                () -> transactions.executeWithoutResult(
+                        status -> conversations.deleteIfActive(conversation.id(), OWNER.id(), DecisionFixtures.NOW)));
+        service = new ValueEvaluationService(List.of(deleting), new ValueEvaluator(), store);
+        assertHidden(() -> service.evaluate(OWNER, check.id(), "deleting"));
+        ValueEvaluation ended = evaluations.findAll().getFirst();
+        assertThat(ended.outcome()).isEqualTo(DecisionOutcome.EVALUATED);
+        assertThat(ended.evidence().result().orderedCandidateIds()).hasSize(2);
+        assertHidden(() -> service.read(OWNER, ended.id()));
+        assertHidden(() -> service.replay(OWNER, ended.id(), "deleting"));
+        assertHidden(() -> store.finish(OTHER.id(), ended.id(), ended.evidence()));
+    }
+
+    @Test
     @DisplayName("잘못된 평가 JSON 한 줄은 다른 평가의 별도 복구 트랜잭션과 기동을 막지 않는다")
     void recoversValidRowsBesideInvalidEvidence() {
         ValueEvaluation bad = store.begin(OWNER.id(), check.id(), "fixture-a");
@@ -222,6 +239,10 @@ class ValueEvaluationStoreTest {
     }
 
     private DecisionProvider provider(String id) {
+        return provider(id, () -> {});
+    }
+
+    private DecisionProvider provider(String id, Runnable duringCall) {
         return new DecisionProvider() {
             @Override
             public String id() {
@@ -231,6 +252,7 @@ class ValueEvaluationStoreTest {
             @Override
             public DecisionResponse evaluate(
                     DecisionState state, List<DecisionQuestion> questions, DecisionRequest request) {
+                duringCall.run();
                 return new DecisionResponse(
                         new DecisionProviderInfo(
                                 id, "fixture-1", "requested", "test-model", "actual", "test-model", null),

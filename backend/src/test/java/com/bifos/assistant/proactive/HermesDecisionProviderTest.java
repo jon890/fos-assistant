@@ -30,6 +30,7 @@ import com.bifos.assistant.usage.application.UserExecutionLimiter;
 import com.bifos.assistant.usage.domain.AgentExecution;
 import com.bifos.assistant.usage.domain.type.ExecutionStatus;
 import java.time.Duration;
+import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -109,6 +110,26 @@ class HermesDecisionProviderTest {
         assertThat(evaluate(Duration.ofSeconds(1)).result().failure()).isEqualTo(DecisionFailure.INVALID_RESULT);
         complete("private response that is not JSON");
         assertThat(evaluate(Duration.ofSeconds(1)).result().failure()).isEqualTo(DecisionFailure.INVALID_RESULT);
+    }
+
+    @Test
+    @DisplayName("응답 전체의 JSON 코드 펜스 한 겹만 벗겨 같은 계약으로 검증한다")
+    void acceptsOnlyOneOuterJsonFence() {
+        String output = json.writeValueAsString(DecisionFixtures.ordered(DecisionFixtures.state()));
+        for (String language : List.of("json", "")) {
+            complete("  ```" + language + "\n" + output + "\n```  ");
+            assertThat(evaluate(Duration.ofSeconds(1)).result())
+                    .isEqualTo(DecisionFixtures.ordered(DecisionFixtures.state()));
+        }
+        for (String invalid : List.of(
+                "설명\n```json\n" + output + "\n```",
+                "```json\n" + output + "\n```\n추가 글",
+                "```json\n" + output + "\n```\n```json\n{}\n```",
+                "```json\n" + output + " {}\n```",
+                "```json\nprivate response that is not JSON\n```")) {
+            complete(invalid);
+            assertThat(evaluate(Duration.ofSeconds(1)).result().failure()).isEqualTo(DecisionFailure.INVALID_RESULT);
+        }
     }
 
     @Test

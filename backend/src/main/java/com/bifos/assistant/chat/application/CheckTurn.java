@@ -40,6 +40,14 @@ public interface CheckTurn {
     String stoppedNotice();
 
     /**
+     * 사용자에게 바로 알리지 않는 turn 인가. 참이면 답과 멈춤 알림 줄을 대화에 저장하지 않는다. {@link #answer} 와
+     * {@link #stoppedNotice} 는 그대로 부른다.
+     */
+    default boolean silent() {
+        return false;
+    }
+
+    /**
      * 멈춘 turn 뒤에 그 대화의 대기 줄을 멈춰 둘지다. 사용자가 멈췄으면 참이고, Control Plane 이 상한으로 멈췄으면 거짓이다. 거짓이면 대기
      * 메시지가 그대로 다음 turn 으로 간다.
      */

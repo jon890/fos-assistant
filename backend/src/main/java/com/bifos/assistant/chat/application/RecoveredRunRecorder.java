@@ -298,7 +298,8 @@ public class RecoveredRunRecorder {
      * 않기 때문이다. 그때는 앞 답을 대신한 것으로 적는다.
      *
      * <p>{@link RecoveredAnswerGuard} 가 막는 turn(먼저 살펴보기 turn)이면 답 대신 그 알림 줄 하나를 남기고 그 번호를
-     * 돌려준다. 그 답은 검사하지 않은 글이기 때문이다. 답이 비었어도 그 줄은 남긴다.
+     * 돌려준다. 그 답은 검사하지 않은 글이기 때문이다. 답이 비었어도 그 줄은 남긴다. 가드가 빈 글을 주면 답도 알림 줄도 남기지 않고
+     * null 이다. 사용자에게 바로 알리지 않는 자동 실행 살펴보기 turn 이다.
      *
      * <p>그 밖의 turn 이 취소로 끝났고 답이 비었으면 아무것도 남기지 않고 null 이다.
      *
@@ -316,6 +317,9 @@ public class RecoveredRunRecorder {
                 .map(guard -> guard.noticeInsteadOfAnswer(row.id(), row.status()))
                 .flatMap(Optional::stream)
                 .findFirst();
+        if (notice.isPresent() && notice.get().isEmpty()) {
+            return null;
+        }
         if (notice.isPresent()) {
             return messages.save(ChatMessage.fromSystem(conversationId, notice.get(), now))
                     .id();
