@@ -1,6 +1,7 @@
 package com.bifos.assistant.chat.infra;
 
 import static com.bifos.assistant.chat.infra.ArtifactPathPolicy.validation;
+
 import java.io.IOException;
 import java.nio.file.DirectoryStream;
 import java.nio.file.FileVisitResult;
@@ -190,7 +191,6 @@ public class ArtifactStore {
         }
     }
 
-
     /**
      * 대화 폴더마다 마지막으로 바뀐 때가 {@code cutoff} 보다 앞섰는지 보고, 앞섰으면 그 폴더의 파일을 지운다.
      *
@@ -362,21 +362,6 @@ public class ArtifactStore {
         }
         return files;
     }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
     private static String relativeOf(Path folder, Path file) {
         return StreamSupport.stream(folder.relativize(file).spliterator(), false)
