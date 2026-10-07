@@ -287,7 +287,7 @@ public final class ArchitectureRules {
      * {@code shared.concurrent.VirtualThreadBackgroundTasks} 와 HTTP 연결에 묶인 {@code ChatEventStreams},
      * {@code NotificationEventStreams} 만 부른다. 요청 밖 작업은 {@code BackgroundTasks} 로 띄운다.
      *
-     * <p>근거: ADR-096. 직접 띄운 스레드는 검사가 끝날 때 기다리지 못한다.
+     * <p>근거: ADR-20261007 / background-tasks. 직접 띄운 스레드는 검사가 끝날 때 기다리지 못한다.
      */
     public static final ArchRule VIRTUAL_THREADS_ONLY_THROUGH_BACKGROUND_TASKS = CompositeArchRule.of(noClasses()
                     .that()
@@ -315,7 +315,7 @@ public final class ArchitectureRules {
      * {@code Executors.newVirtualThreadPerTaskExecutor()} 는 {@code ResearchAndBuildFlow} 만 부른다.
      * 그 흐름은 {@code try} 블록이 닫힐 때 실행기가 작업을 모두 기다린다.
      *
-     * <p>근거: ADR-096. 블록 밖으로 살아 남는 실행기는 검사가 끝날 때 기다리지 못한다.
+     * <p>근거: ADR-20261007 / background-tasks. 블록 밖으로 살아 남는 실행기는 검사가 끝날 때 기다리지 못한다.
      */
     public static final ArchRule VIRTUAL_THREAD_EXECUTOR_ONLY_IN_RESEARCH_AND_BUILD_FLOW = noClasses()
             .that()

@@ -71,8 +71,9 @@ description: Gmail 메일을 찾고 읽고, 승인받은 메일과 라벨, 자�
 필터는 새 메일에만 적용된다. 필터를 바꾸려면 `list_filters` 로 원래 설정을 읽고, `delete_filter` 로 지운 뒤 `create_filter` 로 다시 만든다.
 두 쓰기에 각각 승인이 필요하다. 다시 만들기가 실패하면 원래 설정을 사용자에게 알리고 새 승인을 받아 복구한다.
 
-승인 실행에서 `apply_labels_to_query` 가 `invalid_input` 으로 끝나면 인자를 확인하고, 같은 검색어로 `search_messages` 의 모든 쪽을 다시 읽어 대상 수를 센다. 새 수와 검색어를 보여 주고 다시 승인을 요청한다.
-서버는 수가 달라졌을 때 `GMAIL_TARGET_COUNT_CHANGED` 와 `actual_count` 를 반환하지만, 현재 승인 경로는 공통 오류 어휘만 전달한다. 이 경로에서 이전 수나 반환하지 않은 수를 새 수로 쓰지 않는다.
+승인 결과의 오류 코드가 `GMAIL_TARGET_COUNT_CHANGED` 이면 아무것도 바뀌지 않았다. 세부의 `actual_count` 가 지금 대상 수다.
+「승인 당시 대상 수와 현재 대상 수가 달라 실행하지 않았어요. 다시 조회해서 확인할까요?」 처럼 두 수를 함께 알리고 묻는다. 사용자가 원하면 같은 검색어로 다시 조회한 뒤 새 수로 승인을 요청한다.
+`actual_count` 가 없으면 이전 수나 짐작한 수를 새 수로 쓰지 않고 다시 센다. 오류 코드가 `GMAIL_INVALID_INPUT` 이면 인자를 확인한다.
 대상이 501통 이상이면 검색 조건을 나누어 각 500통 이내로 요청한다. 일부만 적용한 것으로 말하지 않는다.
 필터와 일괄 적용도 `TRASH`, `SPAM` 을 더하거나 떼지 못한다. `forward` 와 전달 주소 관리는 하지 못한다.
 
@@ -80,4 +81,4 @@ description: Gmail 메일을 찾고 읽고, 승인받은 메일과 라벨, 자�
 
 메일을 읽지 못했으면 읽지 못했다고 말한다. 내용을 지어내지 않는다.
 자격 증명이 거절됐으면 연결 화면에서 값을 다시 등록해야 한다고 알린다.
-필터 쓰기가 `forbidden` 으로 끝나면 읽기 도구 `list_filters` 로 권한을 확인한다. 여기서 `GMAIL_FILTER_SCOPE_REQUIRED` 가 나오면 Google Cloud 동의 화면에 `gmail.settings.basic` 을 더하고, `gmail.modify` 와 함께 토큰을 다시 받아 연결 값을 바꾸라고 알린다. 조회가 성공하면 쓰기 오류를 권한 부족으로 단정하지 않는다.
+필터 쓰기나 `list_filters` 의 오류 코드가 `GMAIL_FILTER_SCOPE_REQUIRED` 이면 Google Cloud 동의 화면에 `gmail.settings.basic` 을 더하고, `gmail.modify` 와 함께 토큰을 다시 받아 연결 값을 바꾸라고 알린다. 오류 코드가 `GMAIL_FORBIDDEN` 이면 필터 권한 부족으로 단정하지 않는다.

@@ -13,6 +13,7 @@
 | 점검 대화 | `conversation.purpose = CHECK` | 사용자와 에이전트마다 하나를 이어 쓰는 대화. 살펴보기 결과가 여기 남는다 |
 | 분야 지침 | 스킬 `proactive-check` | 무엇을 읽고 무엇을 고를지 정하는 그 에이전트의 지침. 분야 패키지가 소유한다 |
 | 발견 | `proactive_check_finding` | 결과 블록의 `findings` 하나 |
+| 문제 후보 | `proactive_check_problem` | 결과 블록 버전 3의 `problemCandidates` 하나. 발견을 근거로 이 사용자가 풀 가치가 있다고 모델이 본 문제다 |
 | 살펴보기 트리 | 루트가 살펴보기 turn 인 실행 트리 | 그 turn 과 그 turn 이 맡긴 자식 실행 |
 
 「할 일 후보」 는 결과 안의 문장이다. 에이전트는 `follow_up_propose` 로 [할 일](follow-up.md)을 제안할 수도 있다.
@@ -71,6 +72,8 @@ Hermes 가 복구돼도 꺼진 일정은 발화하지 않으며, 이미 대기 �
 
 22시부터 07시까지는 실행하고 알림만 억제한다. 시각은 사용자가 고른 시간대를 따른다.
 예약 실행의 정상 `NOTHING_NEW` 는 대화 답과 무소식 알림 줄을 남기지 않는다.
+모델이 `FINDINGS` 로 답했어도 검사를 통과한 새 발견이 없고 질문과 출처 장애도 없으면 예약 실행에서는 같은 무소식으로 다룬다.
+대화 답과 보고를 남기지 않고, 참고로 내린 발견만 셈을 위해 저장한다. 그래서 이미 알린 발견의 되풀이가 다음 날 깨우기를 `UNREAD_REPORT` 로 막지 않는다.
 질문과 출처 장애는 무소식과 구분해 남긴다.
 
 ### 시작 응답
@@ -100,7 +103,10 @@ Hermes 가 복구돼도 꺼진 일정은 발화하지 않으며, 이미 대기 �
 
 `report_json` 에 검사한 모양을 저장하고 점검 대화와 「지금 볼 것」 의 보고 카드가 같은 기록을 읽는다.
 보고 글은 신뢰하지 않는 글로 처리하며, Markdown 문법을 이스케이프하고 안전한 원문 링크만 만든다.
-`report_opened_at` 은 요청자가 자신의 보고를 열 때만 채운다.
+`report_opened_at` 은 요청자가 자신의 보고를 열 때 채운다.
+요청자가 점검 대화의 메시지 목록을 읽거나 그 대화에 질문을 보낼 때도 그 대화에서 열지 않은 자신의 보고를 모두 채운다(`ChatService` 의 `CheckReportReads` port 를 `proactive` 가 구현한다).
+다른 사용자의 보고와 다른 대화의 보고는 건드리지 않는다.
+대기 행에서 꺼내 보낸 질문은 기록하지 않는다. 앞 turn 이 끝난 뒤에 저장되므로 그 사이 만든 보고를 사용자가 보지 않았을 수 있다.
 보고 카드는 `LATER` 이고, 실제 승인 대기는 기존 「내 차례」 에서 센다.
 
 분야 스킬은 버전 2 보고를 내도록 갱신해야 한다. 버전 1 호환이 있어 Control Plane 을 먼저 배포해도 기존 스킬은 동작한다.
@@ -188,7 +194,8 @@ sequenceDiagram
 | 허용된 Memory | `ContextAssembler.assemble`. 그 에이전트가 받는 collection 만이다([ADR-053](../adr/ADR-053-에이전트는-허용된-collection-의-memory-만-받는다.md)). 보통 turn 과 같다 | `instructions` |
 | 지난 결과와 사용자의 논의 | 점검 대화의 Hermes session. 지난 답과 그 뒤 사용자가 받아들이거나 거절하거나 관심을 좁힌 대화가 그 안에 있다 | `session_id` |
 | 최근에 알린 발견 | 그 점검 대화의 `NEW` 발견 가운데 `digest-window` 안의 것을 `digest-max-items` 개까지. 영역, 주제 키, 제목, 원문 주소, 확인 날짜, 그 살펴보기가 끝난 뒤 지금까지 사용자가 보낸 메시지 수 | `input`. 모델이 쓴 글에서 온 것이라 `<external-data>` 로 감싼다 |
-| 변화 신호 | 지난 살펴보기 시각, 그 뒤 사용자가 점검 대화에 보낸 메시지 수, Memory 문맥이 지난 살펴보기와 같은지(`agent_execution.instructions_hash` 비교) | `input` |
+| 최근에 받아들인 문제 후보 | 그 점검 대화의 `ACCEPTED` 문제 후보 가운데 `digest-window` 안의 것을 `digest-max-items` 개까지. 문제 키와 문제 | `input`. 모델이 쓴 글이라 `<external-data>` 로 감싼다 |
+| 변화 신호 | 지난 살펴보기 시각(`UNREAD_REPORT` 처럼 모델 없이 건너뛴 줄은 뺀다), 그 뒤 사용자가 점검 대화에 보낸 메시지 수, Memory 문맥이 지난 살펴보기와 같은지(`agent_execution.instructions_hash` 비교) | `input` |
 | 분야의 맥락 | 분야 지침이 정한 읽기 도구를 붙은 커넥터 서버에서 직접 불러 읽는다. 커리어는 아래 「분야 지침이 지킬 것」 | 살펴보기 turn 이 도구로 읽는다 |
 
 session 을 새로 바꾼 뒤에도 최근에 알린 발견과 변화 신호는 실리므로 같은 제안을 되풀이하지 않는다.
@@ -204,7 +211,7 @@ session 을 새로 바꾼 뒤에도 최근에 알린 발견과 변화 신호는 
 | 자리 | 싣는 것 |
 | --- | --- |
 | `instructions` | 그 사용자와 에이전트의 Memory 문맥(보통 turn 과 같다), 응답 지시, 아래 「Control Plane 지시」 |
-| `input` | `skill_view(name="proactive-check")` 로 지침을 읽고 따르라는 문장, 지금 시각, 변화 신호, 최근에 알린 발견 목록 |
+| `input` | `skill_view(name="proactive-check")` 로 지침을 읽고 따르라는 문장, 지금 시각, 변화 신호, 최근에 알린 발견 목록, 최근에 받아들인 문제 후보 목록 |
 | `session_id` | 점검 대화의 session |
 
 ### Control Plane 지시
@@ -229,6 +236,7 @@ session 을 새로 바꾼 뒤에도 최근에 알린 발견과 변화 신호는 
 | 시작 | `SYSTEM` | 먼저 살펴보기를 시작했어요 |
 | 발견이 있다 | `ASSISTANT` | 아래 「그리기」 의 글. 실행 번호가 붙어 작업 과정이 보인다 |
 | `NOTHING_NEW` 이고 발견, 질문, 확인하지 못한 출처가 모두 없다 | `SYSTEM` | 살펴봤지만 새로 알릴 것이 없어요 |
+| 예약 실행이고 새 발견, 질문, 확인하지 못한 출처가 모두 없다 | 남기지 않는다 | 보고도 만들지 않는다. 위의 무소식 줄과 아래 「발견이 있다」 보다 먼저 본다 |
 | `NOTHING_NEW` 인데 질문이나 확인하지 못한 출처가 있다 | `ASSISTANT` | 질문과 확인하지 못한 출처 절을 그린다. 질문이 없으면 「새로 알릴 것은 없어요」 도 넣는다 |
 | 답이 비었다 | `SYSTEM` | 살펴봤지만 답을 받지 못했어요. 다시 눌러 주세요 |
 | 블록이 없거나 읽지 못했다 | `SYSTEM` | 살펴봤지만 결과 형식이 맞지 않아 정리하지 못했어요. 다시 눌러 주세요 |
@@ -336,13 +344,14 @@ turn 이 어떻게 끝나든 잠금을 풀기 전에 `ProactiveCheckService` 가
 
 | 칸 | 타입 | 상한 | 뜻 |
 | --- | --- | --- | --- |
-| `version` | 정수 | | 1과 2를 읽는다. 새 스킬은 2를 쓴다 |
+| `version` | 정수 | | 1, 2, 3을 읽는다. 새 스킬은 3을 쓴다. 3은 2에 `problemCandidates` 를 더한 것이다 |
 | `outcome` | `FINDINGS`, `NOTHING_NEW` | | 할 말이 있는가 |
 | `summary` | 문자열, 선택 | 300자 | 한두 문장 요약 |
 | `findings` | 배열 | 5개 | 발견. `NOTHING_NEW` 면 비운다 |
 | `questions` | 문자열 배열 | 3개, 각 300자 | 사용자에게 묻고 싶은 것 |
 | `followUpCandidates` | 문자열 배열 | 3개, 각 200자 | 할 일 후보 |
 | `sourceFailures` | 문자열 배열 | 5개, 각 200자 | 읽지 못한 출처와 까닭 |
+| `problemCandidates` | 배열, 버전 3만 | 3개 | 문제 후보. 아래 「문제 후보」 |
 
 `findings` 의 한 칸:
 
@@ -372,7 +381,7 @@ turn 이 어떻게 끝나든 잠금을 풀기 전에 `ProactiveCheckService` 가
 | `EMPTY_ANSWER` | 답이 비었다 |
 | `NO_BLOCK` | 닫는 태그가 없거나 그 앞에 여는 태그가 없다 |
 | `NOT_JSON` | 태그 사이가 JSON 객체 하나가 아니다 |
-| `BAD_VERSION` | `version` 이 없거나 1과 2가 아니다 |
+| `BAD_VERSION` | `version` 이 없거나 1, 2, 3이 아니다 |
 | `BAD_OUTCOME` | `outcome` 이 없거나 `FINDINGS`, `NOTHING_NEW` 가 아니다 |
 
 **태그 글자 사이에 낀 보이지 않는 서식 문자(Unicode `Cf`)는 무시한다.**
@@ -447,6 +456,57 @@ turn 이 어떻게 끝나든 잠금을 풀기 전에 `ProactiveCheckService` 가
 | `INCOMPLETE` | 근거가 부족해요 |
 | `REPEATED` | 이미 알린 것이에요 |
 
+## 문제 후보
+
+결정은 [ADR-093](../adr/ADR-093-문제-찾기는-살펴보기-결과의-문제-후보로-받고-control-plane-이-근거와-중복을-결정적으로-검사한다.md) 에 있다.
+발견이 관찰이라면 문제 후보는 그 관찰이 이 사용자에게 뜻하는 문제다. 우선순위, 실행 여부, 승인 필요 여부는 정하지 않는다.
+버전 3 블록의 `problemCandidates` 로 받고, 버전 1과 2는 후보 0개로 읽는다.
+
+| 칸 | 타입 | 상한 | 뜻 |
+| --- | --- | --- | --- |
+| `problemKey` | 문자열 | 120자 | 분야 지침이 정한, 같은 문제면 늘 같은 키. 예: `position:deadline:example-backend`. 앞뒤 공백을 지우고 소문자로 맞춰 견준다 |
+| `problem` | 문자열 | 300자 | 무엇이 문제인가. 관찰을 되풀이하지 않고 이 사용자에게 뜻하는 바를 적는다 |
+| `relatedGoal` | 문자열 | 200자 | 이 문제가 닿는 사용자의 목표나 맥락. Memory, 분야 문서, 점검 대화에서 사용자가 말한 것 |
+| `evidence` | 문자열 배열 | 5개, 각 120자 | 근거가 된 같은 블록 발견의 `topicKey` |
+| `proposedAction` | `{"type": "ACTION" 또는 "QUESTION", "text": 문자열}` | 200자 | 다음 행동이나 다음 조사, 또는 사용자에게 물을 것 |
+| `confidence` | `LOW`, `MEDIUM`, `HIGH` | | 모델이 이 문제를 얼마나 확신하는가 |
+| `expectedBenefit` | 문자열 | 300자 | 해결하면 사용자가 얻을 것의 가설 |
+| `sideEffect` | `NONE`, `INTERNAL`, `EXTERNAL` | | 제안 행동이 남길 영향의 힌트. 앱 밖에 쓰거나 연락하면 `EXTERNAL`, 이 앱 안에만 남으면 `INTERNAL` |
+| `risk` | 문자열, 선택 | 200자 | 행동의 위험이나 되돌리기 어려운 점 |
+| `changeSinceLast` | 문자열, 선택 | 300자 | 같은 문제 키를 다시 낼 때 지난번과 달라진 점 |
+
+상한을 넘는 글은 잘라 읽고, 넘는 원소는 버린다. 후보 하나가 틀려도 블록 전체를 거절하지 않는다.
+
+### 후보 검사
+
+`ProblemJudgement.judge` 가 후보마다 `ACCEPTED` 와 `DROPPED` 를 정한다. 첫 번째로 걸린 까닭 하나를 남긴다.
+같은 블록의 발견이 하나도 없으면 후보를 검사하지도 저장하지도 않는다. 가리킬 근거가 없기 때문이다.
+
+| 순서 | 조건 | 걸리면 까닭 |
+| --- | --- | --- |
+| 1 | `problemKey`, `problem`, `proposedAction.text`, `expectedBenefit` 이 있고, `proposedAction.type`, `confidence`, `sideEffect` 가 정해진 값이다 | `INCOMPLETE` |
+| 2 | `relatedGoal` 이 있다 | `NO_GOAL` |
+| 3 | `evidence` 의 주제 키 가운데 하나 이상이 같은 블록의 발견을 가리키고(앞뒤 공백만 무시하고 견준다), 그 발견이 `NEW` 이거나 `REPEATED` 로만 참고가 됐다 | `NO_EVIDENCE` |
+| 4 | 같은 블록에서 앞서 받아들인 후보와 문제 키가 다르다. 같은 점검 대화의 `digest-window` 안에 받아들인 후보와 문제 키가 같으면 `changeSinceLast` 가 있다 | `DUPLICATE` |
+| 5 | `proposedAction.text` 의 `title_key` 가 그 사용자의 `PROPOSED` 나 `OPEN` 할 일과 다르다 | `EXISTING_FOLLOW_UP` |
+
+`REPEATED` 발견도 근거가 된다. 이미 알린 공고라도 마감이 다가오면 문제는 남아 있기 때문이다.
+원문이 없거나, 이번에 확인하지 않았거나, 마감되거나 오래되거나 신선도를 모르거나, 근거가 부족한 발견은 근거가 되지 못한다.
+
+`title_key` 비교는 [할 일](follow-up.md)의 `FollowUpService.titleKey` 와 같은 정규화다. 다른 말로 적은 같은 일은 걸리지 않는다.
+
+받아들인 후보의 신선도(`evidence_checked_at`)는 근거가 된 발견의 확인 시각 가운데 가장 이른 것이다. 모델이 쓴 값을 받지 않는다.
+
+### 남기는 것과 그리지 않는 것
+
+후보는 받아들인 것과 버린 것을 모두 `proactive_check_problem` 에 남긴다. 답 메시지를 저장한 뒤 발견과 한 트랜잭션에서 저장한다.
+근거는 발견의 주제 키, 검사를 통과한 원문 주소, 확인 시각만 남긴다. 원문 본문과 커넥터 응답은 남기지 않는다.
+
+후보는 대화와 보고에 그리지 않는다. 사용자에게 올릴지는 우선순위와 자율 수준을 정하는 다음 단계가 정한다.
+다음 살펴보기는 최근에 받아들인 후보를 입력에 실어, 모델이 같은 문제 키를 다시 내지 않게 한다.
+
+예약 실행의 `NOTHING_NEW` 침묵, 「새로 알릴 것이 없어요」 알림 줄, 다섯 칸 보고는 후보와 상관없이 지금 그대로다.
+
 ## 분야 지침이 지킬 것
 
 분야 패키지가 쓰는 `proactive-check` 스킬은 아래를 지킨다. Control Plane 이 지시와 검사로 지키는 것과 겹쳐도 지침에 다시 적는다.
@@ -455,6 +515,7 @@ turn 이 어떻게 끝나든 잠금을 풀기 전에 `ProactiveCheckService` 가
 - 저장된 후보는 출발점이다. 후보가 없어도 허용된 웹 조사로 새 근거를 찾는다
 - 원문을 열어 확인한 것만 사실로 적고 나머지는 추정이나 아직 모르는 것으로 적는다
 - 결과 블록의 모양을 지킨다
+- 문제 후보는 사용자의 목표나 맥락과 이어지고 이번 발견이 근거인 것만 낸다. 새 자료가 나왔다는 사실만으로 후보를 만들지 않는다. 없으면 비운다
 
 커리어 분야는 아래를 더한다.
 
@@ -487,6 +548,7 @@ turn 이 어떻게 끝나든 잠금을 풀기 전에 `ProactiveCheckService` 가
 | 시작 전 점검, 점검 대화의 찾기와 만들기, 다른 사용자의 접근, session 교체 | `ProactiveCheckService` 시험 |
 | 시간과 도구 호출 상한, 상한 중지가 실패했을 때의 다시 시도, 끝날 때의 전달 표시 | `ChatService` 와 `ProactiveCheckService` 시험 |
 | 커넥터 쓰기 거절, MCP 도구 거절, 위임 대상과 수 | 각 판정 자리의 시험 |
+| 문제 후보의 읽기와 검사. 급한 문제, 나중에 중요한 문제, 목표 없는 관찰, 중복, 할 일 없음 fixture | `ProblemJudgementTest`, `CheckResultParserTest` |
 | 웹 도구와 붙은 커넥터의 읽기 도구 직접 호출을 거쳐 대화에 결과가 남는 합성 흐름, 쓰기 도구의 `READ_ONLY_RUN` 거절과 쓰기 허용 때의 승인 줄, 검색 결과의 지시가 쓰기로 이어지지 않음, 연결 해제 뒤의 출처 실패 | `test/e2e/scenarios/proactive-check.ts` |
 
 시험과 공개 기록에는 합성 데이터만 쓴다.

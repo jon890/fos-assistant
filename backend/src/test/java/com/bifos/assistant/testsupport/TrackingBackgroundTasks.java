@@ -7,7 +7,7 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * 띄운 스레드를 모두 쥐는 검사용 {@link BackgroundTasks} 다(ADR-096).
+ * 띄운 스레드를 모두 쥐는 검사용 {@link BackgroundTasks} 다(ADR-20261007 / background-tasks).
  *
  * <p>운영 구현과 같은 이름의 가상 스레드를 띄운다. {@link IntegrationTestIsolation} 이 검사가 끝날 때 {@link #awaitIdle} 로
  * 그 스레드가 모두 끝나기를 기다린다. 기다리는 것은 시간이 아니라 스레드의 끝이다.

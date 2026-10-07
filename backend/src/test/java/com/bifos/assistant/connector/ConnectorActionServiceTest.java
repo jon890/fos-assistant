@@ -45,7 +45,9 @@ import com.bifos.assistant.hermes.HermesConnectorClient;
 import com.bifos.assistant.hermes.HermesConnectorClient.InstallResult;
 import com.bifos.assistant.hermes.dto.CallResult;
 import com.bifos.assistant.hermes.dto.ConnectorCallError;
+import com.bifos.assistant.hermes.dto.ConnectorErrorDetail;
 import com.bifos.assistant.hermes.dto.ConnectorManifest;
+import com.bifos.assistant.hermes.dto.ConnectorRecovery;
 import com.bifos.assistant.hermes.dto.ConnectorTool;
 import com.bifos.assistant.mcp.McpCallSigner;
 import com.bifos.assistant.mcp.infra.AgentTokenRepository;
@@ -485,6 +487,24 @@ class ConnectorActionServiceTest {
         assertThat(approved.status()).isEqualTo(ActionStatus.FAILED);
         assertThat(approved.errorCode()).isEqualTo("forbidden");
         assertThat(onlyAction().errorCode()).isEqualTo("forbidden");
+    }
+
+    @Test
+    @DisplayName("실패 결과에 커넥터가 선언한 오류 계약이 있으면 kind 를 붙인 JSON 으로 결과 글에 남긴다")
+    void failedExecutionStoresDeclaredErrorDetail() {
+        UUID actionId = ask(WRITE, ARGS).actionId();
+        when(connector.execute(anyString(), anyString(), anyString(), anyString()))
+                .thenReturn(CallResult.failure(
+                        ConnectorCallError.INVALID_INPUT,
+                        new ConnectorErrorDetail(
+                                "GMAIL_TARGET_COUNT_CHANGED", Map.of("actual_count", 17L), ConnectorRecovery.RECHECK)));
+
+        service.approve(me, actionId, null);
+
+        assertThat(onlyAction().errorCode()).isEqualTo("invalid_input");
+        assertThat(JSON.readTree(onlyAction().resultText()))
+                .isEqualTo(JSON.readTree("{\"kind\":\"connector_error\",\"code\":\"GMAIL_TARGET_COUNT_CHANGED\","
+                        + "\"details\":{\"actual_count\":17},\"recovery\":\"recheck\"}"));
     }
 
     @Test

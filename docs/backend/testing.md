@@ -1,7 +1,7 @@
 # backend 통합 검사
 
 Spring 컨텍스트를 띄우는 backend 검사를 쓰는 방법이다.
-왜 컨텍스트를 함께 쓰는지는 [ADR-095](../adr/ADR-095-backend-통합-검사는-공통-기반-컨텍스트-하나를-함께-쓰고-기동-설정이-다른-검사만-변형을-둔다.md) 가 갖는다.
+왜 컨텍스트를 함께 쓰는지는 [ADR-20261007 / test-context-base](../adr/ADR-20261007-test-context-base.md) 가 갖는다.
 
 ## 기반 주석
 
@@ -51,7 +51,7 @@ class ConversationPagingTest {
 컨텍스트와 H2 DB 를 앞뒤 검사와 함께 쓴다.
 
 - **검사가 띄운 백그라운드 작업은 그 검사 안에서 끝난다.**
-  운영 코드는 요청 밖 작업을 `BackgroundTasks` 로 띄운다([ADR-096](../adr/ADR-096-운영의-백그라운드-작업은-한-빈으로-띄우고-검사는-끝날-때-모두-join-한다.md)).
+  운영 코드는 요청 밖 작업을 `BackgroundTasks` 로 띄운다([ADR-20261007 / background-tasks](../adr/ADR-20261007-background-tasks.md)).
   기반은 그 자리에 띄운 스레드를 쥐는 `TrackingBackgroundTasks` 를 넣고, 공통 확장 `IntegrationTestIsolation` 이 검사가 끝날 때 모두 join 한다.
   30초 상한은 멈춘 작업을 잡는 데만 쓴다. 넘으면 남은 스레드 이름과 함께 그 검사가 실패한다.
   turn 을 붙잡는 대역(`holdSubmits()` 등)을 쓴 검사는 끝나기 전에 푼다.

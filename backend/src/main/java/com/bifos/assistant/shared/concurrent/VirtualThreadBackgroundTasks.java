@@ -3,7 +3,7 @@ package com.bifos.assistant.shared.concurrent;
 import org.springframework.stereotype.Component;
 
 /**
- * 운영의 {@link BackgroundTasks} 구현이다(ADR-096).
+ * 운영의 {@link BackgroundTasks} 구현이다(ADR-20261007 / background-tasks).
  *
  * <p>직접 가상 스레드를 띄우던 때와 같은 동작이다. 스레드 이름과 스레드 수가 바뀌지 않는다.
  */

@@ -11,6 +11,8 @@ import com.bifos.assistant.context.ContextProperties;
 import com.bifos.assistant.context.ContextSource;
 import com.bifos.assistant.context.ContextTrust;
 import com.bifos.assistant.context.ResultHeader;
+import com.bifos.assistant.hermes.dto.ConnectorErrorDetail;
+import com.bifos.assistant.hermes.dto.ConnectorRecovery;
 import com.bifos.assistant.memory.domain.type.MemoryScope;
 import com.bifos.assistant.memory.domain.type.MemorySensitivity;
 import com.bifos.assistant.shared.util.ExternalData;
@@ -21,6 +23,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
@@ -106,6 +109,18 @@ public class ConnectorActionResultSource implements AutoTurnResultSource {
                 null);
     }
 
+    /** 복구 어휘를 모델에게 줄 안내 한 줄로 바꾼다. 커넥터는 어휘만 고르고 글은 Control Plane 이 정한다(ADR-092). */
+    static String recoveryInput(ConnectorRecovery recovery) {
+        return switch (recovery) {
+            case RECHECK ->
+                "복구: 승인한 뒤 대상이 바뀌어 실행하지 않았다. 세부에 지금 값이 있으면 승인 당시 값과 함께 알리고,"
+                        + " 다시 조회해 확인할지 묻는다. 사용자가 원하면 같은 조건으로 다시 조회해 새로 승인을 요청한다.";
+            case RECONNECT -> "복구: 연결의 권한이나 값이 모자라다. 사용자에게 연결을 다시 등록하도록 안내한다." + " 커넥터 스킬에 절차가 있으면 그것을 따른다.";
+            case FIX_INPUT -> "복구: 인자가 맞지 않았다. 인자를 고쳐 새로 승인을 요청한다.";
+            case RETRY_LATER -> "복구: 서비스가 응답하지 않았다. 읽기 도구로 지금 상태를 확인한 뒤 다시 시도할지 사용자에게 묻는다.";
+        };
+    }
+
     private static Optional<UUID> actionIdOf(String key) {
         try {
             return Optional.of(UUID.fromString(key));
@@ -133,13 +148,31 @@ public class ConnectorActionResultSource implements AutoTurnResultSource {
     private static String input(ConnectorActionResult result, ContextFreshness freshness, Duration staleAfter) {
         List<String> fields = new ArrayList<>(
                 List.of("동작: " + result.title(), "상태: " + result.status().name()));
+        Optional<ConnectorErrorDetail> detail = result.status() == ActionStatus.FAILED
+                ? ConnectorErrorDetail.fromStored(result.resultText())
+                : Optional.empty();
         if (result.status() == ActionStatus.FAILED && result.errorCode() != null) {
             fields.add("오류: " + result.errorCode());
         }
+        detail.ifPresent(found -> {
+            fields.add("오류 코드: " + found.code());
+            if (!found.details().isEmpty()) {
+                fields.add("세부: "
+                        + found.details().entrySet().stream()
+                                .map(entry -> entry.getKey() + "=" + entry.getValue())
+                                .collect(Collectors.joining(", ")));
+            }
+        });
         StringBuilder input = new StringBuilder("승인한 동작의 결과가 도착했다.\n")
                 .append(ResultHeader.render("승인한 동작", fields, result.executedAt(), freshness, staleAfter));
         if (result.status() == ActionStatus.UNKNOWN) {
             return input.append('\n').append(UNKNOWN_INPUT).toString();
+        }
+        if (result.status() == ActionStatus.FAILED) {
+            // 실패 줄의 글은 Control Plane 이 검증해 저장한 오류 계약뿐이다. 본문으로 옮기지 않고 복구 안내만 잇는다.
+            detail.map(ConnectorErrorDetail::recovery)
+                    .ifPresent(recovery -> input.append('\n').append(recoveryInput(recovery)));
+            return input.toString();
         }
         if (result.resultText() != null && !result.resultText().isBlank()) {
             input.append('\n').append(ExternalData.wrap(result.resultText()));

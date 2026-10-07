@@ -13,7 +13,7 @@ import org.springframework.test.context.junit.jupiter.SpringExtension;
  *
  * <p>turn, 위임, 살펴보기 같은 요청 밖 작업은 가상 스레드에서 돈다. 검사가 끝난 뒤에도 돌던 작업은 다음 검사가 정한 대역 응답을 가져가거나
  * 대역에 받은 명령을 남긴다. 그래서 검사가 끝나면 {@link TrackingBackgroundTasks} 가 쥔 스레드가 모두 끝날 때까지 join 한 뒤 대역과
- * 시계를 되돌린다(ADR-096). 상한 안에 끝나지 않으면 그 검사를 실패로 둔다. 남은 작업을 알리지 않고 넘기면 원인과 먼 다음 검사가
+ * 시계를 되돌린다(ADR-20261007 / background-tasks). 상한 안에 끝나지 않으면 그 검사를 실패로 둔다. 남은 작업을 알리지 않고 넘기면 원인과 먼 다음 검사가
  * 흔들린다. 상한은 판정 기준이 아니라 멈춘 작업을 잡는 안전장치다.
  *
  * <p>Mockito mock 과 spy 는 Spring 이 검사마다 초기화하므로 여기서 다루지 않는다.

@@ -39,13 +39,17 @@ import com.bifos.assistant.proactive.application.ProactiveCheckGuard;
 import com.bifos.assistant.proactive.application.ProactiveCheckService;
 import com.bifos.assistant.proactive.domain.ProactiveCheck;
 import com.bifos.assistant.proactive.domain.ProactiveCheckFinding;
+import com.bifos.assistant.proactive.domain.ProactiveCheckProblem;
 import com.bifos.assistant.proactive.domain.type.CheckInvalidReason;
 import com.bifos.assistant.proactive.domain.type.CheckOutcome;
 import com.bifos.assistant.proactive.domain.type.CheckStatus;
 import com.bifos.assistant.proactive.domain.type.CheckTrigger;
 import com.bifos.assistant.proactive.domain.type.FindingKind;
 import com.bifos.assistant.proactive.domain.type.FindingReason;
+import com.bifos.assistant.proactive.domain.type.ProblemDropReason;
+import com.bifos.assistant.proactive.domain.type.ProblemStatus;
 import com.bifos.assistant.proactive.infra.ProactiveCheckFindingRepository;
+import com.bifos.assistant.proactive.infra.ProactiveCheckProblemRepository;
 import com.bifos.assistant.proactive.infra.ProactiveCheckRepository;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.domain.type.UserRole;
@@ -93,6 +97,8 @@ class ProactiveCheckTurnTest {
     private static final Duration WAIT_LIMIT = Duration.ofSeconds(10);
     private static final String TOPIC_KEY = "study:kafka-exactly-once";
     private static final String SOURCE_URL = "https://docs.example.test/kafka/exactly-once";
+    private static final String PROBLEM_KEY = "study:exactly-once-gap";
+    private static final String PROBLEM_TEXT = "정확히 한 번 처리를 설명할 근거가 부족하다";
 
     @Autowired
     ProactiveCheckService service;
@@ -133,6 +139,9 @@ class ProactiveCheckTurnTest {
 
     @Autowired
     ProactiveCheckFindingRepository findings;
+
+    @Autowired
+    ProactiveCheckProblemRepository problems;
 
     @Autowired
     TransactionTemplate transactions;
@@ -189,6 +198,9 @@ class ProactiveCheckTurnTest {
                 .toList();
         owned.forEach(conversation -> awaitIdle(conversation.id()));
         List<Long> conversationIds = owned.stream().map(Conversation::id).toList();
+        problems.deleteAll(problems.findAll().stream()
+                .filter(problem -> conversationIds.contains(problem.conversationId()))
+                .toList());
         findings.deleteAll(findings.findAll().stream()
                 .filter(finding -> conversationIds.contains(finding.conversationId()))
                 .toList());
@@ -372,7 +384,9 @@ class ProactiveCheckTurnTest {
         assertThat(second.instructions())
                 .contains("이번 실행은 읽기만 한다")
                 .contains("<fos-check-result>")
-                .contains("changeSinceLast");
+                .contains("changeSinceLast")
+                .contains("problemCandidates")
+                .contains("relatedGoal");
         assertThat(second.input())
                 .contains("skill_view(name=\"proactive-check\")")
                 .contains("<external-data>")
@@ -497,10 +511,101 @@ class ProactiveCheckTurnTest {
         ProactiveCheck second = checksOf(conversation).getLast();
         assertThat(second.newFindings()).isZero();
         assertThat(second.referenceFindings()).isEqualTo(1);
+        assertThat(second.report()).as("단추로 연 살펴보기는 되풀이만 있어도 보고를 남긴다").isNotNull();
         assertThat(findingsOf(conversation))
                 .filteredOn(finding -> finding.checkId().equals(second.id()))
                 .extracting(ProactiveCheckFinding::reason)
                 .containsExactly(FindingReason.REPEATED);
+    }
+
+    @Test
+    @DisplayName("버전 3의 문제 후보는 검사해 받아들인 것과 버린 것을 모두 남기고 답에는 그리지 않는다")
+    void savesJudgedProblemCandidatesWithoutRenderingThem() {
+        stub().willAnswer(command -> answer(problemBlock(PROBLEM_KEY, null, true)));
+
+        Conversation conversation = runCheck();
+
+        ChatMessage answer =
+                messages.findByConversationIdOrderByIdAsc(conversation.id()).getLast();
+        assertThat(answer.content())
+                .contains("**새로 알릴 것**")
+                .doesNotContain(PROBLEM_TEXT)
+                .doesNotContain(PROBLEM_KEY)
+                .doesNotContain("목표 없는 관찰");
+        ProactiveCheck check = onlyCheckOf(conversation);
+        List<ProactiveCheckProblem> saved = problemsOf(conversation);
+        assertThat(saved)
+                .extracting(ProactiveCheckProblem::status)
+                .containsExactly(ProblemStatus.ACCEPTED, ProblemStatus.DROPPED);
+        ProactiveCheckProblem accepted = saved.getFirst();
+        assertThat(accepted.checkId()).isEqualTo(check.id());
+        assertThat(accepted.problemKey()).isEqualTo(PROBLEM_KEY);
+        assertThat(accepted.problem()).isEqualTo(PROBLEM_TEXT);
+        assertThat(accepted.actionType()).isEqualTo("ACTION");
+        assertThat(accepted.evidence()).hasSize(1);
+        assertThat(accepted.evidence().getFirst().topicKey()).isEqualTo(TOPIC_KEY);
+        assertThat(accepted.evidence().getFirst().sourceUrl()).isEqualTo(SOURCE_URL);
+        assertThat(accepted.evidenceCheckedAt()).isNotNull();
+        assertThat(saved.getLast().dropReason()).isEqualTo(ProblemDropReason.NO_GOAL);
+    }
+
+    @Test
+    @DisplayName("다음 살펴보기는 받아들인 문제 후보를 감싸 싣고, 같은 문제 키를 다시 내면 중복으로 버린다")
+    void secondCheckCarriesAcceptedProblemsAndDropsDuplicate() {
+        stub().willAnswer(command -> answer(problemBlock(PROBLEM_KEY, null, false)));
+        Conversation conversation = runCheck();
+
+        runCheck();
+
+        String input = stub().received().getLast().input();
+        String wrapped = input.substring(input.indexOf("최근에 받아들인 문제 후보"));
+        assertThat(wrapped).contains("<external-data>").contains("- " + PROBLEM_KEY + " · " + PROBLEM_TEXT);
+        ProactiveCheck second = checksOf(conversation).getLast();
+        assertThat(problemsOf(conversation))
+                .filteredOn(problem -> problem.checkId().equals(second.id()))
+                .extracting(ProactiveCheckProblem::dropReason)
+                .containsExactly(ProblemDropReason.DUPLICATE);
+    }
+
+    @Test
+    @DisplayName("예약 살펴보기는 되풀이 발견의 새 문제 후보를 저장하면서 답과 보고는 남기지 않는다")
+    void savesProblemFromRepeatedFindingWithoutScheduledReport() {
+        stub().willAnswer(command -> answer(problemBlock(PROBLEM_KEY, null, false)));
+        Conversation conversation = runCheck();
+        ProactiveCheck first = onlyCheckOf(conversation);
+        first.openReport(Instant.now());
+        checks.save(first);
+        int messageCount =
+                messages.findByConversationIdOrderByIdAsc(conversation.id()).size();
+        stub().willAnswer(command -> answer(problemBlock("study:another-gap", null, false)));
+
+        service.start(owner, agent.code(), CheckTrigger.SCHEDULED);
+        awaitIdle(conversation.id());
+
+        ProactiveCheck second = checksOf(conversation).getLast();
+        assertThat(second.status()).isEqualTo(CheckStatus.SUCCEEDED);
+        assertThat(second.newFindings()).isZero();
+        assertThat(second.referenceFindings()).isEqualTo(1);
+        assertThat(second.report()).isNull();
+        assertThat(messages.findByConversationIdOrderByIdAsc(conversation.id())).hasSize(messageCount);
+        assertThat(problemsOf(conversation))
+                .filteredOn(problem -> problem.checkId().equals(second.id()))
+                .extracting(ProactiveCheckProblem::status)
+                .containsExactly(ProblemStatus.ACCEPTED);
+        assertThat(findingsOf(conversation))
+                .filteredOn(finding -> finding.checkId().equals(second.id()))
+                .extracting(ProactiveCheckFinding::reason)
+                .containsExactly(FindingReason.REPEATED);
+    }
+
+    @Test
+    @DisplayName("버전 1과 2의 블록은 문제 후보 0개다")
+    void savesNoProblemsForOlderVersions() {
+        stub().willAnswer(command -> answer(findingsBlock(TOPIC_KEY, SOURCE_URL, null)));
+
+        Conversation conversation = runCheck();
+
+        assertThat(problemsOf(conversation)).isEmpty();
     }
 
     @Test
@@ -546,6 +651,7 @@ class ProactiveCheckTurnTest {
                 .contains("- 지난 살펴보기: 처음")
                 .contains("- Memory 문맥이 지난 살펴보기와 같은지: 모름")
                 .contains("최근에 알린 발견이 없다.")
+                .contains("최근에 받아들인 문제 후보가 없다.")
                 .doesNotContain("<external-data>");
     }
 
@@ -678,6 +784,38 @@ class ProactiveCheckTurnTest {
                 .filter(finding -> finding.conversationId().equals(conversation.id()))
                 .sorted(Comparator.comparing(ProactiveCheckFinding::id))
                 .toList();
+    }
+
+    private List<ProactiveCheckProblem> problemsOf(Conversation conversation) {
+        return problems.findAll().stream()
+                .filter(problem -> problem.conversationId().equals(conversation.id()))
+                .sorted(Comparator.comparing(ProactiveCheckProblem::id))
+                .toList();
+    }
+
+    /**
+     * 발견 하나와 문제 후보를 담은 버전 3 블록이다. 첫 후보는 그 발견을 근거로 하고 검사를 모두 통과한다.
+     *
+     * @param withObservation 목표 없는 관찰 후보를 하나 더 넣는다
+     */
+    private static String problemBlock(String problemKey, String changeSinceLast, boolean withObservation) {
+        String change = changeSinceLast == null ? "" : ",\"changeSinceLast\":\"" + changeSinceLast + "\"";
+        String observation = withObservation
+                ? ",{\"problemKey\":\"study:observation\",\"problem\":\"목표 없는 관찰\","
+                        + "\"evidence\":[\"" + TOPIC_KEY
+                        + "\"],\"proposedAction\":{\"type\":\"ACTION\",\"text\":\"읽기\"},"
+                        + "\"confidence\":\"LOW\",\"expectedBenefit\":\"모른다\",\"sideEffect\":\"NONE\"}"
+                : "";
+        return block("{\"version\":3,\"outcome\":\"FINDINGS\",\"findings\":[{"
+                + "\"area\":\"study\",\"topicKey\":\"" + TOPIC_KEY + "\",\"title\":\"Kafka 정확히 한 번 처리\","
+                + "\"sourceUrl\":\"" + SOURCE_URL + "\",\"checkedAt\":\"" + Instant.now() + "\","
+                + "\"freshness\":\"CURRENT\",\"whyItMatters\":\"지금 하는 일과 닿아 있어요\","
+                + "\"facts\":[\"트랜잭션 프로듀서를 쓴다\"],\"next\":{\"type\":\"ACTION\",\"text\":\"문서를 읽는다\"}}],"
+                + "\"problemCandidates\":[{\"problemKey\":\"" + problemKey + "\",\"problem\":\"" + PROBLEM_TEXT + "\","
+                + "\"relatedGoal\":\"다음 분기 면접 준비\",\"evidence\":[\"" + TOPIC_KEY + "\"],"
+                + "\"proposedAction\":{\"type\":\"ACTION\",\"text\":\"예제를 한 번 돌려 본다\"},"
+                + "\"confidence\":\"MEDIUM\",\"expectedBenefit\":\"면접에서 설계 근거를 말한다\","
+                + "\"sideEffect\":\"NONE\"" + change + "}" + observation + "]}");
     }
 
     /** 확인 시각을 지금으로 둔 발견 하나짜리 결과 블록이다. */
