@@ -1,6 +1,7 @@
 import type { Page } from "../../web/node_modules/@playwright/test/index.js";
 import { expect, test } from "./fixtures.ts";
 import { fixBrowserTime, FIXED_BROWSER_NOW } from "./helpers.ts";
+import { openMemoryAdvanced } from "./memory-page.ts";
 
 test.beforeEach(async ({ page }) => {
   await fixBrowserTime(page);
@@ -75,7 +76,7 @@ async function stubTokenApi(page: Page, seed: StubToken[] = []) {
 test("토큰을 만들면 원문은 한 번만 보이고 브라우저 저장소에 남지 않는다", async ({ page }, testInfo) => {
   const label = `career-os ${testInfo.project.name}`;
   const { requests } = await stubTokenApi(page);
-  await page.goto("/memory");
+  await openMemoryAdvanced(page);
   const form = tokenForm(page);
   await expect(form.getByLabel("만료")).toHaveValue("90");
   await expect(form.getByLabel("만료").locator("option:checked")).toHaveText("90일");
@@ -105,7 +106,7 @@ test("토큰을 만들면 원문은 한 번만 보이고 브라우저 저장소�
 
 test("「확인했어요」 를 누르면 원문이 화면에서 사라진다", async ({ page }, testInfo) => {
   await stubTokenApi(page);
-  await page.goto("/memory");
+  await openMemoryAdvanced(page);
   await issueToken(page, `확인 ${testInfo.project.name}`, false);
   await expect(page.getByTestId("issued-service-token")).toBeVisible();
   await page.getByRole("button", { name: "확인했어요" }).click();
@@ -114,20 +115,20 @@ test("「확인했어요」 를 누르면 원문이 화면에서 사라진다", 
 
 test("허용 목록에서 꺼진 사용자의 발급 거절은 할 일을 알리고 원문을 보이지 않는다", async ({ page }, testInfo) => {
   // 브라우저 검사의 사용자는 허용 목록에 없어 실제 backend 가 403 으로 거절한다.
-  await page.goto("/memory");
+  await openMemoryAdvanced(page);
   await issueToken(page, `거절 ${testInfo.project.name}`, false);
   await expect(page.getByText("이 계정으로는 토큰을 만들 수 없어요. 관리자에게 문의해 주세요.")).toBeVisible();
   await expect(page.getByTestId("issued-service-token")).toHaveCount(0);
 });
 
 test("만료 선택지에 「만료 없음」 이 없다", async ({ page }) => {
-  await page.goto("/memory");
+  await openMemoryAdvanced(page);
   const options = await tokenForm(page).getByLabel("만료").locator("option").allTextContents();
   expect(options).toEqual(["30일", "90일", "1년"]);
 });
 
 test("영역을 고르지 않으면 만들지 못하고 고른 영역 아래에만 민감 허용이 보인다", async ({ page }) => {
-  await page.goto("/memory");
+  await openMemoryAdvanced(page);
   const form = tokenForm(page);
   await form.getByLabel("이름").fill("영역 없음");
   await expect(form.getByRole("button", { name: "토큰 만들기" })).toBeDisabled();
@@ -141,7 +142,7 @@ test("영역을 고르지 않으면 만들지 못하고 고른 영역 아래에�
 test("마지막 사용 날짜를 보인다", async ({ page }, testInfo) => {
   const label = `사용 ${testInfo.project.name}`;
   await stubTokenApi(page, [fakeToken(label, { lastUsedAt: new Date(FIXED_BROWSER_NOW.getTime() - 3_600_000).toISOString() })]);
-  await page.goto("/memory");
+  await openMemoryAdvanced(page);
   await issueToken(page, "대역", false);
   const item = tokenItem(page, label);
   await expect(item).toContainText("마지막 사용");
@@ -153,7 +154,7 @@ test("만료가 가까운 토큰과 만료된 토큰에 표시를 달고 만료�
     fakeToken("곧 만료 토큰", { expiresAt: new Date(FIXED_BROWSER_NOW.getTime() + 3 * 86_400_000).toISOString() }),
     fakeToken("만료 토큰", { expiresAt: new Date(FIXED_BROWSER_NOW.getTime() - 86_400_000).toISOString() }),
   ]);
-  await page.goto("/memory");
+  await openMemoryAdvanced(page);
   await issueToken(page, "대역", false);
   const expiring = tokenItem(page, "곧 만료 토큰");
   await expect(expiring.getByText("곧 만료돼요")).toBeVisible();
@@ -166,7 +167,7 @@ test("만료가 가까운 토큰과 만료된 토큰에 표시를 달고 만료�
 test("폐기하면 표시가 바뀌고 폐기 단추가 사라진다", async ({ page }, testInfo) => {
   const label = `폐기 ${testInfo.project.name}`;
   await stubTokenApi(page);
-  await page.goto("/memory");
+  await openMemoryAdvanced(page);
   await issueToken(page, label, false);
   const item = tokenItem(page, label);
   await item.getByRole("button", { name: "폐기", exact: true }).click();

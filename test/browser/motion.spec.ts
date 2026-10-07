@@ -1,4 +1,5 @@
 import { conversationIdOf, expect, test } from "./fixtures.ts";
+import { cleanupMemories, createMemory, memoryRow, openRow, reloadMemoryLists } from "./memory-page.ts";
 import type { Locator, Page, TestInfo } from "../../web/node_modules/@playwright/test/index.js";
 
 // 움직임 자체를 검사하므로 공통 fixture의 움직임 줄이기를 여기서는 쓰지 않는다.
@@ -320,20 +321,14 @@ test("지우기가 실패하면 줄이 나가는 움직임 없이 남는다", as
   expect(await leavingSeen(page), "실패한 지우기는 나가는 움직임을 시작하지 않는다").toEqual([]);
 });
 
-/** 문서 폼에도 같은 이름의 칸이 있어 기억 폼 안에서만 찾는다. */
-function memoryForm(page: Page) {
-  return page.locator("form").filter({ has: page.getByRole("heading", { name: "새 기억" }) });
-}
-
 test("새 기억은 등장 움직임을 갖고 지운 기억은 나가는 움직임을 거쳐 사라진다", async ({ page }, testInfo) => {
   const title = `움직임 기억 ${testInfo.project.name} ${Date.now()}`;
   await recordLeavingRows(page);
   await page.goto("/memory");
-  await memoryForm(page).getByLabel("범위").selectOption("USER");
-  await memoryForm(page).getByLabel("제목", { exact: true }).fill(title);
-  await memoryForm(page).getByLabel("내용").fill("움직임을 검사하는 기억");
-  await memoryForm(page).getByRole("button", { name: "저장" }).click();
-  const item = page.getByRole("heading", { name: title }).locator("xpath=ancestor::article");
+  // 화면을 연 뒤에 생긴 기억이 되도록 연 다음 만들고 목록을 다시 읽게 한다.
+  await createMemory(page, { scope: "USER", title, content: "움직임을 검사하는 기억" });
+  await reloadMemoryLists(page);
+  const item = memoryRow(page, title);
   await expect(item).toBeVisible();
   expect(await animationOf(item), "화면을 연 뒤에 생긴 기억").toEqual({ name: "message-assistant", duration: "0.2s" });
 
@@ -341,7 +336,9 @@ test("새 기억은 등장 움직임을 갖고 지운 기억은 나가는 움직
   await expect(item).toBeVisible();
   expect((await animationOf(item)).name, "처음부터 있던 기억").toBe("none");
 
+  await openRow(page, title);
   await item.getByRole("button", { name: "지우기" }).click();
+  await page.getByRole("alertdialog").getByRole("button", { name: "지우기" }).click();
   await expect(item).toHaveCount(0);
   expect((await leavingSeen(page)).length, "사라지기 전에 data-leaving 이 붙은 기억 수").toBe(1);
 });
@@ -349,28 +346,32 @@ test("새 기억은 등장 움직임을 갖고 지운 기억은 나가는 움직
 test("기억을 지운 뒤 목록을 다시 읽지 못해도 남은 줄이 투명한 채로 있지 않다", async ({ page }, testInfo) => {
   const title = `움직임 다시 읽기 실패 ${testInfo.project.name} ${Date.now()}`;
   await recordLeavingRows(page);
+  await createMemory(page, { scope: "USER", title, content: "다시 읽기가 실패하는 기억" });
   await page.goto("/memory");
-  await memoryForm(page).getByLabel("범위").selectOption("USER");
-  await memoryForm(page).getByLabel("제목", { exact: true }).fill(title);
-  await memoryForm(page).getByLabel("내용").fill("다시 읽기가 실패하는 기억");
-  await memoryForm(page).getByRole("button", { name: "저장" }).click();
-  const item = page.getByRole("heading", { name: title }).locator("xpath=ancestor::article");
+  const item = memoryRow(page, title);
   await expect(item).toBeVisible();
+  await openRow(page, title);
 
-  // 지우기 요청은 그대로 보내 성공시키고, 뒤이어 목록을 다시 읽는 요청만 실패시킨다.
-  await page.route("**/api/memories", (route) => route.request().method() === "GET"
-    ? route.fulfill({ status: 500, contentType: "application/json", body: JSON.stringify({ code: "INTERNAL_ERROR", message: "다시 읽기 실패" }) })
-    : route.continue());
-  const removed = page.waitForResponse((response) => response.request().method() === "DELETE" && /\/api\/memories\/\d+$/.test(new URL(response.url()).pathname));
-  const reloaded = page.waitForResponse((response) => response.request().method() === "GET" && new URL(response.url()).pathname === "/api/memories");
-  await item.getByRole("button", { name: "지우기" }).click();
-  expect((await removed).ok(), "기억 지우기 요청의 성공 여부").toBe(true);
-  expect((await reloaded).status(), "목록 다시 읽기의 상태 코드").toBe(500);
+  try {
+    // 지우기 요청은 그대로 보내 성공시키고, 뒤이어 목록을 다시 읽는 요청만 실패시킨다.
+    await page.route("**/api/memories", (route) => route.request().method() === "GET"
+      ? route.fulfill({ status: 500, contentType: "application/json", body: JSON.stringify({ code: "INTERNAL_ERROR", message: "다시 읽기 실패" }) })
+      : route.continue());
+    const removed = page.waitForResponse((response) => response.request().method() === "DELETE" && /\/api\/memories\/\d+$/.test(new URL(response.url()).pathname));
+    const reloaded = page.waitForResponse((response) => response.request().method() === "GET" && new URL(response.url()).pathname === "/api/memories");
+    await item.getByRole("button", { name: "지우기" }).click();
+    await page.getByRole("alertdialog").getByRole("button", { name: "지우기" }).click();
+    expect((await removed).ok(), "기억 지우기 요청의 성공 여부").toBe(true);
+    expect((await reloaded).status(), "목록 다시 읽기의 상태 코드").toBe(500);
 
-  await expect(item, "다시 읽지 못해 남은 줄").toBeVisible();
-  await expect(item, "남은 줄의 data-leaving 속성").not.toHaveAttribute("data-leaving");
-  expect(await item.evaluate((node) => getComputedStyle(node).opacity), "남은 줄의 불투명도").toBe("1");
-  expect((await leavingSeen(page)).length, "다시 읽기 전에 data-leaving 이 붙은 기억 수").toBe(1);
+    await expect(item, "다시 읽지 못해 남은 줄").toBeVisible();
+    await expect(item, "남은 줄의 data-leaving 속성").not.toHaveAttribute("data-leaving");
+    expect(await item.evaluate((node) => getComputedStyle(node).opacity), "남은 줄의 불투명도").toBe("1");
+    expect((await leavingSeen(page)).length, "다시 읽기 전에 data-leaving 이 붙은 기억 수").toBe(1);
+  } finally {
+    await page.unroute("**/api/memories");
+    await cleanupMemories(page, [title]);
+  }
 });
 
 test("줄인 움직임에서 「새 메시지」 단추는 바로 내려간다", async ({ page }) => {
