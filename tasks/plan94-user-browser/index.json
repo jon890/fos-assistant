@@ -1,0 +1,15 @@
+{
+  "name": "plan94-user-browser",
+  "description": "사용자마다 브라우저 하나를 Control Plane 이 관리한다 — 단계 2a-2: 로그인 화면의 backend(화면 SSE, 입력)",
+  "status": "in_progress",
+  "created_at": "2026-10-08",
+  "total_phases": 1,
+  "current_phase": 1,
+  "phases": [
+    {
+      "number": 1,
+      "file": "phase-01.md",
+      "execution_profile": "deep"
+    }
+  ]
+}
