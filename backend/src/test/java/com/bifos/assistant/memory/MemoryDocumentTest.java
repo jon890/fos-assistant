@@ -27,6 +27,7 @@ import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import jakarta.validation.Validation;
 import jakarta.validation.Validator;
+import java.sql.Date;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
@@ -101,7 +102,7 @@ class MemoryDocumentTest {
                 "UPDATE memory SET source_type = ?, source_ref = ?, source_date = ? WHERE id = ?",
                 "brain",
                 "legacy/example.md",
-                java.sql.Date.valueOf("2026-01-02"),
+                Date.valueOf("2026-01-02"),
                 id);
 
         assertThat(controller.get(id).content()).isEqualTo("기존 본문");
@@ -111,7 +112,7 @@ class MemoryDocumentTest {
         Map<String, Object> stored = row(id);
         assertThat(stored.get("SOURCE_TYPE")).isEqualTo("brain");
         assertThat(stored.get("SOURCE_REF")).isEqualTo("legacy/example.md");
-        assertThat(stored.get("SOURCE_DATE")).isEqualTo(java.sql.Date.valueOf("2026-01-02"));
+        assertThat(stored.get("SOURCE_DATE")).isEqualTo(Date.valueOf("2026-01-02"));
 
         as(KID);
         assertCode(() -> controller.get(id), ErrorCode.MEMORY_NOT_FOUND);
