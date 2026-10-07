@@ -16,7 +16,7 @@ class ConversationPagingTest {
 }
 ```
 
-기반이 주는 것은 아래와 같다. 목록 자체는 `BackendIntegrationTest` 의 주석 선언이 갖는다.
+기반이 주는 것은 아래와 같다. mock 과 spy 목록은 `BackendIntegrationTest` 의 주석 선언이, 대역 빈 목록은 `IntegrationTestDoubles` 가 갖는다.
 
 | 무엇 | 검사에서 받는 법 | 검사마다 되돌리는 것 |
 | --- | --- | --- |
@@ -26,6 +26,8 @@ class ConversationPagingTest {
 | 시험 시계 `TestClock`. 운영의 `Clock` 빈 자리에 들어간다 | `@Autowired TestClock clock` 뒤 `clock.set(...)`, `clock.advance(...)` | 공통 확장이 실제 시각으로 되돌린다 |
 | Hermes 사건 스트림, toolset, 커넥터, 스킬, 모델, 대시보드 클라이언트의 Mockito mock | `@Autowired` 로 받아 `when(...)` 으로 정한다 | Spring 이 초기화한다 |
 | 운영 빈 몇 개의 Mockito spy | `@Autowired` 로 받아 `doReturn(...)`, `verify(...)` 를 쓴다 | Spring 이 초기화한다 |
+| 스케줄러 `CapturingTaskScheduler`. 자동 설정 스케줄러 자리에 들어가 `@Scheduled` 실행도 맡는다 | `capture()` 로 켜면 예약을 실행하지 않고 모은다. `drain()` 으로 꺼낸다 | 공통 확장이 `reset()` 해 다시 실제로 예약한다 |
+| 꺼 둔 대역(후보 출처, 권한 회수 실패, 결과 출처, 깨우기 재시도, 커넥터 변경 기록) | `@Autowired` 로 받아 켠다 | 공통 확장이 끈다 |
 
 MySQL 태그 검사의 기준 클래스만 `@SpringBootTest` 로 따로 둔다.
 
@@ -76,6 +78,8 @@ class UserExecutionLimitBackgroundTest { ... }
 - **기반의 spy 는 `verify(...)` 의 matcher 사이에서 부르지 않는다.** Mockito 가 그 호출을 matcher 를 쓰는 호출로 읽는다. 값을 먼저 지역 변수로 받는다.
 - **검사가 바꾼 static 상태는 `@BeforeEach` 에서 되돌린다.**
 - **운영 빈이 JVM 메모리에 두는 캐시는 다음 검사에 남는다.** 보관 시간을 test profile 에서 짧게 두거나, 그 캐시가 시험 시계를 쓰게 해 검사가 시간을 옮긴다. 검사가 private 필드를 바꿔 비우지 않는다.
+  - 커넥터 카탈로그 캐시는 카탈로그 하나를 열쇠 없이 들고 있어 실제 시각으로 판정한다. 시험 시계를 쓰면 시계를 과거로 멈추는 검사에서 앞 검사의 카탈로그가 보관 시간 안으로 들어온다. test profile 의 보관 시간과 실패 기억 시간을 1ms 로 두고, 지나가게 하려는 검사는 2ms 를 기다린다.
+  - 스킬 커맨드 캐시는 `Clock` 빈을 받아 검사에서 `TestClock` 을 쓴다. 열쇠가 에이전트 번호이고 검사마다 에이전트를 새로 만들어, 시계를 과거로 멈춰도 앞 검사의 목록을 받지 않는다.
 
 ## 컨텍스트 수 확인
 

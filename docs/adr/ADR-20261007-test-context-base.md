@@ -11,7 +11,7 @@
   - 검사 클래스에 컨텍스트 키를 바꾸는 선언(`@MockitoBean`, `@MockitoSpyBean`, `@Import`, `@TestPropertySource`, `@DynamicPropertySource`, `@ContextConfiguration`, `@ActiveProfiles`, `@DirtiesContext`, 중첩 `@TestConfiguration`)을 두지 않는다. 구조 규칙으로 확인한다.
   - 컨텍스트를 함께 쓰는 검사 사이의 격리는 JUnit 확장 하나가 맡는다.
 - **맥락**:
-  - 2026-10-07 측정에서 `@SpringBootTest` 검사 141개(MySQL 태그 제외)가 컨텍스트를 77번 띄웠다.
+  - 2026-10-07 측정에서 `@SpringBootTest` 검사 141개(MySQL 태그 제외)가 컨텍스트를 77번 띄웠다(그날 origin/main 을 두 번 합치기 전. 합친 뒤 main 기준선은 79번).
     기동 합계가 약 64초에서 78초로, 검사 클래스 시간 합계의 절반 가까이였다.
   - 컨텍스트가 나뉜 까닭은 한 가지가 아니었다. 클래스마다 둔 같은 모양의 Hermes 대역 설정 38종,
     `@MockitoBean` 16종, `@MockitoSpyBean` 20종, 속성 30개 키, 웹 환경 차이, 클래스마다 둔 `@DynamicPropertySource` 가 함께 컨텍스트를 나눴다.
