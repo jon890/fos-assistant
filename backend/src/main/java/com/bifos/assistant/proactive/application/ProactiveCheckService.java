@@ -72,6 +72,7 @@ public class ProactiveCheckService {
     private final CheckReportFactory reportFactory;
     private final ExecutionDeliveryWriter deliveryWriter;
     private final ApplicationEventPublisher events;
+    private final CheckFeedback feedback;
     private final Clock clock;
     private final TransactionTemplate transactions;
 
@@ -310,6 +311,7 @@ public class ProactiveCheckService {
             String message = failure instanceof ApiException ? failure.getMessage() : "internal error";
             recordQuietly(() -> hub.publish(conversationId, ChatEvent.error(code, message)), conversationId);
         }
+        recordQuietly(() -> feedback.ended(run.check()), conversationId);
         if (rootId != null) {
             recordQuietly(() -> deliveryWriter.markTreeDelivered(rootId, clock.instant()), conversationId);
             recordQuietly(() -> events.publishEvent(new ProactiveCheckEnded(rootId)), conversationId);
