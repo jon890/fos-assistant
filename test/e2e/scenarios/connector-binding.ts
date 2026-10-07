@@ -48,6 +48,8 @@ const CONNECTION = connectionPath(DEMO_CONNECTOR.id);
 const PREFIX = `mcp__${DEMO_CONNECTOR.mcp_server}__`;
 const CONTROL_PLANE_MCP = "fos-assistant";
 /** 연결은 쓸 수 있는데 그 에이전트에 붙인 것이 아직 반영되지 않은 호출에 Control Plane 이 답하는 글이다. 판정은 `NOT_READY` 다. */
+/** 반영 예정 없이 PENDING 으로 남은 바인딩의 호출에 Control Plane 이 답하는 글이다. */
+const BINDING_CHECK = "이 연결이 준비되지 않아 실행하지 않았다. 사용자에게 연결 화면에서 연결을 확인하라고 알린다.";
 const BINDING_PENDING = "이 에이전트에 붙인 연결이 아직 반영되지 않았다. 대개 몇 분 안에 저절로 반영되니 사용자에게 잠시 뒤 다시 시도하라고 알린다.";
 const BINDING_RESTART = "이 에이전트에 붙인 연결은 관리자가 반영을 마쳐야 쓸 수 있다. 지금은 실행하지 않았으니 사용자에게 관리자의 반영을 기다리라고 알린다.";
 /** 그 실행의 에이전트에 그 서버를 붙인 연결이 없어 줄을 남기지 않고 막은 호출의 글이다. */
@@ -273,7 +275,8 @@ export const connectorBindingScenario: Scenario = {
         `hook 이 꺼졌는데 연결은 READY 이고 바인딩은 PENDING 이 아니다: ${JSON.stringify(offCheck)}`,
       );
       const offProbe = await probeTool(context, owner, agent.code, `${PREFIX}list_scopes`);
-      expect(offProbe.answer === `block ${BINDING_PENDING}`, `PENDING 바인딩의 호출이 반영 대기 글로 막히지 않았다: ${offProbe.answer}`);
+      // 반영 예정 없이 PENDING 으로 내려간 바인딩은 저절로 풀리지 않아 연결 확인을 안내한다.
+      expect(offProbe.answer === `block ${BINDING_CHECK}`, `예정 없는 PENDING 바인딩의 호출이 연결 확인 글로 막히지 않았다: ${offProbe.answer}`);
       context.hermes.setPolicyHook(agent.profile, true);
       hookOff = undefined;
       const onCheck = expectStatus(

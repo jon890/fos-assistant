@@ -312,8 +312,7 @@ public class ConnectorPolicyService {
                 events.publishEvent(new ConnectorActionChanged(saved.conversationId(), saved.publicId()));
             }
             if (bindingPending && saved.denyReason() == ActionDenyReason.NOT_READY) {
-                return new ConnectorPolicyAnswer(
-                        false, binding.restartRequired() ? BINDING_RESTART_MESSAGE : BINDING_PENDING_MESSAGE, null);
+                return new ConnectorPolicyAnswer(false, bindingPendingMessage(binding), null);
             }
             return answer(saved);
         } catch (DataIntegrityViolationException ex) {
@@ -488,5 +487,16 @@ public class ConnectorPolicyService {
             case ARGS_TOO_LARGE -> ARGS_TOO_LARGE_MESSAGE;
             case READ_ONLY_RUN -> READ_ONLY_RUN_MESSAGE;
         };
+    }
+
+    /**
+     * 반영되지 않은 바인딩의 호출에 주는 글이다. 재시작 대기는 관리자를 기다리고, 반영 예정이 남았으면 잠시 뒤 다시 시도한다.
+     * 예정 없이 남은 바인딩(반영 예정 확인이 실패했거나 정책 hook 이 꺼졌다)은 저절로 풀리지 않아 연결 확인을 안내한다.
+     */
+    private static String bindingPendingMessage(ConnectorBinding binding) {
+        if (binding.restartRequired()) {
+            return BINDING_RESTART_MESSAGE;
+        }
+        return binding.applyDueAt() != null ? BINDING_PENDING_MESSAGE : NOT_READY_MESSAGE;
     }
 }
