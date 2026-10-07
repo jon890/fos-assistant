@@ -243,6 +243,18 @@ public enum ErrorCode {
     VALUE_EVALUATION_NOT_FOUND(HttpStatus.NOT_FOUND),
     /** 끝나지 않았거나 실패한 살펴보기와 아직 평가 중인 시도는 replay 할 수 없다. */
     VALUE_EVALUATION_STATE_CONFLICT(HttpStatus.CONFLICT),
+    /** 요청자에게 브라우저가 없다. 관리자 경로에서는 그 번호의 브라우저가 없다. */
+    BROWSER_NOT_FOUND(HttpStatus.NOT_FOUND),
+    /** 사용자 브라우저 기능이 꺼져 있다. 상태 조회 말고 모든 쓰기가 이 코드다. */
+    BROWSER_DISABLED(HttpStatus.SERVICE_UNAVAILABLE),
+    /** 동시에 켤 수 있는 브라우저 수가 찼다. 다른 브라우저를 멈추지 않는다. */
+    BROWSER_CAPACITY(HttpStatus.CONFLICT),
+    /** 그 브라우저에서 다른 전이가 진행 중이거나 지금 상태에서 허용하지 않는 전이다. */
+    BROWSER_BUSY(HttpStatus.CONFLICT),
+    /** 컨테이너를 만들거나 켰지만 CDP 가 답하지 않았다. 남은 컨테이너는 지우고 {@code FAILED} 로 둔다. */
+    BROWSER_START_FAILED(HttpStatus.BAD_GATEWAY),
+    /** 요청자에게 브라우저가 이미 있다. 사용자 하나에 브라우저 하나다. */
+    BROWSER_EXISTS(HttpStatus.CONFLICT),
     INTERNAL_ERROR(HttpStatus.INTERNAL_SERVER_ERROR);
 
     private final HttpStatus status;
