@@ -6,10 +6,12 @@ import com.bifos.assistant.proactive.domain.type.DecisionLevel;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import tools.jackson.databind.DeserializationFeature;
 import tools.jackson.databind.json.JsonMapper;
 
@@ -30,12 +32,26 @@ record EvalDataset(
             if (in == null) {
                 throw new IllegalStateException("fixture 가 없다: " + RESOURCE);
             }
-            return JsonMapper.builder()
+            EvalDataset dataset = JsonMapper.builder()
                     .disable(DeserializationFeature.FAIL_ON_NULL_FOR_PRIMITIVES)
                     .build()
                     .readValue(in, EvalDataset.class);
+            dataset.requireUniqueProblemKeys();
+            return dataset;
         } catch (IOException ex) {
             throw new UncheckedIOException(ex);
+        }
+    }
+
+    /** 결정적 provider 가 문제 키로 판단 기록을 찾으므로 시나리오 사이에 키가 겹치면 거절한다. 이력의 같은 키는 중복 시나리오의 뜻이다. */
+    private void requireUniqueProblemKeys() {
+        Set<String> seen = new HashSet<>();
+        for (Scenario scenario : scenarios) {
+            for (Problem problem : scenario.check().problems()) {
+                if (!seen.add(problem.problemKey())) {
+                    throw new IllegalStateException("문제 키가 시나리오 사이에 겹친다: " + problem.problemKey());
+                }
+            }
         }
     }
 

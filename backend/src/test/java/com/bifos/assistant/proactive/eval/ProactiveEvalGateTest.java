@@ -14,7 +14,6 @@ import com.bifos.assistant.agent.domain.type.CredentialScope;
 import com.bifos.assistant.agent.infra.AgentRepository;
 import com.bifos.assistant.chat.application.TurnCancellation;
 import com.bifos.assistant.chat.domain.Conversation;
-import com.bifos.assistant.chat.infra.ChatMessageRepository;
 import com.bifos.assistant.chat.infra.ConversationRepository;
 import com.bifos.assistant.feedback.application.model.FeedbackLabel;
 import com.bifos.assistant.feedback.domain.type.FeedbackEventType;
@@ -28,6 +27,7 @@ import com.bifos.assistant.hermes.dto.HermesRunCommand;
 import com.bifos.assistant.hermes.dto.HermesRunResult;
 import com.bifos.assistant.hermes.dto.TokenUsage;
 import com.bifos.assistant.proactive.application.AutonomyPolicyService;
+import com.bifos.assistant.proactive.application.AutonomyProperties;
 import com.bifos.assistant.proactive.application.DecisionFeedbackExporter;
 import com.bifos.assistant.proactive.application.ProactiveCheckService;
 import com.bifos.assistant.proactive.application.ValueEvaluationService;
@@ -40,8 +40,10 @@ import com.bifos.assistant.proactive.domain.ProactiveCheckProblem;
 import com.bifos.assistant.proactive.domain.ValueEvaluation;
 import com.bifos.assistant.proactive.domain.type.AutonomyExecutionStatus;
 import com.bifos.assistant.proactive.domain.type.AutonomyLevel;
+import com.bifos.assistant.proactive.domain.type.AutonomyReason;
 import com.bifos.assistant.proactive.domain.type.CheckStatus;
 import com.bifos.assistant.proactive.domain.type.CheckTrigger;
+import com.bifos.assistant.proactive.domain.type.DecisionAxis;
 import com.bifos.assistant.proactive.domain.type.DecisionConfidence;
 import com.bifos.assistant.proactive.domain.type.DecisionOutcome;
 import com.bifos.assistant.proactive.eval.EvalDataset.Scenario;
@@ -62,11 +64,11 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -92,7 +94,7 @@ import tools.jackson.databind.node.ObjectNode;
  *
  * <p>Observe(대역 Hermes 가 낸 결과 블록) → 문제 찾기 → 가치 판단(결정적 provider) → 행동 정책 → Hermes 자동 실행 → 결과 → 판단 피드백
  * export 까지 실제 서비스로 돈다. 같은 fixture 를 provider 마다 다시 돌려 판단과 최종 행동 수준을 따로 센다. 실제 모델과 Hermes 는 부르지
- * 않는다. 경계(approval bypass, permission bypass, 근거가 약한 자동 실행, 자동 실행 결과 노출)가 하나라도 깨지면 실패한다. 품질 지표는
+ * 않는다. 경계(approval bypass, permission bypass, 근거가 약한 자동 실행, 자동 실행 결과 노출)가 하나라도 깨지면 실패한다. 자동 실행의 대역 답은 새 발견과 할 일 후보를 담아 노출 검사가 걸릴 수 있게 한다. 품질 지표는
  * 보고서에만 남기고 승자를 정하지 않는다.
  */
 @SpringBootTest(
@@ -109,7 +111,6 @@ class ProactiveEvalGateTest {
     static final List<String> COMPARED = List.of("fixture-a", "fixture-b");
     static final Path REPORT_DIR = Path.of("build", "reports", "proactive-eval");
     private static final Duration WAIT_LIMIT = Duration.ofSeconds(10);
-    private static final Duration MAX_EVIDENCE_AGE = Duration.ofHours(72);
     private static final String READ_ONLY_INSTRUCTION = "이번 실행은 읽기만 한다";
     private static final JsonMapper JSON = JsonMapper.builder().build();
     /** 시나리오마다 이 시각에서 시작한다. 살펴보기, 판단, 행동 정책이 모두 이 시계를 쓴다. */
@@ -175,6 +176,9 @@ class ProactiveEvalGateTest {
     DecisionFeedbackExporter exporter;
 
     @Autowired
+    AutonomyProperties autonomyProperties;
+
+    @Autowired
     List<ReplayDecisionProvider> providers;
 
     @Autowired
@@ -191,9 +195,6 @@ class ProactiveEvalGateTest {
 
     @Autowired
     ConversationRepository conversations;
-
-    @Autowired
-    ChatMessageRepository messages;
 
     @Autowired
     ProactiveCheckRepository checks;
@@ -305,10 +306,6 @@ class ProactiveEvalGateTest {
                     .allSatisfy(each -> assertThat(each.level()).isEqualTo(AutonomyLevel.IGNORE.name()));
             assertThat(run.autonomousRuns()).isZero();
         }
-        assertThat(EvalScoreboard.score("fixture-a", runs).duplicateSuggestion().hit())
-                .isZero();
-        assertThat(EvalScoreboard.score("fixture-b", runs).duplicateSuggestion().hit())
-                .isZero();
     }
 
     /** 사용자와 에이전트를 새로 만들어 시나리오 하나를 끝까지 돈다. */
@@ -329,20 +326,18 @@ class ProactiveEvalGateTest {
         ReplayDecisionProvider provider = provider(providerId);
         int callsBefore = provider.calls();
         int submittedBefore = stub().received().size();
-        long messagesBefore = messages.findByConversationIdOrderByIdAsc(check.conversationId())
-                .size();
+        long exposedBefore = exposed(user, check.conversationId());
         ValueEvaluation evaluation = evaluations.evaluate(user, check.id(), providerId);
         int modelCalls = provider.calls() - callsBefore;
 
-        stub().willAnswer(command ->
-                answer(block(JSON.createObjectNode().put("version", 3).put("outcome", "NOTHING_NEW"))));
+        // 자동 실행이 새 발견과 할 일 후보를 내도 사용자에게 바로 보이면 안 된다. 노출 검사가 실제로 걸릴 수 있는 답을 준다.
+        String autonomousOutput = block(autonomousBlock(scenario.check()));
+        stub().willAnswer(command -> answer(autonomousOutput));
         List<AutonomyDecision> decisions = autonomy.decide(user, evaluation.id());
         awaitIdle(check.conversationId());
         List<HermesRunCommand> delegated = List.copyOf(
                 stub().received().subList(submittedBefore, stub().received().size()));
-        int autonomousMessages = (int) (messages.findByConversationIdOrderByIdAsc(check.conversationId())
-                        .size()
-                - messagesBefore);
+        int autonomousMessages = (int) (exposed(user, check.conversationId()) - exposedBefore);
 
         Map<Long, AutonomyDecision> byCandidate =
                 decisions.stream().collect(Collectors.toMap(AutonomyDecision::candidateId, each -> each));
@@ -355,7 +350,7 @@ class ProactiveEvalGateTest {
                     decision == null ? List.of() : decision.reasons(),
                     problem.sideEffect(),
                     decision != null && decision.executionStatus() == AutonomyExecutionStatus.STARTED,
-                    decision != null && weakBasis(decision.inputs()),
+                    decision != null && weakBasis(decision.inputs(), decision.reasons()),
                     scenario.truth().get(problem.problemKey())));
         }
         Map<Long, String> keys =
@@ -424,17 +419,48 @@ class ProactiveEvalGateTest {
         return candidates && judged && policies && results;
     }
 
-    /** 근거가 오래됐거나 후보나 판단의 확신이 낮다. 이런 후보의 자동 실행은 hard failure 다. */
-    private static boolean weakBasis(AutonomyInputs inputs) {
-        boolean stale = inputs.evidenceCheckedAt() == null
-                || Duration.between(inputs.evidenceCheckedAt(), inputs.decidedAt())
-                                .compareTo(MAX_EVIDENCE_AGE)
-                        > 0;
+    /**
+     * 근거나 판단이 실행 근거로 약하다. 정책의 판정을 그대로 쓰지 않고 입력에서 따로 판정한다. 이런 후보의 자동 실행은 실패시키는 경계다.
+     *
+     * <p>근거나 평가가 오래됐거나, 후보, 종합, 여섯 축의 확신 가운데 {@code MEDIUM}, {@code HIGH} 가 아닌 것이 있거나, 평가가 근거 부족이거나
+     * replay 다.
+     */
+    private boolean weakBasis(AutonomyInputs inputs, List<AutonomyReason> reasons) {
+        boolean staleEvidence =
+                olderThan(inputs.evidenceCheckedAt(), inputs.decidedAt(), autonomyProperties.maxEvidenceAge());
+        boolean staleEvaluation =
+                olderThan(inputs.evaluatedAt(), inputs.decidedAt(), autonomyProperties.maxEvaluationAge())
+                        || olderThan(inputs.asOf(), inputs.decidedAt(), autonomyProperties.maxEvaluationAge());
         boolean lowCandidate =
                 !"MEDIUM".equals(inputs.candidateConfidence()) && !"HIGH".equals(inputs.candidateConfidence());
-        boolean lowJudgement = inputs.judgementConfidence() == DecisionConfidence.LOW
-                || inputs.axisConfidences().containsValue(DecisionConfidence.LOW);
-        return stale || lowCandidate || lowJudgement;
+        boolean lowJudgement = !confident(inputs.judgementConfidence())
+                || Arrays.stream(DecisionAxis.values())
+                        .anyMatch(axis -> !confident(inputs.axisConfidences().get(axis)));
+        boolean insufficient = inputs.evaluationOutcome() != DecisionOutcome.EVALUATED || inputs.replay();
+        return staleEvidence || staleEvaluation || lowCandidate || lowJudgement || insufficient;
+    }
+
+    private static boolean confident(DecisionConfidence confidence) {
+        return confidence == DecisionConfidence.MEDIUM || confidence == DecisionConfidence.HIGH;
+    }
+
+    private static boolean olderThan(Instant at, Instant now, Duration maxAge) {
+        return at == null || at.isAfter(now) || Duration.between(at, now).compareTo(maxAge) > 0;
+    }
+
+    /** 사용자에게 보이는 것의 수다. 점검 대화의 메시지, 그 대화의 보고, 알림, 할 일을 센다. */
+    private long exposed(CurrentUser user, Long conversationId) {
+        Long count = jdbc.queryForObject(
+                "SELECT (SELECT COUNT(*) FROM chat_message WHERE conversation_id = ?)"
+                        + " + (SELECT COUNT(*) FROM proactive_check WHERE conversation_id = ? AND report_json IS NOT NULL)"
+                        + " + (SELECT COUNT(*) FROM notification WHERE user_id = ?)"
+                        + " + (SELECT COUNT(*) FROM follow_up WHERE user_id = ?)",
+                Long.class,
+                conversationId,
+                conversationId,
+                user.id(),
+                user.id());
+        return count == null ? 0 : count;
     }
 
     private ProactiveCheck runCheck(CurrentUser user, Agent agent, EvalDataset.Check fixture) {
@@ -502,6 +528,24 @@ class ProactiveEvalGateTest {
         return root;
     }
 
+    /** 자동 실행의 답이다. 같은 발견에 새 발견 하나와 할 일 후보를 더한다. */
+    private static ObjectNode autonomousBlock(EvalDataset.Check fixture) {
+        ObjectNode root = resultBlock(fixture);
+        ObjectNode extra = ((ArrayNode) root.get("findings"))
+                .addObject()
+                .put("area", "autonomy")
+                .put("topicKey", "autonomy:extra-finding")
+                .put("title", "자동 실행이 찾은 합성 발견")
+                .put("sourceUrl", "https://example.com/autonomy/extra")
+                .put("checkedAt", CLOCK.instant().toString())
+                .put("freshness", "CURRENT")
+                .put("whyItMatters", "합성 fixture 의 발견이다");
+        extra.putArray("facts").add("합성 사실");
+        extra.putObject("next").put("type", "QUESTION").put("text", "살펴볼까요");
+        root.putArray("followUpCandidates").add("합성 할 일 후보");
+        return root;
+    }
+
     private static String block(ObjectNode json) {
         return "블록 밖의 글\n<fos-check-result>\n" + JSON.writeValueAsString(json) + "\n</fos-check-result>";
     }
@@ -546,12 +590,17 @@ class ProactiveEvalGateTest {
         return (StubHermesRunsClient) hermes;
     }
 
+    private boolean running(Long conversationId) {
+        Long count = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM proactive_check WHERE conversation_id = ? AND status = 'RUNNING'",
+                Long.class,
+                conversationId);
+        return count != null && count > 0;
+    }
+
     private void awaitIdle(Long conversationId) {
         long deadline = System.nanoTime() + WAIT_LIMIT.toNanos();
-        while (turns.markOf(conversationId).running()
-                || checks.findAll().stream()
-                        .anyMatch(each -> Objects.equals(each.conversationId(), conversationId)
-                                && each.status() == CheckStatus.RUNNING)) {
+        while (turns.markOf(conversationId).running() || running(conversationId)) {
             if (System.nanoTime() > deadline) {
                 fail("대화 %d 의 살펴보기가 %s 안에 끝나지 않았다", conversationId, WAIT_LIMIT);
             }
