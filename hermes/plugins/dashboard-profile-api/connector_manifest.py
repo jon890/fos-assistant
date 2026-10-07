@@ -1,81 +1,68 @@
+"""운영 목록의 커넥터를 읽고 검증해 카탈로그로 낸다."""
+
 from __future__ import annotations
 
-import hashlib
 import json
 import os
 import pathlib
-import re
+
+# 옛 기능 모듈의 import 계약을 유지하려고 이동한 이름도 다시 내보낸다.
+
 from .common import (
     BASE_ENV_KEYS,
     CONTROL_PLANE_MCP,
-    SKILL_NAME_RE,
     logger,
 )
 
+from .connector_policy import (
+    _canonical_server_name,
+    _connector_errors,
+    _connector_fields,
+    _connector_tools,
+    _hermes_tool_name,
+    _tool_identifiers,
+)
 
-# 요청은 이름만 받는다. 실행 정의는 커넥터 checkout 의 manifest 가 소유한다.
-# 커넥터 이름과 plugin 디렉터리를 묶은 JSON 을 대시보드 프로세스의 환경 변수로 받는다. 근거는 ADR-041 이 갖는다.
-CONNECTOR_ROOTS_ENV = "FOS_ASSISTANT_CONNECTOR_ROOTS"
-# 커넥터 MCP 서버를 실행할 파일의 절대 경로다. 운영 목록 항목에 `command` 가 없을 때 쓴다.
-CONNECTOR_COMMAND_ENV = "FOS_ASSISTANT_CONNECTOR_COMMAND"
-CONNECTOR_STATE = ".fos-connectors.json"
-# 소유 기록 항목의 설치 방식이다. 칸이 없으면 옛 설치다.
-BIND_MODE = "bind"
-ISOLATED_MODE = "isolated"
-CONNECTOR_SKILL_PARTS = ("references", "templates")
-# 커넥터 스킬 하나의 상한이다. Control Plane 이 올린 스킬에 거는 제한과 같다(`docs/backend/skill.md`).
-CONNECTOR_SKILL_MAX_FILES = 20
-CONNECTOR_SKILL_MAX_CHARS = 100_000
-# `connector.json` 의 형식 규칙이다. `docs/connectors.md` 의 「connector.json」 표와 같다.
-CONNECTOR_ID_RE = re.compile(r"^[a-z0-9][a-z0-9-]{0,63}$")
-FIELD_KEY_RE = re.compile(r"^[a-z][a-z0-9_]{0,31}$")
-ENV_NAME_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]{0,127}$")
-# 바인딩 주인의 첨부 디렉터리를 받을 env 이름이다(ADR-20261007 connector-owner-attachments).
-OWNER_ATTACHMENTS_ENV_RE = re.compile(r"^[A-Z][A-Z0-9_]{0,63}$")
-# 그 env 에 설치가 넣는 값의 끝 모양이다. `<attachment_agent_root>/users/<SHA-256 16진수>` 다.
-OWNER_ATTACHMENTS_VALUE_RE = re.compile(r"^/[^$\0\r\n]*/users/[0-9a-f]{64}$")
-TOOL_NAME_RE = re.compile(r"^[A-Za-z0-9_.-]{1,128}$")
-SERVER_NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$")
-ERROR_WORDS = frozenset({"credential_rejected", "forbidden", "invalid_input", "unavailable", "outcome_unknown"})
-# 쓰기를 보냈는데 됐는지 모른다는 어휘다. 실행 경로만 504 로 답하고 `call` 은 `unavailable` 로 읽는다.
-OUTCOME_UNKNOWN = "outcome_unknown"
-# `errors` 표의 오류 코드 형식이다. 승인한 호출의 실행 경로가 이 코드를 Control Plane 에 그대로 넘긴다(ADR-092).
-ERROR_CODE_RE = re.compile(r"[A-Z][A-Z0-9_]{0,63}")
-# `errors` 표의 객체 항목이 고를 수 있는 복구 어휘다. 커넥터는 글을 쓰지 않고 어휘만 고른다.
-# Control Plane 의 `ConnectorRecovery` 와 같다. 한쪽을 바꾸면 다른 쪽도 바꾼다.
-ERROR_RECOVERIES = frozenset({"recheck", "reconnect", "fix_input", "retry_later"})
-# 오류 하나가 넘길 수 있는 세부 칸의 수와 정수 값의 절댓값 상한이다. Control Plane 이 같은 상한으로 다시 본다.
-ERROR_DETAILS_MAX = 4
-# `connector.json` 의 `toolsets` 가 열 수 있는 내장 toolset 이다. 읽기 전용 이미지 도구만 둔다(ADR-044).
-# 셸, 파일, 기억, 스킬, 위임 도구는 manifest 로 열리지 않는다.
-CONNECTOR_TOOLSETS = frozenset({"vision"})
-# `connector.json` 의 `schema: 2` 가 도구마다 선언하는 위험도와 승인 방식이다(ADR-049).
-# 표는 `docs/backend/connector-tool-policy.md` 의 「도구 정책」 과 같다.
-TOOL_RISKS = ("READ", "SENSITIVE", "WRITE", "DESTRUCTIVE", "FINANCIAL")
-# 느슨한 것에서 엄격한 것의 순서다. 하한 비교가 이 순서의 자리를 쓴다.
-TOOL_APPROVALS = ("none", "required", "always")
-# 위험도마다 (`approval` 이 없을 때의 기본값, 선언이 내려갈 수 없는 하한) 이다.
-TOOL_RISK_DEFAULTS = {"READ": ("none", "none"), "SENSITIVE": ("required", "required"),
-                      "WRITE": ("required", "required"), "DESTRUCTIVE": ("always", "always"),
-                      "FINANCIAL": ("always", "always")}
-TOOL_TITLE_MAX_CHARS = 80
-# `tools.<이름>.identifiers` 가 가리키는 인자 이름이다(ADR-089). 도구 인자 객체의 맨 위 칸만 가리킨다.
-# 31자까지다. 32자 이상인 이름은 Control Plane 이 키 이름 자체를 긴 덩어리로 보고 가린다.
-TOOL_IDENTIFIER_RE = re.compile(r"[A-Za-z_][A-Za-z0-9_]{0,30}")
-# 비밀 키로 읽히는 인자 이름이다. Control Plane 의 `ToolDetailRedactor` 의 `SECRET_KEYS` 와 `isSecretKey` 와 같다.
-# 한쪽을 바꾸면 다른 쪽도 바꾼다. 어긋나도 Control Plane 이 그 칸을 다시 가리므로 비밀이 보이지는 않는다.
-SECRET_ARGUMENT_NAMES = frozenset({"token", "secret", "password", "passwd", "apikey", "authorization", "cookie",
-                                   "credential", "credentials", "privatekey", "accesskey", "clientsecret"})
-SECRET_ARGUMENT_SUFFIXES = ("token", "secret", "password", "privatekey")
-# Hermes 가 MCP 도구의 등록 이름에 허용하는 길이다. 넘으면 앞부분에 해시를 붙여 줄인다.
-HERMES_TOOL_NAME_MAX_CHARS = 64
-# 서버 이름으로 계산한 등록 이름의 앞부분(`mcp__<서버>__`)이 넘지 못하는 길이다.
-# 앞부분이 길면 등록 이름이 잘릴 때 앞부분까지 잘려, Control Plane 이 그 서버의 도구임을 알아보지 못한다.
-HERMES_TOOL_PREFIX_MAX_CHARS = 40
-# 설치가 연결용 profile 의 `SOUL.md` 에 쓰는 스킬 본문의 상한이다. Control Plane 의 성격 본문 상한과 같다.
-CONNECTOR_PERSONA_MAX_CHARS = 8000
-# `.mcp.json` 의 인자가 plugin 디렉터리를 가리키는 자리다. 그 밖의 치환은 받지 않는다.
-PLUGIN_ROOT_REF = "${CLAUDE_PLUGIN_ROOT}"
+from .connector_schema import (
+    BIND_MODE,
+    CONNECTOR_COMMAND_ENV,
+    CONNECTOR_ID_RE,
+    CONNECTOR_PERSONA_MAX_CHARS,
+    CONNECTOR_ROOTS_ENV,
+    CONNECTOR_SKILL_MAX_CHARS,
+    CONNECTOR_SKILL_MAX_FILES,
+    CONNECTOR_SKILL_PARTS,
+    CONNECTOR_STATE,
+    CONNECTOR_TOOLSETS,
+    ENV_NAME_RE,
+    ERROR_CODE_RE,
+    ERROR_DETAILS_MAX,
+    ERROR_RECOVERIES,
+    ERROR_WORDS,
+    FIELD_KEY_RE,
+    HERMES_TOOL_NAME_MAX_CHARS,
+    HERMES_TOOL_PREFIX_MAX_CHARS,
+    ISOLATED_MODE,
+    OUTCOME_UNKNOWN,
+    OWNER_ATTACHMENTS_ENV_RE,
+    OWNER_ATTACHMENTS_VALUE_RE,
+    PLUGIN_ROOT_REF,
+    SECRET_ARGUMENT_NAMES,
+    SECRET_ARGUMENT_SUFFIXES,
+    SERVER_NAME_RE,
+    TOOL_APPROVALS,
+    TOOL_IDENTIFIER_RE,
+    TOOL_NAME_RE,
+    TOOL_RISKS,
+    TOOL_RISK_DEFAULTS,
+    TOOL_TITLE_MAX_CHARS,
+)
+
+from .connector_skills import (
+    _connector_persona,
+    _connector_skills,
+    _skill_name,
+)
 
 
 def _connector_roots() -> dict[str, dict]:
@@ -129,273 +116,6 @@ def _read_connector_json(root: pathlib.Path, relative: str):
     if path.resolve() != path or not path.is_file():
         raise ValueError("%s 가 없거나 링크다" % relative)
     return json.loads(path.read_text(encoding="utf-8"))
-
-
-def _connector_fields(declared) -> list:
-    """`connector.json` 의 `fields` 를 검증한다. 틀리면 예외다.
-
-    빈 목록도 받는다. 값을 받지 않는 일반 MCP 서버가 입력 칸 없이 카탈로그에 오르는 길이다(ADR-083).
-    """
-    if not isinstance(declared, list):
-        raise ValueError("fields 는 목록이다")
-    for field in declared:
-        if (not isinstance(field, dict)
-                or not isinstance(field.get("key"), str) or not FIELD_KEY_RE.match(field["key"])
-                or not isinstance(field.get("env"), str) or not ENV_NAME_RE.match(field["env"])
-                or field["env"] in BASE_ENV_KEYS
-                or not isinstance(field.get("label"), str)
-                or not isinstance(field.get("description", ""), str)
-                or not isinstance(field.get("secret", False), bool)
-                or not isinstance(field.get("required", True), bool)):
-            raise ValueError("fields 의 칸 모양이 올바르지 않다")
-        if "pattern" in field:
-            if not isinstance(field["pattern"], str):
-                raise ValueError("pattern 은 문자열이다")
-            try:
-                re.compile(field["pattern"])
-            except re.error:
-                raise ValueError("pattern 을 정규식으로 읽지 못한다") from None
-        if "options" in field:
-            options = field["options"]
-            if (not isinstance(options, dict)
-                    or not isinstance(options.get("tool"), str) or not TOOL_NAME_RE.match(options["tool"])
-                    or any(not isinstance(options.get(name), str) for name in ("items", "value", "label"))
-                    or not isinstance(options.get("auto_select_single", False), bool)):
-                raise ValueError("options 모양이 올바르지 않다")
-    for name in ("key", "env"):
-        if len({field[name] for field in declared}) != len(declared):
-            raise ValueError("fields 의 %s 가 겹친다" % name)
-    return declared
-
-
-def _canonical_server_name(server: str) -> str:
-    """MCP 서버 이름을 견줄 수 있게 맞춘다. Hermes 등록 규칙대로 글자를 `_` 로 바꾸고 소문자로 맞춘다.
-
-    등록 규칙만 쓰면 대소문자만 다른 이름이 다른 서버로 읽힌다. 이름을 대소문자 없이 다루는 자리가
-    하나라도 있으면 두 서버의 도구가 섞이므로 가장 넓게 같은 이름으로 본다.
-    """
-    return re.sub(r"[^A-Za-z0-9_]", "_", server).lower()
-
-
-def _hermes_tool_name(server: str, tool: str) -> str:
-    """Hermes 가 MCP 도구에 붙이는 등록 이름이다. `tools/mcp_tool_schema.py` 의 `mcp_prefixed_tool_name` 과 같은 규칙이다.
-
-    규칙은 `docs/hermes/connector-policy.md` 의 「MCP 도구의 등록 이름」 이 갖는다.
-    글자를 바꾸고 줄이므로 서로 다른 도구가 같은 등록 이름이 될 수 있다.
-    """
-    full = "mcp__%s__%s" % (re.sub(r"[^A-Za-z0-9_]", "_", server), re.sub(r"[^A-Za-z0-9_]", "_", tool))
-    if len(full) <= HERMES_TOOL_NAME_MAX_CHARS:
-        return full
-    return full[:HERMES_TOOL_NAME_MAX_CHARS - 9] + "_" + hashlib.sha256(full.encode("utf-8")).hexdigest()[:8]
-
-
-def _tool_identifiers(declared_tool: dict, approval: str) -> list:
-    """`tools.<이름>.identifiers` 를 검증해 선언한 순서대로 낸다. 틀리면 예외다.
-
-    승인 카드가 있는 도구에만 뜻이 있어 `approval` 이 `required` 인 도구에만 받는다.
-    비밀 키로 읽히는 이름은 Control Plane 이 어차피 가리므로, 선언한 사람이 잘못 안 것으로 보고 거절한다.
-    """
-    if "identifiers" not in declared_tool:
-        return []
-    identifiers = declared_tool["identifiers"]
-    if approval != "required":
-        raise ValueError("identifiers 는 approval 이 required 인 도구에만 선언한다")
-    if not isinstance(identifiers, list) or not all(
-            isinstance(item, str) and TOOL_IDENTIFIER_RE.fullmatch(item) for item in identifiers):
-        raise ValueError("identifiers 는 인자 이름의 배열이다")
-    if len(set(identifiers)) != len(identifiers):
-        raise ValueError("identifiers 에 같은 이름이 두 번 있다")
-    for item in identifiers:
-        normalized = item.replace("_", "").lower()
-        if normalized in SECRET_ARGUMENT_NAMES or normalized.endswith(SECRET_ARGUMENT_SUFFIXES):
-            raise ValueError("identifiers 에 비밀 키로 읽히는 이름을 둘 수 없다")
-    return list(identifiers)
-
-
-def _connector_tools(declared: dict, verify_tool: str, option_tools: set, mcp_server: str) -> dict:
-    """`connector.json` 의 도구 정책을 검증해 `{도구 이름: {"risk", "approval", "title", "grant", "outbound", "identifiers"}}` 로 낸다.
-
-    틀리면 예외다.
-
-    하한보다 느슨한 선언은 고쳐서 받지 않고 거절한다. 조용히 엄격하게 읽으면 선언이 틀린 것을 만든 사람이 모른다.
-    `schema: 1` 은 도구 정책을 선언하지 않는다. 대시보드가 부르는 읽기 전용 도구만 정책으로 낸다.
-    `grant` 는 그 도구에 상시 허락을 줄 수 있는지다(ADR-065). 기본값을 채운 값이고,
-    `approval` 이 `required` 이고 선언이 닫지 않았을 때만 참이다.
-    `outbound` 는 그 도구가 데이터를 계정 밖의 사람에게 보낸다는 선언이다. 참인 도구는 상시 허락이 닫혀 있어야 한다.
-    `identifiers` 는 승인 카드가 길이로 가리지 않을 식별자 인자의 이름이다(ADR-089). 기본값은 빈 배열이다.
-    """
-    call_tools = {verify_tool} | set(option_tools)
-    if declared["schema"] == 1:
-        if "tools" in declared or "default_tool_policy" in declared:
-            raise ValueError("tools 와 default_tool_policy 는 schema 2 에서만 선언한다")
-        return {name: {"risk": "READ", "approval": "none", "title": None, "grant": False, "outbound": False,
-                       "identifiers": []}
-                for name in sorted(call_tools)}
-    if declared["schema"] != 2:
-        raise ValueError("schema 는 1 이나 2 만 받는다")
-
-    tools = declared.get("tools")
-    if not isinstance(tools, dict) or not tools:
-        raise ValueError("schema 2 의 tools 는 비어 있지 않은 객체다")
-    if "default_tool_policy" in declared and declared["default_tool_policy"] != "deny":
-        raise ValueError("default_tool_policy 는 deny 만 받는다")
-    policies = {}
-    for name, declared_tool in tools.items():
-        if not isinstance(name, str) or not TOOL_NAME_RE.match(name):
-            raise ValueError("tools 의 키는 도구 이름이다")
-        if not isinstance(declared_tool, dict) or set(declared_tool) - {
-                "risk", "approval", "title", "grant", "outbound", "identifiers"}:
-            raise ValueError("tools 의 값은 risk, approval, title, grant, outbound, identifiers 만 갖는 객체다")
-        risk = declared_tool.get("risk")
-        if not isinstance(risk, str) or risk not in TOOL_RISKS:
-            raise ValueError("risk 는 정해 둔 위험도 가운데 하나다")
-        default, floor = TOOL_RISK_DEFAULTS[risk]
-        approval = declared_tool.get("approval", default)
-        if not isinstance(approval, str) or approval not in TOOL_APPROVALS:
-            raise ValueError("approval 은 none, required, always 가운데 하나다")
-        if TOOL_APPROVALS.index(approval) < TOOL_APPROVALS.index(floor):
-            raise ValueError("approval 이 그 위험도의 하한보다 느슨하다")
-        title = declared_tool.get("title")
-        if "title" in declared_tool and (not isinstance(title, str) or not 1 <= len(title) <= TOOL_TITLE_MAX_CHARS):
-            raise ValueError("title 은 1자에서 %d자까지의 문자열이다" % TOOL_TITLE_MAX_CHARS)
-        if "grant" in declared_tool:
-            # `1` 이나 `0` 을 boolean 으로 받지 않는다.
-            if type(declared_tool["grant"]) is not bool:
-                raise ValueError("grant 는 true 나 false 다")
-            if approval != "required":
-                raise ValueError("grant 는 approval 이 required 인 도구에만 선언한다")
-        grant = approval == "required" and declared_tool.get("grant") is not False
-        outbound = declared_tool.get("outbound", False)
-        if type(outbound) is not bool:
-            raise ValueError("outbound 는 true 나 false 다")
-        # 밖으로 나가는 도구는 호출마다 사람이 본다. 상시 허락이 열려 있으면 고쳐 읽지 않고 거절한다.
-        if outbound and (approval != "required" or grant):
-            raise ValueError("outbound 가 참인 도구는 approval 이 required 이고 grant 가 false 여야 한다")
-        identifiers = _tool_identifiers(declared_tool, approval)
-        policies[name] = {"risk": risk, "approval": approval, "title": title, "grant": grant, "outbound": outbound,
-                          "identifiers": identifiers}
-    for name in call_tools:
-        # 대시보드가 승인 없이 부르는 도구다. 읽기 전용이고 승인이 없는 선언만 맞는다.
-        if policies.get(name, {}).get("risk") != "READ" or policies[name]["approval"] != "none":
-            raise ValueError("확인 도구와 선택지 도구는 tools 에 READ 와 none 으로 선언한다")
-    # 판정은 등록 이름으로 도구를 찾는다. 두 도구의 등록 이름이 같으면 어느 정책인지 알 수 없다.
-    if len({_hermes_tool_name(mcp_server, name) for name in policies}) != len(policies):
-        raise ValueError("tools 의 두 도구가 같은 Hermes 등록 이름이 된다")
-    return policies
-
-
-def _connector_persona(skill_dirs: list) -> str | None:
-    """스킬 디렉터리들의 `<스킬>/SKILL.md` 본문을 이름 순으로 이어 붙인다. 스킬이 없으면 None 이다.
-
-    `SKILL.md` 밖의 파일은 읽지 않는다. 스킬 디렉터리나 `SKILL.md` 가 링크이면 읽지 않고 예외를 낸다.
-    링크가 plugin 밖의 파일을 가리키면 그 내용이 모델의 지침으로 들어가기 때문이다.
-    앞머리(frontmatter)는 뗀다. 합친 본문이 상한을 넘으면 예외다. 본문은 로그에 싣지 않는다.
-    """
-    bodies = []
-    for directory in skill_dirs:
-        for skill in sorted(directory.iterdir()):
-            source = skill / "SKILL.md"
-            if skill.is_symlink() or source.is_symlink():
-                raise ValueError("스킬 디렉터리나 SKILL.md 가 링크다")
-            if not skill.is_dir() or not source.is_file():
-                continue
-            # BOM 과 CRLF 가 있어도 앞머리를 알아보게 맞춘다.
-            text = source.read_text(encoding="utf-8-sig").replace("\r\n", "\n")
-            if text.startswith("---\n"):
-                head, separator, rest = text[4:].partition("\n---\n")
-                if not separator:
-                    raise ValueError("SKILL.md 의 앞머리가 닫히지 않았다")
-                text = rest
-            if text.strip():
-                bodies.append(text.strip())
-    if not bodies:
-        return None
-    persona = "\n\n".join(bodies) + "\n"
-    if len(persona) > CONNECTOR_PERSONA_MAX_CHARS:
-        raise ValueError("스킬 본문이 %d자를 넘는다" % CONNECTOR_PERSONA_MAX_CHARS)
-    return persona
-
-
-def _skill_name(skill_md: str, fallback: str) -> str:
-    """`SKILL.md` 앞머리의 `name` 이다. 없으면 디렉터리 이름이다. 경로 조각으로 쓸 수 없는 이름이면 예외다.
-
-    Hermes 가 스킬 목록을 만들 때 같은 규칙으로 이름을 정한다(`tools/skills_tool.py` 의 `_find_all_skills`).
-
-    앞머리가 환경 값이나 자격 증명 파일을 요청하면 예외다. Hermes 는 스킬을 읽을 때 그 칸의 이름으로
-    profile `.env` 의 값과 profile 안의 파일을 셸 실행 공간에 넣는다. 바인딩 설치는 커넥터 값을 그 `.env` 에
-    복사하므로 실행 공간이 커넥터 비밀을 받게 된다. 칸 목록은 Control Plane 이 올린 스킬에 거는 것과 같다(ADR-086).
-    """
-    import yaml
-    text = skill_md.lstrip("﻿").replace("\r\n", "\n")
-    name = fallback
-    # 앞머리를 알아보는 규칙도 Hermes 와 같게 둔다(`agent/skill_utils.py` 의 `parse_frontmatter`).
-    # 첫 줄이 `--- ` 처럼 정확히 `---` 가 아니어도 Hermes 는 앞머리로 읽으므로 여기서도 읽어 검사한다.
-    if text.startswith("---"):
-        closing = re.search(r"\n---\s*\n", text[3:])
-        if closing is None:
-            raise ValueError("SKILL.md 의 앞머리가 닫히지 않았다")
-        head = text[3:3 + closing.start()]
-        front = yaml.safe_load(head) if head.strip() else {}
-        if not isinstance(front, dict):
-            raise ValueError("SKILL.md 의 앞머리가 객체가 아니다")
-        setup = front.get("setup")
-        prerequisites = front.get("prerequisites")
-        if ("required_environment_variables" in front or "required_credential_files" in front
-                or (isinstance(setup, dict) and "collect_secrets" in setup)
-                or (isinstance(prerequisites, dict) and "env_vars" in prerequisites)):
-            raise ValueError("SKILL.md 의 앞머리가 환경 값이나 자격 증명 파일을 요청한다")
-        name = front.get("name", fallback)
-    # 설치와 떼기가 이 이름을 profile 의 스킬 디렉터리 이름으로 쓴다.
-    if not isinstance(name, str) or not SKILL_NAME_RE.match(name) or ".." in name:
-        raise ValueError("스킬 이름이 경로로 쓸 수 없는 모양이다")
-    return name
-
-
-def _connector_skills(skill_dirs: list) -> dict:
-    """바인딩 설치가 profile 에 복사할 스킬이다. `{스킬 이름: {상대 경로: 파일 바이트}}` 다. 틀리면 예외다.
-
-    스킬마다 `SKILL.md` 와 `references/`, `templates/` 아래 정규 파일을 읽는다.
-    스킬 디렉터리 아래 어느 항목이든 링크이면 거절한다. 링크가 plugin 밖의 파일을 가리키면 그 내용이 profile 로 복사된다.
-    UTF-8 로 읽히지 않는 파일, 상한을 넘는 스킬, 이름이 겹치는 스킬도 거절한다. 본문은 로그에 싣지 않는다.
-    """
-    skills = {}
-    for directory in skill_dirs:
-        for skill in sorted(directory.iterdir()):
-            if skill.is_symlink():
-                raise ValueError("스킬 디렉터리 아래에 링크가 있다")
-            source = skill / "SKILL.md"
-            if not skill.is_dir() or not source.is_file():
-                continue
-            for current, dirs, names in os.walk(skill):
-                if any(os.path.islink(os.path.join(current, child)) for child in dirs + names):
-                    raise ValueError("스킬 디렉터리 아래에 링크가 있다")
-            paths = [source]
-            for part in CONNECTOR_SKILL_PARTS:
-                if (skill / part).is_dir():
-                    for current, dirs, names in os.walk(skill / part):
-                        dirs.sort()
-                        paths.extend(pathlib.Path(current) / name for name in sorted(names)
-                                     if (pathlib.Path(current) / name).is_file())
-            if len(paths) > CONNECTOR_SKILL_MAX_FILES:
-                raise ValueError("스킬 하나의 파일이 %d개를 넘는다" % CONNECTOR_SKILL_MAX_FILES)
-            files = {}
-            for path in paths:
-                relative = path.relative_to(skill)
-                if any(part in ("", ".", "..") for part in relative.parts):
-                    raise ValueError("스킬 파일 경로에 . 이나 .. 이 있다")
-                data = path.read_bytes()
-                try:
-                    text = data.decode("utf-8")
-                except UnicodeDecodeError:
-                    raise ValueError("스킬 파일이 UTF-8 이 아니다") from None
-                if len(text) > CONNECTOR_SKILL_MAX_CHARS:
-                    raise ValueError("스킬 파일이 %d자를 넘는다" % CONNECTOR_SKILL_MAX_CHARS)
-                files[relative.as_posix()] = data
-            name = _skill_name(files["SKILL.md"].decode("utf-8"), skill.name)
-            if name in skills:
-                raise ValueError("스킬 이름이 겹친다")
-            skills[name] = files
-    return skills
 
 
 def _load_connector(connector_id: str, entry: dict) -> dict:
@@ -552,40 +272,6 @@ def _load_connector(connector_id: str, entry: dict) -> dict:
         "tools": tools,
         "server": definition,
     }
-
-
-def _connector_errors(declared) -> tuple:
-    """`errors` 표를 `{코드: 공통 어휘}` 와 `{코드: 복구 계약}` 으로 나눠 검증한다(ADR-092).
-
-    항목은 공통 어휘 글이거나 `{category, recovery, details}` 객체다. 객체의 `recovery` 는 복구 어휘 하나이고
-    `details` 는 도구 오류에서 넘길 칸 이름의 목록이다. 칸 값의 모양은 실행 경로가 본다.
-    """
-    if not isinstance(declared, dict):
-        raise ValueError("errors 는 객체다")
-    words, contracts = {}, {}
-    for code, entry in declared.items():
-        if not isinstance(code, str) or not ERROR_CODE_RE.fullmatch(code):
-            raise ValueError("errors 의 코드는 대문자, 숫자, 밑줄로 64자까지다")
-        if isinstance(entry, dict):
-            if "category" not in entry or set(entry) - {"category", "recovery", "details"}:
-                raise ValueError("errors 의 객체 항목은 category 와 선택 칸 recovery, details 만 갖는다")
-            recovery = entry.get("recovery")
-            details = entry.get("details", [])
-            if recovery is not None and recovery not in ERROR_RECOVERIES:
-                raise ValueError("errors 의 recovery 는 복구 어휘 가운데 하나다")
-            if (not isinstance(details, list) or len(details) > ERROR_DETAILS_MAX
-                    or any(not isinstance(key, str) or not FIELD_KEY_RE.fullmatch(key) for key in details)
-                    or len(set(details)) != len(details)):
-                raise ValueError("errors 의 details 는 겹치지 않는 칸 이름 %d개까지다" % ERROR_DETAILS_MAX)
-            entry = entry["category"]
-            if entry == OUTCOME_UNKNOWN:
-                # 실행 경로가 504 로 답하는 코드다. 실패로 기록되지 않으므로 복구 정보를 실을 자리가 없다.
-                raise ValueError("outcome_unknown 인 코드는 복구 계약을 갖지 않는다")
-            contracts[code] = {"recovery": recovery, "details": tuple(details)}
-        if not isinstance(entry, str) or entry not in ERROR_WORDS:
-            raise ValueError("errors 의 값은 공통 어휘 다섯 가운데 하나다")
-        words[code] = entry
-    return words, contracts
 
 
 def _connector_manifest(connector_id: str) -> dict | None:
