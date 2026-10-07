@@ -14,7 +14,7 @@ Hermes core 는 고치지 않는다.
 | 요청 | 쓰임 |
 | --- | --- |
 | `GET /api/profiles` | 이름이 이미 있는지 본다 |
-| `POST /api/profiles` | profile 을 만든다. 아래 「만든 자리에서 설정 틀을 쓴다」 를 거친다 |
+| `POST /api/profiles` | profile 을 만든다. `profiles.py` 의 「만든 자리에서 설정 틀을 쓴다」 를 거친다 |
 | `DELETE /api/profiles/<이름>` | 관리 표식이 있는 profile 을 지운다 |
 | `PUT /api/env` | 그 profile 의 `.env` 에 정해 둔 key 한 줄을 쓴다 |
 | `DELETE /api/env` | 관리 profile 의 커넥터 칸 key 만 지운다 |
@@ -46,76 +46,6 @@ Hermes core 는 고치지 않는다.
 커넥터 경로의 계약은 `docs/backend/connector-install.md` 의 「대시보드 plugin 계약」 이 소유한다(ADR-043).
 이 plugin 은 커넥터의 이름을 코드에 두지 않는다. 운영 목록의 plugin 디렉터리마다 `connector.json` 을 읽는다.
 
-## 만든 자리에서 설정 틀을 쓴다
-
-clone 없이 만든 profile 은 `config.yaml` 에 `model` 만 받는다.
-그대로 두면 API 경로가 `hermes-api-server` 복합 toolset 으로 떨어져
-`terminal`, `file`, `memory` 를 포함한 거의 모든 toolset 이 열린다.
-그래서 토큰으로 부른 `POST /api/profiles` 는 처리기가 성공한 뒤 같은 요청 안에서 아래를 한다.
-
-1. 새로 생긴 이름이 정확히 하나인지 본다
-2. 새 profile 의 `model` 블록만 남기고, 같은 디렉터리의 `default-config.yaml.template` 의
-   나머지 키를 쓴다. 틀의 `model` 은 자리표시자라 쓰지 않는다.
-   틀에는 Control Plane MCP 등록과 켤 profile plugin 목록이 들어 있다
-3. `.no-bundled-skills` 표식을 쓴다
-4. 틀의 `plugins.enabled` 에 있는 plugin 을 `profile-plugins/<이름>/` 에서 그 profile 로 복사한다
-5. 쓴 파일을 다시 읽어 `_get_platform_tools(config, "api_server")` 로 계산하고,
-   `FORBIDDEN_TOOLSETS` 가 하나도 없는지 본다
-6. 관리 표식 `MANAGED_MARKER` 를 쓴다
-7. 공유 gateway 에 그 profile 의 plugin 을 다시 읽으라고 알린다. 실패해도 만들기는 성공이다
-
-1~6 에서 하나라도 실패하면 새로 생긴 이름을 모두 지우고 500 을 돌려준다.
-틀이 없거나, 복사할 plugin 이 없거나, 계산 함수를 읽어 오지 못하거나, 계산이 예외를 내는 경우가 모두 여기 해당한다.
-`_get_platform_tools` 는 밑줄로 시작하는 내부 함수라 Hermes 를 올릴 때 이름이 바뀔 수 있다.
-그때 넓게 열린 profile 이 남지 않고 만들기가 거절되게 하려는 것이다.
-
-MCP 토큰은 틀에 넣지 않는다. 틀은 `${MCP_FOS_ASSISTANT_API_KEY}` 참조만 두고,
-Control Plane 이 토큰을 발급해 `PUT /api/env` 로 넣는다.
-
-**만들기 전 목록을 읽지 못하면 처리기를 부르지 않는다.**
-전후 목록의 차이로 새 이름을 찾으므로, 앞의 목록이 비면 운영 profile 전부가 새 이름으로 보여
-되돌리기가 그것을 지운다.
-
-## 지우기
-
-`DELETE /api/profiles/<이름>` 은 그 profile 에 관리 표식이 있을 때만 토큰으로 받는다.
-표식은 위 6 에서만 쓴다. 사람이 대시보드나 CLI 로 만든 profile 과 기본 profile 에는 없다.
-그래서 이 토큰으로 지울 수 있는 것은 이 토큰으로 만든 profile 뿐이다.
-표식은 파일이라 대시보드를 다시 띄워도 남는다.
-
-## 경로를 등록하지 않는 이유
-
-`register_token_route` 로 경로를 등록하면 두 가지가 함께 따라온다.
-
-`is_token_route` 는 경로 문자열만 보고 메서드는 보지 않는다.
-`/api/env` 를 등록하면 같은 경로의 `DELETE` 까지 토큰으로 열리고,
-그 요청은 그 profile 의 credential 한 줄을 지운다.
-
-`token_auth_middleware` 는 등록된 경로의 인증을 혼자 판정한다.
-토큰이 없으면 쿠키를 보지 않고 401 로 끝내므로,
-사람이 브라우저로 여는 대시보드의 같은 경로가 함께 막힌다.
-`GET /api/profiles` 가 여기 해당한다. 대시보드의 profile 목록이 그 경로를 쓴다.
-
-그래서 경로를 등록하지 않고 `token_auth_middleware` 를 감싼 것이 직접 판정한다.
-감싼 것이 지키는 규칙은 하나다.
-
-**들어오는 길을 더하기만 하고, 사람이 쓰던 길을 막지 않는다.**
-
-- 우리가 연 요청이고 토큰이 맞으면 검사를 거쳐 인증된 것으로 표시하고 통과시킨다
-- 그 밖의 모든 경우는 다음으로 그대로 넘긴다. 쿠키 검사가 판정한다
-- 우리가 다루지 않는 경로는 원래 미들웨어에 그대로 넘긴다. drain plugin 이 계속 돈다
-
-토큰이 없거나 틀린 요청은 쿠키도 없으므로 결국 401 을 받는다.
-사람의 브라우저는 쿠키가 있으므로 지금까지대로 200 을 받는다.
-
-`web_server.py` 는 요청마다 `from ... import token_auth_middleware` 를 다시 하므로
-모듈 속성을 바꿔 두면 그다음 요청부터 감싼 것이 쓰인다.
-
-미들웨어에서 본문을 읽어도 그 뒤의 처리기가 같은 본문을 다시 읽는다.
-`PUT /api/config` 가 운영에서 그렇게 돈다.
-
-**감싸지 못하면 provider 도 등록하지 않는다.** 여는 자리가 하나뿐이라 그것이 없으면 닫힌 채로 남는다.
-
 ## 비밀값
 
 `HERMES_DASHBOARD_PROFILE_API_SECRET` 하나를 받는다.
@@ -130,6 +60,8 @@ Control Plane 이 토큰을 발급해 `PUT /api/env` 로 넣는다.
 from __future__ import annotations
 
 import os
+
+# 시험과 기존 호출부가 쓰는 이름을 진입점에서 다시 내보낸다.
 from .common import (
     BASE_ENV_KEYS,
     CONNECTOR_HOST_MARKER,
