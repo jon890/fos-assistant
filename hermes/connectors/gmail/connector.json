@@ -40,12 +40,13 @@
     "apply_labels_to_query": { "risk": "WRITE", "title": "검색한 메일의 라벨 바꾸기", "grant": false, "outbound": false }
   },
   "errors": {
-    "GMAIL_UNAUTHORIZED": "credential_rejected",
+    "GMAIL_UNAUTHORIZED": { "category": "credential_rejected", "recovery": "reconnect" },
     "GMAIL_FORBIDDEN": "forbidden",
-    "GMAIL_FILTER_SCOPE_REQUIRED": "forbidden",
-    "GMAIL_INVALID_INPUT": "invalid_input",
-    "GMAIL_TARGET_COUNT_CHANGED": "invalid_input",
+    "GMAIL_FILTER_SCOPE_REQUIRED": { "category": "forbidden", "recovery": "reconnect" },
+    "GMAIL_INVALID_INPUT": { "category": "invalid_input", "recovery": "fix_input" },
+    "GMAIL_TARGET_COUNT_CHANGED": { "category": "invalid_input", "recovery": "recheck",
+      "details": ["actual_count"] },
     "GMAIL_SEND_UNKNOWN": "outcome_unknown",
-    "GMAIL_UNAVAILABLE": "unavailable"
+    "GMAIL_UNAVAILABLE": { "category": "unavailable", "recovery": "retry_later" }
   }
 }

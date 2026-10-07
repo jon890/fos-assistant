@@ -401,6 +401,32 @@ describe("Gmail 라벨과 필터", () => {
     }
   });
 
+  test("일반 403의 Google 오류 본문은 결과에 싣지 않고 코드만 돌려준다", async () => {
+    const { fake, server } = setup();
+    fake.on(
+      "GET",
+      "/gmail/labels",
+      {
+        error: {
+          code: 403,
+          message: "Request had insufficient authentication scopes.",
+          status: "PERMISSION_DENIED",
+        },
+      },
+      403,
+    );
+    try {
+      await withMcp(server, async (client) => {
+        const { result, body } = await tool(client, "list_labels");
+        expect(result.isError).toBe(true);
+        expect(body).toEqual({ error: { code: "GMAIL_FORBIDDEN" } });
+        expect(JSON.stringify(result)).not.toContain("insufficient");
+      });
+    } finally {
+      fake.stop();
+    }
+  });
+
   test("기존 메일 적용은 다중 페이지에서 전부 찾되 500개 이하여야 정확한 승인 수와 일치한다", async () => {
     const { fake, server } = setup();
     fake.on("GET", "/gmail/messages", {
