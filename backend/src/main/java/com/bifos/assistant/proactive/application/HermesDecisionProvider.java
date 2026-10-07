@@ -99,8 +99,8 @@ public class HermesDecisionProvider implements DecisionProvider {
             executions.attachRunId(execution, runId);
             result = await(command, runId);
             if (!result.succeeded()) {
-                executions.fail(execution, "DECISION_PROVIDER_FAILED");
-                return failed(choice, execution, DecisionFailure.PROVIDER_FAILED);
+                executions.failSystem(execution, result, baseUrl, "DECISION_PROVIDER_FAILED");
+                return new DecisionResponse(info(choice, execution, true), DecisionResult.fallback(DecisionFailure.PROVIDER_FAILED));
             }
             executions.completeSystem(execution, result, baseUrl);
             DecisionResult decision = parse(result.output());
@@ -164,7 +164,11 @@ public class HermesDecisionProvider implements DecisionProvider {
     }
 
     private DecisionProviderInfo info(ModelChoice choice, AgentExecution execution) {
-        boolean succeeded = execution != null && execution.status() == ExecutionStatus.SUCCEEDED;
+        return info(choice, execution, false);
+    }
+
+    private DecisionProviderInfo info(ModelChoice choice, AgentExecution execution, boolean terminalResult) {
+        boolean succeeded = execution != null && (terminalResult || execution.status() == ExecutionStatus.SUCCEEDED);
         return new DecisionProviderInfo(
                 id(),
                 VERSION,

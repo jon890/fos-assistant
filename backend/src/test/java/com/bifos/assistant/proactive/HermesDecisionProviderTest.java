@@ -3,6 +3,7 @@ package com.bifos.assistant.proactive;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -119,7 +120,7 @@ class HermesDecisionProviderTest {
         DecisionResponse response = evaluate(Duration.ofSeconds(1));
         assertThat(response.result().failure()).isEqualTo(DecisionFailure.PROVIDER_FAILED);
         assertThat(json.writeValueAsString(response)).doesNotContain("private error");
-        verify(executions).fail(execution, "DECISION_PROVIDER_FAILED");
+        verify(executions).failSystem(eq(execution), any(), anyString(), eq("DECISION_PROVIDER_FAILED"));
     }
 
     private void complete(String output) {
