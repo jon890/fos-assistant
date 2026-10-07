@@ -16,7 +16,6 @@ import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import java.time.Clock;
 import java.time.Duration;
-import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -329,13 +328,13 @@ class UserBrowserServiceTest {
     void touchesRunningBrowserOncePerMinute() {
         UserBrowserService service = service(true, 2);
         service.create(101L);
-        var first = service.start(101L).lastActiveAt();
+        service.start(101L);
+        // DB 는 나노초를 마이크로초로 반올림해 남기므로 메모리의 시각 대신 저장된 값끼리 견준다
+        var stored = repository.findByUserId(101L).orElseThrow().lastActiveAt();
 
         service.touch(101L);
 
-        // DB 는 마이크로초까지 남기므로 나노초가 있는 시계(Linux)에서도 같게 견주려고 자른다.
-        assertThat(repository.findByUserId(101L).orElseThrow().lastActiveAt().truncatedTo(ChronoUnit.MICROS))
-                .isEqualTo(first.truncatedTo(ChronoUnit.MICROS));
+        assertThat(repository.findByUserId(101L).orElseThrow().lastActiveAt()).isEqualTo(stored);
     }
 
     private UserBrowserService service(boolean enabled, int maxRunning) {
