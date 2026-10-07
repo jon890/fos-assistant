@@ -1,5 +1,8 @@
 package com.bifos.assistant.memory.application;
 
+import com.bifos.assistant.feedback.application.DecisionFeedbackRecorder;
+import com.bifos.assistant.feedback.domain.type.FeedbackActor;
+import com.bifos.assistant.feedback.domain.type.FeedbackEventType;
 import com.bifos.assistant.memory.application.model.CapturedMemory;
 import com.bifos.assistant.memory.application.model.MemoryAccess;
 import com.bifos.assistant.memory.application.model.MemoryRememberOutcome;
@@ -54,6 +57,7 @@ public class MemoryCaptureService {
     private final MemoryRepository memories;
     private final MemoryRevisionRepository revisions;
     private final MemoryCaptureRepository captures;
+    private final DecisionFeedbackRecorder feedback;
     private final Clock clock;
 
     /**
@@ -112,6 +116,11 @@ public class MemoryCaptureService {
                                 clock.instant()));
         MemoryCaptureKind kind = direct ? MemoryCaptureKind.CREATED : MemoryCaptureKind.PROPOSED;
         record(saved.id(), user, request, kind, direct ? saved.revision() : null);
+        if (!direct) {
+            // 바로 저장은 사용자 본인의 말이라 제안이 아니다. 제안만 판단 피드백의 SURFACED 로 남긴다.
+            feedback.record(MemoryService.proposalFeedback(
+                    user, saved, FeedbackEventType.SURFACED, FeedbackActor.AGENT, clock.instant()));
+        }
         return new MemoryRememberResult(
                 direct ? MemoryRememberOutcome.REMEMBERED : MemoryRememberOutcome.PROPOSED, saved.id());
     }
