@@ -338,6 +338,13 @@ public class ProactiveCheckRun implements CheckTurn {
                         each.checkedAt(),
                         now))
                 .toList();
+        if (check.trigger() == CheckTrigger.SCHEDULED
+                && newFindings == 0
+                && block.questions().isEmpty()
+                && block.sourceFailures().isEmpty()) {
+            // 검사를 통과한 새 발견이 없으면 정상 무변화와 같다. 참고로 내린 발견은 셈을 위해 저장하되 답과 보고를 남기지 않는다.
+            return new CheckAnswer("", false, true);
+        }
         pendingReport = deps.reportFactory().create(block, judged, executionId);
         return new CheckAnswer(deps.renderer().render(block, judged, pendingReport), false, false);
     }
