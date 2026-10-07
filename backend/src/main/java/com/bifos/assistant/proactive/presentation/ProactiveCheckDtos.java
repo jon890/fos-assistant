@@ -3,6 +3,11 @@ package com.bifos.assistant.proactive.presentation;
 import com.bifos.assistant.proactive.application.model.CheckBlocker;
 import com.bifos.assistant.proactive.application.model.CheckStatusView;
 import com.bifos.assistant.proactive.domain.ProactiveCheck;
+import com.bifos.assistant.proactive.domain.CandidateJudgement;
+import com.bifos.assistant.proactive.domain.ValueEvaluation;
+import com.bifos.assistant.proactive.domain.type.DecisionOutcome;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -16,6 +21,20 @@ import lombok.NoArgsConstructor;
  */
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
 public final class ProactiveCheckDtos {
+
+    /** 설치된 adapter 이름만 받는다. 모델, profile, 후보 본문은 요청으로 고르지 않는다. */
+    public record EvaluationRequest(@NotBlank @Size(max = 64) String provider) {}
+
+    /** 실행 번호와 provider/model 원문은 내부 평가 기록에만 남긴다. */
+    public record EvaluationResponse(Long id, Long replayOfId, DecisionOutcome outcome,
+            List<CandidateJudgement> judgements, List<Long> orderedCandidateIds, String explanation) {
+
+        static EvaluationResponse from(ValueEvaluation row) {
+            var result = row.evidence().result();
+            return new EvaluationResponse(row.id(), row.replayOfId(), row.outcome(), result.judgements(),
+                    result.orderedCandidateIds(), result.explanation());
+        }
+    }
 
     /**
      * 살펴보기 상태다.

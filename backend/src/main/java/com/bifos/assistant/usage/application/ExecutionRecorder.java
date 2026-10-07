@@ -1,5 +1,7 @@
 package com.bifos.assistant.usage.application;
 
+import com.bifos.assistant.agent.domain.type.CostMode;
+
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.hermes.HermesRunsClient;
 import com.bifos.assistant.hermes.dto.HermesRunResult;
@@ -320,6 +322,39 @@ public class ExecutionRecorder {
      */
     public AgentExecution startDetached(CurrentUser user, Agent agent, ModelChoice requested) {
         return start(user, null, agent, null, null, ExecutionContextSnapshot.ofChars(0L), requested, null, null);
+    }
+
+    /** 설치 설정의 시스템 profile 로 판단만 한다. 사용자 에이전트 줄을 만들지 않으며 요청자의 백그라운드 한도로 센다. */
+    public AgentExecution startSystem(CurrentUser user, String profileName,
+            CostMode costMode, ModelChoice requested) {
+        return limiter.admit(user.id(), ExecutionAdmission.BACKGROUND, () -> executions.save(AgentExecution.builder()
+                .userId(user.id())
+                .profileName(profileName)
+                .costMode(costMode)
+                .provider(requested.provider())
+                .model(requested.model())
+                .reasoningEffort(requested.reasoningEffort())
+                .reasoningEffortSource(requested.reasoningEffort() == null
+                        ? ReasoningEffortSource.UNKNOWN : ReasoningEffortSource.REQUESTED)
+                .contextChars(0L)
+                .status(ExecutionStatus.RUNNING)
+                .startedAt(clock.instant())
+                .build()));
+    }
+
+    /** 시스템 판단 실행의 실제 모델과 토큰을 남긴다. 실제 모델을 모르면 요청 모델로 대신하지 않는다. */
+    public AgentExecution completeSystem(AgentExecution execution, HermesRunResult result, String apiBaseUrl) {
+        SessionRuntime actual = result.runtime();
+        if (actual == null || isBlank(actual.provider()) || isBlank(actual.model())) {
+            actual = hermes.readSessionRuntime(apiBaseUrl, execution.profileName(), result.sessionId());
+        }
+        String provider = actual == null ? null : actual.provider();
+        String model = actual == null ? null : actual.model();
+        TokenUsage usage = result.usage() == null ? TokenUsage.empty() : result.usage();
+        execution.attachRunId(result.runId());
+        execution.markSucceeded(provider, model, usage,
+                costs.estimate(provider, model, usage, execution.costMode()), clock.instant());
+        return executions.save(execution);
     }
 
     /** 제출 직후 run 번호를 붙인다. */
