@@ -6,6 +6,7 @@ import com.bifos.assistant.usage.domain.CostByAgent;
 import com.bifos.assistant.usage.domain.CostByDay;
 import com.bifos.assistant.usage.domain.CostByFingerprint;
 import com.bifos.assistant.usage.domain.CostByModel;
+import com.bifos.assistant.usage.domain.ExecutionAgentRef;
 import com.bifos.assistant.usage.domain.MonthlyCost;
 import com.bifos.assistant.usage.domain.MonthlyCostDetail;
 import com.bifos.assistant.usage.domain.type.ExecutionStatus;
@@ -32,6 +33,13 @@ public interface AgentExecutionRepository extends JpaRepository<AgentExecution, 
             """)
     long countIncompleteEventObservations(
             @Param("userId") Long userId, @Param("from") Instant from, @Param("to") Instant to);
+
+    /** 실행 번호들의 에이전트 번호만 읽는다. 기억 목록이 남긴 에이전트를 보일 때 쓴다. */
+    @Query("""
+            select new com.bifos.assistant.usage.domain.ExecutionAgentRef(e.id, e.agentId)
+            from AgentExecution e where e.id in :ids
+            """)
+    List<ExecutionAgentRef> findAgentRefs(@Param("ids") Collection<Long> ids);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select e from AgentExecution e where e.id = :id")

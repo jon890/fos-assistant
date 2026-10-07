@@ -7,6 +7,7 @@ import static org.mockito.Mockito.when;
 
 import com.bifos.assistant.context.ContextAssembler;
 import com.bifos.assistant.memory.application.MemoryService;
+import com.bifos.assistant.memory.application.MemorySources;
 import com.bifos.assistant.memory.domain.Memory;
 import com.bifos.assistant.memory.domain.type.MemoryScope;
 import com.bifos.assistant.memory.domain.type.MemorySensitivity;
@@ -58,6 +59,9 @@ class MemoryDocumentTest {
 
     @Autowired
     ContextAssembler context;
+
+    @Autowired
+    MemorySources sources;
 
     @Autowired
     JdbcTemplate jdbc;
@@ -195,7 +199,7 @@ class MemoryDocumentTest {
     @DisplayName("문서는 Memory 목록에 나오지 않는다")
     void documentIsNotListedAsMemory() {
         Long id = createSensitive().id();
-        MemoryController memoryController = new MemoryController(memories, context, currentUser);
+        MemoryController memoryController = new MemoryController(memories, context, sources, currentUser);
 
         assertThat(memoryController.readable()).extracting(MemoryView::id).doesNotContain(id);
     }

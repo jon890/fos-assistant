@@ -1,6 +1,9 @@
 package com.bifos.assistant.memory.presentation;
 
 import com.bifos.assistant.memory.application.MemoryService;
+import com.bifos.assistant.memory.application.MemorySources;
+import com.bifos.assistant.memory.application.model.MemorySource;
+import com.bifos.assistant.memory.domain.Memory;
 import com.bifos.assistant.memory.application.OmittedMemories;
 import com.bifos.assistant.memory.presentation.MemoryDtos.CreateMemoryRequest;
 import com.bifos.assistant.memory.presentation.MemoryDtos.MemoryView;
@@ -9,6 +12,7 @@ import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.auth.CurrentUserProvider;
 import jakarta.validation.Valid;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -26,6 +30,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class MemoryController {
     private final MemoryService memories;
     private final OmittedMemories omittedMemories;
+    private final MemorySources sources;
     private final CurrentUserProvider currentUser;
 
     /**
@@ -33,13 +38,17 @@ public class MemoryController {
      *
      * <p>지금 조립하면 자리가 없어 빠질 항목에 표시를 함께 보낸다. 그 표시가 없으면 본문이 긴 항목
      * 하나가 실리지 않는 것을 쓴 사람이 알 길이 없다. 대화 화면에는 끼우지 않고 이 목록에서만 보인다.
+     *
+     * <p>에이전트가 남긴 항목에는 남긴 에이전트를 함께 보낸다. 사용자가 무엇을 에이전트가 기억했는지 검토하는 데 쓴다.
      */
     @GetMapping
     public List<MemoryView> readable() {
         CurrentUser user = currentUser.require();
         Set<Long> omitted = omittedMemories.omittedFor(user);
-        return memories.readableBy(user).stream()
-                .map(memory -> MemoryView.from(memory, omitted.contains(memory.id())))
+        List<Memory> readable = memories.readableBy(user);
+        Map<Long, MemorySource> bySource = sources.of(user, readable);
+        return readable.stream()
+                .map(memory -> MemoryView.from(memory, omitted.contains(memory.id()), bySource.get(memory.id())))
                 .toList();
     }
 

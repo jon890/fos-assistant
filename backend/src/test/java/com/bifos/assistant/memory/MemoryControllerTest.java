@@ -6,6 +6,7 @@ import static org.mockito.Mockito.when;
 
 import com.bifos.assistant.context.ContextAssembler;
 import com.bifos.assistant.memory.application.MemoryService;
+import com.bifos.assistant.memory.application.MemorySources;
 import com.bifos.assistant.memory.domain.Memory;
 import com.bifos.assistant.memory.domain.type.MemoryScope;
 import com.bifos.assistant.memory.infra.MemoryRepository;
@@ -37,13 +38,16 @@ class MemoryControllerTest {
     @Autowired
     ContextAssembler context;
 
+    @Autowired
+    MemorySources sources;
+
     private final CurrentUserProvider currentUser = mock(CurrentUserProvider.class);
     private MemoryController controller;
 
     @BeforeEach
     void setUp() {
         repository.deleteAll();
-        controller = new MemoryController(memories, context, currentUser);
+        controller = new MemoryController(memories, context, sources, currentUser);
         when(currentUser.require()).thenReturn(ADMIN);
     }
 
