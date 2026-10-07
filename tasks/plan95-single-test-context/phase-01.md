@@ -81,7 +81,7 @@ Javadoc 에 ADR 을 적는다.
 
 `backend/src/test/java/com/bifos/assistant/shared/config/LivePropertiesTest.java`: `fixed` 가 같은 값을 돌려주고 `type()` 이 맞다.
 `ModelsDevPriceCatalog` 의 기존 단위 검사에 「`current()` 가 다른 경로를 돌려주면 그 파일의 가격을 읽는다」 를 더한다. 같은 record 를 계속 돌려주면 파일을 다시 열지 않는지도 본다.
-`AgentDelegationService` 의 동시 위임 한도를 보는 단위 검사를 더한다: 한도 1 에서 자리를 하나 얻으면 둘째는 거절되고, `current()` 가 한도 2 를 돌려주면 둘째가 얻어진다. 돌려준 뒤에는 다시 얻을 수 있다.
+`backend/src/test/java/com/bifos/assistant/orchestration/AgentDelegationServiceRaceTest.java` 에 동시 위임 한도를 보는 단위 검사를 더한다(`current()` 가 바뀌는 `LiveProperties` 는 람다나 작은 클래스로 만든다): 한도 1 에서 자리를 하나 얻으면 둘째는 거절되고, `current()` 가 한도 2 를 돌려주면 둘째가 얻어진다. 돌려준 뒤에는 다시 얻을 수 있다.
 
 ## 검증
 

@@ -29,7 +29,7 @@ class ConversationPagingTest {
 
 MySQL 태그 검사의 기준 클래스만 `@SpringBootTest` 로 따로 둔다.
 
-**검사 클래스 안에 `@MockitoBean`, `@MockitoSpyBean`, `@Import`, `@TestPropertySource`, `@DynamicPropertySource` 를 두지 않는다.**
+**검사 클래스에 `@MockitoBean`, `@MockitoSpyBean`, `@Import`, `@TestPropertySource`, `@DynamicPropertySource`, `@ContextConfiguration`, `@ActiveProfiles`, `@DirtiesContext`, 중첩 `@TestConfiguration` 을 두지 않는다.**
 하나라도 두면 Spring 이 컨텍스트를 새로 띄운다. 구조 규칙이 막는다.
 - 기반에 있는 타입은 `@Autowired` 로 받는다.
 - 설정 값을 바꿔야 하면 아래 「설정 바꾸기」 를 쓴다.

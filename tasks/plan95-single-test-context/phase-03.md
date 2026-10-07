@@ -43,6 +43,7 @@
   - `AgentLifecycleFlagsTest` 의 `AgentEndpointProbe`: 실제 HTTP 를 확인한다. 확인 메서드를 정한다
   - `ProactiveCheckTurnTest`, `CareerDailyPilotTest` 의 `AgentConnectorBindings`: mock 은 빈 목록을 줬다. 검사가 부르는 조회 메서드가 빈 목록을 돌려주게 정한다
 - spy 를 정할 때는 `when(spy.x())` 대신 `doReturn(...).when(spy).x()` 를 쓴다. `when` 은 실제 메서드를 한 번 부른다.
+- 기반으로 올리는 대역 설정은 `testsupport/` 로 옮긴다. `@TestConfiguration` 을 떼고 `IntegrationTestDoubles` 의 빈으로 합쳐도 된다. 지금 testsupport 밖에 있는 것은 `attention/AttentionTestCandidates`, `connector/ConnectorPolicyTestDoubles`, `ResultDeliveryRecordTest.TestResults`, `PersonAccessRollbackTest.FailingRevoker`, `DelegationWakeUserLimitTest` 의 두 설정이다.
 - 기반으로 올리는 대역은 기본이 꺼짐이고, 꺼진 상태에서 운영 동작에 아무 영향이 없어야 한다. 켜는 검사는 그 대역을 `@Autowired` 로 받아 켜고, 공통 확장이 검사 뒤에 끈다(대역마다 `reset()` 을 두고 `IntegrationTestIsolation` 이 부른다).
 - `ConnectorPolicyTestDoubles` 는 커넥터 카탈로그 캐시에 시각을 옮길 수 있는 시계를 넣는다. 운영 `ConnectorCatalogCache` 와 `SkillCommandCatalog` 의 `@Autowired` 생성자가 `Clock` 빈을 받게 하면 기반의 `TestClock` 이 들어간다(운영의 `Clock` 빈은 `Clock.systemUTC()` 라 동작이 같다). 그 뒤 검사는 `TestClock.advance` 로 시간을 옮긴다. 이 변경은 운영 코드 두 곳이다.
 
@@ -73,7 +74,7 @@
 `ArchitectureRules` 에 `TESTS` 대상 규칙을 하나 더한다. `testsupport` 밖의 검사 클래스는 아래를 갖지 않는다.
 - `@MockitoBean`, `@MockitoSpyBean` 필드와 클래스에 붙은 `@MockitoBean`, `@MockitoSpyBean`
 - `@Import`, `@TestPropertySource`, `@DynamicPropertySource`, `@SpringBootTest`, `@ContextConfiguration`, `@ActiveProfiles`, `@DirtiesContext`
-- `@TestConfiguration` 클래스(검사 클래스 안의 중첩 클래스 포함). Spring Boot 는 `@Import` 없이도 중첩 `@TestConfiguration` 을 찾아 컨텍스트를 나눈다 예외는 MySQL 태그 검사(`@Tag("mysql")` 이거나 이름에 `Mysql` 이 든 클래스)다.
+- `@TestConfiguration` 클래스(검사 클래스 안의 중첩 클래스 포함). Spring Boot 는 `@Import` 없이도 중첩 `@TestConfiguration` 을 찾아 컨텍스트를 나눈다. 예외는 MySQL 태그 검사(`@Tag("mysql")` 이거나 이름에 `Mysql` 이 든 클래스)다.
 `ArchitectureRulesTest` 에서 `TESTS` 로 검사하고 기준 파일은 비어 있다.
 
 ### 6. 이 phase 를 검증하는 검사
