@@ -121,7 +121,7 @@ terminal:
     - <read_only_mounts 의 각 항목>:ro
     - <profiles[profile].read_only_mounts 의 각 항목>:ro
   docker_forward_env: []
-  docker_env: <profiles[profile].env>
+  docker_env: <profiles[profile].env>   # env 가 비면 이 칸을 두지 않는다
   env_passthrough: []
   credential_files: []
   container_cpu: <cpu>
@@ -130,6 +130,7 @@ terminal:
 ```
 
 `docker_shared_container_key` 의 지문은 이 칸을 뺀 나머지 `terminal:` 을 키 정렬 JSON 으로 만든 sha256 앞 12자다. 주인이나 실행 공간 설정이 바뀌면 키가 바뀌어 Hermes 가 새 컨테이너를 만든다. 한 키는 profile 하나만 쓴다.
+`profiles[profile].env` 가 비면 `docker_env` 칸을 넣지 않고 지문을 계산한다. Hermes 의 config 저장이 빈 dict 를 기본값과 같다며 지우므로, 칸을 넣고 계산하면 저장된 `terminal:` 로 다시 계산한 지문이 키와 어긋난다.
 `fos-sandbox-profile` label 은 proxy 검사와 유휴 정리, 복구에서 정책의 profile 을 식별한다. API 요청으로 label 을 지정하지 못한다.
 
 **기존 Hermes 예약 작업은 기본 profile(local)에 남으며 아직 격리되지 않았다.**
