@@ -2,7 +2,17 @@ package com.bifos.assistant.proactive.presentation;
 
 import com.bifos.assistant.proactive.application.model.CheckBlocker;
 import com.bifos.assistant.proactive.application.model.CheckStatusView;
+import com.bifos.assistant.proactive.domain.AutonomyDecision;
+import com.bifos.assistant.proactive.domain.CandidateJudgement;
 import com.bifos.assistant.proactive.domain.ProactiveCheck;
+import com.bifos.assistant.proactive.domain.ValueEvaluation;
+import com.bifos.assistant.proactive.domain.type.AutonomyExecutionStatus;
+import com.bifos.assistant.proactive.domain.type.AutonomyLevel;
+import com.bifos.assistant.proactive.domain.type.AutonomyReason;
+import com.bifos.assistant.proactive.domain.type.DecisionOutcome;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -16,6 +26,52 @@ import lombok.NoArgsConstructor;
  */
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
 public final class ProactiveCheckDtos {
+
+    /** 설치된 adapter 이름만 받는다. 모델, profile, 후보 본문은 요청으로 고르지 않는다. */
+    public record EvaluationRequest(
+            @NotBlank @Size(max = 64) String provider) {}
+
+    /** 실행 번호와 provider/model 원문은 내부 평가 기록에만 남긴다. */
+    public record EvaluationResponse(
+            Long id,
+            Long replayOfId,
+            DecisionOutcome outcome,
+            List<CandidateJudgement> judgements,
+            List<Long> orderedCandidateIds,
+            String explanation) {
+
+        static EvaluationResponse from(ValueEvaluation row) {
+            var result = row.evidence().result();
+            return new EvaluationResponse(
+                    row.id(),
+                    row.replayOfId(),
+                    row.outcome(),
+                    result.judgements(),
+                    result.orderedCandidateIds(),
+                    result.explanation());
+        }
+    }
+
+    /**
+     * 후보 하나의 행동 정책 판정이다. 시작한 살펴보기 식별자와 판정 입력 원문은 싣지 않는다.
+     *
+     * @param executionStatus {@code EXECUTE} 가 아니면 null
+     */
+    public record AutonomyDecisionResponse(
+            Long id,
+            Long candidateId,
+            AutonomyLevel level,
+            List<AutonomyReason> reasons,
+            AutonomyExecutionStatus executionStatus) {
+
+        static AutonomyDecisionResponse from(AutonomyDecision row) {
+            return new AutonomyDecisionResponse(
+                    row.id(), row.candidateId(), row.level(), row.reasons(), row.executionStatus());
+        }
+    }
+
+    /** 사용자의 자동 실행 동의다. */
+    public record AutonomyPreferenceBody(@NotNull Boolean readOnlyExecution) {}
 
     /**
      * 살펴보기 상태다.

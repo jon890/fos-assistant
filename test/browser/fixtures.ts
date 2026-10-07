@@ -31,6 +31,7 @@ import {
   TEST_EMAIL,
   WEB_BASE_URL,
 } from "./settings.ts";
+import { isolatedUser } from "./helpers.ts";
 
 const { expect, test: base } = playwright;
 
@@ -94,6 +95,8 @@ const PROFILE_KEYS: Record<string, string> = {
 };
 
 export type FakeHermesControl = {
+  /** 장애와 보류 설정을 비우고 기다리는 응답을 해제한다. profile과 기록은 보존한다. */
+  resetControls(): Promise<void>;
   holdNextRun(): Promise<void>;
   waitForHeldRun(): Promise<void>;
   releaseHeldRun(): Promise<void>;
@@ -131,6 +134,7 @@ async function fakeHermesControl(): Promise<FakeHermesControl> {
       throw new Error(`가짜 Hermes 제어 요청이 실패했다: ${response.status}`);
   };
   return {
+    resetControls: () => call("/__test/reset-controls", "POST"),
     holdNextRun: () => call("/__test/hold-next-run", "POST"),
     waitForHeldRun: () => call("/__test/wait-held-run", "GET"),
     releaseHeldRun: () => call("/__test/release-held-run", "POST"),
@@ -705,6 +709,7 @@ export default async function setupServices(): Promise<() => Promise<void>> {
  */
 export function waitForStreamedContentAfterLoad(
   page: import("../../web/node_modules/@playwright/test/index.js").Page,
+  waitForShellReady = true,
 ) {
   const streamedContentPlaced = () =>
     page.waitForFunction(
@@ -718,23 +723,41 @@ export function waitForStreamedContentAfterLoad(
   page.goto = async (...args) => {
     const response = await goto(...args);
     await streamedContentPlaced();
+    if (waitForShellReady)
+      await page.locator('main[aria-busy="false"]').waitFor({ state: "attached" });
     return response;
   };
   const reload = page.reload.bind(page);
   page.reload = async (...args) => {
     const response = await reload(...args);
     await streamedContentPlaced();
+    if (waitForShellReady)
+      await page.locator('main[aria-busy="false"]').waitFor({ state: "attached" });
     return response;
   };
 }
 
-export const test = base.extend<{ hermes: FakeHermesControl }>({
+export const test = base.extend<{ hermes: FakeHermesControl; isolatedMember: { email: string; name: string }; resetHermes: void; waitForShellReady: boolean }>({
+  // 외부 스크립트를 막고 SSR 첫 그림을 검사할 때만 false로 둔다.
+  waitForShellReady: [true, { option: true }],
+  isolatedMember: async ({}, use, testInfo) => {
+    await use(isolatedUser(testInfo, "member"));
+  },
+  resetHermes: [async ({}, use) => {
+    const hermes = await fakeHermesControl();
+    await hermes.resetControls();
+    try {
+      await use();
+    } finally {
+      await hermes.resetControls();
+    }
+  }, { auto: true }],
   hermes: async ({}, use) => {
     await use(await fakeHermesControl());
   },
-  page: async ({ context, page }, use) => {
+  page: async ({ context, page, waitForShellReady }, use) => {
     await setSession(context, { email: TEST_EMAIL, name: "브라우저 테스트" });
-    waitForStreamedContentAfterLoad(page);
+    waitForStreamedContentAfterLoad(page, waitForShellReady);
     await use(page);
   },
 });

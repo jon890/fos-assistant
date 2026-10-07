@@ -1,6 +1,7 @@
 package com.bifos.assistant.proactive.application;
 
 import com.bifos.assistant.chat.application.RecoveredAnswerGuard;
+import com.bifos.assistant.proactive.domain.type.CheckTrigger;
 import com.bifos.assistant.proactive.infra.ProactiveCheckRepository;
 import com.bifos.assistant.usage.domain.type.ExecutionStatus;
 import java.util.Optional;
@@ -25,6 +26,10 @@ public class ProactiveCheckAnswerGuard implements RecoveredAnswerGuard {
     public Optional<String> noticeInsteadOfAnswer(Long rootExecutionId, ExecutionStatus ended) {
         if (!checks.existsByRootExecutionId(rootExecutionId)) {
             return Optional.empty();
+        }
+        // 자동 실행한 살펴보기는 사용자에게 바로 알리지 않는다. 답도 알림 줄도 남기지 않는다.
+        if (checks.existsByRootExecutionIdAndTrigger(rootExecutionId, CheckTrigger.AUTONOMY)) {
+            return Optional.of("");
         }
         return Optional.of(
                 ended == ExecutionStatus.CANCELLED

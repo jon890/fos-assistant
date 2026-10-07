@@ -20,8 +20,10 @@ import pathlib
 import re
 import sqlite3
 import sys
+import typing
 import unittest
 import warnings
+import yaml
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 
@@ -283,6 +285,32 @@ class HermesSourceTest(unittest.TestCase):
         if path not in self.trees:
             self.trees[path] = _parse(path)
         return self.trees[path]
+
+    def test_decision_profile_blocks_implicit_mcp_tools_in_upstream_resolver(self):
+        """상류의 순수 합집합 함수를 실행해 no_mcp 가 기본 MCP 도구를 넣지 않는지 본다."""
+        node = self.resolve("hermes_cli.tools_config", "_merge_mcp_servers")
+        self.assertIsInstance(node, ast.FunctionDef)
+        namespace = {"List": list, "Set": set,
+                     "enabled_mcp_server_names": lambda config: set(config.get("mcp_servers", {}))}
+        exec(compile(ast.Module(body=[node], type_ignores=[]), "upstream_mcp_resolver", "exec"), namespace)
+        template = yaml.safe_load((PLUGIN_DIR.parent.parent / "decision-profile/config.yaml.template").read_text())
+        template["mcp_servers"] = {"demo": {"enabled": True}, "control-plane": {"enabled": True}}
+        resolve = namespace["_merge_mcp_servers"]
+        self.assertEqual(set(), resolve(template, template["platform_toolsets"]["api_server"], {"no_mcp"}, True))
+        self.assertEqual({"demo", "control-plane"}, resolve(template, [], set(), True))
+
+    def test_decision_profile_disables_both_upstream_memory_stores(self):
+        """memory.enabled 에 기대지 않고 상류가 실제로 읽는 두 저장 플래그를 확인한다."""
+        node = self.resolve("tools.memory_tool", "get_builtin_memory_store_flags")
+        self.assertIsInstance(node, ast.FunctionDef)
+        namespace = {"Optional": typing.Optional, "Dict": typing.Dict, "Any": typing.Any, "Tuple": typing.Tuple,
+                     "get_builtin_memory_config": lambda config: config.get("memory", {}),
+                     "is_truthy_value": lambda value, default=True: default if value is None else value}
+        exec(compile(ast.Module(body=[node], type_ignores=[]), "upstream_memory_flags", "exec"), namespace)
+        template = yaml.safe_load((PLUGIN_DIR.parent.parent / "decision-profile/config.yaml.template").read_text())
+        flags = namespace["get_builtin_memory_store_flags"]
+        self.assertEqual((False, False), flags(template))
+        self.assertEqual((True, True), flags({"memory": {"enabled": False}}))
 
     def module_path(self, module):
         base = self.root.joinpath(*module.split("."))

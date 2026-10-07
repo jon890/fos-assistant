@@ -309,6 +309,15 @@ public class ProactiveCheckRun implements CheckTurn {
     }
 
     /**
+     * 자동 실행으로 시작해 답, 보고, 발견, 알림 줄을 남기지 않는 살펴보기인가. 문제 후보만 남겨 다시 가치 평가와 행동 정책을 거치게
+     * 한다.
+     */
+    @Override
+    public boolean silent() {
+        return check.trigger() == CheckTrigger.AUTONOMY;
+    }
+
+    /**
      * 결과 블록을 읽고 발견을 검사해 대화에 남길 글을 정한다. 발견은 들고 있다가 답 메시지를 저장한 뒤 {@link #saveFindings} 가
      * 저장하고, 결과와 셈은 {@link #record} 가 적는다. 답을 저장하지 못했는데 발견이 남으면 사용자가 보지 못한 발견이 다음 살펴보기에서
      * 이미 알린 것으로 내려가기 때문이다.
@@ -459,7 +468,7 @@ public class ProactiveCheckRun implements CheckTurn {
                     outcome,
                     newFindings,
                     referenceFindings,
-                    pendingReport,
+                    silent() ? null : pendingReport,
                     toolCalls.get(),
                     delegations,
                     tokens.input(),
@@ -475,7 +484,8 @@ public class ProactiveCheckRun implements CheckTurn {
      * 발견을 근거로 한 후보가 다음 살펴보기에서 중복으로 걸리지 않게 하기 위해 발견과 같은 자리에서 저장한다.
      */
     void saveFindings() {
-        List<ProactiveCheckFinding> judged = pendingFindings;
+        // 사용자가 보지 못한 발견이 다음 살펴보기에서 이미 알린 것으로 내려가지 않게, 알리지 않는 살펴보기는 발견을 남기지 않는다.
+        List<ProactiveCheckFinding> judged = silent() ? List.of() : pendingFindings;
         if (!judged.isEmpty()) {
             deps.findings().saveAll(judged);
         }

@@ -239,6 +239,10 @@ public enum ErrorCode {
     TASK_AGENT_NOT_SUPPORTED(HttpStatus.BAD_REQUEST),
     /** 그 경로가 받지 않는 메서드로 왔다. 받는 메서드는 {@code Allow} 헤더가 적는다. */
     METHOD_NOT_ALLOWED(HttpStatus.METHOD_NOT_ALLOWED),
+    /** 없는 평가와 남의 평가, 지운 대화의 평가를 같은 응답으로 숨긴다. */
+    VALUE_EVALUATION_NOT_FOUND(HttpStatus.NOT_FOUND),
+    /** 끝나지 않았거나 실패한 살펴보기와 아직 평가 중인 시도는 replay 할 수 없다. */
+    VALUE_EVALUATION_STATE_CONFLICT(HttpStatus.CONFLICT),
     INTERNAL_ERROR(HttpStatus.INTERNAL_SERVER_ERROR);
 
     private final HttpStatus status;

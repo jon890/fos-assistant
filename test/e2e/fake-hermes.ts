@@ -1800,6 +1800,34 @@ export function startFakeHermes(
       const requestUrl = new URL(request.url ?? "/", "http://fake-hermes.test");
       const path = requestUrl.pathname;
 
+      // 검사가 실패해 finally까지 가지 못해도 다음 검사에 장애나 보류 설정을 넘기지 않는다.
+      // profile, 실행과 session 기록은 지우지 않는다. 그것들은 DB와 함께 각 검사가 소유한다.
+      if (request.method === "POST" && path === "/__test/reset-controls") {
+        busy = false;
+        readinessOutage = undefined;
+        blockedProviders.clear();
+        holdNextRun = false;
+        const releasedRunId = releaseHeldRun();
+        const releasedRun = releasedRunId === undefined ? undefined : runs.get(releasedRunId);
+        if (releasedRun !== undefined) releasedRun.status = "completed";
+        releaseHeldSoul();
+        releaseLongActivity();
+        holdNextConfig = false;
+        heldConfigWaiter?.();
+        releaseConfig?.();
+        heldConfigReady = undefined;
+        heldConfigWaiter = undefined;
+        releaseConfig = undefined;
+        sandboxUnavailable = false;
+        droppedToolset = undefined;
+        proactiveScript = undefined;
+        openProactiveGate?.();
+        proactiveGate = undefined;
+        openProactiveGate = undefined;
+        lastSubmittedRuntime = {};
+        return send(response, 204, null);
+      }
+
       const blockMatch = TEST_BLOCK_PROVIDER_PATH.exec(path);
       if (request.method === "POST" && blockMatch) {
         blockedProviders.add(blockMatch[1]!);
