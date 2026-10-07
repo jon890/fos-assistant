@@ -1,0 +1,99 @@
+# Phase 03. 검사 하나만 쓰는 mock 과 대역을 기반으로 올리고 클래스 안 선언을 막는다
+
+**Execution profile**: deep
+
+## 목표
+
+검사 클래스 안의 `@MockitoBean`, `@MockitoSpyBean`, `@Import` 를 없애 컨텍스트를 기반 하나로 모은다.
+그 뒤로 검사 클래스가 컨텍스트를 나누는 선언을 다시 두지 못하게 구조 규칙으로 막는다. 검사가 확인하는 것은 바꾸지 않는다.
+
+**범위 외**: 측정과 보존 상한(phase 04).
+
+## 컨텍스트
+
+**근거 문서**: `docs/backend/testing.md` 「기반 주석」, `docs/adr/ADR-20261007-test-context-base.md`.
+
+경로는 `backend/src/test/java/com/bifos/assistant/` 아래다. 지금 남은 선언은 아래다. 작업 전에 `git grep -n "@MockitoBean\|@MockitoSpyBean\|^@Import" -- backend/src/test` 로 다시 확인한다.
+
+| 검사 | 선언 | 처리 |
+| --- | --- | --- |
+| `agent/AgentLifecycleFlagsTest` | `@MockitoBean AgentEndpointProbe` | 기반 spy |
+| `chat/ChatServiceTest` | `@MockitoBean SkillService`, `@Import(SkillCatalogClock)` | `SkillService` 기반 spy. 스킬 캐시 시계는 아래 항목 2 |
+| `chat/StarterSuggestionServiceTest`, `memory/MemoryProposerTest`, `usage/FailedExecutionUsageRoutesTest` | `@MockitoBean PriceCatalog` | 기반 spy |
+| `connector/ApprovalNotificationTest` | `@MockitoBean CheckNotificationPolicy`, `@Import(ConnectorPolicyTestDoubles)` | spy, 아래 항목 2 |
+| `connector/ConnectorActionServiceTest`, `ConnectorPolicyEndpointTest` | `@Import(ConnectorPolicyTestDoubles)` | 아래 항목 2 |
+| `people/PersonRegistrarTest` | `@MockitoBean HermesProfileProvisioner` | 기반 spy |
+| `proactive/ProactiveCheckTurnTest`, `CareerDailyPilotTest` | `@MockitoBean AgentConnectorBindings` | 기반 spy |
+| `proactive/AutonomyPolicyServiceTest` | `@MockitoSpyBean AutonomyDecisionRepository`, `@MockitoBean ProactiveCheckService` | 둘 다 기반 spy |
+| `task/ProactiveScheduleTransactionTest` | `@MockitoBean SkillCommandCatalog` | 기반 spy |
+| `usage/ExecutionContextSourceTest`, `ExecutionConversationTest`, `ExecutionLifecycleTest`, `FailedExecutionUsageRoutesTest`, `UsageCostRecordingTest`, `usage/application/SubagentUsageLedgerTest` | `@MockitoBean HermesRunsClient` | 기반의 `StubHermesRunsClient` 를 spy 로 두고 `doReturn` 으로 바꾸거나, 대역 API(`willReturn` 등)로 바꾼다 |
+| `attention/AttentionServiceTest`, `AttentionControlServiceTest` | `@Import(AttentionTestCandidates)` | 대역을 기반으로 옮긴다. 꺼 두면 후보를 내지 않는다 |
+| `people/PersonAccessRollbackTest` | `@Import(FailingRevoker)` | 꺼 둔 대역으로 기반에 |
+| `chat/ResultDeliveryRecordTest`, `ResultDeliveryRetryTest` | `@Import(ResultDeliveryRecordTest.TestResults)` | 빈 상태면 결과를 내지 않는 대역으로 기반에 |
+| `chat/DelegationWakeUserLimitTest`, `ResultDeliveryRetryUserLimitTest` | `@Import(CapturingSchedulerConfig, RetryThreadsConfig)` | 아래 항목 3 |
+| `chat/ModelTierFallbackIntegrationTest`, `ModelTierSeedImportIntegrationTest` | 기동 때 가져오기를 보는 `@TestPropertySource` | 아래 항목 4 |
+| `hermes/SkillViewStreamTest` | `@SpringBootTest` | 실제 스트림을 검사 안에서 직접 만든다. `@BackendIntegrationTest` 로 바꾼다 |
+
+## 의도 메모
+
+- mock 에서 spy 로 바꾸면 정하지 않은 메서드가 null 대신 실제로 돈다. 검사가 그 차이에 기대는지 하나씩 본다. 기대면 그 메서드를 `doReturn`/`doNothing` 으로 정해 지금 의미를 지킨다.
+- spy 를 정할 때는 `when(spy.x())` 대신 `doReturn(...).when(spy).x()` 를 쓴다. `when` 은 실제 메서드를 한 번 부른다.
+- 기반으로 올리는 대역은 기본이 꺼짐이고, 꺼진 상태에서 운영 동작에 아무 영향이 없어야 한다. 켜는 검사는 그 대역을 `@Autowired` 로 받아 켜고, 공통 확장이 검사 뒤에 끈다(대역마다 `reset()` 을 두고 `IntegrationTestIsolation` 이 부른다).
+- `ConnectorPolicyTestDoubles` 는 커넥터 카탈로그 캐시에 시각을 옮길 수 있는 시계를 넣는다. 운영 `ConnectorCatalogCache` 와 `SkillCommandCatalog` 의 `@Autowired` 생성자가 `Clock` 빈을 받게 하면 기반의 `TestClock` 이 들어간다(운영의 `Clock` 빈은 `Clock.systemUTC()` 라 동작이 같다). 그 뒤 검사는 `TestClock.advance` 로 시간을 옮긴다. 이 변경은 운영 코드 두 곳이다.
+
+## 작업 항목
+
+### 1. 기반 spy 를 늘린다
+
+`BackendIntegrationTest` 의 `@MockitoSpyBean(types = ...)` 에 위 표의 「기반 spy」 타입과 `StubHermesRunsClient`(필요하면)를 더한다. 각 검사의 필드를 `@Autowired` 로 바꾸고 `when` 을 `doReturn` 으로 바꾼다.
+
+### 2. 커넥터 카탈로그 캐시와 스킬 캐시의 시계
+
+`backend/src/main/java/com/bifos/assistant/connector/application/ConnectorCatalogCache.java` 와 `backend/src/main/java/com/bifos/assistant/skill/application/SkillCommandCatalog.java` 의 `@Autowired` 생성자가 `Clock` 을 받게 한다.
+`ConnectorPolicyTestDoubles` 의 캐시 대체를 지우고, `ChangeRecorder` 는 꺼 둔 대역으로 기반에 올린다. `expireCatalog()` 는 `TestClock.advance(TTL + 1초)` 로 바꾼다.
+`ChatServiceTest.SkillCatalogClock` 을 지우고 `SKILL_CLOCK.advance` 를 `TestClock.advance` 로 바꾼다. 그 검사 안에서 다른 시간 계산이 바뀌지 않는지 본다.
+`application-test.yml` 의 `catalog-ttl: 1ms` 는 남긴다(시간을 옮기지 않는 다른 검사가 앞 검사의 카탈로그를 보지 않게).
+
+### 3. 스케줄러 대역
+
+`DelegationWakeUserLimitTest.CapturingSchedulerConfig` 는 `TaskScheduler` 를 바꿔 끼운다. 기반에 「기본은 운영 스케줄러에 넘기고, 켜면 예약을 붙잡는」 스케줄러를 `@Primary` 로 둔다. `RetryThreads` 도 꺼 둔 대역으로 기반에 둔다. 두 검사가 켠다.
+
+### 4. 모델 tier 검사
+
+두 검사는 기동 때 `ModelTierSeedImporter.run` 이 한 일을 본다. `@OverrideProperties` 로 값을 바꾼 뒤 `ModelTierSeedImporter.run(...)` 을 검사 안에서 직접 부르고 같은 단언을 한다. 앞 검사가 남긴 tier 정의 줄을 검사 전에 지운다.
+
+### 5. 구조 규칙
+
+`ArchitectureRules` 에 `TESTS` 대상 규칙을 하나 더한다. `testsupport` 밖의 검사 클래스는 `@MockitoBean`, `@MockitoSpyBean` 필드와 `@Import`, `@TestPropertySource`, `@DynamicPropertySource`, `@SpringBootTest` 를 갖지 않는다. 예외는 MySQL 태그 검사(`@Tag("mysql")` 이거나 이름에 `Mysql` 이 든 클래스)다.
+`ArchitectureRulesTest` 에서 `TESTS` 로 검사하고 기준 파일은 비어 있다.
+
+### 6. 이 phase 를 검증하는 검사
+
+위 구조 규칙이 검증이다. 규칙이 실제로 잡는지 확인하려고 임시 검사 클래스에 `@MockitoBean` 을 두어 규칙이 위반을 보고하는 것을 본 뒤 지운다(커밋하지 않는다). 옮긴 검사는 기존 단언이 그대로 통과해야 한다.
+
+## 검증
+
+```bash
+# cwd: 저장소 root
+(cd backend && ./gradlew test --tests '*ArchitectureRulesTest' --tests '*Attention*' --tests '*Connector*' --tests '*ModelTier*' --tests '*SkillViewStreamTest' --tests '*ChatServiceTest' --tests '*Usage*' --tests '*Execution*')
+(cd backend && ./gradlew test)
+(cd backend && ./gradlew qualityCheck)
+scripts/quality.sh check
+git grep -ln "@MockitoBean\|@MockitoSpyBean\|^@Import\|^@SpringBootTest" -- backend/src/test
+```
+
+- 모두 종료 코드 0
+- 마지막 줄의 결과가 `testsupport/` 아래 파일과 MySQL 기준 클래스(`MysqlMigrationTest`, `RepositoryQueryMysqlTest`, `CollationMixQueryMysqlTest`)뿐이다
+
+## 변경 파일
+
+| 파일 | 변경 |
+| --- | --- |
+| `backend/src/main/java/com/bifos/assistant/connector/application/ConnectorCatalogCache.java` | 수정 |
+| `backend/src/main/java/com/bifos/assistant/skill/application/SkillCommandCatalog.java` | 수정 |
+| `backend/src/test/java/com/bifos/assistant/testsupport/*.java` | 수정 |
+| `backend/src/test/java/com/bifos/assistant/**/*.java` | 수정 |
+| `backend/src/test/java/com/bifos/assistant/architecture/ArchitectureRules.java` | 수정 |
+| `backend/src/test/resources/application-test.yml` | 수정 |
+| `backend/config/archunit/store/stored.rules` | 수정 |
+| `backend/config/archunit/store/*` | 신규 |

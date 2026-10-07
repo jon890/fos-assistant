@@ -112,6 +112,7 @@
 | [ADR-093](ADR-093-문제-찾기는-살펴보기-결과의-문제-후보로-받고-control-plane-이-근거와-중복을-결정적으로-검사한다.md) | 문제 찾기는 살펴보기 결과의 문제 후보로 받고 Control Plane 이 근거와 중복을 결정적으로 검사한다 | backend | Accepted. ADR-081 의 결과 블록을 버전 3으로 넓힌다 |
 | [ADR-20261007 / autonomy-policy](ADR-20261007-autonomy-policy.md) | 행동 수준은 Control Plane 의 결정적 규칙이 정하고 첫 자동 실행은 읽기 전용 살펴보기 한 번이다 | backend | Accepted |
 | [ADR-20261007 / background-tasks](ADR-20261007-background-tasks.md) | 운영의 백그라운드 작업은 한 빈으로 띄우고, 검사는 끝날 때 모두 join 한다 | backend | Accepted |
+| [ADR-20261007 / live-properties](ADR-20261007-live-properties.md) | 운영 코드는 실행 중에 쓰는 설정을 LiveProperties 로 읽는다 | backend | Accepted |
 | [ADR-20261007 / numbering-scheme](ADR-20261007-numbering-scheme.md) | Flyway 는 UTC 시각 버전을 쓰고 ADR 은 결정 날짜와 슬러그로 구분한다 | 공통 | Accepted |
-| [ADR-20261007 / test-context-base](ADR-20261007-test-context-base.md) | backend 통합 검사는 공통 기반 컨텍스트 하나를 함께 쓰고, 기동 설정이 다른 검사만 변형을 둔다 | backend | Accepted |
+| [ADR-20261007 / test-context-base](ADR-20261007-test-context-base.md) | backend 통합 검사는 Spring 컨텍스트 하나를 함께 쓰고, 설정과 대역은 검사마다 바꿔 끼운다 | backend | Accepted |
 | [ADR-20261007 / value-evaluation](ADR-20261007-value-evaluation.md) | 가치 판단은 축별 근거와 재평가 입력을 남기고 행동 정책과 분리한다 | backend, hermes | Accepted |

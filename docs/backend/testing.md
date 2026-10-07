@@ -27,29 +27,39 @@ class ConversationPagingTest {
 | Hermes 사건 스트림, toolset, 커넥터, 스킬, 모델, 대시보드 클라이언트의 Mockito mock | `@Autowired` 로 받아 `when(...)` 으로 정한다 | Spring 이 초기화한다 |
 | 운영 빈 몇 개의 Mockito spy | `@Autowired` 로 받아 `doReturn(...)`, `verify(...)` 를 쓴다 | Spring 이 초기화한다 |
 
-예외가 둘 있다. MySQL 태그 검사의 기준 클래스, 그리고 기반이 mock 으로 바꾼 빈의 실제 구현이 필요한 검사다. 후자의 예는 실제 HTTP 서버로 Hermes 사건 스트림을 읽는 `SkillViewStreamTest` 다. 둘은 `@SpringBootTest` 로 따로 둔다.
+MySQL 태그 검사의 기준 클래스만 `@SpringBootTest` 로 따로 둔다.
 
-**검사 안에 `@MockitoBean`, `@MockitoSpyBean`, `@Import`, `@DynamicPropertySource` 를 더하면 컨텍스트가 하나 늘어난다.**
-기반에 있는 타입은 `@Autowired` 로 받는다.
-기반에 없는 빈을 바꿔야 하면 아래 「변형」 을 먼저 본다.
+**검사 클래스 안에 `@MockitoBean`, `@MockitoSpyBean`, `@Import`, `@TestPropertySource`, `@DynamicPropertySource` 를 두지 않는다.**
+하나라도 두면 Spring 이 컨텍스트를 새로 띄운다. 구조 규칙이 막는다.
+- 기반에 있는 타입은 `@Autowired` 로 받는다.
+- 설정 값을 바꿔야 하면 아래 「설정 바꾸기」 를 쓴다.
+- mock 이 필요하던 빈은 기반의 spy 로 올리고 `doReturn(...).when(spy)` 로 바꾼다. 정하지 않은 메서드는 실제로 돈다.
+- 검사만 쓰는 대역 빈이 필요하면 꺼 두면 아무것도 하지 않는 대역으로 기반에 올리고 그 검사가 켠다. 공통 확장이 검사 뒤에 끈다.
 
-## 변형
+## 설정 바꾸기
 
-기동할 때 읽는 설정이 달라야 하는 검사만 컨텍스트를 따로 둔다.
-값 묶음이 같은 검사끼리는 컨텍스트를 함께 쓰므로, 여럿이 쓰는 묶음은 이름 있는 주석으로 둔다.
+운영 코드는 실행 중에 쓰는 설정을 `LiveProperties<T>` 에서 읽는다([ADR-20261007 / live-properties](../adr/ADR-20261007-live-properties.md)).
+검사는 `@OverrideProperties` 로 그 값을 바꾼다. 값의 모양은 `application.yml` 의 키와 같다.
 
-| 주석 | 바꾸는 설정 | 쓰는 검사 |
-| --- | --- | --- |
-| `@DelegationWakeEnabled` | 위임 결과로 다음 turn 을 여는 깨우기를 켠다 | 깨우기와 결과 전달 |
-| `@SmallExecutionLimit` | 사용자 동시 실행 한도를 2 로 둔다 | 한도에 닿는 경로 |
-| `@MemoryEncryptionDisabled` | 민감 memory 암호화 key 를 비운다 | 암호화가 꺼진 동작 |
-| `@SamplePriceCatalog` | 가격표를 `pricing/models-dev-sample.json` 으로 둔다 | 금액이 적히는 경로 |
-| `@LongProactiveCheckTimeouts` | Hermes 실행 상한을 30초, 살펴보기 시간 상한을 20초로 늘린다 | 살펴보기와 예약 실행이 끝까지 도는 경로 |
-| `@MemoryProposeEnabled` | 대화 뒤 Memory 제안을 켠다 | 제안이 만들어지는 경로 |
+```java
+@BackendIntegrationTest
+@OverrideProperties({"assistant.user-execution.max-running=2", "assistant.user-execution.background-reserve=1"})
+class UserExecutionLimitBackgroundTest { ... }
+```
 
-변형 주석은 `@BackendIntegrationTest` 와 함께 단다.
-여러 변형을 함께 달 때는 위 표의 순서대로 달고, 남는 값은 그 뒤 하나의 `@TestPropertySource` 에 둔다.
-한 검사만 쓰는 값은 `@TestPropertySource(properties = ...)` 로 둔다.
+- 공통 확장이 검사마다 시작 전에 적용하고, 끝난 뒤 기동 값으로 되돌린다. 컨텍스트는 새로 뜨지 않는다.
+- 바꾼 값도 운영 record 의 생성자를 거쳐 같은 검증을 받는다.
+- `LiveProperties` 로 읽지 않는 설정을 적으면 검사가 실패한다. 그 값을 바꾸려면 먼저 운영 사용처를 `LiveProperties` 로 옮긴다.
+- 여럿이 쓰는 묶음은 이름 있는 주석으로 둔다. `@OverrideProperties` 를 메타 주석으로 갖는다.
+
+| 주석 | 바꾸는 설정 |
+| --- | --- |
+| `@DelegationWakeEnabled` | 위임 결과로 다음 turn 을 여는 깨우기를 켠다 |
+| `@SmallExecutionLimit` | 사용자 동시 실행 한도를 2 로 둔다 |
+| `@MemoryEncryptionDisabled` | 민감 memory 암호화 key 를 비운다 |
+| `@SamplePriceCatalog` | 가격표를 `pricing/models-dev-sample.json` 으로 둔다 |
+| `@LongProactiveCheckTimeouts` | Hermes 실행 상한을 30초, 살펴보기 시간 상한을 20초로 늘린다 |
+| `@MemoryProposeEnabled` | 대화 뒤 Memory 제안을 켠다 |
 
 ## 검사 사이에 남기지 않는 것
 
@@ -65,14 +75,10 @@ class ConversationPagingTest {
   고정 code 를 쓰는 검사가 검사 트랜잭션 안에서 지우고 다시 넣으면, Hibernate 가 넣기를 먼저 내보내 유일 제약에 걸린다. 지운 뒤 `flush()` 한다.
 - **기반의 spy 는 `verify(...)` 의 matcher 사이에서 부르지 않는다.** Mockito 가 그 호출을 matcher 를 쓰는 호출로 읽는다. 값을 먼저 지역 변수로 받는다.
 - **검사가 바꾼 static 상태는 `@BeforeEach` 에서 되돌린다.**
-- **운영 빈이 JVM 메모리에 두는 캐시는 test profile 에서 보관 시간을 짧게 둔다.** 예: 커넥터 카탈로그 캐시. 검사가 private 필드를 바꿔 비우지 않는다.
+- **운영 빈이 JVM 메모리에 두는 캐시는 다음 검사에 남는다.** 보관 시간을 test profile 에서 짧게 두거나, 그 캐시가 시험 시계를 쓰게 해 검사가 시간을 옮긴다. 검사가 private 필드를 바꿔 비우지 않는다.
 
-## 보존 상한과 측정
+## 컨텍스트 수 확인
 
-Spring 은 띄운 컨텍스트를 상한까지 보존하고, 넘으면 가장 오래 쓰지 않은 것을 닫는다.
-상한은 `backend/build.gradle.kts` 의 `spring.test.context.cache.maxSize` 이고, 그 값의 근거는 그 주석이 갖는다.
-
-변형을 더하거나 기반을 바꾼 뒤에는 컨텍스트 수를 다시 본다.
+`./gradlew test` 가 띄우는 컨텍스트는 3개 이하다.
 전체 검사 뒤 `backend/build/test-results/test/*.xml` 에서 `HikariPool-N` 의 가장 큰 N 이 띄운 컨텍스트 수다.
-서로 다른 컨텍스트 키 수는 상한을 넉넉히(예: 64) 둔 실행에서 Spring 캐시 통계 줄(`logging.level.org.springframework.test.context.cache=DEBUG`)의 `missCount` 최댓값으로 구한다.
-띄운 수가 키 수보다 크면 밀려난 컨텍스트를 다시 띄우고 있다. 상한이 키 수보다 작아도 다시 뜨는 것이 없을 수 있다. 검사 순서상 같은 키가 다시 쓰이기 전에 밀려나지 않기 때문이다.
+보존 상한 `spring.test.context.cache.maxSize`(`backend/build.gradle.kts`)는 그 수보다 크게 두어 닫히는 컨텍스트가 없게 한다.

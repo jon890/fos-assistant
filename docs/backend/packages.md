@@ -14,7 +14,7 @@ Control Plane 의 패키지마다 맡는 책임과 패키지 사이의 방향 �
 | --- | --- |
 | `shared/auth` | 토큰 검사와 현재 사용자, profile 토큰 필터의 타입, 토큰의 주소를 현재 사용자로 바꾸는 port |
 | `shared/error` | 오류 코드와 응답 형태 |
-| `shared/config` | 시계, 스케줄링, 보안 필터 설정 |
+| `shared/config` | 시계, 스케줄링, 보안 필터 설정, 실행 중에 쓰는 설정을 읽는 `LiveProperties`([ADR-20261007 / live-properties](../adr/ADR-20261007-live-properties.md)) |
 | `shared/util` | 외부 서비스의 글을 감싸는 함수와 문자열 지문 |
 | `shared/concurrent` | 요청 밖 작업을 띄우는 `BackgroundTasks`. 직접 가상 스레드를 띄우지 않는 까닭은 [ADR-20261007 / background-tasks](../adr/ADR-20261007-background-tasks.md) |
 | `shared/domain/type` | 모든 패키지가 권한 판정에 읽는 역할 값 |
