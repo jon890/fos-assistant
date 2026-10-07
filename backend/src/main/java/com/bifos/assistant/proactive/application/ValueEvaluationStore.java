@@ -10,8 +10,8 @@ import com.bifos.assistant.proactive.domain.DecisionState;
 import com.bifos.assistant.proactive.domain.ProactiveCheck;
 import com.bifos.assistant.proactive.domain.ValueEvaluation;
 import com.bifos.assistant.proactive.domain.type.CheckStatus;
-import com.bifos.assistant.proactive.domain.type.DecisionOutcome;
 import com.bifos.assistant.proactive.domain.type.DecisionFailure;
+import com.bifos.assistant.proactive.domain.type.DecisionOutcome;
 import com.bifos.assistant.proactive.domain.type.ProblemStatus;
 import com.bifos.assistant.proactive.infra.ProactiveCheckProblemRepository;
 import com.bifos.assistant.proactive.infra.ProactiveCheckRepository;
@@ -38,8 +38,10 @@ public class ValueEvaluationStore {
     @Transactional
     public ValueEvaluation begin(Long userId, Long checkId, String provider) {
         requireCheck(userId, checkId);
-        List<DecisionCandidate> candidates = problems.findByCheckIdAndStatusOrderByIdAsc(checkId, ProblemStatus.ACCEPTED)
-                .stream().map(DecisionCandidate::from).toList();
+        List<DecisionCandidate> candidates =
+                problems.findByCheckIdAndStatusOrderByIdAsc(checkId, ProblemStatus.ACCEPTED).stream()
+                        .map(DecisionCandidate::from)
+                        .toList();
         if (candidates.size() > 3) {
             throw conflict();
         }
@@ -53,7 +55,13 @@ public class ValueEvaluationStore {
         if (source.outcome() == DecisionOutcome.RUNNING) {
             throw conflict();
         }
-        return insert(userId, source.checkId(), source.id(), source.evidence().state(), source.evidence().questions(), provider);
+        return insert(
+                userId,
+                source.checkId(),
+                source.id(),
+                source.evidence().state(),
+                source.evidence().questions(),
+                provider);
     }
 
     @Transactional(readOnly = true)
@@ -75,22 +83,35 @@ public class ValueEvaluationStore {
     public void recover() {
         for (ValueEvaluation row : evaluations.findByOutcome(DecisionOutcome.RUNNING)) {
             DecisionEvidence input = row.evidence();
-            row.finish(new DecisionEvidence(input.state(), input.questions(), input.provider(),
+            row.finish(new DecisionEvidence(
+                    input.state(),
+                    input.questions(),
+                    input.provider(),
                     DecisionResult.fallback(DecisionFailure.INTERRUPTED)));
             evaluations.save(row);
         }
     }
 
-    private ValueEvaluation insert(Long userId, Long checkId, Long replayOfId, DecisionState state,
-            List<DecisionQuestion> questions, String provider) {
-        DecisionEvidence evidence = new DecisionEvidence(state, questions,
-                new DecisionProviderInfo(provider, "unknown", null, null, null, null, null), DecisionResult.running());
+    private ValueEvaluation insert(
+            Long userId,
+            Long checkId,
+            Long replayOfId,
+            DecisionState state,
+            List<DecisionQuestion> questions,
+            String provider) {
+        DecisionEvidence evidence = new DecisionEvidence(
+                state,
+                questions,
+                new DecisionProviderInfo(provider, "unknown", null, null, null, null, null),
+                DecisionResult.running());
         return evaluations.save(ValueEvaluation.of(checkId, userId, replayOfId, evidence, clock.instant()));
     }
 
     private void requireCheck(Long userId, Long checkId) {
         ProactiveCheck check = checks.findByIdAndUserId(checkId, userId).orElseThrow(ValueEvaluationStore::notFound);
-        if (conversations.findByIdAndUserIdAndDeletedAtIsNull(check.conversationId(), userId).isEmpty()) {
+        if (conversations
+                .findByIdAndUserIdAndDeletedAtIsNull(check.conversationId(), userId)
+                .isEmpty()) {
             throw notFound();
         }
         if (check.status() != CheckStatus.SUCCEEDED) {

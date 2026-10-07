@@ -95,7 +95,8 @@ class HermesDecisionProviderTest {
         DecisionResponse response = evaluate(Duration.ofMillis(10));
         assertThat(response.result().failure()).isEqualTo(DecisionFailure.TIMEOUT);
         assertThat(response.result().orderedCandidateIds()).isEmpty();
-        verify(limiter).holdUntilRemoteEnds(user.id(), execution.id(), BASE + "/p/" + PROFILE, PROFILE, "decision-run", false);
+        verify(limiter)
+                .holdUntilRemoteEnds(user.id(), execution.id(), BASE + "/p/" + PROFILE, PROFILE, "decision-run", false);
         verify(executions).fail(execution, "DECISION_TIMEOUT");
     }
 
@@ -112,8 +113,9 @@ class HermesDecisionProviderTest {
     @Test
     @DisplayName("provider 오류 본문은 평가 기록으로 복제하지 않는다")
     void storesOnlyFailureCode() {
-        when(hermes.awaitCompletion(any(), anyString())).thenReturn(
-                new HermesRunResult("decision-run", "session", "failed", null, null, null, "private error", null));
+        when(hermes.awaitCompletion(any(), anyString()))
+                .thenReturn(new HermesRunResult(
+                        "decision-run", "session", "failed", null, null, null, "private error", null));
         DecisionResponse response = evaluate(Duration.ofSeconds(1));
         assertThat(response.result().failure()).isEqualTo(DecisionFailure.PROVIDER_FAILED);
         assertThat(json.writeValueAsString(response)).doesNotContain("private error");
@@ -121,16 +123,17 @@ class HermesDecisionProviderTest {
     }
 
     private void complete(String output) {
-        when(hermes.awaitCompletion(any(), anyString())).thenReturn(
-                HermesRunResult.of("decision-run", "fresh-session", "completed", output, null, null, null));
+        when(hermes.awaitCompletion(any(), anyString()))
+                .thenReturn(HermesRunResult.of("decision-run", "fresh-session", "completed", output, null, null, null));
     }
 
     private DecisionResponse evaluate(Duration timeout) {
-        ValueEvaluationProperties properties = new ValueEvaluationProperties(true, PROFILE, "requested-provider",
-                "requested-model", "high", timeout, CostMode.SUBSCRIPTION);
+        ValueEvaluationProperties properties = new ValueEvaluationProperties(
+                true, PROFILE, "requested-provider", "requested-model", "high", timeout, CostMode.SUBSCRIPTION);
         HermesProperties runtime = new HermesProperties(null, BASE, "synthetic", BASE, null, null, null, null);
-        HermesDecisionProvider provider = new HermesDecisionProvider(properties, runtime, hermes, readiness, defaults,
-                visibility, executions, limiter, json);
-        return new ValueEvaluator().evaluate(DecisionFixtures.state(), ValueEvaluator.QUESTIONS, provider, new DecisionRequest(user));
+        HermesDecisionProvider provider = new HermesDecisionProvider(
+                properties, runtime, hermes, readiness, defaults, visibility, executions, limiter, json);
+        return new ValueEvaluator()
+                .evaluate(DecisionFixtures.state(), ValueEvaluator.QUESTIONS, provider, new DecisionRequest(user));
     }
 }

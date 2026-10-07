@@ -12,8 +12,8 @@ import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.usage.application.ExecutionRecorder;
 import com.bifos.assistant.usage.application.UsageSummaryService;
 import com.bifos.assistant.usage.domain.AgentExecution;
-import com.bifos.assistant.usage.infra.AgentExecutionRepository;
 import com.bifos.assistant.usage.domain.type.ExecutionStatus;
+import com.bifos.assistant.usage.infra.AgentExecutionRepository;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -30,10 +30,19 @@ import org.springframework.test.context.ActiveProfiles;
 class SystemDecisionExecutionTest {
 
     private static final CurrentUser USER = new CurrentUser(960_001L, "user@example.com", "사용자A", 1L, UserRole.MEMBER);
-    @Autowired ExecutionRecorder recorder;
-    @Autowired AgentExecutionRepository executions;
-    @Autowired UsageSummaryService usage;
-    @Autowired Clock clock;
+
+    @Autowired
+    ExecutionRecorder recorder;
+
+    @Autowired
+    AgentExecutionRepository executions;
+
+    @Autowired
+    UsageSummaryService usage;
+
+    @Autowired
+    Clock clock;
+
     private final List<Long> created = new ArrayList<>();
 
     @AfterEach
@@ -45,11 +54,21 @@ class SystemDecisionExecutionTest {
     @DisplayName("시스템 판단도 요청자의 실행 기록과 합계에 남고 에이전트 없는 줄을 정렬할 수 있다")
     void recordsSystemExecutionWithoutCreatingAnAgent() {
         Instant now = clock.instant();
-        AgentExecution system = recorder.startSystem(USER, "decision-test", CostMode.SUBSCRIPTION,
+        AgentExecution system = recorder.startSystem(
+                USER,
+                "decision-test",
+                CostMode.SUBSCRIPTION,
                 ModelChoice.of("requested-provider", "requested-model", "high"));
         created.add(system.id());
-        HermesRunResult result = new HermesRunResult("system-run", "session-new", "completed", "not-stored",
-                "requested-model", "requested-provider", null, TokenUsage.empty(),
+        HermesRunResult result = new HermesRunResult(
+                "system-run",
+                "session-new",
+                "completed",
+                "not-stored",
+                "requested-model",
+                "requested-provider",
+                null,
+                TokenUsage.empty(),
                 new SessionRuntime("actual-model", "actual-provider"));
         recorder.completeSystem(system, result, "http://hermes.example.com");
         assertThat(executions.findById(system.id()).orElseThrow()).satisfies(row -> {
@@ -60,10 +79,17 @@ class SystemDecisionExecutionTest {
             assertThat(row.model()).isEqualTo("actual-model");
             assertThat(row.outputText()).isNull();
         });
-        AgentExecution other = executions.save(AgentExecution.builder().userId(USER.id()).agentId(960_101L)
-                .profileName("source-test").costMode(CostMode.SUBSCRIPTION).status(ExecutionStatus.SUCCEEDED).startedAt(now).build());
+        AgentExecution other = executions.save(AgentExecution.builder()
+                .userId(USER.id())
+                .agentId(960_101L)
+                .profileName("source-test")
+                .costMode(CostMode.SUBSCRIPTION)
+                .status(ExecutionStatus.SUCCEEDED)
+                .startedAt(now)
+                .build());
         created.add(other.id());
-        var lines = usage.byAgent(USER.id(), now.minusSeconds(1), clock.instant().plusSeconds(1));
+        var lines =
+                usage.byAgent(USER.id(), now.minusSeconds(1), clock.instant().plusSeconds(1));
         assertThat(lines).hasSize(2);
         assertThat(lines.getLast().cost().agentId()).isNull();
     }

@@ -36,13 +36,18 @@ public class ValueEvaluationService {
 
     private ValueEvaluation run(CurrentUser user, ValueEvaluation row, DecisionProvider provider) {
         DecisionEvidence input = row.evidence();
-        DecisionResponse response = evaluator.evaluate(input.state(), input.questions(), provider, new DecisionRequest(user));
-        return store.finish(user.id(), row.id(), new DecisionEvidence(input.state(), input.questions(),
-                response.provider(), response.result()));
+        DecisionResponse response =
+                evaluator.evaluate(input.state(), input.questions(), provider, new DecisionRequest(user));
+        return store.finish(
+                user.id(),
+                row.id(),
+                new DecisionEvidence(input.state(), input.questions(), response.provider(), response.result()));
     }
 
     private DecisionProvider provider(String id) {
-        return providers.stream().filter(each -> each.id().equals(id)).findFirst()
+        return providers.stream()
+                .filter(each -> each.id().equals(id))
+                .findFirst()
                 .orElseThrow(() -> new ApiException(ErrorCode.VALIDATION_FAILED, "unknown decision provider"));
     }
 }

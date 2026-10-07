@@ -28,8 +28,8 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
-import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.DeserializationFeature;
+import tools.jackson.databind.ObjectMapper;
 
 /** 도구가 없는 시스템 profile 로 기존 reasoning 모델에 한 번 묻는다. 새 session 으로 보내 사용자 간 이력을 잇지 않는다. */
 @Component
@@ -85,8 +85,15 @@ public class HermesDecisionProvider implements DecisionProvider {
             visibility.requireVisible(request.user().groupId(), choice);
             baseUrl = hermesProperties.profileBaseUrl(properties.profile());
             execution = executions.startSystem(request.user(), properties.profile(), properties.costMode(), choice);
-            HermesRunCommand command = new HermesRunCommand(properties.profile(), baseUrl,
-                    prompt(state, questions), INSTRUCTIONS, null, choice.provider(), choice.model(), choice.reasoningEffort());
+            HermesRunCommand command = new HermesRunCommand(
+                    properties.profile(),
+                    baseUrl,
+                    prompt(state, questions),
+                    INSTRUCTIONS,
+                    null,
+                    choice.provider(),
+                    choice.model(),
+                    choice.reasoningEffort());
             executions.markSubmitted(execution);
             runId = hermes.submit(command);
             executions.attachRunId(execution, runId);
@@ -101,7 +108,8 @@ public class HermesDecisionProvider implements DecisionProvider {
         } catch (Exception ex) {
             if (execution != null) {
                 if (runId != null && result == null) {
-                    limiter.holdUntilRemoteEnds(request.user().id(), execution.id(), baseUrl, properties.profile(), runId, false);
+                    limiter.holdUntilRemoteEnds(
+                            request.user().id(), execution.id(), baseUrl, properties.profile(), runId, false);
                 }
                 executions.fail(execution, "DECISION_" + failure(ex).name());
             }
@@ -117,7 +125,9 @@ public class HermesDecisionProvider implements DecisionProvider {
         if (profile == null || profile.provider() == null || profile.model() == null) {
             throw new IllegalStateException("system decision model is unknown");
         }
-        return ModelChoice.of(profile.provider(), profile.model(),
+        return ModelChoice.of(
+                profile.provider(),
+                profile.model(),
                 requested.reasoningEffort() == null ? profile.reasoningEffort() : requested.reasoningEffort());
     }
 
@@ -132,8 +142,8 @@ public class HermesDecisionProvider implements DecisionProvider {
     }
 
     private String prompt(DecisionState state, List<DecisionQuestion> questions) {
-        return PROMPT_MARK + "\n" + ExternalData.wrap(json.writeValueAsString(
-                Map.of("state", state, "questions", questions)));
+        return PROMPT_MARK + "\n"
+                + ExternalData.wrap(json.writeValueAsString(Map.of("state", state, "questions", questions)));
     }
 
     private DecisionResult parse(String output) {
@@ -141,7 +151,9 @@ public class HermesDecisionProvider implements DecisionProvider {
             return DecisionResult.fallback(DecisionFailure.INVALID_RESULT);
         }
         try {
-            return json.readerFor(DecisionResult.class).with(DeserializationFeature.FAIL_ON_TRAILING_TOKENS).readValue(output);
+            return json.readerFor(DecisionResult.class)
+                    .with(DeserializationFeature.FAIL_ON_TRAILING_TOKENS)
+                    .readValue(output);
         } catch (RuntimeException ex) {
             return DecisionResult.fallback(DecisionFailure.INVALID_RESULT);
         }
@@ -152,10 +164,14 @@ public class HermesDecisionProvider implements DecisionProvider {
     }
 
     private DecisionProviderInfo info(ModelChoice choice, AgentExecution execution) {
-        boolean succeeded = execution != null
-                && execution.status() == ExecutionStatus.SUCCEEDED;
-        return new DecisionProviderInfo(id(), VERSION, choice.provider(), choice.model(),
-                succeeded ? execution.provider() : null, succeeded ? execution.model() : null,
+        boolean succeeded = execution != null && execution.status() == ExecutionStatus.SUCCEEDED;
+        return new DecisionProviderInfo(
+                id(),
+                VERSION,
+                choice.provider(),
+                choice.model(),
+                succeeded ? execution.provider() : null,
+                succeeded ? execution.model() : null,
                 execution == null ? null : execution.id());
     }
 

@@ -24,10 +24,16 @@ public class ValueEvaluationRecovery implements SmartLifecycle {
 
     public void recover() {
         store.recover();
-        for (AgentExecution execution : executions.findByAgentIdIsNullAndConversationIdIsNullAndStatus(ExecutionStatus.RUNNING)) {
+        for (AgentExecution execution :
+                executions.findByAgentIdIsNullAndConversationIdIsNullAndStatus(ExecutionStatus.RUNNING)) {
             if (execution.hermesRunId() != null) {
-                limiter.holdUntilRemoteEnds(execution.userId(), execution.id(), hermes.profileBaseUrl(execution.profileName()),
-                        execution.profileName(), execution.hermesRunId(), false);
+                limiter.holdUntilRemoteEnds(
+                        execution.userId(),
+                        execution.id(),
+                        hermes.profileBaseUrl(execution.profileName()),
+                        execution.profileName(),
+                        execution.hermesRunId(),
+                        false);
             }
             recorder.fail(execution, "DECISION_INTERRUPTED");
         }

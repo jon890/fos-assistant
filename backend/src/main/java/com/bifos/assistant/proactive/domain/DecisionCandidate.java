@@ -23,8 +23,18 @@ public record DecisionCandidate(
     }
 
     public static DecisionCandidate from(ProactiveCheckProblem problem) {
-        return new DecisionCandidate(problem.id(), problem.problemKey(), problem.problem(), problem.relatedGoal(),
-                problem.actionType(), problem.actionText(), problem.confidence(), problem.expectedBenefit(),
-                problem.sideEffect(), problem.risk(), problem.evidence(), problem.evidenceCheckedAt());
+        return new DecisionCandidate(
+                problem.id(),
+                problem.problemKey(),
+                problem.problem(),
+                problem.relatedGoal(),
+                problem.actionType(),
+                problem.actionText(),
+                problem.confidence(),
+                problem.expectedBenefit(),
+                problem.sideEffect(),
+                problem.risk(),
+                problem.evidence(),
+                problem.evidenceCheckedAt());
     }
 }

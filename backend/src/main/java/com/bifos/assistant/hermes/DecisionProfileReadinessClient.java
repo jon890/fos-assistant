@@ -1,7 +1,7 @@
 package com.bifos.assistant.hermes;
 
-import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 import tools.jackson.databind.JsonNode;
@@ -23,10 +23,16 @@ public class DecisionProfileReadinessClient {
             factory.setReadTimeout(properties.readTimeout());
             RestClient client = RestClient.builder().requestFactory(factory).build();
             String baseUrl = properties.dashboardBaseUrl().replaceAll("/+$", "");
-            JsonNode result = client.get().uri(baseUrl + "/api/profiles/{profile}/decision-readiness", profile)
-                    .header("Authorization", "Bearer " + properties.dashboardToken()).retrieve().body(JsonNode.class);
-            return result != null && result.path("version").isInt() && result.path("version").asInt() == 1
-                    && result.path("ready").isBoolean() && result.path("ready").asBoolean();
+            JsonNode result = client.get()
+                    .uri(baseUrl + "/api/profiles/{profile}/decision-readiness", profile)
+                    .header("Authorization", "Bearer " + properties.dashboardToken())
+                    .retrieve()
+                    .body(JsonNode.class);
+            return result != null
+                    && result.path("version").isInt()
+                    && result.path("version").asInt() == 1
+                    && result.path("ready").isBoolean()
+                    && result.path("ready").asBoolean();
         } catch (RuntimeException ex) {
             return false;
         }

@@ -30,15 +30,18 @@ class ValueEvaluationRecoveryTest {
         when(running.userId()).thenReturn(72L);
         when(running.profileName()).thenReturn("decision-test");
         when(running.hermesRunId()).thenReturn("run-system");
-        when(executions.findByAgentIdIsNullAndConversationIdIsNullAndStatus(any())).thenReturn(List.of(running));
-        HermesProperties properties = new HermesProperties(null, "http://hermes.example.com", "synthetic",
-                "http://hermes.example.com", null, null, null, null);
+        when(executions.findByAgentIdIsNullAndConversationIdIsNullAndStatus(any()))
+                .thenReturn(List.of(running));
+        HermesProperties properties = new HermesProperties(
+                null, "http://hermes.example.com", "synthetic", "http://hermes.example.com", null, null, null, null);
 
         new ValueEvaluationRecovery(store, executions, recorder, limiter, properties).recover();
 
         var order = inOrder(store, limiter, recorder);
         order.verify(store).recover();
-        order.verify(limiter).holdUntilRemoteEnds(72L, 71L, "http://hermes.example.com/p/decision-test", "decision-test", "run-system", false);
+        order.verify(limiter)
+                .holdUntilRemoteEnds(
+                        72L, 71L, "http://hermes.example.com/p/decision-test", "decision-test", "run-system", false);
         order.verify(recorder).fail(running, "DECISION_INTERRUPTED");
     }
 }

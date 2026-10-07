@@ -51,8 +51,8 @@ public class ValueEvaluation {
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
-    public static ValueEvaluation of(Long checkId, Long userId, Long replayOfId,
-            DecisionEvidence evidence, Instant now) {
+    public static ValueEvaluation of(
+            Long checkId, Long userId, Long replayOfId, DecisionEvidence evidence, Instant now) {
         ValueEvaluation row = new ValueEvaluation();
         row.checkId = checkId;
         row.userId = userId;

@@ -34,7 +34,8 @@ class ValueEvaluatorTest {
         assertThat(result.explanation()).contains("마감 이틀", "실행 부담");
         assertThat(result.judgements()).allSatisfy(each -> {
             assertThat(each.axes()).hasSize(6);
-            assertThat(each.axes()).allSatisfy(axis -> assertThat(axis.evidenceKeys()).isNotEmpty());
+            assertThat(each.axes())
+                    .allSatisfy(axis -> assertThat(axis.evidenceKeys()).isNotEmpty());
         });
     }
 
@@ -43,10 +44,11 @@ class ValueEvaluatorTest {
     void removesOrderingWhenConfidenceIsLow() {
         DecisionResult original = DecisionFixtures.ordered(state);
         CandidateJudgement first = original.judgements().getFirst();
-        List<CandidateJudgement> judgements = List.of(new CandidateJudgement(first.candidateId(), first.axes(),
-                DecisionConfidence.LOW, first.explanation()), original.judgements().getLast());
-        DecisionResult result = validate(new DecisionResult(original.outcome(), judgements, original.orderedCandidateIds(),
-                original.explanation(), null));
+        List<CandidateJudgement> judgements = List.of(
+                new CandidateJudgement(first.candidateId(), first.axes(), DecisionConfidence.LOW, first.explanation()),
+                original.judgements().getLast());
+        DecisionResult result = validate(new DecisionResult(
+                original.outcome(), judgements, original.orderedCandidateIds(), original.explanation(), null));
         assertThat(result.outcome()).isEqualTo(DecisionOutcome.INSUFFICIENT_EVIDENCE);
         assertThat(result.orderedCandidateIds()).isEmpty();
         assertThat(result.judgements()).hasSize(2);
@@ -59,13 +61,28 @@ class ValueEvaluatorTest {
         CandidateJudgement first = original.judgements().getFirst();
         List<AxisJudgement> forged = new ArrayList<>(first.axes());
         AxisJudgement axis = forged.getFirst();
-        forged.set(0, new AxisJudgement(axis.axis(), axis.choice(), axis.confidence(), axis.explanation(), List.of("other-user")));
-        assertInvalid(new DecisionResult(original.outcome(), List.of(new CandidateJudgement(11L, forged,
-                first.confidence(), first.explanation()), original.judgements().getLast()), original.orderedCandidateIds(), "근거", null));
+        forged.set(
+                0,
+                new AxisJudgement(
+                        axis.axis(), axis.choice(), axis.confidence(), axis.explanation(), List.of("other-user")));
+        assertInvalid(new DecisionResult(
+                original.outcome(),
+                List.of(
+                        new CandidateJudgement(11L, forged, first.confidence(), first.explanation()),
+                        original.judgements().getLast()),
+                original.orderedCandidateIds(),
+                "근거",
+                null));
         forged = new ArrayList<>(first.axes());
         forged.set(0, forged.getLast());
-        assertInvalid(new DecisionResult(original.outcome(), List.of(new CandidateJudgement(11L, forged,
-                first.confidence(), first.explanation()), original.judgements().getLast()), original.orderedCandidateIds(), "중복", null));
+        assertInvalid(new DecisionResult(
+                original.outcome(),
+                List.of(
+                        new CandidateJudgement(11L, forged, first.confidence(), first.explanation()),
+                        original.judgements().getLast()),
+                original.orderedCandidateIds(),
+                "중복",
+                null));
         assertInvalid(new DecisionResult(original.outcome(), List.of(first), List.of(11L, 12L), "누락", null));
         assertInvalid(new DecisionResult(original.outcome(), original.judgements(), List.of(11L, 11L), "중복 순서", null));
         assertInvalid(new DecisionResult(original.outcome(), original.judgements(), List.of(11L, 999L), "없는 후보", null));
@@ -77,7 +94,8 @@ class ValueEvaluatorTest {
         DecisionProvider provider = mock(DecisionProvider.class);
         when(provider.id()).thenReturn("fixture");
         DecisionRequest request = new DecisionRequest(null);
-        when(provider.evaluate(state, ValueEvaluator.QUESTIONS, request)).thenThrow(new IllegalStateException("private failure"));
+        when(provider.evaluate(state, ValueEvaluator.QUESTIONS, request))
+                .thenThrow(new IllegalStateException("private failure"));
         DecisionResponse response = evaluator.evaluate(state, ValueEvaluator.QUESTIONS, provider, request);
         assertThat(response.result().failure()).isEqualTo(DecisionFailure.PROVIDER_FAILED);
         assertThat(response.result().orderedCandidateIds()).isEmpty();
@@ -89,8 +107,11 @@ class ValueEvaluatorTest {
     void skipsProviderWhenCandidatesAreEmpty() {
         DecisionProvider provider = mock(DecisionProvider.class);
         when(provider.id()).thenReturn("fixture");
-        DecisionResponse result = evaluator.evaluate(new DecisionState(1, DecisionFixtures.NOW, List.of()),
-                ValueEvaluator.QUESTIONS, provider, new DecisionRequest(null));
+        DecisionResponse result = evaluator.evaluate(
+                new DecisionState(1, DecisionFixtures.NOW, List.of()),
+                ValueEvaluator.QUESTIONS,
+                provider,
+                new DecisionRequest(null));
         assertThat(result.result().outcome()).isEqualTo(DecisionOutcome.EMPTY);
         assertThat(result.result().orderedCandidateIds()).isEmpty();
     }

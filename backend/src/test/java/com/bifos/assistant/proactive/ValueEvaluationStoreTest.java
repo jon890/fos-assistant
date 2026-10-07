@@ -44,16 +44,30 @@ import org.springframework.transaction.support.TransactionTemplate;
 @ActiveProfiles("test")
 class ValueEvaluationStoreTest {
 
-    private static final CurrentUser OWNER = new CurrentUser(950_001L, "owner@example.com", "사용자A", 1L, UserRole.MEMBER);
+    private static final CurrentUser OWNER =
+            new CurrentUser(950_001L, "owner@example.com", "사용자A", 1L, UserRole.MEMBER);
     private static final CurrentUser OTHER = new CurrentUser(950_002L, "other@example.com", "사용자B", 1L, UserRole.ADMIN);
 
-    @Autowired ValueEvaluationStore store;
-    @Autowired ValueEvaluationRepository evaluations;
-    @Autowired ProactiveCheckProblemRepository problems;
-    @Autowired ProactiveCheckRepository checks;
-    @Autowired ConversationRepository conversations;
-    @Autowired TransactionTemplate transactions;
-    @Autowired ValueEvaluationRecovery recovery;
+    @Autowired
+    ValueEvaluationStore store;
+
+    @Autowired
+    ValueEvaluationRepository evaluations;
+
+    @Autowired
+    ProactiveCheckProblemRepository problems;
+
+    @Autowired
+    ProactiveCheckRepository checks;
+
+    @Autowired
+    ConversationRepository conversations;
+
+    @Autowired
+    TransactionTemplate transactions;
+
+    @Autowired
+    ValueEvaluationRecovery recovery;
 
     private Conversation conversation;
     private ProactiveCheck check;
@@ -62,20 +76,53 @@ class ValueEvaluationStoreTest {
     @BeforeEach
     void setUp() {
         transactions.executeWithoutResult(status -> {
-            conversation = conversations.save(Conversation.startedForCheck(OWNER.id(), "가치 평가", 950_101L, DecisionFixtures.NOW));
-            check = ProactiveCheck.started(OWNER.id(), 950_101L, conversation.id(), CheckTrigger.MANUAL, false, DecisionFixtures.NOW);
+            conversation = conversations.save(
+                    Conversation.startedForCheck(OWNER.id(), "가치 평가", 950_101L, DecisionFixtures.NOW));
+            check = ProactiveCheck.started(
+                    OWNER.id(), 950_101L, conversation.id(), CheckTrigger.MANUAL, false, DecisionFixtures.NOW);
             check.succeed(CheckOutcome.FINDINGS, 2, 0, null, 0, 0, 0, 0, 0, DecisionFixtures.NOW);
             check = checks.save(check);
             for (var candidate : DecisionFixtures.state().candidates()) {
-                problems.save(ProactiveCheckProblem.of(check.id(), conversation.id(), ProblemStatus.ACCEPTED, null,
-                        candidate.problemKey(), candidate.problem(), candidate.relatedGoal(), candidate.actionType(),
-                        candidate.actionText(), candidate.confidence(), candidate.expectedBenefit(), candidate.sideEffect(),
-                        candidate.risk(), null, candidate.evidence(), candidate.evidenceCheckedAt(), DecisionFixtures.NOW));
+                problems.save(ProactiveCheckProblem.of(
+                        check.id(),
+                        conversation.id(),
+                        ProblemStatus.ACCEPTED,
+                        null,
+                        candidate.problemKey(),
+                        candidate.problem(),
+                        candidate.relatedGoal(),
+                        candidate.actionType(),
+                        candidate.actionText(),
+                        candidate.confidence(),
+                        candidate.expectedBenefit(),
+                        candidate.sideEffect(),
+                        candidate.risk(),
+                        null,
+                        candidate.evidence(),
+                        candidate.evidenceCheckedAt(),
+                        DecisionFixtures.NOW));
             }
-            problems.save(ProactiveCheckProblem.of(check.id(), conversation.id(), ProblemStatus.DROPPED, null,
-                    "dropped", "버린 후보", null, null, null, null, null, null, null, null, List.of(), null, DecisionFixtures.NOW));
+            problems.save(ProactiveCheckProblem.of(
+                    check.id(),
+                    conversation.id(),
+                    ProblemStatus.DROPPED,
+                    null,
+                    "dropped",
+                    "버린 후보",
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    List.of(),
+                    null,
+                    DecisionFixtures.NOW));
         });
-        service = new ValueEvaluationService(List.of(provider("fixture-a"), provider("fixture-b")), new ValueEvaluator(), store);
+        service = new ValueEvaluationService(
+                List.of(provider("fixture-a"), provider("fixture-b")), new ValueEvaluator(), store);
     }
 
     @AfterEach
@@ -95,9 +142,24 @@ class ValueEvaluationStoreTest {
         ValueEvaluation first = service.evaluate(OWNER, check.id(), "fixture-a");
         transactions.executeWithoutResult(status -> {
             var candidate = DecisionFixtures.state().candidates().getFirst();
-            problems.save(ProactiveCheckProblem.of(check.id(), conversation.id(), ProblemStatus.ACCEPTED, null,
-                    "later", "나중에 생긴 후보", "다른 목표", "QUESTION", "나중에 물을까요", "HIGH", "효과", "NONE",
-                    null, null, candidate.evidence(), candidate.evidenceCheckedAt(), DecisionFixtures.NOW));
+            problems.save(ProactiveCheckProblem.of(
+                    check.id(),
+                    conversation.id(),
+                    ProblemStatus.ACCEPTED,
+                    null,
+                    "later",
+                    "나중에 생긴 후보",
+                    "다른 목표",
+                    "QUESTION",
+                    "나중에 물을까요",
+                    "HIGH",
+                    "효과",
+                    "NONE",
+                    null,
+                    null,
+                    candidate.evidence(),
+                    candidate.evidenceCheckedAt(),
+                    DecisionFixtures.NOW));
         });
         ValueEvaluation second = service.replay(OWNER, first.id(), "fixture-b");
         ValueEvaluation third = service.replay(OWNER, first.id(), "fixture-a");
@@ -119,7 +181,8 @@ class ValueEvaluationStoreTest {
         assertHidden(() -> service.read(OTHER, first.id()));
         assertHidden(() -> service.replay(OTHER, first.id(), "fixture-b"));
         assertHidden(() -> service.evaluate(OTHER, check.id(), "fixture-a"));
-        transactions.executeWithoutResult(status -> conversations.deleteIfActive(conversation.id(), OWNER.id(), DecisionFixtures.NOW));
+        transactions.executeWithoutResult(
+                status -> conversations.deleteIfActive(conversation.id(), OWNER.id(), DecisionFixtures.NOW));
         assertHidden(() -> service.read(OWNER, first.id()));
         assertHidden(() -> service.replay(OWNER, first.id(), "fixture-b"));
     }
@@ -143,15 +206,20 @@ class ValueEvaluationStoreTest {
             }
 
             @Override
-            public DecisionResponse evaluate(DecisionState state, List<DecisionQuestion> questions, DecisionRequest request) {
-                return new DecisionResponse(new DecisionProviderInfo(id, "fixture-1", "requested", "test-model",
-                        "actual", "test-model", null), DecisionFixtures.ordered(state));
+            public DecisionResponse evaluate(
+                    DecisionState state, List<DecisionQuestion> questions, DecisionRequest request) {
+                return new DecisionResponse(
+                        new DecisionProviderInfo(
+                                id, "fixture-1", "requested", "test-model", "actual", "test-model", null),
+                        DecisionFixtures.ordered(state));
             }
         };
     }
 
     private void assertHidden(Runnable action) {
-        assertThatThrownBy(action::run).isInstanceOfSatisfying(ApiException.class,
-                ex -> assertThat(ex.code()).isEqualTo(ErrorCode.VALUE_EVALUATION_NOT_FOUND));
+        assertThatThrownBy(action::run)
+                .isInstanceOfSatisfying(
+                        ApiException.class,
+                        ex -> assertThat(ex.code()).isEqualTo(ErrorCode.VALUE_EVALUATION_NOT_FOUND));
     }
 }
