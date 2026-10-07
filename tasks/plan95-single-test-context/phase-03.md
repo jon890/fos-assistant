@@ -55,6 +55,8 @@
 
 ### 2. 커넥터 카탈로그 캐시와 스킬 캐시의 시계
 
+구현 중 정정: 커넥터 카탈로그 캐시는 시험 시계를 받지 않는다. 시계를 과거로 멈추는 검사가 있으면 앞 검사의 카탈로그가 보관 시간 안으로 들어와 새기 때문이다. 카탈로그는 test profile 의 짧은 보관 시간(1ms)과 실패 기억 시간(1ms)으로 실제 시각에 따라 지나고, `expireCatalog()` 는 그 시간이 지나기를 기다린다. 아래 문단에서 `ConnectorCatalogCache` 에 관한 것은 이 정정이 앞선다.
+
 `backend/src/main/java/com/bifos/assistant/connector/application/ConnectorCatalogCache.java` 와 `backend/src/main/java/com/bifos/assistant/skill/application/SkillCommandCatalog.java` 의 `@Autowired` 생성자가 `Clock` 을 받게 한다.
 `ConnectorPolicyTestDoubles` 의 캐시 대체를 지우고, `ChangeRecorder` 는 꺼 둔 대역으로 기반에 올린다. `expireCatalog()` 는 `TestClock.advance(TTL + 1초)` 로 바꾼다.
 `ChatServiceTest.SkillCatalogClock` 을 지우고 `SKILL_CLOCK.advance` 를 `TestClock.advance` 로 바꾼다. 그 검사 안에서 다른 시간 계산이 바뀌지 않는지 본다.
@@ -99,7 +101,6 @@ git grep -ln "@MockitoBean\|@MockitoSpyBean\|^@Import\|^@SpringBootTest" -- back
 
 | 파일 | 변경 |
 | --- | --- |
-| `backend/src/main/java/com/bifos/assistant/connector/application/ConnectorCatalogCache.java` | 수정 |
 | `backend/src/main/java/com/bifos/assistant/skill/application/SkillCommandCatalog.java` | 수정 |
 | `backend/src/test/java/com/bifos/assistant/testsupport/*.java` | 수정 |
 | `backend/src/test/java/com/bifos/assistant/**/*.java` | 수정 |
