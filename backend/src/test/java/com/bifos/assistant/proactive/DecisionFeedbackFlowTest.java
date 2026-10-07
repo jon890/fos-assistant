@@ -284,6 +284,17 @@ class DecisionFeedbackFlowTest {
     }
 
     @Test
+    @DisplayName("대화를 지운 뒤 그 대화에서 나온 Memory 제안을 받아들여도 지운 대화에 사건을 남기지 않는다")
+    void skipsEventsAfterConversationIsDeleted() {
+        Memory proposed = memories.proposeUser(owner, "합성 관심 범위", "합성 분야의 공고만 본다", root.id());
+        chat.delete(owner, checkConversation.id());
+
+        memories.accept(owner, proposed.id());
+
+        assertThat(subjectEvents("memory:" + proposed.id())).isEmpty();
+    }
+
+    @Test
     @DisplayName("점검 대화를 지우면 그 살펴보기의 상황과 제안이 replay 읽기 모델에서 빠진다")
     void hidesDeletedCheckConversation() {
         checkFeedback.ended(reported);

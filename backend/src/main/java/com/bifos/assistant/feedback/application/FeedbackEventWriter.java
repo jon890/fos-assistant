@@ -18,11 +18,19 @@ class FeedbackEventWriter {
 
     private final FeedbackEventRepository events;
     private final AgentExecutionRepository executions;
+    private final FeedbackConversations conversations;
 
-    /** 부르는 쪽 트랜잭션의 커밋 뒤에도 돌 수 있게 늘 새 트랜잭션을 연다. */
+    /**
+     * 부르는 쪽 트랜잭션의 커밋 뒤에도 돌 수 있게 늘 새 트랜잭션을 연다. 묶인 대화를 이미 지웠으면 넣지 않는다. 대화를 지운 뒤 끝난 동작의
+     * 사건이 지운 대화에 남지 않게 한다.
+     */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void insert(FeedbackEntry entry) {
-        events.save(toEvent(entry));
+        FeedbackEvent event = toEvent(entry);
+        if (event.conversationId() != null && !conversations.isActive(event.conversationId())) {
+            return;
+        }
+        events.save(event);
     }
 
     /** 실행 번호가 있으면 트리 루트로 바꾸고, 대화를 모르면 그 실행의 대화를 쓴다. */

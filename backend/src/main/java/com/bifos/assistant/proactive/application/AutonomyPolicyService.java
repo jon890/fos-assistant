@@ -269,20 +269,7 @@ public class AutonomyPolicyService {
         }
         String failure = error;
         if (failure != null) {
-            // 시작한 살펴보기의 결과는 그 살펴보기가 끝날 때 남는다. 여기서는 시작하지 못한 것만 남긴다.
-            feedback.record(FeedbackEntry.of(
-                            user.id(),
-                            FeedbackSubjectType.AUTONOMY_DECISION,
-                            row.id(),
-                            FeedbackEventType.EXECUTION_FAILED,
-                            FeedbackActor.SYSTEM,
-                            clock.instant())
-                    .conversation(checks.findById(row.sourceCheckId())
-                            .map(ProactiveCheck::conversationId)
-                            .orElse(null))
-                    .sourceCheck(row.sourceCheckId())
-                    .autonomyDecision(row.id())
-                    .reason(failure));
+            recordStartFailure(user, row, failure);
         }
         try {
             return Objects.requireNonNull(transactions.execute(status -> {
@@ -297,6 +284,28 @@ public class AutonomyPolicyService {
         } catch (RuntimeException ex) {
             log.warn("자동 실행 결과를 적지 못했다 decisionId={}", row.id(), ex);
             return row;
+        }
+    }
+
+    /** 시작하지 못한 판정의 판단 피드백 사건이다. 관측용이라 점검 대화를 읽지 못해도 판정 결과 저장을 막지 않는다. */
+    private void recordStartFailure(CurrentUser user, AutonomyDecision row, String failure) {
+        try {
+            // 시작한 살펴보기의 결과는 그 살펴보기가 끝날 때 남는다. 여기서는 시작하지 못한 것만 남긴다.
+            feedback.record(FeedbackEntry.of(
+                            user.id(),
+                            FeedbackSubjectType.AUTONOMY_DECISION,
+                            row.id(),
+                            FeedbackEventType.EXECUTION_FAILED,
+                            FeedbackActor.SYSTEM,
+                            clock.instant())
+                    .conversation(checks.findById(row.sourceCheckId())
+                            .map(ProactiveCheck::conversationId)
+                            .orElse(null))
+                    .sourceCheck(row.sourceCheckId())
+                    .autonomyDecision(row.id())
+                    .reason(failure));
+        } catch (RuntimeException ex) {
+            log.warn("자동 실행 실패의 판단 피드백을 남기지 못했다 decisionId={}", row.id());
         }
     }
 

@@ -7,7 +7,7 @@ package com.bifos.assistant.feedback.application.model;
 public enum FeedbackLabel {
     /** 받아들이거나 승인했다. */
     ACCEPTED,
-    /** 거절하거나 숨기거나 받아들인 뒤 그만뒀다. 그 제안 하나에 대한 일회성 반응이다. */
+    /** 거절했거나, 받아들인 기록 없이 그만뒀다. 그 제안 하나에 대한 일회성 반응이다. */
     DECLINED,
     /** 미루기만 했다. 지금은 아니라는 뜻이고 싫다는 뜻이 아니다. */
     DEFERRED,
