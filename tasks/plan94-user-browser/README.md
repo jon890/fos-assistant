@@ -6,7 +6,7 @@
 ## 상태
 
 단계 1 을 구현했다. 그 phase 문서는 구현 PR 에서 지웠고, 오래 남을 계약은 `docs/backend/user-browser.md` 와 `docs/backend/schema/browser.md` 에 있다.
-단계 2a-1 을 구현했다. 남은 것은 단계 2a-2, 2b, 3, 4 다. 단계 2 는 운영 코드 1,000줄 상한 때문에 셋으로 나눴다. 남은 phase 01 은 단계 2a-2 다. 다음 단계를 시작할 때 이 디렉터리에 phase 를 더한다. 단계 3 의 PR 이 이 디렉터리를 지운다.
+단계 2a-1 과 2a-2 를 구현했다. 로그인 화면의 계약은 `docs/backend/user-browser.md` 의 「로그인 화면」 이 갖는다. 남은 것은 단계 2b, 3, 4 다. 단계 2 는 운영 코드 1,000줄 상한 때문에 셋으로 나눴다. 다음 단계를 시작할 때 이 디렉터리에 phase 를 더한다. 단계 3 의 PR 이 이 디렉터리를 지운다.
 
 ## 단계와 PR
 
@@ -45,7 +45,7 @@
 | D6 | 프로필 보관 | 사용자가 지울 때까지 둔다. 사용자를 끄면 멈추기만 한다 | 쓰지 않은 지 N일이 지나면 지운다 |
 | D7 | 관리자의 권한 | 상태 보기, 끄기, 지우기. 남의 화면은 못 연다 | 남의 화면도 연다 |
 
-## 단계 2 와 3 의 계약 초안
+## 단계 3 의 계약 초안
 
 구현하는 PR 이 `docs/backend/user-browser.md` 로 옮긴다.
 
@@ -54,8 +54,6 @@
 | 줄 |
 | --- |
 | `assistant.browser.gateway-base-url` / / Hermes 가 중계에 닿는 주소. 바인딩 설치가 이 주소에 접근 표식을 붙인다 / 없음 |
-| `GET /api/browser/screen` / 화면 SSE. 아래 「로그인 화면」 |
-| `POST /api/browser/screen/input` / 화면 입력 |
 
 ### 단계 3: `user_browser_grant`
 
@@ -84,29 +82,3 @@
 
 접근 표식이 없거나 틀리면 404 다. 있는지 없는지를 응답으로 구분하지 않는다.
 Chrome 에는 `Host: localhost` 와 `Origin` 없이 보낸다.
-
-### 단계 2: 로그인 화면
-
-`GET /api/browser/screen` 은 브라우저를 켜고 지금 탭에 붙어 SSE 를 연다.
-
-| 사건 | 본문 |
-| --- | --- |
-| `frame` | `{data, width, height}`. `data` 는 JPEG base64 |
-| `tabs` | `[{id, title, url, active}]`. 탭이 바뀔 때 |
-| `closed` | 다른 화면이 열렸거나 브라우저가 멈췄다 |
-
-`POST /api/browser/screen/input` 의 `type` 이다. 나머지 칸은 그 종류의 CDP 인자 가운데 필요한 것만 남긴 것이다.
-
-| `type` | CDP |
-| --- | --- |
-| `mouse` | `Input.dispatchMouseEvent` |
-| `touch` | `Input.dispatchTouchEvent` |
-| `wheel` | `Input.dispatchMouseEvent` 의 `mouseWheel` |
-| `key` | `Input.dispatchKeyEvent`. 특수 키만(Enter, Backspace, Tab, 방향 키 등) |
-| `text` | `Input.insertText`. 500자까지 |
-| `navigate` | `Page.navigate`. `http`, `https` 만 |
-| `back`, `reload` | `Page.navigateToHistoryEntry`, `Page.reload` |
-| `tab` | 고른 탭으로 screencast 를 옮긴다 |
-| `resize` | `Emulation.setDeviceMetricsOverride`. 폭 320~1600 |
-
-입력 본문은 로그와 실행 기록에 남기지 않는다.
