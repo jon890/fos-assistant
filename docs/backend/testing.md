@@ -44,8 +44,11 @@ class ConversationPagingTest {
 | `@SmallExecutionLimit` | 사용자 동시 실행 한도를 2 로 둔다 | 한도에 닿는 경로 |
 | `@MemoryEncryptionDisabled` | 민감 memory 암호화 key 를 비운다 | 암호화가 꺼진 동작 |
 | `@SamplePriceCatalog` | 가격표를 `pricing/models-dev-sample.json` 으로 둔다 | 금액이 적히는 경로 |
+| `@LongProactiveCheckTimeouts` | Hermes 실행 상한을 30초, 살펴보기 시간 상한을 20초로 늘린다 | 살펴보기와 예약 실행이 끝까지 도는 경로 |
+| `@MemoryProposeEnabled` | 대화 뒤 Memory 제안을 켠다 | 제안이 만들어지는 경로 |
 
 변형 주석은 `@BackendIntegrationTest` 와 함께 단다.
+여러 변형을 함께 달 때는 위 표의 순서대로 달고, 남는 값은 그 뒤 하나의 `@TestPropertySource` 에 둔다.
 한 검사만 쓰는 값은 `@TestPropertySource(properties = ...)` 로 둔다.
 
 ## 검사 사이에 남기지 않는 것

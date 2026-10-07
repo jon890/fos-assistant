@@ -60,6 +60,7 @@ import com.bifos.assistant.task.infra.TaskRepository;
 import com.bifos.assistant.task.infra.TaskRunRepository;
 import com.bifos.assistant.task.infra.TaskTriggerRepository;
 import com.bifos.assistant.testsupport.BackendIntegrationTest;
+import com.bifos.assistant.testsupport.LongProactiveCheckTimeouts;
 import com.bifos.assistant.testsupport.SmallExecutionLimit;
 import com.bifos.assistant.usage.application.TurnSlot;
 import com.bifos.assistant.usage.application.UserExecutionLimiter;
@@ -81,7 +82,6 @@ import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.PageRequest;
-import org.springframework.test.context.TestPropertySource;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -98,7 +98,7 @@ import org.springframework.transaction.support.TransactionTemplate;
  */
 @BackendIntegrationTest
 @SmallExecutionLimit
-@TestPropertySource(properties = {"hermes.run-timeout=30s", "assistant.proactive-check.max-duration=20s"})
+@LongProactiveCheckTimeouts
 class TaskRunStarterTest {
 
     private static final Duration WAIT_LIMIT = Duration.ofSeconds(10);

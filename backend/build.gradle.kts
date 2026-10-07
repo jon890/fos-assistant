@@ -62,10 +62,11 @@ tasks.test {
     }
     // 전체 검사가 함께 보존하는 Spring 문맥은 기본 512MB 힙에 들어가지 않는다.
     maxHeapSize = "1g"
-    // 2026-10-07 측정: 서로 다른 컨텍스트가 37개고 문맥 하나가 30MB 남짓을 쥔다. 상한 16 은 하나가 밀려 다시 뜨고,
-    // 24 는 다시 뜨는 것이 없으며 Full GC 가 실행마다 2~3번이다(옮기기 전 2번). 37 이면 1g 힙에 들어가지 않아 Full GC 가 63번이다.
-    // 컨텍스트 키 수나 문맥 크기가 달라지면 전체 검사에서 HikariPool-N 의 최댓값과 Pause Full 수를 다시 본다.
-    systemProperty("spring.test.context.cache.maxSize", "24")
+    // Spring 이 띄운 검사 컨텍스트를 몇 개까지 메모리에 남겨 둘지다. 넘으면 가장 오래 쓰지 않은 것을 닫는다.
+    // 2026-10-07 측정: 서로 다른 컨텍스트가 38개고 문맥 하나가 30MB 남짓을 쥔다. 16 은 하나가 밀려 다시 뜨고 Full GC 가 2번이다.
+    // 24 는 다시 뜨는 것이 없지만 Full GC 가 6번으로 늘고, 64 로 두어 모두 남기면 1g 힙이 모자라 컨텍스트가 뜨지 못한다.
+    // 힙 여유를 우선해 16 으로 둔다. 컨텍스트 키 수나 문맥 크기가 달라지면 HikariPool-N 의 최댓값과 Pause Full 수를 다시 본다.
+    systemProperty("spring.test.context.cache.maxSize", "16")
 }
 
 /**

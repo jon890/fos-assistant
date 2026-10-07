@@ -28,6 +28,7 @@ import com.bifos.assistant.model.domain.ModelChoice;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.testsupport.BackendIntegrationTest;
+import com.bifos.assistant.testsupport.MemoryProposeEnabled;
 import com.bifos.assistant.testsupport.SmallExecutionLimit;
 import com.bifos.assistant.usage.application.ExecutionRecorder;
 import com.bifos.assistant.usage.application.UserExecutionLimiter;
@@ -60,12 +61,12 @@ import tools.jackson.databind.ObjectMapper;
  */
 @BackendIntegrationTest
 @SmallExecutionLimit
+@MemoryProposeEnabled
 @TestPropertySource(
         properties = {
             "assistant.user-execution.background-reserve=1",
             "assistant.starters.enabled=true",
-            "assistant.starters.retry-after-failure=10m",
-            "assistant.memory.propose.enabled=true"
+            "assistant.starters.retry-after-failure=10m"
         })
 class UserExecutionLimitBackgroundTest {
 

@@ -56,6 +56,7 @@ import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.testsupport.BackendIntegrationTest;
+import com.bifos.assistant.testsupport.LongProactiveCheckTimeouts;
 import com.bifos.assistant.usage.domain.AgentExecution;
 import com.bifos.assistant.usage.infra.AgentExecutionRepository;
 import com.bifos.assistant.usage.infra.ExecutionEventRepository;
@@ -86,12 +87,8 @@ import org.springframework.transaction.support.TransactionTemplate;
  * 목록은 대역이고 모든 데이터는 합성이다.
  */
 @BackendIntegrationTest
-@TestPropertySource(
-        properties = {
-            "hermes.run-timeout=30s",
-            "assistant.proactive-check.max-duration=20s",
-            "assistant.proactive-check.session-max-checks=2"
-        })
+@LongProactiveCheckTimeouts
+@TestPropertySource(properties = {"assistant.proactive-check.session-max-checks=2"})
 class ProactiveCheckTurnTest {
 
     private static final Duration WAIT_LIMIT = Duration.ofSeconds(10);

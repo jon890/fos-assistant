@@ -40,6 +40,7 @@ import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.testsupport.BackendIntegrationTest;
 import com.bifos.assistant.testsupport.DelegationWakeEnabled;
+import com.bifos.assistant.testsupport.LongProactiveCheckTimeouts;
 import com.bifos.assistant.usage.application.ExecutionDeliveryWriter;
 import com.bifos.assistant.usage.domain.AgentExecution;
 import com.bifos.assistant.usage.domain.DelegationKey;
@@ -61,7 +62,6 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationEventPublisher;
-import org.springframework.test.context.TestPropertySource;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /**
@@ -72,7 +72,7 @@ import org.springframework.transaction.support.TransactionTemplate;
  */
 @BackendIntegrationTest
 @DelegationWakeEnabled
-@TestPropertySource(properties = {"hermes.run-timeout=30s", "assistant.proactive-check.max-duration=20s"})
+@LongProactiveCheckTimeouts
 class ProactiveCheckEndTest {
 
     private static final Duration WAIT_LIMIT = Duration.ofSeconds(10);

@@ -20,6 +20,10 @@ class VariantAnnotationsTest {
     @SmallExecutionLimit
     static class OnlyVariant {}
 
+    @LongProactiveCheckTimeouts
+    @TestPropertySource(properties = "assistant.proactive-check.session-max-checks=2")
+    static class VariantWithRemainingValue {}
+
     @Test
     @DisplayName("변형을 함께 달면 병합된 속성에 두 값이 모두 있다")
     void mergesPropertiesOfBothVariants() {
@@ -31,6 +35,22 @@ class VariantAnnotationsTest {
         assertThat(properties)
                 .containsExactlyInAnyOrder(
                         "assistant.delegation-wake.enabled=true", "assistant.user-execution.max-running=2");
+    }
+
+    @Test
+    @DisplayName("살펴보기 시간 상한 변형 뒤에 남는 값을 달면 병합된 속성에 세 값이 모두 있다")
+    void mergesVariantWithRemainingValue() {
+        String[] properties =
+                MergedAnnotations.from(VariantWithRemainingValue.class, SearchStrategy.TYPE_HIERARCHY).stream(
+                                TestPropertySource.class)
+                        .flatMap(annotation -> Arrays.stream(annotation.getStringArray("properties")))
+                        .toArray(String[]::new);
+
+        assertThat(properties)
+                .containsExactlyInAnyOrder(
+                        "hermes.run-timeout=30s",
+                        "assistant.proactive-check.max-duration=20s",
+                        "assistant.proactive-check.session-max-checks=2");
     }
 
     @Test

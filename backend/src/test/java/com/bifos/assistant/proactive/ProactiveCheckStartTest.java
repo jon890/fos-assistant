@@ -42,6 +42,7 @@ import com.bifos.assistant.shared.auth.CurrentUserProvider;
 import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.shared.error.GlobalExceptionHandler;
 import com.bifos.assistant.testsupport.BackendIntegrationTest;
+import com.bifos.assistant.testsupport.LongProactiveCheckTimeouts;
 import com.bifos.assistant.testsupport.SmallExecutionLimit;
 import com.bifos.assistant.usage.domain.AgentExecution;
 import com.bifos.assistant.usage.infra.AgentExecutionRepository;
@@ -58,7 +59,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
@@ -73,7 +73,7 @@ import tools.jackson.databind.json.JsonMapper;
  */
 @BackendIntegrationTest
 @SmallExecutionLimit
-@TestPropertySource(properties = {"hermes.run-timeout=30s", "assistant.proactive-check.max-duration=20s"})
+@LongProactiveCheckTimeouts
 class ProactiveCheckStartTest {
 
     private static final Duration WAIT_LIMIT = Duration.ofSeconds(10);
