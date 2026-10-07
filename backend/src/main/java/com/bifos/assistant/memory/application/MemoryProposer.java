@@ -6,6 +6,7 @@ import com.bifos.assistant.hermes.dto.HermesRunCommand;
 import com.bifos.assistant.hermes.dto.HermesRunResult;
 import com.bifos.assistant.model.domain.ModelChoice;
 import com.bifos.assistant.shared.auth.CurrentUser;
+import com.bifos.assistant.shared.config.LiveProperties;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.usage.application.ExecutionEventRecorder;
@@ -30,7 +31,7 @@ import tools.jackson.databind.ObjectMapper;
 public class MemoryProposer {
     private static final int TITLE_LIMIT = 200;
 
-    private final MemoryProposalProperties properties;
+    private final LiveProperties<MemoryProposalProperties> properties;
     private final MemoryService memories;
     private final HermesRunsClient hermes;
     private final ExecutionRecorder executions;
@@ -54,7 +55,7 @@ public class MemoryProposer {
             AgentExecution parentExecution,
             String answer,
             ModelChoice requested) {
-        if (!properties.enabled()) {
+        if (!properties.current().enabled()) {
             return;
         }
 

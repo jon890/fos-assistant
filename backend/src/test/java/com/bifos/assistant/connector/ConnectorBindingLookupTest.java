@@ -15,6 +15,7 @@ import com.bifos.assistant.connector.infra.ConnectorBindingRepository;
 import com.bifos.assistant.connector.infra.ConnectorConnectionRepository;
 import com.bifos.assistant.hermes.HermesConnectorClient;
 import com.bifos.assistant.shared.domain.type.UserRole;
+import com.bifos.assistant.testsupport.BackendIntegrationTest;
 import com.bifos.assistant.user.domain.AppUser;
 import com.bifos.assistant.user.infra.AppUserRepository;
 import java.time.Instant;
@@ -23,13 +24,9 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.test.context.ActiveProfiles;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 /** 붙은 연결의 서버 이름과 도구 이름 앞부분을 바인딩 행으로만 읽는지 본다. 대시보드는 대역이고 불리지 않아야 한다. */
-@SpringBootTest
-@ActiveProfiles("test")
+@BackendIntegrationTest
 class ConnectorBindingLookupTest {
     private static final Instant NOW = Instant.parse("2026-10-01T00:00:00Z");
 
@@ -48,7 +45,7 @@ class ConnectorBindingLookupTest {
     @Autowired
     AppUserRepository users;
 
-    @MockitoBean
+    @Autowired
     HermesConnectorClient connector;
 
     @AfterEach

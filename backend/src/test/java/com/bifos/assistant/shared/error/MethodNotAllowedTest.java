@@ -6,6 +6,7 @@ import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
+import com.bifos.assistant.testsupport.BackendIntegrationTest;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -15,9 +16,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.slf4j.LoggerFactory;
-import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
-import org.springframework.test.context.ActiveProfiles;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
@@ -27,8 +26,7 @@ import tools.jackson.databind.json.JsonMapper;
  * <p>로그인 판정 경로는 인증 없이 닿고 POST 만 받는다. 그래서 보안 필터를 지나 DispatcherServlet 이
  * 메서드를 거절하는 자리까지 간다. 인증이 필요한 경로는 토큰 없는 요청을 보안 필터가 먼저 막는다.
  */
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
-@ActiveProfiles("test")
+@BackendIntegrationTest
 class MethodNotAllowedTest {
 
     private static final String POST_ONLY = "/api/v1/signin/allowed";

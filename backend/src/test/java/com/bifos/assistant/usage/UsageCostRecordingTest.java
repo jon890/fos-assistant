@@ -1,7 +1,6 @@
 package com.bifos.assistant.usage;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.Mockito.when;
 
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.agent.domain.type.AgentVisibility;
@@ -9,24 +8,22 @@ import com.bifos.assistant.agent.domain.type.CostMode;
 import com.bifos.assistant.agent.domain.type.CredentialScope;
 import com.bifos.assistant.chat.domain.Conversation;
 import com.bifos.assistant.chat.infra.ConversationRepository;
-import com.bifos.assistant.hermes.HermesRunsClient;
+import com.bifos.assistant.hermes.StubHermesRunsClient;
+import com.bifos.assistant.hermes.StubHermesRunsClient.SessionLookup;
 import com.bifos.assistant.hermes.dto.HermesRunResult;
 import com.bifos.assistant.hermes.dto.SessionRuntime;
 import com.bifos.assistant.hermes.dto.TokenUsage;
 import com.bifos.assistant.model.domain.ModelChoice;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.domain.type.UserRole;
+import com.bifos.assistant.testsupport.BackendIntegrationTest;
+import com.bifos.assistant.testsupport.SamplePriceCatalog;
 import com.bifos.assistant.usage.application.ExecutionRecorder;
 import com.bifos.assistant.usage.domain.AgentExecution;
 import com.bifos.assistant.usage.domain.MonthlyCost;
 import com.bifos.assistant.usage.domain.MonthlyCostDetail;
 import com.bifos.assistant.usage.domain.type.ExecutionStatus;
 import com.bifos.assistant.usage.infra.AgentExecutionRepository;
-import java.io.IOException;
-import java.net.URISyntaxException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.attribute.FileTime;
 import java.time.Instant;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -34,15 +31,10 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.test.context.ActiveProfiles;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 /** 실행이 끝날 때 금액을 저장하고, 그 저장된 금액만 더해 한 달 합계가 나오는지 본다. */
-@SpringBootTest
-@ActiveProfiles("test")
+@BackendIntegrationTest
+@SamplePriceCatalog
 class UsageCostRecordingTest {
 
     private static final Long USER_ID = 4_101L;
@@ -57,9 +49,9 @@ class UsageCostRecordingTest {
     @Autowired
     ExecutionRecorder recorder;
 
-    /** 실제로 돈 모델을 읽는 세션 조회를 여기서는 하지 않는다. 기록 규칙만 보는 검사다. */
-    @MockitoBean
-    HermesRunsClient hermes;
+    /** 실제로 돈 모델을 읽는 세션 조회는 대역이 받는다. 기록 규칙만 보는 검사다. */
+    @Autowired
+    StubHermesRunsClient hermes;
 
     @Autowired
     AgentExecutionRepository executions;
@@ -68,23 +60,6 @@ class UsageCostRecordingTest {
     ConversationRepository conversations;
 
     private Conversation conversation;
-
-    @DynamicPropertySource
-    static void pointAtTheSampleCatalog(DynamicPropertyRegistry registry) {
-        registry.add("assistant.pricing.catalog-path", () -> sampleCatalog().toString());
-    }
-
-    private static Path sampleCatalog() {
-        try {
-            Path file = Path.of(UsageCostRecordingTest.class
-                    .getResource("/pricing/models-dev-sample.json")
-                    .toURI());
-            Files.setLastModifiedTime(file, FileTime.from(Instant.parse("2026-09-17T04:00:00Z")));
-            return file;
-        } catch (URISyntaxException | IOException ex) {
-            throw new IllegalStateException(ex);
-        }
-    }
 
     @BeforeEach
     void startFromAnEmptyLedger() {
@@ -220,8 +195,7 @@ class UsageCostRecordingTest {
     @DisplayName("runtime 없는 실패 응답은 세션의 실제 모델을 읽어 환산한다")
     void resolvesLegacyFailedRuntimeFromSession() {
         Agent agent = subscriptionAgent();
-        when(hermes.readSessionRuntime(agent.apiBaseUrl(), agent.hermesProfile(), "failed-session"))
-                .thenReturn(new SessionRuntime("example-model-large", "anthropic"));
+        hermes.willReportSessionRuntime(new SessionRuntime("example-model-large", "anthropic"));
         AgentExecution execution =
                 recorder.start(caller(), conversation.executionConversation(), agent, null, null, 0L);
         HermesRunResult result = new HermesRunResult(
@@ -236,6 +210,9 @@ class UsageCostRecordingTest {
 
         AgentExecution failed = recorder.fail(execution, agent, result, requested(agent), "FAILED");
 
+        assertThat(hermes.sessionLookups())
+                .as("그 에이전트의 주소와 profile 로 실제 모델을 물은 세션")
+                .containsExactly(new SessionLookup(agent.apiBaseUrl(), agent.hermesProfile(), "failed-session"));
         assertThat(failed.provider()).isEqualTo("anthropic");
         assertThat(failed.model()).isEqualTo("example-model-large");
         assertThat(failed.cachedInputTokens()).isNull();

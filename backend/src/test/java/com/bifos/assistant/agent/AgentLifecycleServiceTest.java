@@ -37,6 +37,7 @@ import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.skill.domain.SkillBundle;
 import com.bifos.assistant.skill.infra.SkillStore;
+import com.bifos.assistant.testsupport.BackendIntegrationTest;
 import com.bifos.assistant.user.domain.AppUser;
 import com.bifos.assistant.user.infra.AppUserRepository;
 import java.nio.file.Path;
@@ -58,10 +59,6 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.InOrder;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.test.context.ActiveProfiles;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
-import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 
 /**
  * 사용자가 에이전트를 만들고, 공개 범위를 바꾸고, 지우는 순서를 본다.
@@ -70,8 +67,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
  * 차례로 세어지는지 볼 수 있다. Hermes 대시보드와 도구 목록만 대역이고, profile 을 만드는 순서와 토큰
  * 발급, key 파일은 실제 bean 이다.
  */
-@SpringBootTest
-@ActiveProfiles("test")
+@BackendIntegrationTest
 class AgentLifecycleServiceTest {
 
     /** plugin 틀이 붙이는 안전한 기본 도구다. 셸과 파일 등급이 없다. */
@@ -110,17 +106,17 @@ class AgentLifecycleServiceTest {
     @Autowired
     ConnectorConnectionRepository connections;
 
-    @MockitoBean
+    @Autowired
     HermesConnectorClient connector;
 
-    @MockitoBean
+    @Autowired
     HermesDashboardClient dashboard;
 
-    @MockitoBean
+    @Autowired
     HermesToolsetClient toolsets;
 
     /** 실제 디렉터리에 쓰되, 지우기가 실패하는 경우만 흉내 낼 수 있게 감싼다. */
-    @MockitoSpyBean
+    @Autowired
     SkillStore skillStore;
 
     /** 이 테스트가 실제 key 디렉터리에 남긴 파일을 지우려고 적어 둔다. */

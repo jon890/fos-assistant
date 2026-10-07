@@ -38,6 +38,9 @@ import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
+import com.bifos.assistant.testsupport.BackendIntegrationTest;
+import com.bifos.assistant.testsupport.DelegationWakeEnabled;
+import com.bifos.assistant.testsupport.LongProactiveCheckTimeouts;
 import com.bifos.assistant.usage.application.ExecutionDeliveryWriter;
 import com.bifos.assistant.usage.domain.AgentExecution;
 import com.bifos.assistant.usage.domain.DelegationKey;
@@ -58,15 +61,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.ApplicationEventPublisher;
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Import;
-import org.springframework.context.annotation.Primary;
-import org.springframework.test.context.ActiveProfiles;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
-import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /**
@@ -75,27 +70,13 @@ import org.springframework.transaction.support.TransactionTemplate;
  * <p>위임 결과 깨우기를 켜고 띄운다. 끝난 위임 결과가 남아 있으면 점검 대화에 자동 turn 이 열리는 설정이다. 위임 자식 줄은
  * 살펴보기 turn 이 완료를 기다리는 자리에서 직접 만든다. 도는 자식은 이 서버가 돌리지 않는 실행이다. 모든 데이터는 합성이다.
  */
-@SpringBootTest(
-        properties = {
-            "hermes.run-timeout=30s",
-            "assistant.proactive-check.max-duration=20s",
-            "assistant.delegation-wake.enabled=true"
-        })
-@ActiveProfiles("test")
-@Import(ProactiveCheckEndTest.StubRuntime.class)
+@BackendIntegrationTest
+@DelegationWakeEnabled
+@LongProactiveCheckTimeouts
 class ProactiveCheckEndTest {
 
     private static final Duration WAIT_LIMIT = Duration.ofSeconds(10);
     private static final String START_NOTICE = "먼저 살펴보기를 시작했어요";
-
-    @TestConfiguration
-    static class StubRuntime {
-        @Bean
-        @Primary
-        StubHermesRunsClient stubHermesRunsClient() {
-            return new StubHermesRunsClient();
-        }
-    }
 
     @Autowired
     ProactiveCheckService service;
@@ -140,19 +121,19 @@ class ProactiveCheckEndTest {
     ExecutionDeliveryWriter deliveryWriter;
 
     /** 중지가 닿기 전에 끝난 자식을 만드는 검사만 바꾼다. 그 밖의 검사에서는 실제 동작 그대로다. */
-    @MockitoSpyBean
+    @Autowired
     AgentDelegationService delegations;
 
     /** 실제 Hermes 를 부르지 않도록 켜진 toolset 을 대역으로 둔다. */
-    @MockitoBean
+    @Autowired
     HermesToolsetClient toolsets;
 
     /** 켜진 스킬 목록을 대역으로 둔다. */
-    @MockitoBean
+    @Autowired
     HermesSkillClient skillClient;
 
     /** 실제 스트림 주소로 연결하지 않게 대역으로 둔다. 사건은 흘리지 않는다. */
-    @MockitoBean
+    @Autowired
     HermesRunEventStream eventStream;
 
     private CurrentUser owner;

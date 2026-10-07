@@ -9,6 +9,7 @@ import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.agent.infra.AgentRepository;
 import com.bifos.assistant.people.domain.AllowedPerson;
 import com.bifos.assistant.people.infra.AllowedPersonRepository;
+import com.bifos.assistant.testsupport.BackendIntegrationTest;
 import com.bifos.assistant.user.application.UserProvisioningService;
 import com.bifos.assistant.user.infra.AppUserRepository;
 import java.time.Instant;
@@ -16,10 +17,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.dao.DataIntegrityViolationException;
-import org.springframework.test.context.ActiveProfiles;
-import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 
 /**
  * 첫 로그인에 에이전트를 저장하지 못하면 사용자 저장도 함께 되돌려지는지 본다.
@@ -27,8 +25,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
  * <p>테스트 클래스에 트랜잭션을 두지 않는다. 두면 {@code resolve} 의 트랜잭션이 테스트의 트랜잭션에 합류해
  * 되돌려진 것을 볼 수 없다.
  */
-@SpringBootTest
-@ActiveProfiles("test")
+@BackendIntegrationTest
 class FirstAgentCreatorTest {
 
     private static final String EMAIL = "uncle@example.com";
@@ -45,7 +42,7 @@ class FirstAgentCreatorTest {
     AllowedPersonRepository people;
 
     /** 에이전트 저장이 실패하는 경우를 만들려면 저장소가 던지게 할 수 있어야 한다. */
-    @MockitoSpyBean
+    @Autowired
     AgentRepository agents;
 
     @BeforeEach

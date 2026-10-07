@@ -37,7 +37,6 @@ import { startersScenario } from "./scenarios/starters.ts";
 import { skillsScenario } from "./scenarios/skills.ts";
 import { memoryScenario } from "./scenarios/memory.ts";
 import { memoryDocumentScenario } from "./scenarios/memory-document.ts";
-import { memoryImportScenario } from "./scenarios/memory-import.ts";
 import { chatScenario } from "./scenarios/chat.ts";
 import { followUpScenario } from "./scenarios/follow-up.ts";
 import { conversationHistoryScenario } from "./scenarios/conversation-history.ts";
@@ -102,7 +101,6 @@ const SCENARIOS: readonly Scenario[] = [
   // 문서를 지우고 끝나고 대화 turn 과 에이전트를 만들지 않아 뒤 시나리오의 Memory 주입과 사용량 세기에 걸리지 않는다.
   memoryDocumentScenario,
   // 대화 turn 을 돌리지 않고 들인 항목을 지우고 끝나므로 뒤 시나리오의 Memory 주입과 사용량 세기에 걸리지 않는다.
-  memoryImportScenario,
   meScenario,
   bindingScenario,
   agentsScenario,

@@ -8,7 +8,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
@@ -28,29 +28,21 @@ import org.springframework.transaction.event.TransactionalEventListener;
  * 두어 사건마다 올리고, 읽기 시작할 때의 번호가 그대로일 때만 캐시에 넣는다.
  */
 @Service
+@RequiredArgsConstructor
 public class SkillCommandCatalog {
 
     /** 켜진 스킬 이름을 들고 있는 시간이다. */
     static final Duration TTL = Duration.ofSeconds(30);
 
     private final SkillService skills;
+    /** 운영의 {@link Clock} 빈이다. 검사는 시험 시계로 보관 시간을 옮긴다. */
     private final Clock clock;
+
     private final Map<Long, Cached> cache = new ConcurrentHashMap<>();
     private final Map<Long, Long> generations = new ConcurrentHashMap<>();
 
     /** 읽은 시각과 그때의 켜진 스킬 이름이다. */
-    private record Cached(Instant readAt, Set<String> names) {
-    }
-
-    @Autowired
-    public SkillCommandCatalog(SkillService skills) {
-        this(skills, Clock.systemUTC());
-    }
-
-    public SkillCommandCatalog(SkillService skills, Clock clock) {
-        this.skills = skills;
-        this.clock = clock;
-    }
+    private record Cached(Instant readAt, Set<String> names) {}
 
     /** 그 에이전트에서 커맨드로 부를 수 있는 스킬 이름이다. {@code skills} toolset 이 꺼져 있으면 빈 집합이다. */
     public Set<String> enabledNames(Agent agent) {
@@ -70,8 +62,7 @@ public class SkillCommandCatalog {
                 : Set.of();
         // 사건은 세대 번호를 먼저 올리고 캐시를 비운다. 같은 칸의 compute 와 remove 는 차례로 돌아서, 번호를
         // 본 뒤에 온 사건이면 넣은 것을 그 사건이 비운다.
-        cache.compute(agentId, (id, previous) ->
-                generationOf(id) == generation ? new Cached(now, names) : previous);
+        cache.compute(agentId, (id, previous) -> generationOf(id) == generation ? new Cached(now, names) : previous);
         return names;
     }
 

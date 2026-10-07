@@ -5,21 +5,19 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.bifos.assistant.mcp.presentation.AgentTokenAuthenticationFilter;
 import com.bifos.assistant.shared.auth.AgentTokenFilter;
 import com.bifos.assistant.shared.auth.ControlPlaneJwtFilter;
+import com.bifos.assistant.testsupport.BackendIntegrationTest;
 import jakarta.servlet.Filter;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.security.web.SecurityFilterChain;
-import org.springframework.test.context.ActiveProfiles;
 
 /**
  * profile 토큰 필터가 {@code shared.auth} 의 타입으로 주입돼도 보안 필터 순서와 서블릿 필터 등록 끄기가 그대로인지 본다.
  */
-@SpringBootTest
-@ActiveProfiles("test")
+@BackendIntegrationTest
 class AgentTokenFilterWiringTest {
 
     @Autowired

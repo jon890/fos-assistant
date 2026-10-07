@@ -9,6 +9,8 @@ import com.bifos.assistant.chat.infra.ConversationRepository;
 import com.bifos.assistant.hermes.HermesProperties;
 import com.bifos.assistant.hermes.HermesRunsClient;
 import com.bifos.assistant.hermes.dto.HermesRunLookup;
+import com.bifos.assistant.shared.concurrent.BackgroundTasks;
+import com.bifos.assistant.shared.config.LiveProperties;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.usage.application.UserExecutionLimiter;
@@ -39,10 +41,8 @@ import org.springframework.transaction.support.TransactionTemplate;
  * 기동할 때 {@code RUNNING} 으로 남은 실행을 Hermes 에 물어 정한다(ADR-061).
  *
  * <p>두 단계로 돈다. <b>잡기</b>({@link #claim})는 웹 서버가 요청을 받기 전에 끝난다. 남은 줄을 읽고 대화 turn 의
- * 루트 줄, 흐름 turn 의 루트 줄과 그 자식 줄마다 그 대화의 turn 잠금을 잡는다. Hermes 를 부르지 않는다.
- * <b>묻기</b>({@link #reconcile})는
- * 애플리케이션이 다 뜬 뒤에 돈다. 줄을 적거나 잠금을 풀면 {@link NextTurnDispatcher} 가 turn 을 여는데, 그것은 다 뜬
- * 뒤여야 하기 때문이다.
+ * 루트 줄, 흐름 turn 의 루트 줄과 그 자식 줄마다 그 대화의 turn 잠금을 잡는다. Hermes 를 부르지 않는다. <b>묻기</b>({@link #reconcile})는
+ * 애플리케이션이 다 뜬 뒤에 돈다. 줄을 적거나 잠금을 풀면 {@link NextTurnDispatcher} 가 turn 을 여는데, 그것은 다 뜬 뒤여야 하기 때문이다.
  *
  * <p>여기서는 turn 을 열지 않는다. 잠금을 풀면 닫기 리스너가 다음 turn 을 정한다. 위임 실행과 그 밖의 실행은 자기
  * Hermes session 으로 돌아 대화의 session 과 겹치지 않으므로 잠금을 잡지 않는다.
@@ -71,7 +71,7 @@ public class RestartReconciler implements SmartLifecycle {
     private static final Duration MAX_RETRY_INTERVAL = Duration.ofSeconds(5);
 
     private final RestartReconcileProperties properties;
-    private final HermesProperties hermesProperties;
+    private final LiveProperties<HermesProperties> hermesProperties;
     private final HermesRunsClient hermes;
     private final AgentExecutionRepository executions;
     private final AgentService agents;
@@ -83,6 +83,7 @@ public class RestartReconciler implements SmartLifecycle {
     private final ConversationRepository conversations;
     private final ConversationEventHub hub;
     private final UserExecutionLimiter limiter;
+    private final BackgroundTasks backgroundTasks;
 
     /** 잡았지만 아직 묻기 시작하지 않은 줄이다. 실행 번호가 열쇠다. {@code this} 로 지킨다. */
     private final Map<Long, Claimed> pending = new LinkedHashMap<>();
@@ -158,8 +159,7 @@ public class RestartReconciler implements SmartLifecycle {
      * {@link NextTurnDispatcher} 의 기동 뒤 깨우기보다 먼저 돈다. 잠금이 잡힌 대화는 그 깨우기가 건너뛴다.
      *
      * <p>{@link #start} 의 잡기가 실패했으면 여기서 다시 잡는다. 그때는 웹 서버가 이미 요청을 받고 있으므로, 기동
-     * 시각보다 뒤에 시작한 줄은 이 프로세스가 돌리는 살아 있는 turn 으로 보고 건드리지 않는다. 예외가 나도 기동을
-     * 실패시키지 않는다.
+     * 시각보다 뒤에 시작한 줄은 이 프로세스가 돌리는 살아 있는 turn 으로 보고 건드리지 않는다. 예외가 나도 기동을 실패시키지 않는다.
      */
     @EventListener(ApplicationReadyEvent.class)
     @Order(0)
@@ -173,8 +173,7 @@ public class RestartReconciler implements SmartLifecycle {
      * 기동 때의 잡기가 실패했으면 기동 시각을 기준으로 다시 잡고, 기억한 줄을 묻기 시작한다.
      *
      * <p>다시 잡기까지 실패해도 이미 기억한 줄은 묻는다. 그 줄은 잠금을 쥐고 있어, 묻지 않으면 그 대화가 잠긴 채
-     * 남는다. 기억하지 못한 줄은 {@code RUNNING} 으로 남아 다음 기동이 정한다. 기준 시각 없는 {@link #claim} 은
-     * 부르지 않는다.
+     * 남는다. 기억하지 못한 줄은 {@code RUNNING} 으로 남아 다음 기동이 정한다. 기준 시각 없는 {@link #claim} 은 부르지 않는다.
      */
     void resumeAfterStart() {
         try {
@@ -233,7 +232,7 @@ public class RestartReconciler implements SmartLifecycle {
     }
 
     private Duration maxWait() {
-        return properties.maxWait() == null ? hermesProperties.runTimeout() : properties.maxWait();
+        return properties.maxWait() == null ? hermesProperties.current().runTimeout() : properties.maxWait();
     }
 
     /**
@@ -364,7 +363,7 @@ public class RestartReconciler implements SmartLifecycle {
         }
         Agent target = agent;
         try {
-            Thread.ofVirtual().name("restart-reconcile-" + row.id()).start(() -> follow(item, target, maxWait, epoch));
+            backgroundTasks.start("restart-reconcile-" + row.id(), () -> follow(item, target, maxWait, epoch));
         } catch (RuntimeException | Error ex) {
             log.warn("남은 실행을 정할 스레드를 띄우지 못했다 executionId={}", row.id(), ex);
             finish(item, epoch);
@@ -398,7 +397,8 @@ public class RestartReconciler implements SmartLifecycle {
         boolean finished = false;
         boolean stopSent = false;
         RecoveredRunKind kind = null;
-        Duration interval = hermesProperties.pollInterval();
+        Duration pollInterval = hermesProperties.current().pollInterval();
+        Duration interval = pollInterval;
         while (true) {
             if (halted(epoch)) {
                 return;
@@ -419,7 +419,7 @@ public class RestartReconciler implements SmartLifecycle {
                     recorder.failWithout(row.id(), REMOTE_RUN_LOST);
                     return;
                 }
-                interval = hermesProperties.pollInterval();
+                interval = pollInterval;
                 if (kind == null) {
                     kind = recorder.kindOf(row);
                 }

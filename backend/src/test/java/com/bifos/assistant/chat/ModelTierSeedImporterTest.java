@@ -14,6 +14,7 @@ import com.bifos.assistant.chat.application.ModelTierSeedImporter;
 import com.bifos.assistant.chat.domain.ModelTierDefinition;
 import com.bifos.assistant.chat.infra.ModelTierDefinitionRepository;
 import com.bifos.assistant.model.domain.type.ModelTier;
+import com.bifos.assistant.shared.config.LiveProperties;
 import com.bifos.assistant.user.infra.AppUserRepository;
 import java.util.ArrayList;
 import java.util.List;
@@ -42,7 +43,8 @@ class ModelTierSeedImporterTest {
                 .when(definitions)
                 .saveAll(any());
 
-        new ModelTierSeedImporter(configured(), definitions, users).run(null);
+        new ModelTierSeedImporter(LiveProperties.fixed(ModelTierProperties.class, configured()), definitions, users)
+                .run(null);
 
         assertThat(saved).extracting(ModelTierDefinition::groupId).containsOnly(10L);
         assertThat(saved)
@@ -57,7 +59,11 @@ class ModelTierSeedImporterTest {
     @Test
     @DisplayName("설정에 모델이 하나도 없으면 아무것도 읽거나 저장하지 않는다")
     void doesNothingWithoutConfiguredMapping() {
-        new ModelTierSeedImporter(new ModelTierProperties(null, null, null), definitions, users).run(null);
+        new ModelTierSeedImporter(
+                        LiveProperties.fixed(ModelTierProperties.class, new ModelTierProperties(null, null, null)),
+                        definitions,
+                        users)
+                .run(null);
 
         verifyNoInteractions(users);
         verify(definitions, never()).saveAll(any());

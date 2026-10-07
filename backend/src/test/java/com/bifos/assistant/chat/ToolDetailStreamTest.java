@@ -35,6 +35,7 @@ import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.auth.CurrentUserProvider;
 import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.shared.error.GlobalExceptionHandler;
+import com.bifos.assistant.testsupport.BackendIntegrationTest;
 import com.bifos.assistant.usage.domain.ExecutionEvent;
 import com.bifos.assistant.usage.domain.type.ExecutionEventType;
 import com.bifos.assistant.usage.infra.AgentExecutionRepository;
@@ -53,14 +54,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.context.TestConfiguration;
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Import;
-import org.springframework.context.annotation.Primary;
 import org.springframework.http.MediaType;
-import org.springframework.test.context.ActiveProfiles;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.RequestBuilder;
@@ -75,24 +69,13 @@ import tools.jackson.databind.json.JsonMapper;
  * <p>판정은 컨트롤러가 서비스에 넘기는 사건 소비자에서 하므로 컨트롤러를 거쳐 SSE 응답을 끝까지 읽는다.
  * 근거는 ADR-038 과 ADR-063 에 있다.
  */
-@SpringBootTest
-@ActiveProfiles("test")
-@Import(ToolDetailStreamTest.StubRuntime.class)
+@BackendIntegrationTest
 class ToolDetailStreamTest {
 
     private static final String COMMAND = "python3 run.py";
     private static final String QUERY = "제주 날씨";
     private static final String GOAL = "숙소를 찾는다";
     private static final String SUBAGENT_MODEL = "example-model-small";
-
-    @TestConfiguration
-    static class StubRuntime {
-        @Bean
-        @Primary
-        StubHermesRunsClient stubHermesRunsClient() {
-            return new StubHermesRunsClient();
-        }
-    }
 
     @Autowired
     ChatService chat;
@@ -128,7 +111,7 @@ class ToolDetailStreamTest {
     HermesRunsClient hermes;
 
     /** 도구 사건을 흘리려면 Hermes 의 사건 스트림을 우리가 열어 주어야 한다. */
-    @MockitoBean
+    @Autowired
     HermesRunEventStream eventStream;
 
     private final CurrentUserProvider currentUser = mock(CurrentUserProvider.class);

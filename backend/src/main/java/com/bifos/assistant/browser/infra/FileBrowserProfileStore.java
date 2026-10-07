@@ -1,6 +1,7 @@
 package com.bifos.assistant.browser.infra;
 
 import com.bifos.assistant.browser.domain.BrowserProfileStore;
+import com.bifos.assistant.shared.config.LiveProperties;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.FileVisitResult;
@@ -26,7 +27,7 @@ public class FileBrowserProfileStore implements BrowserProfileStore {
 
     private static final Pattern KEY = Pattern.compile("^[0-9a-f]{64}$");
 
-    private final BrowserProperties properties;
+    private final LiveProperties<BrowserProperties> properties;
 
     @Override
     public void ensure(String profileKey) {
@@ -85,7 +86,7 @@ public class FileBrowserProfileStore implements BrowserProfileStore {
         if (profileKey == null || !KEY.matcher(profileKey).matches()) {
             throw new IllegalArgumentException("browser profile key is not valid");
         }
-        String root = properties.profileRoot();
+        String root = properties.current().profileRoot();
         if (root == null || root.isBlank()) {
             throw new IllegalStateException("assistant.browser.profile-root is not configured");
         }

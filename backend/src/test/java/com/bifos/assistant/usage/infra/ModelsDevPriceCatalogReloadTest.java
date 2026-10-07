@@ -2,6 +2,7 @@ package com.bifos.assistant.usage.infra;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.bifos.assistant.shared.config.LiveProperties;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -139,7 +140,59 @@ class ModelsDevPriceCatalogReloadTest {
         assertThat(catalog.find("openai", "new-model")).isPresent();
     }
 
+    @Test
+    @DisplayName("설정이 다른 경로를 가리키면 확인 간격을 기다리지 않고 그 파일의 가격을 읽는다")
+    void readsPricesOfOtherPathRightAwayWhenSettingsPointToIt() throws IOException {
+        Path first = write("first.json", catalog("old-model"), FIRST);
+        Path second = write("second.json", catalog("new-model"), SECOND);
+        AtomicReference<PricingProperties> settings = new AtomicReference<>(new PricingProperties(first.toString()));
+        ModelsDevPriceCatalog catalog = catalogOf(live(settings));
+        assertThat(catalog.find("openai", "old-model")).as("처음 설정의 파일").isPresent();
+
+        settings.set(new PricingProperties(second.toString()));
+
+        assertThat(catalog.find("openai", "new-model")).as("바뀐 설정의 파일").isPresent();
+        assertThat(catalog.find("openai", "old-model")).as("이전 파일의 가격을 버린다").isEmpty();
+        assertThat(catalog.version()).isEqualTo("models.dev@2026-09-28");
+    }
+
+    @Test
+    @DisplayName("설정이 같은 record 를 계속 돌려주면 확인 간격 안에서 파일을 다시 읽지 않는다")
+    void doesNotRereadFileWithinCheckIntervalWhileSettingsStayTheSame() throws IOException {
+        Path file = write(catalog("old-model"), FIRST);
+        PricingProperties same = new PricingProperties(file.toString());
+        AtomicReference<PricingProperties> settings = new AtomicReference<>(same);
+        ModelsDevPriceCatalog catalog = catalogOf(live(settings));
+        write(catalog("new-model"), SECOND);
+
+        settings.set(same);
+
+        assertThat(catalog.find("openai", "new-model"))
+                .as("같은 record 면 파일과 스냅숏을 다시 정하지 않는다")
+                .isEmpty();
+        assertThat(catalog.version()).isEqualTo("models.dev@2026-09-17");
+    }
+
     private ModelsDevPriceCatalog catalogOf(Path file) {
+        return catalogOf(LiveProperties.fixed(PricingProperties.class, new PricingProperties(file.toString())));
+    }
+
+    /** 부를 때마다 {@code settings} 의 지금 값을 돌려준다. */
+    private static LiveProperties<PricingProperties> live(AtomicReference<PricingProperties> settings) {
+        return new LiveProperties<>() {
+            @Override
+            public PricingProperties current() {
+                return settings.get();
+            }
+
+            @Override
+            public Class<PricingProperties> type() {
+                return PricingProperties.class;
+            }
+        };
+    }
+
+    private ModelsDevPriceCatalog catalogOf(LiveProperties<PricingProperties> properties) {
         Clock clock = new Clock() {
             @Override
             public ZoneOffset getZone() {
@@ -156,11 +209,15 @@ class ModelsDevPriceCatalogReloadTest {
                 return now.get();
             }
         };
-        return new ModelsDevPriceCatalog(new PricingProperties(file.toString()), clock);
+        return new ModelsDevPriceCatalog(properties, clock);
     }
 
     private Path write(String body, Instant modifiedAt) throws IOException {
-        Path file = dir.resolve("catalog.json");
+        return write("catalog.json", body, modifiedAt);
+    }
+
+    private Path write(String name, String body, Instant modifiedAt) throws IOException {
+        Path file = dir.resolve(name);
         Files.writeString(file, body);
         Files.setLastModifiedTime(file, FileTime.from(modifiedAt));
         return file;

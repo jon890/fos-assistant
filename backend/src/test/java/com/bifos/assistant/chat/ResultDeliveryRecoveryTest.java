@@ -43,6 +43,8 @@ import com.bifos.assistant.hermes.dto.HermesRunResult;
 import com.bifos.assistant.hermes.dto.TokenUsage;
 import com.bifos.assistant.memory.infra.MemoryRepository;
 import com.bifos.assistant.shared.domain.type.UserRole;
+import com.bifos.assistant.testsupport.BackendIntegrationTest;
+import com.bifos.assistant.testsupport.DelegationWakeEnabled;
 import com.bifos.assistant.usage.application.ExecutionDeliveryWriter;
 import com.bifos.assistant.usage.domain.AgentExecution;
 import com.bifos.assistant.usage.domain.type.ExecutionStatus;
@@ -61,11 +63,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.context.annotation.Import;
-import org.springframework.test.context.ActiveProfiles;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
-import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 
 /**
  * 이전 프로세스가 {@code RUNNING} 으로 남긴 전달 시도를 기동할 때 닫고, 기동 정리가 정한 부모 실행 줄의 시도를 그 줄과 함께
@@ -74,9 +71,8 @@ import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
  * <p>줄은 이전 프로세스가 남긴 것처럼 저장소로 직접 만든다. 기준 시각은 고정한 값을 넘긴다. 깨우기를 켜 두어 「다시 열리지
  * 않는다」 검사가 실제로 기동 훑기를 거친다.
  */
-@SpringBootTest(properties = "assistant.delegation-wake.enabled=true")
-@ActiveProfiles("test")
-@Import(ChatServiceTest.StubRuntime.class)
+@BackendIntegrationTest
+@DelegationWakeEnabled
 class ResultDeliveryRecoveryTest {
 
     private static final Duration WAIT_LIMIT = Duration.ofSeconds(10);
@@ -88,11 +84,11 @@ class ResultDeliveryRecoveryTest {
     private static final Instant AFTER_START = STARTED_AT.plus(Duration.ofMinutes(1));
 
     /** 자동 turn 의 답 조각은 이 검사가 보지 않는다. 실제 스트림 주소로 연결하지 않게 대역으로 둔다. */
-    @MockitoBean
+    @Autowired
     HermesRunEventStream eventStream;
 
     /** 시도 하나를 닫다 실패하는 경우를 만들려고 감싼다. 그 밖의 검사에서는 실제 동작 그대로다. */
-    @MockitoSpyBean
+    @Autowired
     ResultDeliveryAttemptRepository attempts;
 
     @Autowired

@@ -189,30 +189,6 @@ public class Memory {
         return memory;
     }
 
-    /**
-     * 주인이 검토한 묶음에서 들인 줄이다(ADR-058). 곧 ACCEPTED 이고 승인한 사람은 주인이다. 출처 칸 셋이 어느 파일에서
-     * 왔는지 남긴다.
-     */
-    public static Memory imported(
-            Long ownerUserId,
-            MemoryEntryType entryType,
-            String documentKey,
-            String title,
-            StoredContent body,
-            MemoryPlacement placement,
-            String sourceType,
-            String sourceRef,
-            LocalDate sourceDate,
-            Instant now) {
-        Memory memory = accepted(MemoryScope.USER, ownerUserId, null, title, body, placement, ownerUserId, now);
-        memory.entryType = entryType;
-        memory.documentKey = documentKey;
-        memory.sourceType = sourceType;
-        memory.sourceRef = sourceRef;
-        memory.sourceDate = sourceDate;
-        return memory;
-    }
-
     public static Memory proposedUser(
             Long ownerUserId,
             String title,

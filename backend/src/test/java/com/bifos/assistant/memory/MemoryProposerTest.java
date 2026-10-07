@@ -2,9 +2,9 @@ package com.bifos.assistant.memory;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
 
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.agent.domain.type.AgentVisibility;
@@ -26,9 +26,12 @@ import com.bifos.assistant.memory.infra.MemoryRepository;
 import com.bifos.assistant.model.domain.ModelChoice;
 import com.bifos.assistant.model.domain.type.ModelTier;
 import com.bifos.assistant.shared.auth.CurrentUser;
+import com.bifos.assistant.shared.config.LiveProperties;
 import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
+import com.bifos.assistant.testsupport.BackendIntegrationTest;
+import com.bifos.assistant.testsupport.MemoryProposeEnabled;
 import com.bifos.assistant.usage.application.ExecutionContextSnapshot;
 import com.bifos.assistant.usage.application.ExecutionEventRecorder;
 import com.bifos.assistant.usage.application.ExecutionRecorder;
@@ -53,29 +56,12 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentMatchers;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.context.TestConfiguration;
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Import;
-import org.springframework.context.annotation.Primary;
-import org.springframework.test.context.ActiveProfiles;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.transaction.support.TransactionTemplate;
 import tools.jackson.databind.ObjectMapper;
 
-@SpringBootTest(properties = "assistant.memory.propose.enabled=true")
-@ActiveProfiles("test")
-@Import(MemoryProposerTest.StubRuntime.class)
+@BackendIntegrationTest
+@MemoryProposeEnabled
 class MemoryProposerTest {
-
-    @TestConfiguration
-    static class StubRuntime {
-        @Bean
-        @Primary
-        StubHermesRunsClient stubHermesRunsClient() {
-            return new StubHermesRunsClient();
-        }
-    }
 
     private static final CurrentUser USER = new CurrentUser(1L, "user@example.com", "user", 1L, UserRole.MEMBER);
 
@@ -103,7 +89,7 @@ class MemoryProposerTest {
     @Autowired
     HermesRunsClient hermes;
 
-    @MockitoBean
+    @Autowired
     PriceCatalog prices;
 
     @Autowired
@@ -363,10 +349,11 @@ class MemoryProposerTest {
     @DisplayName("실패한 Memory 제안도 사용량과 실제 모델 비용을 보존하고 원래 대화에는 오류를 전하지 않는다")
     void preservesUsageAndCostWithoutThrowingWhenProposalReturnsFailure(String errorCode) {
         AgentExecution parent = recorder.start(USER, conversation.executionConversation(), agent, null, null, 0L);
-        when(prices.find("served-provider", "served-model"))
-                .thenReturn(Optional.of(new CatalogPrice(
+        doReturn(Optional.of(new CatalogPrice(
                         new ModelPrice(new BigDecimal("5"), new BigDecimal("30"), new BigDecimal("0.5"), List.of()),
-                        "test-pricing@2026-10-01")));
+                        "test-pricing@2026-10-01")))
+                .when(prices)
+                .find("served-provider", "served-model");
         String error = "PROVIDER_BLOCKED".equals(errorCode)
                 ? HermesRunResult.PROVIDER_AUTH_FAILED_PREFIX + " every account is blocked"
                 : "provider stopped after generating tokens";
@@ -436,7 +423,7 @@ class MemoryProposerTest {
                         ArgumentMatchers.any(),
                         ArgumentMatchers.any());
         MemoryProposer isolated = new MemoryProposer(
-                new MemoryProposalProperties(true),
+                LiveProperties.fixed(MemoryProposalProperties.class, new MemoryProposalProperties(true)),
                 mock(MemoryService.class),
                 mock(HermesRunsClient.class),
                 failingRecorder,

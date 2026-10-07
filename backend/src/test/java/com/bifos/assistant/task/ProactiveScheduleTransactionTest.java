@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.clearInvocations;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -35,6 +36,7 @@ import com.bifos.assistant.task.domain.type.TaskState;
 import com.bifos.assistant.task.infra.TaskRepository;
 import com.bifos.assistant.task.infra.TaskRunRepository;
 import com.bifos.assistant.task.infra.TaskTriggerRepository;
+import com.bifos.assistant.testsupport.BackendIntegrationTest;
 import com.bifos.assistant.user.domain.AppUser;
 import com.bifos.assistant.user.infra.AppUserRepository;
 import java.time.Instant;
@@ -50,24 +52,20 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.test.context.ActiveProfiles;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 /**
  * Hermes 준비 상태를 읽지 못해도 매일 깨우기를 끈 트랜잭션이 커밋되고, 이후 발화가 새 살펴보기를 열지 않는지 실제 DB로 본다.
  */
-@SpringBootTest
-@ActiveProfiles("test")
+@BackendIntegrationTest
 class ProactiveScheduleTransactionTest {
 
     private static final Instant NOW = Instant.parse("2026-11-01T00:00:00Z");
     private static final Instant DUE = Instant.parse("2026-11-01T00:01:00Z");
 
-    @MockitoBean
+    @Autowired
     HermesToolsetClient toolsets;
 
-    @MockitoBean
+    @Autowired
     SkillCommandCatalog skills;
 
     @Autowired
@@ -105,7 +103,7 @@ class ProactiveScheduleTransactionTest {
 
     @BeforeEach
     void setUp() {
-        when(skills.enabledNames(any(Agent.class))).thenReturn(Set.of("proactive-check"));
+        doReturn(Set.of("proactive-check")).when(skills).enabledNames(any(Agent.class));
         when(toolsets.readEnabled(anyString(), anyString())).thenReturn(List.of("web", "skills", "fos-assistant"));
     }
 
@@ -132,7 +130,7 @@ class ProactiveScheduleTransactionTest {
 
         reset(toolsets, skills);
         when(toolsets.readEnabled(anyString(), anyString())).thenThrow(new ApiException(errorCode, "Hermes " + band));
-        when(skills.enabledNames(any(Agent.class))).thenReturn(Set.of("proactive-check"));
+        doReturn(Set.of("proactive-check")).when(skills).enabledNames(any(Agent.class));
 
         var read = schedules.get(fixture.currentUser(), fixture.agent().code());
 
@@ -165,7 +163,7 @@ class ProactiveScheduleTransactionTest {
 
         reset(toolsets, skills);
         when(toolsets.readEnabled(anyString(), anyString())).thenReturn(List.of("web", "skills", "fos-assistant"));
-        when(skills.enabledNames(any(Agent.class))).thenReturn(Set.of("proactive-check"));
+        doReturn(Set.of("proactive-check")).when(skills).enabledNames(any(Agent.class));
 
         assertThat(firing.fireDue(DUE)).as("복구 뒤 새 CHECK 발화").isZero();
         assertThat(starter.startQueued(DUE)).as("기존 QUEUED CHECK 시작").isZero();

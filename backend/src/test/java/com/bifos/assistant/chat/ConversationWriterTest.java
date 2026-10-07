@@ -6,21 +6,19 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import com.bifos.assistant.chat.application.ConversationWriter;
 import com.bifos.assistant.chat.domain.Conversation;
 import com.bifos.assistant.chat.infra.ConversationRepository;
+import com.bifos.assistant.testsupport.BackendIntegrationTest;
 import java.time.Instant;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.dao.InvalidDataAccessApiUsageException;
-import org.springframework.test.context.ActiveProfiles;
 
 /**
  * 대화의 조건부 update 가 트랜잭션을 {@link ConversationWriter} 에서 얻는 것을 고정한다.
  *
  * <p>이 클래스의 검사는 트랜잭션 밖에서 돈다. 오래 도는 turn 이 이 update 를 그렇게 부르기 때문이다.
  */
-@SpringBootTest
-@ActiveProfiles("test")
+@BackendIntegrationTest
 class ConversationWriterTest {
 
     private static final long WRITER_USER_ID = 9203L;

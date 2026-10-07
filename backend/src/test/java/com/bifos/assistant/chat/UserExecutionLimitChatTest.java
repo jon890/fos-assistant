@@ -42,6 +42,8 @@ import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.shared.error.GlobalExceptionHandler;
+import com.bifos.assistant.testsupport.BackendIntegrationTest;
+import com.bifos.assistant.testsupport.SmallExecutionLimit;
 import com.bifos.assistant.usage.application.UserExecutionLimiter;
 import com.bifos.assistant.usage.domain.AgentExecution;
 import com.bifos.assistant.usage.domain.type.ExecutionStatus;
@@ -69,11 +71,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
-import org.springframework.test.context.ActiveProfiles;
-import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
@@ -83,9 +81,8 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
  * <p>한도를 2 로 두고, 같은 사용자의 두 대화에서 turn 을 붙잡아 자리를 채운다. 붙잡는 것은 그 turn 의 글을 담은 제출만이다.
  * 대역 전체를 붙잡으면 다른 사용자의 실행까지 멈춘다.
  */
-@SpringBootTest(properties = "assistant.user-execution.max-running=2")
-@ActiveProfiles("test")
-@Import(ChatServiceTest.StubRuntime.class)
+@BackendIntegrationTest
+@SmallExecutionLimit
 class UserExecutionLimitChatTest {
 
     private static final Duration WAIT_LIMIT = Duration.ofSeconds(10);
@@ -108,7 +105,7 @@ class UserExecutionLimitChatTest {
     @Autowired
     ConversationEventHub hub;
 
-    @MockitoSpyBean
+    @Autowired
     UserExecutionLimiter limiter;
 
     @Autowired

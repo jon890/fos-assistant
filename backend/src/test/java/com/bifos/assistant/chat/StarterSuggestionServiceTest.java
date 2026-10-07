@@ -3,6 +3,7 @@ package com.bifos.assistant.chat;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.spy;
@@ -32,9 +33,12 @@ import com.bifos.assistant.hermes.dto.SessionRuntime;
 import com.bifos.assistant.hermes.dto.TokenUsage;
 import com.bifos.assistant.model.domain.ModelChoice;
 import com.bifos.assistant.shared.auth.CurrentUser;
+import com.bifos.assistant.shared.config.LiveProperties;
 import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
+import com.bifos.assistant.testsupport.BackendIntegrationTest;
+import com.bifos.assistant.testsupport.OverrideProperties;
 import com.bifos.assistant.usage.application.ExecutionRecorder;
 import com.bifos.assistant.usage.application.UserExecutionLimiter;
 import com.bifos.assistant.usage.domain.CatalogPrice;
@@ -62,13 +66,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.context.TestConfiguration;
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Import;
-import org.springframework.context.annotation.Primary;
-import org.springframework.test.context.ActiveProfiles;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import tools.jackson.databind.ObjectMapper;
 
 /**
@@ -77,31 +74,20 @@ import tools.jackson.databind.ObjectMapper;
  * <p>서비스를 직접 만들어 시각과 실행기를 바꿔 끼운다. 시각을 옮겨 오래됨과 재시도 시간을 만들고, 실행기가 받은
  * 만들기가 끝나기를 기다린 뒤 결과를 읽는다. 다른 검사에서는 추천이 꺼져 있고 이 검사만 켠다.
  */
-@SpringBootTest(
-        properties = {
-            "assistant.starters.enabled=true",
-            "assistant.starters.refresh-after=24h",
-            "assistant.starters.retry-after-failure=10m"
-        })
-@ActiveProfiles("test")
-@Import(StarterSuggestionServiceTest.StubRuntime.class)
+@BackendIntegrationTest
+@OverrideProperties({
+    "assistant.starters.enabled=true",
+    "assistant.starters.refresh-after=24h",
+    "assistant.starters.retry-after-failure=10m"
+})
 class StarterSuggestionServiceTest {
-
-    @TestConfiguration
-    static class StubRuntime {
-        @Bean
-        @Primary
-        StubHermesRunsClient stubHermesRunsClient() {
-            return new StubHermesRunsClient();
-        }
-    }
 
     private static final CurrentUser DAD = new CurrentUser(81L, "dad@example.com", "아빠", 1L, UserRole.MEMBER);
     private static final CurrentUser KID = new CurrentUser(82L, "kid@example.com", "아이", 1L, UserRole.MEMBER);
     private static final List<String> FOUR = List.of("일정 정리해 줘", "장보기 목록 만들어 줘", "날씨 알려 줘", "가계부 요약해 줘");
 
     @Autowired
-    StarterProperties properties;
+    LiveProperties<StarterProperties> properties;
 
     @Autowired
     AgentService agentService;
@@ -136,7 +122,7 @@ class StarterSuggestionServiceTest {
     @Autowired
     UserExecutionLimiter limiter;
 
-    @MockitoBean
+    @Autowired
     PriceCatalog prices;
 
     private final MutableClock clock = new MutableClock(Instant.parse("2026-01-01T00:00:00Z"));
@@ -455,10 +441,11 @@ class StarterSuggestionServiceTest {
     @ValueSource(strings = {"FAILED", "PROVIDER_BLOCKED", "STARTER_OUTPUT_INVALID"})
     @DisplayName("추천 실패와 잘못된 답은 사용량과 실제 모델 비용을 보존하고 재시도 시간 동안 NONE 을 준다")
     void preservesUsageAndCostForFailedResultAndInvalidOutput(String errorCode) {
-        when(prices.find("served-provider", "served-model"))
-                .thenReturn(Optional.of(new CatalogPrice(
+        doReturn(Optional.of(new CatalogPrice(
                         new ModelPrice(new BigDecimal("5"), new BigDecimal("30"), new BigDecimal("0.5"), List.of()),
-                        "test-pricing@2026-10-01")));
+                        "test-pricing@2026-10-01")))
+                .when(prices)
+                .find("served-provider", "served-model");
         boolean invalidOutput = "STARTER_OUTPUT_INVALID".equals(errorCode);
         String error = "PROVIDER_BLOCKED".equals(errorCode)
                 ? HermesRunResult.PROVIDER_AUTH_FAILED_PREFIX + " every account is blocked"

@@ -34,6 +34,7 @@ import com.bifos.assistant.orchestration.application.SessionOwnerResolver;
 import com.bifos.assistant.proactive.application.CheckNotificationPolicy;
 import com.bifos.assistant.proactive.application.ProactiveCheckGuard;
 import com.bifos.assistant.proactive.domain.ProactiveCheck;
+import com.bifos.assistant.shared.config.LiveProperties;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.util.Sha256;
 import com.bifos.assistant.usage.domain.AgentExecution;
@@ -111,7 +112,7 @@ public class ConnectorPolicyService {
     private final ConnectorToolGrantRepository grants;
     private final SessionOwnerResolver owners;
     private final ConnectorCatalogCache catalog;
-    private final ConnectorPolicyProperties properties;
+    private final LiveProperties<ConnectorPolicyProperties> properties;
     private final ApplicationEventPublisher events;
     private final NotificationService notifications;
     private final ConversationNotices conversations;
@@ -130,7 +131,7 @@ public class ConnectorPolicyService {
             ConnectorToolGrantRepository grants,
             SessionOwnerResolver owners,
             ConnectorCatalogCache catalog,
-            ConnectorPolicyProperties properties,
+            LiveProperties<ConnectorPolicyProperties> properties,
             ApplicationEventPublisher events,
             NotificationService notifications,
             ConversationNotices conversations,
@@ -161,7 +162,7 @@ public class ConnectorPolicyService {
             ConnectorToolGrantRepository grants,
             SessionOwnerResolver owners,
             ConnectorCatalogCache catalog,
-            ConnectorPolicyProperties properties,
+            LiveProperties<ConnectorPolicyProperties> properties,
             ApplicationEventPublisher events,
             NotificationService notifications,
             ConversationNotices conversations,
@@ -292,7 +293,7 @@ public class ConnectorPolicyService {
                 argsSha256,
                 now);
         if (needsApproval) {
-            action.awaitApproval(argsJson, now.plus(properties.approvalTtl()));
+            action.awaitApproval(argsJson, now.plus(properties.current().approvalTtl()));
         }
         try {
             ConnectorAction saved = transactions.execute(status -> {

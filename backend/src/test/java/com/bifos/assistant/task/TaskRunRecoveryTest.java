@@ -36,6 +36,7 @@ import com.bifos.assistant.task.domain.type.TaskRunStatus;
 import com.bifos.assistant.task.infra.TaskRepository;
 import com.bifos.assistant.task.infra.TaskRunRepository;
 import com.bifos.assistant.task.infra.TaskTriggerRepository;
+import com.bifos.assistant.testsupport.BackendIntegrationTest;
 import com.bifos.assistant.user.domain.AppUser;
 import com.bifos.assistant.user.infra.AppUserRepository;
 import java.time.Clock;
@@ -50,9 +51,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.data.domain.PageRequest;
-import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /**
@@ -62,8 +61,7 @@ import org.springframework.transaction.support.TransactionTemplate;
  * <p>{@code @SpringBootTest} 컨텍스트는 이미 기동 사건을 지나 정리가 끝난 것으로 적혀 있다. 그래서 끝나기 전의 모습은
  * {@link TaskRunRecovery} 와 {@link TaskDispatcher} 를 직접 만들어 본다.
  */
-@SpringBootTest
-@ActiveProfiles("test")
+@BackendIntegrationTest
 class TaskRunRecoveryTest {
 
     private static final Instant NOW = Instant.parse("2026-11-01T00:00:30Z");
