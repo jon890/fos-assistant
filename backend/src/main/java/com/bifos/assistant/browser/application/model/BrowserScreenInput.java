@@ -6,12 +6,7 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.Map;
 
-/**
- * 화면에 보내는 입력 하나다. 모양은 {@code docs/backend/user-browser.md} 의 「로그인 화면」 이 정하고, 받는 쪽이 이미 검사했다.
- *
- * <p>칸은 종류마다 필요한 것만 채운다. 좌표는 프레임 그림 안의 비율(0~1)이고, {@code key} 는 {@link #KEYS} 가운데 하나다.
- * 본문(글자, 좌표, 주소)은 로그와 오류 응답에 싣지 않는다.
- */
+/** 화면에 보내는 입력 하나다. 모양은 {@code docs/backend/user-browser.md} 의 「로그인 화면」 이 정하고, 받는 쪽이 이미 검사했다. */
 public record BrowserScreenInput(
         Kind kind,
         String action,

@@ -407,7 +407,7 @@ class UserBrowserServiceTest {
                         new FakeCdp(),
                         new FakeCdp(),
                         new BrowserUsage(),
-                        Duration.ofMinutes(30),
+                        () -> Duration.ofMinutes(30),
                         Duration.ofSeconds(2)));
     }
 

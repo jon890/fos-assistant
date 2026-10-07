@@ -58,7 +58,7 @@ class BrowserScreensTest {
         cdp = new FakeCdp();
         cdp.pages.add(new CdpTarget("T1", "첫 탭", "https://example.com/"));
         usage = new BrowserUsage();
-        screens = new BrowserScreens(cdp, cdp, usage, Duration.ofMinutes(30), Duration.ofHours(1));
+        screens = new BrowserScreens(cdp, cdp, usage, () -> Duration.ofMinutes(30), Duration.ofHours(1));
         runtime = new FakeBrowserRuntime();
         service = service(repository);
         sweeper =

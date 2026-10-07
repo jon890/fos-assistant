@@ -123,6 +123,8 @@ QR 로그인은 세션 쿠키만 준다(2026-10-08 실측). 그래서 QR 로그�
 탭에 붙지 못하면 `BROWSER_START_FAILED` 다.
 
 한 브라우저에 화면은 하나다. 새로 열면 앞의 화면에 `closed`(`replaced`)를 보내고 닫는다.
+화면 등록부는 JVM 메모리에 둔다. Control Plane 은 한 프로세스이고 재기동하면 SSE 도 끊긴다. 화면마다 도는 탭 확인, 시간 초과, `ping` 은 스케줄러 하나로 돌고 화면이 닫히면 취소된다.
+SSE 자체의 시간 제한은 두지 않고 화면의 수명은 `screen-timeout` 이 정한다. 사건은 한 번에 하나씩 쓴다.
 화면이 열려 있는 동안 자동 중지하지 않고(`BrowserUsage`), 입력마다 활동을 기록한다. 끄기와 지우기, 사용자 끄기는 브라우저를 멈추기 전에 화면을 닫는다.
 화면은 `Page.startScreencast {format: "jpeg", quality: 60, maxWidth: 1280, maxHeight: 2000}` 로 프레임을 받고, SSE 에 쓴 뒤에 ack 한다.
 받는 쪽이 읽지 않으면 ack 도 멈추므로 Chrome 이 프레임을 더 보내지 않는다.

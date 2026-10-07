@@ -140,9 +140,7 @@ public final class UserBrowserDtos {
                     require("width", width != null && width >= 320 && width <= 1600);
                     require("height", height != null && height >= 320 && height <= 2000);
                 }
-                case BACK, RELOAD -> {
-                    // 칸이 없다
-                }
+                case BACK, RELOAD -> {}
             }
             return new BrowserScreenInput(
                     kind,

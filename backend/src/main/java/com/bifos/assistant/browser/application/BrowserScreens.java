@@ -19,28 +19,19 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
-/**
- * 브라우저마다 열린 로그인 화면 하나를 갖는 등록부다.
- *
- * <p>새 화면을 열면 앞의 화면에 {@code closed}({@code replaced})를 보내고 닫는다. 브라우저를 멈추기 전에 {@link #close(Long)} 로
- * 화면을 닫는다. 화면마다 도는 탭 목록 확인과 시간 초과는 이 등록부의 스케줄러 하나로 돌고, 화면이 닫히면 취소된다.
- *
- * <p>JVM 메모리에 둔다. Control Plane 은 한 프로세스이고, 재기동하면 SSE 도 함께 끊긴다.
- */
+/** 브라우저마다 열린 로그인 화면 하나를 갖는 JVM 메모리 등록부다. 화면마다 도는 예약은 스케줄러 하나로 돈다. */
 @Slf4j
 @Component
 public class BrowserScreens implements AutoCloseable {
 
     private static final Duration TAB_INTERVAL = Duration.ofSeconds(2);
-    /** 끊긴 받는 쪽을 알아보려고 주석 줄을 보내는 간격이다. */
+    // 끊긴 받는 쪽을 알아보려고 주석 줄을 보내는 간격이다
     private static final Duration HEARTBEAT = Duration.ofSeconds(15);
-
     private final CdpTargets targets;
     private final CdpConnector connector;
     private final BrowserUsage usage;
-    /** 화면을 열 때마다 읽는다. 운영 설정을 바꾸면 다음 화면부터 적용된다. */
+    // 화면을 열 때마다 읽는다. 운영 설정을 바꾸면 다음 화면부터 적용된다
     private final Supplier<Duration> timeout;
-
     private final Duration tabInterval;
     private final ScheduledThreadPoolExecutor scheduler;
     private final Map<Long, BrowserScreenSession> screens = new ConcurrentHashMap<>();
@@ -55,11 +46,6 @@ public class BrowserScreens implements AutoCloseable {
     }
 
     BrowserScreens(
-            CdpTargets targets, CdpConnector connector, BrowserUsage usage, Duration timeout, Duration tabInterval) {
-        this(targets, connector, usage, () -> timeout, tabInterval);
-    }
-
-    private BrowserScreens(
             CdpTargets targets,
             CdpConnector connector,
             BrowserUsage usage,

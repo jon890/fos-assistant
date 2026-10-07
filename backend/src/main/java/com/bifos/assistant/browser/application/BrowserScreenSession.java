@@ -27,35 +27,35 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
 import lombok.AccessLevel;
+import lombok.Getter;
 import lombok.RequiredArgsConstructor;
+import lombok.experimental.Accessors;
 import lombok.extern.slf4j.Slf4j;
 import tools.jackson.databind.JsonNode;
 
-/**
- * 로그인 화면 하나다. CDP 연결 하나, 받는 쪽 하나, 사용 핸들 하나를 쥔다. 계약은 {@code docs/backend/user-browser.md} 의
- * 「로그인 화면」 이 갖는다.
- *
- * <p>프레임은 받는 쪽에 넘긴 뒤 ack 한다. 탭 목록이 바뀌면 알리고, 새 탭(로그인 팝업)이 생기면 그 탭으로 옮긴다. 좌표 입력은 마지막
- * 프레임의 화면 크기로 바꾸고, 프레임이 아직 없으면 버린다. 입력 본문은 로그에 남기지 않는다.
- */
+/** 로그인 화면 하나다. CDP 연결, 받는 쪽, 사용 핸들을 하나씩 쥔다. 계약은 {@code docs/backend/user-browser.md} 의 「로그인 화면」 이다. */
 @Slf4j
 @RequiredArgsConstructor(access = AccessLevel.PACKAGE)
+@Accessors(fluent = true)
 public class BrowserScreenSession {
 
     /** screencast 인자다. 프레임 하나가 수백 KB 다. */
     static final Map<String, Object> SCREENCAST =
             Map.of("format", "jpeg", "quality", 60, "maxWidth", 1280, "maxHeight", 2000);
 
-    /** {@code closed} 의 까닭이다. 다른 화면이 열렸다, 브라우저가 멈췄다, 시간이 지났다. */
+    // closed 의 까닭이다. 다른 화면이 열렸다, 브라우저가 멈췄다, 시간이 지났다
     static final String REPLACED = "replaced";
-
     static final String STOPPED = "stopped";
     static final String TIMEOUT = "timeout";
     /** 프레임 없이 연이어 끊긴 연결을 다시 잇는 상한이다. */
     static final int MAX_RECONNECTS = 3;
 
+    @Getter(AccessLevel.PACKAGE)
     private final Long browserId;
+
+    @Getter(AccessLevel.PACKAGE)
     private final Long userId;
+
     private final URI cdp;
     private final CdpTargets targets;
     private final CdpConnector connector;
@@ -67,27 +67,16 @@ public class BrowserScreenSession {
     private final List<ScheduledFuture<?>> tasks = new ArrayList<>();
     private final Object lock = new Object();
 
-    /** 지금 붙은 탭과 그 연결이다. {@link #lock} 으로 지킨다. 탭을 옮길 때마다 세대가 오른다. */
+    // 아래 상태는 lock 으로 지킨다. 탭을 옮길 때마다 세대가 오른다
     private CdpConnection connection;
-
     private String targetId;
     private long generation;
     private boolean mouseDown;
     private List<CdpTarget> tabs = List.of();
-    /** 프레임 없이 연이어 다시 이은 횟수와 마지막 {@code resize} 인자다. */
+    // 프레임 없이 연이어 다시 이은 횟수, 마지막 resize 인자, 마지막 프레임의 화면 크기(CSS 픽셀)다
     private int reconnects;
-
     private volatile Map<String, Object> metrics;
-    /** 마지막 프레임의 화면 크기(CSS 픽셀)다. 프레임이 아직 없으면 비어 있다. */
     private volatile Viewport viewport;
-
-    Long browserId() {
-        return browserId;
-    }
-
-    Long userId() {
-        return userId;
-    }
 
     boolean closed() {
         return closed.get();

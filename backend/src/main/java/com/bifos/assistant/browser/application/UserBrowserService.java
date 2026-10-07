@@ -51,9 +51,8 @@ public class UserBrowserService {
     public static final String STOP_FAILED = "stop_failed";
 
     private static final Duration POLL_INTERVAL = Duration.ofMillis(500);
-    /** 활동을 다시 기록하기까지의 간격이다. {@link UserBrowser#touch(Instant)} 와 같다. */
+    // 활동을 다시 기록하기까지의 간격이다. UserBrowser.touch 와 같다
     private static final Duration TOUCH_INTERVAL = Duration.ofMinutes(1);
-
     private static final List<UserBrowserStatus> COUNTED =
             List.of(UserBrowserStatus.STARTING, UserBrowserStatus.RUNNING);
 
