@@ -29,13 +29,8 @@ Memory 는 에이전트가 실행할 때 `instructions` 로 받는 사실이다.
 - 문서(`DOCUMENT`)는 사용자가 직접 쓰고 고친다. 곧 `ACCEPTED` 이고 꺼내는 방식은 `SEARCH` 다.
   Memory 목록(`GET /api/v1/memories`)은 종류가 `MEMORY` 인 줄만 내고, `PATCH /api/v1/memories/{id}` 와 승인과 거절은 문서에 `MEMORY_NOT_FOUND` 로 답한다.
   문서는 `/api/v1/memory-documents` 가 따로 다룬다. 고칠 때 화면이 읽은 판 번호를 함께 보내고, 지금 판과 다르면 `MEMORY_REVISION_CONFLICT` 로 거절한다([ADR-057](../adr/ADR-057-문서는-사람이-화면에서-직접-쓰고-고친다.md)).
-- 기존 개인 지식은 주인이 검토한 묶음을 `/memory` 화면에서 올려 들인다.
-  `POST /api/v1/memory-imports/preview` 는 대조만 하고 `POST /api/v1/memory-imports` 가 `NEW` 인 항목만 한 트랜잭션으로 저장한다.
-  들인 줄은 요청자가 주인인 `USER` 범위의 `ACCEPTED` 이고 `source_type` 이 `brain` 이다.
-  같은 `source_ref` 는 `DUPLICATE`, 같은 문서 이름이나 같은 제목은 `CONFLICT` 로 답하고 저장하지 않는다.
-  쓰는 길은 웹 JWT 뿐이다. 서비스 토큰은 읽기만 한다.
-  묶음을 만드는 스크립트는 `scripts/brain-import/` 에 있고 주인의 기기에서 돈다. 어디에도 저장하지 않는다.
-  신원 항목(`identity`)은 아직 `IDENTITY_HELD` 로 거절한다.
+- 기존 개인 지식의 일회성 이관은 끝났다. 이관 도구와 기억 가져오기 API 는 제거했다.
+  이미 들인 항목의 `source_type=brain`, `source_ref`, `source_date` 는 출처 기록으로 보존한다.
 - 서비스 토큰은 만료가 필수이고(1일에서 365일), 주인이 허용 목록에 켜져 있을 때만 통한다.
   인증마다 `shared.auth.UserAccessPolicy` 로 묻고 `people.application.AllowedUserAccessPolicy` 가 로그인 판정과 같은 답을 낸다.
   발급도 같은 질문을 먼저 한다. 꺼진 사용자는 살아 있는 웹 세션으로도 새 토큰을 받지 못한다. 그 요청은 발급에 닿기 전에 필터에서 401 `ACCESS_REVOKED` 로 막힌다(ADR-059). 허용 목록에 줄이 없는 사용자는 발급에서 403 `FORBIDDEN` 이다.
@@ -85,11 +80,9 @@ Memory 는 에이전트가 실행할 때 `instructions` 로 받는 사실이다.
 | `memory.application.model.MemoryAccess` | 한 실행이 받는 collection 과 민감 허용 |
 | `memory.infra.MemoryQueries` | 볼 수 있는 항목과 실행에 실을 항목을 고르는 조건. 모두 읽어 온 뒤 거르지 않고 데이터베이스가 고른다. 검색을 붙일 때도 이 조건 뒤에 붙인다 |
 | `memory.application.MemoryCollectionService` | 그룹의 collection 목록. 줄이 없는 그룹이면 기본 일곱 개를 넣는다 |
-| `memory.application.MemoryImportService` | 묶음을 항목마다 대조하고 `NEW` 인 항목만 한 트랜잭션으로 저장한다. 미리보기와 저장이 같은 판정을 쓴다 |
 | `memory.application.ServiceTokenService` | 서비스 토큰의 발급과 폐기, 원문으로 요청자 증명, 사용자를 끈 사건을 받아 토큰 폐기 |
 | `memory.presentation.ServiceTokenInterceptor` | `/api/v1/service/**` 의 인증. 증명한 요청자를 요청 속성에 둔다 |
 | `memory.presentation.MemoryDocumentController` | 사용자가 문서를 만들고 읽고 고치는 API 와 collection 목록 |
-| `memory.presentation.MemoryImportController` | 웹 JWT 로 묶음을 미리보고 들이는 API |
 | `memory.presentation.MemoryDocumentServiceController` | 서비스 토큰으로 문서 하나를 읽는 API |
 | `agent.application.AgentMemoryCollectionService` | 에이전트가 받는 collection 읽기, 새 에이전트에 `core` 넣기 |
 
@@ -176,47 +169,16 @@ sequenceDiagram
 민감도를 일반에서 민감으로 바꾸는 수정은 물러나는 판과 앞선 평문 판을 같은 트랜잭션에서 암호화한다. key 가 없으면 아무것도 바뀌지 않는다.
 지금 화면의 수정이 항상 싣는 설정을 끄면 색인으로 간다. 이미 보관한 항목은 보관한 채로 둔다.
 
-### 기존 개인 지식을 들일 때
+### 기존 개인 지식의 이관 종료
 
-```mermaid
-sequenceDiagram
-    participant O as 주인
-    participant P as 주인의 기기
-    participant W as 웹
-    participant C as Control Plane
-    participant D as 데이터베이스
+일회성 이관이 끝났고 원본 저장소와 분석기도 삭제됐다.
+이관 스크립트와 기억 가져오기 API, 웹의 가져오기 프록시는 제거했다.
+앞으로 기억과 문서는 기존의 작성·수정 API 로 관리한다.
 
-    O->>P: 분석기가 보고서를 만든다
-    O->>P: 결정 파일을 고쳐 들일 항목을 적는다
-    P->>P: 묶는다. PENDING 이 남았으면 멈춘다
-    O->>W: 묶음 파일을 화면에 올린다
-    W->>C: POST /api/v1/memory-imports/preview
-    C->>D: 출처와 문서 이름과 제목으로 항목마다 대조한다
-    C-->>W: 항목마다 NEW, DUPLICATE, CONFLICT, REJECTED
-    O->>W: 미리보기를 보고 확인한다
-    W->>C: POST /api/v1/memory-imports
-    C->>D: NEW 인 항목만 한 트랜잭션으로 저장한다
-    C-->>W: 항목마다 결과와 저장한 번호
-```
-
-보고서와 결정 파일과 묶음은 주인의 기기에만 있고 저장소에 넣지 않는다. 묶음은 민감 본문을 평문으로 담으므로 가져오기가 끝나면 지운다.
-들이기는 본문으로 대조하지 않는다. 민감 본문은 암호문이라 견줄 수 없고 해시를 두면 지문이 남기 때문이다([ADR-058](../adr/ADR-058-기존-개인-지식-저장소는-주인이-검토한-묶음을-화면에서-올려-들여온다.md)).
-로그에는 사용자 번호와 결과별 개수만 남긴다. 제목과 본문과 `source_ref` 는 남기지 않는다.
-
-#### 들이기가 갈리는 지점
-
-| 응답 | 언제 |
-| --- | --- |
-| 항목 `NEW` | 아래 어느 것에도 걸리지 않는다. 저장한다 |
-| 항목 `DUPLICATE` | 요청자의 줄 가운데 `source_type` 이 `brain` 이고 `source_ref` 가 같은 것이 있다. 저장하지 않는다 |
-| 항목 `CONFLICT` | 출처는 다른데 같은 collection 에 같은 `documentKey` 의 문서가 있다(`DOCUMENT_KEY_TAKEN`). 또는 같은 collection 에 같은 제목의 `MEMORY` 가 있다(`TITLE_TAKEN`). 저장하지 않는다 |
-| 항목 `REJECTED` | 칸이 틀렸다(`INVALID_FIELD`), 본문이 12,000자를 넘는다(`CONTENT_TOO_LONG`), 그룹에 없는 collection 이다(`UNKNOWN_COLLECTION`), 신원 항목이다(`IDENTITY_HELD`), 종류에 맞지 않는 `retrieval` 이다(`RETRIEVAL_NOT_ALLOWED`), 같은 묶음의 앞 항목과 출처나 문서 이름이 같다(`DUPLICATE_IN_BUNDLE`). 저장하지 않는다 |
-| 400 `VALIDATION_FAILED` | 항목이 없다, 100개를 넘는다, `schemaVersion` 이 1 이 아니다. 아무것도 저장하지 않는다 |
-| 409 `MEMORY_ENCRYPTION_UNAVAILABLE` | 새로 들일 민감 항목이 있는데 암호화 key 가 없다. 미리보기도 같고 일반 항목도 저장하지 않는다 |
-| 409 `MEMORY_IMPORT_RETRY` | 들이는 사이에 같은 출처나 같은 이름의 줄이 먼저 들어왔다. 트랜잭션이 되돌아가며, 다시 올리면 그 항목이 `DUPLICATE` 나 `CONFLICT` 로 나온다 |
-| 413 `MEMORY_IMPORT_TOO_LARGE` | 요청 본문이 2MB 를 넘는다. 웹 서버 라우트가 Control Plane 을 부르기 전에 거절한다 |
-
-같은 주인의 같은 출처가 두 줄이 되지 않게 `uk_memory_user_source` 가 마지막으로 막는다. 대조는 서비스가 조회로 하고, 이 제약은 두 요청이 겹친 경우를 위한 것이다.
+이미 들인 항목과 판 이력은 그대로 남는다.
+`source_type` 의 `brain` 값과 `source_ref`, `source_date` 는 출처 기록이며 지우거나 바꾸지 않는다.
+표와 칸, 출처의 유일 제약도 유지한다. 이관 종료에 따른 마이그레이션은 없다.
+과거 이관 절차와 종료 결정은 [ADR-058](../adr/ADR-058-기존-개인-지식-저장소는-주인이-검토한-묶음을-화면에서-올려-들여온다.md) 이 갖는다.
 
 ### 다른 서비스가 문서를 읽을 때
 
