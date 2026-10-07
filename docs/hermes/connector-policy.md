@@ -145,7 +145,7 @@ hook 이 `{"action": "approve", "message": "<사유>", "rule_key": "<키>"}` 를
 
 아직 확인하지 못했다. 실행 방법은 운영 저장소가 갖는다.
 
-- 떠 있는 공유 gateway 가 profile 의 `fos-ctx` 를 새 판으로 바꾼 뒤 재시작 없이 새 코드를 읽는지
+- 떠 있는 공유 gateway 가 profile 의 `fos-ctx` 를 새 판으로 바꾼 뒤 재시작 없이 새 코드를 읽는지. `__init__.py`뿐 아니라 `connector_policy`와 `hooks` 등 하위 모듈도 새 판인지 확인한다. 파일 비교로 답하는 `policy_hook`만으로는 실행 중인 모듈의 판을 증명하지 못한다
 - native 자식과 공유 gateway 에서 실제 커넥터 호출이 hook 을 거치는지. 대역 서버의 호출 기록과 `connector_action` 을 견준다
 - Control Plane 이 내려가 있을 때 연결을 붙인 에이전트의 커넥터 도구가 막히는지
 - 바인딩 profile 에서 커넥터 도구의 결과가 `<external-data>` 안에 있고 그 바깥을 `<untrusted_tool_result>` 가 감싸는지. 실행 기록의 도구 내용으로 본다
