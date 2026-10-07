@@ -17,7 +17,10 @@
 - 서비스는 `backend/src/main/java/com/bifos/assistant/connector/application/ConnectorBindingService.java` 다
   - `bind`, `reinstall`, `resync` 가 설치를 보낸다. `resync(binding, manifest, afterRestart)` 는 연결 확인(`ConnectorConnectionService#recordCheck`, `afterRestart` 거짓)과 관리자 반영 완료(`confirmLocked`, 참)가 부른다. 재시작 여부는 `reinstallNeedsRestart` 가 돌려준다
   - 잠금 순서는 사용자 행(`AppUserRepository#findByIdForUpdate`) 다음 에이전트 행(`AgentRepository#findByIdForUpdate`)이다. MySQL REPEATABLE READ 때문에 트랜잭션의 첫 읽기가 잠금이어야 한다. `confirmApplied` 의 Javadoc 이 그 까닭을 적는다. 그 메서드처럼 id 는 트랜잭션 밖에서 읽고 안에서 잠근 뒤 바인딩을 다시 읽는다
-  - 생성자가 둘이다. `Clock` 을 받는 쪽을 시험이 쓴다
+  - 생성자가 둘이다. 시험(`ConnectorBindingServiceTest`)은 `@SpringBootTest` 로 주입받은 서비스를 쓰므로 시계는 `Clock.systemUTC()` 다. 시각이 지난 상태는 `ConnectorBindingServiceTest` 524행 근처처럼 `jdbc.update("UPDATE agent_connector_binding SET ...")` 로 만든다
+  - `ConnectorBinding.agent` 와 `connection` 은 LAZY 이고 `spring.jpa.open-in-view` 가 거짓이다. 트랜잭션 밖에서 연관을 읽으면 초기화 예외가 난다
+  - 연결 확인(`ConnectorConnectionService#recordCheck`)은 연결의 사용자 행을 잠근다. 바인딩의 연결 사용자와 에이전트 주인은 붙이기 규칙으로 같다
+  - 반영 전 호출을 막는 글은 `ConnectorPolicyService.BINDING_PENDING_MESSAGE` 다. 지금은 「관리자가 반영을 마치면 …」 이다
 - 설치 응답은 `backend/src/main/java/com/bifos/assistant/hermes/HermesConnectorClient.java` 의 `record InstallResult(boolean restartRequired, boolean pluginUpdated)` 이고 `HttpHermesConnectorClient` 가 `optionalBoolean(body, "plugin_updated", false)` 로 읽는다. 시험 코드에 `new InstallResult(` 가 36군데 있다
 - 일정 작업 본보기는 `connector/application/ConnectorActionExpirer.java`(`@Scheduled(cron = "${assistant.connector.policy.expire-cron}")`)다. 설정 record 본보기는 `ConnectorPolicyProperties`(`@DefaultValue`, `requirePositive`)이고 `@ConfigurationPropertiesScan` 이 찾는다
 - 시험 설정 `backend/src/test/resources/application-test.yml` 은 `assistant.connector.policy.expire-cron: "-"` 로 일정을 끈다
@@ -31,6 +34,7 @@
 - 재시작 대기 바인딩은 예약 확인 대상에서 뺀다. 관리자 반영 완료가 맡는다
 - 옛 대시보드 plugin 은 `reload_pending` 을 내지 않고 바뀐 것이 있으면 `restart_required` 를 참으로 답한다. 그 경우 지금처럼 재시작 대기가 된다
 - 기본 지연 150초는 gateway housekeeping 60초 두 주기와 연결 시간이다
+- 옛 설치 분기의 재시작 판정은 `pluginUpdated` 만 본다. 옛 설치는 설치된 커넥터에 `restart_required` 를 늘 참으로 답하기 때문이다(`reinstallNeedsRestart` Javadoc). 공통 메서드도 이 규칙을 지킨다
 
 ## 작업 항목
 
@@ -56,14 +60,18 @@
 ### 5. `ConnectorBindingService`
 
 - 생성자 둘에 `ConnectorBindingProperties` 를 받는다
-- 설치 결과를 바인딩에 적는 private 메서드 하나로 `bind`, `reinstall` 의 일반 바인딩 분기, `resync` 를 모은다. `restart = restartRequired || pluginUpdated` 이고, `!restart && reloadPending` 이면 `scheduleApply(now.plus(applyDelay))` 다. `reinstallNeedsRestart` 는 `InstallResult` 를 돌려주게 바꾼다. 옛 설치 분기의 판정은 그대로다
+- 설치 결과를 바인딩에 적는 private 메서드 하나로 `bind`, `reinstall` 의 일반 바인딩 분기, `resync` 를 모은다. 일반 바인딩은 `restart = restartRequired || pluginUpdated`, 옛 설치는 `restart = pluginUpdated` 이고, `!restart && reloadPending` 이면 `scheduleApply(now.plus(applyDelay))` 다. `reinstallNeedsRestart` 는 `InstallResult` 를 돌려주게 바꾼다. 옛 설치 분기의 판정은 그대로다
 - `resync` 는 `afterRestart` 가 거짓이고 `applyDueAt` 이 지금보다 뒤면 설치를 다시 보내지 않고 `PENDING` 으로 둔다. 다시 보낸 설치가 `reloadPending` 이면 시각을 적고 `PENDING` 으로 돌아간다
-- 새 `public int applyDue()`: 트랜잭션 밖에서 `apply_due_at <= now` 이고 재시작 대기가 아닌 바인딩의 id, 주인 id, 에이전트 id 를 읽는다. 바인딩마다 `TransactionTemplate` 안에서 주인 사용자 행, 에이전트 행을 잠그고 바인딩을 id 로 다시 읽는다. 아직 대상이면 `clearApplyDue()` 뒤 `resync(binding, ConnectorManifests.find(connector, connectorId), false)` 를 돌리고 저장한다. 한 바인딩의 실패는 `warn` 으로 남기고 다음으로 간다. 처리한 수를 돌려준다
+- 새 `public int applyDue()`: 트랜잭션 밖에서 `apply_due_at <= now` 이고 재시작 대기가 아닌 바인딩의 id, 연결 사용자 id, 에이전트 id 를 projection 으로 읽는다(작업 항목 6). 바인딩마다 `TransactionTemplate` 안에서 연결 사용자 행(`AppUserRepository#findByIdForUpdate`), 에이전트 행(`AgentRepository#findByIdForUpdate`)을 잠그고 바인딩을 id 로 다시 읽는다. 바인딩이 없거나, 에이전트가 지워졌거나, 에이전트 주인이 연결 사용자와 다르거나, 더는 대상이 아니면 건너뛴다. 아직 대상이면 `clearApplyDue()` 뒤 `resync(binding, ConnectorManifests.find(connector, connectorId), false)` 를 돌리고 저장한다. 한 바인딩의 실패는 `warn` 으로 남기고 다음으로 간다. 처리한 수를 돌려준다
 - 클래스 Javadoc 의 「공유 gateway 를 재시작한 뒤 반영 완료만 누른다」 와 `bind` Javadoc 을 새 흐름으로 고친다
 
 ### 6. `connector/infra/ConnectorBindingRepository.java`
 
-예약 대상을 읽는 메서드를 더한다. 파생 쿼리 `findByApplyDueAtLessThanEqualAndRestartRequiredFalse(Instant now)` 를 쓴다. `RepositoryQueryMysqlTest` 가 저절로 실행한다.
+예약 대상을 읽는 메서드를 더한다. 엔티티 대신 `@Query("select b.id, b.agent.id, b.connection.userId from ConnectorBinding b where b.applyDueAt <= :now and b.restartRequired = false")` 처럼 id 셋을 돌려주는 projection 을 쓴다. 반환 타입은 `connector/application/model` 이나 저장소 안의 record 로 둔다(backend/AGENTS.md 의 「데이터 클래스」 규칙을 따른다). `RepositoryQueryMysqlTest` 가 저절로 실행한다.
+
+### 6-1. `connector/application/ConnectorPolicyService.java`
+
+`BINDING_PENDING_MESSAGE` 를 「이 에이전트에 붙인 연결이 아직 반영되지 않았다. 대개 몇 분 안에 저절로 반영되니 사용자에게 잠시 뒤 다시 시도하라고 알린다.」 로 바꾼다. 위 주석의 「연결 확인을 다시 해도 풀리지 않는다」 도 새 흐름에 맞게 고친다. 이 글을 단언하는 backend 시험(`git grep -n "관리자가 반영을 마치면" backend/src/test`)을 같이 고친다. e2e 상수는 phase 03 이 고친다.
 
 ### 7. `connector/application/ConnectorBindingApplier.java` (신규)
 
@@ -75,7 +83,7 @@
 - `backend/src/test/java/com/bifos/assistant/connector/ConnectorBindingServiceTest.java`: 기존 대역이 설치 응답을 정하는 방법을 따라
   - 붙이기 응답이 `reloadPending` 이면 재시작 대기가 아니고 `applyDueAt` 이 지금 더하기 지연이다
   - 연결 확인이 그 시각 전이면 설치를 다시 보내지 않고 `PENDING` 이다
-  - 시각이 지난 뒤 `applyDue()` 가 probe 성공으로 `READY` 로 두고 `applyDueAt` 을 비운다
+  - `jdbc.update` 로 `apply_due_at` 을 과거로 바꾼 뒤 `applyDue()` 가 probe 성공으로 `READY` 로 두고 `applyDueAt` 을 비운다
   - probe 가 실패하면 `PENDING` 이고 `applyDueAt` 이 비어 다음 `applyDue()` 가 다시 집지 않는다
   - 재시작 대기 바인딩은 `applyDue()` 가 집지 않는다
 - `backend/src/test/java/com/bifos/assistant/hermes/HttpHermesConnectorClientTest.java`: `reload_pending` 을 읽고 없으면 거짓이다
@@ -110,6 +118,8 @@ node scripts/check-migration-versions.mjs
 | `backend/src/main/java/com/bifos/assistant/connector/application/ConnectorBindingService.java` | 수정 |
 | `backend/src/main/java/com/bifos/assistant/connector/application/ConnectorBindingApplier.java` | 신규 |
 | `backend/src/main/java/com/bifos/assistant/connector/infra/ConnectorBindingRepository.java` | 수정 |
+| `backend/src/main/java/com/bifos/assistant/connector/application/ConnectorPolicyService.java` | 수정 |
+| `backend/src/test/java/com/bifos/assistant/connector/**` | 수정 |
 | `backend/src/main/resources/application.yml` | 수정 |
 | `backend/src/test/resources/application-test.yml` | 수정 |
 | `backend/src/test/java/com/bifos/assistant/connector/ConnectorBindingTest.java` | 수정 |

@@ -40,25 +40,31 @@
   - `.env` 에서 `field_env` 에 든 이름의 쓰기 전 줄과 쓴 뒤 줄을 견줘 `env_changed` 를 구한다
   - `restart = previous is not None and (previous != server or env_changed)`
 - 떼기 분기의 `restart` 는 거짓이다
-- 스킬 파일이 바뀌면(`desired` 가운데 원래 바이트와 다른 것이 있거나 `stale` 이 비어 있지 않으면) `updated` 의 `skills.disabled` 에서 `SKILL_INDEX_MARKER_PREFIX` 로 시작하는 항목을 빼고 새 표식 하나를 더한다. `skills` 나 `disabled` 가 없으면 만든다. `disabled` 가 목록이 아니면 `ValueError` 로 거절한다. 이 쓰기는 지금의 `config_path` 대상에 들어가 같은 묶음으로 되돌려진다
-- 돌려주는 dict 에 `reload_pending` 을 더한다. 바뀐 것이 있고 `restart` 가 거짓이면 참이다. 바뀐 것이 없으면 모든 칸이 거짓이다. 붙이기의 `restart_required` 는 지금의 `enabled` 대신 `restart` 다
+- 스킬 파일이 바뀌면(`desired` 가운데 원래 바이트와 다른 것이 있거나 `stale` 이 비어 있지 않으면) `updated` 의 `skills.disabled` 에서 `SKILL_INDEX_MARKER_PREFIX` 로 시작하는 항목을 빼고 새 표식 하나를 더한다. `skills` 나 `disabled` 가 없으면 만든다
+  - `disabled` 가 문자열이면 Hermes 가 읽는 것처럼(`agent/skill_utils.py` 의 `parse_config_string_list`) 목록으로 바꿔 쓴다. `[` 로 시작하면 `ast.literal_eval` 로 목록 리터럴을 읽고, 아니면 그 문자열 하나를 이름 하나로 둔다. 쉼표로 나누지 않는다
+  - 그 밖의 형태(사전, 숫자 등)면 붙이기는 `FileExistsError` 로 거절한다. 처리기가 409 로 답하고 backend 는 `CONNECTOR_BIND_CONFLICT` 로 끝낸다. 떼기는 표식을 쓰지 않고 그대로 뗀다. 운영자가 설정을 바꿔도 떼야 `.env` 에 비밀이 남지 않는다는 원칙(같은 함수 docstring)을 지킨다
+  - 이 쓰기는 지금의 `config_path` 대상에 들어가 같은 묶음으로 되돌려진다
+- 돌려주는 dict 에 `reload_pending` 을 더한다. 바뀐 것이 있고 `restart` 와 `plugin_updated` 가 모두 거짓이면 참이다. 바뀐 것이 없으면 모든 칸이 거짓이다. 붙이기의 `restart_required` 는 지금의 `enabled` 대신 `restart` 다. `restart_required` 를 `plugin_updated` 와 OR 하지 않는다. `plugin_updated` 가 참이면 `reload_pending` 은 거짓이고, backend 가 그것만으로 재시작 대기로 둔다
 - 함수 docstring 의 「떠 있는 profile 에 더한 서버는 gateway 를 다시 띄워야 보이므로…」 문단을 새 판정으로 고친다
 
 ### 2. `hermes/tests/test_dashboard_profile_api.py`
 
+- `test_profile_with_only_the_connector_marker_takes_bindings_only` 의 처음 붙이기 단언(지금 `restart_required` 와 `plugin_updated` 가 참)을 `restart_required` 거짓, `plugin_updated` 참, `reload_pending` 거짓으로 바꾼다
 - `test_binding_two_connectors_adds_their_names_and_keeps_the_profile` 의 첫 붙이기 단언을 `restart_required` 거짓, `reload_pending` 참으로 바꾼다. 그 시험의 `skills.disabled` 에 표식 하나만 있는지 본다
 - 새 시험(이름은 영문 동사로 시작):
   - 같은 커넥터를 다른 보관 값으로 다시 붙이면 `restart_required` 참, `reload_pending` 거짓
   - 같은 값으로 다시 붙이면 모든 칸이 거짓이고 `config.yaml` 이 그대로다
   - 떼면 `restart_required` 거짓, `reload_pending` 참이고, 표식이 새 값으로 바뀌며 운영자가 넣어 둔 다른 `skills.disabled` 이름은 남는다
-  - `skills.disabled` 가 목록이 아니면 붙이기가 거절되고 파일이 바뀌지 않는다
+  - `skills.disabled` 가 사전이면 붙이기가 409 로 거절되고 파일이 바뀌지 않는다. 같은 상태에서 떼기는 200 이고 `.env` 의 칸 값이 지워진다
+  - `skills.disabled` 가 목록 리터럴 문자열(`"['a', 'b']"`)이면 그 이름들과 표식이 목록으로 남는다
+  - `skills.disabled` 가 이름 하나 문자열(`"a,b"`)이면 그 문자열 하나와 표식이 목록으로 남는다
 
 ### 3. `hermes/tests/hermes_contract.py` 와 `hermes/tests/test_hermes_contract.py`
 
 - `hermes_contract.py` 에 `LIVE_RELOAD` 선언을 둔다. 확인할 소스 지점은 셋이다
   - `gateway/run.py` 에 문자열 상수 `"MCP config reconcile"` 이 있다
   - `gateway/run_profile_reconcile.py` 에 함수 `_mcp_config_reconciler` 가 있고 그 안에서 `reconcile_mcp_servers_with_config` 를 부른다
-  - `agent/prompt_builder.py` 의 `_build_skills_system_prompt_inner` 가 `get_disabled_skill_names` 를 부른다
+  - `agent/prompt_builder.py` 의 `_build_skills_system_prompt_inner` 가 `get_disabled_skill_names` 를 부르고, 그 결과를 담은 이름 `disabled` 가 `cache_key` 할당의 값 안에 나온다
 - `test_hermes_contract.py` 의 `HermesSourceTest` 에 시험 하나를 더한다. 실패 메시지는 「Hermes 를 올리면 재시작 없는 반영이 깨질 수 있다. ADR-20261007 connector-live-reload 를 다시 본다」 는 뜻을 담는다
 
 ### 4. 문서
@@ -67,17 +73,18 @@
 - `docs/backend/connector-install.md`: 「바인딩 설치」 표의 「답의 `restart_required`」 행을 새 판정과 `reload_pending` 으로 고치고, 스킬 행에 표식을 적는다. 「떼어도 gateway 의 스킬 색인은 재시작 전까지 그 스킬 이름을 남긴다」 줄을 지운다
 - `docs/hermes/tools-and-skills.md`: 「profile 생성과 Control Plane MCP」 의 `/reload-mcp` 문단에 MCP 설정 맞추기 주기와 스킬 색인 표식을 더하고 ADR 을 가리킨다
 - `docs/hermes/mcp-profile-credentials.md`: 「설정 저장과 gateway 연결 확인」 에 새 이름은 맞추기 주기에 연결되고 같은 이름의 값 교체는 그렇지 않다는 것을 적는다
-- `docs/hermes/upgrades.md`: 올릴 때 확인할 것에 「MCP 설정 맞추기와 스킬 색인 캐시 키」 를 더하고 계약 시험을 가리킨다
+- `docs/hermes/upgrades.md`: 「대시보드 plugin 이 기대는 내부 지점」 절에 「MCP 설정 맞추기와 스킬 색인 캐시 키」 를 더하고 계약 시험을 가리킨다
 
 ## 검증
 
 ```bash
 # cwd: 저장소 root
 python3 -m unittest discover -s hermes/tests
+scripts/check-hermes-contract.sh v2026.9.24
 scripts/check-public-safe.sh
 ```
 
-- 모두 종료 코드 0. 계약의 소스 확인은 `HERMES_SOURCE` 가 있을 때만 돌고 PR CI 가 돌린다
+- 모두 종료 코드 0. `check-hermes-contract.sh` 는 공개 상류 저장소의 그 태그를 받아 `HermesSourceTest` 를 돌린다
 
 ## 변경 파일
 
