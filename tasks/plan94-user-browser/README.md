@@ -5,8 +5,8 @@
 
 ## 상태
 
-단계 1 을 구현한다(phase 01 부터 04). 단계 1 PR 이 이 phase 파일들을 지우고 이 README 의 단계 표를 갱신한다.
-단계 2 부터는 앞 단계가 머지된 뒤 같은 디렉터리에 phase 를 더한다.
+단계 1 을 구현했다. 그 phase 문서는 구현 PR 에서 지웠고, 오래 남을 계약은 `docs/backend/user-browser.md` 와 `docs/backend/schema/browser.md` 에 있다.
+남은 것은 단계 2, 3, 4 다. 다음 단계를 시작할 때 이 디렉터리에 phase 를 더한다. 단계 3 의 PR 이 이 디렉터리를 지운다.
 
 ## 단계와 PR
 
@@ -19,15 +19,6 @@
 | 2 | 로그인 화면. CDP screencast 를 SSE 로, 입력을 POST 로. 휴대폰의 터치와 한글 입력, 탭 고르기 | 이 저장소 | 1 |
 | 3 | 중계(`/internal/browser-gateway`), `user_browser_grant`, `connector.json` 의 `owner_browser_env`, 바인딩 설치와 확인 도구 호출에 중계 주소 싣기. 네이버 블로그 커넥터의 `cdp_url` 칸을 빼고 `owner_browser_env` 로 바꾼다 | 이 저장소 | 2 |
 | 4 | 운영 이행. 기존 사용자의 상주 Chrome 로그인을 새 브라우저로 옮기고 상주 Chrome 과 중계를 내린다 | `fos-home-infra` | 3 의 배포 |
-
-단계 1 의 phase 는 넷으로 나눈다.
-
-| phase | 담는 것 |
-| --- | --- |
-| 01 | 마이그레이션, 엔티티, 저장소, 상태 전이 규칙과 단위 테스트 |
-| 02 | proxy 클라이언트(생성, 시작, 정지, 삭제, 조회), 켜기와 끄기 서비스, 동시 수 잠금, 가짜 proxy 를 쓴 통합 테스트 |
-| 03 | 자동 중지와 상태 맞추기 스케줄러, 사용자 끄기와 연동, 관리자 API |
-| 04 | 웹 「내 브라우저」 화면과 관리자 목록, e2e 와 브라우저 검사, 문서 |
 
 ## 운영 순서
 
