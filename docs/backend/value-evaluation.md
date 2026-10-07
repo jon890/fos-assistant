@@ -36,6 +36,7 @@
 `DecisionRequest`는 요청 사용자이며, 상태와 질문은 모델과 무관한 값이다.
 `DecisionResponse`는 provider 식별 정보와 `DecisionResult`다.
 새 adapter는 이 port만 구현하며 `ValueEvaluator`의 검사와 행동 정책을 바꾸지 않는다.
+같은 fixture 를 여러 provider 로 replay 해 루프 전체를 견주는 평가는 [먼저 살펴보기 루프 평가](proactive-eval.md)가 갖는다.
 
 첫 adapter `hermes`는 도구 없는 시스템 판단 profile에 Hermes Runs로 한 번 묻는다.
 profile은 설치 설정에서만 정한다. 사용자에게 보이는 에이전트를 만들지 않으며 요청 본문으로 profile을 고르지 못한다.
