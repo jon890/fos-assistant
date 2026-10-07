@@ -87,6 +87,8 @@ echo "임시 로그(종료 시 삭제): ${LOG_DIR}"
 if [ "$#" -gt 0 ]; then
   echo "브라우저 검사는 인자로 준 spec 만 돌린다: $*"
 fi
+# 파일 길이는 무거운 검사 전에 먼저 실패시킨다. 마지막 quality 단계에서도 독립 실행을 위해 다시 확인한다.
+step file-length     node "${ROOT}/scripts/check-file-length.mjs"
 step web-install     pnpm --dir "${ROOT}/web" install --frozen-lockfile
 if [ "${skip_browser}" = false ]; then
   step playwright    pnpm --dir "${ROOT}/web" exec playwright install chromium

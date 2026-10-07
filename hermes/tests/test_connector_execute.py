@@ -13,6 +13,8 @@ import time
 import types
 import unittest
 from unittest import mock
+from plugin_loading import patch_plugin
+
 
 import test_connector_call as call_base
 import test_connector_manifest as base
@@ -82,7 +84,7 @@ class ConnectorExecuteTest(base.ConnectorGateCase):
         status, body = self.execute(args={"text": "안녕"}, profile="human")
         self.assertEqual(status, 200, body)
         self.assertEqual(body, {"ok": True, "result": {"written": True, "text": "안녕", "token": "demo"}})
-        with mock.patch.object(self.plugin, "_run_connector_execute") as runner:
+        with patch_plugin(self.plugin, "_run_connector_execute") as runner:
             self.assertEqual(self.execute(profile="human-old")[0], 401)
             self.assertEqual(self.execute(profile="plain")[0], 401)
             runner.assert_not_called()
@@ -251,7 +253,7 @@ class ConnectorExecuteTest(base.ConnectorGateCase):
         self.install("plain", installed=False)
         self.install("human", managed=False)
         valid = {"profile": PROFILE, "hermes_tool": WRITE_NOTE, "args": {}}
-        with mock.patch.object(self.plugin, "_run_connector_execute") as runner:
+        with patch_plugin(self.plugin, "_run_connector_execute") as runner:
             for label, path, body, expected in (
                 ("not installed", EXECUTE, {**valid, "profile": "plain"}, 404),
                 ("no managed marker", EXECUTE, {**valid, "profile": "human"}, 401),
@@ -275,13 +277,13 @@ class ConnectorExecuteTest(base.ConnectorGateCase):
     def test_registered_name_of_the_longest_length_reaches_the_child(self):
         """등록 이름 128자는 본문 검사를 지난다. 서버에 그런 도구가 없어 400 이다."""
         real = self.plugin._run_connector_execute
-        with mock.patch.object(self.plugin, "_run_connector_execute", wraps=real) as runner:
+        with patch_plugin(self.plugin, "_run_connector_execute", wraps=real) as runner:
             self.assertEqual(self.execute("t" * 128)[0], 400)
         runner.assert_called_once()
 
     def test_service_token_is_required(self):
         """토큰이 없거나 틀리면 401 이고, `POST` 밖의 메서드는 열지 않는다."""
-        with mock.patch.object(self.plugin, "_run_connector_execute") as runner:
+        with patch_plugin(self.plugin, "_run_connector_execute") as runner:
             self.assertEqual(self.execute(token=None)[0], 401)
             self.assertEqual(self.execute(token="wrong")[0], 401)
             self.assertEqual(self.request(EXECUTE, "GET")[0], 401)
@@ -302,7 +304,7 @@ class ConnectorExecuteTest(base.ConnectorGateCase):
         status, body = self.execute("mcp__demo__list_scopes", profile="lost")
         self.assertEqual(status, 504, body)
         # 시간 초과 때와 같은 상태와 모양이다. Control Plane 이 두 경우를 같은 길로 읽는다. 글만 까닭을 따로 말한다.
-        with mock.patch.object(self.plugin, "CONNECTOR_EXECUTE_TIMEOUT_SECONDS", 3):
+        with patch_plugin(self.plugin, "CONNECTOR_EXECUTE_TIMEOUT_SECONDS", 3):
             slow_status, slow_body = self.execute("mcp__demo__list_scopes", profile="slow")
         self.assertEqual((slow_status, set(slow_body)), (status, set(body)))
         self.assertEqual(set(body), {"detail"})
@@ -326,7 +328,7 @@ class ConnectorExecuteTest(base.ConnectorGateCase):
                 async def fixed(manifest, hermes_tool, args, env, progress, result=result):
                     return result
 
-                with mock.patch.object(self.plugin, "_run_connector_execute", fixed):
+                with patch_plugin(self.plugin, "_run_connector_execute", fixed):
                     self.assertEqual(self.execute(), expected)
 
     def test_plain_text_write_tool_is_still_refused_by_call(self):
@@ -341,7 +343,7 @@ class ConnectorExecuteTest(base.ConnectorGateCase):
         """시간 제한을 넘긴 실행은 결과를 모르므로 504 이고 자식 프로세스가 남지 않는다."""
         self.install("slow", token=call_base.SLOW_TOKEN)
         started = time.monotonic()
-        with mock.patch.object(self.plugin, "CONNECTOR_EXECUTE_TIMEOUT_SECONDS", 3):
+        with patch_plugin(self.plugin, "CONNECTOR_EXECUTE_TIMEOUT_SECONDS", 3):
             status, body = self.execute("mcp__demo__list_scopes", profile="slow")
         self.assertEqual(status, 504, body)
         self.assertEqual(set(body), {"detail"})
@@ -374,14 +376,14 @@ class ConnectorExecuteTest(base.ConnectorGateCase):
         self.assert_no_child_left()
         # 소유 기록을 읽지 못해도 실행되지 않은 것이다.
         (self.profile_root / PROFILE / self.plugin.CONNECTOR_STATE).write_text("{not json", encoding="utf-8")
-        with mock.patch.object(self.plugin, "_run_connector_execute") as runner:
+        with patch_plugin(self.plugin, "_run_connector_execute") as runner:
             self.assertEqual(self.execute(), UNAVAILABLE)
             runner.assert_not_called()
 
     def test_sdk_outside_supported_range_is_unavailable_without_starting_child(self):
         """지원 범위 밖의 SDK 판이면 자식을 띄우지 않고 unavailable 이다."""
-        with mock.patch.object(self.plugin, "_mcp_sdk_version", return_value="1.30.0"), \
-                mock.patch.object(self.plugin, "_run_connector_execute") as runner:
+        with patch_plugin(self.plugin, "_mcp_sdk_version", return_value="1.30.0"), \
+                patch_plugin(self.plugin, "_run_connector_execute") as runner:
             self.assertEqual(self.execute(), UNAVAILABLE)
         runner.assert_not_called()
 
@@ -400,7 +402,7 @@ class ConnectorExecuteTest(base.ConnectorGateCase):
                 await release.wait()
                 return call_base.tool_result(call_base.SCOPES)
 
-            with mock.patch.object(self.plugin, "_run_connector_tool", held):
+            with patch_plugin(self.plugin, "_run_connector_tool", held):
                 running = [asyncio.ensure_future(self.send(call_base.CALL, "POST", call_body))
                            for _ in range(self.plugin.CONNECTOR_CALL_LIMIT)]
                 while started < self.plugin.CONNECTOR_CALL_LIMIT:
@@ -423,7 +425,7 @@ class ConnectorExecuteTest(base.ConnectorGateCase):
             progress["sent"] = True
             return result
 
-        with mock.patch.object(self.plugin, "_run_connector_execute", fixed):
+        with patch_plugin(self.plugin, "_run_connector_execute", fixed):
             return self.execute(**request)
 
     def test_declared_error_code_and_recovery_contract_are_forwarded(self):

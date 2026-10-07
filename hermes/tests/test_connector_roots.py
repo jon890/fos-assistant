@@ -1,6 +1,5 @@
 """dashboard-profile-api 가 커넥터 경로와 실행 파일을 환경 변수에서 읽는 규칙을 검사한다."""
 
-import importlib.util
 import json
 import logging
 import os
@@ -9,6 +8,8 @@ import sys
 import types
 import unittest
 from unittest import mock
+
+from plugin_loading import load_plugin
 
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
@@ -45,9 +46,7 @@ class ConnectorEnvironmentTest(unittest.TestCase):
         # 틀린 값은 경고 로그를 남긴다. 검사 출력에는 결과만 둔다.
         logging.disable(logging.CRITICAL)
         cls.addClassCleanup(logging.disable, logging.NOTSET)
-        spec = importlib.util.spec_from_file_location("connector_environment_test", PLUGIN)
-        cls.plugin = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(cls.plugin)
+        cls.plugin = load_plugin("connector_environment_test", PLUGIN, cls.addClassCleanup)
 
     def environment(self, **values):
         """두 환경 변수를 지운 뒤 준 값만 넣는다. 검사가 끝나면 되돌린다."""

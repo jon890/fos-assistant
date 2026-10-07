@@ -3,7 +3,7 @@
 backend 는 Spring Boot 4, Java 21, MySQL, Flyway 이고 web 은 Next.js 16, React 19, Tailwind 4 입니다.
 검사는 backend 의 JUnit, `test/e2e`(가짜 Hermes), `test/browser`(Playwright), `test/unit`(node:test) 입니다.
 
-기본은 **직접** 검토한다. diff 가 커서 한 번에 보기 어려우면 서브 에이전트를 스폰해 영역별로 나눠 맡기고, 결과를 취합해 게시하는 것은 당신이 한다.
+기본은 **직접** 검토한다. 변경이 크면 backend, web, hermes 등 디렉터리별로 하위 에이전트에 나눠 읽게 한다. 각 에이전트에 담당 경로와 관련 지침을 주고, 디렉터리 사이의 계약과 결과 취합은 당신이 맡는다.
 점검 기준은 저장소의 지침이 소유한다. 루트 `AGENTS.md`, `backend/AGENTS.md`, `web/AGENTS.md`, `docs/` 와 `docs/adr/` 이다. `docs/` 의 색인은 `docs/README.md` 다.
 diff 가 건드리는 영역의 지침을 먼저 읽는다. 판정 기준을 이 프롬프트에 옮겨 적지 않는다. 아래는 그 지침 가운데 리뷰에서 특히 볼 곳을 가리킬 뿐이다.
 그 뒤 GitHub review API 를 한 번 호출해 **요약과 인라인을 리뷰 하나로 묶어 게시**한다.
@@ -12,9 +12,13 @@ diff 가 건드리는 영역의 지침을 먼저 읽는다. 판정 기준을 이
 ## 1단계: PR 데이터 수집
 
 ```
-gh pr diff $PR_NUMBER --repo $REPO -- ':!web/pnpm-lock.yaml' ':!*.lock' ':!*.snap'
+gh pr diff $PR_NUMBER --repo $REPO
 gh pr view $PR_NUMBER --repo $REPO --json title,body,additions,deletions
 ```
+
+파일 이동이 있으면 PR의 base와 head를 fetch하고 `git diff --color-moved <base>...<head>`로 이동한 줄을 구별한다. 이동만 한 코드는 반복해서 읽지 않고 실제 변경과 이동으로 깨질 수 있는 import·경로·등록 관계에 집중한다.
+
+lock 파일, 빌드 결과물과 시험 스냅샷은 검토 대상에서 제외한다. `gh pr diff`는 경로 필터를 받지 않으므로 경로별 필터가 필요하면 fetch한 base와 head의 `git diff`에 pathspec을 준다.
 
 필터링 후 diff 가 비어 있으면 `body` 만 담은 짧은 긍정 리뷰를 게시하고 종료한다.
 필요하면 변경된 파일 전체와 관련 지침을 Read / Grep 으로 읽어 맥락을 파악한다 (코드 수정과 파일 생성은 절대 금지다. 읽기만 한다).
@@ -95,7 +99,7 @@ FINDING_END
 
 | 무엇 | 어떻게 드러나는가 |
 | --- | --- |
-| 가짜 Hermes 가 실제와 다른 모양을 보낸다 | 테스트는 통과하는데 운영에서 동작하지 않는다. `test/e2e/fake-hermes.ts` 가 Hermes 가 실제로 주는 칸과 다르게 답하도록 바뀐 곳을 본다 |
+| 가짜 Hermes 가 실제와 다른 모양을 보낸다 | 테스트는 통과하는데 운영에서 동작하지 않는다. `test/e2e/fake-hermes.ts`와 `test/e2e/fake-hermes/` 아래 모듈이 Hermes 가 실제로 주는 칸과 다르게 답하도록 바뀐 곳을 본다 |
 | 동시에 도는 요청의 차례 가정 | 중지와 제출처럼 두 스레드가 같은 실행을 다룰 때, 시도 하나의 성패로 전체 결과를 정한다. 테스트가 한 차례만 재현한다 |
 | 요청 시작에 읽은 엔티티를 끝에서 통째로 저장한다 | 그 사이 다른 요청이 바꾼 값(지운 표시, 바꾼 이름)이 옛 값으로 덮인다 |
 | 화면의 상태가 조건부로 DOM 에 들어간다 | 마우스를 올리거나 이력을 다시 읽을 때 요소가 생기며 레이아웃이 밀린다 |
@@ -236,3 +240,4 @@ rm -f "$REVIEW_JSON" "$BODY_MD"
 - **내용 있는 섹션만 포함** — 빈 등급 섹션은 생략한다. 건수 표는 늘 둔다
 - **인라인 댓글은 등급 표시로 시작한다** — 첫 줄이 `🔴 **P1 치명**` 처럼 색 원과 등급이다. 워크플로가 이 표시가 없는 댓글을 지운다
 - **이슈 0 건이면** `comments` 는 빈 배열, `body` 는 🟢 짧은 긍정 리뷰
+- **어떤 경우에도 마지막에 리뷰를 제출한다.** 변경이 크거나 하위 에이전트가 실패해 검토를 끝내지 못했어도 확인한 범위와 미확인 범위를 body에 명시해 3단계의 리뷰를 제출한다. 지적이 없거나 검토가 일부만 끝났다는 이유로 제출을 생략하지 않는다. API 제출이 실패하면 오류를 분명히 남기고 성공했다고 쓰지 않는다.

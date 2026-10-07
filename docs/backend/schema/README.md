@@ -19,6 +19,7 @@ AI credential 은 Hermes profile 의 `.env` 에, profile 의 API server key 는 
 | [`feedback.md`](feedback.md) | `decision_feedback_event` |
 | [`proactive.md`](proactive.md) | `proactive_check`, `proactive_check_finding`, `proactive_check_problem`, `proactive_value_evaluation`, `proactive_autonomy_decision`, `user_autonomy_preference` |
 | [`task.md`](task.md) | `task`, `task_trigger`, `task_run` |
+| [`browser.md`](browser.md) | `user_browser` |
 
 ## 마이그레이션 작성 규칙
 

@@ -38,7 +38,9 @@ describe() {
 }
 
 run_check() {
-  local backend=0 lint=0 format=0
+  local backend=0 lint=0 format=0 file_length=0
+
+  node "${ROOT}/scripts/check-file-length.mjs" || file_length=$?
 
   # --continue: 앞 검사가 실패해도 나머지를 돌려 한 번에 모든 위반을 본다.
   (cd "${ROOT}/backend" && ./gradlew qualityCheck --continue) || backend=$?
@@ -50,13 +52,14 @@ run_check() {
   (cd "${ROOT}/web" && pnpm format:check) || format=$?
 
   echo ""
+  describe "파일 길이" "${file_length}"
   describe "backend (qualityCheck)" "${backend}"
   describe "web (lint)" "${lint}"
   describe "web (format:check)" "${format}"
   echo ""
   node "${ROOT}/scripts/quality-report.mjs"
 
-  if [ "${backend}" -ne 0 ] || [ "${lint}" -ne 0 ] || [ "${format}" -ne 0 ]; then
+  if [ "${file_length}" -ne 0 ] || [ "${backend}" -ne 0 ] || [ "${lint}" -ne 0 ] || [ "${format}" -ne 0 ]; then
     return 1
   fi
   return 0

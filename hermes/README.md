@@ -8,6 +8,26 @@ Control Plane 이 기대는 Hermes 쪽 코드다. Hermes 에 설치하는 plugin
 | `dashboard-profile-api` | 대시보드의 profile 관리와 도구 목록 경로를 `Authorization: Bearer` 로 연다 | Hermes 기본 루트의 `plugins/` | 대시보드 |
 | `fos-ctx` | Control Plane MCP 호출 인자에 서명한 run 맥락 `_fos_ctx` 를 덮어쓰고, `skill_manage` 와 자식의 로컬 이미지 전달을 막고, 자식 session 을 등록하고, 커넥터를 설치한 profile 의 커넥터 도구 호출을 Control Plane 에 묻고, 바인딩 profile 의 커넥터 도구 결과를 `<external-data>` 로 감싼다 | Control Plane MCP 를 등록한 profile 과 커넥터를 설치한 profile 마다 | gateway |
 
+## plugin 파일 안내
+
+각 plugin 의 `__init__.py` 는 Hermes 가 부르는 `register` 와 기존 이름을 다시 내보낸다.
+하위 모듈은 다른 기능 모듈을 직접 import 하며 패키지 `__init__.py` 를 import 하지 않는다.
+
+| plugin | 모듈 | 맡는 것 |
+| --- | --- | --- |
+| `dashboard-profile-api` | `common.py` | 응답, 본문 읽기, profile 이름, 원자적 쓰기, 공용 표식 |
+| `dashboard-profile-api` | `profiles.py`, `session.py` | profile 생성과 삭제, 스킬 검사, 모델 기본값과 판단 준비 검사, 자식 session provider |
+| `dashboard-profile-api` | `sandbox.py`, `toolconfig.py`, `env.py` | 실행 공간과 첨부 디렉터리, 도구와 스킬 경로 설정, env 검사 |
+| `dashboard-profile-api` | `connector_manifest.py`, `connector_vault.py` | 커넥터 선언과 카탈로그, 연결 보관 파일 |
+| `dashboard-profile-api` | `connector_install.py`, `connector_run.py` | 설치와 바인딩과 probe, 도구 호출과 실행과 오류 응답 |
+| `dashboard-profile-api` | `routes.py` | 인증 provider, 경로 표, 토큰 미들웨어 |
+| `fos-ctx` | `context.py` | 서명, 토큰 읽기, 루트 session 조회, 호출 문맥 |
+| `fos-ctx` | `connector_policy.py` | 이름 대응 파일, 정책 질의, 서버 선택 |
+| `fos-ctx` | `subagent.py`, `hooks.py` | 자식 session 등록, hook 진입점, 이미지 검사와 외부 데이터 감싸기 |
+
+설치 묶음은 대시보드 plugin 과 profile plugin 의 모든 Python 모듈을 함께 담는다.
+커넥터 설치와 `policy_hook` 조회도 `fos-ctx` 의 하위 모듈까지 묶음과 비교한다.
+
 ## 범용 커넥터
 
 `hermes/connectors/<커넥터 이름>/` 은 이 저장소가 유지보수하는 커넥터다([ADR-064](../docs/adr/ADR-064-범용-커넥터는-이-저장소의-hermes-connectors-에-두고-저장소가-유지보수한다.md)).
@@ -32,7 +52,7 @@ hermes/bundle.sh --out <디렉터리> --mcp-url <Control Plane MCP 주소>
 
 `--out` 은 없거나 비어 있는 디렉터리여야 하고, `--mcp-url` 은 `http://` 나 `https://` 로 시작해야 한다.
 묶음은 Hermes 의 `plugins/dashboard-profile-api/` 자리에 그대로 들어갈 모양이다.
-plugin 파일, 주소를 채운 `default-config.yaml.template`, 틀의 `plugins.enabled` 가 켜는 profile plugin 을 담은 `profile-plugins/<이름>/` 이다.
+plugin 디렉터리의 모든 `*.py` 와 `plugin.yaml`, 주소를 채운 `default-config.yaml.template`, 틀의 `plugins.enabled` 가 켜는 profile plugin 을 담은 `profile-plugins/<이름>/` 이다.
 틀의 MCP 주소 자리는 `__FOS_ASSISTANT_MCP_URL__` 이다. 주소를 주지 않거나 자리가 남으면 묶음을 만들지 않고 실패한다.
 묶음을 Hermes 에 넣고 대시보드를 다시 띄우는 것은 운영 저장소가 한다.
 디렉터리 배치와 배포 순서는 [`../docs/code-architecture.md`](../docs/code-architecture.md) 의 「Hermes 쪽 코드 (`hermes/`)」 절이 갖는다.
@@ -361,7 +381,7 @@ MCP 도구는 만든 뒤 1~2분 안에 붙는다. 이유는 운영 저장소의 
 표식은 토큰으로 만든 profile 에 plugin 이 모든 검사를 지난 뒤 마지막에 쓴다.
 사람이 만든 profile 과 기본 profile 은 401 이다. 파일이라 대시보드를 다시 띄워도 남는다.
 
-**`PUT /api/env` 는 [plugin 의 허용 목록](plugins/dashboard-profile-api/__init__.py) 에 있는 key 만 받는다.**
+**`PUT /api/env` 는 [plugin 의 허용 목록](plugins/dashboard-profile-api/common.py) 에 있는 key 만 받는다.**
 기본 key 는 plugin 이 갖고, 커넥터 key 는 카탈로그 manifest 의 `fields[].env` 로 요청마다 계산한다.
 본문은 `{profile, key, value}` 이고 값은 한 줄이어야 한다.
 provider credential 은 이 토큰으로 쓰지 못한다.

@@ -17,7 +17,9 @@ export const renderShape = {
     .describe("사진 번호를 키로 한 사진 설명. 미리보기에만 보인다. 값은 300자까지"),
   artifact_path: z
     .string()
-    .describe("결과물 폴더 안의 <폴더>/index.html. 한 단계만 받는다"),
+    .describe(
+      "결과물 폴더 안의 index.html 이나 <폴더>/index.html. 폴더는 세 단계까지. artifact_write 의 path 와 글자까지 같아야 한다",
+    ),
   kind: z
     .enum(["preview", "package"])
     .default("preview")
@@ -35,7 +37,8 @@ export type RenderResult =
   | { problems: []; html: string; assets: StickerAsset[] }
   | { problems: string[]; html: null; assets: [] };
 
-const ARTIFACT_PATH = /^[^/\\.][^/\\]{0,80}\/index\.html$/;
+// 조각마다 점으로 시작하지 않고 `/` 와 `\\` 가 없다. 폴더는 세 단계까지다.
+const ARTIFACT_PATH = /^(?:[^/\\.][^/\\]{0,80}\/){0,3}index\.html$/;
 const NOTE_KEY = /^[1-9][0-9]{0,2}$/;
 const NOTE_MAX = 300;
 /** 같은 대화의 첨부 파일 이름 `<첨부 번호>.<확장자>`. 이 모양만 첨부 주소로 부른다. */
@@ -55,7 +58,7 @@ export function escapeHtml(value: string) {
 function validateRenderOptions(input: RenderInput): string[] {
   const problems: string[] = [];
   if (!ARTIFACT_PATH.test(input.artifact_path))
-    problems.push("artifact_path 는 <폴더>/index.html 한 단계만 받습니다.");
+    problems.push("artifact_path 는 index.html 이나 <폴더>/index.html 이고 폴더는 세 단계까지 받습니다.");
   for (const [key, note] of Object.entries(input.photo_notes ?? {})) {
     if (!NOTE_KEY.test(key))
       problems.push(`photo_notes 의 키 ${key} 는 사진 번호(1~999)여야 합니다.`);
@@ -79,19 +82,33 @@ export async function renderDraft(
   if (problems.length > 0) return { problems, html: null, assets: [] };
 
   const blocks = parseBody(input.body);
+  const attachments = attachmentBase(input.artifact_path);
   if (input.kind === "package")
-    return { problems: [], html: packageHtml(input, blocks), assets: [] };
-  const folder = input.artifact_path.slice(0, -"/index.html".length);
-  return { problems: [], ...previewHtml(input, blocks, folder) };
+    return { problems: [], html: packageHtml(input, blocks, attachments), assets: [] };
+  const folder = input.artifact_path.slice(0, -"index.html".length);
+  return { problems: [], ...previewHtml(input, blocks, folder, attachments) };
+}
+
+/**
+ * 결과물 HTML 에서 같은 대화의 첨부를 부르는 상대 주소.
+ * 결과물은 대화 주소 아래 `files/<artifact_path>` 에 있고 첨부는 `files` 의 형제인 `attachments` 다.
+ * 그래서 `index.html` 은 `../attachments`, `a/index.html` 은 `../../attachments` 다.
+ */
+export function attachmentBase(artifactPath: string) {
+  const depth = artifactPath.split("/").length - 1;
+  return `${"../".repeat(depth + 1)}attachments`;
 }
 
 /** 사진 자리. 첨부 이름이면 같은 대화의 첨부 주소를 상대 경로로 부르고, 아니면 이름표만 둔다. */
-function photoHtml(block: Extract<Block, { type: "image" }>, note?: string) {
+function photoHtml(
+  block: Extract<Block, { type: "image" }>,
+  attachments: string,
+  note?: string,
+) {
   const label = `${block.number}번째 사진`;
   const attachment = ATTACHMENT_NAME.exec(block.file);
-  // 결과물은 <폴더>/index.html 에 있고 첨부는 대화 주소 아래 files 의 형제인 attachments 다.
   const image = attachment
-    ? `<img src="../../attachments/${attachment[1]}" alt="${label}" loading="lazy">`
+    ? `<img src="${attachments}/${attachment[1]}" alt="${label}" loading="lazy">`
     : "";
   const caption = note
     ? `<span class="label">${label}</span> ${escapeHtml(note)}`
@@ -120,7 +137,7 @@ article p.blank{min-height:1.8em}
 .map span{color:#666;font-size:13px}
 `;
 
-function previewHtml(input: RenderInput, blocks: Block[], folder: string) {
+function previewHtml(input: RenderInput, blocks: Block[], folder: string, attachments: string) {
   const assets: StickerAsset[] = [];
   const seenStickers = new Set<string>();
   const body = blocks
@@ -131,7 +148,7 @@ function previewHtml(input: RenderInput, blocks: Block[], folder: string) {
             ? `<p class="blank"></p>`
             : `<p>${escapeHtml(block.line)}</p>`;
         case "image":
-          return photoHtml(block, input.photo_notes?.[String(block.number)]);
+          return photoHtml(block, attachments, input.photo_notes?.[String(block.number)]);
         case "sticker": {
           const ogq = OGQ_STICKER.exec(block.code);
           if (!ogq)
@@ -139,7 +156,7 @@ function previewHtml(input: RenderInput, blocks: Block[], folder: string) {
           if (!seenStickers.has(block.code)) {
             seenStickers.add(block.code);
             assets.push({
-              path: `${folder}/stickers/${block.code}.png`,
+              path: `${folder}stickers/${block.code}.png`,
               source_url: `${STICKER_HOST}/${ogq[1]}/original_${ogq[2]}.png?type=p100_100`,
             });
           }
@@ -192,7 +209,7 @@ pre{margin:0;padding:12px;background:#f6f8fa;border:1px solid #dfe3e8;border-rad
 `;
 
 /** 자동 입력이 막혔을 때 사람이 붙여넣을 묶음. 지시 줄은 자리 표시 글로 바꾼다. */
-function packageHtml(input: RenderInput, blocks: Block[]) {
+function packageHtml(input: RenderInput, blocks: Block[], attachments: string) {
   const text = blocks
     .map((block) => {
       switch (block.type) {
@@ -210,7 +227,7 @@ function packageHtml(input: RenderInput, blocks: Block[]) {
   const photos = blocks
     .flatMap((block) =>
       block.type === "image"
-        ? [photoHtml(block, input.photo_notes?.[String(block.number)])]
+        ? [photoHtml(block, attachments, input.photo_notes?.[String(block.number)])]
         : [],
     )
     .join("\n");
