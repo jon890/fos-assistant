@@ -1209,6 +1209,30 @@ class ProfileApiRouteTest(unittest.TestCase):
         self.assertIs(rewritten.body["plugin_updated"], False)
         self.assertIs(self.policy_hook(), True)
 
+    def test_policy_hook_checks_and_repairs_every_python_module(self):
+        """하위 모듈이 바뀌거나 없어져도 hook 조회가 거짓이고 설치가 모두 복원한다."""
+        self.connector_fixture()
+        self.assertEqual(self.connector().status_code, 200)
+        source = self.profile_plugins / "fos-ctx"
+        installed = self.root / "alice/plugins/fos-ctx"
+        expected = {"plugin.yaml"} | {module.name for module in source.glob("*.py")}
+        self.assertEqual(set(self.plugin.PROFILE_PLUGIN_FILES), expected)
+        for name in sorted(expected):
+            original = (source / name).read_bytes()
+            for change in ("changed", "missing"):
+                with self.subTest(module=name, change=change):
+                    target = installed / name
+                    if change == "changed":
+                        target.write_bytes(original + b"# changed\n")
+                    else:
+                        target.unlink()
+                    self.assertIs(self.policy_hook(), False)
+                    repaired = self.connector()
+                    self.assertEqual(repaired.status_code, 200)
+                    self.assertIs(repaired.body["plugin_updated"], True)
+                    self.assertEqual(target.read_bytes(), original)
+                    self.assertIs(self.policy_hook(), True)
+
     def test_connector_install_restores_a_missing_profile_plugin(self):
         """profile 에 hook plugin 디렉터리가 없으면 설치가 묶음의 판으로 만든다."""
         self.connector_fixture()
