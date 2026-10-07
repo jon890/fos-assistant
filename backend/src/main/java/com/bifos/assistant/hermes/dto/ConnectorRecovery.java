@@ -15,7 +15,7 @@ import lombok.experimental.Accessors;
 @Accessors(fluent = true)
 @RequiredArgsConstructor
 public enum ConnectorRecovery {
-    /** 승인 뒤 대상이 바뀌었다. 다시 조회해 지금 상태를 보이고 새로 승인을 받는다. */
+    /** 승인 뒤 대상이 바뀌었다. 지금 값을 알리고 다시 조회할지 묻는다. */
     RECHECK("recheck"),
     /** 연결의 권한이나 값이 모자라다. 사용자가 연결을 다시 등록해야 한다. */
     RECONNECT("reconnect"),

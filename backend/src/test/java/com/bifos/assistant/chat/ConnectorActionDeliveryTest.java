@@ -275,8 +275,8 @@ class ConnectorActionDeliveryTest {
         assertThat(deliveredInput())
                 .endsWith("[출처: 승인한 동작, 동작: 이름 없는 동작, 상태: FAILED, 오류: invalid_input,"
                         + " 오류 코드: GMAIL_TARGET_COUNT_CHANGED, 세부: actual_count=17, 끝난 시각: " + executedText() + "]\n"
-                        + "복구: 승인한 뒤 대상이 바뀌어 실행하지 않았다. 같은 조건으로 다시 조회해 지금 상태를 사용자에게 보이고,"
-                        + " 그대로 진행할지 다시 묻는다. 같은 인자로 다시 승인을 요청하지 않는다.")
+                        + "복구: 승인한 뒤 대상이 바뀌어 실행하지 않았다. 세부에 지금 값이 있으면 승인 당시 값과 함께 알리고,"
+                        + " 다시 조회해 확인할지 묻는다. 사용자가 원하면 같은 조건으로 다시 조회해 새로 승인을 요청한다.")
                 .doesNotContain("<external-data>");
     }
 

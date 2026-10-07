@@ -113,8 +113,8 @@ public class ConnectorActionResultSource implements AutoTurnResultSource {
     static String recoveryInput(ConnectorRecovery recovery) {
         return switch (recovery) {
             case RECHECK ->
-                "복구: 승인한 뒤 대상이 바뀌어 실행하지 않았다. 같은 조건으로 다시 조회해 지금 상태를 사용자에게 보이고,"
-                        + " 그대로 진행할지 다시 묻는다. 같은 인자로 다시 승인을 요청하지 않는다.";
+                "복구: 승인한 뒤 대상이 바뀌어 실행하지 않았다. 세부에 지금 값이 있으면 승인 당시 값과 함께 알리고,"
+                        + " 다시 조회해 확인할지 묻는다. 사용자가 원하면 같은 조건으로 다시 조회해 새로 승인을 요청한다.";
             case RECONNECT -> "복구: 연결의 권한이나 값이 모자라다. 사용자에게 연결을 다시 등록하도록 안내한다." + " 커넥터 스킬에 절차가 있으면 그것을 따른다.";
             case FIX_INPUT -> "복구: 인자가 맞지 않았다. 인자를 고쳐 새로 승인을 요청한다.";
             case RETRY_LATER -> "복구: 서비스가 응답하지 않았다. 읽기 도구로 지금 상태를 확인한 뒤 다시 시도할지 사용자에게 묻는다.";
