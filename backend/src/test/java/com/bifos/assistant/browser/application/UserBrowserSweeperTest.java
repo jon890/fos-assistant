@@ -53,7 +53,7 @@ class UserBrowserSweeperTest {
         service = service(true);
         revoked.clear();
         sweeper = new UserBrowserSweeper(
-                service, repository, runtime, usage, userId -> !revoked.contains(userId), Clock.systemUTC());
+                service, screens(), repository, runtime, usage, userId -> !revoked.contains(userId), Clock.systemUTC());
     }
 
     @AfterEach
@@ -237,7 +237,7 @@ class UserBrowserSweeperTest {
         when(broken.findByStatusAndLastActiveAtBefore(any(), any()))
                 .thenThrow(new DataAccessResourceFailureException("db down"));
         UserBrowserSweeper failing =
-                new UserBrowserSweeper(service, broken, runtime, usage, userId -> true, Clock.systemUTC());
+                new UserBrowserSweeper(service, screens(), broken, runtime, usage, userId -> true, Clock.systemUTC());
 
         failing.onReady();
         failing.sweep();
@@ -249,8 +249,8 @@ class UserBrowserSweeperTest {
     @DisplayName("기능이 꺼져 있으면 아무것도 하지 않는다")
     void doesNothingWhenDisabled() {
         runtime.plant("stranger", "f".repeat(64), true);
-        UserBrowserSweeper disabled =
-                new UserBrowserSweeper(service(false), repository, runtime, usage, userId -> false, Clock.systemUTC());
+        UserBrowserSweeper disabled = new UserBrowserSweeper(
+                service(false), screens(), repository, runtime, usage, userId -> false, Clock.systemUTC());
 
         disabled.sweep();
         disabled.onAccessRevoked(new UserAccessRevoked(201L));
@@ -280,6 +280,10 @@ class UserBrowserSweeperTest {
                 "UPDATE user_browser SET updated_at = ? WHERE id = ?",
                 Timestamp.from(Instant.now().minus(age)),
                 id);
+    }
+
+    private BrowserScreens screens() {
+        return new BrowserScreens(new FakeCdp(), new FakeCdp(), usage, Duration.ofMinutes(30), Duration.ofSeconds(2));
     }
 
     private UserBrowserService service(boolean enabled) {

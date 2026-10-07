@@ -189,8 +189,7 @@ public class UserBrowserService {
     /**
      * 화면 입력이나 중계 통신이 있었다. 켜져 있을 때만 마지막 활동 시각을 1분에 한 번까지 쓴다.
      *
-     * <p>마지막 기록에서 1분이 지나지 않았으면 DB 를 읽지 않는다. 다른 전이와 겹쳐 저장하지 못하면 이번 기록은 버린다. 다음 활동이 다시
-     * 쓴다.
+     * <p>1분 안이면 DB 를 읽지 않는다. 다른 전이와 겹쳐 저장하지 못하면 이번 기록은 버린다. 다음 활동이 다시 쓴다.
      */
     public void touch(Long userId) {
         Instant now = clock.instant();
@@ -202,7 +201,6 @@ public class UserBrowserService {
                 .filter(browser -> browser.status() == UserBrowserStatus.RUNNING)
                 .ifPresent(browser -> {
                     if (!browser.touch(now)) {
-                        // 줄에 이미 1분 안의 기록이 있다. 그 시각부터 거른다
                         touched.put(userId, browser.lastActiveAt());
                         return;
                     }
@@ -215,11 +213,7 @@ public class UserBrowserService {
                 });
     }
 
-    /**
-     * 로그인 화면을 열고 앞의 화면은 닫는다. 꺼져 있으면 켜고, 탭에 붙지 못했으면 {@code BROWSER_START_FAILED} 다.
-     *
-     * <p>활동은 화면을 열기 전에 기록한다. 기록이 실패해도 사용 핸들을 쥔 화면이 남지 않는다.
-     */
+    /** 로그인 화면을 열고 앞의 화면은 닫는다. 꺼져 있으면 켜고, 탭에 붙지 못했으면 {@code BROWSER_START_FAILED} 다. 활동은 열기 전에 기록한다. */
     public void openScreen(Long userId, String url, BrowserScreenSink sink) {
         UserBrowserSnapshot started = start(userId);
         URI address = Optional.ofNullable(owned(userId).containerId())
@@ -227,11 +221,6 @@ public class UserBrowserService {
                 .orElseThrow(() -> new ApiException(ErrorCode.BROWSER_START_FAILED, "user browser has no cdp address"));
         touch(userId);
         screens.open(started.id(), userId, address, url, sink);
-    }
-
-    /** 그 브라우저의 화면을 닫는다. 상태 맞추기가 사라진 컨테이너의 줄을 멈춤으로 되돌릴 때 쓴다. */
-    public void closeScreen(Long browserId) {
-        screens.close(browserId);
     }
 
     /** 요청자의 열린 화면에 입력을 보내고 활동을 기록한다. 열린 화면이 없으면 {@code BROWSER_SCREEN_CLOSED} 다. */
