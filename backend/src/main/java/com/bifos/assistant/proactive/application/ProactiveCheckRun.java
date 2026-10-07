@@ -175,7 +175,7 @@ public class ProactiveCheckRun implements CheckTurn {
      */
     @Override
     public boolean silent() {
-        return check.trigger() == CheckTrigger.AUTONOMY;
+        return results.silent();
     }
 
     /**

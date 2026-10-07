@@ -10,7 +10,6 @@
     "backend/src/main/java/com/bifos/assistant/connector/application/ConnectorBindingService.java": 612,
     "backend/src/main/java/com/bifos/assistant/hermes/HttpHermesConnectorClient.java": 614,
     "backend/src/main/java/com/bifos/assistant/orchestration/application/AgentDelegationService.java": 607,
-    "backend/src/main/java/com/bifos/assistant/proactive/application/ProactiveCheckRun.java": 763,
     "backend/src/main/java/com/bifos/assistant/usage/application/ExecutionRecorder.java": 585,
     "backend/src/main/java/com/bifos/assistant/usage/domain/AgentExecution.java": 665,
     "hermes/connectors/naver-blog/src/editor/page.ts": 515,

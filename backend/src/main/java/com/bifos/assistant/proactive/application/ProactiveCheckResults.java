@@ -43,9 +43,9 @@ class ProactiveCheckResults {
     volatile int newFindings;
     volatile int referenceFindings;
     /** 검사한 발견. 답 메시지를 저장한 뒤 {@link #saveFindings} 가 저장한다. 블록에 발견이 없으면 비어 있다. */
-    volatile List<ProactiveCheckFinding> pendingFindings = List.of();
+    private volatile List<ProactiveCheckFinding> pendingFindings = List.of();
     /** 검사한 문제 후보. 발견과 함께 {@link #saveFindings} 가 저장한다. 발견이 없으면 비어 있다. */
-    volatile List<ProactiveCheckProblem> pendingProblems = List.of();
+    private volatile List<ProactiveCheckProblem> pendingProblems = List.of();
     /** 결과 블록 v2를 검사해 만든 보고다. */
     volatile CheckReport pendingReport;
 
@@ -207,7 +207,7 @@ class ProactiveCheckResults {
      * 자동 실행으로 시작해 답, 보고, 발견, 알림 줄을 남기지 않는 살펴보기인가. 문제 후보만 남겨 다시 가치 평가와 행동 정책을 거치게
      * 한다.
      */
-    public boolean silent() {
+    boolean silent() {
         return check.trigger() == CheckTrigger.AUTONOMY;
     }
 }

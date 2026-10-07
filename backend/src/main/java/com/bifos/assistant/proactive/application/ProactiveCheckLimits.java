@@ -114,7 +114,7 @@ class ProactiveCheckLimits {
     }
 
     /**
-     * 멈추기를 부르고, 실패하면 정한 까닭을 되돌린 뒤 {@link #STOP_RETRY_INTERVAL} 뒤에 다시 시도한다. 까닭이 남아 있는 동안 turn 이
+     * 멈추기를 부르고, 실패하면 정한 까닭을 되돌린 뒤 {@link ProactiveCheckRun#STOP_RETRY_INTERVAL} 뒤에 다시 시도한다. 까닭이 남아 있는 동안 turn 이
      * 예외로 끝나면 상한으로 멈춘 것으로 적히므로, 멈추지 못한 채 실패한 turn 이 상한으로 기록되지 않게 바로 되돌린다.
      *
      * <p>되돌릴 때는 자기가 정한 까닭일 때만 비운다. 이미 끝난 turn 이면 멈추기가 {@code EXECUTION_NOT_RUNNING} 으로 끝나고, 닫혔으니
