@@ -14,6 +14,7 @@ import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.usage.application.ExecutionEventRecorder;
 import com.bifos.assistant.usage.application.ExecutionRecorder;
 import com.bifos.assistant.usage.domain.AgentExecution;
+import com.bifos.assistant.usage.domain.type.EventObservation;
 import com.bifos.assistant.usage.domain.type.ExecutionEventType;
 import com.bifos.assistant.usage.domain.type.ExecutionStatus;
 import com.bifos.assistant.usage.infra.AgentExecutionRepository;
@@ -139,6 +140,12 @@ public class RecoveredRunRecorder {
             Written locked = executionRepository
                     .lockById(executionId)
                     .filter(row -> row.status() == ExecutionStatus.RUNNING)
+                    .map(row -> {
+                        if (row.eventObservation() == EventObservation.OBSERVING) {
+                            row.finishEventObservation(false);
+                        }
+                        return row;
+                    })
                     .map(write)
                     .orElse(null);
             if (locked != null) {

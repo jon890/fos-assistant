@@ -81,6 +81,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import java.util.function.IntFunction;
@@ -110,6 +111,8 @@ import org.springframework.transaction.support.TransactionTemplate;
 @RequiredArgsConstructor
 public class ChatService {
     private static final int TITLE_LIMIT = 60;
+    private static final Set<String> TERMINAL_EVENTS =
+            Set.of("run.completed", "run.failed", "run.cancelled", "run.interrupted");
 
     /** 대화 목록 한 쪽의 상한이다. 웹이 더 크게 요청해도 이만큼만 읽는다. */
     public static final int MAX_CONVERSATION_PAGE = 100;
@@ -1268,6 +1271,7 @@ public class ChatService {
     private String submit(PendingTurn pending) {
         try {
             executions.markSubmitted(pending.execution());
+            executions.beginEventObservation(pending.execution());
             String runId = hermes.submit(pending.command());
             executions.attachRunId(pending.execution(), runId);
             append(pending, ExecutionEventType.RUN_STARTED, null);
@@ -1294,6 +1298,7 @@ public class ChatService {
         // 일부 HTTP 스트림은 다른 스레드의 close 중에도 readLine 을 놓지 않는다.
         // 중지 유예 시간이 지나면 요청 스레드를 먼저 풀어 상태 조회와 stopped 사건으로 진행한다.
         CompletableFuture<Void> streamDone = new CompletableFuture<>();
+        AtomicBoolean terminalSeen = new AtomicBoolean();
         ToolDetailScope detailScope = toolDetailScope(pending.agent());
         Thread.startVirtualThread(() -> {
             try {
@@ -1304,6 +1309,9 @@ public class ChatService {
                         event -> {
                             synchronized (pending) {
                                 if (!handle.cancelled().get() || !turns.isStopConfirmed(handle)) {
+                                    if (TERMINAL_EVENTS.contains(event.type())) {
+                                        terminalSeen.set(true);
+                                    }
                                     if (onEvent == null) {
                                         append(pending, event);
                                     } else {
@@ -1315,11 +1323,20 @@ public class ChatService {
                         stream -> turns.attachStream(handle, stream),
                         detailScope);
             } catch (ApiException ex) {
+                synchronized (pending) {
+                    executions.finishEventObservation(pending.execution(), false);
+                }
                 log.warn("Hermes event stream ended before final status runId={}", runId, ex);
             } catch (RuntimeException ex) {
+                synchronized (pending) {
+                    executions.finishEventObservation(pending.execution(), false);
+                }
                 // 사건은 관측용이다. 읽다가 예기치 못한 오류가 나도 가려진 스레드 오류로 두지 않고 남긴다
                 log.warn("Hermes event stream failed runId={}", runId, ex);
             } finally {
+                synchronized (pending) {
+                    executions.finishEventObservation(pending.execution(), terminalSeen.get());
+                }
                 turns.detachStream(handle);
                 streamDone.complete(null);
             }
@@ -1328,6 +1345,11 @@ public class ChatService {
             turns.awaitStreamOrGrace(handle, streamDone, hermesProperties.runTimeout());
         } else {
             turns.awaitStreamOrGrace(handle, streamDone);
+        }
+        synchronized (pending) {
+            if (!streamDone.isDone()) {
+                executions.finishEventObservation(pending.execution(), false);
+            }
         }
     }
 
@@ -2100,6 +2122,7 @@ public class ChatService {
                     "could not record an execution event executionId={}",
                     pending.execution().id(),
                     ex);
+            executions.finishEventObservation(pending.execution(), false);
         }
     }
 

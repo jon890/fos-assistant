@@ -31,6 +31,7 @@
 | `reasoning_effort_source` | VARCHAR(20) NULL | `reasoning_effort` 의 출처. `REQUESTED`, `AGENT_DEFAULT`, `PROFILE_DEFAULT`, `UNKNOWN` 이다. 이 칸이 생기기 전의 실행은 비어 있고 추정해 채우지 않는다 |
 | `model_tier` | VARCHAR(16) NULL | 실행을 시작할 때 해석한 모델 단계. 단계 없이 돈 실행은 비어 있다 |
 | `cost_mode` | VARCHAR(20) | 실행 당시 에이전트의 `SUBSCRIPTION` 또는 `API` |
+| `event_observation` | VARCHAR(20) | 사건 관측 범위. 과거 실행과 제출 전 실행은 `UNKNOWN`, 수집 중은 `OBSERVING`, 정상 종료는 `OBSERVED`, 비수집이나 읽기·저장 실패는 `INCOMPLETE`다. 실행 성공과 자식 비용 확정 여부와는 별개다 |
 | `status` | VARCHAR(20) | `RUNNING`, `SUCCEEDED`, `FAILED`, `CANCELLED` |
 | `error_code` | VARCHAR(64) NULL | |
 | `input_tokens`, `cached_input_tokens`, `output_tokens`, `total_tokens` | BIGINT NULL | provider 가 알려준 것만 채운다 |
@@ -65,6 +66,12 @@
 0 은 공짜라는 뜻으로 읽히기 때문이다.
 환산액과 실제 청구액을 나눈 근거는
 [ADR-014](../../adr/ADR-014-실제-청구액과-환산액을-나눠-적는다.md)에 있다.
+
+### 사건 관측 범위
+
+새 실행은 Hermes에 제출할 때 `INCOMPLETE`로 적는다. 대화의 사건 수집 경로는 제출 직후 `OBSERVING`으로 바꾸며, 종료 사건을 받고 스트림이 정상적으로 닫히면 `OBSERVED`로 적는다. 종료 사건 없는 조기 EOF, 읽기·사건 저장 실패, 대기 상한이나 중지 유예 종료는 `INCOMPLETE`로 남긴다. 실패 표시를 뒤늦은 스트림 종료로 지우지 않는다. 기동 복구는 `OBSERVING`으로 남은 줄을 `INCOMPLETE`로 바꾸고 답과 확인한 사용량을 보존한다. 사건을 수집하지 않는 Flow 단계와 FOS 위임 등은 `INCOMPLETE`로 남는다. Hermes에 제출하지 않는 합성 루트는 `UNKNOWN`이다.
+
+월 합계의 `observationIncompleteExecutions`는 같은 사용자와 시작 시각 구간의 끝난 `INCOMPLETE` 실행만 센다. 관리자에게만 보내며, 자식 건수나 비용에 더하지 않는다. 마이그레이션 이전의 `UNKNOWN` 실행은 경고 수에서 제외한다. 관측 여부를 추정하지 않고, 과거 실행이 배포 직후 경고 수를 채우지 않게 하기 위해서다. 화면은 과거 실행의 관측 범위를 확인하지 않았다는 안내를 유지한다.
 
 ### 끝나지 않은 실행
 
