@@ -1,4 +1,4 @@
-import { expect, test } from "./fixtures.ts";
+import { CONVERSATION_URL, expect, test } from "./fixtures.ts";
 import { clickAndWaitForResponse, waitForViewTransition } from "./helpers.ts";
 
 async function ask(
@@ -178,6 +178,7 @@ test("답 없는 질문을 다시 시도해 같은 질문에 답을 붙인다", 
   await page.getByRole("textbox", { name: "메시지" }).fill("중지 조각 전 검사");
   await page.getByRole("button", { name: "보내기" }).click();
   await hermes.waitForHeldRun();
+  await expect(page).toHaveURL(CONVERSATION_URL);
   const stop = page
     .getByTestId("composer-shell")
     .getByRole("button", { name: "중지" });

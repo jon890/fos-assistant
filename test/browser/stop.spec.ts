@@ -1,4 +1,10 @@
-import { CONVERSATION_ID, conversationIdOf, expect, test } from "./fixtures.ts";
+import {
+  CONVERSATION_ID,
+  CONVERSATION_URL,
+  conversationIdOf,
+  expect,
+  test,
+} from "./fixtures.ts";
 import type { Page } from "../../web/node_modules/@playwright/test/index.js";
 import { waitForViewTransition } from "./helpers.ts";
 
@@ -198,6 +204,7 @@ test("중지에 마우스를 올려 풀이가 열려 있어도 첫 Esc 로 답�
   await hermes.holdNextRun();
   await beginHeldTurn(page, "중지 풀이 Esc 검사");
   await hermes.waitForHeldRun();
+  await expect(page).toHaveURL(CONVERSATION_URL);
   const stop = page
     .getByTestId("composer-shell")
     .getByRole("button", { name: "중지" });

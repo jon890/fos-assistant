@@ -52,7 +52,7 @@ export async function fixBrowserTime(page: Page, at = FIXED_BROWSER_NOW) {
   await page.clock.setFixedTime(at);
 }
 
-/** 화면 전환의 스냅샷이 사라져 실제 단추가 포인터 사건을 받을 때까지 기다린다. */
+/** 주소 변경과 조작할 단추의 준비를 확인한 뒤, 진행 중인 화면 전환의 스냅샷이 사라질 때까지 기다린다. */
 export async function waitForViewTransition(page: Page) {
   await page.waitForFunction(() =>
     document
