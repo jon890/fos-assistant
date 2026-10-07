@@ -78,10 +78,16 @@ public class ValueEvaluationStore {
         return evaluations.save(row);
     }
 
-    /** Web server 가 요청을 받기 전 기동 단계에서 호출한다. 원래 입력을 보존하고 중단 상태만 바꾼다. */
+    /** JSON 변환 전에 식별자만 읽어 손상된 한 줄이 다른 줄의 복구를 막지 않게 한다. */
+    @Transactional(readOnly = true)
+    public List<Long> findRunningIds() {
+        return evaluations.findIdsByOutcome(DecisionOutcome.RUNNING);
+    }
+
+    /** Web server 가 열리기 전 한 줄씩 별도 트랜잭션으로 원래 입력을 보존하고 중단 상태만 바꾼다. */
     @Transactional
-    public void recover() {
-        for (ValueEvaluation row : evaluations.findByOutcome(DecisionOutcome.RUNNING)) {
+    public void recover(Long id) {
+        evaluations.findById(id).filter(row -> row.outcome() == DecisionOutcome.RUNNING).ifPresent(row -> {
             DecisionEvidence input = row.evidence();
             row.finish(new DecisionEvidence(
                     input.state(),
@@ -89,7 +95,7 @@ public class ValueEvaluationStore {
                     input.provider(),
                     DecisionResult.fallback(DecisionFailure.INTERRUPTED)));
             evaluations.save(row);
-        }
+        });
     }
 
     private ValueEvaluation insert(

@@ -37,6 +37,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.support.TransactionTemplate;
 
@@ -68,6 +69,9 @@ class ValueEvaluationStoreTest {
 
     @Autowired
     ValueEvaluationRecovery recovery;
+
+    @Autowired
+    JdbcTemplate jdbc;
 
     private Conversation conversation;
     private ProactiveCheck check;
@@ -196,6 +200,23 @@ class ValueEvaluationStoreTest {
         assertThat(ended.outcome()).isEqualTo(DecisionOutcome.FALLBACK);
         assertThat(ended.evidence().result().failure()).isEqualTo(DecisionFailure.INTERRUPTED);
         assertThat(ended.evidence().state()).isEqualTo(running.evidence().state());
+    }
+
+    @Test
+    @DisplayName("잘못된 평가 JSON 한 줄은 다른 평가의 별도 복구 트랜잭션과 기동을 막지 않는다")
+    void recoversValidRowsBesideInvalidEvidence() {
+        ValueEvaluation bad = store.begin(OWNER.id(), check.id(), "fixture-a");
+        ValueEvaluation good = store.begin(OWNER.id(), check.id(), "fixture-a");
+        jdbc.update("UPDATE proactive_value_evaluation SET evidence_json = ? WHERE id = ?", "{}", bad.id());
+        try {
+            recovery.start();
+            assertThat(recovery.isRunning()).isTrue();
+            assertThat(store.read(OWNER.id(), good.id()).evidence().result().failure()).isEqualTo(DecisionFailure.INTERRUPTED);
+            assertThat(jdbc.queryForObject("SELECT outcome FROM proactive_value_evaluation WHERE id = ?", String.class, bad.id()))
+                    .isEqualTo("RUNNING");
+        } finally {
+            jdbc.update("DELETE FROM proactive_value_evaluation WHERE id = ?", bad.id());
+        }
     }
 
     private DecisionProvider provider(String id) {

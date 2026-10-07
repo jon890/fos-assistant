@@ -70,6 +70,8 @@ profile 생성과 배포는 운영 저장소가 맡는다.
 `proactive_value_evaluation`에 시도마다 새 줄을 남긴다.
 모델 호출 전에 `RUNNING`과 입력·질문을 저장하고, 호출 뒤 결과를 붙인다. 모델을 기다리는 동안 저장 트랜잭션을 열지 않는다.
 기동할 때 남은 `RUNNING`은 `FALLBACK / INTERRUPTED`로 닫고 자동으로 다시 부르지 않는다.
+한 줄의 저장·JSON 읽기가 실패해도 다른 줄의 복구와 서버 기동을 이어 간다.
+복구하지 못한 줄은 원래 상태로 두고 식별자와 오류 종류만 기록한다.
 
 `evidence_json`에는 `DecisionEvidence`를 둔다.
 

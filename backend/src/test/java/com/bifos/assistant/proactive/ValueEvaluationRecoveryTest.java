@@ -1,9 +1,13 @@
 package com.bifos.assistant.proactive;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.verify;
 
 import com.bifos.assistant.hermes.HermesProperties;
 import com.bifos.assistant.proactive.application.ValueEvaluationRecovery;
@@ -38,10 +42,45 @@ class ValueEvaluationRecoveryTest {
         new ValueEvaluationRecovery(store, executions, recorder, limiter, properties).recover();
 
         var order = inOrder(store, limiter, recorder);
-        order.verify(store).recover();
+        order.verify(store).findRunningIds();
         order.verify(limiter)
                 .holdUntilRemoteEnds(
                         72L, 71L, "http://hermes.example.com/p/decision-test", "decision-test", "run-system", false);
         order.verify(recorder).fail(running, "DECISION_INTERRUPTED");
+    }
+
+    @Test
+    @DisplayName("한 평가나 실행의 복구가 실패해도 다음 줄을 닫고 서버 기동을 이어 간다")
+    void isolatesFailuresOfIndividualRows() {
+        ValueEvaluationStore store = mock(ValueEvaluationStore.class);
+        AgentExecutionRepository executions = mock(AgentExecutionRepository.class);
+        ExecutionRecorder recorder = mock(ExecutionRecorder.class);
+        AgentExecution bad = mock(AgentExecution.class);
+        AgentExecution good = mock(AgentExecution.class);
+        when(store.findRunningIds()).thenReturn(List.of(1L, 2L));
+        doThrow(new IllegalStateException("synthetic conversion failure")).when(store).recover(1L);
+        when(executions.findByAgentIdIsNullAndConversationIdIsNullAndStatus(any())).thenReturn(List.of(bad, good));
+        when(recorder.fail(bad, "DECISION_INTERRUPTED")).thenThrow(new IllegalStateException("synthetic update failure"));
+        ValueEvaluationRecovery recovery = new ValueEvaluationRecovery(store, executions, recorder,
+                mock(UserExecutionLimiter.class), mock(HermesProperties.class));
+        assertThatCode(recovery::start).doesNotThrowAnyException();
+        assertThat(recovery.isRunning()).isTrue();
+        verify(store).recover(2L);
+        verify(recorder).fail(good, "DECISION_INTERRUPTED");
+    }
+
+    @Test
+    @DisplayName("복구 목록 조회가 실패해도 다른 복구를 시도하고 기동을 이어 간다")
+    void continuesStartupAfterRepositoryFailure() {
+        ValueEvaluationStore store = mock(ValueEvaluationStore.class);
+        AgentExecutionRepository executions = mock(AgentExecutionRepository.class);
+        when(store.findRunningIds()).thenThrow(new IllegalStateException("synthetic database failure"));
+        when(executions.findByAgentIdIsNullAndConversationIdIsNullAndStatus(any()))
+                .thenThrow(new IllegalStateException("synthetic database failure"));
+        ValueEvaluationRecovery recovery = new ValueEvaluationRecovery(store, executions,
+                mock(ExecutionRecorder.class), mock(UserExecutionLimiter.class), mock(HermesProperties.class));
+        assertThatCode(recovery::start).doesNotThrowAnyException();
+        assertThat(recovery.isRunning()).isTrue();
+        verify(executions).findByAgentIdIsNullAndConversationIdIsNullAndStatus(any());
     }
 }
