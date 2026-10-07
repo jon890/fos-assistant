@@ -21,6 +21,27 @@ AI credential 은 Hermes profile 의 `.env` 에, profile 의 API server key 는 
 
 ## 마이그레이션 작성 규칙
 
+### 새 버전은 UTC 작성 시각으로 정한다
+
+새 파일은 `V<YYYYMMDDHHMMSS>__<설명>.sql` 형식이다. UTC 시각 14자리를 쓴다.
+작성 시각은 `date -u +%Y%m%d%H%M%S` 로 얻는다.
+전환 PR 이 머지될 때 main 에 있는 숫자 버전은 이름과 내용을 그대로 유지한다.
+운영에 적용된 파일은 주석도 고치지 않는다. 배포 뒤 `test/unit/migration-checksums.json` 에 추가하는 규칙도 같다.
+
+운영과 시험에 `spring.flyway.out-of-order=true` 를 둔다.
+높은 시각 버전이 먼저 배포되어도 나중에 들어온 낮은 시각 버전을 적용한다.
+**서로 의존하는 마이그레이션은 한 PR 에 둔다.** 그 안에서는 의존하는 파일의 시각을 더 크게 정한다.
+다른 PR 의 미적용 스키마에 기대는 SQL 은 만들지 않는다.
+버전이 겹치면 적용 전인 새 파일만 새 시각으로 바꾼다.
+
+`node scripts/check-migration-versions.mjs [기준 ref]` 는 기본으로 `origin/main` 과 비교한다.
+새 파일의 시각 형식과 유효한 UTC 날짜, 지금보다 1일 넘게 미래인지 검사하고 모든 파일의 버전 중복을 찾는다.
+CI 는 PR 의 main base 와 비교한다. push 는 직전 main, 정기 실행은 현재 main 을 기준으로 삼는다.
+기존 마이그레이션 불변 검사와 `scripts/check-mysql-migration.sh` 는 계속 실행한다.
+결정 근거는 [ADR-20261007 / numbering-scheme](../../adr/ADR-20261007-numbering-scheme.md) 에 있다.
+
+### MySQL 작성 주의점
+
 운영 MySQL 에서 마이그레이션 하나가 오류 1267(Illegal mix of collations)로 실패해 서비스가 내려간 적이 있다.
 H2 로 도는 검사는 모두 통과한 상태였다. 아래 규칙은 그 일에서 나왔다.
 
