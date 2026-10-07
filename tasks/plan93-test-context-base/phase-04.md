@@ -27,7 +27,16 @@ young GC 뒤 힙 중앙값 798MB(1g 힙), Full GC 2번이었다. 보존 상한�
 
 ### 1. 측정
 
-GC 로그를 켜는 Gradle init 스크립트를 저장소 밖 임시 디렉터리에 만든다. 내용은 `tasks.withType(Test).configureEach { jvmArgs "-Xlog:gc:file=<경로>" }` 이다.
+GC 로그와 Spring 컨텍스트 캐시 통계를 켜는 Gradle init 스크립트(Groovy, `.gradle`)를 저장소 밖 임시 디렉터리에 만든다.
+
+```groovy
+allprojects {
+  tasks.withType(Test).configureEach {
+    jvmArgs "-Xlog:gc:file=<GC 로그 경로>"
+    systemProperty "logging.level.org.springframework.test.context.cache", "DEBUG"
+  }
+}
+```
 `cd backend && ./gradlew test --rerun-tasks --init-script <그 파일>` 을 돌리고 아래를 센다.
 
 | 값 | 읽는 곳 |
@@ -35,12 +44,14 @@ GC 로그를 켜는 Gradle init 스크립트를 저장소 밖 임시 디렉터�
 | 컨텍스트 기동 수 | `backend/build/test-results/test/*.xml` 의 `HikariPool-N` 가장 큰 N, `Started <클래스> in <초> seconds` 의 줄 수 |
 | 기동 합계 | 위 `Started` 줄의 초 합 |
 | 검사 클래스 시간 합계 | 각 xml 의 `<testsuite time=...>` 합 |
-| 서로 다른 컨텍스트 키 수 | `@BackendIntegrationTest` 검사의 `@TestPropertySource`, `@Import`, 변형 주석, 남은 `@MockitoBean`·`@MockitoSpyBean` 필드 타입의 조합 수 |
+| 서로 다른 컨텍스트 키 수 | 마지막 결과 xml 의 Spring 캐시 통계 줄(`Spring test ApplicationContext cache statistics`)의 `missCount`. 상한이 키 수 이상이면 `missCount` 가 키 수와 같다 |
 | 힙 | GC 로그의 young GC 뒤 크기 최댓값과 중앙값, `Pause Full` 줄 수, 마지막 시각(검사 JVM 실행 시간) |
 
 ### 2. 보존 상한
 
-`backend/build.gradle.kts` 의 `systemProperty("spring.test.context.cache.maxSize", ...)` 를 위 의도 메모의 기준으로 정한 값으로 둔다.
+후보 값 둘로 전체 검사를 한 번씩 돌린다. 하나는 16 이고, 다른 하나는 16 으로 측정한 `missCount`(키 수)다. 키 수가 16 이하면 16 하나만 돈다.
+`missCount` 가 키 수와 같고 `Pause Full` 이 0 인 후보 가운데 가장 작은 값을 고른다. 둘 다 조건을 못 맞추면 측정값과 함께 멈추고 보고한다.
+`backend/build.gradle.kts` 의 `systemProperty("spring.test.context.cache.maxSize", ...)` 를 그 값으로 둔다.
 그 위 주석을 측정 날짜, 컨텍스트 수, 힙 값으로 고쳐 쓴다. 16 을 유지해도 주석의 근거는 새 측정으로 바꾼다.
 
 ### 3. 세 번 연속 통과

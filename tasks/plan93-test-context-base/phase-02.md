@@ -32,6 +32,9 @@
 - `hermes.run-timeout` 과 살펴보기 `max-duration` 을 `application-test.yml` 에서 올리지 않는다. ADR-095 의 대안 기각을 본다.
 - 검사 하나만 쓰는 대역(`PriceCatalog`, `SkillService`, `AgentEndpointProbe`, `HermesProfileProvisioner`, `CheckNotificationPolicy`, `AgentConnectorBindings`, `SkillCommandCatalog` 의 mock, 검사 클래스 안의 `@TestConfiguration`)은 기반에 넣지 않는다.
 - `SkillViewStreamTest` 는 실제 `HttpServer` 로 사건 스트림을 읽으므로 기반의 사건 스트림 mock 을 쓸 수 없다. `@SpringBootTest` 로 따로 둔다. MySQL 태그의 기준 클래스(`MysqlMigrationTest`, `RepositoryQueryMysqlTest`, `CollationMixQueryMysqlTest`)도 그대로 둔다.
+- H2 검사를 상속하는 MySQL 검사 넷(`AgentVisibilityMysqlLockTest`, `AttachmentUploadLimitMysqlTest`, `ChatMessageParentGuardMysqlTest`, `ConnectorBindingServiceMysqlLockTest`)은 `@Inherited` 인 `@BackendIntegrationTest` 를 물려받는다. RANDOM_PORT, spy, 격리 확장이 그 넷에도 걸린다. `./gradlew test` 는 mysql 태그를 빼므로 로컬에서는 드러나지 않는다. 원격 검증 목록의 CI backend job(MySQL 검사 포함)으로 확인한다.
+- 메타 주석 안에서 `@ExtendWith(IntegrationTestIsolation.class)` 는 `@SpringBootTest` 보다 뒤에 둔다. JUnit 은 `AfterEachCallback` 을 등록의 역순으로 부르므로, 이 순서여야 Spring 의 mock 초기화와 `@Transactional` 되돌리기보다 join 이 먼저 돈다.
+- `TaskScheduler` 와 `ScheduledExecutorService` 에 건 예약(위임 깨우기의 재시도 예약, 중지 유예 타이머)은 join 대상이 아니다(ADR-096). 실제 스케줄러로 그 예약을 거는 검사는 그 예약이 다음 검사에 닿지 않는지 본다.
 - 30초 상한은 판정 기준이 아니라 멈춘 작업을 잡는 안전장치다. 기다리는 것은 시간이 아니라 스레드의 끝이다.
 
 ## 작업 항목
@@ -40,7 +43,9 @@
 
 `@Inherited`, `@SpringBootTest(webEnvironment = RANDOM_PORT)`, `@ActiveProfiles("test")`, `@Import(IntegrationTestDoubles.class)`,
 위 mock 여섯 종의 `@MockitoBean(types = ...)`, spy 목록의 `@MockitoSpyBean(types = ...)`, `@ExtendWith(IntegrationTestIsolation.class)` 를 묶는다.
-경로는 `backend/src/test/java/com/bifos/assistant/testsupport/` 다. Javadoc 은 `docs/backend/testing.md` 를 가리킨다. 주석의 낱말은 저장소 관례대로 「검사」 를 쓴다.
+경로는 `backend/src/test/java/com/bifos/assistant/testsupport/` 다. Javadoc 은 `docs/backend/testing.md` 를 가리킨다.
+시제품에서 가져온 testsupport 파일 전체의 주석은 저장소 관례대로 「시험」 대신 「검사」 를 쓴다.
+시제품은 import 를 static import 위에 넣었다. 바꾼 파일에 `cd backend && ./gradlew spotlessApply` 를 돌린다.
 
 ### 2. `testsupport/IntegrationTestDoubles.java`, `TestClock.java`, `TrackingBackgroundTasks.java`
 
@@ -56,6 +61,7 @@ JUnit `BeforeEachCallback`, `AfterEachCallback` 이다.
 - 검사 전: `StubHermesRunsClient` 가 있으면 `reset()`, `TestClock.reset()`
 - 검사 후: `TrackingBackgroundTasks.awaitIdle(Duration.ofSeconds(30))` 를 부르고, 성공하든 실패하든 대역과 시계를 되돌린다
 - `ReflectionTestUtils` 로 운영 빈의 private 필드를 읽지 않는다
+- 검사 후 정리는 `static void afterTest(ApplicationContext context, Duration limit)` 로 빼서 `afterEach` 가 부른다. 아래 항목 5 의 검사가 이 메서드를 직접 부른다
 
 ### 4. 검사 이전
 
@@ -78,11 +84,16 @@ JUnit `BeforeEachCallback`, `AfterEachCallback` 이다.
 - 정상: 띄운 스레드 둘이 끝나면 `awaitIdle` 이 돌아오고, 스레드 안에서 다시 띄운 스레드도 기다린다
 - 실패: `CountDownLatch` 로 붙잡은 스레드가 있으면 짧은 상한(100ms)으로 부른 `awaitIdle` 이 그 스레드 이름을 담은 `AssertionError` 를 던진다. 끝나면 latch 를 풀어 스레드를 정리한다
 
+`backend/src/test/java/com/bifos/assistant/testsupport/IntegrationTestIsolationTest.java` 를 만든다. 컨텍스트는 `StaticApplicationContext` 에 `TrackingBackgroundTasks`, `StubHermesRunsClient`, `TestClock` 을 등록해 만든다.
+
+- 정상: 띄운 작업이 끝나면 `afterTest` 가 돌아오고, 대역에 넣어 둔 응답과 시계의 고정 시각이 되돌려진다
+- 실패: latch 로 붙잡은 작업이 있으면 `afterTest` 가 그 스레드 이름을 담은 `AssertionError` 를 던지고, 그래도 대역과 시계는 되돌려진다
+
 ## 검증
 
 ```bash
 # cwd: 저장소 root
-(cd backend && ./gradlew test --tests '*TrackingBackgroundTasksTest')
+(cd backend && ./gradlew test --tests '*TrackingBackgroundTasksTest' --tests '*IntegrationTestIsolationTest')
 (cd backend && ./gradlew test)
 (cd backend && ./gradlew qualityCheck)
 scripts/quality.sh check
@@ -103,4 +114,5 @@ git grep -ln "^@SpringBootTest" -- backend/src/test
 | `backend/src/test/java/com/bifos/assistant/testsupport/TestClock.java` | 신규 |
 | `backend/src/test/java/com/bifos/assistant/testsupport/TrackingBackgroundTasks.java` | 신규 |
 | `backend/src/test/java/com/bifos/assistant/testsupport/TrackingBackgroundTasksTest.java` | 신규 |
+| `backend/src/test/java/com/bifos/assistant/testsupport/IntegrationTestIsolationTest.java` | 신규 |
 | `backend/src/test/java/com/bifos/assistant/**/*Test.java` | 수정 |

@@ -20,6 +20,7 @@ Spring 은 `@TestPropertySource` 의 값 배열을 순서까지 견줘 컨텍스
 
 - 변형 주석은 `@BackendIntegrationTest` 와 함께 다는 보조 주석이다. 변형 주석에 `@BackendIntegrationTest` 를 넣지 않는다. 두 변형을 함께 다는 검사가 있다.
 - 변형 주석은 `@TestPropertySource` 를 메타 주석으로 갖는다. 여러 변형을 단 검사의 값은 Spring 이 합친다.
+- **변형 주석은 아래 표의 순서대로 달고, 남는 값은 그 뒤 하나의 `@TestPropertySource` 에 둔다.** 같은 묶음을 쓰는 검사의 컨텍스트 키가 순서까지 같아야 한다.
 - 가격표를 기반에 넣지 않는다. 기본 설정은 가격표가 없어 금액이 빈다. 그 상태를 전제로 하는 검사의 의미가 바뀐다.
 - `UsageCostRecordingTest` 는 가격표 파일의 수정 시각을 `2026-09-17T04:00:00Z` 로 고정한다. 공유 설정이 그 시각을 고정한다. 가격표를 쓰는 다른 검사는 그 시각을 단언하지 않는다.
 
