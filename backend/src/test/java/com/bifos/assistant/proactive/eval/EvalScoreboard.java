@@ -151,21 +151,23 @@ final class EvalScoreboard {
     }
 
     static Score score(String providerId, List<RunOutcome> all) {
-        List<RunOutcome> runs = all.stream()
-                .filter(run -> run.providerId().equals(providerId))
-                .toList();
+        List<RunOutcome> runs =
+                all.stream().filter(run -> run.providerId().equals(providerId)).toList();
         List<CandidateOutcome> candidates =
                 runs.stream().flatMap(run -> run.candidates().stream()).toList();
-        Ratio policyMatch = ratio(candidates, each -> true, each -> each.truth().allowed().contains(each.level()));
+        Ratio policyMatch =
+                ratio(candidates, each -> true, each -> each.truth().allowed().contains(each.level()));
         Ratio importantMiss =
                 ratio(candidates, each -> each.truth().important(), each -> SILENT.contains(each.level()));
-        Ratio lowValue =
-                ratio(candidates, each -> each.truth().lowValue(), each -> PROMOTED.contains(each.level()));
-        Ratio duplicate =
-                ratio(candidates, each -> each.truth().duplicate(), each -> !each.level().equals(DROPPED));
+        Ratio lowValue = ratio(candidates, each -> each.truth().lowValue(), each -> PROMOTED.contains(each.level()));
+        Ratio duplicate = ratio(
+                candidates,
+                each -> each.truth().duplicate(),
+                each -> !each.level().equals(DROPPED));
         Ratio falsePositive =
                 ratio(candidates, each -> each.truth().expectsSilence(), each -> PROMOTED.contains(each.level()));
-        int silenceTotal = (int) runs.stream().filter(RunOutcome::expectsSilence).count();
+        int silenceTotal =
+                (int) runs.stream().filter(RunOutcome::expectsSilence).count();
         int silenceHit = (int) runs.stream()
                 .filter(RunOutcome::expectsSilence)
                 .filter(RunOutcome::silent)
@@ -177,7 +179,8 @@ final class EvalScoreboard {
         int pairsAgreed = 0;
         int pairs = 0;
         for (RunOutcome run : rankedRuns) {
-            if (!run.ranked().isEmpty() && run.ranked().getFirst().equals(run.truthRank().getFirst())) {
+            if (!run.ranked().isEmpty()
+                    && run.ranked().getFirst().equals(run.truthRank().getFirst())) {
                 top1++;
             }
             List<String> truth = run.truthRank();
@@ -217,9 +220,7 @@ final class EvalScoreboard {
     }
 
     private static Ratio ratio(
-            List<CandidateOutcome> candidates,
-            Predicate<CandidateOutcome> in,
-            Predicate<CandidateOutcome> hit) {
+            List<CandidateOutcome> candidates, Predicate<CandidateOutcome> in, Predicate<CandidateOutcome> hit) {
         List<CandidateOutcome> base = candidates.stream().filter(in).toList();
         return new Ratio((int) base.stream().filter(hit).count(), base.size());
     }

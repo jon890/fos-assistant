@@ -70,14 +70,15 @@ final class ReplayDecisionProvider implements DecisionProvider {
             case UNAVAILABLE -> response(DecisionResult.fallback(DecisionFailure.PROVIDER_UNAVAILABLE));
             case TIMEOUT -> response(DecisionResult.fallback(DecisionFailure.TIMEOUT));
             case ERROR -> throw new IllegalStateException("fixture provider failure");
-            case INVALID -> response(new DecisionResult(
-                    DecisionOutcome.EVALUATED,
-                    List.of(),
-                    state.candidates().stream()
-                            .map(DecisionCandidate::candidateId)
-                            .toList(),
-                    "후보를 빠뜨린 판단",
-                    null));
+            case INVALID ->
+                response(new DecisionResult(
+                        DecisionOutcome.EVALUATED,
+                        List.of(),
+                        state.candidates().stream()
+                                .map(DecisionCandidate::candidateId)
+                                .toList(),
+                        "후보를 빠뜨린 판단",
+                        null));
         };
     }
 
@@ -85,7 +86,8 @@ final class ReplayDecisionProvider implements DecisionProvider {
         String model = dataset.providers().containsKey(id)
                 ? dataset.providers().get(id).model()
                 : id;
-        return new DecisionResponse(new DecisionProviderInfo(id, "fixture-1", "fixture", model, "fixture", model, null), result);
+        return new DecisionResponse(
+                new DecisionProviderInfo(id, "fixture-1", "fixture", model, "fixture", model, null), result);
     }
 
     private DecisionResult replay(DecisionState state, List<DecisionQuestion> questions) {

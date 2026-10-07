@@ -329,22 +329,23 @@ class ProactiveEvalGateTest {
         ReplayDecisionProvider provider = provider(providerId);
         int callsBefore = provider.calls();
         int submittedBefore = stub().received().size();
-        long messagesBefore = messages.findByConversationIdOrderByIdAsc(check.conversationId()).size();
+        long messagesBefore = messages.findByConversationIdOrderByIdAsc(check.conversationId())
+                .size();
         ValueEvaluation evaluation = evaluations.evaluate(user, check.id(), providerId);
         int modelCalls = provider.calls() - callsBefore;
 
-        stub().willAnswer(command -> answer(block(JSON.createObjectNode()
-                .put("version", 3)
-                .put("outcome", "NOTHING_NEW"))));
+        stub().willAnswer(command ->
+                answer(block(JSON.createObjectNode().put("version", 3).put("outcome", "NOTHING_NEW"))));
         List<AutonomyDecision> decisions = autonomy.decide(user, evaluation.id());
         awaitIdle(check.conversationId());
-        List<HermesRunCommand> delegated =
-                List.copyOf(stub().received().subList(submittedBefore, stub().received().size()));
-        int autonomousMessages = (int)
-                (messages.findByConversationIdOrderByIdAsc(check.conversationId()).size() - messagesBefore);
+        List<HermesRunCommand> delegated = List.copyOf(
+                stub().received().subList(submittedBefore, stub().received().size()));
+        int autonomousMessages = (int) (messages.findByConversationIdOrderByIdAsc(check.conversationId())
+                        .size()
+                - messagesBefore);
 
-        Map<Long, AutonomyDecision> byCandidate = decisions.stream()
-                .collect(Collectors.toMap(AutonomyDecision::candidateId, each -> each));
+        Map<Long, AutonomyDecision> byCandidate =
+                decisions.stream().collect(Collectors.toMap(AutonomyDecision::candidateId, each -> each));
         List<CandidateOutcome> outcomes = new ArrayList<>();
         for (ProactiveCheckProblem problem : found) {
             AutonomyDecision decision = byCandidate.get(problem.id());
@@ -429,8 +430,8 @@ class ProactiveEvalGateTest {
                 || Duration.between(inputs.evidenceCheckedAt(), inputs.decidedAt())
                                 .compareTo(MAX_EVIDENCE_AGE)
                         > 0;
-        boolean lowCandidate = !"MEDIUM".equals(inputs.candidateConfidence())
-                && !"HIGH".equals(inputs.candidateConfidence());
+        boolean lowCandidate =
+                !"MEDIUM".equals(inputs.candidateConfidence()) && !"HIGH".equals(inputs.candidateConfidence());
         boolean lowJudgement = inputs.judgementConfidence() == DecisionConfidence.LOW
                 || inputs.axisConfidences().containsValue(DecisionConfidence.LOW);
         return stale || lowCandidate || lowJudgement;
@@ -460,10 +461,14 @@ class ProactiveEvalGateTest {
         ArrayNode findings = root.putArray("findings");
         for (EvalDataset.Finding finding : fixture.findings()) {
             ObjectNode node = findings.addObject()
-                    .put("area", finding.topicKey().substring(0, finding.topicKey().indexOf(':')))
+                    .put(
+                            "area",
+                            finding.topicKey().substring(0, finding.topicKey().indexOf(':')))
                     .put("topicKey", finding.topicKey())
                     .put("title", finding.title())
-                    .put("sourceUrl", "https://example.com/" + finding.topicKey().replace(':', '/'))
+                    .put(
+                            "sourceUrl",
+                            "https://example.com/" + finding.topicKey().replace(':', '/'))
                     .put("checkedAt", now.toString())
                     .put("freshness", "CURRENT")
                     .put("whyItMatters", "합성 fixture 의 발견이다");
@@ -482,9 +487,7 @@ class ProactiveEvalGateTest {
                     .put("sideEffect", problem.sideEffect());
             ArrayNode evidence = node.putArray("evidence");
             problem.evidence().forEach(evidence::add);
-            node.putObject("proposedAction")
-                    .put("type", problem.actionType())
-                    .put("text", problem.actionText());
+            node.putObject("proposedAction").put("type", problem.actionType()).put("text", problem.actionText());
             if (problem.risk() != null) {
                 node.put("risk", problem.risk());
             }
@@ -569,7 +572,9 @@ class ProactiveEvalGateTest {
             Map<String, Object> json = new LinkedHashMap<>();
             json.put("datasetVersion", DATASET.version());
             json.put("hardGates", gates);
-            json.put("scores", COMPARED.stream().map(id -> EvalScoreboard.score(id, runs)).toList());
+            json.put(
+                    "scores",
+                    COMPARED.stream().map(id -> EvalScoreboard.score(id, runs)).toList());
             json.put("runs", runs);
             Files.writeString(
                     REPORT_DIR.resolve("report.json"),
