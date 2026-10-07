@@ -723,6 +723,7 @@ export function waitForStreamedContentAfterLoad(
     const response = await goto(...args);
     await streamedContentPlaced();
     await page.locator('main[aria-busy="false"]').waitFor({ state: "attached" });
+    await expect(page.locator('main > div[aria-busy="true"]')).toHaveCount(0);
     return response;
   };
   const reload = page.reload.bind(page);
@@ -730,6 +731,7 @@ export function waitForStreamedContentAfterLoad(
     const response = await reload(...args);
     await streamedContentPlaced();
     await page.locator('main[aria-busy="false"]').waitFor({ state: "attached" });
+    await expect(page.locator('main > div[aria-busy="true"]')).toHaveCount(0);
     return response;
   };
 }
