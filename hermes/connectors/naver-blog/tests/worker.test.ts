@@ -14,7 +14,8 @@ import {
   writeInput,
 } from "../src/jobs.ts";
 import type { Env } from "../src/session.ts";
-import { fakeRunDraft, runWorker } from "../src/worker.ts";
+import { runWorker } from "../src/worker.ts";
+import { fakeRunDraft } from "./fake-worker-entry.ts";
 
 const CDP_URL = "http://127.0.0.1:9";
 const ENV = { NAVER_BLOG_CDP_URL: CDP_URL, NAVER_BLOG_ID: "example-blog" };

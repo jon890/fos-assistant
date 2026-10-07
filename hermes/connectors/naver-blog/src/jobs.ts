@@ -330,26 +330,17 @@ export function finishState(
   });
 }
 
-/** `kill(pid, 0)` 으로 그 프로세스가 있는지 본다. 권한이 없다는 답도 있다는 뜻이다. */
-function processExists(pid: number) {
-  try {
-    process.kill(pid, 0);
-    return true;
-  } catch (error) {
-    return (error as NodeJS.ErrnoException).code === "EPERM";
-  }
-}
-
 /**
- * 작업이 아직 돌고 있는지 본다. 잠금을 만든 MCP 서버는 응답한 뒤 곧 닫히므로 작업 프로세스로 판정한다.
- * `pid` 가 있으면 그 프로세스가 있고 30초 안에 갱신했으며 시작한 지 11분이 안 됐어야 한다.
+ * 작업이 아직 돌고 있는지 본다. 잠금을 만든 MCP 서버는 응답한 뒤 곧 닫히므로 작업 프로세스가 남긴 상태로 판정한다.
+ * `pid` 가 있으면 30초 안에 `heartbeat_at` 을 갱신했고 시작한 지 11분이 안 됐어야 한다.
+ * `kill(pid, 0)` 은 보지 않는다. 승인한 호출과 Hermes 가 쥔 MCP 서버의 PID 네임스페이스가 다르면
+ * 살아 있는 작업 프로세스도 없다고 답하기 때문이다. 그 대신 작업 프로세스가 죽었다는 판정이 최대 30초 늦어진다.
  * 상태 파일이나 `pid` 가 아직 없으면 `createdAt` 에서 10초 안일 때만 살아 있다.
  */
 export function jobAlive(state: JobState | null, createdAt: number, now = Date.now()) {
   if (state && isFinished(state.status)) return false;
   if (!state || state.pid == null) return now - createdAt < STARTING_MS;
   return (
-    processExists(state.pid) &&
     now - Date.parse(state.heartbeat_at ?? "") < HEARTBEAT_STALE_MS &&
     now - Date.parse(state.started_at) < JOB_STALE_MS
   );

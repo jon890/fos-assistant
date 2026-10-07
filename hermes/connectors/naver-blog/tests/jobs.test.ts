@@ -22,6 +22,7 @@ import {
   finishedFile,
   finishStale,
   finishState,
+  jobAlive,
   type JobState,
   lockFile,
   readState,
@@ -79,6 +80,9 @@ async function deadPid() {
   return child.pid;
 }
 
+/** 30초 넘게 갱신하지 않은 작업의 `heartbeat_at`. */
+const staleHeartbeat = () => new Date(Date.now() - 31_000).toISOString();
+
 const errorCode = (work: Promise<unknown>) =>
   work.then(
     () => "resolved",
@@ -108,13 +112,43 @@ test("잠금을 만든 프로세스가 끝나도 작업 프로세스가 살아 �
   expect((await readState(dir, first))?.status).toBe("running");
 });
 
-test("pid 가 사라진 작업의 잠금은 묵은 잠금으로 풀리고 그 작업은 timeout 실패로 끝난다", async () => {
+test("pid 가 없는 프로세스여도 방금 갱신한 작업은 살아 있어 같은 브라우저의 둘째 작업은 NAVER_BLOG_BUSY 다", async () => {
+  // 승인한 호출과 MCP 서버의 PID 네임스페이스가 다르면 살아 있는 작업 프로세스도 `kill(pid, 0)` 에 없다고 나온다.
   const dir = await jobDir();
   const first = randomUUID();
   await acquireLock(dir, CDP_A, first);
   await createState(
     dir,
     running(first, { stage: "photos", pid: await deadPid(), heartbeat_at: new Date().toISOString() }),
+  );
+  await ageLock(dir, CDP_A, first);
+
+  expect(await errorCode(acquireLock(dir, CDP_A, randomUUID()))).toBe("NAVER_BLOG_BUSY");
+  expect((await readState(dir, first))?.status).toBe("running");
+});
+
+test("jobAlive 는 pid 가 있는 작업을 마지막 갱신에서 30초 안이고 시작한 지 11분 안일 때만 살아 있다고 본다", async () => {
+  const now = Date.parse("2026-01-01T00:20:00.000Z");
+  const at = (ms: number) => new Date(now - ms).toISOString();
+  const pid = await deadPid();
+  const job = (heartbeatAgo: number, startedAgo = 60_000) =>
+    running(randomUUID(), { pid, heartbeat_at: at(heartbeatAgo), started_at: at(startedAgo) });
+
+  expect(jobAlive(job(0), 0, now)).toBe(true);
+  expect(jobAlive(job(29_999), 0, now)).toBe(true);
+  expect(jobAlive(job(30_000), 0, now)).toBe(false);
+  expect(jobAlive(job(31_000), 0, now)).toBe(false);
+  expect(jobAlive(job(0, 11 * 60_000), 0, now)).toBe(false);
+  expect(jobAlive({ ...job(0), heartbeat_at: null }, 0, now)).toBe(false);
+});
+
+test("30초 넘게 갱신하지 않은 작업의 잠금은 묵은 잠금으로 풀리고 그 작업은 timeout 실패로 끝난다", async () => {
+  const dir = await jobDir();
+  const first = randomUUID();
+  await acquireLock(dir, CDP_A, first);
+  await createState(
+    dir,
+    running(first, { stage: "photos", pid: await deadPid(), heartbeat_at: staleHeartbeat() }),
   );
   await ageLock(dir, CDP_A, first);
   const second = randomUUID();
@@ -138,7 +172,7 @@ test("저장 단추를 누른 뒤 사라진 작업은 unknown 으로 끝난다",
       stage: "save",
       save_clicked: true,
       pid: await deadPid(),
-      heartbeat_at: new Date().toISOString(),
+      heartbeat_at: staleHeartbeat(),
     }),
   );
   await ageLock(dir, CDP_A, first);

@@ -29,7 +29,7 @@ import {
 } from "./jobs.ts";
 import { renderDraft, renderShape, type RenderInput } from "./render.ts";
 import { readConnection, sessionStatus, type Env } from "./session.ts";
-import { fakeRunDraft, runWorker } from "./worker.ts";
+import { runWorker } from "./worker.ts";
 
 const MINIMUM_BUN_VERSION = [1, 3, 14] as const;
 
@@ -76,7 +76,7 @@ const DEFAULT_SERVER_DEPS: ServerDeps = {
  */
 function workerEnvironment(env: Env) {
   const keys = ["PATH", "HOME", "NAVER_BLOG_CDP_URL", "NAVER_BLOG_ID", ATTACHMENT_DIR_ENV];
-  if (env.NAVER_BLOG_JOB_DIR) keys.push("NAVER_BLOG_JOB_DIR", "NAVER_BLOG_TEST_FAKE_RUN");
+  if (env.NAVER_BLOG_JOB_DIR) keys.push("NAVER_BLOG_JOB_DIR");
   const picked: Record<string, string> = {};
   for (const key of keys) {
     const value = env[key];
@@ -254,9 +254,7 @@ export async function runServer() {
   }
   const jobFile = workerArgument(process.argv);
   if (jobFile !== null) {
-    const fake =
-      process.env.NAVER_BLOG_TEST_FAKE_RUN === "1" && Boolean(process.env.NAVER_BLOG_JOB_DIR);
-    await runWorker(jobFile, fake ? { runDraft: fakeRunDraft } : {});
+    await runWorker(jobFile);
     // 닫히지 않은 연결이 남아도 작업 프로세스는 여기서 끝난다.
     process.exit(0);
   }

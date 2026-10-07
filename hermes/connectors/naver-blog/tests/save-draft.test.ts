@@ -9,7 +9,8 @@ import { createServer, type ServerDeps } from "../src/server.ts";
 import type { Env } from "../src/session.ts";
 import { FakeCdp, upstreamText } from "./fake-cdp.ts";
 
-const SERVER_ENTRY = join(import.meta.dir, "../src/server.ts");
+/** 같은 작업 프로세스를 가짜 `runDraft` 로 돌리는 시험 전용 진입 파일. */
+const FAKE_WORKER_ENTRY = join(import.meta.dir, "fake-worker-entry.ts");
 const JPEG = new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 1, 2, 3, 4]);
 const LOGGED_IN = [
   { name: "NID_AUT", domain: ".naver.com" },
@@ -26,7 +27,7 @@ afterEach(async () => {
 async function setup({
   cookies = LOGGED_IN,
   photo = JPEG,
-  deps = { workerEntry: SERVER_ENTRY },
+  deps = { workerEntry: FAKE_WORKER_ENTRY },
   ownerAttachments = true,
 }: {
   cookies?: typeof LOGGED_IN;
@@ -53,7 +54,6 @@ async function setup({
     NAVER_BLOG_ID: "example-blog",
     NAVER_BLOG_ATTACHMENT_DIR: attachmentDir,
     NAVER_BLOG_JOB_DIR: jobDir,
-    NAVER_BLOG_TEST_FAKE_RUN: "1",
     PATH: process.env.PATH,
     HOME: process.env.HOME,
   };
@@ -203,8 +203,8 @@ test("없는 작업 번호면 NAVER_BLOG_JOB_NOT_FOUND 다", async () => {
   expect(result).toEqual({ isError: true, body: { error: { code: "NAVER_BLOG_JOB_NOT_FOUND" } } });
 });
 
-test("draft_job 은 pid 가 사라진 running 작업을 timeout 으로 끝내고 잠금을 푼다", async () => {
-  const { jobDir, call } = await setup({ deps: { workerEntry: SERVER_ENTRY } });
+test("draft_job 은 30초 넘게 갱신하지 않은 running 작업을 timeout 으로 끝내고 잠금을 푼다", async () => {
+  const { jobDir, call } = await setup();
   const jobId = "11111111-1111-4111-8111-111111111111";
   const gone = Bun.spawn([process.execPath, "-e", ""]);
   await gone.exited;
@@ -220,7 +220,7 @@ test("draft_job 은 pid 가 사라진 running 작업을 timeout 으로 끝내고
       result: null,
       error: null,
       pid: gone.pid,
-      heartbeat_at: new Date().toISOString(),
+      heartbeat_at: new Date(Date.now() - 31_000).toISOString(),
     }),
   );
   await writeFile(
