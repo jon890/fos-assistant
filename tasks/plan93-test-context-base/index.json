@@ -1,0 +1,14 @@
+{
+  "name": "plan93-test-context-base",
+  "description": "backend 통합 검사를 공통 기반 컨텍스트 하나로 모으고 요청 밖 작업을 BackgroundTasks 로 띄워, 컨텍스트 기동과 힙 사용을 줄이고 검사 사이 누수를 결정적으로 막는다",
+  "status": "pending",
+  "created_at": "2026-10-07",
+  "total_phases": 4,
+  "current_phase": 1,
+  "phases": [
+    { "number": 1, "file": "phase-01.md", "execution_profile": "deep" },
+    { "number": 2, "file": "phase-02.md", "execution_profile": "deep" },
+    { "number": 3, "file": "phase-03.md", "execution_profile": "standard" },
+    { "number": 4, "file": "phase-04.md", "execution_profile": "standard" }
+  ]
+}
