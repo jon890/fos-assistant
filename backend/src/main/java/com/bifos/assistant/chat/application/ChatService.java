@@ -1592,8 +1592,10 @@ public class ChatService {
         if (!pendingIds.isEmpty()) {
             onEvent.accept(ChatEvent.user(conversation.publicId(), question.id(), text));
             onEvent.accept(ChatEvent.pending(conversation.publicId()));
+        } else {
+            // 대기 행에서 꺼낸 질문은 앞 turn 이 끝난 뒤에 저장된다. 그 사이 만든 보고를 사용자가 본 것으로 적지 않는다.
+            markCheckReportsRead(user, conversation);
         }
-        markCheckReportsRead(user, conversation);
     }
 
     private ChatMessage answerMessage(PendingTurn pending, String answer, Long executionId) {

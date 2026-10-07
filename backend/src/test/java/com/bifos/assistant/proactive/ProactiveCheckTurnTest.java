@@ -512,6 +512,7 @@ class ProactiveCheckTurnTest {
         ProactiveCheck second = checksOf(conversation).getLast();
         assertThat(second.newFindings()).isZero();
         assertThat(second.referenceFindings()).isEqualTo(1);
+        assertThat(second.report()).as("단추로 연 살펴보기는 되풀이만 있어도 보고를 남긴다").isNotNull();
         assertThat(findingsOf(conversation))
                 .filteredOn(finding -> finding.checkId().equals(second.id()))
                 .extracting(ProactiveCheckFinding::reason)

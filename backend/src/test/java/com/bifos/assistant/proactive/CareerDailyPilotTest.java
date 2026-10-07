@@ -402,6 +402,18 @@ class CareerDailyPilotTest {
         assertThat(checks.findById(mine.id()).orElseThrow().reportOpenedAt())
                 .as("다시 읽어도 첫 시각")
                 .isEqualTo(readAt);
+
+        ProactiveCheck later = reported(owner.id(), agent.id(), read.id());
+        Instant sentAt = readAt.plus(Duration.ofHours(1));
+        CLOCK.set(sentAt);
+        stub().willReturn(result("{\"version\":2,\"outcome\":\"NOTHING_NEW\"}"));
+        chat.send(owner, read.id(), "이 공고는 관심 없어", null);
+        assertThat(checks.findById(later.id()).orElseThrow().reportOpenedAt())
+                .as("점검 대화에 보낸 질문")
+                .isEqualTo(sentAt);
+        assertThat(checks.findById(otherConversationReport.id()).orElseThrow().reportOpenedAt())
+                .as("보낸 뒤에도 다른 점검 대화")
+                .isNull();
     }
 
     /** 끝난 살펴보기에 보고 하나를 붙여 저장한다. 정리 단계가 지운다. */

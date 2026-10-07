@@ -18,6 +18,7 @@ import com.bifos.assistant.proactive.domain.type.CheckOutcome;
 import com.bifos.assistant.proactive.domain.type.CheckStatus;
 import com.bifos.assistant.proactive.domain.type.CheckTrigger;
 import com.bifos.assistant.proactive.domain.type.FindingKind;
+import com.bifos.assistant.proactive.domain.type.FindingReason;
 import com.bifos.assistant.proactive.infra.ProactiveCheckFindingRepository;
 import com.bifos.assistant.proactive.infra.ProactiveCheckRepository;
 import com.bifos.assistant.shared.auth.CurrentUser;
@@ -343,6 +344,13 @@ public class ProactiveCheckRun implements CheckTurn {
                 && block.questions().isEmpty()
                 && block.sourceFailures().isEmpty()) {
             // 검사를 통과한 새 발견이 없으면 정상 무변화와 같다. 참고로 내린 발견은 셈을 위해 저장하되 답과 보고를 남기지 않는다.
+            // 되풀이가 아닌 까닭으로 내린 발견은 결과 형식이나 분야 지침의 문제일 수 있어 까닭만 로그에 남긴다.
+            Map<FindingReason, Long> reasons = judged.stream()
+                    .filter(each -> each.reason() != null && each.reason() != FindingReason.REPEATED)
+                    .collect(Collectors.groupingBy(JudgedFinding::reason, Collectors.counting()));
+            if (!reasons.isEmpty()) {
+                log.info("예약 살펴보기의 발견이 모두 참고로 내려가 침묵했다 checkId={} reasons={}", check.id(), reasons);
+            }
             return new CheckAnswer("", false, true);
         }
         pendingReport = deps.reportFactory().create(block, judged, executionId);
