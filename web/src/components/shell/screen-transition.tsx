@@ -17,7 +17,11 @@ const serverNotHydrated = () => false;
  */
 export function ScreenTransition({ children }: { children: React.ReactNode }) {
   // shell보다 늦게 들어오는 본문의 링크도 동작이 붙은 뒤 준비가 끝난다.
-  const ready = useSyncExternalStore(subscribeHydration, hydrated, serverNotHydrated);
+  const ready = useSyncExternalStore(
+    subscribeHydration,
+    hydrated,
+    serverNotHydrated,
+  );
   const key = screenKey(usePathname());
   if (key === "chat") return children;
   if (ENABLED) {
