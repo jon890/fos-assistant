@@ -1,38 +1,22 @@
 package com.bifos.assistant.chat.infra;
 
-import static com.bifos.assistant.chat.infra.ArtifactPathPolicy.requireOrdinaryTarget;
-import static com.bifos.assistant.chat.infra.ArtifactPathPolicy.requireOrdinaryTargetInDirectory;
-import static com.bifos.assistant.chat.infra.ArtifactPathPolicy.storeFailure;
 import static com.bifos.assistant.chat.infra.ArtifactPathPolicy.validation;
-import static com.bifos.assistant.chat.infra.ArtifactPathPolicy.verifyParent;
-
-import com.bifos.assistant.shared.error.ApiException;
 import java.io.IOException;
-import java.nio.ByteBuffer;
-import java.nio.channels.SeekableByteChannel;
-import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.DirectoryStream;
 import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
 import java.nio.file.LinkOption;
 import java.nio.file.NoSuchFileException;
-import java.nio.file.OpenOption;
 import java.nio.file.Path;
-import java.nio.file.SecureDirectoryStream;
 import java.nio.file.SimpleFileVisitor;
-import java.nio.file.StandardCopyOption;
-import java.nio.file.StandardOpenOption;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.time.Instant;
 import java.util.ArrayList;
-import java.util.EnumSet;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
-import java.util.UUID;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.stream.Collectors;
 import java.util.stream.StreamSupport;
@@ -53,13 +37,11 @@ public class ArtifactStore {
 
     static final String HTML = ArtifactPathPolicy.HTML;
     private static final int LOCK_COUNT = 64;
-    private static final AtomicBoolean UNSUPPORTED_SECURE_DIRECTORY_WARNING_LOGGED = new AtomicBoolean();
 
     private final Path root;
     private final ArtifactPathPolicy paths;
     private final String agentRoot;
-    private final boolean forceAtomicMoveFallback;
-    private final ArtifactAtomicMover atomicMover;
+    private final ArtifactFileWriter fileWriter;
     private final ArtifactCleanupProbe cleanupProbe;
 
     /**
@@ -72,12 +54,12 @@ public class ArtifactStore {
 
     @Autowired
     public ArtifactStore(ArtifactProperties properties) {
-        this(properties, false, ArtifactStore::atomicMove);
+        this(properties, false, ArtifactFileWriter::atomicMove);
     }
 
     /** Linux에서도 링크 재검사와 원자 교체 대체 경로를 검사할 때 쓴다. */
     ArtifactStore(ArtifactProperties properties, boolean forceAtomicMoveFallback) {
-        this(properties, forceAtomicMoveFallback, ArtifactStore::atomicMove);
+        this(properties, forceAtomicMoveFallback, ArtifactFileWriter::atomicMove);
     }
 
     /** 파일 시스템의 원자 교체 실패를 결정적으로 검사할 때 쓴다. */
@@ -94,8 +76,7 @@ public class ArtifactStore {
         this.root = Path.of(properties.root()).toAbsolutePath().normalize();
         this.paths = new ArtifactPathPolicy(root);
         this.agentRoot = stripTrailingSlash(properties.agentRoot());
-        this.forceAtomicMoveFallback = forceAtomicMoveFallback;
-        this.atomicMover = atomicMover;
+        this.fileWriter = new ArtifactFileWriter(paths, forceAtomicMoveFallback, atomicMover);
         this.cleanupProbe = cleanupProbe;
         for (int index = 0; index < LOCK_COUNT; index++) {
             conversationLocks[index] = new ReentrantLock();
@@ -203,38 +184,12 @@ public class ArtifactStore {
         ReentrantLock lock = lockOf(conversationId);
         lock.lock();
         try {
-            return writeLocked(conversationId, relativePath, content);
+            return fileWriter.writeLocked(conversationId, relativePath, content);
         } finally {
             lock.unlock();
         }
     }
 
-    private long writeLocked(Long conversationId, String relativePath, byte[] content) {
-        Path target = resolveForWrite(conversationId, relativePath);
-        Path parent = target.getParent();
-        try {
-            Path folder = paths.checkedConversationFolder(conversationId);
-            verifyParent(parent, folder);
-            requireOrdinaryTarget(target);
-            try (DirectoryStream<Path> stream = Files.newDirectoryStream(parent)) {
-                if (!forceAtomicMoveFallback && stream instanceof SecureDirectoryStream<Path> secure) {
-                    writeWithSecureDirectory(secure, target.getFileName(), content);
-                } else {
-                    if (!forceAtomicMoveFallback) {
-                        warnUnsupportedSecureDirectoryOnce();
-                    } else {
-                        log.warn("using forced checked atomic artifact replacement for verification");
-                    }
-                    writeWithAtomicMove(parent, target, folder, content, atomicMover);
-                }
-            }
-            return content.length;
-        } catch (ApiException ex) {
-            throw ex;
-        } catch (IOException | RuntimeException ex) {
-            throw storeFailure(ex);
-        }
-    }
 
     /**
      * 대화 폴더마다 마지막으로 바뀐 때가 {@code cutoff} 보다 앞섰는지 보고, 앞섰으면 그 폴더의 파일을 지운다.
@@ -414,78 +369,12 @@ public class ArtifactStore {
 
 
 
-    private static void writeWithSecureDirectory(SecureDirectoryStream<Path> directory, Path targetName, byte[] content)
-            throws IOException {
-        Path temporaryName = Path.of(".artifact-" + UUID.randomUUID() + ".tmp");
-        boolean temporaryCreated = false;
-        try {
-            Set<OpenOption> options =
-                    Set.of(StandardOpenOption.CREATE_NEW, StandardOpenOption.WRITE, LinkOption.NOFOLLOW_LINKS);
-            try (SeekableByteChannel channel = directory.newByteChannel(temporaryName, options)) {
-                temporaryCreated = true;
-                writeFully(channel, content);
-            }
-            requireOrdinaryTargetInDirectory(directory, targetName);
-            directory.move(temporaryName, directory, targetName);
-            temporaryCreated = false;
-        } finally {
-            if (temporaryCreated) {
-                deleteSecurely(directory, temporaryName);
-            }
-        }
-    }
-
-    private static void writeWithAtomicMove(
-            Path parent, Path target, Path folder, byte[] content, ArtifactAtomicMover atomicMover) throws IOException {
-        Path temporary = null;
-        try {
-            temporary = Files.createTempFile(parent, ".artifact-", ".tmp");
-            try (SeekableByteChannel channel = Files.newByteChannel(
-                    temporary, EnumSet.of(StandardOpenOption.WRITE, StandardOpenOption.TRUNCATE_EXISTING))) {
-                writeFully(channel, content);
-            }
-            verifyParent(parent, folder);
-            requireOrdinaryTarget(target);
-            atomicMover.move(temporary, target);
-            temporary = null;
-        } catch (AtomicMoveNotSupportedException ex) {
-            throw ex;
-        } finally {
-            if (temporary != null) {
-                try {
-                    Files.deleteIfExists(temporary);
-                } catch (IOException ignored) {
-                    // 저장 실패의 원인을 임시 파일 정리 실패로 바꾸지 않는다.
-                }
-            }
-        }
-    }
 
 
-    private static void writeFully(SeekableByteChannel channel, byte[] content) throws IOException {
-        ByteBuffer buffer = ByteBuffer.wrap(content);
-        while (buffer.hasRemaining()) {
-            channel.write(buffer);
-        }
-    }
 
-    private static void deleteSecurely(SecureDirectoryStream<Path> directory, Path temporary) {
-        try {
-            directory.deleteFile(temporary);
-        } catch (IOException ignored) {
-            // 저장 실패의 원인을 임시 파일 정리 실패로 바꾸지 않는다.
-        }
-    }
 
-    private static void atomicMove(Path source, Path target) throws IOException {
-        Files.move(source, target, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
-    }
 
-    private static void warnUnsupportedSecureDirectoryOnce() {
-        if (UNSUPPORTED_SECURE_DIRECTORY_WARNING_LOGGED.compareAndSet(false, true)) {
-            log.warn("SecureDirectoryStream is unavailable; using checked atomic artifact replacement");
-        }
-    }
+
 
 
 

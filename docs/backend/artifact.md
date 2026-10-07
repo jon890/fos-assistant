@@ -116,6 +116,7 @@ Hermes 기본 스킬만 있어도 색인 안내문이 `skill_manage` 를 권하�
 | `chat/infra/ArtifactSourceProperties` | 허용 호스트와 연결, 읽기, 호출 전체 제한 시간을 받는다 |
 | `chat/infra/ArtifactStore` | 대화별 잠금과 결과물 저장, 파일 훑기, 보관 기간 정리를 조정한다 |
 | `chat/infra/ArtifactPathPolicy` | 읽기·쓰기 경로와 확장자, 대화 폴더 경계와 링크를 판정하고 쓰기에 필요한 부모 폴더를 만든다 |
+| `chat/infra/ArtifactFileWriter` | 경로 판정을 다시 확인하며 임시 파일을 완성하고 원자 교체한 뒤 실패한 임시 파일을 지운다 |
 | `chat/infra/ArtifactSourceFetcher` | URL 과 DNS 를 검사하고 검증한 IP 에 HTTPS 로 연결해 제한된 이미지 본문만 반환한다 |
 
 `ArtifactWriteService.write(CurrentUser, ArtifactWriteRequest)` 는 대화 주인을 확인하기 전에는
