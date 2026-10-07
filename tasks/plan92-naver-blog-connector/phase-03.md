@@ -126,6 +126,7 @@ git add -N hermes/connectors/naver-blog && bash scripts/check-public-safe.sh
 | `hermes/connectors/naver-blog/src/jobs.ts` | 신규 |
 | `hermes/connectors/naver-blog/src/worker.ts` | 신규 |
 | `hermes/connectors/naver-blog/src/server.ts` | 수정 |
+| `hermes/connectors/naver-blog/src/errors.ts` | 수정 |
 | `hermes/connectors/naver-blog/connector.json` | 수정 |
 | `hermes/connectors/naver-blog/skills/naver-blog/SKILL.md` | 수정 |
 | `hermes/connectors/naver-blog/dist/naver-blog-mcp.js` | 수정 |
