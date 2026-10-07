@@ -4,7 +4,6 @@
     "hermes/connectors/gmail/src/html-entities.ts": "HTML 문자 참조를 변환하는 데이터 표다. 실행 로직을 나눌 대상이 아니다."
   },
   "files": {
-    "backend/src/main/java/com/bifos/assistant/chat/application/ChatService.java": 2167,
     "backend/src/main/java/com/bifos/assistant/chat/application/RestartReconciler.java": 615,
     "backend/src/main/java/com/bifos/assistant/chat/infra/ArtifactStore.java": 702,
     "backend/src/main/java/com/bifos/assistant/connector/application/ConnectorActionService.java": 882,
