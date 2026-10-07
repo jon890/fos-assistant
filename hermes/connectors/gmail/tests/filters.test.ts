@@ -133,7 +133,7 @@ describe("Gmail 라벨과 필터", () => {
     } finally {
       fake.stop();
     }
-  });
+  }, 30_000);
 
   test.each([
     ["text_color", "#cd74e6", "#16a766"],

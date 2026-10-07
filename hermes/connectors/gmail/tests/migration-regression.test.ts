@@ -1021,20 +1021,21 @@ describe("조립한 메일 확인과 전송 경계", () => {
   });
 
   test("응답 없는 send만 unknown이고 draft와 modify는 unavailable이다", async () => {
-    const { fake, server } = setup({ timeoutMs: 20 });
+    // 토큰 교환이 먼저 끝나고 쓰기 요청에서 시간 제한에 걸리도록 여유를 둔다.
+    const { fake, server } = setup({ timeoutMs: 250 });
     fake.routes.set("POST /gmail/messages/send", async () => {
-      await Bun.sleep(100);
+      await Bun.sleep(1_000);
       return json({});
     });
     fake.routes.set("POST /gmail/drafts", async () => {
-      await Bun.sleep(100);
+      await Bun.sleep(1_000);
       return json({});
     });
     fake.on("GET", "/gmail/labels", {
       labels: [{ id: "INBOX", name: "INBOX", type: "system" }],
     });
     fake.routes.set("POST /gmail/messages/m1/modify", async () => {
-      await Bun.sleep(100);
+      await Bun.sleep(1_000);
       return json({});
     });
     try {
