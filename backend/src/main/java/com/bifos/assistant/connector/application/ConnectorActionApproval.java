@@ -1,5 +1,8 @@
 package com.bifos.assistant.connector.application;
 
+import static com.bifos.assistant.connector.application.ConnectorActionDetails.grantable;
+import static com.bifos.assistant.connector.application.ConnectorActionDetails.hiddenArgs;
+
 import com.bifos.assistant.connector.application.model.ConnectorActionView;
 import com.bifos.assistant.connector.domain.ConnectorAction;
 import com.bifos.assistant.connector.domain.ConnectorBinding;
@@ -35,10 +38,7 @@ import java.time.ZoneId;
 import java.util.Optional;
 import java.util.UUID;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
-import static com.bifos.assistant.connector.application.ConnectorActionDetails.grantable;
-import static com.bifos.assistant.connector.application.ConnectorActionDetails.hiddenArgs;
 
 /** 승인의 두 트랜잭션과 그 사이 실행, 승인 직전 정책 확인을 맡는다. */
 @Slf4j

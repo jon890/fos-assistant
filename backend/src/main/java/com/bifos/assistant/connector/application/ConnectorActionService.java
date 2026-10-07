@@ -106,8 +106,18 @@ public class ConnectorActionService {
         this.details = new ConnectorActionDetails(actions, catalog);
         ConnectorActionSignals signals = new ConnectorActionSignals(events, notifications, conversations);
         this.approval = new ConnectorActionApproval(
-                actions, grants, connections, bindings, users, connector, delegation, feedback, details, signals,
-                transactions, clock);
+                actions,
+                grants,
+                connections,
+                bindings,
+                users,
+                connector,
+                delegation,
+                feedback,
+                details,
+                signals,
+                transactions,
+                clock);
         this.lifecycle = new ConnectorActionLifecycle(actions, grants, details, signals, transactions, clock);
     }
 

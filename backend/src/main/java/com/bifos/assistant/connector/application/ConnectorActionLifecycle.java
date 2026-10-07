@@ -128,16 +128,16 @@ class ConnectorActionLifecycle {
         for (ConnectorAction due : dueActions) {
             try {
                 // 줄을 잠그고 다시 읽는다. 그 사이 승인이나 거절이 끝났으면 건드리지 않는다.
-                Optional<ConnectorAction> changed =
-                        transactions.execute(status -> actions.findByPublicIdForUpdate(due.publicId())
-                                .filter(action -> action.status() == ActionStatus.PENDING
-                                        && action.expiresAt().isBefore(now))
-                                .map(action -> {
-                                    action.expire(now);
-                                    ConnectorAction saved = actions.save(action);
-                                    signals.notifyExpired(saved, manifests.getOrDefault(saved.connectorId(), Optional.empty()));
-                                    return saved;
-                                }));
+                Optional<ConnectorAction> changed = transactions.execute(status -> actions.findByPublicIdForUpdate(
+                                due.publicId())
+                        .filter(action -> action.status() == ActionStatus.PENDING
+                                && action.expiresAt().isBefore(now))
+                        .map(action -> {
+                            action.expire(now);
+                            ConnectorAction saved = actions.save(action);
+                            signals.notifyExpired(saved, manifests.getOrDefault(saved.connectorId(), Optional.empty()));
+                            return saved;
+                        }));
                 if (changed.isPresent()) {
                     signals.publish(changed.get());
                     expired++;
