@@ -42,7 +42,7 @@ public class HermesRunEventStream {
     /** 할 일을 제안하는 Control Plane MCP 도구 이름의 끝이다. 인자에 할 일 제목이 실린다. */
     private static final String FOLLOW_UP_PROPOSE_TOOL_SUFFIX = "follow_up_propose";
 
-    /** 기억을 남기는 Control Plane MCP 도구 이름의 끝이다. 인자에 사람에 관한 사실이 실린다(ADR-094). */
+    /** 기억을 남기는 Control Plane MCP 도구 이름의 끝이다. 인자에 사람에 관한 사실이 실린다(ADR-20261007 / memory-remember). */
     private static final String MEMORY_REMEMBER_TOOL_SUFFIX = "memory_remember";
 
     private final RestClient restClient;

@@ -235,7 +235,7 @@ public class Memory {
     }
 
     /**
-     * 에이전트가 {@code memory_remember} 로 제안한 개인 항목이다(ADR-094). 민감 항목이면 중복 키를 비운다. 키가 본문의 해시라
+     * 에이전트가 {@code memory_remember} 로 제안한 개인 항목이다(ADR-20261007 / memory-remember). 민감 항목이면 중복 키를 비운다. 키가 본문의 해시라
      * 평문 칸에 지문이 남기 때문이다.
      */
     public static Memory proposed(
@@ -261,7 +261,7 @@ public class Memory {
     }
 
     /**
-     * 사용자가 대화에서 직접 말해 바로 저장한 개인 항목이다(ADR-094). 그 말을 승인으로 보아 곧 ACCEPTED 이고 승인한 사람은
+     * 사용자가 대화에서 직접 말해 바로 저장한 개인 항목이다(ADR-20261007 / memory-remember). 그 말을 승인으로 보아 곧 ACCEPTED 이고 승인한 사람은
      * 주인이다. 민감 항목은 이 길로 오지 않는다.
      */
     public static Memory remembered(

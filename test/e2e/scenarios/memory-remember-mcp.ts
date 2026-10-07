@@ -2,7 +2,7 @@
  * 에이전트가 대화 중에 `memory_remember` 로 사실을 남길 때, 사람이 말한 turn 의 근거 있는 호출만 바로 저장되고
  * 그 밖은 제안으로 남는 것을 실제 대화 turn 으로 본다.
  *
- * <p>계약은 ADR-094 과 `docs/backend/memory.md` 의 「에이전트가 기억을 남기는 길」 이 갖는다. 주인과 대화는 서명한
+ * <p>계약은 ADR-20261007 / memory-remember 과 `docs/backend/memory.md` 의 「에이전트가 기억을 남기는 길」 이 갖는다. 주인과 대화는 서명한
  * `_fos_ctx` 로 찾은 origin 실행에서 정한다. 가짜 Hermes 가 run 마다 그 run 의 session 으로 서명해 부른다.
  */
 import { randomUUID } from "node:crypto";

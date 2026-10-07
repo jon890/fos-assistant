@@ -284,7 +284,7 @@ public class McpController {
 
     /**
      * 인자는 {@code title}, {@code content}, {@code evidence}, {@code memory_id}, {@code collection}, {@code sensitive} 만
-     * 받는다. 다른 키가 오면 인자 오류다(ADR-094).
+     * 받는다. 다른 키가 오면 인자 오류다(ADR-20261007 / memory-remember).
      *
      * <p>사용자와 범위를 인자로 받지 않는다. 바로 저장할지를 정하는 인자도 없다. 그 판정은 실행의 출처로 한다. 선택 인자의
      * {@code null} 은 없는 것으로 본다.
