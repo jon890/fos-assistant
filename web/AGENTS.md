@@ -144,6 +144,32 @@ BROWSER_WEB_SERVER=dev pnpm test:browser
 
 브라우저 검사의 포트를 고정하고 싶으면 `BROWSER_WEB_PORT` 와 `BROWSER_CONTROL_PLANE_PORT` 를 준다.
 
+### 브라우저 시험의 독립성과 대기
+
+CI shard마다 웹 서버, Control Plane, H2 DB와 임시 파일을 따로 만든다.
+한 shard 안에서는 `workers: 1`을 유지한다. 서버 상태를 바꾸는 검사를 병렬로 돌리지 않는다.
+
+- 다른 시험이 만든 대화나 할 일을 다음 시험의 준비 데이터로 쓰지 않는다.
+  사용자 데이터는 `isolatedMember` fixture나 `helpers.ts`의 `isolatedUser`로 나눈다.
+  실행, 폭, 시험과 반복 번호가 주소에 반영된다. 준비한 에이전트는 시험마다 지운다.
+- 공통 fixture는 시험 전후에 대역의 장애, provider 차단과 보류 설정을 초기화한다.
+  profile과 실행 기록은 지우지 않으므로 공유 에이전트의 설정을 고쳤으면 시험이 원래 값으로 돌린다.
+- 문서 이동 뒤에는 스트리밍 HTML 조각의 배치와 `main`의 `aria-busy="false"`를 기다린다.
+  SSR에 그려진 단추가 보인다는 사실만으로 이벤트가 붙었다고 판단하지 않는다.
+  상태 변경 요청은 `clickAndWaitForResponse`로 응답 본문 수신까지 확인하고, 이어서 바뀐 화면을 단언한다.
+  SSE는 끝나지 않을 수 있으므로 전역 `networkidle`을 준비 조건으로 쓰지 않는다.
+- 비동기 서버 작업은 해당 API의 완료 상태를 폴링한다. 고정 시간만 기다리지 않는다.
+  폴링 간격 자체를 검사할 때는 `page.clock`으로 시간을 진행하고 요청 횟수와 화면 상태를 함께 본다.
+- 날짜만 보는 대역 화면은 `fixBrowserTime`으로 시각을 고정한다. 서버와 왕복하는 시험은 서버 시각을 기준으로 데이터를 만든다.
+  월별 집계의 준비 데이터는 러너의 시간대와 관계없이 `Asia/Seoul` 달력으로 만든다.
+- 일반 동작 시험은 움직임 줄이기를 켠다. 움직임 자체를 검사하는 spec은 `reducedMotion: "no-preference"`를 명시한다.
+  짧은 움직임은 끝난 뒤 계산값을 읽지 않고 시작 사건을 기록해 검증한다.
+
+CI는 전체 shard 검사 뒤 새 spec과 수정 spec을 재시도 없이 3회 반복한다.
+공통 fixture를 바꾸거나 매일 실행할 때는 `browser-stability.mjs`의 공유 상태 회귀 묶음도 반복한다.
+한 번이라도 실패하면 `browser-mobile` 또는 `browser-desktop` 필수 검사가 실패한다.
+로컬에서도 관련 spec에 `--repeat-each=3 --retries=0`을 주어 반복과 두 폭을 확인한다.
+
 **운영 코드에 시험용 문을 만들지 않는다.**
 로그인은 테스트가 NextAuth 세션 쿠키를 직접 만들어 넣는다.
 테스트일 때만 켜지는 우회를 두면 그 문이 운영에도 남는다.
