@@ -16,8 +16,6 @@ import com.bifos.assistant.hermes.HermesConnectorClient;
 import com.bifos.assistant.notification.application.NotificationService;
 import com.bifos.assistant.orchestration.application.DelegationProperties;
 import com.bifos.assistant.shared.auth.CurrentUser;
-import com.bifos.assistant.shared.error.ApiException;
-import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.user.infra.AppUserRepository;
 import java.time.Clock;
 import java.time.Instant;
@@ -44,10 +42,8 @@ import org.springframework.transaction.support.TransactionTemplate;
  */
 @Service
 public class ConnectorActionService {
-    private static final String NOT_FOUND_MESSAGE = "this connector action does not exist";
-
     /** 만료한 승인 줄을 알리는 알림의 제목이다. 본문은 도구 제목이다. */
-    static final String APPROVAL_EXPIRED_TITLE = "승인 요청이 만료됐어요";
+    static final String APPROVAL_EXPIRED_TITLE = ConnectorActionSignals.APPROVAL_EXPIRED_TITLE;
 
     private final ConnectorActionDetails details;
     private final ConnectorActionApproval approval;
@@ -314,9 +310,5 @@ public class ConnectorActionService {
      */
     public void rejectPendingFor(ConnectorConnection connection, Long agentId, Instant now) {
         lifecycle.rejectPendingFor(connection, agentId, now);
-    }
-
-    static ApiException notFound() {
-        return new ApiException(ErrorCode.CONNECTOR_ACTION_NOT_FOUND, NOT_FOUND_MESSAGE);
     }
 }

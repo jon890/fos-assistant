@@ -104,7 +104,7 @@ class ConnectorActionLifecycle {
     void revokeGrant(CurrentUser user, Long grantId) {
         ConnectorToolGrant grant = grants.findById(grantId)
                 .filter(found -> found.userId().equals(user.id()))
-                .orElseThrow(ConnectorActionService::notFound);
+                .orElseThrow(ConnectorActionDetails::notFound);
         grant.revoke(now());
         grants.save(grant);
     }

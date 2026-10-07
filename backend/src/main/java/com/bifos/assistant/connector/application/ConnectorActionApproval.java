@@ -158,7 +158,7 @@ class ConnectorActionApproval {
         Instant now = now();
         // 연결을 다시 등록하거나 해제하는 쪽과 같은 순서로 잠근다. 사용자 행이 먼저이고 승인 줄이 다음이다.
         // 그쪽이 값을 바꾸는 동안에는 여기서 기다리고, 그쪽이 커밋한 뒤에는 이 줄이 이미 PENDING 이 아니다.
-        users.findByIdForUpdate(user.id()).orElseThrow(ConnectorActionService::notFound);
+        users.findByIdForUpdate(user.id()).orElseThrow(ConnectorActionDetails::notFound);
         ConnectorAction action = requirePending(user, actionId);
         if (!action.expiresAt().isAfter(now)) {
             action.expire(now);
@@ -232,7 +232,7 @@ class ConnectorActionApproval {
     private ConnectorAction record(UUID actionId, CallResult result) {
         Instant now = now();
         ConnectorAction action =
-                actions.findByPublicIdForUpdate(actionId).orElseThrow(ConnectorActionService::notFound);
+                actions.findByPublicIdForUpdate(actionId).orElseThrow(ConnectorActionDetails::notFound);
         if (action.status() != ActionStatus.EXECUTING) {
             // 실행하는 동안 기동 정리가 이 줄을 이미 끝냈다. 그 상태를 그대로 둔다.
             return action;
@@ -280,7 +280,7 @@ class ConnectorActionApproval {
     private ConnectorAction requirePending(CurrentUser user, UUID actionId) {
         ConnectorAction action = actions.findByPublicIdForUpdate(actionId)
                 .filter(found -> found.userId().equals(user.id()))
-                .orElseThrow(ConnectorActionService::notFound);
+                .orElseThrow(ConnectorActionDetails::notFound);
         if (action.status() != ActionStatus.PENDING) {
             throw notPending();
         }

@@ -1,7 +1,5 @@
 package com.bifos.assistant.connector.application;
 
-import static com.bifos.assistant.connector.application.ConnectorActionService.APPROVAL_EXPIRED_TITLE;
-
 import com.bifos.assistant.chat.application.ConversationNotices;
 import com.bifos.assistant.connector.application.model.ConnectorActionChanged;
 import com.bifos.assistant.connector.application.model.ConnectorActionView;
@@ -21,6 +19,9 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 /** 승인 줄의 사건과 만료 알림을 기존 커밋 순서로 전한다. */
 @Slf4j
 class ConnectorActionSignals {
+    /** 만료한 승인 줄을 알리는 알림의 제목이다. 본문은 도구 제목이다. */
+    static final String APPROVAL_EXPIRED_TITLE = "승인 요청이 만료됐어요";
+
     private final ApplicationEventPublisher events;
     private final NotificationService notifications;
     private final ConversationNotices conversations;

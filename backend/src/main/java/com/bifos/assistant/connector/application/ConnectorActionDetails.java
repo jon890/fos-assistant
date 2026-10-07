@@ -12,6 +12,8 @@ import com.bifos.assistant.connector.infra.ConnectorActionRepository;
 import com.bifos.assistant.hermes.ToolDetailRedactor;
 import com.bifos.assistant.hermes.dto.ConnectorManifest;
 import com.bifos.assistant.shared.auth.CurrentUser;
+import com.bifos.assistant.shared.error.ApiException;
+import com.bifos.assistant.shared.error.ErrorCode;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -29,6 +31,8 @@ import lombok.extern.slf4j.Slf4j;
 /** 승인 줄의 조회와 결과 전달 표시, 지금 카탈로그로 만든 표시 값을 맡는다. */
 @Slf4j
 class ConnectorActionDetails {
+    private static final String NOT_FOUND_MESSAGE = "this connector action does not exist";
+
     /** 실행을 보낸 뒤 끝난 상태들이다. 자동 turn 으로 모델에게 전한다. */
     private static final Set<ActionStatus> EXECUTED =
             Set.of(ActionStatus.SUCCEEDED, ActionStatus.FAILED, ActionStatus.UNKNOWN);
@@ -251,5 +255,9 @@ class ConnectorActionDetails {
                     ex.getClass().getSimpleName());
             return Optional.empty();
         }
+    }
+
+    static ApiException notFound() {
+        return new ApiException(ErrorCode.CONNECTOR_ACTION_NOT_FOUND, NOT_FOUND_MESSAGE);
     }
 }
