@@ -5,7 +5,6 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.tuple;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
-import static argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doThrow;
@@ -987,8 +986,7 @@ class ChatServiceTest {
                 null));
         doThrow(new DataIntegrityViolationException("시작 사건 저장 실패"))
                 .when(executionEvents)
-                .save(argThat(
-                        event -> event.eventType() == ExecutionEventType.SUBAGENT_STARTED));
+                .save(argThat(event -> event.eventType() == ExecutionEventType.SUBAGENT_STARTED));
 
         ChatTurn turn = chat.send(user, null, "안녕", "dad");
 
