@@ -23,7 +23,7 @@ import tools.jackson.databind.json.JsonMapper;
  * 의 「결과 계약」 이 갖는다.
  *
  * <p>상한을 넘는 글은 잘라 읽고 넘는 배열 원소는 버린다. 블록을 읽지 못한 것으로 보는 경우는 답이 비었거나, 블록이 없거나,
- * JSON 이 아니거나, {@code version} 이 1이나 2가 아니거나, {@code outcome} 이 없거나 모르는 값일 때뿐이고 그 까닭을
+ * JSON 이 아니거나, {@code version} 이 1, 2, 3이 아니거나, {@code outcome} 이 없거나 모르는 값일 때뿐이고 그 까닭을
  * {@link CheckInvalidReason} 으로 돌려준다. 읽지 못해도 예외를 밖으로 던지지 않는다.
  *
  * <p>태그 글자 사이에 낀 보이지 않는 서식 문자(Unicode {@code Cf}. 폭 없는 공백, U+FEFF 등)는 무시한다. 모델이 여는 태그 가운데에
@@ -67,6 +67,15 @@ public class CheckResultParser {
     private static final int ITEMS_MAX = 6;
     private static final int NEXT_TEXT_MAX = 300;
     private static final int CHANGE_SINCE_LAST_MAX = 300;
+    private static final int PROBLEMS_MAX = 3;
+    private static final int PROBLEM_KEY_MAX = 120;
+    private static final int PROBLEM_MAX = 300;
+    private static final int RELATED_GOAL_MAX = 200;
+    private static final int EVIDENCE_MAX = 5;
+    private static final int EVIDENCE_KEY_MAX = 120;
+    private static final int ACTION_TEXT_MAX = 200;
+    private static final int EXPECTED_BENEFIT_MAX = 300;
+    private static final int RISK_MAX = 200;
     /** 계약에 상한이 없는 짧은 칸(시각, 신선도, next 종류)이 끝없이 길어지지 않게 하는 값이다. */
     private static final int SHORT_FIELD_MAX = 64;
 
@@ -124,7 +133,7 @@ public class CheckResultParser {
     /** 읽은 JSON 객체를 계약대로 검사해 블록으로 바꾼다. */
     private static CheckResultRead blockOf(JsonNode root) {
         JsonNode version = root.get("version");
-        if (version == null || !version.isIntegralNumber() || (version.asInt() != 1 && version.asInt() != 2)) {
+        if (version == null || !version.isIntegralNumber() || version.asInt() < 1 || version.asInt() > 3) {
             return CheckResultRead.invalid(CheckInvalidReason.BAD_VERSION);
         }
         Optional<CheckOutcome> outcome = outcomeOf(root.get("outcome"));
@@ -139,7 +148,8 @@ public class CheckResultParser {
                 texts(root.get("questions"), QUESTIONS_MAX, QUESTION_MAX),
                 texts(root.get("followUpCandidates"), FOLLOW_UPS_MAX, FOLLOW_UP_MAX),
                 texts(root.get("sourceFailures"), SOURCE_FAILURES_MAX, SOURCE_FAILURE_MAX),
-                version.asInt() == 2 ? report(root.get("report")) : null));
+                version.asInt() >= 2 ? report(root.get("report")) : null,
+                version.asInt() == 3 ? problems(root.get("problemCandidates")) : List.of()));
     }
 
     /** 앞뒤를 코드 울타리({@code ```json} 등)로 감쌌으면 벗긴다. */
@@ -200,10 +210,45 @@ public class CheckResultParser {
     }
 
     private static Next next(JsonNode node) {
+        return next(node, NEXT_TEXT_MAX);
+    }
+
+    private static Next next(JsonNode node, int textMax) {
         if (node == null || !node.isObject()) {
             return null;
         }
-        return new Next(text(node.get("type"), SHORT_FIELD_MAX), text(node.get("text"), NEXT_TEXT_MAX));
+        return new Next(text(node.get("type"), SHORT_FIELD_MAX), text(node.get("text"), textMax));
+    }
+
+    /** 버전 3의 문제 후보를 읽는다. 객체가 아닌 원소는 건너뛰고 상한을 넘는 원소는 버린다. */
+    private static List<CheckResultBlock.ProblemCandidate> problems(JsonNode array) {
+        List<CheckResultBlock.ProblemCandidate> found = new ArrayList<>();
+        if (array == null || !array.isArray()) {
+            return found;
+        }
+        for (JsonNode element : array) {
+            if (found.size() >= PROBLEMS_MAX) {
+                break;
+            }
+            if (element.isObject()) {
+                found.add(problem(element));
+            }
+        }
+        return List.copyOf(found);
+    }
+
+    private static CheckResultBlock.ProblemCandidate problem(JsonNode node) {
+        return new CheckResultBlock.ProblemCandidate(
+                text(node.get("problemKey"), PROBLEM_KEY_MAX),
+                text(node.get("problem"), PROBLEM_MAX),
+                text(node.get("relatedGoal"), RELATED_GOAL_MAX),
+                texts(node.get("evidence"), EVIDENCE_MAX, EVIDENCE_KEY_MAX),
+                next(node.get("proposedAction"), ACTION_TEXT_MAX),
+                text(node.get("confidence"), SHORT_FIELD_MAX),
+                text(node.get("expectedBenefit"), EXPECTED_BENEFIT_MAX),
+                text(node.get("sideEffect"), SHORT_FIELD_MAX),
+                text(node.get("risk"), RISK_MAX),
+                text(node.get("changeSinceLast"), CHANGE_SINCE_LAST_MAX));
     }
 
     /** 모델이 쓴 승인 번호와 근거 주소는 믿지 않고 읽지 않는다. */

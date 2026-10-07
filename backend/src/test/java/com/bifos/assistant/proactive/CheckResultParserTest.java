@@ -133,9 +133,10 @@ class CheckResultParserTest {
     }
 
     @Test
-    @DisplayName("version 이 1 또는 2가 아니면 BAD_VERSION 이다")
+    @DisplayName("version 이 1, 2, 3이 아니면 BAD_VERSION 이다")
     void reportsBadVersion() {
-        assertInvalid(block("{\"version\": 3, \"outcome\": \"NOTHING_NEW\"}"), CheckInvalidReason.BAD_VERSION);
+        assertInvalid(block("{\"version\": 4, \"outcome\": \"NOTHING_NEW\"}"), CheckInvalidReason.BAD_VERSION);
+        assertInvalid(block("{\"version\": 0, \"outcome\": \"NOTHING_NEW\"}"), CheckInvalidReason.BAD_VERSION);
         assertInvalid(block("{\"version\": \"1\", \"outcome\": \"NOTHING_NEW\"}"), CheckInvalidReason.BAD_VERSION);
         assertInvalid(block("{\"outcome\": \"NOTHING_NEW\"}"), CheckInvalidReason.BAD_VERSION);
     }
@@ -160,6 +161,68 @@ class CheckResultParserTest {
         assertThat(result.report().changed()).containsExactly("새 공고", "새 자료", "세 번째");
         assertThat(result.report().done()).containsExactly("원문 확인");
         assertThat(result.report().next()).containsExactly("다음 주 확인", "지원 조건 비교");
+    }
+
+    @Test
+    @DisplayName("version 3은 보고와 문제 후보를 읽고, 후보는 3개까지 상한 안에서 자른다")
+    void readsVersionThreeProblemCandidatesWithinLimits() {
+        String candidate = """
+                {
+                  "problemKey": "%s",
+                  "problem": "%s",
+                  "relatedGoal": "%s",
+                  "evidence": ["position:a", "position:b", "position:c", "position:d", "position:e", "position:f", 7],
+                  "proposedAction": {"type": "ACTION", "text": "%s"},
+                  "confidence": "HIGH",
+                  "expectedBenefit": "%s",
+                  "sideEffect": "NONE",
+                  "risk": "%s",
+                  "changeSinceLast": "%s"
+                }""".formatted(
+                        "k".repeat(121),
+                        "p".repeat(301),
+                        "g".repeat(201),
+                        "a".repeat(201),
+                        "b".repeat(301),
+                        "r".repeat(201),
+                        "c".repeat(301));
+        CheckResultBlock result = parser.read(block("""
+                        {
+                          "version": 3,
+                          "outcome": "FINDINGS",
+                          "report": {"changed": ["새 공고"]},
+                          "problemCandidates": [%s, "문자열은 건너뛴다", %s, %s, %s]
+                        }""".formatted(candidate, candidate, candidate, candidate)))
+                .block();
+
+        assertThat(result.version()).isEqualTo(3);
+        assertThat(result.report().changed()).containsExactly("새 공고");
+        assertThat(result.problemCandidates()).hasSize(3);
+        CheckResultBlock.ProblemCandidate first = result.problemCandidates().getFirst();
+        assertThat(first.problemKey()).hasSize(120);
+        assertThat(first.problem()).hasSize(300);
+        assertThat(first.relatedGoal()).hasSize(200);
+        assertThat(first.evidence())
+                .containsExactly("position:a", "position:b", "position:c", "position:d", "position:e");
+        assertThat(first.proposedAction().type()).isEqualTo("ACTION");
+        assertThat(first.proposedAction().text()).hasSize(200);
+        assertThat(first.confidence()).isEqualTo("HIGH");
+        assertThat(first.expectedBenefit()).hasSize(300);
+        assertThat(first.sideEffect()).isEqualTo("NONE");
+        assertThat(first.risk()).hasSize(200);
+        assertThat(first.changeSinceLast()).hasSize(300);
+    }
+
+    @Test
+    @DisplayName("version 1과 2의 problemCandidates 는 읽지 않아 후보 0개다")
+    void ignoresProblemCandidatesBeforeVersionThree() {
+        String candidates = "\"problemCandidates\": [{\"problemKey\": \"study:x\"}]";
+        for (int version : new int[] {1, 2}) {
+            CheckResultBlock result = parser.read(
+                            block("{\"version\": " + version + ", \"outcome\": \"NOTHING_NEW\", " + candidates + "}"))
+                    .block();
+            assertThat(result.problemCandidates()).as("version " + version).isEmpty();
+        }
     }
 
     @Test
