@@ -20,7 +20,7 @@
 - 결과물 HTML 이 같은 대화의 첨부를 부르는 계약은 `docs/backend/artifact.md` 의 「같은 대화의 첨부 사진을 부를 때」 다. web 라우트는 `web/src/app/api/chat/conversations/[conversationId]/files/[...path]/route.ts` 와 `web/src/app/api/chat/conversations/[conversationId]/attachments/[attachmentId]/route.ts` 다
 - 실제 네이버와 Chrome 에 닿는 검사를 만들지 않는다. 사람 이름, 메일, 블로그 아이디는 가상 값(`example-blog`, `가상국수`)만 쓴다
 
-**근거 문서**: `docs/connectors/naver-blog.md` 의 「등록 칸」, 「도구와 정책」, 「초안」, 「미리보기」, 「오류」, 「서버와 검사」. `docs/adr/ADR-092-네이버-블로그-커넥터는-사용자의-chrome-에-cdp-로-붙고-임시저장은-승인한-뒤-백그라운드-작업으로-돈다.md`. `docs/connector-authoring.md` 의 「갖출 것」.
+**근거 문서**: `docs/connectors/naver-blog.md` 의 「등록 칸」, 「도구와 정책」, 「초안」, 「미리보기」, 「오류」, 「서버와 검사」. `docs/adr/ADR-20261007-naver-blog-connector.md`. `docs/connector-authoring.md` 의 「갖출 것」.
 
 ## 의도 메모
 

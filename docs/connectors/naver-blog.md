@@ -2,7 +2,7 @@
 
 사용자가 로그인해 둔 Chrome 에 붙어 네이버 블로그 글을 임시저장하는 범용 커넥터다. 코드는 [`hermes/connectors/naver-blog/`](../../hermes/connectors/naver-blog) 에 있다.
 이 문서는 도구와 정책, 초안의 모양, 보안, 설정 안내, 실제 계정으로 확인하는 절차를 갖는다.
-결정과 근거는 [ADR-092](../adr/ADR-092-네이버-블로그-커넥터는-사용자의-chrome-에-cdp-로-붙고-임시저장은-승인한-뒤-백그라운드-작업으로-돈다.md) 에 있다.
+결정과 근거는 [ADR-20261007 / naver-blog-connector](../adr/ADR-20261007-naver-blog-connector.md) 에 있다.
 커넥터 공통 계약은 [커넥터 연결](../connectors.md) 과 [커넥터 도구 정책](../backend/connector-tool-policy.md) 이 갖는다.
 
 **발행하지 않는다.** 글은 임시저장 상태로 남고, 공개는 사용자가 네이버에서 직접 한다.
@@ -15,7 +15,7 @@
 | `blog_id` | `NAVER_BLOG_ID` | 아니다 | 글을 쓸 블로그의 아이디. `blog.naver.com/<아이디>` 의 그 값이다. 영문자, 숫자, `_`, `-` 로 50자까지 |
 
 둘 다 필수다. 운영자가 주는 값(`operator_env`)은 없다.
-설치가 주는 env 는 `NAVER_BLOG_ATTACHMENT_DIR` 하나다. `connector.json` 의 `owner_attachments_env` 로 선언하고, 바인딩 설치가 그 에이전트 주인의 첨부 디렉터리를 넣는다. 사용자가 넣는 칸이 아니다([ADR-093](../adr/ADR-093-사용자-첨부를-읽는-커넥터는-바인딩-주인의-첨부-디렉터리를-설치가-정한-env-로만-받는다.md)).
+설치가 주는 env 는 `NAVER_BLOG_ATTACHMENT_DIR` 하나다. `connector.json` 의 `owner_attachments_env` 로 선언하고, 바인딩 설치가 그 에이전트 주인의 첨부 디렉터리를 넣는다. 사용자가 넣는 칸이 아니다([ADR-20261007 / connector-owner-attachments](../adr/ADR-20261007-connector-owner-attachments.md)).
 CDP 주소는 그 브라우저를 조작하는 권한이라 비밀 칸이다. 주소 자체는 key 가 아니어도 화면과 응답과 DB 에 원문을 남기지 않는다.
 확인 도구는 `session_status` 다. 등록할 때 그 주소의 브라우저에 붙어 네이버 로그인 쿠키가 있는지 보고, 있으면 저장한다.
 

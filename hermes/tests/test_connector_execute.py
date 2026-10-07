@@ -6,6 +6,7 @@
 import asyncio
 import json
 import os
+import pathlib
 import subprocess
 import sys
 import time
@@ -15,6 +16,8 @@ from unittest import mock
 
 import test_connector_call as call_base
 import test_connector_manifest as base
+
+REPO = pathlib.Path(__file__).resolve().parents[2]
 
 EXECUTE = "/api/connectors/%s/execute" % base.DEMO
 PROFILE = "alice"
@@ -144,7 +147,7 @@ class ConnectorExecuteTest(base.ConnectorGateCase):
         self.assertEqual(body["result"]["path"], os.path.dirname(sys.executable))
 
     def declare_owner_attachments(self):
-        """시험 커넥터가 주인의 첨부 디렉터리를 `DEMO_ATTACHMENT_DIR` 로 받게 하고 실행 공간 정책을 준다(ADR-093)."""
+        """시험 커넥터가 주인의 첨부 디렉터리를 `DEMO_ATTACHMENT_DIR` 로 받게 하고 실행 공간 정책을 준다(ADR-20261007 connector-owner-attachments)."""
         self.rewrite("connector.json", lambda value: value.update(owner_attachments_env="DEMO_ATTACHMENT_DIR"))
         self.rewrite(".mcp.json", lambda value: value["mcpServers"]["demo"]["env"].update(
             DEMO_ATTACHMENT_DIR="${DEMO_ATTACHMENT_DIR}"))
@@ -213,7 +216,7 @@ class ConnectorExecuteTest(base.ConnectorGateCase):
         """다른 profile 의 값으로 실행하지 않는다. 토큰이 거절되는 profile 은 그 오류를 받는다."""
         self.install("bob", token=call_base.BAD_TOKEN)
         self.assertEqual(self.execute("mcp__demo__list_scopes", profile="bob"),
-                         (200, {"ok": False, "error": "credential_rejected"}))
+                         (200, {"ok": False, "error": "credential_rejected", "code": "DEMO_UNAUTHORIZED"}))
         self.assertEqual(self.execute("mcp__demo__list_scopes"), (200, {"ok": True, "result": call_base.SCOPES}))
 
     def test_unknown_registered_name_is_refused(self):
@@ -289,7 +292,7 @@ class ConnectorExecuteTest(base.ConnectorGateCase):
         self.install("bob", token=call_base.BAD_TOKEN)
         self.install("carol", token=call_base.ODD_TOKEN)
         self.assertEqual(self.execute("mcp__demo__list_scopes", profile="bob"),
-                         (200, {"ok": False, "error": "credential_rejected"}))
+                         (200, {"ok": False, "error": "credential_rejected", "code": "DEMO_UNAUTHORIZED"}))
         self.assertEqual(self.execute("mcp__demo__list_scopes", profile="carol"), UNAVAILABLE)
 
     def test_outcome_unknown_code_answers_504(self):
@@ -306,7 +309,7 @@ class ConnectorExecuteTest(base.ConnectorGateCase):
         # 다른 코드는 그대로 200 과 공통 어휘다.
         self.install("bob", token=call_base.BAD_TOKEN)
         self.assertEqual(self.execute("mcp__demo__list_scopes", profile="bob"),
-                         (200, {"ok": False, "error": "credential_rejected"}))
+                         (200, {"ok": False, "error": "credential_rejected", "code": "DEMO_UNAUTHORIZED"}))
         self.assert_no_child_left()
 
     def test_plain_text_result_of_a_finished_write_is_a_success(self):
@@ -412,6 +415,66 @@ class ConnectorExecuteTest(base.ConnectorGateCase):
         self.assertEqual(accepted[0], 200, accepted)
         self.assertTrue(accepted[1]["ok"], accepted)
 
+    def fixed_execute(self, payload, **request):
+        """도구가 `payload` 를 오류 결과로 돌려준 것처럼 실행 경로를 한 번 지난다."""
+        result = call_base.tool_result(is_error=True, content=[call_base.text_content(json.dumps(payload))])
+
+        async def fixed(manifest, hermes_tool, args, env, progress):
+            progress["sent"] = True
+            return result
+
+        with mock.patch.object(self.plugin, "_run_connector_execute", fixed):
+            return self.execute(**request)
+
+    def test_declared_error_code_and_recovery_contract_are_forwarded(self):
+        """`errors` 표의 코드는 그대로, 객체 항목은 복구 어휘와 선언한 세부 칸까지 넘긴다(ADR-092).
+
+        세부 칸은 정수와 boolean 만 넘긴다. 선언하지 않은 칸, 원문 메시지, 중첩 값은 넘기지 않는다.
+        """
+        self.rewrite("connector.json", lambda value: value["errors"].update(
+            DEMO_STALE={"category": "invalid_input", "recovery": "recheck",
+                        "details": ["actual_count", "retryable", "label", "ratio"]}))
+        stale = {"code": "DEMO_STALE", "actual_count": 17, "retryable": True, "label": "raw text",
+                 "ratio": 0.5, "message": "provider said no", "nested": {"actual_count": 1}}
+        self.assertEqual(self.fixed_execute({"error": stale}), (200, {
+            "ok": False, "error": "invalid_input", "code": "DEMO_STALE", "recovery": "recheck",
+            "details": {"actual_count": 17, "retryable": True}}))
+        for label, value in (("string", "17"), ("float", 17.0), ("over the bound", 1_000_000_001),
+                             ("list", [17]), ("object", {"n": 17}), ("null", None)):
+            with self.subTest(label):
+                self.assertEqual(self.fixed_execute({"error": {"code": "DEMO_STALE", "actual_count": value}}),
+                                 (200, {"ok": False, "error": "invalid_input", "code": "DEMO_STALE",
+                                        "recovery": "recheck"}))
+        self.assertEqual(self.fixed_execute({"error": {"code": "DEMO_STALE", "actual_count": -1_000_000_000}}),
+                         (200, {"ok": False, "error": "invalid_input", "code": "DEMO_STALE", "recovery": "recheck",
+                                "details": {"actual_count": -1_000_000_000}}))
+        # 글로 선언한 코드는 코드만 넘긴다. 다른 칸은 버린다.
+        self.assertEqual(self.fixed_execute({"error": {"code": "DEMO_FORBIDDEN", "message": "raw", "actual_count": 1}}),
+                         (200, {"ok": False, "error": "forbidden", "code": "DEMO_FORBIDDEN"}))
+        # 표에 없는 코드는 지금처럼 unavailable 이고 코드도 넘기지 않는다.
+        self.assertEqual(self.fixed_execute({"error": {"code": "DEMO_RAW_403", "actual_count": 1}}), UNAVAILABLE)
+        self.assertEqual(self.fixed_execute({"error": "DEMO_STALE"}), UNAVAILABLE)
+
+    def test_error_contract_stays_out_of_the_call_path(self):
+        """선택지와 확인 도구의 `call` 경로는 공통 어휘만 준다. 복구 계약은 승인한 실행의 결과에만 싣는다."""
+        self.rewrite("connector.json", lambda value: value["errors"].update(
+            DEMO_STALE={"category": "invalid_input", "recovery": "recheck", "details": ["actual_count"]}))
+        manifest = self.plugin._connector_manifest(base.DEMO)
+        result = call_base.tool_result(is_error=True, content=[call_base.text_content(
+            json.dumps({"error": {"code": "DEMO_STALE", "actual_count": 3}}))])
+        self.assertEqual(self.plugin._connector_call_answer(manifest, result), {"ok": False, "error": "invalid_input"})
+
+    def test_four_details_are_the_limit(self):
+        """세부 칸은 넷까지 선언할 수 있다. 다섯은 manifest 검증이 거절한다."""
+        self.rewrite("connector.json", lambda value: value["errors"].update(
+            DEMO_STALE={"category": "invalid_input", "details": ["a", "b", "c", "d"]}))
+        self.assertEqual(self.fixed_execute({"error": {"code": "DEMO_STALE", "a": 1, "b": 2, "c": 3, "d": False}}),
+                         (200, {"ok": False, "error": "invalid_input", "code": "DEMO_STALE",
+                                "details": {"a": 1, "b": 2, "c": 3, "d": False}}))
+        self.rewrite("connector.json", lambda value: value["errors"].update(
+            DEMO_STALE={"category": "invalid_input", "details": ["a", "b", "c", "d", "e"]}))
+        self.assertIsNone(self.plugin._connector_manifest(base.DEMO))
+
     def test_arguments_and_results_are_not_logged(self):
         """인자와 결과와 profile 의 값은 성공과 실패의 어느 로그에도 없다."""
         from mcp import ClientSession
@@ -429,6 +492,28 @@ class ConnectorExecuteTest(base.ConnectorGateCase):
         self.assertIn("RuntimeError", log, "실패 로그를 모으지 못하면 이 검사는 아무것도 보지 않는다")
         for hidden in (secret_text, call_base.OK_TOKEN, "written"):
             self.assertNotIn(hidden, log)
+
+
+class GmailErrorContractTest(base.ConnectorGateCase):
+    """저장소의 Gmail manifest 로 Gmail 서버가 내는 오류 모양을 실행 결과로 바꿔 본다(ADR-092)."""
+
+    def answer(self, error):
+        manifest = self.plugin._load_connector(
+            "gmail", {"root": REPO / "hermes/connectors/gmail", "command": sys.executable, "env": {}})
+        result = call_base.tool_result(is_error=True, content=[call_base.text_content(json.dumps({"error": error}))])
+        return self.plugin._connector_execute_answer(manifest, result)
+
+    def test_target_count_change_carries_the_actual_count(self):
+        self.assertEqual(self.answer({"code": "GMAIL_TARGET_COUNT_CHANGED", "actual_count": 17}), {
+            "ok": False, "error": "invalid_input", "code": "GMAIL_TARGET_COUNT_CHANGED", "recovery": "recheck",
+            "details": {"actual_count": 17}})
+
+    def test_filter_scope_is_a_reconnect_and_differs_from_a_plain_403(self):
+        self.assertEqual(self.answer({"code": "GMAIL_FILTER_SCOPE_REQUIRED"}), {
+            "ok": False, "error": "forbidden", "code": "GMAIL_FILTER_SCOPE_REQUIRED", "recovery": "reconnect"})
+        # 일반 403 은 코드만 넘긴다. 서버가 실수로 원문을 실어도 옮기지 않는다.
+        self.assertEqual(self.answer({"code": "GMAIL_FORBIDDEN", "message": "Request had insufficient scopes"}),
+                         {"ok": False, "error": "forbidden", "code": "GMAIL_FORBIDDEN"})
 
 
 if __name__ == "__main__":

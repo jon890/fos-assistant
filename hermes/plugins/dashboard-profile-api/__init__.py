@@ -272,7 +272,7 @@ PROFILE_PLUGIN_FILES = ("plugin.yaml", "__init__.py")
 CONNECTOR_ID_RE = re.compile(r"^[a-z0-9][a-z0-9-]{0,63}$")
 FIELD_KEY_RE = re.compile(r"^[a-z][a-z0-9_]{0,31}$")
 ENV_NAME_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]{0,127}$")
-# 바인딩 주인의 첨부 디렉터리를 받을 env 이름이다(ADR-093).
+# 바인딩 주인의 첨부 디렉터리를 받을 env 이름이다(ADR-20261007 connector-owner-attachments).
 OWNER_ATTACHMENTS_ENV_RE = re.compile(r"^[A-Z][A-Z0-9_]{0,63}$")
 # 그 env 에 설치가 넣는 값의 끝 모양이다. `<attachment_agent_root>/users/<SHA-256 16진수>` 다.
 OWNER_ATTACHMENTS_VALUE_RE = re.compile(r"^/[^$\0\r\n]*/users/[0-9a-f]{64}$")
@@ -281,6 +281,14 @@ SERVER_NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$")
 ERROR_WORDS = frozenset({"credential_rejected", "forbidden", "invalid_input", "unavailable", "outcome_unknown"})
 # 쓰기를 보냈는데 됐는지 모른다는 어휘다. 실행 경로만 504 로 답하고 `call` 은 `unavailable` 로 읽는다.
 OUTCOME_UNKNOWN = "outcome_unknown"
+# `errors` 표의 오류 코드 형식이다. 승인한 호출의 실행 경로가 이 코드를 Control Plane 에 그대로 넘긴다(ADR-092).
+ERROR_CODE_RE = re.compile(r"[A-Z][A-Z0-9_]{0,63}")
+# `errors` 표의 객체 항목이 고를 수 있는 복구 어휘다. 커넥터는 글을 쓰지 않고 어휘만 고른다.
+# Control Plane 의 `ConnectorRecovery` 와 같다. 한쪽을 바꾸면 다른 쪽도 바꾼다.
+ERROR_RECOVERIES = frozenset({"recheck", "reconnect", "fix_input", "retry_later"})
+# 오류 하나가 넘길 수 있는 세부 칸의 수와 정수 값의 절댓값 상한이다. Control Plane 이 같은 상한으로 다시 본다.
+ERROR_DETAILS_MAX = 4
+ERROR_DETAIL_INT_MAX = 1_000_000_000
 # `connector.json` 의 `toolsets` 가 열 수 있는 내장 toolset 이다. 읽기 전용 이미지 도구만 둔다(ADR-044).
 # 셸, 파일, 기억, 스킬, 위임 도구는 manifest 로 열리지 않는다.
 CONNECTOR_TOOLSETS = frozenset({"vision"})
@@ -967,7 +975,7 @@ def _load_connector(connector_id: str, entry: dict) -> dict:
         raise ValueError("operator_env 는 칸과 겹치지 않는 env 이름 목록이다")
     if set(operator_env) - set(entry["env"]):
         raise ValueError("operator_env 의 값이 운영 목록에 없다")
-    # 사용자 첨부를 읽는 커넥터가 받을 env 이름이다. 값은 바인딩 설치가 그 에이전트 주인의 디렉터리로 넣는다(ADR-093).
+    # 사용자 첨부를 읽는 커넥터가 받을 env 이름이다. 값은 바인딩 설치가 그 에이전트 주인의 디렉터리로 넣는다(ADR-20261007 connector-owner-attachments).
     owner_attachments_env = declared.get("owner_attachments_env")
     if owner_attachments_env is not None and (
             not isinstance(owner_attachments_env, str) or not OWNER_ATTACHMENTS_ENV_RE.match(owner_attachments_env)
@@ -981,11 +989,7 @@ def _load_connector(connector_id: str, entry: dict) -> dict:
     if operator_secrets:
         # 조용히 무시하면 비밀이 필요한 커넥터의 확인이 까닭 없이 실패한다. 받지 못하는 칸임을 밝힌다(ADR-046).
         raise ValueError("operator_secrets 는 아직 지원하지 않는다")
-    errors = declared.get("errors", {})
-    if not isinstance(errors, dict) or any(
-            not isinstance(code, str) or not isinstance(word, str) or word not in ERROR_WORDS
-            for code, word in errors.items()):
-        raise ValueError("errors 의 값은 공통 어휘 다섯 가운데 하나다")
+    errors, error_contracts = _connector_errors(declared.get("errors", {}))
     toolsets = declared.get("toolsets", [])
     if (not isinstance(toolsets, list) or any(not isinstance(name, str) for name in toolsets)
             or len(set(toolsets)) != len(toolsets) or set(toolsets) - CONNECTOR_TOOLSETS):
@@ -1079,6 +1083,7 @@ def _load_connector(connector_id: str, entry: dict) -> dict:
         "owner_attachments_env": owner_attachments_env,
         "optional_env": optional_env,
         "errors": errors,
+        "error_contracts": error_contracts,
         "toolsets": list(toolsets),
         "attachments": attachments,
         "persona": persona,
@@ -1088,6 +1093,40 @@ def _load_connector(connector_id: str, entry: dict) -> dict:
         "tools": tools,
         "server": definition,
     }
+
+
+def _connector_errors(declared) -> tuple:
+    """`errors` 표를 `{코드: 공통 어휘}` 와 `{코드: 복구 계약}` 으로 나눠 검증한다(ADR-092).
+
+    항목은 공통 어휘 글이거나 `{category, recovery, details}` 객체다. 객체의 `recovery` 는 복구 어휘 하나이고
+    `details` 는 도구 오류에서 넘길 칸 이름의 목록이다. 칸 값의 모양은 실행 경로가 본다.
+    """
+    if not isinstance(declared, dict):
+        raise ValueError("errors 는 객체다")
+    words, contracts = {}, {}
+    for code, entry in declared.items():
+        if not isinstance(code, str) or not ERROR_CODE_RE.fullmatch(code):
+            raise ValueError("errors 의 코드는 대문자, 숫자, 밑줄로 64자까지다")
+        if isinstance(entry, dict):
+            if "category" not in entry or set(entry) - {"category", "recovery", "details"}:
+                raise ValueError("errors 의 객체 항목은 category 와 선택 칸 recovery, details 만 갖는다")
+            recovery = entry.get("recovery")
+            details = entry.get("details", [])
+            if recovery is not None and recovery not in ERROR_RECOVERIES:
+                raise ValueError("errors 의 recovery 는 복구 어휘 가운데 하나다")
+            if (not isinstance(details, list) or len(details) > ERROR_DETAILS_MAX
+                    or any(not isinstance(key, str) or not FIELD_KEY_RE.fullmatch(key) for key in details)
+                    or len(set(details)) != len(details)):
+                raise ValueError("errors 의 details 는 겹치지 않는 칸 이름 %d개까지다" % ERROR_DETAILS_MAX)
+            entry = entry["category"]
+            if entry == OUTCOME_UNKNOWN:
+                # 실행 경로가 504 로 답하는 코드다. 실패로 기록되지 않으므로 복구 정보를 실을 자리가 없다.
+                raise ValueError("outcome_unknown 인 코드는 복구 계약을 갖지 않는다")
+            contracts[code] = {"recovery": recovery, "details": tuple(details)}
+        if not isinstance(entry, str) or entry not in ERROR_WORDS:
+            raise ValueError("errors 의 값은 공통 어휘 다섯 가운데 하나다")
+        words[code] = entry
+    return words, contracts
 
 
 def _connector_manifest(connector_id: str) -> dict | None:
@@ -1243,7 +1282,7 @@ def _server_matches(manifest: dict, server: dict) -> bool:
     옛 판이 남긴 기록을 그대로 인정해야 이미 설치한 연결이 끊기지 않는다(ADR-041).
     `tools` 는 견주지 않는다. 옛 기록에는 그 키가 없고, 다시 보낸 설치가 지금 manifest 의 값으로 덮어쓴다.
     주인의 첨부 디렉터리 env 는 설치마다 그 주인의 값이라 manifest 와 견주지 않는다. 빈 값이거나
-    `<루트>/users/<64자리 16진수>` 모양인지만 본다. 참조(`${...}`)를 받으면 profile `.env` 가 경로를 정하게 된다(ADR-093).
+    `<루트>/users/<64자리 16진수>` 모양인지만 본다. 참조(`${...}`)를 받으면 profile `.env` 가 경로를 정하게 된다(ADR-20261007 connector-owner-attachments).
     """
     expected = manifest["server"]
     if (server["command"] != expected["command"] or server["args"] != expected["args"]
@@ -1766,7 +1805,7 @@ def _connector_bind_config(profile_dir: pathlib.Path, plugin: str, enabled: bool
     떼기는 재시작이 필요 없다고 답한다. 다음 실행은 도구 목록에서 이름이 빠져 그 서버를 받지 않고,
     떼기 전에 시작해 그 서버를 쥔 실행의 호출은 대응에 남은 서버를 보고 hook 이 묻고 판정이 막는다.
     manifest 가 `owner_attachments_env` 를 선언했으면 `owner_attachments` 를 그 이름으로 서버 정의에 직접 넣는다.
-    다시 설치할 때마다 받은 주인의 값으로 다시 쓴다(ADR-093).
+    다시 설치할 때마다 받은 주인의 값으로 다시 쓴다(ADR-20261007 connector-owner-attachments).
     """
     import yaml
     if profile_dir.resolve() != profile_dir:
@@ -2085,7 +2124,7 @@ async def _connector_request(request):
         bind = body.get("bind") if isinstance(body, dict) else None
         # 운영 목록에 없는 이름은 끄기만 받는다. 소유 기록이 있으면 설치를 끄고, 없으면 바꾸지 않고 성공이다.
         # `bind` 는 바인딩 설치에서만 뜻이 있다. 떼기는 소유 기록의 설치 방식을 따른다.
-        # `sandbox_owner` 는 사진 도구를 여는 옛 설치와, 사용자 첨부를 읽는 커넥터의 바인딩 설치에서 쓴다(ADR-091, ADR-093).
+        # `sandbox_owner` 는 사진 도구를 여는 옛 설치와, 사용자 첨부를 읽는 커넥터의 바인딩 설치에서 쓴다(ADR-091, ADR-20261007 connector-owner-attachments).
         # 바인딩 설치는 API 도구 목록의 내장 toolset 을 바꾸지 않는다. 그 값으로 주인의 첨부 디렉터리만 정한다.
         if (body is None
                 or not {"profile", "plugin", "enabled"} <= set(body) <= {"profile", "plugin", "enabled", "bind", "sandbox_owner"}
@@ -2166,7 +2205,7 @@ async def _connector_request(request):
             owner_attachments = None
             if manifest["owner_attachments_env"] is not None:
                 # 경로는 운영 정책의 루트와 Control Plane 이 정한 주인에서만 만든다. 모델, 요청의 다른 칸, manifest 는
-                # 경로를 정하지 못한다. 선언하지 않은 커넥터는 `sandbox_owner` 를 받아도 쓰지 않는다(ADR-093).
+                # 경로를 정하지 못한다. 선언하지 않은 커넥터는 `sandbox_owner` 를 받아도 쓰지 않는다(ADR-20261007 connector-owner-attachments).
                 if owner is None:
                     return _rejected("사용자 첨부를 읽는 connector 에는 sandbox_owner 가 필요하다")
                 sandbox = _sandbox_policy()
@@ -2306,21 +2345,67 @@ def _leaf_error_types(error) -> list:
     return [name for item in inner for name in _leaf_error_types(item)]
 
 
+_UNREADABLE = object()
+
+
+def _tool_payload(result):
+    """도구 결과의 구조화 값이나 첫 텍스트 칸의 JSON 이다. 둘 다 읽지 못하면 `_UNREADABLE` 이다."""
+    if result.structured_content is not None:
+        return result.structured_content
+    try:
+        text = next(item.text for item in result.content if item.type == "text")
+        return json.loads(text)
+    except (StopIteration, ValueError, TypeError):
+        return _UNREADABLE
+
+
+def _tool_error(payload) -> tuple:
+    """오류 결과의 `error` 객체와 그 코드다. 모양이 맞지 않으면 빈 객체와 None 이다."""
+    error = payload.get("error") if isinstance(payload, dict) else None
+    if not isinstance(error, dict):
+        return {}, None
+    code = error.get("code")
+    return error, code if isinstance(code, str) else None
+
+
 def _connector_call_answer(manifest: dict, result) -> dict:
     """도구 결과를 `{ok, result}` 나 `{ok, error}` 로 바꾼다. 읽지 못한 결과는 `unavailable` 이다."""
-    payload = result.structured_content
-    if payload is None:
-        try:
-            text = next(item.text for item in result.content if item.type == "text")
-            payload = json.loads(text)
-        except (StopIteration, ValueError, TypeError):
-            return {"ok": False, "error": "unavailable"}
+    payload = _tool_payload(result)
+    if payload is _UNREADABLE:
+        return {"ok": False, "error": "unavailable"}
     if result.is_error:
-        error = payload.get("error") if isinstance(payload, dict) else None
-        code = error.get("code") if isinstance(error, dict) else None
-        word = manifest["errors"].get(code, "unavailable") if isinstance(code, str) else "unavailable"
-        return {"ok": False, "error": word}
+        _, code = _tool_error(payload)
+        return {"ok": False, "error": manifest["errors"].get(code, "unavailable") if code else "unavailable"}
     return {"ok": True, "result": payload}
+
+
+def _safe_error_detail(value) -> bool:
+    """오류 세부 칸으로 넘길 수 있는 값인가. 상한 안의 정수와 boolean 만이다. 글과 실수, 배열, 객체는 넘기지 않는다."""
+    if isinstance(value, bool):
+        return True
+    return type(value) is int and abs(value) <= ERROR_DETAIL_INT_MAX
+
+
+def _connector_error_answer(manifest: dict, result, answer: dict) -> dict:
+    """실패 답에 커넥터가 선언한 오류 코드와 복구 계약을 더한다(ADR-092).
+
+    `errors` 표에 있는 코드만 더한다. 세부 칸은 그 코드의 `details` 가 적은 이름이고 값이 정수나 boolean 인 것만 옮긴다.
+    도구 오류의 다른 칸, 원문 메시지, 중첩 값은 옮기지 않는다. 복구 어휘는 도구 결과가 아니라 manifest 에서 꺼낸다.
+    """
+    payload = _tool_payload(result)
+    error, code = _tool_error(payload) if payload is not _UNREADABLE else ({}, None)
+    if code is None or code not in manifest["errors"]:
+        return answer
+    answer = {**answer, "code": code}
+    contract = manifest["error_contracts"].get(code)
+    if contract is None:
+        return answer
+    if contract["recovery"] is not None:
+        answer["recovery"] = contract["recovery"]
+    details = {key: error[key] for key in contract["details"] if key in error and _safe_error_detail(error[key])}
+    if details:
+        answer["details"] = details
+    return answer
 
 
 async def _connector_call_request(request, connector_id: str):
@@ -2370,7 +2455,7 @@ async def _connector_call_request(request, connector_id: str):
     server = manifest["server"]
     env.update({name: server["env"][name] for name in manifest["operator_env"]})
     if manifest["owner_attachments_env"] is not None:
-        # 이 경로에는 바인딩 주인이 없다. 빈 값을 주어 커넥터가 사용자 첨부를 읽지 않게 한다(ADR-093).
+        # 이 경로에는 바인딩 주인이 없다. 빈 값을 주어 커넥터가 사용자 첨부를 읽지 않게 한다(ADR-20261007 connector-owner-attachments).
         env[manifest["owner_attachments_env"]] = ""
     # 대시보드 프로세스의 PATH 를 물려주지 않는다. 실행 파일이 있는 디렉터리만 준다.
     env["PATH"] = os.path.dirname(server["command"])
@@ -2443,7 +2528,9 @@ def _connector_execute_answer(manifest: dict, result) -> dict:
     `call` 처럼 `unavailable` 로 답하면 이미 실행된 쓰기가 실패로 기록된다.
     """
     answer = _connector_call_answer(manifest, result)
-    if result.is_error or answer["ok"]:
+    if result.is_error:
+        return _connector_error_answer(manifest, result, answer)
+    if answer["ok"]:
         return answer
     text = next((item.text for item in result.content if item.type == "text"), "")
     return {"ok": True, "result": {"text": text if isinstance(text, str) else ""}}
@@ -2454,7 +2541,7 @@ def _installed_owner_attachments(profile_dir: pathlib.Path, manifest: dict) -> s
 
     바인딩 설치가 운영 정책의 `attachment_agent_root` 와 주인으로 넣은 값만 돌려준다.
     값이 없거나, 지금 정책의 루트 아래 `users/<64자리 16진수>` 모양이 아니거나, 정책이 없으면 빈 값이다.
-    빈 값을 받은 커넥터는 사용자 첨부를 읽지 않는다(ADR-093).
+    빈 값을 받은 커넥터는 사용자 첨부를 읽지 않는다(ADR-20261007 connector-owner-attachments).
     """
     import yaml
     config_path = profile_dir / "config.yaml"
@@ -3022,12 +3109,16 @@ def _sandbox_terminal(policy: dict, profile: str, owner: str, attachment_snapsho
                             _sandbox_attachment_agent_directory(policy, owner)),
         ] + ["%s:ro" % m for m in mounts],
         "docker_forward_env": [],
-        "docker_env": settings["env"],
         "env_passthrough": [],
         "credential_files": [],
         "container_cpu": policy["cpu"],
         "container_memory": policy["memory_mb"],
     }
+    # 빈 `docker_env` 는 칸을 두지 않는다. Hermes 의 config 저장은 빈 dict 를 기본값과 같다고 보고 지우므로
+    # (빈 dict 는 `_explicit_config_paths` 의 잎 경로가 아니라 보존되지 않는다), 칸을 넣고 지문을 계산하면
+    # 저장된 terminal 로 다시 계산한 지문이 키와 어긋난다. 칸이 없으면 Hermes 는 같은 기본값 `{}` 를 쓴다.
+    if settings["env"]:
+        terminal["docker_env"] = settings["env"]
     # Hermes 의 docker backend 는 컨테이너를 label 로만 찾아 다시 쓰고, 프로세스 안의 캐시는
     # 지워진 컨테이너를 옛 run 인자로 다시 만든다. 마운트나 이미지가 바뀌어도 새 컨테이너가 생기지 않는다.
     # 이 키가 label 과 캐시 키와 /root 의 디렉터리 이름을 정하므로, 주인이나 실행 공간 설정이 바뀌면

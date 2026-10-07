@@ -216,7 +216,7 @@ class ConnectorCallTest(base.ConnectorGateCase):
         self.assertEqual(body["result"]["path"], os.path.dirname(sys.executable))
 
     def test_child_receives_an_empty_owner_attachments_directory(self):
-        """주인의 첨부 디렉터리를 선언한 커넥터의 확인 도구는 그 env 를 빈 값으로 받는다. 이 경로에는 바인딩 주인이 없다(ADR-093)."""
+        """주인의 첨부 디렉터리를 선언한 커넥터의 확인 도구는 그 env 를 빈 값으로 받는다. 이 경로에는 바인딩 주인이 없다(ADR-20261007 connector-owner-attachments)."""
         self.rewrite("connector.json", lambda value: value.update(
             verify={"tool": "env_view"}, owner_attachments_env="DEMO_ATTACHMENT_DIR"))
         self.rewrite(".mcp.json", lambda value: value["mcpServers"]["demo"]["env"].update(

@@ -20,7 +20,7 @@ phase 03 의 작업 프로세스가 이 함수들을 차례로 부른다. 이 ph
 - CDP 창구는 phase 01 의 `src/cdp.ts` 의 `CdpSession` 과 `httpJson` 을 쓴다
 - 원본이 실측으로 걸린 것들은 공개 문서에 적힌 그대로 지킨다. `docs/connectors/naver-blog.md` 의 「작업」 표와 아래 「의도 메모」 가 그것이다
 
-**근거 문서**: `docs/connectors/naver-blog.md` 의 「작업」, 「서버와 검사」, 「보안」. `docs/adr/ADR-092-네이버-블로그-커넥터는-사용자의-chrome-에-cdp-로-붙고-임시저장은-승인한-뒤-백그라운드-작업으로-돈다.md` 의 「감당할 것」.
+**근거 문서**: `docs/connectors/naver-blog.md` 의 「작업」, 「서버와 검사」, 「보안」. `docs/adr/ADR-20261007-naver-blog-connector.md` 의 「감당할 것」.
 
 ## 의도 메모
 

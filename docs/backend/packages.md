@@ -33,7 +33,7 @@ Control Plane 의 패키지마다 맡는 책임과 패키지 사이의 방향 �
 | `task` | 예약 작업과 시각, 발화 기록, 발화기와 예약 turn 시작([`task.md`](task.md)) |
 | `notification` | 사용자에게 대화 밖에서 알리는 줄의 저장과 읽음 표시, 사용자 단위 SSE, 오래된 줄 정리([`notification.md`](notification.md)) |
 | `followup` | 할 일의 저장과 상태 전이, 사람이 쓰는 API, 에이전트의 제안 저장([`follow-up.md`](follow-up.md)) |
-| `proactive` | 먼저 살펴보기의 시작 전 점검, 점검 대화의 살펴보기 turn, 상한, 결과 계약의 검사와 그리기, 살펴보기 트리 판정([`proactive-check.md`](proactive-check.md)) |
+| `proactive` | 먼저 살펴보기의 시작 전 점검, 점검 대화의 살펴보기 turn, 상한, 결과 계약의 검사와 그리기, 문제 후보의 검사와 저장, 살펴보기 트리 판정([`proactive-check.md`](proactive-check.md)) |
 | `attention` | 먼저 알리기의 판정과 지금 화면이 읽는 카드. 다른 패키지의 기록을 읽기만 한다([`attention.md`](attention.md)) |
 
 검사: `ArchitectureRules.SHARED_DOES_NOT_DEPEND_ON_DOMAINS`
@@ -87,7 +87,7 @@ Control Plane 의 패키지마다 맡는 책임과 패키지 사이의 방향 �
 ### proactive
 
 `proactive` 는 `followup` 바로 위다. 살펴보기 turn 은 `ChatService.runProactiveCheck` 가 돌리고, 살펴보기만의 일은 `chat` 이 가진 port `CheckTurn` 을 `proactive` 가 구현해 넘긴다.
-`chat` 은 `proactive` 를 import 하지 않는다. 기동 정리가 끝낸 살펴보기 turn 의 답을 대화에 남기지 않도록, `chat` 의 port `RecoveredAnswerGuard` 도 `proactive` 가 구현한다.
+`chat` 은 `proactive` 를 import 하지 않는다. 기동 정리가 끝낸 살펴보기 turn 의 답을 대화에 남기지 않도록, `chat` 의 port `RecoveredAnswerGuard` 도 `proactive` 가 구현한다. 사용자가 점검 대화를 읽으면 그 대화의 보고를 연 것으로 적도록 `chat` 의 port `CheckReportReads` 도 `proactive` 가 구현한다.
 `orchestration`, `mcp`, `connector` 는 `proactive` 보다 위라 `ProactiveCheckGuard` 로 살펴보기 트리인지 묻는다.
 살펴보기가 끝나 도는 위임 자식을 멈추는 일은 `proactive` 가 낸 `ProactiveCheckEnded` 사건을 `orchestration` 이 받아 한다.
 

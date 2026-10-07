@@ -1530,7 +1530,7 @@ class ProfileApiRouteTest(unittest.TestCase):
         return self.request("/api/connectors", "PUT", token="valid", full_response=True, body=body)
 
     def declare_owner_attachments(self, connector, server="demo", name="DEMO_ATTACHMENT_DIR"):
-        """시험 커넥터 사본이 주인의 첨부 디렉터리를 받는 env 를 선언하게 한다(ADR-093)."""
+        """시험 커넥터 사본이 주인의 첨부 디렉터리를 받는 env 를 선언하게 한다(ADR-20261007 connector-owner-attachments)."""
         declared = json.loads((connector / "connector.json").read_text(encoding="utf-8"))
         declared["owner_attachments_env"] = name
         (connector / "connector.json").write_text(json.dumps(declared), encoding="utf-8")
@@ -2861,7 +2861,6 @@ class ProfileApiRouteTest(unittest.TestCase):
                 ),
             ] + [m + ":ro" for m in mounts],
             "docker_forward_env": [],
-            "docker_env": {},
             "env_passthrough": [],
             "credential_files": [],
             "container_cpu": cpu,
@@ -2878,6 +2877,32 @@ class ProfileApiRouteTest(unittest.TestCase):
         self.assertEqual(self.request("/api/config", "PUT", token="valid", body=body), 200)
         saved = yaml.safe_load((self.root / profile / "config.yaml").read_text(encoding="utf-8"))
         return saved["terminal"]["docker_shared_container_key"]
+
+    @staticmethod
+    def hermes_save_shape(value):
+        """Hermes 의 config 저장이 지우는 빈 dict 를 뺀다. 빈 dict 는 보존할 잎 경로가 아니고 기본값 `{}` 과 같다."""
+        if not isinstance(value, dict):
+            return value
+        return {k: ProfileApiRouteTest.hermes_save_shape(v) for k, v in value.items()
+                if not (isinstance(v, dict) and not v)}
+
+    def test_saved_terminal_fingerprint_matches_the_key_for_empty_and_filled_env(self):
+        """저장된 terminal 에서 키를 뺀 나머지로 감사 규칙대로 다시 계산한 지문이 키의 지문과 같다."""
+        self.make_profile("blog")
+        self.register_memory("blog")
+        self.set_sandbox_policy(self.sandbox_policy(profiles={
+            "owner": {},
+            "blog": {"env": {"CAREER_BACKEND_URL": "http://backend.test"}},
+        }))
+        for profile, has_env in (("owner", False), ("blog", True)):
+            with self.subTest(profile=profile):
+                self.save_sandbox_key(profile=profile)
+                saved = yaml.safe_load((self.root / profile / "config.yaml").read_text(encoding="utf-8"))
+                terminal = self.hermes_save_shape(saved["terminal"])
+                self.assertEqual("docker_env" in terminal, has_env)
+                key = terminal.pop("docker_shared_container_key")
+                fingerprint = hashlib.sha256(json.dumps(terminal, sort_keys=True).encode("utf-8")).hexdigest()[:12]
+                self.assertEqual(key, "%s-user-1-%s" % (profile, fingerprint))
 
     def test_sandbox_container_key_changes_with_owner_and_policy(self):
         """같은 입력이면 키가 같고, 주인이나 마운트나 이미지가 바뀌면 키가 바뀌며, 다른 profile 과 겹치지 않는다."""
@@ -3432,7 +3457,7 @@ class ProfileApiRouteTest(unittest.TestCase):
         self.register_memory("alice")
         self.save_sandbox_key(profile="alice")
         alice = yaml.safe_load((self.root / "alice/config.yaml").read_text(encoding="utf-8"))["terminal"]
-        self.assertEqual(alice["docker_env"], {})
+        self.assertNotIn("docker_env", alice)
         self.assertEqual(alice["docker_extra_args"], ["--network=sandbox-net", "--label=fos-sandbox-profile=alice"])
 
         original = (self.root / "owner/config.yaml").read_bytes()

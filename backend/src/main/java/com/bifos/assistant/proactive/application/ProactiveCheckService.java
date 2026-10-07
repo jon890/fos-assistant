@@ -14,12 +14,14 @@ import com.bifos.assistant.chat.application.model.OpenedCheck;
 import com.bifos.assistant.chat.domain.Conversation;
 import com.bifos.assistant.chat.infra.ChatMessageRepository;
 import com.bifos.assistant.context.ContextAssembler;
+import com.bifos.assistant.followup.application.FollowUpService;
 import com.bifos.assistant.proactive.application.model.CheckReadiness;
 import com.bifos.assistant.proactive.application.model.CheckStatusView;
 import com.bifos.assistant.proactive.domain.ProactiveCheck;
 import com.bifos.assistant.proactive.domain.type.CheckSkippedReason;
 import com.bifos.assistant.proactive.domain.type.CheckTrigger;
 import com.bifos.assistant.proactive.infra.ProactiveCheckFindingRepository;
+import com.bifos.assistant.proactive.infra.ProactiveCheckProblemRepository;
 import com.bifos.assistant.proactive.infra.ProactiveCheckRepository;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.error.ApiException;
@@ -55,6 +57,8 @@ public class ProactiveCheckService {
     private final CheckConversations checkConversations;
     private final ProactiveCheckRepository checks;
     private final ProactiveCheckFindingRepository findings;
+    private final ProactiveCheckProblemRepository problems;
+    private final FollowUpService followUps;
     private final ProactiveCheckProperties properties;
     private final TurnCancellation turns;
     private final ChatService chat;
@@ -243,7 +247,8 @@ public class ProactiveCheckService {
         int delegations = rootId == null ? 0 : countDelegations(rootId, conversationId);
         if (returned) {
             // 돌아왔으면 답 메시지는 저장됐다. 답을 저장하지 못한 turn 은 예외로 끝나 발견을 남기지 않는다.
-            recordQuietly(run::saveFindings, conversationId);
+            // 발견과 문제 후보를 한 트랜잭션에 남긴다. 한쪽만 남으면 다음 살펴보기의 중복 판정이 어긋난다.
+            recordQuietly(() -> transactions.executeWithoutResult(status -> run.saveFindings()), conversationId);
             recordQuietly(() -> run.record(delegations), conversationId);
         } else if (run.limitStopped() || turns.isStopConfirmed(handle)) {
             log.info("멈춘 살펴보기가 예외로 끝났다 conversationId={}", conversationId, failure);
@@ -303,6 +308,8 @@ public class ProactiveCheckService {
                 properties,
                 checks,
                 findings,
+                problems,
+                followUps,
                 messages,
                 executions,
                 contextAssembler,

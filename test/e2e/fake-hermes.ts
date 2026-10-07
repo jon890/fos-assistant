@@ -980,7 +980,7 @@ export function startFakeHermes(
       send(response, 409, { error: "this profile has bound connectors" });
       return;
     }
-    // Control Plane 은 바인딩 설치에 그 에이전트의 `sandbox_owner` 를 늘 싣는다(ADR-093). 빠지거나 모양이 틀리면 거절한다.
+    // Control Plane 은 바인딩 설치에 그 에이전트의 `sandbox_owner` 를 늘 싣는다(ADR-20261007 connector-owner-attachments). 빠지거나 모양이 틀리면 거절한다.
     if (typeof sandboxOwner !== "string" || !SANDBOX_OWNER_PATTERN.test(sandboxOwner)) {
       send(response, 400, { error: "sandbox_owner is required for a binding install" });
       return;

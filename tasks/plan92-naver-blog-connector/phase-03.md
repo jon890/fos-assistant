@@ -17,7 +17,7 @@
 - 오류 코드의 공통 어휘 대응은 `connector.json` 의 `errors` 가 갖는다. `outcome_unknown` 은 쓰기를 보냈는데 됐는지 모른다는 뜻이다(`docs/connectors.md`)
 - phase 01 의 `src/draft.ts`(`draftShape`, `validateDraft`, `checkPhotoFiles`, `parseBody`), `src/session.ts`(`sessionStatus`), phase 02 의 `src/editor/run.ts`(`runDraft`, `EditorError`) 를 쓴다
 
-**근거 문서**: `docs/connectors/naver-blog.md` 의 「도구와 정책」, 「작업」, 「오류」. `docs/adr/ADR-092-네이버-블로그-커넥터는-사용자의-chrome-에-cdp-로-붙고-임시저장은-승인한-뒤-백그라운드-작업으로-돈다.md`.
+**근거 문서**: `docs/connectors/naver-blog.md` 의 「도구와 정책」, 「작업」, 「오류」. `docs/adr/ADR-20261007-naver-blog-connector.md`.
 
 ## 의도 메모
 

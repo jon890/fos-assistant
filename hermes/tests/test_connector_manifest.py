@@ -190,6 +190,24 @@ class ConnectorCatalogTest(ConnectorGateCase):
             ("verify.tool is not a string", "connector.json", lambda value: value.update(verify={"tool": 1})),
             ("errors value outside the vocabulary", "connector.json",
              lambda value: value["errors"].update(DEMO_FORBIDDEN="denied")),
+            ("errors code in lower case", "connector.json",
+             lambda value: value["errors"].update(demo_lower="forbidden")),
+            ("errors object without category", "connector.json",
+             lambda value: value["errors"].update(DEMO_FORBIDDEN={"recovery": "reconnect"})),
+            ("errors object with an unknown key", "connector.json",
+             lambda value: value["errors"].update(DEMO_FORBIDDEN={"category": "forbidden", "message": "x"})),
+            ("errors recovery outside the vocabulary", "connector.json",
+             lambda value: value["errors"].update(DEMO_FORBIDDEN={"category": "forbidden", "recovery": "call_us"})),
+            ("errors details over the limit", "connector.json",
+             lambda value: value["errors"].update(DEMO_FORBIDDEN={"category": "forbidden",
+                                                                  "details": ["a", "b", "c", "d", "e"]})),
+            ("errors details repeat a name", "connector.json",
+             lambda value: value["errors"].update(DEMO_FORBIDDEN={"category": "forbidden", "details": ["a", "a"]})),
+            ("errors details name format", "connector.json",
+             lambda value: value["errors"].update(DEMO_FORBIDDEN={"category": "forbidden", "details": ["Count"]})),
+            ("errors contract on outcome_unknown", "connector.json",
+             lambda value: value["errors"].update(DEMO_UNKNOWN={"category": "outcome_unknown",
+                                                                "recovery": "recheck"})),
             ("toolsets opens the shell", "connector.json", lambda value: value.update(toolsets=["terminal"])),
             ("toolsets mixes an allowed and a closed name", "connector.json",
              lambda value: value.update(toolsets=["vision", "file"])),
@@ -415,7 +433,7 @@ class ConnectorCatalogTest(ConnectorGateCase):
 
 
 class ConnectorOwnerAttachmentsTest(ConnectorGateCase):
-    """사용자 첨부를 읽는 커넥터가 `owner_attachments_env` 를 선언하는 규칙을 검사한다(ADR-093)."""
+    """사용자 첨부를 읽는 커넥터가 `owner_attachments_env` 를 선언하는 규칙을 검사한다(ADR-20261007 connector-owner-attachments)."""
 
     NAME = "DEMO_ATTACHMENT_DIR"
 

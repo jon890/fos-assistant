@@ -214,7 +214,10 @@ public class ConnectorAction {
         this.executedAt = now;
     }
 
-    /** @param errorCode 공통 오류 어휘의 글자 */
+    /**
+     * @param errorCode 공통 오류 어휘의 글자
+     * @param resultText 커넥터가 선언한 오류 코드와 복구 계약의 저장 글({@code ConnectorErrorDetail#toStored}). 없으면 null
+     */
     public void fail(String errorCode, String resultText, Instant now) {
         require(ActionStatus.EXECUTING);
         this.status = ActionStatus.FAILED;

@@ -168,7 +168,7 @@ export const ATTACHMENT_DIR_ENV = "NAVER_BLOG_ATTACHMENT_DIR";
 
 /**
  * 사진 경로의 문제는 원인과 상관없이 같은 문장이다. 없음, 링크, 첨부 디렉터리 밖, 크기, 서명을 나누면
- * 승인 없는 `render_draft` 로 다른 경로가 있는지 떠볼 수 있다(ADR-093). 문장에 경로를 싣지 않는다.
+ * 승인 없는 `render_draft` 로 다른 경로가 있는지 떠볼 수 있다(ADR-20261007 connector-owner-attachments). 문장에 경로를 싣지 않는다.
  */
 export const PHOTO_DIRECTORY_PROBLEM = "사진 디렉터리를 쓸 수 없습니다.";
 export const photoProblem = (number: number) =>

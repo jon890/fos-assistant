@@ -201,7 +201,7 @@ web 의 서버 라우트는 브라우저의 `If-None-Match` 와 `If-Modified-Sin
 - 같은 출처의 주소라 결과물의 `img-src 'self'` 가 허용하고, iframe 의 `allow-same-origin` 으로 로그인 쿠키가 함께 간다. 첨부는 그 대화의 주인만 받으므로 결과물을 여는 사람과 같은 권한이다
 - 첨부는 `Cache-Control: private` 이다. 대화 화면에서 이미 받은 사진은 브라우저가 다시 받지 않는다
 - 첨부를 지웠거나 30일이 지났으면 410 이라 그 자리는 깨진 그림이다. HTML 은 `alt` 에 몇 번째 사진인지 적는다
-- 이 모양에 기대는 쪽은 네이버 블로그 커넥터의 미리보기다([ADR-092](../adr/ADR-092-네이버-블로그-커넥터는-사용자의-chrome-에-cdp-로-붙고-임시저장은-승인한-뒤-백그라운드-작업으로-돈다.md)). 두 주소나 첨부 파일 이름을 바꾸면 그 미리보기도 함께 고친다. `test/unit/artifact-attachment-route.test.ts` 가 두 web 라우트가 형제로 있는지 본다
+- 이 모양에 기대는 쪽은 네이버 블로그 커넥터의 미리보기다([ADR-20261007 / naver-blog-connector](../adr/ADR-20261007-naver-blog-connector.md)). 두 주소나 첨부 파일 이름을 바꾸면 그 미리보기도 함께 고친다. `test/unit/artifact-attachment-route.test.ts` 가 두 web 라우트가 형제로 있는지 본다
 
 ## 메시지 한 줄의 `artifacts`
 

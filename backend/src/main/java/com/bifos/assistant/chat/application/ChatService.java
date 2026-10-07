@@ -17,6 +17,7 @@ import com.bifos.assistant.chat.domain.ChatMessage;
 import com.bifos.assistant.chat.domain.ChatPendingMessage;
 import com.bifos.assistant.chat.domain.Conversation;
 import com.bifos.assistant.chat.domain.RunSession;
+import com.bifos.assistant.chat.domain.type.ConversationPurpose;
 import com.bifos.assistant.chat.domain.type.DeliveryAttemptStatus;
 import com.bifos.assistant.chat.domain.type.MessageRole;
 import com.bifos.assistant.chat.domain.type.ModelSelectionMode;
@@ -146,6 +147,7 @@ public class ChatService {
     private final UserExecutionLimiter limiter;
     private final ResultDeliveryRecorder resultDeliveries;
     private final ContextProperties contextProperties;
+    private final List<CheckReportReads> checkReportReads;
 
     public ChatTurn send(CurrentUser user, Long conversationId, String text, String agentCode) {
         return send(user, conversationId, text, agentCode, List.of());
@@ -1590,6 +1592,9 @@ public class ChatService {
         if (!pendingIds.isEmpty()) {
             onEvent.accept(ChatEvent.user(conversation.publicId(), question.id(), text));
             onEvent.accept(ChatEvent.pending(conversation.publicId()));
+        } else {
+            // 대기 행에서 꺼낸 질문은 앞 turn 이 끝난 뒤에 저장된다. 그 사이 만든 보고를 사용자가 본 것으로 적지 않는다.
+            markCheckReportsRead(user, conversation);
         }
     }
 
@@ -1807,9 +1812,25 @@ public class ChatService {
                 .toList());
     }
 
+    /** 주인을 확인하고 메시지를 읽는다. 점검 대화면 그 대화의 열지 않은 보고를 연 것으로 적는다. */
     public List<ChatMessage> history(CurrentUser user, Long conversationId) {
         Conversation conversation = access.requireOwn(user, conversationId);
+        markCheckReportsRead(user, conversation);
         return messages.findByConversationIdOrderByIdAsc(conversation.id());
+    }
+
+    /** 사용자가 점검 대화를 읽었거나 그 대화에 질문을 남겼다. 보고 열람 기록은 대화를 막지 않으므로 실패해도 넘어간다. */
+    private void markCheckReportsRead(CurrentUser user, Conversation conversation) {
+        if (conversation.purpose() != ConversationPurpose.CHECK) {
+            return;
+        }
+        for (CheckReportReads reads : checkReportReads) {
+            try {
+                reads.markRead(user.id(), conversation.id(), clock.instant());
+            } catch (RuntimeException ex) {
+                log.warn("점검 대화의 보고를 연 것으로 적지 못했다 conversationId={}", conversation.id(), ex);
+            }
+        }
     }
 
     /**

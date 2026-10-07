@@ -11,7 +11,7 @@
 
 ## 컨텍스트
 
-- 결정과 계약: `docs/adr/ADR-093-사용자-첨부를-읽는-커넥터는-바인딩-주인의-첨부-디렉터리를-설치가-정한-env-로만-받는다.md`, `docs/connectors.md` 의 「connector.json」 표와 「승인」 끝의 실행 경로 목록, `docs/backend/connector-install.md` 의 「바인딩 설치」, `hermes/README.md` 의 「커넥터」 에서 `call` 과 `execute` 의 자식 env, `docs/connector-authoring.md` 의 「사용자 첨부를 읽는 커넥터」. 이 문서들은 이미 이 계약으로 고쳐져 있다
+- 결정과 계약: `docs/adr/ADR-20261007-connector-owner-attachments.md`, `docs/connectors.md` 의 「connector.json」 표와 「승인」 끝의 실행 경로 목록, `docs/backend/connector-install.md` 의 「바인딩 설치」, `hermes/README.md` 의 「커넥터」 에서 `call` 과 `execute` 의 자식 env, `docs/connector-authoring.md` 의 「사용자 첨부를 읽는 커넥터」. 이 문서들은 이미 이 계약으로 고쳐져 있다
 - 대시보드 plugin: `hermes/plugins/dashboard-profile-api/__init__.py`
   - manifest 검증 `_load_connector` (약 930행). `operator_env` 검사(958행부터 965행까지)와 `.mcp.json` env 합 검사(1006행)가 본보기다. 결과 사전에 `operator_env` 를 담는 곳(1063행)
   - 실행 공간 경로 함수 `_sandbox_policy`, `_sandbox_attachment_agent_directory(policy, owner)`, `_sandbox_attachment_path_identity(root, owner)`(중간 링크 거절), `_sandbox_unavailable`, `SANDBOX_OWNER_RE`
@@ -130,5 +130,5 @@ git add -N hermes backend test && bash scripts/check-public-safe.sh
 | `docs/connectors.md` | 수정 |
 | `docs/backend/connector-install.md` | 수정 |
 | `hermes/README.md` | 수정 |
-| `docs/adr/ADR-093-사용자-첨부를-읽는-커넥터는-바인딩-주인의-첨부-디렉터리를-설치가-정한-env-로만-받는다.md` | 수정 |
-| `docs/adr/ADR-092-네이버-블로그-커넥터는-사용자의-chrome-에-cdp-로-붙고-임시저장은-승인한-뒤-백그라운드-작업으로-돈다.md` | 수정 |
+| `docs/adr/ADR-20261007-connector-owner-attachments.md` | 수정 |
+| `docs/adr/ADR-20261007-naver-blog-connector.md` | 수정 |

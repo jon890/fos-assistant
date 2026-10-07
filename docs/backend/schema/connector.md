@@ -91,7 +91,7 @@
 | `expires_at` | `DATETIME(6)` | 승인 줄만. 만든 시각에서 24시간 뒤 |
 | `decided_at` | `DATETIME(6)` | 승인, 거절, 만료한 시각 |
 | `executed_at` | `DATETIME(6)` | 실행 결과를 적은 시각 |
-| `result_text` | `MEDIUMTEXT` | 실행 결과. 위임 답과 같은 상한으로 자른다 |
+| `result_text` | `MEDIUMTEXT` | 실행 결과. 위임 답과 같은 상한으로 자른다. `FAILED` 줄은 커넥터가 선언한 오류 계약이 있을 때만 `{"kind": "connector_error", "code", "details", "recovery"}` 를 담고 없으면 null 이다([ADR-092](../../adr/ADR-092-승인한-실행의-실패는-커넥터가-선언한-오류-코드와-복구-어휘와-정수-세부만-에이전트까지-전한다.md)) |
 | `error_code` | `VARCHAR(64)` | 공통 오류 어휘 넷과 `TIMEOUT`. 사용자가 거절한 것이 아니라 시스템이 실행하지 않고 끝낸 `REJECTED` 줄은 `not_executable`(승인할 때 연결이나 그 에이전트의 바인딩이 준비되지 않았거나, 그 에이전트에서 연결을 떼었거나, 정책이 바뀜)이나 `connection_changed`(연결을 해제했거나 값을 다시 등록함)다 |
 | `result_delivered_at` | `DATETIME(6)` | 결과나 거절, 만료를 대화에 전한 시각. `agent_execution` 의 같은 이름 칸과 뜻이 같다 |
 | `created_at` | `DATETIME(6) NOT NULL` | |

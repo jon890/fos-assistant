@@ -16,6 +16,7 @@ spring:
   flyway:
     enabled: true
     baseline-on-migrate: true
+    out-of-order: true
   servlet:
     multipart:
       # 기본 상한 1MB 로는 휴대폰 사진 대부분이 서비스 판정 전에 걸린다.

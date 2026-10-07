@@ -19,7 +19,7 @@ frontend 는 화면의 동작과 구조이고, hermes 는 외부 런타임인 He
 | [`self-hosting.md`](self-hosting.md) | 기술 스택, 개별 실행, 주요 환경 변수 |
 | [`privacy.md`](privacy.md) | 개인정보 처리 안내. 커넥터 데이터가 어디로 가고 어디에 남는가 |
 | [`model-tiers.md`](model-tiers.md) | 모델 단계의 선택 규칙, 에이전트 기본 모델, 모델 숨김, 비동기 자식 사용량 |
-| [`adr/INDEX.md`](adr/INDEX.md) | 되돌리기 어려운 결정의 목록 |
+| [`adr/INDEX.md`](adr/INDEX.md) | 되돌리기 어려운 결정의 목록과 ADR 작성·참조·정렬 규칙 |
 
 ## backend
 

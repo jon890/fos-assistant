@@ -50,7 +50,7 @@ class CheckAnswerRendererTest {
             List<String> followUps,
             List<String> sourceFailures) {
         return new CheckResultBlock(
-                1, CheckOutcome.FINDINGS, summary, findings, questions, followUps, sourceFailures, null);
+                1, CheckOutcome.FINDINGS, summary, findings, questions, followUps, sourceFailures, null, List.of());
     }
 
     private String render(CheckResultBlock block) {

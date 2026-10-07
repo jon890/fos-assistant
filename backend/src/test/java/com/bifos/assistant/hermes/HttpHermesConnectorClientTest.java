@@ -13,9 +13,11 @@ import static org.springframework.test.web.client.response.MockRestResponseCreat
 import com.bifos.assistant.hermes.HermesConnectorClient.InstallResult;
 import com.bifos.assistant.hermes.dto.CallResult;
 import com.bifos.assistant.hermes.dto.ConnectorCallError;
+import com.bifos.assistant.hermes.dto.ConnectorErrorDetail;
 import com.bifos.assistant.hermes.dto.ConnectorField;
 import com.bifos.assistant.hermes.dto.ConnectorFieldOptions;
 import com.bifos.assistant.hermes.dto.ConnectorManifest;
+import com.bifos.assistant.hermes.dto.ConnectorRecovery;
 import com.bifos.assistant.hermes.dto.ConnectorTool;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -446,6 +448,37 @@ class HttpHermesConnectorClientTest {
 
         assertThat(result.ok()).isFalse();
         assertThat(result.error()).isEqualTo(ConnectorCallError.FORBIDDEN);
+        server.verify();
+    }
+
+    @DisplayName("실행의 실패 응답에 실린 오류 코드와 정수 세부와 복구 어휘를 읽고, 글 세부와 모르는 복구 어휘는 버린다")
+    @Test
+    void executeReadsDeclaredErrorDetail() {
+        server.expect(requestTo(BASE + "/api/connectors/demo-notes/execute"))
+                .andRespond(withSuccess(
+                        "{\"ok\":false,\"error\":\"invalid_input\",\"code\":\"GMAIL_TARGET_COUNT_CHANGED\","
+                                + "\"recovery\":\"recheck\",\"details\":{\"actual_count\":17,\"message\":\"raw\"}}",
+                        MediaType.APPLICATION_JSON));
+        server.expect(requestTo(BASE + "/api/connectors/demo-notes/execute"))
+                .andRespond(withSuccess(
+                        "{\"ok\":false,\"error\":\"forbidden\",\"code\":\"GMAIL_FORBIDDEN\",\"recovery\":\"call_us\"}",
+                        MediaType.APPLICATION_JSON));
+        server.expect(requestTo(BASE + "/api/connectors/demo-notes/execute"))
+                .andRespond(withSuccess(
+                        "{\"ok\":false,\"error\":\"forbidden\",\"code\":\"Request had insufficient scopes\"}",
+                        MediaType.APPLICATION_JSON));
+
+        CallResult changed = client.execute(PROFILE, DEMO, "mcp__demo__write_note", "{}");
+        CallResult forbidden = client.execute(PROFILE, DEMO, "mcp__demo__write_note", "{}");
+        CallResult raw = client.execute(PROFILE, DEMO, "mcp__demo__write_note", "{}");
+
+        assertThat(changed.error()).isEqualTo(ConnectorCallError.INVALID_INPUT);
+        assertThat(changed.detail())
+                .isEqualTo(new ConnectorErrorDetail(
+                        "GMAIL_TARGET_COUNT_CHANGED", Map.of("actual_count", 17L), ConnectorRecovery.RECHECK));
+        assertThat(forbidden.detail()).isEqualTo(new ConnectorErrorDetail("GMAIL_FORBIDDEN", Map.of(), null));
+        assertThat(raw.error()).isEqualTo(ConnectorCallError.FORBIDDEN);
+        assertThat(raw.detail()).as("코드 형식이 아닌 글은 코드로 읽지 않는다").isNull();
         server.verify();
     }
 

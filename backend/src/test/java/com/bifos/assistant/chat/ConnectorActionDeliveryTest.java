@@ -260,6 +260,77 @@ class ConnectorActionDeliveryTest {
     }
 
     @Test
+    @DisplayName("실패 결과 글이 오류 계약이면 머리줄에 오류 코드와 세부를 싣고 다음 줄에 복구 안내를 붙인다")
+    void failedActionCarriesDeclaredErrorDetailAndRecovery() {
+        UUID actionId = action(
+                "FAILED",
+                "{\"kind\":\"connector_error\",\"code\":\"GMAIL_TARGET_COUNT_CHANGED\","
+                        + "\"details\":{\"actual_count\":17},\"recovery\":\"recheck\"}",
+                "invalid_input",
+                conversation.id());
+
+        changed(actionId);
+        awaitIdle(conversation.id());
+
+        assertThat(deliveredInput())
+                .endsWith("[출처: 승인한 동작, 동작: 이름 없는 동작, 상태: FAILED, 오류: invalid_input,"
+                        + " 오류 코드: GMAIL_TARGET_COUNT_CHANGED, 세부: actual_count=17, 끝난 시각: " + executedText() + "]\n"
+                        + "복구: 승인한 뒤 대상이 바뀌어 실행하지 않았다. 세부에 지금 값이 있으면 승인 당시 값과 함께 알리고,"
+                        + " 다시 조회해 확인할지 묻는다. 사용자가 원하면 같은 조건으로 다시 조회해 새로 승인을 요청한다.")
+                .doesNotContain("<external-data>");
+    }
+
+    @Test
+    @DisplayName("복구 어휘 없이 코드만 있는 오류 계약은 머리줄에 오류 코드만 싣고 복구 줄을 붙이지 않는다")
+    void failedActionWithCodeOnlyHasNoRecoveryLine() {
+        UUID actionId = action(
+                "FAILED",
+                "{\"kind\":\"connector_error\",\"code\":\"GMAIL_FORBIDDEN\"}",
+                "forbidden",
+                conversation.id());
+
+        changed(actionId);
+        awaitIdle(conversation.id());
+
+        assertThat(deliveredInput())
+                .endsWith("[출처: 승인한 동작, 동작: 이름 없는 동작, 상태: FAILED, 오류: forbidden, 오류 코드: GMAIL_FORBIDDEN, 끝난 시각: "
+                        + executedText() + "]");
+    }
+
+    @Test
+    @DisplayName("성공한 줄의 결과 글은 오류 계약 모양이어도 해석하지 않고 외부 데이터로 감싼다")
+    void succeededActionNeverReadsTheErrorContract() {
+        String text = "{\"kind\":\"connector_error\",\"code\":\"GMAIL_FORBIDDEN\",\"recovery\":\"reconnect\"}";
+        UUID actionId = action("SUCCEEDED", text, null, conversation.id());
+
+        changed(actionId);
+        awaitIdle(conversation.id());
+
+        assertThat(deliveredInput())
+                .contains("상태: SUCCEEDED, 끝난 시각: ")
+                .contains("<external-data>\n" + text + "\n</external-data>")
+                .doesNotContain("오류 코드:")
+                .doesNotContain("복구:");
+    }
+
+    @Test
+    @DisplayName("실패 결과 글이 오류 계약 형식이 아니면 입력에 싣지 않는다")
+    void failedActionIgnoresTextThatIsNotAnErrorContract() {
+        UUID actionId = action(
+                "FAILED",
+                "{\"code\":\"GMAIL_FORBIDDEN\",\"message\":\"provider raw body\"}",
+                "forbidden",
+                conversation.id());
+
+        changed(actionId);
+        awaitIdle(conversation.id());
+
+        assertThat(deliveredInput())
+                .endsWith("[출처: 승인한 동작, 동작: 이름 없는 동작, 상태: FAILED, 오류: forbidden, 끝난 시각: " + executedText() + "]")
+                .doesNotContain("provider raw body");
+    }
+
+    @Test
     @DisplayName("7시간 전에 실행한 승인 결과는 머리줄에 오래됨을 넣고 다음 줄에 지금 상태와 다를 수 있다는 안내를 붙인다")
     void staleApprovalResultCarriesStaleNote() {
         executedAt = Instant.now().minus(Duration.ofHours(7));
