@@ -48,7 +48,7 @@
 | | `APPROVED` | `approve`. 누른 때 이미 만료됐거나 그 뒤 실행하지 못하고 끝나도 사용자의 반응이라 남긴다 |
 | | `REJECTED` | `reject` |
 | | `EXECUTION_SUCCEEDED`, `EXECUTION_FAILED` | 실행 결과가 `SUCCEEDED`, `FAILED` 일 때. 실패는 커넥터가 선언한 오류 코드를 `reason_code` 에 둔다 |
-| 지금 화면의 제안 항목 | `DISMISSED`, `POSTPONED` | `NEEDS_ME` 카드의 `FOLLOW_UP_PROPOSED`, `MEMORY_PROPOSED`, `APPROVAL_PENDING` 항목을 숨기거나 미뤘을 때. 열쇠는 그 `itemKey` 다 |
+| 지금 화면의 제안 항목 | `DISMISSED`, `POSTPONED` | `NEEDS_ME` 카드의 `FOLLOW_UP_PROPOSED`, `MEMORY_PROPOSED`, `APPROVAL_PENDING` 항목을 숨기거나 미뤘을 때. 열쇠는 그 `itemKey` 다. 제안의 대화(할 일, 승인 줄)나 제안한 실행(Memory)을 채우고, 원천을 찾지 못하면 남기지 않는다 |
 | 살펴보기(`proactive_check:<번호>`) | `SURFACED` | 사용자가 열었거나 매일 깨우기로 돈 살펴보기가 검사한 보고를 남기고 끝났을 때 |
 | | `EXECUTION_SUCCEEDED`, `EXECUTION_FAILED` | `AUTONOMY` 살펴보기가 끝났을 때. 결과 블록을 읽지 못했으면 `INVALID_RESULT`, 멈추거나 실패했으면 그 오류 코드다. 기동 정리가 닫은 줄은 `INTERRUPTED` 다 |
 | 행동 정책 판정(`autonomy_decision:<번호>`) | `EXECUTION_FAILED` | 자동 실행을 시작하지 못했을 때. 오류 코드를 `reason_code` 에 둔다 |
@@ -64,6 +64,7 @@
 되돌려진 동작의 사건은 남지 않는다. 기록이 실패해도 부르는 쪽으로 던지지 않고 사용자 번호와 종류, 예외 이름만 로그에 낸다.
 실행 번호를 받으면 그 실행의 트리 루트와 대화를 채운다. 실행 줄이 없으면 그 칸을 비운다.
 묶인 대화를 이미 지웠으면 넣지 않는다. 대화를 지운 뒤 그 대화의 제안에 반응하거나 실행이 끝나도 사건이 남지 않는다.
+대화가 남았는지는 기록 트랜잭션 안에서 대화 줄을 공유 잠금으로 읽어 본다. 대화 삭제는 그 줄을 고친 뒤 같은 트랜잭션에서 사건을 지우므로, 삭제가 먼저 커밋되면 지운 대화로 보고 버리고, 기록이 먼저 잠그면 삭제가 기다렸다가 그 사건까지 지운다.
 
 제목, 본문, 인자, 결과 글, 모델이 쓴 글은 받지 않는다.
 판(`subject_version`)은 할 일이면 `title_key`, Memory 면 판 번호, 승인 줄이면 인자 해시다. 고친 칸은 `TITLE`, `DUE_AT`, `WAITING` 같은 이름만 남긴다.

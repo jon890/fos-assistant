@@ -28,6 +28,8 @@ import com.bifos.assistant.chat.infra.ConversationRepository;
 import com.bifos.assistant.hermes.HermesConnectorClient;
 import com.bifos.assistant.hermes.dto.ConnectorManifest;
 import com.bifos.assistant.hermes.dto.ConnectorTool;
+import com.bifos.assistant.memory.application.MemoryService;
+import com.bifos.assistant.memory.domain.Memory;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.shared.error.ApiException;
@@ -143,6 +145,9 @@ class AttentionControlServiceTest {
     @Autowired
     AttentionControlRepository controlEntries;
 
+    @Autowired
+    MemoryService memories;
+
     private final List<Long> createdUsers = new ArrayList<>();
     private CurrentUser dad;
     private Agent chief;
@@ -164,6 +169,7 @@ class AttentionControlServiceTest {
         for (Long userId : createdUsers) {
             jdbc.update("DELETE FROM attention_event WHERE user_id = ?", userId);
             jdbc.update("DELETE FROM decision_feedback_event WHERE user_id = ?", userId);
+            jdbc.update("DELETE FROM memory WHERE owner_user_id = ?", userId);
             jdbc.update("DELETE FROM attention_control WHERE user_id = ?", userId);
             jdbc.update("DELETE FROM connector_action WHERE user_id = ?", userId);
             jdbc.update("DELETE FROM agent_execution WHERE user_id = ?", userId);
@@ -316,6 +322,34 @@ class AttentionControlServiceTest {
                 .containsExactly(
                         tuple("connector_action:" + actionId, "POSTPONED", "USER", "ATTENTION_SNOOZE"),
                         tuple("connector_action:" + actionId, "DISMISSED", "USER", "ATTENTION_HIDE"));
+    }
+
+    @Test
+    @DisplayName("Memory 제안을 숨기면 제안한 실행의 대화를 채워 남기고, 그 대화를 지운 뒤 숨기면 남기지 않는다")
+    void fillsOriginAndSkipsDeletedConversationForMemoryProposal() {
+        Conversation kept = conversationOf(dad, "취미 이야기");
+        AgentExecution keptRun = executions.save(root(dad, kept, ExecutionStatus.SUCCEEDED, NOW.minusSeconds(60), NOW));
+        Memory keptProposal = memories.proposeUser(dad, "합성 취미", "합성 취미를 즐긴다", keptRun.id());
+        Conversation deleted = conversationOf(dad, "지울 이야기");
+        AgentExecution deletedRun =
+                executions.save(root(dad, deleted, ExecutionStatus.SUCCEEDED, NOW.minusSeconds(60), NOW));
+        Memory deletedProposal = memories.proposeUser(dad, "합성 일정", "합성 일정이 있다", deletedRun.id());
+        jdbc.update("UPDATE conversation SET deleted_at = ? WHERE id = ?", Timestamp.from(NOW), deleted.id());
+
+        for (AttentionItem item : card(attention.view(dad), CardKey.NEEDS_ME).items()) {
+            controls.hide(dad, CardKey.NEEDS_ME, item.itemKey(), item.stateKey());
+        }
+
+        assertThat(jdbc.queryForList(
+                        "SELECT subject_key, conversation_id FROM decision_feedback_event"
+                                + " WHERE user_id = ? AND event_type = 'DISMISSED'",
+                        dad.id()))
+                .singleElement()
+                .satisfies(row -> {
+                    assertThat(row.get("SUBJECT_KEY")).isEqualTo("memory:" + keptProposal.id());
+                    assertThat(row.get("CONVERSATION_ID")).isEqualTo(kept.id());
+                });
+        assertThat(deletedProposal.id()).isNotNull();
     }
 
     @Test
