@@ -1,4 +1,4 @@
-import { constants } from "node:fs";
+import { constants, type Stats } from "node:fs";
 import { lstat, open, realpath } from "node:fs/promises";
 import { isAbsolute, join } from "node:path";
 import { z } from "zod";
@@ -214,10 +214,35 @@ async function checkDirectory(
 }
 
 /**
+ * 사진 파일을 연 뒤 디렉터리 확인을 다시 하고, 그 자리의 파일이 연 파일(`opened`)과 같은지 `lstat` 으로 대조한다.
+ * `O_NOFOLLOW` 는 마지막 조각만 막으므로, 확인과 열기 사이에 위 디렉터리가 링크로 바뀌면 연 파일이 밖의 것일 수 있다.
+ * 열린 뒤에도 같은 경로가 첨부 디렉터리 아래의 같은 파일을 가리키면 연 파일이 그 파일이다.
+ * 실행 공간이 첨부를 읽기 전용으로 붙인다는 전제에 기대지 않는다.
+ */
+export async function stillInPlace(
+  photoDir: string,
+  attachmentDir: string | undefined,
+  path: string,
+  opened: Stats,
+): Promise<boolean> {
+  if ((await checkDirectory(photoDir, attachmentDir)) === null) return false;
+  try {
+    const again = await lstat(path);
+    return (
+      !again.isSymbolicLink() && again.isFile() && again.dev === opened.dev && again.ino === opened.ino
+    );
+  } catch {
+    return false;
+  }
+}
+
+/**
  * 사진 파일 하나를 열어 보통 파일, 크기, 이미지 서명을 확인한다.
  * `whole` 이 참이면 바이트 전체를, 아니면 머리 12바이트를 돌려준다. 어긋나면 `null` 이다.
  */
 async function inspectPhoto(
+  photoDir: string,
+  attachmentDir: string | undefined,
   directory: string,
   file: string,
   whole: boolean,
@@ -242,6 +267,7 @@ async function inspectPhoto(
     const stat = await handle.stat();
     // 확인한 파일과 연 파일이 다르면 그 사이에 바뀐 것이다.
     if (!stat.isFile() || stat.dev !== linked.dev || stat.ino !== linked.ino) return null;
+    if (!(await stillInPlace(photoDir, attachmentDir, path, stat))) return null;
     if (stat.size > PHOTO_MAX_BYTES) return null;
     const size = whole ? stat.size : Math.min(12, stat.size);
     const bytes = new Uint8Array(size);
@@ -274,7 +300,10 @@ export async function checkPhotoFiles(
   const problems: string[] = [];
   for (const image of images) {
     if (!usable.has(image.file))
-      usable.set(image.file, (await inspectPhoto(directory, image.file, false)) !== null);
+      usable.set(
+        image.file,
+        (await inspectPhoto(input.photo_dir, attachmentDir, directory, image.file, false)) !== null,
+      );
     if (!usable.get(image.file)) problems.push(photoProblem(image.number));
   }
   return problems;
@@ -286,10 +315,12 @@ export async function readPhoto(
   file: string,
   attachmentDir: string | undefined,
 ): Promise<{ bytes: Uint8Array; mime: string }> {
-  const directory = input.photo_dir
-    ? await checkDirectory(input.photo_dir, attachmentDir)
-    : null;
-  const bytes = directory ? await inspectPhoto(directory, file, true) : null;
+  const photoDir = input.photo_dir;
+  const directory = photoDir ? await checkDirectory(photoDir, attachmentDir) : null;
+  const bytes =
+    photoDir && directory
+      ? await inspectPhoto(photoDir, attachmentDir, directory, file, true)
+      : null;
   if (!bytes) throw new ToolError("NAVER_BLOG_PHOTO_INVALID");
   return { bytes, mime: MIME[extensionOf(file)]! };
 }

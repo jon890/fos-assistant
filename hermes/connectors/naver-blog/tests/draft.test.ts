@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, expect, test } from "bun:test";
-import { mkdir, mkdtemp, realpath, rm, symlink, truncate, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, open, realpath, rename, rm, symlink, truncate, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
@@ -9,6 +9,7 @@ import {
   PHOTO_MAX_BYTES,
   photoProblem,
   readPhoto,
+  stillInPlace,
   validateDraft,
   type DraftInput,
 } from "../src/draft.ts";
@@ -308,4 +309,27 @@ test("readPhoto 는 서명이 틀린 사진을 NAVER_BLOG_PHOTO_INVALID 로 거�
   await expect(readPhoto(draft("[사진 1: fake.jpg]"), "fake.jpg", attachmentDir)).rejects.toMatchObject({
     code: "NAVER_BLOG_PHOTO_INVALID",
   });
+});
+
+test("연 뒤의 재확인은 그 자리가 연 파일 그대로일 때만 통과하고, 파일이나 위 디렉터리가 바뀌면 거절한다", async () => {
+  const path = join(photoDir, "101.jpg");
+  await writeFile(path, JPEG);
+  const handle = await open(path, "r");
+  try {
+    const opened = await handle.stat();
+    expect(await stillInPlace(photoDir, attachmentDir, path, opened)).toBe(true);
+
+    // 연 뒤 같은 이름에 다른 파일이 들어오면 연 파일과 inode 가 다르다.
+    await rename(path, join(photoDir, "moved.jpg"));
+    await writeFile(path, JPEG);
+    expect(await stillInPlace(photoDir, attachmentDir, path, opened)).toBe(false);
+
+    // 연 뒤 사진 디렉터리가 다른 사용자의 디렉터리를 가리키는 링크로 바뀌어도 거절한다.
+    await writeFile(join(otherDir, "101.jpg"), JPEG);
+    await rename(photoDir, join(attachmentDir, "photos-moved"));
+    await symlink(otherDir, photoDir);
+    expect(await stillInPlace(photoDir, attachmentDir, path, opened)).toBe(false);
+  } finally {
+    await handle.close();
+  }
 });

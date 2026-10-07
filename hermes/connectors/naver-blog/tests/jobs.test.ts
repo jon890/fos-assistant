@@ -25,6 +25,7 @@ import {
   type JobState,
   lockFile,
   readState,
+  releaseLock,
   removeStaleLock,
   stateFile,
   updateState,
@@ -278,6 +279,48 @@ test("묵은 잠금 정리는 판정한 뒤 다른 job_id 로 다시 만들어�
   expect(await readdir(dir)).toEqual([lockFile(dir, CDP_A).slice(dir.length + 1)]);
 
   await removeStaleLock(lockFile(dir, CDP_A), fresh);
+  expect(await readdir(dir)).toEqual([]);
+});
+
+test("끝냄 표시를 만들고 10초 넘게 상태를 쓰지 않았으면 그 쪽이 죽은 것으로 보고 대신 끝낸다", async () => {
+  const dir = await jobDir();
+  const jobId = randomUUID();
+  await createState(dir, running(jobId, { stage: "photos", pid: 1 }));
+  // 다른 프로세스가 끝냄 표시만 만들고 상태를 쓰기 전에 죽었다.
+  await writeFile(finishedFile(dir, jobId), "");
+  const abandoned = new Date(Date.now() - 11_000);
+  await utimes(finishedFile(dir, jobId), abandoned, abandoned);
+
+  const finished = await finishState(dir, jobId, { status: "succeeded", result: { saved_after: 4 } });
+
+  expect(finished?.status).toBe("succeeded");
+  expect(await readState(dir, jobId)).toMatchObject({
+    status: "succeeded",
+    stage: "photos",
+    result: { saved_after: 4 },
+  });
+});
+
+test("24시간이 지난 고아 임시 파일과 되돌리지 못한 잠금만 지우고, 그 작업의 releaseLock 은 남긴 잠금도 지운다", async () => {
+  const dir = await jobDir();
+  const day = 24 * 60 * 60_000;
+  const lock = lockFile(dir, CDP_A).slice(dir.length + 1);
+  const jobId = randomUUID();
+  const oldTemporary = `${randomUUID()}.json.${randomUUID()}.tmp`;
+  const oldStale = `${lock}.${randomUUID()}.stale`;
+  const oldKept = `${lock}.stale-${randomUUID()}`;
+  const recentKept = `${lock}.stale-${jobId}`;
+  const oldTime = new Date(Date.now() - day - 60_000);
+  for (const name of [oldTemporary, oldStale, oldKept]) {
+    await writeFile(join(dir, name), JSON.stringify({ job_id: randomUUID() }));
+    await utimes(join(dir, name), oldTime, oldTime);
+  }
+  await writeFile(join(dir, recentKept), JSON.stringify({ job_id: jobId }));
+
+  await cleanupJobDir(dir);
+  expect(await readdir(dir)).toEqual([recentKept]);
+
+  await releaseLock(dir, jobId);
   expect(await readdir(dir)).toEqual([]);
 });
 

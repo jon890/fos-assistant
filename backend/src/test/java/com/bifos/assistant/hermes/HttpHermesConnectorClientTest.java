@@ -841,9 +841,9 @@ class HttpHermesConnectorClientTest {
         server.verify();
     }
 
-    @DisplayName("바인딩 설치는 보내기 전에 그 주인의 첨부 디렉터리를 만들고, 그 자리가 링크면 보내지 않는다")
+    @DisplayName("바인딩 설치는 보내기 전에 그 주인의 첨부 디렉터리를 만든다")
     @Test
-    void bindCreatesTheOwnersAttachmentDirectoryAndRefusesALink() throws Exception {
+    void bindCreatesTheOwnersAttachmentDirectoryFirst() {
         server.expect(requestTo(BASE + "/api/connectors"))
                 .andExpect(content().json("{\"enabled\":true,\"sandbox_owner\":\"u3\"}"))
                 .andRespond(withSuccess(
@@ -852,16 +852,34 @@ class HttpHermesConnectorClientTest {
                         MediaType.APPLICATION_JSON));
 
         assertThat(client.bindConnector(PROFILE, DEMO, "c7", "u3")).isEqualTo(new InstallResult(false, false));
-        Path users = attachmentRoot.resolve("users");
-        assertThat(users.resolve(SandboxAttachmentDirectory.key("u3"))).isDirectory();
+        assertThat(attachmentRoot.resolve("users").resolve(SandboxAttachmentDirectory.key("u3")))
+                .isDirectory();
+        server.verify();
+    }
 
-        // 다른 주인의 디렉터리를 가리키는 링크면 대시보드에 보내지 않는다. 위의 한 번 말고 요청이 더 가지 않는다.
+    @DisplayName("바인딩 설치는 첨부 디렉터리를 만들지 못해도 요청을 보내고, 대시보드의 409 를 설치 충돌로 돌려준다")
+    @Test
+    void bindSendsEvenWhenTheAttachmentDirectoryCannotBeMade() throws Exception {
+        Path users = Files.createDirectory(attachmentRoot.resolve("users"));
         Path other = Files.createDirectory(users.resolve(SandboxAttachmentDirectory.key("u4")));
         Files.createSymbolicLink(users.resolve(SandboxAttachmentDirectory.key("u5")), other);
+        // 첨부를 선언하지 않은 커넥터는 대시보드가 디렉터리를 보지 않으므로 설치된다.
+        server.expect(requestTo(BASE + "/api/connectors"))
+                .andExpect(content().json("{\"enabled\":true,\"sandbox_owner\":\"u5\"}"))
+                .andRespond(withSuccess(
+                        "{\"profile\":\"user-demo\",\"plugin\":\"demo-notes\",\"enabled\":true,"
+                                + "\"restart_required\":true}",
+                        MediaType.APPLICATION_JSON));
+        // 첨부를 선언한 커넥터는 대시보드가 링크를 보고 409 로 거절한다.
+        server.expect(requestTo(BASE + "/api/connectors"))
+                .andExpect(content().json("{\"enabled\":true,\"sandbox_owner\":\"u5\"}"))
+                .andRespond(withStatus(HttpStatus.CONFLICT));
+
+        assertThat(client.bindConnector(PROFILE, DEMO, "c7", "u5")).isEqualTo(new InstallResult(true, false));
         assertThatThrownBy(() -> client.bindConnector(PROFILE, DEMO, "c7", "u5"))
-                .isInstanceOfSatisfying(
-                        HermesRequestRejected.class,
-                        ex -> assertThat(ex.status()).isEqualTo(409));
+                .isInstanceOf(ConnectorInstallConflict.class);
+        assertThat(Files.isSymbolicLink(users.resolve(SandboxAttachmentDirectory.key("u5"))))
+                .isTrue();
         server.verify();
     }
 

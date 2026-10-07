@@ -71,13 +71,21 @@ function errorOf(error: unknown, stage: string): Record<string, unknown> {
  * 자기 `pid` 를 적고 5초마다 `heartbeat_at` 을 갱신하며, 입력 파일을 읽고 지운 뒤 `runDraft` 를 돌린다.
  * 저장 단추를 누르기 직전에 `save_clicked` 를 쓰고 다시 읽어, 그 사이 정리가 작업을 끝냈으면 누르지 않는다.
  * 끝나면 결과를 쓰고 자기 잠금을 푼다. 끝난 상태는 다시 쓰지 않는다.
- * 작업 디렉터리 확인이나 상태 쓰기처럼 `runDraft` 밖에서 난 예외도 `editor_failed` 로 끝내고 잠금을 푼다.
+ * 상태 쓰기처럼 `runDraft` 밖에서 난 예외도 `editor_failed` 로 끝내고 잠금을 푼다.
+ * 작업 디렉터리 확인이 실패하면 그 디렉터리를 믿을 수 없으므로 아무것도 쓰거나 지우지 않고 끝낸다.
  */
 export async function runWorker(jobFile: string, overrides: Partial<WorkerDeps> = {}) {
   const deps = { ...DEFAULT_DEPS, ...overrides };
   const dir = dirname(jobFile);
   const jobId = basename(jobFile).replace(/\.json$/, "");
   if (!JOB_ID_PATTERN.test(jobId) || basename(jobFile) !== `${jobId}.json`) return;
+  try {
+    await checkJobDir(dir);
+  } catch {
+    // 남이 바꿨을 수 있는 디렉터리에 상태를 쓰거나 입력과 잠금을 지우지 않는다. 디렉터리가 바로잡히면
+    // 다음 호출의 묵은 작업 정리가 pid 없는 이 작업을 timeout 으로 끝내고 입력과 잠금을 지운다.
+    return;
+  }
   let stage = "queued";
   let clicked = false;
   try {
@@ -92,7 +100,6 @@ export async function runWorker(jobFile: string, overrides: Partial<WorkerDeps> 
   }
 
   async function work() {
-    await checkJobDir(dir);
     const heartbeat = () => updateState(dir, jobId, { heartbeat_at: new Date().toISOString() });
     const started = await updateState(dir, jobId, {
       pid: process.pid,

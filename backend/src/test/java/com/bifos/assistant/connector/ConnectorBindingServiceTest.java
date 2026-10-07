@@ -239,7 +239,10 @@ class ConnectorBindingServiceTest {
         verify(connector).bindConnector(firstAgent.hermesProfile(), DEMO, firstConnection.vault(), firstOwner);
         verify(connector).bindConnector(secondAgent.hermesProfile(), DEMO, secondConnection.vault(), secondOwner);
 
-        // 관리자 반영 완료가 설치를 다시 보낼 때도 그 에이전트 주인의 값이다.
+        // 관리자 반영 완료가 설치를 다시 보낼 때도 그 에이전트 주인의 값이다. 반영 완료를 하는 관리자는 주인과 다른 사용자다.
+        // user() 의 둘째 인자는 그룹이라, 관리자는 그 에이전트와 같은 그룹 2 에 두고 사용자 id 만 주인과 다르다.
+        assertThat(admin.id()).isNotEqualTo(second.id());
+        String adminOwner = "u" + admin.id();
         when(connector.bindConnector(anyString(), anyString(), anyString(), anyString()))
                 .thenReturn(new InstallResult(false, false));
         Instant shown = shownTo(admin);
@@ -248,6 +251,7 @@ class ConnectorBindingServiceTest {
 
         verify(connector).bindConnector(secondAgent.hermesProfile(), DEMO, secondConnection.vault(), secondOwner);
         verify(connector, never()).bindConnector(anyString(), anyString(), anyString(), eq(firstOwner));
+        verify(connector, never()).bindConnector(anyString(), anyString(), anyString(), eq(adminOwner));
     }
 
     @Test

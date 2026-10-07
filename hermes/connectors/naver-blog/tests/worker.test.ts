@@ -8,6 +8,7 @@ import {
   acquireLock,
   createState,
   finishState,
+  lockFile,
   readState,
   stateFile,
   writeInput,
@@ -190,10 +191,11 @@ test("정리가 먼저 작업을 끝냈으면 save_clicking 이 실패해 저장
   await expectOnlyState(dir, jobId);
 });
 
-test("작업 디렉터리 확인이 실패해도 editor_failed 로 끝내고 자기 잠금을 푼다", async () => {
+test("작업 디렉터리 확인이 실패하면 상태를 쓰지 않고 입력과 잠금도 지우지 않은 채 끝낸다", async () => {
   const { dir, jobId, run } = await queuedJob();
   // 모드가 700 이 아니면 작업 디렉터리 확인이 실패한다. 소유자는 여전히 쓸 수 있다.
   await chmod(dir, 0o750);
+  const before = await readState(dir, jobId);
   let called = false;
 
   await run(async () => {
@@ -201,11 +203,11 @@ test("작업 디렉터리 확인이 실패해도 editor_failed 로 끝내고 자
     return { state: null, savedBefore: 3, savedAfter: 4 };
   });
 
-  const state = await readState(dir, jobId);
   expect(called).toBe(false);
-  expect(state?.status).toBe("failed");
-  expect(state?.error).toEqual({ code: "editor_failed", stage: "queued" });
-  await expectOnlyState(dir, jobId);
+  expect(await readState(dir, jobId)).toEqual(before);
+  expect((await readdir(dir)).sort()).toEqual(
+    [`${jobId}.input.json`, `${jobId}.json`, lockFile(dir, CDP_URL).slice(dir.length + 1)].sort(),
+  );
 });
 
 /** 주인의 첨부 디렉터리 아래에 사진 한 장을 둔 사진 디렉터리. */

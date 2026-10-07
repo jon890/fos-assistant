@@ -18,6 +18,10 @@
   Hermes 는 첨부 루트를 읽기 전용으로 보므로 만들지 못하고 존재와 링크 없음만 확인한다.
   이 일은 `hermes/SandboxAttachmentDirectory` 가 맡는다. 루트, `users`, 사용자 폴더 가운데 링크가 있거나
   실제 경로가 루트 아래 그 폴더와 다르면 보내지 않고 `AGENT_SANDBOX_UNAVAILABLE` 409 로 멈춘다.
+  커넥터를 에이전트에 붙이는 바인딩 설치(`bindConnector`)도 보내기 전에 같은 폴더를 만들지만, 최선 노력이다.
+  만들지 못해도 경고 로그만 남기고 설치 요청을 보낸다. 사용자 첨부를 읽는다고 선언한 커넥터면
+  대시보드가 그 폴더를 확인하지 못해 409 로 거절하고, 선언하지 않은 커넥터는 첨부 루트 문제로 막히지 않는다
+  ([ADR-20261007 / connector-owner-attachments](../adr/ADR-20261007-connector-owner-attachments.md)).
 - 파일 이름은 `{첨부 번호}.{확장자}` 다. 올릴 때의 이름을 파일 이름으로 쓰지 않는다.
 - **행을 지우지 않는다.** 파일을 지우고 `deleted_at` 을 적는다.
 - 받는 형식은 `image/jpeg`, `image/png`, `image/gif`, `image/webp` 넷이다. HEIC 는 받지 않는다.

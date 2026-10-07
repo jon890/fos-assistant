@@ -57,6 +57,12 @@ export const JOB_ID_PATTERN =
 const STATE_FILE = /^([0-9a-f-]{36})\.json$/;
 const INPUT_FILE = /^([0-9a-f-]{36})\.input\.json$/;
 const FINISHED_FILE = /^([0-9a-f-]{36})\.finished$/;
+/**
+ * 쓰다 남은 임시 파일과 되돌리지 못한 묵은 잠금. 만든 프로세스가 지우기 전에 죽었으면 남는다.
+ * `<상태 파일>.<uuid>.tmp`, `lock-<hash>.<uuid>.stale`, `lock-<hash>.stale-<job_id>` 다.
+ */
+const ORPHAN_FILE =
+  /^(?:[0-9a-f-]{36}\.json\.[0-9a-f-]{36}\.tmp|lock-[0-9a-f]{16}\.(?:[0-9a-f-]{36}\.stale|stale-[0-9a-f-]{36}))$/;
 
 const isFinished = (status: JobStatus) => status !== "running";
 const unavailable = () => new ToolError("NAVER_BLOG_UNAVAILABLE");
@@ -111,13 +117,13 @@ export async function openJobDir(env: Env) {
 }
 
 /**
- * 끝난 지 24시간이 지난 상태 파일, 만든 지 24시간이 지난 끝냄 표시,
+ * 끝난 지 24시간이 지난 상태 파일, 만든 지 24시간이 지난 끝냄 표시와 고아 임시 파일, 묵은 잠금,
  * 끝났거나 상태 파일이 없는 작업의 입력 파일을 지운다.
  */
 export async function cleanupJobDir(dir: string, now = Date.now()) {
   const names = await readdir(dir).catch(() => [] as string[]);
   for (const name of names) {
-    if (FINISHED_FILE.test(name)) {
+    if (FINISHED_FILE.test(name) || ORPHAN_FILE.test(name)) {
       const path = join(dir, name);
       const info = await stat(path).catch(() => null);
       if (info && now - info.mtimeMs > KEEP_MS) await unlink(path).catch(() => {});
@@ -253,6 +259,10 @@ export function updateState(
     if (!current || isFinished(current.status) || (await finishClaimed(dir, jobId)))
       return current;
     const next = { ...current, ...patch };
+    // 확인과 쓰기 사이는 프로세스 사이에서 잠기지 않는다. 그 틈에 정리가 끝냄 표시를 만들고 끝난 상태를 쓰면
+    // 이 쓰기가 `running` 으로 덮을 수 있다. `finishState` 가 쓴 뒤 다시 읽어 한 번 더 쓰므로 대개 바로잡히고,
+    // 그 뒤에도 덮였으면 작업 프로세스는 끝냄 표시를 보고 더 쓰지 않아 heartbeat 가 멈춘다.
+    // 그러면 다음 정리가 묵은 작업으로 보고 10초 지난 끝냄 표시를 넘겨받아 다시 끝낸다.
     await writeAtomic(path, next);
     return next;
   });
@@ -422,7 +432,11 @@ export async function acquireLock(dir: string, cdpUrl: string, jobId: string) {
 /**
  * 묵었다고 판정한 잠금을 지운다. 판정한 뒤 다른 호출이 그 잠금을 지우고 새로 만들었을 수 있어,
  * 임시 이름으로 옮긴 뒤 내용이 판정한 `jobId` 와 같을 때만 지운다. 다르면 제자리로 되돌린다.
- * 되돌리는 `link` 는 그 사이 또 다른 잠금이 생겼으면 실패하고, 그때는 새 잠금을 둔다.
+ *
+ * 옮기기와 되돌리기 사이에는 그 자리에 잠금이 없다. 그 틈에 또 다른 호출이 새 잠금을 만들면 되돌리는 `link` 가
+ * 실패하고, 옮긴 잠금의 작업과 새 잠금의 작업이 같은 브라우저를 함께 쓸 수 있다. 이 틈은 막지 않는다.
+ * 그때 옮긴 잠금은 살아 있는 작업의 것일 수 있어 지우지 않고 `lock-<hash>.stale-<job_id>` 로 남긴다.
+ * `lock-` 으로 시작하므로 그 작업의 `releaseLock` 이 내용으로 찾아 지우고, 못 지운 것은 `cleanupJobDir` 가 지운다.
  */
 export async function removeStaleLock(path: string, jobId: string | null) {
   const moved = `${path}.${randomUUID()}.stale`;
@@ -432,7 +446,17 @@ export async function removeStaleLock(path: string, jobId: string | null) {
     return;
   }
   const lock = await readLock(moved);
-  if (lock && lock.jobId !== jobId) await link(moved, path).catch(() => {});
+  if (!lock || lock.jobId === jobId) {
+    await unlink(moved).catch(() => {});
+    return;
+  }
+  try {
+    await link(moved, path);
+  } catch {
+    if (lock.jobId && JOB_ID_PATTERN.test(lock.jobId))
+      await rename(moved, `${path}.stale-${lock.jobId}`).catch(() => {});
+    return;
+  }
   await unlink(moved).catch(() => {});
 }
 

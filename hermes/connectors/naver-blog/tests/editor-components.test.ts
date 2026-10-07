@@ -23,6 +23,13 @@ test("정식 이름과 줄임 표기로 쓴 같은 주소는 같은 값이 된�
   );
 });
 
+test("지도 검색이 섞어 쓰는 광주의 두 표기는 같은 값이 된다", () => {
+  expect(normalizePlaceAddress("전남광주통합특별시 가상구 예시로 12")).toBe("광주 가상구 예시로 12");
+  expect(normalizePlaceAddress("전남광주통합특별시 가상구 예시로 12")).toBe(
+    normalizePlaceAddress("광주광역시 가상구 예시로 12"),
+  );
+});
+
 test("시도 이름이 아닌 첫 낱말과 둘째 낱말 뒤의 시도 이름은 바꾸지 않는다", () => {
   expect(normalizePlaceAddress("가상시 서울특별시로 10")).toBe("가상시 서울특별시로 10");
   expect(normalizePlaceAddress("가상구 경기도 11")).toBe("가상구 경기도 11");
