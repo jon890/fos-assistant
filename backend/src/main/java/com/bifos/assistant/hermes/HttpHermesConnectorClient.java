@@ -14,6 +14,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.function.Supplier;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.MediaType;
@@ -29,6 +30,7 @@ import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.node.ObjectNode;
 
 /** connector 요청은 비밀값을 포함하므로 원격 오류 본문이나 cause 를 로그와 예외에 남기지 않는다. */
+@Slf4j
 @Component
 public class HttpHermesConnectorClient implements HermesConnectorClient {
     private static final JsonMapper MAPPER = JsonMapper.builder().build();
@@ -245,9 +247,27 @@ public class HttpHermesConnectorClient implements HermesConnectorClient {
     }
 
     @Override
-    public InstallResult bindConnector(String profile, String connectorId, String vault) {
+    public InstallResult bindConnector(String profile, String connectorId, String vault, String sandboxOwner) {
+        // 대시보드는 주인의 첨부 디렉터리를 만들지 않고 링크 없이 있는지만 본다(ADR-091, ADR-20261007 connector-owner-attachments).
+        // 만들기는 최선 노력이다. 첨부를 선언하지 않은 커넥터의 붙이기가 첨부 루트 문제로 멈추지 않게 하고, 선언한 커넥터는
+        // 대시보드가 디렉터리를 확인하지 못해 409 로 거절하므로 경계는 그대로다.
+        try {
+            attachmentDirectory.ensure(sandboxOwner);
+        } catch (HermesRequestRejected ex) {
+            log.warn("커넥터 주인의 첨부 디렉터리를 만들지 못해 확인을 대시보드에 맡긴다 profile={} connector={}", profile, connectorId);
+        }
         return refusable(
-                Map.of(PROFILE, profile, PLUGIN, connectorId, ENABLED, true, "bind", Map.of(VAULT, vault)),
+                Map.of(
+                        PROFILE,
+                        profile,
+                        PLUGIN,
+                        connectorId,
+                        ENABLED,
+                        true,
+                        "bind",
+                        Map.of(VAULT, vault),
+                        "sandbox_owner",
+                        sandboxOwner),
                 profile,
                 connectorId,
                 true);

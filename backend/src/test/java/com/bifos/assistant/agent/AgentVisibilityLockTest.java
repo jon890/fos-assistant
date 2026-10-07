@@ -135,11 +135,12 @@ class AgentVisibilityLockTest {
         when(connector.readCatalog()).thenReturn(List.of(DEMO_MANIFEST));
         CountDownLatch locked = new CountDownLatch(1);
         CountDownLatch release = new CountDownLatch(1);
-        when(connector.bindConnector(anyString(), anyString(), anyString())).thenAnswer(invocation -> {
-            locked.countDown();
-            assertThat(release.await(10, TimeUnit.SECONDS)).isTrue();
-            return new InstallResult(true, false);
-        });
+        when(connector.bindConnector(anyString(), anyString(), anyString(), anyString()))
+                .thenAnswer(invocation -> {
+                    locked.countDown();
+                    assertThat(release.await(10, TimeUnit.SECONDS)).isTrue();
+                    return new InstallResult(true, false);
+                });
         ExecutorService pool = Executors.newFixedThreadPool(2);
         try {
             Future<AgentConnectionView> binding = pool.submit(() -> bindingService.bind(kid, created.code(), DEMO));

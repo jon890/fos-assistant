@@ -9,6 +9,8 @@ import { AssistantRow, MessageBubble, type Turn } from "./message-bubble";
 import { ActivityBlock } from "./activity/activity-block";
 import type { ActivityState } from "./activity/activity-state";
 import { WaitingIndicator } from "./waiting-indicator";
+import { MemoryCaptureList } from "./memory-capture-list";
+import type { MemoryCapture } from "@/lib/memory-capture-api";
 import {
   foldVersions,
   isLatestView,
@@ -43,6 +45,10 @@ type Props = {
   onRetryDelivery?(deliveryId: number): void;
   /** 다시 전달을 보내는 중이다. 알림 줄의 단추를 막는다 */
   deliveryRetrying?: boolean;
+  /** 이 대화에서 에이전트가 남긴 기억 기록이다. 각 답 아래에 그 답의 실행 것만 보인다 */
+  memoryCaptures?: MemoryCapture[];
+  /** 기억 기록을 처리했다. 되돌리거나 거절한 줄의 번호를 주면 그 줄을 먼저 뺀다 */
+  onMemoryCapturesChanged?(removedId?: number): void;
 };
 
 export function MessageList({
@@ -67,6 +73,8 @@ export function MessageList({
   skillCommandChips,
   onRetryDelivery,
   deliveryRetrying,
+  memoryCaptures = [],
+  onMemoryCapturesChanged,
 }: Props) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const shouldFollow = useRef(true);
@@ -140,7 +148,11 @@ export function MessageList({
   const visible = [...foldedVisible, ...pendingVisible];
   const lastVisible = visible.at(-1)?.turn;
   const hasNoAnswer = lastVisible?.role === "USER" && latestView && !sending;
-  const contentVersion = `${turns.map((turn) => `${turn.id}:${turn.content.length}`).join("|")}:${sending}:${activity?.items.length}:${turnError}`;
+  // 기억 기록은 turn 이 끝난 뒤 따로 읽혀 답 아래에 들어오므로 맨 아래 따라가기도 그 번호와 상태를 본다.
+  const capturesVersion = memoryCaptures
+    .map((capture) => `${capture.id}:${capture.status}`)
+    .join(",");
+  const contentVersion = `${turns.map((turn) => `${turn.id}:${turn.content.length}`).join("|")}:${sending}:${activity?.items.length}:${turnError}:${capturesVersion}`;
 
   const hasLiveActivity = activity !== null && activity.items.length > 0;
   // 답이 아직 없으면 기다림 점이나 진행 중 블록이 비서 줄 하나에 들어온다. 답이 흘러나오면 그 답의 줄이 블록을 받는다.
@@ -266,6 +278,17 @@ export function MessageList({
                             : undefined
                         }
                       />
+                      {turn.role === "ASSISTANT" &&
+                      typeof turn.executionId === "number" &&
+                      onMemoryCapturesChanged ? (
+                        <MemoryCaptureList
+                          captures={memoryCaptures.filter(
+                            (capture) =>
+                              capture.executionId === turn.executionId,
+                          )}
+                          onChanged={onMemoryCapturesChanged}
+                        />
+                      ) : null}
                       {isLast && hasNoAnswer ? (
                         <li
                           data-testid="no-answer"

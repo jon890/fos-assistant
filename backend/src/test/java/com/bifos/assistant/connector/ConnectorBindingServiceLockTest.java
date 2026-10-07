@@ -126,7 +126,8 @@ class ConnectorBindingServiceLockTest {
         when(connector.readCatalog()).thenReturn(List.of(DEMO_MANIFEST));
         when(connector.call(anyString(), anyString(), anyMap()))
                 .thenReturn(CallResult.success(MAPPER.readTree("{\"ok\":true}")));
-        when(connector.bindConnector(anyString(), anyString(), anyString())).thenReturn(new InstallResult(true, false));
+        when(connector.bindConnector(anyString(), anyString(), anyString(), anyString()))
+                .thenReturn(new InstallResult(true, false));
         when(connector.putConnector(anyString(), anyString(), anyBoolean(), anyString()))
                 .thenReturn(new InstallResult(false, false));
         when(connector.readConnector(anyString(), anyString()))
@@ -162,11 +163,12 @@ class ConnectorBindingServiceLockTest {
         Instant shown = shownTo(admin);
         CountDownLatch locked = new CountDownLatch(1);
         CountDownLatch release = new CountDownLatch(1);
-        when(connector.bindConnector(anyString(), anyString(), anyString())).thenAnswer(invocation -> {
-            locked.countDown();
-            assertThat(release.await(10, TimeUnit.SECONDS)).isTrue();
-            return new InstallResult(true, false);
-        });
+        when(connector.bindConnector(anyString(), anyString(), anyString(), anyString()))
+                .thenAnswer(invocation -> {
+                    locked.countDown();
+                    assertThat(release.await(10, TimeUnit.SECONDS)).isTrue();
+                    return new InstallResult(true, false);
+                });
         ExecutorService pool = Executors.newFixedThreadPool(2);
         try {
             Future<?> registering =
@@ -210,11 +212,12 @@ class ConnectorBindingServiceLockTest {
         service.bind(owner, agent.code(), DEMO);
         CountDownLatch locked = new CountDownLatch(1);
         CountDownLatch release = new CountDownLatch(1);
-        when(connector.bindConnector(anyString(), anyString(), anyString())).thenAnswer(invocation -> {
-            locked.countDown();
-            assertThat(release.await(10, TimeUnit.SECONDS)).isTrue();
-            return new InstallResult(false, false);
-        });
+        when(connector.bindConnector(anyString(), anyString(), anyString(), anyString()))
+                .thenAnswer(invocation -> {
+                    locked.countDown();
+                    assertThat(release.await(10, TimeUnit.SECONDS)).isTrue();
+                    return new InstallResult(false, false);
+                });
         ExecutorService pool = Executors.newFixedThreadPool(2);
         try {
             Future<?> registering =

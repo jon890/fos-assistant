@@ -48,6 +48,7 @@ class McpToolServiceTest {
             mock(ExecutionDeliveryWriter.class),
             mock(AgentRepository.class),
             mock(FollowUpService.class),
+            mock(McpMemoryRemember.class),
             Clock.systemUTC());
     private final AgentExecution parent = mock(AgentExecution.class);
     private McpCaller caller;

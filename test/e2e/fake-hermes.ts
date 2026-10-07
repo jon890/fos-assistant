@@ -307,6 +307,8 @@ type Run = {
   proactive?: { tools: string[]; gate?: Promise<void> };
   /** 정책이 허용해 커넥터 서버에 닿은 호출이다. 사건 스트림이 호출마다 시작과 완료 사건을 실제 Hermes 의 모양으로 흘린다. */
   connectorCalls?: ConnectorCall[];
+  /** 바깥 도구를 쓰는 run 이다. 사건 스트림이 `web_search` 도구 사건을 흘린 뒤 끝난다. */
+  outsideTool?: boolean;
 };
 
 /** 허용된 커넥터 도구 호출 하나다. `hermesTool` 은 등록 이름이다. */
@@ -401,6 +403,14 @@ function withoutResponseGuide(instructions: string): string {
   const header = "# 답변 형식\n\n";
   if (!instructions.startsWith(header)) return instructions;
 
+  const nextSection = instructions.indexOf("\n\n", header.length);
+  return withoutMemoryGuide(nextSection < 0 ? "" : instructions.slice(nextSection + 2));
+}
+
+/** `memory_remember` 를 받는 실행에 답변 형식 뒤에 붙는 「# 기억」 지침이다. 빈 줄 없는 한 단락이라 그 단락만 뺀다. */
+function withoutMemoryGuide(instructions: string): string {
+  const header = "# 기억\n\n";
+  if (!instructions.startsWith(header)) return instructions;
   const nextSection = instructions.indexOf("\n\n", header.length);
   return nextSection < 0 ? "" : instructions.slice(nextSection + 2);
 }
@@ -819,6 +829,14 @@ export type FakeHermes = {
   close(): Promise<void>;
   setArtifactWriteMcp(endpoint: string, token: string): void;
   setMemoryReadMcp(endpoint: string, token: string): void;
+  /**
+   * 이 입력을 받은 run 이 `memory_remember` 를 서명해 부르고 도구 결과의 text 를 답으로 돌려주게 한다.
+   *
+   * <p>사용자가 말한 입력 그대로를 질문으로 보내야 하므로 입력에 인자를 싣지 않고 따로 등록한다.
+   */
+  setMemoryRememberCall(input: string, args: Record<string, unknown>): void;
+  /** 이 입력을 받은 run 의 사건 스트림이 `web_search` 도구 사건을 흘린 뒤 끝나게 한다. 바깥 글을 읽은 대화를 만든다. */
+  setOutsideToolRun(input: string): void;
   /** 하위 에이전트 검사 입력으로 등록한 자식 session 과 그 응답 상태다. 등록이 거절돼도 run 은 실패하지 않고 여기에만 남는다. */
   subagentRegistrations(): readonly { childSessionId: string; rootSessionId: string; status: number }[];
   /** 등록한 자식 session 이 부모의 루트로 서명해 `memory_read` 를 부르고 도구 결과의 text 를 돌려준다. */
@@ -939,6 +957,7 @@ export function startFakeHermes(
     plugin: string,
     enabled: boolean,
     bind: { vault?: unknown } | undefined,
+    sandboxOwner: unknown,
   ) => {
     if (!profiles.has(profile) && keys[profile] === undefined) {
       send(response, 401, { reason: "not_marked" });
@@ -977,6 +996,11 @@ export function startFakeHermes(
     // 바인딩 항목이 있는 profile 은 옛 설치를 받지 않는다.
     if (bind === undefined) {
       send(response, 409, { error: "this profile has bound connectors" });
+      return;
+    }
+    // Control Plane 은 바인딩 설치에 그 에이전트의 `sandbox_owner` 를 늘 싣는다(ADR-20261007 connector-owner-attachments). 빠지거나 모양이 틀리면 거절한다.
+    if (typeof sandboxOwner !== "string" || !SANDBOX_OWNER_PATTERN.test(sandboxOwner)) {
+      send(response, 400, { error: "sandbox_owner is required for a binding install" });
       return;
     }
     const stored = typeof bind.vault === "string" ? vaults.get(bind.vault) : undefined;
@@ -1060,6 +1084,8 @@ export function startFakeHermes(
   let droppedToolset: string | undefined;
   let artifactWriteMcp: { endpoint: string; token: string } | undefined;
   let memoryReadMcp: { endpoint: string; token: string } | undefined;
+  const memoryRememberCalls = new Map<string, Record<string, unknown>>();
+  const outsideToolInputs = new Set<string>();
   const subagentRegistrations: { childSessionId: string; rootSessionId: string; status: number }[] = [];
   let connectorPolicyEndpoint: string | undefined;
   const connectorToolCalls: ConnectorToolCall[] = [];
@@ -1376,7 +1402,7 @@ export function startFakeHermes(
 
     if (request.method === "PUT" && path === CONNECTORS_PATH) {
       const body = JSON.parse((await readBody(request)) || "{}") as {
-        profile?: string; plugin?: string; enabled?: unknown; bind?: { vault?: unknown };
+        profile?: string; plugin?: string; enabled?: unknown; bind?: { vault?: unknown }; sandbox_owner?: unknown;
       };
       if (body.profile === undefined || typeof body.plugin !== "string" || typeof body.enabled !== "boolean") {
         send(response, 400, { error: "invalid connector request" });
@@ -1384,7 +1410,7 @@ export function startFakeHermes(
       }
       const boundHere = boundConnectors.get(body.profile);
       if (body.bind !== undefined || boundHere?.has(body.plugin) === true) {
-        bindingInstall(response, body.profile, body.plugin, body.enabled, body.bind);
+        bindingInstall(response, body.profile, body.plugin, body.enabled, body.bind, body.sandbox_owner);
         return true;
       }
       // 어느 커넥터든 바인딩 항목이 있는 profile 은 옛 설치를 받지 않는다.
@@ -2058,6 +2084,16 @@ export function startFakeHermes(
             }
             return;
           }
+          // 바깥 도구를 쓰는 run 이다. 도구 사건을 흘린 뒤에 끝나므로, 답을 받은 때에는 그 사건이 저장돼 있다.
+          if (run.outsideTool === true) {
+            event(response, { event: "tool.started", tool: "web_search", preview: "web_search" });
+            event(response, { event: "tool.completed", tool: "web_search", duration: 0.1, error: false });
+            event(response, { event: "message.delta", delta: run.output });
+            run.status = "completed";
+            event(response, { event: "run.completed" });
+            response.end();
+            return;
+          }
           const script = scripts.get(run.input);
           if (script !== undefined) {
             for (const scripted of script.events ?? []) {
@@ -2278,6 +2314,10 @@ export function startFakeHermes(
             submitted.session_id,
           )
           : undefined;
+        const rememberCall = memoryRememberCalls.get(input);
+        const rememberOutput = rememberCall !== undefined
+          ? await callControlPlaneToolViaMcp("memory_remember", rememberCall, submitted.session_id)
+          : undefined;
         const connectorCalls: ConnectorCall[] = [];
         const connectorOutput = input.startsWith(CONNECTOR_TOOL_PROBE)
           ? await judgeConnectorCalls(
@@ -2347,13 +2387,14 @@ export function startFakeHermes(
         const slow = !held && !starterRun && slowRunMs !== undefined;
         runs.set(runId, {
           run_id: runId,
-          status: held || slow ? "running" : "completed",
+          status: held || slow || outsideToolInputs.has(input) ? "running" : "completed",
           session_id: sessionId,
                   // 실제 Hermes 와 같이 요청 본문의 값을 그대로 되돌려 준다. 실제로 돈 모델이 아니다.
           model: submitted.model ?? profile!,
           output: (proactiveRun ? script?.output ?? defaultProactiveOutput() : undefined)
             ?? memoryReadOutput
             ?? followUpProposeOutput
+            ?? rememberOutput
             ?? connectorOutput
             ?? (registeredChild === undefined ? undefined : `하위 에이전트 session: ${registeredChild}`)
             ?? scripts.get(input)?.output
@@ -2364,6 +2405,7 @@ export function startFakeHermes(
           interruptEvents: input === "스트림 중단 검사",
           usage: FAKE_USAGE,
           connectorCalls,
+          outsideTool: outsideToolInputs.has(input),
           proactive: proactiveRun
             ? {
                 tools: script === undefined ? DEFAULT_PROACTIVE_TOOLS : script.tools ?? [],
@@ -2511,6 +2553,12 @@ export function startFakeHermes(
         },
         setMemoryReadMcp: (endpoint: string, token: string) => {
           memoryReadMcp = { endpoint, token };
+        },
+        setMemoryRememberCall: (input, args) => {
+          memoryRememberCalls.set(input, args);
+        },
+        setOutsideToolRun: (input) => {
+          outsideToolInputs.add(input);
         },
         subagentRegistrations: () => [...subagentRegistrations],
         readMemoryAsSubagent: (childSessionId, memoryId) => {

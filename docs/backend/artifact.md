@@ -186,6 +186,23 @@ web 의 서버 라우트는 브라우저의 `If-None-Match` 와 `If-Modified-Sin
 
 2026-09-29 운영에서 원본 해상도 사진 12장, 약 28MB 가 든 결과물을 네 번 열 때마다 모두 200 으로 전체를 다시 받았다.
 
+## 같은 대화의 첨부 사진을 부를 때
+
+**결과물 HTML 은 그 대화에 첨부한 사진을 복사하지 않고 첨부 주소로 부를 수 있다.**
+대화 화면이 쓰는 두 주소가 같은 대화 주소 아래의 형제이기 때문이다.
+
+| 무엇 | web 주소 |
+| --- | --- |
+| 결과물 파일 | `/api/chat/conversations/{공개 식별자}/files/{폴더 안의 경로}` |
+| 첨부 사진 | `/api/chat/conversations/{공개 식별자}/attachments/{첨부 번호}` |
+
+- 결과물 폴더 안 `<폴더>/index.html` 에 둔 HTML 은 `../../attachments/<첨부 번호>` 로 그 대화의 첨부를 부른다. HTML 의 깊이가 다르면 `../` 의 수가 달라진다
+- 첨부 번호는 실행 입력의 `[이번 메시지에 올린 사진]` 이 적은 파일 이름 `<첨부 번호>.<확장자>` 의 앞부분이다([ADR-091](../adr/ADR-091-사진-첨부는-사용자별로-저장하고-실행-공간에는-그-사용자만-붙인다.md))
+- 같은 출처의 주소라 결과물의 `img-src 'self'` 가 허용하고, iframe 의 `allow-same-origin` 으로 로그인 쿠키가 함께 간다. 첨부는 그 대화의 주인만 받으므로 결과물을 여는 사람과 같은 권한이다
+- 첨부는 `Cache-Control: private` 이다. 대화 화면에서 이미 받은 사진은 브라우저가 다시 받지 않는다
+- 첨부를 지웠거나 30일이 지났으면 410 이라 그 자리는 깨진 그림이다. HTML 은 `alt` 에 몇 번째 사진인지 적는다
+- 이 모양에 기대는 쪽은 네이버 블로그 커넥터의 미리보기다([ADR-20261007 / naver-blog-connector](../adr/ADR-20261007-naver-blog-connector.md)). 두 주소나 첨부 파일 이름을 바꾸면 그 미리보기도 함께 고친다. `test/unit/artifact-attachment-route.test.ts` 가 두 web 라우트가 형제로 있는지 본다
+
 ## 메시지 한 줄의 `artifacts`
 
 `GET .../messages` 의 한 줄은 `artifacts` 를 갖는다. `[{ "path", "byteSize", "deleted" }]` 이고 없으면 빈 배열이다.
