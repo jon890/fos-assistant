@@ -138,6 +138,43 @@ test("카테고리가 없으면 category_not_found 와 있는 카테고리 이�
   expectOnlyOwnTabClosed(cdp, otherTab);
 });
 
+test("움직임이 멈추길 기다린 뒤 발행 단추가 레이어를 열지 못하면 다시 눌러 저장까지 간다", async () => {
+  const { cdp, editor, stages, run, otherTab } = await setup();
+  editor.animatingPolls = 3;
+  editor.publishIgnored = 2;
+
+  const result = await run();
+
+  expect(stages).toEqual(ALL_STAGES);
+  expect(result.savedAfter).toBe(4);
+  expect(editor.animatingPolls).toBe(0);
+  // settings 단계에서 셋(둘은 열리지 않음), 닫기 하나, 저장 전 대조와 state 에서 열고 닫기 둘씩이다.
+  expect(editor.publishClicks).toBe(8);
+  expect(editor.scripts.filter((script) => script.includes("tpb*i.publish"))).toEqual([]);
+  expectOnlyOwnTabClosed(cdp, otherTab);
+});
+
+test("발행 설정이 끝내 열리지 않으면 세 번만 누르고 덮은 요소의 클래스 이름을 진단으로 남긴다", async () => {
+  const { cdp, editor, run, otherTab } = await setup();
+  editor.publishIgnored = 99;
+  const diagnosis = {
+    publish_button: "shown",
+    covered_by: "div.layer_popup__x1.is_show__y2",
+    layers: ["div.layer_popup__x1.is_show__y2"],
+  };
+  editor.publishDiagnosis = diagnosis;
+
+  const failure = await run().catch((error) => error);
+
+  expect(failure.code).toBe("editor_failed");
+  expect(failure.stage).toBe("settings");
+  expect(failure.message).toBe("발행 설정을 열지 못했다");
+  expect(failure.extra).toEqual({ diagnosis });
+  expect(editor.publishClicks).toBe(3);
+  expect(editor.saved).toBe(3);
+  expectOnlyOwnTabClosed(cdp, otherTab);
+});
+
 test("상호명과 주소가 맞는 장소가 둘이면 place_not_unique 와 후보 둘을 돌려준다", async () => {
   const { cdp, editor, run, otherTab } = await setup();
   editor.places = { [PLACE.name]: [PLACE, PLACE] };
