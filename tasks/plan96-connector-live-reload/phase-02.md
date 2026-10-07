@@ -118,6 +118,8 @@ node scripts/check-migration-versions.mjs
 | `backend/src/main/java/com/bifos/assistant/connector/application/ConnectorBindingService.java` | 수정 |
 | `backend/src/main/java/com/bifos/assistant/connector/application/ConnectorBindingApplier.java` | 신규 |
 | `backend/src/main/java/com/bifos/assistant/connector/infra/ConnectorBindingRepository.java` | 수정 |
+| `backend/src/main/java/com/bifos/assistant/connector/domain/DueBinding.java` | 신규 |
+| `docs/backend/connector-tool-policy.md` | 수정 |
 | `backend/src/main/java/com/bifos/assistant/connector/application/ConnectorPolicyService.java` | 수정 |
 | `backend/src/test/java/com/bifos/assistant/connector/**` | 수정 |
 | `backend/src/main/resources/application.yml` | 수정 |
