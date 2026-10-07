@@ -14,6 +14,8 @@ import time
 import types
 import unittest
 from unittest import mock
+from plugin_loading import patch_plugin
+
 
 import mcp.types as mcp_types
 
@@ -121,7 +123,7 @@ class ConnectorCallTest(base.ConnectorGateCase):
         """`values` 와 `vault` 를 함께 보내거나, 이름이 틀리거나, 없거나, 다른 커넥터의 보관 파일이면 400 이고 자식을 띄우지 않는다."""
         self.store_vault("c1", token=OK_TOKEN)
         self.store_vault("c3", connector="other-notes", token=OK_TOKEN)
-        with mock.patch.object(self.plugin, "_run_connector_tool") as runner:
+        with patch_plugin(self.plugin, "_run_connector_tool") as runner:
             for label, body in (
                 ("both", {"tool": "list_scopes", "values": {"token": OK_TOKEN}, "vault": "c1"}),
                 ("bad name", {"tool": "list_scopes", "vault": "../c1"}),
@@ -157,7 +159,7 @@ class ConnectorCallTest(base.ConnectorGateCase):
 
     def test_only_declared_tools_and_known_connectors_are_called(self):
         """manifest 가 선택지나 확인에 쓰지 않는 도구와 모르는 커넥터는 4xx 이고 자식을 띄우지 않는다."""
-        with mock.patch.object(self.plugin, "_run_connector_tool") as runner:
+        with patch_plugin(self.plugin, "_run_connector_tool") as runner:
             for label, path, body, expected in (
                 ("write tool", CALL, {"tool": "write_note", "values": {"token": OK_TOKEN}}, 400),
                 ("undeclared read tool", CALL, {"tool": "env_view", "values": {"token": OK_TOKEN}}, 400),
@@ -187,7 +189,7 @@ class ConnectorCallTest(base.ConnectorGateCase):
 
     def test_values_are_checked_before_the_child_starts(self):
         """모르는 칸, 문자열이 아닌 값, 형식에 맞지 않는 값은 invalid_input 이고 자식을 띄우지 않는다."""
-        with mock.patch.object(self.plugin, "_run_connector_tool") as runner:
+        with patch_plugin(self.plugin, "_run_connector_tool") as runner:
             for label, values in (
                 ("unknown key", {"token": OK_TOKEN, "other": "x"}),
                 ("env name instead of key", {"DEMO_TOKEN": OK_TOKEN}),
@@ -243,7 +245,7 @@ class ConnectorCallTest(base.ConnectorGateCase):
                 await release.wait()
                 return tool_result(SCOPES)
 
-            with mock.patch.object(self.plugin, "_run_connector_tool", held):
+            with patch_plugin(self.plugin, "_run_connector_tool", held):
                 running = [asyncio.ensure_future(self.send(CALL, "POST", body)) for _ in range(4)]
                 while started < 4:
                     await asyncio.sleep(0)
@@ -267,7 +269,7 @@ class ConnectorCallTest(base.ConnectorGateCase):
         async def broken(manifest, tool, env):
             raise RuntimeError("injected")
 
-        with mock.patch.object(self.plugin, "_run_connector_tool", broken):
+        with patch_plugin(self.plugin, "_run_connector_tool", broken):
             for _ in range(5):
                 self.assertEqual(self.call(), UNAVAILABLE)
         self.assertEqual(self.call(), (200, {"ok": True, "result": SCOPES}))
@@ -275,7 +277,7 @@ class ConnectorCallTest(base.ConnectorGateCase):
     def test_slow_tool_times_out_and_leaves_no_child(self):
         """시간 제한을 넘긴 도구는 unavailable 이고 자식 프로세스가 남지 않는다."""
         started = time.monotonic()
-        with mock.patch.object(self.plugin, "CONNECTOR_CALL_TIMEOUT_SECONDS", 3):
+        with patch_plugin(self.plugin, "CONNECTOR_CALL_TIMEOUT_SECONDS", 3):
             self.assertEqual(self.call(SLOW_TOKEN), UNAVAILABLE)
         # 도구는 60초를 기다린다. 그보다 훨씬 먼저 돌아와야 제한이 실제로 끊은 것이다.
         self.assertLess(time.monotonic() - started, 20)
@@ -320,7 +322,7 @@ class ConnectorCallTest(base.ConnectorGateCase):
                 async def fixed(manifest, tool, env, result=result):
                     return result
 
-                with mock.patch.object(self.plugin, "_run_connector_tool", fixed), collected_logs() as records:
+                with patch_plugin(self.plugin, "_run_connector_tool", fixed), collected_logs() as records:
                     self.assertEqual(self.call(), expected)
                 if label == "input required":
                     ours = [line for line in records if "dashboard-profile-api" in line]
@@ -329,8 +331,8 @@ class ConnectorCallTest(base.ConnectorGateCase):
 
     def test_sdk_outside_supported_range_is_unavailable_without_starting_child(self):
         """지원 범위 밖의 SDK 판이면 자식을 띄우지 않고 unavailable 이며, 로그에 판과 까닭이 남는다."""
-        with mock.patch.object(self.plugin, "_mcp_sdk_version", return_value="1.30.0"), \
-                mock.patch.object(self.plugin, "_run_connector_tool") as runner, collected_logs() as records:
+        with patch_plugin(self.plugin, "_mcp_sdk_version", return_value="1.30.0"), \
+                patch_plugin(self.plugin, "_run_connector_tool") as runner, collected_logs() as records:
             self.assertEqual(self.call(), UNAVAILABLE)
         runner.assert_not_called()
         ours = [line for line in records if "dashboard-profile-api" in line]
@@ -353,7 +355,7 @@ class ConnectorCallTest(base.ConnectorGateCase):
         async def broken(manifest, tool, env):
             raise ExceptionGroup("outer", [AttributeError("secret-text")])
 
-        with mock.patch.object(self.plugin, "_run_connector_tool", broken), collected_logs() as records:
+        with patch_plugin(self.plugin, "_run_connector_tool", broken), collected_logs() as records:
             self.assertEqual(self.call(), UNAVAILABLE)
         log = "\n".join(records)
         self.assertIn("AttributeError", log)
@@ -369,8 +371,8 @@ class ConnectorCallTest(base.ConnectorGateCase):
         ctx = mock.Mock(register_dashboard_auth_provider=mock.Mock())
         with mock.patch.dict(sys.modules, modules), \
                 mock.patch.dict(os.environ, {self.plugin.ENV_VAR: "x7Kq9mZp2Lw5Rt8Vb3Nc6Hd1Fg4Js0Ya"}), \
-                mock.patch.object(self.plugin, "_install_gate", return_value=True), \
-                mock.patch.object(self.plugin, "_mcp_sdk_version", return_value="1.30.0"), \
+                patch_plugin(self.plugin, "_install_gate", return_value=True), \
+                patch_plugin(self.plugin, "_mcp_sdk_version", return_value="1.30.0"), \
                 collected_logs() as records:
             self.plugin.register(ctx)
         ctx.register_dashboard_auth_provider.assert_called_once()
@@ -388,7 +390,7 @@ class ConnectorCallTest(base.ConnectorGateCase):
 
         with collected_logs() as records:
             responses = [self.call(), self.call(BAD_TOKEN), self.call(ODD_TOKEN), self.call(OK_TOKEN, scope="zzz")]
-            with mock.patch.object(self.plugin, "CONNECTOR_CALL_TIMEOUT_SECONDS", 2):
+            with patch_plugin(self.plugin, "CONNECTOR_CALL_TIMEOUT_SECONDS", 2):
                 responses.append(self.call(SLOW_TOKEN))
             responses.append(self.request(CALL, "POST", {"tool": "list_scopes",
                                                          "values": {"token": OK_TOKEN, "other": "x"}}))

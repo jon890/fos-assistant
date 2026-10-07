@@ -3,7 +3,6 @@
 import asyncio
 import contextlib
 import hashlib
-import importlib.util
 import json
 import logging
 import os
@@ -18,6 +17,8 @@ import unittest
 from unittest import mock
 
 import yaml
+
+from plugin_loading import load_plugin, patch_plugin, set_plugin
 
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
@@ -179,9 +180,7 @@ class ProfileApiRouteTest(unittest.TestCase):
         seam.authenticate_token = lambda request: (
             (types.SimpleNamespace(provider="fos-profile-api"), None) if request.token == "valid" else (None, None)
         )
-        spec = importlib.util.spec_from_file_location("profile_api_route_test", bundle / "__init__.py")
-        cls.plugin = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(cls.plugin)
+        cls.plugin = load_plugin("profile_api_route_test", bundle / "__init__.py", cls.addClassCleanup)
         assert cls.plugin._install_gate()
         cls.gate = staticmethod(seam.token_auth_middleware)
 
@@ -195,9 +194,9 @@ class ProfileApiRouteTest(unittest.TestCase):
                 sys.modules[name] = previous
 
     def setUp(self):
-        self.plugin.PROFILE_WRITE_LOCK = asyncio.Lock()
-        self.plugin.TEMPLATE_PATH = self.template
-        self.plugin.PROFILE_PLUGIN_DIR = self.profile_plugins
+        set_plugin(self.plugin, "PROFILE_WRITE_LOCK", asyncio.Lock())
+        set_plugin(self.plugin, "TEMPLATE_PATH", self.template)
+        set_plugin(self.plugin, "PROFILE_PLUGIN_DIR", self.profile_plugins)
         self.tools._get_platform_tools = fake_platform_tools
         type(self).list_fails = False
         type(self).deleted = []
@@ -845,7 +844,7 @@ class ProfileApiRouteTest(unittest.TestCase):
                 raise OSError("injected")
             return write(target, value)
 
-        with mock.patch.object(self.plugin, "_atomic_private_write", side_effect=failing_write):
+        with patch_plugin(self.plugin, "_atomic_private_write", side_effect=failing_write):
             self.assertEqual(self.connector().status_code, 503)
         self.assertEqual((self.root / "alice/config.yaml").read_bytes(), before)
         self.assertEqual(soul.read_text(encoding="utf-8"), "기본 성격\n")
@@ -933,7 +932,7 @@ class ProfileApiRouteTest(unittest.TestCase):
                 failed = True
                 raise OSError("injected")
             return write(target, value)
-        with mock.patch.object(self.plugin, "_atomic_private_write", side_effect=failing_write):
+        with patch_plugin(self.plugin, "_atomic_private_write", side_effect=failing_write):
             self.assertEqual(self.connector().status_code, 503)
         self.assertEqual(path.read_bytes(), before)
         self.assertFalse((self.root / "alice/.env").exists())
@@ -1036,7 +1035,7 @@ class ProfileApiRouteTest(unittest.TestCase):
             write(target, value)
             if "connector-backups" in target.parts and target.name == "config.yaml":
                 env.write_text("OTHER=external\n", encoding="utf-8")
-        with mock.patch.object(self.plugin, "_atomic_private_write", side_effect=external_edit):
+        with patch_plugin(self.plugin, "_atomic_private_write", side_effect=external_edit):
             self.assertEqual(self.connector().status_code, 409)
         self.assertEqual(env.read_text(), "OTHER=external\n")
 
@@ -1210,6 +1209,62 @@ class ProfileApiRouteTest(unittest.TestCase):
         self.assertIs(rewritten.body["plugin_updated"], False)
         self.assertIs(self.policy_hook(), True)
 
+    def test_policy_hook_checks_and_repairs_every_python_module(self):
+        """하위 모듈이 바뀌거나 없어져도 hook 조회가 거짓이고 설치가 모두 복원한다."""
+        self.connector_fixture()
+        self.assertEqual(self.connector().status_code, 200)
+        source = self.profile_plugins / "fos-ctx"
+        installed = self.root / "alice/plugins/fos-ctx"
+        expected = {"plugin.yaml"} | {module.name for module in source.glob("*.py")}
+        self.assertEqual(set(self.plugin.PROFILE_PLUGIN_FILES), expected)
+        for name in sorted(expected):
+            original = (source / name).read_bytes()
+            for change in ("changed", "missing"):
+                with self.subTest(module=name, change=change):
+                    target = installed / name
+                    if change == "changed":
+                        target.write_bytes(original + b"# changed\n")
+                    else:
+                        target.unlink()
+                    self.assertIs(self.policy_hook(), False)
+                    repaired = self.connector()
+                    self.assertEqual(repaired.status_code, 200)
+                    self.assertIs(repaired.body["plugin_updated"], True)
+                    self.assertEqual(target.read_bytes(), original)
+                    self.assertIs(self.policy_hook(), True)
+
+    def assert_profile_entrypoint_is_written_last(self, install):
+        """단일 파일 plugin 을 갱신할 때 진입점 교체 전에 하위 모듈이 모두 있어야 한다."""
+        installed = self.root / "alice/plugins/fos-ctx"
+        modules = {module.name for module in (self.profile_plugins / "fos-ctx").glob("*.py")}
+        modules.remove("__init__.py")
+        for name in modules:
+            (installed / name).unlink()
+        (installed / "__init__.py").write_bytes(b"# previous plugin\n")
+        original_write = self.plugin._atomic_private_write
+        written = []
+
+        def write(target, value):
+            if target.parent == installed:
+                if target.name == "__init__.py":
+                    self.assertTrue(all((installed / name).is_file() for name in modules))
+                written.append(target.name)
+            return original_write(target, value)
+
+        with patch_plugin(self.plugin, "_atomic_private_write", side_effect=write):
+            response = install()
+        self.assertEqual(response.status_code, 200)
+        self.assertIs(response.body["plugin_updated"], True)
+        self.assertEqual(written[-1], "__init__.py")
+
+    def test_connector_install_writes_profile_entrypoint_after_modules(self):
+        self.connector_fixture()
+        self.assert_profile_entrypoint_is_written_last(self.connector)
+
+    def test_binding_install_writes_profile_entrypoint_after_modules(self):
+        self.bind_fixture()
+        self.assert_profile_entrypoint_is_written_last(self.bind)
+
     def test_connector_install_restores_a_missing_profile_plugin(self):
         """profile 에 hook plugin 디렉터리가 없으면 설치가 묶음의 판으로 만든다."""
         self.connector_fixture()
@@ -1229,7 +1284,7 @@ class ProfileApiRouteTest(unittest.TestCase):
         self.connector_fixture()
         installed = self.root / "alice/plugins/fos-ctx/__init__.py"
         installed.write_bytes(b"# kept\n")
-        self.plugin.PROFILE_PLUGIN_DIR = self.root.parent / "no-profile-plugins"
+        set_plugin(self.plugin, "PROFILE_PLUGIN_DIR", self.root.parent / "no-profile-plugins")
         response = self.connector()
         self.assertEqual(response.status_code, 200)
         self.assertIs(response.body["changed"], True)
@@ -1313,7 +1368,7 @@ class ProfileApiRouteTest(unittest.TestCase):
             attempted.append(target)
             return write(target, value)
 
-        with mock.patch.object(self.plugin, "_atomic_private_write", side_effect=failing_write):
+        with patch_plugin(self.plugin, "_atomic_private_write", side_effect=failing_write):
             self.assertEqual(self.connector().status_code, 503)
         # 실패한 쓰기가 마지막이었다. 그 앞에 나머지 파일을 모두 썼어야 되돌리기를 검사한 것이다.
         self.assertEqual(attempted[-1], None)
@@ -1334,7 +1389,7 @@ class ProfileApiRouteTest(unittest.TestCase):
                 raise OSError("injected")
             return write(target, value)
 
-        with mock.patch.object(self.plugin, "_atomic_private_write", side_effect=failing_write):
+        with patch_plugin(self.plugin, "_atomic_private_write", side_effect=failing_write):
             self.assertEqual(self.connector().status_code, 503)
         self.assertFalse((profile / "plugins").exists())
         self.assertFalse((profile / self.plugin.CONNECTOR_TOOL_MAP).exists())
@@ -1804,9 +1859,7 @@ class ProfileApiRouteTest(unittest.TestCase):
         self.assertIs(self.status_of()["policy_hook"], True)
 
         # 떼기 전에 시작한 실행은 그 서버를 쥐고 있다. 그 profile 에 설치된 fos-ctx 가 쓰기 도구를 정책에 묻는다.
-        spec = importlib.util.spec_from_file_location("fos_ctx_installed", alice / "plugins/fos-ctx/__init__.py")
-        ctx = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(ctx)
+        ctx = load_plugin("fos_ctx_installed", alice / "plugins/fos-ctx/__init__.py", self.addCleanup)
         asked = []
 
         def policy(tool_name, args, session_id, tool_call_id, servers):
@@ -1814,8 +1867,8 @@ class ProfileApiRouteTest(unittest.TestCase):
             return {"action": "block", "message": "붙은 연결이 없다"}
 
         read_tool_map = ctx.read_tool_map
-        with mock.patch.object(ctx, "read_tool_map", lambda: read_tool_map(alice)), \
-                mock.patch.object(ctx, "connector_policy", side_effect=policy):
+        with patch_plugin(ctx, "read_tool_map", lambda: read_tool_map(alice)), \
+                patch_plugin(ctx, "connector_policy", side_effect=policy):
             result = ctx.pre_tool_call(tool_name="mcp__demo__write_note", args={"text": "x"},
                                        session_id="session-1", tool_call_id="call-1")
         self.assertEqual(result, {"action": "block", "message": "붙은 연결이 없다"})
@@ -1854,8 +1907,8 @@ class ProfileApiRouteTest(unittest.TestCase):
             ran.append(manifest["id"])
             return None
 
-        with mock.patch.object(self.plugin, "_mcp_sdk_problem", return_value=None), \
-                mock.patch.object(self.plugin, "_run_connector_execute", side_effect=runner):
+        with patch_plugin(self.plugin, "_mcp_sdk_problem", return_value=None), \
+                patch_plugin(self.plugin, "_run_connector_execute", side_effect=runner):
             for plugin, tool in ((DEMO, "mcp__demo__write_note"), (OTHER, "mcp__other__write_note")):
                 self.request("/api/connectors/%s/execute" % plugin, "POST", token="valid", full_response=True,
                              body={"profile": "alice", "hermes_tool": tool, "args": {}})
@@ -2145,7 +2198,7 @@ class ProfileApiRouteTest(unittest.TestCase):
             attempted.append(target)
             return write(target, value)
 
-        with mock.patch.object(self.plugin, "_atomic_private_write", side_effect=failing_write):
+        with patch_plugin(self.plugin, "_atomic_private_write", side_effect=failing_write):
             self.assertEqual(self.bind().status_code, 503)
         # 실패한 쓰기가 마지막이었다. 그 앞에 나머지 파일을 모두 썼어야 되돌리기를 검사한 것이다.
         self.assertEqual(attempted[-1], None)
@@ -2352,8 +2405,8 @@ class ProfileApiRouteTest(unittest.TestCase):
             seen.append((tool, env))
             return types.SimpleNamespace(structured_content={"scopes": []}, is_error=False, content=[])
 
-        with mock.patch.object(self.plugin, "_mcp_sdk_problem", return_value=None), \
-                mock.patch.object(self.plugin, "_run_connector_tool", verify):
+        with patch_plugin(self.plugin, "_mcp_sdk_problem", return_value=None), \
+                patch_plugin(self.plugin, "_run_connector_tool", verify):
             called = self.request("/api/connectors/%s/call" % DEMO, "POST", token="valid", full_response=True,
                                   body={"tool": "list_scopes", "vault": "c7"})
         self.assertEqual((called.status_code, called.body), (200, {"ok": True, "result": {"scopes": []}}))
@@ -2509,7 +2562,7 @@ class ProfileApiRouteTest(unittest.TestCase):
 
     def test_create_removes_profile_when_profile_plugin_is_missing(self):
         """profile 용 plugin 이 없으면 만든 profile 을 지운다."""
-        self.plugin.PROFILE_PLUGIN_DIR = self.root / "missing-plugins"
+        set_plugin(self.plugin, "PROFILE_PLUGIN_DIR", self.root / "missing-plugins")
         self.assert_rolled_back(self.create())
 
     def test_create_rejects_body_keys_before_handler(self):
@@ -2533,7 +2586,7 @@ class ProfileApiRouteTest(unittest.TestCase):
 
     def test_create_without_template_removes_profile(self):
         """템플릿이 없으면 만든 profile 을 지운다."""
-        self.plugin.TEMPLATE_PATH = self.root / "missing.yaml.template"
+        set_plugin(self.plugin, "TEMPLATE_PATH", self.root / "missing.yaml.template")
         self.assert_rolled_back(self.create())
 
     def test_create_removes_profile_when_forbidden_toolset_remains(self):
@@ -3105,7 +3158,7 @@ class ProfileApiRouteTest(unittest.TestCase):
 
     def test_sandbox_attachment_preparation_failure_preserves_config(self):
         original = (self.root / "owner/config.yaml").read_bytes()
-        with mock.patch.object(self.plugin, "_sandbox_verify_attachment_directories", side_effect=OSError("denied")):
+        with patch_plugin(self.plugin, "_sandbox_verify_attachment_directories", side_effect=OSError("denied")):
             self.assertEqual(self.request("/api/config", "PUT", token="valid", body=self.file_body()), 409)
         self.assertEqual((self.root / "owner/config.yaml").read_bytes(), original)
 
@@ -3141,7 +3194,7 @@ class ProfileApiRouteTest(unittest.TestCase):
             directory.symlink_to(directory.with_name("old-user"), target_is_directory=True)
             return terminal
 
-        with mock.patch.object(self.plugin, "_sandbox_terminal", side_effect=replace_source):
+        with patch_plugin(self.plugin, "_sandbox_terminal", side_effect=replace_source):
             self.assertEqual(self.request("/api/config", "PUT", token="valid", body=self.file_body()), 409)
         self.assertEqual((self.root / "owner/config.yaml").read_bytes(), original)
 
@@ -3156,7 +3209,7 @@ class ProfileApiRouteTest(unittest.TestCase):
             directory.mkdir()
             return write_config(*args, **kwargs)
 
-        with mock.patch.object(self.plugin, "_write_checked_config", side_effect=replace_target):
+        with patch_plugin(self.plugin, "_write_checked_config", side_effect=replace_target):
             self.assertEqual(self.request("/api/config", "PUT", token="valid", body=self.file_body()), 409)
         self.assertEqual((self.root / "owner/config.yaml").read_bytes(), original)
 
@@ -3171,7 +3224,7 @@ class ProfileApiRouteTest(unittest.TestCase):
             directory.symlink_to(directory.with_name("old-user"), target_is_directory=True)
             return snapshot
 
-        with mock.patch.object(self.plugin, "_sandbox_verify_attachment_directories", side_effect=replace_source):
+        with patch_plugin(self.plugin, "_sandbox_verify_attachment_directories", side_effect=replace_source):
             self.assertEqual(self.request("/api/config", "PUT", token="valid", body=self.file_body()), 409)
         self.assertEqual((self.root / "owner/config.yaml").read_bytes(), original)
 
@@ -3191,7 +3244,7 @@ class ProfileApiRouteTest(unittest.TestCase):
             directory.symlink_to(directory.with_name("old-user"), target_is_directory=True)
             return install(*args, **kwargs)
 
-        with mock.patch.object(self.plugin, "_connector_config", side_effect=replace_source):
+        with patch_plugin(self.plugin, "_connector_config", side_effect=replace_source):
             self.assertEqual(self.connector().status_code, 409)
         self.assertEqual(path.read_bytes(), original)
         self.assertFalse((path.parent / self.plugin.CONNECTOR_STATE).exists())
