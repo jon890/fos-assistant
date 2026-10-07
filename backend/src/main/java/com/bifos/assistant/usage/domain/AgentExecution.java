@@ -34,34 +34,6 @@ import lombok.experimental.Accessors;
 @Accessors(fluent = true)
 public class AgentExecution {
 
-    /** 과거 실행은 UNKNOWN 이다. 새 제출은 비수집을 먼저 표시하고 수집 경로가 OBSERVING 으로 바꾼다. */
-    @Enumerated(EnumType.STRING)
-    @Column(name = "event_observation", nullable = false, length = 20)
-    private EventObservation eventObservation = EventObservation.UNKNOWN;
-
-    private void closeInterruptedObservation() {
-        if (eventObservation == EventObservation.OBSERVING) {
-            eventObservation = EventObservation.INCOMPLETE;
-        }
-    }
-
-    public void beginEventObservation() {
-        eventObservation = EventObservation.OBSERVING;
-    }
-
-    /** 실패 표시는 뒤늦은 정상 스트림 종료로 지우지 않는다. */
-    public boolean finishEventObservation(boolean complete) {
-        if (complete && eventObservation != EventObservation.OBSERVING) {
-            return false;
-        }
-        EventObservation next = complete ? EventObservation.OBSERVED : EventObservation.INCOMPLETE;
-        if (eventObservation == next) {
-            return false;
-        }
-        eventObservation = next;
-        return true;
-    }
-
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Getter
@@ -160,6 +132,11 @@ public class AgentExecution {
     @Column(name = "status", nullable = false, length = 20)
     @Getter
     private ExecutionStatus status;
+
+    /** 과거 실행은 UNKNOWN 이다. 새 제출은 비수집을 먼저 표시하고 수집 경로가 OBSERVING 으로 바꾼다. */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "event_observation", nullable = false, length = 20)
+    private EventObservation eventObservation = EventObservation.UNKNOWN;
 
     @Column(name = "error_code", length = 64)
     @Getter
@@ -324,6 +301,29 @@ public class AgentExecution {
      */
     public Long treeRootId() {
         return rootExecutionId == null ? id : rootExecutionId;
+    }
+
+    private void closeInterruptedObservation() {
+        if (eventObservation == EventObservation.OBSERVING) {
+            eventObservation = EventObservation.INCOMPLETE;
+        }
+    }
+
+    public void beginEventObservation() {
+        eventObservation = EventObservation.OBSERVING;
+    }
+
+    /** 실패 표시는 뒤늦은 정상 스트림 종료로 지우지 않는다. */
+    public boolean finishEventObservation(boolean complete) {
+        if (complete && eventObservation != EventObservation.OBSERVING) {
+            return false;
+        }
+        EventObservation next = complete ? EventObservation.OBSERVED : EventObservation.INCOMPLETE;
+        if (eventObservation == next) {
+            return false;
+        }
+        eventObservation = next;
+        return true;
     }
 
     /** 실행을 제출한 직후 Hermes 가 준 run 번호를 적는다. */
