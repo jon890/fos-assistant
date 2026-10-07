@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef } from "react";
+import { useRef, useState } from "react";
 import { X } from "lucide-react";
 import { cn } from "cn";
 import {
@@ -49,8 +49,10 @@ export function ArtifactPanel({
   // 첫 그림에서 폭을 모르면(null) 옆에 붙는 모양으로 그린다.
   const wide = useMediaQuery("(min-width: 1024px)");
   const closeRef = useRef<HTMLButtonElement>(null);
+  // 다시 열 때는 옛 X-Frame-Options 가 남은 캐시를 피한다. 열린 동안에는 주소를 유지한다.
+  const [cacheKey] = useState(() => crypto.randomUUID());
   const name = givenName ?? artifactName(path);
-  const src = artifactUrl(conversationId, path);
+  const src = `${artifactUrl(conversationId, path)}?open=${cacheKey}`;
 
   const header = (title: React.ReactNode) => (
     <header className="flex min-w-0 items-center gap-2 border-b border-border px-4 py-3">

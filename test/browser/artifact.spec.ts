@@ -53,6 +53,9 @@ test("답 아래 결과물을 누르면 스크립트가 막힌 iframe 에 사진
   // 주소를 직접 열어도 스크립트가 돌지 않도록 응답 머리글이 옮겨져 있어야 한다.
   const src = await frame.getAttribute("src");
   expect(src).toBeTruthy();
+  const openedUrl = new URL(src!, page.url());
+  expect(openedUrl.searchParams.get("open")).toBeTruthy();
+  await expect(panel.getByTestId("artifact-open-tab")).toHaveAttribute("href", src!);
   const direct = await page.request.get(src!);
   expect(direct.status()).toBe(200);
   const headers = direct.headers();
@@ -77,6 +80,15 @@ test("답 아래 결과물을 누르면 스크립트가 막힌 iframe 에 사진
 
   await panel.getByRole("button", { name: "결과물 닫기" }).click();
   await expect(panel).toHaveCount(0);
+
+  // 같은 파일을 다시 열어도 이전 응답의 차단 머리글이 남은 캐시 주소를 쓰지 않는다.
+  await rows.first().getByRole("button").click();
+  await expect(frame).toBeVisible();
+  const reopenedSrc = await frame.getAttribute("src");
+  expect(reopenedSrc).not.toBe(src);
+  expect(new URL(reopenedSrc!, page.url()).pathname).toBe(openedUrl.pathname);
+  await expect(panel.getByTestId("artifact-open-tab")).toHaveAttribute("href", reopenedSrc!);
+  await expect(frame.contentFrame().locator("img")).toBeVisible();
 });
 
 test("결과물 패널을 연 채 작업 과정 패널을 열면 결과물 패널이 닫힌다", async ({ page }, testInfo) => {
