@@ -1,14 +1,13 @@
 package com.bifos.assistant.usage.application;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.Mockito.when;
 
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.agent.domain.type.AgentVisibility;
 import com.bifos.assistant.agent.domain.type.CostMode;
 import com.bifos.assistant.agent.domain.type.CredentialScope;
 import com.bifos.assistant.agent.infra.AgentRepository;
-import com.bifos.assistant.hermes.HermesRunsClient;
+import com.bifos.assistant.hermes.StubHermesRunsClient;
 import com.bifos.assistant.hermes.dto.SubagentSessionUsage;
 import com.bifos.assistant.testsupport.BackendIntegrationTest;
 import com.bifos.assistant.testsupport.SamplePriceCatalog;
@@ -34,7 +33,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 /**
  * native 자식의 원장 줄이 월 합계와 축별 합계에 한 번만 더해지고, 금액을 확인하지 못한 자식이 건수로
@@ -102,8 +100,8 @@ class SubagentUsageLedgerTest {
     AgentRepository agents;
 
     /** 자식 session 조회만 대역으로 바꾼다. 저장소와 재조회는 실제 빈이다. */
-    @MockitoBean
-    HermesRunsClient hermes;
+    @Autowired
+    StubHermesRunsClient hermes;
 
     private Agent agent;
     private Instant now;
@@ -483,8 +481,7 @@ class SubagentUsageLedgerTest {
     }
 
     private void stubSession(String session, SubagentSessionUsage usage) {
-        when(hermes.readSubagentUsage(agent.apiBaseUrl(), agent.hermesProfile(), session))
-                .thenReturn(usage);
+        hermes.willReportSubagentUsage(session, usage);
     }
 
     /** provider 를 읽었고 이미 끝난 자식의 session 응답이다. */

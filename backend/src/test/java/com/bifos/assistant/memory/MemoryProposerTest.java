@@ -2,9 +2,9 @@ package com.bifos.assistant.memory;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
 
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.agent.domain.type.AgentVisibility;
@@ -56,7 +56,6 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentMatchers;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.transaction.support.TransactionTemplate;
 import tools.jackson.databind.ObjectMapper;
 
@@ -90,7 +89,7 @@ class MemoryProposerTest {
     @Autowired
     HermesRunsClient hermes;
 
-    @MockitoBean
+    @Autowired
     PriceCatalog prices;
 
     @Autowired
@@ -350,10 +349,11 @@ class MemoryProposerTest {
     @DisplayName("실패한 Memory 제안도 사용량과 실제 모델 비용을 보존하고 원래 대화에는 오류를 전하지 않는다")
     void preservesUsageAndCostWithoutThrowingWhenProposalReturnsFailure(String errorCode) {
         AgentExecution parent = recorder.start(USER, conversation.executionConversation(), agent, null, null, 0L);
-        when(prices.find("served-provider", "served-model"))
-                .thenReturn(Optional.of(new CatalogPrice(
+        doReturn(Optional.of(new CatalogPrice(
                         new ModelPrice(new BigDecimal("5"), new BigDecimal("30"), new BigDecimal("0.5"), List.of()),
-                        "test-pricing@2026-10-01")));
+                        "test-pricing@2026-10-01")))
+                .when(prices)
+                .find("served-provider", "served-model");
         String error = "PROVIDER_BLOCKED".equals(errorCode)
                 ? HermesRunResult.PROVIDER_AUTH_FAILED_PREFIX + " every account is blocked"
                 : "provider stopped after generating tokens";

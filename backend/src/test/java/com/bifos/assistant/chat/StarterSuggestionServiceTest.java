@@ -3,6 +3,7 @@ package com.bifos.assistant.chat;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.spy;
@@ -65,7 +66,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import tools.jackson.databind.ObjectMapper;
 
 /**
@@ -122,7 +122,7 @@ class StarterSuggestionServiceTest {
     @Autowired
     UserExecutionLimiter limiter;
 
-    @MockitoBean
+    @Autowired
     PriceCatalog prices;
 
     private final MutableClock clock = new MutableClock(Instant.parse("2026-01-01T00:00:00Z"));
@@ -441,10 +441,11 @@ class StarterSuggestionServiceTest {
     @ValueSource(strings = {"FAILED", "PROVIDER_BLOCKED", "STARTER_OUTPUT_INVALID"})
     @DisplayName("추천 실패와 잘못된 답은 사용량과 실제 모델 비용을 보존하고 재시도 시간 동안 NONE 을 준다")
     void preservesUsageAndCostForFailedResultAndInvalidOutput(String errorCode) {
-        when(prices.find("served-provider", "served-model"))
-                .thenReturn(Optional.of(new CatalogPrice(
+        doReturn(Optional.of(new CatalogPrice(
                         new ModelPrice(new BigDecimal("5"), new BigDecimal("30"), new BigDecimal("0.5"), List.of()),
-                        "test-pricing@2026-10-01")));
+                        "test-pricing@2026-10-01")))
+                .when(prices)
+                .find("served-provider", "served-model");
         boolean invalidOutput = "STARTER_OUTPUT_INVALID".equals(errorCode);
         String error = "PROVIDER_BLOCKED".equals(errorCode)
                 ? HermesRunResult.PROVIDER_AUTH_FAILED_PREFIX + " every account is blocked"

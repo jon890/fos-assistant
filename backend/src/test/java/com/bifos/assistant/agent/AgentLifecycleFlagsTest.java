@@ -2,6 +2,8 @@ package com.bifos.assistant.agent;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.verifyNoInteractions;
 
 import com.bifos.assistant.agent.application.AgentEndpointProbe;
@@ -41,7 +43,6 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
@@ -89,7 +90,7 @@ class AgentLifecycleFlagsTest {
     HermesToolsetClient hermesToolsets;
 
     /** 관리자가 등록할 때 주소가 닿는지 본다. 실제 Hermes 를 부르지 않도록 통과시킨다. */
-    @MockitoBean
+    @Autowired
     AgentEndpointProbe endpointProbe;
 
     private CurrentUser owner;
@@ -98,6 +99,7 @@ class AgentLifecycleFlagsTest {
 
     @BeforeEach
     void reset() {
+        doNothing().when(endpointProbe).requireReachable(any(), any());
         ((StubHermesRunsClient) hermes).reset();
         owner = user(UserRole.MEMBER);
         otherMember = user(UserRole.MEMBER);

@@ -10,7 +10,6 @@ import com.bifos.assistant.agent.domain.type.CredentialScope;
 import com.bifos.assistant.agent.infra.AgentRepository;
 import com.bifos.assistant.chat.application.DelegationFinished;
 import com.bifos.assistant.chat.application.TurnCancellation;
-import com.bifos.assistant.chat.application.WakeRetryDue;
 import com.bifos.assistant.chat.domain.ChatMessage;
 import com.bifos.assistant.chat.domain.Conversation;
 import com.bifos.assistant.chat.domain.type.MessageRole;
@@ -25,8 +24,10 @@ import com.bifos.assistant.memory.infra.MemoryRepository;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.testsupport.BackendIntegrationTest;
+import com.bifos.assistant.testsupport.CapturingTaskScheduler;
 import com.bifos.assistant.testsupport.DelegationWakeEnabled;
 import com.bifos.assistant.testsupport.SmallExecutionLimit;
+import com.bifos.assistant.testsupport.WakeRetryThreads;
 import com.bifos.assistant.usage.application.UserExecutionLimiter;
 import com.bifos.assistant.usage.domain.AgentExecution;
 import com.bifos.assistant.usage.domain.type.ExecutionStatus;
@@ -39,23 +40,12 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
-import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.CopyOnWriteArrayList;
-import java.util.concurrent.LinkedBlockingQueue;
-import java.util.concurrent.ScheduledFuture;
-import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.ApplicationEventPublisher;
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Import;
-import org.springframework.context.annotation.Primary;
-import org.springframework.context.event.EventListener;
-import org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler;
 
 /**
  * 위임 결과 자동 turn 이 사용자 실행 한도에 닿았을 때 상한이 있는 재시도를 거는지 본다(ADR-069).
@@ -67,77 +57,10 @@ import org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler;
 @BackendIntegrationTest
 @DelegationWakeEnabled
 @SmallExecutionLimit
-@Import({
-    DelegationWakeUserLimitTest.CapturingSchedulerConfig.class,
-    DelegationWakeUserLimitTest.RetryThreadsConfig.class
-})
 class DelegationWakeUserLimitTest {
 
     private static final Duration WAIT_LIMIT = Duration.ofSeconds(10);
     private static final int MAX_BUSY_RETRIES = 10;
-
-    /** 시각 예약만 모아 두고 돌리지 않는다. 그 밖의 예약은 실제 스케줄러로 간다. */
-    static final class CapturingTaskScheduler extends ThreadPoolTaskScheduler {
-        private final List<Runnable> scheduled = new CopyOnWriteArrayList<>();
-        private final List<Instant> startTimes = new CopyOnWriteArrayList<>();
-
-        @Override
-        public ScheduledFuture<?> schedule(Runnable task, Instant startTime) {
-            scheduled.add(task);
-            startTimes.add(startTime);
-            return null;
-        }
-
-        /** 모아 둔 작업을 꺼내 비운다. */
-        List<Runnable> drain() {
-            List<Runnable> tasks = new ArrayList<>(scheduled);
-            scheduled.clear();
-            return tasks;
-        }
-
-        void clear() {
-            scheduled.clear();
-            startTimes.clear();
-        }
-    }
-
-    @TestConfiguration
-    static class CapturingSchedulerConfig {
-        @Bean
-        @Primary
-        CapturingTaskScheduler capturingTaskScheduler() {
-            return new CapturingTaskScheduler();
-        }
-    }
-
-    /** 재시도 사건을 낸 스레드를 모은다. 그 스레드가 끝나면 사건을 받은 쪽의 일도 끝났다. */
-    static final class RetryThreads {
-        private final BlockingQueue<Thread> threads = new LinkedBlockingQueue<>();
-
-        @EventListener
-        public void onWakeRetryDue(WakeRetryDue event) {
-            threads.add(Thread.currentThread());
-        }
-
-        /** 재시도 사건 하나가 나고 그 스레드가 끝날 때까지 기다린다. 제한 시간을 넘으면 실패한다. */
-        void awaitOne() throws InterruptedException {
-            Thread thread = threads.poll(WAIT_LIMIT.toMillis(), TimeUnit.MILLISECONDS);
-            if (thread == null) {
-                fail("재시도 사건이 %s 안에 나지 않았다", WAIT_LIMIT);
-            }
-            if (!thread.join(WAIT_LIMIT)) {
-                fail("재시도 스레드 %s 가 %s 안에 끝나지 않았다", thread.getName(), WAIT_LIMIT);
-            }
-        }
-    }
-
-    @TestConfiguration
-    static class RetryThreadsConfig {
-        @Bean
-        RetryThreads retryThreads() {
-            return new RetryThreads();
-        }
-    }
 
     /** 자동 turn 의 답 조각은 이 검사가 보지 않는다. 실제 스트림 주소로 연결하지 않게 대역으로 둔다. */
     @Autowired
@@ -147,7 +70,7 @@ class DelegationWakeUserLimitTest {
     CapturingTaskScheduler scheduler;
 
     @Autowired
-    RetryThreads retryThreads;
+    WakeRetryThreads retryThreads;
 
     @Autowired
     UserExecutionLimiter limiter;
@@ -195,8 +118,8 @@ class DelegationWakeUserLimitTest {
     void setUp() {
         awaitAllIdle();
         stub().reset();
-        scheduler.clear();
-        retryThreads.threads.clear();
+        scheduler.capture();
+        retryThreads.start();
         executionEvents.deleteAll();
         executions.deleteAll();
         messages.deleteAll();
@@ -236,7 +159,7 @@ class DelegationWakeUserLimitTest {
 
         finished(done);
 
-        assertThat(scheduler.startTimes)
+        assertThat(scheduler.startTimes())
                 .as("예약한 재시도")
                 .singleElement()
                 .satisfies(at -> assertThat(at).as("예약 시각").isAfterOrEqualTo(before.plus(Duration.ofSeconds(30))));
@@ -260,7 +183,7 @@ class DelegationWakeUserLimitTest {
             assertThat(due).as("%d번째 짧은 재시도", ran + 1).hasSize(1);
             runRetry(due.getFirst());
         }
-        List<Instant> times = scheduler.startTimes;
+        List<Instant> times = scheduler.startTimes();
         Instant shortRetry = times.get(times.size() - 2);
         Instant longRetry = times.getLast();
         assertThat(longRetry)
@@ -273,7 +196,7 @@ class DelegationWakeUserLimitTest {
         runRetry(slow.getFirst());
         List<Runnable> again = scheduler.drain();
         assertThat(again).as("여전히 막히면 다시 건 예약").hasSize(1);
-        assertThat(scheduler.startTimes.getLast())
+        assertThat(scheduler.startTimes().getLast())
                 .as("이어 건 예약도 5분 간격")
                 .isAfterOrEqualTo(Instant.now().plus(Duration.ofMinutes(5)).minus(WAIT_LIMIT));
         assertThat(executions.findById(done.id()).orElseThrow().resultDeliveredAt())
@@ -347,7 +270,7 @@ class DelegationWakeUserLimitTest {
     /** 예약한 재시도 작업을 돌리고, 그 작업이 띄운 스레드가 사건을 내고 끝날 때까지 기다린다. */
     private void runRetry(Runnable task) throws InterruptedException {
         task.run();
-        retryThreads.awaitOne();
+        retryThreads.awaitOne(WAIT_LIMIT);
     }
 
     /** 대화 turn 의 루트가 아닌 RUNNING 줄 둘로 dad 의 자리를 채운다. 대화가 없어 결과로 전해지지 않는다. */

@@ -27,6 +27,7 @@ import com.tngtech.archunit.base.DescribedPredicate;
 import com.tngtech.archunit.core.domain.JavaClass;
 import com.tngtech.archunit.core.domain.JavaConstructor;
 import com.tngtech.archunit.core.domain.JavaField;
+import com.tngtech.archunit.core.domain.JavaMethod;
 import com.tngtech.archunit.lang.ArchCondition;
 import com.tngtech.archunit.lang.ArchRule;
 import com.tngtech.archunit.lang.CompositeArchRule;
@@ -44,12 +45,26 @@ import java.util.concurrent.Executors;
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.context.annotation.Import;
 import org.springframework.stereotype.Component;
 import org.springframework.stereotype.Repository;
 import org.springframework.stereotype.Service;
+import org.springframework.test.annotation.DirtiesContext;
+import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.ContextConfiguration;
+import org.springframework.test.context.DynamicPropertySource;
+import org.springframework.test.context.TestPropertySource;
+import org.springframework.test.context.TestPropertySources;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.test.context.bean.override.mockito.MockitoBeans;
+import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
+import org.springframework.test.context.bean.override.mockito.MockitoSpyBeans;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.validation.annotation.Validated;
 
@@ -246,6 +261,44 @@ public final class ArchitectureRules {
             .should()
             .beAnnotatedWith(DisplayName.class)
             .as("테스트 메서드에는 DisplayName 이 붙는다");
+
+    /** 검사 클래스나 그 중첩 클래스에 붙으면 Spring 이 컨텍스트를 따로 띄우는 주석이다. */
+    private static final List<Class<? extends Annotation>> CONTEXT_SPLITTING_CLASS_ANNOTATIONS = List.of(
+            MockitoBean.class,
+            MockitoBeans.class,
+            MockitoSpyBean.class,
+            MockitoSpyBeans.class,
+            Import.class,
+            TestPropertySource.class,
+            TestPropertySources.class,
+            SpringBootTest.class,
+            ContextConfiguration.class,
+            ActiveProfiles.class,
+            DirtiesContext.class,
+            TestConfiguration.class);
+
+    /** 필드에 붙으면 컨텍스트를 나누는 주석이다. */
+    private static final List<Class<? extends Annotation>> CONTEXT_SPLITTING_FIELD_ANNOTATIONS =
+            List.of(MockitoBean.class, MockitoSpyBean.class);
+
+    /** 메서드에 붙으면 컨텍스트를 나누거나 닫는 주석이다. */
+    private static final List<Class<? extends Annotation>> CONTEXT_SPLITTING_METHOD_ANNOTATIONS =
+            List.of(DynamicPropertySource.class, DirtiesContext.class);
+
+    /**
+     * {@code testsupport} 밖의 검사 클래스는 Spring 컨텍스트를 나누는 선언을 두지 않는다. 대상 주석은 클래스와 중첩 클래스는
+     * {@link #CONTEXT_SPLITTING_CLASS_ANNOTATIONS}, 필드는 {@link #CONTEXT_SPLITTING_FIELD_ANNOTATIONS}, 메서드는
+     * {@link #CONTEXT_SPLITTING_METHOD_ANNOTATIONS} 가 갖는다. 중첩 {@code TestConfiguration} 클래스는 따로 가져오지 않아도 Spring
+     * Boot 가 찾아 컨텍스트를 나눈다. 테스트 클래스만 읽는다. MySQL 검사({@code @Tag("mysql")} 이거나 이름에 {@code Mysql} 이 든 클래스와 그 중첩 클래스)는 따로 띄우므로 뺀다.
+     *
+     * <p>근거: ADR-20261007 / test-context-base. 검사 클래스마다 선언이 다르면 컨텍스트가 늘고, 닫힌 컨텍스트가 힙을 붙잡는다.
+     */
+    public static final ArchRule TESTS_DO_NOT_SPLIT_CONTEXT = classes()
+            .that(resideOutsideOfPackage("com.bifos.assistant.testsupport.."))
+            .and(notMysqlTest())
+            .should(notDeclareContextSplitting())
+            .allowEmptyShould(true)
+            .as("검사 클래스는 Spring 컨텍스트를 나누는 선언을 두지 않는다");
 
     /**
      * {@code application} 밖의 클래스와 메서드에는 {@code @Transactional} 을 붙이지 않는다.
@@ -514,6 +567,57 @@ public final class ArchitectureRules {
             }
         }
         return false;
+    }
+
+    /** 그 클래스나 바깥 클래스가 MySQL 검사가 아니다. */
+    private static DescribedPredicate<JavaClass> notMysqlTest() {
+        return new DescribedPredicate<>("MySQL 검사가 아니다") {
+            @Override
+            public boolean test(JavaClass item) {
+                Optional<JavaClass> current = Optional.of(item);
+                while (current.isPresent()) {
+                    JavaClass each = current.get();
+                    boolean tagged = each.tryGetAnnotationOfType(Tag.class)
+                            .map(tag -> "mysql".equals(tag.value()))
+                            .orElse(false);
+                    if (tagged || each.getSimpleName().contains("Mysql")) {
+                        return false;
+                    }
+                    current = each.getEnclosingClass();
+                }
+                return true;
+            }
+        };
+    }
+
+    private static ArchCondition<JavaClass> notDeclareContextSplitting() {
+        return new ArchCondition<>("컨텍스트를 나누는 주석을 클래스, 필드, 메서드에 두지 않는다") {
+            @Override
+            public void check(JavaClass item, ConditionEvents events) {
+                for (Class<? extends Annotation> type : CONTEXT_SPLITTING_CLASS_ANNOTATIONS) {
+                    if (item.isAnnotatedWith(type)) {
+                        events.add(SimpleConditionEvent.violated(
+                                item, item.getName() + " 에 @" + type.getSimpleName() + " 이 붙었다"));
+                    }
+                }
+                for (JavaField field : item.getFields()) {
+                    for (Class<? extends Annotation> type : CONTEXT_SPLITTING_FIELD_ANNOTATIONS) {
+                        if (field.isAnnotatedWith(type)) {
+                            events.add(SimpleConditionEvent.violated(
+                                    field, field.getFullName() + " 에 @" + type.getSimpleName() + " 이 붙었다"));
+                        }
+                    }
+                }
+                for (JavaMethod method : item.getMethods()) {
+                    for (Class<? extends Annotation> type : CONTEXT_SPLITTING_METHOD_ANNOTATIONS) {
+                        if (method.isAnnotatedWith(type)) {
+                            events.add(SimpleConditionEvent.violated(
+                                    method, method.getFullName() + " 에 @" + type.getSimpleName() + " 이 붙었다"));
+                        }
+                    }
+                }
+            }
+        };
     }
 
     private static ArchCondition<JavaClass> notEnclosedByController() {

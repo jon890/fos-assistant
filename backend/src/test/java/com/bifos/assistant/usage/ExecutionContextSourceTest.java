@@ -36,7 +36,6 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DataAccessResourceFailureException;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
@@ -79,8 +78,8 @@ class ExecutionContextSourceTest {
     @Autowired
     PlatformTransactionManager transactionManager;
 
-    /** 실제로 돈 모델을 읽는 세션 조회를 여기서는 하지 않는다. 기록 규칙만 보는 검사다. */
-    @MockitoBean
+    /** 실제로 돈 모델을 읽는 세션 조회는 대역이 받는다. 기록 규칙만 보는 검사다. */
+    @Autowired
     HermesRunsClient hermes;
 
     private Conversation conversation;

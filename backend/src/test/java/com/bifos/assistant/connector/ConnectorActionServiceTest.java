@@ -18,8 +18,6 @@ import com.bifos.assistant.agent.domain.type.AgentVisibility;
 import com.bifos.assistant.agent.domain.type.CostMode;
 import com.bifos.assistant.agent.domain.type.CredentialScope;
 import com.bifos.assistant.agent.infra.AgentRepository;
-import com.bifos.assistant.connector.ConnectorPolicyTestDoubles.ChangeRecorder;
-import com.bifos.assistant.connector.ConnectorPolicyTestDoubles.Seen;
 import com.bifos.assistant.connector.application.ConnectorActionService;
 import com.bifos.assistant.connector.application.ConnectorCheckReportApprovals;
 import com.bifos.assistant.connector.application.ConnectorConnectionService;
@@ -60,6 +58,8 @@ import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.testsupport.BackendIntegrationTest;
+import com.bifos.assistant.testsupport.ConnectorChangeRecorder;
+import com.bifos.assistant.testsupport.ConnectorChangeRecorder.Seen;
 import com.bifos.assistant.usage.domain.AgentExecution;
 import com.bifos.assistant.usage.domain.type.ExecutionStatus;
 import com.bifos.assistant.usage.infra.AgentExecutionRepository;
@@ -94,7 +94,6 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -108,7 +107,6 @@ import tools.jackson.databind.json.JsonMapper;
  * 구성을 쓴다.
  */
 @BackendIntegrationTest
-@Import(ConnectorPolicyTestDoubles.class)
 class ConnectorActionServiceTest {
     private static final JsonMapper JSON = JsonMapper.builder().build();
     private static final String PROFILE = "connector-action-owner";
@@ -171,7 +169,7 @@ class ConnectorActionServiceTest {
     PlatformTransactionManager transactionManager;
 
     @Autowired
-    ChangeRecorder recorder;
+    ConnectorChangeRecorder recorder;
 
     @Autowired
     DelegationProperties delegation;
@@ -198,17 +196,10 @@ class ConnectorActionServiceTest {
 
     @BeforeEach
     void setUp() {
-        jdbc.update("DELETE FROM connector_action");
-        jdbc.update("DELETE FROM connector_tool_grant");
-        bindings.deleteAll();
-        connections.deleteAll();
-        McpCallSigner.clearRuns(jdbc, List.of(PROFILE, OTHER_PROFILE));
-        agents.deleteAll();
-        tokens.deleteAll();
-        users.deleteAll();
-        recorder.seen.clear();
+        deleteRows();
+        recorder.start();
         // 앞선 검사가 읽은 카탈로그가 남지 않게 보관 시간보다 멀리 옮긴다.
-        ConnectorPolicyTestDoubles.expireCatalog();
+        expireCatalog();
         when(connector.readCatalog()).thenReturn(List.of(DECLARING));
         when(connector.execute(anyString(), anyString(), anyString(), anyString()))
                 .thenReturn(CallResult.success(JSON.readTree("{\"saved\":true}")));
@@ -279,7 +270,7 @@ class ConnectorActionServiceTest {
         assertThat(Duration.between(row.createdAt(), row.expiresAt())).isEqualTo(Duration.ofHours(24));
         verify(connector, never()).execute(anyString(), anyString(), anyString(), anyString());
         // 사건은 줄을 커밋한 뒤에 나간다.
-        assertThat(recorder.seen)
+        assertThat(recorder.seen())
                 .containsExactly(new Seen(new ConnectorActionChanged(CONVERSATION, row.publicId()), false));
     }
 
@@ -299,7 +290,7 @@ class ConnectorActionServiceTest {
     @DisplayName("승인하면 저장한 인자와 값이 같은 인자로 한 번 실행하고 줄이 SUCCEEDED 와 결과를 갖는다")
     void approvalExecutesOnceWithStoredArgumentsAndRecordsResult() {
         UUID actionId = ask(WRITE, ARGS).actionId();
-        recorder.seen.clear();
+        recorder.clear();
 
         ConnectorActionView approved = service.approve(me, actionId, null);
 
@@ -314,13 +305,15 @@ class ConnectorActionServiceTest {
         assertThat(row.decidedAt()).isNotNull();
         assertThat(row.executedAt()).isNotNull();
         assertThat(grants.findAll()).isEmpty();
-        assertThat(recorder.seen).containsExactly(new Seen(new ConnectorActionChanged(CONVERSATION, actionId), false));
+        assertThat(recorder.seen())
+                .containsExactly(new Seen(new ConnectorActionChanged(CONVERSATION, actionId), false));
     }
 
     @AfterEach
     void tearDown() {
         checks.deleteAllById(createdChecks);
         createdChecks.clear();
+        deleteRows();
     }
 
     @Test
@@ -524,7 +517,7 @@ class ConnectorActionServiceTest {
     @DisplayName("거절하면 REJECTED 이고 실행하지 않으며 그 뒤 승인은 CONNECTOR_ACTION_NOT_PENDING 이다")
     void rejectionDoesNotExecute() {
         UUID actionId = ask(WRITE, ARGS).actionId();
-        recorder.seen.clear();
+        recorder.clear();
 
         ConnectorActionView rejected = service.reject(me, actionId);
 
@@ -533,7 +526,8 @@ class ConnectorActionServiceTest {
         assertCode(() -> service.approve(me, actionId, null), ErrorCode.CONNECTOR_ACTION_NOT_PENDING);
         assertCode(() -> service.reject(me, actionId), ErrorCode.CONNECTOR_ACTION_NOT_PENDING);
         verify(connector, never()).execute(anyString(), anyString(), anyString(), anyString());
-        assertThat(recorder.seen).containsExactly(new Seen(new ConnectorActionChanged(CONVERSATION, actionId), false));
+        assertThat(recorder.seen())
+                .containsExactly(new Seen(new ConnectorActionChanged(CONVERSATION, actionId), false));
     }
 
     @Test
@@ -560,7 +554,7 @@ class ConnectorActionServiceTest {
     void expireMarksOnlyActionsPastTheirExpiry() {
         UUID actionId = ask(WRITE, ARGS).actionId();
         Instant expiresAt = onlyAction().expiresAt();
-        recorder.seen.clear();
+        recorder.clear();
 
         // 만료 시각과 같은 순간은 아직 지난 것이 아니다.
         assertThat(service.expire(expiresAt)).isZero();
@@ -571,7 +565,8 @@ class ConnectorActionServiceTest {
         assertThat(service.expire(expiresAt.plusMillis(2))).isZero();
         assertCode(() -> service.approve(me, actionId, null), ErrorCode.CONNECTOR_ACTION_NOT_PENDING);
         verify(connector, never()).execute(anyString(), anyString(), anyString(), anyString());
-        assertThat(recorder.seen).containsExactly(new Seen(new ConnectorActionChanged(CONVERSATION, actionId), false));
+        assertThat(recorder.seen())
+                .containsExactly(new Seen(new ConnectorActionChanged(CONVERSATION, actionId), false));
     }
 
     @Test
@@ -717,7 +712,7 @@ class ConnectorActionServiceTest {
     @DisplayName("상시 허락을 닫은 도구의 인자에 가려지는 글이 있으면 hiddenArgs 가 참이고 승인해도 실행하지 않고 REJECTED 와 hidden_args 로 끝낸다")
     void closedGrantToolWithHiddenArgumentsIsNotExecuted(String name, String args, GrantPeriod grant) {
         UUID actionId = ask(MAIL, args).actionId();
-        recorder.seen.clear();
+        recorder.clear();
 
         assertThat(service.listForConversation(me, CONVERSATION))
                 .extracting(ConnectorActionView::actionId, ConnectorActionView::hiddenArgs)
@@ -732,7 +727,8 @@ class ConnectorActionServiceTest {
         assertThat(row.errorCode()).isEqualTo("hidden_args");
         assertThat(grants.findAll()).isEmpty();
         verify(connector, never()).execute(anyString(), anyString(), anyString(), anyString());
-        assertThat(recorder.seen).containsExactly(new Seen(new ConnectorActionChanged(CONVERSATION, actionId), false));
+        assertThat(recorder.seen())
+                .containsExactly(new Seen(new ConnectorActionChanged(CONVERSATION, actionId), false));
     }
 
     static Stream<Arguments> argumentsWithHiddenText() {
@@ -845,7 +841,7 @@ class ConnectorActionServiceTest {
     void unreadableCatalogDoesNotWarnAboutHiddenArguments() {
         UUID hidden = ask(WRITE, "{\"text\":\"" + HIDDEN_TOKEN + "\"}").actionId();
         UUID plain = ask(WRITE, ARGS).actionId();
-        ConnectorPolicyTestDoubles.expireCatalog();
+        expireCatalog();
         when(connector.readCatalog()).thenThrow(new IllegalStateException());
 
         assertThat(service.listForConversation(me, CONVERSATION))
@@ -870,7 +866,7 @@ class ConnectorActionServiceTest {
         assertThat(service.grants(me)).as("선언이 상시 허락을 닫았다").isEmpty();
         assertThat(grants.findAll()).as("줄은 지우지 않는다").hasSize(1);
 
-        ConnectorPolicyTestDoubles.expireCatalog();
+        expireCatalog();
         when(connector.readCatalog()).thenThrow(new IllegalStateException());
         assertThat(service.grants(me))
                 .as("카탈로그를 읽지 못했다")
@@ -945,12 +941,12 @@ class ConnectorActionServiceTest {
                 .isEqualTo(earlier);
 
         grants.save(ConnectorToolGrant.of(owner.id(), DEMO, MAIL, now.plus(Duration.ofDays(1)), now));
-        ConnectorPolicyTestDoubles.expireCatalog();
+        expireCatalog();
         when(connector.readCatalog()).thenThrow(new IllegalStateException());
         assertThat(service.revokeClosedGrants(now)).as("카탈로그를 읽지 못했다").isZero();
 
         doReturn(List.of(DECLARING)).when(connector).readCatalog();
-        ConnectorPolicyTestDoubles.expireCatalog();
+        expireCatalog();
         assertThat(service.revokeClosedGrants(now)).as("닫은 도구의 유효한 줄 하나").isEqualTo(1);
     }
 
@@ -993,7 +989,7 @@ class ConnectorActionServiceTest {
     void grantIsRefusedWhenCatalogIsUnreadable() {
         catalogBecomes(legacyManifest());
         UUID actionId = ask(WRITE, ARGS).actionId();
-        ConnectorPolicyTestDoubles.expireCatalog();
+        expireCatalog();
         when(connector.readCatalog()).thenThrow(new IllegalStateException());
 
         assertThat(service.listForConversation(me, CONVERSATION))
@@ -1123,7 +1119,7 @@ class ConnectorActionServiceTest {
     @DisplayName("승인할 때 카탈로그를 읽지 못하면 실행하지 않고 REJECTED 줄을 오류 없이 돌려준다")
     void approvalWithUnreadableCatalogRejectsTheAction() {
         UUID actionId = ask(WRITE, ARGS).actionId();
-        ConnectorPolicyTestDoubles.expireCatalog();
+        expireCatalog();
         when(connector.readCatalog()).thenThrow(new IllegalStateException());
 
         ConnectorActionView closed = service.approve(me, actionId, null);
@@ -1155,7 +1151,7 @@ class ConnectorActionServiceTest {
                 .thenReturn(new InstallResult(false, false));
         service.approve(me, ask(WRITE, ARGS).actionId(), GrantPeriod.DAYS_30);
         UUID waiting = ask("send_note", ARGS).actionId();
-        recorder.seen.clear();
+        recorder.clear();
 
         connectionService.disconnect(me, DEMO);
 
@@ -1165,7 +1161,7 @@ class ConnectorActionServiceTest {
         assertThat(service.grants(me)).isEmpty();
         assertThat(grants.findAll())
                 .allSatisfy(grant -> assertThat(grant.revokedAt()).isNotNull());
-        assertThat(recorder.seen)
+        assertThat(recorder.seen())
                 .extracting(Seen::event)
                 .containsExactly(new ConnectorActionChanged(CONVERSATION, waiting));
         // 사건은 해제의 트랜잭션이 커밋한 직후 그 스레드에서 나간다. 그 자리에서도 전했다는 표시가 저장돼야 한다.
@@ -1343,7 +1339,7 @@ class ConnectorActionServiceTest {
     @DisplayName("카탈로그를 읽지 못해도 승인 줄 목록은 나오고 이름은 고정 문구다")
     void listSurvivesUnreadableCatalog() {
         UUID actionId = ask(WRITE, ARGS).actionId();
-        ConnectorPolicyTestDoubles.expireCatalog();
+        expireCatalog();
         when(connector.readCatalog()).thenThrow(new IllegalStateException());
 
         List<ConnectorActionView> listed = service.listForConversation(me, CONVERSATION);
@@ -1416,7 +1412,7 @@ class ConnectorActionServiceTest {
     /** 카탈로그를 바꾸고, 다음 판정이 다시 읽게 보관 시간보다 멀리 옮긴다. */
     private void catalogBecomes(ConnectorManifest manifest) {
         when(connector.readCatalog()).thenReturn(List.of(manifest));
-        ConnectorPolicyTestDoubles.expireCatalog();
+        expireCatalog();
     }
 
     private ConnectorAction onlyAction() {
@@ -1469,5 +1465,31 @@ class ConnectorActionServiceTest {
 
     private static ConnectorManifest manifest(List<ConnectorTool> tools) {
         return new ConnectorManifest(DEMO, "검사용 메모", "", List.of(), "list_scopes", "demo", List.of(), false, 2, tools);
+    }
+
+    /**
+     * 앞 검사나 앞 단계가 읽은 카탈로그와 읽기 실패가 지나가기를 기다린다. 캐시는 실제 시각으로 재고, 검사 설정의 보관 시간과 실패
+     * 기억 시간은 1ms 다. 2ms 는 그보다 반드시 길어 다음 읽기가 늘 카탈로그를 다시 읽는다. 캐시가 다시 읽을지 미리 알 방법이 없어
+     * 시간으로 기다린다.
+     */
+    private static void expireCatalog() {
+        try {
+            Thread.sleep(Duration.ofMillis(2));
+        } catch (InterruptedException ex) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException("카탈로그 보관 시간을 기다리다 끊겼다", ex);
+        }
+    }
+
+    /** 이 검사가 쓰는 표를 비운다. 컨텍스트를 함께 쓰는 다음 검사에 행을 남기지 않게 검사 뒤에도 부른다. */
+    private void deleteRows() {
+        jdbc.update("DELETE FROM connector_action");
+        jdbc.update("DELETE FROM connector_tool_grant");
+        bindings.deleteAll();
+        connections.deleteAll();
+        McpCallSigner.clearRuns(jdbc, List.of(PROFILE, OTHER_PROFILE));
+        agents.deleteAll();
+        tokens.deleteAll();
+        users.deleteAll();
     }
 }

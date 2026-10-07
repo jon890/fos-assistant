@@ -49,7 +49,8 @@ class RootExecutionQueryTest {
                 .orElseGet(() -> agents.save(Agent.of(
                         "root-query-dad",
                         "루트 조회 아빠",
-                        "dad",
+                        // profile 이름은 유일하다. 다른 검사가 남긴 dad 에이전트와 겹치지 않게 이 검사만의 이름을 쓴다
+                        "root-query-dad",
                         "http://127.0.0.1:1/p/dad",
                         CostMode.SUBSCRIPTION,
                         CredentialScope.SHARED_HOUSEHOLD,

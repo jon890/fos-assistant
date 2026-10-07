@@ -8,27 +8,29 @@ import com.bifos.assistant.chat.infra.ModelTierDefinitionRepository;
 import com.bifos.assistant.model.domain.type.ModelTier;
 import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.testsupport.BackendIntegrationTest;
+import com.bifos.assistant.testsupport.OverrideProperties;
 import com.bifos.assistant.user.domain.AppUser;
 import com.bifos.assistant.user.infra.AppUserRepository;
 import java.time.Instant;
 import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.test.context.TestPropertySource;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /** 설정의 단계 초기값이 실제 저장소와 실제 빈에서 한 번만 옮겨지는지 본다. */
 @BackendIntegrationTest
-@TestPropertySource(
-        properties = {
-            "assistant.model-tiers.fast.model=example-fast",
-            "assistant.model-tiers.fast.reasoning-effort=low",
-            "assistant.model-tiers.balanced.provider=example-provider",
-            "assistant.model-tiers.balanced.model=example-balanced",
-            "assistant.model-tiers.balanced.reasoning-effort=medium"
-        })
+@OverrideProperties({
+    "assistant.model-tiers.fast.model=example-fast",
+    "assistant.model-tiers.fast.reasoning-effort=low",
+    "assistant.model-tiers.balanced.provider=example-provider",
+    "assistant.model-tiers.balanced.model=example-balanced",
+    "assistant.model-tiers.balanced.reasoning-effort=medium"
+})
 class ModelTierSeedImportIntegrationTest {
 
     private static final Long GROUP_ID = 9_000_000_005L;
@@ -46,11 +48,25 @@ class ModelTierSeedImportIntegrationTest {
     @Autowired
     TransactionTemplate transactions;
 
+    /** 이 검사 전에 있던 정의 행이다. 옮기기는 사용자가 있는 모든 그룹에 쓰므로 검사 뒤에 그 밖의 행을 지운다. */
+    private Set<Long> existing;
+
+    @BeforeEach
+    void clearLeftovers() {
+        cleanUp();
+        existing = definitions.findAll().stream().map(ModelTierDefinition::id).collect(Collectors.toSet());
+    }
+
     @AfterEach
     void cleanUp() {
         transactions.executeWithoutResult(status -> {
             definitions.deleteByGroupId(GROUP_ID);
             users.findByEmail(EMAIL).ifPresent(users::delete);
+            if (existing != null) {
+                definitions.deleteAll(definitions.findAll().stream()
+                        .filter(definition -> !existing.contains(definition.id()))
+                        .toList());
+            }
         });
     }
 

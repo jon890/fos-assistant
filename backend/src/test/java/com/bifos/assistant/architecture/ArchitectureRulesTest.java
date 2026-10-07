@@ -172,6 +172,12 @@ class ArchitectureRulesTest {
     }
 
     @Test
+    @DisplayName("testsupport 밖의 검사 클래스가 Spring 컨텍스트를 나누는 선언을 두지 않는다")
+    void testsDoNotSplitContext() {
+        FreezingArchRule.freeze(ArchitectureRules.TESTS_DO_NOT_SPLIT_CONTEXT).check(TESTS);
+    }
+
+    @Test
     @DisplayName("테스트 메서드에 DisplayName 이 붙는다")
     void testMethodsHaveDisplayName() {
         FreezingArchRule.freeze(ArchitectureRules.TEST_METHODS_HAVE_DISPLAY_NAME)

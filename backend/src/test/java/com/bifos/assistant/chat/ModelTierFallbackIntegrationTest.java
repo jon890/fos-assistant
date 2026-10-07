@@ -8,6 +8,7 @@ import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.agent.domain.type.AgentVisibility;
 import com.bifos.assistant.agent.domain.type.CostMode;
 import com.bifos.assistant.agent.domain.type.CredentialScope;
+import com.bifos.assistant.chat.application.ModelTierSeedImporter;
 import com.bifos.assistant.chat.application.ModelTierService;
 import com.bifos.assistant.chat.application.ResolvedModelTier;
 import com.bifos.assistant.chat.domain.Conversation;
@@ -19,29 +20,29 @@ import com.bifos.assistant.model.domain.type.ModelTier;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.testsupport.BackendIntegrationTest;
+import com.bifos.assistant.testsupport.OverrideProperties;
 import java.time.Instant;
 import java.util.List;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.test.context.TestPropertySource;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /** 배포 단계 mapping 이 비어 있을 때 기존 seed 행의 fallback을 실제 컨텍스트에서 확인한다. */
 @BackendIntegrationTest
-@TestPropertySource(
-        properties = {
-            "assistant.model-tiers.fast.provider=",
-            "assistant.model-tiers.fast.model=",
-            "assistant.model-tiers.fast.reasoning-effort=",
-            "assistant.model-tiers.balanced.provider=",
-            "assistant.model-tiers.balanced.model=",
-            "assistant.model-tiers.balanced.reasoning-effort=",
-            "assistant.model-tiers.deep.provider=",
-            "assistant.model-tiers.deep.model=",
-            "assistant.model-tiers.deep.reasoning-effort="
-        })
+@OverrideProperties({
+    "assistant.model-tiers.fast.provider=",
+    "assistant.model-tiers.fast.model=",
+    "assistant.model-tiers.fast.reasoning-effort=",
+    "assistant.model-tiers.balanced.provider=",
+    "assistant.model-tiers.balanced.model=",
+    "assistant.model-tiers.balanced.reasoning-effort=",
+    "assistant.model-tiers.deep.provider=",
+    "assistant.model-tiers.deep.model=",
+    "assistant.model-tiers.deep.reasoning-effort="
+})
 class ModelTierFallbackIntegrationTest {
 
     private static final Agent AGENT = Agent.of(
@@ -61,10 +62,18 @@ class ModelTierFallbackIntegrationTest {
     ModelTierService tiers;
 
     @Autowired
+    ModelTierSeedImporter importer;
+
+    @Autowired
     ModelTierDefinitionRepository definitions;
 
     @Autowired
     TransactionTemplate transactions;
+
+    @BeforeEach
+    void clearLeftovers() {
+        transactions.executeWithoutResult(status -> definitions.deleteByGroupId(GROUP_ID));
+    }
 
     @AfterEach
     void cleanUp() {
@@ -74,6 +83,8 @@ class ModelTierFallbackIntegrationTest {
     @Test
     @DisplayName("비어 있는 기존 seed 단계는 선택 대화에서도 tier 기록을 남기고 profile 기본값으로 해석한다")
     void nullSeedUsesProfileDefaultWhileKeepingTier() {
+        // 기동 때 하던 초기값 옮기기를 비어 있는 mapping 으로 돌린다. 옮길 것이 없어 아무것도 저장하지 않는다
+        importer.run(null);
         definitions.saveAll(List.of(
                 ModelTierDefinition.of(GROUP_ID, ModelTier.FAST, null, null, null),
                 ModelTierDefinition.of(GROUP_ID, ModelTier.BALANCED, null, null, null),

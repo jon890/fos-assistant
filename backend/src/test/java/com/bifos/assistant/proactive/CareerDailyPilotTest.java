@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.fail;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.when;
 
 import com.bifos.assistant.agent.application.AgentConnectorBindings;
@@ -70,7 +71,6 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.PageRequest;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 /**
  * 커리어 에이전트의 매일 깨우기를 시계를 앞으로 돌려 여러 날 이어 돌린다. 이슈 #166 의 파일럿 검증이다.
@@ -165,7 +165,7 @@ class CareerDailyPilotTest {
     HermesSkillClient skillClient;
 
     /** 커리어 커넥터 서버가 붙은 에이전트로 둔다. 붙은 연결이 있으면 지시가 직접 호출을 고른다. */
-    @MockitoBean
+    @Autowired
     AgentConnectorBindings connectorBindings;
 
     private CurrentUser owner;
@@ -183,7 +183,9 @@ class CareerDailyPilotTest {
         cleanTasks();
         when(toolsets.readEnabled(anyString(), anyString())).thenReturn(List.of("web", "skills", "fos-assistant"));
         when(skillClient.list(anyString())).thenReturn(List.of(new HermesSkill("proactive-check", "살펴보기", true)));
-        when(connectorBindings.connectorServers(any())).thenReturn(Set.of("career"));
+        doReturn(false).when(connectorBindings).hasBindings(any());
+        doReturn(Set.of("career")).when(connectorBindings).connectorServers(any());
+        doReturn(Set.of()).when(connectorBindings).connectorToolPrefixes(any());
         String suffix = UUID.randomUUID().toString().substring(0, 8);
         AppUser user =
                 users.save(AppUser.of("pilot-" + suffix + "@example.com", "사용자A", 1L, UserRole.MEMBER, ENABLED_AT));

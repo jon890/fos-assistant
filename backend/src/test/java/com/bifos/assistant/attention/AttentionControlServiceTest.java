@@ -30,6 +30,7 @@ import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
+import com.bifos.assistant.testsupport.AttentionTestCandidates;
 import com.bifos.assistant.testsupport.BackendIntegrationTest;
 import com.bifos.assistant.testsupport.TestClock;
 import com.bifos.assistant.usage.domain.AgentExecution;
@@ -51,7 +52,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 /**
@@ -61,7 +61,6 @@ import org.springframework.jdbc.core.JdbcTemplate;
  * 지운다. 커넥터 카탈로그는 대역이 답한다.
  */
 @BackendIntegrationTest
-@Import(AttentionTestCandidates.class)
 class AttentionControlServiceTest {
 
     private static final Instant NOW = Instant.parse("2026-10-04T09:00:00Z");
@@ -114,6 +113,10 @@ class AttentionControlServiceTest {
     @Autowired
     JdbcTemplate jdbc;
 
+    /** 후보를 읽은 횟수를 센다. 공통 확장이 검사마다 0 으로 되돌린다. */
+    @Autowired
+    AttentionTestCandidates.ReadCountingCandidates readCounting;
+
     @Autowired
     AttentionControlRepository controlEntries;
 
@@ -127,7 +130,6 @@ class AttentionControlServiceTest {
     @BeforeEach
     void setUp() {
         clock.set(NOW);
-        AttentionTestCandidates.PROBE.reads.set(0);
         when(connector.readCatalog()).thenReturn(List.of(MANIFEST));
         dad = member();
         chief = agentOf(dad, "집안일 도우미");
@@ -395,7 +397,7 @@ class AttentionControlServiceTest {
         assertCode(
                 () -> controls.hide(dad, CardKey.FAILURES, "conversation:" + UUID.randomUUID(), "a".repeat(65)),
                 ErrorCode.VALIDATION_FAILED);
-        assertThat(AttentionTestCandidates.PROBE.reads.get()).as("후보를 읽은 횟수").isZero();
+        assertThat(readCounting.reads()).as("후보를 읽은 횟수").isZero();
     }
 
     @Test
@@ -404,7 +406,7 @@ class AttentionControlServiceTest {
         assertCode(
                 () -> controls.record(dad, "a".repeat(81), "0123456789abcdef", AttentionEventType.OPENED),
                 ErrorCode.VALIDATION_FAILED);
-        assertThat(AttentionTestCandidates.PROBE.reads.get()).as("후보를 읽은 횟수").isZero();
+        assertThat(readCounting.reads()).as("후보를 읽은 횟수").isZero();
     }
 
     @Test

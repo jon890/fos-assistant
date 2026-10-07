@@ -33,6 +33,7 @@ import com.bifos.assistant.hermes.dto.ConnectorTool;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.shared.util.Sha256;
+import com.bifos.assistant.testsupport.AttentionTestCandidates;
 import com.bifos.assistant.testsupport.BackendIntegrationTest;
 import com.bifos.assistant.testsupport.TestClock;
 import com.bifos.assistant.usage.domain.AgentExecution;
@@ -52,7 +53,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -67,7 +67,6 @@ import tools.jackson.databind.json.JsonMapper;
  * 지운다. 커넥터 카탈로그는 대역이 답한다.
  */
 @BackendIntegrationTest
-@Import(AttentionTestCandidates.class)
 class AttentionServiceTest {
 
     private static final Instant NOW = Instant.parse("2026-10-04T09:00:00Z");
@@ -126,6 +125,10 @@ class AttentionServiceTest {
     @Autowired
     JdbcTemplate jdbc;
 
+    /** 켜면 나를 기다리는 카드의 출처 하나가 읽기에 실패한다. */
+    @Autowired
+    AttentionTestCandidates.FailingCandidates failingCandidates;
+
     private final List<Long> createdUsers = new ArrayList<>();
     private CurrentUser dad;
     private Agent chief;
@@ -133,7 +136,6 @@ class AttentionServiceTest {
     @BeforeEach
     void setUp() {
         clock.set(NOW);
-        AttentionTestCandidates.FAILING.failing = false;
         when(connector.readCatalog()).thenReturn(List.of(MANIFEST));
         dad = member();
         chief = agentOf(dad, "집안일 도우미");
@@ -142,7 +144,6 @@ class AttentionServiceTest {
     @AfterEach
     void tearDown() {
         SecurityContextHolder.clearContext();
-        AttentionTestCandidates.FAILING.failing = false;
         for (Long userId : createdUsers) {
             jdbc.update("DELETE FROM attention_event WHERE user_id = ?", userId);
             jdbc.update("DELETE FROM attention_control WHERE user_id = ?", userId);
@@ -466,7 +467,7 @@ class AttentionServiceTest {
         message(ChatMessage.fromUser(conversation.id(), dad.id(), "목록 정리해 줘", NOW.minusSeconds(600)));
         failedRoot(dad, conversation, NOW.minusSeconds(600), NOW.minusSeconds(540));
         insertPendingAction(dad, conversation.id(), NOW.plus(Duration.ofHours(3)));
-        AttentionTestCandidates.FAILING.failing = true;
+        failingCandidates.fail();
 
         AttentionView view = service.view(dad);
 

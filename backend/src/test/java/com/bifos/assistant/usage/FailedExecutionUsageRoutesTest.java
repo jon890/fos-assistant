@@ -2,9 +2,7 @@ package com.bifos.assistant.usage;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.doReturn;
 
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.agent.domain.type.AgentVisibility;
@@ -18,7 +16,7 @@ import com.bifos.assistant.chat.domain.type.MessageRole;
 import com.bifos.assistant.chat.infra.ChatMessageRepository;
 import com.bifos.assistant.chat.infra.ConversationRepository;
 import com.bifos.assistant.hermes.HermesRunEventStream;
-import com.bifos.assistant.hermes.HermesRunsClient;
+import com.bifos.assistant.hermes.StubHermesRunsClient;
 import com.bifos.assistant.hermes.dto.HermesRunResult;
 import com.bifos.assistant.hermes.dto.SessionRuntime;
 import com.bifos.assistant.hermes.dto.TokenUsage;
@@ -52,7 +50,6 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.PageRequest;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 /** 대화와 위임 경로가 Hermes 실패 결과의 사용량을 실제 실행 기록과 비용으로 보존하는지 본다. */
 @BackendIntegrationTest
@@ -90,13 +87,13 @@ class FailedExecutionUsageRoutesTest {
     @Autowired
     ExecutionEventRepository events;
 
-    @MockitoBean
-    HermesRunsClient hermes;
+    @Autowired
+    StubHermesRunsClient hermes;
 
     @Autowired
     HermesRunEventStream eventStream;
 
-    @MockitoBean
+    @Autowired
     PriceCatalog prices;
 
     private CurrentUser user;
@@ -122,18 +119,18 @@ class FailedExecutionUsageRoutesTest {
         agent.changeDefaultModel("requested-provider", "requested-model", null);
         agent = agents.save(agent);
         conversation = conversations.save(Conversation.startedBy(user.id(), "실패 사용량", agent.id(), Instant.now()));
-        when(hermes.submit(any())).thenReturn(RUN_ID);
-        when(prices.find(PROVIDER, MODEL))
-                .thenReturn(Optional.of(new CatalogPrice(
+        doReturn(Optional.of(new CatalogPrice(
                         new ModelPrice(new BigDecimal("5"), new BigDecimal("30"), new BigDecimal("0.5"), List.of()),
-                        PRICING_VERSION)));
+                        PRICING_VERSION)))
+                .when(prices)
+                .find(PROVIDER, MODEL);
     }
 
     @ParameterizedTest
     @ValueSource(strings = {"FAILED", "PROVIDER_BLOCKED"})
     @DisplayName("일반 대화는 실패 응답의 사용량과 실제 모델 비용을 남기고 원래 오류를 전달한다")
     void preservesUsageAndCostWhenConversationReceivesFailedResult(String errorCode) {
-        when(hermes.awaitCompletion(any(), any())).thenReturn(failedResult(errorCode));
+        hermes.willReturn(failedResult(errorCode));
         ErrorCode expected =
                 "PROVIDER_BLOCKED".equals(errorCode) ? ErrorCode.PROVIDER_BLOCKED : ErrorCode.HERMES_RUN_FAILED;
 
@@ -149,14 +146,14 @@ class FailedExecutionUsageRoutesTest {
                 .singleElement()
                 .satisfies(message -> assertThat(message.role()).isEqualTo(MessageRole.USER));
         assertThat(chat.running(user, conversation.id()).running()).isFalse();
-        verify(hermes).submit(any());
+        assertThat(hermes.received()).as("Hermes 에 보낸 실행").hasSize(1);
     }
 
     @ParameterizedTest
     @ValueSource(strings = {"FAILED", "PROVIDER_BLOCKED"})
     @DisplayName("위임 실행은 실패 응답의 사용량과 실제 모델 비용을 남기고 실패 결과를 전달한다")
     void preservesUsageAndCostWhenDelegatedRunReceivesFailedResult(String errorCode) {
-        when(hermes.awaitCompletion(any(), any())).thenReturn(failedResult(errorCode));
+        hermes.willReturn(failedResult(errorCode));
         AgentExecution parent = recorder.start(user, conversation.executionConversation(), agent, null, null, 0L);
         RunSession session = RunSession.fresh();
         DelegationKey key =
@@ -190,7 +187,7 @@ class FailedExecutionUsageRoutesTest {
         assertThat(run.result().succeeded()).isFalse();
         assertThat(run.result().errorCode()).isEqualTo(errorCode);
         assertThat(run.result().output()).isNull();
-        verify(hermes).submit(any());
+        assertThat(hermes.received()).as("Hermes 에 보낸 실행").hasSize(1);
     }
 
     private void assertFailedUsage(AgentExecution execution, String errorCode) {

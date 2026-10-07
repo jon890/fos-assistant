@@ -1,7 +1,6 @@
 package com.bifos.assistant.usage;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.Mockito.when;
 
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.agent.domain.type.AgentVisibility;
@@ -9,7 +8,7 @@ import com.bifos.assistant.agent.domain.type.CostMode;
 import com.bifos.assistant.agent.domain.type.CredentialScope;
 import com.bifos.assistant.chat.domain.Conversation;
 import com.bifos.assistant.chat.infra.ConversationRepository;
-import com.bifos.assistant.hermes.HermesRunsClient;
+import com.bifos.assistant.hermes.StubHermesRunsClient;
 import com.bifos.assistant.hermes.dto.HermesRunResult;
 import com.bifos.assistant.hermes.dto.SessionRuntime;
 import com.bifos.assistant.hermes.dto.TokenUsage;
@@ -31,7 +30,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 /** 실행이 끝날 때 금액을 저장하고, 그 저장된 금액만 더해 한 달 합계가 나오는지 본다. */
 @BackendIntegrationTest
@@ -50,9 +48,9 @@ class UsageCostRecordingTest {
     @Autowired
     ExecutionRecorder recorder;
 
-    /** 실제로 돈 모델을 읽는 세션 조회를 여기서는 하지 않는다. 기록 규칙만 보는 검사다. */
-    @MockitoBean
-    HermesRunsClient hermes;
+    /** 실제로 돈 모델을 읽는 세션 조회는 대역이 받는다. 기록 규칙만 보는 검사다. */
+    @Autowired
+    StubHermesRunsClient hermes;
 
     @Autowired
     AgentExecutionRepository executions;
@@ -196,8 +194,7 @@ class UsageCostRecordingTest {
     @DisplayName("runtime 없는 실패 응답은 세션의 실제 모델을 읽어 환산한다")
     void resolvesLegacyFailedRuntimeFromSession() {
         Agent agent = subscriptionAgent();
-        when(hermes.readSessionRuntime(agent.apiBaseUrl(), agent.hermesProfile(), "failed-session"))
-                .thenReturn(new SessionRuntime("example-model-large", "anthropic"));
+        hermes.willReportSessionRuntime(new SessionRuntime("example-model-large", "anthropic"));
         AgentExecution execution =
                 recorder.start(caller(), conversation.executionConversation(), agent, null, null, 0L);
         HermesRunResult result = new HermesRunResult(
@@ -212,6 +209,7 @@ class UsageCostRecordingTest {
 
         AgentExecution failed = recorder.fail(execution, agent, result, requested(agent), "FAILED");
 
+        assertThat(hermes.sessionLookups()).as("실제 모델을 물은 세션").containsExactly("failed-session");
         assertThat(failed.provider()).isEqualTo("anthropic");
         assertThat(failed.model()).isEqualTo("example-model-large");
         assertThat(failed.cachedInputTokens()).isNull();

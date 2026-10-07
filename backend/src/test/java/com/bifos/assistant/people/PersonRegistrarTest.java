@@ -3,6 +3,7 @@ package com.bifos.assistant.people;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -24,7 +25,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 /**
  * 사람 하나를 더하는 순서와 실패했을 때 되돌리는 것을 본다.
@@ -49,11 +49,13 @@ class PersonRegistrarTest {
     AgentRepository agents;
 
     /** 실제 Hermes 대시보드를 부르지 않는다. 언제 불렸는지와 실패했을 때를 여기서 정한다. */
-    @MockitoBean
+    @Autowired
     HermesProfileProvisioner profiles;
 
     @BeforeEach
     void setUp() {
+        doNothing().when(profiles).provision(any());
+        doNothing().when(profiles).deprovision(any());
         people.deleteAll();
         agents.deleteAll();
     }

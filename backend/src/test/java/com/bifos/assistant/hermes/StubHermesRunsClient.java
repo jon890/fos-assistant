@@ -4,6 +4,7 @@ import com.bifos.assistant.hermes.dto.HermesRunCommand;
 import com.bifos.assistant.hermes.dto.HermesRunLookup;
 import com.bifos.assistant.hermes.dto.HermesRunResult;
 import com.bifos.assistant.hermes.dto.SessionRuntime;
+import com.bifos.assistant.hermes.dto.SubagentSessionUsage;
 import com.bifos.assistant.shared.error.ApiException;
 import java.time.Duration;
 import java.util.ArrayDeque;
@@ -48,6 +49,9 @@ public class StubHermesRunsClient implements HermesRunsClient {
 
     private final List<String> sessionLookups = new CopyOnWriteArrayList<>();
 
+    /** 자식 session 조회가 session 번호마다 답할 값이다. 없으면 읽지 못한 것으로 본다. */
+    private final Map<String, SubagentSessionUsage> subagentUsages = new ConcurrentHashMap<>();
+
     private final Map<String, Deque<HermesRunLookup>> lookupAnswers = new ConcurrentHashMap<>();
     private final Map<String, HermesRunLookup> lastLookupAnswers = new ConcurrentHashMap<>();
     private final Map<String, ApiException> lookupFailures = new ConcurrentHashMap<>();
@@ -82,6 +86,11 @@ public class StubHermesRunsClient implements HermesRunsClient {
     /** 세션 조회가 실제로 돈 provider 와 모델을 이렇게 답하게 한다. */
     public void willReportSessionRuntime(SessionRuntime runtime) {
         this.sessionRuntime = runtime;
+    }
+
+    /** 그 자식 session 을 물으면 이 사용량을 답하게 한다. */
+    public void willReportSubagentUsage(String sessionId, SubagentSessionUsage usage) {
+        subagentUsages.put(sessionId, usage);
     }
 
     /** 세션 조회를 부른 session 번호들. */
@@ -164,6 +173,7 @@ public class StubHermesRunsClient implements HermesRunsClient {
         beforeAwait = () -> {};
         sessionRuntime = null;
         sessionLookups.clear();
+        subagentUsages.clear();
         stopped.clear();
         onStop = runId -> {};
         lookupAnswers.clear();
@@ -230,6 +240,11 @@ public class StubHermesRunsClient implements HermesRunsClient {
     public SessionRuntime readSessionRuntime(String apiBaseUrl, String profileName, String sessionId) {
         sessionLookups.add(sessionId);
         return sessionRuntime;
+    }
+
+    @Override
+    public SubagentSessionUsage readSubagentUsage(String apiBaseUrl, String profileName, String sessionId) {
+        return subagentUsages.get(sessionId);
     }
 
     private void awaitGate() {

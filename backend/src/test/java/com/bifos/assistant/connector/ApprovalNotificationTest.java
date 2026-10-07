@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.clearInvocations;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -46,6 +47,7 @@ import com.bifos.assistant.usage.domain.type.ExecutionStatus;
 import com.bifos.assistant.usage.infra.AgentExecutionRepository;
 import com.bifos.assistant.user.domain.AppUser;
 import com.bifos.assistant.user.infra.AppUserRepository;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -55,20 +57,16 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
  * 승인이 필요한 커넥터 호출이 새 승인 줄을 만들 때와 그 줄이 만료될 때 알림을 남기는지 실제 DB 로 확인한다(ADR-070).
  *
  * <p>계약은 {@code docs/backend/notification.md} 의 「알림 종류」 다. 승인 카드가 뜰 대화가 있어야 알림이 생기므로 실제
- * 대화를 저장하고 실행이 그 대화 번호를 갖게 준비한다. 컨텍스트 수를 늘리지 않으려고 {@link ConnectorActionServiceTest} 와
- * 같은 구성을 쓴다.
+ * 대화를 저장하고 실행이 그 대화 번호를 갖게 준비한다.
  */
 @BackendIntegrationTest
-@Import(ConnectorPolicyTestDoubles.class)
 class ApprovalNotificationTest {
     private static final JsonMapper JSON = JsonMapper.builder().build();
     private static final String PROFILE = "approval-notice-owner";
@@ -136,7 +134,7 @@ class ApprovalNotificationTest {
     @Autowired
     HermesConnectorClient connector;
 
-    @MockitoBean
+    @Autowired
     CheckNotificationPolicy checkNotifications;
 
     private final List<NotificationEvent> received = new CopyOnWriteArrayList<>();
@@ -149,17 +147,9 @@ class ApprovalNotificationTest {
 
     @BeforeEach
     void setUp() {
-        when(checkNotifications.allows(any(), any())).thenReturn(true);
-        jdbc.update("DELETE FROM connector_action");
-        jdbc.update("DELETE FROM connector_tool_grant");
-        notifications.deleteAll();
-        bindings.deleteAll();
-        connections.deleteAll();
-        McpCallSigner.clearRuns(jdbc, List.of(PROFILE));
-        agents.deleteAll();
-        tokens.deleteAll();
-        users.deleteAll();
-        ConnectorPolicyTestDoubles.expireCatalog();
+        doReturn(true).when(checkNotifications).allows(any(), any());
+        deleteRows();
+        expireCatalog();
         when(connector.readCatalog()).thenReturn(List.of(DECLARING));
         when(connector.execute(anyString(), anyString(), anyString(), anyString()))
                 .thenReturn(CallResult.success(JSON.readTree("{\"saved\":true}")));
@@ -194,12 +184,13 @@ class ApprovalNotificationTest {
     void tearDown() {
         subscription.run();
         notifications.deleteAll();
+        deleteRows();
     }
 
     @Test
     @DisplayName("조용한 시간의 승인 요청은 승인 카드를 유지하고 알림과 알림 사건만 생략한다")
     void quietCheckKeepsApprovalWithoutNotification() {
-        when(checkNotifications.allows(any(), any())).thenReturn(false);
+        doReturn(false).when(checkNotifications).allows(any(), any());
 
         ConnectorPolicyAnswer answer = ask(root, WRITE, ARGS);
 
@@ -303,7 +294,7 @@ class ApprovalNotificationTest {
         Instant expiresAt = onlyActionExpiry();
         notifications.deleteAll();
         when(connector.readCatalog()).thenThrow(new IllegalStateException("catalog down"));
-        ConnectorPolicyTestDoubles.expireCatalog();
+        expireCatalog();
 
         assertThat(service.expire(expiresAt.plusMillis(1))).isEqualTo(1);
 
@@ -315,7 +306,7 @@ class ApprovalNotificationTest {
     void expiryWithoutConversationSkipsNotificationAndCatalog() {
         ask(startRun(null), WRITE, ARGS);
         Instant expiresAt = onlyActionExpiry();
-        ConnectorPolicyTestDoubles.expireCatalog();
+        expireCatalog();
         clearInvocations(connector);
 
         assertThat(service.expire(expiresAt.plusMillis(1))).isEqualTo(1);
@@ -389,5 +380,32 @@ class ApprovalNotificationTest {
         List<Notification> rows = notifications.findAll();
         assertThat(rows).as("notification 의 줄").hasSize(1);
         return rows.getFirst();
+    }
+
+    /**
+     * 앞 검사나 앞 단계가 읽은 카탈로그와 읽기 실패가 지나가기를 기다린다. 캐시는 실제 시각으로 재고, 검사 설정의 보관 시간과 실패
+     * 기억 시간은 1ms 다. 2ms 는 그보다 반드시 길어 다음 읽기가 늘 카탈로그를 다시 읽는다. 캐시가 다시 읽을지 미리 알 방법이 없어
+     * 시간으로 기다린다.
+     */
+    private static void expireCatalog() {
+        try {
+            Thread.sleep(Duration.ofMillis(2));
+        } catch (InterruptedException ex) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException("카탈로그 보관 시간을 기다리다 끊겼다", ex);
+        }
+    }
+
+    /** 이 검사가 쓰는 표를 비운다. 컨텍스트를 함께 쓰는 다음 검사에 행을 남기지 않게 검사 뒤에도 부른다. */
+    private void deleteRows() {
+        jdbc.update("DELETE FROM connector_action");
+        jdbc.update("DELETE FROM connector_tool_grant");
+        notifications.deleteAll();
+        bindings.deleteAll();
+        connections.deleteAll();
+        McpCallSigner.clearRuns(jdbc, List.of(PROFILE));
+        agents.deleteAll();
+        tokens.deleteAll();
+        users.deleteAll();
     }
 }

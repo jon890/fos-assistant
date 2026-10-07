@@ -1,5 +1,7 @@
 package com.bifos.assistant.testsupport;
 
+import com.bifos.assistant.agent.application.AgentConnectorBindings;
+import com.bifos.assistant.agent.application.AgentEndpointProbe;
 import com.bifos.assistant.agent.application.AgentService;
 import com.bifos.assistant.agent.infra.AgentRepository;
 import com.bifos.assistant.chat.application.AttachmentService;
@@ -20,10 +22,17 @@ import com.bifos.assistant.hermes.HermesSkillClient;
 import com.bifos.assistant.hermes.HermesToolsetClient;
 import com.bifos.assistant.memory.application.MemoryContentSealer;
 import com.bifos.assistant.orchestration.application.AgentDelegationService;
+import com.bifos.assistant.people.application.HermesProfileProvisioner;
+import com.bifos.assistant.proactive.application.CheckNotificationPolicy;
 import com.bifos.assistant.proactive.application.ProactiveCheckGuard;
+import com.bifos.assistant.proactive.application.ProactiveCheckService;
+import com.bifos.assistant.proactive.infra.AutonomyDecisionRepository;
+import com.bifos.assistant.skill.application.SkillCommandCatalog;
+import com.bifos.assistant.skill.application.SkillService;
 import com.bifos.assistant.skill.infra.ExecutionSkillUseRepository;
 import com.bifos.assistant.skill.infra.SkillStore;
 import com.bifos.assistant.usage.application.UserExecutionLimiter;
+import com.bifos.assistant.usage.domain.PriceCatalog;
 import com.bifos.assistant.usage.infra.ExecutionEventRepository;
 import com.bifos.assistant.user.infra.AppUserRepository;
 import java.lang.annotation.Documented;
@@ -80,23 +89,32 @@ import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
         })
 @MockitoSpyBean(
         types = {
-            AgentRepository.class,
+            AgentConnectorBindings.class,
             AgentDelegationService.class,
+            AgentEndpointProbe.class,
+            AgentRepository.class,
             AgentService.class,
             AppUserRepository.class,
             AttachmentService.class,
+            AutonomyDecisionRepository.class,
             ChatMessageRepository.class,
             ChatPendingMessageRepository.class,
             ChatService.class,
+            CheckNotificationPolicy.class,
             ContextAssembler.class,
             ConversationEventHub.class,
             ExecutionEventRepository.class,
             ExecutionSkillUseRepository.class,
+            HermesProfileProvisioner.class,
             MemoryContentSealer.class,
+            PriceCatalog.class,
             ProactiveCheckGuard.class,
+            ProactiveCheckService.class,
             RecoveredRunRecorder.class,
             ResultDeliveryAttemptRepository.class,
             ResultDeliveryRecorder.class,
+            SkillCommandCatalog.class,
+            SkillService.class,
             SkillStore.class,
             TurnCancellation.class,
             UserExecutionLimiter.class

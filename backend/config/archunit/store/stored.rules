@@ -1,5 +1,5 @@
 #
-#Wed Oct 07 15:26:09 KST 2026
+#Wed Oct 07 16:06:48 KST 2026
 ConfigurationProperties\ \uD074\uB798\uC2A4\uC5D0\uB294\ Validated\ \uAC00\ \uBD99\uB294\uB2E4=f875bef7-581f-41c7-8e85-cf4b3d36f833
 Enumerated\ \uD544\uB4DC\uC758\ \uD0C0\uC785\uC740\ domain.type\ \uC5D0\ \uC788\uB2E4=2c9d047b-fb3f-4e7d-b83b-975d0be92766
 Executors.newVirtualThreadPerTaskExecutor\ \uB294\ ResearchAndBuildFlow\ \uB9CC\ \uBD80\uB978\uB2E4=b956377f-5712-4099-bac3-c1966cf911e5
@@ -16,6 +16,7 @@ orchestration\ \uC740\ ChatService\ \uC5D0\ \uC758\uC874\uD558\uC9C0\ \uC54A\uB2
 orchestration\ \uC740\ mcp\ \uC5D0\ \uC758\uC874\uD558\uC9C0\ \uC54A\uB294\uB2E4=c84381bf-ad9a-4965-a421-9254c649c3f8
 shared\ \uB294\ \uB2E4\uB978\ \uCD5C\uC0C1\uC704\ \uD328\uD0A4\uC9C0\uC5D0\ \uC758\uC874\uD558\uC9C0\ \uC54A\uB294\uB2E4=25192a86-f325-4b77-b6d1-3c590c06ead7
 \uAC00\uC0C1\ \uC2A4\uB808\uB4DC\uB294\ BackgroundTasks\ \uC640\ SSE\ \uC5F0\uACB0\uB9CC\ \uC9C1\uC811\ \uB744\uC6B4\uB2E4=0124e7b3-233d-4291-a8b5-8623a841dddd
+\uAC80\uC0AC\ \uD074\uB798\uC2A4\uB294\ Spring\ \uCEE8\uD14D\uC2A4\uD2B8\uB97C\ \uB098\uB204\uB294\ \uC120\uC5B8\uC744\ \uB450\uC9C0\ \uC54A\uB294\uB2E4=b67abddb-c743-487e-9128-9a30598ba870
 \uC11C\uBE44\uC2A4\uC640\ infra\ \uC548\uC758\ \uC911\uCCA9\ \uD0C0\uC785\uC740\ private\ \uC774\uB2E4=48448fa9-9176-4cf5-bcc0-f28f044ecc43
 \uC2E4\uD589\ \uC911\uC5D0\ \uC4F0\uB294\ \uC124\uC815\ record\ \uB294\ LivePropertiesConfig\ \uB9CC\ \uC8FC\uC785\uBC1B\uB294\uB2E4=3e02381a-ce81-49c5-acd7-fadade7f83a4
 \uCD5C\uC0C1\uC704\ \uD328\uD0A4\uC9C0\ \uC0AC\uC774\uC758\ \uAC04\uC120\uC740\ \uC21C\uD658\uC5D0\ \uC18D\uD558\uC9C0\ \uC54A\uB294\uB2E4=0fd01c41-aa58-43cb-81c5-236ae5119948

@@ -17,8 +17,9 @@ import org.springframework.test.context.DynamicPropertyRegistrar;
 /**
  * {@link BackendIntegrationTest} 의 공통 대역이다.
  *
- * <p>여기 둔 빈은 상태를 갖는다. {@link IntegrationTestIsolation} 이 검사마다 비운다. 검사 클래스 하나만 쓰는 대역을 여기 더하지
- * 않는다. 더하면 모든 검사의 동작이 바뀐다.
+ * <p>여기 둔 빈은 상태를 갖는다. {@link IntegrationTestIsolation} 이 검사마다 비운다. 몇 검사만 쓰는 대역은 꺼 두면 아무것도 하지
+ * 않게 만들어 여기 둔다. 쓰는 검사가 켜고 공통 확장이 검사 뒤에 끈다. 꺼 둔 상태에서 운영 동작을 바꾸는 대역은 더하지 않는다. 모든
+ * 검사의 동작이 바뀐다.
  */
 @TestConfiguration(proxyBeanMethods = false)
 public class IntegrationTestDoubles {
@@ -47,6 +48,49 @@ public class IntegrationTestDoubles {
     @Primary
     TrackingBackgroundTasks trackingBackgroundTasks() {
         return new TrackingBackgroundTasks();
+    }
+
+    /** 기본은 모든 예약을 실제로 건다. 운영에 스케줄러 빈이 없어 이 빈이 {@code @Scheduled} 실행까지 맡는다. */
+    @Bean
+    @Primary
+    CapturingTaskScheduler capturingTaskScheduler() {
+        return new CapturingTaskScheduler();
+    }
+
+    /** 기본은 아무것도 모으지 않는다. */
+    @Bean
+    WakeRetryThreads wakeRetryThreads() {
+        return new WakeRetryThreads();
+    }
+
+    /** 기본은 아무것도 적지 않는다. */
+    @Bean
+    ConnectorChangeRecorder connectorChangeRecorder() {
+        return new ConnectorChangeRecorder();
+    }
+
+    /** 기본은 사건을 받아도 아무것도 하지 않는다. */
+    @Bean
+    FailingAccessRevoker failingAccessRevoker() {
+        return new FailingAccessRevoker();
+    }
+
+    /** 비어 있으면 결과를 내지 않는다. */
+    @Bean
+    TestAutoTurnResultSource testAutoTurnResultSource() {
+        return new TestAutoTurnResultSource();
+    }
+
+    /** 후보를 내지 않는다. 기본은 읽기도 실패하지 않는다. */
+    @Bean
+    AttentionTestCandidates.FailingCandidates failingAttentionCandidates() {
+        return new AttentionTestCandidates.FailingCandidates();
+    }
+
+    /** 후보를 내지 않고 읽은 횟수만 센다. */
+    @Bean
+    AttentionTestCandidates.ReadCountingCandidates readCountingAttentionCandidates() {
+        return new AttentionTestCandidates.ReadCountingCandidates();
     }
 
     /**

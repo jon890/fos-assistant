@@ -47,6 +47,7 @@ import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.testsupport.BackendIntegrationTest;
 import com.bifos.assistant.testsupport.DelegationWakeEnabled;
+import com.bifos.assistant.testsupport.TestAutoTurnResultSource;
 import com.bifos.assistant.usage.application.ExecutionDeliveryWriter;
 import com.bifos.assistant.usage.domain.AgentExecution;
 import com.bifos.assistant.usage.domain.ExecutionContextSource;
@@ -72,7 +73,6 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationEventPublisher;
-import org.springframework.context.annotation.Import;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.transaction.support.TransactionTemplate;
 
@@ -86,7 +86,6 @@ import org.springframework.transaction.support.TransactionTemplate;
  */
 @BackendIntegrationTest
 @DelegationWakeEnabled
-@Import(ResultDeliveryRecordTest.TestResults.class)
 class ResultDeliveryRetryTest {
 
     private static final Duration WAIT_LIMIT = Duration.ofSeconds(10);
@@ -122,7 +121,7 @@ class ResultDeliveryRetryTest {
     TransactionTemplate transactions;
 
     @Autowired
-    ResultDeliveryRecordTest.TestResultSource testResults;
+    TestAutoTurnResultSource testResults;
 
     @Autowired
     ExecutionDeliveryWriter deliveryWriter;
@@ -181,7 +180,7 @@ class ResultDeliveryRetryTest {
     void setUp() {
         awaitAllIdle();
         stub().reset();
-        testResults.clear();
+        testResults.reset();
         events.clear();
         deliveryItems.deleteAll();
         attempts.deleteAll();
@@ -214,7 +213,7 @@ class ResultDeliveryRetryTest {
     void tearDown() {
         stub().releaseSubmits();
         awaitAllIdle();
-        testResults.clear();
+        testResults.reset();
     }
 
     @Test
