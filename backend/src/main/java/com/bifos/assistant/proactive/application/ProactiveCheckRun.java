@@ -6,19 +6,24 @@ import com.bifos.assistant.chat.application.model.CheckAnswer;
 import com.bifos.assistant.chat.domain.type.MessageRole;
 import com.bifos.assistant.chat.infra.ChatMessageRepository;
 import com.bifos.assistant.context.ContextAssembler;
+import com.bifos.assistant.followup.application.FollowUpService;
 import com.bifos.assistant.proactive.application.model.AnnouncedKey;
 import com.bifos.assistant.proactive.application.model.CheckResultBlock;
 import com.bifos.assistant.proactive.application.model.CheckResultRead;
 import com.bifos.assistant.proactive.application.model.JudgedFinding;
+import com.bifos.assistant.proactive.application.model.JudgedProblem;
 import com.bifos.assistant.proactive.domain.CheckReport;
 import com.bifos.assistant.proactive.domain.ProactiveCheck;
 import com.bifos.assistant.proactive.domain.ProactiveCheckFinding;
+import com.bifos.assistant.proactive.domain.ProactiveCheckProblem;
 import com.bifos.assistant.proactive.domain.type.CheckInvalidReason;
 import com.bifos.assistant.proactive.domain.type.CheckOutcome;
 import com.bifos.assistant.proactive.domain.type.CheckStatus;
 import com.bifos.assistant.proactive.domain.type.CheckTrigger;
 import com.bifos.assistant.proactive.domain.type.FindingKind;
+import com.bifos.assistant.proactive.domain.type.ProblemStatus;
 import com.bifos.assistant.proactive.infra.ProactiveCheckFindingRepository;
+import com.bifos.assistant.proactive.infra.ProactiveCheckProblemRepository;
 import com.bifos.assistant.proactive.infra.ProactiveCheckRepository;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.util.ExternalData;
@@ -84,6 +89,7 @@ public class ProactiveCheckRun implements CheckTurn {
             - 변화 신호가 모두 그대로이고 분야의 새 후보도 없으면 조사를 줄이고 NOTHING_NEW 로 끝낸다.
             - 최근에 알린 발견을 같은 근거로 다시 알리지 않는다. 새 원문이 있거나 마감, 적합성이 바뀌었을 때만 changeSinceLast 에 적고 다시 알린다.
             - 사용자가 답하지 않은 것을 선호나 거절로 여기지 않는다. 메시지 수는 반응이 있었는지만 알린다.
+            - 문제 후보는 사용자의 목표나 맥락과 이어지고 이번 발견이 근거인 것만 낸다. 새 자료가 나왔다는 사실만으로 후보를 만들지 않는다. 최근에 받아들인 문제 후보와 같은 문제 키는 달라진 점이 있을 때만 changeSinceLast 에 적고 다시 낸다.
             - follow_up_propose 는 PROPOSED 할 일만 만든다. 사용자가 받아들여야 OPEN 이 되며, 이 실행은 할 일을 직접 받아들이거나 끝낼 수 없다.
             - 답 끝에 아래 결과 블록 하나를 둔다. 블록 밖의 글은 사용자에게 보이지 않는다.
 
@@ -92,7 +98,7 @@ public class ProactiveCheckRun implements CheckTurn {
             </fos-check-result>
 
             결과 블록의 칸:
-            - version: 정수 2. version 1도 읽지만 보고 카드는 만들지 않는다
+            - version: 정수 3. version 1과 2도 읽지만 1은 보고 카드를, 1과 2는 문제 후보를 만들지 않는다
             - outcome: FINDINGS 또는 NOTHING_NEW
             - summary: 문자열, 선택, 300자까지. 한두 문장 요약
             - findings: 배열, 5개까지. NOTHING_NEW 면 비운다
@@ -100,6 +106,7 @@ public class ProactiveCheckRun implements CheckTurn {
             - followUpCandidates: 문자열 배열, 3개까지, 각 200자까지. 할 일 후보
             - sourceFailures: 문자열 배열, 5개까지, 각 200자까지. 읽지 못한 출처와 까닭
             - report: 객체. changed와 done은 각각 문자열 배열 3개까지, next는 문자열 배열 2개까지. evidence와 needsApproval은 적지 않는다
+            - problemCandidates: 배열, 3개까지. 이번 발견을 근거로 이 사용자가 풀 가치가 있는 문제. 없으면 비운다. 우선순위는 적지 않는다
 
             findings 의 한 칸:
             - area: 문자열, 40자까지. 분야 지침이 정한 영역
@@ -114,7 +121,19 @@ public class ProactiveCheckRun implements CheckTurn {
             - inferences: 문자열 배열, 6개까지, 각 300자까지. 추정
             - unknowns: 문자열 배열, 6개까지, 각 300자까지. 아직 모르는 조건
             - next: {"type": "ACTION" 또는 "QUESTION", "text": 300자까지}
-            - changeSinceLast: 문자열, 선택, 300자까지. 같은 주제를 다시 알릴 때 지난번과 달라진 점""";
+            - changeSinceLast: 문자열, 선택, 300자까지. 같은 주제를 다시 알릴 때 지난번과 달라진 점
+
+            problemCandidates 의 한 칸:
+            - problemKey: 문자열, 120자까지. 분야 지침이 정한, 같은 문제면 늘 같은 키
+            - problem: 문자열, 300자까지. 관찰을 되풀이하지 않고 이 사용자에게 뜻하는 문제
+            - relatedGoal: 문자열, 200자까지. 이 문제가 닿는 사용자의 목표나 맥락
+            - evidence: 문자열 배열, 5개까지. 근거가 된 같은 블록 findings 의 topicKey
+            - proposedAction: {"type": "ACTION" 또는 "QUESTION", "text": 200자까지}. 다음 행동이나 조사, 또는 물을 것
+            - confidence: LOW, MEDIUM, HIGH 가운데 하나
+            - expectedBenefit: 문자열, 300자까지. 해결하면 사용자가 얻을 것의 가설
+            - sideEffect: NONE, INTERNAL, EXTERNAL 가운데 하나. 앱 밖에 쓰거나 연락하면 EXTERNAL
+            - risk: 문자열, 선택, 200자까지
+            - changeSinceLast: 문자열, 선택, 300자까지. 같은 문제 키를 다시 낼 때 지난번과 달라진 점""";
 
     /**
      * 경계 줄과 연결 줄을 골라 지시를 만든다. 경계 줄은 쓰기 허용이, 연결 줄은 붙은 연결이 있는지가 정한다. 나머지는 모두 같다.
@@ -148,6 +167,7 @@ public class ProactiveCheckRun implements CheckTurn {
 
     static final String OPENING = "먼저 살펴보기를 시작한다. `skill_view(name=\"proactive-check\")` 로 지침을 읽고 그 절차대로 살펴본다.";
     static final String NO_RECENT_FINDINGS = "최근에 알린 발견이 없다.";
+    static final String NO_RECENT_PROBLEMS = "최근에 받아들인 문제 후보가 없다.";
 
     private static final String UNKNOWN = "모름";
     private static final DateTimeFormatter DATE = DateTimeFormatter.ISO_LOCAL_DATE.withZone(ZoneOffset.UTC);
@@ -169,6 +189,8 @@ public class ProactiveCheckRun implements CheckTurn {
     private volatile int referenceFindings;
     /** 검사한 발견. 답 메시지를 저장한 뒤 {@link #saveFindings} 가 저장한다. 블록에 발견이 없으면 비어 있다. */
     private volatile List<ProactiveCheckFinding> pendingFindings = List.of();
+    /** 검사한 문제 후보. 발견과 함께 {@link #saveFindings} 가 저장한다. 발견이 없으면 비어 있다. */
+    private volatile List<ProactiveCheckProblem> pendingProblems = List.of();
     /** 결과 블록 v2를 검사해 만든 보고다. */
     private volatile CheckReport pendingReport;
     /** 멈춤 알림 줄의 글을 내줬다. 그 줄은 부르는 쪽이 저장했다. */
@@ -192,11 +214,14 @@ public class ProactiveCheckRun implements CheckTurn {
      *
      * @param executions 지난 살펴보기의 루트 실행 줄을 읽어 Memory 문맥 지문을 견준다
      * @param chat 상한에 닿은 turn 을 멈춘다
+     * @param followUps 문제 후보가 이미 챙기는 할 일과 같은지 본다
      */
     record Deps(
             ProactiveCheckProperties properties,
             ProactiveCheckRepository checks,
             ProactiveCheckFindingRepository findings,
+            ProactiveCheckProblemRepository problems,
+            FollowUpService followUps,
             ChatMessageRepository messages,
             AgentExecutionRepository executions,
             ContextAssembler contextAssembler,
@@ -338,6 +363,17 @@ public class ProactiveCheckRun implements CheckTurn {
                         each.checkedAt(),
                         now))
                 .toList();
+        pendingProblems = block.problemCandidates().isEmpty() || judged.isEmpty()
+                ? List.of()
+                : ProblemJudgement.judge(
+                                block.problemCandidates(),
+                                judged,
+                                acceptedProblemKeysSince(
+                                        now.minus(deps.properties().digestWindow())),
+                                title -> deps.followUps().hasOpenWithTitle(owner.id(), title))
+                        .stream()
+                        .map(each -> problemRow(each, now))
+                        .toList();
         pendingReport = deps.reportFactory().create(block, judged, executionId);
         return new CheckAnswer(deps.renderer().render(block, judged, pendingReport), false, false);
     }
@@ -418,12 +454,43 @@ public class ProactiveCheckRun implements CheckTurn {
         deps.checks().save(check);
     }
 
-    /** 들고 있던 발견을 저장한다. turn 이 답 메시지를 저장하고 돌아왔을 때만 부른다. 발견이 없으면 아무것도 하지 않는다. */
+    /**
+     * 들고 있던 발견과 문제 후보를 저장한다. turn 이 답 메시지를 저장하고 돌아왔을 때만 부른다. 없으면 아무것도 하지 않는다. 사용자가 보지 못한
+     * 발견을 근거로 한 후보가 다음 살펴보기에서 중복으로 걸리지 않게 하기 위해 발견과 같은 자리에서 저장한다.
+     */
     void saveFindings() {
         List<ProactiveCheckFinding> judged = pendingFindings;
         if (!judged.isEmpty()) {
             deps.findings().saveAll(judged);
         }
+        List<ProactiveCheckProblem> problems = pendingProblems;
+        if (!problems.isEmpty()) {
+            deps.problems().saveAll(problems);
+        }
+    }
+
+    /** 검사한 후보 하나를 줄로 만든다. 행동이 없으면 그 칸을 비운다. */
+    private ProactiveCheckProblem problemRow(JudgedProblem judged, Instant now) {
+        CheckResultBlock.ProblemCandidate candidate = judged.candidate();
+        CheckResultBlock.Next action = candidate.proposedAction();
+        return ProactiveCheckProblem.of(
+                check.id(),
+                check.conversationId(),
+                judged.status(),
+                judged.reason(),
+                judged.problemKey(),
+                candidate.problem(),
+                candidate.relatedGoal(),
+                action == null ? null : action.type(),
+                action == null ? null : action.text(),
+                candidate.confidence(),
+                candidate.expectedBenefit(),
+                candidate.sideEffect(),
+                candidate.risk(),
+                candidate.changeSinceLast(),
+                judged.evidence(),
+                judged.evidenceCheckedAt(),
+                now);
     }
 
     /** turn 이 예외로 끝났을 때 살펴보기 줄을 {@code FAILED} 와 그 오류 코드로 적는다. */
@@ -518,6 +585,7 @@ public class ProactiveCheckRun implements CheckTurn {
                     .append(memorySignal(previous));
         }
         text.append("\n\n최근에 알린 발견\n").append(recentFindings(now));
+        text.append("\n\n최근에 받아들인 문제 후보\n").append(recentProblems(now));
         return text.toString();
     }
 
@@ -591,6 +659,34 @@ public class ProactiveCheckRun implements CheckTurn {
                                         .orElse(null))))
                 .collect(Collectors.joining("\n"));
         return ExternalData.wrap(lines);
+    }
+
+    /** 최근에 받아들인 문제 후보를 한 줄씩 적고 {@code <external-data>} 로 감싼다. 모델이 쓴 글에서 온 것이기 때문이다. */
+    private String recentProblems(Instant now) {
+        List<ProactiveCheckProblem> recent = deps.problems()
+                .findByConversationIdAndStatusAndCreatedAtAfterOrderByIdDesc(
+                        check.conversationId(),
+                        ProblemStatus.ACCEPTED,
+                        now.minus(deps.properties().digestWindow()),
+                        PageRequest.ofSize(deps.properties().digestMaxItems()));
+        if (recent.isEmpty()) {
+            return NO_RECENT_PROBLEMS;
+        }
+        String lines = recent.stream()
+                .map(problem -> "- " + orDash(problem.problemKey()) + " · " + orDash(problem.problem()))
+                .collect(Collectors.joining("\n"));
+        return ExternalData.wrap(lines);
+    }
+
+    /** 그 시각 뒤에 받아들인 문제 후보의 정규화한 문제 키다. */
+    private Set<String> acceptedProblemKeysSince(Instant after) {
+        return deps
+                .problems()
+                .findByConversationIdAndStatusAndCreatedAtAfter(check.conversationId(), ProblemStatus.ACCEPTED, after)
+                .stream()
+                .map(ProactiveCheckProblem::problemKey)
+                .filter(key -> !key.isEmpty())
+                .collect(Collectors.toSet());
     }
 
     /** 이미 알린 주제 키와 원문 주소. 주제 키가 빈 발견은 되풀이 판정을 하지 않으므로 넣지 않는다. */

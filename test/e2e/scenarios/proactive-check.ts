@@ -59,6 +59,17 @@ const STUDY = { topicKey: "study:e2e-proactive-stream", title: "스트림 처리
 /** 저장된 후보 없이 웹에서 찾은 자료다. 맥락 반영 단계에서 달라진 점과 함께 다시 낸다. */
 const WEB_ONLY = { topicKey: "study:e2e-proactive-queue", title: "메시지 큐 입문 자료", sourceUrl: "https://example.com/e2e/proactive/queue" };
 const CHANGE = "새 판이 나와 다룬 범위가 넓어졌어요";
+/** 웹에서 찾은 자료를 근거로 낸 문제 후보다. 대화에 그리지 않고 다음 살펴보기 입력에만 실린다(ADR-093). */
+const PROBLEM = {
+  problemKey: "study:e2e-queue-gap",
+  problem: "메시지 큐 재처리 방식을 설명할 근거가 부족하다",
+  relatedGoal: "다음 분기 면접 준비",
+  evidence: [WEB_ONLY.topicKey],
+  proposedAction: { type: "ACTION", text: "재처리 예제를 한 번 돌려 본다" },
+  confidence: "MEDIUM",
+  expectedBenefit: "면접에서 설계 근거를 말한다",
+  sideEffect: "NONE",
+};
 const SOURCE_FAILURE = "시험 커넥터 연결이 해제돼 읽지 못했어요";
 /** 살펴볼 에이전트의 profile 이다. 대역이 그 profile 의 hook 처럼 커넥터 도구 판정을 묻는다. */
 const PROFILE = DAD_BINDING.profileName;
@@ -412,14 +423,15 @@ export const proactiveCheckScenario: Scenario = {
         expect(!answer.includes(forbidden), `답에 「${forbidden}」 가 남았다:\n${answer}`);
       }
 
-      step("저장된 후보가 없을 때: 후보 읽기가 아무것도 주지 않아도 웹 사건과 원문이 있는 발견이 「새로 알릴 것」 에 남는다");
+      step("저장된 후보가 없을 때: 후보 읽기가 아무것도 주지 않아도 웹 사건과 원문이 있는 발견이 「새로 알릴 것」 에 남고, 버전 3의 문제 후보는 그리지 않는다");
       const secondEvents = await openConversationEvents(context, conversationId);
       try {
         context.hermes.setProactiveScript({
           tools: ["web_search", "web_extract"],
           hold: true,
           output: proactiveOutput({
-            version: 1, outcome: "FINDINGS", findings: [currentFinding(WEB_ONLY, new Date().toISOString())],
+            version: 3, outcome: "FINDINGS", findings: [currentFinding(WEB_ONLY, new Date().toISOString())],
+            problemCandidates: [PROBLEM],
           }),
         });
         const beforeSecond = (await statusOf(context)).lastCheck;
@@ -447,13 +459,22 @@ export const proactiveCheckScenario: Scenario = {
           && JSON.stringify(linkTargets(webAnswer)) === JSON.stringify([WEB_ONLY.sourceUrl, WEB_ONLY.sourceUrl]),
         `웹에서 찾은 발견이 「새로 알릴 것」 에 남지 않았다:\n${webAnswer}`,
       );
+      for (const hidden of [PROBLEM.problem, PROBLEM.problemKey, PROBLEM.expectedBenefit]) {
+        expect(!webAnswer.includes(hidden), `답에 문제 후보의 「${hidden}」 가 그려졌다:\n${webAnswer}`);
+      }
 
-      step("침묵: NOTHING_NEW 면 「살펴봤지만 새로 알릴 것이 없어요」 한 줄만 더해지고 답이 없다");
+      step("침묵: NOTHING_NEW 면 「살펴봤지만 새로 알릴 것이 없어요」 한 줄만 더해지고 답이 없으며, 입력에는 앞서 받아들인 문제 후보가 실린다");
       const beforeSilent = await messagesOf(context, conversationId);
       const beforeSilentCheck = (await statusOf(context)).lastCheck;
       context.hermes.setProactiveScript({ output: proactiveOutput({ version: 1, outcome: "NOTHING_NEW", findings: [] }) });
       await startCheck(context);
       const silent = await awaitFinished(context, beforeSilentCheck, "침묵");
+      const silentInput = context.hermes.proactiveInputs().at(-1)?.input ?? "";
+      const recentProblems = silentInput.slice(silentInput.indexOf("최근에 받아들인 문제 후보"));
+      expect(
+        recentProblems.includes("<external-data>") && recentProblems.includes(`- ${PROBLEM.problemKey} · ${PROBLEM.problem}`),
+        `다음 살펴보기 입력에 받아들인 문제 후보가 감싸여 실리지 않았다:\n${silentInput}`,
+      );
       expect(silent.status === "SUCCEEDED" && silent.outcome === "NOTHING_NEW", `침묵한 살펴보기의 줄이 다르다: ${JSON.stringify(silent)}`);
       const added = (await messagesOf(context, conversationId)).slice(beforeSilent.length);
       expect(
