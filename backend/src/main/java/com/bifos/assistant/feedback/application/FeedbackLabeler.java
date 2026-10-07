@@ -16,19 +16,22 @@ import lombok.NoArgsConstructor;
  * 제안 하나의 사건을 첫 반응으로 읽는다. 저장하지 않는 순수 함수다.
  *
  * <p>잘못된 학습을 막는 규칙을 여기 둔다. 무응답은 싫어함이 아니다. 거절과 숨기기는 그 제안 하나에 대한 일회성 반응이고 오래 가는 선호가
- * 아니다. 오래 가는 선호의 근거는 사용자가 받아들인 Memory 제안 하나뿐이다(ADR-012).
+ * 아니다. 오래 가는 선호의 근거는 사용자가 받아들였고 그 뒤 무르거나 거절하지 않은 Memory 제안 하나뿐이다(ADR-012).
  */
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
 public final class FeedbackLabeler {
 
     /** 반응 읽기 규칙의 버전이다. 규칙이 바뀌면 올린다. */
-    public static final int VERSION = 1;
+    public static final int VERSION = 2;
 
     /** 지금 화면의 숨기기다. 상태가 바뀔 때까지만 가리므로 거절이 아니라 미루기처럼 읽는다. */
     public static final String ATTENTION_HIDE = "ATTENTION_HIDE";
 
     /** 지금 화면의 미루기다. */
     public static final String ATTENTION_SNOOZE = "ATTENTION_SNOOZE";
+
+    /** 사용자가 {@code memory_remember} 의 기록을 되돌려 받아들인 제안을 다시 제안으로 돌렸다. 받아들임을 무른 것이다. */
+    public static final String MEMORY_UNDO = "MEMORY_UNDO";
 
     private static final Set<FeedbackEventType> POSITIVE =
             Set.of(FeedbackEventType.ACCEPTED, FeedbackEventType.APPROVED);
@@ -69,11 +72,19 @@ public final class FeedbackLabeler {
                 .filter(OUTCOMES::contains)
                 .reduce((first, second) -> second)
                 .orElse(null);
-        boolean accepted = ordered.stream()
-                .anyMatch(event ->
-                        event.actor() == FeedbackActor.USER && event.eventType() == FeedbackEventType.ACCEPTED);
+        // 첫 반응은 그대로 두지만, 오래 가는 선호는 지금 유효한 결정만 근거로 삼는다. 받아들인 뒤 되돌리거나 거절했으면 선호가 아니다.
+        FeedbackEventType lastDecision = ordered.stream()
+                .filter(event -> event.actor() == FeedbackActor.USER)
+                .filter(event -> POSITIVE.contains(event.eventType()) || declines(event))
+                .map(FeedbackEvent::eventType)
+                .reduce((first, second) -> second)
+                .orElse(null);
         return new SubjectLabel(
-                label, wantsNow(label), edited, outcome, subject == FeedbackSubjectType.MEMORY && accepted);
+                label,
+                wantsNow(label),
+                edited,
+                outcome,
+                subject == FeedbackSubjectType.MEMORY && lastDecision == FeedbackEventType.ACCEPTED);
     }
 
     /** 거절과, 받아들인 할 일을 그만둔 것이다. 지금 화면의 숨기기는 빼고 미루기로 읽는다. */
