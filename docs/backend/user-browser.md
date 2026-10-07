@@ -102,6 +102,25 @@ Control Plane 의 경로는 같은 이름에 `/api/v1` 을 붙인 것이다(`/ap
 
 오류 코드는 `BROWSER_NOT_FOUND`(404), `BROWSER_DISABLED`(503), `BROWSER_CAPACITY`(409), `BROWSER_BUSY`(409, 다른 전이가 진행 중), `BROWSER_START_FAILED`(502), `BROWSER_EXISTS`(409), `BROWSER_STOP_FAILED`(502, 줄은 `FAILED` 로 남고 다시 끌 수 있다) 다.
 
+## 로그인 유지
+
+끌 때 컨테이너를 지우므로 로그인은 프로필 디렉터리에 남은 것만 다음 기동으로 이어진다.
+프로필을 만들거나 켤 때 `Default/Preferences` 가 없으면 `{"session":{"restore_on_startup":1}}` 를 주인만 읽는 권한으로 써 둔다.
+Chrome 의 「이전 세션 이어서 열기」 라서, 정상 종료한 뒤 다음 기동에서 세션 쿠키도 돌아온다. 끄기는 SIGTERM 뒤 10초를 기다리므로 정상 종료다.
+이미 있는 설정 파일은 Chrome 이 고쳐 쓰는 것이라 건드리지 않는다. 그 자리의 링크는 따라가지 않는다.
+
+## CDP 연결
+
+Control Plane 은 브라우저의 CDP 에 두 가지로 닿는다. 주소는 컨테이너 IP 이고 `Origin` 은 보내지 않는다.
+
+| 무엇 | 하는 일 |
+| --- | --- |
+| HTTP 창구 | `GET /json/list` 의 `page` 대상만 탭으로 본다. 새 탭은 `PUT /json/new?<주소>`, 앞으로 가져오기는 `GET /json/activate/<id>` |
+| WebSocket | `ws://<CDP 주소의 host:port>/devtools/page/<id>` 로 탭 하나에 붙는다. Chrome 이 알려 주는 WebSocket 주소의 host 는 쓰지 않는다 |
+
+대상 번호는 영문자와 숫자만 받는다. 명령은 번호로 응답과 짝짓고 10초 안에 답이 없으면 실패다.
+연결이 끊기면 기다리던 명령을 모두 실패로 끝낸다. 조각난 메시지는 모아서 읽고, 16M 글자를 넘는 메시지가 오면 연결을 끊는다.
+
 ## 다음 단계
 
 로그인 화면(단계 2)과 커넥터 중계, 접근 표식 표(단계 3)는 아직 없다. 결정은 [ADR-20261007 / user-browser](../adr/ADR-20261007-user-browser.md) 가 갖고, 각 단계를 구현하는 PR 이 그 계약을 이 문서에 더한다.
