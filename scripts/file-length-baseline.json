@@ -4,14 +4,14 @@
     "hermes/connectors/gmail/src/html-entities.ts": "HTML 문자 참조를 변환하는 데이터 표다. 실행 로직을 나눌 대상이 아니다."
   },
   "files": {
-    "backend/src/main/java/com/bifos/assistant/chat/application/ChatService.java": 2163,
+    "backend/src/main/java/com/bifos/assistant/chat/application/ChatService.java": 2167,
     "backend/src/main/java/com/bifos/assistant/chat/application/RestartReconciler.java": 615,
     "backend/src/main/java/com/bifos/assistant/chat/infra/ArtifactStore.java": 702,
-    "backend/src/main/java/com/bifos/assistant/connector/application/ConnectorActionService.java": 852,
+    "backend/src/main/java/com/bifos/assistant/connector/application/ConnectorActionService.java": 882,
     "backend/src/main/java/com/bifos/assistant/connector/application/ConnectorBindingService.java": 612,
     "backend/src/main/java/com/bifos/assistant/hermes/HttpHermesConnectorClient.java": 614,
     "backend/src/main/java/com/bifos/assistant/orchestration/application/AgentDelegationService.java": 607,
-    "backend/src/main/java/com/bifos/assistant/proactive/application/ProactiveCheckRun.java": 758,
+    "backend/src/main/java/com/bifos/assistant/proactive/application/ProactiveCheckRun.java": 763,
     "backend/src/main/java/com/bifos/assistant/usage/application/ExecutionRecorder.java": 585,
     "backend/src/main/java/com/bifos/assistant/usage/domain/AgentExecution.java": 665,
     "hermes/connectors/gmail/src/server.ts": 1454,
