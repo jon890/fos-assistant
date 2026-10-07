@@ -1,4 +1,4 @@
--- 먼저 살펴보기 결과 버전 3의 문제 후보(ADR-093)다. 받아들인 것과 버린 것을 모두 남긴다.
+-- 먼저 살펴보기 결과 버전 3의 문제 후보(ADR-092)다. 받아들인 것과 버린 것을 모두 남긴다.
 -- 칸의 뜻은 docs/backend/schema/proactive.md 가 갖는다. 근거는 발견의 주제 키, 원문 주소, 확인 시각만 참조로 둔다.
 CREATE TABLE proactive_check_problem (
     id BIGINT NOT NULL AUTO_INCREMENT,

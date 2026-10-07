@@ -85,7 +85,7 @@ public class AttachmentService {
         attachment.nameStoredFile(AttachmentStore.storedName(attachment.id(), extension));
 
         try (InputStream in = body.getInputStream()) {
-            store.save(conversationId, attachment.id(), extension, in);
+            store.save(attachment, in);
         } catch (IOException ex) {
             throw new ApiException(ErrorCode.INTERNAL_ERROR, "could not read the uploaded image", ex);
         }
@@ -177,7 +177,16 @@ public class AttachmentService {
         if (attached == null || attached.isEmpty()) {
             return text;
         }
-        String directory = stripTrailingSlash(properties.agentRoot()) + "/" + conversationId;
+        Long ownerUserId = attached.getFirst().uploadedByUserId();
+        boolean sameOwnerAndConversation = attached.stream()
+                .allMatch(attachment -> ownerUserId.equals(attachment.uploadedByUserId())
+                        && conversationId.equals(attachment.conversationId()));
+        if (!sameOwnerAndConversation) {
+            throw notAttachable();
+        }
+        attached.forEach(store::prepare);
+        String directory = stripTrailingSlash(properties.agentRoot()) + "/users/"
+                + AttachmentStore.userDirectoryKey(ownerUserId) + "/" + conversationId;
         Map<Long, Integer> order = orderInConversation(conversationId);
         String files = attached.stream()
                 .map(it ->

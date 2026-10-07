@@ -30,6 +30,7 @@ class AgentSandboxOwnerTest {
         Agent agent = agentWith(42L, AgentVisibility.GROUP, null);
 
         assertThat(agent.sandboxOwner()).isEqualTo("a42");
+        assertThat(agent.acceptsAttachments()).isFalse();
     }
 
     private static Agent agentWith(Long id, AgentVisibility visibility, Long ownerUserId) {

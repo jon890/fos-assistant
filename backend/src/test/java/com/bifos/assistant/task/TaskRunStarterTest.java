@@ -97,8 +97,16 @@ import org.springframework.transaction.support.TransactionTemplate;
  *
  * <p>사용자 실행 한도를 2 로 두고, 자리를 채울 때는 그 사용자의 turn 자리 둘을 먼저 얻어 둔다. 시각은 검사가
  * {@link TaskRunStarter#startQueued} 에 넘기는 값이 정한다. turn 은 가상 스레드에서 돌므로 발화 줄이 끝날 때까지 기다린다.
+ *
+ * <p>CHECK 발화는 살펴보기 turn 을 돌린다. 시험 프로필의 살펴보기 시간 상한(500ms)은 느린 러너에서 turn 이 끝나기 전에 닿으므로
+ * 다른 살펴보기 검사처럼 Hermes 실행 한도와 함께 올린다.
  */
-@SpringBootTest(properties = "assistant.user-execution.max-running=2")
+@SpringBootTest(
+        properties = {
+            "assistant.user-execution.max-running=2",
+            "hermes.run-timeout=30s",
+            "assistant.proactive-check.max-duration=20s"
+        })
 @ActiveProfiles("test")
 @Import(TaskRunStarterTest.StubHermes.class)
 class TaskRunStarterTest {

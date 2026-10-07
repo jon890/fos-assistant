@@ -2,6 +2,7 @@ package com.bifos.assistant;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.bifos.assistant.chat.application.AttachmentBackfill;
 import com.bifos.assistant.chat.application.FlowRegistry;
 import com.bifos.assistant.testsupport.MysqlTestDatabase;
 import com.bifos.assistant.testsupport.RepositoryQuerySweep;
@@ -33,7 +34,8 @@ import org.springframework.transaction.PlatformTransactionManager;
  * 보려는 것이 아니므로 실패 전체를 단언하지 않고, 정렬 규칙이 섞인 두 메서드가 실패 목록에 있고 그 실패가 오류 1267 인지만 본다.
  *
  * <p>같은 까닭으로 기동할 때 에이전트 표를 읽는 {@link FlowRegistry} 를 대역으로 둔다. V57 뒤에 {@code agent} 에 더한 칸이 있어
- * 그 읽기가 없는 칸 오류로 문맥을 띄우지 못한다.
+ * 그 읽기가 없는 칸 오류로 문맥을 띄우지 못한다. 첨부 복사도 V75 의 {@code position} 칸을 읽으므로 같은 까닭으로
+ * 대역을 둔다. 현재 스키마에서 첨부 복사는 첨부 시험과 저장소 쿼리 검사로 따로 확인한다.
  */
 @Tag("mysql")
 @SpringBootTest
@@ -64,6 +66,10 @@ class CollationMixQueryMysqlTest {
     /** 기동할 때의 흐름 이름 확인을 건너뛴다. 까닭은 클래스 설명에 있다. */
     @MockitoBean
     private FlowRegistry flowRegistry;
+
+    /** 옛 스키마에는 현재 첨부 엔티티의 모든 칸이 없으므로 기동 복사를 실행하지 않는다. */
+    @MockitoBean
+    private AttachmentBackfill attachmentBackfill;
 
     @DynamicPropertySource
     static void useMysqlBeforeUnify(DynamicPropertyRegistry registry) {

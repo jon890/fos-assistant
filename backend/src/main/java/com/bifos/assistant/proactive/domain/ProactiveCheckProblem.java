@@ -21,7 +21,7 @@ import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
 /**
- * 살펴보기 결과 버전 3의 문제 후보 하나다(ADR-093).
+ * 살펴보기 결과 버전 3의 문제 후보 하나다(ADR-092).
  *
  * <p>받아들인 것과 버린 것을 모두 남긴다. 다음 살펴보기의 중복 판정과 입력에 쓰고, 우선순위를 정하는 다음 단계가 읽는다. 글은 모델이 쓴
  * 것이고 대화에 그리지 않는다. 근거는 발견의 참조만 두고 원문 본문을 두지 않는다.

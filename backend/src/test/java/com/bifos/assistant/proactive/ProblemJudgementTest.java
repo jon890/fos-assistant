@@ -22,7 +22,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /**
- * 문제 후보 검사의 순서와 조건을 커리어 분야의 합성 fixture 로 고정한다(ADR-093).
+ * 문제 후보 검사의 순서와 조건을 커리어 분야의 합성 fixture 로 고정한다(ADR-092).
  *
  * <p>fixture 는 급한 문제, 나중에 중요한 문제, 목표 없는 관찰, 중복, 할 일 없음이다. 발견은 실제 검사({@link FindingJudgement})를
  * 거쳐 만든다. 회사와 주소는 모두 가상이다.
