@@ -36,6 +36,7 @@ import com.bifos.assistant.context.ContextProperties;
 import com.bifos.assistant.context.ContextSource;
 import com.bifos.assistant.context.ContextTrust;
 import com.bifos.assistant.context.ResultHeader;
+import com.bifos.assistant.feedback.application.DecisionFeedbackRecorder;
 import com.bifos.assistant.hermes.HermesProperties;
 import com.bifos.assistant.hermes.HermesRunEventStream;
 import com.bifos.assistant.hermes.HermesRunsClient;
@@ -154,6 +155,7 @@ public class ChatService {
     private final ResultDeliveryRecorder resultDeliveries;
     private final ContextProperties contextProperties;
     private final List<CheckReportReads> checkReportReads;
+    private final DecisionFeedbackRecorder feedback;
 
     public ChatTurn send(CurrentUser user, Long conversationId, String text, String agentCode) {
         return send(user, conversationId, text, agentCode, List.of());
@@ -2013,6 +2015,8 @@ public class ChatService {
         }
         // 지운 대화에는 더 보낼 수 없다. 남기면 기동 확인이 보낼 수 없는 행을 계속 만난다.
         pendingMessages.deleteAllOf(conversationId);
+        // 판단 피드백은 사용자의 기록이다. 대화를 지우면 그 대화에서 나온 제안의 사건도 함께 지운다.
+        feedback.forgetConversation(user.id(), conversationId);
     }
 
     /**

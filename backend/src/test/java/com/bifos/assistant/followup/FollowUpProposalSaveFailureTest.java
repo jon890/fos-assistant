@@ -11,6 +11,7 @@ import static org.mockito.Mockito.when;
 import com.bifos.assistant.chat.application.ConversationAccess;
 import com.bifos.assistant.chat.application.ConversationPublicIdLookup;
 import com.bifos.assistant.chat.domain.Conversation;
+import com.bifos.assistant.feedback.application.DecisionFeedbackRecorder;
 import com.bifos.assistant.followup.application.FollowUpService;
 import com.bifos.assistant.followup.application.model.FollowUpProposalOutcome;
 import com.bifos.assistant.followup.domain.FollowUp;
@@ -49,6 +50,7 @@ class FollowUpProposalSaveFailureTest {
                 repository,
                 conversations,
                 mock(ConversationPublicIdLookup.class),
+                mock(DecisionFeedbackRecorder.class),
                 mock(PlatformTransactionManager.class),
                 Clock.fixed(NOW, ZoneOffset.UTC));
     }
