@@ -53,7 +53,7 @@
 | `runDraft` 의 끝 | 상태 |
 | --- | --- |
 | 성공 | `succeeded`, `result` 는 `state` 와 저장 전후 수 |
-| `save_clicked: true` 를 쓴 뒤의 모든 실패, 중단, 예외 | `unknown` |
+| `save_clicked: true` 를 쓴 뒤의 모든 실패, 중단, 예외 | `unknown`. 단, 저장 수가 늘어난 것을 확인한 뒤 `state` 읽기만 실패한 경우는 아래 `runDraft` 변경으로 성공이 된다 |
 | 그 전의 시간 초과(중단) | `failed`, `error.code: "timeout"` |
 | 그 전의 `EditorError` | `failed`, `error` 는 `{code, stage, message, ...extra}` |
 | 그 전의 그 밖의 예외 | `failed`, `error.code: "editor_failed"`. 예외 원문을 싣지 않는다 |
@@ -61,6 +61,10 @@
 끝나면 잠금을 지운다. 잠금의 `job_id` 가 자기 것일 때만 지운다. 상태를 쓰는 것은 「끝난 상태는 다시 쓰지 않는다」 를 지킨다.
 
 `src/server.ts` 의 진입부: `process.argv` 에 `--worker <파일>` 이 있으면 MCP 서버를 띄우지 않고 `runWorker` 만 돌린 뒤 끝낸다. 프록시 env 를 빼고 다시 실행하는 기존 처리보다 뒤에 둔다.
+
+### 2-1. `src/editor/run.ts` 의 저장 확인 뒤 처리
+
+`save` 가 저장 수가 늘어난 것을 확인했으면 그 뒤의 `state` 단계에서 난 예외는 삼키고 `{state: null, savedBefore, savedAfter}` 를 돌려준다. 임시저장은 이미 확인됐기 때문이다. `editor-run.test.ts` 에 「저장 확인 뒤 `state` 가 실패해도 성공」 을 더한다.
 
 ### 3. `save_draft` 도구
 
@@ -129,3 +133,5 @@ git add -N hermes/connectors/naver-blog && bash scripts/check-public-safe.sh
 | `hermes/connectors/naver-blog/tests/worker.test.ts` | 신규 |
 | `hermes/connectors/naver-blog/tests/save-draft.test.ts` | 신규 |
 | `hermes/connectors/naver-blog/tests/contracts.test.ts` | 수정 |
+| `hermes/connectors/naver-blog/src/editor/run.ts` | 수정 |
+| `hermes/connectors/naver-blog/tests/editor-run.test.ts` | 수정 |
