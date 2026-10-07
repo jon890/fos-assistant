@@ -34,7 +34,6 @@ export function DocumentSection({
     if (result.ok) setDocuments(result.data);
   }
 
-
   return (
     <section className="mb-8" aria-labelledby="memory-documents-heading">
       <h2 id="memory-documents-heading" className="mb-1 text-lg font-semibold">
