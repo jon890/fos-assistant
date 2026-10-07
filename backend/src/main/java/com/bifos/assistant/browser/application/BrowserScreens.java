@@ -57,12 +57,7 @@ public class BrowserScreens implements AutoCloseable {
         this.scheduler.setRemoveOnCancelPolicy(true);
     }
 
-    /**
-     * 그 브라우저의 지금 탭에 화면을 연다. 앞의 화면이 있으면 닫는다.
-     *
-     * @param url 시작 주소. 없으면 지금 주소에 머문다
-     * @throws ApiException 탭에 붙지 못했으면 {@code BROWSER_START_FAILED}
-     */
+    /** 지금 탭에 화면을 열고 앞의 화면은 닫는다. 탭에 붙지 못했으면 {@code BROWSER_START_FAILED} 다. */
     public void open(Long browserId, Long userId, URI cdp, String url, BrowserScreenSink sink) {
         BrowserScreenSession session = new BrowserScreenSession(
                 browserId, userId, cdp, targets, connector, usage.open(browserId), sink, scheduler, this::forget);
@@ -73,20 +68,14 @@ public class BrowserScreens implements AutoCloseable {
         try {
             session.start(url, timeout, tabInterval);
         } catch (RuntimeException ex) {
-            log.warn(
-                    "browser screen could not attach id={} error={}",
-                    browserId,
-                    ex.getClass().getSimpleName());
+            String error = ex.getClass().getSimpleName();
+            log.warn("browser screen could not attach id={} error={}", browserId, error);
             session.close(null);
             throw new ApiException(ErrorCode.BROWSER_START_FAILED, "browser screen could not attach", ex);
         }
     }
 
-    /**
-     * 요청자의 열린 화면에 입력을 보낸다. 요청자의 화면만 찾으므로 남의 화면에는 닿지 않는다.
-     *
-     * @throws ApiException 열린 화면이 없으면 {@code BROWSER_SCREEN_CLOSED}
-     */
+    /** 요청자의 열린 화면에만 입력을 보낸다. 열린 화면이 없으면 {@code BROWSER_SCREEN_CLOSED} 다. */
     public void input(Long userId, BrowserScreenInput input) {
         screens.values().stream()
                 .filter(session -> session.userId().equals(userId) && !session.closed())

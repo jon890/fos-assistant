@@ -61,17 +61,16 @@ final class BrowserScreenStream implements BrowserScreenSink {
 
     @Override
     public void onClose(Runnable callback) {
-        boolean run;
         lock.lock();
         try {
             onClose = callback;
-            run = !open;
+            if (open) {
+                return;
+            }
         } finally {
             lock.unlock();
         }
-        if (run) {
-            callback.run();
-        }
+        callback.run();
     }
 
     private void ended() {

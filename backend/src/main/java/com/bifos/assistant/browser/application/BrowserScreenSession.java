@@ -26,6 +26,8 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
+import lombok.AccessLevel;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import tools.jackson.databind.JsonNode;
 
@@ -33,41 +35,22 @@ import tools.jackson.databind.JsonNode;
  * 로그인 화면 하나다. CDP 연결 하나, 받는 쪽 하나, 사용 핸들 하나를 쥔다. 계약은 {@code docs/backend/user-browser.md} 의
  * 「로그인 화면」 이 갖는다.
  *
- * <p>지금 탭의 screencast 프레임을 받는 대로 ack 하고 {@code frame} 사건으로 넘긴다. 정해 둔 간격마다 탭 목록을 보고, 바뀌면
- * {@code tabs} 사건을 보낸다. 새 탭이 생기면(로그인 팝업) screencast 를 그 탭으로 옮긴다.
- *
- * <p>입력은 정한 종류만 CDP 명령으로 바꾼다. 좌표는 마지막 프레임의 화면 크기를 곱해 CSS 픽셀로 바꾸고, 프레임이 아직 없으면 버린다.
- * 입력 본문은 로그에 남기지 않는다.
- *
- * <p>닫기는 한 번만 일어난다. 예약한 일을 취소하고 CDP 연결과 받는 쪽과 사용 핸들을 닫은 뒤 등록부에서 뺀다.
+ * <p>프레임은 받는 대로 ack 하고 넘긴다. 탭 목록이 바뀌면 알리고, 새 탭(로그인 팝업)이 생기면 그 탭으로 옮긴다. 좌표 입력은 마지막
+ * 프레임의 화면 크기로 바꾸고, 프레임이 아직 없으면 버린다. 입력 본문은 로그에 남기지 않는다.
  */
 @Slf4j
+@RequiredArgsConstructor(access = AccessLevel.PACKAGE)
 public class BrowserScreenSession {
 
     /** screencast 인자다. 프레임 하나가 수백 KB 다. */
     static final Map<String, Object> SCREENCAST =
             Map.of("format", "jpeg", "quality", 60, "maxWidth", 1280, "maxHeight", 2000);
 
-    /** 다른 화면이 열렸다. */
+    /** {@code closed} 의 까닭이다. 다른 화면이 열렸다, 브라우저가 멈췄다, 시간이 지났다. */
     static final String REPLACED = "replaced";
-    /** 브라우저가 멈췄거나 닿지 않는다. */
+
     static final String STOPPED = "stopped";
-    /** 화면을 열어 둘 수 있는 시간이 지났다. */
     static final String TIMEOUT = "timeout";
-
-    /** 특수 키의 CDP 값이다. 글자를 만드는 키만 {@code text} 를 갖는다. */
-    private static final Map<String, KeySpec> KEY_SPECS = Map.of(
-            "Enter", new KeySpec("Enter", 13, "\r"),
-            "Backspace", new KeySpec("Backspace", 8, null),
-            "Tab", new KeySpec("Tab", 9, null),
-            "Escape", new KeySpec("Escape", 27, null),
-            "ArrowLeft", new KeySpec("ArrowLeft", 37, null),
-            "ArrowUp", new KeySpec("ArrowUp", 38, null),
-            "ArrowRight", new KeySpec("ArrowRight", 39, null),
-            "ArrowDown", new KeySpec("ArrowDown", 40, null),
-            "Delete", new KeySpec("Delete", 46, null));
-
-    private static final String ABOUT_BLANK = "about:blank";
 
     private final Long browserId;
     private final Long userId;
@@ -92,27 +75,6 @@ public class BrowserScreenSession {
     /** 마지막 프레임의 화면 크기(CSS 픽셀)다. 프레임이 아직 없으면 비어 있다. */
     private volatile Viewport viewport;
 
-    BrowserScreenSession(
-            Long browserId,
-            Long userId,
-            URI cdp,
-            CdpTargets targets,
-            CdpConnector connector,
-            BrowserUsageHandle usage,
-            BrowserScreenSink sink,
-            ScheduledExecutorService scheduler,
-            Consumer<BrowserScreenSession> ended) {
-        this.browserId = browserId;
-        this.userId = userId;
-        this.cdp = cdp;
-        this.targets = targets;
-        this.connector = connector;
-        this.usage = usage;
-        this.sink = sink;
-        this.scheduler = scheduler;
-        this.ended = ended;
-    }
-
     Long browserId() {
         return browserId;
     }
@@ -125,51 +87,37 @@ public class BrowserScreenSession {
         return closed.get();
     }
 
-    /**
-     * 지금 탭에 붙어 screencast 를 시작한다. 탭이 없으면 빈 탭을 연다. 붙지 못하면 런타임 예외다.
-     *
-     * @param url 시작 주소. 없으면 지금 주소에 머문다
-     */
+    /** 지금 탭(없으면 새 빈 탭)에 붙어 screencast 를 시작한다. {@code url} 이 없으면 지금 주소에 머문다. 붙지 못하면 런타임 예외다. */
     void start(String url, Duration timeout, Duration tabInterval) {
         List<CdpTarget> pages = targets.list(cdp);
         if (pages.isEmpty()) {
-            pages = List.of(targets.create(cdp, ABOUT_BLANK));
+            pages = List.of(targets.create(cdp, "about:blank"));
         }
         synchronized (lock) {
             tabs = pages;
         }
         attach(pages.get(0).id(), url);
         sink.onClose(() -> close(null));
-        if (!sendTabs()) {
-            close(null);
-            return;
-        }
+        sendTabs();
+        long interval = tabInterval.toMillis();
         schedule(scheduler.schedule(() -> close(TIMEOUT), timeout.toMillis(), TimeUnit.MILLISECONDS));
-        schedule(scheduler.scheduleWithFixedDelay(
-                this::pollTabs, tabInterval.toMillis(), tabInterval.toMillis(), TimeUnit.MILLISECONDS));
+        schedule(scheduler.scheduleWithFixedDelay(this::pollTabs, interval, interval, TimeUnit.MILLISECONDS));
     }
 
-    /**
-     * 입력 하나를 CDP 명령으로 보낸다. 명령의 결과는 기다리지 않는다.
-     *
-     * @throws ApiException 화면이 이미 닫혔으면 {@code BROWSER_SCREEN_CLOSED}
-     */
+    /** 입력 하나를 CDP 명령으로 보내고 결과는 기다리지 않는다. 화면이 이미 닫혔으면 {@code BROWSER_SCREEN_CLOSED} 다. */
     void input(BrowserScreenInput input) {
         if (closed.get()) {
             throw new ApiException(ErrorCode.BROWSER_SCREEN_CLOSED, "browser screen is closed");
-        }
-        if (input.kind() == BrowserScreenInput.Kind.TAB) {
-            selectTab(input.targetId());
-            return;
         }
         CdpConnection current;
         synchronized (lock) {
             current = connection;
         }
-        if (current == null) {
+        if (input.kind() != BrowserScreenInput.Kind.TAB && current == null) {
             return;
         }
         switch (input.kind()) {
+            case TAB -> guard("tab switch", () -> selectTab(input.targetId()));
             case MOUSE -> mouse(current, input);
             case WHEEL -> wheel(current, input);
             case KEY -> key(current, input.key());
@@ -177,30 +125,15 @@ public class BrowserScreenSession {
             case NAVIGATE -> command(current, "Page.navigate", Map.of("url", input.url()));
             case BACK -> back(current);
             case RELOAD -> command(current, "Page.reload", Map.of());
-            case RESIZE ->
-                command(
-                        current,
-                        "Emulation.setDeviceMetricsOverride",
-                        Map.of(
-                                "width",
-                                input.width(),
-                                "height",
-                                input.height(),
-                                "deviceScaleFactor",
-                                1,
-                                "mobile",
-                                false));
-            case TAB -> {
-                // 위에서 따로 다뤘다
+            case RESIZE -> {
+                Map<String, Object> metrics = Map.of(
+                        "width", input.width(), "height", input.height(), "deviceScaleFactor", 1, "mobile", false);
+                command(current, "Emulation.setDeviceMetricsOverride", metrics);
             }
         }
     }
 
-    /**
-     * 화면을 닫는다. 한 번만 일어난다.
-     *
-     * @param reason 받는 쪽에 보낼 {@code closed} 의 까닭. 받는 쪽이 먼저 끊겼으면 비운다
-     */
+    /** 한 번만 닫는다. 예약한 일, 연결, 받는 쪽, 사용 핸들을 닫고 등록부에서 뺀다. 받는 쪽이 먼저 끊겼으면 {@code reason} 을 비운다. */
     void close(String reason) {
         if (!closed.compareAndSet(false, true)) {
             return;
@@ -279,11 +212,7 @@ public class BrowserScreenSession {
         if (width > 0 && height > 0) {
             viewport = new Viewport(width, height);
         }
-        Map<String, Object> frame = new LinkedHashMap<>();
-        frame.put("data", params.path("data").asString(""));
-        frame.put("width", width);
-        frame.put("height", height);
-        if (!sink.send("frame", frame)) {
+        if (!sink.send("frame", Map.of("data", params.path("data").asString(""), "width", width, "height", height))) {
             close(null);
         }
     }
@@ -296,47 +225,26 @@ public class BrowserScreenSession {
             }
         }
         try {
-            scheduler.execute(this::recover);
+            scheduler.execute(() -> guard("tab recovery", () -> {
+                List<CdpTarget> pages = listTabs();
+                if (pages != null) {
+                    synchronized (lock) {
+                        tabs = pages;
+                    }
+                    attach(pages.get(0).id(), null);
+                    sendTabs();
+                }
+            }));
         } catch (RejectedExecutionException ex) {
-            close(STOPPED);
-        }
-    }
-
-    private void recover() {
-        if (closed.get()) {
-            return;
-        }
-        try {
-            List<CdpTarget> pages = targets.list(cdp);
-            if (pages.isEmpty()) {
-                close(STOPPED);
-                return;
-            }
-            synchronized (lock) {
-                tabs = pages;
-            }
-            attach(pages.get(0).id(), null);
-            if (!sendTabs()) {
-                close(null);
-            }
-        } catch (RuntimeException ex) {
-            log.debug(
-                    "browser screen lost its tab id={} error={}",
-                    browserId,
-                    ex.getClass().getSimpleName());
             close(STOPPED);
         }
     }
 
     /** 탭 목록을 본다. 바뀌면 알리고, 새 탭이 생겼으면 그리로 옮기고, 붙은 탭이 사라졌으면 남은 탭으로 옮긴다. */
     private void pollTabs() {
-        if (closed.get()) {
-            return;
-        }
-        try {
-            List<CdpTarget> pages = targets.list(cdp);
-            if (pages.isEmpty()) {
-                close(STOPPED);
+        guard("tab check", () -> {
+            List<CdpTarget> pages = listTabs();
+            if (pages == null) {
                 return;
             }
             List<CdpTarget> before;
@@ -358,39 +266,31 @@ public class BrowserScreenSession {
             if (next != null) {
                 moveTo(next);
             }
-            if ((next != null || !pages.equals(before)) && !sendTabs()) {
-                close(null);
+            if (next != null || !pages.equals(before)) {
+                sendTabs();
             }
-        } catch (RuntimeException ex) {
-            log.debug(
-                    "browser screen tab check failed id={} error={}",
-                    browserId,
-                    ex.getClass().getSimpleName());
+        });
+    }
+
+    /** 탭 목록을 읽는다. 탭이 하나도 없으면 {@code stopped} 로 닫고 {@code null} 이다. */
+    private List<CdpTarget> listTabs() {
+        List<CdpTarget> pages = targets.list(cdp);
+        if (pages.isEmpty()) {
             close(STOPPED);
+            return null;
         }
+        return pages;
     }
 
     /** 고른 탭으로 옮긴다. 목록에 없는 탭은 무시한다. */
     private void selectTab(String id) {
-        boolean known;
         synchronized (lock) {
-            known = tabs.stream().anyMatch(tab -> tab.id().equals(id)) && !id.equals(targetId);
-        }
-        if (!known) {
-            return;
-        }
-        try {
-            moveTo(id);
-            if (!sendTabs()) {
-                close(null);
+            if (id.equals(targetId) || tabs.stream().noneMatch(tab -> tab.id().equals(id))) {
+                return;
             }
-        } catch (RuntimeException ex) {
-            log.debug(
-                    "browser screen tab switch failed id={} error={}",
-                    browserId,
-                    ex.getClass().getSimpleName());
-            close(STOPPED);
         }
+        moveTo(id);
+        sendTabs();
     }
 
     private void moveTo(String id) {
@@ -403,7 +303,8 @@ public class BrowserScreenSession {
         attach(id, null);
     }
 
-    private boolean sendTabs() {
+    /** 탭 목록을 알린다. 받는 쪽이 끊겼으면 화면을 닫는다. */
+    private void sendTabs() {
         List<Map<String, Object>> views = new ArrayList<>();
         synchronized (lock) {
             for (CdpTarget tab : tabs) {
@@ -415,35 +316,42 @@ public class BrowserScreenSession {
                 views.add(view);
             }
         }
-        return sink.send("tabs", views);
+        if (!sink.send("tabs", views)) {
+            close(null);
+        }
+    }
+
+    /** 닫히지 않았으면 탭을 다루는 일을 돌린다. 실패하면 오류 종류만 남기고 {@code stopped} 로 닫는다. */
+    private void guard(String step, Runnable work) {
+        if (closed.get()) {
+            return;
+        }
+        try {
+            work.run();
+        } catch (RuntimeException ex) {
+            String error = ex.getClass().getSimpleName();
+            log.debug("browser screen {} failed id={} error={}", step, browserId, error);
+            close(STOPPED);
+        }
     }
 
     private void mouse(CdpConnection current, BrowserScreenInput input) {
-        Viewport size = viewport;
-        if (size == null) {
+        Map<String, Object> params = point(input);
+        if (params == null) {
             return;
         }
-        String type;
         boolean pressed;
         synchronized (lock) {
-            switch (input.action()) {
-                case "down" -> {
-                    type = "mousePressed";
-                    mouseDown = true;
-                }
-                case "up" -> {
-                    type = "mouseReleased";
-                    mouseDown = false;
-                }
-                default -> type = "mouseMoved";
-            }
+            mouseDown = "down".equals(input.action()) || (mouseDown && !"up".equals(input.action()));
             pressed = mouseDown;
         }
-        Map<String, Object> params = new HashMap<>();
-        params.put("type", type);
-        params.put("x", input.x() * size.width());
-        params.put("y", input.y() * size.height());
+        String type = switch (input.action()) {
+            case "down" -> "mousePressed";
+            case "up" -> "mouseReleased";
+            default -> "mouseMoved";
+        };
         boolean click = !"mouseMoved".equals(type);
+        params.put("type", type);
         params.put("button", click || pressed ? "left" : "none");
         params.put("buttons", pressed ? 1 : 0);
         if (click) {
@@ -453,44 +361,39 @@ public class BrowserScreenSession {
     }
 
     private void wheel(CdpConnection current, BrowserScreenInput input) {
-        Viewport size = viewport;
-        if (size == null) {
-            return;
+        Map<String, Object> params = point(input);
+        if (params != null) {
+            params.putAll(Map.of("type", "mouseWheel", "deltaX", 0, "deltaY", input.deltaY()));
+            command(current, "Input.dispatchMouseEvent", params);
         }
-        command(
-                current,
-                "Input.dispatchMouseEvent",
-                Map.of(
-                        "type",
-                        "mouseWheel",
-                        "x",
-                        input.x() * size.width(),
-                        "y",
-                        input.y() * size.height(),
-                        "deltaX",
-                        0,
-                        "deltaY",
-                        input.deltaY()));
     }
 
+    /** 비율 좌표를 마지막 프레임의 CSS 픽셀로 바꾼 인자다. 프레임이 아직 없으면 {@code null} 이다. */
+    private Map<String, Object> point(BrowserScreenInput input) {
+        Viewport size = viewport;
+        if (size == null) {
+            return null;
+        }
+        Map<String, Object> params = new HashMap<>();
+        params.put("x", input.x() * size.width());
+        params.put("y", input.y() * size.height());
+        return params;
+    }
+
+    /** 특수 키를 누르고 뗀다. 글자를 만드는 Enter 만 {@code text} 를 싣는다. */
     private void key(CdpConnection current, String name) {
-        KeySpec spec = KEY_SPECS.get(name);
-        if (spec == null) {
+        Integer keyCode = BrowserScreenInput.KEYS.get(name);
+        if (keyCode == null) {
             return;
         }
-        Map<String, Object> down = new HashMap<>();
-        down.put("type", spec.text() == null ? "rawKeyDown" : "keyDown");
-        down.put("key", name);
-        down.put("code", spec.code());
-        down.put("windowsVirtualKeyCode", spec.keyCode());
-        if (spec.text() != null) {
-            down.put("text", spec.text());
+        Map<String, Object> up = Map.of("type", "keyUp", "key", name, "code", name, "windowsVirtualKeyCode", keyCode);
+        Map<String, Object> down = new HashMap<>(up);
+        down.put("type", "Enter".equals(name) ? "keyDown" : "rawKeyDown");
+        if ("Enter".equals(name)) {
+            down.put("text", "\r");
         }
         command(current, "Input.dispatchKeyEvent", down);
-        command(
-                current,
-                "Input.dispatchKeyEvent",
-                Map.of("type", "keyUp", "key", name, "code", spec.code(), "windowsVirtualKeyCode", spec.keyCode()));
+        command(current, "Input.dispatchKeyEvent", up);
     }
 
     private void back(CdpConnection current) {
@@ -530,7 +433,4 @@ public class BrowserScreenSession {
 
     /** 마지막 프레임의 화면 크기다. */
     private record Viewport(int width, int height) {}
-
-    /** 특수 키 하나의 CDP 값이다. */
-    private record KeySpec(String code, int keyCode, String text) {}
 }

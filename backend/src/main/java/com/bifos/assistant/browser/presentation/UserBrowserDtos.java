@@ -75,12 +75,7 @@ public final class UserBrowserDtos {
         }
     }
 
-    /**
-     * 화면 입력의 본문이다. 칸은 {@code type} 마다 필요한 것만 쓴다. 계약은 {@code docs/backend/user-browser.md} 의 「로그인 화면」 이
-     * 갖는다.
-     *
-     * <p>모양이 틀리면 {@code VALIDATION_FAILED} 이고, 오류 메시지에는 칸 이름만 싣고 값은 싣지 않는다.
-     */
+    /** 화면 입력의 본문이다. 칸은 {@code type} 마다 필요한 것만 쓴다. 오류 메시지에는 칸 이름만 싣고 값은 싣지 않는다. */
     public record ScreenInputRequest(
             String type,
             String action,
@@ -131,7 +126,7 @@ public final class UserBrowserDtos {
                     requireRatio();
                     require("deltaY", deltaY != null && Math.abs(deltaY) <= MAX_WHEEL);
                 }
-                case KEY -> require("key", key != null && BrowserScreenInput.KEYS.contains(key));
+                case KEY -> require("key", key != null && BrowserScreenInput.KEYS.containsKey(key));
                 case TEXT -> require("text", text != null && !text.isEmpty() && text.length() <= MAX_TEXT);
                 case NAVIGATE -> require("url", BrowserScreenInput.webUrl(url));
                 case TAB -> require("id", id != null && TARGET_ID.matcher(id).matches());

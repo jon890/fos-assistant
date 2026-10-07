@@ -196,12 +196,7 @@ public class UserBrowserService {
                 });
     }
 
-    /**
-     * 로그인 화면을 연다. 꺼져 있으면 켠다. 이 브라우저에 열려 있던 앞의 화면은 닫힌다.
-     *
-     * @param url 시작 주소. 없으면 지금 주소에 머문다
-     * @throws ApiException 켜기의 오류와 같고, 탭에 붙지 못했으면 {@code BROWSER_START_FAILED}
-     */
+    /** 로그인 화면을 열고 앞의 화면은 닫는다. 꺼져 있으면 켜고, 탭에 붙지 못했으면 {@code BROWSER_START_FAILED} 다. */
     public void openScreen(Long userId, String url, BrowserScreenSink sink) {
         UserBrowserSnapshot started = start(userId);
         URI address = Optional.ofNullable(owned(userId).containerId())
@@ -211,11 +206,7 @@ public class UserBrowserService {
         touch(userId);
     }
 
-    /**
-     * 요청자의 열린 화면에 입력을 보내고 활동을 기록한다.
-     *
-     * @throws ApiException 열린 화면이 없으면 {@code BROWSER_SCREEN_CLOSED}
-     */
+    /** 요청자의 열린 화면에 입력을 보내고 활동을 기록한다. 열린 화면이 없으면 {@code BROWSER_SCREEN_CLOSED} 다. */
     public void screenInput(Long userId, BrowserScreenInput input) {
         requireEnabled();
         screens.input(userId, input);
