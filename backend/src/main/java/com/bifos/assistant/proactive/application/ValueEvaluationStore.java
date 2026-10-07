@@ -87,15 +87,18 @@ public class ValueEvaluationStore {
     /** Web server 가 열리기 전 한 줄씩 별도 트랜잭션으로 원래 입력을 보존하고 중단 상태만 바꾼다. */
     @Transactional
     public void recover(Long id) {
-        evaluations.findById(id).filter(row -> row.outcome() == DecisionOutcome.RUNNING).ifPresent(row -> {
-            DecisionEvidence input = row.evidence();
-            row.finish(new DecisionEvidence(
-                    input.state(),
-                    input.questions(),
-                    input.provider(),
-                    DecisionResult.fallback(DecisionFailure.INTERRUPTED)));
-            evaluations.save(row);
-        });
+        evaluations
+                .findById(id)
+                .filter(row -> row.outcome() == DecisionOutcome.RUNNING)
+                .ifPresent(row -> {
+                    DecisionEvidence input = row.evidence();
+                    row.finish(new DecisionEvidence(
+                            input.state(),
+                            input.questions(),
+                            input.provider(),
+                            DecisionResult.fallback(DecisionFailure.INTERRUPTED)));
+                    evaluations.save(row);
+                });
     }
 
     private ValueEvaluation insert(

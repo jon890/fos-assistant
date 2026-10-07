@@ -35,7 +35,10 @@ public class ValueEvaluationRecovery implements SmartLifecycle {
                 try {
                     store.recover(id);
                 } catch (RuntimeException ex) {
-                    log.warn("가치 평가의 기동 복구를 건너뛴다 evaluationId={} error={}", id, ex.getClass().getSimpleName());
+                    log.warn(
+                            "가치 평가의 기동 복구를 건너뛴다 evaluationId={} error={}",
+                            id,
+                            ex.getClass().getSimpleName());
                 }
             }
         } catch (RuntimeException ex) {
@@ -50,7 +53,10 @@ public class ValueEvaluationRecovery implements SmartLifecycle {
                 try {
                     recoverExecution(execution);
                 } catch (RuntimeException ex) {
-                    log.warn("판단 실행의 기동 복구를 건너뛴다 executionId={} error={}", execution.id(), ex.getClass().getSimpleName());
+                    log.warn(
+                            "판단 실행의 기동 복구를 건너뛴다 executionId={} error={}",
+                            execution.id(),
+                            ex.getClass().getSimpleName());
                 }
             }
         } catch (RuntimeException ex) {
@@ -59,16 +65,16 @@ public class ValueEvaluationRecovery implements SmartLifecycle {
     }
 
     private void recoverExecution(AgentExecution execution) {
-            if (execution.hermesRunId() != null) {
-                limiter.holdUntilRemoteEnds(
-                        execution.userId(),
-                        execution.id(),
-                        hermes.profileBaseUrl(execution.profileName()),
-                        execution.profileName(),
-                        execution.hermesRunId(),
-                        false);
-            }
-            recorder.fail(execution, "DECISION_INTERRUPTED");
+        if (execution.hermesRunId() != null) {
+            limiter.holdUntilRemoteEnds(
+                    execution.userId(),
+                    execution.id(),
+                    hermes.profileBaseUrl(execution.profileName()),
+                    execution.profileName(),
+                    execution.hermesRunId(),
+                    false);
+        }
+        recorder.fail(execution, "DECISION_INTERRUPTED");
     }
 
     @Override

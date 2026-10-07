@@ -6,8 +6,8 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 import com.bifos.assistant.hermes.HermesProperties;
 import com.bifos.assistant.proactive.application.ValueEvaluationRecovery;
@@ -58,11 +58,15 @@ class ValueEvaluationRecoveryTest {
         AgentExecution bad = mock(AgentExecution.class);
         AgentExecution good = mock(AgentExecution.class);
         when(store.findRunningIds()).thenReturn(List.of(1L, 2L));
-        doThrow(new IllegalStateException("synthetic conversion failure")).when(store).recover(1L);
-        when(executions.findByAgentIdIsNullAndConversationIdIsNullAndStatus(any())).thenReturn(List.of(bad, good));
-        when(recorder.fail(bad, "DECISION_INTERRUPTED")).thenThrow(new IllegalStateException("synthetic update failure"));
-        ValueEvaluationRecovery recovery = new ValueEvaluationRecovery(store, executions, recorder,
-                mock(UserExecutionLimiter.class), mock(HermesProperties.class));
+        doThrow(new IllegalStateException("synthetic conversion failure"))
+                .when(store)
+                .recover(1L);
+        when(executions.findByAgentIdIsNullAndConversationIdIsNullAndStatus(any()))
+                .thenReturn(List.of(bad, good));
+        when(recorder.fail(bad, "DECISION_INTERRUPTED"))
+                .thenThrow(new IllegalStateException("synthetic update failure"));
+        ValueEvaluationRecovery recovery = new ValueEvaluationRecovery(
+                store, executions, recorder, mock(UserExecutionLimiter.class), mock(HermesProperties.class));
         assertThatCode(recovery::start).doesNotThrowAnyException();
         assertThat(recovery.isRunning()).isTrue();
         verify(store).recover(2L);
@@ -77,8 +81,12 @@ class ValueEvaluationRecoveryTest {
         when(store.findRunningIds()).thenThrow(new IllegalStateException("synthetic database failure"));
         when(executions.findByAgentIdIsNullAndConversationIdIsNullAndStatus(any()))
                 .thenThrow(new IllegalStateException("synthetic database failure"));
-        ValueEvaluationRecovery recovery = new ValueEvaluationRecovery(store, executions,
-                mock(ExecutionRecorder.class), mock(UserExecutionLimiter.class), mock(HermesProperties.class));
+        ValueEvaluationRecovery recovery = new ValueEvaluationRecovery(
+                store,
+                executions,
+                mock(ExecutionRecorder.class),
+                mock(UserExecutionLimiter.class),
+                mock(HermesProperties.class));
         assertThatCode(recovery::start).doesNotThrowAnyException();
         assertThat(recovery.isRunning()).isTrue();
         verify(executions).findByAgentIdIsNullAndConversationIdIsNullAndStatus(any());

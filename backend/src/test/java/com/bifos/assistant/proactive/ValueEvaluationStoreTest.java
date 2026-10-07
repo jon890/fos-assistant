@@ -211,8 +211,10 @@ class ValueEvaluationStoreTest {
         try {
             recovery.start();
             assertThat(recovery.isRunning()).isTrue();
-            assertThat(store.read(OWNER.id(), good.id()).evidence().result().failure()).isEqualTo(DecisionFailure.INTERRUPTED);
-            assertThat(jdbc.queryForObject("SELECT outcome FROM proactive_value_evaluation WHERE id = ?", String.class, bad.id()))
+            assertThat(store.read(OWNER.id(), good.id()).evidence().result().failure())
+                    .isEqualTo(DecisionFailure.INTERRUPTED);
+            assertThat(jdbc.queryForObject(
+                            "SELECT outcome FROM proactive_value_evaluation WHERE id = ?", String.class, bad.id()))
                     .isEqualTo("RUNNING");
         } finally {
             jdbc.update("DELETE FROM proactive_value_evaluation WHERE id = ?", bad.id());
