@@ -357,7 +357,8 @@ class UserBrowserServiceTest {
                 128,
                 maxRunning,
                 Duration.ofMinutes(10),
-                Duration.ofMillis(100));
+                Duration.ofMillis(100),
+                Duration.ofMinutes(30));
         BrowserProfileStore profiles = new BrowserProfileStore() {
             @Override
             public void ensure(String profileKey) {
@@ -372,7 +373,18 @@ class UserBrowserServiceTest {
             }
         };
         return new UserBrowserService(
-                browsers, runtime, profiles, address -> cdpReady.get(), properties, Clock.systemUTC());
+                browsers,
+                runtime,
+                profiles,
+                address -> cdpReady.get(),
+                properties,
+                Clock.systemUTC(),
+                new BrowserScreens(
+                        new FakeCdp(),
+                        new FakeCdp(),
+                        new BrowserUsage(),
+                        Duration.ofMinutes(30),
+                        Duration.ofSeconds(2)));
     }
 
     private static void assertCode(ThrowingCallable call, ErrorCode code) {

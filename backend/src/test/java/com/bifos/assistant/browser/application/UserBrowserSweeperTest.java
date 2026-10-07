@@ -284,7 +284,13 @@ class UserBrowserSweeperTest {
 
     private UserBrowserService service(boolean enabled) {
         return new UserBrowserService(
-                repository, runtime, profiles(), address -> true, properties(enabled), Clock.systemUTC());
+                repository,
+                runtime,
+                profiles(),
+                address -> true,
+                properties(enabled),
+                Clock.systemUTC(),
+                new BrowserScreens(new FakeCdp(), new FakeCdp(), usage, Duration.ofMinutes(30), Duration.ofSeconds(2)));
     }
 
     private static BrowserProperties properties(boolean enabled) {
@@ -303,7 +309,8 @@ class UserBrowserSweeperTest {
                 128,
                 5,
                 Duration.ofMinutes(10),
-                Duration.ofMillis(100));
+                Duration.ofMillis(100),
+                Duration.ofMinutes(30));
     }
 
     private static BrowserProfileStore profiles() {

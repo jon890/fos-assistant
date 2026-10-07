@@ -25,6 +25,7 @@ import org.springframework.validation.annotation.Validated;
  * @param maxRunning 동시에 켜 둘 수 있는 브라우저 수. {@code STARTING} 과 {@code RUNNING} 을 센다
  * @param idleTimeout 화면도 중계 연결도 없이 이만큼 지나면 자동으로 멈춘다
  * @param startTimeout 켠 뒤 CDP 가 답하기를 기다리는 시간
+ * @param screenTimeout 로그인 화면 하나가 열려 있을 수 있는 시간. 넘으면 화면을 닫는다
  */
 @Validated
 @ConfigurationProperties(prefix = "assistant.browser")
@@ -43,7 +44,8 @@ public record BrowserProperties(
         Integer shmMb,
         int maxRunning,
         Duration idleTimeout,
-        Duration startTimeout) {
+        Duration startTimeout,
+        Duration screenTimeout) {
 
     private static final String PREFIX = "assistant.browser.";
 
@@ -52,6 +54,7 @@ public record BrowserProperties(
         requireAtLeastOne("max-running", maxRunning);
         requirePositive("idle-timeout", idleTimeout);
         requirePositive("start-timeout", startTimeout);
+        requirePositive("screen-timeout", screenTimeout);
         if (enabled) {
             requireText("proxy-url", proxyUrl);
             requireText("image", image);

@@ -1,5 +1,7 @@
 package com.bifos.assistant.browser.application;
 
+import com.bifos.assistant.browser.application.model.BrowserScreenInput;
+import com.bifos.assistant.browser.application.model.BrowserScreenSink;
 import com.bifos.assistant.browser.application.model.UserBrowserSnapshot;
 import com.bifos.assistant.browser.domain.BrowserProfileStore;
 import com.bifos.assistant.browser.domain.BrowserRuntime;
@@ -55,6 +57,7 @@ public class UserBrowserService {
     private final CdpProbe cdp;
     private final BrowserProperties properties;
     private final Clock clock;
+    private final BrowserScreens screens;
     private final ReentrantLock startLock = new ReentrantLock();
 
     /** 프로필 디렉터리 이름이다. 첨부 디렉터리 키와 같은 계산이지만 루트가 다르다. */
@@ -193,6 +196,32 @@ public class UserBrowserService {
                 });
     }
 
+    /**
+     * 로그인 화면을 연다. 꺼져 있으면 켠다. 이 브라우저에 열려 있던 앞의 화면은 닫힌다.
+     *
+     * @param url 시작 주소. 없으면 지금 주소에 머문다
+     * @throws ApiException 켜기의 오류와 같고, 탭에 붙지 못했으면 {@code BROWSER_START_FAILED}
+     */
+    public void openScreen(Long userId, String url, BrowserScreenSink sink) {
+        UserBrowserSnapshot started = start(userId);
+        URI address = Optional.ofNullable(owned(userId).containerId())
+                .flatMap(runtime::cdpAddress)
+                .orElseThrow(() -> new ApiException(ErrorCode.BROWSER_START_FAILED, "user browser has no cdp address"));
+        screens.open(started.id(), userId, address, url, sink);
+        touch(userId);
+    }
+
+    /**
+     * 요청자의 열린 화면에 입력을 보내고 활동을 기록한다.
+     *
+     * @throws ApiException 열린 화면이 없으면 {@code BROWSER_SCREEN_CLOSED}
+     */
+    public void screenInput(Long userId, BrowserScreenInput input) {
+        requireEnabled();
+        screens.input(userId, input);
+        touch(userId);
+    }
+
     /** 컨테이너를 만들고 켜고 CDP 를 기다린다. 실패하면 컨테이너를 지우고 {@code FAILED} 로 둔다. */
     private UserBrowserSnapshot launch(UserBrowser browser) {
         String containerId = null;
@@ -244,6 +273,8 @@ public class UserBrowserService {
         if (browser.status() == UserBrowserStatus.STOPPED) {
             return browser;
         }
+        // 화면이 먼저 닫혀야 멈춘 브라우저에 붙은 화면이 남지 않는다
+        screens.close(browser.id());
         browser.beginStop(clock.instant());
         UserBrowser stopping = save(browser);
         try {
