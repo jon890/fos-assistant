@@ -99,7 +99,7 @@
 | [ADR-080](ADR-080-먼저-살펴보기는-점검-대화의-turn-하나로-돌고-읽기-경계를-control-plane-이-강제한다.md) | 먼저 살펴보기는 점검 대화의 turn 하나로 돌고 읽기 경계를 Control Plane 이 강제한다 | backend, frontend | Accepted. ADR-040 의 「부모는 맡긴 뒤 기다리지 않는다」 에 살펴보기 트리의 예외를 둔다. 맡길 곳을 커넥터 에이전트로 한정한 부분은 ADR-083 이 대체한다 |
 | [ADR-081](ADR-081-살펴보기-결과는-답-끝의-구조화-블록으로-받고-control-plane-이-검사해-그린다.md) | 살펴보기 결과는 답 끝의 구조화 블록으로 받고 Control Plane 이 검사해 그린다 | backend | Accepted. ADR-009 의 신뢰하지 않는 글 원칙을 살펴보기 결과에 적용한다 |
 | [ADR-082](ADR-082-먼저-살펴보기의-쓰기-도구는-관리자가-에이전트마다-켜고-커넥터-쓰기는-승인-카드로-보낸다.md) | 먼저 살펴보기의 쓰기 도구는 관리자가 에이전트마다 켜고, 커넥터 쓰기는 승인 카드로 보낸다 | backend, frontend | Accepted. 켠 에이전트에 한해 ADR-080 의 읽기 경계를 넓힌다. 맡길 곳을 커넥터 에이전트로 한정한 부분은 ADR-083 이 대체한다 |
-| [ADR-083](ADR-083-커넥터는-사용자가-한-번-연결하고-자기-에이전트에-여럿-붙여-그-에이전트가-도구를-직접-부른다.md) | 커넥터는 사용자가 한 번 연결하고 자기 에이전트에 여럿 붙여 그 에이전트가 도구를 직접 부른다 | 공통 | Accepted. 새 연결에 대해 ADR-039, ADR-044, ADR-045 를, 커넥터 에이전트 부분에 대해 ADR-029, ADR-049, ADR-080, ADR-082 를 대체한다 |
+| [ADR-083](ADR-083-커넥터는-사용자가-한-번-연결하고-자기-에이전트에-여럿-붙여-그-에이전트가-도구를-직접-부른다.md) | 커넥터는 사용자가 한 번 연결하고 자기 에이전트에 여럿 붙여 그 에이전트가 도구를 직접 부른다 | 공통 | Accepted. 새 연결에 대해 ADR-039, ADR-044, ADR-045 를, 커넥터 에이전트 부분에 대해 ADR-029, ADR-049, ADR-080, ADR-082 를 대체한다. 처음 붙이기와 스킬 변경의 재시작 대기는 [ADR-20261007 / connector-live-reload](ADR-20261007-connector-live-reload.md) 가 대체한다 |
 | [ADR-084](ADR-084-gmail-typescript-filters.md) | Gmail 커넥터는 TypeScript 묶음 파일로 실행하고 필터 권한을 따로 받는다 | hermes | Accepted. ADR-066 의 서버와 단일 scope 를 대체한다 |
 | [ADR-085](ADR-085-매일-깨우기는-예약-작업을-다시-쓰고-다섯-칸-보고를-지금-화면에-올린다.md) | 매일 깨우기는 예약 작업을 다시 쓰고 다섯 칸 보고를 지금 화면에 올린다 | backend, frontend | Accepted. ADR-074, 076, 078, 079, 080, 081, 082 의 매일 깨우기와 보고 계약을 개정한다 |
 | [ADR-086](ADR-086-셸과-파일-도구는-사용자별-docker-실행-공간에서만-돈다.md) | 셸과 파일 도구는 사용자별 docker 실행 공간에서만 돈다 | backend, frontend, hermes | Accepted. 운영 정책에 등록한 profile 에만 적용한다. ADR-082 의 남는 위험을 사용자 실행 공간 안으로 줄인다. ADR-029 의 「파일 접근을 격리하지 않는다」 전제는 실행 공간이 적용된 profile 에서 바뀐다 |
@@ -111,6 +111,7 @@
 | [ADR-092](ADR-092-승인한-실행의-실패는-커넥터가-선언한-오류-코드와-복구-어휘와-정수-세부만-에이전트까지-전한다.md) | 승인한 실행의 실패는 커넥터가 선언한 오류 코드와 복구 어휘와 정수 세부만 에이전트까지 전한다 | backend, hermes | Accepted. ADR-043 의 공통 오류 어휘 옆에 커넥터가 선언한 코드와 복구 계약을 더하고 ADR-050 의 실패 결과 저장을 바꾼다 |
 | [ADR-093](ADR-093-문제-찾기는-살펴보기-결과의-문제-후보로-받고-control-plane-이-근거와-중복을-결정적으로-검사한다.md) | 문제 찾기는 살펴보기 결과의 문제 후보로 받고 Control Plane 이 근거와 중복을 결정적으로 검사한다 | backend | Accepted. ADR-081 의 결과 블록을 버전 3으로 넓힌다 |
 | [ADR-20261007 / autonomy-policy](ADR-20261007-autonomy-policy.md) | 행동 수준은 Control Plane 의 결정적 규칙이 정하고 첫 자동 실행은 읽기 전용 살펴보기 한 번이다 | backend | Accepted |
+| [ADR-20261007 / connector-live-reload](ADR-20261007-connector-live-reload.md) | 커넥터를 붙이면 공유 gateway 의 MCP 설정 맞추기로 반영하고 Control Plane 이 두 주기 뒤 스스로 확인한다 | hermes, backend | Accepted. ADR-083 의 「붙이면 재시작 뒤 관리자 반영 완료로 READY」 를 첫 붙이기와 스킬 변경에서 대체한다 |
 | [ADR-20261007 / connector-owner-attachments](ADR-20261007-connector-owner-attachments.md) | 사용자 첨부를 읽는 커넥터는 바인딩 주인의 첨부 디렉터리를 설치가 정한 env 로만 받는다 | hermes, backend | Accepted. ADR-091 의 사용자별 첨부 경계를 커넥터 MCP 서버까지 넓힌다 |
 | [ADR-20261007 / decision-feedback](ADR-20261007-decision-feedback.md) | 판단 피드백은 제안 열쇠에 덧붙이는 사건으로 남기고 반응은 읽을 때 정한다 | backend | Accepted |
 | [ADR-20261007 / memory-remember](ADR-20261007-memory-remember.md) | 사용자가 대화에서 직접 말한 사실은 에이전트가 바로 기억하고 그 밖은 제안으로 남긴다 | backend, frontend, hermes | Accepted. ADR-012 의 「사람이 받아들여야 저장된다」 와 「에이전트가 스스로 쓰는 경로를 두지 않는다」 를 개정한다 |
