@@ -30,6 +30,7 @@ import com.bifos.assistant.skill.application.UserSkillUsage;
 import com.bifos.assistant.skill.domain.ExecutionSkillUse;
 import com.bifos.assistant.skill.domain.type.SkillUseSource;
 import com.bifos.assistant.skill.infra.ExecutionSkillUseRepository;
+import com.bifos.assistant.testsupport.BackendIntegrationTest;
 import com.bifos.assistant.usage.application.ExecutionTreeService;
 import com.bifos.assistant.usage.application.RootExecutionQuery;
 import com.bifos.assistant.usage.application.UsageSummaryService;
@@ -47,9 +48,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.test.context.ActiveProfiles;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 /**
  * 스킬 호출 이력을 누가 어디까지 보는지 본다(ADR-034).
@@ -57,8 +55,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
  * <p>가족용 에이전트 하나를 두 사용자가 쓴다. 주인은 스킬 목록에서 둘을 합친 합계만 보고, 각 사용자는
  * {@code /usage/skills} 에서 자기 호출과 그 대화만 본다.
  */
-@SpringBootTest
-@ActiveProfiles("test")
+@BackendIntegrationTest
 class SkillUsageQueryTest {
 
     private static final String AGENT_CODE = "usage-family";
@@ -104,10 +101,10 @@ class SkillUsageQueryTest {
     @Autowired
     UsageSummaryService summaries;
 
-    @MockitoBean
+    @Autowired
     HermesSkillClient skillClient;
 
-    @MockitoBean
+    @Autowired
     HermesToolsetClient toolsets;
 
     private final CurrentUserProvider currentUser = mock(CurrentUserProvider.class);

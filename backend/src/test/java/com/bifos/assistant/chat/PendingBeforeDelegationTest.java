@@ -37,6 +37,7 @@ import com.bifos.assistant.memory.infra.MemoryRepository;
 import com.bifos.assistant.orchestration.application.ResearchAndBuildFlow;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.domain.type.UserRole;
+import com.bifos.assistant.testsupport.BackendIntegrationTest;
 import com.bifos.assistant.usage.domain.AgentExecution;
 import com.bifos.assistant.usage.domain.type.ExecutionStatus;
 import com.bifos.assistant.usage.infra.AgentExecutionRepository;
@@ -54,13 +55,9 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.ApplicationEventPublisher;
-import org.springframework.context.annotation.Import;
 import org.springframework.data.domain.PageRequest;
-import org.springframework.test.context.ActiveProfiles;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
-import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
+import org.springframework.test.context.TestPropertySource;
 
 /**
  * 보낼 대기 메시지와 끝난 위임 결과가 함께 있을 때 사용자의 말이 먼저 가는지 본다(ADR-048).
@@ -68,23 +65,22 @@ import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
  * <p>두 turn 이 모두 테스트 스레드 밖에서 돈다. 앞 turn 이 닫히고 다음 turn 이 열리는 사이에는 잠금이 잠깐 비므로,
  * 잠금이 아니라 쌓인 메시지 수를 기다린 뒤 단언한다.
  */
-@SpringBootTest(properties = "assistant.delegation-wake.enabled=true")
-@ActiveProfiles("test")
-@Import(ChatServiceTest.StubRuntime.class)
+@BackendIntegrationTest
+@TestPropertySource(properties = "assistant.delegation-wake.enabled=true")
 class PendingBeforeDelegationTest {
 
     private static final Duration WAIT_LIMIT = Duration.ofSeconds(10);
 
     /** 답 조각은 이 검사가 보지 않는다. 실제 스트림 주소로 연결하지 않게 대역으로 둔다. */
-    @MockitoBean
+    @Autowired
     HermesRunEventStream eventStream;
 
     /** 대기 메시지 turn 이 사용자 메시지를 저장하기 전에 실패하는 경우를 만들려고 감싼다. 그 밖의 검사에서는 실제 동작 그대로다. */
-    @MockitoSpyBean
+    @Autowired
     ChatService chat;
 
     /** 대기 행을 멈추다 실패하는 경우를 만들려고 감싼다. 그 밖의 검사에서는 실제 동작 그대로다. */
-    @MockitoSpyBean
+    @Autowired
     ChatPendingMessageRepository pendingRows;
 
     @Autowired
@@ -94,7 +90,7 @@ class PendingBeforeDelegationTest {
     NextTurnDispatcher dispatcher;
 
     /** 대기 줄이 멈췄다는 알림이 실패하는 경우를 만들려고 감싼다. 그 밖의 검사에서는 실제 동작 그대로다. */
-    @MockitoSpyBean
+    @Autowired
     ConversationEventHub hub;
 
     @Autowired

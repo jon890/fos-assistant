@@ -23,6 +23,7 @@ import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.auth.CurrentUserProvider;
 import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.shared.error.GlobalExceptionHandler;
+import com.bifos.assistant.testsupport.BackendIntegrationTest;
 import com.bifos.assistant.user.domain.AppUser;
 import com.bifos.assistant.user.infra.AppUserRepository;
 import java.nio.charset.StandardCharsets;
@@ -33,10 +34,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockHttpServletResponse;
-import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import tools.jackson.databind.JsonNode;
@@ -48,8 +47,7 @@ import tools.jackson.databind.json.JsonMapper;
  * <p>검사마다 그 대화의 turn 잠금을 잡아 둔다. 잡지 않으면 더한 글이 곧바로 turn 으로 나가 Hermes 를 부른다.
  * 잠금을 풀기 전에 대기 행을 비워 풀 때도 turn 이 열리지 않게 한다. 남은 행은 다른 검사 문맥의 기동 확인이 보낸다.
  */
-@SpringBootTest
-@ActiveProfiles("test")
+@BackendIntegrationTest
 class PendingMessageControllerTest {
 
     @Autowired

@@ -10,6 +10,7 @@ import com.bifos.assistant.hermes.dto.HermesRunResult;
 import com.bifos.assistant.hermes.dto.TokenUsage;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
+import com.bifos.assistant.testsupport.BackendIntegrationTest;
 import com.bifos.assistant.usage.application.TurnSlot;
 import com.bifos.assistant.usage.application.UserExecutionLimiter;
 import com.bifos.assistant.usage.application.model.ExecutionAdmission;
@@ -34,12 +35,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.context.TestConfiguration;
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Import;
-import org.springframework.context.annotation.Primary;
-import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.TestPropertySource;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /**
@@ -48,7 +44,8 @@ import org.springframework.transaction.support.TransactionTemplate;
  * <p>원격 종료 확인 자리는 대역 Hermes 의 조회 답으로 돌려주는 때를 정한다. 다시 묻는 간격은 이 클래스가 적은
  * {@code hermes.poll-interval} 이다. 쥔 자리를 남기는 검사는 끝나기 전에 그 run 을 모른다고 답하게 해 돌려받는다.
  */
-@SpringBootTest(
+@BackendIntegrationTest
+@TestPropertySource(
         properties = {
             "assistant.user-execution.max-running=3",
             "assistant.user-execution.background-reserve=1",
@@ -56,19 +53,9 @@ import org.springframework.transaction.support.TransactionTemplate;
             // 조회 횟수를 세는 검사가 test profile 의 값이 바뀌어도 같은 간격으로 돌게 여기 적는다
             "hermes.poll-interval=10ms"
         })
-@ActiveProfiles("test")
-@Import(UserExecutionLimiterTest.StubRuntime.class)
 class UserExecutionLimiterTest {
 
     /** {@code ChatServiceTest.StubRuntime} 은 chat 패키지 안에서만 보여 이 패키지에서 import 하지 못하므로 따로 둔다. */
-    @TestConfiguration
-    static class StubRuntime {
-        @Bean
-        @Primary
-        StubHermesRunsClient stubHermesRunsClient() {
-            return new StubHermesRunsClient();
-        }
-    }
 
     /** {@code remote-end-max-wait} 와 같은 값이다. */
     private static final Duration REMOTE_END_MAX_WAIT = Duration.ofSeconds(2);

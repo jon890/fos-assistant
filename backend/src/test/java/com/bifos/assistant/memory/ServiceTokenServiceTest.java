@@ -29,6 +29,7 @@ import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.shared.util.Sha256;
+import com.bifos.assistant.testsupport.BackendIntegrationTest;
 import com.bifos.assistant.user.domain.AppUser;
 import com.bifos.assistant.user.infra.AppUserRepository;
 import jakarta.validation.Validation;
@@ -41,18 +42,15 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.support.TransactionTemplate;
 import tools.jackson.databind.json.JsonMapper;
 
 /** 서비스 토큰의 발급과 폐기와 만료 규칙, 사용자를 끌 때의 일괄 폐기를 확인한다(ADR-056). */
-@SpringBootTest
-@ActiveProfiles("test")
+@BackendIntegrationTest
 class ServiceTokenServiceTest {
 
     private static final String DAD_EMAIL = "svc-token-dad@example.com";

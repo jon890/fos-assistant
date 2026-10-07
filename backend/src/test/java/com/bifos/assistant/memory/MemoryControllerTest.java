@@ -14,16 +14,14 @@ import com.bifos.assistant.memory.presentation.MemoryDtos.MemoryView;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.auth.CurrentUserProvider;
 import com.bifos.assistant.shared.domain.type.UserRole;
+import com.bifos.assistant.testsupport.BackendIntegrationTest;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.test.context.ActiveProfiles;
 
 /** 사람이 제안을 승인하거나 거절하는 API 응답과 목록의 주입 여부 표시를 확인한다. */
-@SpringBootTest
-@ActiveProfiles("test")
+@BackendIntegrationTest
 class MemoryControllerTest {
 
     private static final CurrentUser ADMIN = new CurrentUser(1L, "admin@example.com", "admin", 1L, UserRole.ADMIN);

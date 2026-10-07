@@ -7,6 +7,7 @@ import com.bifos.assistant.chat.domain.ModelTierDefinition;
 import com.bifos.assistant.chat.infra.ModelTierDefinitionRepository;
 import com.bifos.assistant.model.domain.type.ModelTier;
 import com.bifos.assistant.shared.domain.type.UserRole;
+import com.bifos.assistant.testsupport.BackendIntegrationTest;
 import com.bifos.assistant.user.domain.AppUser;
 import com.bifos.assistant.user.infra.AppUserRepository;
 import java.time.Instant;
@@ -15,12 +16,12 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.TestPropertySource;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /** 설정의 단계 초기값이 실제 저장소와 실제 빈에서 한 번만 옮겨지는지 본다. */
-@SpringBootTest(
+@BackendIntegrationTest
+@TestPropertySource(
         properties = {
             "assistant.model-tiers.fast.model=example-fast",
             "assistant.model-tiers.fast.reasoning-effort=low",
@@ -28,7 +29,6 @@ import org.springframework.transaction.support.TransactionTemplate;
             "assistant.model-tiers.balanced.model=example-balanced",
             "assistant.model-tiers.balanced.reasoning-effort=medium"
         })
-@ActiveProfiles("test")
 class ModelTierSeedImportIntegrationTest {
 
     private static final Long GROUP_ID = 9_000_000_005L;

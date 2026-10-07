@@ -39,6 +39,7 @@ import com.bifos.assistant.memory.domain.type.MemoryScope;
 import com.bifos.assistant.memory.infra.MemoryRepository;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.domain.type.UserRole;
+import com.bifos.assistant.testsupport.BackendIntegrationTest;
 import com.bifos.assistant.usage.domain.AgentExecution;
 import com.bifos.assistant.usage.domain.ExecutionContextSource;
 import com.bifos.assistant.usage.domain.type.ExecutionStatus;
@@ -61,12 +62,9 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.ApplicationEventPublisher;
-import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.test.context.ActiveProfiles;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.test.context.TestPropertySource;
 
 /**
  * 승인 줄이 생기거나 끝났을 때 그 요청이 나온 대화에 무엇이 전해지는지 본다(ADR-050).
@@ -75,9 +73,8 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
  * e2e 가 본다. 여기서는 끝난 줄을 직접 넣고 사건을 내, 알림 줄과 자동 turn 과 전했다는 표시만 본다. 자동 turn 은
  * 테스트 스레드 밖에서 돌므로 끝날 때까지 기다린 뒤 단언한다.
  */
-@SpringBootTest(properties = "assistant.delegation-wake.enabled=true")
-@ActiveProfiles("test")
-@Import(ChatServiceTest.StubRuntime.class)
+@BackendIntegrationTest
+@TestPropertySource(properties = "assistant.delegation-wake.enabled=true")
 class ConnectorActionDeliveryTest {
 
     private static final Duration WAIT_LIMIT = Duration.ofSeconds(10);
@@ -87,11 +84,11 @@ class ConnectorActionDeliveryTest {
     private static final DateTimeFormatter SEOUL_TIME =
             DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm").withZone(ZoneId.of("Asia/Seoul"));
 
-    @MockitoBean
+    @Autowired
     HermesRunEventStream eventStream;
 
     /** 카탈로그를 읽지 못하게 둔다. 알림 줄의 이름은 고정 문구로, 모델 입력의 이름은 원래 도구 이름으로 나온다. */
-    @MockitoBean
+    @Autowired
     HermesConnectorClient connector;
 
     @Autowired

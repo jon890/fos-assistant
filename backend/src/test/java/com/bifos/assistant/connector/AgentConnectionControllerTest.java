@@ -40,6 +40,7 @@ import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.auth.CurrentUserProvider;
 import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.shared.error.GlobalExceptionHandler;
+import com.bifos.assistant.testsupport.BackendIntegrationTest;
 import com.bifos.assistant.user.domain.AppUser;
 import com.bifos.assistant.user.infra.AppUserRepository;
 import java.time.Instant;
@@ -51,9 +52,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.test.context.ActiveProfiles;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import tools.jackson.databind.json.JsonMapper;
@@ -63,8 +61,7 @@ import tools.jackson.databind.json.JsonMapper;
  *
  * <p>권한은 실제 바인딩 서비스와 저장소로 판정한다. 로그인 사용자와 대시보드의 커넥터, 스킬, 도구 목록 경로만 대역이다.
  */
-@SpringBootTest
-@ActiveProfiles("test")
+@BackendIntegrationTest
 class AgentConnectionControllerTest {
     private static final JsonMapper MAPPER = JsonMapper.builder().build();
     private static final String DEMO = "demo-notes";
@@ -109,13 +106,13 @@ class AgentConnectionControllerTest {
     @Autowired
     AppUserRepository users;
 
-    @MockitoBean
+    @Autowired
     HermesConnectorClient connector;
 
-    @MockitoBean
+    @Autowired
     HermesSkillClient skills;
 
-    @MockitoBean
+    @Autowired
     HermesToolsetClient toolsets;
 
     private final CurrentUserProvider currentUser = mock(CurrentUserProvider.class);

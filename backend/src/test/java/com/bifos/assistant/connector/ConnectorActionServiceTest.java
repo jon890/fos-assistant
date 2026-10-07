@@ -57,6 +57,7 @@ import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
+import com.bifos.assistant.testsupport.BackendIntegrationTest;
 import com.bifos.assistant.usage.domain.AgentExecution;
 import com.bifos.assistant.usage.domain.type.ExecutionStatus;
 import com.bifos.assistant.usage.infra.AgentExecutionRepository;
@@ -91,11 +92,8 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.test.context.ActiveProfiles;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 import tools.jackson.databind.json.JsonMapper;
@@ -107,8 +105,7 @@ import tools.jackson.databind.json.JsonMapper;
  * 걸리지 않게 검사가 시계를 보관 시간보다 멀리 옮긴다. 컨텍스트 수를 늘리지 않으려고 판정 경로의 끝단 검사와 같은
  * 구성을 쓴다.
  */
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
-@ActiveProfiles("test")
+@BackendIntegrationTest
 @Import(ConnectorPolicyTestDoubles.class)
 class ConnectorActionServiceTest {
     private static final JsonMapper JSON = JsonMapper.builder().build();
@@ -186,7 +183,7 @@ class ConnectorActionServiceTest {
     @Autowired
     ConnectorCheckReportApprovals reportApprovals;
 
-    @MockitoBean
+    @Autowired
     HermesConnectorClient connector;
 
     private final List<Long> createdChecks = new ArrayList<>();

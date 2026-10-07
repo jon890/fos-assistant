@@ -21,6 +21,7 @@ import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
+import com.bifos.assistant.testsupport.BackendIntegrationTest;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -31,9 +32,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.data.domain.PageRequest;
-import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /**
@@ -42,8 +41,7 @@ import org.springframework.transaction.support.TransactionTemplate;
  * <p>저장소는 트랜잭션을 열지 않으므로 호출을 {@link TransactionTemplate} 안에서 한다. 검사들이 H2 를 함께 써서, 이 검사가 만든 줄이 다른
  * 검사에 보이지 않도록 앞뒤로 지운다. 사용자와 에이전트 번호는 다른 검사와 겹치지 않는 값을 쓴다.
  */
-@SpringBootTest
-@ActiveProfiles("test")
+@BackendIntegrationTest
 class ProactiveCheckRepositoryTest {
     private static final Instant NOW = Instant.parse("2026-10-01T00:00:00Z");
     private static final long USER = 930_001L;

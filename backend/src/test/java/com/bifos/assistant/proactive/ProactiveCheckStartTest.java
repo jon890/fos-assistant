@@ -41,6 +41,7 @@ import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.auth.CurrentUserProvider;
 import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.shared.error.GlobalExceptionHandler;
+import com.bifos.assistant.testsupport.BackendIntegrationTest;
 import com.bifos.assistant.usage.domain.AgentExecution;
 import com.bifos.assistant.usage.infra.AgentExecutionRepository;
 import com.bifos.assistant.usage.infra.ExecutionEventRepository;
@@ -56,13 +57,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.context.TestConfiguration;
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Import;
-import org.springframework.context.annotation.Primary;
-import org.springframework.test.context.ActiveProfiles;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
@@ -75,27 +70,17 @@ import tools.jackson.databind.json.JsonMapper;
  * <p>사용자 실행 한도를 2 로 둔다. 다른 두 대화의 turn 을 붙잡으면 사용자 자리가 없다. Hermes 의 실행, 스트림, toolset, 스킬 목록은
  * 대역이고 모든 데이터는 합성이다.
  */
-@SpringBootTest(
+@BackendIntegrationTest
+@TestPropertySource(
         properties = {
             "hermes.run-timeout=30s",
             "assistant.proactive-check.max-duration=20s",
             "assistant.user-execution.max-running=2"
         })
-@ActiveProfiles("test")
-@Import(ProactiveCheckStartTest.StubRuntime.class)
 class ProactiveCheckStartTest {
 
     private static final Duration WAIT_LIMIT = Duration.ofSeconds(10);
     private static final JsonMapper JSON = JsonMapper.builder().build();
-
-    @TestConfiguration
-    static class StubRuntime {
-        @Bean
-        @Primary
-        StubHermesRunsClient stubHermesRunsClient() {
-            return new StubHermesRunsClient();
-        }
-    }
 
     @Autowired
     ProactiveCheckService service;
@@ -134,15 +119,15 @@ class ProactiveCheckStartTest {
     TransactionTemplate transactions;
 
     /** 실제 Hermes 를 부르지 않도록 켜진 toolset 을 대역으로 둔다. */
-    @MockitoBean
+    @Autowired
     HermesToolsetClient toolsets;
 
     /** 켜진 스킬 목록을 대역으로 둔다. */
-    @MockitoBean
+    @Autowired
     HermesSkillClient skillClient;
 
     /** 실제 스트림 주소로 연결하지 않게 대역으로 둔다. */
-    @MockitoBean
+    @Autowired
     HermesRunEventStream eventStream;
 
     private final CurrentUserProvider currentUser = mock(CurrentUserProvider.class);

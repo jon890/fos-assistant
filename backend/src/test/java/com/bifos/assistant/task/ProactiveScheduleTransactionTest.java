@@ -35,6 +35,7 @@ import com.bifos.assistant.task.domain.type.TaskState;
 import com.bifos.assistant.task.infra.TaskRepository;
 import com.bifos.assistant.task.infra.TaskRunRepository;
 import com.bifos.assistant.task.infra.TaskTriggerRepository;
+import com.bifos.assistant.testsupport.BackendIntegrationTest;
 import com.bifos.assistant.user.domain.AppUser;
 import com.bifos.assistant.user.infra.AppUserRepository;
 import java.time.Instant;
@@ -50,21 +51,18 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 /**
  * Hermes 준비 상태를 읽지 못해도 매일 깨우기를 끈 트랜잭션이 커밋되고, 이후 발화가 새 살펴보기를 열지 않는지 실제 DB로 본다.
  */
-@SpringBootTest
-@ActiveProfiles("test")
+@BackendIntegrationTest
 class ProactiveScheduleTransactionTest {
 
     private static final Instant NOW = Instant.parse("2026-11-01T00:00:00Z");
     private static final Instant DUE = Instant.parse("2026-11-01T00:01:00Z");
 
-    @MockitoBean
+    @Autowired
     HermesToolsetClient toolsets;
 
     @MockitoBean

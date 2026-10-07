@@ -23,6 +23,7 @@ import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.task.domain.TaskRun;
 import com.bifos.assistant.task.infra.TaskRunRepository;
+import com.bifos.assistant.testsupport.BackendIntegrationTest;
 import com.bifos.assistant.usage.domain.AgentExecution;
 import com.bifos.assistant.usage.domain.type.ExecutionStatus;
 import com.bifos.assistant.usage.infra.AgentExecutionRepository;
@@ -38,12 +39,9 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.test.context.ActiveProfiles;
 
 /** 사용자 turn 의 첫 반응 시간을 날짜와 모델 단계별로 집계하는 조회를 확인한다. */
-@SpringBootTest
-@ActiveProfiles("test")
+@BackendIntegrationTest
 class FirstResponseLatencyTest {
 
     private static final Long ADMIN_ID = 5_101L;

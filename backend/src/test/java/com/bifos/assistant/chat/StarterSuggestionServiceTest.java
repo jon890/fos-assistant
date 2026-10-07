@@ -35,6 +35,7 @@ import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
+import com.bifos.assistant.testsupport.BackendIntegrationTest;
 import com.bifos.assistant.usage.application.ExecutionRecorder;
 import com.bifos.assistant.usage.application.UserExecutionLimiter;
 import com.bifos.assistant.usage.domain.CatalogPrice;
@@ -62,12 +63,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.context.TestConfiguration;
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Import;
-import org.springframework.context.annotation.Primary;
-import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import tools.jackson.databind.ObjectMapper;
 
@@ -77,24 +73,14 @@ import tools.jackson.databind.ObjectMapper;
  * <p>서비스를 직접 만들어 시각과 실행기를 바꿔 끼운다. 시각을 옮겨 오래됨과 재시도 시간을 만들고, 실행기가 받은
  * 만들기가 끝나기를 기다린 뒤 결과를 읽는다. 다른 검사에서는 추천이 꺼져 있고 이 검사만 켠다.
  */
-@SpringBootTest(
+@BackendIntegrationTest
+@TestPropertySource(
         properties = {
             "assistant.starters.enabled=true",
             "assistant.starters.refresh-after=24h",
             "assistant.starters.retry-after-failure=10m"
         })
-@ActiveProfiles("test")
-@Import(StarterSuggestionServiceTest.StubRuntime.class)
 class StarterSuggestionServiceTest {
-
-    @TestConfiguration
-    static class StubRuntime {
-        @Bean
-        @Primary
-        StubHermesRunsClient stubHermesRunsClient() {
-            return new StubHermesRunsClient();
-        }
-    }
 
     private static final CurrentUser DAD = new CurrentUser(81L, "dad@example.com", "아빠", 1L, UserRole.MEMBER);
     private static final CurrentUser KID = new CurrentUser(82L, "kid@example.com", "아이", 1L, UserRole.MEMBER);

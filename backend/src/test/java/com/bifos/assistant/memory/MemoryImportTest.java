@@ -25,6 +25,7 @@ import com.bifos.assistant.shared.auth.CurrentUserProvider;
 import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
+import com.bifos.assistant.testsupport.BackendIntegrationTest;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
@@ -34,15 +35,12 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.system.CapturedOutput;
 import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.test.context.ActiveProfiles;
 
 /** 묶음을 대조하고 들이는 API 를 확인한다(ADR-058). */
-@SpringBootTest
-@ActiveProfiles("test")
+@BackendIntegrationTest
 @ExtendWith(OutputCaptureExtension.class)
 class MemoryImportTest {
 

@@ -34,6 +34,7 @@ import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
+import com.bifos.assistant.testsupport.BackendIntegrationTest;
 import com.bifos.assistant.usage.domain.AgentExecution;
 import com.bifos.assistant.usage.domain.MonthlyCost;
 import com.bifos.assistant.usage.domain.type.ExecutionEventType;
@@ -68,33 +69,15 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.context.TestConfiguration;
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Import;
-import org.springframework.context.annotation.Primary;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
-import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 
 /** 흐름 하나가 실행 넷을 남기고 그 넷이 부모의 경계를 물려받는 것을 고정한다. */
-@SpringBootTest
-@ActiveProfiles("test")
-@Import(ResearchAndBuildFlowTest.StubRuntime.class)
+@BackendIntegrationTest
 class ResearchAndBuildFlowTest {
-
-    @TestConfiguration
-    static class StubRuntime {
-        @Bean
-        @Primary
-        StubHermesRunsClient stubHermesRunsClient() {
-            return new StubHermesRunsClient();
-        }
-    }
 
     /** Chief 에게 준 지시에만 들어 있는 말이다. 대역이 이것으로 단계를 가려낸다. */
     private static final String CHIEF_MARK = "조사할 것과 만들 것을 나눈다";
@@ -158,7 +141,7 @@ class ResearchAndBuildFlowTest {
     @Autowired
     McpCallerResolver callerResolver;
 
-    @MockitoSpyBean
+    @Autowired
     TurnCancellation turns;
 
     /** 단계가 돌려준 Hermes run 번호별로 그 단계가 받은 session 을 모은다. 실행 줄을 run 번호로 짝짓는 데 쓴다. */

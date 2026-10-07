@@ -9,6 +9,7 @@ import com.bifos.assistant.agent.domain.type.CredentialScope;
 import com.bifos.assistant.agent.infra.AgentRepository;
 import com.bifos.assistant.chat.domain.Conversation;
 import com.bifos.assistant.chat.infra.ConversationRepository;
+import com.bifos.assistant.testsupport.BackendIntegrationTest;
 import com.bifos.assistant.usage.application.RootExecutionPage;
 import com.bifos.assistant.usage.application.RootExecutionQuery;
 import com.bifos.assistant.usage.domain.AgentExecution;
@@ -19,12 +20,9 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.test.context.ActiveProfiles;
 
 /** 루트 실행 목록 조회가 자식 여부와 대화의 공개 식별자를 함께 싣는지 본다. */
-@SpringBootTest
-@ActiveProfiles("test")
+@BackendIntegrationTest
 class RootExecutionQueryTest {
 
     private static final Long USER_ID = 4_402L;

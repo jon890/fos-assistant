@@ -32,6 +32,8 @@ import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
+import com.bifos.assistant.testsupport.BackendIntegrationTest;
+import com.bifos.assistant.testsupport.TestClock;
 import com.bifos.assistant.usage.domain.AgentExecution;
 import com.bifos.assistant.usage.domain.type.ExecutionStatus;
 import com.bifos.assistant.usage.infra.AgentExecutionRepository;
@@ -39,11 +41,8 @@ import com.bifos.assistant.user.domain.AppUser;
 import com.bifos.assistant.user.infra.AppUserRepository;
 import java.nio.ByteBuffer;
 import java.sql.Timestamp;
-import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
-import java.time.ZoneId;
-import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
@@ -56,14 +55,10 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
-import org.springframework.context.annotation.Primary;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.test.context.ActiveProfiles;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 /**
  * 숨기기, 미루기, 되돌리기와 지표 사건을 실제 DB 로 본다. 규칙은 {@code docs/backend/attention.md} 의 「억제 신호」 와 「API」 다.
@@ -71,13 +66,11 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
  * <p>시각은 이 검사의 시계가 정한다. 사용자는 검사마다 새로 만들어 다른 검사의 줄과 섞이지 않게 하고, 끝나면 그 사용자의 줄을
  * 지운다. 커넥터 카탈로그는 대역이 답한다.
  */
-@SpringBootTest
-@ActiveProfiles("test")
-@Import(AttentionControlServiceTest.FixedClock.class)
+@BackendIntegrationTest
+@Import(AttentionControlServiceTest.Candidates.class)
 class AttentionControlServiceTest {
 
     private static final Instant NOW = Instant.parse("2026-10-04T09:00:00Z");
-    private static final TestClock CLOCK = new TestClock(NOW);
     private static final ReadCountingCandidates PROBE = new ReadCountingCandidates();
 
     private static final String CONNECTOR = "attention-control-notes";
@@ -99,13 +92,7 @@ class AttentionControlServiceTest {
                     new ConnectorTool(WRITE, "WRITE", "required", "메모 쓰기", null)));
 
     @TestConfiguration
-    static class FixedClock {
-        @Bean
-        @Primary
-        Clock attentionControlTestClock() {
-            return CLOCK;
-        }
-
+    static class Candidates {
         /** 후보를 읽었는지 세는 출처다. 후보를 내지 않는다. */
         @Bean
         AttentionCandidates readCountingCandidates() {
@@ -113,7 +100,10 @@ class AttentionControlServiceTest {
         }
     }
 
-    @MockitoBean
+    @Autowired
+    TestClock clock;
+
+    @Autowired
     HermesConnectorClient connector;
 
     @Autowired
@@ -152,7 +142,7 @@ class AttentionControlServiceTest {
 
     @BeforeEach
     void setUp() {
-        CLOCK.set(NOW);
+        clock.set(NOW);
         PROBE.reads.set(0);
         when(connector.readCatalog()).thenReturn(List.of(MANIFEST));
         dad = member();
@@ -253,7 +243,7 @@ class AttentionControlServiceTest {
         controls.snooze(dad, CardKey.FAILURES, failure.itemKey(), tomorrowMorning);
 
         assertThat(card(attention.view(dad), CardKey.FAILURES).items()).isEmpty();
-        CLOCK.set(tomorrowMorning.plusSeconds(60));
+        clock.set(tomorrowMorning.plusSeconds(60));
         assertThat(onlyItem(attention.view(dad), CardKey.FAILURES).itemKey()).isEqualTo(failure.itemKey());
     }
 
@@ -392,7 +382,7 @@ class AttentionControlServiceTest {
                 .build());
         AttentionItem later = onlyItem(attention.view(dad), CardKey.DELEGATED);
 
-        CLOCK.set(NOW.plus(Duration.ofMinutes(15)));
+        clock.set(NOW.plus(Duration.ofMinutes(15)));
         AttentionItem now = onlyItem(attention.view(dad), CardKey.DELEGATED);
 
         String key = "execution:" + delegation.id();
@@ -603,34 +593,6 @@ class AttentionControlServiceTest {
         public List<AttentionCandidate> read(CurrentUser user, Instant now) {
             reads.incrementAndGet();
             return List.of();
-        }
-    }
-
-    /** 검사가 정한 시각만 주는 시계다. */
-    static final class TestClock extends Clock {
-        private volatile Instant now;
-
-        TestClock(Instant now) {
-            this.now = now;
-        }
-
-        void set(Instant instant) {
-            now = instant;
-        }
-
-        @Override
-        public Instant instant() {
-            return now;
-        }
-
-        @Override
-        public ZoneId getZone() {
-            return ZoneOffset.UTC;
-        }
-
-        @Override
-        public Clock withZone(ZoneId zone) {
-            return this;
         }
     }
 }

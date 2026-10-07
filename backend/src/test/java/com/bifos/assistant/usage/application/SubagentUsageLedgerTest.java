@@ -10,6 +10,7 @@ import com.bifos.assistant.agent.domain.type.CredentialScope;
 import com.bifos.assistant.agent.infra.AgentRepository;
 import com.bifos.assistant.hermes.HermesRunsClient;
 import com.bifos.assistant.hermes.dto.SubagentSessionUsage;
+import com.bifos.assistant.testsupport.BackendIntegrationTest;
 import com.bifos.assistant.usage.domain.AgentExecution;
 import com.bifos.assistant.usage.domain.CostByAgent;
 import com.bifos.assistant.usage.domain.CostByDay;
@@ -34,8 +35,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
@@ -46,8 +45,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
  *
  * <p>재조회 빈이 실제 시계를 읽으므로 시각은 모두 검사를 시작한 순간에서 떨어진 거리로 적는다.
  */
-@SpringBootTest
-@ActiveProfiles("test")
+@BackendIntegrationTest
 class SubagentUsageLedgerTest {
 
     private static final Long USER_ID = 4_501L;

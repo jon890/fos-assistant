@@ -46,6 +46,7 @@ import com.bifos.assistant.hermes.dto.TokenUsage;
 import com.bifos.assistant.memory.infra.MemoryRepository;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.domain.type.UserRole;
+import com.bifos.assistant.testsupport.BackendIntegrationTest;
 import com.bifos.assistant.usage.domain.AgentExecution;
 import com.bifos.assistant.usage.domain.type.ExecutionStatus;
 import com.bifos.assistant.usage.infra.AgentExecutionRepository;
@@ -63,11 +64,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.test.context.ActiveProfiles;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.test.context.TestPropertySource;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
@@ -81,9 +79,8 @@ import tools.jackson.databind.json.JsonMapper;
  * 다른 검사에는 그 커넥터의 manifest 가 없는 것으로 보여 카탈로그를 읽지 못했을 때와 같다. 반대로 다른 검사가 남긴 읽기 실패는
  * 잠시 기억되므로 준비에서 그 기억이 지나기를 기다린다.
  */
-@SpringBootTest(properties = "assistant.delegation-wake.enabled=true")
-@ActiveProfiles("test")
-@Import(ChatServiceTest.StubRuntime.class)
+@BackendIntegrationTest
+@TestPropertySource(properties = "assistant.delegation-wake.enabled=true")
 class ConnectorDeliveryRetryTest {
 
     private static final Duration WAIT_LIMIT = Duration.ofSeconds(10);
@@ -109,10 +106,10 @@ class ConnectorDeliveryRetryTest {
     /** {@code ConnectorActionResultSource} 의 입력 글이다. 상수는 package-private 이라 글로 견준다. */
     private static final String UNKNOWN_INPUT = "실행 여부를 알 수 없다. 다시 실행하지 말고 사용자에게 확인을 부탁한다.";
 
-    @MockitoBean
+    @Autowired
     HermesRunEventStream eventStream;
 
-    @MockitoBean
+    @Autowired
     HermesConnectorClient connector;
 
     @Autowired

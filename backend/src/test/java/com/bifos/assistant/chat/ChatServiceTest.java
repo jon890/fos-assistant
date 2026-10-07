@@ -67,6 +67,7 @@ import com.bifos.assistant.skill.application.SkillsChanged;
 import com.bifos.assistant.skill.domain.ExecutionSkillUse;
 import com.bifos.assistant.skill.domain.type.SkillUseSource;
 import com.bifos.assistant.skill.infra.ExecutionSkillUseRepository;
+import com.bifos.assistant.testsupport.BackendIntegrationTest;
 import com.bifos.assistant.usage.domain.AgentExecution;
 import com.bifos.assistant.usage.domain.ExecutionContextSource;
 import com.bifos.assistant.usage.domain.ExecutionEvent;
@@ -97,7 +98,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.annotation.Bean;
@@ -108,27 +108,18 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
-import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.transaction.support.TransactionTemplate;
 
-@SpringBootTest
-@ActiveProfiles("test")
-@Import(ChatServiceTest.StubRuntime.class)
+@BackendIntegrationTest
+@Import(ChatServiceTest.SkillCatalogClock.class)
 class ChatServiceTest {
 
     /** 켜진 스킬 캐시가 실제 시계에 기대지 않게 한다. 테스트마다 앞으로 옮겨 앞 테스트가 채운 캐시를 모두 지나게 한다. */
     static final TestClock SKILL_CLOCK = new TestClock(Instant.parse("2026-09-30T00:00:00Z"));
 
     @TestConfiguration
-    static class StubRuntime {
-        @Bean
-        @Primary
-        StubHermesRunsClient stubHermesRunsClient() {
-            return new StubHermesRunsClient();
-        }
-
+    static class SkillCatalogClock {
         @Bean
         @Primary
         SkillCommandCatalog testSkillCommandCatalog(SkillService skills) {
@@ -213,11 +204,11 @@ class ChatServiceTest {
     HermesRunsClient hermes;
 
     /** 실행 사건을 검사하려면 스트림을 우리가 열어 주어야 한다. */
-    @MockitoBean
+    @Autowired
     HermesRunEventStream eventStream;
 
     /** 저장이 실패해도 대화가 이어지는지 보려면 저장소가 던지게 만들 수 있어야 한다. */
-    @MockitoSpyBean
+    @Autowired
     ExecutionEventRepository executionEvents;
 
     @Autowired

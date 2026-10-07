@@ -24,6 +24,7 @@ import com.bifos.assistant.hermes.dto.TokenUsage;
 import com.bifos.assistant.memory.infra.MemoryRepository;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.domain.type.UserRole;
+import com.bifos.assistant.testsupport.BackendIntegrationTest;
 import com.bifos.assistant.usage.application.UserExecutionLimiter;
 import com.bifos.assistant.usage.domain.AgentExecution;
 import com.bifos.assistant.usage.domain.type.ExecutionStatus;
@@ -46,7 +47,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.annotation.Bean;
@@ -54,8 +54,7 @@ import org.springframework.context.annotation.Import;
 import org.springframework.context.annotation.Primary;
 import org.springframework.context.event.EventListener;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler;
-import org.springframework.test.context.ActiveProfiles;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.test.context.TestPropertySource;
 
 /**
  * 위임 결과 자동 turn 이 사용자 실행 한도에 닿았을 때 상한이 있는 재시도를 거는지 본다(ADR-069).
@@ -64,10 +63,9 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
  * 검사가 곧바로 돌린다. 30초를 실제로 기다리지 않는다. 예약한 작업은 가상 스레드를 띄우고 돌아오므로 검사는 그 스레드가
  * 끝날 때까지 기다린다.
  */
-@SpringBootTest(properties = {"assistant.delegation-wake.enabled=true", "assistant.user-execution.max-running=2"})
-@ActiveProfiles("test")
+@BackendIntegrationTest
+@TestPropertySource(properties = {"assistant.delegation-wake.enabled=true", "assistant.user-execution.max-running=2"})
 @Import({
-    ChatServiceTest.StubRuntime.class,
     DelegationWakeUserLimitTest.CapturingSchedulerConfig.class,
     DelegationWakeUserLimitTest.RetryThreadsConfig.class
 })
@@ -140,7 +138,7 @@ class DelegationWakeUserLimitTest {
     }
 
     /** 자동 turn 의 답 조각은 이 검사가 보지 않는다. 실제 스트림 주소로 연결하지 않게 대역으로 둔다. */
-    @MockitoBean
+    @Autowired
     HermesRunEventStream eventStream;
 
     @Autowired

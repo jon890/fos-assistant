@@ -11,6 +11,7 @@ import com.bifos.assistant.memory.application.MemoryService;
 import com.bifos.assistant.memory.domain.MemoryRevisionId;
 import com.bifos.assistant.memory.infra.MemoryRepository;
 import com.bifos.assistant.memory.infra.MemoryRevisionRepository;
+import com.bifos.assistant.testsupport.BackendIntegrationTest;
 import java.time.OffsetDateTime;
 import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
@@ -20,16 +21,12 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mockito;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.DefaultApplicationArguments;
-import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.system.CapturedOutput;
 import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.test.context.ActiveProfiles;
-import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 
 /** 기동할 때 평문으로 남은 민감 줄을 암호화하는 보정을 본다(ADR-055). */
-@SpringBootTest
-@ActiveProfiles("test")
+@BackendIntegrationTest
 @ExtendWith(OutputCaptureExtension.class)
 class MemoryContentBackfillTest {
 
@@ -52,7 +49,7 @@ class MemoryContentBackfillTest {
     @Autowired
     JdbcTemplate jdbc;
 
-    @MockitoSpyBean
+    @Autowired
     MemoryContentSealer sealer;
 
     @BeforeEach

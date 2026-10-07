@@ -16,6 +16,7 @@ import com.bifos.assistant.hermes.dto.TokenUsage;
 import com.bifos.assistant.model.domain.ModelChoice;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.domain.type.UserRole;
+import com.bifos.assistant.testsupport.BackendIntegrationTest;
 import com.bifos.assistant.usage.application.ExecutionRecorder;
 import com.bifos.assistant.usage.domain.AgentExecution;
 import com.bifos.assistant.usage.domain.MonthlyCost;
@@ -34,15 +35,12 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 /** 실행이 끝날 때 금액을 저장하고, 그 저장된 금액만 더해 한 달 합계가 나오는지 본다. */
-@SpringBootTest
-@ActiveProfiles("test")
+@BackendIntegrationTest
 class UsageCostRecordingTest {
 
     private static final Long USER_ID = 4_101L;

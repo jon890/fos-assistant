@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.bifos.assistant.chat.domain.ChatPendingMessage;
 import com.bifos.assistant.chat.infra.ChatPendingMessageRepository;
+import com.bifos.assistant.testsupport.BackendIntegrationTest;
 import java.time.Instant;
 import java.util.List;
 import org.junit.jupiter.api.AfterEach;
@@ -11,9 +12,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.context.annotation.Import;
-import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /**
@@ -22,9 +20,7 @@ import org.springframework.transaction.support.TransactionTemplate;
  * <p>저장소는 트랜잭션을 열지 않으므로 호출을 {@link TransactionTemplate} 안에서 한다. 검사들이 H2 를 함께 써서
  * 남은 대기 행이 다른 검사에 보이지 않도록 앞뒤로 비운다.
  */
-@SpringBootTest
-@ActiveProfiles("test")
-@Import(ChatServiceTest.StubRuntime.class)
+@BackendIntegrationTest
 class ChatPendingMessageRepositoryTest {
     private static final Instant NOW = Instant.parse("2026-09-30T00:00:00Z");
     private static final long CONVERSATION = 910_001L;

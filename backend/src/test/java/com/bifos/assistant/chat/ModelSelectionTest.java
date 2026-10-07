@@ -33,6 +33,7 @@ import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
+import com.bifos.assistant.testsupport.BackendIntegrationTest;
 import com.bifos.assistant.usage.domain.AgentExecution;
 import com.bifos.assistant.usage.domain.ExecutionEvent;
 import com.bifos.assistant.usage.domain.type.ExecutionEventType;
@@ -52,35 +53,17 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.context.TestConfiguration;
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Import;
-import org.springframework.context.annotation.Primary;
 import org.springframework.data.domain.PageRequest;
-import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 /**
  * 실행이 대화가 고른 모델과 effort 로 Hermes 를 부르고, 실제로 돈 모델을 적고, 막혀도 넘기지 않는 것을 본다.
  *
  * <p>한 provider 안에서 계정을 돌려 쓰는 것은 Hermes 가 이미 하므로 검사하지 않는다.
  */
-@SpringBootTest
-@ActiveProfiles("test")
-@Import(ModelSelectionTest.StubRuntime.class)
+@BackendIntegrationTest
 class ModelSelectionTest {
-
-    @TestConfiguration
-    static class StubRuntime {
-        @Bean
-        @Primary
-        StubHermesRunsClient stubHermesRunsClient() {
-            return new StubHermesRunsClient();
-        }
-    }
 
     private static final String AGENT_CODE = "selection";
 
@@ -164,7 +147,7 @@ class ModelSelectionTest {
     @Autowired
     ModelHiddenRepository hiddenModels;
 
-    @MockitoBean
+    @Autowired
     HermesRunEventStream eventStream;
 
     /**
@@ -173,7 +156,7 @@ class ModelSelectionTest {
      * <p>읽은 목록은 Spring context 가 사는 동안 메모리에 남는다. 그래서 검사마다 다른 목록을 주지 않고 늘 같은
      * 목록을 답하게 한다. 어느 검사가 먼저 읽어도 결과가 같다.
      */
-    @MockitoBean
+    @Autowired
     HermesModelClient modelClient;
 
     private CurrentUser user;

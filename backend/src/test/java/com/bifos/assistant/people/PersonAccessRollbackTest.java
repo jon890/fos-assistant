@@ -8,6 +8,7 @@ import com.bifos.assistant.people.domain.AllowedPerson;
 import com.bifos.assistant.people.infra.AllowedPersonRepository;
 import com.bifos.assistant.shared.auth.UserAccessRevoked;
 import com.bifos.assistant.shared.domain.type.UserRole;
+import com.bifos.assistant.testsupport.BackendIntegrationTest;
 import com.bifos.assistant.user.domain.AppUser;
 import com.bifos.assistant.user.infra.AppUserRepository;
 import java.time.Instant;
@@ -16,16 +17,13 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
 import org.springframework.context.event.EventListener;
-import org.springframework.test.context.ActiveProfiles;
 
 /** 끄는 저장과 토큰 폐기가 한 트랜잭션이라, 폐기가 실패하면 끄기도 되돌아가는지 확인한다(ADR-056). */
-@SpringBootTest
-@ActiveProfiles("test")
+@BackendIntegrationTest
 @Import(PersonAccessRollbackTest.FailingRevoker.class)
 class PersonAccessRollbackTest {
 

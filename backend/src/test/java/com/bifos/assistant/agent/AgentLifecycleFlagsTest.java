@@ -28,6 +28,7 @@ import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
+import com.bifos.assistant.testsupport.BackendIntegrationTest;
 import com.bifos.assistant.user.domain.AppUser;
 import com.bifos.assistant.user.infra.AppUserRepository;
 import java.time.Instant;
@@ -38,14 +39,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.context.TestConfiguration;
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Import;
-import org.springframework.context.annotation.Primary;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -57,19 +52,8 @@ import org.springframework.transaction.support.TransactionTemplate;
  * <p>표를 비우지 않는다. 번호와 메일을 무작위로 만들어 이 클래스가 만든 행만 읽고 단언한다. 같은 스프링
  * 문맥을 쓰는 다른 테스트의 행을 지우지 않고, 그 행에 단언이 흔들리지도 않는다.
  */
-@SpringBootTest
-@ActiveProfiles("test")
-@Import(AgentLifecycleFlagsTest.StubRuntime.class)
+@BackendIntegrationTest
 class AgentLifecycleFlagsTest {
-
-    @TestConfiguration
-    static class StubRuntime {
-        @Bean
-        @Primary
-        StubHermesRunsClient stubHermesRunsClient() {
-            return new StubHermesRunsClient();
-        }
-    }
 
     private static final Instant DELETED_AT = Instant.parse("2026-09-29T00:00:00Z");
 
@@ -101,7 +85,7 @@ class AgentLifecycleFlagsTest {
     PlatformTransactionManager transactionManager;
 
     /** 그룹으로 공개하는 요청이 도구 목록을 읽는다. 실제 Hermes 를 부르지 않도록 빈 목록을 돌려준다. */
-    @MockitoBean
+    @Autowired
     HermesToolsetClient hermesToolsets;
 
     /** 관리자가 등록할 때 주소가 닿는지 본다. 실제 Hermes 를 부르지 않도록 통과시킨다. */

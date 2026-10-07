@@ -26,6 +26,7 @@ import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
+import com.bifos.assistant.testsupport.BackendIntegrationTest;
 import com.bifos.assistant.usage.application.UserExecutionLimiter;
 import com.bifos.assistant.usage.domain.AgentExecution;
 import com.bifos.assistant.usage.domain.DelegationKey;
@@ -48,14 +49,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.context.TestConfiguration;
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Import;
-import org.springframework.context.annotation.Primary;
 import org.springframework.data.domain.PageRequest;
-import org.springframework.test.context.ActiveProfiles;
-import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
+import org.springframework.test.context.TestPropertySource;
 
 /**
  * 위임 자식과 흐름 단계가 사용자 실행 한도에 닿으면 기다리지 않고 거절되는지 본다(ADR-069).
@@ -63,21 +58,11 @@ import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
  * <p>한도를 2 로 둔다. 부모 turn 이 자리 하나를 쥔 채 자식 자리를 기다리는 교착이 없어야 한다. 붙잡는 것은 그 실행의 글을
  * 담은 제출만이다.
  */
-@SpringBootTest(properties = "assistant.user-execution.max-running=2")
-@ActiveProfiles("test")
-@Import(UserExecutionLimitDelegationTest.StubRuntime.class)
+@BackendIntegrationTest
+@TestPropertySource(properties = "assistant.user-execution.max-running=2")
 class UserExecutionLimitDelegationTest {
 
     /** {@code ChatServiceTest.StubRuntime} 은 chat 패키지 안에서만 보여 이 패키지에서 import 하지 못하므로 따로 둔다. */
-    @TestConfiguration
-    static class StubRuntime {
-        @Bean
-        @Primary
-        StubHermesRunsClient stubHermesRunsClient() {
-            return new StubHermesRunsClient();
-        }
-    }
-
     private static final Duration WAIT_LIMIT = Duration.ofSeconds(10);
 
     /** 위임 거절이 이만큼 안에 와야 한다. 제출 대기 시간(기본 30초)보다 훨씬 짧다. */
@@ -97,7 +82,7 @@ class UserExecutionLimitDelegationTest {
     @Autowired
     AgentDelegationService delegations;
 
-    @MockitoSpyBean
+    @Autowired
     UserExecutionLimiter limiter;
 
     @Autowired

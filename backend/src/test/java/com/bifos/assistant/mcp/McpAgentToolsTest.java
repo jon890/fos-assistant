@@ -28,6 +28,7 @@ import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
+import com.bifos.assistant.testsupport.BackendIntegrationTest;
 import com.bifos.assistant.usage.domain.AgentExecution;
 import com.bifos.assistant.usage.domain.DelegationKey;
 import com.bifos.assistant.usage.domain.type.ExecutionEventType;
@@ -57,14 +58,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.boot.test.web.server.LocalServerPort;
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Import;
-import org.springframework.context.annotation.Primary;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.test.context.ActiveProfiles;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.node.ObjectNode;
@@ -85,9 +80,7 @@ import tools.jackson.databind.node.ObjectNode;
  * <p>{@code agent_stop} 은 {@code agent_status} 와 같은 판정을 지나고, 멈춘 위임 실행이 origin 인 Hermes 하위 에이전트의
  * 호출은 거절된다(ADR-037). turn 중지와 이어지는 것은 {@code AgentDelegationServiceTest} 가 본다.
  */
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
-@ActiveProfiles("test")
-@Import(McpAgentToolsTest.StubRuntime.class)
+@BackendIntegrationTest
 class McpAgentToolsTest {
     private static final String SHARED = "tools-shared";
     private static final String PRIVATE_A = "tools-private-a";
@@ -1346,15 +1339,6 @@ class McpAgentToolsTest {
         return send(
                 token,
                 toolCall("agent_stop", withContext(arguments, McpCallSigner.context(token, "agent_stop", root))));
-    }
-
-    @TestConfiguration
-    static class StubRuntime {
-        @Bean
-        @Primary
-        StubHermesRunsClient stubHermesRunsClient() {
-            return new StubHermesRunsClient();
-        }
     }
 
     private StubHermesRunsClient stub() {

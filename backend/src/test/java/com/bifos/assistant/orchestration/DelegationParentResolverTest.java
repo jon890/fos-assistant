@@ -8,6 +8,7 @@ import com.bifos.assistant.orchestration.application.DelegationParentResolver;
 import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
+import com.bifos.assistant.testsupport.BackendIntegrationTest;
 import com.bifos.assistant.usage.domain.AgentExecution;
 import com.bifos.assistant.usage.domain.type.ExecutionStatus;
 import com.bifos.assistant.usage.infra.AgentExecutionRepository;
@@ -20,13 +21,10 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.test.context.ActiveProfiles;
 
 /** 토큰의 profile 과 서명한 루트 session 으로 도는 부모 실행을 정확히 하나만 고르는 것을 고정한다. */
-@SpringBootTest
-@ActiveProfiles("test")
+@BackendIntegrationTest
 class DelegationParentResolverTest {
 
     private static final List<String> MY_EMAILS =

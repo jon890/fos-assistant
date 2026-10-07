@@ -32,6 +32,7 @@ import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
+import com.bifos.assistant.testsupport.BackendIntegrationTest;
 import com.bifos.assistant.usage.application.ExecutionDeliveryWriter;
 import com.bifos.assistant.usage.domain.AgentExecution;
 import com.bifos.assistant.usage.domain.DelegationKey;
@@ -61,14 +62,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.context.TestConfiguration;
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Import;
-import org.springframework.context.annotation.Primary;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.test.context.ActiveProfiles;
-import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
+import org.springframework.test.context.TestPropertySource;
 
 /**
  * 위임 시작의 제출 대기, 서버 전체 한도, 답 자르기, 같은 호출의 동시 요청, 중지를 고정한다(ADR-017).
@@ -76,7 +71,8 @@ import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
  * <p>설정값을 짧고 작게 바꿔 띄운다. 도구 경계와 요청자 판정은 {@code McpAgentToolsTest} 가 본다. 위임은 가상 스레드에서
  * 돌므로 각 검사는 자기가 띄운 실행이 끝날 때까지 기다린 뒤 끝난다.
  */
-@SpringBootTest(
+@BackendIntegrationTest
+@TestPropertySource(
         properties = {
             "assistant.delegation.submit-timeout=300ms",
             "assistant.delegation.max-active=2",
@@ -84,8 +80,6 @@ import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
             "assistant.delegation.status-wait-max=2s",
             "assistant.proactive-check.max-delegations=2"
         })
-@ActiveProfiles("test")
-@Import(AgentDelegationServiceTest.StubRuntime.class)
 class AgentDelegationServiceTest {
 
     private static final String CHIEF_PROFILE = "delegation-chief";
@@ -100,15 +94,6 @@ class AgentDelegationServiceTest {
     private static final String CONNECTOR = "delegation-connector";
     /** 다른 사용자의 비공개 커넥터 에이전트다. */
     private static final String OTHER_CONNECTOR = "delegation-other-connector";
-
-    @TestConfiguration
-    static class StubRuntime {
-        @Bean
-        @Primary
-        StubHermesRunsClient stubHermesRunsClient() {
-            return new StubHermesRunsClient();
-        }
-    }
 
     @Autowired
     AgentDelegationService delegations;
@@ -147,7 +132,7 @@ class AgentDelegationServiceTest {
     ProactiveCheckRepository checks;
 
     /** 위임 판정 사이에 살펴보기가 끝나는 경우를 만든다. 정하지 않은 검사에서는 실제 그대로다. */
-    @MockitoSpyBean
+    @Autowired
     ProactiveCheckGuard checkGuard;
 
     private final List<Long> createdChecks = new ArrayList<>();

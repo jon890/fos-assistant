@@ -7,6 +7,7 @@ import com.bifos.assistant.chat.infra.AttachmentProperties;
 import com.bifos.assistant.chat.infra.ChatAttachmentRepository;
 import com.bifos.assistant.chat.infra.ConversationRepository;
 import com.bifos.assistant.shared.domain.type.UserRole;
+import com.bifos.assistant.testsupport.BackendIntegrationTest;
 import com.bifos.assistant.user.domain.AppUser;
 import com.bifos.assistant.user.infra.AppUserRepository;
 import io.jsonwebtoken.Jwts;
@@ -35,9 +36,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
-import org.springframework.test.context.ActiveProfiles;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
@@ -47,8 +46,7 @@ import tools.jackson.databind.json.JsonMapper;
  * <p>MockMvc 의 multipart 요청은 Tomcat 과 multipart resolver 의 크기 상한을 거치지 않아, 설정의
  * {@code max-file-size} 를 빠뜨려도 통과한다. 그래서 실제 서버를 띄운다.
  */
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
-@ActiveProfiles("test")
+@BackendIntegrationTest
 class AttachmentUploadLimitTest {
 
     private static final String JWT_SECRET = "test-secret-test-secret-test-secret-test-secret";

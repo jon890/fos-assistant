@@ -28,6 +28,7 @@ import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
+import com.bifos.assistant.testsupport.BackendIntegrationTest;
 import com.bifos.assistant.usage.application.ExecutionRecorder;
 import com.bifos.assistant.usage.domain.AgentExecution;
 import com.bifos.assistant.usage.domain.CatalogPrice;
@@ -50,14 +51,11 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.data.domain.PageRequest;
-import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 /** 대화와 위임 경로가 Hermes 실패 결과의 사용량을 실제 실행 기록과 비용으로 보존하는지 본다. */
-@SpringBootTest
-@ActiveProfiles("test")
+@BackendIntegrationTest
 class FailedExecutionUsageRoutesTest {
 
     private static final String RUN_ID = "run-failed-with-usage";
@@ -95,7 +93,7 @@ class FailedExecutionUsageRoutesTest {
     @MockitoBean
     HermesRunsClient hermes;
 
-    @MockitoBean
+    @Autowired
     HermesRunEventStream eventStream;
 
     @MockitoBean

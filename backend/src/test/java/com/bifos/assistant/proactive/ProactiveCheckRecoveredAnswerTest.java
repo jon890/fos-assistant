@@ -21,6 +21,7 @@ import com.bifos.assistant.proactive.domain.ProactiveCheck;
 import com.bifos.assistant.proactive.domain.type.CheckTrigger;
 import com.bifos.assistant.proactive.infra.ProactiveCheckRepository;
 import com.bifos.assistant.shared.domain.type.UserRole;
+import com.bifos.assistant.testsupport.BackendIntegrationTest;
 import com.bifos.assistant.usage.domain.AgentExecution;
 import com.bifos.assistant.usage.domain.type.ExecutionStatus;
 import com.bifos.assistant.usage.infra.AgentExecutionRepository;
@@ -36,8 +37,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /**
@@ -46,8 +45,7 @@ import org.springframework.transaction.support.TransactionTemplate;
  * <p>실행 줄은 이전 프로세스가 남긴 것처럼 저장소로 직접 만들고, Hermes 의 답은 그대로 넘긴다. 실제로 돈 모델을 답에 실어 Hermes
  * 세션 조회를 부르지 않는다. 모든 데이터는 합성이다.
  */
-@SpringBootTest
-@ActiveProfiles("test")
+@BackendIntegrationTest
 class ProactiveCheckRecoveredAnswerTest {
 
     private static final Instant STARTED = Instant.parse("2026-10-01T00:00:00Z");

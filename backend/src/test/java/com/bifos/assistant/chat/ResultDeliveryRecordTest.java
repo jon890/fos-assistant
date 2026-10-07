@@ -43,6 +43,7 @@ import com.bifos.assistant.hermes.dto.TokenUsage;
 import com.bifos.assistant.memory.infra.MemoryRepository;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.domain.type.UserRole;
+import com.bifos.assistant.testsupport.BackendIntegrationTest;
 import com.bifos.assistant.usage.domain.AgentExecution;
 import com.bifos.assistant.usage.domain.type.ExecutionStatus;
 import com.bifos.assistant.usage.infra.AgentExecutionRepository;
@@ -63,16 +64,13 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.PageRequest;
-import org.springframework.test.context.ActiveProfiles;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
-import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
+import org.springframework.test.context.TestPropertySource;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /**
@@ -80,24 +78,24 @@ import org.springframework.transaction.support.TransactionTemplate;
  *
  * <p>자동 turn 은 테스트 스레드 밖의 가상 스레드에서 돈다. 검사마다 그 turn 이 끝날 때까지 기다린 뒤 단언한다.
  */
-@SpringBootTest(properties = "assistant.delegation-wake.enabled=true")
-@ActiveProfiles("test")
-@Import({ChatServiceTest.StubRuntime.class, ResultDeliveryRecordTest.TestResults.class})
+@BackendIntegrationTest
+@TestPropertySource(properties = "assistant.delegation-wake.enabled=true")
+@Import(ResultDeliveryRecordTest.TestResults.class)
 class ResultDeliveryRecordTest {
 
     private static final Duration WAIT_LIMIT = Duration.ofSeconds(10);
     private static final String TEST_SOURCE = "TEST_SOURCE";
 
     /** 자동 turn 의 답 조각은 이 검사가 보지 않는다. 실제 스트림 주소로 연결하지 않게 대역으로 둔다. */
-    @MockitoBean
+    @Autowired
     HermesRunEventStream eventStream;
 
     /** 실행 줄을 만들기 전에 실패하는 경우를 만들려고 감싼다. 그 밖의 검사에서는 실제 동작 그대로다. */
-    @MockitoSpyBean
+    @Autowired
     ContextAssembler contextAssembler;
 
     /** 시도에 실행 줄을 잇다 실패하는 경우를 만들려고 감싼다. 그 밖의 검사에서는 실제 동작 그대로다. */
-    @MockitoSpyBean
+    @Autowired
     ResultDeliveryRecorder recorder;
 
     @Autowired

@@ -28,6 +28,7 @@ import com.bifos.assistant.proactive.domain.ProactiveCheck;
 import com.bifos.assistant.proactive.domain.type.CheckTrigger;
 import com.bifos.assistant.proactive.infra.ProactiveCheckRepository;
 import com.bifos.assistant.shared.domain.type.UserRole;
+import com.bifos.assistant.testsupport.BackendIntegrationTest;
 import com.bifos.assistant.usage.domain.AgentExecution;
 import com.bifos.assistant.usage.domain.type.ExecutionStatus;
 import com.bifos.assistant.usage.infra.AgentExecutionRepository;
@@ -48,12 +49,9 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.test.context.ActiveProfiles;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.node.ObjectNode;
@@ -64,8 +62,7 @@ import tools.jackson.databind.node.ObjectNode;
  * <p>계약은 {@code docs/backend/connector-tool-policy.md} 의 「도구 호출 판정」 이다. 본문 서명은 운영 코드가 아니라 {@link McpCallSigner}
  * 가 따로 계산한다. 카탈로그는 대역이 내고, 보관 시간에 걸리지 않게 검사마다 시계를 보관 시간보다 멀리 옮긴다.
  */
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
-@ActiveProfiles("test")
+@BackendIntegrationTest
 @Import(ConnectorPolicyTestDoubles.class)
 class ConnectorPolicyEndpointTest {
     private static final String PATH = "/internal/hermes/connector-policy";
@@ -150,7 +147,7 @@ class ConnectorPolicyEndpointTest {
     @Autowired
     JdbcTemplate jdbc;
 
-    @MockitoBean
+    @Autowired
     HermesConnectorClient connector;
 
     private final HttpClient client = HttpClient.newHttpClient();

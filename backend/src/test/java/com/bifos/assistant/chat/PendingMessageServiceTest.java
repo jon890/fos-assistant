@@ -36,6 +36,7 @@ import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
+import com.bifos.assistant.testsupport.BackendIntegrationTest;
 import com.bifos.assistant.usage.domain.type.ExecutionStatus;
 import com.bifos.assistant.usage.infra.AgentExecutionRepository;
 import com.bifos.assistant.usage.infra.ExecutionEventRepository;
@@ -54,11 +55,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.context.annotation.Import;
 import org.springframework.data.domain.PageRequest;
-import org.springframework.test.context.ActiveProfiles;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 /**
  * turn 이 도는 동안 보낸 글이 대기 줄에 쌓였다가 다음 turn 으로 합쳐 가는지 본다(ADR-048).
@@ -66,16 +63,14 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
  * <p>대기 메시지로 연 turn 은 테스트 스레드 밖의 가상 스레드에서 돈다. 검사마다 그 turn 이 끝날 때까지 기다린 뒤
  * 단언한다. 남은 대기 행은 다른 검사 문맥의 기동 확인이 turn 으로 보내므로 앞뒤에서 비운다.
  */
-@SpringBootTest
-@ActiveProfiles("test")
-@Import(ChatServiceTest.StubRuntime.class)
+@BackendIntegrationTest
 class PendingMessageServiceTest {
 
     private static final Duration WAIT_LIMIT = Duration.ofSeconds(10);
     private static final Instant QUEUED_AT = Instant.parse("2026-09-30T00:00:00Z");
 
     /** 답 조각은 이 검사가 보지 않는다. 실제 스트림 주소로 연결하지 않게 대역으로 둔다. */
-    @MockitoBean
+    @Autowired
     HermesRunEventStream eventStream;
 
     @Autowired

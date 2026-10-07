@@ -18,18 +18,19 @@ import com.bifos.assistant.model.domain.ModelChoice;
 import com.bifos.assistant.model.domain.type.ModelTier;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.domain.type.UserRole;
+import com.bifos.assistant.testsupport.BackendIntegrationTest;
 import java.time.Instant;
 import java.util.List;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.TestPropertySource;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /** 배포 단계 mapping 이 비어 있을 때 기존 seed 행의 fallback을 실제 컨텍스트에서 확인한다. */
-@SpringBootTest(
+@BackendIntegrationTest
+@TestPropertySource(
         properties = {
             "assistant.model-tiers.fast.provider=",
             "assistant.model-tiers.fast.model=",
@@ -41,7 +42,6 @@ import org.springframework.transaction.support.TransactionTemplate;
             "assistant.model-tiers.deep.model=",
             "assistant.model-tiers.deep.reasoning-effort="
         })
-@ActiveProfiles("test")
 class ModelTierFallbackIntegrationTest {
 
     private static final Agent AGENT = Agent.of(

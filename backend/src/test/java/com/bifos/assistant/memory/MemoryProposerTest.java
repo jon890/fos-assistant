@@ -29,6 +29,7 @@ import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
+import com.bifos.assistant.testsupport.BackendIntegrationTest;
 import com.bifos.assistant.usage.application.ExecutionContextSnapshot;
 import com.bifos.assistant.usage.application.ExecutionEventRecorder;
 import com.bifos.assistant.usage.application.ExecutionRecorder;
@@ -53,29 +54,14 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentMatchers;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.context.TestConfiguration;
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Import;
-import org.springframework.context.annotation.Primary;
-import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.transaction.support.TransactionTemplate;
 import tools.jackson.databind.ObjectMapper;
 
-@SpringBootTest(properties = "assistant.memory.propose.enabled=true")
-@ActiveProfiles("test")
-@Import(MemoryProposerTest.StubRuntime.class)
+@BackendIntegrationTest
+@TestPropertySource(properties = "assistant.memory.propose.enabled=true")
 class MemoryProposerTest {
-
-    @TestConfiguration
-    static class StubRuntime {
-        @Bean
-        @Primary
-        StubHermesRunsClient stubHermesRunsClient() {
-            return new StubHermesRunsClient();
-        }
-    }
 
     private static final CurrentUser USER = new CurrentUser(1L, "user@example.com", "user", 1L, UserRole.MEMBER);
 

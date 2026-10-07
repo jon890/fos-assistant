@@ -26,6 +26,7 @@ import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
+import com.bifos.assistant.testsupport.BackendIntegrationTest;
 import com.bifos.assistant.user.domain.AppUser;
 import com.bifos.assistant.user.infra.AppUserRepository;
 import java.time.Instant;
@@ -43,9 +44,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.test.context.ActiveProfiles;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 /**
  * 붙이기와 공개 범위 변경이 같은 에이전트에 함께 올 때 에이전트 행 잠금으로 줄을 서는지 본다(ADR-083).
@@ -53,8 +51,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
  * <p>{@link AgentVisibilityMysqlLockTest} 가 같은 검사를 MySQL 에서 돌린다. 테스트 클래스에 트랜잭션을 두지 않는다. 서비스의
  * 트랜잭션과 행 잠금이 실제로 돌아야 동시 요청의 차례를 볼 수 있다. Hermes 대시보드와 커넥터, 도구 목록 경로만 대역이다.
  */
-@SpringBootTest
-@ActiveProfiles("test")
+@BackendIntegrationTest
 class AgentVisibilityLockTest {
 
     /** plugin 틀이 붙이는 안전한 기본 도구다. 셸과 파일 등급이 없다. */
@@ -96,13 +93,13 @@ class AgentVisibilityLockTest {
     @Autowired
     ConnectorConnectionRepository connections;
 
-    @MockitoBean
+    @Autowired
     HermesConnectorClient connector;
 
-    @MockitoBean
+    @Autowired
     HermesDashboardClient dashboard;
 
-    @MockitoBean
+    @Autowired
     HermesToolsetClient toolsets;
 
     /** 이 테스트가 실제 key 디렉터리에 남긴 파일을 지우려고 적어 둔다. */

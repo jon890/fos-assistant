@@ -32,6 +32,7 @@ import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.auth.CurrentUserProvider;
 import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.shared.error.GlobalExceptionHandler;
+import com.bifos.assistant.testsupport.BackendIntegrationTest;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
@@ -41,9 +42,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.test.context.ActiveProfiles;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -54,8 +52,7 @@ import org.springframework.transaction.support.TransactionTemplate;
  * <p>Hermes 의 toolset 과 스킬 목록은 대역으로 둔다. 검사들이 H2 를 함께 쓰므로 사용자 번호는 다른 검사와 겹치지 않는 값을 쓰고, 만든 줄은
  * 끝날 때 지운다.
  */
-@SpringBootTest
-@ActiveProfiles("test")
+@BackendIntegrationTest
 class ProactiveCheckStatusTest {
 
     private static final Instant NOW = Instant.parse("2026-10-01T00:00:00Z");
@@ -76,11 +73,11 @@ class ProactiveCheckStatusTest {
     TransactionTemplate transactions;
 
     /** 실제 Hermes 를 부르지 않도록 켜진 toolset 을 대역으로 둔다. */
-    @MockitoBean
+    @Autowired
     HermesToolsetClient toolsets;
 
     /** 켜진 스킬 목록을 대역으로 둔다. */
-    @MockitoBean
+    @Autowired
     HermesSkillClient skillClient;
 
     private final CurrentUserProvider currentUser = mock(CurrentUserProvider.class);

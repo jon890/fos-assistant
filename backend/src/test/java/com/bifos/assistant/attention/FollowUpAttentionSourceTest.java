@@ -29,6 +29,8 @@ import com.bifos.assistant.followup.infra.FollowUpRepository;
 import com.bifos.assistant.hermes.HermesConnectorClient;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.domain.type.UserRole;
+import com.bifos.assistant.testsupport.BackendIntegrationTest;
+import com.bifos.assistant.testsupport.TestClock;
 import com.bifos.assistant.usage.domain.AgentExecution;
 import com.bifos.assistant.usage.domain.type.ExecutionStatus;
 import com.bifos.assistant.usage.infra.AgentExecutionRepository;
@@ -36,11 +38,8 @@ import com.bifos.assistant.user.domain.AppUser;
 import com.bifos.assistant.user.infra.AppUserRepository;
 import java.nio.ByteBuffer;
 import java.sql.Timestamp;
-import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
-import java.time.ZoneId;
-import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -51,39 +50,23 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.context.TestConfiguration;
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Import;
-import org.springframework.context.annotation.Primary;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.test.context.ActiveProfiles;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 /**
  * 할 일이 나를 기다리는 카드에 어떻게 올라오는지 실제 DB 로 본다. 규칙은 {@code docs/backend/attention.md} 의 「후보와 trigger」 다.
  *
  * <p>시각은 이 검사의 시계가 정한다. 사용자는 검사마다 새로 만들고 끝나면 그 사용자의 줄을 지운다.
  */
-@SpringBootTest
-@ActiveProfiles("test")
-@Import(FollowUpAttentionSourceTest.FixedClock.class)
+@BackendIntegrationTest
 class FollowUpAttentionSourceTest {
 
     private static final Instant NOW = Instant.parse("2026-10-04T09:00:00Z");
-    private static final TestClock CLOCK = new TestClock(NOW);
     private static final String TITLE = "학교 알림장 확인";
 
-    @TestConfiguration
-    static class FixedClock {
-        @Bean
-        @Primary
-        Clock followUpAttentionTestClock() {
-            return CLOCK;
-        }
-    }
+    @Autowired
+    TestClock clock;
 
-    @MockitoBean
+    @Autowired
     HermesConnectorClient connector;
 
     @Autowired
@@ -119,7 +102,7 @@ class FollowUpAttentionSourceTest {
 
     @BeforeEach
     void setUp() {
-        CLOCK.set(NOW);
+        clock.set(NOW);
         when(connector.readCatalog()).thenReturn(List.of());
         dad = member();
         chief = agentOf(dad);
@@ -338,7 +321,7 @@ class FollowUpAttentionSourceTest {
         controls.hide(dad, CardKey.NEEDS_ME, shown.itemKey(), shown.stateKey());
         assertThat(card(service.view(dad)).items()).isEmpty();
 
-        CLOCK.set(dueAt.minus(Duration.ofHours(10)));
+        clock.set(dueAt.minus(Duration.ofHours(10)));
 
         AttentionItem again = onlyItem(service.view(dad));
         assertThat(again.level()).isEqualTo(AttentionLevel.NOW);
@@ -468,33 +451,5 @@ class FollowUpAttentionSourceTest {
         List<AttentionItem> items = card(view).items();
         assertThat(items).as("나를 기다리는 카드의 항목").hasSize(1);
         return items.getFirst();
-    }
-
-    /** 검사가 정한 시각만 주는 시계다. */
-    static final class TestClock extends Clock {
-        private volatile Instant now;
-
-        TestClock(Instant now) {
-            this.now = now;
-        }
-
-        void set(Instant instant) {
-            now = instant;
-        }
-
-        @Override
-        public Instant instant() {
-            return now;
-        }
-
-        @Override
-        public ZoneId getZone() {
-            return ZoneOffset.UTC;
-        }
-
-        @Override
-        public Clock withZone(ZoneId zone) {
-            return this;
-        }
     }
 }

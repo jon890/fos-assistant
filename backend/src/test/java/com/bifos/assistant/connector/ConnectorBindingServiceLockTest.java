@@ -37,6 +37,7 @@ import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
+import com.bifos.assistant.testsupport.BackendIntegrationTest;
 import com.bifos.assistant.user.domain.AppUser;
 import com.bifos.assistant.user.infra.AppUserRepository;
 import java.sql.Timestamp;
@@ -55,10 +56,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.test.context.ActiveProfiles;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
@@ -67,8 +65,7 @@ import tools.jackson.databind.json.JsonMapper;
  * <p>{@link ConnectorBindingServiceMysqlLockTest} 가 같은 검사를 MySQL 에서 돌린다. 테스트 클래스에 트랜잭션을 두지 않는다. 서비스의
  * 트랜잭션과 행 잠금이 실제로 돌아야 동시 요청의 차례를 볼 수 있다. 대시보드의 커넥터, 스킬, 도구 목록 경로만 대역이다.
  */
-@SpringBootTest
-@ActiveProfiles("test")
+@BackendIntegrationTest
 class ConnectorBindingServiceLockTest {
     private static final JsonMapper MAPPER = JsonMapper.builder().build();
     private static final String DEMO = "demo-notes";
@@ -112,13 +109,13 @@ class ConnectorBindingServiceLockTest {
     @Autowired
     JdbcTemplate jdbc;
 
-    @MockitoBean
+    @Autowired
     HermesConnectorClient connector;
 
-    @MockitoBean
+    @Autowired
     HermesSkillClient skills;
 
-    @MockitoBean
+    @Autowired
     HermesToolsetClient toolsets;
 
     @BeforeEach

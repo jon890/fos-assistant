@@ -35,6 +35,8 @@ import com.bifos.assistant.hermes.dto.ConnectorTool;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.shared.util.Sha256;
+import com.bifos.assistant.testsupport.BackendIntegrationTest;
+import com.bifos.assistant.testsupport.TestClock;
 import com.bifos.assistant.usage.domain.AgentExecution;
 import com.bifos.assistant.usage.domain.type.ExecutionStatus;
 import com.bifos.assistant.usage.infra.AgentExecutionRepository;
@@ -42,11 +44,8 @@ import com.bifos.assistant.user.domain.AppUser;
 import com.bifos.assistant.user.infra.AppUserRepository;
 import java.nio.ByteBuffer;
 import java.sql.Timestamp;
-import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
-import java.time.ZoneId;
-import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
@@ -56,16 +55,12 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
-import org.springframework.context.annotation.Primary;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.test.context.ActiveProfiles;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 import tools.jackson.databind.json.JsonMapper;
@@ -76,13 +71,11 @@ import tools.jackson.databind.json.JsonMapper;
  * <p>시각은 이 검사의 시계가 정한다. 사용자는 검사마다 새로 만들어 다른 검사의 줄과 섞이지 않게 하고, 끝나면 그 사용자의 줄을
  * 지운다. 커넥터 카탈로그는 대역이 답한다.
  */
-@SpringBootTest
-@ActiveProfiles("test")
-@Import(AttentionServiceTest.FixedClock.class)
+@BackendIntegrationTest
+@Import(AttentionServiceTest.Candidates.class)
 class AttentionServiceTest {
 
     private static final Instant NOW = Instant.parse("2026-10-04T09:00:00Z");
-    private static final TestClock CLOCK = new TestClock(NOW);
     private static final FailingCandidates FAILING = new FailingCandidates();
 
     private static final String CONNECTOR = "attention-notes";
@@ -104,13 +97,7 @@ class AttentionServiceTest {
                     new ConnectorTool(WRITE, "WRITE", "required", "메모 쓰기", null)));
 
     @TestConfiguration
-    static class FixedClock {
-        @Bean
-        @Primary
-        Clock attentionTestClock() {
-            return CLOCK;
-        }
-
+    static class Candidates {
         /** 나를 기다리는 카드의 기록 읽기를 실패시킬 수 있는 대역이다. 꺼 두면 후보를 내지 않는다. */
         @Bean
         AttentionCandidates failingNeedsMeCandidates() {
@@ -118,7 +105,10 @@ class AttentionServiceTest {
         }
     }
 
-    @MockitoBean
+    @Autowired
+    TestClock clock;
+
+    @Autowired
     HermesConnectorClient connector;
 
     @Autowired
@@ -157,7 +147,7 @@ class AttentionServiceTest {
 
     @BeforeEach
     void setUp() {
-        CLOCK.set(NOW);
+        clock.set(NOW);
         FAILING.failing = false;
         when(connector.readCatalog()).thenReturn(List.of(MANIFEST));
         dad = member();
@@ -634,34 +624,6 @@ class AttentionServiceTest {
                 throw new IllegalStateException("검사가 낸 읽기 실패");
             }
             return List.of();
-        }
-    }
-
-    /** 검사가 정한 시각만 주는 시계다. */
-    static final class TestClock extends Clock {
-        private volatile Instant now;
-
-        TestClock(Instant now) {
-            this.now = now;
-        }
-
-        void set(Instant instant) {
-            now = instant;
-        }
-
-        @Override
-        public Instant instant() {
-            return now;
-        }
-
-        @Override
-        public ZoneId getZone() {
-            return ZoneOffset.UTC;
-        }
-
-        @Override
-        public Clock withZone(ZoneId zone) {
-            return this;
         }
     }
 }

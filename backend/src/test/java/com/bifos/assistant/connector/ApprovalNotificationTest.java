@@ -40,6 +40,7 @@ import com.bifos.assistant.notification.infra.NotificationRepository;
 import com.bifos.assistant.proactive.application.CheckNotificationPolicy;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.domain.type.UserRole;
+import com.bifos.assistant.testsupport.BackendIntegrationTest;
 import com.bifos.assistant.usage.domain.AgentExecution;
 import com.bifos.assistant.usage.domain.type.ExecutionStatus;
 import com.bifos.assistant.usage.infra.AgentExecutionRepository;
@@ -54,10 +55,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import tools.jackson.databind.json.JsonMapper;
 
@@ -68,8 +67,7 @@ import tools.jackson.databind.json.JsonMapper;
  * 대화를 저장하고 실행이 그 대화 번호를 갖게 준비한다. 컨텍스트 수를 늘리지 않으려고 {@link ConnectorActionServiceTest} 와
  * 같은 구성을 쓴다.
  */
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
-@ActiveProfiles("test")
+@BackendIntegrationTest
 @Import(ConnectorPolicyTestDoubles.class)
 class ApprovalNotificationTest {
     private static final JsonMapper JSON = JsonMapper.builder().build();
@@ -135,7 +133,7 @@ class ApprovalNotificationTest {
     @Autowired
     JdbcTemplate jdbc;
 
-    @MockitoBean
+    @Autowired
     HermesConnectorClient connector;
 
     @MockitoBean

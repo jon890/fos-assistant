@@ -15,6 +15,7 @@ import com.bifos.assistant.hermes.dto.TokenUsage;
 import com.bifos.assistant.model.domain.ModelChoice;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.domain.type.UserRole;
+import com.bifos.assistant.testsupport.BackendIntegrationTest;
 import com.bifos.assistant.usage.application.ExecutionContextSnapshot;
 import com.bifos.assistant.usage.application.ExecutionRecorder;
 import com.bifos.assistant.usage.domain.AgentExecution;
@@ -29,13 +30,10 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 /** 실행 시작과 종료가 하나의 기록을 상태 전이하는지 확인한다. */
-@SpringBootTest
-@ActiveProfiles("test")
+@BackendIntegrationTest
 class ExecutionLifecycleTest {
 
     private static final Long USER_ID = 4_102L;
