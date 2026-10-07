@@ -22,6 +22,7 @@ import com.bifos.assistant.proactive.domain.type.CheckStatus;
 import com.bifos.assistant.proactive.domain.type.CheckTrigger;
 import com.bifos.assistant.proactive.infra.ProactiveCheckRepository;
 import com.bifos.assistant.shared.domain.type.UserRole;
+import com.bifos.assistant.testsupport.BackendIntegrationTest;
 import com.bifos.assistant.usage.application.ExecutionDeliveryWriter;
 import com.bifos.assistant.usage.domain.AgentExecution;
 import com.bifos.assistant.usage.domain.type.ExecutionStatus;
@@ -39,13 +40,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.ApplicationEventPublisher;
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Import;
-import org.springframework.context.annotation.Primary;
-import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /**
@@ -54,19 +49,8 @@ import org.springframework.transaction.support.TransactionTemplate;
  * <p>기동은 이미 지났으므로 같은 빈 셋으로 새 복구를 만들어 시작한다. 시각은 고정한다. Hermes 는 대역이고 받은 중지를 적는다. 모든
  * 데이터는 합성이다.
  */
-@SpringBootTest
-@ActiveProfiles("test")
-@Import(ProactiveCheckRecoveryTest.StubRuntime.class)
+@BackendIntegrationTest
 class ProactiveCheckRecoveryTest {
-
-    @TestConfiguration
-    static class StubRuntime {
-        @Bean
-        @Primary
-        StubHermesRunsClient stubHermesRunsClient() {
-            return new StubHermesRunsClient();
-        }
-    }
 
     private static final Instant STARTED = Instant.parse("2026-10-01T00:00:00Z");
     private static final Instant NOW = Instant.parse("2026-10-01T00:10:00Z");

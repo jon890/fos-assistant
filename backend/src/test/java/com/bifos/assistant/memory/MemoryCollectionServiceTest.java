@@ -5,17 +5,15 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.bifos.assistant.memory.application.MemoryCollectionService;
 import com.bifos.assistant.memory.domain.MemoryCollection;
 import com.bifos.assistant.memory.infra.MemoryCollectionRepository;
+import com.bifos.assistant.testsupport.BackendIntegrationTest;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.test.context.ActiveProfiles;
 
 /** 그룹의 collection 목록과 기본 collection 을 확인한다(ADR-052). */
-@SpringBootTest
-@ActiveProfiles("test")
+@BackendIntegrationTest
 class MemoryCollectionServiceTest {
 
     @Autowired

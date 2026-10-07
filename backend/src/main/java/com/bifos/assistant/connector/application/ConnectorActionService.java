@@ -16,6 +16,7 @@ import com.bifos.assistant.hermes.HermesConnectorClient;
 import com.bifos.assistant.notification.application.NotificationService;
 import com.bifos.assistant.orchestration.application.DelegationProperties;
 import com.bifos.assistant.shared.auth.CurrentUser;
+import com.bifos.assistant.shared.config.LiveProperties;
 import com.bifos.assistant.user.infra.AppUserRepository;
 import java.time.Clock;
 import java.time.Instant;
@@ -60,7 +61,7 @@ public class ConnectorActionService {
             AppUserRepository users,
             ConnectorCatalogCache catalog,
             HermesConnectorClient connector,
-            DelegationProperties delegation,
+            LiveProperties<DelegationProperties> delegation,
             ApplicationEventPublisher events,
             NotificationService notifications,
             ConversationNotices conversations,
@@ -91,7 +92,7 @@ public class ConnectorActionService {
             AppUserRepository users,
             ConnectorCatalogCache catalog,
             HermesConnectorClient connector,
-            DelegationProperties delegation,
+            LiveProperties<DelegationProperties> delegation,
             ApplicationEventPublisher events,
             NotificationService notifications,
             ConversationNotices conversations,

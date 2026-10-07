@@ -34,6 +34,8 @@ import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
+import com.bifos.assistant.testsupport.BackendIntegrationTest;
+import com.bifos.assistant.testsupport.SamplePriceCatalog;
 import com.bifos.assistant.usage.domain.AgentExecution;
 import com.bifos.assistant.usage.domain.MonthlyCost;
 import com.bifos.assistant.usage.domain.type.ExecutionEventType;
@@ -44,8 +46,6 @@ import com.bifos.assistant.usage.presentation.UsageController;
 import com.bifos.assistant.usage.presentation.UsageDtos.ExecutionView;
 import com.bifos.assistant.user.domain.AppUser;
 import com.bifos.assistant.user.infra.AppUserRepository;
-import java.net.URISyntaxException;
-import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -68,54 +68,19 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.context.TestConfiguration;
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Import;
-import org.springframework.context.annotation.Primary;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.test.context.ActiveProfiles;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
-import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 
 /** 흐름 하나가 실행 넷을 남기고 그 넷이 부모의 경계를 물려받는 것을 고정한다. */
-@SpringBootTest
-@ActiveProfiles("test")
-@Import(ResearchAndBuildFlowTest.StubRuntime.class)
+@BackendIntegrationTest
+@SamplePriceCatalog
 class ResearchAndBuildFlowTest {
-
-    @TestConfiguration
-    static class StubRuntime {
-        @Bean
-        @Primary
-        StubHermesRunsClient stubHermesRunsClient() {
-            return new StubHermesRunsClient();
-        }
-    }
 
     /** Chief 에게 준 지시에만 들어 있는 말이다. 대역이 이것으로 단계를 가려낸다. */
     private static final String CHIEF_MARK = "조사할 것과 만들 것을 나눈다";
 
     private static final String SPLIT_JSON = "{\"research\":\"전기차 보조금\",\"build\":\"비교 표\"}";
-
-    /** 금액을 실제로 환산하려면 가격표가 있어야 한다. 표본 가격표를 가리킨다. */
-    @DynamicPropertySource
-    static void pointAtTheSampleCatalog(DynamicPropertyRegistry registry) {
-        registry.add("assistant.pricing.catalog-path", () -> sampleCatalog().toString());
-    }
-
-    private static Path sampleCatalog() {
-        try {
-            return Path.of(ResearchAndBuildFlowTest.class
-                    .getResource("/pricing/models-dev-sample.json")
-                    .toURI());
-        } catch (URISyntaxException ex) {
-            throw new IllegalStateException(ex);
-        }
-    }
 
     /** 이 검사가 쓰는 에이전트와 사용자다. 다른 검사 클래스와 겹치지 않는 이름으로 둔다. */
     private static final String MY_AGENT = "flow-dad";
@@ -158,7 +123,7 @@ class ResearchAndBuildFlowTest {
     @Autowired
     McpCallerResolver callerResolver;
 
-    @MockitoSpyBean
+    @Autowired
     TurnCancellation turns;
 
     /** 단계가 돌려준 Hermes run 번호별로 그 단계가 받은 session 을 모은다. 실행 줄을 run 번호로 짝짓는 데 쓴다. */

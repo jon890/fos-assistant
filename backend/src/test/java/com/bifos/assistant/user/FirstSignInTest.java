@@ -11,6 +11,7 @@ import com.bifos.assistant.hermes.HermesModelClient;
 import com.bifos.assistant.hermes.HermesProperties;
 import com.bifos.assistant.people.domain.AllowedPerson;
 import com.bifos.assistant.people.infra.AllowedPersonRepository;
+import com.bifos.assistant.testsupport.BackendIntegrationTest;
 import com.bifos.assistant.user.application.UserProvisioningService;
 import com.bifos.assistant.user.domain.AppUser;
 import com.bifos.assistant.user.infra.AppUserRepository;
@@ -19,9 +20,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.test.context.ActiveProfiles;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 /**
  * 허용 목록에 있는 사람이 처음 들어올 때 무엇이 함께 생기는지 본다.
@@ -29,8 +27,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
  * <p>에이전트를 만들려고 시도하는 것은 {@code app_user} 를 새로 저장하는 그 순간뿐이다. 에이전트는 모델을
  * 갖지 않으므로 그때 Hermes 에 모델을 묻지 않는다.
  */
-@SpringBootTest
-@ActiveProfiles("test")
+@BackendIntegrationTest
 class FirstSignInTest {
 
     private static final String EMAIL = "aunt@example.com";
@@ -56,7 +53,7 @@ class FirstSignInTest {
     PeopleProperties peopleProperties;
 
     /** 답을 정해 두지 않는다. 첫 로그인이 이 대역을 한 번도 부르지 않는지 본다. */
-    @MockitoBean
+    @Autowired
     HermesModelClient hermesModels;
 
     @BeforeEach

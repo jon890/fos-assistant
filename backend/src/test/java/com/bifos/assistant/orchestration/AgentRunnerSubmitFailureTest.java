@@ -29,6 +29,7 @@ import com.bifos.assistant.orchestration.application.DelegationOutput;
 import com.bifos.assistant.orchestration.application.DelegationProperties;
 import com.bifos.assistant.proactive.infra.ProactiveCheckRepository;
 import com.bifos.assistant.shared.auth.CurrentUser;
+import com.bifos.assistant.shared.config.LiveProperties;
 import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
@@ -93,8 +94,9 @@ class AgentRunnerSubmitFailureTest {
                 executions,
                 mock(ExecutionEventRecorder.class),
                 mock(ExecutionEventRepository.class),
-                new DelegationOutput(
-                        new DelegationProperties(2, 4, 16, Duration.ofSeconds(30), 100, Duration.ofSeconds(20))),
+                new DelegationOutput(LiveProperties.fixed(
+                        DelegationProperties.class,
+                        new DelegationProperties(2, 4, 16, Duration.ofSeconds(30), 100, Duration.ofSeconds(20)))),
                 modelTiers,
                 Clock.systemUTC(),
                 limiter,

@@ -24,6 +24,7 @@ import com.bifos.assistant.proactive.application.model.DecisionRequest;
 import com.bifos.assistant.proactive.application.model.DecisionResponse;
 import com.bifos.assistant.proactive.domain.type.DecisionFailure;
 import com.bifos.assistant.shared.auth.CurrentUser;
+import com.bifos.assistant.shared.concurrent.VirtualThreadBackgroundTasks;
 import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.usage.application.ExecutionRecorder;
 import com.bifos.assistant.usage.application.UserExecutionLimiter;
@@ -154,7 +155,16 @@ class HermesDecisionProviderTest {
                 true, PROFILE, "requested-provider", "requested-model", "high", timeout, CostMode.SUBSCRIPTION);
         HermesProperties runtime = new HermesProperties(null, BASE, "synthetic", BASE, null, null, null, null);
         HermesDecisionProvider provider = new HermesDecisionProvider(
-                properties, runtime, hermes, readiness, defaults, visibility, executions, limiter, json);
+                properties,
+                runtime,
+                hermes,
+                readiness,
+                defaults,
+                visibility,
+                executions,
+                limiter,
+                json,
+                new VirtualThreadBackgroundTasks());
         return new ValueEvaluator()
                 .evaluate(DecisionFixtures.state(), ValueEvaluator.QUESTIONS, provider, new DecisionRequest(user));
     }

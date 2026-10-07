@@ -62,10 +62,11 @@ tasks.test {
     }
     // 전체 검사가 함께 보존하는 Spring 문맥은 기본 512MB 힙에 들어가지 않는다.
     maxHeapSize = "1g"
-    // 문맥 하나가 30MB 남짓을 쥐므로 기본 보존 수 32 로는 GC 뒤에도 1g 힙이 거의 찬다. 그 상태에서는 GC 가 쉬지 않아
-    // 시간 상한이 짧은 검사가 흔들리고 끝내 OutOfMemoryError 로 문맥을 띄우지 못한다. 16 으로 두어도 검사가 이미 닫힌 문맥을
-    // 다시 띄우는 일은 늘지 않았다.
-    systemProperty("spring.test.context.cache.maxSize", "16")
+    // Spring 이 띄운 검사 컨텍스트를 몇 개까지 메모리에 남겨 둘지다. 넘으면 가장 오래 쓰지 않은 것을 닫는다.
+    // 2026-10-07 측정: 전체 검사가 띄우는 컨텍스트는 1개이고(HikariPool-N 의 최댓값이 1, Full GC 0번) 3번 연속 같았다.
+    // 측정한 수보다 큰 가장 작은 값인 2 로 두어, 컨텍스트가 하나 늘어도 닫혀 다시 뜨지 않게 한다.
+    // 컨텍스트가 늘면 HikariPool-N 의 최댓값과 Pause Full 수를 다시 보고 이 값을 올린다.
+    systemProperty("spring.test.context.cache.maxSize", "2")
 }
 
 /**

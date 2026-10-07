@@ -2,14 +2,15 @@ package com.bifos.assistant.browser.application;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.bifos.assistant.browser.domain.BrowserRuntime;
-import com.bifos.assistant.browser.domain.CdpProbe;
 import com.bifos.assistant.browser.domain.type.UserBrowserStatus;
 import com.bifos.assistant.browser.infra.UserBrowserRepository;
 import com.bifos.assistant.people.application.PersonAccessService;
 import com.bifos.assistant.people.domain.AllowedPerson;
 import com.bifos.assistant.people.infra.AllowedPersonRepository;
 import com.bifos.assistant.shared.domain.type.UserRole;
+import com.bifos.assistant.testsupport.BackendIntegrationTest;
+import com.bifos.assistant.testsupport.FakeBrowserRuntime;
+import com.bifos.assistant.testsupport.OverrideProperties;
 import com.bifos.assistant.user.domain.AppUser;
 import com.bifos.assistant.user.infra.AppUserRepository;
 import java.time.Instant;
@@ -18,13 +19,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.context.TestConfiguration;
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Import;
-import org.springframework.context.annotation.Primary;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.test.context.ActiveProfiles;
 
 /**
  * 관리자가 실제 {@link PersonAccessService} 로 사용자를 끄면, 커밋 뒤 리스너가 새 트랜잭션에서 그 사용자의 브라우저를 멈추는지 본다.
@@ -32,28 +27,11 @@ import org.springframework.test.context.ActiveProfiles;
  * <p>리스너는 커밋이 끝난 트랜잭션의 정리 단계에서 돈다. 그 자리에서 저장이 원래 트랜잭션에 붙으면 저장이 반영되지 않으므로, 기능을 켠 실제 빈으로
  * 확인한다.
  */
-@SpringBootTest(properties = "assistant.browser.enabled=true")
-@ActiveProfiles("test")
-@Import(UserBrowserAccessRevokedTest.FakeRuntime.class)
+@BackendIntegrationTest
+@OverrideProperties("assistant.browser.enabled=true")
 class UserBrowserAccessRevokedTest {
 
     private static final String EMAIL = "browser-revoked@example.com";
-
-    /** 실제 proxy 와 CDP 대신 메모리 대역을 쓴다. */
-    @TestConfiguration
-    static class FakeRuntime {
-        @Bean
-        @Primary
-        FakeBrowserRuntime fakeBrowserRuntime() {
-            return new FakeBrowserRuntime();
-        }
-
-        @Bean
-        @Primary
-        CdpProbe fakeCdpProbe() {
-            return address -> true;
-        }
-    }
 
     @Autowired
     PersonAccessService access;
@@ -64,8 +42,9 @@ class UserBrowserAccessRevokedTest {
     @Autowired
     UserBrowserRepository repository;
 
+    /** 기반이 실제 proxy 자리에 넣은 대역이다. CDP 도 기반의 대역이 늘 답한다. */
     @Autowired
-    BrowserRuntime runtime;
+    FakeBrowserRuntime runtime;
 
     @Autowired
     AllowedPersonRepository people;
@@ -99,6 +78,6 @@ class UserBrowserAccessRevokedTest {
         access.setEnabled(person.id(), false);
 
         assertThat(repository.findByUserId(user.id()).orElseThrow().status()).isEqualTo(UserBrowserStatus.STOPPED);
-        assertThat(((FakeBrowserRuntime) runtime).containers).isEmpty();
+        assertThat(runtime.containers()).isEmpty();
     }
 }

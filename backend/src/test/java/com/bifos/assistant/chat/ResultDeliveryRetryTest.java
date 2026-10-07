@@ -45,6 +45,9 @@ import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
+import com.bifos.assistant.testsupport.BackendIntegrationTest;
+import com.bifos.assistant.testsupport.DelegationWakeEnabled;
+import com.bifos.assistant.testsupport.TestAutoTurnResultSource;
 import com.bifos.assistant.usage.application.ExecutionDeliveryWriter;
 import com.bifos.assistant.usage.domain.AgentExecution;
 import com.bifos.assistant.usage.domain.ExecutionContextSource;
@@ -69,13 +72,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.ApplicationEventPublisher;
-import org.springframework.context.annotation.Import;
 import org.springframework.data.domain.PageRequest;
-import org.springframework.test.context.ActiveProfiles;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
-import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /**
@@ -86,9 +84,8 @@ import org.springframework.transaction.support.TransactionTemplate;
  *
  * <p>구성은 {@link ResultDeliveryRecordTest} 와 같게 둔다. 같은 Spring 컨텍스트를 써서 컨텍스트 수를 늘리지 않는다.
  */
-@SpringBootTest(properties = "assistant.delegation-wake.enabled=true")
-@ActiveProfiles("test")
-@Import({ChatServiceTest.StubRuntime.class, ResultDeliveryRecordTest.TestResults.class})
+@BackendIntegrationTest
+@DelegationWakeEnabled
 class ResultDeliveryRetryTest {
 
     private static final Duration WAIT_LIMIT = Duration.ofSeconds(10);
@@ -101,14 +98,14 @@ class ResultDeliveryRetryTest {
     private static final DateTimeFormatter SEOUL_TIME =
             DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm").withZone(ZoneId.of("Asia/Seoul"));
 
-    @MockitoBean
+    @Autowired
     HermesRunEventStream eventStream;
 
     /** {@link ResultDeliveryRecordTest} 와 같은 컨텍스트를 쓰려고 같게 감싼다. 이 검사에서는 실제 동작 그대로다. */
-    @MockitoSpyBean
+    @Autowired
     ContextAssembler contextAssembler;
 
-    @MockitoSpyBean
+    @Autowired
     ResultDeliveryRecorder recorder;
 
     @Autowired
@@ -124,7 +121,7 @@ class ResultDeliveryRetryTest {
     TransactionTemplate transactions;
 
     @Autowired
-    ResultDeliveryRecordTest.TestResultSource testResults;
+    TestAutoTurnResultSource testResults;
 
     @Autowired
     ExecutionDeliveryWriter deliveryWriter;
@@ -183,7 +180,7 @@ class ResultDeliveryRetryTest {
     void setUp() {
         awaitAllIdle();
         stub().reset();
-        testResults.clear();
+        testResults.reset();
         events.clear();
         deliveryItems.deleteAll();
         attempts.deleteAll();
@@ -216,7 +213,7 @@ class ResultDeliveryRetryTest {
     void tearDown() {
         stub().releaseSubmits();
         awaitAllIdle();
-        testResults.clear();
+        testResults.reset();
     }
 
     @Test

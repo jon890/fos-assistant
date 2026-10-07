@@ -26,6 +26,7 @@ import com.bifos.assistant.shared.auth.CurrentUserProvider;
 import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
+import com.bifos.assistant.testsupport.BackendIntegrationTest;
 import jakarta.validation.Validation;
 import jakarta.validation.Validator;
 import java.sql.Date;
@@ -35,13 +36,10 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.test.context.ActiveProfiles;
 
 /** 사용자가 문서를 쓰고 고치는 API 와 문서를 기존 Memory 경로에서 떼어 두는 것을 확인한다(ADR-057). */
-@SpringBootTest
-@ActiveProfiles("test")
+@BackendIntegrationTest
 class MemoryDocumentTest {
 
     private static final CurrentUser DAD = new CurrentUser(1L, "dad@example.com", "dad", 1L, UserRole.ADMIN);

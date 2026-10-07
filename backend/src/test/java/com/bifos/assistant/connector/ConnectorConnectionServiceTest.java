@@ -58,6 +58,7 @@ import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
+import com.bifos.assistant.testsupport.BackendIntegrationTest;
 import com.bifos.assistant.user.domain.AppUser;
 import com.bifos.assistant.user.infra.AppUserRepository;
 import java.time.Clock;
@@ -76,13 +77,9 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InOrder;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.system.CapturedOutput;
 import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.test.context.ActiveProfiles;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
-import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -93,8 +90,7 @@ import tools.jackson.databind.json.JsonMapper;
  *
  * <p>대시보드는 대역이다. 붙은 바인딩은 행을 직접 넣어 만든다. 붙이는 경로는 {@code ConnectorBindingServiceTest} 가 본다.
  */
-@SpringBootTest
-@ActiveProfiles("test")
+@BackendIntegrationTest
 @ExtendWith(OutputCaptureExtension.class)
 class ConnectorConnectionServiceTest {
     private static final JsonMapper MAPPER = JsonMapper.builder().build();
@@ -177,16 +173,16 @@ class ConnectorConnectionServiceTest {
     @Autowired
     PlatformTransactionManager transactionManager;
 
-    @MockitoSpyBean
+    @Autowired
     AppUserRepository users;
 
     @Autowired
     JdbcTemplate jdbc;
 
-    @MockitoBean
+    @Autowired
     HermesConnectorClient connector;
 
-    @MockitoBean
+    @Autowired
     HermesToolsetClient toolsets;
 
     @BeforeEach

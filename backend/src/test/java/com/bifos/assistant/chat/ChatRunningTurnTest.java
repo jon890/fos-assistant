@@ -27,6 +27,7 @@ import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
+import com.bifos.assistant.testsupport.BackendIntegrationTest;
 import com.bifos.assistant.usage.domain.AgentExecution;
 import com.bifos.assistant.usage.domain.type.ExecutionStatus;
 import com.bifos.assistant.usage.infra.AgentExecutionRepository;
@@ -41,10 +42,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.context.annotation.Import;
 import org.springframework.data.domain.PageRequest;
-import org.springframework.test.context.ActiveProfiles;
 
 /**
  * 같은 대화를 연 다른 창이 도는 turn 을 알아보는 조회를 본다.
@@ -52,9 +50,7 @@ import org.springframework.test.context.ActiveProfiles;
  * <p>도는지는 실행 줄의 상태가 아니라 메모리 표시로 판정해야 한다. 흐름은 루트 줄이 끝난 뒤에도 자식이
  * 돌기 때문이다. 가짜 Hermes 가 결과를 돌려주기 전에 조회해 turn 이 도는 순간을 붙잡는다.
  */
-@SpringBootTest
-@ActiveProfiles("test")
-@Import(ChatServiceTest.StubRuntime.class)
+@BackendIntegrationTest
 class ChatRunningTurnTest {
 
     /** 흐름의 Chief 에게 준 지시에만 들어 있는 말이다. 대역이 이것으로 단계를 가려낸다. */

@@ -38,6 +38,8 @@ import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
+import com.bifos.assistant.testsupport.BackendIntegrationTest;
+import com.bifos.assistant.testsupport.DelegationWakeEnabled;
 import com.bifos.assistant.usage.domain.AgentExecution;
 import com.bifos.assistant.usage.domain.type.ExecutionStatus;
 import com.bifos.assistant.usage.infra.AgentExecutionRepository;
@@ -58,12 +60,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.ApplicationEventPublisher;
-import org.springframework.context.annotation.Import;
-import org.springframework.test.context.ActiveProfiles;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
-import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 
 /**
  * 맡긴 일의 결과가 끝나면 부모 대화의 turn 이 자동으로 열리는지 본다.
@@ -71,9 +68,8 @@ import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
  * <p>자동 turn 은 테스트 스레드 밖의 가상 스레드에서 돈다. 검사마다 그 turn 이 끝날 때까지 기다린 뒤 단언한다.
  * 기다리지 않으면 다음 검사의 대역 Hermes 기록과 메시지 수가 흔들린다.
  */
-@SpringBootTest(properties = "assistant.delegation-wake.enabled=true")
-@ActiveProfiles("test")
-@Import(ChatServiceTest.StubRuntime.class)
+@BackendIntegrationTest
+@DelegationWakeEnabled
 class DelegationWakeServiceTest {
 
     private static final Duration WAIT_LIMIT = Duration.ofSeconds(10);
@@ -84,11 +80,11 @@ class DelegationWakeServiceTest {
             DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm").withZone(ZoneId.of("Asia/Seoul"));
 
     /** 자동 turn 의 답 조각은 이 검사가 보지 않는다. 실제 스트림 주소로 연결하지 않게 대역으로 둔다. */
-    @MockitoBean
+    @Autowired
     HermesRunEventStream eventStream;
 
     /** 자동 turn 이 결과를 전하기 전에 실패하는 경우를 만들려고 감싼다. 그 밖의 검사에서는 실제 동작 그대로다. */
-    @MockitoSpyBean
+    @Autowired
     ChatService chat;
 
     @Autowired

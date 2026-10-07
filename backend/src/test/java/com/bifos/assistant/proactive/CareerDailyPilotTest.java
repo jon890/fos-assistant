@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.fail;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.when;
 
 import com.bifos.assistant.agent.application.AgentConnectorBindings;
@@ -19,7 +20,6 @@ import com.bifos.assistant.chat.domain.Conversation;
 import com.bifos.assistant.chat.domain.type.MessageRole;
 import com.bifos.assistant.chat.infra.ChatMessageRepository;
 import com.bifos.assistant.chat.infra.ConversationRepository;
-import com.bifos.assistant.hermes.HermesRunEventStream;
 import com.bifos.assistant.hermes.HermesRunsClient;
 import com.bifos.assistant.hermes.HermesSkillClient;
 import com.bifos.assistant.hermes.HermesSkillClient.HermesSkill;
@@ -51,13 +51,14 @@ import com.bifos.assistant.task.domain.type.TaskRunStatus;
 import com.bifos.assistant.task.infra.TaskRepository;
 import com.bifos.assistant.task.infra.TaskRunRepository;
 import com.bifos.assistant.task.infra.TaskTriggerRepository;
+import com.bifos.assistant.testsupport.BackendIntegrationTest;
+import com.bifos.assistant.testsupport.LongProactiveCheckTimeouts;
+import com.bifos.assistant.testsupport.TestClock;
 import com.bifos.assistant.user.domain.AppUser;
 import com.bifos.assistant.user.infra.AppUserRepository;
-import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneId;
-import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -69,14 +70,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.context.TestConfiguration;
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Import;
-import org.springframework.context.annotation.Primary;
 import org.springframework.data.domain.PageRequest;
-import org.springframework.test.context.ActiveProfiles;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 /**
  * 커리어 에이전트의 매일 깨우기를 시계를 앞으로 돌려 여러 날 이어 돌린다. 이슈 #166 의 파일럿 검증이다.
@@ -96,9 +90,8 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
  *   <li>사용자가 깨우기를 끄면 발화하지 않는다
  * </ol>
  */
-@SpringBootTest(properties = {"hermes.run-timeout=30s", "assistant.proactive-check.max-duration=20s"})
-@ActiveProfiles("test")
-@Import(CareerDailyPilotTest.Runtime.class)
+@BackendIntegrationTest
+@LongProactiveCheckTimeouts
 class CareerDailyPilotTest {
 
     private static final Duration WAIT_LIMIT = Duration.ofSeconds(10);
@@ -107,27 +100,11 @@ class CareerDailyPilotTest {
     private static final Instant ENABLED_AT = Instant.parse("2026-11-01T00:00:00Z");
 
     private static final Instant FIRST_WAKE = Instant.parse("2026-11-01T23:30:00Z");
-    private static final PilotClock CLOCK = new PilotClock(ENABLED_AT);
 
     private static final String POSITION_KEY = "position:example-backend-platform";
     private static final String POSITION_URL = "https://jobs.example.com/backend-platform";
     private static final String FEEDBACK = "이런 공고는 관심 없어";
     private static final String SOURCE_FAILURE = "mcp__career__get_context_document CAREER_UNAVAILABLE";
-
-    @TestConfiguration
-    static class Runtime {
-        @Bean
-        @Primary
-        StubHermesRunsClient pilotStubHermesRunsClient() {
-            return new StubHermesRunsClient();
-        }
-
-        @Bean
-        @Primary
-        Clock pilotClock() {
-            return CLOCK;
-        }
-    }
 
     @Autowired
     TaskDispatcher dispatcher;
@@ -177,18 +154,19 @@ class CareerDailyPilotTest {
     @Autowired
     NotificationRepository notifications;
 
-    @MockitoBean
+    /** 깨우기, 살펴보기, 메시지가 모두 이 시각을 쓴다. */
+    @Autowired
+    TestClock clock;
+
+    @Autowired
     HermesToolsetClient toolsets;
 
-    @MockitoBean
+    @Autowired
     HermesSkillClient skillClient;
 
     /** 커리어 커넥터 서버가 붙은 에이전트로 둔다. 붙은 연결이 있으면 지시가 직접 호출을 고른다. */
-    @MockitoBean
+    @Autowired
     AgentConnectorBindings connectorBindings;
-
-    @MockitoBean
-    HermesRunEventStream eventStream;
 
     private CurrentUser owner;
     private Agent agent;
@@ -200,12 +178,14 @@ class CareerDailyPilotTest {
 
     @BeforeEach
     void setUp() {
-        CLOCK.set(ENABLED_AT);
+        clock.set(ENABLED_AT);
         stub().reset();
         cleanTasks();
         when(toolsets.readEnabled(anyString(), anyString())).thenReturn(List.of("web", "skills", "fos-assistant"));
         when(skillClient.list(anyString())).thenReturn(List.of(new HermesSkill("proactive-check", "살펴보기", true)));
-        when(connectorBindings.connectorServers(any())).thenReturn(Set.of("career"));
+        doReturn(false).when(connectorBindings).hasBindings(any());
+        doReturn(Set.of("career")).when(connectorBindings).connectorServers(any());
+        doReturn(Set.of()).when(connectorBindings).connectorToolPrefixes(any());
         String suffix = UUID.randomUUID().toString().substring(0, 8);
         AppUser user =
                 users.save(AppUser.of("pilot-" + suffix + "@example.com", "사용자A", 1L, UserRole.MEMBER, ENABLED_AT));
@@ -271,12 +251,12 @@ class CareerDailyPilotTest {
         assertThat(runOf(2).reason()).isEqualTo(TaskRunReason.UNREAD_REPORT);
 
         // 사용자가 지금 화면의 단추 대신 점검 대화를 직접 열고 거절한다. 그 말에서 나온 영구 선호는 제안으로만 남는다.
-        CLOCK.set(CLOCK.instant().plus(Duration.ofHours(10)));
+        clock.set(clock.instant().plus(Duration.ofHours(10)));
         chat.history(owner, first.conversationId());
         assertThat(checks.findById(first.id()).orElseThrow().reportOpenedAt())
                 .as("점검 대화를 읽은 시각")
-                .isEqualTo(CLOCK.instant());
-        messages.save(ChatMessage.fromUser(first.conversationId(), owner.id(), FEEDBACK, CLOCK.instant()));
+                .isEqualTo(clock.instant());
+        messages.save(ChatMessage.fromUser(first.conversationId(), owner.id(), FEEDBACK, clock.instant()));
         Memory proposal = memories.proposeUser(owner, "커리어 선호", "백엔드 플랫폼 공고는 원하지 않는다", null);
 
         // 3일: 사용자 답이 실리고, 모델이 같은 공고를 다시 내도 침묵한다.
@@ -383,7 +363,7 @@ class CareerDailyPilotTest {
         ProactiveCheck otherConversationReport = reported(owner.id(), otherAgent.id(), otherConversation.id());
         ProactiveCheck otherUserReport = reported(otherUser.id(), agent.id(), otherUsers.id());
         Instant readAt = ENABLED_AT.plus(Duration.ofHours(2));
-        CLOCK.set(readAt);
+        clock.set(readAt);
 
         chat.history(owner, read.id());
 
@@ -397,7 +377,7 @@ class CareerDailyPilotTest {
                 .as("다른 사용자의 점검 대화")
                 .isNull();
 
-        CLOCK.set(readAt.plusSeconds(60));
+        clock.set(readAt.plusSeconds(60));
         chat.history(owner, read.id());
         assertThat(checks.findById(mine.id()).orElseThrow().reportOpenedAt())
                 .as("다시 읽어도 첫 시각")
@@ -405,7 +385,7 @@ class CareerDailyPilotTest {
 
         ProactiveCheck later = reported(owner.id(), agent.id(), read.id());
         Instant sentAt = readAt.plus(Duration.ofHours(1));
-        CLOCK.set(sentAt);
+        clock.set(sentAt);
         stub().willReturn(result("{\"version\":2,\"outcome\":\"NOTHING_NEW\"}"));
         chat.send(owner, read.id(), "이 공고는 관심 없어", null);
         assertThat(checks.findById(later.id()).orElseThrow().reportOpenedAt())
@@ -447,7 +427,7 @@ class CareerDailyPilotTest {
     }
 
     private void tickAt(Instant at) {
-        CLOCK.set(at);
+        clock.set(at);
         dispatcher.tick(at);
     }
 
@@ -518,11 +498,11 @@ class CareerDailyPilotTest {
     }
 
     /** 확인 시각을 지금으로 둔 포지션 발견 하나와 v2 보고 초안이다. */
-    private static String positionFindings(String changeSinceLast) {
+    private String positionFindings(String changeSinceLast) {
         String change = changeSinceLast == null ? "" : ",\"changeSinceLast\":\"" + changeSinceLast + "\"";
         return "{\"version\":2,\"outcome\":\"FINDINGS\",\"summary\":\"새 포지션을 찾았어요\",\"findings\":[{"
                 + "\"area\":\"position\",\"topicKey\":\"" + POSITION_KEY + "\",\"title\":\"예시 회사 백엔드 플랫폼\","
-                + "\"sourceUrl\":\"" + POSITION_URL + "\",\"checkedAt\":\"" + CLOCK.instant() + "\","
+                + "\"sourceUrl\":\"" + POSITION_URL + "\",\"checkedAt\":\"" + clock.instant() + "\","
                 + "\"freshness\":\"CURRENT\",\"whyItMatters\":\"선호한 플랫폼 역할과 맞아요\","
                 + "\"facts\":[\"공고가 열려 있다\"],\"next\":{\"type\":\"QUESTION\",\"text\":\"지원을 검토해 볼까요\"}"
                 + change + "}],\"report\":{\"changed\":[\"새 포지션 하나\"],\"done\":[\"공고 원문을 확인했다\"],"
@@ -546,33 +526,5 @@ class CareerDailyPilotTest {
         tasks.deleteAll();
         checks.deleteAllById(createdChecks);
         createdChecks.clear();
-    }
-
-    /** 검사가 정한 시각만 주는 시계다. 깨우기, 살펴보기, 메시지가 모두 이 시각을 쓴다. */
-    static final class PilotClock extends Clock {
-        private volatile Instant now;
-
-        PilotClock(Instant now) {
-            this.now = now;
-        }
-
-        void set(Instant instant) {
-            now = instant;
-        }
-
-        @Override
-        public Instant instant() {
-            return now;
-        }
-
-        @Override
-        public ZoneId getZone() {
-            return ZoneOffset.UTC;
-        }
-
-        @Override
-        public Clock withZone(ZoneId zone) {
-            return this;
-        }
     }
 }

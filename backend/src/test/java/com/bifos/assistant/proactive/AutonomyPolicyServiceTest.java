@@ -7,9 +7,9 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyNoInteractions;
 
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.agent.domain.type.AgentVisibility;
@@ -54,6 +54,8 @@ import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
+import com.bifos.assistant.testsupport.BackendIntegrationTest;
+import com.bifos.assistant.testsupport.OverrideProperties;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.Arrays;
@@ -65,15 +67,11 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.test.context.ActiveProfiles;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
-import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /** 판정 저장, 실행 키, 시작 경로 연결을 본다. 시작 경로는 대역이며 Hermes 를 부르지 않는다. */
-@SpringBootTest(properties = "assistant.autonomy.execution-enabled=true")
-@ActiveProfiles("test")
+@BackendIntegrationTest
+@OverrideProperties("assistant.autonomy.execution-enabled=true")
 class AutonomyPolicyServiceTest {
 
     private static final CurrentUser OWNER =
@@ -83,7 +81,7 @@ class AutonomyPolicyServiceTest {
     @Autowired
     AutonomyPolicyService service;
 
-    @MockitoSpyBean
+    @Autowired
     AutonomyDecisionRepository decisions;
 
     @Autowired
@@ -110,7 +108,8 @@ class AutonomyPolicyServiceTest {
     @Autowired
     FeedbackEventRepository feedbackEvents;
 
-    @MockitoBean
+    /** 실제 살펴보기를 시작하지 않는다. 시작 경로를 불렀는지와 그 결과를 검사마다 정한다. */
+    @Autowired
     ProactiveCheckService checkService;
 
     private Agent agent;
@@ -137,6 +136,7 @@ class AutonomyPolicyServiceTest {
             started = succeeded(CheckTrigger.AUTONOMY, now);
         });
         service.changeReadOnlyExecution(OWNER, true);
+        doReturn(null).when(checkService).startAutonomous(any(), any(), any());
     }
 
     @AfterEach
@@ -203,7 +203,7 @@ class AutonomyPolicyServiceTest {
             assertThat(decision.reasons()).containsExactly(AutonomyReason.ALREADY_EXECUTED);
             assertThat(decision.executionKey()).isNull();
         });
-        verifyNoInteractions(checkService);
+        verify(checkService, never()).startAutonomous(any(), any(), any());
     }
 
     @Test
@@ -217,7 +217,7 @@ class AutonomyPolicyServiceTest {
         assertThat(decision.reasons()).contains(AutonomyReason.EXTERNAL_WRITE_REQUIRES_APPROVAL);
         assertThat(decision.executionKey()).isNull();
         assertThat(decision.inputs().sideEffect()).isEqualTo("EXTERNAL");
-        verifyNoInteractions(checkService);
+        verify(checkService, never()).startAutonomous(any(), any(), any());
     }
 
     @Test
@@ -231,7 +231,7 @@ class AutonomyPolicyServiceTest {
         assertThat(decision.level()).isEqualTo(AutonomyLevel.SURFACE);
         assertThat(decision.reasons()).containsExactly(AutonomyReason.USER_AUTONOMY_DISABLED);
         assertThat(service.readOnlyExecutionConsented(OWNER)).isFalse();
-        verifyNoInteractions(checkService);
+        verify(checkService, never()).startAutonomous(any(), any(), any());
     }
 
     @Test
@@ -244,7 +244,7 @@ class AutonomyPolicyServiceTest {
 
         assertThat(decision.level()).isEqualTo(AutonomyLevel.SURFACE);
         assertThat(decision.reasons()).contains(AutonomyReason.REPLAY_INPUT);
-        verifyNoInteractions(checkService);
+        verify(checkService, never()).startAutonomous(any(), any(), any());
     }
 
     @Test
@@ -282,7 +282,7 @@ class AutonomyPolicyServiceTest {
                 .isInstanceOfSatisfying(
                         ApiException.class,
                         ex -> assertThat(ex.code()).isEqualTo(ErrorCode.VALUE_EVALUATION_NOT_FOUND));
-        verifyNoInteractions(checkService);
+        verify(checkService, never()).startAutonomous(any(), any(), any());
     }
 
     @Test
@@ -296,7 +296,7 @@ class AutonomyPolicyServiceTest {
 
         assertThat(decision.level()).isEqualTo(AutonomyLevel.IGNORE);
         assertThat(decision.reasons()).contains(AutonomyReason.CANDIDATE_NOT_CURRENT);
-        verifyNoInteractions(checkService);
+        verify(checkService, never()).startAutonomous(any(), any(), any());
     }
 
     /** 미리 넣는 실행 키 줄의 입력이다. 판정에는 쓰이지 않는다. */

@@ -27,6 +27,7 @@ import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.shared.util.Sha256;
+import com.bifos.assistant.testsupport.BackendIntegrationTest;
 import com.bifos.assistant.user.domain.AppUser;
 import com.bifos.assistant.user.infra.AppUserRepository;
 import io.jsonwebtoken.Jwts;
@@ -49,11 +50,9 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.test.context.ActiveProfiles;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
@@ -63,8 +62,7 @@ import tools.jackson.databind.json.JsonMapper;
  * <p>인증 실패 다섯 가지의 응답이 같은지, 읽을 수 없는 문서 다섯 가지의 응답이 같은지, 서비스 토큰이 사용자 API 를
  * 열지 못하는지가 핵심이다. 응답이 갈리면 토큰이나 문서가 있다는 사실이 밖으로 샌다.
  */
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
-@ActiveProfiles("test")
+@BackendIntegrationTest
 class MemoryDocumentServiceApiTest {
 
     private static final String JWT_SECRET = "test-secret-test-secret-test-secret-test-secret";

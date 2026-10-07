@@ -28,6 +28,7 @@ import com.bifos.assistant.task.domain.Task;
 import com.bifos.assistant.task.domain.type.ConversationMode;
 import com.bifos.assistant.task.domain.type.NotifyPolicy;
 import com.bifos.assistant.task.infra.TaskRepository;
+import com.bifos.assistant.testsupport.BackendIntegrationTest;
 import com.bifos.assistant.user.application.UserDisplayNameService;
 import com.bifos.assistant.user.domain.AppUser;
 import com.bifos.assistant.user.infra.AppUserRepository;
@@ -41,8 +42,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.test.context.ActiveProfiles;
 
 /**
  * 작업이 만든 대화가 대화 응답에 작업의 공개 식별자와 이름을 싣는지 본다(ADR-078).
@@ -50,8 +49,7 @@ import org.springframework.test.context.ActiveProfiles;
  * <p>목록, 단건, 이름 바꾸기, 모델 고르기 응답은 같은 줄 모양을 쓴다. 웹이 이름 바꾸기 응답으로 목록의 줄을 통째로 바꾸므로 모두
  * 작업 칸을 실어야 한다.
  */
-@SpringBootTest
-@ActiveProfiles("test")
+@BackendIntegrationTest
 class ConversationTaskLabelTest {
 
     private static final Instant BASE = Instant.parse("2026-10-04T00:00:00Z");

@@ -7,11 +7,11 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.timeout;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
 
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.agent.domain.type.AgentVisibility;
@@ -58,7 +58,6 @@ import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
-import com.bifos.assistant.skill.application.SkillCommandCatalog;
 import com.bifos.assistant.skill.application.SkillList;
 import com.bifos.assistant.skill.application.SkillListItem;
 import com.bifos.assistant.skill.application.SkillService;
@@ -67,6 +66,8 @@ import com.bifos.assistant.skill.application.SkillsChanged;
 import com.bifos.assistant.skill.domain.ExecutionSkillUse;
 import com.bifos.assistant.skill.domain.type.SkillUseSource;
 import com.bifos.assistant.skill.infra.ExecutionSkillUseRepository;
+import com.bifos.assistant.testsupport.BackendIntegrationTest;
+import com.bifos.assistant.testsupport.TestClock;
 import com.bifos.assistant.usage.domain.AgentExecution;
 import com.bifos.assistant.usage.domain.ExecutionContextSource;
 import com.bifos.assistant.usage.domain.ExecutionEvent;
@@ -78,11 +79,8 @@ import com.bifos.assistant.usage.infra.ExecutionContextSourceRepository;
 import com.bifos.assistant.usage.infra.ExecutionEventRepository;
 import com.bifos.assistant.user.domain.AppUser;
 import com.bifos.assistant.user.infra.AppUserRepository;
-import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
-import java.time.ZoneId;
-import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -98,72 +96,20 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.ApplicationEventPublisher;
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Import;
-import org.springframework.context.annotation.Primary;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.test.context.ActiveProfiles;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
-import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.transaction.support.TransactionTemplate;
 
-@SpringBootTest
-@ActiveProfiles("test")
-@Import(ChatServiceTest.StubRuntime.class)
+@BackendIntegrationTest
 class ChatServiceTest {
 
-    /** 켜진 스킬 캐시가 실제 시계에 기대지 않게 한다. 테스트마다 앞으로 옮겨 앞 테스트가 채운 캐시를 모두 지나게 한다. */
-    static final TestClock SKILL_CLOCK = new TestClock(Instant.parse("2026-09-30T00:00:00Z"));
-
-    @TestConfiguration
-    static class StubRuntime {
-        @Bean
-        @Primary
-        StubHermesRunsClient stubHermesRunsClient() {
-            return new StubHermesRunsClient();
-        }
-
-        @Bean
-        @Primary
-        SkillCommandCatalog testSkillCommandCatalog(SkillService skills) {
-            return new SkillCommandCatalog(skills, SKILL_CLOCK);
-        }
-    }
-
-    /** 테스트가 정한 시각만 주는 시계다. */
-    static final class TestClock extends Clock {
-        private volatile Instant now;
-
-        TestClock(Instant now) {
-            this.now = now;
-        }
-
-        void advance(Duration duration) {
-            now = now.plus(duration);
-        }
-
-        @Override
-        public Instant instant() {
-            return now;
-        }
-
-        @Override
-        public ZoneId getZone() {
-            return ZoneOffset.UTC;
-        }
-
-        @Override
-        public Clock withZone(ZoneId zone) {
-            return this;
-        }
-    }
+    /** 켜진 스킬 캐시의 보관 시간을 검사가 옮긴다. */
+    @Autowired
+    TestClock clock;
 
     @Autowired
     ChatService chat;
@@ -214,18 +160,18 @@ class ChatServiceTest {
     HermesRunsClient hermes;
 
     /** 실행 사건을 검사하려면 스트림을 우리가 열어 주어야 한다. */
-    @MockitoBean
+    @Autowired
     HermesRunEventStream eventStream;
 
     /** 저장이 실패해도 대화가 이어지는지 보려면 저장소가 던지게 만들 수 있어야 한다. */
-    @MockitoSpyBean
+    @Autowired
     ExecutionEventRepository executionEvents;
 
     @Autowired
     ExecutionSkillUseRepository skillUses;
 
     /** 스킬 커맨드가 확인하는 켜진 스킬 목록을 테스트가 정한다. Hermes 대시보드를 부르지 않는다. */
-    @MockitoBean
+    @Autowired
     SkillService skillService;
 
     @Autowired
@@ -287,23 +233,13 @@ class ChatServiceTest {
     @AfterEach
     void clearSecurityContext() {
         SecurityContextHolder.clearContext();
+        deleteRows();
     }
 
     @BeforeEach
     void reset() {
-        SKILL_CLOCK.advance(Duration.ofHours(1));
         stub().reset();
-        skillUses.deleteAll();
-        contextSources.deleteAll();
-        executionEvents.deleteAll();
-        executions.deleteAll();
-        messages.deleteAll();
-        tierDefinitions.deleteAll();
-        bindings.deleteAll();
-        connections.deleteAll();
-        agents.deleteAll();
-        memoryRepository.deleteAll();
-        users.deleteAll();
+        deleteRows();
     }
 
     private CurrentUser member(String email, String profileName) {
@@ -1182,8 +1118,9 @@ class ChatServiceTest {
                         ? new SkillListItem(name.substring(0, name.length() - 4), "", SkillSource.UPLOADED, false, null)
                         : new SkillListItem(name, "", SkillSource.UPLOADED, true, null))
                 .toList();
-        when(skillService.commandList(argThat(agent -> agent != null && agentCode.equals(agent.code()))))
-                .thenReturn(new SkillList(items, false, skillsToolsetEnabled, 30));
+        doReturn(new SkillList(items, false, skillsToolsetEnabled, 30))
+                .when(skillService)
+                .commandList(argThat(agent -> agent != null && agentCode.equals(agent.code())));
     }
 
     private List<ExecutionSkillUse> skillUsesOf(Long executionId) {
@@ -1334,6 +1271,8 @@ class ChatServiceTest {
     @Test
     @DisplayName("켜진 스킬 목록은 에이전트마다 캐시하고 SkillsChanged 를 받으면 다시 읽는다")
     void cachesEnabledSkillListPerAgentAndRereadsOnSkillsChanged() {
+        // 캐시가 읽은 시각부터 재도록 시계를 멈춘다. 흐르는 시계에서는 아래 29초가 보관 시간을 넘길 수 있다
+        clock.set(Instant.now());
         CurrentUser dad = member("dad@example.com", "dad");
         Long agentId = agents.findByCode("dad").orElseThrow().id();
         skillsOf("dad", true, "shopping");
@@ -1344,12 +1283,27 @@ class ChatServiceTest {
 
         // 목록이 바뀌어도 사건 전에는 들고 있던 목록으로 판별한다. 캐시 시간 안이다.
         skillsOf("dad", true, "shopping:off");
-        SKILL_CLOCK.advance(Duration.ofSeconds(29));
+        clock.advance(Duration.ofSeconds(29));
         chat.send(dad, first.conversationId(), "/shopping 셋", null);
 
         applicationEvents.publishEvent(new SkillsChanged(agentId));
 
         assertCode(() -> chat.send(dad, first.conversationId(), "/shopping 넷", null), ErrorCode.SKILL_COMMAND_UNKNOWN);
         assertThat(stub().received()).as("Hermes 에 보낸 것").hasSize(3);
+    }
+
+    /** 이 검사가 쓰는 표를 비운다. 컨텍스트를 함께 쓰는 다음 검사에 행을 남기지 않게 검사 뒤에도 부른다. */
+    private void deleteRows() {
+        skillUses.deleteAll();
+        contextSources.deleteAll();
+        executionEvents.deleteAll();
+        executions.deleteAll();
+        messages.deleteAll();
+        tierDefinitions.deleteAll();
+        bindings.deleteAll();
+        connections.deleteAll();
+        agents.deleteAll();
+        memoryRepository.deleteAll();
+        users.deleteAll();
     }
 }

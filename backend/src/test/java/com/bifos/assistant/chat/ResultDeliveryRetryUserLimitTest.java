@@ -32,6 +32,10 @@ import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
+import com.bifos.assistant.testsupport.BackendIntegrationTest;
+import com.bifos.assistant.testsupport.CapturingTaskScheduler;
+import com.bifos.assistant.testsupport.DelegationWakeEnabled;
+import com.bifos.assistant.testsupport.SmallExecutionLimit;
 import com.bifos.assistant.usage.application.UserExecutionLimiter;
 import com.bifos.assistant.usage.domain.AgentExecution;
 import com.bifos.assistant.usage.domain.type.ExecutionStatus;
@@ -49,25 +53,17 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.ApplicationEventPublisher;
-import org.springframework.context.annotation.Import;
-import org.springframework.test.context.ActiveProfiles;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 /**
  * 결과 다시 전달이 사용자 실행 한도에 닿으면 묶음을 바꾸지 않고 다시 시도를 예약하지 않는지 본다(ADR-069, ADR-075).
  *
  * <p>한도를 2 로 두고 그 사용자의 RUNNING 자식 줄 둘로 자리를 채운다. 구성은 {@link DelegationWakeUserLimitTest} 와 같게
- * 둔다. 같은 Spring 컨텍스트를 써서 컨텍스트 수를 늘리지 않고, 예약은 그 검사의 대역 스케줄러가 받는다.
+ * 둔다. 예약은 기반의 대역 스케줄러가 받는다.
  */
-@SpringBootTest(properties = {"assistant.delegation-wake.enabled=true", "assistant.user-execution.max-running=2"})
-@ActiveProfiles("test")
-@Import({
-    ChatServiceTest.StubRuntime.class,
-    DelegationWakeUserLimitTest.CapturingSchedulerConfig.class,
-    DelegationWakeUserLimitTest.RetryThreadsConfig.class
-})
+@BackendIntegrationTest
+@DelegationWakeEnabled
+@SmallExecutionLimit
 class ResultDeliveryRetryUserLimitTest {
 
     private static final Duration WAIT_LIMIT = Duration.ofSeconds(10);
@@ -75,11 +71,11 @@ class ResultDeliveryRetryUserLimitTest {
     /** 한도로 거절한 뒤 제출이 없는지 지켜보는 시간이다. 거절은 그 자리에서 끝나므로 늦은 제출이 있다면 이 안에 보인다. */
     private static final Duration QUIET_PERIOD = Duration.ofSeconds(1);
 
-    @MockitoBean
+    @Autowired
     HermesRunEventStream eventStream;
 
     @Autowired
-    DelegationWakeUserLimitTest.CapturingTaskScheduler scheduler;
+    CapturingTaskScheduler scheduler;
 
     @Autowired
     UserExecutionLimiter limiter;
@@ -139,7 +135,7 @@ class ResultDeliveryRetryUserLimitTest {
     void setUp() {
         awaitAllIdle();
         stub().reset();
-        scheduler.clear();
+        scheduler.capture();
         deliveryItems.deleteAll();
         attempts.deleteAll();
         deliveries.deleteAll();

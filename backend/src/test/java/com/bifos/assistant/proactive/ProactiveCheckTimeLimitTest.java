@@ -34,6 +34,8 @@ import com.bifos.assistant.proactive.domain.type.CheckTrigger;
 import com.bifos.assistant.proactive.infra.ProactiveCheckRepository;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.domain.type.UserRole;
+import com.bifos.assistant.testsupport.BackendIntegrationTest;
+import com.bifos.assistant.testsupport.OverrideProperties;
 import com.bifos.assistant.usage.domain.AgentExecution;
 import com.bifos.assistant.usage.infra.AgentExecutionRepository;
 import com.bifos.assistant.usage.infra.ExecutionEventRepository;
@@ -50,14 +52,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.context.TestConfiguration;
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Import;
-import org.springframework.context.annotation.Primary;
-import org.springframework.test.context.ActiveProfiles;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
-import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /**
@@ -66,27 +60,16 @@ import org.springframework.transaction.support.TransactionTemplate;
  *
  * <p>모든 데이터는 합성이다.
  */
-@SpringBootTest(
-        properties = {
-            "hermes.run-timeout=30s",
-            "assistant.proactive-check.max-duration=" + ProactiveCheckTimeLimitTest.MAX_DURATION_MILLIS + "ms"
-        })
-@ActiveProfiles("test")
-@Import(ProactiveCheckTimeLimitTest.StubRuntime.class)
+@BackendIntegrationTest
+@OverrideProperties({
+    "hermes.run-timeout=30s",
+    "assistant.proactive-check.max-duration=" + ProactiveCheckTimeLimitTest.MAX_DURATION_MILLIS + "ms"
+})
 class ProactiveCheckTimeLimitTest {
 
     static final long MAX_DURATION_MILLIS = 1000;
 
     private static final Duration WAIT_LIMIT = Duration.ofSeconds(10);
-
-    @TestConfiguration
-    static class StubRuntime {
-        @Bean
-        @Primary
-        StubHermesRunsClient stubHermesRunsClient() {
-            return new StubHermesRunsClient();
-        }
-    }
 
     @Autowired
     ProactiveCheckService service;
@@ -122,19 +105,19 @@ class ProactiveCheckTimeLimitTest {
     TransactionTemplate transactions;
 
     /** 시간 상한 스레드가 멈추기를 불렀는지 본다. 그 밖의 동작은 실제 그대로다. */
-    @MockitoSpyBean
+    @Autowired
     ChatService chat;
 
     /** 실제 Hermes 를 부르지 않도록 켜진 toolset 을 대역으로 둔다. */
-    @MockitoBean
+    @Autowired
     HermesToolsetClient toolsets;
 
     /** 켜진 스킬 목록을 대역으로 둔다. */
-    @MockitoBean
+    @Autowired
     HermesSkillClient skillClient;
 
     /** 실제 스트림 주소로 연결하지 않게 대역으로 둔다. 사건은 흘리지 않는다. */
-    @MockitoBean
+    @Autowired
     HermesRunEventStream eventStream;
 
     private CurrentUser owner;

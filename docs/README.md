@@ -26,6 +26,7 @@ frontend 는 화면의 동작과 구조이고, hermes 는 외부 런타임인 He
 | 문서 | 소유하는 것 |
 | --- | --- |
 | [`backend/packages.md`](backend/packages.md) | backend 패키지의 책임, 한 번의 대화가 지나는 길, 가격표 |
+| [`backend/testing.md`](backend/testing.md) | Spring 통합 검사의 공통 기반 주석, 설정 바꾸기, 검사 사이에 남기지 않는 것, 컨텍스트 수 확인 |
 | [`backend/quality.md`](backend/quality.md) | 구조 규칙과 코드 규칙의 기준 파일을 갱신하는 방법, 뺀 규칙의 까닭 · 언어 공통 파일 길이 기준 목록 |
 | [`backend/schema/README.md`](backend/schema/README.md) | 표와 칸의 뜻. 표를 주제별 파일로 나눈 색인이 있다 |
 | [`backend/agent.md`](backend/agent.md) | 페르소나, 에이전트 도구, 에이전트를 만들고 지우는 규칙 |

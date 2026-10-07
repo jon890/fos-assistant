@@ -43,9 +43,8 @@ class ProactiveCheckLimits {
     void started(Long executionId, String hermesRootSessionId) {
         check.attachRoot(executionId, hermesRootSessionId);
         deps.checks().save(check);
-        Thread timer = Thread.ofVirtual()
-                .name("proactive-check-time-limit-" + executionId)
-                .unstarted(() -> awaitTimeLimit(executionId));
+        Thread timer = deps.backgroundTasks()
+                .unstarted("proactive-check-time-limit-" + executionId, () -> awaitTimeLimit(executionId));
         synchronized (limitLock) {
             if (closed) {
                 return;
@@ -57,7 +56,7 @@ class ProactiveCheckLimits {
 
     /** 스트림을 읽는 스레드에서 불린다. 센 값이 {@code max-tool-calls} 를 넘는 첫 순간 멈춘다. */
     void toolStarted(Long executionId) {
-        if (toolCalls.incrementAndGet() > deps.properties().maxToolCalls()) {
+        if (toolCalls.incrementAndGet() > deps.properties().current().maxToolCalls()) {
             limitReached(TOOL_LIMIT, executionId);
         }
     }
@@ -77,7 +76,7 @@ class ProactiveCheckLimits {
     /** {@code max-duration} 만큼 잔 뒤 끝나지 않았으면 멈춘다. {@link #close} 가 깨우면 그대로 끝난다. */
     private void awaitTimeLimit(Long executionId) {
         try {
-            Thread.sleep(deps.properties().maxDuration());
+            Thread.sleep(deps.properties().current().maxDuration());
         } catch (InterruptedException ex) {
             return;
         }
@@ -91,9 +90,8 @@ class ProactiveCheckLimits {
      */
     private void limitReached(String reason, Long executionId) {
         if (claimStop(reason)) {
-            Thread.ofVirtual()
-                    .name("proactive-check-stop-" + executionId)
-                    .start(() -> stopWithRetry(reason, executionId));
+            deps.backgroundTasks()
+                    .start("proactive-check-stop-" + executionId, () -> stopWithRetry(reason, executionId));
         }
     }
 
