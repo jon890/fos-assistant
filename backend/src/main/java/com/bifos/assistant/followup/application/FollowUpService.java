@@ -96,6 +96,20 @@ public class FollowUpService {
         return Sha256.hex(normalized);
     }
 
+    /**
+     * 그 사용자에게 같은 제목의 열린 할 일({@code PROPOSED}, {@code OPEN})이 있는지다. 먼저 살펴보기의 문제 후보가 이미 챙기는 일인지
+     * 판정하는 데 쓴다(ADR-093). 제목이 비었으면 거짓이다.
+     */
+    @Transactional(readOnly = true)
+    public boolean hasOpenWithTitle(Long userId, String title) {
+        if (title == null || title.isBlank()) {
+            return false;
+        }
+        return followUps
+                .findByUserIdAndTitleKeyAndOpenMarker(userId, titleKey(title.strip()), FollowUp.OPEN_MARKER)
+                .isPresent();
+    }
+
     /** 끝나지 않은 할 일을 만든 순서로 낸다. */
     @Transactional(readOnly = true)
     public List<FollowUpSnapshot> list(CurrentUser user) {

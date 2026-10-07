@@ -36,7 +36,8 @@ class CheckReportFactoryTest {
                 List.of(),
                 List.of(),
                 List.of(),
-                new CheckResultBlock.ReportDraft(List.of("바뀜"), List.of("확인"), List.of("다음")));
+                new CheckResultBlock.ReportDraft(List.of("바뀜"), List.of("확인"), List.of("다음")),
+                List.of());
         List<JudgedFinding> judged = List.of(
                 new JudgedFinding(
                         null, FindingKind.REFERENCE, FindingReason.CLOSED, "https://example.com/closed", null),

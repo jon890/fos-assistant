@@ -16,7 +16,7 @@ AI credential 은 Hermes profile 의 `.env` 에, profile 의 API server key 는 
 | [`connector.md`](connector.md) | `connector_connection`, `agent_connector_binding`, `connector_action`, `connector_tool_grant` |
 | [`attention.md`](attention.md) | `follow_up`, `attention_control`, `attention_event` |
 | [`notification.md`](notification.md) | `notification` |
-| [`proactive.md`](proactive.md) | `proactive_check`, `proactive_check_finding` |
+| [`proactive.md`](proactive.md) | `proactive_check`, `proactive_check_finding`, `proactive_check_problem` |
 | [`task.md`](task.md) | `task`, `task_trigger`, `task_run` |
 
 ## 마이그레이션 작성 규칙
