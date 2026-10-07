@@ -12,29 +12,48 @@ async function beginHeldTurn(page: Page, text: string) {
   await page.getByRole("button", { name: "보내기" }).click();
 }
 
-test("답을 만드는 동안 중지 단추를 보이고 중지한 답을 남긴다", async ({ page, hermes }) => {
+test("답을 만드는 동안 중지 단추를 보이고 중지한 답을 남긴다", async ({
+  page,
+  hermes,
+}) => {
   await hermes.holdNextRun();
   await beginHeldTurn(page, "중지 화면 검사");
   await hermes.waitForHeldRun();
-  const stop = page.getByTestId("composer-shell").getByRole("button", { name: "중지" });
+  const stop = page
+    .getByTestId("composer-shell")
+    .getByRole("button", { name: "중지" });
   await expect(stop).toBeVisible();
   // 답이 오는 동안에도 보내기는 중지 옆에 그대로 있다.
-  await expect(page.getByTestId("composer-shell").getByRole("button", { name: "보내기" })).toBeVisible();
+  await expect(
+    page.getByTestId("composer-shell").getByRole("button", { name: "보내기" }),
+  ).toBeVisible();
   await expect(page.getByRole("button", { name: "답 복사" })).toHaveCount(0);
   await stop.click();
-  await expect(page.getByTestId("stopped-mark")).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByTestId("stopped-mark")).toBeVisible({
+    timeout: 30_000,
+  });
   await expect(stop).toHaveCount(0);
   await page.reload();
   await expect(page.getByTestId("stopped-mark")).toBeVisible();
 });
 
-test("사진을 실은 실행 중에는 사진을 지우거나 다음 사진을 고를 수 없다", async ({ page, hermes }) => {
+test("사진을 실은 실행 중에는 사진을 지우거나 다음 사진을 고를 수 없다", async ({
+  page,
+  hermes,
+}) => {
   await page.goto("/");
-  const uploaded = page.waitForResponse((response) => response.request().method() === "POST"
-    && new RegExp(`/api/chat/conversations/${CONVERSATION_ID}/attachments$`).test(response.url()));
-  await page.getByTestId("attachment-input").setInputFiles([
-    { name: "running.png", mimeType: "image/png", buffer: PNG_1X1 },
-  ]);
+  const uploaded = page.waitForResponse(
+    (response) =>
+      response.request().method() === "POST" &&
+      new RegExp(
+        `/api/chat/conversations/${CONVERSATION_ID}/attachments$`,
+      ).test(response.url()),
+  );
+  await page
+    .getByTestId("attachment-input")
+    .setInputFiles([
+      { name: "running.png", mimeType: "image/png", buffer: PNG_1X1 },
+    ]);
   const attachmentId = ((await (await uploaded).json()) as { id: number }).id;
   const conversationId = conversationIdOf(page.url());
   await expect(page.getByTestId("attachment-uploading")).toHaveCount(0);
@@ -44,10 +63,19 @@ test("사진을 실은 실행 중에는 사진을 지우거나 다음 사진을 
   await hermes.waitForHeldRun();
   await expect(page.getByTestId("attachment-input")).toBeDisabled();
   await expect(page.getByRole("button", { name: "사진 첨부" })).toBeDisabled();
-  await expect(page.getByRole("button", { name: "사진 지우기" })).toBeDisabled();
-  await page.getByTestId("composer-shell").getByRole("button", { name: "중지" }).click();
-  await expect(page.getByTestId("stopped-mark")).toBeVisible({ timeout: 30_000 });
-  const attachment = await page.request.get(`/api/chat/conversations/${conversationId}/attachments/${attachmentId}`);
+  await expect(
+    page.getByRole("button", { name: "사진 지우기" }),
+  ).toBeDisabled();
+  await page
+    .getByTestId("composer-shell")
+    .getByRole("button", { name: "중지" })
+    .click();
+  await expect(page.getByTestId("stopped-mark")).toBeVisible({
+    timeout: 30_000,
+  });
+  const attachment = await page.request.get(
+    `/api/chat/conversations/${conversationId}/attachments/${attachmentId}`,
+  );
   expect(attachment.ok()).toBeTruthy();
 });
 
@@ -55,24 +83,39 @@ test("중지 요청 실패 뒤에는 다시 중지할 수 있다", async ({ page
   await hermes.holdNextRun();
   await beginHeldTurn(page, "중지 재시도 검사");
   await hermes.waitForHeldRun();
-  await page.route("**/api/chat/executions/*/stop", (route) => route.fulfill({
-    status: 503,
-    contentType: "application/json",
-    body: JSON.stringify({ code: "HERMES_UNAVAILABLE", message: "중지하지 못했다" }),
-  }));
-  const stop = page.getByTestId("composer-shell").getByRole("button", { name: "중지" });
+  await page.route("**/api/chat/executions/*/stop", (route) =>
+    route.fulfill({
+      status: 503,
+      contentType: "application/json",
+      body: JSON.stringify({
+        code: "HERMES_UNAVAILABLE",
+        message: "중지하지 못했다",
+      }),
+    }),
+  );
+  const stop = page
+    .getByTestId("composer-shell")
+    .getByRole("button", { name: "중지" });
   await stop.click();
   await expect(stop).toBeEnabled();
   await page.unroute("**/api/chat/executions/*/stop");
   await stop.click();
-  await expect(page.getByTestId("stopped-mark")).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByTestId("stopped-mark")).toBeVisible({
+    timeout: 30_000,
+  });
 });
 
-test("남긴 답이 없으면 사용자 메시지 아래에 안내를 보인다", async ({ page, hermes }) => {
+test("남긴 답이 없으면 사용자 메시지 아래에 안내를 보인다", async ({
+  page,
+  hermes,
+}) => {
   await hermes.holdNextRun();
   await beginHeldTurn(page, "중지 조각 전 검사");
   await hermes.waitForHeldRun();
-  await page.getByTestId("composer-shell").getByRole("button", { name: "중지" }).click();
+  await page
+    .getByTestId("composer-shell")
+    .getByRole("button", { name: "중지" })
+    .click();
   await expect(page.getByTestId("no-answer")).toBeVisible({ timeout: 30_000 });
   await expect(page.getByTestId("assistant-message")).toHaveCount(0);
   await page.reload();
@@ -88,77 +131,126 @@ test("답과 코드 블록의 원문을 복사한다", async ({ context, page })
   await expect(answerCopy).toBeVisible({ timeout: 30_000 });
   await answerCopy.click();
   await expect(answerCopy).toHaveText("복사됨");
-  await expect.poll(() => page.evaluate(() => navigator.clipboard.readText())).toContain("public class Greeting");
+  await expect
+    .poll(() => page.evaluate(() => navigator.clipboard.readText()))
+    .toContain("public class Greeting");
   const codeCopy = page.getByRole("button", { name: "코드 복사" }).first();
   await codeCopy.click();
-  await expect.poll(() => page.evaluate(() => navigator.clipboard.readText())).toContain("public class Greeting");
+  await expect
+    .poll(() => page.evaluate(() => navigator.clipboard.readText()))
+    .toContain("public class Greeting");
 });
 
-test("작업 과정 패널을 닫는 Esc 가 중지보다 먼저다", async ({ page, hermes }) => {
+test("작업 과정 패널을 닫는 Esc 가 중지보다 먼저다", async ({
+  page,
+  hermes,
+}) => {
   await hermes.holdNextRun();
   await page.goto("/");
   await page.getByRole("radio", { name: "흐름 비서" }).click();
-  await page.getByRole("textbox", { name: "메시지" }).fill("중지 패널 Esc 검사");
+  await page
+    .getByRole("textbox", { name: "메시지" })
+    .fill("중지 패널 Esc 검사");
   await page.getByRole("button", { name: "보내기" }).click();
   await hermes.waitForHeldRun();
-  const block = page.locator('[data-testid="activity-block"][data-mode="live"]');
+  const block = page.locator(
+    '[data-testid="activity-block"][data-mode="live"]',
+  );
   await expect(block).toBeVisible();
   await block.getByTestId("activity-toggle").click();
   await block.getByTestId("activity-open-panel").click();
   await expect(page.getByTestId("activity-panel")).toBeVisible();
   await page.keyboard.press("Escape");
   await expect(page.getByTestId("activity-panel")).toHaveCount(0);
-  await expect(page.getByTestId("composer-shell").getByRole("button", { name: "중지" })).toBeEnabled();
+  await expect(
+    page.getByTestId("composer-shell").getByRole("button", { name: "중지" }),
+  ).toBeEnabled();
   await page.keyboard.press("Escape");
   await expect(page.getByTestId("no-answer")).toBeVisible({ timeout: 30_000 });
-  await expect(page.getByTestId("composer-shell").getByRole("button", { name: "중지" })).toHaveCount(0);
+  await expect(
+    page.getByTestId("composer-shell").getByRole("button", { name: "중지" }),
+  ).toHaveCount(0);
 });
 
-test("입력칸에 초점이 있어도 Esc 로 답을 중지한다", async ({ page, hermes }) => {
+test("입력칸에 초점이 있어도 Esc 로 답을 중지한다", async ({
+  page,
+  hermes,
+}) => {
   await hermes.holdNextRun();
   await beginHeldTurn(page, "중지 입력 Esc 검사");
   await hermes.waitForHeldRun();
   // 대역이 실행을 받은 뒤에도 화면은 `started` 사건을 받아야 실행 번호를 안다. 그전의 Esc 는 멈출 실행이 없다.
-  await expect(page.getByTestId("composer-shell").getByRole("button", { name: "중지" })).toBeEnabled();
+  await expect(
+    page.getByTestId("composer-shell").getByRole("button", { name: "중지" }),
+  ).toBeEnabled();
   await page.getByRole("textbox", { name: "메시지" }).focus();
   await page.keyboard.press("Escape");
-  await expect(page.getByTestId("stopped-mark")).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByTestId("stopped-mark")).toBeVisible({
+    timeout: 30_000,
+  });
 });
 
-test("중지에 마우스를 올려 풀이가 열려 있어도 첫 Esc 로 답을 중지한다", async ({ page, hermes }) => {
+test("중지에 마우스를 올려 풀이가 열려 있어도 첫 Esc 로 답을 중지한다", async ({
+  page,
+  hermes,
+}) => {
   await hermes.holdNextRun();
   await beginHeldTurn(page, "중지 풀이 Esc 검사");
   await hermes.waitForHeldRun();
-  const stop = page.getByTestId("composer-shell").getByRole("button", { name: "중지" });
+  const stop = page
+    .getByTestId("composer-shell")
+    .getByRole("button", { name: "중지" });
   await expect(stop).toBeEnabled();
   await stop.hover();
   await expect(page.getByRole("tooltip")).toHaveText("중지");
   await page.keyboard.press("Escape");
   await expect(page.getByRole("tooltip")).toHaveCount(0);
   // 멈춘 답은 받은 조각이 있으면 중지 표시를, 없으면 답이 없다는 안내를 남긴다. 어느 쪽이든 멈춘 것이다.
-  await expect(page.getByTestId("stopped-mark").or(page.getByTestId("no-answer")).first()).toBeVisible({ timeout: 30_000 });
+  await expect(
+    page.getByTestId("stopped-mark").or(page.getByTestId("no-answer")).first(),
+  ).toBeVisible({ timeout: 30_000 });
 });
 
-test("닫히는 중인 풀이가 남아 있어도 Esc 로 답을 중지한다", async ({ page, hermes }, testInfo) => {
-  test.skip(testInfo.project.name !== "desktop", "마우스를 올려 여는 풀이는 넓은 화면에서만 확인한다");
+test("닫히는 중인 풀이가 남아 있어도 Esc 로 답을 중지한다", async ({
+  page,
+  hermes,
+}, testInfo) => {
+  test.skip(
+    testInfo.project.name !== "desktop",
+    "마우스를 올려 여는 풀이는 넓은 화면에서만 확인한다",
+  );
   await page.emulateMedia({ reducedMotion: "no-preference" });
   await hermes.holdNextRun();
   await beginHeldTurn(page, "닫히는 풀이 Esc 검사");
   await hermes.waitForHeldRun();
-  await expect(page.getByTestId("composer-shell").getByRole("button", { name: "중지" })).toBeEnabled();
+  await expect(
+    page.getByTestId("composer-shell").getByRole("button", { name: "중지" }),
+  ).toBeEnabled();
   // 닫히는 움직임을 늘려 풀이가 닫힌 채 남아 있는 동안 Esc 를 누른다.
-  await page.addStyleTag({ content: '[data-slot="tooltip-content"]{animation-duration:5s !important}' });
+  await page.addStyleTag({
+    content: '[data-slot="tooltip-content"]{animation-duration:5s !important}',
+  });
   await page.getByRole("button", { name: "사이드바 접기" }).hover();
   await expect(page.getByRole("tooltip")).toHaveText("사이드바 접기");
   await page.mouse.move(600, 300, { steps: 10 });
-  await expect(page.locator('[data-slot="tooltip-content"][data-state="closed"]')).toBeVisible();
+  await expect(
+    page.locator('[data-slot="tooltip-content"][data-state="closed"]'),
+  ).toBeVisible();
   await page.getByRole("textbox", { name: "메시지" }).focus();
   await page.keyboard.press("Escape");
-  await expect(page.getByTestId("stopped-mark").or(page.getByTestId("no-answer")).first()).toBeVisible({ timeout: 30_000 });
+  await expect(
+    page.getByTestId("stopped-mark").or(page.getByTestId("no-answer")).first(),
+  ).toBeVisible({ timeout: 30_000 });
 });
 
-test("좁은 화면에서 열린 서랍은 Esc 로 닫고 실행은 계속한다", async ({ page, hermes }, testInfo) => {
-  test.skip(testInfo.project.name !== "mobile", "좁은 화면 서랍 동작만 확인한다");
+test("좁은 화면에서 열린 서랍은 Esc 로 닫고 실행은 계속한다", async ({
+  page,
+  hermes,
+}, testInfo) => {
+  test.skip(
+    testInfo.project.name !== "mobile",
+    "좁은 화면 서랍 동작만 확인한다",
+  );
   await hermes.holdNextRun();
   await beginHeldTurn(page, "서랍 Esc 실행 유지 검사");
   await hermes.waitForHeldRun();
@@ -167,7 +259,11 @@ test("좁은 화면에서 열린 서랍은 Esc 로 닫고 실행은 계속한다
   await expect(drawer).toBeInViewport();
   await page.keyboard.press("Escape");
   await expect(drawer).toBeHidden();
-  await expect(page.getByTestId("composer-shell").getByRole("button", { name: "중지" })).toBeEnabled();
+  await expect(
+    page.getByTestId("composer-shell").getByRole("button", { name: "중지" }),
+  ).toBeEnabled();
   await hermes.releaseHeldRun();
-  await expect(page.getByTestId("assistant-message")).toHaveCount(1, { timeout: 30_000 });
+  await expect(page.getByTestId("assistant-message")).toHaveCount(1, {
+    timeout: 30_000,
+  });
 });
