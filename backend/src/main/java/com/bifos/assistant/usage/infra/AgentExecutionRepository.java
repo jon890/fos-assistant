@@ -47,6 +47,9 @@ public interface AgentExecutionRepository extends JpaRepository<AgentExecution, 
 
     List<AgentExecution> findByStatus(ExecutionStatus status);
 
+    /** 사용자 에이전트와 대화에 묶이지 않은 시스템 실행이다. 기동 때 원격 종료를 확인한다. */
+    List<AgentExecution> findByAgentIdIsNullAndConversationIdIsNullAndStatus(ExecutionStatus status);
+
     /**
      * 그 Hermes session 을 가진 그 profile 의 실행을 상태로 골라 둘까지만 읽는다.
      *

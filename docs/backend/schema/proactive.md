@@ -93,3 +93,19 @@
 
 후보의 글은 모델이 쓴 글이고 대화에 그리지 않는다. 다섯 칸 보고(`report_json`)처럼 검사한 모양을 그대로 남긴다.
 원문 본문과 커넥터 응답은 남기지 않는다.
+
+## `proactive_value_evaluation`
+
+가치 평가 시도 하나다. [가치 평가](../value-evaluation.md)가 입력과 결과, replay 계약을 갖는다.
+
+| 칸 | 타입 | 뜻 |
+| --- | --- | --- |
+| `id` | BIGINT PK | 평가 식별자 |
+| `check_id` | BIGINT FK | 후보가 나온 살펴보기. 지우면 평가도 함께 지운다 |
+| `user_id` | BIGINT FK | 요청 사용자. 관리자도 남의 것을 읽지 못한다 |
+| `replay_of_id` | BIGINT, 선택 | 바로 재평가한 원본 시도 |
+| `outcome` | VARCHAR(32) | `RUNNING`, `EVALUATED`, `INSUFFICIENT_EVIDENCE`, `FALLBACK`, `EMPTY` |
+| `evidence_json` | JSON | 최소 후보 스냅샷·기준 시각·질문, provider 식별 정보, 축별 판단·근거 키·확신·설명·순서 |
+| `created_at` | DATETIME(6) | 평가 시도를 시작한 시각 |
+
+사용자와 시작 시각, 상태에 색인이 있다. 전체 개인 문맥과 원시 모델 응답을 저장하지 않는다.
