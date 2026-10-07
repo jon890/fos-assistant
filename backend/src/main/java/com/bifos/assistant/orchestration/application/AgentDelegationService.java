@@ -561,13 +561,22 @@ public class AgentDelegationService {
         return depth;
     }
 
-    /** 서버 전체 동시 위임의 자리 하나를 얻는다. 늘린 뒤 한도를 넘으면 되돌리고 거절한다. */
+    /**
+     * 서버 전체 동시 위임의 자리 하나를 얻는다. 한도 아래일 때만 compare-and-set 으로 하나 늘린다.
+     *
+     * <p>먼저 늘리고 넘으면 되돌리는 방식은 거절될 요청이 잠깐 올린 수 때문에 한도 안의 다른 요청까지 거절할 수 있다. 그래서 한도를 넘는
+     * 값은 한 번도 쓰지 않는다.
+     */
     private boolean tryAcquireSlot(int maxActive) {
-        if (activeDelegations.incrementAndGet() > maxActive) {
-            activeDelegations.decrementAndGet();
-            return false;
+        while (true) {
+            int current = activeDelegations.get();
+            if (current >= maxActive) {
+                return false;
+            }
+            if (activeDelegations.compareAndSet(current, current + 1)) {
+                return true;
+            }
         }
-        return true;
     }
 
     /** {@link #tryAcquireSlot} 로 얻은 자리를 돌려준다. */

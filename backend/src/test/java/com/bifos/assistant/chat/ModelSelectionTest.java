@@ -22,6 +22,7 @@ import com.bifos.assistant.hermes.HermesModelClient;
 import com.bifos.assistant.hermes.HermesRunEventStream;
 import com.bifos.assistant.hermes.HermesRunsClient;
 import com.bifos.assistant.hermes.StubHermesRunsClient;
+import com.bifos.assistant.hermes.StubHermesRunsClient.SessionLookup;
 import com.bifos.assistant.hermes.dto.HermesModelCatalog;
 import com.bifos.assistant.hermes.dto.HermesRunResult;
 import com.bifos.assistant.hermes.dto.ReasoningCapability;
@@ -221,7 +222,7 @@ class ModelSelectionTest {
         assertThat(execution.model()).isEqualTo("example-provider/example-model-c");
         assertThat(execution.provider()).isEqualTo("nvidia");
         assertThat(execution.reasoningEffort()).isEqualTo("low");
-        assertThat(stub().sessionLookups()).containsExactly("sess-1");
+        assertThat(stub().sessionLookups()).extracting(SessionLookup::sessionId).containsExactly("sess-1");
     }
 
     @Test

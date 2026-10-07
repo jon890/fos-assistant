@@ -42,12 +42,12 @@ import com.bifos.assistant.proactive.application.CheckNotificationPolicy;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.testsupport.BackendIntegrationTest;
+import com.bifos.assistant.testsupport.ConnectorCatalogTimes;
 import com.bifos.assistant.usage.domain.AgentExecution;
 import com.bifos.assistant.usage.domain.type.ExecutionStatus;
 import com.bifos.assistant.usage.infra.AgentExecutionRepository;
 import com.bifos.assistant.user.domain.AppUser;
 import com.bifos.assistant.user.infra.AppUserRepository;
-import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -149,7 +149,7 @@ class ApprovalNotificationTest {
     void setUp() {
         doReturn(true).when(checkNotifications).allows(any(), any());
         deleteRows();
-        expireCatalog();
+        ConnectorCatalogTimes.expire();
         when(connector.readCatalog()).thenReturn(List.of(DECLARING));
         when(connector.execute(anyString(), anyString(), anyString(), anyString()))
                 .thenReturn(CallResult.success(JSON.readTree("{\"saved\":true}")));
@@ -294,7 +294,7 @@ class ApprovalNotificationTest {
         Instant expiresAt = onlyActionExpiry();
         notifications.deleteAll();
         when(connector.readCatalog()).thenThrow(new IllegalStateException("catalog down"));
-        expireCatalog();
+        ConnectorCatalogTimes.expire();
 
         assertThat(service.expire(expiresAt.plusMillis(1))).isEqualTo(1);
 
@@ -306,7 +306,7 @@ class ApprovalNotificationTest {
     void expiryWithoutConversationSkipsNotificationAndCatalog() {
         ask(startRun(null), WRITE, ARGS);
         Instant expiresAt = onlyActionExpiry();
-        expireCatalog();
+        ConnectorCatalogTimes.expire();
         clearInvocations(connector);
 
         assertThat(service.expire(expiresAt.plusMillis(1))).isEqualTo(1);
@@ -380,20 +380,6 @@ class ApprovalNotificationTest {
         List<Notification> rows = notifications.findAll();
         assertThat(rows).as("notification 의 줄").hasSize(1);
         return rows.getFirst();
-    }
-
-    /**
-     * 앞 검사나 앞 단계가 읽은 카탈로그와 읽기 실패가 지나가기를 기다린다. 캐시는 실제 시각으로 재고, 검사 설정의 보관 시간과 실패
-     * 기억 시간은 1ms 다. 2ms 는 그보다 반드시 길어 다음 읽기가 늘 카탈로그를 다시 읽는다. 캐시가 다시 읽을지 미리 알 방법이 없어
-     * 시간으로 기다린다.
-     */
-    private static void expireCatalog() {
-        try {
-            Thread.sleep(Duration.ofMillis(2));
-        } catch (InterruptedException ex) {
-            Thread.currentThread().interrupt();
-            throw new IllegalStateException("카탈로그 보관 시간을 기다리다 끊겼다", ex);
-        }
     }
 
     /** 이 검사가 쓰는 표를 비운다. 컨텍스트를 함께 쓰는 다음 검사에 행을 남기지 않게 검사 뒤에도 부른다. */

@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.bifos.assistant.chat.application.DelegationWakeProperties;
+import com.bifos.assistant.connector.application.ConnectorPolicyProperties;
 import com.bifos.assistant.hermes.HermesProperties;
 import com.bifos.assistant.orchestration.application.DelegationProperties;
 import com.bifos.assistant.shared.config.LiveProperties;
@@ -38,6 +39,9 @@ class OverridePropertiesTest {
     @Autowired
     LiveProperties<HermesProperties> hermes;
 
+    @Autowired
+    LiveProperties<ConnectorPolicyProperties> connectorPolicy;
+
     @Test
     @DisplayName("검사 클래스에 단 값이 LiveProperties 의 현재 값이 된다")
     void appliesValueOfTestClass() {
@@ -70,6 +74,21 @@ class OverridePropertiesTest {
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("hermes.read-timeout");
         assertThat(hermes.current()).isSameAs(before);
+    }
+
+    @Test
+    @DisplayName("기동 때만 읽는 커넥터 정책의 만료 일정 키는 그 키 이름을 담아 실패하고 아무것도 바꾸지 않는다")
+    void rejectsConnectorExpireCronReadOnlyAtStartup() {
+        ConnectorPolicyProperties before = connectorPolicy.current();
+
+        assertThatThrownBy(() -> IntegrationTestIsolation.apply(
+                        context,
+                        List.of(
+                                "assistant.connector.policy.approval-ttl=1h",
+                                "assistant.connector.policy.expire-cron=* * * * * *")))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("assistant.connector.policy.expire-cron");
+        assertThat(connectorPolicy.current()).isSameAs(before);
     }
 
     @Test

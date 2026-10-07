@@ -58,6 +58,7 @@ import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.testsupport.BackendIntegrationTest;
+import com.bifos.assistant.testsupport.ConnectorCatalogTimes;
 import com.bifos.assistant.testsupport.ConnectorChangeRecorder;
 import com.bifos.assistant.testsupport.ConnectorChangeRecorder.Seen;
 import com.bifos.assistant.usage.domain.AgentExecution;
@@ -199,7 +200,7 @@ class ConnectorActionServiceTest {
         deleteRows();
         recorder.start();
         // 앞선 검사가 읽은 카탈로그가 남지 않게 보관 시간보다 멀리 옮긴다.
-        expireCatalog();
+        ConnectorCatalogTimes.expire();
         when(connector.readCatalog()).thenReturn(List.of(DECLARING));
         when(connector.execute(anyString(), anyString(), anyString(), anyString()))
                 .thenReturn(CallResult.success(JSON.readTree("{\"saved\":true}")));
@@ -841,7 +842,7 @@ class ConnectorActionServiceTest {
     void unreadableCatalogDoesNotWarnAboutHiddenArguments() {
         UUID hidden = ask(WRITE, "{\"text\":\"" + HIDDEN_TOKEN + "\"}").actionId();
         UUID plain = ask(WRITE, ARGS).actionId();
-        expireCatalog();
+        ConnectorCatalogTimes.expire();
         when(connector.readCatalog()).thenThrow(new IllegalStateException());
 
         assertThat(service.listForConversation(me, CONVERSATION))
@@ -866,7 +867,7 @@ class ConnectorActionServiceTest {
         assertThat(service.grants(me)).as("선언이 상시 허락을 닫았다").isEmpty();
         assertThat(grants.findAll()).as("줄은 지우지 않는다").hasSize(1);
 
-        expireCatalog();
+        ConnectorCatalogTimes.expire();
         when(connector.readCatalog()).thenThrow(new IllegalStateException());
         assertThat(service.grants(me))
                 .as("카탈로그를 읽지 못했다")
@@ -941,12 +942,12 @@ class ConnectorActionServiceTest {
                 .isEqualTo(earlier);
 
         grants.save(ConnectorToolGrant.of(owner.id(), DEMO, MAIL, now.plus(Duration.ofDays(1)), now));
-        expireCatalog();
+        ConnectorCatalogTimes.expire();
         when(connector.readCatalog()).thenThrow(new IllegalStateException());
         assertThat(service.revokeClosedGrants(now)).as("카탈로그를 읽지 못했다").isZero();
 
         doReturn(List.of(DECLARING)).when(connector).readCatalog();
-        expireCatalog();
+        ConnectorCatalogTimes.expire();
         assertThat(service.revokeClosedGrants(now)).as("닫은 도구의 유효한 줄 하나").isEqualTo(1);
     }
 
@@ -989,7 +990,7 @@ class ConnectorActionServiceTest {
     void grantIsRefusedWhenCatalogIsUnreadable() {
         catalogBecomes(legacyManifest());
         UUID actionId = ask(WRITE, ARGS).actionId();
-        expireCatalog();
+        ConnectorCatalogTimes.expire();
         when(connector.readCatalog()).thenThrow(new IllegalStateException());
 
         assertThat(service.listForConversation(me, CONVERSATION))
@@ -1119,7 +1120,7 @@ class ConnectorActionServiceTest {
     @DisplayName("승인할 때 카탈로그를 읽지 못하면 실행하지 않고 REJECTED 줄을 오류 없이 돌려준다")
     void approvalWithUnreadableCatalogRejectsTheAction() {
         UUID actionId = ask(WRITE, ARGS).actionId();
-        expireCatalog();
+        ConnectorCatalogTimes.expire();
         when(connector.readCatalog()).thenThrow(new IllegalStateException());
 
         ConnectorActionView closed = service.approve(me, actionId, null);
@@ -1339,7 +1340,7 @@ class ConnectorActionServiceTest {
     @DisplayName("카탈로그를 읽지 못해도 승인 줄 목록은 나오고 이름은 고정 문구다")
     void listSurvivesUnreadableCatalog() {
         UUID actionId = ask(WRITE, ARGS).actionId();
-        expireCatalog();
+        ConnectorCatalogTimes.expire();
         when(connector.readCatalog()).thenThrow(new IllegalStateException());
 
         List<ConnectorActionView> listed = service.listForConversation(me, CONVERSATION);
@@ -1412,7 +1413,7 @@ class ConnectorActionServiceTest {
     /** 카탈로그를 바꾸고, 다음 판정이 다시 읽게 보관 시간보다 멀리 옮긴다. */
     private void catalogBecomes(ConnectorManifest manifest) {
         when(connector.readCatalog()).thenReturn(List.of(manifest));
-        expireCatalog();
+        ConnectorCatalogTimes.expire();
     }
 
     private ConnectorAction onlyAction() {
@@ -1465,20 +1466,6 @@ class ConnectorActionServiceTest {
 
     private static ConnectorManifest manifest(List<ConnectorTool> tools) {
         return new ConnectorManifest(DEMO, "검사용 메모", "", List.of(), "list_scopes", "demo", List.of(), false, 2, tools);
-    }
-
-    /**
-     * 앞 검사나 앞 단계가 읽은 카탈로그와 읽기 실패가 지나가기를 기다린다. 캐시는 실제 시각으로 재고, 검사 설정의 보관 시간과 실패
-     * 기억 시간은 1ms 다. 2ms 는 그보다 반드시 길어 다음 읽기가 늘 카탈로그를 다시 읽는다. 캐시가 다시 읽을지 미리 알 방법이 없어
-     * 시간으로 기다린다.
-     */
-    private static void expireCatalog() {
-        try {
-            Thread.sleep(Duration.ofMillis(2));
-        } catch (InterruptedException ex) {
-            Thread.currentThread().interrupt();
-            throw new IllegalStateException("카탈로그 보관 시간을 기다리다 끊겼다", ex);
-        }
     }
 
     /** 이 검사가 쓰는 표를 비운다. 컨텍스트를 함께 쓰는 다음 검사에 행을 남기지 않게 검사 뒤에도 부른다. */

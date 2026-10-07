@@ -8,6 +8,7 @@ import com.bifos.assistant.connector.application.model.ConnectorActionChanged;
 import com.bifos.assistant.hermes.StubHermesRunsClient;
 import com.bifos.assistant.hermes.dto.SessionRuntime;
 import com.bifos.assistant.shared.auth.UserAccessRevoked;
+import com.bifos.assistant.shared.config.LiveProperties;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.UUID;
@@ -91,6 +92,57 @@ class IntegrationTestIsolationTest {
         } finally {
             hold.countDown();
             held.join();
+        }
+    }
+
+    @Test
+    @DisplayName("한 대역의 reset 이 던져도 설정과 다른 대역은 되돌리고, 처음 예외에 뒤의 예외를 붙여 던진다")
+    void resetsSettingsAndOtherDoublesWhenOneDoubleResetThrows() {
+        OverridableLiveProperties<String> setting =
+                new OverridableLiveProperties<>(LiveProperties.fixed(String.class, "startup"));
+        setting.override("changed");
+        StaticApplicationContext broken = new StaticApplicationContext();
+        try {
+            broken.getBeanFactory().registerSingleton("tasks", new TrackingBackgroundTasks());
+            broken.getBeanFactory().registerSingleton("setting", setting);
+            broken.getBeanFactory().registerSingleton("stub", new StubHermesRunsClient() {
+                @Override
+                public void reset() {
+                    throw new IllegalStateException("stub reset failed");
+                }
+            });
+            broken.getBeanFactory().registerSingleton("clock", clock);
+            broken.getBeanFactory().registerSingleton("scheduler", new CapturingTaskScheduler());
+            broken.getBeanFactory().registerSingleton("retryThreads", new WakeRetryThreads() {
+                @Override
+                public void reset() {
+                    throw new IllegalStateException("retry reset failed");
+                }
+            });
+            broken.getBeanFactory().registerSingleton("recorder", recorder);
+            broken.getBeanFactory().registerSingleton("revoker", revoker);
+            broken.getBeanFactory().registerSingleton("results", new TestAutoTurnResultSource());
+            broken.getBeanFactory().registerSingleton("failing", new AttentionTestCandidates.FailingCandidates());
+            broken.getBeanFactory().registerSingleton("counting", new AttentionTestCandidates.ReadCountingCandidates());
+            broken.refresh();
+
+            assertThatThrownBy(() -> IntegrationTestIsolation.afterTest(broken, Duration.ofSeconds(5)))
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessage("stub reset failed")
+                    .satisfies(thrown -> assertThat(thrown.getSuppressed())
+                            .as("뒤에 던진 대역의 예외가 붙어야 한다")
+                            .extracting(Throwable::getMessage)
+                            .containsExactly("retry reset failed"));
+
+            assertThat(setting.current()).as("바꾼 설정이 기동 값으로 돌아와야 한다").isEqualTo("startup");
+            assertThat(clock.instant()).as("던진 대역 뒤의 시계도 고정 시각에서 풀려야 한다").isNotEqualTo(FIXED);
+            assertThatCode(() -> revoker.on(new UserAccessRevoked(1L)))
+                    .as("던진 대역 뒤의 폐기 실패 대역도 꺼져야 한다")
+                    .doesNotThrowAnyException();
+            recorder.on(new ConnectorActionChanged(1L, UUID.randomUUID()));
+            assertThat(recorder.seen()).as("던진 대역 뒤의 사건 기록 대역도 꺼져야 한다").isEmpty();
+        } finally {
+            broken.close();
         }
     }
 

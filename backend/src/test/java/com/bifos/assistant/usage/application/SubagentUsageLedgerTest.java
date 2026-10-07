@@ -8,6 +8,7 @@ import com.bifos.assistant.agent.domain.type.CostMode;
 import com.bifos.assistant.agent.domain.type.CredentialScope;
 import com.bifos.assistant.agent.infra.AgentRepository;
 import com.bifos.assistant.hermes.StubHermesRunsClient;
+import com.bifos.assistant.hermes.StubHermesRunsClient.SessionLookup;
 import com.bifos.assistant.hermes.dto.SubagentSessionUsage;
 import com.bifos.assistant.testsupport.BackendIntegrationTest;
 import com.bifos.assistant.testsupport.SamplePriceCatalog;
@@ -258,6 +259,7 @@ class SubagentUsageLedgerTest {
         assertThat(second.pricedSubagents()).isOne();
         assertThat(second.pendingSubagents()).isZero();
         assertThat(second.estimatedMicros()).isEqualTo(PARENT_MICROS + CHILD_MICROS);
+        assertAskedAgentFor(CHILD);
     }
 
     @Test
@@ -271,6 +273,7 @@ class SubagentUsageLedgerTest {
         reconciler.discover(now);
         reconciler.poll(onlyJob().id());
 
+        assertAskedAgentFor(CHILD);
         assertThat(jobs.findByExecutionIdIn(List.of(parent.id()))).hasSize(1);
         MonthlyUsageSummary summary = summaries.monthly(USER_ID, from, to);
         assertThat(summary.pricedSubagents()).isOne();
@@ -315,6 +318,7 @@ class SubagentUsageLedgerTest {
         reconciler.discover(now);
         reconciler.poll(onlyJob().id());
 
+        assertAskedAgentFor(CHILD);
         assertThat(jobs.findByExecutionIdIn(List.of(parent.id()))).hasSize(1);
         assertThat(events.findByExecutionIdInOrderByExecutionIdAscSequenceAsc(List.of(parent.id())))
                 .filteredOn(event -> event.eventType() == ExecutionEventType.SUBAGENT_COMPLETED)
@@ -471,7 +475,19 @@ class SubagentUsageLedgerTest {
         reconciler.discover(now);
         SubagentUsageJob job = onlyJob();
         reconciler.poll(job.id());
+        assertAskedAgentFor(session);
         return jobs.findById(job.id()).orElseThrow();
+    }
+
+    /**
+     * 자식 session 조회가 모두 그 에이전트의 Hermes 주소와 profile 로, 그 session 을 물었는지 본다. 대역은 session 만 보고 답하므로
+     * 주소와 profile 이 틀려도 답이 나온다. 그래서 받은 값을 따로 확인한다.
+     */
+    private void assertAskedAgentFor(String session) {
+        assertThat(hermes.subagentUsageLookups())
+                .as("자식 session 조회가 받은 주소와 profile, session")
+                .isNotEmpty()
+                .containsOnly(new SessionLookup(agent.apiBaseUrl(), agent.hermesProfile(), session));
     }
 
     private SubagentUsageJob onlyJob() {

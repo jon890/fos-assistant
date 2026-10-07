@@ -9,6 +9,7 @@ import java.nio.file.Path;
 import java.nio.file.attribute.FileTime;
 import java.time.Instant;
 import org.springframework.beans.factory.config.BeanPostProcessor;
+import org.springframework.boot.task.ThreadPoolTaskSchedulerBuilder;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Primary;
@@ -50,11 +51,16 @@ public class IntegrationTestDoubles {
         return new TrackingBackgroundTasks();
     }
 
-    /** 기본은 모든 예약을 실제로 건다. 운영에 스케줄러 빈이 없어 이 빈이 {@code @Scheduled} 실행까지 맡는다. */
+    /**
+     * 기본은 모든 예약을 실제로 건다. 운영에 스케줄러 빈이 없어 이 빈이 {@code @Scheduled} 실행까지 맡는다.
+     *
+     * <p>Boot 자동 설정의 builder 로 만들어 운영 스케줄러와 같은 {@code spring.task.scheduling.*} 값(스레드 수, 이름 앞부분, 종료 대기)을
+     * 받는다.
+     */
     @Bean
     @Primary
-    CapturingTaskScheduler capturingTaskScheduler() {
-        return new CapturingTaskScheduler();
+    CapturingTaskScheduler capturingTaskScheduler(ThreadPoolTaskSchedulerBuilder builder) {
+        return builder.configure(new CapturingTaskScheduler());
     }
 
     /** 기본은 아무것도 모으지 않는다. */

@@ -8,7 +8,7 @@
     검사는 선언형 주석 `@OverrideProperties` 로 값을 정하고, 공통 확장이 검사 전에 적용하고 검사 뒤에 기동 값으로 되돌린다.
   - Hermes 대역, 시험 시계, 백그라운드 작업 실행기, Hermes 클라이언트 mock, 검사가 동작을 바꾸는 운영 빈의 spy 는 기반 한곳에 둔다.
   - 검사 하나만 쓰던 mock 은 기반의 spy 로 올린다. 검사 하나만 쓰던 대역 설정은 꺼 두면 아무것도 하지 않는 대역으로 기반에 올리고, 그 검사가 켠다.
-  - 검사 클래스에 컨텍스트 키를 바꾸는 선언(`@MockitoBean`, `@MockitoSpyBean`, `@Import`, `@TestPropertySource`, `@DynamicPropertySource`, `@ContextConfiguration`, `@ActiveProfiles`, `@DirtiesContext`, 중첩 `@TestConfiguration`)을 두지 않는다. 구조 규칙으로 확인한다.
+  - 검사 클래스에 컨텍스트 키를 바꾸는 선언(`@MockitoBean`, `@MockitoSpyBean`, `@Import`, `@TestPropertySource`, 중첩 `@TestConfiguration` 등)을 두지 않는다. 구조 규칙으로 확인하고, 막는 목록은 그 규칙이 갖는다. `@Tag("mysql")` 검사는 예외다.
   - 컨텍스트를 함께 쓰는 검사 사이의 격리는 JUnit 확장 하나가 맡는다.
 - **맥락**:
   - 2026-10-07 측정에서 `@SpringBootTest` 검사 141개(MySQL 태그 제외)가 컨텍스트를 77번 띄웠다(그날 origin/main 을 두 번 합치기 전. 합친 뒤 main 기준선은 79번).

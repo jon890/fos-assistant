@@ -9,6 +9,7 @@ import com.bifos.assistant.agent.domain.type.CredentialScope;
 import com.bifos.assistant.chat.domain.Conversation;
 import com.bifos.assistant.chat.infra.ConversationRepository;
 import com.bifos.assistant.hermes.StubHermesRunsClient;
+import com.bifos.assistant.hermes.StubHermesRunsClient.SessionLookup;
 import com.bifos.assistant.hermes.dto.HermesRunResult;
 import com.bifos.assistant.hermes.dto.SessionRuntime;
 import com.bifos.assistant.hermes.dto.TokenUsage;
@@ -209,7 +210,9 @@ class UsageCostRecordingTest {
 
         AgentExecution failed = recorder.fail(execution, agent, result, requested(agent), "FAILED");
 
-        assertThat(hermes.sessionLookups()).as("실제 모델을 물은 세션").containsExactly("failed-session");
+        assertThat(hermes.sessionLookups())
+                .as("그 에이전트의 주소와 profile 로 실제 모델을 물은 세션")
+                .containsExactly(new SessionLookup(agent.apiBaseUrl(), agent.hermesProfile(), "failed-session"));
         assertThat(failed.provider()).isEqualTo("anthropic");
         assertThat(failed.model()).isEqualTo("example-model-large");
         assertThat(failed.cachedInputTokens()).isNull();

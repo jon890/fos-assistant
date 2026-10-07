@@ -1,5 +1,6 @@
 package com.bifos.assistant.testsupport;
 
+import com.bifos.assistant.connector.application.ConnectorPolicyProperties;
 import com.bifos.assistant.hermes.HermesProperties;
 import com.bifos.assistant.hermes.StubHermesRunsClient;
 import com.bifos.assistant.proactive.application.ProactiveCheckProperties;
@@ -46,12 +47,22 @@ public class IntegrationTestIsolation implements BeforeEachCallback, AfterEachCa
 
     private static final Duration IDLE_LIMIT = Duration.ofSeconds(30);
 
-    /** {@link LiveProperties} 로 읽는 칸이 일부뿐인 설정이다. 여기 적은 키만 바꿀 수 있다. */
+    /**
+     * {@link LiveProperties} 로 읽는 칸이 일부뿐인 설정이다. 여기 적은 키만 바꿀 수 있다.
+     *
+     * <p>커넥터 정책의 {@code expire-cron} 은 {@code @Scheduled} 가 기동 때 한 번 읽으므로 바꿔도 일정이 그대로다. 그래서 목록에
+     * 넣지 않는다.
+     */
     private static final Map<Class<?>, Set<ConfigurationPropertyName>> PARTIAL = Map.of(
             HermesProperties.class,
             Set.of(
                     ConfigurationPropertyName.of("hermes.run-timeout"),
-                    ConfigurationPropertyName.of("hermes.poll-interval")));
+                    ConfigurationPropertyName.of("hermes.poll-interval")),
+            ConnectorPolicyProperties.class,
+            Set.of(
+                    ConfigurationPropertyName.of("assistant.connector.policy.catalog-ttl"),
+                    ConfigurationPropertyName.of("assistant.connector.policy.catalog-failure-ttl"),
+                    ConfigurationPropertyName.of("assistant.connector.policy.approval-ttl")));
 
     @Override
     public void beforeEach(ExtensionContext context) {
@@ -129,17 +140,47 @@ public class IntegrationTestIsolation implements BeforeEachCallback, AfterEachCa
         bound.forEach(OverridableLiveProperties::override);
     }
 
+    /**
+     * 설정을 먼저 되돌리고 대역을 하나씩 되돌린다. 한 항목이 던져도 나머지는 되돌린다. 남은 대역과 설정은 원인과 먼 다음 검사를 흔든다.
+     *
+     * @throws RuntimeException 처음 던진 것. {@link Error} 이면 그대로 던진다. 그 뒤에 던진 것은 suppressed 로 붙는다
+     */
     private static void reset(ApplicationContext context) {
-        context.getBean(StubHermesRunsClient.class).reset();
-        context.getBean(TestClock.class).reset();
-        context.getBean(CapturingTaskScheduler.class).reset();
-        context.getBean(WakeRetryThreads.class).reset();
-        context.getBean(ConnectorChangeRecorder.class).reset();
-        context.getBean(FailingAccessRevoker.class).reset();
-        context.getBean(TestAutoTurnResultSource.class).reset();
-        context.getBean(AttentionTestCandidates.FailingCandidates.class).reset();
-        context.getBean(AttentionTestCandidates.ReadCountingCandidates.class).reset();
-        overridables(context).forEach(OverridableLiveProperties::reset);
+        List<Throwable> failures = new ArrayList<>();
+        attempt(failures, () -> overridables(context).forEach(OverridableLiveProperties::reset));
+        attempt(failures, () -> context.getBean(StubHermesRunsClient.class).reset());
+        attempt(failures, () -> context.getBean(TestClock.class).reset());
+        attempt(failures, () -> context.getBean(CapturingTaskScheduler.class).reset());
+        attempt(failures, () -> context.getBean(WakeRetryThreads.class).reset());
+        attempt(failures, () -> context.getBean(ConnectorChangeRecorder.class).reset());
+        attempt(failures, () -> context.getBean(FailingAccessRevoker.class).reset());
+        attempt(failures, () -> context.getBean(TestAutoTurnResultSource.class).reset());
+        attempt(
+                failures,
+                () -> context.getBean(AttentionTestCandidates.FailingCandidates.class)
+                        .reset());
+        attempt(
+                failures,
+                () -> context.getBean(AttentionTestCandidates.ReadCountingCandidates.class)
+                        .reset());
+        if (failures.isEmpty()) {
+            return;
+        }
+        Throwable first = failures.getFirst();
+        failures.subList(1, failures.size()).forEach(first::addSuppressed);
+        if (first instanceof RuntimeException runtime) {
+            throw runtime;
+        }
+        throw (Error) first;
+    }
+
+    /** 되돌리기 하나를 돌리고, 던지면 모아 둔다. 단언 실패 같은 {@link Error} 도 모아 뒤 항목을 막지 않는다. */
+    private static void attempt(List<Throwable> failures, Runnable step) {
+        try {
+            step.run();
+        } catch (RuntimeException | Error ex) {
+            failures.add(ex);
+        }
     }
 
     private static List<OverridableLiveProperties<?>> overridables(ApplicationContext context) {
