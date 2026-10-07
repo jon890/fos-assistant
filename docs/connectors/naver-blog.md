@@ -44,7 +44,7 @@ MCP 서버 이름은 `naver-blog` 다.
 | 도구 | 인자 | 결과 |
 | --- | --- | --- |
 | `session_status` | 없음 | `{browser: "connected", logged_in: true, blog_id}`. 로그인 쿠키가 없으면 `NAVER_BLOG_LOGIN_REQUIRED` 로 실패한다 |
-| `render_draft` | 아래 「초안」 의 다섯 칸, `photo_notes`(사진 번호를 키로 한 사진 설명, 선택), `artifact_path`(결과물 폴더 안의 `<폴더>/index.html`), `kind`(`preview` 나 `package`, 기본 `preview`) | `{problems: [], html, assets}`. 초안이 계약을 어기면 `html` 없이 `problems` 에 어긋난 자리를 문장으로 담는다. `assets` 는 미리보기가 부르는 스티커 그림을 결과물 폴더에 받아 둘 `[{path, source_url}]` 이다 |
+| `render_draft` | 아래 「초안」 의 다섯 칸, `photo_notes`(사진 번호를 키로 한 사진 설명, 선택), `artifact_path`(결과물 폴더 안의 `index.html` 이나 `<폴더>/index.html`, 폴더는 세 단계까지), `kind`(`preview` 나 `package`, 기본 `preview`) | `{problems: [], html, assets}`. 초안이 계약을 어기면 `html` 없이 `problems` 에 어긋난 자리를 문장으로 담는다. `assets` 는 미리보기가 부르는 스티커 그림을 결과물 폴더에 받아 둘 `[{path, source_url}]` 이다 |
 | `save_draft` | 아래 「초안」 의 다섯 칸 | `{job_id, status: "running"}`. `job_id` 는 UUID 다 |
 | `draft_job` | `job_id`, `wait_seconds`(0~50, 기본 45) | 아래 「작업」 의 상태 |
 
@@ -96,7 +96,8 @@ MCP 서버 이름은 `naver-blog` 다.
 
 - 네이버 모바일 화면 폭으로 그린다. 사진 자리마다 몇 번째 사진인지와 `photo_notes` 의 설명을 붙인다. 설명은 미리보기에만 보이고 네이버에는 들어가지 않는다
 - 사진은 바이트를 담지 않고 같은 대화의 첨부 주소를 상대 경로로 부른다. 파일 이름이 `<첨부 번호>.<확장자>` 인 사진만 그렇게 그리고, 다른 이름이면 이름표만 보인다. 계약은 [결과물 파일](../backend/artifact.md) 의 「같은 대화의 첨부 사진을 부를 때」 가 갖는다
-- `artifact_path` 는 `<폴더>/index.html` 한 단계만 받는다. 상대 경로의 깊이가 거기에 맞춰져 있다
+- `artifact_path` 는 `index.html` 이나 `<폴더>/index.html` 이고 폴더는 세 단계까지 받는다. 사진 주소의 `../` 수를 그 깊이로 정한다(`index.html` 은 `../attachments`, `a/index.html` 은 `../../attachments`)
+- 에이전트는 `artifact_write` 의 `path` 를 `artifact_path` 와 글자까지 같게 준다. 다른 깊이에 쓰면 사진 주소가 풀리지 않아 사진이 보이지 않는다. 2026-10-07 운영에서 `<폴더>/index.html` 로 그린 HTML 을 `index.html` 에 써서 사진이 404 였다
 - 스티커는 네이버 편집기에 들어가는 것과 같은 그림으로 보인다. 결과물 화면은 외부 그림을 막으므로(`img-src 'self' data:`) HTML 은 `stickers/<코드>.png` 를 상대 경로로 부르고, 에이전트가 `assets` 의 항목마다 `artifact_write` 의 주소 방식(`source_url`)으로 그 그림을 같은 폴더에 받아 둔다
 - OGQ 스티커 코드 `ogq_<묶음>-<번호>` 의 그림 주소는 `https://storep-phinf.pstatic.net/ogq_<묶음>/original_<번호>.png?type=p100_100` 이다. 2026-10-07 에 공개 묶음 하나로 받아 370×320 PNG 를 확인했다. 그 모양이 아닌 코드와 받지 못한 그림은 이름표로 보인다
 - 주소 방식은 Control Plane 의 `assistant.artifact.source.allowed-hosts` 에 `storep-phinf.pstatic.net` 이 있어야 된다. 없으면 `artifact_write` 가 거절하고 스티커는 이름표로 보인다
