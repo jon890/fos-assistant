@@ -21,10 +21,10 @@ import com.bifos.assistant.shared.auth.CurrentUserProvider;
 import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
-import java.time.Clock;
+import com.bifos.assistant.testsupport.BackendIntegrationTest;
+import com.bifos.assistant.testsupport.TestClock;
 import java.time.Duration;
 import java.time.Instant;
-import java.time.ZoneOffset;
 import java.util.List;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -33,34 +33,20 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.context.TestConfiguration;
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Import;
-import org.springframework.context.annotation.Primary;
-import org.springframework.test.context.ActiveProfiles;
 
 /**
  * 지표 사건을 {@code trigger} 별로 세는 것과 보관 기간 정리를 본다. 셈은 {@code docs/backend/attention.md} 의 「지표」 다.
  *
  * <p>지표는 모든 사용자의 사건을 세므로 검사마다 사건 표를 비운다. 사건은 저장소로 바로 넣는다. 시각은 이 검사의 시계가 정한다.
  */
-@SpringBootTest
-@ActiveProfiles("test")
-@Import(AttentionMetricsServiceTest.FixedClock.class)
+@BackendIntegrationTest
 class AttentionMetricsServiceTest {
 
     private static final Instant NOW = Instant.parse("2026-10-04T09:00:00Z");
     private static final Long USER = 7_001L;
 
-    @TestConfiguration
-    static class FixedClock {
-        @Bean
-        @Primary
-        Clock attentionMetricsTestClock() {
-            return Clock.fixed(NOW, ZoneOffset.UTC);
-        }
-    }
+    @Autowired
+    TestClock clock;
 
     @Autowired
     AttentionMetricsService metrics;
@@ -73,6 +59,7 @@ class AttentionMetricsServiceTest {
 
     @BeforeEach
     void setUp() {
+        clock.set(NOW);
         events.deleteAll();
     }
 

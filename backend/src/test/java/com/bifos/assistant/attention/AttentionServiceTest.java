@@ -9,9 +9,7 @@ import com.bifos.assistant.agent.domain.type.AgentVisibility;
 import com.bifos.assistant.agent.domain.type.CostMode;
 import com.bifos.assistant.agent.domain.type.CredentialScope;
 import com.bifos.assistant.agent.infra.AgentRepository;
-import com.bifos.assistant.attention.application.AttentionCandidates;
 import com.bifos.assistant.attention.application.AttentionService;
-import com.bifos.assistant.attention.application.model.AttentionCandidate;
 import com.bifos.assistant.attention.application.model.AttentionCard;
 import com.bifos.assistant.attention.application.model.AttentionItem;
 import com.bifos.assistant.attention.application.model.AttentionSignal;
@@ -35,6 +33,9 @@ import com.bifos.assistant.hermes.dto.ConnectorTool;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.shared.util.Sha256;
+import com.bifos.assistant.testsupport.AttentionTestCandidates;
+import com.bifos.assistant.testsupport.BackendIntegrationTest;
+import com.bifos.assistant.testsupport.TestClock;
 import com.bifos.assistant.usage.domain.AgentExecution;
 import com.bifos.assistant.usage.domain.type.ExecutionStatus;
 import com.bifos.assistant.usage.infra.AgentExecutionRepository;
@@ -42,30 +43,19 @@ import com.bifos.assistant.user.domain.AppUser;
 import com.bifos.assistant.user.infra.AppUserRepository;
 import java.nio.ByteBuffer;
 import java.sql.Timestamp;
-import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
-import java.time.ZoneId;
-import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.context.TestConfiguration;
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Import;
-import org.springframework.context.annotation.Primary;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.test.context.ActiveProfiles;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 import tools.jackson.databind.json.JsonMapper;
@@ -76,14 +66,10 @@ import tools.jackson.databind.json.JsonMapper;
  * <p>시각은 이 검사의 시계가 정한다. 사용자는 검사마다 새로 만들어 다른 검사의 줄과 섞이지 않게 하고, 끝나면 그 사용자의 줄을
  * 지운다. 커넥터 카탈로그는 대역이 답한다.
  */
-@SpringBootTest
-@ActiveProfiles("test")
-@Import(AttentionServiceTest.FixedClock.class)
+@BackendIntegrationTest
 class AttentionServiceTest {
 
     private static final Instant NOW = Instant.parse("2026-10-04T09:00:00Z");
-    private static final TestClock CLOCK = new TestClock(NOW);
-    private static final FailingCandidates FAILING = new FailingCandidates();
 
     private static final String CONNECTOR = "attention-notes";
     private static final String WRITE = "write_note";
@@ -103,22 +89,10 @@ class AttentionServiceTest {
                     new ConnectorTool("list_scopes", "READ", "none", null, null),
                     new ConnectorTool(WRITE, "WRITE", "required", "메모 쓰기", null)));
 
-    @TestConfiguration
-    static class FixedClock {
-        @Bean
-        @Primary
-        Clock attentionTestClock() {
-            return CLOCK;
-        }
+    @Autowired
+    TestClock clock;
 
-        /** 나를 기다리는 카드의 기록 읽기를 실패시킬 수 있는 대역이다. 꺼 두면 후보를 내지 않는다. */
-        @Bean
-        AttentionCandidates failingNeedsMeCandidates() {
-            return FAILING;
-        }
-    }
-
-    @MockitoBean
+    @Autowired
     HermesConnectorClient connector;
 
     @Autowired
@@ -151,14 +125,17 @@ class AttentionServiceTest {
     @Autowired
     JdbcTemplate jdbc;
 
+    /** 켜면 나를 기다리는 카드의 출처 하나가 읽기에 실패한다. */
+    @Autowired
+    AttentionTestCandidates.FailingCandidates failingCandidates;
+
     private final List<Long> createdUsers = new ArrayList<>();
     private CurrentUser dad;
     private Agent chief;
 
     @BeforeEach
     void setUp() {
-        CLOCK.set(NOW);
-        FAILING.failing = false;
+        clock.set(NOW);
         when(connector.readCatalog()).thenReturn(List.of(MANIFEST));
         dad = member();
         chief = agentOf(dad, "집안일 도우미");
@@ -167,7 +144,6 @@ class AttentionServiceTest {
     @AfterEach
     void tearDown() {
         SecurityContextHolder.clearContext();
-        FAILING.failing = false;
         for (Long userId : createdUsers) {
             jdbc.update("DELETE FROM attention_event WHERE user_id = ?", userId);
             jdbc.update("DELETE FROM attention_control WHERE user_id = ?", userId);
@@ -491,7 +467,7 @@ class AttentionServiceTest {
         message(ChatMessage.fromUser(conversation.id(), dad.id(), "목록 정리해 줘", NOW.minusSeconds(600)));
         failedRoot(dad, conversation, NOW.minusSeconds(600), NOW.minusSeconds(540));
         insertPendingAction(dad, conversation.id(), NOW.plus(Duration.ofHours(3)));
-        FAILING.failing = true;
+        failingCandidates.fail();
 
         AttentionView view = service.view(dad);
 
@@ -617,51 +593,5 @@ class AttentionServiceTest {
         List<AttentionItem> items = card(view, key).items();
         assertThat(items).as("카드 %s 의 항목", key).hasSize(1);
         return items.getFirst();
-    }
-
-    /** 켜 두면 기록 읽기가 실패하는 나를 기다리는 카드의 출처다. */
-    static final class FailingCandidates implements AttentionCandidates {
-        volatile boolean failing;
-
-        @Override
-        public Set<CardKey> cards() {
-            return Set.of(CardKey.NEEDS_ME);
-        }
-
-        @Override
-        public List<AttentionCandidate> read(CurrentUser user, Instant now) {
-            if (failing) {
-                throw new IllegalStateException("검사가 낸 읽기 실패");
-            }
-            return List.of();
-        }
-    }
-
-    /** 검사가 정한 시각만 주는 시계다. */
-    static final class TestClock extends Clock {
-        private volatile Instant now;
-
-        TestClock(Instant now) {
-            this.now = now;
-        }
-
-        void set(Instant instant) {
-            now = instant;
-        }
-
-        @Override
-        public Instant instant() {
-            return now;
-        }
-
-        @Override
-        public ZoneId getZone() {
-            return ZoneOffset.UTC;
-        }
-
-        @Override
-        public Clock withZone(ZoneId zone) {
-            return this;
-        }
     }
 }

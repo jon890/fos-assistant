@@ -116,6 +116,20 @@ class ArchitectureRulesTest {
     }
 
     @Test
+    @DisplayName("가상 스레드를 BackgroundTasks 와 SSE 연결 밖에서 새로 직접 띄우지 않는다")
+    void virtualThreadsOnlyThroughBackgroundTasks() {
+        FreezingArchRule.freeze(ArchitectureRules.VIRTUAL_THREADS_ONLY_THROUGH_BACKGROUND_TASKS)
+                .check(MAIN);
+    }
+
+    @Test
+    @DisplayName("Executors.newVirtualThreadPerTaskExecutor 를 ResearchAndBuildFlow 밖에서 새로 부르지 않는다")
+    void virtualThreadExecutorOnlyInResearchAndBuildFlow() {
+        FreezingArchRule.freeze(ArchitectureRules.VIRTUAL_THREAD_EXECUTOR_ONLY_IN_RESEARCH_AND_BUILD_FLOW)
+                .check(MAIN);
+    }
+
+    @Test
     @DisplayName("ConfigurationProperties 클래스에 Validated 가 붙는다")
     void configurationPropertiesAreValidated() {
         FreezingArchRule.freeze(ArchitectureRules.CONFIGURATION_PROPERTIES_ARE_VALIDATED)
@@ -141,6 +155,26 @@ class ArchitectureRulesTest {
     void domainTypeDependsOnNothingAbove() {
         FreezingArchRule.freeze(ArchitectureRules.DOMAIN_TYPE_DEPENDS_ON_NOTHING_ABOVE)
                 .check(MAIN);
+    }
+
+    @Test
+    @DisplayName("실행 중에 쓰는 설정 record 를 LivePropertiesConfig 밖에서 새로 주입받지 않는다")
+    void liveSettingsOnlyThroughLiveProperties() {
+        FreezingArchRule.freeze(ArchitectureRules.LIVE_SETTINGS_ONLY_THROUGH_LIVE_PROPERTIES)
+                .check(MAIN);
+    }
+
+    @Test
+    @DisplayName("hermes 의 runTimeout 과 pollInterval 을 LiveProperties 밖에서 새로 읽지 않는다")
+    void hermesTimeoutsOnlyThroughLiveProperties() {
+        FreezingArchRule.freeze(ArchitectureRules.HERMES_TIMEOUTS_ONLY_THROUGH_LIVE_PROPERTIES)
+                .check(MAIN);
+    }
+
+    @Test
+    @DisplayName("testsupport 밖의 검사 클래스가 Spring 컨텍스트를 나누는 선언을 두지 않는다")
+    void testsDoNotSplitContext() {
+        FreezingArchRule.freeze(ArchitectureRules.TESTS_DO_NOT_SPLIT_CONTEXT).check(TESTS);
     }
 
     @Test

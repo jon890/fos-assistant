@@ -13,6 +13,8 @@ import com.bifos.assistant.proactive.infra.ProactiveCheckFindingRepository;
 import com.bifos.assistant.proactive.infra.ProactiveCheckProblemRepository;
 import com.bifos.assistant.proactive.infra.ProactiveCheckRepository;
 import com.bifos.assistant.shared.auth.CurrentUser;
+import com.bifos.assistant.shared.concurrent.BackgroundTasks;
+import com.bifos.assistant.shared.config.LiveProperties;
 import com.bifos.assistant.usage.domain.AgentExecution;
 import com.bifos.assistant.usage.infra.AgentExecutionRepository;
 import java.time.Clock;
@@ -92,7 +94,7 @@ public class ProactiveCheckRun implements CheckTurn {
      * @param followUps 문제 후보가 이미 챙기는 할 일과 같은지 본다
      */
     record Deps(
-            ProactiveCheckProperties properties,
+            LiveProperties<ProactiveCheckProperties> properties,
             ProactiveCheckRepository checks,
             ProactiveCheckFindingRepository findings,
             ProactiveCheckProblemRepository problems,
@@ -104,7 +106,8 @@ public class ProactiveCheckRun implements CheckTurn {
             CheckAnswerRenderer renderer,
             CheckReportFactory reportFactory,
             ChatService chat,
-            Clock clock) {}
+            Clock clock,
+            BackgroundTasks backgroundTasks) {}
 
     /**
      * @param check 이미 저장한 {@code RUNNING} 살펴보기 줄

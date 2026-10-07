@@ -7,6 +7,7 @@ import com.bifos.assistant.hermes.HermesModelClient;
 import com.bifos.assistant.people.domain.AllowedPerson;
 import com.bifos.assistant.people.infra.AllowedPersonRepository;
 import com.bifos.assistant.shared.auth.CurrentUser;
+import com.bifos.assistant.testsupport.BackendIntegrationTest;
 import com.bifos.assistant.user.application.AllowedUserResolver;
 import com.bifos.assistant.user.domain.AppUser;
 import com.bifos.assistant.user.infra.AppUserRepository;
@@ -16,17 +17,13 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.test.context.ActiveProfiles;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 /**
  * 허용 목록에서 꺼진 주소가 요청마다 막히는지 실제 데이터베이스에서 본다(ADR-059).
  *
  * <p>줄이 꺼져 있을 때만 막는다. 줄이 없는 주소는 막지 않는다.
  */
-@SpringBootTest
-@ActiveProfiles("test")
+@BackendIntegrationTest
 class RevokedUserTest {
 
     private static final String EMAIL = "aunt@example.com";
@@ -46,7 +43,7 @@ class RevokedUserTest {
     AgentRepository agents;
 
     /** 사용자를 만들 때 Hermes 를 부르지 않게 대역으로 둔다. */
-    @MockitoBean
+    @Autowired
     HermesModelClient hermesModels;
 
     @BeforeEach

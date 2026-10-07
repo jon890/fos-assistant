@@ -59,6 +59,9 @@ import com.bifos.assistant.task.domain.type.TaskState;
 import com.bifos.assistant.task.infra.TaskRepository;
 import com.bifos.assistant.task.infra.TaskRunRepository;
 import com.bifos.assistant.task.infra.TaskTriggerRepository;
+import com.bifos.assistant.testsupport.BackendIntegrationTest;
+import com.bifos.assistant.testsupport.LongProactiveCheckTimeouts;
+import com.bifos.assistant.testsupport.SmallExecutionLimit;
 import com.bifos.assistant.usage.application.TurnSlot;
 import com.bifos.assistant.usage.application.UserExecutionLimiter;
 import com.bifos.assistant.user.domain.AppUser;
@@ -78,15 +81,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.context.TestConfiguration;
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Import;
-import org.springframework.context.annotation.Primary;
 import org.springframework.data.domain.PageRequest;
-import org.springframework.test.context.ActiveProfiles;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
-import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -101,14 +96,9 @@ import org.springframework.transaction.support.TransactionTemplate;
  * <p>CHECK 발화는 살펴보기 turn 을 돌린다. 시험 프로필의 살펴보기 시간 상한(500ms)은 느린 러너에서 turn 이 끝나기 전에 닿으므로
  * 다른 살펴보기 검사처럼 Hermes 실행 한도와 함께 올린다.
  */
-@SpringBootTest(
-        properties = {
-            "assistant.user-execution.max-running=2",
-            "hermes.run-timeout=30s",
-            "assistant.proactive-check.max-duration=20s"
-        })
-@ActiveProfiles("test")
-@Import(TaskRunStarterTest.StubHermes.class)
+@BackendIntegrationTest
+@SmallExecutionLimit
+@LongProactiveCheckTimeouts
 class TaskRunStarterTest {
 
     private static final Duration WAIT_LIMIT = Duration.ofSeconds(10);
@@ -118,27 +108,18 @@ class TaskRunStarterTest {
     private static final String TITLE = "매달 정리";
     private static final String INSTRUCTION = "지난달 기록을 보고 정리해 줘";
 
-    @TestConfiguration
-    static class StubHermes {
-        @Bean
-        @Primary
-        StubHermesRunsClient taskStubHermesRunsClient() {
-            return new StubHermesRunsClient();
-        }
-    }
-
     /** 답 조각은 이 검사가 보지 않는다. 실제 스트림 주소로 연결하지 않게 대역으로 둔다. */
-    @MockitoBean
+    @Autowired
     HermesRunEventStream eventStream;
 
-    @MockitoBean
+    @Autowired
     HermesToolsetClient toolsets;
 
-    @MockitoBean
+    @Autowired
     HermesSkillClient skillClient;
 
     /** 시작 단계가 대화를 만드는 사이에 다른 트랜잭션을 끼워 넣는다. 끼우지 않은 검사에서는 실제 메서드가 그대로 돈다. */
-    @MockitoSpyBean
+    @Autowired
     ChatService chat;
 
     @Autowired
@@ -150,7 +131,7 @@ class TaskRunStarterTest {
     @Autowired
     HermesRunsClient hermes;
 
-    @MockitoSpyBean
+    @Autowired
     TurnCancellation turns;
 
     @Autowired

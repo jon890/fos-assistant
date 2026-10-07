@@ -1,15 +1,17 @@
 package com.bifos.assistant.usage.application;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.Mockito.when;
 
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.agent.domain.type.AgentVisibility;
 import com.bifos.assistant.agent.domain.type.CostMode;
 import com.bifos.assistant.agent.domain.type.CredentialScope;
 import com.bifos.assistant.agent.infra.AgentRepository;
-import com.bifos.assistant.hermes.HermesRunsClient;
+import com.bifos.assistant.hermes.StubHermesRunsClient;
+import com.bifos.assistant.hermes.StubHermesRunsClient.SessionLookup;
 import com.bifos.assistant.hermes.dto.SubagentSessionUsage;
+import com.bifos.assistant.testsupport.BackendIntegrationTest;
+import com.bifos.assistant.testsupport.SamplePriceCatalog;
 import com.bifos.assistant.usage.domain.AgentExecution;
 import com.bifos.assistant.usage.domain.CostByAgent;
 import com.bifos.assistant.usage.domain.CostByDay;
@@ -23,8 +25,6 @@ import com.bifos.assistant.usage.domain.type.ExecutionStatus;
 import com.bifos.assistant.usage.infra.AgentExecutionRepository;
 import com.bifos.assistant.usage.infra.ExecutionEventRepository;
 import com.bifos.assistant.usage.infra.SubagentUsageJobRepository;
-import java.net.URISyntaxException;
-import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneId;
@@ -34,11 +34,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.test.context.ActiveProfiles;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 /**
  * native 자식의 원장 줄이 월 합계와 축별 합계에 한 번만 더해지고, 금액을 확인하지 못한 자식이 건수로
@@ -46,8 +41,8 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
  *
  * <p>재조회 빈이 실제 시계를 읽으므로 시각은 모두 검사를 시작한 순간에서 떨어진 거리로 적는다.
  */
-@SpringBootTest
-@ActiveProfiles("test")
+@BackendIntegrationTest
+@SamplePriceCatalog
 class SubagentUsageLedgerTest {
 
     private static final Long USER_ID = 4_501L;
@@ -106,28 +101,13 @@ class SubagentUsageLedgerTest {
     AgentRepository agents;
 
     /** 자식 session 조회만 대역으로 바꾼다. 저장소와 재조회는 실제 빈이다. */
-    @MockitoBean
-    HermesRunsClient hermes;
+    @Autowired
+    StubHermesRunsClient hermes;
 
     private Agent agent;
     private Instant now;
     private Instant from;
     private Instant to;
-
-    @DynamicPropertySource
-    static void pointAtTheSampleCatalog(DynamicPropertyRegistry registry) {
-        registry.add("assistant.pricing.catalog-path", () -> sampleCatalog().toString());
-    }
-
-    private static Path sampleCatalog() {
-        try {
-            return Path.of(SubagentUsageLedgerTest.class
-                    .getResource("/pricing/models-dev-sample.json")
-                    .toURI());
-        } catch (URISyntaxException ex) {
-            throw new IllegalStateException(ex);
-        }
-    }
 
     @BeforeEach
     void startFromAnEmptyLedger() {
@@ -308,6 +288,7 @@ class SubagentUsageLedgerTest {
         assertThat(second.pricedSubagents()).isOne();
         assertThat(second.pendingSubagents()).isZero();
         assertThat(second.estimatedMicros()).isEqualTo(PARENT_MICROS + CHILD_MICROS);
+        assertAskedAgentFor(CHILD);
     }
 
     @Test
@@ -321,6 +302,7 @@ class SubagentUsageLedgerTest {
         reconciler.discover(now);
         reconciler.poll(onlyJob().id());
 
+        assertAskedAgentFor(CHILD);
         assertThat(jobs.findByExecutionIdIn(List.of(parent.id()))).hasSize(1);
         MonthlyUsageSummary summary = summaries.monthly(USER_ID, from, to);
         assertThat(summary.pricedSubagents()).isOne();
@@ -365,6 +347,7 @@ class SubagentUsageLedgerTest {
         reconciler.discover(now);
         reconciler.poll(onlyJob().id());
 
+        assertAskedAgentFor(CHILD);
         assertThat(jobs.findByExecutionIdIn(List.of(parent.id()))).hasSize(1);
         assertThat(events.findByExecutionIdInOrderByExecutionIdAscSequenceAsc(List.of(parent.id())))
                 .filteredOn(event -> event.eventType() == ExecutionEventType.SUBAGENT_COMPLETED)
@@ -522,7 +505,19 @@ class SubagentUsageLedgerTest {
         reconciler.discover(now);
         SubagentUsageJob job = onlyJob();
         reconciler.poll(job.id());
+        assertAskedAgentFor(session);
         return jobs.findById(job.id()).orElseThrow();
+    }
+
+    /**
+     * 자식 session 조회가 모두 그 에이전트의 Hermes 주소와 profile 로, 그 session 을 물었는지 본다. 대역은 session 만 보고 답하므로
+     * 주소와 profile 이 틀려도 답이 나온다. 그래서 받은 값을 따로 확인한다.
+     */
+    private void assertAskedAgentFor(String session) {
+        assertThat(hermes.subagentUsageLookups())
+                .as("자식 session 조회가 받은 주소와 profile, session")
+                .isNotEmpty()
+                .containsOnly(new SessionLookup(agent.apiBaseUrl(), agent.hermesProfile(), session));
     }
 
     private SubagentUsageJob onlyJob() {
@@ -532,8 +527,7 @@ class SubagentUsageLedgerTest {
     }
 
     private void stubSession(String session, SubagentSessionUsage usage) {
-        when(hermes.readSubagentUsage(agent.apiBaseUrl(), agent.hermesProfile(), session))
-                .thenReturn(usage);
+        hermes.willReportSubagentUsage(session, usage);
     }
 
     /** provider 를 읽었고 이미 끝난 자식의 session 응답이다. */

@@ -9,6 +9,7 @@ import com.bifos.assistant.orchestration.application.SubagentSessionRegistrar;
 import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
+import com.bifos.assistant.testsupport.BackendIntegrationTest;
 import com.bifos.assistant.usage.domain.AgentExecution;
 import com.bifos.assistant.usage.domain.type.ExecutionStatus;
 import com.bifos.assistant.usage.infra.AgentExecutionRepository;
@@ -22,9 +23,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.test.context.ActiveProfiles;
 
 /**
  * MCP 호출의 origin 실행을 등록으로 먼저 정하고, 등록이 없으면 최상위 session 일 때만 도는 실행을 찾는 것을
@@ -32,8 +31,7 @@ import org.springframework.test.context.ActiveProfiles;
  *
  * <p>번호가 붙은 검사는 리뷰가 요구한 필수 검사의 번호다.
  */
-@SpringBootTest
-@ActiveProfiles("test")
+@BackendIntegrationTest
 class SessionOwnerResolverTest {
 
     private static final String PROFILE = "session-owner";

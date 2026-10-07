@@ -13,6 +13,7 @@ import com.bifos.assistant.orchestration.infra.HermesSessionBindingRepository;
 import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
+import com.bifos.assistant.testsupport.BackendIntegrationTest;
 import com.bifos.assistant.usage.domain.AgentExecution;
 import com.bifos.assistant.usage.domain.type.ExecutionStatus;
 import com.bifos.assistant.usage.infra.AgentExecutionRepository;
@@ -31,17 +32,14 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.test.context.ActiveProfiles;
 
 /**
  * 하위 에이전트 session 등록이 부모를 풀어 origin 실행을 정하고, 한 번 적은 줄을 바꾸지 않는 것을 고정한다(ADR-037).
  *
  * <p>번호가 붙은 검사는 리뷰가 요구한 필수 검사의 번호다.
  */
-@SpringBootTest
-@ActiveProfiles("test")
+@BackendIntegrationTest
 class SubagentSessionRegistrarTest {
 
     private static final String PROFILE_A = "registrar-a";

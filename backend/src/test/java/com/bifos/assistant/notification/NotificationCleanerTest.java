@@ -7,6 +7,7 @@ import com.bifos.assistant.notification.application.NotificationProperties;
 import com.bifos.assistant.notification.domain.Notification;
 import com.bifos.assistant.notification.domain.type.NotificationKind;
 import com.bifos.assistant.notification.infra.NotificationRepository;
+import com.bifos.assistant.testsupport.BackendIntegrationTest;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -16,13 +17,10 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.PlatformTransactionManager;
 
 /** 일정이 부르는 {@code runScheduled} 가 주입받은 시계의 시각에서 보관 기간보다 오래된 알림만 지우는지 확인한다. */
-@SpringBootTest
-@ActiveProfiles("test")
+@BackendIntegrationTest
 class NotificationCleanerTest {
 
     private static final Instant NOW = Instant.parse("2026-10-01T04:30:00Z");

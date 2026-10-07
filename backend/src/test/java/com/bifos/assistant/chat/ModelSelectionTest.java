@@ -22,6 +22,7 @@ import com.bifos.assistant.hermes.HermesModelClient;
 import com.bifos.assistant.hermes.HermesRunEventStream;
 import com.bifos.assistant.hermes.HermesRunsClient;
 import com.bifos.assistant.hermes.StubHermesRunsClient;
+import com.bifos.assistant.hermes.StubHermesRunsClient.SessionLookup;
 import com.bifos.assistant.hermes.dto.HermesModelCatalog;
 import com.bifos.assistant.hermes.dto.HermesRunResult;
 import com.bifos.assistant.hermes.dto.ReasoningCapability;
@@ -33,6 +34,8 @@ import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
+import com.bifos.assistant.testsupport.BackendIntegrationTest;
+import com.bifos.assistant.testsupport.SamplePriceCatalog;
 import com.bifos.assistant.usage.domain.AgentExecution;
 import com.bifos.assistant.usage.domain.ExecutionEvent;
 import com.bifos.assistant.usage.domain.type.ExecutionEventType;
@@ -42,8 +45,6 @@ import com.bifos.assistant.usage.infra.AgentExecutionRepository;
 import com.bifos.assistant.usage.infra.ExecutionEventRepository;
 import com.bifos.assistant.user.domain.AppUser;
 import com.bifos.assistant.user.infra.AppUserRepository;
-import java.net.URISyntaxException;
-import java.nio.file.Path;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
@@ -52,57 +53,22 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.context.TestConfiguration;
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Import;
-import org.springframework.context.annotation.Primary;
 import org.springframework.data.domain.PageRequest;
-import org.springframework.test.context.ActiveProfiles;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 /**
  * 실행이 대화가 고른 모델과 effort 로 Hermes 를 부르고, 실제로 돈 모델을 적고, 막혀도 넘기지 않는 것을 본다.
  *
  * <p>한 provider 안에서 계정을 돌려 쓰는 것은 Hermes 가 이미 하므로 검사하지 않는다.
  */
-@SpringBootTest
-@ActiveProfiles("test")
-@Import(ModelSelectionTest.StubRuntime.class)
+@BackendIntegrationTest
+@SamplePriceCatalog
 class ModelSelectionTest {
-
-    @TestConfiguration
-    static class StubRuntime {
-        @Bean
-        @Primary
-        StubHermesRunsClient stubHermesRunsClient() {
-            return new StubHermesRunsClient();
-        }
-    }
 
     private static final String AGENT_CODE = "selection";
 
     /** 그 provider 의 계정이 전부 막혔을 때 Hermes 가 돌려주는 글이다. 실측한 문장이다. */
     private static final String BLOCKED_ERROR = HermesRunResult.PROVIDER_AUTH_FAILED_PREFIX
             + " No Codex credentials stored. Run `hermes auth` to authenticate.";
-
-    /** 금액이 비는 것이 가격표가 없어서가 아니라는 것을 보이려고 표본 가격표를 가리킨다. */
-    @DynamicPropertySource
-    static void pointAtTheSampleCatalog(DynamicPropertyRegistry registry) {
-        registry.add("assistant.pricing.catalog-path", () -> sampleCatalog().toString());
-    }
-
-    private static Path sampleCatalog() {
-        try {
-            return Path.of(ModelSelectionTest.class
-                    .getResource("/pricing/models-dev-sample.json")
-                    .toURI());
-        } catch (URISyntaxException ex) {
-            throw new IllegalStateException(ex);
-        }
-    }
 
     /** reasoning 끄기를 받는다고 Hermes 가 밝힌 모델이다. */
     private static final String CAN_DISABLE_MODEL = "example-model-off";
@@ -164,7 +130,7 @@ class ModelSelectionTest {
     @Autowired
     ModelHiddenRepository hiddenModels;
 
-    @MockitoBean
+    @Autowired
     HermesRunEventStream eventStream;
 
     /**
@@ -173,7 +139,7 @@ class ModelSelectionTest {
      * <p>읽은 목록은 Spring context 가 사는 동안 메모리에 남는다. 그래서 검사마다 다른 목록을 주지 않고 늘 같은
      * 목록을 답하게 한다. 어느 검사가 먼저 읽어도 결과가 같다.
      */
-    @MockitoBean
+    @Autowired
     HermesModelClient modelClient;
 
     private CurrentUser user;
@@ -256,7 +222,7 @@ class ModelSelectionTest {
         assertThat(execution.model()).isEqualTo("example-provider/example-model-c");
         assertThat(execution.provider()).isEqualTo("nvidia");
         assertThat(execution.reasoningEffort()).isEqualTo("low");
-        assertThat(stub().sessionLookups()).containsExactly("sess-1");
+        assertThat(stub().sessionLookups()).extracting(SessionLookup::sessionId).containsExactly("sess-1");
     }
 
     @Test

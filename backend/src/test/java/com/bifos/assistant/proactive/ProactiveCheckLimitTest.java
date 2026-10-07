@@ -42,6 +42,9 @@ import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
+import com.bifos.assistant.testsupport.BackendIntegrationTest;
+import com.bifos.assistant.testsupport.LongProactiveCheckTimeouts;
+import com.bifos.assistant.testsupport.OverrideProperties;
 import com.bifos.assistant.usage.domain.AgentExecution;
 import com.bifos.assistant.usage.infra.AgentExecutionRepository;
 import com.bifos.assistant.usage.infra.ExecutionEventRepository;
@@ -62,14 +65,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.context.TestConfiguration;
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Import;
-import org.springframework.context.annotation.Primary;
-import org.springframework.test.context.ActiveProfiles;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
-import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /**
@@ -79,15 +74,12 @@ import org.springframework.transaction.support.TransactionTemplate;
  * <p>Hermes 의 run 은 완료를 기다리는 자리에서 중지가 올 때까지 멈춰 둔다. 실제 Hermes 에서 도는 run 과 같다. 멈춘 run 은
  * {@code cancelled} 로 끝난다. 모든 데이터는 합성이다.
  */
-@SpringBootTest(
-        properties = {
-            "hermes.run-timeout=30s",
-            "assistant.proactive-check.max-duration=20s",
-            "assistant.proactive-check.max-tool-calls=" + ProactiveCheckLimitTest.MAX_TOOL_CALLS,
-            "assistant.memory.propose.enabled=false"
-        })
-@ActiveProfiles("test")
-@Import(ProactiveCheckLimitTest.StubRuntime.class)
+@BackendIntegrationTest
+@LongProactiveCheckTimeouts
+@OverrideProperties({
+    "assistant.proactive-check.max-tool-calls=" + ProactiveCheckLimitTest.MAX_TOOL_CALLS,
+    "assistant.memory.propose.enabled=false"
+})
 class ProactiveCheckLimitTest {
 
     static final int MAX_TOOL_CALLS = 3;
@@ -103,20 +95,11 @@ class ProactiveCheckLimitTest {
     /** 상한에 닿은 살펴보기에 멈추기를 부르는 최대 횟수다. 문서의 「상한」 이 정한다. */
     private static final int STOP_ATTEMPTS = 3;
 
-    @TestConfiguration
-    static class StubRuntime {
-        @Bean
-        @Primary
-        StubHermesRunsClient stubHermesRunsClient() {
-            return new StubHermesRunsClient();
-        }
-    }
-
     @Autowired
     ProactiveCheckService service;
 
     /** 멈추기가 실패하는 경우를 만든다. 정하지 않은 검사에서는 실제 그대로다. */
-    @MockitoSpyBean
+    @Autowired
     ChatService chat;
 
     @Autowired
@@ -153,15 +136,15 @@ class ProactiveCheckLimitTest {
     TransactionTemplate transactions;
 
     /** 실제 Hermes 를 부르지 않도록 켜진 toolset 을 대역으로 둔다. */
-    @MockitoBean
+    @Autowired
     HermesToolsetClient toolsets;
 
     /** 켜진 스킬 목록을 대역으로 둔다. */
-    @MockitoBean
+    @Autowired
     HermesSkillClient skillClient;
 
     /** 도구 사건을 흘리는 대역이다. 검사마다 흘릴 사건을 정한다. */
-    @MockitoBean
+    @Autowired
     HermesRunEventStream eventStream;
 
     private CurrentUser owner;

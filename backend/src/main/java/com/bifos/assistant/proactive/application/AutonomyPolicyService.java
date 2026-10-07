@@ -30,6 +30,7 @@ import com.bifos.assistant.proactive.infra.AutonomyPreferenceRepository;
 import com.bifos.assistant.proactive.infra.ProactiveCheckProblemRepository;
 import com.bifos.assistant.proactive.infra.ProactiveCheckRepository;
 import com.bifos.assistant.shared.auth.CurrentUser;
+import com.bifos.assistant.shared.config.LiveProperties;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import java.time.Clock;
@@ -70,7 +71,7 @@ public class AutonomyPolicyService {
     private final AutonomyPreferenceRepository preferences;
     private final AgentService agents;
     private final ProactiveCheckService checkService;
-    private final AutonomyProperties properties;
+    private final LiveProperties<AutonomyProperties> properties;
     private final DecisionFeedbackRecorder feedback;
     private final TransactionTemplate transactions;
     private final Clock clock;
@@ -120,6 +121,7 @@ public class AutonomyPolicyService {
     }
 
     private Decided record(CurrentUser user, Long evaluationId) {
+        AutonomyProperties settings = properties.current();
         ValueEvaluation evaluation = evaluations.read(user.id(), evaluationId);
         if (evaluation.outcome() == DecisionOutcome.RUNNING) {
             throw new ApiException(ErrorCode.VALUE_EVALUATION_STATE_CONFLICT, "value evaluation is still running");
@@ -135,10 +137,11 @@ public class AutonomyPolicyService {
                         CandidateJudgement::candidateId, Function.identity(), (first, ignored) -> first));
         List<DecisionCandidate> ordered = ordered(evidence);
         List<AutonomyInputs> inputs = ordered.stream()
-                .map(candidate -> inputsOf(evaluation, candidate, judgements.get(candidate.candidateId()), facts))
+                .map(candidate ->
+                        inputsOf(evaluation, candidate, judgements.get(candidate.candidateId()), facts, settings))
                 .toList();
         List<AutonomyVerdict> verdicts =
-                AutonomyPolicy.decideAll(inputs, properties.maxEvaluationAge(), properties.maxEvidenceAge());
+                AutonomyPolicy.decideAll(inputs, settings.maxEvaluationAge(), settings.maxEvidenceAge());
         List<AutonomyDecision> rows = new ArrayList<>();
         for (int i = 0; i < ordered.size(); i++) {
             AutonomyVerdict verdict = verdicts.get(i);
@@ -170,7 +173,11 @@ public class AutonomyPolicyService {
     }
 
     private AutonomyInputs inputsOf(
-            ValueEvaluation evaluation, DecisionCandidate candidate, CandidateJudgement judgement, Facts facts) {
+            ValueEvaluation evaluation,
+            DecisionCandidate candidate,
+            CandidateJudgement judgement,
+            Facts facts,
+            AutonomyProperties settings) {
         return new AutonomyInputs(
                 evaluation.outcome(),
                 evaluation.replayOfId() != null,
@@ -186,7 +193,7 @@ public class AutonomyPolicyService {
                 axisConfidences(judgement),
                 judgement == null ? null : judgement.confidence(),
                 candidate.evidenceCheckedAt(),
-                properties.executionEnabled(),
+                settings.executionEnabled(),
                 facts.consented(),
                 facts.writesAllowed(),
                 facts.sourceTrigger(),

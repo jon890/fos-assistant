@@ -9,6 +9,7 @@ import com.bifos.assistant.hermes.dto.RunEvent;
 import com.bifos.assistant.skill.domain.ExecutionSkillUse;
 import com.bifos.assistant.skill.domain.type.SkillUseSource;
 import com.bifos.assistant.skill.infra.ExecutionSkillUseRepository;
+import com.bifos.assistant.testsupport.BackendIntegrationTest;
 import com.bifos.assistant.usage.application.ExecutionEventRecorder;
 import com.bifos.assistant.usage.domain.AgentExecution;
 import com.bifos.assistant.usage.domain.ExecutionEvent;
@@ -26,8 +27,6 @@ import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.test.context.ActiveProfiles;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
@@ -36,8 +35,7 @@ import tools.jackson.databind.json.JsonMapper;
  * <p>32자를 넘는 스킬 이름은 token 으로 보여 도구 내용에서 가려진다. 그래도 스킬 사용 기록에는 가리기 전에
  * 꺼내 검증한 이름이 남아야 한다. 근거는 ADR-047 에 있다.
  */
-@SpringBootTest
-@ActiveProfiles("test")
+@BackendIntegrationTest
 class SkillViewStreamTest {
 
     /** 소문자와 숫자와 붙임표로 된 44자 이름이다. 이름 규칙에는 맞고 token 가리기에는 걸린다. */

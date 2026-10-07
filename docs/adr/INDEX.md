@@ -111,11 +111,14 @@
 | [ADR-092](ADR-092-승인한-실행의-실패는-커넥터가-선언한-오류-코드와-복구-어휘와-정수-세부만-에이전트까지-전한다.md) | 승인한 실행의 실패는 커넥터가 선언한 오류 코드와 복구 어휘와 정수 세부만 에이전트까지 전한다 | backend, hermes | Accepted. ADR-043 의 공통 오류 어휘 옆에 커넥터가 선언한 코드와 복구 계약을 더하고 ADR-050 의 실패 결과 저장을 바꾼다 |
 | [ADR-093](ADR-093-문제-찾기는-살펴보기-결과의-문제-후보로-받고-control-plane-이-근거와-중복을-결정적으로-검사한다.md) | 문제 찾기는 살펴보기 결과의 문제 후보로 받고 Control Plane 이 근거와 중복을 결정적으로 검사한다 | backend | Accepted. ADR-081 의 결과 블록을 버전 3으로 넓힌다 |
 | [ADR-20261007 / autonomy-policy](ADR-20261007-autonomy-policy.md) | 행동 수준은 Control Plane 의 결정적 규칙이 정하고 첫 자동 실행은 읽기 전용 살펴보기 한 번이다 | backend | Accepted |
+| [ADR-20261007 / background-tasks](ADR-20261007-background-tasks.md) | 운영의 백그라운드 작업은 한 빈으로 띄우고, 검사는 끝날 때 모두 join 한다 | backend | Accepted |
 | [ADR-20261007 / connector-owner-attachments](ADR-20261007-connector-owner-attachments.md) | 사용자 첨부를 읽는 커넥터는 바인딩 주인의 첨부 디렉터리를 설치가 정한 env 로만 받는다 | hermes, backend | Accepted. ADR-091 의 사용자별 첨부 경계를 커넥터 MCP 서버까지 넓힌다 |
 | [ADR-20261007 / decision-feedback](ADR-20261007-decision-feedback.md) | 판단 피드백은 제안 열쇠에 덧붙이는 사건으로 남기고 반응은 읽을 때 정한다 | backend | Accepted |
+| [ADR-20261007 / live-properties](ADR-20261007-live-properties.md) | 운영 코드는 실행 중에 쓰는 설정을 LiveProperties 로 읽는다 | backend | Accepted |
 | [ADR-20261007 / memory-remember](ADR-20261007-memory-remember.md) | 사용자가 대화에서 직접 말한 사실은 에이전트가 바로 기억하고 그 밖은 제안으로 남긴다 | backend, frontend, hermes | Accepted. ADR-012 의 「사람이 받아들여야 저장된다」 와 「에이전트가 스스로 쓰는 경로를 두지 않는다」 를 개정한다 |
 | [ADR-20261007 / naver-blog-connector](ADR-20261007-naver-blog-connector.md) | 네이버 블로그 커넥터는 사용자의 Chrome 에 CDP 로 붙고, 임시저장은 승인한 뒤 백그라운드 작업으로 돈다 | hermes, backend | Accepted. ADR-083 의 바인딩으로 블로그 전용 profile 을 대신한다 |
 | [ADR-20261007 / numbering-scheme](ADR-20261007-numbering-scheme.md) | Flyway 는 UTC 시각 버전을 쓰고 ADR 은 결정 날짜와 슬러그로 구분한다 | 공통 | Accepted |
 | [ADR-20261007 / proactive-eval](ADR-20261007-proactive-eval.md) | 먼저 살펴보기 루프는 결정적 provider 로 실제 서비스를 replay 해 측정하고 안전 경계만 CI 를 막는다 | backend | Accepted |
+| [ADR-20261007 / test-context-base](ADR-20261007-test-context-base.md) | backend 통합 검사는 Spring 컨텍스트 하나를 함께 쓰고, 설정과 대역은 검사마다 바꿔 끼운다 | backend | Accepted |
 | [ADR-20261007 / user-browser](ADR-20261007-user-browser.md) | 사용자마다 브라우저 하나를 Control Plane 이 관리하고, 커넥터는 바인딩이 준 중계 주소로만 닿는다 | backend, frontend, hermes | Accepted. ADR-20261007 / naver-blog-connector 의 CDP 주소 연결 칸을 바꾼다 |
 | [ADR-20261007 / value-evaluation](ADR-20261007-value-evaluation.md) | 가치 판단은 축별 근거와 재평가 입력을 남기고 행동 정책과 분리한다 | backend, hermes | Accepted |

@@ -4,6 +4,7 @@ import com.bifos.assistant.hermes.dto.HermesRunCommand;
 import com.bifos.assistant.hermes.dto.HermesRunLookup;
 import com.bifos.assistant.hermes.dto.HermesRunResult;
 import com.bifos.assistant.hermes.dto.SessionRuntime;
+import com.bifos.assistant.hermes.dto.SubagentSessionUsage;
 import com.bifos.assistant.shared.error.ApiException;
 import java.time.Duration;
 import java.util.ArrayDeque;
@@ -46,7 +47,12 @@ public class StubHermesRunsClient implements HermesRunsClient {
     /** 세션 조회가 답할 값이다. 비어 있으면 읽지 못한 것으로 본다. */
     private volatile SessionRuntime sessionRuntime;
 
-    private final List<String> sessionLookups = new CopyOnWriteArrayList<>();
+    private final List<SessionLookup> sessionLookups = new CopyOnWriteArrayList<>();
+
+    private final List<SessionLookup> subagentUsageLookups = new CopyOnWriteArrayList<>();
+
+    /** 자식 session 조회가 session 번호마다 답할 값이다. 없으면 읽지 못한 것으로 본다. */
+    private final Map<String, SubagentSessionUsage> subagentUsages = new ConcurrentHashMap<>();
 
     private final Map<String, Deque<HermesRunLookup>> lookupAnswers = new ConcurrentHashMap<>();
     private final Map<String, HermesRunLookup> lastLookupAnswers = new ConcurrentHashMap<>();
@@ -84,9 +90,19 @@ public class StubHermesRunsClient implements HermesRunsClient {
         this.sessionRuntime = runtime;
     }
 
-    /** 세션 조회를 부른 session 번호들. */
-    public List<String> sessionLookups() {
+    /** 그 자식 session 을 물으면 이 사용량을 답하게 한다. */
+    public void willReportSubagentUsage(String sessionId, SubagentSessionUsage usage) {
+        subagentUsages.put(sessionId, usage);
+    }
+
+    /** 세션 조회가 받은 주소와 profile, session 번호. 부른 순서다. */
+    public List<SessionLookup> sessionLookups() {
         return sessionLookups;
+    }
+
+    /** 자식 session 조회가 받은 주소와 profile, session 번호. 부른 순서다. */
+    public List<SessionLookup> subagentUsageLookups() {
+        return subagentUsageLookups;
     }
 
     /**
@@ -164,6 +180,8 @@ public class StubHermesRunsClient implements HermesRunsClient {
         beforeAwait = () -> {};
         sessionRuntime = null;
         sessionLookups.clear();
+        subagentUsageLookups.clear();
+        subagentUsages.clear();
         stopped.clear();
         onStop = runId -> {};
         lookupAnswers.clear();
@@ -228,8 +246,14 @@ public class StubHermesRunsClient implements HermesRunsClient {
 
     @Override
     public SessionRuntime readSessionRuntime(String apiBaseUrl, String profileName, String sessionId) {
-        sessionLookups.add(sessionId);
+        sessionLookups.add(new SessionLookup(apiBaseUrl, profileName, sessionId));
         return sessionRuntime;
+    }
+
+    @Override
+    public SubagentSessionUsage readSubagentUsage(String apiBaseUrl, String profileName, String sessionId) {
+        subagentUsageLookups.add(new SessionLookup(apiBaseUrl, profileName, sessionId));
+        return subagentUsages.get(sessionId);
     }
 
     private void awaitGate() {
@@ -255,4 +279,7 @@ public class StubHermesRunsClient implements HermesRunsClient {
         }
         return nextResult;
     }
+
+    /** session 을 물은 한 번이다. 어느 Hermes 의 어느 profile 에 물었는지 함께 담는다. */
+    public record SessionLookup(String apiBaseUrl, String profileName, String sessionId) {}
 }

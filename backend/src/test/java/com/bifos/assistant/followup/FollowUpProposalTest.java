@@ -16,16 +16,15 @@ import com.bifos.assistant.followup.domain.type.FollowUpStatus;
 import com.bifos.assistant.followup.infra.FollowUpRepository;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.domain.type.UserRole;
+import com.bifos.assistant.testsupport.BackendIntegrationTest;
+import com.bifos.assistant.testsupport.TestClock;
 import com.bifos.assistant.usage.domain.AgentExecution;
 import com.bifos.assistant.usage.domain.type.ExecutionStatus;
 import com.bifos.assistant.usage.infra.AgentExecutionRepository;
 import com.bifos.assistant.user.domain.AppUser;
 import com.bifos.assistant.user.infra.AppUserRepository;
-import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
-import java.time.ZoneId;
-import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -39,36 +38,21 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.context.TestConfiguration;
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Import;
-import org.springframework.context.annotation.Primary;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.test.context.ActiveProfiles;
 
 /**
  * 에이전트의 할 일 제안과 네 억제 규칙을 실제 DB 로 본다. 규칙은 {@code docs/backend/follow-up.md} 의 「제안 억제」 다.
  *
  * <p>시각은 이 검사의 시계가 정한다. 사용자, 대화, 실행은 검사마다 새로 만들어 다른 검사의 줄과 섞이지 않게 하고, 끝나면 지운다.
  */
-@SpringBootTest
-@ActiveProfiles("test")
-@Import(FollowUpProposalTest.FixedClock.class)
+@BackendIntegrationTest
 class FollowUpProposalTest {
 
     private static final Instant NOW = Instant.parse("2026-10-05T09:00:00Z");
-    private static final TestClock CLOCK = new TestClock(NOW);
     private static final String TITLE = "할 일 검사 7391";
 
-    @TestConfiguration
-    static class FixedClock {
-        @Bean
-        @Primary
-        Clock followUpProposalTestClock() {
-            return CLOCK;
-        }
-    }
+    @Autowired
+    TestClock clock;
 
     @Autowired
     FollowUpService followUps;
@@ -98,7 +82,7 @@ class FollowUpProposalTest {
 
     @BeforeEach
     void setUp() {
-        CLOCK.set(NOW);
+        clock.set(NOW);
         dad = member();
         agent = agentOf(dad);
         conversation = conversationOf(dad);
@@ -113,7 +97,7 @@ class FollowUpProposalTest {
             jdbc.update("DELETE FROM agent WHERE owner_user_id = ?", userId);
         }
         createdUsers.clear();
-        CLOCK.set(NOW);
+        clock.set(NOW);
     }
 
     @Test
@@ -152,7 +136,7 @@ class FollowUpProposalTest {
         followUps.reject(dad, proposed.publicId());
 
         FollowUpProposalOutcome right = propose(run(), TITLE);
-        CLOCK.set(NOW.plus(Duration.ofDays(29)));
+        clock.set(NOW.plus(Duration.ofDays(29)));
         FollowUpProposalOutcome later = propose(run(), TITLE);
 
         assertThat(right).isEqualTo(FollowUpProposalOutcome.DECLINED_BEFORE);
@@ -166,7 +150,7 @@ class FollowUpProposalTest {
         propose(run(), TITLE);
         followUps.reject(dad, rowsOf(dad).getFirst().publicId());
 
-        CLOCK.set(NOW.plus(Duration.ofDays(31)));
+        clock.set(NOW.plus(Duration.ofDays(31)));
         FollowUpProposalOutcome outcome = propose(run(), TITLE);
 
         assertThat(outcome).isEqualTo(FollowUpProposalOutcome.CREATED);
@@ -206,10 +190,10 @@ class FollowUpProposalTest {
         propose(run(), "점검 할 일 2");
         propose(run(), "점검 할 일 3");
 
-        CLOCK.set(NOW.plus(Duration.ofDays(7)));
+        clock.set(NOW.plus(Duration.ofDays(7)));
         assertThat(propose(run(), "점검 할 일 4")).isEqualTo(FollowUpProposalOutcome.TOO_MANY_PROPOSALS);
 
-        CLOCK.set(NOW.plus(Duration.ofDays(7)).plusSeconds(1));
+        clock.set(NOW.plus(Duration.ofDays(7)).plusSeconds(1));
         assertThat(propose(run(), "점검 할 일 4")).isEqualTo(FollowUpProposalOutcome.CREATED);
         assertThat(rowsOf(dad)).hasSize(4);
         assertThat(rowsOf(dad)).allMatch(row -> row.status() == FollowUpStatus.PROPOSED);
@@ -222,7 +206,7 @@ class FollowUpProposalTest {
         propose(run(), "보통 할 일 2");
         propose(run(), "보통 할 일 3");
 
-        CLOCK.set(NOW.plus(Duration.ofDays(8)));
+        clock.set(NOW.plus(Duration.ofDays(8)));
 
         assertThat(propose(run(), "보통 할 일 4")).isEqualTo(FollowUpProposalOutcome.TOO_MANY_PROPOSALS);
         assertThat(rowsOf(dad)).hasSize(3);
@@ -299,7 +283,7 @@ class FollowUpProposalTest {
                 .hermesSessionId("fos-" + UUID.randomUUID())
                 .costMode(CostMode.SUBSCRIPTION)
                 .status(ExecutionStatus.RUNNING)
-                .startedAt(CLOCK.instant())
+                .startedAt(clock.instant())
                 .build());
     }
 
@@ -326,33 +310,5 @@ class FollowUpProposalTest {
 
     private Conversation conversationOf(CurrentUser owner) {
         return conversations.save(Conversation.startedBy(owner.id(), "할 일 검사 대화", agent.id(), NOW));
-    }
-
-    /** 검사가 정한 시각만 주는 시계다. */
-    static final class TestClock extends Clock {
-        private volatile Instant now;
-
-        TestClock(Instant now) {
-            this.now = now;
-        }
-
-        void set(Instant instant) {
-            now = instant;
-        }
-
-        @Override
-        public Instant instant() {
-            return now;
-        }
-
-        @Override
-        public ZoneId getZone() {
-            return ZoneOffset.UTC;
-        }
-
-        @Override
-        public Clock withZone(ZoneId zone) {
-            return this;
-        }
     }
 }

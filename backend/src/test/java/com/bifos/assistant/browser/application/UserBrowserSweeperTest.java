@@ -12,6 +12,9 @@ import com.bifos.assistant.browser.domain.type.UserBrowserStatus;
 import com.bifos.assistant.browser.infra.BrowserProperties;
 import com.bifos.assistant.browser.infra.UserBrowserRepository;
 import com.bifos.assistant.shared.auth.UserAccessRevoked;
+import com.bifos.assistant.shared.config.LiveProperties;
+import com.bifos.assistant.testsupport.BackendIntegrationTest;
+import com.bifos.assistant.testsupport.FakeBrowserRuntime;
 import java.sql.Timestamp;
 import java.time.Clock;
 import java.time.Duration;
@@ -23,14 +26,11 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.dao.DataAccessResourceFailureException;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.test.context.ActiveProfiles;
 
 /** 자동 중지와 상태 맞추기, 꺼진 사용자의 브라우저 멈춤을 실제 DB 와 대역 proxy 로 본다. */
-@SpringBootTest
-@ActiveProfiles("test")
+@BackendIntegrationTest
 class UserBrowserSweeperTest {
 
     @Autowired
@@ -94,7 +94,7 @@ class UserBrowserSweeperTest {
     @DisplayName("RUNNING 인데 컨테이너가 사라졌으면 STOPPED 로 맞춘다")
     void resetsRunningWithoutContainer() {
         Long id = running(201L);
-        runtime.containers.clear();
+        runtime.containers().clear();
         ageUpdate(id, Duration.ofSeconds(5));
 
         sweeper.sweep();
@@ -116,7 +116,7 @@ class UserBrowserSweeperTest {
         sweeper.sweep();
 
         assertThat(status(201L)).isEqualTo(UserBrowserStatus.STOPPED);
-        assertThat(runtime.removed).contains("left");
+        assertThat(runtime.removed()).contains("left");
     }
 
     @Test
@@ -131,7 +131,7 @@ class UserBrowserSweeperTest {
         sweeper.sweep();
 
         assertThat(status(201L)).isEqualTo(UserBrowserStatus.STARTING);
-        assertThat(runtime.removed).doesNotContain("booting");
+        assertThat(runtime.removed()).doesNotContain("booting");
     }
 
     @Test
@@ -144,7 +144,7 @@ class UserBrowserSweeperTest {
 
         sweeper.sweep();
 
-        assertThat(runtime.removed).containsExactlyInAnyOrder("stranger", "stale", "unlabeled");
+        assertThat(runtime.removed()).containsExactlyInAnyOrder("stranger", "stale", "unlabeled");
     }
 
     @Test
@@ -152,16 +152,16 @@ class UserBrowserSweeperTest {
     void retriesStopOfFailedBrowserWithContainer() {
         Long id = running(201L);
         String container = repository.findById(id).orElseThrow().containerId();
-        runtime.failingStops.add(container);
+        runtime.failingStops().add(container);
         ageActivity(id, Duration.ofMinutes(11));
         sweeper.sweep();
         assertThat(status(201L)).isEqualTo(UserBrowserStatus.FAILED);
 
-        runtime.failingStops.clear();
+        runtime.failingStops().clear();
         sweeper.sweep();
 
         assertThat(status(201L)).isEqualTo(UserBrowserStatus.STOPPED);
-        assertThat(runtime.containers).doesNotContainKey(container);
+        assertThat(runtime.containers()).doesNotContainKey(container);
     }
 
     @Test
@@ -171,7 +171,7 @@ class UserBrowserSweeperTest {
         Long second = running(202L);
         ageActivity(first, Duration.ofMinutes(11));
         ageActivity(second, Duration.ofMinutes(11));
-        runtime.failingStops.add(repository.findById(first).orElseThrow().containerId());
+        runtime.failingStops().add(repository.findById(first).orElseThrow().containerId());
 
         sweeper.sweep();
 
@@ -187,7 +187,7 @@ class UserBrowserSweeperTest {
         sweeper.onAccessRevoked(new UserAccessRevoked(201L));
 
         assertThat(status(201L)).isEqualTo(UserBrowserStatus.STOPPED);
-        assertThat(runtime.containers).isEmpty();
+        assertThat(runtime.containers()).isEmpty();
     }
 
     @Test
@@ -203,7 +203,7 @@ class UserBrowserSweeperTest {
         assertThat(service.stopIfIdle(id, cutoff)).isFalse();
 
         assertThat(status(201L)).isEqualTo(UserBrowserStatus.RUNNING);
-        assertThat(runtime.containers).hasSize(1);
+        assertThat(runtime.containers()).hasSize(1);
     }
 
     @Test
@@ -227,7 +227,7 @@ class UserBrowserSweeperTest {
 
         assertThat(status(201L)).isEqualTo(UserBrowserStatus.STOPPED);
         assertThat(status(202L)).isEqualTo(UserBrowserStatus.RUNNING);
-        assertThat(runtime.removed).contains("c-late");
+        assertThat(runtime.removed()).contains("c-late");
     }
 
     @Test
@@ -242,7 +242,7 @@ class UserBrowserSweeperTest {
         failing.onReady();
         failing.sweep();
 
-        assertThat(runtime.removed).isEmpty();
+        assertThat(runtime.removed()).isEmpty();
     }
 
     @Test
@@ -255,7 +255,7 @@ class UserBrowserSweeperTest {
         disabled.sweep();
         disabled.onAccessRevoked(new UserAccessRevoked(201L));
 
-        assertThat(runtime.removed).isEmpty();
+        assertThat(runtime.removed()).isEmpty();
     }
 
     private Long running(Long userId) {
@@ -284,7 +284,12 @@ class UserBrowserSweeperTest {
 
     private UserBrowserService service(boolean enabled) {
         return new UserBrowserService(
-                repository, runtime, profiles(), address -> true, properties(enabled), Clock.systemUTC());
+                repository,
+                runtime,
+                profiles(),
+                address -> true,
+                LiveProperties.fixed(BrowserProperties.class, properties(enabled)),
+                Clock.systemUTC());
     }
 
     private static BrowserProperties properties(boolean enabled) {
