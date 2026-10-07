@@ -33,6 +33,14 @@ public interface ConversationRepository extends JpaRepository<Conversation, Long
     @Query("select c from Conversation c where c.id = :id")
     Optional<Conversation> findByIdForMessageWrite(@Param("id") Long id);
 
+    /**
+     * 공유 잠금으로 읽는다. 대화 삭제가 이 줄을 고치는 동안은 그 커밋을 기다리고, 먼저 잠그면 삭제가 이 트랜잭션의 커밋을 기다린다. 판단 피드백
+     * 기록이 삭제와 차례를 맞추는 데 쓴다.
+     */
+    @Lock(LockModeType.PESSIMISTIC_READ)
+    @Query("select c from Conversation c where c.id = :id")
+    Optional<Conversation> findByIdForShare(@Param("id") Long id);
+
     /** 메시지 저장이 끝나기를 기다린 뒤 빈 작업 대화만 지운다. 트랜잭션은 ChatService 가 연다. */
     default int discardEmptyTaskConversation(Long id) {
         if (findByIdForMessageWrite(id).isEmpty()) {
