@@ -1,6 +1,7 @@
 package com.bifos.assistant.proactive;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.mock;
 
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.agent.domain.type.AgentVisibility;
@@ -13,6 +14,7 @@ import com.bifos.assistant.chat.infra.ChatMessageRepository;
 import com.bifos.assistant.chat.infra.ConversationRepository;
 import com.bifos.assistant.hermes.HermesRunsClient;
 import com.bifos.assistant.hermes.StubHermesRunsClient;
+import com.bifos.assistant.proactive.application.CheckFeedback;
 import com.bifos.assistant.proactive.application.ProactiveCheckRecovery;
 import com.bifos.assistant.proactive.domain.ProactiveCheck;
 import com.bifos.assistant.proactive.domain.type.CheckOutcome;
@@ -217,7 +219,8 @@ class ProactiveCheckRecoveryTest {
     }
 
     private ProactiveCheckRecovery newRecovery() {
-        return new ProactiveCheckRecovery(checks, deliveryWriter, events, Clock.fixed(NOW, ZoneOffset.UTC));
+        return new ProactiveCheckRecovery(
+                checks, deliveryWriter, events, mock(CheckFeedback.class), Clock.fixed(NOW, ZoneOffset.UTC));
     }
 
     private StubHermesRunsClient stub() {
