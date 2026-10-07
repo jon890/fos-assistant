@@ -89,7 +89,7 @@ phase 03 의 작업 프로세스가 이 함수들을 차례로 부른다. 이 ph
 ### 6. `src/editor/settings.ts`
 
 원본의 `settings`, `save`, `state`. 카테고리 목록에서 이름이 같은 것을 고르고 없으면 `category_not_found` 와 `extra.categories`(이름 목록, 50개까지). 태그는 입력란에서 Enter 로 칩을 만든다. 설정은 연 단추를 다시 눌러 닫는다.
-`save(page, onStage)`: 화면의 제목, 사진 수와 `문서 너비`, 스티커 수, 지도 수, 카테고리, 태그가 초안과 같은지 본 뒤 저장 단추만 마우스로 누르고, 누른 직후 `onStage("save_clicked")` 를 부른 뒤 저장 수가 늘기를 기다린다. 누른 뒤에 난 예외는 모두 `save_unconfirmed` 로 바꿔 던진다.
+`save(page, onStage)`: 화면의 제목, 사진 수와 `문서 너비`, 스티커 수, 지도 수, 카테고리, 태그가 초안과 같은지 본 뒤 누르기 직전에 `await onStage("save_clicking")` 을 부르고 그것이 끝난 뒤에 저장 단추만 마우스로 누른다. 그다음 저장 수가 늘기를 기다린다. 알린 뒤에 난 예외는 모두 `save_unconfirmed` 로 바꿔 던진다. `onStage` 는 `Promise` 를 돌려줄 수 있다
 `save` 는 `{savedBefore, savedAfter}` 를 돌려준다. 누른 뒤 늘지 않았으면 `EditorError("save_unconfirmed", "save", ...)` 를 던진다. 이 코드는 phase 03 이 `unknown` 으로 바꾼다. 누르기 전 대조에서 어긋나면 `editor_failed` 다.
 `state`: 결과에 담을 `{title, photos, fitted_photos, stickers, maps, category, tags, saved_count}`.
 
@@ -104,7 +104,7 @@ phase 01 의 `tests/fake-cdp.ts` 에 탭 WebSocket 의 기본 응답을 더한�
 허용 메서드는 `Target`·`Page`·`Runtime`·`DOM`·`Input`·`Emulation`·`Storage` 가운데 이 phase 가 실제로 쓰는 것만 적는다. `Page.enable` 과 `Page.handleJavaScriptDialog` 가 들어간다. 시험마다 `EditorPage` 의 기다리는 시간을 1초 안쪽으로 넘겨 bun test 의 기본 제한 5초 안에 끝낸다.
 
 - `tests/editor-photos.test.ts`: 사진 자리 하나에서 `Page.fileChooserOpened` 를 보내면 `DOM.resolveNode` 가 그 `backendNodeId` 로 오고, `Runtime.callFunctionOn` 의 첫 인자가 시험 파일의 base64 와 같다. `Page.setInterceptFileChooserDialog` 가 켜졌다가 꺼진다. 선택 창 이벤트가 오지 않으면 `photo_upload_failed` 와 `photo: 1`. `DOM.setFileInputFiles` 는 한 번도 오지 않는다
-- `tests/editor-run.test.ts`: 모든 단계가 기대한 화면을 돌려주는 대역으로 `runDraft` 가 단계를 차례로 알리고 저장 수 3→4 를 돌려준다. 연 주소는 `https://blog.naver.com/PostWriteForm.naver?blogId=example-blog` 하나뿐이다. 받은 `Runtime.evaluate` 와 `Runtime.callFunctionOn` 의 어떤 식에도 `tpb*i.publish` 가 없다. 로그인 화면 대역이면 `login_required` 이고 탭이 닫힌다. 카테고리가 없는 대역이면 `category_not_found` 와 이름 목록. 장소 후보가 둘이면 `place_not_unique` 와 후보 둘. 저장 수가 늘지 않으면 `save_unconfirmed` 이고 그 전에 `save_clicked` 가 알려진다. 이미 중단된 `signal` 이면 탭을 닫고 끝난다. 열린 alert 이벤트를 보내면 `Page.handleJavaScriptDialog` 가 온다. 모든 경우에 `/json/close/<연 탭>` 이 한 번 오고 다른 탭은 닫히지 않는다
+- `tests/editor-run.test.ts`: 모든 단계가 기대한 화면을 돌려주는 대역으로 `runDraft` 가 단계를 차례로 알리고 저장 수 3→4 를 돌려준다. 연 주소는 `https://blog.naver.com/PostWriteForm.naver?blogId=example-blog` 하나뿐이다. 받은 `Runtime.evaluate` 와 `Runtime.callFunctionOn` 의 어떤 식에도 `tpb*i.publish` 가 없다. 로그인 화면 대역이면 `login_required` 이고 탭이 닫힌다. 카테고리가 없는 대역이면 `category_not_found` 와 이름 목록. 장소 후보가 둘이면 `place_not_unique` 와 후보 둘. 저장 수가 늘지 않으면 `save_unconfirmed` 이고 그 전에 `save_clicking` 이 알려진다. 이미 중단된 `signal` 이면 탭을 닫고 끝난다. 열린 alert 이벤트를 보내면 `Page.handleJavaScriptDialog` 가 온다. 모든 경우에 `/json/close/<연 탭>` 이 한 번 오고 다른 탭은 닫히지 않는다
 - `tests/editor-text.test.ts`: 이모지가 든 줄을 글자와 이모지로 나눠 `Input.insertText` 를 두 번 부르고, 줄 사이에 Enter 를 누른다
 
 ## 검증

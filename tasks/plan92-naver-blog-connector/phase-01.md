@@ -105,9 +105,9 @@ env 의 `NAVER_BLOG_CDP_URL` 과 `NAVER_BLOG_ID` 를 연결 칸과 같은 정규
 인자: 초안 다섯 칸, `photo_notes`(키가 `^[1-9][0-9]{0,2}$` 인 객체, 값은 300자까지 글자, 선택), `artifact_path`(`^[^/\\.][^/\\]{0,80}/index\.html$`), `kind`(`preview` | `package`, 기본 `preview`).
 
 - `validateDraft` 와 `checkPhotoFiles` 의 문장이 있으면 `{problems, html: null}` 을 오류 없이 돌려준다
-- `preview`: 폭 390px 의 모바일 화면 모양 HTML. 스크립트, 외부 CSS, 외부 그림, 폰트 없이 `<style>` 하나. 제목, 카테고리, 태그(`#` 붙여 보임)를 위에 두고 본문 블록을 차례로 그린다. 글 줄은 `<p>`, 빈 줄은 빈 문단. 사진 자리는 `N번째 사진` 이름표와 `photo_notes[N]` 설명을 붙이고, 파일 이름이 `^([0-9]+)\.[a-z0-9]+$` 이면 `<img src="../../attachments/<첨부 번호>" alt="N번째 사진" loading="lazy">` 를 둔다. 다른 이름이면 이름표만. 스티커는 `스티커: <코드>` 이름표, 지도는 상호명과 주소 카드
+- `preview`: 폭 390px 의 모바일 화면 모양 HTML. 스크립트, 외부 CSS, 외부 그림, 폰트 없이 `<style>` 하나. 제목, 카테고리, 태그(`#` 붙여 보임)를 위에 두고 본문 블록을 차례로 그린다. 글 줄은 `<p>`, 빈 줄은 빈 문단. 사진 자리는 `N번째 사진` 이름표와 `photo_notes[N]` 설명을 붙이고, 파일 이름이 `^([0-9]+)\.[a-z0-9]+$` 이면 `<img src="../../attachments/<첨부 번호>" alt="N번째 사진" loading="lazy">` 를 둔다. 다른 이름이면 이름표만. 스티커는 코드가 `^(ogq_[0-9a-f]+)-([0-9]+)$` 이면 `<img class="sticker" src="stickers/<코드>.png" alt="스티커 <코드>">`(가로 `min(100%, 370px)`, 가운데)로 그리고 결과의 `assets` 에 `{path: "<artifact_path 의 폴더>/stickers/<코드>.png", source_url: "https://storep-phinf.pstatic.net/<묶음>/original_<번호>.png?type=p100_100"}` 을 코드마다 한 번 더한다. 다른 모양의 코드는 `스티커: <코드>` 이름표다. 지도는 상호명과 주소 카드. 사진은 네이버의 `문서 너비` 처럼 화면 폭을 꽉 채운다
 - `package`: 사람이 붙여넣을 수동 등록용 묶음. 제목, 카테고리, 태그(쉼표로 이은 줄), 본문 전체(지시 줄은 `[N번째 사진 자리]`, `[스티커 <코드>]`, `[지도 <상호명> / <주소>]` 로 바꿈), 붙여넣는 순서 안내. 사진은 미리보기와 같은 상대 주소로 보인다
-- 모든 글은 HTML 이스케이프한다. `photo_dir` 와 파일 시스템 경로는 HTML 에 넣지 않는다. 결과는 `{problems: [], html}`
+- 모든 글은 HTML 이스케이프한다. `photo_dir` 와 파일 시스템 경로는 HTML 에 넣지 않는다. 결과는 `{problems: [], html, assets}`. 계약 위반이면 `{problems, html: null, assets: []}`
 - `readOnlyHint: true`
 
 ### 7. `src/server.ts`
@@ -119,7 +119,7 @@ env 의 `NAVER_BLOG_CDP_URL` 과 `NAVER_BLOG_ID` 를 연결 칸과 같은 정규
 앞머리는 `name: naver-blog` 와 `description` 만 둔다. `required_environment_variables` 같은 칸을 두지 않는다. 본문은 2,500자 안팎으로 아래를 적는다.
 
 - 언제 쓰는가: 사용자가 대화에 사진을 올리고 네이버 블로그 글을 쓰자고 할 때
-- 차례: 사진을 몇 번째 사진 순서대로 모두 `vision_analyze` 로 본다 → 사진에 없고 사용자가 말하지 않은 사실을 쓰지 않는다. 장소와 필수 사실을 묻는다 → 본문을 「초안」 모양으로 만든다 → `render_draft` 로 미리보기를 만들고 `artifact_write` 로 `<폴더>/index.html` 에 쓴다 → 사용자가 확인하면 `save_draft` 로 임시저장을 요청하고 `draft_job` 으로 결과를 확인한다. 이 두 도구의 자세한 쓰임은 phase 03 이 이 스킬에 더한다
+- 차례: 사진을 몇 번째 사진 순서대로 모두 `vision_analyze` 로 본다 → 사진에 없고 사용자가 말하지 않은 사실을 쓰지 않는다. 장소와 필수 사실을 묻는다 → 본문을 「초안」 모양으로 만든다 → `render_draft` 로 미리보기를 만들고, `assets` 의 항목마다 `artifact_write` 의 `source_url` 로 스티커 그림을 받은 뒤(실패해도 이어 간다) `artifact_write` 로 `<폴더>/index.html` 에 쓴다 → 사용자가 확인하면 `save_draft` 로 임시저장을 요청하고 `draft_job` 으로 결과를 확인한다. 이 두 도구의 자세한 쓰임은 phase 03 이 이 스킬에 더한다
 - 사진은 사용자가 보낸 순서(몇 번째 사진)대로 놓는다. 사용자가 바꾸라고 할 때만 바꾼다
 - 답에 파일 경로를 쓰지 않는다. 미리보기는 답 아래에 붙는다
 - 발행하지 않는다. 로그인, 캡차, 기기 인증에서 막히면 우회하지 않고 사용자에게 브라우저 조작을 부탁한다
@@ -141,7 +141,7 @@ env 의 `NAVER_BLOG_CDP_URL` 과 `NAVER_BLOG_ID` 를 연결 칸과 같은 정규
 - `tests/fake-cdp.ts`: `Bun.serve` 로 HTTP 창구(`/json/version`, `/json/list`, `/json/new`, `/json/close/<id>`)와 WebSocket(`/devtools/browser/<id>`, `/devtools/page/<id>`)을 흉내 낸다. 받은 메서드를 기록하고, 시험이 메서드마다 답을 정한다. 허용 목록(이 phase 는 `Storage.getCookies`) 밖의 메서드가 오면 기록에 위반으로 남긴다
 - `tests/naver-blog.test.ts`(공통 계약 검사가 `tests/<id>.test.ts` 를 요구한다): 쿠키 둘이 있으면 `logged_in: true`. 하나라도 없으면 `NAVER_BLOG_LOGIN_REQUIRED`. 닫힌 포트면 `NAVER_BLOG_BROWSER_UNREACHABLE`. 응답하지 않는 서버면 `timeoutMs: 300` 으로 같은 오류. `webSocketDebuggerUrl` 이 `ws://127.0.0.1:9/...` 처럼 다른 주소를 적어도 `cdp_url` 의 호스트와 포트로 붙는다. 정규식이 `http://chrome.example.internal:1` 을 거절한다. 결과와 오류 글에 CDP 주소가 없다
 - `tests/draft.test.ts`: 지시 줄 셋과 글 줄, 빈 줄을 나누는 정상 예 하나. 모양이 틀린 지시 줄은 글 줄이 된다. 제한 위반, `photo_dir` 누락, `../x.jpg`, 링크, 20MB 초과, 서명 불일치(이름은 `.jpg` 인데 PNG 머리)를 각각 문장으로 돌려준다. 문장에 디렉터리 경로가 없다. 임시 디렉터리에 합성 바이트로 만든 파일만 쓴다
-- `tests/render.test.ts`: `101.jpg` 는 `../../attachments/101` 로, `photo.jpg` 는 그림 없이 이름표로 그린다. `photo_notes` 가 들어가고, `<script` 가 없고, 제목의 `<b>` 가 이스케이프되고, `photo_dir` 문자열이 HTML 에 없다. `package` 는 지시 줄을 자리 표시로 바꾼다. 계약 위반이면 `html` 이 `null` 이다
+- `tests/render.test.ts`: `101.jpg` 는 `../../attachments/101` 로, `photo.jpg` 는 그림 없이 이름표로 그린다. `photo_notes` 가 들어가고, `<script` 가 없고, 제목의 `<b>` 가 이스케이프되고, `photo_dir` 문자열이 HTML 에 없다. `package` 는 지시 줄을 자리 표시로 바꾼다. 계약 위반이면 `html` 이 `null` 이다. `ogq_abc123-4` 스티커 두 번은 `stickers/ogq_abc123-4.png` 를 부르고 `assets` 에 `https://storep-phinf.pstatic.net/ogq_abc123/original_4.png?type=p100_100` 이 한 번만 든다. `sticker_hello` 는 이름표이고 `assets` 에 없다
 - `tests/contracts.test.ts`: gmail 의 같은 이름 시험처럼 서버의 도구 목록이 `connector.json` 의 `tools` 와 같고 `READ` 도구만 `readOnlyHint` 가 참인지 본다
 
 ## 검증

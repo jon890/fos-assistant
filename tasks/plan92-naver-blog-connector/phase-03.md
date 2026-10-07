@@ -34,17 +34,17 @@
 
 | 파일 | 내용 |
 | --- | --- |
-| `<job_id>.json` | `{job_id, status, stage, started_at, finished_at, result, error, pid, heartbeat_at}`. 모드 600 |
+| `<job_id>.json` | `{job_id, status, stage, save_clicked, started_at, finished_at, result, error, pid, heartbeat_at}`. 모드 600 |
 | `<job_id>.input.json` | 초안 다섯 칸만. 연결 칸 값은 담지 않는다. 모드 600. 작업 프로세스가 읽은 뒤 바로 지운다 |
 | `lock-<cdp_url 의 sha256 앞 16자>` | 그 브라우저에서 돌고 있는 작업의 `{job_id, created_at}`. `O_EXCL` 로 만든다. 브라우저가 다르면 서로 막지 않는다 |
 
 - `job_id` 는 `crypto.randomUUID()` 다
 - 상태 파일은 임시 파일에 쓴 뒤 이름을 바꿔 바꾼다
-- **잠금이 살아 있는지는 잠금이 가리키는 작업의 상태 파일로 판정한다.** 잠금을 만든 MCP 서버는 응답한 뒤 곧 닫히므로 잠금에 그 pid 를 두지 않는다. 상태가 `running` 이고, `pid` 가 있으면 그 프로세스가 살아 있고 `heartbeat_at` 이 30초 안이며, 시작한 지 11분이 안 됐으면 살아 있다. `pid` 가 아직 없으면 잠금을 만든 지 10초 안일 때만 살아 있다
-- 살아 있지 않은 잠금은 묵은 잠금으로 보고 지운다. 그 작업이 아직 `running` 이면 `save_clicked` 를 지난 작업은 `unknown`, 아니면 `failed` 와 `error.code: "timeout"` 으로 끝낸다
+- **잠금이 살아 있는지는 잠금이 가리키는 작업의 상태 파일로 판정한다.** 잠금을 만든 MCP 서버는 응답한 뒤 곧 닫히므로 잠금에 그 pid 를 두지 않는다. 상태가 `running` 이고, `pid` 가 있으면 그 프로세스가 살아 있고 `heartbeat_at` 이 30초 안이며, 시작한 지 11분이 안 됐으면 살아 있다. `pid` 가 아직 없거나 상태 파일이 아직 없으면 잠금을 만든 지 10초 안일 때만 살아 있다
+- 살아 있지 않은 잠금은 묵은 잠금으로 보고 지운다. 그 작업이 아직 `running` 이면 `save_clicked: true` 인 작업은 `unknown`, 아니면 `failed` 와 `error.code: "timeout"` 으로 끝낸다
 - **끝난 상태(`succeeded`, `failed`, `unknown`)는 다시 쓰지 않는다.** 상태를 쓰는 함수는 쓰기 직전에 파일을 다시 읽어 이미 끝났으면 아무것도 하지 않는다. 작업 프로세스가 늦게 끝나도 정리가 적은 결과를 덮지 않고, 그 반대도 같다
 - 작업 디렉터리를 읽을 때마다 끝난 지 24시간이 지난 상태 파일과 남은 입력 파일을 지운다
-- `status` 는 `running`, `succeeded`, `failed`, `unknown`. 작업 프로세스는 시작하자마자 자기 `pid` 와 `heartbeat_at` 을 적고 5초마다 `heartbeat_at` 을 갱신한다. `stage` 에는 `runDraft` 가 알린 단계를 적고, `save_clicked` 를 받으면 `saved_clicked: true` 를 함께 남긴다
+- `status` 는 `running`, `succeeded`, `failed`, `unknown`. 작업 프로세스는 시작하자마자 자기 `pid` 와 `heartbeat_at` 을 적고 5초마다 `heartbeat_at` 을 갱신한다. `stage` 에는 `runDraft` 가 알린 단계를 적고, `save_clicking` 을 받으면 상태 파일에 `save_clicked: true` 를 쓰고 그 쓰기가 끝난 뒤에 돌아간다(그래야 단추를 누른 뒤 죽어도 정리가 `unknown` 으로 본다). `stage` 는 `save` 로 둔다. `save_clicked` 는 `draft_job` 결과에도 남긴다
 
 ### 2. `src/worker.ts`
 
@@ -53,7 +53,7 @@
 | `runDraft` 의 끝 | 상태 |
 | --- | --- |
 | 성공 | `succeeded`, `result` 는 `state` 와 저장 전후 수 |
-| `save_clicked` 를 받은 뒤의 모든 실패, 중단, 예외 | `unknown` |
+| `save_clicked: true` 를 쓴 뒤의 모든 실패, 중단, 예외 | `unknown` |
 | 그 전의 시간 초과(중단) | `failed`, `error.code: "timeout"` |
 | 그 전의 `EditorError` | `failed`, `error` 는 `{code, stage, message, ...extra}` |
 | 그 전의 그 밖의 예외 | `failed`, `error.code: "editor_failed"`. 예외 원문을 싣지 않는다 |
@@ -99,8 +99,8 @@
 
 `runDraft` 는 시험에서 바꿔 끼울 수 있게 `src/worker.ts` 가 모듈 경계로 받는다(예: `runWorker(jobFile, deps = {runDraft})`).
 
-- `tests/jobs.test.ts`: 임시 작업 디렉터리에서 **잠금을 만든 프로세스가 끝난 뒤에도** 살아 있는 작업 프로세스(시험이 띄운 자식 하나가 `pid` 와 `heartbeat_at` 을 적는다)가 있으면 둘째 작업이 `NAVER_BLOG_BUSY` 다. 다른 CDP 주소의 작업은 막지 않는다. 죽은 `pid` 의 작업은 묵은 잠금으로 풀리고 `timeout` 으로 끝난다. `saved_clicked` 를 지난 작업은 `unknown` 이다. `succeeded` 로 끝난 상태 위에 정리가 `timeout` 을 쓰려 해도 그대로다. 모드 755 인 작업 디렉터리를 거절한다. 24시간 지난 상태 파일이 지워진다. 상태 파일에 `body` 와 `photo_dir` 문자열이 없다
-- `tests/worker.test.ts`: 성공하는 가짜 `runDraft` 로 `succeeded` 와 결과, `save_unconfirmed` 로 `unknown`, `save_clicked` 를 알린 뒤 일반 예외를 던지면 `unknown`, `category_not_found` 로 `failed` 와 `categories`, `limitMs: 100` 에서 끝나지 않는 가짜는 `signal` 을 받고 `timeout`. 입력 파일이 지워지고 잠금이 풀리고 입력 파일에 CDP 주소가 없다
+- `tests/jobs.test.ts`: 임시 작업 디렉터리에서 **잠금을 만든 프로세스가 끝난 뒤에도** 살아 있는 작업 프로세스(시험이 띄운 자식 하나가 `pid` 와 `heartbeat_at` 을 적는다)가 있으면 둘째 작업이 `NAVER_BLOG_BUSY` 다. 다른 CDP 주소의 작업은 막지 않는다. 죽은 `pid` 의 작업은 묵은 잠금으로 풀리고 `timeout` 으로 끝난다. `save_clicked: true` 인 작업은 `unknown` 이다. `succeeded` 로 끝난 상태 위에 정리가 `timeout` 을 쓰려 해도 그대로다. 모드 755 인 작업 디렉터리를 거절한다. 24시간 지난 상태 파일이 지워진다. 상태 파일에 `body` 와 `photo_dir` 문자열이 없다
+- `tests/worker.test.ts`: 성공하는 가짜 `runDraft` 로 `succeeded` 와 결과, `save_unconfirmed` 로 `unknown`, `save_clicking` 을 알린 뒤 일반 예외를 던지면 `unknown`, `category_not_found` 로 `failed` 와 `categories`, `limitMs: 100` 에서 끝나지 않는 가짜는 `signal` 을 받고 `timeout`. 입력 파일이 지워지고 잠금이 풀리고 입력 파일에 CDP 주소가 없다
 - `tests/save-draft.test.ts`: phase 01 의 가짜 CDP 서버와 임시 사진 디렉터리로 `save_draft` 를 부른다. `createServer` 에 `workerEntry` 로 `src/server.ts` 의 절대 경로를 넘겨 실제 작업 프로세스(`bun src/server.ts --worker`)를 띄운다. 작업 프로세스는 `NAVER_BLOG_TEST_FAKE_RUN=1` 이고 `NAVER_BLOG_JOB_DIR` 이 함께 있을 때만 `runDraft` 대신 즉시 성공하는 대역을 쓴다. 작업 프로세스의 pgid 가 시험 프로세스와 다르다. 돌려받은 `job_id` 로 `draft_job` 이 `succeeded` 를 돌려준다. 로그인 쿠키가 없으면 작업을 만들지 않고 `NAVER_BLOG_LOGIN_REQUIRED`. 서명이 틀린 사진이면 `NAVER_BLOG_PHOTO_INVALID`. 결과와 오류에 CDP 주소와 사진 디렉터리가 없다
 - `tests/contracts.test.ts` 는 도구 넷과 `connector.json` 이 같은지 그대로 본다
 
@@ -110,7 +110,7 @@
 cd hermes/connectors/naver-blog && bun install --frozen-lockfile && bun run typecheck && bun test ./src ./tests ./scripts && bun run build && bun run check:bundle
 bash scripts/check-connectors.sh
 python3 -m unittest discover -s hermes/tests
-bash scripts/check-public-safe.sh
+git add -N hermes/connectors/naver-blog && bash scripts/check-public-safe.sh
 ```
 
 기대값: 모두 종료 코드 0. 계약 검사가 도구 넷을 찾고 `save_draft` 의 `title` 과 `outbound` 를 확인한다.
