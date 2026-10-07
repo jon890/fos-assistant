@@ -709,6 +709,7 @@ export default async function setupServices(): Promise<() => Promise<void>> {
  */
 export function waitForStreamedContentAfterLoad(
   page: import("../../web/node_modules/@playwright/test/index.js").Page,
+  waitForShellReady = true,
 ) {
   const streamedContentPlaced = () =>
     page.waitForFunction(
@@ -722,19 +723,23 @@ export function waitForStreamedContentAfterLoad(
   page.goto = async (...args) => {
     const response = await goto(...args);
     await streamedContentPlaced();
-    await page.locator('main[aria-busy="false"]').waitFor({ state: "attached" });
+    if (waitForShellReady)
+      await page.locator('main[aria-busy="false"]').waitFor({ state: "attached" });
     return response;
   };
   const reload = page.reload.bind(page);
   page.reload = async (...args) => {
     const response = await reload(...args);
     await streamedContentPlaced();
-    await page.locator('main[aria-busy="false"]').waitFor({ state: "attached" });
+    if (waitForShellReady)
+      await page.locator('main[aria-busy="false"]').waitFor({ state: "attached" });
     return response;
   };
 }
 
-export const test = base.extend<{ hermes: FakeHermesControl; isolatedMember: { email: string; name: string }; resetHermes: void }>({
+export const test = base.extend<{ hermes: FakeHermesControl; isolatedMember: { email: string; name: string }; resetHermes: void; waitForShellReady: boolean }>({
+  // 외부 스크립트를 막고 SSR 첫 그림을 검사할 때만 false로 둔다.
+  waitForShellReady: [true, { option: true }],
   isolatedMember: async ({}, use, testInfo) => {
     await use(isolatedUser(testInfo, "member"));
   },
@@ -750,9 +755,9 @@ export const test = base.extend<{ hermes: FakeHermesControl; isolatedMember: { e
   hermes: async ({}, use) => {
     await use(await fakeHermesControl());
   },
-  page: async ({ context, page }, use) => {
+  page: async ({ context, page, waitForShellReady }, use) => {
     await setSession(context, { email: TEST_EMAIL, name: "브라우저 테스트" });
-    waitForStreamedContentAfterLoad(page);
+    waitForStreamedContentAfterLoad(page, waitForShellReady);
     await use(page);
   },
 });
