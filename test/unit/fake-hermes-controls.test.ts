@@ -54,6 +54,26 @@ test("대역 제어 초기화는 장애와 미사용 보류를 걷고 profile �
     );
     assert.equal(finished.status, 200);
     assert.equal((await finished.json()).status, "completed");
+    await call("/__test/hold-next-run");
+    const held = await fetch(`${hermes.baseUrl}/p/browser/v1/runs`, {
+      method: "POST",
+      headers: { Authorization: "Bearer example-key" },
+      body: JSON.stringify({ input: "정리해야 하는 실행" }),
+      signal: AbortSignal.timeout(2000),
+    });
+    const heldId = (await held.json()).run_id;
+    assert.equal((await call("/__test/wait-held-run", "GET")).status, 200);
+    assert.equal((await call("/__test/reset-controls")).status, 204);
+    const released = await fetch(
+      `${hermes.baseUrl}/p/browser/v1/runs/${heldId}`,
+      {
+        headers: { Authorization: "Bearer example-key" },
+        signal: AbortSignal.timeout(2000),
+      },
+    );
+    assert.equal(released.status, 200);
+    assert.equal((await released.json()).status, "completed");
+    assert.equal((await call("/__test/wait-held-run", "GET")).status, 409);
     assert.equal(
       (await call("/__test/last-submitted-runtime", "GET")).status,
       200,
