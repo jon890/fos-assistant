@@ -172,6 +172,28 @@ class FeedbackLabelerTest {
     }
 
     @Test
+    @DisplayName("받아들인 Memory 제안을 되돌린 뒤 거절하거나 그대로 두면 첫 반응은 ACCEPTED 로 남고 오래 가는 선호는 아니다")
+    void undoneMemoryAcceptIsNotPersistent() {
+        List<FeedbackEvent> undone = new ArrayList<>(events(FeedbackActor.AGENT, FeedbackEventType.SURFACED));
+        undone.add(event(FeedbackActor.USER, FeedbackEventType.ACCEPTED, null, 1));
+        undone.add(event(FeedbackActor.USER, FeedbackEventType.DISMISSED, FeedbackLabeler.MEMORY_UNDO, 2));
+        List<FeedbackEvent> rejected = new ArrayList<>(undone);
+        rejected.add(event(FeedbackActor.USER, FeedbackEventType.REJECTED, null, 3));
+        List<FeedbackEvent> acceptedAgain = new ArrayList<>(undone);
+        acceptedAgain.add(event(FeedbackActor.USER, FeedbackEventType.ACCEPTED, null, 3));
+
+        SubjectLabel undoneLabel = FeedbackLabeler.label(FeedbackSubjectType.MEMORY, undone);
+        SubjectLabel rejectedLabel = FeedbackLabeler.label(FeedbackSubjectType.MEMORY, rejected);
+        SubjectLabel acceptedAgainLabel = FeedbackLabeler.label(FeedbackSubjectType.MEMORY, acceptedAgain);
+
+        assertThat(undoneLabel.label()).isEqualTo(FeedbackLabel.ACCEPTED);
+        assertThat(undoneLabel.persistentPreference()).isFalse();
+        assertThat(rejectedLabel.label()).isEqualTo(FeedbackLabel.ACCEPTED);
+        assertThat(rejectedLabel.persistentPreference()).isFalse();
+        assertThat(acceptedAgainLabel.persistentPreference()).isTrue();
+    }
+
+    @Test
     @DisplayName("지금 화면에서 숨기기만 한 제안은 거절이 아니라 DEFERRED 다")
     void hideOnlyIsDeferred() {
         List<FeedbackEvent> history = new ArrayList<>(events(FeedbackActor.AGENT, FeedbackEventType.SURFACED));

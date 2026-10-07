@@ -303,7 +303,7 @@ jobs:
             | jq --arg sha "$REVIEW_HEAD" --argjson last "$LAST_REVIEW_ID" \
               -f .review-tools/scripts/submitted-claude-reviews.jq)
           if [ "$COUNT" -eq 0 ]; then
-            echo "::error::이번 실행에서 현재 커밋에 제출한 Claude 리뷰가 없습니다."
+            echo "::error::리뷰 미제출: 이번 실행에서 현재 커밋에 제출한 Claude 리뷰가 없습니다."
             exit 1
           fi
           echo "현재 커밋의 새 Claude 리뷰 $COUNT 건을 확인했습니다." >> "$GITHUB_STEP_SUMMARY"
