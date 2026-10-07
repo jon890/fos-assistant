@@ -3,6 +3,11 @@ package com.bifos.assistant.followup.application;
 import com.bifos.assistant.chat.application.ConversationAccess;
 import com.bifos.assistant.chat.application.ConversationPublicIdLookup;
 import com.bifos.assistant.chat.domain.type.ConversationPurpose;
+import com.bifos.assistant.feedback.application.DecisionFeedbackRecorder;
+import com.bifos.assistant.feedback.application.model.FeedbackEntry;
+import com.bifos.assistant.feedback.domain.type.FeedbackActor;
+import com.bifos.assistant.feedback.domain.type.FeedbackEventType;
+import com.bifos.assistant.feedback.domain.type.FeedbackSubjectType;
 import com.bifos.assistant.followup.application.model.FollowUpPatch;
 import com.bifos.assistant.followup.application.model.FollowUpProposalOutcome;
 import com.bifos.assistant.followup.application.model.FollowUpSnapshot;
@@ -18,6 +23,7 @@ import java.text.Normalizer;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -67,6 +73,7 @@ public class FollowUpService {
     private final FollowUpRepository followUps;
     private final ConversationAccess conversations;
     private final ConversationPublicIdLookup conversationIds;
+    private final DecisionFeedbackRecorder feedback;
     private final TransactionTemplate transactions;
     private final Clock clock;
 
@@ -75,11 +82,13 @@ public class FollowUpService {
             FollowUpRepository followUps,
             ConversationAccess conversations,
             ConversationPublicIdLookup conversationIds,
+            DecisionFeedbackRecorder feedback,
             PlatformTransactionManager transactionManager,
             Clock clock) {
         this.followUps = followUps;
         this.conversations = conversations;
         this.conversationIds = conversationIds;
+        this.feedback = feedback;
         this.transactions = new TransactionTemplate(transactionManager);
         this.clock = clock;
     }
@@ -192,8 +201,9 @@ public class FollowUpService {
                 if (followUps.countByProposedByExecutionId(executionId) >= MAX_PROPOSALS_PER_EXECUTION) {
                     return FollowUpProposalOutcome.TOO_MANY_IN_RUN;
                 }
-                followUps.saveAndFlush(
+                FollowUp saved = followUps.saveAndFlush(
                         FollowUp.proposed(owner.id(), conversationId, executionId, stripped, key, dueAt, waiting, now));
+                feedback.record(feedbackOf(saved, FeedbackEventType.SURFACED, FeedbackActor.AGENT, now));
                 return FollowUpProposalOutcome.CREATED;
             });
         } catch (DataIntegrityViolationException | PessimisticLockingFailureException ex) {
@@ -245,8 +255,14 @@ public class FollowUpService {
                 }
                 Instant dueAt = patch.dueAtPresent() ? patch.dueAt() : followUp.dueAt();
                 boolean waiting = patch.waiting() == null ? followUp.waiting() : patch.waiting();
+                List<String> changed = changedFields(followUp, key, dueAt, waiting);
                 followUp.revise(title, key, dueAt, waiting, now);
-                return followUps.saveAndFlush(followUp);
+                FollowUp revised = followUps.saveAndFlush(followUp);
+                if (revised.proposedByAgent() && !changed.isEmpty()) {
+                    feedback.record(feedbackOf(revised, FeedbackEventType.EDITED, FeedbackActor.USER, now)
+                            .changed(changed));
+                }
+                return revised;
             });
         } catch (DataIntegrityViolationException ex) {
             // 고치는 사이에 같은 제목의 줄이 열렸다.
@@ -258,26 +274,32 @@ public class FollowUpService {
 
     /** 제안을 받아들인다. {@code PROPOSED} 만 받는다. */
     public FollowUpSnapshot accept(CurrentUser user, UUID id) {
-        return transition(user, id, "accepted", FollowUpStatus.PROPOSED, FollowUp::accept);
+        return transition(user, id, "accepted", FollowUpStatus.PROPOSED, FollowUp::accept, FeedbackEventType.ACCEPTED);
     }
 
     /** 제안을 거절한다. {@code PROPOSED} 만 받는다. */
     public FollowUpSnapshot reject(CurrentUser user, UUID id) {
-        return transition(user, id, "rejected", FollowUpStatus.PROPOSED, FollowUp::reject);
+        return transition(user, id, "rejected", FollowUpStatus.PROPOSED, FollowUp::reject, FeedbackEventType.REJECTED);
     }
 
-    /** 끝낸다. {@code OPEN} 만 받는다. */
+    /** 끝낸다. {@code OPEN} 만 받는다. 제안에서 온 할 일이면 사용자가 그 일을 해낸 실행 결과로 기록한다. */
     public FollowUpSnapshot done(CurrentUser user, UUID id) {
-        return transition(user, id, "done", FollowUpStatus.OPEN, FollowUp::done);
+        return transition(user, id, "done", FollowUpStatus.OPEN, FollowUp::done, FeedbackEventType.EXECUTION_SUCCEEDED);
     }
 
-    /** 그만둔다. {@code OPEN} 만 받는다. */
+    /** 그만둔다. {@code OPEN} 만 받는다. 제안에서 온 할 일이면 받아들인 뒤 그만둔 것으로 기록한다. */
     public FollowUpSnapshot drop(CurrentUser user, UUID id) {
-        return transition(user, id, "dropped", FollowUpStatus.OPEN, FollowUp::drop);
+        return transition(user, id, "dropped", FollowUpStatus.OPEN, FollowUp::drop, FeedbackEventType.DISMISSED);
     }
 
+    /** @param event 제안에서 온 할 일이면 남길 판단 피드백 사건 */
     private FollowUpSnapshot transition(
-            CurrentUser user, UUID id, String action, FollowUpStatus from, BiConsumer<FollowUp, Instant> move) {
+            CurrentUser user,
+            UUID id,
+            String action,
+            FollowUpStatus from,
+            BiConsumer<FollowUp, Instant> move,
+            FeedbackEventType event) {
         Instant now = clock.instant();
         FollowUp saved = transactions.execute(status -> {
             FollowUp followUp = requireOwn(user, id);
@@ -285,7 +307,11 @@ public class FollowUpService {
                 throw notInState();
             }
             move.accept(followUp, now);
-            return followUps.saveAndFlush(followUp);
+            FollowUp moved = followUps.saveAndFlush(followUp);
+            if (moved.proposedByAgent()) {
+                feedback.record(feedbackOf(moved, event, FeedbackActor.USER, now).reason(action.toUpperCase(Locale.ROOT)));
+            }
+            return moved;
         });
         log.info("follow-up {} userId={} followUpId={}", action, user.id(), saved.publicId());
         return snapshot(saved);
@@ -304,7 +330,10 @@ public class FollowUpService {
                         return new Created(existing, "reused");
                     }
                     existing.accept(now);
-                    return new Created(followUps.saveAndFlush(existing), "accepted");
+                    FollowUp accepted = followUps.saveAndFlush(existing);
+                    feedback.record(feedbackOf(accepted, FeedbackEventType.ACCEPTED, FeedbackActor.USER, now)
+                            .reason("DIRECT_CREATE"));
+                    return new Created(accepted, "accepted");
                 });
     }
 
@@ -315,6 +344,33 @@ public class FollowUpService {
      *     {@code accepted}
      */
     private record Created(FollowUp followUp, String action) {}
+
+    /**
+     * 판단 피드백 사건이다. 열쇠는 지금 화면의 {@code itemKey} 와 같고, 판은 제목 열쇠다. 제목은 담지 않는다. 트랜잭션 안에서 부르면 커밋한
+     * 뒤에 남는다.
+     */
+    private static FeedbackEntry feedbackOf(
+            FollowUp followUp, FeedbackEventType type, FeedbackActor actor, Instant now) {
+        return FeedbackEntry.of(followUp.userId(), FeedbackSubjectType.FOLLOW_UP, followUp.publicId(), type, actor, now)
+                .conversation(followUp.conversationId())
+                .originExecution(followUp.proposedByExecutionId())
+                .version(followUp.titleKey());
+    }
+
+    /** 고치기 전과 견주어 바뀐 칸 이름이다. 값은 담지 않는다. */
+    private static List<String> changedFields(FollowUp before, String titleKey, Instant dueAt, boolean waiting) {
+        List<String> changed = new ArrayList<>();
+        if (!titleKey.equals(before.titleKey())) {
+            changed.add("TITLE");
+        }
+        if (!Objects.equals(dueAt, before.dueAt())) {
+            changed.add("DUE_AT");
+        }
+        if (waiting != before.waiting()) {
+            changed.add("WAITING");
+        }
+        return changed;
+    }
 
     /** 주인의 할 일을 잠그고 읽는다. 같은 줄을 바꾸는 요청이 서로 덮지 않게 한다. 트랜잭션 안에서 부른다. */
     private FollowUp requireOwn(CurrentUser user, UUID id) {

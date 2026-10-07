@@ -20,12 +20,18 @@ import com.bifos.assistant.connector.domain.type.ConnectionStatus;
 import com.bifos.assistant.connector.infra.ConnectorActionRepository;
 import com.bifos.assistant.connector.infra.ConnectorBindingRepository;
 import com.bifos.assistant.connector.infra.ConnectorToolGrantRepository;
+import com.bifos.assistant.feedback.application.DecisionFeedbackRecorder;
+import com.bifos.assistant.feedback.application.model.FeedbackEntry;
+import com.bifos.assistant.feedback.domain.type.FeedbackActor;
+import com.bifos.assistant.feedback.domain.type.FeedbackEventType;
+import com.bifos.assistant.feedback.domain.type.FeedbackSubjectType;
 import com.bifos.assistant.hermes.dto.ConnectorManifest;
 import com.bifos.assistant.notification.application.NotificationService;
 import com.bifos.assistant.notification.domain.NotificationTarget;
 import com.bifos.assistant.notification.domain.type.NotificationKind;
 import com.bifos.assistant.notification.domain.type.NotificationTargetType;
 import com.bifos.assistant.orchestration.application.SessionOwnerResolver;
+import com.bifos.assistant.proactive.domain.ProactiveCheck;
 import com.bifos.assistant.proactive.application.CheckNotificationPolicy;
 import com.bifos.assistant.proactive.application.ProactiveCheckGuard;
 import com.bifos.assistant.shared.error.ApiException;
@@ -104,6 +110,7 @@ public class ConnectorPolicyService {
     private final ConversationNotices conversations;
     private final ProactiveCheckGuard checkGuard;
     private final CheckNotificationPolicy checkNotifications;
+    private final DecisionFeedbackRecorder feedback;
     private final TransactionTemplate transactions;
     private final Clock clock;
 
@@ -122,6 +129,7 @@ public class ConnectorPolicyService {
             ConversationNotices conversations,
             ProactiveCheckGuard checkGuard,
             CheckNotificationPolicy checkNotifications,
+            DecisionFeedbackRecorder feedback,
             PlatformTransactionManager transactionManager) {
         this(
                 actions,
@@ -135,6 +143,7 @@ public class ConnectorPolicyService {
                 conversations,
                 checkGuard,
                 checkNotifications,
+                feedback,
                 transactionManager,
                 Clock.systemUTC());
     }
@@ -151,6 +160,7 @@ public class ConnectorPolicyService {
             ConversationNotices conversations,
             ProactiveCheckGuard checkGuard,
             CheckNotificationPolicy checkNotifications,
+            DecisionFeedbackRecorder feedback,
             PlatformTransactionManager transactionManager,
             Clock clock) {
         this.actions = actions;
@@ -164,6 +174,7 @@ public class ConnectorPolicyService {
         this.conversations = conversations;
         this.checkGuard = checkGuard;
         this.checkNotifications = checkNotifications;
+        this.feedback = feedback;
         this.transactions = new TransactionTemplate(transactionManager);
         this.clock = clock;
     }
@@ -285,6 +296,20 @@ public class ConnectorPolicyService {
                 }
                 return stored;
             });
+            if (needsApproval) {
+                // 커밋한 뒤라 바로 남는다. 살펴보기 트리의 승인 줄이면 그 살펴보기로 잇는다.
+                feedback.record(FeedbackEntry.of(
+                                saved.userId(),
+                                FeedbackSubjectType.CONNECTOR_ACTION,
+                                saved.publicId(),
+                                FeedbackEventType.SURFACED,
+                                FeedbackActor.AGENT,
+                                now)
+                        .conversation(saved.conversationId())
+                        .originExecution(saved.originExecutionId())
+                        .sourceCheck(checkGuard.checkOf(origin).map(ProactiveCheck::id).orElse(null))
+                        .version(saved.argsSha256()));
+            }
             // 사건은 커밋한 뒤에 낸다. 받은 쪽이 읽었을 때 줄이 있어야 한다.
             if (needsApproval && saved.conversationId() != null) {
                 events.publishEvent(new ConnectorActionChanged(saved.conversationId(), saved.publicId()));

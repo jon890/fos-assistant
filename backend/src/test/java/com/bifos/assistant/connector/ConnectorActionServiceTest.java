@@ -84,6 +84,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Stream;
+import org.assertj.core.groups.Tuple;
 import org.assertj.core.api.ThrowableAssert.ThrowingCallable;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -201,6 +202,7 @@ class ConnectorActionServiceTest {
 
     @BeforeEach
     void setUp() {
+        jdbc.update("DELETE FROM decision_feedback_event");
         jdbc.update("DELETE FROM connector_action");
         jdbc.update("DELETE FROM connector_tool_grant");
         bindings.deleteAll();
@@ -284,6 +286,39 @@ class ConnectorActionServiceTest {
         // 사건은 줄을 커밋한 뒤에 나간다.
         assertThat(recorder.seen)
                 .containsExactly(new Seen(new ConnectorActionChanged(CONVERSATION, row.publicId()), false));
+    }
+
+    @Test
+    @DisplayName("승인 줄을 보이고 승인해 실행하면 SURFACED, APPROVED, EXECUTION_SUCCEEDED 판단 피드백이 인자 해시와 함께 남는다")
+    void recordsDecisionFeedbackForApprovalFlow() {
+        UUID actionId = ask(WRITE, ARGS).actionId();
+
+        service.approve(me, actionId, null);
+
+        ConnectorAction row = onlyAction();
+        assertThat(feedbackRows())
+                .containsExactly(
+                        tuple("connector_action:" + actionId, "SURFACED", "AGENT", row.argsSha256()),
+                        tuple("connector_action:" + actionId, "APPROVED", "USER", row.argsSha256()),
+                        tuple("connector_action:" + actionId, "EXECUTION_SUCCEEDED", "SYSTEM", row.argsSha256()));
+        assertThat(jdbc.queryForObject(
+                        "SELECT COUNT(*) FROM decision_feedback_event WHERE origin_execution_id = ? AND conversation_id = ?",
+                        Long.class,
+                        run.id(),
+                        CONVERSATION))
+                .isEqualTo(3L);
+    }
+
+    @Test
+    @DisplayName("승인 줄을 거절하면 REJECTED 판단 피드백이 남고 실행 결과는 남지 않는다")
+    void recordsDecisionFeedbackForRejection() {
+        UUID actionId = ask(WRITE, ARGS).actionId();
+
+        service.reject(me, actionId);
+
+        assertThat(feedbackRows())
+                .extracting(row -> row.toList().get(1))
+                .containsExactly("SURFACED", "REJECTED");
     }
 
     @Test
@@ -1440,6 +1475,17 @@ class ConnectorActionServiceTest {
         } catch (InterruptedException ex) {
             Thread.currentThread().interrupt();
         }
+    }
+
+    /** 판단 피드백을 {@code (subjectKey, eventType, actor, subjectVersion)} 로 남긴 순서대로 읽는다. */
+    private List<Tuple> feedbackRows() {
+        return jdbc
+                .queryForList(
+                        "SELECT subject_key, event_type, actor, subject_version FROM decision_feedback_event ORDER BY id")
+                .stream()
+                .map(row -> tuple(
+                        row.get("SUBJECT_KEY"), row.get("EVENT_TYPE"), row.get("ACTOR"), row.get("SUBJECT_VERSION")))
+                .toList();
     }
 
     private static CurrentUser currentUser(AppUser user) {

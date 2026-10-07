@@ -163,6 +163,7 @@ class AttentionControlServiceTest {
     void tearDown() {
         for (Long userId : createdUsers) {
             jdbc.update("DELETE FROM attention_event WHERE user_id = ?", userId);
+            jdbc.update("DELETE FROM decision_feedback_event WHERE user_id = ?", userId);
             jdbc.update("DELETE FROM attention_control WHERE user_id = ?", userId);
             jdbc.update("DELETE FROM connector_action WHERE user_id = ?", userId);
             jdbc.update("DELETE FROM agent_execution WHERE user_id = ?", userId);
@@ -298,6 +299,35 @@ class AttentionControlServiceTest {
                 () -> controls.hide(dad, CardKey.FAILURES, momsFailure.itemKey(), momsFailure.stateKey()),
                 ErrorCode.ATTENTION_ITEM_NOT_FOUND);
         assertThat(controlRows()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("승인 대기를 숨기면 DISMISSED, 미루면 POSTPONED 판단 피드백이 그 승인 줄의 열쇠로 남는다")
+    void recordsDecisionFeedbackForSuggestionControls() {
+        Conversation conversation = conversationOf(dad, "메모 남기기");
+        UUID actionId = insertPendingAction(conversation.id(), NOW.plus(Duration.ofHours(3)));
+        AttentionItem approval = onlyItem(attention.view(dad), CardKey.NEEDS_ME);
+
+        controls.snooze(dad, CardKey.NEEDS_ME, approval.itemKey(), NOW.plus(Duration.ofHours(1)));
+        controls.restore(dad, CardKey.NEEDS_ME, approval.itemKey());
+        controls.hide(dad, CardKey.NEEDS_ME, approval.itemKey(), approval.stateKey());
+
+        assertThat(feedbackRows())
+                .containsExactly(
+                        tuple("connector_action:" + actionId, "POSTPONED", "USER", "ATTENTION_SNOOZE"),
+                        tuple("connector_action:" + actionId, "DISMISSED", "USER", "ATTENTION_HIDE"));
+    }
+
+    @Test
+    @DisplayName("제안이 아닌 실패 항목을 숨기면 판단 피드백을 남기지 않는다")
+    void skipsDecisionFeedbackForNonSuggestions() {
+        Conversation conversation = failedConversation("목록 정리");
+        AttentionItem failure = onlyItem(attention.view(dad), CardKey.FAILURES);
+
+        controls.hide(dad, CardKey.FAILURES, failure.itemKey(), failure.stateKey());
+
+        assertThat(conversation.id()).isNotNull();
+        assertThat(feedbackRows()).isEmpty();
     }
 
     @Test
@@ -475,6 +505,19 @@ class AttentionControlServiceTest {
 
     private void failedRoot(Conversation conversation, Instant started, Instant finished) {
         executions.save(root(dad, conversation, ExecutionStatus.FAILED, started, finished));
+    }
+
+    /** 요청자의 판단 피드백을 {@code (subjectKey, eventType, actor, reasonCode)} 로 일어난 순서대로 읽는다. */
+    private List<Tuple> feedbackRows() {
+        return jdbc
+                .queryForList(
+                        "SELECT subject_key, event_type, actor, reason_code FROM decision_feedback_event"
+                                + " WHERE user_id = ? ORDER BY id",
+                        dad.id())
+                .stream()
+                .map(row -> tuple(
+                        row.get("SUBJECT_KEY"), row.get("EVENT_TYPE"), row.get("ACTOR"), row.get("REASON_CODE")))
+                .toList();
     }
 
     /** 요청자의 사건을 {@code (itemKey, stateKey, trigger, attention)} 로 읽는다. */

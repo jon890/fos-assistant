@@ -12,6 +12,11 @@ import com.bifos.assistant.attention.domain.type.AttentionTrigger;
 import com.bifos.assistant.attention.domain.type.CardKey;
 import com.bifos.assistant.attention.infra.AttentionControlRepository;
 import com.bifos.assistant.attention.infra.AttentionEventRepository;
+import com.bifos.assistant.feedback.application.DecisionFeedbackRecorder;
+import com.bifos.assistant.feedback.application.model.FeedbackEntry;
+import com.bifos.assistant.feedback.domain.type.FeedbackActor;
+import com.bifos.assistant.feedback.domain.type.FeedbackEventType;
+import com.bifos.assistant.feedback.domain.type.FeedbackSubjectType;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
@@ -50,6 +55,7 @@ public class AttentionControlService {
     private final AttentionEventRepository events;
     private final AttentionEventWriter writer;
     private final AttentionProperties properties;
+    private final DecisionFeedbackRecorder feedback;
     private final TransactionTemplate transactions;
     private final Clock clock;
 
@@ -60,6 +66,7 @@ public class AttentionControlService {
             AttentionEventRepository events,
             AttentionEventWriter writer,
             AttentionProperties properties,
+            DecisionFeedbackRecorder feedback,
             PlatformTransactionManager transactionManager,
             Clock clock) {
         this.attention = attention;
@@ -67,6 +74,7 @@ public class AttentionControlService {
         this.events = events;
         this.writer = writer;
         this.properties = properties;
+        this.feedback = feedback;
         this.transactions = new TransactionTemplate(transactionManager);
         this.clock = clock;
     }
@@ -82,7 +90,7 @@ public class AttentionControlService {
         requireStateKey(stateKey);
         requireCard(card);
         AttentionSnapshot snapshot = attention.snapshot(user);
-        requireCandidate(snapshot, card, itemKey);
+        AttentionCandidate candidate = requireCandidate(snapshot, card, itemKey);
         Instant now = snapshot.now();
         saveControl(
                 user,
@@ -91,6 +99,7 @@ public class AttentionControlService {
                 entry -> entry.rehide(stateKey, now),
                 () -> AttentionControlEntry.hide(user.id(), card, itemKey, stateKey, now));
         recordInCard(user, snapshot, card, itemKey, stateKey, AttentionEventType.HIDDEN);
+        recordFeedback(user, candidate, FeedbackEventType.DISMISSED, "ATTENTION_HIDE", now);
     }
 
     /**
@@ -116,6 +125,26 @@ public class AttentionControlService {
                 () -> AttentionControlEntry.snooze(user.id(), card, itemKey, until, now));
         // 미루기 요청에는 상태가 없어 그 카드 후보의 지금 상태로 사건을 남긴다.
         recordInCard(user, snapshot, card, itemKey, candidate.stateKey(), AttentionEventType.SNOOZED);
+        recordFeedback(user, candidate, FeedbackEventType.POSTPONED, "ATTENTION_SNOOZE", now);
+    }
+
+    /**
+     * 제안과 승인 대기 항목을 숨기거나 미루면 그 제안의 판단 피드백 사건을 남긴다. 다른 항목은 제안이 아니라 남기지 않는다. 숨기기는 그
+     * 상태가 바뀔 때까지만 가리는 일회성 반응이다.
+     */
+    private void recordFeedback(
+            CurrentUser user, AttentionCandidate candidate, FeedbackEventType type, String reason, Instant now) {
+        FeedbackSubjectType subject = switch (candidate.trigger()) {
+            case FOLLOW_UP_PROPOSED -> FeedbackSubjectType.FOLLOW_UP;
+            case MEMORY_PROPOSED -> FeedbackSubjectType.MEMORY;
+            case APPROVAL_PENDING -> FeedbackSubjectType.CONNECTOR_ACTION;
+            default -> null;
+        };
+        if (subject == null || subject != FeedbackSubjectType.ofKey(candidate.itemKey())) {
+            return;
+        }
+        feedback.record(FeedbackEntry.ofKey(user.id(), subject, candidate.itemKey(), type, FeedbackActor.USER, now)
+                .reason(reason));
     }
 
     /**

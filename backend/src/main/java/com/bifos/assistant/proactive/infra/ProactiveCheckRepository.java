@@ -1,5 +1,7 @@
 package com.bifos.assistant.proactive.infra;
 
+import java.util.Collection;
+import java.time.Instant;
 import com.bifos.assistant.proactive.domain.ProactiveCheck;
 import com.bifos.assistant.proactive.domain.type.CheckStatus;
 import com.bifos.assistant.proactive.domain.type.CheckTrigger;
@@ -52,4 +54,12 @@ public interface ProactiveCheckRepository extends JpaRepository<ProactiveCheck, 
      */
     Optional<ProactiveCheck> findFirstByConversationIdAndStatusNotAndSkippedReasonIsNullOrderByIdDesc(
             Long conversationId, CheckStatus status);
+
+    /** 그 사용자가 그 시각 뒤에 연 살펴보기. 판단 피드백의 replay 읽기 모델이 상황으로 읽는다. */
+    List<ProactiveCheck> findByUserIdAndStartedAtGreaterThanEqualOrderByIdAsc(Long userId, Instant since);
+
+    List<ProactiveCheck> findByUserIdAndIdIn(Long userId, Collection<Long> ids);
+
+    /** 그 사용자의 그 루트 실행들의 살펴보기. 제안을 낸 실행에서 살펴보기를 찾는다. */
+    List<ProactiveCheck> findByUserIdAndRootExecutionIdIn(Long userId, Collection<Long> rootExecutionIds);
 }

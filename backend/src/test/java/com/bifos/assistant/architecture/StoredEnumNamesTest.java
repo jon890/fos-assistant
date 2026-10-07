@@ -3,6 +3,9 @@ package com.bifos.assistant.architecture;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.bifos.assistant.agent.domain.type.AgentVisibility;
+import com.bifos.assistant.feedback.domain.type.FeedbackActor;
+import com.bifos.assistant.feedback.domain.type.FeedbackEventType;
+import com.bifos.assistant.feedback.domain.type.FeedbackSubjectType;
 import com.bifos.assistant.agent.domain.type.CostMode;
 import com.bifos.assistant.agent.domain.type.CredentialScope;
 import com.bifos.assistant.chat.domain.type.ConversationPurpose;
@@ -76,7 +79,23 @@ class StoredEnumNamesTest {
                             "STALE",
                             "FRESHNESS_UNKNOWN",
                             "INCOMPLETE",
-                            "REPEATED")));
+                            "REPEATED")),
+            Map.entry(
+                    FeedbackEventType.class,
+                    List.of(
+                            "SURFACED",
+                            "ACCEPTED",
+                            "DISMISSED",
+                            "POSTPONED",
+                            "EDITED",
+                            "APPROVED",
+                            "REJECTED",
+                            "EXECUTION_SUCCEEDED",
+                            "EXECUTION_FAILED")),
+            Map.entry(
+                    FeedbackSubjectType.class,
+                    List.of("FOLLOW_UP", "MEMORY", "CONNECTOR_ACTION", "CHECK", "AUTONOMY_DECISION")),
+            Map.entry(FeedbackActor.class, List.of("USER", "AGENT", "SYSTEM")));
 
     @Test
     @DisplayName("저장되는 enum 의 상수 이름이 순서까지 옮기기 전과 같다")
