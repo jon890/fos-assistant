@@ -86,7 +86,8 @@ class MysqlMigrationTest {
             assertThat(probe.migrate().migrationsExecuted).isEqualTo(1);
             probe.validate();
             assertThat(probe.info().pending()).isEmpty();
-            try (var connection = DriverManager.getConnection(database.url(), database.username(), database.password());
+            try (var connection =
+                            DriverManager.getConnection(database.url(), database.username(), database.password());
                     var statement = connection.createStatement();
                     var rows = statement.executeQuery("SELECT COUNT(*) FROM timestamp_earlier")) {
                 assertThat(rows.next()).isTrue();
