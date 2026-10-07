@@ -1,47 +1,73 @@
-# Phase 01. CDP 세션 클라이언트와 세션 이어가기 프로필
+# Phase 01. 화면 SSE 와 입력 API
 
 **Execution profile**: deep
 
 ## 목표
 
-Control Plane 이 사용자 브라우저의 탭 하나에 CDP WebSocket 으로 붙어 명령을 보내고 사건을 받는 클라이언트를 만든다. 프로필을 만들 때 Chrome 이 이전 세션(세션 쿠키 포함)을 이어서 열도록 설정을 써 둔다.
+사용자가 자기 브라우저의 지금 탭을 SSE 로 보고(CDP screencast), POST 로 입력을 보낸다. 한 브라우저에 화면은 하나만 열리고, 화면이 열려 있는 동안 자동 중지하지 않는다.
 
-**범위 외**: 화면 SSE 와 입력 API(phase 02), 웹 화면(단계 2b), 커넥터 중계(단계 3).
+**범위 외**: 웹 화면(단계 2b), 커넥터 중계(단계 3).
 
 ## 컨텍스트
 
 **근거 문서**: `docs/adr/ADR-20261007-user-browser.md`, `docs/backend/user-browser.md`, `tasks/plan94-user-browser/README.md` 의 「단계 2: 로그인 화면」
 
-- 브라우저 컨테이너의 CDP 주소는 `BrowserRuntime.cdpAddress(containerId)` 가 준다(`http://<컨테이너 IP>:<포트>`). 운영 이미지는 그 포트에서 작은 TCP 중계가 Chrome 의 loopback CDP 로 잇고, Control Plane 의 주소에서 오는 연결만 받는다
-- Chrome 은 `Host` 가 IP 나 `localhost` 일 때만 받는다. 컨테이너 IP 를 그대로 쓰면 통과한다. JDK `HttpClient` 와 `java.net.http.WebSocket` 은 `Host` 를 바꾸지 못하지만 IP 주소라 괜찮다. `Origin` 은 보내지 않는다
-- 새 의존성을 들이지 않는다. JDK 21 의 `java.net.http.WebSocket` 과 Jackson 3(`tools.jackson`) 을 쓴다
-- 층 규칙: port 는 `browser.domain`, 구현은 `browser.infra`(단계 1 의 `BrowserRuntime`, `DockerProxyBrowserRuntime` 본보기). infra 는 application 을 import 하지 못한다(`ArchitectureRules.LAYER_DIRECTION`)
-- 프로필 디렉터리는 `FileBrowserProfileStore` 가 만든다. Chrome 은 `<프로필>/Default/Preferences` JSON 을 읽는다
+- 이미 머지된 `CdpTargets`, `CdpConnector` 를 쓴다
+- SSE 본보기: `notification/presentation/NotificationController.java`(`SseEmitter`), `chat/presentation/ConversationEventController.java`
+- 컨트롤러와 DTO 는 단계 1 의 `browser/presentation/UserBrowserController.java`, `UserBrowserDtos.java` 에 더한다. 경로는 `/api/v1/browser/screen`, `/api/v1/browser/screen/input`
+- 켜기는 `UserBrowserService.start(userId)` 를 그대로 부른다(동시 수, `BROWSER_CAPACITY`). 화면이 쓰는 중임은 `BrowserUsage.open(id)` 핸들로 알리고, 입력마다 `UserBrowserService.touch(userId)` 를 부른다
+- 끄기와 지우기, 자동 중지, 사용자 끄기가 브라우저를 멈추면 그 브라우저의 화면도 닫혀야 한다. `UserBrowserService` 가 컨테이너를 멈추기 전에 화면 등록부의 `close(browserId)` 를 부른다
 
 ## 의도 메모
 
-- 네이버 QR 로그인은 세션 쿠키만 준다(2026-10-08 실측). 단계 1 은 끌 때 컨테이너를 지우므로 세션 쿠키가 다음 기동에 남지 않는다. Chrome 의 「이전 세션 이어서 열기」(`session.restore_on_startup = 1`)를 켜면 정상 종료한 뒤 다음 기동에서 세션 쿠키가 돌아온다. 끄기는 이미 `stop?t=10`(SIGTERM 뒤 10초 대기)이라 정상 종료다. 운영의 QR 로그인 → 끄기 → 켜기 왕복으로 확인한다. 실패하면 아이디·비밀번호와 「로그인 상태 유지」 안내로 바꾼다
-- 같은 실측: headless 에서 QR 로그인 주소로 바로 가면 막히고, 일반 로그인 화면에서 QR 로 바꾸면 통과한다. 그래서 화면의 시작 주소는 호출자가 고르고(phase 02), 서비스 이름과 주소는 커넥터가 단계 3 에서 준다. 커넥터 밖 코드에 서비스 이름을 쓰지 않는다(`test/unit/connector-neutral.test.ts`)
-- CDP 명령은 id 로 응답을 짝짓고 10초 안에 답이 없으면 실패로 끝낸다. 연결이 끊기면 기다리던 명령을 모두 실패로 끝내고 닫힘을 알린다
+- 웹은 WebSocket 을 중계하지 못한다(Next.js 라우트). 그래서 프레임은 SSE, 입력은 POST 다
+- 웹에 CDP 를 열지 않는다. 입력은 아래 표의 종류만 받는다. `Runtime.evaluate` 같은 명령은 어느 경로로도 보내지 못한다
+- 휴대폰의 탭과 끌기는 웹이 `mouse` 와 `wheel` 로 바꿔 보낸다. 그래서 `touch` 종류는 두지 않는다(계약 초안에서 뺀다)
+- 한글은 입력기가 조합을 끝낸 글자를 `text` 로 받아 `Input.insertText` 로 넣는다
+- 좌표는 웹이 프레임 그림 안의 비율(0~1)로 보낸다. 서버가 마지막 프레임의 `metadata.deviceWidth`, `deviceHeight` 를 곱해 CSS 픽셀로 바꾼다. 프레임이 아직 없으면 그 입력을 버린다
+- 입력 본문(글자, 좌표, 주소)은 로그와 실행 기록에 남기지 않는다. 오류 응답에도 싣지 않는다
+- 새 탭이 생기면(로그인 팝업) screencast 를 그 탭으로 옮긴다. 탭 목록은 화면이 열려 있는 동안 2초마다 `CdpTargets.list` 로 보고, 바뀌면 `tabs` 사건을 보낸다
+- 프레임은 받으면 바로 ack 한다. SSE 쓰기가 실패하면 화면을 닫는다
 
 ## 작업 항목
 
-### 1. 세션 이어가기 설정
+### 1. 화면 세션
 
-`FileBrowserProfileStore.ensure` 가 디렉터리를 만든 뒤 `Default/Preferences` 가 없으면 `{"session":{"restore_on_startup":1}}` 를 쓴다(권한 600). 이미 있으면 건드리지 않는다. 링크를 따라가지 않는다.
-시험: `FileBrowserProfileStoreTest` 에 새 프로필에 그 파일이 생기고, 있던 파일은 그대로인 경우를 더한다.
+- `browser.application.BrowserScreens`(등록부): 브라우저 번호마다 열린 화면 하나. 새로 열면 앞의 화면에 `closed`(`replaced`)를 보내고 닫는다. `close(browserId)` 는 `closed`(`stopped`)를 보내고 닫는다
+- `browser.application.BrowserScreenSession`: CDP 연결 하나, SSE 하나, 사용 핸들 하나. 열 때 `Page.enable`, 시작 주소가 있으면 `Page.navigate`, `Page.startScreencast {format: "jpeg", quality: 60, maxWidth: 1280, maxHeight: 2000}`. `Page.screencastFrame` 마다 `frame` 사건 `{data, width, height}` 와 `Page.screencastFrameAck`
+- 화면 수명: 설정 `assistant.browser.screen-timeout`(기본 `30m`). 넘으면 `closed`(`timeout`)
+- 연결이 끊기면(CDP 쪽이나 SSE 쪽) 핸들을 닫고 등록부에서 뺀다
 
-### 2. CDP 클라이언트
+### 2. API
 
-- `browser.domain.CdpTargets`(port): `list(URI cdp) → List<CdpTarget>`(page 만, `id`, `title`, `url`), `create(URI cdp, String url) → CdpTarget`(`PUT /json/new?<url>`), `activate(URI cdp, String id)`
-- `browser.domain.CdpConnector`(port): `connect(URI cdp, String targetId, Consumer<CdpEvent> events, Runnable closed) → CdpConnection`. `CdpConnection` 은 `send(String method, Map<String,Object> params) → CompletableFuture<JsonNode>` 와 `close()`
-- `browser.infra.HttpCdpTargets`, `browser.infra.WebSocketCdpConnector`: 위 구현. WebSocket 주소는 `ws://<cdp 의 host:port>/devtools/page/<id>` 로 만든다(Chrome 이 준 주소의 host 를 믿지 않는다). 대상 id 는 `[A-Za-z0-9]+` 만 받는다
-- 메시지 조각(`last == false`)을 모아 한 JSON 으로 읽는다. screencast 프레임은 수백 KB 다
+| 메서드와 경로 | 하는 일 |
+| --- | --- |
+| `GET /api/v1/browser/screen?url=<시작 주소, 선택>` | 브라우저를 켜고(필요하면) 지금 탭에 붙어 SSE 를 연다. `url` 은 `http`, `https` 만. 켜기 실패와 기능 꺼짐은 SSE 를 열기 전에 JSON 오류로 돌려준다 |
+| `POST /api/v1/browser/screen/input` | 열린 화면이 없으면 409 `BROWSER_SCREEN_CLOSED`. 받는 본문은 아래 표 |
 
-### 3. 시험
+| `type` | 칸 | CDP |
+| --- | --- | --- |
+| `mouse` | `action`(`down`, `up`, `move`), `x`, `y`(0~1), `button`(`left` 만) | `Input.dispatchMouseEvent` |
+| `wheel` | `x`, `y`, `deltaY`(-2000~2000) | `Input.dispatchMouseEvent` 의 `mouseWheel` |
+| `key` | `key`(`Enter`, `Backspace`, `Tab`, `Escape`, `ArrowUp`, `ArrowDown`, `ArrowLeft`, `ArrowRight`, `Delete`) | `Input.dispatchKeyEvent` 의 `keyDown`, `keyUp` |
+| `text` | `text`(1~500자) | `Input.insertText` |
+| `navigate` | `url`(`http`, `https`) | `Page.navigate` |
+| `back`, `reload` | 없음 | `Page.getNavigationHistory` 뒤 `Page.navigateToHistoryEntry`, `Page.reload` |
+| `tab` | `id` | screencast 를 그 탭으로 옮긴다 |
+| `resize` | `width`(320~1600), `height`(320~2000) | `Emulation.setDeviceMetricsOverride`(`deviceScaleFactor` 1, `mobile` false) |
 
-- `backend/src/test/java/com/bifos/assistant/browser/infra/WebSocketCdpConnectorTest.java`: JDK `HttpServer` 로는 WebSocket 을 받을 수 없으니 시험 안에 작은 가짜 CDP WebSocket 서버(소켓으로 핸드셰이크와 텍스트 프레임만)를 둔다. 명령 응답 짝짓기, 사건 전달, 조각난 큰 메시지, 시간 초과, 끊김 때 기다리던 명령 실패를 확인한다
-- `backend/src/test/java/com/bifos/assistant/browser/infra/HttpCdpTargetsTest.java`: JDK `HttpServer` 로 `/json/list`(page 와 그 밖 섞어서), `/json/new`(PUT), 이상한 id 거절
+`ErrorCode` 에 `BROWSER_SCREEN_CLOSED`(409)를 더한다. 모양이 틀리면 400 `VALIDATION_FAILED` 다.
+
+### 3. 문서
+
+`docs/backend/user-browser.md` 에 「로그인 화면」 절을 더하고(README 의 초안을 위 표대로 고쳐 옮긴다), 「설정」 에 `screen-timeout`, 「API」 에 두 경로, 「로그인 유지」 에 세션 이어가기와 QR 실측을 적는다.
+ADR 의 「결과」 에 QR 로그인은 세션 쿠키만 주므로 세션 이어가기 설정에 기댄다는 것을 한 줄 더한다.
+
+### 4. 시험
+
+- `backend/src/test/java/com/bifos/assistant/browser/application/BrowserScreenSessionTest.java`: 가짜 `CdpConnector` 와 `CdpTargets` 로 열기 순서(enable, navigate, startScreencast), 프레임 전달과 ack, 좌표 변환, 프레임 전 입력 버림, 새 탭으로 옮김, 시간 초과 닫힘
+- `backend/src/test/java/com/bifos/assistant/browser/application/BrowserScreensTest.java`: 두 번째 화면이 첫 화면을 닫음, 끄기가 화면을 닫음, 화면이 열려 있으면 자동 중지 안 함
+- `backend/src/test/java/com/bifos/assistant/browser/presentation/UserBrowserScreenControllerTest.java`: 입력 종류별 검증(범위 밖 좌표, 501자, `javascript:` 주소, 모르는 키, 모르는 종류 → 400), 화면 없음 409, 기능 꺼짐 503, 남의 화면에 입력할 길이 없음(요청자 기준)
 
 ## 검증
 
@@ -56,15 +82,17 @@ cd backend && ./gradlew qualityCheck
 
 | 파일 | 변경 |
 |---|---|
-| `backend/src/main/java/com/bifos/assistant/browser/infra/FileBrowserProfileStore.java` | 수정 |
-| `backend/src/main/java/com/bifos/assistant/browser/domain/CdpTargets.java` | 신규 |
-| `backend/src/main/java/com/bifos/assistant/browser/domain/CdpTarget.java` | 신규 |
-| `backend/src/main/java/com/bifos/assistant/browser/domain/CdpConnector.java` | 신규 |
-| `backend/src/main/java/com/bifos/assistant/browser/domain/CdpConnection.java` | 신규 |
-| `backend/src/main/java/com/bifos/assistant/browser/domain/CdpEvent.java` | 신규 |
-| `backend/src/main/java/com/bifos/assistant/browser/infra/HttpCdpTargets.java` | 신규 |
-| `backend/src/main/java/com/bifos/assistant/browser/infra/WebSocketCdpConnector.java` | 신규 |
-| `backend/src/test/java/com/bifos/assistant/browser/infra/FileBrowserProfileStoreTest.java` | 수정 |
-| `backend/src/test/java/com/bifos/assistant/browser/infra/WebSocketCdpConnectorTest.java` | 신규 |
-| `backend/src/test/java/com/bifos/assistant/browser/infra/HttpCdpTargetsTest.java` | 신규 |
+| `backend/src/main/java/com/bifos/assistant/browser/application/BrowserScreens.java` | 신규 |
+| `backend/src/main/java/com/bifos/assistant/browser/application/BrowserScreenSession.java` | 신규 |
+| `backend/src/main/java/com/bifos/assistant/browser/application/model/**` | 수정 |
+| `backend/src/main/java/com/bifos/assistant/browser/application/UserBrowserService.java` | 수정 |
+| `backend/src/main/java/com/bifos/assistant/browser/infra/BrowserProperties.java` | 수정 |
+| `backend/src/main/java/com/bifos/assistant/browser/presentation/UserBrowserController.java` | 수정 |
+| `backend/src/main/java/com/bifos/assistant/browser/presentation/UserBrowserDtos.java` | 수정 |
+| `backend/src/main/java/com/bifos/assistant/shared/error/ErrorCode.java` | 수정 |
+| `backend/src/main/resources/application.yml` | 수정 |
+| `backend/src/test/java/com/bifos/assistant/browser/application/BrowserScreenSessionTest.java` | 신규 |
+| `backend/src/test/java/com/bifos/assistant/browser/application/BrowserScreensTest.java` | 신규 |
+| `backend/src/test/java/com/bifos/assistant/browser/presentation/UserBrowserScreenControllerTest.java` | 신규 |
 | `docs/backend/user-browser.md` | 수정 |
+| `docs/adr/ADR-20261007-user-browser.md` | 수정 |
