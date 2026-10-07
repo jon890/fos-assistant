@@ -69,4 +69,5 @@ Spring 은 띄운 컨텍스트를 상한까지 보존하고, 넘으면 가장 �
 
 변형을 더하거나 기반을 바꾼 뒤에는 컨텍스트 수를 다시 본다.
 전체 검사 뒤 `backend/build/test-results/test/*.xml` 에서 `HikariPool-N` 의 가장 큰 N 이 띄운 컨텍스트 수다.
-그 수가 상한을 넘으면 밀려난 컨텍스트를 다시 띄우고 있다.
+서로 다른 컨텍스트 키 수는 상한을 넉넉히(예: 64) 둔 실행에서 Spring 캐시 통계 줄(`logging.level.org.springframework.test.context.cache=DEBUG`)의 `missCount` 최댓값으로 구한다.
+띄운 수가 키 수보다 크면 밀려난 컨텍스트를 다시 띄우고 있다. 상한이 키 수보다 작아도 다시 뜨는 것이 없을 수 있다. 검사 순서상 같은 키가 다시 쓰이기 전에 밀려나지 않기 때문이다.
