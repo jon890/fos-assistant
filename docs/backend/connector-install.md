@@ -67,6 +67,9 @@ profile 이 어떤 요청을 받는지는 두 표식이 정한다. 판정은 요
 
 보관 파일이 없거나 다른 커넥터의 것이면 400 이다. 보관 값이 지금 칸 선언과 맞지 않아도 400 이다.
 
+Control Plane 은 바인딩 설치 요청에 그 에이전트의 `sandbox_owner` 를 늘 함께 보낸다. 연결 확인과 반영 완료가 다시 설치할 때도 같다.
+manifest 가 `owner_attachments_env` 를 선언했으면 plugin 은 운영 정책의 `attachment_agent_root` 아래 `users/<SHA-256(sandbox_owner)>` 를 그 env 의 값으로 서버 정의에 직접 넣는다([ADR-093](../adr/ADR-093-사용자-첨부를-읽는-커넥터는-바인딩-주인의-첨부-디렉터리를-설치가-정한-env-로만-받는다.md)). `sandbox_owner` 가 없으면 400, 운영 정책이 없거나 그 디렉터리를 중간 링크 없이 확인하지 못하면 409 다. 선언하지 않은 커넥터는 `sandbox_owner` 를 쓰지 않는다.
+
 | 무엇 | 붙일 때 | 뗄 때(`enabled: false`) |
 | --- | --- | --- |
 | profile `.env` | manifest 의 `fields[].env` 마다 보관 값을 쓰고, 보관 파일에 없는 선택 칸의 key 는 지운다 | 소유 기록의 서버 정의가 `${이름}` 으로 참조하던 이름을 지운다. manifest 가 있고 기록의 실행 정의가 지금과 같으면 `fields[].env` 도 지운다. 기본 key 는 지우지 않는다 |

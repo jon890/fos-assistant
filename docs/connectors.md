@@ -66,11 +66,12 @@ plugin 디렉터리 root 에 둔다. 소유는 그 plugin 의 저장소다. 같�
 | `toolsets` | 선택. 옛 커넥터 에이전트에 켤 내장 toolset 이름 목록이다. 지금은 `vision` 만 받는다. 없으면 빈 목록이다. 연결을 붙인 에이전트의 도구는 바꾸지 않는다. 그 에이전트의 도구는 주인이 정한다 |
 | `attachments` | 선택 boolean. 참이면 옛 커넥터 에이전트의 대화가 사진을 받는다. 없으면 거짓이다. 연결을 붙인 에이전트가 사진을 받는지는 그 에이전트의 설정이 정한다 |
 | `operator_env` | 사용자가 넣지 않고 운영자가 주는 env 이름. 값은 운영 설정이 갖는다. **비밀이 아닌 운영 설정만 둔다.** 값이 profile 설정과 소유 기록에 그대로 복제된다 |
+| `owner_attachments_env` | 선택. 사용자 첨부를 읽는 커넥터가 받을 env 이름 하나. 바인딩 설치가 그 에이전트 주인의 첨부 디렉터리를 넣는다. 값은 운영 정책과 Control Plane 이 정한 주인에서만 온다([ADR-093](adr/ADR-093-사용자-첨부를-읽는-커넥터는-바인딩-주인의-첨부-디렉터리를-설치가-정한-env-로만-받는다.md)) |
 | `operator_secrets` | 운영자가 주는 비밀의 env 이름 목록. 지금은 지원하지 않는다. 비어 있지 않으면 그 커넥터를 카탈로그에 내지 않는다([ADR-046](adr/ADR-046-운영-비밀은-operator-env-와-다른-칸으로-선언하고-자식-mcp-프로세스에만-넣는다.md)) |
 | `errors` | 도구 오류 코드를 공통 어휘로 바꾸는 표. 표에 없는 코드는 `unavailable` 이다. `outcome_unknown` 은 쓰기를 보냈는데 됐는지 모른다는 뜻이다 |
 
 - `options.tool` 과 `verify.tool` 은 `.mcp.json` 서버의 도구 가운데 `readOnlyHint: true` 인 것만 된다. 대시보드가 도구를 부를 때 `tools/list` 로 확인한다. manifest 를 읽을 때는 도구 이름의 형식만 본다. 카탈로그는 요청마다 읽으므로 읽을 때마다 MCP 서버를 띄우지 않는다
-- `.mcp.json` 서버 env 는 `fields[].env` 와 `operator_env` 의 합과 같아야 한다. 하나라도 다르면 그 커넥터를 카탈로그에 내지 않는다
+- `.mcp.json` 서버 env 는 `fields[].env` 와 `operator_env`, `owner_attachments_env` 의 합과 같아야 한다. 세 이름은 겹치지 않는다. 하나라도 다르면 그 커넥터를 카탈로그에 내지 않는다
 - `toolsets` 가 목록이 아니거나, 이름이 겹치거나, `vision` 밖의 이름이 하나라도 있으면 그 커넥터를 카탈로그에 내지 않는다. 셸, 파일, 기억, 스킬, 위임 도구는 manifest 로 열리지 않는다([ADR-044](adr/ADR-044-커넥터-manifest-는-읽기-전용-이미지-도구만-열-수-있다.md))
 - `attachments` 가 참인데 `toolsets` 에 `vision` 이 없으면 그 커넥터를 카탈로그에 내지 않는다. 사진은 파일로 놓이고 에이전트가 이미지 도구로 읽기 때문이다([ADR-020](adr/ADR-020-사진은-공유-디렉터리에-두고-에이전트가-파일로-읽는다.md))
 - 도구 결과는 MCP 응답의 첫 텍스트 칸을 JSON 으로 읽는다. `structuredContent` 가 있으면 그것을 먼저 쓴다. 실패는 `isError: true` 와 `{"error": {"code": "..."}}` 다
@@ -241,7 +242,7 @@ plugin 디렉터리 root 에 둔다. 소유는 그 plugin 의 저장소다. 같�
 - Control Plane 은 승인 줄의 에이전트(판정한 실행의 에이전트)에 붙은 바인딩의 profile 로 보낸다([ADR-083](adr/ADR-083-커넥터는-사용자가-한-번-연결하고-자기-에이전트에-여럿-붙여-그-에이전트가-도구를-직접-부른다.md))
 - 그 profile 에 그 커넥터의 소유 기록이 있어야 한다. 관리 표식이 있거나, 커넥터 표식만 있으면 그 항목이 바인딩 설치여야 한다
 - 커넥터 MCP 서버를 자식으로 한 번 띄워 `tools/list` 를 읽고, 등록 이름이 `hermes_tool` 과 같은 도구가 정확히 하나일 때 그 도구를 `args` 로 부른다. `schema: 2` 는 그 도구가 `tools` 에 있어야 한다
-- 자식의 env 는 그 profile `.env` 에서 manifest 의 `fields[].env` 만 꺼내고 운영 목록의 `env` 를 더한다. 나머지 값은 넘기지 않는다
+- 자식의 env 는 그 profile `.env` 에서 manifest 의 `fields[].env` 만 꺼내고 운영 목록의 `env` 를 더한다. `owner_attachments_env` 를 선언한 커넥터는 설치한 서버 정의의 그 값을 더한다. 나머지 값은 넘기지 않는다
 - 시간 제한은 60초, 동시 실행은 `call` 과 같은 한도를 함께 쓴다
 - 도구가 `errors` 표에서 `outcome_unknown` 인 코드로 실패하면 504 로 답한다. 시간 초과와 같이 실행됐는지 모른다는 뜻이다
 - 대시보드는 승인 여부를 다시 확인하지 않는다. Control Plane 이 승인한 줄로만 부른다
