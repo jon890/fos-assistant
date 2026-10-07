@@ -27,7 +27,7 @@ jobs:
         with:
           node-version: '22.18.0'
           package-manager-cache: false
-      - name: 실제 변경 줄 검사
+      - name: 운영 코드 변경 줄 검사
         id: size
         env:
           PR_BASE: ${{ github.event.pull_request.base.sha }}
@@ -57,7 +57,7 @@ jobs:
             const present = labels.some(item => item.name === label);
             if (process.env.LARGE === 'true' && !present) {
               try {
-                await github.rest.issues.createLabel({ ...context.repo, name: label, color: 'd93f0b', description: '실제 변경 줄이 큰 PR' });
+                await github.rest.issues.createLabel({ ...context.repo, name: label, color: 'd93f0b', description: '운영 코드 변경 줄이 큰 PR' });
               } catch (error) {
                 if (error.status !== 422) throw error;
               }
