@@ -6,6 +6,8 @@ import static org.mockito.AdditionalAnswers.delegatesTo;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 
 import com.bifos.assistant.browser.application.model.UserBrowserSnapshot;
 import com.bifos.assistant.browser.domain.BrowserProfileStore;
@@ -17,8 +19,10 @@ import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.testsupport.BackendIntegrationTest;
 import com.bifos.assistant.testsupport.FakeBrowserRuntime;
+import java.sql.Timestamp;
 import java.time.Clock;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -335,6 +339,26 @@ class UserBrowserServiceTest {
         service.touch(101L);
 
         assertThat(repository.findByUserId(101L).orElseThrow().lastActiveAt()).isEqualTo(stored);
+    }
+
+    @Test
+    @DisplayName("마지막 기록에서 1분이 지나지 않은 활동은 DB 를 읽지 않고 거른다")
+    void skipsDatabaseWithinTouchInterval() {
+        service(true, 2).create(101L);
+        Long id = service(true, 2).start(101L).id();
+        jdbc.update(
+                "UPDATE user_browser SET last_active_at = ? WHERE id = ?",
+                Timestamp.from(Instant.now().minus(Duration.ofMinutes(2))),
+                id);
+        UserBrowserRepository counting = mock(UserBrowserRepository.class, delegatesTo(repository));
+        UserBrowserService service = service(true, 2, counting);
+
+        service.touch(101L);
+        service.touch(101L);
+        service.touch(101L);
+
+        verify(counting, times(1)).findByUserId(101L);
+        verify(counting, times(1)).save(any());
     }
 
     private UserBrowserService service(boolean enabled, int maxRunning) {

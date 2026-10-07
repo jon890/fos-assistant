@@ -205,7 +205,9 @@ public class UserBrowserSweeper {
         }
     }
 
+    /** 줄을 멈춤으로 되돌린다. 그 브라우저에 붙은 화면이 사라진 컨테이너를 보고 있지 않게 먼저 닫는다. */
     private void reset(UserBrowser browser, String reason) {
+        service.closeScreen(browser.id());
         browser.resetStopped(clock.instant());
         try {
             browsers.saveAndFlush(browser);

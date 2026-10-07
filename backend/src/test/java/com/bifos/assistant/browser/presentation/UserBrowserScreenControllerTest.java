@@ -140,6 +140,36 @@ class UserBrowserScreenControllerTest {
     }
 
     @Test
+    @DisplayName("본문이 8KB 를 넘으면 값을 싣지 않은 400 이다")
+    void rejectsOversizedInput() throws Exception {
+        String body = "{\"type\":\"text\",\"text\":\"secret-value\"" + " ".repeat(8 * 1024) + "}";
+
+        MvcResult result = input(mvc(true), body)
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"))
+                .andReturn();
+
+        assertThat(result.getResponse().getContentAsString()).doesNotContain("secret-value");
+    }
+
+    @Test
+    @DisplayName("SSE 만 받는 요청도 기능 꺼짐과 틀린 시작 주소는 JSON 본문의 code 로 받는다")
+    void returnsJsonErrorsToEventStreamRequests() throws Exception {
+        mvc(false)
+                .perform(get("/api/v1/browser/screen").accept(MediaType.TEXT_EVENT_STREAM))
+                .andExpect(status().isServiceUnavailable())
+                .andExpect(jsonPath("$.code").value("BROWSER_DISABLED"));
+        screens.close();
+
+        mvc(true)
+                .perform(get("/api/v1/browser/screen")
+                        .param("url", "file:///etc/passwd")
+                        .accept(MediaType.TEXT_EVENT_STREAM))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"));
+    }
+
+    @Test
     @DisplayName("열린 화면이 없으면 입력은 409 BROWSER_SCREEN_CLOSED 다")
     void rejectsInputWithoutScreen() throws Exception {
         input(mvc(true), "{\"type\":\"reload\"}")

@@ -6,6 +6,7 @@ import com.bifos.assistant.browser.application.model.UserBrowserSnapshot;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import com.fasterxml.jackson.annotation.JsonInclude;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Locale;
@@ -94,9 +95,14 @@ public final class UserBrowserDtos {
         private static final Pattern TARGET_ID = Pattern.compile("^[A-Za-z0-9]{1,128}$");
         private static final int MAX_TEXT = 500;
         private static final int MAX_WHEEL = 2000;
+        /** 본문의 바이트 상한이다. 가장 긴 입력(주소 2048자)도 넉넉히 들어간다. */
+        private static final int MAX_BODY = 8 * 1024;
 
-        /** 본문을 읽고 검사한다. JSON 이 아니거나 모양이 틀리면 값을 싣지 않은 {@code VALIDATION_FAILED} 다. */
+        /** 본문을 읽고 검사한다. 8KB 를 넘거나 JSON 이 아니거나 모양이 틀리면 값을 싣지 않은 {@code VALIDATION_FAILED} 다. */
         static BrowserScreenInput parse(String body) {
+            if (body != null && body.getBytes(StandardCharsets.UTF_8).length > MAX_BODY) {
+                throw invalid("body");
+            }
             ScreenInputRequest request;
             try {
                 request = body == null ? null : JSON.readValue(body, ScreenInputRequest.class);

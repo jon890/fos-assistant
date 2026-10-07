@@ -2,6 +2,9 @@ package com.bifos.assistant.browser.application;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.mock;
 
 import com.bifos.assistant.browser.application.model.BrowserScreenInput;
 import com.bifos.assistant.browser.application.model.BrowserScreenInput.Kind;
@@ -25,7 +28,9 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.mockito.AdditionalAnswers;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.dao.DataAccessResourceFailureException;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 /** 브라우저마다 화면 하나, 끄기와 화면 닫기, 자동 중지와 화면의 관계를 실제 DB 와 대역 proxy, 대역 CDP 로 본다. */
@@ -45,6 +50,7 @@ class BrowserScreensTest {
     private BrowserScreens screens;
     private UserBrowserService service;
     private UserBrowserSweeper sweeper;
+    private FakeBrowserRuntime runtime;
 
     @BeforeEach
     void setUp() {
@@ -53,15 +59,8 @@ class BrowserScreensTest {
         cdp.pages.add(new CdpTarget("T1", "첫 탭", "https://example.com/"));
         usage = new BrowserUsage();
         screens = new BrowserScreens(cdp, cdp, usage, Duration.ofMinutes(30), Duration.ofHours(1));
-        FakeBrowserRuntime runtime = new FakeBrowserRuntime();
-        service = new UserBrowserService(
-                repository,
-                runtime,
-                profiles(),
-                address -> true,
-                LiveProperties.fixed(BrowserProperties.class, properties()),
-                Clock.systemUTC(),
-                screens);
+        runtime = new FakeBrowserRuntime();
+        service = service(repository);
         sweeper = new UserBrowserSweeper(service, repository, runtime, usage, userId -> true, Clock.systemUTC());
     }
 
@@ -146,6 +145,55 @@ class BrowserScreensTest {
         sink.disconnect();
         sweeper.sweep();
         assertThat(status(201L)).isEqualTo(UserBrowserStatus.STOPPED);
+    }
+
+    @Test
+    @DisplayName("화면을 열 때 활동 기록이 실패하면 화면을 열지 않고 사용 핸들도 남기지 않는다")
+    void opensNoScreenWhenTouchFails() {
+        Long id = service.create(201L).id();
+        service.start(201L);
+        ageActivity(id, Duration.ofMinutes(2));
+        UserBrowserRepository failing = mock(UserBrowserRepository.class, AdditionalAnswers.delegatesTo(repository));
+        doThrow(new DataAccessResourceFailureException("database is down"))
+                .when(failing)
+                .save(any());
+
+        assertThatThrownBy(() -> service(failing).openScreen(201L, null, new RecordingScreenSink()))
+                .isInstanceOf(DataAccessResourceFailureException.class);
+        assertThat(screens.isOpen(id)).isFalse();
+        assertThat(usage.inUse(id)).isFalse();
+        assertThat(cdp.attached).isEmpty();
+    }
+
+    @Test
+    @DisplayName("상태 맞추기가 컨테이너가 사라진 RUNNING 을 STOPPED 로 되돌리면 그 화면에 stopped 를 보내고 닫는다")
+    void reconcileClosesScreenOfVanishedContainer() {
+        Long id = service.create(201L).id();
+        RecordingScreenSink sink = new RecordingScreenSink();
+        service.openScreen(201L, null, sink);
+        jdbc.update(
+                "UPDATE user_browser SET updated_at = ? WHERE id = ?",
+                Timestamp.from(Instant.now().minus(Duration.ofMinutes(1))),
+                id);
+        runtime.containers().clear();
+
+        sweeper.reconcile();
+
+        assertThat(status(201L)).isEqualTo(UserBrowserStatus.STOPPED);
+        assertThat(sink.data("closed")).containsExactly(Map.of("reason", "stopped"));
+        assertThat(screens.isOpen(id)).isFalse();
+        assertThat(usage.inUse(id)).isFalse();
+    }
+
+    private UserBrowserService service(UserBrowserRepository browsers) {
+        return new UserBrowserService(
+                browsers,
+                runtime,
+                profiles(),
+                address -> true,
+                LiveProperties.fixed(BrowserProperties.class, properties()),
+                Clock.systemUTC(),
+                screens);
     }
 
     private UserBrowserStatus status(Long userId) {

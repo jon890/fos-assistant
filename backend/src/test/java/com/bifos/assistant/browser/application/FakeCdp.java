@@ -31,6 +31,10 @@ public final class FakeCdp implements CdpTargets, CdpConnector {
 
     public volatile boolean failConnect;
     public volatile boolean failList;
+    /** 이 탭의 다음 {@code Page.startScreencast} 응답을 {@link #releaseScreencast()} 까지 붙잡는다. */
+    public volatile String holdScreencast;
+
+    private volatile CompletableFuture<JsonNode> heldScreencast;
 
     private final Map<String, Connection> connections = new ConcurrentHashMap<>();
 
@@ -88,6 +92,16 @@ public final class FakeCdp implements CdpTargets, CdpConnector {
         return connection != null && connection.closedByUs;
     }
 
+    /** 붙잡은 {@code Page.startScreencast} 가 있는가. */
+    public boolean screencastHeld() {
+        return heldScreencast != null;
+    }
+
+    /** 붙잡은 {@code Page.startScreencast} 를 연결이 닫힌 것처럼 실패로 끝낸다. */
+    public void releaseScreencast() {
+        heldScreencast.completeExceptionally(new IllegalStateException("cdp connection is closed"));
+    }
+
     /** 그 메서드로 보낸 명령이다. */
     public List<Sent> sent(String method) {
         return sent.stream().filter(command -> command.method().equals(method)).toList();
@@ -118,6 +132,11 @@ public final class FakeCdp implements CdpTargets, CdpConnector {
                 return CompletableFuture.failedFuture(new IllegalStateException("cdp connection is closed"));
             }
             sent.add(new Sent(targetId, method, params));
+            if ("Page.startScreencast".equals(method) && targetId.equals(holdScreencast)) {
+                holdScreencast = null;
+                heldScreencast = new CompletableFuture<>();
+                return heldScreencast;
+            }
             if ("Page.getNavigationHistory".equals(method)) {
                 return CompletableFuture.completedFuture(
                         JSON.readTree("{\"currentIndex\":1,\"entries\":[{\"id\":11},{\"id\":12}]}"));

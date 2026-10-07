@@ -32,6 +32,8 @@ import org.springframework.stereotype.Component;
 public class BrowserScreens implements AutoCloseable {
 
     private static final Duration TAB_INTERVAL = Duration.ofSeconds(2);
+    /** 끊긴 받는 쪽을 알아보려고 주석 줄을 보내는 간격이다. */
+    private static final Duration HEARTBEAT = Duration.ofSeconds(15);
 
     private final CdpTargets targets;
     private final CdpConnector connector;
@@ -82,7 +84,7 @@ public class BrowserScreens implements AutoCloseable {
             previous.close(BrowserScreenSession.REPLACED);
         }
         try {
-            session.start(url, timeout.get(), tabInterval);
+            session.start(url, timeout.get(), tabInterval, HEARTBEAT);
         } catch (RuntimeException ex) {
             String error = ex.getClass().getSimpleName();
             log.warn("browser screen could not attach id={} error={}", browserId, error);

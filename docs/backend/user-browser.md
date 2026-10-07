@@ -119,14 +119,20 @@ QR 로그인은 세션 쿠키만 준다(2026-10-08 실측). 그래서 QR 로그�
 ## 로그인 화면
 
 `GET /api/v1/browser/screen` 은 브라우저를 켜고(꺼져 있으면) 지금 탭에 붙어 SSE 를 연다.
-`url` 은 `http`, `https` 만 받고 열 때 그 주소로 간다. 켜기 실패와 기능 꺼짐, 틀린 주소는 SSE 를 열기 전에 JSON 오류다.
+`url` 은 `http`, `https` 만 받고 열 때 그 주소로 간다. 켜기 실패와 기능 꺼짐, 틀린 주소는 SSE 를 열기 전에 JSON 오류다. `Accept: text/event-stream` 만 보낸 요청도 같다.
 탭에 붙지 못하면 `BROWSER_START_FAILED` 다.
 
 한 브라우저에 화면은 하나다. 새로 열면 앞의 화면에 `closed`(`replaced`)를 보내고 닫는다.
 화면이 열려 있는 동안 자동 중지하지 않고(`BrowserUsage`), 입력마다 활동을 기록한다. 끄기와 지우기, 사용자 끄기는 브라우저를 멈추기 전에 화면을 닫는다.
-화면은 `Page.startScreencast {format: "jpeg", quality: 60, maxWidth: 1280, maxHeight: 2000}` 로 프레임을 받고, 받는 대로 ack 한다.
+화면은 `Page.startScreencast {format: "jpeg", quality: 60, maxWidth: 1280, maxHeight: 2000}` 로 프레임을 받고, SSE 에 쓴 뒤에 ack 한다.
+받는 쪽이 읽지 않으면 ack 도 멈추므로 Chrome 이 프레임을 더 보내지 않는다.
 2초마다 탭 목록을 보고 바뀌면 `tabs` 를 보낸다. 새 탭이 생기면(로그인 팝업) screencast 를 그 탭으로 옮기고, 붙은 탭이 사라지면 남은 탭으로 옮긴다.
+탭을 옮기면 마지막 `resize` 값을 새 탭에 다시 보낸다.
+붙은 탭의 연결이 끊기면 다시 잇는다. 프레임 없이 연이어 3번을 넘게 끊기면 `closed`(`stopped`)로 닫는다.
 SSE 쓰기가 실패하거나 SSE 가 끊기면 화면을 닫는다.
+15초마다 SSE 에 주석 `ping` 을 보낸다. 쓰지 못하면 끊긴 것으로 보고 `closed` 없이 닫는다. 그래서 말없이 끊긴 화면이 `screen-timeout` 까지 자동 중지를 막지 않는다.
+다른 쓰기가 막혀 있으면 `ping` 과 `closed` 는 기다리지 않고 건너뛴다. 끄기와 화면 교체가 읽지 않는 받는 쪽에 붙잡히지 않는다.
+상태 맞추기가 컨테이너가 사라진 `RUNNING` 을 `STOPPED` 로 되돌릴 때도 그 화면을 `closed`(`stopped`)로 닫는다.
 
 | 사건 | 본문 |
 | --- | --- |
@@ -135,7 +141,7 @@ SSE 쓰기가 실패하거나 SSE 가 끊기면 화면을 닫는다.
 | `closed` | `{reason}`. `replaced`(다른 화면이 열렸다), `stopped`(브라우저가 멈췄거나 닿지 않는다), `timeout`(`screen-timeout` 이 지났다) |
 
 `POST /api/v1/browser/screen/input` 은 요청자의 열린 화면에만 닿는다. 없으면 `BROWSER_SCREEN_CLOSED`(409)다.
-본문의 `type` 과 칸이다. 모양이 틀리면 `VALIDATION_FAILED`(400)이고 오류 메시지에는 칸 이름만 싣는다.
+본문의 `type` 과 칸이다. 모양이 틀리거나 본문이 8KB 를 넘으면 `VALIDATION_FAILED`(400)이고 오류 메시지에는 칸 이름만 싣는다.
 
 | `type` | 칸 | CDP |
 | --- | --- | --- |

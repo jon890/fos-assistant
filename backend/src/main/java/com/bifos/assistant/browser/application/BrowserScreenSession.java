@@ -35,8 +35,9 @@ import tools.jackson.databind.JsonNode;
  * 로그인 화면 하나다. CDP 연결 하나, 받는 쪽 하나, 사용 핸들 하나를 쥔다. 계약은 {@code docs/backend/user-browser.md} 의
  * 「로그인 화면」 이 갖는다.
  *
- * <p>프레임은 받는 대로 ack 하고 넘긴다. 탭 목록이 바뀌면 알리고, 새 탭(로그인 팝업)이 생기면 그 탭으로 옮긴다. 좌표 입력은 마지막
- * 프레임의 화면 크기로 바꾸고, 프레임이 아직 없으면 버린다. 입력 본문은 로그에 남기지 않는다.
+ * <p>프레임은 받는 쪽에 넘긴 뒤 ack 한다. 받는 쪽이 읽지 않으면 ack 도 멈춰 Chrome 이 프레임을 더 보내지 않는다. 탭 목록이 바뀌면
+ * 알리고, 새 탭(로그인 팝업)이 생기면 그 탭으로 옮긴다. 좌표 입력은 마지막 프레임의 화면 크기로 바꾸고, 프레임이 아직 없으면 버린다. 입력
+ * 본문은 로그에 남기지 않는다.
  */
 @Slf4j
 @RequiredArgsConstructor(access = AccessLevel.PACKAGE)
@@ -51,6 +52,9 @@ public class BrowserScreenSession {
 
     static final String STOPPED = "stopped";
     static final String TIMEOUT = "timeout";
+
+    /** 프레임 없이 연이어 끊긴 연결을 다시 잇는 상한이다. 넘으면 {@code stopped} 로 닫는다. */
+    static final int MAX_RECONNECTS = 3;
 
     private final Long browserId;
     private final Long userId;
@@ -72,6 +76,10 @@ public class BrowserScreenSession {
     private long generation;
     private boolean mouseDown;
     private List<CdpTarget> tabs = List.of();
+    /** 프레임 없이 연이어 다시 이은 횟수다. 프레임을 받으면 0 이 된다. */
+    private int reconnects;
+    /** 마지막 {@code resize} 의 인자다. 탭을 옮기면 새 탭에 다시 보낸다. */
+    private Map<String, Object> metrics;
     /** 마지막 프레임의 화면 크기(CSS 픽셀)다. 프레임이 아직 없으면 비어 있다. */
     private volatile Viewport viewport;
 
@@ -88,7 +96,7 @@ public class BrowserScreenSession {
     }
 
     /** 지금 탭(없으면 새 빈 탭)에 붙어 screencast 를 시작한다. {@code url} 이 없으면 지금 주소에 머문다. 붙지 못하면 런타임 예외다. */
-    void start(String url, Duration timeout, Duration tabInterval) {
+    void start(String url, Duration timeout, Duration tabInterval, Duration heartbeat) {
         List<CdpTarget> pages = targets.list(cdp);
         if (pages.isEmpty()) {
             pages = List.of(targets.create(cdp, "about:blank"));
@@ -100,8 +108,10 @@ public class BrowserScreenSession {
         sink.onClose(() -> close(null));
         sendTabs();
         long interval = tabInterval.toMillis();
+        long ping = heartbeat.toMillis();
         schedule(scheduler.schedule(() -> close(TIMEOUT), timeout.toMillis(), TimeUnit.MILLISECONDS));
         schedule(scheduler.scheduleWithFixedDelay(this::pollTabs, interval, interval, TimeUnit.MILLISECONDS));
+        schedule(scheduler.scheduleWithFixedDelay(this::heartbeat, ping, ping, TimeUnit.MILLISECONDS));
     }
 
     /** 입력 하나를 CDP 명령으로 보내고 결과는 기다리지 않는다. 화면이 이미 닫혔으면 {@code BROWSER_SCREEN_CLOSED} 다. */
@@ -126,14 +136,21 @@ public class BrowserScreenSession {
             case BACK -> back(current);
             case RELOAD -> command(current, "Page.reload", Map.of());
             case RESIZE -> {
-                Map<String, Object> metrics = Map.of(
+                Map<String, Object> resized = Map.of(
                         "width", input.width(), "height", input.height(), "deviceScaleFactor", 1, "mobile", false);
-                command(current, "Emulation.setDeviceMetricsOverride", metrics);
+                synchronized (lock) {
+                    metrics = resized;
+                }
+                command(current, "Emulation.setDeviceMetricsOverride", resized);
             }
         }
     }
 
-    /** 한 번만 닫는다. 예약한 일, 연결, 받는 쪽, 사용 핸들을 닫고 등록부에서 뺀다. 받는 쪽이 먼저 끊겼으면 {@code reason} 을 비운다. */
+    /**
+     * 한 번만 닫는다. 예약한 일, 연결, 받는 쪽, 사용 핸들을 닫고 등록부에서 뺀다. 받는 쪽이 먼저 끊겼으면 {@code reason} 을 비운다.
+     *
+     * <p>{@code closed} 는 다른 쓰기가 막혀 있으면 건너뛴다. 끄기와 화면 교체가 읽지 않는 받는 쪽에 붙잡히지 않게 한다.
+     */
     void close(String reason) {
         if (!closed.compareAndSet(false, true)) {
             return;
@@ -147,7 +164,7 @@ public class BrowserScreenSession {
             generation++;
         }
         if (reason != null) {
-            sink.send("closed", Map.of("reason", reason));
+            sink.trySend("closed", Map.of("reason", reason));
         }
         sink.complete();
         if (current != null) {
@@ -157,12 +174,19 @@ public class BrowserScreenSession {
         ended.accept(this);
     }
 
-    /** 그 탭에 붙는다. 앞의 연결은 닫는다. 세대가 바뀐 뒤에 온 앞 연결의 사건은 버린다. */
+    /**
+     * 그 탭에 붙는다. 앞의 연결은 닫는다. 세대가 바뀐 뒤에 온 앞 연결의 사건은 버린다.
+     *
+     * <p>사용자의 탭 고르기와 스케줄러의 탭 옮기기가 겹치면 뒤의 붙기가 이 연결을 닫아 명령이 실패한다. 그때 세대가 바뀌었으면 조용히
+     * 돌아가고, 세대가 그대로일 때만 실패를 올린다.
+     */
     private void attach(String id, String url) {
         long attached;
         CdpConnection previous;
+        Map<String, Object> resized;
         synchronized (lock) {
             attached = ++generation;
+            resized = metrics;
             previous = connection;
             connection = null;
             targetId = id;
@@ -181,11 +205,23 @@ public class BrowserScreenSession {
             }
             connection = opened;
         }
-        opened.send("Page.enable", Map.of());
-        if (url != null) {
-            opened.send("Page.navigate", Map.of("url", url));
+        try {
+            opened.send("Page.enable", Map.of());
+            if (resized != null) {
+                command(opened, "Emulation.setDeviceMetricsOverride", resized);
+            }
+            if (url != null) {
+                opened.send("Page.navigate", Map.of("url", url));
+            }
+            opened.send("Page.startScreencast", SCREENCAST).join();
+        } catch (RuntimeException ex) {
+            synchronized (lock) {
+                if (attached != generation) {
+                    return;
+                }
+            }
+            throw ex;
         }
-        opened.send("Page.startScreencast", SCREENCAST).join();
     }
 
     private void onEvent(long attached, CdpEvent event) {
@@ -198,31 +234,41 @@ public class BrowserScreenSession {
                 return;
             }
             current = connection;
+            reconnects = 0;
         }
         JsonNode params = event.params();
         JsonNode metadata = params.path("metadata");
         int width = (int) Math.round(metadata.path("deviceWidth").asDouble());
         int height = (int) Math.round(metadata.path("deviceHeight").asDouble());
+        if (width > 0 && height > 0) {
+            viewport = new Viewport(width, height);
+        }
+        if (!sink.send("frame", Map.of("data", params.path("data").asString(""), "width", width, "height", height))) {
+            close(null);
+            return;
+        }
+        // 넘긴 뒤에 ack 해야 읽지 않는 받는 쪽 앞에 프레임이 쌓이지 않는다
         if (current != null) {
             command(
                     current,
                     "Page.screencastFrameAck",
                     Map.of("sessionId", params.path("sessionId").asInt()));
         }
-        if (width > 0 && height > 0) {
-            viewport = new Viewport(width, height);
-        }
-        if (!sink.send("frame", Map.of("data", params.path("data").asString(""), "width", width, "height", height))) {
-            close(null);
-        }
     }
 
-    /** 붙은 탭의 연결이 끊겼다. 다른 탭이 남아 있으면 그리로 옮기고, 없으면 화면을 닫는다. */
+    /** 붙은 탭의 연결이 끊겼다. 다른 탭이 남아 있으면 그리로 옮기고, 없거나 프레임 없이 연이어 끊긴 횟수가 상한을 넘으면 화면을 닫는다. */
     private void onConnectionLost(long attached) {
+        boolean exhausted;
         synchronized (lock) {
             if (attached != generation || closed.get()) {
                 return;
             }
+            exhausted = ++reconnects > MAX_RECONNECTS;
+        }
+        if (exhausted) {
+            log.debug("browser screen reconnect limit reached id={}", browserId);
+            close(STOPPED);
+            return;
         }
         try {
             scheduler.execute(() -> guard("tab recovery", () -> {
@@ -270,6 +316,13 @@ public class BrowserScreenSession {
                 sendTabs();
             }
         });
+    }
+
+    /** 받는 쪽이 끊겼는지 주석 줄로 본다. 끊겼으면 {@code closed} 없이 닫는다. 끊긴 화면이 사용 핸들을 쥐고 있지 않게 한다. */
+    private void heartbeat() {
+        if (!closed.get() && !sink.ping()) {
+            close(null);
+        }
     }
 
     /** 탭 목록을 읽는다. 탭이 하나도 없으면 {@code stopped} 로 닫고 {@code null} 이다. */

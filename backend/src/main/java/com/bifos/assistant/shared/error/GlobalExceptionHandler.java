@@ -3,6 +3,7 @@ package com.bifos.assistant.shared.error;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.PessimisticLockingFailureException;
 import org.springframework.http.HttpMethod;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -16,10 +17,17 @@ import org.springframework.web.multipart.MaxUploadSizeExceededException;
 @Slf4j
 public class GlobalExceptionHandler {
 
+    /**
+     * 서비스가 정한 오류를 그 코드의 상태로 돌려준다.
+     *
+     * <p>내용 형식을 JSON 으로 정해 둔다. SSE 만 받는 요청({@code Accept: text/event-stream})이 스트림을 열기 전에 실패해도 형식 협상에
+     * 막히지 않고 JSON 본문이 쓰인다.
+     */
     @ExceptionHandler(ApiException.class)
     public ResponseEntity<ErrorResponse> handleApi(ApiException ex) {
         log.warn("api error code={} message={}", ex.code(), ex.getMessage());
         return ResponseEntity.status(ex.code().status())
+                .contentType(MediaType.APPLICATION_JSON)
                 .body(new ErrorResponse(ex.code().name(), ex.getMessage(), ex.missingToolsets()));
     }
 

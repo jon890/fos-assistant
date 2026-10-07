@@ -13,6 +13,7 @@ import java.net.URI;
 import java.time.Duration;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -231,10 +232,128 @@ class BrowserScreenSessionTest {
         assertThat(usage.inUse(BROWSER_ID)).isFalse();
     }
 
+    @Test
+    @DisplayName("주석 줄 쓰기가 실패하면 closed 없이 닫고 사용 핸들을 놓는다")
+    void closesWhenHeartbeatFails() throws InterruptedException {
+        open(Duration.ofMinutes(30), Duration.ofHours(1), Duration.ofMillis(20), null);
+
+        sink.pingFailing = true;
+
+        await(() -> ended.get());
+        assertThat(sink.data("closed")).isEmpty();
+        assertThat(usage.inUse(BROWSER_ID)).isFalse();
+    }
+
+    @Test
+    @DisplayName("앞 탭 옮기기의 연결을 뒤 탭 옮기기가 닫아 명령이 실패해도 화면을 닫지 않는다")
+    void ignoresFailureOfSupersededAttach() throws InterruptedException {
+        cdp.pages.add(new CdpTarget("T2", "둘째", "https://example.com/b"));
+        BrowserScreenSession session = open(Duration.ofMinutes(30), Duration.ofHours(1), null);
+        cdp.holdScreencast = "T2";
+
+        Thread first = Thread.ofPlatform().start(() -> session.input(input(Kind.TAB, null, null, null, "T2")));
+        await(() -> cdp.screencastHeld());
+        session.input(input(Kind.TAB, null, null, null, "T1"));
+        cdp.releaseScreencast();
+        first.join(2000);
+
+        assertThat(first.isAlive()).isFalse();
+        assertThat(session.closed()).isFalse();
+        assertThat(sink.data("closed")).isEmpty();
+        assertThat(cdp.attached).containsExactly("T1", "T2", "T1");
+        assertThat(cdp.closedByUs("T2")).isTrue();
+    }
+
+    @Test
+    @DisplayName("프레임은 받는 쪽에 넘긴 뒤에 ack 한다")
+    void acknowledgesAfterForwarding() throws InterruptedException {
+        open(Duration.ofMinutes(30), Duration.ofHours(1), null);
+        sink.gate = new CountDownLatch(1);
+
+        Thread reader = Thread.ofPlatform().start(() -> cdp.frame("T1", 400, 800, 3));
+        await(() -> sink.writing);
+        assertThat(cdp.sent("Page.screencastFrameAck")).isEmpty();
+
+        sink.gate.countDown();
+        reader.join(2000);
+        assertThat(cdp.sent("Page.screencastFrameAck")).hasSize(1);
+    }
+
+    @Test
+    @DisplayName("받는 쪽 쓰기가 막혀 있어도 닫기는 closed 를 건너뛰고 바로 돌아온다")
+    void closesWithoutWaitingForBlockedWrite() throws InterruptedException {
+        BrowserScreenSession session = open(Duration.ofMinutes(30), Duration.ofHours(1), null);
+        CountDownLatch gate = new CountDownLatch(1);
+        sink.gate = gate;
+        Thread reader = Thread.ofPlatform().start(() -> cdp.frame("T1", 400, 800, 3));
+        await(() -> sink.writing);
+
+        Thread closer = Thread.ofPlatform().start(() -> session.close(BrowserScreenSession.REPLACED));
+        closer.join(2000);
+
+        assertThat(closer.isAlive()).isFalse();
+        assertThat(sink.completed).isTrue();
+        assertThat(usage.inUse(BROWSER_ID)).isFalse();
+        gate.countDown();
+        reader.join(2000);
+        assertThat(sink.data("closed")).isEmpty();
+        assertThat(cdp.sent("Page.screencastFrameAck")).isEmpty();
+    }
+
+    @Test
+    @DisplayName("프레임 없이 연이어 세 번까지만 다시 잇고 넘으면 stopped 로 닫는다")
+    void stopsAfterReconnectLimit() throws InterruptedException {
+        open(Duration.ofMinutes(30), Duration.ofHours(1), null);
+
+        for (int attempt = 1; attempt <= 3; attempt++) {
+            dropAndAwaitReattach(attempt + 1);
+        }
+        cdp.frame("T1", 400, 800, 1);
+        dropAndAwaitReattach(5);
+        assertThat(sink.data("closed")).isEmpty();
+
+        // 프레임 뒤 첫 끊김이 다시 1회째다. 두 번 더 이은 뒤 네 번째 끊김에서 닫는다
+        dropAndAwaitReattach(6);
+        dropAndAwaitReattach(7);
+        cdp.drop("T1");
+
+        await(() -> sink.completed);
+        assertThat(sink.data("closed")).containsExactly(Map.of("reason", "stopped"));
+        assertThat(cdp.attached).hasSize(7);
+    }
+
+    @Test
+    @DisplayName("마지막 크기 입력을 기억했다가 탭을 옮기면 screencast 전에 새 탭에 다시 보낸다")
+    void reappliesResizeAfterTabSwitch() {
+        cdp.pages.add(new CdpTarget("T2", "둘째", "https://example.com/b"));
+        BrowserScreenSession session = open(Duration.ofMinutes(30), Duration.ofHours(1), null);
+
+        session.input(new BrowserScreenInput(Kind.RESIZE, null, 0, 0, 0, null, null, null, null, 390, 844));
+        session.input(input(Kind.TAB, null, null, null, "T2"));
+
+        List<FakeCdp.Sent> resized = cdp.sent("Emulation.setDeviceMetricsOverride");
+        assertThat(resized).extracting(FakeCdp.Sent::targetId).containsExactly("T1", "T2");
+        assertThat(resized.get(1).params()).containsEntry("width", 390).containsEntry("height", 844);
+        assertThat(cdp.sent.stream()
+                        .filter(command -> command.targetId().equals("T2"))
+                        .map(FakeCdp.Sent::method))
+                .containsExactly("Page.enable", "Emulation.setDeviceMetricsOverride", "Page.startScreencast");
+    }
+
+    /** 붙은 탭을 끊고 다시 붙어 screencast 를 시작하기까지 기다린다. 붙기가 끝나기 전에 다시 끊으면 경합이 된다. */
+    private void dropAndAwaitReattach(int screencasts) throws InterruptedException {
+        cdp.drop("T1");
+        await(() -> cdp.sent("Page.startScreencast").size() == screencasts);
+    }
+
     private BrowserScreenSession open(Duration timeout, Duration tabInterval, String url) {
+        return open(timeout, tabInterval, Duration.ofHours(1), url);
+    }
+
+    private BrowserScreenSession open(Duration timeout, Duration tabInterval, Duration heartbeat, String url) {
         BrowserScreenSession session = new BrowserScreenSession(
                 BROWSER_ID, 201L, CDP, cdp, cdp, usage.open(BROWSER_ID), sink, scheduler, closed -> ended.set(true));
-        session.start(url, timeout, tabInterval);
+        session.start(url, timeout, tabInterval, heartbeat);
         return session;
     }
 
