@@ -13,7 +13,7 @@
   | 이름 대응 파일만 | `fos-ctx` 가 호출마다 읽으므로 따로 할 것이 없다 | `reload_pending: true` |
   | 이미 있던 서버의 정의나 그 서버의 `.env` 값 | 이름이 같아 맞추기가 다시 연결하지 않는다. 지금처럼 재시작을 기다린다 | `restart_required: true` |
   | `fos-ctx` plugin 파일 | 지금처럼 재시작을 기다린다 | `plugin_updated: true` |
-  | 떼기 | gateway 의 다음 주기가 그 서버만 끊는다. 스킬은 색인 표식을 바꿔 다음 실행에서 뺀다 | `restart_required: false` |
+  | 떼기 | gateway 의 다음 주기가 그 서버만 끊는다. 스킬은 색인 표식을 바꿔 다음 실행에서 뺀다 | `restart_required: false`, `reload_pending: true`. Control Plane 의 떼기는 바인딩 행을 지우므로 이 칸을 쓰지 않는다 |
 
 - **맥락**: [ADR-083](ADR-083-커넥터는-사용자가-한-번-연결하고-자기-에이전트에-여럿-붙여-그-에이전트가-도구를-직접-부른다.md) 의 바인딩은 붙이면 재시작 대기가 되고, 관리자가 공유 gateway 를 재시작한 뒤 반영 완료를 눌러야 `READY` 가 됐다. 재시작은 모든 사용자의 대화를 잠깐 끊는다.
   운영과 같은 Hermes v0.21.5 이미지의 일회성 컨테이너(`--network none`)에서 아래를 확인했다(2026-10-07).
