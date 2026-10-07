@@ -223,9 +223,7 @@ public class AutonomyPolicyService {
         return Objects.equals(row.problemKey(), snapshot.problemKey())
                 && Objects.equals(row.actionType(), snapshot.actionType())
                 && Objects.equals(row.actionText(), snapshot.actionText())
-                && Objects.equals(row.sideEffect(), snapshot.sideEffect())
-                && Objects.equals(row.confidence(), snapshot.confidence())
-                && Objects.equals(row.evidenceCheckedAt(), snapshot.evidenceCheckedAt());
+                && Objects.equals(row.sideEffect(), snapshot.sideEffect());
     }
 
     private static Map<DecisionAxis, DecisionLevel> choices(CandidateJudgement judgement) {

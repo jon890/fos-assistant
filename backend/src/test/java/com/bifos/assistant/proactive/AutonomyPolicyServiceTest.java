@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -20,6 +21,7 @@ import com.bifos.assistant.chat.infra.ConversationRepository;
 import com.bifos.assistant.proactive.application.AutonomyPolicyService;
 import com.bifos.assistant.proactive.application.ProactiveCheckService;
 import com.bifos.assistant.proactive.domain.AutonomyDecision;
+import com.bifos.assistant.proactive.domain.AutonomyInputs;
 import com.bifos.assistant.proactive.domain.AxisJudgement;
 import com.bifos.assistant.proactive.domain.CandidateJudgement;
 import com.bifos.assistant.proactive.domain.DecisionCandidate;
@@ -51,6 +53,7 @@ import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
@@ -63,6 +66,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /** 판정 저장, 실행 키, 시작 경로 연결을 본다. 시작 경로는 대역이며 Hermes 를 부르지 않는다. */
@@ -77,7 +81,7 @@ class AutonomyPolicyServiceTest {
     @Autowired
     AutonomyPolicyService service;
 
-    @Autowired
+    @MockitoSpyBean
     AutonomyDecisionRepository decisions;
 
     @Autowired
@@ -111,7 +115,7 @@ class AutonomyPolicyServiceTest {
 
     @BeforeEach
     void setUp() {
-        Instant now = Instant.now();
+        Instant now = Instant.now().truncatedTo(ChronoUnit.MICROS);
         transactions.executeWithoutResult(status -> {
             agent = agents.save(Agent.of(
                     "autonomy-" + UUID.randomUUID(),
@@ -162,10 +166,37 @@ class AutonomyPolicyServiceTest {
         assertThat(first.executionStatus()).isEqualTo(AutonomyExecutionStatus.STARTED);
         assertThat(decisions.findById(first.id()).orElseThrow().executionCheckId())
                 .isEqualTo(started.id());
-        assertThat(second.level()).isEqualTo(AutonomyLevel.IGNORE);
+        assertThat(second.level()).isEqualTo(AutonomyLevel.SURFACE);
         assertThat(second.reasons()).containsExactly(AutonomyReason.ALREADY_EXECUTED);
         assertThat(second.executionKey()).isNull();
         verify(checkService, times(1)).startAutonomous(any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("다른 요청이 실행 키를 먼저 저장해 유일 제약에 걸리면 다시 판정해 ALREADY_EXECUTED 로 남기고 시작하지 않는다")
+    void retriesAfterExecutionKeyConflict() {
+        ValueEvaluation evaluation = evaluation(null, candidate("study:example", "NONE"));
+        // 첫 판정이 실행 키를 보지 못한 사이에 다른 요청이 같은 원천의 실행 키를 커밋한 상황이다.
+        transactions.executeWithoutResult(status -> decisions.save(AutonomyDecision.of(
+                OWNER.id(),
+                evaluation.id(),
+                evaluation.evidence().state().candidates().getFirst().candidateId(),
+                source.id(),
+                AutonomyLevel.EXECUTE,
+                List.of(AutonomyReason.READ_ONLY_SAFE),
+                decisionsInputsPlaceholder(),
+                1,
+                Instant.now())));
+        doReturn(false).doReturn(true).when(decisions).existsByExecutionKey(any());
+
+        List<AutonomyDecision> decided = service.decide(OWNER, evaluation.id());
+
+        assertThat(decided).singleElement().satisfies(decision -> {
+            assertThat(decision.level()).isEqualTo(AutonomyLevel.SURFACE);
+            assertThat(decision.reasons()).containsExactly(AutonomyReason.ALREADY_EXECUTED);
+            assertThat(decision.executionKey()).isNull();
+        });
+        verifyNoInteractions(checkService);
     }
 
     @Test
@@ -252,6 +283,11 @@ class AutonomyPolicyServiceTest {
         verifyNoInteractions(checkService);
     }
 
+    /** 미리 넣는 실행 키 줄의 입력이다. 판정에는 쓰이지 않는다. */
+    private static AutonomyInputs decisionsInputsPlaceholder() {
+        return AutonomyFixtures.safe().build();
+    }
+
     private ProactiveCheck succeeded(CheckTrigger trigger, Instant now) {
         ProactiveCheck check = ProactiveCheck.started(OWNER.id(), agent.id(), conversation.id(), trigger, false, now);
         check.succeed(CheckOutcome.FINDINGS, 1, 0, null, 0, 0, 0, 0, 0, now);
@@ -259,7 +295,7 @@ class AutonomyPolicyServiceTest {
     }
 
     private ProactiveCheckProblem candidate(String key, String sideEffect) {
-        Instant now = Instant.now();
+        Instant now = Instant.now().truncatedTo(ChronoUnit.MICROS);
         return transactions.execute(status -> problems.save(ProactiveCheckProblem.of(
                 source.id(),
                 conversation.id(),
@@ -282,7 +318,7 @@ class AutonomyPolicyServiceTest {
 
     /** 모든 축이 실행에 맞는 판단을 가진 평가를 저장한다. */
     private ValueEvaluation evaluation(Long replayOfId, ProactiveCheckProblem problem) {
-        Instant now = Instant.now();
+        Instant now = Instant.now().truncatedTo(ChronoUnit.MICROS);
         DecisionCandidate snapshot = DecisionCandidate.from(problem);
         List<AxisJudgement> axes = Arrays.stream(DecisionAxis.values())
                 .map(axis -> new AxisJudgement(

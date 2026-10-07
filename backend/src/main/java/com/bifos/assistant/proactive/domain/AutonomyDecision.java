@@ -12,6 +12,7 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 import java.time.Instant;
 import java.util.List;
 import lombok.AccessLevel;
@@ -27,7 +28,10 @@ import org.hibernate.type.SqlTypes;
  * <p>{@code EXECUTE} 만 실행 키를 가진다. 실행 키는 원천 살펴보기마다 유일해 같은 원천에서 자동 실행이 두 번 나가지 않는다.
  */
 @Entity
-@Table(name = "proactive_autonomy_decision")
+@Table(
+        name = "proactive_autonomy_decision",
+        uniqueConstraints =
+                @UniqueConstraint(name = "uk_proactive_autonomy_decision_execution_key", columnNames = "execution_key"))
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @Accessors(fluent = true)
