@@ -1,10 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { fetchMemories } from "@/lib/memory-api";
 import { MEMORY_MANUAL_CREATE } from "@/lib/memory-features";
-import { MEMORY_IMPORTED_EVENT } from "@/lib/memory-import";
 import type { MemorySourceFields } from "@/lib/memory-source";
 import {
   MEMORY_FILTERS,
@@ -55,7 +54,7 @@ export function MemoryList({
   readAt: string;
   /** 「문서」 탭에 그릴 절이다. 문서를 읽지 못했으면 비어 있고 탭을 보이지 않는다. */
   documents?: React.ReactNode;
-  /** 목록 아래 접어 두는 절이다. 가져오기와 외부 서비스 연결이 들어온다. */
+  /** 목록 아래 접어 두는 절이다. 외부 서비스 연결이 들어온다. */
   advanced?: React.ReactNode;
 }) {
   const [memories, setMemories] = useState(initialMemories);
@@ -79,11 +78,6 @@ export function MemoryList({
       );
     }
   }
-  // 가져오기 절은 서버가 그린 자식이라 이 목록의 상태를 모른다. 가져오기가 끝났다는 알림을 받아 다시 읽는다.
-  useEffect(() => {
-    window.addEventListener(MEMORY_IMPORTED_EVENT, reload);
-    return () => window.removeEventListener(MEMORY_IMPORTED_EVENT, reload);
-  });
   function toggle(id: number) {
     setOpenId((current) => (current === id ? null : id));
   }
@@ -188,7 +182,7 @@ export function MemoryList({
       {advanced ? (
         <details className="group mt-10 rounded-md border border-border">
           <summary className="cursor-pointer list-none px-4 py-3 text-sm font-medium outline-none hover:bg-muted focus-visible:ring-3 focus-visible:ring-inset focus-visible:ring-ring/50">
-            가져오기와 외부 서비스 연결
+            외부 서비스 연결
           </summary>
           <div className="border-t border-border px-4 pt-4">{advanced}</div>
         </details>
