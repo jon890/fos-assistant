@@ -8,8 +8,9 @@ import { Notice } from "@/components/ui/notice";
 import { describeFailure } from "@/components/error-message";
 import { DeleteBrowserDialog } from "@/components/browser/delete-browser-dialog";
 import {
-  BROWSER_STATUS,
   browserAction,
+  browserStatusView,
+  failedToStop,
   fetchBrowser,
   type BrowserAction,
   type BrowserView,
@@ -120,15 +121,17 @@ export function UserBrowserPanel() {
           <div className="flex flex-wrap items-center gap-2">
             <h2 className="font-semibold">상태</h2>
             <Badge
-              variant={BROWSER_STATUS[status].variant}
+              variant={browserStatusView(status, view.lastError).variant}
               data-testid="browser-status"
             >
-              {BROWSER_STATUS[status].label}
+              {browserStatusView(status, view.lastError).label}
             </Badge>
           </div>
           {status === "FAILED" ? (
             <p className="text-sm text-muted-foreground">
-              잠시 뒤 다시 켜 주세요.
+              {failedToStop(status, view.lastError)
+                ? "잠시 뒤 다시 꺼 주세요."
+                : "잠시 뒤 다시 켜 주세요."}
             </p>
           ) : null}
           <p className="text-sm text-muted-foreground">

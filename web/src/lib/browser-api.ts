@@ -29,7 +29,7 @@ export type AdminBrowser = {
 export type BrowserAction = "create" | "start" | "stop" | "delete";
 
 /** 상태마다 화면 문구와 배지 색이다. */
-export const BROWSER_STATUS: Record<
+const BROWSER_STATUS: Record<
   BrowserStatus,
   { label: string; variant: "outline" | "info" | "success" | "destructive" }
 > = {
@@ -39,6 +39,27 @@ export const BROWSER_STATUS: Record<
   STOPPING: { label: "끄는 중이에요", variant: "info" },
   FAILED: { label: "켜지 못했어요", variant: "destructive" },
 };
+
+/** 끄거나 지우다 proxy 호출이 실패했을 때 Control Plane 이 `lastError` 에 남기는 코드다. */
+const STOP_FAILED = "stop_failed";
+
+/** 끄다 실패한 `FAILED` 인가. 그 밖의 `FAILED` 는 켜다 실패한 것이다. */
+export function failedToStop(
+  status: BrowserStatus,
+  lastError: string | null | undefined,
+): boolean {
+  return status === "FAILED" && lastError === STOP_FAILED;
+}
+
+/** 상태의 화면 문구와 배지 색이다. `FAILED` 는 `lastError` 로 켜기 실패와 끄기 실패를 나눈다. */
+export function browserStatusView(
+  status: BrowserStatus,
+  lastError: string | null | undefined,
+): { label: string; variant: "outline" | "info" | "success" | "destructive" } {
+  return failedToStop(status, lastError)
+    ? { label: "끄지 못했어요", variant: "destructive" }
+    : BROWSER_STATUS[status];
+}
 
 const ACTIONS: Record<BrowserAction, { path: string; method: string }> = {
   create: { path: "/api/browser", method: "POST" },

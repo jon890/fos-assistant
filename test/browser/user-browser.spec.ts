@@ -14,6 +14,9 @@ type FakeBrowser = {
   /** 켜기 뒤 「켜는 중」 으로 답할 남은 읽기 횟수다. 0 이 되면 켜진다. */
   startingReads: number;
   startError?: { status: number; code: string; message: string };
+  stopError?: { status: number; code: string; message: string };
+  /** `FAILED` 일 때 Control Plane 이 남기는 까닭 코드다. */
+  lastError?: string;
 };
 
 function view(state: FakeBrowser) {
@@ -24,7 +27,7 @@ function view(state: FakeBrowser) {
     enabled: true,
     exists: true,
     status: state.status,
-    lastError: state.status === "FAILED" ? "BROWSER_START_FAILED" : null,
+    lastError: state.status === "FAILED" ? (state.lastError ?? null) : null,
     startedAt: null,
     lastActiveAt: null,
     idleTimeoutSeconds: 600,
@@ -53,6 +56,7 @@ async function fakeBrowserRoutes(page: Page, state: FakeBrowser) {
   await page.route("**/api/browser/start", (route) => {
     if (state.startError) {
       state.status = "FAILED";
+      state.lastError = "start_failed";
       const { status, code, message } = state.startError;
       return json(route, { code, message }, status);
     }
@@ -61,6 +65,12 @@ async function fakeBrowserRoutes(page: Page, state: FakeBrowser) {
     return json(route, view(state));
   });
   await page.route("**/api/browser/stop", (route) => {
+    if (state.stopError) {
+      state.status = "FAILED";
+      state.lastError = "stop_failed";
+      const { status, code, message } = state.stopError;
+      return json(route, { code, message }, status);
+    }
     state.status = "STOPPED";
     return json(route, view(state));
   });
@@ -157,6 +167,32 @@ test("켜지 못하면 할 일만 알리고 오류 코드는 그리지 않는다
   ).toBeVisible();
   await expect(page.getByTestId("browser-status")).toHaveText("켜지 못했어요");
   await expect(page.getByText("BROWSER_START_FAILED")).toHaveCount(0);
+  await expect(page.getByText("start_failed")).toHaveCount(0);
+});
+
+test("끄지 못하면 끄기 실패로 알리고 오류 코드는 그리지 않는다", async ({ page }) => {
+  await fakeBrowserRoutes(page, {
+    enabled: true,
+    status: "RUNNING",
+    startingReads: 0,
+    stopError: {
+      status: 502,
+      code: "BROWSER_STOP_FAILED",
+      message: "browser did not stop",
+    },
+  });
+  await page.goto("/browser");
+
+  await page.getByRole("button", { name: "끄기" }).click();
+  await expect(
+    page.getByRole("alert").filter({
+      hasText: "브라우저를 끄지 못했어요. 잠시 뒤 다시 꺼 주세요.",
+    }),
+  ).toBeVisible();
+  await expect(page.getByTestId("browser-status")).toHaveText("끄지 못했어요");
+  await expect(page.getByText("잠시 뒤 다시 꺼 주세요.", { exact: true })).toBeVisible();
+  await expect(page.getByText("stop_failed")).toHaveCount(0);
+  await expect(page.getByText("BROWSER_STOP_FAILED")).toHaveCount(0);
 });
 
 test("동시에 켤 수 있는 수가 차면 잠시 뒤 다시 켜라고 알린다", async ({

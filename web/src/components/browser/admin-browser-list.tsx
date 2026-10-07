@@ -9,8 +9,8 @@ import { describeAdminError } from "@/components/error-message";
 import { DeleteBrowserDialog } from "@/components/browser/delete-browser-dialog";
 import { formatWhen } from "@/lib/format";
 import {
-  BROWSER_STATUS,
   adminBrowserAction,
+  browserStatusView,
   fetchAdminBrowsers,
   type AdminBrowser,
 } from "@/lib/browser-api";
@@ -97,8 +97,13 @@ export function AdminBrowserList() {
               <div className="min-w-0 space-y-1 text-sm">
                 <div className="flex flex-wrap items-center gap-2">
                   <p className="font-medium break-all">{browser.userName}</p>
-                  <Badge variant={BROWSER_STATUS[browser.status].variant}>
-                    {BROWSER_STATUS[browser.status].label}
+                  <Badge
+                    variant={
+                      browserStatusView(browser.status, browser.lastError)
+                        .variant
+                    }
+                  >
+                    {browserStatusView(browser.status, browser.lastError).label}
                   </Badge>
                 </div>
                 <p className="text-muted-foreground">
