@@ -14,7 +14,7 @@ public interface CdpTargets {
     /** 열린 탭이다. 탭이 아닌 대상(service worker 등)은 뺀다. */
     List<CdpTarget> list(URI cdp);
 
-    /** 그 주소로 새 탭을 연다. */
+    /** 그 주소로 새 탭을 연다. 주소의 scheme 이 허용한 것인지는 호출자가 확인한다. 여기서는 보지 않는다. */
     CdpTarget create(URI cdp, String url);
 
     /** 그 탭을 앞으로 가져온다. */
