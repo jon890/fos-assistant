@@ -43,6 +43,7 @@ frontend 는 화면의 동작과 구조이고, hermes 는 외부 런타임인 He
 | [`backend/proactive-check.md`](backend/proactive-check.md) | 먼저 살펴보기의 진입점, 시작 전 점검, 점검 대화, 읽기 경계, 상한, 결과 계약, 분야 지침이 지킬 것 |
 | [`backend/value-evaluation.md`](backend/value-evaluation.md) | 문제 후보의 가치 판단 축, provider, 저장과 replay, 실패와 다음 행동 정책의 입력 |
 | [`backend/autonomy-policy.md`](backend/autonomy-policy.md) | 후보마다 무시, 보이기, 승인, 실행을 정하는 결정적 규칙과 까닭 코드, 자동 실행의 범위와 중복 방지 |
+| [`backend/decision-feedback.md`](backend/decision-feedback.md) | 제안에 대한 사용자 반응과 실행 결과의 사건, 기록 지점, 반응 읽기 규칙, offline replay 읽기 모델, 보관과 삭제 |
 | [`backend/task.md`](backend/task.md) | 예약 작업. 작업과 시각의 규칙, 발화와 시작, 결과와 알림, 상한, 화면 |
 | [`backend/execution-limit.md`](backend/execution-limit.md) | 사용자 한 명이 Hermes 에 동시에 맡기는 실행의 한도, 세는 실행과 세지 못하는 실행, 한도끼리의 관계, 한도에 닿을 때 |
 | [`backend/context-bundle.md`](backend/context-bundle.md) | 여러 기록에서 모은 문맥의 항목 모델, 출처와 권한과 신선도, Hermes 에 넘기는 형식, 합성 시나리오 |
