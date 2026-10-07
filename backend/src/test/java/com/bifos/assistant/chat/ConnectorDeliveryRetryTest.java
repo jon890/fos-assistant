@@ -47,6 +47,7 @@ import com.bifos.assistant.memory.infra.MemoryRepository;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.testsupport.BackendIntegrationTest;
+import com.bifos.assistant.testsupport.DelegationWakeEnabled;
 import com.bifos.assistant.usage.domain.AgentExecution;
 import com.bifos.assistant.usage.domain.type.ExecutionStatus;
 import com.bifos.assistant.usage.infra.AgentExecutionRepository;
@@ -65,7 +66,6 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.test.context.TestPropertySource;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
@@ -80,7 +80,7 @@ import tools.jackson.databind.json.JsonMapper;
  * 잠시 기억되므로 준비에서 그 기억이 지나기를 기다린다.
  */
 @BackendIntegrationTest
-@TestPropertySource(properties = "assistant.delegation-wake.enabled=true")
+@DelegationWakeEnabled
 class ConnectorDeliveryRetryTest {
 
     private static final Duration WAIT_LIMIT = Duration.ofSeconds(10);

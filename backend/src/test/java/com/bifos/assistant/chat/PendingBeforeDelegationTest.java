@@ -38,6 +38,7 @@ import com.bifos.assistant.orchestration.application.ResearchAndBuildFlow;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.testsupport.BackendIntegrationTest;
+import com.bifos.assistant.testsupport.DelegationWakeEnabled;
 import com.bifos.assistant.usage.domain.AgentExecution;
 import com.bifos.assistant.usage.domain.type.ExecutionStatus;
 import com.bifos.assistant.usage.infra.AgentExecutionRepository;
@@ -57,7 +58,6 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.PageRequest;
-import org.springframework.test.context.TestPropertySource;
 
 /**
  * 보낼 대기 메시지와 끝난 위임 결과가 함께 있을 때 사용자의 말이 먼저 가는지 본다(ADR-048).
@@ -66,7 +66,7 @@ import org.springframework.test.context.TestPropertySource;
  * 잠금이 아니라 쌓인 메시지 수를 기다린 뒤 단언한다.
  */
 @BackendIntegrationTest
-@TestPropertySource(properties = "assistant.delegation-wake.enabled=true")
+@DelegationWakeEnabled
 class PendingBeforeDelegationTest {
 
     private static final Duration WAIT_LIMIT = Duration.ofSeconds(10);

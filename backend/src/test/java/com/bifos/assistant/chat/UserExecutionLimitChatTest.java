@@ -43,6 +43,7 @@ import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.shared.error.GlobalExceptionHandler;
 import com.bifos.assistant.testsupport.BackendIntegrationTest;
+import com.bifos.assistant.testsupport.SmallExecutionLimit;
 import com.bifos.assistant.usage.application.UserExecutionLimiter;
 import com.bifos.assistant.usage.domain.AgentExecution;
 import com.bifos.assistant.usage.domain.type.ExecutionStatus;
@@ -71,7 +72,6 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
-import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
@@ -82,7 +82,7 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
  * 대역 전체를 붙잡으면 다른 사용자의 실행까지 멈춘다.
  */
 @BackendIntegrationTest
-@TestPropertySource(properties = "assistant.user-execution.max-running=2")
+@SmallExecutionLimit
 class UserExecutionLimitChatTest {
 
     private static final Duration WAIT_LIMIT = Duration.ofSeconds(10);

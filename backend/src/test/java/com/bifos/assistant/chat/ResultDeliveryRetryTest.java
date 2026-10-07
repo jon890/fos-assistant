@@ -46,6 +46,7 @@ import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.testsupport.BackendIntegrationTest;
+import com.bifos.assistant.testsupport.DelegationWakeEnabled;
 import com.bifos.assistant.usage.application.ExecutionDeliveryWriter;
 import com.bifos.assistant.usage.domain.AgentExecution;
 import com.bifos.assistant.usage.domain.ExecutionContextSource;
@@ -73,7 +74,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.annotation.Import;
 import org.springframework.data.domain.PageRequest;
-import org.springframework.test.context.TestPropertySource;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /**
@@ -85,7 +85,7 @@ import org.springframework.transaction.support.TransactionTemplate;
  * <p>구성은 {@link ResultDeliveryRecordTest} 와 같게 둔다. 같은 Spring 컨텍스트를 써서 컨텍스트 수를 늘리지 않는다.
  */
 @BackendIntegrationTest
-@TestPropertySource(properties = "assistant.delegation-wake.enabled=true")
+@DelegationWakeEnabled
 @Import(ResultDeliveryRecordTest.TestResults.class)
 class ResultDeliveryRetryTest {
 

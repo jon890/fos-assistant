@@ -39,6 +39,7 @@ import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.testsupport.BackendIntegrationTest;
+import com.bifos.assistant.testsupport.DelegationWakeEnabled;
 import com.bifos.assistant.usage.domain.AgentExecution;
 import com.bifos.assistant.usage.domain.type.ExecutionStatus;
 import com.bifos.assistant.usage.infra.AgentExecutionRepository;
@@ -60,7 +61,6 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationEventPublisher;
-import org.springframework.test.context.TestPropertySource;
 
 /**
  * 맡긴 일의 결과가 끝나면 부모 대화의 turn 이 자동으로 열리는지 본다.
@@ -69,7 +69,7 @@ import org.springframework.test.context.TestPropertySource;
  * 기다리지 않으면 다음 검사의 대역 Hermes 기록과 메시지 수가 흔들린다.
  */
 @BackendIntegrationTest
-@TestPropertySource(properties = "assistant.delegation-wake.enabled=true")
+@DelegationWakeEnabled
 class DelegationWakeServiceTest {
 
     private static final Duration WAIT_LIMIT = Duration.ofSeconds(10);

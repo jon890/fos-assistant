@@ -17,6 +17,7 @@ import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.testsupport.BackendIntegrationTest;
+import com.bifos.assistant.testsupport.MemoryEncryptionDisabled;
 import java.time.LocalDate;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
@@ -24,11 +25,10 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.test.context.TestPropertySource;
 
 /** 암호화 key 가 없을 때 민감 항목을 평문으로 저장하지 않는지 본다(ADR-058, ADR-055). */
 @BackendIntegrationTest
-@TestPropertySource(properties = {"assistant.memory.encryption.active-key-id=", "assistant.memory.encryption.keys="})
+@MemoryEncryptionDisabled
 class MemoryImportEncryptionDisabledTest {
 
     private static final CurrentUser DAD = new CurrentUser(1L, "dad@example.com", "dad", 1L, UserRole.ADMIN);

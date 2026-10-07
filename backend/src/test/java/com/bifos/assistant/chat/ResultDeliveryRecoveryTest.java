@@ -44,6 +44,7 @@ import com.bifos.assistant.hermes.dto.TokenUsage;
 import com.bifos.assistant.memory.infra.MemoryRepository;
 import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.testsupport.BackendIntegrationTest;
+import com.bifos.assistant.testsupport.DelegationWakeEnabled;
 import com.bifos.assistant.usage.application.ExecutionDeliveryWriter;
 import com.bifos.assistant.usage.domain.AgentExecution;
 import com.bifos.assistant.usage.domain.type.ExecutionStatus;
@@ -62,7 +63,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.test.context.TestPropertySource;
 
 /**
  * 이전 프로세스가 {@code RUNNING} 으로 남긴 전달 시도를 기동할 때 닫고, 기동 정리가 정한 부모 실행 줄의 시도를 그 줄과 함께
@@ -72,7 +72,7 @@ import org.springframework.test.context.TestPropertySource;
  * 않는다」 검사가 실제로 기동 훑기를 거친다.
  */
 @BackendIntegrationTest
-@TestPropertySource(properties = "assistant.delegation-wake.enabled=true")
+@DelegationWakeEnabled
 class ResultDeliveryRecoveryTest {
 
     private static final Duration WAIT_LIMIT = Duration.ofSeconds(10);

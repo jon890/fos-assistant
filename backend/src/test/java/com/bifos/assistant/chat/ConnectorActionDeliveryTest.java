@@ -40,6 +40,7 @@ import com.bifos.assistant.memory.infra.MemoryRepository;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.testsupport.BackendIntegrationTest;
+import com.bifos.assistant.testsupport.DelegationWakeEnabled;
 import com.bifos.assistant.usage.domain.AgentExecution;
 import com.bifos.assistant.usage.domain.ExecutionContextSource;
 import com.bifos.assistant.usage.domain.type.ExecutionStatus;
@@ -64,7 +65,6 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.test.context.TestPropertySource;
 
 /**
  * 승인 줄이 생기거나 끝났을 때 그 요청이 나온 대화에 무엇이 전해지는지 본다(ADR-050).
@@ -74,7 +74,7 @@ import org.springframework.test.context.TestPropertySource;
  * 테스트 스레드 밖에서 돌므로 끝날 때까지 기다린 뒤 단언한다.
  */
 @BackendIntegrationTest
-@TestPropertySource(properties = "assistant.delegation-wake.enabled=true")
+@DelegationWakeEnabled
 class ConnectorActionDeliveryTest {
 
     private static final Duration WAIT_LIMIT = Duration.ofSeconds(10);

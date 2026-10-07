@@ -39,6 +39,7 @@ import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.testsupport.BackendIntegrationTest;
+import com.bifos.assistant.testsupport.DelegationWakeEnabled;
 import com.bifos.assistant.usage.application.ExecutionDeliveryWriter;
 import com.bifos.assistant.usage.domain.AgentExecution;
 import com.bifos.assistant.usage.domain.DelegationKey;
@@ -70,12 +71,8 @@ import org.springframework.transaction.support.TransactionTemplate;
  * 살펴보기 turn 이 완료를 기다리는 자리에서 직접 만든다. 도는 자식은 이 서버가 돌리지 않는 실행이다. 모든 데이터는 합성이다.
  */
 @BackendIntegrationTest
-@TestPropertySource(
-        properties = {
-            "hermes.run-timeout=30s",
-            "assistant.proactive-check.max-duration=20s",
-            "assistant.delegation-wake.enabled=true"
-        })
+@DelegationWakeEnabled
+@TestPropertySource(properties = {"hermes.run-timeout=30s", "assistant.proactive-check.max-duration=20s"})
 class ProactiveCheckEndTest {
 
     private static final Duration WAIT_LIMIT = Duration.ofSeconds(10);

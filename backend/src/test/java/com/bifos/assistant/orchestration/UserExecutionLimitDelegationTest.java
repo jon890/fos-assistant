@@ -27,6 +27,7 @@ import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.testsupport.BackendIntegrationTest;
+import com.bifos.assistant.testsupport.SmallExecutionLimit;
 import com.bifos.assistant.usage.application.UserExecutionLimiter;
 import com.bifos.assistant.usage.domain.AgentExecution;
 import com.bifos.assistant.usage.domain.DelegationKey;
@@ -50,7 +51,6 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.PageRequest;
-import org.springframework.test.context.TestPropertySource;
 
 /**
  * 위임 자식과 흐름 단계가 사용자 실행 한도에 닿으면 기다리지 않고 거절되는지 본다(ADR-069).
@@ -59,7 +59,7 @@ import org.springframework.test.context.TestPropertySource;
  * 담은 제출만이다.
  */
 @BackendIntegrationTest
-@TestPropertySource(properties = "assistant.user-execution.max-running=2")
+@SmallExecutionLimit
 class UserExecutionLimitDelegationTest {
 
     /** {@code ChatServiceTest.StubRuntime} 은 chat 패키지 안에서만 보여 이 패키지에서 import 하지 못하므로 따로 둔다. */

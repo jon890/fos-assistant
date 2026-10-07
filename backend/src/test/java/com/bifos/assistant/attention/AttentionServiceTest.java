@@ -9,9 +9,7 @@ import com.bifos.assistant.agent.domain.type.AgentVisibility;
 import com.bifos.assistant.agent.domain.type.CostMode;
 import com.bifos.assistant.agent.domain.type.CredentialScope;
 import com.bifos.assistant.agent.infra.AgentRepository;
-import com.bifos.assistant.attention.application.AttentionCandidates;
 import com.bifos.assistant.attention.application.AttentionService;
-import com.bifos.assistant.attention.application.model.AttentionCandidate;
 import com.bifos.assistant.attention.application.model.AttentionCard;
 import com.bifos.assistant.attention.application.model.AttentionItem;
 import com.bifos.assistant.attention.application.model.AttentionSignal;
@@ -48,15 +46,12 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.TestConfiguration;
-import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -72,11 +67,10 @@ import tools.jackson.databind.json.JsonMapper;
  * 지운다. 커넥터 카탈로그는 대역이 답한다.
  */
 @BackendIntegrationTest
-@Import(AttentionServiceTest.Candidates.class)
+@Import(AttentionTestCandidates.class)
 class AttentionServiceTest {
 
     private static final Instant NOW = Instant.parse("2026-10-04T09:00:00Z");
-    private static final FailingCandidates FAILING = new FailingCandidates();
 
     private static final String CONNECTOR = "attention-notes";
     private static final String WRITE = "write_note";
@@ -95,15 +89,6 @@ class AttentionServiceTest {
             List.of(
                     new ConnectorTool("list_scopes", "READ", "none", null, null),
                     new ConnectorTool(WRITE, "WRITE", "required", "메모 쓰기", null)));
-
-    @TestConfiguration
-    static class Candidates {
-        /** 나를 기다리는 카드의 기록 읽기를 실패시킬 수 있는 대역이다. 꺼 두면 후보를 내지 않는다. */
-        @Bean
-        AttentionCandidates failingNeedsMeCandidates() {
-            return FAILING;
-        }
-    }
 
     @Autowired
     TestClock clock;
@@ -148,7 +133,7 @@ class AttentionServiceTest {
     @BeforeEach
     void setUp() {
         clock.set(NOW);
-        FAILING.failing = false;
+        AttentionTestCandidates.FAILING.failing = false;
         when(connector.readCatalog()).thenReturn(List.of(MANIFEST));
         dad = member();
         chief = agentOf(dad, "집안일 도우미");
@@ -157,7 +142,7 @@ class AttentionServiceTest {
     @AfterEach
     void tearDown() {
         SecurityContextHolder.clearContext();
-        FAILING.failing = false;
+        AttentionTestCandidates.FAILING.failing = false;
         for (Long userId : createdUsers) {
             jdbc.update("DELETE FROM attention_event WHERE user_id = ?", userId);
             jdbc.update("DELETE FROM attention_control WHERE user_id = ?", userId);
@@ -481,7 +466,7 @@ class AttentionServiceTest {
         message(ChatMessage.fromUser(conversation.id(), dad.id(), "목록 정리해 줘", NOW.minusSeconds(600)));
         failedRoot(dad, conversation, NOW.minusSeconds(600), NOW.minusSeconds(540));
         insertPendingAction(dad, conversation.id(), NOW.plus(Duration.ofHours(3)));
-        FAILING.failing = true;
+        AttentionTestCandidates.FAILING.failing = true;
 
         AttentionView view = service.view(dad);
 
@@ -607,23 +592,5 @@ class AttentionServiceTest {
         List<AttentionItem> items = card(view, key).items();
         assertThat(items).as("카드 %s 의 항목", key).hasSize(1);
         return items.getFirst();
-    }
-
-    /** 켜 두면 기록 읽기가 실패하는 나를 기다리는 카드의 출처다. */
-    static final class FailingCandidates implements AttentionCandidates {
-        volatile boolean failing;
-
-        @Override
-        public Set<CardKey> cards() {
-            return Set.of(CardKey.NEEDS_ME);
-        }
-
-        @Override
-        public List<AttentionCandidate> read(CurrentUser user, Instant now) {
-            if (failing) {
-                throw new IllegalStateException("검사가 낸 읽기 실패");
-            }
-            return List.of();
-        }
     }
 }

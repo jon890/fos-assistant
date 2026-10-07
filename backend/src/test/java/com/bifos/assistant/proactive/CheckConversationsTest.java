@@ -18,6 +18,7 @@ import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.testsupport.BackendIntegrationTest;
+import com.bifos.assistant.testsupport.SmallExecutionLimit;
 import com.bifos.assistant.usage.application.TurnSlot;
 import com.bifos.assistant.usage.application.UserExecutionLimiter;
 import java.time.Instant;
@@ -34,7 +35,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.test.context.TestPropertySource;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /**
@@ -44,7 +44,7 @@ import org.springframework.transaction.support.TransactionTemplate;
  * 번호는 다른 검사와 겹치지 않는 값을 쓰고, 만든 줄은 끝날 때 지운다.
  */
 @BackendIntegrationTest
-@TestPropertySource(properties = "assistant.user-execution.max-running=2")
+@SmallExecutionLimit
 class CheckConversationsTest {
 
     private static final Instant NOW = Instant.parse("2026-10-01T00:00:00Z");

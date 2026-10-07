@@ -45,6 +45,9 @@ assistant:
     policy:
       # 검사가 뜰 때마다 만료 정리가 함께 돌지 않게 끈다. 검사는 그 메서드를 직접 부른다
       expire-cron: "-"
+      # 검사들이 컨텍스트를 함께 쓰므로 앞 검사가 읽은 커넥터 카탈로그가 다음 검사에 남지 않게 한다.
+      # 보관 시간 자체는 ConnectorCatalogCacheTest 와 ConnectorPolicyTestDoubles 가 본다
+      catalog-ttl: 1ms
   proactive-check:
     # 아래 hermes.run-timeout(1s) 보다 짧아야 기동한다. 살펴보기 turn 을 돌리는 검사는 두 값을 함께 올린다
     max-duration: 500ms

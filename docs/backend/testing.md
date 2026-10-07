@@ -60,6 +60,7 @@ class ConversationPagingTest {
   고정 code 를 쓰는 검사가 검사 트랜잭션 안에서 지우고 다시 넣으면, Hibernate 가 넣기를 먼저 내보내 유일 제약에 걸린다. 지운 뒤 `flush()` 한다.
 - **기반의 spy 는 `verify(...)` 의 matcher 사이에서 부르지 않는다.** Mockito 가 그 호출을 matcher 를 쓰는 호출로 읽는다. 값을 먼저 지역 변수로 받는다.
 - **검사가 바꾼 static 상태는 `@BeforeEach` 에서 되돌린다.**
+- **운영 빈이 JVM 메모리에 두는 캐시는 test profile 에서 보관 시간을 짧게 둔다.** 예: 커넥터 카탈로그 캐시. 검사가 private 필드를 바꿔 비우지 않는다.
 
 ## 보존 상한과 측정
 

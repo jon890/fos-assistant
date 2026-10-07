@@ -25,6 +25,8 @@ import com.bifos.assistant.memory.infra.MemoryRepository;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.testsupport.BackendIntegrationTest;
+import com.bifos.assistant.testsupport.DelegationWakeEnabled;
+import com.bifos.assistant.testsupport.SmallExecutionLimit;
 import com.bifos.assistant.usage.application.UserExecutionLimiter;
 import com.bifos.assistant.usage.domain.AgentExecution;
 import com.bifos.assistant.usage.domain.type.ExecutionStatus;
@@ -54,7 +56,6 @@ import org.springframework.context.annotation.Import;
 import org.springframework.context.annotation.Primary;
 import org.springframework.context.event.EventListener;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler;
-import org.springframework.test.context.TestPropertySource;
 
 /**
  * 위임 결과 자동 turn 이 사용자 실행 한도에 닿았을 때 상한이 있는 재시도를 거는지 본다(ADR-069).
@@ -64,7 +65,8 @@ import org.springframework.test.context.TestPropertySource;
  * 끝날 때까지 기다린다.
  */
 @BackendIntegrationTest
-@TestPropertySource(properties = {"assistant.delegation-wake.enabled=true", "assistant.user-execution.max-running=2"})
+@DelegationWakeEnabled
+@SmallExecutionLimit
 @Import({
     DelegationWakeUserLimitTest.CapturingSchedulerConfig.class,
     DelegationWakeUserLimitTest.RetryThreadsConfig.class

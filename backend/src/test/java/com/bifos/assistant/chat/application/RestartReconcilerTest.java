@@ -34,6 +34,8 @@ import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.testsupport.BackendIntegrationTest;
+import com.bifos.assistant.testsupport.DelegationWakeEnabled;
+import com.bifos.assistant.testsupport.SamplePriceCatalog;
 import com.bifos.assistant.usage.application.UserExecutionLimiter;
 import com.bifos.assistant.usage.domain.AgentExecution;
 import com.bifos.assistant.usage.domain.ExecutionEvent;
@@ -43,8 +45,6 @@ import com.bifos.assistant.usage.infra.AgentExecutionRepository;
 import com.bifos.assistant.usage.infra.ExecutionEventRepository;
 import com.bifos.assistant.user.domain.AppUser;
 import com.bifos.assistant.user.infra.AppUserRepository;
-import java.net.URISyntaxException;
-import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
@@ -57,8 +57,6 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.web.server.context.WebServerApplicationContext;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.context.TestPropertySource;
 
 /**
@@ -68,9 +66,10 @@ import org.springframework.test.context.TestPropertySource;
  * 남긴 것처럼 저장소로 직접 만든다. 묻기는 가상 스레드에서 돌므로 결과는 기다려 읽는다.
  */
 @BackendIntegrationTest
+@DelegationWakeEnabled
+@SamplePriceCatalog
 @TestPropertySource(
         properties = {
-            "assistant.delegation-wake.enabled=true",
             // 상한을 넘겨 FAILED 로 적은 줄의 사용자 자리가 남아 있는 것을 볼 동안 돌려주지 않게 길게 둔다.
             // 그 자리를 남기는 검사는 끝나기 전에 그 run 을 모른다고 답하게 해 돌려받는다.
             "assistant.user-execution.remote-end-max-wait=30s"
@@ -89,22 +88,6 @@ class RestartReconcilerTest {
 
     /** 표본 가격표가 아는 provider 와 모델이다. 이 짝으로 끝나야 금액이 적힌다. */
     private static final SessionRuntime PRICED_RUNTIME = new SessionRuntime("example-model-large", "anthropic");
-
-    /** 금액이 적히는지 보려고 표본 가격표를 가리킨다. 기본 설정에는 가격표가 없어 금액이 늘 빈다. */
-    @DynamicPropertySource
-    static void pointAtTheSampleCatalog(DynamicPropertyRegistry registry) {
-        registry.add("assistant.pricing.catalog-path", () -> sampleCatalog().toString());
-    }
-
-    private static Path sampleCatalog() {
-        try {
-            return Path.of(RestartReconcilerTest.class
-                    .getResource("/pricing/models-dev-sample.json")
-                    .toURI());
-        } catch (URISyntaxException ex) {
-            throw new IllegalStateException(ex);
-        }
-    }
 
     /** 대기 메시지 turn 과 자동 turn 의 답 조각은 이 검사가 보지 않는다. 실제 스트림 주소로 연결하지 않게 대역으로 둔다. */
     @Autowired

@@ -60,6 +60,7 @@ import com.bifos.assistant.task.infra.TaskRepository;
 import com.bifos.assistant.task.infra.TaskRunRepository;
 import com.bifos.assistant.task.infra.TaskTriggerRepository;
 import com.bifos.assistant.testsupport.BackendIntegrationTest;
+import com.bifos.assistant.testsupport.SmallExecutionLimit;
 import com.bifos.assistant.usage.application.TurnSlot;
 import com.bifos.assistant.usage.application.UserExecutionLimiter;
 import com.bifos.assistant.user.domain.AppUser;
@@ -96,12 +97,8 @@ import org.springframework.transaction.support.TransactionTemplate;
  * 다른 살펴보기 검사처럼 Hermes 실행 한도와 함께 올린다.
  */
 @BackendIntegrationTest
-@TestPropertySource(
-        properties = {
-            "assistant.user-execution.max-running=2",
-            "hermes.run-timeout=30s",
-            "assistant.proactive-check.max-duration=20s"
-        })
+@SmallExecutionLimit
+@TestPropertySource(properties = {"hermes.run-timeout=30s", "assistant.proactive-check.max-duration=20s"})
 class TaskRunStarterTest {
 
     private static final Duration WAIT_LIMIT = Duration.ofSeconds(10);

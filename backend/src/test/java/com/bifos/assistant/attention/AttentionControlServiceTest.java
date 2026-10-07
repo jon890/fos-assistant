@@ -10,10 +10,8 @@ import com.bifos.assistant.agent.domain.type.AgentVisibility;
 import com.bifos.assistant.agent.domain.type.CostMode;
 import com.bifos.assistant.agent.domain.type.CredentialScope;
 import com.bifos.assistant.agent.infra.AgentRepository;
-import com.bifos.assistant.attention.application.AttentionCandidates;
 import com.bifos.assistant.attention.application.AttentionControlService;
 import com.bifos.assistant.attention.application.AttentionService;
-import com.bifos.assistant.attention.application.model.AttentionCandidate;
 import com.bifos.assistant.attention.application.model.AttentionCard;
 import com.bifos.assistant.attention.application.model.AttentionItem;
 import com.bifos.assistant.attention.application.model.AttentionView;
@@ -45,9 +43,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Set;
 import java.util.UUID;
-import java.util.concurrent.atomic.AtomicInteger;
 import org.assertj.core.api.ThrowableAssert.ThrowingCallable;
 import org.assertj.core.groups.Tuple;
 import org.junit.jupiter.api.AfterEach;
@@ -55,8 +51,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.TestConfiguration;
-import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.JdbcTemplate;
 
@@ -67,11 +61,10 @@ import org.springframework.jdbc.core.JdbcTemplate;
  * 지운다. 커넥터 카탈로그는 대역이 답한다.
  */
 @BackendIntegrationTest
-@Import(AttentionControlServiceTest.Candidates.class)
+@Import(AttentionTestCandidates.class)
 class AttentionControlServiceTest {
 
     private static final Instant NOW = Instant.parse("2026-10-04T09:00:00Z");
-    private static final ReadCountingCandidates PROBE = new ReadCountingCandidates();
 
     private static final String CONNECTOR = "attention-control-notes";
     private static final String WRITE = "write_note";
@@ -90,15 +83,6 @@ class AttentionControlServiceTest {
             List.of(
                     new ConnectorTool("list_scopes", "READ", "none", null, null),
                     new ConnectorTool(WRITE, "WRITE", "required", "메모 쓰기", null)));
-
-    @TestConfiguration
-    static class Candidates {
-        /** 후보를 읽었는지 세는 출처다. 후보를 내지 않는다. */
-        @Bean
-        AttentionCandidates readCountingCandidates() {
-            return PROBE;
-        }
-    }
 
     @Autowired
     TestClock clock;
@@ -143,7 +127,7 @@ class AttentionControlServiceTest {
     @BeforeEach
     void setUp() {
         clock.set(NOW);
-        PROBE.reads.set(0);
+        AttentionTestCandidates.PROBE.reads.set(0);
         when(connector.readCatalog()).thenReturn(List.of(MANIFEST));
         dad = member();
         chief = agentOf(dad, "집안일 도우미");
@@ -411,7 +395,7 @@ class AttentionControlServiceTest {
         assertCode(
                 () -> controls.hide(dad, CardKey.FAILURES, "conversation:" + UUID.randomUUID(), "a".repeat(65)),
                 ErrorCode.VALIDATION_FAILED);
-        assertThat(PROBE.reads.get()).as("후보를 읽은 횟수").isZero();
+        assertThat(AttentionTestCandidates.PROBE.reads.get()).as("후보를 읽은 횟수").isZero();
     }
 
     @Test
@@ -420,7 +404,7 @@ class AttentionControlServiceTest {
         assertCode(
                 () -> controls.record(dad, "a".repeat(81), "0123456789abcdef", AttentionEventType.OPENED),
                 ErrorCode.VALIDATION_FAILED);
-        assertThat(PROBE.reads.get()).as("후보를 읽은 횟수").isZero();
+        assertThat(AttentionTestCandidates.PROBE.reads.get()).as("후보를 읽은 횟수").isZero();
     }
 
     @Test
@@ -578,21 +562,5 @@ class AttentionControlServiceTest {
         List<AttentionItem> items = card(view, key).items();
         assertThat(items).as("카드 %s 의 항목", key).hasSize(1);
         return items.getFirst();
-    }
-
-    /** 후보를 읽은 횟수를 세는 출처다. 후보를 내지 않아 다른 카드의 판정을 바꾸지 않는다. */
-    static final class ReadCountingCandidates implements AttentionCandidates {
-        final AtomicInteger reads = new AtomicInteger();
-
-        @Override
-        public Set<CardKey> cards() {
-            return Set.of(CardKey.NEEDS_ME);
-        }
-
-        @Override
-        public List<AttentionCandidate> read(CurrentUser user, Instant now) {
-            reads.incrementAndGet();
-            return List.of();
-        }
     }
 }

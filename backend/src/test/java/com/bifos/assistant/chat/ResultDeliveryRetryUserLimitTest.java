@@ -33,6 +33,8 @@ import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.testsupport.BackendIntegrationTest;
+import com.bifos.assistant.testsupport.DelegationWakeEnabled;
+import com.bifos.assistant.testsupport.SmallExecutionLimit;
 import com.bifos.assistant.usage.application.UserExecutionLimiter;
 import com.bifos.assistant.usage.domain.AgentExecution;
 import com.bifos.assistant.usage.domain.type.ExecutionStatus;
@@ -52,7 +54,6 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.annotation.Import;
-import org.springframework.test.context.TestPropertySource;
 
 /**
  * 결과 다시 전달이 사용자 실행 한도에 닿으면 묶음을 바꾸지 않고 다시 시도를 예약하지 않는지 본다(ADR-069, ADR-075).
@@ -61,7 +62,8 @@ import org.springframework.test.context.TestPropertySource;
  * 둔다. 같은 Spring 컨텍스트를 써서 컨텍스트 수를 늘리지 않고, 예약은 그 검사의 대역 스케줄러가 받는다.
  */
 @BackendIntegrationTest
-@TestPropertySource(properties = {"assistant.delegation-wake.enabled=true", "assistant.user-execution.max-running=2"})
+@DelegationWakeEnabled
+@SmallExecutionLimit
 @Import({
     DelegationWakeUserLimitTest.CapturingSchedulerConfig.class,
     DelegationWakeUserLimitTest.RetryThreadsConfig.class

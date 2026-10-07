@@ -42,6 +42,7 @@ import com.bifos.assistant.shared.auth.CurrentUserProvider;
 import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.shared.error.GlobalExceptionHandler;
 import com.bifos.assistant.testsupport.BackendIntegrationTest;
+import com.bifos.assistant.testsupport.SmallExecutionLimit;
 import com.bifos.assistant.usage.domain.AgentExecution;
 import com.bifos.assistant.usage.infra.AgentExecutionRepository;
 import com.bifos.assistant.usage.infra.ExecutionEventRepository;
@@ -71,12 +72,8 @@ import tools.jackson.databind.json.JsonMapper;
  * 대역이고 모든 데이터는 합성이다.
  */
 @BackendIntegrationTest
-@TestPropertySource(
-        properties = {
-            "hermes.run-timeout=30s",
-            "assistant.proactive-check.max-duration=20s",
-            "assistant.user-execution.max-running=2"
-        })
+@SmallExecutionLimit
+@TestPropertySource(properties = {"hermes.run-timeout=30s", "assistant.proactive-check.max-duration=20s"})
 class ProactiveCheckStartTest {
 
     private static final Duration WAIT_LIMIT = Duration.ofSeconds(10);

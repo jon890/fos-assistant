@@ -11,6 +11,7 @@ import com.bifos.assistant.agent.infra.AgentRepository;
 import com.bifos.assistant.hermes.HermesRunsClient;
 import com.bifos.assistant.hermes.dto.SubagentSessionUsage;
 import com.bifos.assistant.testsupport.BackendIntegrationTest;
+import com.bifos.assistant.testsupport.SamplePriceCatalog;
 import com.bifos.assistant.usage.domain.AgentExecution;
 import com.bifos.assistant.usage.domain.CostByAgent;
 import com.bifos.assistant.usage.domain.CostByDay;
@@ -24,8 +25,6 @@ import com.bifos.assistant.usage.domain.type.ExecutionStatus;
 import com.bifos.assistant.usage.infra.AgentExecutionRepository;
 import com.bifos.assistant.usage.infra.ExecutionEventRepository;
 import com.bifos.assistant.usage.infra.SubagentUsageJobRepository;
-import java.net.URISyntaxException;
-import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneId;
@@ -35,8 +34,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 /**
@@ -46,6 +43,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
  * <p>재조회 빈이 실제 시계를 읽으므로 시각은 모두 검사를 시작한 순간에서 떨어진 거리로 적는다.
  */
 @BackendIntegrationTest
+@SamplePriceCatalog
 class SubagentUsageLedgerTest {
 
     private static final Long USER_ID = 4_501L;
@@ -111,21 +109,6 @@ class SubagentUsageLedgerTest {
     private Instant now;
     private Instant from;
     private Instant to;
-
-    @DynamicPropertySource
-    static void pointAtTheSampleCatalog(DynamicPropertyRegistry registry) {
-        registry.add("assistant.pricing.catalog-path", () -> sampleCatalog().toString());
-    }
-
-    private static Path sampleCatalog() {
-        try {
-            return Path.of(SubagentUsageLedgerTest.class
-                    .getResource("/pricing/models-dev-sample.json")
-                    .toURI());
-        } catch (URISyntaxException ex) {
-            throw new IllegalStateException(ex);
-        }
-    }
 
     @BeforeEach
     void startFromAnEmptyLedger() {

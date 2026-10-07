@@ -28,6 +28,7 @@ import com.bifos.assistant.model.domain.ModelChoice;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.testsupport.BackendIntegrationTest;
+import com.bifos.assistant.testsupport.SmallExecutionLimit;
 import com.bifos.assistant.usage.application.ExecutionRecorder;
 import com.bifos.assistant.usage.application.UserExecutionLimiter;
 import com.bifos.assistant.usage.domain.AgentExecution;
@@ -58,9 +59,9 @@ import tools.jackson.databind.ObjectMapper;
  * 않는다. 추천 서비스는 {@code StarterSuggestionServiceTest} 처럼 시각과 실행기를 바꿔 끼워 직접 만든다.
  */
 @BackendIntegrationTest
+@SmallExecutionLimit
 @TestPropertySource(
         properties = {
-            "assistant.user-execution.max-running=2",
             "assistant.user-execution.background-reserve=1",
             "assistant.starters.enabled=true",
             "assistant.starters.retry-after-failure=10m",
