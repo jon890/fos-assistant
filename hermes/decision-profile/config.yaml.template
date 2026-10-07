@@ -1,0 +1,15 @@
+# 판단 전용 시스템 profile 이다. 모델과 자격 증명은 설치할 때 정한다.
+# 새 session 으로 후보만 받고, 사용자 대화와 기억을 읽지 않는다.
+model:
+  default: __MODEL__
+  provider: __PROVIDER__
+fallback_providers: []
+platform_toolsets:
+  api_server: [no_mcp]
+memory:
+  provider: none
+  memory_enabled: false
+  user_profile_enabled: false
+mcp_servers: {}
+agent:
+  disabled_toolsets: [memory, session_search, skills, context_engine]
