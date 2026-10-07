@@ -218,11 +218,17 @@ jobs:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
         with:
           persist-credentials: false
+          fetch-depth: 0
       - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
           node-version: '22.18.0'
           package-manager-cache: false
       - run: node --test 'test/unit/**/*.test.ts'
+      - name: 마이그레이션 버전 검사
+        env:
+          # PR 은 main 의 base, push 는 직전 main, 정기 실행은 현재 main 과 비교한다.
+          MIGRATION_BASE: ${{ github.event.pull_request.base.sha || github.event.before || github.sha }}
+        run: node scripts/check-migration-versions.mjs "$MIGRATION_BASE"
 
   hermes:
     name: hermes
