@@ -30,6 +30,7 @@ final class TopLevelPackageOrder extends ArchCondition<JavaClass> {
             "agent",
             "skill",
             "usage",
+            "feedback",
             "memory",
             "context",
             "chat",

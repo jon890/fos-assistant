@@ -24,6 +24,7 @@ Control Plane 의 패키지마다 맡는 책임과 패키지 사이의 방향 �
 | `hermes` | Runs API 호출과 profile key 조회, 대시보드 호출 |
 | `chat` | 대화, 메시지, 한 번의 실행 흐름, 대화의 모델 선택, 추천 질문 생성, 흐름의 계약과 등록 |
 | `usage` | 실행 기록, 실행 사건, 비용 환산, 사용량 조회, 사용자 실행 한도([`execution-limit.md`](execution-limit.md)) |
+| `feedback` | 제안에 대한 사용자 반응과 실행 결과의 사건 저장, 대화 삭제와 보관 기간의 정리, 반응 읽기 규칙([`decision-feedback.md`](decision-feedback.md)). 위 패키지가 부르기만 하고 이 패키지는 그 패키지를 모른다 |
 | `memory` | 개인과 그룹 공용 Memory, 제안과 승인, 판 기록, 그룹의 collection 목록, 에이전트의 실행에 보이는 항목 판정, 문서 쓰기와 고치기, 서비스 토큰, 다른 서비스의 문서 읽기, 기존 개인 지식의 들이기 |
 | `context` | 실행에 넣을 `instructions` 조립과 문맥 묶음의 항목 모델 |
 | `mcp` | Memory 본문 조회, 결과물 쓰기와 할 일 제안 도구의 인자 검사, 장기 토큰 인증과 profile 묶기, 요청자 판정 |
@@ -34,7 +35,7 @@ Control Plane 의 패키지마다 맡는 책임과 패키지 사이의 방향 �
 | `task` | 예약 작업과 시각, 발화 기록, 발화기와 예약 turn 시작([`task.md`](task.md)) |
 | `notification` | 사용자에게 대화 밖에서 알리는 줄의 저장과 읽음 표시, 사용자 단위 SSE, 오래된 줄 정리([`notification.md`](notification.md)) |
 | `followup` | 할 일의 저장과 상태 전이, 사람이 쓰는 API, 에이전트의 제안 저장([`follow-up.md`](follow-up.md)) |
-| `proactive` | 먼저 살펴보기의 시작 전 점검, 점검 대화의 살펴보기 turn, 상한, 결과 계약의 검사와 그리기, 문제 후보의 검사와 저장, 살펴보기 트리 판정([`proactive-check.md`](proactive-check.md)) |
+| `proactive` | 먼저 살펴보기의 시작 전 점검, 점검 대화의 살펴보기 turn, 상한, 결과 계약의 검사와 그리기, 문제 후보의 검사와 저장, 살펴보기 트리 판정([`proactive-check.md`](proactive-check.md)), 판단 피드백의 replay 읽기 모델 |
 | `attention` | 먼저 알리기의 판정과 지금 화면이 읽는 카드. 다른 패키지의 기록을 읽기만 한다([`attention.md`](attention.md)) |
 
 검사: `ArchitectureRules.SHARED_DOES_NOT_DEPEND_ON_DOMAINS`
@@ -52,7 +53,7 @@ Control Plane 의 패키지마다 맡는 책임과 패키지 사이의 방향 �
 
 ### 최상위 패키지의 층 순서
 
-최상위 패키지는 아래 순서를 따른다. 자리 1 이 맨 아래이고 19 가 맨 위다.
+최상위 패키지는 아래 순서를 따른다. 자리 1 이 맨 아래이고 20 이 맨 위다.
 
 | 자리 | 패키지 |
 | --- | --- |
@@ -64,17 +65,18 @@ Control Plane 의 패키지마다 맡는 책임과 패키지 사이의 방향 �
 | 6 | `agent` |
 | 7 | `skill` |
 | 8 | `usage` |
-| 9 | `memory` |
-| 10 | `context` |
-| 11 | `chat` |
-| 12 | `followup` |
-| 13 | `proactive` |
-| 14 | `orchestration` |
-| 15 | `mcp` |
-| 16 | `people` |
-| 17 | `connector` |
-| 18 | `task` |
-| 19 | `attention` |
+| 9 | `feedback` |
+| 10 | `memory` |
+| 11 | `context` |
+| 12 | `chat` |
+| 13 | `followup` |
+| 14 | `proactive` |
+| 15 | `orchestration` |
+| 16 | `mcp` |
+| 17 | `people` |
+| 18 | `connector` |
+| 19 | `task` |
+| 20 | `attention` |
 
 위 패키지는 아래 패키지를 쓰고 아래 패키지는 위 패키지를 import 하지 않는다.
 거꾸로 써야 하면 아래 패키지에 port 를 두고 위 패키지가 구현한다.

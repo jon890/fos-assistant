@@ -253,6 +253,11 @@ assistant:
     start-timeout: 30s
     # 자동 중지와 상태 맞추기를 도는 간격. 기동 때도 한 번 돈다
     sweep-interval: 1m
+  decision-feedback:
+    # 판단 피드백 사건을 남기는 기간. 지난 줄은 cleanup-cron 에 지운다
+    retention: 365d
+    # 보관 기간이 지난 판단 피드백 사건을 지우는 시각. Control Plane 의 시간대를 따른다
+    cleanup-cron: "0 45 4 * * *"
   pricing:
     # models.dev 카탈로그를 복사해 둔 경로. 없으면 실행 비용을 비워 두고 기동은 계속한다
     catalog-path: ${ASSISTANT_PRICING_CATALOG:}
