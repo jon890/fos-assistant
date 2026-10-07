@@ -6,7 +6,7 @@
 # 묶음은 Hermes 의 plugins/dashboard-profile-api/ 자리에 그대로 들어갈 모양이다.
 #
 #   <out>/
-#     __init__.py, plugin.yaml         plugins/dashboard-profile-api/ 그대로
+#     *.py, plugin.yaml         plugins/dashboard-profile-api/ 그대로
 #     default-config.yaml.template     profile-template/config.yaml.template 에 MCP 주소를 채운 것
 #     profile-plugins/<이름>/          틀의 plugins.enabled 가 켜는 plugin
 #
@@ -88,7 +88,7 @@ python3 -c 'import yaml' 2>/dev/null || fail "python3 에 PyYAML 이 없다. 틀
 FILLING=1
 mkdir -p -- "$OUT/profile-plugins"
 
-cp -- "$DASHBOARD_PLUGIN/__init__.py" "$DASHBOARD_PLUGIN/plugin.yaml" "$OUT/"
+cp -- "$DASHBOARD_PLUGIN/"*.py "$DASHBOARD_PLUGIN/plugin.yaml" "$OUT/"
 cp -- "$SCRIPT_DIR/decision-profile/config.yaml.template" "$OUT/decision-config.yaml.template"
 
 # 주소를 글자 그대로 넣는다. sed 의 구분자와 특수 글자를 피하려고 Python 으로 바꾼다.

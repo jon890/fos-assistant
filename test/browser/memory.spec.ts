@@ -1,130 +1,209 @@
 import type { Page } from "../../web/node_modules/@playwright/test/index.js";
 import { expect, setSession, test } from "./fixtures.ts";
+import { TEST_EMAIL } from "./settings.ts";
+import {
+  cleanupMemories,
+  confirmDelete,
+  createMemory,
+  expectNoHorizontalOverflow,
+  memoryRow,
+  openRow,
+  reloadMemoryLists,
+} from "./memory-page.ts";
 
-/** 문서 폼에도 같은 이름의 칸이 있어 기억 폼 안에서만 찾는다. */
-function memoryForm(page: Page) {
-  return page.locator("form").filter({ has: page.getByRole("heading", { name: "새 기억" }) });
+type StubMemory = Record<string, unknown> & { id: number; title: string; status: string };
+
+function stub(id: number, title: string, overrides: Record<string, unknown> = {}): StubMemory {
+  return {
+    id,
+    scope: "USER",
+    ownerUserId: 1,
+    title,
+    content: `${title} 내용`,
+    alwaysInject: false,
+    status: "ACCEPTED",
+    proposedByExecutionId: null,
+    sourceAgentName: null,
+    sourceAgentDeleted: false,
+    sensitive: false,
+    omittedFromContext: false,
+    createdAt: "2026-10-01T00:00:00Z",
+    updatedAt: "2026-10-01T00:00:00Z",
+    ...overrides,
+  };
 }
 
-test("Memory 화면에서 개인 항목을 만들고 고치고 지운다", async ({ page }, testInfo) => {
-  const title = `${testInfo.project.name} 음식 선호`;
+/** 화면의 기억 목록 요청을 가짜 목록으로 바꾸고 다시 읽게 한다. 서버가 그린 첫 목록은 바꿀 수 없다. */
+async function showStubMemories(page: Page, list: () => unknown[]) {
+  await page.route("**/api/memories", async (route) =>
+    route.request().method() === "GET" ? route.fulfill({ json: list() }) : route.fallback());
   await page.goto("/memory");
-  await expect(page.getByRole("heading", { name: "검토할 기억" })).toHaveCount(0);
-  await expect(page.getByRole("heading", { name: "그룹이 함께 아는 것" })).toBeVisible();
-  await expect(memoryForm(page).getByRole("button", { name: "저장" })).toBeDisabled();
+  await reloadMemoryLists(page);
+}
 
-  await memoryForm(page).getByLabel("범위").selectOption("USER");
-  await memoryForm(page).getByLabel("제목", { exact: true }).fill(title);
-  await memoryForm(page).getByLabel("내용").fill("국수는 맵지 않게 먹는다");
-  await memoryForm(page).getByLabel("답을 만들 때 항상 함께 넣기").check();
-  await memoryForm(page).getByRole("button", { name: "저장" }).click();
-  await expect(page.getByText(title, { exact: true })).toBeVisible();
+test("손으로 만드는 양식은 보이지 않고 가져오기와 외부 서비스 연결은 접혀 있다", async ({ page }) => {
+  await page.goto("/memory");
+  await expect(page.getByRole("heading", { name: "기억", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "새 기억" })).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: "새 문서" })).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: "외부 서비스 연결" })).toBeHidden();
+  await expect(page.getByRole("heading", { name: "기존 기록 가져오기" })).toBeHidden();
 
-  const item = page.getByRole("heading", { name: title }).locator("xpath=ancestor::article");
-  await item.getByRole("button", { name: "고치기" }).click();
-  await item.getByRole("textbox").fill("국수는 맵지 않게 먹는다.");
-  await item.getByRole("button", { name: "저장" }).click();
-  await expect(page.getByText("국수는 맵지 않게 먹는다.", { exact: true })).toBeVisible();
-  await item.getByRole("button", { name: "지우기" }).click();
-  await expect(page.getByText(title, { exact: true })).toHaveCount(0);
-
-  const viewportWidth = page.viewportSize()?.width;
-  expect(viewportWidth).toBeDefined();
-  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(viewportWidth!);
+  await page.getByText("가져오기와 외부 서비스 연결").click();
+  await expect(page.getByRole("heading", { name: "외부 서비스 연결" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "기존 기록 가져오기" })).toBeVisible();
 });
 
-test("관리자에게만 그룹 공용 범위를 보인다", async ({ page }) => {
-  await page.goto("/memory");
-  await expect(page.getByRole("option", { name: "그룹 공용" })).toHaveCount(1);
+test("목록에서 기억을 눌러 열고 고치고 지운다", async ({ page }, testInfo) => {
+  const title = `음식 선호 ${testInfo.project.name} ${Date.now()}`;
+  try {
+    await createMemory(page, { scope: "USER", title, content: "국수는 맵지 않게 먹는다" });
+    await page.goto("/memory");
+
+    const row = memoryRow(page, title);
+    await expect(row).toBeVisible();
+    await expect(row.getByText("나에 대해")).toBeVisible();
+    await expect(row.getByTestId("memory-source")).toHaveText("직접 남김");
+    // 펼치기 전에는 본문이 보이지 않는다.
+    await expect(page.getByText("국수는 맵지 않게 먹는다", { exact: true })).toHaveCount(0);
+
+    await openRow(page, title);
+    await expect(row.getByText("국수는 맵지 않게 먹는다", { exact: true })).toBeVisible();
+    await expectNoHorizontalOverflow(page);
+
+    await row.getByRole("button", { name: "고치기" }).click();
+    await row.getByLabel("내용").fill("국수는 맵지 않게 먹는다.");
+    await row.getByLabel("답을 만들 때 항상 함께 넣기").check();
+    await row.getByRole("button", { name: "저장" }).click();
+    await expect(row.getByText("국수는 맵지 않게 먹는다.", { exact: true })).toBeVisible();
+    await expect(row.getByText("답을 만들 때 항상 함께 넣음")).toBeVisible();
+
+    await row.getByRole("button", { name: "지우기" }).click();
+    const dialog = page.getByRole("alertdialog");
+    await expect(dialog.getByText("이 기억을 지울까요?")).toBeVisible();
+    await dialog.getByRole("button", { name: "취소" }).click();
+    await expect(page.getByRole("alertdialog")).toHaveCount(0);
+    await expect(row).toBeVisible();
+
+    await confirmDelete(page, title);
+    await expect(memoryRow(page, title)).toHaveCount(0);
+  } finally {
+    await cleanupMemories(page, [title]);
+  }
 });
 
-test("MEMBER 역할은 그룹 공용 Memory의 범위와 편집 제어를 보지 않는다", async ({ context, page }) => {
-  const title = "MEMBER 편집 금지";
-  await page.goto("/memory");
-  await memoryForm(page).getByLabel("범위").selectOption("GROUP");
-  await memoryForm(page).getByLabel("제목", { exact: true }).fill(title);
-  await memoryForm(page).getByLabel("내용").fill("그룹만 아는 내용");
-  await memoryForm(page).getByRole("button", { name: "저장" }).click();
-  await expect(page.getByRole("heading", { name: title })).toBeVisible();
-
-  await setSession(context, { email: "member@example.com", name: "가족 사용자" });
-  await page.goto("/memory");
-  await expect(page.getByRole("option", { name: "그룹 공용" })).toHaveCount(0);
-  const item = page.getByRole("heading", { name: title }).locator("xpath=ancestor::article");
-  await expect(item.getByRole("button", { name: "고치기" })).toHaveCount(0);
-  await expect(item.getByRole("button", { name: "지우기" })).toHaveCount(0);
+test("한 번에 한 줄만 펼친다", async ({ page }) => {
+  await showStubMemories(page, () => [stub(930, "첫째 기억"), stub(931, "둘째 기억")]);
+  await openRow(page, "첫째 기억");
+  await expect(page.getByText("첫째 기억 내용")).toBeVisible();
+  await openRow(page, "둘째 기억");
+  await expect(page.getByText("둘째 기억 내용")).toBeVisible();
+  await expect(page.getByText("첫째 기억 내용")).toHaveCount(0);
 });
 
-test("제안을 처리하면 목록과 머리의 미처리 수가 함께 갱신된다", async ({ page }) => {
-  const proposed = [{ id: 910, scope: "USER", ownerUserId: 1, title: "제안", content: "남길 사실", alwaysInject: false, status: "PROPOSED" }];
-  let state: unknown[] = proposed;
-  await page.route("**/api/memories", async (route) => {
-    if (route.request().method() === "GET") return route.fulfill({ json: state });
-    return route.fulfill({ status: 201, json: proposed[0] });
+test("MEMBER 역할은 그룹 기억을 열어도 고치기와 지우기를 보지 않는다", async ({ context, page }, testInfo) => {
+  const title = `MEMBER 편집 금지 ${testInfo.project.name} ${Date.now()}`;
+  try {
+    await createMemory(page, { scope: "GROUP", title, content: "그룹만 아는 내용" });
+    await setSession(context, { email: "member@example.com", name: "가족 사용자" });
+    await page.goto("/memory");
+    const row = memoryRow(page, title);
+    await expect(row.getByText("그룹", { exact: true })).toBeVisible();
+    await openRow(page, title);
+    await expect(row.getByText("그룹만 아는 내용")).toBeVisible();
+    await expect(row.getByRole("button", { name: "고치기" })).toHaveCount(0);
+    await expect(row.getByRole("button", { name: "지우기" })).toHaveCount(0);
+  } finally {
+    await setSession(context, { email: TEST_EMAIL, name: "브라우저 테스트" });
+    await cleanupMemories(page, [title]);
+  }
+});
+
+test("에이전트가 남긴 기억에 남긴 에이전트를 보이고 따로 모아 본다", async ({ page }) => {
+  await showStubMemories(page, () => [
+    stub(940, "보이는 에이전트 기억", { proposedByExecutionId: 11, sourceAgentName: "가족 비서" }),
+    stub(941, "모르는 에이전트 기억", { proposedByExecutionId: 12 }),
+    stub(942, "지운 에이전트 기억", { proposedByExecutionId: 13, sourceAgentDeleted: true }),
+    stub(943, "직접 남긴 기억", { scope: "GROUP" }),
+  ]);
+  await expect(memoryRow(page, "보이는 에이전트 기억").getByTestId("memory-source")).toHaveText("가족 비서가 남김");
+  await expect(memoryRow(page, "모르는 에이전트 기억").getByTestId("memory-source")).toHaveText("에이전트가 남김");
+  await expect(memoryRow(page, "지운 에이전트 기억").getByTestId("memory-source")).toHaveText("지운 에이전트가 남김");
+  await expect(memoryRow(page, "직접 남긴 기억").getByTestId("memory-source")).toHaveText("직접 남김");
+
+  await page.getByRole("button", { name: "에이전트가 남김", exact: true }).click();
+  await expect(memoryRow(page, "보이는 에이전트 기억")).toBeVisible();
+  await expect(memoryRow(page, "직접 남긴 기억")).toHaveCount(0);
+
+  await page.getByRole("button", { name: "그룹", exact: true }).click();
+  await expect(memoryRow(page, "직접 남긴 기억")).toBeVisible();
+  await expect(memoryRow(page, "보이는 에이전트 기억")).toHaveCount(0);
+  await expectNoHorizontalOverflow(page);
+});
+
+test("제안을 열어 받아들이면 목록과 머리의 미처리 수가 함께 갱신된다", async ({ page }) => {
+  const proposed = stub(910, "검토할 제안", { status: "PROPOSED", proposedByExecutionId: 21, sourceAgentName: "가족 비서" });
+  let state: unknown[] = [proposed];
+  await page.route("**/api/memories/910/accept", async (route) => {
+    state = [{ ...proposed, status: "ACCEPTED" }];
+    await route.fulfill({ json: state[0] });
   });
-  await page.route("**/api/memories/910/accept", async (route) => { state = [{ ...proposed[0], status: "ACCEPTED" }]; await route.fulfill({ json: state[0] }); });
-  await page.route("**/api/memories/910/reject", async (route) => { state = []; await route.fulfill({ json: proposed[0] }); });
-  await page.goto("/memory");
-  await memoryForm(page).getByLabel("범위").selectOption("USER");
-  await memoryForm(page).getByLabel("제목", { exact: true }).fill("새 항목");
-  await memoryForm(page).getByLabel("내용").fill("내용");
-  await memoryForm(page).getByRole("button", { name: "저장" }).click();
+  await showStubMemories(page, () => state);
   await expect(page.getByRole("heading", { name: "검토할 기억" })).toBeVisible();
   await expect(page.getByTestId("memory-proposal-count")).toHaveText("1");
-  await page.getByRole("button", { name: "받아들이기" }).click();
+  const row = memoryRow(page, "검토할 제안");
+  await expect(row.getByTestId("memory-source")).toHaveText("가족 비서가 남김");
+
+  await openRow(page, "검토할 제안");
+  await expect(row.getByText("검토할 제안 내용")).toBeVisible();
+  await row.getByRole("button", { name: "받아들이기" }).click();
   await expect(page.getByRole("heading", { name: "검토할 기억" })).toHaveCount(0);
   await expect(page.getByTestId("memory-proposal-count")).toHaveCount(0);
+  await expect(memoryRow(page, "검토할 제안")).toBeVisible();
 });
 
-test("제안을 물리면 제안 절과 머리의 미처리 수가 사라진다", async ({ page }) => {
-  const proposed = [{ id: 911, scope: "USER", ownerUserId: 1, title: "거절할 제안", content: "남길 사실", alwaysInject: false, status: "PROPOSED" }];
-  let state: unknown[] = proposed;
-  await page.route("**/api/memories", async (route) => route.request().method() === "GET"
-    ? route.fulfill({ json: state }) : route.fulfill({ status: 201, json: proposed[0] }));
-  await page.route("**/api/memories/911/reject", async (route) => { state = []; await route.fulfill({ json: proposed[0] }); });
-  await page.goto("/memory");
-  await memoryForm(page).getByLabel("범위").selectOption("USER");
-  await memoryForm(page).getByLabel("제목", { exact: true }).fill("새 항목");
-  await memoryForm(page).getByLabel("내용").fill("내용");
-  await memoryForm(page).getByRole("button", { name: "저장" }).click();
+test("제안을 거절하면 제안 절과 머리의 미처리 수가 사라진다", async ({ page }) => {
+  const proposed = stub(911, "거절할 제안", { status: "PROPOSED", proposedByExecutionId: 22 });
+  let state: unknown[] = [proposed];
+  await page.route("**/api/memories/911/reject", async (route) => {
+    state = [];
+    await route.fulfill({ json: proposed });
+  });
+  await showStubMemories(page, () => state);
   await expect(page.getByTestId("memory-proposal-count")).toHaveText("1");
-  await page.getByRole("button", { name: "거절" }).click();
+  await openRow(page, "거절할 제안");
+  await page.getByRole("button", { name: "거절", exact: true }).click();
   await expect(page.getByRole("heading", { name: "검토할 기억" })).toHaveCount(0);
   await expect(page.getByTestId("memory-proposal-count")).toHaveCount(0);
 });
 
-test("Memory 변경이 실패하면 성공처럼 닫지 않고 오류를 보인다", async ({ page }, testInfo) => {
-  // 두 폭이 같은 제목을 만들고 지우지 않으면 같은 제목의 줄이 둘이 된다.
-  const title = `실패 검사 ${testInfo.project.name} ${Date.now()}`;
-  await page.goto("/memory");
-  await memoryForm(page).getByLabel("범위").selectOption("USER");
-  await memoryForm(page).getByLabel("제목", { exact: true }).fill(title);
-  await memoryForm(page).getByLabel("내용").fill("원래 내용");
-  await memoryForm(page).getByRole("button", { name: "저장" }).click();
-  const item = page.getByRole("heading", { name: title, exact: true }).locator("xpath=ancestor::article");
-  await page.route("**/api/memories/*", async (route) => route.fulfill({ status: 500 }));
-  await item.getByRole("button", { name: "고치기" }).click();
-  await item.getByRole("textbox").fill("바뀐 내용");
-  await item.getByRole("button", { name: "저장" }).click();
-  await expect(item.getByRole("alert")).toHaveText("기억을 고치지 못했어요.");
-  await expect(item.getByRole("textbox")).toBeVisible();
+test("기억을 고치지 못하면 닫지 않고 오류를 보인다", async ({ page }) => {
+  await showStubMemories(page, () => [stub(950, "실패할 기억")]);
+  await page.route("**/api/memories/950", async (route) => route.fulfill({ status: 500 }));
+  await openRow(page, "실패할 기억");
+  const row = memoryRow(page, "실패할 기억");
+  await row.getByRole("button", { name: "고치기" }).click();
+  await row.getByLabel("내용").fill("바뀐 내용");
+  await row.getByRole("button", { name: "저장" }).click();
+  await expect(row.getByRole("alert")).toHaveText("기억을 고치지 못했어요.");
+  await expect(row.getByLabel("내용")).toBeVisible();
+});
+
+test("민감한 기억은 본문을 보이지 않고 고치기 없이 지우기만 둔다", async ({ page }) => {
+  await showStubMemories(page, () => [stub(960, "민감한 기억", { content: "", sensitive: true })]);
+  const row = memoryRow(page, "민감한 기억");
+  await expect(row.getByText("민감", { exact: true })).toBeVisible();
+  await openRow(page, "민감한 기억");
+  await expect(row.getByText("민감한 내용이라 여기서는 보이지 않아요.")).toBeVisible();
+  await expect(row.getByRole("button", { name: "고치기" })).toHaveCount(0);
+  await expect(row.getByRole("button", { name: "지우기" })).toBeVisible();
 });
 
 test("문맥에 실리지 않은 항목에 표시가 보인다", async ({ page }) => {
-  const list = [
-    { id: 920, scope: "USER", ownerUserId: 1, title: "너무 긴 항목", content: "가".repeat(200), alwaysInject: true, status: "ACCEPTED", omittedFromContext: true },
-    { id: 921, scope: "USER", ownerUserId: 1, title: "실린 항목", content: "짧게 남긴 사실", alwaysInject: true, status: "ACCEPTED", omittedFromContext: false },
-  ];
-  await page.route("**/api/memories", async (route) => route.request().method() === "GET"
-    ? route.fulfill({ json: list }) : route.fulfill({ status: 201, json: list[0] }));
-  await page.goto("/memory");
-  await memoryForm(page).getByLabel("범위").selectOption("USER");
-  await memoryForm(page).getByLabel("제목", { exact: true }).fill("새 항목");
-  await memoryForm(page).getByLabel("내용").fill("내용");
-  await memoryForm(page).getByRole("button", { name: "저장" }).click();
-
-  const omitted = page.getByRole("heading", { name: "너무 긴 항목" }).locator("xpath=ancestor::article");
-  await expect(omitted.getByTestId("memory-omitted")).toHaveText("길어서 답에 포함되지 않음");
-  const kept = page.getByRole("heading", { name: "실린 항목" }).locator("xpath=ancestor::article");
-  await expect(kept.getByTestId("memory-omitted")).toHaveCount(0);
+  await showStubMemories(page, () => [
+    stub(920, "너무 긴 항목", { content: "가".repeat(200), alwaysInject: true, omittedFromContext: true }),
+    stub(921, "실린 항목", { alwaysInject: true }),
+  ]);
+  await expect(memoryRow(page, "너무 긴 항목").getByTestId("memory-omitted")).toHaveText("길어서 답에 포함되지 않음");
+  await expect(memoryRow(page, "실린 항목").getByTestId("memory-omitted")).toHaveCount(0);
 });

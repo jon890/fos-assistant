@@ -285,6 +285,7 @@ jobs:
           cache: pnpm
           cache-dependency-path: web/pnpm-lock.yaml
       - run: cd web && pnpm install --frozen-lockfile
+      # 파일 길이 기준 목록도 quality.sh 에서 검사한다.
       - run: scripts/quality.sh check
 
   public-safe:

@@ -26,8 +26,8 @@ frontend 는 화면의 동작과 구조이고, hermes 는 외부 런타임인 He
 | 문서 | 소유하는 것 |
 | --- | --- |
 | [`backend/packages.md`](backend/packages.md) | backend 패키지의 책임, 한 번의 대화가 지나는 길, 가격표 |
-| [`backend/testing.md`](backend/testing.md) | Spring 통합 검사의 공통 기반 주석과 변형, 검사 사이에 남기지 않는 것, 컨텍스트 보존 상한 |
-| [`backend/quality.md`](backend/quality.md) | 구조 규칙과 코드 규칙의 기준 파일을 갱신하는 방법, 뺀 규칙의 까닭 |
+| [`backend/testing.md`](backend/testing.md) | Spring 통합 검사의 공통 기반 주석, 설정 바꾸기, 검사 사이에 남기지 않는 것, 컨텍스트 수 확인 |
+| [`backend/quality.md`](backend/quality.md) | 구조 규칙과 코드 규칙의 기준 파일을 갱신하는 방법, 뺀 규칙의 까닭 · 언어 공통 파일 길이 기준 목록 |
 | [`backend/schema/README.md`](backend/schema/README.md) | 표와 칸의 뜻. 표를 주제별 파일로 나눈 색인이 있다 |
 | [`backend/agent.md`](backend/agent.md) | 페르소나, 에이전트 도구, 에이전트를 만들고 지우는 규칙 |
 | [`backend/agent-delegation.md`](backend/agent-delegation.md) | `agent_*` 도구로 다른 에이전트에게 맡기는 경로와 결과 도착, 끝나지 않은 결과 전달과 다시 전달 |
@@ -47,6 +47,7 @@ frontend 는 화면의 동작과 구조이고, hermes 는 외부 런타임인 He
 | [`backend/value-evaluation.md`](backend/value-evaluation.md) | 문제 후보의 가치 판단 축, provider, 저장과 replay, 실패와 다음 행동 정책의 입력 |
 | [`backend/autonomy-policy.md`](backend/autonomy-policy.md) | 후보마다 무시, 보이기, 승인, 실행을 정하는 결정적 규칙과 까닭 코드, 자동 실행의 범위와 중복 방지 |
 | [`backend/decision-feedback.md`](backend/decision-feedback.md) | 제안에 대한 사용자 반응과 실행 결과의 사건, 기록 지점, 반응 읽기 규칙, offline replay 읽기 모델, 보관과 삭제 |
+| [`backend/proactive-eval.md`](backend/proactive-eval.md) | 문제 찾기부터 판단 피드백까지 루프를 합성 fixture 와 결정적 provider 로 replay 하는 평가, 지표와 실패시키는 경계 |
 | [`backend/task.md`](backend/task.md) | 예약 작업. 작업과 시각의 규칙, 발화와 시작, 결과와 알림, 상한, 화면 |
 | [`backend/execution-limit.md`](backend/execution-limit.md) | 사용자 한 명이 Hermes 에 동시에 맡기는 실행의 한도, 세는 실행과 세지 못하는 실행, 한도끼리의 관계, 한도에 닿을 때 |
 | [`backend/context-bundle.md`](backend/context-bundle.md) | 여러 기록에서 모은 문맥의 항목 모델, 출처와 권한과 신선도, Hermes 에 넘기는 형식, 합성 시나리오 |
@@ -62,6 +63,7 @@ frontend 는 화면의 동작과 구조이고, hermes 는 외부 런타임인 He
 | [`frontend/chat.md`](frontend/chat.md) | 대화 화면의 모델 선택, 에이전트 질문, 다시 생성, 결과 다시 전달, 메시지 동작 |
 | [`frontend/activity.md`](frontend/activity.md) | 실행 하나를 다시 보는 화면과 작업 과정 표시 |
 | [`frontend/now.md`](frontend/now.md) | 지금 화면의 카드와 이유 문구, 숨기기와 미루기, 폭별 배치 |
+| [`frontend/memory.md`](frontend/memory.md) | 기억 화면의 간략 목록과 펼침, 검토 흐름, 남긴 에이전트 표시, 숨긴 양식 |
 
 화면에 관한 결정은 `adr/INDEX.md` 에서 층 칸이 frontend 인 것을 본다.
 

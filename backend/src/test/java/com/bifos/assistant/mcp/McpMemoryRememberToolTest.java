@@ -366,6 +366,9 @@ class McpMemoryRememberToolTest {
         assertThat(restored.acceptedByUserId()).isNull();
         assertThat(restored.acceptedAt()).isNull();
         assertThat(captures.findById(accepted.id()).orElseThrow().undone()).isTrue();
+        assertThat(feedbackEvents())
+                .as("받아들임을 무른 것을 사용자의 마지막 결정으로 한 번만 남긴다")
+                .containsExactly("SURFACED|AGENT", "ACCEPTED|USER", "DISMISSED|USER");
     }
 
     @Test

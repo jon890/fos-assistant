@@ -35,8 +35,14 @@ class BundleTest(unittest.TestCase):
             with self.subTest(relative):
                 self.assertTrue((self.out / relative).is_file(), "%s 가 묶음에 없다" % relative)
         source = ROOT / "plugins/dashboard-profile-api"
-        for name in ("__init__.py", "plugin.yaml"):
+        for name in [p.name for p in source.glob("*.py")] + ["plugin.yaml"]:
             self.assertEqual((self.out / name).read_bytes(), (source / name).read_bytes())
+        for plugin in (ROOT / "plugins").iterdir():
+            bundled = self.out / "profile-plugins" / plugin.name
+            if bundled.is_dir():
+                for module in plugin.glob("*.py"):
+                    with self.subTest(plugin=plugin.name, module=module.name):
+                        self.assertEqual((bundled / module.name).read_bytes(), module.read_bytes())
         text = (self.out / "default-config.yaml.template").read_text(encoding="utf-8")
         self.assertNotIn(PLACEHOLDER, text)
         template = yaml.safe_load(text)

@@ -8,6 +8,7 @@ import static org.mockito.Mockito.when;
 import com.bifos.assistant.context.ContextAssembler;
 import com.bifos.assistant.memory.application.MemoryImportService;
 import com.bifos.assistant.memory.application.MemoryService;
+import com.bifos.assistant.memory.application.MemorySources;
 import com.bifos.assistant.memory.domain.type.MemoryScope;
 import com.bifos.assistant.memory.infra.MemoryRepository;
 import com.bifos.assistant.memory.infra.MemoryRevisionRepository;
@@ -63,6 +64,9 @@ class MemoryImportTest {
 
     @Autowired
     ContextAssembler context;
+
+    @Autowired
+    MemorySources sources;
 
     @Autowired
     JdbcTemplate jdbc;
@@ -322,7 +326,7 @@ class MemoryImportTest {
     @DisplayName("들인 문서와 원문은 Memory 목록에 없고 들인 기억은 있다")
     void importedRowsInMemoryList() {
         commit(threeItems());
-        MemoryController memoryController = new MemoryController(memories, context, currentUser);
+        MemoryController memoryController = new MemoryController(memories, context, sources, currentUser);
 
         assertThat(memoryController.readable()).extracting(MemoryView::title).containsExactly("일하는 방식");
     }

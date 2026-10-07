@@ -76,10 +76,6 @@ export default defineConfig([
     // 쪼갤 후보 목록이다. 실패시키지 않는다.
     files: ["src/**/*.{ts,tsx}"],
     rules: {
-      "max-lines": [
-        "warn",
-        { max: 400, skipBlankLines: true, skipComments: true },
-      ],
       "max-lines-per-function": [
         "warn",
         { max: 150, skipBlankLines: true, skipComments: true },
