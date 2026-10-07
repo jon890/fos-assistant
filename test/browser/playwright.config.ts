@@ -18,6 +18,8 @@ export default defineConfig({
   // (legacy-conversation-url.spec.ts 가 그렇다). 그래서 검사를 나란히 돌리지 않는다. 나눠 돌리는 것은 CI 의 shard 가 맡는다.
   fullyParallel: false,
   workers: 1,
+  retries: 0,
+  forbidOnly: Boolean(process.env.CI),
   reporter: "list",
   // 워크트리 여럿이 함께 돌 때 서로의 결과를 지우지 않게 포트로 나눈다. 실행을 시작할 때 이 디렉터리를 비운다.
   outputDir: join(tmpdir(), `fos-assistant-playwright-results-${WEB_PORT}`),
@@ -25,6 +27,8 @@ export default defineConfig({
   use: {
     baseURL: WEB_BASE_URL,
     trace: "retain-on-failure",
+    reducedMotion: "reduce",
+    timezoneId: "Asia/Seoul",
   },
   projects: [
     {
