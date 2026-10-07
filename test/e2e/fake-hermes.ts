@@ -851,21 +851,13 @@ export type FakeHermes = {
   proactiveInputs(): readonly { profile: string; input: string }[];
 };
 
-/**
- * fake Hermes 를 띄우고 그 주소를 돌려준다.
- *
- * @param profileKeys profile 이름과 그 profile 의 API server key
- * @param label 이 대역을 다른 대역과 구분하는 이름. 실행의 답에 그대로 실린다. 주소를 옮기는 검사가
- *     답이 어느 대역에서 왔는지 보는 데 쓴다
- * @param skillRoot Control Plane 이 스킬 버전 디렉터리를 쓰는 루트. 주면 그 아래 경로만 게시로 받는다.
- *     Hermes 쪽 루트와 같은 경로여야 대역이 게시된 `SKILL.md` 를 읽을 수 있다
- */
-export function startFakeHermes(
+
+/** 서버 하나가 소유하는 시험 상태다. 다른 서버와 공유하지 않는다. */
+function createFakeHermesState(
   profileKeys: Record<string, string>,
-  label?: string,
-  initialApiServerToolsets: Record<string, string[]> = {},
-  skillRoot?: string,
-): Promise<FakeHermes> {
+  label: string | undefined,
+  initialApiServerToolsets: Record<string, string[]>,
+) {
   const who = label === undefined ? "fake hermes" : `fake hermes ${label}`;
   /**
    * profile 이름과 그 profile 의 key 다.
@@ -875,10 +867,6 @@ export function startFakeHermes(
    * 고치지 않게 하기 위해서다.
    */
   const keys: Record<string, string> = { ...profileKeys };
-  /** 실제 Hermes 가 모르는 run 에 주는 404 본문이다. 지운 run 과 한 번도 없던 run 이 같다. */
-  const runNotFound = (runId: string) => ({
-    error: { message: `Run not found: ${runId}`, type: "invalid_request_error", code: "run_not_found" },
-  });
   const runs = new Map<string, Run>();
   const sessions = new Map<string, Session>();
   /** 자식 session 의 모델과 provider 다. provider 는 session 응답이 아니라 대시보드의 provider 경로가 준다. 비우면 provider 없이 `example-fast` 를 준다. */
@@ -916,127 +904,6 @@ export function startFakeHermes(
   const boundConnectors = new Map<string, Map<string, string>>();
   /** 대시보드로 만들지 않은 profile 의 `.env` 다. 바인딩 설치가 칸 값을 여기 쓴다. */
   const hostEnv = new Map<string, Record<string, string>>();
-  /** 그 profile 의 `.env` 다. 대시보드로 만든 profile 은 `profiles` 의 것을 쓴다. */
-  const envOf = (profile: string): Record<string, string> => {
-    const managed = profiles.get(profile);
-    if (managed !== undefined) return managed;
-    const host = hostEnv.get(profile) ?? {};
-    hostEnv.set(profile, host);
-    return host;
-  };
-  /** 그 profile 에 바인딩 설치한 커넥터의 MCP 서버 이름이다. 도구 목록을 쓰는 요청이 이 이름을 모두 실어야 한다. */
-  const boundServers = (profile: string): string[] =>
-    [...(boundConnectors.get(profile)?.keys() ?? [])].flatMap((id) => fakeConnector(id)?.mcp_server ?? []);
-  /** 그 커넥터의 칸 선언과 맞는 값인가. 모르는 키, 필수 칸 누락, `pattern` 위반, 두 줄 이상인 값은 받지 않는다. */
-  const vaultValuesValid = (connector: FakeConnector, values: unknown): values is Record<string, string> => {
-    if (typeof values !== "object" || values === null || Array.isArray(values)) return false;
-    const given = values as Record<string, unknown>;
-    const declared = new Set(connector.fields.map((field) => field.key));
-    if (Object.entries(given).some(([key, value]) =>
-      !declared.has(key) || typeof value !== "string" || value === "" || value.includes("\n"))) {
-      return false;
-    }
-    return connector.fields.every((field) => {
-      const value = given[field.key] as string | undefined;
-      if (value === undefined) return !field.required;
-      return field.pattern === undefined || new RegExp(field.pattern).test(value);
-    });
-  };
-
-  /**
-   * `PUT /api/connectors` 의 바인딩 설치와 그 떼기다. 받는 조건과 바꾸는 것은 `docs/backend/connector-install.md` 의
-   * 「바인딩 설치」 를 따른다.
-   *
-   * <p>붙이기는 보관 파일의 값을 그 profile 의 `.env` 에 쓰고 서버 이름을 API 도구 목록에 더한다. 있던 이름은 그대로 둔다.
-   * 바뀐 것이 있으면 `restart_required` 가 참이다. 떠 있는 profile 에 더한 MCP 서버는 재시작해야 보이기 때문이다. 떼기는 그
-   * 이름만 빼고 env 를 지우며 재시작을 요구하지 않는다. 스킬 복사는 흉내 내지 않는다. 시험 커넥터에 스킬이 없다.
-   */
-  const bindingInstall = (
-    response: ServerResponse,
-    profile: string,
-    plugin: string,
-    enabled: boolean,
-    bind: { vault?: unknown } | undefined,
-    sandboxOwner: unknown,
-  ) => {
-    if (!profiles.has(profile) && keys[profile] === undefined) {
-      send(response, 401, { reason: "not_marked" });
-      return;
-    }
-    const answer = (changed: boolean, restartRequired: boolean) => send(response, 200, {
-      profile, plugin, enabled, changed, restart_required: restartRequired, plugin_updated: false,
-    });
-    const bound = boundConnectors.get(profile) ?? new Map<string, string>();
-    const toolsets = apiServerToolsets.get(profile);
-    const connector = fakeConnector(plugin);
-    if (!enabled) {
-      if (bind !== undefined) {
-        send(response, 400, { error: "invalid connector request" });
-        return;
-      }
-      connectorRequests.push(`unbind ${profile}`);
-      // 카탈로그에 없는 커넥터도 실제 대시보드는 소유 기록만 보고 뗀다. 이 대역은 그 기록만 지운다.
-      if (connector === undefined) {
-        answer(bound.delete(plugin), false);
-        return;
-      }
-      // 그 profile 에 붙지 않은 커넥터는 뗄 것이 없다. 실제 대시보드처럼 아무것도 바꾸지 않고 바뀐 것 없이 답한다.
-      if (!bound.delete(plugin)) {
-        answer(false, false);
-        return;
-      }
-      const env = envOf(profile);
-      for (const field of connector.fields) delete env[field.env];
-      if (toolsets !== undefined) {
-        apiServerToolsets.set(profile, toolsets.filter((name) => name !== connector.mcp_server));
-      }
-      answer(true, false);
-      return;
-    }
-    // 바인딩 항목이 있는 profile 은 옛 설치를 받지 않는다.
-    if (bind === undefined) {
-      send(response, 409, { error: "this profile has bound connectors" });
-      return;
-    }
-    // Control Plane 은 바인딩 설치에 그 에이전트의 `sandbox_owner` 를 늘 싣는다(ADR-20261007 connector-owner-attachments). 빠지거나 모양이 틀리면 거절한다.
-    if (typeof sandboxOwner !== "string" || !SANDBOX_OWNER_PATTERN.test(sandboxOwner)) {
-      send(response, 400, { error: "sandbox_owner is required for a binding install" });
-      return;
-    }
-    const stored = typeof bind.vault === "string" ? vaults.get(bind.vault) : undefined;
-    if (connector === undefined || stored === undefined || stored.connector !== plugin) {
-      send(response, 400, { error: "no such vault for this connector" });
-      return;
-    }
-    // 도구 목록이 없거나 Control Plane MCP 가 없는 목록, 어느 커넥터든 옛 설치가 있는 profile 은 파일을 하나도 바꾸지 않고 거절한다.
-    if (toolsets === undefined || !toolsets.includes(CONTROL_PLANE_MCP)
-        || (installedConnectors.get(profile)?.size ?? 0) > 0) {
-      send(response, 409, { error: "the profile conflicts with this connector" });
-      return;
-    }
-    // 정책 hook 이 꺼진 profile 에는 새로 붙이지 않는다. 이미 붙은 커넥터를 다시 설치하는 것은 받고 hook 상태로 PENDING 에 남는다.
-    if (!bound.has(plugin) && policyHookOff.has(profile)) {
-      send(response, 409, { error: "the policy hook plugin is not enabled" });
-      return;
-    }
-    const env = envOf(profile);
-    let changed = bound.get(plugin) !== bind.vault;
-    for (const field of connector.fields) {
-      const value = stored.values[field.key];
-      if (env[field.env] !== value) changed = true;
-      if (value === undefined) delete env[field.env];
-      else env[field.env] = value;
-    }
-    const next = toolsets.filter((name) => name !== "no_mcp");
-    if (!next.includes(connector.mcp_server)) next.push(connector.mcp_server);
-    if (next.join() !== toolsets.join()) changed = true;
-    apiServerToolsets.set(profile, next);
-    bound.set(plugin, bind.vault as string);
-    boundConnectors.set(profile, bound);
-    policyHookInstalled.add(profile);
-    connectorRequests.push(`bind ${profile}`);
-    answer(changed, changed);
-  };
   /** profile 이름과 전역으로 끈 스킬 이름들이다. */
   const disabledSkills = new Map<string, Set<string>>();
   const blockedProviders = new Set<string>();
@@ -1054,12 +921,6 @@ export function startFakeHermes(
   const slowActive = new Map<string, string>();
   let maxTotalConcurrency = 0;
   const maxProfileConcurrency = new Map<string, number>();
-  /** 지연 중인 실행 하나를 끝낸다. 이미 중지된 실행의 상태는 덮어쓰지 않는다. */
-  const finishSlowRun = (runId: string) => {
-    if (!slowActive.delete(runId)) return;
-    const run = runs.get(runId);
-    if (run !== undefined && run.status === "running") run.status = "completed";
-  };
   let heldRunId: string | undefined;
   let heldRunWaiter: (() => void) | undefined;
   let heldRunReady: Promise<void> | undefined;
@@ -1097,6 +958,218 @@ export function startFakeHermes(
   let proactiveGate: Promise<void> | undefined;
   let openProactiveGate: (() => void) | undefined;
   const proactiveInputs: { profile: string; input: string }[] = [];
+  return {
+    who,
+    keys: keys as Record<string, string>,
+    runs,
+    sessions,
+    childUsages,
+    profiles,
+    apiServerToolsets,
+    souls,
+    externalDirs,
+    installedConnectors,
+    connectorRequests: connectorRequests as string[],
+    policyHookInstalled,
+    policyHookOff,
+    connectorEnvNames,
+    vaults,
+    boundConnectors,
+    hostEnv,
+    disabledSkills,
+    blockedProviders,
+    scripts,
+    busy,
+    readinessOutage: readinessOutage as "busy" | "unavailable" | "timeout" | undefined,
+    submitCount,
+    modelOptionsCalls,
+    lastSubmittedRuntime: lastSubmittedRuntime as { provider?: string; model?: string; reasoningEffort?: string },
+    holdNextRun,
+    slowRunMs: slowRunMs as number | undefined,
+    slowActive,
+    maxTotalConcurrency,
+    maxProfileConcurrency,
+    heldRunId: heldRunId as string | undefined,
+    heldRunWaiter: heldRunWaiter as (() => void) | undefined,
+    heldRunReady: heldRunReady as Promise<void> | undefined,
+    eventsOpened,
+    eventsWaiters,
+    longActivityGate: longActivityGate as (() => void) | undefined,
+    holdNextSoul,
+    heldSoul: heldSoul as { response: ServerResponse; payload: unknown } | undefined,
+    stoppedRuns: stoppedRuns as string[],
+    emptyUntilStopped,
+    lastSubmittedInstructions: lastSubmittedInstructions as string | undefined,
+    lastSubmittedInput: lastSubmittedInput as string | undefined,
+    holdNextConfig,
+    sandboxUnavailable,
+    lastSandboxOwner: lastSandboxOwner as string | null,
+    heldConfigWaiter: heldConfigWaiter as (() => void) | undefined,
+    heldConfigReady: heldConfigReady as Promise<void> | undefined,
+    releaseConfig: releaseConfig as (() => void) | undefined,
+    droppedToolset: droppedToolset as string | undefined,
+    artifactWriteMcp: artifactWriteMcp as { endpoint: string; token: string } | undefined,
+    memoryReadMcp: memoryReadMcp as { endpoint: string; token: string } | undefined,
+    memoryRememberCalls,
+    outsideToolInputs,
+    subagentRegistrations: subagentRegistrations as { childSessionId: string; rootSessionId: string; status: number }[],
+    connectorPolicyEndpoint: connectorPolicyEndpoint as string | undefined,
+    connectorToolCalls: connectorToolCalls as ConnectorToolCall[],
+    directConnectorCalls,
+    proactiveScript: proactiveScript as ProactiveScript | undefined,
+    proactiveGate: proactiveGate as Promise<void> | undefined,
+    openProactiveGate: openProactiveGate as (() => void) | undefined,
+    proactiveInputs: proactiveInputs as { profile: string; input: string }[],
+  };
+}
+
+/**
+ * fake Hermes 를 띄우고 그 주소를 돌려준다.
+ *
+ * @param profileKeys profile 이름과 그 profile 의 API server key
+ * @param label 이 대역을 다른 대역과 구분하는 이름. 실행의 답에 그대로 실린다. 주소를 옮기는 검사가
+ *     답이 어느 대역에서 왔는지 보는 데 쓴다
+ * @param skillRoot Control Plane 이 스킬 버전 디렉터리를 쓰는 루트. 주면 그 아래 경로만 게시로 받는다.
+ *     Hermes 쪽 루트와 같은 경로여야 대역이 게시된 `SKILL.md` 를 읽을 수 있다
+ */
+export function startFakeHermes(
+  profileKeys: Record<string, string>,
+  label?: string,
+  initialApiServerToolsets: Record<string, string[]> = {},
+  skillRoot?: string,
+): Promise<FakeHermes> {
+  const state = createFakeHermesState(profileKeys, label, initialApiServerToolsets);
+  /** 실제 Hermes 가 모르는 run 에 주는 404 본문이다. 지운 run 과 한 번도 없던 run 이 같다. */
+  const runNotFound = (runId: string) => ({
+    error: { message: `Run not found: ${runId}`, type: "invalid_request_error", code: "run_not_found" },
+  });
+  /** 그 profile 의 `.env` 다. 대시보드로 만든 profile 은 `profiles` 의 것을 쓴다. */
+  const envOf = (profile: string): Record<string, string> => {
+    const managed = state.profiles.get(profile);
+    if (managed !== undefined) return managed;
+    const host = state.hostEnv.get(profile) ?? {};
+    state.hostEnv.set(profile, host);
+    return host;
+  };
+  /** 그 profile 에 바인딩 설치한 커넥터의 MCP 서버 이름이다. 도구 목록을 쓰는 요청이 이 이름을 모두 실어야 한다. */
+  const boundServers = (profile: string): string[] =>
+    [...(state.boundConnectors.get(profile)?.keys() ?? [])].flatMap((id) => fakeConnector(id)?.mcp_server ?? []);
+  /** 그 커넥터의 칸 선언과 맞는 값인가. 모르는 키, 필수 칸 누락, `pattern` 위반, 두 줄 이상인 값은 받지 않는다. */
+  const vaultValuesValid = (connector: FakeConnector, values: unknown): values is Record<string, string> => {
+    if (typeof values !== "object" || values === null || Array.isArray(values)) return false;
+    const given = values as Record<string, unknown>;
+    const declared = new Set(connector.fields.map((field) => field.key));
+    if (Object.entries(given).some(([key, value]) =>
+      !declared.has(key) || typeof value !== "string" || value === "" || value.includes("\n"))) {
+      return false;
+    }
+    return connector.fields.every((field) => {
+      const value = given[field.key] as string | undefined;
+      if (value === undefined) return !field.required;
+      return field.pattern === undefined || new RegExp(field.pattern).test(value);
+    });
+  };
+
+  /**
+   * `PUT /api/connectors` 의 바인딩 설치와 그 떼기다. 받는 조건과 바꾸는 것은 `docs/backend/connector-install.md` 의
+   * 「바인딩 설치」 를 따른다.
+   *
+   * <p>붙이기는 보관 파일의 값을 그 profile 의 `.env` 에 쓰고 서버 이름을 API 도구 목록에 더한다. 있던 이름은 그대로 둔다.
+   * 바뀐 것이 있으면 `restart_required` 가 참이다. 떠 있는 profile 에 더한 MCP 서버는 재시작해야 보이기 때문이다. 떼기는 그
+   * 이름만 빼고 env 를 지우며 재시작을 요구하지 않는다. 스킬 복사는 흉내 내지 않는다. 시험 커넥터에 스킬이 없다.
+   */
+  const bindingInstall = (
+    response: ServerResponse,
+    profile: string,
+    plugin: string,
+    enabled: boolean,
+    bind: { vault?: unknown } | undefined,
+    sandboxOwner: unknown,
+  ) => {
+    if (!state.profiles.has(profile) && state.keys[profile] === undefined) {
+      send(response, 401, { reason: "not_marked" });
+      return;
+    }
+    const answer = (changed: boolean, restartRequired: boolean) => send(response, 200, {
+      profile, plugin, enabled, changed, restart_required: restartRequired, plugin_updated: false,
+    });
+    const bound = state.boundConnectors.get(profile) ?? new Map<string, string>();
+    const toolsets = state.apiServerToolsets.get(profile);
+    const connector = fakeConnector(plugin);
+    if (!enabled) {
+      if (bind !== undefined) {
+        send(response, 400, { error: "invalid connector request" });
+        return;
+      }
+      state.connectorRequests.push(`unbind ${profile}`);
+      // 카탈로그에 없는 커넥터도 실제 대시보드는 소유 기록만 보고 뗀다. 이 대역은 그 기록만 지운다.
+      if (connector === undefined) {
+        answer(bound.delete(plugin), false);
+        return;
+      }
+      // 그 profile 에 붙지 않은 커넥터는 뗄 것이 없다. 실제 대시보드처럼 아무것도 바꾸지 않고 바뀐 것 없이 답한다.
+      if (!bound.delete(plugin)) {
+        answer(false, false);
+        return;
+      }
+      const env = envOf(profile);
+      for (const field of connector.fields) delete env[field.env];
+      if (toolsets !== undefined) {
+        state.apiServerToolsets.set(profile, toolsets.filter((name) => name !== connector.mcp_server));
+      }
+      answer(true, false);
+      return;
+    }
+    // 바인딩 항목이 있는 profile 은 옛 설치를 받지 않는다.
+    if (bind === undefined) {
+      send(response, 409, { error: "this profile has bound connectors" });
+      return;
+    }
+    // Control Plane 은 바인딩 설치에 그 에이전트의 `sandbox_owner` 를 늘 싣는다(ADR-20261007 connector-owner-attachments). 빠지거나 모양이 틀리면 거절한다.
+    if (typeof sandboxOwner !== "string" || !SANDBOX_OWNER_PATTERN.test(sandboxOwner)) {
+      send(response, 400, { error: "sandbox_owner is required for a binding install" });
+      return;
+    }
+    const stored = typeof bind.vault === "string" ? state.vaults.get(bind.vault) : undefined;
+    if (connector === undefined || stored === undefined || stored.connector !== plugin) {
+      send(response, 400, { error: "no such vault for this connector" });
+      return;
+    }
+    // 도구 목록이 없거나 Control Plane MCP 가 없는 목록, 어느 커넥터든 옛 설치가 있는 profile 은 파일을 하나도 바꾸지 않고 거절한다.
+    if (toolsets === undefined || !toolsets.includes(CONTROL_PLANE_MCP)
+        || (state.installedConnectors.get(profile)?.size ?? 0) > 0) {
+      send(response, 409, { error: "the profile conflicts with this connector" });
+      return;
+    }
+    // 정책 hook 이 꺼진 profile 에는 새로 붙이지 않는다. 이미 붙은 커넥터를 다시 설치하는 것은 받고 hook 상태로 PENDING 에 남는다.
+    if (!bound.has(plugin) && state.policyHookOff.has(profile)) {
+      send(response, 409, { error: "the policy hook plugin is not enabled" });
+      return;
+    }
+    const env = envOf(profile);
+    let changed = bound.get(plugin) !== bind.vault;
+    for (const field of connector.fields) {
+      const value = stored.values[field.key];
+      if (env[field.env] !== value) changed = true;
+      if (value === undefined) delete env[field.env];
+      else env[field.env] = value;
+    }
+    const next = toolsets.filter((name) => name !== "no_mcp");
+    if (!next.includes(connector.mcp_server)) next.push(connector.mcp_server);
+    if (next.join() !== toolsets.join()) changed = true;
+    state.apiServerToolsets.set(profile, next);
+    bound.set(plugin, bind.vault as string);
+    state.boundConnectors.set(profile, bound);
+    state.policyHookInstalled.add(profile);
+    state.connectorRequests.push(`bind ${profile}`);
+    answer(changed, changed);
+  };
+  /** 지연 중인 실행 하나를 끝낸다. 이미 중지된 실행의 상태는 덮어쓰지 않는다. */
+  const finishSlowRun = (runId: string) => {
+    if (!state.slowActive.delete(runId)) return;
+    const run = state.runs.get(runId);
+    if (run !== undefined && run.status === "running") run.status = "completed";
+  };
 
   /**
    * profile 플러그인의 `pre_tool_call` hook 처럼 커넥터 도구 호출마다 Control Plane 에 판정을 묻는다.
@@ -1126,8 +1199,8 @@ export function startFakeHermes(
       const original = connector === undefined ? "" : hermesTool.slice(`mcp__${connector.mcp_server}__`.length);
       const tool = connector !== undefined && Object.hasOwn(connector.tools, original) ? original : null;
       let blocked = "정책을 확인하지 못했다";
-      if (token !== undefined && connectorPolicyEndpoint !== undefined && sessionId !== undefined) {
-        const response = await fetch(connectorPolicyEndpoint, {
+      if (token !== undefined && state.connectorPolicyEndpoint !== undefined && sessionId !== undefined) {
+        const response = await fetch(state.connectorPolicyEndpoint, {
           method: "POST",
           headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
           body: JSON.stringify(signedPolicyRequest(
@@ -1137,7 +1210,7 @@ export function startFakeHermes(
         if (response.status === 200) {
           const answer = await response.json() as { decision?: unknown; message?: unknown };
           if (answer.decision === "allow") {
-            connectorToolCalls.push({ profile, hermesTool, argsJson, via: "hook" });
+            state.connectorToolCalls.push({ profile, hermesTool, argsJson, via: "hook" });
             allowed?.push({ hermesTool, argsJson });
             output.push(`${hermesTool}: allow`);
             continue;
@@ -1167,14 +1240,14 @@ export function startFakeHermes(
     sessionId: string | undefined,
     rootSessionId: string | undefined = sessionId,
   ): Promise<string> => {
-    if (memoryReadMcp === undefined) throw new Error(`${name} MCP runtime is not configured`);
+    if (state.memoryReadMcp === undefined) throw new Error(`${name} MCP runtime is not configured`);
     if (sessionId === undefined || rootSessionId === undefined) {
       throw new Error(`${name} MCP needs the submitted session_id to sign _fos_ctx`);
     }
-    const _fos_ctx = signedCallContext(memoryReadMcp.token, name, rootSessionId, sessionId, `call_${randomUUID()}`);
-    const response = await fetch(memoryReadMcp.endpoint, {
+    const _fos_ctx = signedCallContext(state.memoryReadMcp.token, name, rootSessionId, sessionId, `call_${randomUUID()}`);
+    const response = await fetch(state.memoryReadMcp.endpoint, {
       method: "POST",
-      headers: { Authorization: `Bearer ${memoryReadMcp.token}`, "Content-Type": "application/json" },
+      headers: { Authorization: `Bearer ${state.memoryReadMcp.token}`, "Content-Type": "application/json" },
       body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/call", params: { name, arguments: { ...args, _fos_ctx } } }),
     });
     if (!response.ok) throw new Error(`${name} MCP HTTP ${response.status}`);
@@ -1198,16 +1271,16 @@ export function startFakeHermes(
    * 등록 경로는 `/mcp` 와 같은 서버에 있어 MCP 주소에서 `/mcp` 를 떼어 만든다.
    */
   const registerSubagent = async (rootSessionId: string | undefined): Promise<string> => {
-    if (memoryReadMcp === undefined) throw new Error("subagent registration needs the MCP token");
+    if (state.memoryReadMcp === undefined) throw new Error("subagent registration needs the MCP token");
     if (rootSessionId === undefined) throw new Error("subagent registration needs the submitted session_id");
     const childSessionId = `native-${randomUUID()}`;
-    const origin = memoryReadMcp.endpoint.replace(/\/mcp$/, "");
+    const origin = state.memoryReadMcp.endpoint.replace(/\/mcp$/, "");
     const response = await fetch(`${origin}/internal/hermes/session-bindings/subagent`, {
       method: "POST",
-      headers: { Authorization: `Bearer ${memoryReadMcp.token}`, "Content-Type": "application/json" },
-      body: JSON.stringify(signedSubagentRegistration(memoryReadMcp.token, rootSessionId, rootSessionId, childSessionId)),
+      headers: { Authorization: `Bearer ${state.memoryReadMcp.token}`, "Content-Type": "application/json" },
+      body: JSON.stringify(signedSubagentRegistration(state.memoryReadMcp.token, rootSessionId, rootSessionId, childSessionId)),
     });
-    subagentRegistrations.push({ childSessionId, rootSessionId, status: response.status });
+    state.subagentRegistrations.push({ childSessionId, rootSessionId, status: response.status });
     return childSessionId;
   };
 
@@ -1217,22 +1290,22 @@ export function startFakeHermes(
    * <p>제출받은 run 의 session 이 곧 루트 session 이다. 하위 에이전트가 아니므로 session 과 루트가 같다.
    */
   const writeArtifactViaMcp = async (conversationId: string, sessionId: string | undefined): Promise<void> => {
-    if (artifactWriteMcp === undefined) throw new Error("artifact_write MCP runtime is not configured");
+    if (state.artifactWriteMcp === undefined) throw new Error("artifact_write MCP runtime is not configured");
     if (sessionId === undefined) throw new Error("artifact_write MCP needs the submitted session_id to sign _fos_ctx");
-    const token = artifactWriteMcp.token;
+    const token = state.artifactWriteMcp.token;
     const request = async (body: unknown): Promise<unknown> => {
-      const response = await fetch(artifactWriteMcp.endpoint, {
+      const response = await fetch(state.artifactWriteMcp.endpoint, {
         method: "POST",
-        headers: { Authorization: `Bearer ${artifactWriteMcp.token}`, "Content-Type": "application/json" },
+        headers: { Authorization: `Bearer ${state.artifactWriteMcp.token}`, "Content-Type": "application/json" },
         body: JSON.stringify(body),
       });
       if (!response.ok) throw new Error(`artifact_write MCP HTTP ${response.status}`);
       return response.json();
     };
     await request({ jsonrpc: "2.0", id: 1, method: "initialize" });
-    const notification = await fetch(artifactWriteMcp.endpoint, {
+    const notification = await fetch(state.artifactWriteMcp.endpoint, {
       method: "POST",
-      headers: { Authorization: `Bearer ${artifactWriteMcp.token}`, "Content-Type": "application/json" },
+      headers: { Authorization: `Bearer ${state.artifactWriteMcp.token}`, "Content-Type": "application/json" },
       body: JSON.stringify({ jsonrpc: "2.0", method: "notifications/initialized" }),
     });
     if (notification.status !== 202) throw new Error(`artifact_write MCP notification ${notification.status}`);
@@ -1248,7 +1321,7 @@ export function startFakeHermes(
   };
 
   const authorized = (request: IncomingMessage, profile: string): boolean => {
-    const expected = keys[profile];
+    const expected = state.keys[profile];
     return expected !== undefined && request.headers.authorization === `Bearer ${expected}`;
   };
 
@@ -1258,25 +1331,25 @@ export function startFakeHermes(
 
   /** 붙잡은 성격 읽기 응답을 보내고 대기 표시를 끈다. 붙잡은 것이 없어도 대기 표시는 끈다. */
   const releaseHeldSoul = () => {
-    holdNextSoul = false;
-    const held = heldSoul;
-    heldSoul = undefined;
+    state.holdNextSoul = false;
+    const held = state.heldSoul;
+    state.heldSoul = undefined;
     if (held !== undefined) send(held.response, 200, held.payload);
   };
   /** 붙잡은 실행을 풀되 실행 상태는 바꾸지 않는다. */
   const releaseHeldRun = (): string | undefined => {
-    const runId = heldRunId;
-    heldRunWaiter?.();
-    heldRunId = undefined;
-    heldRunReady = undefined;
-    heldRunWaiter = undefined;
+    const runId = state.heldRunId;
+    state.heldRunWaiter?.();
+    state.heldRunId = undefined;
+    state.heldRunReady = undefined;
+    state.heldRunWaiter = undefined;
     return runId;
   };
 
   /** 기다리는 긴 작업 과정 스트림을 풀고 대기 표시를 지운다. 기다리는 것이 없으면 아무것도 하지 않는다. */
   const releaseLongActivity = () => {
-    const gate = longActivityGate;
-    longActivityGate = undefined;
+    const gate = state.longActivityGate;
+    state.longActivityGate = undefined;
     gate?.();
   };
 
@@ -1328,7 +1401,7 @@ export function startFakeHermes(
         send(response, 400, { error: "values or vault is required" });
         return true;
       }
-      const stored = body.vault === undefined ? undefined : vaults.get(body.vault);
+      const stored = body.vault === undefined ? undefined : state.vaults.get(body.vault);
       if (body.vault !== undefined && stored?.connector !== callMatch[1]) {
         send(response, 400, { error: "no such vault for this connector" });
         return true;
@@ -1338,7 +1411,7 @@ export function startFakeHermes(
         send(response, 200, { ok: false, error: "invalid_input" });
         return true;
       }
-      connectorRequests.push(`call ${body.tool}`);
+      state.connectorRequests.push(`call ${body.tool}`);
       send(response, 200, verifyAnswer(connector, values));
       return true;
     }
@@ -1351,8 +1424,8 @@ export function startFakeHermes(
       };
       const connectorId = executeMatch[1]!;
       const installed = body.profile !== undefined
-        && (installedConnectors.get(body.profile)?.has(connectorId) === true
-          || boundConnectors.get(body.profile)?.has(connectorId) === true);
+        && (state.installedConnectors.get(body.profile)?.has(connectorId) === true
+          || state.boundConnectors.get(body.profile)?.has(connectorId) === true);
       if (fakeConnector(connectorId) === undefined || !installed) {
         send(response, 404, { error: "no such connector" });
         return true;
@@ -1361,7 +1434,7 @@ export function startFakeHermes(
         send(response, 400, { error: "invalid request" });
         return true;
       }
-      connectorToolCalls.push({
+      state.connectorToolCalls.push({
         profile: body.profile!, hermesTool: body.hermes_tool, argsJson: JSON.stringify(body.args), via: "execute",
       });
       send(response, 200, { ok: true, result: { saved: true } });
@@ -1370,15 +1443,15 @@ export function startFakeHermes(
 
     if (request.method === "GET" && path === CONNECTORS_PATH) {
       // 대시보드로 만든 profile 은 관리 표식이, 미리 심어 둔 profile 은 운영자가 둔 커넥터 표식이 있는 것으로 친다.
-      if (queryProfile === null || (!profiles.has(queryProfile) && keys[queryProfile] === undefined)) {
+      if (queryProfile === null || (!state.profiles.has(queryProfile) && state.keys[queryProfile] === undefined)) {
         send(response, 404, { error: "no such profile" });
         return true;
       }
-      const env = profiles.get(queryProfile) ?? hostEnv.get(queryProfile) ?? {};
-      const installed = installedConnectors.get(queryProfile) ?? new Set<string>();
-      const toolsets = apiServerToolsets.get(queryProfile) ?? [];
+      const env = state.profiles.get(queryProfile) ?? state.hostEnv.get(queryProfile) ?? {};
+      const installed = state.installedConnectors.get(queryProfile) ?? new Set<string>();
+      const toolsets = state.apiServerToolsets.get(queryProfile) ?? [];
       const states = FAKE_CONNECTORS.map((connector) => {
-        const bound = boundConnectors.get(queryProfile)?.has(connector.id) === true;
+        const bound = state.boundConnectors.get(queryProfile)?.has(connector.id) === true;
         const filled = connector.fields.every((field) => !field.required || env[field.env] !== undefined);
         // 옛 설치는 도구 목록이 설치가 쓰는 목록과 같을 때만 configured 다. 다른 내장 도구나 Control Plane MCP 가 남으면 아니다.
         // 바인딩 설치는 서버 이름이 목록에 있으면 된다. Control Plane MCP 와 다른 도구가 함께 있어도 된다.
@@ -1394,7 +1467,7 @@ export function startFakeHermes(
       });
       send(response, 200, {
         profile: queryProfile,
-        policy_hook: policyHookInstalled.has(queryProfile) && !policyHookOff.has(queryProfile),
+        policy_hook: state.policyHookInstalled.has(queryProfile) && !state.policyHookOff.has(queryProfile),
         connectors: states,
       });
       return true;
@@ -1408,7 +1481,7 @@ export function startFakeHermes(
         send(response, 400, { error: "invalid connector request" });
         return true;
       }
-      const boundHere = boundConnectors.get(body.profile);
+      const boundHere = state.boundConnectors.get(body.profile);
       if (body.bind !== undefined || boundHere?.has(body.plugin) === true) {
         bindingInstall(response, body.profile, body.plugin, body.enabled, body.bind, body.sandbox_owner);
         return true;
@@ -1418,9 +1491,9 @@ export function startFakeHermes(
         send(response, 409, { error: "this profile has bound connectors" });
         return true;
       }
-      if (!profiles.has(body.profile)) {
+      if (!state.profiles.has(body.profile)) {
         // 커넥터 표식만 있는 profile 은 옛 설치를 받지 않는다. 붙은 것이 없는 떼기는 끌 것이 없으므로 바뀐 것 없이 성공한다.
-        if (keys[body.profile] !== undefined && !body.enabled) {
+        if (state.keys[body.profile] !== undefined && !body.enabled) {
           send(response, 200, {
             profile: body.profile, plugin: body.plugin, enabled: false, changed: false, restart_required: false,
             plugin_updated: false,
@@ -1441,20 +1514,20 @@ export function startFakeHermes(
         }
         return true;
       }
-      connectorRequests.push(`install ${body.profile} ${body.enabled ? "on" : "off"}`);
-      const installed = installedConnectors.get(body.profile) ?? new Set<string>();
+      state.connectorRequests.push(`install ${body.profile} ${body.enabled ? "on" : "off"}`);
+      const installed = state.installedConnectors.get(body.profile) ?? new Set<string>();
       const changed = installed.has(body.plugin) !== body.enabled;
       if (body.enabled) {
         installed.add(body.plugin);
         // 설치는 그 profile 의 정책 hook 을 지금 판으로 맞춘다.
-        policyHookInstalled.add(body.profile);
+        state.policyHookInstalled.add(body.profile);
       } else {
         installed.delete(body.plugin);
       }
-      installedConnectors.set(body.profile, installed);
+      state.installedConnectors.set(body.profile, installed);
       // 설치는 그 profile 의 API 도구 목록을 커넥터의 MCP 서버 이름과 선언한 toolset 으로 다시 쓰고,
       // 해제는 MCP 가 없는 목록으로 쓴다.
-      apiServerToolsets.set(
+      state.apiServerToolsets.set(
         body.profile,
         body.enabled ? [DEMO_CONNECTOR.mcp_server, ...DEMO_CONNECTOR.toolsets] : ["no_mcp"],
       );
@@ -1474,12 +1547,12 @@ export function startFakeHermes(
         send(response, 400, { error: "invalid vault request" });
         return true;
       }
-      if (vaults.has(body.vault) && vaults.get(body.vault)!.connector !== connector.id) {
+      if (state.vaults.has(body.vault) && state.vaults.get(body.vault)!.connector !== connector.id) {
         send(response, 409, { error: "the vault belongs to another connector" });
         return true;
       }
-      vaults.set(body.vault, { connector: connector.id, values: { ...body.values } });
-      connectorRequests.push("vault put");
+      state.vaults.set(body.vault, { connector: connector.id, values: { ...body.values } });
+      state.connectorRequests.push("vault put");
       send(response, 200, { ok: true });
       return true;
     }
@@ -1490,8 +1563,8 @@ export function startFakeHermes(
         send(response, 400, { error: "invalid vault request" });
         return true;
       }
-      connectorRequests.push("vault delete");
-      send(response, 200, { changed: vaults.delete(body.vault) });
+      state.connectorRequests.push("vault delete");
+      send(response, 200, { changed: state.vaults.delete(body.vault) });
       return true;
     }
 
@@ -1505,16 +1578,16 @@ export function startFakeHermes(
         return true;
       }
       // 옛 설치는 관리 표식이 있는 profile 에만 있다.
-      const env = profiles.get(body.profile);
+      const env = state.profiles.get(body.profile);
       if (env === undefined) {
-        send(response, keys[body.profile] === undefined ? 404 : 401, { error: "no managed profile" });
+        send(response, state.keys[body.profile] === undefined ? 404 : 401, { error: "no managed profile" });
         return true;
       }
-      if (!installedConnectors.get(body.profile)?.has(DEMO_CONNECTOR.id)) {
+      if (!state.installedConnectors.get(body.profile)?.has(DEMO_CONNECTOR.id)) {
         send(response, 404, { error: "the connector is not installed in this profile" });
         return true;
       }
-      if (vaults.has(body.vault) && vaults.get(body.vault)!.connector !== DEMO_CONNECTOR.id) {
+      if (state.vaults.has(body.vault) && state.vaults.get(body.vault)!.connector !== DEMO_CONNECTOR.id) {
         send(response, 409, { error: "the vault belongs to another connector" });
         return true;
       }
@@ -1527,8 +1600,8 @@ export function startFakeHermes(
         send(response, 400, { error: "a required field is empty" });
         return true;
       }
-      vaults.set(body.vault, { connector: DEMO_CONNECTOR.id, values });
-      connectorRequests.push(`vault import ${body.profile}`);
+      state.vaults.set(body.vault, { connector: DEMO_CONNECTOR.id, values });
+      state.connectorRequests.push(`vault import ${body.profile}`);
       send(response, 200, { ok: true });
       return true;
     }
@@ -1538,12 +1611,12 @@ export function startFakeHermes(
       // 그 profile 에 설치하거나 붙인 커넥터의 서버만 시험한다.
       const connector = FAKE_CONNECTORS.find((candidate) => candidate.mcp_server === probeMatch[1]);
       if (connector === undefined || queryProfile === null
-          || (!installedConnectors.get(queryProfile)?.has(connector.id)
-            && !boundConnectors.get(queryProfile)?.has(connector.id))) {
+          || (!state.installedConnectors.get(queryProfile)?.has(connector.id)
+            && !state.boundConnectors.get(queryProfile)?.has(connector.id))) {
         send(response, 404, { error: "no such mcp server" });
         return true;
       }
-      connectorRequests.push(`probe ${queryProfile}`);
+      state.connectorRequests.push(`probe ${queryProfile}`);
       send(response, 200, { ok: true, tools: (SERVER_TOOLS[connector.mcp_server] ?? []).map((name) => ({ name })) });
       return true;
     }
@@ -1558,15 +1631,15 @@ export function startFakeHermes(
         send(response, 400, { error: "profile query is required" });
         return true;
       }
-      if (!keys[queryProfile]) {
+      if (!state.keys[queryProfile]) {
         send(response, 404, { error: "no such profile" });
         return true;
       }
-      const disabled = disabledSkills.get(queryProfile) ?? new Set<string>();
+      const disabled = state.disabledSkills.get(queryProfile) ?? new Set<string>();
       // 실제 응답의 모양이다. `enabled` 는 전역 `skills.disabled` 만 반영한다.
       send(response, 200, [
         ...BUILTIN_SKILLS.map((skill) => ({ ...skill, category: "builtin", provenance: "bundled" })),
-        ...readPublishedSkills(externalDirs.get(queryProfile) ?? []).map((skill) => ({
+        ...readPublishedSkills(state.externalDirs.get(queryProfile) ?? []).map((skill) => ({
           ...skill, category: "agent", provenance: "agent",
         })),
       ].map((skill) => ({ ...skill, enabled: !disabled.has(skill.name), usage: 0 })));
@@ -1583,14 +1656,14 @@ export function startFakeHermes(
         send(response, 400, { error: "profile, name and enabled are required" });
         return true;
       }
-      if (!keys[body.profile]) {
+      if (!state.keys[body.profile]) {
         send(response, 404, { error: "no such profile" });
         return true;
       }
-      const disabled = disabledSkills.get(body.profile) ?? new Set<string>();
+      const disabled = state.disabledSkills.get(body.profile) ?? new Set<string>();
       if (body.enabled) disabled.delete(body.name);
       else disabled.add(body.name);
-      disabledSkills.set(body.profile, disabled);
+      state.disabledSkills.set(body.profile, disabled);
       send(response, 200, { ok: true, name: body.name, enabled: body.enabled });
       return true;
     }
@@ -1613,7 +1686,7 @@ export function startFakeHermes(
         && configKeys.length >= 1
         && configKeys.every((key) => key === "platform_toolsets" || key === "skills");
       if (body.profile === undefined || queryProfile !== null && queryProfile !== body.profile
-          || !keys[body.profile] || !exactKeys) {
+          || !state.keys[body.profile] || !exactKeys) {
         send(response, 400, { error: "invalid configuration" });
         return true;
       }
@@ -1642,7 +1715,7 @@ export function startFakeHermes(
             send(response, 400, { error: "sandbox_owner is required for shell toolsets" });
             return true;
           }
-          if (sandboxUnavailable) {
+          if (state.sandboxUnavailable) {
             send(response, 409, { detail: "the isolated shell workspace is not configured", code: "sandbox_unavailable" });
             return true;
           }
@@ -1682,26 +1755,26 @@ export function startFakeHermes(
             return true;
           }
         }
-        const effectiveToolsets = nextToolsets ?? apiServerToolsets.get(profile) ?? DEFAULT_API_SERVER_TOOLSETS;
+        const effectiveToolsets = nextToolsets ?? state.apiServerToolsets.get(profile) ?? DEFAULT_API_SERVER_TOOLSETS;
         if (dirs.length > 0 && !effectiveToolsets.includes("skills")) {
           send(response, 400, { error: "the skills toolset is off for this profile" });
           return true;
         }
         nextDirs = dirs as string[];
       }
-      if (holdNextConfig) {
-        holdNextConfig = false;
-        heldConfigWaiter?.();
-        await new Promise<void>((done) => { releaseConfig = done; });
-        releaseConfig = undefined;
+      if (state.holdNextConfig) {
+        state.holdNextConfig = false;
+        state.heldConfigWaiter?.();
+        await new Promise<void>((done) => { state.releaseConfig = done; });
+        state.releaseConfig = undefined;
       }
-      lastSandboxOwner = typeof body.sandbox_owner === "string" ? body.sandbox_owner : null;
+      state.lastSandboxOwner = typeof body.sandbox_owner === "string" ? body.sandbox_owner : null;
       if (nextToolsets !== undefined) {
-        connectorRequests.push(`toolsets ${profile}`);
-        apiServerToolsets.set(profile, nextToolsets.filter((name) => name !== droppedToolset));
-        droppedToolset = undefined;
+        state.connectorRequests.push(`toolsets ${profile}`);
+        state.apiServerToolsets.set(profile, nextToolsets.filter((name) => name !== state.droppedToolset));
+        state.droppedToolset = undefined;
       }
-      if (nextDirs !== undefined) externalDirs.set(profile, nextDirs);
+      if (nextDirs !== undefined) state.externalDirs.set(profile, nextDirs);
       send(response, 200, { ok: true });
       return true;
     }
@@ -1717,7 +1790,7 @@ export function startFakeHermes(
 
     // `PROFILE_PATH` 의 `.+` 가 이 경로도 함께 먹으므로 그 분기보다 앞에서 처리한다.
     if (request.method === "GET" && sessionProviderMatch !== null) {
-      const child = childUsages.get(decodeURIComponent(sessionProviderMatch[2]!));
+      const child = state.childUsages.get(decodeURIComponent(sessionProviderMatch[2]!));
       if (child === undefined || child.profile !== decodeURIComponent(sessionProviderMatch[1]!)) {
         send(response, 404, { detail: "없는 session 이다" });
         return true;
@@ -1729,11 +1802,11 @@ export function startFakeHermes(
     if (soulMatch !== null) {
       const name = decodeURIComponent(soulMatch[1]!);
       if (request.method === "GET") {
-        const content = souls.get(name);
+        const content = state.souls.get(name);
         const payload = { content: content ?? "", exists: content !== undefined };
-        if (holdNextSoul) {
-          holdNextSoul = false;
-          heldSoul = { response, payload };
+        if (state.holdNextSoul) {
+          state.holdNextSoul = false;
+          state.heldSoul = { response, payload };
           return true;
         }
         send(response, 200, payload);
@@ -1741,7 +1814,7 @@ export function startFakeHermes(
       }
       if (request.method === "PUT") {
         const body = JSON.parse((await readBody(request)) || "{}") as { content?: string };
-        souls.set(name, body.content ?? "");
+        state.souls.set(name, body.content ?? "");
         // 실제 대시보드는 쓴 본문을 되돌려주지 않고 `{"ok": true}` 만 준다.
         send(response, 200, { ok: true });
         return true;
@@ -1755,12 +1828,12 @@ export function startFakeHermes(
         send(response, 400, { error: "name is required" });
         return true;
       }
-      if (profiles.has(name)) {
+      if (state.profiles.has(name)) {
         send(response, 409, { error: "profile already exists" });
         return true;
       }
-      profiles.set(name, {});
-      apiServerToolsets.set(name, [...PLUGIN_TEMPLATE_TOOLSETS]);
+      state.profiles.set(name, {});
+      state.apiServerToolsets.set(name, [...PLUGIN_TEMPLATE_TOOLSETS]);
       send(response, 200, { name });
       return true;
     }
@@ -1771,33 +1844,33 @@ export function startFakeHermes(
         key?: string;
         value?: string;
       };
-      const env = body.profile === undefined ? undefined : profiles.get(body.profile);
+      const env = body.profile === undefined ? undefined : state.profiles.get(body.profile);
       if (env === undefined || body.key === undefined || body.value === undefined) {
         send(response, 404, { error: "no such profile" });
         return true;
       }
       env[body.key] = body.value;
-      if (connectorEnvNames.has(body.key)) {
+      if (state.connectorEnvNames.has(body.key)) {
         // 커넥터 칸은 응답이 재시작 필요 여부도 담는다. 값은 적지 않는다.
-        connectorRequests.push(`env put ${body.profile} ${body.key}`);
+        state.connectorRequests.push(`env put ${body.profile} ${body.key}`);
         send(response, 200, { profile: body.profile, key: body.key, restart_required: false });
         return true;
       }
       // 이 칸으로 들어온 값이 그 profile 의 key 가 된다. 대역이 스스로 만들면 Control Plane 이 key
       // 파일에 쓴 값과 어긋나 그 profile 의 실행이 401 을 받는다.
-      if (body.key === API_KEY_ENV_NAME) keys[body.profile!] = body.value;
+      if (body.key === API_KEY_ENV_NAME) state.keys[body.profile!] = body.value;
       send(response, 200, { profile: body.profile, key: body.key });
       return true;
     }
 
     if (request.method === "DELETE" && path === ENV_PATH) {
       const body = JSON.parse((await readBody(request)) || "{}") as { profile?: string; key?: string };
-      const env = body.profile === undefined ? undefined : profiles.get(body.profile);
-      if (env === undefined || body.key === undefined || !connectorEnvNames.has(body.key)) {
+      const env = body.profile === undefined ? undefined : state.profiles.get(body.profile);
+      if (env === undefined || body.key === undefined || !state.connectorEnvNames.has(body.key)) {
         send(response, 404, { error: "no such profile" });
         return true;
       }
-      connectorRequests.push(`env delete ${body.profile} ${body.key}`);
+      state.connectorRequests.push(`env delete ${body.profile} ${body.key}`);
       delete env[body.key];
       send(response, 200, { profile: body.profile, key: body.key, restart_required: false });
       return true;
@@ -1805,14 +1878,14 @@ export function startFakeHermes(
 
     if (request.method === "DELETE" && profileMatch !== null) {
       const name = decodeURIComponent(profileMatch[1]!);
-      if (!profiles.delete(name)) {
+      if (!state.profiles.delete(name)) {
         send(response, 404, { error: "no such profile" });
         return true;
       }
-      delete keys[name];
+      delete state.keys[name];
       // 붙인 커넥터의 소유 기록과 `.env` 는 profile 디렉터리에 있어 함께 사라진다.
-      boundConnectors.delete(name);
-      hostEnv.delete(name);
+      state.boundConnectors.delete(name);
+      state.hostEnv.delete(name);
       send(response, 200, { name });
       return true;
     }
@@ -1829,49 +1902,49 @@ export function startFakeHermes(
       // 검사가 실패해 finally까지 가지 못해도 다음 검사에 장애나 보류 설정을 넘기지 않는다.
       // profile, 실행과 session 기록은 지우지 않는다. 그것들은 DB와 함께 각 검사가 소유한다.
       if (request.method === "POST" && path === "/__test/reset-controls") {
-        busy = false;
-        readinessOutage = undefined;
-        blockedProviders.clear();
-        holdNextRun = false;
+        state.busy = false;
+        state.readinessOutage = undefined;
+        state.blockedProviders.clear();
+        state.holdNextRun = false;
         const releasedRunId = releaseHeldRun();
-        const releasedRun = releasedRunId === undefined ? undefined : runs.get(releasedRunId);
+        const releasedRun = releasedRunId === undefined ? undefined : state.runs.get(releasedRunId);
         if (releasedRun !== undefined) releasedRun.status = "completed";
         releaseHeldSoul();
         releaseLongActivity();
-        holdNextConfig = false;
-        heldConfigWaiter?.();
-        releaseConfig?.();
-        heldConfigReady = undefined;
-        heldConfigWaiter = undefined;
-        releaseConfig = undefined;
-        sandboxUnavailable = false;
-        droppedToolset = undefined;
-        proactiveScript = undefined;
-        openProactiveGate?.();
-        proactiveGate = undefined;
-        openProactiveGate = undefined;
-        lastSubmittedRuntime = {};
+        state.holdNextConfig = false;
+        state.heldConfigWaiter?.();
+        state.releaseConfig?.();
+        state.heldConfigReady = undefined;
+        state.heldConfigWaiter = undefined;
+        state.releaseConfig = undefined;
+        state.sandboxUnavailable = false;
+        state.droppedToolset = undefined;
+        state.proactiveScript = undefined;
+        state.openProactiveGate?.();
+        state.proactiveGate = undefined;
+        state.openProactiveGate = undefined;
+        state.lastSubmittedRuntime = {};
         return send(response, 204, null);
       }
 
       const blockMatch = TEST_BLOCK_PROVIDER_PATH.exec(path);
       if (request.method === "POST" && blockMatch) {
-        blockedProviders.add(blockMatch[1]!);
+        state.blockedProviders.add(blockMatch[1]!);
         return send(response, 204, null);
       }
 
       if (request.method === "POST" && path === TEST_CLEAR_BLOCKED_PATH) {
-        blockedProviders.clear();
+        state.blockedProviders.clear();
         return send(response, 204, null);
       }
 
       if (request.method === "POST" && path === TEST_BUSY_PATH) {
-        busy = true;
+        state.busy = true;
         return send(response, 204, null);
       }
 
       if (request.method === "POST" && path === TEST_CLEAR_BUSY_PATH) {
-        busy = false;
+        state.busy = false;
         return send(response, 204, null);
       }
 
@@ -1880,48 +1953,48 @@ export function startFakeHermes(
         if (outage !== undefined && outage !== "busy" && outage !== "unavailable" && outage !== "timeout") {
           return send(response, 400, { error: "outage must be busy, unavailable, timeout, or omitted" });
         }
-        readinessOutage = outage;
+        state.readinessOutage = outage;
         return send(response, 204, null);
       }
 
       if (request.method === "POST" && path === TEST_HOLD_NEXT_CONFIG_PATH) {
-        holdNextConfig = true;
-        heldConfigReady = new Promise<void>((done) => { heldConfigWaiter = done; });
+        state.holdNextConfig = true;
+        state.heldConfigReady = new Promise<void>((done) => { state.heldConfigWaiter = done; });
         return send(response, 204, null);
       }
       if (request.method === "POST" && path === TEST_RELEASE_HELD_CONFIG_PATH) {
-        releaseConfig?.();
+        state.releaseConfig?.();
         return send(response, 204, null);
       }
       if (request.method === "POST" && path === TEST_SANDBOX_UNAVAILABLE_PATH) {
         const { unavailable } = JSON.parse((await readBody(request)) || "{}") as { unavailable?: unknown };
         if (typeof unavailable !== "boolean") return send(response, 400, { error: "unavailable must be a boolean" });
-        sandboxUnavailable = unavailable;
+        state.sandboxUnavailable = unavailable;
         return send(response, 204, null);
       }
       if (request.method === "GET" && path === TEST_LAST_SANDBOX_OWNER_PATH) {
-        return send(response, 200, { sandboxOwner: lastSandboxOwner });
+        return send(response, 200, { sandboxOwner: state.lastSandboxOwner });
       }
 
       if (request.method === "POST" && path === TEST_HOLD_NEXT_RUN_PATH) {
-        holdNextRun = true;
-        heldRunReady = new Promise<void>((done) => {
-          heldRunWaiter = done;
+        state.holdNextRun = true;
+        state.heldRunReady = new Promise<void>((done) => {
+          state.heldRunWaiter = done;
         });
         return send(response, 204, null);
       }
 
       if (request.method === "GET" && path === TEST_WAIT_HELD_RUN_PATH) {
-        if (heldRunReady === undefined) return send(response, 409, { error: "no held run is pending" });
-        await heldRunReady;
+        if (state.heldRunReady === undefined) return send(response, 409, { error: "no held run is pending" });
+        await state.heldRunReady;
         return send(response, 204, null);
       }
 
       if (request.method === "POST" && path === TEST_RELEASE_HELD_RUN_PATH) {
-        holdNextRun = false;
+        state.holdNextRun = false;
         const releasedRunId = releaseHeldRun();
         if (releasedRunId === undefined) return send(response, 204, null);
-        const run = runs.get(releasedRunId);
+        const run = state.runs.get(releasedRunId);
         if (run !== undefined) run.status = "completed";
         return send(response, 204, null);
       }
@@ -1933,22 +2006,22 @@ export function startFakeHermes(
 
       if (request.method === "POST" && path === TEST_SCRIPT_PATH) {
         const script = JSON.parse(await readBody(request)) as DemoScript;
-        scripts.set(script.input, script);
+        state.scripts.set(script.input, script);
         return send(response, 204, null);
       }
 
       if (request.method === "POST" && path === TEST_PROACTIVE_OUTPUT_PATH) {
         const { output } = JSON.parse(await readBody(request)) as { output: string };
-        proactiveScript = { output, tools: [] };
+        state.proactiveScript = { output, tools: [] };
         return send(response, 204, null);
       }
 
       if (request.method === "GET" && path === TEST_LAST_SUBMITTED_RUNTIME_PATH) {
-        return send(response, 200, lastSubmittedRuntime);
+        return send(response, 200, state.lastSubmittedRuntime);
       }
 
       if (request.method === "POST" && path === TEST_HOLD_NEXT_SOUL_PATH) {
-        holdNextSoul = true;
+        state.holdNextSoul = true;
         return send(response, 204, null);
       }
 
@@ -1966,11 +2039,11 @@ export function startFakeHermes(
         if (enabledToolsetsMatch) {
           const profile = enabledToolsetsMatch[1]!;
           if (!authorized(request, profile)) return send(response, 401, { error: "bad key for this profile" });
-          if (readinessOutage === "busy") return send(response, 429, RATE_LIMITED);
-          if (readinessOutage === "unavailable") return send(response, 503, { error: "Hermes is unavailable" });
+          if (state.readinessOutage === "busy") return send(response, 429, RATE_LIMITED);
+          if (state.readinessOutage === "unavailable") return send(response, 503, { error: "Hermes is unavailable" });
           // Control Plane 의 Hermes read timeout(10초)보다 길게 기다려 실제 timeout 경로를 탄다.
-          if (readinessOutage === "timeout") await wait(11_000);
-          const enabled = new Set(apiServerToolsets.get(profile) ?? DEFAULT_API_SERVER_TOOLSETS);
+          if (state.readinessOutage === "timeout") await wait(11_000);
+          const enabled = new Set(state.apiServerToolsets.get(profile) ?? DEFAULT_API_SERVER_TOOLSETS);
           // 실제 listener 는 목록을 `data` 로 감싼다(v0.21.3 `gateway/platforms/api_server.py` 의 `_handle_toolsets`).
           return send(response, 200, {
             object: "list",
@@ -1984,7 +2057,7 @@ export function startFakeHermes(
           if (!authorized(request, profile)) {
             return send(response, 401, { error: "bad key for this profile" });
           }
-          modelOptionsCalls += 1;
+          state.modelOptionsCalls += 1;
           // 실제 응답의 모양이다. 설정하지 않은 provider 도 빈 행으로 함께 온다.
           return send(response, 200, {
             ...DEFAULT_RUNTIME,
@@ -2016,7 +2089,7 @@ export function startFakeHermes(
           if (!authorized(request, profile!)) {
             return send(response, 401, { error: "bad key for this profile" });
           }
-          const child = childUsages.get(sessionId!);
+          const child = state.childUsages.get(sessionId!);
           if (child && child.profile === profile) {
             child.reads += 1;
             const ended = !child.delayed || child.reads > 1;
@@ -2027,7 +2100,7 @@ export function startFakeHermes(
               input_tokens: 100, cache_read_tokens: 50, cache_write_tokens: 10, output_tokens: 20,
             } });
           }
-          const session = sessions.get(sessionId!);
+          const session = state.sessions.get(sessionId!);
           if (!session) return send(response, 404, { error: "no such session" });
           // 실제 v0.21.5 는 세션 행을 session 안에 감싸고 provider 칸을 주지 않는다(저장소의 billing_provider).
           return send(response, 200, { object: "session", session: { id: sessionId, model: session.model } });
@@ -2048,10 +2121,10 @@ export function startFakeHermes(
           if (!authorized(request, profile)) {
             return send(response, 401, { error: "bad key for this profile" });
           }
-          eventsOpened.add(runId!);
-          for (const done of eventsWaiters.get(runId!) ?? []) done();
-          eventsWaiters.delete(runId!);
-          const run = runs.get(runId);
+          state.eventsOpened.add(runId!);
+          for (const done of state.eventsWaiters.get(runId!) ?? []) done();
+          state.eventsWaiters.delete(runId!);
+          const run = state.runs.get(runId);
           if (!run) return send(response, 404, runNotFound(runId!));
           if (run.input === "사건 스트림 실패 검사") {
             return send(response, 503, { error: "event stream unavailable" });
@@ -2063,7 +2136,7 @@ export function startFakeHermes(
           });
           response.write(": keepalive\n\n");
           // 지연 중인 실행은 끝나거나 중지될 때까지 스트림을 연 채로 둔다. 실제 Hermes 가 도는 동안 그렇게 한다.
-          while (slowActive.has(runId!) && !response.destroyed) await wait(20);
+          while (state.slowActive.has(runId!) && !response.destroyed) await wait(20);
           // 살펴보기 실행이다. 도구 사건과 마지막 답 글을 흘린다. Control Plane 은 답 조각을 화면으로 보내지 않아야 한다.
           if (run.proactive !== undefined) {
             if (run.proactive.gate !== undefined) {
@@ -2082,8 +2155,8 @@ export function startFakeHermes(
             if (run.status === "cancelled") {
               response.end();
             } else {
-              emptyUntilStopped.set(runId!, response);
-              response.on("close", () => emptyUntilStopped.delete(runId!));
+              state.emptyUntilStopped.set(runId!, response);
+              response.on("close", () => state.emptyUntilStopped.delete(runId!));
             }
             return;
           }
@@ -2097,17 +2170,17 @@ export function startFakeHermes(
             response.end();
             return;
           }
-          const script = scripts.get(run.input);
+          const script = state.scripts.get(run.input);
           if (script !== undefined) {
             for (const scripted of script.events ?? []) {
               if (scripted.event === "subagent.start" && typeof scripted.child_session_id === "string") {
-                childUsages.set(scripted.child_session_id, { profile: profile!, parent: run.session_id, reads: 0, delayed: false });
+                state.childUsages.set(scripted.child_session_id, { profile: profile!, parent: run.session_id, reads: 0, delayed: false });
               }
               event(response, scripted);
             }
             if (script.pause === true) {
               await new Promise<void>((resolve) => {
-                longActivityGate = resolve;
+                state.longActivityGate = resolve;
                 response.on("close", resolve);
               });
             }
@@ -2133,7 +2206,7 @@ export function startFakeHermes(
             }
             event(response, { event: "tool.started", tool: "terminal", preview: "단계 31" });
             await new Promise<void>((resolve) => {
-              longActivityGate = resolve;
+              state.longActivityGate = resolve;
               response.on("close", resolve);
             });
             event(response, { event: "tool.completed", tool: "terminal", duration: 0.1, error: false });
@@ -2143,7 +2216,7 @@ export function startFakeHermes(
             }
             event(response, { event: "tool.started", tool: "terminal", preview: "단계 42" });
             await new Promise<void>((resolve) => {
-              longActivityGate = resolve;
+              state.longActivityGate = resolve;
               response.on("close", resolve);
             });
             event(response, { event: "tool.completed", tool: "terminal", duration: 0.1, error: false });
@@ -2217,7 +2290,7 @@ export function startFakeHermes(
             const parentSessionId = run.input === "압축 뒤 자식 완료 검사"
               ? `compacted-${run.session_id}`
               : run.session_id;
-            childUsages.set(childSessionId, { profile: profile!, parent: parentSessionId,
+            state.childUsages.set(childSessionId, { profile: profile!, parent: parentSessionId,
               reads: 0, delayed: run.input === "자식 늦은 완료 검사",
               ...(run.input === SUBAGENT_PROVIDER_PROBE ? { model: "example-model-large", provider: "anthropic" } : {}) });
             const child = { subagent_id: `sa-${run.run_id}`, goal: "부모 뒤에 끝나는 조사",
@@ -2260,15 +2333,15 @@ export function startFakeHermes(
           if (!authorized(request, profile!)) {
             return send(response, 401, { error: "bad key for this profile" });
           }
-          const run = runs.get(runId!);
+          const run = state.runs.get(runId!);
           if (!run) return send(response, 404, runNotFound(runId!));
           run.status = "cancelled";
           if (run.input === "중지 빈 답 검사" || run.input === "중지 조각 전 검사") run.output = "";
-          emptyUntilStopped.get(runId!)?.end();
-          emptyUntilStopped.delete(runId!);
-          stoppedRuns.push(runId!);
-          if (heldRunId === runId) releaseHeldRun();
-          slowActive.delete(runId!);
+          state.emptyUntilStopped.get(runId!)?.end();
+          state.emptyUntilStopped.delete(runId!);
+          state.stoppedRuns.push(runId!);
+          if (state.heldRunId === runId) releaseHeldRun();
+          state.slowActive.delete(runId!);
           return send(response, 200, { status: "stopping" });
         }
         const match = RUN_PATH.exec(path);
@@ -2277,9 +2350,9 @@ export function startFakeHermes(
         if (!authorized(request, profile)) {
           return send(response, 401, { error: "bad key for this profile" });
         }
-        submitCount += 1;
+        state.submitCount += 1;
         // 한도에 닿은 gateway 는 본문을 읽기 전에 거절한다. 실행을 만들지 않는다.
-        if (busy) return send(response, 429, RATE_LIMITED);
+        if (state.busy) return send(response, 429, RATE_LIMITED);
 
         const raw = await readBody(request);
         const submitted = (raw.length > 0 ? JSON.parse(raw) : {}) as {
@@ -2295,9 +2368,9 @@ export function startFakeHermes(
         // 그 실행에 흔들리지 않도록 「마지막 제출」 기록을 덮어쓰지 않고 `holdNextRun` 도 가져가지 않는다.
         const starterRun = input.startsWith(STARTER_MARK);
         if (!starterRun) {
-          lastSubmittedInstructions = submitted.instructions;
+          state.lastSubmittedInstructions = submitted.instructions;
           // 되돌려 받는 쪽은 원문을 본다. 결과물 폴더 단락이 붙었는지 검사가 이것으로 안다.
-          lastSubmittedInput = submitted.input;
+          state.lastSubmittedInput = submitted.input;
         }
         if (input === ARTIFACT_PROBE && artifactFolder !== undefined) writeArtifactDraft(artifactFolder);
         if (input === ARTIFACT_SAME_NAME_PROBE && artifactFolder !== undefined) writeSameNameArtifacts(artifactFolder);
@@ -2317,7 +2390,7 @@ export function startFakeHermes(
             submitted.session_id,
           )
           : undefined;
-        const rememberCall = memoryRememberCalls.get(input);
+        const rememberCall = state.memoryRememberCalls.get(input);
         const rememberOutput = rememberCall !== undefined
           ? await callControlPlaneToolViaMcp("memory_remember", rememberCall, submitted.session_id)
           : undefined;
@@ -2325,15 +2398,15 @@ export function startFakeHermes(
         const connectorOutput = input.startsWith(CONNECTOR_TOOL_PROBE)
           ? await judgeConnectorCalls(
             profile!,
-            profiles.get(profile!)?.MCP_FOS_ASSISTANT_API_KEY,
+            state.profiles.get(profile!)?.MCP_FOS_ASSISTANT_API_KEY,
             submitted.session_id,
             input.split("\n").slice(1).map((line) => line.trim()).filter((line) => line.length > 0),
-            `connector-call-${submitCount}`,
+            `connector-call-${state.submitCount}`,
             connectorCalls,
           )
           : undefined;
         if (!starterRun) {
-          lastSubmittedRuntime = {
+          state.lastSubmittedRuntime = {
             provider: submitted.provider,
             model: submitted.model,
             reasoningEffort: submitted.model_options?.reasoning?.effort,
@@ -2344,7 +2417,7 @@ export function startFakeHermes(
 
         // 실제 Hermes 는 provider 만 받으면 config 의 모델 문자열을 그대로 써서 실패한다.
         if (submitted.provider !== undefined && submitted.model === undefined) {
-          runs.set(runId, {
+          state.runs.set(runId, {
             run_id: runId,
             status: "failed",
             session_id: sessionId,
@@ -2360,8 +2433,8 @@ export function startFakeHermes(
         }
 
         // 그 provider 의 계정이 전부 막힌 상태다. 접수는 되고 나중에 failed 로 바뀐다.
-        if (submitted.provider !== undefined && blockedProviders.has(submitted.provider)) {
-          runs.set(runId, {
+        if (submitted.provider !== undefined && state.blockedProviders.has(submitted.provider)) {
+          state.runs.set(runId, {
             run_id: runId,
             status: "failed",
             session_id: sessionId,
@@ -2379,18 +2452,18 @@ export function startFakeHermes(
         const instructionsEcho = echoed.length > 0 ? ` [instructions: ${echoed}]` : "";
         // 살펴보기 실행은 넣어 둔 각본 하나를 가져간다. 각본이 없으면 기본 답을 준다.
         const proactiveRun = !starterRun && input.includes(PROACTIVE_CHECK_CALL);
-        const script = proactiveRun ? proactiveScript : undefined;
+        const script = proactiveRun ? state.proactiveScript : undefined;
         if (proactiveRun) {
-          proactiveScript = undefined;
-          proactiveInputs.push({ profile: profile!, input: submitted.input ?? "" });
+          state.proactiveScript = undefined;
+          state.proactiveInputs.push({ profile: profile!, input: submitted.input ?? "" });
         }
-        const heldByNext = holdNextRun && !starterRun;
-        if (heldByNext) holdNextRun = false;
+        const heldByNext = state.holdNextRun && !starterRun;
+        if (heldByNext) state.holdNextRun = false;
         const held = heldByNext || script?.hold === true;
-        const slow = !held && !starterRun && slowRunMs !== undefined;
-        runs.set(runId, {
+        const slow = !held && !starterRun && state.slowRunMs !== undefined;
+        state.runs.set(runId, {
           run_id: runId,
-          status: held || slow || outsideToolInputs.has(input) ? "running" : "completed",
+          status: held || slow || state.outsideToolInputs.has(input) ? "running" : "completed",
           session_id: sessionId,
                   // 실제 Hermes 와 같이 요청 본문의 값을 그대로 되돌려 준다. 실제로 돈 모델이 아니다.
           model: submitted.model ?? profile!,
@@ -2400,19 +2473,19 @@ export function startFakeHermes(
             ?? rememberOutput
             ?? connectorOutput
             ?? (registeredChild === undefined ? undefined : `하위 에이전트 session: ${registeredChild}`)
-            ?? scripts.get(input)?.output
+            ?? state.scripts.get(input)?.output
             ?? specialOutputFor(input)
-            ?? `[${who} on profile ${profile}]${instructionsEcho} ${input}`,
+            ?? `[${state.who} on profile ${profile}]${instructionsEcho} ${input}`,
           input,
           provider: submitted.provider ?? null,
           interruptEvents: input === "스트림 중단 검사",
           usage: FAKE_USAGE,
           connectorCalls,
-          outsideTool: outsideToolInputs.has(input),
+          outsideTool: state.outsideToolInputs.has(input),
           proactive: proactiveRun
             ? {
                 tools: script === undefined ? DEFAULT_PROACTIVE_TOOLS : script.tools ?? [],
-                gate: script?.waitBeforeEvents === true ? proactiveGate : undefined,
+                gate: script?.waitBeforeEvents === true ? state.proactiveGate : undefined,
               }
             : undefined,
         });
@@ -2423,19 +2496,19 @@ export function startFakeHermes(
           provider:
             input === SESSION_MODEL_PROBE ? "nvidia" : submitted.provider ?? DEFAULT_RUNTIME.provider,
         };
-        sessions.set(sessionId, served);
-        const stored = runs.get(runId);
+        state.sessions.set(sessionId, served);
+        const stored = state.runs.get(runId);
         if (stored) stored.runtime = { provider: served.provider, model: served.model, route_source: "global" };
         if (held) {
-          heldRunId = runId;
-          heldRunWaiter?.();
+          state.heldRunId = runId;
+          state.heldRunWaiter?.();
         }
         if (slow) {
-          slowActive.set(runId, profile!);
-          maxTotalConcurrency = Math.max(maxTotalConcurrency, slowActive.size);
-          const sameProfile = [...slowActive.values()].filter((name) => name === profile).length;
-          maxProfileConcurrency.set(profile!, Math.max(maxProfileConcurrency.get(profile!) ?? 0, sameProfile));
-          setTimeout(() => finishSlowRun(runId), slowRunMs);
+          state.slowActive.set(runId, profile!);
+          state.maxTotalConcurrency = Math.max(state.maxTotalConcurrency, state.slowActive.size);
+          const sameProfile = [...state.slowActive.values()].filter((name) => name === profile).length;
+          state.maxProfileConcurrency.set(profile!, Math.max(state.maxProfileConcurrency.get(profile!) ?? 0, sameProfile));
+          setTimeout(() => finishSlowRun(runId), state.slowRunMs);
         }
         return send(response, 200, { run_id: runId, status: "queued" });
       }
@@ -2446,7 +2519,7 @@ export function startFakeHermes(
       if (!authorized(request, profile)) {
         return send(response, 401, { error: "bad key for this profile" });
       }
-      const run = runs.get(runId);
+      const run = state.runs.get(runId);
       if (!run) return send(response, 404, runNotFound(runId!));
       return send(response, 200, run);
     })();
@@ -2462,138 +2535,138 @@ export function startFakeHermes(
       }
       resolve({
         baseUrl: `http://127.0.0.1:${address.port}`,
-        lastSubmittedInstructions: () => lastSubmittedInstructions,
-        lastSubmittedInput: () => lastSubmittedInput,
-        modelOptionsCalls: () => modelOptionsCalls,
-        lastSubmittedRuntime: () => lastSubmittedRuntime,
-        blockProvider: (provider: string) => blockedProviders.add(provider),
-        clearBlockedProviders: () => blockedProviders.clear(),
+        lastSubmittedInstructions: () => state.lastSubmittedInstructions,
+        lastSubmittedInput: () => state.lastSubmittedInput,
+        modelOptionsCalls: () => state.modelOptionsCalls,
+        lastSubmittedRuntime: () => state.lastSubmittedRuntime,
+        blockProvider: (provider: string) => state.blockedProviders.add(provider),
+        clearBlockedProviders: () => state.blockedProviders.clear(),
         busy: () => {
-          busy = true;
+          state.busy = true;
         },
         clearBusy: () => {
-          busy = false;
+          state.busy = false;
         },
         setReadinessOutage: (outage) => {
-          readinessOutage = outage;
+          state.readinessOutage = outage;
         },
-        submitCount: () => submitCount,
-        profiles: () => [...profiles.keys()],
-        profileEnv: (name: string) => ({ ...(profiles.get(name) ?? hostEnv.get(name) ?? {}) }),
-        soulOf: (name: string) => souls.get(name),
-        skillDirsOf: (name: string) => [...(externalDirs.get(name) ?? [])],
+        submitCount: () => state.submitCount,
+        profiles: () => [...state.profiles.keys()],
+        profileEnv: (name: string) => ({ ...(state.profiles.get(name) ?? state.hostEnv.get(name) ?? {}) }),
+        soulOf: (name: string) => state.souls.get(name),
+        skillDirsOf: (name: string) => [...(state.externalDirs.get(name) ?? [])],
         apiServerToolsetsOf: (name: string) => {
-          const toolsets = apiServerToolsets.get(name);
+          const toolsets = state.apiServerToolsets.get(name);
           return toolsets === undefined ? undefined : [...toolsets];
         },
-        connectorRequests: () => [...connectorRequests],
+        connectorRequests: () => [...state.connectorRequests],
         setPolicyHook: (profile: string, active: boolean) => {
-          if (active) policyHookOff.delete(profile);
-          else policyHookOff.add(profile);
+          if (active) state.policyHookOff.delete(profile);
+          else state.policyHookOff.add(profile);
         },
         setConnectorPolicy: (endpoint: string) => {
-          connectorPolicyEndpoint = endpoint;
+          state.connectorPolicyEndpoint = endpoint;
         },
-        connectorToolCalls: () => connectorToolCalls.map((entry) => ({ ...entry })),
+        connectorToolCalls: () => state.connectorToolCalls.map((entry) => ({ ...entry })),
         callConnectorTools: (profile: string, sessionId: string, lines: readonly string[], token: string) => {
-          directConnectorCalls += 1;
-          return judgeConnectorCalls(profile, token, sessionId, lines, `connector-direct-${directConnectorCalls}`);
+          state.directConnectorCalls += 1;
+          return judgeConnectorCalls(profile, token, sessionId, lines, `connector-direct-${state.directConnectorCalls}`);
         },
-        boundConnectorsOf: (profile: string) => [...(boundConnectors.get(profile)?.keys() ?? [])],
+        boundConnectorsOf: (profile: string) => [...(state.boundConnectors.get(profile)?.keys() ?? [])],
         holdNextRun: () => {
-          holdNextRun = true;
-          heldRunReady = new Promise<void>((done) => {
-            heldRunWaiter = done;
+          state.holdNextRun = true;
+          state.heldRunReady = new Promise<void>((done) => {
+            state.heldRunWaiter = done;
           });
         },
         slowRuns: (ms: number | undefined) => {
-          slowRunMs = ms;
+          state.slowRunMs = ms;
         },
         runConcurrency: () => ({
-          maxTotal: maxTotalConcurrency,
-          maxByProfile: Object.fromEntries(maxProfileConcurrency),
+          maxTotal: state.maxTotalConcurrency,
+          maxByProfile: Object.fromEntries(state.maxProfileConcurrency),
         }),
         resetRunConcurrency: () => {
-          maxTotalConcurrency = 0;
-          maxProfileConcurrency.clear();
+          state.maxTotalConcurrency = 0;
+          state.maxProfileConcurrency.clear();
         },
-        waitForHeldRun: () => heldRunReady ?? Promise.reject(new Error("유지할 실행을 먼저 지정해야 한다")),
+        waitForHeldRun: () => state.heldRunReady ?? Promise.reject(new Error("유지할 실행을 먼저 지정해야 한다")),
         releaseHeldRun: () => {
-          holdNextRun = false;
+          state.holdNextRun = false;
           const releasedRunId = releaseHeldRun();
           if (releasedRunId === undefined) return;
-          const run = runs.get(releasedRunId);
+          const run = state.runs.get(releasedRunId);
           if (run !== undefined) run.status = "completed";
         },
         forgetRun: (runId: string) => {
-          runs.delete(runId);
+          state.runs.delete(runId);
         },
         waitForRunEvents: (runId: string) =>
-          eventsOpened.has(runId)
+          state.eventsOpened.has(runId)
             ? Promise.resolve()
             : new Promise<void>((done) => {
-                eventsWaiters.set(runId, [...(eventsWaiters.get(runId) ?? []), done]);
+                state.eventsWaiters.set(runId, [...(state.eventsWaiters.get(runId) ?? []), done]);
               }),
         heldRun: () => {
-          const run = heldRunId === undefined ? undefined : runs.get(heldRunId);
+          const run = state.heldRunId === undefined ? undefined : state.runs.get(state.heldRunId);
           return run === undefined ? undefined : { runId: run.run_id, sessionId: run.session_id };
         },
         releaseLongActivity,
         holdNextSoul: () => {
-          holdNextSoul = true;
+          state.holdNextSoul = true;
         },
         releaseHeldSoul,
-        stoppedRuns: () => [...stoppedRuns],
+        stoppedRuns: () => [...state.stoppedRuns],
         holdNextConfig: () => {
-          holdNextConfig = true;
-          heldConfigReady = new Promise<void>((done) => { heldConfigWaiter = done; });
+          state.holdNextConfig = true;
+          state.heldConfigReady = new Promise<void>((done) => { state.heldConfigWaiter = done; });
         },
-        waitForHeldConfig: () => heldConfigReady ?? Promise.reject(new Error("유지할 설정을 먼저 지정해야 한다")),
-        releaseHeldConfig: () => releaseConfig?.(),
-        dropNextAppliedToolset: (name) => { droppedToolset = name; },
+        waitForHeldConfig: () => state.heldConfigReady ?? Promise.reject(new Error("유지할 설정을 먼저 지정해야 한다")),
+        releaseHeldConfig: () => state.releaseConfig?.(),
+        dropNextAppliedToolset: (name) => { state.droppedToolset = name; },
         setArtifactWriteMcp: (endpoint: string, token: string) => {
-          artifactWriteMcp = { endpoint, token };
+          state.artifactWriteMcp = { endpoint, token };
         },
         setMemoryReadMcp: (endpoint: string, token: string) => {
-          memoryReadMcp = { endpoint, token };
+          state.memoryReadMcp = { endpoint, token };
         },
         setMemoryRememberCall: (input, args) => {
-          memoryRememberCalls.set(input, args);
+          state.memoryRememberCalls.set(input, args);
         },
         setOutsideToolRun: (input) => {
-          outsideToolInputs.add(input);
+          state.outsideToolInputs.add(input);
         },
-        subagentRegistrations: () => [...subagentRegistrations],
+        subagentRegistrations: () => [...state.subagentRegistrations],
         readMemoryAsSubagent: (childSessionId, memoryId) => {
-          const registered = subagentRegistrations.find((entry) => entry.childSessionId === childSessionId);
+          const registered = state.subagentRegistrations.find((entry) => entry.childSessionId === childSessionId);
           if (registered === undefined) return Promise.reject(new Error(`등록한 적 없는 자식 session 이다: ${childSessionId}`));
           return readMemoryViaMcp(memoryId, childSessionId, registered.rootSessionId);
         },
         readMemoryAsUnregisteredSubagent: (rootSessionId, memoryId) =>
           readMemoryViaMcp(memoryId, `native-${randomUUID()}`, rootSessionId),
         setProactiveScript: (script: ProactiveScript) => {
-          proactiveScript = { ...script, tools: [...(script.tools ?? [])] };
-          proactiveGate = script.waitBeforeEvents === true
+          state.proactiveScript = { ...script, tools: [...(script.tools ?? [])] };
+          state.proactiveGate = script.waitBeforeEvents === true
             ? new Promise<void>((done) => {
-                openProactiveGate = done;
+                state.openProactiveGate = done;
               })
             : undefined;
           if (script.hold === true) {
-            heldRunReady = new Promise<void>((done) => {
-              heldRunWaiter = done;
+            state.heldRunReady = new Promise<void>((done) => {
+              state.heldRunWaiter = done;
             });
           }
         },
-        releaseProactiveEvents: () => openProactiveGate?.(),
-        proactiveInputs: () => proactiveInputs.map((entry) => ({ ...entry })),
+        releaseProactiveEvents: () => state.openProactiveGate?.(),
+        proactiveInputs: () => state.proactiveInputs.map((entry) => ({ ...entry })),
         close: () =>
           new Promise<void>((done) => {
-            holdNextRun = false;
+            state.holdNextRun = false;
             releaseHeldRun();
             releaseLongActivity();
-            openProactiveGate?.();
-            holdNextSoul = false;
-            heldSoul = undefined;
+            state.openProactiveGate?.();
+            state.holdNextSoul = false;
+            state.heldSoul = undefined;
             server.closeAllConnections();
             server.close(() => done());
           }),
