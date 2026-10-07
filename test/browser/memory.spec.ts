@@ -55,7 +55,7 @@ test("손으로 만드는 양식은 보이지 않고 외부 서비스 연결은 
   await expect(page.getByRole("heading", { name: "외부 서비스 연결" })).toBeHidden();
   await expect(page.getByRole("heading", { name: "기존 기록 가져오기" })).toHaveCount(0);
 
-  await page.getByText("외부 서비스 연결").click();
+  await page.locator("summary", { hasText: "외부 서비스 연결" }).click();
   await expect(page.getByRole("heading", { name: "외부 서비스 연결" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "기존 기록 가져오기" })).toHaveCount(0);
 });

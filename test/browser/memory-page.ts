@@ -80,7 +80,7 @@ export async function openDocumentTab(page: Page) {
 /** 기억 화면을 열고 아래에 접어 둔 「외부 서비스 연결」 을 펼친다. */
 export async function openMemoryAdvanced(page: Page) {
   await page.goto("/memory");
-  await page.getByText("외부 서비스 연결").click();
+  await page.locator("summary", { hasText: "외부 서비스 연결" }).click();
 }
 
 export async function expectNoHorizontalOverflow(page: Page) {
