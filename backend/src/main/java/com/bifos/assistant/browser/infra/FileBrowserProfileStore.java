@@ -4,15 +4,20 @@ import com.bifos.assistant.browser.domain.BrowserProfileStore;
 import com.bifos.assistant.shared.config.LiveProperties;
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.nio.ByteBuffer;
+import java.nio.channels.SeekableByteChannel;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
 import java.nio.file.LinkOption;
+import java.nio.file.OpenOption;
 import java.nio.file.Path;
 import java.nio.file.SimpleFileVisitor;
 import java.nio.file.StandardOpenOption;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.nio.file.attribute.PosixFilePermissions;
+import java.util.Set;
 import java.util.regex.Pattern;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -67,23 +72,42 @@ public class FileBrowserProfileStore implements BrowserProfileStore {
         if (Files.exists(preferences, LinkOption.NOFOLLOW_LINKS)) {
             return;
         }
-        // CREATE_NEW 는 그 자리에 링크가 생겨 있어도 따라가지 않고 실패한다
-        Files.write(
-                preferences,
-                SESSION_RESTORE,
-                StandardOpenOption.CREATE_NEW,
-                StandardOpenOption.WRITE,
-                LinkOption.NOFOLLOW_LINKS);
-        if (Files.getFileStore(preferences).supportsFileAttributeView("posix")) {
-            Files.setPosixFilePermissions(preferences, PosixFilePermissions.fromString("rw-------"));
+        // CREATE_NEW 는 그 자리에 링크가 생겨 있어도 따라가지 않고 실패한다. 권한은 만들 때 함께 준다
+        Set<OpenOption> options =
+                Set.of(StandardOpenOption.CREATE_NEW, StandardOpenOption.WRITE, LinkOption.NOFOLLOW_LINKS);
+        try (SeekableByteChannel channel = posix(defaults)
+                ? Files.newByteChannel(
+                        preferences,
+                        options,
+                        PosixFilePermissions.asFileAttribute(PosixFilePermissions.fromString("rw-------")))
+                : Files.newByteChannel(preferences, options)) {
+            ByteBuffer content = ByteBuffer.wrap(SESSION_RESTORE);
+            while (content.hasRemaining()) {
+                channel.write(content);
+            }
+        } catch (FileAlreadyExistsException ex) {
+            // 같은 프로필을 동시에 만든 다른 요청이 먼저 썼다
         }
     }
 
+    /** 권한을 만들 때 함께 준다. 같은 자리를 동시에 만든 다른 요청이 먼저 만들었으면 그 디렉터리를 그대로 쓴다. */
     private static void createOwnerOnlyDirectory(Path dir) throws IOException {
-        Files.createDirectory(dir);
-        if (Files.getFileStore(dir).supportsFileAttributeView("posix")) {
-            Files.setPosixFilePermissions(dir, PosixFilePermissions.fromString("rwx------"));
+        try {
+            if (posix(dir.getParent())) {
+                Files.createDirectory(
+                        dir, PosixFilePermissions.asFileAttribute(PosixFilePermissions.fromString("rwx------")));
+            } else {
+                Files.createDirectory(dir);
+            }
+        } catch (FileAlreadyExistsException ex) {
+            if (!Files.isDirectory(dir, LinkOption.NOFOLLOW_LINKS)) {
+                throw new IllegalStateException("browser profile directory is not a directory", ex);
+            }
         }
+    }
+
+    private static boolean posix(Path dir) throws IOException {
+        return Files.getFileStore(dir).supportsFileAttributeView("posix");
     }
 
     @Override
