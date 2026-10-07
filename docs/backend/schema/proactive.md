@@ -1,6 +1,6 @@
 # 먼저 살펴보기
 
-먼저 살펴보기 한 번과 그 발견을 저장하는 표 둘의 칸과 제약을 갖는다.
+먼저 살펴보기 한 번과 그 발견, 문제 후보를 저장하는 표 셋의 칸과 제약을 갖는다.
 이 표들을 읽고 쓰는 경로는 [`backend/proactive-check.md`](../proactive-check.md) 가 갖는다.
 점검 대화는 [`chat.md`](chat.md) 의 `conversation.purpose` 로 가린다.
 
@@ -62,3 +62,34 @@
 
 발견의 이유, 사실, 추정, 다음 행동은 대화 메시지에만 있고 이 표에 두지 않는다.
 같은 글을 두 곳에 두면 사용자가 대화를 지워도 한쪽에 남는다.
+
+## proactive_check_problem
+
+결과 블록 버전 3의 문제 후보 하나다([ADR-093](../../adr/ADR-093-문제-찾기는-살펴보기-결과의-문제-후보로-받고-control-plane-이-근거와-중복을-결정적으로-검사한다.md)).
+받아들인 것과 버린 것을 모두 남긴다. 다음 살펴보기의 중복 판정과 입력에 쓰고, 우선순위를 정하는 다음 단계가 읽는다.
+칸의 뜻과 검사는 [`proactive-check.md`](../proactive-check.md) 의 「문제 후보」 가 갖는다.
+
+| 칸 | 타입 | 뜻 |
+| --- | --- | --- |
+| `check_id` | BIGINT FK `proactive_check` ON DELETE CASCADE | 이 후보를 낸 살펴보기 |
+| `conversation_id` | BIGINT | 점검 대화. `proactive_check.conversation_id` 와 같다. 중복 판정을 대화로 읽으려고 둔다 |
+| `status` | VARCHAR(16) | `ACCEPTED`, `DROPPED` |
+| `drop_reason` | VARCHAR(32) NULL | `DROPPED` 의 까닭. `INCOMPLETE`, `NO_GOAL`, `NO_EVIDENCE`, `DUPLICATE`, `EXISTING_FOLLOW_UP` |
+| `problem_key` | VARCHAR(120) | 앞뒤 공백을 지우고 소문자로 맞춘 문제 키. 비었으면 빈 글이다 |
+| `problem` | VARCHAR(300) NULL | 모델이 쓴 문제 |
+| `related_goal` | VARCHAR(200) NULL | 모델이 쓴 관련 목표나 맥락 |
+| `action_type` | VARCHAR(16) NULL | `ACTION`, `QUESTION`. 정해진 값 밖이면 모델이 쓴 값을 잘라 둔다 |
+| `action_text` | VARCHAR(200) NULL | 다음 행동이나 질문 |
+| `confidence` | VARCHAR(16) NULL | `LOW`, `MEDIUM`, `HIGH`. 정해진 값 밖이면 모델이 쓴 값을 잘라 둔다 |
+| `expected_benefit` | VARCHAR(300) NULL | 기대 효과 가설 |
+| `side_effect` | VARCHAR(16) NULL | `NONE`, `INTERNAL`, `EXTERNAL`. 정해진 값 밖이면 모델이 쓴 값을 잘라 둔다 |
+| `risk` | VARCHAR(200) NULL | 위험 힌트 |
+| `change_since_last` | VARCHAR(300) NULL | 지난번과 달라진 점 |
+| `evidence_json` | JSON | 근거로 받아들인 발견의 `topicKey`, `sourceUrl`, `checkedAt` 배열. 근거가 없으면 빈 배열이다 |
+| `evidence_checked_at` | DATETIME(6) NULL | 근거 발견의 확인 시각 가운데 가장 이른 것. 근거가 없으면 비어 있다 |
+| `created_at` | DATETIME(6) | |
+
+색인은 `(conversation_id, status, created_at)` 이다.
+
+후보의 글은 모델이 쓴 글이고 대화에 그리지 않는다. 다섯 칸 보고(`report_json`)처럼 검사한 모양을 그대로 남긴다.
+원문 본문과 커넥터 응답은 남기지 않는다.
