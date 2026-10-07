@@ -122,4 +122,13 @@ git add -N hermes backend test && bash scripts/check-public-safe.sh
 | `hermes/connectors/naver-blog/tests/save-draft.test.ts` | 수정 |
 | `hermes/connectors/naver-blog/tests/worker.test.ts` | 수정 |
 | `docs/connectors/naver-blog.md` | 수정 |
+| `hermes/tests/fixtures/demo-connector/server.py` | 수정 |
+| `hermes/connectors/naver-blog/src/editor/photos.ts` | 수정 |
+| `hermes/connectors/naver-blog/src/editor/run.ts` | 수정 |
+| `hermes/connectors/naver-blog/tests/editor-photos.test.ts` | 수정 |
+| `hermes/connectors/naver-blog/tests/editor-run.test.ts` | 수정 |
+| `docs/connectors.md` | 수정 |
+| `docs/backend/connector-install.md` | 수정 |
+| `hermes/README.md` | 수정 |
+| `docs/adr/ADR-093-사용자-첨부를-읽는-커넥터는-바인딩-주인의-첨부-디렉터리를-설치가-정한-env-로만-받는다.md` | 수정 |
 | `docs/adr/ADR-092-네이버-블로그-커넥터는-사용자의-chrome-에-cdp-로-붙고-임시저장은-승인한-뒤-백그라운드-작업으로-돈다.md` | 수정 |
