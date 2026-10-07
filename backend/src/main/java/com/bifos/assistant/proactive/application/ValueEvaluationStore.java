@@ -73,7 +73,8 @@ public class ValueEvaluationStore {
 
     @Transactional
     public ValueEvaluation finish(Long userId, Long id, DecisionEvidence evidence) {
-        ValueEvaluation row = read(userId, id);
+        // 판단 중 대화를 지워도 이미 시작한 기록은 닫는다. 조회 권한은 read 가 따로 확인한다.
+        ValueEvaluation row = evaluations.findByIdAndUserId(id, userId).orElseThrow(ValueEvaluationStore::notFound);
         row.finish(evidence);
         return evaluations.save(row);
     }

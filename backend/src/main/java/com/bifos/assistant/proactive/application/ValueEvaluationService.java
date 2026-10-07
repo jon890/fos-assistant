@@ -38,10 +38,11 @@ public class ValueEvaluationService {
         DecisionEvidence input = row.evidence();
         DecisionResponse response =
                 evaluator.evaluate(input.state(), input.questions(), provider, new DecisionRequest(user));
-        return store.finish(
+        store.finish(
                 user.id(),
                 row.id(),
                 new DecisionEvidence(input.state(), input.questions(), response.provider(), response.result()));
+        return store.read(user.id(), row.id());
     }
 
     private DecisionProvider provider(String id) {
