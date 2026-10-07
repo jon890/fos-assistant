@@ -42,6 +42,7 @@ export async function sessionStatus(
 
   const session = await CdpSession.connect(
     wsUrlFor(cdpUrl, debuggerUrl),
+    cdpUrl,
     remaining(),
   );
   try {
