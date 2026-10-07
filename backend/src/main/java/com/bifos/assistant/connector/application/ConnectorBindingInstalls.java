@@ -46,7 +46,11 @@ public class ConnectorBindingInstalls {
     boolean record(ConnectorBinding binding, InstallResult installed, boolean legacy, Instant now) {
         boolean restart = legacy ? installed.pluginUpdated() : installed.restartRequired() || installed.pluginUpdated();
         binding.installed(restart, now);
-        boolean scheduled = !legacy && !restart && installed.reloadPending();
+        // 재시작 대기는 관리자 반영 완료가 푼다. 남은 반영 예정 시각이 그 반영 완료를 막지 않게 비우고, 새로 잡지도 않는다.
+        if (restart) {
+            binding.clearApplyDue();
+        }
+        boolean scheduled = !legacy && !binding.restartRequired() && installed.reloadPending();
         if (scheduled) {
             binding.scheduleApply(now.plus(properties.applyDelay()));
         }

@@ -767,6 +767,33 @@ class ConnectorBindingServiceTest {
     }
 
     @Test
+    @DisplayName("반영 예정이 남은 바인딩이 값 교체로 재시작 대기가 되면 예정이 비워져 관리자 반영 완료가 READY 로 둔다")
+    void restartAfterScheduledApplyClearsDueSoConfirmSucceeds() {
+        CurrentUser owner = user(UserRole.MEMBER, 1L);
+        CurrentUser admin = user(UserRole.ADMIN, 1L);
+        connect(owner, DEMO, VALUES);
+        Agent agent = agent(owner, AgentVisibility.PRIVATE);
+        when(connector.bindConnector(anyString(), anyString(), anyString(), anyString()))
+                .thenReturn(new InstallResult(false, false, true));
+        service.bind(owner, agent.code(), DEMO);
+        assertThat(onlyBinding().applyDueAt()).isNotNull();
+        // 값을 다시 등록하면 붙은 바인딩에 설치를 다시 보내고, 이미 있던 서버의 값이 바뀌어 재시작이 필요하다.
+        when(connector.bindConnector(anyString(), anyString(), anyString(), anyString()))
+                .thenReturn(new InstallResult(true, false, false));
+        connect(owner, DEMO, VALUES);
+        ConnectorBinding waiting = onlyBinding();
+        assertThat(waiting.restartRequired()).isTrue();
+        assertThat(waiting.applyDueAt()).isNull();
+        Instant shown = shownTo(admin);
+        when(connector.bindConnector(anyString(), anyString(), anyString(), anyString()))
+                .thenReturn(new InstallResult(false, false));
+
+        AgentConnectionView confirmed = service.confirmApplied(admin, agent.code(), DEMO, shown);
+
+        assertThat(confirmed.status()).isEqualTo(BindingStatus.READY);
+    }
+
+    @Test
     @DisplayName("반영 완료에서 다시 보낸 설치가 바뀐 것이 있다고 답하면 READY 가 아니고 연결 실패로 끝난다")
     void confirmAppliedStaysPendingWhenReinstallNeedsRestartAgain() {
         CurrentUser owner = user(UserRole.MEMBER, 1L);
