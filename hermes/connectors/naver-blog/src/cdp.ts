@@ -89,6 +89,7 @@ export class CdpSession {
   private closed = false;
   private readonly pending = new Map<number, Pending>();
   private readonly waiters = new Map<string, Set<Pending>>();
+  private readonly listeners = new Map<string, Set<(params: any) => void>>();
 
   private constructor(private readonly socket: WebSocket) {
     socket.addEventListener("message", (event) => this.receive(event.data));
@@ -175,6 +176,17 @@ export class CdpSession {
     });
   }
 
+  /**
+   * 이름이 같은 이벤트가 올 때마다 부를 함수를 건다. 돌려준 함수를 부르면 뗀다.
+   * 탭에 뜬 대화 상자처럼 언제 올지 모르는 이벤트를 연결 내내 받을 때 쓴다.
+   */
+  onEvent(method: string, listener: (params: any) => void) {
+    const listeners = this.listeners.get(method) ?? new Set();
+    this.listeners.set(method, listeners);
+    listeners.add(listener);
+    return () => listeners.delete(listener);
+  }
+
   close() {
     this.shutdown();
     try {
@@ -201,6 +213,13 @@ export class CdpSession {
       return;
     }
     if (typeof message?.method === "string") {
+      for (const listener of this.listeners.get(message.method) ?? []) {
+        try {
+          listener(message.params ?? {});
+        } catch {
+          // 받는 쪽의 실패가 다른 이벤트와 명령 응답을 막지 않게 한다.
+        }
+      }
       const waiters = this.waiters.get(message.method);
       if (!waiters) return;
       for (const waiter of waiters) {
@@ -227,5 +246,6 @@ export class CdpSession {
       }
     }
     this.waiters.clear();
+    this.listeners.clear();
   }
 }
