@@ -94,6 +94,12 @@ grep -rn 'style={{' web/src/
 | 꼭 받아들여야 한다 | `pnpm exec eslint --suppress-rule <규칙> <파일>` 로 더한다. 까닭을 커밋 메시지와 PR 본문에 적는다 |
 | 규칙을 새로 더했다 | `pnpm exec eslint --suppress-all` 로 기존 위반을 기준에 둔다. 그 규칙의 위반 수를 커밋 메시지에 적는다 |
 
+### 파일 길이
+
+파일 길이는 언어 공통 검사로 강제한다. 범위, 상한, 기준 목록과 갱신 방법은
+[`../docs/backend/quality.md`](../docs/backend/quality.md)의 「파일 길이 기준 목록」이 갖는다.
+함수 길이 경고는 ESLint가 계속 검사한다.
+
 ### 상대 경로 import 예외
 
 `test/unit/*.test.ts` 가 `node --test` 로 읽는 web 파일과, 그 파일이 런타임에 import 하는 web 파일은 상대 경로 import 를 쓴다.

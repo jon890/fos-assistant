@@ -87,6 +87,7 @@ echo "임시 로그(종료 시 삭제): ${LOG_DIR}"
 if [ "$#" -gt 0 ]; then
   echo "브라우저 검사는 인자로 준 spec 만 돌린다: $*"
 fi
+step file-length     node "${ROOT}/scripts/check-file-length.mjs"
 step web-install     pnpm --dir "${ROOT}/web" install --frozen-lockfile
 if [ "${skip_browser}" = false ]; then
   step playwright    pnpm --dir "${ROOT}/web" exec playwright install chromium

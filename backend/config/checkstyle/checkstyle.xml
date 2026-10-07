@@ -29,12 +29,6 @@
     <property name="optional" value="false"/>
   </module>
 
-  <!-- 쪼갤 후보 목록이다. 빈 줄과 주석을 포함한 전체 줄 수를 센다 -->
-  <module name="FileLength">
-    <property name="max" value="500"/>
-    <property name="severity" value="warning"/>
-  </module>
-
   <!-- 인스턴스를 만들지 않는 클래스는 @NoArgsConstructor(access = AccessLevel.PRIVATE) 로 쓴다 -->
   <module name="RegexpMultiline">
     <property name="id" value="privateEmptyConstructor"/>
