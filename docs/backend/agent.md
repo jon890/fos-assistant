@@ -83,8 +83,8 @@
 - profile 의 공통 비활성화 목록이 막아 켜지지 않은 toolset 은 `AGENT_TOOLS_NOT_APPLIED` 응답의 `missingToolsets` 로 알린다. 화면은 `GET` 으로 현재 목록을 다시 읽는다
 - 이름과 설명은 대시보드 `GET /api/tools/toolsets` 에서 읽는다. 그 응답의 `enabled` 는 CLI 기준이라 쓰지 않는다
 - Hermes 가 쓰기 없이 미분류 toolset 을 켤 수 있다. 도구 응답의 `unclassifiedEnabled` 는 listener 에서 켜진 미분류 이름이고, 화면은 관리자에게 알리라는 경고를 보인다
-- 그룹 공개에서 막는 toolset 은 `terminal`, `file`, `code_execution`, `browser`, `computer_use`, `session_search` 여섯이다. 이 문서는 이 여섯을 「셸·파일 계열」 이라 부른다. 셸·파일 계열이 켜진 에이전트는 `PRIVATE` 만 된다. `GROUP` 생성과 수정, 도구 변경 모두에서 최종 listener 주소의 현재 목록을 본다. 꺼진 에이전트의 공개 범위 변경은 검사하지 않고 켤 때 검사한다. 읽지 못하면 변경하지 않는다
-- 도구를 쓸 때마다(스킬 게시가 `skills` 를 함께 켤 때 포함) 본문에 `sandbox_owner` 를 함께 보낸다. 에이전트 주인이 있으면 `u<사용자 번호>`, 없으면 `a<에이전트 번호>` 다. 대시보드 plugin 은 셸 계열 도구 저장에서 신뢰한 운영 정책을 검사한다. 정책에 등록된 profile 만 사용자 실행 공간 설정을 쓰고, 미등록 profile 은 local 로 둔다. 정책이 없거나 잘못됐으면 plugin 이 거절하고 Control Plane 은 `AGENT_SANDBOX_UNAVAILABLE` 로 알린다. 근거는 [ADR-086](../adr/ADR-086-셸과-파일-도구는-사용자별-docker-실행-공간에서만-돈다.md) 다
+- 그룹 공개에서 막는 toolset 은 `terminal`, `file`, `code_execution`, `vision`, `image_gen`, `video_gen`, `browser`, `computer_use`, `session_search` 아홉이다. 이 문서는 이 아홉을 「셸·파일·사진 계열」 이라 부른다. 셸·파일·사진 계열이 켜진 에이전트는 `PRIVATE` 만 된다. `GROUP` 생성과 수정, 도구 변경 모두에서 최종 listener 주소의 현재 목록을 본다. 꺼진 에이전트의 공개 범위 변경은 검사하지 않고 켤 때 검사한다. 읽지 못하면 변경하지 않는다
+- 도구를 쓸 때마다(스킬 게시가 `skills` 를 함께 켤 때 포함) 본문에 `sandbox_owner` 를 함께 보낸다. 에이전트 주인이 있으면 `u<사용자 번호>`, 없으면 `a<에이전트 번호>` 다. 보내기 전에 그 주인의 첨부 사용자 디렉터리를 만든다([ADR-091](../adr/ADR-091-사진-첨부는-사용자별로-저장하고-실행-공간에는-그-사용자만-붙인다.md)). 대시보드 plugin 은 셸 계열 도구 저장에서 신뢰한 운영 정책을 검사한다. 정책에 등록된 profile 만 사용자 실행 공간 설정을 쓰고, 미등록 profile 은 사진 없는 셸 도구만 local 로 둔다. `vision`, `image_gen`, `video_gen` 이 있으면 저장을 거절한다. 정책이 없거나 잘못됐으면 plugin 이 거절하고 Control Plane 은 `AGENT_SANDBOX_UNAVAILABLE` 로 알린다. 근거는 [ADR-086](../adr/ADR-086-셸과-파일-도구는-사용자별-docker-실행-공간에서만-돈다.md) 다
 - 도구 변경과 에이전트 접근 범위 변경은 같은 에이전트 행의 쓰기 잠금을 잡고 검사한다. 도구 변경은 이미 잠겨 있으면 `AGENT_BUSY` 로 곧바로 알린다. 공개 범위 변경은 잠금을 기다린다. 연결 붙이기와 같은 잠금을 기다려야 붙이기가 커밋한 바인딩을 보고 판정하기 때문이다
 
 | 경로 | 누가 | 무엇 |
@@ -100,7 +100,7 @@
 | 경로 | 하는 일 | 거절 |
 | --- | --- | --- |
 | `POST /api/v1/agents` | `{ "name", "visibility"? }` 로 만든다. 공개 범위 기본값은 `PRIVATE`. 201 과 에이전트를 돌려준다 | `VALIDATION_FAILED`, 상한이면 409 `AGENT_LIMIT_REACHED`, profile 을 만들지 못하면 `HERMES_PROVISION_FAILED` |
-| `PATCH /api/v1/agents/{code}/visibility` | `{ "visibility" }`. 주인과 `ADMIN` 이 승인 없이 바꾼다 | `FORBIDDEN`, 읽을 수 없거나 지웠으면 `AGENT_NOT_FOUND`, 다른 요청이 그 에이전트를 고치는 중이면 `AGENT_BUSY`, `visibility` 가 비었으면 `VALIDATION_FAILED`, 켜진 에이전트를 그룹 공개로 바꿀 때 셸·파일 toolset 이 켜져 있으면 `AGENT_TOOLS_REQUIRE_PRIVATE`. 꺼진 에이전트는 켤 때 관리자 수정이 검사한다. 연결이 붙은 에이전트를 그룹 공개로 바꾸면 `AGENT_CONNECTIONS_REQUIRE_PRIVATE` |
+| `PATCH /api/v1/agents/{code}/visibility` | `{ "visibility" }`. 주인과 `ADMIN` 이 승인 없이 바꾼다 | `FORBIDDEN`, 읽을 수 없거나 지웠으면 `AGENT_NOT_FOUND`, 다른 요청이 그 에이전트를 고치는 중이면 `AGENT_BUSY`, `visibility` 가 비었으면 `VALIDATION_FAILED`, 켜진 에이전트를 그룹 공개로 바꿀 때 셸·파일·사진 toolset 이 켜져 있으면 `AGENT_TOOLS_REQUIRE_PRIVATE`. 꺼진 에이전트는 켤 때 관리자 수정이 검사한다. 연결이 붙은 에이전트를 그룹 공개로 바꾸면 `AGENT_CONNECTIONS_REQUIRE_PRIVATE` |
 | `DELETE /api/v1/agents/{code}` | 붙은 연결을 모두 뗀 뒤 지운다. 204 | `FORBIDDEN`, 읽을 수 없거나 지웠으면 `AGENT_NOT_FOUND`, 고치는 중이거나 그 사이 주인이 바뀌었으면 `AGENT_BUSY`, 떼지 못하면 `CONNECTOR_ACTION_EXECUTING` 이나 `CONNECTOR_OPERATION_FAILED`, profile 을 거두지 못하면 그 Hermes 오류 |
 
 공개 범위를 바꿔도 주인은 그대로다.
@@ -211,17 +211,20 @@ sequenceDiagram
     U->>W: 켤 도구 목록
     W->>C: PUT /api/v1/agents/{code}/tools
     C->>C: 볼 수 있는가, 바꾸는 도구마다 그 등급을 켤 수 있는가
-    C->>C: 셸·파일 계열이 켜지는데 그룹 공개인가
+    C->>C: 셸·파일·사진 계열이 켜지는데 그룹 공개인가
     C->>D: PUT /api/config (profile 하나, 도구 목록, sandbox_owner)
     D->>D: plugin 이 키와 profile 과 memory 를 검사한다
-    alt 셸·파일 도구(terminal, file, code_execution)를 하나라도 켠다
+    alt 셸·파일·사진 도구(terminal, file, code_execution, vision, image_gen, video_gen)를 하나라도 켠다
         D->>D: 운영의 실행 공간 정책이 유효한가
         alt 없거나 잘못됐다
             D-->>C: 409 sandbox_unavailable
             C-->>U: AGENT_SANDBOX_UNAVAILABLE
         else 이 profile 이 정책에 등록됐다
             D->>D: terminal 설정을 docker 실행 공간으로 다시 쓴다
-        else 미등록 profile 이다
+        else 미등록 profile 에 vision, image_gen, video_gen 을 켠다
+            D-->>C: 409 sandbox_unavailable
+            C-->>U: AGENT_SANDBOX_UNAVAILABLE
+        else 사진 도구가 없는 미등록 profile 이다
             D->>D: local 실행을 유지한다
         end
     end
@@ -240,8 +243,8 @@ sequenceDiagram
 | --- | --- |
 | 주인이 관리자 등급을 바꾸려 한다 | 거절한다. 화면은 그 도구를 누를 수 없게 두고 관리자만 켤 수 있다고 보인다 |
 | 관리자 등급을 켠다 | 확인 창을 거친다. 허락은 이때 한 번이다 |
-| 그룹 공개 에이전트에 셸·파일 계열을 켠다 | 거절한다. 먼저 `PRIVATE` 로 바꿔야 한다 |
-| 셸·파일 계열이 켜진 profile 로 그룹 공개 에이전트를 만들거나 고친다 | 거절한다. 최종 listener 주소의 도구를 먼저 끈다 |
+| 그룹 공개 에이전트에 셸·파일·사진 계열을 켠다 | 거절한다. 먼저 `PRIVATE` 로 바꿔야 한다 |
+| 셸·파일·사진 계열이 켜진 profile 로 그룹 공개 에이전트를 만들거나 고친다 | 거절한다. 최종 listener 주소의 도구를 먼저 끈다 |
 | 그룹의 다른 사용자가 도구를 보거나 바꾸려 한다 | 거절한다. 에이전트 주인 또는 `ADMIN` 만 보고 바꾼다 |
 | 도구 변경과 공개 범위 변경이 동시에 들어온다 | 에이전트 행을 잠그고 차례로 검사한다. 도구 변경은 이미 잠겨 있으면 `AGENT_BUSY` 로 곧바로 알리고, 공개 범위 변경은 잠금을 기다린다 |
 | 등급 표에 없는 이름이 온다 | 거절한다 |
@@ -249,16 +252,16 @@ sequenceDiagram
 | `memory` 를 켜거나 Control Plane MCP(`fos-assistant`) 를 빼려 한다 | Control Plane 과 plugin 이 모두 거절한다 |
 | 요청한 도구가 빠지거나 분류된 도구가 예상과 다르다 | `AGENT_TOOLS_NOT_APPLIED` 로 켜지지 않은 이름을 알린다. 화면은 도구 목록을 다시 읽고, profile 설정에서 막힌 도구는 관리자에게 알리라고 안내한다. 미분류 도구만 더 켜진 것은 성공 응답의 `unclassifiedEnabled` 로 따로 알린다 |
 | `terminal`, `file`, `code_execution` 을 켜는데 운영의 실행 공간 정책이 없거나 잘못됐다 | 409 `AGENT_SANDBOX_UNAVAILABLE`. 아무것도 바뀌지 않는다. 화면은 「격리된 실행 공간이 준비되지 않아 이 도구를 켤 수 없어요」 를 보인다 |
-| 정책이 유효하지만 이 profile 은 등록되지 않았다 | 셸 도구 저장을 허용하고 local 로 둔다. 기존 local 옵션은 유지하며, 이전 docker 설정이 있으면 제거한다. 다른 사용자 파일과 서버 설정에 닿을 수 있다 |
-| `terminal`, `file`, `code_execution` 가운데 하나라도 켜진 에이전트의 주인을 관리자가 바꾼다 | 409 `AGENT_OWNER_CHANGE_REQUIRES_SHELL_OFF`. 아무것도 바뀌지 않는다. 격리한 profile 의 실행 공간이 옛 주인을 가리킬 수 있어 막는다. Control Plane 은 profile 별 격리 상태를 조회하지 않으므로 local 에이전트에도 같은 제한을 적용한다. 그 도구를 먼저 끄고, 새 주인이 다시 켜면 정책을 다시 적용한다. `browser`, `computer_use`, `session_search` 만 켜졌으면 막지 않는다. 주인이 그대로인 접근 변경은 검사하지 않는다 |
-| 올린 스킬 가운데 앞머리에 비밀 요청 칸이 있는 것이 있는데 `terminal`, `file`, `code_execution` 가운데 하나라도 켜거나 켠 채 둔다 | 409 `AGENT_SKILL_REQUESTS_SECRETS`. Hermes 에 쓰지 않는다. 메시지에 그 스킬 이름이 있다. 화면은 그 스킬을 먼저 고치거나 지우라고 알린다. 지금 버전과 표식 없이 남은 더 새 버전을 함께 본다 |
-| 셸·파일 도구가 이미 켜진 profile 의 다른 도구를 바꾼다 | 켜진 셸·파일 도구가 저장 목록에 함께 있으므로 위와 같이 정책을 검사해 docker 또는 local 설정을 쓰거나 거절한다 |
+| 정책이 유효하지만 이 profile 은 등록되지 않았다 | `vision`, `image_gen`, `video_gen` 을 켜거나 사진 커넥터를 설치하면 409 `sandbox_unavailable`. 사진 없는 셸 도구 저장만 local 을 허용한다. 기존 local 옵션은 유지하며, 이전 docker 설정이 있으면 제거한다. 다른 사용자 파일과 서버 설정에 닿을 수 있다 |
+| `terminal`, `file`, `code_execution`, `vision`, `image_gen`, `video_gen` 가운데 하나라도 켜진 에이전트의 주인을 관리자가 바꾼다 | 409 `AGENT_OWNER_CHANGE_REQUIRES_SHELL_OFF`. 아무것도 바뀌지 않는다. 격리한 profile 의 실행 공간이 옛 주인을 가리킬 수 있어 막는다. Control Plane 은 profile 별 격리 상태를 조회하지 않으므로 local 에이전트에도 같은 제한을 적용한다. 그 도구를 먼저 끄고, 새 주인이 다시 켜면 정책을 다시 적용한다. `browser`, `computer_use`, `session_search` 만 켜졌으면 막지 않는다. 주인이 그대로인 접근 변경은 검사하지 않는다 |
+| 올린 스킬 가운데 앞머리에 비밀 요청 칸이 있는 것이 있는데 `terminal`, `file`, `code_execution`, `vision`, `image_gen`, `video_gen` 가운데 하나라도 켜거나 켠 채 둔다 | 409 `AGENT_SKILL_REQUESTS_SECRETS`. Hermes 에 쓰지 않는다. 메시지에 그 스킬 이름이 있다. 화면은 그 스킬을 먼저 고치거나 지우라고 알린다. 지금 버전과 표식 없이 남은 더 새 버전을 함께 본다 |
+| 셸·파일·사진 도구가 이미 켜진 profile 의 다른 도구를 바꾼다 | 켜진 셸·파일·사진 도구가 저장 목록에 함께 있으므로 위와 같이 정책을 검사해 docker 또는 local 설정을 쓰거나 거절한다 |
 | 대시보드나 listener 가 멈춰 있다 | 도구 절만 열리지 않는다. 대화는 그대로 돈다 |
 
 ## 에이전트를 만들 때
 
 사용자가 에이전트 목록의 「새 에이전트」 에서 이름을 넣는다.
-만드는 차례와 실패했을 때 거두는 순서는 위 「에이전트 만들기와 지우기」 의 일곱 단계가 갖는다.
+만드는 차례와 실패했을 때 거두는 순서는 위 「에이전트 만들기와 지우기」 의 아홉 단계가 갖는다.
 201 을 받으면 화면은 그 에이전트의 상세로 간다.
 
 ### 에이전트 만들기가 갈리는 지점
@@ -270,7 +273,7 @@ sequenceDiagram
 | 중간에 Hermes 가 실패한다 | 만든 것을 역순으로 거두고 `HERMES_PROVISION_FAILED`. 거두기까지 실패하면 원래 오류를 올리고 로그를 남긴다 |
 | 만든 직후 첫 대화에서 MCP 도구가 아직 없다 | 새 profile 의 MCP 연결은 1~2분 안에 붙는다. 그동안 Memory 읽기와 결과물 쓰기가 없는 채로 답한다 |
 | 이름이 비었거나 너무 길다 | `VALIDATION_FAILED` |
-| 그룹에 공개한다 | 주인이 승인 없이 한다. 켜진 에이전트에 셸·파일 도구가 켜져 있으면 `AGENT_TOOLS_REQUIRE_PRIVATE`. 꺼진 에이전트는 켤 때 관리자 수정이 검사한다 |
+| 그룹에 공개한다 | 주인이 승인 없이 한다. 켜진 에이전트에 셸·파일·사진 도구가 켜져 있으면 `AGENT_TOOLS_REQUIRE_PRIVATE`. 꺼진 에이전트는 켤 때 관리자 수정이 검사한다 |
 | 지운다 | 확인 창을 거친다. 에이전트는 목록에서 빠지고 대화는 읽기만 된다. Control Plane 이 만든 profile 만 profile 까지 지운다 |
 | 지운 에이전트의 대화에 보낸다 | `AGENT_NOT_FOUND` |
 | 대화가 가리키는 에이전트 행이 아예 없다 | 지운 에이전트의 대화와 같다. 목록에 남고, 대화 화면에서 「지운 에이전트」 로 보이며 읽기만 된다. 목록은 그 대화 때문에 실패하지 않는다 |

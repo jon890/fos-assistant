@@ -19,11 +19,14 @@ import com.bifos.assistant.hermes.dto.ConnectorFieldOptions;
 import com.bifos.assistant.hermes.dto.ConnectorManifest;
 import com.bifos.assistant.hermes.dto.ConnectorRecovery;
 import com.bifos.assistant.hermes.dto.ConnectorTool;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -50,12 +53,16 @@ class HttpHermesConnectorClientTest {
     private HttpHermesConnectorClient client;
     private MockRestServiceServer server;
 
+    @TempDir
+    Path attachmentRoot;
+
     @BeforeEach
     void setUp() {
         var builder = RestClient.builder();
         server = MockRestServiceServer.bindTo(builder).build();
         client = new HttpHermesConnectorClient(
-                new HermesProperties("unused", BASE, "test-dashboard-token", BASE, null, null, null, null));
+                new HermesProperties("unused", BASE, "test-dashboard-token", BASE, null, null, null, null),
+                new SandboxAttachmentDirectory(attachmentRoot.toString()));
         ReflectionTestUtils.setField(client, "client", builder.build());
         // 실행 경로는 읽기 제한이 다른 클라이언트를 쓴다. 같은 대역 서버에 붙인다.
         ReflectionTestUtils.setField(client, "executeClient", builder.build());
@@ -296,8 +303,45 @@ class HttpHermesConnectorClientTest {
         server.expect(requestTo(BASE + "/api/connectors"))
                 .andRespond(withSuccess(body + "}", MediaType.APPLICATION_JSON));
 
-        assertThat(client.putConnector(PROFILE, DEMO, true)).isEqualTo(new InstallResult(true, true));
-        assertThat(client.putConnector(PROFILE, DEMO, true)).isEqualTo(new InstallResult(true, false));
+        assertThat(client.putConnector(PROFILE, DEMO, true, "u1")).isEqualTo(new InstallResult(true, true));
+        assertThat(client.putConnector(PROFILE, DEMO, true, "u1")).isEqualTo(new InstallResult(true, false));
+        server.verify();
+    }
+
+    @DisplayName("첨부를 올린 적 없는 주인의 커넥터도 보내기 전에 첨부 디렉터리를 만들어 설치한다")
+    @Test
+    void putConnectorCreatesTheOwnersAttachmentDirectoryFirst() {
+        server.expect(requestTo(BASE + "/api/connectors"))
+                .andRespond(withSuccess(
+                        "{\"profile\":\"user-demo\",\"plugin\":\"demo-notes\",\"enabled\":true,"
+                                + "\"restart_required\":true}",
+                        MediaType.APPLICATION_JSON));
+
+        assertThat(client.putConnector(PROFILE, DEMO, true, "u3")).isEqualTo(new InstallResult(true, false));
+
+        assertThat(attachmentRoot.resolve("users").resolve(SandboxAttachmentDirectory.key("u3")))
+                .isDirectory();
+        server.verify();
+    }
+
+    @DisplayName("켜는 설치는 첨부 디렉터리가 링크이면 보내지 않고, 끄는 설치는 막지 않는다")
+    @Test
+    void linkedAttachmentDirectoryBlocksOnlyEnablingInstalls() throws Exception {
+        Path users = Files.createDirectory(attachmentRoot.resolve("users"));
+        Path other = Files.createDirectory(users.resolve(SandboxAttachmentDirectory.key("u4")));
+        Files.createSymbolicLink(users.resolve(SandboxAttachmentDirectory.key("u3")), other);
+        server.expect(requestTo(BASE + "/api/connectors"))
+                .andExpect(content().json("{\"enabled\":false,\"sandbox_owner\":\"u3\"}"))
+                .andRespond(withSuccess(
+                        "{\"profile\":\"user-demo\",\"plugin\":\"demo-notes\",\"enabled\":false,"
+                                + "\"restart_required\":true}",
+                        MediaType.APPLICATION_JSON));
+
+        assertThatThrownBy(() -> client.putConnector(PROFILE, DEMO, true, "u3"))
+                .isInstanceOfSatisfying(
+                        HermesRequestRejected.class,
+                        ex -> assertThat(ex.status()).isEqualTo(409));
+        assertThat(client.putConnector(PROFILE, DEMO, false, "u3")).isEqualTo(new InstallResult(true, false));
         server.verify();
     }
 
@@ -517,7 +561,10 @@ class HttpHermesConnectorClientTest {
         server.expect(requestTo(BASE + "/api/connectors"))
                 .andExpect(method(HttpMethod.PUT))
                 .andExpect(header("Authorization", "Bearer test-dashboard-token"))
-                .andExpect(content().json("{\"profile\":\"user-demo\",\"plugin\":\"demo-notes\",\"enabled\":true}"))
+                .andExpect(
+                        content()
+                                .json(
+                                        "{\"profile\":\"user-demo\",\"plugin\":\"demo-notes\",\"enabled\":true,\"sandbox_owner\":\"u1\"}"))
                 .andRespond(withSuccess(
                         "{\"profile\":\"user-demo\",\"plugin\":\"demo-notes\",\"enabled\":true,\"restart_required\":true}",
                         MediaType.APPLICATION_JSON));
@@ -527,7 +574,7 @@ class HttpHermesConnectorClientTest {
                                 + "{\"plugin\":\"other\",\"enabled\":false,\"configured\":false},"
                                 + "{\"plugin\":\"demo-notes\",\"enabled\":true,\"configured\":true}]}",
                         MediaType.APPLICATION_JSON));
-        assertThat(client.putConnector(PROFILE, DEMO, true)).isEqualTo(new InstallResult(true, false));
+        assertThat(client.putConnector(PROFILE, DEMO, true, "u1")).isEqualTo(new InstallResult(true, false));
         var state = client.readConnector(PROFILE, DEMO);
         assertThat(state.enabled()).isTrue();
         assertThat(state.configured()).isTrue();
@@ -547,8 +594,10 @@ class HttpHermesConnectorClientTest {
                 .andRespond(withSuccess(
                         "{\"profile\":\"user-demo\",\"plugin\":\"demo-notes\",\"enabled\":false,\"restart_required\":false}",
                         MediaType.APPLICATION_JSON));
-        assertThatThrownBy(() -> client.putConnector(PROFILE, DEMO, true)).isInstanceOf(IllegalStateException.class);
-        assertThatThrownBy(() -> client.putConnector(PROFILE, DEMO, true)).isInstanceOf(IllegalStateException.class);
+        assertThatThrownBy(() -> client.putConnector(PROFILE, DEMO, true, "u1"))
+                .isInstanceOf(IllegalStateException.class);
+        assertThatThrownBy(() -> client.putConnector(PROFILE, DEMO, true, "u1"))
+                .isInstanceOf(IllegalStateException.class);
         server.verify();
     }
 

@@ -29,6 +29,7 @@ import com.bifos.assistant.chat.domain.ChatMessage;
 import com.bifos.assistant.chat.domain.Conversation;
 import com.bifos.assistant.chat.domain.type.MessageRole;
 import com.bifos.assistant.chat.infra.AttachmentProperties;
+import com.bifos.assistant.chat.infra.AttachmentStore;
 import com.bifos.assistant.chat.infra.ChatAttachmentRepository;
 import com.bifos.assistant.chat.infra.ChatMessageRepository;
 import com.bifos.assistant.chat.infra.ConversationRepository;
@@ -214,6 +215,8 @@ class ChatAttachmentTurnTest {
         StringBuilder expected = new StringBuilder(artifactPreamble(conversationId))
                 .append("[이번 메시지에 올린 사진]\n")
                 .append(AGENT_ROOT)
+                .append("/users/")
+                .append(AttachmentStore.userDirectoryKey(dad.id()))
                 .append("/")
                 .append(conversationId)
                 .append("\n");
@@ -395,6 +398,40 @@ class ChatAttachmentTurnTest {
         assertThat(userContentsOf(conversationId)).isEmpty();
         assertThat(attachmentRows.findById(photo.id()).orElseThrow().messageId())
                 .isNull();
+    }
+
+    @Test
+    @DisplayName("다른 사용자 소유 그룹 에이전트는 사진을 받지 않고 실행도 시작하지 않는다")
+    void groupAgentOwnedByAnotherUserRejectsPhotos() {
+        CurrentUser mom = member("mom@example.com");
+        Agent shared = agentOf(dad, "shared");
+        shared.changeAccess(true, AgentVisibility.GROUP, dad.id());
+        agents.save(shared);
+        assertThat(shared.acceptsAttachments()).isFalse();
+        Long conversationId = chat.startEmpty(mom, "shared").id();
+        ChatAttachment photo = upload(mom, conversationId, "b.png");
+
+        assertRejected(() -> chat.send(mom, conversationId, "사진 봐", null, List.of(photo.id())));
+
+        assertThat(userContentsOf(conversationId)).isEmpty();
+        assertThat(attachmentRows.findById(photo.id()).orElseThrow().messageId())
+                .isNull();
+    }
+
+    @Test
+    @DisplayName("사진을 보낸 뒤 에이전트 주인이 바뀌면 다시 생성도 거절한다")
+    void regenerationRejectsAttachmentOwnerMismatch() {
+        Long conversationId = chat.startEmpty(dad, "dad").id();
+        ChatAttachment photo = upload(dad, conversationId, "a.png");
+        chat.send(dad, conversationId, "사진 봐", null, List.of(photo.id()));
+        Agent changed = agents.findByCode("dad").orElseThrow();
+        CurrentUser mom = member("mom@example.com");
+        changed.changeAccess(true, AgentVisibility.PRIVATE, mom.id());
+        agents.save(changed);
+
+        assertRejected(() -> chat.regenerate(dad, conversationId, event -> {}));
+
+        assertThat(stub().received()).hasSize(1);
     }
 
     @Test

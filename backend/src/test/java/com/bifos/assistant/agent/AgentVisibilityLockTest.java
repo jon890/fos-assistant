@@ -58,7 +58,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 class AgentVisibilityLockTest {
 
     /** plugin 틀이 붙이는 안전한 기본 도구다. 셸과 파일 등급이 없다. */
-    private static final List<String> SAFE_TOOLSETS = List.of("web", "skills", "todo", "vision");
+    private static final List<String> SAFE_TOOLSETS = List.of("web", "skills", "todo");
 
     private static final String DEMO = "demo-notes";
 

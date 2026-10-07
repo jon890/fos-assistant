@@ -54,8 +54,9 @@ public class HttpHermesConnectorClient implements HermesConnectorClient {
     private final RestClient executeClient;
     private final String baseUrl;
     private final String token;
+    private final SandboxAttachmentDirectory attachmentDirectory;
 
-    public HttpHermesConnectorClient(HermesProperties properties) {
+    public HttpHermesConnectorClient(HermesProperties properties, SandboxAttachmentDirectory attachmentDirectory) {
         SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
         factory.setConnectTimeout(properties.connectTimeout());
         factory.setReadTimeout(properties.readTimeout());
@@ -67,6 +68,7 @@ public class HttpHermesConnectorClient implements HermesConnectorClient {
         this.executeClient = client.mutate().requestFactory(executeFactory).build();
         this.baseUrl = properties.dashboardBaseUrl().replaceAll("/$", "");
         this.token = properties.dashboardToken();
+        this.attachmentDirectory = attachmentDirectory;
     }
 
     @Override
@@ -227,12 +229,16 @@ public class HttpHermesConnectorClient implements HermesConnectorClient {
     }
 
     @Override
-    public InstallResult putConnector(String profile, String connectorId, boolean enabled) {
+    public InstallResult putConnector(String profile, String connectorId, boolean enabled, String sandboxOwner) {
+        // 끄는 요청은 실행 공간을 열지 않으므로 첨부 디렉터리 문제로 막지 않는다.
+        if (enabled) {
+            attachmentDirectory.ensure(sandboxOwner);
+        }
         JsonNode body = request(() -> client.put()
                 .uri(baseUrl + "/api/connectors")
                 .header(AUTHORIZATION, bearer())
                 .contentType(MediaType.APPLICATION_JSON)
-                .body(Map.of(PROFILE, profile, PLUGIN, connectorId, ENABLED, enabled))
+                .body(Map.of(PROFILE, profile, PLUGIN, connectorId, ENABLED, enabled, "sandbox_owner", sandboxOwner))
                 .retrieve()
                 .body(JsonNode.class));
         return installResult(body, profile, connectorId, enabled);

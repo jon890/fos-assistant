@@ -74,7 +74,7 @@ class AttachmentCleanerClockTest {
                 ChatAttachment.of(conversationId, 9202L, "photo.png", "image/png", 3, expiresAt, Instant.now()));
         attachment.nameStoredFile(AttachmentStore.storedName(attachment.id(), "png"));
         attachments.save(attachment);
-        store.save(conversationId, attachment.id(), "png", new ByteArrayInputStream(new byte[] {1, 2, 3}));
+        store.save(attachment, new ByteArrayInputStream(new byte[] {1, 2, 3}));
         return attachment;
     }
 
