@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.tuple;
 import static org.mockito.ArgumentMatchers.anyBoolean;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
@@ -40,6 +41,7 @@ import com.bifos.assistant.connector.infra.ConnectorActionRepository;
 import com.bifos.assistant.connector.infra.ConnectorBindingRepository;
 import com.bifos.assistant.connector.infra.ConnectorConnectionRepository;
 import com.bifos.assistant.connector.infra.ConnectorToolGrantRepository;
+import com.bifos.assistant.feedback.application.FeedbackConversations;
 import com.bifos.assistant.hermes.ConnectorExecutionUnknown;
 import com.bifos.assistant.hermes.HermesConnectorClient;
 import com.bifos.assistant.hermes.HermesConnectorClient.InstallResult;
@@ -192,6 +194,10 @@ class ConnectorActionServiceTest {
     @MockitoBean
     HermesConnectorClient connector;
 
+    /** 이 검사의 대화 번호는 대화 줄 없이 쓰는 고정 값이라, 판단 피드백이 남아 있는 대화로 보게 한다. */
+    @MockitoBean
+    FeedbackConversations feedbackConversations;
+
     private final List<Long> createdChecks = new ArrayList<>();
 
     private AppUser owner;
@@ -203,6 +209,7 @@ class ConnectorActionServiceTest {
     @BeforeEach
     void setUp() {
         jdbc.update("DELETE FROM decision_feedback_event");
+        when(feedbackConversations.isActive(anyLong())).thenReturn(true);
         jdbc.update("DELETE FROM connector_action");
         jdbc.update("DELETE FROM connector_tool_grant");
         bindings.deleteAll();
