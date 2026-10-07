@@ -150,6 +150,7 @@ test("한 번에 한 줄만 펼친다", async ({ page }) => {
 test("MEMBER 역할은 그룹 기억을 열어도 고치기와 지우기를 보지 않는다", async ({
   context,
   page,
+  isolatedMember,
 }, testInfo) => {
   const title = `MEMBER 편집 금지 ${testInfo.project.name} ${Date.now()}`;
   try {
@@ -158,10 +159,11 @@ test("MEMBER 역할은 그룹 기억을 열어도 고치기와 지우기를 보�
       title,
       content: "그룹만 아는 내용",
     });
-    await setSession(context, {
-      email: "member@example.com",
-      name: "가족 사용자",
-    });
+    await setSession(context, isolatedMember);
+    // 화면의 병렬 조회보다 먼저 사용자를 준비하고 이 시험에서 쓸 권한을 확인한다.
+    const me = await page.request.get("/api/me");
+    expect(me.ok()).toBeTruthy();
+    expect((await me.json()).role).toBe("MEMBER");
     await page.goto("/memory");
     const row = memoryRow(page, title);
     await expect(row.getByText("그룹", { exact: true })).toBeVisible();

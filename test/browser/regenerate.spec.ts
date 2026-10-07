@@ -1,4 +1,5 @@
 import { expect, test } from "./fixtures.ts";
+import { clickAndWaitForResponse, waitForViewTransition } from "./helpers.ts";
 
 async function ask(
   page: import("../../web/node_modules/@playwright/test/index.js").Page,
@@ -177,10 +178,17 @@ test("답 없는 질문을 다시 시도해 같은 질문에 답을 붙인다", 
   await page.getByRole("textbox", { name: "메시지" }).fill("중지 조각 전 검사");
   await page.getByRole("button", { name: "보내기" }).click();
   await hermes.waitForHeldRun();
-  await page
+  const stop = page
     .getByTestId("composer-shell")
-    .getByRole("button", { name: "중지" })
-    .click();
+    .getByRole("button", { name: "중지" });
+  await expect(stop).toBeEnabled();
+  await waitForViewTransition(page);
+  await clickAndWaitForResponse(
+    page,
+    stop,
+    "POST",
+    /\/api\/chat\/executions\/\d+\/stop$/,
+  );
   await expect(page.getByTestId("no-answer")).toBeVisible({ timeout: 30_000 });
   await page.getByRole("button", { name: "다시 시도" }).click();
   await expect(page.getByTestId("assistant-message")).toHaveCount(1, {

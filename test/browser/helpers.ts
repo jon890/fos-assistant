@@ -51,3 +51,19 @@ export const FIXED_BROWSER_NOW = new Date("2026-10-07T03:00:00Z");
 export async function fixBrowserTime(page: Page, at = FIXED_BROWSER_NOW) {
   await page.clock.setFixedTime(at);
 }
+
+/** 화면 전환의 스냅샷이 사라져 실제 단추가 포인터 사건을 받을 때까지 기다린다. */
+export async function waitForViewTransition(page: Page) {
+  await page.waitForFunction(() =>
+    document
+      .getAnimations()
+      .every(
+        (animation) =>
+          !(
+            animation.effect instanceof KeyframeEffect &&
+            animation.effect.pseudoElement?.startsWith("::view-transition") &&
+            animation.playState !== "finished"
+          ),
+      ),
+  );
+}

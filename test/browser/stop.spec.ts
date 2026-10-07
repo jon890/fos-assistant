@@ -1,5 +1,6 @@
 import { CONVERSATION_ID, conversationIdOf, expect, test } from "./fixtures.ts";
 import type { Page } from "../../web/node_modules/@playwright/test/index.js";
+import { waitForViewTransition } from "./helpers.ts";
 
 const PNG_1X1 = Buffer.from(
   "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=",
@@ -201,6 +202,7 @@ test("중지에 마우스를 올려 풀이가 열려 있어도 첫 Esc 로 답�
     .getByTestId("composer-shell")
     .getByRole("button", { name: "중지" });
   await expect(stop).toBeEnabled();
+  await waitForViewTransition(page);
   await stop.hover();
   await expect(page.getByRole("tooltip")).toHaveText("중지");
   await page.keyboard.press("Escape");
