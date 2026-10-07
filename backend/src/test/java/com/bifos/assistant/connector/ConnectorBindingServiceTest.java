@@ -24,6 +24,7 @@ import com.bifos.assistant.agent.domain.type.AgentVisibility;
 import com.bifos.assistant.agent.domain.type.CostMode;
 import com.bifos.assistant.agent.domain.type.CredentialScope;
 import com.bifos.assistant.agent.infra.AgentRepository;
+import com.bifos.assistant.connector.application.ConnectorBindingApplier;
 import com.bifos.assistant.connector.application.ConnectorBindingService;
 import com.bifos.assistant.connector.application.ConnectorConnectionService;
 import com.bifos.assistant.connector.application.model.AdminConnectionSnapshot;
@@ -136,6 +137,9 @@ class ConnectorBindingServiceTest {
 
     @Autowired
     ConnectorBindingService service;
+
+    @Autowired
+    ConnectorBindingApplier applier;
 
     @Autowired
     ConnectorConnectionService connectionService;
@@ -280,14 +284,14 @@ class ConnectorBindingServiceTest {
         when(connector.bindConnector(anyString(), anyString(), anyString(), anyString()))
                 .thenReturn(new InstallResult(false, false, true));
         service.bind(owner, agent.code(), DEMO);
-        assertThat(service.applyDue()).as("예정 시각 전").isZero();
+        assertThat(applier.applyDue()).as("예정 시각 전").isZero();
         jdbc.update("UPDATE agent_connector_binding SET apply_due_at = ?", Timestamp.from(LONG_AGO));
         // gateway 가 이미 연결했으므로 다시 보낸 설치는 바뀐 것이 없다.
         when(connector.bindConnector(anyString(), anyString(), anyString(), anyString()))
                 .thenReturn(new InstallResult(false, false));
         clearInvocations(connector);
 
-        assertThat(service.applyDue()).isEqualTo(1);
+        assertThat(applier.applyDue()).isEqualTo(1);
 
         InOrder order = inOrder(connector);
         order.verify(connector).bindConnector(anyString(), eq(DEMO), anyString(), anyString());
@@ -296,7 +300,7 @@ class ConnectorBindingServiceTest {
         ConnectorBinding stored = onlyBinding();
         assertThat(stored.status()).isEqualTo(BindingStatus.READY);
         assertThat(stored.applyDueAt()).isNull();
-        assertThat(service.applyDue()).as("다시 부르기").isZero();
+        assertThat(applier.applyDue()).as("다시 부르기").isZero();
     }
 
     @Test
@@ -313,13 +317,13 @@ class ConnectorBindingServiceTest {
                 .thenReturn(new InstallResult(false, false));
         when(connector.probe(anyString(), anyString())).thenReturn(new ProbeResult(false, List.of()));
 
-        assertThat(service.applyDue()).isEqualTo(1);
+        assertThat(applier.applyDue()).isEqualTo(1);
 
         ConnectorBinding stored = onlyBinding();
         assertThat(stored.status()).isEqualTo(BindingStatus.PENDING);
         assertThat(stored.applyDueAt()).isNull();
         clearInvocations(connector);
-        assertThat(service.applyDue()).as("다시 부르기").isZero();
+        assertThat(applier.applyDue()).as("다시 부르기").isZero();
         verify(connector, never()).bindConnector(anyString(), anyString(), anyString(), anyString());
     }
 
@@ -336,7 +340,7 @@ class ConnectorBindingServiceTest {
         clearInvocations(connector);
 
         Instant before = Instant.now();
-        assertThat(service.applyDue()).isEqualTo(1);
+        assertThat(applier.applyDue()).isEqualTo(1);
 
         verify(connector, never()).probe(anyString(), anyString());
         ConnectorBinding stored = onlyBinding();
@@ -356,7 +360,7 @@ class ConnectorBindingServiceTest {
         jdbc.update("UPDATE agent_connector_binding SET apply_due_at = ?", Timestamp.from(LONG_AGO));
         clearInvocations(connector);
 
-        assertThat(service.applyDue()).isZero();
+        assertThat(applier.applyDue()).isZero();
 
         verify(connector, never()).bindConnector(anyString(), anyString(), anyString(), anyString());
         ConnectorBinding stored = onlyBinding();
@@ -377,7 +381,7 @@ class ConnectorBindingServiceTest {
         jdbc.update("UPDATE agent SET deleted_at = ? WHERE id = ?", Timestamp.from(Instant.now()), agent.id());
         clearInvocations(connector);
 
-        assertThat(service.applyDue()).as("지워진 에이전트는 대상이 아니다").isZero();
+        assertThat(applier.applyDue()).as("지워진 에이전트는 대상이 아니다").isZero();
 
         verify(connector, never()).bindConnector(anyString(), anyString(), anyString(), anyString());
         verify(connector, never()).probe(anyString(), anyString());
@@ -400,7 +404,7 @@ class ConnectorBindingServiceTest {
         when(connector.readCatalog()).thenThrow(new IllegalStateException("catalog down"));
         clearInvocations(connector);
 
-        assertThat(service.applyDue()).isZero();
+        assertThat(applier.applyDue()).isZero();
 
         verify(connector, never()).bindConnector(anyString(), anyString(), anyString(), anyString());
         ConnectorBinding stored = onlyBinding();
