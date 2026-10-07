@@ -11,6 +11,8 @@ import java.util.Set;
 import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
+import lombok.AccessLevel;
+import lombok.NoArgsConstructor;
 
 /**
  * 시나리오 실행 결과를 지표로 센다. 지표의 정의는 {@code docs/backend/proactive-eval.md} 의 「지표」 가 갖는다.
@@ -18,13 +20,12 @@ import java.util.stream.Collectors;
  * <p>판단(ranking)과 최종 행동 수준(policy)을 따로 센다. 실제 시간은 기계마다 다르므로 비교 지표에 넣지 않고, provider 가 기록한 흉내
  * 지연과 비용만 센다.
  */
+@NoArgsConstructor(access = AccessLevel.PRIVATE)
 final class EvalScoreboard {
 
     static final String DROPPED = EvalDataset.Truth.DROPPED;
     private static final Set<String> PROMOTED = Set.of("SURFACE", "ASK_APPROVAL", "EXECUTE");
     private static final Set<String> SILENT = Set.of("IGNORE", DROPPED);
-
-    private EvalScoreboard() {}
 
     /**
      * 후보 하나의 결과다.
