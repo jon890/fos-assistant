@@ -526,6 +526,7 @@ class ProactiveCheckTurnTest {
         ProactiveCheck second = checksOf(conversation).getLast();
         assertThat(second.newFindings()).isZero();
         assertThat(second.referenceFindings()).isEqualTo(1);
+        assertThat(second.report()).as("단추로 연 살펴보기는 되풀이만 있어도 보고를 남긴다").isNotNull();
         assertThat(findingsOf(conversation))
                 .filteredOn(finding -> finding.checkId().equals(second.id()))
                 .extracting(ProactiveCheckFinding::reason)
@@ -579,6 +580,37 @@ class ProactiveCheckTurnTest {
                 .filteredOn(problem -> problem.checkId().equals(second.id()))
                 .extracting(ProactiveCheckProblem::dropReason)
                 .containsExactly(ProblemDropReason.DUPLICATE);
+    }
+
+    @Test
+    @DisplayName("예약 살펴보기는 되풀이 발견의 새 문제 후보를 저장하면서 답과 보고는 남기지 않는다")
+    void savesProblemFromRepeatedFindingWithoutScheduledReport() {
+        stub().willAnswer(command -> answer(problemBlock(PROBLEM_KEY, null, false)));
+        Conversation conversation = runCheck();
+        ProactiveCheck first = onlyCheckOf(conversation);
+        first.openReport(Instant.now());
+        checks.save(first);
+        int messageCount =
+                messages.findByConversationIdOrderByIdAsc(conversation.id()).size();
+        stub().willAnswer(command -> answer(problemBlock("study:another-gap", null, false)));
+
+        service.start(owner, agent.code(), CheckTrigger.SCHEDULED);
+        awaitIdle(conversation.id());
+
+        ProactiveCheck second = checksOf(conversation).getLast();
+        assertThat(second.status()).isEqualTo(CheckStatus.SUCCEEDED);
+        assertThat(second.newFindings()).isZero();
+        assertThat(second.referenceFindings()).isEqualTo(1);
+        assertThat(second.report()).isNull();
+        assertThat(messages.findByConversationIdOrderByIdAsc(conversation.id())).hasSize(messageCount);
+        assertThat(problemsOf(conversation))
+                .filteredOn(problem -> problem.checkId().equals(second.id()))
+                .extracting(ProactiveCheckProblem::status)
+                .containsExactly(ProblemStatus.ACCEPTED);
+        assertThat(findingsOf(conversation))
+                .filteredOn(finding -> finding.checkId().equals(second.id()))
+                .extracting(ProactiveCheckFinding::reason)
+                .containsExactly(FindingReason.REPEATED);
     }
 
     @Test
