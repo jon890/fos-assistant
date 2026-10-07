@@ -97,7 +97,7 @@ public class BrowserScreens implements AutoCloseable {
     }
 
     /** 그 브라우저에 열린 화면이 있는가. */
-    public boolean isOpen(Long browserId) {
+    boolean isOpen(Long browserId) {
         return screens.containsKey(browserId);
     }
 

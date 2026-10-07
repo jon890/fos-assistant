@@ -53,4 +53,32 @@ class BrowserScreenStreamTest {
         assertThat(stream.send("frame", Map.of())).isFalse();
         assertThat(stream.ping()).isFalse();
     }
+
+    @Test
+    @DisplayName("진행 중인 프레임 쓰기가 곧 끝나면 closed 는 잠깐 기다렸다가 보낸다")
+    void sendsClosedAfterShortWrite() throws InterruptedException {
+        CountDownLatch writing = new CountDownLatch(1);
+        AtomicInteger sent = new AtomicInteger();
+        SseEmitter emitter = new SseEmitter(0L) {
+            @Override
+            public void send(SseEventBuilder builder) throws IOException {
+                if (sent.incrementAndGet() == 1) {
+                    writing.countDown();
+                    try {
+                        Thread.sleep(100);
+                    } catch (InterruptedException ex) {
+                        Thread.currentThread().interrupt();
+                        throw new IOException("interrupted", ex);
+                    }
+                }
+            }
+        };
+        BrowserScreenStream stream = new BrowserScreenStream(emitter);
+        Thread writer = Thread.ofPlatform().start(() -> stream.send("frame", Map.of()));
+        assertThat(writing.await(2, TimeUnit.SECONDS)).isTrue();
+
+        assertThat(stream.trySend("closed", Map.of("reason", "replaced"))).isTrue();
+        writer.join(2000);
+        assertThat(sent.get()).isEqualTo(2);
+    }
 }
