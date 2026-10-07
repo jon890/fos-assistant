@@ -33,6 +33,7 @@ import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.testsupport.BackendIntegrationTest;
+import com.bifos.assistant.testsupport.OverrideProperties;
 import com.bifos.assistant.usage.application.ExecutionDeliveryWriter;
 import com.bifos.assistant.usage.domain.AgentExecution;
 import com.bifos.assistant.usage.domain.DelegationKey;
@@ -63,7 +64,6 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.test.context.TestPropertySource;
 
 /**
  * 위임 시작의 제출 대기, 서버 전체 한도, 답 자르기, 같은 호출의 동시 요청, 중지를 고정한다(ADR-017).
@@ -72,14 +72,13 @@ import org.springframework.test.context.TestPropertySource;
  * 돌므로 각 검사는 자기가 띄운 실행이 끝날 때까지 기다린 뒤 끝난다.
  */
 @BackendIntegrationTest
-@TestPropertySource(
-        properties = {
-            "assistant.delegation.submit-timeout=300ms",
-            "assistant.delegation.max-active=2",
-            "assistant.delegation.output-max-chars=20",
-            "assistant.delegation.status-wait-max=2s",
-            "assistant.proactive-check.max-delegations=2"
-        })
+@OverrideProperties({
+    "assistant.delegation.submit-timeout=300ms",
+    "assistant.delegation.max-active=2",
+    "assistant.delegation.output-max-chars=20",
+    "assistant.delegation.status-wait-max=2s",
+    "assistant.proactive-check.max-delegations=2"
+})
 class AgentDelegationServiceTest {
 
     private static final String CHIEF_PROFILE = "delegation-chief";

@@ -37,6 +37,7 @@ import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.testsupport.BackendIntegrationTest;
+import com.bifos.assistant.testsupport.OverrideProperties;
 import com.bifos.assistant.usage.application.ExecutionRecorder;
 import com.bifos.assistant.usage.application.UserExecutionLimiter;
 import com.bifos.assistant.usage.domain.CatalogPrice;
@@ -64,7 +65,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import tools.jackson.databind.ObjectMapper;
 
@@ -75,12 +75,11 @@ import tools.jackson.databind.ObjectMapper;
  * 만들기가 끝나기를 기다린 뒤 결과를 읽는다. 다른 검사에서는 추천이 꺼져 있고 이 검사만 켠다.
  */
 @BackendIntegrationTest
-@TestPropertySource(
-        properties = {
-            "assistant.starters.enabled=true",
-            "assistant.starters.refresh-after=24h",
-            "assistant.starters.retry-after-failure=10m"
-        })
+@OverrideProperties({
+    "assistant.starters.enabled=true",
+    "assistant.starters.refresh-after=24h",
+    "assistant.starters.retry-after-failure=10m"
+})
 class StarterSuggestionServiceTest {
 
     private static final CurrentUser DAD = new CurrentUser(81L, "dad@example.com", "아빠", 1L, UserRole.MEMBER);
@@ -88,7 +87,7 @@ class StarterSuggestionServiceTest {
     private static final List<String> FOUR = List.of("일정 정리해 줘", "장보기 목록 만들어 줘", "날씨 알려 줘", "가계부 요약해 줘");
 
     @Autowired
-    StarterProperties properties;
+    LiveProperties<StarterProperties> properties;
 
     @Autowired
     AgentService agentService;
@@ -149,7 +148,7 @@ class StarterSuggestionServiceTest {
                 DAD.id(),
                 Instant.now()));
         service = new StarterSuggestionService(
-                LiveProperties.fixed(StarterProperties.class, properties),
+                properties,
                 agentService,
                 conversations,
                 messages,
@@ -253,7 +252,7 @@ class StarterSuggestionServiceTest {
                 .when(rejecting)
                 .requireRunnable(any(), any(), any());
         service = new StarterSuggestionService(
-                LiveProperties.fixed(StarterProperties.class, properties),
+                properties,
                 agentService,
                 conversations,
                 messages,
@@ -377,7 +376,7 @@ class StarterSuggestionServiceTest {
         ExecutionRecorder failingRecorder = spy(executions);
         doThrow(new IllegalStateException("저장 실패")).when(failingRecorder).complete(any(), any(), any(), any());
         service = new StarterSuggestionService(
-                LiveProperties.fixed(StarterProperties.class, properties),
+                properties,
                 agentService,
                 conversations,
                 messages,

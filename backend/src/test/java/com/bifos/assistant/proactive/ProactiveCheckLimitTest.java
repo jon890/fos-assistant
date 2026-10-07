@@ -44,6 +44,7 @@ import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.testsupport.BackendIntegrationTest;
 import com.bifos.assistant.testsupport.LongProactiveCheckTimeouts;
+import com.bifos.assistant.testsupport.OverrideProperties;
 import com.bifos.assistant.usage.domain.AgentExecution;
 import com.bifos.assistant.usage.infra.AgentExecutionRepository;
 import com.bifos.assistant.usage.infra.ExecutionEventRepository;
@@ -64,7 +65,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.test.context.TestPropertySource;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /**
@@ -76,11 +76,10 @@ import org.springframework.transaction.support.TransactionTemplate;
  */
 @BackendIntegrationTest
 @LongProactiveCheckTimeouts
-@TestPropertySource(
-        properties = {
-            "assistant.proactive-check.max-tool-calls=" + ProactiveCheckLimitTest.MAX_TOOL_CALLS,
-            "assistant.memory.propose.enabled=false"
-        })
+@OverrideProperties({
+    "assistant.proactive-check.max-tool-calls=" + ProactiveCheckLimitTest.MAX_TOOL_CALLS,
+    "assistant.memory.propose.enabled=false"
+})
 class ProactiveCheckLimitTest {
 
     static final int MAX_TOOL_CALLS = 3;

@@ -56,8 +56,8 @@ import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
  *       모두 끝나기를 기다리고 대역과 시계를 되돌린다
  * </ul>
  *
- * <p>기동할 때 정해지는 설정을 바꾸는 검사는 {@code @TestPropertySource} 를 더한다. 그 값 묶음마다 컨텍스트가 하나 늘어나므로,
- * 같은 값을 쓰는 검사는 같은 문자열을 쓴다. 쓰는 법은 {@code docs/backend/testing.md} 가 갖는다.
+ * <p>설정을 바꾸는 검사는 {@link OverrideProperties} 를 더한다. {@link IntegrationTestIsolation} 이 검사마다 적용하고 되돌리므로
+ * 컨텍스트가 늘지 않는다. 쓰는 법은 {@code docs/backend/testing.md} 「설정 바꾸기」 가 갖는다.
  *
  * <p>{@link IntegrationTestIsolation} 은 {@code @SpringBootTest} 보다 뒤에 등록한다. JUnit 은 {@code AfterEachCallback} 을
  * 등록의 역순으로 부르므로, 이 순서여야 Spring 의 mock 초기화와 트랜잭션 되돌리기보다 join 이 먼저 돈다.

@@ -35,6 +35,7 @@ import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.testsupport.BackendIntegrationTest;
 import com.bifos.assistant.testsupport.DelegationWakeEnabled;
+import com.bifos.assistant.testsupport.OverrideProperties;
 import com.bifos.assistant.testsupport.SamplePriceCatalog;
 import com.bifos.assistant.usage.application.UserExecutionLimiter;
 import com.bifos.assistant.usage.domain.AgentExecution;
@@ -57,7 +58,6 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.web.server.context.WebServerApplicationContext;
-import org.springframework.test.context.TestPropertySource;
 
 /**
  * 기동할 때 {@code RUNNING} 으로 남은 실행을 Hermes 에 물어 정하는 것을 본다.
@@ -68,12 +68,11 @@ import org.springframework.test.context.TestPropertySource;
 @BackendIntegrationTest
 @DelegationWakeEnabled
 @SamplePriceCatalog
-@TestPropertySource(
-        properties = {
-            // 상한을 넘겨 FAILED 로 적은 줄의 사용자 자리가 남아 있는 것을 볼 동안 돌려주지 않게 길게 둔다.
-            // 그 자리를 남기는 검사는 끝나기 전에 그 run 을 모른다고 답하게 해 돌려받는다.
-            "assistant.user-execution.remote-end-max-wait=30s"
-        })
+@OverrideProperties({
+    // 상한을 넘겨 FAILED 로 적은 줄의 사용자 자리가 남아 있는 것을 볼 동안 돌려주지 않게 길게 둔다.
+    // 그 자리를 남기는 검사는 끝나기 전에 그 run 을 모른다고 답하게 해 돌려받는다.
+    "assistant.user-execution.remote-end-max-wait=30s"
+})
 class RestartReconcilerTest {
 
     private static final Duration WAIT_LIMIT = Duration.ofSeconds(10);

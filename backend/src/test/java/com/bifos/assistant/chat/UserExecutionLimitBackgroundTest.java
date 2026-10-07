@@ -30,6 +30,7 @@ import com.bifos.assistant.shared.config.LiveProperties;
 import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.testsupport.BackendIntegrationTest;
 import com.bifos.assistant.testsupport.MemoryProposeEnabled;
+import com.bifos.assistant.testsupport.OverrideProperties;
 import com.bifos.assistant.testsupport.SmallExecutionLimit;
 import com.bifos.assistant.usage.application.ExecutionRecorder;
 import com.bifos.assistant.usage.application.UserExecutionLimiter;
@@ -51,7 +52,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.test.context.TestPropertySource;
 import tools.jackson.databind.ObjectMapper;
 
 /**
@@ -63,18 +63,17 @@ import tools.jackson.databind.ObjectMapper;
 @BackendIntegrationTest
 @SmallExecutionLimit
 @MemoryProposeEnabled
-@TestPropertySource(
-        properties = {
-            "assistant.user-execution.background-reserve=1",
-            "assistant.starters.enabled=true",
-            "assistant.starters.retry-after-failure=10m"
-        })
+@OverrideProperties({
+    "assistant.user-execution.background-reserve=1",
+    "assistant.starters.enabled=true",
+    "assistant.starters.retry-after-failure=10m"
+})
 class UserExecutionLimitBackgroundTest {
 
     private static final String PROMPTS = "[\"일정 정리해 줘\",\"장보기 목록 만들어 줘\"]";
 
     @Autowired
-    StarterProperties starterProperties;
+    LiveProperties<StarterProperties> starterProperties;
 
     @Autowired
     AgentService agentService;
@@ -156,7 +155,7 @@ class UserExecutionLimitBackgroundTest {
                 Instant.now()));
         conversation = conversations.save(Conversation.startedBy(dad.id(), "대화", agent.id(), Instant.now()));
         starters = new StarterSuggestionService(
-                LiveProperties.fixed(StarterProperties.class, starterProperties),
+                starterProperties,
                 agentService,
                 conversations,
                 messages,

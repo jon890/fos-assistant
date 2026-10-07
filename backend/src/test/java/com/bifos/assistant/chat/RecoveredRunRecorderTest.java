@@ -32,6 +32,7 @@ import com.bifos.assistant.memory.infra.MemoryRepository;
 import com.bifos.assistant.orchestration.application.ResearchAndBuildFlow;
 import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.testsupport.BackendIntegrationTest;
+import com.bifos.assistant.testsupport.OverrideProperties;
 import com.bifos.assistant.testsupport.SamplePriceCatalog;
 import com.bifos.assistant.usage.domain.AgentExecution;
 import com.bifos.assistant.usage.domain.ExecutionEvent;
@@ -58,7 +59,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.event.ApplicationEvents;
 import org.springframework.test.context.event.RecordApplicationEvents;
 
@@ -70,7 +70,7 @@ import org.springframework.test.context.event.RecordApplicationEvents;
  */
 @BackendIntegrationTest
 @SamplePriceCatalog
-@TestPropertySource(properties = "assistant.delegation.output-max-chars=" + RecoveredRunRecorderTest.OUTPUT_MAX_CHARS)
+@OverrideProperties("assistant.delegation.output-max-chars=" + RecoveredRunRecorderTest.OUTPUT_MAX_CHARS)
 @RecordApplicationEvents
 class RecoveredRunRecorderTest {
 

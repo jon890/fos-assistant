@@ -40,16 +40,14 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.test.context.TestPropertySource;
 
 /**
  * 사용량 목록이 자식 여부를 어떻게 붙이는지 본다.
  *
- * <p>질의 수를 세려고 통계를 켠 별도의 문맥으로 띄운다. 세는 것은 <b>목록 길이가 늘어도 자식 확인이 한
+ * <p>질의 수는 Hibernate 통계로 센다. 통계는 test profile 이 켠다. 세는 것은 <b>목록 길이가 늘어도 자식 확인이 한
  * 번인가</b> 하나다. 목록 조회 전체의 질의 수가 아니다.
  */
 @BackendIntegrationTest
-@TestPropertySource(properties = "spring.jpa.properties.hibernate.generate_statistics=true")
 class UsageControllerTest {
 
     private static final Long USER_ID = 4_401L;
@@ -92,8 +90,8 @@ class UsageControllerTest {
                 .orElseGet(() -> agents.save(Agent.of(
                         "list-dad",
                         "목록 아빠",
-                        "dad",
-                        "http://127.0.0.1:1/p/dad",
+                        "list-dad",
+                        "http://127.0.0.1:1/p/list-dad",
                         CostMode.SUBSCRIPTION,
                         CredentialScope.SHARED_HOUSEHOLD,
                         AgentVisibility.PRIVATE,

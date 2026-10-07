@@ -35,6 +35,7 @@ import com.bifos.assistant.proactive.infra.ProactiveCheckRepository;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.testsupport.BackendIntegrationTest;
+import com.bifos.assistant.testsupport.OverrideProperties;
 import com.bifos.assistant.usage.domain.AgentExecution;
 import com.bifos.assistant.usage.infra.AgentExecutionRepository;
 import com.bifos.assistant.usage.infra.ExecutionEventRepository;
@@ -51,7 +52,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.test.context.TestPropertySource;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /**
@@ -61,11 +61,10 @@ import org.springframework.transaction.support.TransactionTemplate;
  * <p>모든 데이터는 합성이다.
  */
 @BackendIntegrationTest
-@TestPropertySource(
-        properties = {
-            "hermes.run-timeout=30s",
-            "assistant.proactive-check.max-duration=" + ProactiveCheckTimeLimitTest.MAX_DURATION_MILLIS + "ms"
-        })
+@OverrideProperties({
+    "hermes.run-timeout=30s",
+    "assistant.proactive-check.max-duration=" + ProactiveCheckTimeLimitTest.MAX_DURATION_MILLIS + "ms"
+})
 class ProactiveCheckTimeLimitTest {
 
     static final long MAX_DURATION_MILLIS = 1000;

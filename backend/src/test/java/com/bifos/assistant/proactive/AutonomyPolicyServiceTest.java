@@ -53,6 +53,7 @@ import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.testsupport.BackendIntegrationTest;
+import com.bifos.assistant.testsupport.OverrideProperties;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.Arrays;
@@ -64,14 +65,13 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /** 판정 저장, 실행 키, 시작 경로 연결을 본다. 시작 경로는 대역이며 Hermes 를 부르지 않는다. */
 @BackendIntegrationTest
-@TestPropertySource(properties = "assistant.autonomy.execution-enabled=true")
+@OverrideProperties("assistant.autonomy.execution-enabled=true")
 class AutonomyPolicyServiceTest {
 
     private static final CurrentUser OWNER =
