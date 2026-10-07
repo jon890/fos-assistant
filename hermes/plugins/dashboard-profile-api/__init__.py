@@ -3028,12 +3028,16 @@ def _sandbox_terminal(policy: dict, profile: str, owner: str, attachment_snapsho
                             _sandbox_attachment_agent_directory(policy, owner)),
         ] + ["%s:ro" % m for m in mounts],
         "docker_forward_env": [],
-        "docker_env": settings["env"],
         "env_passthrough": [],
         "credential_files": [],
         "container_cpu": policy["cpu"],
         "container_memory": policy["memory_mb"],
     }
+    # 빈 `docker_env` 는 칸을 두지 않는다. Hermes 의 config 저장은 빈 dict 를 기본값과 같다고 보고 지우므로
+    # (빈 dict 는 `_explicit_config_paths` 의 잎 경로가 아니라 보존되지 않는다), 칸을 넣고 지문을 계산하면
+    # 저장된 terminal 로 다시 계산한 지문이 키와 어긋난다. 칸이 없으면 Hermes 는 같은 기본값 `{}` 를 쓴다.
+    if settings["env"]:
+        terminal["docker_env"] = settings["env"]
     # Hermes 의 docker backend 는 컨테이너를 label 로만 찾아 다시 쓰고, 프로세스 안의 캐시는
     # 지워진 컨테이너를 옛 run 인자로 다시 만든다. 마운트나 이미지가 바뀌어도 새 컨테이너가 생기지 않는다.
     # 이 키가 label 과 캐시 키와 /root 의 디렉터리 이름을 정하므로, 주인이나 실행 공간 설정이 바뀌면
