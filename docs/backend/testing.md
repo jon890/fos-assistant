@@ -27,6 +27,8 @@ class ConversationPagingTest {
 | Hermes 사건 스트림, toolset, 커넥터, 스킬, 모델, 대시보드 클라이언트의 Mockito mock | `@Autowired` 로 받아 `when(...)` 으로 정한다 | Spring 이 초기화한다 |
 | 운영 빈 몇 개의 Mockito spy | `@Autowired` 로 받아 `doReturn(...)`, `verify(...)` 를 쓴다 | Spring 이 초기화한다 |
 
+예외가 둘 있다. MySQL 태그 검사의 기준 클래스, 그리고 기반이 mock 으로 바꾼 빈의 실제 구현이 필요한 검사다. 후자의 예는 실제 HTTP 서버로 Hermes 사건 스트림을 읽는 `SkillViewStreamTest` 다. 둘은 `@SpringBootTest` 로 따로 둔다.
+
 **검사 안에 `@MockitoBean`, `@MockitoSpyBean`, `@Import`, `@DynamicPropertySource` 를 더하면 컨텍스트가 하나 늘어난다.**
 기반에 있는 타입은 `@Autowired` 로 받는다.
 기반에 없는 빈을 바꿔야 하면 아래 「변형」 을 먼저 본다.

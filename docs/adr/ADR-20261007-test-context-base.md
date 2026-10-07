@@ -41,4 +41,5 @@
     - **검사는 앞 검사가 남긴 데이터에 기대지 않는다.** 스키마가 검사 클래스마다 새로 만들어지지 않는다. 고정된 유일 값(에이전트 code 등)을 쓰는 검사는 지운 것을 먼저 내보내거나 값을 검사마다 새로 만든다.
     - **기반의 spy 는 모든 통합 검사에서 spy 다.** 정하지 않으면 실제 동작이지만, 그 빈의 메서드를 `verify(...)` 의 matcher 사이에서 부르면 Mockito 가 matcher 수를 잘못 센다. 값은 먼저 지역 변수로 받는다.
     - **기반에 대역을 더하면 모든 검사가 바뀐다.** 더할 때는 전체 검사로 확인한다.
-- **적용 범위**: `backend/src/test` 의 Spring 통합 검사. MySQL 태그 검사의 기준 클래스는 이 결정 밖이다. 쓰는 방법은 [`docs/backend/testing.md`](../backend/testing.md) 가 갖는다.
+- **적용 범위**: `backend/src/test` 의 Spring 통합 검사. MySQL 태그 검사의 기준 클래스는 이 결정 밖이다.
+  기반이 mock 으로 바꾼 빈의 실제 구현이 필요한 검사(실제 HTTP 서버로 Hermes 사건 스트림을 읽는 `SkillViewStreamTest`)도 `@SpringBootTest` 로 따로 둔다. 쓰는 방법은 [`docs/backend/testing.md`](../backend/testing.md) 가 갖는다.
