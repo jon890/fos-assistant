@@ -1,0 +1,67 @@
+name: PR 크기
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, labeled, unlabeled]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pr-size-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  pr-size:
+    name: pr-size
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      large: ${{ steps.size.outputs.large }}
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: '22.18.0'
+          package-manager-cache: false
+      - name: 운영 코드 변경 줄 검사
+        id: size
+        env:
+          PR_BASE: ${{ github.event.pull_request.base.sha }}
+          PR_HEAD: ${{ github.event.pull_request.head.sha }}
+          PR_LABELS: ${{ toJSON(github.event.pull_request.labels.*.name) }}
+        run: node scripts/pr-size.mjs "$PR_BASE" "$PR_HEAD"
+
+  size-label:
+    # 쓰기 토큰을 가진 작업은 PR 코드를 체크아웃하거나 실행하지 않는다.
+    # 포크 PR은 크기를 검사하되 읽기 전용 토큰으로 라벨을 바꾸지 않는다.
+    if: always() && needs.pr-size.outputs.large != '' && github.event.pull_request.head.repo.full_name == github.repository
+    needs: pr-size
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      pull-requests: write
+      issues: write
+    steps:
+      - uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
+        env:
+          LARGE: ${{ needs.pr-size.outputs.large }}
+        with:
+          script: |
+            const params = { ...context.repo, issue_number: context.issue.number };
+            const label = '규모:큼';
+            const labels = await github.paginate(github.rest.issues.listLabelsOnIssue, { ...params, per_page: 100 });
+            const present = labels.some(item => item.name === label);
+            if (process.env.LARGE === 'true' && !present) {
+              try {
+                await github.rest.issues.createLabel({ ...context.repo, name: label, color: 'd93f0b', description: '운영 코드 변경 줄이 큰 PR' });
+              } catch (error) {
+                if (error.status !== 422) throw error;
+              }
+              await github.rest.issues.addLabels({ ...params, labels: [label] });
+            } else if (process.env.LARGE === 'false' && present) {
+              await github.rest.issues.removeLabel({ ...params, name: label });
+            }
