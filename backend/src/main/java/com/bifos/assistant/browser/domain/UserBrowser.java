@@ -119,6 +119,13 @@ public class UserBrowser {
         this.updatedAt = now;
     }
 
+    /** 끄다 실패해 남은 컨테이너를 지웠다. 줄은 {@code FAILED} 로 두고 컨테이너 번호만 비운다. */
+    public void clearLeftoverContainer(Instant now) {
+        require(UserBrowserStatus.FAILED);
+        this.containerId = null;
+        this.updatedAt = now;
+    }
+
     /** 끄기를 시작한다. 켜져 있거나 실패한 줄만 끈다. */
     public void beginStop(Instant now) {
         require(UserBrowserStatus.RUNNING, UserBrowserStatus.FAILED);

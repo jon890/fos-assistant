@@ -27,7 +27,8 @@ proxy 의 정책과 이미지, 망, 프로필 디렉터리의 위치는 운영 �
 
 | 요청 | 시작 상태 | 하는 일 | 끝 상태 |
 | --- | --- | --- | --- |
-| 켜기 | `STOPPED`, `FAILED` | `FAILED` 줄에 컨테이너 번호가 남아 있으면 먼저 그 컨테이너를 지운다. 동시 수를 센다. proxy 로 컨테이너를 만들고 켠다. CDP 의 `/json/version` 이 답할 때까지 30초 기다린다 | `RUNNING`. 실패하면 컨테이너를 지우고 `FAILED`. 남은 컨테이너를 지우지 못하면 `BROWSER_STOP_FAILED` 로 거절하고 `FAILED` 그대로 |
+| 만들기 | 줄 없음 | 지우다 만 프로필 디렉터리가 남아 있으면 비운 뒤 새로 만든다 | `STOPPED` |
+| 켜기 | `STOPPED`, `FAILED` | `FAILED` 줄에 컨테이너 번호가 남아 있으면 먼저 그 컨테이너를 지우고 번호를 비운다. 동시 수를 센다. proxy 로 컨테이너를 만들고 켠다. CDP 의 `/json/version` 이 답할 때까지 30초 기다린다 | `RUNNING`. 실패하면 컨테이너를 지우고 `FAILED`. 남은 컨테이너를 지우지 못하면 `BROWSER_STOP_FAILED` 로 거절하고 `FAILED` 그대로 |
 | 끄기 | `RUNNING`, `FAILED` | 컨테이너를 멈추고 지운다 | `STOPPED` |
 | 지우기 | `STOPPED`, `RUNNING`, `FAILED` | 끄기를 한 뒤 끈 줄을 그 버전으로 지우고, 지운 뒤에 프로필 디렉터리를 지운다. | 줄 없음. 그 사이 다른 전이가 줄을 바꿨으면 `BROWSER_BUSY` 이고 줄과 프로필이 남는다 |
 | 자동 중지 | `RUNNING` | `last_active_at` 이 유휴 시간보다 오래고 쓰는 중인 핸들(`BrowserUsage`)이 없다. 멈추기 직전에 줄을 다시 읽어 아직 유휴인지 본다 | `STOPPED` |

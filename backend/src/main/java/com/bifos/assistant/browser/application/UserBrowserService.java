@@ -84,7 +84,7 @@ public class UserBrowserService {
     }
 
     /**
-     * 브라우저를 만든다. 프로필 디렉터리를 만들고 {@code STOPPED} 로 저장한다.
+     * 브라우저를 만든다. 남은 프로필 디렉터리를 비우고 새로 만든 뒤 {@code STOPPED} 로 저장한다.
      *
      * @throws ApiException 이미 있으면 {@code BROWSER_EXISTS}
      */
@@ -94,6 +94,8 @@ public class UserBrowserService {
             throw new ApiException(ErrorCode.BROWSER_EXISTS, "user browser already exists");
         }
         String key = profileKey(userId);
+        // 줄이 없는데 디렉터리가 남아 있으면 지우다 만 프로필이다. 남은 쿠키로 로그인된 채 켜지지 않게 비운다
+        profiles.delete(key);
         profiles.ensure(key);
         try {
             return UserBrowserSnapshot.of(browsers.saveAndFlush(UserBrowser.create(userId, key, clock.instant())));
@@ -291,6 +293,9 @@ public class UserBrowserService {
                     ex.getClass().getSimpleName());
             throw new ApiException(ErrorCode.BROWSER_STOP_FAILED, "user browser leftover container not removed", ex);
         }
+        // 번호를 비워야 동시 수를 셀 때 이미 지운 자기 컨테이너가 들지 않는다
+        browser.clearLeftoverContainer(clock.instant());
+        save(browser);
     }
 
     private void removeQuietly(String containerId) {

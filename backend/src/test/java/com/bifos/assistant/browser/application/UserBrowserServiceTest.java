@@ -17,7 +17,9 @@ import com.bifos.assistant.shared.error.ErrorCode;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 import org.assertj.core.api.ThrowableAssert.ThrowingCallable;
@@ -46,6 +48,7 @@ class UserBrowserServiceTest {
 
     private FakeBrowserRuntime runtime;
     private final Set<String> profileDirs = new HashSet<>();
+    private final List<String> profileCalls = new ArrayList<>();
     private final AtomicBoolean cdpReady = new AtomicBoolean(true);
 
     @BeforeEach
@@ -53,6 +56,7 @@ class UserBrowserServiceTest {
         jdbc.update("DELETE FROM user_browser");
         runtime = new FakeBrowserRuntime();
         profileDirs.clear();
+        profileCalls.clear();
         cdpReady.set(true);
     }
 
@@ -189,6 +193,29 @@ class UserBrowserServiceTest {
         runtime.failingActions.clear();
 
         assertCode(() -> service.start(102L), ErrorCode.BROWSER_CAPACITY);
+    }
+
+    @Test
+    @DisplayName("끄다 실패해 남은 컨테이너를 켜기가 지우면 동시 수 1 에서도 다시 켤 수 있다")
+    void restartsAfterLeftoverRemovalWithSingleSlot() {
+        UserBrowserService service = service(true, 1);
+        service.create(101L);
+        service.start(101L);
+        runtime.failingActions.add("stop");
+        assertCode(() -> service.stop(101L), ErrorCode.BROWSER_STOP_FAILED);
+        runtime.failingActions.clear();
+
+        assertThat(service.start(101L).status()).isEqualTo(UserBrowserStatus.RUNNING);
+    }
+
+    @Test
+    @DisplayName("만들 때 지우다 만 프로필 디렉터리를 먼저 비운다")
+    void clearsLeftoverProfileOnCreate() {
+        UserBrowserService service = service(true, 2);
+
+        service.create(101L);
+
+        assertThat(profileCalls).containsExactly("delete", "ensure");
     }
 
     @Test
@@ -335,11 +362,13 @@ class UserBrowserServiceTest {
         BrowserProfileStore profiles = new BrowserProfileStore() {
             @Override
             public void ensure(String profileKey) {
+                profileCalls.add("ensure");
                 profileDirs.add(profileKey);
             }
 
             @Override
             public void delete(String profileKey) {
+                profileCalls.add("delete");
                 profileDirs.remove(profileKey);
             }
         };
