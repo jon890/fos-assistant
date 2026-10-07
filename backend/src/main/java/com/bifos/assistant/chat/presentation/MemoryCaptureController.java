@@ -15,7 +15,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * 대화에서 에이전트가 남긴 기억 기록을 읽고 되돌린다(ADR-092).
+ * 대화에서 에이전트가 남긴 기억 기록을 읽고 되돌린다(ADR-093).
  *
  * <p>받아들이기, 거절, 고치기는 {@code /api/v1/memories/{id}} 의 경로를 그대로 쓴다. 누구의 기록인지는 로그인에서만 정한다.
  */

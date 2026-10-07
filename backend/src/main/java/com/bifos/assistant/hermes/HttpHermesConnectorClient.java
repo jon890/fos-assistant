@@ -2,6 +2,7 @@ package com.bifos.assistant.hermes;
 
 import com.bifos.assistant.hermes.dto.CallResult;
 import com.bifos.assistant.hermes.dto.ConnectorCallError;
+import com.bifos.assistant.hermes.dto.ConnectorErrorDetail;
 import com.bifos.assistant.hermes.dto.ConnectorField;
 import com.bifos.assistant.hermes.dto.ConnectorFieldOptions;
 import com.bifos.assistant.hermes.dto.ConnectorManifest;
@@ -210,7 +211,8 @@ public class HttpHermesConnectorClient implements HermesConnectorClient {
                 return CallResult.success(result);
             }
             return CallResult.failure(
-                    ConnectorCallError.fromWord(text(answer, "error")).orElseThrow(ConnectorExecutionUnknown::new));
+                    ConnectorCallError.fromWord(text(answer, "error")).orElseThrow(ConnectorExecutionUnknown::new),
+                    ConnectorErrorDetail.fromAnswer(answer).orElse(null));
         } catch (JacksonException | IllegalStateException ex) {
             throw new ConnectorExecutionUnknown();
         }

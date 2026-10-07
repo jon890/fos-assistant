@@ -16,7 +16,7 @@ import lombok.NoArgsConstructor;
 import lombok.experimental.Accessors;
 
 /**
- * 에이전트가 {@code memory_remember} 로 남긴 기록 한 줄이다(ADR-092).
+ * 에이전트가 {@code memory_remember} 로 남긴 기록 한 줄이다(ADR-093).
  *
  * <p>대화의 답 아래에 「기억했어요」 와 제안 카드를 그리고, 되돌리기가 무엇을 되돌릴지 정한다. 칸의 뜻은
  * {@code docs/backend/schema/memory.md} 의 「memory_capture」 가 갖는다.
