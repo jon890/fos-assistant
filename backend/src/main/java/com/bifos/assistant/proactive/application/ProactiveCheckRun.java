@@ -25,10 +25,10 @@ import java.util.List;
  * 먼저 살펴보기 한 번의 {@link CheckTurn} 이다(ADR-080, ADR-081). 살펴보기마다 새로 만들고 빈으로 두지 않는다.
  *
  * <p>입력과 지시, 대화에 남기는 글은 {@code docs/backend/proactive-check.md} 의 「실행에 싣는 것」, 「Control Plane 지시」,
- * 「대화에 남는 것」 이 갖는다. 결과와 셈은 이 객체가 들고 있다가 {@link #record} 로 살펴보기 줄에 한 번 적는다. 스트림 스레드와
- * turn 스레드가 같은 엔티티를 함께 고치지 않게 하기 위해서다.
+ * 「대화에 남는 것」 이 갖는다. {@link ProactiveCheckResults} 가 결과와 셈을 들고, 이 조정자는 {@link #record} 로
+ * 그 값을 살펴보기 줄에 한 번 적는다. 스트림 스레드와 turn 스레드가 같은 엔티티를 함께 고치지 않게 하기 위해서다.
  *
- * <p>시간과 도구 호출 상한도 여기서 지킨다. 뜻은 문서의 「상한」 이 갖는다. 상한에 닿으면 멈춘 까닭을 정하고 가상 스레드에서
+ * <p>시간과 도구 호출 상한은 {@link ProactiveCheckLimits} 가 지킨다. 뜻은 문서의 「상한」 이 갖는다. 상한에 닿으면 멈춘 까닭을 정하고 가상 스레드에서
  * {@link ChatService#stop} 을 부른다. 멈추기가 실패하면 까닭을 되돌리고 {@link #STOP_ATTEMPTS} 번까지 다시 시도한다.
  * {@link #close} 뒤에는 까닭을 정하지 않고 멈추기를 부르지 않는다.
  */
@@ -195,7 +195,7 @@ public class ProactiveCheckRun implements CheckTurn {
     @Override
     public String stoppedNotice() {
         stopped = true;
-        String reason = limits.stopReason.get();
+        String reason = limits.stopReason();
         if (TIME_LIMIT.equals(reason)) {
             return TIME_LIMIT_NOTICE;
         }
@@ -208,7 +208,7 @@ public class ProactiveCheckRun implements CheckTurn {
     /** 상한으로 멈췄으면 거짓이다. Control Plane 이 멈춘 것이라 대기 메시지를 그대로 보낸다. */
     @Override
     public boolean holdPendingOnStop() {
-        return limits.stopReason.get() == null;
+        return limits.stopReason() == null;
     }
 
     /** 시간 상한 스레드를 깨워 끝내고, 그 뒤로는 상한에 닿아도 멈추기를 부르지 않는다. 줄을 적기 전에 부른다. */
@@ -218,7 +218,7 @@ public class ProactiveCheckRun implements CheckTurn {
 
     /** 상한에 닿아 멈춘 까닭이 남아 있는지다. 멈추기를 부르는 중이거나 멈췄으면 참이고, 멈추기가 실패했으면 거짓이다. */
     boolean limitStopped() {
-        return limits.stopReason.get() != null;
+        return limits.stopReason() != null;
     }
 
     /** 멈춤 알림 줄의 글을 이미 내줬는지다. 냈으면 그 줄은 대화에 저장됐다. */
@@ -244,18 +244,18 @@ public class ProactiveCheckRun implements CheckTurn {
      */
     void record(int delegations) {
         Instant now = deps.clock().instant();
-        if (stopped || results.outcome == null) {
-            check.stop(limits.stopReason.get(), limits.toolCalls.get(), delegations, now);
-        } else if (results.outcome == CheckOutcome.INVALID_RESULT) {
-            check.succeedInvalid(results.invalidReason, limits.toolCalls.get(), delegations, now);
+        if (stopped || results.outcome() == null) {
+            check.stop(limits.stopReason(), limits.toolCalls(), delegations, now);
+        } else if (results.outcome() == CheckOutcome.INVALID_RESULT) {
+            check.succeedInvalid(results.invalidReason(), limits.toolCalls(), delegations, now);
         } else {
             TreeTokens tokens = treeTokens();
             check.succeed(
-                    results.outcome,
-                    results.newFindings,
-                    results.referenceFindings,
-                    silent() ? null : results.pendingReport,
-                    limits.toolCalls.get(),
+                    results.outcome(),
+                    results.newFindings(),
+                    results.referenceFindings(),
+                    silent() ? null : results.pendingReport(),
+                    limits.toolCalls(),
                     delegations,
                     tokens.input(),
                     tokens.cachedInput(),
@@ -275,7 +275,7 @@ public class ProactiveCheckRun implements CheckTurn {
 
     /** turn 이 예외로 끝났을 때 살펴보기 줄을 {@code FAILED} 와 그 오류 코드로 적는다. */
     void recordFailure(String errorCode, int delegations) {
-        check.fail(errorCode, limits.toolCalls.get(), delegations, deps.clock().instant());
+        check.fail(errorCode, limits.toolCalls(), delegations, deps.clock().instant());
         deps.checks().save(check);
     }
 

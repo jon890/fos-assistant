@@ -18,13 +18,13 @@ class ProactiveCheckLimits {
     private final ProactiveCheck check;
     private final ProactiveCheckRun.Deps deps;
 
-    final AtomicInteger toolCalls = new AtomicInteger();
+    private final AtomicInteger toolCalls = new AtomicInteger();
 
     /**
      * 상한으로 멈춘 까닭. 멈추기를 부르는 동안과 멈춘 뒤에만 있다. 멈추기가 실패하면 비우고, 사용자가 멈췄거나 멈추지 않았으면 비어
      * 있다.
      */
-    final AtomicReference<String> stopReason = new AtomicReference<>();
+    private final AtomicReference<String> stopReason = new AtomicReference<>();
 
     /** 닫힘 표시와 시간 상한 스레드, 멈추기 시도 수를 함께 바꾸고 읽는 잠금이다. 상한 판정이 닫힌 뒤에 끼어들지 않게 한다. */
     private final Object limitLock = new Object();
@@ -136,5 +136,13 @@ class ProactiveCheckLimits {
                 return;
             }
         } while (claimStop(reason));
+    }
+
+    String stopReason() {
+        return stopReason.get();
+    }
+
+    int toolCalls() {
+        return toolCalls.get();
     }
 }

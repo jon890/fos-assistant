@@ -36,18 +36,18 @@ class ProactiveCheckResults {
     private final ProactiveCheck check;
     private final ProactiveCheckRun.Deps deps;
 
-    volatile CheckOutcome outcome;
+    private volatile CheckOutcome outcome;
     /** 결과 블록을 읽지 못한 까닭. {@link #outcome} 이 {@code INVALID_RESULT} 일 때만 있다. */
-    volatile CheckInvalidReason invalidReason;
+    private volatile CheckInvalidReason invalidReason;
 
-    volatile int newFindings;
-    volatile int referenceFindings;
+    private volatile int newFindings;
+    private volatile int referenceFindings;
     /** 검사한 발견. 답 메시지를 저장한 뒤 {@link #saveFindings} 가 저장한다. 블록에 발견이 없으면 비어 있다. */
     private volatile List<ProactiveCheckFinding> pendingFindings = List.of();
     /** 검사한 문제 후보. 발견과 함께 {@link #saveFindings} 가 저장한다. 발견이 없으면 비어 있다. */
     private volatile List<ProactiveCheckProblem> pendingProblems = List.of();
     /** 결과 블록 v2를 검사해 만든 보고다. */
-    volatile CheckReport pendingReport;
+    private volatile CheckReport pendingReport;
 
     ProactiveCheckResults(CurrentUser owner, ProactiveCheck check, ProactiveCheckRun.Deps deps) {
         this.owner = owner;
@@ -209,5 +209,25 @@ class ProactiveCheckResults {
      */
     boolean silent() {
         return check.trigger() == CheckTrigger.AUTONOMY;
+    }
+
+    CheckOutcome outcome() {
+        return outcome;
+    }
+
+    CheckInvalidReason invalidReason() {
+        return invalidReason;
+    }
+
+    CheckReport pendingReport() {
+        return pendingReport;
+    }
+
+    int newFindings() {
+        return newFindings;
+    }
+
+    int referenceFindings() {
+        return referenceFindings;
     }
 }
