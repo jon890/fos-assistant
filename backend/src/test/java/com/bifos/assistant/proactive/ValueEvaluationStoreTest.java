@@ -205,8 +205,10 @@ class ValueEvaluationStoreTest {
     @Test
     @DisplayName("판단 중 대화를 지워도 완료 기록은 닫고 응답과 조회는 감춘다")
     void closesAttemptEvenIfConversationIsDeletedDuringProviderCall() {
-        DecisionProvider deleting = provider("deleting", () -> transactions.executeWithoutResult(
-                status -> conversations.deleteIfActive(conversation.id(), OWNER.id(), DecisionFixtures.NOW)));
+        DecisionProvider deleting = provider(
+                "deleting",
+                () -> transactions.executeWithoutResult(
+                        status -> conversations.deleteIfActive(conversation.id(), OWNER.id(), DecisionFixtures.NOW)));
         service = new ValueEvaluationService(List.of(deleting), new ValueEvaluator(), store);
         assertHidden(() -> service.evaluate(OWNER, check.id(), "deleting"));
         ValueEvaluation ended = evaluations.findAll().getFirst();
