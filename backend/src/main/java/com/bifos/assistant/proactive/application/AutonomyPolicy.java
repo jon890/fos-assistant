@@ -61,27 +61,35 @@ public final class AutonomyPolicy {
     /** 걸린 까닭을 모두 모은다. 판정 순서와 상관없이 모아 기록이 판정의 근거를 빠짐없이 갖게 한다. */
     static EnumSet<AutonomyReason> reasons(AutonomyInputs in, Duration maxEvaluationAge, Duration maxEvidenceAge) {
         EnumSet<AutonomyReason> reasons = EnumSet.noneOf(AutonomyReason.class);
-        DecisionLevel benefit = choice(in, DecisionAxis.EXPECTED_BENEFIT);
-        DecisionLevel urgency = choice(in, DecisionAxis.URGENCY);
-        DecisionLevel goal = choice(in, DecisionAxis.GOAL_ALIGNMENT);
-        DecisionLevel cost = choice(in, DecisionAxis.COST);
-        DecisionLevel risk = choice(in, DecisionAxis.RISK);
-        DecisionLevel evidence = choice(in, DecisionAxis.EVIDENCE_QUALITY);
+        addIgnoreReasons(in, reasons);
+        addWeakBasisReasons(in, maxEvaluationAge, maxEvidenceAge, reasons);
+        addApprovalReasons(in, reasons);
+        addExecutionBlockers(in, reasons);
+        return reasons;
+    }
 
+    private static void addIgnoreReasons(AutonomyInputs in, Set<AutonomyReason> reasons) {
+        DecisionLevel benefit = choice(in, DecisionAxis.EXPECTED_BENEFIT);
         if (!in.candidateCurrent()) {
             reasons.add(AutonomyReason.CANDIDATE_NOT_CURRENT);
         }
         if (!JUDGED_OUTCOMES.contains(in.evaluationOutcome()) || !in.judged()) {
             reasons.add(AutonomyReason.EVALUATION_NOT_USABLE);
         }
-        if (benefit == DecisionLevel.LOW && (urgency == DecisionLevel.LOW || goal == DecisionLevel.LOW)) {
+        if (benefit == DecisionLevel.LOW
+                && (choice(in, DecisionAxis.URGENCY) == DecisionLevel.LOW
+                        || choice(in, DecisionAxis.GOAL_ALIGNMENT) == DecisionLevel.LOW)) {
             reasons.add(AutonomyReason.LOW_VALUE);
         }
         if (in.alreadyExecuted()) {
             reasons.add(AutonomyReason.ALREADY_EXECUTED);
         }
+    }
 
-        if (in.evaluationOutcome() == DecisionOutcome.INSUFFICIENT_EVIDENCE || evidence == DecisionLevel.LOW) {
+    private static void addWeakBasisReasons(
+            AutonomyInputs in, Duration maxEvaluationAge, Duration maxEvidenceAge, Set<AutonomyReason> reasons) {
+        if (in.evaluationOutcome() == DecisionOutcome.INSUFFICIENT_EVIDENCE
+                || choice(in, DecisionAxis.EVIDENCE_QUALITY) == DecisionLevel.LOW) {
             reasons.add(AutonomyReason.INSUFFICIENT_EVIDENCE);
         }
         if (lowConfidence(in)) {
@@ -105,8 +113,10 @@ public final class AutonomyPolicy {
         } else if (!"ACTION".equals(in.actionType())) {
             reasons.add(AutonomyReason.ACTION_UNDECLARED);
         }
+    }
 
-        // 부작용 힌트는 모델이 쓴 값이다. NONE 은 실행 조건의 하나일 뿐이고, 나머지는 모두 승인 쪽으로 보낸다.
+    /** 부작용 힌트는 모델이 쓴 값이다. NONE 은 실행 조건의 하나일 뿐이고, 나머지는 모두 승인 쪽으로 보낸다. */
+    private static void addApprovalReasons(AutonomyInputs in, Set<AutonomyReason> reasons) {
         String sideEffect = in.sideEffect();
         if ("EXTERNAL".equals(sideEffect)) {
             reasons.add(AutonomyReason.EXTERNAL_WRITE_REQUIRES_APPROVAL);
@@ -115,14 +125,21 @@ public final class AutonomyPolicy {
         } else if (!"NONE".equals(sideEffect)) {
             reasons.add(AutonomyReason.SIDE_EFFECT_UNDECLARED);
         }
+        DecisionLevel risk = choice(in, DecisionAxis.RISK);
         if (risk == DecisionLevel.MEDIUM || risk == DecisionLevel.HIGH) {
             reasons.add(AutonomyReason.RISK_NOT_LOW);
         }
+    }
 
-        if (benefit != DecisionLevel.HIGH || goal == DecisionLevel.LOW || goal == DecisionLevel.UNKNOWN) {
+    /** 허락에 해당하는 입력은 모두 Control Plane 의 기록이다. */
+    private static void addExecutionBlockers(AutonomyInputs in, Set<AutonomyReason> reasons) {
+        DecisionLevel goal = choice(in, DecisionAxis.GOAL_ALIGNMENT);
+        if (choice(in, DecisionAxis.EXPECTED_BENEFIT) != DecisionLevel.HIGH
+                || goal == DecisionLevel.LOW
+                || goal == DecisionLevel.UNKNOWN) {
             reasons.add(AutonomyReason.VALUE_NOT_HIGH);
         }
-        if (cost != DecisionLevel.LOW) {
+        if (choice(in, DecisionAxis.COST) != DecisionLevel.LOW) {
             reasons.add(AutonomyReason.COST_NOT_LOW);
         }
         if (!in.executionEnabled() || !in.userConsented()) {
@@ -137,7 +154,6 @@ public final class AutonomyPolicy {
         if (!in.agentStartable()) {
             reasons.add(AutonomyReason.AGENT_NOT_STARTABLE);
         }
-        return reasons;
     }
 
     /** 앞 묶음에 하나라도 있으면 뒤 묶음을 보지 않는다. 근거가 약한 후보에는 승인을 묻지 않는다. */

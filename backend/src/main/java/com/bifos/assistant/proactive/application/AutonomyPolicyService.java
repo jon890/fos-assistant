@@ -14,6 +14,7 @@ import com.bifos.assistant.proactive.domain.ProactiveCheck;
 import com.bifos.assistant.proactive.domain.ProactiveCheckProblem;
 import com.bifos.assistant.proactive.domain.ValueEvaluation;
 import com.bifos.assistant.proactive.domain.type.AutonomyLevel;
+import com.bifos.assistant.proactive.domain.type.CheckTrigger;
 import com.bifos.assistant.proactive.domain.type.DecisionAxis;
 import com.bifos.assistant.proactive.domain.type.DecisionConfidence;
 import com.bifos.assistant.proactive.domain.type.DecisionLevel;
@@ -121,42 +122,14 @@ public class AutonomyPolicyService {
                 .orElseThrow(
                         () -> new ApiException(ErrorCode.VALUE_EVALUATION_NOT_FOUND, "value evaluation not found"));
         Optional<Agent> agent = agents.findById(source.agentId());
-        boolean startable = agent.filter(each -> !each.isDeleted() && each.enabled() && each.isReadableBy(user.id()))
-                .isPresent();
-        boolean writesAllowed = agent.map(Agent::proactiveCheckWritesAllowed).orElse(false);
-        boolean consented = readOnlyExecutionConsented(user);
-        boolean alreadyExecuted = decisions.existsByExecutionKey(AutonomyDecision.executionKey(source.id()));
-        Instant now = clock.instant();
-
+        Facts facts = facts(user, source, agent);
         DecisionEvidence evidence = evaluation.evidence();
         Map<Long, CandidateJudgement> judgements = evidence.result().judgements().stream()
                 .collect(Collectors.toMap(
                         CandidateJudgement::candidateId, Function.identity(), (first, ignored) -> first));
         List<DecisionCandidate> ordered = ordered(evidence);
         List<AutonomyInputs> inputs = ordered.stream()
-                .map(candidate -> new AutonomyInputs(
-                        evaluation.outcome(),
-                        evaluation.replayOfId() != null,
-                        evaluation.createdAt(),
-                        evidence.state().asOf(),
-                        now,
-                        judgements.containsKey(candidate.candidateId()),
-                        current(evaluation.checkId(), candidate),
-                        candidate.actionType(),
-                        candidate.sideEffect(),
-                        candidate.confidence(),
-                        choices(judgements.get(candidate.candidateId())),
-                        axisConfidences(judgements.get(candidate.candidateId())),
-                        Optional.ofNullable(judgements.get(candidate.candidateId()))
-                                .map(CandidateJudgement::confidence)
-                                .orElse(null),
-                        candidate.evidenceCheckedAt(),
-                        properties.executionEnabled(),
-                        consented,
-                        writesAllowed,
-                        source.trigger(),
-                        startable,
-                        alreadyExecuted))
+                .map(candidate -> inputsOf(evaluation, candidate, judgements.get(candidate.candidateId()), facts))
                 .toList();
         List<AutonomyVerdict> verdicts =
                 AutonomyPolicy.decideAll(inputs, properties.maxEvaluationAge(), properties.maxEvidenceAge());
@@ -172,10 +145,47 @@ public class AutonomyPolicyService {
                     verdict.reasons(),
                     inputs.get(i),
                     AutonomyPolicy.VERSION,
-                    now));
+                    facts.now()));
         }
         return new Decided(
                 decisions.saveAllAndFlush(rows), agent.map(Agent::code).orElse(null));
+    }
+
+    /** 후보와 상관없이 판정 하나에 같은 값이다. 허락에 해당하는 값은 모두 여기서 Control Plane 의 기록으로 읽는다. */
+    private Facts facts(CurrentUser user, ProactiveCheck source, Optional<Agent> agent) {
+        return new Facts(
+                clock.instant(),
+                readOnlyExecutionConsented(user),
+                agent.map(Agent::proactiveCheckWritesAllowed).orElse(false),
+                source.trigger(),
+                agent.filter(each -> !each.isDeleted() && each.enabled() && each.isReadableBy(user.id()))
+                        .isPresent(),
+                decisions.existsByExecutionKey(AutonomyDecision.executionKey(source.id())));
+    }
+
+    private AutonomyInputs inputsOf(
+            ValueEvaluation evaluation, DecisionCandidate candidate, CandidateJudgement judgement, Facts facts) {
+        return new AutonomyInputs(
+                evaluation.outcome(),
+                evaluation.replayOfId() != null,
+                evaluation.createdAt(),
+                evaluation.evidence().state().asOf(),
+                facts.now(),
+                judgement != null,
+                current(evaluation.checkId(), candidate),
+                candidate.actionType(),
+                candidate.sideEffect(),
+                candidate.confidence(),
+                choices(judgement),
+                axisConfidences(judgement),
+                judgement == null ? null : judgement.confidence(),
+                candidate.evidenceCheckedAt(),
+                properties.executionEnabled(),
+                facts.consented(),
+                facts.writesAllowed(),
+                facts.sourceTrigger(),
+                facts.startable(),
+                facts.alreadyExecuted());
     }
 
     /**
@@ -271,4 +281,12 @@ public class AutonomyPolicyService {
     }
 
     private record Decided(List<AutonomyDecision> rows, String agentCode) {}
+
+    private record Facts(
+            Instant now,
+            boolean consented,
+            boolean writesAllowed,
+            CheckTrigger sourceTrigger,
+            boolean startable,
+            boolean alreadyExecuted) {}
 }

@@ -1392,7 +1392,7 @@ public class ChatService {
     private ChatTurn finishCheck(PendingTurn pending, CheckTurn check, Long executionId, String output) {
         CheckAnswer checked = check.answer(executionId, output);
         Conversation conversation = pending.conversation();
-        if (checked.omit()) {
+        if (checked.omit() || check.silent()) {
             return new ChatTurn(conversation.id(), conversation.publicId(), executionId, "", null, false);
         }
         ChatMessage message;

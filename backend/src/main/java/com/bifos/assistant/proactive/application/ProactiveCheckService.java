@@ -129,15 +129,7 @@ public class ProactiveCheckService {
      */
     public UUID start(CurrentUser user, String agentCode, CheckTrigger trigger, Consumer<ProactiveCheck> beforeRun) {
         Agent agent = agents.requireStartable(user, agentCode);
-        if (trigger == CheckTrigger.AUTONOMY && agent.proactiveCheckWritesAllowed()) {
-            throw new ApiException(
-                    ErrorCode.PROACTIVE_CHECK_UNAVAILABLE,
-                    "an autonomous check runs only within the read-only boundary");
-        }
-        if (!readiness.check(agent).available()) {
-            throw new ApiException(
-                    ErrorCode.PROACTIVE_CHECK_UNAVAILABLE, "this agent cannot run a proactive check now");
-        }
+        requireReady(agent, trigger);
         OpenedCheck opened = checkConversations.findOrCreate(user, agent);
         Conversation conversation = opened.conversation();
         if (trigger == CheckTrigger.SCHEDULED && hasUnreadReport(conversation.id())) {
@@ -191,6 +183,22 @@ public class ProactiveCheckService {
             throw ex;
         }
         return conversation.publicId();
+    }
+
+    /**
+     * 시작 전 점검을 통과해야 한다. 자동 실행은 쓰기 도구 허용이 켜진 에이전트를 Hermes 를 부르기 전에 거절한다. 판정 뒤 관리자가 켠 경우도
+     * 여기서 막는다.
+     */
+    private void requireReady(Agent agent, CheckTrigger trigger) {
+        if (trigger == CheckTrigger.AUTONOMY && agent.proactiveCheckWritesAllowed()) {
+            throw new ApiException(
+                    ErrorCode.PROACTIVE_CHECK_UNAVAILABLE,
+                    "an autonomous check runs only within the read-only boundary");
+        }
+        if (!readiness.check(agent).available()) {
+            throw new ApiException(
+                    ErrorCode.PROACTIVE_CHECK_UNAVAILABLE, "this agent cannot run a proactive check now");
+        }
     }
 
     /** 보고를 연 사용자만 시각을 적는다. 이미 연 보고를 다시 열어도 첫 시각을 보존한다. */

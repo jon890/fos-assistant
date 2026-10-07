@@ -39,7 +39,10 @@ public interface CheckTurn {
     /** 멈췄을 때 남기는 알림 줄의 글이다. */
     String stoppedNotice();
 
-    /** 사용자에게 바로 알리지 않는 turn 인가. 참이면 멈춤 알림 줄을 대화에 저장하지 않는다. {@link #stoppedNotice} 는 그대로 부른다. */
+    /**
+     * 사용자에게 바로 알리지 않는 turn 인가. 참이면 답과 멈춤 알림 줄을 대화에 저장하지 않는다. {@link #answer} 와
+     * {@link #stoppedNotice} 는 그대로 부른다.
+     */
     default boolean silent() {
         return false;
     }
