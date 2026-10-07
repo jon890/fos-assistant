@@ -42,3 +42,69 @@
 | D5 | 기본 한도 | 동시 2개, 유휴 10분, 컨테이너 메모리 1GB | 사용자가 숫자를 정한다 |
 | D6 | 프로필 보관 | 사용자가 지울 때까지 둔다. 사용자를 끄면 멈추기만 한다 | 쓰지 않은 지 N일이 지나면 지운다 |
 | D7 | 관리자의 권한 | 상태 보기, 끄기, 지우기. 남의 화면은 못 연다 | 남의 화면도 연다 |
+
+## 단계 2 와 3 의 계약 초안
+
+구현하는 PR 이 `docs/backend/user-browser.md` 로 옮긴다.
+
+추가할 설정과 API 줄이다.
+
+| 줄 |
+| --- |
+| `assistant.browser.gateway-base-url` / / Hermes 가 중계에 닿는 주소. 바인딩 설치가 이 주소에 접근 표식을 붙인다 / 없음 |
+| `GET /api/browser/screen` / 화면 SSE. 아래 「로그인 화면」 |
+| `POST /api/browser/screen/input` / 화면 입력 |
+
+### 단계 3: `user_browser_grant`
+
+바인딩이 중계에 쓰는 접근 표식이다.
+
+| 칸 | 타입 | 빈 값 | 뜻 |
+| --- | --- | --- | --- |
+| `id` | BIGINT | 아니다 | |
+| `user_browser_id` | BIGINT | 아니다 | `user_browser.id` |
+| `binding_id` | BIGINT | 아니다 | `agent_connector_binding.id`. 유일. 바인딩을 지우면 함께 지운다 |
+| `token_hash` | CHAR(64) | 아니다 | 접근 표식의 SHA-256. 유일 |
+| `created_at` | DATETIME(6) | 아니다 | |
+
+접근 표식 원문은 바인딩 설치 요청에 한 번 실려 Hermes 의 서버 정의에만 남는다. 다시 설치할 때는 새로 만든다.
+
+### 단계 3: 중계
+
+`/internal/browser-gateway/<접근 표식>/` 아래만 받는다. 이 경로는 웹 라우트로 열지 않는다.
+
+| 받는 것 | 하는 일 |
+| --- | --- |
+| `GET json/version`, `GET json/list` | 접근 표식으로 브라우저를 찾아 켠 뒤 넘긴다. 응답의 `webSocketDebuggerUrl` 을 중계 주소로 바꾼다 |
+| `PUT json/new?<주소>`, `GET json/close/<id>`, `GET json/activate/<id>` | 그대로 넘긴다 |
+| WebSocket `devtools/browser/<id>`, `devtools/page/<id>` | 양쪽 메시지를 그대로 잇는다. 연결이 열려 있는 동안 자동 중지하지 않는다 |
+| 그 밖 | 404 |
+
+접근 표식이 없거나 틀리면 404 다. 있는지 없는지를 응답으로 구분하지 않는다.
+Chrome 에는 `Host: localhost` 와 `Origin` 없이 보낸다.
+
+### 단계 2: 로그인 화면
+
+`GET /api/browser/screen` 은 브라우저를 켜고 지금 탭에 붙어 SSE 를 연다.
+
+| 사건 | 본문 |
+| --- | --- |
+| `frame` | `{data, width, height}`. `data` 는 JPEG base64 |
+| `tabs` | `[{id, title, url, active}]`. 탭이 바뀔 때 |
+| `closed` | 다른 화면이 열렸거나 브라우저가 멈췄다 |
+
+`POST /api/browser/screen/input` 의 `type` 이다. 나머지 칸은 그 종류의 CDP 인자 가운데 필요한 것만 남긴 것이다.
+
+| `type` | CDP |
+| --- | --- |
+| `mouse` | `Input.dispatchMouseEvent` |
+| `touch` | `Input.dispatchTouchEvent` |
+| `wheel` | `Input.dispatchMouseEvent` 의 `mouseWheel` |
+| `key` | `Input.dispatchKeyEvent`. 특수 키만(Enter, Backspace, Tab, 방향 키 등) |
+| `text` | `Input.insertText`. 500자까지 |
+| `navigate` | `Page.navigate`. `http`, `https` 만 |
+| `back`, `reload` | `Page.navigateToHistoryEntry`, `Page.reload` |
+| `tab` | 고른 탭으로 screencast 를 옮긴다 |
+| `resize` | `Emulation.setDeviceMetricsOverride`. 폭 320~1600 |
+
+입력 본문은 로그와 실행 기록에 남기지 않는다.
