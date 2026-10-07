@@ -1,7 +1,7 @@
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { afterEach, expect, test } from "bun:test";
-import { wsUrlFor } from "../src/cdp.ts";
+import { CdpSession, websocketOriginFor, wsUrlFor } from "../src/cdp.ts";
 import { createServer } from "../src/server.ts";
 import { sessionStatus, type Env } from "../src/session.ts";
 import { closedPortUrl, FakeCdp, upstreamText } from "./fake-cdp.ts";
@@ -63,8 +63,30 @@ test("로그인 쿠키 둘이 있으면 브라우저 대상의 쿠키만 읽고 
     { target: "browser/fake-browser", method: "Storage.getCookies", params: {} },
   ]);
   expect(cdp.httpRequests).not.toContain("PUT /json/new");
-  expect(cdp.origins).toEqual(["http://localhost"]);
+  expect(cdp.origins).toEqual([`http://localhost:${cdp.server.port}`]);
   expect(cdp.violations).toEqual([]);
+});
+
+test("CDP 주소의 포트로 HTTP Origin 을 만들고 기본 포트는 생략한다", () => {
+  const cdp = fake();
+  expect(websocketOriginFor(cdp.url)).toBe(`http://localhost:${cdp.server.port}`);
+  expect(websocketOriginFor(`${cdp.url}/`)).toBe(`http://localhost:${cdp.server.port}`);
+  expect(websocketOriginFor("http://192.0.2.10")).toBe("http://localhost");
+  expect(websocketOriginFor("http://localhost:80/")).toBe("http://localhost");
+  expect(websocketOriginFor("https://localhost")).toBe("http://localhost");
+  expect(websocketOriginFor("https://localhost:443/")).toBe("http://localhost:443");
+  expect(websocketOriginFor("https://localhost:80/")).toBe("http://localhost");
+});
+
+test("CDP 서버는 포트 없는 Origin 을 거절한다", async () => {
+  const cdp = fake();
+  await expect(
+    CdpSession.connect(
+      wsUrlFor(cdp.url, `${cdp.url}/devtools/browser/fake-browser`),
+      "http://localhost",
+    ),
+  ).rejects.toMatchObject({ code: "NAVER_BLOG_BROWSER_UNREACHABLE" });
+  expect(cdp.origins).toEqual(["http://localhost"]);
 });
 
 test("끝에 / 가 붙은 연결 주소도 같은 창구로 붙는다", async () => {

@@ -12,6 +12,8 @@ import com.bifos.assistant.attention.domain.type.AttentionTrigger;
 import com.bifos.assistant.attention.domain.type.CardKey;
 import com.bifos.assistant.attention.infra.AttentionControlRepository;
 import com.bifos.assistant.attention.infra.AttentionEventRepository;
+import com.bifos.assistant.feedback.application.FeedbackLabeler;
+import com.bifos.assistant.feedback.domain.type.FeedbackEventType;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
@@ -50,6 +52,7 @@ public class AttentionControlService {
     private final AttentionEventRepository events;
     private final AttentionEventWriter writer;
     private final AttentionProperties properties;
+    private final SuggestionFeedback suggestions;
     private final TransactionTemplate transactions;
     private final Clock clock;
 
@@ -60,6 +63,7 @@ public class AttentionControlService {
             AttentionEventRepository events,
             AttentionEventWriter writer,
             AttentionProperties properties,
+            SuggestionFeedback suggestions,
             PlatformTransactionManager transactionManager,
             Clock clock) {
         this.attention = attention;
@@ -67,6 +71,7 @@ public class AttentionControlService {
         this.events = events;
         this.writer = writer;
         this.properties = properties;
+        this.suggestions = suggestions;
         this.transactions = new TransactionTemplate(transactionManager);
         this.clock = clock;
     }
@@ -82,7 +87,7 @@ public class AttentionControlService {
         requireStateKey(stateKey);
         requireCard(card);
         AttentionSnapshot snapshot = attention.snapshot(user);
-        requireCandidate(snapshot, card, itemKey);
+        AttentionCandidate candidate = requireCandidate(snapshot, card, itemKey);
         Instant now = snapshot.now();
         saveControl(
                 user,
@@ -91,6 +96,7 @@ public class AttentionControlService {
                 entry -> entry.rehide(stateKey, now),
                 () -> AttentionControlEntry.hide(user.id(), card, itemKey, stateKey, now));
         recordInCard(user, snapshot, card, itemKey, stateKey, AttentionEventType.HIDDEN);
+        suggestions.controlled(user, candidate, FeedbackEventType.DISMISSED, FeedbackLabeler.ATTENTION_HIDE, now);
     }
 
     /**
@@ -116,6 +122,7 @@ public class AttentionControlService {
                 () -> AttentionControlEntry.snooze(user.id(), card, itemKey, until, now));
         // 미루기 요청에는 상태가 없어 그 카드 후보의 지금 상태로 사건을 남긴다.
         recordInCard(user, snapshot, card, itemKey, candidate.stateKey(), AttentionEventType.SNOOZED);
+        suggestions.controlled(user, candidate, FeedbackEventType.POSTPONED, FeedbackLabeler.ATTENTION_SNOOZE, now);
     }
 
     /**

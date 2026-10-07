@@ -144,7 +144,8 @@
 
 ## 기록할 사건
 
-결정 기록(#216)이 읽을 자리다. 이번에는 이 표의 줄만 남기고 따로 사건을 내지 않는다.
+[판단 피드백](decision-feedback.md)이 읽는 자리다. 판정과 실행 상태는 이 표의 줄에 남고, 판단 피드백은 아래 둘만 사건으로 더한다.
+자동 실행을 시작하지 못하면 `autonomy_decision:<번호>` 의 `EXECUTION_FAILED`, 시작한 살펴보기가 끝나면 `proactive_check:<번호>` 의 `EXECUTION_SUCCEEDED` 나 `EXECUTION_FAILED` 다.
 
 | 때 | 어디에 남는가 |
 | --- | --- |

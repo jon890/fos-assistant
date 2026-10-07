@@ -78,9 +78,9 @@ export class EditorPage {
    * `confirm` 이나 `alert` 가 떠 있으면 페이지 실행이 멈춰 모든 명령이 시간 초과로 끝난다.
    * 큰 가상 창에서는 아래 문단에 보낸 마우스 이벤트가 편집기에 닿지 않아 화면 크기를 1280×720 으로 둔다.
    */
-  static async attach(wsUrl: string, options: EditorOptions = {}) {
+  static async attach(wsUrl: string, cdpUrl: string, options: EditorOptions = {}) {
     const { signal, ...times } = options;
-    const session = await CdpSession.connect(wsUrl);
+    const session = await CdpSession.connect(wsUrl, cdpUrl);
     const page = new EditorPage(session, { ...DEFAULT_TIMES, ...times }, signal);
     session.onEvent("Page.javascriptDialogOpening", () => {
       session.send("Page.handleJavaScriptDialog", { accept: true }).catch(() => {});
@@ -282,7 +282,11 @@ export async function openWriteTab(
     const debuggerUrl = target?.webSocketDebuggerUrl;
     if (typeof debuggerUrl !== "string")
       throw new EditorError("editor_failed", "open", "새 탭에 붙을 주소가 없다");
-    const page = await EditorPage.attach(wsUrlFor(cdpUrl, debuggerUrl), options);
+    const page = await EditorPage.attach(
+      wsUrlFor(cdpUrl, debuggerUrl),
+      cdpUrl,
+      options,
+    );
     return { targetId, page };
   } catch (error) {
     await closeTab(cdpUrl, targetId).catch(() => {});

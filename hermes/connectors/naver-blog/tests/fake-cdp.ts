@@ -88,6 +88,8 @@ export class FakeCdp {
     );
     if (socketPath) {
       this.origins.push(request.headers.get("origin") ?? "");
+      if (request.headers.get("origin") !== `http://localhost:${server.port}`)
+        return new Response("origin rejected", { status: 403 });
       if (server.upgrade(request, { data: { target: `${socketPath[1]}/${socketPath[2]}` } }))
         return undefined;
       return new Response("upgrade failed", { status: 400 });

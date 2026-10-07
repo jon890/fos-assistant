@@ -3,6 +3,7 @@ package com.bifos.assistant.proactive.infra;
 import com.bifos.assistant.proactive.domain.ProactiveCheckProblem;
 import com.bifos.assistant.proactive.domain.type.ProblemStatus;
 import java.time.Instant;
+import java.util.Collection;
 import java.util.List;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -19,4 +20,7 @@ public interface ProactiveCheckProblemRepository extends JpaRepository<Proactive
     /** 그 점검 대화에서 그 시각 뒤에 남긴 그 상태의 후보를 모두 읽는다. 중복 판정에 쓴다. */
     List<ProactiveCheckProblem> findByConversationIdAndStatusAndCreatedAtAfter(
             Long conversationId, ProblemStatus status, Instant after);
+
+    /** 그 살펴보기들의 후보 전부. 받아들인 것과 버린 것을 함께 읽는다. */
+    List<ProactiveCheckProblem> findByCheckIdInOrderByIdAsc(Collection<Long> checkIds);
 }

@@ -202,10 +202,12 @@ CDP 는 Bun 의 WebSocket 으로 직접 부르고 브라우저 자동화 라이�
 # cwd: 아무 곳. Chrome 이 도는 기계에서 실행한다
 google-chrome --user-data-dir="$HOME/.config/naver-blog-chrome" \
   --remote-debugging-address=127.0.0.1 --remote-debugging-port=<포트> \
-  --remote-allow-origins='*' --headless=new
+  --remote-allow-origins='http://localhost:<포트>' --headless=new
 ```
 
-`--remote-allow-origins` 가 없으면 Chrome 이 WebSocket 연결을 거절한다. 원인은 화면에 드러나지 않는다.
+Chrome 의 `--remote-allow-origins` 에는 `http://localhost:<포트>` 가 있어야 한다. 이 포트는 연결 칸의 `cdp_url` 에 적은 포트와 같아야 한다. 중계로 포트가 바뀌면 중계 주소의 포트를 쓴다.
+커넥터는 세션 확인과 임시저장 작업의 모든 WebSocket 연결에 이 Origin 을 보낸다. `cdp_url` 에 포트가 없거나 HTTP 기본 포트인 80이면 `http://localhost` 를 허용한다.
+허용한 Origin 이 다르면 Chrome 이 WebSocket 연결을 거절한다. 원인은 화면에 드러나지 않는다.
 headless 로 띄우면 user agent 에 `HeadlessChrome` 이 들어가 네이버가 막을 수 있다. `--user-agent` 로 일반 Chrome 의 값을 준다.
 커넥터가 Chrome 과 다른 기계나 컨테이너에서 돌면 그 자리에서 닿는 주소로 포트를 중계한다. 중계는 커넥터가 도는 자리에서 오는 연결만 받게 둔다.
 
