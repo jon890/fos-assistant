@@ -22,6 +22,10 @@ public interface ProactiveCheckRepository extends JpaRepository<ProactiveCheck, 
 
     List<ProactiveCheck> findByUserIdAndReportIsNotNullAndReportOpenedAtIsNullOrderByStartedAtDesc(Long userId);
 
+    /** 그 사용자가 그 점검 대화에서 아직 열지 않은 보고. 점검 대화를 읽으면 모두 연 것으로 적는다. */
+    List<ProactiveCheck> findByUserIdAndConversationIdAndReportIsNotNullAndReportOpenedAtIsNull(
+            Long userId, Long conversationId);
+
     /** 그 실행 줄이 살펴보기 turn 인지. 살펴보기 트리를 가리는 데 쓴다. */
     boolean existsByRootExecutionId(Long rootExecutionId);
 
