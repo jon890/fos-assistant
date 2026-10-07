@@ -75,8 +75,7 @@ class ChatConversationManagement {
     }
 
     /** 대화가 고른 단계를 저장한다. DEFAULT 는 에이전트 기본 모델만 쓰도록 사용자·그룹 기본값도 건너뛴다. */
-    Conversation chooseModelTier(
-            CurrentUser user, Long conversationId, ModelSelectionMode mode, ModelTier tier) {
+    Conversation chooseModelTier(CurrentUser user, Long conversationId, ModelSelectionMode mode, ModelTier tier) {
         Conversation conversation = access.requireOwn(user, conversationId);
         if (mode == null
                 || mode == ModelSelectionMode.CUSTOM

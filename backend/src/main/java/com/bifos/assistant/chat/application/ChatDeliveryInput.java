@@ -133,8 +133,7 @@ class ChatDeliveryInput {
      *
      * @param external 커넥터 에이전트의 답이거나 출처를 모르는 답이다
      */
-    static ContextItem delegationItem(
-            AgentExecution result, boolean external, Instant now, Duration staleAfter) {
+    static ContextItem delegationItem(AgentExecution result, boolean external, Instant now, Duration staleAfter) {
         ContextFreshness freshness = ResultHeader.freshnessOf(result.finishedAt(), now, staleAfter);
         return new ContextItem(
                 ContextSource.DELEGATION_RESULT,

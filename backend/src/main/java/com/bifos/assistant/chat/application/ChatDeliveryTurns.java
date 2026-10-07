@@ -66,8 +66,7 @@ class ChatDeliveryTurns {
      * @param owner 대화 주인. 요청이 없으므로 부르는 쪽이 사용자 행으로 만든다
      * @param onEvent 알림 줄, {@code started}, 답 조각, {@code done} 이나 {@code stopped} 를 받는다
      */
-    void runDelegationResults(
-            CurrentUser owner, Long conversationId, TurnHandle handle, Consumer<ChatEvent> onEvent) {
+    void runDelegationResults(CurrentUser owner, Long conversationId, TurnHandle handle, Consumer<ChatEvent> onEvent) {
         List<AgentExecution> results = executionRepository.findUndeliveredResults(conversationId);
         Map<Long, Agent> resultAgents = chatDeliveryInput.resultAgentsOf(results);
         List<AutoTurnDelivery> deliveries = new ArrayList<>();
@@ -90,8 +89,8 @@ class ChatDeliveryTurns {
         if (notices.isEmpty()) {
             return;
         }
-        DeliveryInput delivery =
-                ChatDeliveryInput.deliveryInput(results, resultAgents, extras, clock.instant(), contextProperties.resultStaleAfter());
+        DeliveryInput delivery = ChatDeliveryInput.deliveryInput(
+                results, resultAgents, extras, clock.instant(), contextProperties.resultStaleAfter());
         Routed routed = chatTurnRouting.route(owner, conversationId, delivery.input(), null, List.of());
         if (routed.flow() != null) {
             // 흐름은 이 입력을 받을 자리가 없다. 깨우는 쪽이 이미 거르므로 그 사이 흐름이 붙은 경우뿐이다.
@@ -141,7 +140,8 @@ class ChatDeliveryTurns {
         // 사용자 실행 한도에 닿으면 USER_BUSY 가 그대로 올라간다. 묶음을 바꾸지 않고 다시 시도를 예약하지 않는다.
         TurnHandle handle = turns.open(user.id(), conversation.id());
         try {
-            DeliveryInput delivery = chatDeliveryInput.retryInput(user, conversation.id(), resultDeliveries.itemsOf(deliveryId));
+            DeliveryInput delivery =
+                    chatDeliveryInput.retryInput(user, conversation.id(), resultDeliveries.itemsOf(deliveryId));
             Routed routed = chatTurnRouting.route(user, conversation.id(), delivery.input(), null, List.of());
             // 잠금 전에 본 에이전트는 그 사이 바뀌었을 수 있다. 자동 turn 이 잠금 뒤 흐름을 다시 거르는 것과 같다.
             if (routed.flow() != null) {

@@ -186,7 +186,8 @@ public class ChatService {
             // 흐름은 지시를 흐름 안에서 저장해 알림 줄과 한 트랜잭션으로 묶을 수 없다. 작업을 만들 때 이미 거른다.
             throw new ApiException(ErrorCode.TASK_AGENT_NOT_SUPPORTED, "an agent with a flow cannot run a task");
         }
-        ChatTurn turn = chatTurnRunner.runTurn(owner, routed, instruction, new TurnIntent.Scheduled(notice), onEvent, true, handle);
+        ChatTurn turn = chatTurnRunner.runTurn(
+                owner, routed, instruction, new TurnIntent.Scheduled(notice), onEvent, true, handle);
         onEvent.accept(
                 turn.cancelled()
                         ? ChatEvent.stopped(turn.conversationPublicId(), turn.messageId(), turn.executionId())
@@ -218,7 +219,8 @@ public class ChatService {
         if (check.renewSession()) {
             sessions.renew(routed.conversation());
         }
-        ChatTurn turn = chatTurnRunner.runTurn(owner, routed, input, new TurnIntent.ProactiveCheck(check), onEvent, true, handle);
+        ChatTurn turn = chatTurnRunner.runTurn(
+                owner, routed, input, new TurnIntent.ProactiveCheck(check), onEvent, true, handle);
         onEvent.accept(
                 turn.cancelled()
                         ? ChatEvent.stopped(turn.conversationPublicId(), turn.messageId(), turn.executionId())
@@ -253,7 +255,8 @@ public class ChatService {
             }
             List<Long> ids = rows.stream().map(ChatPendingMessage::id).toList();
             try {
-                ChatTurn turn = chatTurnRunner.runTurn(owner, routed, text, new TurnIntent.Fresh(ids), onEvent, true, handle);
+                ChatTurn turn =
+                        chatTurnRunner.runTurn(owner, routed, text, new TurnIntent.Fresh(ids), onEvent, true, handle);
                 onEvent.accept(
                         turn.cancelled()
                                 ? ChatEvent.stopped(turn.conversationPublicId(), turn.messageId(), turn.executionId())
@@ -286,14 +289,16 @@ public class ChatService {
             }
             ChatMessage last = active.getLast();
             ChatMessage previousAnswer = last.role() == MessageRole.ASSISTANT ? last : null;
-            ChatMessage question = previousAnswer == null ? last : ChatTurnRouting.previousQuestion(active, previousAnswer);
+            ChatMessage question =
+                    previousAnswer == null ? last : ChatTurnRouting.previousQuestion(active, previousAnswer);
             if (question == null || question.role() != MessageRole.USER) {
                 throw new ApiException(ErrorCode.MESSAGE_NOT_LATEST, "the latest message is not a question");
             }
             List<ChatAttachment> attached = attachments.allOf(conversation.id()).stream()
                     .filter(attachment -> question.id().equals(attachment.messageId()) && attachment.isVisible())
                     .toList();
-            Routed routed = chatTurnRouting.routeExisting(user, conversation, attached, question.content(), requestReceivedAt);
+            Routed routed =
+                    chatTurnRouting.routeExisting(user, conversation, attached, question.content(), requestReceivedAt);
             TurnIntent intent = new TurnIntent.Regenerate(previousAnswer, question);
             if (routed.flow() != null) {
                 chatTurnRunner.runFlow(user, routed, question.content(), intent, onEvent, true, handle);

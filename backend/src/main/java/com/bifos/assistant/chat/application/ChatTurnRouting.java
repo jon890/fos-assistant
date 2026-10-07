@@ -65,8 +65,7 @@ class ChatTurnRouting {
      * <p>새 대화를 저장하기 전에 사용자 자리가 남았는지 본다(ADR-069). 없으면 {@code USER_BUSY} 로 거절하고 아무것도
      * 저장하지 않는다. 그대로 저장하면 거절된 요청마다 그 글을 제목으로 한 빈 대화가 목록에 남는다.
      */
-    Routed route(
-            CurrentUser user, Long conversationId, String text, String agentCode, List<Long> attachmentIds) {
+    Routed route(CurrentUser user, Long conversationId, String text, String agentCode, List<Long> attachmentIds) {
         Instant requestReceivedAt = clock.instant();
         boolean withAttachments = attachmentIds != null && !attachmentIds.isEmpty();
         if (withAttachments && conversationId == null) {
