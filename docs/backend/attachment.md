@@ -11,7 +11,7 @@
   사용자 디렉터리 키는 `u<사용자 번호>` 의 UTF-8 SHA-256 소문자 64자리다. 첨부 행의 올린 사용자를 따른다.
 - 실행 공간에는 신뢰한 `sandbox_owner` 에 대응하는 사용자 폴더 하나만 읽기 전용으로 붙인다.
   `agent-root` 는 Hermes 정책의 `attachment_agent_root` 와 같아야 한다. 전체 첨부 루트를 공통 mount 에 넣지 않는다.
-- **사용자 폴더는 Control Plane 이 만든다.** 업로드와 복사 때 말고도, 실행 공간 설정을 쓰는 세 Hermes 호출
+- **사용자 폴더는 Control Plane 이 만든다.** 업로드와 복사 때 말고도, 실행 공간 설정을 쓰고 만들지 못하면 멈추는 세 Hermes 호출
   (도구 저장 `writeApiServer`, 옛 커넥터를 켜는 `putConnector`, 도구 목록을 함께 쓰는 스킬 게시 `publish`)을 보내기 전에
   `{root}/users/{SHA-256(sandbox_owner)}` 를 만든다. 사진을 올린 적 없는 주인도 실행 공간을 쓰기 때문이다.
   `root` 는 미리 있어야 하고, Hermes 정책의 두 첨부 루트와 같은 디렉터리여야 한다.
