@@ -33,7 +33,10 @@ public interface ProactiveCheckRepository extends JpaRepository<ProactiveCheck, 
     /** 그 상태의 살펴보기. 기동할 때 {@code RUNNING} 으로 남은 줄을 찾는다. */
     List<ProactiveCheck> findByStatus(CheckStatus status);
 
-    /** 그 점검 대화에서 그 상태가 아닌 마지막 살펴보기. 변화 신호의 「지난 살펴보기」 를 읽는다. */
-    Optional<ProactiveCheck> findFirstByConversationIdAndStatusNotOrderByIdDesc(
+    /**
+     * 그 점검 대화에서 그 상태가 아니고 모델을 부른 마지막 살펴보기. 변화 신호의 「지난 살펴보기」 를 읽는다. 모델 없이 건너뛴 줄은 지난
+     * 결과도 루트 실행도 없으므로 뺀다.
+     */
+    Optional<ProactiveCheck> findFirstByConversationIdAndStatusNotAndSkippedReasonIsNullOrderByIdDesc(
             Long conversationId, CheckStatus status);
 }
