@@ -27,6 +27,9 @@ public final class FeedbackLabeler {
     /** 지금 화면의 숨기기다. 상태가 바뀔 때까지만 가리므로 거절이 아니라 미루기처럼 읽는다. */
     public static final String ATTENTION_HIDE = "ATTENTION_HIDE";
 
+    /** 지금 화면의 미루기다. */
+    public static final String ATTENTION_SNOOZE = "ATTENTION_SNOOZE";
+
     private static final Set<FeedbackEventType> POSITIVE =
             Set.of(FeedbackEventType.ACCEPTED, FeedbackEventType.APPROVED);
     private static final Set<FeedbackEventType> OUTCOMES =

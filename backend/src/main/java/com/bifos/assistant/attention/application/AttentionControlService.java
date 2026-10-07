@@ -126,7 +126,7 @@ public class AttentionControlService {
                 () -> AttentionControlEntry.snooze(user.id(), card, itemKey, until, now));
         // 미루기 요청에는 상태가 없어 그 카드 후보의 지금 상태로 사건을 남긴다.
         recordInCard(user, snapshot, card, itemKey, candidate.stateKey(), AttentionEventType.SNOOZED);
-        recordFeedback(user, candidate, FeedbackEventType.POSTPONED, "ATTENTION_SNOOZE", now);
+        recordFeedback(user, candidate, FeedbackEventType.POSTPONED, FeedbackLabeler.ATTENTION_SNOOZE, now);
     }
 
     /**

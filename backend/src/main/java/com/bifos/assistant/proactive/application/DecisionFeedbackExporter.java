@@ -205,19 +205,15 @@ public class DecisionFeedbackExporter {
                 .filter(Objects::nonNull)
                 .findFirst()
                 .ifPresent(checkId -> resolved.put(key, checkId)));
-        Set<Long> autonomous = resolved.entrySet().stream()
-                .filter(entry -> FeedbackSubjectType.ofKey(entry.getKey()) == FeedbackSubjectType.CHECK)
-                .map(Map.Entry::getValue)
-                .collect(Collectors.toSet());
+        // 자동 실행 트리에서 나온 것은 결과든 제안이든 모두 원천 살펴보기로 옮긴다. 자동 실행 한 번이 두 결정으로 나뉘지 않게 한다.
+        Set<Long> autonomous = new HashSet<>(resolved.values());
         if (!autonomous.isEmpty()) {
             Map<Long, Long> sources = decisions.findByUserIdAndExecutionCheckIdIn(user.id(), autonomous).stream()
                     .collect(Collectors.toMap(
                             AutonomyDecision::executionCheckId,
                             AutonomyDecision::sourceCheckId,
                             (first, ignored) -> first));
-            resolved.replaceAll((key, checkId) -> FeedbackSubjectType.ofKey(key) == FeedbackSubjectType.CHECK
-                    ? sources.getOrDefault(checkId, checkId)
-                    : checkId);
+            resolved.replaceAll((key, checkId) -> sources.getOrDefault(checkId, checkId));
         }
         return resolved;
     }

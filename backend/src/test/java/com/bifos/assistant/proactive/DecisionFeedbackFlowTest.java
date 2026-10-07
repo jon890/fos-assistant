@@ -323,8 +323,10 @@ class DecisionFeedbackFlowTest {
                         new DecisionProviderInfo("fixture", "1", null, "fixture-model", null, null, null),
                         DecisionFixtures.ordered(state)),
                 now));
+        AgentExecution autonomousRoot = executions.save(execution(null, now));
         ProactiveCheck autonomous = ProactiveCheck.started(
                 owner.id(), career.id(), checkConversation.id(), CheckTrigger.AUTONOMY, false, now);
+        autonomous.attachRoot(autonomousRoot.id(), "session-autonomous");
         autonomous.succeed(CheckOutcome.NOTHING_NEW, 0, 0, null, 0, 0, 0, 0, 0, now);
         ProactiveCheck savedAutonomous = checks.save(autonomous);
         AutonomyDecision decision = AutonomyDecision.of(
@@ -341,14 +343,20 @@ class DecisionFeedbackFlowTest {
         decisions.save(decision);
 
         checkFeedback.ended(savedAutonomous);
+        followUps.propose(owner, checkConversation.id(), autonomousRoot.id(), FIRST_TITLE, null, false);
         DecisionFeedbackExport export = exporter.export(owner, Duration.ofDays(30));
 
         DecisionRecord source = record(export, "check:" + reported.id());
-        assertThat(source.subjects()).singleElement().satisfies(subject -> {
-            assertThat(subject.subjectKey()).isEqualTo("proactive_check:" + savedAutonomous.id());
-            assertThat(subject.label()).isEqualTo(FeedbackLabel.NOT_SURFACED);
-            assertThat(subject.outcome()).isEqualTo(FeedbackEventType.EXECUTION_SUCCEEDED);
-        });
+        Map<String, Subject> subjects =
+                source.subjects().stream().collect(Collectors.toMap(Subject::subjectKey, Function.identity()));
+        assertThat(subjects).hasSize(2);
+        Subject outcome = subjects.get("proactive_check:" + savedAutonomous.id());
+        assertThat(outcome.label()).isEqualTo(FeedbackLabel.NOT_SURFACED);
+        assertThat(outcome.outcome()).isEqualTo(FeedbackEventType.EXECUTION_SUCCEEDED);
+        assertThat(subjects.keySet()).anyMatch(key -> key.startsWith("follow_up:"));
+        assertThat(record(export, "check:" + savedAutonomous.id()).subjects())
+                .as("자동 실행 트리의 제안은 원천 결정으로 옮겨 자동 실행의 상황에는 남지 않는다")
+                .isEmpty();
         assertThat(source.judgments()).singleElement().satisfies(judgment -> {
             assertThat(judgment.requestedModel()).isEqualTo("fixture-model");
             assertThat(judgment.orderedCandidateIds()).containsExactly(11L, 12L);
