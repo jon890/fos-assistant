@@ -248,6 +248,13 @@ function usageTabs(page: Page) {
 }
 
 test("관리자 영역의 사용량에는 탭 넷이 보이고 주소의 tab 값이 고른 탭이 된다", async ({ page }) => {
+  const prefetchedTabs: string[] = [];
+  page.on("request", (request) => {
+    const url = new URL(request.url());
+    if (url.pathname === "/admin/usage" && url.searchParams.has("tab") && request.headers()["next-router-prefetch"] === "1") {
+      prefetchedTabs.push(url.searchParams.get("tab")!);
+    }
+  });
   await page.goto("/admin/usage");
   for (const label of TAB_LABELS) {
     await expect(usageTabs(page).getByRole("link", { name: label, exact: true })).toBeVisible();
@@ -263,10 +270,10 @@ test("관리자 영역의 사용량에는 탭 넷이 보이고 주소의 tab 값
   await expect(usageTabs(page).getByRole("link", { name: "요약", exact: true })).toHaveAttribute("aria-current", "page");
 
   await usageTabs(page).getByRole("link", { name: "실행 기록", exact: true }).click();
-  // 탭은 서버 컴포넌트의 Link 라 다음 화면을 서버에서 받은 뒤에 주소가 바뀐다.
-  // 다른 검사와 함께 돌아 서버가 바쁘면 기본 5초를 넘겨, 이 단언만 기다리는 시간을 늘린다.
+  // 고른 집계만 읽고 주소와 탭 표시가 함께 바뀌어야 한다.
   await expect(page).toHaveURL(/\/admin\/usage\?tab=executions$/, { timeout: 15_000 });
   await expect(usageTabs(page).getByRole("link", { name: "실행 기록", exact: true })).toHaveAttribute("aria-current", "page");
+  expect(prefetchedTabs).toEqual([]);
 });
 
 test("모델이 스킬을 읽은 대화는 스킬 탭에 보이고 누르면 그 대화로 가며 실행 기록 줄에 스킬 이름이 붙는다", async ({ page }, testInfo) => {

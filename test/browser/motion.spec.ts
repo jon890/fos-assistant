@@ -1,6 +1,9 @@
 import { conversationIdOf, expect, test } from "./fixtures.ts";
 import type { Locator, Page, TestInfo } from "../../web/node_modules/@playwright/test/index.js";
 
+// 움직임 자체를 검사하므로 공통 fixture의 움직임 줄이기를 여기서는 쓰지 않는다.
+test.use({ reducedMotion: "no-preference" });
+
 /** 그 요소에 지금 걸린 animation 의 이름과 길이를 읽는다. */
 function animationOf(element: Locator) {
   return element.evaluate((node) => {

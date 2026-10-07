@@ -14,7 +14,7 @@ public interface RecoveredAnswerGuard {
     /**
      * 그 루트 실행의 답 대신 남길 알림 줄의 글이다. 답을 그대로 남겨도 되면 빈 값이다.
      *
-     * <p>글이 있으면 답이 비었어도 그 알림 줄 하나를 남긴다.
+     * <p>글이 있으면 답이 비었어도 그 알림 줄 하나를 남긴다. 빈 글이면 답도 알림 줄도 남기지 않는다. 사용자에게 바로 알리지 않는 turn 이다.
      *
      * @param rootExecutionId 기동 정리가 끝낸 대화 turn 의 실행 줄
      * @param ended 그 실행이 끝난 상태. {@code SUCCEEDED} 나 {@code CANCELLED} 다

@@ -7,7 +7,8 @@
 ## 세는 실행
 
 Control Plane 이 Hermes 에 실행을 맡기는 길은 `HermesRunsClient.submit`(`POST /v1/runs`) 하나다.
-그 메서드를 부르는 곳은 `ChatService`, `AgentRunner`, `MemoryProposer`, `StarterSuggestionService` 넷이고 다른 진입점은 모두 이 넷을 거친다.
+그 메서드는 `ChatService`, `AgentRunner`, `MemoryProposer`, `StarterSuggestionService`, `HermesDecisionProvider`가 부른다.
+다른 진입점은 모두 이 다섯 곳을 거친다.
 
 | 진입점 | 지나는 길 | 자리의 종류 |
 | --- | --- | --- |
@@ -19,10 +20,12 @@ Control Plane 이 Hermes 에 실행을 맡기는 길은 `HermesRunsClient.submit
 | 위임 결과와 커넥터 결과의 자동 turn | `DelegationWakeService.tryWake` 에서 `ChatService.runDelegationResults` | turn 자리 |
 | 흐름의 Chief | `ChatService.runFlow` 에서 `ResearchAndBuildFlow`, `AgentRunner.run` | turn 자리 |
 | 먼저 살펴보기 | `ProactiveCheckService.start` 가 잠금을 잡고 가상 스레드에서 `ChatService.runProactiveCheck` | turn 자리 |
+| 행동 정책의 자동 실행 | `AutonomyPolicyService.decide` 에서 `ProactiveCheckService.startAutonomous`. 매일 깨우기와 같은 백그라운드 자리다 | turn 자리 |
 | 흐름의 Researcher, Engineer, Synthesizer | `ChildExecutionRunner.run` 에서 `AgentRunner.run` | 실행 줄 |
 | `agent_delegate` 로 맡긴 자식 | `AgentDelegationService.delegate` 에서 `ChildExecutionRunner.delegate`, `AgentRunner.run` | 실행 줄 |
 | Memory 제안 | `ChatService.finish` 에서 `MemoryProposer.proposeFrom` | 실행 줄, 백그라운드 |
 | 추천 질문 | `StarterSuggestionService.generate`. 추천 읽기와 turn 완료 뒤 갱신이 띄운다 | 실행 줄, 백그라운드 |
+| 문제 후보의 가치 평가와 replay | `ValueEvaluationService`에서 `HermesDecisionProvider.evaluate`, `ExecutionRecorder.startSystem` | 실행 줄, 백그라운드 |
 | 기동 정리가 다시 잡은 대화 turn 과 흐름 turn | `RestartReconciler` | turn 자리. 한도를 보지 않고 얻는다 |
 
 Hermes 를 부르지만 실행을 시작하지 않는 것은 세지 않는다.
@@ -77,12 +80,13 @@ OS 격리나 CPU, 메모리, 비용의 상한을 보장하지 않는다.
 실행 줄은 `RUNNING` 이고 대화 turn 의 루트 줄이 아닌 것만 센다.
 대화 turn 의 루트 줄은 `parent_execution_id` 가 비고 `conversation_id` 가 있는 줄이다. 그 turn 은 turn 자리로 이미 세었다.
 흐름의 Chief 도 대화 turn 의 루트 줄이다. 그래서 Chief 가 끝난 뒤 자식이 시작하기 전에도 그 turn 은 자리 하나를 쥔다.
-추천 질문 줄은 대화가 없어 루트 줄이어도 센다.
+추천 질문과 시스템 판단 줄은 대화가 없어 루트 줄이어도 센다.
 
 **판정과 자리 만들기는 사용자 잠금 하나 안에서 한다.**
 turn 자리를 얻을 때와 실행 줄을 만들 때 모두 같은 잠금을 잡고, 셋을 더해 판정하고, 통과하면 그 안에서 자리를 만든다.
 두 경로가 각자 세고 각자 만들면 합이 한도를 넘는다.
-실행 줄의 저장은 그 잠금 안에서 커밋까지 끝난다. 부르는 쪽(`ChatService.runTurn`, `AgentRunner.run`, `MemoryProposer`, `StarterSuggestionService`)은 트랜잭션을 열지 않는다.
+실행 줄의 저장은 그 잠금 안에서 커밋까지 끝난다.
+부르는 쪽(`ChatService.runTurn`, `AgentRunner.run`, `MemoryProposer`, `StarterSuggestionService`, `HermesDecisionProvider`)은 트랜잭션을 열지 않는다.
 트랜잭션 안에서 부르면 잠금을 푼 뒤에 커밋되어 다른 스레드가 그 줄을 세지 못한다. `UserExecutionLimiter` 는 그 경우 예외를 던진다.
 
 **대화 turn 의 루트 줄은 사용자 한도를 다시 보지 않는다.** turn 자리가 이미 그 turn 을 세었다.

@@ -45,6 +45,8 @@ export function UsageTabs({
       {visibleTabs(isAdmin).map((tab) => (
         <Link
           key={tab.value}
+          // 탭마다 집계를 다시 읽는다. 미리 읽기와 이동이 겹치지 않게 고른 탭만 읽는다.
+          prefetch={false}
           href={
             tab.value === "summary" ? basePath : `${basePath}?tab=${tab.value}`
           }

@@ -1,5 +1,10 @@
 import type { Page } from "../../web/node_modules/@playwright/test/index.js";
 import { expect, test } from "./fixtures.ts";
+import { fixBrowserTime, FIXED_BROWSER_NOW } from "./helpers.ts";
+
+test.beforeEach(async ({ page }) => {
+  await fixBrowserTime(page);
+});
 
 function tokenForm(page: Page) {
   return page.locator("form").filter({ has: page.getByRole("heading", { name: "새 토큰" }) });
@@ -31,8 +36,8 @@ function fakeToken(label: string, patch: Partial<StubToken> = {}): StubToken {
   return {
     id: 9000 + label.length,
     label,
-    createdAt: new Date(Date.now() - 86_400_000).toISOString(),
-    expiresAt: new Date(Date.now() + 90 * 86_400_000).toISOString(),
+    createdAt: new Date(FIXED_BROWSER_NOW.getTime() - 86_400_000).toISOString(),
+    expiresAt: new Date(FIXED_BROWSER_NOW.getTime() + 90 * 86_400_000).toISOString(),
     lastUsedAt: null,
     revokedAt: null,
     collections: [{ collection: "identity", allowSensitive: false }],
@@ -54,14 +59,14 @@ async function stubTokenApi(page: Page, seed: StubToken[] = []) {
     if (route.request().method() === "GET") return route.fulfill({ json: tokens });
     const body = route.request().postDataJSON() as { label: string; expiresInDays: number; collections: StubToken["collections"] };
     requests.push({ expiresInDays: body.expiresInDays, collections: body.collections });
-    const info = fakeToken(body.label, { collections: body.collections, expiresAt: new Date(Date.now() + body.expiresInDays * 86_400_000).toISOString() });
+    const info = fakeToken(body.label, { collections: body.collections, expiresAt: new Date(FIXED_BROWSER_NOW.getTime() + body.expiresInDays * 86_400_000).toISOString() });
     tokens.push(info);
     return route.fulfill({ json: { info, token: `fos_svc_${"ab12".repeat(12)}` } });
   });
   await page.route("**/api/service-tokens/*", async (route) => {
     const id = Number(new URL(route.request().url()).pathname.split("/").pop());
     const token = tokens.find((candidate) => candidate.id === id);
-    if (token) token.revokedAt = new Date().toISOString();
+    if (token) token.revokedAt = FIXED_BROWSER_NOW.toISOString();
     return route.fulfill({ status: 204 });
   });
   return { tokens, requests };
@@ -135,7 +140,7 @@ test("영역을 고르지 않으면 만들지 못하고 고른 영역 아래에�
 
 test("마지막 사용 날짜를 보인다", async ({ page }, testInfo) => {
   const label = `사용 ${testInfo.project.name}`;
-  await stubTokenApi(page, [fakeToken(label, { lastUsedAt: new Date(Date.now() - 3_600_000).toISOString() })]);
+  await stubTokenApi(page, [fakeToken(label, { lastUsedAt: new Date(FIXED_BROWSER_NOW.getTime() - 3_600_000).toISOString() })]);
   await page.goto("/memory");
   await issueToken(page, "대역", false);
   const item = tokenItem(page, label);
@@ -145,8 +150,8 @@ test("마지막 사용 날짜를 보인다", async ({ page }, testInfo) => {
 
 test("만료가 가까운 토큰과 만료된 토큰에 표시를 달고 만료된 토큰은 폐기하지 못한다", async ({ page }) => {
   await stubTokenApi(page, [
-    fakeToken("곧 만료 토큰", { expiresAt: new Date(Date.now() + 3 * 86_400_000).toISOString() }),
-    fakeToken("만료 토큰", { expiresAt: new Date(Date.now() - 86_400_000).toISOString() }),
+    fakeToken("곧 만료 토큰", { expiresAt: new Date(FIXED_BROWSER_NOW.getTime() + 3 * 86_400_000).toISOString() }),
+    fakeToken("만료 토큰", { expiresAt: new Date(FIXED_BROWSER_NOW.getTime() - 86_400_000).toISOString() }),
   ]);
   await page.goto("/memory");
   await issueToken(page, "대역", false);

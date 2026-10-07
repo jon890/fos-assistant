@@ -123,9 +123,15 @@ Hermes 의 실행 조회가 무엇을 얼마 동안 답하는지는 [`hermes/run
 | `chat.application.RestartReconciler` | 기동할 때 남은 실행을 나누고, 대화의 turn 잠금을 잡고, 실행마다 가상 스레드에서 Hermes 에 묻는다 |
 | `chat.application.RecoveredRunRecorder` | Hermes 의 답 하나를 실행 줄과 대화에 적는다. 이미 끝난 줄이면 아무것도 하지 않는다 |
 | `chat.application.RestartReconcileProperties` | `assistant.restart-reconcile.enabled` 와 `max-wait`. `max-wait` 을 비우면 `hermes.run-timeout` 이다 |
+| `proactive.application.ValueEvaluationRecovery` | 남은 평가를 한 줄씩 `FALLBACK / INTERRUPTED`로 닫고 시스템 판단 실행을 `FAILED / DECISION_INTERRUPTED`로 적는다. 원격 run이 있으면 종료 확인 자리를 먼저 쥔다 |
 | `hermes.HermesRunsClient.lookupRun` | 실행 하나의 지금 상태를 한 번 읽는다. 끝났다, 돈다, 모른다(404) 가운데 하나다. 닿지 못하면 예외다 |
 
-두 단계로 돈다.
+가치 평가 복구는 `Integer.MIN_VALUE` phase로 먼저 돈다.
+`ProactiveCheckRecovery`는 `RestartReconciler.PHASE - 1`, `RestartReconciler`는 `PHASE`다.
+시스템 판단의 에이전트 없는 실행 줄을 `RestartReconciler`가 잡기 전에 닫기 위해서다.
+평가 복구의 한 줄이나 목록 조회가 실패해도 다른 복구와 서버 기동을 이어 간다. 실패한 줄은 식별자와 오류 종류만 기록한다.
+
+그 뒤 `RestartReconciler`가 두 단계로 돈다.
 
 1. **잡기.** 웹 서버가 요청을 받기 전에 돈다. `RUNNING` 줄을 읽고, run 번호가 있는 대화 turn 의 루트 줄과 흐름 turn 의 줄마다 그 대화의 turn 잠금을 잡는다.
    이 잠금은 사용자 실행 한도를 보지 않고 turn 자리를 얻는다. 이미 Hermes 에서 도는 실행이라 거절할 수 없다.
