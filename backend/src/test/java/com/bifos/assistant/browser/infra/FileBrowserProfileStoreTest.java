@@ -65,6 +65,46 @@ class FileBrowserProfileStoreTest {
     }
 
     @Test
+    @DisplayName("새 프로필에는 이전 세션을 이어서 여는 설정 파일을 주인만 읽는 권한으로 써 둔다")
+    void writesSessionRestorePreferences() throws Exception {
+        store.ensure(KEY);
+
+        Path preferences = root.resolve(KEY).resolve("Default/Preferences");
+        assertThat(preferences).hasContent("{\"session\":{\"restore_on_startup\":1}}");
+        if (Files.getFileStore(preferences).supportsFileAttributeView("posix")) {
+            assertThat(PosixFilePermissions.toString(Files.getPosixFilePermissions(preferences)))
+                    .isEqualTo("rw-------");
+        }
+    }
+
+    @Test
+    @DisplayName("설정 파일이 이미 있으면 내용을 그대로 두고, 설정 파일이 없던 기존 프로필에는 써 둔다")
+    void keepsExistingPreferences() throws Exception {
+        Files.createDirectories(root.resolve(KEY).resolve("Default"));
+        store.ensure(KEY);
+        Path preferences = root.resolve(KEY).resolve("Default/Preferences");
+        assertThat(preferences).exists();
+
+        Files.writeString(preferences, "{\"chrome\":\"owned\"}");
+        store.ensure(KEY);
+
+        assertThat(preferences).hasContent("{\"chrome\":\"owned\"}");
+    }
+
+    @Test
+    @DisplayName("설정 파일 자리의 링크를 따라가지 않아 링크가 가리키는 파일은 그대로다")
+    void doesNotFollowPreferencesLink() throws Exception {
+        Path outside = Files.createDirectories(temp.resolve("outside"));
+        Files.writeString(outside.resolve("target"), "keep");
+        Files.createDirectories(root.resolve(KEY).resolve("Default"));
+        Files.createSymbolicLink(root.resolve(KEY).resolve("Default/Preferences"), outside.resolve("target"));
+
+        store.ensure(KEY);
+
+        assertThat(outside.resolve("target")).hasContent("keep");
+    }
+
+    @Test
     @DisplayName("지우면 디렉터리를 통째로 지우고 없는 디렉터리를 지워도 성공이다")
     void deletesWholeDirectory() throws Exception {
         store.ensure(KEY);
