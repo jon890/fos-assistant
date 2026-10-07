@@ -1,6 +1,7 @@
 package com.bifos.assistant.memory.application;
 
 import com.bifos.assistant.feedback.application.DecisionFeedbackRecorder;
+import com.bifos.assistant.feedback.application.FeedbackLabeler;
 import com.bifos.assistant.feedback.domain.type.FeedbackActor;
 import com.bifos.assistant.feedback.domain.type.FeedbackEventType;
 import com.bifos.assistant.memory.application.model.CapturedMemory;
@@ -194,7 +195,11 @@ public class MemoryCaptureService {
                 throw conflict("the memory status has changed after it was remembered");
             }
             memory.restoreProposal(clock.instant());
-            memories.save(memory);
+            Memory restored = memories.save(memory);
+            // 받아들임을 무른 것이다. 첫 반응은 그대로 두고, 오래 가는 선호로 읽히지 않게 사용자의 마지막 결정을 남긴다.
+            feedback.record(MemoryService.proposalFeedback(
+                            user, restored, FeedbackEventType.DISMISSED, FeedbackActor.USER, clock.instant())
+                    .reason(FeedbackLabeler.MEMORY_UNDO));
         } else {
             memoryService.delete(user, capture.memoryId());
         }
