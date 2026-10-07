@@ -14,7 +14,6 @@
   <suppress id="fullyQualifiedName" files="src[\\/]main[\\/].*[\\/](AgentExecutionRepository|ExecutionSkillUseRepository|ChatMessageRepository)\.java"/>
 
   <!-- 테스트는 시나리오가 길고 생성자 주입 규칙과 관계가 없다 -->
-  <suppress checks="(^|\.)FileLength(Check)?$" files="src[\\/]test[\\/]"/>
   <suppress checks="(^|\.)MethodLength(Check)?$" files="src[\\/]test[\\/]"/>
   <suppress id="requiredArgsConstructor" files="src[\\/]test[\\/]"/>
 </suppressions>
