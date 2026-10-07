@@ -133,10 +133,7 @@ public class CheckResultParser {
     /** 읽은 JSON 객체를 계약대로 검사해 블록으로 바꾼다. */
     private static CheckResultRead blockOf(JsonNode root) {
         JsonNode version = root.get("version");
-        if (version == null
-                || !version.isIntegralNumber()
-                || version.asInt() < 1
-                || version.asInt() > 3) {
+        if (version == null || !version.isIntegralNumber() || version.asInt() < 1 || version.asInt() > 3) {
             return CheckResultRead.invalid(CheckInvalidReason.BAD_VERSION);
         }
         Optional<CheckOutcome> outcome = outcomeOf(root.get("outcome"));

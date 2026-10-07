@@ -160,8 +160,7 @@ class ProblemJudgementTest {
     }
 
     private static JudgedProblem only(List<ProblemCandidate> candidates, Set<String> accepted) {
-        List<JudgedProblem> judged =
-                ProblemJudgement.judge(candidates, careerFindings(), accepted, NO_OPEN_FOLLOW_UP);
+        List<JudgedProblem> judged = ProblemJudgement.judge(candidates, careerFindings(), accepted, NO_OPEN_FOLLOW_UP);
         assertThat(judged).hasSize(1);
         return judged.getFirst();
     }
@@ -183,11 +182,13 @@ class ProblemJudgementTest {
     @DisplayName("나중에 중요한 문제: 이미 알린 발견도 근거가 되고, 근거가 여럿이면 가장 이른 확인 시각을 신선도로 쓴다")
     void acceptsImportantLaterCandidateOnRepeatedFinding() {
         assertThat(careerFindings().get(1).reason()).isEqualTo(FindingReason.REPEATED);
-        JudgedProblem judged =
-                only(List.of(withEvidence(importantLater(), List.of(STUDY_TOPIC, POSITION_TOPIC, STUDY_TOPIC))), Set.of());
+        JudgedProblem judged = only(
+                List.of(withEvidence(importantLater(), List.of(STUDY_TOPIC, POSITION_TOPIC, STUDY_TOPIC))), Set.of());
 
         assertThat(judged.status()).isEqualTo(ProblemStatus.ACCEPTED);
-        assertThat(judged.evidence()).extracting(ProblemEvidence::topicKey).containsExactly(STUDY_TOPIC, POSITION_TOPIC);
+        assertThat(judged.evidence())
+                .extracting(ProblemEvidence::topicKey)
+                .containsExactly(STUDY_TOPIC, POSITION_TOPIC);
         assertThat(judged.evidenceCheckedAt()).isEqualTo(Instant.parse(EARLIER_CHECKED_AT));
     }
 
@@ -203,8 +204,8 @@ class ProblemJudgementTest {
     @Test
     @DisplayName("근거: 마감 공고, 원문 없는 발견, 블록에 없는 주제 키만 가리키면 NO_EVIDENCE 다")
     void dropsCandidateWithoutUsableEvidence() {
-        for (List<String> evidence :
-                List.of(List.of(CLOSED_TOPIC), List.of(UNSOURCED_TOPIC), List.of("position:not-in-block"), List.<String>of())) {
+        for (List<String> evidence : List.of(
+                List.of(CLOSED_TOPIC), List.of(UNSOURCED_TOPIC), List.of("position:not-in-block"), List.<String>of())) {
             JudgedProblem judged = only(List.of(withEvidence(urgent(), evidence)), Set.of());
 
             assertThat(judged.reason()).as("근거 %s", evidence).isEqualTo(ProblemDropReason.NO_EVIDENCE);
@@ -219,7 +220,8 @@ class ProblemJudgementTest {
         Set<String> accepted = Set.of("position:deadline:example-corp");
 
         assertThat(only(List.of(urgent()), accepted).reason()).isEqualTo(ProblemDropReason.DUPLICATE);
-        assertThat(only(List.of(withChange(urgent(), "마감이 이틀 앞으로 다가왔다")), accepted).status())
+        assertThat(only(List.of(withChange(urgent(), "마감이 이틀 앞으로 다가왔다")), accepted)
+                        .status())
                 .isEqualTo(ProblemStatus.ACCEPTED);
     }
 
@@ -229,7 +231,9 @@ class ProblemJudgementTest {
         List<JudgedProblem> judged = ProblemJudgement.judge(
                 List.of(urgent(), withChange(urgent(), "다른 표현")), careerFindings(), Set.of(), NO_OPEN_FOLLOW_UP);
 
-        assertThat(judged).extracting(JudgedProblem::status).containsExactly(ProblemStatus.ACCEPTED, ProblemStatus.DROPPED);
+        assertThat(judged)
+                .extracting(JudgedProblem::status)
+                .containsExactly(ProblemStatus.ACCEPTED, ProblemStatus.DROPPED);
         assertThat(judged.getLast().reason()).isEqualTo(ProblemDropReason.DUPLICATE);
     }
 
@@ -239,7 +243,9 @@ class ProblemJudgementTest {
         List<JudgedProblem> judged = ProblemJudgement.judge(
                 List.of(withGoal(urgent(), null), urgent()), careerFindings(), Set.of(), NO_OPEN_FOLLOW_UP);
 
-        assertThat(judged).extracting(JudgedProblem::status).containsExactly(ProblemStatus.DROPPED, ProblemStatus.ACCEPTED);
+        assertThat(judged)
+                .extracting(JudgedProblem::status)
+                .containsExactly(ProblemStatus.DROPPED, ProblemStatus.ACCEPTED);
     }
 
     @Test
@@ -250,13 +256,16 @@ class ProblemJudgementTest {
         List<JudgedProblem> judged =
                 ProblemJudgement.judge(List.of(importantLater(), urgent()), careerFindings(), Set.of(), open);
 
-        assertThat(judged).extracting(JudgedProblem::reason).containsExactly(ProblemDropReason.EXISTING_FOLLOW_UP, null);
+        assertThat(judged)
+                .extracting(JudgedProblem::reason)
+                .containsExactly(ProblemDropReason.EXISTING_FOLLOW_UP, null);
     }
 
     @Test
     @DisplayName("계약: 정해진 값 밖의 확신이나 빈 문제 키는 INCOMPLETE 이고 다른 검사보다 먼저 걸린다")
     void dropsIncompleteCandidateFirst() {
-        assertThat(only(List.of(withGoal(withConfidence(urgent(), "VERY_HIGH"), null)), Set.of()).reason())
+        assertThat(only(List.of(withGoal(withConfidence(urgent(), "VERY_HIGH"), null)), Set.of())
+                        .reason())
                 .isEqualTo(ProblemDropReason.INCOMPLETE);
         ProblemCandidate blankKey = new ProblemCandidate(
                 " ",

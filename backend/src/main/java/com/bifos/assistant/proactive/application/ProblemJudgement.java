@@ -128,7 +128,8 @@ public final class ProblemJudgement {
     private static Map<String, JudgedFinding> usableEvidence(List<JudgedFinding> findings) {
         Map<String, JudgedFinding> byTopic = new LinkedHashMap<>();
         for (JudgedFinding finding : findings) {
-            String topicKey = finding.finding() == null ? null : finding.finding().topicKey();
+            String topicKey =
+                    finding.finding() == null ? null : finding.finding().topicKey();
             boolean usable = finding.kind() == FindingKind.NEW || finding.reason() == FindingReason.REPEATED;
             if (usable && !isBlank(topicKey)) {
                 byTopic.putIfAbsent(topicKey, finding);

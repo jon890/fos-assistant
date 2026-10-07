@@ -202,7 +202,8 @@ class CheckResultParserTest {
         assertThat(first.problemKey()).hasSize(120);
         assertThat(first.problem()).hasSize(300);
         assertThat(first.relatedGoal()).hasSize(200);
-        assertThat(first.evidence()).containsExactly("position:a", "position:b", "position:c", "position:d", "position:e");
+        assertThat(first.evidence())
+                .containsExactly("position:a", "position:b", "position:c", "position:d", "position:e");
         assertThat(first.proposedAction().type()).isEqualTo("ACTION");
         assertThat(first.proposedAction().text()).hasSize(200);
         assertThat(first.confidence()).isEqualTo("HIGH");
@@ -217,8 +218,8 @@ class CheckResultParserTest {
     void ignoresProblemCandidatesBeforeVersionThree() {
         String candidates = "\"problemCandidates\": [{\"problemKey\": \"study:x\"}]";
         for (int version : new int[] {1, 2}) {
-            CheckResultBlock result = parser.read(block(
-                            "{\"version\": " + version + ", \"outcome\": \"NOTHING_NEW\", " + candidates + "}"))
+            CheckResultBlock result = parser.read(
+                            block("{\"version\": " + version + ", \"outcome\": \"NOTHING_NEW\", " + candidates + "}"))
                     .block();
             assertThat(result.problemCandidates()).as("version " + version).isEmpty();
         }

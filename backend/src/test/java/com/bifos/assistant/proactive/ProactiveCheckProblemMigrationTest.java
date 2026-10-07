@@ -35,7 +35,8 @@ class ProactiveCheckProblemMigrationTest {
                 .dataSource(url, "sa", "")
                 .locations("classpath:db/migration")
                 .load();
-        assertThat(Arrays.stream(flyway.info().all()).anyMatch(info -> MIGRATION_DESCRIPTION.equals(info.getDescription())))
+        assertThat(Arrays.stream(flyway.info().all())
+                        .anyMatch(info -> MIGRATION_DESCRIPTION.equals(info.getDescription())))
                 .as("설명이 '%s' 인 마이그레이션", MIGRATION_DESCRIPTION)
                 .isTrue();
         flyway.migrate();

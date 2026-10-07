@@ -539,7 +539,8 @@ class ProactiveCheckTurnTest {
 
         Conversation conversation = runCheck();
 
-        ChatMessage answer = messages.findByConversationIdOrderByIdAsc(conversation.id()).getLast();
+        ChatMessage answer =
+                messages.findByConversationIdOrderByIdAsc(conversation.id()).getLast();
         assertThat(answer.content())
                 .contains("**새로 알릴 것**")
                 .doesNotContain(PROBLEM_TEXT)
@@ -547,7 +548,8 @@ class ProactiveCheckTurnTest {
                 .doesNotContain("목표 없는 관찰");
         ProactiveCheck check = onlyCheckOf(conversation);
         List<ProactiveCheckProblem> saved = problemsOf(conversation);
-        assertThat(saved).extracting(ProactiveCheckProblem::status)
+        assertThat(saved)
+                .extracting(ProactiveCheckProblem::status)
                 .containsExactly(ProblemStatus.ACCEPTED, ProblemStatus.DROPPED);
         ProactiveCheckProblem accepted = saved.getFirst();
         assertThat(accepted.checkId()).isEqualTo(check.id());
@@ -571,9 +573,7 @@ class ProactiveCheckTurnTest {
 
         String input = stub().received().getLast().input();
         String wrapped = input.substring(input.indexOf("최근에 받아들인 문제 후보"));
-        assertThat(wrapped)
-                .contains("<external-data>")
-                .contains("- " + PROBLEM_KEY + " · " + PROBLEM_TEXT);
+        assertThat(wrapped).contains("<external-data>").contains("- " + PROBLEM_KEY + " · " + PROBLEM_TEXT);
         ProactiveCheck second = checksOf(conversation).getLast();
         assertThat(problemsOf(conversation))
                 .filteredOn(problem -> problem.checkId().equals(second.id()))
@@ -785,7 +785,8 @@ class ProactiveCheckTurnTest {
         String change = changeSinceLast == null ? "" : ",\"changeSinceLast\":\"" + changeSinceLast + "\"";
         String observation = withObservation
                 ? ",{\"problemKey\":\"study:observation\",\"problem\":\"목표 없는 관찰\","
-                        + "\"evidence\":[\"" + TOPIC_KEY + "\"],\"proposedAction\":{\"type\":\"ACTION\",\"text\":\"읽기\"},"
+                        + "\"evidence\":[\"" + TOPIC_KEY
+                        + "\"],\"proposedAction\":{\"type\":\"ACTION\",\"text\":\"읽기\"},"
                         + "\"confidence\":\"LOW\",\"expectedBenefit\":\"모른다\",\"sideEffect\":\"NONE\"}"
                 : "";
         return block("{\"version\":3,\"outcome\":\"FINDINGS\",\"findings\":[{"
