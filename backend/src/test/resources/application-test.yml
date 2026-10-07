@@ -77,6 +77,20 @@ assistant:
     root: build/test-skills
     # 검사가 게시된 경로에 적힌 글자를 실제 디렉터리와 견주므로 두 루트를 같게 둔다
     agent-root: build/test-skills
+  browser:
+    # 기능을 켜는 검사가 이 값을 덮는다. 주소와 경로는 실재하지 않는 시험 값이다
+    enabled: false
+    proxy-url: https://browser-proxy.example.test
+    image: example/browser:test
+    network: example-browser
+    cdp-port: 9999
+    profile-root: build/test-browser-profiles
+    profile-host-root: /example/browser-profiles
+    profile-mount: /example/profile
+    memory-mb: 512
+    cpu: 1
+    pids-limit: 256
+    shm-mb: 128
 hermes:
   profile-key-dir: build/test-hermes-keys
   # 실재하지 않는 주소다. 이 값으로 대시보드를 부르는 테스트가 없고, 부르면 닿지 못해 실패한다

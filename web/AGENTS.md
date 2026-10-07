@@ -74,6 +74,7 @@ grep -rn 'style={{' web/src/
 | Hermes API 주소 | 에이전트 연결 주소 |
 | credential 범위 | AI 계정 사용 범위 |
 | Hermes profile | profile (관리자 영역에서만) |
+| 사용자 브라우저(`user_browser`) | 내 브라우저. 관리자 영역에서는 「브라우저」. 상태는 「꺼져 있어요」, 「켜는 중이에요」, 「켜져 있어요」, 「끄는 중이에요」, 「켜지 못했어요」 |
 
 ## lint 와 포맷
 

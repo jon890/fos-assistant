@@ -117,4 +117,5 @@
 | [ADR-20261007 / naver-blog-connector](ADR-20261007-naver-blog-connector.md) | 네이버 블로그 커넥터는 사용자의 Chrome 에 CDP 로 붙고, 임시저장은 승인한 뒤 백그라운드 작업으로 돈다 | hermes, backend | Accepted. ADR-083 의 바인딩으로 블로그 전용 profile 을 대신한다 |
 | [ADR-20261007 / numbering-scheme](ADR-20261007-numbering-scheme.md) | Flyway 는 UTC 시각 버전을 쓰고 ADR 은 결정 날짜와 슬러그로 구분한다 | 공통 | Accepted |
 | [ADR-20261007 / proactive-eval](ADR-20261007-proactive-eval.md) | 먼저 살펴보기 루프는 결정적 provider 로 실제 서비스를 replay 해 측정하고 안전 경계만 CI 를 막는다 | backend | Accepted |
+| [ADR-20261007 / user-browser](ADR-20261007-user-browser.md) | 사용자마다 브라우저 하나를 Control Plane 이 관리하고, 커넥터는 바인딩이 준 중계 주소로만 닿는다 | backend, frontend, hermes | Accepted. ADR-20261007 / naver-blog-connector 의 CDP 주소 연결 칸을 바꾼다 |
 | [ADR-20261007 / value-evaluation](ADR-20261007-value-evaluation.md) | 가치 판단은 축별 근거와 재평가 입력을 남기고 행동 정책과 분리한다 | backend, hermes | Accepted |
