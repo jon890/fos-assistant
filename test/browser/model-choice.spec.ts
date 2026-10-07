@@ -25,6 +25,35 @@ function tierSettings(page: Page): Locator {
   return page.getByTestId("model-tier-settings");
 }
 
+test("에이전트가 없는 새 대화는 모델 조회 없이 기본 단계 표시를 유지한다", async ({
+  page,
+}) => {
+  const modelRequests: string[] = [];
+  page.on("request", (request) => {
+    const url = new URL(request.url());
+    if (
+      url.pathname === "/api/chat/model-tiers" ||
+      url.pathname === "/api/chat/model-options"
+    ) {
+      modelRequests.push(request.url());
+    }
+  });
+  await page.route("**/api/agents", (route) => route.fulfill({ json: [] }));
+
+  await page.goto("/");
+  for (const [tier, label] of [
+    ["fast", "빠르게"],
+    ["balanced", "균형"],
+    ["deep", "깊게"],
+  ]) {
+    const button = page.getByTestId(`model-tier-${tier}`);
+    await expect(button).toHaveText(label);
+    await expect(button).toBeDisabled();
+  }
+  await expect(tierSettings(page)).toBeDisabled();
+  expect(modelRequests).toEqual([]);
+});
+
 async function openSettings(page: Page): Promise<void> {
   if ((await picker(page).count()) === 0) await tierSettings(page).click();
   await expect(picker(page)).toBeVisible();
