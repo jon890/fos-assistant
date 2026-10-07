@@ -24,7 +24,7 @@ import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
 
 /**
- * 문제 후보마다 받아들일지 버릴지 정한다(ADR-092). 모델이 쓴 값을 믿지 않고 Control Plane 이 결정적으로 확인한다.
+ * 문제 후보마다 받아들일지 버릴지 정한다(ADR-093). 모델이 쓴 값을 믿지 않고 Control Plane 이 결정적으로 확인한다.
  *
  * <p>검사는 아래 순서이고 처음 걸린 까닭 하나만 남긴다. 순서와 조건은 {@code docs/backend/proactive-check.md} 의 「후보
  * 검사」 가 갖는다. 우선순위와 권한은 정하지 않는다.

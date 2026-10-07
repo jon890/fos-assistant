@@ -59,7 +59,7 @@ const STUDY = { topicKey: "study:e2e-proactive-stream", title: "스트림 처리
 /** 저장된 후보 없이 웹에서 찾은 자료다. 맥락 반영 단계에서 달라진 점과 함께 다시 낸다. */
 const WEB_ONLY = { topicKey: "study:e2e-proactive-queue", title: "메시지 큐 입문 자료", sourceUrl: "https://example.com/e2e/proactive/queue" };
 const CHANGE = "새 판이 나와 다룬 범위가 넓어졌어요";
-/** 웹에서 찾은 자료를 근거로 낸 문제 후보다. 대화에 그리지 않고 다음 살펴보기 입력에만 실린다(ADR-092). */
+/** 웹에서 찾은 자료를 근거로 낸 문제 후보다. 대화에 그리지 않고 다음 살펴보기 입력에만 실린다(ADR-093). */
 const PROBLEM = {
   problemKey: "study:e2e-queue-gap",
   problem: "메시지 큐 재처리 방식을 설명할 근거가 부족하다",

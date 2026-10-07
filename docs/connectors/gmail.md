@@ -90,18 +90,18 @@ MCP 서버 이름은 `gmail` 이다. 인자는 `search_messages` 의 `max_result
 
 ### 오류
 
-| 서버가 내는 코드 | 공통 어휘 | 언제 |
-| --- | --- | --- |
-| `GMAIL_UNAUTHORIZED` | `credential_rejected` | 토큰 endpoint 가 `invalid_grant` 나 `invalid_client` 로 답했다. Gmail API 가 401 로 답했다. 세 값 가운데 하나가 비었다 |
-| `GMAIL_FORBIDDEN` | `forbidden` | Gmail API 가 403 으로 답했다. scope 가 모자라거나 프로젝트에서 Gmail API 를 켜지 않았다 |
-| `GMAIL_FILTER_SCOPE_REQUIRED` | `forbidden` | 필터 API 가 403 으로 답했다. 두 scope 로 토큰을 다시 받아 연결 값을 바꾼다 |
-| `GMAIL_TARGET_COUNT_CHANGED` | `invalid_input` | 승인한 수와 검색한 수가 다르다. 변경하지 않고 `actual_count` 를 알린다 |
-| `GMAIL_INVALID_INPUT` | `invalid_input` | 인자가 비었거나 모양이 틀리다. 막은 라벨을 더하려 했다. Gmail API 가 400 이나 404 로 답했다 |
-| `GMAIL_SEND_UNKNOWN` | `outcome_unknown` | 보내기나 답장의 보내는 요청(`messages/send`)을 보낸 뒤 시간 안에 답이 없거나, 연결이 끊겼거나, 응답을 읽지 못했거나, Gmail API 가 5xx 로 답했다. 메일이 나갔는지 모른다. 승인 줄은 실패가 아니라 `UNKNOWN` 으로 남는다 |
-| `GMAIL_UNAVAILABLE` | `unavailable` | 연결하지 못했다. 시간 안에 답이 없다. Gmail API 가 3xx, 429, 5xx 나 위에 없는 4xx 로 답했다. 응답을 읽지 못했다. 토큰 endpoint 가 `invalid_grant` 와 `invalid_client` 밖의 오류로 답했다 |
+| 서버가 내는 코드 | 공통 어휘 | 복구 어휘 | 언제 |
+| --- | --- | --- | --- |
+| `GMAIL_UNAUTHORIZED` | `credential_rejected` | `reconnect` | 토큰 endpoint 가 `invalid_grant` 나 `invalid_client` 로 답했다. Gmail API 가 401 로 답했다. 세 값 가운데 하나가 비었다 |
+| `GMAIL_FORBIDDEN` | `forbidden` | | Gmail API 가 403 으로 답했다. scope 가 모자라거나 프로젝트에서 Gmail API 를 켜지 않았다 |
+| `GMAIL_FILTER_SCOPE_REQUIRED` | `forbidden` | `reconnect` | 필터 API 가 403 으로 답했다. 두 scope 로 토큰을 다시 받아 연결 값을 바꾼다 |
+| `GMAIL_TARGET_COUNT_CHANGED` | `invalid_input` | `recheck`, 세부 `actual_count` | 승인한 수와 검색한 수가 다르다. 변경하지 않고 `actual_count` 를 알린다 |
+| `GMAIL_INVALID_INPUT` | `invalid_input` | `fix_input` | 인자가 비었거나 모양이 틀리다. 막은 라벨을 더하려 했다. Gmail API 가 400 이나 404 로 답했다 |
+| `GMAIL_SEND_UNKNOWN` | `outcome_unknown` | | 보내기나 답장의 보내는 요청(`messages/send`)을 보낸 뒤 시간 안에 답이 없거나, 연결이 끊겼거나, 응답을 읽지 못했거나, Gmail API 가 5xx 로 답했다. 메일이 나갔는지 모른다. 승인 줄은 실패가 아니라 `UNKNOWN` 으로 남는다 |
+| `GMAIL_UNAVAILABLE` | `unavailable` | `retry_later` | 연결하지 못했다. 시간 안에 답이 없다. Gmail API 가 3xx, 429, 5xx 나 위에 없는 4xx 로 답했다. 응답을 읽지 못했다. 토큰 endpoint 가 `invalid_grant` 와 `invalid_client` 밖의 오류로 답했다 |
 
 오류 결과는 코드만 담는다. 대상 수 변경에는 서버가 센 `actual_count` 도 담는다.
-승인 실행은 현재 공통 오류 어휘만 전달하므로 서버의 원래 코드와 `actual_count` 는 에이전트에 닿지 않는다. 일괄 적용의 `invalid_input` 은 인자를 확인하고 읽기 검색으로 다시 센 뒤 새 승인을 받는다. 필터 쓰기의 `forbidden` 은 `list_filters` 로 확인하고, 읽기 결과가 `GMAIL_FILTER_SCOPE_REQUIRED` 일 때 토큰 재발급을 안내한다.
+승인 실행이 실패하면 공통 어휘와 함께 서버의 코드, 복구 어휘, `actual_count` 가 에이전트에 닿는다([커넥터 연결](../connectors.md) 의 「오류 복구 계약」). 일반 403 인 `GMAIL_FORBIDDEN` 은 코드만 닿고 Google 의 오류 글은 닿지 않는다.
 Google 이 준 오류 글과 요청한 주소는 결과와 로그에 싣지 않는다.
 도구 인자는 모두 문자열이다. 숫자나 객체를 보내면 MCP SDK 가 서버 처리 전에 타입 오류로 거절한다. 이 오류는 JSON 결과가 아니어서 현재 공통 승인 경로에서 `unavailable` 로 보일 수 있다. 이 경우 연결 재시도보다 인자 타입을 먼저 확인한다.
 외부 호출의 제한 시간은 호출마다 15초다. 대시보드가 확인 도구를 기다리는 시간은 10초라, Google 이 느리게 답하면 등록과 연결 확인이 서버의 제한 시간보다 먼저 `unavailable` 로 끝난다. 어느 호출도 다시 부르지 않는다. 보내기가 시간 안에 답하지 않았을 때 다시 부르면 메일이 두 번 나갈 수 있다.
@@ -142,7 +142,7 @@ Google 이 준 오류 글과 요청한 주소는 결과와 로그에 싣지 않�
 4. `apply_labels_to_query` 에 같은 검색어와 라벨, 센 수를 글자로 적은 `expected_count` 를 넣는다.
 
 **승인 카드에는 검색어와 대상 수를 함께 보인다.** 서버가 다시 검색한 수가 다르면 아무것도 바꾸지 않고 `GMAIL_TARGET_COUNT_CHANGED` 와 `actual_count` 를 반환한다.
-승인 경로에서는 `invalid_input` 만 받으므로 에이전트가 같은 검색어로 모든 쪽을 다시 읽어 센 뒤 새 승인을 요청한다. 501통 이상이면 일부만 바꾸지 않고 거절한다.
+에이전트는 승인 결과의 `actual_count` 를 지금 수로 알리고, 다시 조회해 확인할지 묻는다. 그대로 다시 승인을 요청하지 않는다. 501통 이상이면 일부만 바꾸지 않고 거절한다.
 승인한 수가 0이고 검색도 비어 있으면 쓰기 없이 대상 수 0으로 끝난다.
 수가 같아도 검색과 변경 사이에 새 메일이 오면 그 메일은 이번 적용 대상에 들지 않는다.
 
@@ -225,7 +225,7 @@ Python 을 쓸 수 없으면 [OAuth 2.0 Playground](https://developers.google.co
 ### 기존 토큰에 필터 권한 더하기
 
 `gmail.modify` 만 받은 옛 토큰도 연결 확인과 라벨·메일 도구는 계속 쓸 수 있다.
-필터 쓰기가 `forbidden` 으로 끝나면 먼저 `list_filters` 를 부른다. 읽기 결과가 `GMAIL_FILTER_SCOPE_REQUIRED` 이면 다음 순서로 바꾼다. 조회가 성공하면 쓰기 오류의 다른 원인을 확인한다.
+필터 쓰기가 `GMAIL_FILTER_SCOPE_REQUIRED` 로 끝나면 다음 순서로 바꾼다. 같은 `forbidden` 이라도 코드가 `GMAIL_FORBIDDEN` 이면 필터 scope 문제로 단정하지 않는다.
 
 1. Google Cloud 동의 화면의 데이터 액세스에 `gmail.settings.basic` 을 더한다.
 2. 위 토큰 발급 스크립트를 다시 실행해 두 scope 를 함께 허용한다.

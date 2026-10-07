@@ -678,7 +678,11 @@ public class ConnectorActionService {
         } else if (result.ok()) {
             action.succeed(clip(result.result().toString()), now);
         } else {
-            action.fail(result.error().word(), null, now);
+            // 커넥터가 선언한 코드와 복구 계약만 저장한다. 외부 서비스의 오류 원문은 이 값에 들어오지 못한다(ADR-092).
+            action.fail(
+                    result.error().word(),
+                    result.detail() == null ? null : result.detail().toStored(),
+                    now);
         }
         return actions.save(action);
     }
