@@ -23,32 +23,40 @@ export default async function MemoryPage() {
     readMe(),
   ]);
   if (!result.ok) return <p className="text-sm">{result.message}</p>;
-  // 문서 절과 외부 서비스 연결 절은 각각 읽지 못하면 그 절만 빼고 기존 기억 화면은 그대로 그린다.
-  const sections = (
-    <>
-      {documents.ok && collections.ok ? (
-        <DocumentSection
-          initialDocuments={documents.data}
-          collections={collections.data}
-        />
-      ) : null}
-      {tokens.ok && collections.ok ? (
-        <ServiceTokenPanel
-          initialTokens={tokens.data}
-          collections={collections.data}
-        />
-      ) : null}
-      {documents.ok && collections.ok ? (
-        <ImportSection collections={collections.data} />
-      ) : null}
-    </>
-  );
+  const readAt = new Date().toISOString();
+  // 문서 탭과 접어 둔 절은 각각 읽지 못하면 그 부분만 빼고 기억 목록은 그대로 그린다.
+  const documentsReady = documents.ok && collections.ok;
+  const tokensReady = tokens.ok && collections.ok;
   return (
     <MemoryList
       initialMemories={result.data}
       isAdmin={me?.role === "ADMIN"}
       currentUserId={me?.id}
-      after={sections}
+      readAt={readAt}
+      documents={
+        documentsReady ? (
+          <DocumentSection
+            initialDocuments={documents.data}
+            collections={collections.data}
+            readAt={readAt}
+          />
+        ) : null
+      }
+      advanced={
+        documentsReady || tokensReady ? (
+          <>
+            {tokensReady ? (
+              <ServiceTokenPanel
+                initialTokens={tokens.data}
+                collections={collections.data}
+              />
+            ) : null}
+            {documentsReady ? (
+              <ImportSection collections={collections.data} />
+            ) : null}
+          </>
+        ) : null
+      }
     />
   );
 }
