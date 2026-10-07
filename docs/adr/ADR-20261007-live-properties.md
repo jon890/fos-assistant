@@ -6,7 +6,7 @@
   위임 깨우기, 사용자 실행 한도, 먼저 살펴보기, 위임, 추천 질문, memory 제안, autonomy, 가격표, memory 암호화, 커넥터 정책, 모델 tier 다.
   `HermesProperties` 는 `runTimeout()` 과 `pollInterval()` 을 쓰는 곳만 `LiveProperties<HermesProperties>` 로 읽는다.
   - 운영 구현은 기동 때 바인딩한 record 를 그대로 돌려준다. 값이 바뀌지 않으므로 운영 동작은 지금과 같다.
-  - 기동 때 한 번 계산하던 값(가격표 파일, 암호화 key 표)은 `current()` 가 돌려준 record 가 바뀌었을 때만 다시 계산한다.
+  - 기동 때 한 번 계산하던 값(가격표 파일, 암호화 key 표)은 `current()` 가 돌려준 설정 값(가격표 경로, 활성 key 와 key 목록)이 바뀌었을 때만 다시 계산한다. record 를 필드로 쥐지 않으려고 참조 대신 값을 견준다.
   - 서버 전체 동시 위임 한도는 기동 때 만든 `Semaphore` 대신 쓰는 수를 세고 `current().maxActive()` 와 견준다.
   - 기동 때 두 설정을 함께 검사하던 것(살펴보기 `max-duration` 이 `hermes.run-timeout` 보다 짧다)은 그대로 기동 때 검사한다.
   - 위 설정 record 를 `LiveProperties` 빈 정의 밖에서 주입받지 않는다. `runTimeout()` 과 `pollInterval()` 은 `LiveProperties` 로만 읽는다. 구조 규칙으로 확인한다.
