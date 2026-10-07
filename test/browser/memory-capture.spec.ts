@@ -91,6 +91,8 @@ test("바로 저장한 기록이 답 아래에 보이고 되돌리면 사라진�
   await expect(row).toHaveAttribute("data-kind", "CREATED");
   await expect(row).toHaveAttribute("data-status", "ACCEPTED");
   await expect(row).toContainText("기억했어요: 좋아하는 과일");
+  // 기록은 답보다 늦게 읽혀 들어오지만 맨 아래 따라가기가 그 줄까지 내려간다.
+  await expect(row).toBeInViewport();
   await page.getByTestId("memory-capture-undo").click();
 
   await expect(page.getByTestId("memory-captures")).toHaveCount(0);
