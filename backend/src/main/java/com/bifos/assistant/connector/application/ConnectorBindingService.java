@@ -517,7 +517,8 @@ public class ConnectorBindingService implements AgentConnectorDetacher {
     private InstallResult installAgain(ConnectorBinding binding, String connectorId, boolean legacy) {
         String profile = binding.agent().hermesProfile();
         if (legacy) {
-            return connector.putConnector(profile, connectorId, true, binding.agent().sandboxOwner());
+            return connector.putConnector(
+                    profile, connectorId, true, binding.agent().sandboxOwner());
         }
         return connector.bindConnector(
                 profile,
@@ -585,8 +586,7 @@ public class ConnectorBindingService implements AgentConnectorDetacher {
         if (users.findByIdForUpdate(due.userId()).isEmpty()) {
             return false;
         }
-        Optional<Agent> agent =
-                agents.findByIdForUpdate(due.agentId()).filter(candidate -> !candidate.isDeleted());
+        Optional<Agent> agent = agents.findByIdForUpdate(due.agentId()).filter(candidate -> !candidate.isDeleted());
         if (agent.isEmpty() || !Objects.equals(agent.get().ownerUserId(), due.userId())) {
             return false;
         }

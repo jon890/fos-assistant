@@ -15,7 +15,8 @@ import org.springframework.validation.annotation.Validated;
 @Validated
 @ConfigurationProperties(prefix = "assistant.connector.binding")
 public record ConnectorBindingProperties(
-        @DefaultValue("150s") Duration applyDelay, @DefaultValue("*/30 * * * * *") String applyCron) {
+        @DefaultValue("150s") Duration applyDelay,
+        @DefaultValue("*/30 * * * * *") String applyCron) {
 
     /** 지연이 0 이하이면 기동을 멈춘다. gateway 가 연결하기 전에 확인해 바인딩이 늘 {@code PENDING} 으로 남는데 기동은 성공해 알아채지 못한다. */
     public ConnectorBindingProperties {

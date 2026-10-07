@@ -242,7 +242,9 @@ class ConnectorBindingServiceTest {
         assertThat(stored.restartRequired()).isFalse();
         assertThat(stored.restartRequiredSince()).isNull();
         assertThat(stored.applyDueAt())
-                .isBetween(before.plus(APPLY_DELAY).minusMillis(1), after.plus(APPLY_DELAY).plusMillis(1));
+                .isBetween(
+                        before.plus(APPLY_DELAY).minusMillis(1),
+                        after.plus(APPLY_DELAY).plusMillis(1));
         verify(connector, never()).probe(anyString(), anyString());
     }
 
@@ -340,7 +342,8 @@ class ConnectorBindingServiceTest {
         ConnectorBinding stored = onlyBinding();
         assertThat(stored.status()).isEqualTo(BindingStatus.PENDING);
         assertThat(stored.restartRequired()).isFalse();
-        assertThat(stored.applyDueAt()).isAfterOrEqualTo(before.plus(APPLY_DELAY).minusMillis(1));
+        assertThat(stored.applyDueAt())
+                .isAfterOrEqualTo(before.plus(APPLY_DELAY).minusMillis(1));
     }
 
     @Test
