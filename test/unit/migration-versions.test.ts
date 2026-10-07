@@ -14,6 +14,6 @@ test("서로 다른 PR이 더한 Flyway 마이그레이션의 버전은 겹치�
   assert.deepEqual(
     [...versions.values()].filter((group) => group.length > 1),
     [],
-    "겹친 마이그레이션 번호를 최신 main 뒤의 번호로 옮긴다",
+    "겹친 새 마이그레이션의 버전을 적용 전에 다시 정한다",
   );
 });
