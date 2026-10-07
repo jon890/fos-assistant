@@ -56,7 +56,7 @@ async function setup() {
   const stages: string[] = [];
   const run = (signal = new AbortController().signal) =>
     runDraft(env, parseBody(BODY), input, (stage) => void stages.push(stage), signal, TIMES);
-  return { cdp, editor, input, stages, run, otherTab };
+  return { cdp, editor, input, env, stages, run, otherTab };
 }
 
 /** 연 탭 하나만 한 번 닫혔고 미리 열려 있던 탭은 그대로인지 본다. */
@@ -168,6 +168,32 @@ test("열린 alert 이벤트가 오면 Page.handleJavaScriptDialog 로 수락하
 
   const dialogs = cdp.calls.filter((call) => call.method === "Page.handleJavaScriptDialog");
   expect(dialogs.map((call) => call.params)).toEqual([{ accept: true }]);
+  expect(stages).toEqual(ALL_STAGES);
+  expectOnlyOwnTabClosed(cdp, otherTab);
+});
+
+test("저장 확인 뒤 state 가 실패해도 저장 수와 함께 성공하고 state 는 null 이다", async () => {
+  const { cdp, input, env, otherTab } = await setup();
+  const stages: string[] = [];
+  const onStage = (stage: RunStage) => {
+    stages.push(stage);
+    // 저장을 확인한 뒤부터 화면 스크립트가 모두 실패하게 해 상태 읽기를 깨뜨린다.
+    if (stage === "state")
+      cdp.on("Runtime.evaluate", () => {
+        throw new Error("broken");
+      });
+  };
+
+  const result = await runDraft(
+    env,
+    parseBody(BODY),
+    input,
+    onStage,
+    new AbortController().signal,
+    TIMES,
+  );
+
+  expect(result).toEqual({ state: null, savedBefore: 3, savedAfter: 4 });
   expect(stages).toEqual(ALL_STAGES);
   expectOnlyOwnTabClosed(cdp, otherTab);
 });

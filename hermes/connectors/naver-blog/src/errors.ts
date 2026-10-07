@@ -4,6 +4,9 @@ export type ErrorCode =
   | "NAVER_BLOG_PHOTO_INVALID"
   | "NAVER_BLOG_LOGIN_REQUIRED"
   | "NAVER_BLOG_BROWSER_UNREACHABLE"
+  | "NAVER_BLOG_BUSY"
+  | "NAVER_BLOG_JOB_NOT_FOUND"
+  | "NAVER_BLOG_START_UNKNOWN"
   | "NAVER_BLOG_UNAVAILABLE";
 
 /** 코드만 싣는 오류. CDP 주소, 파일 경로, 브라우저가 준 원문을 담지 않는다. */

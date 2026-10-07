@@ -27,13 +27,18 @@
   "default_tool_policy": "deny",
   "tools": {
     "session_status": { "risk": "READ" },
-    "render_draft": { "risk": "READ" }
+    "render_draft": { "risk": "READ" },
+    "save_draft": { "risk": "WRITE", "title": "네이버 블로그에 임시저장", "outbound": false },
+    "draft_job": { "risk": "READ" }
   },
   "errors": {
     "NAVER_BLOG_INVALID_INPUT": "invalid_input",
     "NAVER_BLOG_PHOTO_INVALID": "invalid_input",
     "NAVER_BLOG_LOGIN_REQUIRED": "credential_rejected",
     "NAVER_BLOG_BROWSER_UNREACHABLE": "unavailable",
+    "NAVER_BLOG_BUSY": "unavailable",
+    "NAVER_BLOG_JOB_NOT_FOUND": "invalid_input",
+    "NAVER_BLOG_START_UNKNOWN": "outcome_unknown",
     "NAVER_BLOG_UNAVAILABLE": "unavailable"
   }
 }

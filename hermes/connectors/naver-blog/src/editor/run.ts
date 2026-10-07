@@ -22,7 +22,8 @@ export type RunStage =
   | "save_clicking"
   | "state";
 
-export type RunResult = { state: EditorState; savedBefore: number; savedAfter: number };
+/** `state` 가 `null` 이면 임시저장은 확인했지만 편집기 상태를 읽지 못했다. */
+export type RunResult = { state: EditorState | null; savedBefore: number; savedAfter: number };
 
 /** 탭의 진행 표시가 같은 초안을 가리키는지 보려고 쓰는 초안의 해시. */
 function draftHash(input: DraftInput) {
@@ -35,6 +36,7 @@ function draftHash(input: DraftInput) {
  * 새 탭에 글쓰기 화면을 열어 초안을 넣고 임시저장한다. 발행하지 않는다.
  * 단계가 바뀔 때마다 `onStage` 를 부르고 그것이 끝나기를 기다린다.
  * 단계 사이와 기다리는 동안 `signal` 을 보고, 중단되면 `editor_failed` 와 `aborted` 로 끝난다.
+ * 저장 수가 늘어난 것을 확인한 뒤의 `state` 단계 실패는 삼키고 `state: null` 로 성공한다. 임시저장은 이미 됐다.
  * 성공이든 실패든 연 탭 하나를 닫는다.
  */
 export async function runDraft(
@@ -67,8 +69,12 @@ export async function runDraft(
     await settings(page, input, hash);
     await enter("save");
     const saved = await save(page, input, blocks, hash, onStage as (stage: string) => unknown);
-    await enter("state");
-    return { state: await state(page), ...saved };
+    try {
+      await enter("state");
+      return { state: await state(page), ...saved };
+    } catch {
+      return { state: null, ...saved };
+    }
   } finally {
     page.close();
     await closeTab(cdpUrl, targetId).catch(() => {});
