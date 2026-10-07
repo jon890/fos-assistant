@@ -3,13 +3,22 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { decideMemoryProposal } from "@/lib/memory-api";
+import { ExpandableRow } from "./expandable-row";
+import { MemoryMeta } from "./memory-meta";
 import type { Memory } from "./memory-list";
 
+/** 에이전트가 제안해 사람의 검토를 기다리는 기억 한 줄이다. 펼쳐 본문을 보고 받아들이거나 거절한다. */
 export function MemoryProposal({
   memory,
+  open,
+  readAt,
+  onToggle,
   onChanged,
 }: {
   memory: Memory;
+  open: boolean;
+  readAt: string;
+  onToggle(): void;
   onChanged(): Promise<void>;
 }) {
   /** 보내는 중인 결정이다. 누른 단추에만 회전 표시를 두고 다른 단추는 잠그기만 한다. */
@@ -34,9 +43,22 @@ export function MemoryProposal({
     await onChanged();
   }
   return (
-    <article className="rounded-md border border-border bg-muted p-4">
-      <h3 className="font-semibold">{memory.title}</h3>
-      <p className="mt-2 whitespace-pre-wrap text-sm">{memory.content}</p>
+    <ExpandableRow
+      title={memory.title}
+      meta={<MemoryMeta memory={memory} readAt={readAt} />}
+      open={open}
+      onToggle={onToggle}
+      tone="review"
+    >
+      {memory.sensitive ? (
+        <p className="text-sm text-muted-foreground">
+          민감한 내용이라 여기서는 보이지 않아요.
+        </p>
+      ) : (
+        <p className="whitespace-pre-wrap break-words text-sm">
+          {memory.content}
+        </p>
+      )}
       {error ? (
         <p role="alert" className="mt-2 text-sm text-destructive">
           {error}
@@ -63,6 +85,6 @@ export function MemoryProposal({
           거절
         </Button>
       </div>
-    </article>
+    </ExpandableRow>
   );
 }
