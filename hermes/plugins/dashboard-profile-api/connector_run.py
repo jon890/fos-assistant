@@ -36,7 +36,6 @@ from .connector_mcp import (
     _leaf_error_types,
     _mcp_sdk_problem,
     _mcp_sdk_version,
-    _mcp_sdk_version_cache,
     _run_connector_execute,
     _run_connector_tool,
     _safe_error_detail,
