@@ -165,13 +165,17 @@ function ShellBody({
 
   if (!signedIn) {
     return (
-      <main aria-busy={wide === null} className="mx-auto min-h-0 w-full flex-1 overflow-y-auto px-4 py-5">
+      <main
+        aria-busy={wide === null}
+        className="mx-auto min-h-0 w-full flex-1 overflow-y-auto px-4 py-5"
+      >
         {children}
       </main>
     );
   }
 
-  if (inAdminArea) return <AdminShell ready={wide !== null}>{children}</AdminShell>;
+  if (inAdminArea)
+    return <AdminShell ready={wide !== null}>{children}</AdminShell>;
 
   return (
     <TitleContext.Provider value={setTitle}>
@@ -267,7 +271,10 @@ function ShellBody({
             </TooltipButton>
           </header>
           {/* 서버의 첫 그림에는 아직 동작이 붙지 않았다. 폭을 읽은 뒤 준비 상태를 낭독기에도 알린다. */}
-          <main aria-busy={wide === null} className="mx-auto min-h-0 w-full flex-1 overflow-y-auto px-4 py-5">
+          <main
+            aria-busy={wide === null}
+            className="mx-auto min-h-0 w-full flex-1 overflow-y-auto px-4 py-5"
+          >
             <ScreenTransition>{children}</ScreenTransition>
           </main>
         </div>
