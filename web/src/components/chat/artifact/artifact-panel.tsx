@@ -50,7 +50,9 @@ export function ArtifactPanel({
   const wide = useMediaQuery("(min-width: 1024px)");
   const closeRef = useRef<HTMLButtonElement>(null);
   // 다시 열 때는 옛 X-Frame-Options 가 남은 캐시를 피한다. 열린 동안에는 주소를 유지한다.
-  const [cacheKey] = useState(() => crypto.randomUUID());
+  const [cacheKey] = useState(
+    () => `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+  );
   const name = givenName ?? artifactName(path);
   const src = `${artifactUrl(conversationId, path)}?open=${cacheKey}`;
 

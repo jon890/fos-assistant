@@ -29,6 +29,10 @@ async function createConversation(page: Page, text: string): Promise<string> {
 }
 
 test("답 아래 결과물을 누르면 스크립트가 막힌 iframe 에 사진과 함께 뜬다", async ({ page }) => {
+  // 평문 HTTP 에서 제공되지 않는 API 없이도 패널을 열 수 있어야 한다.
+  await page.addInitScript(() => {
+    Object.defineProperty(window.crypto, "randomUUID", { value: undefined });
+  });
   const rows = await sendProbe(page);
   await expect(rows.first()).toHaveText("초안");
 
