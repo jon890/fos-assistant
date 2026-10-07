@@ -84,6 +84,13 @@ const MESSAGES: Record<string, string> = {
   FOLLOW_UP_NOT_FOUND: "이미 지워졌거나 없는 할 일이에요.",
   FOLLOW_UP_STATE_CONFLICT:
     "이미 처리했거나 같은 할 일이 있어요. 화면을 다시 열어 주세요.",
+  BROWSER_NOT_FOUND: "브라우저가 없어요. 화면을 다시 열어 주세요.",
+  BROWSER_DISABLED: "아직 준비 중이에요.",
+  BROWSER_CAPACITY:
+    "지금은 켤 수 있는 브라우저가 다 찼어요. 잠시 뒤 다시 켜 주세요.",
+  BROWSER_BUSY: "브라우저 상태가 바뀌는 중이에요. 잠시 뒤 다시 해 주세요.",
+  BROWSER_START_FAILED: "브라우저를 켜지 못했어요. 잠시 뒤 다시 켜 주세요.",
+  BROWSER_EXISTS: "이미 브라우저가 있어요. 화면을 다시 열어 주세요.",
 };
 
 export function describeError(code: string, fallback: string): string {
