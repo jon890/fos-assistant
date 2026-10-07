@@ -97,11 +97,21 @@ class SystemDecisionExecutionTest {
     @Test
     @DisplayName("실패한 판단도 실제 모델과 토큰은 보존하고 오류 본문은 저장하지 않는다")
     void preservesUsageOfFailedSystemExecution() {
-        AgentExecution system = recorder.startSystem(USER, "decision-test", CostMode.SUBSCRIPTION,
+        AgentExecution system = recorder.startSystem(
+                USER,
+                "decision-test",
+                CostMode.SUBSCRIPTION,
                 ModelChoice.of("requested-provider", "requested-model", null));
         created.add(system.id());
-        HermesRunResult result = new HermesRunResult("failed-run", "session-new", "failed", null,
-                null, null, "private error", new TokenUsage(10L, 0L, 4L, 14L),
+        HermesRunResult result = new HermesRunResult(
+                "failed-run",
+                "session-new",
+                "failed",
+                null,
+                null,
+                null,
+                "private error",
+                new TokenUsage(10L, 0L, 4L, 14L),
                 new SessionRuntime("actual-model", "actual-provider"));
         recorder.failSystem(system, result, "http://hermes.example.com", "DECISION_PROVIDER_FAILED");
         assertThat(executions.findById(system.id()).orElseThrow()).satisfies(row -> {

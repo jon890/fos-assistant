@@ -100,7 +100,8 @@ public class HermesDecisionProvider implements DecisionProvider {
             result = await(command, runId);
             if (!result.succeeded()) {
                 executions.failSystem(execution, result, baseUrl, "DECISION_PROVIDER_FAILED");
-                return new DecisionResponse(info(choice, execution, true), DecisionResult.fallback(DecisionFailure.PROVIDER_FAILED));
+                return new DecisionResponse(
+                        info(choice, execution, true), DecisionResult.fallback(DecisionFailure.PROVIDER_FAILED));
             }
             executions.completeSystem(execution, result, baseUrl);
             DecisionResult decision = parse(result.output());

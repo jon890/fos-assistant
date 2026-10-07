@@ -351,11 +351,13 @@ public class ExecutionRecorder {
     }
 
     /** 실패한 시스템 판단도 실제 모델과 사용량을 보존한다. 실패 응답 본문은 남기지 않는다. */
-    public AgentExecution failSystem(AgentExecution execution, HermesRunResult result, String apiBaseUrl, String errorCode) {
+    public AgentExecution failSystem(
+            AgentExecution execution, HermesRunResult result, String apiBaseUrl, String errorCode) {
         return recordSystem(execution, result, apiBaseUrl, errorCode);
     }
 
-    private AgentExecution recordSystem(AgentExecution execution, HermesRunResult result, String apiBaseUrl, String errorCode) {
+    private AgentExecution recordSystem(
+            AgentExecution execution, HermesRunResult result, String apiBaseUrl, String errorCode) {
         SessionRuntime actual = result.runtime();
         if (actual == null || isBlank(actual.provider()) || isBlank(actual.model())) {
             actual = hermes.readSessionRuntime(apiBaseUrl, execution.profileName(), result.sessionId());
