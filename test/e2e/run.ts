@@ -253,6 +253,9 @@ function startControlPlane(
       // 요청을 만든 직후에 답하므로 이 시간 안에 끝난다. 만료 정리도 1분이 아니라 1초마다 돌린다.
       ASSISTANT_CONNECTOR_POLICY_APPROVAL_TTL: "15s",
       ASSISTANT_CONNECTOR_POLICY_EXPIRE_CRON: "* * * * * *",
+      // 재시작이 필요 없는 붙이기를 Control Plane 이 스스로 확인하는 것을 기본값 150초를 기다리지 않고 본다.
+      ASSISTANT_CONNECTOR_BINDING_APPLY_DELAY: "10s",
+      ASSISTANT_CONNECTOR_BINDING_APPLY_CRON: "* * * * * *",
       // 예약 작업이 정한 시각에 발화하는 것을 기본값 30초를 기다리지 않고 본다.
       ASSISTANT_TASK_DISPATCH_CRON: "* * * * * *",
       HERMES_PROFILE_KEY_DIR: keyDir,

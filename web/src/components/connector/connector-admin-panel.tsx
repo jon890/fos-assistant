@@ -23,12 +23,13 @@ const key = (connection: AdminConnection) =>
   `${connection.agentCode}/${connection.connectorId}`;
 
 /**
- * 재시작 대기, 준비 중, 그 밖(선언하지 않은 도구만 남은 바인딩)으로 나눠 상태 글을 낸다.
+ * 재시작 대기, 반영 중, 그 밖(선언하지 않은 도구만 남은 바인딩)으로 나눠 상태 글을 낸다.
+ * 반영 중은 재시작이 필요 없는 바인딩이다. Control Plane 이 스스로 확인하므로 관리자가 할 일이 없다.
  * 바인딩의 `READY` 는 에이전트에 붙었다는 뜻이라 연결 상태의 「연결됨」 이 아니라 「붙음」 이다.
  */
 function statusText(connection: AdminConnection): string {
   if (connection.restartRequired) return "반영 대기";
-  if (connection.status === "PENDING") return "준비 중";
+  if (connection.status === "PENDING") return "반영 중";
   return "붙음";
 }
 
@@ -83,7 +84,8 @@ export function ConnectorAdminPanel({
       <CardHeader>
         <CardTitle>연결 반영 확인</CardTitle>
         <CardDescription>
-          공유 gateway 를 재시작한 뒤 에이전트마다 붙인 연결을 확인해요.
+          재시작이 필요한 연결만 공유 gateway 를 재시작한 뒤 확인해요. 나머지는
+          1-2분 안에 저절로 반영돼요.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-3">
@@ -119,8 +121,7 @@ export function ConnectorAdminPanel({
                     </Badge>
                   ) : null}
                 </div>
-                {connection.restartRequired ||
-                connection.status === "PENDING" ? (
+                {connection.restartRequired ? (
                   <div className="flex flex-col items-end gap-1">
                     <Button
                       disabled={pending !== null}

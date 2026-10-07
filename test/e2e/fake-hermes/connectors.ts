@@ -123,8 +123,9 @@ export function createBindings(state: FakeHermesState) {
    * 「바인딩 설치」 를 따른다.
    *
    * <p>붙이기는 보관 파일의 값을 그 profile 의 `.env` 에 쓰고 서버 이름을 API 도구 목록에 더한다. 있던 이름은 그대로 둔다.
-   * 바뀐 것이 있으면 `restart_required` 가 참이다. 떠 있는 profile 에 더한 MCP 서버는 재시작해야 보이기 때문이다. 떼기는 그
-   * 이름만 빼고 env 를 지우며 재시작을 요구하지 않는다. 스킬 복사는 흉내 내지 않는다. 시험 커넥터에 스킬이 없다.
+   * 붙기 전이던 커넥터에서 바뀐 것이 있으면 `reload_pending` 이 참이고 재시작은 필요 없다. 새 MCP 서버는 공유 gateway 가 설정
+   * 맞추기 주기에 연결한다. 이미 붙어 있던 커넥터의 값이 바뀌면 `restart_required` 가 참이다. 떠 있는 서버의 env 는 재시작해야
+   * 바뀌기 때문이다. 떼기는 그 이름만 빼고 env 를 지우며 `reload_pending` 이 참이고 재시작은 요구하지 않는다. 스킬 복사는 흉내 내지 않는다. 시험 커넥터에 스킬이 없다.
    */
   const bindingInstall = (
     response: ServerResponse,
@@ -138,8 +139,9 @@ export function createBindings(state: FakeHermesState) {
       send(response, 401, { reason: "not_marked" });
       return;
     }
-    const answer = (changed: boolean, restartRequired: boolean) => send(response, 200, {
-      profile, plugin, enabled, changed, restart_required: restartRequired, plugin_updated: false,
+    const answer = (changed: boolean, restartRequired: boolean, reloadPending: boolean) => send(response, 200, {
+      profile, plugin, enabled, changed, restart_required: restartRequired, reload_pending: reloadPending,
+      plugin_updated: false,
     });
     const bound = state.boundConnectors.get(profile) ?? new Map<string, string>();
     const toolsets = state.apiServerToolsets.get(profile);
@@ -152,12 +154,13 @@ export function createBindings(state: FakeHermesState) {
       state.connectorRequests.push(`unbind ${profile}`);
       // 카탈로그에 없는 커넥터도 실제 대시보드는 소유 기록만 보고 뗀다. 이 대역은 그 기록만 지운다.
       if (connector === undefined) {
-        answer(bound.delete(plugin), false);
+        const removed = bound.delete(plugin);
+        answer(removed, false, removed);
         return;
       }
       // 그 profile 에 붙지 않은 커넥터는 뗄 것이 없다. 실제 대시보드처럼 아무것도 바꾸지 않고 바뀐 것 없이 답한다.
       if (!bound.delete(plugin)) {
-        answer(false, false);
+        answer(false, false, false);
         return;
       }
       const env = envOf(profile);
@@ -165,7 +168,7 @@ export function createBindings(state: FakeHermesState) {
       if (toolsets !== undefined) {
         state.apiServerToolsets.set(profile, toolsets.filter((name) => name !== connector.mcp_server));
       }
-      answer(true, false);
+      answer(true, false, true);
       return;
     }
     // 바인딩 항목이 있는 profile 은 옛 설치를 받지 않는다.
@@ -194,6 +197,7 @@ export function createBindings(state: FakeHermesState) {
       send(response, 409, { error: "the policy hook plugin is not enabled" });
       return;
     }
+    const wasBound = bound.has(plugin);
     const env = envOf(profile);
     let changed = bound.get(plugin) !== bind.vault;
     for (const field of connector.fields) {
@@ -210,7 +214,7 @@ export function createBindings(state: FakeHermesState) {
     state.boundConnectors.set(profile, bound);
     state.policyHookInstalled.add(profile);
     state.connectorRequests.push(`bind ${profile}`);
-    answer(changed, changed);
+    answer(changed, wasBound && changed, !wasBound && changed);
   };
   return { envOf, boundServers, vaultValuesValid, bindingInstall };
 }

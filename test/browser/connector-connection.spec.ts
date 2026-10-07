@@ -434,6 +434,36 @@ test("관리자는 바인딩마다 한 줄을 보고 반영 완료에 목록에�
   ).toBe(true);
 });
 
+test("재시작 대기가 아닌 PENDING 바인딩은 반영 중으로 보이고 반영 완료 단추가 없다", async ({
+  page,
+}) => {
+  await page.route("**/api/admin/connections", (route) =>
+    route.fulfill({
+      json: [
+        adminBinding("agent-live", {
+          restartRequired: false,
+          restartRequiredSince: null,
+        }),
+        adminBinding("agent-restart"),
+      ],
+    }),
+  );
+  await page.goto("/admin/connections");
+  const rows = page
+    .getByTestId("connector-admin-panel")
+    .getByRole("listitem");
+  await expect(rows).toHaveCount(2);
+  const live = rows.filter({ hasText: "에이전트 agent-live" });
+  const restart = rows.filter({ hasText: "에이전트 agent-restart" });
+  await expect(live).toContainText("반영 중");
+  await expect(live.getByRole("button", { name: "반영 완료" })).toHaveCount(0);
+  await expect(live).not.toContainText("재시작한 뒤 눌러 주세요");
+  await expect(restart).toContainText("반영 대기");
+  await expect(
+    restart.getByRole("button", { name: "반영 완료" }),
+  ).toBeVisible();
+});
+
 test("재시작한 뒤 다시 설치된 바인딩의 반영 완료는 한 번 더 재시작하라고 알리고 목록을 다시 읽는다", async ({
   page,
 }) => {
