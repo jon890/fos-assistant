@@ -1,5 +1,9 @@
 package com.bifos.assistant.proactive.application;
 
+import static com.bifos.assistant.proactive.application.ProactiveCheckRun.NO_RECENT_FINDINGS;
+import static com.bifos.assistant.proactive.application.ProactiveCheckRun.NO_RECENT_PROBLEMS;
+import static com.bifos.assistant.proactive.application.ProactiveCheckRun.OPENING;
+
 import com.bifos.assistant.chat.domain.type.MessageRole;
 import com.bifos.assistant.proactive.domain.ProactiveCheck;
 import com.bifos.assistant.proactive.domain.ProactiveCheckFinding;
@@ -20,12 +24,8 @@ import java.util.Optional;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.springframework.data.domain.PageRequest;
-import static com.bifos.assistant.proactive.application.ProactiveCheckRun.OPENING;
-import static com.bifos.assistant.proactive.application.ProactiveCheckRun.NO_RECENT_FINDINGS;
-import static com.bifos.assistant.proactive.application.ProactiveCheckRun.NO_RECENT_PROBLEMS;
 
 /** 변화 신호와 최근 발견·문제 후보를 살펴보기 입력으로 조립한다. */
-
 class ProactiveCheckInput {
     private static final String UNKNOWN = "모름";
     private static final DateTimeFormatter DATE = DateTimeFormatter.ISO_LOCAL_DATE.withZone(ZoneOffset.UTC);

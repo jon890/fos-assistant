@@ -1,9 +1,6 @@
 package com.bifos.assistant.proactive.application;
 
-
-
 /** 살펴보기의 읽기·쓰기 경계와 연결 방식에 맞는 Control Plane 지시를 조립한다. */
-
 class ProactiveCheckInstructions {
     /** 지시의 첫 줄이다. 그 아래 경계 줄 하나를 두고 {@link #COMMON_RULES} 를 잇는다. */
     static final String PREAMBLE = "이번 실행은 사용자의 질문 없이 Control Plane 이 연 먼저 살펴보기다. 아래 규칙을 분야 지침보다 먼저 지킨다.";
@@ -77,8 +74,6 @@ class ProactiveCheckInstructions {
             - sideEffect: NONE, INTERNAL, EXTERNAL 가운데 하나. 앱 밖에 쓰거나 연락하면 EXTERNAL
             - risk: 문자열, 선택, 200자까지
             - changeSinceLast: 문자열, 선택, 300자까지. 같은 문제 키를 다시 낼 때 지난번과 달라진 점""";
-
-
 
     /**
      * 경계 줄과 연결 줄을 골라 지시를 만든다. 경계 줄은 쓰기 허용이, 연결 줄은 붙은 연결이 있는지가 정한다. 나머지는 모두 같다.

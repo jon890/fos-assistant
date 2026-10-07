@@ -303,5 +303,4 @@ public class ProactiveCheckRun implements CheckTurn {
     private record TreeTokens(long input, long cachedInput, long output) {
         private static final TreeTokens ZERO = new TreeTokens(0, 0, 0);
     }
-
 }

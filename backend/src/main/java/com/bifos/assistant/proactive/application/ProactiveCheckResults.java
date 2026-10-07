@@ -1,5 +1,9 @@
 package com.bifos.assistant.proactive.application;
 
+import static com.bifos.assistant.proactive.application.ProactiveCheckRun.EMPTY_ANSWER_NOTICE;
+import static com.bifos.assistant.proactive.application.ProactiveCheckRun.INVALID_RESULT_NOTICE;
+import static com.bifos.assistant.proactive.application.ProactiveCheckRun.NOTHING_NEW_NOTICE;
+
 import com.bifos.assistant.chat.application.model.CheckAnswer;
 import com.bifos.assistant.proactive.application.model.AnnouncedKey;
 import com.bifos.assistant.proactive.application.model.CheckResultBlock;
@@ -24,9 +28,6 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
-import static com.bifos.assistant.proactive.application.ProactiveCheckRun.EMPTY_ANSWER_NOTICE;
-import static com.bifos.assistant.proactive.application.ProactiveCheckRun.INVALID_RESULT_NOTICE;
-import static com.bifos.assistant.proactive.application.ProactiveCheckRun.NOTHING_NEW_NOTICE;
 
 /** 결과 블록을 판정하고 답을 만든 뒤, 답 저장 후 발견과 문제 후보를 저장한다. */
 @Slf4j

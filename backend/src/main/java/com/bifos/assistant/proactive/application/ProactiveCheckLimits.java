@@ -1,14 +1,15 @@
 package com.bifos.assistant.proactive.application;
 
+import static com.bifos.assistant.proactive.application.ProactiveCheckRun.STOP_ATTEMPTS;
+import static com.bifos.assistant.proactive.application.ProactiveCheckRun.STOP_RETRY_INTERVAL;
+import static com.bifos.assistant.proactive.application.ProactiveCheckRun.TIME_LIMIT;
+import static com.bifos.assistant.proactive.application.ProactiveCheckRun.TOOL_LIMIT;
+
 import com.bifos.assistant.proactive.domain.ProactiveCheck;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import lombok.extern.slf4j.Slf4j;
-import static com.bifos.assistant.proactive.application.ProactiveCheckRun.TIME_LIMIT;
-import static com.bifos.assistant.proactive.application.ProactiveCheckRun.TOOL_LIMIT;
-import static com.bifos.assistant.proactive.application.ProactiveCheckRun.STOP_ATTEMPTS;
-import static com.bifos.assistant.proactive.application.ProactiveCheckRun.STOP_RETRY_INTERVAL;
 
 /** 살펴보기의 시간·도구 상한과 닫힘 잠금, 멈추기 재시도를 한 실행 안에서 지킨다. */
 @Slf4j
@@ -31,7 +32,6 @@ class ProactiveCheckLimits {
     private boolean closed;
     private Thread timeLimit;
     private int stopAttempts;
-
 
     ProactiveCheckLimits(CurrentUser owner, ProactiveCheck check, ProactiveCheckRun.Deps deps) {
         this.owner = owner;
