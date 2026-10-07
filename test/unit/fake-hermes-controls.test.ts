@@ -62,7 +62,7 @@ test("대역 제어 초기화는 장애와 미사용 보류를 걷고 profile �
       signal: AbortSignal.timeout(2000),
     });
     const heldId = (await held.json()).run_id;
-    assert.equal((await call("/__test/wait-held-run", "GET")).status, 200);
+    assert.equal((await call("/__test/wait-held-run", "GET")).status, 204);
     assert.equal((await call("/__test/reset-controls")).status, 204);
     const released = await fetch(
       `${hermes.baseUrl}/p/browser/v1/runs/${heldId}`,
