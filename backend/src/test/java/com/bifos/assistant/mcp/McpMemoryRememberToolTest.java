@@ -136,6 +136,7 @@ class McpMemoryRememberToolTest {
 
     @AfterEach
     void tearDown() {
+        jdbc.update("DELETE FROM decision_feedback_event WHERE user_id = ?", dad.id());
         jdbc.update("DELETE FROM memory_capture WHERE user_id = ?", dad.id());
         jdbc.update("DELETE FROM memory_revision WHERE owner_user_id = ?", dad.id());
         jdbc.update("DELETE FROM memory WHERE owner_user_id = ?", dad.id());
@@ -177,6 +178,7 @@ class McpMemoryRememberToolTest {
         MemoryCapture capture = onlyCapture();
         assertThat(capture.kind()).isEqualTo(MemoryCaptureKind.CREATED);
         assertThat(capture.conversationId()).isEqualTo(conversation.id());
+        assertThat(feedbackEvents()).as("바로 저장은 제안이 아니라 판단 피드백을 남기지 않는다").isEmpty();
     }
 
     @Test
@@ -195,6 +197,17 @@ class McpMemoryRememberToolTest {
                         .filter(capture -> dad.id().equals(capture.userId()))
                         .map(MemoryCapture::kind))
                 .containsOnly(MemoryCaptureKind.PROPOSED);
+        assertThat(feedbackEvents()).containsExactly("SURFACED|AGENT", "SURFACED|AGENT");
+    }
+
+    /** 판단 피드백을 {@code 종류|주체} 로 남긴 순서대로 읽는다. */
+    private List<String> feedbackEvents() {
+        return jdbc
+                .queryForList(
+                        "SELECT event_type, actor FROM decision_feedback_event WHERE user_id = ? ORDER BY id", dad.id())
+                .stream()
+                .map(row -> row.get("EVENT_TYPE") + "|" + row.get("ACTOR"))
+                .toList();
     }
 
     @Test

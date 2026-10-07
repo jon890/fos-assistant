@@ -22,6 +22,11 @@ import com.bifos.assistant.connector.infra.ConnectorActionRepository;
 import com.bifos.assistant.connector.infra.ConnectorBindingRepository;
 import com.bifos.assistant.connector.infra.ConnectorConnectionRepository;
 import com.bifos.assistant.connector.infra.ConnectorToolGrantRepository;
+import com.bifos.assistant.feedback.application.DecisionFeedbackRecorder;
+import com.bifos.assistant.feedback.application.model.FeedbackEntry;
+import com.bifos.assistant.feedback.domain.type.FeedbackActor;
+import com.bifos.assistant.feedback.domain.type.FeedbackEventType;
+import com.bifos.assistant.feedback.domain.type.FeedbackSubjectType;
 import com.bifos.assistant.hermes.ConnectorExecutionUnknown;
 import com.bifos.assistant.hermes.HermesConnectorClient;
 import com.bifos.assistant.hermes.ToolDetailRedactor;
@@ -112,6 +117,7 @@ public class ConnectorActionService {
     private final ApplicationEventPublisher events;
     private final NotificationService notifications;
     private final ConversationNotices conversations;
+    private final DecisionFeedbackRecorder feedback;
     private final TransactionTemplate transactions;
     private final Clock clock;
 
@@ -130,6 +136,7 @@ public class ConnectorActionService {
             ApplicationEventPublisher events,
             NotificationService notifications,
             ConversationNotices conversations,
+            DecisionFeedbackRecorder feedback,
             PlatformTransactionManager transactionManager) {
         this(
                 actions,
@@ -143,6 +150,7 @@ public class ConnectorActionService {
                 events,
                 notifications,
                 conversations,
+                feedback,
                 transactionManager,
                 Clock.systemUTC());
     }
@@ -159,6 +167,7 @@ public class ConnectorActionService {
             ApplicationEventPublisher events,
             NotificationService notifications,
             ConversationNotices conversations,
+            DecisionFeedbackRecorder feedback,
             PlatformTransactionManager transactionManager,
             Clock clock) {
         this.actions = actions;
@@ -172,6 +181,7 @@ public class ConnectorActionService {
         this.events = events;
         this.notifications = notifications;
         this.conversations = conversations;
+        this.feedback = feedback;
         this.transactions = new TransactionTemplate(transactionManager);
         this.clock = clock;
     }
@@ -247,6 +257,9 @@ public class ConnectorActionService {
      */
     public ConnectorActionView approve(CurrentUser user, UUID actionId, GrantPeriod grant) {
         Approval approval = transactions.execute(status -> beginApproval(user, actionId, grant));
+        // 사용자가 승인했다. 그 뒤 실행하지 못하고 끝난 줄도 사용자의 반응은 승인이다.
+        feedback.record(actionFeedback(approval.action(), FeedbackEventType.APPROVED, FeedbackActor.USER)
+                .reason(grant == null ? null : "WITH_GRANT"));
         if (approval.profile() == null) {
             // 실행하지 않고 끝낸 줄이다. 그 상태를 커밋한 뒤에 알린다.
             publish(approval.action());
@@ -279,6 +292,7 @@ public class ConnectorActionService {
             action.reject(now());
             return actions.save(action);
         });
+        feedback.record(actionFeedback(rejected, FeedbackEventType.REJECTED, FeedbackActor.USER));
         publish(rejected);
         return view(rejected);
     }
@@ -674,17 +688,33 @@ public class ConnectorActionService {
             return action;
         }
         if (result == null) {
+            // 실행됐는지 모르는 줄은 성공도 실패도 아니라 판단 피드백 사건을 남기지 않는다.
             action.unknown(now);
         } else if (result.ok()) {
             action.succeed(clip(result.result().toString()), now);
+            feedback.record(actionFeedback(action, FeedbackEventType.EXECUTION_SUCCEEDED, FeedbackActor.SYSTEM));
         } else {
             // 커넥터가 선언한 코드와 복구 계약만 저장한다. 외부 서비스의 오류 원문은 이 값에 들어오지 못한다(ADR-092).
             action.fail(
                     result.error().word(),
                     result.detail() == null ? null : result.detail().toStored(),
                     now);
+            feedback.record(actionFeedback(action, FeedbackEventType.EXECUTION_FAILED, FeedbackActor.SYSTEM)
+                    .reason(action.errorCode()));
         }
         return actions.save(action);
+    }
+
+    /**
+     * 승인 줄의 판단 피드백 사건이다. 열쇠는 지금 화면의 {@code itemKey} 와 같고, 판은 인자 해시다. 인자와 결과 글은 담지 않는다.
+     * 트랜잭션 안에서 부르면 커밋한 뒤에 남는다.
+     */
+    private FeedbackEntry actionFeedback(ConnectorAction action, FeedbackEventType type, FeedbackActor actor) {
+        return FeedbackEntry.of(
+                        action.userId(), FeedbackSubjectType.CONNECTOR_ACTION, action.publicId(), type, actor, now())
+                .conversation(action.conversationId())
+                .originExecution(action.originExecutionId())
+                .version(action.argsSha256());
     }
 
     /** 위임 답과 같은 상한으로 자른다. 상한 자리에서 대리 쌍이 나뉘면 그 앞에서 자른다. */
