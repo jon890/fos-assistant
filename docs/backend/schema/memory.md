@@ -28,8 +28,8 @@ Memory 항목과 그 판, 그룹의 collection 목록, 에이전트가 받는 co
 | `source_ref` | VARCHAR(512) NULL | 출처를 가리키는 값. 다른 항목이면 `memory:<번호>`. 들인 줄은 `<namespace>/<저장소 안의 경로>` 다 |
 | `source_date` | DATE NULL | 출처의 날짜 |
 | `status` | VARCHAR(20) | `PROPOSED` 또는 `ACCEPTED` 또는 `REJECTED` |
-| `proposed_by_execution_id` | BIGINT NULL | 이 항목을 제안한 실행. 사람이 직접 적었으면 비어 있다 |
-| `proposal_dedup_key` | VARCHAR(64) NULL | 제안한 사용자·제목·본문의 해시. 직접 등록한 항목은 비어 있다 |
+| `proposed_by_execution_id` | BIGINT NULL | 이 항목을 제안하거나 `memory_remember` 로 바로 저장한 실행. 사람이 직접 적었으면 비어 있다 |
+| `proposal_dedup_key` | VARCHAR(64) NULL | 제안하거나 바로 저장한 사용자·제목·본문의 해시. 직접 등록한 항목과 민감 항목은 비어 있다 |
 | `accepted_by_user_id` | BIGINT NULL | 누가 받아들였는가 |
 | `accepted_at` | DATETIME(6) NULL | |
 | `created_at`, `updated_at` | DATETIME(6) | |
@@ -123,3 +123,30 @@ Memory 항목과 그 판, 그룹의 collection 목록, 에이전트가 받는 co
 
 **줄이 하나도 없는 에이전트는 Memory 를 받지 않는다.**
 에이전트를 처음 저장할 때 `core` 한 줄을 민감 허용 없이 넣는다. 옛 커넥터 에이전트에는 넣지 않고, 줄이 있어도 옛 커넥터 에이전트는 받지 않는다.
+
+## memory_capture
+
+에이전트가 `memory_remember` 로 남긴 기록 한 줄이다. 대화의 답 아래에 「기억했어요」 와 제안 카드를 그리고, 되돌리기가 무엇을 되돌릴지 정한다.
+도구와 API 는 [`backend/memory.md`](../memory.md) 의 「에이전트가 기억을 남기는 길」 이 갖는다.
+
+| 칸 | 타입 | 뜻 |
+| --- | --- | --- |
+| `id` | BIGINT | 기본 키 |
+| `memory_id` | BIGINT | 만들거나 고친 항목. 되돌리거나 사람이 지우면 `memory` 에 없는 번호가 된다. 외래 키를 걸지 않는다 |
+| `user_id` | BIGINT | 항목의 주인. origin 실행의 사용자다 |
+| `conversation_id` | BIGINT NULL | 그 실행의 대화. 대화 밖의 실행이면 비어 있다 |
+| `execution_id` | BIGINT | 기록을 남긴 origin 실행. 한 실행의 상한(3개)을 이 칸으로 센다 |
+| `kind` | VARCHAR(20) | `CREATED` 바로 저장해 만들었다, `UPDATED` 바로 저장해 기존 항목의 본문을 고쳤다, `PROPOSED` 제안으로 남겼다 |
+| `base_revision` | INT NULL | `CREATED` 는 저장한 때의 판 번호, `UPDATED` 는 고치기 전의 판 번호, `PROPOSED` 는 비어 있다 |
+| `previous_status` | VARCHAR(20) NULL | 기존 제안을 받아들인 `CREATED` 는 `PROPOSED`, 나머지는 비어 있다 |
+| `created_at` | DATETIME(6) | |
+| `undone_at` | DATETIME(6) NULL | 사람이 되돌린 시각. 되돌린 기록은 대화에 그리지 않는다 |
+
+| 색인 | 칸 | 쓰는 곳 |
+| --- | --- | --- |
+| `idx_memory_capture_conversation` | `conversation_id`, `id` | 대화의 기록 목록 |
+| `idx_memory_capture_execution` | `execution_id` | 한 실행의 상한 |
+
+- 같은 사실을 같은 실행에서 두 번 남겨도 중복 키가 같은 항목을 하나로 둔다. 기록은 저장하거나 고친 경우에만 남는다
+- `CREATED` 를 되돌릴 때 항목의 판이 `base_revision` 이 아니면, `UPDATED` 를 되돌릴 때 `base_revision + 1` 이 아니면 그 뒤에 사람이 다시 고친 것이다. 되돌리지 않는다
+- 이미 있던 제안을 바로 저장 조건에서 받아들인 기록도 `CREATED` 다. `previous_status` 에 `PROPOSED` 를 남기고 되돌리면 항목을 보존하며 승인 정보도 지워 제안 상태로 돌린다

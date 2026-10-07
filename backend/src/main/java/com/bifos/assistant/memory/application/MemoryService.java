@@ -321,7 +321,7 @@ public class MemoryService {
                 : memory.content();
     }
 
-    private StoredContent stored(String plain, MemorySensitivity sensitivity, String binding) {
+    StoredContent stored(String plain, MemorySensitivity sensitivity, String binding) {
         return sensitivity == MemorySensitivity.SENSITIVE ? cipher.seal(plain, binding) : StoredContent.plain(plain);
     }
 
@@ -339,7 +339,7 @@ public class MemoryService {
                 BY_ID);
     }
 
-    private Memory revise(
+    Memory revise(
             CurrentUser user, Memory memory, String content, MemoryRetrieval retrieval, MemorySensitivity sensitivity) {
         requirePlaceable(retrieval, sensitivity);
         // 판을 남기기 전에 암호화한다. key 가 없으면 여기서 거절돼 판도 본문도 바뀌지 않는다
@@ -455,7 +455,7 @@ public class MemoryService {
         return new ApiException(ErrorCode.MEMORY_NOT_FOUND, "no such memory");
     }
 
-    private static String proposalDedupKey(Long ownerUserId, String title, String content) {
+    static String proposalDedupKey(Long ownerUserId, String title, String content) {
         return Sha256.hex(ownerUserId + "\u0000" + title + "\u0000" + content);
     }
 }

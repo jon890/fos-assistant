@@ -10,9 +10,9 @@ AI credential 은 Hermes profile 의 `.env` 에, profile 의 API server key 는 
 | 파일 | 표 |
 | --- | --- |
 | [`users-agents.md`](users-agents.md) | `app_user`, `allowed_person`, `agent`, `model_tier_definition`, `model_tier_group_setting`, `model_hidden`, `agent_token`, `service_token`, `service_token_collection` |
-| [`chat.md`](chat.md) | `conversation`, `chat_message`, `chat_pending_message`, `chat_attachment`, `chat_artifact`, `result_delivery`, `result_delivery_item`, `result_delivery_attempt` |
+| [`chat.md`](chat.md) | `conversation`, `chat_message`, `chat_pending_message`, `chat_attachment`, `chat_artifact`, `result_delivery`, `result_delivery_item`, `result_delivery_attempt`, `execution_question` |
 | [`execution.md`](execution.md) | `agent_execution`, `execution_event`, `subagent_usage_job`, `execution_skill_use`, `hermes_session_binding`, `execution_context_source` |
-| [`memory.md`](memory.md) | `memory`, `memory_revision`, `memory_collection`, `agent_memory_collection` |
+| [`memory.md`](memory.md) | `memory`, `memory_revision`, `memory_collection`, `agent_memory_collection`, `memory_capture` |
 | [`connector.md`](connector.md) | `connector_connection`, `agent_connector_binding`, `connector_action`, `connector_tool_grant` |
 | [`attention.md`](attention.md) | `follow_up`, `attention_control`, `attention_event` |
 | [`notification.md`](notification.md) | `notification` |
@@ -154,6 +154,7 @@ H2 용 `*MigrationTest` 가 데이터베이스를 만드는 메서드를 열어 
 
 Memory 는 줄을 지운다. 지우기 전에 마지막 값을 `memory_revision` 에 `DELETED` 로 남기므로 본문은 그 표에 남는다. 민감 항목의 판은 암호문으로 남는다.
 화면의 삭제는 목록과 주입에서 빼는 것이고, 본문을 완전히 없애는 길은 아직 없다.
+기억 기록(`memory_capture`)은 항목을 지워도 남는다. 대화는 항목이 없는 기록을 그리지 않는다. 되돌린 기록은 `undone_at` 을 적고 남긴다.
 에이전트를 지워도 `agent_memory_collection` 의 줄은 그대로 둔다. 지운 에이전트는 실행되지 않으므로 그 줄을 읽는 자리가 없다.
 서비스 토큰은 폐기해도 줄이 남는다. 언제까지 쓰였는지가 남아야 한다.
 

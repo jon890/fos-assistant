@@ -2,14 +2,15 @@
 
 Memory 는 에이전트가 실행할 때 `instructions` 로 받는 사실이다.
 단일 소스는 Control Plane 데이터베이스이고, Hermes 의 내장 memory 는 쓰지 않는다.
-이 파일은 Memory 의 범위와 승인, 실행에 실을 항목을 고르고 조립하는 규칙, 색인의 본문을 `memory_read` 로 읽는 길을 갖는다.
+이 파일은 Memory 의 범위와 승인, 실행에 실을 항목을 고르고 조립하는 규칙, 색인의 본문을 `memory_read` 로 읽는 길, 에이전트가 `memory_remember` 로 기억을 남기는 길을 갖는다.
 
 ## 범위와 조립
 
 - 범위는 `USER` 와 `GROUP` 둘뿐이고 등록할 때 반드시 명시한다.
 - 에이전트가 제안하면 `PROPOSED` 로 들어오고, 사람이 받아들여야 `ACCEPTED` 가 된다.
+  예외는 사람이 보낸 대화 turn 에서 사용자가 직접 말한 사실이다. 그 말을 승인으로 보고 바로 `ACCEPTED` 로 저장한다(아래 「에이전트가 기억을 남기는 길」).
   주입되는 것은 `ACCEPTED` 뿐이다.
-- 항목은 collection 하나에 속한다. 지금 화면과 제안이 만드는 항목은 모두 `core` 다.
+- 항목은 collection 하나에 속한다. 지금 화면과 대화 뒤 자동 제안이 만드는 항목은 모두 `core` 다. `memory_remember` 는 그 에이전트가 받는 collection 을 고를 수 있고 기본값은 `core` 다.
 - `ContextAssembler.assemble(user, agentId)` 가 요청자의 `USER` 항목과 요청자가 속한 그룹의 `GROUP` 항목 가운데 그 에이전트가 받는 collection 의 항목만 골라 조립한다.
   다른 사용자의 개인 항목과 받지 않는 collection 의 항목은 고르는 단계에서 빠진다.
 - 본문까지 싣는 항상 층과 제목만 싣는 색인 층으로 나눈다. `retrieval` 이 `ALWAYS` 면 항상 층에 본문을 싣고, `SEARCH` 면 제목과 번호만 색인에 싣는다. `ARCHIVE` 와 종류가 `SOURCE` 인 항목은 어느 층에도 싣지 않는다.
@@ -262,3 +263,106 @@ sequenceDiagram
 
 도구로 본문을 읽은 턴은 Hermes 가 API 콜을 한 번에서 두 번이나 세 번으로 늘려 입력 비용이 커진다.
 측정값과, 항상 층과 도구 가운데 어느 쪽이 싼지의 손익분기는 [`mcp-caller.md`](mcp-caller.md#입력-비용은-api-콜-수가-정한다) 의 「입력 비용은 API 콜 수가 정한다」 가 갖는다.
+
+## 에이전트가 기억을 남기는 길
+
+에이전트는 Control Plane MCP 도구 `memory_remember` 로 사람에 관한 오래 쓰일 사실을 남긴다.
+바로 저장(`ACCEPTED`)할지 제안(`PROPOSED`)으로 둘지는 Control Plane 이 실행의 출처로 정한다.
+결정과 프롬프트 주입을 막는 근거는 [ADR-20261007 / memory-remember](../adr/ADR-20261007-memory-remember.md) 에 있다.
+
+### 도구 계약
+
+`tools/list` 에서 Control Plane 도구 가운데 마지막이다.
+
+| 입력 | 타입 | 뜻 |
+| --- | --- | --- |
+| `title` | 문자열, 1자부터 200자 | 항목 제목. 다음 실행의 색인에 실린다. 앞뒤 공백을 지운다 |
+| `content` | 문자열, 1자부터 2000자 | 본문. 앞뒤 공백을 지운다 |
+| `evidence` | 문자열, 선택, 500자까지 | 사용자가 이번 메시지에서 한 말을 고치지 않고 옮긴 구절. 바로 저장 판정에 쓴다 |
+| `memory_id` | 정수, 선택 | 같은 사실을 고칠 기존 항목 번호. 지시문의 색인에 있는 번호다 |
+| `collection` | 문자열, 선택 | 둘 collection. 없으면 `core`. 그 에이전트가 받는 collection 이어야 한다 |
+| `sensitive` | 참거짓, 선택 | 민감한 내용이면 참. 참이면 늘 제안이고 본문은 암호문으로 저장한다 |
+
+- 사용자와 범위를 인자로 받지 않는다. 주인은 origin 실행의 사용자이고 범위는 늘 `USER` 다
+- 「사용자가 요청했다」 같은 인자는 없다. 바로 저장 판정은 아래 조건으로만 한다
+- 선택 인자의 `null` 은 없는 것으로 본다. 모르는 키와 타입이 틀린 인자는 JSON-RPC `-32602` 다
+- 꺼내는 방식은 `SEARCH` 로 고정한다. 항상 싣기는 사람이 `/memory` 에서 켠다
+- 먼저 살펴보기 트리에서는 받지 않는다. 옛 커넥터 에이전트의 실행은 요청자 판정에서 먼저 거절한다([ADR-045](../adr/ADR-045-커넥터-에이전트는-자기-mcp-서버만-받고-memory-와-control-plane-도구를-받지-않는다.md))
+- **fos-ctx 가 이 도구를 서명 필수로 안다.** plugin 을 먼저 배포한다
+- **실행 사건에 이 도구의 인자와 결과를 남기지 않는다.** `HermesRunEventStream` 이 시작 사건과 끝 사건의 `detail` 을 비운다. 인자에 사람에 관한 사실이 실린다
+
+### 바로 저장 판정
+
+여섯 조건을 모두 만족하면 바로 저장하고, 하나라도 어긋나면 제안으로 내린다. 거절하지 않는다.
+4 와 5 는 지금 실행 하나가 아니라 대화 전체를 본다. Hermes session 이 앞 turn 의 도구 결과와 맡긴 일의 결과를 이력으로 이어 가므로, 앞 turn 에서 읽은 바깥 글이 뒤 turn 의 짧은 대답(「응 그래」)을 근거로 저장을 시킬 수 있다.
+
+| 순서 | 조건 | 어디서 본다 |
+| --- | --- | --- |
+| 1 | origin 실행이 루트 실행이다(`parent_execution_id` 가 없다) | `agent_execution` |
+| 2 | 그 실행이 사람이 보낸 turn 이다. 새 질문과 다시 생성만 해당한다 | `execution_question` 의 줄과 그 줄이 가리키는 그 사용자의 `USER` 메시지 |
+| 3 | `evidence` 를 NFC 로 맞추고 연속 공백을 하나로 줄인 글이 같은 방식으로 맞춘 질문 원문에 들어 있다. 공백을 뺀 길이가 2자 이상이다 | `chat_message.content` |
+| 4 | 그 대화의 어느 실행에도 아래 「안쪽 도구」 밖의 `TOOL_STARTED` 사건이나 `SUBAGENT_STARTED` 사건이 없다 | `execution_event` 와 `agent_execution.conversation_id` |
+| 5 | 그 대화에 사람의 질문 없이 Hermes 로 보낸 루트 실행이 없다. 맡긴 일의 결과를 전하는 turn 과 예약 작업 turn 이 여기 걸린다. 그 대화의 첫 `execution_question` 보다 앞선 실행은 보지 않는다 | `agent_execution` 과 `execution_question` |
+| 6 | 민감하지 않다 | 인자 `sensitive` |
+
+안쪽 도구는 바깥 글을 읽지 않는다고 보는 도구다. `mcp__fos_assistant__` 의 `memory_read`, `memory_remember`, `follow_up_propose`, `agent_list`, `agent_delegate`, `artifact_write` 와 Hermes 의 `todo`, `tool_search`, `tool_describe` 다. `tool_search` 와 `tool_describe` 는 도구 정의만 읽는다. 실행을 중계하는 `tool_call` 은 이 목록에 넣지 않는다.
+`agent_status` 와 `agent_stop` 은 맡긴 실행의 답을 돌려주므로 넣지 않는다. `skill_view` 도 넣지 않는다. 같은 toolset 의 `skill_manage` 가 다른 대화에서 읽은 글을 스킬에 써 둘 수 있다.
+한 실행 3개 상한과 같은 글의 중복 확인은 잠그지 않는다. 한 실행이 도구를 나란히 부르면 상한을 넘거나 도구 오류가 날 수 있다. 할 일 제안과 같은 수준으로 둔다.
+
+이 판정 뒤에 공통으로 본다.
+
+- 한 실행이 남긴 기록이 이미 3개면 저장하지 않는다
+- `collection` 이 그 에이전트가 받는 collection 이 아니면 저장하지 않는다
+- 같은 사용자의 같은 제목과 본문(`proposal_dedup_key`)이 있으면 새 줄을 만들지 않는다. 그 줄이 제안이고 지금이 바로 저장 조건이면 받아들인다
+- `memory_id` 를 주면 바로 저장 조건일 때만 그 항목의 본문을 고친다. 요청자의 `USER` 범위 `MEMORY` 항목이고 `ACCEPTED` 이고 민감하지 않고 그 에이전트가 받는 collection 이어야 한다. 제목과 꺼내는 방식은 그대로다
+
+### 결과
+
+결과는 MCP 도구 결과 `{ "content": [{ "type": "text", "text": "<아래 글>" }], "isError": <참거짓> }` 하나다.
+
+| 결과 | `isError` | 글 |
+| --- | --- | --- |
+| 바로 저장 | 거짓 | 「기억했다. 사용자 화면에 「기억했어요」 와 되돌리기가 보인다. 답에서 무엇을 기억했는지 짧게 알린다.」 |
+| 기존 항목을 고쳤다 | 거짓 | 「기존 기억을 고쳤다. 이전 값은 이력에 남았다. 답에서 무엇을 바꿨는지 짧게 알린다.」 |
+| 제안 | 거짓 | 「제안으로 남겼다. 사용자가 받아들여야 기억한다. 답에서 아직 승인 전이라는 것을 알린다.」 |
+| 같은 내용이 저장돼 있다 | 거짓 | 「이미 같은 내용을 기억하고 있다. 새로 남기지 않았다.」 |
+| 같은 제안이 있다 | 거짓 | 「같은 제안이 이미 있다. 사용자가 받아들이기를 기다린다.」 |
+| 사용자가 거절한 내용이다 | 참 | 「사용자가 이 내용을 거절했다. 다시 남기지 않는다.」 |
+| 한 실행의 상한 | 참 | 「이번 답에서 이미 3개를 남겼다. 더 남기지 않는다.」 |
+| 받지 않는 collection | 참 | 「이 에이전트가 쓸 수 없는 collection 이다. collection 없이 다시 부른다.」 |
+| 고칠 항목이 없다 | 참 | 「고칠 기억을 찾지 못했다. memory_id 없이 새로 남긴다.」 |
+| 바로 저장 조건이 아닌 고치기 | 참 | 「지금은 기존 기억을 고칠 수 없다. 사용자에게 바꿀지 묻는다.」 |
+| 민감 본문을 암호화할 key 가 없다 | 참 | 「민감한 내용을 저장할 수 없다.」 |
+| 그 에이전트가 받는 collection 이 없다 | 참 | 「이 에이전트는 기억을 남길 수 없다.」 |
+| 값 오류 | 참 | `title`, `content`, `evidence`, `collection` 의 길이나 모양이 틀렸다는 한 줄 |
+
+### 지침
+
+Control Plane MCP 도구를 받는 실행의 공통 답변 지침 뒤에 「# 기억」 절을 싣는다. 글은 `ContextAssembler.MEMORY_INSTRUCTIONS` 가 갖는다.
+옛 커넥터 에이전트와 먼저 살펴보기 turn 은 싣지 않는다.
+
+### 대화에 보이는 것
+
+기록 한 줄이 `memory_capture` 에 남는다. 대화는 그 기록을 만든 실행의 답 아래에 그린다.
+맡겨서 도는 실행이 남긴 제안은 그 대화에 그 실행의 답 줄이 없어 `/memory` 의 제안 목록에서만 보인다.
+
+| 기록 | 화면 | 누르면 |
+| --- | --- | --- |
+| `CREATED`, 항목이 `ACCEPTED` | 「기억했어요: 제목」 [고치기] [되돌리기] | 고치기는 `PATCH /api/v1/memories/{id}`, 되돌리기는 새 항목을 지우고 기존 제안을 받아들였으면 제안 상태로 돌린다. 그 뒤에 고쳤으면 409 `MEMORY_REVISION_CONFLICT` 다 |
+| `UPDATED`, 항목이 `ACCEPTED` | 「기억을 고쳤어요: 제목」 [고치기] [되돌리기] | 되돌리기는 고치기 전의 판으로 돌린다. 그 뒤에 다시 바뀌었으면 409 `MEMORY_REVISION_CONFLICT` 다 |
+| `PROPOSED`, 항목이 `PROPOSED` | 제안 카드 [받아들이기] [고쳐서 받아들이기] [거절] | `/accept`, `PATCH` 뒤 `/accept`, `/reject`. `/memory` 의 제안 목록에도 보인다 |
+
+| 경로 | 하는 일 |
+| --- | --- |
+| `GET /api/v1/chat/conversations/{conversationId}/memory-captures` | 요청자가 그 대화에서 남긴 기록과 항목의 지금 값을 만든 순으로 낸다. 되돌린 기록과 항목이 없어진 기록은 뺀다. 민감 항목은 본문을 싣지 않는다. 남의 대화는 다른 대화 경로와 같은 404 다 |
+| `POST /api/v1/memory-captures/{id}/undo` | 기록 하나를 되돌린다. 남의 기록이나 없는 기록은 404 `MEMORY_NOT_FOUND`, 제안 기록은 409 `MEMORY_REVISION_CONFLICT` 다. 이미 되돌린 기록은 그대로 둔다 |
+
+응답 칸은 `id`, `memoryId`, `executionId`, `kind`, `status`, `title`, `content`, `sensitive`, `alwaysInject`, `createdAt` 이다.
+제목과 본문은 모델이 쓴 글이다. 화면은 평문으로만 그린다(ADR-009). 로그에는 사용자, 항목, 실행, 기록 번호와 결과만 남긴다.
+
+| 클래스 | 하는 일 |
+| --- | --- |
+| `mcp.application.McpMemoryRemember` | 도구 정의, 인자 값 검사, 바로 저장 판정의 1부터 5 |
+| `memory.application.MemoryCaptureService` | 민감도, collection, 상한, 중복, 고치기 대상 판정과 저장, 대화의 기록 목록, 되돌리기 |
+| `chat.application.TurnQuestions` | 실행에 이어 둔 질문 원문 읽기, 질문 없이 보낸 루트 실행이 있는지 보기 |
+| `chat.presentation.MemoryCaptureController` | 대화의 기록 목록과 되돌리기 API |

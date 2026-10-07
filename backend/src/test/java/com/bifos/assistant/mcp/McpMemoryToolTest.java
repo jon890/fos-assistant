@@ -151,7 +151,7 @@ class McpMemoryToolTest {
                 .isEqualTo(buildProperties.getVersion());
         JsonNode listed = body(mcp(dadToken, "{\"jsonrpc\":\"2.0\",\"id\":18,\"method\":\"tools/list\"}"));
         assertThat(listed.path("id").asInt()).isEqualTo(18);
-        assertThat(listed.path("result").path("tools")).hasSize(7);
+        assertThat(listed.path("result").path("tools")).hasSize(8);
         assertThat(listed.path("result").path("tools").get(0).path("name").asString())
                 .isEqualTo("memory_read");
         assertThat(listed.path("result").path("tools").get(1).path("name").asString())
