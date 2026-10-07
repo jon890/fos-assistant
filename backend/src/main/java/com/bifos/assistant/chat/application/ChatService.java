@@ -110,6 +110,8 @@ import org.springframework.transaction.support.TransactionTemplate;
 @RequiredArgsConstructor
 public class ChatService {
     private static final int TITLE_LIMIT = 60;
+    private static final Set<String> TERMINAL_EVENTS =
+            Set.of("run.completed", "run.failed", "run.cancelled", "run.interrupted");
 
     /** 대화 목록 한 쪽의 상한이다. 웹이 더 크게 요청해도 이만큼만 읽는다. */
     public static final int MAX_CONVERSATION_PAGE = 100;
@@ -1305,8 +1307,7 @@ public class ChatService {
                         event -> {
                             synchronized (pending) {
                                 if (!handle.cancelled().get() || !turns.isStopConfirmed(handle)) {
-                                    if (Set.of("run.completed", "run.failed", "run.cancelled")
-                                            .contains(event.type())) {
+                                    if (TERMINAL_EVENTS.contains(event.type())) {
                                         terminalSeen.set(true);
                                     }
                                     if (onEvent == null) {

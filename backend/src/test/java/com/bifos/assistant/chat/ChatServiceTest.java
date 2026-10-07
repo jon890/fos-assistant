@@ -1042,6 +1042,19 @@ class ChatServiceTest {
     }
 
     @Test
+    @DisplayName("중단 종료 사건까지 정상적으로 읽으면 관측 완료로 기록한다")
+    void interruptedTerminalEventCompletesObservation() {
+        CurrentUser user = member("interrupted@example.com", "dad");
+        stub().willReturn(HermesRunResult.of("run-1", "sess-1", "completed", "네", "dad", null, TokenUsage.empty()));
+        hermesStreams(new RunEvent("run.interrupted", null, null, null, null, null));
+
+        ChatTurn turn = chat.send(user, null, "안녕", "dad");
+
+        assertThat(executions.findById(turn.executionId()).orElseThrow().eventObservation())
+                .isEqualTo(EventObservation.OBSERVED);
+    }
+
+    @Test
     @DisplayName("한 번에 받는 경로로 돈 실행이 도구를 부르지 않았으면 RUN STARTED와 RUN COMPLETED 둘만 남긴다")
     void nonStreamPathWithoutToolCallsLeavesOnlyRunStartedAndRunCompleted() {
         CurrentUser dad = member("dad@example.com", "dad");
