@@ -28,6 +28,7 @@ class ConversationPagingTest {
 | 운영 빈 몇 개의 Mockito spy | `@Autowired` 로 받아 `doReturn(...)`, `verify(...)` 를 쓴다 | Spring 이 초기화한다 |
 | 스케줄러 `CapturingTaskScheduler`. 자동 설정 스케줄러 자리에 들어가 `@Scheduled` 실행도 맡는다 | `capture()` 로 켜면 예약을 실행하지 않고 모은다. `drain()` 으로 꺼낸다 | 공통 확장이 `reset()` 해 다시 실제로 예약한다 |
 | 꺼 둔 대역(후보 출처, 권한 회수 실패, 결과 출처, 깨우기 재시도, 커넥터 변경 기록) | `@Autowired` 로 받아 켠다 | 공통 확장이 끈다 |
+| 먼저 살펴보기 평가의 판단 provider(`fixture-` id 6개) | `@Autowired List<ReplayDecisionProvider>` | 되돌리지 않는다. 운영은 provider 를 id 로만 골라 이 id 를 부르지 않는 검사에 영향이 없다 |
 | 브라우저 proxy 대역 `FakeBrowserRuntime` 과 늘 답하는 CDP 대역. 운영 코드는 브라우저 기능이 켜져 있을 때만 부른다 | `@OverrideProperties("assistant.browser.enabled=true")` 로 기능을 켜고 `@Autowired FakeBrowserRuntime` 으로 받는다 | 공통 확장이 `reset()` 한다 |
 
 MySQL 태그 검사의 기준 클래스만 `@SpringBootTest` 로 따로 둔다.
