@@ -12,8 +12,13 @@ export const PROXY_ENVIRONMENT_KEYS = [
 
 const HTTP_TIMEOUT_MS = 5_000;
 const COMMAND_TIMEOUT_MS = 30_000;
-/** Chrome 은 `--remote-allow-origins` 에 든 Origin 만 받는다. 설정 안내가 그 값을 연다. */
-const WEBSOCKET_ORIGIN = "http://localhost";
+/** Chrome 허용 목록과 맞추도록 CDP 주소의 포트로 loopback HTTP Origin 을 만든다. */
+export function websocketOriginFor(cdpUrl: string) {
+  // HTTP Origin 의 기본 포트 규칙을 적용하고, HTTPS 주소에 명시한 포트도 보존한다.
+  const origin = new URL(cdpUrl.replace(/^https:/, "http:"));
+  origin.hostname = "localhost";
+  return origin.origin;
+}
 
 /** 테스트처럼 이미 실행 중인 프로세스에서도 다음 요청이 프록시 값을 읽지 않게 한다. */
 export function clearProxyEnvironment() {
@@ -98,13 +103,15 @@ export class CdpSession {
   }
 
   /** 대상 하나에 붙는다. 브라우저 대상에는 Page 도메인이 없어 붙자마자 아무것도 켜지 않는다. */
-  static connect(wsUrl: string, timeoutMs = COMMAND_TIMEOUT_MS) {
+  static connect(wsUrl: string, cdpUrl: string, timeoutMs = COMMAND_TIMEOUT_MS) {
     clearProxyEnvironment();
     return new Promise<CdpSession>((resolve, reject) => {
       let socket: WebSocket;
       try {
         // Bun 의 WebSocket 은 두 번째 인자로 headers 를 받는다. tsconfig 의 lib 에서 DOM 을 빼 bun-types 선언을 쓴다.
-        socket = new WebSocket(wsUrl, { headers: { Origin: WEBSOCKET_ORIGIN } });
+        socket = new WebSocket(wsUrl, {
+          headers: { Origin: websocketOriginFor(cdpUrl) },
+        });
       } catch {
         reject(unreachable());
         return;
