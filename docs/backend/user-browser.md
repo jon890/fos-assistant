@@ -45,9 +45,23 @@ proxy 의 정책과 이미지, 망, 프로필 디렉터리의 위치는 운영 �
 | 끄기 | `RUNNING`, `FAILED` | 화면과 중계 연결을 닫는다. 컨테이너를 멈추고 지운다 | `STOPPED` |
 | 지우기 | 아무 상태 | 끄기를 한 뒤 프로필 디렉터리를 지우고 줄을 지운다. 그 브라우저의 접근 표식도 지운다 | 줄 없음 |
 | 자동 중지 | `RUNNING` | `last_active_at` 이 유휴 시간보다 오래고 화면도 중계 연결도 없다 | `STOPPED` |
+| 사용자 끄기 | `STOPPED` 밖의 상태 | 관리자가 허용 목록에서 사용자를 끄면 끄기를 한다. 프로필과 줄은 남긴다 | `STOPPED` |
 
 동시 수는 `STARTING` 과 `RUNNING` 인 줄을 센다. 셀 때 `user_browser` 의 켜기를 한 번에 하나만 하도록 잠근다.
-`STARTING` 과 `STOPPING` 은 Control Plane 이 재기동하면 실제 컨테이너를 보고 정한다.
+이미 `RUNNING` 인 브라우저를 켜거나 `STOPPED` 인 브라우저를 끄면 아무것도 하지 않고 지금 상태를 돌려준다.
+`STARTING` 이나 `STOPPING` 인 줄에 다른 전이를 요청하면 `BROWSER_BUSY` 다.
+
+끄다가 proxy 호출이 실패하면 `FAILED` 와 `stop_failed` 를 남긴다. 켜다가 실패한 코드는 `start_failed`, `start_timeout` 이다.
+
+자동 중지와 상태 맞추기는 `assistant.browser.sweep-interval`(기본 `1m`)마다 돌고, 기동할 때 한 번 돈다. 기능이 꺼져 있으면 돌지 않는다.
+상태 맞추기는 proxy 의 브라우저 컨테이너 목록과 표를 견준다.
+
+| 표와 실제 | 맞추는 것 |
+| --- | --- |
+| `RUNNING` 인데 그 컨테이너가 없거나 꺼져 있다 | 남은 컨테이너를 지우고 `STOPPED` |
+| `STARTING` 이나 `STOPPING` 이 2분 넘게 그대로다 | 그 키의 컨테이너를 지우고 `STOPPED`. 재기동으로 끊긴 전이가 여기서 정해진다 |
+| 컨테이너 라벨의 키에 해당하는 줄이 없거나 그 줄이 `STOPPED` 다 | 컨테이너를 지운다 |
+| `RUNNING` 이나 `FAILED` 인 줄이 가리키지 않는 같은 키의 컨테이너 | 컨테이너를 지운다 |
 
 ## 설정
 
@@ -69,6 +83,7 @@ env 로 받는다. 기본값이 있는 값은 코드를 바꾸지 않고 설치 
 | `assistant.browser.max-running` | `ASSISTANT_BROWSER_MAX_RUNNING` | 동시에 켤 수 있는 수. 1 이상이고 상한은 두지 않는다 | `2` |
 | `assistant.browser.idle-timeout` | `ASSISTANT_BROWSER_IDLE_TIMEOUT` | 자동 중지까지의 유휴 시간. `10m` 같은 Duration 형식이다 | `10m` |
 | `assistant.browser.start-timeout` | | 켠 뒤 CDP 가 답하기를 기다리는 시간 | `30s` |
+| `assistant.browser.sweep-interval` | | 자동 중지와 상태 맞추기를 도는 간격 | `1m` |
 | `assistant.browser.gateway-base-url` | | Hermes 가 중계에 닿는 주소. 바인딩 설치가 이 주소에 접근 표식을 붙인다 | 없음 |
 
 이미지, 망, 자원, 프로필 루트는 proxy 정책이 강제한다. Control Plane 은 정책과 같은 값을 운영 설정으로 받아 생성 요청에 싣는다.
@@ -80,16 +95,22 @@ env 로 받는다. 기본값이 있는 값은 코드를 바꾸지 않고 설치 
 
 | 메서드와 경로 | 하는 일 |
 | --- | --- |
-| `GET /api/browser` | 내 브라우저의 상태. 없으면 `{exists: false}` |
-| `POST /api/browser` | 내 브라우저를 만든다. `STOPPED` 로 생긴다 |
+| `GET /api/browser` | 내 브라우저의 상태. 기능이 꺼져 있어도 200 이고 `{enabled: false}` 만 준다. 없으면 `{enabled: true, exists: false, idleTimeoutSeconds}` |
+| `POST /api/browser` | 내 브라우저를 만든다. `STOPPED` 로 생긴다. 이미 있으면 `BROWSER_EXISTS`(409) |
 | `POST /api/browser/start`, `POST /api/browser/stop` | 켜기와 끄기 |
-| `DELETE /api/browser` | 지우기 |
+| `DELETE /api/browser` | 지우기. 본문 없이 204 |
 | `GET /api/browser/screen` | 화면 SSE. 아래 「로그인 화면」 |
 | `POST /api/browser/screen/input` | 화면 입력 |
 | `GET /api/admin/browsers` | 관리자. 모든 브라우저의 사용자, 상태, 시각 |
-| `POST /api/admin/browsers/{id}/stop`, `DELETE /api/admin/browsers/{id}` | 관리자. 끄기와 지우기 |
+| `POST /api/admin/browsers/{id}/stop`, `DELETE /api/admin/browsers/{id}` | 관리자. 끄기와 지우기. 지우기는 본문 없이 204 |
 
-오류 코드는 `BROWSER_NOT_FOUND`(404), `BROWSER_DISABLED`(503), `BROWSER_CAPACITY`(409), `BROWSER_BUSY`(409, 다른 전이가 진행 중), `BROWSER_START_FAILED`(502) 다.
+Control Plane 의 경로는 같은 이름에 `/api/v1` 을 붙인 것이다(`/api/v1/browser`, `/api/v1/admin/browsers`).
+
+내 브라우저 응답은 `{enabled, exists, status, lastError, startedAt, lastActiveAt, idleTimeoutSeconds}` 다.
+관리자 목록은 줄마다 `{id, userId, userName, status, lastError, startedAt, lastActiveAt}` 이다. 컨테이너 번호와 프로필 키는 싣지 않는다.
+관리자 목록은 기능이 꺼져 있어도 읽는다. 쓰기는 기능이 꺼져 있으면 503 이다.
+
+오류 코드는 `BROWSER_NOT_FOUND`(404), `BROWSER_DISABLED`(503), `BROWSER_CAPACITY`(409), `BROWSER_BUSY`(409, 다른 전이가 진행 중), `BROWSER_START_FAILED`(502), `BROWSER_EXISTS`(409) 다.
 
 ## 중계
 

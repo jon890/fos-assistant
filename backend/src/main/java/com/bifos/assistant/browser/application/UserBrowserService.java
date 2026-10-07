@@ -62,6 +62,23 @@ public class UserBrowserService {
         return Sha256.hex("u" + userId);
     }
 
+    /** 기능이 켜져 있는가. 꺼져 있으면 상태 조회 말고 모든 쓰기가 {@code BROWSER_DISABLED} 다. */
+    public boolean enabled() {
+        return properties.enabled();
+    }
+
+    /** 자동 중지까지의 유휴 시간이다. 화면이 안내 문구에 쓴다. */
+    public Duration idleTimeout() {
+        return properties.idleTimeout();
+    }
+
+    /** 관리자 목록이다. 모든 브라우저를 번호 순으로 돌려준다. */
+    public List<UserBrowserSnapshot> list() {
+        return browsers.findAllByOrderByIdAsc().stream()
+                .map(UserBrowserSnapshot::of)
+                .toList();
+    }
+
     public Optional<UserBrowserSnapshot> get(Long userId) {
         return browsers.findByUserId(userId).map(UserBrowserSnapshot::of);
     }

@@ -19,4 +19,7 @@ public interface UserBrowserRepository extends JpaRepository<UserBrowser, Long> 
     List<UserBrowser> findByStatusAndLastActiveAtBefore(UserBrowserStatus status, Instant before);
 
     List<UserBrowser> findByStatusIn(Collection<UserBrowserStatus> statuses);
+
+    /** 관리자 목록과 상태 맞추기가 읽는다. 사용자 하나에 한 줄이라 가족 규모에서는 작다. */
+    List<UserBrowser> findAllByOrderByIdAsc();
 }

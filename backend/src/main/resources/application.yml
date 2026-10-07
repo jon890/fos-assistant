@@ -249,6 +249,8 @@ assistant:
     idle-timeout: ${ASSISTANT_BROWSER_IDLE_TIMEOUT:10m}
     # 켠 뒤 CDP 가 답하기를 기다리는 시간. 넘으면 컨테이너를 지우고 FAILED 로 둔다
     start-timeout: 30s
+    # 자동 중지와 상태 맞추기를 도는 간격. 기동 때도 한 번 돈다
+    sweep-interval: 1m
   pricing:
     # models.dev 카탈로그를 복사해 둔 경로. 없으면 실행 비용을 비워 두고 기동은 계속한다
     catalog-path: ${ASSISTANT_PRICING_CATALOG:}

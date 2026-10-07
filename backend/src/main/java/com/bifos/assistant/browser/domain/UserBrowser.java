@@ -137,6 +137,21 @@ public class UserBrowser {
     }
 
     /**
+     * 실제 컨테이너가 없거나 꺼져 있어 {@code STOPPED} 로 맞춘다. 상태 맞추기만 부른다.
+     *
+     * <p>{@code RUNNING} 인데 컨테이너가 사라졌거나, {@code STARTING} 과 {@code STOPPING} 이 오래 그대로인 줄이다. 남은 컨테이너는 부르는
+     * 쪽이 먼저 지운다.
+     */
+    public void resetStopped(Instant now) {
+        require(UserBrowserStatus.RUNNING, UserBrowserStatus.STARTING, UserBrowserStatus.STOPPING);
+        this.status = UserBrowserStatus.STOPPED;
+        this.containerId = null;
+        this.startedAt = null;
+        this.lastError = null;
+        this.updatedAt = now;
+    }
+
+    /**
      * 화면 입력이나 중계 통신이 있었다. 마지막 기록에서 {@link #TOUCH_INTERVAL} 이 지나지 않았으면 쓰지 않는다.
      *
      * @return 마지막 활동 시각을 바꿨으면 참

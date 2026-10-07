@@ -17,6 +17,9 @@ final class FakeBrowserRuntime implements BrowserRuntime {
     final Map<String, RuntimeContainer> containers = new LinkedHashMap<>();
     final List<String> removed = new ArrayList<>();
     final Set<String> failingActions = ConcurrentHashMap.newKeySet();
+    /** 이 컨테이너를 멈추려 하면 실패한다. */
+    final Set<String> failingStops = ConcurrentHashMap.newKeySet();
+
     private int sequence;
 
     @Override
@@ -37,6 +40,9 @@ final class FakeBrowserRuntime implements BrowserRuntime {
     @Override
     public synchronized void stop(String containerId) {
         fail("stop");
+        if (failingStops.contains(containerId)) {
+            throw new IllegalStateException("browser proxy stop failed with status 500");
+        }
         RuntimeContainer found = containers.get(containerId);
         if (found != null) {
             containers.put(containerId, new RuntimeContainer(containerId, found.profileKey(), false));

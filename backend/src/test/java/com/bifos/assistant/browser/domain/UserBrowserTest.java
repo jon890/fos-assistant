@@ -120,6 +120,23 @@ class UserBrowserTest {
     }
 
     @Test
+    @DisplayName("상태 맞추기는 켜진 줄과 전이 중인 줄을 STOPPED 로 돌리고 멈춘 줄은 거절한다")
+    void resetsRunningOrTransitioningToStopped() {
+        UserBrowser browser = running();
+        browser.resetStopped(NOW);
+        assertThat(browser.status()).isEqualTo(UserBrowserStatus.STOPPED);
+        assertThat(browser.containerId()).isNull();
+
+        browser.beginStart(NOW);
+        browser.resetStopped(NOW);
+        assertThat(browser.status()).isEqualTo(UserBrowserStatus.STOPPED);
+
+        assertThatThrownBy(() -> browser.resetStopped(NOW))
+                .isInstanceOfSatisfying(
+                        ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.BROWSER_BUSY));
+    }
+
+    @Test
     @DisplayName("활동 시각은 마지막 기록에서 1분이 지나야 다시 쓴다")
     void touchesAtMostOncePerMinute() {
         UserBrowser browser = running();
