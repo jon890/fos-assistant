@@ -6,6 +6,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import com.bifos.assistant.context.ContextAssembler;
 import com.bifos.assistant.memory.application.MemoryContentBackfill;
 import com.bifos.assistant.memory.application.MemoryService;
+import com.bifos.assistant.memory.application.MemorySources;
 import com.bifos.assistant.memory.domain.Memory;
 import com.bifos.assistant.memory.domain.type.MemoryRetrieval;
 import com.bifos.assistant.memory.domain.type.MemoryScope;
@@ -56,6 +57,9 @@ class MemoryEncryptionDisabledTest {
 
     @Autowired
     ContextAssembler context;
+
+    @Autowired
+    MemorySources sources;
 
     @Autowired
     JdbcTemplate jdbc;
@@ -196,6 +200,6 @@ class MemoryEncryptionDisabledTest {
     private List<MemoryView> views() {
         CurrentUserProvider currentUser = Mockito.mock(CurrentUserProvider.class);
         Mockito.when(currentUser.require()).thenReturn(ADMIN);
-        return new MemoryController(memories, context, currentUser).readable();
+        return new MemoryController(memories, context, sources, currentUser).readable();
     }
 }

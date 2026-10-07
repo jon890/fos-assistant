@@ -1,4 +1,4 @@
-# backend 품질 검사
+# 코드 품질 검사
 
 기준 파일을 갱신하거나 규칙을 뺄 때 읽는 절차를 갖는다.
 규칙의 이름과 뜻은 `ArchitectureRules.java` 의 Javadoc 이, 코드 규칙의 심각도와 까닭은 `checkstyle.xml` 의 주석이 갖는다.
@@ -69,3 +69,38 @@
 ## OpenRewrite 버전
 
 플러그인은 7.39.0 에 둔다. 7.40.0 과 7.41.0 은 Maven Central 에 없는 `rewrite-bom` 8.91.0 을 가리켜 받지 못한다.
+
+## 파일 길이 기준 목록
+
+`scripts/check-file-length.mjs`가 언어 공통 파일 길이 규칙을 소유한다.
+빈 줄과 주석을 포함한 전체 줄 수를 세며 마지막 개행은 빈 줄로 더하지 않는다.
+`scripts/quality.sh check`, `scripts/check-local.sh`, CI의 `quality` 단계에서 검사한다.
+
+| 언어 | 검사 범위 | 상한 |
+| --- | --- | --- |
+| Java | `backend/src/main`의 `.java` | 500줄 |
+| TypeScript/TSX | `web/src`, `hermes/connectors/*/src`의 `.ts`, `.tsx` | 400줄 |
+| TypeScript/JavaScript | `scripts`의 `.ts`, `.mjs` | 400줄 |
+| Python | `hermes` 아래 비시험 `.py`(plugin 포함) | 400줄 |
+
+시험 경로(`src/test`, `test/`, `tests/`, `hermes/tests`)와 `*.test.*`, `*.spec.*`,
+Python 시험 파일(`test_*.py`, `*_test.py`), 생성물(`dist`, `build`, `bundle`, `bundles`)과 의존성 디렉터리는 제외한다.
+데이터 표는 `scripts/file-length-baseline.json`의 `exclusions`에 경로와 까닭을 명시한다.
+Gmail의 `html-entities.ts`는 HTML 문자 참조 데이터 표라 제외한다.
+
+기존 긴 파일은 같은 파일의 `files`에 현재 줄 수를 기준값으로 둔다.
+기준 목록에 없는 파일이 상한을 넘거나, 목록에 든 파일이 기준값보다 커지면 실패한다.
+줄어들거나 삭제된 파일은 통과시키고 기준값을 낮추라는 안내만 낸다.
+병렬로 파일을 나누는 PR들이 기준 파일을 동시에 고쳐 충돌하지 않도록 갱신은 강제하지 않는다.
+
+```bash
+# cwd: 저장소 root
+node scripts/check-file-length.mjs
+node scripts/check-file-length.mjs --update
+```
+
+`--update`는 기준값을 실제 줄 수로 낮춘다. 상한 이하가 됐거나 삭제된 파일은 목록에서 뺀다.
+새 항목을 추가하거나 기준값을 올리지 않으며, 위반이 있으면 기준 파일을 바꾸지 않는다.
+갱신한 기준 파일은 같은 커밋에 넣는다. 새 코드는 기준 목록에 추가하지 않고 나눈다.
+Checkstyle의 `FileLength`와 ESLint의 `max-lines`는 이 검사로 대체한다.
+메서드와 함수 길이 경고는 그대로 유지한다.

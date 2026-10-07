@@ -2,6 +2,45 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { FAKE_DASHBOARD_TOKEN, startFakeHermes } from "../e2e/fake-hermes.ts";
 
+test("대역 서버 둘의 장애, profile, 실행과 대본은 서로 섞이지 않는다", async () => {
+  const first = await startFakeHermes({ browser: "first-key" });
+  const second = await startFakeHermes({ browser: "second-key" });
+  try {
+    first.busy();
+    first.blockProvider("openai-codex");
+    const dashboardHeaders = { Authorization: `Bearer ${FAKE_DASHBOARD_TOKEN}` };
+    await fetch(`${first.baseUrl}/api/profiles`, {
+      method: "POST", headers: dashboardHeaders, body: JSON.stringify({ name: "first-profile" }),
+    });
+    await fetch(`${first.baseUrl}/__test/script`, {
+      method: "POST", body: JSON.stringify({ input: "서버 격리 검사", output: "첫째 서버의 대본" }),
+    });
+    const submit = (baseUrl: string, key: string) => fetch(`${baseUrl}/p/browser/v1/runs`, {
+      method: "POST", headers: { Authorization: `Bearer ${key}` },
+      body: JSON.stringify({ input: "서버 격리 검사", provider: "openai-codex", model: "example-model" }),
+    });
+    assert.equal((await submit(first.baseUrl, "first-key")).status, 429);
+    const secondId = (await (await submit(second.baseUrl, "second-key")).json()).run_id;
+    const status = (baseUrl: string, key: string, id: string) => fetch(`${baseUrl}/p/browser/v1/runs/${id}`, {
+      headers: { Authorization: `Bearer ${key}` },
+    });
+    const secondRun = await (await status(second.baseUrl, "second-key", secondId)).json();
+    assert.equal(secondRun.status, "completed");
+    assert.match(secondRun.output, /서버 격리 검사/);
+    assert.notEqual(secondRun.output, "첫째 서버의 대본");
+    assert.deepEqual(first.profiles(), ["first-profile"]);
+    assert.deepEqual(second.profiles(), []);
+    assert.equal((await status(first.baseUrl, "first-key", secondId)).status, 404);
+    first.clearBusy();
+    first.clearBlockedProviders();
+    const firstId = (await (await submit(first.baseUrl, "first-key")).json()).run_id;
+    assert.equal((await (await status(first.baseUrl, "first-key", firstId)).json()).output, "첫째 서버의 대본");
+    assert.equal((await status(second.baseUrl, "second-key", firstId)).status, 404);
+  } finally {
+    await Promise.all([first.close(), second.close()]);
+  }
+});
+
 test("대역 제어 초기화는 장애와 미사용 보류를 걷고 profile 설정은 보존한다", async () => {
   const hermes = await startFakeHermes({ browser: "example-key" });
   const call = (path: string, method = "POST", body?: unknown) =>

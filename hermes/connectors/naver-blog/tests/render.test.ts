@@ -126,9 +126,25 @@ test("package 는 지시 줄을 자리 표시로 바꾸고 태그를 쉼표로 �
 });
 
 test.each([
+  ["index.html", "../attachments/101", "stickers/ogq_abc123-4.png"],
+  ["noodle-review/index.html", "../../attachments/101", "noodle-review/stickers/ogq_abc123-4.png"],
+  ["blog/noodle/index.html", "../../../attachments/101", "blog/noodle/stickers/ogq_abc123-4.png"],
+])("artifact_path 가 %s 이면 사진은 %s 를 부르고 스티커는 같은 폴더에 받는다", async (path, photo, sticker) => {
+  const preview = await renderDraft(input({ artifact_path: path }), attachmentDir);
+  const pack = await renderDraft(input({ artifact_path: path, kind: "package" }), attachmentDir);
+
+  expect(preview.problems).toEqual([]);
+  expect(preview.html).toContain(`<img src="${photo}" alt="1번째 사진" loading="lazy">`);
+  expect(preview.assets.map((asset) => asset.path)).toEqual([sticker]);
+  expect(pack.html).toContain(`<img src="${photo}" alt="1번째 사진" loading="lazy">`);
+});
+
+test.each([
   ["초안 계약 위반", { title: "" }],
   ["없는 사진 파일", { body: "[사진 1: 999.jpg]" }],
-  ["깊은 artifact_path", { artifact_path: "a/b/index.html" }],
+  ["폴더가 네 단계인 artifact_path", { artifact_path: "a/b/c/d/index.html" }],
+  ["index.html 이 아닌 artifact_path", { artifact_path: "noodle-review/preview.html" }],
+  ["점으로 시작하는 폴더가 가운데 있는 artifact_path", { artifact_path: "a/.hidden/index.html" }],
   ["점으로 시작하는 artifact_path", { artifact_path: "../index.html" }],
   ["사진 번호가 아닌 photo_notes 키", { photo_notes: { first: "설명" } }],
   ["301자 photo_notes", { photo_notes: { "1": "가".repeat(301) } }],

@@ -20,6 +20,13 @@ test("hermes 의 plugin 밖 파일은 Hermes 연동 라벨만 붙는다", () => 
   assert.deepEqual(labelsFor("hermes/README.md"), ["위험:Hermes연동"]);
 });
 
+test("가짜 Hermes의 진입 파일과 분리 모듈은 Hermes 연동 라벨이 붙는다", () => {
+  assert.deepEqual(labelsFor("test/e2e/fake-hermes.ts"), ["위험:Hermes연동"]);
+  assert.deepEqual(labelsFor("test/e2e/fake-hermes/event-routes.ts"), ["위험:Hermes연동"]);
+  assert.deepEqual(labelsFor("test/e2e/fake-hermes/state.ts"), ["위험:Hermes연동"]);
+  assert.deepEqual(labelsFor("test/e2e/fake-hermes-other.ts"), []);
+});
+
 test("Hermes 문서에서 옮겨 온 절을 가진 backend 문서는 Hermes 연동 라벨이 붙는다", () => {
   assert.deepEqual(labelsFor("docs/backend/mcp-caller.md"), ["위험:Hermes연동"]);
   assert.deepEqual(labelsFor("docs/backend/conversation.md"), ["위험:Hermes연동"]);

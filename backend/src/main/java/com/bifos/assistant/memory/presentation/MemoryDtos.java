@@ -1,5 +1,6 @@
 package com.bifos.assistant.memory.presentation;
 
+import com.bifos.assistant.memory.application.model.MemorySource;
 import com.bifos.assistant.memory.application.model.ServiceTokenGrant;
 import com.bifos.assistant.memory.application.model.ServiceTokenSnapshot;
 import com.bifos.assistant.memory.domain.Memory;
@@ -35,6 +36,9 @@ public final class MemoryDtos {
      * <p>{@code omittedFromContext} 는 지금 조립하면 자리가 없어 실리지 않을 항목이라는 뜻이다.
      * 본문이 상한을 넘거나 앞선 항목들이 자리를 다 쓴 경우가 여기 해당한다. 목록을 조회할 때만
      * 판정하고, 한 항목만 돌려주는 응답은 언제나 거짓이다.
+     *
+     * <p>{@code sourceAgentName} 과 {@code sourceAgentDeleted} 는 에이전트가 남긴 기억의 출처다. 목록을 조회할 때만
+     * 채우고 뜻은 {@link MemorySource} 가 갖는다. 에이전트가 남기지 않았거나 한 항목만 돌려주는 응답은 null 과 거짓이다.
      */
     public record MemoryView(
             Long id,
@@ -51,12 +55,14 @@ public final class MemoryDtos {
             Instant createdAt,
             Instant updatedAt,
             boolean sensitive,
-            boolean omittedFromContext) {
+            boolean omittedFromContext,
+            String sourceAgentName,
+            boolean sourceAgentDeleted) {
         static MemoryView from(Memory memory) {
-            return from(memory, false);
+            return from(memory, false, null);
         }
 
-        static MemoryView from(Memory memory, boolean omittedFromContext) {
+        static MemoryView from(Memory memory, boolean omittedFromContext, MemorySource source) {
             boolean sensitive = memory.sensitivity() == MemorySensitivity.SENSITIVE;
             return new MemoryView(
                     memory.id(),
@@ -73,7 +79,9 @@ public final class MemoryDtos {
                     memory.createdAt(),
                     memory.updatedAt(),
                     sensitive,
-                    omittedFromContext);
+                    omittedFromContext,
+                    source == null ? null : source.agentName(),
+                    source != null && source.agentDeleted());
         }
     }
 

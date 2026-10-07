@@ -1,10 +1,12 @@
 import type { Block, DraftInput } from "../draft.ts";
 import { componentProblems, componentState } from "./components.ts";
 import {
+  ABORTED,
   BODY_SELECTOR,
   buttonFinder,
   click,
   componentCount,
+  EditorError,
   type EditorPage,
   normalize,
   paragraphs,
@@ -25,6 +27,37 @@ const TAG_INPUT = "#tag-input";
 const SAVE_BUTTON = "저장";
 const CATEGORIES_MAX = 50;
 const SAVE_TRIES = 25;
+const OPEN_TRIES = 3;
+const DIAGNOSIS_LAYERS = 8;
+
+// 끝이 있는 애니메이션과 전환(패널이 열리는 중)이 도는지 읽는 식. 깜박이는 커서 같은 무한 반복은 뺀다.
+const ANIMATING =
+  "document.getAnimations().some(a => a.playState === 'running'" +
+  " && a.effect?.getComputedTiming().iterations !== Infinity)";
+
+// 요소를 태그와 앞 클래스 둘로만 적는다. 바뀌는 해시가 붙어도 어느 레이어인지는 알아볼 수 있다.
+// 편집기 도구 막대 안의 layer 클래스는 늘 보이므로 레이어 목록에서 뺀다.
+const PUBLISH_DIAGNOSIS = `(() => {
+  const name = e => e ? (e.tagName.toLowerCase() + [...e.classList].slice(0, 2).map(c => "." + c).join(""))
+    .replace(/[^A-Za-z0-9_.-]/g, "").slice(0, 80) : null;
+  const shown = e => { const r = e.getBoundingClientRect(); const s = getComputedStyle(e);
+    return r.width > 0 && r.height > 0 && s.display !== "none" && s.visibility !== "hidden"; };
+  const button = document.querySelector(${JSON.stringify(PUBLISH_SETTINGS_BUTTON)});
+  let state = "missing", covered = null;
+  if (button) {
+    const r = button.getBoundingClientRect();
+    if (!r.width || !r.height) state = "hidden";
+    else {
+      state = button.disabled ? "disabled" : "shown";
+      const hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+      if (!hit || !(hit === button || button.contains(hit))) covered = name(hit);
+    }
+  }
+  const layers = [...document.querySelectorAll("[class*=layer], [class*=popup], [class*=dim], [role=dialog]")]
+    .filter(e => shown(e) && !e.closest("[class*=toolbar]")).map(name);
+  return JSON.stringify({ publish_button: state, covered_by: covered,
+    layers: [...new Set(layers)].slice(0, ${DIAGNOSIS_LAYERS}) });
+})()`;
 
 const q = (value: unknown) => JSON.stringify(value);
 
@@ -37,11 +70,35 @@ async function settingsOpen(page: EditorPage) {
   return Boolean(await page.js("!!document.querySelector('[class^=layer_publish]')"));
 }
 
-/** 발행 설정 레이어만 연다. */
+/**
+ * 발행 설정 레이어만 연다.
+ * 운영처럼 CDP 왕복이 빠르면 사진을 넣은 직후 편집기가 아직 움직이는 동안 단추를 누르게 된다. 그때 레이어가 열리지 않은 일이 있었다.
+ * 끝이 있는 애니메이션이 멈추기를 잠시 기다리고, 단추가 덮이지 않은 채 제자리에 있을 때 누른다. 레이어가 뜨지 않으면 몇 번 다시 누른다.
+ * 누를 때마다 먼저 열렸는지 보므로 늦게 열린 레이어를 다시 눌러 닫지 않는다.
+ */
 async function openSettings(page: EditorPage) {
-  if (await settingsOpen(page)) return true;
-  if (!(await click(page, PUBLISH_SETTINGS_BUTTON))) return false;
-  return page.waitUntil(() => settingsOpen(page));
+  for (let i = 0; i < OPEN_TRIES; i++) {
+    if (await settingsOpen(page)) return true;
+    await page.waitUntil(async () => !(await page.js(ANIMATING)), page.step(5));
+    if (await settingsOpen(page)) return true;
+    if (!(await clickStableControl(page, PUBLISH_SETTINGS_BUTTON))) continue;
+    if (await page.waitUntil(() => settingsOpen(page))) return true;
+  }
+  return false;
+}
+
+/**
+ * 발행 단추를 열지 못한 까닭을 클래스 이름으로만 읽는다. 글과 주소는 싣지 않는다.
+ * `publish_button` 은 단추의 상태, `covered_by` 는 단추 가운데를 차지한 요소, `layers` 는 보이는 레이어다.
+ */
+async function publishDiagnosis(page: EditorPage) {
+  try {
+    const raw = await page.js<string>(PUBLISH_DIAGNOSIS);
+    return JSON.parse(raw || "{}") as Record<string, unknown>;
+  } catch (error) {
+    if (error instanceof EditorError && error.message === ABORTED) throw error;
+    return {};
+  }
 }
 
 /** 연 단추를 다시 눌러 설정 레이어만 닫는다. */
@@ -83,8 +140,8 @@ async function categoryNames(page: EditorPage) {
   return [...new Set(JSON.parse(raw || "[]") as string[])].slice(0, CATEGORIES_MAX);
 }
 
-/** 움직이는 발행 설정 창이 멈추고 단추가 드러난 뒤 누른다. */
-async function clickStableSettingsControl(page: EditorPage, selector: string) {
+/** 움직이는 화면이 멈추고 단추가 드러난 뒤 누른다. */
+async function clickStableControl(page: EditorPage, selector: string) {
   let lastTop: number | null = null;
   let stableSince = 0;
   let point: { x: number; y: number } | null = null;
@@ -132,8 +189,11 @@ export async function settings(page: EditorPage, input: DraftInput, draftHash: s
   const tags = draftTags(input);
   const note = await requireClearScreen(page);
   if (note) throw page.fail("editor_failed", "화면을 덮은 알림이 있어 설정하지 못한다");
-  if (!(await openSettings(page))) throw page.fail("editor_failed", "발행 설정을 열지 못했다");
-  if (!(await clickStableSettingsControl(page, CATEGORY_BUTTON)))
+  if (!(await openSettings(page)))
+    throw page.fail("editor_failed", "발행 설정을 열지 못했다", {
+      diagnosis: await publishDiagnosis(page),
+    });
+  if (!(await clickStableControl(page, CATEGORY_BUTTON)))
     throw page.fail("editor_failed", "카테고리 선택기를 열지 못했다");
   const label = categoryOptionFinder(category);
   if (!(await page.waitUntil(async () => Boolean(await page.js(`!!(${label})`)), page.step(10))))
@@ -146,7 +206,7 @@ export async function settings(page: EditorPage, input: DraftInput, draftHash: s
     throw page.fail("editor_failed", "카테고리 선택이 반영되지 않았다");
 
   for (const tag of tags) {
-    if (!(await clickStableSettingsControl(page, TAG_INPUT)))
+    if (!(await clickStableControl(page, TAG_INPUT)))
       throw page.fail("editor_failed", "태그 입력칸을 누르지 못했다");
     await page.insertText(tag);
     const typed = await page.waitUntil(

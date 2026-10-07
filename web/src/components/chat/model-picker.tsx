@@ -175,6 +175,10 @@ export function ModelPicker({
 
   async function loadOptions() {
     const version = ++loadVersion.current;
+    if (!agentCode) {
+      setOptionsState({ status: "failed" });
+      return;
+    }
     setOptionsState({ status: "loading" });
     try {
       const response = await fetchModelOptions(agentCode);
@@ -484,7 +488,10 @@ export function ModelTierPicker({
 
   useEffect(() => {
     let active = true;
-    void getModelTiers(agentCode).then((result) => {
+    const result = agentCode
+      ? getModelTiers(agentCode)
+      : Promise.resolve({ ok: false as const });
+    void result.then((result) => {
       if (!active) return;
       if (result.ok) {
         setState({ loading: false, data: result.data });
