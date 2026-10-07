@@ -11,6 +11,7 @@ spring:
     open-in-view: false
   flyway:
     enabled: false
+    out-of-order: true
 
 assistant:
   usage:
