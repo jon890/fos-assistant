@@ -6,7 +6,6 @@
 """
 
 import http.server
-import importlib.util
 import json
 import logging
 import os
@@ -19,6 +18,8 @@ import types
 import unittest
 
 import yaml
+
+from plugin_loading import load_plugin, set_plugin
 
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
@@ -51,11 +52,8 @@ POLICY_VECTOR_ARGS_JSON = '{"text":"안녕"}'
 POLICY_VECTOR_SIG = "e23e297aec4837aeddd50e71dcde79969ad5544e6c93ea7b9ab7657f221037da"
 
 
-def load_plugin():
-    spec = importlib.util.spec_from_file_location("fos_ctx_under_test", PLUGIN_DIR / "__init__.py")
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module
+def load_ctx(add_cleanup):
+    return load_plugin("fos_ctx_under_test", PLUGIN_DIR / "__init__.py", add_cleanup)
 
 
 class ManifestTest(unittest.TestCase):
@@ -73,7 +71,7 @@ class ManifestTest(unittest.TestCase):
 
 class SignatureContractTest(unittest.TestCase):
     def setUp(self):
-        self.plugin = load_plugin()
+        self.plugin = load_ctx(self.addCleanup)
 
     def test_key_is_hex_digest_of_token(self):
         """키는 토큰의 hex digest 다."""
@@ -138,7 +136,7 @@ class PluginFixture(unittest.TestCase):
         constants.get_hermes_home = lambda: pathlib.Path(self.tmp.name)
         self.saved = {name: sys.modules.get(name) for name in ("agent", "agent.secret_scope", "hermes_constants")}
         sys.modules.update({"agent": agent, "agent.secret_scope": secret_scope, "hermes_constants": constants})
-        self.plugin = load_plugin()
+        self.plugin = load_ctx(self.addCleanup)
 
     def tearDown(self):
         for name, module in self.saved.items():
@@ -300,7 +298,7 @@ class SubagentRegistrationTest(PluginFixture):
         self.url = "http://127.0.0.1:%d/internal/hermes/session-bindings/subagent" % self.server.server_address[1]
         self.saved_env = os.environ.get("FOS_CTX_SUBAGENT_URL")
         os.environ["FOS_CTX_SUBAGENT_URL"] = self.url
-        self.plugin.REGISTER_TIMEOUT = 1.0
+        set_plugin(self.plugin, "REGISTER_TIMEOUT", 1.0)
 
     def tearDown(self):
         self.server.shutdown()
@@ -524,7 +522,7 @@ class ConnectorPolicyTest(PluginFixture):
 
     def test_slow_server_blocks(self):
         """서버가 제한 시간보다 늦으면 막는다."""
-        self.plugin.POLICY_TIMEOUT = 0.2
+        set_plugin(self.plugin, "POLICY_TIMEOUT", 0.2)
         self.answer = (200, b'{"decision": "allow"}', 5.0)
         self.assertBlocked(self.call("mcp__demo__write_note"), self.plugin.POLICY_BLOCK_MESSAGE)
         self.assertEqual(len(self.requests), 1)
