@@ -101,9 +101,10 @@ test("10MB 응답, null·array·손상 JSON은 읽기 성공으로 가장하지 
 });
 
 test("timeout은 재시도하지 않고 send만 결과 불명으로 분류한다", async () => {
-  const { fake, server } = setup(10);
+  // 토큰 교환이 먼저 끝나고 profile 요청에서 시간 제한에 걸리도록 여유를 둔다.
+  const { fake, server } = setup(250);
   fake.routes.set("GET /gmail/profile", async () => {
-    await Bun.sleep(100);
+    await Bun.sleep(1_000);
     return json({ emailAddress: "late" });
   });
   try {
