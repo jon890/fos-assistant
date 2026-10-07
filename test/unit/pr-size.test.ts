@@ -7,6 +7,9 @@ import test from "node:test";
 import { category, classify, compare, countChanges, excluded } from "../../scripts/pr-size.mjs";
 
 const SCRIPT = new URL("../../scripts/pr-size.mjs", import.meta.url).pathname;
+// 시험 자식이 CI 작업의 출력과 요약을 바꾸거나 예외 라벨을 물려받지 않게 한다.
+const CLI_ENV = { ...process.env };
+for (const key of ["GITHUB_OUTPUT", "GITHUB_STEP_SUMMARY", "PR_LABELS"]) delete CLI_ENV[key];
 
 test("추가와 삭제를 합치고 바이너리는 줄 수에 넣지 않는다", () => {
   assert.deepEqual(countChanges("200\t201\tsrc/a.ts\0-\t-\timage.png\0"), { production: 401, tests: 0, docs: 0, ignored: 0 });
@@ -79,14 +82,14 @@ test("공통 조상부터 세므로 base의 새 변경은 포함하지 않고 �
     writeFileSync(join(cwd, "base.ts"), "base\n".repeat(1500));
     git("add", "."); git("commit", "-qm", "base");
     assert.deepEqual(compare("HEAD", head, cwd), { production: 2, tests: 2000, docs: 2000, ignored: 2000 });
-    const result = spawnSync("node", [SCRIPT, "HEAD", head], { cwd, encoding: "utf8" });
+    const result = spawnSync("node", [SCRIPT, "HEAD", head], { cwd, encoding: "utf8", env: CLI_ENV });
     assert.equal(result.status, 0, result.stderr);
     assert.match(result.stdout, /운영 코드 2줄, 시험 2000줄, 문서 2000줄/);
     git("checkout", "--detach", head);
     writeFileSync(join(cwd, "large.ts"), "change\n".repeat(1001));
     git("add", "."); git("commit", "-qm", "large");
-    assert.equal(spawnSync("node", [SCRIPT, head], { cwd }).status, 1);
-    assert.equal(spawnSync("node", [SCRIPT, head], { cwd, env: { ...process.env, PR_LABELS: '["규모:예외"]' } }).status, 0);
+    assert.equal(spawnSync("node", [SCRIPT, head], { cwd, env: CLI_ENV }).status, 1);
+    assert.equal(spawnSync("node", [SCRIPT, head], { cwd, env: { ...CLI_ENV, PR_LABELS: '["규모:예외"]' } }).status, 0);
   } finally {
     rmSync(cwd, { recursive: true, force: true });
   }
