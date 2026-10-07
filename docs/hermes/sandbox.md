@@ -175,7 +175,7 @@ profile 셋을 썼다. 사용자 A 의 profile 둘, 사용자 B 의 profile 하�
 | 사용자 A 의 두 profile 이 쓴 `/workspace` 파일 | 서로 보인다 |
 | 사용자 B 의 `/workspace` | A 의 파일이 없다 |
 | 사용자별 볼륨 방식에서 같은 시험 | 위와 같다. 컨테이너는 profile 마다 하나 |
-| 대시보드 plugin 이 쓰는 `terminal:` 블록을 둔 뒤 실제 `PUT /api/config` 처리기로 도구 목록을 저장 | 블록이 남는다. 값이 빈 `docker_env: {}` 만 지워지고 기본값이 같아 동작은 같다 |
+| 대시보드 plugin 이 쓰는 `terminal:` 블록을 둔 뒤 실제 `PUT /api/config` 처리기로 도구 목록을 저장 | 블록이 남는다. 값이 빈 `docker_env: {}` 만 지워지고 기본값이 같아 동작은 같다. 그래서 plugin 은 빈 env 에서 `docker_env` 칸을 넣지 않고 지문을 계산한다 |
 | 그 블록으로 셸과 `write_file` | `/workspace` 에서 돈다. 읽기 전용으로 붙인 경로는 읽히고 쓰기는 「Read-only file system」 이다. 전용 망에 붙는다 |
 | 한 프로세스에서 `docker_volumes` 의 `/workspace` 원본만 바꾸고 셸을 다시 부른다 | **옛 컨테이너와 옛 원본이 그대로 쓰였다.** 바꾸기 전 디렉터리의 파일이 보였다 |
 | 같은 시험에서 `docker_shared_container_key` 도 함께 바꾼다 | 같은 프로세스에서 새 컨테이너가 생기고 새 원본만 보였다 |
