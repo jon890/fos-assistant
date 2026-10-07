@@ -343,7 +343,7 @@ test.describe("지금 화면", () => {
     const title = "장보기 예약 확인";
     await openNow(page);
     const needsMe = page.getByTestId("now-card-needs_me");
-    await needsMe.getByRole("button", { name: "할 일 더하기" }).click();
+    await page.getByRole("button", { name: "할 일 더하기" }).click();
     const dialog = page.getByRole("dialog", { name: "할 일 더하기" });
     await dialog.getByLabel("제목", { exact: true }).fill(title);
     await dialog
