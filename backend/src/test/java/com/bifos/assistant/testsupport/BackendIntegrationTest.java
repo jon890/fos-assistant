@@ -14,6 +14,7 @@ import com.bifos.assistant.chat.infra.ChatMessageRepository;
 import com.bifos.assistant.chat.infra.ChatPendingMessageRepository;
 import com.bifos.assistant.chat.infra.ResultDeliveryAttemptRepository;
 import com.bifos.assistant.context.ContextAssembler;
+import com.bifos.assistant.feedback.application.FeedbackConversations;
 import com.bifos.assistant.hermes.HermesConnectorClient;
 import com.bifos.assistant.hermes.HermesDashboardClient;
 import com.bifos.assistant.hermes.HermesModelClient;
@@ -105,6 +106,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
             ConversationEventHub.class,
             ExecutionEventRepository.class,
             ExecutionSkillUseRepository.class,
+            FeedbackConversations.class,
             HermesProfileProvisioner.class,
             MemoryContentSealer.class,
             PriceCatalog.class,
