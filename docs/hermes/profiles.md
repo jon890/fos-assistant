@@ -1,5 +1,8 @@
 # profile 생성
 
+도구 없는 시스템 판단 profile은 [가치 평가](../backend/value-evaluation.md)의 준비 상태 계약을 따른다.
+`GET /api/profiles/{name}/decision-readiness`는 Control Plane 관리 토큰으로 그 profile의 준비 여부만 읽는다.
+
 ## profile 을 HTTP 로 만드는 길
 
 대시보드 웹서버에 profile 관리 API 가 있다.

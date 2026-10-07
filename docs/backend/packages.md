@@ -86,6 +86,10 @@ Control Plane 의 패키지마다 맡는 책임과 패키지 사이의 방향 �
 
 ### proactive
 
+문제 후보의 가치 평가는 `ValueEvaluationService`와 `ValueEvaluator`가 맡는다.
+`DecisionProvider`는 모델과 무관한 판단 port이며 첫 adapter는 도구 없는 시스템 profile에 Hermes Runs로 묻는다.
+권한과 행동 정책을 결정하지 않는다([가치 평가](value-evaluation.md)).
+
 `proactive` 는 `followup` 바로 위다. 살펴보기 turn 은 `ChatService.runProactiveCheck` 가 돌리고, 살펴보기만의 일은 `chat` 이 가진 port `CheckTurn` 을 `proactive` 가 구현해 넘긴다.
 `chat` 은 `proactive` 를 import 하지 않는다. 기동 정리가 끝낸 살펴보기 turn 의 답을 대화에 남기지 않도록, `chat` 의 port `RecoveredAnswerGuard` 도 `proactive` 가 구현한다. 사용자가 점검 대화를 읽으면 그 대화의 보고를 연 것으로 적도록 `chat` 의 port `CheckReportReads` 도 `proactive` 가 구현한다.
 `orchestration`, `mcp`, `connector` 는 `proactive` 보다 위라 `ProactiveCheckGuard` 로 살펴보기 트리인지 묻는다.

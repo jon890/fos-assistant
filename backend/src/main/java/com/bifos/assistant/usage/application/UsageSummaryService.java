@@ -126,7 +126,7 @@ public class UsageSummaryService {
         lines.sort(Comparator.comparing(
                         (BreakdownLine<CostByAgent> line) -> orZero(line.cost().estimatedMicros()))
                 .reversed()
-                .thenComparing(line -> line.cost().agentId()));
+                .thenComparing(line -> line.cost().agentId(), Comparator.nullsLast(Comparator.naturalOrder())));
         return lines;
     }
 
