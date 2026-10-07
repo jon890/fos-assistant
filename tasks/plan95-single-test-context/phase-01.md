@@ -44,7 +44,9 @@
 
 ## 작업 항목
 
-### 1. `shared/config/LiveProperties.java`, `LivePropertiesConfig.java`
+### 1. `shared/config/LiveProperties.java`, 루트 패키지의 `LivePropertiesConfig.java`
+
+`LivePropertiesConfig` 는 여러 기능 패키지의 설정 record 를 가져오므로 `shared` 에 두면 `SHARED_DOES_NOT_DEPEND_ON_DOMAINS` 에 걸린다. `AssistantApplication` 과 같은 루트 패키지에 둔다.
 
 ```java
 public interface LiveProperties<T> {
@@ -102,7 +104,7 @@ scripts/quality.sh check
 | 파일 | 변경 |
 | --- | --- |
 | `backend/src/main/java/com/bifos/assistant/shared/config/LiveProperties.java` | 신규 |
-| `backend/src/main/java/com/bifos/assistant/shared/config/LivePropertiesConfig.java` | 신규 |
+| `backend/src/main/java/com/bifos/assistant/LivePropertiesConfig.java` | 신규 |
 | `backend/src/main/java/com/bifos/assistant/**/*.java` | 수정 |
 | `backend/src/test/java/com/bifos/assistant/shared/config/LivePropertiesTest.java` | 신규 |
 | `backend/src/test/java/com/bifos/assistant/**/*Test.java` | 수정 |
