@@ -100,7 +100,8 @@ public class UsageSummaryService {
                 priced,
                 pending,
                 unconfirmed,
-                unpriced);
+                unpriced,
+                executions.countIncompleteEventObservations(userId, from, to));
     }
 
     /** 에이전트별 합계다. 자식은 부모 실행의 에이전트 줄에 더한다. */

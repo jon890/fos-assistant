@@ -261,7 +261,7 @@ session 은 cache 를 뺀 `input_tokens` 와 cache read·write 를 따로 누적
 
 Control Plane 은 이 값을 대시보드 plugin 의 읽기 경로로 받는다([ADR-067](../adr/ADR-067-native-하위-에이전트의-provider-는-대시보드-plugin-이-session-저장소에서-읽어-준다.md)).
 plugin 은 Hermes 의 저장소 클래스를 쓰지 않고 SQLite 의 읽기 전용 방식으로 파일을 직접 연다.
-**Hermes 판을 올릴 때 위 표의 표 이름과 칸 이름을 다시 확인한다.**
+**Hermes 버전을 올릴 때 위 표의 표 이름과 칸 이름을 다시 확인한다.**
 
 ### 자식의 모델은 부모의 것이 아니다
 
@@ -364,7 +364,7 @@ gateway 의 `/stop` 과 같은 함수이고, 부모 session 이 정확히 같은
 
 | 무엇 | 지금 |
 | --- | --- |
-| 자식의 Control Plane MCP 호출(`memory_read`, `artifact_write`, `agent_list`, `agent_delegate`, `agent_status`, `agent_stop`, `follow_up_propose`) | origin 실행이나 그 루트 실행이 `CANCELLED` 면 거절한다([ADR-037](../adr/ADR-037-hermes-하위-에이전트-session-의-주인은-만들-때-등록한-줄로-정한다.md)). 다른 거절과 같은 도구 결과다 |
+| 자식의 Control Plane MCP 호출(`memory_read`, `artifact_write`, `agent_list`, `agent_delegate`, `agent_status`, `agent_stop`, `follow_up_propose`, `memory_remember`) | origin 실행이나 그 루트 실행이 `CANCELLED` 면 거절한다([ADR-037](../adr/ADR-037-hermes-하위-에이전트-session-의-주인은-만들-때-등록한-줄로-정한다.md)). 다른 거절과 같은 도구 결과다 |
 | 자식의 Hermes 자체 도구(웹 검색, 터미널 등) | 막지 못한다 |
 | 자식 run 자체 | 멈추지 못한다. 동기 위임 자식만 부모 run 의 중지와 함께 멈춘다. background 자식을 멈추는 길은 위 「native 하위 에이전트를 멈추는 길」 에 있고 구현하지 않았다 |
 
@@ -421,3 +421,7 @@ Use the read_file tool with offset and limit to access specific ...
 
 MCP 결과는 `<untrusted_tool_result>` 로 감싸여 들어간다.
 그 안의 내용을 지시가 아니라 데이터로 다루라는 안내가 함께 붙는다.
+
+### 사건을 관측하지 못한 실행
+
+자식 시작 사건을 읽거나 저장하지 못하면 실제 자식 수와 빠진 금액은 알 수 없다. Control Plane은 실행의 `event_observation`에 관측 범위를 저장하고, 관리자 월 합계에 자식 수와 별개인 관측 누락 실행 수를 보낸다. 스트림을 정상적으로 읽었다는 `OBSERVED`도 발견한 자식의 사용량·가격 확정을 보장하지 않는다. 기존 확인 중·미확인·가격 미확인 건수는 그대로 남는다. 비수집 경로와 기동 복구, 과거 실행의 처리 규칙은 [`실행 스키마`](../backend/schema/execution.md)의 「사건 관측 범위」가 갖는다. 관측 누락 때문에 원래 실행을 다시 제출하거나 자식 수·토큰·비용을 추정하지 않는다.

@@ -76,4 +76,20 @@ public interface ExecutionEventRepository extends JpaRepository<ExecutionEvent, 
      * {@code in} 절은 데이터베이스마다 다르게 동작한다.
      */
     List<ExecutionEvent> findByExecutionIdInOrderByExecutionIdAscSequenceAsc(Collection<Long> executionIds);
+
+    /**
+     * 그 대화의 실행 가운데 바깥 글을 읽었을 수 있는 도구나 하위 에이전트를 시작한 것이 있는가(ADR-20261007 / memory-remember).
+     *
+     * <p>Hermes session 은 대화의 앞 turn 들을 이력으로 이어 가므로 지금 실행 하나가 아니라 대화 전체를 본다.
+     * {@code internalTools} 에 든 도구의 시작 사건만 빼고 센다. 이름이 없는 도구 시작 사건도 바깥 도구로 본다.
+     */
+    @Query("""
+            select case when count(event) > 0 then true else false end from ExecutionEvent event, AgentExecution e
+            where event.executionId = e.id and e.conversationId = :conversationId
+                and (event.eventType = 'SUBAGENT_STARTED'
+                    or (event.eventType = 'TOOL_STARTED'
+                        and (event.toolName is null or event.toolName not in :internalTools)))
+            """)
+    boolean existsOutsideToolStartInConversation(
+            @Param("conversationId") Long conversationId, @Param("internalTools") Collection<String> internalTools);
 }

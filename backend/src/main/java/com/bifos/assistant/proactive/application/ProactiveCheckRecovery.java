@@ -38,6 +38,7 @@ public class ProactiveCheckRecovery implements SmartLifecycle {
     private final ProactiveCheckRepository checks;
     private final ExecutionDeliveryWriter deliveryWriter;
     private final ApplicationEventPublisher events;
+    private final CheckFeedback feedback;
     private final Clock clock;
 
     /** 이 프로세스에서 이미 닫았다. 다시 시작할 때 도는 살펴보기는 이 프로세스의 것이라 닫지 않는다. */
@@ -121,5 +122,6 @@ public class ProactiveCheckRecovery implements SmartLifecycle {
         }
         check.fail(INTERRUPTED, check.toolCalls(), check.delegations(), now);
         checks.save(check);
+        feedback.ended(check);
     }
 }

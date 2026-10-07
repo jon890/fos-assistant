@@ -81,6 +81,20 @@ class ContextAssemblerTest {
     }
 
     @Test
+    @DisplayName("memory_remember 를 받는 실행에만 기억 지침을 표 지침 뒤에 싣는다")
+    void addsMemoryInstructionsOnlyWhenRemembering() {
+        AssembledContext remembering = assembler.withResponseInstructions(AssembledContext.empty(), true);
+        AssembledContext plain = assembler.withResponseInstructions(AssembledContext.empty(), false);
+
+        assertThat(remembering.instructions())
+                .startsWith("# 답변 형식")
+                .contains("# 기억", "memory_remember", "evidence", "작업 기록");
+        assertThat(plain.instructions()).doesNotContain("# 기억").doesNotContain("memory_remember");
+        assertThat(assembler.withResponseInstructions(AssembledContext.empty()).instructions())
+                .isEqualTo(plain.instructions());
+    }
+
+    @Test
     @DisplayName("공통 표 지침은 Memory 예산 밖에 두고 누락 항목을 보존한다")
     void keepsMemoryBudgetAndOmissionsIndependent() {
         String body = "가".repeat(8_000);

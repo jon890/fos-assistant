@@ -18,6 +18,8 @@ import com.bifos.assistant.agent.domain.type.CredentialScope;
 import com.bifos.assistant.agent.infra.AgentRepository;
 import com.bifos.assistant.chat.domain.Conversation;
 import com.bifos.assistant.chat.infra.ConversationRepository;
+import com.bifos.assistant.feedback.domain.type.FeedbackEventType;
+import com.bifos.assistant.feedback.infra.FeedbackEventRepository;
 import com.bifos.assistant.proactive.application.AutonomyPolicyService;
 import com.bifos.assistant.proactive.application.ProactiveCheckService;
 import com.bifos.assistant.proactive.domain.AutonomyDecision;
@@ -103,6 +105,9 @@ class AutonomyPolicyServiceTest {
     @Autowired
     TransactionTemplate transactions;
 
+    @Autowired
+    FeedbackEventRepository feedbackEvents;
+
     /** 실제 살펴보기를 시작하지 않는다. 시작 경로를 불렀는지와 그 결과를 검사마다 정한다. */
     @Autowired
     ProactiveCheckService checkService;
@@ -137,6 +142,8 @@ class AutonomyPolicyServiceTest {
     @AfterEach
     void tearDown() {
         transactions.executeWithoutResult(status -> {
+            feedbackEvents.deleteAll(feedbackEvents.findByUserIdAndOccurredAtGreaterThanEqualOrderByOccurredAtAscIdAsc(
+                    OWNER.id(), Instant.EPOCH));
             decisions.deleteAll();
             preferences.deleteAll();
             evaluations.deleteAll();
@@ -255,6 +262,15 @@ class AutonomyPolicyServiceTest {
         assertThat(failed.executionError()).isEqualTo("USER_BUSY");
         assertThat(again.reasons()).containsExactly(AutonomyReason.ALREADY_EXECUTED);
         verify(checkService, times(1)).startAutonomous(any(), any(), any());
+        assertThat(feedbackEvents.findByUserIdAndSubjectKeyInOrderByOccurredAtAscIdAsc(
+                        OWNER.id(), List.of("autonomy_decision:" + failed.id())))
+                .singleElement()
+                .satisfies(event -> {
+                    assertThat(event.eventType()).isEqualTo(FeedbackEventType.EXECUTION_FAILED);
+                    assertThat(event.reasonCode()).isEqualTo("USER_BUSY");
+                    assertThat(event.autonomyDecisionId()).isEqualTo(failed.id());
+                    assertThat(event.sourceCheckId()).isEqualTo(source.id());
+                });
     }
 
     @Test

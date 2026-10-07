@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.tuple;
 import static org.mockito.ArgumentMatchers.anyBoolean;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
@@ -38,6 +39,7 @@ import com.bifos.assistant.connector.infra.ConnectorActionRepository;
 import com.bifos.assistant.connector.infra.ConnectorBindingRepository;
 import com.bifos.assistant.connector.infra.ConnectorConnectionRepository;
 import com.bifos.assistant.connector.infra.ConnectorToolGrantRepository;
+import com.bifos.assistant.feedback.application.FeedbackConversations;
 import com.bifos.assistant.hermes.ConnectorExecutionUnknown;
 import com.bifos.assistant.hermes.HermesConnectorClient;
 import com.bifos.assistant.hermes.HermesConnectorClient.InstallResult;
@@ -87,6 +89,7 @@ import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Stream;
 import org.assertj.core.api.ThrowableAssert.ThrowingCallable;
+import org.assertj.core.groups.Tuple;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -187,6 +190,10 @@ class ConnectorActionServiceTest {
     @Autowired
     HermesConnectorClient connector;
 
+    /** 이 검사의 대화 번호는 대화 줄 없이 쓰는 고정 값이라, 판단 피드백이 남아 있는 대화로 보게 한다. */
+    @Autowired
+    FeedbackConversations feedbackConversations;
+
     private final List<Long> createdChecks = new ArrayList<>();
 
     private AppUser owner;
@@ -198,6 +205,7 @@ class ConnectorActionServiceTest {
     @BeforeEach
     void setUp() {
         deleteRows();
+        doReturn(true).when(feedbackConversations).isActive(anyLong());
         recorder.start();
         // 앞선 검사가 읽은 카탈로그가 남지 않게 보관 시간보다 멀리 옮긴다.
         ConnectorCatalogTimes.expire();
@@ -273,6 +281,37 @@ class ConnectorActionServiceTest {
         // 사건은 줄을 커밋한 뒤에 나간다.
         assertThat(recorder.seen())
                 .containsExactly(new Seen(new ConnectorActionChanged(CONVERSATION, row.publicId()), false));
+    }
+
+    @Test
+    @DisplayName("승인 줄을 보이고 승인해 실행하면 SURFACED, APPROVED, EXECUTION_SUCCEEDED 판단 피드백이 인자 해시와 함께 남는다")
+    void recordsDecisionFeedbackForApprovalFlow() {
+        UUID actionId = ask(WRITE, ARGS).actionId();
+
+        service.approve(me, actionId, null);
+
+        ConnectorAction row = onlyAction();
+        assertThat(feedbackRows())
+                .containsExactly(
+                        tuple("connector_action:" + actionId, "SURFACED", "AGENT", row.argsSha256()),
+                        tuple("connector_action:" + actionId, "APPROVED", "USER", row.argsSha256()),
+                        tuple("connector_action:" + actionId, "EXECUTION_SUCCEEDED", "SYSTEM", row.argsSha256()));
+        assertThat(jdbc.queryForObject(
+                        "SELECT COUNT(*) FROM decision_feedback_event WHERE origin_execution_id = ? AND conversation_id = ?",
+                        Long.class,
+                        run.id(),
+                        CONVERSATION))
+                .isEqualTo(3L);
+    }
+
+    @Test
+    @DisplayName("승인 줄을 거절하면 REJECTED 판단 피드백이 남고 실행 결과는 남지 않는다")
+    void recordsDecisionFeedbackForRejection() {
+        UUID actionId = ask(WRITE, ARGS).actionId();
+
+        service.reject(me, actionId);
+
+        assertThat(feedbackRows()).extracting(row -> row.toList().get(1)).containsExactly("SURFACED", "REJECTED");
     }
 
     @Test
@@ -1436,6 +1475,17 @@ class ConnectorActionServiceTest {
         }
     }
 
+    /** 판단 피드백을 {@code (subjectKey, eventType, actor, subjectVersion)} 로 남긴 순서대로 읽는다. */
+    private List<Tuple> feedbackRows() {
+        return jdbc
+                .queryForList(
+                        "SELECT subject_key, event_type, actor, subject_version FROM decision_feedback_event ORDER BY id")
+                .stream()
+                .map(row -> tuple(
+                        row.get("SUBJECT_KEY"), row.get("EVENT_TYPE"), row.get("ACTOR"), row.get("SUBJECT_VERSION")))
+                .toList();
+    }
+
     private static CurrentUser currentUser(AppUser user) {
         return new CurrentUser(user.id(), user.email(), user.displayName(), user.groupId(), user.role());
     }
@@ -1470,6 +1520,7 @@ class ConnectorActionServiceTest {
 
     /** 이 검사가 쓰는 표를 비운다. 컨텍스트를 함께 쓰는 다음 검사에 행을 남기지 않게 검사 뒤에도 부른다. */
     private void deleteRows() {
+        jdbc.update("DELETE FROM decision_feedback_event");
         jdbc.update("DELETE FROM connector_action");
         jdbc.update("DELETE FROM connector_tool_grant");
         bindings.deleteAll();

@@ -226,6 +226,11 @@ assistant:
     event-retention: 90d
     # 보관 기간이 지난 지표 사건을 지우는 시각. Control Plane 의 시간대를 따른다
     cleanup-cron: "0 30 4 * * *"
+  decision-feedback:
+    # 판단 피드백 사건을 남기는 기간. 지난 줄은 cleanup-cron 에 지운다
+    retention: 365d
+    # 보관 기간이 지난 판단 피드백 사건을 지우는 시각. Control Plane 의 시간대를 따른다
+    cleanup-cron: "0 45 4 * * *"
   pricing:
     # models.dev 카탈로그를 복사해 둔 경로. 없으면 실행 비용을 비워 두고 기동은 계속한다
     catalog-path: ${ASSISTANT_PRICING_CATALOG:}

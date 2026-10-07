@@ -192,6 +192,7 @@ class UsageControllerTest {
         assertThat(cost.pricedExecutions()).as("pricedExecutions").isNull();
         assertThat(cost.unpricedExecutions()).as("unpricedExecutions").isNull();
         assertThat(cost.subscriptionExecutions()).as("subscriptionExecutions").isNull();
+        assertThat(cost.observationIncompleteExecutions()).isNull();
     }
 
     @Test

@@ -601,7 +601,7 @@ class McpAgentToolsTest {
     }
 
     @ParameterizedTest
-    @DisplayName("연결용 에이전트의 실행에서 온 호출은 도구 일곱 모두 서명이 틀린 호출과 같은 거절이다")
+    @DisplayName("연결용 에이전트의 실행에서 온 호출은 도구 여덟 모두 서명이 틀린 호출과 같은 거절이다")
     @ValueSource(
             strings = {
                 "memory_read",
@@ -610,7 +610,8 @@ class McpAgentToolsTest {
                 "agent_status",
                 "agent_delegate",
                 "agent_stop",
-                "follow_up_propose"
+                "follow_up_propose",
+                "memory_remember"
             })
     void rejectsEveryToolCalledFromConnectorAgentRun(String toolName) throws Exception {
         String token = tokens.issue(profileOf(ORIGIN_CODE), "origin").rawToken();

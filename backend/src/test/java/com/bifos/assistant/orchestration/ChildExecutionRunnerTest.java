@@ -168,6 +168,7 @@ class ChildExecutionRunnerTest {
         assertThat(result.output()).isEqualTo("조사 결과");
         AgentExecution child = executions.findById(result.executionId()).orElseThrow();
         assertThat(child.status()).isEqualTo(ExecutionStatus.SUCCEEDED);
+        assertThat(child.eventObservation().name()).isEqualTo("INCOMPLETE");
         assertThat(child.parentExecutionId()).isEqualTo(parent.id());
         assertThat(child.rootExecutionId()).isEqualTo(parent.id());
         assertThat(stub().received()).singleElement().satisfies(command -> {

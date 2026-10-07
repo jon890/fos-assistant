@@ -446,6 +446,11 @@ public class ProactiveCheckRun implements CheckTurn {
         return stopped;
     }
 
+    /** 이 turn 의 살펴보기 줄. {@link #record} 뒤에는 끝난 상태를 담는다. */
+    ProactiveCheck check() {
+        return check;
+    }
+
     /** 살펴보기 turn 의 실행 줄. 실행 줄을 만들기 전에 끝났으면 null 이다. */
     Long rootExecutionId() {
         return check.rootExecutionId();

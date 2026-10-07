@@ -2,6 +2,11 @@ package com.bifos.assistant.memory.application;
 
 import com.bifos.assistant.agent.application.AgentMemoryCollectionService;
 import com.bifos.assistant.agent.application.AgentMemoryGrants;
+import com.bifos.assistant.feedback.application.DecisionFeedbackRecorder;
+import com.bifos.assistant.feedback.application.model.FeedbackEntry;
+import com.bifos.assistant.feedback.domain.type.FeedbackActor;
+import com.bifos.assistant.feedback.domain.type.FeedbackEventType;
+import com.bifos.assistant.feedback.domain.type.FeedbackSubjectType;
 import com.bifos.assistant.memory.application.model.MemoryAccess;
 import com.bifos.assistant.memory.domain.Memory;
 import com.bifos.assistant.memory.domain.MemoryCollection;
@@ -22,6 +27,7 @@ import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.shared.util.Sha256;
 import java.time.Clock;
+import java.time.Instant;
 import java.util.List;
 import java.util.regex.Pattern;
 import lombok.RequiredArgsConstructor;
@@ -53,6 +59,7 @@ public class MemoryService {
     private final AgentMemoryCollectionService agentCollections;
     private final MemoryCollectionService collections;
     private final MemoryContentCipher cipher;
+    private final DecisionFeedbackRecorder feedback;
     private final Clock clock;
 
     /**
@@ -240,23 +247,50 @@ public class MemoryService {
     @Transactional
     public Memory proposeUser(CurrentUser user, String title, String content, Long proposedByExecutionId) {
         String dedupKey = proposalDedupKey(user.id(), title, content);
-        return memories.findByProposalDedupKey(dedupKey)
-                .orElseGet(() -> memories.save(Memory.proposedUser(
-                        user.id(), title, content, proposedByExecutionId, dedupKey, clock.instant())));
+        return memories.findByProposalDedupKey(dedupKey).orElseGet(() -> {
+            Instant now = clock.instant();
+            Memory proposed =
+                    memories.save(Memory.proposedUser(user.id(), title, content, proposedByExecutionId, dedupKey, now));
+            feedback.record(proposalFeedback(user, proposed, FeedbackEventType.SURFACED, FeedbackActor.AGENT, now));
+            return proposed;
+        });
     }
 
     @Transactional
     public Memory accept(CurrentUser user, Long id) {
         Memory memory = requireMemoryForUpdate(user, id);
-        memory.accept(user.id(), clock.instant());
-        return memories.save(memory);
+        boolean proposal = memory.status() == MemoryStatus.PROPOSED;
+        Instant now = clock.instant();
+        memory.accept(user.id(), now);
+        Memory accepted = memories.save(memory);
+        if (proposal) {
+            feedback.record(proposalFeedback(user, accepted, FeedbackEventType.ACCEPTED, FeedbackActor.USER, now));
+        }
+        return accepted;
     }
 
     @Transactional
     public Memory reject(CurrentUser user, Long id) {
         Memory memory = requireMemoryForUpdate(user, id);
-        memory.reject(clock.instant());
-        return memories.save(memory);
+        boolean proposal = memory.status() == MemoryStatus.PROPOSED;
+        Instant now = clock.instant();
+        memory.reject(now);
+        Memory rejected = memories.save(memory);
+        if (proposal) {
+            feedback.record(proposalFeedback(user, rejected, FeedbackEventType.REJECTED, FeedbackActor.USER, now));
+        }
+        return rejected;
+    }
+
+    /**
+     * 제안의 판단 피드백 사건이다. 열쇠는 지금 화면의 {@code itemKey} 와 같고, 판은 판 번호다. 제목과 본문은 담지 않는다. 대화는 제안한
+     * 실행에서 기록기가 채운다.
+     */
+    static FeedbackEntry proposalFeedback(
+            CurrentUser user, Memory memory, FeedbackEventType type, FeedbackActor actor, Instant now) {
+        return FeedbackEntry.of(user.id(), FeedbackSubjectType.MEMORY, memory.id(), type, actor, now)
+                .originExecution(memory.proposedByExecutionId())
+                .version(Integer.toString(memory.revision()));
     }
 
     /**
@@ -321,7 +355,7 @@ public class MemoryService {
                 : memory.content();
     }
 
-    private StoredContent stored(String plain, MemorySensitivity sensitivity, String binding) {
+    StoredContent stored(String plain, MemorySensitivity sensitivity, String binding) {
         return sensitivity == MemorySensitivity.SENSITIVE ? cipher.seal(plain, binding) : StoredContent.plain(plain);
     }
 
@@ -339,7 +373,7 @@ public class MemoryService {
                 BY_ID);
     }
 
-    private Memory revise(
+    Memory revise(
             CurrentUser user, Memory memory, String content, MemoryRetrieval retrieval, MemorySensitivity sensitivity) {
         requirePlaceable(retrieval, sensitivity);
         // 판을 남기기 전에 암호화한다. key 가 없으면 여기서 거절돼 판도 본문도 바뀌지 않는다
@@ -455,7 +489,7 @@ public class MemoryService {
         return new ApiException(ErrorCode.MEMORY_NOT_FOUND, "no such memory");
     }
 
-    private static String proposalDedupKey(Long ownerUserId, String title, String content) {
+    static String proposalDedupKey(Long ownerUserId, String title, String content) {
         return Sha256.hex(ownerUserId + "\u0000" + title + "\u0000" + content);
     }
 }

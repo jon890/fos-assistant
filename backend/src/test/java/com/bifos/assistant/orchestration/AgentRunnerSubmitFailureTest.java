@@ -27,6 +27,7 @@ import com.bifos.assistant.orchestration.application.AgentRun;
 import com.bifos.assistant.orchestration.application.AgentRunner;
 import com.bifos.assistant.orchestration.application.DelegationOutput;
 import com.bifos.assistant.orchestration.application.DelegationProperties;
+import com.bifos.assistant.proactive.infra.ProactiveCheckRepository;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.config.LiveProperties;
 import com.bifos.assistant.shared.domain.type.UserRole;
@@ -79,7 +80,7 @@ class AgentRunnerSubmitFailureTest {
     @BeforeEach
     void setUp() {
         when(contextAssembler.assemble(eq(user), any())).thenReturn(new AssembledContext(null, 0));
-        when(contextAssembler.withResponseInstructions(any())).thenCallRealMethod();
+        when(contextAssembler.withResponseInstructions(any(), anyBoolean())).thenCallRealMethod();
         when(started.id()).thenReturn(3L);
         when(failed.id()).thenReturn(3L);
         when(failed.status()).thenReturn(ExecutionStatus.FAILED);
@@ -98,7 +99,8 @@ class AgentRunnerSubmitFailureTest {
                         new DelegationProperties(2, 4, 16, Duration.ofSeconds(30), 100, Duration.ofSeconds(20)))),
                 modelTiers,
                 Clock.systemUTC(),
-                limiter);
+                limiter,
+                mock(ProactiveCheckRepository.class));
     }
 
     @Test

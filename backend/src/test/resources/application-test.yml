@@ -70,6 +70,9 @@ assistant:
   attention:
     # 검사가 뜰 때마다 지우는 일이 함께 돌지 않게 끈다. 검사는 그 메서드를 직접 부른다
     cleanup-cron: "-"
+  decision-feedback:
+    # 검사가 뜰 때마다 지우는 일이 함께 돌지 않게 끈다. 검사는 그 메서드를 직접 부른다
+    cleanup-cron: "-"
   task:
     # 검사가 뜰 때마다 발화기가 함께 돌지 않게 끈다. 검사는 그 메서드를 직접 부른다
     dispatch-cron: "-"

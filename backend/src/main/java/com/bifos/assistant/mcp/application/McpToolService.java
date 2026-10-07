@@ -75,6 +75,7 @@ public class McpToolService {
     private final ExecutionDeliveryWriter deliveryWriter;
     private final AgentRepository agents;
     private final FollowUpService followUps;
+    private final McpMemoryRemember memoryRemember;
     private final Clock clock;
 
     public List<Map<String, Object>> tools() {
@@ -203,7 +204,8 @@ public class McpToolService {
                                         "waiting",
                                         Map.of("type", "boolean")),
                                 "required",
-                                List.of("title"))));
+                                List.of("title"))),
+                memoryRemember.definition());
     }
 
     /**
@@ -380,6 +382,18 @@ public class McpToolService {
         };
     }
 
+    /** {@link McpMemoryRemember#remember} 에 넘긴다. */
+    public Map<String, Object> remember(
+            McpCaller caller,
+            String title,
+            String content,
+            String evidence,
+            Long memoryId,
+            String collection,
+            boolean sensitive) {
+        return memoryRemember.remember(caller, title, content, evidence, memoryId, collection, sensitive);
+    }
+
     private static String delegationFailureMessage(Failure failure) {
         return switch (failure) {
             case AGENT_UNAVAILABLE -> "맡길 수 없는 에이전트입니다.";
@@ -448,7 +462,7 @@ public class McpToolService {
         return JSON.writeValueAsString(Map.of("path", result.path(), "byteSize", result.byteSize()));
     }
 
-    private static Map<String, Object> result(String text, boolean error) {
+    static Map<String, Object> result(String text, boolean error) {
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("content", List.of(Map.of("type", "text", "text", text)));
         result.put("isError", error);
