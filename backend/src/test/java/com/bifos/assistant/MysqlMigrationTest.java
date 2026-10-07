@@ -73,7 +73,8 @@ class MysqlMigrationTest {
             Flyway probe = Flyway.configure()
                     .configuration(flyway.getConfiguration())
                     .dataSource(database.url(), database.username(), database.password())
-                    .locations("classpath:db/migration", "filesystem:" + directory)
+                    // 기존 스키마 검사는 위의 실제 기동이 맡는다. 임시 버전은 미래의 main 버전과도 독립이다.
+                    .locations("filesystem:" + directory)
                     .load();
             probe.migrate();
             assertThat(probe.info().current().getVersion().getVersion()).isEqualTo("20261007000002");
