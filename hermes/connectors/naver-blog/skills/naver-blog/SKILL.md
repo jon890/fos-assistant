@@ -26,8 +26,9 @@ description: 대화에 올린 사진으로 네이버 블로그 글을 쓰고, �
 4. `render_draft` 로 미리보기를 만든다
    - `problems` 가 있으면 `html` 이 없다. 문장대로 초안을 고쳐 다시 부른다
    - `assets` 의 항목마다 `artifact_write` 를 `source_url` 과 함께 불러 `path` 에 스티커 그림을 받아 둔다. 실패해도 이어 간다. 그 스티커는 이름표로 보인다
-   - 받은 `html` 을 `artifact_write` 로 `<폴더>/index.html` 에 쓴다. `render_draft` 에 준 `artifact_path` 와 같은 경로다
-5. 사용자가 고칠 곳을 말하면 초안을 고쳐 4 를 다시 한다. 같은 `artifact_path` 에 덮어쓴다
+   - 받은 `html` 을 `artifact_write` 로 쓴다. **`path` 는 `render_draft` 에 준 `artifact_path` 와 글자까지 같아야 한다.**
+     사진 주소의 `../` 수가 그 깊이에 맞춰져 있어, 다른 자리에 쓰면 사진이 보이지 않는다. 폴더를 빼거나 바꾸지 않는다
+5. 사용자가 고칠 곳을 말하면 초안을 고쳐 4 를 다시 한다. 같은 `artifact_path` 로 그리고 같은 `path` 에 덮어쓴다
 6. 사용자가 미리보기를 확인하면 `save_draft` 로 임시저장을 요청하고 `draft_job` 으로 결과를 확인한다
 
 ## 초안

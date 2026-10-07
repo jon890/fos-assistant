@@ -231,6 +231,14 @@ export class FakeEditor {
   /** 받은 `Runtime.evaluate` 식과 `Runtime.callFunctionOn` 함수. */
   readonly scripts: string[] = [];
   intercept = false;
+  /** 발행 단추를 이만큼 눌러도 레이어가 열리지 않는다. 바쁜 편집기를 흉내 낸다. */
+  publishIgnored = 0;
+  /** 끝이 있는 애니메이션이 돈다고 이만큼 답한다. */
+  animatingPolls = 0;
+  /** 발행 단추 진단 식의 답. */
+  publishDiagnosis = { publish_button: "shown", covered_by: null as string | null, layers: [] as string[] };
+  /** 발행 단추를 누른 수. */
+  publishClicks = 0;
 
   private readonly storage = new Map<string, string>();
   private focused: "title" | "body" | "search" | "tag" | null = null;
@@ -300,6 +308,16 @@ export class FakeEditor {
   }
 
   private readonly photoAction = () => {};
+
+  private readonly publishAction = () => {
+    this.publishClicks += 1;
+    if (this.publishIgnored > 0) {
+      this.publishIgnored -= 1;
+      return;
+    }
+    this.settingsOpen = !this.settingsOpen;
+    this.categoryListOpen = false;
+  };
 
   private spot(action: () => void) {
     const x = this.nextSpot++;
@@ -404,11 +422,7 @@ export class FakeEditor {
         this.results = [];
       };
     }
-    if (finder.includes('data-click-area=\\"tpb.publish\\"'))
-      return () => {
-        this.settingsOpen = !this.settingsOpen;
-        this.categoryListOpen = false;
-      };
+    if (finder.includes('data-click-area=\\"tpb.publish\\"')) return this.publishAction;
     if (finder.includes("label[for]")) {
       const name = quoted(finder, "===");
       if (!this.categoryListOpen || !this.categories.includes(name)) return null;
@@ -457,9 +471,16 @@ export class FakeEditor {
         y: 1,
       });
     }
+    if (expression.includes("publish_button:")) return JSON.stringify(this.publishDiagnosis);
+    if (expression.includes("getAnimations()")) {
+      if (this.animatingPolls <= 0) return false;
+      this.animatingPolls -= 1;
+      return true;
+    }
     if (expression.includes("elementFromPoint")) {
       const selector = quoted(expression, "querySelector(");
       let action: (() => void) | null = null;
+      if (selector.includes("tpb.publish")) action = this.publishAction;
       if (selector.includes("tpb*i.category") && this.settingsOpen)
         action = () => (this.categoryListOpen = true);
       if (selector === "#tag-input" && this.settingsOpen) action = () => (this.focused = "tag");
