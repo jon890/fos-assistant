@@ -16,6 +16,8 @@ public interface ProactiveCheckRepository extends JpaRepository<ProactiveCheck, 
     /** 그 사용자가 그 에이전트로 연 마지막 살펴보기. */
     Optional<ProactiveCheck> findFirstByUserIdAndAgentIdOrderByIdDesc(Long userId, Long agentId);
 
+    boolean existsByRootExecutionIdAndTrigger(Long rootExecutionId, CheckTrigger trigger);
+
     /** 마지막 살펴보기를 보일 때 자동 실행으로 시작한 줄은 뺀다. 그 결과는 사용자에게 바로 알리지 않는다. */
     Optional<ProactiveCheck> findFirstByUserIdAndAgentIdAndTriggerNotOrderByIdDesc(
             Long userId, Long agentId, CheckTrigger trigger);

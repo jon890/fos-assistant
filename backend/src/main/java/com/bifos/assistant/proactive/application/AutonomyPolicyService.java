@@ -270,7 +270,7 @@ public class AutonomyPolicyService {
                 if (failure == null) {
                     saved.started(startedCheck.get());
                 } else {
-                    saved.failed(failure);
+                    saved.failed(failure, startedCheck.get());
                 }
                 return decisions.save(saved);
             }));

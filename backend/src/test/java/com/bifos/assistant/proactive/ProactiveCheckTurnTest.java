@@ -617,24 +617,38 @@ class ProactiveCheckTurnTest {
     @Test
     @DisplayName("자동 실행한 살펴보기는 문제 후보만 저장하고 답, 보고, 발견, 알림 줄을 남기지 않는다")
     void autonomousCheckSavesOnlyProblemCandidates() {
+        Conversation conversation = runCheck();
+        ProactiveCheck manual = onlyCheckOf(conversation);
+        int messageCount =
+                messages.findByConversationIdOrderByIdAsc(conversation.id()).size();
         stub().willAnswer(command -> answer(problemBlock(PROBLEM_KEY, null, false)));
 
         UUID publicId = service.startAutonomous(owner, agent.code(), ignored -> {});
-        Conversation conversation = conversations
-                .findByPublicIdAndUserIdAndDeletedAtIsNull(publicId, owner.id())
-                .orElseThrow();
         awaitIdle(conversation.id());
 
-        ProactiveCheck check = onlyCheckOf(conversation);
+        assertThat(publicId).isEqualTo(conversation.publicId());
+        ProactiveCheck check = checksOf(conversation).getLast();
         assertThat(check.trigger()).isEqualTo(CheckTrigger.AUTONOMY);
         assertThat(check.status()).isEqualTo(CheckStatus.SUCCEEDED);
         assertThat(check.report()).isNull();
-        assertThat(messages.findByConversationIdOrderByIdAsc(conversation.id())).isEmpty();
+        assertThat(messages.findByConversationIdOrderByIdAsc(conversation.id())).hasSize(messageCount);
         assertThat(findingsOf(conversation)).isEmpty();
         assertThat(problemsOf(conversation))
                 .extracting(ProactiveCheckProblem::status)
                 .containsExactly(ProblemStatus.ACCEPTED);
-        assertThat(service.status(owner, agent.code()).lastCheck()).isNull();
+        assertThat(service.status(owner, agent.code()).lastCheck().id()).isEqualTo(manual.id());
+    }
+
+    @Test
+    @DisplayName("점검 대화가 없으면 자동 실행은 대화를 새로 만들지 않고 거절한다")
+    void autonomousCheckDoesNotRecreateConversation() {
+        assertThatThrownBy(() -> service.startAutonomous(owner, agent.code(), ignored -> {}))
+                .isInstanceOfSatisfying(
+                        ApiException.class,
+                        ex -> assertThat(ex.code()).isEqualTo(ErrorCode.PROACTIVE_CHECK_UNAVAILABLE));
+        assertThat(conversations.findAll().stream().filter(each -> each.userId().equals(owner.id())))
+                .isEmpty();
+        assertThat(stub().received()).isEmpty();
     }
 
     @Test

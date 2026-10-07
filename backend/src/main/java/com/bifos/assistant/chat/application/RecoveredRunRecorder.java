@@ -316,6 +316,9 @@ public class RecoveredRunRecorder {
                 .map(guard -> guard.noticeInsteadOfAnswer(row.id(), row.status()))
                 .flatMap(Optional::stream)
                 .findFirst();
+        if (notice.isPresent() && notice.get().isEmpty()) {
+            return null;
+        }
         if (notice.isPresent()) {
             return messages.save(ChatMessage.fromSystem(conversationId, notice.get(), now))
                     .id();

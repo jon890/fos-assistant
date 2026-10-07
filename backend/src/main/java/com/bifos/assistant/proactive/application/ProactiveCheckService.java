@@ -130,7 +130,7 @@ public class ProactiveCheckService {
     public UUID start(CurrentUser user, String agentCode, CheckTrigger trigger, Consumer<ProactiveCheck> beforeRun) {
         Agent agent = agents.requireStartable(user, agentCode);
         requireReady(agent, trigger);
-        OpenedCheck opened = checkConversations.findOrCreate(user, agent);
+        OpenedCheck opened = open(user, agent, trigger);
         Conversation conversation = opened.conversation();
         if (trigger == CheckTrigger.SCHEDULED && hasUnreadReport(conversation.id())) {
             ProactiveCheck skipped = ProactiveCheck.started(
@@ -183,6 +183,21 @@ public class ProactiveCheckService {
             throw ex;
         }
         return conversation.publicId();
+    }
+
+    /**
+     * 점검 대화를 찾거나 만든다. 자동 실행은 사용자가 지운 점검 대화를 다시 만들지 않는다. 빈 대화가 목록에 나타나기 때문이다.
+     */
+    private OpenedCheck open(CurrentUser user, Agent agent, CheckTrigger trigger) {
+        if (trigger != CheckTrigger.AUTONOMY) {
+            return checkConversations.findOrCreate(user, agent);
+        }
+        return checkConversations
+                .find(user.id(), agent.id())
+                .map(conversation -> new OpenedCheck(conversation, false))
+                .orElseThrow(() -> new ApiException(
+                        ErrorCode.PROACTIVE_CHECK_UNAVAILABLE,
+                        "an autonomous check needs an existing check conversation"));
     }
 
     /**

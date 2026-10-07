@@ -124,9 +124,11 @@ public class AutonomyDecision {
         executionCheckId = checkId;
     }
 
-    public void failed(String errorCode) {
+    /** @param checkId 시작 경로가 살펴보기 줄을 저장한 뒤 실패했으면 그 줄. 저장 전에 거절됐으면 null */
+    public void failed(String errorCode, Long checkId) {
         requirePending();
         executionStatus = AutonomyExecutionStatus.FAILED;
+        executionCheckId = checkId;
         executionError = errorCode == null || errorCode.length() <= EXECUTION_ERROR_MAX_LENGTH
                 ? errorCode
                 : errorCode.substring(0, EXECUTION_ERROR_MAX_LENGTH);
