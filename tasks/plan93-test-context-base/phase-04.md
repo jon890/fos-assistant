@@ -44,13 +44,14 @@ allprojects {
 | 컨텍스트 기동 수 | `backend/build/test-results/test/*.xml` 의 `HikariPool-N` 가장 큰 N, `Started <클래스> in <초> seconds` 의 줄 수 |
 | 기동 합계 | 위 `Started` 줄의 초 합 |
 | 검사 클래스 시간 합계 | 각 xml 의 `<testsuite time=...>` 합 |
-| 서로 다른 컨텍스트 키 수 | 마지막 결과 xml 의 Spring 캐시 통계 줄(`Spring test ApplicationContext cache statistics`)의 `missCount`. 상한이 키 수 이상이면 `missCount` 가 키 수와 같다 |
+| 서로 다른 컨텍스트 키 수 | 상한을 64 로 둔 실행에서, 모든 결과 xml 의 Spring 캐시 통계 줄(`Spring test ApplicationContext cache statistics`) 가운데 `missCount` 의 최댓값. 그 값이 같은 줄의 `size` 와 같아야 한다. xml 파일 순서는 실행 순서가 아니므로 최댓값을 쓴다 |
 | 힙 | GC 로그의 young GC 뒤 크기 최댓값과 중앙값, `Pause Full` 줄 수, 마지막 시각(검사 JVM 실행 시간) |
 
 ### 2. 보존 상한
 
-후보 값 둘로 전체 검사를 한 번씩 돌린다. 하나는 16 이고, 다른 하나는 16 으로 측정한 `missCount`(키 수)다. 키 수가 16 이하면 16 하나만 돈다.
-`missCount` 가 키 수와 같고 `Pause Full` 이 0 인 후보 가운데 가장 작은 값을 고른다. 둘 다 조건을 못 맞추면 측정값과 함께 멈추고 보고한다.
+먼저 `backend/build.gradle.kts` 의 상한을 잠시 64 로 두고 전체 검사를 돌려 키 수를 정한다(위 표).
+그다음 후보 「키 수」 와 「16」 으로 한 번씩 돌린다. 키 수가 16 이하면 키 수 하나만 돈다.
+각 실행의 `missCount` 최댓값이 키 수와 같고 `Pause Full` 이 0 인 후보 가운데 가장 작은 값을 고른다. 둘 다 조건을 못 맞추면 측정값과 함께 멈추고 보고한다.
 `backend/build.gradle.kts` 의 `systemProperty("spring.test.context.cache.maxSize", ...)` 를 그 값으로 둔다.
 그 위 주석을 측정 날짜, 컨텍스트 수, 힙 값으로 고쳐 쓴다. 16 을 유지해도 주석의 근거는 새 측정으로 바꾼다.
 

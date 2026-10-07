@@ -95,7 +95,7 @@ Javadoc 에 ADR-096 을 적는다.
 ### 5. 시작 실패 경로를 검사한다
 
 `AgentDelegationServiceRaceTest` 에 검사 하나를 더한다. `start` 가 `IllegalStateException` 을 던지는 `BackgroundTasks` 대역을 넘긴다.
-위임을 시작하면 `SUBMIT_FAILED` 로 끝나고 `activeDelegations` 자리가 돌아오는지 본다. 이 검사의 기존 모양(직접 만든 서비스와 대역)을 따른다.
+위임을 시작하면 `SUBMIT_FAILED` 로 끝나고 동시 위임 자리가 돌아오는지 본다. 이 검사는 서버 한도를 1 로 두므로, 실패한 뒤 다음 위임 요청이 `BUSY` 로 거절되지 않는 것으로 자리 반환을 확인한다. 이 검사의 기존 모양(직접 만든 서비스와 대역)을 따른다.
 
 ## 검증
 
