@@ -37,6 +37,11 @@
 ## 의도 메모
 
 - mock 에서 spy 로 바꾸면 정하지 않은 메서드가 null 대신 실제로 돈다. 검사가 그 차이에 기대는지 하나씩 본다. 기대면 그 메서드를 `doReturn`/`doNothing` 으로 정해 지금 의미를 지킨다.
+- 정하지 않은 메서드가 실제로 돌 때 부작용이 큰 곳은 검사 전에 정한다.
+  - `AutonomyPolicyServiceTest` 의 `ProactiveCheckService`: 실제 살펴보기가 시작된다. 검사가 부르는 시작 메서드를 `doReturn`/`doNothing` 으로 정한다
+  - `PersonRegistrarTest` 의 `HermesProfileProvisioner`: 실제 profile 을 만든다. 검사가 부르는 만들기 메서드를 정한다
+  - `AgentLifecycleFlagsTest` 의 `AgentEndpointProbe`: 실제 HTTP 를 확인한다. 확인 메서드를 정한다
+  - `ProactiveCheckTurnTest`, `CareerDailyPilotTest` 의 `AgentConnectorBindings`: mock 은 빈 목록을 줬다. 검사가 부르는 조회 메서드가 빈 목록을 돌려주게 정한다
 - spy 를 정할 때는 `when(spy.x())` 대신 `doReturn(...).when(spy).x()` 를 쓴다. `when` 은 실제 메서드를 한 번 부른다.
 - 기반으로 올리는 대역은 기본이 꺼짐이고, 꺼진 상태에서 운영 동작에 아무 영향이 없어야 한다. 켜는 검사는 그 대역을 `@Autowired` 로 받아 켜고, 공통 확장이 검사 뒤에 끈다(대역마다 `reset()` 을 두고 `IntegrationTestIsolation` 이 부른다).
 - `ConnectorPolicyTestDoubles` 는 커넥터 카탈로그 캐시에 시각을 옮길 수 있는 시계를 넣는다. 운영 `ConnectorCatalogCache` 와 `SkillCommandCatalog` 의 `@Autowired` 생성자가 `Clock` 빈을 받게 하면 기반의 `TestClock` 이 들어간다(운영의 `Clock` 빈은 `Clock.systemUTC()` 라 동작이 같다). 그 뒤 검사는 `TestClock.advance` 로 시간을 옮긴다. 이 변경은 운영 코드 두 곳이다.
@@ -53,10 +58,11 @@
 `ConnectorPolicyTestDoubles` 의 캐시 대체를 지우고, `ChangeRecorder` 는 꺼 둔 대역으로 기반에 올린다. `expireCatalog()` 는 `TestClock.advance(TTL + 1초)` 로 바꾼다.
 `ChatServiceTest.SkillCatalogClock` 을 지우고 `SKILL_CLOCK.advance` 를 `TestClock.advance` 로 바꾼다. 그 검사 안에서 다른 시간 계산이 바뀌지 않는지 본다.
 `application-test.yml` 의 `catalog-ttl: 1ms` 는 남긴다(시간을 옮기지 않는 다른 검사가 앞 검사의 카탈로그를 보지 않게).
+시계를 고정하는 검사(`AttentionServiceTest` 등 `clock.set` 을 쓰는 검사)에서는 `TestClock` 이 멈춰 있어 `1ms` 도 지나지 않는다. 그 검사들이 검사 도중 카탈로그나 스킬 목록이 바뀌는 것을 보지 않는지 확인하고, 보면 그 지점에서 `clock.advance` 를 부른다.
 
 ### 3. 스케줄러 대역
 
-`DelegationWakeUserLimitTest.CapturingSchedulerConfig` 는 `TaskScheduler` 를 바꿔 끼운다. 기반에 「기본은 운영 스케줄러에 넘기고, 켜면 예약을 붙잡는」 스케줄러를 `@Primary` 로 둔다. `RetryThreads` 도 꺼 둔 대역으로 기반에 둔다. 두 검사가 켠다.
+`DelegationWakeUserLimitTest.CapturingSchedulerConfig` 는 `TaskScheduler` 를 바꿔 끼운다. 운영 코드에는 `TaskScheduler` 빈이 없고 Spring Boot 자동 설정의 `ThreadPoolTaskScheduler` 를 쓴다. 그 자동 설정은 다른 스케줄러 빈이 있으면 만들어지지 않는다. 그래서 기반 스케줄러는 `ThreadPoolTaskScheduler` 를 상속하고, 꺼져 있으면 `super.schedule(...)` 로 실제로 예약하며 켜면 예약을 붙잡는다. 이 빈이 `@Scheduled` 실행도 맡는다. `RetryThreads` 도 꺼 둔 대역으로 기반에 둔다. 두 검사가 켠다.
 
 ### 4. 모델 tier 검사
 
@@ -64,12 +70,15 @@
 
 ### 5. 구조 규칙
 
-`ArchitectureRules` 에 `TESTS` 대상 규칙을 하나 더한다. `testsupport` 밖의 검사 클래스는 `@MockitoBean`, `@MockitoSpyBean` 필드와 `@Import`, `@TestPropertySource`, `@DynamicPropertySource`, `@SpringBootTest` 를 갖지 않는다. 예외는 MySQL 태그 검사(`@Tag("mysql")` 이거나 이름에 `Mysql` 이 든 클래스)다.
+`ArchitectureRules` 에 `TESTS` 대상 규칙을 하나 더한다. `testsupport` 밖의 검사 클래스는 아래를 갖지 않는다.
+- `@MockitoBean`, `@MockitoSpyBean` 필드와 클래스에 붙은 `@MockitoBean`, `@MockitoSpyBean`
+- `@Import`, `@TestPropertySource`, `@DynamicPropertySource`, `@SpringBootTest`, `@ContextConfiguration`, `@ActiveProfiles`, `@DirtiesContext`
+- `@TestConfiguration` 클래스(검사 클래스 안의 중첩 클래스 포함). Spring Boot 는 `@Import` 없이도 중첩 `@TestConfiguration` 을 찾아 컨텍스트를 나눈다 예외는 MySQL 태그 검사(`@Tag("mysql")` 이거나 이름에 `Mysql` 이 든 클래스)다.
 `ArchitectureRulesTest` 에서 `TESTS` 로 검사하고 기준 파일은 비어 있다.
 
 ### 6. 이 phase 를 검증하는 검사
 
-위 구조 규칙이 검증이다. 규칙이 실제로 잡는지 확인하려고 임시 검사 클래스에 `@MockitoBean` 을 두어 규칙이 위반을 보고하는 것을 본 뒤 지운다(커밋하지 않는다). 옮긴 검사는 기존 단언이 그대로 통과해야 한다.
+위 구조 규칙이 검증이다. 규칙이 실제로 잡는지 확인하려고 임시 검사 클래스에 `@MockitoBean` 필드와 중첩 `@TestConfiguration` 을 두어 규칙이 위반을 보고하는 것을 본 뒤 지운다(커밋하지 않는다). 옮긴 검사는 기존 단언이 그대로 통과해야 한다.
 
 ## 검증
 

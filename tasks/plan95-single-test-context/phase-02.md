@@ -22,6 +22,7 @@ phase 01 이 `shared/config/LiveProperties` 와 `LivePropertiesConfig` 를 만�
 - 값은 `application.yml` 키 문자열(`"assistant.user-execution.max-running=2"`)로 받는다. 지금 `@TestPropertySource` 와 같은 모양이라 검사 수정이 작다.
 - 바꾼 record 는 Spring `Binder` 로 만든다. 덮어쓸 값의 `MapConfigurationPropertySource` 를 앞에 두고 컨텍스트 `Environment` 의 속성 출처를 뒤에 두어 그 record 의 prefix 로 바인딩한다. 생성자 검증이 그대로 돈다.
 - `assistant.proactive-check.max-duration` 이나 `hermes.run-timeout` 을 바꾸면 운영의 기동 검사와 같은 조건(`requireShorterThan`)을 다시 확인한다.
+- 키가 어느 prefix 에 속하는지는 마침표 경계로 판정한다(`ConfigurationPropertyName.of(prefix).isAncestorOf(ConfigurationPropertyName.of(key))`). `assistant.delegation` 과 `assistant.delegation-wake`, `assistant.memory.encryption` 과 `assistant.memory.propose` 처럼 앞부분이 겹치는 prefix 가 있다. `startsWith` 로 나누면 키가 엉뚱한 record 로 가 조용히 버려진다.
 - 어떤 `LiveProperties` 의 prefix 에도 속하지 않는 키를 적으면 검사를 실패로 둔다. 조용히 무시하면 검사가 바뀌지 않은 설정으로 통과한다.
 - `hermes.run-timeout` 과 `hermes.poll-interval` 외의 `hermes.*` 키도 실패로 둔다(phase 01 이 그 두 값만 `LiveProperties` 로 읽게 했다).
 - `spring.jpa.properties.hibernate.generate_statistics` 는 Hibernate 기동 때만 읽는다. `application-test.yml` 에서 늘 `true` 로 두고 `UsageControllerTest` 의 속성을 지운다.
@@ -35,7 +36,8 @@ phase 01 이 `shared/config/LiveProperties` 와 `LivePropertiesConfig` 를 만�
 
 ### 2. `testsupport/OverrideProperties.java`
 
-`@Target({TYPE, ANNOTATION_TYPE})`, `@Retention(RUNTIME)`, `@Inherited`, `@Repeatable` 이고 `String[] value()` 다.
+`@Target({TYPE, ANNOTATION_TYPE})`, `@Retention(RUNTIME)`, `@Inherited`, `@Repeatable(OverrideProperties.List.class)` 이고 `String[] value()` 다. 컨테이너 주석 `List` 는 같은 파일 안의 중첩 주석으로 둔다.
+`BackendIntegrationTest` 의 Javadoc 에서 `@TestPropertySource` 를 쓰라는 문장을 `@OverrideProperties` 로 고친다.
 변형 주석 다섯을 `@OverrideProperties(...)` 를 메타 주석으로 갖게 바꾼다. 값은 지금 각 주석의 `@TestPropertySource` 값과 같다.
 `SamplePriceCatalog` 는 `assistant.pricing.catalog-path` 를 바꾸는 주석으로 바꾼다. 파일 경로는 클래스패스 `/pricing/models-dev-sample.json` 의 실제 경로이고, 적용할 때 그 파일의 수정 시각을 `2026-09-17T04:00:00Z` 로 고정한다(지금 `SamplePriceCatalogProperties` 가 하는 일). `SamplePriceCatalogProperties` 는 지운다.
 
@@ -56,6 +58,7 @@ phase 01 이 `shared/config/LiveProperties` 와 `LivePropertiesConfig` 를 만�
 - 정상: `LiveProperties<UserExecutionProperties>.current().maxRunning()` 이 2 다
 - 되돌리기: `IntegrationTestIsolation` 의 정리 메서드를 직접 부른 뒤 기동 값(test profile 의 1000)으로 돌아온다
 - 실패: 어느 prefix 에도 속하지 않는 키로 적용을 부르면 그 키 이름을 담은 예외가 난다
+- 경계: `assistant.delegation-wake.enabled=true` 를 적용하면 `DelegationWakeProperties` 만 바뀌고 `DelegationProperties` 는 기동 값 그대로다
 - 기존 `VariantAnnotationsTest` 는 `@OverrideProperties` 병합을 확인하도록 고친다
 
 ## 검증
@@ -70,7 +73,7 @@ git grep -ln "@TestPropertySource" -- backend/src/test
 ```
 
 - 모두 종료 코드 0
-- 마지막 줄의 결과가 비어 있거나 `ModelTier*IntegrationTest.java` 둘과 MySQL 기준 클래스뿐이다
+- 마지막 줄의 결과가 `ModelTier*IntegrationTest.java` 둘뿐이다
 
 ## 변경 파일
 

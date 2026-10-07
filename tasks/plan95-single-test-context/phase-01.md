@@ -21,7 +21,7 @@
 | `usage/application/UserExecutionProperties` | `assistant.user-execution` | `usage/application/UserExecutionLimiter` |
 | `proactive/application/ProactiveCheckProperties` | `assistant.proactive-check` | `proactive/application/ProactiveCheckReadiness`, `ProactiveCheckGuard`, `ProactiveCheckRun`(Deps), `ProactiveCheckService` |
 | `chat/application/StarterProperties` | `assistant.starters` | `chat/application/StarterSuggestionService` |
-| `orchestration/application/DelegationProperties` | `assistant.delegation` | `mcp/application/McpToolService`, `connector/application/ConnectorActionService`, `orchestration/application/AgentRunner`, `AgentDelegationService`, `DelegationOutput` |
+| `orchestration/application/DelegationProperties` | `assistant.delegation` | `mcp/application/McpToolService`, `connector/application/ConnectorActionService`, `orchestration/application/AgentDelegationService`, `DelegationOutput`. `AgentRunner` 는 Javadoc 에서만 가리키므로 바꾸지 않는다 |
 | `proactive/application/AutonomyProperties` | `assistant.autonomy` | `proactive/application/AutonomyPolicyService` |
 | `usage/infra/PricingProperties` | `assistant.pricing` | `usage/infra/ModelsDevPriceCatalog` |
 | `memory/application/MemoryEncryptionProperties` | `assistant.memory.encryption` | `memory/application/MemoryContentCipher` |
@@ -38,6 +38,7 @@
 
 - `LiveProperties` 는 운영에서 값을 바꾸는 메서드를 갖지 않는다. 바꾸는 구현은 검사 쪽에만 둔다.
 - 한 요청이나 한 메서드 안에서는 `current()` 를 한 번 읽어 지역 변수로 쥔다. 필드로 쥐지 않는다.
+- `AgentDelegationService` 의 서버 전체 동시 위임 한도는 지금 생성자에서 `new Semaphore(properties.maxActive())` 로 만든다(`AgentDelegationService.java` 114행 부근). 이것을 「쓰는 수를 세는 `AtomicInteger` 와 `current().maxActive()` 를 비교해 자리를 얻는다」 로 바꾼다. 얻기는 늘린 뒤 한도를 넘으면 되돌리고 거절한다. 돌려주기는 줄인다. 운영에서 한도가 바뀌지 않으므로 동작은 같다.
 - 가격표 파일과 암호화 key 표처럼 생성자에서 계산하던 것은 `current()` 가 이전과 다른 record 를 돌려줄 때만 다시 계산한다(참조 비교). 운영에서는 다시 계산하지 않는다.
 - `ModelTierSeedImporter` 는 `ApplicationRunner` 라 기동 때만 돈다. `run` 이 `current()` 를 읽게만 바꾸고 동작은 그대로 둔다.
 
@@ -71,6 +72,7 @@ Javadoc 에 ADR 을 적는다.
 
 `backend/src/test/java/com/bifos/assistant/architecture/ArchitectureRules.java` 에 규칙 둘을 더한다. `MAIN` 에만 건다.
 - 위 표의 record 타입(Hermes 제외)을 생성자 인자나 필드로 갖는 운영 클래스는 `LivePropertiesConfig` 뿐이다.
+  예외는 기동 검사 `ProactiveCheckProperties$RunTimeoutCheck`(`ProactiveCheckProperties.java` 71행 부근)다. 이름으로 적는다.
 - `HermesProperties.runTimeout()` 과 `pollInterval()` 을 부르는 운영 클래스는 `LivePropertiesConfig` 를 거친 사용처와 `HermesRunEventStream`, `HttpHermesRunsClient`, `ProactiveCheckProperties`(기동 검사)뿐이다. 이 규칙은 「`HermesProperties` 를 필드로 갖고 그 두 메서드를 부르는 클래스」 가 위 예외뿐임을 확인한다.
 
 `ArchitectureRulesTest` 에 기존 모양(`FreezingArchRule.freeze(...).check(MAIN)`)으로 더하고, `docs/backend/quality.md` 「규칙을 새로 더했다」 절차로 빈 기준 파일을 만든다.
@@ -79,6 +81,7 @@ Javadoc 에 ADR 을 적는다.
 
 `backend/src/test/java/com/bifos/assistant/shared/config/LivePropertiesTest.java`: `fixed` 가 같은 값을 돌려주고 `type()` 이 맞다.
 `ModelsDevPriceCatalog` 의 기존 단위 검사에 「`current()` 가 다른 경로를 돌려주면 그 파일의 가격을 읽는다」 를 더한다. 같은 record 를 계속 돌려주면 파일을 다시 열지 않는지도 본다.
+`AgentDelegationService` 의 동시 위임 한도를 보는 단위 검사를 더한다: 한도 1 에서 자리를 하나 얻으면 둘째는 거절되고, `current()` 가 한도 2 를 돌려주면 둘째가 얻어진다. 돌려준 뒤에는 다시 얻을 수 있다.
 
 ## 검증
 
