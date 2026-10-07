@@ -19,6 +19,7 @@ Control Plane 의 패키지마다 맡는 책임과 패키지 사이의 방향 �
 | `shared/concurrent` | 요청 밖 작업을 띄우는 `BackgroundTasks`. 직접 가상 스레드를 띄우지 않는 까닭은 [ADR-20261007 / background-tasks](../adr/ADR-20261007-background-tasks.md) |
 | `shared/domain/type` | 모든 패키지가 권한 판정에 읽는 역할 값 |
 | `user` | 사용자와 첫 로그인 처리 |
+| `browser` | 사용자마다 하나씩 두는 브라우저의 상태와 전이, 브라우저 proxy 로 컨테이너 켜기와 끄기, 자동 중지와 상태 맞추기([`user-browser.md`](user-browser.md)) |
 | `model` | 모델 선택을 담는 값과 모델 단계 값. 서비스는 아직 `chat` 에 있다 |
 | `agent` | 에이전트 등록과 사용자의 만들기·지우기, 공개 범위, Hermes profile 연결, 페르소나, 도구, 에이전트가 받는 Memory collection |
 | `hermes` | Runs API 호출과 profile key 조회, 대시보드 호출 |
@@ -53,29 +54,30 @@ Control Plane 의 패키지마다 맡는 책임과 패키지 사이의 방향 �
 
 ### 최상위 패키지의 층 순서
 
-최상위 패키지는 아래 순서를 따른다. 자리 1 이 맨 아래이고 19 가 맨 위다.
+최상위 패키지는 아래 순서를 따른다. 자리 1 이 맨 아래이고 20 이 맨 위다.
 
 | 자리 | 패키지 |
 | --- | --- |
 | 1 | `hermes` |
 | 2 | `user` |
-| 3 | `notification` |
-| 4 | `model` |
-| 5 | `agent` |
-| 6 | `skill` |
-| 7 | `usage` |
-| 8 | `feedback` |
-| 9 | `memory` |
-| 10 | `context` |
-| 11 | `chat` |
-| 12 | `followup` |
-| 13 | `proactive` |
-| 14 | `orchestration` |
-| 15 | `mcp` |
-| 16 | `people` |
-| 17 | `connector` |
-| 18 | `task` |
-| 19 | `attention` |
+| 3 | `browser` |
+| 4 | `notification` |
+| 5 | `model` |
+| 6 | `agent` |
+| 7 | `skill` |
+| 8 | `usage` |
+| 9 | `feedback` |
+| 10 | `memory` |
+| 11 | `context` |
+| 12 | `chat` |
+| 13 | `followup` |
+| 14 | `proactive` |
+| 15 | `orchestration` |
+| 16 | `mcp` |
+| 17 | `people` |
+| 18 | `connector` |
+| 19 | `task` |
+| 20 | `attention` |
 
 위 패키지는 아래 패키지를 쓰고 아래 패키지는 위 패키지를 import 하지 않는다.
 거꾸로 써야 하면 아래 패키지에 port 를 두고 위 패키지가 구현한다.
@@ -83,6 +85,7 @@ Control Plane 의 패키지마다 맡는 책임과 패키지 사이의 방향 �
 `shared` 는 순서 밖이고 어느 패키지도 쓰지 않는다.
 `task` 는 `attention` 바로 아래다. 예약 turn 을 열려고 `chat` 을, 에이전트와 주인을 다시 확인하려고 `agent` 와 `user` 를, 결과를 알리려고 `notification` 을 쓴다. 대화 목록이 작업 이름을 보이려고 `chat` 에 port(`ConversationTaskLabels`)를 두고 `task` 가 구현한다.
 `followup` 은 `chat` 바로 위다. 대화 주인을 확인하고 공개 식별자를 얻으려고 `chat` 을 쓰고, 제안 도구(`mcp`)와 먼저 알리기(`attention`)가 `followup` 을 쓴다.
+`browser` 는 `user` 바로 위다. 관리자 목록의 사용자 이름을 읽으려고 `user` 를 쓰고, 사용자를 끈 사건(`shared.auth.UserAccessRevoked`)을 받는다. 커넥터 바인딩이 브라우저 중계를 쓰게 되므로 `connector` 보다 아래에 둔다.
 `notification` 은 `user` 바로 위다. 알림을 만드는 쪽(`connector`, 그 위의 패키지)이 모두 이 패키지를 부르고, 이 패키지는 알림을 받는 사용자 말고 다른 도메인을 모른다.
 `attention` 은 맨 위다. 먼저 알리기의 후보를 읽으려고 `usage`, `chat`, `agent`, `memory`, `connector`, `followup` 의 `application` 을 부르고, 어느 패키지도 `attention` 을 import 하지 않는다.
 검사: `ArchitectureRules.TOP_LEVEL_PACKAGES_FOLLOW_LAYER_ORDER`, 근거: ADR-068

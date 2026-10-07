@@ -34,6 +34,7 @@ frontend 는 화면의 동작과 구조이고, hermes 는 외부 런타임인 He
 | [`backend/artifact.md`](backend/artifact.md) | 에이전트가 만든 결과물 파일의 저장과 조회 |
 | [`backend/attachment.md`](backend/attachment.md) | 대화에 올린 사진의 저장과 전달 |
 | [`backend/connector-install.md`](backend/connector-install.md) | 대시보드 plugin 의 커넥터 경로를 쓰는 방법, 연결 등록과 바인딩 설치와 실패 처리, 옛 커넥터 에이전트와 옮겨 가기 |
+| [`backend/user-browser.md`](backend/user-browser.md) | 사용자마다 하나씩 두는 브라우저의 표와 상태, API, 커넥터 중계, 로그인 화면 |
 | [`backend/connector-tool-policy.md`](backend/connector-tool-policy.md) | 커넥터 도구의 위험도와 승인 방식, 도구 호출 판정, 승인이 필요한 호출의 흐름, 사용자별 호출 제한 |
 | [`backend/conversation.md`](backend/conversation.md) | 대화와 실행 사건, 모델 단계와 자식 기록, 도구 내용 가리기 |
 | [`backend/mcp-caller.md`](backend/mcp-caller.md) | Control Plane MCP 호출의 요청자를 정하는 방법, MCP 서버와 결과물 쓰기 도구의 계약, 도구 호출의 입력 비용 |

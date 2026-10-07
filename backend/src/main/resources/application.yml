@@ -226,6 +226,33 @@ assistant:
     event-retention: 90d
     # 보관 기간이 지난 지표 사건을 지우는 시각. Control Plane 의 시간대를 따른다
     cleanup-cron: "0 30 4 * * *"
+  browser:
+    # 사용자마다 하나씩 두는 브라우저. 꺼져 있으면 아래 운영 값이 비어도 기동하고 상태 조회 말고 모두 503 이다
+    enabled: ${ASSISTANT_BROWSER_ENABLED:false}
+    # 브라우저 전용 Docker socket proxy 의 주소
+    proxy-url: ${ASSISTANT_BROWSER_PROXY_URL:}
+    # 아래 이미지, 망, 자원, 프로필 루트는 proxy 정책과 같은 값을 넣는다. 다르면 proxy 가 생성 요청을 거절한다
+    image: ${ASSISTANT_BROWSER_IMAGE:}
+    network: ${ASSISTANT_BROWSER_NETWORK:}
+    cdp-port: ${ASSISTANT_BROWSER_CDP_PORT:}
+    # 프로필 루트를 Control Plane 이 보는 경로와 Docker 호스트가 보는 경로. 같은 디렉터리를 두 곳에서 본다
+    profile-root: ${ASSISTANT_BROWSER_PROFILE_ROOT:}
+    profile-host-root: ${ASSISTANT_BROWSER_PROFILE_HOST_ROOT:}
+    # 컨테이너 안에서 프로필 디렉터리를 붙이는 경로. 이미지가 쓰는 경로와 같게 둔다
+    profile-mount: ${ASSISTANT_BROWSER_PROFILE_MOUNT:}
+    # 컨테이너 하나의 메모리 상한(MB). 스왑은 주지 않는다
+    memory-mb: ${ASSISTANT_BROWSER_MEMORY_MB:1024}
+    cpu: ${ASSISTANT_BROWSER_CPU:}
+    pids-limit: ${ASSISTANT_BROWSER_PIDS_LIMIT:}
+    shm-mb: ${ASSISTANT_BROWSER_SHM_MB:}
+    # 동시에 켜 둘 수 있는 브라우저 수. 넘으면 켜기를 거절하고 다른 브라우저를 멈추지 않는다
+    max-running: ${ASSISTANT_BROWSER_MAX_RUNNING:2}
+    # 화면도 중계 연결도 없이 이만큼 지나면 자동으로 멈춘다
+    idle-timeout: ${ASSISTANT_BROWSER_IDLE_TIMEOUT:10m}
+    # 켠 뒤 CDP 가 답하기를 기다리는 시간. 넘으면 컨테이너를 지우고 FAILED 로 둔다
+    start-timeout: 30s
+    # 자동 중지와 상태 맞추기를 도는 간격. 기동 때도 한 번 돈다
+    sweep-interval: 1m
   decision-feedback:
     # 판단 피드백 사건을 남기는 기간. 지난 줄은 cleanup-cron 에 지운다
     retention: 365d

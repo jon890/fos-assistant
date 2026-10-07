@@ -22,6 +22,9 @@ test("공통 대역 변경과 매일 실행은 공유 상태 회귀 묶음을 �
     "usage.spec.ts",
   ];
   assert.deepEqual(selectSpecs(["test/e2e/fake-hermes.ts"]), regression);
+  assert.deepEqual(selectSpecs(["test/e2e/fake-hermes/event-routes.ts"]), regression);
+  assert.deepEqual(selectSpecs(["test/e2e/fake-hermes/state.ts"]), regression);
+  assert.deepEqual(selectSpecs(["test/e2e/fake-hermes-other.ts"]), []);
   assert.deepEqual(selectSpecs(["web/package.json"]), regression);
   assert.deepEqual(
     selectSpecs(["web/src/components/shell/screen-transition.tsx"]),
