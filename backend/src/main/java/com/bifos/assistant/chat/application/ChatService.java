@@ -78,6 +78,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import java.util.function.IntFunction;
@@ -1287,6 +1288,7 @@ public class ChatService {
         // 일부 HTTP 스트림은 다른 스레드의 close 중에도 readLine 을 놓지 않는다.
         // 중지 유예 시간이 지나면 요청 스레드를 먼저 풀어 상태 조회와 stopped 사건으로 진행한다.
         CompletableFuture<Void> streamDone = new CompletableFuture<>();
+        AtomicBoolean terminalSeen = new AtomicBoolean();
         ToolDetailScope detailScope = toolDetailScope(pending.agent());
         Thread.startVirtualThread(() -> {
             try {
@@ -1297,6 +1299,10 @@ public class ChatService {
                         event -> {
                             synchronized (pending) {
                                 if (!handle.cancelled().get() || !turns.isStopConfirmed(handle)) {
+                                    if (Set.of("run.completed", "run.failed", "run.cancelled")
+                                            .contains(event.type())) {
+                                        terminalSeen.set(true);
+                                    }
                                     if (onEvent == null) {
                                         append(pending, event);
                                     } else {
@@ -1320,7 +1326,7 @@ public class ChatService {
                 log.warn("Hermes event stream failed runId={}", runId, ex);
             } finally {
                 synchronized (pending) {
-                    executions.finishEventObservation(pending.execution(), true);
+                    executions.finishEventObservation(pending.execution(), terminalSeen.get());
                 }
                 turns.detachStream(handle);
                 streamDone.complete(null);

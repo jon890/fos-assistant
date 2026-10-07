@@ -51,10 +51,11 @@ public class AgentExecution {
 
     /** 실패 표시는 뒤늦은 정상 스트림 종료로 지우지 않는다. */
     public boolean finishEventObservation(boolean complete) {
-        EventObservation next = complete && eventObservation == EventObservation.OBSERVING
-                ? EventObservation.OBSERVED
-                : EventObservation.INCOMPLETE;
-        if (complete && eventObservation != EventObservation.OBSERVING || eventObservation == next) {
+        if (complete && eventObservation != EventObservation.OBSERVING) {
+            return false;
+        }
+        EventObservation next = complete ? EventObservation.OBSERVED : EventObservation.INCOMPLETE;
+        if (eventObservation == next) {
             return false;
         }
         eventObservation = next;

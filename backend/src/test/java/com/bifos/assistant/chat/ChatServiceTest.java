@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.tuple;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
+import static argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doThrow;
@@ -986,7 +987,7 @@ class ChatServiceTest {
                 null));
         doThrow(new DataIntegrityViolationException("시작 사건 저장 실패"))
                 .when(executionEvents)
-                .save(org.mockito.ArgumentMatchers.argThat(
+                .save(argThat(
                         event -> event.eventType() == ExecutionEventType.SUBAGENT_STARTED));
 
         ChatTurn turn = chat.send(user, null, "안녕", "dad");
@@ -1026,10 +1027,26 @@ class ChatServiceTest {
     }
 
     @Test
+    @DisplayName("종료 사건 없이 스트림이 정상 EOF 로 닫혀도 답은 남고 관측 누락으로 기록한다")
+    void keepsObservationGapWhenStreamClosesBeforeTerminalEvent() {
+        CurrentUser user = member("eof@example.com", "dad");
+        stub().willReturn(HermesRunResult.of("run-1", "sess-1", "completed", "네", "dad", null, TokenUsage.empty()));
+        hermesStreams(new RunEvent("message.delta", "네", null, null, null, null));
+
+        ChatTurn turn = chat.send(user, null, "안녕", "dad");
+
+        assertThat(turn.assistantText()).isEqualTo("네");
+        AgentExecution saved = executions.findById(turn.executionId()).orElseThrow();
+        assertThat(saved.status()).isEqualTo(ExecutionStatus.SUCCEEDED);
+        assertThat(saved.eventObservation()).isEqualTo(EventObservation.INCOMPLETE);
+    }
+
+    @Test
     @DisplayName("한 번에 받는 경로로 돈 실행이 도구를 부르지 않았으면 RUN STARTED와 RUN COMPLETED 둘만 남긴다")
     void nonStreamPathWithoutToolCallsLeavesOnlyRunStartedAndRunCompleted() {
         CurrentUser dad = member("dad@example.com", "dad");
         stub().willReturn(HermesRunResult.of("run-1", "sess-1", "completed", "네", "dad", null, TokenUsage.empty()));
+        hermesStreams(new RunEvent("run.completed", null, null, null, null, null));
 
         ChatTurn turn = chat.send(dad, null, "안녕", "dad");
 
