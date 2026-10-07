@@ -62,6 +62,31 @@ test("이번 달 합계와 가격을 찾지 못한 실행을 구분한다", asyn
   await expect(records.getByText("0.0000 USD").first()).toBeVisible();
 });
 
+test("사건을 읽지 못해도 답은 남고 사용량에 관측 누락을 자식 수와 별도로 보인다", async ({ page }) => {
+  const token = await controlPlaneToken();
+  const observationGaps = async (): Promise<number> => {
+    const cost = await page.request.get(`${CONTROL_PLANE_BASE_URL}/api/v1/usage/monthly-cost`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    expect(cost.ok()).toBeTruthy();
+    return (await cost.json() as { observationIncompleteExecutions: number }).observationIncompleteExecutions;
+  };
+  const gapsBefore = await observationGaps();
+  const response = await page.request.post("/api/chat", {
+    data: { text: "사건 스트림 실패 검사", agentCode: "browser" },
+  });
+  expect(response.ok()).toBeTruthy();
+  const turn = await response.json() as { assistantText: string };
+  expect(turn.assistantText).toContain("사건 스트림 실패 검사");
+  expect(await observationGaps()).toBe(gapsBefore + 1);
+
+  await page.goto("/admin/usage");
+
+  await expect(page.getByText(/관측 범위 미확인/)).toBeVisible();
+  await expect(page.getByText(/도우미 수와 빠진 금액은 알 수 없어요/)).toBeVisible();
+  await expect(page.getByText("관측된 도우미가 없어요.", { exact: true })).toHaveCount(0);
+});
+
 test("금액을 확인하지 못한 도우미 수를 요약에 보인다", async ({ page }) => {
   test.setTimeout(60_000);
   const response = await page.request.post("/api/chat/stream", {

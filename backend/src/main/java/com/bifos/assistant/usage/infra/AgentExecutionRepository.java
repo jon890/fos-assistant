@@ -23,6 +23,16 @@ import org.springframework.data.repository.query.Param;
 
 public interface AgentExecutionRepository extends JpaRepository<AgentExecution, Long> {
 
+    /** 알 수 없는 자식 수 대신 사건 관측이 빠진 실행을 센다. 과거 UNKNOWN 과 실행 중인 줄은 뺀다. */
+    @Query("""
+            select count(e) from AgentExecution e
+            where e.userId = :userId and e.startedAt >= :from and e.startedAt < :to
+              and e.status <> com.bifos.assistant.usage.domain.type.ExecutionStatus.RUNNING
+              and e.eventObservation = 'INCOMPLETE'
+            """)
+    long countIncompleteEventObservations(
+            @Param("userId") Long userId, @Param("from") Instant from, @Param("to") Instant to);
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select e from AgentExecution e where e.id = :id")
     Optional<AgentExecution> lockById(@Param("id") Long id);

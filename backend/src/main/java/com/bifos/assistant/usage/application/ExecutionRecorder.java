@@ -387,6 +387,28 @@ public class ExecutionRecorder {
         executions.save(execution);
     }
 
+    /** 사건 수집을 시작하기 전에 저장한다. 재기동 중 끊기면 수집 완료로 오인하지 않는다. */
+    public void beginEventObservation(AgentExecution execution) {
+        execution.beginEventObservation();
+        saveEventObservation(execution);
+    }
+
+    /** 관측 실패가 답과 확인한 사용량의 저장을 막지 않는다. */
+    public void finishEventObservation(AgentExecution execution, boolean complete) {
+        if (execution.finishEventObservation(complete)) {
+            saveEventObservation(execution);
+        }
+    }
+
+    private void saveEventObservation(AgentExecution execution) {
+        try {
+            executions.save(execution);
+        } catch (RuntimeException ex) {
+            execution.finishEventObservation(false);
+            log.warn("사건 관측 상태를 저장하지 못했다 executionId={}", execution.id(), ex);
+        }
+    }
+
     /** Flow 루트에는 실행기 진입보다 앞선 원래 요청 수신 시각을 남긴다. */
     public void markRequestReceived(AgentExecution execution, Instant at) {
         execution.markRequestReceived(at);
