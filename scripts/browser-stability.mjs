@@ -27,7 +27,7 @@ const SHARED_FILES = new Set([
 /** 바뀐 spec은 모두, 공통 환경을 바꿨으면 회귀 묶음도 반복한다. 파일을 지운 것은 실행하지 않는다. */
 export function selectSpecs(files, daily = false) {
   const selected = new Set(
-    daily || files.some((file) => SHARED_FILES.has(file))
+    daily || files.some((file) => SHARED_FILES.has(file) || file.startsWith("test/e2e/fake-hermes/"))
       ? REGRESSION_SPECS
       : [],
   );
