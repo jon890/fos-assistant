@@ -1,6 +1,9 @@
 package com.bifos.assistant.browser.application;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 import com.bifos.assistant.browser.application.model.BrowserUsageHandle;
 import com.bifos.assistant.browser.domain.BrowserProfileStore;
@@ -13,12 +16,15 @@ import java.sql.Timestamp;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.HashSet;
+import java.util.Set;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.dao.DataAccessResourceFailureException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 
@@ -37,6 +43,7 @@ class UserBrowserSweeperTest {
     private BrowserUsage usage;
     private UserBrowserService service;
     private UserBrowserSweeper sweeper;
+    private final Set<Long> revoked = new HashSet<>();
 
     @BeforeEach
     void setUp() {
@@ -44,7 +51,9 @@ class UserBrowserSweeperTest {
         runtime = new FakeBrowserRuntime();
         usage = new BrowserUsage();
         service = service(true);
-        sweeper = new UserBrowserSweeper(service, repository, runtime, usage, Clock.systemUTC());
+        revoked.clear();
+        sweeper = new UserBrowserSweeper(
+                service, repository, runtime, usage, userId -> !revoked.contains(userId), Clock.systemUTC());
     }
 
     @AfterEach
@@ -165,11 +174,66 @@ class UserBrowserSweeperTest {
     }
 
     @Test
+    @DisplayName("후보를 읽은 뒤 활동이 기록됐으면 자동 중지가 멈추지 않는다")
+    void skipsIdleStopWhenTouchedAfterListing() {
+        Long id = running(201L);
+        Instant cutoff = Instant.now().minus(Duration.ofMinutes(10));
+        ageActivity(id, Duration.ofMinutes(11));
+        assertThat(repository.findByStatusAndLastActiveAtBefore(UserBrowserStatus.RUNNING, cutoff))
+                .hasSize(1);
+        ageActivity(id, Duration.ofSeconds(1));
+
+        assertThat(service.stopIfIdle(id, cutoff)).isFalse();
+
+        assertThat(status(201L)).isEqualTo(UserBrowserStatus.RUNNING);
+        assertThat(runtime.containers).hasSize(1);
+    }
+
+    @Test
+    @DisplayName("사용자 끄기 때 켜는 중이라 멈추지 못한 브라우저를 다음 점검이 멈추고 허용된 사용자는 그대로 둔다")
+    void stopsRevokedUserBrowserOnNextSweep() {
+        Long id = service.create(201L).id();
+        UserBrowser browser = repository.findById(id).orElseThrow();
+        browser.beginStart(Instant.now());
+        repository.saveAndFlush(browser);
+        running(202L);
+        revoked.add(201L);
+
+        sweeper.onAccessRevoked(new UserAccessRevoked(201L));
+        assertThat(status(201L)).isEqualTo(UserBrowserStatus.STARTING);
+
+        UserBrowser starting = repository.findById(id).orElseThrow();
+        starting.markRunning("c-late", Instant.now());
+        repository.saveAndFlush(starting);
+        runtime.plant("c-late", UserBrowserService.profileKey(201L), true);
+        sweeper.sweep();
+
+        assertThat(status(201L)).isEqualTo(UserBrowserStatus.STOPPED);
+        assertThat(status(202L)).isEqualTo(UserBrowserStatus.RUNNING);
+        assertThat(runtime.removed).contains("c-late");
+    }
+
+    @Test
+    @DisplayName("점검 중 DB 예외가 나도 밖으로 던지지 않는다")
+    void swallowsDatabaseErrorDuringSweep() {
+        UserBrowserRepository broken = mock(UserBrowserRepository.class);
+        when(broken.findByStatusAndLastActiveAtBefore(any(), any()))
+                .thenThrow(new DataAccessResourceFailureException("db down"));
+        UserBrowserSweeper failing =
+                new UserBrowserSweeper(service, broken, runtime, usage, userId -> true, Clock.systemUTC());
+
+        failing.onReady();
+        failing.sweep();
+
+        assertThat(runtime.removed).isEmpty();
+    }
+
+    @Test
     @DisplayName("기능이 꺼져 있으면 아무것도 하지 않는다")
     void doesNothingWhenDisabled() {
         runtime.plant("stranger", "f".repeat(64), true);
         UserBrowserSweeper disabled =
-                new UserBrowserSweeper(service(false), repository, runtime, usage, Clock.systemUTC());
+                new UserBrowserSweeper(service(false), repository, runtime, usage, userId -> false, Clock.systemUTC());
 
         disabled.sweep();
         disabled.onAccessRevoked(new UserAccessRevoked(201L));
@@ -215,6 +279,7 @@ class UserBrowserSweeperTest {
                 9999,
                 "build/unused",
                 "/example/browser-profiles",
+                "/example/profile",
                 512,
                 1.0,
                 256,

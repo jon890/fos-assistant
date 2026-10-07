@@ -17,6 +17,7 @@ import org.springframework.validation.annotation.Validated;
  * @param cdpPort 컨테이너 안에서 CDP 를 받는 포트
  * @param profileRoot Control Plane 이 보는 프로필 루트. 사용자마다 그 아래에 디렉터리 하나를 둔다
  * @param profileHostRoot 같은 루트를 Docker 호스트에서 본 경로. 생성 요청의 {@code Binds} 에 쓴다
+ * @param profileMount 컨테이너 안에서 프로필 디렉터리를 붙이는 경로. 이미지가 쓰는 경로와 같아야 한다
  * @param memoryMb 컨테이너 메모리 상한(MB). 스왑은 주지 않는다
  * @param cpu 컨테이너가 쓰는 CPU 수
  * @param pidsLimit 컨테이너 안의 프로세스 수 상한
@@ -35,6 +36,7 @@ public record BrowserProperties(
         Integer cdpPort,
         String profileRoot,
         String profileHostRoot,
+        String profileMount,
         int memoryMb,
         Double cpu,
         Integer pidsLimit,
@@ -56,6 +58,7 @@ public record BrowserProperties(
             requireText("network", network);
             requireText("profile-root", profileRoot);
             requireText("profile-host-root", profileHostRoot);
+            requireText("profile-mount", profileMount);
             requireAtLeastOne("cdp-port", cdpPort);
             requireAtLeastOne("memory-mb", memoryMb);
             requireAtLeastOne("pids-limit", pidsLimit);

@@ -240,6 +240,7 @@ class UserBrowserControllerTest {
                 9999,
                 "build/unused",
                 "/example/browser-profiles",
+                "/example/profile",
                 512,
                 1.0,
                 256,

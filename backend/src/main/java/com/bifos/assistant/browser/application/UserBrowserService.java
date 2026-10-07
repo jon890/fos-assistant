@@ -105,10 +105,12 @@ public class UserBrowserService {
     /**
      * 브라우저를 켠다. 이미 켜져 있으면 그대로 돌려준다.
      *
-     * @throws ApiException 동시 수가 찼으면 {@code BROWSER_CAPACITY}, 켜지 못했으면 {@code BROWSER_START_FAILED}
+     * @throws ApiException 동시 수가 찼으면 {@code BROWSER_CAPACITY}, 켜지 못했으면 {@code BROWSER_START_FAILED}, 실패한 줄에 남은
+     *     컨테이너를 지우지 못했으면 {@code BROWSER_STOP_FAILED}
      */
     public UserBrowserSnapshot start(Long userId) {
         requireEnabled();
+        clearFailedContainer(owned(userId));
         UserBrowser browser;
         startLock.lock();
         try {
@@ -130,13 +132,30 @@ public class UserBrowserService {
     /** 브라우저를 끈다. 이미 멈춰 있으면 그대로 돌려준다. */
     public UserBrowserSnapshot stop(Long userId) {
         requireEnabled();
-        return halt(owned(userId));
+        return UserBrowserSnapshot.of(halt(owned(userId)));
     }
 
     /** 관리자가 그 번호의 브라우저를 끈다. */
     public UserBrowserSnapshot stopById(Long id) {
         requireEnabled();
-        return halt(byId(id));
+        return UserBrowserSnapshot.of(halt(byId(id)));
+    }
+
+    /**
+     * 자동 중지다. 줄을 다시 읽어 아직 켜져 있고 유휴 기준 시각보다 오래 쓰지 않았을 때만, 읽은 버전으로 멈춘다.
+     *
+     * <p>후보를 읽은 뒤 활동이 기록됐으면 멈추지 않는다. 다시 읽은 뒤에 기록됐으면 낙관적 잠금이 걸려 {@code BROWSER_BUSY} 다.
+     *
+     * @return 멈췄으면 참
+     */
+    public boolean stopIfIdle(Long id, Instant cutoff) {
+        requireEnabled();
+        Optional<UserBrowser> idle = browsers.findById(id)
+                .filter(browser -> browser.status() == UserBrowserStatus.RUNNING)
+                .filter(browser ->
+                        browser.lastActiveAt() == null || browser.lastActiveAt().isBefore(cutoff));
+        idle.ifPresent(this::halt);
+        return idle.isPresent();
     }
 
     /** 끈 뒤 프로필 디렉터리와 줄을 지운다. 로그인이 모두 풀린다. */
@@ -216,9 +235,9 @@ public class UserBrowserService {
         }
     }
 
-    private UserBrowserSnapshot halt(UserBrowser browser) {
+    private UserBrowser halt(UserBrowser browser) {
         if (browser.status() == UserBrowserStatus.STOPPED) {
-            return UserBrowserSnapshot.of(browser);
+            return browser;
         }
         browser.beginStop(clock.instant());
         UserBrowser stopping = save(browser);
@@ -237,13 +256,38 @@ public class UserBrowserService {
             throw new ApiException(ErrorCode.BROWSER_STOP_FAILED, "user browser did not stop", ex);
         }
         stopping.markStopped(clock.instant());
-        return UserBrowserSnapshot.of(save(stopping));
+        return save(stopping);
     }
 
+    /** 끈 줄을 그 버전으로 지운 뒤에 프로필을 지운다. 그 사이 다른 전이가 줄을 바꿨으면 줄과 프로필을 모두 남긴다. */
     private void remove(UserBrowser browser) {
-        halt(browser);
-        profiles.delete(browser.profileKey());
-        browsers.deleteById(browser.id());
+        UserBrowser stopped = halt(browser);
+        try {
+            browsers.delete(stopped);
+        } catch (OptimisticLockingFailureException ex) {
+            throw new ApiException(ErrorCode.BROWSER_BUSY, "user browser changed concurrently", ex);
+        }
+        profiles.delete(stopped.profileKey());
+    }
+
+    /**
+     * 끄다 실패한 줄에 컨테이너가 남아 있으면 켜기 전에 지운다. {@code beginStart} 가 번호를 지우면 그 컨테이너를 다시 찾지 못한다.
+     *
+     * <p>proxy 가 그 컨테이너를 모르면 지운 것으로 본다. 지우지 못하면 번호를 남긴 채 거절한다.
+     */
+    private void clearFailedContainer(UserBrowser browser) {
+        if (browser.status() != UserBrowserStatus.FAILED || browser.containerId() == null) {
+            return;
+        }
+        try {
+            runtime.remove(browser.containerId());
+        } catch (RuntimeException ex) {
+            log.warn(
+                    "user browser leftover removal failed id={} error={}",
+                    browser.id(),
+                    ex.getClass().getSimpleName());
+            throw new ApiException(ErrorCode.BROWSER_STOP_FAILED, "user browser leftover container not removed", ex);
+        }
     }
 
     private void removeQuietly(String containerId) {

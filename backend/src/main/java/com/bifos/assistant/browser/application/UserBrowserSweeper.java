@@ -5,6 +5,7 @@ import com.bifos.assistant.browser.domain.RuntimeContainer;
 import com.bifos.assistant.browser.domain.UserBrowser;
 import com.bifos.assistant.browser.domain.type.UserBrowserStatus;
 import com.bifos.assistant.browser.infra.UserBrowserRepository;
+import com.bifos.assistant.shared.auth.UserAccessPolicy;
 import com.bifos.assistant.shared.auth.UserAccessRevoked;
 import java.time.Clock;
 import java.time.Duration;
@@ -21,6 +22,8 @@ import org.springframework.context.event.EventListener;
 import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
 
@@ -42,6 +45,7 @@ public class UserBrowserSweeper {
     private final UserBrowserRepository browsers;
     private final BrowserRuntime runtime;
     private final BrowserUsage usage;
+    private final UserAccessPolicy access;
     private final Clock clock;
 
     @Scheduled(
@@ -57,21 +61,35 @@ public class UserBrowserSweeper {
         sweep();
     }
 
-    /** 자동 중지와 상태 맞추기를 한 번 돈다. */
+    /** 자동 중지와 꺼진 사용자의 브라우저 멈춤, 상태 맞추기를 한 번 돈다. 예외는 로그만 남겨 기동과 다음 점검을 막지 않는다. */
     public void sweep() {
         if (!service.enabled()) {
             return;
         }
-        stopIdle();
-        reconcile();
+        try {
+            stopIdle();
+            stopRevoked();
+            reconcile();
+        } catch (RuntimeException ex) {
+            log.warn("user browser sweep failed error={}", name(ex));
+        }
     }
 
     /**
      * 사용자를 끄면 그 사용자의 브라우저를 멈춘다. 프로필은 남긴다(ADR 의 「삭제」).
      *
-     * <p>끈 요청이 커밋된 뒤에 돈다. 멈추지 못하면 로그만 남기고, 그 사용자는 다시 로그인하지 못하므로 자동 중지가 멈춘다.
+     * <p>끈 요청이 커밋된 뒤에 돈다. 그 자리에서는 커밋이 끝난 트랜잭션이 아직 묶여 있어, 저장소 호출이 거기에 붙으면 저장하지 못한다.
+     * {@code NOT_SUPPORTED} 로 그 트랜잭션을 떼어 두면 서비스의 저장마다 저장소가 자기 트랜잭션을 연다. proxy 호출을 트랜잭션 밖에서 하는
+     * 서비스의 규칙과도 맞다.
+     *
+     * <p>끄기 요청 스레드에서 동기로 돈다. 저장소에 비동기 실행기 설정이 없고, 가족 규모라 멈출 브라우저는 많아야 하나다. 멈추기는 proxy 의
+     * 읽기 시간 제한(30초)까지 기다릴 수 있다.
+     *
+     * <p>{@code STARTING} 이나 {@code STOPPING} 이라 {@code BROWSER_BUSY} 이거나 멈추지 못하면 로그만 남긴다. 다음 점검의
+     * {@link #stopRevoked()} 가 그 사용자를 다시 보고 멈춘다.
      */
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT, fallbackExecution = true)
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
     public void onAccessRevoked(UserAccessRevoked event) {
         if (!service.enabled()) {
             return;
@@ -85,7 +103,7 @@ public class UserBrowserSweeper {
         }
     }
 
-    /** 유휴 시간이 지났고 화면도 중계 연결도 없는 {@code RUNNING} 을 멈춘다. */
+    /** 유휴 시간이 지났고 화면도 중계 연결도 없는 {@code RUNNING} 을 멈춘다. 멈추기 직전에 줄을 다시 읽어 아직 유휴인지 본다. */
     void stopIdle() {
         Instant cutoff = clock.instant().minus(service.idleTimeout());
         for (UserBrowser browser : browsers.findByStatusAndLastActiveAtBefore(UserBrowserStatus.RUNNING, cutoff)) {
@@ -93,10 +111,30 @@ public class UserBrowserSweeper {
                 continue;
             }
             try {
-                service.stopById(browser.id());
-                log.info("user browser stopped after idle id={}", browser.id());
+                if (service.stopIfIdle(browser.id(), cutoff)) {
+                    log.info("user browser stopped after idle id={}", browser.id());
+                }
             } catch (RuntimeException ex) {
                 log.warn("user browser idle stop failed id={} error={}", browser.id(), name(ex));
+            }
+        }
+    }
+
+    /**
+     * 허용 목록에서 꺼진 사용자의 {@code RUNNING} 과 {@code FAILED} 를 멈춘다. 사용자 끄기 때 멈추지 못한 브라우저를 여기서 다시 본다.
+     *
+     * <p>{@code STARTING} 과 {@code STOPPING} 은 건너뛴다. 켜기가 끝나면 다음 점검이 멈추고, 끝나지 못하면 상태 맞추기가 정한다.
+     */
+    void stopRevoked() {
+        for (UserBrowser browser :
+                browsers.findByStatusIn(List.of(UserBrowserStatus.RUNNING, UserBrowserStatus.FAILED))) {
+            try {
+                if (!access.allowed(browser.userId())) {
+                    service.stopById(browser.id());
+                    log.info("user browser stopped after access removal id={}", browser.id());
+                }
+            } catch (RuntimeException ex) {
+                log.warn("user browser stop for removed user failed id={} error={}", browser.id(), name(ex));
             }
         }
     }

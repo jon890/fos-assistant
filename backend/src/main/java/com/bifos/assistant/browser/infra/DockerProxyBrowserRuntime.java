@@ -34,8 +34,6 @@ public class DockerProxyBrowserRuntime implements BrowserRuntime {
     static final String BROWSER_LABEL = "fos-browser";
     /** 컨테이너 주인의 프로필 키를 적는 라벨이다. */
     static final String USER_LABEL = "fos-browser-user";
-    /** 컨테이너 안에서 프로필 디렉터리를 붙이는 자리다. 이미지가 이 경로를 쓴다. */
-    static final String PROFILE_MOUNT = "/example/profile";
 
     private static final Duration CONNECT_TIMEOUT = Duration.ofSeconds(5);
     /** 멈추기는 컨테이너가 끝나기를 10초까지 기다린다. 그보다 넉넉히 둔다. */
@@ -160,7 +158,8 @@ public class DockerProxyBrowserRuntime implements BrowserRuntime {
         Map<String, Object> hostConfig = new LinkedHashMap<>();
         hostConfig.put(
                 "Binds",
-                List.of(trimSlash(properties.profileHostRoot()) + "/" + profileKey + ":" + PROFILE_MOUNT + ":rw"));
+                List.of(trimSlash(properties.profileHostRoot()) + "/" + profileKey + ":" + properties.profileMount()
+                        + ":rw"));
         hostConfig.put("NetworkMode", properties.network());
         hostConfig.put("Memory", memory);
         hostConfig.put("MemorySwap", memory);

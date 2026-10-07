@@ -83,6 +83,7 @@ assistant:
     cdp-port: 9999
     profile-root: build/test-browser-profiles
     profile-host-root: /example/browser-profiles
+    profile-mount: /example/profile
     memory-mb: 512
     cpu: 1
     pids-limit: 256

@@ -2,6 +2,10 @@ package com.bifos.assistant.browser.application;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.AdditionalAnswers.delegatesTo;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.mock;
 
 import com.bifos.assistant.browser.application.model.UserBrowserSnapshot;
 import com.bifos.assistant.browser.domain.BrowserProfileStore;
@@ -187,6 +191,63 @@ class UserBrowserServiceTest {
     }
 
     @Test
+    @DisplayName("끄다 실패해 컨테이너가 남은 줄을 켜면 남은 컨테이너를 먼저 지우고 새로 띄운다")
+    void removesLeftoverContainerBeforeRestart() {
+        UserBrowserService service = service(true, 2);
+        service.create(101L);
+        service.start(101L);
+        runtime.failingActions.add("stop");
+        assertCode(() -> service.stop(101L), ErrorCode.BROWSER_STOP_FAILED);
+        assertThat(repository.findByUserId(101L).orElseThrow().containerId()).isEqualTo("c1");
+        runtime.failingActions.clear();
+
+        assertThat(service.start(101L).status()).isEqualTo(UserBrowserStatus.RUNNING);
+
+        assertThat(runtime.removed).containsExactly("c1");
+        assertThat(runtime.containers).containsOnlyKeys("c2");
+    }
+
+    @Test
+    @DisplayName("남은 컨테이너를 지우지 못하면 BROWSER_STOP_FAILED 로 거절하고 번호를 남긴다")
+    void rejectsRestartWhenLeftoverRemovalFails() {
+        UserBrowserService service = service(true, 2);
+        service.create(101L);
+        service.start(101L);
+        runtime.failingActions.add("stop");
+        assertCode(() -> service.stop(101L), ErrorCode.BROWSER_STOP_FAILED);
+        runtime.failingActions.clear();
+        runtime.failingActions.add("remove");
+
+        assertCode(() -> service.start(101L), ErrorCode.BROWSER_STOP_FAILED);
+
+        var saved = repository.findByUserId(101L).orElseThrow();
+        assertThat(saved.status()).isEqualTo(UserBrowserStatus.FAILED);
+        assertThat(saved.containerId()).isEqualTo("c1");
+        assertThat(runtime.containers).containsOnlyKeys("c1");
+    }
+
+    @Test
+    @DisplayName("지우는 사이에 다른 전이가 줄을 바꾸면 BROWSER_BUSY 이고 줄과 프로필이 남는다")
+    void keepsRowAndProfileWhenChangedDuringDelete() {
+        UserBrowserRepository racing = mock(UserBrowserRepository.class, delegatesTo(repository));
+        doAnswer(call -> {
+                    jdbc.update(
+                            "UPDATE user_browser SET status = 'STARTING', version = version + 1 WHERE user_id = 101");
+                    repository.delete(call.getArgument(0));
+                    return null;
+                })
+                .when(racing)
+                .delete(any());
+        UserBrowserService service = service(true, 2, racing);
+        service.create(101L);
+
+        assertCode(() -> service.delete(101L), ErrorCode.BROWSER_BUSY);
+
+        assertThat(repository.findByUserId(101L).orElseThrow().status()).isEqualTo(UserBrowserStatus.STARTING);
+        assertThat(profileDirs).containsExactly(UserBrowserService.profileKey(101L));
+    }
+
+    @Test
     @DisplayName("관리자는 번호로 끄고 지운다")
     void stopsAndDeletesById() {
         UserBrowserService service = service(true, 2);
@@ -234,6 +295,10 @@ class UserBrowserServiceTest {
     }
 
     private UserBrowserService service(boolean enabled, int maxRunning) {
+        return service(enabled, maxRunning, repository);
+    }
+
+    private UserBrowserService service(boolean enabled, int maxRunning, UserBrowserRepository browsers) {
         BrowserProperties properties = new BrowserProperties(
                 enabled,
                 "https://browser-proxy.example.test",
@@ -242,6 +307,7 @@ class UserBrowserServiceTest {
                 9999,
                 "build/unused",
                 "/example/browser-profiles",
+                "/example/profile",
                 512,
                 1.0,
                 256,
@@ -261,7 +327,7 @@ class UserBrowserServiceTest {
             }
         };
         return new UserBrowserService(
-                repository, runtime, profiles, address -> cdpReady.get(), properties, Clock.systemUTC());
+                browsers, runtime, profiles, address -> cdpReady.get(), properties, Clock.systemUTC());
     }
 
     private static void assertCode(ThrowingCallable call, ErrorCode code) {

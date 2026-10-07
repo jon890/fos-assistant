@@ -49,6 +49,7 @@ class DockerProxyBrowserRuntimeTest {
                         9999,
                         "build/unused",
                         "/example/browser-profiles/",
+                        "/example/profile",
                         1024,
                         1.5,
                         256,
@@ -57,6 +58,29 @@ class DockerProxyBrowserRuntimeTest {
                         Duration.ofMinutes(10),
                         Duration.ofSeconds(30)),
                 builder);
+    }
+
+    @Test
+    @DisplayName("기능이 켜져 있는데 컨테이너 안 마운트 경로가 비어 있으면 기동을 멈춘다")
+    void requiresProfileMountWhenEnabled() {
+        assertThatThrownBy(() -> new BrowserProperties(
+                        true,
+                        BASE,
+                        "example/browser:test",
+                        "example-browser",
+                        9999,
+                        "build/unused",
+                        "/example/browser-profiles",
+                        " ",
+                        1024,
+                        1.5,
+                        256,
+                        128,
+                        2,
+                        Duration.ofMinutes(10),
+                        Duration.ofSeconds(30)))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("profile-mount");
     }
 
     @Test

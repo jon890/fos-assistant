@@ -34,6 +34,7 @@ class FileBrowserProfileStoreTest {
                 null,
                 root.toString(),
                 null,
+                null,
                 1024,
                 null,
                 null,

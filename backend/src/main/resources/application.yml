@@ -238,6 +238,8 @@ assistant:
     # 프로필 루트를 Control Plane 이 보는 경로와 Docker 호스트가 보는 경로. 같은 디렉터리를 두 곳에서 본다
     profile-root: ${ASSISTANT_BROWSER_PROFILE_ROOT:}
     profile-host-root: ${ASSISTANT_BROWSER_PROFILE_HOST_ROOT:}
+    # 컨테이너 안에서 프로필 디렉터리를 붙이는 경로. 이미지가 쓰는 경로와 같게 둔다
+    profile-mount: ${ASSISTANT_BROWSER_PROFILE_MOUNT:}
     # 컨테이너 하나의 메모리 상한(MB). 스왑은 주지 않는다
     memory-mb: ${ASSISTANT_BROWSER_MEMORY_MB:1024}
     cpu: ${ASSISTANT_BROWSER_CPU:}

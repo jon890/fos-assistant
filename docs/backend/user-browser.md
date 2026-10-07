@@ -41,19 +41,23 @@ proxy 의 정책과 이미지, 망, 프로필 디렉터리의 위치는 운영 �
 
 | 요청 | 시작 상태 | 하는 일 | 끝 상태 |
 | --- | --- | --- | --- |
-| 켜기 | `STOPPED`, `FAILED` | 동시 수를 센다. proxy 로 컨테이너를 만들고 켠다. CDP 의 `/json/version` 이 답할 때까지 30초 기다린다 | `RUNNING`. 실패하면 컨테이너를 지우고 `FAILED` |
+| 켜기 | `STOPPED`, `FAILED` | `FAILED` 줄에 컨테이너 번호가 남아 있으면 먼저 그 컨테이너를 지운다. 동시 수를 센다. proxy 로 컨테이너를 만들고 켠다. CDP 의 `/json/version` 이 답할 때까지 30초 기다린다 | `RUNNING`. 실패하면 컨테이너를 지우고 `FAILED`. 남은 컨테이너를 지우지 못하면 `BROWSER_STOP_FAILED` 로 거절하고 `FAILED` 그대로 |
 | 끄기 | `RUNNING`, `FAILED` | 화면과 중계 연결을 닫는다. 컨테이너를 멈추고 지운다 | `STOPPED` |
-| 지우기 | 아무 상태 | 끄기를 한 뒤 프로필 디렉터리를 지우고 줄을 지운다. 그 브라우저의 접근 표식도 지운다 | 줄 없음 |
-| 자동 중지 | `RUNNING` | `last_active_at` 이 유휴 시간보다 오래고 화면도 중계 연결도 없다 | `STOPPED` |
-| 사용자 끄기 | `STOPPED` 밖의 상태 | 관리자가 허용 목록에서 사용자를 끄면 끄기를 한다. 프로필과 줄은 남긴다 | `STOPPED` |
+| 지우기 | `STOPPED`, `RUNNING`, `FAILED` | 끄기를 한 뒤 끈 줄을 그 버전으로 지우고, 지운 뒤에 프로필 디렉터리를 지운다. 그 브라우저의 접근 표식도 지운다 | 줄 없음. 그 사이 다른 전이가 줄을 바꿨으면 `BROWSER_BUSY` 이고 줄과 프로필이 남는다 |
+| 자동 중지 | `RUNNING` | `last_active_at` 이 유휴 시간보다 오래고 화면도 중계 연결도 없다. 멈추기 직전에 줄을 다시 읽어 아직 유휴인지 본다 | `STOPPED` |
+| 사용자 끄기 | `RUNNING`, `FAILED` | 관리자가 허용 목록에서 사용자를 끄면 끄기가 커밋된 뒤 끄기를 한다. 프로필과 줄은 남긴다 | `STOPPED` |
 
 동시 수는 `STARTING` 과 `RUNNING` 인 줄을 센다. 셀 때 `user_browser` 의 켜기를 한 번에 하나만 하도록 잠근다.
 이미 `RUNNING` 인 브라우저를 켜거나 `STOPPED` 인 브라우저를 끄면 아무것도 하지 않고 지금 상태를 돌려준다.
-`STARTING` 이나 `STOPPING` 인 줄에 다른 전이를 요청하면 `BROWSER_BUSY` 다.
+`STARTING` 이나 `STOPPING` 인 줄에 다른 전이를 요청하면 `BROWSER_BUSY` 다. 지우기와 사용자 끄기도 그렇다.
+사용자 끄기가 `BUSY` 이거나 proxy 호출이 실패하면 로그만 남긴다.
+다음 점검이 허용 목록에서 꺼진 사용자의 `RUNNING` 과 `FAILED` 를 다시 보고 끈다.
+`STARTING` 과 `STOPPING` 은 그 점검도 건너뛰고, 켜기가 끝나면 그다음 점검이 끄고 끝나지 못하면 상태 맞추기가 정한다.
 
 끄다가 proxy 호출이 실패하면 `FAILED` 와 `stop_failed` 를 남긴다. 켜다가 실패한 코드는 `start_failed`, `start_timeout` 이다.
 
-자동 중지와 상태 맞추기는 `assistant.browser.sweep-interval`(기본 `1m`)마다 돌고, 기동할 때 한 번 돈다. 기능이 꺼져 있으면 돌지 않는다.
+자동 중지와 꺼진 사용자의 브라우저 끄기, 상태 맞추기는 `assistant.browser.sweep-interval`(기본 `1m`)마다 돌고, 기동할 때 한 번 돈다. 기능이 꺼져 있으면 돌지 않는다.
+점검 중 DB 예외가 나면 경고 로그만 남기고 기동을 멈추지 않는다.
 상태 맞추기는 proxy 의 브라우저 컨테이너 목록과 표를 견준다.
 
 | 표와 실제 | 맞추는 것 |
@@ -76,6 +80,7 @@ env 로 받는다. 기본값이 있는 값은 코드를 바꾸지 않고 설치 
 | `assistant.browser.cdp-port` | `ASSISTANT_BROWSER_CDP_PORT` | 컨테이너 안에서 CDP 를 받는 포트 | 없음 |
 | `assistant.browser.profile-root` | `ASSISTANT_BROWSER_PROFILE_ROOT` | Control Plane 이 보는 프로필 루트 | 없음 |
 | `assistant.browser.profile-host-root` | `ASSISTANT_BROWSER_PROFILE_HOST_ROOT` | 같은 루트를 Docker 호스트에서 본 경로. 생성 요청의 `Binds` 에 쓴다 | 없음 |
+| `assistant.browser.profile-mount` | `ASSISTANT_BROWSER_PROFILE_MOUNT` | 컨테이너 안에서 프로필 디렉터리를 붙이는 경로. 이미지가 쓰는 경로와 같게 둔다 | 없음 |
 | `assistant.browser.memory-mb` | `ASSISTANT_BROWSER_MEMORY_MB` | 컨테이너 메모리 상한(MB). 스왑은 주지 않는다 | `1024` |
 | `assistant.browser.cpu` | `ASSISTANT_BROWSER_CPU` | 컨테이너가 쓰는 CPU 수 | 없음 |
 | `assistant.browser.pids-limit` | `ASSISTANT_BROWSER_PIDS_LIMIT` | 컨테이너 안의 프로세스 수 상한 | 없음 |
