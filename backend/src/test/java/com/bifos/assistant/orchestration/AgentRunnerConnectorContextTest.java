@@ -31,6 +31,7 @@ import com.bifos.assistant.orchestration.application.AgentRun;
 import com.bifos.assistant.orchestration.application.AgentRunner;
 import com.bifos.assistant.orchestration.application.DelegationOutput;
 import com.bifos.assistant.orchestration.application.DelegationProperties;
+import com.bifos.assistant.proactive.infra.ProactiveCheckRepository;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.usage.application.ExecutionContextSnapshot;
@@ -66,6 +67,7 @@ class AgentRunnerConnectorContextTest {
     private final HermesRunsClient hermes = mock(HermesRunsClient.class);
     private final ExecutionRecorder executions = mock(ExecutionRecorder.class);
     private final ModelTierService modelTiers = mock(ModelTierService.class);
+    private final ProactiveCheckRepository proactiveChecks = mock(ProactiveCheckRepository.class);
     private static final Instant REQUEST_RECEIVED_AT = Instant.parse("2026-10-01T00:00:00Z");
     private final CurrentUser user = new CurrentUser(1L, "runner@example.com", "가", 1L, UserRole.MEMBER);
     private final AgentExecution started = mock(AgentExecution.class);
@@ -97,7 +99,8 @@ class AgentRunnerConnectorContextTest {
                         new DelegationProperties(2, 4, 16, Duration.ofSeconds(30), 100, Duration.ofSeconds(20))),
                 modelTiers,
                 Clock.fixed(REQUEST_RECEIVED_AT, ZoneOffset.UTC),
-                mock(UserExecutionLimiter.class));
+                mock(UserExecutionLimiter.class),
+                proactiveChecks);
     }
 
     @Test
@@ -168,6 +171,28 @@ class AgentRunnerConnectorContextTest {
         String instructions = submitted().instructions();
         assertThat(instructions).contains("GFM", MEMORY).endsWith("\n\n" + ADDITION);
         assertThat(recordedSnapshot().contextChars()).isEqualTo(instructions.length() - ("\n\n" + ADDITION).length());
+    }
+
+    @Test
+    @DisplayName("살펴보기 트리의 자식은 Memory 를 읽되 기억을 남기는 지침은 받지 않는다")
+    void excludesRememberInstructionsFromProactiveChild() {
+        when(proactiveChecks.existsByRootExecutionId(10L)).thenReturn(true);
+
+        runner.run(
+                user,
+                Conversation.startedBy(user.id(), "대화", 2L, Instant.now()),
+                agent(),
+                "일",
+                10L,
+                10L,
+                RunSession.fresh(),
+                execution -> {},
+                (execution, runId) -> {},
+                () -> false,
+                null);
+
+        assertThat(submitted().instructions()).contains("GFM", MEMORY).doesNotContain("memory_remember");
+        verify(contextAssembler).withResponseInstructions(any(), eq(false));
     }
 
     @Test

@@ -13,6 +13,7 @@ import com.bifos.assistant.hermes.dto.HermesRunCommand;
 import com.bifos.assistant.hermes.dto.HermesRunResult;
 import com.bifos.assistant.model.domain.ModelChoice;
 import com.bifos.assistant.orchestration.domain.ChildResult;
+import com.bifos.assistant.proactive.infra.ProactiveCheckRepository;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
@@ -67,6 +68,7 @@ public class AgentRunner {
     private final ModelTierService modelTiers;
     private final Clock clock;
     private final UserExecutionLimiter limiter;
+    private final ProactiveCheckRepository proactiveChecks;
 
     /**
      * 실행 하나를 끝까지 돌린다.
@@ -140,7 +142,9 @@ public class AgentRunner {
         Instant requestReceivedAt = clock.instant();
         AssembledContext context =
                 agent.connectorManaged() ? AssembledContext.empty() : contextAssembler.assemble(user, agent.id());
-        context = contextAssembler.withResponseInstructions(context, !agent.connectorManaged());
+        boolean rememberAllowed = !agent.connectorManaged()
+                && (rootExecutionId == null || !proactiveChecks.existsByRootExecutionId(rootExecutionId));
+        context = contextAssembler.withResponseInstructions(context, rememberAllowed);
         ExecutionContextSnapshot snapshot = new ExecutionContextSnapshot(
                 context.chars(),
                 null,
