@@ -1,5 +1,6 @@
 package com.bifos.assistant.usage.infra;
 
+import com.bifos.assistant.shared.config.LiveProperties;
 import com.bifos.assistant.usage.domain.CatalogPrice;
 import com.bifos.assistant.usage.domain.ModelPrice;
 import com.bifos.assistant.usage.domain.PriceCatalog;
@@ -17,6 +18,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.locks.ReentrantLock;
 import lombok.extern.slf4j.Slf4j;
@@ -57,29 +59,29 @@ public class ModelsDevPriceCatalog implements PriceCatalog {
     /** 파일의 수정 시각을 다시 보는 간격이다. 비용 환산은 실행이 끝날 때마다 불리므로 매번 디스크를 보지 않는다. */
     static final Duration CHECK_INTERVAL = Duration.ofMinutes(1);
 
-    private final Path file;
+    private final LiveProperties<PricingProperties> properties;
     private final Clock clock;
     private final ReentrantLock reloadLock = new ReentrantLock();
+    /** 지금 파일을 정한 설정의 경로다. {@code current().catalogPath()} 가 이것과 다를 때만 파일과 스냅숏을 다시 정한다. */
+    private volatile String appliedPath;
+    /** 경로를 한 번이라도 정했는지. 설정의 경로는 null 일 수 있어 {@link #appliedPath} 만으로는 구분하지 못한다. */
+    private volatile boolean pathApplied;
+
+    private volatile Path file;
     private volatile Snapshot snapshot = Snapshot.EMPTY;
     private volatile Instant nextCheck = Instant.MIN;
     private volatile String lastFailure;
     private volatile Instant failedModifiedAt;
 
     @Autowired
-    public ModelsDevPriceCatalog(PricingProperties properties) {
+    public ModelsDevPriceCatalog(LiveProperties<PricingProperties> properties) {
         this(properties, Clock.systemUTC());
     }
 
-    ModelsDevPriceCatalog(PricingProperties properties, Clock clock) {
-        String catalogPath = properties.catalogPath();
+    ModelsDevPriceCatalog(LiveProperties<PricingProperties> properties, Clock clock) {
+        this.properties = properties;
         this.clock = clock;
-        if (catalogPath == null || catalogPath.isBlank()) {
-            this.file = null;
-            log.info("가격 카탈로그를 설정하지 않았다. 실행 비용은 비워 둔다");
-        } else {
-            this.file = Path.of(catalogPath);
-            reloadIfChanged();
-        }
+        current();
     }
 
     @Override
@@ -107,10 +109,40 @@ public class ModelsDevPriceCatalog implements PriceCatalog {
     }
 
     private Snapshot current() {
+        String catalogPath = properties.current().catalogPath();
+        if (!pathApplied || !Objects.equals(catalogPath, appliedPath)) {
+            apply(catalogPath);
+        }
         if (file != null && !clock.instant().isBefore(nextCheck)) {
             reloadIfChanged();
         }
         return snapshot;
+    }
+
+    /**
+     * 설정이 가리키는 파일로 바꾸고 들고 있던 가격을 버린다. 다음 조회가 새 파일을 곧바로 읽는다.
+     *
+     * <p>읽던 중인 {@link #reloadIfChanged} 가 옛 파일의 가격을 바꾼 뒤에 덮어 쓰지 않게, 읽기 lock 을 기다려 잡고 바꾼다.
+     */
+    private void apply(String catalogPath) {
+        reloadLock.lock();
+        try {
+            if (pathApplied && Objects.equals(catalogPath, appliedPath)) {
+                return;
+            }
+            file = catalogPath == null || catalogPath.isBlank() ? null : Path.of(catalogPath);
+            snapshot = Snapshot.EMPTY;
+            nextCheck = Instant.MIN;
+            lastFailure = null;
+            failedModifiedAt = null;
+            appliedPath = catalogPath;
+            pathApplied = true;
+            if (file == null) {
+                log.info("가격 카탈로그를 설정하지 않았다. 실행 비용은 비워 둔다");
+            }
+        } finally {
+            reloadLock.unlock();
+        }
     }
 
     /**
@@ -125,7 +157,11 @@ public class ModelsDevPriceCatalog implements PriceCatalog {
             return;
         }
         Instant modifiedAt = null;
+        Path file = this.file;
         try {
+            if (file == null) {
+                return;
+            }
             nextCheck = clock.instant().plus(CHECK_INTERVAL);
             modifiedAt = capturedAt(file);
             if (modifiedAt.equals(snapshot.modifiedAt()) || modifiedAt.equals(failedModifiedAt)) {

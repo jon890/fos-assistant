@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.bifos.assistant.agent.domain.type.CostMode;
 import com.bifos.assistant.hermes.dto.TokenUsage;
+import com.bifos.assistant.shared.config.LiveProperties;
 import com.bifos.assistant.usage.application.CostEstimator;
 import com.bifos.assistant.usage.domain.CatalogPrice;
 import com.bifos.assistant.usage.domain.EstimatedCost;
@@ -38,6 +39,10 @@ class CostEstimatorTest {
     private static Path catalogFile;
     private static CostEstimator estimator;
 
+    private static LiveProperties<PricingProperties> pricing(String catalogPath) {
+        return LiveProperties.fixed(PricingProperties.class, new PricingProperties(catalogPath));
+    }
+
     @BeforeAll
     static void loadCatalog() throws URISyntaxException, IOException {
         catalogFile = Path.of(CostEstimatorTest.class
@@ -45,7 +50,7 @@ class CostEstimatorTest {
                 .toURI());
         // pricing_version 은 파일의 수정 시각에서 나온다. 검사에서 그 날짜를 못 박는다.
         Files.setLastModifiedTime(catalogFile, FileTime.from(Instant.parse("2026-09-17T04:00:00Z")));
-        estimator = new CostEstimator(new ModelsDevPriceCatalog(new PricingProperties(catalogFile.toString())));
+        estimator = new CostEstimator(new ModelsDevPriceCatalog(pricing(catalogFile.toString())));
     }
 
     @Test
@@ -146,9 +151,8 @@ class CostEstimatorTest {
     @Test
     @DisplayName("카탈로그가 없으면 기동을 막지 않고 금액만 비워 둔다")
     void leavesOnlyAmountEmptyWithoutBlockingStartupWhenNoCatalog() {
-        CostEstimator noCatalog =
-                new CostEstimator(new ModelsDevPriceCatalog(new PricingProperties("/tmp/no-such-catalog.json")));
-        CostEstimator notConfigured = new CostEstimator(new ModelsDevPriceCatalog(new PricingProperties("")));
+        CostEstimator noCatalog = new CostEstimator(new ModelsDevPriceCatalog(pricing("/tmp/no-such-catalog.json")));
+        CostEstimator notConfigured = new CostEstimator(new ModelsDevPriceCatalog(pricing("")));
 
         assertThat(noCatalog.estimate("openai", "example-model", usage(1000L, null, 500L)))
                 .isEqualTo(EstimatedCost.unknown());

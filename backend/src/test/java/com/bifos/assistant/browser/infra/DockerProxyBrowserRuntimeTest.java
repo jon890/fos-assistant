@@ -9,6 +9,7 @@ import static org.springframework.test.web.client.response.MockRestResponseCreat
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 
 import com.bifos.assistant.browser.domain.RuntimeContainer;
+import com.bifos.assistant.shared.config.LiveProperties;
 import java.net.URI;
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
@@ -41,23 +42,25 @@ class DockerProxyBrowserRuntimeTest {
         RestClient.Builder builder = RestClient.builder();
         server = MockRestServiceServer.bindTo(builder).build();
         runtime = new DockerProxyBrowserRuntime(
-                new BrowserProperties(
-                        true,
-                        BASE + "/",
-                        "example/browser:test",
-                        "example-browser",
-                        9999,
-                        "build/unused",
-                        "/example/browser-profiles/",
-                        "/example/profile",
-                        1024,
-                        1.5,
-                        256,
-                        128,
-                        2,
-                        Duration.ofMinutes(10),
-                        Duration.ofSeconds(30),
-                        Duration.ofMinutes(30)),
+                LiveProperties.fixed(
+                        BrowserProperties.class,
+                        new BrowserProperties(
+                                true,
+                                BASE + "/",
+                                "example/browser:test",
+                                "example-browser",
+                                9999,
+                                "build/unused",
+                                "/example/browser-profiles/",
+                                "/example/profile",
+                                1024,
+                                1.5,
+                                256,
+                                128,
+                                2,
+                                Duration.ofMinutes(10),
+                                Duration.ofSeconds(30),
+                                Duration.ofMinutes(30))),
                 builder);
     }
 

@@ -9,6 +9,7 @@ import com.bifos.assistant.chat.infra.AttachmentProperties;
 import com.bifos.assistant.chat.infra.AttachmentStore;
 import com.bifos.assistant.chat.infra.ChatAttachmentRepository;
 import com.bifos.assistant.chat.infra.ConversationRepository;
+import com.bifos.assistant.testsupport.BackendIntegrationTest;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -23,12 +24,9 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.test.context.ActiveProfiles;
 
 /** 일정이 부르는 {@code runScheduled} 가 주입받은 시계의 시각을 기준으로 첨부를 지우는지 확인한다. */
-@SpringBootTest
-@ActiveProfiles("test")
+@BackendIntegrationTest
 class AttachmentCleanerClockTest {
 
     private static final Instant NOW = Instant.parse("2026-03-01T04:00:00Z");

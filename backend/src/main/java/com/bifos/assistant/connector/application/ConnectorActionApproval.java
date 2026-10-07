@@ -28,6 +28,7 @@ import com.bifos.assistant.hermes.dto.CallResult;
 import com.bifos.assistant.hermes.dto.ConnectorManifest;
 import com.bifos.assistant.orchestration.application.DelegationProperties;
 import com.bifos.assistant.shared.auth.CurrentUser;
+import com.bifos.assistant.shared.config.LiveProperties;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.user.infra.AppUserRepository;
@@ -58,7 +59,7 @@ class ConnectorActionApproval {
     private final ConnectorBindingRepository bindings;
     private final AppUserRepository users;
     private final HermesConnectorClient connector;
-    private final DelegationProperties delegation;
+    private final LiveProperties<DelegationProperties> delegation;
     private final DecisionFeedbackRecorder feedback;
     private final ConnectorActionDetails details;
     private final ConnectorActionSignals signals;
@@ -72,7 +73,7 @@ class ConnectorActionApproval {
             ConnectorBindingRepository bindings,
             AppUserRepository users,
             HermesConnectorClient connector,
-            DelegationProperties delegation,
+            LiveProperties<DelegationProperties> delegation,
             DecisionFeedbackRecorder feedback,
             ConnectorActionDetails details,
             ConnectorActionSignals signals,
@@ -269,7 +270,7 @@ class ConnectorActionApproval {
 
     /** 위임 답과 같은 상한으로 자른다. 상한 자리에서 대리 쌍이 나뉘면 그 앞에서 자른다. */
     private String clip(String text) {
-        int max = delegation.outputMaxChars();
+        int max = delegation.current().outputMaxChars();
         if (text.length() <= max) {
             return text;
         }

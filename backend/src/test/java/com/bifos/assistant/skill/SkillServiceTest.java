@@ -45,6 +45,7 @@ import com.bifos.assistant.skill.application.SkillsChanged;
 import com.bifos.assistant.skill.domain.SkillBundle;
 import com.bifos.assistant.skill.domain.SkillFile;
 import com.bifos.assistant.skill.infra.SkillStore;
+import com.bifos.assistant.testsupport.BackendIntegrationTest;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -68,10 +69,7 @@ import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mockito;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.HttpStatus;
-import org.springframework.test.context.ActiveProfiles;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.context.event.ApplicationEvents;
 import org.springframework.test.context.event.RecordApplicationEvents;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -85,8 +83,7 @@ import org.springframework.web.client.HttpClientErrorException;
  * 저장이 차례로 도는지 볼 수 있다. 대시보드의 스킬 경로와 도구 목록만 대역이고, 버전 디렉터리는
  * {@code application-test.yml} 의 경로에 실제로 쓴다.
  */
-@SpringBootTest
-@ActiveProfiles("test")
+@BackendIntegrationTest
 @RecordApplicationEvents
 class SkillServiceTest {
 
@@ -119,10 +116,10 @@ class SkillServiceTest {
     @Autowired
     ConnectorBindingRepository bindings;
 
-    @MockitoBean
+    @Autowired
     HermesSkillClient skillClient;
 
-    @MockitoBean
+    @Autowired
     HermesToolsetClient toolsets;
 
     /** 스킬 커맨드의 캐시를 비우는 {@link SkillsChanged} 를 서비스가 냈는지 본다. */
@@ -405,12 +402,9 @@ class SkillServiceTest {
         skills.delete(OWNER, OWNED, "shopping");
 
         String republished = store.currentVersion(OWNED_PROFILE).orElseThrow();
-        verify(skillClient)
-                .publish(
-                        eq(OWNED_PROFILE),
-                        eq(List.of(store.agentPath(OWNED_PROFILE, republished))),
-                        any(),
-                        anyString());
+        // SkillStore 는 공통 기반의 spy 다. matcher 사이에서 부르면 Mockito 가 matcher 수를 잘못 센다
+        String publishedPath = store.agentPath(OWNED_PROFILE, republished);
+        verify(skillClient).publish(eq(OWNED_PROFILE), eq(List.of(publishedPath)), any(), anyString());
         assertThat(store.readCurrent(OWNED_PROFILE)).containsOnlyKeys("weekly-plan");
         assertThat(store.readPending(OWNED_PROFILE))
                 .as("Hermes 가 벗어난 표식 없는 버전은 지운다")
@@ -661,9 +655,9 @@ class SkillServiceTest {
 
         String afterFirst = store.currentVersion(OWNED_PROFILE).orElseThrow();
         assertThat(store.readCurrent(OWNED_PROFILE)).containsOnlyKeys("shopping");
-        verify(skillClient)
-                .publish(
-                        eq(OWNED_PROFILE), eq(List.of(store.agentPath(OWNED_PROFILE, afterFirst))), any(), anyString());
+        // SkillStore 는 공통 기반의 spy 다. matcher 사이에서 부르면 Mockito 가 matcher 수를 잘못 센다
+        String publishedPath = store.agentPath(OWNED_PROFILE, afterFirst);
+        verify(skillClient).publish(eq(OWNED_PROFILE), eq(List.of(publishedPath)), any(), anyString());
         assertCode(() -> skills.delete(OWNER, OWNED, "weekly-plan"), ErrorCode.SKILL_NOT_FOUND);
 
         skills.delete(OWNER, OWNED, "shopping");

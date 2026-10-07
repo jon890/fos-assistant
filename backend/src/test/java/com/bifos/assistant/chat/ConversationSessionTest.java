@@ -8,18 +8,16 @@ import com.bifos.assistant.chat.domain.Conversation;
 import com.bifos.assistant.chat.domain.RunSession;
 import com.bifos.assistant.chat.infra.ConversationRepository;
 import com.bifos.assistant.shared.domain.type.UserRole;
+import com.bifos.assistant.testsupport.BackendIntegrationTest;
 import com.bifos.assistant.user.domain.AppUser;
 import com.bifos.assistant.user.infra.AppUserRepository;
 import java.time.Instant;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.test.context.ActiveProfiles;
 
 /** 대화 turn 에 보낼 session 을 Control Plane 이 한 번만 정하고 대화 목록의 순서를 흔들지 않는 것을 고정한다. */
-@SpringBootTest
-@ActiveProfiles("test")
+@BackendIntegrationTest
 class ConversationSessionTest {
 
     @Autowired

@@ -10,6 +10,7 @@ import com.bifos.assistant.browser.domain.UserBrowser;
 import com.bifos.assistant.browser.domain.type.UserBrowserStatus;
 import com.bifos.assistant.browser.infra.BrowserProperties;
 import com.bifos.assistant.browser.infra.UserBrowserRepository;
+import com.bifos.assistant.shared.config.LiveProperties;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.shared.util.Sha256;
@@ -55,7 +56,7 @@ public class UserBrowserService {
     private final BrowserRuntime runtime;
     private final BrowserProfileStore profiles;
     private final CdpProbe cdp;
-    private final BrowserProperties properties;
+    private final LiveProperties<BrowserProperties> properties;
     private final Clock clock;
     private final BrowserScreens screens;
     private final ReentrantLock startLock = new ReentrantLock();
@@ -67,12 +68,12 @@ public class UserBrowserService {
 
     /** 기능이 켜져 있는가. 꺼져 있으면 상태 조회 말고 모든 쓰기가 {@code BROWSER_DISABLED} 다. */
     public boolean enabled() {
-        return properties.enabled();
+        return properties.current().enabled();
     }
 
     /** 자동 중지까지의 유휴 시간이다. 화면이 안내 문구에 쓴다. */
     public Duration idleTimeout() {
-        return properties.idleTimeout();
+        return properties.current().idleTimeout();
     }
 
     /** 관리자 목록이다. 모든 브라우저를 번호 순으로 돌려준다. */
@@ -126,7 +127,7 @@ public class UserBrowserService {
             // 끄다 실패해 컨테이너가 남은 FAILED 도 돌고 있을 수 있어 함께 센다
             long running = browsers.countByStatusIn(COUNTED)
                     + browsers.countByStatusAndContainerIdIsNotNull(UserBrowserStatus.FAILED);
-            if (running >= properties.maxRunning()) {
+            if (running >= properties.current().maxRunning()) {
                 throw new ApiException(ErrorCode.BROWSER_CAPACITY, "too many browsers are running");
             }
             browser.beginStart(clock.instant());
@@ -246,7 +247,7 @@ public class UserBrowserService {
     }
 
     private boolean awaitReady(String containerId) {
-        Instant deadline = clock.instant().plus(properties.startTimeout());
+        Instant deadline = clock.instant().plus(properties.current().startTimeout());
         while (true) {
             Optional<URI> address = runtime.cdpAddress(containerId);
             if (address.isPresent() && cdp.ready(address.get())) {
@@ -353,7 +354,7 @@ public class UserBrowserService {
     }
 
     private void requireEnabled() {
-        if (!properties.enabled()) {
+        if (!properties.current().enabled()) {
             throw new ApiException(ErrorCode.BROWSER_DISABLED, "user browser is disabled");
         }
     }

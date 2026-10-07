@@ -20,6 +20,9 @@ import com.bifos.assistant.orchestration.application.DelegationResult;
 import com.bifos.assistant.orchestration.domain.ChildResult;
 import com.bifos.assistant.proactive.application.ProactiveCheckGuard;
 import com.bifos.assistant.shared.auth.CurrentUser;
+import com.bifos.assistant.shared.concurrent.BackgroundTasks;
+import com.bifos.assistant.shared.concurrent.VirtualThreadBackgroundTasks;
+import com.bifos.assistant.shared.config.LiveProperties;
 import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.usage.application.ExecutionDeliveryWriter;
 import com.bifos.assistant.usage.domain.AgentExecution;
@@ -28,12 +31,17 @@ import com.bifos.assistant.usage.domain.type.ExecutionStatus;
 import com.bifos.assistant.usage.infra.AgentExecutionRepository;
 import java.time.Clock;
 import java.time.Duration;
+import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import org.junit.jupiter.api.BeforeEach;
@@ -60,6 +68,9 @@ class AgentDelegationServiceRaceTest {
     private final CurrentUser user = new CurrentUser(1L, "race-a@example.com", "가", 1L, UserRole.MEMBER);
     private final AgentExecution origin = mock(AgentExecution.class);
     private final ProactiveCheckGuard checkGuard = mock(ProactiveCheckGuard.class);
+    /** 서비스가 위임마다 읽는 설정이다. 서버 전체 한도를 바꾸는 검사만 새 값을 넣는다. */
+    private final AtomicReference<DelegationProperties> settings = new AtomicReference<>(withMaxActive(1));
+
     private AgentDelegationService delegations;
 
     @BeforeEach
@@ -75,19 +86,34 @@ class AgentDelegationServiceRaceTest {
         when(children.startableAgent(user, WORKER)).thenReturn(agent);
         // 보통 turn 의 위임을 본다. 살펴보기 트리를 보는 검사만 참으로 바꾼다.
         when(checkGuard.isCheckTree(any())).thenReturn(false);
-        // 서버 전체 한도를 1 로 둬, 거절한 요청이 자리를 돌려주지 않고 남기면 다음 요청이 BUSY 가 된다.
-        delegations = new AgentDelegationService(
+        delegations = service(new VirtualThreadBackgroundTasks());
+    }
+
+    /** 서버 전체 한도를 1 로 둬, 거절한 요청이 자리를 돌려주지 않고 남기면 다음 요청이 BUSY 가 된다. */
+    private AgentDelegationService service(BackgroundTasks backgroundTasks) {
+        return new AgentDelegationService(
                 mock(AgentService.class),
                 executions,
                 mock(ExecutionDeliveryWriter.class),
                 children,
                 conversations,
-                new DelegationProperties(2, 4, 1, SUBMIT_TIMEOUT, 100, Duration.ofSeconds(20)),
+                new LiveProperties<>() {
+                    @Override
+                    public DelegationProperties current() {
+                        return settings.get();
+                    }
+
+                    @Override
+                    public Class<DelegationProperties> type() {
+                        return DelegationProperties.class;
+                    }
+                },
                 mock(TurnCancellation.class),
                 mock(HermesRunsClient.class),
                 event -> {},
                 checkGuard,
-                Clock.systemUTC());
+                Clock.systemUTC(),
+                backgroundTasks);
     }
 
     @Test
@@ -133,6 +159,42 @@ class AgentDelegationServiceRaceTest {
                 .as("거절한 요청이 줄과 자리를 남기지 않아 같은 키로 새로 시작한다: %s", retried)
                 .isEqualTo(77L);
         assertThat(retried.status()).isEqualTo(ExecutionStatus.RUNNING);
+    }
+
+    @Test
+    @DisplayName("실행 스레드를 띄우지 못하면 SUBMIT FAILED 로 끝나고 동시 위임 자리를 돌려준다")
+    void returnsSlotAndSubmitFailedWhenRunThreadCannotStart() {
+        BackgroundTasks real = new VirtualThreadBackgroundTasks();
+        AtomicBoolean failNext = new AtomicBoolean(true);
+        // 첫 시작만 실패시키고 그 뒤는 실제로 띄운다. 스레드를 더 띄울 수 없는 상황과 같다.
+        BackgroundTasks failingOnce = new BackgroundTasks() {
+            @Override
+            public Thread start(String name, Runnable task) {
+                if (failNext.compareAndSet(true, false)) {
+                    throw new IllegalStateException("스레드를 띄우지 못했다");
+                }
+                return real.start(name, task);
+            }
+
+            @Override
+            public Thread unstarted(String name, Runnable task) {
+                return real.unstarted(name, task);
+            }
+        };
+        delegations = service(failingOnce);
+
+        DelegationResult failed = delegations.delegate(user, origin, key("call_start_failed"), WORKER, "시작이 실패한다");
+
+        assertThat(failed.failure()).as("시작이 실패한 요청: %s", failed).isEqualTo(DelegationResult.Failure.SUBMIT_FAILED);
+        verify(children, never()).delegate(any(), any(), any(), any(), any(), any(), any(), any(), any());
+
+        startsWithRow(78L);
+        DelegationResult next = delegations.delegate(user, origin, key("call_after_failure"), WORKER, "다음 요청");
+        assertThat(next.failure())
+                .as("서버 한도가 1 이라 자리를 돌려주지 않았으면 BUSY 다: %s", next)
+                .isNull();
+        assertThat(next.executionId()).as("다음 요청: %s", next).isEqualTo(78L);
+        assertThat(next.status()).isEqualTo(ExecutionStatus.RUNNING);
     }
 
     @Test
@@ -189,6 +251,70 @@ class AgentDelegationServiceRaceTest {
         Optional<AgentExecution> read = delegations.status(user, origin, 88L, Duration.ofSeconds(5));
 
         assertThat(read).as("다시 읽은 줄").containsSame(endedRow);
+    }
+
+    @Test
+    @DisplayName("서버 전체 동시 위임 한도는 위임마다 지금 설정을 읽고 끝난 실행이 돌려준 자리는 다시 얻는다")
+    void serverWideLimitReadsCurrentSettingsAndReusesReturnedSlot() throws Exception {
+        List<Thread> started = new CopyOnWriteArrayList<>();
+        BackgroundTasks real = new VirtualThreadBackgroundTasks();
+        // 띄운 실행 스레드를 모아, 자리를 돌려줄 때까지 기다린다.
+        BackgroundTasks recording = new BackgroundTasks() {
+            @Override
+            public Thread start(String name, Runnable task) {
+                Thread thread = real.start(name, task);
+                started.add(thread);
+                return thread;
+            }
+
+            @Override
+            public Thread unstarted(String name, Runnable task) {
+                return real.unstarted(name, task);
+            }
+        };
+        delegations = service(recording);
+        CountDownLatch finish = new CountDownLatch(1);
+        AtomicLong nextId = new AtomicLong(100L);
+        // 실행이 줄을 만들고 제출한 뒤 finish 까지 돌아, 그동안 자리를 쥔다.
+        when(children.delegate(any(), any(), any(), any(), any(), any(), any(), any(), any()))
+                .thenAnswer(invocation -> {
+                    long id = nextId.incrementAndGet();
+                    AgentExecution row = mock(AgentExecution.class);
+                    when(row.id()).thenReturn(id);
+                    Consumer<AgentExecution> onStarted = invocation.getArgument(6);
+                    BiConsumer<AgentExecution, String> onSubmitted = invocation.getArgument(7);
+                    onStarted.accept(row);
+                    onSubmitted.accept(row, "run-" + id);
+                    finish.await(10, TimeUnit.SECONDS);
+                    return ChildResult.succeeded(id, "답");
+                });
+
+        DelegationResult first = delegations.delegate(user, origin, key("call_limit_first"), WORKER, "첫 요청");
+        DelegationResult refused = delegations.delegate(user, origin, key("call_limit_second"), WORKER, "한도 1 의 둘째");
+
+        settings.set(withMaxActive(2));
+        DelegationResult second = delegations.delegate(user, origin, key("call_limit_third"), WORKER, "한도 2 의 둘째");
+
+        finish.countDown();
+        for (Thread thread : started) {
+            assertThat(thread.join(Duration.ofSeconds(10)))
+                    .as("실행 스레드 %s 가 끝났다", thread.getName())
+                    .isTrue();
+        }
+        settings.set(withMaxActive(1));
+        DelegationResult afterReturn = delegations.delegate(user, origin, key("call_limit_after"), WORKER, "돌려준 뒤");
+
+        assertThat(first.failure()).as("한도 1 의 첫 요청: %s", first).isNull();
+        assertThat(refused.failure()).as("한도 1 에서 자리를 쥔 동안의 둘째: %s", refused).isEqualTo(DelegationResult.Failure.BUSY);
+        assertThat(second.failure()).as("한도를 2 로 올린 뒤의 둘째: %s", second).isNull();
+        assertThat(afterReturn.failure())
+                .as("두 실행이 자리를 돌려준 뒤 한도 1 의 요청: %s", afterReturn)
+                .isNull();
+    }
+
+    /** 서버 전체 한도만 다른 위임 설정이다. 나머지는 {@link #service} 의 기본값과 같다. */
+    private static DelegationProperties withMaxActive(int maxActive) {
+        return new DelegationProperties(2, 4, maxActive, SUBMIT_TIMEOUT, 100, Duration.ofSeconds(20));
     }
 
     /** 이 대화에서 요청자가 맡긴 위임 실행 줄이다. */

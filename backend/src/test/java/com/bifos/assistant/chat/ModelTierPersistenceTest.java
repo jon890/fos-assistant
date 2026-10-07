@@ -15,19 +15,17 @@ import com.bifos.assistant.model.domain.ModelChoice;
 import com.bifos.assistant.model.domain.type.ModelTier;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.domain.type.UserRole;
+import com.bifos.assistant.testsupport.BackendIntegrationTest;
 import java.time.Instant;
 import java.util.List;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /** 실제 저장소에서 그룹 단계 정의를 교체할 때 unique 제약을 지키는지 확인한다. */
-@SpringBootTest
-@ActiveProfiles("test")
+@BackendIntegrationTest
 class ModelTierPersistenceTest {
 
     private static final Agent AGENT = Agent.of(

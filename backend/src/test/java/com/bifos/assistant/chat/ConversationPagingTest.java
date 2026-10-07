@@ -30,6 +30,7 @@ import com.bifos.assistant.shared.auth.CurrentUserProvider;
 import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
+import com.bifos.assistant.testsupport.BackendIntegrationTest;
 import com.bifos.assistant.usage.infra.AgentExecutionRepository;
 import com.bifos.assistant.usage.infra.ExecutionEventRepository;
 import com.bifos.assistant.user.application.UserDisplayNameService;
@@ -43,12 +44,9 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.test.context.ActiveProfiles;
 
 /** 대화 목록을 cursor 로 쪽마다 읽는 동작을 본다. */
-@SpringBootTest
-@ActiveProfiles("test")
+@BackendIntegrationTest
 class ConversationPagingTest {
 
     private static final Instant BASE = Instant.parse("2026-01-01T00:00:00Z");

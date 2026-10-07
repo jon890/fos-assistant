@@ -9,6 +9,7 @@ import com.bifos.assistant.chat.infra.ChatMessageRepository;
 import com.bifos.assistant.chat.infra.ConversationRepository;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
+import com.bifos.assistant.testsupport.BackendIntegrationTest;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
@@ -23,15 +24,12 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /** 메시지 저장과 빈 작업 대화 삭제를 별도 트랜잭션에서 경합시킨다. MySQL 검사도 같은 계약을 상속한다. */
-@SpringBootTest
-@ActiveProfiles("test")
+@BackendIntegrationTest
 class ChatMessageParentGuardTest {
 
     @Autowired

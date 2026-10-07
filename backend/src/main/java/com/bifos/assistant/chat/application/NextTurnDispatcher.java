@@ -5,6 +5,7 @@ import com.bifos.assistant.chat.domain.Conversation;
 import com.bifos.assistant.chat.infra.ChatPendingMessageRepository;
 import com.bifos.assistant.chat.infra.ConversationRepository;
 import com.bifos.assistant.shared.auth.CurrentUser;
+import com.bifos.assistant.shared.concurrent.BackgroundTasks;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.user.domain.AppUser;
@@ -56,6 +57,7 @@ public class NextTurnDispatcher {
     private final ChatService chat;
     private final ConversationEventHub hub;
     private final TransactionTemplate transactions;
+    private final BackgroundTasks backgroundTasks;
 
     private final Clock clock = Clock.systemUTC();
 
@@ -191,9 +193,8 @@ public class NextTurnDispatcher {
         CurrentUser current =
                 new CurrentUser(owner.id(), owner.email(), owner.displayName(), owner.groupId(), owner.role());
         try {
-            Thread.ofVirtual()
-                    .name("pending-turn-" + conversationId)
-                    .start(() -> runQueuedTurn(current, conversation, handle, ids));
+            backgroundTasks.start(
+                    "pending-turn-" + conversationId, () -> runQueuedTurn(current, conversation, handle, ids));
         } catch (RuntimeException | Error ex) {
             log.warn("대기 메시지 turn 스레드를 띄우지 못했다 conversationId={}", conversationId, ex);
             turns.close(handle);

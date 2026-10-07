@@ -19,9 +19,11 @@ import com.bifos.assistant.browser.infra.BrowserProperties;
 import com.bifos.assistant.browser.infra.UserBrowserRepository;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.auth.CurrentUserProvider;
+import com.bifos.assistant.shared.config.LiveProperties;
 import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.shared.error.GlobalExceptionHandler;
+import com.bifos.assistant.testsupport.BackendIntegrationTest;
 import com.bifos.assistant.user.application.UserDisplayNameService;
 import java.net.URI;
 import java.time.Clock;
@@ -34,11 +36,9 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
@@ -48,8 +48,7 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
  *
  * <p>요청자는 인증 필터가 채우는 것과 같은 보안 문맥으로 넣는다. 서비스는 실제 DB 와 대역 proxy 로 돈다.
  */
-@SpringBootTest
-@ActiveProfiles("test")
+@BackendIntegrationTest
 class UserBrowserControllerTest {
 
     private static final CurrentUser MEMBER = new CurrentUser(301L, "kid@example.com", "아이", 1L, UserRole.MEMBER);
@@ -172,9 +171,13 @@ class UserBrowserControllerTest {
                 runtime(),
                 profiles(),
                 address -> true,
-                properties(enabled),
+                LiveProperties.fixed(BrowserProperties.class, properties(enabled)),
                 Clock.systemUTC(),
-                new BrowserScreens(new FakeCdp(), new FakeCdp(), new BrowserUsage(), properties(enabled)));
+                new BrowserScreens(
+                        new FakeCdp(),
+                        new FakeCdp(),
+                        new BrowserUsage(),
+                        LiveProperties.fixed(BrowserProperties.class, properties(enabled))));
         CurrentUserProvider currentUser = new CurrentUserProvider();
         UserDisplayNameService names = mock(UserDisplayNameService.class);
         when(names.find(MEMBER.id())).thenReturn("아이");

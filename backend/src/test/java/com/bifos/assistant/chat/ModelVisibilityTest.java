@@ -28,6 +28,7 @@ import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
+import com.bifos.assistant.testsupport.BackendIntegrationTest;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -38,13 +39,10 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /** 그룹의 모델 숨김과 에이전트 기본 모델이 목록, 저장 검증, 실행 검증에 같은 규칙으로 걸리는지 본다. */
-@SpringBootTest
-@ActiveProfiles("test")
+@BackendIntegrationTest
 class ModelVisibilityTest {
 
     private static final Long GROUP_ID = 9_000_000_003L;

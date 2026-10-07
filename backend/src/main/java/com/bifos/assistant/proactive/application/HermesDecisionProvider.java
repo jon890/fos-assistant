@@ -16,6 +16,7 @@ import com.bifos.assistant.proactive.domain.DecisionQuestion;
 import com.bifos.assistant.proactive.domain.DecisionResult;
 import com.bifos.assistant.proactive.domain.DecisionState;
 import com.bifos.assistant.proactive.domain.type.DecisionFailure;
+import com.bifos.assistant.shared.concurrent.BackgroundTasks;
 import com.bifos.assistant.shared.util.ExternalData;
 import com.bifos.assistant.usage.application.ExecutionRecorder;
 import com.bifos.assistant.usage.application.UserExecutionLimiter;
@@ -67,6 +68,7 @@ public class HermesDecisionProvider implements DecisionProvider {
     private final ExecutionRecorder executions;
     private final UserExecutionLimiter limiter;
     private final ObjectMapper json;
+    private final BackgroundTasks backgroundTasks;
 
     @Override
     public String id() {
@@ -137,7 +139,7 @@ public class HermesDecisionProvider implements DecisionProvider {
 
     private HermesRunResult await(HermesRunCommand command, String runId) throws Exception {
         FutureTask<HermesRunResult> pending = new FutureTask<>(() -> hermes.awaitCompletion(command, runId));
-        Thread.ofVirtual().name("value-evaluation-" + runId).start(pending);
+        backgroundTasks.start("value-evaluation-" + runId, pending);
         try {
             return pending.get(properties.timeout().toMillis(), TimeUnit.MILLISECONDS);
         } finally {

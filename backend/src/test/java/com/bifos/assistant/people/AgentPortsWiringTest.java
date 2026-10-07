@@ -7,6 +7,7 @@ import com.bifos.assistant.agent.application.ReservedProfileNames;
 import com.bifos.assistant.people.application.HermesProfileProvisioner;
 import com.bifos.assistant.people.domain.AllowedPerson;
 import com.bifos.assistant.people.infra.AllowedPersonRepository;
+import com.bifos.assistant.testsupport.BackendIntegrationTest;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
@@ -15,12 +16,9 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.test.context.ActiveProfiles;
 
 /** {@code agent} 가 둔 port 둘을 {@code people} 의 구현이 채우는지 확인한다(ADR-068). */
-@SpringBootTest
-@ActiveProfiles("test")
+@BackendIntegrationTest
 class AgentPortsWiringTest {
 
     @Autowired

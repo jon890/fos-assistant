@@ -3,6 +3,7 @@ package com.bifos.assistant.people;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -18,14 +19,12 @@ import com.bifos.assistant.people.domain.AllowedPerson;
 import com.bifos.assistant.people.infra.AllowedPersonRepository;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
+import com.bifos.assistant.testsupport.BackendIntegrationTest;
 import java.time.Instant;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.test.context.ActiveProfiles;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 /**
  * 사람 하나를 더하는 순서와 실패했을 때 되돌리는 것을 본다.
@@ -33,8 +32,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
  * <p>Hermes 쪽은 대역으로 바꿔 끼우고 우리 표는 실제 저장소를 쓴다. 「행이 남지 않았다」를 단언하려면
  * 실제로 저장되고 실제로 지워지는 것을 봐야 하기 때문이다.
  */
-@SpringBootTest
-@ActiveProfiles("test")
+@BackendIntegrationTest
 class PersonRegistrarTest {
 
     private static final String EMAIL = "aunt@example.com";
@@ -51,11 +49,13 @@ class PersonRegistrarTest {
     AgentRepository agents;
 
     /** 실제 Hermes 대시보드를 부르지 않는다. 언제 불렸는지와 실패했을 때를 여기서 정한다. */
-    @MockitoBean
+    @Autowired
     HermesProfileProvisioner profiles;
 
     @BeforeEach
     void setUp() {
+        doNothing().when(profiles).provision(any());
+        doNothing().when(profiles).deprovision(any());
         people.deleteAll();
         agents.deleteAll();
     }

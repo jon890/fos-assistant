@@ -45,6 +45,7 @@ import com.bifos.assistant.proactive.infra.ProactiveCheckRepository;
 import com.bifos.assistant.proactive.infra.ValueEvaluationRepository;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.domain.type.UserRole;
+import com.bifos.assistant.testsupport.BackendIntegrationTest;
 import com.bifos.assistant.usage.domain.AgentExecution;
 import com.bifos.assistant.usage.domain.type.ExecutionStatus;
 import com.bifos.assistant.usage.infra.AgentExecutionRepository;
@@ -63,17 +64,14 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /**
  * 커리어 매일 깨우기의 합성 시나리오로 판단 피드백의 기록 지점과 replay 읽기 모델을 본다. 보고를 보인 살펴보기, 알릴 것이 없던 침묵, 그
  * 살펴보기 트리에서 나온 할 일과 Memory 제안, 사용자의 반응, 대화 삭제가 한 결정으로 이어지는지 확인한다. 실제 개인 정보는 쓰지 않는다.
  */
-@SpringBootTest
-@ActiveProfiles("test")
+@BackendIntegrationTest
 class DecisionFeedbackFlowTest {
 
     private static final String FIRST_TITLE = "합성 공고 마감 확인";

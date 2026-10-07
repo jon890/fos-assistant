@@ -5,6 +5,7 @@ import com.bifos.assistant.browser.application.model.BrowserScreenSink;
 import com.bifos.assistant.browser.domain.CdpConnector;
 import com.bifos.assistant.browser.domain.CdpTargets;
 import com.bifos.assistant.browser.infra.BrowserProperties;
+import com.bifos.assistant.shared.config.LiveProperties;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import java.net.URI;
@@ -13,6 +14,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
+import java.util.function.Supplier;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
@@ -34,19 +36,33 @@ public class BrowserScreens implements AutoCloseable {
     private final CdpTargets targets;
     private final CdpConnector connector;
     private final BrowserUsage usage;
-    private final Duration timeout;
+    /** 화면을 열 때마다 읽는다. 운영 설정을 바꾸면 다음 화면부터 적용된다. */
+    private final Supplier<Duration> timeout;
+
     private final Duration tabInterval;
     private final ScheduledThreadPoolExecutor scheduler;
     private final Map<Long, BrowserScreenSession> screens = new ConcurrentHashMap<>();
 
     @Autowired
     public BrowserScreens(
-            CdpTargets targets, CdpConnector connector, BrowserUsage usage, BrowserProperties properties) {
-        this(targets, connector, usage, properties.screenTimeout(), TAB_INTERVAL);
+            CdpTargets targets,
+            CdpConnector connector,
+            BrowserUsage usage,
+            LiveProperties<BrowserProperties> properties) {
+        this(targets, connector, usage, () -> properties.current().screenTimeout(), TAB_INTERVAL);
     }
 
     BrowserScreens(
             CdpTargets targets, CdpConnector connector, BrowserUsage usage, Duration timeout, Duration tabInterval) {
+        this(targets, connector, usage, () -> timeout, tabInterval);
+    }
+
+    private BrowserScreens(
+            CdpTargets targets,
+            CdpConnector connector,
+            BrowserUsage usage,
+            Supplier<Duration> timeout,
+            Duration tabInterval) {
         this.targets = targets;
         this.connector = connector;
         this.usage = usage;
@@ -66,7 +82,7 @@ public class BrowserScreens implements AutoCloseable {
             previous.close(BrowserScreenSession.REPLACED);
         }
         try {
-            session.start(url, timeout, tabInterval);
+            session.start(url, timeout.get(), tabInterval);
         } catch (RuntimeException ex) {
             String error = ex.getClass().getSimpleName();
             log.warn("browser screen could not attach id={} error={}", browserId, error);

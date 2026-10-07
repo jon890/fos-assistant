@@ -20,6 +20,7 @@ import com.bifos.assistant.hermes.dto.HermesRunResult;
 import com.bifos.assistant.hermes.dto.TokenUsage;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.domain.type.UserRole;
+import com.bifos.assistant.testsupport.BackendIntegrationTest;
 import com.bifos.assistant.usage.infra.AgentExecutionRepository;
 import com.bifos.assistant.user.domain.AppUser;
 import com.bifos.assistant.user.infra.AppUserRepository;
@@ -28,28 +29,11 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.context.TestConfiguration;
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Import;
-import org.springframework.context.annotation.Primary;
-import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
 
 /** 보관 기간이 지나 사라진 사진은 다시 생성 Hermes 입력에 넣지 않는다. */
-@SpringBootTest
-@ActiveProfiles("test")
-@Import(RegenerateDeletedAttachmentTest.StubRuntime.class)
+@BackendIntegrationTest
 class RegenerateDeletedAttachmentTest {
-
-    @TestConfiguration
-    static class StubRuntime {
-        @Bean
-        @Primary
-        StubHermesRunsClient stubHermesRunsClient() {
-            return new StubHermesRunsClient();
-        }
-    }
 
     @Autowired
     ChatService chat;
@@ -86,6 +70,9 @@ class RegenerateDeletedAttachmentTest {
         messages.deleteAll();
         agents.deleteAll();
         users.deleteAll();
+        // 검사 트랜잭션 안에서 지운다. Hibernate 는 넣기를 지우기보다 먼저 내보내므로,
+        // 앞 검사가 남긴 같은 code 의 에이전트와 부딪히지 않게 지우기를 먼저 내보낸다
+        users.flush();
     }
 
     @Test

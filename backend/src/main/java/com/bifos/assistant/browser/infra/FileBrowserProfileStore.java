@@ -1,6 +1,7 @@
 package com.bifos.assistant.browser.infra;
 
 import com.bifos.assistant.browser.domain.BrowserProfileStore;
+import com.bifos.assistant.shared.config.LiveProperties;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
@@ -34,7 +35,7 @@ public class FileBrowserProfileStore implements BrowserProfileStore {
     private static final byte[] SESSION_RESTORE =
             "{\"session\":{\"restore_on_startup\":1}}".getBytes(StandardCharsets.UTF_8);
 
-    private final BrowserProperties properties;
+    private final LiveProperties<BrowserProperties> properties;
 
     @Override
     public void ensure(String profileKey) {
@@ -122,7 +123,7 @@ public class FileBrowserProfileStore implements BrowserProfileStore {
         if (profileKey == null || !KEY.matcher(profileKey).matches()) {
             throw new IllegalArgumentException("browser profile key is not valid");
         }
-        String root = properties.profileRoot();
+        String root = properties.current().profileRoot();
         if (root == null || root.isBlank()) {
             throw new IllegalStateException("assistant.browser.profile-root is not configured");
         }

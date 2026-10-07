@@ -3,6 +3,7 @@ package com.bifos.assistant.browser.infra;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.bifos.assistant.shared.config.LiveProperties;
 import java.nio.file.Files;
 import java.nio.file.LinkOption;
 import java.nio.file.Path;
@@ -26,23 +27,25 @@ class FileBrowserProfileStoreTest {
     @BeforeEach
     void setUp() {
         root = temp.resolve("profiles");
-        store = new FileBrowserProfileStore(new BrowserProperties(
-                false,
-                null,
-                null,
-                null,
-                null,
-                root.toString(),
-                null,
-                null,
-                1024,
-                null,
-                null,
-                null,
-                2,
-                Duration.ofMinutes(10),
-                Duration.ofSeconds(30),
-                Duration.ofMinutes(30)));
+        store = new FileBrowserProfileStore(LiveProperties.fixed(
+                BrowserProperties.class,
+                new BrowserProperties(
+                        false,
+                        null,
+                        null,
+                        null,
+                        null,
+                        root.toString(),
+                        null,
+                        null,
+                        1024,
+                        null,
+                        null,
+                        null,
+                        2,
+                        Duration.ofMinutes(10),
+                        Duration.ofSeconds(30),
+                        Duration.ofMinutes(30))));
     }
 
     @Test

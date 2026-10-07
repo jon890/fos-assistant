@@ -10,8 +10,11 @@ import com.bifos.assistant.browser.domain.CdpTarget;
 import com.bifos.assistant.browser.domain.type.UserBrowserStatus;
 import com.bifos.assistant.browser.infra.BrowserProperties;
 import com.bifos.assistant.browser.infra.UserBrowserRepository;
+import com.bifos.assistant.shared.config.LiveProperties;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
+import com.bifos.assistant.testsupport.BackendIntegrationTest;
+import com.bifos.assistant.testsupport.FakeBrowserRuntime;
 import java.net.URI;
 import java.sql.Timestamp;
 import java.time.Clock;
@@ -23,13 +26,10 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.test.context.ActiveProfiles;
 
 /** 브라우저마다 화면 하나, 끄기와 화면 닫기, 자동 중지와 화면의 관계를 실제 DB 와 대역 proxy, 대역 CDP 로 본다. */
-@SpringBootTest
-@ActiveProfiles("test")
+@BackendIntegrationTest
 class BrowserScreensTest {
 
     private static final URI CDP = URI.create("http://192.0.2.10:9999");
@@ -55,7 +55,13 @@ class BrowserScreensTest {
         screens = new BrowserScreens(cdp, cdp, usage, Duration.ofMinutes(30), Duration.ofHours(1));
         FakeBrowserRuntime runtime = new FakeBrowserRuntime();
         service = new UserBrowserService(
-                repository, runtime, profiles(), address -> true, properties(), Clock.systemUTC(), screens);
+                repository,
+                runtime,
+                profiles(),
+                address -> true,
+                LiveProperties.fixed(BrowserProperties.class, properties()),
+                Clock.systemUTC(),
+                screens);
         sweeper = new UserBrowserSweeper(service, repository, runtime, usage, userId -> true, Clock.systemUTC());
     }
 

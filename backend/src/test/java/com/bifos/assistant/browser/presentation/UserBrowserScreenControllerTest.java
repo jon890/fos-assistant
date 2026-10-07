@@ -19,8 +19,10 @@ import com.bifos.assistant.browser.infra.BrowserProperties;
 import com.bifos.assistant.browser.infra.UserBrowserRepository;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.auth.CurrentUserProvider;
+import com.bifos.assistant.shared.config.LiveProperties;
 import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.shared.error.GlobalExceptionHandler;
+import com.bifos.assistant.testsupport.BackendIntegrationTest;
 import java.net.URI;
 import java.time.Clock;
 import java.time.Duration;
@@ -31,12 +33,10 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.ResultActions;
@@ -47,8 +47,7 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
  *
  * <p>요청자는 인증 필터가 채우는 것과 같은 보안 문맥으로 넣는다. 서비스는 실제 DB 와 대역 proxy, 대역 CDP 로 돈다.
  */
-@SpringBootTest
-@ActiveProfiles("test")
+@BackendIntegrationTest
 class UserBrowserScreenControllerTest {
 
     private static final CurrentUser OWNER = new CurrentUser(311L, "owner@example.com", "주인", 1L, UserRole.MEMBER);
@@ -181,9 +180,16 @@ class UserBrowserScreenControllerTest {
     }
 
     private MockMvc mvc(boolean enabled) {
-        screens = new BrowserScreens(cdp, cdp, new BrowserUsage(), properties(enabled));
+        screens = new BrowserScreens(
+                cdp, cdp, new BrowserUsage(), LiveProperties.fixed(BrowserProperties.class, properties(enabled)));
         UserBrowserService service = new UserBrowserService(
-                repository, runtime(), profiles(), address -> true, properties(enabled), Clock.systemUTC(), screens);
+                repository,
+                runtime(),
+                profiles(),
+                address -> true,
+                LiveProperties.fixed(BrowserProperties.class, properties(enabled)),
+                Clock.systemUTC(),
+                screens);
         return MockMvcBuilders.standaloneSetup(new UserBrowserController(service, new CurrentUserProvider()))
                 .setControllerAdvice(new GlobalExceptionHandler())
                 .build();

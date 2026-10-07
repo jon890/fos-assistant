@@ -7,6 +7,7 @@ import com.bifos.assistant.hermes.HermesToolsetClient;
 import com.bifos.assistant.proactive.application.model.CheckBlocker;
 import com.bifos.assistant.proactive.application.model.CheckBlockerCode;
 import com.bifos.assistant.proactive.application.model.CheckReadiness;
+import com.bifos.assistant.shared.config.LiveProperties;
 import com.bifos.assistant.skill.application.SkillCommandCatalog;
 import java.util.ArrayList;
 import java.util.List;
@@ -45,14 +46,14 @@ public class ProactiveCheckReadiness {
     /** 무엇을 읽고 무엇을 고를지 정하는 분야 지침 스킬의 이름이다. */
     static final String SKILL_NAME = "proactive-check";
 
-    private final ProactiveCheckProperties properties;
+    private final LiveProperties<ProactiveCheckProperties> properties;
     private final SkillCommandCatalog skills;
     private final HermesToolsetClient toolsets;
     private final AgentConnectorBindings connectorBindings;
 
     public CheckReadiness check(Agent agent) {
         List<CheckBlocker> blockers = new ArrayList<>();
-        if (!properties.enabled()) {
+        if (!properties.current().enabled()) {
             blockers.add(CheckBlocker.of(CheckBlockerCode.DISABLED));
         }
         // 커넥터 에이전트와 흐름이 붙은 에이전트는 살펴보기를 하지 않으므로 Hermes 를 부를 까닭이 없다.

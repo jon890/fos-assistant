@@ -91,7 +91,8 @@ class ProactiveCheckResults {
             return new CheckAnswer(NOTHING_NEW_NOTICE, true, false);
         }
         Instant now = deps.clock().instant();
-        Set<AnnouncedKey> announced = announcedSince(now.minus(deps.properties().digestWindow()));
+        Set<AnnouncedKey> announced =
+                announcedSince(now.minus(deps.properties().current().digestWindow()));
         List<JudgedFinding> judged = block.findings().stream()
                 .map(finding -> FindingJudgement.judge(finding, check.startedAt(), now, announced))
                 .toList();
@@ -117,7 +118,7 @@ class ProactiveCheckResults {
                                 block.problemCandidates(),
                                 judged,
                                 acceptedProblemKeysSince(
-                                        now.minus(deps.properties().digestWindow())),
+                                        now.minus(deps.properties().current().digestWindow())),
                                 title -> deps.followUps().hasOpenWithTitle(owner.id(), title))
                         .stream()
                         .map(each -> problemRow(each, now))

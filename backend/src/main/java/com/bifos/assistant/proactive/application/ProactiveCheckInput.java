@@ -111,8 +111,8 @@ class ProactiveCheckInput {
                 .findByConversationIdAndKindAndCreatedAtAfterOrderByIdDesc(
                         check.conversationId(),
                         FindingKind.NEW,
-                        now.minus(deps.properties().digestWindow()),
-                        PageRequest.ofSize(deps.properties().digestMaxItems()));
+                        now.minus(deps.properties().current().digestWindow()),
+                        PageRequest.ofSize(deps.properties().current().digestMaxItems()));
         if (recent.isEmpty()) {
             return NO_RECENT_FINDINGS;
         }
@@ -147,8 +147,8 @@ class ProactiveCheckInput {
                 .findByConversationIdAndStatusAndCreatedAtAfterOrderByIdDesc(
                         check.conversationId(),
                         ProblemStatus.ACCEPTED,
-                        now.minus(deps.properties().digestWindow()),
-                        PageRequest.ofSize(deps.properties().digestMaxItems()));
+                        now.minus(deps.properties().current().digestWindow()),
+                        PageRequest.ofSize(deps.properties().current().digestMaxItems()));
         if (recent.isEmpty()) {
             return NO_RECENT_PROBLEMS;
         }

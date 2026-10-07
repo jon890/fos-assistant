@@ -1,6 +1,7 @@
 package com.bifos.assistant.chat.application;
 
 import com.bifos.assistant.hermes.HermesRunsClient;
+import com.bifos.assistant.shared.concurrent.BackgroundTasks;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.usage.application.TurnSlot;
@@ -35,14 +36,17 @@ public class TurnCancellation {
     private final Duration streamGrace;
     private final List<Consumer<TurnClosed>> closeListeners = new CopyOnWriteArrayList<>();
     private final UserExecutionLimiter limiter;
+    private final BackgroundTasks backgroundTasks;
 
     public TurnCancellation(
             HermesRunsClient hermes,
             @Value("${assistant.chat.stop-stream-grace:10s}") Duration streamGrace,
-            UserExecutionLimiter limiter) {
+            UserExecutionLimiter limiter,
+            BackgroundTasks backgroundTasks) {
         this.hermes = hermes;
         this.streamGrace = streamGrace;
         this.limiter = limiter;
+        this.backgroundTasks = backgroundTasks;
     }
 
     /**
@@ -253,7 +257,7 @@ public class TurnCancellation {
         handle.closeTask = scheduler.schedule(
                 () -> {
                     handle.streamGraceExpired.complete(null);
-                    Thread.startVirtualThread(() -> closeStream(handle));
+                    startCloseStream(handle);
                 },
                 streamGrace.toMillis(),
                 TimeUnit.MILLISECONDS);
@@ -351,8 +355,12 @@ public class TurnCancellation {
     public void attachStream(TurnHandle handle, Closeable stream) {
         handle.stream = stream;
         if (handle.streamGraceExpired.isDone()) {
-            Thread.startVirtualThread(() -> closeStream(handle));
+            startCloseStream(handle);
         }
+    }
+
+    private void startCloseStream(TurnHandle handle) {
+        backgroundTasks.start("turn-stream-close-" + handle.conversationId, () -> closeStream(handle));
     }
 
     public void detachStream(TurnHandle handle) {

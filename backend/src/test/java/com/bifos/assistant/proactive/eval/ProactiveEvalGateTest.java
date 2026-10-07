@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.fail;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.when;
 
 import com.bifos.assistant.agent.application.AgentConnectorBindings;
@@ -53,14 +54,18 @@ import com.bifos.assistant.proactive.eval.EvalScoreboard.RunOutcome;
 import com.bifos.assistant.proactive.infra.ProactiveCheckProblemRepository;
 import com.bifos.assistant.proactive.infra.ProactiveCheckRepository;
 import com.bifos.assistant.shared.auth.CurrentUser;
+import com.bifos.assistant.shared.config.LiveProperties;
 import com.bifos.assistant.shared.domain.type.UserRole;
+import com.bifos.assistant.testsupport.BackendIntegrationTest;
+import com.bifos.assistant.testsupport.LongProactiveCheckTimeouts;
+import com.bifos.assistant.testsupport.OverrideProperties;
+import com.bifos.assistant.testsupport.TestClock;
 import com.bifos.assistant.user.domain.AppUser;
 import com.bifos.assistant.user.infra.AppUserRepository;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -77,14 +82,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.context.TestConfiguration;
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Import;
-import org.springframework.context.annotation.Primary;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.test.context.ActiveProfiles;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.node.ArrayNode;
 import tools.jackson.databind.node.ObjectNode;
@@ -97,14 +95,9 @@ import tools.jackson.databind.node.ObjectNode;
  * 않는다. 경계(approval bypass, permission bypass, 근거가 약한 자동 실행, 자동 실행 결과 노출)가 하나라도 깨지면 실패한다. 자동 실행의 대역 답은 새 발견과 할 일 후보를 담아 노출 검사가 걸릴 수 있게 한다. 품질 지표는
  * 보고서에만 남기고 승자를 정하지 않는다.
  */
-@SpringBootTest(
-        properties = {
-            "hermes.run-timeout=30s",
-            "assistant.proactive-check.max-duration=20s",
-            "assistant.autonomy.execution-enabled=true"
-        })
-@ActiveProfiles("test")
-@Import(ProactiveEvalGateTest.Providers.class)
+@BackendIntegrationTest
+@LongProactiveCheckTimeouts
+@OverrideProperties("assistant.autonomy.execution-enabled=true")
 class ProactiveEvalGateTest {
 
     static final EvalDataset DATASET = EvalDataset.load();
@@ -115,53 +108,6 @@ class ProactiveEvalGateTest {
     private static final JsonMapper JSON = JsonMapper.builder().build();
     /** 시나리오마다 이 시각에서 시작한다. 살펴보기, 판단, 행동 정책이 모두 이 시계를 쓴다. */
     private static final Instant BASE = Instant.parse("2026-11-02T00:00:00Z");
-
-    private static final EvalClock CLOCK = new EvalClock(BASE);
-
-    @TestConfiguration
-    static class Providers {
-        @Bean
-        @Primary
-        StubHermesRunsClient evalStubHermesRunsClient() {
-            return new StubHermesRunsClient();
-        }
-
-        @Bean
-        @Primary
-        Clock evalClock() {
-            return CLOCK;
-        }
-
-        @Bean
-        ReplayDecisionProvider fixtureA() {
-            return new ReplayDecisionProvider("fixture-a", ReplayDecisionProvider.Mode.REPLAY, DATASET);
-        }
-
-        @Bean
-        ReplayDecisionProvider fixtureB() {
-            return new ReplayDecisionProvider("fixture-b", ReplayDecisionProvider.Mode.REPLAY, DATASET);
-        }
-
-        @Bean
-        ReplayDecisionProvider fixtureUnavailable() {
-            return new ReplayDecisionProvider("fixture-unavailable", ReplayDecisionProvider.Mode.UNAVAILABLE, DATASET);
-        }
-
-        @Bean
-        ReplayDecisionProvider fixtureTimeout() {
-            return new ReplayDecisionProvider("fixture-timeout", ReplayDecisionProvider.Mode.TIMEOUT, DATASET);
-        }
-
-        @Bean
-        ReplayDecisionProvider fixtureError() {
-            return new ReplayDecisionProvider("fixture-error", ReplayDecisionProvider.Mode.ERROR, DATASET);
-        }
-
-        @Bean
-        ReplayDecisionProvider fixtureInvalid() {
-            return new ReplayDecisionProvider("fixture-invalid", ReplayDecisionProvider.Mode.INVALID, DATASET);
-        }
-    }
 
     @Autowired
     ProactiveCheckService checkService;
@@ -176,7 +122,10 @@ class ProactiveEvalGateTest {
     DecisionFeedbackExporter exporter;
 
     @Autowired
-    AutonomyProperties autonomyProperties;
+    LiveProperties<AutonomyProperties> autonomyProperties;
+
+    @Autowired
+    TestClock clock;
 
     @Autowired
     List<ReplayDecisionProvider> providers;
@@ -205,16 +154,16 @@ class ProactiveEvalGateTest {
     @Autowired
     JdbcTemplate jdbc;
 
-    @MockitoBean
+    @Autowired
     HermesToolsetClient toolsets;
 
-    @MockitoBean
+    @Autowired
     HermesSkillClient skillClient;
 
-    @MockitoBean
+    @Autowired
     AgentConnectorBindings connectorBindings;
 
-    @MockitoBean
+    @Autowired
     HermesRunEventStream eventStream;
 
     private final List<Long> createdUsers = new ArrayList<>();
@@ -224,7 +173,7 @@ class ProactiveEvalGateTest {
         stub().reset();
         when(toolsets.readEnabled(anyString(), anyString())).thenReturn(List.of("web", "skills", "fos-assistant"));
         when(skillClient.list(anyString())).thenReturn(List.of(new HermesSkill("proactive-check", "살펴보기", true)));
-        when(connectorBindings.connectorServers(any())).thenReturn(Set.of());
+        doReturn(Set.of()).when(connectorBindings).connectorServers(any());
     }
 
     @AfterEach
@@ -311,17 +260,17 @@ class ProactiveEvalGateTest {
     /** 사용자와 에이전트를 새로 만들어 시나리오 하나를 끝까지 돈다. */
     private RunOutcome run(Scenario scenario, String providerId) {
         stub().reset();
-        CLOCK.set(BASE);
+        clock.set(BASE);
         CurrentUser user = newUser();
         Agent agent = newAgent(user, scenario.agentWritesAllowed());
         autonomy.changeReadOnlyExecution(user, true);
         for (EvalDataset.Check earlier : scenario.historyOrEmpty()) {
             runCheck(user, agent, earlier);
-            CLOCK.advance(Duration.ofHours(scenario.historyGapHours()));
+            clock.advance(Duration.ofHours(scenario.historyGapHours()));
         }
         ProactiveCheck check = runCheck(user, agent, scenario.check());
         List<ProactiveCheckProblem> found = problems.findByCheckIdInOrderByIdAsc(List.of(check.id()));
-        CLOCK.advance(Duration.ofHours(scenario.decisionDelayHours()));
+        clock.advance(Duration.ofHours(scenario.decisionDelayHours()));
 
         ReplayDecisionProvider provider = provider(providerId);
         int callsBefore = provider.calls();
@@ -426,11 +375,18 @@ class ProactiveEvalGateTest {
      * replay 다.
      */
     private boolean weakBasis(AutonomyInputs inputs, List<AutonomyReason> reasons) {
-        boolean staleEvidence =
-                olderThan(inputs.evidenceCheckedAt(), inputs.decidedAt(), autonomyProperties.maxEvidenceAge());
-        boolean staleEvaluation =
-                olderThan(inputs.evaluatedAt(), inputs.decidedAt(), autonomyProperties.maxEvaluationAge())
-                        || olderThan(inputs.asOf(), inputs.decidedAt(), autonomyProperties.maxEvaluationAge());
+        boolean staleEvidence = olderThan(
+                inputs.evidenceCheckedAt(),
+                inputs.decidedAt(),
+                autonomyProperties.current().maxEvidenceAge());
+        boolean staleEvaluation = olderThan(
+                        inputs.evaluatedAt(),
+                        inputs.decidedAt(),
+                        autonomyProperties.current().maxEvaluationAge())
+                || olderThan(
+                        inputs.asOf(),
+                        inputs.decidedAt(),
+                        autonomyProperties.current().maxEvaluationAge());
         boolean lowCandidate =
                 !"MEDIUM".equals(inputs.candidateConfidence()) && !"HIGH".equals(inputs.candidateConfidence());
         boolean lowJudgement = !confident(inputs.judgementConfidence())
@@ -481,8 +437,8 @@ class ProactiveEvalGateTest {
     }
 
     /** fixture 의 발견과 문제 후보로 버전 3 결과 블록을 만든다. 확인 시각은 지금에서 거꾸로 센다. */
-    private static ObjectNode resultBlock(EvalDataset.Check fixture) {
-        Instant now = CLOCK.instant();
+    private ObjectNode resultBlock(EvalDataset.Check fixture) {
+        Instant now = clock.instant();
         ObjectNode root = JSON.createObjectNode().put("version", 3).put("outcome", "FINDINGS");
         ArrayNode findings = root.putArray("findings");
         for (EvalDataset.Finding finding : fixture.findings()) {
@@ -529,7 +485,7 @@ class ProactiveEvalGateTest {
     }
 
     /** 자동 실행의 답이다. 같은 발견에 새 발견 하나와 할 일 후보를 더한다. */
-    private static ObjectNode autonomousBlock(EvalDataset.Check fixture) {
+    private ObjectNode autonomousBlock(EvalDataset.Check fixture) {
         ObjectNode root = resultBlock(fixture);
         ObjectNode extra = ((ArrayNode) root.get("findings"))
                 .addObject()
@@ -537,7 +493,7 @@ class ProactiveEvalGateTest {
                 .put("topicKey", "autonomy:extra-finding")
                 .put("title", "자동 실행이 찾은 합성 발견")
                 .put("sourceUrl", "https://example.com/autonomy/extra")
-                .put("checkedAt", CLOCK.instant().toString())
+                .put("checkedAt", clock.instant().toString())
                 .put("freshness", "CURRENT")
                 .put("whyItMatters", "합성 fixture 의 발견이다");
         extra.putArray("facts").add("합성 사실");
@@ -558,7 +514,7 @@ class ProactiveEvalGateTest {
     private CurrentUser newUser() {
         String suffix = UUID.randomUUID().toString().substring(0, 8);
         AppUser user =
-                users.save(AppUser.of("eval-" + suffix + "@example.com", "사용자A", 1L, UserRole.MEMBER, CLOCK.instant()));
+                users.save(AppUser.of("eval-" + suffix + "@example.com", "사용자A", 1L, UserRole.MEMBER, clock.instant()));
         createdUsers.add(user.id());
         return new CurrentUser(user.id(), user.email(), user.displayName(), user.groupId(), user.role());
     }
@@ -574,7 +530,7 @@ class ProactiveEvalGateTest {
                 CredentialScope.SHARED_HOUSEHOLD,
                 AgentVisibility.PRIVATE,
                 user.id(),
-                CLOCK.instant());
+                clock.instant());
         agent.changeProactiveCheckWritesAllowed(writesAllowed);
         return agents.save(agent);
     }

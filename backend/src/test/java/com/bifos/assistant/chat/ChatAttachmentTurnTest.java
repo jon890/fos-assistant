@@ -47,6 +47,7 @@ import com.bifos.assistant.shared.auth.CurrentUserProvider;
 import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
+import com.bifos.assistant.testsupport.BackendIntegrationTest;
 import com.bifos.assistant.usage.infra.AgentExecutionRepository;
 import com.bifos.assistant.usage.infra.ExecutionEventRepository;
 import com.bifos.assistant.user.application.UserDisplayNameService;
@@ -66,14 +67,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.context.TestConfiguration;
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Import;
-import org.springframework.context.annotation.Primary;
 import org.springframework.core.io.ByteArrayResource;
-import org.springframework.test.context.ActiveProfiles;
-import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 
 /**
  * 메시지에 사진을 묶고, 사진이 놓인 자리를 Hermes 입력에만 알리는 것을 확인한다.
@@ -81,22 +75,11 @@ import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
  * <p>에이전트 쪽 경로는 {@code application-test.yml} 의 {@code agent-root} 다. 검사는 그 경로를 열지
  * 않고 입력에 적힌 글자만 본다.
  */
-@SpringBootTest
-@ActiveProfiles("test")
-@Import(ChatAttachmentTurnTest.StubRuntime.class)
+@BackendIntegrationTest
 class ChatAttachmentTurnTest {
 
     private static final String AGENT_ROOT = "/agent-side/attachments";
     private static final byte[] IMAGE = "not really a png".getBytes(StandardCharsets.UTF_8);
-
-    @TestConfiguration
-    static class StubRuntime {
-        @Bean
-        @Primary
-        StubHermesRunsClient stubHermesRunsClient() {
-            return new StubHermesRunsClient();
-        }
-    }
 
     @Autowired
     ChatService chat;
@@ -144,7 +127,7 @@ class ChatAttachmentTurnTest {
     HermesRunsClient hermes;
 
     /** 묶는 사이에 다른 요청이 끼어든 것을 만들려면 판정을 통과시킬 수 있어야 한다. */
-    @MockitoSpyBean
+    @Autowired
     AttachmentService attachments;
 
     private CurrentUser dad;

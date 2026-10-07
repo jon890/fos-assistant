@@ -10,23 +10,20 @@ import com.bifos.assistant.skill.application.SkillUseRecorder;
 import com.bifos.assistant.skill.domain.ExecutionSkillUse;
 import com.bifos.assistant.skill.domain.type.SkillUseSource;
 import com.bifos.assistant.skill.infra.ExecutionSkillUseRepository;
+import com.bifos.assistant.testsupport.BackendIntegrationTest;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.dao.DataIntegrityViolationException;
-import org.springframework.test.context.ActiveProfiles;
-import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 
 /**
  * 스킬 사용을 적는 자리가 미리보기에서 이름을 어떻게 고르고, 중복과 저장 실패를 어떻게 다루는지 본다.
  *
  * <p>테스트 클래스에 트랜잭션을 두지 않는다. 저장이 새 트랜잭션에서 실제로 끝나야 다음 호출이 그 줄을 본다.
  */
-@SpringBootTest
-@ActiveProfiles("test")
+@BackendIntegrationTest
 class SkillUseRecorderTest {
 
     /** 실행 표와 외래 키로 묶이지 않아 실제 실행 줄 없이 번호만 쓴다. */
@@ -38,7 +35,7 @@ class SkillUseRecorderTest {
     SkillUseRecorder recorder;
 
     /** 저장이 실패해도 던지지 않는지 보려면 저장소가 던지게 만들 수 있어야 한다. */
-    @MockitoSpyBean
+    @Autowired
     ExecutionSkillUseRepository uses;
 
     @BeforeEach

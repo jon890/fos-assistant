@@ -31,6 +31,9 @@ import com.bifos.assistant.hermes.dto.TokenUsage;
 import com.bifos.assistant.memory.infra.MemoryRepository;
 import com.bifos.assistant.orchestration.application.ResearchAndBuildFlow;
 import com.bifos.assistant.shared.domain.type.UserRole;
+import com.bifos.assistant.testsupport.BackendIntegrationTest;
+import com.bifos.assistant.testsupport.OverrideProperties;
+import com.bifos.assistant.testsupport.SamplePriceCatalog;
 import com.bifos.assistant.usage.domain.AgentExecution;
 import com.bifos.assistant.usage.domain.ExecutionEvent;
 import com.bifos.assistant.usage.domain.type.ExecutionEventType;
@@ -40,7 +43,6 @@ import com.bifos.assistant.usage.infra.ExecutionEventRepository;
 import com.bifos.assistant.user.domain.AppUser;
 import com.bifos.assistant.user.infra.AppUserRepository;
 import java.io.IOException;
-import java.net.URISyntaxException;
 import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -57,12 +59,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.context.annotation.Import;
-import org.springframework.test.context.ActiveProfiles;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.context.event.ApplicationEvents;
 import org.springframework.test.context.event.RecordApplicationEvents;
 
@@ -72,9 +68,9 @@ import org.springframework.test.context.event.RecordApplicationEvents;
  * <p>실행 줄은 이전 프로세스가 남긴 것처럼 저장소로 직접 만든다. Hermes 에 묻는 것은 이 검사가 보지 않으므로
  * 결과를 그대로 넘긴다.
  */
-@SpringBootTest(properties = "assistant.delegation.output-max-chars=" + RecoveredRunRecorderTest.OUTPUT_MAX_CHARS)
-@ActiveProfiles("test")
-@Import(ChatServiceTest.StubRuntime.class)
+@BackendIntegrationTest
+@SamplePriceCatalog
+@OverrideProperties("assistant.delegation.output-max-chars=" + RecoveredRunRecorderTest.OUTPUT_MAX_CHARS)
 @RecordApplicationEvents
 class RecoveredRunRecorderTest {
 
@@ -85,23 +81,7 @@ class RecoveredRunRecorderTest {
     /** 표본 가격표가 아는 provider 와 모델이다. 이 짝으로 끝나야 금액이 적힌다. */
     private static final SessionRuntime PRICED_RUNTIME = new SessionRuntime("example-model-large", "anthropic");
 
-    /** 금액이 적히는지 보려고 표본 가격표를 가리킨다. 기본 설정에는 가격표가 없어 금액이 늘 빈다. */
-    @DynamicPropertySource
-    static void pointAtTheSampleCatalog(DynamicPropertyRegistry registry) {
-        registry.add("assistant.pricing.catalog-path", () -> sampleCatalog().toString());
-    }
-
-    private static Path sampleCatalog() {
-        try {
-            return Path.of(RecoveredRunRecorderTest.class
-                    .getResource("/pricing/models-dev-sample.json")
-                    .toURI());
-        } catch (URISyntaxException ex) {
-            throw new IllegalStateException(ex);
-        }
-    }
-
-    @MockitoBean
+    @Autowired
     HermesRunEventStream eventStream;
 
     @Autowired
