@@ -45,6 +45,7 @@ public class McpMemoryRemember {
      *
      * <p>{@code agent_status} 와 {@code agent_stop} 은 맡긴 실행의 답을 돌려주므로 넣지 않는다. 그 답에 바깥 글이 실릴 수 있다.
      * {@code skill_view} 도 넣지 않는다. 같은 toolset 의 {@code skill_manage} 가 다른 대화에서 읽은 글을 스킬에 써 둘 수 있다.
+     * {@code tool_search} 와 {@code tool_describe} 는 도구 정의만 읽는다. 실행을 중계하는 {@code tool_call} 은 넣지 않는다.
      */
     static final Set<String> INTERNAL_TOOLS = Set.of(
             "mcp__fos_assistant__memory_read",
@@ -53,7 +54,9 @@ public class McpMemoryRemember {
             "mcp__fos_assistant__agent_list",
             "mcp__fos_assistant__agent_delegate",
             "mcp__fos_assistant__artifact_write",
-            "todo");
+            "todo",
+            "tool_search",
+            "tool_describe");
 
     static final String MEMORY_REMEMBER_DESCRIPTION = "사용자에 관한 오래 쓰일 사실을 기억으로 남긴다. "
             + "남길 것은 가족 구성, 이름과 관계, 선호, 상황, 결정이다(예: 「아들 이름은 홍길동이다」, 「매운 음식을 못 먹는다」). "

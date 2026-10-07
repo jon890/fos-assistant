@@ -1,6 +1,7 @@
 package com.bifos.assistant.memory.domain;
 
 import com.bifos.assistant.memory.domain.type.MemoryCaptureKind;
+import com.bifos.assistant.memory.domain.type.MemoryStatus;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -56,6 +57,11 @@ public class MemoryCapture {
     @Column(name = "base_revision")
     private Integer baseRevision;
 
+    /** 기존 제안을 받아들인 기록이면 승인 전 상태다. 새 항목과 본문 수정은 null 이다. */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "previous_status", length = 20)
+    private MemoryStatus previousStatus;
+
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
 
@@ -69,6 +75,7 @@ public class MemoryCapture {
             Long executionId,
             MemoryCaptureKind kind,
             Integer baseRevision,
+            MemoryStatus previousStatus,
             Instant now) {
         MemoryCapture capture = new MemoryCapture();
         capture.memoryId = memoryId;
@@ -77,6 +84,7 @@ public class MemoryCapture {
         capture.executionId = executionId;
         capture.kind = kind;
         capture.baseRevision = baseRevision;
+        capture.previousStatus = previousStatus;
         capture.createdAt = now;
         return capture;
     }

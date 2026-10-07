@@ -143,7 +143,7 @@ public class MemoryCaptureService {
     }
 
     /**
-     * 기록 하나를 되돌린다. 새로 만든 항목은 지우고, 고친 항목은 고치기 전의 판으로 돌린다. 이미 되돌렸으면 그대로 둔다.
+     * 기록 하나를 되돌린다. 새 항목은 지우고, 기존 제안의 승인은 물리고, 고친 항목은 이전 판으로 돌린다. 이미 되돌렸으면 그대로 둔다.
      *
      * @throws ApiException 남의 기록이거나 없으면 MEMORY_NOT_FOUND, 제안이면 MEMORY_REVISION_CONFLICT, 고친 뒤에 다시 바뀐
      *     항목이면 MEMORY_REVISION_CONFLICT
@@ -167,7 +167,7 @@ public class MemoryCaptureService {
         log.info("memory capture undone userId={} captureId={} kind={}", user.id(), captureId, capture.kind());
     }
 
-    /** 바로 저장한 항목을 지운다. 그 뒤에 사람이 고쳤으면 지우지 않는다. 이미 없으면 기록만 되돌린다. */
+    /** 바로 저장을 되돌린다. 새 항목은 지우고 기존 제안은 복원한다. 그 뒤에 고쳤으면 막고, 이미 없으면 기록만 되돌린다. */
     private void removeCreated(CurrentUser user, MemoryCapture capture) {
         Optional<Memory> found = memories.findByIdForUpdate(capture.memoryId());
         if (found.isEmpty()) {
@@ -176,7 +176,19 @@ public class MemoryCaptureService {
         if (capture.baseRevision() != null && found.get().revision() != capture.baseRevision()) {
             throw conflict("the memory has changed after it was remembered");
         }
-        memoryService.delete(user, capture.memoryId());
+        if (capture.previousStatus() == MemoryStatus.PROPOSED) {
+            Memory memory = found.get();
+            if (!Objects.equals(memory.ownerUserId(), user.id()) || memory.scope() != MemoryScope.USER) {
+                throw notFound();
+            }
+            if (memory.status() != MemoryStatus.ACCEPTED) {
+                throw conflict("the memory status has changed after it was remembered");
+            }
+            memory.restoreProposal(clock.instant());
+            memories.save(memory);
+        } else {
+            memoryService.delete(user, capture.memoryId());
+        }
     }
 
     private void restore(CurrentUser user, MemoryCapture capture) {
@@ -240,7 +252,7 @@ public class MemoryCaptureService {
                     yield new MemoryRememberResult(MemoryRememberOutcome.ALREADY_PROPOSED, existing.id());
                 }
                 Memory memory = memoryService.accept(user, existing.id());
-                record(memory.id(), user, request, MemoryCaptureKind.CREATED, memory.revision());
+                record(memory.id(), user, request, MemoryCaptureKind.CREATED, memory.revision(), MemoryStatus.PROPOSED);
                 yield new MemoryRememberResult(MemoryRememberOutcome.REMEMBERED, memory.id());
             }
         };
@@ -248,8 +260,25 @@ public class MemoryCaptureService {
 
     private void record(
             Long memoryId, CurrentUser user, MemoryRememberRequest request, MemoryCaptureKind kind, Integer base) {
+        record(memoryId, user, request, kind, base, null);
+    }
+
+    private void record(
+            Long memoryId,
+            CurrentUser user,
+            MemoryRememberRequest request,
+            MemoryCaptureKind kind,
+            Integer base,
+            MemoryStatus previousStatus) {
         captures.save(MemoryCapture.of(
-                memoryId, user.id(), request.conversationId(), request.executionId(), kind, base, clock.instant()));
+                memoryId,
+                user.id(),
+                request.conversationId(),
+                request.executionId(),
+                kind,
+                base,
+                previousStatus,
+                clock.instant()));
         log.info(
                 "memory captured userId={} memoryId={} executionId={} kind={}",
                 user.id(),

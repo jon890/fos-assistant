@@ -18,6 +18,7 @@ CREATE TABLE memory_capture (
     execution_id BIGINT NOT NULL,
     kind VARCHAR(20) NOT NULL,
     base_revision INT NULL,
+    previous_status VARCHAR(20) NULL,
     created_at DATETIME(6) NOT NULL,
     undone_at DATETIME(6) NULL,
     PRIMARY KEY (id)

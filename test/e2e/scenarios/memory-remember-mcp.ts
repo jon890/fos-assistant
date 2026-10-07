@@ -128,10 +128,27 @@ export const memoryRememberMcpScenario: Scenario = {
       expect((await memories(context)).every((m) => m.title !== "서명 없음" && m.title !== "도는 실행 없음"),
         "거절한 호출이 Memory 를 만들었다");
 
-      step("사용자가 말한 사실을 근거와 함께 남기면 바로 저장하고 CREATED 기록이 생긴다");
+      step("Hermes 가 도구 정의를 검색하고 설명을 읽는 사건을 흘린다");
+      const discoveryText = "기억 도구를 찾아 줘";
+      const discoveryScript = await fetch(`${context.hermesBaseUrl}/__test/script`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          input: discoveryText,
+          output: "기억 도구를 찾았다",
+          events: ["tool_search", "tool_describe"].flatMap((tool) => [
+            { event: "tool.started", tool, preview: "memory_remember" },
+            { event: "tool.completed", tool, duration: 0.1, error: false },
+          ]),
+        }),
+      });
+      expect(discoveryScript.status === 204, `도구 검색 각본 등록이 실패했다: ${discoveryScript.status}`);
+      const discovery = await send(context, discoveryText);
+
+      step("도구 정의를 읽은 대화에서 사용자가 말한 사실을 남기면 바로 저장하고 CREATED 기록이 생긴다");
       context.hermes.setMemoryRememberCall(DIRECT_TEXT,
         { title: DIRECT_TITLE, content: "다른 사람은 홍길동이다", evidence: "다른 사람은 홍길동이야" });
-      const direct = await send(context, DIRECT_TEXT);
+      const direct = await send(context, DIRECT_TEXT, discovery.conversationId);
       expect(direct.assistantText.startsWith(REMEMBERED), `바로 저장의 답이 다르다: ${direct.assistantText}`);
       const saved = (await memories(context)).filter((m) => m.title === DIRECT_TITLE);
       expect(saved.length === 1, `저장한 Memory 가 한 줄이 아니다: ${JSON.stringify(saved)}`);

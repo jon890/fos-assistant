@@ -220,6 +220,20 @@ class McpMemoryRememberToolTest {
     }
 
     @Test
+    @DisplayName("Hermes 도구 정의 검색과 설명을 읽어도 바로 저장하고 중계 실행은 제안이다")
+    void remembersAfterToolDiscoveryButProposesAfterRelay() throws Exception {
+        askedInThisTurn();
+        toolStarted("tool_search");
+        toolStarted("tool_describe");
+
+        assertThat(text(call(remember("다른 사람", "다른 사람은 홍길동이다", "다른 사람은 홍길동이야"))))
+                .isEqualTo(REMEMBERED);
+
+        toolStarted("tool_call");
+        assertThat(text(call(remember("사는 곳", "서울에 산다", "홍길동이야")))).isEqualTo(PROPOSED);
+    }
+
+    @Test
     @DisplayName("같은 대화의 앞 실행이 바깥 도구를 썼으면 지금 실행이 쓰지 않았어도 제안이다")
     void proposesWhenEarlierRunReadOutsideText() throws Exception {
         AgentExecution earlier = otherRootRun("run-earlier");
@@ -317,6 +331,30 @@ class McpMemoryRememberToolTest {
 
         assertThat(result.path("isError").asBoolean()).isTrue();
         assertThat(memoriesOfDad()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("기존 제안을 바로 저장한 기록을 되돌리면 항목을 보존하고 승인 전 상태로 돌아간다")
+    void restoresProposalWhenUndoingAcceptance() throws Exception {
+        askedInThisTurn();
+        call(remember("다른 사람", "다른 사람은 홍길동이다", null));
+        Long memoryId = onlyMemory().id();
+        call(remember("다른 사람", "다른 사람은 홍길동이다", "다른 사람은 홍길동이야"));
+        MemoryCapture accepted = capturesOfDad().stream()
+                .filter(capture -> capture.kind() == MemoryCaptureKind.CREATED)
+                .findFirst()
+                .orElseThrow();
+        assertThat(accepted.previousStatus()).isEqualTo(MemoryStatus.PROPOSED);
+
+        captureService.undo(currentDad(), accepted.id());
+        captureService.undo(currentDad(), accepted.id());
+
+        Memory restored = memories.findById(memoryId).orElseThrow();
+        assertThat(restored.status()).isEqualTo(MemoryStatus.PROPOSED);
+        assertThat(restored.content()).isEqualTo("다른 사람은 홍길동이다");
+        assertThat(restored.acceptedByUserId()).isNull();
+        assertThat(restored.acceptedAt()).isNull();
+        assertThat(captures.findById(accepted.id()).orElseThrow().undone()).isTrue();
     }
 
     @Test

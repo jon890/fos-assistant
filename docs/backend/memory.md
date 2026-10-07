@@ -305,7 +305,7 @@ sequenceDiagram
 | 5 | 그 대화에 사람의 질문 없이 Hermes 로 보낸 루트 실행이 없다. 맡긴 일의 결과를 전하는 turn 과 예약 작업 turn 이 여기 걸린다. 그 대화의 첫 `execution_question` 보다 앞선 실행은 보지 않는다 | `agent_execution` 과 `execution_question` |
 | 6 | 민감하지 않다 | 인자 `sensitive` |
 
-안쪽 도구는 바깥 글을 읽지 않는다고 보는 도구다. `mcp__fos_assistant__` 의 `memory_read`, `memory_remember`, `follow_up_propose`, `agent_list`, `agent_delegate`, `artifact_write` 와 Hermes 의 `todo` 다.
+안쪽 도구는 바깥 글을 읽지 않는다고 보는 도구다. `mcp__fos_assistant__` 의 `memory_read`, `memory_remember`, `follow_up_propose`, `agent_list`, `agent_delegate`, `artifact_write` 와 Hermes 의 `todo`, `tool_search`, `tool_describe` 다. `tool_search` 와 `tool_describe` 는 도구 정의만 읽는다. 실행을 중계하는 `tool_call` 은 이 목록에 넣지 않는다.
 `agent_status` 와 `agent_stop` 은 맡긴 실행의 답을 돌려주므로 넣지 않는다. `skill_view` 도 넣지 않는다. 같은 toolset 의 `skill_manage` 가 다른 대화에서 읽은 글을 스킬에 써 둘 수 있다.
 한 실행 3개 상한과 같은 글의 중복 확인은 잠그지 않는다. 한 실행이 도구를 나란히 부르면 상한을 넘거나 도구 오류가 날 수 있다. 할 일 제안과 같은 수준으로 둔다.
 
@@ -348,7 +348,7 @@ Control Plane MCP 도구를 받는 실행의 공통 답변 지침 뒤에 「# �
 
 | 기록 | 화면 | 누르면 |
 | --- | --- | --- |
-| `CREATED`, 항목이 `ACCEPTED` | 「기억했어요: 제목」 [고치기] [되돌리기] | 고치기는 `PATCH /api/v1/memories/{id}`, 되돌리기는 항목을 지운다. 그 뒤에 고쳤으면 409 `MEMORY_REVISION_CONFLICT` 다 |
+| `CREATED`, 항목이 `ACCEPTED` | 「기억했어요: 제목」 [고치기] [되돌리기] | 고치기는 `PATCH /api/v1/memories/{id}`, 되돌리기는 새 항목을 지우고 기존 제안을 받아들였으면 제안 상태로 돌린다. 그 뒤에 고쳤으면 409 `MEMORY_REVISION_CONFLICT` 다 |
 | `UPDATED`, 항목이 `ACCEPTED` | 「기억을 고쳤어요: 제목」 [고치기] [되돌리기] | 되돌리기는 고치기 전의 판으로 돌린다. 그 뒤에 다시 바뀌었으면 409 `MEMORY_REVISION_CONFLICT` 다 |
 | `PROPOSED`, 항목이 `PROPOSED` | 제안 카드 [받아들이기] [고쳐서 받아들이기] [거절] | `/accept`, `PATCH` 뒤 `/accept`, `/reject`. `/memory` 의 제안 목록에도 보인다 |
 

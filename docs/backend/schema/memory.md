@@ -138,6 +138,7 @@ Memory 항목과 그 판, 그룹의 collection 목록, 에이전트가 받는 co
 | `execution_id` | BIGINT | 기록을 남긴 origin 실행. 한 실행의 상한(3개)을 이 칸으로 센다 |
 | `kind` | VARCHAR(20) | `CREATED` 바로 저장해 만들었다, `UPDATED` 바로 저장해 기존 항목의 본문을 고쳤다, `PROPOSED` 제안으로 남겼다 |
 | `base_revision` | INT NULL | `CREATED` 는 저장한 때의 판 번호, `UPDATED` 는 고치기 전의 판 번호, `PROPOSED` 는 비어 있다 |
+| `previous_status` | VARCHAR(20) NULL | 기존 제안을 받아들인 `CREATED` 는 `PROPOSED`, 나머지는 비어 있다 |
 | `created_at` | DATETIME(6) | |
 | `undone_at` | DATETIME(6) NULL | 사람이 되돌린 시각. 되돌린 기록은 대화에 그리지 않는다 |
 
@@ -148,4 +149,4 @@ Memory 항목과 그 판, 그룹의 collection 목록, 에이전트가 받는 co
 
 - 같은 사실을 같은 실행에서 두 번 남겨도 중복 키가 같은 항목을 하나로 둔다. 기록은 저장하거나 고친 경우에만 남는다
 - `CREATED` 를 되돌릴 때 항목의 판이 `base_revision` 이 아니면, `UPDATED` 를 되돌릴 때 `base_revision + 1` 이 아니면 그 뒤에 사람이 다시 고친 것이다. 되돌리지 않는다
-- 이미 있던 제안을 바로 저장 조건에서 받아들인 기록도 `CREATED` 다. 되돌리면 그 항목을 지운다
+- 이미 있던 제안을 바로 저장 조건에서 받아들인 기록도 `CREATED` 다. `previous_status` 에 `PROPOSED` 를 남기고 되돌리면 항목을 보존하며 승인 정보도 지워 제안 상태로 돌린다

@@ -295,6 +295,14 @@ public class Memory {
         updatedAt = at;
     }
 
+    /** 기존 제안을 받아들인 기록을 되돌린다. 승인 정보도 지워 다시 주입되지 않게 한다. */
+    public void restoreProposal(Instant at) {
+        status = MemoryStatus.PROPOSED;
+        acceptedByUserId = null;
+        acceptedAt = null;
+        updatedAt = at;
+    }
+
     /**
      * 본문과 꺼내는 방식과 민감도를 고치고 판을 하나 올린다.
      *
