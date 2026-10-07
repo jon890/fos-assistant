@@ -17,6 +17,8 @@ import com.bifos.assistant.chat.domain.type.ConversationPurpose;
 import com.bifos.assistant.chat.domain.type.ModelSelectionMode;
 import com.bifos.assistant.hermes.dto.HermesModelCatalog;
 import com.bifos.assistant.hermes.dto.ReasoningCapability;
+import com.bifos.assistant.memory.application.model.CapturedMemory;
+import com.bifos.assistant.memory.domain.type.MemorySensitivity;
 import com.bifos.assistant.model.domain.ModelChoice;
 import com.bifos.assistant.model.domain.type.ModelTier;
 import jakarta.validation.Valid;
@@ -386,6 +388,41 @@ public final class ChatDtos {
     public record LatencyStatView(long count, Long p50Ms, Long p90Ms) {
         static LatencyStatView from(LatencyStat stat) {
             return new LatencyStatView(stat.count(), stat.p50Ms(), stat.p90Ms());
+        }
+    }
+
+    /**
+     * 대화의 답 아래에 그릴 기억 기록 하나다(ADR-20261007 / memory-remember).
+     *
+     * <p>{@code kind} 는 {@code CREATED}, {@code UPDATED}, {@code PROPOSED} 이고 {@code status} 는 항목의 지금 승인 상태다. 민감
+     * 항목은 본문을 싣지 않는다.
+     */
+    public record MemoryCaptureView(
+            Long id,
+            Long memoryId,
+            Long executionId,
+            String kind,
+            String status,
+            String title,
+            String content,
+            boolean sensitive,
+            boolean alwaysInject,
+            Instant createdAt) {
+        static MemoryCaptureView from(CapturedMemory captured) {
+            var capture = captured.capture();
+            var memory = captured.memory();
+            boolean sensitive = memory.sensitivity() == MemorySensitivity.SENSITIVE;
+            return new MemoryCaptureView(
+                    capture.id(),
+                    memory.id(),
+                    capture.executionId(),
+                    capture.kind().name(),
+                    memory.status().name(),
+                    memory.title(),
+                    sensitive || memory.sealed() ? "" : memory.content(),
+                    sensitive,
+                    memory.alwaysInject(),
+                    capture.createdAt());
         }
     }
 }
