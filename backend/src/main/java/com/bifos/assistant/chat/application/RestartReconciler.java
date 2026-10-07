@@ -10,6 +10,7 @@ import com.bifos.assistant.hermes.HermesProperties;
 import com.bifos.assistant.hermes.HermesRunsClient;
 import com.bifos.assistant.hermes.dto.HermesRunLookup;
 import com.bifos.assistant.shared.concurrent.BackgroundTasks;
+import com.bifos.assistant.shared.config.LiveProperties;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.usage.application.UserExecutionLimiter;
@@ -72,7 +73,7 @@ public class RestartReconciler implements SmartLifecycle {
     private static final Duration MAX_RETRY_INTERVAL = Duration.ofSeconds(5);
 
     private final RestartReconcileProperties properties;
-    private final HermesProperties hermesProperties;
+    private final LiveProperties<HermesProperties> hermesProperties;
     private final HermesRunsClient hermes;
     private final AgentExecutionRepository executions;
     private final AgentService agents;
@@ -235,7 +236,7 @@ public class RestartReconciler implements SmartLifecycle {
     }
 
     private Duration maxWait() {
-        return properties.maxWait() == null ? hermesProperties.runTimeout() : properties.maxWait();
+        return properties.maxWait() == null ? hermesProperties.current().runTimeout() : properties.maxWait();
     }
 
     /**
@@ -400,7 +401,8 @@ public class RestartReconciler implements SmartLifecycle {
         boolean finished = false;
         boolean stopSent = false;
         RecoveredRunKind kind = null;
-        Duration interval = hermesProperties.pollInterval();
+        Duration pollInterval = hermesProperties.current().pollInterval();
+        Duration interval = pollInterval;
         while (true) {
             if (halted(epoch)) {
                 return;
@@ -421,7 +423,7 @@ public class RestartReconciler implements SmartLifecycle {
                     recorder.failWithout(row.id(), REMOTE_RUN_LOST);
                     return;
                 }
-                interval = hermesProperties.pollInterval();
+                interval = pollInterval;
                 if (kind == null) {
                     kind = recorder.kindOf(row);
                 }

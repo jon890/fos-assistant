@@ -4,6 +4,7 @@ import com.bifos.assistant.connector.application.ConnectorCatalogCache;
 import com.bifos.assistant.connector.application.ConnectorPolicyProperties;
 import com.bifos.assistant.connector.application.model.ConnectorActionChanged;
 import com.bifos.assistant.hermes.HermesConnectorClient;
+import com.bifos.assistant.shared.config.LiveProperties;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -35,7 +36,11 @@ public class ConnectorPolicyTestDoubles {
     @Primary
     ConnectorCatalogCache movingCatalogCache(HermesConnectorClient connector) {
         return new ConnectorCatalogCache(
-                connector, new ConnectorPolicyProperties(TTL, Duration.ofSeconds(5), Duration.ofHours(24), "-"), CLOCK);
+                connector,
+                LiveProperties.fixed(
+                        ConnectorPolicyProperties.class,
+                        new ConnectorPolicyProperties(TTL, Duration.ofSeconds(5), Duration.ofHours(24), "-")),
+                CLOCK);
     }
 
     @Bean

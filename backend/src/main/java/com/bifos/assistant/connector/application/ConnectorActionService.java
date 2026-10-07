@@ -33,6 +33,7 @@ import com.bifos.assistant.notification.domain.type.NotificationKind;
 import com.bifos.assistant.notification.domain.type.NotificationTargetType;
 import com.bifos.assistant.orchestration.application.DelegationProperties;
 import com.bifos.assistant.shared.auth.CurrentUser;
+import com.bifos.assistant.shared.config.LiveProperties;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.user.infra.AppUserRepository;
@@ -108,7 +109,7 @@ public class ConnectorActionService {
     private final AppUserRepository users;
     private final ConnectorCatalogCache catalog;
     private final HermesConnectorClient connector;
-    private final DelegationProperties delegation;
+    private final LiveProperties<DelegationProperties> delegation;
     private final ApplicationEventPublisher events;
     private final NotificationService notifications;
     private final ConversationNotices conversations;
@@ -126,7 +127,7 @@ public class ConnectorActionService {
             AppUserRepository users,
             ConnectorCatalogCache catalog,
             HermesConnectorClient connector,
-            DelegationProperties delegation,
+            LiveProperties<DelegationProperties> delegation,
             ApplicationEventPublisher events,
             NotificationService notifications,
             ConversationNotices conversations,
@@ -155,7 +156,7 @@ public class ConnectorActionService {
             AppUserRepository users,
             ConnectorCatalogCache catalog,
             HermesConnectorClient connector,
-            DelegationProperties delegation,
+            LiveProperties<DelegationProperties> delegation,
             ApplicationEventPublisher events,
             NotificationService notifications,
             ConversationNotices conversations,
@@ -689,7 +690,7 @@ public class ConnectorActionService {
 
     /** 위임 답과 같은 상한으로 자른다. 상한 자리에서 대리 쌍이 나뉘면 그 앞에서 자른다. */
     private String clip(String text) {
-        int max = delegation.outputMaxChars();
+        int max = delegation.current().outputMaxChars();
         if (text.length() <= max) {
             return text;
         }

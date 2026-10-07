@@ -158,6 +158,20 @@ class ArchitectureRulesTest {
     }
 
     @Test
+    @DisplayName("실행 중에 쓰는 설정 record 를 LivePropertiesConfig 밖에서 새로 주입받지 않는다")
+    void liveSettingsOnlyThroughLiveProperties() {
+        FreezingArchRule.freeze(ArchitectureRules.LIVE_SETTINGS_ONLY_THROUGH_LIVE_PROPERTIES)
+                .check(MAIN);
+    }
+
+    @Test
+    @DisplayName("hermes 의 runTimeout 과 pollInterval 을 LiveProperties 밖에서 새로 읽지 않는다")
+    void hermesTimeoutsOnlyThroughLiveProperties() {
+        FreezingArchRule.freeze(ArchitectureRules.HERMES_TIMEOUTS_ONLY_THROUGH_LIVE_PROPERTIES)
+                .check(MAIN);
+    }
+
+    @Test
     @DisplayName("테스트 메서드에 DisplayName 이 붙는다")
     void testMethodsHaveDisplayName() {
         FreezingArchRule.freeze(ArchitectureRules.TEST_METHODS_HAVE_DISPLAY_NAME)

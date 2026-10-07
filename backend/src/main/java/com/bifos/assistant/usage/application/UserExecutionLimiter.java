@@ -4,6 +4,7 @@ import com.bifos.assistant.hermes.HermesProperties;
 import com.bifos.assistant.hermes.HermesRunsClient;
 import com.bifos.assistant.hermes.dto.HermesRunLookup;
 import com.bifos.assistant.shared.concurrent.BackgroundTasks;
+import com.bifos.assistant.shared.config.LiveProperties;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.usage.application.model.ExecutionAdmission;
@@ -42,10 +43,10 @@ public class UserExecutionLimiter {
     /** Hermes 에 닿지 못해 다시 묻는 간격은 여기까지만 늘린다. */
     private static final Duration MAX_RETRY_INTERVAL = Duration.ofSeconds(5);
 
-    private final UserExecutionProperties properties;
+    private final LiveProperties<UserExecutionProperties> properties;
     private final AgentExecutionRepository executions;
     private final HermesRunsClient hermes;
-    private final HermesProperties hermesProperties;
+    private final LiveProperties<HermesProperties> hermesProperties;
     private final BackgroundTasks backgroundTasks;
 
     private final Map<Long, ReentrantLock> locks = new ConcurrentHashMap<>();
@@ -62,9 +63,10 @@ public class UserExecutionLimiter {
         ReentrantLock lock = lockOf(userId);
         lock.lock();
         try {
+            int maxRunning = properties.current().maxRunning();
             Usage usage = usage(userId);
-            if (usage.total() >= properties.maxRunning()) {
-                throw reject(userId, "turn", usage);
+            if (usage.total() >= maxRunning) {
+                throw reject(userId, "turn", usage, maxRunning);
             }
             return addTurn(userId);
         } finally {
@@ -82,10 +84,11 @@ public class UserExecutionLimiter {
         ReentrantLock lock = lockOf(userId);
         lock.lock();
         try {
+            UserExecutionProperties settings = properties.current();
             Usage usage = usage(userId);
-            int reserve = Math.max(1, properties.backgroundReserve());
-            if (usage.total() + 1 + reserve > properties.maxRunning()) {
-                throw reject(userId, "background-turn", usage);
+            int reserve = Math.max(1, settings.backgroundReserve());
+            if (usage.total() + 1 + reserve > settings.maxRunning()) {
+                throw reject(userId, "background-turn", usage, settings.maxRunning());
             }
             turnSlots.merge(userId, 1, Integer::sum);
             if (conversationId != null) {
@@ -133,18 +136,19 @@ public class UserExecutionLimiter {
         ReentrantLock lock = lockOf(userId);
         lock.lock();
         try {
+            UserExecutionProperties settings = properties.current();
             Usage usage = usage(userId);
             int reserve = admission == ExecutionAdmission.BACKGROUND_CHILD
-                    ? Math.max(1, properties.backgroundReserve())
-                    : properties.backgroundReserve();
+                    ? Math.max(1, settings.backgroundReserve())
+                    : settings.backgroundReserve();
             boolean full;
             if (admission == ExecutionAdmission.CHILD) {
-                full = usage.total() >= properties.maxRunning();
+                full = usage.total() >= settings.maxRunning();
             } else {
-                full = usage.total() + 1 + reserve > properties.maxRunning();
+                full = usage.total() + 1 + reserve > settings.maxRunning();
             }
             if (full) {
-                throw reject(userId, admission.name(), usage);
+                throw reject(userId, admission.name(), usage, settings.maxRunning());
             }
             return create.get();
         } finally {
@@ -157,7 +161,7 @@ public class UserExecutionLimiter {
         ReentrantLock lock = lockOf(userId);
         lock.lock();
         try {
-            return usage(userId).total() < properties.maxRunning();
+            return usage(userId).total() < properties.current().maxRunning();
         } finally {
             lock.unlock();
         }
@@ -263,14 +267,15 @@ public class UserExecutionLimiter {
      */
     private void awaitRemoteEnd(Long executionId, String apiBaseUrl, String profileName, String runId) {
         long deadline = System.nanoTime() + remoteEndMaxWait().toNanos();
-        Duration interval = hermesProperties.pollInterval();
+        Duration pollInterval = hermesProperties.current().pollInterval();
+        Duration interval = pollInterval;
         while (true) {
             try {
                 HermesRunLookup lookup = hermes.lookupRun(apiBaseUrl, profileName, runId);
                 if (lookup.state() != HermesRunLookup.State.RUNNING) {
                     return;
                 }
-                interval = hermesProperties.pollInterval();
+                interval = pollInterval;
             } catch (RuntimeException ex) {
                 Duration doubled = interval.multipliedBy(2);
                 interval = doubled.compareTo(MAX_RETRY_INTERVAL) > 0 ? MAX_RETRY_INTERVAL : doubled;
@@ -291,7 +296,10 @@ public class UserExecutionLimiter {
     }
 
     private Duration remoteEndMaxWait() {
-        return properties.remoteEndMaxWait() == null ? hermesProperties.runTimeout() : properties.remoteEndMaxWait();
+        UserExecutionProperties settings = properties.current();
+        return settings.remoteEndMaxWait() == null
+                ? hermesProperties.current().runTimeout()
+                : settings.remoteEndMaxWait();
     }
 
     /** 모음에서 빼고, 빈 모음은 맵에서 지운다. */
@@ -326,7 +334,7 @@ public class UserExecutionLimiter {
         return new Usage(turns, remote, rows);
     }
 
-    private ApiException reject(Long userId, String kind, Usage usage) {
+    private ApiException reject(Long userId, String kind, Usage usage, int maxRunning) {
         log.info(
                 "사용자 실행 한도에 닿아 거절했다 userId={} kind={} turnSlots={} remoteEndHolds={} runningRows={} maxRunning={}",
                 userId,
@@ -334,7 +342,7 @@ public class UserExecutionLimiter {
                 usage.turns(),
                 usage.remote(),
                 usage.rows(),
-                properties.maxRunning());
+                maxRunning);
         return new ApiException(ErrorCode.USER_BUSY, "this user has reached the concurrent execution limit");
     }
 

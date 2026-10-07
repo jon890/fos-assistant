@@ -7,6 +7,7 @@ import static org.mockito.Mockito.mock;
 import com.bifos.assistant.hermes.HermesProperties;
 import com.bifos.assistant.hermes.HermesRunsClient;
 import com.bifos.assistant.shared.concurrent.VirtualThreadBackgroundTasks;
+import com.bifos.assistant.shared.config.LiveProperties;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.usage.application.TurnSlot;
@@ -214,10 +215,12 @@ class TurnCancellationTest {
         // 대화 잠금을 보고 지나간 뒤 자리를 얻기 전에, 같은 대화를 연 다른 요청이 하나뿐인 자리와 잠금을 먼저 가져간다.
         UserExecutionLimiter limiter =
                 new UserExecutionLimiter(
-                        new UserExecutionProperties(1, 0, null),
+                        LiveProperties.fixed(UserExecutionProperties.class, new UserExecutionProperties(1, 0, null)),
                         mock(AgentExecutionRepository.class),
                         mock(HermesRunsClient.class),
-                        new HermesProperties(null, null, null, null, null, null, null, null),
+                        LiveProperties.fixed(
+                                HermesProperties.class,
+                                new HermesProperties(null, null, null, null, null, null, null, null)),
                         new VirtualThreadBackgroundTasks()) {
                     @Override
                     public TurnSlot acquireTurn(Long userId) {
@@ -309,10 +312,11 @@ class TurnCancellationTest {
 
     private static UserExecutionLimiter limiter(int maxRunning) {
         return new UserExecutionLimiter(
-                new UserExecutionProperties(maxRunning, 0, null),
+                LiveProperties.fixed(UserExecutionProperties.class, new UserExecutionProperties(maxRunning, 0, null)),
                 mock(AgentExecutionRepository.class),
                 mock(HermesRunsClient.class),
-                new HermesProperties(null, null, null, null, null, null, null, null),
+                LiveProperties.fixed(
+                        HermesProperties.class, new HermesProperties(null, null, null, null, null, null, null, null)),
                 new VirtualThreadBackgroundTasks());
     }
 

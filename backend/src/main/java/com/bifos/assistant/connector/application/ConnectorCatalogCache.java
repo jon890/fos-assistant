@@ -2,6 +2,7 @@ package com.bifos.assistant.connector.application;
 
 import com.bifos.assistant.hermes.HermesConnectorClient;
 import com.bifos.assistant.hermes.dto.ConnectorManifest;
+import com.bifos.assistant.shared.config.LiveProperties;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.List;
@@ -19,7 +20,7 @@ import org.springframework.stereotype.Component;
 @Component
 public class ConnectorCatalogCache {
     private final HermesConnectorClient connector;
-    private final ConnectorPolicyProperties properties;
+    private final LiveProperties<ConnectorPolicyProperties> properties;
     private final Clock clock;
 
     private List<ConnectorManifest> manifests = List.of();
@@ -29,11 +30,13 @@ public class ConnectorCatalogCache {
 
     // 검사가 시각을 고정할 수 있게 Clock 을 받는 생성자를 따로 둔다.
     @Autowired
-    public ConnectorCatalogCache(HermesConnectorClient connector, ConnectorPolicyProperties properties) {
+    public ConnectorCatalogCache(
+            HermesConnectorClient connector, LiveProperties<ConnectorPolicyProperties> properties) {
         this(connector, properties, Clock.systemUTC());
     }
 
-    public ConnectorCatalogCache(HermesConnectorClient connector, ConnectorPolicyProperties properties, Clock clock) {
+    public ConnectorCatalogCache(
+            HermesConnectorClient connector, LiveProperties<ConnectorPolicyProperties> properties, Clock clock) {
         this.connector = connector;
         this.properties = properties;
         this.clock = clock;
@@ -50,8 +53,9 @@ public class ConnectorCatalogCache {
      */
     public synchronized Optional<ConnectorManifest> find(String connectorId) {
         Instant now = Instant.now(clock);
-        if (readAt == null || !now.isBefore(readAt.plus(properties.catalogTtl()))) {
-            if (failure != null && now.isBefore(failedAt.plus(properties.catalogFailureTtl()))) {
+        ConnectorPolicyProperties settings = properties.current();
+        if (readAt == null || !now.isBefore(readAt.plus(settings.catalogTtl()))) {
+            if (failure != null && now.isBefore(failedAt.plus(settings.catalogFailureTtl()))) {
                 throw failure;
             }
             try {

@@ -4,6 +4,7 @@ import com.bifos.assistant.chat.domain.Conversation;
 import com.bifos.assistant.chat.infra.ConversationRepository;
 import com.bifos.assistant.proactive.domain.ProactiveCheck;
 import com.bifos.assistant.proactive.infra.ProactiveCheckRepository;
+import com.bifos.assistant.shared.config.LiveProperties;
 import com.bifos.assistant.usage.domain.AgentExecution;
 import java.util.Optional;
 import java.util.UUID;
@@ -22,7 +23,7 @@ import org.springframework.stereotype.Component;
 public class ProactiveCheckGuard {
 
     private final ProactiveCheckRepository checks;
-    private final ProactiveCheckProperties properties;
+    private final LiveProperties<ProactiveCheckProperties> properties;
     private final ConversationRepository conversations;
 
     /** 그 실행의 트리 루트가 살펴보기 turn 인가. */
@@ -49,6 +50,6 @@ public class ProactiveCheckGuard {
 
     /** 살펴보기 트리 하나에서 맡길 수 있는 위임 자식 수. 끝난 자식도 센다. */
     public int maxDelegations() {
-        return properties.maxDelegations();
+        return properties.current().maxDelegations();
     }
 }

@@ -6,10 +6,12 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import com.bifos.assistant.memory.application.MemoryContentCipher;
 import com.bifos.assistant.memory.application.MemoryEncryptionProperties;
 import com.bifos.assistant.memory.domain.StoredContent;
+import com.bifos.assistant.shared.config.LiveProperties;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import java.util.Arrays;
 import java.util.Base64;
+import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -20,7 +22,11 @@ class MemoryContentCipherTest {
     private static final String PLAIN = "평문-표식-7391";
 
     private static MemoryContentCipher cipher() {
-        return new MemoryContentCipher(new MemoryEncryptionProperties("test-1", TEST_KEYS));
+        return new MemoryContentCipher(live(new MemoryEncryptionProperties("test-1", TEST_KEYS)));
+    }
+
+    private static LiveProperties<MemoryEncryptionProperties> live(MemoryEncryptionProperties properties) {
+        return LiveProperties.fixed(MemoryEncryptionProperties.class, properties);
     }
 
     private static String keyOf(int fill) {
@@ -90,7 +96,7 @@ class MemoryContentCipherTest {
     @Test
     @DisplayName("key 가 없으면 암호화를 거절하고 평문을 돌려주지 않는다")
     void disabled() {
-        MemoryContentCipher cipher = new MemoryContentCipher(new MemoryEncryptionProperties("", ""));
+        MemoryContentCipher cipher = new MemoryContentCipher(live(new MemoryEncryptionProperties("", "")));
 
         assertThat(cipher.enabled()).isFalse();
         assertThatThrownBy(() -> cipher.seal(PLAIN, "USER:7"))
@@ -103,14 +109,44 @@ class MemoryContentCipherTest {
     @DisplayName("옛 key 로 쓴 글을 풀고 새 글은 활성 key 로 쓴다")
     void rotation() {
         MemoryContentCipher oldOnly =
-                new MemoryContentCipher(new MemoryEncryptionProperties("old-1", "old-1:" + keyOf(1)));
+                new MemoryContentCipher(live(new MemoryEncryptionProperties("old-1", "old-1:" + keyOf(1))));
         MemoryContentCipher rotated = new MemoryContentCipher(
-                new MemoryEncryptionProperties("new-1", "old-1:" + keyOf(1) + ",new-1:" + keyOf(2)));
+                live(new MemoryEncryptionProperties("new-1", "old-1:" + keyOf(1) + ",new-1:" + keyOf(2))));
         StoredContent oldSealed = oldOnly.seal(PLAIN, "USER:7");
 
         assertThat(rotated.open(oldSealed.content(), oldSealed.keyId(), "USER:7"))
                 .isEqualTo(PLAIN);
         assertThat(rotated.seal(PLAIN, "USER:7").keyId()).isEqualTo("new-1");
+    }
+
+    @Test
+    @DisplayName("설정 record 가 바뀌면 key 표를 다시 만들어 새 활성 key 로 쓰고 옛 key 의 글도 푼다")
+    void rebuildsKeysWhenSettingsChange() {
+        AtomicReference<MemoryEncryptionProperties> settings =
+                new AtomicReference<>(new MemoryEncryptionProperties("old-1", "old-1:" + keyOf(1)));
+        MemoryContentCipher cipher = new MemoryContentCipher(new LiveProperties<>() {
+            @Override
+            public MemoryEncryptionProperties current() {
+                return settings.get();
+            }
+
+            @Override
+            public Class<MemoryEncryptionProperties> type() {
+                return MemoryEncryptionProperties.class;
+            }
+        });
+        StoredContent oldSealed = cipher.seal(PLAIN, "USER:7");
+
+        settings.set(new MemoryEncryptionProperties("new-1", "old-1:" + keyOf(1) + ",new-1:" + keyOf(2)));
+
+        assertThat(cipher.seal(PLAIN, "USER:7").keyId()).as("바뀐 뒤 쓰는 key").isEqualTo("new-1");
+        assertThat(cipher.open(oldSealed.content(), oldSealed.keyId(), "USER:7"))
+                .as("바뀌기 전 key 로 쓴 글")
+                .isEqualTo(PLAIN);
+
+        settings.set(new MemoryEncryptionProperties("", ""));
+
+        assertThat(cipher.enabled()).as("key 를 모두 뺀 설정").isFalse();
     }
 
     @Test

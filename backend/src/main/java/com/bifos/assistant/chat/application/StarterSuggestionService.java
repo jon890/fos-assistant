@@ -13,6 +13,7 @@ import com.bifos.assistant.hermes.dto.HermesRunResult;
 import com.bifos.assistant.model.domain.ModelChoice;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.concurrent.BackgroundTasks;
+import com.bifos.assistant.shared.config.LiveProperties;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.usage.application.ExecutionRecorder;
@@ -65,7 +66,7 @@ public class StarterSuggestionService {
     private static final String INVALID_OUTPUT = "STARTER_OUTPUT_INVALID";
     private static final String GENERATION_FAILED = "STARTER_GENERATION_FAILED";
 
-    private final StarterProperties properties;
+    private final LiveProperties<StarterProperties> properties;
     private final AgentService agents;
     private final ConversationRepository conversations;
     private final ChatMessageRepository messages;
@@ -89,7 +90,7 @@ public class StarterSuggestionService {
 
     @Autowired
     public StarterSuggestionService(
-            StarterProperties properties,
+            LiveProperties<StarterProperties> properties,
             AgentService agents,
             ConversationRepository conversations,
             ChatMessageRepository messages,
@@ -115,7 +116,7 @@ public class StarterSuggestionService {
 
     /** 시각과 실행기를 바꿔 끼운다. 테스트가 시간을 옮기고 만들기가 끝나기를 기다릴 때 쓴다. */
     public StarterSuggestionService(
-            StarterProperties properties,
+            LiveProperties<StarterProperties> properties,
             AgentService agents,
             ConversationRepository conversations,
             ChatMessageRepository messages,
@@ -149,7 +150,7 @@ public class StarterSuggestionService {
      */
     public StarterSuggestions read(CurrentUser user, String code) {
         Agent agent = agents.requireReadable(user, code);
-        if (!properties.enabled() || !agent.enabled()) {
+        if (!properties.current().enabled() || !agent.enabled()) {
             return none();
         }
         Key key = new Key(user.id(), agent.id());
@@ -178,7 +179,7 @@ public class StarterSuggestionService {
      */
     public void refreshIfStale(CurrentUser user, Agent agent) {
         try {
-            if (!properties.enabled() || !agent.enabled()) {
+            if (!properties.current().enabled() || !agent.enabled()) {
                 return;
             }
             Key key = new Key(user.id(), agent.id());
@@ -291,7 +292,7 @@ public class StarterSuggestionService {
     /** 그 사용자가 그 에이전트와 나눈 최근 대화마다 처음 꺼낸 말을 모은다. 다른 사용자의 대화는 읽지 않는다. */
     private List<String> firstQuestions(CurrentUser user, Agent agent) {
         List<Conversation> recent = conversations.findByUserIdAndAgentIdAndDeletedAtIsNullOrderByUpdatedAtDesc(
-                user.id(), agent.id(), PageRequest.of(0, properties.historyConversations()));
+                user.id(), agent.id(), PageRequest.of(0, properties.current().historyConversations()));
         List<String> questions = new ArrayList<>();
         for (Conversation conversation : recent) {
             messages.findFirstByConversationIdAndRoleOrderByIdAsc(conversation.id(), MessageRole.USER)
@@ -360,12 +361,14 @@ public class StarterSuggestionService {
     }
 
     private boolean isStale(Entry entry) {
-        return clock.instant().isAfter(entry.generatedAt().plus(properties.refreshAfter()));
+        return clock.instant()
+                .isAfter(entry.generatedAt().plus(properties.current().refreshAfter()));
     }
 
     private boolean recentlyFailed(Key key) {
         Instant failedAt = lastFailures.get(key);
-        return failedAt != null && clock.instant().isBefore(failedAt.plus(properties.retryAfterFailure()));
+        return failedAt != null
+                && clock.instant().isBefore(failedAt.plus(properties.current().retryAfterFailure()));
     }
 
     private StarterSuggestions current(Key key) {

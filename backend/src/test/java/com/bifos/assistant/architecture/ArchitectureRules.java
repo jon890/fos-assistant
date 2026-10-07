@@ -11,8 +11,22 @@ import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noMethods;
 import static com.tngtech.archunit.library.Architectures.layeredArchitecture;
 
+import com.bifos.assistant.chat.application.DelegationWakeProperties;
+import com.bifos.assistant.chat.application.ModelTierProperties;
+import com.bifos.assistant.chat.application.StarterProperties;
+import com.bifos.assistant.connector.application.ConnectorPolicyProperties;
+import com.bifos.assistant.hermes.HermesProperties;
+import com.bifos.assistant.memory.application.MemoryEncryptionProperties;
+import com.bifos.assistant.memory.application.MemoryProposalProperties;
+import com.bifos.assistant.orchestration.application.DelegationProperties;
+import com.bifos.assistant.proactive.application.AutonomyProperties;
+import com.bifos.assistant.proactive.application.ProactiveCheckProperties;
+import com.bifos.assistant.usage.application.UserExecutionProperties;
+import com.bifos.assistant.usage.infra.PricingProperties;
 import com.tngtech.archunit.base.DescribedPredicate;
 import com.tngtech.archunit.core.domain.JavaClass;
+import com.tngtech.archunit.core.domain.JavaConstructor;
+import com.tngtech.archunit.core.domain.JavaField;
 import com.tngtech.archunit.lang.ArchCondition;
 import com.tngtech.archunit.lang.ArchRule;
 import com.tngtech.archunit.lang.CompositeArchRule;
@@ -23,7 +37,9 @@ import jakarta.persistence.Enumerated;
 import java.lang.annotation.Annotation;
 import java.security.MessageDigest;
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.Executors;
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
@@ -384,6 +400,62 @@ public final class ArchitectureRules {
             .allowEmptyShould(true)
             .as("domain.type 은 위 층에 의존하지 않는다");
 
+    /** {@code LivePropertiesConfig} 의 전체 이름이다. 패키지 루트에 있어 구조 규칙이 이름으로 가리킨다. */
+    private static final String LIVE_PROPERTIES_CONFIG = "com.bifos.assistant.LivePropertiesConfig";
+
+    /** 기동 때 살펴보기 {@code max-duration} 과 {@code hermes.run-timeout} 을 견주는 설정 클래스다. */
+    private static final String RUN_TIMEOUT_CHECK =
+            "com.bifos.assistant.proactive.application.ProactiveCheckProperties$RunTimeoutCheck";
+
+    /** 실행 중에 쓰는 설정 record 다. {@code HermesProperties} 는 두 칸만 해당하므로 따로 본다. */
+    private static final List<Class<?>> LIVE_SETTINGS = List.of(
+            DelegationWakeProperties.class,
+            UserExecutionProperties.class,
+            ProactiveCheckProperties.class,
+            StarterProperties.class,
+            DelegationProperties.class,
+            AutonomyProperties.class,
+            PricingProperties.class,
+            MemoryEncryptionProperties.class,
+            ModelTierProperties.class,
+            ConnectorPolicyProperties.class,
+            MemoryProposalProperties.class);
+
+    /** {@code HermesProperties} 가운데 {@code LiveProperties} 로 읽는 칸이다. */
+    private static final Set<String> HERMES_LIVE_ACCESSORS = Set.of("runTimeout", "pollInterval");
+
+    /**
+     * 실행 중에 쓰는 설정 record 를 생성자 인자나 필드로 갖는 운영 클래스는 {@code LivePropertiesConfig} 뿐이다.
+     * 다른 클래스는 {@code LiveProperties<그 record>} 를 주입받아 쓸 때마다 {@code current()} 를 읽는다.
+     * 예외는 기동 때 두 설정을 견주는 {@code ProactiveCheckProperties$RunTimeoutCheck} 다.
+     *
+     * <p>근거: ADR-20261007 / live-properties. record 를 필드로 쥐면 검사가 바꾼 값을 보지 못한다.
+     */
+    public static final ArchRule LIVE_SETTINGS_ONLY_THROUGH_LIVE_PROPERTIES = classes()
+            .that()
+            .doNotHaveFullyQualifiedName(LIVE_PROPERTIES_CONFIG)
+            .and()
+            .doNotHaveFullyQualifiedName(RUN_TIMEOUT_CHECK)
+            .should(notHoldAny(LIVE_SETTINGS))
+            .as("실행 중에 쓰는 설정 record 는 LivePropertiesConfig 만 주입받는다");
+
+    /**
+     * {@code HermesProperties} 를 생성자 인자나 필드로 갖고 {@code runTimeout()} 이나 {@code pollInterval()} 을 부르는 운영 클래스는
+     * 실제 Hermes 클라이언트 {@code HermesRunEventStream}, {@code HttpHermesRunsClient} 와 기동 검사
+     * {@code ProactiveCheckProperties$RunTimeoutCheck} 뿐이다. 다른 사용처는 {@code LiveProperties<HermesProperties>} 로 읽는다.
+     *
+     * <p>근거: ADR-20261007 / live-properties. 두 클라이언트는 HTTP 클라이언트를 만들 때 한 번 읽고, 통합 검사가 대역으로 바꾼다.
+     */
+    public static final ArchRule HERMES_TIMEOUTS_ONLY_THROUGH_LIVE_PROPERTIES = classes()
+            .that()
+            .doNotHaveFullyQualifiedName("com.bifos.assistant.hermes.HermesRunEventStream")
+            .and()
+            .doNotHaveFullyQualifiedName("com.bifos.assistant.hermes.HttpHermesRunsClient")
+            .and()
+            .doNotHaveFullyQualifiedName(RUN_TIMEOUT_CHECK)
+            .should(notReadHermesTimeoutsFromInjectedProperties())
+            .as("hermes 의 runTimeout 과 pollInterval 은 LiveProperties 로 읽는다");
+
     private static DescribedPredicate<JavaClass> enclosedByServiceOrInfra() {
         return new DescribedPredicate<>("바깥 클래스가 서비스이거나 infra 안에 있다") {
             @Override
@@ -396,6 +468,52 @@ public final class ArchitectureRules {
                         .orElse(false);
             }
         };
+    }
+
+    /** 생성자 인자나 필드의 타입이 {@code types} 가운데 하나면 위반이다. */
+    private static ArchCondition<JavaClass> notHoldAny(List<Class<?>> types) {
+        return new ArchCondition<>("실행 중에 쓰는 설정 record 를 생성자 인자나 필드로 갖지 않는다") {
+            @Override
+            public void check(JavaClass item, ConditionEvents events) {
+                for (Class<?> type : types) {
+                    if (holds(item, type)) {
+                        events.add(SimpleConditionEvent.violated(
+                                item, item.getName() + " 가 " + type.getSimpleName() + " 을 생성자 인자나 필드로 갖는다"));
+                    }
+                }
+            }
+        };
+    }
+
+    /** {@code HermesProperties} 를 쥐고 {@code runTimeout()} 이나 {@code pollInterval()} 을 부르면 위반이다. */
+    private static ArchCondition<JavaClass> notReadHermesTimeoutsFromInjectedProperties() {
+        return new ArchCondition<>("HermesProperties 를 쥐고 runTimeout 이나 pollInterval 을 부르지 않는다") {
+            @Override
+            public void check(JavaClass item, ConditionEvents events) {
+                boolean reads = item.getMethodCallsFromSelf().stream()
+                        .anyMatch(call -> call.getTargetOwner().isEquivalentTo(HermesProperties.class)
+                                && HERMES_LIVE_ACCESSORS.contains(call.getName()));
+                if (reads && holds(item, HermesProperties.class)) {
+                    events.add(SimpleConditionEvent.violated(
+                            item, item.getName() + " 가 HermesProperties 를 쥐고 runTimeout 이나 pollInterval 을 부른다"));
+                }
+            }
+        };
+    }
+
+    /** 그 클래스가 {@code type} 을 필드로 갖거나 생성자 인자로 받는지 본다. */
+    private static boolean holds(JavaClass item, Class<?> type) {
+        for (JavaField field : item.getFields()) {
+            if (field.getRawType().isEquivalentTo(type)) {
+                return true;
+            }
+        }
+        for (JavaConstructor constructor : item.getConstructors()) {
+            if (constructor.getRawParameterTypes().stream().anyMatch(each -> each.isEquivalentTo(type))) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private static ArchCondition<JavaClass> notEnclosedByController() {

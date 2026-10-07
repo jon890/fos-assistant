@@ -25,6 +25,7 @@ import com.bifos.assistant.proactive.infra.ProactiveCheckProblemRepository;
 import com.bifos.assistant.proactive.infra.ProactiveCheckRepository;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.concurrent.BackgroundTasks;
+import com.bifos.assistant.shared.config.LiveProperties;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.usage.application.ExecutionDeliveryWriter;
@@ -60,7 +61,7 @@ public class ProactiveCheckService {
     private final ProactiveCheckFindingRepository findings;
     private final ProactiveCheckProblemRepository problems;
     private final FollowUpService followUps;
-    private final ProactiveCheckProperties properties;
+    private final LiveProperties<ProactiveCheckProperties> properties;
     private final TurnCancellation turns;
     private final ChatService chat;
     private final ConversationEventHub hub;
@@ -244,7 +245,7 @@ public class ProactiveCheckService {
         String rootSession = conversation.hermesRootSessionId();
         return rootSession != null
                 && checks.countByConversationIdAndHermesRootSessionId(conversation.id(), rootSession)
-                        >= properties.sessionMaxChecks();
+                        >= properties.current().sessionMaxChecks();
     }
 
     /**

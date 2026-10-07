@@ -26,6 +26,7 @@ import com.bifos.assistant.memory.application.MemoryProposer;
 import com.bifos.assistant.memory.infra.MemoryRepository;
 import com.bifos.assistant.model.domain.ModelChoice;
 import com.bifos.assistant.shared.auth.CurrentUser;
+import com.bifos.assistant.shared.config.LiveProperties;
 import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.testsupport.BackendIntegrationTest;
 import com.bifos.assistant.testsupport.MemoryProposeEnabled;
@@ -155,7 +156,7 @@ class UserExecutionLimitBackgroundTest {
                 Instant.now()));
         conversation = conversations.save(Conversation.startedBy(dad.id(), "대화", agent.id(), Instant.now()));
         starters = new StarterSuggestionService(
-                starterProperties,
+                LiveProperties.fixed(StarterProperties.class, starterProperties),
                 agentService,
                 conversations,
                 messages,

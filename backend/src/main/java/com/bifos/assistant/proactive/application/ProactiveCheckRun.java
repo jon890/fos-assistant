@@ -28,6 +28,7 @@ import com.bifos.assistant.proactive.infra.ProactiveCheckProblemRepository;
 import com.bifos.assistant.proactive.infra.ProactiveCheckRepository;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.concurrent.BackgroundTasks;
+import com.bifos.assistant.shared.config.LiveProperties;
 import com.bifos.assistant.shared.util.ExternalData;
 import com.bifos.assistant.usage.domain.AgentExecution;
 import com.bifos.assistant.usage.infra.AgentExecutionRepository;
@@ -219,7 +220,7 @@ public class ProactiveCheckRun implements CheckTurn {
      * @param followUps 문제 후보가 이미 챙기는 할 일과 같은지 본다
      */
     record Deps(
-            ProactiveCheckProperties properties,
+            LiveProperties<ProactiveCheckProperties> properties,
             ProactiveCheckRepository checks,
             ProactiveCheckFindingRepository findings,
             ProactiveCheckProblemRepository problems,
@@ -303,7 +304,7 @@ public class ProactiveCheckRun implements CheckTurn {
     /** 스트림을 읽는 스레드에서 불린다. 센 값이 {@code max-tool-calls} 를 넘는 첫 순간 멈춘다. */
     @Override
     public void toolStarted(Long executionId) {
-        if (toolCalls.incrementAndGet() > deps.properties().maxToolCalls()) {
+        if (toolCalls.incrementAndGet() > deps.properties().current().maxToolCalls()) {
             limitReached(TOOL_LIMIT, executionId);
         }
     }
@@ -354,7 +355,8 @@ public class ProactiveCheckRun implements CheckTurn {
             return new CheckAnswer(NOTHING_NEW_NOTICE, true, false);
         }
         Instant now = deps.clock().instant();
-        Set<AnnouncedKey> announced = announcedSince(now.minus(deps.properties().digestWindow()));
+        Duration digestWindow = deps.properties().current().digestWindow();
+        Set<AnnouncedKey> announced = announcedSince(now.minus(digestWindow));
         List<JudgedFinding> judged = block.findings().stream()
                 .map(finding -> FindingJudgement.judge(finding, check.startedAt(), now, announced))
                 .toList();
@@ -379,8 +381,7 @@ public class ProactiveCheckRun implements CheckTurn {
                 : ProblemJudgement.judge(
                                 block.problemCandidates(),
                                 judged,
-                                acceptedProblemKeysSince(
-                                        now.minus(deps.properties().digestWindow())),
+                                acceptedProblemKeysSince(now.minus(digestWindow)),
                                 title -> deps.followUps().hasOpenWithTitle(owner.id(), title))
                         .stream()
                         .map(each -> problemRow(each, now))
@@ -528,7 +529,7 @@ public class ProactiveCheckRun implements CheckTurn {
     /** {@code max-duration} 만큼 잔 뒤 끝나지 않았으면 멈춘다. {@link #close} 가 깨우면 그대로 끝난다. */
     private void awaitTimeLimit(Long executionId) {
         try {
-            Thread.sleep(deps.properties().maxDuration());
+            Thread.sleep(deps.properties().current().maxDuration());
         } catch (InterruptedException ex) {
             return;
         }
@@ -653,12 +654,13 @@ public class ProactiveCheckRun implements CheckTurn {
      * 도중에 내려가 {@code RUNNING} 으로 남은 줄) 「모름」 이다.
      */
     private String recentFindings(Instant now) {
+        ProactiveCheckProperties settings = deps.properties().current();
         List<ProactiveCheckFinding> recent = deps.findings()
                 .findByConversationIdAndKindAndCreatedAtAfterOrderByIdDesc(
                         check.conversationId(),
                         FindingKind.NEW,
-                        now.minus(deps.properties().digestWindow()),
-                        PageRequest.ofSize(deps.properties().digestMaxItems()));
+                        now.minus(settings.digestWindow()),
+                        PageRequest.ofSize(settings.digestMaxItems()));
         if (recent.isEmpty()) {
             return NO_RECENT_FINDINGS;
         }
@@ -689,12 +691,13 @@ public class ProactiveCheckRun implements CheckTurn {
 
     /** 최근에 받아들인 문제 후보를 한 줄씩 적고 {@code <external-data>} 로 감싼다. 모델이 쓴 글에서 온 것이기 때문이다. */
     private String recentProblems(Instant now) {
+        ProactiveCheckProperties settings = deps.properties().current();
         List<ProactiveCheckProblem> recent = deps.problems()
                 .findByConversationIdAndStatusAndCreatedAtAfterOrderByIdDesc(
                         check.conversationId(),
                         ProblemStatus.ACCEPTED,
-                        now.minus(deps.properties().digestWindow()),
-                        PageRequest.ofSize(deps.properties().digestMaxItems()));
+                        now.minus(settings.digestWindow()),
+                        PageRequest.ofSize(settings.digestMaxItems()));
         if (recent.isEmpty()) {
             return NO_RECENT_PROBLEMS;
         }

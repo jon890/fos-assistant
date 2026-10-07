@@ -32,6 +32,7 @@ import com.bifos.assistant.hermes.dto.SessionRuntime;
 import com.bifos.assistant.hermes.dto.TokenUsage;
 import com.bifos.assistant.model.domain.ModelChoice;
 import com.bifos.assistant.shared.auth.CurrentUser;
+import com.bifos.assistant.shared.config.LiveProperties;
 import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
@@ -148,7 +149,7 @@ class StarterSuggestionServiceTest {
                 DAD.id(),
                 Instant.now()));
         service = new StarterSuggestionService(
-                properties,
+                LiveProperties.fixed(StarterProperties.class, properties),
                 agentService,
                 conversations,
                 messages,
@@ -252,7 +253,7 @@ class StarterSuggestionServiceTest {
                 .when(rejecting)
                 .requireRunnable(any(), any(), any());
         service = new StarterSuggestionService(
-                properties,
+                LiveProperties.fixed(StarterProperties.class, properties),
                 agentService,
                 conversations,
                 messages,
@@ -376,7 +377,7 @@ class StarterSuggestionServiceTest {
         ExecutionRecorder failingRecorder = spy(executions);
         doThrow(new IllegalStateException("저장 실패")).when(failingRecorder).complete(any(), any(), any(), any());
         service = new StarterSuggestionService(
-                properties,
+                LiveProperties.fixed(StarterProperties.class, properties),
                 agentService,
                 conversations,
                 messages,

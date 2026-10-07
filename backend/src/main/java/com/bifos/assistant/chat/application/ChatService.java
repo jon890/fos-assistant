@@ -48,6 +48,7 @@ import com.bifos.assistant.model.domain.ModelChoice;
 import com.bifos.assistant.model.domain.type.ModelTier;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.concurrent.BackgroundTasks;
+import com.bifos.assistant.shared.config.LiveProperties;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.shared.util.ExternalData;
@@ -124,7 +125,7 @@ public class ChatService {
     private final AgentConnectorBindings connectorBindings;
     private final HermesRunsClient hermes;
     private final HermesRunEventStream eventStream;
-    private final HermesProperties hermesProperties;
+    private final LiveProperties<HermesProperties> hermesProperties;
     private final ExecutionRecorder executions;
     private final ExecutionEventRecorder eventRecorder;
     private final ExecutionEventRepository executionEvents;
@@ -1319,7 +1320,8 @@ public class ChatService {
             }
         });
         if (onEvent == null) {
-            turns.awaitStreamOrGrace(handle, streamDone, hermesProperties.runTimeout());
+            turns.awaitStreamOrGrace(
+                    handle, streamDone, hermesProperties.current().runTimeout());
         } else {
             turns.awaitStreamOrGrace(handle, streamDone);
         }

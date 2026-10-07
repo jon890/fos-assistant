@@ -26,6 +26,7 @@ import com.bifos.assistant.memory.infra.MemoryRepository;
 import com.bifos.assistant.model.domain.ModelChoice;
 import com.bifos.assistant.model.domain.type.ModelTier;
 import com.bifos.assistant.shared.auth.CurrentUser;
+import com.bifos.assistant.shared.config.LiveProperties;
 import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
@@ -422,7 +423,7 @@ class MemoryProposerTest {
                         ArgumentMatchers.any(),
                         ArgumentMatchers.any());
         MemoryProposer isolated = new MemoryProposer(
-                new MemoryProposalProperties(true),
+                LiveProperties.fixed(MemoryProposalProperties.class, new MemoryProposalProperties(true)),
                 mock(MemoryService.class),
                 mock(HermesRunsClient.class),
                 failingRecorder,

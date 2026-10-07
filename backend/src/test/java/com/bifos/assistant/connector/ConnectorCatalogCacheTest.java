@@ -13,6 +13,7 @@ import com.bifos.assistant.connector.application.ConnectorPolicyProperties;
 import com.bifos.assistant.hermes.HermesConnectorClient;
 import com.bifos.assistant.hermes.dto.ConnectorManifest;
 import com.bifos.assistant.hermes.dto.ConnectorTool;
+import com.bifos.assistant.shared.config.LiveProperties;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -30,7 +31,11 @@ class ConnectorCatalogCacheTest {
     private final HermesConnectorClient connector = mock(HermesConnectorClient.class);
     private final MovingClock clock = new MovingClock(START);
     private final ConnectorCatalogCache cache = new ConnectorCatalogCache(
-            connector, new ConnectorPolicyProperties(TTL, FAILURE_TTL, Duration.ofHours(24), "-"), clock);
+            connector,
+            LiveProperties.fixed(
+                    ConnectorPolicyProperties.class,
+                    new ConnectorPolicyProperties(TTL, FAILURE_TTL, Duration.ofHours(24), "-")),
+            clock);
 
     @Test
     @DisplayName("보관 시간 안에서는 카탈로그를 한 번만 읽고 처음 읽은 값으로 답한다")

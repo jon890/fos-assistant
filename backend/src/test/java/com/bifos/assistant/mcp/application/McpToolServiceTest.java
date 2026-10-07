@@ -18,6 +18,7 @@ import com.bifos.assistant.memory.domain.Memory;
 import com.bifos.assistant.orchestration.application.AgentDelegationService;
 import com.bifos.assistant.orchestration.application.DelegationProperties;
 import com.bifos.assistant.shared.auth.CurrentUser;
+import com.bifos.assistant.shared.config.LiveProperties;
 import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
@@ -44,7 +45,9 @@ class McpToolServiceTest {
             memories,
             artifacts,
             mock(AgentDelegationService.class),
-            new DelegationProperties(2, 4, 16, Duration.ofSeconds(30), 1000, Duration.ofSeconds(20)),
+            LiveProperties.fixed(
+                    DelegationProperties.class,
+                    new DelegationProperties(2, 4, 16, Duration.ofSeconds(30), 1000, Duration.ofSeconds(20))),
             mock(ExecutionDeliveryWriter.class),
             mock(AgentRepository.class),
             mock(FollowUpService.class),

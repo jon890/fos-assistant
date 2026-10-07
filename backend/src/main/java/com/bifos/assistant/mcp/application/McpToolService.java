@@ -15,6 +15,7 @@ import com.bifos.assistant.orchestration.application.DelegationProperties;
 import com.bifos.assistant.orchestration.application.DelegationResult;
 import com.bifos.assistant.orchestration.application.DelegationResult.Failure;
 import com.bifos.assistant.shared.auth.CurrentUser;
+import com.bifos.assistant.shared.config.LiveProperties;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.shared.util.ExternalData;
@@ -69,7 +70,7 @@ public class McpToolService {
     private final ArtifactWriteService artifacts;
     private final AgentDelegationService delegations;
     /** {@code agent_status} 설명에 기다리는 시간의 상한을 적는다. */
-    private final DelegationProperties delegationProperties;
+    private final LiveProperties<DelegationProperties> delegationProperties;
 
     private final ExecutionDeliveryWriter deliveryWriter;
     private final AgentRepository agents;
@@ -148,7 +149,7 @@ public class McpToolService {
                         "agent_status",
                         "description",
                         "다른 에이전트에게 맡긴 실행의 지금 상태와 결과를 읽는다. execution_id 에는 agent_delegate 로 받은 번호를 넣는다. 결과는 끝나면 자동으로 전달되므로 기다리려고 반복해서 부르지 않는다. 사용자가 진행 상황을 물을 때 한 번 부른다. 먼저 살펴보기에서는 wait_seconds 로 끝나기를 기다린다(최대 "
-                                + delegationProperties.statusWaitMax().toSeconds() + "초).",
+                                + delegationProperties.current().statusWaitMax().toSeconds() + "초).",
                         "inputSchema",
                         Map.of(
                                 "type",
