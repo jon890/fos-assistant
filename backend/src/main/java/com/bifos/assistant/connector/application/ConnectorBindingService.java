@@ -196,7 +196,8 @@ public class ConnectorBindingService implements AgentConnectorDetacher {
                 bindings.save(ConnectorBinding.pending(agent, connection, declared.mcpServer(), now));
         binding.beginInstall(now);
         try {
-            InstallResult installed = connector.bindConnector(agent.hermesProfile(), connectorId, connection.vault());
+            InstallResult installed = connector.bindConnector(
+                    agent.hermesProfile(), connectorId, connection.vault(), agent.sandboxOwner());
             binding.installed(installed.restartRequired() || installed.pluginUpdated(), now);
         } catch (ConnectorInstallConflict ex) {
             throw new ApiException(
@@ -387,7 +388,7 @@ public class ConnectorBindingService implements AgentConnectorDetacher {
                 binding.installed(restart || installed.restartRequired() || installed.pluginUpdated(), now);
             } else {
                 InstallResult installed = connector.bindConnector(
-                        profile, manifest.id(), binding.connection().vault());
+                        profile, manifest.id(), binding.connection().vault(), agent.sandboxOwner());
                 binding.installed(installed.restartRequired() || installed.pluginUpdated(), now);
             }
             if (binding.mcpServer() == null) {
@@ -514,7 +515,10 @@ public class ConnectorBindingService implements AgentConnectorDetacher {
                     .pluginUpdated();
         }
         InstallResult installed = connector.bindConnector(
-                profile, connectorId, binding.connection().vault());
+                profile,
+                connectorId,
+                binding.connection().vault(),
+                binding.agent().sandboxOwner());
         return installed.restartRequired() || installed.pluginUpdated();
     }
 

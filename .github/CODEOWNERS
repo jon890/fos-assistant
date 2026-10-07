@@ -2,3 +2,6 @@
 /hermes/connectors/gmail/ @jon890
 /hermes/connectors/gmail/tests/ @jon890
 /docs/connectors/gmail.md @jon890
+/hermes/connectors/naver-blog/ @jon890
+/hermes/connectors/naver-blog/tests/ @jon890
+/docs/connectors/naver-blog.md @jon890

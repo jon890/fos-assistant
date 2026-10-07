@@ -811,7 +811,7 @@ class HttpHermesConnectorClientTest {
         server.verify();
     }
 
-    @DisplayName("바인딩 설치는 bind 칸에 보관 파일 이름을 싣고 떼기는 bind 칸 없이 끈다")
+    @DisplayName("바인딩 설치는 bind 칸에 보관 파일 이름과 sandbox_owner 를 싣고 떼기는 bind 칸 없이 끈다")
     @Test
     void bindsWithVaultAndUnbindsWithoutBindField() {
         server.expect(requestTo(BASE + "/api/connectors"))
@@ -819,7 +819,7 @@ class HttpHermesConnectorClientTest {
                 .andExpect(content()
                         .json(
                                 "{\"profile\":\"user-demo\",\"plugin\":\"demo-notes\",\"enabled\":true,"
-                                        + "\"bind\":{\"vault\":\"c7\"}}",
+                                        + "\"bind\":{\"vault\":\"c7\"},\"sandbox_owner\":\"u1\"}",
                                 JsonCompareMode.STRICT))
                 .andRespond(withSuccess(
                         "{\"profile\":\"user-demo\",\"plugin\":\"demo-notes\",\"enabled\":true,"
@@ -836,8 +836,50 @@ class HttpHermesConnectorClientTest {
                                 + "\"restart_required\":false}",
                         MediaType.APPLICATION_JSON));
 
-        assertThat(client.bindConnector(PROFILE, DEMO, "c7")).isEqualTo(new InstallResult(true, false));
+        assertThat(client.bindConnector(PROFILE, DEMO, "c7", "u1")).isEqualTo(new InstallResult(true, false));
         assertThat(client.unbindConnector(PROFILE, DEMO)).isEqualTo(new InstallResult(false, false));
+        server.verify();
+    }
+
+    @DisplayName("바인딩 설치는 보내기 전에 그 주인의 첨부 디렉터리를 만든다")
+    @Test
+    void bindCreatesTheOwnersAttachmentDirectoryFirst() {
+        server.expect(requestTo(BASE + "/api/connectors"))
+                .andExpect(content().json("{\"enabled\":true,\"sandbox_owner\":\"u3\"}"))
+                .andRespond(withSuccess(
+                        "{\"profile\":\"user-demo\",\"plugin\":\"demo-notes\",\"enabled\":true,"
+                                + "\"restart_required\":false}",
+                        MediaType.APPLICATION_JSON));
+
+        assertThat(client.bindConnector(PROFILE, DEMO, "c7", "u3")).isEqualTo(new InstallResult(false, false));
+        assertThat(attachmentRoot.resolve("users").resolve(SandboxAttachmentDirectory.key("u3")))
+                .isDirectory();
+        server.verify();
+    }
+
+    @DisplayName("바인딩 설치는 첨부 디렉터리를 만들지 못해도 요청을 보내고, 대시보드의 409 를 설치 충돌로 돌려준다")
+    @Test
+    void bindSendsEvenWhenTheAttachmentDirectoryCannotBeMade() throws Exception {
+        Path users = Files.createDirectory(attachmentRoot.resolve("users"));
+        Path other = Files.createDirectory(users.resolve(SandboxAttachmentDirectory.key("u4")));
+        Files.createSymbolicLink(users.resolve(SandboxAttachmentDirectory.key("u5")), other);
+        // 첨부를 선언하지 않은 커넥터는 대시보드가 디렉터리를 보지 않으므로 설치된다.
+        server.expect(requestTo(BASE + "/api/connectors"))
+                .andExpect(content().json("{\"enabled\":true,\"sandbox_owner\":\"u5\"}"))
+                .andRespond(withSuccess(
+                        "{\"profile\":\"user-demo\",\"plugin\":\"demo-notes\",\"enabled\":true,"
+                                + "\"restart_required\":true}",
+                        MediaType.APPLICATION_JSON));
+        // 첨부를 선언한 커넥터는 대시보드가 링크를 보고 409 로 거절한다.
+        server.expect(requestTo(BASE + "/api/connectors"))
+                .andExpect(content().json("{\"enabled\":true,\"sandbox_owner\":\"u5\"}"))
+                .andRespond(withStatus(HttpStatus.CONFLICT));
+
+        assertThat(client.bindConnector(PROFILE, DEMO, "c7", "u5")).isEqualTo(new InstallResult(true, false));
+        assertThatThrownBy(() -> client.bindConnector(PROFILE, DEMO, "c7", "u5"))
+                .isInstanceOf(ConnectorInstallConflict.class);
+        assertThat(Files.isSymbolicLink(users.resolve(SandboxAttachmentDirectory.key("u5"))))
+                .isTrue();
         server.verify();
     }
 
@@ -854,13 +896,13 @@ class HttpHermesConnectorClientTest {
         server.expect(requestTo(BASE + "/api/connectors"))
                 .andRespond(withStatus(HttpStatus.BAD_REQUEST).body(detail).contentType(MediaType.APPLICATION_JSON));
 
-        assertThatThrownBy(() -> client.bindConnector(PROFILE, DEMO, "c7"))
+        assertThatThrownBy(() -> client.bindConnector(PROFILE, DEMO, "c7", "u1"))
                 .isInstanceOfSatisfying(ConnectorInstallConflict.class, ex -> assertNoDetail(ex));
-        assertThatThrownBy(() -> client.bindConnector(PROFILE, DEMO, "c7"))
+        assertThatThrownBy(() -> client.bindConnector(PROFILE, DEMO, "c7", "u1"))
                 .isInstanceOfSatisfying(ConnectorProfileRejected.class, ex -> assertNoDetail(ex));
         assertThatThrownBy(() -> client.unbindConnector(PROFILE, DEMO))
                 .isInstanceOfSatisfying(ConnectorInstallConflict.class, ex -> assertNoDetail(ex));
-        assertThatThrownBy(() -> client.bindConnector(PROFILE, DEMO, "c7"))
+        assertThatThrownBy(() -> client.bindConnector(PROFILE, DEMO, "c7", "u1"))
                 .isInstanceOfSatisfying(IllegalStateException.class, ex -> assertNoDetail(ex));
         server.verify();
     }
