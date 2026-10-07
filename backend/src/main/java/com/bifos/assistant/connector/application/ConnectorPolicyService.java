@@ -297,21 +297,7 @@ public class ConnectorPolicyService {
                 return stored;
             });
             if (needsApproval) {
-                // 커밋한 뒤라 바로 남는다. 살펴보기 트리의 승인 줄이면 그 살펴보기로 잇는다.
-                feedback.record(FeedbackEntry.of(
-                                saved.userId(),
-                                FeedbackSubjectType.CONNECTOR_ACTION,
-                                saved.publicId(),
-                                FeedbackEventType.SURFACED,
-                                FeedbackActor.AGENT,
-                                now)
-                        .conversation(saved.conversationId())
-                        .originExecution(saved.originExecutionId())
-                        .sourceCheck(checkGuard
-                                .checkOf(origin)
-                                .map(ProactiveCheck::id)
-                                .orElse(null))
-                        .version(saved.argsSha256()));
+                recordSurfaced(saved, origin, now);
             }
             // 사건은 커밋한 뒤에 낸다. 받은 쪽이 읽었을 때 줄이 있어야 한다.
             if (needsApproval && saved.conversationId() != null) {
@@ -327,6 +313,21 @@ public class ConnectorPolicyService {
                     .map(first -> replayed(first, hermesTool, argsSha256))
                     .orElseThrow(() -> ex);
         }
+    }
+
+    /** 승인 줄을 보인 판단 피드백 사건이다. 커밋한 뒤에 부르므로 바로 남는다. 살펴보기 트리의 승인 줄이면 그 살펴보기로 잇는다. */
+    private void recordSurfaced(ConnectorAction saved, AgentExecution origin, Instant now) {
+        feedback.record(FeedbackEntry.of(
+                        saved.userId(),
+                        FeedbackSubjectType.CONNECTOR_ACTION,
+                        saved.publicId(),
+                        FeedbackEventType.SURFACED,
+                        FeedbackActor.AGENT,
+                        now)
+                .conversation(saved.conversationId())
+                .originExecution(saved.originExecutionId())
+                .sourceCheck(checkGuard.checkOf(origin).map(ProactiveCheck::id).orElse(null))
+                .version(saved.argsSha256()));
     }
 
     /** 살펴보기 줄을 한 번 읽어 경계를 정한다. 줄이 없으면 살펴보기 트리가 아니다. */

@@ -9,6 +9,8 @@ import com.bifos.assistant.feedback.domain.type.FeedbackSubjectType;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Set;
+import lombok.AccessLevel;
+import lombok.NoArgsConstructor;
 
 /**
  * 제안 하나의 사건을 첫 반응으로 읽는다. 저장하지 않는 순수 함수다.
@@ -16,6 +18,7 @@ import java.util.Set;
  * <p>잘못된 학습을 막는 규칙을 여기 둔다. 무응답은 싫어함이 아니다. 거절과 숨기기는 그 제안 하나에 대한 일회성 반응이고 오래 가는 선호가
  * 아니다. 오래 가는 선호의 근거는 사용자가 받아들인 Memory 제안 하나뿐이다(ADR-012).
  */
+@NoArgsConstructor(access = AccessLevel.PRIVATE)
 public final class FeedbackLabeler {
 
     /** 반응 읽기 규칙의 버전이다. 규칙이 바뀌면 올린다. */
@@ -27,8 +30,6 @@ public final class FeedbackLabeler {
             Set.of(FeedbackEventType.REJECTED, FeedbackEventType.DISMISSED);
     private static final Set<FeedbackEventType> OUTCOMES =
             Set.of(FeedbackEventType.EXECUTION_SUCCEEDED, FeedbackEventType.EXECUTION_FAILED);
-
-    private FeedbackLabeler() {}
 
     /** @param events 같은 제안의 사건. 순서는 상관없다 */
     public static SubjectLabel label(FeedbackSubjectType subject, List<FeedbackEvent> events) {

@@ -117,22 +117,12 @@ public class DecisionFeedbackExporter {
         List<DecisionRecord> records = new ArrayList<>();
         situations.values().stream()
                 .sorted(Comparator.comparing(ProactiveCheck::id))
-                .forEach(check -> {
-                    String decisionKey = CHECK_KEY_PREFIX + check.id();
-                    records.add(new DecisionRecord(
-                            decisionKey,
-                            situation(check),
-                            candidates.getOrDefault(check.id(), List.of()).stream()
-                                    .map(DecisionFeedbackExporter::candidate)
-                                    .toList(),
-                            judgments.getOrDefault(check.id(), List.of()).stream()
-                                    .map(DecisionFeedbackExporter::judgment)
-                                    .toList(),
-                            policies.getOrDefault(check.id(), List.of()).stream()
-                                    .map(DecisionFeedbackExporter::policy)
-                                    .toList(),
-                            grouped.getOrDefault(decisionKey, List.of())));
-                });
+                .forEach(check -> records.add(checkRecord(
+                        check,
+                        candidates.getOrDefault(check.id(), List.of()),
+                        judgments.getOrDefault(check.id(), List.of()),
+                        policies.getOrDefault(check.id(), List.of()),
+                        grouped.getOrDefault(CHECK_KEY_PREFIX + check.id(), List.of()))));
         grouped.forEach((decisionKey, list) -> {
             if (!decisionKey.startsWith(CHECK_KEY_PREFIX)) {
                 records.add(new DecisionRecord(decisionKey, null, List.of(), List.of(), List.of(), list));
@@ -140,6 +130,21 @@ public class DecisionFeedbackExporter {
         });
         return new DecisionFeedbackExport(
                 DecisionFeedbackExport.VERSION, FeedbackLabeler.VERSION, from, to, List.copyOf(records));
+    }
+
+    private static DecisionRecord checkRecord(
+            ProactiveCheck check,
+            List<ProactiveCheckProblem> candidates,
+            List<ValueEvaluation> judgments,
+            List<AutonomyDecision> policies,
+            List<Subject> subjects) {
+        return new DecisionRecord(
+                CHECK_KEY_PREFIX + check.id(),
+                situation(check),
+                candidates.stream().map(DecisionFeedbackExporter::candidate).toList(),
+                judgments.stream().map(DecisionFeedbackExporter::judgment).toList(),
+                policies.stream().map(DecisionFeedbackExporter::policy).toList(),
+                subjects);
     }
 
     /**
