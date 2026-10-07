@@ -37,12 +37,12 @@ test("생성 파일만 제외하고 소스와 직접 관리하는 설정은 센�
 
 test("시험과 문서는 별도로 표시하고 운영 코드만 상한에 넣는다", () => {
   const tests = ["backend/src/test/java/A.java", "web/src/a.test.ts", "web/src/a.spec.tsx", "hermes/tests/a.py", "hermes/connectors/sample/tests/a.ts", "test/e2e/a.ts", "e2e/a.ts"];
-  const docs = ["docs/adr/ADR-example.md", "AGENTS.md", "hermes/README.md", "docs/contract.json"];
+  const docs = ["docs/adr/INDEX.md", "AGENTS.md", "hermes/README.md", "docs/contract.json"];
   const production = ["backend/src/main/java/A.java", "web/src/app.ts", "hermes/plugins/a.py", "scripts/check.sh", ".github/workflows/ci.yml", "backend/build.gradle.kts"];
   for (const file of tests) assert.equal(category(file), "tests", file);
   for (const file of docs) assert.equal(category(file), "docs", file);
   for (const file of production) assert.equal(category(file), "production", file);
-  const counts = countChanges("400\t0\tweb/src/app.ts\0" + "6000\t0\ttest/unit/a.test.ts\0" + "7000\t0\tdocs/contract.md\0");
+  const counts = countChanges("400\t0\tweb/src/app.ts\0" + "6000\t0\ttest/unit/a.test.ts\0" + "7000\t0\tdocs/README.md\0");
   assert.deepEqual(counts, { production: 400, tests: 6000, docs: 7000, ignored: 0 });
   assert.deepEqual(classify(counts.production), { large: false, pass: true });
   assert.deepEqual(countChanges("1\t2\t\0scripts/check.sh\0test/check.sh\0"), { production: 3, tests: 0, docs: 0, ignored: 0 });
