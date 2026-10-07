@@ -117,10 +117,15 @@ public final class UsageDtos {
 
         static BreakdownRow ofAgent(BreakdownLine<CostByAgent> line) {
             CostByAgent cost = line.cost();
-            String code = cost.agentCode() == null ? String.valueOf(cost.agentId()) : cost.agentCode();
+            String code = cost.agentId() == null
+                    ? "system-decision"
+                    : cost.agentCode() == null ? String.valueOf(cost.agentId()) : cost.agentCode();
+            String label = cost.agentId() == null
+                    ? "시스템 판단"
+                    : cost.agentName() == null ? code : cost.agentName();
             return new BreakdownRow(
                     code,
-                    cost.agentName() == null ? code : cost.agentName(),
+                    label,
                     cost.agentCode(),
                     cost.executions(),
                     line.subagents(),

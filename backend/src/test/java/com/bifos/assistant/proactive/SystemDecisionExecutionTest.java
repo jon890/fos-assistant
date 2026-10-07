@@ -14,8 +14,11 @@ import com.bifos.assistant.usage.application.UsageSummaryService;
 import com.bifos.assistant.usage.domain.AgentExecution;
 import com.bifos.assistant.usage.domain.type.ExecutionStatus;
 import com.bifos.assistant.usage.infra.AgentExecutionRepository;
+import com.bifos.assistant.usage.presentation.UsageController;
 import java.time.Clock;
 import java.time.Instant;
+import java.time.YearMonth;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.List;
 import org.junit.jupiter.api.AfterEach;
@@ -24,6 +27,8 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.context.SecurityContextHolder;
 
 @SpringBootTest
 @ActiveProfiles("test")
@@ -39,6 +44,9 @@ class SystemDecisionExecutionTest {
 
     @Autowired
     UsageSummaryService usage;
+
+    @Autowired
+    UsageController controller;
 
     @Autowired
     Clock clock;
@@ -92,6 +100,20 @@ class SystemDecisionExecutionTest {
                 usage.byAgent(USER.id(), now.minusSeconds(1), clock.instant().plusSeconds(1));
         assertThat(lines).hasSize(2);
         assertThat(lines.getLast().cost().agentId()).isNull();
+        var previous = SecurityContextHolder.getContext();
+        try {
+            var context = SecurityContextHolder.createEmptyContext();
+            var admin = new CurrentUser(USER.id(), USER.email(), USER.displayName(), USER.groupId(), UserRole.ADMIN);
+            context.setAuthentication(new UsernamePasswordAuthenticationToken(admin, null, List.of()));
+            SecurityContextHolder.setContext(context);
+            String month = YearMonth.from(now.atZone(ZoneId.of("Asia/Seoul"))).toString();
+            assertThat(controller.breakdown("agent", month).rows())
+                    .filteredOn(row -> row.key().equals("system-decision"))
+                    .singleElement()
+                    .satisfies(row -> assertThat(row.label()).isEqualTo("시스템 판단"));
+        } finally {
+            SecurityContextHolder.setContext(previous);
+        }
     }
 
     @Test
