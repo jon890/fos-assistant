@@ -11,6 +11,7 @@ import com.bifos.assistant.orchestration.application.DelegationResult.Failure;
 import com.bifos.assistant.proactive.application.ProactiveCheckGuard;
 import com.bifos.assistant.proactive.domain.type.CheckStatus;
 import com.bifos.assistant.shared.auth.CurrentUser;
+import com.bifos.assistant.shared.concurrent.BackgroundTasks;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.usage.application.ExecutionDeliveryWriter;
@@ -65,6 +66,7 @@ public class AgentDelegationService {
     private final ApplicationEventPublisher events;
     private final ProactiveCheckGuard checkGuard;
     private final Clock clock;
+    private final BackgroundTasks backgroundTasks;
 
     /**
      * 이 프로세스에서 도는 위임 실행의 중지 표시와 run 참조다. 실행 번호가 열쇠다.
@@ -95,7 +97,8 @@ public class AgentDelegationService {
             HermesRunsClient hermes,
             ApplicationEventPublisher events,
             ProactiveCheckGuard checkGuard,
-            Clock clock) {
+            Clock clock,
+            BackgroundTasks backgroundTasks) {
         this.agents = agents;
         this.executions = executions;
         this.deliveryWriter = deliveryWriter;
@@ -107,6 +110,7 @@ public class AgentDelegationService {
         this.events = events;
         this.checkGuard = checkGuard;
         this.clock = clock;
+        this.backgroundTasks = backgroundTasks;
         this.activeDelegations = new Semaphore(properties.maxActive());
         for (int i = 0; i < ROOT_LOCK_STRIPES; i++) {
             rootLocks[i] = new ReentrantLock();
@@ -319,10 +323,9 @@ public class AgentDelegationService {
             handoff = new Handoff();
             Handoff started = handoff;
             try {
-                Thread.ofVirtual()
-                        .name("agent-delegate-" + rootId)
-                        .start(() ->
-                                run(user, conversation.get(), origin, agent, task, delegationKey, checkTree, started));
+                backgroundTasks.start(
+                        "agent-delegate-" + rootId,
+                        () -> run(user, conversation.get(), origin, agent, task, delegationKey, checkTree, started));
             } catch (RuntimeException | Error ex) {
                 activeDelegations.release();
                 log.warn("위임 실행 스레드를 띄우지 못했다 originExecutionId={}", origin.id(), ex);

@@ -9,6 +9,7 @@ import com.bifos.assistant.hermes.dto.ProfileModelDefaults;
 import com.bifos.assistant.hermes.dto.SubagentProviderLookup;
 import com.bifos.assistant.hermes.dto.SubagentSessionUsage;
 import com.bifos.assistant.hermes.dto.TokenUsage;
+import com.bifos.assistant.shared.concurrent.BackgroundTasks;
 import com.bifos.assistant.usage.domain.AgentExecution;
 import com.bifos.assistant.usage.domain.ExecutionCost;
 import com.bifos.assistant.usage.domain.ExecutionEvent;
@@ -59,6 +60,7 @@ public class SubagentUsageReconciler {
     private final CostEstimator estimator;
     private final TransactionTemplate transaction;
     private final Clock clock;
+    private final BackgroundTasks backgroundTasks;
     private final Semaphore slots = new Semaphore(4);
     private final Set<String> active = ConcurrentHashMap.newKeySet();
 
@@ -72,8 +74,20 @@ public class SubagentUsageReconciler {
             ProfileModelDefaultsClient defaults,
             SubagentProviderClient providers,
             CostEstimator estimator,
-            PlatformTransactionManager manager) {
-        this(executions, events, jobs, agents, hermes, defaults, providers, estimator, manager, Clock.systemUTC());
+            PlatformTransactionManager manager,
+            BackgroundTasks backgroundTasks) {
+        this(
+                executions,
+                events,
+                jobs,
+                agents,
+                hermes,
+                defaults,
+                providers,
+                estimator,
+                manager,
+                Clock.systemUTC(),
+                backgroundTasks);
     }
 
     SubagentUsageReconciler(
@@ -86,7 +100,8 @@ public class SubagentUsageReconciler {
             SubagentProviderClient providers,
             CostEstimator estimator,
             PlatformTransactionManager manager,
-            Clock clock) {
+            Clock clock,
+            BackgroundTasks backgroundTasks) {
         this.executions = executions;
         this.events = events;
         this.jobs = jobs;
@@ -97,6 +112,7 @@ public class SubagentUsageReconciler {
         this.estimator = estimator;
         this.transaction = new TransactionTemplate(manager);
         this.clock = clock;
+        this.backgroundTasks = backgroundTasks;
     }
 
     @Scheduled(cron = "${assistant.usage.reconcile-cron:*/5 * * * * *}")
@@ -148,7 +164,7 @@ public class SubagentUsageReconciler {
             active.remove(key);
             return;
         }
-        Thread.startVirtualThread(() -> {
+        backgroundTasks.start("subagent-usage-" + key, () -> {
             try {
                 action.run();
             } catch (RuntimeException ex) {

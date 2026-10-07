@@ -5,6 +5,7 @@ import static org.mockito.Mockito.mock;
 
 import com.bifos.assistant.hermes.HermesProperties;
 import com.bifos.assistant.hermes.HermesRunsClient;
+import com.bifos.assistant.shared.concurrent.VirtualThreadBackgroundTasks;
 import com.bifos.assistant.usage.application.UserExecutionLimiter;
 import com.bifos.assistant.usage.application.UserExecutionProperties;
 import com.bifos.assistant.usage.infra.AgentExecutionRepository;
@@ -24,7 +25,9 @@ class TurnCancellationCloseTest {
                     new UserExecutionProperties(1000, 0, null),
                     mock(AgentExecutionRepository.class),
                     mock(HermesRunsClient.class),
-                    new HermesProperties(null, null, null, null, null, null, null, null)));
+                    new HermesProperties(null, null, null, null, null, null, null, null),
+                    new VirtualThreadBackgroundTasks()),
+            new VirtualThreadBackgroundTasks());
 
     @AfterEach
     void tearDown() {

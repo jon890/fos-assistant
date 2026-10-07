@@ -20,6 +20,7 @@ import com.bifos.assistant.hermes.SubagentProviderClient;
 import com.bifos.assistant.hermes.dto.ProfileModelDefaults;
 import com.bifos.assistant.hermes.dto.SubagentProviderLookup;
 import com.bifos.assistant.hermes.dto.SubagentSessionUsage;
+import com.bifos.assistant.shared.concurrent.VirtualThreadBackgroundTasks;
 import com.bifos.assistant.usage.domain.AgentExecution;
 import com.bifos.assistant.usage.domain.CatalogPrice;
 import com.bifos.assistant.usage.domain.ExecutionEvent;
@@ -802,7 +803,8 @@ class SubagentUsageReconcilerTest {
                 providers,
                 new CostEstimator(prices),
                 new TestTransactionManager(),
-                Clock.fixed(NOW, ZoneOffset.UTC));
+                Clock.fixed(NOW, ZoneOffset.UTC),
+                new VirtualThreadBackgroundTasks());
         return new Fixtures(
                 reconciler,
                 executions,

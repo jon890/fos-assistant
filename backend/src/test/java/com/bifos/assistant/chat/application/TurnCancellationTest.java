@@ -6,6 +6,7 @@ import static org.mockito.Mockito.mock;
 
 import com.bifos.assistant.hermes.HermesProperties;
 import com.bifos.assistant.hermes.HermesRunsClient;
+import com.bifos.assistant.shared.concurrent.VirtualThreadBackgroundTasks;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.usage.application.TurnSlot;
@@ -216,7 +217,8 @@ class TurnCancellationTest {
                         new UserExecutionProperties(1, 0, null),
                         mock(AgentExecutionRepository.class),
                         mock(HermesRunsClient.class),
-                        new HermesProperties(null, null, null, null, null, null, null, null)) {
+                        new HermesProperties(null, null, null, null, null, null, null, null),
+                        new VirtualThreadBackgroundTasks()) {
                     @Override
                     public TurnSlot acquireTurn(Long userId) {
                         if (rivalStarted.compareAndSet(false, true)) {
@@ -310,11 +312,13 @@ class TurnCancellationTest {
                 new UserExecutionProperties(maxRunning, 0, null),
                 mock(AgentExecutionRepository.class),
                 mock(HermesRunsClient.class),
-                new HermesProperties(null, null, null, null, null, null, null, null));
+                new HermesProperties(null, null, null, null, null, null, null, null),
+                new VirtualThreadBackgroundTasks());
     }
 
     private static TurnCancellation turnsWith(UserExecutionLimiter limiter) {
-        return new TurnCancellation(mock(HermesRunsClient.class), Duration.ofMillis(10), limiter);
+        return new TurnCancellation(
+                mock(HermesRunsClient.class), Duration.ofMillis(10), limiter, new VirtualThreadBackgroundTasks());
     }
 
     private static TurnCancellation turnsWithLimit(int maxRunning) {

@@ -116,6 +116,20 @@ class ArchitectureRulesTest {
     }
 
     @Test
+    @DisplayName("가상 스레드를 BackgroundTasks 와 SSE 연결 밖에서 새로 직접 띄우지 않는다")
+    void virtualThreadsOnlyThroughBackgroundTasks() {
+        FreezingArchRule.freeze(ArchitectureRules.VIRTUAL_THREADS_ONLY_THROUGH_BACKGROUND_TASKS)
+                .check(MAIN);
+    }
+
+    @Test
+    @DisplayName("Executors.newVirtualThreadPerTaskExecutor 를 ResearchAndBuildFlow 밖에서 새로 부르지 않는다")
+    void virtualThreadExecutorOnlyInResearchAndBuildFlow() {
+        FreezingArchRule.freeze(ArchitectureRules.VIRTUAL_THREAD_EXECUTOR_ONLY_IN_RESEARCH_AND_BUILD_FLOW)
+                .check(MAIN);
+    }
+
+    @Test
     @DisplayName("ConfigurationProperties 클래스에 Validated 가 붙는다")
     void configurationPropertiesAreValidated() {
         FreezingArchRule.freeze(ArchitectureRules.CONFIGURATION_PROPERTIES_ARE_VALIDATED)

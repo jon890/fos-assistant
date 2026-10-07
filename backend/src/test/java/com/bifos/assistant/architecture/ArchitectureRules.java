@@ -24,6 +24,7 @@ import java.lang.annotation.Annotation;
 import java.security.MessageDigest;
 import java.time.Instant;
 import java.util.Optional;
+import java.util.concurrent.Executors;
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
 import org.junit.jupiter.api.DisplayName;
@@ -280,6 +281,48 @@ public final class ArchitectureRules {
             .should()
             .callMethod(MessageDigest.class, "getInstance", String.class)
             .as("MessageDigest.getInstance 는 Sha256 만 부른다");
+
+    /**
+     * 가상 스레드를 직접 띄우는 {@code Thread.ofVirtual()} 과 {@code Thread.startVirtualThread} 는
+     * {@code shared.concurrent.VirtualThreadBackgroundTasks} 와 HTTP 연결에 묶인 {@code ChatEventStreams},
+     * {@code NotificationEventStreams} 만 부른다. 요청 밖 작업은 {@code BackgroundTasks} 로 띄운다.
+     *
+     * <p>근거: ADR-096. 직접 띄운 스레드는 검사가 끝날 때 기다리지 못한다.
+     */
+    public static final ArchRule VIRTUAL_THREADS_ONLY_THROUGH_BACKGROUND_TASKS = CompositeArchRule.of(noClasses()
+                    .that()
+                    .doNotHaveFullyQualifiedName("com.bifos.assistant.shared.concurrent.VirtualThreadBackgroundTasks")
+                    .and()
+                    .doNotHaveFullyQualifiedName("com.bifos.assistant.chat.presentation.ChatEventStreams")
+                    .and()
+                    .doNotHaveFullyQualifiedName(
+                            "com.bifos.assistant.notification.presentation.NotificationEventStreams")
+                    .should()
+                    .callMethod(Thread.class, "ofVirtual"))
+            .and(noClasses()
+                    .that()
+                    .doNotHaveFullyQualifiedName("com.bifos.assistant.shared.concurrent.VirtualThreadBackgroundTasks")
+                    .and()
+                    .doNotHaveFullyQualifiedName("com.bifos.assistant.chat.presentation.ChatEventStreams")
+                    .and()
+                    .doNotHaveFullyQualifiedName(
+                            "com.bifos.assistant.notification.presentation.NotificationEventStreams")
+                    .should()
+                    .callMethod(Thread.class, "startVirtualThread", Runnable.class))
+            .as("가상 스레드는 BackgroundTasks 와 SSE 연결만 직접 띄운다");
+
+    /**
+     * {@code Executors.newVirtualThreadPerTaskExecutor()} 는 {@code ResearchAndBuildFlow} 만 부른다.
+     * 그 흐름은 {@code try} 블록이 닫힐 때 실행기가 작업을 모두 기다린다.
+     *
+     * <p>근거: ADR-096. 블록 밖으로 살아 남는 실행기는 검사가 끝날 때 기다리지 못한다.
+     */
+    public static final ArchRule VIRTUAL_THREAD_EXECUTOR_ONLY_IN_RESEARCH_AND_BUILD_FLOW = noClasses()
+            .that()
+            .doNotHaveFullyQualifiedName("com.bifos.assistant.orchestration.application.ResearchAndBuildFlow")
+            .should()
+            .callMethod(Executors.class, "newVirtualThreadPerTaskExecutor")
+            .as("Executors.newVirtualThreadPerTaskExecutor 는 ResearchAndBuildFlow 만 부른다");
 
     /**
      * {@code @ConfigurationProperties} 클래스에는 {@code @Validated} 도 붙는다.

@@ -20,6 +20,8 @@ import com.bifos.assistant.orchestration.application.DelegationResult;
 import com.bifos.assistant.orchestration.domain.ChildResult;
 import com.bifos.assistant.proactive.application.ProactiveCheckGuard;
 import com.bifos.assistant.shared.auth.CurrentUser;
+import com.bifos.assistant.shared.concurrent.BackgroundTasks;
+import com.bifos.assistant.shared.concurrent.VirtualThreadBackgroundTasks;
 import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.usage.application.ExecutionDeliveryWriter;
 import com.bifos.assistant.usage.domain.AgentExecution;
@@ -34,6 +36,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import org.junit.jupiter.api.BeforeEach;
@@ -75,8 +78,12 @@ class AgentDelegationServiceRaceTest {
         when(children.startableAgent(user, WORKER)).thenReturn(agent);
         // 보통 turn 의 위임을 본다. 살펴보기 트리를 보는 검사만 참으로 바꾼다.
         when(checkGuard.isCheckTree(any())).thenReturn(false);
-        // 서버 전체 한도를 1 로 둬, 거절한 요청이 자리를 돌려주지 않고 남기면 다음 요청이 BUSY 가 된다.
-        delegations = new AgentDelegationService(
+        delegations = service(new VirtualThreadBackgroundTasks());
+    }
+
+    /** 서버 전체 한도를 1 로 둬, 거절한 요청이 자리를 돌려주지 않고 남기면 다음 요청이 BUSY 가 된다. */
+    private AgentDelegationService service(BackgroundTasks backgroundTasks) {
+        return new AgentDelegationService(
                 mock(AgentService.class),
                 executions,
                 mock(ExecutionDeliveryWriter.class),
@@ -87,7 +94,8 @@ class AgentDelegationServiceRaceTest {
                 mock(HermesRunsClient.class),
                 event -> {},
                 checkGuard,
-                Clock.systemUTC());
+                Clock.systemUTC(),
+                backgroundTasks);
     }
 
     @Test
@@ -133,6 +141,42 @@ class AgentDelegationServiceRaceTest {
                 .as("거절한 요청이 줄과 자리를 남기지 않아 같은 키로 새로 시작한다: %s", retried)
                 .isEqualTo(77L);
         assertThat(retried.status()).isEqualTo(ExecutionStatus.RUNNING);
+    }
+
+    @Test
+    @DisplayName("실행 스레드를 띄우지 못하면 SUBMIT FAILED 로 끝나고 동시 위임 자리를 돌려준다")
+    void returnsSlotAndSubmitFailedWhenRunThreadCannotStart() {
+        BackgroundTasks real = new VirtualThreadBackgroundTasks();
+        AtomicBoolean failNext = new AtomicBoolean(true);
+        // 첫 시작만 실패시키고 그 뒤는 실제로 띄운다. 스레드를 더 띄울 수 없는 상황과 같다.
+        BackgroundTasks failingOnce = new BackgroundTasks() {
+            @Override
+            public Thread start(String name, Runnable task) {
+                if (failNext.compareAndSet(true, false)) {
+                    throw new IllegalStateException("스레드를 띄우지 못했다");
+                }
+                return real.start(name, task);
+            }
+
+            @Override
+            public Thread unstarted(String name, Runnable task) {
+                return real.unstarted(name, task);
+            }
+        };
+        delegations = service(failingOnce);
+
+        DelegationResult failed = delegations.delegate(user, origin, key("call_start_failed"), WORKER, "시작이 실패한다");
+
+        assertThat(failed.failure()).as("시작이 실패한 요청: %s", failed).isEqualTo(DelegationResult.Failure.SUBMIT_FAILED);
+        verify(children, never()).delegate(any(), any(), any(), any(), any(), any(), any(), any(), any());
+
+        startsWithRow(78L);
+        DelegationResult next = delegations.delegate(user, origin, key("call_after_failure"), WORKER, "다음 요청");
+        assertThat(next.failure())
+                .as("서버 한도가 1 이라 자리를 돌려주지 않았으면 BUSY 다: %s", next)
+                .isNull();
+        assertThat(next.executionId()).as("다음 요청: %s", next).isEqualTo(78L);
+        assertThat(next.status()).isEqualTo(ExecutionStatus.RUNNING);
     }
 
     @Test

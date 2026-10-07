@@ -12,6 +12,7 @@ import com.bifos.assistant.hermes.dto.HermesRunCommand;
 import com.bifos.assistant.hermes.dto.HermesRunResult;
 import com.bifos.assistant.model.domain.ModelChoice;
 import com.bifos.assistant.shared.auth.CurrentUser;
+import com.bifos.assistant.shared.concurrent.BackgroundTasks;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.usage.application.ExecutionRecorder;
@@ -26,7 +27,6 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executor;
-import java.util.concurrent.Executors;
 import java.util.function.Predicate;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -97,7 +97,8 @@ public class StarterSuggestionService {
             ExecutionRecorder executions,
             ModelTierService modelTiers,
             ObjectMapper objectMapper,
-            UserExecutionLimiter limiter) {
+            UserExecutionLimiter limiter,
+            BackgroundTasks backgroundTasks) {
         this(
                 properties,
                 agents,
@@ -109,7 +110,7 @@ public class StarterSuggestionService {
                 objectMapper,
                 limiter,
                 Clock.systemUTC(),
-                Executors.newVirtualThreadPerTaskExecutor());
+                task -> backgroundTasks.start("starter-suggestion", task));
     }
 
     /** 시각과 실행기를 바꿔 끼운다. 테스트가 시간을 옮기고 만들기가 끝나기를 기다릴 때 쓴다. */

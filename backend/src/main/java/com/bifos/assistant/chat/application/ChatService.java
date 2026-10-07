@@ -46,6 +46,7 @@ import com.bifos.assistant.memory.domain.type.MemorySensitivity;
 import com.bifos.assistant.model.domain.ModelChoice;
 import com.bifos.assistant.model.domain.type.ModelTier;
 import com.bifos.assistant.shared.auth.CurrentUser;
+import com.bifos.assistant.shared.concurrent.BackgroundTasks;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.shared.util.ExternalData;
@@ -144,6 +145,7 @@ public class ChatService {
     private final ChatPendingMessageRepository pendingMessages;
     private final List<AutoTurnResultSource> resultSources;
     private final UserExecutionLimiter limiter;
+    private final BackgroundTasks backgroundTasks;
     private final ResultDeliveryRecorder resultDeliveries;
     private final ContextProperties contextProperties;
 
@@ -1285,7 +1287,7 @@ public class ChatService {
         // 중지 유예 시간이 지나면 요청 스레드를 먼저 풀어 상태 조회와 stopped 사건으로 진행한다.
         CompletableFuture<Void> streamDone = new CompletableFuture<>();
         ToolDetailScope detailScope = toolDetailScope(pending.agent());
-        Thread.startVirtualThread(() -> {
+        backgroundTasks.start("turn-event-stream-" + runId, () -> {
             try {
                 eventStream.open(
                         pending.command().apiBaseUrl(),

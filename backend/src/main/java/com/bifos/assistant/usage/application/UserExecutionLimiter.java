@@ -3,6 +3,7 @@ package com.bifos.assistant.usage.application;
 import com.bifos.assistant.hermes.HermesProperties;
 import com.bifos.assistant.hermes.HermesRunsClient;
 import com.bifos.assistant.hermes.dto.HermesRunLookup;
+import com.bifos.assistant.shared.concurrent.BackgroundTasks;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.usage.application.model.ExecutionAdmission;
@@ -45,6 +46,7 @@ public class UserExecutionLimiter {
     private final AgentExecutionRepository executions;
     private final HermesRunsClient hermes;
     private final HermesProperties hermesProperties;
+    private final BackgroundTasks backgroundTasks;
 
     private final Map<Long, ReentrantLock> locks = new ConcurrentHashMap<>();
     private final Map<Long, Integer> turnSlots = new ConcurrentHashMap<>();
@@ -203,9 +205,9 @@ public class UserExecutionLimiter {
             lock.unlock();
         }
         try {
-            Thread.ofVirtual()
-                    .name("remote-end-" + executionId)
-                    .start(() -> followRemoteEnd(userId, executionId, apiBaseUrl, profileName, runId, stopAlreadySent));
+            backgroundTasks.start(
+                    "remote-end-" + executionId,
+                    () -> followRemoteEnd(userId, executionId, apiBaseUrl, profileName, runId, stopAlreadySent));
         } catch (RuntimeException | Error ex) {
             log.warn("Hermes 에서 끝났는지 확인할 스레드를 띄우지 못해 사용자 자리를 곧바로 돌려준다 executionId={} runId={}", executionId, runId, ex);
             releaseRemoteEnd(userId, executionId);

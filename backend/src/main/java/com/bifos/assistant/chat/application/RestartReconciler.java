@@ -9,6 +9,7 @@ import com.bifos.assistant.chat.infra.ConversationRepository;
 import com.bifos.assistant.hermes.HermesProperties;
 import com.bifos.assistant.hermes.HermesRunsClient;
 import com.bifos.assistant.hermes.dto.HermesRunLookup;
+import com.bifos.assistant.shared.concurrent.BackgroundTasks;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.usage.application.UserExecutionLimiter;
@@ -83,6 +84,7 @@ public class RestartReconciler implements SmartLifecycle {
     private final ConversationRepository conversations;
     private final ConversationEventHub hub;
     private final UserExecutionLimiter limiter;
+    private final BackgroundTasks backgroundTasks;
 
     /** 잡았지만 아직 묻기 시작하지 않은 줄이다. 실행 번호가 열쇠다. {@code this} 로 지킨다. */
     private final Map<Long, Claimed> pending = new LinkedHashMap<>();
@@ -364,7 +366,7 @@ public class RestartReconciler implements SmartLifecycle {
         }
         Agent target = agent;
         try {
-            Thread.ofVirtual().name("restart-reconcile-" + row.id()).start(() -> follow(item, target, maxWait, epoch));
+            backgroundTasks.start("restart-reconcile-" + row.id(), () -> follow(item, target, maxWait, epoch));
         } catch (RuntimeException | Error ex) {
             log.warn("남은 실행을 정할 스레드를 띄우지 못했다 executionId={}", row.id(), ex);
             finish(item, epoch);

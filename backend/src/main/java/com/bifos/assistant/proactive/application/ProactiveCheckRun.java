@@ -21,6 +21,7 @@ import com.bifos.assistant.proactive.domain.type.FindingKind;
 import com.bifos.assistant.proactive.infra.ProactiveCheckFindingRepository;
 import com.bifos.assistant.proactive.infra.ProactiveCheckRepository;
 import com.bifos.assistant.shared.auth.CurrentUser;
+import com.bifos.assistant.shared.concurrent.BackgroundTasks;
 import com.bifos.assistant.shared.util.ExternalData;
 import com.bifos.assistant.usage.domain.AgentExecution;
 import com.bifos.assistant.usage.infra.AgentExecutionRepository;
@@ -204,7 +205,8 @@ public class ProactiveCheckRun implements CheckTurn {
             CheckAnswerRenderer renderer,
             CheckReportFactory reportFactory,
             ChatService chat,
-            Clock clock) {}
+            Clock clock,
+            BackgroundTasks backgroundTasks) {}
 
     /**
      * @param check 이미 저장한 {@code RUNNING} 살펴보기 줄
@@ -261,9 +263,8 @@ public class ProactiveCheckRun implements CheckTurn {
     public void started(Long executionId, String hermesRootSessionId) {
         check.attachRoot(executionId, hermesRootSessionId);
         deps.checks().save(check);
-        Thread timer = Thread.ofVirtual()
-                .name("proactive-check-time-limit-" + executionId)
-                .unstarted(() -> awaitTimeLimit(executionId));
+        Thread timer = deps.backgroundTasks()
+                .unstarted("proactive-check-time-limit-" + executionId, () -> awaitTimeLimit(executionId));
         synchronized (limitLock) {
             if (closed) {
                 return;
@@ -449,9 +450,8 @@ public class ProactiveCheckRun implements CheckTurn {
      */
     private void limitReached(String reason, Long executionId) {
         if (claimStop(reason)) {
-            Thread.ofVirtual()
-                    .name("proactive-check-stop-" + executionId)
-                    .start(() -> stopWithRetry(reason, executionId));
+            deps.backgroundTasks()
+                    .start("proactive-check-stop-" + executionId, () -> stopWithRetry(reason, executionId));
         }
     }
 
