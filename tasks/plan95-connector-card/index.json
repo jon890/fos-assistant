@@ -1,0 +1,25 @@
+{
+  "name": "plan95-connector-card",
+  "description": "커넥터를 아이콘, 이름, 설명, 링크, 연결 상태, 도구 요약이 있는 카드로 보인다 — connector.json 의 icon·link 를 대시보드와 Control Plane 이 검증해 같은 출처의 이미지로 넘긴다",
+  "status": "pending",
+  "created_at": "2026-10-08",
+  "total_phases": 3,
+  "current_phase": 1,
+  "phases": [
+    {
+      "number": 1,
+      "file": "phase-01.md",
+      "execution_profile": "deep"
+    },
+    {
+      "number": 2,
+      "file": "phase-02.md",
+      "execution_profile": "deep"
+    },
+    {
+      "number": 3,
+      "file": "phase-03.md",
+      "execution_profile": "standard"
+    }
+  ]
+}

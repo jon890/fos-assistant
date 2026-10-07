@@ -18,7 +18,8 @@
 
 ```
 hermes/connectors/<id>/
-  connector.json           입력 칸, 확인 도구, 도구 정책
+  connector.json           입력 칸, 확인 도구, 도구 정책, 아이콘과 링크
+  icon.svg                 커넥터 카드의 아이콘. 직접 그린 단순한 도형이고 상표 로고를 복사하지 않는다
   .mcp.json                MCP 서버 하나의 정의
   .claude-plugin/plugin.json
   src/server.ts            TypeScript stdio MCP 서버
@@ -151,6 +152,7 @@ CI 의 `hermes` job 과 `scripts/check-local.sh` 가 돌린다. 커넥터를 더
 | `operator_env` 와 `operator_secrets` 가 비었다 | 운영 값 없이 돌지 않는다 |
 | `.mcp.json` 의 `command` 가 `bun` 이고 `dist/<id>-mcp.js` 하나를 실행한다. TypeScript 소스가 있고 Python 서버는 없다 | 운영자의 환경에서 뜨지 않는다 |
 | 스킬이 하나 이상 있다 | 붙인 에이전트에 지침이 없다 |
+| `icon` 과 `link` 를 선언했다 | 카드가 기본 아이콘으로 보이고 서비스로 가는 길이 없다 |
 | `tests/<id>.test.ts`, `docs/connectors/<id>.md`, `CODEOWNERS` 의 줄이 있다 | 검사나 안내나 소유자가 없다 |
 
 검사가 보지 못하는 것은 리뷰가 본다. 위험도 분류가 맞는지, 어느 도구가 밖으로 나가는지, scope 가 가장 작은지다.
