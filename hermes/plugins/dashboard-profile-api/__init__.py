@@ -201,6 +201,7 @@ CATALOG_PATH = "/api/connectors/catalog"
 CALL_ROUTE_RE = re.compile(r"^/api/connectors/([^/]+)/call$")
 EXECUTE_ROUTE_RE = re.compile(r"^/api/connectors/([^/]+)/execute$")
 MODEL_DEFAULTS_RE = re.compile(r"^/api/profiles/([^/]+)/model-defaults$")
+DECISION_READINESS_RE = re.compile(r"^/api/profiles/([^/]+)/decision-readiness$")
 # native 하위 에이전트가 쓴 자식 session 의 provider 를 읽는 경로다(ADR-067).
 SESSION_PROVIDER_RE = re.compile(r"^/api/profiles/([^/]+)/sessions/([^/]+)/provider$")
 # 경로에서 온 session id 다. 저장소 조회의 인자로만 쓰고 파일 경로에는 쓰지 않는다.
@@ -3330,6 +3331,35 @@ def _model_defaults_response(name):
         return _rejected("profile 설정을 읽지 못했다", 503)
 
 
+def _decision_readiness_response(name):
+    """판단 profile 의 도구와 기억 차단만 확인한다. 설정과 파일 내용은 돌려주지 않는다."""
+    if not isinstance(name, str) or not PROFILE_NAME_RE.fullmatch(name):
+        return _rejected("profile 이름이 올바르지 않다", 400)
+    try:
+        from hermes_cli.profiles import get_profile_dir, profile_exists
+        from hermes_cli.tools_config import _get_platform_tools
+        from hermes_cli.web_server_profiles import _config_profile_scope
+        from starlette.responses import JSONResponse
+        import yaml
+
+        if not profile_exists(name):
+            return _rejected("없는 profile 이다", 404)
+        with _config_profile_scope(name):
+            config = yaml.safe_load((get_profile_dir(name) / "config.yaml").read_text(encoding="utf-8")) or {}
+            toolsets = _get_platform_tools(config, "api_server")
+        memory = config.get("memory") or {}
+        ready = (not toolsets
+                 and (config.get("platform_toolsets") or {}).get("api_server") == ["no_mcp"]
+                 and memory.get("provider") == "none"
+                 and memory.get("memory_enabled") is False
+                 and memory.get("user_profile_enabled") is False
+                 and config.get("fallback_providers") == [])
+        return JSONResponse({"version": 1, "ready": ready}, status_code=200)
+    except Exception:
+        logger.warning("dashboard-profile-api: 판단 profile 설정을 읽지 못했다")
+        return _rejected("profile 설정을 읽지 못했다", 503)
+
+
 def _session_provider_response(name, session_id):
     """자식 session 한 줄에서 provider 와 모델만 돌려준다.
 
@@ -3483,6 +3513,13 @@ def _install_gate() -> bool:
         path = request.url.path
         method = request.method.upper()
 
+        decision_match = DECISION_READINESS_RE.match(path) if method == "GET" else None
+        if decision_match is not None:
+            principal, _ = seam.authenticate_token(request)
+            if principal is None or getattr(principal, "provider", None) != ProfileApiProvider.name:
+                return _rejected("Control Plane 토큰이 필요하다", 401)
+            return await asyncio.to_thread(_decision_readiness_response, decision_match.group(1))
+
         defaults_match = MODEL_DEFAULTS_RE.match(path) if method == "GET" else None
         if defaults_match is not None:
             principal, _ = seam.authenticate_token(request)
@@ -3601,6 +3638,7 @@ def register(ctx) -> None:
     for path, method in VAULT_ROUTES:
         opened.setdefault(path, []).append(method)
     opened["/api/profiles/<이름>/model-defaults"] = ["GET"]
+    opened["/api/profiles/<이름>/decision-readiness"] = ["GET"]
     opened["/api/profiles/<이름>/sessions/<session id>/provider"] = ["GET"]
     logger.info(
         "dashboard-profile-api: %s 를 토큰으로 연다. 스킬 루트는 %s 다",

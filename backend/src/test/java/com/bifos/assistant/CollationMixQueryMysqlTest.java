@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.bifos.assistant.chat.application.AttachmentBackfill;
 import com.bifos.assistant.chat.application.FlowRegistry;
+import com.bifos.assistant.proactive.application.ValueEvaluationRecovery;
 import com.bifos.assistant.testsupport.MysqlTestDatabase;
 import com.bifos.assistant.testsupport.RepositoryQuerySweep;
 import java.sql.SQLException;
@@ -70,6 +71,10 @@ class CollationMixQueryMysqlTest {
     /** 옛 스키마에는 현재 첨부 엔티티의 모든 칸이 없으므로 기동 복사를 실행하지 않는다. */
     @MockitoBean
     private AttachmentBackfill attachmentBackfill;
+
+    /** V57 에는 가치 평가 표가 없어 현재 실행의 기동 복구를 실행하지 않는다. */
+    @MockitoBean
+    private ValueEvaluationRecovery valueEvaluationRecovery;
 
     @DynamicPropertySource
     static void useMysqlBeforeUnify(DynamicPropertyRegistry registry) {

@@ -10,6 +10,8 @@ import org.springframework.data.jpa.repository.Lock;
 
 public interface ProactiveCheckRepository extends JpaRepository<ProactiveCheck, Long> {
 
+    Optional<ProactiveCheck> findByIdAndUserId(Long id, Long userId);
+
     /** 그 사용자가 그 에이전트로 연 마지막 살펴보기. */
     Optional<ProactiveCheck> findFirstByUserIdAndAgentIdOrderByIdDesc(Long userId, Long agentId);
 

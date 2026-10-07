@@ -89,6 +89,7 @@ FILLING=1
 mkdir -p -- "$OUT/profile-plugins"
 
 cp -- "$DASHBOARD_PLUGIN/__init__.py" "$DASHBOARD_PLUGIN/plugin.yaml" "$OUT/"
+cp -- "$SCRIPT_DIR/decision-profile/config.yaml.template" "$OUT/decision-config.yaml.template"
 
 # 주소를 글자 그대로 넣는다. sed 의 구분자와 특수 글자를 피하려고 Python 으로 바꾼다.
 python3 - "$TEMPLATE" "$OUT/default-config.yaml.template" "$PLACEHOLDER" "$MCP_URL" <<'PY' \
