@@ -90,6 +90,7 @@ const MESSAGES: Record<string, string> = {
     "지금은 켤 수 있는 브라우저가 다 찼어요. 잠시 뒤 다시 켜 주세요.",
   BROWSER_BUSY: "브라우저 상태가 바뀌는 중이에요. 잠시 뒤 다시 해 주세요.",
   BROWSER_START_FAILED: "브라우저를 켜지 못했어요. 잠시 뒤 다시 켜 주세요.",
+  BROWSER_STOP_FAILED: "브라우저를 끄지 못했어요. 잠시 뒤 다시 꺼 주세요.",
   BROWSER_EXISTS: "이미 브라우저가 있어요. 화면을 다시 열어 주세요.",
 };
 

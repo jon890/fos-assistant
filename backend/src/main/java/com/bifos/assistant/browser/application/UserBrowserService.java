@@ -234,7 +234,7 @@ public class UserBrowserService {
                     ex.getClass().getSimpleName());
             stopping.markFailed(STOP_FAILED, clock.instant());
             save(stopping);
-            throw new IllegalStateException("user browser did not stop", ex);
+            throw new ApiException(ErrorCode.BROWSER_STOP_FAILED, "user browser did not stop", ex);
         }
         stopping.markStopped(clock.instant());
         return UserBrowserSnapshot.of(save(stopping));

@@ -110,7 +110,7 @@ Control Plane 의 경로는 같은 이름에 `/api/v1` 을 붙인 것이다(`/ap
 관리자 목록은 줄마다 `{id, userId, userName, status, lastError, startedAt, lastActiveAt}` 이다. 컨테이너 번호와 프로필 키는 싣지 않는다.
 관리자 목록은 기능이 꺼져 있어도 읽는다. 쓰기는 기능이 꺼져 있으면 503 이다.
 
-오류 코드는 `BROWSER_NOT_FOUND`(404), `BROWSER_DISABLED`(503), `BROWSER_CAPACITY`(409), `BROWSER_BUSY`(409, 다른 전이가 진행 중), `BROWSER_START_FAILED`(502), `BROWSER_EXISTS`(409) 다.
+오류 코드는 `BROWSER_NOT_FOUND`(404), `BROWSER_DISABLED`(503), `BROWSER_CAPACITY`(409), `BROWSER_BUSY`(409, 다른 전이가 진행 중), `BROWSER_START_FAILED`(502), `BROWSER_EXISTS`(409), `BROWSER_STOP_FAILED`(502, 줄은 `FAILED` 로 남고 다시 끌 수 있다) 다.
 
 ## 중계
 

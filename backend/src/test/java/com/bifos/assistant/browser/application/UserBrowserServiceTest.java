@@ -158,6 +158,21 @@ class UserBrowserServiceTest {
     }
 
     @Test
+    @DisplayName("proxy 가 끄기를 거절하면 stop_failed 로 두고 BROWSER_STOP_FAILED 이며 다시 끌 수 있다")
+    void failsStopOnProxyErrorAndAllowsRetry() {
+        UserBrowserService service = service(true, 2);
+        service.create(101L);
+        service.start(101L);
+        runtime.failingActions.add("stop");
+
+        assertCode(() -> service.stop(101L), ErrorCode.BROWSER_STOP_FAILED);
+        assertThat(repository.findByUserId(101L).orElseThrow().lastError()).isEqualTo(UserBrowserService.STOP_FAILED);
+
+        runtime.failingActions.clear();
+        assertThat(service.stop(101L).status()).isEqualTo(UserBrowserStatus.STOPPED);
+    }
+
+    @Test
     @DisplayName("지우면 끈 뒤 프로필 디렉터리와 줄을 지운다")
     void deletesBrowserWithProfile() {
         UserBrowserService service = service(true, 2);
