@@ -14,12 +14,14 @@ import com.bifos.assistant.chat.application.model.OpenedCheck;
 import com.bifos.assistant.chat.domain.Conversation;
 import com.bifos.assistant.chat.infra.ChatMessageRepository;
 import com.bifos.assistant.context.ContextAssembler;
+import com.bifos.assistant.followup.application.FollowUpService;
 import com.bifos.assistant.proactive.application.model.CheckReadiness;
 import com.bifos.assistant.proactive.application.model.CheckStatusView;
 import com.bifos.assistant.proactive.domain.ProactiveCheck;
 import com.bifos.assistant.proactive.domain.type.CheckSkippedReason;
 import com.bifos.assistant.proactive.domain.type.CheckTrigger;
 import com.bifos.assistant.proactive.infra.ProactiveCheckFindingRepository;
+import com.bifos.assistant.proactive.infra.ProactiveCheckProblemRepository;
 import com.bifos.assistant.proactive.infra.ProactiveCheckRepository;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.error.ApiException;
@@ -55,6 +57,8 @@ public class ProactiveCheckService {
     private final CheckConversations checkConversations;
     private final ProactiveCheckRepository checks;
     private final ProactiveCheckFindingRepository findings;
+    private final ProactiveCheckProblemRepository problems;
+    private final FollowUpService followUps;
     private final ProactiveCheckProperties properties;
     private final TurnCancellation turns;
     private final ChatService chat;
@@ -303,6 +307,8 @@ public class ProactiveCheckService {
                 properties,
                 checks,
                 findings,
+                problems,
+                followUps,
                 messages,
                 executions,
                 contextAssembler,
