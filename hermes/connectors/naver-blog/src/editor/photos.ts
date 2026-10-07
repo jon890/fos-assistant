@@ -173,7 +173,7 @@ export async function photos(
     page.fail("photo_upload_failed", message, { photo });
 
   const note = await requireClearScreen(page);
-  if (note) throw page.fail("editor_failed", `화면을 덮은 알림이 있어 사진을 넣지 못한다: ${note}`);
+  if (note) throw page.fail("editor_failed", "화면을 덮은 알림이 있어 사진을 넣지 못한다");
 
   let inserted = await imageCount(page);
   if (inserted > images.length)
@@ -225,7 +225,7 @@ export async function photos(
     );
     if (!settled) throw failed(number, "사진 전송이 끝나지 않았다");
     if (!(await imageUploaded(page, before)))
-      throw failed(number, `사진 전송 중 알림이 떴다: ${await blockingPopup(page)}`);
+      throw failed(number, "사진 전송 중 알림이 떴다");
     if (!(await fitImage(page, before)))
       throw failed(number, "사진에 `문서 너비` 를 적용하지 못했다");
     inserted += 1;

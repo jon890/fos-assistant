@@ -103,6 +103,18 @@ export function validateDraft(input: DraftInput): string[] {
     if (/[#,]/.test(tag))
       problems.push(`${index + 1}번째 태그에 # 이나 쉼표를 넣지 않습니다.`);
   });
+  // 네이버는 같은 태그를 한 번만 둔다. 대소문자와 앞뒤 공백만 다른 태그도 같은 태그다.
+  const firstIndex = new Map<string, number>();
+  input.tags.forEach((tag, index) => {
+    const key = tag.trim().toLowerCase();
+    if (!key) return;
+    const first = firstIndex.get(key);
+    if (first === undefined) firstIndex.set(key, index);
+    else
+      problems.push(
+        `${index + 1}번째 태그가 ${first + 1}번째 태그와 같습니다. 같은 태그는 한 번만 넣습니다.`,
+      );
+  });
   const bodyLength = length(input.body);
   if (bodyLength > BODY_MAX)
     problems.push(`본문은 ${BODY_MAX}자까지입니다. 지금 ${bodyLength}자입니다.`);

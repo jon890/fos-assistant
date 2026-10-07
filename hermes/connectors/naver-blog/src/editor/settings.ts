@@ -131,7 +131,7 @@ export async function settings(page: EditorPage, input: DraftInput, draftHash: s
   const category = input.category.trim();
   const tags = draftTags(input);
   const note = await requireClearScreen(page);
-  if (note) throw page.fail("editor_failed", `화면을 덮은 알림이 있어 설정하지 못한다: ${note}`);
+  if (note) throw page.fail("editor_failed", "화면을 덮은 알림이 있어 설정하지 못한다");
   if (!(await openSettings(page))) throw page.fail("editor_failed", "발행 설정을 열지 못했다");
   if (!(await clickStableSettingsControl(page, CATEGORY_BUTTON)))
     throw page.fail("editor_failed", "카테고리 선택기를 열지 못했다");
@@ -240,6 +240,7 @@ async function saveReadiness(
  * 초안과 화면을 대조한 뒤 임시저장 단추만 누르고 저장 수가 늘었는지 본다.
  * 누르기 직전에 `onStage("save_clicking")` 을 부르고 그것이 끝난 뒤에 누른다.
  * 그 뒤에 난 실패는 저장됐는지 모르므로 모두 `save_unconfirmed` 다.
+ * 알린 뒤 마우스 이벤트를 보내기 전에 중단 신호가 와 누르지 않았어도 작업 상태는 이미 `save_clicked` 라 `unknown` 이 된다. 다시 저장하지 않게 하는 보수적 처리다.
  */
 export async function save(
   page: EditorPage,

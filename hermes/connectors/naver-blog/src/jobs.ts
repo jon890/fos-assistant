@@ -2,6 +2,7 @@ import { createHash, randomUUID } from "node:crypto";
 import { constants } from "node:fs";
 import {
   chmod,
+  link,
   lstat,
   mkdir,
   open,
@@ -46,6 +47,8 @@ const HEARTBEAT_STALE_MS = 30_000;
 const JOB_STALE_MS = 11 * 60_000;
 /** 작업 프로세스가 아직 `pid` 를 적지 않은 잠금을 살아 있다고 보는 시간. */
 const STARTING_MS = 10_000;
+/** 끝냄 표시를 만든 쪽이 이 시간 안에 끝난 상태를 쓰지 않았으면 그 쪽이 쓰다 죽은 것으로 본다. */
+const CLAIM_STALE_MS = 10_000;
 /** 끝난 작업 파일을 남겨 두는 시간. */
 const KEEP_MS = 24 * 60 * 60_000;
 
@@ -53,12 +56,18 @@ export const JOB_ID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 const STATE_FILE = /^([0-9a-f-]{36})\.json$/;
 const INPUT_FILE = /^([0-9a-f-]{36})\.input\.json$/;
+const FINISHED_FILE = /^([0-9a-f-]{36})\.finished$/;
 
 const isFinished = (status: JobStatus) => status !== "running";
 const unavailable = () => new ToolError("NAVER_BLOG_UNAVAILABLE");
 
 export const stateFile = (dir: string, jobId: string) => join(dir, `${jobId}.json`);
 export const inputFile = (dir: string, jobId: string) => join(dir, `${jobId}.input.json`);
+/**
+ * 작업을 끝낼 권리 표시. 작업 프로세스와 묵은 작업을 정리하는 쪽은 서로 다른 프로세스라
+ * 이 파일을 먼저 만든 쪽만 끝난 상태를 쓰고, 작업 프로세스는 이 파일이 있으면 더 쓰지 않는다.
+ */
+export const finishedFile = (dir: string, jobId: string) => join(dir, `${jobId}.finished`);
 
 /** CDP 주소마다 하나인 잠금 파일. 끝 `/` 만 다른 주소는 같은 브라우저다. */
 export function lockFile(dir: string, cdpUrl: string) {
@@ -101,10 +110,19 @@ export async function openJobDir(env: Env) {
   return dir;
 }
 
-/** 끝난 지 24시간이 지난 상태 파일과, 끝났거나 상태 파일이 없는 작업의 입력 파일을 지운다. */
+/**
+ * 끝난 지 24시간이 지난 상태 파일, 만든 지 24시간이 지난 끝냄 표시,
+ * 끝났거나 상태 파일이 없는 작업의 입력 파일을 지운다.
+ */
 export async function cleanupJobDir(dir: string, now = Date.now()) {
   const names = await readdir(dir).catch(() => [] as string[]);
   for (const name of names) {
+    if (FINISHED_FILE.test(name)) {
+      const path = join(dir, name);
+      const info = await stat(path).catch(() => null);
+      if (info && now - info.mtimeMs > KEEP_MS) await unlink(path).catch(() => {});
+      continue;
+    }
     const stateMatch = STATE_FILE.exec(name);
     if (stateMatch) {
       const state = await readState(dir, stateMatch[1]!);
@@ -155,9 +173,28 @@ async function writeAtomic(path: string, value: unknown) {
   }
 }
 
-/** 새 작업의 상태 파일. 이미 있으면 실패한다. */
+/**
+ * 새 작업의 상태 파일. 이미 있으면 `EEXIST` 로 실패한다.
+ * 다 쓴 임시 파일을 `link` 로 붙여 읽는 쪽이 반쯤 쓴 파일을 보지 않고, 있는 파일을 덮지도 않는다.
+ */
 export async function createState(dir: string, state: JobState) {
-  await writeAtomic(stateFile(dir, state.job_id), state);
+  const path = stateFile(dir, state.job_id);
+  const temporary = `${path}.${randomUUID()}.tmp`;
+  const handle = await open(
+    temporary,
+    constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL,
+    0o600,
+  );
+  try {
+    await handle.writeFile(JSON.stringify(state));
+  } finally {
+    await handle.close();
+  }
+  try {
+    await link(temporary, path);
+  } finally {
+    await unlink(temporary).catch(() => {});
+  }
 }
 
 /** 작업 프로세스가 읽을 초안 사본. 연결 칸 값은 담지 않는다. */
@@ -177,9 +214,32 @@ export async function writeInput(dir: string, jobId: string, input: unknown) {
 /** 한 프로세스 안에서 같은 상태 파일을 고치는 일을 차례로 세운다. 갱신이 단계 기록을 덮지 않게 한다. */
 const queues = new Map<string, Promise<unknown>>();
 
+function queued<T>(path: string, task: () => Promise<T>): Promise<T> {
+  const work = (queues.get(path) ?? Promise.resolve()).catch(() => {}).then(task);
+  queues.set(path, work);
+  void work.finally(() => {
+    if (queues.get(path) === work) queues.delete(path);
+  }).catch(() => {});
+  return work;
+}
+
+async function exists(path: string) {
+  try {
+    await lstat(path);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** 끝냄 표시가 있으면 참. 작업 프로세스는 쓰기 전에 이것을 보고, 있으면 쓰지 않는다. */
+export function finishClaimed(dir: string, jobId: string) {
+  return exists(finishedFile(dir, jobId));
+}
+
 /**
- * 상태 파일을 다시 읽어 `patch` 를 합쳐 쓴다. 끝난 상태와 없는 파일에는 아무것도 쓰지 않는다.
- * 늦게 끝난 작업 프로세스와 묵은 작업을 정리하는 쪽이 서로의 결과를 덮지 않는다.
+ * 상태 파일을 다시 읽어 `patch` 를 합쳐 쓴다. 끝난 상태와 없는 파일, 끝냄 표시가 있는 작업에는 아무것도 쓰지 않는다.
+ * 다른 프로세스가 작업을 끝내기로 한 뒤에 heartbeat 나 단계 기록이 `running` 을 되살리지 않는다.
  * 쓴 뒤의 상태를, 쓰지 않았으면 읽은 상태를 돌려준다.
  */
 export function updateState(
@@ -188,33 +248,75 @@ export function updateState(
   patch: Partial<JobState>,
 ): Promise<JobState | null> {
   const path = stateFile(dir, jobId);
-  const work = (queues.get(path) ?? Promise.resolve())
-    .catch(() => {})
-    .then(async () => {
-      const current = await readState(dir, jobId);
-      if (!current || isFinished(current.status)) return current;
-      const next = { ...current, ...patch };
-      await writeAtomic(path, next);
-      return next;
-    });
-  queues.set(path, work);
-  void work.finally(() => {
-    if (queues.get(path) === work) queues.delete(path);
-  }).catch(() => {});
-  return work;
+  return queued(path, async () => {
+    const current = await readState(dir, jobId);
+    if (!current || isFinished(current.status) || (await finishClaimed(dir, jobId)))
+      return current;
+    const next = { ...current, ...patch };
+    await writeAtomic(path, next);
+    return next;
+  });
 }
 
-/** 작업을 끝난 상태로 쓴다. 이미 끝났으면 그대로 둔다. */
+/** 만든 지 10초가 지난 끝냄 표시면 참. 표시를 만든 쪽이 상태를 쓰기 전에 죽었다는 뜻이다. */
+async function abandonedClaim(dir: string, jobId: string) {
+  const info = await stat(finishedFile(dir, jobId)).catch(() => null);
+  return info !== null && Date.now() - info.mtimeMs > CLAIM_STALE_MS;
+}
+
+/** 끝냄 표시를 `O_EXCL` 로 만든다. 만든 쪽만 참이다. */
+async function claimFinish(dir: string, jobId: string) {
+  try {
+    const handle = await open(
+      finishedFile(dir, jobId),
+      constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL,
+      0o600,
+    );
+    await handle.close();
+    return true;
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "EEXIST") return false;
+    throw error;
+  }
+}
+
+type Outcome = {
+  status: Exclude<JobStatus, "running">;
+  result?: unknown;
+  error?: JobState["error"];
+};
+
+/**
+ * 작업을 끝난 상태로 쓴다. 끝냄 표시를 먼저 만든 쪽만 쓰고, 이미 끝났거나 남이 표시를 만들었으면 그대로 둔다.
+ * 남이 만든 표시가 10초가 지나도 상태가 `running` 이면 그 쪽이 쓰다 죽은 것으로 보고 대신 쓴다.
+ * `outcome` 이 함수면 표시를 만든 뒤 읽은 상태로 결과를 정한다.
+ * 쓴 뒤 다시 읽어, 표시를 만들기 직전에 읽고 늦게 쓴 갱신이 `running` 으로 덮었으면 한 번 더 쓴다.
+ */
 export function finishState(
   dir: string,
   jobId: string,
-  outcome: { status: Exclude<JobStatus, "running">; result?: unknown; error?: JobState["error"] },
+  outcome: Outcome | ((current: JobState) => Outcome),
 ) {
-  return updateState(dir, jobId, {
-    status: outcome.status,
-    result: outcome.result ?? null,
-    error: outcome.error ?? null,
-    finished_at: new Date().toISOString(),
+  const path = stateFile(dir, jobId);
+  return queued(path, async () => {
+    const before = await readState(dir, jobId);
+    if (!before || isFinished(before.status)) return before;
+    if (!(await claimFinish(dir, jobId)) && !(await abandonedClaim(dir, jobId)))
+      return readState(dir, jobId);
+    const current = (await readState(dir, jobId)) ?? before;
+    if (isFinished(current.status)) return current;
+    const decided = typeof outcome === "function" ? outcome(current) : outcome;
+    const next: JobState = {
+      ...current,
+      status: decided.status,
+      result: decided.result ?? null,
+      error: decided.error ?? null,
+      finished_at: new Date().toISOString(),
+    };
+    await writeAtomic(path, next);
+    const after = await readState(dir, jobId);
+    if (after && !isFinished(after.status)) await writeAtomic(path, next);
+    return next;
   });
 }
 
@@ -243,12 +345,15 @@ export function jobAlive(state: JobState | null, createdAt: number, now = Date.n
   );
 }
 
-/** 살아 있지 않은 작업을 끝낸다. 저장 단추를 누른 뒤였으면 `unknown`, 아니면 `timeout` 실패다. */
+/**
+ * 살아 있지 않은 작업을 끝낸다. 저장 단추를 누른 뒤였으면 `unknown`, 아니면 `timeout` 실패다.
+ * 판정은 끝냄 표시를 만든 뒤 다시 읽은 상태로 한다. 그 사이 작업 프로세스가 `save_clicked` 를 썼을 수 있다.
+ */
 export function finishStale(dir: string, state: JobState) {
-  return finishState(dir, state.job_id, {
-    status: state.save_clicked ? "unknown" : "failed",
-    error: { code: "timeout", stage: state.stage },
-  });
+  return finishState(dir, state.job_id, (current) => ({
+    status: current.save_clicked ? "unknown" : "failed",
+    error: { code: "timeout", stage: current.stage },
+  }));
 }
 
 type LockBody = { job_id?: unknown; created_at?: unknown };
@@ -309,9 +414,26 @@ export async function acquireLock(dir: string, cdpUrl: string, jobId: string) {
       : null;
     if (jobAlive(holder, lock.createdAt)) throw new ToolError("NAVER_BLOG_BUSY");
     if (holder && !isFinished(holder.status)) await finishStale(dir, holder);
-    await unlink(path).catch(() => {});
+    await removeStaleLock(path, lock.jobId);
   }
   throw new ToolError("NAVER_BLOG_BUSY");
+}
+
+/**
+ * 묵었다고 판정한 잠금을 지운다. 판정한 뒤 다른 호출이 그 잠금을 지우고 새로 만들었을 수 있어,
+ * 임시 이름으로 옮긴 뒤 내용이 판정한 `jobId` 와 같을 때만 지운다. 다르면 제자리로 되돌린다.
+ * 되돌리는 `link` 는 그 사이 또 다른 잠금이 생겼으면 실패하고, 그때는 새 잠금을 둔다.
+ */
+export async function removeStaleLock(path: string, jobId: string | null) {
+  const moved = `${path}.${randomUUID()}.stale`;
+  try {
+    await rename(path, moved);
+  } catch {
+    return;
+  }
+  const lock = await readLock(moved);
+  if (lock && lock.jobId !== jobId) await link(moved, path).catch(() => {});
+  await unlink(moved).catch(() => {});
 }
 
 /** 그 작업이 잡은 잠금만 지운다. 다른 작업이 새로 잡은 잠금은 두고 간다. */

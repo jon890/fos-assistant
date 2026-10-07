@@ -103,10 +103,8 @@ export class CdpSession {
     return new Promise<CdpSession>((resolve, reject) => {
       let socket: WebSocket;
       try {
-        // Bun 의 WebSocket 은 두 번째 인자로 headers 를 받지만 타입 선언은 표준 생성자를 따른다.
-        socket = new WebSocket(wsUrl, {
-          headers: { Origin: WEBSOCKET_ORIGIN },
-        } as unknown as string[]);
+        // Bun 의 WebSocket 은 두 번째 인자로 headers 를 받는다. tsconfig 의 lib 에서 DOM 을 빼 bun-types 선언을 쓴다.
+        socket = new WebSocket(wsUrl, { headers: { Origin: WEBSOCKET_ORIGIN } });
       } catch {
         reject(unreachable());
         return;

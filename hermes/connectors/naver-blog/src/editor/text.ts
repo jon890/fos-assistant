@@ -63,7 +63,7 @@ function bodyMismatch(want: string[], got: string[]) {
 export async function fill(page: EditorPage, title: string, blocks: Block[], draftHash: string) {
   await setStage(page, draftHash, "fill", false);
   const note = await requireClearScreen(page);
-  if (note) throw page.fail("editor_failed", `화면을 덮은 알림이 있어 글자를 넣지 못한다: ${note}`);
+  if (note) throw page.fail("editor_failed", "화면을 덮은 알림이 있어 글자를 넣지 못한다");
 
   if (!(await focus(page, TITLE_SELECTOR, ".se-documentTitle")))
     throw page.fail("editor_failed", "제목 자리에 커서를 두지 못했다");

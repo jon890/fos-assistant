@@ -4,11 +4,12 @@ import { type DraftInput, parseBody } from "./draft.ts";
 import { EditorError, runDraft, type RunStage } from "./editor/run.ts";
 import {
   checkJobDir,
+  finishClaimed,
   finishState,
   HEARTBEAT_MS,
   inputFile,
   JOB_ID_PATTERN,
-  type JobState,
+  readState,
   releaseLock,
   updateState,
 } from "./jobs.ts";
@@ -68,87 +69,104 @@ function errorOf(error: unknown, stage: string): Record<string, unknown> {
 /**
  * 분리된 작업 프로세스의 본체. `jobFile` 은 `<작업 디렉터리>/<job_id>.json` 이다.
  * 자기 `pid` 를 적고 5초마다 `heartbeat_at` 을 갱신하며, 입력 파일을 읽고 지운 뒤 `runDraft` 를 돌린다.
- * 저장 단추를 누르기 직전에 `save_clicked` 를 쓰고, 그 쓰기가 끝나지 않으면 누르지 않는다.
+ * 저장 단추를 누르기 직전에 `save_clicked` 를 쓰고 다시 읽어, 그 사이 정리가 작업을 끝냈으면 누르지 않는다.
  * 끝나면 결과를 쓰고 자기 잠금을 푼다. 끝난 상태는 다시 쓰지 않는다.
+ * 작업 디렉터리 확인이나 상태 쓰기처럼 `runDraft` 밖에서 난 예외도 `editor_failed` 로 끝내고 잠금을 푼다.
  */
 export async function runWorker(jobFile: string, overrides: Partial<WorkerDeps> = {}) {
   const deps = { ...DEFAULT_DEPS, ...overrides };
   const dir = dirname(jobFile);
   const jobId = basename(jobFile).replace(/\.json$/, "");
   if (!JOB_ID_PATTERN.test(jobId) || basename(jobFile) !== `${jobId}.json`) return;
-  await checkJobDir(dir);
-
-  const heartbeat = () => updateState(dir, jobId, { heartbeat_at: new Date().toISOString() });
-  const started = await updateState(dir, jobId, {
-    pid: process.pid,
-    heartbeat_at: new Date().toISOString(),
-  });
-  if (!started || started.status !== "running") {
-    await unlink(inputFile(dir, jobId)).catch(() => {});
-    return;
-  }
-  const timer = setInterval(() => void heartbeat().catch(() => {}), HEARTBEAT_MS);
-  const controller = new AbortController();
-  const limit = setTimeout(() => controller.abort(), deps.limitMs);
-  let stage = started.stage;
+  let stage = "queued";
   let clicked = false;
-  let outcome: Parameters<typeof finishState>[2];
   try {
-    const input = await takeInput(dir, jobId);
-    if (!input) {
-      outcome = { status: "failed", error: { code: "editor_failed", stage } };
-    } else {
-      const onStage = async (next: RunStage) => {
-        if (next === "save_clicking") {
-          const written: JobState | null = await updateState(dir, jobId, {
-            save_clicked: true,
-            stage: "save",
-          });
-          // 정리가 이미 이 작업을 끝냈으면 저장 단추를 누르지 않는다.
-          if (written?.save_clicked !== true || written.status !== "running")
-            throw new Error("job already finished");
-          clicked = true;
-          stage = "save";
-          return;
-        }
-        stage = next;
-        await updateState(dir, jobId, { stage: next });
-      };
-      try {
-        const { state, savedBefore, savedAfter } = await deps.runDraft(
-          deps.env,
-          parseBody(input.body),
-          input,
-          onStage,
-          controller.signal,
-        );
-        outcome = {
-          status: "succeeded",
-          result: { state, saved_before: savedBefore, saved_after: savedAfter },
+    await work();
+  } catch {
+    await finishState(dir, jobId, {
+      status: clicked ? "unknown" : "failed",
+      error: { code: "editor_failed", stage },
+    }).catch(() => {});
+    await unlink(inputFile(dir, jobId)).catch(() => {});
+    await releaseLock(dir, jobId);
+  }
+
+  async function work() {
+    await checkJobDir(dir);
+    const heartbeat = () => updateState(dir, jobId, { heartbeat_at: new Date().toISOString() });
+    const started = await updateState(dir, jobId, {
+      pid: process.pid,
+      heartbeat_at: new Date().toISOString(),
+    });
+    if (!started || started.status !== "running") {
+      await unlink(inputFile(dir, jobId)).catch(() => {});
+      return;
+    }
+    const timer = setInterval(() => void heartbeat().catch(() => {}), HEARTBEAT_MS);
+    const controller = new AbortController();
+    const limit = setTimeout(() => controller.abort(), deps.limitMs);
+    stage = started.stage;
+    let outcome: Parameters<typeof finishState>[2];
+    try {
+      const input = await takeInput(dir, jobId);
+      if (!input) {
+        outcome = { status: "failed", error: { code: "editor_failed", stage } };
+      } else {
+        const onStage = async (next: RunStage) => {
+          if (next === "save_clicking") {
+            const written = await updateState(dir, jobId, { save_clicked: true, stage: "save" });
+            // 쓴 뒤 다시 읽는다. 정리가 이미 이 작업을 끝냈거나 끝내기로 했으면 저장 단추를 누르지 않는다.
+            const current = await readState(dir, jobId);
+            if (
+              written?.save_clicked !== true ||
+              current?.status !== "running" ||
+              current.save_clicked !== true ||
+              (await finishClaimed(dir, jobId))
+            )
+              throw new Error("job already finished");
+            clicked = true;
+            stage = "save";
+            return;
+          }
+          stage = next;
+          await updateState(dir, jobId, { stage: next });
         };
-      } catch (error) {
-        if (clicked) {
+        try {
+          const { state, savedBefore, savedAfter } = await deps.runDraft(
+            deps.env,
+            parseBody(input.body),
+            input,
+            onStage,
+            controller.signal,
+          );
           outcome = {
-            status: "unknown",
-            error: controller.signal.aborted && !(error instanceof EditorError)
-              ? { code: "timeout", stage }
-              : errorOf(error, stage),
+            status: "succeeded",
+            result: { state, saved_before: savedBefore, saved_after: savedAfter },
           };
-        } else if (controller.signal.aborted) {
-          outcome = { status: "failed", error: { code: "timeout", stage } };
-        } else {
-          outcome = { status: "failed", error: errorOf(error, stage) };
+        } catch (error) {
+          if (clicked) {
+            outcome = {
+              status: "unknown",
+              error: controller.signal.aborted && !(error instanceof EditorError)
+                ? { code: "timeout", stage }
+                : errorOf(error, stage),
+            };
+          } else if (controller.signal.aborted) {
+            outcome = { status: "failed", error: { code: "timeout", stage } };
+          } else {
+            outcome = { status: "failed", error: errorOf(error, stage) };
+          }
         }
       }
+    } finally {
+      clearTimeout(limit);
+      clearInterval(timer);
     }
-  } finally {
-    clearTimeout(limit);
-    clearInterval(timer);
-  }
-  try {
-    await finishState(dir, jobId, outcome);
-  } finally {
-    await releaseLock(dir, jobId);
+    try {
+      await finishState(dir, jobId, outcome);
+    } finally {
+      await releaseLock(dir, jobId);
+    }
   }
 }
 

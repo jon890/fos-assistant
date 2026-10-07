@@ -110,7 +110,10 @@ test("save_draft 는 다른 프로세스 묶음의 작업 프로세스를 띄우
   });
   expect(job.body).not.toContainKey("pid");
   expect(job.body).not.toContainKey("heartbeat_at");
-  expect(await readdir(jobDir)).toEqual([`${started.body.job_id}.json`]);
+  expect((await readdir(jobDir)).sort()).toEqual([
+    `${started.body.job_id}.finished`,
+    `${started.body.job_id}.json`,
+  ]);
 });
 
 test("로그인 쿠키가 없으면 작업을 만들지 않고 NAVER_BLOG_LOGIN_REQUIRED 다", async () => {
@@ -208,5 +211,5 @@ test("draft_job 은 pid 가 사라진 running 작업을 timeout 으로 끝내고
   const result = await call("draft_job", { job_id: jobId, wait_seconds: 0 });
 
   expect(result.body).toMatchObject({ status: "failed", error: { code: "timeout", stage: "fill" } });
-  expect(await readdir(jobDir)).toEqual([`${jobId}.json`]);
+  expect((await readdir(jobDir)).sort()).toEqual([`${jobId}.finished`, `${jobId}.json`]);
 });

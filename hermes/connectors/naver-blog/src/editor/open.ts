@@ -39,7 +39,7 @@ export async function open(page: EditorPage) {
         throw page.fail("editor_failed", "작성 중인 글 알림을 닫지 못했다");
       note = await requireClearScreen(page);
     }
-    if (note) throw page.fail("editor_failed", `알림이 떠 있어 멈춘다: ${note}`);
+    if (note) throw page.fail("editor_failed", "알림이 떠 있어 멈춘다");
     await clearProgress(page);
     return;
   }

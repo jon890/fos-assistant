@@ -1,6 +1,16 @@
 import { afterEach, expect, test } from "bun:test";
 import { randomUUID } from "node:crypto";
-import { chmod, mkdir, mkdtemp, readdir, readFile, rm, stat, writeFile } from "node:fs/promises";
+import {
+  chmod,
+  mkdir,
+  mkdtemp,
+  readdir,
+  readFile,
+  rm,
+  stat,
+  utimes,
+  writeFile,
+} from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { RunStage } from "../src/editor/run.ts";
@@ -9,10 +19,13 @@ import {
   checkJobDir,
   cleanupJobDir,
   createState,
+  finishedFile,
   finishStale,
+  finishState,
   type JobState,
   lockFile,
   readState,
+  removeStaleLock,
   stateFile,
   updateState,
   writeInput,
@@ -183,7 +196,7 @@ test("없는 작업 디렉터리는 모드 700 으로 만든다", async () => {
   expect((await stat(dir)).mode & 0o777).toBe(0o700);
 });
 
-test("끝난 지 24시간이 지난 상태 파일과 끝난 작업의 입력 파일을 지운다", async () => {
+test("끝난 지 24시간이 지난 상태 파일과 끝냄 표시, 끝난 작업의 입력 파일을 지운다", async () => {
   const dir = await jobDir();
   const day = 24 * 60 * 60_000;
   const old = randomUUID();
@@ -191,7 +204,11 @@ test("끝난 지 24시간이 지난 상태 파일과 끝난 작업의 입력 파
   const active = randomUUID();
   const finishedAt = (ago: number) => new Date(Date.now() - ago).toISOString();
   await createState(dir, { ...running(old), status: "failed", finished_at: finishedAt(day + 60_000) });
+  await writeFile(finishedFile(dir, old), "");
+  const oldTime = new Date(Date.now() - day - 60_000);
+  await utimes(finishedFile(dir, old), oldTime, oldTime);
   await createState(dir, { ...running(recent), status: "succeeded", finished_at: finishedAt(day - 60_000) });
+  await writeFile(finishedFile(dir, recent), "");
   await writeInput(dir, recent, { title: "남은 사본" });
   await createState(dir, running(active, { started_at: finishedAt(2 * day) }));
   await writeInput(dir, active, { title: "도는 작업의 사본" });
@@ -199,8 +216,69 @@ test("끝난 지 24시간이 지난 상태 파일과 끝난 작업의 입력 파
   await cleanupJobDir(dir);
 
   expect((await readdir(dir)).sort()).toEqual(
-    [`${active}.input.json`, `${active}.json`, `${recent}.json`].sort(),
+    [`${active}.input.json`, `${active}.json`, `${recent}.finished`, `${recent}.json`].sort(),
   );
+});
+
+test("이미 있는 상태 파일 위에 createState 는 EEXIST 로 실패하고 원래 파일을 둔다", async () => {
+  const dir = await jobDir();
+  const jobId = randomUUID();
+  await createState(dir, running(jobId, { stage: "photos" }));
+
+  expect(await errorCode(createState(dir, running(jobId)))).toBe("EEXIST");
+
+  expect((await readState(dir, jobId))?.stage).toBe("photos");
+  expect(await readdir(dir)).toEqual([`${jobId}.json`]);
+});
+
+test("정리가 끝냄 표시를 먼저 만들면 작업 프로세스의 heartbeat 와 끝내기가 그 결과를 덮지 못한다", async () => {
+  const dir = await jobDir();
+  const jobId = randomUUID();
+  const snapshot = running(jobId, { stage: "photos", pid: 1, heartbeat_at: new Date().toISOString() });
+  await createState(dir, snapshot);
+  // 다른 프로세스의 정리가 끝냄 표시를 만들었고, 아직 상태는 쓰지 않은 순간.
+  await writeFile(finishedFile(dir, jobId), "");
+
+  const heartbeat = await updateState(dir, jobId, { heartbeat_at: "2026-01-01T00:00:00.000Z" });
+  const finished = await finishState(dir, jobId, { status: "succeeded", result: { saved_after: 4 } });
+
+  expect(heartbeat).toEqual(snapshot);
+  expect(finished).toEqual(snapshot);
+  expect(await readState(dir, jobId)).toEqual(snapshot);
+});
+
+test("끝냄 표시를 만든 정리가 쓴 timeout 위에 작업 프로세스의 heartbeat 가 running 을 되살리지 못한다", async () => {
+  const dir = await jobDir();
+  const jobId = randomUUID();
+  const snapshot = running(jobId, { stage: "photos", pid: 1, heartbeat_at: new Date().toISOString() });
+  await createState(dir, snapshot);
+
+  await finishStale(dir, snapshot);
+  await updateState(dir, jobId, { heartbeat_at: new Date().toISOString(), stage: "components" });
+  await finishState(dir, jobId, { status: "succeeded" });
+
+  const state = await readState(dir, jobId);
+  expect(state?.status).toBe("failed");
+  expect(state?.stage).toBe("photos");
+  expect(state?.error).toEqual({ code: "timeout", stage: "photos" });
+  expect(await readdir(dir)).toContain(`${jobId}.finished`);
+});
+
+test("묵은 잠금 정리는 판정한 뒤 다른 job_id 로 다시 만들어진 잠금을 지우지 않는다", async () => {
+  const dir = await jobDir();
+  const stale = randomUUID();
+  const fresh = randomUUID();
+  // 묵었다고 판정한 잠금은 이미 다른 호출이 지웠고, 그 자리에 새 작업이 잠금을 잡았다.
+  await acquireLock(dir, CDP_A, fresh);
+  const before = await readFile(lockFile(dir, CDP_A), "utf8");
+
+  await removeStaleLock(lockFile(dir, CDP_A), stale);
+
+  expect(await readFile(lockFile(dir, CDP_A), "utf8")).toBe(before);
+  expect(await readdir(dir)).toEqual([lockFile(dir, CDP_A).slice(dir.length + 1)]);
+
+  await removeStaleLock(lockFile(dir, CDP_A), fresh);
+  expect(await readdir(dir)).toEqual([]);
 });
 
 test("작업 상태 파일에는 초안 본문과 사진 디렉터리가 없다", async () => {

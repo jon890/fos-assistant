@@ -1,6 +1,6 @@
 import { afterEach, expect, test } from "bun:test";
 import { randomUUID } from "node:crypto";
-import { mkdtemp, readdir, rm } from "node:fs/promises";
+import { chmod, mkdtemp, readdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { EditorError, type runDraft } from "../src/editor/run.ts";
@@ -62,9 +62,9 @@ async function queuedJob() {
   return { dir, jobId, run };
 }
 
-/** 작업이 끝나면 입력 파일과 잠금이 없고 상태 파일 하나만 남는다. */
+/** 작업이 끝나면 입력 파일과 잠금이 없고 상태 파일과 끝냄 표시만 남는다. */
 async function expectOnlyState(dir: string, jobId: string) {
-  expect(await readdir(dir)).toEqual([`${jobId}.json`]);
+  expect((await readdir(dir)).sort()).toEqual([`${jobId}.finished`, `${jobId}.json`]);
 }
 
 test("성공하면 succeeded 와 편집기 상태, 저장 전후 수를 남기고 연결 값은 env 에서 읽는다", async () => {
@@ -184,5 +184,23 @@ test("정리가 먼저 작업을 끝냈으면 save_clicking 이 실패해 저장
   expect(state?.status).toBe("failed");
   expect(state?.error).toEqual({ code: "timeout" });
   expect(state?.save_clicked).toBe(false);
+  await expectOnlyState(dir, jobId);
+});
+
+test("작업 디렉터리 확인이 실패해도 editor_failed 로 끝내고 자기 잠금을 푼다", async () => {
+  const { dir, jobId, run } = await queuedJob();
+  // 모드가 700 이 아니면 작업 디렉터리 확인이 실패한다. 소유자는 여전히 쓸 수 있다.
+  await chmod(dir, 0o750);
+  let called = false;
+
+  await run(async () => {
+    called = true;
+    return { state: null, savedBefore: 3, savedAfter: 4 };
+  });
+
+  const state = await readState(dir, jobId);
+  expect(called).toBe(false);
+  expect(state?.status).toBe("failed");
+  expect(state?.error).toEqual({ code: "editor_failed", stage: "queued" });
   await expectOnlyState(dir, jobId);
 });

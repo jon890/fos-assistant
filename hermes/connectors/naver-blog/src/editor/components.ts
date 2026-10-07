@@ -27,19 +27,40 @@ const CANDIDATES_MAX = 10;
 
 const q = (value: unknown) => JSON.stringify(value);
 
-/** 네이버 지도와 초안이 다르게 쓰는 지역 표기를 맞춘다. */
+/** 시도 정식 이름과 흔한 줄임 표기를 줄임 표기 하나로 모은다. 17개 시도와 바뀌기 전 이름을 담는다. */
+const REGION_SHORT_NAMES: Record<string, string> = Object.fromEntries(
+  (
+    [
+      ["서울", ["서울특별시", "서울시"]],
+      ["부산", ["부산광역시", "부산시"]],
+      ["대구", ["대구광역시", "대구시"]],
+      ["인천", ["인천광역시", "인천시"]],
+      ["광주", ["광주광역시"]],
+      ["대전", ["대전광역시", "대전시"]],
+      ["울산", ["울산광역시", "울산시"]],
+      ["세종", ["세종특별자치시", "세종시"]],
+      ["경기", ["경기도"]],
+      ["강원", ["강원특별자치도", "강원도"]],
+      ["충북", ["충청북도"]],
+      ["충남", ["충청남도"]],
+      ["전북", ["전북특별자치도", "전라북도"]],
+      ["전남", ["전라남도"]],
+      ["경북", ["경상북도"]],
+      ["경남", ["경상남도"]],
+      ["제주", ["제주특별자치도", "제주도"]],
+    ] as const
+  ).flatMap(([short, names]) => names.map((name) => [name, short])),
+);
+
+/**
+ * 네이버 지도와 초안이 다르게 쓰는 지역 표기를 맞춘다.
+ * 공백을 하나로 모으고, 앞의 `대한민국` 을 떼고, 첫 낱말이 시도 이름이면 줄임 표기로 바꾼다.
+ */
 export function normalizePlaceAddress(text: string) {
-  let address = normalize(text).split(/\s+/).filter(Boolean).join(" ");
-  if (address.startsWith("대한민국 ")) address = address.slice("대한민국 ".length);
-  if (address.startsWith("경기 ")) address = `경기도 ${address.slice("경기 ".length)}`;
-  // 지도 검색 결과가 같은 도로명 주소에 이 표기들을 번갈아 쓴다.
-  for (const prefix of ["광주광역시 ", "전남광주통합특별시 "]) {
-    if (address.startsWith(prefix)) {
-      address = `광주 ${address.slice(prefix.length)}`;
-      break;
-    }
-  }
-  return address;
+  const words = normalize(text).split(/\s+/).filter(Boolean);
+  if (words[0] === "대한민국") words.shift();
+  if (words[0] && REGION_SHORT_NAMES[words[0]]) words[0] = REGION_SHORT_NAMES[words[0]]!;
+  return words.join(" ");
 }
 
 /** 지도 검색 결과와 카드 주소 끝에 반복된 상호명을 뗀다. */
@@ -260,8 +281,7 @@ export function componentProblems(blocks: Block[], state: ComponentState, lines:
 export async function components(page: EditorPage, blocks: Block[], draftHash: string) {
   await setStage(page, draftHash, "components", false);
   const note = await requireClearScreen(page);
-  if (note)
-    throw page.fail("editor_failed", `화면을 덮은 알림이 있어 구성요소를 넣지 못한다: ${note}`);
+  if (note) throw page.fail("editor_failed", "화면을 덮은 알림이 있어 구성요소를 넣지 못한다");
   const currentProblems = async () =>
     componentProblems(blocks, await componentState(page), await paragraphs(page, BODY_SELECTOR));
   if ((await currentProblems()).length === 0) {

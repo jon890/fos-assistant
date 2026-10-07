@@ -98,6 +98,12 @@ test.each([
   expect(problems[0]).toContain(word);
 });
 
+test("대소문자와 앞뒤 공백만 다른 태그가 두 번 오면 둘째 자리를 문장으로 알린다", () => {
+  const problems = validateDraft(draft("본문", { tags: ["Noodle", "국수", " noodle "] }));
+
+  expect(problems).toEqual([expect.stringContaining("3번째 태그가 1번째 태그와 같습니다")]);
+});
+
 test("20,000자 본문은 받는다", () => {
   expect(validateDraft(draft("가".repeat(20_000)))).toEqual([]);
 });
