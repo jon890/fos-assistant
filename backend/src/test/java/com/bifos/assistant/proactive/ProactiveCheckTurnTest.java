@@ -590,7 +590,8 @@ class ProactiveCheckTurnTest {
         ProactiveCheck first = onlyCheckOf(conversation);
         first.openReport(Instant.now());
         checks.save(first);
-        int messageCount = messages.findByConversationIdOrderByIdAsc(conversation.id()).size();
+        int messageCount =
+                messages.findByConversationIdOrderByIdAsc(conversation.id()).size();
         stub().willAnswer(command -> answer(problemBlock("study:another-gap", null, false)));
 
         service.start(owner, agent.code(), CheckTrigger.SCHEDULED);
