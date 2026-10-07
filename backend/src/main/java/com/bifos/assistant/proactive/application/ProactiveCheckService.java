@@ -247,7 +247,8 @@ public class ProactiveCheckService {
         int delegations = rootId == null ? 0 : countDelegations(rootId, conversationId);
         if (returned) {
             // 돌아왔으면 답 메시지는 저장됐다. 답을 저장하지 못한 turn 은 예외로 끝나 발견을 남기지 않는다.
-            recordQuietly(run::saveFindings, conversationId);
+            // 발견과 문제 후보를 한 트랜잭션에 남긴다. 한쪽만 남으면 다음 살펴보기의 중복 판정이 어긋난다.
+            recordQuietly(() -> transactions.executeWithoutResult(status -> run.saveFindings()), conversationId);
             recordQuietly(() -> run.record(delegations), conversationId);
         } else if (run.limitStopped() || turns.isStopConfirmed(handle)) {
             log.info("멈춘 살펴보기가 예외로 끝났다 conversationId={}", conversationId, failure);

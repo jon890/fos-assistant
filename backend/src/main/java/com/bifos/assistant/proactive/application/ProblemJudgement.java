@@ -132,7 +132,7 @@ public final class ProblemJudgement {
                     finding.finding() == null ? null : finding.finding().topicKey();
             boolean usable = finding.kind() == FindingKind.NEW || finding.reason() == FindingReason.REPEATED;
             if (usable && !isBlank(topicKey)) {
-                byTopic.putIfAbsent(topicKey, finding);
+                byTopic.putIfAbsent(topicKey.strip(), finding);
             }
         }
         return byTopic;
@@ -146,9 +146,10 @@ public final class ProblemJudgement {
         List<ProblemEvidence> found = new ArrayList<>();
         Set<String> seen = new HashSet<>();
         for (String topicKey : candidate.evidence()) {
-            JudgedFinding finding = byTopic.get(topicKey);
-            if (finding != null && seen.add(topicKey)) {
-                found.add(new ProblemEvidence(topicKey, finding.sourceUrl(), finding.checkedAt()));
+            String key = topicKey == null ? "" : topicKey.strip();
+            JudgedFinding finding = byTopic.get(key);
+            if (finding != null && seen.add(key)) {
+                found.add(new ProblemEvidence(key, finding.sourceUrl(), finding.checkedAt()));
             }
         }
         return List.copyOf(found);

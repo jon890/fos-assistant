@@ -284,6 +284,40 @@ class ProblemJudgementTest {
     }
 
     @Test
+    @DisplayName("계약: 행동이 없거나 영향 힌트가 정해진 값 밖이면 INCOMPLETE 다")
+    void dropsCandidateWithoutActionOrKnownSideEffect() {
+        ProblemCandidate noAction = new ProblemCandidate(
+                "study:no-action", "문제", "목표", List.of(POSITION_TOPIC), null, "LOW", "효과", "NONE", null, null);
+        ProblemCandidate unknownSideEffect = new ProblemCandidate(
+                "study:side-effect",
+                "문제",
+                "목표",
+                List.of(POSITION_TOPIC),
+                new Next("ACTION", "행동"),
+                "LOW",
+                "효과",
+                "SEND_MAIL",
+                null,
+                null);
+
+        List<JudgedProblem> judged = ProblemJudgement.judge(
+                List.of(noAction, unknownSideEffect), careerFindings(), Set.of(), NO_OPEN_FOLLOW_UP);
+
+        assertThat(judged)
+                .extracting(JudgedProblem::reason)
+                .containsExactly(ProblemDropReason.INCOMPLETE, ProblemDropReason.INCOMPLETE);
+    }
+
+    @Test
+    @DisplayName("근거: 주제 키의 앞뒤 공백은 무시하고 견준다")
+    void matchesEvidenceIgnoringSurroundingSpaces() {
+        JudgedProblem judged = only(List.of(withEvidence(urgent(), List.of("  " + POSITION_TOPIC + " "))), Set.of());
+
+        assertThat(judged.status()).isEqualTo(ProblemStatus.ACCEPTED);
+        assertThat(judged.evidence()).extracting(ProblemEvidence::topicKey).containsExactly(POSITION_TOPIC);
+    }
+
+    @Test
     @DisplayName("할 일 없음: 발견이 없는 블록은 후보를 검사하지도 남기지도 않는다")
     void returnsNothingWhenBlockHasNoFindings() {
         assertThat(ProblemJudgement.judge(List.of(urgent()), List.of(), Set.of(), NO_OPEN_FOLLOW_UP))

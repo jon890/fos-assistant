@@ -363,14 +363,17 @@ public class ProactiveCheckRun implements CheckTurn {
                         each.checkedAt(),
                         now))
                 .toList();
-        pendingProblems = ProblemJudgement.judge(
-                        block.problemCandidates(),
-                        judged,
-                        acceptedProblemKeysSince(now.minus(deps.properties().digestWindow())),
-                        title -> deps.followUps().hasOpenWithTitle(owner.id(), title))
-                .stream()
-                .map(each -> problemRow(each, now))
-                .toList();
+        pendingProblems = block.problemCandidates().isEmpty() || judged.isEmpty()
+                ? List.of()
+                : ProblemJudgement.judge(
+                                block.problemCandidates(),
+                                judged,
+                                acceptedProblemKeysSince(
+                                        now.minus(deps.properties().digestWindow())),
+                                title -> deps.followUps().hasOpenWithTitle(owner.id(), title))
+                        .stream()
+                        .map(each -> problemRow(each, now))
+                        .toList();
         pendingReport = deps.reportFactory().create(block, judged, executionId);
         return new CheckAnswer(deps.renderer().render(block, judged, pendingReport), false, false);
     }

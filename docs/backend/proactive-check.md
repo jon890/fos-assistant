@@ -480,7 +480,7 @@ turn 이 어떻게 끝나든 잠금을 풀기 전에 `ProactiveCheckService` 가
 | --- | --- | --- |
 | 1 | `problemKey`, `problem`, `proposedAction.text`, `expectedBenefit` 이 있고, `proposedAction.type`, `confidence`, `sideEffect` 가 정해진 값이다 | `INCOMPLETE` |
 | 2 | `relatedGoal` 이 있다 | `NO_GOAL` |
-| 3 | `evidence` 의 주제 키 가운데 하나 이상이 같은 블록의 발견을 가리키고, 그 발견이 `NEW` 이거나 `REPEATED` 로만 참고가 됐다 | `NO_EVIDENCE` |
+| 3 | `evidence` 의 주제 키 가운데 하나 이상이 같은 블록의 발견을 가리키고(앞뒤 공백만 무시하고 견준다), 그 발견이 `NEW` 이거나 `REPEATED` 로만 참고가 됐다 | `NO_EVIDENCE` |
 | 4 | 같은 블록에서 앞서 받아들인 후보와 문제 키가 다르다. 같은 점검 대화의 `digest-window` 안에 받아들인 후보와 문제 키가 같으면 `changeSinceLast` 가 있다 | `DUPLICATE` |
 | 5 | `proposedAction.text` 의 `title_key` 가 그 사용자의 `PROPOSED` 나 `OPEN` 할 일과 다르다 | `EXISTING_FOLLOW_UP` |
 
@@ -493,7 +493,7 @@ turn 이 어떻게 끝나든 잠금을 풀기 전에 `ProactiveCheckService` 가
 
 ### 남기는 것과 그리지 않는 것
 
-후보는 받아들인 것과 버린 것을 모두 `proactive_check_problem` 에 남긴다. 발견과 같이 답 메시지를 저장한 뒤에 저장한다.
+후보는 받아들인 것과 버린 것을 모두 `proactive_check_problem` 에 남긴다. 답 메시지를 저장한 뒤 발견과 한 트랜잭션에서 저장한다.
 근거는 발견의 주제 키, 검사를 통과한 원문 주소, 확인 시각만 남긴다. 원문 본문과 커넥터 응답은 남기지 않는다.
 
 후보는 대화와 보고에 그리지 않는다. 사용자에게 올릴지는 우선순위와 자율 수준을 정하는 다음 단계가 정한다.
