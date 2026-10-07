@@ -76,8 +76,7 @@ public class ProactiveCheckRun implements CheckTurn {
             + " 연결한 서비스에 쓰는 일은 사용자 승인을 기다린다.";
 
     /**
-     * 붙은 연결이 없는 에이전트의 살펴보기가 싣는 위임 줄이다. 옛 커넥터 에이전트에 맡기던 분야 지침이 그대로 돌게 한다. 글은 문서의
-     * 「Control Plane 지시」 와 같다.
+     * 붙은 연결이 없는 에이전트의 살펴보기가 싣는 위임 줄이다. 옛 커넥터 에이전트에 맡기던 분야 지침이 그대로 돌게 한다. 글은 문서의 「Control Plane 지시」 와 같다.
      */
     static final String DELEGATE_RULE = "- 다른 에이전트에는 연결한 서비스의 에이전트에만 필요한 질의를 맡기고, agent_status 의 wait_seconds 로 기다린다.";
 
@@ -200,8 +199,7 @@ public class ProactiveCheckRun implements CheckTurn {
     private volatile boolean stopped;
 
     /**
-     * 상한으로 멈춘 까닭. 멈추기를 부르는 동안과 멈춘 뒤에만 있다. 멈추기가 실패하면 비우고, 사용자가 멈췄거나 멈추지 않았으면 비어
-     * 있다.
+     * 상한으로 멈춘 까닭. 멈추기를 부르는 동안과 멈춘 뒤에만 있다. 멈추기가 실패하면 비우고, 사용자가 멈췄거나 멈추지 않았으면 비어 있다.
      */
     private final AtomicReference<String> stopReason = new AtomicReference<>();
 
@@ -310,8 +308,7 @@ public class ProactiveCheckRun implements CheckTurn {
     }
 
     /**
-     * 자동 실행으로 시작해 답, 보고, 발견, 알림 줄을 남기지 않는 살펴보기인가. 문제 후보만 남겨 다시 가치 평가와 행동 정책을 거치게
-     * 한다.
+     * 자동 실행으로 시작해 답, 보고, 발견, 알림 줄을 남기지 않는 살펴보기인가. 문제 후보만 남겨 다시 가치 평가와 행동 정책을 거치게 한다.
      */
     @Override
     public boolean silent() {

@@ -27,7 +27,6 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.ReentrantLock;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
@@ -72,8 +71,7 @@ public class AgentDelegationService {
     /**
      * 이 프로세스에서 도는 위임 실행의 중지 표시와 run 참조다. 실행 번호가 열쇠다.
      *
-     * <p>실행 줄이 생긴 직후 넣고 그 실행이 끝나 상태를 적은 뒤 뺀다. 서버가 다시 뜨면 비고, 그때 남은 RUNNING 줄은
-     * 기동 정리가 Hermes 에 물어 정한다(ADR-061).
+     * <p>실행 줄이 생긴 직후 넣고 그 실행이 끝나 상태를 적은 뒤 뺀다. 서버가 다시 뜨면 비고, 그때 남은 RUNNING 줄은 기동 정리가 Hermes 에 물어 정한다(ADR-061).
      */
     private final ConcurrentHashMap<Long, RunningDelegation> running = new ConcurrentHashMap<>();
 
@@ -84,11 +82,8 @@ public class AgentDelegationService {
      */
     private final ReentrantLock[] rootLocks = new ReentrantLock[ROOT_LOCK_STRIPES];
 
-    /**
-     * 서버 전체에서 동시에 도는 위임의 수다. 자리를 얻을 때 늘리고, 실행을 끝까지 돈 가상 스레드가 줄인다.
-     * 한도는 얻을 때마다 {@link DelegationProperties#maxActive()} 를 읽어 견준다.
-     */
-    private final AtomicInteger activeDelegations = new AtomicInteger();
+    /** 서버 전체에서 동시에 도는 위임의 자리다. 실행을 끝까지 돈 가상 스레드가 돌려준다. */
+    private final DelegationSlots activeDelegations = new DelegationSlots();
 
     public AgentDelegationService(
             AgentService agents,
@@ -144,11 +139,9 @@ public class AgentDelegationService {
      * 기다리지 않고 끝난 결과는 다음 turn 에 전해지기 때문이다(ADR-040).
      *
      * <p>기다리는 시간은 {@code wait} 와 {@link DelegationProperties#statusWaitMax()} 가운데 짧은 쪽이다. 0 이하이면 기다리지
-     * 않는다. 이 서버가 돌리지 않는 {@code RUNNING} 실행은 끝나도 알 길이 없어 기다리지 않는다. 처음 읽은 뒤 그 사이 끝나 도는
-     * 표시가 없어졌으면 한 번 다시 읽어 끝난 상태를 준다.
+     * 않는다. 이 서버가 돌리지 않는 {@code RUNNING} 실행은 끝나도 알 길이 없어 기다리지 않는다. 처음 읽은 뒤 그 사이 끝나 도는 표시가 없어졌으면 한 번 다시 읽어 끝난 상태를 준다.
      *
-     * <p>트랜잭션을 걸지 않는다. 한 트랜잭션 안에서 기다리면 다시 읽어도 같은 영속 컨텍스트의 엔티티가 나오고, 기다리는 동안 DB
-     * 연결도 쥔다. {@link #stop} 과 같은 형태다.
+     * <p>트랜잭션을 걸지 않는다. 한 트랜잭션 안에서 기다리면 다시 읽어도 같은 영속 컨텍스트의 엔티티가 나오고, 기다리는 동안 DB 연결도 쥔다. {@link #stop} 과 같은 형태다.
      */
     public Optional<AgentExecution> status(CurrentUser user, AgentExecution origin, Long executionId, Duration wait) {
         Optional<AgentExecution> found = status(user, origin, executionId);
@@ -171,8 +164,7 @@ public class AgentDelegationService {
     /**
      * 요청자가 물을 수 있는 위임 실행 하나를 멈추고 그 뒤의 상태를 돌려준다. 그 실행이 다시 맡긴 실행은 멈추지 않는다.
      *
-     * <p>권한은 {@link #status} 와 같이 {@link #canQuery} 가 정한다. 아니면 없는 실행과 같게 빈 값이다. 이미 끝난 실행은
-     * 멈추지 않고 끝난 상태를 그대로 돌려준다.
+     * <p>권한은 {@link #status} 와 같이 {@link #canQuery} 가 정한다. 아니면 없는 실행과 같게 빈 값이다. 이미 끝난 실행은 멈추지 않고 끝난 상태를 그대로 돌려준다.
      *
      * <p>도는 실행이면 중지 표시를 켜고, run 번호가 있으면 Hermes 에 중지를 보낸다. 상태는 그 실행을 돌리는 가상 스레드만
      * 적는다. 그래서 멈추기와 끝나기가 겹치면 먼저 적힌 상태가 남는다. CANCELLED 가 적히기를 {@link #STOP_WAIT} 까지
@@ -322,7 +314,7 @@ public class AgentDelegationService {
             if (deadline - System.nanoTime() <= 0) {
                 return rejected(Failure.SUBMIT_FAILED, origin, "실행을 시작하기 전에 제한 시간이 지났다");
             }
-            if (!tryAcquireSlot(settings.maxActive())) {
+            if (!activeDelegations.tryAcquire(settings.maxActive())) {
                 return rejected(Failure.BUSY, origin, "서버 전체 동시 위임 한도에 닿았다");
             }
             handoff = new Handoff();
@@ -332,7 +324,7 @@ public class AgentDelegationService {
                         "agent-delegate-" + rootId,
                         () -> run(user, conversation.get(), origin, agent, task, delegationKey, checkTree, started));
             } catch (RuntimeException | Error ex) {
-                releaseSlot();
+                activeDelegations.release();
                 log.warn("위임 실행 스레드를 띄우지 못했다 originExecutionId={}", origin.id(), ex);
                 return DelegationResult.rejected(Failure.SUBMIT_FAILED);
             }
@@ -465,7 +457,7 @@ public class AgentDelegationService {
                 turns.untrackRun(rootId, runId);
             }
             delegation.markEnded();
-            releaseSlot();
+            activeDelegations.release();
             handoff.markEnded(failure);
             if (executionId != null) {
                 publishFinished(conversation, executionId);
@@ -559,29 +551,6 @@ public class AgentDelegationService {
                     .orElse(null);
         }
         return depth;
-    }
-
-    /**
-     * 서버 전체 동시 위임의 자리 하나를 얻는다. 한도 아래일 때만 compare-and-set 으로 하나 늘린다.
-     *
-     * <p>먼저 늘리고 넘으면 되돌리는 방식은 거절될 요청이 잠깐 올린 수 때문에 한도 안의 다른 요청까지 거절할 수 있다. 그래서 한도를 넘는
-     * 값은 한 번도 쓰지 않는다.
-     */
-    private boolean tryAcquireSlot(int maxActive) {
-        while (true) {
-            int current = activeDelegations.get();
-            if (current >= maxActive) {
-                return false;
-            }
-            if (activeDelegations.compareAndSet(current, current + 1)) {
-                return true;
-            }
-        }
-    }
-
-    /** {@link #tryAcquireSlot} 로 얻은 자리를 돌려준다. */
-    private void releaseSlot() {
-        activeDelegations.decrementAndGet();
     }
 
     private ReentrantLock lockOf(Long rootId) {

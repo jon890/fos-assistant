@@ -41,10 +41,8 @@ import org.springframework.transaction.support.TransactionTemplate;
  * 기동할 때 {@code RUNNING} 으로 남은 실행을 Hermes 에 물어 정한다(ADR-061).
  *
  * <p>두 단계로 돈다. <b>잡기</b>({@link #claim})는 웹 서버가 요청을 받기 전에 끝난다. 남은 줄을 읽고 대화 turn 의
- * 루트 줄, 흐름 turn 의 루트 줄과 그 자식 줄마다 그 대화의 turn 잠금을 잡는다. Hermes 를 부르지 않는다.
- * <b>묻기</b>({@link #reconcile})는
- * 애플리케이션이 다 뜬 뒤에 돈다. 줄을 적거나 잠금을 풀면 {@link NextTurnDispatcher} 가 turn 을 여는데, 그것은 다 뜬
- * 뒤여야 하기 때문이다.
+ * 루트 줄, 흐름 turn 의 루트 줄과 그 자식 줄마다 그 대화의 turn 잠금을 잡는다. Hermes 를 부르지 않는다. <b>묻기</b>({@link #reconcile})는
+ * 애플리케이션이 다 뜬 뒤에 돈다. 줄을 적거나 잠금을 풀면 {@link NextTurnDispatcher} 가 turn 을 여는데, 그것은 다 뜬 뒤여야 하기 때문이다.
  *
  * <p>여기서는 turn 을 열지 않는다. 잠금을 풀면 닫기 리스너가 다음 turn 을 정한다. 위임 실행과 그 밖의 실행은 자기
  * Hermes session 으로 돌아 대화의 session 과 겹치지 않으므로 잠금을 잡지 않는다.
@@ -161,8 +159,7 @@ public class RestartReconciler implements SmartLifecycle {
      * {@link NextTurnDispatcher} 의 기동 뒤 깨우기보다 먼저 돈다. 잠금이 잡힌 대화는 그 깨우기가 건너뛴다.
      *
      * <p>{@link #start} 의 잡기가 실패했으면 여기서 다시 잡는다. 그때는 웹 서버가 이미 요청을 받고 있으므로, 기동
-     * 시각보다 뒤에 시작한 줄은 이 프로세스가 돌리는 살아 있는 turn 으로 보고 건드리지 않는다. 예외가 나도 기동을
-     * 실패시키지 않는다.
+     * 시각보다 뒤에 시작한 줄은 이 프로세스가 돌리는 살아 있는 turn 으로 보고 건드리지 않는다. 예외가 나도 기동을 실패시키지 않는다.
      */
     @EventListener(ApplicationReadyEvent.class)
     @Order(0)
@@ -176,8 +173,7 @@ public class RestartReconciler implements SmartLifecycle {
      * 기동 때의 잡기가 실패했으면 기동 시각을 기준으로 다시 잡고, 기억한 줄을 묻기 시작한다.
      *
      * <p>다시 잡기까지 실패해도 이미 기억한 줄은 묻는다. 그 줄은 잠금을 쥐고 있어, 묻지 않으면 그 대화가 잠긴 채
-     * 남는다. 기억하지 못한 줄은 {@code RUNNING} 으로 남아 다음 기동이 정한다. 기준 시각 없는 {@link #claim} 은
-     * 부르지 않는다.
+     * 남는다. 기억하지 못한 줄은 {@code RUNNING} 으로 남아 다음 기동이 정한다. 기준 시각 없는 {@link #claim} 은 부르지 않는다.
      */
     void resumeAfterStart() {
         try {
