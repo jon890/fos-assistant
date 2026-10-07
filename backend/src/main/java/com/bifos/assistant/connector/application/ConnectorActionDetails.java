@@ -154,7 +154,7 @@ class ConnectorActionDetails {
         return actions.findConversationsWithUndelivered(EXECUTED);
     }
 
-    List<ConnectorActionResult> undelivered(Long conversationId, Set<ActionStatus> statuses) {
+    private List<ConnectorActionResult> undelivered(Long conversationId, Set<ActionStatus> statuses) {
         Map<String, Optional<ConnectorManifest>> manifests = new HashMap<>();
         return actions
                 .findByConversationIdAndStatusInAndResultDeliveredAtIsNullOrderByIdAsc(conversationId, statuses)
@@ -164,7 +164,7 @@ class ConnectorActionDetails {
     }
 
     /** @param manifests 커넥터마다 한 번만 읽으려고 부르는 쪽이 들고 있는 manifest 들 */
-    ConnectorActionResult resultOf(ConnectorAction action, Map<String, Optional<ConnectorManifest>> manifests) {
+    private ConnectorActionResult resultOf(ConnectorAction action, Map<String, Optional<ConnectorManifest>> manifests) {
         ConnectorActionView view = view(action, manifests.computeIfAbsent(action.connectorId(), this::readManifest));
         return new ConnectorActionResult(
                 action.publicId(),

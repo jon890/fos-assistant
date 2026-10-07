@@ -6,7 +6,6 @@
   "files": {
     "backend/src/main/java/com/bifos/assistant/chat/application/ChatService.java": 2167,
     "backend/src/main/java/com/bifos/assistant/chat/application/RestartReconciler.java": 615,
-    "backend/src/main/java/com/bifos/assistant/connector/application/ConnectorActionService.java": 882,
     "backend/src/main/java/com/bifos/assistant/connector/application/ConnectorBindingService.java": 612,
     "backend/src/main/java/com/bifos/assistant/hermes/HttpHermesConnectorClient.java": 614,
     "backend/src/main/java/com/bifos/assistant/orchestration/application/AgentDelegationService.java": 607,

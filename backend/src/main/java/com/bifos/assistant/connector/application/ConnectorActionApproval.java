@@ -154,7 +154,7 @@ class ConnectorActionApproval {
      * 실행할 수 없는 줄은 실행하지 않고 끝낸다. 실행은 그 줄의 에이전트에 붙은 바인딩의 profile 에서 한다(ADR-083). 그 상태를 커밋해야 하므로 예외로 알리지 않고 profile 없는 결과로 돌려준다. 정책은 요청을 만들 때가
      * 아니라 지금 것으로 다시 본다. 그 사이 운영자가 도구를 선언에서 뺐거나 위험도를 올렸을 수 있다.
      */
-    Approval beginApproval(CurrentUser user, UUID actionId, GrantPeriod grant) {
+    private Approval beginApproval(CurrentUser user, UUID actionId, GrantPeriod grant) {
         Instant now = now();
         // 연결을 다시 등록하거나 해제하는 쪽과 같은 순서로 잠근다. 사용자 행이 먼저이고 승인 줄이 다음이다.
         // 그쪽이 값을 바꾸는 동안에는 여기서 기다리고, 그쪽이 커밋한 뒤에는 이 줄이 이미 PENDING 이 아니다.
@@ -229,7 +229,7 @@ class ConnectorActionApproval {
      *
      * @param result 실행 결과. 실행됐는지 알 수 없으면 null
      */
-    ConnectorAction record(UUID actionId, CallResult result) {
+    private ConnectorAction record(UUID actionId, CallResult result) {
         Instant now = now();
         ConnectorAction action =
                 actions.findByPublicIdForUpdate(actionId).orElseThrow(ConnectorActionService::notFound);
@@ -259,7 +259,7 @@ class ConnectorActionApproval {
      * 승인 줄의 판단 피드백 사건이다. 열쇠는 지금 화면의 {@code itemKey} 와 같고, 판은 인자 해시다. 인자와 결과 글은 담지 않는다.
      * 트랜잭션 안에서 부르면 커밋한 뒤에 남는다.
      */
-    FeedbackEntry actionFeedback(ConnectorAction action, FeedbackEventType type, FeedbackActor actor) {
+    private FeedbackEntry actionFeedback(ConnectorAction action, FeedbackEventType type, FeedbackActor actor) {
         return FeedbackEntry.of(
                         action.userId(), FeedbackSubjectType.CONNECTOR_ACTION, action.publicId(), type, actor, now())
                 .conversation(action.conversationId())
@@ -268,7 +268,7 @@ class ConnectorActionApproval {
     }
 
     /** 위임 답과 같은 상한으로 자른다. 상한 자리에서 대리 쌍이 나뉘면 그 앞에서 자른다. */
-    String clip(String text) {
+    private String clip(String text) {
         int max = delegation.outputMaxChars();
         if (text.length() <= max) {
             return text;
@@ -277,7 +277,7 @@ class ConnectorActionApproval {
     }
 
     /** 줄을 잠그고 읽는다. 없는 줄과 남의 줄은 같은 응답이다. 트랜잭션 안에서만 부른다. */
-    ConnectorAction requirePending(CurrentUser user, UUID actionId) {
+    private ConnectorAction requirePending(CurrentUser user, UUID actionId) {
         ConnectorAction action = actions.findByPublicIdForUpdate(actionId)
                 .filter(found -> found.userId().equals(user.id()))
                 .orElseThrow(ConnectorActionService::notFound);
@@ -287,7 +287,7 @@ class ConnectorActionApproval {
         return action;
     }
 
-    Instant now() {
+    private Instant now() {
         return Instant.now(clock);
     }
 

@@ -248,7 +248,7 @@ class ConnectorActionLifecycle {
         signals.publishAfterCommit(actions.saveAll(pending));
     }
 
-    Instant now() {
+    private Instant now() {
         return Instant.now(clock);
     }
 }
