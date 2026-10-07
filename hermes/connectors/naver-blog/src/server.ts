@@ -5,7 +5,13 @@ import { randomUUID } from "node:crypto";
 import { rm } from "node:fs/promises";
 import { z } from "zod";
 import { PROXY_ENVIRONMENT_KEYS } from "./cdp.ts";
-import { checkPhotoFiles, draftShape, type DraftInput, validateDraft } from "./draft.ts";
+import {
+  ATTACHMENT_DIR_ENV,
+  checkPhotoFiles,
+  draftShape,
+  type DraftInput,
+  validateDraft,
+} from "./draft.ts";
 import { guard, ToolError } from "./errors.ts";
 import {
   acquireLock,
@@ -64,9 +70,12 @@ const DEFAULT_SERVER_DEPS: ServerDeps = {
   startWaitMs: 5_000,
 };
 
-/** 작업 프로세스에 넘기는 env. 연결 칸 값은 파일에 쓰지 않고 env 로만 넘긴다. */
+/**
+ * 작업 프로세스에 넘기는 env. 연결 칸 값은 파일에 쓰지 않고 env 로만 넘긴다.
+ * 작업 프로세스가 사진을 읽을 때도 같은 첨부 디렉터리로 다시 검사하도록 그 env 를 함께 넘긴다.
+ */
 function workerEnvironment(env: Env) {
-  const keys = ["PATH", "HOME", "NAVER_BLOG_CDP_URL", "NAVER_BLOG_ID"];
+  const keys = ["PATH", "HOME", "NAVER_BLOG_CDP_URL", "NAVER_BLOG_ID", ATTACHMENT_DIR_ENV];
   if (env.NAVER_BLOG_JOB_DIR) keys.push("NAVER_BLOG_JOB_DIR", "NAVER_BLOG_TEST_FAKE_RUN");
   const picked: Record<string, string> = {};
   for (const key of keys) {
@@ -83,7 +92,8 @@ function workerEnvironment(env: Env) {
  */
 async function saveDraft(env: Env, input: DraftInput, deps: ServerDeps) {
   if (validateDraft(input).length) throw new ToolError("NAVER_BLOG_INVALID_INPUT");
-  if ((await checkPhotoFiles(input)).length) throw new ToolError("NAVER_BLOG_PHOTO_INVALID");
+  if ((await checkPhotoFiles(input, env[ATTACHMENT_DIR_ENV])).length)
+    throw new ToolError("NAVER_BLOG_PHOTO_INVALID");
   const { cdpUrl } = readConnection(env);
   await sessionStatus(env);
   const dir = await openJobDir(env);
@@ -175,7 +185,7 @@ export function createServer(env: Env = process.env, overrides: Partial<ServerDe
       inputSchema: renderShape,
       annotations: { readOnlyHint: true },
     },
-    (input) => guard(() => renderDraft(input as RenderInput)),
+    (input) => guard(() => renderDraft(input as RenderInput, env[ATTACHMENT_DIR_ENV])),
   );
   server.registerTool(
     "save_draft",

@@ -24,6 +24,7 @@
     }
   ],
   "verify": { "tool": "session_status" },
+  "owner_attachments_env": "NAVER_BLOG_ATTACHMENT_DIR",
   "default_tool_policy": "deny",
   "tools": {
     "session_status": { "risk": "READ" },

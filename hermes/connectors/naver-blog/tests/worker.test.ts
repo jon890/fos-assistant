@@ -1,6 +1,6 @@
 import { afterEach, expect, test } from "bun:test";
 import { randomUUID } from "node:crypto";
-import { chmod, mkdtemp, readdir, rm } from "node:fs/promises";
+import { chmod, mkdir, mkdtemp, readdir, realpath, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { EditorError, type runDraft } from "../src/editor/run.ts";
@@ -12,7 +12,8 @@ import {
   stateFile,
   writeInput,
 } from "../src/jobs.ts";
-import { runWorker } from "../src/worker.ts";
+import type { Env } from "../src/session.ts";
+import { fakeRunDraft, runWorker } from "../src/worker.ts";
 
 const CDP_URL = "http://127.0.0.1:9";
 const ENV = { NAVER_BLOG_CDP_URL: CDP_URL, NAVER_BLOG_ID: "example-blog" };
@@ -38,8 +39,10 @@ afterEach(async () => {
   while (cleanups.length) await cleanups.pop()!();
 });
 
+const JPEG = new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 1, 2, 3, 4]);
+
 /** 잠금과 대기 중인 상태 파일, 입력 파일을 준비한 작업 하나. */
-async function queuedJob() {
+async function queuedJob(input: Record<string, unknown> = INPUT, env: Env = ENV) {
   const dir = await mkdtemp(join(tmpdir(), "naver-blog-worker-"));
   cleanups.push(() => rm(dir, { recursive: true, force: true }));
   const jobId = randomUUID();
@@ -56,9 +59,9 @@ async function queuedJob() {
     pid: null,
     heartbeat_at: null,
   });
-  await writeInput(dir, jobId, INPUT);
+  await writeInput(dir, jobId, input as typeof INPUT);
   const run = (fake: typeof runDraft, limitMs = 5_000) =>
-    runWorker(stateFile(dir, jobId), { runDraft: fake, limitMs, env: ENV });
+    runWorker(stateFile(dir, jobId), { runDraft: fake, limitMs, env });
   return { dir, jobId, run };
 }
 
@@ -203,4 +206,39 @@ test("작업 디렉터리 확인이 실패해도 editor_failed 로 끝내고 자
   expect(state?.status).toBe("failed");
   expect(state?.error).toEqual({ code: "editor_failed", stage: "queued" });
   await expectOnlyState(dir, jobId);
+});
+
+/** 주인의 첨부 디렉터리 아래에 사진 한 장을 둔 사진 디렉터리. */
+async function ownerPhotos() {
+  // 링크가 없도록 실제 경로를 쓴다. 커넥터가 링크를 거절한다.
+  const attachmentDir = await realpath(await mkdtemp(join(tmpdir(), "naver-blog-worker-photos-")));
+  cleanups.push(() => rm(attachmentDir, { recursive: true, force: true }));
+  const photoDir = join(attachmentDir, "conversation");
+  await mkdir(photoDir);
+  await writeFile(join(photoDir, "101.jpg"), JPEG);
+  const input = { ...INPUT, body: "[사진 1: 101.jpg]", photo_dir: photoDir };
+  return { attachmentDir, input };
+}
+
+test("작업 프로세스는 자기 env 의 첨부 디렉터리 아래 사진을 다시 검사해 읽는다", async () => {
+  const { attachmentDir, input } = await ownerPhotos();
+  const { dir, jobId, run } = await queuedJob(input, { ...ENV, NAVER_BLOG_ATTACHMENT_DIR: attachmentDir });
+
+  await run(fakeRunDraft);
+
+  const state = await readState(dir, jobId);
+  expect(state?.status).toBe("succeeded");
+  expect(state?.result).toMatchObject({ state: { photos: 1 } });
+});
+
+test("작업 프로세스의 env 에 첨부 디렉터리가 없으면 사진을 읽지 않고 실패한다", async () => {
+  const { input } = await ownerPhotos();
+  const { dir, jobId, run } = await queuedJob(input, ENV);
+
+  await run(fakeRunDraft);
+
+  const state = await readState(dir, jobId);
+  expect(state?.status).toBe("failed");
+  expect(state?.error).toEqual({ code: "editor_failed", stage: "open" });
+  expect(JSON.stringify(state)).not.toContain(input.photo_dir);
 });

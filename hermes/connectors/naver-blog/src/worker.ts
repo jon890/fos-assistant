@@ -1,6 +1,6 @@
 import { readFile, unlink } from "node:fs/promises";
 import { basename, dirname } from "node:path";
-import { type DraftInput, parseBody } from "./draft.ts";
+import { ATTACHMENT_DIR_ENV, type DraftInput, parseBody, readPhoto } from "./draft.ts";
 import { EditorError, runDraft, type RunStage } from "./editor/run.ts";
 import {
   checkJobDir,
@@ -173,15 +173,18 @@ export async function runWorker(jobFile: string, overrides: Partial<WorkerDeps> 
 /**
  * 시험이 실제 작업 프로세스를 띄울 때 쓰는 대역. 브라우저에 닿지 않고 잠깐 기다린 뒤 성공한다.
  * 기다리는 동안 시험이 작업 프로세스의 프로세스 묶음을 확인한다.
+ * 사진은 실제 작업처럼 작업 프로세스의 env 가 가리키는 첨부 디렉터리로 다시 검사해 읽는다.
  */
-export const fakeRunDraft: typeof runDraft = async (_env, _blocks, input, onStage) => {
+export const fakeRunDraft: typeof runDraft = async (env, blocks, input, onStage) => {
   await onStage("open");
+  const images = blocks.filter((block) => block.type === "image");
+  for (const image of images) await readPhoto(input, image.file, env[ATTACHMENT_DIR_ENV]);
   await Bun.sleep(800);
   return {
     state: {
       title: input.title,
-      photos: 0,
-      fitted_photos: 0,
+      photos: images.length,
+      fitted_photos: images.length,
       stickers: 0,
       maps: 0,
       category: input.category,

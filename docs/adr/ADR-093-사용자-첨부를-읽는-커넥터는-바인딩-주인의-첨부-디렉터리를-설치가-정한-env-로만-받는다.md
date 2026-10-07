@@ -12,7 +12,7 @@
 | --- | --- |
 | 선언 | `owner_attachments_env` 는 env 이름 하나다. `fields[].env`, `operator_env` 와 겹치지 않는다. `.mcp.json` 의 서버 env 는 세 이름의 합과 같다 |
 | 값 | 대시보드 plugin 이 운영 정책의 `attachment_agent_root` 와 Control Plane 이 보낸 `sandbox_owner` 로 `users/<SHA-256(sandbox_owner)>` 를 만든다. 모델, 요청 본문, manifest 는 경로를 정하지 못한다 |
-| 설치 | Control Plane 은 바인딩 설치 요청에 그 에이전트의 `sandbox_owner` 를 늘 함께 보낸다. 선언한 커넥터인데 `sandbox_owner` 가 없으면 400, 운영 정책이 없거나 그 디렉터리를 링크 없이 확인하지 못하면 409(`AGENT_SANDBOX_UNAVAILABLE`)다. 값은 `operator_env` 처럼 서버 정의에 직접 들어가고 profile `.env` 를 거치지 않는다 |
+| 설치 | Control Plane 은 바인딩 설치 요청에 그 에이전트의 `sandbox_owner` 를 늘 함께 보낸다. 선언한 커넥터인데 `sandbox_owner` 가 없으면 400, 운영 정책이 없거나 그 디렉터리를 링크 없이 확인하지 못하면 대시보드가 409 로 거절하고 Control Plane 은 붙이기를 `CONNECTOR_BIND_CONFLICT`(409)로 끝낸다. Control Plane 이 그 디렉터리를 만들지 못하면 다른 외부 실패처럼 `CONNECTOR_OPERATION_FAILED` 와 `PENDING` 이다. 값은 `operator_env` 처럼 서버 정의에 직접 들어가고 profile `.env` 를 거치지 않는다 |
 | 실행 경로 | 승인한 호출의 실행은 설치한 서버 정의의 그 값을 자식 env 에 넣는다. 등록 화면의 확인 도구와 선택지 호출(profile 없음)에는 빈 값을 준다 |
 | 커넥터의 검사 | 값이 비었으면 사용자 첨부를 읽지 않는다. 받은 경로의 실제 경로가 그 디렉터리 아래여야 하고, 그 디렉터리부터 파일까지 어느 조각도 링크가 아니어야 한다 |
 | 오류 | 경로가 그 디렉터리 밖이든, 없든, 링크든 같은 문장으로 거절한다. 승인 없는 읽기 도구로 다른 경로가 있는지 떠볼 수 없게 한다 |

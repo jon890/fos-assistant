@@ -1,5 +1,5 @@
 import { afterEach, expect, test } from "bun:test";
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, realpath, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { type DraftInput, parseBody } from "../src/draft.ts";
@@ -36,7 +36,8 @@ afterEach(async () => {
 
 /** 가짜 브라우저 하나에 다른 탭 하나를 미리 열어 두고, 편집기 대역과 초안을 준비한다. */
 async function setup() {
-  const photoDir = await mkdtemp(join(tmpdir(), "naver-blog-run-"));
+  // 사진 디렉터리를 주인의 첨부 디렉터리로도 쓴다. 커넥터가 링크를 거절하므로 실제 경로를 쓴다.
+  const photoDir = await realpath(await mkdtemp(join(tmpdir(), "naver-blog-run-")));
   cleanups.push(() => rm(photoDir, { recursive: true, force: true }));
   await writeFile(join(photoDir, "101.jpg"), PHOTO);
   const cdp = new FakeCdp({ allowed: EDITOR_METHODS });
@@ -52,7 +53,11 @@ async function setup() {
     body: BODY,
     photo_dir: photoDir,
   };
-  const env = { NAVER_BLOG_CDP_URL: cdp.url, NAVER_BLOG_ID: "example-blog" };
+  const env = {
+    NAVER_BLOG_CDP_URL: cdp.url,
+    NAVER_BLOG_ID: "example-blog",
+    NAVER_BLOG_ATTACHMENT_DIR: photoDir,
+  };
   const stages: string[] = [];
   const run = (signal = new AbortController().signal) =>
     runDraft(env, parseBody(BODY), input, (stage) => void stages.push(stage), signal, TIMES);

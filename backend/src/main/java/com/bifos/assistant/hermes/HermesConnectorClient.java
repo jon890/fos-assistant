@@ -91,10 +91,15 @@ public interface HermesConnectorClient {
     /**
      * 보관 파일의 값으로 그 profile 에 커넥터를 붙인다.
      *
-     * @throws ConnectorInstallConflict 대시보드가 409 로 답했을 때. 그 profile 의 설정과 충돌한다
+     * <p>요청에 그 에이전트의 {@code sandboxOwner} 를 늘 싣는다. 사용자 첨부를 읽는 커넥터는 대시보드가 그 주인의 첨부 디렉터리를
+     * 서버 정의에 넣는다(ADR-093). 보내기 전에 그 주인의 첨부 디렉터리를 만들고, 만들지 못하면 {@link HermesRequestRejected} 를
+     * 던진다.
+     *
+     * @param sandboxOwner 그 에이전트의 실행 공간 주인. {@code Agent#sandboxOwner()} 의 값이다
+     * @throws ConnectorInstallConflict 대시보드가 409 로 답했을 때. 그 profile 의 설정과 충돌하거나 첨부 디렉터리를 확인하지 못했다
      * @throws ConnectorProfileRejected 대시보드가 401 로 답했을 때. 그 profile 이 커넥터를 받지 않는다
      */
-    InstallResult bindConnector(String profile, String connectorId, String vault);
+    InstallResult bindConnector(String profile, String connectorId, String vault, String sandboxOwner);
 
     /**
      * 그 profile 에 붙인 커넥터를 뗀다. 요청은 옛 설치를 끄는 것과 같다. 대시보드가 소유 기록의 방식으로 떼는 법을 고른다.

@@ -154,12 +154,14 @@ async function attachPhoto(
 /**
  * 사진 자리마다 자리표시 글을 지우고 사진 바이트를 넣는다.
  * 전송이 끝나면 `문서 너비` 를 적용한다. 실패하면 `photo_upload_failed` 와 몇 번째 사진 자리인지다.
+ * 사진 파일은 바인딩 주인의 첨부 디렉터리(`attachmentDir`) 아래에서만 읽는다.
  */
 export async function photos(
   page: EditorPage,
   input: DraftInput,
   blocks: Block[],
   draftHash: string,
+  attachmentDir: string | undefined,
 ) {
   await setStage(page, draftHash, "photos", false);
   const images = blocks.filter(
@@ -198,7 +200,7 @@ export async function photos(
     const number = inserted + offset + 1;
     let photo;
     try {
-      photo = await readPhoto(input, block.file);
+      photo = await readPhoto(input, block.file, attachmentDir);
     } catch {
       throw failed(number, "사진 파일을 읽지 못했다");
     }

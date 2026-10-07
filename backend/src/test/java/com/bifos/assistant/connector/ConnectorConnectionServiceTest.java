@@ -200,7 +200,7 @@ class ConnectorConnectionServiceTest {
                 .thenReturn(CallResult.success(MAPPER.readTree("{\"scopes\":[]}")));
         when(connector.putConnector(anyString(), anyString(), anyBoolean(), anyString()))
                 .thenReturn(new InstallResult(false, false));
-        when(connector.bindConnector(anyString(), anyString(), anyString()))
+        when(connector.bindConnector(anyString(), anyString(), anyString(), anyString()))
                 .thenReturn(new InstallResult(false, false));
         when(connector.unbindConnector(anyString(), anyString())).thenReturn(new InstallResult(false, false));
         when(connector.readConnector(anyString(), anyString())).thenReturn(state(HermesConnectorClient.MODE_BIND));
@@ -277,7 +277,8 @@ class ConnectorConnectionServiceTest {
         ConnectorBinding bound = readyBinding(ordinary, connection, "demo");
         Agent legacy = agent(user, true);
         ConnectorBinding legacyBound = readyBinding(legacy, connection, null);
-        when(connector.bindConnector(anyString(), anyString(), anyString())).thenReturn(new InstallResult(true, false));
+        when(connector.bindConnector(anyString(), anyString(), anyString(), anyString()))
+                .thenReturn(new InstallResult(true, false));
         when(connector.putConnector(anyString(), anyString(), anyBoolean(), anyString()))
                 .thenReturn(new InstallResult(true, false));
         Map<String, String> replaced = Map.of("token", OTHER_TOKEN);
@@ -285,7 +286,7 @@ class ConnectorConnectionServiceTest {
         ConnectionSnapshot registered = service.register(user, DEMO, replaced);
 
         verify(connector).putVault(connection.vault(), DEMO, replaced);
-        verify(connector).bindConnector(ordinary.hermesProfile(), DEMO, connection.vault());
+        verify(connector).bindConnector(ordinary.hermesProfile(), DEMO, connection.vault(), ordinary.sandboxOwner());
         // 옛 바인딩은 받은 값을 지금처럼 그 profile 의 env 에 쓴다.
         verify(connector).putEnv(legacy.hermesProfile(), "DEMO_TOKEN", OTHER_TOKEN);
         verify(connector).deleteEnv(legacy.hermesProfile(), "DEMO_SCOPE");
@@ -316,8 +317,8 @@ class ConnectorConnectionServiceTest {
         ConnectorBinding fineBinding = readyBinding(fine, connection, "demo");
         doThrow(new IllegalStateException())
                 .when(connector)
-                .bindConnector(eq(broken.hermesProfile()), anyString(), anyString());
-        when(connector.bindConnector(eq(fine.hermesProfile()), anyString(), anyString()))
+                .bindConnector(eq(broken.hermesProfile()), anyString(), anyString(), anyString());
+        when(connector.bindConnector(eq(fine.hermesProfile()), anyString(), anyString(), anyString()))
                 .thenReturn(new InstallResult(true, false));
 
         ConnectionSnapshot registered = service.register(user, DEMO, Map.of("token", OTHER_TOKEN));
@@ -759,7 +760,7 @@ class ConnectorConnectionServiceTest {
 
         assertThat(stored(user).status()).isEqualTo(ConnectionStatus.PENDING);
         assertThat(bindings.findAll()).extracting(ConnectorBinding::status).containsExactly(BindingStatus.READY);
-        verify(connector, never()).bindConnector(anyString(), anyString(), anyString());
+        verify(connector, never()).bindConnector(anyString(), anyString(), anyString(), anyString());
 
         doThrow(new IllegalStateException()).when(connector).callWithVault(anyString(), anyString(), anyString());
         assertCode(() -> service.check(user, DEMO), ErrorCode.CONNECTOR_UNAVAILABLE);
@@ -786,7 +787,7 @@ class ConnectorConnectionServiceTest {
         assertThat(resynced.mcpServer()).isEqualTo("demo");
         assertThat(resynced.status()).isEqualTo(BindingStatus.READY);
         assertThat(agentEnabled(legacy)).isTrue();
-        verify(connector, never()).bindConnector(anyString(), anyString(), anyString());
+        verify(connector, never()).bindConnector(anyString(), anyString(), anyString(), anyString());
     }
 
     @Test
@@ -818,7 +819,7 @@ class ConnectorConnectionServiceTest {
                 .extracting(BoundAgentSummary::status)
                 .containsExactly(BindingStatus.READY);
         verify(connector)
-                .bindConnector(agent.hermesProfile(), DEMO, stored(user).vault());
+                .bindConnector(agent.hermesProfile(), DEMO, stored(user).vault(), agent.sandboxOwner());
         verify(connector).probe(agent.hermesProfile(), "demo");
 
         when(connector.readConnector(anyString(), anyString())).thenReturn(state(HermesConnectorClient.MODE_ISOLATED));
@@ -848,7 +849,7 @@ class ConnectorConnectionServiceTest {
 
         ConnectionSnapshot checked = service.check(user, DEMO);
 
-        verify(connector, never()).bindConnector(anyString(), anyString(), anyString());
+        verify(connector, never()).bindConnector(anyString(), anyString(), anyString(), anyString());
         assertThat(checked.bindings())
                 .extracting(BoundAgentSummary::status, BoundAgentSummary::restartRequired)
                 .containsExactly(tuple(BindingStatus.PENDING, true));
@@ -869,7 +870,7 @@ class ConnectorConnectionServiceTest {
         assertThat(checked.mcpServer()).isEqualTo("demo");
         assertThat(checked.status()).isEqualTo(BindingStatus.PENDING);
         assertThat(checked.restartRequired()).isTrue();
-        verify(connector, never()).bindConnector(anyString(), anyString(), anyString());
+        verify(connector, never()).bindConnector(anyString(), anyString(), anyString(), anyString());
     }
 
     @Test
@@ -901,7 +902,7 @@ class ConnectorConnectionServiceTest {
         ConnectionSnapshot checked = service.check(user, DEMO);
 
         verify(connector, never()).callWithVault(anyString(), anyString(), anyString());
-        verify(connector, never()).bindConnector(anyString(), anyString(), anyString());
+        verify(connector, never()).bindConnector(anyString(), anyString(), anyString(), anyString());
         assertThat(checked.status()).isEqualTo(ConnectionStatus.PENDING);
         assertThat(stored(user).status()).isEqualTo(ConnectionStatus.PENDING);
         assertThat(checked.bindings()).extracting(BoundAgentSummary::status).containsExactly(BindingStatus.PENDING);
@@ -913,7 +914,8 @@ class ConnectorConnectionServiceTest {
         CurrentUser user = user(UserRole.MEMBER, 1L);
         service.register(user, DEMO, VALUES);
         ConnectorBinding binding = pendingBinding(agent(user, false), stored(user));
-        when(connector.bindConnector(anyString(), anyString(), anyString())).thenReturn(new InstallResult(true, false));
+        when(connector.bindConnector(anyString(), anyString(), anyString(), anyString()))
+                .thenReturn(new InstallResult(true, false));
 
         ConnectionSnapshot checked = service.check(user, DEMO);
 
@@ -950,7 +952,7 @@ class ConnectorConnectionServiceTest {
         ConnectionSnapshot checked = service.check(user, DEMO);
 
         verify(connector, never()).callWithVault(anyString(), anyString(), anyString());
-        verify(connector, never()).bindConnector(anyString(), anyString(), anyString());
+        verify(connector, never()).bindConnector(anyString(), anyString(), anyString(), anyString());
         assertThat(checked.status()).isEqualTo(ConnectionStatus.PENDING);
         assertThat(checked.bindings()).extracting(BoundAgentSummary::status).containsExactly(BindingStatus.PENDING);
     }

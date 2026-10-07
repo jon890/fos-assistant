@@ -134,7 +134,7 @@ plugin 디렉터리 root 에 둔다. 소유는 그 plugin 의 저장소다. 같�
 | 내 연결이 `READY` 가 아니거나 값이 보관 파일에 없다 | `CONNECTOR_NOT_CONNECTED`(409) |
 | 커넥터가 카탈로그에 없다 | `CONNECTOR_NOT_FOUND`(404) |
 | 커넥터의 스킬 이름이 그 에이전트의 스킬과 겹친다 | `SKILL_NAME_TAKEN`(409) |
-| 대시보드가 그 profile 의 설정이나 이미 붙은 다른 커넥터와 충돌한다고 거절했다. 그 profile 에서 `fos-ctx` 가 꺼져 있는 것도 여기 든다 | `CONNECTOR_BIND_CONFLICT`(409) |
+| 대시보드가 그 profile 의 설정이나 이미 붙은 다른 커넥터와 충돌한다고 거절했다. 그 profile 에서 `fos-ctx` 가 꺼져 있는 것도 여기 든다. `owner_attachments_env` 를 선언한 커넥터인데 실행 공간 정책이 없거나 주인의 첨부 디렉터리를 확인하지 못한 것도 여기 든다 | `CONNECTOR_BIND_CONFLICT`(409) |
 | 그 profile 이 아직 커넥터를 받을 준비가 되지 않았다. 표식이 없다 | `CONNECTOR_PROFILE_NOT_READY`(409) |
 | 그 밖의 외부 실패 | `CONNECTOR_OPERATION_FAILED`(502) |
 

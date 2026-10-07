@@ -1,5 +1,5 @@
 import { afterEach, expect, test } from "bun:test";
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, realpath, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { type DraftInput, parseBody } from "../src/draft.ts";
@@ -17,7 +17,8 @@ afterEach(async () => {
 });
 
 async function setup(body: string) {
-  const photoDir = await mkdtemp(join(tmpdir(), "naver-blog-photos-"));
+  // 사진 디렉터리를 주인의 첨부 디렉터리로도 쓴다. 커넥터가 링크를 거절하므로 실제 경로를 쓴다.
+  const photoDir = await realpath(await mkdtemp(join(tmpdir(), "naver-blog-photos-")));
   cleanups.push(() => rm(photoDir, { recursive: true, force: true }));
   await writeFile(join(photoDir, "101.jpg"), PHOTO);
   const cdp = new FakeCdp({ allowed: EDITOR_METHODS });
@@ -37,17 +38,17 @@ async function setup(body: string) {
     body,
     photo_dir: photoDir,
   };
-  return { cdp, editor, page: page as EditorPage, input, blocks: parseBody(body) };
+  return { cdp, editor, page: page as EditorPage, input, blocks: parseBody(body), attachmentDir: photoDir };
 }
 
 const paramsOf = (cdp: FakeCdp, method: string) =>
   cdp.calls.filter((call) => call.method === method).map((call) => call.params);
 
 test("파일 선택 창의 backendNodeId 로 찾은 input 에 사진 바이트를 넣고 문서 너비를 적용한다", async () => {
-  const { cdp, editor, page, input, blocks } = await setup("앞 줄\n[사진 1: 101.jpg]");
+  const { cdp, editor, page, input, blocks, attachmentDir } = await setup("앞 줄\n[사진 1: 101.jpg]");
   editor.body = ["앞 줄", "[사진 자리: 101.jpg]"];
 
-  await photos(page, input, blocks, "draft-hash");
+  await photos(page, input, blocks, "draft-hash", attachmentDir);
 
   expect(paramsOf(cdp, "DOM.resolveNode")).toEqual([{ backendNodeId: editor.backendNodeId }]);
   const [call] = paramsOf(cdp, "Runtime.callFunctionOn");
@@ -68,11 +69,11 @@ test("파일 선택 창의 backendNodeId 로 찾은 input 에 사진 바이트�
 });
 
 test("선택 창 이벤트가 오지 않으면 photo_upload_failed 와 첫째 사진 자리로 끝나고 가로채기를 끈다", async () => {
-  const { cdp, editor, page, input, blocks } = await setup("[사진 1: 101.jpg]");
+  const { cdp, editor, page, input, blocks, attachmentDir } = await setup("[사진 1: 101.jpg]");
   editor.body = ["[사진 자리: 101.jpg]"];
   editor.chooser = false;
 
-  const failure = await photos(page, input, blocks, "draft-hash").catch((error) => error);
+  const failure = await photos(page, input, blocks, "draft-hash", attachmentDir).catch((error) => error);
 
   expect(failure.code).toBe("photo_upload_failed");
   expect(failure.stage).toBe("photos");
@@ -87,9 +88,9 @@ test("선택 창 이벤트가 오지 않으면 photo_upload_failed 와 첫째 �
 });
 
 test("사진 줄이 없으면 파일 선택 창을 가로채지 않는다", async () => {
-  const { cdp, page, input, blocks } = await setup("글만 있는 본문");
+  const { cdp, page, input, blocks, attachmentDir } = await setup("글만 있는 본문");
 
-  await photos(page, input, blocks, "draft-hash");
+  await photos(page, input, blocks, "draft-hash", attachmentDir);
 
   expect(cdp.methods()).not.toContain("Page.setInterceptFileChooserDialog");
   expect(cdp.methods()).not.toContain("Input.dispatchMouseEvent");

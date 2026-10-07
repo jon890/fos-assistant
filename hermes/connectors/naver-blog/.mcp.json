@@ -5,7 +5,8 @@
       "args": ["${CLAUDE_PLUGIN_ROOT}/dist/naver-blog-mcp.js"],
       "env": {
         "NAVER_BLOG_CDP_URL": "${NAVER_BLOG_CDP_URL}",
-        "NAVER_BLOG_ID": "${NAVER_BLOG_ID}"
+        "NAVER_BLOG_ID": "${NAVER_BLOG_ID}",
+        "NAVER_BLOG_ATTACHMENT_DIR": "${NAVER_BLOG_ATTACHMENT_DIR}"
       }
     }
   }

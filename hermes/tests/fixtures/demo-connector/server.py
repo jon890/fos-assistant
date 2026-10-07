@@ -45,8 +45,12 @@ async def list_scopes() -> CallToolResult:
 
 @server.tool(annotations=ToolAnnotations(read_only_hint=True))
 async def env_view() -> dict:
-    """자식이 받은 환경 변수의 이름과 PATH 를 낸다. 값은 내지 않는다."""
-    return {"names": sorted(os.environ), "path": os.environ.get("PATH", "")}
+    """자식이 받은 환경 변수의 이름과 PATH, 주인의 첨부 디렉터리를 낸다. 칸 값은 내지 않는다.
+
+    `attachments` 는 `owner_attachments_env` 를 `DEMO_ATTACHMENT_DIR` 로 선언한 시험이 받은 값이다. 없으면 null 이다.
+    """
+    return {"names": sorted(os.environ), "path": os.environ.get("PATH", ""),
+            "attachments": os.environ.get("DEMO_ATTACHMENT_DIR")}
 
 
 @server.tool(annotations=ToolAnnotations(read_only_hint=False))

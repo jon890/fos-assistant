@@ -414,6 +414,61 @@ class ConnectorCatalogTest(ConnectorGateCase):
         self.assertEqual(demo["server"]["env"]["DEMO_BASE"], DEMO_BASE)
 
 
+class ConnectorOwnerAttachmentsTest(ConnectorGateCase):
+    """사용자 첨부를 읽는 커넥터가 `owner_attachments_env` 를 선언하는 규칙을 검사한다(ADR-093)."""
+
+    NAME = "DEMO_ATTACHMENT_DIR"
+
+    def declare(self, name=NAME, reference=None):
+        """`connector.json` 에 선언하고 `.mcp.json` 서버 env 에 그 이름의 참조를 더한다."""
+        self.rewrite("connector.json", lambda value: value.update(owner_attachments_env=name))
+        self.rewrite(".mcp.json", lambda value: value["mcpServers"]["demo"]["env"].update(
+            {name if isinstance(name, str) else self.NAME: reference or "${%s}" % name}))
+
+    def test_declared_name_reaches_the_manifest_but_not_the_catalog(self):
+        """바른 선언은 manifest 에 담기고, 서버 정의의 값은 빈 글이며, 카탈로그 응답에는 이름이 없다."""
+        self.assertIsNone(self.plugin._connector_manifest(DEMO)["owner_attachments_env"])
+        self.declare()
+        manifest = self.plugin._connector_manifest(DEMO)
+        self.assertEqual(manifest["owner_attachments_env"], self.NAME)
+        # 주인을 모르는 설치는 빈 값 그대로라 커넥터가 사용자 첨부를 읽지 않는다. profile `.env` 참조가 아니다.
+        self.assertEqual(manifest["server"]["env"][self.NAME], "")
+        body = self.catalog()
+        self.assertEqual([entry["id"] for entry in body], [DEMO])
+        self.assertNotIn(self.NAME, json.dumps(body))
+        self.assertNotIn("owner_attachments_env", body[0])
+
+    def test_invalid_declaration_leaves_the_connector_out(self):
+        """선언이 칸이나 운영자 env 와 겹치거나, `.mcp.json` 에 없거나, 모양이 틀리면 카탈로그에서 빠진다."""
+        originals = {name: (self.connector_root / name).read_bytes() for name in ("connector.json", ".mcp.json")}
+        cases = (
+            ("overlaps a field env", lambda: self.rewrite(
+                "connector.json", lambda value: value.update(owner_attachments_env="DEMO_TOKEN"))),
+            ("overlaps an operator env", lambda: self.rewrite(
+                "connector.json", lambda value: value.update(owner_attachments_env="DEMO_BASE"))),
+            ("missing from .mcp.json", lambda: self.rewrite(
+                "connector.json", lambda value: value.update(owner_attachments_env=self.NAME))),
+            ("lower case name", lambda: self.declare("demo_attachment_dir")),
+            ("starts with an underscore", lambda: self.declare("_DEMO_DIR")),
+            ("65 characters", lambda: self.declare("D" * 65)),
+            ("not a string", lambda: self.declare(["DEMO_ATTACHMENT_DIR"])),
+            ("a base key", lambda: self.declare("API_SERVER_KEY")),
+            ("server env is a literal path", lambda: self.declare(reference="/attachments/users/owner")),
+            ("server env references another name", lambda: self.declare(reference="${DEMO_TOKEN}")),
+            ("server env uses an empty default", lambda: self.declare(reference="${DEMO_ATTACHMENT_DIR:-}")),
+        )
+        for label, change in cases:
+            with self.subTest(label):
+                change()
+                self.assertEqual(self.catalog(), [])
+                self.assertIsNone(self.plugin._connector_manifest(DEMO))
+                for name, data in originals.items():
+                    (self.connector_root / name).write_bytes(data)
+        # 64자는 받는다. 위의 65자 거절이 길이 때문이었음을 확인한다.
+        self.declare("D" * 64)
+        self.assertEqual(self.plugin._connector_manifest(DEMO)["owner_attachments_env"], "D" * 64)
+
+
 class ConnectorFieldlessAndSkillTest(ConnectorGateCase):
     """입력 칸이 없는 커넥터와, 바인딩 설치가 복사할 스킬을 카탈로그로 내는 규칙을 검사한다(ADR-083)."""
 

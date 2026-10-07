@@ -1,7 +1,7 @@
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { afterEach, expect, test } from "bun:test";
-import { mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readdir, readFile, realpath, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { inputFile, readState, stateFile } from "../src/jobs.ts";
@@ -27,22 +27,31 @@ async function setup({
   cookies = LOGGED_IN,
   photo = JPEG,
   deps = { workerEntry: SERVER_ENTRY },
+  ownerAttachments = true,
 }: {
   cookies?: typeof LOGGED_IN;
   photo?: Uint8Array;
   deps?: Partial<ServerDeps>;
+  /** 거짓이면 사진 디렉터리를 바인딩 주인의 첨부 디렉터리 밖에 둔다. */
+  ownerAttachments?: boolean;
 } = {}) {
   const cdp = new FakeCdp();
   cdp.on("Storage.getCookies", () => ({ cookies }));
   cleanups.push(() => cdp.stop());
-  const photoDir = await mkdtemp(join(tmpdir(), "naver-blog-photos-"));
+  // 바인딩 설치가 `NAVER_BLOG_ATTACHMENT_DIR` 로 주는 주인의 첨부 디렉터리. 링크가 없도록 실제 경로를 쓴다.
+  const root = await realpath(await mkdtemp(join(tmpdir(), "naver-blog-photos-")));
+  const attachmentDir = join(root, "owner");
+  const photoDir = join(ownerAttachments ? attachmentDir : join(root, "other"), "conversation");
+  await mkdir(attachmentDir);
+  await mkdir(photoDir, { recursive: true });
   const jobDir = await mkdtemp(join(tmpdir(), "naver-blog-jobs-"));
-  cleanups.push(() => rm(photoDir, { recursive: true, force: true }));
+  cleanups.push(() => rm(root, { recursive: true, force: true }));
   cleanups.push(() => rm(jobDir, { recursive: true, force: true }));
   await writeFile(join(photoDir, "101.jpg"), photo);
   const env: Env = {
     NAVER_BLOG_CDP_URL: cdp.url,
     NAVER_BLOG_ID: "example-blog",
+    NAVER_BLOG_ATTACHMENT_DIR: attachmentDir,
     NAVER_BLOG_JOB_DIR: jobDir,
     NAVER_BLOG_TEST_FAKE_RUN: "1",
     PATH: process.env.PATH,
@@ -62,7 +71,7 @@ async function setup({
     const text = (result.content as Array<{ text: string }>)[0]?.text ?? "";
     expect(text).not.toContain(cdp.url);
     expect(text).not.toContain(new URL(cdp.url).host);
-    expect(text).not.toContain(photoDir);
+    expect(text).not.toContain(root);
     expect(text).not.toContain(upstreamText);
     return { isError: result.isError === true, body: JSON.parse(text) };
   };
@@ -101,12 +110,13 @@ test("save_draft 는 다른 프로세스 묶음의 작업 프로세스를 띄우
   const job = await call("draft_job", { job_id: started.body.job_id, wait_seconds: 4 });
 
   expect(job.isError).toBe(false);
+  // 작업 프로세스가 넘겨받은 첨부 디렉터리로 사진을 다시 검사해 읽었다.
   expect(job.body).toMatchObject({
     job_id: started.body.job_id,
     status: "succeeded",
     save_clicked: false,
     error: null,
-    result: { saved_before: 0, saved_after: 1 },
+    result: { state: { photos: 1 }, saved_before: 0, saved_after: 1 },
   });
   expect(job.body).not.toContainKey("pid");
   expect(job.body).not.toContainKey("heartbeat_at");
@@ -127,6 +137,16 @@ test("로그인 쿠키가 없으면 작업을 만들지 않고 NAVER_BLOG_LOGIN_
 
 test("서명이 확장자와 맞지 않는 사진이면 브라우저에 닿기 전에 NAVER_BLOG_PHOTO_INVALID 다", async () => {
   const { cdp, jobDir, call, draft } = await setup({ photo: new TextEncoder().encode("not an image") });
+
+  const result = await call("save_draft", draft);
+
+  expect(result).toEqual({ isError: true, body: { error: { code: "NAVER_BLOG_PHOTO_INVALID" } } });
+  expect(cdp.httpRequests).toEqual([]);
+  expect(await readdir(jobDir)).toEqual([]);
+});
+
+test("사진 디렉터리가 주인의 첨부 디렉터리 밖이면 브라우저에 닿기 전에 NAVER_BLOG_PHOTO_INVALID 다", async () => {
+  const { cdp, jobDir, call, draft } = await setup({ ownerAttachments: false });
 
   const result = await call("save_draft", draft);
 

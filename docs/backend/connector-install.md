@@ -279,7 +279,7 @@ plugin 과 정책을 먼저 반영한 뒤 재등록·연결 확인·관리자 �
 정책이 없거나 profile 이 미등록이면 409, 주인 키가 없거나 틀리면 400 으로 설치를 거절한다.
 실패는 `PENDING` 과 `CONNECTOR_OPERATION_FAILED` 로 남는다. 사용자별 mount 와 배포 확인은
 [사진 첨부](attachment.md)와 [ADR-091](../adr/ADR-091-사진-첨부는-사용자별로-저장하고-실행-공간에는-그-사용자만-붙인다.md)이 갖는다.
-바인딩 설치는 API 도구 목록의 내장 toolset 을 바꾸지 않으므로 `sandbox_owner` 를 싣지 않는다.
+바인딩 설치는 API 도구 목록의 내장 toolset 을 바꾸지 않는다. 바인딩 설치 요청의 `sandbox_owner` 는 실행 공간이 아니라 `owner_attachments_env` 의 값을 정하는 데만 쓴다(위 「바인딩 설치」).
 
 옛 커넥터 에이전트는 기본으로 사진을 받지 않는다. manifest 의 `attachments` 가 참이고 그 바인딩이 `READY` 로 확인됐을 때만 받는다.
 Control Plane 은 연결 확인과 관리자 반영 완료에서 선언한 toolset 이 실제로 켜진 것을 본 뒤에만 `agent.connector_attachments` 를 참으로 두고, `Agent.acceptsAttachments()` 가 그 열을 본다.

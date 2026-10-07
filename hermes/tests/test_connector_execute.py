@@ -143,6 +143,72 @@ class ConnectorExecuteTest(base.ConnectorGateCase):
         self.assertEqual(names, {"DEMO_TOKEN", "DEMO_SCOPE", "DEMO_BASE", "PATH"} | inherited)
         self.assertEqual(body["result"]["path"], os.path.dirname(sys.executable))
 
+    def declare_owner_attachments(self):
+        """시험 커넥터가 주인의 첨부 디렉터리를 `DEMO_ATTACHMENT_DIR` 로 받게 하고 실행 공간 정책을 준다(ADR-093)."""
+        self.rewrite("connector.json", lambda value: value.update(owner_attachments_env="DEMO_ATTACHMENT_DIR"))
+        self.rewrite(".mcp.json", lambda value: value["mcpServers"]["demo"]["env"].update(
+            DEMO_ATTACHMENT_DIR="${DEMO_ATTACHMENT_DIR}"))
+        self.agent_root = str(self.base / "agent-attachments")
+        policy = {"image": "sandbox-image:test", "workspace_root": str(self.base / "workspace"),
+                  "attachment_root": str(self.base / "attachments"), "attachment_agent_root": self.agent_root,
+                  "profiles": {}}
+        patch = mock.patch.dict(os.environ, {self.plugin.SANDBOX_ENV: json.dumps(policy)})
+        patch.start()
+        self.addCleanup(patch.stop)
+
+    def install_owner_attachments(self, name, value, config_value=None):
+        """설치한 서버 정의(`config.yaml` 과 소유 기록)에 주인의 첨부 디렉터리 값을 둔다.
+
+        `config_value` 를 주면 `config.yaml` 에만 그 값을 둔다. 실행 경로는 `config.yaml` 의 값을 읽는다.
+        """
+        import yaml
+        profile = self.profile_root / name
+        state = json.loads((profile / self.plugin.CONNECTOR_STATE).read_text(encoding="utf-8"))
+        state[base.DEMO]["server"]["env"]["DEMO_ATTACHMENT_DIR"] = value
+        (profile / self.plugin.CONNECTOR_STATE).write_text(json.dumps(state), encoding="utf-8")
+        server = state[base.DEMO]["server"]
+        if config_value is not None:
+            server = {**server, "env": {**server["env"], "DEMO_ATTACHMENT_DIR": config_value}}
+        (profile / "config.yaml").write_text(yaml.safe_dump({"mcp_servers": {"demo": server}}), encoding="utf-8")
+
+    def test_child_receives_the_installed_owner_attachments_directory(self):
+        """선언한 커넥터의 실행은 그 profile 에 설치한 서버 정의의 주인 디렉터리를 자식 env 에 넣는다."""
+        self.declare_owner_attachments()
+        self.install("bob")
+        alice = self.agent_root + "/users/" + "a" * 64
+        bob = self.agent_root + "/users/" + "b" * 64
+        self.install_owner_attachments(PROFILE, alice)
+        self.install_owner_attachments("bob", bob)
+        with mock.patch.dict(os.environ, {"DEMO_ATTACHMENT_DIR": "/parent/users/" + "c" * 64}):
+            answers = {name: self.execute("mcp__demo__env_view", profile=name) for name in (PROFILE, "bob")}
+        for name, expected in ((PROFILE, alice), ("bob", bob)):
+            status, body = answers[name]
+            self.assertEqual(status, 200, body)
+            self.assertEqual(body["result"]["attachments"], expected, name)
+
+    def test_child_receives_an_empty_value_when_the_installed_directory_is_not_usable(self):
+        """설치한 값이 없거나, 정책 루트 밖이거나, 모양이 틀리거나, 정책이 없으면 빈 값이다."""
+        self.declare_owner_attachments()
+        valid = self.agent_root + "/users/" + "a" * 64
+        for label, value in (("outside the policy root", "/elsewhere/users/" + "a" * 64),
+                             ("short key", self.agent_root + "/users/" + "a" * 63),
+                             ("reference to the profile env", "${DEMO_ATTACHMENT_DIR}"),
+                             ("empty", "")):
+            with self.subTest(label):
+                self.install_owner_attachments(PROFILE, valid, config_value=value)
+                status, body = self.execute("mcp__demo__env_view")
+                self.assertEqual(status, 200, body)
+                self.assertEqual(body["result"]["attachments"], "")
+        self.install_owner_attachments(PROFILE, self.agent_root + "/users/" + "a" * 64)
+        with mock.patch.dict(os.environ):
+            os.environ.pop(self.plugin.SANDBOX_ENV)
+            status, body = self.execute("mcp__demo__env_view")
+        self.assertEqual(status, 200, body)
+        self.assertEqual(body["result"]["attachments"], "")
+        # 서버 정의가 없는 profile 도 빈 값이다.
+        (self.profile_root / PROFILE / "config.yaml").unlink()
+        self.assertEqual(self.execute("mcp__demo__env_view")[1]["result"]["attachments"], "")
+
     def test_token_comes_from_the_requested_profile(self):
         """다른 profile 의 값으로 실행하지 않는다. 토큰이 거절되는 profile 은 그 오류를 받는다."""
         self.install("bob", token=call_base.BAD_TOKEN)

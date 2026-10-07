@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import type { Block, DraftInput } from "../draft.ts";
+import { ATTACHMENT_DIR_ENV, type Block, type DraftInput } from "../draft.ts";
 import { type Env, readConnection } from "../session.ts";
 import { components } from "./components.ts";
 import { open } from "./open.ts";
@@ -62,7 +62,7 @@ export async function runDraft(
     await enter("fill");
     await fill(page, input.title, blocks, hash);
     await enter("photos");
-    await photos(page, input, blocks, hash);
+    await photos(page, input, blocks, hash, env[ATTACHMENT_DIR_ENV]);
     await enter("components");
     await components(page, blocks, hash);
     await enter("settings");

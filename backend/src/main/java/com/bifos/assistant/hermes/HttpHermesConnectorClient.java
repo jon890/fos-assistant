@@ -243,9 +243,21 @@ public class HttpHermesConnectorClient implements HermesConnectorClient {
     }
 
     @Override
-    public InstallResult bindConnector(String profile, String connectorId, String vault) {
+    public InstallResult bindConnector(String profile, String connectorId, String vault, String sandboxOwner) {
+        // 대시보드는 주인의 첨부 디렉터리를 만들지 않고 링크 없이 있는지만 본다(ADR-091, ADR-093).
+        attachmentDirectory.ensure(sandboxOwner);
         return refusable(
-                Map.of(PROFILE, profile, PLUGIN, connectorId, ENABLED, true, "bind", Map.of(VAULT, vault)),
+                Map.of(
+                        PROFILE,
+                        profile,
+                        PLUGIN,
+                        connectorId,
+                        ENABLED,
+                        true,
+                        "bind",
+                        Map.of(VAULT, vault),
+                        "sandbox_owner",
+                        sandboxOwner),
                 profile,
                 connectorId,
                 true);

@@ -1,5 +1,5 @@
 import { constants } from "node:fs";
-import { lstat, open } from "node:fs/promises";
+import { lstat, open, realpath } from "node:fs/promises";
 import { isAbsolute, join } from "node:path";
 import { z } from "zod";
 import { ToolError } from "./errors.ts";
@@ -163,80 +163,119 @@ function matchesSignature(extension: string, head: Uint8Array) {
   }
 }
 
-/** 사진 디렉터리가 링크 아닌 절대 경로 디렉터리인지 본다. 문장에 경로를 싣지 않는다. */
-async function checkDirectory(photoDir: string): Promise<string | null> {
-  if (!isAbsolute(photoDir) || photoDir.split("/").includes(".."))
-    return "photo_dir 은 .. 없는 절대 경로여야 합니다.";
+/** 설치가 바인딩 주인의 첨부 디렉터리를 넣는 env 이름. connector.json 의 `owner_attachments_env` 와 같다. */
+export const ATTACHMENT_DIR_ENV = "NAVER_BLOG_ATTACHMENT_DIR";
+
+/**
+ * 사진 경로의 문제는 원인과 상관없이 같은 문장이다. 없음, 링크, 첨부 디렉터리 밖, 크기, 서명을 나누면
+ * 승인 없는 `render_draft` 로 다른 경로가 있는지 떠볼 수 있다(ADR-093). 문장에 경로를 싣지 않는다.
+ */
+export const PHOTO_DIRECTORY_PROBLEM = "사진 디렉터리를 쓸 수 없습니다.";
+export const photoProblem = (number: number) =>
+  `${number}번째 사진 자리의 사진을 쓸 수 없습니다.`;
+
+/** `..` 조각 없는 절대 경로를 끝의 `/` 없이 돌려준다. 아니면 `null`. */
+function plainAbsolute(path: string) {
+  if (!isAbsolute(path) || path.split("/").includes("..") || path.includes("\0")) return null;
+  const trimmed = path.replace(/\/+$/, "");
+  return trimmed === "" ? null : trimmed;
+}
+
+/**
+ * 사진 디렉터리가 바인딩 주인의 첨부 디렉터리(`attachmentDir`) 아래인지 본다. 맞으면 그 디렉터리의 경로다.
+ * 첨부 디렉터리가 비었으면 아무 디렉터리도 받지 않는다. 등록 화면의 확인 도구에서는 비어 있다.
+ * 첨부 디렉터리와 사진 디렉터리의 실제 경로가 받은 글자 그대로여야 하고,
+ * 첨부 디렉터리부터 사진 디렉터리까지 조각마다 `lstat` 으로 링크 아닌 디렉터리여야 한다.
+ * 대시보드 plugin 이 첨부 디렉터리를 설치할 때 쓰는 규칙과 같다.
+ */
+async function checkDirectory(
+  photoDir: string,
+  attachmentDir: string | undefined,
+): Promise<string | null> {
+  const root = plainAbsolute(attachmentDir ?? "");
+  const directory = plainAbsolute(photoDir);
+  if (!root || !directory) return null;
+  if (directory !== root && !directory.startsWith(`${root}/`)) return null;
   try {
-    const stat = await lstat(photoDir);
-    if (stat.isSymbolicLink() || !stat.isDirectory())
-      return "photo_dir 이 링크 아닌 디렉터리가 아닙니다.";
+    // 실제 경로가 글자 그대로면 `.` 이나 빈 조각도 없다.
+    if ((await realpath(root)) !== root || (await realpath(directory)) !== directory) return null;
+    const paths = [root];
+    if (directory !== root)
+      for (const part of directory.slice(root.length + 1).split("/"))
+        paths.push(`${paths[paths.length - 1]}/${part}`);
+    for (const path of paths) {
+      const stat = await lstat(path);
+      if (stat.isSymbolicLink() || !stat.isDirectory()) return null;
+    }
   } catch {
-    return "photo_dir 디렉터리를 찾지 못했습니다.";
+    return null;
   }
-  return null;
+  return directory;
 }
 
 /**
  * 사진 파일 하나를 열어 보통 파일, 크기, 이미지 서명을 확인한다.
- * `whole` 이 참이면 바이트 전체를, 아니면 머리 12바이트를 돌려준다. 문제는 파일 이름만 담은 문장이다.
+ * `whole` 이 참이면 바이트 전체를, 아니면 머리 12바이트를 돌려준다. 어긋나면 `null` 이다.
  */
 async function inspectPhoto(
-  photoDir: string,
+  directory: string,
   file: string,
   whole: boolean,
-): Promise<{ problem: string } | { bytes: Uint8Array }> {
-  if (!isPhotoName(file))
-    return { problem: `사진 파일 이름 ${file} 은 받지 않습니다.` };
-  const path = join(photoDir, file);
+): Promise<Uint8Array | null> {
+  if (!isPhotoName(file)) return null;
+  const path = join(directory, file);
+  let linked;
   try {
-    const stat = await lstat(path);
-    if (stat.isSymbolicLink() || !stat.isFile())
-      return { problem: `사진 ${file} 은 링크 아닌 보통 파일이 아닙니다.` };
+    linked = await lstat(path);
   } catch {
-    return { problem: `사진 ${file} 을 찾지 못했습니다.` };
+    return null;
   }
+  if (linked.isSymbolicLink() || !linked.isFile()) return null;
   let handle;
   try {
     // 확인과 읽기 사이에 링크로 바뀌어도 따라가지 않는다.
     handle = await open(path, constants.O_RDONLY | constants.O_NOFOLLOW);
   } catch {
-    return { problem: `사진 ${file} 을 열지 못했습니다.` };
+    return null;
   }
   try {
     const stat = await handle.stat();
-    if (!stat.isFile())
-      return { problem: `사진 ${file} 은 링크 아닌 보통 파일이 아닙니다.` };
-    if (stat.size > PHOTO_MAX_BYTES)
-      return { problem: `사진 ${file} 이 20MB 를 넘습니다.` };
+    // 확인한 파일과 연 파일이 다르면 그 사이에 바뀐 것이다.
+    if (!stat.isFile() || stat.dev !== linked.dev || stat.ino !== linked.ino) return null;
+    if (stat.size > PHOTO_MAX_BYTES) return null;
     const size = whole ? stat.size : Math.min(12, stat.size);
     const bytes = new Uint8Array(size);
     const { bytesRead } = await handle.read(bytes, 0, size, 0);
-    if (!matchesSignature(extensionOf(file), bytes.subarray(0, bytesRead)))
-      return { problem: `사진 ${file} 의 내용이 확장자의 이미지 형식과 맞지 않습니다.` };
-    return { bytes: bytes.subarray(0, bytesRead) };
+    if (!matchesSignature(extensionOf(file), bytes.subarray(0, bytesRead))) return null;
+    return bytes.subarray(0, bytesRead);
+  } catch {
+    return null;
   } finally {
     await handle.close();
   }
 }
 
-/** 본문이 부르는 사진 파일을 모두 확인한다. 같은 파일은 한 번만 본다. */
-export async function checkPhotoFiles(input: DraftInput): Promise<string[]> {
-  const files = [
-    ...new Set(
-      parseBody(input.body).flatMap((block) =>
-        block.type === "image" ? [block.file] : [],
-      ),
-    ),
-  ];
-  if (files.length === 0) return [];
+/**
+ * 본문이 부르는 사진 파일을 모두 확인한다. 같은 파일은 한 번만 열고, 문제는 그 파일을 부른 사진 자리마다 알린다.
+ * `attachmentDir` 은 바인딩 설치가 넣은 주인의 첨부 디렉터리다. 비었으면 사진을 하나도 받지 않는다.
+ */
+export async function checkPhotoFiles(
+  input: DraftInput,
+  attachmentDir: string | undefined,
+): Promise<string[]> {
+  const images = parseBody(input.body).flatMap((block) =>
+    block.type === "image" ? [block] : [],
+  );
+  if (images.length === 0) return [];
   if (!input.photo_dir) return ["사진 지시가 있으면 photo_dir 이 필요합니다."];
-  const directoryProblem = await checkDirectory(input.photo_dir);
-  if (directoryProblem) return [directoryProblem];
+  const directory = await checkDirectory(input.photo_dir, attachmentDir);
+  if (!directory) return [PHOTO_DIRECTORY_PROBLEM];
+  const usable = new Map<string, boolean>();
   const problems: string[] = [];
-  for (const file of files) {
-    const result = await inspectPhoto(input.photo_dir, file, false);
-    if ("problem" in result) problems.push(result.problem);
+  for (const image of images) {
+    if (!usable.has(image.file))
+      usable.set(image.file, (await inspectPhoto(directory, image.file, false)) !== null);
+    if (!usable.get(image.file)) problems.push(photoProblem(image.number));
   }
   return problems;
 }
@@ -245,10 +284,12 @@ export async function checkPhotoFiles(input: DraftInput): Promise<string[]> {
 export async function readPhoto(
   input: DraftInput,
   file: string,
+  attachmentDir: string | undefined,
 ): Promise<{ bytes: Uint8Array; mime: string }> {
-  if (!input.photo_dir || (await checkDirectory(input.photo_dir)))
-    throw new ToolError("NAVER_BLOG_PHOTO_INVALID");
-  const result = await inspectPhoto(input.photo_dir, file, true);
-  if ("problem" in result) throw new ToolError("NAVER_BLOG_PHOTO_INVALID");
-  return { bytes: result.bytes, mime: MIME[extensionOf(file)]! };
+  const directory = input.photo_dir
+    ? await checkDirectory(input.photo_dir, attachmentDir)
+    : null;
+  const bytes = directory ? await inspectPhoto(directory, file, true) : null;
+  if (!bytes) throw new ToolError("NAVER_BLOG_PHOTO_INVALID");
+  return { bytes, mime: MIME[extensionOf(file)]! };
 }

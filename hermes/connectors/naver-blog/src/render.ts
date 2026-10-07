@@ -65,11 +65,17 @@ function validateRenderOptions(input: RenderInput): string[] {
   return problems;
 }
 
-/** 초안을 검사하고 미리보기나 수동 등록용 HTML 을 만든다. 아무것도 쓰지 않는다. */
-export async function renderDraft(input: RenderInput): Promise<RenderResult> {
+/**
+ * 초안을 검사하고 미리보기나 수동 등록용 HTML 을 만든다. 아무것도 쓰지 않는다.
+ * 사진은 바인딩 주인의 첨부 디렉터리(`attachmentDir`) 아래에서만 받는다. 경로 문제는 원인을 나누지 않는다.
+ */
+export async function renderDraft(
+  input: RenderInput,
+  attachmentDir: string | undefined,
+): Promise<RenderResult> {
   const problems = [...validateRenderOptions(input), ...validateDraft(input)];
   // 파일 이름이나 디렉터리 모양이 틀렸으면 그 경로의 파일을 열지 않는다.
-  if (problems.length === 0) problems.push(...(await checkPhotoFiles(input)));
+  if (problems.length === 0) problems.push(...(await checkPhotoFiles(input, attachmentDir)));
   if (problems.length > 0) return { problems, html: null, assets: [] };
 
   const blocks = parseBody(input.body);

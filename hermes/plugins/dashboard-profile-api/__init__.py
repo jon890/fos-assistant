@@ -272,6 +272,10 @@ PROFILE_PLUGIN_FILES = ("plugin.yaml", "__init__.py")
 CONNECTOR_ID_RE = re.compile(r"^[a-z0-9][a-z0-9-]{0,63}$")
 FIELD_KEY_RE = re.compile(r"^[a-z][a-z0-9_]{0,31}$")
 ENV_NAME_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]{0,127}$")
+# 바인딩 주인의 첨부 디렉터리를 받을 env 이름이다(ADR-093).
+OWNER_ATTACHMENTS_ENV_RE = re.compile(r"^[A-Z][A-Z0-9_]{0,63}$")
+# 그 env 에 설치가 넣는 값의 끝 모양이다. `<attachment_agent_root>/users/<SHA-256 16진수>` 다.
+OWNER_ATTACHMENTS_VALUE_RE = re.compile(r"^/[^$\0\r\n]*/users/[0-9a-f]{64}$")
 TOOL_NAME_RE = re.compile(r"^[A-Za-z0-9_.-]{1,128}$")
 SERVER_NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$")
 ERROR_WORDS = frozenset({"credential_rejected", "forbidden", "invalid_input", "unavailable", "outcome_unknown"})
@@ -963,6 +967,14 @@ def _load_connector(connector_id: str, entry: dict) -> dict:
         raise ValueError("operator_env 는 칸과 겹치지 않는 env 이름 목록이다")
     if set(operator_env) - set(entry["env"]):
         raise ValueError("operator_env 의 값이 운영 목록에 없다")
+    # 사용자 첨부를 읽는 커넥터가 받을 env 이름이다. 값은 바인딩 설치가 그 에이전트 주인의 디렉터리로 넣는다(ADR-093).
+    owner_attachments_env = declared.get("owner_attachments_env")
+    if owner_attachments_env is not None and (
+            not isinstance(owner_attachments_env, str) or not OWNER_ATTACHMENTS_ENV_RE.match(owner_attachments_env)
+            or owner_attachments_env in BASE_ENV_KEYS or owner_attachments_env in field_env
+            or owner_attachments_env in operator_env):
+        raise ValueError("owner_attachments_env 는 칸과 운영자 env 와 겹치지 않는 env 이름 하나다")
+    owner_env = {owner_attachments_env} if owner_attachments_env is not None else set()
     operator_secrets = declared.get("operator_secrets", [])
     if not isinstance(operator_secrets, list) or any(not isinstance(name, str) for name in operator_secrets):
         raise ValueError("operator_secrets 는 env 이름 목록이다")
@@ -1003,8 +1015,8 @@ def _load_connector(connector_id: str, entry: dict) -> dict:
             or not isinstance(server.get("args"), list) or not isinstance(server.get("env"), dict)):
         raise ValueError("MCP 서버 정의 모양이 올바르지 않다")
     optional_env = frozenset(field["env"] for field in fields if field.get("required", True) is False)
-    if set(server["env"]) != field_env | set(operator_env):
-        raise ValueError("MCP 서버 env 가 fields 와 operator_env 의 합과 다르다")
+    if set(server["env"]) != field_env | set(operator_env) | owner_env:
+        raise ValueError("MCP 서버 env 가 fields 와 operator_env, owner_attachments_env 의 합과 다르다")
     for name, value in server["env"].items():
         # 비밀값 원문이나 다른 변수의 참조를 받지 않는다. 선택 칸만 빈 기본값 참조를 쓸 수 있다.
         if value != "${%s}" % name and not (name in optional_env and value == "${%s:-}" % name):
@@ -1045,6 +1057,9 @@ def _load_connector(connector_id: str, entry: dict) -> dict:
     env = {name: "${%s}" % name for name in server["env"]}
     # 운영자 env 는 profile `.env` 를 거치지 않는다. 운영 목록의 값을 서버 정의에 직접 넣는다.
     env.update({name: entry["env"][name] for name in operator_env})
+    # 주인의 첨부 디렉터리도 profile `.env` 를 거치지 않는다. 바인딩 설치가 이 빈 값을 그 주인의 디렉터리로 바꾼다.
+    # 주인을 모르는 설치는 빈 값 그대로 두어 커넥터가 사용자 첨부를 읽지 않는다.
+    env.update({name: "" for name in owner_env})
     option_tools = {field["options"]["tool"] for field in fields if "options" in field}
     tools = _connector_tools(declared, verify["tool"], option_tools, mcp_server)
     definition = {"command": command, "args": args, "env": env, "enabled": True}
@@ -1061,6 +1076,7 @@ def _load_connector(connector_id: str, entry: dict) -> dict:
         "verify": {"tool": verify["tool"]},
         "mcp_server": mcp_server,
         "operator_env": frozenset(operator_env),
+        "owner_attachments_env": owner_attachments_env,
         "optional_env": optional_env,
         "errors": errors,
         "toolsets": list(toolsets),
@@ -1226,6 +1242,8 @@ def _server_matches(manifest: dict, server: dict) -> bool:
     운영자 env 는 옛 기록의 `${이름}` 참조와 지금 정의의 직접 값을 같다고 본다.
     옛 판이 남긴 기록을 그대로 인정해야 이미 설치한 연결이 끊기지 않는다(ADR-041).
     `tools` 는 견주지 않는다. 옛 기록에는 그 키가 없고, 다시 보낸 설치가 지금 manifest 의 값으로 덮어쓴다.
+    주인의 첨부 디렉터리 env 는 설치마다 그 주인의 값이라 manifest 와 견주지 않는다. 빈 값이거나
+    `<루트>/users/<64자리 16진수>` 모양인지만 본다. 참조(`${...}`)를 받으면 profile `.env` 가 경로를 정하게 된다(ADR-093).
     """
     expected = manifest["server"]
     if (server["command"] != expected["command"] or server["args"] != expected["args"]
@@ -1233,7 +1251,10 @@ def _server_matches(manifest: dict, server: dict) -> bool:
         return False
     for name, value in server["env"].items():
         reference = "${%s}" % name
-        if name in manifest["operator_env"]:
+        if name == manifest["owner_attachments_env"]:
+            if value != "" and not OWNER_ATTACHMENTS_VALUE_RE.match(value):
+                return False
+        elif name in manifest["operator_env"]:
             if value not in (reference, expected["env"][name]):
                 return False
         elif value != reference and not (value == "" and name in manifest["optional_env"]):
@@ -1730,7 +1751,8 @@ def _skill_tree_files(directory: pathlib.Path) -> dict | None:
 
 
 def _connector_bind_config(profile_dir: pathlib.Path, plugin: str, enabled: bool,
-                           vault: str | None = None, values: dict | None = None) -> dict:
+                           vault: str | None = None, values: dict | None = None,
+                           owner_attachments: str | None = None) -> dict:
     """일반 에이전트의 profile 에 커넥터를 붙이거나 뗀다. 실패하면 같은 요청 안에서 이 요청이 쓴 파일만 되돌린다.
 
     붙이기는 보관 파일의 값(`values`)을 그 profile `.env` 에 쓰고, 서버를 더하고, API 도구 목록에 서버 이름을 더하고,
@@ -1743,6 +1765,8 @@ def _connector_bind_config(profile_dir: pathlib.Path, plugin: str, enabled: bool
     떠 있는 profile 에 더한 서버는 gateway 를 다시 띄워야 보이므로 붙이기는 바뀐 것이 있으면 재시작이 필요하다고 답한다.
     떼기는 재시작이 필요 없다고 답한다. 다음 실행은 도구 목록에서 이름이 빠져 그 서버를 받지 않고,
     떼기 전에 시작해 그 서버를 쥔 실행의 호출은 대응에 남은 서버를 보고 hook 이 묻고 판정이 막는다.
+    manifest 가 `owner_attachments_env` 를 선언했으면 `owner_attachments` 를 그 이름으로 서버 정의에 직접 넣는다.
+    다시 설치할 때마다 받은 주인의 값으로 다시 쓴다(ADR-093).
     """
     import yaml
     if profile_dir.resolve() != profile_dir:
@@ -1817,6 +1841,11 @@ def _connector_bind_config(profile_dir: pathlib.Path, plugin: str, enabled: bool
         for field in manifest["fields"]:
             if field["env"] in manifest["optional_env"] and not values.get(field["key"]):
                 server["env"][field["env"]] = ""
+        if manifest["owner_attachments_env"] is not None:
+            # 경로는 요청 처리가 운영 정책과 `sandbox_owner` 로 만든 값만 받는다. 없으면 설치하지 않는다.
+            if not isinstance(owner_attachments, str) or not OWNER_ATTACHMENTS_VALUE_RE.match(owner_attachments):
+                raise ValueError("주인의 첨부 디렉터리 없이 사용자 첨부를 읽는 connector 를 설치하지 않는다")
+            server["env"][manifest["owner_attachments_env"]] = owner_attachments
         servers[name] = server
         allowed = [item for item in allowed if item != "no_mcp"]
         if name not in allowed:
@@ -2056,7 +2085,8 @@ async def _connector_request(request):
         bind = body.get("bind") if isinstance(body, dict) else None
         # 운영 목록에 없는 이름은 끄기만 받는다. 소유 기록이 있으면 설치를 끄고, 없으면 바꾸지 않고 성공이다.
         # `bind` 는 바인딩 설치에서만 뜻이 있다. 떼기는 소유 기록의 설치 방식을 따른다.
-        # `sandbox_owner` 는 사진 도구를 여는 옛 설치에서만 쓴다. 바인딩 설치는 API 도구 목록의 내장 toolset 을 바꾸지 않는다.
+        # `sandbox_owner` 는 사진 도구를 여는 옛 설치와, 사용자 첨부를 읽는 커넥터의 바인딩 설치에서 쓴다(ADR-091, ADR-093).
+        # 바인딩 설치는 API 도구 목록의 내장 toolset 을 바꾸지 않는다. 그 값으로 주인의 첨부 디렉터리만 정한다.
         if (body is None
                 or not {"profile", "plugin", "enabled"} <= set(body) <= {"profile", "plugin", "enabled", "bind", "sandbox_owner"}
                 or not isinstance(body["plugin"], str) or not CONNECTOR_ID_RE.match(body["plugin"])
@@ -2064,7 +2094,7 @@ async def _connector_request(request):
                 or (body["enabled"] and body["plugin"] not in roots)
                 or ("bind" in body and (not isinstance(bind, dict) or set(bind) != {"vault"}
                                         or not isinstance(bind["vault"], str) or not VAULT_ID_RE.match(bind["vault"])))):
-            return _rejected("profile, 알려진 plugin, enabled 와 바인딩이면 bind.vault, 옛 설치면 sandbox_owner 만 필요하다")
+            return _rejected("profile, 알려진 plugin, enabled 와 바인딩이면 bind.vault, 그리고 sandbox_owner 만 받는다")
         owner = body.get("sandbox_owner")
         if owner is not None and not (isinstance(owner, str) and SANDBOX_OWNER_RE.match(owner)):
             return _rejected("sandbox_owner 형식이 올바르지 않다")
@@ -2133,6 +2163,22 @@ async def _connector_request(request):
             manifest = await asyncio.to_thread(_connector_manifest, body["plugin"])
             if manifest is None:
                 raise ValueError("쓸 수 없는 connector 는 설치하지 않는다")
+            owner_attachments = None
+            if manifest["owner_attachments_env"] is not None:
+                # 경로는 운영 정책의 루트와 Control Plane 이 정한 주인에서만 만든다. 모델, 요청의 다른 칸, manifest 는
+                # 경로를 정하지 못한다. 선언하지 않은 커넥터는 `sandbox_owner` 를 받아도 쓰지 않는다(ADR-093).
+                if owner is None:
+                    return _rejected("사용자 첨부를 읽는 connector 에는 sandbox_owner 가 필요하다")
+                sandbox = _sandbox_policy()
+                if sandbox is None:
+                    return _sandbox_unavailable()
+                try:
+                    # Control Plane 이 만든 그 주인의 디렉터리를 조각마다 링크 없이 확인한다. 만들지 않는다(ADR-091).
+                    await asyncio.to_thread(_sandbox_attachment_path_identity,
+                                            pathlib.Path(sandbox["attachment_agent_root"]), owner)
+                except (OSError, ValueError, RuntimeError):
+                    return _sandbox_unavailable()
+                owner_attachments = _sandbox_attachment_agent_directory(sandbox, owner)
             stored = await asyncio.to_thread(_read_vault, body["bind"]["vault"])
             if stored is None or stored["connector"] != body["plugin"]:
                 return _rejected("그 connector 의 보관 파일이 없다")
@@ -2140,7 +2186,7 @@ async def _connector_request(request):
             if values is None:
                 return _rejected("보관 파일의 값이 지금 칸 선언과 맞지 않는다")
             result = await asyncio.to_thread(_connector_bind_config, profile_dir, body["plugin"], True,
-                                             body["bind"]["vault"], values)
+                                             body["bind"]["vault"], values, owner_attachments)
             return JSONResponse({**response, **result}, status_code=200)
         if unbind:
             result = await asyncio.to_thread(_connector_bind_config, profile_dir, body["plugin"], False)
@@ -2323,6 +2369,9 @@ async def _connector_call_request(request, connector_id: str):
         env[field["env"]] = value
     server = manifest["server"]
     env.update({name: server["env"][name] for name in manifest["operator_env"]})
+    if manifest["owner_attachments_env"] is not None:
+        # 이 경로에는 바인딩 주인이 없다. 빈 값을 주어 커넥터가 사용자 첨부를 읽지 않게 한다(ADR-093).
+        env[manifest["owner_attachments_env"]] = ""
     # 대시보드 프로세스의 PATH 를 물려주지 않는다. 실행 파일이 있는 디렉터리만 준다.
     env["PATH"] = os.path.dirname(server["command"])
 
@@ -2400,6 +2449,34 @@ def _connector_execute_answer(manifest: dict, result) -> dict:
     return {"ok": True, "result": {"text": text if isinstance(text, str) else ""}}
 
 
+def _installed_owner_attachments(profile_dir: pathlib.Path, manifest: dict) -> str:
+    """그 profile 에 설치한 서버 정의(`config.yaml` 의 `mcp_servers`)가 가진 주인의 첨부 디렉터리다.
+
+    바인딩 설치가 운영 정책의 `attachment_agent_root` 와 주인으로 넣은 값만 돌려준다.
+    값이 없거나, 지금 정책의 루트 아래 `users/<64자리 16진수>` 모양이 아니거나, 정책이 없으면 빈 값이다.
+    빈 값을 받은 커넥터는 사용자 첨부를 읽지 않는다(ADR-093).
+    """
+    import yaml
+    config_path = profile_dir / "config.yaml"
+    if config_path.is_symlink() or not config_path.is_file():
+        return ""
+    config = yaml.safe_load(config_path.read_text(encoding="utf-8")) or {}
+    servers = config.get("mcp_servers") if isinstance(config, dict) else None
+    server = servers.get(manifest["mcp_server"]) if isinstance(servers, dict) else None
+    env = server.get("env") if isinstance(server, dict) else None
+    value = env.get(manifest["owner_attachments_env"]) if isinstance(env, dict) else None
+    if not isinstance(value, str) or not OWNER_ATTACHMENTS_VALUE_RE.match(value):
+        return ""
+    policy = _sandbox_policy()
+    if policy is None:
+        return ""
+    prefix = "%s/users/" % policy["attachment_agent_root"].rstrip("/")
+    key = value[len(prefix):]
+    if not value.startswith(prefix) or not re.fullmatch(r"[0-9a-f]{64}", key):
+        return ""
+    return value
+
+
 async def _connector_execute_request(request, connector_id: str):
     """Control Plane 이 승인한 호출을 그 profile 의 값과 받은 인자로 한 번 실행한다(ADR-050).
 
@@ -2446,6 +2523,8 @@ async def _connector_execute_request(request, connector_id: str):
             return _rejected("관리 표식이 없는 profile 이다", 401)
         env_path = profile_dir / ".env"
         env_text = env_path.read_text(encoding="utf-8") if env_path.is_file() else ""
+        owner_attachments = (_installed_owner_attachments(profile_dir, manifest)
+                             if manifest["owner_attachments_env"] is not None else None)
     except Exception as error:
         # 자식을 띄우기 전이다. 실행되지 않았다. profile 의 값이 섞일 수 있어 예외의 종류만 남긴다.
         logger.warning("dashboard-profile-api: 커넥터 %s 를 실행할 profile 을 확인하지 못했다: %s",
@@ -2455,6 +2534,8 @@ async def _connector_execute_request(request, connector_id: str):
     env = {field["env"]: _env_value(env_text, field["env"]) for field in manifest["fields"]}
     server = manifest["server"]
     env.update({name: server["env"][name] for name in manifest["operator_env"]})
+    if owner_attachments is not None:
+        env[manifest["owner_attachments_env"]] = owner_attachments
     # 대시보드 프로세스의 PATH 를 물려주지 않는다. 실행 파일이 있는 디렉터리만 준다.
     env["PATH"] = os.path.dirname(server["command"])
 

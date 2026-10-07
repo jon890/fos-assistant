@@ -1,11 +1,13 @@
 import { afterEach, beforeEach, expect, test } from "bun:test";
-import { mkdir, mkdtemp, rm, symlink, truncate, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, realpath, rm, symlink, truncate, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
   checkPhotoFiles,
   parseBody,
+  PHOTO_DIRECTORY_PROBLEM,
   PHOTO_MAX_BYTES,
+  photoProblem,
   readPhoto,
   validateDraft,
   type DraftInput,
@@ -17,12 +19,20 @@ const WEBP = new TextEncoder().encode("RIFF\0\0\0\0WEBPVP8 ");
 const HEIC = Uint8Array.from([0, 0, 0, 0x18, ...new TextEncoder().encode("ftypheic")]);
 
 let root: string;
+/** 바인딩 설치가 `NAVER_BLOG_ATTACHMENT_DIR` 로 주는 주인의 첨부 디렉터리. */
+let attachmentDir: string;
+/** 같은 첨부 루트 아래 다른 사용자의 디렉터리. */
+let otherDir: string;
 let photoDir: string;
 
 beforeEach(async () => {
-  root = await mkdtemp(join(tmpdir(), "naver-blog-draft-"));
-  photoDir = join(root, "photos");
-  await mkdir(photoDir);
+  // macOS 의 임시 디렉터리는 링크 아래에 있다. 커넥터가 링크를 거절하므로 실제 경로를 쓴다.
+  root = await realpath(await mkdtemp(join(tmpdir(), "naver-blog-draft-")));
+  attachmentDir = join(root, "users", "owner");
+  otherDir = join(root, "users", "other");
+  photoDir = join(attachmentDir, "photos");
+  await mkdir(photoDir, { recursive: true });
+  await mkdir(otherDir, { recursive: true });
 });
 
 afterEach(async () => {
@@ -141,7 +151,7 @@ test("확장자의 대소문자는 가리지 않는다", () => {
   expect(validateDraft(draft("[사진 1: 101.JPG]"))).toEqual([]);
 });
 
-test("서명이 맞는 사진 파일은 문장이 없고, 같은 파일을 두 번 놓아도 된다", async () => {
+test("첨부 디렉터리 아래의 서명이 맞는 사진 파일은 문장이 없고, 같은 파일을 두 번 놓아도 된다", async () => {
   await writeFile(join(photoDir, "101.jpg"), JPEG);
   await writeFile(join(photoDir, "102.png"), PNG);
   await writeFile(join(photoDir, "103.webp"), WEBP);
@@ -149,13 +159,19 @@ test("서명이 맞는 사진 파일은 문장이 없고, 같은 파일을 두 �
 
   const problems = await checkPhotoFiles(
     draft("[사진 1: 101.jpg]\n[사진 2: 102.png]\n[사진 3: 103.webp]\n[사진 4: 104.heic]\n[사진 5: 101.jpg]"),
+    attachmentDir,
   );
 
   expect(problems).toEqual([]);
 });
 
-test("사진 파일의 문제를 파일 이름만 담은 문장으로 알린다", async () => {
-  await writeFile(join(photoDir, "outside.jpg"), JPEG);
+test("첨부 디렉터리 바로 아래의 사진도 받는다", async () => {
+  await writeFile(join(attachmentDir, "101.jpg"), JPEG);
+
+  expect(await checkPhotoFiles(draft("[사진 1: 101.jpg]", { photo_dir: attachmentDir }), attachmentDir)).toEqual([]);
+});
+
+test("링크, 20MB 초과, 서명이 틀린 파일, 없는 파일을 사진 자리 번호만 담은 같은 문장으로 알린다", async () => {
   await writeFile(join(root, "target.jpg"), JPEG);
   await symlink(join(root, "target.jpg"), join(photoDir, "link.jpg"));
   await writeFile(join(photoDir, "big.jpg"), JPEG);
@@ -164,62 +180,123 @@ test("사진 파일의 문제를 파일 이름만 담은 문장으로 알린다"
 
   const problems = await checkPhotoFiles(
     draft("[사진 1: link.jpg]\n[사진 2: big.jpg]\n[사진 3: fake.jpg]\n[사진 4: missing.jpg]"),
+    attachmentDir,
   );
 
   expect(problems).toEqual([
-    expect.stringMatching(/link\.jpg.*링크/),
-    expect.stringMatching(/big\.jpg.*20MB/),
-    expect.stringMatching(/fake\.jpg.*형식/),
-    expect.stringMatching(/missing\.jpg.*찾지 못했/),
+    "1번째 사진 자리의 사진을 쓸 수 없습니다.",
+    "2번째 사진 자리의 사진을 쓸 수 없습니다.",
+    "3번째 사진 자리의 사진을 쓸 수 없습니다.",
+    "4번째 사진 자리의 사진을 쓸 수 없습니다.",
   ]);
   expectNoPath(problems);
+});
+
+test("같은 문제 파일을 두 자리에 놓으면 두 자리를 모두 알린다", async () => {
+  const problems = await checkPhotoFiles(
+    draft("[사진 1: missing.jpg]\n[사진 7: missing.jpg]"),
+    attachmentDir,
+  );
+
+  expect(problems).toEqual([photoProblem(1), photoProblem(7)]);
 });
 
 test("20MB 와 같은 크기의 사진은 받는다", async () => {
   await writeFile(join(photoDir, "edge.jpg"), JPEG);
   await truncate(join(photoDir, "edge.jpg"), PHOTO_MAX_BYTES);
 
-  expect(await checkPhotoFiles(draft("[사진 1: edge.jpg]"))).toEqual([]);
+  expect(await checkPhotoFiles(draft("[사진 1: edge.jpg]"), attachmentDir)).toEqual([]);
 });
 
 test("photo_dir 밖을 가리키는 ../x.jpg 는 사진 지시가 되지 않고 readPhoto 도 거절한다", async () => {
-  await writeFile(join(root, "x.jpg"), JPEG);
+  await writeFile(join(attachmentDir, "x.jpg"), JPEG);
   // 지시 줄 정규식이 / 를 받지 않아 글 줄이 된다. 파일을 직접 읽는 쪽도 같은 이름을 거절한다.
   const input = draft("[사진 1: ../x.jpg]");
 
   expect(parseBody(input.body)).toEqual([{ type: "text", line: "[사진 1: ../x.jpg]" }]);
-  await expect(readPhoto(input, "../x.jpg")).rejects.toMatchObject({
+  await expect(readPhoto(input, "../x.jpg", attachmentDir)).rejects.toMatchObject({
     code: "NAVER_BLOG_PHOTO_INVALID",
   });
 });
 
-test.each([
-  ["상대 경로", () => "photos"],
-  [".. 조각", () => `${photoDir}/../photos`],
-  ["없는 디렉터리", () => join(root, "missing")],
-])("photo_dir 이 %s 이면 경로 없이 문장으로 알린다", async (_, dir) => {
+/** 사진 디렉터리의 문제마다 그 상황을 만들고 `[photo_dir, 첨부 디렉터리]` 를 돌려준다. */
+const directoryCases: Array<[string, () => Promise<[string, string | undefined]>]> = [
+  ["상대 경로", async () => ["photos", attachmentDir]],
+  [".. 조각", async () => [`${photoDir}/../photos`, attachmentDir]],
+  ["없는 디렉터리", async () => [join(attachmentDir, "missing"), attachmentDir]],
+  [
+    "다른 사용자의 디렉터리",
+    async () => {
+      await writeFile(join(otherDir, "101.jpg"), JPEG);
+      return [otherDir, attachmentDir];
+    },
+  ],
+  [
+    "첨부 디렉터리 이름으로 시작하는 옆 디렉터리",
+    async () => {
+      await mkdir(`${attachmentDir}-x`);
+      await writeFile(join(`${attachmentDir}-x`, "101.jpg"), JPEG);
+      return [`${attachmentDir}-x`, attachmentDir];
+    },
+  ],
+  [
+    "다른 사용자의 디렉터리를 가리키는 링크",
+    async () => {
+      await writeFile(join(otherDir, "101.jpg"), JPEG);
+      await symlink(otherDir, join(attachmentDir, "linked"));
+      return [join(attachmentDir, "linked"), attachmentDir];
+    },
+  ],
+  [
+    "첨부 디렉터리 안을 가리키는 링크",
+    async () => {
+      await symlink(photoDir, join(attachmentDir, "linked"));
+      return [join(attachmentDir, "linked"), attachmentDir];
+    },
+  ],
+  [
+    "중간 조각이 링크인 경로",
+    async () => {
+      await symlink(attachmentDir, join(attachmentDir, "loop"));
+      return [join(attachmentDir, "loop", "photos"), attachmentDir];
+    },
+  ],
+  [
+    "첨부 디렉터리 자체가 링크",
+    async () => {
+      await symlink(attachmentDir, join(root, "users", "alias"));
+      const alias = join(root, "users", "alias");
+      return [join(alias, "photos"), alias];
+    },
+  ],
+  ["빈 env", async () => [photoDir, ""]],
+  ["없는 env", async () => [photoDir, undefined]],
+];
+
+test.each(directoryCases)("photo_dir 이 %s 이면 경로 없이 같은 문장으로 알린다", async (_, prepare) => {
   await writeFile(join(photoDir, "101.jpg"), JPEG);
+  const [dir, attachments] = await prepare();
 
-  const problems = await checkPhotoFiles(draft("[사진 1: 101.jpg]", { photo_dir: dir() }));
+  const problems = await checkPhotoFiles(draft("[사진 1: 101.jpg]", { photo_dir: dir }), attachments);
 
-  expect(problems).toEqual([expect.stringContaining("photo_dir")]);
+  expect(problems).toEqual([PHOTO_DIRECTORY_PROBLEM]);
+  expect(PHOTO_DIRECTORY_PROBLEM).toBe("사진 디렉터리를 쓸 수 없습니다.");
   expectNoPath(problems);
 });
 
-test("photo_dir 이 링크면 받지 않는다", async () => {
+test.each(directoryCases)("readPhoto 는 photo_dir 이 %s 이면 NAVER_BLOG_PHOTO_INVALID 로 거절한다", async (_, prepare) => {
   await writeFile(join(photoDir, "101.jpg"), JPEG);
-  await symlink(photoDir, join(root, "linked"));
+  const [dir, attachments] = await prepare();
 
-  const problems = await checkPhotoFiles(draft("[사진 1: 101.jpg]", { photo_dir: join(root, "linked") }));
-
-  expect(problems).toEqual([expect.stringContaining("링크")]);
-  expectNoPath(problems);
+  await expect(
+    readPhoto(draft("[사진 1: 101.jpg]", { photo_dir: dir }), "101.jpg", attachments),
+  ).rejects.toMatchObject({ code: "NAVER_BLOG_PHOTO_INVALID" });
 });
 
 test("readPhoto 는 확인한 사진의 바이트와 MIME 형식을 돌려준다", async () => {
   await writeFile(join(photoDir, "102.png"), PNG);
 
-  const photo = await readPhoto(draft("[사진 1: 102.png]"), "102.png");
+  const photo = await readPhoto(draft("[사진 1: 102.png]"), "102.png", attachmentDir);
 
   expect(photo.mime).toBe("image/png");
   expect([...photo.bytes]).toEqual([...PNG]);
@@ -228,7 +305,7 @@ test("readPhoto 는 확인한 사진의 바이트와 MIME 형식을 돌려준다
 test("readPhoto 는 서명이 틀린 사진을 NAVER_BLOG_PHOTO_INVALID 로 거절한다", async () => {
   await writeFile(join(photoDir, "fake.jpg"), PNG);
 
-  await expect(readPhoto(draft("[사진 1: fake.jpg]"), "fake.jpg")).rejects.toMatchObject({
+  await expect(readPhoto(draft("[사진 1: fake.jpg]"), "fake.jpg", attachmentDir)).rejects.toMatchObject({
     code: "NAVER_BLOG_PHOTO_INVALID",
   });
 });

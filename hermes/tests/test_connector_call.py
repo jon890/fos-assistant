@@ -215,6 +215,20 @@ class ConnectorCallTest(base.ConnectorGateCase):
         # PATH 는 대시보드의 것이 아니라 실행 파일이 있는 디렉터리만이다.
         self.assertEqual(body["result"]["path"], os.path.dirname(sys.executable))
 
+    def test_child_receives_an_empty_owner_attachments_directory(self):
+        """주인의 첨부 디렉터리를 선언한 커넥터의 확인 도구는 그 env 를 빈 값으로 받는다. 이 경로에는 바인딩 주인이 없다(ADR-093)."""
+        self.rewrite("connector.json", lambda value: value.update(
+            verify={"tool": "env_view"}, owner_attachments_env="DEMO_ATTACHMENT_DIR"))
+        self.rewrite(".mcp.json", lambda value: value["mcpServers"]["demo"]["env"].update(
+            DEMO_ATTACHMENT_DIR="${DEMO_ATTACHMENT_DIR}"))
+        # 대시보드 프로세스에 같은 이름이 있어도 자식에게 가지 않는다.
+        with mock.patch.dict(os.environ, {"DEMO_ATTACHMENT_DIR": "/parent/users/" + "a" * 64}):
+            status, body = self.call(tool="env_view")
+        self.assertEqual(status, 200)
+        self.assertTrue(body["ok"], body)
+        self.assertIn("DEMO_ATTACHMENT_DIR", body["result"]["names"])
+        self.assertEqual(body["result"]["attachments"], "")
+
     def test_fifth_concurrent_call_is_refused_without_waiting(self):
         """이미 4개가 돌고 있으면 다섯 번째는 기다리지 않고 unavailable 이고, 자리가 나면 다시 받는다."""
         body = {"tool": "list_scopes", "values": {"token": OK_TOKEN}}

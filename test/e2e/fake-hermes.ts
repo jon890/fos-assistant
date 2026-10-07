@@ -939,6 +939,7 @@ export function startFakeHermes(
     plugin: string,
     enabled: boolean,
     bind: { vault?: unknown } | undefined,
+    sandboxOwner: unknown,
   ) => {
     if (!profiles.has(profile) && keys[profile] === undefined) {
       send(response, 401, { reason: "not_marked" });
@@ -977,6 +978,11 @@ export function startFakeHermes(
     // 바인딩 항목이 있는 profile 은 옛 설치를 받지 않는다.
     if (bind === undefined) {
       send(response, 409, { error: "this profile has bound connectors" });
+      return;
+    }
+    // Control Plane 은 바인딩 설치에 그 에이전트의 `sandbox_owner` 를 늘 싣는다(ADR-093). 빠지거나 모양이 틀리면 거절한다.
+    if (typeof sandboxOwner !== "string" || !SANDBOX_OWNER_PATTERN.test(sandboxOwner)) {
+      send(response, 400, { error: "sandbox_owner is required for a binding install" });
       return;
     }
     const stored = typeof bind.vault === "string" ? vaults.get(bind.vault) : undefined;
@@ -1376,7 +1382,7 @@ export function startFakeHermes(
 
     if (request.method === "PUT" && path === CONNECTORS_PATH) {
       const body = JSON.parse((await readBody(request)) || "{}") as {
-        profile?: string; plugin?: string; enabled?: unknown; bind?: { vault?: unknown };
+        profile?: string; plugin?: string; enabled?: unknown; bind?: { vault?: unknown }; sandbox_owner?: unknown;
       };
       if (body.profile === undefined || typeof body.plugin !== "string" || typeof body.enabled !== "boolean") {
         send(response, 400, { error: "invalid connector request" });
@@ -1384,7 +1390,7 @@ export function startFakeHermes(
       }
       const boundHere = boundConnectors.get(body.profile);
       if (body.bind !== undefined || boundHere?.has(body.plugin) === true) {
-        bindingInstall(response, body.profile, body.plugin, body.enabled, body.bind);
+        bindingInstall(response, body.profile, body.plugin, body.enabled, body.bind, body.sandbox_owner);
         return true;
       }
       // 어느 커넥터든 바인딩 항목이 있는 profile 은 옛 설치를 받지 않는다.
