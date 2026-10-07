@@ -6,9 +6,11 @@ import com.bifos.assistant.model.domain.ModelChoice;
 import java.time.Duration;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.context.properties.bind.DefaultValue;
+import org.springframework.validation.annotation.Validated;
 
 /** 시스템 판단 profile 은 설치 때 받는다. 사용자 화면에 에이전트를 만들지 않는다. */
 @ConfigurationProperties(prefix = "assistant.value-evaluation")
+@Validated
 public record ValueEvaluationProperties(
         @DefaultValue("false") boolean enabled,
         String profile,
