@@ -969,21 +969,23 @@ class ChatServiceTest {
     void keepsObservationGapWhenOnlyChildStartCannotBeSaved() {
         CurrentUser user = member("observer@example.com", "dad");
         stub().willReturn(HermesRunResult.of("run-1", "sess-1", "completed", "네", "dad", null, TokenUsage.empty()));
-        hermesStreams(new RunEvent(
-                "subagent.start",
-                null,
-                null,
-                "도우미 시작",
-                null,
-                null,
-                "child-1",
-                null,
-                null,
-                "child-session",
-                null,
-                null,
-                null,
-                null));
+        hermesStreams(
+                new RunEvent(
+                        "subagent.start",
+                        null,
+                        null,
+                        "도우미 시작",
+                        null,
+                        null,
+                        "child-1",
+                        null,
+                        null,
+                        "child-session",
+                        null,
+                        null,
+                        null,
+                        null),
+                new RunEvent("run.completed", null, null, null, null, null));
         doThrow(new DataIntegrityViolationException("시작 사건 저장 실패"))
                 .when(executionEvents)
                 .save(argThat(event -> event.eventType() == ExecutionEventType.SUBAGENT_STARTED));
