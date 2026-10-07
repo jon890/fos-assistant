@@ -29,6 +29,7 @@ import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.testsupport.BackendIntegrationTest;
 import jakarta.validation.Validation;
 import jakarta.validation.Validator;
+import java.sql.Date;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
@@ -91,6 +92,33 @@ class MemoryDocumentTest {
         assertThatThrownBy(action::run)
                 .isInstanceOfSatisfying(
                         ApiException.class, e -> assertThat(e.code()).isEqualTo(code));
+    }
+
+    @Test
+    @DisplayName("이관한 문서는 읽고 고쳐도 기존 출처가 남고 다른 사용자에게 보이지 않는다")
+    void preservesMigratedDocumentProvenance() {
+        Long id = controller
+                .create(new CreateDocumentRequest("core", "legacy-document", "이관 문서", "기존 본문", false))
+                .id();
+        jdbc.update(
+                "UPDATE memory SET source_type = ?, source_ref = ?, source_date = ? WHERE id = ?",
+                "brain",
+                "legacy/example.md",
+                Date.valueOf("2026-01-02"),
+                id);
+
+        assertThat(controller.get(id).content()).isEqualTo("기존 본문");
+        assertThat(controller.list()).extracting(DocumentSummaryView::id).contains(id);
+        controller.update(id, new UpdateDocumentRequest("고친 본문", false, 1));
+        assertThat(controller.get(id).content()).isEqualTo("고친 본문");
+        Map<String, Object> stored = row(id);
+        assertThat(stored.get("SOURCE_TYPE")).isEqualTo("brain");
+        assertThat(stored.get("SOURCE_REF")).isEqualTo("legacy/example.md");
+        assertThat(stored.get("SOURCE_DATE")).isEqualTo(Date.valueOf("2026-01-02"));
+
+        as(KID);
+        assertCode(() -> controller.get(id), ErrorCode.MEMORY_NOT_FOUND);
+        assertThat(controller.list()).extracting(DocumentSummaryView::id).doesNotContain(id);
     }
 
     @Test

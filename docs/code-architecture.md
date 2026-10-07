@@ -46,7 +46,11 @@ hermes/
       __init__.py             register 와 기존 이름 다시 내보내기
       common.py, profiles.py, session.py
       sandbox.py, toolconfig.py, env.py
-      connector_manifest.py, connector_vault.py, connector_install.py, connector_run.py
+      connector_schema.py, connector_policy.py, connector_skills.py
+      connector_manifest.py, connector_vault.py
+      connector_state.py, connector_status.py
+      connector_isolated.py, connector_binding.py, connector_install.py
+      connector_mcp.py, connector_run.py
       routes.py               인증 provider 와 토큰 경로 연결
     fos-ctx/                 profile plugin. Control Plane MCP 호출에 _fos_ctx 서명을 붙이고, 바인딩 profile 과 옛 설치 profile 의 커넥터 도구 호출을 Control Plane 에 물어 막는다
       __init__.py             register 와 기존 이름 다시 내보내기

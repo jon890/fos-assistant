@@ -8,7 +8,7 @@ import {
   expectNoHorizontalOverflow,
   memoryRow,
   openRow,
-  reloadMemoryLists,
+  reloadMemoryListBySaving,
 } from "./memory-page.ts";
 
 type StubMemory = Record<string, unknown> & { id: number; title: string; status: string };
@@ -37,21 +37,27 @@ function stub(id: number, title: string, overrides: Record<string, unknown> = {}
 async function showStubMemories(page: Page, list: () => unknown[]) {
   await page.route("**/api/memories", async (route) =>
     route.request().method() === "GET" ? route.fulfill({ json: list() }) : route.fallback());
-  await page.goto("/memory");
-  await reloadMemoryLists(page);
+  const title = `목록 준비 ${Date.now()} ${Math.random()}`;
+  const { id } = await createMemory(page, { scope: "USER", title, content: "목록 다시 읽기 검사" });
+  try {
+    await page.goto("/memory");
+    await reloadMemoryListBySaving(page, title);
+  } finally {
+    await page.request.delete(`/api/memories/${id}`);
+  }
 }
 
-test("손으로 만드는 양식은 보이지 않고 가져오기와 외부 서비스 연결은 접혀 있다", async ({ page }) => {
+test("손으로 만드는 양식은 보이지 않고 외부 서비스 연결은 접혀 있다", async ({ page }) => {
   await page.goto("/memory");
   await expect(page.getByRole("heading", { name: "기억", exact: true })).toBeVisible();
   await expect(page.getByRole("heading", { name: "새 기억" })).toHaveCount(0);
   await expect(page.getByRole("heading", { name: "새 문서" })).toHaveCount(0);
   await expect(page.getByRole("heading", { name: "외부 서비스 연결" })).toBeHidden();
-  await expect(page.getByRole("heading", { name: "기존 기록 가져오기" })).toBeHidden();
+  await expect(page.getByRole("heading", { name: "기존 기록 가져오기" })).toHaveCount(0);
 
-  await page.getByText("가져오기와 외부 서비스 연결").click();
+  await page.locator("summary", { hasText: "외부 서비스 연결" }).click();
   await expect(page.getByRole("heading", { name: "외부 서비스 연결" })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "기존 기록 가져오기" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "기존 기록 가져오기" })).toHaveCount(0);
 });
 
 test("목록에서 기억을 눌러 열고 고치고 지운다", async ({ page }, testInfo) => {

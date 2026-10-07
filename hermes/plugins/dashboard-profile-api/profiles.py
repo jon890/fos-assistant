@@ -1,3 +1,41 @@
+"""## 만든 자리에서 설정 틀을 쓴다
+
+clone 없이 만든 profile 은 `config.yaml` 에 `model` 만 받는다.
+그대로 두면 API 경로가 `hermes-api-server` 복합 toolset 으로 떨어져
+`terminal`, `file`, `memory` 를 포함한 거의 모든 toolset 이 열린다.
+그래서 토큰으로 부른 `POST /api/profiles` 는 처리기가 성공한 뒤 같은 요청 안에서 아래를 한다.
+
+1. 새로 생긴 이름이 정확히 하나인지 본다
+2. 새 profile 의 `model` 블록만 남기고, 같은 디렉터리의 `default-config.yaml.template` 의
+   나머지 키를 쓴다. 틀의 `model` 은 자리표시자라 쓰지 않는다.
+   틀에는 Control Plane MCP 등록과 켤 profile plugin 목록이 들어 있다
+3. `.no-bundled-skills` 표식을 쓴다
+4. 틀의 `plugins.enabled` 에 있는 plugin 을 `profile-plugins/<이름>/` 에서 그 profile 로 복사한다
+5. 쓴 파일을 다시 읽어 `_get_platform_tools(config, "api_server")` 로 계산하고,
+   `FORBIDDEN_TOOLSETS` 가 하나도 없는지 본다
+6. 관리 표식 `MANAGED_MARKER` 를 쓴다
+7. 공유 gateway 에 그 profile 의 plugin 을 다시 읽으라고 알린다. 실패해도 만들기는 성공이다
+
+1~6 에서 하나라도 실패하면 새로 생긴 이름을 모두 지우고 500 을 돌려준다.
+틀이 없거나, 복사할 plugin 이 없거나, 계산 함수를 읽어 오지 못하거나, 계산이 예외를 내는 경우가 모두 여기 해당한다.
+`_get_platform_tools` 는 밑줄로 시작하는 내부 함수라 Hermes 를 올릴 때 이름이 바뀔 수 있다.
+그때 넓게 열린 profile 이 남지 않고 만들기가 거절되게 하려는 것이다.
+
+MCP 토큰은 틀에 넣지 않는다. 틀은 `${MCP_FOS_ASSISTANT_API_KEY}` 참조만 두고,
+Control Plane 이 토큰을 발급해 `PUT /api/env` 로 넣는다.
+
+**만들기 전 목록을 읽지 못하면 처리기를 부르지 않는다.**
+전후 목록의 차이로 새 이름을 찾으므로, 앞의 목록이 비면 운영 profile 전부가 새 이름으로 보여
+되돌리기가 그것을 지운다.
+
+## 지우기
+
+`DELETE /api/profiles/<이름>` 은 그 profile 에 관리 표식이 있을 때만 토큰으로 받는다.
+표식은 위 6 에서만 쓴다. 사람이 대시보드나 CLI 로 만든 profile 과 기본 profile 에는 없다.
+그래서 이 토큰으로 지울 수 있는 것은 이 토큰으로 만든 profile 뿐이다.
+표식은 파일이라 대시보드를 다시 띄워도 남는다.
+"""
+
 from __future__ import annotations
 
 import datetime
