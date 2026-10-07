@@ -92,7 +92,10 @@ public class AutonomyPolicyService {
     }
 
     public boolean readOnlyExecutionConsented(CurrentUser user) {
-        return preferences.findById(user.id()).map(AutonomyPreference::readOnlyExecution).orElse(false);
+        return preferences
+                .findById(user.id())
+                .map(AutonomyPreference::readOnlyExecution)
+                .orElse(false);
     }
 
     public boolean changeReadOnlyExecution(CurrentUser user, boolean consented) {
@@ -115,11 +118,10 @@ public class AutonomyPolicyService {
             throw new ApiException(ErrorCode.VALUE_EVALUATION_STATE_CONFLICT, "value evaluation is still running");
         }
         ProactiveCheck source = checks.findByIdAndUserId(evaluation.checkId(), user.id())
-                .orElseThrow(() ->
-                        new ApiException(ErrorCode.VALUE_EVALUATION_NOT_FOUND, "value evaluation not found"));
+                .orElseThrow(
+                        () -> new ApiException(ErrorCode.VALUE_EVALUATION_NOT_FOUND, "value evaluation not found"));
         Optional<Agent> agent = agents.findById(source.agentId());
-        boolean startable = agent.filter(each ->
-                        !each.isDeleted() && each.enabled() && each.isReadableBy(user.id()))
+        boolean startable = agent.filter(each -> !each.isDeleted() && each.enabled() && each.isReadableBy(user.id()))
                 .isPresent();
         boolean writesAllowed = agent.map(Agent::proactiveCheckWritesAllowed).orElse(false);
         boolean consented = readOnlyExecutionConsented(user);
@@ -172,7 +174,8 @@ public class AutonomyPolicyService {
                     AutonomyPolicy.VERSION,
                     now));
         }
-        return new Decided(decisions.saveAllAndFlush(rows), agent.map(Agent::code).orElse(null));
+        return new Decided(
+                decisions.saveAllAndFlush(rows), agent.map(Agent::code).orElse(null));
     }
 
     /**

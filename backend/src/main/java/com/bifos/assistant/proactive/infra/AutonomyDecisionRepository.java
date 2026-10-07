@@ -6,5 +6,4 @@ import org.springframework.data.jpa.repository.JpaRepository;
 public interface AutonomyDecisionRepository extends JpaRepository<AutonomyDecision, Long> {
 
     boolean existsByExecutionKey(String executionKey);
-
 }

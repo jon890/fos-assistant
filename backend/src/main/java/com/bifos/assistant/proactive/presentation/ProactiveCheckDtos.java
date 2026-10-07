@@ -1,14 +1,14 @@
 package com.bifos.assistant.proactive.presentation;
 
-import com.bifos.assistant.proactive.domain.AutonomyDecision;
-import com.bifos.assistant.proactive.domain.type.AutonomyExecutionStatus;
-import com.bifos.assistant.proactive.domain.type.AutonomyLevel;
-import com.bifos.assistant.proactive.domain.type.AutonomyReason;
 import com.bifos.assistant.proactive.application.model.CheckBlocker;
 import com.bifos.assistant.proactive.application.model.CheckStatusView;
+import com.bifos.assistant.proactive.domain.AutonomyDecision;
 import com.bifos.assistant.proactive.domain.CandidateJudgement;
 import com.bifos.assistant.proactive.domain.ProactiveCheck;
 import com.bifos.assistant.proactive.domain.ValueEvaluation;
+import com.bifos.assistant.proactive.domain.type.AutonomyExecutionStatus;
+import com.bifos.assistant.proactive.domain.type.AutonomyLevel;
+import com.bifos.assistant.proactive.domain.type.AutonomyReason;
 import com.bifos.assistant.proactive.domain.type.DecisionOutcome;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;

@@ -1,8 +1,8 @@
 package com.bifos.assistant.proactive.infra;
 
 import com.bifos.assistant.proactive.domain.ProactiveCheck;
-import com.bifos.assistant.proactive.domain.type.CheckTrigger;
 import com.bifos.assistant.proactive.domain.type.CheckStatus;
+import com.bifos.assistant.proactive.domain.type.CheckTrigger;
 import jakarta.persistence.LockModeType;
 import java.util.List;
 import java.util.Optional;

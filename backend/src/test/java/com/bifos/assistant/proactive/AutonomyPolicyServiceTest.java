@@ -160,7 +160,8 @@ class AutonomyPolicyServiceTest {
         assertThat(first.level()).isEqualTo(AutonomyLevel.EXECUTE);
         assertThat(first.reasons()).containsExactly(AutonomyReason.READ_ONLY_SAFE);
         assertThat(first.executionStatus()).isEqualTo(AutonomyExecutionStatus.STARTED);
-        assertThat(decisions.findById(first.id()).orElseThrow().executionCheckId()).isEqualTo(started.id());
+        assertThat(decisions.findById(first.id()).orElseThrow().executionCheckId())
+                .isEqualTo(started.id());
         assertThat(second.level()).isEqualTo(AutonomyLevel.IGNORE);
         assertThat(second.reasons()).containsExactly(AutonomyReason.ALREADY_EXECUTED);
         assertThat(second.executionKey()).isNull();
@@ -241,8 +242,8 @@ class AutonomyPolicyServiceTest {
     @DisplayName("평가 뒤 후보 줄이 지워졌으면 IGNORE 다")
     void missingCandidateIgnores() {
         ValueEvaluation evaluation = evaluation(null, candidate("study:example", "NONE"));
-        transactions.executeWithoutResult(status -> problems.deleteAll(
-                problems.findByCheckIdAndStatusOrderByIdAsc(source.id(), ProblemStatus.ACCEPTED)));
+        transactions.executeWithoutResult(status ->
+                problems.deleteAll(problems.findByCheckIdAndStatusOrderByIdAsc(source.id(), ProblemStatus.ACCEPTED)));
 
         AutonomyDecision decision = service.decide(OWNER, evaluation.id()).getFirst();
 

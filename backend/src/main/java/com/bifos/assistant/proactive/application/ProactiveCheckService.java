@@ -131,7 +131,8 @@ public class ProactiveCheckService {
         Agent agent = agents.requireStartable(user, agentCode);
         if (trigger == CheckTrigger.AUTONOMY && agent.proactiveCheckWritesAllowed()) {
             throw new ApiException(
-                    ErrorCode.PROACTIVE_CHECK_UNAVAILABLE, "an autonomous check runs only within the read-only boundary");
+                    ErrorCode.PROACTIVE_CHECK_UNAVAILABLE,
+                    "an autonomous check runs only within the read-only boundary");
         }
         if (!readiness.check(agent).available()) {
             throw new ApiException(

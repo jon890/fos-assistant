@@ -26,7 +26,8 @@ import org.junit.jupiter.params.provider.ValueSource;
 class AutonomyPolicyTest {
 
     private static AutonomyVerdict decide(AutonomyInputs inputs) {
-        return AutonomyPolicy.decideAll(List.of(inputs), EVALUATION_AGE, EVIDENCE_AGE).getFirst();
+        return AutonomyPolicy.decideAll(List.of(inputs), EVALUATION_AGE, EVIDENCE_AGE)
+                .getFirst();
     }
 
     @Test
@@ -71,7 +72,8 @@ class AutonomyPolicyTest {
     @Test
     @DisplayName("사용자 동의가 꺼져 있어도 외부 쓰기 후보는 승인 대상으로 남는다")
     void approvalOutranksDisabledAutonomy() {
-        AutonomyVerdict verdict = decide(safe().sideEffect("EXTERNAL").consented(false).build());
+        AutonomyVerdict verdict =
+                decide(safe().sideEffect("EXTERNAL").consented(false).build());
 
         assertThat(verdict.level()).isEqualTo(AutonomyLevel.ASK_APPROVAL);
         assertThat(verdict.reasons()).contains(AutonomyReason.USER_AUTONOMY_DISABLED);
@@ -82,9 +84,9 @@ class AutonomyPolicyTest {
     void otherWritesAskApproval() {
         assertThat(decide(safe().sideEffect("INTERNAL").build()).reasons())
                 .contains(AutonomyReason.INTERNAL_WRITE_REQUIRES_APPROVAL);
-        assertThat(decide(safe().sideEffect("SEND").build()).reasons())
-                .contains(AutonomyReason.SIDE_EFFECT_UNDECLARED);
-        AutonomyVerdict risky = decide(safe().axis(DecisionAxis.RISK, DecisionLevel.MEDIUM).build());
+        assertThat(decide(safe().sideEffect("SEND").build()).reasons()).contains(AutonomyReason.SIDE_EFFECT_UNDECLARED);
+        AutonomyVerdict risky =
+                decide(safe().axis(DecisionAxis.RISK, DecisionLevel.MEDIUM).build());
         assertThat(risky.level()).isEqualTo(AutonomyLevel.ASK_APPROVAL);
         assertThat(risky.reasons()).contains(AutonomyReason.RISK_NOT_LOW);
     }
@@ -93,7 +95,8 @@ class AutonomyPolicyTest {
     @EnumSource(DecisionAxis.class)
     @DisplayName("한 축이라도 UNKNOWN 이면 SURFACE 다")
     void unknownAxisSurfaces(DecisionAxis axis) {
-        AutonomyVerdict verdict = decide(safe().axis(axis, DecisionLevel.UNKNOWN).build());
+        AutonomyVerdict verdict =
+                decide(safe().axis(axis, DecisionLevel.UNKNOWN).build());
 
         assertThat(verdict.level()).isEqualTo(AutonomyLevel.SURFACE);
         assertThat(verdict.reasons()).contains(AutonomyReason.UNKNOWN_JUDGEMENT);
@@ -105,7 +108,8 @@ class AutonomyPolicyTest {
             names = {"FALLBACK", "EMPTY", "RUNNING"})
     @DisplayName("판단하지 못한 평가는 외부 쓰기 후보여도 IGNORE 다")
     void unusableEvaluationIgnores(DecisionOutcome outcome) {
-        AutonomyVerdict verdict = decide(safe().outcome(outcome).sideEffect("EXTERNAL").build());
+        AutonomyVerdict verdict =
+                decide(safe().outcome(outcome).sideEffect("EXTERNAL").build());
 
         assertThat(verdict.level()).isEqualTo(AutonomyLevel.IGNORE);
         assertThat(verdict.reasons()).contains(AutonomyReason.EVALUATION_NOT_USABLE);
@@ -114,7 +118,8 @@ class AutonomyPolicyTest {
     @Test
     @DisplayName("근거 부족 평가와 낮은 확신은 SURFACE 다")
     void weakBasisSurfaces() {
-        AutonomyVerdict insufficient = decide(safe().outcome(DecisionOutcome.INSUFFICIENT_EVIDENCE).build());
+        AutonomyVerdict insufficient =
+                decide(safe().outcome(DecisionOutcome.INSUFFICIENT_EVIDENCE).build());
         assertThat(insufficient.level()).isEqualTo(AutonomyLevel.SURFACE);
         assertThat(insufficient.reasons()).contains(AutonomyReason.INSUFFICIENT_EVIDENCE);
 
@@ -122,8 +127,7 @@ class AutonomyPolicyTest {
         assertThat(low.level()).isEqualTo(AutonomyLevel.SURFACE);
         assertThat(low.reasons()).contains(AutonomyReason.LOW_CONFIDENCE);
 
-        assertThat(decide(safe().candidateConfidence("LOW").build()).reasons())
-                .contains(AutonomyReason.LOW_CONFIDENCE);
+        assertThat(decide(safe().candidateConfidence("LOW").build()).reasons()).contains(AutonomyReason.LOW_CONFIDENCE);
     }
 
     @Test
@@ -138,10 +142,12 @@ class AutonomyPolicyTest {
     @Test
     @DisplayName("오래된 평가와 오래된 근거, 미래 시각의 근거는 EXECUTE 로 가지 않는다")
     void staleInputsNeverExecute() {
-        assertThat(decide(safe().evaluatedAt(NOW.minus(EVALUATION_AGE).minusSeconds(1)).build())
+        assertThat(decide(safe().evaluatedAt(NOW.minus(EVALUATION_AGE).minusSeconds(1))
+                                .build())
                         .reasons())
                 .contains(AutonomyReason.STALE_EVALUATION);
-        assertThat(decide(safe().evidenceCheckedAt(NOW.minus(EVIDENCE_AGE).minusSeconds(1)).build())
+        assertThat(decide(safe().evidenceCheckedAt(NOW.minus(EVIDENCE_AGE).minusSeconds(1))
+                                .build())
                         .reasons())
                 .contains(AutonomyReason.STALE_EVIDENCE);
         assertThat(decide(safe().evidenceCheckedAt(null).build()).level()).isEqualTo(AutonomyLevel.SURFACE);
@@ -218,7 +224,8 @@ class AutonomyPolicyTest {
     @ValueSource(booleans = {true, false})
     @DisplayName("같은 입력이면 같은 수준과 같은 까닭이 나온다")
     void deterministic(boolean external) {
-        AutonomyInputs inputs = safe().sideEffect(external ? "EXTERNAL" : "NONE").build();
+        AutonomyInputs inputs =
+                safe().sideEffect(external ? "EXTERNAL" : "NONE").build();
 
         assertThat(decide(inputs)).isEqualTo(decide(inputs));
     }

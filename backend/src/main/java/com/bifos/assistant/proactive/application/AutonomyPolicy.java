@@ -59,8 +59,7 @@ public final class AutonomyPolicy {
     }
 
     /** 걸린 까닭을 모두 모은다. 판정 순서와 상관없이 모아 기록이 판정의 근거를 빠짐없이 갖게 한다. */
-    static EnumSet<AutonomyReason> reasons(
-            AutonomyInputs in, Duration maxEvaluationAge, Duration maxEvidenceAge) {
+    static EnumSet<AutonomyReason> reasons(AutonomyInputs in, Duration maxEvaluationAge, Duration maxEvidenceAge) {
         EnumSet<AutonomyReason> reasons = EnumSet.noneOf(AutonomyReason.class);
         DecisionLevel benefit = choice(in, DecisionAxis.EXPECTED_BENEFIT);
         DecisionLevel urgency = choice(in, DecisionAxis.URGENCY);
@@ -88,8 +87,7 @@ public final class AutonomyPolicy {
         if (lowConfidence(in)) {
             reasons.add(AutonomyReason.LOW_CONFIDENCE);
         }
-        if (in.judged()
-                && AXES.stream().anyMatch(axis -> choice(in, axis) == DecisionLevel.UNKNOWN)) {
+        if (in.judged() && AXES.stream().anyMatch(axis -> choice(in, axis) == DecisionLevel.UNKNOWN)) {
             reasons.add(AutonomyReason.UNKNOWN_JUDGEMENT);
         }
         if (olderThan(in.evaluatedAt(), in.decidedAt(), maxEvaluationAge)
@@ -170,14 +168,16 @@ public final class AutonomyPolicy {
 
     /** 판단이 없으면 확신을 따지지 않는다. 그때는 {@code EVALUATION_NOT_USABLE} 이 이미 다루지 않음으로 보낸다. */
     private static boolean lowConfidence(AutonomyInputs in) {
-        boolean candidateConfident = "MEDIUM".equals(in.candidateConfidence()) || "HIGH".equals(in.candidateConfidence());
+        boolean candidateConfident =
+                "MEDIUM".equals(in.candidateConfidence()) || "HIGH".equals(in.candidateConfidence());
         if (!candidateConfident) {
             return true;
         }
         if (!in.judged()) {
             return false;
         }
-        return in.judgementConfidence() != DecisionConfidence.MEDIUM && in.judgementConfidence() != DecisionConfidence.HIGH
+        return in.judgementConfidence() != DecisionConfidence.MEDIUM
+                        && in.judgementConfidence() != DecisionConfidence.HIGH
                 || AXES.stream()
                         .anyMatch(axis -> in.axisConfidences().get(axis) != DecisionConfidence.MEDIUM
                                 && in.axisConfidences().get(axis) != DecisionConfidence.HIGH);
