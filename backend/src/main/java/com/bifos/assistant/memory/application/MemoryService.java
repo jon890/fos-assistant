@@ -249,8 +249,8 @@ public class MemoryService {
         String dedupKey = proposalDedupKey(user.id(), title, content);
         return memories.findByProposalDedupKey(dedupKey).orElseGet(() -> {
             Instant now = clock.instant();
-            Memory proposed = memories.save(
-                    Memory.proposedUser(user.id(), title, content, proposedByExecutionId, dedupKey, now));
+            Memory proposed =
+                    memories.save(Memory.proposedUser(user.id(), title, content, proposedByExecutionId, dedupKey, now));
             feedback.record(proposalFeedback(user, proposed, FeedbackEventType.SURFACED, FeedbackActor.AGENT, now));
             return proposed;
         });

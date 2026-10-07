@@ -30,8 +30,8 @@ import com.bifos.assistant.proactive.domain.ProactiveCheck;
 import com.bifos.assistant.proactive.domain.type.CheckOutcome;
 import com.bifos.assistant.proactive.domain.type.CheckTrigger;
 import com.bifos.assistant.proactive.infra.ProactiveCheckRepository;
-import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.shared.auth.CurrentUser;
+import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.usage.domain.AgentExecution;
 import com.bifos.assistant.usage.domain.type.ExecutionStatus;
 import com.bifos.assistant.usage.infra.AgentExecutionRepository;
@@ -125,8 +125,7 @@ class DecisionFeedbackFlowTest {
                 AgentVisibility.PRIVATE,
                 owner.id(),
                 now));
-        checkConversation =
-                conversations.save(Conversation.startedForCheck(owner.id(), "커리어 살펴보기", career.id(), now));
+        checkConversation = conversations.save(Conversation.startedForCheck(owner.id(), "커리어 살펴보기", career.id(), now));
         root = executions.save(execution(null, now));
         reported = ProactiveCheck.started(
                 owner.id(), career.id(), checkConversation.id(), CheckTrigger.SCHEDULED, false, now.minusSeconds(120));
@@ -154,7 +153,9 @@ class DecisionFeedbackFlowTest {
         for (Long userId : List.of(owner.id(), other.id())) {
             jdbc.update("DELETE FROM decision_feedback_event WHERE user_id = ?", userId);
             jdbc.update("DELETE FROM follow_up WHERE user_id = ?", userId);
-            jdbc.update("DELETE FROM memory_revision WHERE memory_id IN (SELECT id FROM memory WHERE owner_user_id = ?)", userId);
+            jdbc.update(
+                    "DELETE FROM memory_revision WHERE memory_id IN (SELECT id FROM memory WHERE owner_user_id = ?)",
+                    userId);
             jdbc.update("DELETE FROM memory WHERE owner_user_id = ?", userId);
             jdbc.update("DELETE FROM proactive_check WHERE user_id = ?", userId);
             jdbc.update("DELETE FROM agent_execution WHERE user_id = ?", userId);
@@ -220,7 +221,8 @@ class DecisionFeedbackFlowTest {
     @Test
     @DisplayName("살펴보기 밖의 대화에서 나온 할 일 제안은 그 제안의 열쇠로 따로 묶이고 대화를 지우면 사건이 함께 지워진다")
     void forgetsEventsWhenConversationIsDeleted() {
-        Conversation plain = conversations.save(Conversation.startedBy(owner.id(), "합성 대화", career.id(), Instant.now()));
+        Conversation plain =
+                conversations.save(Conversation.startedBy(owner.id(), "합성 대화", career.id(), Instant.now()));
         AgentExecution turn = executions.save(AgentExecution.builder()
                 .userId(owner.id())
                 .conversationId(plain.id())
@@ -235,7 +237,8 @@ class DecisionFeedbackFlowTest {
         followUps.accept(owner, proposed.publicId());
         String key = FeedbackSubjectType.FOLLOW_UP.key(proposed.publicId());
 
-        assertThat(record(exporter.export(owner, Duration.ofDays(30)), key).situation()).isNull();
+        assertThat(record(exporter.export(owner, Duration.ofDays(30)), key).situation())
+                .isNull();
         assertThat(subjectEvents(key)).hasSize(2).allSatisfy(event -> {
             assertThat(event.conversationId()).isEqualTo(plain.id());
             assertThat(event.originExecutionId()).isEqualTo(turn.id());

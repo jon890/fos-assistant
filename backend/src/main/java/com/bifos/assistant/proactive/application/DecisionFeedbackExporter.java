@@ -148,11 +148,10 @@ public class DecisionFeedbackExporter {
      * <p>기간 앞의 사건도 함께 읽어 첫 반응을 잃지 않게 한다.
      */
     private Map<String, List<FeedbackEvent>> visibleSubjects(CurrentUser user, Instant from) {
-        Set<String> keys = events
-                .findByUserIdAndOccurredAtGreaterThanEqualOrderByOccurredAtAscIdAsc(user.id(), from)
-                .stream()
-                .map(FeedbackEvent::subjectKey)
-                .collect(Collectors.toCollection(HashSet::new));
+        Set<String> keys =
+                events.findByUserIdAndOccurredAtGreaterThanEqualOrderByOccurredAtAscIdAsc(user.id(), from).stream()
+                        .map(FeedbackEvent::subjectKey)
+                        .collect(Collectors.toCollection(HashSet::new));
         if (keys.isEmpty()) {
             return Map.of();
         }
@@ -208,7 +207,9 @@ public class DecisionFeedbackExporter {
         if (!autonomous.isEmpty()) {
             Map<Long, Long> sources = decisions.findByUserIdAndExecutionCheckIdIn(user.id(), autonomous).stream()
                     .collect(Collectors.toMap(
-                            AutonomyDecision::executionCheckId, AutonomyDecision::sourceCheckId, (first, ignored) -> first));
+                            AutonomyDecision::executionCheckId,
+                            AutonomyDecision::sourceCheckId,
+                            (first, ignored) -> first));
             resolved.replaceAll((key, checkId) -> FeedbackSubjectType.ofKey(key) == FeedbackSubjectType.CHECK
                     ? sources.getOrDefault(checkId, checkId)
                     : checkId);
@@ -224,8 +225,7 @@ public class DecisionFeedbackExporter {
         List<ProactiveCheck> owned = checks.findByUserIdAndIdIn(user.id(), checkIds);
         Set<Long> active = conversations
                 .activeOf(
-                        user,
-                        owned.stream().map(ProactiveCheck::conversationId).collect(Collectors.toSet()))
+                        user, owned.stream().map(ProactiveCheck::conversationId).collect(Collectors.toSet()))
                 .keySet();
         Map<Long, ProactiveCheck> result = new TreeMap<>();
         owned.stream()

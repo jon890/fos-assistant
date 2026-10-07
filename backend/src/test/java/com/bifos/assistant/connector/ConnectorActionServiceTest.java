@@ -84,8 +84,8 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Stream;
-import org.assertj.core.groups.Tuple;
 import org.assertj.core.api.ThrowableAssert.ThrowingCallable;
+import org.assertj.core.groups.Tuple;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -316,9 +316,7 @@ class ConnectorActionServiceTest {
 
         service.reject(me, actionId);
 
-        assertThat(feedbackRows())
-                .extracting(row -> row.toList().get(1))
-                .containsExactly("SURFACED", "REJECTED");
+        assertThat(feedbackRows()).extracting(row -> row.toList().get(1)).containsExactly("SURFACED", "REJECTED");
     }
 
     @Test

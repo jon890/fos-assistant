@@ -1,8 +1,8 @@
 package com.bifos.assistant.proactive.infra;
 
-import java.util.List;
-import java.util.Collection;
 import com.bifos.assistant.proactive.domain.AutonomyDecision;
+import java.util.Collection;
+import java.util.List;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface AutonomyDecisionRepository extends JpaRepository<AutonomyDecision, Long> {

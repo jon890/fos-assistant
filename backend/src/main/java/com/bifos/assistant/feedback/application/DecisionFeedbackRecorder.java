@@ -87,9 +87,8 @@ public class DecisionFeedbackRecorder {
 
     /** 실행 번호가 있으면 트리 루트로 바꾸고, 대화를 모르면 그 실행의 대화를 쓴다. */
     private FeedbackEvent toEvent(FeedbackEntry entry) {
-        Optional<AgentExecution> origin = entry.originExecutionId() == null
-                ? Optional.empty()
-                : executions.findById(entry.originExecutionId());
+        Optional<AgentExecution> origin =
+                entry.originExecutionId() == null ? Optional.empty() : executions.findById(entry.originExecutionId());
         Long rootExecutionId = origin.map(AgentExecution::treeRootId).orElse(entry.originExecutionId());
         Long conversationId = entry.conversationId() != null
                 ? entry.conversationId()

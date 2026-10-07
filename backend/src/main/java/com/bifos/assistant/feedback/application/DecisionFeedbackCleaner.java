@@ -43,8 +43,7 @@ public class DecisionFeedbackCleaner {
      * @return 지운 줄 수
      */
     public int clean(Instant now) {
-        Integer result =
-                transactions.execute(status -> events.deleteOccurredBefore(now.minus(properties.retention())));
+        Integer result = transactions.execute(status -> events.deleteOccurredBefore(now.minus(properties.retention())));
         int deleted = result == null ? 0 : result;
         log.info("expired decision feedback events cleaned deleted={}", deleted);
         return deleted;

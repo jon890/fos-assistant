@@ -1,9 +1,9 @@
 package com.bifos.assistant.proactive.infra;
 
-import java.util.Collection;
 import com.bifos.assistant.proactive.domain.ProactiveCheckProblem;
 import com.bifos.assistant.proactive.domain.type.ProblemStatus;
 import java.time.Instant;
+import java.util.Collection;
 import java.util.List;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;

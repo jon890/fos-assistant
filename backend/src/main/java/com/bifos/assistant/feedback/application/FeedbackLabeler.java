@@ -21,7 +21,8 @@ public final class FeedbackLabeler {
     /** 반응 읽기 규칙의 버전이다. 규칙이 바뀌면 올린다. */
     public static final int VERSION = 1;
 
-    private static final Set<FeedbackEventType> POSITIVE = Set.of(FeedbackEventType.ACCEPTED, FeedbackEventType.APPROVED);
+    private static final Set<FeedbackEventType> POSITIVE =
+            Set.of(FeedbackEventType.ACCEPTED, FeedbackEventType.APPROVED);
     private static final Set<FeedbackEventType> NEGATIVE =
             Set.of(FeedbackEventType.REJECTED, FeedbackEventType.DISMISSED);
     private static final Set<FeedbackEventType> OUTCOMES =
@@ -43,8 +44,8 @@ public final class FeedbackLabeler {
                 .orElse(null);
         boolean surfaced = ordered.stream().anyMatch(event -> event.eventType() == FeedbackEventType.SURFACED);
         boolean postponed = ordered.stream()
-                .anyMatch(event -> event.actor() == FeedbackActor.USER
-                        && event.eventType() == FeedbackEventType.POSTPONED);
+                .anyMatch(event ->
+                        event.actor() == FeedbackActor.USER && event.eventType() == FeedbackEventType.POSTPONED);
         FeedbackLabel label;
         if (decisive != null) {
             label = POSITIVE.contains(decisive) ? FeedbackLabel.ACCEPTED : FeedbackLabel.DECLINED;
@@ -56,8 +57,8 @@ public final class FeedbackLabeler {
             label = FeedbackLabel.NOT_SURFACED;
         }
         boolean edited = ordered.stream()
-                .anyMatch(event ->
-                        event.actor() == FeedbackActor.USER && event.eventType() == FeedbackEventType.EDITED);
+                .anyMatch(
+                        event -> event.actor() == FeedbackActor.USER && event.eventType() == FeedbackEventType.EDITED);
         FeedbackEventType outcome = ordered.stream()
                 .map(FeedbackEvent::eventType)
                 .filter(OUTCOMES::contains)

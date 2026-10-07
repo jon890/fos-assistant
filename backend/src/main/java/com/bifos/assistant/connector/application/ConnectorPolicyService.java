@@ -31,9 +31,9 @@ import com.bifos.assistant.notification.domain.NotificationTarget;
 import com.bifos.assistant.notification.domain.type.NotificationKind;
 import com.bifos.assistant.notification.domain.type.NotificationTargetType;
 import com.bifos.assistant.orchestration.application.SessionOwnerResolver;
-import com.bifos.assistant.proactive.domain.ProactiveCheck;
 import com.bifos.assistant.proactive.application.CheckNotificationPolicy;
 import com.bifos.assistant.proactive.application.ProactiveCheckGuard;
+import com.bifos.assistant.proactive.domain.ProactiveCheck;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.util.Sha256;
 import com.bifos.assistant.usage.domain.AgentExecution;
@@ -307,7 +307,10 @@ public class ConnectorPolicyService {
                                 now)
                         .conversation(saved.conversationId())
                         .originExecution(saved.originExecutionId())
-                        .sourceCheck(checkGuard.checkOf(origin).map(ProactiveCheck::id).orElse(null))
+                        .sourceCheck(checkGuard
+                                .checkOf(origin)
+                                .map(ProactiveCheck::id)
+                                .orElse(null))
                         .version(saved.argsSha256()));
             }
             // 사건은 커밋한 뒤에 낸다. 받은 쪽이 읽었을 때 줄이 있어야 한다.

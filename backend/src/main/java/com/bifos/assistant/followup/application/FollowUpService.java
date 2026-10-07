@@ -309,7 +309,8 @@ public class FollowUpService {
             move.accept(followUp, now);
             FollowUp moved = followUps.saveAndFlush(followUp);
             if (moved.proposedByAgent()) {
-                feedback.record(feedbackOf(moved, event, FeedbackActor.USER, now).reason(action.toUpperCase(Locale.ROOT)));
+                feedback.record(
+                        feedbackOf(moved, event, FeedbackActor.USER, now).reason(action.toUpperCase(Locale.ROOT)));
             }
             return moved;
         });

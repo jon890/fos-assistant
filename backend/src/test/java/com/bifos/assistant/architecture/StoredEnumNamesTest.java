@@ -3,14 +3,14 @@ package com.bifos.assistant.architecture;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.bifos.assistant.agent.domain.type.AgentVisibility;
-import com.bifos.assistant.feedback.domain.type.FeedbackActor;
-import com.bifos.assistant.feedback.domain.type.FeedbackEventType;
-import com.bifos.assistant.feedback.domain.type.FeedbackSubjectType;
 import com.bifos.assistant.agent.domain.type.CostMode;
 import com.bifos.assistant.agent.domain.type.CredentialScope;
 import com.bifos.assistant.chat.domain.type.ConversationPurpose;
 import com.bifos.assistant.chat.domain.type.MessageRole;
 import com.bifos.assistant.connector.domain.type.BindingStatus;
+import com.bifos.assistant.feedback.domain.type.FeedbackActor;
+import com.bifos.assistant.feedback.domain.type.FeedbackEventType;
+import com.bifos.assistant.feedback.domain.type.FeedbackSubjectType;
 import com.bifos.assistant.model.domain.type.ModelTier;
 import com.bifos.assistant.proactive.domain.type.AutonomyExecutionStatus;
 import com.bifos.assistant.proactive.domain.type.AutonomyLevel;

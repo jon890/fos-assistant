@@ -15,10 +15,12 @@ public interface FeedbackEventRepository extends JpaRepository<FeedbackEvent, Lo
     List<FeedbackEvent> findByUserIdAndOccurredAtGreaterThanEqualOrderByOccurredAtAscIdAsc(Long userId, Instant since);
 
     /** 그 사용자의 그 제안들에 남은 사건이다. */
-    List<FeedbackEvent> findByUserIdAndSubjectKeyInOrderByOccurredAtAscIdAsc(Long userId, Collection<String> subjectKeys);
+    List<FeedbackEvent> findByUserIdAndSubjectKeyInOrderByOccurredAtAscIdAsc(
+            Long userId, Collection<String> subjectKeys);
 
     /** 그 대화에 묶인 사건의 제안 열쇠다. 대화를 지울 때 그 제안의 사건을 함께 지우려고 읽는다. */
-    @Query("select distinct e.subjectKey from FeedbackEvent e where e.userId = :userId and e.conversationId = :conversationId")
+    @Query(
+            "select distinct e.subjectKey from FeedbackEvent e where e.userId = :userId and e.conversationId = :conversationId")
     List<String> findSubjectKeysOfConversation(
             @Param("userId") Long userId, @Param("conversationId") Long conversationId);
 

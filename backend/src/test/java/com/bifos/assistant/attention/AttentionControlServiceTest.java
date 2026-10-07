@@ -515,8 +515,8 @@ class AttentionControlServiceTest {
                                 + " WHERE user_id = ? ORDER BY id",
                         dad.id())
                 .stream()
-                .map(row -> tuple(
-                        row.get("SUBJECT_KEY"), row.get("EVENT_TYPE"), row.get("ACTOR"), row.get("REASON_CODE")))
+                .map(row ->
+                        tuple(row.get("SUBJECT_KEY"), row.get("EVENT_TYPE"), row.get("ACTOR"), row.get("REASON_CODE")))
                 .toList();
     }
 
