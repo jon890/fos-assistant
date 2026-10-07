@@ -81,9 +81,6 @@ public final class AutonomyPolicy {
                         || choice(in, DecisionAxis.GOAL_ALIGNMENT) == DecisionLevel.LOW)) {
             reasons.add(AutonomyReason.LOW_VALUE);
         }
-        if (in.alreadyExecuted()) {
-            reasons.add(AutonomyReason.ALREADY_EXECUTED);
-        }
     }
 
     private static void addWeakBasisReasons(
@@ -153,6 +150,10 @@ public final class AutonomyPolicy {
         }
         if (!in.agentStartable()) {
             reasons.add(AutonomyReason.AGENT_NOT_STARTABLE);
+        }
+        // 실행 키가 막는 것은 EXECUTE 자리뿐이다. 다른 후보의 SURFACE 와 ASK_APPROVAL 은 그대로 둔다.
+        if (in.alreadyExecuted()) {
+            reasons.add(AutonomyReason.ALREADY_EXECUTED);
         }
     }
 

@@ -48,7 +48,6 @@
 | 다루지 않음 | `CANDIDATE_NOT_CURRENT` | 지금의 후보 줄이 없거나 `ACCEPTED` 가 아니거나 스냅샷과 다르다 |
 | 다루지 않음 | `EVALUATION_NOT_USABLE` | 평가가 `EVALUATED` 나 `INSUFFICIENT_EVIDENCE` 가 아니거나 그 후보의 판단이 없다 |
 | 다루지 않음 | `LOW_VALUE` | `EXPECTED_BENEFIT` 가 `LOW` 이고 `URGENCY` 나 `GOAL_ALIGNMENT` 가 `LOW` 다 |
-| 다루지 않음 | `ALREADY_EXECUTED` | 그 원천 살펴보기의 실행 키가 이미 있다 |
 | 근거 부족 | `INSUFFICIENT_EVIDENCE` | 평가가 `INSUFFICIENT_EVIDENCE` 이거나 `EVIDENCE_QUALITY` 가 `LOW` 다 |
 | 근거 부족 | `LOW_CONFIDENCE` | 종합 확신이나 축 확신에 `LOW` 가 있거나 후보 자신의 확신이 `MEDIUM`, `HIGH` 가 아니다 |
 | 근거 부족 | `UNKNOWN_JUDGEMENT` | 여섯 축 가운데 빠지거나 `UNKNOWN` 인 축이 있다 |
@@ -68,6 +67,7 @@
 | 실행 막힘 | `SOURCE_IS_AUTONOMOUS` | 원천 살펴보기가 자동 실행으로 시작했다 |
 | 실행 막힘 | `AGENT_NOT_STARTABLE` | 에이전트가 없거나 지워졌거나 꺼졌거나 요청자가 읽을 수 없다 |
 | 실행 막힘 | `EXECUTION_TAKEN` | 같은 판정에서 추천 순서가 앞선 후보가 `EXECUTE` 를 받았다 |
+| 실행 막힘 | `ALREADY_EXECUTED` | 그 원천 살펴보기의 실행 키가 이미 있다. 다른 후보의 `SURFACE`, `ASK_APPROVAL` 은 그대로다 |
 | 실행 | `READ_ONLY_SAFE` | 위의 까닭이 하나도 없다 |
 
 **모델이 권한을 넓히지 못한다.**

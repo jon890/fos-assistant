@@ -198,12 +198,15 @@ class AutonomyPolicyTest {
     }
 
     @Test
-    @DisplayName("지금의 후보가 아니거나 이미 실행한 원천이면 IGNORE 다")
-    void notCurrentOrExecutedIgnores() {
+    @DisplayName("지금의 후보가 아니면 IGNORE 이고, 이미 실행한 원천은 EXECUTE 자리만 막고 승인 후보는 그대로 둔다")
+    void notCurrentIgnoresAndExecutedBlocksOnlyExecution() {
         assertThat(decide(safe().current(false).build()).level()).isEqualTo(AutonomyLevel.IGNORE);
         AutonomyVerdict executed = decide(safe().alreadyExecuted(true).build());
-        assertThat(executed.level()).isEqualTo(AutonomyLevel.IGNORE);
+        assertThat(executed.level()).isEqualTo(AutonomyLevel.SURFACE);
         assertThat(executed.reasons()).containsExactly(AutonomyReason.ALREADY_EXECUTED);
+        AutonomyVerdict external =
+                decide(safe().alreadyExecuted(true).sideEffect("EXTERNAL").build());
+        assertThat(external.level()).isEqualTo(AutonomyLevel.ASK_APPROVAL);
     }
 
     @Test
