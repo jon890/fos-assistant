@@ -1,6 +1,6 @@
 # Phase 01. 커넥터 뼈대와 초안 검사, 미리보기, 세션 확인
 
-**Execution profile**: standard
+**Execution profile**: deep
 
 ## 목표
 
@@ -43,9 +43,9 @@
   "description": "로그인해 둔 Chrome 에 붙어 승인한 글을 네이버 블로그에 임시저장합니다. 발행하지 않습니다.",
   "fields": [
     { "key": "cdp_url", "env": "NAVER_BLOG_CDP_URL", "label": "브라우저 연결 주소",
-      "description": "네이버에 로그인한 Chrome 의 원격 디버깅 주소입니다. 예: http://chrome.example.internal:<포트>",
+      "description": "네이버에 로그인한 Chrome 의 원격 디버깅 주소입니다. IP 주소나 localhost 만 받습니다. 예: http://192.0.2.10:<포트>",
       "secret": true, "required": true,
-      "pattern": "^https?://[A-Za-z0-9.-]+(:[0-9]{1,5})?/?$" },
+      "pattern": "^https?://([0-9]{1,3}(\\.[0-9]{1,3}){3}|localhost)(:[0-9]{1,5})?/?$" },
     { "key": "blog_id", "env": "NAVER_BLOG_ID", "label": "블로그 아이디",
       "description": "blog.naver.com/<아이디> 의 아이디입니다.",
       "secret": false, "required": true, "pattern": "^[A-Za-z0-9_-]{1,50}$" }
@@ -79,12 +79,14 @@ Bun 의 전역 `fetch` 와 `WebSocket` 만 쓰는 CDP 창구.
 
 - `endpoint(cdpUrl)`: 끝 `/` 를 뗀 주소
 - `httpJson(cdpUrl, path, {method, timeoutMs})`: `/json/version`, `/json/list`, `/json/new?<주소>`(PUT), `/json/close/<id>` 를 부른다. 기본 제한 5초
-- `class CdpSession`: `connect(wsUrl, timeoutMs)`, `send(method, params)` 가 응답 `id` 로 짝을 맞춘다. `waitEvent(method, timeoutMs)`, `close()`. 명령마다 제한 시간을 둔다(기본 30초). 이 phase 는 브라우저 대상만 쓰지만 phase 02 가 탭 대상에도 쓴다
+- `wsUrlFor(cdpUrl, webSocketDebuggerUrl)`: Chrome 이 준 `webSocketDebuggerUrl` 의 호스트와 포트는 쓰지 않는다(Chrome 이 자기 loopback 주소를 적어 중계 너머에서는 닿지 않는다). 그 값의 경로만 꺼내 `cdp_url` 의 호스트와 포트에 붙인다. `http` 는 `ws`, `https` 는 `wss` 다
+- 연결 칸의 정규식이 호스트를 IPv4 와 `localhost` 로 한정한다. Chrome 의 디버깅 HTTP 창구가 `Host` 가 IP 나 `localhost` 가 아닌 요청을 거절하기 때문이다. WebSocket 은 `Origin: http://localhost` 를 붙여 연다(Bun 의 `new WebSocket(url, {headers})`)
+- `class CdpSession`: `connect(wsUrl, timeoutMs)`, 붙자마자 `Page.enable` 은 하지 않는다(브라우저 대상에는 Page 가 없다. 탭 대상의 처리는 phase 02 가 정한다), `send(method, params)` 가 응답 `id` 로 짝을 맞춘다. `waitEvent(method, timeoutMs)`, `close()`. 명령마다 제한 시간을 둔다(기본 30초). 이 phase 는 브라우저 대상만 쓰지만 phase 02 가 탭 대상에도 쓴다
 - 연결 실패, 시간 초과, 닫힘은 모두 `NAVER_BLOG_BROWSER_UNREACHABLE` 로 바꾼다
 
 ### 4. `src/session.ts` 와 `session_status`
 
-`sessionStatus(env)`: `/json/version` 의 `webSocketDebuggerUrl` 에 붙어 `Storage.getCookies` 를 부른다. 도메인이 `naver.com` 이나 `.naver.com` 인 `NID_AUT` 와 `NID_SES` 가 모두 있으면 `{browser: "connected", logged_in: true, blog_id}` 를 돌려준다. 없으면 `NAVER_BLOG_LOGIN_REQUIRED`. 전체를 8초 안에 끝낸다.
+`sessionStatus(env, {timeoutMs = 8000} = {})`: `/json/version` 의 `webSocketDebuggerUrl` 을 `wsUrlFor` 로 바꿔 붙어 `Storage.getCookies` 를 부른다. 도메인이 `naver.com` 이나 `.naver.com` 인 `NID_AUT` 와 `NID_SES` 가 모두 있으면 `{browser: "connected", logged_in: true, blog_id}` 를 돌려준다. 없으면 `NAVER_BLOG_LOGIN_REQUIRED`. 전체를 `timeoutMs` 안에 끝낸다. 시험은 짧은 값을 넘긴다.
 env 의 `NAVER_BLOG_CDP_URL` 과 `NAVER_BLOG_ID` 를 연결 칸과 같은 정규식으로 다시 검사하고 어긋나면 `NAVER_BLOG_INVALID_INPUT`.
 서버에서 `readOnlyHint: true` 로 등록한다.
 
@@ -137,7 +139,7 @@ env 의 `NAVER_BLOG_CDP_URL` 과 `NAVER_BLOG_ID` 를 연결 칸과 같은 정규
 ### 11. 이 phase 를 검증하는 시험
 
 - `tests/fake-cdp.ts`: `Bun.serve` 로 HTTP 창구(`/json/version`, `/json/list`, `/json/new`, `/json/close/<id>`)와 WebSocket(`/devtools/browser/<id>`, `/devtools/page/<id>`)을 흉내 낸다. 받은 메서드를 기록하고, 시험이 메서드마다 답을 정한다. 허용 목록(이 phase 는 `Storage.getCookies`) 밖의 메서드가 오면 기록에 위반으로 남긴다
-- `tests/session.test.ts`: 쿠키 둘이 있으면 `logged_in: true`. 하나라도 없으면 `NAVER_BLOG_LOGIN_REQUIRED`. 닫힌 포트면 `NAVER_BLOG_BROWSER_UNREACHABLE`. 응답하지 않는 서버면 8초 안에 같은 오류. 결과와 오류 글에 CDP 주소가 없다
+- `tests/naver-blog.test.ts`(공통 계약 검사가 `tests/<id>.test.ts` 를 요구한다): 쿠키 둘이 있으면 `logged_in: true`. 하나라도 없으면 `NAVER_BLOG_LOGIN_REQUIRED`. 닫힌 포트면 `NAVER_BLOG_BROWSER_UNREACHABLE`. 응답하지 않는 서버면 `timeoutMs: 300` 으로 같은 오류. `webSocketDebuggerUrl` 이 `ws://127.0.0.1:9/...` 처럼 다른 주소를 적어도 `cdp_url` 의 호스트와 포트로 붙는다. 정규식이 `http://chrome.example.internal:1` 을 거절한다. 결과와 오류 글에 CDP 주소가 없다
 - `tests/draft.test.ts`: 지시 줄 셋과 글 줄, 빈 줄을 나누는 정상 예 하나. 모양이 틀린 지시 줄은 글 줄이 된다. 제한 위반, `photo_dir` 누락, `../x.jpg`, 링크, 20MB 초과, 서명 불일치(이름은 `.jpg` 인데 PNG 머리)를 각각 문장으로 돌려준다. 문장에 디렉터리 경로가 없다. 임시 디렉터리에 합성 바이트로 만든 파일만 쓴다
 - `tests/render.test.ts`: `101.jpg` 는 `../../attachments/101` 로, `photo.jpg` 는 그림 없이 이름표로 그린다. `photo_notes` 가 들어가고, `<script` 가 없고, 제목의 `<b>` 가 이스케이프되고, `photo_dir` 문자열이 HTML 에 없다. `package` 는 지시 줄을 자리 표시로 바꾼다. 계약 위반이면 `html` 이 `null` 이다
 - `tests/contracts.test.ts`: gmail 의 같은 이름 시험처럼 서버의 도구 목록이 `connector.json` 의 `tools` 와 같고 `READ` 도구만 `readOnlyHint` 가 참인지 본다
@@ -153,6 +155,7 @@ bash scripts/check-public-safe.sh
 ```
 
 기대값: 모두 종료 코드 0. `hermes/tests` 의 계약 검사가 `naver-blog` 를 찾아 통과한다.
+`scripts/check-public-safe.sh` 는 `git grep` 으로 추적 파일만 본다. 돌리기 전에 새 파일을 `git add -N` 으로 올린다.
 
 ## 변경 파일
 
@@ -176,7 +179,7 @@ bash scripts/check-public-safe.sh
 | `hermes/connectors/naver-blog/dist/naver-blog-mcp.js` | 신규 |
 | `hermes/connectors/naver-blog/skills/naver-blog/SKILL.md` | 신규 |
 | `hermes/connectors/naver-blog/tests/fake-cdp.ts` | 신규 |
-| `hermes/connectors/naver-blog/tests/session.test.ts` | 신규 |
+| `hermes/connectors/naver-blog/tests/naver-blog.test.ts` | 신규 |
 | `hermes/connectors/naver-blog/tests/draft.test.ts` | 신규 |
 | `hermes/connectors/naver-blog/tests/render.test.ts` | 신규 |
 | `hermes/connectors/naver-blog/tests/contracts.test.ts` | 신규 |

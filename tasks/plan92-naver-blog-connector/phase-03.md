@@ -30,32 +30,35 @@
 
 ### 1. `src/jobs.ts`
 
-작업 디렉터리 `/tmp/fos-naver-blog-jobs`(모드 700, 없으면 만든다. 링크면 거절)를 쓴다. 시험은 `NAVER_BLOG_JOB_DIR` env 로 바꿀 수 있다. 이 env 는 `.mcp.json` 에 넣지 않는다.
+작업 디렉터리 `/tmp/fos-naver-blog-jobs` 를 쓴다. 없으면 모드 700 으로 만든다. 있으면 `lstat` 으로 링크가 아니고 디렉터리이며 소유자가 자기 uid 이고 모드가 700 인지 보고, 아니면 `NAVER_BLOG_UNAVAILABLE` 이다. 시험은 `NAVER_BLOG_JOB_DIR` env 로 바꿀 수 있다. 이 env 는 `.mcp.json` 에 넣지 않는다.
 
 | 파일 | 내용 |
 | --- | --- |
 | `<job_id>.json` | `{job_id, status, stage, started_at, finished_at, result, error, pid, heartbeat_at}`. 모드 600 |
-| `<job_id>.input.json` | 초안 다섯 칸과 작업에 필요한 env 두 값. 모드 600. 작업 프로세스가 읽은 뒤 바로 지운다 |
-| `lock` | 돌고 있는 작업의 `{job_id, pid, created_at}`. `O_EXCL` 로 만든다 |
+| `<job_id>.input.json` | 초안 다섯 칸만. 연결 칸 값은 담지 않는다. 모드 600. 작업 프로세스가 읽은 뒤 바로 지운다 |
+| `lock-<cdp_url 의 sha256 앞 16자>` | 그 브라우저에서 돌고 있는 작업의 `{job_id, created_at}`. `O_EXCL` 로 만든다. 브라우저가 다르면 서로 막지 않는다 |
 
 - `job_id` 는 `crypto.randomUUID()` 다
 - 상태 파일은 임시 파일에 쓴 뒤 이름을 바꿔 바꾼다
-- 잠금이 있어도 그 `pid` 가 살아 있지 않거나 15분이 지났으면 묵은 잠금으로 보고 지운다. 그 잠금의 작업이 `running` 이면 `stage` 가 `save` 일 때 `unknown`, 아니면 `failed` 와 `error.code: "timeout"` 으로 끝낸다
+- **잠금이 살아 있는지는 잠금이 가리키는 작업의 상태 파일로 판정한다.** 잠금을 만든 MCP 서버는 응답한 뒤 곧 닫히므로 잠금에 그 pid 를 두지 않는다. 상태가 `running` 이고, `pid` 가 있으면 그 프로세스가 살아 있고 `heartbeat_at` 이 30초 안이며, 시작한 지 11분이 안 됐으면 살아 있다. `pid` 가 아직 없으면 잠금을 만든 지 10초 안일 때만 살아 있다
+- 살아 있지 않은 잠금은 묵은 잠금으로 보고 지운다. 그 작업이 아직 `running` 이면 `save_clicked` 를 지난 작업은 `unknown`, 아니면 `failed` 와 `error.code: "timeout"` 으로 끝낸다
+- **끝난 상태(`succeeded`, `failed`, `unknown`)는 다시 쓰지 않는다.** 상태를 쓰는 함수는 쓰기 직전에 파일을 다시 읽어 이미 끝났으면 아무것도 하지 않는다. 작업 프로세스가 늦게 끝나도 정리가 적은 결과를 덮지 않고, 그 반대도 같다
 - 작업 디렉터리를 읽을 때마다 끝난 지 24시간이 지난 상태 파일과 남은 입력 파일을 지운다
-- `status` 는 `running`, `succeeded`, `failed`, `unknown`. 작업 프로세스는 5초마다 `heartbeat_at` 을 갱신한다
+- `status` 는 `running`, `succeeded`, `failed`, `unknown`. 작업 프로세스는 시작하자마자 자기 `pid` 와 `heartbeat_at` 을 적고 5초마다 `heartbeat_at` 을 갱신한다. `stage` 에는 `runDraft` 가 알린 단계를 적고, `save_clicked` 를 받으면 `saved_clicked: true` 를 함께 남긴다
 
 ### 2. `src/worker.ts`
 
-`runWorker(jobFile)`: 입력 파일을 읽고 지운 뒤 `runDraft` 를 부른다. 단계가 바뀔 때마다 `stage` 를 쓴다. 전체 제한은 10분이고 넘기면 탭을 닫고 `timeout` 으로 끝낸다.
+`runWorker(jobFile, deps = {runDraft, limitMs: 600_000})`: 자기 `pid` 를 적고, 입력 파일을 읽고 지운 뒤 `runDraft` 를 부른다. 연결 칸 값은 자기 env 의 `NAVER_BLOG_CDP_URL`, `NAVER_BLOG_ID` 에서 읽는다. 단계가 바뀔 때마다 `stage` 를 쓴다. `limitMs` 가 지나면 `AbortController` 로 `runDraft` 를 멈춘다(`runDraft` 가 탭을 닫는다).
 
 | `runDraft` 의 끝 | 상태 |
 | --- | --- |
 | 성공 | `succeeded`, `result` 는 `state` 와 저장 전후 수 |
-| `EditorError` 가 `save_unconfirmed` | `unknown` |
-| 그 밖의 `EditorError` | `failed`, `error` 는 `{code, stage, message, ...extra}` |
-| 그 밖의 예외 | `failed`, `error.code: "editor_failed"`. 예외 원문을 싣지 않는다 |
+| `save_clicked` 를 받은 뒤의 모든 실패, 중단, 예외 | `unknown` |
+| 그 전의 시간 초과(중단) | `failed`, `error.code: "timeout"` |
+| 그 전의 `EditorError` | `failed`, `error` 는 `{code, stage, message, ...extra}` |
+| 그 전의 그 밖의 예외 | `failed`, `error.code: "editor_failed"`. 예외 원문을 싣지 않는다 |
 
-끝나면 잠금을 지운다. 잠금의 `job_id` 가 자기 것일 때만 지운다.
+끝나면 잠금을 지운다. 잠금의 `job_id` 가 자기 것일 때만 지운다. 상태를 쓰는 것은 「끝난 상태는 다시 쓰지 않는다」 를 지킨다.
 
 `src/server.ts` 의 진입부: `process.argv` 에 `--worker <파일>` 이 있으면 MCP 서버를 띄우지 않고 `runWorker` 만 돌린 뒤 끝낸다. 프록시 env 를 빼고 다시 실행하는 기존 처리보다 뒤에 둔다.
 
@@ -67,8 +70,8 @@
 2. `sessionStatus` 로 브라우저와 로그인 쿠키. 실패는 그 코드 그대로
 3. 잠금을 만든다. 살아 있는 잠금이 있으면 `NAVER_BLOG_BUSY`
 4. 상태 파일(`running`, `stage: "queued"`)과 입력 파일을 쓴다
-5. `node:child_process` 의 `spawn(process.execPath, [process.argv[1], "--worker", 상태 파일], {detached: true, stdio: "ignore", env: 최소 env})` 후 `unref()`. 최소 env 는 `PATH`, `HOME` 과 작업 디렉터리 env 뿐이다. 칸 값은 입력 파일로 넘긴다
-6. 5초 안에 상태 파일의 `pid` 가 채워지고 `stage` 가 `queued` 가 아니게 되기를 기다린다. 되면 `{job_id, status: "running"}`. 안 되면 `NAVER_BLOG_START_UNKNOWN`
+5. `node:child_process` 의 `spawn(process.execPath, [workerEntry, "--worker", 상태 파일], {detached: true, stdio: "ignore", env})` 후 `unref()`. `detached` 가 새 세션을 만들어 대시보드가 MCP 서버의 프로세스 묶음을 정리해도 작업 프로세스에 닿지 않는다. `workerEntry` 는 `createServer(env, deps)` 의 의존성으로 받고 기본값은 `process.argv[1]` 이다. `env` 는 `PATH`, `HOME`, `NAVER_BLOG_CDP_URL`, `NAVER_BLOG_ID` 이고, `NAVER_BLOG_JOB_DIR` 이 있으면 그것과 `NAVER_BLOG_TEST_FAKE_RUN` 을 함께 넘긴다. 칸 값은 파일에 쓰지 않는다(`docs/connector-authoring.md` 의 「비밀값과 권한」)
+6. 5초 안에 상태 파일에 `pid` 가 채워지고 (`stage` 가 `queued` 가 아니거나 `status` 가 `running` 이 아니게) 되기를 기다린다. 되면 `{job_id, status: "running"}`. 안 되면 `NAVER_BLOG_START_UNKNOWN`
 7. 띄우기 전에 실패하면 잠금과 두 파일을 지운다
 
 `connector.json` 의 `tools` 에 `"save_draft": { "risk": "WRITE", "title": "네이버 블로그에 임시저장", "outbound": false }` 를 더한다. `grant` 는 적지 않는다(상시 허락을 줄 수 있다). `identifiers` 는 두지 않는다.
@@ -76,7 +79,7 @@
 ### 4. `draft_job` 도구
 
 인자 `job_id`(UUID 모양), `wait_seconds`(정수 0~50, 기본 45). 상태 파일을 읽고, `running` 이면 1초마다 다시 읽어 끝나거나 기다린 시간이 차면 돌려준다.
-`running` 인데 `pid` 가 살아 있지 않거나 `heartbeat_at` 이 30초 넘게 멈췄거나 시작한 지 10분이 지났으면 위 「묵은 잠금」 과 같이 끝내고 잠금을 푼다. 없는 작업이면 `NAVER_BLOG_JOB_NOT_FOUND`.
+`running` 인데 위 「잠금이 살아 있는지」 의 판정에서 살아 있지 않으면 「묵은 잠금」 과 같이 끝내고 잠금을 푼다. 기준이 11분이라 작업 프로세스 자신의 10분 제한과 겹치지 않는다. 없는 작업이면 `NAVER_BLOG_JOB_NOT_FOUND`.
 결과는 상태 파일에서 `pid` 와 `heartbeat_at` 을 뺀 것이다. `readOnlyHint: true`.
 
 `connector.json`: `tools` 에 `"draft_job": { "risk": "READ" }`, `errors` 에 `"NAVER_BLOG_BUSY": "unavailable"`, `"NAVER_BLOG_JOB_NOT_FOUND": "invalid_input"`, `"NAVER_BLOG_START_UNKNOWN": "outcome_unknown"` 를 더한다.
@@ -88,16 +91,17 @@
 - `save_draft` 는 사용자가 미리보기를 확인한 뒤에만 부른다. 부르면 승인 카드가 간다. 같은 도구를 다시 부르지 않는다
 - 승인 결과로 `job_id` 를 받으면 바로 `draft_job` 을 부른다. `running` 이면 다시 부른다
 - `succeeded` 면 `result` 에서 읽은 것만 완료라고 알린다. `unknown` 이면 다시 저장하지 말고 네이버 임시저장 목록을 확인해 달라고 한다
-- `failed` 의 `error.code` 마다 할 일: `login_required` 와 `security_check` 는 브라우저 조작을 부탁하고 멈춘다. `category_not_found` 는 `categories` 에서 고르게 묻는다. `place_not_unique` 는 `candidates` 에서 고르게 묻고 본문의 지도 줄을 고른 상호명과 주소로 고친다. `photo_upload_failed` 와 `editor_failed` 는 `render_draft` 의 `kind: "package"` 로 수동 등록용 묶음을 만들어 보여 주고 멈춘다
+- `failed` 의 `error.code` 마다 할 일: `login_required` 는 로그인이나 보안 확인을 브라우저에서 해 달라고 부탁하고 멈춘다. 우회하지 않는다. `category_not_found` 는 `categories` 에서 고르게 묻는다. `place_not_unique` 는 `candidates` 에서 고르게 묻고 본문의 지도 줄을 고른 상호명과 주소로 고친다. `photo_upload_failed` 와 `editor_failed` 는 `render_draft` 의 `kind: "package"` 로 수동 등록용 묶음을 만들어 보여 주고 멈춘다
+- 승인 결과 자체가 「실행했는지 모름」 으로 오면(작업 번호가 없다) 다시 부르지 말고 네이버 임시저장 목록을 확인해 달라고 한다
 - 스킬 본문은 8,000자를 넘기지 않는다
 
 ### 6. 이 phase 를 검증하는 시험
 
 `runDraft` 는 시험에서 바꿔 끼울 수 있게 `src/worker.ts` 가 모듈 경계로 받는다(예: `runWorker(jobFile, deps = {runDraft})`).
 
-- `tests/jobs.test.ts`: 임시 작업 디렉터리에서 잠금이 둘째 작업을 `NAVER_BLOG_BUSY` 로 막는다. 죽은 `pid` 의 잠금은 묵은 잠금으로 풀리고 그 작업이 `timeout` 으로 끝난다. `stage: "save"` 에서 멈춘 작업은 `unknown` 이다. 24시간 지난 상태 파일이 지워진다. 상태 파일에 `body` 와 `photo_dir` 문자열이 없다
-- `tests/worker.test.ts`: 성공하는 가짜 `runDraft` 로 `succeeded` 와 결과, `save_unconfirmed` 로 `unknown`, `category_not_found` 로 `failed` 와 `categories`. 입력 파일이 지워지고 잠금이 풀린다
-- `tests/save-draft.test.ts`: phase 01 의 가짜 CDP 서버와 임시 사진 디렉터리로 `save_draft` 를 부른다. 실제 작업 프로세스를 `bun src/server.ts --worker` 로 띄우되 시험용 env(`NAVER_BLOG_TEST_FAKE_RUN=1`)일 때만 `runDraft` 대신 즉시 성공하는 대역을 쓴다. 그 env 는 시험 밖에서 읽히지 않도록 `NAVER_BLOG_JOB_DIR` 이 함께 있을 때만 본다. 돌려받은 `job_id` 로 `draft_job` 이 `succeeded` 를 돌려준다. 로그인 쿠키가 없으면 작업을 만들지 않고 `NAVER_BLOG_LOGIN_REQUIRED`. 서명이 틀린 사진이면 `NAVER_BLOG_PHOTO_INVALID`. 결과와 오류에 CDP 주소와 사진 디렉터리가 없다
+- `tests/jobs.test.ts`: 임시 작업 디렉터리에서 **잠금을 만든 프로세스가 끝난 뒤에도** 살아 있는 작업 프로세스(시험이 띄운 자식 하나가 `pid` 와 `heartbeat_at` 을 적는다)가 있으면 둘째 작업이 `NAVER_BLOG_BUSY` 다. 다른 CDP 주소의 작업은 막지 않는다. 죽은 `pid` 의 작업은 묵은 잠금으로 풀리고 `timeout` 으로 끝난다. `saved_clicked` 를 지난 작업은 `unknown` 이다. `succeeded` 로 끝난 상태 위에 정리가 `timeout` 을 쓰려 해도 그대로다. 모드 755 인 작업 디렉터리를 거절한다. 24시간 지난 상태 파일이 지워진다. 상태 파일에 `body` 와 `photo_dir` 문자열이 없다
+- `tests/worker.test.ts`: 성공하는 가짜 `runDraft` 로 `succeeded` 와 결과, `save_unconfirmed` 로 `unknown`, `save_clicked` 를 알린 뒤 일반 예외를 던지면 `unknown`, `category_not_found` 로 `failed` 와 `categories`, `limitMs: 100` 에서 끝나지 않는 가짜는 `signal` 을 받고 `timeout`. 입력 파일이 지워지고 잠금이 풀리고 입력 파일에 CDP 주소가 없다
+- `tests/save-draft.test.ts`: phase 01 의 가짜 CDP 서버와 임시 사진 디렉터리로 `save_draft` 를 부른다. `createServer` 에 `workerEntry` 로 `src/server.ts` 의 절대 경로를 넘겨 실제 작업 프로세스(`bun src/server.ts --worker`)를 띄운다. 작업 프로세스는 `NAVER_BLOG_TEST_FAKE_RUN=1` 이고 `NAVER_BLOG_JOB_DIR` 이 함께 있을 때만 `runDraft` 대신 즉시 성공하는 대역을 쓴다. 작업 프로세스의 pgid 가 시험 프로세스와 다르다. 돌려받은 `job_id` 로 `draft_job` 이 `succeeded` 를 돌려준다. 로그인 쿠키가 없으면 작업을 만들지 않고 `NAVER_BLOG_LOGIN_REQUIRED`. 서명이 틀린 사진이면 `NAVER_BLOG_PHOTO_INVALID`. 결과와 오류에 CDP 주소와 사진 디렉터리가 없다
 - `tests/contracts.test.ts` 는 도구 넷과 `connector.json` 이 같은지 그대로 본다
 
 ## 검증
