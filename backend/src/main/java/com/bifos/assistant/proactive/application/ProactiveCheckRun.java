@@ -507,8 +507,8 @@ public class ProactiveCheckRun implements CheckTurn {
         Long conversationId = check.conversationId();
         StringBuilder text =
                 new StringBuilder(OPENING).append("\n\n지금 시각: ").append(now).append("\n\n변화 신호\n");
-        Optional<ProactiveCheck> last =
-                deps.checks().findFirstByConversationIdAndStatusNotAndSkippedReasonIsNullOrderByIdDesc(
+        Optional<ProactiveCheck> last = deps.checks()
+                .findFirstByConversationIdAndStatusNotAndSkippedReasonIsNullOrderByIdDesc(
                         conversationId, CheckStatus.RUNNING);
         if (last.isEmpty()) {
             text.append("- 지난 살펴보기: 처음\n- 그 뒤 사용자가 이 대화에 보낸 메시지: ")

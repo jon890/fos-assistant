@@ -31,14 +31,13 @@ import com.bifos.assistant.hermes.dto.TokenUsage;
 import com.bifos.assistant.memory.application.MemoryService;
 import com.bifos.assistant.memory.domain.Memory;
 import com.bifos.assistant.notification.infra.NotificationRepository;
-import com.bifos.assistant.proactive.domain.ProactiveCheck;
 import com.bifos.assistant.proactive.domain.CheckReport;
+import com.bifos.assistant.proactive.domain.ProactiveCheck;
 import com.bifos.assistant.proactive.domain.ProactiveCheckFinding;
 import com.bifos.assistant.proactive.domain.type.CheckOutcome;
 import com.bifos.assistant.proactive.domain.type.CheckSkippedReason;
 import com.bifos.assistant.proactive.domain.type.CheckStatus;
 import com.bifos.assistant.proactive.domain.type.CheckTrigger;
-import com.bifos.assistant.proactive.domain.type.FindingKind;
 import com.bifos.assistant.proactive.domain.type.FindingReason;
 import com.bifos.assistant.proactive.infra.ProactiveCheckFindingRepository;
 import com.bifos.assistant.proactive.infra.ProactiveCheckRepository;
@@ -106,6 +105,7 @@ class CareerDailyPilotTest {
     private static final ZoneId SEOUL = ZoneId.of("Asia/Seoul");
     /** 깨우기를 켜는 때다. 서울 시각 11월 1일 09:00 이라 첫 발화는 11월 2일 08:30 이다. */
     private static final Instant ENABLED_AT = Instant.parse("2026-11-01T00:00:00Z");
+
     private static final Instant FIRST_WAKE = Instant.parse("2026-11-01T23:30:00Z");
     private static final PilotClock CLOCK = new PilotClock(ENABLED_AT);
 
@@ -207,8 +207,8 @@ class CareerDailyPilotTest {
         when(skillClient.list(anyString())).thenReturn(List.of(new HermesSkill("proactive-check", "살펴보기", true)));
         when(connectorBindings.connectorServers(any())).thenReturn(Set.of("career"));
         String suffix = UUID.randomUUID().toString().substring(0, 8);
-        AppUser user = users.save(
-                AppUser.of("pilot-" + suffix + "@example.com", "사용자A", 1L, UserRole.MEMBER, ENABLED_AT));
+        AppUser user =
+                users.save(AppUser.of("pilot-" + suffix + "@example.com", "사용자A", 1L, UserRole.MEMBER, ENABLED_AT));
         owner = new CurrentUser(user.id(), user.email(), user.displayName(), user.groupId(), user.role());
         String code = "career-" + suffix;
         agent = agents.save(Agent.of(
@@ -235,7 +235,9 @@ class CareerDailyPilotTest {
     @Test
     @DisplayName("매일 깨우기가 엿새 동안 발견, 건너뛰기, 피드백 뒤 되풀이 침묵, 정상 침묵, 출처 장애, 끄기를 차례로 지킨다")
     void runsCareerDailyCycleAcrossSixDays() {
-        assertThat(schedules.update(owner, agent.code(), true, "08:30", SEOUL.getId()).nextRunAt())
+        assertThat(schedules
+                        .update(owner, agent.code(), true, "08:30", SEOUL.getId())
+                        .nextRunAt())
                 .as("첫 발화 예정 시각")
                 .isEqualTo(FIRST_WAKE);
 
@@ -246,9 +248,7 @@ class CareerDailyPilotTest {
         assertThat(first.report()).as("1일 보고").isNotNull();
         assertThat(first.report().evidence()).containsExactly(POSITION_URL);
         HermesRunCommand firstCommand = stub().received().getLast();
-        assertThat(firstCommand.input())
-                .contains("- 지난 살펴보기: 처음")
-                .contains("최근에 알린 발견이 없다.");
+        assertThat(firstCommand.input()).contains("- 지난 살펴보기: 처음").contains("최근에 알린 발견이 없다.");
         assertThat(firstCommand.instructions())
                 .as("붙은 커리어 커넥터를 직접 부르고 읽기만 하라는 지시")
                 .contains("- 연결한 서비스의 도구는 직접 부른다.")
@@ -294,9 +294,7 @@ class CareerDailyPilotTest {
         assertThat(third.newFindings()).isZero();
         assertThat(third.referenceFindings()).isEqualTo(1);
         assertThat(third.report()).as("되풀이만 있으면 보고를 만들지 않는다").isNull();
-        assertThat(findingsOf(third))
-                .extracting(ProactiveCheckFinding::reason)
-                .containsExactly(FindingReason.REPEATED);
+        assertThat(findingsOf(third)).extracting(ProactiveCheckFinding::reason).containsExactly(FindingReason.REPEATED);
         assertThat(lastMessage(third).content()).as("3일 뒤 마지막 메시지").isEqualTo(FEEDBACK);
 
         // 사용자가 Memory 제안을 받아들인다.
@@ -314,8 +312,8 @@ class CareerDailyPilotTest {
         assertThat(lastMessage(fourth).content()).isEqualTo(FEEDBACK);
 
         // 5일: 커리어 출처 장애는 무소식으로 숨기지 않는다.
-        answerWith(command -> result("{\"version\":2,\"outcome\":\"NOTHING_NEW\",\"sourceFailures\":[\""
-                + SOURCE_FAILURE + "\"]}"));
+        answerWith(command ->
+                result("{\"version\":2,\"outcome\":\"NOTHING_NEW\",\"sourceFailures\":[\"" + SOURCE_FAILURE + "\"]}"));
         ProactiveCheck fifth = wake(5);
         ChatMessage failure = lastMessage(fifth);
         assertThat(failure.role()).isEqualTo(MessageRole.ASSISTANT);
@@ -358,8 +356,8 @@ class CareerDailyPilotTest {
     @Test
     @DisplayName("점검 대화를 읽거나 그 대화에 보내면 그 사용자의 그 대화 보고만 연 것으로 적는다")
     void marksOnlyReportsOfReadCheckConversationAsOpened() {
-        Conversation read = conversations.save(
-                Conversation.startedForCheck(owner.id(), "먼저 살펴보기 · 커리어", agent.id(), ENABLED_AT));
+        Conversation read =
+                conversations.save(Conversation.startedForCheck(owner.id(), "먼저 살펴보기 · 커리어", agent.id(), ENABLED_AT));
         Agent otherAgent = agents.save(Agent.of(
                 agent.code() + "-b",
                 "공부",
@@ -390,7 +388,8 @@ class CareerDailyPilotTest {
         chat.history(owner, read.id());
 
         assertThat(checks.findById(mine.id()).orElseThrow().reportOpenedAt()).isEqualTo(readAt);
-        assertThat(checks.findById(mineEarlier.id()).orElseThrow().reportOpenedAt()).isEqualTo(readAt);
+        assertThat(checks.findById(mineEarlier.id()).orElseThrow().reportOpenedAt())
+                .isEqualTo(readAt);
         assertThat(checks.findById(otherConversationReport.id()).orElseThrow().reportOpenedAt())
                 .as("같은 사용자의 다른 점검 대화")
                 .isNull();
