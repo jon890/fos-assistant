@@ -178,6 +178,20 @@ class UserBrowserServiceTest {
     }
 
     @Test
+    @DisplayName("끄다 실패해 컨테이너가 남은 브라우저도 동시 수에 든다")
+    void countsFailedBrowserWithContainerTowardCapacity() {
+        UserBrowserService service = service(true, 1);
+        service.create(101L);
+        service.create(102L);
+        service.start(101L);
+        runtime.failingActions.add("stop");
+        assertCode(() -> service.stop(101L), ErrorCode.BROWSER_STOP_FAILED);
+        runtime.failingActions.clear();
+
+        assertCode(() -> service.start(102L), ErrorCode.BROWSER_CAPACITY);
+    }
+
+    @Test
     @DisplayName("지우면 끈 뒤 프로필 디렉터리와 줄을 지운다")
     void deletesBrowserWithProfile() {
         UserBrowserService service = service(true, 2);

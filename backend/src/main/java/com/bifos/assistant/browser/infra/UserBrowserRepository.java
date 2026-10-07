@@ -20,6 +20,12 @@ public interface UserBrowserRepository extends JpaRepository<UserBrowser, Long> 
 
     List<UserBrowser> findByStatusIn(Collection<UserBrowserStatus> statuses);
 
+    /** 끄다 실패해 컨테이너가 남았을 수 있는 줄을 센다. 그 컨테이너도 동시 수에 든다. */
+    long countByStatusAndContainerIdIsNotNull(UserBrowserStatus status);
+
+    /** 끄다 실패해 컨테이너가 남았을 수 있는 줄이다. 점검이 다시 끈다. */
+    List<UserBrowser> findByStatusAndContainerIdIsNotNull(UserBrowserStatus status);
+
     /** 관리자 목록과 상태 맞추기가 읽는다. 사용자 하나에 한 줄이라 가족 규모에서는 작다. */
     List<UserBrowser> findAllByOrderByIdAsc();
 }

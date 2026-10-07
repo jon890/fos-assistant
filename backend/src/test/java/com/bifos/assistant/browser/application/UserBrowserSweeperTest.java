@@ -148,6 +148,23 @@ class UserBrowserSweeperTest {
     }
 
     @Test
+    @DisplayName("끄다 실패해 컨테이너가 남은 FAILED 는 다음 점검이 다시 끈다")
+    void retriesStopOfFailedBrowserWithContainer() {
+        Long id = running(201L);
+        String container = repository.findById(id).orElseThrow().containerId();
+        runtime.failingStops.add(container);
+        ageActivity(id, Duration.ofMinutes(11));
+        sweeper.sweep();
+        assertThat(status(201L)).isEqualTo(UserBrowserStatus.FAILED);
+
+        runtime.failingStops.clear();
+        sweeper.sweep();
+
+        assertThat(status(201L)).isEqualTo(UserBrowserStatus.STOPPED);
+        assertThat(runtime.containers).doesNotContainKey(container);
+    }
+
+    @Test
     @DisplayName("한 줄을 멈추다 실패해도 다음 줄은 멈춘다")
     void continuesAfterOneFailure() {
         Long first = running(201L);

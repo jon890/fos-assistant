@@ -33,7 +33,7 @@ proxy 의 정책과 이미지, 망, 프로필 디렉터리의 위치는 운영 �
 | 자동 중지 | `RUNNING` | `last_active_at` 이 유휴 시간보다 오래고 쓰는 중인 핸들(`BrowserUsage`)이 없다. 멈추기 직전에 줄을 다시 읽어 아직 유휴인지 본다 | `STOPPED` |
 | 사용자 끄기 | `RUNNING`, `FAILED` | 관리자가 허용 목록에서 사용자를 끄면 끄기가 커밋된 뒤 끄기를 한다. 프로필과 줄은 남긴다 | `STOPPED` |
 
-동시 수는 `STARTING` 과 `RUNNING` 인 줄을 센다. 셀 때 `user_browser` 의 켜기를 한 번에 하나만 하도록 잠근다.
+동시 수는 `STARTING` 과 `RUNNING` 인 줄, 끄다 실패해 `container_id` 가 남은 `FAILED` 줄을 센다. 남은 컨테이너도 돌고 있을 수 있기 때문이다. 셀 때 `user_browser` 의 켜기를 한 번에 하나만 하도록 잠근다.
 이미 `RUNNING` 인 브라우저를 켜거나 `STOPPED` 인 브라우저를 끄면 아무것도 하지 않고 지금 상태를 돌려준다.
 `STARTING` 이나 `STOPPING` 인 줄에 다른 전이를 요청하면 `BROWSER_BUSY` 다. 지우기와 사용자 끄기도 그렇다.
 사용자 끄기가 `BUSY` 이거나 proxy 호출이 실패하면 로그만 남긴다.
@@ -43,6 +43,7 @@ proxy 의 정책과 이미지, 망, 프로필 디렉터리의 위치는 운영 �
 끄다가 proxy 호출이 실패하면 `FAILED` 와 `stop_failed` 를 남긴다. 켜다가 실패한 코드는 `start_failed`, `start_timeout` 이다.
 
 자동 중지와 꺼진 사용자의 브라우저 끄기, 상태 맞추기는 `assistant.browser.sweep-interval`(기본 `1m`)마다 돌고, 기동할 때 한 번 돈다. 기능이 꺼져 있으면 돌지 않는다.
+점검은 끄다 실패해 컨테이너가 남은 `FAILED` 를 다시 끈다.
 점검 중 DB 예외가 나면 경고 로그만 남기고 기동을 멈추지 않는다.
 상태 맞추기는 proxy 의 브라우저 컨테이너 목록과 표를 견준다.
 

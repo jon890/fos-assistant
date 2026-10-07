@@ -118,7 +118,10 @@ public class UserBrowserService {
             if (browser.status() == UserBrowserStatus.RUNNING) {
                 return UserBrowserSnapshot.of(browser);
             }
-            if (browsers.countByStatusIn(COUNTED) >= properties.maxRunning()) {
+            // 끄다 실패해 컨테이너가 남은 FAILED 도 돌고 있을 수 있어 함께 센다
+            long running = browsers.countByStatusIn(COUNTED)
+                    + browsers.countByStatusAndContainerIdIsNotNull(UserBrowserStatus.FAILED);
+            if (running >= properties.maxRunning()) {
                 throw new ApiException(ErrorCode.BROWSER_CAPACITY, "too many browsers are running");
             }
             browser.beginStart(clock.instant());

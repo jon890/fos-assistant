@@ -69,6 +69,7 @@ public class UserBrowserSweeper {
         try {
             stopIdle();
             stopRevoked();
+            retryFailedStops();
             reconcile();
         } catch (RuntimeException ex) {
             log.warn("user browser sweep failed error={}", name(ex));
@@ -135,6 +136,18 @@ public class UserBrowserSweeper {
                 }
             } catch (RuntimeException ex) {
                 log.warn("user browser stop for removed user failed id={} error={}", browser.id(), name(ex));
+            }
+        }
+    }
+
+    /** 끄다 실패해 컨테이너가 남은 {@code FAILED} 를 다시 끈다. 남은 컨테이너가 동시 수와 메모리를 쥐고 있지 않게 한다. */
+    void retryFailedStops() {
+        for (UserBrowser browser : browsers.findByStatusAndContainerIdIsNotNull(UserBrowserStatus.FAILED)) {
+            try {
+                service.stopById(browser.id());
+                log.info("user browser leftover container stopped id={}", browser.id());
+            } catch (RuntimeException ex) {
+                log.warn("user browser leftover stop failed id={} error={}", browser.id(), name(ex));
             }
         }
     }
