@@ -70,9 +70,9 @@ import com.bifos.assistant.skill.infra.ExecutionSkillUseRepository;
 import com.bifos.assistant.usage.domain.AgentExecution;
 import com.bifos.assistant.usage.domain.ExecutionContextSource;
 import com.bifos.assistant.usage.domain.ExecutionEvent;
+import com.bifos.assistant.usage.domain.type.EventObservation;
 import com.bifos.assistant.usage.domain.type.ExecutionEventType;
 import com.bifos.assistant.usage.domain.type.ExecutionStatus;
-import com.bifos.assistant.usage.domain.type.EventObservation;
 import com.bifos.assistant.usage.infra.AgentExecutionRepository;
 import com.bifos.assistant.usage.infra.ExecutionContextSourceRepository;
 import com.bifos.assistant.usage.infra.ExecutionEventRepository;
@@ -969,10 +969,25 @@ class ChatServiceTest {
     void keepsObservationGapWhenOnlyChildStartCannotBeSaved() {
         CurrentUser user = member("observer@example.com", "dad");
         stub().willReturn(HermesRunResult.of("run-1", "sess-1", "completed", "네", "dad", null, TokenUsage.empty()));
-        hermesStreams(new RunEvent("subagent.start", null, null, "도우미 시작", null, null, "child-1", null, null, "child-session", null, null, null, null));
+        hermesStreams(new RunEvent(
+                "subagent.start",
+                null,
+                null,
+                "도우미 시작",
+                null,
+                null,
+                "child-1",
+                null,
+                null,
+                "child-session",
+                null,
+                null,
+                null,
+                null));
         doThrow(new DataIntegrityViolationException("시작 사건 저장 실패"))
                 .when(executionEvents)
-                .save(org.mockito.ArgumentMatchers.argThat(event -> event.eventType() == ExecutionEventType.SUBAGENT_STARTED));
+                .save(org.mockito.ArgumentMatchers.argThat(
+                        event -> event.eventType() == ExecutionEventType.SUBAGENT_STARTED));
 
         ChatTurn turn = chat.send(user, null, "안녕", "dad");
 

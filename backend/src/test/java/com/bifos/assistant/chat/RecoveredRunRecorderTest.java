@@ -191,7 +191,8 @@ class RecoveredRunRecorderTest {
         assertThat(saved.status()).isEqualTo(ExecutionStatus.SUCCEEDED);
         assertThat(saved.eventObservation().name()).isEqualTo("INCOMPLETE");
         assertThat(messages.findByConversationIdOrderByIdAsc(conversation.id()))
-                .extracting(ChatMessage::content).contains("복구한 답");
+                .extracting(ChatMessage::content)
+                .contains("복구한 답");
     }
 
     @Test

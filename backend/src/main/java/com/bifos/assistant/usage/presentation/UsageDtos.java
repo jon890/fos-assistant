@@ -66,7 +66,8 @@ public final class UsageDtos {
         static MonthlyCostView from(String month, MonthlyUsageSummary cost, boolean internal) {
             long total = cost.pricedExecutions() + cost.unpricedExecutions();
             if (!internal) {
-                return new MonthlyCostView(month, null, null, null, null, null, null, null, null, null, null, null, total);
+                return new MonthlyCostView(
+                        month, null, null, null, null, null, null, null, null, null, null, null, total);
             }
             return new MonthlyCostView(
                     month,

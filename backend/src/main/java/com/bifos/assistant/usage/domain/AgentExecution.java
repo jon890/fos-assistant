@@ -3,8 +3,8 @@ package com.bifos.assistant.usage.domain;
 import com.bifos.assistant.agent.domain.type.CostMode;
 import com.bifos.assistant.hermes.dto.TokenUsage;
 import com.bifos.assistant.model.domain.type.ModelTier;
-import com.bifos.assistant.usage.domain.type.ExecutionStatus;
 import com.bifos.assistant.usage.domain.type.EventObservation;
+import com.bifos.assistant.usage.domain.type.ExecutionStatus;
 import com.bifos.assistant.usage.domain.type.ReasoningEffortSource;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -52,7 +52,8 @@ public class AgentExecution {
     /** 실패 표시는 뒤늦은 정상 스트림 종료로 지우지 않는다. */
     public boolean finishEventObservation(boolean complete) {
         EventObservation next = complete && eventObservation == EventObservation.OBSERVING
-                ? EventObservation.OBSERVED : EventObservation.INCOMPLETE;
+                ? EventObservation.OBSERVED
+                : EventObservation.INCOMPLETE;
         if (complete && eventObservation != EventObservation.OBSERVING || eventObservation == next) {
             return false;
         }

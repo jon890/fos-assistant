@@ -20,10 +20,11 @@ class EventObservationMigrationTest {
                 var statement = connection.createStatement()) {
             statement.execute("CREATE TABLE agent_execution (id BIGINT PRIMARY KEY, estimated_cost_micros BIGINT)");
             statement.execute("INSERT INTO agent_execution VALUES (1, 1234)");
-            ScriptUtils.executeSqlScript(connection, new ClassPathResource(
-                    "db/migration/V20261007051452__execution_event_observation.sql"));
+            ScriptUtils.executeSqlScript(
+                    connection, new ClassPathResource("db/migration/V20261007051452__execution_event_observation.sql"));
 
-            try (var rows = statement.executeQuery("SELECT event_observation, estimated_cost_micros FROM agent_execution")) {
+            try (var rows =
+                    statement.executeQuery("SELECT event_observation, estimated_cost_micros FROM agent_execution")) {
                 assertThat(rows.next()).isTrue();
                 assertThat(rows.getString("event_observation")).isEqualTo("UNKNOWN");
                 assertThat(rows.getLong("estimated_cost_micros")).isEqualTo(1234L);

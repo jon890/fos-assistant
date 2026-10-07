@@ -176,7 +176,8 @@ class SubagentUsageLedgerTest {
         parent.beginEventObservation();
         parent.finishEventObservation(true);
         executions.save(parent);
-        assertThat(summaries.monthly(USER_ID, from, to).observationIncompleteExecutions()).isZero();
+        assertThat(summaries.monthly(USER_ID, from, to).observationIncompleteExecutions())
+                .isZero();
     }
 
     @Test
@@ -467,7 +468,8 @@ class SubagentUsageLedgerTest {
         startEvent(running, 1, CHILD);
         startEvent(running, 2, null);
 
-        assertThat(summaries.monthly(USER_ID, from, to)).isEqualTo(new MonthlyUsageSummary(0, 0, 0, 0, 0, 0, 0, 0, 0, 0));
+        assertThat(summaries.monthly(USER_ID, from, to))
+                .isEqualTo(new MonthlyUsageSummary(0, 0, 0, 0, 0, 0, 0, 0, 0, 0));
     }
 
     @Test

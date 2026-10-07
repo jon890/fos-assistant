@@ -140,7 +140,8 @@ public class RecoveredRunRecorder {
                     .lockById(executionId)
                     .filter(row -> row.status() == ExecutionStatus.RUNNING)
                     .map(row -> {
-                        if (row.eventObservation() == com.bifos.assistant.usage.domain.type.EventObservation.OBSERVING) {
+                        if (row.eventObservation()
+                                == com.bifos.assistant.usage.domain.type.EventObservation.OBSERVING) {
                             row.finishEventObservation(false);
                         }
                         return row;

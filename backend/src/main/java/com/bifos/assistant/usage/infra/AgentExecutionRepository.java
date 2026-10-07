@@ -30,7 +30,8 @@ public interface AgentExecutionRepository extends JpaRepository<AgentExecution, 
               and e.status <> com.bifos.assistant.usage.domain.type.ExecutionStatus.RUNNING
               and e.eventObservation = 'INCOMPLETE'
             """)
-    long countIncompleteEventObservations(@Param("userId") Long userId, @Param("from") Instant from, @Param("to") Instant to);
+    long countIncompleteEventObservations(
+            @Param("userId") Long userId, @Param("from") Instant from, @Param("to") Instant to);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select e from AgentExecution e where e.id = :id")
