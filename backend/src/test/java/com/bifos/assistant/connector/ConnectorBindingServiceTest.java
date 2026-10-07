@@ -746,6 +746,30 @@ class ConnectorBindingServiceTest {
     }
 
     @Test
+    @DisplayName("반영 예정 시각 전의 관리자 반영 완료는 설치를 다시 보내지 않고 READY 로 두지 않으며 연결 실패로 끝난다")
+    void confirmAppliedBeforeApplyDueStaysPending() {
+        CurrentUser owner = user(UserRole.MEMBER, 1L);
+        CurrentUser admin = user(UserRole.ADMIN, 1L);
+        connect(owner, DEMO, VALUES);
+        Agent agent = agent(owner, AgentVisibility.PRIVATE);
+        when(connector.bindConnector(anyString(), anyString(), anyString(), anyString()))
+                .thenReturn(new InstallResult(false, false, true));
+        service.bind(owner, agent.code(), DEMO);
+        Instant due = onlyBinding().applyDueAt();
+        Instant shown = shownTo(admin);
+        clearInvocations(connector);
+
+        assertThatThrownBy(() -> service.confirmApplied(admin, agent.code(), DEMO, shown))
+                .isInstanceOf(ConnectorOperationFailure.class);
+
+        verify(connector, never()).bindConnector(anyString(), anyString(), anyString(), anyString());
+        verify(connector, never()).probe(anyString(), anyString());
+        ConnectorBinding stored = onlyBinding();
+        assertThat(stored.status()).isEqualTo(BindingStatus.PENDING);
+        assertThat(stored.applyDueAt()).isEqualTo(due);
+    }
+
+    @Test
     @DisplayName("반영 완료에서 다시 보낸 설치가 바뀐 것이 있다고 답하면 READY 가 아니고 연결 실패로 끝난다")
     void confirmAppliedStaysPendingWhenReinstallNeedsRestartAgain() {
         CurrentUser owner = user(UserRole.MEMBER, 1L);

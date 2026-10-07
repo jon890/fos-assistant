@@ -437,7 +437,7 @@ public class ConnectorBindingService implements AgentConnectorDetacher {
      * 설치를 한 번 다시 보내고 그 profile 에 반영됐는지 본다. 쓸 수 있으면 {@code READY}, 아니면 {@code PENDING} 이다.
      *
      * <p>사용자의 연결 확인과 예약 확인({@code afterRestart} 거짓)에서는 재시작 대기인 바인딩과 반영 예정 시각이 아직 오지
-     * 않은 바인딩에 설치를 다시 보내지 않는다. 관리자 반영 완료({@code afterRestart} 참)는 재시작이 끝났다고 보고 다시 보낸다.
+     * 않은 바인딩에 설치를 다시 보내지 않는다. 관리자 반영 완료({@code afterRestart} 참)는 재시작이 끝났다고 보고 다시 보낸다. 다만 반영 예정 시각 전에는 관리자 반영 완료도 다시 보내지 않는다.
      * 다시 보낸 설치가 재시작을 요구하면 그 시각으로 대기를 새로 시작하고, {@code reload_pending} 이면 반영 예정 시각을 새로
      * 적는다. 둘 다 {@code PENDING} 으로 돌아간다. 카탈로그에서 빠진 커넥터는 서버를 확인할 수 없어 다시 보내지 않고
      * {@code PENDING} 이다.
@@ -458,9 +458,10 @@ public class ConnectorBindingService implements AgentConnectorDetacher {
         if (binding.mcpServer() == null && manifest.isPresent()) {
             binding.recordServer(manifest.get().mcpServer());
         }
-        boolean waiting = binding.restartRequired()
-                || (binding.applyDueAt() != null && binding.applyDueAt().isAfter(now));
-        if ((!afterRestart && waiting) || manifest.isEmpty()) {
+        // 관리자 반영 완료는 재시작 대기만 넘는다. 반영 예정 시각 전에는 gateway 가 아직 서버를 연결하지 않았을 수 있다.
+        // probe 는 gateway 와 별개의 연결이라 그 전에 통과해 READY 가 되면 실제 실행에는 도구가 없다.
+        boolean dueLater = binding.applyDueAt() != null && binding.applyDueAt().isAfter(now);
+        if ((!afterRestart && binding.restartRequired()) || dueLater || manifest.isEmpty()) {
             binding.pending(now);
             return false;
         }

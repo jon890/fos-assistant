@@ -200,9 +200,14 @@ export function createBindings(state: FakeHermesState) {
     const wasBound = bound.has(plugin);
     const env = envOf(profile);
     let changed = bound.get(plugin) !== bind.vault;
+    // 실제 plugin 처럼 이미 붙은 서버의 `.env` 값이 바뀐 것만 재시작 대기로 본다.
+    let envChanged = false;
     for (const field of connector.fields) {
       const value = stored.values[field.key];
-      if (env[field.env] !== value) changed = true;
+      if (env[field.env] !== value) {
+        changed = true;
+        envChanged = true;
+      }
       if (value === undefined) delete env[field.env];
       else env[field.env] = value;
     }
@@ -214,7 +219,8 @@ export function createBindings(state: FakeHermesState) {
     state.boundConnectors.set(profile, bound);
     state.policyHookInstalled.add(profile);
     state.connectorRequests.push(`bind ${profile}`);
-    answer(changed, wasBound && changed, !wasBound && changed);
+    const restart = wasBound && envChanged;
+    answer(changed, restart, changed && !restart);
   };
   return { envOf, boundServers, vaultValuesValid, bindingInstall };
 }

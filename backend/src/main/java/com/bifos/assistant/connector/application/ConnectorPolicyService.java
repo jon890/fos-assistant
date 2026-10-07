@@ -80,6 +80,9 @@ public class ConnectorPolicyService {
      */
     static final String BINDING_PENDING_MESSAGE =
             "이 에이전트에 붙인 연결이 아직 반영되지 않았다. 대개 몇 분 안에 저절로 반영되니 사용자에게 잠시 뒤 다시 시도하라고 알린다.";
+    /** 재시작이 필요한 바인딩이다. 저절로 풀리지 않고 관리자 반영 완료가 있어야 풀린다. */
+    static final String BINDING_RESTART_MESSAGE =
+            "이 에이전트에 붙인 연결은 관리자가 반영을 마쳐야 쓸 수 있다. 지금은 실행하지 않았으니 사용자에게 관리자의 반영을 기다리라고 알린다.";
 
     private static final String UNDECLARED_MESSAGE = "이 도구는 사용이 허락되지 않아 실행하지 않았다. 다시 부르지 않는다.";
     private static final String RISK_NOT_OPEN_MESSAGE = "이 도구는 아직 열리지 않아 실행하지 않았다. 다시 부르지 않는다.";
@@ -308,7 +311,8 @@ public class ConnectorPolicyService {
                 events.publishEvent(new ConnectorActionChanged(saved.conversationId(), saved.publicId()));
             }
             if (bindingPending && saved.denyReason() == ActionDenyReason.NOT_READY) {
-                return new ConnectorPolicyAnswer(false, BINDING_PENDING_MESSAGE, null);
+                return new ConnectorPolicyAnswer(
+                        false, binding.restartRequired() ? BINDING_RESTART_MESSAGE : BINDING_PENDING_MESSAGE, null);
             }
             return answer(saved);
         } catch (DataIntegrityViolationException ex) {
