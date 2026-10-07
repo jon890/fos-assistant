@@ -17,6 +17,7 @@ const LINKS = [
   { href: "/admin/models", label: "모델" },
   { href: "/admin/usage", label: "사용량과 비용" },
   { href: "/admin/connections", label: "커넥터" },
+  { href: "/admin/browsers", label: "브라우저" },
 ] as const;
 
 function under(pathname: string, href: string): boolean {
