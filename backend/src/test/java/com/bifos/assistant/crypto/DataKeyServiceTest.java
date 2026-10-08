@@ -15,14 +15,19 @@ import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.concurrent.ThreadLocalRandom;
+import java.util.regex.Pattern;
 import javax.crypto.spec.SecretKeySpec;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 
 /** 사용자별 데이터 key 를 만들고 풀고 KEK 를 바꿀 때 다시 감싸는지 확인한다. 검사용 KEK 파일을 쓴다. */
 @BackendIntegrationTest
+@ExtendWith(OutputCaptureExtension.class)
 class DataKeyServiceTest {
 
     private static final String PLAIN = "평문-표식-5521 혈압약 복용 기록";
@@ -86,6 +91,23 @@ class DataKeyServiceTest {
 
         assertThat(cipher.open(sealed.keyId(), userId, "row:3", sealed.content()))
                 .isEmpty();
+    }
+
+    @Test
+    @DisplayName("풀지 못한 데이터 key 의 경고는 1분 안에 한 번만 남긴다")
+    void warnsOnceForUnavailableDataKey(CapturedOutput output) {
+        Long userId = anyUserId();
+        SealedText sealed = cipher.seal(userId, "row:5", PLAIN).orElseThrow();
+        keys.deleteById(sealed.keyId());
+        cipher.forgetCachedKeys();
+
+        for (int i = 0; i < 5; i++) {
+            assertThat(cipher.open(sealed.keyId(), userId, "row:5", sealed.content()))
+                    .isEmpty();
+        }
+
+        String marker = "데이터 key 를 풀지 못했다. 1분 동안 이 key 의 본문은 읽을 수 없는 것으로 본다 keyId=" + sealed.keyId() + " ";
+        assertThat(output.getAll().split(Pattern.quote(marker), -1)).hasSize(2);
     }
 
     @Test

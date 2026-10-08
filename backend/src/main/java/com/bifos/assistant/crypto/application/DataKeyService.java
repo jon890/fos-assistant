@@ -10,6 +10,7 @@ import com.bifos.assistant.crypto.infra.DataEncryptionProperties;
 import com.bifos.assistant.crypto.infra.UserDataKeyRepository;
 import java.nio.charset.StandardCharsets;
 import java.time.Clock;
+import java.time.Duration;
 import java.util.Optional;
 import javax.crypto.spec.SecretKeySpec;
 import lombok.extern.slf4j.Slf4j;
@@ -28,11 +29,19 @@ import org.springframework.stereotype.Component;
 @Slf4j
 public class DataKeyService implements TextCipher {
 
+    private static final Duration UNAVAILABLE_TTL = Duration.ofMinutes(1);
+
     private final KeyEncryptionKeys keks;
     private final DataKeyWriter writer;
     private final UserDataKeyRepository keys;
     private final KeyCache<Long, DataKey> byId;
     private final KeyCache<Long, DataKey> byUser;
+
+    /**
+     * 풀지 못한 데이터 key 번호다. 1분 동안 다시 읽지 않고 경고도 다시 남기지 않는다. KEK 를 뺐거나 데이터 key 줄을 지웠을 때
+     * 그 사용자의 메시지마다 조회와 경고가 되풀이되지 않게 한다.
+     */
+    private final KeyCache<Long, Boolean> unavailable;
 
     public DataKeyService(
             KeyEncryptionKeys keks,
@@ -45,6 +54,7 @@ public class DataKeyService implements TextCipher {
         this.keys = keys;
         this.byId = new KeyCache<>(properties.dekCacheTtl(), properties.dekCacheMaxEntries(), clock);
         this.byUser = new KeyCache<>(properties.dekCacheTtl(), properties.dekCacheMaxEntries(), clock);
+        this.unavailable = new KeyCache<>(UNAVAILABLE_TTL, properties.dekCacheMaxEntries(), clock);
     }
 
     @Override
@@ -64,8 +74,18 @@ public class DataKeyService implements TextCipher {
 
     @Override
     public Optional<String> open(Long keyId, Long ownerUserId, String aad, String sealed) {
+        if (unavailable.get(keyId).isPresent()) {
+            return Optional.empty();
+        }
+        DataKey key;
         try {
-            DataKey key = forReading(keyId);
+            key = forReading(keyId);
+        } catch (IllegalStateException e) {
+            unavailable.put(keyId, Boolean.TRUE);
+            log.warn("데이터 key 를 풀지 못했다. 1분 동안 이 key 의 본문은 읽을 수 없는 것으로 본다 keyId={} reason={}", keyId, e.getMessage());
+            return Optional.empty();
+        }
+        try {
             if (!key.userId().equals(ownerUserId)) {
                 log.warn("데이터 key 의 주인이 본문의 주인과 다르다 keyId={} ownerUserId={}", keyId, ownerUserId);
                 return Optional.empty();
@@ -81,6 +101,7 @@ public class DataKeyService implements TextCipher {
     public void forgetCachedKeys() {
         byId.clear();
         byUser.clear();
+        unavailable.clear();
     }
 
     private DataKey forWriting(Long userId) {
