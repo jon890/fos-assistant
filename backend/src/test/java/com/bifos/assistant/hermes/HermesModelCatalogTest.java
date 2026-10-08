@@ -249,9 +249,11 @@ class HermesModelCatalogTest {
 
         HermesModelCatalog catalog = client.readCatalog(baseUrl(), "dad");
 
-        assertThat(catalog.providers()).extracting(HermesModelCatalog.Provider::slug)
+        assertThat(catalog.providers())
+                .extracting(HermesModelCatalog.Provider::slug)
                 .containsExactly("openai-codex", "anthropic", "openrouter");
-        assertThat(catalog.providers()).extracting(provider -> provider.reasoning().get("shared-model"))
+        assertThat(catalog.providers())
+                .extracting(provider -> provider.reasoning().get("shared-model"))
                 .containsExactly(
                         new ReasoningCapability(UNSUPPORTED, SUPPORTED),
                         new ReasoningCapability(SUPPORTED, UNSUPPORTED),

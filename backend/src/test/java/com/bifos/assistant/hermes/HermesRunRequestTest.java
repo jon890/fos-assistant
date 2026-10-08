@@ -142,11 +142,13 @@ class HermesRunRequestTest {
             JsonNode body = submittedBody();
             assertThat(body.path("provider").asString()).isEqualTo(provider);
             assertThat(body.path("model").asString()).isEqualTo("shared-model");
-            assertThat(body.path("model_options").path("reasoning").path("effort").asString())
+            assertThat(body.path("model_options")
+                            .path("reasoning")
+                            .path("effort")
+                            .asString())
                     .isEqualTo("max");
             assertThat(receivedAuthorization.get()).isEqualTo("Bearer dad-key");
-            assertThat(body.propertyNames())
-                    .containsExactlyInAnyOrder("input", "provider", "model", "model_options");
+            assertThat(body.propertyNames()).containsExactlyInAnyOrder("input", "provider", "model", "model_options");
         }
     }
 

@@ -237,9 +237,12 @@ class CostEstimatorTest {
         CostEstimator costs = new CostEstimator(catalog);
         TokenUsage tokens = usage(1000L, null, 500L);
 
-        assertThat(costs.estimate("provider-a", "shared-model", tokens).micros()).isEqualTo(6_000L);
-        assertThat(costs.estimate("provider-b", "shared-model", tokens).micros()).isEqualTo(20_000L);
-        assertThat(costs.estimate("provider-b", "shared-model", tokens).pricingVersion()).isEqualTo("b@1");
+        assertThat(costs.estimate("provider-a", "shared-model", tokens).micros())
+                .isEqualTo(6_000L);
+        assertThat(costs.estimate("provider-b", "shared-model", tokens).micros())
+                .isEqualTo(20_000L);
+        assertThat(costs.estimate("provider-b", "shared-model", tokens).pricingVersion())
+                .isEqualTo("b@1");
         assertThat(costs.estimate("provider-c", "shared-model", tokens)).isEqualTo(EstimatedCost.unknown());
     }
 
