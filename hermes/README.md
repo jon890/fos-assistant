@@ -164,6 +164,11 @@ terminal:
 `profiles[profile].env` 가 비면 `docker_env` 칸을 넣지 않고 지문을 계산한다. Hermes 의 config 저장이 빈 dict 를 기본값과 같다며 지우므로, 칸을 넣고 계산하면 저장된 `terminal:` 로 다시 계산한 지문이 키와 어긋난다.
 `fos-sandbox-profile` label 은 proxy 검사와 유휴 정리, 복구에서 정책의 profile 을 식별한다. API 요청으로 label 을 지정하지 못한다.
 
+docker `terminal:` 을 쓰는 같은 설정 쓰기에서 `approvals.unattended_mode: approve` 도 쓴다. `approvals` 의 다른 키는 그대로 둔다.
+`backend: local` 을 쓸 때는 `approvals.unattended_mode` 를 지운다. 남은 `approvals` 가 비면 블록째 지운다.
+그래서 API 경로의 `execute_code` 는 docker 실행 공간에서만 승인 없이 돈다. 셸 위험 명령과 커넥터 승인은 그대로 승인 카드로 간다.
+판정 경로는 [실행 공간](../docs/hermes/sandbox.md) 의 「`execute_code` 의 승인 판정」, 결정은 [ADR-20261008 / execute-code-unattended](../docs/adr/ADR-20261008-execute-code-unattended.md) 가 갖는다.
+
 **기존 Hermes 예약 작업은 기본 profile(local)에 남으며 아직 격리되지 않았다.**
 named profile 의 도구 저장은 기본 profile 설정과 예약 작업을 바꾸지 않는다.
 Control Plane 의 예약 작업과 매일 깨우기는 별도 기능이며 각각의 에이전트 profile 을 쓴다.

@@ -127,4 +127,5 @@
 | [ADR-20261008 / check-finding-reaction](ADR-20261008-check-finding-reaction.md) | 살펴보기 발견의 반응은 판단 피드백 사건으로 받고, 「관심 없음」 은 digest 기간 안에서만 같은 주제를 내린다 | backend, frontend | Accepted. ADR-20261007 / decision-feedback 의 「억제 규칙을 바꾸지 않는다」 와 ADR-081 의 되풀이 규칙에 예외를 둔다 |
 | [ADR-20261008 / connector-card](ADR-20261008-connector-card.md) | 커넥터 아이콘은 plugin 안의 파일을 카탈로그에 실어 같은 출처의 이미지로만 그리고, 링크는 https 만 받는다 | 공통 | Accepted. ADR-043 의 `connector.json` 에 화면용 선택 칸을 더한다 |
 | [ADR-20261008 / connector-output-files](ADR-20261008-connector-output-files.md) | 커넥터는 계산할 목록을 그 에이전트 실행 공간에 읽기 전용으로 붙는 파일로 내고, 계산은 스크립트가 한다 | hermes | Accepted. ADR-086 의 실행 공간에 커넥터 출력 디렉터리를 더한다 |
+| [ADR-20261008 / execute-code-unattended](ADR-20261008-execute-code-unattended.md) | docker 실행 공간을 쓰는 profile 은 API 경로의 `execute_code` 를 승인 없이 컨테이너에서 돌린다 | hermes | Accepted. ADR-086 의 실행 공간 설정에 `approvals.unattended_mode` 를 더한다 |
 | [ADR-20261008 / read-data-flow](ADR-20261008-read-data-flow.md) | 커넥터 READ 결과는 가는 곳마다 따로 판정하고, 판정하지 못하는 길은 감수로 적는다 | 공통 | Accepted. ADR-083 과 ADR-086 의 「감당할 것」 을 흐름마다 나눠 적는다 |
