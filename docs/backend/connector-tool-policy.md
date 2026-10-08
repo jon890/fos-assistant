@@ -109,7 +109,7 @@ Hermes 는 MCP 도구를 `mcp__<서버>__<도구>` 로 등록하면서 글자를
 | 대응의 서버와 맞는 도구 | 묻는다 | 묻는다 |
 | 대응의 어느 서버와도 맞지 않는 `mcp__` 도구 | 막는다. 그 profile 에는 커넥터 서버만 있다 | 건드리지 않는다. Control Plane MCP 와 운영자가 넣은 다른 MCP 서버의 도구다 |
 | `execute_code` | 막는다 | 건드리지 않는다. 그 안에서 부른 커넥터 도구는 session 이 없어 막힌다 |
-| 커넥터 도구의 결과 | 바꾸지 않는다. Control Plane 이 위임 결과를 감싼다 | hook 이 `<external-data>` 로 감싼다 |
+| 커넥터 도구의 결과 | 바꾸지 않는다. Control Plane 이 위임 결과를 감싼다 | hook 이 `<external-data>` 로 감싼다. 그 에이전트의 위임 결과도 Control Plane 이 감싼다 |
 
 **바인딩 profile 에서 대응에 실리지 않은 커넥터 서버는 판정 없이 나간다.**
 그래서 바인딩 설치와 떼기는 manifest 를 읽지 못했거나 소유 기록의 서버 이름이나 실행 정의가 지금 manifest 와 다른 서버도 소유 기록의 이름으로 빈 `tools` 와 함께 싣는다. Control Plane 은 그 서버의 도구를 선언 없는 도구로 막는다.

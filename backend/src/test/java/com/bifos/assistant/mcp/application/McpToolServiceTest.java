@@ -9,6 +9,7 @@ import static org.mockito.Mockito.when;
 import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
+import com.bifos.assistant.agent.application.AgentConnectorBindings;
 import com.bifos.assistant.agent.infra.AgentRepository;
 import com.bifos.assistant.chat.application.ArtifactWriteRequest;
 import com.bifos.assistant.chat.application.ArtifactWriteService;
@@ -50,6 +51,7 @@ class McpToolServiceTest {
                     new DelegationProperties(2, 4, 16, Duration.ofSeconds(30), 1000, Duration.ofSeconds(20))),
             mock(ExecutionDeliveryWriter.class),
             mock(AgentRepository.class),
+            mock(AgentConnectorBindings.class),
             mock(FollowUpService.class),
             mock(McpMemoryRemember.class),
             Clock.systemUTC());
