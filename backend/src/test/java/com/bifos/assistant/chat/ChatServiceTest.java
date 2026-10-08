@@ -613,6 +613,32 @@ class ChatServiceTest {
                 .isZero();
     }
 
+    @Test
+    @DisplayName("목록에서 숨긴 대화에 사용자가 질문을 보내면 숨김이 풀려 다시 목록에 보인다")
+    void showsHiddenConversationAgainWhenUserSendsQuestion() {
+        CurrentUser dad = member("dad@example.com", "dad");
+        stub().willReturn(HermesRunResult.of("run-1", "sess-1", "completed", "네", "m", "p", TokenUsage.empty()));
+        ChatTurn first = chat.send(dad, null, "안녕", "dad");
+        assertThat(conversationWriter.hideFromList(first.conversationId(), Instant.parse("2026-11-01T00:00:00Z")))
+                .as("숨긴 대화 수")
+                .isEqualTo(1);
+        assertThat(chat.conversationsOf(dad, null, 10).items())
+                .extracting(Conversation::id)
+                .as("숨긴 뒤의 목록")
+                .doesNotContain(first.conversationId());
+
+        stub().willReturn(HermesRunResult.of("run-2", "sess-1", "completed", "네", "m", "p", TokenUsage.empty()));
+        chat.send(dad, first.conversationId(), "하나 더", "dad");
+
+        assertThat(conversations.findById(first.conversationId()).orElseThrow().hiddenAt())
+                .as("질문 뒤의 숨긴 시각")
+                .isNull();
+        assertThat(chat.conversationsOf(dad, null, 10).items())
+                .extracting(Conversation::id)
+                .as("질문 뒤의 목록")
+                .contains(first.conversationId());
+    }
+
     /** Hermes 가 받은 session 을 그대로 돌려주게 한다. 실제 Hermes 가 모르는 id 를 받았을 때와 같다. */
     private void hermesEchoesSession() {
         stub().willAnswer(command -> HermesRunResult.of(

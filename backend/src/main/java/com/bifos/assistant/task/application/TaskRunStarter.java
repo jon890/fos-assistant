@@ -55,6 +55,9 @@ import org.springframework.transaction.support.TransactionTemplate;
 @RequiredArgsConstructor
 public class TaskRunStarter {
 
+    /** 답 전체가 이 표시면 그 발화는 알릴 것 없이 끝난다. 앞뒤 공백만 무시하고 대소문자는 가린다. */
+    static final String NOTHING_TO_REPORT = "[SILENT]";
+
     private final TaskRunRepository runs;
     private final TaskRepository tasks;
     private final AppUserRepository users;
@@ -133,7 +136,7 @@ public class TaskRunStarter {
             backgroundTasks.start("task-run-" + runId, () -> runTurn(runId, prepared, handle));
         } catch (RuntimeException | Error ex) {
             log.warn("예약 작업의 turn 스레드를 띄우지 못했다 taskRunId={}", runId, ex);
-            finishSafely(runId, null, false, true);
+            finishSafely(runId, null, null, false, true);
             turns.close(handle);
             return false;
         }
@@ -355,15 +358,15 @@ public class TaskRunStarter {
                     "예약 작업 「" + prepared.title() + "」 을 시작했어요",
                     prepared.instruction(),
                     event -> hub.publish(conversationId, event));
-            finishSafely(runId, turn.executionId(), turn.cancelled(), false);
+            finishSafely(runId, turn.executionId(), turn.assistantText(), turn.cancelled(), false);
         } catch (ApiException ex) {
             log.warn("예약 작업의 turn 이 실패했다 taskRunId={} code={}", runId, ex.code(), ex);
             hub.publish(conversationId, ChatEvent.error(ex.code().name(), ex.getMessage()));
-            finishSafely(runId, null, false, true);
+            finishSafely(runId, null, null, false, true);
         } catch (RuntimeException ex) {
             log.error("예약 작업의 turn 이 예외로 끝났다 taskRunId={}", runId, ex);
             hub.publish(conversationId, ChatEvent.error("INTERNAL_ERROR", "internal error"));
-            finishSafely(runId, null, false, true);
+            finishSafely(runId, null, null, false, true);
         } finally {
             turns.close(handle);
         }
@@ -372,8 +375,13 @@ public class TaskRunStarter {
     /**
      * 도는 줄의 결과를 적고 알린다. 적지 못해도 예외를 올리지 않는다. 그 줄은 {@code RUNNING} 으로 남아 다음 기동의 정리가
      * 닫는다.
+     *
+     * <p>답 전체가 {@link #NOTHING_TO_REPORT} 면 「보고할 것 없음」 으로 닫고, {@code NEW_PER_RUN} 대화는 같은 트랜잭션에서
+     * 목록에서만 뺀다. 대화를 지우지 않으므로 실행 기록에서 그 대화를 열 수 있다.
+     *
+     * @param answer turn 의 마지막 답 글. 실패했거나 답이 없으면 null
      */
-    private void finishSafely(Long runId, Long executionId, boolean cancelled, boolean failed) {
+    private void finishSafely(Long runId, Long executionId, String answer, boolean cancelled, boolean failed) {
         try {
             transactions.executeWithoutResult(status -> {
                 TaskRun run = runs.findByIdForUpdate(runId).orElse(null);
@@ -381,14 +389,20 @@ public class TaskRunStarter {
                     return;
                 }
                 Instant now = clock.instant();
+                Task task = tasks.findById(run.taskId()).orElseThrow();
                 if (failed) {
                     run.fail(TaskRunReason.FAILED, now);
                 } else if (cancelled) {
                     run.cancel(executionId, now);
+                } else if (answer != null && NOTHING_TO_REPORT.equals(answer.strip())) {
+                    run.succeedQuietly(executionId, now);
+                    if (task.conversationMode() == ConversationMode.NEW_PER_RUN && run.conversationId() != null) {
+                        chat.hideTaskConversation(run.conversationId(), now);
+                    }
                 } else {
                     run.succeed(executionId, now);
                 }
-                notices.announce(tasks.findById(run.taskId()).orElseThrow(), run);
+                notices.announce(task, run);
             });
         } catch (RuntimeException ex) {
             log.warn("예약 작업의 발화 결과를 적지 못했다 taskRunId={}", runId, ex);

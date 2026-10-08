@@ -13,6 +13,7 @@ import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import java.time.Clock;
+import java.time.Instant;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
@@ -97,6 +98,11 @@ class ChatConversationManagement {
     /** 예약 작업 발화가 그 대화를 작업의 단계로 고르게 한다. 부르는 쪽의 트랜잭션이 있으면 그 안에서 바꾼다. */
     void chooseTierForTask(Long conversationId, ModelTier tier) {
         conversationWriter.chooseTierForTask(conversationId, tier);
+    }
+
+    /** 예약 작업이 「보고할 것 없음」 으로 끝낸 대화를 목록에서만 뺀다. 부르는 쪽의 트랜잭션이 있으면 그 안에서 바꾼다. */
+    void hideTaskConversation(Long conversationId, Instant now) {
+        conversationWriter.hideFromList(conversationId, now);
     }
 
     void delete(CurrentUser user, Long conversationId) {

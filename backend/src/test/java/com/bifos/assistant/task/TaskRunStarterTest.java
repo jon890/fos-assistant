@@ -818,6 +818,87 @@ class TaskRunStarterTest {
         assertThat(conversation.modelTier()).as("대화의 단계").isNull();
     }
 
+    @Test
+    @DisplayName("답 전체가 [SILENT] 인 NEW_PER_RUN 발화는 NOTHING_TO_REPORT 로 끝나고 ALWAYS 여도 알리지 않으며 대화를 지우지 않고 목록에서만 뺀다")
+    void finishesQuietlyAndHidesNewPerRunConversation() {
+        Fixture fixture = fixture(ConversationMode.NEW_PER_RUN, NotifyPolicy.ALWAYS);
+        answerWith("  [SILENT]\n");
+        TaskRun run = queued(fixture, SCHEDULED, NOW);
+
+        starter.startQueued(NOW);
+
+        TaskRun finished = awaitFinished(run);
+        assertThat(finished.status()).isEqualTo(TaskRunStatus.SUCCEEDED);
+        assertThat(finished.reason()).as("발화의 까닭").isEqualTo(TaskRunReason.NOTHING_TO_REPORT);
+        assertThat(finished.executionId()).as("루트 실행 번호").isNotNull();
+        assertThat(notificationsOf(fixture.owner().id())).as("그 사용자의 알림").isEmpty();
+        Conversation conversation =
+                conversations.findById(finished.conversationId()).orElseThrow();
+        assertThat(conversation.hiddenAt()).as("목록에서 뺀 시각").isNotNull();
+        assertThat(conversation.deletedAt()).as("지운 시각").isNull();
+    }
+
+    @Test
+    @DisplayName("답 전체가 [SILENT] 인 SINGLE 발화는 NOTHING_TO_REPORT 로 끝나고 알리지 않지만 대화를 목록에서 빼지 않는다")
+    void finishesQuietlyWithoutHidingSingleConversation() {
+        Fixture fixture = fixture(ConversationMode.SINGLE, NotifyPolicy.ALWAYS);
+        answerWith("  [SILENT]\n");
+        TaskRun run = queued(fixture, SCHEDULED, NOW);
+
+        starter.startQueued(NOW);
+
+        TaskRun finished = awaitFinished(run);
+        assertThat(finished.status()).isEqualTo(TaskRunStatus.SUCCEEDED);
+        assertThat(finished.reason()).as("발화의 까닭").isEqualTo(TaskRunReason.NOTHING_TO_REPORT);
+        assertThat(notificationsOf(fixture.owner().id())).as("그 사용자의 알림").isEmpty();
+        assertThat(conversations
+                        .findById(finished.conversationId())
+                        .orElseThrow()
+                        .hiddenAt())
+                .as("목록에서 뺀 시각")
+                .isNull();
+    }
+
+    @Test
+    @DisplayName("답이 [SILENT] 로 시작해도 뒤에 글이 있으면 보통 SUCCEEDED 이고 TASK_SUCCEEDED 하나다")
+    void finishesNormallyWhenSilentMarkerHasTrailingText() {
+        assertFinishesNormally("[SILENT] 새 영상 없음");
+    }
+
+    @Test
+    @DisplayName("소문자 [silent] 는 표시로 보지 않아 보통 SUCCEEDED 이고 TASK_SUCCEEDED 하나다")
+    void finishesNormallyWhenSilentMarkerIsLowerCase() {
+        assertFinishesNormally("[silent]");
+    }
+
+    private void assertFinishesNormally(String answer) {
+        Fixture fixture = fixture(ConversationMode.NEW_PER_RUN, NotifyPolicy.ALWAYS);
+        answerWith(answer);
+        TaskRun run = queued(fixture, SCHEDULED, NOW);
+
+        starter.startQueued(NOW);
+
+        TaskRun finished = awaitFinished(run);
+        assertThat(finished.status()).isEqualTo(TaskRunStatus.SUCCEEDED);
+        assertThat(finished.reason()).as("답 %s 의 까닭", answer).isNull();
+        assertThat(conversations
+                        .findById(finished.conversationId())
+                        .orElseThrow()
+                        .hiddenAt())
+                .as("목록에서 뺀 시각")
+                .isNull();
+        assertThat(notificationsOf(fixture.owner().id()))
+                .extracting(Notification::kind)
+                .as("답 %s 의 알림", answer)
+                .containsExactly(NotificationKind.TASK_SUCCEEDED);
+    }
+
+    /** 가짜 Hermes 가 이 글로 답하게 한다. 나머지는 준비 단계의 답과 같다. */
+    private void answerWith(String text) {
+        stub().willReturn(HermesRunResult.of(
+                "run-task", "session", "completed", text, "model", "provider", TokenUsage.empty()));
+    }
+
     /** 다시 읽은 작업에 단계를 고른다. fixture 의 분리된 객체를 저장하면 merge 가 다른 칸을 그 때의 값으로 덮는다. */
     private void chooseTier(Fixture fixture, ModelTier tier) {
         Task task = tasks.findById(fixture.task().id()).orElseThrow();

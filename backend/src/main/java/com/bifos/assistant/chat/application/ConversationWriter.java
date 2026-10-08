@@ -62,6 +62,16 @@ public class ConversationWriter {
     }
 
     @Transactional
+    public int hideFromList(Long id, Instant now) {
+        return repository.hideFromList(id, now);
+    }
+
+    @Transactional
+    public int showInList(Long id) {
+        return repository.showInList(id);
+    }
+
+    @Transactional
     public int deleteIfActive(Long id, Long userId, Instant now) {
         return repository.deleteIfActive(id, userId, now);
     }
