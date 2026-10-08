@@ -29,8 +29,9 @@ OverrideProperties를 쓰지 않는다. 시험별 설정은 실제 MemoryService
 `ContextProperties`에 `Duration memoryStaleAfter`(설정 없으면 180일)와 `Map<String, Duration> memoryCollectionStaleAfter`(설정 없으면 빈 맵)를 추가한다.
 collection별 기준이 있으면 기본값보다 우선한다. 기준 0 이하는 UNKNOWN으로 판정하는 명시적 끄기다.
 맵은 방어 복사하여 불변으로 둔다. ContextAssembler에 Clock을 주입하고 assemble마다 now를 한 번 읽는다.
-always/index/omitted 항목 모두 updatedAt으로 판정하며 기준 없음 또는 수정 시각 없음은 UNKNOWN이다.
-예산 계산에서 불필요한 문맥 항목 생성이 있으면 제목 기반 길이 계산으로 정리한다.
+always/index/omitted 항목 모두 updatedAt으로 판정한다. ContextAssembler의 판정 함수는
+기준 없음 또는 0 이하를 먼저 검사해 UNKNOWN을 내고 나머지만 ResultHeader.freshnessOf에 넘긴다.
+예산 계산의 indexLength는 문맥 항목을 만들지 않고 제목과 동일한 충돌 표기로 길이를 계산한다.
 현재 주입 글, 예산, 지문, 권한, 암호문 건너뛰기를 유지한다.
 
 ### 2. ContextAssemblerTest, MemoryFreshnessTest, ContextPropertiesTest 테스트
@@ -46,7 +47,7 @@ collection 덮어쓰기, 기준 0 및 수정 시각 없음의 UNKNOWN을 검증�
 ## 검증
 
 ```bash
-cd backend && ./gradlew test --tests '*ContextAssemblerTest' --tests '*MemoryFreshnessTest' --tests '*ResultHeaderTest' --tests '*ExecutionContextSourceTest' --tests '*ConnectorActionDeliveryTest' --tests '*ResultDeliveryRetryTest'
+cd backend && ./gradlew test --tests '*ContextAssemblerTest' --tests '*ContextPropertiesTest' --tests '*MemoryFreshnessTest' --tests '*ResultHeaderTest' --tests '*ExecutionContextSourceTest' --tests '*ConnectorActionDeliveryTest' --tests '*ResultDeliveryRetryTest'
 cd backend && ./gradlew qualityCheck
 node scripts/check-file-length.mjs
 scripts/check-public-safe.sh
