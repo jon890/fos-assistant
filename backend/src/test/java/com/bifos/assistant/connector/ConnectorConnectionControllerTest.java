@@ -33,6 +33,7 @@ import com.bifos.assistant.connector.presentation.AdminAgentConnectionController
 import com.bifos.assistant.connector.presentation.ConnectionDtos;
 import com.bifos.assistant.connector.presentation.ConnectorConnectionAdminController;
 import com.bifos.assistant.connector.presentation.ConnectorConnectionController;
+import com.bifos.assistant.hermes.dto.ConnectorAppearance;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.auth.CurrentUserProvider;
 import com.bifos.assistant.shared.domain.type.UserRole;
@@ -59,6 +60,8 @@ class ConnectorConnectionControllerTest {
 
     private static final String AGENT = "a-owned";
     private static final Instant SHOWN = Instant.parse("2026-10-01T00:00:00Z");
+    private static final String ICON = "data:image/svg+xml;base64,PHN2Zy8+";
+    private static final String LINK = "https://notes.example.test/";
     private static final List<BoundAgentSummary> BINDINGS =
             List.of(new BoundAgentSummary(AGENT, "비서", BindingStatus.PENDING, true));
 
@@ -86,6 +89,7 @@ class ConnectorConnectionControllerTest {
                         DEMO,
                         "검사용 메모",
                         "검사에서만 쓰는 커넥터입니다.",
+                        new ConnectorAppearance(ICON, LINK),
                         List.of(
                                 new ConnectorFieldSummary("token", "토큰", "", true, true, "^demo_.+$", false, false),
                                 new ConnectorFieldSummary("scope", "범위", "", false, false, null, true, true)),
@@ -99,6 +103,8 @@ class ConnectorConnectionControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].id").value(DEMO))
                 .andExpect(jsonPath("$[0].title").value("검사용 메모"))
+                .andExpect(jsonPath("$[0].icon").value(ICON))
+                .andExpect(jsonPath("$[0].link").value(LINK))
                 .andExpect(jsonPath("$[0].myStatus").value("PENDING"))
                 .andExpect(jsonPath("$[0].available").value(true))
                 .andExpect(jsonPath("$[0].fields[0].key").value("token"))
@@ -126,9 +132,17 @@ class ConnectorConnectionControllerTest {
     void catalogMarksRemovedConnectorAsUnavailableWithEmptyFields() throws Exception {
         when(service.catalog(MEMBER))
                 .thenReturn(List.of(new ConnectorSummary(
-                        DEMO, DEMO, "", List.of(), List.of(), ConnectionStatus.READY, false, List.of())));
+                        DEMO,
+                        DEMO,
+                        "",
+                        ConnectorAppearance.NONE,
+                        List.of(),
+                        List.of(),
+                        ConnectionStatus.READY,
+                        false,
+                        List.of())));
 
-        mvc.perform(get("/api/v1/connectors"))
+        MvcResult result = mvc.perform(get("/api/v1/connectors"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].id").value(DEMO))
                 .andExpect(jsonPath("$[0].title").value(DEMO))
@@ -136,7 +150,10 @@ class ConnectorConnectionControllerTest {
                 .andExpect(jsonPath("$[0].myStatus").value("READY"))
                 .andExpect(jsonPath("$[0].available").value(false))
                 .andExpect(jsonPath("$[0].fields").isEmpty())
-                .andExpect(jsonPath("$[0].tools").isEmpty());
+                .andExpect(jsonPath("$[0].tools").isEmpty())
+                .andReturn();
+        // 응답은 null 칸을 빼지 않는다. 화면이 칸이 있는 null 을 받는지 본다.
+        assertThat(result.getResponse().getContentAsString()).contains("\"icon\":null", "\"link\":null");
     }
 
     @Test

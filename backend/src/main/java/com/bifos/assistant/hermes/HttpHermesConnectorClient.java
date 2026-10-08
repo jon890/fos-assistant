@@ -427,7 +427,6 @@ public class HttpHermesConnectorClient implements HermesConnectorClient {
         for (JsonNode field : declared) {
             fields.add(field(field));
         }
-        String description = text(item, "description");
         JsonNode schema = item.get("schema");
         JsonNode tools = item.get("tools");
         // 판이나 도구 선언의 모양이 틀리면 둘을 함께 버린다. 도구만 비우면 도구를 선언하지 않는 판으로 읽혀 통과한다.
@@ -435,7 +434,7 @@ public class HttpHermesConnectorClient implements HermesConnectorClient {
         return new ConnectorManifest(
                 requiredText(item, "id"),
                 requiredText(item, "title"),
-                description == null ? "" : description,
+                text(item, "description"),
                 fields,
                 requiredText(item.get("verify"), "tool"),
                 requiredText(item, "mcp_server"),
@@ -443,7 +442,8 @@ public class HttpHermesConnectorClient implements HermesConnectorClient {
                 optionalBoolean(item, "attachments", false),
                 readable ? schema(schema) : SCHEMA_UNREADABLE,
                 readable ? tools(tools) : List.of(),
-                names(item.get("skills")));
+                names(item.get("skills")),
+                ConnectorAppearances.read(item));
     }
 
     private static boolean readableSchema(JsonNode declared) {

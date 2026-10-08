@@ -46,7 +46,7 @@ hermes/
       __init__.py             register 와 기존 이름 다시 내보내기
       common.py, profiles.py, session.py
       sandbox.py, toolconfig.py, env.py
-      connector_schema.py, connector_policy.py, connector_skills.py
+      connector_schema.py, connector_policy.py, connector_skills.py, connector_appearance.py
       connector_manifest.py, connector_vault.py
       connector_state.py, connector_status.py
       connector_isolated.py, connector_binding.py, connector_install.py
