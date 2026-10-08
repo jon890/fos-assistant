@@ -8,7 +8,7 @@ import { NavPending } from "./nav-pending";
 
 const LINKS = [
   { href: "/agents", label: "에이전트" },
-  { href: "/connections", label: "연결" },
+  { href: "/connections", label: "외부 서비스 연결" },
   { href: "/tasks", label: "예약 작업" },
   { href: "/memory", label: "기억" },
   { href: "/usage", label: "사용량" },

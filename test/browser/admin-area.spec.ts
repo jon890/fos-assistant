@@ -183,7 +183,7 @@ test("연결 반영 확인은 관리자 영역에 있고 일반 연결 화면에
   await expect(page.getByTestId("connector-admin-panel")).toBeVisible();
 
   await page.goto("/connections");
-  await expect(page.getByRole("heading", { name: "연결", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "외부 서비스 연결", exact: true })).toBeVisible();
   await expect(page.getByTestId("connector-admin-panel")).toHaveCount(0);
 });
 

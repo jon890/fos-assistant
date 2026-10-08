@@ -107,7 +107,7 @@ function NotFound() {
         href="/connections"
         className="text-sm text-foreground underline underline-offset-4"
       >
-        연결 목록으로 돌아가기
+        서비스 연결로 돌아가기
       </Link>
     </div>
   );

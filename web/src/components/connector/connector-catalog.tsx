@@ -55,13 +55,13 @@ export function ConnectorCatalog() {
 
   return (
     <div className="mx-auto w-full max-w-2xl">
-      <h1 className="text-xl font-semibold">연결</h1>
+      <h1 className="text-xl font-semibold">외부 서비스 연결</h1>
       <p className="mt-1 mb-4 text-sm text-muted-foreground">
-        계정을 한 번 연결하고, 에이전트 화면에서 그 에이전트가 쓸 연결을 붙여요.
+        쓰는 서비스의 계정을 연결하면 에이전트가 그 서비스로 일을 도와요.
       </p>
       {error ? (
         <Notice variant="error" role="alert">
-          연결 목록을 읽지 못했어요. {error}
+          서비스 목록을 읽지 못했어요. {error}
         </Notice>
       ) : connectors === null ? (
         <p className="text-sm text-muted-foreground">불러오는 중…</p>

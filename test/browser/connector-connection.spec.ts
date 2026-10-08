@@ -865,7 +865,7 @@ test("붙인 에이전트는 이름과 반영 대기로 보이고 상세로 이�
   await page.goto("/connections");
   await expect(
     page.getByText(
-      "계정을 한 번 연결하고, 에이전트 화면에서 그 에이전트가 쓸 연결을 붙여요.",
+      "쓰는 서비스의 계정을 연결하면 에이전트가 그 서비스로 일을 도와요.",
     ),
   ).toBeVisible();
   await expect(page.getByTestId("connector-binding-count")).toHaveText(

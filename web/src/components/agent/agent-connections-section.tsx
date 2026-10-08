@@ -142,7 +142,7 @@ function ConnectionRow({
         </p>
         {!view.bound && !ready && !blocked ? (
           <p className="mt-1 text-xs text-muted-foreground">
-            연결 화면에서 연결을 확인해 주세요.
+            서비스 연결에서 연결을 확인해 주세요.
           </p>
         ) : null}
         {view.skills.length > 0 && skillsOff ? (
@@ -277,7 +277,7 @@ export function AgentConnectionsSection({
             href="/connections"
             className="text-foreground underline underline-offset-4"
           >
-            연결 화면
+            서비스 연결
           </Link>
           에서 먼저 연결해요.
         </p>
@@ -289,7 +289,7 @@ export function AgentConnectionsSection({
               href="/connections"
               className="text-foreground underline underline-offset-4"
             >
-              연결 화면
+              서비스 연결
             </Link>
             에서 연결해요.
           </p>
