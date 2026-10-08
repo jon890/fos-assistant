@@ -18,7 +18,8 @@ import org.springframework.stereotype.Component;
  * 끝난 살펴보기의 판단 피드백 사건을 남긴다(ADR-20261007 decision-feedback).
  *
  * <p>사용자가 연 살펴보기와 매일 깨우기는 검사한 보고를 남겼을 때만 {@code SURFACED} 다. 알릴 것이 없어 보고를 남기지 않은 침묵은 사건이
- * 아니다. 자동 실행({@code AUTONOMY})은 사용자에게 보이지 않으므로 실행 결과만 남긴다.
+ * 아니다. 보고를 보이면 그 살펴보기의 「새로 알릴 것」 발견마다 {@code SURFACED} 도 남긴다. 자동 실행({@code AUTONOMY})은 사용자에게
+ * 보이지 않으므로 실행 결과만 남긴다.
  */
 @Component
 @RequiredArgsConstructor
@@ -26,6 +27,7 @@ public class CheckFeedback {
 
     private final DecisionFeedbackRecorder feedback;
     private final ProactiveCheckRepository checks;
+    private final CheckFindingReactions reactions;
     private final Clock clock;
 
     /**
@@ -52,6 +54,7 @@ public class CheckFeedback {
         }
         if (check.report() != null) {
             feedback.record(entry(check, FeedbackEventType.SURFACED));
+            reactions.surfaced(check);
         }
     }
 

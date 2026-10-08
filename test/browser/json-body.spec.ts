@@ -27,6 +27,7 @@ const ROUTES: ReadonlyArray<{ method: "POST" | "PUT" | "PATCH"; path: string }> 
   { method: "PATCH", path: "/api/admin/people/1" },
   { method: "POST", path: "/api/memories" },
   { method: "PATCH", path: "/api/memories/1" },
+  { method: "PUT", path: "/api/check-findings/1/reaction" },
 ];
 
 const INVALID = { code: "VALIDATION_FAILED", message: "요청 내용이 올바르지 않아요." };

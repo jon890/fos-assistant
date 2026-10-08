@@ -11,7 +11,7 @@
 | --- | --- | --- |
 | `id` | BIGINT PK | |
 | `user_id` | BIGINT FK `app_user` ON DELETE CASCADE | 기록의 주인. 다른 사용자는 관리자여도 읽지 못한다 |
-| `subject_type` | VARCHAR(24) | `FOLLOW_UP`, `MEMORY`, `CONNECTOR_ACTION`, `CHECK`, `AUTONOMY_DECISION` |
+| `subject_type` | VARCHAR(24) | `FOLLOW_UP`, `MEMORY`, `CONNECTOR_ACTION`, `CHECK`, `CHECK_FINDING`, `AUTONOMY_DECISION` |
 | `subject_key` | VARCHAR(80) | 제안의 열쇠. 지금 화면의 `itemKey` 와 같은 모양이다. 같은 제안의 사건을 잇는 correlation key 다 |
 | `event_type` | VARCHAR(24) | `SURFACED`, `ACCEPTED`, `DISMISSED`, `POSTPONED`, `EDITED`, `APPROVED`, `REJECTED`, `EXECUTION_SUCCEEDED`, `EXECUTION_FAILED` |
 | `actor` | VARCHAR(16) | `USER`, `AGENT`, `SYSTEM` |

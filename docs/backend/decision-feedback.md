@@ -4,6 +4,7 @@
 결정은 [ADR-20261007 / decision-feedback](../adr/ADR-20261007-decision-feedback.md)에 있다.
 칸은 [`schema/feedback.md`](schema/feedback.md) 가 갖는다.
 이 기록은 개인화 모델이 아니다. Memory, 할 일의 억제 규칙, 지금 화면의 판정을 바꾸지 않는다.
+예외는 살펴보기 발견의 「관심 없음」 하나다. 같은 점검 대화의 digest 기간 안에서만 같은 주제를 내린다([ADR-20261008 / check-finding-reaction](../adr/ADR-20261008-check-finding-reaction.md)). 아래 「살펴보기 발견의 지금 반응」 을 본다.
 
 ## 이어지는 기록
 
@@ -50,6 +51,8 @@
 | | `REJECTED` | `reject` |
 | | `EXECUTION_SUCCEEDED`, `EXECUTION_FAILED` | 실행 결과가 `SUCCEEDED`, `FAILED` 일 때. 실패는 커넥터가 선언한 오류 코드를 `reason_code` 에 둔다 |
 | 지금 화면의 제안 항목 | `DISMISSED`, `POSTPONED` | `NEEDS_ME` 카드의 `FOLLOW_UP_PROPOSED`, `MEMORY_PROPOSED`, `APPROVAL_PENDING` 항목을 숨기거나 미뤘을 때. 열쇠는 그 `itemKey` 다. 제안의 대화(할 일, 승인 줄)나 제안한 실행(Memory)을 채우고, 원천을 찾지 못하면 남기지 않는다 |
+| 살펴보기 발견(`check_finding:<번호>`) | `SURFACED` | 그 살펴보기의 `SURFACED` 를 남길 때 「새로 알릴 것」(`kind = NEW`) 발견마다. 주체는 `SYSTEM` 이다 |
+| | `ACCEPTED`, `POSTPONED`, `DISMISSED` | 점검 대화의 발견 단추 「받아들임」, 「나중에」, 「관심 없음」. 지금 반응과 같은 단추를 다시 누르면 남기지 않는다 |
 | 살펴보기(`proactive_check:<번호>`) | `SURFACED` | 사용자가 열었거나 매일 깨우기로 돈 살펴보기가 검사한 보고를 남기고 끝났을 때 |
 | | `EXECUTION_SUCCEEDED`, `EXECUTION_FAILED` | `AUTONOMY` 살펴보기가 끝났을 때. 결과 블록을 읽지 못했으면 `INVALID_RESULT`, 멈추거나 실패했으면 그 오류 코드다. 기동 정리가 닫은 줄은 `INTERRUPTED` 다 |
 | 행동 정책 판정(`autonomy_decision:<번호>`) | `EXECUTION_FAILED` | 자동 실행을 시작하지 못했을 때. 오류 코드를 `reason_code` 에 둔다 |
@@ -75,7 +78,7 @@
 
 반응은 저장하지 않는다. replay 읽기 모델이 제안 하나의 사건을 그때마다 읽는다. 규칙 버전은 `FeedbackLabeler.VERSION` 이고 지금은 2다.
 
-1. 사용자 사건 가운데 처음 나온 `ACCEPTED`, `APPROVED` 는 `ACCEPTED`, 처음 나온 `REJECTED` 와 할 일의 그만둠(`DISMISSED`)은 `DECLINED` 다
+1. 사용자 사건 가운데 처음 나온 `ACCEPTED`, `APPROVED` 는 `ACCEPTED`, 처음 나온 `REJECTED` 와 할 일의 그만둠, 살펴보기 발견의 「관심 없음」(`DISMISSED`)은 `DECLINED` 다
 2. 그런 사건이 없고 `POSTPONED` 나 지금 화면의 숨기기(`DISMISSED`, `ATTENTION_HIDE`)가 있으면 `DEFERRED` 다
 3. 그것도 없고 `SURFACED` 가 있으면 `NO_RESPONSE` 다
 4. 보인 기록이 없으면 `NOT_SURFACED` 다
@@ -99,6 +102,12 @@
 - `persistentPreference` 는 사용자의 마지막 결정(받아들임, 거절, 되돌림)이 받아들임인 Memory 제안만 참이다. 첫 반응은 그대로 `ACCEPTED` 로 읽되, 받아들인 뒤 되돌리거나 거절했으면 오래 가는 선호가 아니다. 오래 가는 선호는 Memory 에만 남는다([ADR-012](../adr/ADR-012-memory-는-사람이-승인한-것만-남는다.md), [ADR-20261007 / memory-remember](../adr/ADR-20261007-memory-remember.md))
 - 규칙 버전 2 에서 `persistentPreference` 를 마지막 결정 기준으로 바꿨다. 버전 1 은 받아들인 사건이 하나라도 있으면 참이었다
 - 에이전트와 시스템의 사건은 사용자 반응이 아니다
+
+### 살펴보기 발견의 지금 반응
+
+발견의 지금 반응은 그 발견의 사용자 사건 가운데 마지막 `ACCEPTED`, `POSTPONED`, `DISMISSED` 다. 사용자가 단추를 바꾸면 지금 반응도 바뀐다.
+위 첫 반응 규칙과 다르다. replay 는 첫 반응 규칙대로 「받아들임」 을 `ACCEPTED`, 「관심 없음」 을 `DECLINED`, 「나중에」 를 `DEFERRED` 로 읽는다. 지금 반응은 replay 에 쓰지 않고 다음 살펴보기의 입력과 되풀이 판정에만 쓴다([먼저 살펴보기](proactive-check.md)의 「살펴보기가 읽는 맥락」 과 「검사」).
+「관심 없음」 이 그 발견의 주제를 내리는 것은 그 발견을 알린 시각부터 같은 점검 대화의 `digest-window` 안뿐이다. 기간이 지나면 같은 주제를 다시 알릴 수 있다.
 
 ## replay 읽기 모델
 
@@ -146,10 +155,11 @@
 | 제안 | 매일 깨우기 살펴보기의 보고 `SURFACED`, 그 트리가 낸 할 일과 Memory 의 `SURFACED` |
 | 침묵 | 보고 없는 상황. 사건은 없다 |
 | 숨기기와 미루기 | 지금 화면의 제안 항목 `DISMISSED`, `POSTPONED`. 보고 항목에는 숨기기 단추가 없다 |
+| 발견 반응 | 점검 대화의 발견 단추가 남기는 `check_finding` 의 `ACCEPTED`, `POSTPONED`, `DISMISSED`. 그 살펴보기의 결정에 묶인다 |
 | 관심 범위 줄이기 | 대화에서 나온 Memory 제안의 `ACCEPTED` 나 `REJECTED`. 받아들인 것만 오래 가는 선호다 |
 | 할 일 | 할 일의 `ACCEPTED`, `EDITED`, `EXECUTION_SUCCEEDED`, `DISMISSED`. 모두 그 살펴보기의 결정에 묶인다 |
 
-대화로 「이런 공고는 관심 없다」 고 답한 글 자체는 기록하지 않는다. 그 글은 대화에만 있다.
+대화로 「이런 공고는 관심 없다」 고 답한 글 자체는 기록하지 않는다. 그 글은 대화에만 있다. 발견 하나에 대한 거절은 발견 단추로 남긴다.
 
 ## 보관과 삭제
 

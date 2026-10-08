@@ -25,6 +25,8 @@ type ToolsetsView = { toolsets: { name: string; enabled: boolean }[] };
 type AgentView = { code: string };
 type AdminAgentView = { code: string; enabled: boolean; visibility: string; proactiveCheckWritesAllowed: boolean };
 type ConnectorActionView = { actionId: string; status: string };
+type CheckFindingsView = { dismissWindowDays: number; findings: { id: number; topicKey: string | null; reaction: string | null }[] };
+type FeedbackExport = { records: { subjects: { subjectKey: string; label: string | null }[] }[] };
 
 /** 살펴볼 일반 에이전트다. 연결의 주인인 아빠의 비공개 에이전트라 그 연결을 붙일 수 있다. */
 const AGENT = "dad";
@@ -532,6 +534,50 @@ export const proactiveCheckScenario: Scenario = {
         JSON.stringify(linkTargets(contextAnswer)) === JSON.stringify([WEB_ONLY.sourceUrl, WEB_ONLY.sourceUrl]),
         `보고 근거와 발견 상세에 달라진 발견의 링크만 남아야 한다: ${JSON.stringify(linkTargets(contextAnswer))}\n${contextAnswer}`,
       );
+
+      step("발견 반응: 「관심 없음」 을 누른 주제는 원문 주소와 달라진 점이 새로워도 이미 알린 것으로 내려가고 입력에 반응이 실린다");
+      const reacted = expectStatus(
+        await call(context, `/chat/conversations/${conversationId}/check-findings`, { token: context.tokens.dad }),
+        200,
+        "점검 대화의 발견 목록",
+      ).json<CheckFindingsView>().findings.filter((finding) => finding.topicKey === WEB_ONLY.topicKey).at(-1);
+      if (reacted === undefined) fail(`발견 목록에 ${WEB_ONLY.topicKey} 가 없다`);
+      const reactionPath = `/check-findings/${reacted.id}/reaction`;
+      expectStatus(
+        await call(context, reactionPath, { method: "PUT", token: context.tokens.dad, body: { reaction: "DISMISSED" } }),
+        204,
+        "관심 없음 반응",
+      );
+      expectStatus(
+        await call(context, reactionPath, { method: "PUT", token: context.tokens.kid, body: { reaction: "DISMISSED" } }),
+        404,
+        "다른 사용자의 반응",
+      );
+      const beforeDismissed = (await statusOf(context)).lastCheck;
+      context.hermes.setProactiveScript({
+        output: proactiveOutput({
+          version: 1,
+          outcome: "FINDINGS",
+          findings: [{
+            ...currentFinding({ ...WEB_ONLY, sourceUrl: `${WEB_ONLY.sourceUrl}/next` }, new Date().toISOString()),
+            changeSinceLast: CHANGE,
+          }],
+        }),
+      });
+      await startCheck(context);
+      await awaitFinished(context, beforeDismissed, "관심 없음 뒤 살펴보기");
+      const dismissedInput = context.hermes.proactiveInputs().at(-1)?.input ?? "";
+      expect(dismissedInput.includes("· 반응 관심 없음"), `살펴보기 입력에 「관심 없음」 반응이 없다:\n${dismissedInput}`);
+      const dismissedAnswer = lastAnswer(await messagesOf(context, conversationId), "관심 없음 뒤 살펴보기").content;
+      expect(
+        dismissedAnswer.includes(`- ${WEB_ONLY.title}: 이미 알린 것이에요`),
+        `관심 없음 주제가 이미 알린 것으로 내려가지 않았다:\n${dismissedAnswer}`,
+      );
+      const subjectKey = `check_finding:${reacted.id}`;
+      const subject = expectStatus(
+        await call(context, "/decision-feedback/export", { token: context.tokens.dad }), 200, "판단 피드백 내보내기",
+      ).json<FeedbackExport>().records.flatMap((record) => record.subjects).find((each) => each.subjectKey === subjectKey);
+      expect(subject?.label === "DECLINED", `${subjectKey} 의 반응 읽기가 DECLINED 가 아니다: ${JSON.stringify(subject)}`);
 
       step("다른 사용자: 이 에이전트의 상태 조회와 시작이 404 이고 대화 목록에 이 점검 대화가 없다");
       for (const [method, path] of [["GET", CHECK_PATH], ["POST", `${CHECK_PATH}/runs`]] as const) {

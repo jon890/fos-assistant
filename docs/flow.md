@@ -167,6 +167,34 @@ flowchart TD
 
 흐름의 세부와 경계는 [`backend/proactive-check.md`](backend/proactive-check.md) 가 갖는다.
 
+### 발견에 반응할 때
+
+점검 대화의 답 아래 「새로 알릴 것」 발견마다 「받아들임」, 「나중에」, 「관심 없음」 이 있다.
+반응은 그 발견의 마지막 단추이고, 다음 살펴보기가 입력과 되풀이 판정에서 읽는다.
+
+```mermaid
+sequenceDiagram
+    participant B as 브라우저
+    participant C as Control Plane
+    participant H as Hermes
+
+    B->>C: GET 점검 대화의 check-findings
+    C-->>B: 발견, 지금 반응, dismissWindowDays
+    B->>C: PUT check-findings/{번호}/reaction
+    alt 남의 발견이거나 참고로 내린 발견
+        C-->>B: 404 PROACTIVE_CHECK_NOT_FOUND
+    else 지금 반응과 같다
+        C-->>B: 204. 사건을 더 남기지 않는다
+    else
+        C->>C: decision_feedback_event 에 check_finding 사건을 덧붙인다
+        C-->>B: 204. 화면이 목록을 다시 읽는다
+    end
+    Note over C,H: 다음 살펴보기
+    C->>H: 최근에 알린 발견과 그 반응을 입력에 싣는다
+    H-->>C: 결과 블록
+    C->>C: 「관심 없음」 주제 키는 digest-window 동안 REPEATED 로 내린다
+```
+
 ## 커넥터를 붙일 때
 
 커넥터는 에이전트에게 쥐어 주는 도구 묶음이다. 계정은 「연결」 화면에서 한 번 연결하고, 그 연결을 에이전트 상세에서 붙인다.

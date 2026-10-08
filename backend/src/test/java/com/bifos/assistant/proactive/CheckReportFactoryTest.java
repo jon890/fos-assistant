@@ -78,7 +78,7 @@ class CheckReportFactoryTest {
                 """).block();
         Instant now = Instant.parse("2026-10-05T00:00:00Z");
         List<JudgedFinding> judged = block.findings().stream()
-                .map(finding -> FindingJudgement.judge(finding, now, now, Set.of()))
+                .map(finding -> FindingJudgement.judge(finding, now, now, Set.of(), Set.of()))
                 .toList();
 
         CheckReport report = new CheckReportFactory(rootId -> List.of()).create(block, judged, null);

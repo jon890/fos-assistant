@@ -5,6 +5,7 @@ import static com.bifos.assistant.proactive.application.ProactiveCheckRun.NO_REC
 import static com.bifos.assistant.proactive.application.ProactiveCheckRun.OPENING;
 
 import com.bifos.assistant.chat.domain.type.MessageRole;
+import com.bifos.assistant.proactive.application.model.FindingReaction;
 import com.bifos.assistant.proactive.domain.ProactiveCheck;
 import com.bifos.assistant.proactive.domain.ProactiveCheckFinding;
 import com.bifos.assistant.proactive.domain.ProactiveCheckProblem;
@@ -103,6 +104,8 @@ class ProactiveCheckInput {
     /**
      * 최근에 알린 발견을 한 줄씩 적고 {@code <external-data>} 로 감싼다. 모델이 쓴 글에서 온 것이기 때문이다.
      *
+     * <p>줄 끝에 그 발견의 지금 반응을 붙인다. 반응 낱말은 Control Plane 이 정하지만 같은 줄의 제목이 모델 글이라 함께 감싼다.
+     *
      * <p>메시지 수는 그 발견을 낸 살펴보기가 끝난 뒤부터 센다. 같은 살펴보기의 발견은 한 번만 센다. 그 살펴보기가 끝난 시각이 없으면(서버가
      * 도중에 내려가 {@code RUNNING} 으로 남은 줄) 「모름」 이다.
      */
@@ -125,6 +128,10 @@ class ProactiveCheckInput {
                                 .toList())
                         .stream()
                         .collect(Collectors.toMap(ProactiveCheck::id, Function.identity()));
+        Map<Long, FindingReaction> reactions = deps.reactions()
+                .current(
+                        owner.id(),
+                        recent.stream().map(ProactiveCheckFinding::id).toList());
         Map<Long, String> countsByCheck = new HashMap<>();
         String lines = recent.stream()
                 .map(finding -> "- [" + finding.area() + "] " + orDash(finding.topicKey())
@@ -136,7 +143,8 @@ class ProactiveCheckInput {
                                 finding.checkId(),
                                 id -> userMessagesAfter(Optional.ofNullable(checksById.get(id))
                                         .map(ProactiveCheck::finishedAt)
-                                        .orElse(null))))
+                                        .orElse(null)))
+                        + " · 반응 " + reactionLabel(reactions.get(finding.id())))
                 .collect(Collectors.joining("\n"));
         return ExternalData.wrap(lines);
     }
@@ -156,6 +164,18 @@ class ProactiveCheckInput {
                 .map(problem -> "- " + orDash(problem.problemKey()) + " · " + orDash(problem.problem()))
                 .collect(Collectors.joining("\n"));
         return ExternalData.wrap(lines);
+    }
+
+    /** 입력에 싣는 지금 반응의 낱말이다. 반응이 없으면 「없음」 이다. */
+    private static String reactionLabel(FindingReaction reaction) {
+        if (reaction == null) {
+            return "없음";
+        }
+        return switch (reaction) {
+            case ACCEPTED -> "받아들임";
+            case POSTPONED -> "나중에";
+            case DISMISSED -> "관심 없음";
+        };
     }
 
     private static String orDash(String value) {

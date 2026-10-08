@@ -75,6 +75,7 @@ public class ProactiveCheckService {
     private final ExecutionDeliveryWriter deliveryWriter;
     private final ApplicationEventPublisher events;
     private final CheckFeedback feedback;
+    private final CheckFindingReactions reactions;
     private final Clock clock;
     private final TransactionTemplate transactions;
     private final BackgroundTasks backgroundTasks;
@@ -355,6 +356,7 @@ public class ProactiveCheckService {
                 findings,
                 problems,
                 followUps,
+                reactions,
                 messages,
                 executions,
                 contextAssembler,
