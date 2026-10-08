@@ -398,7 +398,10 @@ public class TaskRunStarter {
                     run.cancel(executionId, now);
                 } else if (answer != null && NOTHING_TO_REPORT.equals(answer.strip())) {
                     run.succeedQuietly(executionId, now);
-                    if (task.conversationMode() == ConversationMode.NEW_PER_RUN && run.conversationId() != null) {
+                    // 발화 중에 SINGLE 을 NEW_PER_RUN 으로 바꿔도 작업에 남은 SINGLE 대화는 숨기지 않는다.
+                    if (task.conversationMode() == ConversationMode.NEW_PER_RUN
+                            && run.conversationId() != null
+                            && !run.conversationId().equals(task.conversationId())) {
                         chat.hideTaskConversation(run.conversationId(), now);
                     }
                 } else {

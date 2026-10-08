@@ -179,7 +179,7 @@ const REASON_TEXTS: Record<string, string> = {
   NOTHING_TO_REPORT: "알릴 것이 없어 조용히 끝냈어요",
 };
 
-/** 실행이 건너뛰어졌거나 실패한 까닭을 화면 문구로 바꾼다. 보이지 않을 까닭은 null 이다. */
+/** 실행이 건너뛰어졌거나 실패한 까닭과 조용히 끝낸 까닭을 화면 문구로 바꾼다. 보이지 않을 까닭은 null 이다. */
 export function runReasonText(reason: string | null): string | null {
   if (reason === null) return null;
   return REASON_TEXTS[reason] ?? null;
