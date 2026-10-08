@@ -65,11 +65,11 @@ flowchart LR
 | 수단 | 보장하는 것 | 보장하지 않는 것 |
 | --- | --- | --- |
 | `<external-data>` 감싸기 | 바인딩 profile 의 커넥터 도구 결과에 출처 안내와 닫는 표시 바꾸기를 붙인다. Hermes 의 `<untrusted_tool_result>` 가 그 바깥에 한 번 더 있다 | 모델이 그 글을 지시로 따르지 않는 것. hook 이 실패하면 감싸기 없이 원래 결과가 간다. 셸, 웹, 파일 도구의 결과와 커넥터 출력 파일은 감싸지 않는다 |
-| 커넥터 도구 판정 | 바인딩한 커넥터 서버의 도구만 지나간다. 선언 없는 도구, `DESTRUCTIVE`, `FINANCIAL` 은 거절한다. 쓰기는 승인이나 상시 허락이 있어야 나간다. Control Plane 이 답하지 않거나 틀린 답을 주면 막는다 | 인자에 무엇이 실렸는지, 그 글이 다른 커넥터에서 왔는지. `fos-ctx` 가 꺼지거나 옛 판이면 판정 없이 나간다. 그때 연결 확인이 바인딩을 `PENDING` 으로 둔다 |
+| 커넥터 도구 판정 | 바인딩한 커넥터 서버의 도구만 지나간다. `schema: 2` 의 선언 없는 도구, `DESTRUCTIVE`, `FINANCIAL` 은 거절한다. `schema: 1` 의 선언 없는 도구는 쓰기로 읽는다. 쓰기는 승인이나 상시 허락이 있어야 나간다. Control Plane 이 답하지 않거나 틀린 답을 주면 막는다 | 인자에 무엇이 실렸는지, 그 글이 다른 커넥터에서 왔는지. `fos-ctx` 가 꺼지거나 옛 판이면 판정 없이 나간다. 그때 연결 확인이 바인딩을 `PENDING` 으로 둔다 |
 | 승인 카드 | 사람이 그 호출의 인자를 보고 정한다. 상시 허락을 닫은 도구는 가려지는 글이 있으면 승인하지 못한다 | 상시 허락이 있는 기간의 호출. 사람이 본문을 읽지 않고 누르는 것 |
 | 실행 공간 | 등록한 profile 의 셸, 파일 도구, `execute_code` 가 profile `.env`, 연결 보관 파일, 대응 파일, 다른 사용자의 파일에 닿지 않는다 | 밖으로 나가는 요청. 실행 공간을 적용하지 않은 profile. 컨테이너 밖에서 도는 web, browser 도구 |
 | 바인딩의 주인과 공개 범위 | 연결이 붙은 에이전트는 `PRIVATE` 이고 주인이 자기 연결만 붙인다. 남이 주인의 계정으로 외부 서비스를 부르지 못한다 | 주인 자신의 실행 안에서 글이 어디로 가는지 |
-| `memory_remember` 의 바깥 도구 확인 | 그 대화에 Control Plane MCP 밖의 도구나 하위 에이전트가 있었으면 바로 저장하지 않고 제안으로 둔다 | 사건 저장이 실패해 도구 시작 줄이 빠진 대화 |
+| `memory_remember` 의 바깥 도구 확인 | 근거가 이번 질문 원문에 있고, 그 대화의 도구가 모두 안쪽 목록(`McpMemoryRemember.INTERNAL_TOOLS`)에 들 때만 바로 저장한다. 커넥터 도구, 웹, 하위 에이전트, 맡긴 실행의 답을 돌려주는 `agent_status` 가 하나라도 있으면 제안으로 둔다 | 사건 저장이 실패해 도구 시작 줄이 빠진 대화 |
 | 도구 내용 가림 | 커넥터 도구의 입력과 결과는 실행 기록에 `[연결 도구 내용 가림]` 만 남는다. 다른 도구는 비밀 모양을 가리고 500자로 자른다 | 비밀 모양이 아닌 본문. 하위 에이전트의 목표 |
 
 ## 흐름 판정 코드
@@ -89,6 +89,7 @@ flowchart LR
 | `READ_ONLY_RUN` | 거절 | 사람이 보지 않는 먼저 살펴보기 트리라 승인 없는 READ 만 받는다 |
 | `NO_SESSION` | 거절 | 실행 맥락이 없는 커넥터 호출이다. `execute_code` 안의 호출이 여기 온다 |
 | `CREDENTIAL_ABSENT` | 거절 | 실행 공간에 비밀값이 없어 닿을 것이 없다 |
+| `HIDDEN_ARGS` | 거절 | 상시 허락을 닫은 도구의 인자에 가려지는 글이 있어 승인해도 실행하지 않는다 |
 | `UNMEDIATED_EGRESS` | 통제 없음 | 호출마다 판정하는 곳이 없다. 도구를 켜는 등급과 사후 기록만 있다. 결정으로 감수한다 |
 | `OPEN_GAP` | 열린 틈 | 정한 계약과 달리 남거나 감싸지지 않는다. 후속에서 고친다 |
 
@@ -111,15 +112,17 @@ flowchart LR
 | RF-09 | `web` 도구의 검색어나 주소로 | 통제 없음 | `UNMEDIATED_EGRESS` | 없다. `web` 은 주인 등급이다 | `test_read_data_flow` `test_shell_web_and_browser_calls_are_not_inspected` |
 | RF-10 | 내장 `browser` 도구의 주소로 | 통제 없음 | `UNMEDIATED_EGRESS` | 없다. 관리자 등급이고 profile 틀은 꺼 둔다 | `test_read_data_flow` `test_shell_web_and_browser_calls_are_not_inspected` |
 | RF-11 | 사용자 `/workspace` 의 파일로 | 허용 | `SAME_OWNER_SINK` | 실행 공간의 사용자 디렉터리 | 별도 시험 없음. 실행 공간 측정은 [`hermes/sandbox.md`](hermes/sandbox.md) 가 갖는다 |
-| RF-12 | `artifact_write` 결과물로 | 허용 | `SAME_OWNER_SINK` | Control Plane. 대화 주인만 읽고 스크립트와 외부 이미지를 막는 머리글을 붙인다 | `ArtifactTest` 의 머리글 시험과 남의 대화 시험, `test_read_data_flow` `test_control_plane_sinks_keep_body_and_get_signed_context` |
+| RF-12 | `artifact_write` 결과물로 | 허용 | `SAME_OWNER_SINK` | Control Plane. 대화 주인만 읽고 스크립트와 외부 이미지를 막는 머리글을 붙인다. 결과물 안의 링크는 사용자가 누르면 새 창으로 열린다 | `ArtifactTest` 의 머리글 시험과 남의 대화 시험, `test_read_data_flow` `test_control_plane_sinks_keep_body_and_get_signed_context` |
 | RF-13 | `memory_remember` 로 | 사용자 승인 | `PROPOSAL_ONLY` | Control Plane. 대화에 바깥 도구가 있으면 제안이다 | `McpMemoryRememberToolTest` 의 커넥터 READ 시험과 바깥 도구 시험 |
 | RF-14 | `follow_up_propose` 로 | 사용자 승인 | `PROPOSAL_ONLY` | Control Plane. 사람이 받아들여야 할 일이 된다 | `McpFollowUpToolTest` |
-| RF-15 | `agent_delegate` 의 `task` 로 다른 에이전트에 | 허용. 결과가 돌아올 때 감싸지 않는다 | `SAME_OWNER_SINK`, `OPEN_GAP` | Control Plane. 대상은 요청자 소유이거나 그룹 공개 에이전트다. 자식 실행은 요청자 명의다 | `test_read_data_flow` `test_control_plane_sinks_keep_body_and_get_signed_context` |
+| RF-15 | `agent_delegate` 의 `task` 로 다른 에이전트에 | 허용. 결과가 돌아올 때 감싸지 않는다 | `SAME_OWNER_SINK`, `OPEN_GAP` | Control Plane. 대상은 요청자 소유이거나 그룹 공개 에이전트다. 자식 실행은 요청자 명의이고 대상 에이전트의 도구로 돈다. 그 도구로 가는 흐름은 이 표의 다른 줄이 정한다. 결과는 다음 turn 전달과 `agent_status` 두 길로 돌아온다 | `test_read_data_flow` `test_control_plane_sinks_keep_body_and_get_signed_context` |
 | RF-16 | 실행 기록의 도구 내용으로 | 커넥터 도구는 허용(가림). 다른 도구의 인자로 다시 실린 본문은 열린 틈 | `REDACTED_RECORD`, `OPEN_GAP` | `ToolDetailRedactor` | `ToolDetailRedactorTest` 의 연결 도구 시험과 다른 도구 인자 시험 |
 | RF-17 | 승인 줄로 | 허용 | `SAME_OWNER_SINK` | 승인 줄에 인자 원문이 16KB 까지, 결과 글이 남는다. 주인 화면은 가린 인자를 받는다 | `ConnectorActionServiceTest` |
-| RF-18 | Hermes 와 backend 로그로 | 남기지 않는다 | `REDACTED_RECORD` | hook 은 인자와 결과 본문을 로그에 남기지 않는다 | `test_fos_ctx` 의 `test_logs_hide_token_signature_and_args`, `test_unreadable_tool_map_returns_none_without_leaking` |
-| RF-19 | 커넥터 출력 파일로 | 허용 | `SAME_OWNER_SINK` | 그 profile 의 실행 공간에만 읽기 전용으로 붙는다. 셸이 읽은 뒤는 RF-08 과 같다 | `test_dashboard_profile_api_connector_binding_output` |
+| RF-18 | `fos-ctx` 와 backend 로그로 | 허용(가림) | `REDACTED_RECORD` | hook 은 인자와 결과 본문을 로그에 남기지 않는다. backend 는 도구 인자와 결과를 로그에 남기는 줄이 없다(코드 확인, 시험 없음). Hermes core 의 로그는 확인하지 않았다 | `test_fos_ctx` 의 `test_logs_hide_token_signature_and_args`, `test_unreadable_tool_map_returns_none_without_leaking` |
+| RF-19 | 커넥터 출력 파일로 | 허용 | `SAME_OWNER_SINK` | 그 profile 의 실행 공간에만 읽기 전용으로 붙는다. 셸이 읽은 뒤는 RF-08 과 같다 | `test_dashboard_profile_api_connector_binding_output`, `test_dashboard_profile_api_sandbox_terminal` 의 출력 디렉터리 읽기 전용 시험 |
 | RF-20 | 모델 공급자로 | 허용 | `WRAPPED_CONTEXT` | 없다. 대화에 쓰인 글은 요청의 일부다([`privacy.md`](privacy.md)) | 해당 없음 |
+| RF-21 | 그 밖의 주인 등급 도구로 (`vision`, `tts`) | 통제 없음 | `UNMEDIATED_EGRESS` | 없다. `vision_analyze` 가 모델이 준 주소를 내려받는지는 확인하지 않았다. 확인 전까지 RF-09 와 같은 반출 길로 본다 | 해당 없음 |
+| RF-22 | 그 밖의 관리자 등급 도구로 (`image_gen`, `video_gen`, `discord`, `homeassistant`, `spotify`, `computer_use`, `cronjob`, `session_search`) | 통제 없음 | `UNMEDIATED_EGRESS` | 없다. 관리자가 켠다. `cronjob` 은 글을 Hermes 예약 작업에 오래 남기고 그 작업은 local 로 돈다(RC-02) | 해당 없음 |
 
 비밀값(OAuth 토큰, 원격 디버깅 주소, MCP 토큰)의 흐름이다.
 
@@ -129,7 +132,7 @@ flowchart LR
 | RC-02 | 실행 공간을 적용하지 않은 profile 의 셸이 `.env` 나 보관 파일로 | 통제 없음 | `UNMEDIATED_EGRESS` | 없다. ADR-083 이 감수한다 | 해당 없음 |
 | RC-03 | 스킬 앞머리가 값을 실행 공간에 넣게 하는 길 | 거절 | `CREDENTIAL_ABSENT` | Control Plane 의 스킬 저장과 도구 저장(`AGENT_SKILL_REQUESTS_SECRETS`), 대시보드 plugin 의 manifest 검증 | `SkillFrontmatterTest`, `AgentToolServiceTest`, `test_connectors_contract` |
 | RC-04 | 실행 기록, 승인 카드, 응답으로 | 허용(가림) | `REDACTED_RECORD` | `ToolDetailRedactor`. 비밀 모양과 비밀 키 이름의 값을 가린다 | `ToolDetailRedactorTest` |
-| RC-05 | 상시 허락을 닫은 쓰기의 인자로 | 거절 | `PER_CALL_APPROVAL` | 가려지는 글이 있는 승인 줄은 승인하지 못한다 | `ConnectorActionServiceTest` |
+| RC-05 | 상시 허락을 닫은 쓰기의 인자로 | 거절 | `HIDDEN_ARGS` | 가려지는 글이 있는 승인 줄은 승인하지 못한다 | `ConnectorActionServiceTest` |
 
 ## 열린 틈
 
@@ -137,8 +140,8 @@ flowchart LR
 
 | 틈 | 지금 | 고칠 방향 |
 | --- | --- | --- |
-| 하위 에이전트의 목표 | 실행 기록이 하위 에이전트 사건의 목표를 가리지 않고 저장한다(`ExecutionEventRecorder`). 목표에 READ 본문이나 비밀값이 실리면 그대로 남는다 | 도구 내용과 같은 가림을 건다 |
-| 바인딩 에이전트의 위임 결과 | 위임 결과를 다음 turn 에 전할 때 `ExternalData` 로 감싸는 판정이 옛 커넥터 에이전트(`connectorManaged`)만 본다. 연결을 붙인 일반 에이전트의 결과는 감싸지 않는다 | 연결이 붙은 에이전트의 결과도 감싼다 |
+| 하위 에이전트의 목표 | 실행 기록이 하위 에이전트 사건의 목표를 가리지 않고 저장한다(`ExecutionEventRecorder`). 목표에서 만든 하위 에이전트 이름도 앞 128자가 그대로 남는다. 목표에 READ 본문이나 비밀값이 실리면 그대로 남는다 | 도구 내용과 같은 가림을 건다 |
+| 바인딩 에이전트의 위임 결과 | 위임 결과를 `ExternalData` 로 감싸는 판정이 옛 커넥터 에이전트(`connectorManaged`)만 본다. 다음 turn 으로 전하는 길(`ChatDeliveryInput.isExternalResult`)과 `agent_status` 의 답(`McpToolService`)이 같다. 연결을 붙인 일반 에이전트의 결과는 두 길 모두 감싸지 않는다 | 두 길 모두 연결이 붙은 에이전트의 결과도 감싼다 |
 | 다른 도구 인자로 다시 실린 본문 | READ 본문이 `agent_delegate`, `artifact_write`, `web_search` 같은 일반 도구의 인자로 다시 실리면 비밀 모양만 가린 앞 500자가 실행 기록에 남고 관리자에게 보인다 | 후속에서 정한다 |
 
 ## 실행 공간이 해결한 것과 남은 것
@@ -158,7 +161,7 @@ flowchart LR
 
 다시 볼 후보는 둘이다.
 
-- `web` 도구는 주인 등급이라 `MEMBER` 가 연결을 붙인 자기 에이전트에 관리자 없이 켤 수 있다. 셸 계열과 달리 관리자가 위험을 받아들인 적이 없는 반출 길이다(RF-09)
+- `web` 도구는 주인 등급이라 `MEMBER` 가 연결을 붙인 자기 에이전트에 관리자 없이 켤 수 있다. 셸 계열과 달리 관리자가 위험을 받아들인 적이 없는 반출 길이다(RF-09). `vision` 이 주소를 내려받는다면 같은 길이다(RF-21)
 - 실행 공간의 밖으로 나가는 요청을 허용 목록으로 거르는 것은 ADR-086 이 실측 비용을 본 뒤 다시 정하기로 했다
 
 사용자가 명시적으로 승인한 여러 출처의 작업은 막지 않는다. 메일을 읽고 그 내용으로 자기 블로그 임시저장을 만드는 것이 그 예다(RF-04).
@@ -166,6 +169,7 @@ flowchart LR
 ## 시험을 돌리는 법
 
 합성 시험은 지어낸 메일 본문과 `example` 주소만 쓴다.
+표에서 시험이 「해당 없음」 이거나 「별도 시험 없음」 인 줄은 판정하는 곳이 이 저장소의 코드 밖에 있거나 운영 측정으로 확인한 줄이다.
 
 ```bash
 # cwd: 저장소 root
