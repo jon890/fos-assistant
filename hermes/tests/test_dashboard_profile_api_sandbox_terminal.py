@@ -2,6 +2,7 @@
 
 import hashlib
 import json
+import logging
 import os
 import pathlib
 import yaml
@@ -146,15 +147,27 @@ class ProfileApiSandboxTerminalTest(support.ProfileApiRouteTest):
         self.assertEqual(self.alice_config()["approvals"], {"unattended_mode": "approve"})
 
     def test_non_object_approvals_rejects_the_shell_save(self):
-        """approvals 가 객체가 아니면 셸 저장을 500 으로 멈추고 설정 파일을 그대로 둔다."""
+        """approvals 가 객체가 아니면 비어 보이는 값이라도 셸 저장을 500 으로 멈추고 설정 파일을 그대로 둔다."""
         path = self.root / "owner/config.yaml"
-        config = yaml.safe_load(path.read_text(encoding="utf-8"))
-        config["approvals"] = "approve"
-        path.write_text(yaml.safe_dump(config), encoding="utf-8")
-        original = path.read_bytes()
+        base = yaml.safe_load(path.read_text(encoding="utf-8"))
+        # 준비가 로그를 꺼 둔다. 어느 예외로 거절했는지 읽는 동안만 켠다.
+        logging.disable(logging.NOTSET)
+        self.addCleanup(logging.disable, logging.CRITICAL)
+        for approvals in ("approve", False, []):
+            with self.subTest(approvals=approvals):
+                config = dict(base, approvals=approvals)
+                path.write_text(yaml.safe_dump(config), encoding="utf-8")
+                original = path.read_bytes()
 
-        self.assertEqual(self.request("/api/config", "PUT", token="valid", body=self.file_body()), 500)
-        self.assertEqual(path.read_bytes(), original)
+                with self.assertLogs(self.plugin.logger, level="ERROR") as logs:
+                    status = self.request("/api/config", "PUT", token="valid", body=self.file_body())
+
+                self.assertEqual(status, 500)
+                self.assertEqual(path.read_bytes(), original)
+                errors = [record.exc_info[1] for record in logs.records if record.exc_info]
+                self.assertEqual(len(errors), 1, "검증 실패 예외 로그가 하나가 아니다: %r" % errors)
+                self.assertIsInstance(errors[0], ValueError)
+                self.assertEqual(str(errors[0]), "approvals 설정이 객체가 아니다")
 
     def test_connector_output_root_mounts_the_profile_directory_read_only_at_the_same_path(self):
         """정책에 출력 루트가 있으면 그 profile 의 출력 디렉터리를 만들고 같은 경로에 읽기 전용으로 붙인다."""
