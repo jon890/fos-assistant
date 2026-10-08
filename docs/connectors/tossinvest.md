@@ -22,9 +22,8 @@
 | --- | --- | --- |
 | `single_binding` | 참 | 토스증권은 client 마다 유효한 토큰이 하나다. 두 에이전트에 붙이면 서로의 토큰을 무효로 만든다 |
 | `sandbox_required` | 참 | 키에 권한 범위가 없어 조회용 키로도 주문할 수 있다. 셸이 `.env` 를 읽는 profile 에 붙이지 않는다 |
-| `owner_output_env` | `TOSSINVEST_OUTPUT_DIR` | 주문 내역을 실행 공간에 파일로 낸다 |
 
-규칙은 [ADR-20261008 / connector-binding-guards](../adr/ADR-20261008-connector-binding-guards.md) 와 [ADR-20261008 / connector-output-files](../adr/ADR-20261008-connector-output-files.md) 가 갖는다.
+규칙은 [ADR-20261008 / connector-binding-guards](../adr/ADR-20261008-connector-binding-guards.md) 가 갖는다.
 
 ## 도구와 정책
 
@@ -36,7 +35,7 @@ MCP 서버 이름은 `tossinvest` 다. 도구는 모두 `READ` 이고 승인 없
 | `get_quotes` | `GET /api/v1/prices`, `GET /api/v1/stocks` | 종목 20개까지의 현재가와 이름을 읽는다 |
 | `get_holdings` | `GET /api/v1/holdings` | 보유 종목과 평가, 손익을 읽는다 |
 | `get_buying_power` | `GET /api/v1/buying-power`, `GET /api/v1/sellable-quantity` | 통화별 주문 가능 현금과, 종목을 주면 그 종목의 매도 가능 수량을 읽는다 |
-| `list_orders` | `GET /api/v1/orders` | 미체결이나 끝난 주문을 기간으로 읽는다. 파일로 낼 수 있다 |
+| `list_orders` | `GET /api/v1/orders` | 미체결이나 끝난 주문을 기간으로 읽는다 |
 
 계좌 데이터(보유, 잔고, 주문)도 `READ` 다. 연결이 붙은 에이전트는 주인만 쓰고, 메일 본문을 `READ` 로 둔 Gmail 커넥터와 같은 판단이다. 먼저 살펴보기와 예약 작업이 계좌를 읽는다.
 
@@ -48,27 +47,21 @@ MCP 서버 이름은 `tossinvest` 다. 도구는 모두 `READ` 이고 승인 없
 | `get_quotes` | `symbols`: 쉼표로 이은 종목 코드나 티커 1~20개 | `{quotes: [{symbol, name, last_price, currency, timestamp}]}` |
 | `get_holdings` | 없음 | `{total, items}`. 금액은 공제 전(`market_value`, `profit_loss`, `profit_loss_rate`)과 비용 공제 후(`..._after_cost`)를 함께 싣는다. `total` 의 금액은 `{krw, usd}` 이고, `items` 의 금액은 그 종목의 거래 통화 기준 글 하나다. 금액과 수량은 API 가 준 10진수 글 그대로다 |
 | `get_buying_power` | `currency`: `KRW` 나 `USD`. `symbol`: 선택 | `{currency, cash_buying_power, sellable_quantity?}` |
-| `list_orders` | `status`: `OPEN` 이나 `CLOSED`. `from`, `to`: 선택, `YYYY-MM-DD`(한국 시각). `symbol`: 선택. `output`: 선택, `"file"` | 아래 「주문 내역」 |
+| `list_orders` | `status`: `OPEN` 이나 `CLOSED`. `from`, `to`: 선택, `YYYY-MM-DD`(한국 시각). `symbol`: 선택 | `{orders, has_more}`. 아래 「주문 내역」 |
 
 종목 기호는 `^[A-Za-z0-9.-]{1,12}$` 만 받는다. 종목 이름은 100자로 자른다. 날짜는 `from` 이 `to` 보다 늦거나 기간이 366일을 넘으면 `TOSSINVEST_INVALID_INPUT` 이다.
 
 ### 주문 내역
 
-`output` 이 없으면 주문 100건까지를 결과에 담고 `has_more` 로 더 있는지 알린다. 미체결(`OPEN`)은 API 가 전량을 주므로 앞 100건만 담는다.
-`output: "file"` 이면 기간 전체를 한 파일에 쓴다. 끝난 주문은 커서로 100건씩 최대 20쪽까지 돈다. 넘으면 일부만 쓰지 않고 `TOSSINVEST_TOO_MANY_ORDERS` 로 끝낸다.
+주문 100건까지를 결과에 담고 `has_more` 로 더 있는지 알린다. 끝난 주문(`CLOSED`)은 한 쪽(100건)만 읽는다. 미체결(`OPEN`)은 API 가 전량을 주므로 앞 100건만 담는다.
+금액과 수량은 API 가 준 10진수 글 그대로 둔다. 미국 주식의 달러 금액과 소수점 수량이 있어 정수로 바꾸면 값이 바뀐다.
 
-파일은 `TOSSINVEST_OUTPUT_DIR` 아래 `orders-<UTC 시각>-<난수>.jsonl` 이고, 한 줄이 주문 하나다. 쓰는 동안은 `.orders-<같은 꼬리>.tmp` 에 쓰고, 다 쓴 뒤 기존 파일을 덮지 않는 방법으로 최종 이름을 만든다. 실패하면 임시 파일을 지운다.
-
-| 칸 | 뜻 |
+| `orders[]` 의 칸 | 뜻 |
 | --- | --- |
 | `order_id`, `symbol`, `side`, `order_type`, `status`, `currency` | API 값 그대로 |
 | `price`, `quantity`, `order_amount` | API 가 준 10진수 글. 없으면 null |
 | `filled_quantity`, `average_filled_price`, `filled_amount`, `commission`, `tax` | `execution` 의 값. 10진수 글이거나 null |
 | `ordered_at`, `filled_at`, `canceled_at`, `settlement_date` | API 값 그대로 |
-
-결과는 `{file, count, from, to, fields}` 다. 항목 내용은 담지 않는다.
-금액은 10진수 글로 둔다. 미국 주식의 달러 금액과 소수점 수량이 있어 정수로 바꾸면 값이 바뀐다. 스크립트는 `decimal` 로 더한다.
-쓸 때마다 그 디렉터리에서 24시간 지난 자기 파일(`orders-*.jsonl`, `.orders-*.tmp`)을 지운다. 값이 비었으면(실행 공간 정책에 출력 루트가 없다) `TOSSINVEST_OUTPUT_UNAVAILABLE` 로 거절한다.
 
 ### 토큰
 
@@ -87,8 +80,6 @@ MCP 서버 이름은 `tossinvest` 다. 도구는 모두 `READ` 이고 승인 없
 | `TOSSINVEST_FORBIDDEN` | `forbidden` | | 그 밖의 403 |
 | `TOSSINVEST_ACCOUNT_NOT_FOUND` | `invalid_input` | `reconnect` | 고른 계좌 순번이 없다. 상태와 관계없이 `account-not-found` 면 이 코드다 |
 | `TOSSINVEST_INVALID_INPUT` | `invalid_input` | `fix_input` | 인자가 형식에 맞지 않는다, 없는 종목이다 |
-| `TOSSINVEST_TOO_MANY_ORDERS` | `invalid_input` | `fix_input` | 파일 출력이 2,000건을 넘는다. 기간을 줄인다 |
-| `TOSSINVEST_OUTPUT_UNAVAILABLE` | `unavailable` | | 출력 디렉터리가 없다 |
 | `TOSSINVEST_RATE_LIMITED` | `unavailable` | `retry_later` | 429 |
 | `TOSSINVEST_NETWORK`, `TOSSINVEST_UNAVAILABLE` | `unavailable` | `retry_later` | 닿지 못했거나 시간이 지났다, 5xx 와 그 밖의 4xx, 다시 보낸 호출도 `token-revoked` 였다 |
 
@@ -136,5 +127,4 @@ WTS 에서 허용 IP 를 고친 뒤 연결 화면에서 연결 확인을 누른�
 2. 실행 공간이 없는 에이전트에 붙이면 거절되는지, 있는 에이전트에 붙는지 본다
 3. 같은 연결을 두 번째 에이전트에 붙이면 거절되는지 본다
 4. 대화에서 보유 종목, 현재가, 주문 가능 현금, 이번 달 끝난 주문을 묻는다
-5. 이번 달 끝난 주문을 파일로 받아 스크립트로 건수를 세게 한다
-6. 연결 확인을 누른 직후 대화에서 다시 보유 종목을 물어, 토큰을 한 번 다시 받고 성공하는지 본다
+5. 연결 확인을 누른 직후 대화에서 다시 보유 종목을 물어, 토큰을 한 번 다시 받고 성공하는지 본다

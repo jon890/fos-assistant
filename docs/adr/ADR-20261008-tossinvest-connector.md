@@ -2,7 +2,7 @@
 
 - **status**: `accepted`
 - Date: 2026-10-08
-- 커넥터 계약은 [ADR-043](ADR-043-커넥터는-plugin-의-connector-json-으로-선언하고-control-plane-은-범용-흐름만-갖는다.md) 과 [ADR-049](ADR-049-커넥터-도구-호출은-profile-plugin-의-hook-이-control-plane-에-물어-판정한다.md) 를 따른다. 바인딩 제한은 [ADR-20261008 / connector-binding-guards](ADR-20261008-connector-binding-guards.md), 파일 출력은 [ADR-20261008 / connector-output-files](ADR-20261008-connector-output-files.md) 의 것이다.
+- 커넥터 계약은 [ADR-043](ADR-043-커넥터는-plugin-의-connector-json-으로-선언하고-control-plane-은-범용-흐름만-갖는다.md) 과 [ADR-049](ADR-049-커넥터-도구-호출은-profile-plugin-의-hook-이-control-plane-에-물어-판정한다.md) 를 따른다. 바인딩 제한은 [ADR-20261008 / connector-binding-guards](ADR-20261008-connector-binding-guards.md) 의 것이다.
 
 ### 결정
 
@@ -17,8 +17,8 @@
 | 토큰 | 프로세스 메모리에만 둔다. 파일에 두지 않는다 |
 | 토큰 재발급 | `401 token-revoked` 와 `expired-token` 이면 토큰을 다시 받아 그 호출을 한 번만 다시 보낸다. 한 프로세스 안의 재발급은 한 번에 하나다. 다시 보낸 호출도 `token-revoked` 면 자격 증명 문제가 아니라 다툼이므로 다시 시도할 오류로 끝낸다. `invalid-token` 과 `invalid_client` 는 다시 받지 않는다 |
 | 허용 IP 거절 | `403 ip-not-allowed` 는 따로 둔 오류 코드로 끝낸다. 공통 어휘 `forbidden`, 복구 `reconnect` 다. 연결 확인이 같은 코드로 실패하면 연결이 `PENDING` 이 된다 |
-| 계산 | `list_orders` 는 `output: "file"` 이면 기간 전체를 JSON Lines 로 쓰고 경로, 건수, 기간, 칸 목록만 돌려준다. 금액과 수량은 API 가 준 10진수 글 그대로 둔다. 미국 주식의 달러 금액과 소수점 수량이 있어 정수로 바꾸면 값이 바뀐다. 스크립트는 10진수로 더한다 |
-| 호출량 | 한 도구 호출이 부르는 API 수에 상한을 둔다. `list_orders` 의 페이지는 100건씩 최대 20쪽이다. 넘으면 일부만 쓰지 않고 오류로 끝낸다 |
+| 금액 | 금액과 수량은 API 가 준 10진수 글 그대로 둔다. 미국 주식의 달러 금액과 소수점 수량이 있어 정수로 바꾸면 값이 바뀐다 |
+| 호출량 | 한 도구 호출이 같은 API 를 여러 번 부르지 않는다. `list_orders` 는 한 쪽(100건)만 읽는다 |
 
 ### 맥락
 
@@ -44,7 +44,7 @@
 ### 결과
 
 - 얻는 것:
-  - 에이전트가 사용자 자신의 계좌로 보유, 잔고, 주문 내역을 읽고, 합계와 비중은 스크립트가 10진수로 계산한다.
+  - 에이전트가 사용자 자신의 계좌로 보유, 잔고, 주문 내역을 읽는다.
   - 돈이 움직이는 도구가 커넥터에 없다. 키가 셸에 닿지 않게 하는 것은 `sandbox_required` 다.
 - 감당할 것:
   - 확인 도구와 선택지 호출이 토큰을 새로 받을 때마다 Hermes 쪽 프로세스의 토큰이 무효가 된다. 다음 호출이 한 번 다시 받는다. 다른 프로그램이 같은 client 로 토큰을 받으면 서로 무효로 만든다. 그래서 이 커넥터 전용 client 를 받으라고 안내한다.
