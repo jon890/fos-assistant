@@ -33,10 +33,12 @@ import {
   writeInput,
 } from "../src/jobs.ts";
 import { runWorker } from "../src/worker.ts";
+import { GATEWAY_PATH } from "./fake-cdp.ts";
 
 const JOBS = join(import.meta.dir, "../src/jobs.ts");
-const CDP_A = "http://127.0.0.1:9";
-const CDP_B = "http://127.0.0.1:10";
+const BLOG_A = "example-blog";
+const BLOG_B = "other-blog";
+const BROWSER_URL = `http://127.0.0.1:9${GATEWAY_PATH}`;
 const cleanups: Array<() => unknown> = [];
 
 afterEach(async () => {
@@ -66,9 +68,9 @@ function running(jobId: string, overrides: Partial<JobState> = {}): JobState {
 }
 
 /** 잠금의 생성 시각을 1분 전으로 돌린다. 판정이 「만든 지 10초 안」 에 기대지 않게 한다. */
-async function ageLock(dir: string, cdpUrl: string, jobId: string) {
+async function ageLock(dir: string, blogId: string, jobId: string) {
   await writeFile(
-    lockFile(dir, cdpUrl),
+    lockFile(dir, blogId),
     JSON.stringify({ job_id: jobId, created_at: new Date(Date.now() - 60_000).toISOString() }),
   );
 }
@@ -89,7 +91,7 @@ const errorCode = (work: Promise<unknown>) =>
     (error) => (error as { code?: string }).code,
   );
 
-test("잠금을 만든 프로세스가 끝나도 작업 프로세스가 살아 있으면 같은 브라우저의 둘째 작업은 NAVER_BLOG_BUSY 다", async () => {
+test("잠금을 만든 프로세스가 끝나도 작업 프로세스가 살아 있으면 같은 블로그의 둘째 작업은 NAVER_BLOG_BUSY 다", async () => {
   const dir = await jobDir();
   const first = randomUUID();
   // MCP 서버처럼 잠금과 상태 파일을 만들고 바로 끝나는 프로세스.
@@ -97,33 +99,32 @@ test("잠금을 만든 프로세스가 끝나도 작업 프로세스가 살아 �
     process.execPath,
     "-e",
     `import { acquireLock, createState } from ${JSON.stringify(JOBS)};
-     await acquireLock(${JSON.stringify(dir)}, ${JSON.stringify(CDP_A)}, ${JSON.stringify(first)});
+     await acquireLock(${JSON.stringify(dir)}, ${JSON.stringify(BLOG_A)}, ${JSON.stringify(first)});
      await createState(${JSON.stringify(dir)}, ${JSON.stringify(running(first))});`,
   ]);
   expect(await creator.exited).toBe(0);
   const worker = Bun.spawn([process.execPath, "-e", "await Bun.sleep(30000)"]);
   cleanups.push(() => worker.kill());
   await updateState(dir, first, { pid: worker.pid, heartbeat_at: new Date().toISOString() });
-  await ageLock(dir, CDP_A, first);
+  await ageLock(dir, BLOG_A, first);
 
-  expect(await errorCode(acquireLock(dir, CDP_A, randomUUID()))).toBe("NAVER_BLOG_BUSY");
-  expect(await errorCode(acquireLock(dir, `${CDP_A}/`, randomUUID()))).toBe("NAVER_BLOG_BUSY");
-  expect(await errorCode(acquireLock(dir, CDP_B, randomUUID()))).toBe("resolved");
+  expect(await errorCode(acquireLock(dir, BLOG_A, randomUUID()))).toBe("NAVER_BLOG_BUSY");
+  expect(await errorCode(acquireLock(dir, BLOG_B, randomUUID()))).toBe("resolved");
   expect((await readState(dir, first))?.status).toBe("running");
 });
 
-test("pid 가 없는 프로세스여도 방금 갱신한 작업은 살아 있어 같은 브라우저의 둘째 작업은 NAVER_BLOG_BUSY 다", async () => {
+test("pid 가 없는 프로세스여도 방금 갱신한 작업은 살아 있어 같은 블로그의 둘째 작업은 NAVER_BLOG_BUSY 다", async () => {
   // 승인한 호출과 MCP 서버의 PID 네임스페이스가 다르면 살아 있는 작업 프로세스도 `kill(pid, 0)` 에 없다고 나온다.
   const dir = await jobDir();
   const first = randomUUID();
-  await acquireLock(dir, CDP_A, first);
+  await acquireLock(dir, BLOG_A, first);
   await createState(
     dir,
     running(first, { stage: "photos", pid: await deadPid(), heartbeat_at: new Date().toISOString() }),
   );
-  await ageLock(dir, CDP_A, first);
+  await ageLock(dir, BLOG_A, first);
 
-  expect(await errorCode(acquireLock(dir, CDP_A, randomUUID()))).toBe("NAVER_BLOG_BUSY");
+  expect(await errorCode(acquireLock(dir, BLOG_A, randomUUID()))).toBe("NAVER_BLOG_BUSY");
   expect((await readState(dir, first))?.status).toBe("running");
 });
 
@@ -145,27 +146,27 @@ test("jobAlive 는 pid 가 있는 작업을 마지막 갱신에서 30초 안이�
 test("30초 넘게 갱신하지 않은 작업의 잠금은 묵은 잠금으로 풀리고 그 작업은 timeout 실패로 끝난다", async () => {
   const dir = await jobDir();
   const first = randomUUID();
-  await acquireLock(dir, CDP_A, first);
+  await acquireLock(dir, BLOG_A, first);
   await createState(
     dir,
     running(first, { stage: "photos", pid: await deadPid(), heartbeat_at: staleHeartbeat() }),
   );
-  await ageLock(dir, CDP_A, first);
+  await ageLock(dir, BLOG_A, first);
   const second = randomUUID();
 
-  await acquireLock(dir, CDP_A, second);
+  await acquireLock(dir, BLOG_A, second);
 
   const stale = await readState(dir, first);
   expect(stale?.status).toBe("failed");
   expect(stale?.error).toEqual({ code: "timeout", stage: "photos" });
   expect(stale?.finished_at).not.toBeNull();
-  expect(JSON.parse(await readFile(lockFile(dir, CDP_A), "utf8")).job_id).toBe(second);
+  expect(JSON.parse(await readFile(lockFile(dir, BLOG_A), "utf8")).job_id).toBe(second);
 });
 
 test("저장 단추를 누른 뒤 사라진 작업은 unknown 으로 끝난다", async () => {
   const dir = await jobDir();
   const first = randomUUID();
-  await acquireLock(dir, CDP_A, first);
+  await acquireLock(dir, BLOG_A, first);
   await createState(
     dir,
     running(first, {
@@ -175,9 +176,9 @@ test("저장 단추를 누른 뒤 사라진 작업은 unknown 으로 끝난다",
       heartbeat_at: staleHeartbeat(),
     }),
   );
-  await ageLock(dir, CDP_A, first);
+  await ageLock(dir, BLOG_A, first);
 
-  await acquireLock(dir, CDP_A, randomUUID());
+  await acquireLock(dir, BLOG_A, randomUUID());
 
   const stale = await readState(dir, first);
   expect(stale?.status).toBe("unknown");
@@ -187,12 +188,12 @@ test("저장 단추를 누른 뒤 사라진 작업은 unknown 으로 끝난다",
 test("pid 를 적기 전의 잠금은 만든 지 10초 안이면 살아 있다", async () => {
   const dir = await jobDir();
   const first = randomUUID();
-  await acquireLock(dir, CDP_A, first);
+  await acquireLock(dir, BLOG_A, first);
 
-  expect(await errorCode(acquireLock(dir, CDP_A, randomUUID()))).toBe("NAVER_BLOG_BUSY");
+  expect(await errorCode(acquireLock(dir, BLOG_A, randomUUID()))).toBe("NAVER_BLOG_BUSY");
 
-  await ageLock(dir, CDP_A, first);
-  expect(await errorCode(acquireLock(dir, CDP_A, randomUUID()))).toBe("resolved");
+  await ageLock(dir, BLOG_A, first);
+  expect(await errorCode(acquireLock(dir, BLOG_A, randomUUID()))).toBe("resolved");
 });
 
 test("succeeded 로 끝난 상태 위에 정리가 timeout 을 쓰려 해도 그대로다", async () => {
@@ -304,15 +305,15 @@ test("묵은 잠금 정리는 판정한 뒤 다른 job_id 로 다시 만들어�
   const stale = randomUUID();
   const fresh = randomUUID();
   // 묵었다고 판정한 잠금은 이미 다른 호출이 지웠고, 그 자리에 새 작업이 잠금을 잡았다.
-  await acquireLock(dir, CDP_A, fresh);
-  const before = await readFile(lockFile(dir, CDP_A), "utf8");
+  await acquireLock(dir, BLOG_A, fresh);
+  const before = await readFile(lockFile(dir, BLOG_A), "utf8");
 
-  await removeStaleLock(lockFile(dir, CDP_A), stale);
+  await removeStaleLock(lockFile(dir, BLOG_A), stale);
 
-  expect(await readFile(lockFile(dir, CDP_A), "utf8")).toBe(before);
-  expect(await readdir(dir)).toEqual([lockFile(dir, CDP_A).slice(dir.length + 1)]);
+  expect(await readFile(lockFile(dir, BLOG_A), "utf8")).toBe(before);
+  expect(await readdir(dir)).toEqual([lockFile(dir, BLOG_A).slice(dir.length + 1)]);
 
-  await removeStaleLock(lockFile(dir, CDP_A), fresh);
+  await removeStaleLock(lockFile(dir, BLOG_A), fresh);
   expect(await readdir(dir)).toEqual([]);
 });
 
@@ -338,7 +339,7 @@ test("끝냄 표시를 만들고 10초 넘게 상태를 쓰지 않았으면 그 
 test("24시간이 지난 고아 임시 파일과 되돌리지 못한 잠금만 지우고, 그 작업의 releaseLock 은 남긴 잠금도 지운다", async () => {
   const dir = await jobDir();
   const day = 24 * 60 * 60_000;
-  const lock = lockFile(dir, CDP_A).slice(dir.length + 1);
+  const lock = lockFile(dir, BLOG_A).slice(dir.length + 1);
   const jobId = randomUUID();
   const oldTemporary = `${randomUUID()}.json.${randomUUID()}.tmp`;
   const oldStale = `${lock}.${randomUUID()}.stale`;
@@ -363,7 +364,7 @@ test("작업 상태 파일에는 초안 본문과 사진 디렉터리가 없다"
   const jobId = randomUUID();
   const body = "가상국수 본문 한 줄";
   const photoDir = "/example/photos/dir";
-  await acquireLock(dir, CDP_A, jobId);
+  await acquireLock(dir, BLOG_A, jobId);
   await createState(dir, running(jobId));
   await writeInput(dir, jobId, {
     title: "가상국수 다녀온 날",
@@ -376,7 +377,7 @@ test("작업 상태 파일에는 초안 본문과 사진 디렉터리가 없다"
   const read = async () => snapshots.push(await readFile(stateFile(dir, jobId), "utf8"));
 
   await runWorker(stateFile(dir, jobId), {
-    env: { NAVER_BLOG_CDP_URL: CDP_A, NAVER_BLOG_ID: "example-blog" },
+    env: { NAVER_BLOG_BROWSER_URL: BROWSER_URL, NAVER_BLOG_ID: BLOG_A },
     runDraft: async (_env, _blocks, _input, onStage) => {
       for (const stage of ["open", "fill", "save", "save_clicking"] as RunStage[]) {
         await onStage(stage);
@@ -393,6 +394,6 @@ test("작업 상태 파일에는 초안 본문과 사진 디렉터리가 없다"
     expect(snapshot).not.toContain(photoDir);
     expect(snapshot).not.toContain('"body"');
     expect(snapshot).not.toContain('"photo_dir"');
-    expect(snapshot).not.toContain(CDP_A);
+    expect(snapshot).not.toContain(BROWSER_URL);
   }
 });

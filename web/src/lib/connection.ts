@@ -57,6 +57,8 @@ export type ConnectorSummary = {
   available: boolean;
   /** 이 연결을 붙인 내 에이전트들이다. */
   bindings: BoundAgent[];
+  /** 「내 브라우저」 에서 먼저 로그인할 `https://` 주소다. 선언하지 않았으면 null 이다. 옛 Control Plane 은 내지 않는다. */
+  ownerBrowserLoginUrl: string | null;
 };
 
 export type ConnectorOption = { value: string; label: string };
@@ -125,8 +127,18 @@ export function connectionErrorMessage(code: string): string {
     : FALLBACK_MESSAGE;
 }
 
-export type ConnectionCallResult<T> =
-  { ok: true; data: T } | { ok: false; code: string; message: string };
+export type ConnectionFailure = { ok: false; code: string; message: string };
+
+export type ConnectionCallResult<T> = { ok: true; data: T } | ConnectionFailure;
+
+/** 「내 브라우저」 에서 그 주소를 여는 화면 주소다. `https://` 주소일 때만 주고 아니면 null 이다. */
+export function browserLoginHref(
+  url: string | null | undefined,
+): string | null {
+  return url?.startsWith("https://")
+    ? `/browser?url=${encodeURIComponent(url)}`
+    : null;
+}
 
 export async function connectionCall<T>(
   path: string,

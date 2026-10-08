@@ -50,7 +50,7 @@ async function setup({
   cleanups.push(() => rm(jobDir, { recursive: true, force: true }));
   await writeFile(join(photoDir, "101.jpg"), photo);
   const env: Env = {
-    NAVER_BLOG_CDP_URL: cdp.url,
+    NAVER_BLOG_BROWSER_URL: cdp.url,
     NAVER_BLOG_ID: "example-blog",
     NAVER_BLOG_ATTACHMENT_DIR: attachmentDir,
     NAVER_BLOG_JOB_DIR: jobDir,
@@ -65,7 +65,7 @@ async function setup({
   cleanups.push(() => server.close());
   cleanups.push(() => client.close());
 
-  /** 도구를 부르고, 결과 글에 CDP 주소와 사진 디렉터리, 브라우저 원문이 없는지 함께 본다. */
+  /** 도구를 부르고, 결과 글에 중계 주소와 사진 디렉터리, 브라우저 원문이 없는지 함께 본다. */
   const call = async (name: string, args: Record<string, unknown>) => {
     const result = await client.callTool({ name, arguments: args });
     const text = (result.content as Array<{ text: string }>)[0]?.text ?? "";
