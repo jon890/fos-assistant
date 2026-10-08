@@ -1,5 +1,6 @@
 package com.bifos.assistant.chat.application;
 
+import com.bifos.assistant.agent.application.AgentConnectorBindings;
 import com.bifos.assistant.agent.application.AgentService;
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.chat.application.model.AutoTurnResult;
@@ -28,6 +29,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -39,6 +41,7 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 class ChatDeliveryInput {
     private final AgentService agents;
+    private final AgentConnectorBindings bindings;
     private final AgentExecutionRepository executionRepository;
     private final Clock clock;
     private final List<AutoTurnResultSource> resultSources;
@@ -92,25 +95,36 @@ class ChatDeliveryInput {
         if (results.isEmpty() && extras.isEmpty()) {
             throw ResultDeliveryRecorder.notRetryable();
         }
+        Map<Long, Agent> resultAgents = resultAgentsOf(results);
         return deliveryInput(
-                results, resultAgentsOf(results), extras, clock.instant(), contextProperties.resultStaleAfter());
+                results,
+                resultAgents,
+                externalAgentsOf(resultAgents),
+                extras,
+                clock.instant(),
+                contextProperties.resultStaleAfter());
     }
 
     /**
      * 결과마다 출처 머리줄을 두고, 답이 있으면 그 아래에 잇는다. 머리줄에는 에이전트 이름, 실행 번호, 상태, 끝난 시각을 적고 실패는
      * 오류 코드를 더한다. 오래된 결과는 신선도와 안내 한 줄을 더한다(ADR-071).
      *
-     * <p>연결용 에이전트의 답은 외부 서비스의 글을 담으므로 {@code <external-data>} 로 감싸 지시가 아니라고 알린다.
-     * 에이전트 행이 없는 결과도 출처를 모르므로 감싼다. 감싸도 모델이 그 글을 따르지 않는다는 보장은 없다(ADR-049).
+     * <p>옛 연결용 에이전트와 연결이 붙은 에이전트의 답은 외부 서비스의 글을 담을 수 있으므로 {@code <external-data>} 로
+     * 감싸 지시가 아니라고 알린다. 에이전트 행이 없는 결과도 출처를 모르므로 감싼다.
+     * 감싸도 모델이 그 글을 따르지 않는다는 보장은 없다(ADR-049).
      *
      * <p>결과마다 {@code DELEGATION_RESULT} 항목을 하나씩 만든다. 본문은 입력에만 싣고 항목에 두지 않는다.
      */
     static DeliveryInput delegationInput(
-            List<AgentExecution> results, Map<Long, Agent> resultAgents, Instant now, Duration staleAfter) {
+            List<AgentExecution> results,
+            Map<Long, Agent> resultAgents,
+            Set<Long> externalAgents,
+            Instant now,
+            Duration staleAfter) {
         StringBuilder input = new StringBuilder("맡긴 일의 결과가 도착했다.");
         List<ContextItem> items = new ArrayList<>();
         for (AgentExecution result : results) {
-            boolean external = isExternalResult(result, resultAgents);
+            boolean external = isExternalResult(result, resultAgents, externalAgents);
             ContextItem item = delegationItem(result, external, now, staleAfter);
             items.add(item);
             List<String> fields = new ArrayList<>(List.of(
@@ -159,13 +173,14 @@ class ChatDeliveryInput {
     static DeliveryInput deliveryInput(
             List<AgentExecution> results,
             Map<Long, Agent> resultAgents,
+            Set<Long> externalAgents,
             List<AutoTurnResult> extras,
             Instant now,
             Duration staleAfter) {
         StringBuilder input = new StringBuilder();
         List<ContextItem> items = new ArrayList<>();
         if (!results.isEmpty()) {
-            DeliveryInput delegation = delegationInput(results, resultAgents, now, staleAfter);
+            DeliveryInput delegation = delegationInput(results, resultAgents, externalAgents, now, staleAfter);
             input.append(delegation.input());
             items.addAll(delegation.items());
         }
@@ -188,9 +203,21 @@ class ChatDeliveryInput {
                 : agents.byIds(results.stream().map(AgentExecution::agentId).toList());
     }
 
-    static boolean isExternalResult(AgentExecution execution, Map<Long, Agent> resultAgents) {
+    /**
+     * 답을 외부 글로 감쌀 에이전트다. 옛 연결용 에이전트와 연결이 하나라도 붙은 에이전트다(ADR-20261008 / read-data-flow).
+     *
+     * <p>지금 붙은 연결로 정한다. 실행이 끝난 뒤 연결을 뗐으면 감싸지 않는다.
+     */
+    Set<Long> externalAgentsOf(Map<Long, Agent> resultAgents) {
+        return resultAgents.values().stream()
+                .filter(agent -> agent.connectorManaged() || bindings.hasBindings(agent.id()))
+                .map(Agent::id)
+                .collect(Collectors.toSet());
+    }
+
+    static boolean isExternalResult(AgentExecution execution, Map<Long, Agent> resultAgents, Set<Long> externalAgents) {
         Agent agent = resultAgents.get(execution.agentId());
-        return agent == null || agent.connectorManaged();
+        return agent == null || externalAgents.contains(agent.id());
     }
 
     static String delegationNotice(List<AgentExecution> results, Map<Long, Agent> resultAgents) {
