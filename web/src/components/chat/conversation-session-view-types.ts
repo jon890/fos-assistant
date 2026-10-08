@@ -28,6 +28,7 @@ export type Props = Pick<
   | "setSelectedVersions"
   | "deliveryRetrying"
   | "memoryCaptures"
+  | "memoryUses"
   | "displayName"
   | "error"
   | "observing"

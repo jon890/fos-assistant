@@ -11,6 +11,8 @@ import type { ActivityState } from "./activity/activity-state";
 import { WaitingIndicator } from "./waiting-indicator";
 import { MemoryCaptureList } from "./memory-capture-list";
 import type { MemoryCapture } from "@/lib/memory-capture-api";
+import { MemoryUseList } from "./memory-use-list";
+import type { MemoryUse } from "@/lib/memory-use-api";
 import { CheckFindingReactions } from "./check-finding-reactions";
 import type { CheckFinding } from "@/lib/check-finding-api";
 import {
@@ -51,6 +53,8 @@ type Props = {
   memoryCaptures?: MemoryCapture[];
   /** 기억 기록을 처리했다. 되돌리거나 거절한 줄의 번호를 주면 그 줄을 먼저 뺀다 */
   onMemoryCapturesChanged?(removedId?: number): void;
+  /** 이 대화의 답마다 그 실행이 본문을 받은 기억이다. 각 답 아래에 그 답의 실행 것만 접어 보인다 */
+  memoryUses?: MemoryUse[];
   /** 점검 대화의 발견과 지금 반응이다. 각 답 아래에 그 답의 실행 것만 보인다 */
   checkFindings?: CheckFinding[];
   /** 「관심 없음」 을 고른 주제를 다시 알리지 않는 날 수다 */
@@ -83,6 +87,7 @@ export function MessageList({
   deliveryRetrying,
   memoryCaptures = [],
   onMemoryCapturesChanged,
+  memoryUses = [],
   checkFindings = [],
   dismissWindowDays = 0,
   onCheckFindingsChanged,
@@ -159,14 +164,17 @@ export function MessageList({
   const visible = [...foldedVisible, ...pendingVisible];
   const lastVisible = visible.at(-1)?.turn;
   const hasNoAnswer = lastVisible?.role === "USER" && latestView && !sending;
-  // 기억 기록은 turn 이 끝난 뒤 따로 읽혀 답 아래에 들어오므로 맨 아래 따라가기도 그 번호와 상태를 본다.
+  // 기억 기록과 참고한 기억은 turn 이 끝난 뒤 따로 읽혀 답 아래에 들어오므로 맨 아래 따라가기도 그 줄을 본다. 펼침 상태는 넣지 않는다.
   const capturesVersion = memoryCaptures
     .map((capture) => `${capture.id}:${capture.status}`)
+    .join(",");
+  const usesVersion = memoryUses
+    .map((use) => `${use.executionId}:${use.memoryId}`)
     .join(",");
   const findingsVersion = checkFindings
     .map((finding) => `${finding.id}:${finding.reaction}`)
     .join(",");
-  const contentVersion = `${turns.map((turn) => `${turn.id}:${turn.content.length}`).join("|")}:${sending}:${activity?.items.length}:${turnError}:${capturesVersion}:${findingsVersion}`;
+  const contentVersion = `${turns.map((turn) => `${turn.id}:${turn.content.length}`).join("|")}:${sending}:${activity?.items.length}:${turnError}:${capturesVersion}:${usesVersion}:${findingsVersion}`;
 
   const hasLiveActivity = activity !== null && activity.items.length > 0;
   // 답이 아직 없으면 기다림 점이나 진행 중 블록이 비서 줄 하나에 들어온다. 답이 흘러나오면 그 답의 줄이 블록을 받는다.
@@ -313,6 +321,13 @@ export function MessageList({
                               capture.executionId === turn.executionId,
                           )}
                           onChanged={onMemoryCapturesChanged}
+                        />
+                      ) : null}
+                      {turn.role === "ASSISTANT" ? (
+                        <MemoryUseList
+                          uses={memoryUses.filter(
+                            (use) => use.executionId === turn.executionId,
+                          )}
                         />
                       ) : null}
                       {isLast && hasNoAnswer ? (

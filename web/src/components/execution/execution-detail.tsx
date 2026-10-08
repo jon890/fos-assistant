@@ -68,6 +68,7 @@ function effortSourceLabel(node: ExecutionTreeNode): string {
 
 const CONTEXT_SOURCE_LABELS: Record<string, string> = {
   MEMORY_ALWAYS: "기억(항상)",
+  MEMORY_FACTS: "기억(개인 사실)",
   MEMORY_INDEX: "기억(제목만)",
   DELEGATION_RESULT: "맡긴 일 결과",
   CONNECTOR_RESULT: "승인한 동작 결과",
