@@ -88,7 +88,9 @@ Memory 는 에이전트가 실행할 때 `instructions` 로 받는 사실이다.
 | `memory.presentation.ServiceTokenInterceptor` | `/api/v1/service/**` 의 인증. 증명한 요청자를 요청 속성에 둔다 |
 | `memory.presentation.MemoryDocumentController` | 사용자가 문서를 만들고 읽고 고치는 API 와 collection 목록 |
 | `memory.presentation.MemoryDocumentServiceController` | 서비스 토큰으로 문서 하나를 읽는 API |
-| `agent.application.AgentMemoryCollectionService` | 에이전트가 받는 collection 읽기, 새 에이전트에 `core` 넣기 |
+| `agent.application.AgentMemoryCollectionService` | 에이전트가 받는 collection 읽기, 새 에이전트에 `core` 넣기, 관리자가 고른 목록으로 바꾸고 변경 기록 남기기 |
+| `memory.application.AgentMemorySettingService` | 관리 화면이 보는 collection 목록과 빠진 항목 수, 최근 변경을 모으고 고른 collection 을 검사한다 |
+| `memory.presentation.AgentMemorySettingController` | `/api/v1/admin/agents/{code}/memory-collections` |
 
 근거는 [`adr/ADR-052-memory-는-collection-종류-꺼내는-방식-민감도-판-출처를-가진다.md`](../adr/ADR-052-memory-는-collection-종류-꺼내는-방식-민감도-판-출처를-가진다.md) 와
 [`adr/ADR-053-에이전트는-허용된-collection-의-memory-만-받는다.md`](../adr/ADR-053-에이전트는-허용된-collection-의-memory-만-받는다.md) 와
@@ -96,6 +98,64 @@ Memory 는 에이전트가 실행할 때 `instructions` 로 받는 사실이다.
 [`adr/ADR-056-다른-서비스는-사용자에-묶인-서비스-토큰으로-문서를-읽기만-한다.md`](../adr/ADR-056-다른-서비스는-사용자에-묶인-서비스-토큰으로-문서를-읽기만-한다.md) 와
 [`adr/ADR-057-문서는-사람이-화면에서-직접-쓰고-고친다.md`](../adr/ADR-057-문서는-사람이-화면에서-직접-쓰고-고친다.md) 와
 [`adr/ADR-058-기존-개인-지식-저장소는-주인이-검토한-묶음을-화면에서-올려-들여온다.md`](../adr/ADR-058-기존-개인-지식-저장소는-주인이-검토한-묶음을-화면에서-올려-들여온다.md) 에 있다.
+
+### 관리자가 에이전트의 collection 을 바꿀 때
+
+`ADMIN` 이 관리자 영역의 에이전트 상세에서 받는 collection 과 민감 허용을 바꾼다. 자동으로 붙이지 않는다.
+근거는 [ADR-20261008 / agent-memory-grants-admin](../adr/ADR-20261008-agent-memory-grants-admin.md) 에 있다.
+
+| 경로 | 누가 | 무엇 |
+| --- | --- | --- |
+| `GET /api/v1/admin/agents/{code}/memory-collections` | `ADMIN` | 아래 응답 |
+| `PUT /api/v1/admin/agents/{code}/memory-collections` | `ADMIN` | 본문 `{ "collections": [{ "collection": "career", "allowSensitive": true }] }`. 받을 collection 전체다. 빈 목록이면 모두 뗀다. 응답은 `GET` 과 같다 |
+
+```json
+{
+  "countedFor": "OWNER",
+  "ownerName": "사용자A",
+  "collections": [
+    { "key": "core", "displayName": "기본", "listed": true, "granted": true, "allowSensitive": false, "entryCount": 12, "sensitiveEntryCount": 0 },
+    { "key": "career", "displayName": "경력", "listed": true, "granted": false, "allowSensitive": false, "entryCount": 3, "sensitiveEntryCount": 1 }
+  ],
+  "changes": [
+    { "collection": "career", "changeType": "GRANTED", "allowSensitive": true, "changedByName": "관리자A", "changedAt": "2026-10-08T05:00:00Z" }
+  ]
+}
+```
+
+| 칸 | 뜻 |
+| --- | --- |
+| `countedFor` | 수를 센 대상. `OWNER` 는 주인의 `USER` 항목과 주인 그룹의 `GROUP` 항목, `GROUP` 은 주인이 없어 관리자 그룹의 `GROUP` 항목만 |
+| `ownerName` | 주인의 표시 이름. 주인이 없으면 null |
+| `collections` | 그룹의 collection 목록 순서로 낸다. 받는 줄이 있지만 목록에 없는 collection 은 key 순서로 뒤에 붙이고 `listed` 가 거짓, `displayName` 이 key 다 |
+| `entryCount` | 그 collection 에서 실릴 수 있는 항목 수. `ACCEPTED` 이고 `SOURCE` 와 `ARCHIVE` 가 아니다. 민감 항목도 센다 |
+| `sensitiveEntryCount` | 그 가운데 `SENSITIVE` 인 수 |
+| `changes` | `agent_memory_collection_change` 의 최근 10줄. 새것부터 |
+
+```mermaid
+sequenceDiagram
+    participant W as 관리 화면
+    participant C as Control Plane
+    participant D as 데이터베이스
+    W->>C: PUT memory-collections (전체 목록)
+    C->>C: ADMIN 인가, 지우지 않은 에이전트인가, 옛 커넥터 에이전트가 아닌가
+    C->>C: 그룹 목록이나 지금 받는 줄에 있는 collection 인가, 겹치지 않는가
+    C->>D: 에이전트 행을 쓰기 잠금으로 읽는다
+    C->>D: 지금 줄과 비교해 붙이고, 떼고, 민감 허용을 바꾼다
+    C->>D: 바뀐 collection 마다 agent_memory_collection_change 한 줄
+    C-->>W: GET 과 같은 응답
+```
+
+| 갈리는 지점 | 응답 |
+| --- | --- |
+| `ADMIN` 이 아니다 | `FORBIDDEN` |
+| 없거나 지운 에이전트다 | `AGENT_NOT_FOUND` |
+| 옛 커넥터 에이전트다 | `FORBIDDEN`. 줄이 있어도 받지 않으므로 바꾸지 않는다 |
+| 그룹 목록에도 지금 받는 줄에도 없는 collection, 같은 collection 이 둘, 64개 넘는 목록 | `VALIDATION_FAILED` |
+| 바뀐 것이 없다 | 아무것도 쓰지 않고 지금 값을 낸다 |
+| 두 관리자가 동시에 저장한다 | 잠금을 기다려 하나씩 돈다. 나중 저장이 이기고 기록은 둘 다 남는다 |
+
+바꾼 값은 다음 실행의 조립과 `memory_read` 판정부터 쓰인다. 저장하는 쪽이 따로 비울 캐시가 없다.
 
 ## Memory 본문을 읽는 길
 

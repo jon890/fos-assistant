@@ -1,0 +1,13 @@
+{
+  "name": "plan96-agent-memory-collections",
+  "description": "관리자가 에이전트별 Memory collection 과 민감 허용을 보고 바꾸는 API 와 화면, 변경 기록 표",
+  "status": "pending",
+  "created_at": "2026-10-08",
+  "total_phases": 3,
+  "current_phase": 1,
+  "phases": [
+    { "number": 1, "file": "phase-01.md", "execution_profile": "standard" },
+    { "number": 2, "file": "phase-02.md", "execution_profile": "standard" },
+    { "number": 3, "file": "phase-03.md", "execution_profile": "standard" }
+  ]
+}
