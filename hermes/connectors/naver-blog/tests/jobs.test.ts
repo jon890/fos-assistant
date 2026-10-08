@@ -185,6 +185,14 @@ test("저장 단추를 누른 뒤 사라진 작업은 unknown 으로 끝난다",
   expect(stale?.save_clicked).toBe(true);
 });
 
+test("대소문자만 다른 두 블로그 아이디는 같은 잠금을 써서 둘째 작업은 NAVER_BLOG_BUSY 다", async () => {
+  const dir = await jobDir();
+  await acquireLock(dir, "Example-Blog", randomUUID());
+
+  expect(lockFile(dir, "EXAMPLE-BLOG")).toBe(lockFile(dir, "example-blog"));
+  expect(await errorCode(acquireLock(dir, "example-blog", randomUUID()))).toBe("NAVER_BLOG_BUSY");
+});
+
 test("pid 를 적기 전의 잠금은 만든 지 10초 안이면 살아 있다", async () => {
   const dir = await jobDir();
   const first = randomUUID();

@@ -6,7 +6,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { inputFile, readState, stateFile } from "../src/jobs.ts";
 import { createServer, type ServerDeps } from "../src/server.ts";
-import type { Env } from "../src/session.ts";
+import { type Env, sessionStatus } from "../src/session.ts";
 import { FakeCdp, upstreamText } from "./fake-cdp.ts";
 
 /** 같은 작업 프로세스를 가짜 `runDraft` 로 돌리는 시험 전용 진입 파일. */
@@ -124,6 +124,25 @@ test("save_draft 는 다른 프로세스 묶음의 작업 프로세스를 띄우
     `${started.body.job_id}.finished`,
     `${started.body.job_id}.json`,
   ]);
+});
+
+test("save_draft 는 중계가 꺼진 브라우저를 켤 시간을 두어 45초 제한으로 로그인을 확인한다", async () => {
+  const timeouts: Array<number | undefined> = [];
+  const { call, draft } = await setup({
+    deps: {
+      workerEntry: FAKE_WORKER_ENTRY,
+      checkSession: (env, options) => {
+        timeouts.push(options?.timeoutMs);
+        return sessionStatus(env, options);
+      },
+    },
+  });
+
+  const started = await call("save_draft", draft);
+
+  expect(started.isError).toBe(false);
+  expect(timeouts).toEqual([45_000]);
+  await call("draft_job", { job_id: started.body.job_id, wait_seconds: 4 });
 });
 
 test("로그인 쿠키가 없으면 작업을 만들지 않고 NAVER_BLOG_LOGIN_REQUIRED 다", async () => {

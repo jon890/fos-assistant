@@ -76,7 +76,8 @@ export const finishedFile = (dir: string, jobId: string) => join(dir, `${jobId}.
 
 /** 블로그마다 하나인 잠금 파일. 중계 주소는 바인딩마다 달라 같은 브라우저도 여러 주소로 온다. */
 export function lockFile(dir: string, blogId: string) {
-  const hash = createHash("sha256").update(blogId).digest("hex");
+  // 블로그 주소는 아이디의 대소문자를 가리지 않으므로 소문자로 맞춘 뒤 해시한다.
+  const hash = createHash("sha256").update(blogId.toLowerCase()).digest("hex");
   return join(dir, `lock-${hash.slice(0, 16)}`);
 }
 

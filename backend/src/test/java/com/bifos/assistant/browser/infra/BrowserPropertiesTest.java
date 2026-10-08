@@ -47,6 +47,21 @@ class BrowserPropertiesTest {
     }
 
     @Test
+    @DisplayName("표식을 붙인 주소가 대시보드의 검사를 지나지 못하면 기동을 멈추고 값을 메시지에 싣지 않는다")
+    void rejectsGatewayUrlTheDashboardWouldRefuse() {
+        for (String url : new String[] {
+            "https://control_plane.example.test/internal/browser-gateway",
+            "https://control-plane.example.test/a%20b/internal/browser-gateway"
+        }) {
+            assertThatThrownBy(() -> properties(url, SECRET))
+                    .as(url)
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessageContaining("gateway-base-url")
+                    .hasMessageNotContaining("example.test");
+        }
+    }
+
+    @Test
     @DisplayName("비밀이 31자면 기동을 멈추고 값을 메시지에 싣지 않으며 32자면 받는다")
     void requiresSecretOfAtLeast32Characters() {
         String shortSecret = SECRET.substring(1);

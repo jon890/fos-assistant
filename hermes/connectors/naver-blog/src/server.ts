@@ -63,11 +63,14 @@ export type ServerDeps = {
   workerEntry: string;
   /** 작업 프로세스가 시작을 알리기를 기다리는 시간. */
   startWaitMs: number;
+  /** `save_draft` 가 작업을 띄우기 전에 브라우저와 로그인을 확인하는 함수. */
+  checkSession: typeof sessionStatus;
 };
 
 const DEFAULT_SERVER_DEPS: ServerDeps = {
   workerEntry: process.argv[1] ?? "",
   startWaitMs: 5_000,
+  checkSession: sessionStatus,
 };
 
 /**
@@ -96,7 +99,7 @@ async function saveDraft(env: Env, input: DraftInput, deps: ServerDeps) {
     throw new ToolError("NAVER_BLOG_PHOTO_INVALID");
   const { blogId } = readConnection(env);
   // 중계가 꺼진 브라우저를 켜는 데 30초까지 걸려 확인 도구의 8초보다 길게 기다린다.
-  await sessionStatus(env, { timeoutMs: 45_000 });
+  await deps.checkSession(env, { timeoutMs: 45_000 });
   const dir = await openJobDir(env);
   const jobId = randomUUID();
   await acquireLock(dir, blogId, jobId);

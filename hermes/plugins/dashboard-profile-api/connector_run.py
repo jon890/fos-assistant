@@ -180,22 +180,30 @@ async def _connector_call_request(request, connector_id: str):
     return JSONResponse(answer, status_code=200)
 
 
-def _installed_owner_attachments(profile_dir: pathlib.Path, manifest: dict) -> str:
-    """그 profile 에 설치한 서버 정의(`config.yaml` 의 `mcp_servers`)가 가진 주인의 첨부 디렉터리다.
+def _installed_server_env(profile_dir: pathlib.Path, manifest: dict) -> dict:
+    """그 profile 에 설치한 서버 정의(`config.yaml` 의 `mcp_servers`)가 가진 env 다.
+
+    `config.yaml` 이 없거나 링크이거나, 그 서버 정의나 env 가 사전이 아니면 빈 사전이다.
+    """
+    import yaml
+    config_path = profile_dir / "config.yaml"
+    if config_path.is_symlink() or not config_path.is_file():
+        return {}
+    config = yaml.safe_load(config_path.read_text(encoding="utf-8")) or {}
+    servers = config.get("mcp_servers") if isinstance(config, dict) else None
+    server = servers.get(manifest["mcp_server"]) if isinstance(servers, dict) else None
+    env = server.get("env") if isinstance(server, dict) else None
+    return env if isinstance(env, dict) else {}
+
+
+def _installed_owner_attachments(installed_env: dict, manifest: dict) -> str:
+    """설치한 서버 정의의 env(`_installed_server_env`)가 가진 주인의 첨부 디렉터리다.
 
     바인딩 설치가 운영 정책의 `attachment_agent_root` 와 주인으로 넣은 값만 돌려준다.
     값이 없거나, 지금 정책의 루트 아래 `users/<64자리 16진수>` 모양이 아니거나, 정책이 없으면 빈 값이다.
     빈 값을 받은 커넥터는 사용자 첨부를 읽지 않는다(ADR-20261007 connector-owner-attachments).
     """
-    import yaml
-    config_path = profile_dir / "config.yaml"
-    if config_path.is_symlink() or not config_path.is_file():
-        return ""
-    config = yaml.safe_load(config_path.read_text(encoding="utf-8")) or {}
-    servers = config.get("mcp_servers") if isinstance(config, dict) else None
-    server = servers.get(manifest["mcp_server"]) if isinstance(servers, dict) else None
-    env = server.get("env") if isinstance(server, dict) else None
-    value = env.get(manifest["owner_attachments_env"]) if isinstance(env, dict) else None
+    value = installed_env.get(manifest["owner_attachments_env"])
     if not isinstance(value, str) or not OWNER_ATTACHMENTS_VALUE_RE.match(value):
         return ""
     policy = _sandbox_policy()
@@ -208,21 +216,13 @@ def _installed_owner_attachments(profile_dir: pathlib.Path, manifest: dict) -> s
     return value
 
 
-def _installed_owner_browser(profile_dir: pathlib.Path, manifest: dict) -> str:
-    """그 profile 에 설치한 서버 정의(`config.yaml` 의 `mcp_servers`)가 가진 브라우저 중계 주소다.
+def _installed_owner_browser(installed_env: dict, manifest: dict) -> str:
+    """설치한 서버 정의의 env(`_installed_server_env`)가 가진 브라우저 중계 주소다.
 
     바인딩 설치가 그 바인딩의 표식으로 넣은 값이다. 값이 없거나 `<gateway-base-url>/<접근 표식>` 모양이 아니면 빈 값이다.
     빈 값을 받은 커넥터는 브라우저에 닿지 못한다고 답한다(ADR-20261008 browser-gateway-token).
     """
-    import yaml
-    config_path = profile_dir / "config.yaml"
-    if config_path.is_symlink() or not config_path.is_file():
-        return ""
-    config = yaml.safe_load(config_path.read_text(encoding="utf-8")) or {}
-    servers = config.get("mcp_servers") if isinstance(config, dict) else None
-    server = servers.get(manifest["mcp_server"]) if isinstance(servers, dict) else None
-    env = server.get("env") if isinstance(server, dict) else None
-    value = env.get(manifest["owner_browser_env"]) if isinstance(env, dict) else None
+    value = installed_env.get(manifest["owner_browser_env"])
     if not isinstance(value, str) or not OWNER_BROWSER_VALUE_RE.fullmatch(value):
         return ""
     return value
@@ -274,9 +274,13 @@ async def _connector_execute_request(request, connector_id: str):
             return _rejected("관리 표식이 없는 profile 이다", 401)
         env_path = profile_dir / ".env"
         env_text = env_path.read_text(encoding="utf-8") if env_path.is_file() else ""
-        owner_attachments = (_installed_owner_attachments(profile_dir, manifest)
+        # 설치한 서버 정의는 주인의 값을 쓰는 커넥터만 읽는다. 한 번 읽어 두 값의 모양 검사에 함께 쓴다.
+        installed_env = (_installed_server_env(profile_dir, manifest)
+                         if manifest["owner_attachments_env"] is not None or manifest["owner_browser_env"] is not None
+                         else {})
+        owner_attachments = (_installed_owner_attachments(installed_env, manifest)
                              if manifest["owner_attachments_env"] is not None else None)
-        owner_browser = (_installed_owner_browser(profile_dir, manifest)
+        owner_browser = (_installed_owner_browser(installed_env, manifest)
                          if manifest["owner_browser_env"] is not None else None)
     except Exception as error:
         # 자식을 띄우기 전이다. 실행되지 않았다. profile 의 값이 섞일 수 있어 예외의 종류만 남긴다.

@@ -88,7 +88,7 @@ env 로 받는다. 기본값이 있는 값은 코드를 바꾸지 않고 설치 
 | `assistant.browser.start-timeout` | | 켠 뒤 CDP 가 답하기를 기다리는 시간 | `30s` |
 | `assistant.browser.sweep-interval` | | 자동 중지와 상태 맞추기를 도는 간격 | `1m` |
 | `assistant.browser.screen-timeout` | | 로그인 화면 하나가 열려 있을 수 있는 시간. 넘으면 `closed`(`timeout`) | `30m` |
-| `assistant.browser.gateway-base-url` | `ASSISTANT_BROWSER_GATEWAY_BASE_URL` | Hermes 가 중계에 닿는 주소. `http` 나 `https` 이고 끝이 `/internal/browser-gateway` 다. 아래 「중계」 | 없음 |
+| `assistant.browser.gateway-base-url` | `ASSISTANT_BROWSER_GATEWAY_BASE_URL` | Hermes 가 중계에 닿는 주소. `http` 나 `https` 이고 끝이 `/internal/browser-gateway` 다. 호스트는 영문자와 숫자, `.`, `-` 만 쓰고 경로 조각은 영문자와 숫자, `.`, `_`, `~`, `-` 만 쓴다. 아래 「중계」 | 없음 |
 | `assistant.browser.gateway-secret` | `ASSISTANT_BROWSER_GATEWAY_SECRET` | 접근 표식을 서명하는 비밀값. 32자 이상. 운영 비밀값이다 | 없음 |
 
 이미지, 망, 자원, 프로필 루트는 proxy 정책이 강제한다. Control Plane 은 정책과 같은 값을 운영 설정으로 받아 생성 요청에 싣는다.

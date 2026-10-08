@@ -329,6 +329,35 @@ class ProfileApiConnectorBindingBrowserTest(support.ProfileApiRouteTest):
                 self.assertEqual(self.bind(browser=value).status_code, 400)
                 self.assertEqual(self.tree("alice"), before)
 
+    def test_rebinding_removes_the_env_line_of_a_field_no_longer_declared(self):
+        """옛 소유 기록이 참조하던 칸이 지금 manifest 에 없으면 다시 붙일 때 그 `.env` 줄을 지운다.
+
+        브라우저 주소를 연결 칸으로 받던 커넥터가 중계 주소를 받도록 바뀐 profile 이다. 옛 주소 줄이 남지 않는다.
+        """
+        demo, _ = self.bind_fixture()
+        self.assertEqual(self.bind().status_code, 200)
+        state_path = self.root / "alice/.fos-connectors.json"
+        record = json.loads(state_path.read_text(encoding="utf-8"))
+        record[DEMO]["server"]["env"]["DEMO_OLD_URL"] = "${DEMO_OLD_URL}"
+        state_path.write_text(json.dumps(record), encoding="utf-8")
+        config = self.alice_config()
+        config["mcp_servers"]["demo"] = record[DEMO]["server"]
+        self.write_config("alice", config)
+        env_path = self.root / "alice/.env"
+        env_path.write_text(env_path.read_text(encoding="utf-8") + "DEMO_OLD_URL=http://192.0.2.1:9222\n",
+                            encoding="utf-8")
+        self.declare_owner_browser(demo)
+
+        response = self.bind(browser=BROWSER_ADDRESS)
+
+        self.assertEqual(response.status_code, 200, response.body)
+        lines = env_path.read_text(encoding="utf-8").splitlines()
+        self.assertEqual([line for line in lines if line.startswith("DEMO_OLD_URL=")], [], lines)
+        self.assertIn("DEMO_TOKEN=" + DEMO_VALUE, lines)
+        server_env = self.alice_config()["mcp_servers"]["demo"]["env"]
+        self.assertNotIn("DEMO_OLD_URL", server_env)
+        self.assertEqual(server_env["DEMO_BROWSER_URL"], BROWSER_ADDRESS)
+
     def test_vault_with_a_field_no_longer_declared_still_binds(self):
         """지금 manifest 에 없는 칸이 남은 보관 파일로도 설치된다. 남은 칸만 `.env` 에 쓴다. 보관 파일을 쓰는 검사는 그대로 거절한다."""
         self.bind_fixture()
