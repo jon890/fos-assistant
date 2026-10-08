@@ -23,7 +23,10 @@
   "default_tool_policy": "deny",
   "tools": {
     "list_accounts": { "risk": "READ" },
-    "get_quotes": { "risk": "READ" }
+    "get_quotes": { "risk": "READ" },
+    "get_holdings": { "risk": "READ" },
+    "get_buying_power": { "risk": "READ" },
+    "list_orders": { "risk": "READ" }
   },
   "errors": {
     "TOSSINVEST_UNAUTHORIZED": { "category": "credential_rejected", "recovery": "reconnect" },

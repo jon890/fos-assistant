@@ -116,6 +116,10 @@ function isAllowed(method: string, path: string) {
     "GET /api/v1/accounts",
     "GET /api/v1/prices",
     "GET /api/v1/stocks",
+    "GET /api/v1/holdings",
+    "GET /api/v1/buying-power",
+    "GET /api/v1/sellable-quantity",
+    "GET /api/v1/orders",
   ]).has(`${method} ${path}`);
 }
 

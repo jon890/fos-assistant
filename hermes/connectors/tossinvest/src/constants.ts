@@ -17,3 +17,9 @@ export const TOKEN_MARGIN_MS = 60_000;
 export const SYMBOL = /^[A-Za-z0-9.-]{1,12}$/;
 export const NAME_MAX_CHARS = 100;
 export const QUOTE_SYMBOLS_MAX = 20;
+/** connector.json 의 `account` 칸 형식과 같다. */
+export const ACCOUNT_SEQ = /^[0-9]{1,10}$/;
+/** `list_orders` 가 결과에 담는 주문 수의 상한이고, 끝난 주문 한 쪽의 `limit` 이다. */
+export const ORDERS_MAX = 100;
+/** `from` 과 `to` 를 모두 포함해 센 기간의 상한이다. */
+export const ORDER_PERIOD_MAX_DAYS = 366;

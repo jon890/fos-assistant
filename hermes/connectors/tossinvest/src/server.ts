@@ -8,6 +8,7 @@ import {
 } from "./runtime.ts";
 import { createToolRegistration } from "./tool-registration.ts";
 import { registerReadTools } from "./read-tools.ts";
+import { registerAccountTools } from "./account-tools.ts";
 
 export { isSupportedBunVersion } from "./runtime.ts";
 export type { TossinvestOptions } from "./client.ts";
@@ -17,6 +18,7 @@ export function createTossinvestServer(options: TossinvestOptions = {}) {
   const server = new McpServer({ name: "fos-tossinvest", version: "1.0.0" });
   const register = createToolRegistration(server);
   registerReadTools(register, client);
+  registerAccountTools(register, client);
   return server;
 }
 

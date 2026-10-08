@@ -1,4 +1,5 @@
 import {
+  ACCOUNT_SEQ,
   API_BASE,
   REQUEST_TIMEOUT_MS,
   RESPONSE_MAX_BYTES,
@@ -14,6 +15,8 @@ export interface TossinvestOptions {
 }
 export interface RequestOptions {
   query?: URLSearchParams;
+  /** 참이면 `X-Tossinvest-Account` 헤더에 `TOSSINVEST_ACCOUNT_SEQ` 를 싣는다. */
+  account?: boolean;
 }
 /** HTTP 상태와 JSON 본문이다. 본문이 JSON 이 아니면 `data` 가 undefined 다. */
 interface Exchange {
@@ -179,26 +182,41 @@ export class Tossinvest {
     if (this.cached?.value === token) this.cached = null;
   }
 
+  /** 고른 계좌 순번이다. 비었거나 형식이 틀리면 요청하기 전에 거절한다. */
+  private accountSeq(): string {
+    const seq = this.env.TOSSINVEST_ACCOUNT_SEQ ?? "";
+    if (!ACCOUNT_SEQ.test(seq))
+      throw new TossinvestError("TOSSINVEST_ACCOUNT_NOT_FOUND");
+    return seq;
+  }
+
   private async send(
     path: string,
     options: RequestOptions,
     token: string,
+    account: string | null,
   ): Promise<Exchange> {
     const query = options.query?.toString();
+    const headers: Record<string, string> = {
+      authorization: `Bearer ${token}`,
+      accept: "application/json",
+    };
+    if (account !== null) headers["x-tossinvest-account"] = account;
     return this.exchange(`${this.apiBase}${path}${query ? `?${query}` : ""}`, {
       method: "GET",
-      headers: { authorization: `Bearer ${token}`, accept: "application/json" },
+      headers,
     });
   }
 
   /** API 를 한 번 부른다. 토큰이 철회됐거나 만료됐으면 다시 받아 한 번만 다시 보낸다. */
   async request(path: string, options: RequestOptions = {}): Promise<any> {
+    const account = options.account ? this.accountSeq() : null;
     const first = await this.token();
-    let result = await this.send(path, options, first);
+    let result = await this.send(path, options, first, account);
     if (result.status === 401 && RETRY_CODES.has(bodyCode(result.data))) {
       this.discard(first);
       const second = await this.token();
-      result = await this.send(path, options, second);
+      result = await this.send(path, options, second, account);
       // 두 번째도 철회됐으면 다른 프로세스와 토큰을 다툰 것이다. 자격 증명이 틀린 것이 아니다.
       if (result.status === 401 && bodyCode(result.data) === "token-revoked")
         throw new TossinvestError("TOSSINVEST_UNAVAILABLE");
