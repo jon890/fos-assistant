@@ -188,7 +188,7 @@ function ProposalCard({
   );
 }
 
-/** 저장된 기록의 「기억했어요」 줄이다. 제안을 받아들인 줄은 되돌리기가 없다. */
+/** 저장된 기록의 「기억했어요」 줄과 그 본문이다. 제안을 받아들인 줄은 되돌리기가 없다. */
 function RememberedLine({
   capture,
   actions,
@@ -235,6 +235,16 @@ function RememberedLine({
           </>
         ) : null}
       </div>
+      {actions.mode !== null ? null : capture.sensitive ? (
+        <p className="mt-1 text-xs">민감한 내용이라 여기서 보이지 않아요.</p>
+      ) : (
+        <p
+          data-testid="memory-capture-content"
+          className="mt-1 whitespace-pre-wrap break-words text-foreground"
+        >
+          {capture.content}
+        </p>
+      )}
       <CaptureEditor actions={actions} />
       <CaptureError actions={actions} />
     </div>
