@@ -1,4 +1,4 @@
-## ADR-20261007: 사용자마다 브라우저 하나를 Control Plane 이 관리하고, 커넥터는 바인딩이 준 중계 주소로만 닿는다
+## ADR-20261007 / user-browser: 사용자마다 브라우저 하나를 Control Plane 이 관리하고, 커넥터는 바인딩이 준 중계 주소로만 닿는다
 
 - **status**: `accepted`
 - Date: 2026-10-07

@@ -1,4 +1,4 @@
-## ADR-20261007: backend 통합 검사는 Spring 컨텍스트 하나를 함께 쓰고, 설정과 대역은 검사마다 바꿔 끼운다
+## ADR-20261007 / test-context-base: backend 통합 검사는 Spring 컨텍스트 하나를 함께 쓰고, 설정과 대역은 검사마다 바꿔 끼운다
 
 - **status**: `accepted`
 - Date: 2026-10-07

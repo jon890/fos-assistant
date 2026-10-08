@@ -1,4 +1,4 @@
-## ADR-20261007: 먼저 살펴보기 루프는 결정적 provider 로 실제 서비스를 replay 해 측정하고 안전 경계만 CI 를 막는다
+## ADR-20261007 / proactive-eval: 먼저 살펴보기 루프는 결정적 provider 로 실제 서비스를 replay 해 측정하고 안전 경계만 CI 를 막는다
 
 - **status**: `accepted`
 - Date: 2026-10-07

@@ -1,4 +1,4 @@
-## ADR-20261008: docker 실행 공간을 쓰는 profile 은 API 경로의 `execute_code` 를 승인 없이 컨테이너에서 돌린다
+## ADR-20261008 / execute-code-unattended: docker 실행 공간을 쓰는 profile 은 API 경로의 `execute_code` 를 승인 없이 컨테이너에서 돌린다
 
 - **status**: `accepted`
 - Date: 2026-10-08

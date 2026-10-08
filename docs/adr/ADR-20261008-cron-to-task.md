@@ -1,4 +1,4 @@
-## ADR-20261008: Hermes cron 자동화는 예약 작업으로 옮기고, 결과는 assistant 안에서만 받는다
+## ADR-20261008 / cron-to-task: Hermes cron 자동화는 예약 작업으로 옮기고, 결과는 assistant 안에서만 받는다
 
 - **status**: `accepted`
 - Date: 2026-10-08

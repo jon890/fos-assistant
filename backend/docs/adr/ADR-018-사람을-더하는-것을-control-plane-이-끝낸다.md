@@ -1,4 +1,4 @@
-# ADR-018. 사람을 더하는 것을 Control Plane 이 끝낸다
+# ADR-018: 사람을 더하는 것을 Control Plane 이 끝낸다
 
 - **status**: `accepted`
 

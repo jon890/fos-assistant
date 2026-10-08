@@ -1,4 +1,4 @@
-## ADR-20261007: 행동 수준은 Control Plane 의 결정적 규칙이 정하고 첫 자동 실행은 읽기 전용 살펴보기 한 번이다
+## ADR-20261007 / autonomy-policy: 행동 수준은 Control Plane 의 결정적 규칙이 정하고 첫 자동 실행은 읽기 전용 살펴보기 한 번이다
 
 - **status**: `accepted`
 - Date: 2026-10-07

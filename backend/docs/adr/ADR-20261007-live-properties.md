@@ -1,4 +1,4 @@
-## ADR-20261007: 운영 코드는 실행 중에 쓰는 설정을 LiveProperties 로 읽는다
+## ADR-20261007 / live-properties: 운영 코드는 실행 중에 쓰는 설정을 LiveProperties 로 읽는다
 
 - **status**: `accepted`
 - Date: 2026-10-07

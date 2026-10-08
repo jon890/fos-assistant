@@ -1,4 +1,4 @@
-## ADR-20261007: Flyway 는 UTC 시각 버전을 쓰고 ADR 은 결정 날짜와 슬러그로 구분한다
+## ADR-20261007 / numbering-scheme: Flyway 는 UTC 시각 버전을 쓰고 ADR 은 결정 날짜와 슬러그로 구분한다
 
 - **status**: `accepted`
 - Date: 2026-10-07

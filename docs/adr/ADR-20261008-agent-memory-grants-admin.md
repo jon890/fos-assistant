@@ -1,4 +1,4 @@
-## ADR-20261008: 관리자가 에이전트의 Memory collection 을 한 번에 바꾸고, 바꾼 것은 누가 언제를 표에 남긴다
+## ADR-20261008 / agent-memory-grants-admin: 관리자가 에이전트의 Memory collection 을 한 번에 바꾸고, 바꾼 것은 누가 언제를 표에 남긴다
 
 - **status**: `accepted`
 - Date: 2026-10-08

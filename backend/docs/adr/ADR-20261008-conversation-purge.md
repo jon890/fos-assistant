@@ -1,4 +1,4 @@
-## ADR-20261008: 지운 대화는 정리 작업이 본문과 Hermes session 까지 지우고, 대화 줄과 실행 줄은 본문 없이 남긴다
+## ADR-20261008 / conversation-purge: 지운 대화는 정리 작업이 본문과 Hermes session 까지 지우고, 대화 줄과 실행 줄은 본문 없이 남긴다
 
 - **status**: `accepted`
 - Date: 2026-10-08

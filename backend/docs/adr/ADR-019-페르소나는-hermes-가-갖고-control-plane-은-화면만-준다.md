@@ -1,4 +1,4 @@
-# ADR-019. 페르소나는 Hermes 가 갖고 Control Plane 은 화면만 준다
+# ADR-019: 페르소나는 Hermes 가 갖고 Control Plane 은 화면만 준다
 
 - **status**: `accepted`
 
