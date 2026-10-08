@@ -1,5 +1,6 @@
 import { expect, setSession, test } from "./fixtures.ts";
-import type { Page } from "../../web/node_modules/@playwright/test/index.js";
+import { isolatedUser } from "./helpers.ts";
+import type { Page, TestInfo } from "../../web/node_modules/@playwright/test/index.js";
 
 type Newcomer = { email: string; displayName: string; hermesProfile: string };
 
@@ -10,11 +11,13 @@ type Newcomer = { email: string; displayName: string; hermesProfile: string };
  * 이름을 주소와 profile 이름에 함께 섞는다. 같은 값을 쓰면 뒤에 도는 쪽이 「이미 있는 이메일」로
  * 거절된다.
  */
-function newcomer(slot: string, label: string, project: string): Newcomer {
+function newcomer(slot: string, label: string, testInfo: TestInfo): Newcomer {
+  const user = isolatedUser(testInfo, slot);
+  const localPart = user.email.slice(0, user.email.indexOf("@"));
   return {
-    email: `${slot}-${project}@example.com`,
-    displayName: `${label} ${project}`,
-    hermesProfile: `${slot}${project}`,
+    email: user.email,
+    displayName: `${label} ${testInfo.project.name}`,
+    hermesProfile: `${slot}-${localPart.slice(slot.length + 1)}`,
   };
 }
 
@@ -32,7 +35,7 @@ async function addPerson(page: Page, person: Newcomer): Promise<void> {
 }
 
 test("관리자가 사람을 더하면 목록에 한 줄이 늘어난다", async ({ page }, testInfo) => {
-  const person = newcomer("aunt", "이모", testInfo.project.name);
+  const person = newcomer("aunt", "이모", testInfo);
   await page.goto("/admin/people");
 
   const list = page.getByRole("table", { name: "등록된 사용자" });
@@ -46,18 +49,21 @@ test("관리자가 사람을 더하면 목록에 한 줄이 늘어난다", async
   const row = list.getByRole("row").filter({ hasText: person.email });
   await expect(row).toHaveCount(1);
   await expect(row.getByText(person.hermesProfile, { exact: true })).toBeVisible();
-  // 아직 한 번도 들어오지 않았으므로 그 사람의 사용자와 에이전트는 없다.
-  await expect(row.getByText("로그인한 적 없음", { exact: true })).toBeVisible();
+  await expect(row.getByText("기록 없음", { exact: true })).toHaveCount(2);
+  await row.getByRole("button", { name: "상세" }).click();
+  await expect(row.getByRole("button", { name: "상세" })).toHaveAttribute("aria-expanded", "true");
+  await expect(page.getByText("첫 로그인 여부", { exact: true })).toBeVisible();
+  await expect(page.getByText("로그인한 적 없음", { exact: true })).toBeVisible();
   await expect(row.getByText("켜짐", { exact: true })).toBeVisible();
 });
 
 test("이미 쓰는 profile 이름으로 더하면 무엇이 겹쳤는지 알린다", async ({ page }, testInfo) => {
   // 겹칠 대상을 이 검사가 직접 만든다.
-  const owner = newcomer("uncle", "삼촌", testInfo.project.name);
+  const owner = newcomer("uncle", "삼촌", testInfo);
   await addPerson(page, owner);
   await page.goto("/admin/people");
 
-  await page.getByLabel("이메일").fill(`uncle-twin-${testInfo.project.name}@example.com`);
+  await page.getByLabel("이메일").fill(isolatedUser(testInfo, "uncle-twin").email);
   await page.getByLabel("이름", { exact: true }).fill("삼촌의 쌍둥이");
   await page.getByLabel("profile").fill(owner.hermesProfile);
   await page.getByRole("button", { name: "추가" }).click();
@@ -67,7 +73,7 @@ test("이미 쓰는 profile 이름으로 더하면 무엇이 겹쳤는지 알린
 
 test("사용 중지하고 다시 허용할 수 있다", async ({ page }, testInfo) => {
   // 켜고 끌 사람을 이 검사가 직접 만든다.
-  const person = newcomer("cousin", "사촌", testInfo.project.name);
+  const person = newcomer("cousin", "사촌", testInfo);
   await addPerson(page, person);
   await page.goto("/admin/people");
   const row = page
@@ -84,8 +90,8 @@ test("사용 중지하고 다시 허용할 수 있다", async ({ page }, testInf
   await expect(row.getByText("켜짐", { exact: true })).toBeVisible();
 });
 
-test("관리자가 아닌 사람에게는 사람 관리 화면이 보이지 않는다", async ({ context, page }) => {
-  await setSession(context, { email: "member@example.com", name: "가족 사용자" });
+test("관리자가 아닌 사람에게는 사람 관리 화면이 보이지 않는다", async ({ context, page }, testInfo) => {
+  await setSession(context, isolatedUser(testInfo, "member"));
 
   await page.goto("/");
   await expect(page.getByTestId("admin-entry")).toHaveCount(0);
@@ -93,4 +99,6 @@ test("관리자가 아닌 사람에게는 사람 관리 화면이 보이지 않�
   await page.goto("/admin/people");
   await expect(page).toHaveURL(/\/$/);
   await expect(page.getByRole("table", { name: "등록된 사용자" })).toHaveCount(0);
+  const response = await page.request.get("/api/admin/people");
+  expect(response.status()).toBe(403);
 });

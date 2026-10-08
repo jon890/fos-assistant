@@ -1,6 +1,7 @@
 import NextAuth from "next-auth";
 import Google from "next-auth/providers/google";
 import { isSignInAllowed } from "@/lib/control-plane";
+import { recordSignIn } from "@/lib/signin-activity";
 
 /**
  * 로그인 화면을 그려 놓고 동작하지 않는 대신 첫 요청에서 실패한다.
@@ -34,6 +35,11 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       const email = profile?.email;
       if (!email) return false;
       return isSignInAllowed(email);
+    },
+  },
+  events: {
+    async signIn({ user }) {
+      if (user.email) await recordSignIn(user.email);
     },
   },
   pages: { signIn: "/signin" },
