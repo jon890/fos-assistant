@@ -6,6 +6,7 @@ import com.bifos.assistant.chat.domain.type.ModelSelectionMode;
 import com.bifos.assistant.model.domain.type.ModelTier;
 import jakarta.persistence.LockModeType;
 import java.time.Instant;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -20,13 +21,18 @@ public interface ConversationRepository extends JpaRepository<Conversation, Long
 
     Optional<Conversation> findByIdAndUserIdAndDeletedAtIsNull(Long id, Long userId);
 
-    /** 지웠지만 본문을 아직 지우지 않은 대화의 번호다. 먼저 지운 대화부터 낸다(ADR-20261008 / conversation-purge). */
+    /**
+     * 지웠지만 본문을 아직 지우지 않은 대화의 번호다. 먼저 지운 대화부터 낸다(ADR-20261008 / conversation-purge).
+     *
+     * <p>{@code skipped} 는 실패해 기다리는 중인 대화다. 빼고 골라야 그 대화가 쌓여도 뒤에 지운 대화가 밀리지 않는다. 비우면 안 되므로
+     * 기다리는 대화가 없으면 없는 번호 하나를 넘긴다.
+     */
     @Query("""
             select c.id from Conversation c
-             where c.purgedAt is null and c.deletedAt is not null
+             where c.purgedAt is null and c.deletedAt is not null and c.id not in :skipped
              order by c.deletedAt asc, c.id asc
             """)
-    List<Long> findPurgeCandidates(Pageable page);
+    List<Long> findPurgeCandidates(@Param("skipped") Collection<Long> skipped, Pageable page);
 
     /**
      * 본문을 지운 대화로 적는다. 제목과 Hermes session 을 비운다. 줄은 남긴다. 실행 기록과 다른 표가 이 번호를 가리킨다.

@@ -95,6 +95,22 @@ public interface ExecutionEventRepository extends JpaRepository<ExecutionEvent, 
             @Param("conversationId") Long conversationId, @Param("internalTools") Collection<String> internalTools);
 
     /**
+     * 그 대화의 실행이 낳은 자식 가운데 아직 사용량 작업 줄이 없는 것이 있는가. {@link #findUnscheduledChildren} 과 같은 조건을 그
+     * 대화로 한정한다. 작업 줄이 생기기 전에 Hermes session 을 지우면 자식 사용량을 읽지 못한다.
+     */
+    @Query("""
+            select case when count(event) > 0 then true else false end
+              from ExecutionEvent event, AgentExecution parent
+             where event.executionId = parent.id and parent.conversationId = :conversationId
+               and parent.finishedAt is not null and parent.finishedAt >= :since
+               and event.eventType = 'SUBAGENT_STARTED' and event.hermesSessionId is not null
+               and not exists (select job.id from SubagentUsageJob job
+                   where job.profileName = parent.profileName and job.childSessionId = event.hermesSessionId)
+            """)
+    boolean existsUnscheduledChildInConversation(
+            @Param("conversationId") Long conversationId, @Param("since") Instant since);
+
+    /**
      * 그 대화 실행의 사건에서 {@code detail} 을 비운다. 사건 줄과 토큰은 남긴다.
      *
      * <p>트랜잭션은 {@code ConversationExecutionPurge} 가 연다.

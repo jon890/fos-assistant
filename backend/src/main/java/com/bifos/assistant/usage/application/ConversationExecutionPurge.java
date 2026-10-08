@@ -5,6 +5,7 @@ import com.bifos.assistant.usage.domain.type.ExecutionStatus;
 import com.bifos.assistant.usage.infra.AgentExecutionRepository;
 import com.bifos.assistant.usage.infra.ExecutionEventRepository;
 import com.bifos.assistant.usage.infra.SubagentUsageJobRepository;
+import java.time.Instant;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -27,13 +28,15 @@ public class ConversationExecutionPurge {
     /**
      * 그 대화의 실행이 모두 끝났고 자식 사용량도 다 읽었는가.
      *
-     * <p>도는 실행이 있으면 그 session 을 지금 지워도 Hermes 가 이어 쓴다. 자식 사용량을 읽는 중이면 session 을 지운 뒤
-     * 사용량을 잃는다. 둘 다 아니어야 지운다.
+     * <p>도는 실행이 있으면 그 session 을 지금 지워도 Hermes 가 이어 쓴다. 자식 사용량을 읽는 중이거나, 부모 실행은 끝났지만
+     * 자식의 작업 줄이 아직 생기지 않았으면 session 을 지운 뒤 사용량을 잃는다. 셋 다 아니어야 지운다.
      */
     @Transactional(readOnly = true)
-    public boolean settled(Long conversationId) {
+    public boolean settled(Long conversationId, Instant now) {
         return !executions.existsByConversationIdAndStatus(conversationId, ExecutionStatus.RUNNING)
-                && !usageJobs.existsWaitingInConversation(conversationId);
+                && !usageJobs.existsWaitingInConversation(conversationId)
+                && !events.existsUnscheduledChildInConversation(
+                        conversationId, now.minus(SubagentUsageReconciler.DISCOVERY_WINDOW));
     }
 
     /** 그 대화의 실행이 보낸 Hermes session 을 겹치지 않게 낸다. */

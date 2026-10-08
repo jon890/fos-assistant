@@ -40,7 +40,8 @@ import org.springframework.stereotype.Component;
  * </ol>
  *
  * <p>어느 단계든 실패하면 그 대화는 지운 시각을 적지 않고 남는다. 다음 차례에 처음부터 다시 한다. 이미 지운 session 과 파일은
- * 다시 지워도 그대로 끝난다. 실패가 이어지는 대화는 기다리는 간격을 한 시간까지 두 배씩 늘린다. 이 간격은 메모리에만 둔다.
+ * 다시 지워도 그대로 끝난다. 실패가 이어지는 대화는 기다리는 간격을 한 시간까지 두 배씩 늘리고, 그동안 후보에서 빼서 뒤에 지운
+ * 대화가 밀리지 않게 한다. 다섯 번 잇달아 실패하면 error 로그를 남긴다. 이 간격은 메모리에만 둔다.
  */
 @Component
 @RequiredArgsConstructor
@@ -50,8 +51,17 @@ public class ConversationPurger {
     /** 한 차례에 보는 대화 수다. 지운 순서대로 본다. */
     private static final int BATCH = 50;
 
+    /** 한 차례에 쓰는 시간의 상한이다. 정리는 다른 주기 작업과 scheduler 스레드 하나를 함께 쓴다. */
+    private static final Duration TICK_BUDGET = Duration.ofSeconds(20);
+
+    /** 이만큼 잇달아 실패하면 error 로그로 알린다. 운영자가 원인을 찾아야 하는 대화다. */
+    private static final int ALERT_ATTEMPTS = 5;
+
     private static final Duration FIRST_BACKOFF = Duration.ofMinutes(1);
     private static final Duration MAX_BACKOFF = Duration.ofHours(1);
+
+    /** 기다리는 대화가 없을 때 후보 질의에 넘기는 번호다. 대화 번호는 1부터다. */
+    private static final List<Long> NONE_SKIPPED = List.of(-1L);
 
     private final ConversationRepository conversations;
     private final ConversationPurgeWriter writer;
@@ -63,7 +73,7 @@ public class ConversationPurger {
     private final ArtifactStore artifactStore;
     private final Clock clock;
 
-    /** 실패한 대화를 다음에 다시 볼 시각과 그때 기다릴 간격이다. */
+    /** 실패한 대화를 다음에 다시 볼 시각과 그때 기다릴 간격, 잇단 실패 수다. */
     private final Map<Long, Backoff> backoffs = new ConcurrentHashMap<>();
 
     /** 운영은 매분 돈다. 검사에서는 {@code -} 로 끄고 {@link #purgeDue} 를 직접 부른다. */
@@ -73,19 +83,24 @@ public class ConversationPurger {
     }
 
     /**
-     * 지웠지만 본문이 남은 대화를 지운다.
+     * 지웠지만 본문이 남은 대화를 지운다. 기다리는 간격 안의 대화는 후보에서 뺀다.
      *
      * @return 이번 차례에 지운 대화 수
      */
     public int purgeDue(Instant now) {
-        List<Long> candidates = conversations.findPurgeCandidates(PageRequest.of(0, BATCH));
+        List<Long> waitingIds = backoffs.entrySet().stream()
+                .filter(entry -> now.isBefore(entry.getValue().retryAt()))
+                .map(Map.Entry::getKey)
+                .toList();
+        List<Long> candidates = conversations.findPurgeCandidates(
+                waitingIds.isEmpty() ? NONE_SKIPPED : waitingIds, PageRequest.of(0, BATCH));
+        long started = System.nanoTime();
         int purged = 0;
         int waiting = 0;
         int failed = 0;
         for (Long conversationId : candidates) {
-            Backoff backoff = backoffs.get(conversationId);
-            if (backoff != null && now.isBefore(backoff.retryAt())) {
-                continue;
+            if (Duration.ofNanos(System.nanoTime() - started).compareTo(TICK_BUDGET) > 0) {
+                break;
             }
             try {
                 if (purgeOne(conversationId, now)) {
@@ -96,13 +111,7 @@ public class ConversationPurger {
                 }
             } catch (RuntimeException ex) {
                 failed++;
-                Duration next =
-                        backoff == null ? FIRST_BACKOFF : min(backoff.interval().multipliedBy(2), MAX_BACKOFF);
-                backoffs.put(conversationId, new Backoff(now.plus(next), next));
-                log.warn(
-                        "지운 대화의 본문을 지우지 못했다 conversationId={} error={}",
-                        conversationId,
-                        ex.getClass().getSimpleName());
+                recordFailure(conversationId, now, ex);
             }
         }
         if (purged > 0 || failed > 0) {
@@ -111,13 +120,37 @@ public class ConversationPurger {
         return purged;
     }
 
+    private void recordFailure(Long conversationId, Instant now, RuntimeException ex) {
+        Backoff previous = backoffs.get(conversationId);
+        Duration next =
+                previous == null ? FIRST_BACKOFF : min(previous.interval().multipliedBy(2), MAX_BACKOFF);
+        int attempts = previous == null ? 1 : previous.attempts() + 1;
+        backoffs.put(conversationId, new Backoff(now.plus(next), next, attempts));
+        String code = ex instanceof ApiException api ? api.code().name() : "-";
+        if (attempts == ALERT_ATTEMPTS) {
+            log.error(
+                    "지운 대화의 본문을 잇달아 지우지 못했다 conversationId={} attempts={} error={} code={}",
+                    conversationId,
+                    attempts,
+                    ex.getClass().getSimpleName(),
+                    code);
+        } else {
+            log.warn(
+                    "지운 대화의 본문을 지우지 못했다 conversationId={} attempts={} error={} code={}",
+                    conversationId,
+                    attempts,
+                    ex.getClass().getSimpleName(),
+                    code);
+        }
+    }
+
     /**
      * 대화 하나를 지운다.
      *
      * @return 지웠으면 참. 실행이 아직 돌거나 다른 차례가 먼저 지웠으면 거짓
      */
     private boolean purgeOne(Long conversationId, Instant now) {
-        if (!executions.settled(conversationId)) {
+        if (!executions.settled(conversationId, now)) {
             return false;
         }
         Conversation conversation = conversations.findById(conversationId).orElse(null);
@@ -132,6 +165,9 @@ public class ConversationPurger {
     private void deleteHermesSessions(Conversation conversation) {
         List<ExecutionSessionRef> refs = new ArrayList<>(executions.sessions(conversation.id()));
         Agent conversationAgent = agents.findById(conversation.agentId()).orElse(null);
+        if (conversationAgent == null && conversation.hermesSessionId() != null) {
+            log.warn("에이전트가 없어 대화의 Hermes session 을 지우지 못했다 conversationId={}", conversation.id());
+        }
         if (conversationAgent != null) {
             for (String sessionId : new String[] {conversation.hermesSessionId(), conversation.hermesRootSessionId()}) {
                 if (sessionId != null && !sessionId.isBlank()) {
@@ -185,6 +221,6 @@ public class ConversationPurger {
         return left.compareTo(right) <= 0 ? left : right;
     }
 
-    /** 실패한 대화를 다시 볼 시각과 그때 쓴 간격이다. */
-    private record Backoff(Instant retryAt, Duration interval) {}
+    /** 실패한 대화를 다시 볼 시각과 그때 쓴 간격, 잇단 실패 수다. */
+    private record Backoff(Instant retryAt, Duration interval, int attempts) {}
 }

@@ -39,8 +39,10 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -100,6 +102,7 @@ class ConversationPurgerTest {
 
     private AppUser owner;
     private Agent agent;
+    private final List<Filled> created = new ArrayList<>();
 
     @BeforeEach
     void setUp() {
@@ -116,6 +119,16 @@ class ConversationPurgerTest {
                 AgentVisibility.PRIVATE,
                 owner.id(),
                 NOW));
+    }
+
+    /** 지우지 않은 대화의 파일이 남으면 다음 실행에서 같은 번호의 파일과 부딪친다. */
+    @AfterEach
+    void tearDown() {
+        for (Filled filled : created) {
+            attachmentStore.delete(filled.attachment());
+            artifactStore.deleteFolder(filled.conversationId());
+        }
+        created.clear();
     }
 
     @Test
@@ -182,6 +195,30 @@ class ConversationPurgerTest {
         assertThat(messages.findByConversationIdOrderByIdAsc(filled.conversationId()))
                 .isEmpty();
         assertThat(deletedSessionIds()).contains(filled.sessionId());
+    }
+
+    @Test
+    @DisplayName("끝난 실행의 자식이 아직 사용량 작업 줄을 받지 못했으면 미루고, 그 기간이 지나면 지운다")
+    void waitsForUnscheduledChildUsage() throws Exception {
+        Filled filled = filledConversation(ExecutionStatus.SUCCEEDED);
+        events.save(ExecutionEvent.builder()
+                .executionId(filled.executionId())
+                .sequence(2)
+                .eventType(ExecutionEventType.SUBAGENT_STARTED)
+                .hermesSessionId("child-" + UUID.randomUUID())
+                .occurredAt(NOW)
+                .build());
+        conversationWriter.deleteIfActive(filled.conversationId(), owner.id(), NOW.minusSeconds(60));
+
+        purger.purgeDue(NOW);
+
+        assertThat(messages.findByConversationIdOrderByIdAsc(filled.conversationId()))
+                .hasSize(2);
+
+        purger.purgeDue(NOW.plus(Duration.ofHours(25)));
+
+        assertThat(messages.findByConversationIdOrderByIdAsc(filled.conversationId()))
+                .isEmpty();
     }
 
     @Test
@@ -263,7 +300,9 @@ class ConversationPurgerTest {
         attachments.save(attachment);
         attachmentStore.save(attachment, new ByteArrayInputStream(new byte[] {1, 2, 3}));
         artifactStore.write(conversation.id(), "report/index.html", "<p>결과</p>".getBytes(StandardCharsets.UTF_8));
-        return new Filled(conversation.id(), execution.id(), sessionId, attachment);
+        Filled filled = new Filled(conversation.id(), execution.id(), sessionId, attachment);
+        created.add(filled);
+        return filled;
     }
 
     private List<String> deletedSessionIds() {
