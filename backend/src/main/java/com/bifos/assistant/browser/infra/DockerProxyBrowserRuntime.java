@@ -13,6 +13,7 @@ import java.util.Optional;
 import java.util.function.Supplier;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.client.BufferingClientHttpRequestFactory;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.HttpClientErrorException;
@@ -219,11 +220,11 @@ public class DockerProxyBrowserRuntime implements BrowserRuntime {
         return value.endsWith("/") ? value.substring(0, value.length() - 1) : value;
     }
 
-    private static SimpleClientHttpRequestFactory requestFactory() {
+    private static BufferingClientHttpRequestFactory requestFactory() {
         SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
         factory.setConnectTimeout(CONNECT_TIMEOUT);
         factory.setReadTimeout(READ_TIMEOUT);
-        return factory;
+        return new BufferingClientHttpRequestFactory(factory);
     }
 
     /** proxy 가 그 컨테이너를 모른다고 답했다. 멈추기와 지우기에서는 성공으로 본다. */
