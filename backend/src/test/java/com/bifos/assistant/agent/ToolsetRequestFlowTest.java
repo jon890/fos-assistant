@@ -41,6 +41,7 @@ import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
+import org.assertj.core.api.ThrowableAssert.ThrowingCallable;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -225,7 +226,9 @@ class ToolsetRequestFlowTest {
             assertThat(enabled.get()).doesNotContain("image_gen");
             assertThat(notifications.unreadCount(owner.id())).isEqualTo(1);
         } finally {
-            if (change.equals("group")) jdbc.update("update app_user set group_id = ? where id = ?", group, owner.id());
+            if (change.equals("group")) {
+                jdbc.update("update app_user set group_id = ? where id = ?", group, owner.id());
+            }
         }
     }
 
@@ -327,13 +330,16 @@ class ToolsetRequestFlowTest {
     private void changeAgent(boolean deleted, Long ownerId, AgentVisibility scope) {
         transactions.executeWithoutResult(status -> {
             Agent row = agents.findByIdForUpdate(agent.id()).orElseThrow();
-            if (deleted) row.markDeleted(Instant.now());
-            else row.changeAccess(true, scope, ownerId);
+            if (deleted) {
+                row.markDeleted(Instant.now());
+            } else {
+                row.changeAccess(true, scope, ownerId);
+            }
             agents.saveAndFlush(row);
         });
     }
 
-    private static void assertError(org.assertj.core.api.ThrowableAssert.ThrowingCallable action, ErrorCode code) {
+    private static void assertError(ThrowingCallable action, ErrorCode code) {
         assertThatThrownBy(action)
                 .isInstanceOfSatisfying(
                         ApiException.class, ex -> assertThat(ex.code()).isEqualTo(code));

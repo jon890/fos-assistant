@@ -1,7 +1,7 @@
 package com.bifos.assistant.agent.presentation;
 
 import com.bifos.assistant.agent.application.ToolsetRequestService;
-import com.bifos.assistant.agent.presentation.AgentDtos.ToolsetRequestView;
+import com.bifos.assistant.agent.presentation.AgentDtos.ToolsetRequestResponse;
 import com.bifos.assistant.shared.auth.CurrentUserProvider;
 import jakarta.validation.Valid;
 import java.util.List;
@@ -23,41 +23,44 @@ public class ToolsetRequestController {
     private final CurrentUserProvider currentUser;
 
     @GetMapping("/agents/{code}/tool-requests")
-    public List<ToolsetRequestView> list(@PathVariable String code) {
+    public List<ToolsetRequestResponse> list(@PathVariable String code) {
         return requests.list(currentUser.require(), code, false).stream()
-                .map(ToolsetRequestView::from)
+                .map(ToolsetRequestResponse::from)
                 .toList();
     }
 
     @PostMapping("/agents/{code}/tool-requests")
-    public ToolsetRequestView request(@PathVariable String code, @Valid @RequestBody AgentDtos.RequestToolset body) {
-        return ToolsetRequestView.from(requests.request(currentUser.require(), code, body.toolset()));
+    public ToolsetRequestResponse request(
+            @PathVariable String code, @Valid @RequestBody AgentDtos.RequestToolset body) {
+        return ToolsetRequestResponse.from(requests.request(currentUser.require(), code, body.toolset()));
     }
 
     @GetMapping("/admin/agents/{code}/tool-requests")
-    public List<ToolsetRequestView> listAdmin(@PathVariable String code) {
+    public List<ToolsetRequestResponse> listAdmin(@PathVariable String code) {
         return requests.list(currentUser.requireAdmin(), code, true).stream()
-                .map(ToolsetRequestView::from)
+                .map(ToolsetRequestResponse::from)
                 .toList();
     }
 
     @GetMapping("/tool-requests/{id}")
-    public ToolsetRequestView read(@PathVariable UUID id) {
-        return ToolsetRequestView.from(requests.read(currentUser.require(), id, false));
+    public ToolsetRequestResponse read(@PathVariable UUID id) {
+        return ToolsetRequestResponse.from(requests.read(currentUser.require(), id, false));
     }
 
     @GetMapping("/admin/tool-requests/{id}")
-    public ToolsetRequestView readAdmin(@PathVariable UUID id) {
-        return ToolsetRequestView.from(requests.read(currentUser.requireAdmin(), id, true));
+    public ToolsetRequestResponse readAdmin(@PathVariable UUID id) {
+        return ToolsetRequestResponse.from(requests.read(currentUser.requireAdmin(), id, true));
     }
 
     @PostMapping("/admin/tool-requests/{id}")
-    public ToolsetRequestView decide(@PathVariable UUID id, @Valid @RequestBody AgentDtos.DecideToolsetRequest body) {
-        return ToolsetRequestView.from(requests.decide(currentUser.requireAdmin(), id, body.approve(), body.reason()));
+    public ToolsetRequestResponse decide(
+            @PathVariable UUID id, @Valid @RequestBody AgentDtos.DecideToolsetRequest body) {
+        return ToolsetRequestResponse.from(
+                requests.decide(currentUser.requireAdmin(), id, body.approve(), body.reason()));
     }
 
     @PostMapping("/tool-requests/{id}/cancel")
-    public ToolsetRequestView cancel(@PathVariable UUID id) {
-        return ToolsetRequestView.from(requests.cancel(currentUser.require(), id));
+    public ToolsetRequestResponse cancel(@PathVariable UUID id) {
+        return ToolsetRequestResponse.from(requests.cancel(currentUser.require(), id));
     }
 }

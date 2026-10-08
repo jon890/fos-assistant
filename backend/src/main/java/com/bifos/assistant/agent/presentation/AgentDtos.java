@@ -3,6 +3,7 @@ package com.bifos.assistant.agent.presentation;
 import com.bifos.assistant.agent.application.AgentToolView;
 import com.bifos.assistant.agent.application.PersonaSnapshot;
 import com.bifos.assistant.agent.application.ToolsetCatalogView;
+import com.bifos.assistant.agent.application.ToolsetRequestView;
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.agent.domain.type.AgentVisibility;
 import com.bifos.assistant.agent.domain.type.CostMode;
@@ -171,7 +172,7 @@ public final class AgentDtos {
     public record DecideToolsetRequest(
             @NotNull Boolean approve, @Size(max = 200) String reason) {}
 
-    public record ToolsetRequestView(
+    public record ToolsetRequestResponse(
             UUID id,
             String agentCode,
             String agentName,
@@ -182,8 +183,8 @@ public final class AgentDtos {
             String reason,
             Instant requestedAt,
             Instant decidedAt) {
-        static ToolsetRequestView from(com.bifos.assistant.agent.application.ToolsetRequestView row) {
-            return new ToolsetRequestView(
+        static ToolsetRequestResponse from(ToolsetRequestView row) {
+            return new ToolsetRequestResponse(
                     row.id(),
                     row.agentCode(),
                     row.agentName(),

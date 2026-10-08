@@ -27,7 +27,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/** エ이전트 잠금 아래 요청과 결정을 저장하고 기존 도구 서비스로 승인한 도구를 반영한다. */
+/** 에이전트 잠금 아래 요청과 결정을 저장하고 기존 도구 서비스로 승인한 도구를 반영한다. */
 @Service
 @RequiredArgsConstructor
 public class ToolsetRequestService {
@@ -42,9 +42,9 @@ public class ToolsetRequestService {
 
     @Transactional
     public ToolsetRequestView request(CurrentUser user, String code, String toolset) {
-        requireCurrent(user, false);
         Long agentId = agents.findIdByCode(code).orElseThrow(ToolsetRequestService::notFound);
         Agent agent = agents.findByIdForUpdate(agentId).orElseThrow(ToolsetRequestService::notFound);
+        requireCurrent(user, false);
         requireOwner(user, agent);
         if (ineligible(agent, user.id(), user.groupId(), toolset) != null) {
             throw new ApiException(ErrorCode.TOOLSET_REQUEST_UNAVAILABLE, "this toolset cannot be requested");
@@ -99,8 +99,8 @@ public class ToolsetRequestService {
 
     @Transactional
     public ToolsetRequestView decide(CurrentUser user, UUID id, boolean approve, String reason) {
-        requireCurrent(user, true);
         Agent agent = lockAgent(id);
+        requireCurrent(user, true);
         AgentToolsetRequest row = requireRequest(user, id, true);
         if (row.status() != ToolsetRequestStatus.PENDING) {
             return view(row, agent);
@@ -155,8 +155,8 @@ public class ToolsetRequestService {
 
     @Transactional
     public ToolsetRequestView cancel(CurrentUser user, UUID id) {
-        requireCurrent(user, false);
         Agent agent = lockAgent(id);
+        requireCurrent(user, false);
         AgentToolsetRequest row = requireRequest(user, id, false);
         if (row.status() == ToolsetRequestStatus.PENDING) {
             row.finish(ToolsetRequestStatus.CANCELLED, null, null, clock.instant());

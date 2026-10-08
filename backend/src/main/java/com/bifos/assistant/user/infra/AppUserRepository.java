@@ -1,5 +1,6 @@
 package com.bifos.assistant.user.infra;
 
+import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.user.domain.AppUser;
 import jakarta.persistence.LockModeType;
 import java.util.List;
@@ -12,7 +13,7 @@ import org.springframework.data.repository.query.Param;
 
 public interface AppUserRepository extends JpaRepository<AppUser, Long> {
 
-    List<AppUser> findByGroupIdAndRole(Long groupId, com.bifos.assistant.shared.domain.type.UserRole role);
+    List<AppUser> findByGroupIdAndRole(Long groupId, UserRole role);
 
     Optional<AppUser> findByEmail(String email);
 
