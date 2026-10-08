@@ -87,7 +87,7 @@
 
 `components/agent/agent-memory-section.tsx` 가 관리자 영역 상세의 「기억 영역」 을 그린다. 「모델」 절 뒤, 「관리」 절 앞에 둔다.
 화면이 뜬 뒤 `GET /api/admin/agents/{code}/memory-collections` 를 읽는다. 읽지 못해도 다른 절은 그대로 쓴다.
-API 와 수를 세는 규칙은 [`../backend/memory.md`](../../docs/backend/memory.md) 의 「관리자가 에이전트의 collection 을 바꿀 때」 가 갖는다.
+API 와 수를 세는 규칙은 [`docs/backend/memory.md`](../../docs/backend/memory.md) 의 「관리자가 에이전트의 collection 을 바꿀 때」 가 갖는다.
 
 | 때 | 보이는 것 |
 | --- | --- |
@@ -162,7 +162,7 @@ API 와 수를 세는 규칙은 [`../backend/memory.md`](../../docs/backend/memo
 이 절의 끝에 「매일 깨우기」 소절(`agent-proactive-schedule-section.tsx`)을 그린다.
 에이전트 상세에서는 상태 조회가 실패해도 실패 문구 아래에 그린다.
 소절은 `GET /api/v1/agents/{code}/proactive-check/schedule` 을 읽어 켜기, 시각과 시간대, 막는 까닭, 다음 실행, 마지막 결과를 보이고, 「저장」 이 `PUT` 으로 저장한다([ADR-085](../../docs/adr/ADR-085-매일-깨우기는-예약-작업을-다시-쓰고-다섯-칸-보고를-지금-화면에-올린다.md)).
-그 아래에 매일 루프 설정 「깨운 뒤 먼저 다룰 문제 고르기」 를 둔다. `GET/PUT /api/v1/agents/{code}/proactive-check/loop` 를 쓴다([`../backend/proactive-loop.md`](../../docs/backend/proactive-loop.md) 의 「사용자 설정」).
+그 아래에 매일 루프 설정 「깨운 뒤 먼저 다룰 문제 고르기」 를 둔다. `GET/PUT /api/v1/agents/{code}/proactive-check/loop` 를 쓴다([`docs/backend/proactive-loop.md`](../../docs/backend/proactive-loop.md) 의 「사용자 설정」).
 
 | 상태 | 보이는 것 |
 | --- | --- |
@@ -195,7 +195,7 @@ backend 의 읽기 기준(`AgentService.requireReadable`)은 바꾸지 않는다
 
 `components/agent/agent-value-evaluation-section.tsx` 가 그린다. 관리자 영역 상세(`/admin/agents/{code}`)에서만 먼저 살펴보기 절 바로 뒤에 둔다. 일반 상세에는 그리지 않는다.
 서버 컴포넌트가 `GET /api/v1/admin/agents/{code}/value-evaluation` 을 읽어 넘긴다. 먼저 살펴보기 절을 그리지 않는 에이전트와, 살펴보기 상태를 읽지 못한 에이전트에는 이 절도 그리지 않는다. 그 밖에 이 절의 조회가 실패하면 절 안에 실패 문구만 그린다.
-응답의 모양과 고르는 살펴보기는 [`backend/value-evaluation.md`](../../docs/backend/value-evaluation.md) 의 「관리자 화면이 읽는 묶음」 이 갖는다.
+응답의 모양과 고르는 살펴보기는 [`docs/backend/value-evaluation.md`](../../docs/backend/value-evaluation.md) 의 「관리자 화면이 읽는 묶음」 이 갖는다.
 
 가치 평가와 행동 정책은 요청자의 자료만 다룬다. 관리자도 다른 사용자의 살펴보기를 평가하지 못하므로, 이 절은 관리자 본인이 연 살펴보기만 보인다.
 
@@ -231,7 +231,7 @@ backend 의 읽기 기준(`AgentService.requireReadable`)은 바꾸지 않는다
 `/usage`와 `/admin/usage`는 모두 자기 실행만 읽는다. 여러 사용자의 실행을 모아 보는 별도 화면은 없다.
 에이전트 상세의 도구 이름과 설명은 `lib/toolset-label.ts` 가 한국어로 옮긴다. Hermes 가 준 영어 이름은 표에 없는 도구에만 그대로 쓴다.
 **화면만 가리지 않는다. Control Plane 이 `MEMBER` 역할에게는 그 값을 응답에서 뺀다.**
-빼는 값의 표는 [`backend/conversation.md`](../../docs/backend/conversation.md) 의 「역할에 따라 응답에서 빼는 값」 절이 갖는다.
+빼는 값의 표는 [`docs/backend/conversation.md`](../../docs/backend/conversation.md) 의 「역할에 따라 응답에서 빼는 값」 절이 갖는다.
 `ADMIN` 은 일반 화면에서도 응답으로는 그 값을 받는다. 일반 화면이 그리지 않을 뿐이다.
 
 ### 탭 안의 절
@@ -244,7 +244,7 @@ backend 의 읽기 기준(`AgentService.requireReadable`)은 바꾸지 않는다
 | 사용량 내역 | 에이전트, 모델, 날짜, 지문 네 축 중 고른 하나의 합계 | 첫 조회가 실패했을 때.<br>그 자리에 실패 문구만 그린다.<br>`/usage` 에는 절을 그리지 않는다 |
 | 설정 차이 | 지문별 실행당 평균 비용 | 견줄 지문이 둘 미만일 때 |
 | 첫 반응 시간 | 날짜와 모델 단계별 질문 수, 첫 반응과 제출까지와 첫 조각까지의 중앙값과 90번째 백분위. 세는 규칙은 [모델 단계와 실행 기록](../../docs/model-tiers.md) 의 「첫 반응 시간」 에 있다 | 조회가 실패했을 때.<br>그 자리에 실패 문구만 그린다.<br>`/usage` 에는 절을 그리지 않는다 |
-| 먼저 알리기 | 최근 30일 동안 지금 화면에 보인 항목의 종류(`trigger`)별 보인 수, 숨김 비율, 미루기 비율, 행동 비율, 지금 표시의 헛보임, 첫 행동까지, 오래된 항목 비율. 비율은 분모가 0 이면 `-` 다. 세는 규칙은 [`../backend/attention.md`](../../docs/backend/attention.md) 의 「지표」 에 있다. 보인 항목이 없으면 「아직 지금 화면에 보인 항목이 없어요.」 를 그린다 | 조회가 실패했을 때.<br>그 자리에 실패 문구만 그린다.<br>`/usage` 에는 절을 그리지 않는다 |
+| 먼저 알리기 | 최근 30일 동안 지금 화면에 보인 항목의 종류(`trigger`)별 보인 수, 숨김 비율, 미루기 비율, 행동 비율, 지금 표시의 헛보임, 첫 행동까지, 오래된 항목 비율. 비율은 분모가 0 이면 `-` 다. 세는 규칙은 [`docs/backend/attention.md`](../../docs/backend/attention.md) 의 「지표」 에 있다. 보인 항목이 없으면 「아직 지금 화면에 보인 항목이 없어요.」 를 그린다 | 조회가 실패했을 때.<br>그 자리에 실패 문구만 그린다.<br>`/usage` 에는 절을 그리지 않는다 |
 | 실행 기록 | 실행 한 줄씩. `/admin/usage` 에서는 모델과 요청한 effort, 토큰과 문맥 글자 수와 두 금액까지 | 없다. 기록이 없으면 빈 상태를 그린다 |
 
 화면은 하위 에이전트를 「도우미」 라고 부른다.
@@ -263,12 +263,12 @@ backend 의 읽기 기준(`AgentService.requireReadable`)은 바꾸지 않는다
 **「설정 차이」 는 지금 한 번도 그려지지 않는다.**
 `runtime_fingerprint` 를 채우는 경로가 없어 지문 축이 늘 빈 목록이기 때문이다.
 결함이 아니라 값이 들어오기 시작할 때 고칠 곳이 없도록 먼저 만들어 둔 것이다.
-그 칸을 왜 비워 두는지는 [`backend/schema/execution.md`](../../docs/backend/schema/execution.md) 의 「agent_execution」 절이 갖는다.
+그 칸을 왜 비워 두는지는 [`docs/backend/schema/execution.md`](../../docs/backend/schema/execution.md) 의 「agent_execution」 절이 갖는다.
 
 ## 지금 화면
 
 #161 의 Living View 를 이 저장소에서는 **지금 화면**이라 부른다. 주소, 카드의 배치, 이유 문구, 사용자 제어, 폭별 동작을 갖는다.
-결정은 [ADR-074](adr/ADR-074-지금-화면은-원래-기록을-읽어-만든-view-이고-정해진-카드-넷만-그린다.md), 판정과 API 는 [`../backend/attention.md`](../../docs/backend/attention.md) 가 갖는다.
+결정은 [ADR-074](adr/ADR-074-지금-화면은-원래-기록을-읽어-만든-view-이고-정해진-카드-넷만-그린다.md), 판정과 API 는 [`docs/backend/attention.md`](../../docs/backend/attention.md) 가 갖는다.
 
 ### 주소와 들어오는 길
 
@@ -400,14 +400,12 @@ backend 의 읽기 기준(`AgentService.requireReadable`)은 바꾸지 않는다
 | `md` 이상 | 카드 두 열. 응답 순서대로 왼쪽 위부터 채운다 |
 | `md` 미만 | 카드 한 열. 항목의 동작 단추는 줄 아래로 내려 손가락으로 누를 크기를 지킨다 |
 
-바깥 틀은 `mx-auto max-w-4xl` 이다. `loading.tsx` 는 `PageSkeleton` 의 `cards` 모양과 같은 폭을 쓴다.
-
 ### 시나리오
 
 모든 값은 지어낸 것이다.
 
 **넓은 화면.** 어제 저녁 「주간 장보기 목록 정리」 대화의 답이 실패했고, 메일 초안 만들기 승인이 기다리고 있고, 조사 도우미에게 맡긴 일이 40분째 돈다.
-사이드바 「지금 볼 것」 에 3 이 붙는다. `/now` 를 열면 실패 카드가 왼쪽 위, 내 차례 카드가 오른쪽 위, 맡긴 일 카드가 그 아래, 이어서 하기가 마지막이다.
+사이드바 「지금 볼 것」 에 3 이 붙는다. `/now` 를 열면 실패 카드가 왼쪽 위, 내 차례 카드가 오른쪽 위, 맡긴 일 카드가 그 아래이고, 이어서 하기와 보고 카드가 뒤를 잇는다.
 사용자가 승인 대기 줄의 「대화에서 보기」 를 눌러 승인하고 돌아오면 내 차례 카드에서 그 줄이 사라지고 건수가 2 가 된다.
 
 **좁은 화면.** 휴대폰에서 새 대화 화면을 연다. 인사와 에이전트 카드가 먼저 그려지고, 잠시 뒤 「확인할 것 2건」 한 줄이 나타난다.
@@ -422,7 +420,7 @@ backend 의 읽기 기준(`AgentService.requireReadable`)은 바꾸지 않는다
 
 `/memory` 는 에이전트가 대화하며 남긴 기억을 사람이 검토하고 고치고 지우는 화면이다.
 사람이 손으로 기억을 만드는 자리는 지금 두지 않는다.
-기억이 어떻게 저장되고 실행에 실리는지는 [`../backend/memory.md`](../../docs/backend/memory.md) 가 갖는다.
+기억이 어떻게 저장되고 실행에 실리는지는 [`docs/backend/memory.md`](../../docs/backend/memory.md) 가 갖는다.
 
 ### 화면 구성
 
@@ -472,12 +470,11 @@ backend 의 읽기 기준(`AgentService.requireReadable`)은 바꾸지 않는다
 
 양식 컴포넌트와 API(`POST /api/v1/memories`, `POST /api/v1/memory-documents`)는 지우지 않았다.
 
-이미 들인 기억의 `brain` 출처 기록과 그 표시는 유지한다.
 
 ## 대화 목록
 
 사이드바의 목록은 최근에 고친 순서이고 날짜로 묶는다.
-예약 작업이 만든 대화는 날짜 묶음에서 빼고 맨 위의 「예약 작업」 묶음 아래 작업 이름마다 접힌 줄로 모은다. 자세한 것은 [`../backend/task.md`](../../docs/backend/task.md) 의 「화면」 이다.
+예약 작업이 만든 대화는 날짜 묶음에서 빼고 맨 위의 「예약 작업」 묶음 아래 작업 이름마다 접힌 줄로 모은다. 자세한 것은 [`docs/backend/task.md`](../../docs/backend/task.md) 의 「화면」 이다.
 
 | 묶음 | 기준 |
 | --- | --- |
@@ -576,7 +573,7 @@ flowchart TD
 | 인사 아래 「확인할 것 N건」 | 지금 볼 것이 있으면 그 수를 한 줄로 보인다. 누르면 `/now` 로 간다. 0 건이거나 읽지 못하면 그리지 않는다. [`now.md`](prd.md) 의 「주소와 들어오는 길」 |
 | 에이전트 카드 | 누르면 그 에이전트를 고른다. 처음에는 목록의 첫 에이전트가 골라져 있다. 주소가 `/?agent=<번호>` 이고 그 에이전트가 목록에 있으면 그 에이전트가 골라져 있다. 에이전트 상세의 「대화하기」 와 연결 화면의 「<에이전트>와 대화하기」 가 이 주소로 연다 |
 | 추천 질문 | 고른 에이전트에서 이 사용자가 자주 하는 일. 모델이 만든다. 누르면 그 글로 바로 보낸다 |
-| 입력창의 `/` | 맨 앞에 치면 고른 에이전트의 스킬 목록이 뜬다. [`backend/skill.md`](../../docs/backend/skill.md) 의 「스킬 커맨드로 보낼 때」 |
+| 입력창의 `/` | 맨 앞에 치면 고른 에이전트의 스킬 목록이 뜬다. [`docs/backend/skill.md`](../../docs/backend/skill.md) 의 「스킬 커맨드로 보낼 때」 |
 | 입력창의 `@` | 에이전트 목록이 뜨고 이름으로 거른다. 고르면 그 에이전트를 고르고 `@이름` 은 입력창에서 빠진다 |
 | 첫 메시지 | 보내면 그 에이전트로 대화가 시작되고 에이전트는 그 대화에서 바뀌지 않는다 |
 | 입력창 아래 모델 단추 | 누르면 모델과 effort 를 고르는 창이 뜬다. 처음에는 「기본」 이고, 고르면 빈 대화를 먼저 만들어 거기에 저장한다 |
@@ -585,7 +582,7 @@ flowchart TD
 모델을 먼저 고를 때도 같다. 고른 값을 저장할 대화가 있어야 해서 빈 대화를 먼저 만든다.
 화면은 메시지가 없는 동안 새 대화 화면 모양을 그대로 쓴다.
 흐름이 붙은 에이전트는 사진을 받지 않는다. 그 에이전트를 고르면 사진 단추가 없다.
-옛 커넥터 에이전트는 그 커넥터의 `connector.json` 이 `attachments` 를 참으로 선언했을 때만 받는다([`connectors.md`](../../docs/connectors.md)). 연결을 붙인 일반 에이전트는 붙인 커넥터와 상관없이 다른 일반 에이전트와 같다.
+옛 커넥터 에이전트는 그 커넥터의 `connector.json` 이 `attachments` 를 참으로 선언했을 때만 받는다([`docs/connectors.md`](../../docs/connectors.md)). 연결을 붙인 일반 에이전트는 붙인 커넥터와 상관없이 다른 일반 에이전트와 같다.
 
 **`@` 는 새 대화 화면에서만 뜬다.**
 대화의 에이전트는 첫 메시지가 정하고 바뀌지 않는다. 중간에 다른 에이전트를 부르는 것은 에이전트가 정한다.
@@ -598,7 +595,7 @@ flowchart TD
 | 추천을 만들지 못했다 | 그 자리를 비운다 |
 | `@` 뒤 글자에 맞는 에이전트가 없다 | 목록에 맞는 에이전트가 없다는 한 줄 |
 
-추천 질문은 사람이 고치지 않는다. 만드는 때와 규칙은 [`backend/agent.md`](../../docs/backend/agent.md#추천-질문) 가 갖는다.
+추천 질문은 사람이 고치지 않는다. 만드는 때와 규칙은 [`docs/backend/agent.md`](../../docs/backend/agent.md#추천-질문) 가 갖는다.
 
 ### 추천을 만들 때
 
@@ -645,7 +642,7 @@ sequenceDiagram
 ## 동작을 승인할 때
 
 에이전트가 커넥터의 쓰기 도구를 부르면 Control Plane 이 승인 줄을 남기고, 화면은 입력창 바로 위의 승인 영역에 그 줄을 카드로 그린다.
-승인 줄의 계약은 [`../connectors.md`](../../docs/connectors.md) 의 「승인」 이 갖는다.
+승인 줄의 계약은 [`docs/connectors.md`](../../docs/connectors.md) 의 「승인」 이 갖는다.
 
 **승인 영역은 화면 높이의 40% 까지만 차지하고 안에서 스크롤한다.**
 카드를 메시지 흐름 안에 넣지 않은 것은, 승인 줄이 특정 답에 묶이지 않고 대화 전체의 기다리는 일이기 때문이다.
@@ -679,7 +676,7 @@ sequenceDiagram
 
 ## 참고한 기억
 
-답을 만든 실행이 본문을 받은 기억을 그 답 아래에 접어 둔다. 무엇을 모으는지는 [`backend/memory.md`](../../docs/backend/memory.md) 의 「답마다 참고한 기억」 이 갖는다.
+답을 만든 실행이 본문을 받은 기억을 그 답 아래에 접어 둔다. 무엇을 모으는지는 [`docs/backend/memory.md`](../../docs/backend/memory.md) 의 「답마다 참고한 기억」 이 갖는다.
 
 대화를 열면 `GET /api/v1/chat/conversations/{id}/memory-uses` 를 읽어, 답의 실행 번호가 같은 줄을 그 답 아래에 둔다.
 「기억했어요」 줄과 같은 때에 다시 읽는다. turn 이 끝나거나 답이 새로 저장될 때와, 「기억했어요」 줄에서 되돌리거나 고치거나 받아들였을 때다. 읽지 못하면 앞 목록을 그대로 두고 대화를 막지 않는다.
@@ -791,7 +788,7 @@ Control Plane 이 응답에서 뺀다. 화면도 받은 것을 그대로 그리�
 ### 펼친 목록의 높이
 
 펼친 블록의 목록은 높이 상한 안에서 스크롤한다. 도구를 수십 번 부른 답에서 목록이 대화를 밀어내지 않게 한다.
-상한은 `16rem` 이다. 좁은 폭과 넓은 폭이 같다.
+좁은 폭과 넓은 폭의 상한이 같다.
 
 | 상황 | 목록 |
 | --- | --- |
@@ -799,7 +796,6 @@ Control Plane 이 응답에서 뺀다. 화면도 받은 것을 그대로 그리�
 | 도는 중이고 사용자가 위로 올려 읽고 있다 | 따라가지 않는다. 사용자가 맨 아래로 다시 내리면 그때부터 따라간다 |
 | 끝난 답을 펼친다 | 맨 위부터 보인다. 따라가지 않는다 |
 
-맨 아래에서 `16px` 안이면 맨 아래를 보고 있는 것으로 본다.
 작업 과정 패널은 이미 제 높이 안에서 스크롤하므로 바꾸지 않는다.
 
 ### 끝난 답에서 다시 볼 때
