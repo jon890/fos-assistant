@@ -22,6 +22,7 @@ import com.bifos.assistant.chat.infra.ChatMessageRepository;
 import com.bifos.assistant.chat.infra.ConversationRepository;
 import com.bifos.assistant.chat.infra.ExecutionQuestionRepository;
 import com.bifos.assistant.hermes.StubHermesRunsClient;
+import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.testsupport.BackendIntegrationTest;
@@ -32,7 +33,6 @@ import com.bifos.assistant.usage.domain.type.ExecutionStatus;
 import com.bifos.assistant.usage.infra.AgentExecutionRepository;
 import com.bifos.assistant.usage.infra.ExecutionEventRepository;
 import com.bifos.assistant.user.domain.AppUser;
-import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.user.infra.AppUserRepository;
 import java.io.ByteArrayInputStream;
 import java.nio.charset.StandardCharsets;
@@ -126,8 +126,10 @@ class ConversationPurgerTest {
 
         purger.purgeDue(NOW);
 
-        assertThat(messages.findByConversationIdOrderByIdAsc(filled.conversationId())).isEmpty();
-        assertThat(attachments.findByConversationIdOrderByIdAsc(filled.conversationId())).isEmpty();
+        assertThat(messages.findByConversationIdOrderByIdAsc(filled.conversationId()))
+                .isEmpty();
+        assertThat(attachments.findByConversationIdOrderByIdAsc(filled.conversationId()))
+                .isEmpty();
         assertThat(attachmentFile(filled.attachment())).doesNotExist();
         assertThat(artifactFolder(filled.conversationId())).doesNotExist();
         assertThat(questions.findById(filled.executionId())).isEmpty();

@@ -96,7 +96,8 @@ public class ConversationPurger {
                 }
             } catch (RuntimeException ex) {
                 failed++;
-                Duration next = backoff == null ? FIRST_BACKOFF : min(backoff.interval().multipliedBy(2), MAX_BACKOFF);
+                Duration next =
+                        backoff == null ? FIRST_BACKOFF : min(backoff.interval().multipliedBy(2), MAX_BACKOFF);
                 backoffs.put(conversationId, new Backoff(now.plus(next), next));
                 log.warn(
                         "지운 대화의 본문을 지우지 못했다 conversationId={} error={}",
