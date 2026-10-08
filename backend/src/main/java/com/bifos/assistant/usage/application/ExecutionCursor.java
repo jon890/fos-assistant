@@ -29,7 +29,9 @@ record ExecutionCursor(Instant startedAt, long id) {
             int at = raw.lastIndexOf(SEPARATOR);
             Instant startedAt = Instant.parse(raw.substring(0, at));
             long id = Long.parseLong(raw.substring(at + 1));
-            if (id <= 0) throw invalid();
+            if (id <= 0) {
+                throw invalid();
+            }
             return new ExecutionCursor(startedAt, id);
         } catch (IllegalArgumentException | IndexOutOfBoundsException | DateTimeParseException e) {
             throw invalid();
