@@ -27,13 +27,14 @@
 
 - `AttentionFollowUpRef` record 마지막에 `boolean agentProposed`를 추가한다. Javadoc은 실행 ID로 판정한 에이전트 출처라고 쓴다.
 - `FollowUpAttentionSource.candidate`에서 상태 비교로 `proposed`를 유지하고 `row.proposed()`를 `agentProposed`로 전달한다.
+- `AttentionDtos.FollowUpView`에 `boolean agentProposed`를 추가하고 `from`에서 같은 값을 매핑한다.
 - `web/src/lib/attention.ts`의 응답 타입에 `agentProposed: boolean`을 추가하고 `originText`에서 이 값을 읽는다.
 - `docs/backend/attention.md`의 followUp 응답 표에 칸과 두 boolean의 의미를 명시한다.
 - `docs/frontend/now.md`에서 수락 뒤에도 출처가 유지되며 상태별 단추는 바뀐다고 명시한다.
 
 ### 2. 회귀 테스트
 
-- `FollowUpAttentionSourceTest`에서 record 생성 인자를 갱신하고 제안 수락 전후 `proposed: true→false`, `agentProposed: true→true`, trigger 전이를 확인한다. 직접 만든 할 일은 출처가 거짓임을 확인한다.
+- `FollowUpAttentionSourceTest`에서 record 생성 인자를 갱신하고 제안 수락 전후 `proposed: true→false`, `agentProposed: true→true`, trigger 전이를 확인한다. 직접 만든 할 일은 출처가 거짓임을 확인한다. `AttentionDtos.ViewResponse.from`으로 응답 DTO를 만들고 두 값이 수락 전후에도 그대로 전달되는지 확인한다.
 - `test/unit/attention.test.ts`에서 출처가 상태와 독립임을 확인한다. 수락한 제안은 「대화에서」이고 직접 만든 것은 「직접 더함」이다. 기존 fixture에 새 필드를 채운다.
 - `test/browser/now.spec.ts`의 기존 제안 수락 시나리오에 수락 뒤 「대화에서」 유지와 「직접 더함」 부재를 추가하고 화면을 다시 열어 확인한다. 직접 더한 할 일의 출처 검사는 유지한다.
 
@@ -56,6 +57,7 @@ pnpm --dir web test:browser now.spec.ts --repeat-each=3 --retries=0
 | --- | --- |
 | `backend/src/main/java/com/bifos/assistant/attention/application/model/AttentionFollowUpRef.java` | 수정 |
 | `backend/src/main/java/com/bifos/assistant/attention/application/FollowUpAttentionSource.java` | 수정 |
+| `backend/src/main/java/com/bifos/assistant/attention/presentation/AttentionDtos.java` | 수정 |
 | `backend/src/test/java/com/bifos/assistant/attention/FollowUpAttentionSourceTest.java` | 수정 |
 | `web/src/lib/attention.ts` | 수정 |
 | `test/unit/attention.test.ts` | 수정 |
