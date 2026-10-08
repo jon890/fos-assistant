@@ -17,6 +17,7 @@ import com.bifos.assistant.usage.application.UsageSummaryService;
 import com.bifos.assistant.usage.domain.AgentExecution;
 import com.bifos.assistant.usage.presentation.UsageDtos.BreakdownRow;
 import com.bifos.assistant.usage.presentation.UsageDtos.BreakdownView;
+import com.bifos.assistant.usage.presentation.UsageDtos.ExecutionPageView;
 import com.bifos.assistant.usage.presentation.UsageDtos.ExecutionView;
 import com.bifos.assistant.usage.presentation.UsageDtos.MonthlyCostView;
 import com.bifos.assistant.usage.presentation.UsageDtos.MySkillUsageView;
@@ -72,6 +73,21 @@ public class UsageController {
         CurrentUser user = currentUser.require();
         boolean internal = InternalValuePolicy.visibleTo(user);
         RootExecutionPage rootPage = rootExecutions.page(user.id(), size);
+        return executionViews(rootPage, internal);
+    }
+
+    /** 로그인한 사용자의 루트 실행을 커서 다음부터 읽는다. 기존 배열 응답은 {@link #myExecutions(int)} 에 남긴다. */
+    @GetMapping("/executions/page")
+    public ExecutionPageView myExecutionPage(
+            @RequestParam(defaultValue = "50") int limit, @RequestParam(required = false) String cursor) {
+        int size = Math.clamp(limit, 1, MAX_LIMIT);
+        CurrentUser user = currentUser.require();
+        RootExecutionPage rootPage = rootExecutions.page(user.id(), size, cursor);
+        return new ExecutionPageView(
+                executionViews(rootPage, InternalValuePolicy.visibleTo(user)), rootPage.nextCursor());
+    }
+
+    private List<ExecutionView> executionViews(RootExecutionPage rootPage, boolean internal) {
         List<AgentExecution> page = rootPage.executions();
         Set<Long> withChildren = rootPage.idsHavingChildren();
         Map<Long, UUID> publicIds = rootPage.conversationPublicIds();

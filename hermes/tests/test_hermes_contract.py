@@ -188,6 +188,10 @@ class PluginDeclarationTest(unittest.TestCase):
         self.assertTrue(routes, "ALLOWED_ROUTES 를 찾지 못했다")
         self.assertEqual(set(), routes - contract.HERMES_ROUTES)
 
+    def test_unattended_approval_key_matches_contract(self):
+        tree = _parse(PLUGIN_DIR / "sandbox_approvals.py")
+        self.assertEqual(contract.UNATTENDED_APPROVAL["mode_key"][2], _module_constant(tree, "UNATTENDED_APPROVAL_KEY"))
+
     def test_session_db_file_matches(self):
         values = {_module_constant(tree, "SESSION_DB_FILE") for tree in self.trees.values()
                   if any(isinstance(node, ast.Assign) and isinstance(node.targets[0], ast.Name)
@@ -485,6 +489,130 @@ class HermesSourceTest(unittest.TestCase):
         self.assertTrue(any(isinstance(name, ast.Name) and name.id == result
                             for statement in keys for name in ast.walk(statement.value)),
                         "%s 의 %s 에 %s 가 없다. %s" % (builder, key, result, revisit))
+
+    def test_unattended_approval_points(self):
+        """unattended_mode 가 execute_code 만 열고 셸과 커넥터 승인은 승인 카드로 남는 데 기대는 지점이 그대로인지 본다."""
+        revisit = ("plugin 의 approve 가 셸 위험 명령과 커넥터 승인까지 사람 없이 열 수 있다. "
+                   "ADR-20261008 execute-code-unattended 를 다시 본다")
+
+        def function(tree, name):
+            found = [node for node in ast.walk(tree)
+                     if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and node.name == name]
+            self.assertTrue(found, "%s 가 없다. %s" % (name, revisit))
+            return found[0]
+
+        def calls(node, name):
+            return [call for call in ast.walk(node) if isinstance(call, ast.Call) and (
+                (isinstance(call.func, ast.Name) and call.func.id == name)
+                or (isinstance(call.func, ast.Attribute) and call.func.attr == name))]
+
+        def assigns(node, name):
+            """대상에 `name` 이 들어 있는 대입이다. 튜플 풀기도 포함한다."""
+            return [statement for statement in ast.walk(node) if isinstance(statement, ast.Assign)
+                    and any(isinstance(target, ast.Name) and target.id == name
+                            for item in statement.targets for target in ast.walk(item))]
+
+        def strings(node):
+            return {item.value for item in ast.walk(node) if isinstance(item, ast.Constant) and isinstance(item.value, str)}
+
+        def is_not(node, name):
+            return (isinstance(node, ast.UnaryOp) and isinstance(node.op, ast.Not)
+                    and isinstance(node.operand, ast.Name) and node.operand.id == name)
+
+        def guarded_by_not(tree, node, name):
+            """`node` 가 `if not <name>` 이나 `if ... and not <name> ...` 의 body 안에 있는지 본다."""
+            parents = {child: parent for parent in ast.walk(tree) for child in ast.iter_child_nodes(parent)}
+            child, parent = node, parents.get(node)
+            while parent is not None:
+                if isinstance(parent, ast.If) and any(child is statement for statement in parent.body):
+                    test = parent.test
+                    if is_not(test, name) or (isinstance(test, ast.BoolOp) and isinstance(test.op, ast.And)
+                                              and any(is_not(value, name) for value in test.values)):
+                        return True
+                child, parent = parent, parents.get(parent)
+            return False
+
+        def callers_of(name):
+            """tools, agent, gateway 의 `name` 호출을 가장 가까운 함수 이름으로 모은다. 함수 밖 호출은 `<함수 밖>` 이다."""
+            found = set()
+
+            def visit(node, owner):
+                for child in ast.iter_child_nodes(node):
+                    if isinstance(child, ast.Call) and (
+                            (isinstance(child.func, ast.Name) and child.func.id == name)
+                            or (isinstance(child.func, ast.Attribute) and child.func.attr == name)):
+                        found.add(owner)
+                    if isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                        visit(child, child.name)
+                    else:
+                        visit(child, owner)
+
+            for top in ("tools", "agent", "gateway"):
+                for source in sorted((self.root / top).rglob("*.py")):
+                    if "tests" in source.relative_to(self.root).parts or name not in source.read_text(encoding="utf-8"):
+                        continue
+                    visit(self.tree(source), "<함수 밖>")
+            return found
+
+        relative, starter, variable = contract.UNATTENDED_APPROVAL["exec_ask"]
+        node = function(self.tree(self.root / relative), starter)
+        exports = [statement for statement in ast.walk(node) if isinstance(statement, ast.Assign)
+                   and any(isinstance(target, ast.Subscript)
+                           and isinstance(target.value, ast.Attribute) and target.value.attr == "environ"
+                           and isinstance(target.slice, ast.Constant) and target.slice.value == variable
+                           for target in statement.targets)
+                   and isinstance(statement.value, ast.Constant) and statement.value.value == "1"]
+        self.assertTrue(exports, "%s 에 os.environ[%r] = \"1\" 할당이 없다. %s" % (starter, variable, revisit))
+
+        relative, deciders, gate, flag = contract.UNATTENDED_APPROVAL["ask_first"]
+        tree = self.tree(self.root / relative)
+        for decider in deciders:
+            node = function(tree, decider)
+            gated = calls(node, gate)
+            self.assertTrue(gated, "%s 가 %s 를 부르지 않는다. %s" % (decider, gate, revisit))
+            for call in gated:
+                self.assertTrue(guarded_by_not(tree, call, flag),
+                                "%s 의 %s 호출(%d 행)이 `if not %s` 안에 있지 않다. %s"
+                                % (decider, gate, call.lineno, flag, revisit))
+            sources = assigns(node, flag)
+            self.assertTrue(sources, "%s 에 %s 대입이 없다. %s" % (decider, flag, revisit))
+            for source in sources:
+                self.assertTrue(isinstance(source.value, ast.Call) and isinstance(source.value.func, ast.Name)
+                                and source.value.func.id == "_presence",
+                                "%s 의 %s 가 _presence 에서 오지 않는다(%d 행). %s" % (decider, flag, source.lineno, revisit))
+
+        relative, presence, flag, variable = contract.UNATTENDED_APPROVAL["ask_source"]
+        node = function(self.tree(self.root / relative), presence)
+        self.assertTrue([statement for statement in assigns(node, flag) if variable in strings(statement.value)],
+                        "%s 가 %s 를 %s 에서 계산하지 않는다. %s" % (presence, flag, variable, revisit))
+
+        _, name, expected = contract.UNATTENDED_APPROVAL["callers"]
+        self.assertEqual(expected, callers_of(name),
+                         "%s 를 부르는 함수가 선언과 다르다. 새 호출이 ask 문맥을 먼저 보는지 확인한다. %s" % (name, revisit))
+
+        relative, guard, first, second = contract.UNATTENDED_APPROVAL["execute_code"]
+        node = function(self.tree(self.root / relative), guard)
+        skips, unattended = calls(node, first), calls(node, second)
+        self.assertTrue(skips, "%s 가 %s 를 부르지 않는다. %s" % (guard, first, revisit))
+        self.assertTrue(unattended, "%s 가 %s 를 부르지 않는다. %s" % (guard, second, revisit))
+        self.assertLess(min(call.lineno for call in skips), min(call.lineno for call in unattended),
+                        "%s 가 %s 를 %s 보다 먼저 보지 않는다. %s" % (guard, first, second, revisit))
+
+        relative, getter, key = contract.UNATTENDED_APPROVAL["mode_key"]
+        node = function(self.tree(self.root / relative), getter)
+        self.assertIn(key, strings(node), "%s 가 %r 를 읽지 않는다. %s" % (getter, key, revisit))
+
+        relative, constant, platform = contract.UNATTENDED_APPROVAL["platform"]
+        values = [statement.value for statement in self.tree(self.root / relative).body
+                  if isinstance(statement, ast.Assign) and any(
+                      isinstance(target, ast.Name) and target.id == constant for target in statement.targets)]
+        self.assertTrue(values, "%s 에 %s 할당이 없다. %s" % (relative, constant, revisit))
+        self.assertTrue(any(platform in strings(value) for value in values),
+                        "%s 에 %r 가 없다. %s" % (constant, platform, revisit))
+
+        _, name, expected = contract.UNATTENDED_APPROVAL["getter_callers"]
+        self.assertEqual(expected, callers_of(name),
+                         "%s 를 직접 부르는 함수가 생겼다. 그 호출이 ask 문맥을 먼저 보는지 확인한다. %s" % (name, revisit))
 
     def test_session_store(self):
         paths = [node for node in ast.walk(self.tree(self.root / contract.SESSION_DB_MODULE))

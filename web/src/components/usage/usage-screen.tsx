@@ -1,9 +1,6 @@
 import { BreakdownSection } from "@/components/usage/breakdown-section";
 import type { Breakdown } from "@/components/usage/breakdown-table";
-import {
-  ExecutionList,
-  type UsageExecution,
-} from "@/components/usage/execution-list";
+import { PagedExecutionList } from "@/components/usage/paged-execution-list";
 import {
   AttentionMetricsSection,
   type AttentionMetrics,
@@ -21,6 +18,7 @@ import { SkillUsageList } from "@/components/usage/skill-usage-list";
 import { parseUsageTab, UsageTabs } from "@/components/usage/usage-tabs";
 import { callControlPlane } from "@/lib/control-plane";
 import type { SkillUsageRow } from "@/lib/skill";
+import type { UsageExecutionPage } from "@/lib/usage-paging";
 
 /**
  * 사용량 화면이다. 금액, 모델, 토큰 같은 내부 값은 `admin` 일 때만 읽고 그린다.
@@ -49,7 +47,9 @@ export async function UsageScreen({
     attentionResult,
     skillsResult,
   ] = await Promise.all([
-    callControlPlane<UsageExecution[]>("/api/v1/usage/executions?limit=50"),
+    callControlPlane<UsageExecutionPage>(
+      "/api/v1/usage/executions/page?limit=50",
+    ),
     callControlPlane<MonthlyCost>("/api/v1/usage/monthly-cost"),
     isAdmin
       ? callControlPlane<Breakdown>("/api/v1/usage/breakdown?axis=agent")
@@ -73,7 +73,7 @@ export async function UsageScreen({
     return <p className="text-sm">{executionsResult.message}</p>;
   }
 
-  const executions = executionsResult.data;
+  const executionPage = executionsResult.data;
   const monthly = monthlyResult.ok ? monthlyResult.data : null;
   const fingerprints = fingerprintResult?.ok ? fingerprintResult.data : null;
   return (
@@ -116,7 +116,11 @@ export async function UsageScreen({
         </>
       ) : null}
       {tab === "executions" ? (
-        <ExecutionList executions={executions} isAdmin={isAdmin} />
+        <PagedExecutionList
+          key={JSON.stringify(executionPage)}
+          initialPage={executionPage}
+          isAdmin={isAdmin}
+        />
       ) : null}
       {tab === "skills" && skillsResult ? (
         skillsResult.ok ? (

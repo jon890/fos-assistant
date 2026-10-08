@@ -22,6 +22,7 @@ import com.bifos.assistant.memory.application.MemoryProposalProperties;
 import com.bifos.assistant.orchestration.application.DelegationProperties;
 import com.bifos.assistant.proactive.application.AutonomyProperties;
 import com.bifos.assistant.proactive.application.ProactiveCheckProperties;
+import com.bifos.assistant.proactive.application.ProactiveLoopProperties;
 import com.bifos.assistant.usage.application.UserExecutionProperties;
 import com.bifos.assistant.usage.infra.PricingProperties;
 import com.tngtech.archunit.base.DescribedPredicate;
@@ -490,6 +491,7 @@ public final class ArchitectureRules {
             StarterProperties.class,
             DelegationProperties.class,
             AutonomyProperties.class,
+            ProactiveLoopProperties.class,
             PricingProperties.class,
             MemoryEncryptionProperties.class,
             ModelTierProperties.class,

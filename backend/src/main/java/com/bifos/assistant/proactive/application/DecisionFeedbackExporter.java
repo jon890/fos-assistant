@@ -12,6 +12,7 @@ import com.bifos.assistant.proactive.application.model.DecisionFeedbackExport.Ca
 import com.bifos.assistant.proactive.application.model.DecisionFeedbackExport.DecisionRecord;
 import com.bifos.assistant.proactive.application.model.DecisionFeedbackExport.Event;
 import com.bifos.assistant.proactive.application.model.DecisionFeedbackExport.Judgment;
+import com.bifos.assistant.proactive.application.model.DecisionFeedbackExport.Loop;
 import com.bifos.assistant.proactive.application.model.DecisionFeedbackExport.Policy;
 import com.bifos.assistant.proactive.application.model.DecisionFeedbackExport.Situation;
 import com.bifos.assistant.proactive.application.model.DecisionFeedbackExport.Subject;
@@ -21,6 +22,7 @@ import com.bifos.assistant.proactive.domain.CandidateJudgement;
 import com.bifos.assistant.proactive.domain.DecisionEvidence;
 import com.bifos.assistant.proactive.domain.ProactiveCheck;
 import com.bifos.assistant.proactive.domain.ProactiveCheckProblem;
+import com.bifos.assistant.proactive.domain.ProactiveLoopRun;
 import com.bifos.assistant.proactive.domain.ProblemEvidence;
 import com.bifos.assistant.proactive.domain.ValueEvaluation;
 import com.bifos.assistant.proactive.domain.type.CheckTrigger;
@@ -30,6 +32,7 @@ import com.bifos.assistant.proactive.domain.type.DecisionLevel;
 import com.bifos.assistant.proactive.infra.AutonomyDecisionRepository;
 import com.bifos.assistant.proactive.infra.ProactiveCheckProblemRepository;
 import com.bifos.assistant.proactive.infra.ProactiveCheckRepository;
+import com.bifos.assistant.proactive.infra.ProactiveLoopRunRepository;
 import com.bifos.assistant.proactive.infra.ValueEvaluationRepository;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import java.time.Clock;
@@ -69,6 +72,7 @@ public class DecisionFeedbackExporter {
     private final ProactiveCheckRepository checks;
     private final ProactiveCheckProblemRepository problems;
     private final ValueEvaluationRepository evaluations;
+    private final ProactiveLoopRunRepository loopRuns;
     private final AutonomyDecisionRepository decisions;
     private final OwnConversations conversations;
     private final Clock clock;
@@ -89,6 +93,10 @@ public class DecisionFeedbackExporter {
                 ? Map.of()
                 : problems.findByCheckIdInOrderByIdAsc(situations.keySet()).stream()
                         .collect(Collectors.groupingBy(ProactiveCheckProblem::checkId));
+        Map<Long, ProactiveLoopRun> loops = situations.isEmpty()
+                ? Map.of()
+                : loopRuns.findBySourceCheckIdIn(situations.keySet()).stream()
+                        .collect(Collectors.toMap(ProactiveLoopRun::sourceCheckId, Function.identity()));
         List<ValueEvaluation> judged = situations.isEmpty()
                 ? List.of()
                 : evaluations.findByUserIdAndCheckIdInOrderByIdAsc(user.id(), situations.keySet());
@@ -119,6 +127,7 @@ public class DecisionFeedbackExporter {
                 .sorted(Comparator.comparing(ProactiveCheck::id))
                 .forEach(check -> records.add(checkRecord(
                         check,
+                        loops.get(check.id()),
                         candidates.getOrDefault(check.id(), List.of()),
                         judgments.getOrDefault(check.id(), List.of()),
                         policies.getOrDefault(check.id(), List.of()),
@@ -134,13 +143,14 @@ public class DecisionFeedbackExporter {
 
     private static DecisionRecord checkRecord(
             ProactiveCheck check,
+            ProactiveLoopRun loop,
             List<ProactiveCheckProblem> candidates,
             List<ValueEvaluation> judgments,
             List<AutonomyDecision> policies,
             List<Subject> subjects) {
         return new DecisionRecord(
                 CHECK_KEY_PREFIX + check.id(),
-                situation(check),
+                situation(check, loop),
                 candidates.stream().map(DecisionFeedbackExporter::candidate).toList(),
                 judgments.stream().map(DecisionFeedbackExporter::judgment).toList(),
                 policies.stream().map(DecisionFeedbackExporter::policy).toList(),
@@ -235,7 +245,8 @@ public class DecisionFeedbackExporter {
         return result;
     }
 
-    private static Situation situation(ProactiveCheck check) {
+    /** @param loop 그 살펴보기를 이은 매일 루프 시도. 없으면 null */
+    private static Situation situation(ProactiveCheck check, ProactiveLoopRun loop) {
         return new Situation(
                 check.id(),
                 check.agentId(),
@@ -244,7 +255,19 @@ public class DecisionFeedbackExporter {
                 check.outcome(),
                 check.trigger() != CheckTrigger.AUTONOMY && check.report() != null,
                 check.startedAt(),
-                check.finishedAt());
+                check.finishedAt(),
+                loop == null ? null : loop(loop));
+    }
+
+    private static Loop loop(ProactiveLoopRun run) {
+        return new Loop(
+                run.id(),
+                run.status(),
+                run.skippedReason(),
+                run.errorCode(),
+                run.evaluationId(),
+                run.createdAt(),
+                run.finishedAt());
     }
 
     private static Candidate candidate(ProactiveCheckProblem row) {

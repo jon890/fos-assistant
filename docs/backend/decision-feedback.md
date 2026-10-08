@@ -117,10 +117,11 @@
 
 | 칸 | 뜻 |
 | --- | --- |
-| `version`, `labelVersion` | 읽기 모델의 모양 버전과 반응 읽기 규칙 버전 |
+| `version`, `labelVersion` | 읽기 모델의 모양 버전과 반응 읽기 규칙 버전. 모양 버전은 `situation.loop` 을 더해 2 다 |
 | `from`, `to` | 읽은 기간 |
 | `records[].decisionKey` | 결정 하나의 열쇠. 살펴보기에서 나왔으면 `check:<번호>`, 아니면 그 제안의 열쇠다 |
 | `records[].situation` | 살펴보기의 에이전트, 계기, 상태, 결과, 보고를 보였는지, 시각. 살펴보기 밖의 제안이면 없다 |
+| `records[].situation.loop` | 그 살펴보기를 이은 [매일 루프](proactive-loop.md) 시도의 번호, 상태, 건너뛴 까닭, 오류 코드, 평가 번호, 시각. 시도가 없으면 없다 |
 | `records[].candidates` | 문제 후보의 번호, 상태, 버린 까닭, 문제 키, 행동 종류, 부작용 힌트, 확신, 근거의 주제 키와 확인 시각 |
 | `records[].judgments` | 평가의 번호, replay 원본, 결과, 입력 버전과 기준 시각, adapter 와 모델, 추천 순서, 후보별 축 선택과 확신 |
 | `records[].policies` | 판정의 번호, 후보, 수준, 까닭 코드, 규칙 버전, 실행 상태, 시작한 살펴보기 |

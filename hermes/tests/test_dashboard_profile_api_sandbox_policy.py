@@ -176,6 +176,46 @@ class ProfileApiSandboxPolicyTest(support.ProfileApiRouteTest):
         self.assertEqual(self.request("/api/config", "PUT", token="valid", body=self.file_body(owner=None)), 200)
         self.assertEqual(self.saved_config()["terminal"], {"backend": "local"})
 
+    def test_profile_removed_from_policy_drops_unattended_approval(self):
+        """정책에서 빠져 local 로 돌아간 profile 에는 승인 없는 실행을 남기지 않고 다른 승인 키만 둔다."""
+        path = self.root / "owner/config.yaml"
+        base = path.read_bytes()
+        for label, operator, expected in (("only unattended", {}, None),
+                                          ("with mode", {"mode": "manual"}, {"mode": "manual"})):
+            with self.subTest(label=label):
+                # 앞 subTest 가 남긴 설정 대신 같은 기준 설정에서 시작한다.
+                path.write_bytes(base)
+                self.set_sandbox_policy(self.sandbox_policy())
+                config = self.saved_config()
+                config.pop("approvals", None)
+                if operator:
+                    config["approvals"] = dict(operator)
+                path.write_text(yaml.safe_dump(config, sort_keys=False), encoding="utf-8")
+                self.save_sandbox_key()
+                self.assertEqual(self.saved_config()["approvals"], {**operator, "unattended_mode": "approve"})
+                self.set_sandbox_policy(self.sandbox_policy(profiles={}))
+
+                self.assertEqual(self.request("/api/config", "PUT", token="valid", body=self.file_body(owner=None)), 200)
+
+                saved = self.saved_config()
+                self.assertEqual(saved["terminal"], {"backend": "local"})
+                if expected is None:
+                    self.assertNotIn("approvals", saved)
+                else:
+                    self.assertEqual(saved["approvals"], expected)
+
+    def test_unlisted_local_profile_drops_operator_unattended_approval(self):
+        """정책에 없는 local profile 은 운영자가 직접 넣은 승인 없는 실행도 셸 저장에서 지운다."""
+        path = self.root / "owner/config.yaml"
+        config = self.saved_config()
+        config["approvals"] = {"unattended_mode": "approve", "timeout": 60}
+        path.write_text(yaml.safe_dump(config), encoding="utf-8")
+        self.set_sandbox_policy(self.sandbox_policy(profiles={"alice": {}}))
+
+        self.assertEqual(self.request("/api/config", "PUT", token="valid", body=self.file_body(owner=None)), 200)
+
+        self.assertEqual(self.saved_config()["approvals"], {"timeout": 60})
+
     def test_profile_policy_does_not_change_another_profile_or_default_config(self):
         """도구를 저장한 profile 만 바뀌고 기본 profile 과 다른 profile 의 설정은 그대로다."""
         self.make_profile("alice")

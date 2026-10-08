@@ -49,6 +49,7 @@ from .profiles import (
 from .sandbox import (
     _sandbox_validate_attachment_snapshot,
 )
+from .sandbox_approvals import _with_sandbox_approvals
 
 
 def _connector_config(profile_dir: pathlib.Path, plugin: str, enabled: bool,
@@ -152,6 +153,7 @@ def _connector_config(profile_dir: pathlib.Path, plugin: str, enabled: bool,
                "platform_toolsets": {**(saved.get("platform_toolsets") or {}), "api_server": allowed}}
     if sandbox_terminal is not None:
         updated["terminal"] = sandbox_terminal
+        updated = _with_sandbox_approvals(saved, updated, True)
     elif local_execution:
         previous = saved.get("terminal") or {}
         if not isinstance(previous, dict):
@@ -159,6 +161,7 @@ def _connector_config(profile_dir: pathlib.Path, plugin: str, enabled: bool,
         terminal = dict(previous) if previous.get("backend", "local") == "local" else {}
         terminal["backend"] = "local"
         updated["terminal"] = terminal
+        updated = _with_sandbox_approvals(saved, updated, False)
     values = {config_path: yaml.safe_dump(updated, sort_keys=False, allow_unicode=True).encode(),
               state_path: (json.dumps(state) + "\n").encode(), **values}
     if enabled or owned:

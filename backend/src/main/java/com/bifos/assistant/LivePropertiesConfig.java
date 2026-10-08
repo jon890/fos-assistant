@@ -11,6 +11,7 @@ import com.bifos.assistant.memory.application.MemoryProposalProperties;
 import com.bifos.assistant.orchestration.application.DelegationProperties;
 import com.bifos.assistant.proactive.application.AutonomyProperties;
 import com.bifos.assistant.proactive.application.ProactiveCheckProperties;
+import com.bifos.assistant.proactive.application.ProactiveLoopProperties;
 import com.bifos.assistant.shared.config.LiveProperties;
 import com.bifos.assistant.usage.application.UserExecutionProperties;
 import com.bifos.assistant.usage.infra.PricingProperties;
@@ -57,6 +58,11 @@ public class LivePropertiesConfig {
     @Bean
     public LiveProperties<AutonomyProperties> autonomyPropertiesLive(AutonomyProperties value) {
         return LiveProperties.fixed(AutonomyProperties.class, value);
+    }
+
+    @Bean
+    public LiveProperties<ProactiveLoopProperties> proactiveLoopPropertiesLive(ProactiveLoopProperties value) {
+        return LiveProperties.fixed(ProactiveLoopProperties.class, value);
     }
 
     @Bean
