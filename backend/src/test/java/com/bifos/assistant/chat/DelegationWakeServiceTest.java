@@ -256,7 +256,7 @@ class DelegationWakeServiceTest {
     @Test
     @DisplayName("연결이 붙은 일반 에이전트의 결과도 외부 데이터 표시로 감싸 전한다")
     void wrapsResultOfAgentWithBoundConnectionAsExternalData() {
-        // docs/read-data-flow.md 의 RF-15 다. 붙은 커넥터로 읽은 메일 글이 답에 실려 부모 turn 의 지시로 읽히지 않게 한다.
+        // 커넥터 READ 흐름 판정 표의 RF-15 다. 붙은 커넥터로 읽은 메일 글이 답에 실려 부모 turn 의 지시로 읽히지 않게 한다.
         Agent bound = ordinaryAgent("bound", "메일 비서");
         ConnectorConnection connection =
                 connections.save(ConnectorConnection.pending(dad.id(), "demo-mail", Instant.now()));

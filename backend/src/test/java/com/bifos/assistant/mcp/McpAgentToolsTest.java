@@ -348,7 +348,7 @@ class McpAgentToolsTest {
     @Test
     @DisplayName("연결이 붙은 일반 에이전트 실행의 agent status 출력도 external-data 로 감싼다")
     void agentStatusWrapsOutputOfAgentWithBoundConnection() throws Exception {
-        // docs/read-data-flow.md 의 RF-15 다. 붙은 커넥터로 읽은 글이 답에 실려 부르는 쪽의 지시로 읽히지 않게 한다.
+        // 커넥터 READ 흐름 판정 표의 RF-15 다. 붙은 커넥터로 읽은 글이 답에 실려 부르는 쪽의 지시로 읽히지 않게 한다.
         String root = McpCallSigner.newRoot();
         AgentExecution parent = McpCallSigner.running(executions, userA.id(), null, SHARED, root);
         Agent bound = agents.save(agent(ORIGIN_CODE, "메일 비서", AgentVisibility.PRIVATE, userA.id()));
