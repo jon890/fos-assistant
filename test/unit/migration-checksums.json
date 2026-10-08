@@ -68,5 +68,16 @@
   "V73__proactive_check_writes.sql": "514d01a5b17652899c4fd6b6c0a0645d9310665e769dfbb03f094948f211098a",
   "V74__proactive_check_invalid_reason.sql": "bb9e5c5346695ae4a117dc51f5c1a8cf11e80eb6c3b46d434cb553811d697055",
   "V75__chat_attachment_position.sql": "91c731461948c6273c4e4de037d915f71f859b4225d90cd278b5bf10b7b4e6b8",
-  "V76__chat_attachment_position_backfill.sql": "cc4f94bbf631a2d2459bc66365af0a1dbd049a8fe61ed77d4a117c7003c6e3cd"
+  "V76__chat_attachment_position_backfill.sql": "cc4f94bbf631a2d2459bc66365af0a1dbd049a8fe61ed77d4a117c7003c6e3cd",
+  "V78__proactive_check_report.sql": "a6ccc63afa93fadd768fa4989978ba5dd386dcca5193e0cb05e246d4f4a0f491",
+  "V79__connector_binding.sql": "fd483500740ddb415f51fbea452499633078d4a56ceb6b5a27674cb4687ae4be",
+  "V80__connector_binding_backfill.sql": "b28923b626a22768bdfbbc1e5e79517f9b184cbdc3054833ca660f2ddfc219f4",
+  "V82__proactive_check_problem.sql": "6fc7b4142a1235c519461d55fba79c33b3eedb505aeb3bb168bb5d17e54753cc",
+  "V20261007015927__proactive_value_evaluation.sql": "216ed6aff7ed42f3e50746b0600321825cc932e78a54b1c9029bc918f593ba00",
+  "V20261007015950__memory_capture.sql": "1e08146bdd7d671203d22aa4e74dac5c1eb7569d0ba02b6d7018d63c76f67da3",
+  "V20261007030326__proactive_autonomy_policy.sql": "0173d0a7a2cfca5474bc0bfccdbacf4d06993679b336d69c5f0360fad589d1cc",
+  "V20261007044901__decision_feedback_event.sql": "dd2d01b39857ac8b51aa5a0b5102d3be10e95784fe90bfba0f83082fb0a716ad",
+  "V20261007051418__user_browser.sql": "9aee90ec715926f247df9adf2617049dd7638f5a3ef7e2061c88c12ad631e379",
+  "V20261007051452__execution_event_observation.sql": "a42a6b88cad96812148c27292d5398808e36bc58adbed0e017b337384ba64a6d",
+  "V20261007081400__connector_binding_apply_due.sql": "8f6cf18cd958bf4a3cfdb26ec89a01051393adb090faaa9536721058cec250ce"
 }
