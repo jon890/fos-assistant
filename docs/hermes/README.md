@@ -13,7 +13,7 @@
 | [실행 공간](sandbox.md) | 셸과 파일 도구를 profile 마다 docker 컨테이너에서 돌리는 계약과 측정 |
 | [MCP 프로세스의 환경 값](mcp-profile-credentials.md) | MCP 프로세스에 사용자별 환경 값을 전달하는 계약 |
 | [kanban](kanban.md) | 다중 에이전트 kanban 과 HTTP 호출 |
-| [버전 변경과 실측](upgrades.md) | 버전별 계약 차이와 확인 결과 |
+| [버전 변경과 실측](upgrades.md) | provider 교체의 계약 시험 범위, 버전별 계약 차이와 확인 결과 |
 
 
 NousResearch 의 Hermes Agent 를 Agent Runtime 으로 쓴다.
