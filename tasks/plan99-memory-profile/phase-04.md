@@ -53,8 +53,8 @@
 
 ### 5. 연결
 
-- `use-conversation-session-state.ts`: `const memoryUses = useMemoryUses(conversationId, memoryCaptureKey);` 를 더하고 돌려준다. 돌려주는 `memoryCaptures.changed` 를 감싸, 기억 기록을 되돌리거나 고치거나 받아들인 뒤 `memoryUses.reload()` 도 부르게 한다.
-- `conversation-session-view.tsx`: `memoryUses={memoryUses.uses}` 를 `MessageList` 로 넘긴다.
+- `use-conversation-session-state.ts`: `const memoryUses = useMemoryUses(conversationId, memoryCaptureKey);` 를 더하고 돌려준다. 
+- `conversation-session-view.tsx`: `memoryUses={memoryUses.uses}` 를 `MessageList` 로 넘긴다. `onMemoryCapturesChanged` 에서 `memoryCaptures.changed` 뒤에 `memoryUses.reload()` 도 불러, 기억 기록을 되돌리거나 고치거나 받아들인 뒤 참고한 기억을 다시 읽는다(상태 훅의 함수 길이 상한 때문에 view 에 둔다). `conversation-session-view-types.ts` 의 `Pick` 에 `memoryUses` 를 더한다.
 - `message-list.tsx`: prop `memoryUses?: MemoryUse[]`(기본 `[]`)을 받아 `MemoryCaptureList` 바로 뒤에 `<MemoryUseList uses={memoryUses.filter((use) => use.executionId === turn.executionId)} />` 를 둔다. `capturesVersion` 옆에 `usesVersion`(`${executionId}:${memoryId}` 를 이은 글)을 두고 `contentVersion` 에 넣어, 접힌 줄이 새로 나타나면 맨 아래 따라가기가 보게 한다. 펼치고 접는 상태는 `MemoryUseList` 안에만 두고 `contentVersion` 에 넣지 않는다.
 
 ### 6. `execution-detail.tsx`
@@ -91,6 +91,7 @@ grep -rn 'style={{' web/src/components/chat/memory-use-list.tsx || true
 | `web/src/components/chat/memory-use-list.tsx` | 신규 |
 | `web/src/components/chat/use-conversation-session-state.ts` | 수정 |
 | `web/src/components/chat/conversation-session-view.tsx` | 수정 |
+| `web/src/components/chat/conversation-session-view-types.ts` | 수정 |
 | `web/src/components/chat/message-list.tsx` | 수정 |
 | `web/src/components/execution/execution-detail.tsx` | 수정 |
 | `test/browser/memory-use.spec.ts` | 신규 |
