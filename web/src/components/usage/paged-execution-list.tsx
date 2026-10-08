@@ -48,7 +48,11 @@ export function PagedExecutionList({
   return (
     <div className="space-y-3">
       <ExecutionList executions={page.items} isAdmin={isAdmin} />
-      {error ? <Notice variant="error" role="alert">{error}</Notice> : null}
+      {error ? (
+        <Notice variant="error" role="alert">
+          {error}
+        </Notice>
+      ) : null}
       {page.nextCursor !== null ? (
         <Button loading={loading} loadingText="불러오는 중…" onClick={loadMore}>
           더 보기

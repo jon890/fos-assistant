@@ -108,7 +108,8 @@ class ExecutionPagingTest {
 
         RootExecutionPage page = query.page(USER_ID, 10, otherPage.nextCursor());
 
-        assertThat(page.executions()).extracting(AgentExecution::id)
+        assertThat(page.executions())
+                .extracting(AgentExecution::id)
                 .containsExactly(newer.id(), olderWithHigherId.id(), root.id())
                 .doesNotContain(child.id());
     }

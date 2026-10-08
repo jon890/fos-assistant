@@ -17,8 +17,8 @@ import com.bifos.assistant.usage.application.UsageSummaryService;
 import com.bifos.assistant.usage.domain.AgentExecution;
 import com.bifos.assistant.usage.presentation.UsageDtos.BreakdownRow;
 import com.bifos.assistant.usage.presentation.UsageDtos.BreakdownView;
-import com.bifos.assistant.usage.presentation.UsageDtos.ExecutionView;
 import com.bifos.assistant.usage.presentation.UsageDtos.ExecutionPageView;
+import com.bifos.assistant.usage.presentation.UsageDtos.ExecutionView;
 import com.bifos.assistant.usage.presentation.UsageDtos.MonthlyCostView;
 import com.bifos.assistant.usage.presentation.UsageDtos.MySkillUsageView;
 import java.time.Instant;
@@ -83,7 +83,8 @@ public class UsageController {
         int size = Math.clamp(limit, 1, MAX_LIMIT);
         CurrentUser user = currentUser.require();
         RootExecutionPage rootPage = rootExecutions.page(user.id(), size, cursor);
-        return new ExecutionPageView(executionViews(rootPage, InternalValuePolicy.visibleTo(user)), rootPage.nextCursor());
+        return new ExecutionPageView(
+                executionViews(rootPage, InternalValuePolicy.visibleTo(user)), rootPage.nextCursor());
     }
 
     private List<ExecutionView> executionViews(RootExecutionPage rootPage, boolean internal) {

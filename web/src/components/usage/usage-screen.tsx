@@ -47,7 +47,9 @@ export async function UsageScreen({
     attentionResult,
     skillsResult,
   ] = await Promise.all([
-    callControlPlane<UsageExecutionPage>("/api/v1/usage/executions/page?limit=50"),
+    callControlPlane<UsageExecutionPage>(
+      "/api/v1/usage/executions/page?limit=50",
+    ),
     callControlPlane<MonthlyCost>("/api/v1/usage/monthly-cost"),
     isAdmin
       ? callControlPlane<Breakdown>("/api/v1/usage/breakdown?axis=agent")
