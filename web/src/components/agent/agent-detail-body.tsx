@@ -1,6 +1,9 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
+import { MessageSquare } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { describeError } from "@/components/error-message";
 import { Notice } from "@/components/ui/notice";
 import { AgentAccessSection } from "./agent-access-section";
@@ -53,6 +56,8 @@ type Props = {
   connectorManaged?: boolean;
   /** 에이전트를 지운 뒤 돌아갈 목록 주소다. */
   listHref: string;
+  /** 이 에이전트와 새 대화를 여는 주소다. 요청자가 대화할 수 있는 에이전트일 때만 있다. */
+  chatHref?: string | null;
 };
 
 type ErrorPayload = { code: string; message: string };
@@ -95,6 +100,7 @@ export function AgentDetailBody({
   adminError,
   connectorManaged = false,
   listHref,
+  chatHref = null,
 }: Props) {
   const [visibility, setVisibility] = useState(initialVisibility);
   // 도구 절과 연결 절이 서로의 위험을 알린다. 도구 절이 켜진 도구를, 연결 절이 붙은 연결이 있는지를 알려 준다.
@@ -122,6 +128,16 @@ export function AgentDetailBody({
 
   return (
     <>
+      {chatHref ? (
+        <div className="mx-auto mb-2 flex w-full max-w-2xl justify-end">
+          <Button asChild variant="outline" size="sm">
+            <Link href={chatHref}>
+              <MessageSquare aria-hidden="true" />
+              대화하기
+            </Link>
+          </Button>
+        </div>
+      ) : null}
       {persona === null ? (
         <div className="mx-auto w-full max-w-2xl">
           <h1 className="mb-4 text-xl font-semibold">{name}</h1>
