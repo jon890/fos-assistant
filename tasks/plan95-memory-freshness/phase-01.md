@@ -13,7 +13,8 @@ Memory 문맥 항목의 고정 FRESH를 실제 나이 판정으로 바꾸고 실
 **근거 문서**: `docs/backend/context-bundle.md`의 「신선도」.
 `ContextAssembler`는 `MemoryService`로 권한을 거른 뒤 묶음을 만들고 `ContextSourceRefs`는 그 값을 실행 기록으로 옮긴다.
 `ResultHeader.freshnessOf`는 시각이 비면 UNKNOWN, 기간을 초과하면 STALE, 같으면 FRESH를 내므로 재사용한다.
-`Clock` 빈과 통합 시험의 `TestClock`, `OverrideProperties`가 이미 있다.
+`Clock` 빈과 통합 시험의 `TestClock`이 이미 있다. ContextProperties는 LiveProperties가 아니므로
+OverrideProperties를 쓰지 않는다. 시험별 설정은 실제 MemoryService와 시계로 ContextAssembler를 직접 구성한다.
 
 ## 의도 메모
 
@@ -32,7 +33,7 @@ always/index/omitted 항목 모두 updatedAt으로 판정하며 기준 없음 �
 예산 계산에서 불필요한 문맥 항목 생성이 있으면 제목 기반 길이 계산으로 정리한다.
 현재 주입 글, 예산, 지문, 권한, 암호문 건너뛰기를 유지한다.
 
-### 2. ContextAssemblerTest와 MemoryFreshnessTest 테스트
+### 2. ContextAssemblerTest, MemoryFreshnessTest, ContextPropertiesTest 테스트
 
 기존 ContextAssemblerTest의 새 기억은 기본 180일 안이므로 FRESH가 유지된다.
 수정 시각을 통제하는 시험으로 오래된 항상/색인/생략 항목의 STALE, 새 항목과 경계 시각의 FRESH,
