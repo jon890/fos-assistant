@@ -66,7 +66,7 @@ export function findDocReferences(text: string, file = "README.md"): DocReferenc
 }
 
 function gitLsFiles(args: string[]): string {
-  return execFileSync("git", ["ls-files", ...args], {
+  return execFileSync("git", ["ls-files", "-z", ...args], {
     cwd: REPO_ROOT,
     encoding: "utf8",
     maxBuffer: 64 * 1024 * 1024,
@@ -77,7 +77,7 @@ function gitLsFiles(args: string[]): string {
 function targetFiles(): string[] {
   const output = gitLsFiles(["-s"]);
   const files: string[] = [];
-  for (const row of output.split("\n")) {
+  for (const row of output.split("\0")) {
     const match = /^(\d+) \S+ \d+\t(.+)$/.exec(row);
     if (!match) continue;
     const [, mode, file] = match;
@@ -225,7 +225,7 @@ test("한 문서 안에 같은 헤딩이 두 번 나오지 않는다", async () 
   const problems: string[] = [];
   for (const directory of UNIQUE_HEADING_DIRECTORIES) {
     const files = gitLsFiles([`${directory}/*.md`])
-      .split("\n")
+      .split("\0")
       .filter((file) => file !== "" && file.split("/").length === directory.split("/").length + 1);
     for (const file of files) {
       const text = await readFile(join(REPO_ROOT, file), "utf8");

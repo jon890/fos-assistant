@@ -33,14 +33,14 @@ export function findLinks(markdown: string, file: string): DocLink[] {
   return links;
 }
 
-/** 추적하는 Markdown 과 아직 추적하지 않은 새 Markdown 이다. 심볼릭 링크(`CLAUDE.md`)는 뺀다. */
+/** 추적하는 Markdown 과 아직 추적하지 않은 새 Markdown 이다. 심볼릭 링크(`CLAUDE.md`)는 뺀다. `-z` 라 한글 이름이 따옴표로 감싸이지 않는다. */
 function markdownFiles(): string[] {
-  return execFileSync("git", ["ls-files", "-co", "--exclude-standard", "*.md"], {
+  return execFileSync("git", ["ls-files", "-z", "-co", "--exclude-standard", "*.md"], {
     cwd: REPO_ROOT,
     encoding: "utf8",
     maxBuffer: 64 * 1024 * 1024,
   })
-    .split("\n")
+    .split("\0")
     .filter((file) => file !== "" && existsSync(join(REPO_ROOT, file)))
     .filter((file) => !lstatSync(join(REPO_ROOT, file)).isSymbolicLink());
 }
