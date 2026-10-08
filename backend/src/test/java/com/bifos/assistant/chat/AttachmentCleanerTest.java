@@ -78,12 +78,8 @@ class AttachmentCleanerTest {
 
         assertThat(deleted).isEqualTo(1);
         assertThat(fileOf(expired)).doesNotExist();
-        assertThat(root.resolve(conversationId.toString()).resolve(expired.storedName()))
-                .doesNotExist();
         assertThat(reload(expired).deletedAt()).isEqualTo(NOW);
         assertThat(fileOf(live)).exists();
-        assertThat(root.resolve(conversationId.toString()).resolve(live.storedName()))
-                .exists();
         assertThat(reload(live).deletedAt()).isNull();
     }
 

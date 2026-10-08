@@ -4,7 +4,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.groups.Tuple.tuple;
 
-import com.bifos.assistant.chat.application.AttachmentBackfill;
 import com.bifos.assistant.chat.application.AttachmentContent;
 import com.bifos.assistant.chat.application.AttachmentService;
 import com.bifos.assistant.chat.application.ConversationWriter;
@@ -59,9 +58,6 @@ class AttachmentServiceTest {
     @Autowired
     ConversationWriter conversationWriter;
 
-    @Autowired
-    AttachmentBackfill backfill;
-
     private Path root;
     private Long mine;
     private Long theirs;
@@ -91,6 +87,9 @@ class AttachmentServiceTest {
         Path file = fileOf(saved);
         assertThat(file).exists();
         assertThat(Files.readAllBytes(file)).isEqualTo(IMAGE);
+        try (Stream<Path> children = Files.list(root)) {
+            assertThat(children.map(path -> path.getFileName().toString())).containsExactly("users");
+        }
     }
 
     @Test
@@ -99,7 +98,10 @@ class AttachmentServiceTest {
         assertCode(() -> upload(OWNER, theirs, "image/png", IMAGE), ErrorCode.CONVERSATION_NOT_FOUND);
 
         assertThat(attachments.findByConversationIdOrderByIdAsc(theirs)).isEmpty();
-        assertThat(root.resolve(String.valueOf(theirs))).doesNotExist();
+        assertThat(root.resolve("users")
+                        .resolve(AttachmentStore.userDirectoryKey(OWNER.id()))
+                        .resolve(String.valueOf(theirs)))
+                .doesNotExist();
     }
 
     @Test
@@ -190,8 +192,6 @@ class AttachmentServiceTest {
         ChatAttachment saved = upload(OWNER, mine, "image/png", IMAGE);
         // 정리 작업이 파일을 지우고 지운 시각을 아직 적지 않은 순간이다.
         Files.delete(fileOf(saved));
-        Files.delete(root.resolve(mine.toString()).resolve(saved.storedName()));
-
         assertCode(() -> service.read(OWNER, mine, saved.id()), ErrorCode.ATTACHMENT_GONE);
     }
 
@@ -213,11 +213,19 @@ class AttachmentServiceTest {
 
     @Test
     @DisplayName("내 대화 번호에 남의 첨부 번호를 붙여도 읽지 못한다")
-    void cannotReadOthersAttachmentIdUnderOwnConversationId() {
+    void cannotReadOthersAttachmentIdUnderOwnConversationId() throws IOException {
+        ChatAttachment own = upload(OWNER, mine, "image/png", IMAGE);
         ChatAttachment others = upload(STRANGER, theirs, "image/png", IMAGE);
 
-        assertCode(() -> service.read(OWNER, mine, others.id()), ErrorCode.CONVERSATION_NOT_FOUND);
-        assertCode(() -> service.deleteByUser(OWNER, mine, others.id()), ErrorCode.CONVERSATION_NOT_FOUND);
+        assertThat(fileOf(own)).exists();
+        assertThat(fileOf(others)).exists();
+        try (InputStream mineBody = service.read(OWNER, own.conversationId(), own.id()).body();
+                InputStream otherBody = service.read(STRANGER, theirs, others.id()).body()) {
+            assertThat(mineBody.readAllBytes()).isEqualTo(IMAGE);
+            assertThat(otherBody.readAllBytes()).isEqualTo(IMAGE);
+        }
+        assertCode(() -> service.read(OWNER, own.conversationId(), others.id()), ErrorCode.CONVERSATION_NOT_FOUND);
+        assertCode(() -> service.deleteByUser(OWNER, own.conversationId(), others.id()), ErrorCode.CONVERSATION_NOT_FOUND);
         assertThat(attachments.findById(others.id()).orElseThrow().isVisible()).isTrue();
     }
 
@@ -319,100 +327,6 @@ class AttachmentServiceTest {
         assertThat(reloadedFirst.position()).isZero();
         assertThat(attachments.findById(alreadyBound.id()).orElseThrow().messageId())
                 .isEqualTo(701L);
-    }
-
-    @Test
-    @DisplayName("기동 복사는 기존 두 사용자의 사진을 각 경로에 복사하고 옛 파일과 화면 조회를 유지한다")
-    void backfillsBothUsersAndPreservesLegacyFilesAndReads() throws IOException {
-        ChatAttachment minePhoto = upload(OWNER, mine, "image/png", IMAGE);
-        byte[] otherImage = new byte[] {4, 5, 6};
-        ChatAttachment otherPhoto = upload(STRANGER, theirs, "image/png", otherImage);
-        Path oldMine = putBackInLegacyDirectory(minePhoto);
-        Path oldTheirs = putBackInLegacyDirectory(otherPhoto);
-
-        backfill.copyLegacyFiles();
-        backfill.copyLegacyFiles();
-
-        assertThat(Files.readAllBytes(fileOf(minePhoto))).isEqualTo(IMAGE);
-        assertThat(Files.readAllBytes(fileOf(otherPhoto))).isEqualTo(otherImage);
-        assertThat(oldMine).exists();
-        assertThat(oldTheirs).exists();
-        assertThat(fileOf(minePhoto).getParent().getParent())
-                .isNotEqualTo(fileOf(otherPhoto).getParent().getParent());
-        try (InputStream body = service.read(OWNER, mine, minePhoto.id()).body()) {
-            assertThat(body.readAllBytes()).isEqualTo(IMAGE);
-        }
-        try (InputStream body = service.read(STRANGER, theirs, otherPhoto.id()).body()) {
-            assertThat(body.readAllBytes()).isEqualTo(otherImage);
-        }
-        assertCode(() -> service.read(STRANGER, mine, minePhoto.id()), ErrorCode.CONVERSATION_NOT_FOUND);
-    }
-
-    @Test
-    @DisplayName("기동 뒤 들어온 옛 파일도 에이전트 입력을 만들 때 복사하고 vision 경로를 알린다")
-    void copiesLateLegacyFileBeforeBuildingVisionInput() throws IOException {
-        ChatAttachment photo = upload(OWNER, mine, "image/png", IMAGE);
-        service.attach(701L, mine, List.of(photo.id()));
-        Path legacy = putBackInLegacyDirectory(photo);
-
-        String input = service.agentInput(mine, service.allOf(mine), "사진 설명");
-
-        assertThat(input)
-                .contains(
-                        properties.agentRoot() + "/users/" + AttachmentStore.userDirectoryKey(OWNER.id()) + "/" + mine);
-        assertThat(input).contains("vision_analyze");
-        assertThat(fileOf(photo)).exists();
-        assertThat(legacy).exists();
-    }
-
-    @Test
-    @DisplayName("옛 사본과 사용자별 사본은 사용자가 지울 때 함께 사라지고 다시 복사되지 않는다")
-    void removesBothCopiesAndDoesNotResurrectDeletedPhoto() throws IOException {
-        ChatAttachment photo = upload(OWNER, mine, "image/png", IMAGE);
-        Path legacy = putBackInLegacyDirectory(photo);
-        backfill.copyLegacyFiles();
-
-        service.deleteByUser(OWNER, mine, photo.id());
-        backfill.copyLegacyFiles();
-
-        assertThat(legacy).doesNotExist();
-        assertThat(fileOf(photo)).doesNotExist();
-        assertCode(() -> service.read(OWNER, mine, photo.id()), ErrorCode.ATTACHMENT_GONE);
-    }
-
-    @Test
-    @DisplayName("기동 복사는 한 페이지보다 많은 기존 첨부를 끝까지 처리한다")
-    void copiesLegacyRowsAcrossBackfillPages() throws IOException {
-        List<ChatAttachment> rows = new ArrayList<>();
-        Path legacyDirectory = root.resolve(mine.toString());
-        Files.createDirectories(legacyDirectory);
-        for (int i = 0; i < 260; i++) {
-            ChatAttachment attachment = attachments.save(ChatAttachment.of(
-                    mine,
-                    OWNER.id(),
-                    "image.png",
-                    "image/png",
-                    IMAGE.length,
-                    Instant.now().plusSeconds(3600),
-                    Instant.now()));
-            attachment.nameStoredFile(AttachmentStore.storedName(attachment.id(), "png"));
-            rows.add(attachments.save(attachment));
-            Files.write(legacyDirectory.resolve(attachment.storedName()), IMAGE);
-        }
-
-        backfill.copyLegacyFiles();
-
-        for (ChatAttachment attachment : rows) {
-            assertThat(Files.readAllBytes(fileOf(attachment))).isEqualTo(IMAGE);
-        }
-    }
-
-    private Path putBackInLegacyDirectory(ChatAttachment attachment) throws IOException {
-        Path legacy = root.resolve(attachment.conversationId().toString()).resolve(attachment.storedName());
-        Files.createDirectories(legacy.getParent());
-        Files.deleteIfExists(legacy);
-        Files.move(fileOf(attachment), legacy);
-        return legacy;
     }
 
     private ChatAttachment upload(CurrentUser user, Long conversationId, String contentType, byte[] body) {

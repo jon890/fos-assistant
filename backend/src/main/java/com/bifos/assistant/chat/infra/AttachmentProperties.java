@@ -19,7 +19,6 @@ import org.springframework.validation.annotation.Validated;
  * @param maxFiles 한 번에 보낼 수 있는 장수
  * @param maxBytes 한 장의 상한
  * @param retentionDays 올린 뒤 파일을 두는 날 수
- * @param legacyWriteEnabled 이전 기간에 신규 사진의 옛 경로 사본도 남기는지. 다음 배포가 안정된 뒤 끈다
  */
 @Validated
 @ConfigurationProperties(prefix = "assistant.attachment")
@@ -28,8 +27,7 @@ public record AttachmentProperties(
         String agentRoot,
         Integer maxFiles,
         Long maxBytes,
-        Integer retentionDays,
-        Boolean legacyWriteEnabled) {
+        Integer retentionDays) {
 
     private static final int DEFAULT_MAX_FILES = 30;
     private static final long DEFAULT_MAX_BYTES = 10L * 1024 * 1024;
@@ -47,10 +45,5 @@ public record AttachmentProperties(
         maxFiles = maxFiles == null ? DEFAULT_MAX_FILES : maxFiles;
         maxBytes = maxBytes == null ? DEFAULT_MAX_BYTES : maxBytes;
         retentionDays = retentionDays == null ? DEFAULT_RETENTION_DAYS : retentionDays;
-        legacyWriteEnabled = legacyWriteEnabled == null ? Boolean.TRUE : legacyWriteEnabled;
-    }
-
-    public AttachmentProperties(String root, String agentRoot, Integer maxFiles, Long maxBytes, Integer retentionDays) {
-        this(root, agentRoot, maxFiles, maxBytes, retentionDays, true);
     }
 }
