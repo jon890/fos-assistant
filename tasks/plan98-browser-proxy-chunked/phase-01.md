@@ -36,10 +36,13 @@ factory 를 `BufferingClientHttpRequestFactory` 로 감싸 JSON 직렬화 뒤 �
 
 `backend/src/test/java/com/bifos/assistant/browser/infra/DockerProxyBrowserRuntimeHttpTest.java`
 에서 임시 loopback HTTP 서버를 띄우고 운영 생성자를 사용한다.
-Transfer-Encoding 이 있거나 Content-Length 가 없으면 403 을 돌려주는 proxy 를 만든다.
+생성·시작·정지·삭제 요청에 Transfer-Encoding 이 있거나 Content-Length 가 없으면
+403 을 돌려주는 proxy 를 만든다.
 생성, 시작, 정지, 삭제 요청 순서와 메서드, 경로, query 를 확인한다.
 생성 본문의 실제 byte 수와 Content-Length 가 같고 JSON 정책이 유지되는지 확인한다.
-본문 없는 요청의 길이는 0 이어야 한다. 조회와 목록의 전송도 확인한다.
+본문 없는 제어 요청의 길이는 0 이어야 한다.
+조회·목록은 Content-Length 를 요구하지 않고 Transfer-Encoding 부재와 메서드·경로,
+응답 역직렬화를 확인한다.
 고치기 전 403 으로 실패하고 고친 뒤 통과한 출력을 남긴다.
 
 ## 검증

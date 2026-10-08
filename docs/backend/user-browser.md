@@ -89,7 +89,7 @@ Docker proxy 는 chunked 요청을 거절하므로 Control Plane 은 요청 본�
 버퍼링은 작은 Docker 제어 요청에만 적용하고 연결·응답 timeout 은 유지한다.
 
 회귀 시험은 운영 생성자의 HTTP client 로 실제 TCP 서버를 호출한다.
-가짜 proxy 는 chunked 요청과 길이가 없는 요청을 거절하며, 생성·시작·정지·삭제가
+가짜 proxy 는 chunked 요청과 길이가 없는 쓰기 요청을 거절하며, 생성·시작·정지·삭제가
 통과하는지와 생성 JSON 의 바이트 수가 전송 길이와 같은지 확인한다.
 
 ## API
