@@ -3,6 +3,7 @@ package com.bifos.assistant.chat.presentation;
 import com.bifos.assistant.chat.application.ActivitySummary;
 import com.bifos.assistant.chat.application.AgentModelSettings;
 import com.bifos.assistant.chat.application.HiddenModels;
+import com.bifos.assistant.chat.application.MemoryUse;
 import com.bifos.assistant.chat.application.ModelOptions;
 import com.bifos.assistant.chat.application.PendingQueue;
 import com.bifos.assistant.chat.application.RunningTurn;
@@ -425,6 +426,22 @@ public final class ChatDtos {
                     sensitive,
                     memory.alwaysInject(),
                     capture.createdAt());
+        }
+    }
+
+    /**
+     * 대화의 답 아래에 접어 보일 참고한 기억 하나다(ADR-20261008 / memory-facts).
+     *
+     * <p>{@code via} 는 {@code ALWAYS}, {@code FACTS}, {@code READ} 이고 본문은 싣지 않는다.
+     */
+    public record MemoryUseView(Long executionId, Long memoryId, String title, String scope, String via) {
+        static MemoryUseView from(MemoryUse use) {
+            return new MemoryUseView(
+                    use.executionId(),
+                    use.memoryId(),
+                    use.title(),
+                    use.scope().name(),
+                    use.via().name());
         }
     }
 }

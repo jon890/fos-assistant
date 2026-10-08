@@ -3,6 +3,7 @@
 import { useRef, useState, useEffect, useLayoutEffect } from "react";
 import { usePendingQueue } from "@/components/chat/use-pending-queue";
 import { useMemoryCaptures } from "./use-memory-captures";
+import { useMemoryUses } from "./use-memory-uses";
 import { type ActivityState } from "./activity/activity-state";
 import type { Turn } from "./message-bubble";
 import { useConversations } from "@/components/shell/conversations-provider";
@@ -99,12 +100,13 @@ export function useConversationSessionState({
   const [pendingBusy, setPendingBusy] = useState(false);
   /** 승인 줄을 다시 읽게 하는 값이다. `approval` 사건과 알림 줄을 받을 때 올린다 */
   const [approvalRefresh, setApprovalRefresh] = useState(0);
-  // 답이 새로 저장되거나 turn 이 끝나면(`sending` 이 거짓이 되면) 그 답의 기억 기록을 다시 읽는다.
+  // 답이 새로 저장되거나 turn 이 끝나면(`sending` 이 거짓이 되면) 그 답의 기억 기록과 참고한 기억을 다시 읽는다.
   const memoryCaptureKey = `${sending}:${turns
     .filter((turn) => turn.role === "ASSISTANT")
     .map((turn) => turn.executionId ?? "")
     .join(",")}`;
   const memoryCaptures = useMemoryCaptures(conversationId, memoryCaptureKey);
+  const memoryUses = useMemoryUses(conversationId, memoryCaptureKey);
   /** 대기 메시지로 더하는 요청이 도는 중이다. 같은 글이 두 번 쌓이지 않게 그동안의 보내기를 받지 않는다 */
   const enqueueing = useRef(false);
   /** 대기 줄에 쌓인 글이 있는지다. 대화 단위 SSE 의 처리기는 연결을 열 때의 렌더에 묶여 있어 최신 값을 여기서 읽는다 */
@@ -192,6 +194,7 @@ export function useConversationSessionState({
     setApprovalRefresh,
     memoryCaptureKey,
     memoryCaptures,
+    memoryUses,
     enqueueing,
     hasPendingItems,
   };

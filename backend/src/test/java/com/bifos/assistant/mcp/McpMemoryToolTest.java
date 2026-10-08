@@ -1,6 +1,7 @@
 package com.bifos.assistant.mcp;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.tuple;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.request;
@@ -24,8 +25,10 @@ import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.testsupport.BackendIntegrationTest;
 import com.bifos.assistant.usage.domain.AgentExecution;
+import com.bifos.assistant.usage.domain.ExecutionContextSource;
 import com.bifos.assistant.usage.domain.type.ExecutionStatus;
 import com.bifos.assistant.usage.infra.AgentExecutionRepository;
+import com.bifos.assistant.usage.infra.ExecutionContextSourceRepository;
 import com.bifos.assistant.user.domain.AppUser;
 import com.bifos.assistant.user.infra.AppUserRepository;
 import io.jsonwebtoken.Jwts;
@@ -106,6 +109,9 @@ class McpMemoryToolTest {
     @Autowired
     McpToolService toolService;
 
+    @Autowired
+    ExecutionContextSourceRepository contextSources;
+
     private final HttpClient client = HttpClient.newHttpClient();
     private final JsonMapper json = JsonMapper.builder().build();
     private AppUser dad;
@@ -118,6 +124,10 @@ class McpMemoryToolTest {
 
     @BeforeEach
     void setUp() {
+        jdbc.update(
+                "DELETE FROM execution_context_source WHERE execution_id IN"
+                        + " (SELECT id FROM agent_execution WHERE profile_name = ?)",
+                PROFILE);
         McpCallSigner.clearRuns(jdbc, List.of(PROFILE));
         memoryRepository.deleteAll();
         tokenRepository.deleteAll();
@@ -182,6 +192,68 @@ class McpMemoryToolTest {
         JsonNode unauthorized = body(call(dadToken, hidden.id(), null));
         JsonNode missing = body(call(dadToken, 999999L, null));
         assertThat(unauthorized.path("result")).isEqualTo(missing.path("result"));
+    }
+
+    @Test
+    @DisplayName("읽기에 성공하면 그 실행의 문맥 기록 끝에 MEMORY_READ 줄이 붙고 읽지 못한 호출은 줄을 남기지 않는다")
+    void appendsReadRowAfterAssembledRowsOnlyWhenBodyIsReturned() throws Exception {
+        Memory own = memories.create(current(dad), MemoryScope.USER, "색인", "아빠 본문", false);
+        Memory hidden = memories.create(current(kid), MemoryScope.USER, "비밀", "아이 본문", false);
+        Instant assembledAt = Instant.parse("2026-10-01T00:00:00Z");
+        contextSources.saveAll(List.of(
+                ExecutionContextSource.of(
+                        dadRun.id(), 0, "MEMORY_FACTS", "memory:9001", "INLINE", "FRESH", assembledAt),
+                ExecutionContextSource.of(
+                        dadRun.id(), 1, "MEMORY_INDEX", "memory:9002", "TITLE_ONLY", "FRESH", assembledAt)));
+
+        assertThat(body(call(dadToken, hidden.id(), null))
+                        .path("result")
+                        .path("isError")
+                        .asBoolean())
+                .isTrue();
+        assertThat(body(call(dadToken, 999999L, null))
+                        .path("result")
+                        .path("isError")
+                        .asBoolean())
+                .isTrue();
+        assertThat(body(call(dadToken, own.id(), null))
+                        .path("result")
+                        .path("isError")
+                        .asBoolean())
+                .isFalse();
+
+        assertThat(contextSources.findByIdExecutionIdOrderByIdPositionAsc(dadRun.id()))
+                .as("실행 %s 의 문맥 기록", dadRun.id())
+                .extracting(
+                        ExecutionContextSource::position,
+                        ExecutionContextSource::source,
+                        ExecutionContextSource::sourceRef,
+                        ExecutionContextSource::bodyMode,
+                        ExecutionContextSource::freshness)
+                .containsExactly(
+                        tuple(0, "MEMORY_FACTS", "memory:9001", "INLINE", "FRESH"),
+                        tuple(1, "MEMORY_INDEX", "memory:9002", "TITLE_ONLY", "FRESH"),
+                        tuple(2, "MEMORY_READ", "memory:" + own.id(), "INLINE", "UNKNOWN"));
+    }
+
+    @Test
+    @DisplayName("같은 실행에서 두 번 읽으면 조립 줄이 없어도 position 0 부터 이어 붙는다")
+    void appendsReadsWithContinuingPositions() throws Exception {
+        Memory first = memories.create(current(dad), MemoryScope.USER, "첫째", "첫째 본문", false);
+        Memory second = memories.create(current(dad), MemoryScope.USER, "둘째", "둘째 본문", false);
+
+        body(call(dadToken, first.id(), null));
+        body(call(dadToken, second.id(), null));
+
+        assertThat(contextSources.findByIdExecutionIdOrderByIdPositionAsc(dadRun.id()))
+                .as("실행 %s 의 문맥 기록", dadRun.id())
+                .extracting(
+                        ExecutionContextSource::position,
+                        ExecutionContextSource::source,
+                        ExecutionContextSource::sourceRef)
+                .containsExactly(
+                        tuple(0, "MEMORY_READ", "memory:" + first.id()),
+                        tuple(1, "MEMORY_READ", "memory:" + second.id()));
     }
 
     @Test

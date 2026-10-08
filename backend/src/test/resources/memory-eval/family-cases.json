@@ -1,0 +1,1340 @@
+{
+  "version": 1,
+  "note": "합성 시험 세트. 이름과 사실은 모두 지어낸 것이다",
+  "users": [
+    {
+      "key": "parentA",
+      "role": "ADMIN",
+      "group": "home"
+    },
+    {
+      "key": "parentB",
+      "role": "ADMIN",
+      "group": "home"
+    },
+    {
+      "key": "childA",
+      "role": "MEMBER",
+      "group": "home"
+    },
+    {
+      "key": "neighborA",
+      "role": "ADMIN",
+      "group": "other"
+    }
+  ],
+  "agents": [
+    {
+      "key": "general",
+      "collections": [
+        {
+          "collection": "core",
+          "allowSensitive": false
+        }
+      ]
+    },
+    {
+      "key": "health",
+      "collections": [
+        {
+          "collection": "core",
+          "allowSensitive": false
+        },
+        {
+          "collection": "health",
+          "allowSensitive": false
+        }
+      ]
+    }
+  ],
+  "cases": [
+    {
+      "id": "IE-01",
+      "category": "INFORMATION_EXTRACTION",
+      "asker": "parentA",
+      "agent": "general",
+      "question": "우리 딸 이름이 뭐였지?",
+      "memories": [
+        {
+          "key": "m1",
+          "owner": "parentA",
+          "scope": "USER",
+          "title": "딸 이름",
+          "content": "딸 이름은 홍지수다",
+          "updatedDaysAgo": 3
+        }
+      ],
+      "expect": [
+        "m1"
+      ],
+      "forbidden": []
+    },
+    {
+      "id": "IE-02",
+      "category": "INFORMATION_EXTRACTION",
+      "asker": "parentA",
+      "agent": "general",
+      "question": "아들이 좋아하는 간식이 뭐였지?",
+      "memories": [
+        {
+          "key": "m1",
+          "owner": "parentA",
+          "scope": "USER",
+          "title": "아들 간식",
+          "content": "아들 홍민준은 땅콩버터 샌드위치를 좋아한다",
+          "retrieval": "ALWAYS",
+          "updatedDaysAgo": 10
+        }
+      ],
+      "expect": [
+        "m1"
+      ],
+      "forbidden": []
+    },
+    {
+      "id": "IE-03",
+      "category": "INFORMATION_EXTRACTION",
+      "asker": "parentB",
+      "agent": "general",
+      "question": "아내 생일이 언제였지?",
+      "memories": [
+        {
+          "key": "m1",
+          "owner": "parentB",
+          "scope": "USER",
+          "title": "아내 생일",
+          "content": "아내 생일은 3월 14일이다",
+          "updatedDaysAgo": 30
+        }
+      ],
+      "expect": [
+        "m1"
+      ],
+      "forbidden": []
+    },
+    {
+      "id": "IE-04",
+      "category": "INFORMATION_EXTRACTION",
+      "asker": "parentA",
+      "agent": "general",
+      "question": "우리 어느 동네에 살지?",
+      "memories": [
+        {
+          "key": "m1",
+          "owner": "parentA",
+          "scope": "USER",
+          "title": "사는 동네",
+          "content": "우리 가족은 한빛시 새솔동에 산다",
+          "updatedDaysAgo": 90
+        }
+      ],
+      "expect": [
+        "m1"
+      ],
+      "forbidden": []
+    },
+    {
+      "id": "IE-05",
+      "category": "INFORMATION_EXTRACTION",
+      "asker": "parentA",
+      "agent": "general",
+      "question": "지수가 못 먹는 음식이 있었나?",
+      "memories": [
+        {
+          "key": "m1",
+          "owner": "parentA",
+          "scope": "USER",
+          "title": "지수 식성",
+          "content": "지수는 매운 음식을 잘 못 먹는다. 알레르기는 아니다",
+          "updatedDaysAgo": 14
+        }
+      ],
+      "expect": [
+        "m1"
+      ],
+      "forbidden": []
+    },
+    {
+      "id": "IE-06",
+      "category": "INFORMATION_EXTRACTION",
+      "asker": "parentA",
+      "agent": "general",
+      "question": "강아지 이름이 뭐였지?",
+      "memories": [
+        {
+          "key": "m1",
+          "scope": "GROUP",
+          "group": "home",
+          "title": "강아지 이름",
+          "content": "우리 집 강아지 이름은 보리다",
+          "updatedDaysAgo": 20
+        }
+      ],
+      "expect": [
+        "m1"
+      ],
+      "forbidden": []
+    },
+    {
+      "id": "IE-07",
+      "category": "INFORMATION_EXTRACTION",
+      "asker": "parentA",
+      "agent": "general",
+      "question": "가족 여행 때 우리가 어떻게 다녔더라?",
+      "memories": [
+        {
+          "key": "m1",
+          "owner": "parentA",
+          "scope": "USER",
+          "title": "가족 여행 선호",
+          "content": "가족 여행을 갈 때는 숙소에서 걸어서 갈 수 있는 곳에 식당과 편의점이 있어야 하고, 아침 일정은 아홉 시 이후에 시작하며, 하루에 두 곳 넘게 돌아다니지 않는 것을 좋아한다. 아이들이 지치면 일정을 줄이고 숙소에서 쉬는 날을 따로 둔다. 비행기보다 기차를 선호하고, 짐은 가능하면 작은 가방 하나씩만 챙긴다. 돌아오는 날은 점심 전에 집에 도착하도록 일정을 잡는다.",
+          "updatedDaysAgo": 7
+        }
+      ],
+      "expect": [
+        "m1"
+      ],
+      "forbidden": []
+    },
+    {
+      "id": "IE-08",
+      "category": "INFORMATION_EXTRACTION",
+      "asker": "parentA",
+      "agent": "general",
+      "question": "장은 어떻게 보기로 했지?",
+      "memories": [
+        {
+          "key": "m1",
+          "owner": "parentA",
+          "scope": "USER",
+          "title": "장보기 규칙",
+          "content": "장을 볼 때는 주말 오전에 한꺼번에 보고, 우유와 달걀과 두부는 늘 떨어지지 않게 채워 둔다. 과일은 제철 것으로 한 가지만 사고, 과자는 아이들이 한 번에 하나씩만 고르게 한다. 냉동식품은 쟁여 두지 않고, 남은 채소는 목요일에 국으로 끓여 정리한다. 세제와 휴지는 떨어지기 전에 한 묶음씩 미리 사 둔다. 장바구니는 늘 차 트렁크에 넣어 두고, 영수증은 그날 안에 버린다.",
+          "updatedDaysAgo": 45
+        }
+      ],
+      "expect": [
+        "m1"
+      ],
+      "forbidden": []
+    },
+    {
+      "id": "MS-01",
+      "category": "MULTI_SESSION",
+      "asker": "parentA",
+      "agent": "general",
+      "question": "아이 둘 학교와 학년이 어떻게 되지?",
+      "memories": [
+        {
+          "key": "m1",
+          "owner": "parentA",
+          "scope": "USER",
+          "title": "지수 학교",
+          "content": "지수는 한빛초등학교 3학년이다",
+          "updatedDaysAgo": 40
+        },
+        {
+          "key": "m2",
+          "owner": "parentA",
+          "scope": "USER",
+          "title": "민준 학교",
+          "content": "민준은 푸른중학교 1학년이다",
+          "updatedDaysAgo": 12
+        }
+      ],
+      "expect": [
+        "m1",
+        "m2"
+      ],
+      "forbidden": []
+    },
+    {
+      "id": "MS-02",
+      "category": "MULTI_SESSION",
+      "asker": "parentA",
+      "agent": "general",
+      "question": "아이들 학원 일정이 어떻게 되지?",
+      "memories": [
+        {
+          "key": "m1",
+          "owner": "parentA",
+          "scope": "USER",
+          "title": "지수 학원",
+          "content": "지수는 화요일과 목요일에 피아노 학원에 간다",
+          "updatedDaysAgo": 25
+        },
+        {
+          "key": "m2",
+          "owner": "parentA",
+          "scope": "USER",
+          "title": "민준 학원",
+          "content": "민준은 월요일과 수요일에 수학 학원에 간다",
+          "updatedDaysAgo": 18
+        },
+        {
+          "key": "m3",
+          "owner": "parentA",
+          "scope": "USER",
+          "title": "학원 데려다주기",
+          "content": "학원 데려다주기는 아빠가 월요일과 화요일을 맡는다",
+          "updatedDaysAgo": 5
+        }
+      ],
+      "expect": [
+        "m1",
+        "m2",
+        "m3"
+      ],
+      "forbidden": []
+    },
+    {
+      "id": "MS-03",
+      "category": "MULTI_SESSION",
+      "asker": "parentA",
+      "agent": "general",
+      "question": "가족 식성을 한 번에 알려줘",
+      "memories": [
+        {
+          "key": "m1",
+          "owner": "parentA",
+          "scope": "USER",
+          "title": "지수 식성",
+          "content": "지수는 오이를 싫어한다",
+          "updatedDaysAgo": 60
+        },
+        {
+          "key": "m2",
+          "owner": "parentA",
+          "scope": "USER",
+          "title": "민준 식성",
+          "content": "민준은 국물 있는 음식을 좋아한다",
+          "updatedDaysAgo": 33
+        },
+        {
+          "key": "m3",
+          "owner": "parentA",
+          "scope": "USER",
+          "title": "아빠 식성",
+          "content": "아빠는 단 음식을 잘 안 먹는다",
+          "updatedDaysAgo": 21
+        },
+        {
+          "key": "m4",
+          "scope": "GROUP",
+          "group": "home",
+          "title": "집 식단",
+          "content": "집에서는 평일 저녁에 고기를 먹지 않기로 했다",
+          "updatedDaysAgo": 8
+        }
+      ],
+      "expect": [
+        "m1",
+        "m2",
+        "m3",
+        "m4"
+      ],
+      "forbidden": []
+    },
+    {
+      "id": "MS-04",
+      "category": "MULTI_SESSION",
+      "asker": "parentA",
+      "agent": "general",
+      "question": "이번 주말 일정이 어떻게 되지?",
+      "memories": [
+        {
+          "key": "m1",
+          "owner": "parentA",
+          "scope": "USER",
+          "title": "토요일 일정",
+          "content": "토요일 오전에는 민준 축구 연습이 있다",
+          "updatedDaysAgo": 4
+        },
+        {
+          "key": "m2",
+          "owner": "parentA",
+          "scope": "USER",
+          "title": "일요일 일정",
+          "content": "일요일에는 외할머니 댁에 간다",
+          "updatedDaysAgo": 2
+        }
+      ],
+      "expect": [
+        "m1",
+        "m2"
+      ],
+      "forbidden": []
+    },
+    {
+      "id": "MS-05",
+      "category": "MULTI_SESSION",
+      "asker": "parentB",
+      "agent": "general",
+      "question": "여름 휴가 계획이 어떻게 되지?",
+      "memories": [
+        {
+          "key": "m1",
+          "owner": "parentB",
+          "scope": "USER",
+          "title": "휴가 시기",
+          "content": "여름 휴가는 8월 첫째 주로 잡았다",
+          "updatedDaysAgo": 50
+        },
+        {
+          "key": "m2",
+          "owner": "parentB",
+          "scope": "USER",
+          "title": "휴가 장소",
+          "content": "휴가 장소는 강릉으로 정했다",
+          "updatedDaysAgo": 35
+        },
+        {
+          "key": "m3",
+          "owner": "parentB",
+          "scope": "USER",
+          "title": "휴가 이동",
+          "content": "휴가 때는 기차로 이동한다",
+          "updatedDaysAgo": 9
+        }
+      ],
+      "expect": [
+        "m1",
+        "m2",
+        "m3"
+      ],
+      "forbidden": []
+    },
+    {
+      "id": "MS-06",
+      "category": "MULTI_SESSION",
+      "asker": "childA",
+      "agent": "general",
+      "question": "내 학교 행사랑 우리 집 규칙을 알려줘",
+      "memories": [
+        {
+          "key": "m1",
+          "owner": "childA",
+          "scope": "USER",
+          "title": "운동회",
+          "content": "민준의 학교 운동회는 10월 둘째 주 금요일이다",
+          "updatedDaysAgo": 15
+        },
+        {
+          "key": "m2",
+          "owner": "childA",
+          "scope": "USER",
+          "title": "준비물",
+          "content": "운동회에는 흰색 운동화와 물통을 가져간다",
+          "updatedDaysAgo": 6
+        },
+        {
+          "key": "m3",
+          "scope": "GROUP",
+          "group": "home",
+          "title": "귀가 시간",
+          "content": "아이들은 저녁 7시까지 집에 돌아온다",
+          "updatedDaysAgo": 70
+        }
+      ],
+      "expect": [
+        "m1",
+        "m2",
+        "m3"
+      ],
+      "forbidden": []
+    },
+    {
+      "id": "KU-01",
+      "category": "KNOWLEDGE_UPDATE",
+      "asker": "parentA",
+      "agent": "general",
+      "question": "지금 다니는 회사가 어디지?",
+      "memories": [
+        {
+          "key": "m1",
+          "owner": "parentA",
+          "scope": "USER",
+          "title": "회사",
+          "content": "다니는 회사는 가온소프트다",
+          "updatedDaysAgo": 200
+        },
+        {
+          "key": "m2",
+          "owner": "parentA",
+          "scope": "USER",
+          "title": "회사",
+          "content": "이직해서 지금 다니는 회사는 나래정보다",
+          "updatedDaysAgo": 6
+        }
+      ],
+      "expect": [
+        "m2"
+      ],
+      "forbidden": [
+        {
+          "memory": "m1",
+          "kind": "SUPERSEDED"
+        }
+      ]
+    },
+    {
+      "id": "KU-02",
+      "category": "KNOWLEDGE_UPDATE",
+      "asker": "parentA",
+      "agent": "general",
+      "question": "지금 사는 동네가 어디지?",
+      "memories": [
+        {
+          "key": "m1",
+          "owner": "parentA",
+          "scope": "USER",
+          "title": "사는 동네",
+          "content": "우리는 한빛시 푸른동에 산다",
+          "updatedDaysAgo": 400
+        },
+        {
+          "key": "m2",
+          "owner": "parentA",
+          "scope": "USER",
+          "title": "사는 동네",
+          "content": "한빛시 새솔동으로 이사했다",
+          "updatedDaysAgo": 20
+        }
+      ],
+      "expect": [
+        "m2"
+      ],
+      "forbidden": [
+        {
+          "memory": "m1",
+          "kind": "SUPERSEDED"
+        }
+      ]
+    },
+    {
+      "id": "KU-03",
+      "category": "KNOWLEDGE_UPDATE",
+      "asker": "parentA",
+      "agent": "general",
+      "question": "지수가 몇 학년이지?",
+      "memories": [
+        {
+          "key": "m1",
+          "owner": "parentA",
+          "scope": "USER",
+          "title": "지수 학년",
+          "content": "지수는 초등학교 2학년이다",
+          "updatedDaysAgo": 300
+        },
+        {
+          "key": "m2",
+          "owner": "parentA",
+          "scope": "USER",
+          "title": "지수 학년",
+          "content": "지수는 초등학교 3학년으로 올라갔다",
+          "updatedDaysAgo": 30
+        }
+      ],
+      "expect": [
+        "m2"
+      ],
+      "forbidden": [
+        {
+          "memory": "m1",
+          "kind": "SUPERSEDED"
+        }
+      ]
+    },
+    {
+      "id": "KU-04",
+      "category": "KNOWLEDGE_UPDATE",
+      "asker": "parentB",
+      "agent": "general",
+      "question": "민준이 어떤 운동을 하지?",
+      "memories": [
+        {
+          "key": "m1",
+          "owner": "parentB",
+          "scope": "USER",
+          "title": "민준 운동",
+          "content": "민준은 수영을 배운다",
+          "updatedDaysAgo": 120
+        },
+        {
+          "key": "m2",
+          "owner": "parentB",
+          "scope": "USER",
+          "title": "민준 운동",
+          "content": "민준은 수영을 그만두고 축구를 한다",
+          "updatedDaysAgo": 10
+        }
+      ],
+      "expect": [
+        "m2"
+      ],
+      "forbidden": [
+        {
+          "memory": "m1",
+          "kind": "SUPERSEDED"
+        }
+      ]
+    },
+    {
+      "id": "KU-05",
+      "category": "KNOWLEDGE_UPDATE",
+      "asker": "parentA",
+      "agent": "general",
+      "question": "출근 시간이 몇 시지?",
+      "memories": [
+        {
+          "key": "m1",
+          "owner": "parentA",
+          "scope": "USER",
+          "title": "출근 시간",
+          "content": "출근 시간은 8시 30분으로 바뀌었다",
+          "updatedDaysAgo": 12
+        }
+      ],
+      "expect": [
+        "m1"
+      ],
+      "forbidden": []
+    },
+    {
+      "id": "KU-06",
+      "category": "KNOWLEDGE_UPDATE",
+      "asker": "parentB",
+      "agent": "general",
+      "question": "주말 장보기는 언제 하기로 했지?",
+      "memories": [
+        {
+          "key": "m1",
+          "owner": "parentB",
+          "scope": "USER",
+          "title": "장보기 요일",
+          "content": "장보기는 일요일 오전으로 옮겼다",
+          "updatedDaysAgo": 9
+        }
+      ],
+      "expect": [
+        "m1"
+      ],
+      "forbidden": []
+    },
+    {
+      "id": "KU-07",
+      "category": "KNOWLEDGE_UPDATE",
+      "asker": "parentA",
+      "agent": "general",
+      "question": "지수 담임 선생님이 누구시지?",
+      "memories": [
+        {
+          "key": "m1",
+          "owner": "parentA",
+          "scope": "USER",
+          "title": "지수 담임",
+          "content": "지수 담임은 김서윤 선생님이다",
+          "retrieval": "ALWAYS",
+          "updatedDaysAgo": 280
+        },
+        {
+          "key": "m2",
+          "owner": "parentA",
+          "scope": "USER",
+          "title": "지수 담임",
+          "content": "새 학년 지수 담임은 박도현 선생님이다",
+          "retrieval": "ALWAYS",
+          "updatedDaysAgo": 14
+        }
+      ],
+      "expect": [
+        "m2"
+      ],
+      "forbidden": [
+        {
+          "memory": "m1",
+          "kind": "SUPERSEDED"
+        }
+      ]
+    },
+    {
+      "id": "TE-01",
+      "category": "TEMPORAL",
+      "asker": "parentA",
+      "agent": "general",
+      "question": "지난주에 정한 병원 예약이 언제지?",
+      "memories": [
+        {
+          "key": "m1",
+          "owner": "parentA",
+          "scope": "USER",
+          "title": "병원 예약",
+          "content": "치과 예약은 다음 주 화요일 오후 4시다",
+          "updatedDaysAgo": 2
+        }
+      ],
+      "filler": {
+        "owner": "parentA",
+        "count": 60,
+        "contentChars": 40,
+        "updatedDaysAgo": 60
+      },
+      "expect": [
+        "m1"
+      ],
+      "forbidden": []
+    },
+    {
+      "id": "TE-02",
+      "category": "TEMPORAL",
+      "asker": "parentA",
+      "agent": "general",
+      "question": "요즘 민준이 새로 시작한 게 뭐지?",
+      "memories": [
+        {
+          "key": "m1",
+          "owner": "parentA",
+          "scope": "USER",
+          "title": "민준 새 활동",
+          "content": "민준은 이번 달부터 방과후 코딩 수업을 듣는다",
+          "updatedDaysAgo": 2
+        }
+      ],
+      "filler": {
+        "owner": "parentA",
+        "count": 80,
+        "contentChars": 40,
+        "updatedDaysAgo": 60
+      },
+      "expect": [
+        "m1"
+      ],
+      "forbidden": []
+    },
+    {
+      "id": "TE-03",
+      "category": "TEMPORAL",
+      "asker": "parentB",
+      "agent": "general",
+      "question": "이번 주 아이들 하교 담당이 누구지?",
+      "memories": [
+        {
+          "key": "m1",
+          "owner": "parentB",
+          "scope": "USER",
+          "title": "하교 담당",
+          "content": "이번 주 하교는 엄마가 맡는다",
+          "retrieval": "ALWAYS",
+          "updatedDaysAgo": 1
+        }
+      ],
+      "filler": {
+        "owner": "parentB",
+        "count": 50,
+        "contentChars": 40,
+        "updatedDaysAgo": 60
+      },
+      "expect": [
+        "m1"
+      ],
+      "forbidden": []
+    },
+    {
+      "id": "TE-04",
+      "category": "TEMPORAL",
+      "asker": "parentA",
+      "agent": "general",
+      "question": "최근에 바뀐 저녁 시간이 몇 시지?",
+      "memories": [
+        {
+          "key": "m1",
+          "owner": "parentA",
+          "scope": "USER",
+          "title": "저녁 시간",
+          "content": "저녁은 이제 7시에 먹는다",
+          "updatedDaysAgo": 3
+        }
+      ],
+      "filler": {
+        "owner": "parentA",
+        "count": 100,
+        "contentChars": 40,
+        "updatedDaysAgo": 60
+      },
+      "expect": [
+        "m1"
+      ],
+      "forbidden": []
+    },
+    {
+      "id": "TE-05",
+      "category": "TEMPORAL",
+      "asker": "parentA",
+      "agent": "general",
+      "question": "곧 있을 가족 모임이 언제지?",
+      "memories": [
+        {
+          "key": "m1",
+          "owner": "parentA",
+          "scope": "USER",
+          "title": "가족 모임",
+          "content": "가족 모임은 이번 달 마지막 토요일 점심이다",
+          "updatedDaysAgo": 2
+        }
+      ],
+      "filler": {
+        "owner": "parentA",
+        "count": 120,
+        "contentChars": 40,
+        "updatedDaysAgo": 60
+      },
+      "expect": [
+        "m1"
+      ],
+      "forbidden": []
+    },
+    {
+      "id": "AB-01",
+      "category": "ABSTENTION",
+      "asker": "parentA",
+      "agent": "general",
+      "question": "민준 학교가 어디지?",
+      "memories": [
+        {
+          "key": "m1",
+          "owner": "parentA",
+          "scope": "USER",
+          "title": "지수 학교",
+          "content": "지수는 한빛초등학교 3학년이다",
+          "updatedDaysAgo": 30
+        }
+      ],
+      "expect": [],
+      "forbidden": [
+        {
+          "memory": "m1",
+          "kind": "DISTRACTOR"
+        }
+      ]
+    },
+    {
+      "id": "AB-02",
+      "category": "ABSTENTION",
+      "asker": "parentA",
+      "agent": "general",
+      "question": "남편 생일이 언제지?",
+      "memories": [
+        {
+          "key": "m1",
+          "owner": "parentA",
+          "scope": "USER",
+          "title": "아내 생일",
+          "content": "아내 생일은 3월 14일이다",
+          "updatedDaysAgo": 30
+        }
+      ],
+      "expect": [],
+      "forbidden": [
+        {
+          "memory": "m1",
+          "kind": "DISTRACTOR"
+        }
+      ]
+    },
+    {
+      "id": "AB-03",
+      "category": "ABSTENTION",
+      "asker": "parentB",
+      "agent": "general",
+      "question": "이웃집 강아지 이름이 뭐지?",
+      "memories": [
+        {
+          "key": "m1",
+          "scope": "GROUP",
+          "group": "home",
+          "title": "강아지 이름",
+          "content": "우리 집 강아지 이름은 보리다",
+          "retrieval": "ALWAYS",
+          "updatedDaysAgo": 30
+        }
+      ],
+      "expect": [],
+      "forbidden": [
+        {
+          "memory": "m1",
+          "kind": "DISTRACTOR"
+        }
+      ]
+    },
+    {
+      "id": "AB-04",
+      "category": "ABSTENTION",
+      "asker": "parentA",
+      "agent": "general",
+      "question": "지수 피아노 선생님 이름이 뭐지?",
+      "memories": [
+        {
+          "key": "m1",
+          "owner": "parentA",
+          "scope": "USER",
+          "title": "민준 수학 선생님",
+          "content": "민준 수학 학원 선생님은 이준호 선생님이다",
+          "updatedDaysAgo": 20
+        }
+      ],
+      "expect": [],
+      "forbidden": [
+        {
+          "memory": "m1",
+          "kind": "DISTRACTOR"
+        }
+      ]
+    },
+    {
+      "id": "AB-05",
+      "category": "ABSTENTION",
+      "asker": "parentA",
+      "agent": "general",
+      "question": "겨울 휴가는 어디로 가기로 했지?",
+      "memories": [
+        {
+          "key": "m1",
+          "owner": "parentA",
+          "scope": "USER",
+          "title": "여름 휴가",
+          "content": "여름 휴가 장소는 강릉이다",
+          "updatedDaysAgo": 40
+        }
+      ],
+      "expect": [],
+      "forbidden": [
+        {
+          "memory": "m1",
+          "kind": "DISTRACTOR"
+        }
+      ]
+    },
+    {
+      "id": "AB-06",
+      "category": "ABSTENTION",
+      "asker": "parentA",
+      "agent": "general",
+      "question": "민준이 좋아하는 과일이 뭐지?",
+      "memories": [
+        {
+          "key": "m1",
+          "owner": "parentA",
+          "scope": "USER",
+          "title": "지수 과일",
+          "content": "지수는 딸기를 좋아한다",
+          "retrieval": "ALWAYS",
+          "updatedDaysAgo": 25
+        },
+        {
+          "key": "m2",
+          "owner": "parentA",
+          "scope": "USER",
+          "title": "민준 간식",
+          "content": "민준은 땅콩버터 샌드위치를 좋아한다",
+          "updatedDaysAgo": 25
+        }
+      ],
+      "expect": [],
+      "forbidden": [
+        {
+          "memory": "m1",
+          "kind": "DISTRACTOR"
+        },
+        {
+          "memory": "m2",
+          "kind": "DISTRACTOR"
+        }
+      ]
+    },
+    {
+      "id": "BO-01",
+      "category": "BOUNDARY",
+      "asker": "parentA",
+      "agent": "general",
+      "question": "민준 방 비밀번호 알려줘",
+      "memories": [
+        {
+          "key": "m1",
+          "owner": "childA",
+          "scope": "USER",
+          "title": "개인 메모",
+          "content": "민준이 혼자 정한 비밀 메모다",
+          "retrieval": "ALWAYS",
+          "updatedDaysAgo": 5
+        },
+        {
+          "key": "m2",
+          "owner": "parentA",
+          "scope": "USER",
+          "title": "내 메모",
+          "content": "내 장보기 메모다",
+          "updatedDaysAgo": 5
+        }
+      ],
+      "expect": [
+        "m2"
+      ],
+      "forbidden": [
+        {
+          "memory": "m1",
+          "kind": "BOUNDARY"
+        }
+      ]
+    },
+    {
+      "id": "BO-02",
+      "category": "BOUNDARY",
+      "asker": "parentA",
+      "agent": "general",
+      "question": "이웃 모임 일정이 뭐지?",
+      "memories": [
+        {
+          "key": "m1",
+          "scope": "GROUP",
+          "group": "other",
+          "title": "이웃 모임",
+          "content": "이웃 모임은 매달 첫째 일요일이다",
+          "retrieval": "ALWAYS",
+          "updatedDaysAgo": 5
+        },
+        {
+          "key": "m2",
+          "scope": "GROUP",
+          "group": "other",
+          "title": "이웃 공지",
+          "content": "이웃 공지사항 메모다",
+          "updatedDaysAgo": 5
+        },
+        {
+          "key": "m3",
+          "scope": "GROUP",
+          "group": "home",
+          "title": "우리 모임",
+          "content": "우리 가족 모임은 매달 마지막 토요일이다",
+          "updatedDaysAgo": 5
+        }
+      ],
+      "expect": [
+        "m3"
+      ],
+      "forbidden": [
+        {
+          "memory": "m1",
+          "kind": "BOUNDARY"
+        },
+        {
+          "memory": "m2",
+          "kind": "BOUNDARY"
+        }
+      ]
+    },
+    {
+      "id": "BO-03",
+      "category": "BOUNDARY",
+      "asker": "parentA",
+      "agent": "general",
+      "question": "병원 기록 알려줘",
+      "memories": [
+        {
+          "key": "m1",
+          "owner": "parentA",
+          "scope": "USER",
+          "title": "진료 메모",
+          "content": "정기 진료 메모다",
+          "collection": "health",
+          "updatedDaysAgo": 5
+        },
+        {
+          "key": "m2",
+          "owner": "parentA",
+          "scope": "USER",
+          "title": "일정 메모",
+          "content": "병원 가는 날은 목요일이다",
+          "updatedDaysAgo": 5
+        }
+      ],
+      "expect": [
+        "m2"
+      ],
+      "forbidden": [
+        {
+          "memory": "m1",
+          "kind": "BOUNDARY"
+        }
+      ]
+    },
+    {
+      "id": "BO-04",
+      "category": "BOUNDARY",
+      "asker": "parentA",
+      "agent": "health",
+      "question": "건강 기록 알려줘",
+      "memories": [
+        {
+          "key": "m1",
+          "owner": "parentA",
+          "scope": "USER",
+          "title": "혈압 기록",
+          "content": "혈압 측정 기록 메모다",
+          "collection": "health",
+          "sensitivity": "SENSITIVE",
+          "updatedDaysAgo": 5
+        },
+        {
+          "key": "m2",
+          "owner": "parentA",
+          "scope": "USER",
+          "title": "운동 목표",
+          "content": "하루 팔천 보 걷기가 목표다",
+          "collection": "health",
+          "updatedDaysAgo": 5
+        }
+      ],
+      "expect": [
+        "m2"
+      ],
+      "forbidden": [
+        {
+          "memory": "m1",
+          "kind": "BOUNDARY"
+        }
+      ]
+    },
+    {
+      "id": "BO-05",
+      "category": "BOUNDARY",
+      "asker": "parentA",
+      "agent": "general",
+      "question": "제안만 하고 아직 승인 안 한 것도 알려줘",
+      "memories": [
+        {
+          "key": "m1",
+          "owner": "parentA",
+          "scope": "USER",
+          "title": "승인 전 제안",
+          "content": "아직 승인하지 않은 제안이다",
+          "retrieval": "ALWAYS",
+          "status": "PROPOSED",
+          "updatedDaysAgo": 2
+        },
+        {
+          "key": "m2",
+          "owner": "parentA",
+          "scope": "USER",
+          "title": "승인 전 제안 둘",
+          "content": "아직 승인하지 않은 다른 제안이다",
+          "status": "PROPOSED",
+          "updatedDaysAgo": 2
+        },
+        {
+          "key": "m3",
+          "owner": "parentA",
+          "scope": "USER",
+          "title": "승인한 사실",
+          "content": "저녁은 7시에 먹는다",
+          "updatedDaysAgo": 2
+        }
+      ],
+      "expect": [
+        "m3"
+      ],
+      "forbidden": [
+        {
+          "memory": "m1",
+          "kind": "BOUNDARY"
+        },
+        {
+          "memory": "m2",
+          "kind": "BOUNDARY"
+        }
+      ]
+    },
+    {
+      "id": "BO-06",
+      "category": "BOUNDARY",
+      "asker": "parentA",
+      "agent": "general",
+      "question": "거절한 기억도 알려줘",
+      "memories": [
+        {
+          "key": "m1",
+          "owner": "parentA",
+          "scope": "USER",
+          "title": "거절한 기억",
+          "content": "사용자가 거절한 기억이다",
+          "retrieval": "ALWAYS",
+          "status": "REJECTED",
+          "updatedDaysAgo": 2
+        },
+        {
+          "key": "m2",
+          "owner": "parentA",
+          "scope": "USER",
+          "title": "받은 기억",
+          "content": "아침은 간단히 먹는다",
+          "updatedDaysAgo": 2
+        }
+      ],
+      "expect": [
+        "m2"
+      ],
+      "forbidden": [
+        {
+          "memory": "m1",
+          "kind": "BOUNDARY"
+        }
+      ]
+    },
+    {
+      "id": "BO-07",
+      "category": "BOUNDARY",
+      "asker": "parentA",
+      "agent": "general",
+      "question": "보관해 둔 기억도 알려줘",
+      "memories": [
+        {
+          "key": "m1",
+          "owner": "parentA",
+          "scope": "USER",
+          "title": "보관한 기억",
+          "content": "보관 처리한 오래된 기억이다",
+          "retrieval": "ARCHIVE",
+          "updatedDaysAgo": 90
+        },
+        {
+          "key": "m2",
+          "owner": "parentA",
+          "scope": "USER",
+          "title": "현재 기억",
+          "content": "주말에는 늦잠을 잔다",
+          "updatedDaysAgo": 3
+        }
+      ],
+      "filler": {
+        "owner": "parentA",
+        "count": 150,
+        "contentChars": 40,
+        "updatedDaysAgo": 30
+      },
+      "expect": [
+        "m2"
+      ],
+      "forbidden": [
+        {
+          "memory": "m1",
+          "kind": "BOUNDARY"
+        }
+      ]
+    },
+    {
+      "id": "BO-08",
+      "category": "BOUNDARY",
+      "asker": "parentA",
+      "agent": "general",
+      "question": "배우자가 쓴 레시피 문서 보여줘",
+      "memories": [
+        {
+          "key": "m1",
+          "owner": "parentB",
+          "scope": "USER",
+          "title": "김치찌개 레시피",
+          "content": "배우자가 직접 쓴 김치찌개 레시피 문서다",
+          "entryType": "DOCUMENT",
+          "documentKey": "recipe-kimchi-stew",
+          "updatedDaysAgo": 10
+        },
+        {
+          "key": "m2",
+          "owner": "parentA",
+          "scope": "USER",
+          "title": "내 레시피 문서",
+          "content": "내가 쓴 계란찜 레시피 문서다",
+          "entryType": "DOCUMENT",
+          "documentKey": "recipe-steamed-egg",
+          "updatedDaysAgo": 10
+        }
+      ],
+      "filler": {
+        "owner": "parentA",
+        "count": 150,
+        "contentChars": 40,
+        "updatedDaysAgo": 30
+      },
+      "expect": [
+        "m2"
+      ],
+      "forbidden": [
+        {
+          "memory": "m1",
+          "kind": "BOUNDARY"
+        }
+      ]
+    },
+    {
+      "id": "LD-01",
+      "category": "LOAD",
+      "asker": "parentA",
+      "agent": "general",
+      "question": "짧은 사실이 많을 때 최근 사실이 실리나?",
+      "memories": [
+        {
+          "key": "m1",
+          "owner": "parentA",
+          "scope": "USER",
+          "title": "새 사실",
+          "content": "새로 말한 사실 하나다",
+          "updatedDaysAgo": 1
+        }
+      ],
+      "filler": {
+        "owner": "parentA",
+        "count": 120,
+        "contentChars": 40
+      },
+      "expect": [
+        "m1"
+      ],
+      "forbidden": []
+    },
+    {
+      "id": "LD-02",
+      "category": "LOAD",
+      "asker": "parentA",
+      "agent": "general",
+      "question": "짧은 사실이 많을 때 항상 싣는 사실도 실리나?",
+      "memories": [
+        {
+          "key": "m1",
+          "owner": "parentA",
+          "scope": "USER",
+          "title": "일반 사실",
+          "content": "일반 사실 하나다",
+          "updatedDaysAgo": 5
+        },
+        {
+          "key": "m2",
+          "owner": "parentA",
+          "scope": "USER",
+          "title": "항상 싣는 사실",
+          "content": "항상 싣는 사실 하나다",
+          "retrieval": "ALWAYS",
+          "updatedDaysAgo": 5
+        }
+      ],
+      "filler": {
+        "owner": "parentA",
+        "count": 120,
+        "contentChars": 40
+      },
+      "expect": [
+        "m1",
+        "m2"
+      ],
+      "forbidden": []
+    }
+  ]
+}

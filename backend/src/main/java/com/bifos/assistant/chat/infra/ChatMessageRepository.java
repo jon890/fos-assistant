@@ -14,6 +14,20 @@ public interface ChatMessageRepository extends JpaRepository<ChatMessage, Long>,
 
     List<ChatMessage> findByConversationIdOrderByIdAsc(Long conversationId);
 
+    /**
+     * 대화의 답 메시지가 가리키는 실행 번호를 번호 순으로 읽는다. 메시지 본문은 읽지 않는다.
+     *
+     * <p>실행이 없는 답 줄은 뺀다. 같은 실행의 답이 여럿이어도 한 번씩만 낸다.
+     */
+    @Query("""
+            select distinct m.executionId from ChatMessage m
+            where m.conversationId = :conversationId
+                and m.role = com.bifos.assistant.chat.domain.type.MessageRole.ASSISTANT
+                and m.executionId is not null
+            order by m.executionId
+            """)
+    List<Long> findAssistantExecutionIds(@Param("conversationId") Long conversationId);
+
     /** 대화에서 그 역할이 처음 남긴 메시지를 읽는다. */
     Optional<ChatMessage> findFirstByConversationIdAndRoleOrderByIdAsc(Long conversationId, MessageRole role);
 
