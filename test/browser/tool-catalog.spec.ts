@@ -22,7 +22,11 @@ test("관리자가 활성 도구를 숨겨도 켜짐은 보존하고 관리자 �
     const catalog = await (await page.request.get("/api/admin/toolsets")).json() as CatalogToolset[];
     const count = catalog.find((tool) => tool.name === "spotify")!.enabledAgents.length;
     await expect(row.getByText(`보임 · 켜진 에이전트 ${count}개`)).toBeVisible();
-    await clickAndWaitForResponse(page, switchButton, "PUT", /\/api\/admin\/toolsets$/);
+    // 204에는 본문이 없다. 응답 상태와 화면 반영을 함께 확인한다.
+    const hiddenResponse = page.waitForResponse((response) =>
+      new URL(response.url()).pathname === "/api/admin/toolsets" && response.request().method() === "PUT");
+    await switchButton.click();
+    expect((await hiddenResponse).status()).toBe(204);
     await expect(switchButton).toHaveAttribute("aria-checked", "false");
     await page.reload();
     await expect(switchButton).toHaveAttribute("aria-checked", "false");
@@ -66,12 +70,13 @@ test("도구 목록을 읽지 못하면 재시도하고 저장 실패는 기존 
     return route.fulfill({ json: [{ name: "spotify", label: "Spotify", description: "음악", hidden: false, enabledAgents: [] }] });
   });
   await page.goto("/admin/tools");
-  await expect(page.getByRole("alert")).toHaveText("도구 목록을 불러오지 못했어요. 다시 불러와 주세요.");
+  const section = page.getByRole("region", { name: "화면에 보일 도구" });
+  await expect(section.getByRole("alert")).toHaveText("도구 목록을 불러오지 못했어요. 다시 불러와 주세요.");
   unavailable = false;
   await page.getByRole("button", { name: "다시 불러오기" }).click();
   const switchButton = page.getByRole("switch", { name: "Spotify 보이기" });
   await expect(switchButton).toHaveAttribute("aria-checked", "true");
   await switchButton.click();
-  await expect(page.getByRole("alert")).toHaveText("도구 숨김을 저장하지 못했어요. 다시 시도해 주세요.");
+  await expect(section.getByRole("alert")).toHaveText("도구 숨김을 저장하지 못했어요. 다시 시도해 주세요.");
   await expect(switchButton).toHaveAttribute("aria-checked", "true");
 });
