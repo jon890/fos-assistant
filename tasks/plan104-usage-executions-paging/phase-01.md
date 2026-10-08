@@ -30,15 +30,15 @@
 
 ### 2. 화면과 호출
 
-`web/src/lib/usage-paging.ts`에 UsageExecutionPage, 요청 함수, 순서를 유지하며 id 중복을 제거하는 페이지 병합 함수를 둔다. 타입 import만 execution-list를 참조한다. `web/eslint.config.mjs`의 NODE_TEST_READ_FILES에 새 lib 파일을 등록한다. 요청 함수는 `/api/usage/executions/page`를 쓰고 cursor를 URLSearchParams로 인코딩한다. `web/src/app/api/usage/executions/page/route.ts`는 cursor와 limit만 전달하고 기존 서버 인증을 이용한다.
+`web/src/lib/usage-paging.ts`에 UsageExecutionPage, 요청 함수, 순서를 유지하며 id 중복을 제거하는 페이지 병합 함수를 둔다. 타입 import만 execution-list를 참조한다. `web/eslint.config.mjs`의 NODE_TEST_READ_FILES에 새 lib 파일을 등록한다. 요청 함수는 `/api/usage/executions/page`를 쓰고 cursor를 URLSearchParams로 인코딩한다. `web/src/app/api/usage/executions/page/route.ts`는 cursor와 limit만 전달하고 기존 서버 인증을 이용한다. 빈 cursor도 버리지 않고 전달해 VALIDATION_FAILED를 받는다.
 
 `PagedExecutionList`는 initialPage와 isAdmin을 받고 기존 ExecutionList 위에 상태를 둔다. 더 보기, 불러오는 중, 실패 안내와 재시도를 구현한다. ref로 동시 클릭을 막고 finally에서 풀며 실패 때 rows와 cursor를 유지한다. 마지막 쪽이면 단추를 없앤다. initialPage가 바뀌면 새 페이지로 재설정하는 키나 동등한 처리를 한다. Notice와 Button을 재사용한다. `UsageScreen`은 새 페이지 API를 읽고 실행 기록 탭에 이 부품을 쓴다. 표/카드/트리는 변경하지 않는다.
 
 ### 3. 테스트
 
-`ExecutionPagingTest`는 실제 저장소로 시작 시각 역순, 같은 시각 여러 줄의 id 역순, 커서 경계 배제, limit+1, 정확한 마지막 쪽과 빈 목록, 페이지 사이 최신 줄 삽입, 잘못된 커서, 타 사용자 커서로도 자기 자료만 반환, MEMBER 가림과 ADMIN 값 유지, 기존 배열 응답을 확인한다. 필요한 fixture는 클래스 안에 둔다.
+`ExecutionPagingTest`는 실제 저장소로 시작 시각 역순, 같은 시각 여러 줄의 id 역순, 커서 경계 배제, limit+1, 정확한 마지막 쪽과 빈 목록, 페이지 사이 최신 줄 삽입, 잘못된 커서, 타 사용자 커서로도 자기 자료만 반환하는지 확인한다. `UsageControllerTest`는 값 있는 실행의 MEMBER 가림과 ADMIN 값 유지, limit 최소값을 검증하고 기존 배열 API 시험도 유지한다. 필요한 fixture는 클래스 안에 둔다.
 
-`usage-executions-paging.test.ts`는 병합 순서, 겹친 id, 마지막 쪽 커서와 빈 목록을 확인한다. `usage-executions-paging.spec.ts`는 기존 test-support seed API와 독립된 사용자를 써서 50개를 넘는 기록을 심고 두 폭에서 더 보기로 끝까지 읽고 마지막 단추가 사라지는지 확인한다. 실패 응답 뒤 이전 기록 유지와 재시도, 빠른 두 번 클릭의 중복 방지, 일반 화면의 내부 값 비표시도 확인한다. SSR 초기 목록은 실제 서버를 읽고 브라우저 후속 조회 실패만 route로 대역한다.
+`usage-executions-paging.test.ts`는 병합 순서, 겹친 id, 마지막 쪽 커서와 빈 목록을 확인한다. `usage-executions-paging.spec.ts`는 기존 test-support seed API와 독립된 사용자를 써서 50개를 넘는 기록을 심고 두 폭에서 더 보기로 끝까지 읽고 마지막 단추가 사라지는지 확인한다. 실패 응답 뒤 이전 기록 유지와 재시도, 빠른 두 번 클릭의 중복 방지, 일반 화면의 내부 값 비표시도 확인한다. SSR 초기 목록은 실제 서버를 읽고 브라우저 후속 조회 실패만 route로 대역한다. 빈 cursor의 프록시 요청도 VALIDATION_FAILED인지 확인한다. 관리자 시험은 `UsageTestSupportController`의 test-only `/api/v1/test-support/usage/admin-user` POST로 독립된 관리자를 새로 준비한다. 이 준비 경로는 호출자의 ADMIN 권한을 확인하고 AppUserRepository에 새 email과 displayName, 호출자의 groupId로 ADMIN 사용자를 만든다. 기존 사용자를 고치지 않는다. 브라우저 spec의 별도 ADMIN_SUPPORT_PATH 상수도 이 전체 경로를 쓰고 isolatedUser가 만든 주소와 세션으로 관리자 화면을 확인한다. fixture 실패 경계는 MEMBER 호출의 FORBIDDEN, 기존 MEMBER email을 ADMIN으로 요청한 경우 VALIDATION_FAILED, 이후 `/api/v1/me`의 MEMBER 역할 유지를 브라우저 시험에서 확인한다.
 
 ## 검증
 
@@ -71,6 +71,8 @@ pnpm --dir web test:browser usage-executions-paging.spec.ts --repeat-each=3 --re
 | `backend/src/main/java/com/bifos/assistant/usage/presentation/UsageController.java` | 수정 |
 | `backend/src/main/java/com/bifos/assistant/usage/presentation/UsageDtos.java` | 수정 |
 | `backend/src/test/java/com/bifos/assistant/usage/ExecutionPagingTest.java` | 신규 |
+| `backend/src/test/java/com/bifos/assistant/usage/UsageControllerTest.java` | 수정 |
+| `backend/src/test/java/com/bifos/assistant/testsupport/UsageTestSupportController.java` | 수정 |
 | `web/src/lib/usage-paging.ts` | 신규 |
 | `web/eslint.config.mjs` | 수정 |
 | `web/src/app/api/usage/executions/page/route.ts` | 신규 |
