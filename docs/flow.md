@@ -295,6 +295,7 @@ sequenceDiagram
 | `PENDING_QUEUE_FULL` | 대기 메시지가 5개이거나, 더하면 합친 길이가 8000자를 넘는다 | 답이 끝난 뒤 보내도록 안내한다. 쓴 문장은 입력창에 되돌린다 |
 | `PENDING_MESSAGE_NOT_FOUND` | 취소하려는 대기 메시지가 이미 보내졌거나 없다 | 입력창에 되돌리지 않고 대기 줄을 다시 읽는다 |
 | `EXECUTION_NOT_FOUND` | 없는 실행이거나 남의 실행이다 | 사용량 목록으로 되돌린다 |
+| `AUTONOMY_DECISION_NOT_FOUND` | 반응할 판정이 없다. 남의 것이거나 매일 루프가 보인 판정이 아니다([`backend/proactive-loop.md`](backend/proactive-loop.md) 의 「사용자에게 보이는 것」) | 지금 화면을 다시 읽는다 |
 | `PROACTIVE_LOOP_UNAVAILABLE` | 설치가 매일 루프를 열지 않아 켤 수 없다([`backend/proactive-loop.md`](backend/proactive-loop.md) 의 「사용자 설정」) | 켜기를 막고 설치에서 꺼져 있다고 보인다. 끄기와 쉬기는 된다 |
 | `PROACTIVE_CHECK_UNAVAILABLE` | 먼저 살펴보기를 시작할 수 없다. 까닭은 상태 조회가 준다([`backend/proactive-check.md`](backend/proactive-check.md) 의 「시작 전 점검」) | 상태를 다시 읽어 까닭마다 할 일을 보인다. toolset 이 걸렸으면 끌 toolset 이름을 보인다 |
 | `DELIVERY_NOT_FOUND` | 다시 전달하려는 결과 묶음이 그 대화에 없다 | 안내를 보이고 이력을 다시 읽는다 |

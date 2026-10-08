@@ -7,7 +7,7 @@
 ## 패키지
 
 판정은 최상위 패키지 `attention` 이 맡는다. 층 순서의 맨 위(`task` 위)에 둔다.
-실행 기록(`usage`), Memory 제안(`memory`), 대화(`chat`), 할 일(`followup`), 승인 줄(`connector`)을 모두 읽기 때문이다.
+실행 기록(`usage`), Memory 제안(`memory`), 대화(`chat`), 할 일(`followup`), 승인 줄(`connector`), 살펴보기 보고와 매일 루프 판정(`proactive`)을 모두 읽기 때문이다.
 `attention` 은 읽기만 하고 그 패키지들의 기록을 고치지 않는다. 고치는 동작은 카드의 단추가 각 패키지의 기존 API 로 보낸다.
 **`attention` 은 다른 패키지의 `infra` 를 import 하지 않는다.** 원래 기록은 그 패키지의 `application` 에 둔 읽기 메서드로 읽는다. 저장 방식이 바뀌어도 판정을 고치지 않게 하려는 것이다.
 
@@ -34,6 +34,7 @@
 | `DELEGATION_RUNNING` | `delegated` | 주인의 위임 실행. `delegation_key` 가 있다 | `RUNNING`. 요청자의 지우지 않은 대화에 속한다 | 시작한 지 `long-running-after` 를 넘었다 | 끝남 | `execution:<번호>` | `status` | `CONTROL_PLANE` |
 | `DELEGATION_FINISHED` | `delegated` | 주인의 위임 실행 | 끝났고 `finished_at` 이 `delegated-window` 안. 요청자의 지우지 않은 대화에 속한다 | 아니다 | 없다 | `execution:<번호>` | `status` | `CONTROL_PLANE` |
 | `CONVERSATION_RECENT` | `continue` | 주인의 대화. `deleted_at` 이 비어 있다 | `updated_at` 순으로 `continue-count` 개 | 아니다 | 없다 | `conversation:<대화 공개 식별자>` | `updated_at` | `CONTROL_PLANE` |
+| `PROBLEM_SURFACED` | `needs_me` | 요청자의 [매일 루프](proactive-loop.md) 시도(`DECIDED`)가 만든 평가의 `proactive_autonomy_decision` 가운데 `SURFACE`, `ASK_APPROVAL` 판정 | 시도가 `surface-window` 안에 있고, 원천 점검 대화를 지우지 않았고, 그 판정에 사용자의 「받아들임」 이나 「관심 없음」 이 없다. 같은 문제 키는 가장 최근 판정 하나만 | 아니다 | 받아들임, 관심 없음, 점검 대화 삭제, 창이 지남 | `autonomy_decision:<번호>` | 판정 번호 | `MODEL_INFERRED` |
 | `PROACTIVE_REPORT` | `reports` | 요청자의 `proactive_check` | 검사를 거친 보고가 있고 점검 대화가 지워지지 않았다 | 아니다 | 보고 열람 | `proactive_check:<번호>` | 보고 번호와 완료 시각 | `MODEL_INFERRED` |
 
 **같은 대화에 실패한 turn 과 결과 전달 실패가 함께 있으면 한 항목으로 합친다.**
@@ -131,6 +132,7 @@
 | `CONVERSATION` | `conversation:<공개 식별자>` | 대화의 `updated_at` | `CONVERSATION_RECENT` |
 | `FOLLOW_UP` | `follow_up:<공개 식별자>` | 할 일의 `updated_at` | `FOLLOW_UP_PROPOSED`, `FOLLOW_UP_OPEN` |
 | `RESULT_DELIVERY` | `result_delivery:<묶음 번호>` | 묶음의 `updated_at` | `DELIVERY_FAILED` |
+| `AUTONOMY_DECISION` | `autonomy_decision:<번호>` | 판정의 `created_at` | `PROBLEM_SURFACED` |
 
 `sources` 의 `ref` 는 문맥 묶음의 참조와 같은 형식이다([`context-bundle.md`](context-bundle.md) 의 「항목의 칸」).
 **응답에 실행의 오류 코드, 모델, 금액을 싣지 않는다.** 일반 경로의 응답이라 역할과 상관없이 뺀다([ADR-063](../adr/ADR-063-관리자-전용-표시와-동작은-관리자-영역에만-두고-일반-경로의-응답은-서버가-역할에-따라-줄인다.md)).
@@ -148,6 +150,7 @@
 | 할 일 제안 | 받아들이기, 거절, 고치기 | [`follow-up.md`](follow-up.md) 의 API |
 | 열린 할 일 | 끝냄, 그만둠, 고치기 | [`follow-up.md`](follow-up.md) 의 API |
 | 맡긴 일 | 작업 과정 보기 | `/executions/{번호}` |
+| 먼저 다룰 문제 | 점검 대화에서 보기, 받아들임, 관심 없음 | `/chat/{점검 대화 공개 식별자}`. 반응은 `PUT /api/v1/autonomy-decisions/{id}/reaction`([매일 루프](proactive-loop.md)의 「사용자에게 보이는 것」). 반응을 기록할 뿐 할 일, 승인 줄, 실행을 만들지 않는다 |
 | 이어서 하기 | 제목 링크(단추 없음) | `/chat/{대화 공개 식별자}` |
 
 **판정이 시작하지 않는 것**: Hermes 실행, 커넥터 호출, Memory 쓰기, 할 일 만들기.
@@ -223,6 +226,7 @@
 | `followUp` | `FOLLOW_UP_PROPOSED`, `FOLLOW_UP_OPEN` | `{ id, dueAt, waiting, proposed, agentProposed }`. `id` 는 할 일의 공개 식별자. `proposed` 는 아직 받아들이지 않은 제안인지, `agentProposed` 는 에이전트가 제안한 출처인지다 |
 | `report` | `PROACTIVE_REPORT` | `{ checkId, agentCode, changed, done, evidence, needsApproval, next }`. 보고는 `LATER` 이며 승인 대기의 건수는 기존 `APPROVAL_PENDING` 에서 센다 |
 | `actionId` | `APPROVAL_PENDING` | 승인 줄의 공개 식별자 |
+| `problem` | `PROBLEM_SURFACED` | `{ decisionId, level, action }`. `level` 은 `SURFACE` 나 `ASK_APPROVAL`, `action` 은 제안한 다음 행동 글이다. 문제 글은 `title` 이다. 둘 다 모델이 쓴 글이라 평문으로 그린다 |
 
 ## 웹 알림과의 경계
 

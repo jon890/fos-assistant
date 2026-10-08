@@ -1,0 +1,12 @@
+{
+  "name": "plan105-now-surface",
+  "description": "매일 루프가 낸 SURFACE, ASK_APPROVAL 판정을 지금 화면 「내 차례」 의 먼저 다룰 문제 항목으로 보이고, 반응과 루프 설정을 화면에서 받는다 (#286 의 두 번째 단계)",
+  "status": "pending",
+  "created_at": "2026-10-08",
+  "total_phases": 2,
+  "current_phase": 1,
+  "phases": [
+    { "number": 1, "file": "phase-01.md", "execution_profile": "deep" },
+    { "number": 2, "file": "phase-02.md", "execution_profile": "standard" }
+  ]
+}

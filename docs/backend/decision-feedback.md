@@ -50,16 +50,18 @@
 | | `APPROVED` | `approve`. 누른 때 이미 만료됐거나 그 뒤 실행하지 못하고 끝나도 사용자의 반응이라 남긴다 |
 | | `REJECTED` | `reject` |
 | | `EXECUTION_SUCCEEDED`, `EXECUTION_FAILED` | 실행 결과가 `SUCCEEDED`, `FAILED` 일 때. 실패는 커넥터가 선언한 오류 코드를 `reason_code` 에 둔다 |
-| 지금 화면의 제안 항목 | `DISMISSED`, `POSTPONED` | `NEEDS_ME` 카드의 `FOLLOW_UP_PROPOSED`, `MEMORY_PROPOSED`, `APPROVAL_PENDING` 항목을 숨기거나 미뤘을 때. 열쇠는 그 `itemKey` 다. 제안의 대화(할 일, 승인 줄)나 제안한 실행(Memory)을 채우고, 원천을 찾지 못하면 남기지 않는다 |
+| 지금 화면의 제안 항목 | `DISMISSED`, `POSTPONED` | `NEEDS_ME` 카드의 `FOLLOW_UP_PROPOSED`, `MEMORY_PROPOSED`, `APPROVAL_PENDING`, `PROBLEM_SURFACED` 항목을 숨기거나 미뤘을 때. 열쇠는 그 `itemKey` 다. 제안의 대화(할 일, 승인 줄, 판정의 원천 점검 대화)나 제안한 실행(Memory)을 채우고, 판정이면 원천 살펴보기도 채운다. 원천을 찾지 못하면 남기지 않는다 |
 | 살펴보기 발견(`check_finding:<번호>`) | `SURFACED` | 그 살펴보기의 `SURFACED` 를 남길 때 「새로 알릴 것」(`kind = NEW`) 발견마다. 주체는 `SYSTEM` 이다 |
 | | `ACCEPTED`, `POSTPONED`, `DISMISSED` | 점검 대화의 발견 단추 「받아들임」, 「나중에」, 「관심 없음」. 지금 반응과 같은 단추를 다시 누르면 남기지 않는다 |
 | 살펴보기(`proactive_check:<번호>`) | `SURFACED` | 사용자가 열었거나 매일 깨우기로 돈 살펴보기가 검사한 보고를 남기고 끝났을 때 |
 | | `EXECUTION_SUCCEEDED`, `EXECUTION_FAILED` | `AUTONOMY` 살펴보기가 끝났을 때. 결과 블록을 읽지 못했으면 `INVALID_RESULT`, 멈추거나 실패했으면 그 오류 코드다. 기동 정리가 닫은 줄은 `INTERRUPTED` 다 |
 | 행동 정책 판정(`autonomy_decision:<번호>`) | `EXECUTION_FAILED` | 자동 실행을 시작하지 못했을 때. 오류 코드를 `reason_code` 에 둔다 |
+| | `SURFACED` | [매일 루프](proactive-loop.md)가 판정을 남긴 뒤 `SURFACE`, `ASK_APPROVAL` 판정마다. 주체는 `SYSTEM` 이고 원천 점검 대화와 원천 살펴보기를 채운다 |
+| | `ACCEPTED`, `DISMISSED` | 지금 화면 「먼저 다룰 문제」 항목의 「받아들임」, 「관심 없음」. 지금 반응과 같은 단추를 다시 누르면 남기지 않는다. 숨기기와 미루기는 위 「지금 화면의 제안 항목」 줄이 남긴다 |
 
 사용자가 직접 더한 할 일은 제안이 아니라 사건을 남기지 않는다. 사람이 고르는 지금 화면의 `FOLLOW_UP_OPEN` 항목도 같은 까닭으로 남기지 않는다.
 알릴 것이 없어 보고를 남기지 않은 살펴보기는 침묵이다. 사건이 아니라 상황의 `reportSurfaced = false` 로 읽는다.
-문제 후보와 행동 정책의 `SURFACE`, `ASK_APPROVAL` 은 사용자에게 제안으로 보이는 화면이 없어 `SURFACED` 를 남기지 않는다.
+행동 정책의 `SURFACE`, `ASK_APPROVAL` 은 매일 루프가 낸 판정만 지금 화면에 보여 `SURFACED` 를 남긴다. 관리자 화면이나 판정 API 로 낸 판정은 보이는 화면이 없어 남기지 않는다.
 관리자 영역의 가치 평가 절은 관리자가 자기 평가 결과를 읽는 화면이고 제안이 아니므로 `SURFACED` 를 남기지 않는다.
 
 ### 남기는 방법
@@ -147,7 +149,7 @@
 - 평가의 저장된 입력으로 다른 provider 나 모델을 replay 하고([가치 평가](value-evaluation.md)의 「저장과 replay」), 같은 결정의 사용자 반응과 나란히 둔다
 - 정책 규칙을 바꿨을 때 저장된 `inputs_json` 으로 판정을 다시 내고 지난 실행 결과와 견준다
 
-후보 하나와 사용자 반응 하나를 직접 잇는 표본은 아직 없다. 후보와 정책 판정을 사용자에게 제안으로 보이는 화면이 생기면 그 화면이 `SURFACED` 를 남기고 같은 열쇠 규칙을 따른다.
+후보 하나와 사용자 반응 하나는 판정 열쇠(`autonomy_decision:<번호>`)로 잇는다. 판정 줄이 후보 번호를 갖고, 사건이 원천 살펴보기를 채워 그 결정(`check:<번호>`)에 묶인다.
 
 ## Career 매일 깨우기와의 연결
 

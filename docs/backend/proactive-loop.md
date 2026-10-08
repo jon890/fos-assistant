@@ -96,7 +96,7 @@ provider 는 `assistant.proactive-loop.provider` 다. 판단 profile 이 없거�
 | `PUT /api/v1/agents/{code}/proactive-check/loop` | `{ enabled, snoozedUntil }` 을 저장하고 GET 과 같은 모양을 준다 |
 
 권한은 매일 깨우기 설정과 같다. 조회와 끄기는 `AgentService.requireReadable`, 켜기는 `AgentService.requireStartable` 이다.
-설치 설정이 꺼져 있으면 켜기는 409 `PROACTIVE_LOOP_UNAVAILABLE` 이다. 끄기와 쉬기는 늘 받는다.
+설치 설정이 꺼져 있으면 꺼진 줄을 켜는 요청은 409 `PROACTIVE_LOOP_UNAVAILABLE` 이다. 끄기와 쉬기, 이미 켠 줄을 켠 채 두는 요청은 늘 받는다.
 `snoozedUntil` 은 비우거나 지금부터 30일 안의 시각이다. 벗어나면 400 `VALIDATION_FAILED` 다. 지난 시각을 보내면 비운 것과 같다.
 쉬는 동안의 깨우기는 `SNOOZED` 로 남고 평가하지 않는다. 쉬기가 끝난 뒤 지난 깨우기를 몰아 잇지 않는다.
 
@@ -104,8 +104,20 @@ provider 는 `assistant.proactive-loop.provider` 다. 판단 profile 이 없거�
 
 ## 사용자에게 보이는 것
 
-아직 없다. 판정은 [행동 정책](autonomy-policy.md)의 수준대로 기록만 남는다. `IGNORE` 를 포함해 어떤 판정도 알림, 알림 줄, 승인 줄을 만들지 않는다.
-`SURFACE` 와 `ASK_APPROVAL` 을 사용자에게 보이는 화면과 그 반응 사건은 다음 단계이며, 그 단계가 [ADR-20261008 / daily-loop](../adr/ADR-20261008-daily-loop.md) 을 개정해 정한다.
+매일 루프가 낸 `SURFACE` 와 `ASK_APPROVAL` 판정만 지금 화면 「내 차례」 카드의 「먼저 다룰 문제」 항목으로 보인다. 항목과 판정 규칙은 [`attention.md`](attention.md)의 「후보와 trigger」 의 `PROBLEM_SURFACED` 줄, 화면은 [`../frontend/now.md`](../frontend/now.md)가 갖는다.
+`IGNORE` 는 아무것도 만들지 않는다. 어떤 판정도 알림(`notification`), 알림 줄, 승인 줄을 만들지 않는다. 항목은 `LATER` 라 건수에 세지 않는다.
+관리자 화면이나 판정 API 로 낸 판정은 보이지 않는다. 사용자가 켠 루프가 아니기 때문이다.
+
+판정을 남긴 뒤 `ProactiveLoopCoordinator` 가 `SURFACE`, `ASK_APPROVAL` 판정마다 판단 피드백 `SURFACED` 를 남긴다([판단 피드백](decision-feedback.md)).
+
+| 메서드와 경로 | 하는 일 |
+| --- | --- |
+| `PUT /api/v1/autonomy-decisions/{id}/reaction` | `{ "reaction": "ACCEPTED" \| "DISMISSED" }` 를 남기고 204 를 준다 |
+
+**「받아들임」 은 반응을 기록할 뿐이다.** 할 일, 승인 줄, 실행을 만들지 않는다. `ASK_APPROVAL` 도 승인이 아니다. 외부에 쓰는 일은 지금처럼 커넥터 도구 승인 경로만 거친다.
+요청자의 매일 루프가 낸 `SURFACE`, `ASK_APPROVAL` 판정만 받는다. 남의 판정, 없는 판정, 다른 수준의 판정, 루프 밖의 판정은 404 `AUTONOMY_DECISION_NOT_FOUND`, 모르는 `reaction` 은 400 `VALIDATION_FAILED` 다.
+지금 반응은 그 판정의 마지막 사용자 `ACCEPTED`, `DISMISSED` 다. 지금 화면의 숨기기(`ATTENTION_HIDE`)와 미루기는 지금 반응이 아니다. 지금 반응과 같은 단추를 다시 누르면 사건을 더 남기지 않는다.
+반응이 있는 판정은 항목에서 빠진다. 점검 대화를 지우면 그 대화의 사건과 함께 항목도 사라진다.
 
 ## 기록과 조회
 
@@ -130,6 +142,7 @@ provider 는 `assistant.proactive-loop.provider` 다. 판단 profile 이 없거�
 | `enabled` | `false` | 설치가 루프를 연다. 꺼져 있으면 사용자 설정과 상관없이 잇지 않는다 |
 | `provider` | `hermes` | 평가에 쓸 `DecisionProvider` 이름. 설치된 adapter 여야 한다 |
 | `max-runs-per-day` | `1` | 사용자 한 명의 최근 20시간 시도 상한. 1 이상 |
+| `surface-window` | `7d` | 이 기간 안의 시도가 낸 판정만 지금 화면에 보인다. 0 보다 크다 |
 
 ## 검증
 
@@ -139,6 +152,7 @@ provider 는 `assistant.proactive-loop.provider` 다. 판단 profile 이 없거�
 | provider 실패의 `FALLBACK` 과 모르는 provider 의 `FAILED` | `ProactiveLoopFallbackTest`, `ProactiveLoopUnknownProviderTest` |
 | 기동 때 `RUNNING` 닫기 | `ProactiveLoopRecoveryTest` |
 | 설정 API 의 권한과 검사 | `ProactiveLoopSettingTest`, `ProactiveLoopSettingDisabledTest` |
+| 판정의 `SURFACED`, 지금 화면 항목, 반응과 그 거절, 숨기기와 미루기의 사건 | `SurfacedProblemsTest`, `AutonomyDecisionReactionsTest`, `test/browser/now.spec.ts` |
 | 결정적 provider 로 7일 동안 깨우기와 루프를 이어 돌려 중요한 문제의 적중, 중복, 유용한 침묵, 실패, 호출 수를 세는 합성 반복 | `DailyLoopPilotTest`. 결과는 `backend/build/reports/proactive-loop/report.md` |
 
 합성 반복의 모든 값은 합성이다. 실제 사람, 메일, 계정, 금액, 대화 내용을 쓰지 않는다.
