@@ -31,6 +31,8 @@
 | `GET /api/v1/chat/conversations/{conversationId}/check-findings` | 요청자의 그 대화에서 「새로 알릴 것」 으로 그린 발견과 지금 반응을 오래된 것부터 준다. 아래 「발견 반응」 |
 | `PUT /api/v1/check-findings/{findingId}/reaction` | `{ "reaction": "ACCEPTED" \| "POSTPONED" \| "DISMISSED" }` 로 발견 하나에 반응하고 204 를 준다. 아래 「발견 반응」 |
 
+`.../proactive-check/loop` 의 조회와 저장은 [매일 루프](proactive-loop.md)의 「사용자 설정」 이 갖는다.
+
 살펴보기 상태 조회와 수동 시작, 일정 켜기는 요청자가 그 에이전트로 대화를 시작할 수 있어야 한다(`AgentService.requireStartable`).
 일정 조회와 끄기는 읽기 권한을 확인한다. 보고 열기는 보고 소유권을 확인하며 다른 사용자의 보고는 404 로 답한다.
 점검 대화는 요청자의 것만 찾고 만든다. 같은 에이전트를 쓰는 다른 사용자의 점검 대화는 따로다.

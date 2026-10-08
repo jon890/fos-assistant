@@ -105,7 +105,7 @@ provider 는 `assistant.proactive-loop.provider` 다. 판단 profile 이 없거�
 ## 사용자에게 보이는 것
 
 아직 없다. 판정은 [행동 정책](autonomy-policy.md)의 수준대로 기록만 남는다. `IGNORE` 를 포함해 어떤 판정도 알림, 알림 줄, 승인 줄을 만들지 않는다.
-`SURFACE` 와 `ASK_APPROVAL` 을 지금 화면 「내 차례」 의 항목으로 보이는 일은 다음 단계다([ADR-20261008 / daily-loop](../adr/ADR-20261008-daily-loop.md)).
+`SURFACE` 와 `ASK_APPROVAL` 을 사용자에게 보이는 화면과 그 반응 사건은 다음 단계이며, 그 단계가 [ADR-20261008 / daily-loop](../adr/ADR-20261008-daily-loop.md) 을 개정해 정한다.
 
 ## 기록과 조회
 
