@@ -26,6 +26,9 @@ import org.springframework.validation.annotation.Validated;
  * @param idleTimeout 화면도 중계 연결도 없이 이만큼 지나면 자동으로 멈춘다
  * @param startTimeout 켠 뒤 CDP 가 답하기를 기다리는 시간
  * @param screenTimeout 로그인 화면 하나가 열려 있을 수 있는 시간. 넘으면 화면을 닫는다
+ * @param gatewayBaseUrl Hermes 가 중계에 닿는 주소. {@code http} 나 {@code https} 이고 끝이 {@code /internal/browser-gateway} 다.
+ *     비어 있으면 중계가 꺼진다
+ * @param gatewaySecret 중계의 접근 표식을 서명하는 비밀값. 32자 이상이다. 비어 있으면 중계가 꺼진다
  */
 @Validated
 @ConfigurationProperties(prefix = "assistant.browser")
@@ -45,16 +48,33 @@ public record BrowserProperties(
         int maxRunning,
         Duration idleTimeout,
         Duration startTimeout,
-        Duration screenTimeout) {
+        Duration screenTimeout,
+        String gatewayBaseUrl,
+        String gatewaySecret) {
 
     private static final String PREFIX = "assistant.browser.";
+    private static final String GATEWAY_PATH = "/internal/browser-gateway";
+    private static final int MIN_GATEWAY_SECRET_LENGTH = 32;
 
-    /** 동시 수와 시간은 늘 확인한다. 나머지는 켜져 있을 때만 확인한다. 상한은 두지 않는다. 운영이 정한다. */
+    /**
+     * 동시 수와 시간은 늘 확인한다. 나머지는 켜져 있을 때만 확인한다. 상한은 두지 않는다. 운영이 정한다.
+     *
+     * <p>중계의 두 값은 비어 있으면 중계만 꺼지고 기동한다. 값이 있으면 모양을 확인하고, 메시지에 값을 싣지 않는다.
+     */
     public BrowserProperties {
         requireAtLeastOne("max-running", maxRunning);
         requirePositive("idle-timeout", idleTimeout);
         requirePositive("start-timeout", startTimeout);
         requirePositive("screen-timeout", screenTimeout);
+        if (hasText(gatewayBaseUrl)
+                && !((gatewayBaseUrl.startsWith("http://") || gatewayBaseUrl.startsWith("https://"))
+                        && gatewayBaseUrl.endsWith(GATEWAY_PATH))) {
+            throw new IllegalStateException(PREFIX + "gateway-base-url must be http(s) and end with " + GATEWAY_PATH);
+        }
+        if (hasText(gatewaySecret) && gatewaySecret.length() < MIN_GATEWAY_SECRET_LENGTH) {
+            throw new IllegalStateException(
+                    PREFIX + "gateway-secret must be at least " + MIN_GATEWAY_SECRET_LENGTH + " characters");
+        }
         if (enabled) {
             requireText("proxy-url", proxyUrl);
             requireText("image", image);
@@ -70,6 +90,15 @@ public record BrowserProperties(
                 throw new IllegalStateException(PREFIX + "cpu must be positive: " + cpu);
             }
         }
+    }
+
+    /** 중계의 두 값이 모두 있을 때만 중계가 켜진다. */
+    public boolean gatewayEnabled() {
+        return hasText(gatewayBaseUrl) && hasText(gatewaySecret);
+    }
+
+    private static boolean hasText(String value) {
+        return value != null && !value.isBlank();
     }
 
     private static void requireText(String name, String value) {

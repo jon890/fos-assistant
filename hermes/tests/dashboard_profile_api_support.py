@@ -501,6 +501,12 @@ class ProfileApiRouteTest(unittest.TestCase):
         mcp["mcpServers"][server]["env"][name] = "${%s}" % name
         (connector / ".mcp.json").write_text(json.dumps(mcp), encoding="utf-8")
 
+    def declare_sandbox_required(self, connector):
+        """시험 커넥터 사본이 실행 공간 정책에 등록된 profile 에만 붙게 선언하게 한다(ADR-20261008 connector-binding-guards)."""
+        declared = json.loads((connector / "connector.json").read_text(encoding="utf-8"))
+        declared["sandbox_required"] = True
+        (connector / "connector.json").write_text(json.dumps(declared), encoding="utf-8")
+
     def owner_attachments(self, owner):
         """정책의 `attachment_agent_root` 아래 그 주인의 첨부 디렉터리다."""
         return "%s/users/%s" % (self.attachment_agent_root, hashlib.sha256(owner.encode("utf-8")).hexdigest())

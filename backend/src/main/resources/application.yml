@@ -263,6 +263,9 @@ assistant:
     sweep-interval: 1m
     # 로그인 화면 하나가 열려 있을 수 있는 시간. 넘으면 화면을 닫는다
     screen-timeout: 30m
+    # 커넥터가 브라우저에 닿는 중계의 주소와 접근 표식의 서명 비밀. 둘 중 하나라도 비면 중계만 꺼진다
+    gateway-base-url: ${ASSISTANT_BROWSER_GATEWAY_BASE_URL:}
+    gateway-secret: ${ASSISTANT_BROWSER_GATEWAY_SECRET:}
   decision-feedback:
     # 판단 피드백 사건을 남기는 기간. 지난 줄은 cleanup-cron 에 지운다
     retention: 365d

@@ -91,7 +91,9 @@ class DockerProxyBrowserRuntimeHttpTest {
                 2,
                 Duration.ofMinutes(10),
                 Duration.ofSeconds(30),
-                Duration.ofMinutes(30));
+                Duration.ofMinutes(30),
+                null,
+                null);
     }
 
     private record Request(String requestLine, Map<String, String> headers, byte[] body) {

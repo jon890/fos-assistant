@@ -316,7 +316,9 @@ class UserBrowserSweeperTest {
                 5,
                 Duration.ofMinutes(10),
                 Duration.ofMillis(100),
-                Duration.ofMinutes(30));
+                Duration.ofMinutes(30),
+                null,
+                null);
     }
 
     private static BrowserProfileStore profiles() {
