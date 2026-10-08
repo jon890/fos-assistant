@@ -1,6 +1,6 @@
 {
   "name": "plan99-memory-profile",
-  "description": "#310 0·1단계 — Memory 회수 합성 측정, 짧은 개인 기억을 본문까지 싣는 사용자 프로필 구역, 답마다 참고한 기억 표시",
+  "description": "#310 0·1단계 — Memory 회수 합성 측정, 짧은 개인 기억을 본문까지 싣는 개인 사실 구역, 답마다 참고한 기억 표시",
   "status": "pending",
   "created_at": "2026-10-08",
   "total_phases": 4,

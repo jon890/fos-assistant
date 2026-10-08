@@ -5,7 +5,7 @@
 ## 목표
 
 대화의 답 아래에 「참고한 기억 N개」 접힌 줄을 둔다. 펼치면 제목과 출처와 기억 화면 링크가 보인다.
-관리자 실행 상세의 출처 라벨에 프로필 구역을 더한다.
+관리자 실행 상세의 출처 라벨에 개인 사실 구역을 더한다.
 
 **범위 외**: 서버 API(phase 03). 기억 화면(`/memory`) 자체는 바꾸지 않는다.
 
@@ -24,7 +24,7 @@
 - 화면 문구와 색은 `web/CLAUDE.md`(해요체, 테마 토큰, 인라인 스타일 금지)를 따른다. 제목은 평문으로만 그린다(ADR-009). 링크는 `next/link` 에 `prefetch={false}` 를 준다(줄 수가 정해지지 않은 목록의 링크).
 - 관리자 실행 상세: `web/src/components/execution/execution-detail.tsx` 의 `CONTEXT_SOURCE_LABELS`.
 
-**근거 문서**: `docs/frontend/chat.md` 의 「참고한 기억」, `docs/backend/memory.md` 의 「답마다 참고한 기억」, `docs/adr/ADR-20261008-memory-profile.md`
+**근거 문서**: `docs/frontend/chat.md` 의 「참고한 기억」, `docs/backend/memory.md` 의 「답마다 참고한 기억」, `docs/adr/ADR-20261008-memory-facts.md`
 
 ## 의도 메모
 
@@ -40,11 +40,11 @@
 
 ### 2. `web/src/lib/memory-use-api.ts`
 
-타입 `MemoryUse = { executionId: number; memoryId: number; title: string; scope: "USER" | "GROUP"; via: "ALWAYS" | "PROFILE" | "READ" }` 와 `readMemoryUses(conversationId)`. 실패 문구는 「참고한 기억을 읽지 못했어요.」.
+타입 `MemoryUse = { executionId: number; memoryId: number; title: string; scope: "USER" | "GROUP"; via: "ALWAYS" | "FACTS" | "READ" }` 와 `readMemoryUses(conversationId)`. 실패 문구는 「참고한 기억을 읽지 못했어요.」.
 
 ### 3. `web/src/components/chat/use-memory-uses.ts`
 
-`useMemoryUses(conversationId, refreshKey)` 가 `{ uses }` 를 돌려준다. `use-memory-captures.ts` 에서 `changed` 를 뺀 모양이다.
+`useMemoryUses(conversationId, refreshKey)` 가 `{ uses, reload }` 를 돌려준다. `use-memory-captures.ts` 와 같은 모양이고, `reload()` 는 지울 줄 없이 다시 읽기만 한다.
 
 ### 4. `web/src/components/chat/memory-use-list.tsx`
 
@@ -53,21 +53,22 @@
 
 ### 5. 연결
 
-- `use-conversation-session-state.ts`: `const memoryUses = useMemoryUses(conversationId, memoryCaptureKey);` 를 더하고 돌려준다.
+- `use-conversation-session-state.ts`: `const memoryUses = useMemoryUses(conversationId, memoryCaptureKey);` 를 더하고 돌려준다. 돌려주는 `memoryCaptures.changed` 를 감싸, 기억 기록을 되돌리거나 고치거나 받아들인 뒤 `memoryUses.reload()` 도 부르게 한다.
 - `conversation-session-view.tsx`: `memoryUses={memoryUses.uses}` 를 `MessageList` 로 넘긴다.
-- `message-list.tsx`: prop `memoryUses?: MemoryUse[]`(기본 `[]`)을 받아 `MemoryCaptureList` 바로 뒤에 `<MemoryUseList uses={memoryUses.filter((use) => use.executionId === turn.executionId)} />` 를 둔다. 스크롤 따라가기에 쓰는 `capturesVersion` 처럼 펼친 높이가 바뀌어도 사용자가 연 것이므로 따라가기를 바꾸지 않는다.
+- `message-list.tsx`: prop `memoryUses?: MemoryUse[]`(기본 `[]`)을 받아 `MemoryCaptureList` 바로 뒤에 `<MemoryUseList uses={memoryUses.filter((use) => use.executionId === turn.executionId)} />` 를 둔다. `capturesVersion` 옆에 `usesVersion`(`${executionId}:${memoryId}` 를 이은 글)을 두고 `contentVersion` 에 넣어, 접힌 줄이 새로 나타나면 맨 아래 따라가기가 보게 한다. 펼치고 접는 상태는 `MemoryUseList` 안에만 두고 `contentVersion` 에 넣지 않는다.
 
 ### 6. `execution-detail.tsx`
 
-`CONTEXT_SOURCE_LABELS` 에 `MEMORY_PROFILE: "기억(프로필)"` 을 `MEMORY_ALWAYS` 와 `MEMORY_INDEX` 사이에 더한다.
+`CONTEXT_SOURCE_LABELS` 에 `MEMORY_FACTS: "기억(개인 사실)"` 을 `MEMORY_ALWAYS` 와 `MEMORY_INDEX` 사이에 더한다.
 
 ### 7. `test/browser/memory-use.spec.ts`
 
 `memory-capture.spec.ts` 처럼 대화를 만들고 `**/api/chat/conversations/${conversationId}/memory-uses` 를 흉내 낸다.
 
-- 답의 실행 번호로 세 줄(`PROFILE`, `ALWAYS` 그룹, `READ`)을 주면 「참고한 기억 3개」 단추가 보이고 `aria-expanded="false"` 다. 누르면 세 제목과 「기억한 사실」, 「항상」, 「그룹」, 「찾아 읽음」, 「기억 화면에서 고치기」 링크(`href="/memory"`)가 보인다.
+- 답의 실행 번호로 세 줄(`FACTS`, `ALWAYS` 그룹, `READ`)을 주면 「참고한 기억 3개」 단추가 보이고 `aria-expanded="false"` 다. 누르면 세 제목과 「기억한 사실」, 「항상」, 「그룹」, 「찾아 읽음」, 「기억 화면에서 고치기」 링크(`href="/memory"`)가 보인다.
 - 다른 실행 번호의 줄만 있으면 그 답 아래 `memory-uses` 가 없다.
 - 응답이 500 이어도 대화가 보이고 `memory-uses` 가 없다.
+- 「기억했어요」 줄에서 되돌리면 `memory-uses` 를 다시 요청한다(요청 수로 확인).
 - 제목에 `<b>굵게</b>` 를 주면 글자 그대로 보인다.
 
 ## 검증
