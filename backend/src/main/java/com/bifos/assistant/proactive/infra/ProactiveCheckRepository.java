@@ -3,13 +3,16 @@ package com.bifos.assistant.proactive.infra;
 import com.bifos.assistant.proactive.domain.ProactiveCheck;
 import com.bifos.assistant.proactive.domain.type.CheckStatus;
 import com.bifos.assistant.proactive.domain.type.CheckTrigger;
+import com.bifos.assistant.proactive.domain.type.ProblemStatus;
 import jakarta.persistence.LockModeType;
 import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
+import org.springframework.data.jpa.repository.Query;
 
 public interface ProactiveCheckRepository extends JpaRepository<ProactiveCheck, Long> {
 
@@ -62,4 +65,32 @@ public interface ProactiveCheckRepository extends JpaRepository<ProactiveCheck, 
 
     /** 그 사용자의 그 루트 실행들의 살펴보기. 제안을 낸 실행에서 살펴보기를 찾는다. */
     List<ProactiveCheck> findByUserIdAndRootExecutionIdIn(Long userId, Collection<Long> rootExecutionIds);
+
+    /**
+     * 그 사용자가 그 에이전트로 연, 평가할 수 있는 살펴보기를 최근 것부터 읽는다. 끝났고 자동 실행이 연 줄이 아니며 받아들인 문제 후보가 있고 점검
+     * 대화를 지우지 않은 줄만 읽는다. 개수는 {@code page} 가 정한다.
+     */
+    default List<ProactiveCheck> findEvaluable(Long userId, Long agentId, Pageable page) {
+        return findEvaluable(
+                userId, agentId, CheckStatus.SUCCEEDED, CheckTrigger.AUTONOMY, ProblemStatus.ACCEPTED, page);
+    }
+
+    /** {@link #findEvaluable(Long, Long, Pageable)} 의 조회다. 상태와 계기 값은 JPQL 에 전체 이름으로 쓰지 않고 넘긴다. */
+    @Query("""
+            select c from ProactiveCheck c
+             where c.userId = :userId and c.agentId = :agentId
+               and c.status = :status and c.trigger <> :excludedTrigger
+               and exists (select p.id from ProactiveCheckProblem p
+                            where p.checkId = c.id and p.status = :problemStatus)
+               and exists (select v.id from Conversation v
+                            where v.id = c.conversationId and v.userId = :userId and v.deletedAt is null)
+             order by c.id desc
+            """)
+    List<ProactiveCheck> findEvaluable(
+            Long userId,
+            Long agentId,
+            CheckStatus status,
+            CheckTrigger excludedTrigger,
+            ProblemStatus problemStatus,
+            Pageable page);
 }
