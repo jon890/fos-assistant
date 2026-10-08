@@ -51,8 +51,12 @@ public class ChatMessageWritesImpl implements ChatMessageWrites<ChatMessage> {
         return saved;
     }
 
+    /** 본문을 지운 대화에는 남기지 않는다. 늦게 끝난 실행의 답이 지운 대화에 다시 평문으로 쌓이지 않게 한다. */
     private void lockConversation(Long conversationId) {
-        if (conversations.findByIdForMessageWrite(conversationId).isEmpty()) {
+        if (conversations
+                .findByIdForMessageWrite(conversationId)
+                .filter(conversation -> conversation.purgedAt() == null)
+                .isEmpty()) {
             throw new ApiException(ErrorCode.CONVERSATION_NOT_FOUND, "대화를 찾을 수 없습니다");
         }
     }

@@ -19,6 +19,9 @@ spring:
 assistant:
   usage:
     reconcile-cron: "-"
+  chat:
+    # 검사가 뜰 때마다 지운 대화의 정리가 함께 돌지 않게 끈다. 검사는 그 메서드를 직접 부른다
+    purge-cron: "-"
   context:
     max-chars: 8000
   memory:

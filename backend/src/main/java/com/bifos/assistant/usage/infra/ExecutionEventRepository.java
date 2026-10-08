@@ -7,6 +7,7 @@ import java.util.Collection;
 import java.util.List;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -92,4 +93,17 @@ public interface ExecutionEventRepository extends JpaRepository<ExecutionEvent, 
             """)
     boolean existsOutsideToolStartInConversation(
             @Param("conversationId") Long conversationId, @Param("internalTools") Collection<String> internalTools);
+
+    /**
+     * 그 대화 실행의 사건에서 {@code detail} 을 비운다. 사건 줄과 토큰은 남긴다.
+     *
+     * <p>트랜잭션은 {@code ConversationExecutionPurge} 가 연다.
+     */
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("""
+            update ExecutionEvent ev set ev.detail = null
+             where ev.detail is not null
+               and ev.executionId in (select e.id from AgentExecution e where e.conversationId = :conversationId)
+            """)
+    int clearDetailsOf(@Param("conversationId") Long conversationId);
 }

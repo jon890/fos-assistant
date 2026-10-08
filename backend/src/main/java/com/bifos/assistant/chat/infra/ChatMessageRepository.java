@@ -7,6 +7,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -67,4 +68,19 @@ public interface ChatMessageRepository extends JpaRepository<ChatMessage, Long>,
             """)
     List<TurnTiming> findUserTurnTimings(
             @Param("userId") Long userId, @Param("from") Instant from, @Param("to") Instant to);
+
+    /**
+     * 그 대화의 메시지가 앞선 판을 가리키는 칸을 비운다. 같은 대화의 메시지를 지우기 전에 부른다.
+     *
+     * <p>{@code replaces_message_id} 의 외래 키가 지우는 순서에 따라 한 문장 삭제를 막을 수 있어서다. 트랜잭션은
+     * {@code ConversationPurgeWriter} 가 연다.
+     */
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("update ChatMessage m set m.replacesMessageId = null where m.conversationId = :conversationId")
+    int clearReplacesOf(@Param("conversationId") Long conversationId);
+
+    /** 그 대화의 메시지를 모두 지운다. 트랜잭션은 {@code ConversationPurgeWriter} 가 연다. */
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("delete from ChatMessage m where m.conversationId = :conversationId")
+    int deleteAllOf(@Param("conversationId") Long conversationId);
 }

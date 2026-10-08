@@ -42,4 +42,9 @@ public interface ChatAttachmentRepository extends JpaRepository<ChatAttachment, 
             @Param("conversationId") Long conversationId,
             @Param("attachmentId") Long attachmentId,
             @Param("position") int position);
+
+    /** 그 대화의 첨부 행을 모두 지운다. 파일은 부르는 쪽이 먼저 지운다. 트랜잭션은 {@code ConversationPurgeWriter} 가 연다. */
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("delete from ChatAttachment a where a.conversationId = :conversationId")
+    int deleteAllOf(@Param("conversationId") Long conversationId);
 }

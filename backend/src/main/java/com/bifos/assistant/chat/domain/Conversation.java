@@ -138,6 +138,11 @@ public class Conversation {
     @Getter
     private Instant deletedAt;
 
+    /** 지운 대화의 본문을 실제로 지운 시각이다. 비어 있으면 아직 지우지 않았다. */
+    @Column(name = "purged_at")
+    @Getter
+    private Instant purgedAt;
+
     private Conversation(Long userId, String title, Long agentId, ConversationPurpose purpose, Instant now) {
         this.userId = userId;
         this.title = title;
