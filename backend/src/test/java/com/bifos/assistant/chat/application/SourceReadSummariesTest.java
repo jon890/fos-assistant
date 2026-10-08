@@ -3,6 +3,8 @@ package com.bifos.assistant.chat.application;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.bifos.assistant.chat.domain.ChatMessage;
@@ -17,6 +19,7 @@ import java.lang.reflect.Field;
 import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
+import org.mockito.ArgumentCaptor;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -162,6 +165,19 @@ class SourceReadSummariesTest {
     }
 
     @Test
+    @DisplayName("DNS 절대 이름의 끝 점을 빼고 공개 URL로 보낸다")
+    void removesTrailingDotFromDnsAbsoluteHost() throws Exception {
+        AgentExecution root = execution(1L, null, EventObservation.OBSERVED);
+        stubExecutions(List.of(root), List.of());
+        when(events.findByExecutionIdInOrderByExecutionIdAscSequenceAsc(any()))
+                .thenReturn(List.of(completed(
+                        1L, 1, "{\"results\":[{\"url\":\"https://EXAMPLE.com./read\",\"content\":\"본문\"}]}")));
+
+        assertThat(summaries.of(List.of(answer(10L, 1L))).get(10L))
+                .isEqualTo(new SourceReadSummary(1, List.of("https://example.com/read"), 0, true));
+    }
+
+    @Test
     @DisplayName("트리의 실행 하나라도 사건 관측이 불완전하면 불완전으로 표시한다")
     void marksSummaryIncompleteWhenAChildObservationIsIncomplete() throws Exception {
         AgentExecution root = execution(1L, null, EventObservation.OBSERVED);
@@ -198,6 +214,49 @@ class SourceReadSummariesTest {
         assertThat(summaries.of(List.of(answer(10L, 2L))).get(10L))
                 .isEqualTo(new SourceReadSummary(
                         2, List.of("https://example.com/child", "https://example.com/descendant"), 0, true));
+    }
+
+    @Test
+    @DisplayName("다른 사용자의 자식 실행은 URL과 관측 상태에 넣지 않는다")
+    void excludesAnotherUsersChildExecution() throws Exception {
+        AgentExecution root = execution(1L, null, EventObservation.OBSERVED);
+        AgentExecution ownChild = execution(2L, 1L, EventObservation.OBSERVED);
+        AgentExecution anotherUsersChild = execution(3L, 1L, 2L, EventObservation.INCOMPLETE);
+        stubExecutions(List.of(root, ownChild, anotherUsersChild), List.of(ownChild, anotherUsersChild));
+        when(events.findByExecutionIdInOrderByExecutionIdAscSequenceAsc(any()))
+                .thenReturn(List.of(
+                        completed(2L, 1, "{\"results\":[{\"url\":\"https://example.com/own\",\"content\":\"본문\"}]}"),
+                        completed(3L, 1, "{\"results\":[{\"url\":\"https://example.com/other\",\"content\":\"본문\"}]}")));
+
+        assertThat(summaries.of(List.of(answer(10L, 1L))).get(10L))
+                .isEqualTo(new SourceReadSummary(1, List.of("https://example.com/own"), 0, true));
+    }
+
+    @Test
+    @DisplayName("여러 답의 실행과 자식과 사건을 각각 한 번의 묶음 조회로 읽는다")
+    void batchesExecutionTreeAndEventQueriesForMultipleAnswers() throws Exception {
+        AgentExecution firstRoot = execution(1L, null, EventObservation.OBSERVED);
+        AgentExecution firstChild = execution(2L, 1L, EventObservation.OBSERVED);
+        AgentExecution secondRoot = execution(10L, null, EventObservation.OBSERVED);
+        AgentExecution secondChild = execution(11L, 10L, EventObservation.OBSERVED);
+        stubExecutions(
+                List.of(firstRoot, firstChild, secondRoot, secondChild), List.of(firstChild, secondChild));
+        when(events.findByExecutionIdInOrderByExecutionIdAscSequenceAsc(any())).thenReturn(List.of());
+
+        assertThat(summaries.of(List.of(answer(100L, 1L), answer(101L, 10L))))
+                .containsEntry(100L, new SourceReadSummary(0, List.of(), 0, true))
+                .containsEntry(101L, new SourceReadSummary(0, List.of(), 0, true));
+
+        ArgumentCaptor<Collection<Long>> executionIds = ArgumentCaptor.forClass(Collection.class);
+        verify(executions, times(2)).findAllById(executionIds.capture());
+        assertThat(executionIds.getAllValues())
+                .allSatisfy(ids -> assertThat(ids).containsExactlyInAnyOrder(1L, 10L));
+        ArgumentCaptor<Collection<Long>> rootIds = ArgumentCaptor.forClass(Collection.class);
+        verify(executions).findByRootExecutionIdIn(rootIds.capture());
+        assertThat(rootIds.getValue()).containsExactlyInAnyOrder(1L, 10L);
+        ArgumentCaptor<Collection<Long>> eventIds = ArgumentCaptor.forClass(Collection.class);
+        verify(events).findByExecutionIdInOrderByExecutionIdAscSequenceAsc(eventIds.capture());
+        assertThat(eventIds.getValue()).containsExactlyInAnyOrder(1L, 2L, 10L, 11L);
     }
 
     @Test
@@ -253,8 +312,12 @@ class SourceReadSummariesTest {
     }
 
     private static AgentExecution execution(Long id, Long root, EventObservation observation) throws Exception {
+        return execution(id, root, 1L, observation);
+    }
+
+    private static AgentExecution execution(Long id, Long root, Long userId, EventObservation observation) throws Exception {
         AgentExecution execution = AgentExecution.builder()
-                .userId(1L)
+                .userId(userId)
                 .profileName("p")
                 .status(ExecutionStatus.RUNNING)
                 .startedAt(Instant.EPOCH)

@@ -200,6 +200,9 @@ public class SourceReadSummaries {
                 return null;
             }
             host = host.toLowerCase(Locale.ROOT);
+            if (host.endsWith(".")) {
+                host = host.substring(0, host.length() - 1);
+            }
             if (!host.contains(".")
                     || host.equals("localhost")
                     || host.endsWith(".localhost")
