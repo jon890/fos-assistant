@@ -31,7 +31,9 @@ phase 01 이 만든 backend: `PUT /api/v1/autonomy-decisions/{id}/reaction`(본�
 - 「받아들임」 과 「관심 없음」 이 성공하면 `acted()` 로 사건을 남기고 `ATTENTION_CHANGED_EVENT` 를 보낸 뒤 화면을 다시 읽는다
 - 브라우저 환경에는 판단 profile 이 없어 실제 루프로는 `SURFACE` 판정이 생기지 않는다. 시험 지원 경로로 판정을 심는다
 - 매일 루프 설정은 설치가 꺼져 있으면 스위치를 끄되, 이미 켠 사용자는 끌 수 있게 둔다
-- `web/src/lib/attention.ts` 는 파일 길이 상한(400줄)에 가깝다. 넘으면 새 분기를 `web/src/lib/attention-problem.ts` 같은 새 파일로 옮긴다
+- `web/src/lib/attention.ts` 는 362줄이고 상한은 400줄이다. 이번 변경은 이 파일 안에 둔다. 이 파일은 다른 모듈을 import 하지 않고 `node --test` 가 직접 읽으므로 새 파일로 나누지 않는다
+- 매일 루프 설정 부품은 매일 깨우기 설정의 `<form>` 밖에 둔다. 중첩 `form` 을 만들지 않는다
+- 브라우저 검사는 mobile 과 desktop 이 같은 에이전트와 H2 를 차례로 쓴다. 루프 설정을 켜는 시험은 `restore()` 로 끄고 끝낸다
 
 ## 작업 항목
 
@@ -49,14 +51,16 @@ phase 01 이 만든 backend: `PUT /api/v1/autonomy-decisions/{id}/reaction`(본�
 
 ### 3. 매일 루프 설정
 
-- `web/src/components/agent/agent-proactive-loop-setting.tsx`(새 클라이언트 부품): `docs/frontend/structure.md` 의 매일 루프 설정 표대로 그린다. 「하루 쉬기」 는 지금부터 24시간 뒤, 「일주일 쉬기」 는 7일 뒤를 `snoozedUntil` 로 보내고, 「쉬기 끝내기」 는 `snoozedUntil: null`. 거절은 `describeError(code, ...)` 를 `Notice` 로 보인다
+- `web/src/components/agent/agent-proactive-loop-setting.tsx`(새 클라이언트 부품): `docs/frontend/structure.md` 의 매일 루프 설정 표대로 그린다. `available = false` 이고 `enabled = false` 면 스위치를 막고, `available = false` 이고 `enabled = true` 면 안내를 보이되 스위치로 끄기와 쉬기 단추를 그대로 둔다. 「하루 쉬기」 는 지금부터 24시간 뒤, 「일주일 쉬기」 는 7일 뒤를 `snoozedUntil` 로 보내고, 「쉬기 끝내기」 는 `snoozedUntil: null`. 거절은 `describeError(code, ...)` 를 `Notice` 로 보인다
 - `web/src/components/agent/agent-proactive-schedule-section.tsx`: 매일 깨우기 설정 아래에 새 부품을 둔다
 - `web/src/components/error-message.ts`: `PROACTIVE_LOOP_UNAVAILABLE` 「이 설치에서는 아직 쓸 수 없어요.」, `AUTONOMY_DECISION_NOT_FOUND` 「이미 처리했거나 찾을 수 없는 항목이에요. 화면을 다시 열어 주세요.」
 
 ### 4. 시험 지원
 
-- `backend/src/test/java/com/bifos/assistant/testsupport/ProactiveLoopTestSupportController.java`: `@ConditionalOnProperty(name = "assistant.test-support.enabled", havingValue = "true")`, `POST /api/v1/test-support/proactive-loop/surfaced`, 본문 `{ agentCode, problem, action, level }`. 부르는 사용자의 점검 대화와 끝난 매일 깨우기 살펴보기, 받아들인 문제 후보, 평가, `DECIDED` 시도, 그 평가의 판정 줄 하나를 저장하고 `{ decisionId, conversationId }` 를 준다. 판정 줄의 `SURFACED` 사건도 phase 01 의 `SurfacedProblems.surfaced` 로 남긴다
-- 브라우저 검사의 backend 가 `assistant.test-support.enabled` 를 켜는 자리를 찾아 같은 자리에 `assistant.proactive-loop.enabled=true` 를 더한다(루프 설정 켜기 시험용). 그 파일을 변경 파일 표에 더하지 못했으면 회신에 경로를 적는다
+- `backend/src/test/java/com/bifos/assistant/testsupport/ProactiveLoopTestSupportController.java`: `@ConditionalOnProperty(name = "assistant.test-support.enabled", havingValue = "true")`, `POST /api/v1/test-support/proactive-loop/surfaced`, 본문 `{ agentCode, problem, action, level }`. 부르는 사용자의 점검 대화(`CheckConversations.findOrCreate`), `SUCCEEDED` 이고 `SCHEDULED` 인 살펴보기, 받아들인 문제 후보, 평가(`DecisionEvidence`), 평가 번호가 있는 `DECIDED` 시도, 그 평가의 판정 줄 하나(`AutonomyInputs` 를 채운다)를 저장하고 `{ decisionId, conversationId }` 를 준다. 판정 줄의 `SURFACED` 사건도 phase 01 의 `SurfacedProblems.surfaced` 로 남긴다
+  - 엔티티 조립의 본보기는 `backend/src/test/java/com/bifos/assistant/proactive/ProactiveLoopTestSupport.java` 와 `DecisionFixtures`, `AutonomyFixtures` 다. 뒤 둘은 package-private 이라 `testsupport` 패키지에서 쓰지 못하므로 필요한 값만 이 컨트롤러 안에 만든다. 평가 번호가 null 인 `saveEarlierDecidedRun` 모양은 쓰지 않는다
+- `test/browser/fixtures.ts`: `startControlPlane` 의 환경 변수 블록에서 `ASSISTANT_TESTSUPPORT_ENABLED: "true"` 옆에 `ASSISTANT_PROACTIVELOOP_ENABLED: "true"` 를 더한다. Spring 의 완화된 바인딩으로 `assistant.proactive-loop.enabled` 가 되는지 기존 `ASSISTANT_TESTSUPPORT_ENABLED` 와 같은 규칙으로 확인한다
+- `test/browser/proactive-check.spec.ts` 의 `restore()` 가 `PUT /api/agents/{code}/proactive-check/loop` 로 `{ enabled: false, snoozedUntil: null }` 을 보낸다
 
 ### 5. 이 phase 를 검증하는 시험
 
@@ -64,6 +68,8 @@ phase 01 이 만든 backend: `PUT /api/v1/autonomy-decisions/{id}/reaction`(본�
 - `test/unit/error-message.test.ts`: 새 두 오류 문구
 - `test/browser/now.spec.ts`: 시험 지원으로 `SURFACE` 와 `ASK_APPROVAL` 판정을 하나씩 심는다. 「내 차례」 에 두 항목이 문제 글과 행동 글로 보이고, `ASK_APPROVAL` 항목에 「직접 처리할 일이에요. 승인 요청이 아니에요.」 가, 둘 다에 「받아들임은 기록만 해요.」 안내가 있다. 카드와 사이드바 건수는 늘지 않는다. 「받아들임」 을 누르면 그 항목이 사라지고 새로 고쳐도 다시 나오지 않는다. 「점검 대화에서 보기」 가 `/chat/{conversationId}` 로 간다
 - `test/browser/proactive-check.spec.ts`: 매일 루프 설정을 켜고 「하루 쉬기」 를 누르면 쉬는 시각이 보이고, 새로 고쳐도 남는다. 「쉬기 끝내기」 와 끄기도 저장된다
+- `test/browser/now.spec.ts` 의 실패 경로: `page.route` 로 반응 경로가 502 를 주면 항목 아래에 「반응을 남기지 못했어요. 잠시 뒤 다시 눌러 주세요.」 가 보이고 항목이 남는다
+- `test/unit/attention.test.ts` 나 새 시험에서 반응 route 의 숫자 아닌 번호가 400 인지는 확인하지 않아도 된다. route 는 본보기와 같은 숫자 검사를 그대로 둔다
 
 ## 검증
 
@@ -91,6 +97,7 @@ unit 시험과 두 브라우저 spec 이 통과하고 파일 길이 검사가 �
 | `web/src/components/agent/agent-proactive-schedule-section.tsx` | 수정 |
 | `web/src/components/error-message.ts` | 수정 |
 | `backend/src/test/java/com/bifos/assistant/testsupport/ProactiveLoopTestSupportController.java` | 신규 |
+| `test/browser/fixtures.ts` | 수정 |
 | `test/unit/attention.test.ts` | 수정 |
 | `test/unit/error-message.test.ts` | 수정 |
 | `test/browser/now.spec.ts` | 수정 |

@@ -119,6 +119,18 @@ provider 는 `assistant.proactive-loop.provider` 다. 판단 profile 이 없거�
 지금 반응은 그 판정의 마지막 사용자 `ACCEPTED`, `DISMISSED` 다. 지금 화면의 숨기기(`ATTENTION_HIDE`)와 미루기는 지금 반응이 아니다. 지금 반응과 같은 단추를 다시 누르면 사건을 더 남기지 않는다.
 반응이 있는 판정은 항목에서 빠진다. 점검 대화를 지우면 그 대화의 사건과 함께 항목도 사라진다.
 
+**보일 판정은 아래 순서로 고른다.**
+
+1. 요청자의 `DECIDED` 시도 가운데 `surface-window` 안에 저장한 줄의 평가를 모은다
+2. 그 평가의 판정 가운데 평가와 후보마다 가장 먼저 남긴 줄 하나만 루프의 판정으로 본다. 같은 평가를 판정 API 로 다시 판정한 줄은 루프의 판정이 아니다
+3. 그 가운데 `SURFACE`, `ASK_APPROVAL` 만 남긴다
+4. 같은 문제 키는 가장 늦게 남긴 판정 하나만 남긴다
+5. 남은 판정에 지금 반응이 있으면 뺀다. 그래서 새 판정에 「관심 없음」 을 누르면 같은 키의 옛 판정이 대신 나오지 않는다
+
+원천 살펴보기나 후보 줄이 없거나, 문제 글이 비었거나, 에이전트를 찾지 못한 판정은 그 줄만 빼고 나머지를 보인다.
+이 목록을 읽다 예외가 나면 이 항목만 비우고 로그를 남긴다. 같은 「내 차례」 카드의 승인 대기, 할 일, Memory 제안을 가리지 않기 위해서다.
+반응 API 도 같은 규칙으로 루프의 판정인지 본다. 다시 판정한 줄에 반응하면 404 다.
+
 ## 기록과 조회
 
 시도 줄은 `proactive_loop_run`, 설정은 `proactive_loop_setting` 이다. 칸은 [`schema/proactive.md`](schema/proactive.md)가 갖는다.
@@ -152,7 +164,9 @@ provider 는 `assistant.proactive-loop.provider` 다. 판단 profile 이 없거�
 | provider 실패의 `FALLBACK` 과 모르는 provider 의 `FAILED` | `ProactiveLoopFallbackTest`, `ProactiveLoopUnknownProviderTest` |
 | 기동 때 `RUNNING` 닫기 | `ProactiveLoopRecoveryTest` |
 | 설정 API 의 권한과 검사 | `ProactiveLoopSettingTest`, `ProactiveLoopSettingDisabledTest` |
-| 판정의 `SURFACED`, 지금 화면 항목, 반응과 그 거절, 숨기기와 미루기의 사건 | `SurfacedProblemsTest`, `AutonomyDecisionReactionsTest`, `test/browser/now.spec.ts` |
+| 판정의 `SURFACED`, 고르는 규칙, 반응과 그 거절 | `SurfacedProblemsTest` |
+| 지금 화면 항목, 숨기기와 미루기의 사건, 한 줄이 깨져도 카드가 남음 | `SurfacedProblemCandidatesTest` |
+| 화면의 항목과 반응, 루프 설정 | `test/browser/now.spec.ts`, `test/browser/proactive-check.spec.ts` |
 | 결정적 provider 로 7일 동안 깨우기와 루프를 이어 돌려 중요한 문제의 적중, 중복, 유용한 침묵, 실패, 호출 수를 세는 합성 반복 | `DailyLoopPilotTest`. 결과는 `backend/build/reports/proactive-loop/report.md` |
 
 합성 반복의 모든 값은 합성이다. 실제 사람, 메일, 계정, 금액, 대화 내용을 쓰지 않는다.
