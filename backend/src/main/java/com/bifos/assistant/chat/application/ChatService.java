@@ -18,6 +18,7 @@ import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.usage.domain.type.ExecutionStatus;
 import java.time.Clock;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -425,6 +426,25 @@ public class ChatService {
     public Conversation chooseModelTier(
             CurrentUser user, Long conversationId, ModelSelectionMode mode, ModelTier tier) {
         return chatConversationManagement.chooseModelTier(user, conversationId, mode, tier);
+    }
+
+    /**
+     * 예약 작업 발화가 그 대화를 작업의 단계로 고르게 한다. 고른 모델과 effort 는 지운다.
+     *
+     * <p>주인과 대화는 부르는 쪽이 이미 정했다. 부르는 쪽의 트랜잭션이 있으면 그 안에서 바꾼다.
+     */
+    public void chooseTierForTask(Long conversationId, ModelTier tier) {
+        chatConversationManagement.chooseTierForTask(conversationId, tier);
+    }
+
+    /**
+     * 예약 작업이 「보고할 것 없음」 으로 끝낸 대화를 목록에서만 뺀다. 조회와 보내기는 그대로 된다.
+     *
+     * <p>주인과 대화는 부르는 쪽이 이미 정했다. 부르는 쪽의 트랜잭션이 있으면 그 안에서 바꾼다. MySQL {@code DATETIME(6)} 은
+     * 남는 자리를 반올림하므로 다른 시각 칸처럼 마이크로초로 자른다.
+     */
+    public void hideTaskConversation(Long conversationId, Instant now) {
+        chatConversationManagement.hideTaskConversation(conversationId, now.truncatedTo(ChronoUnit.MICROS));
     }
 
     @Transactional

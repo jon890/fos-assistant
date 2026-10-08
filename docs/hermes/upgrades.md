@@ -1,5 +1,53 @@
 # 버전 변경과 실측
 
+## provider 를 바꿀 때 확인할 계약
+
+provider 를 바꿔도 Control Plane 은 profile 바인딩, 요청한 모델과 effort, 실제 실행 경로와 사용량을 같은 뜻으로 다룬다.
+지원 여부와 credential 선택, 토큰 보고 방식은 provider 에 따라 달라질 수 있다.
+[ADR-060](../adr/ADR-060-reasoning-effort-의-지원은-확인한-것만-보이고-모르면-미확인으로-둔다.md),
+[ADR-067](../adr/ADR-067-native-하위-에이전트의-provider-는-대시보드-plugin-이-session-저장소에서-읽어-준다.md),
+[ADR-088](../adr/ADR-088-대시보드-plugin-은-감싸는-경로의-바꿔-끼우기를-두고-기대는-hermes-내부-지점을-계약-시험으로-확인한다.md)과 현재 구현을 기준으로 아래 범위를 확인한다.
+
+### 가짜 Hermes 로 확인할 수 있는 것
+
+여기서 가짜 Hermes 는 HTTP 응답 fixture, backend 의 stub 과 mock, 가짜 Hermes 모듈과 임시 SQLite 저장소를 포함한다.
+시험 이름은 `backend/src/test/java/com/bifos/assistant/` 와 `hermes/tests/` 아래의 파일을 가리킨다.
+응답을 어떻게 읽고 요청을 어떻게 보내는지 확인하는 범위이며, 실제 provider 의 지원과 청구 방식을 증명하지 않는다.
+
+| 지점 | 유지할 계약 | 시험 |
+| --- | --- | --- |
+| 모델 목록과 reasoning 지원 | 인증된 provider 의 모델만 고른다. 같은 모델 이름이어도 provider 별 capability 를 따로 읽는다. boolean 이 아닌 값과 빠진 칸은 `UNKNOWN` 이며 provider 이름으로 메우지 않는다 | `hermes/HermesModelCatalogTest` |
+| reasoning 끄기 | 미지정과 `none` 을 구분한다. `none` 은 끄기 지원이 `SUPPORTED` 이고 reasoning 이 `UNSUPPORTED` 가 아닐 때만 고른다. 요청 effort 를 적용값으로 바꿔 기록하지 않는다 | `chat/ModelOptionsServiceTest`, `chat/ModelSelectionTest`, `hermes/HermesRunRequestTest` |
+| 실행별 모델 선택 | provider 와 모델을 함께 보내거나 함께 뺀다. provider 를 바꿔도 모델과 effort 를 그대로 보내며, profile 기본값을 쓸 때는 모델 선택 칸을 뺀다. 실패했다고 Control Plane 이 다른 provider 로 다시 제출하지 않는다 | `hermes/HermesRunRequestTest`, `chat/ModelSelectionTest` |
+| 단계와 에이전트 기본 모델 | 모델 단계의 provider 가 비면 요청 profile 의 카탈로그로 정한다. 단계의 모델이 그 카탈로그에 없거나 선택한 모델이 숨겨졌으면 다른 provider 로 대체하지 않고 거절한다. 대화 선택, 에이전트 기본 모델, profile 기본값의 우선순위를 유지한다 | `chat/ModelTierServiceTest`, `chat/ModelVisibilityTest`; 선택 규칙은 [모델 단계](../model-tiers.md) |
+| 요청 경로와 실제 경로 | 실행 조회의 요청 모델과 실제 `runtime` 을 구분한다. Hermes 가 알려 준 실제 provider 와 모델로 실행을 기록한다. 기본값과 요청값으로 실제 경로를 추정하지 않는다 | `hermes/HermesRuntimeReadTest`, `chat/ModelSelectionTest` |
+| profile 인증 경계 | provider 교체로 API 인증 key 를 바꾸지 않는다. 요청자의 바인딩에서 profile 을 정하고 key 가 없으면 다른 profile 의 key 를 빌리지 않는다. 모델 목록 cache 도 profile 별로 나눈다 | `hermes/HermesRunRequestTest`, `hermes/HermesProfileKeyStoreTest`, `chat/ChatServiceTest`, `chat/ModelOptionsServiceTest` |
+| credential 쓰기 경계 | 대시보드의 환경 쓰기는 허용한 Control Plane 칸만 받는다. 커넥터 연결 해제로 모델 credential 을 지우지 않는다. `credential_scope` 는 공유 여부의 선언이며 실제 OAuth 격리를 강제하는 값이 아니다 | `test_dashboard_profile_api_env.py`; 선언의 뜻은 [credential 경계](README.md#oauth-credential-은-여기서-빠진다) |
+| 루트 usage 읽기 | 입력·출력·cache 칸의 알려진 별칭을 같은 토큰 수로 읽는다. 보고하지 않은 칸은 0 으로 채우지 않는다. total 이 없고 입력·출력이 모두 있으면 합을 구한다. cache 를 입력에 임의로 더하지 않는다 | `hermes/HermesUsageParsingTest` |
+| 가격과 비용 모드 | provider 와 모델의 짝으로 가격을 찾는다. 같은 모델이어도 provider 별 가격을 적용하고 가격 미확인은 금액을 비운다. 입력에 포함된 cache 는 한 번만 센다. 구독은 실제 청구액을 비우고 API 는 환산액과 같은 값으로 기록한다 | `usage/CostEstimatorTest`, `usage/UsageCostRecordingTest` |
+| native 자식 provider | session 응답의 provider 를 우선하고 없으면 plugin 을 조회한다. 부모 provider 를 빌리지 않는다. 주 호출이 같은 모델에서 provider 만 바꿔도 복수 경로로 보고 provider 를 비운다. 같은 짝의 반복 호출과 보조 호출은 교체로 세지 않는다. 읽기는 저장소를 바꾸지 않는다 | `hermes/SubagentProviderClientTest`, `usage/application/SubagentUsageReconcilerTest`, `test_dashboard_profile_api_session.py` |
+| native 자식의 미확인과 합계 | session 의 입력에 cache 읽기·쓰기를 더해 run 과 같은 포함 입력으로 환산한다. 필요한 토큰을 모르면 금액을 비운다. 조회 불가 재시도는 종료 뒤 10분까지이며 이후 `PROVIDER_UNKNOWN` 으로 남긴다. usage·가격 미확인을 구분한다. 부모와 자식 사용량을 중복 없이 더하며 재조회가 원장을 다시 더하지 않는다 | `usage/application/SubagentUsageReconcilerTest`, `usage/application/SubagentUsageLedgerTest`, `usage/UsageBreakdownTest` |
+
+### 운영 왕복이 필요한 것
+
+아래는 확인 대상만 적는다. 실행 절차와 계정·환경 값은 `fos-home-infra` 가 소유한다.
+provider 교체 전후에 해당하는 항목을 확인하고, 지원하지 않거나 관측할 수 없는 항목은 그 이유를 남긴다.
+
+| 지점 | 확인 대상 |
+| --- | --- |
+| 실제 모델 선택 | 새 provider 의 인증 상태와 모델 목록이 해당 profile 의 계정과 맞고, 실행별 선택과 profile 기본값이 실제 `runtime` 의 provider·모델로 이어지는가 |
+| 같은 session 의 provider 교체 | provider 를 바꾼 다음 turn 에서 앞 대화와 도구 호출 이력이 유지되는가. Responses 계열의 암호화된 reasoning 조각을 새 경로가 처리하거나 걸러 내는가. 실제 계정에서만 보이는 이력 호환 오류가 없는가([session 연속성](runs-api.md#모델을-바꿔-이어도-맥락이-남는다)) |
+| 실제 reasoning 적용 | Hermes 가 알린 지원값과 실제 provider 가 받는 값이 맞는가. 미지정, `none`, 지원하는 effort 의 생략·축소·변환이 Hermes 계약과 맞는가. 실행 기록의 effort 는 요청값이라는 구분이 유지되는가 |
+| AI credential 선택과 갱신 | API server key 와 AI provider credential 이 다른 역할을 유지하는가. `SHARED_HOUSEHOLD` 의 공유와 `DEDICATED` 의 전용 계정이 실제 인증·갱신에서도 선언과 맞는가. profile 의 OAuth 가 없을 때 루트 저장소를 쓰는 경로와 API key 선택이 예상과 맞는가 |
+| 실패와 fallback | credential 이 없거나 만료되거나 계정이 막혔을 때 다른 profile 의 계정이나 다른 provider 로 넘어가지 않는가. profile 의 `fallback_providers` 가 비어 있고, Hermes 내부 경로 변경이 있으면 실제 경로가 정확히 기록되는가 |
+| 실제 usage 의미 | 입력 토큰에 cache 읽기·쓰기가 포함되는가, 출력에 reasoning 토큰이 포함되는가, 누락과 0 이 구분되는가. cache 단가와 context 구간이 실제 보고 방식에 맞는가. 에이전트의 `cost_mode` 가 새 provider 계정의 구독·종량 경로와 맞는가. 알려진 별칭을 파싱하는 시험만으로 입력 포함 관계까지 확인했다고 보지 않는다 |
+| 부모와 native 자식 | 부모 run usage 에 native 자식 토큰이 포함되지 않는가. 자식 session 의 입력은 cache 읽기·쓰기를 제외한 값이고 run 의 입력은 포함한 값인가. 자식 session 의 최종 카운터와 provider 가 실제 실행과 맞는가. `sessions` 와 `session_model_usage` 가 실제 주 호출 경로를 기록하고 보조 호출을 구분하는가 |
+| plugin 과 Hermes 내부 지점 | 배포한 소스의 이름·시그니처·저장소 schema 가 선언과 맞으며, 등록된 미들웨어와 profile 범위가 실제 HTTP 요청에서도 동작하는가. provider 조회가 읽기 전용이고 권한 밖 session 을 돌려주지 않는가 |
+
+ADR-088 의 `test_hermes_contract.py` 는 상류 소스에서 이름·시그니처·schema 와 일부 응답 모양을 확인하는 별도 검사다.
+가짜 Hermes 의 동작 시험과 운영 왕복 사이에서 구조 변경을 먼저 잡지만, 같은 이름의 함수가 다르게 동작하거나 상류 tag 와 배포 이미지가 다른 것은 왕복 확인으로 판단한다.
+실제 usage 가 위 환산 가정과 다르면 provider 이름별 보정값을 추측해 넣지 않고, 확인한 계약과 그에 맞는 fixture·처리를 함께 고친다.
+
 ## 버전을 올릴 때 달라지는 계약
 
 2026-09-28 에 v0.21.3 과 v0.21.5 의 태그 소스와 변경 이력을 대조했다.
@@ -14,7 +62,7 @@ v0.21.3 은 `v2026.9.14`, commit `345cd2b057a452236de401d3534b8502a7465e8d` 이�
 | --- | --- | --- |
 | v0.21.1 내부 모듈 | 큰 파일을 분리했다. 내부 함수를 import 하는 plugin 은 모듈 위치를 확인해야 한다 | [release note](https://github.com/NousResearch/hermes-agent/releases/tag/v2026.9.7) |
 | v0.21.2 DB | 중복 writer, 정상 DB 손상 오판, profile DB 혼선과 불필요한 기동 write lock 을 고쳤다 | [release note](https://github.com/NousResearch/hermes-agent/releases/tag/v2026.9.11), `SessionDB`, `hermes_state_registry.acquire` |
-| v0.21.3 완료 전달 | 공유 profile 문맥 누락을 고쳤다. API 완료는 여전히 delivery 기록이며 자동 모델 실행이 아니다 | [「공유 listener 의 완료 watcher 결함과 수정」](delegation.md#공유-listener-의-완료-watcher-결함과-수정) |
+| v0.21.3 완료 전달 | 공유 profile 문맥 누락을 고쳤다. v0.21.0 의 완료 watcher 는 요청 profile 문맥을 잃고 listener 주인 profile 의 DB 에서 부모를 찾아, 없으면 완료 결과를 버렸다. v0.21.3 은 완료 사건의 profile 문맥에서 부모 판정과 결과 주입을 하고 보조 profile 의 미전달 기록도 복구한다. API 완료는 여전히 delivery 기록이며 자동 모델 실행이 아니다 | [commit `c632437c3bb3`](https://github.com/NousResearch/hermes-agent/commit/c632437c3bb3fcd19e755882ce346b270ef3d151) |
 | v0.21.3 공유 제공 | `gateway.multiplex_profile_allowlist` 를 제거했다. 살아 있는 모든 profile 을 공유 제공한다 | [commit `9848e22ed659`](https://github.com/NousResearch/hermes-agent/commit/9848e22ed659d2e90ff3126f4dfcf78d9028efeb), `config_migrations` v43 |
 | v0.21.3 cron·curator | `cron.model_drift_guard` 를 없애고 생성 당시 모델로 cron 을 실행한다. curator 의 이전 기본 기간을 stale 30→14일, archive 90→30일로 바꾼다. 명시한 다른 값은 보존한다 | `config_migrations` v42·v44, [commit `be2f7e9c3616`](https://github.com/NousResearch/hermes-agent/commit/be2f7e9c3616) |
 | v0.21.3 DB schema | 29→30 migration 과 자식 transcript 의 trigram 검색 제외가 있다. 첫 DB open 이 index·DDL 을 바꿀 수 있다 | [commit `2b55ded1ac5f`](https://github.com/NousResearch/hermes-agent/commit/2b55ded1ac5f3b41cdc580974e745631dac1bb53), `hermes_state_schema` 의 `_init_schema`, `_reconcile_columns` |
@@ -108,27 +156,6 @@ session 상세의 비캐시 입력 토큰과 혼동하지 않는다.
 [v0.21.5 api_server_runs.py](https://github.com/NousResearch/hermes-agent/blob/v2026.9.24/gateway/platforms/api_server_runs.py) 의
 `terminal_run_status`, `_execute_run`, `_mark_shutdown_interrupted_runs` 다.
 
-## 홈서버에서 확인한 것
-
-2026년 9월 17일에 홈서버에서 직접 확인했다.
-
-| 항목 | 결과 |
-| --- | --- |
-| 버전 | Hermes Agent v0.21.0 (2026.8.31) |
-| `run_submission`, `run_status` | true |
-| `run_events_sse`, `run_stop` | true |
-| 배치 | 공유 listener 하나가 `/p/<profile>/...` 경로로 모든 profile 을 받는다 |
-| subagent 토큰 | 부모 실행의 `usage` 에 포함되지 않는다 |
-
-**subagent 토큰이 부모에 포함되지 않으므로 실행 줄을 전부 더해야 실제 사용량이 나온다.**
-subagent 를 쓴 실행과 쓰지 않은 실행의 토큰을 견줘 확인했고,
-근거는 [ADR-016의 「자식 토큰 실측」 절](../adr/ADR-016-다중-에이전트-조율은-control-plane이-맡는다.md#자식-토큰-실측)에 있다.
-부모 usage 만 저장하면 그만큼이 기록에서 빠진다.
-
-공유 listener 를 쓰더라도 profile 마다 접두가 다르고,
-나중에는 profile 마다 다른 노드를 가리킬 수 있어야 한다.
-그래서 Control Plane 은 API server 주소를 `hermes.base-url` 이 아니라 에이전트의 `api_base_url` 에 둔다.
-
 ## 대시보드 plugin 이 기대는 내부 지점
 
 `dashboard-profile-api` 는 공개 확장점이 아닌 Hermes 내부 지점에 기댄다.
@@ -137,11 +164,6 @@ subagent 를 쓴 실행과 쓰지 않은 실행의 토큰을 견줘 확인했고
 
 Hermes 를 올리기 전에 새 판의 tag 로 `scripts/check-hermes-contract.sh <tag>` 를 돌린다.
 실패한 항목을 plugin 에서 고치고, `HERMES_VERSION` 을 새 tag 로 바꾼 PR 의 CI 가 통과한 뒤 이미지를 올린다.
-
-2026-10-06 에 이 확인을 앞선 판에 돌렸다.
-`v2026.8.31` 에는 `reload_gateway_plugins` 와 `_config_profile_scope` 가 없었다.
-`v2026.7.30` 에는 그 둘과 `list_profile_names` 가 없었다.
-지금 plugin 을 그 판에 올리면 이 지점을 쓰는 단계가 실패한다.
 
 ### MCP 설정 맞추기와 스킬 색인 캐시 키
 
@@ -166,4 +188,3 @@ Hermes 를 올릴 때 아래가 그대로인지 본다. 하나라도 달라지�
 | `mcp_servers.<서버>.tools.exclude` | `approval: always` 인 도구가 모델에게 보인다. 호출은 여전히 Control Plane 이 거절한다 |
 | `PluginContext.call_mcp` 가 `mcp_allowlist` 없는 서버를 부르지 못한다 | plugin 의 직접 호출이 판정 없이 나간다 |
 | `transform_tool_result` hook 은 처음 돌려준 글이 결과를 바꾸고, hook 이 실패하면 원래 결과가 가며, 판정이 막은 호출에는 닿지 않는다 | 바인딩 profile 의 커넥터 결과가 `<external-data>` 없이 들어가거나, 판정이 막은 안내 글까지 외부 글로 감싸져 모델이 승인을 기다리라는 안내를 따르지 않을 수 있다. 결과 hook 이 도는 자리를 다시 확인하고 `fos-ctx` 를 고친다 |
-

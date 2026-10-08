@@ -2,9 +2,7 @@
 
 ## 내장 delegation 이 실제로 하는 것
 
-2026년 9월 18일에 v0.21.0 배포본에서 측정했다.
-운영 profile 을 건드리지 않으려고 컨테이너 안에 격리된 `HERMES_HOME` 을 따로 만들고
-그 아래 측정용 profile 로만 실행했다. 측정이 끝난 뒤 만든 것을 모두 지웠다.
+아래 실측은 v0.21.0 에서 운영 profile 과 격리한 측정용 profile 로 했다.
 
 `delegate_task` 가 그 도구다. 부모 실행이 이 도구를 부르면 Hermes 가 자식 agent 를 만든다.
 
@@ -33,7 +31,7 @@ privacy 로는 이쪽이 안전하다. 부모에 넣은 개인 Memory 가 자식
 
 ### 자식 도구의 허용 범위
 
-2026-09-28 에 v0.21.0 의 `tools/delegate_tool.py` 의 `_build_child_agent` 를 읽어 확인했다.
+v0.21.0 의 `tools/delegate_tool.py` 의 `_build_child_agent` 를 읽어 확인했다.
 
 | 항목 | 동작 |
 | --- | --- |
@@ -110,62 +108,21 @@ v0.21.0 과 v0.21.3 Runs API 의 `usage` 에는 cache 칸이 없지만 이 경�
 
 ### 최상위 위임의 완료 사건은 부모 스트림으로 받지 못할 수 있다
 
-**2026-09-28 에 Hermes v0.21.0 에서 다시 측정했다.**
 `delegate_task` 는 `background` 인자를 무시하며, 그 인자는 도구 스키마에서도 빠져 있다.
 최상위 위임은 항상 비동기로 돌고 **부모 실행이 자식보다 먼저 끝난다.**
 그 시점에 SSE 가 닫혀 `subagent.start` 는 받지만 `subagent.complete` 와 자식 토큰은 받지 못한다.
+`background=false` 로 시켜도 동기 위임을 보장할 수 없다.
 
-2026-09-18 에 적은 「`background=false` 로 시킨 실행에서는 시작과 완료 사건이 모두 왔다」 는
-이번 v0.21.0 측정에서 재현되지 않았다. 이 인자로 동기 위임을 보장할 수 없다.
-
-**v0.21.0 실측에서는 실행의 자식 목록을 얻지 못했다.**
-그 버전의 `GET /api/sessions` 는 `parent_session_id` 질의 인자를 무시하고
-`source` 가 `subagent` 인 session 을 목록에서 제외한다.
-`/v1/runs/{id}/subagents` 같은 경로도 없다. 404 다.
-v0.21.3 과 v0.21.5 의 session 목록은 자식 포함 옵션과 source 필터를 지원한다.
-조회 형식과 사용량 보완 방법은 아래 「자식 session 으로 결과와 토큰을 보완한다」 를 따른다.
+실행의 자식 목록을 돌려주는 Runs 경로는 없다.
+자식 session 의 조회 형식과 사용량 보완 방법은 아래 「자식 session 으로 결과와 토큰을 보완한다」 를 따른다.
 
 그러므로 부모 SSE 를 끝까지 받아도 자식 사용량이 모두 기록된다고 보장할 수 없다.
 완료 사건을 받지 못한 자식의 결과와 토큰은 모르는 값으로 남긴다.
 부모가 끝났다는 이유로 자식이 중지됐다고 판정하거나 토큰을 0 으로 채우지 않는다.
 
-### 공유 listener 의 완료 watcher 결함과 수정
-
-2026-09-28 에 v0.21.0 배포본의 코드와 기존 기록을 읽어 원인을 확인했다.
-HTTP 요청과 부모·자식 session 저장은 요청 profile 의 DB 를 쓴다.
-그러나 완료 watcher 는 새 `Context` 에서 시작해 요청 profile 문맥을 잃는다.
-그 결과 listener 주인 profile 의 DB 에서 부모를 찾고, 없으면 완료 결과를 버린다.
-
-| 단계 | 근거 함수 |
-| --- | --- |
-| HTTP 요청 문맥 | `api_server.py` 의 `_make_profile_prefix_middleware`, `_profile_scope` |
-| session 저장 DB | 같은 파일의 `_ensure_session_db`, `_open_and_cache_session_db`, `delegate_tool.py` 의 `_build_child_agent` |
-| watcher 생성과 부모 판정 | `gateway/run.py` 의 `_spawn_supervised`, `_async_delegation_watcher`, `_deliver_completion_notification`, `_classify_completion_target` |
-| 전달 상태 갱신 | `tools/async_delegation.py` 의 `_db_path`, `claim_completion_delivery`, `drop_completion_delivery` |
-
-`get_hermes_home` 과 `hermes_state.py` 의 `_default_db_path` 는 활성 문맥으로 DB 를 고른다.
-자식은 `propagate_context_to_thread` 로 문맥을 물려받아 올바른 DB 에 결과를 저장한다.
-watcher 의 claim·drop 은 다른 DB 를 볼 수 있고, claim 은 행이 없으면 이전 형식 사건으로
-간주해 성공을 반환한다.
-따라서 로그에 폐기 경고가 있어도 원래 profile 의 전달 행은 `pending` 으로 남을 수 있다.
-부모 session 이 실제로 삭제된 경우와 구분해야 한다.
-
-**v0.21.3 은 완료 사건의 profile 문맥에서 부모 판정, claim, 결과 주입과 정산을 수행한다.**
-시작할 때 보조 profile 의 미전달 기록도 복구한다.
-근거는 [수정 commit `c632437c3bb3`](https://github.com/NousResearch/hermes-agent/commit/c632437c3bb3fcd19e755882ce346b270ef3d151) 과
-[v0.21.3 run_notifications.py](https://github.com/NousResearch/hermes-agent/blob/v2026.9.14/gateway/run_notifications.py) 의
-`_completion_event_scope`, `_deliver_async_delegation_group`, `_restore_secondary_completion_ledgers` 다.
-
-v0.21.0 에서 공유 listener 를 유지하며 완료 watcher 만 profile 별로 고르는 설정은 확인하지 못했다.
-별도 gateway 를 쓰면 기본 문맥과 요청 profile 이 같아져 결함을 피할 수 있다는 소스상 판단은 있지만,
-회피안을 실제로 적용해 검증하지 않았다.
-DB 를 합치는 방식은 profile 분리를 바꾸므로 회피안으로 삼지 않는다.
-최상위 위임은 `_dispatch_delegate_task` 가 `background=True` 로 보내므로
-모델에게 동기 위임을 요구해도 회피가 보장되지 않는다.
-
 ### API 위임 결과는 delivery 기록으로 남는다
 
-2026-09-28 에 v0.21.0 배포본과 v0.21.3, v0.21.5 소스를 대조했다.
+v0.21.0 배포본과 v0.21.3, v0.21.5 소스를 대조했다.
 **API 비동기 위임 완료는 부모의 새 모델 turn 이나 새 run 을 자동으로 만들지 않는다.**
 `APIServerAdapter.supports_async_delivery` 는 거짓이다.
 완료 결과는 `_inject_watch_notification` 에서 `gateway/wake.py` 의
@@ -220,10 +177,8 @@ session 은 cache 를 뺀 `input_tokens` 와 cache read·write 를 따로 누적
 부모 usage 에 자식 usage 가 포함되지 않으므로 부모와 각 자식의 기록을 중복 없이 더한다.
 조회하지 못한 사용량은 모르는 값으로 남긴다.
 
-**종료된 자식 session 은 다시 조회해도 값이 같다.**
-2026-10-01 에 종료된 자식 session 5개를 각각 두 번 조회해 토큰과 종료 시각이 모두 같음을 확인했다.
-본문과 답은 읽거나 기록하지 않았다.
-이 검사는 이미 종료된 session 의 반복 조회를 확인한 것이며 실행 중 값의 변화까지 확인한 것은 아니다.
+**종료된 자식 session 은 다시 조회해도 토큰과 종료 시각이 같다.**
+실행 중인 session 의 값 변화는 확인하지 않았다.
 
 근거는 [v0.21.3 session 직렬화](https://github.com/NousResearch/hermes-agent/blob/v2026.9.14/gateway/platforms/api_server.py) 의
 `_session_response`, `_message_response`, `_handle_list_sessions` 와
@@ -231,7 +186,7 @@ session 은 cache 를 뺀 `input_tokens` 와 cache read·write 를 따로 누적
 
 ### 자식 session 의 provider 는 저장소에만 있다
 
-2026-10-02 에 v0.21.5(`v2026.9.24`)의 소스를 읽고, 운영 Hermes 에서 읽기 전용으로 집계해 확인했다.
+v0.21.5(`v2026.9.24`)의 소스로 확인했다.
 
 | 확인한 것 | 근거 |
 | --- | --- |
@@ -245,15 +200,7 @@ session 은 cache 를 뺀 `input_tokens` 와 cache read·write 를 따로 누적
 자식이 도는 중에 모델이나 provider 가 바뀌면 그 줄의 값은 처음 것이고, 바뀐 뒤의 호출은 `session_model_usage` 에만 남는다.
 그래서 한 줄의 값으로 금액을 환산하려면 `session_model_usage` 에서 `task` 가 빈 줄의 짝이 하나뿐인지 함께 본다.
 
-운영 집계의 결과다. 값의 개수만 세었고 본문은 읽지 않았다.
-
-| 항목 | 값 |
-| --- | --- |
-| `source` 가 `subagent` 인 줄 | 115 |
-| 그 가운데 `billing_provider` 가 채워진 줄 | 115 |
-| 호출이 있었고 끝났는데 `billing_provider` 가 빈 줄 | 0 |
-| `task` 가 빈 `session_model_usage` 의 짝이 하나인 줄 | 115 |
-| `sessions` 의 provider 와 `session_model_usage` 의 provider 가 다른 줄 | 0 |
+운영 집계에서는 끝난 자식 줄 모두 `billing_provider` 가 채워져 있었고, 도중에 provider 가 바뀐 줄은 없었다.
 
 대시보드도 이 저장소를 읽는다. 대시보드는 gateway 와 다른 프로세스이고 profile 마다 저장소 파일을 따로 연다.
 근거는 [`hermes_cli/web_server_sessions.py`](https://github.com/NousResearch/hermes-agent/blob/v2026.9.24/hermes_cli/web_server_sessions.py) 의 `_open_session_db_for_profile` 이다.
@@ -265,7 +212,6 @@ plugin 은 Hermes 의 저장소 클래스를 쓰지 않고 SQLite 의 읽기 전
 
 ### 자식의 모델은 부모의 것이 아니다
 
-부모를 `openai/gpt-oss-20b` 로 돌린 실행에서 자식이 `z-ai/glm-5.2` 로 돌았다.
 자식 모델은 `delegation.provider` 와 `delegation.model` 이 정하고,
 비어 있으면 부모가 아니라 별도 기본값으로 떨어진다.
 실행별 비용을 보려면 이 값을 명시해야 한다.
@@ -279,22 +225,15 @@ plugin 은 Hermes 의 저장소 클래스를 쓰지 않고 SQLite 의 읽기 전
 | 전역으로 바꾸는 자리 | `timeouts.mcp.tool_call` |
 | 연결 제한 시간 | 기본 60초 |
 
-제한 시간을 20초로 줄이고 30초 걸리는 도구를 부르자 아래가 도구 결과로 돌아왔고
-실행 자체는 정상 종료했다.
-
-```text
-MCP call failed: TimeoutError: MCP call timed out after 20.0s (configured timeout: 20.0s)
-```
+제한 시간을 넘긴 호출은 `MCP call failed: TimeoutError` 도구 결과로 돌아오고, 실행 자체는 정상 종료한다.
 
 **실행을 기다리는 도구는 이 시간 안에 끝나야 한다.**
 오래 걸리는 작업을 그 안에서 기다리면 제한 시간에 걸린다.
-아래 「기다리는 도구는 실제로 끊긴다」 가 그 실측이다.
+아래 「기다리는 도구는 실제로 끊긴다」 를 본다.
 
 ### 재귀를 막는 자리가 Hermes 에 없다
 
-도구 안에서 다시 Runs API 를 부르게 하고 깊이를 하나씩 올렸다.
-깊이 2, 3, 4 가 모두 실행됐고 5가 시작되려 할 때 **측정용 서버가 스스로 끊었다.**
-Hermes 는 한 번도 개입하지 않았다.
+도구 안에서 다시 Runs API 를 부르게 하면 깊이가 4까지 올라가도 Hermes 는 개입하지 않았다.
 
 Hermes 는 그 도구가 자기를 다시 부른다는 것을 알지 못한다.
 도구 호출은 그저 외부 HTTP 호출이다.
@@ -302,18 +241,11 @@ Hermes 는 그 도구가 자기를 다시 부른다는 것을 알지 못한다.
 
 ### 기다리는 도구는 실제로 끊긴다
 
-위 재귀 측정에서 제한 시간을 120초로 두었는데, 루트 실행의 도구 호출이 그 시간에 걸렸다.
-아래가 루트 실행의 대화에 남은 도구 결과다.
-
-```text
-{"error": "MCP call failed: TimeoutError: MCP call timed out after 120.0s ..."}
-```
-
-**끊긴 뒤에도 그 아래 실행들은 계속 돌았다.** 깊이 2와 3과 4가 모두 완료로 끝났다.
+위 재귀 측정에서 아래 실행을 기다리던 루트 실행의 도구 호출이 제한 시간에 끊겼다.
+**끊긴 뒤에도 그 아래 실행들은 계속 돌아 완료로 끝났다.**
 도구 호출이 끊기는 것과 그 도구가 시작한 실행이 멈추는 것은 별개다.
 
-루트 실행은 그 뒤 `Service temporarily overloaded` 로 실패했다.
-겹쳐 도는 실행이 쌓여 한 gateway 와 provider 에 몰린 결과다.
+겹쳐 도는 실행은 한 gateway 와 provider 에 몰린다.
 `gateway.api_server.max_concurrent_runs` 의 기본값이 10 이고 넘으면 429 를 준다.
 
 그래서 이 구조를 쓴다면 도구가 실행이 끝날 때까지 기다리게 만들지 않는다.
@@ -334,7 +266,7 @@ Hermes 는 그 도구가 자기를 다시 부른다는 것을 알지 못한다.
 
 #### native 하위 에이전트를 멈추는 길
 
-2026-09-30 에 v0.21.5(`v2026.9.24`)의 소스를 읽어 확인했다.
+v0.21.5(`v2026.9.24`)의 소스를 읽어 확인했다.
 
 | 확인한 것 | 근거 |
 | --- | --- |
@@ -370,7 +302,7 @@ gateway 의 `/stop` 과 같은 함수이고, 부모 session 이 정확히 같은
 
 ### 취소한 실행의 조회 응답
 
-2026-09-25 에 v0.21.0 에서 실제 중지를 한 번 왕복시켜 확인했다.
+v0.21.0 에서 실제 중지를 한 번 왕복시켜 확인했다.
 v0.21.5 의 중단·미완료 응답 차이는 [「Runs 응답과 사건의 버전 차이」](upgrades.md#runs-응답과-사건의-버전-차이) 에 있다.
 
 | 무엇 | 실측 |
@@ -384,44 +316,8 @@ v0.21.5 의 중단·미완료 응답 차이는 [「Runs 응답과 사건의 버�
 **멈춘 자리까지의 답은 조회 응답에서 얻을 수 없다.** 스트림으로 받은 조각을 모아 둔 것만이 그 답이다.
 [ADR-021](../adr/ADR-021-중지한-답은-멈춘-자리까지-남긴다.md) 이 뒤받침으로 둔 경로가 실제로 쓰이는 경로다.
 
-**API server 의 session 은 그 대화 첫 실행의 `run_id` 와 같다.** 뒤의 turn 은 같은 값을 이어 쓴다.
-중지한 turn 뒤에도 그 값이 그대로여서, 다음 turn 이 중지 전의 맥락을 기억했다.
-첫 turn 을 중지한 대화는 그 중지한 실행의 `run_id` 가 곧 session 이다.
-이 세 문장은 Hermes 가 session 을 정하는 대화의 측정이다. 이제 새 대화는 Control Plane 이 첫 turn 전에 정한 `fos-<uuid>` 가 session 이고, 첫 turn 을 중지해도 그 값이 그대로다([ADR-031](../adr/ADR-031-mcp-호출의-부모-실행은-profile-플러그인이-서명한-루트-session-으로-잇는다.md)).
+**새 대화의 session 은 Control Plane 이 첫 turn 전에 정한 `fos-<uuid>` 다.**
+뒤의 turn 은 같은 값을 이어 쓰고, 첫 turn 을 중지해도 그 값이 그대로다([ADR-031](../adr/ADR-031-mcp-호출의-부모-실행은-profile-플러그인이-서명한-루트-session-으로-잇는다.md)).
+중지한 turn 뒤에도 session 이 같아서 다음 turn 은 중지 전의 맥락을 이어 받는다.
 
 중지한 실행은 그 session 으로 실제로 돈 모델을 읽지 못했다. Control Plane 은 그때 요청에 보낸 모델을 적는다.
-
-### API server 에서 위임 도구가 빠지는 원인
-
-2026-09-28 에 Hermes v0.21.0 의 소스로 원인을 확인했다.
-API 경로의 도구 목록을 계산하는 `_get_platform_tools` 는 마지막에 `agent.disabled_toolsets` 를 뺀다.
-그래서 도구 설정에 `delegation` 이 있어도 비활성화 목록에 포함되면 위임 도구가 실행에 노출되지 않는다.
-같은 날 실제 실행에서 `subagent.start` 가 오는 것을 확인했지만,
-최상위 위임은 부모가 먼저 끝나 부모 스트림으로 `subagent.complete` 를 받지 못했다.
-
-### 긴 결과는 잘리지 않고 파일로 빠진다
-
-20만 자를 돌려주는 도구를 불렀다.
-전체가 spillover 파일로 저장되고 대화에는 2천 자 남짓만 들어갔다.
-
-```text
-This tool result was too large (200,014 characters, 195.3 KB).
-Full output saved to: <spillover 파일>
-Use the read_file tool with offset and limit to access specific ...
-```
-
-| 구간 | 무슨 일이 일어나나 |
-| --- | --- |
-| 약 5만 자 이하 | 그대로 대화에 들어간다 |
-| 약 5만 자부터 200만 자까지 | 전체를 파일로 저장하고 대화에는 미리보기만 넣는다 |
-| 200만 자 초과 | 앞 40%와 뒤 60%만 남기고 잘라 낸다 |
-
-**미리보기만 본 모델이 본문을 읽으려면 `read_file` 을 쓸 수 있어야 한다.**
-파일 도구를 잠근 에이전트는 그 본문에 닿지 못한다.
-
-MCP 결과는 `<untrusted_tool_result>` 로 감싸여 들어간다.
-그 안의 내용을 지시가 아니라 데이터로 다루라는 안내가 함께 붙는다.
-
-### 사건을 관측하지 못한 실행
-
-자식 시작 사건을 읽거나 저장하지 못하면 실제 자식 수와 빠진 금액은 알 수 없다. Control Plane은 실행의 `event_observation`에 관측 범위를 저장하고, 관리자 월 합계에 자식 수와 별개인 관측 누락 실행 수를 보낸다. 스트림을 정상적으로 읽었다는 `OBSERVED`도 발견한 자식의 사용량·가격 확정을 보장하지 않는다. 기존 확인 중·미확인·가격 미확인 건수는 그대로 남는다. 비수집 경로와 기동 복구, 과거 실행의 처리 규칙은 [`실행 스키마`](../backend/schema/execution.md)의 「사건 관측 범위」가 갖는다. 관측 누락 때문에 원래 실행을 다시 제출하거나 자식 수·토큰·비용을 추정하지 않는다.

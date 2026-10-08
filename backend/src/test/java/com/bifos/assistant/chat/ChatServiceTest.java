@@ -5,7 +5,6 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.tuple;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
@@ -450,7 +449,14 @@ class ChatServiceTest {
         chat.stream(dad, null, "메모 찾아 줘", "dad", event -> {});
 
         verify(eventStream, timeout(5000))
-                .open(any(), any(), any(), any(), any(), eq(ToolDetailScope.prefixes(Set.of("mcp__demo__"))));
+                .open(
+                        any(),
+                        any(),
+                        any(),
+                        any(),
+                        any(),
+                        argThat(scope ->
+                                !scope.hideAll() && scope.hiddenPrefixes().equals(Set.of("mcp__demo__"))));
     }
 
     @Test
@@ -472,7 +478,14 @@ class ChatServiceTest {
         ChatTurn turn = chat.send(dad, null, "메모 찾아 줘", "dad");
 
         verify(eventStream)
-                .open(any(), any(), any(), any(), any(), eq(ToolDetailScope.prefixes(Set.of("mcp__demo__"))));
+                .open(
+                        any(),
+                        any(),
+                        any(),
+                        any(),
+                        any(),
+                        argThat(scope ->
+                                !scope.hideAll() && scope.hiddenPrefixes().equals(Set.of("mcp__demo__"))));
         List<ExecutionEvent> recorded = eventsOf(turn.executionId());
         assertThat(typesOf(recorded))
                 .containsExactly(
@@ -547,7 +560,7 @@ class ChatServiceTest {
 
         chat.stream(dad, null, "메모 찾아 줘", "dad", event -> {});
 
-        verify(eventStream, timeout(5000)).open(any(), any(), any(), any(), any(), eq(ToolDetailScope.ALL));
+        verify(eventStream, timeout(5000)).open(any(), any(), any(), any(), any(), argThat(ToolDetailScope::hideAll));
     }
 
     @Test
@@ -611,6 +624,32 @@ class ChatServiceTest {
 
         assertThat(conversations.findById(first.conversationId()).orElseThrow().autoTurnCount())
                 .isZero();
+    }
+
+    @Test
+    @DisplayName("목록에서 숨긴 대화에 사용자가 질문을 보내면 숨김이 풀려 다시 목록에 보인다")
+    void showsHiddenConversationAgainWhenUserSendsQuestion() {
+        CurrentUser dad = member("dad@example.com", "dad");
+        stub().willReturn(HermesRunResult.of("run-1", "sess-1", "completed", "네", "m", "p", TokenUsage.empty()));
+        ChatTurn first = chat.send(dad, null, "안녕", "dad");
+        assertThat(conversationWriter.hideFromList(first.conversationId(), Instant.parse("2026-11-01T00:00:00Z")))
+                .as("숨긴 대화 수")
+                .isEqualTo(1);
+        assertThat(chat.conversationsOf(dad, null, 10).items())
+                .extracting(Conversation::id)
+                .as("숨긴 뒤의 목록")
+                .doesNotContain(first.conversationId());
+
+        stub().willReturn(HermesRunResult.of("run-2", "sess-1", "completed", "네", "m", "p", TokenUsage.empty()));
+        chat.send(dad, first.conversationId(), "하나 더", "dad");
+
+        assertThat(conversations.findById(first.conversationId()).orElseThrow().hiddenAt())
+                .as("질문 뒤의 숨긴 시각")
+                .isNull();
+        assertThat(chat.conversationsOf(dad, null, 10).items())
+                .extracting(Conversation::id)
+                .as("질문 뒤의 목록")
+                .contains(first.conversationId());
     }
 
     /** Hermes 가 받은 session 을 그대로 돌려주게 한다. 실제 Hermes 가 모르는 id 를 받았을 때와 같다. */

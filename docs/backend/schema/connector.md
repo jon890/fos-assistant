@@ -1,6 +1,6 @@
 # 커넥터
 
-커넥터 연결과 도구 호출의 판정과 승인, 상시 허락을 저장하는 표 셋의 칸과 제약을 갖는다.
+커넥터 연결과 바인딩, 도구 호출의 판정과 승인, 상시 허락을 저장하는 표 넷의 칸과 제약을 갖는다.
 상태가 바뀌는 조건과 API 는 [커넥터 연결](../../connectors.md) 이 갖는다.
 
 ## connector_connection
@@ -25,12 +25,10 @@
 - `(user_id, connector_id)` 가 유니크다. 한 사람이 같은 커넥터를 둘 연결하지 못한다
 - `agent_id`, `restart_required`, `desired_enabled` 는 연결을 에이전트에 붙이는 바인딩([ADR-083](../../adr/ADR-083-커넥터는-사용자가-한-번-연결하고-자기-에이전트에-여럿-붙여-그-에이전트가-도구를-직접-부른다.md))이 생기며 쓰지 않는 칸이 됐다. 이전 이미지로 되돌릴 때를 위해 남겨 두고, 칸을 지우는 마이그레이션은 옛 커넥터 에이전트를 정리할 때 둔다. `agent_id` 의 유일 제약과 FK 는 남아 있고 비어 있는 값은 유일 제약에 걸리지 않는다
 - 엔티티는 이 세 칸을 매핑하지 않는다. 새 행에서 `agent_id` 는 비고 두 boolean 칸은 기본값 거짓으로 저장된다. 옛 행의 값은 고치지 않아 그대로 남는다
-- V45 가 그때까지 `READY` 이던 연결을 모두 `PENDING` 으로 내렸다. 연결 확인과 gateway 재시작과 관리자 반영 완료로 다시 `READY` 가 된다. 까닭은 그 마이그레이션의 주석에 있다
 - 해제해도 행은 남기고 `fields` 를 `{"values": {}, "secretPrefixes": {}}` 로 비운다. 지우는 경로는 없다
 - 칸 값이 비밀이 아닌지는 DB 가 아니라 Control Plane 이 manifest 의 `secret` 으로 판정해 지킨다
 - `fields` 를 MySQL `JSON` 타입이 아니라 문자열로 둔다. 칸 안을 SQL 로 찾을 일이 없고, 검사가 쓰는 H2 와 MySQL 의 JSON 리터럴 문법이 달라 이관 SQL 을 한 벌로 쓸 수 없다. 엔티티는 변환기로 record 로 읽는다
-- V40 이전에 저장한 앞부분은 원래 길이를 알 수 없어 V40 이 모든 행의 `secretPrefixes` 를 비웠다. `values` 는 그대로 뒀다
-- 가계부 전용으로 먼저 만든 `accountbook_connection` 은 V38 이 이 표로 옮기고 지웠다
+- V40 이전에 저장한 행은 앞부분의 원래 길이를 알 수 없어 `secretPrefixes` 가 비어 있다
 
 `agent.connector_managed BOOLEAN NOT NULL DEFAULT FALSE` 는 바인딩이 생기기 전에 연결마다 만든 옛 커넥터 에이전트를 표시한다. 지금은 새로 참이 되지 않는다.
 이 값이 참인 에이전트는 일반 설정 편집과 공개 범위 변경을 막고 사용자당 에이전트 상한에 세지 않는다. 지우기는 받는다. 사용자가 새 방식으로 옮긴 뒤 그 에이전트를 지울 길이 이것뿐이다.
@@ -62,7 +60,7 @@
 - `(agent_id, connection_id)` 가 유니크다(`uk_agent_connector_binding`). 한 에이전트에 같은 연결을 둘 붙이지 못한다
 - `agent_id` 는 `agent` 를, `connection_id` 는 `connector_connection` 을 FK 로 가리킨다. 연결로 바인딩을 찾으려고 `connection_id` 에 색인을 둔다
 - 떼면 행을 지운다. 떼기는 재시작을 기다리지 않아 남길 상태가 없다. 이력은 `connector_action` 이 갖는다
-- V80 이 해제되지 않은 옛 연결마다 그 연결 전용 에이전트와의 바인딩을 만들었다. 상태와 재시작 대기, 켜려는 의도, 시각은 연결의 값을 옮겼고, 재시작 대기인 바인딩의 `restart_required_since` 는 그 연결의 `updated_at` 이다. `DISCONNECTED` 연결은 그 에이전트가 이미 꺼져 있어 바인딩을 만들지 않았다
+- 해제되지 않은 옛 연결에는 V80 이 그 연결 전용 에이전트와의 바인딩을 만들었다. 그 바인딩의 `restart_required_since` 는 연결의 `updated_at` 이다
 - 옛 커넥터 에이전트(`agent.connector_managed` 가 참)의 바인딩만 그 에이전트를 켜고 끈다. `READY` 가 되면 켜고, `PENDING` 이 되면 끄고 사진 받기를 내린다. 다른 에이전트의 바인딩은 에이전트를 건드리지 않는다
 
 ## connector_action

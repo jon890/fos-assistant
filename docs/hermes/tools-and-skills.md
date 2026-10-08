@@ -2,10 +2,6 @@
 
 ## 도구와 스킬과 승인 설정을 HTTP 로 쓰는 길
 
-2026-09-28 에 v0.21.0 소스로 확인했다.
-도구 목록과 스킬 입력 크기는 함수에 설정을 넣어 계산한 결과다.
-설정 변경 뒤 실제 실행으로 적용 시점을 검증한 것은 아니다.
-
 ### 대시보드 설정 API
 
 대시보드 웹서버는 `_profile_scope(profile)` 안에서 profile 의 설정을 읽고 쓴다.
@@ -141,10 +137,6 @@ profile 별 목록을 대신한다.
 [toolsets.py](https://github.com/NousResearch/hermes-agent/blob/v2026.8.31/toolsets.py),
 [managed_scope.py](https://github.com/NousResearch/hermes-agent/blob/v2026.8.31/hermes_cli/managed_scope.py) 다.
 
-## v0.21.3 에서 확인한 쓰기 경로
-
-2026-09-28 에 v0.21.3 코드와 네트워크가 없는 일회용 컨테이너로 확인했다. 에이전트 도구 선택과 스킬 올리기가 이 경로에 기댄다.
-
 ### 설정 API와 profile 경계
 
 `hermes_cli.web_routers.config_env.update_config`는 `ConfigUpdate`의 `config`를 기존 원문에 재귀 병합한다.
@@ -154,11 +146,8 @@ profile 별 목록을 대신한다.
 `token_auth_middleware`도 등록된 경로의 토큰만 인증하고 본문을 제한하지 않는다.
 근거는 [설정 처리기](https://github.com/NousResearch/hermes-agent/blob/v2026.9.14/hermes_cli/web_routers/config_env.py), [profile 범위](https://github.com/NousResearch/hermes-agent/blob/v2026.9.14/hermes_cli/web_server_profiles.py), [토큰 인증](https://github.com/NousResearch/hermes-agent/blob/v2026.9.14/hermes_cli/dashboard_auth/token_auth.py)이다.
 
-일회성 컨테이너에서 미들웨어가 `await request.json()`으로 본문을 읽고 같은 요청을 `update_config`에 넘겼다.
-설정은 200으로 저장됐다.
-`?profile=alpha`와 본문 `profile=beta`를 함께 보냈을 때 `beta`의 설정이 바뀌었고 `alpha`는 바뀌지 않았다.
+plugin 미들웨어가 `await request.json()`으로 본문을 먼저 읽어도 처리기는 같은 본문을 다시 읽어 저장한다.
 따라서 plugin은 JSON 객체의 최상위 키와 `config` 아래 키를 정확히 검사하고, query와 본문의 profile이 모두 토큰에 묶인 대상과 같은지 확인해야 한다.
-본문을 읽는 것 자체는 이 버전의 FastAPI 경로에서 처리기의 재읽기를 막지 않았다.
 
 현재와 같은 단일 서비스 토큰에는 profile 신원이 들어 있지 않다.
 그 토큰으로 요청한 서로 다른 사용자 사이의 profile 경계를 plugin만으로 증명하려면 profile별 토큰 또는 서버가 검증하는 profile 신원값이 추가로 필요하다.
@@ -180,7 +169,6 @@ Control Plane MCP(`fos-assistant`)의 서버 이름은 API 허용 목록에 계�
 `enabled`는 `_toolset_configuration_platform`을 따른다. 대부분의 도구에서는 `cli`라 API 실행의 켜짐 상태와 다를 수 있다.
 v0.21.3의 API server는 별도 `GET /v1/toolsets`를 제공하며 같은 설명과 도구 목록에 **`api_server` 기준 `enabled`**를 붙인다.
 **두 경로의 응답 모양이 다르다.** 대시보드 경로는 항목 배열을 그대로 돌려주고, `GET /v1/toolsets`는 `{"object": "list", "platform": "api_server", "data": [...]}`로 감싼다.
-가짜 Hermes 가 배열로 돌려주도록 쓰여 있어 테스트가 모두 통과한 채 운영에서 목록 조회가 502 로 실패한 적이 있다.
 이 목록에는 MCP 서버 이름이 없다. v0.21.3의 실제 응답 29개 항목에도 기억 MCP 이름이 없었고, 이 경로의 구현도 내장 도구 목록을 반환한다.
 따라서 Control Plane MCP 서버 `fos-assistant`는 설정에 넣되, 저장 뒤 이 경로로 다시 읽은 결과와 비교하지 않는다.
 근거는 [대시보드 도구 경로](https://github.com/NousResearch/hermes-agent/blob/v2026.9.14/hermes_cli/web_routers/tools.py), [API server 도구 경로](https://github.com/NousResearch/hermes-agent/blob/v2026.9.14/gateway/platforms/api_server.py)다.
@@ -227,13 +215,7 @@ Control Plane 이 저장 규칙을 이 검사에 맞추는 까닭은 [ADR-034](.
 `skill_manage(write_file)`는 해당 네 하위 디렉터리의 텍스트 파일을 다루며 파일당 1 MiB와 100,000자 제한이 있지만, 대시보드 HTTP 경로로 노출되지 않았다.
 근거는 [스킬 HTTP 경로](https://github.com/NousResearch/hermes-agent/blob/v2026.9.14/hermes_cli/web_routers/skills.py), [스킬 쓰기와 검증](https://github.com/NousResearch/hermes-agent/blob/v2026.9.14/tools/skill_manager_tool.py)이다.
 
-공식 `POST /api/files/upload`는 data URL로 파일 하나를 올리고, `POST /api/files/upload-stream`은 multipart로 올린다.
-둘 다 하위 디렉터리를 만들 수 있고 개별 파일의 Hermes 한도는 100 MiB다.
-이 경로 자체는 스킬 전용도 profile 전용도 아니므로 plugin에서 대상 경로를 profile의 승인된 업로드 디렉터리로 제한해야 한다.
-업로드 경로를 분리해도 `file`이나 `terminal` 도구가 같은 컨테이너에서 돌면 파일 자체는 profile 간에 격리되지 않는다. 이 도구를 실행 공간으로 옮기는 것은 [실행 공간](sandbox.md) 이 갖는다.
-제품에는 더 작은 파일 및 전체 묶음 한도를 둘 수 있다.
-`DELETE /api/skills`는 없으므로 삭제는 `skills.external_dirs`에서 경로를 빼고 파일 경로를 제한한 `DELETE /api/files`로 정리하는 흐름이 필요하다.
-근거는 [파일 HTTP 경로](https://github.com/NousResearch/hermes-agent/blob/v2026.9.14/hermes_cli/web_routers/files.py), [파일 루트 제한](https://github.com/NousResearch/hermes-agent/blob/v2026.9.14/hermes_cli/web_server_files.py)이다.
+`DELETE /api/skills`는 없다. 스킬을 빼려면 `skills.external_dirs`에서 경로를 뺀다.
 
 대시보드가 스킬을 만들면 자기 프로세스의 색인 캐시만 비운다.
 공유 gateway의 `build_skills_system_prompt` 메모리 캐시 키에는 스킬 디렉터리 경로와 비활성화 목록은 있지만 디렉터리 내용은 없다.
@@ -273,15 +255,3 @@ MCP 설정 쓰기 실패가 profile 생성 실패로 바뀌지 않는다.
 스킬 색인 캐시 키에는 profile 스킬 디렉터리의 내용이 없고 `skills.disabled`가 들어 있다.
 그래서 바인딩 설치는 스킬 파일을 바꿀 때 `skills.disabled`의 색인 표식(`fos-skill-index-` 앞머리)을 새 값으로 바꿔 그 profile의 다음 실행이 색인을 새로 만들게 한다.
 판정과 근거는 [ADR-20261007 / connector-live-reload](../adr/ADR-20261007-connector-live-reload.md)가 갖는다.
-
-v0.21.3에서는 공유 gateway의 MCP 연결이 profile 범위의 키를 사용한다.
-같은 서버 이름을 두 profile이 써도 서로 다른 credential의 연결을 구분하도록 고쳤다.
-이는 [profile별 공유 MCP 가시성 수정](https://github.com/NousResearch/hermes-agent/pull/106314)과 [동일 이름 연결 분리 수정](https://github.com/NousResearch/hermes-agent/pull/108352)에 해당한다.
-설정 파일 분리만 믿지 말고, 새 profile의 실제 API 실행에 Memory 도구가 나타나는지 검증해야 한다.
-
-### 검증 범위
-
-격리 실험은 운영 이미지와 같은 이미지 ID의 일회성 컨테이너에서 `--network none`으로 실행했다.
-FastAPI의 실제 설정, 도구, 스킬 처리기를 사용했으며 실험 파일은 컨테이너와 함께 없어졌다.
-본문 재읽기, profile 우선순위, 도구 목록 29개, 스킬 생성·수정·비활성화와 색인 경로 변경을 확인했다.
-공유 gateway의 MCP 자동 발견과 새 profile의 실제 대화 실행은 이 조사에서 구동하지 않았으므로 코드 판정으로 구분했다.

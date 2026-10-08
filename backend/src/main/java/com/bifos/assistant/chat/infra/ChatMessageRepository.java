@@ -2,8 +2,10 @@ package com.bifos.assistant.chat.infra;
 
 import com.bifos.assistant.chat.domain.ChatMessage;
 import com.bifos.assistant.chat.domain.TurnTiming;
+import com.bifos.assistant.chat.domain.UserLastMessage;
 import com.bifos.assistant.chat.domain.type.MessageRole;
 import java.time.Instant;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -67,4 +69,13 @@ public interface ChatMessageRepository extends JpaRepository<ChatMessage, Long>,
             """)
     List<TurnTiming> findUserTurnTimings(
             @Param("userId") Long userId, @Param("from") Instant from, @Param("to") Instant to);
+
+    @Query("""
+            select new com.bifos.assistant.chat.domain.UserLastMessage(message.senderUserId, max(message.createdAt))
+            from ChatMessage message
+            where message.role = com.bifos.assistant.chat.domain.type.MessageRole.USER
+                and message.senderUserId in :userIds
+            group by message.senderUserId
+            """)
+    List<UserLastMessage> findLastUserMessages(@Param("userIds") Collection<Long> userIds);
 }

@@ -13,18 +13,14 @@
 정책에서 profile 을 빼면 다음 셸 저장에서 local 로 돌아간다.
 정책 형식과 env, 망, 마운트 검증은 [`../../hermes/README.md`](../../hermes/README.md)의 「셸 실행 공간」이 갖는다.
 
-커리어 실행기의 경로와 Backend URL 은 그 profile 정책의 env 에만 둔다.
-Backend 와 연결할 망과 token 파일의 읽기 전용 마운트도 같은 profile 에만 둔다.
-셸은 token 파일을 읽고 Backend 의 모든 API 를 부를 수 있다. 읽기 전용 마운트는 token 유출이나 API 쓰기를 막지 않는다.
-checkout 은 필요한 코드와 근거만 읽기 전용으로 붙이고, 근거 검사는 `--no-fetch` 로 돌린다.
-작업본은 `/workspace/career`, study 실행기의 임시 자료는 `/tmp` 를 쓴다.
+token 파일을 실행 공간에 읽기 전용으로 붙인 profile 의 셸은 그 token 으로 Backend 의 모든 API 를 부를 수 있다.
+읽기 전용 마운트는 token 유출이나 API 쓰기를 막지 않는다.
 
-**기존 Hermes 예약 작업은 기본 profile(local)에 남으며 아직 격리되지 않았다.**
+**Hermes 예약 작업은 기본 profile 의 설정과 cron 저장소를 따른다.** Control Plane 예약 작업으로 옮긴다([ADR-20261008 / cron-to-task](../adr/ADR-20261008-cron-to-task.md)).
 named profile 저장은 기본 profile 설정과 cron 저장소를 바꾸지 않는다.
 예약 작업 이름이나 지시문에 역할 이름을 넣어도 실행 profile 은 바뀌지 않는다.
 script 를 지정한 예약 작업의 subprocess 는 Hermes 프로세스에서 돈다. terminal backend 를 바꾸는 것으로 격리되지 않는다.
 Control Plane 예약 작업과 매일 깨우기는 각 에이전트의 profile 을 쓰는 별도 기능이다.
-실제 적용 순서와 확인은 `fos-home-infra` 가 갖는다.
 
 ## 무엇이 실행 공간 안에서 도는가
 
@@ -164,6 +160,7 @@ Hermes 는 큰 도구 결과를 모델에 그대로 넣지 않고 파일로 저�
 | 연결이 없을 때 | **Hermes 쪽 경로를 돌려준다.** 셸이나 `execute_code` 를 아직 부르지 않은 turn 에서 목록을 먼저 부르면 실행 공간에서 열리지 않는 경로가 나온다 |
 
 그래서 계산할 데이터를 실행 공간에 넘기는 길로 이 저장에 기대지 않는다.
+미리보기만 본 모델이 본문을 읽으려면 `read_file` 이 있어야 한다. 파일 도구를 잠근 에이전트는 저장된 본문에 닿지 못한다.
 
 ## 파일 도구의 쓰기 경로 검사
 
@@ -295,7 +292,8 @@ proxy 의 기록은 `iron-proxy.log` 에 요청마다 한 줄이다. 별도 audi
 
 ## Docker 를 다루는 길
 
-지금 운영 Hermes 컨테이너에는 Docker socket 이 없다. 실행 공간을 쓰려면 Hermes 가 컨테이너를 만들 수 있어야 한다.
+실행 공간을 쓰려면 Hermes 가 컨테이너를 만들 수 있어야 한다.
+Hermes 는 Docker 를 컨테이너 생성 요청 본문을 검사하는 socket proxy 로만 다룬다([ADR-086](../adr/ADR-086-셸과-파일-도구는-사용자별-docker-실행-공간에서만-돈다.md)).
 
 Hermes 가 쓰는 Docker API 는 `version`, `info`, `ps`, `inspect`, `image inspect`, `create`, `run`, `start`, `exec`, `rm` 이다. volume 과 network API 는 쓰지 않는다.
 
@@ -303,7 +301,7 @@ Hermes 가 쓰는 Docker API 는 `version`, `info`, `ps`, `inspect`, `image insp
 | --- | --- | --- |
 | socket 을 Hermes 에 직접 붙인다 | 동작한다 | Hermes 프로세스나 그 자식(커넥터 MCP 서버 포함)이 뚫리면 호스트 root 와 같다 |
 | 경로와 메서드만 거르는 socket proxy(containers, exec, images, info, version 만 연다) | 실행 공간이 동작한다. volume 과 network 목록은 403 | **`--privileged -v /:/host` 컨테이너 생성이 통과했다.** 호스트 파일 시스템이 보였다 |
-| 컨테이너 생성 요청 본문을 검사하는 proxy | 이 저장소에서 측정하지 않았다 | 권장. 아래 조건을 본문에서 강제한다 |
+| 컨테이너 생성 요청 본문을 검사하는 proxy | 이 저장소에서 측정하지 않았다 | 채택했다. 아래 조건을 본문에서 강제한다 |
 
 본문 검사 proxy 가 거절할 것은 이렇다.
 
@@ -317,18 +315,9 @@ Hermes 가 쓰는 Docker API 는 `version`, `info`, `ps`, `inspect`, `image insp
 
 ## 자원
 
-colima VM(4 CPU, 8 GiB) 에서 측정했다. 이미지는 `python:3.11-slim` 이다.
-
-| 항목 | 측정 |
-| --- | --- |
-| 첫 셸 호출(컨테이너 생성 포함) | 2.3초에서 3.8초 |
-| 이어지는 셸 호출 | 0.3초에서 0.8초 |
-| 멈춘 컨테이너를 다시 띄운 호출 | 3.3초 |
-| 첫 `execute_code`(원격 커널 기동 포함) | 3.1초에서 4.0초 |
-| 유휴 컨테이너 메모리 | 0.6 MiB 에서 15 MiB |
-| 컨테이너 수 | profile 마다 하나(사용자별 볼륨 방식) 또는 사용자마다 하나(공유 키). 셸을 한 번도 쓰지 않은 profile 은 만들지 않는다 |
-
-디스크 상한(`container_disk`)은 storage driver 가 XFS pquota 를 지원할 때만 걸린다. 측정 환경에서는 걸리지 않았다.
+첫 셸 호출은 컨테이너 생성까지 포함해 2~4초, 이어지는 호출은 1초 안쪽이고, 유휴 컨테이너는 메모리를 15 MiB 넘게 쓰지 않았다(4 CPU, 8 GiB VM 측정).
+컨테이너는 profile 마다 하나(사용자별 볼륨 방식) 또는 사용자마다 하나(공유 키)다. 셸을 한 번도 쓰지 않은 profile 은 만들지 않는다.
+디스크 상한(`container_disk`)은 storage driver 가 XFS pquota 를 지원할 때만 걸린다.
 
 ## 근거
 

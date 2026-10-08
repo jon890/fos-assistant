@@ -20,9 +20,7 @@ Control Plane 이 Memory 를 주입하는 자리가 여기다.
 
 ## 도는 실행에 지시를 더하는 `steer`
 
-**이 문서는 2026-10-01 까지 「도는 실행에 메시지를 끼워 넣는 경로는 없다」 고 적었다. 틀린 기술이었다.**
 v0.21.5 의 `gateway/platforms/api_server_runs.py` 에 `_handle_steer_run` 이 있다.
-[`delegation.md`](delegation.md) 와 [`upgrades.md`](upgrades.md) 는 이미 `steer` 경로와 `run.steered` 사건을 적고 있었다.
 
 | 항목 | 계약 |
 | --- | --- |
@@ -48,7 +46,7 @@ v0.21.5 의 `gateway/platforms/api_server_runs.py` 에 `_handle_steer_run` 이 �
 
 ## 실행 조회가 답하는 기간
 
-v0.21.5 의 [`gateway/platforms/api_server_runs.py`](https://github.com/NousResearch/hermes-agent/blob/v2026.9.24/gateway/platforms/api_server_runs.py) 와 `api_server.py` 를 2026-10-02 에 소스로 읽었다. 운영 Hermes 에서 왕복으로 확인하지는 않았다.
+v0.21.5 의 [`gateway/platforms/api_server_runs.py`](https://github.com/NousResearch/hermes-agent/blob/v2026.9.24/gateway/platforms/api_server_runs.py) 와 `api_server.py` 를 소스로 읽었다. 운영 Hermes 에서 왕복으로 확인하지는 않았다.
 
 **실행 상태는 gateway 프로세스의 메모리에 있다.** `_run_statuses` 가 run 번호마다 상태 하나를 갖는다.
 
@@ -148,79 +146,23 @@ Hermes 안에서 다른 모델로 넘어가도 이 값은 바뀌지 않는다.
 실제로 돈 모델은 `GET /api/sessions/{session_id}` 의 `model` 이 담는다.
 fallback 으로 넘어간 뒤의 모델까지 그쪽에 들어 있다.
 
-**v0.21.5 에서 달라진 두 가지**(2026-09-29 운영에서 확인):
+**v0.21.5 에서 달라진 두 가지**(운영에서 확인):
 
 - `GET /api/sessions/{session_id}` 는 행을 `{"object": "session", "session": {...}}` 로 감싸고, `model` 은 `session` 안에 있다. provider 칸은 응답에 없다. Hermes 저장소에는 `billing_provider` 로 남는다. 저장소의 그 칸은 [`delegation.md`](delegation.md) 의 「자식 session 의 provider 는 저장소에만 있다」 가 적는다
 - `GET /v1/runs/{run_id}` 는 끝난 실행에 `runtime: {"provider", "model", "route_source"}` 를 싣는다. fallback 으로 넘어간 경우도 실제로 돈 값이다. 근거는 [v0.21.5 `gateway/platforms/api_server_runs.py`](https://github.com/NousResearch/hermes-agent/blob/v2026.9.24/gateway/platforms/api_server_runs.py) 의 `_served_runtime` 과 `api_server.py` 의 `_sanitize_runtime_metadata` 다
 
 그래서 Control Plane 은 실행의 `runtime` 에 provider 와 모델이 둘 다 있으면 그 짝을 실행 기록에 적는다.
 둘 중 하나라도 없으면 세션 조회, 실행의 `runtime`, 대화가 고른 값 순서로 먼저 있는 것을 칸마다 따로 채운다.
-처음에는 세션 응답을 감싸지 않은 모양으로 읽어, 모델을 보내지 않은 실행의 provider, 모델, 금액이 비었다.
 
 `POST /api/sessions/{id}/chat` 은 응답에 `runtime` 을 담아 요청한 것과 실제로 돈 것을
-한 응답에서 대조할 수 있다. v0.21.3 까지는 그 블록이 `/v1/runs` 에 없었다. v0.21.5 는 아래처럼 실행 조회에도 싣는다.
+한 응답에서 대조할 수 있다. v0.21.3 까지는 그 블록이 `/v1/runs` 에 없었다. v0.21.5 는 위 「v0.21.5 에서 달라진 두 가지」 처럼 실행 조회에도 싣는다.
 
-### 그 칸이 어디서 오는가
-
-`gateway/platforms/api_server.py` 의 `_resolve_model_name` 이 정하고,
-그 결과를 platform 을 만들 때 한 번 담는다. 요청마다 다시 정하지 않는다.
-
-우선순위가 셋이다.
-
-1. 설정의 `model_name` 또는 환경의 `API_SERVER_MODEL_NAME`
-2. 그때 활성인 profile 의 이름
-3. 어느 것도 없으면 `hermes-agent`
-
-| 요청 | 응답의 `model` |
-| --- | --- |
-| `model` 을 준 요청 | 준 문자열을 그대로 돌려준다 |
-| `model` 을 주지 않은 요청 | listener 를 만들 때 정해진 이름 하나 |
-
-`/v1/capabilities` 가 알리는 것도 같은 값이다. **두 칸은 같은 출처다.**
-
-**`/v1/capabilities` 와 `/v1/runs` 에서는 한 listener 가 접두로 여러 profile 을
-서비스해도 이 값이 접두를 따라가지 않는다.**
-platform 을 만들 때 listener 주인의 범위에서 한 번 정해지기 때문이다.
-주인에게 `API_SERVER_MODEL_NAME` 이 없으면 셋째 단계인 `hermes-agent` 가 나온다.
-
-### 경로마다 다르다
-
-세 경로가 같은 값을 주지 않는다.
-
-| 경로 | 무엇을 주는가 |
-| --- | --- |
-| `/v1/capabilities` | platform 을 만들 때 담아 둔 이름 하나 |
-| `/v1/runs` 응답 | 요청이 준 문자열. 주지 않았으면 위와 같은 이름 |
-| `/v1/models` | 접두가 있으면 그 자리에서 다시 정한다 |
-
-`_handle_models` 만 이름 정하는 함수를 다시 부른다.
-앞의 둘은 platform 을 만들 때 담아 둔 값을 그대로 쓴다.
-
-```python
-model_name = (
-    self._resolve_model_name("")
-    if _api_request_profile.get()
-    else self._model_name
-)
-```
-
-**그래서 접두를 따라가는 것은 `/v1/models` 뿐이다.**
-
-**다시 부를 때 넘기는 첫 인자가 비어 있다.**
-우선순위 1 인 `API_SERVER_MODEL_NAME` 을 건너뛰고 2 인 활성 profile 이름으로 간다.
-그러므로 `/v1/models` 가 주는 것은 그 profile 의 `API_SERVER_MODEL_NAME` 이 아니라
-그 profile 의 **이름**이다.
-두 값을 같게 적어 둔 배포에서는 구별되지 않으므로 관측만으로는 판정할 수 없다.
-
-**어느 경로도 실제로 쓴 provider 모델을 주지 않는다.**
-접두를 따라가는 경로가 주는 것도 profile 이름이지 모델 이름이 아니다.
-
+`/v1/capabilities` 와 `/v1/models` 도 실제로 쓴 provider 모델을 주지 않는다.
 실제 모델을 알아야 하면 `/api/model/options` 가 그 profile 의 것을 답한다.
 
 ## `/api/model/options` 는 provider 와 모델 목록을 함께 준다
 
-2026-09-24 에 `openai-codex` 를 쓰는 profile 두 곳에서 불러 확인했다.
-두 응답의 모양이 같았다.
+응답의 모양은 아래와 같다.
 
 ```text
 {
@@ -263,7 +205,7 @@ API server 는 목록을 만들 때 Hermes 가 아는 provider 가운데 빠진 
 목록에 있다고 부를 수 있는 것은 아니므로 `authenticated` 가 참인 행만 골라야 한다.
 
 `key_env` 는 환경 변수 이름이지 값이 아니다.
-`pricing`, `free_tier`, `unavailable_models` 는 provider 에 따라 붙을 수 있지만 이번 두 응답에는 없었다.
+`pricing`, `free_tier`, `unavailable_models` 는 provider 에 따라 붙을 수 있다.
 
 목록은 그 profile 의 `config.yaml` 에서 온다.
 `model` 절, `providers`, 이전 형식의 `custom_providers`, `model_catalog.excluded_providers` 를 읽는다.
@@ -271,7 +213,7 @@ API server 는 목록을 만들 때 Hermes 가 아는 provider 가운데 빠진 
 쿼리는 `refresh` 하나만 읽는다.
 
 다른 경로는 이 목록을 대신하지 못한다.
-`/v1/models` 는 위에 적었듯 profile 이름만 준다.
+`/v1/models` 는 profile 이름만 준다.
 대시보드의 `/api/providers/custom-endpoints` 는 사용자가 더한 endpoint 만 준다.
 둘 다 provider 별 모델 목록이 아니다.
 
@@ -325,7 +267,7 @@ v0.21.0 의 `gateway/platforms/api_server_runs.py` 가 보내는 것을 실측�
 10초마다 `: keepalive` 주석이 온다.
 
 **가짜 Hermes 를 이 형태로 맞춰 둔다.**
-어긋나면 테스트는 통과하는데 운영에서 조각이 흐르지 않는다. 실측으로 그렇게 한 번 놓쳤다.
+어긋나면 테스트는 통과하는데 운영에서 조각이 흐르지 않는다.
 
 ### 붙은 커넥터 서버의 도구 사건
 
@@ -346,7 +288,7 @@ v0.21.5 의 `agent/tool_executor.py` 가 도구 하나를 실행하기 전에 `t
 도구 이름, 걸린 시간, 실패 여부만 남는다.
 
 **사건은 우리가 `GET /v1/runs/{run_id}/events` 를 열어야 받는다.**
-Hermes 는 도구를 실행했다는 로그를 남기지만 사건 스트림은 구독자가 있을 때만 읽힌다. 2026-10-06 에 한 번에 받는 경로로 보낸 실행이 붙은 서버의 도구를 불렀는데 실행 기록에 도구 사건이 없었다.
-Control Plane 이 그 경로에서 스트림을 열지 않았기 때문이고, 지금은 두 경로 모두 연다([ADR-090](../adr/ADR-090-한-번에-받는-경로도-hermes-사건-스트림을-열어-도구-사건을-남긴다.md)).
+Hermes 는 도구를 실행했다는 로그를 남기지만 사건 스트림은 구독자가 있을 때만 읽힌다.
+Control Plane 은 한 번에 받는 경로에서도 스트림을 연다([ADR-090](../adr/ADR-090-한-번에-받는-경로도-hermes-사건-스트림을-열어-도구-사건을-남긴다.md)).
 
 가짜 Hermes 는 허용된 커넥터 도구 호출을 위 모양(`run_id`, `timestamp`, 시작의 인자 `preview`, 완료의 결과 `preview`)으로 흘린다.

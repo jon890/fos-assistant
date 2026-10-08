@@ -258,7 +258,8 @@ class ChatConversationQueries {
         PageRequest window = PageRequest.ofSize(size + 1);
         List<Conversation> rows;
         if (cursor == null) {
-            rows = conversations.findByUserIdAndDeletedAtIsNullOrderByUpdatedAtDescIdDesc(user.id(), window);
+            rows = conversations.findByUserIdAndDeletedAtIsNullAndHiddenAtIsNullOrderByUpdatedAtDescIdDesc(
+                    user.id(), window);
         } else {
             ConversationCursor from = ConversationCursor.decode(cursor);
             rows = conversations.findPageAfter(user.id(), from.updatedAt(), from.id(), window);

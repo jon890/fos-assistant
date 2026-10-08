@@ -4,7 +4,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
 
 import com.bifos.assistant.hermes.dto.ConnectorAppearance;
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -53,6 +56,22 @@ class ConnectorAppearancesTest {
             "https://[::1]/",
             "https://example.com/?a[]=1",
             "https://example.com/" + "a".repeat(501 - "https://example.com/".length()));
+
+    @DisplayName("배포하는 서비스 아이콘이 Control Plane 검증을 통과한다")
+    @ParameterizedTest
+    @ValueSource(strings = {"gmail", "naver-blog"})
+    void acceptsBundledServiceIcons(String connectorId) throws IOException {
+        Path root = Path.of("../hermes/connectors", connectorId);
+        JsonNode manifest = JSON.readTree(Files.readString(root.resolve("connector.json")));
+        byte[] svg = Files.readAllBytes(root.resolve(manifest.path("icon").asText()));
+        String data = Base64.getEncoder().encodeToString(svg);
+        String link = manifest.path("link").asText();
+
+        ConnectorAppearance read = ConnectorAppearances.read(item(icon("image/svg+xml", data), link));
+
+        assertThat(svg.length).isLessThanOrEqualTo(ICON_MAX_BYTES);
+        assertThat(read).isEqualTo(new ConnectorAppearance("data:image/svg+xml;base64," + data, link));
+    }
 
     @DisplayName("SVG 와 PNG 아이콘은 data URL 로, https 링크는 그대로 담는다")
     @Test

@@ -1,6 +1,8 @@
 package com.bifos.assistant.usage;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 import com.bifos.assistant.agent.domain.type.CostMode;
 import com.bifos.assistant.hermes.dto.TokenUsage;
@@ -220,6 +222,28 @@ class CostEstimatorTest {
         EstimatedCost cost = new CostEstimator(reloadedBetween).estimate("openai", "m", usage(1000L, null, 500L));
 
         assertThat(cost.pricingVersion()).isEqualTo("models.dev@2026-09-17");
+    }
+
+    @Test
+    @DisplayName("모델 이름이 같아도 provider 별 가격을 쓰고 모르는 provider 는 금액을 비운다")
+    void pricesSameModelSeparatelyForEachProvider() {
+        PriceCatalog catalog = mock(PriceCatalog.class);
+        when(catalog.find("provider-a", "shared-model"))
+                .thenReturn(Optional.of(new CatalogPrice(
+                        new ModelPrice(new BigDecimal("2"), new BigDecimal("8"), null, List.of()), "a@1")));
+        when(catalog.find("provider-b", "shared-model"))
+                .thenReturn(Optional.of(new CatalogPrice(
+                        new ModelPrice(new BigDecimal("5"), new BigDecimal("30"), null, List.of()), "b@1")));
+        CostEstimator costs = new CostEstimator(catalog);
+        TokenUsage tokens = usage(1000L, null, 500L);
+
+        assertThat(costs.estimate("provider-a", "shared-model", tokens).micros())
+                .isEqualTo(6_000L);
+        assertThat(costs.estimate("provider-b", "shared-model", tokens).micros())
+                .isEqualTo(20_000L);
+        assertThat(costs.estimate("provider-b", "shared-model", tokens).pricingVersion())
+                .isEqualTo("b@1");
+        assertThat(costs.estimate("provider-c", "shared-model", tokens)).isEqualTo(EstimatedCost.unknown());
     }
 
     private static TokenUsage usage(Long input, Long cached, Long output) {
