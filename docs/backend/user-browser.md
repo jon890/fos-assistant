@@ -238,8 +238,8 @@ Control Plane 은 브라우저의 CDP 에 두 가지로 닿는다. 주소는 컨
 | `GET json/list`, `GET json` | 그대로 넘긴다. 줄마다 `webSocketDebuggerUrl` 을 중계 주소로 바꾸고 `devtoolsFrontendUrl` 을 뺀다 |
 | `PUT json/new?<주소>` | 주소가 `http`, `https`, `about:blank` 일 때만 넘긴다. 응답은 `json/list` 의 한 줄처럼 바꾼다 |
 | `GET json/close/<번호>`, `GET json/activate/<번호>` | 번호가 영문자와 숫자일 때만 넘기고 Chrome 의 글을 그대로 준다 |
-| WebSocket `devtools/browser/<번호>`, `devtools/page/<번호>` | Chrome 의 같은 경로에 붙고 양쪽 글 메시지를 그대로 잇는다 |
-| 그 밖 | 404 |
+| WebSocket `devtools/browser/<번호>`, `devtools/page/<번호>` | 번호가 영문자와 숫자, `-` 로 128자까지일 때만 Chrome 의 같은 경로에 붙고 양쪽 글 메시지를 그대로 잇는다. 브라우저 대상 번호는 GUID 다 |
+| 그 밖 | 빈 404 |
 
 중계 주소는 `gateway-base-url` 의 scheme 을 `ws` 나 `wss` 로 바꾸고 `/<접근 표식>/devtools/<종류>/<번호>` 를 붙인 것이다.
 커넥터는 이 주소의 경로만 꺼내 자기가 받은 주소의 호스트에 붙이므로 둘이 달라도 된다.
@@ -261,6 +261,7 @@ Chrome 에는 `BrowserRuntime#cdpAddress` 가 준 컨테이너 IP 주소로, `Or
 
 - 받는 쪽은 Spring WebSocket 이다. 받은 연결 하나에 Chrome 쪽 연결 하나를 열고, 한쪽이 닫히면 다른 쪽도 닫는다
 - 연결이 열려 있는 동안 `BrowserUsage` 핸들을 쥐어 자동 중지하지 않는다. 메시지가 오갈 때마다 활동을 기록한다(1분에 한 번까지 쓴다)
-- 글 메시지만 넘긴다. 메시지 하나는 4M 글자까지다. 넘으면 양쪽을 닫는다
+- 글 메시지만 조각째 그대로 넘긴다. 모아서 넘기지 않으므로 사진 바이트가 든 큰 CDP 메시지도 세션마다 큰 버퍼를 잡지 않는다. 한쪽으로 가는 조각은 앞 조각을 보낸 뒤에 보낸다
+- 메시지 하나(조각의 합)는 64M 글자까지다. 넘으면 양쪽을 닫는다. 바이너리 메시지가 오면 닫는다
 - 끄기, 지우기, 사용자 끄기, 상태 맞추기로 브라우저가 멈추면 Chrome 쪽 연결이 끊기고 받은 연결도 닫힌다
 - 표식은 열 때만 확인한다. 열린 뒤 바인딩을 떼도 그 연결은 닫힐 때까지 간다. 떼기는 도구 목록에서 서버를 빼므로 새 호출은 오지 않는다

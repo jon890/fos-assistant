@@ -6,15 +6,16 @@
 ## 상태
 
 단계 1, 2(2a-1, 2a-2, 2b)를 구현했다. 남은 것은 단계 3, 4 다.
-단계 3 은 운영 코드 1,000줄 상한 때문에 둘로 나눈다. 3a 는 phase 01, 02 이고 3b 는 phase 03, 04 다. 3b 는 3a 의 브랜치 위에 쌓는다.
+단계 3 은 운영 코드 1,000줄 상한 때문에 둘로 나눈다. 3a 는 phase 01, 02 이고 3b 는 phase 03, 04, 05 다. 3b 는 3a 의 브랜치 위에 쌓는다.
 단계 3 의 계약은 `docs/backend/user-browser.md` 의 「중계」 와 `docs/adr/ADR-20261008-browser-gateway-token.md` 가 갖는다. 3b 의 PR 이 이 디렉터리를 지운다.
 
 | phase | PR | 담는 것 |
 | --- | --- | --- |
 | 01 | 3a | 중계 설정, 접근 표식, 주인의 브라우저를 만들고 켜는 서비스 |
-| 02 | 3a | 중계의 HTTP 와 WebSocket, 보안 설정 |
-| 03 | 3b | `owner_browser_env` 배선. 대시보드 plugin 과 Control Plane 의 설치, 확인 호출, 카탈로그 |
-| 04 | 3b | 네이버 블로그 커넥터의 `cdp_url` 을 빼고 중계로 붙기, 웹 안내, 문서 |
+| 02 | 3a | 중계의 HTTP 창구와 보안 설정 |
+| 03 | 3b | 중계의 WebSocket(조각째 잇기) |
+| 04 | 3b | `owner_browser_env` 배선. 대시보드 plugin 과 Control Plane 의 설치, 확인 호출, 카탈로그 |
+| 05 | 3b | 네이버 블로그 커넥터의 `cdp_url` 을 빼고 중계로 붙기, 웹 안내, 문서 |
 
 ## 단계와 PR
 
@@ -36,7 +37,7 @@
 2. 단계 1 을 배포한다. 운영 설정에 proxy 주소를 넣고 `assistant.browser.enabled` 를 켠다
 3. 관리자가 자기 브라우저로 켜기, 끄기, 자동 중지를 확인한다
 4. 단계 2 배포 뒤 관리자가 휴대폰과 PC 에서 네이버에 로그인해 본다
-5. 단계 3 배포 뒤 블로그 주인이 「내 브라우저」 에서 로그인하고 연결을 다시 확인한다. 실제 계정 확인 절차는 `docs/connectors/naver-blog.md` 의 「실제 계정으로 확인하기」 를 따른다
+5. 단계 3 을 배포하기 전에 중계 설정 두 값(`ASSISTANT_BROWSER_GATEWAY_BASE_URL`, `ASSISTANT_BROWSER_GATEWAY_SECRET`)을 넣는다. 값 없이 연결 확인을 하면 빈 주소로 설치되어 값을 넣은 뒤 다시 확인해야 한다. 배포 뒤 블로그 주인이 「내 브라우저」 에서 로그인하고 연결을 다시 확인한다. 실제 계정 확인 절차는 `docs/connectors/naver-blog.md` 의 「실제 계정으로 확인하기」 를 따른다
 6. 단계 4 로 상주 Chrome 을 내린다
 
 ## 사용자가 정한 것
