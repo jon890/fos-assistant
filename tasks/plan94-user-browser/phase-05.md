@@ -94,5 +94,6 @@ scripts/check-local.sh connector-connection
 | `hermes/connectors/naver-blog/dist/naver-blog-mcp.js` | 수정 |
 | `web/src/lib/connection.ts` | 수정 |
 | `web/src/components/connector/connector-connection-panel.tsx` | 수정 |
+| `web/src/components/connector/browser-login.tsx` | 신규 |
 | `test/browser/connector-connection.spec.ts` | 수정 |
 | `docs/connectors/naver-blog.md` | 수정 |
