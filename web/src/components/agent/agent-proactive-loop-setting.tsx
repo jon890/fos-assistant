@@ -87,7 +87,6 @@ export function AgentProactiveLoopSetting({ code }: { code: string }) {
 
   return (
     <div className="mt-6 border-t border-border pt-4">
-      <h4 className="font-medium">깨운 뒤 먼저 다룰 문제 고르기</h4>
       {error ? (
         <Notice variant="error" role="alert" className="mt-3">
           {error}

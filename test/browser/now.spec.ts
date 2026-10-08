@@ -571,6 +571,30 @@ test.describe("지금 화면", () => {
     await page.unrouteAll({ behavior: "ignoreErrors" });
   });
 
+  test("이미 없는 판정에 반응하면 그 코드의 문구를 항목 아래에 보이고 화면을 다시 읽는다", async ({
+    page,
+    isolatedMember,
+  }) => {
+    const problem = "주말 장보기 예산이 넘었어요";
+    await surfaceProblem(isolatedMember.email, await ownAgent(page), problem, "지출 내역부터 훑어 보기", "SURFACE");
+    await page.route("**/api/autonomy-decisions/*/reaction", (route: Route) =>
+      route.fulfill({ status: 404, json: { code: "AUTONOMY_DECISION_NOT_FOUND", message: "no such surfaced decision" } }),
+    );
+
+    await openNow(page);
+    const row = page.getByTestId("now-card-needs_me").getByTestId("now-item").filter({ hasText: problem });
+    await expect(row).toHaveCount(1);
+    const reread = page.waitForResponse(
+      (response) => response.request().method() === "GET" && new URL(response.url()).pathname === "/now",
+    );
+    await row.getByRole("button", { name: "받아들임", exact: true }).click();
+    await expect(row).toContainText("이미 처리했거나 찾을 수 없는 항목이에요. 화면을 다시 열어 주세요.");
+    await expect(row).not.toContainText("잠시 뒤 다시 눌러 주세요");
+    await reread;
+
+    await page.unrouteAll({ behavior: "ignoreErrors" });
+  });
+
   test("새 대화 화면의 「확인할 것 N건」 은 늦게 도착해도 입력창을 밀지 않고 읽지 못하면 그리지 않는다", async ({
     page,
     hermes,

@@ -62,13 +62,14 @@ public class SurfacedProblems {
     private final Clock clock;
 
     /**
-     * 요청자에게 지금 보일 판정을 늦게 남긴 것부터 낸다.
+     * 요청자에게 지금 보일 판정을 늦게 남긴 것부터 {@code surface-max-items} 개까지 낸다. 반응은 이 상한을 보지 않는다.
      *
      * <p>판정을 읽고 나서 후보 줄이나 살펴보기 줄이 없거나 문제 글이 비었으면 그 판정만 뺀다.
      */
     @Transactional(readOnly = true)
     public List<SurfacedProblem> openOf(Long userId, Instant now) {
-        Instant since = now.minus(properties.current().surfaceWindow());
+        ProactiveLoopProperties loop = properties.current();
+        Instant since = now.minus(loop.surfaceWindow());
         Set<Long> evaluationIds =
                 runs.findByUserIdAndStatusAndCreatedAtAfter(userId, LoopRunStatus.DECIDED, since).stream()
                         .map(ProactiveLoopRun::evaluationId)
@@ -120,6 +121,7 @@ public class SurfacedProblems {
         return latestPerKey.values().stream()
                 .filter(surfaced -> !reactions.containsKey(surfaced.decision().id()))
                 .sorted(LATEST.reversed())
+                .limit(loop.surfaceMaxItems())
                 .map(Surfaced::view)
                 .toList();
     }

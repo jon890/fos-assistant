@@ -129,8 +129,13 @@ export function NowItem({
     setError(null);
     const result = await reactToDecision(problem.decisionId, reaction);
     setPending(null);
-    if (result.ok) acted();
-    else setError(result.message);
+    if (result.ok) {
+      acted();
+      return;
+    }
+    setError(result.message);
+    // 판정이 이미 없으면 서버가 지금 화면에서 뺀 것이다. 문구를 보이고 화면을 다시 읽는다.
+    if (result.code === "AUTONOMY_DECISION_NOT_FOUND") router.refresh();
   }
 
   if (control) {

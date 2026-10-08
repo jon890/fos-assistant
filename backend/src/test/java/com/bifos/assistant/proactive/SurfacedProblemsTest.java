@@ -183,8 +183,7 @@ class SurfacedProblemsTest extends ProactiveLoopTestSupport {
     void keepsLatestPerProblemKeyBeforeReaction() {
         CurrentUser user = newUser();
         Agent agent = newAgent(user);
-        Seeded older =
-                seed.decided(user, agent, spec(KEY_A, "옛 시도의 문제", AutonomyLevel.SURFACE, BASE.minusSeconds(7_200)));
+        seed.decided(user, agent, spec(KEY_A, "옛 시도의 문제", AutonomyLevel.SURFACE, BASE.minusSeconds(7_200)));
         Seeded newer = seed.decided(user, agent, spec(KEY_A, "새 시도의 문제", AutonomyLevel.SURFACE, BASE.minusSeconds(60)));
 
         assertThat(surfaced.openOf(user.id(), BASE))
@@ -194,7 +193,6 @@ class SurfacedProblemsTest extends ProactiveLoopTestSupport {
         surfaced.react(user, newer.decisionId(), DecisionReaction.DISMISSED);
 
         assertThat(surfaced.openOf(user.id(), BASE)).as("옛 판정이 되살아나지 않는다").isEmpty();
-        assertThat(older.decisionId()).isNotEqualTo(newer.decisionId());
     }
 
     @Test
@@ -243,10 +241,15 @@ class SurfacedProblemsTest extends ProactiveLoopTestSupport {
         Seeded seeded =
                 seed.decided(user, agent, spec(KEY_A, "마감이 내일이다", AutonomyLevel.SURFACE, BASE.minusSeconds(60)));
 
+        List<Long> before = sideEffectCounts(user);
+
         surfaced.react(user, seeded.decisionId(), DecisionReaction.ACCEPTED);
         surfaced.react(user, seeded.decisionId(), DecisionReaction.ACCEPTED);
 
         assertThat(surfaced.openOf(user.id(), BASE)).isEmpty();
+        assertThat(sideEffectCounts(user))
+                .as("반응 전후의 follow_up, connector_action, agent_execution, notification 줄 수")
+                .isEqualTo(before);
         assertThat(jdbc.queryForList(
                         "SELECT actor, conversation_id, source_check_id, autonomy_decision_id FROM decision_feedback_event"
                                 + " WHERE user_id = ? AND event_type = 'ACCEPTED'",
@@ -258,9 +261,30 @@ class SurfacedProblemsTest extends ProactiveLoopTestSupport {
                     assertThat(row.get("SOURCE_CHECK_ID")).isEqualTo(seeded.checkId());
                     assertThat(row.get("AUTONOMY_DECISION_ID")).isEqualTo(seeded.decisionId());
                 });
-        assertThat(notificationCount(user)).as("반응은 알림을 만들지 않는다").isZero();
         assertThat(surfaced.current(user.id(), List.of(seeded.decisionId())))
                 .isEqualTo(Map.of(seeded.decisionId(), DecisionReaction.ACCEPTED));
+    }
+
+    @Test
+    @DisplayName("판정이 상한보다 많으면 늦은 것부터 surface-max-items 개만 나오고 반응은 상한을 보지 않는다")
+    void limitsOpenDecisionsToSurfaceMaxItems() {
+        CurrentUser user = newUser();
+        Agent agent = newAgent(user);
+        Seeded oldest =
+                seed.decided(user, agent, spec("key:1", "가장 오래된 문제", AutonomyLevel.SURFACE, BASE.minusSeconds(400)));
+        Seeded second =
+                seed.decided(user, agent, spec("key:2", "둘째 문제", AutonomyLevel.SURFACE, BASE.minusSeconds(300)));
+        Seeded third = seed.decided(user, agent, spec("key:3", "셋째 문제", AutonomyLevel.SURFACE, BASE.minusSeconds(200)));
+        Seeded latest =
+                seed.decided(user, agent, spec("key:4", "가장 늦은 문제", AutonomyLevel.SURFACE, BASE.minusSeconds(100)));
+
+        assertThat(surfaced.openOf(user.id(), BASE))
+                .extracting(SurfacedProblem::decisionId)
+                .containsExactly(latest.decisionId(), third.decisionId(), second.decisionId());
+
+        surfaced.react(user, oldest.decisionId(), DecisionReaction.ACCEPTED);
+
+        assertThat(events(user, FeedbackEventType.ACCEPTED)).hasSize(1);
     }
 
     @Test
@@ -368,6 +392,14 @@ class SurfacedProblemsTest extends ProactiveLoopTestSupport {
                 .isInstanceOfSatisfying(
                         ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.VALIDATION_FAILED));
         assertThat(DecisionReaction.parse("ACCEPTED")).isEqualTo(DecisionReaction.ACCEPTED);
+    }
+
+    /** follow_up, connector_action, agent_execution, notification 줄 수다. 반응이 이 줄들을 만들지 않는지 본다. */
+    private List<Long> sideEffectCounts(CurrentUser user) {
+        return List.of("follow_up", "connector_action", "agent_execution", "notification").stream()
+                .map(table -> jdbc.queryForObject(
+                        "SELECT COUNT(*) FROM " + table + " WHERE user_id = ?", Long.class, user.id()))
+                .toList();
     }
 
     private static Spec spec(String problemKey, String problem, AutonomyLevel level, Instant at) {
