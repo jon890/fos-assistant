@@ -364,7 +364,7 @@ sequenceDiagram
     C->>C: 질문 메시지를 저장하고 실행 줄에 잇는다(execution_question)
     C->>H: POST /v1/runs (지시문에 기억 지침)
     H->>C: POST /mcp memory_remember 와 서명한 _fos_ctx
-    C->>C: 루트 실행인가, 본문이 질문 원문의 문장 그대로이고 제목이 본문 안에 있는가, 바깥 도구와 질문 없는 실행이 없는가, 민감하지 않고 민감해 보이는 글이 없는가
+    C->>C: 루트 실행인가, 부정이 질문과 본문 한쪽에만 있지 않은가, 바깥 도구와 질문 없는 실행이 없는가, 민감하지 않고 민감해 보이는 글이 없는가
     alt 모두 만족
         C->>C: memory 를 ACCEPTED 로, memory_capture 를 CREATED 로
         C-->>H: 기억했다

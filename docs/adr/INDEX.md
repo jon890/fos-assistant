@@ -127,4 +127,4 @@
 | [ADR-20261008 / check-finding-reaction](ADR-20261008-check-finding-reaction.md) | 살펴보기 발견의 반응은 판단 피드백 사건으로 받고, 「관심 없음」 은 digest 기간 안에서만 같은 주제를 내린다 | backend, frontend | Accepted. ADR-20261007 / decision-feedback 의 「억제 규칙을 바꾸지 않는다」 와 ADR-081 의 되풀이 규칙에 예외를 둔다 |
 | [ADR-20261008 / connector-card](ADR-20261008-connector-card.md) | 커넥터 아이콘은 plugin 안의 파일을 카탈로그에 실어 같은 출처의 이미지로만 그리고, 링크는 https 만 받는다 | 공통 | Accepted. ADR-043 의 `connector.json` 에 화면용 선택 칸을 더한다 |
 | [ADR-20261008 / connector-output-files](ADR-20261008-connector-output-files.md) | 커넥터는 계산할 목록을 그 에이전트 실행 공간에 읽기 전용으로 붙는 파일로 내고, 계산은 스크립트가 한다 | hermes | Accepted. ADR-086 의 실행 공간에 커넥터 출력 디렉터리를 더한다 |
-| [ADR-20261008 / memory-remember-guard](ADR-20261008-memory-remember-guard.md) | 바로 저장은 사용자가 쓴 문장을 그대로 옮긴 본문만 받고, 민감해 보이는 글과 오래된 대화는 제안으로 내린다 | backend | Accepted. ADR-20261007 / memory-remember 의 바로 저장 조건 2 와 5 를 개정한다 |
+| [ADR-20261008 / memory-remember-guard](ADR-20261008-memory-remember-guard.md) | 바로 저장은 모델이 다듬은 본문도 받고, 부정이 뒤집힌 글과 민감해 보이는 글과 오래된 대화만 제안으로 내린다 | backend, frontend | Accepted. ADR-20261007 / memory-remember 의 바로 저장 조건 2 와 5 를 개정한다 |

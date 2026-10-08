@@ -7,13 +7,13 @@
 대화의 첫 `execution_question` 보다 앞선 루트 실행도 「사람의 질문 없이 Hermes 로 보낸 루트 실행」 으로 센다.
 기능 도입 전에 맡긴 일의 결과가 같은 session 이력에 남은 오래된 대화에서 바로 저장이 열리지 않게 한다.
 
-**범위 외**: 본문 구간 판정(phase 01), 민감 낱말 판정(phase 02).
+**범위 외**: 부정 표지 판정(phase 01), 민감 낱말 판정(phase 02), 화면(phase 04).
 
 ## 컨텍스트
 
 **근거 문서**: `docs/backend/memory.md` 의 「에이전트가 기억을 남기는 길」 절, `docs/adr/ADR-20261008-memory-remember-guard.md`
 
-- 계약: `docs/backend/memory.md` 의 「바로 저장 판정」 표 6.
+- 계약: `docs/backend/memory.md` 의 「바로 저장 판정」 표 5.
 - 근거: `docs/adr/ADR-20261008-memory-remember-guard.md` 의 결정 4.
 - 쿼리는 `backend/src/main/java/com/bifos/assistant/chat/infra/ExecutionQuestionRepository.java` 의 `existsRunWithoutQuestion(Long conversationId)` 다.
   지금은 `and e.id >= (select min(q.executionId) ...)` 절이 첫 질문 줄보다 앞선 실행을 뺀다. 이 절을 지운다.
@@ -39,7 +39,7 @@ Javadoc 의 「이 표가 생기기 전의 실행은 보지 않는다 ...」 두
 
 시험 하나를 더한다: 「기능 도입 전의 질문 없는 루트 실행이 대화에 있으면 그 뒤의 질문 turn 도 제안이다」.
 `dadRun` 을 쓰지 않고, 질문 없는 루트 실행 → 새 root 의 실행 → 그 실행에 `QUESTION` 을 잇는 순서로 저장한 뒤
-`remember("다른 사람", "다른 사람은 홍길동이야", null)` 을 새 root 로 부르면 PROPOSED 다.
+`remember("다른 사람", "다른 사람은 홍길동이다", null)` 을 새 root 로 부르면 PROPOSED 다.
 같은 준비에서 질문 없는 실행을 만들지 않으면 REMEMBERED 라는 대조 단언을 같은 시험이나 별도 시험에 둔다.
 
 ## 검증
