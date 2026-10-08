@@ -18,6 +18,7 @@ from .common import (
     _missing_profile,
     _profile_rejection,
     _rejected,
+    logger,
 )
 
 from .connector_binding import (
@@ -76,6 +77,11 @@ from .connector_vault import (
 
 from .profiles import (
     _check_skills_list,
+)
+
+from .connector_output import (
+    _sandbox_connector_output_directory,
+    _sandbox_prepare_connector_output,
 )
 
 from .sandbox import (
@@ -210,8 +216,21 @@ async def _connector_request(request):
             values = _vault_values(manifest, stored["values"])
             if values is None:
                 return _rejected("보관 파일의 값이 지금 칸 선언과 맞지 않는다")
+            owner_output = None
+            if manifest["owner_output_env"] is not None and owner is not None:
+                # 경로는 운영 정책의 루트와 Control Plane 이 정한 주인, profile, 커넥터 id 로만 만든다.
+                # 실행 공간 정책에 등록된 profile 에만 준다. 미등록 profile 은 그 디렉터리를 붙이지 않는다.
+                # 정책이나 키가 없거나 만들지 못하면 빈 값으로 붙인다. 커넥터가 파일 출력만 거절한다(ADR-20261008 connector-output-files).
+                sandbox = _sandbox_policy()
+                if sandbox is not None and profile in sandbox["profiles"]:
+                    try:
+                        owner_output = await asyncio.to_thread(_sandbox_connector_output_directory, sandbox,
+                                                               profile, owner, body["plugin"])
+                    except (OSError, ValueError, RuntimeError) as error:
+                        logger.warning("dashboard-profile-api: 커넥터 출력 디렉터리를 만들지 못해 빈 값으로 붙인다: %s",
+                                       type(error).__name__)
             result = await asyncio.to_thread(_connector_bind_config, profile_dir, body["plugin"], True,
-                                             body["bind"]["vault"], values, owner_attachments)
+                                             body["bind"]["vault"], values, owner_attachments, owner_output)
             return JSONResponse({**response, **result}, status_code=200)
         if unbind:
             result = await asyncio.to_thread(_connector_bind_config, profile_dir, body["plugin"], False)
@@ -230,6 +249,7 @@ async def _connector_request(request):
                     return _rejected("격리할 사진 도구에는 sandbox_owner 가 필요하다")
                 try:
                     os.makedirs(_sandbox_workspace(sandbox, owner), exist_ok=True)
+                    _sandbox_prepare_connector_output(sandbox, profile, owner)
                     prepared = _sandbox_verify_attachment_directories(sandbox, owner)
                     sandbox_terminal = _sandbox_terminal(sandbox, profile, owner, prepared)
                     attachment_guard = (sandbox, owner, prepared)

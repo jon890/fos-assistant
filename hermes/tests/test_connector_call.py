@@ -231,6 +231,18 @@ class ConnectorCallTest(base.ConnectorGateCase):
         self.assertIn("DEMO_ATTACHMENT_DIR", body["result"]["names"])
         self.assertEqual(body["result"]["attachments"], "")
 
+    def test_child_receives_an_empty_owner_output_directory(self):
+        """출력 디렉터리를 선언한 커넥터의 확인 도구는 그 env 를 빈 값으로 받는다. 확인 도구는 파일을 내지 않는다(ADR-20261008 connector-output-files)."""
+        self.rewrite("connector.json", lambda value: value.update(
+            verify={"tool": "env_view"}, owner_output_env="DEMO_OUTPUT_DIR"))
+        self.rewrite(".mcp.json", lambda value: value["mcpServers"]["demo"]["env"].update(
+            DEMO_OUTPUT_DIR="${DEMO_OUTPUT_DIR}"))
+        with mock.patch.dict(os.environ, {"DEMO_OUTPUT_DIR": "/parent/users/" + "a" * 64 + "/alice/demo"}):
+            status, body = self.call(tool="env_view")
+        self.assertEqual(status, 200)
+        self.assertTrue(body["ok"], body)
+        self.assertEqual(body["result"]["output"], "")
+
     def test_fifth_concurrent_call_is_refused_without_waiting(self):
         """이미 4개가 돌고 있으면 다섯 번째는 기다리지 않고 unavailable 이고, 자리가 나면 다시 받는다."""
         body = {"tool": "list_scopes", "values": {"token": OK_TOKEN}}

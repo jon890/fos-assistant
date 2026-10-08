@@ -129,6 +129,9 @@ async def _connector_call_request(request, connector_id: str):
     if manifest["owner_attachments_env"] is not None:
         # 이 경로에는 바인딩 주인이 없다. 빈 값을 주어 커넥터가 사용자 첨부를 읽지 않게 한다(ADR-20261007 connector-owner-attachments).
         env[manifest["owner_attachments_env"]] = ""
+    if manifest["owner_output_env"] is not None:
+        # 확인 도구와 선택지는 파일을 내지 않는다(ADR-20261008 connector-output-files).
+        env[manifest["owner_output_env"]] = ""
     # 대시보드 프로세스의 PATH 를 물려주지 않는다. 실행 파일이 있는 디렉터리만 준다.
     env["PATH"] = os.path.dirname(server["command"])
 
@@ -255,6 +258,9 @@ async def _connector_execute_request(request, connector_id: str):
     env.update({name: server["env"][name] for name in manifest["operator_env"]})
     if owner_attachments is not None:
         env[manifest["owner_attachments_env"]] = owner_attachments
+    if manifest["owner_output_env"] is not None:
+        # 승인한 쓰기는 파일을 내지 않는다. 파일 출력은 승인 없이 도는 읽기 도구만 쓴다(ADR-20261008 connector-output-files).
+        env[manifest["owner_output_env"]] = ""
     # 대시보드 프로세스의 PATH 를 물려주지 않는다. 실행 파일이 있는 디렉터리만 준다.
     env["PATH"] = os.path.dirname(server["command"])
 

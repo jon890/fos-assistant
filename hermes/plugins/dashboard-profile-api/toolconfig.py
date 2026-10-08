@@ -21,6 +21,10 @@ from .connector_manifest import (
     _entry_mode,
 )
 
+from .connector_output import (
+    _sandbox_prepare_connector_output,
+)
+
 from .sandbox import (
     IMAGE_FILE_TOOLSETS,
     SANDBOX_OWNER_RE,
@@ -254,6 +258,7 @@ async def _check_config_update(request):
             # 칸 일부만 고치면 운영자가 남긴 local 설정이나 값 전달 칸이 섞인다. 통째로 바꾼다.
             try:
                 os.makedirs(_sandbox_workspace(sandbox, owner), exist_ok=True)
+                _sandbox_prepare_connector_output(sandbox, profile, owner)
                 prepared = _sandbox_verify_attachment_directories(sandbox, owner)
                 updated["terminal"] = _sandbox_terminal(sandbox, profile, owner, prepared)
                 request.state.fos_checked_attachments = (sandbox, owner, prepared)

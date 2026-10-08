@@ -44,6 +44,7 @@ token provider 등록, profile 생성의 `name`, 환경 쓰기의 `profile/key/v
 - `docker_volumes`, `docker_extra_args`, `env_passthrough`, `credential_files` 의 이름과 뜻
 - 스킬 앞머리에서 환경 값과 파일을 실행 공간에 넣는 칸의 이름(`tools/skills_tool_setup.py` 의 `_get_required_environment_variables`, `required_credential_files`). 칸이 늘면 올린 스킬 저장 검사(`SkillFrontmatter`)와 대시보드 plugin 의 커넥터 스킬 검사(`_skill_name`)에 함께 더한다
 - `HERMES_WRITE_SAFE_ROOT` 를 docker backend 의 파일 쓰기에도 경로 문자열로 적용한다
+- `execute_code` 가 RPC 로 부를 수 있는 도구(`SANDBOX_ALLOWED_TOOLS`)에 MCP 도구가 없다. 생기면 [ADR-20261008 / connector-output-files](../adr/ADR-20261008-connector-output-files.md) 를 다시 검토한다
 
 **올린 스킬과 이름이 겹치는 스킬이 새로 생기지 않았는지 본다.**
 Hermes 를 올리면 번들 스킬이 늘 수 있다. 같은 이름이면 profile 로컬 스킬이 외부 디렉터리의 올린 스킬보다 먼저 선택되어,

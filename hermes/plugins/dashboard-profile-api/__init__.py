@@ -165,6 +165,13 @@ from .connector_manifest import (
     _tool_identifiers,
 )
 
+from .connector_output import (
+    _sandbox_connector_output_directory,
+    _sandbox_make_private_directory,
+    _sandbox_prepare_connector_output,
+    _sandbox_remove_connector_output,
+)
+
 from .connector_run import (
     CONNECTOR_CALL_LIMIT,
     CONNECTOR_CALL_TIMEOUT_SECONDS,
@@ -267,6 +274,9 @@ from .sandbox import (
     _sandbox_attachment_path_identity,
     _sandbox_attachment_roots_ok,
     _sandbox_attachment_snapshot,
+    _sandbox_connector_output_mount_overlaps,
+    _sandbox_connector_output_profile_directory,
+    _sandbox_connector_output_root_ok,
     _sandbox_env_ok,
     _sandbox_mount_ok,
     _sandbox_mount_overlaps,
