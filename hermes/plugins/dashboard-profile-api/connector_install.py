@@ -196,6 +196,12 @@ async def _connector_request(request):
             manifest = await asyncio.to_thread(_connector_manifest, body["plugin"])
             if manifest is None:
                 raise ValueError("쓸 수 없는 connector 는 설치하지 않는다")
+            if manifest["sandbox_required"]:
+                # 실행 공간을 전제로 하는 커넥터는 정책에 등록된 profile 에만 붙인다. 셸이 지금 켜져 있는지는 보지 않는다.
+                # 셸은 붙인 뒤에 켤 수 있기 때문이다(ADR-20261008 connector-binding-guards).
+                sandbox = _sandbox_policy()
+                if sandbox is None or profile not in sandbox["profiles"]:
+                    return _sandbox_unavailable()
             owner_attachments = None
             if manifest["owner_attachments_env"] is not None:
                 # 경로는 운영 정책의 루트와 Control Plane 이 정한 주인에서만 만든다. 모델, 요청의 다른 칸, manifest 는
