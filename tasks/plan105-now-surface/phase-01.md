@@ -57,7 +57,7 @@
 
 - `List<SurfacedProblem> openOf(Long userId, Instant now)`
   1. `proactive_loop_run` 에서 그 사용자의 `DECIDED` 이고 `created_at` 이 `now - surfaceWindow` 뒤인 줄의 평가 번호를 모은다. 필요한 저장소 메서드를 `ProactiveLoopRunRepository` 에 더한다
-  2. 그 평가들의 판정을 모두 읽어 `(evaluationId, candidateId)` 마다 `id` 가 가장 작은 줄 하나만 남긴다. 필요한 저장소 메서드를 `AutonomyDecisionRepository` 에 더한다
+  2. 그 평가들의 판정을 모두 읽어 `(evaluationId, candidateId)` 마다 `id` 가 가장 작은 줄 하나만 남긴다. 기존 `AutonomyDecisionRepository.findByUserIdAndEvaluationIdInOrderByIdAsc` 를 쓴다
   3. 그 가운데 `SURFACE`, `ASK_APPROVAL` 만 남긴다
   4. 판정의 `candidateId` 로 `proactive_check_problem` 을, `sourceCheckId` 로 `proactive_check` 를 읽어 에이전트와 점검 대화를 채운다. 후보 줄이나 살펴보기 줄이 없거나 문제 글이 비었으면 그 줄만 뺀다
   5. 같은 `problemKey` 는 `createdAt` 이 가장 늦은(같으면 `id` 가 큰) 판정 하나만 남긴다
@@ -124,7 +124,6 @@
 | `backend/src/main/java/com/bifos/assistant/proactive/application/SurfacedProblems.java` | 신규 |
 | `backend/src/main/java/com/bifos/assistant/proactive/application/ProactiveLoopCoordinator.java` | 수정 |
 | `backend/src/main/java/com/bifos/assistant/proactive/infra/ProactiveLoopRunRepository.java` | 수정 |
-| `backend/src/main/java/com/bifos/assistant/proactive/infra/AutonomyDecisionRepository.java` | 수정 |
 | `backend/src/main/java/com/bifos/assistant/feedback/domain/type/FeedbackSubjectType.java` | 수정 |
 | `backend/src/main/java/com/bifos/assistant/proactive/presentation/ProactiveCheckDtos.java` | 수정 |
 | `backend/src/main/java/com/bifos/assistant/proactive/presentation/AutonomyController.java` | 수정 |
@@ -137,6 +136,7 @@
 | `backend/src/main/java/com/bifos/assistant/attention/application/SurfacedProblemCandidates.java` | 신규 |
 | `backend/src/main/java/com/bifos/assistant/attention/application/SuggestionFeedback.java` | 수정 |
 | `backend/src/main/java/com/bifos/assistant/attention/application/ProactiveReportCandidates.java` | 수정 |
+| `backend/src/test/java/com/bifos/assistant/testsupport/SurfacedProblemSeed.java` | 신규 |
 | `backend/src/test/java/com/bifos/assistant/proactive/SurfacedProblemsTest.java` | 신규 |
 | `backend/src/test/java/com/bifos/assistant/attention/SurfacedProblemCandidatesTest.java` | 신규 |
 | `backend/src/test/java/com/bifos/assistant/proactive/ProactiveLoopSettingDisabledTest.java` | 수정 |
