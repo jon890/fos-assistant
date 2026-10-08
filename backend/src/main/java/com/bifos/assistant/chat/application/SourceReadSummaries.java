@@ -20,6 +20,7 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.JsonNode;
@@ -27,16 +28,12 @@ import tools.jackson.databind.json.JsonMapper;
 
 /** 비서 답의 실행 트리에서 원문 열람 완료 사건을 한 번에 모은다. */
 @Component
+@RequiredArgsConstructor
 public class SourceReadSummaries {
     private static final JsonMapper JSON = JsonMapper.builder().build();
     private static final Pattern IPV4 = Pattern.compile("(?:\\d{1,3}\\.){3}\\d{1,3}");
     private final AgentExecutionRepository executions;
     private final ExecutionEventRepository events;
-
-    public SourceReadSummaries(AgentExecutionRepository executions, ExecutionEventRepository events) {
-        this.executions = executions;
-        this.events = events;
-    }
 
     public Map<Long, SourceReadSummary> of(List<ChatMessage> history) {
         Map<Long, Long> ids = new LinkedHashMap<>();
