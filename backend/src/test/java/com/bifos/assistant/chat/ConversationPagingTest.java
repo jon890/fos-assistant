@@ -16,6 +16,7 @@ import com.bifos.assistant.chat.application.ConversationAccess;
 import com.bifos.assistant.chat.application.ConversationPage;
 import com.bifos.assistant.chat.application.ConversationWriter;
 import com.bifos.assistant.chat.application.ModelTierService;
+import com.bifos.assistant.chat.application.SourceReadSummaries;
 import com.bifos.assistant.chat.domain.Conversation;
 import com.bifos.assistant.chat.domain.type.ConversationPurpose;
 import com.bifos.assistant.chat.infra.ChatMessageRepository;
@@ -211,7 +212,8 @@ class ConversationPagingTest {
                 new ChatEventStreams(Duration.ofSeconds(20)),
                 null,
                 mock(ModelTierService.class),
-                List.of());
+                List.of(),
+                mock(SourceReadSummaries.class));
 
         ConversationPageView page = controller.conversations(null, 10);
 

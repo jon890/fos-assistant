@@ -1,5 +1,5 @@
 /**
- * 에이전트가 대화 중에 `memory_remember` 로 사실을 남길 때, 사람이 말한 turn 의 근거 있는 호출만 바로 저장되고
+ * 에이전트가 대화 중에 `memory_remember` 로 사실을 남길 때, 사람이 말한 turn 의 부정이 뒤집히지 않은 호출은 바로 저장되고
  * 그 밖은 제안으로 남는 것을 실제 대화 turn 으로 본다.
  *
  * <p>계약은 ADR-20261007 / memory-remember 과 `docs/backend/memory.md` 의 「에이전트가 기억을 남기는 길」 이 갖는다. 주인과 대화는 서명한
@@ -19,8 +19,8 @@ const INVALID_CALL_CONTEXT = "호출 맥락을 확인할 수 없습니다. 새 �
 
 const DIRECT_TEXT = "다른 사람은 홍길동이야. 기억해 줘";
 const DIRECT_TITLE = "기억 검사 별칭 홍길동";
-const UNQUOTED_TEXT = "우리 집 강아지에 대한 이야기를 하나 할게";
-const UNQUOTED_TITLE = "기억 검사 강아지 이름";
+const NEGATED_TEXT = "우리 집 강아지는 고기를 못 먹어";
+const NEGATED_TITLE = "기억 검사 강아지 고기";
 const OUTSIDE_SEARCH_TEXT = "기억 검사 날씨 찾아 줘";
 const OUTSIDE_TEXT = "고모 생일은 3월 5일이야";
 const OUTSIDE_TITLE = "기억 검사 고모 생일";
@@ -168,12 +168,12 @@ export const memoryRememberMcpScenario: Scenario = {
       expect(instructions.includes("# 더 물어볼 수 있는 것"), `색인 절이 없다:\n${instructions}`);
       expect(instructions.includes(indexLine(savedMemory)), `색인에 저장한 제목이 없다:\n${instructions}`);
 
-      step("근거 인용이 질문에 없으면 제안으로 남고 받아들이면 색인에 실린다");
-      context.hermes.setMemoryRememberCall(UNQUOTED_TEXT,
-        { title: UNQUOTED_TITLE, content: "강아지 이름은 콩이다", evidence: "강아지 이름은 콩이야" });
-      const unquoted = await send(context, UNQUOTED_TEXT, direct.conversationId);
-      expect(unquoted.assistantText.startsWith(PROPOSED), `근거 없는 호출의 답이 다르다: ${unquoted.assistantText}`);
-      const proposed = (await memories(context)).filter((m) => m.title === UNQUOTED_TITLE);
+      step("부정이 사라진 본문은 제안으로 남고 받아들이면 색인에 실린다");
+      context.hermes.setMemoryRememberCall(NEGATED_TEXT, { title: NEGATED_TITLE, content: "강아지는 고기를 좋아한다" });
+      const negated = await send(context, NEGATED_TEXT, direct.conversationId);
+      expect(negated.assistantText.startsWith(PROPOSED),
+        `부정이 사라진 본문은 제안으로 남고 받아들이면 색인에 실린다: ${negated.assistantText}`);
+      const proposed = (await memories(context)).filter((m) => m.title === NEGATED_TITLE);
       expect(proposed.length === 1 && proposed[0]!.status === "PROPOSED", `제안이 아니다: ${JSON.stringify(proposed)}`);
       const proposedMemory = proposed[0]!;
       createdMemoryIds.add(proposedMemory.id);

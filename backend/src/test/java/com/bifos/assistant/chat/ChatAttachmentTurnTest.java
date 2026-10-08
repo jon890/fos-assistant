@@ -24,6 +24,7 @@ import com.bifos.assistant.chat.application.AttachmentService;
 import com.bifos.assistant.chat.application.ChatService;
 import com.bifos.assistant.chat.application.ConversationAccess;
 import com.bifos.assistant.chat.application.ModelTierService;
+import com.bifos.assistant.chat.application.SourceReadSummaries;
 import com.bifos.assistant.chat.domain.ChatAttachment;
 import com.bifos.assistant.chat.domain.ChatMessage;
 import com.bifos.assistant.chat.domain.Conversation;
@@ -482,7 +483,8 @@ class ChatAttachmentTurnTest {
                 new ChatEventStreams(Duration.ofSeconds(20)),
                 null,
                 mock(ModelTierService.class),
-                List.of());
+                List.of(),
+                mock(SourceReadSummaries.class));
     }
 
     private ChatAttachment upload(CurrentUser user, Long conversationId, String name) {

@@ -295,6 +295,7 @@ sequenceDiagram
 | `PENDING_QUEUE_FULL` | 대기 메시지가 5개이거나, 더하면 합친 길이가 8000자를 넘는다 | 답이 끝난 뒤 보내도록 안내한다. 쓴 문장은 입력창에 되돌린다 |
 | `PENDING_MESSAGE_NOT_FOUND` | 취소하려는 대기 메시지가 이미 보내졌거나 없다 | 입력창에 되돌리지 않고 대기 줄을 다시 읽는다 |
 | `EXECUTION_NOT_FOUND` | 없는 실행이거나 남의 실행이다 | 사용량 목록으로 되돌린다 |
+| `PROACTIVE_LOOP_UNAVAILABLE` | 설치가 매일 루프를 열지 않아 켤 수 없다([`backend/proactive-loop.md`](backend/proactive-loop.md) 의 「사용자 설정」) | 켜기를 막고 설치에서 꺼져 있다고 보인다. 끄기와 쉬기는 된다 |
 | `PROACTIVE_CHECK_UNAVAILABLE` | 먼저 살펴보기를 시작할 수 없다. 까닭은 상태 조회가 준다([`backend/proactive-check.md`](backend/proactive-check.md) 의 「시작 전 점검」) | 상태를 다시 읽어 까닭마다 할 일을 보인다. toolset 이 걸렸으면 끌 toolset 이름을 보인다 |
 | `DELIVERY_NOT_FOUND` | 다시 전달하려는 결과 묶음이 그 대화에 없다 | 안내를 보이고 이력을 다시 읽는다 |
 | `DELIVERY_NOT_RETRYABLE` | 다시 전달하려는 묶음이 이미 전하는 중이거나 끝났다. 묶음의 결과가 남지 않았거나 대화에 흐름이 붙은 때도 같다 | 안내를 보이고 이력을 다시 읽는다 |
@@ -364,7 +365,7 @@ sequenceDiagram
     C->>C: 질문 메시지를 저장하고 실행 줄에 잇는다(execution_question)
     C->>H: POST /v1/runs (지시문에 기억 지침)
     H->>C: POST /mcp memory_remember 와 서명한 _fos_ctx
-    C->>C: 루트 실행인가, 근거가 질문 원문에 있는가, 바깥 도구 사건이 없는가, 민감하지 않은가
+    C->>C: 루트 실행인가, 부정이 질문과 본문 한쪽에만 있지 않은가, 바깥 도구와 질문 없는 실행이 없는가, 민감하지 않고 민감해 보이는 글이 없는가
     alt 모두 만족
         C->>C: memory 를 ACCEPTED 로, memory_capture 를 CREATED 로
         C-->>H: 기억했다
