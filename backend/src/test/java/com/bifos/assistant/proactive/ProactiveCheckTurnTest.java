@@ -37,8 +37,10 @@ import com.bifos.assistant.hermes.dto.HermesRunCommand;
 import com.bifos.assistant.hermes.dto.HermesRunResult;
 import com.bifos.assistant.hermes.dto.RunEvent;
 import com.bifos.assistant.hermes.dto.TokenUsage;
+import com.bifos.assistant.proactive.application.CheckFindingReactions;
 import com.bifos.assistant.proactive.application.ProactiveCheckGuard;
 import com.bifos.assistant.proactive.application.ProactiveCheckService;
+import com.bifos.assistant.proactive.application.model.FindingReaction;
 import com.bifos.assistant.proactive.domain.ProactiveCheck;
 import com.bifos.assistant.proactive.domain.ProactiveCheckFinding;
 import com.bifos.assistant.proactive.domain.ProactiveCheckProblem;
@@ -140,6 +142,9 @@ class ProactiveCheckTurnTest {
 
     @Autowired
     ProactiveCheckProblemRepository problems;
+
+    @Autowired
+    CheckFindingReactions reactions;
 
     @Autowired
     TransactionTemplate transactions;
@@ -504,7 +509,7 @@ class ProactiveCheckTurnTest {
                 .contains("- 그 뒤 사용자가 이 대화에 보낸 메시지: 1개")
                 .contains("- Memory 문맥이 지난 살펴보기와 같은지: 같음")
                 .contains("[study] " + TOPIC_KEY + " · Kafka 정확히 한 번 처리 · " + SOURCE_URL)
-                .contains("그 뒤 사용자 메시지 1개");
+                .contains("그 뒤 사용자 메시지 1개 · 반응 없음");
         ChatMessage answer =
                 messages.findByConversationIdOrderByIdAsc(conversation.id()).getLast();
         assertThat(answer.role()).isEqualTo(MessageRole.ASSISTANT);
@@ -517,6 +522,27 @@ class ProactiveCheckTurnTest {
                 .filteredOn(finding -> finding.checkId().equals(second.id()))
                 .extracting(ProactiveCheckFinding::reason)
                 .containsExactly(FindingReason.REPEATED);
+    }
+
+    @Test
+    @DisplayName("관심 없음으로 반응한 발견의 주제는 다음 살펴보기 입력에 반응이 실리고 원문과 달라진 점이 새로워도 이미 알린 참고로 내려간다")
+    void dismissedFindingTopicIsCarriedAndMarkedRepeat() {
+        stub().willAnswer(command -> answer(findingsBlock(TOPIC_KEY, SOURCE_URL, null)));
+        Conversation conversation = runCheck();
+        ProactiveCheckFinding announced = findingsOf(conversation).getFirst();
+        assertThat(announced.kind()).isEqualTo(FindingKind.NEW);
+        reactions.react(owner, announced.id(), FindingReaction.DISMISSED);
+        stub().willAnswer(command ->
+                answer(findingsBlock(TOPIC_KEY, "https://docs.example.test/kafka/exactly-once-v2", "새 버전 문서가 나왔다")));
+
+        runCheck();
+
+        assertThat(stub().received().getLast().input()).contains(TOPIC_KEY).contains(" · 반응 관심 없음");
+        ProactiveCheck second = checksOf(conversation).getLast();
+        assertThat(findingsOf(conversation))
+                .filteredOn(finding -> finding.checkId().equals(second.id()))
+                .extracting(ProactiveCheckFinding::kind, ProactiveCheckFinding::reason)
+                .containsExactly(tuple(FindingKind.REFERENCE, FindingReason.REPEATED));
     }
 
     @Test
