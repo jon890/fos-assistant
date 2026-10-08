@@ -92,13 +92,24 @@ Runs API 는 `instructions` 와 `input` 두 글을 받는다([`../hermes/runs-ap
 
 | `source` | `asOf` | `FRESH` | `STALE` |
 | --- | --- | --- | --- |
-| `MEMORY_ALWAYS`, `MEMORY_INDEX` | `updated_at` | 늘 | 없다. 사람이 승인한 지식은 시간으로 낡지 않고 사람이 고친다 |
+| `MEMORY_ALWAYS`, `MEMORY_INDEX` | `updated_at` | 묶음을 만든 시각과의 차이가 collection의 기준 기간 안 | 기준 기간보다 오래됨 |
 | `DELEGATION_RESULT` | `finished_at` | 묶음을 만든 시각과의 차이가 `assistant.context.result-stale-after`(기본 6시간) 안 | 그보다 오래됨 |
 | `CONNECTOR_RESULT` | `executed_at` | 위와 같다 | 위와 같다 |
 | `EXECUTION_STATE` | 읽은 시각 | 늘 | 없다 |
 | `FOLLOW_UP` | `updated_at` | 늘 | 없다. 기한이 지난 것은 먼저 알리기가 따로 본다 |
 
-`asOf` 가 비어 있으면 `UNKNOWN` 이다. 머리줄에 「끝난 시각: 모름」 을 적는다.
+Memory의 기본 기준은 `assistant.context.memory-stale-after`(기본 180일)다.
+`assistant.context.memory-collection-stale-after`는 collection 이름을 키, 기간을 값으로 받으며 기본 기준을 덮어쓴다.
+예를 들어 `career: 30d`를 지정하면 그 collection의 항목은 수정한 지 30일을 넘었을 때 `STALE`이다.
+기준과 정확히 같은 시각은 `FRESH`다. 기준이 0 이하이거나 `updated_at`이 없으면 `UNKNOWN`이다.
+기본 기준을 0으로 두면 별도 기준을 지정하지 않은 collection은 `UNKNOWN`이다.
+
+Memory는 실행 조립 시각 하나로 항상 층, 색인 층, 예산 때문에 생략한 항목을 모두 판정한다.
+신선도는 내용이 여전히 참이라는 보증이 아니며, 사용자 승인(`trust`)과 별개다.
+낡았다는 이유로 항목을 빼거나 Memory를 고치지 않는다. 주입 글과 그 지문도 바꾸지 않는다.
+판정 값은 문맥 묶음과 `execution_context_source.freshness`에 남는다. 이미 저장한 실행 기록은 다시 판정하지 않는다.
+
+`asOf` 가 비어 있으면 `UNKNOWN` 이다. 결과 머리줄에 「끝난 시각: 모름」 을 적는다.
 결과는 보통 몇 초 안에 전해져 `STALE` 이 되지 않는다. 결과 전달을 다시 하는 경로(#162)가 몇 시간 뒤에 전할 때 `STALE` 이 붙는다.
 
 ## 충돌 표시

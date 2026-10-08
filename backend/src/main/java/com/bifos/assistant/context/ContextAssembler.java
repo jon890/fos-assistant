@@ -7,6 +7,9 @@ import com.bifos.assistant.memory.domain.Memory;
 import com.bifos.assistant.memory.domain.type.MemoryEntryType;
 import com.bifos.assistant.memory.domain.type.MemoryScope;
 import com.bifos.assistant.shared.auth.CurrentUser;
+import java.time.Clock;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -63,6 +66,7 @@ public class ContextAssembler implements OmittedMemories {
 
     private final MemoryService memories;
     private final ContextProperties properties;
+    private final Clock clock;
 
     /** Memory 예산과 관계없이 모든 에이전트 실행에 공통 답변 지침을 넣는다. */
     public AssembledContext withResponseInstructions(AssembledContext context) {
@@ -114,6 +118,7 @@ public class ContextAssembler implements OmittedMemories {
     }
 
     private AssembledContext assemble(CurrentUser user, MemoryAccess access) {
+        Instant now = clock.instant();
         List<Memory> always = memories.alwaysInjectedFor(user, access);
         List<Memory> indexed = memories.indexedFor(user, access);
         Map<Long, List<Memory>> sameNames = sameNameDocuments(indexed);
@@ -122,37 +127,50 @@ public class ContextAssembler implements OmittedMemories {
 
         ContextBuilder builder = new ContextBuilder(maxChars);
         builder.limit(maxChars - indexBudget);
-        appendAlways(builder, GROUP_HEADER, always, MemoryScope.GROUP);
-        appendAlways(builder, USER_HEADER, always, MemoryScope.USER);
+        appendAlways(builder, GROUP_HEADER, always, MemoryScope.GROUP, now);
+        appendAlways(builder, USER_HEADER, always, MemoryScope.USER, now);
         builder.limit(maxChars);
-        appendIndex(builder, indexed, sameNames);
+        appendIndex(builder, indexed, sameNames, now);
         return builder.build();
     }
 
-    private static void appendAlways(ContextBuilder builder, String header, List<Memory> memories, MemoryScope scope) {
+    private void appendAlways(
+            ContextBuilder builder, String header, List<Memory> memories, MemoryScope scope, Instant now) {
         memories.stream()
                 .filter(memory -> memory.scope() == scope)
                 .filter(ContextAssembler::plainOrSkipped)
                 .sorted(Comparator.comparing(Memory::id))
                 .forEach(memory -> {
-                    ContextItem item = alwaysItem(memory);
+                    ContextItem item = alwaysItem(memory, now);
                     builder.append(memory.id(), header, "- " + item.body(), item);
                 });
     }
 
-    /** 항상 층의 줄은 본문까지 싣는다. 사람이 받아들인 지식이라 시간으로 낡지 않는다. */
-    private static ContextItem alwaysItem(Memory memory) {
+    /** 항상 층의 줄은 본문까지 싣는다. */
+    private ContextItem alwaysItem(Memory memory, Instant now) {
         return memoryItem(
-                memory, ContextSource.MEMORY_ALWAYS, ContextBodyMode.INLINE, List.of(), null, memory.content());
+                memory,
+                ContextSource.MEMORY_ALWAYS,
+                ContextBodyMode.INLINE,
+                List.of(),
+                null,
+                memory.content(),
+                memoryFreshness(memory, now));
     }
 
     /** 색인 층의 줄은 제목만 싣는다. 본문은 {@code memory_read} 로만 읽는다. */
-    private static ContextItem indexItem(Memory memory, List<Memory> sameNames) {
+    private ContextItem indexItem(Memory memory, List<Memory> sameNames, Instant now) {
         List<String> conflictsWith = sameNames.stream()
                 .map(other -> ContextItem.memoryRef(other.id()))
                 .toList();
         return memoryItem(
-                memory, ContextSource.MEMORY_INDEX, ContextBodyMode.TITLE_ONLY, conflictsWith, memory.title(), null);
+                memory,
+                ContextSource.MEMORY_INDEX,
+                ContextBodyMode.TITLE_ONLY,
+                conflictsWith,
+                memory.title(),
+                null,
+                memoryFreshness(memory, now));
     }
 
     private static ContextItem memoryItem(
@@ -161,7 +179,8 @@ public class ContextAssembler implements OmittedMemories {
             ContextBodyMode bodyMode,
             List<String> conflictsWith,
             String title,
-            String body) {
+            String body,
+            ContextFreshness freshness) {
         return new ContextItem(
                 source,
                 ContextItem.memoryRef(memory.id()),
@@ -170,11 +189,22 @@ public class ContextAssembler implements OmittedMemories {
                 memory.sensitivity(),
                 ContextTrust.USER_APPROVED,
                 memory.updatedAt(),
-                ContextFreshness.FRESH,
+                freshness,
                 bodyMode,
                 conflictsWith,
                 title,
                 body);
+    }
+
+    /** collection 별 기준을 먼저 보고, 0 이하 기준은 신선도 판정을 끈다. */
+    private ContextFreshness memoryFreshness(Memory memory, Instant now) {
+        Duration staleAfter = properties
+                .memoryCollectionStaleAfter()
+                .getOrDefault(memory.collection(), properties.memoryStaleAfter());
+        if (staleAfter == null || staleAfter.isZero() || staleAfter.isNegative()) {
+            return ContextFreshness.UNKNOWN;
+        }
+        return ResultHeader.freshnessOf(memory.updatedAt(), now, staleAfter);
     }
 
     /**
@@ -190,17 +220,18 @@ public class ContextAssembler implements OmittedMemories {
         return true;
     }
 
-    private static void appendIndex(ContextBuilder builder, List<Memory> memories, Map<Long, List<Memory>> sameNames) {
+    private void appendIndex(
+            ContextBuilder builder, List<Memory> memories, Map<Long, List<Memory>> sameNames, Instant now) {
         memories.stream().sorted(Comparator.comparing(Memory::id)).forEach(memory -> {
             List<Memory> others = sameNames.getOrDefault(memory.id(), List.of());
-            ContextItem item = indexItem(memory, others);
-            builder.append(memory.id(), INDEX_HEADER, indexLine(memory.id(), item, others), item);
+            ContextItem item = indexItem(memory, others, now);
+            builder.append(memory.id(), INDEX_HEADER, indexLine(memory.id(), item.title(), others), item);
         });
     }
 
     /** 색인 한 줄이다. 같은 이름의 문서가 다른 범위에 있으면 그 번호를 줄 끝에 적는다. */
-    private static String indexLine(Long memoryId, ContextItem item, List<Memory> sameNames) {
-        StringBuilder line = new StringBuilder("- [" + memoryId + "] " + item.title());
+    private static String indexLine(Long memoryId, String title, List<Memory> sameNames) {
+        StringBuilder line = new StringBuilder("- [" + memoryId + "] " + title);
         for (Memory other : sameNames) {
             String kind = other.scope() == MemoryScope.GROUP ? "그룹" : "개인";
             line.append(" (같은 이름의 ")
@@ -251,7 +282,7 @@ public class ContextAssembler implements OmittedMemories {
         Set<String> headers = new HashSet<>();
         memories.stream().sorted(Comparator.comparing(Memory::id)).forEach(memory -> {
             List<Memory> others = sameNames.getOrDefault(memory.id(), List.of());
-            String line = indexLine(memory.id(), indexItem(memory, others), others);
+            String line = indexLine(memory.id(), memory.title(), others);
             ContextBuilder.appendTo(rendered, headers, INDEX_HEADER, line);
         });
         return rendered.length() + SEPARATOR.length();
