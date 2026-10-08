@@ -73,9 +73,14 @@ static boolean present(String text)
   - 부정이 살아 있으면 바로 저장한다는 시험을 더한다: `askedInThisTurn("나는 오이를 안 먹어.")` 뒤 `remember("오이", "오이를 먹지 않는다", null)` 가 REMEMBERED.
   - `listsMemoryRememberLast` 의 `.contains("evidence")` 를 `.contains("부정은 content 에 그대로 살린다")` 로 바꾼다.
   - 클래스 Javadoc 의 「근거 인용이 질문 원문에 있고」 를 새 조건으로 고친다.
-  - 나머지 시험의 기대값은 그대로 통과해야 한다(바깥 도구, 질문 없는 실행, 민감 인자, 상한, 되돌리기).
+  - `McpMemoryRemember.remember` 의 `@param evidence` 설명을 「판정에 쓰지 않는 옛 인자. 없으면 null」 로 고친다.
+  - `evidence=null` 호출이 제안이 된다는 데 기대던 기존 시험 셋은 이 phase 뒤에 바로 저장이 되어 깨진다. 아래처럼 바꾼다.
+    - `restoresProposalWhenUndoingAcceptance`: 첫 `remember("다른 사람", "다른 사람은 홍길동이다", null)` 호출을 `askedInThisTurn()` 보다 앞에 둔다(질문이 없어 제안이 된다). 그 뒤 질문을 잇고 같은 제목과 본문으로 다시 부른다. 나머지 단언(`previousStatus()==PROPOSED`, 피드백 3줄)은 그대로다.
+    - `refusesUpdateWithoutDirectConditions`: 두 번째 호출(`memory_id` 를 준 고치기) 앞에 `toolStarted("web_search")` 를 넣어 바로 저장 조건을 깨뜨린다. 「지금은 기존 기억을 고칠 수 없다」 와 `isError` 단언은 그대로다.
+    - `listsAndUndoesCreatedCapture`: 제안이 되어야 하는 호출의 본문을 부정이 든 「등산을 좋아하지 않는다」 로 바꾼다. `containsExactly(CREATED, PROPOSED)` 와 제안 되돌리기 단언은 그대로다.
+  - 그 밖의 기존 시험(바깥 도구, 질문 없는 실행, 민감 인자, 상한)의 기대값은 그대로 통과해야 한다.
 - `backend/src/test/java/com/bifos/assistant/context/ContextAssemblerTest.java` 91행의 `"evidence"` 를 `"그대로 살린다"` 로 바꾼다.
-- `test/e2e/scenarios/memory-remember-mcp.ts` 수정. `UNQUOTED_TEXT` 를 「우리 집 강아지는 고기를 못 먹어」 로, 그 단계의 호출을 `{ title: UNQUOTED_TITLE, content: "강아지는 고기를 좋아한다" }` 로 바꾸고 단계 이름과 실패 문구를 「부정이 사라진 본문은 제안으로 남고 받아들이면 색인에 실린다」 로 바꾼다. 상수 이름은 `NEGATED_TEXT` 처럼 뜻에 맞게 바꿔도 된다.
+- `test/e2e/scenarios/memory-remember-mcp.ts` 수정. `UNQUOTED_TEXT` 를 「우리 집 강아지는 고기를 못 먹어」 로, 그 단계의 호출을 `{ title: UNQUOTED_TITLE, content: "강아지는 고기를 좋아한다" }` 로 바꾸고 단계 이름과 실패 문구를 「부정이 사라진 본문은 제안으로 남고 받아들이면 색인에 실린다」 로 바꾼다. 상수 이름은 `NEGATED_TEXT` 처럼 뜻에 맞게 바꿔도 된다. 파일 머리 주석의 「근거 있는 호출만 바로 저장되고」 도 「부정이 뒤집히지 않은 호출은 바로 저장되고」 로 고친다.
 
 ## 검증
 
@@ -83,7 +88,7 @@ static boolean present(String text)
 
 ```bash
 cd backend && ./gradlew test --tests 'com.bifos.assistant.mcp.application.NegationMarkersTest' --tests 'com.bifos.assistant.mcp.McpMemoryRememberToolTest' --tests 'com.bifos.assistant.context.ContextAssemblerTest' --tests 'com.bifos.assistant.mcp.application.McpToolServiceTest'
-cd backend && ./gradlew checkstyleMain checkstyleTest archTest
+cd backend && ./gradlew checkstyleMain checkstyleTest archTest spotlessCheck
 cd test && npm run typecheck
 ```
 

@@ -14,13 +14,15 @@
 **근거 문서**: `docs/backend/memory.md` 의 「에이전트가 기억을 남기는 길」 절, `docs/adr/ADR-20261008-memory-remember-guard.md`
 
 - 계약: `docs/backend/memory.md` 의 「바로 저장 판정」 표 5.
-- 근거: `docs/adr/ADR-20261008-memory-remember-guard.md` 의 결정 4.
+- 근거: `docs/adr/ADR-20261008-memory-remember-guard.md` 의 결정 3.
 - 쿼리는 `backend/src/main/java/com/bifos/assistant/chat/infra/ExecutionQuestionRepository.java` 의 `existsRunWithoutQuestion(Long conversationId)` 다.
   지금은 `and e.id >= (select min(q.executionId) ...)` 절이 첫 질문 줄보다 앞선 실행을 뺀다. 이 절을 지운다.
 - `RepositoryQueryMysqlTest` 가 저장소 메서드를 실제 MySQL 에서 한 번씩 돌린다. 메서드 이름과 인자는 그대로라 따로 할 일이 없다.
 - 시험은 `backend/src/test/java/com/bifos/assistant/mcp/McpMemoryRememberToolTest.java` 다. `setUp()` 이 `dadRun` 을 가장 먼저 만들고 `call()` 은 `dadRoot` 로 서명한다.
-  그래서 「`dadRun` 보다 앞선 질문 없는 실행」 을 만들려면 시험 안에서 질문 없는 루트 실행을 먼저 저장하고,
-  `McpCallSigner.running(executions, agents, dad.id(), conversation.id(), PROFILE, root)` 로 새 실행과 새 root 를 만든 뒤 그 실행에 질문을 잇고 그 root 로 서명해 부른다.
+  쿼리는 `e.hermesRunId is not null` 인 실행만 센다. `McpCallSigner.running(...)` 은 `hermesRunId` 를 비워 두므로 질문 없는 실행을 그것으로 만들면 세지지 않는다.
+  그래서 질문 없는 루트 실행은 기존 보조 메서드 `otherRootRun("run-legacy")`(hermesRunId 를 채운다)로 먼저 저장하고,
+  그 뒤 `McpCallSigner.running(executions, agents, dad.id(), conversation.id(), PROFILE, root)` 와 `McpCallSigner.newRoot()` 로 새 실행과 새 root 를 만든다. 그 실행에 질문을 잇고 그 root 로 서명해 부른다.
+  이 준비는 옛 쿼리에서는 바로 저장, 새 쿼리에서는 제안으로 갈린다. `otherRootRun` 이 `dadRun` 보다 뒤에 생겨도 새 실행의 번호보다는 작다.
   `signed(...)` 가 `dadRoot` 를 쓰므로 root 를 받는 `call(ObjectNode, String root)` 보조 메서드를 더한다.
 
 ## 의도 메모
@@ -46,7 +48,7 @@ Javadoc 의 「이 표가 생기기 전의 실행은 보지 않는다 ...」 두
 
 ```bash
 cd backend && ./gradlew test --tests 'com.bifos.assistant.mcp.McpMemoryRememberToolTest'
-cd backend && ./gradlew checkstyleMain checkstyleTest
+cd backend && ./gradlew checkstyleMain checkstyleTest spotlessCheck
 ```
 
 기대값: 모두 통과.

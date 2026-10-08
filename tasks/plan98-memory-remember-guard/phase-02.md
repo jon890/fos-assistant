@@ -13,7 +13,7 @@
 **근거 문서**: `docs/backend/memory.md` 의 「에이전트가 기억을 남기는 길」 절, `docs/adr/ADR-20261008-memory-remember-guard.md`
 
 - 계약: `docs/backend/memory.md` 의 「바로 저장 판정」 표 6, 7 과 「민감해 보이는 글」 절.
-- 근거: `docs/adr/ADR-20261008-memory-remember-guard.md` 의 결정 3 과 대안 기각의 「SENSITIVE 로 올려 암호화 저장한다」.
+- 근거: `docs/adr/ADR-20261008-memory-remember-guard.md` 의 결정 2 와 대안 기각의 「SENSITIVE 로 올려 암호화 저장한다」.
 - `backend/src/main/java/com/bifos/assistant/memory/application/MemoryCaptureService.java` 의 `remember(CurrentUser, MemoryAccess, MemoryRememberRequest)` 가
   `boolean direct = request.direct() && sensitivity == MemorySensitivity.NORMAL;` 로 바로 저장을 정한다. 이 값이 새 항목, 같은 제안 받아들이기(`existingOutcome`)에 쓰인다.
   고치기는 `update(...)` 가 `!request.direct() || request.sensitivity() != MemorySensitivity.NORMAL` 이면 `UPDATE_NEEDS_CONFIRMATION` 을 낸다.
@@ -57,13 +57,14 @@ public static boolean suspected(String title, String content)
   - 거짓: 「아들 이름은 홍길동이야」, 「매운 음식을 못 먹어」, 「약속은 금요일이야」(한 글자 「약」 이 걸리지 않음), 「아들은 열 살이야」, 「전화는 오후에 해」.
 - `backend/src/test/java/com/bifos/assistant/mcp/McpMemoryRememberToolTest.java` 수정.
   - 시험 하나를 더한다: 질문 「아빠 계좌는 국민은행이야.」 를 잇고 `remember("아빠 계좌", "아빠 계좌는 국민은행이야", null)` (sensitive 없음)이 PROPOSED, 항목 `status` 가 `PROPOSED` 이고 `sensitivity` 가 `NORMAL` 이다.
+  - 시험 하나를 더한다: 바로 저장한 항목(질문 `QUESTION`, `remember("다른 사람", "다른 사람은 홍길동이다", null)`)에 `memory_id` 를 주고 본문 「다른 사람의 계좌는 국민은행이다」 로 고치면 `isError` 가 참이고 글이 「지금은 기존 기억을 고칠 수 없다」 로 시작하며 항목 본문은 그대로다.
   - 시험 하나를 더한다: 질문 「어제 병원에 다녀왔어. 다른 사람은 홍길동이야.」 처럼 질문에만 민감 낱말이 있으면 `remember("다른 사람", "다른 사람은 홍길동이야", null)` 가 바로 저장된다(질문 원문이 아니라 제목과 본문만 본다).
 
 ## 검증
 
 ```bash
 cd backend && ./gradlew test --tests 'com.bifos.assistant.memory.application.MemorySensitiveHintsTest' --tests 'com.bifos.assistant.mcp.McpMemoryRememberToolTest'
-cd backend && ./gradlew checkstyleMain checkstyleTest archTest
+cd backend && ./gradlew checkstyleMain checkstyleTest archTest spotlessCheck
 ```
 
 기대값: 모두 통과.
