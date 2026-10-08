@@ -43,6 +43,7 @@ function item(overrides: Partial<AttentionItem>): AttentionItem {
     actionId: null,
     followUp: null,
     report: null,
+    problem: null,
     ...overrides,
   };
 }
@@ -228,6 +229,38 @@ test("항목의 단추는 now.md 「동작」 표를 따른다", () => {
     ["link", "대화 열기"],
   ]);
   assert.deepEqual(labels(item({ why: why("CONVERSATION_RECENT", []), conversationId })), []);
+});
+
+test("먼저 다룰 문제는 점검 대화로 가는 링크와 두 반응 단추를 낸다", () => {
+  const conversationId = "7b1e0000-0000-4000-8000-000000000000";
+  const surfaced = item({
+    why: why("PROBLEM_SURFACED", []),
+    conversationId,
+    problem: { decisionId: 7, level: "SURFACE", action: "영수증 사진을 정리해 두기" },
+  });
+  assert.equal(reasonText(surfaced.why), "에이전트가 먼저 다룰 문제로 골랐어요");
+  assert.equal(itemHref(surfaced), `/chat/${conversationId}`);
+  assert.deepEqual(
+    itemActions(surfaced).map((action) => [action.kind, action.label]),
+    [
+      ["link", "점검 대화에서 보기"],
+      ["react-accept", "받아들임"],
+      ["react-dismiss", "관심 없음"],
+    ],
+  );
+});
+
+test("먼저 다룰 문제에 판정 칸이 없으면 단추를 내지 않고, 대화가 없으면 링크만 뺀다", () => {
+  assert.deepEqual(itemActions(item({ why: why("PROBLEM_SURFACED", []), problem: null })), []);
+  const noConversation = item({
+    why: why("PROBLEM_SURFACED", []),
+    conversationId: null,
+    problem: { decisionId: 7, level: "ASK_APPROVAL", action: null },
+  });
+  assert.deepEqual(
+    itemActions(noConversation).map((action) => action.kind),
+    ["react-accept", "react-dismiss"],
+  );
 });
 
 test("갈 곳이 없는 항목에는 링크 단추가 없다", () => {

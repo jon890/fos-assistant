@@ -205,26 +205,53 @@ test.describe("지금 화면", () => {
     await page.unrouteAll({ behavior: "ignoreErrors" });
   });
 
-  /**
-   * 에이전트가 제안한 할 일을 만든다. 제안은 에이전트의 제안 도구만 만들므로 test-support 경로로 넣는다.
-   * 그 사용자의 메일로 서명한 Control Plane 토큰으로 부른다.
-   */
-  async function proposeFollowUp(email: string, conversationId: string, title: string): Promise<string> {
+  /** 그 사용자의 메일로 서명한 Control Plane 토큰으로 test-support 경로를 부르고 응답 본문을 준다. */
+  async function seedViaTestSupport(email: string, path: string, body: unknown, what: string): Promise<unknown> {
     const token = await new SignJWT({ name: "지금 화면 보는 사용자" })
       .setProtectedHeader({ alg: "HS256" })
       .setSubject(email)
       .setIssuedAt()
       .setExpirationTime("2m")
       .sign(new TextEncoder().encode(JWT_SECRET));
-    const response = await fetch(`${CONTROL_PLANE_BASE_URL}/api/v1/test-support/follow-ups/proposed`, {
+    const response = await fetch(`${CONTROL_PLANE_BASE_URL}/api/v1/test-support/${path}`, {
       method: "POST",
       headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ conversationId, title }),
+      body: JSON.stringify(body),
     });
-    expect(response.status, `할 일을 제안하지 못했다: ${await response.clone().text()}`).toBe(200);
-    const { id } = (await response.json()) as { id?: unknown };
+    expect(response.status, `${what}: ${await response.clone().text()}`).toBe(200);
+    return response.json();
+  }
+
+  /**
+   * 에이전트가 제안한 할 일을 만든다. 제안은 에이전트의 제안 도구만 만들므로 test-support 경로로 넣는다.
+   */
+  async function proposeFollowUp(email: string, conversationId: string, title: string): Promise<string> {
+    const { id } = (await seedViaTestSupport(
+      email,
+      "follow-ups/proposed",
+      { conversationId, title },
+      "할 일을 제안하지 못했다",
+    )) as { id?: unknown };
     expect(typeof id, "제안한 할 일의 식별자가 없다").toBe("string");
     return id as string;
+  }
+
+  /**
+   * 매일 루프가 먼저 다룰 문제를 골라 둔 상태를 만든다. 브라우저 환경에는 판단 profile 이 없어 루프가 직접 만들지 못한다.
+   */
+  async function surfaceProblem(
+    email: string,
+    agentCode: string,
+    problem: string,
+    action: string,
+    level: "SURFACE" | "ASK_APPROVAL",
+  ): Promise<{ decisionId: number; conversationId: string }> {
+    return (await seedViaTestSupport(
+      email,
+      "proactive-loop/surfaced",
+      { agentCode, problem, action, level },
+      "먼저 다룰 문제를 심지 못했다",
+    )) as { decisionId: number; conversationId: string };
   }
 
   async function summaryCount(page: Page): Promise<number> {
@@ -463,6 +490,109 @@ test.describe("지금 화면", () => {
       /^\/api\/follow-ups\/[^/]+\/reject$/,
     );
     await expect(rejected).toHaveCount(0, REFRESHED);
+  });
+
+  test("먼저 다룰 문제는 내 차례에 건수 없이 보이고 받아들이면 기록만 남기고 사라진다", async ({
+    page,
+    isolatedMember,
+  }) => {
+    const agentCode = await ownAgent(page);
+    const surfaced = {
+      problem: "장보기 예약이 내일 마감이에요",
+      action: "예약 사이트에서 시간을 확인해 보기",
+    };
+    const approval = {
+      problem: "학교 서류 제출 기한이 다가와요",
+      action: "서류를 직접 챙겨서 제출하기",
+    };
+    const before = await summaryCount(page);
+    const first = await surfaceProblem(isolatedMember.email, agentCode, surfaced.problem, surfaced.action, "SURFACE");
+    const second = await surfaceProblem(
+      isolatedMember.email,
+      agentCode,
+      approval.problem,
+      approval.action,
+      "ASK_APPROVAL",
+    );
+    expect(await summaryCount(page), "먼저 다룰 문제가 지금 볼 것의 수에 들어갔다").toBe(before);
+
+    await openNow(page);
+    const needsMe = page.getByTestId("now-card-needs_me");
+    const row = needsMe.getByTestId("now-item").filter({ hasText: surfaced.problem });
+    const askRow = needsMe.getByTestId("now-item").filter({ hasText: approval.problem });
+    await expect(row).toHaveCount(1);
+    await expect(askRow).toHaveCount(1);
+    await expect(row).toHaveAttribute("data-attention", "LATER");
+    await expect(row).toContainText("에이전트가 먼저 다룰 문제로 골랐어요");
+    await expect(row).toContainText(surfaced.action);
+    await expect(askRow).toContainText(approval.action);
+    await expect(row).not.toContainText("직접 처리할 일이에요. 승인 요청이 아니에요.");
+    await expect(askRow).toContainText("직접 처리할 일이에요. 승인 요청이 아니에요.");
+    for (const target of [row, askRow]) {
+      await expect(target).toContainText("받아들임은 기록만 해요. 할 일이나 승인을 만들지 않아요.");
+      for (const name of ["받아들임", "관심 없음"]) {
+        await expect(target.getByRole("button", { name, exact: true })).toBeVisible();
+      }
+    }
+    await expect(needsMe.getByTestId("card-now-count")).toHaveCount(0);
+
+    await expect(row.getByRole("link", { name: "점검 대화에서 보기" })).toHaveAttribute(
+      "href",
+      `/chat/${first.conversationId}`,
+    );
+    await clickSending(page, row.getByRole("button", { name: "받아들임", exact: true }), "PUT", /^\/api\/autonomy-decisions\/\d+\/reaction$/);
+    await expect(row).toHaveCount(0, REFRESHED);
+    await openNow(page);
+    await expect(row).toHaveCount(0);
+    await expect(askRow).toHaveCount(1);
+    expect(await summaryCount(page), "반응 뒤 지금 볼 것의 수").toBe(before);
+
+    await askRow.getByRole("link", { name: "점검 대화에서 보기" }).click();
+    await expect(page).toHaveURL(new RegExp(`/chat/${second.conversationId}$`));
+  });
+
+  test("먼저 다룰 문제에 반응을 남기지 못하면 항목 아래에 안내를 보이고 항목은 남는다", async ({
+    page,
+    isolatedMember,
+  }) => {
+    const problem = "주간 식단 장보기가 밀렸어요";
+    await surfaceProblem(isolatedMember.email, await ownAgent(page), problem, "필요한 재료부터 적어 보기", "SURFACE");
+    await page.route("**/api/autonomy-decisions/*/reaction", (route: Route) =>
+      route.fulfill({ status: 502, json: { code: "INTERNAL_ERROR", message: "unavailable" } }),
+    );
+
+    await openNow(page);
+    const row = page.getByTestId("now-card-needs_me").getByTestId("now-item").filter({ hasText: problem });
+    await expect(row).toHaveCount(1);
+    await row.getByRole("button", { name: "관심 없음", exact: true }).click();
+    await expect(row).toContainText("반응을 남기지 못했어요. 잠시 뒤 다시 눌러 주세요.");
+    await expect(row).toHaveCount(1);
+
+    await page.unrouteAll({ behavior: "ignoreErrors" });
+  });
+
+  test("이미 없는 판정에 반응하면 그 코드의 문구를 항목 아래에 보이고 화면을 다시 읽는다", async ({
+    page,
+    isolatedMember,
+  }) => {
+    const problem = "주말 장보기 예산이 넘었어요";
+    await surfaceProblem(isolatedMember.email, await ownAgent(page), problem, "지출 내역부터 훑어 보기", "SURFACE");
+    await page.route("**/api/autonomy-decisions/*/reaction", (route: Route) =>
+      route.fulfill({ status: 404, json: { code: "AUTONOMY_DECISION_NOT_FOUND", message: "no such surfaced decision" } }),
+    );
+
+    await openNow(page);
+    const row = page.getByTestId("now-card-needs_me").getByTestId("now-item").filter({ hasText: problem });
+    await expect(row).toHaveCount(1);
+    const reread = page.waitForResponse(
+      (response) => response.request().method() === "GET" && new URL(response.url()).pathname === "/now",
+    );
+    await row.getByRole("button", { name: "받아들임", exact: true }).click();
+    await expect(row).toContainText("이미 처리했거나 찾을 수 없는 항목이에요. 화면을 다시 열어 주세요.");
+    await expect(row).not.toContainText("잠시 뒤 다시 눌러 주세요");
+    await reread;
+
+    await page.unrouteAll({ behavior: "ignoreErrors" });
   });
 
   test("새 대화 화면의 「확인할 것 N건」 은 늦게 도착해도 입력창을 밀지 않고 읽지 못하면 그리지 않는다", async ({

@@ -15,7 +15,7 @@ public enum FeedbackSubjectType {
     CHECK("proactive_check"),
     /** 살펴보기의 「새로 알릴 것」 발견 하나. 열쇠는 {@code check_finding:<번호>} 다. */
     CHECK_FINDING("check_finding"),
-    /** 행동 정책의 판정 하나. 자동 실행을 시작하지 못했다. 열쇠는 {@code autonomy_decision:<번호>} 다. */
+    /** 행동 정책 판정. 자동 실행을 시작하지 못한 것과 매일 루프가 보인 판정의 반응이다. 열쇠는 {@code autonomy_decision:<번호>} 다. */
     AUTONOMY_DECISION("autonomy_decision");
 
     private final String prefix;

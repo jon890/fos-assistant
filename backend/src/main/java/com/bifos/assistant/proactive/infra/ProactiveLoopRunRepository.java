@@ -18,4 +18,11 @@ public interface ProactiveLoopRunRepository extends JpaRepository<ProactiveLoopR
     List<ProactiveLoopRun> findByStatus(LoopRunStatus status);
 
     List<ProactiveLoopRun> findBySourceCheckIdIn(Collection<Long> sourceCheckIds);
+
+    /** 그 사용자의 그 상태 시도 가운데 그 시각 뒤에 저장한 줄이다. 지금 화면에 보일 판정의 평가를 모은다. */
+    List<ProactiveLoopRun> findByUserIdAndStatusAndCreatedAtAfter(Long userId, LoopRunStatus status, Instant after);
+
+    /** 그 사용자의 그 상태 시도 가운데 그 평가들을 만든 줄이다. 판정이 루프의 것인지 본다. */
+    List<ProactiveLoopRun> findByUserIdAndStatusAndEvaluationIdIn(
+            Long userId, LoopRunStatus status, Collection<Long> evaluationIds);
 }
