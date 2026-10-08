@@ -207,7 +207,7 @@ def _connector_bind_config(profile_dir: pathlib.Path, plugin: str, enabled: bool
         if manifest["owner_output_env"] is not None:
             # 출력 디렉터리가 없어도 붙이기는 막지 않는다. 빈 값을 받은 커넥터는 파일 출력만 거절한다.
             server["env"][manifest["owner_output_env"]] = (
-                owner_output if isinstance(owner_output, str) and OWNER_OUTPUT_VALUE_RE.match(owner_output) else "")
+                owner_output if isinstance(owner_output, str) and OWNER_OUTPUT_VALUE_RE.fullmatch(owner_output) else "")
         # 바꾸기 전의 정의다. gateway 는 같은 이름의 서버를 다시 연결하지 않으므로 정의가 바뀌면 재시작해야 한다.
         previous = servers.get(name)
         servers[name] = server
@@ -252,8 +252,9 @@ def _connector_bind_config(profile_dir: pathlib.Path, plugin: str, enabled: bool
         if name in servers and servers[name] != owned["server"]:
             raise FileExistsError("운영자가 바꾼 MCP 서버가 있다")
         servers.pop(name, None)
-        removed_outputs = [value for value in owned["server"]["env"].values()
-                           if isinstance(value, str) and OWNER_OUTPUT_VALUE_RE.match(value)]
+        installed_env = owned["server"].get("env")
+        removed_outputs = [value for value in (installed_env.values() if isinstance(installed_env, dict) else ())
+                           if isinstance(value, str) and OWNER_OUTPUT_VALUE_RE.fullmatch(value)]
         if isinstance(allowed, list):
             allowed = [item for item in allowed if item != name]
         field_env = _bind_entry_env(manifest, owned)
@@ -359,7 +360,7 @@ def _connector_bind_config(profile_dir: pathlib.Path, plugin: str, enabled: bool
         raise
     for value in removed_outputs:
         # 커넥터가 읽은 데이터가 뗀 뒤에 남지 않게 한다. 지우지 못해도 떼기는 끝난 것이다.
-        _sandbox_remove_connector_output(value)
+        _sandbox_remove_connector_output(value, profile_dir.name, plugin)
     # 파일을 모두 지운 스킬 디렉터리는 빈 디렉터리만 남는다. 지우지 못해도 설치는 끝난 것이다.
     for skill in previous_skills:
         for current, dirs, names in os.walk(skills_dir / skill, topdown=False):

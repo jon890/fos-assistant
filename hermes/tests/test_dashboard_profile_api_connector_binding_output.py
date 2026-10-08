@@ -48,6 +48,48 @@ class ProfileApiConnectorBindingOutputTest(support.ProfileApiRouteTest):
         self.assertEqual(self.alice_config()["mcp_servers"]["demo"]["env"]["DEMO_OUTPUT_DIR"], "")
         self.assertIs(self.status_of()["connectors"][0]["configured"], True)
 
+    def test_binding_on_a_profile_outside_the_policy_writes_an_empty_value(self):
+        """실행 공간 정책에 등록되지 않은 profile 은 출력 디렉터리를 붙이지 않으므로 빈 값으로 붙이고 만들지 않는다."""
+        demo, _ = self.bind_fixture()
+        self.declare_owner_output(demo)
+        policy = self.sandbox_policy(connector_output_root=self.connector_output_root)
+        policy["profiles"].pop("alice")
+        self.set_sandbox_policy(policy)
+
+        response = self.bind(owner="user-1")
+
+        self.assertEqual(response.status_code, 200, response.body)
+        self.assertEqual(self.alice_config()["mcp_servers"]["demo"]["env"]["DEMO_OUTPUT_DIR"], "")
+        self.assertFalse(pathlib.Path(self.connector_output_root).exists())
+
+    def test_rejected_binding_does_not_create_the_directory(self):
+        """보관 파일이 없어 거절된 붙이기는 출력 디렉터리를 만들지 않는다."""
+        demo, _ = self.bind_fixture()
+        self.declare_owner_output(demo)
+        self.with_output_root()
+
+        response = self.bind(owner="user-1", vault="missing")
+
+        self.assertEqual(response.status_code, 400, response.body)
+        self.assertFalse(pathlib.Path(self.connector_output_root).exists())
+
+    def test_installed_reference_or_odd_value_is_not_configured(self):
+        """설치 기록의 출력 값이 profile `.env` 참조이거나 모양이 틀리면 설치된 것으로 보지 않는다."""
+        demo, _ = self.bind_fixture()
+        self.declare_owner_output(demo)
+        self.with_output_root()
+        self.assertEqual(self.bind(owner="user-1").status_code, 200)
+        state_path = self.root / "alice/.fos-connectors.json"
+        original = json.loads(state_path.read_text(encoding="utf-8"))
+        for label, value in (("reference", "${DEMO_OUTPUT_DIR}"),
+                             ("trailing newline", self.connector_output_directory("user-1", "alice", DEMO) + "\n"),
+                             ("short key", self.connector_output_root + "/users/abc/alice/" + DEMO)):
+            with self.subTest(label):
+                record = json.loads(json.dumps(original))
+                record[DEMO]["server"]["env"]["DEMO_OUTPUT_DIR"] = value
+                state_path.write_text(json.dumps(record), encoding="utf-8")
+                self.assertIs(self.status_of()["connectors"][0]["configured"], False)
+
     def test_binding_through_a_link_writes_an_empty_value(self):
         """출력 디렉터리 경로에 링크가 섞이면 그 경로를 넣지 않고 빈 값으로 붙인다."""
         demo, _ = self.bind_fixture()
@@ -82,6 +124,24 @@ class ProfileApiConnectorBindingOutputTest(support.ProfileApiRouteTest):
         self.assertTrue(directory.parent.is_dir())
         self.assertTrue(other.is_dir())
         self.assertNotIn("demo", self.alice_config().get("mcp_servers") or {})
+
+    def test_unbinding_keeps_a_linked_directory(self):
+        """설치한 디렉터리가 링크로 바뀌었으면 따라가 지우지 않는다."""
+        demo, _ = self.bind_fixture()
+        self.declare_owner_output(demo)
+        self.with_output_root()
+        self.assertEqual(self.bind(owner="user-1").status_code, 200)
+        directory = pathlib.Path(self.connector_output_directory("user-1", "alice", DEMO))
+        directory.rmdir()
+        elsewhere = pathlib.Path(self.connector_output_root).parent / "elsewhere"
+        elsewhere.mkdir()
+        (elsewhere / "keep.txt").write_text("keep", encoding="utf-8")
+        directory.symlink_to(elsewhere)
+
+        self.assertEqual(self.bind(enabled=False).status_code, 200)
+
+        self.assertTrue((elsewhere / "keep.txt").is_file())
+        self.assertTrue(directory.is_symlink())
 
     def test_unbinding_keeps_a_directory_outside_the_policy_root(self):
         """설치 기록의 값이 지금 정책 루트 밖이면 지우지 않는다."""

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 import pathlib
+import re
 import shutil
 from typing import Optional
 from .common import (
@@ -44,14 +45,19 @@ def _sandbox_connector_output_directory(policy: dict, profile: str, owner: str, 
     return target
 
 
-def _sandbox_remove_connector_output(value: str) -> None:
+def _sandbox_remove_connector_output(value: str, profile: str, connector: str) -> None:
     """뗀 바인딩의 커넥터 출력 디렉터리를 지운다.
 
-    지금 정책의 `connector_output_root` 아래이고 실제 경로가 그 경로 그대로일 때만 지운다. 아니면 남긴다.
+    값이 지금 정책의 `<connector_output_root>/users/<64자리 16진수>/<그 profile>/<그 커넥터>` 이고
+    실제 경로가 그 경로 그대로일 때만 지운다. 아니면 남긴다.
     """
     policy = _sandbox_policy()
     root = policy.get("connector_output_root") if policy is not None else None
-    if root is None or not value.startswith(root.rstrip("/") + "/users/"):
+    if root is None:
+        return
+    prefix = root.rstrip("/") + "/users/"
+    key, _, rest = value[len(prefix):].partition("/") if value.startswith(prefix) else ("", "", "")
+    if not re.fullmatch(r"[0-9a-f]{64}", key) or rest != "%s/%s" % (profile, connector):
         return
     path = pathlib.Path(value)
     try:

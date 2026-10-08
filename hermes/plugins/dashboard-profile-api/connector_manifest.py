@@ -341,7 +341,7 @@ def _server_matches(manifest: dict, server: dict) -> bool:
             if value != "" and not OWNER_ATTACHMENTS_VALUE_RE.match(value):
                 return False
         elif name == manifest["owner_output_env"]:
-            if value != "" and not OWNER_OUTPUT_VALUE_RE.match(value):
+            if value != "" and not OWNER_OUTPUT_VALUE_RE.fullmatch(value):
                 return False
         elif name in manifest["operator_env"]:
             if value not in (reference, expected["env"][name]):
