@@ -26,7 +26,7 @@ class UserActivityMigrationTest {
         Flyway.configure()
                 .dataSource(url, "sa", "")
                 .locations("classpath:db/migration")
-                .target("20261008104500")
+                .target("20261008061000")
                 .load()
                 .migrate();
     }
