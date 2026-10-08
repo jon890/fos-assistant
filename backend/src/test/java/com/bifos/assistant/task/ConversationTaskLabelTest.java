@@ -111,7 +111,8 @@ class ConversationTaskLabelTest {
                 new ChatEventStreams(Duration.ofSeconds(20)),
                 null,
                 mock(ModelTierService.class),
-                taskLabels, mock(SourceReadSummaries.class));
+                taskLabels,
+                mock(SourceReadSummaries.class));
     }
 
     @AfterEach

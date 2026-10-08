@@ -30,10 +30,14 @@ class SourceReadSummariesTest {
     void countsCompletedCallsButOnlyExposesSafeSuccessfulUrls() throws Exception {
         AgentExecution root = execution(1L, null, EventObservation.OBSERVED);
         stubExecutions(List.of(root), List.of());
-        when(events.findByExecutionIdInOrderByExecutionIdAscSequenceAsc(any())).thenReturn(List.of(
-                completed(1L, 1, "{\"results\":[{\"url\":\"https://EXAMPLE.com/a%2Fb?q=x#part\",\"content\":\"ok\"},{\"url\":\"http://localhost/x\",\"content\":\"ok\"}]}"),
-                completed(1L, 2, "{\"success\":false,\"results\":[]}"),
-                completed(1L, 3, "{\"results\":[]}")));
+        when(events.findByExecutionIdInOrderByExecutionIdAscSequenceAsc(any()))
+                .thenReturn(List.of(
+                        completed(
+                                1L,
+                                1,
+                                "{\"results\":[{\"url\":\"https://EXAMPLE.com/a%2Fb?q=x#part\",\"content\":\"ok\"},{\"url\":\"http://localhost/x\",\"content\":\"ok\"}]}"),
+                        completed(1L, 2, "{\"success\":false,\"results\":[]}"),
+                        completed(1L, 3, "{\"results\":[]}")));
 
         assertThat(summaries.of(List.of(answer(10L, 1L))).get(10L))
                 .isEqualTo(new SourceReadSummary(3, List.of("https://example.com/a%2Fb"), 1, true));
@@ -44,12 +48,19 @@ class SourceReadSummariesTest {
     void excludesNonSuccessfulExactWebExtractCompletions() throws Exception {
         AgentExecution root = execution(1L, null, EventObservation.OBSERVED);
         stubExecutions(List.of(root), List.of());
-        when(events.findByExecutionIdInOrderByExecutionIdAscSequenceAsc(any())).thenReturn(List.of(
-                event(1L, 1, ExecutionEventType.TOOL_STARTED, "web_extract", false, "{\"results\":[]}"),
-                event(1L, 2, ExecutionEventType.TOOL_COMPLETED, "web_search", false, "{\"results\":[]}"),
-                event(1L, 3, ExecutionEventType.TOOL_COMPLETED, "mcp__search__web_extract", false, "{\"results\":[]}"),
-                event(1L, 4, ExecutionEventType.TOOL_COMPLETED, "web_extract", true, "{\"results\":[]}"),
-                event(1L, 5, ExecutionEventType.TOOL_COMPLETED, "web_extract", null, "{\"results\":[]}")));
+        when(events.findByExecutionIdInOrderByExecutionIdAscSequenceAsc(any()))
+                .thenReturn(List.of(
+                        event(1L, 1, ExecutionEventType.TOOL_STARTED, "web_extract", false, "{\"results\":[]}"),
+                        event(1L, 2, ExecutionEventType.TOOL_COMPLETED, "web_search", false, "{\"results\":[]}"),
+                        event(
+                                1L,
+                                3,
+                                ExecutionEventType.TOOL_COMPLETED,
+                                "mcp__search__web_extract",
+                                false,
+                                "{\"results\":[]}"),
+                        event(1L, 4, ExecutionEventType.TOOL_COMPLETED, "web_extract", true, "{\"results\":[]}"),
+                        event(1L, 5, ExecutionEventType.TOOL_COMPLETED, "web_extract", null, "{\"results\":[]}")));
 
         assertThat(summaries.of(List.of(answer(10L, 1L))).get(10L))
                 .isEqualTo(new SourceReadSummary(0, List.of(), 0, true));
@@ -60,8 +71,13 @@ class SourceReadSummariesTest {
     void keepsOnlySuccessfulItemsFromMixedResults() throws Exception {
         AgentExecution root = execution(1L, null, EventObservation.OBSERVED);
         stubExecutions(List.of(root), List.of());
-        when(events.findByExecutionIdInOrderByExecutionIdAscSequenceAsc(any())).thenReturn(List.of(completed(
-                1L, 1, "{\"results\":[{\"url\":\"https://example.com/kept\",\"content\":\"본문 [가림]\"},{\"url\":\"https://example.com/error\",\"content\":\"본문\",\"error\":\"실패\"},{\"url\":\"https://example.com/empty\",\"content\":\"   \"}]}")));
+        when(events.findByExecutionIdInOrderByExecutionIdAscSequenceAsc(any()))
+                .thenReturn(
+                        List.of(
+                                completed(
+                                        1L,
+                                        1,
+                                        "{\"results\":[{\"url\":\"https://example.com/kept\",\"content\":\"본문 [가림]\"},{\"url\":\"https://example.com/error\",\"content\":\"본문\",\"error\":\"실패\"},{\"url\":\"https://example.com/empty\",\"content\":\"   \"}]}")));
 
         assertThat(summaries.of(List.of(answer(10L, 1L))).get(10L))
                 .isEqualTo(new SourceReadSummary(1, List.of("https://example.com/kept"), 0, true));
@@ -73,12 +89,21 @@ class SourceReadSummariesTest {
         AgentExecution root = execution(1L, null, EventObservation.OBSERVED);
         AgentExecution child = execution(2L, 1L, EventObservation.OBSERVED);
         stubExecutions(List.of(root, child), List.of(child));
-        when(events.findByExecutionIdInOrderByExecutionIdAscSequenceAsc(any())).thenReturn(List.of(
-                completed(1L, 1, "{\"results\":[{\"url\":\"https://EXAMPLE.com/a?q=one\",\"content\":\"본문\"}]}"),
-                completed(2L, 1, "{\"results\":[{\"url\":\"https://example.com/a#two\",\"content\":\"본문\"},{\"url\":\"https://example.com/b\",\"content\":\"본문\"}]}")));
+        when(events.findByExecutionIdInOrderByExecutionIdAscSequenceAsc(any()))
+                .thenReturn(
+                        List.of(
+                                completed(
+                                        1L,
+                                        1,
+                                        "{\"results\":[{\"url\":\"https://EXAMPLE.com/a?q=one\",\"content\":\"본문\"}]}"),
+                                completed(
+                                        2L,
+                                        1,
+                                        "{\"results\":[{\"url\":\"https://example.com/a#two\",\"content\":\"본문\"},{\"url\":\"https://example.com/b\",\"content\":\"본문\"}]}")));
 
         assertThat(summaries.of(List.of(answer(10L, 1L))).get(10L))
-                .isEqualTo(new SourceReadSummary(2, List.of("https://example.com/a", "https://example.com/b"), 0, true));
+                .isEqualTo(
+                        new SourceReadSummary(2, List.of("https://example.com/a", "https://example.com/b"), 0, true));
     }
 
     @Test
@@ -86,8 +111,9 @@ class SourceReadSummariesTest {
     void marksMalformedJsonAsUnresolved() throws Exception {
         AgentExecution root = execution(1L, null, EventObservation.OBSERVED);
         stubExecutions(List.of(root), List.of());
-        when(events.findByExecutionIdInOrderByExecutionIdAscSequenceAsc(any())).thenReturn(List.of(completed(
-                1L, 1, "{\"results\":[{\"url\":\"https://example.com/truncated\",\"content\":\"본문\"}")));
+        when(events.findByExecutionIdInOrderByExecutionIdAscSequenceAsc(any()))
+                .thenReturn(List.of(completed(
+                        1L, 1, "{\"results\":[{\"url\":\"https://example.com/truncated\",\"content\":\"본문\"}")));
 
         assertThat(summaries.of(List.of(answer(10L, 1L))).get(10L))
                 .isEqualTo(new SourceReadSummary(1, List.of(), 1, true));
@@ -110,8 +136,9 @@ class SourceReadSummariesTest {
     void preservesEarlierSafeUrlsWhenALaterResultItemIsMalformed() throws Exception {
         AgentExecution root = execution(1L, null, EventObservation.OBSERVED);
         stubExecutions(List.of(root), List.of());
-        when(events.findByExecutionIdInOrderByExecutionIdAscSequenceAsc(any())).thenReturn(List.of(completed(
-                1L, 1, "{\"results\":[{\"url\":\"https://example.com/kept\",\"content\":\"본문\"}, false]}")));
+        when(events.findByExecutionIdInOrderByExecutionIdAscSequenceAsc(any()))
+                .thenReturn(List.of(completed(
+                        1L, 1, "{\"results\":[{\"url\":\"https://example.com/kept\",\"content\":\"본문\"}, false]}")));
 
         assertThat(summaries.of(List.of(answer(10L, 1L))).get(10L))
                 .isEqualTo(new SourceReadSummary(1, List.of("https://example.com/kept"), 1, true));
@@ -122,8 +149,13 @@ class SourceReadSummariesTest {
     void rejectsSensitiveInternalAndRedactedUrls() throws Exception {
         AgentExecution root = execution(1L, null, EventObservation.OBSERVED);
         stubExecutions(List.of(root), List.of());
-        when(events.findByExecutionIdInOrderByExecutionIdAscSequenceAsc(any())).thenReturn(List.of(completed(
-                1L, 1, "{\"results\":[{\"url\":\"https://user:secret@example.com/path\",\"content\":\"본문\"},{\"url\":\"https://10.0.0.1/private\",\"content\":\"본문\"},{\"url\":\"https://service.internal/path\",\"content\":\"본문\"},{\"url\":\"https://example.com/[가림]\",\"content\":\"본문\"}]}")));
+        when(events.findByExecutionIdInOrderByExecutionIdAscSequenceAsc(any()))
+                .thenReturn(
+                        List.of(
+                                completed(
+                                        1L,
+                                        1,
+                                        "{\"results\":[{\"url\":\"https://user:secret@example.com/path\",\"content\":\"본문\"},{\"url\":\"https://10.0.0.1/private\",\"content\":\"본문\"},{\"url\":\"https://service.internal/path\",\"content\":\"본문\"},{\"url\":\"https://example.com/[가림]\",\"content\":\"본문\"}]}")));
 
         assertThat(summaries.of(List.of(answer(10L, 1L))).get(10L))
                 .isEqualTo(new SourceReadSummary(1, List.of("https://example.com/path"), 1, true));
@@ -135,8 +167,9 @@ class SourceReadSummariesTest {
         AgentExecution root = execution(1L, null, EventObservation.OBSERVED);
         AgentExecution child = execution(2L, 1L, EventObservation.INCOMPLETE);
         stubExecutions(List.of(root, child), List.of(child));
-        when(events.findByExecutionIdInOrderByExecutionIdAscSequenceAsc(any())).thenReturn(List.of(completed(
-                2L, 1, "{\"results\":[{\"url\":\"https://example.com/read\",\"content\":\"본문\"}]}")));
+        when(events.findByExecutionIdInOrderByExecutionIdAscSequenceAsc(any()))
+                .thenReturn(List.of(
+                        completed(2L, 1, "{\"results\":[{\"url\":\"https://example.com/read\",\"content\":\"본문\"}]}")));
 
         assertThat(summaries.of(List.of(answer(10L, 1L))).get(10L))
                 .isEqualTo(new SourceReadSummary(1, List.of("https://example.com/read"), 0, false));
@@ -151,11 +184,16 @@ class SourceReadSummariesTest {
         AgentExecution descendant = execution(4L, 1L, EventObservation.OBSERVED);
         set(descendant, "parentExecutionId", 2L);
         stubExecutions(List.of(root, child, sibling, descendant), List.of(child, sibling, descendant));
-        when(events.findByExecutionIdInOrderByExecutionIdAscSequenceAsc(any())).thenReturn(List.of(
-                completed(1L, 1, "{\"results\":[{\"url\":\"https://example.com/root\",\"content\":\"본문\"}]}"),
-                completed(2L, 1, "{\"results\":[{\"url\":\"https://example.com/child\",\"content\":\"본문\"}]}"),
-                completed(3L, 1, "{\"results\":[{\"url\":\"https://example.com/sibling\",\"content\":\"본문\"}]}"),
-                completed(4L, 1, "{\"results\":[{\"url\":\"https://example.com/descendant\",\"content\":\"본문\"}]}")));
+        when(events.findByExecutionIdInOrderByExecutionIdAscSequenceAsc(any()))
+                .thenReturn(List.of(
+                        completed(1L, 1, "{\"results\":[{\"url\":\"https://example.com/root\",\"content\":\"본문\"}]}"),
+                        completed(2L, 1, "{\"results\":[{\"url\":\"https://example.com/child\",\"content\":\"본문\"}]}"),
+                        completed(
+                                3L, 1, "{\"results\":[{\"url\":\"https://example.com/sibling\",\"content\":\"본문\"}]}"),
+                        completed(
+                                4L,
+                                1,
+                                "{\"results\":[{\"url\":\"https://example.com/descendant\",\"content\":\"본문\"}]}")));
 
         assertThat(summaries.of(List.of(answer(10L, 2L))).get(10L))
                 .isEqualTo(new SourceReadSummary(

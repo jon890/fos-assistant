@@ -483,7 +483,8 @@ class ChatAttachmentTurnTest {
                 new ChatEventStreams(Duration.ofSeconds(20)),
                 null,
                 mock(ModelTierService.class),
-                List.of(), mock(SourceReadSummaries.class));
+                List.of(),
+                mock(SourceReadSummaries.class));
     }
 
     private ChatAttachment upload(CurrentUser user, Long conversationId, String name) {

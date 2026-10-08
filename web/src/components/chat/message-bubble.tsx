@@ -338,7 +338,9 @@ export function MessageBubble({
           onAnswer={streaming ? undefined : onAnswer}
         />
       </div>
-      {!streaming && !unsaved && turn.sourceReads ? <SourceReadList sourceReads={turn.sourceReads} /> : null}
+      {!streaming && !unsaved && turn.sourceReads ? (
+        <SourceReadList sourceReads={turn.sourceReads} />
+      ) : null}
       {turn.status === "CANCELLED" ? (
         <p
           data-testid="stopped-mark"

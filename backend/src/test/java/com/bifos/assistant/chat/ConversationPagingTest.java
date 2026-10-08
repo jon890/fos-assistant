@@ -212,7 +212,8 @@ class ConversationPagingTest {
                 new ChatEventStreams(Duration.ofSeconds(20)),
                 null,
                 mock(ModelTierService.class),
-                List.of(), mock(SourceReadSummaries.class));
+                List.of(),
+                mock(SourceReadSummaries.class));
 
         ConversationPageView page = controller.conversations(null, 10);
 

@@ -109,7 +109,8 @@ class ConversationMissingAgentTest {
                         new ChatEventStreams(Duration.ofSeconds(20)),
                         null,
                         mock(ModelTierService.class),
-                        List.of(), mock(SourceReadSummaries.class)))
+                        List.of(),
+                        mock(SourceReadSummaries.class)))
                 .setControllerAdvice(new GlobalExceptionHandler())
                 .build();
         AppUser user = users.save(AppUser.of("dad@example.com", "dad", 1L, UserRole.MEMBER, Instant.now()));

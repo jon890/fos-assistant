@@ -24,8 +24,8 @@ class ModelTierRequestValidationTest {
 
     private final ChatService chat = mock(ChatService.class);
     private final ModelTierService tiers = mock(ModelTierService.class);
-    private final MockMvc mvc = MockMvcBuilders.standaloneSetup(
-                    new ChatController(chat, null, null, null, null, null, null, tiers, List.of(), mock(SourceReadSummaries.class)))
+    private final MockMvc mvc = MockMvcBuilders.standaloneSetup(new ChatController(
+                    chat, null, null, null, null, null, null, tiers, List.of(), mock(SourceReadSummaries.class)))
             .setControllerAdvice(new GlobalExceptionHandler())
             .build();
 

@@ -173,7 +173,8 @@ class ConversationEventControllerTest {
                         new ChatEventStreams(Duration.ofSeconds(20)),
                         null,
                         mock(ModelTierService.class),
-                        List.of(), mock(SourceReadSummaries.class)))
+                        List.of(),
+                        mock(SourceReadSummaries.class)))
                 .setControllerAdvice(new GlobalExceptionHandler())
                 .build()
                 .perform(get("/api/v1/chat/conversations/{id}/running", dadsConversation))

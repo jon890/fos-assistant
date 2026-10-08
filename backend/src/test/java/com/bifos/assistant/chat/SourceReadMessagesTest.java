@@ -87,8 +87,7 @@ class SourceReadMessagesTest {
         when(access.requireOwnId(user, conversationId))
                 .thenThrow(new ApiException(ErrorCode.CONVERSATION_NOT_FOUND, "missing"));
 
-        assertThatThrownBy(() -> controller.messages(conversationId))
-                .isInstanceOf(ApiException.class);
+        assertThatThrownBy(() -> controller.messages(conversationId)).isInstanceOf(ApiException.class);
 
         verify(sourceReads, never()).of(any());
     }

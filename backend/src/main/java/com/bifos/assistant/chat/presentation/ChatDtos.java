@@ -1,12 +1,12 @@
 package com.bifos.assistant.chat.presentation;
 
 import com.bifos.assistant.chat.application.ActivitySummary;
-import com.bifos.assistant.chat.application.SourceReadSummary;
 import com.bifos.assistant.chat.application.AgentModelSettings;
 import com.bifos.assistant.chat.application.HiddenModels;
 import com.bifos.assistant.chat.application.ModelOptions;
 import com.bifos.assistant.chat.application.PendingQueue;
 import com.bifos.assistant.chat.application.RunningTurn;
+import com.bifos.assistant.chat.application.SourceReadSummary;
 import com.bifos.assistant.chat.application.StarterSuggestions;
 import com.bifos.assistant.chat.application.model.LatencyRow;
 import com.bifos.assistant.chat.application.model.LatencyStat;

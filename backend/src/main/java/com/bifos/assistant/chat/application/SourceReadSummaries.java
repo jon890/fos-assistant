@@ -49,9 +49,7 @@ public class SourceReadSummaries {
             return Map.of();
         }
         Map<Long, AgentExecution> asked = new LinkedHashMap<>();
-        Set<Long> executionIds = ids.values().stream()
-                .filter(Objects::nonNull)
-                .collect(Collectors.toSet());
+        Set<Long> executionIds = ids.values().stream().filter(Objects::nonNull).collect(Collectors.toSet());
         if (!executionIds.isEmpty()) {
             executions.findAllById(executionIds).forEach(execution -> asked.put(execution.id(), execution));
         }
@@ -68,7 +66,8 @@ public class SourceReadSummaries {
         Map<Long, List<AgentExecution>> childrenByParent = new LinkedHashMap<>();
         for (AgentExecution child : children) {
             if (child.parentExecutionId() != null) {
-                childrenByParent.computeIfAbsent(child.parentExecutionId(), unused -> new ArrayList<>())
+                childrenByParent
+                        .computeIfAbsent(child.parentExecutionId(), unused -> new ArrayList<>())
                         .add(child);
             }
         }
@@ -80,7 +79,8 @@ public class SourceReadSummaries {
         Map<Long, List<ExecutionEvent>> eventRows = new LinkedHashMap<>();
         if (!treeIds.isEmpty()) {
             events.findByExecutionIdInOrderByExecutionIdAscSequenceAsc(treeIds)
-                    .forEach(event -> eventRows.computeIfAbsent(event.executionId(), unused -> new ArrayList<>())
+                    .forEach(event -> eventRows
+                            .computeIfAbsent(event.executionId(), unused -> new ArrayList<>())
                             .add(event));
         }
         Map<Long, SourceReadSummary> result = new LinkedHashMap<>();
@@ -92,8 +92,7 @@ public class SourceReadSummaries {
                     execution == null || !rootRows.containsKey(execution.treeRootId())
                             ? missing()
                             : byExecution.computeIfAbsent(
-                                    executionId,
-                                    unused -> summarize(execution, childrenByParent, eventRows)));
+                                    executionId, unused -> summarize(execution, childrenByParent, eventRows)));
         });
         return result;
     }
@@ -187,10 +186,7 @@ public class SourceReadSummaries {
     }
 
     private static boolean hidden(String value) {
-        return value.contains("[가림]")
-                || value.contains("[항목 ")
-                || value.contains("...")
-                || value.contains("…");
+        return value.contains("[가림]") || value.contains("[항목 ") || value.contains("...") || value.contains("…");
     }
 
     private static String clean(String value) {
