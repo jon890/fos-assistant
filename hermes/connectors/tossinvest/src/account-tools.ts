@@ -5,7 +5,8 @@ import {
   ORDERS_MAX,
   SYMBOL,
 } from "./constants.ts";
-import { TossinvestError, truncateCodePoints } from "./errors.ts";
+import { TossinvestError } from "./errors.ts";
+import { decimalValue as decimal, serviceValue as value, truncateCodePoints } from "./values.ts";
 import type { Tossinvest } from "./client.ts";
 import type { RegisterTool } from "./tool-registration.ts";
 
@@ -17,13 +18,9 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 const isObject = (value: unknown): value is Record<string, any> =>
   Boolean(value) && typeof value === "object" && !Array.isArray(value);
 
-/** 금액, 수량, 비율은 API 가 준 10진수 글 그대로 둔다. 숫자로 바꾸지 않는다. 그 밖의 꼴은 null 이다. */
-const value = (raw: unknown): string | number | null =>
-  typeof raw === "string" || typeof raw === "number" ? raw : null;
-
 /** 합계 금액 `{krw, usd}` 를 옮긴다. `usd` 는 API 가 null 로 줄 수 있다. */
 const money = (raw: unknown) =>
-  isObject(raw) ? { krw: value(raw.krw), usd: value(raw.usd) } : null;
+  isObject(raw) ? { krw: decimal(raw.krw), usd: decimal(raw.usd) } : null;
 
 const objects = (raw: unknown): Record<string, any>[] =>
   Array.isArray(raw) ? raw.filter(isObject) : [];
@@ -91,7 +88,7 @@ export function orderQuery(input: OrderInput): URLSearchParams {
   return query;
 }
 
-/** API 의 주문 하나를 결과 항목으로 옮긴다. 파일 출력도 한 줄을 이것으로 만든다. */
+/** API 의 주문 하나를 결과 항목으로 옮긴다. */
 export function orderRow(row: Record<string, any>) {
   const execution = isObject(row.execution) ? row.execution : {};
   return {
@@ -100,15 +97,15 @@ export function orderRow(row: Record<string, any>) {
     side: value(row.side),
     order_type: value(row.orderType),
     status: value(row.status),
-    price: value(row.price),
-    quantity: value(row.quantity),
-    order_amount: value(row.orderAmount),
+    price: decimal(row.price),
+    quantity: decimal(row.quantity),
+    order_amount: decimal(row.orderAmount),
     currency: value(row.currency),
-    filled_quantity: value(execution.filledQuantity),
-    average_filled_price: value(execution.averageFilledPrice),
-    filled_amount: value(execution.filledAmount),
-    commission: value(execution.commission),
-    tax: value(execution.tax),
+    filled_quantity: decimal(execution.filledQuantity),
+    average_filled_price: decimal(execution.averageFilledPrice),
+    filled_amount: decimal(execution.filledAmount),
+    commission: decimal(execution.commission),
+    tax: decimal(execution.tax),
     ordered_at: value(row.orderedAt),
     filled_at: value(execution.filledAt),
     canceled_at: value(row.canceledAt),
@@ -127,10 +124,10 @@ function holdingsTotal(data: Record<string, any>) {
     market_value_after_cost: money(marketValue.amountAfterCost),
     profit_loss: money(profitLoss.amount),
     profit_loss_after_cost: money(profitLoss.amountAfterCost),
-    profit_loss_rate: value(profitLoss.rate),
-    profit_loss_rate_after_cost: value(profitLoss.rateAfterCost),
+    profit_loss_rate: decimal(profitLoss.rate),
+    profit_loss_rate_after_cost: decimal(profitLoss.rateAfterCost),
     daily_profit_loss: money(daily.amount),
-    daily_profit_loss_rate: value(daily.rate),
+    daily_profit_loss_rate: decimal(daily.rate),
   };
 }
 
@@ -148,20 +145,20 @@ function holdingsItem(row: Record<string, any>) {
         : null,
     market: value(row.marketCountry),
     currency: value(row.currency),
-    quantity: value(row.quantity),
-    last_price: value(row.lastPrice),
-    average_purchase_price: value(row.averagePurchasePrice),
-    purchase_amount: value(marketValue.purchaseAmount),
-    market_value: value(marketValue.amount),
-    market_value_after_cost: value(marketValue.amountAfterCost),
-    profit_loss: value(profitLoss.amount),
-    profit_loss_after_cost: value(profitLoss.amountAfterCost),
-    profit_loss_rate: value(profitLoss.rate),
-    profit_loss_rate_after_cost: value(profitLoss.rateAfterCost),
-    daily_profit_loss: value(daily.amount),
-    daily_profit_loss_rate: value(daily.rate),
-    commission: value(cost.commission),
-    tax: value(cost.tax),
+    quantity: decimal(row.quantity),
+    last_price: decimal(row.lastPrice),
+    average_purchase_price: decimal(row.averagePurchasePrice),
+    purchase_amount: decimal(marketValue.purchaseAmount),
+    market_value: decimal(marketValue.amount),
+    market_value_after_cost: decimal(marketValue.amountAfterCost),
+    profit_loss: decimal(profitLoss.amount),
+    profit_loss_after_cost: decimal(profitLoss.amountAfterCost),
+    profit_loss_rate: decimal(profitLoss.rate),
+    profit_loss_rate_after_cost: decimal(profitLoss.rateAfterCost),
+    daily_profit_loss: decimal(daily.amount),
+    daily_profit_loss_rate: decimal(daily.rate),
+    commission: decimal(cost.commission),
+    tax: decimal(cost.tax),
   };
 }
 
@@ -194,11 +191,12 @@ export function registerAccountTools(register: RegisterTool, client: Tossinvest)
             }),
       ]);
       const powerResult = result(power);
+      const currencyValue = value(powerResult.currency);
       return {
-        currency: typeof powerResult.currency === "string" ? powerResult.currency : code,
-        cash_buying_power: value(powerResult.cashBuyingPower),
+        currency: typeof currencyValue === "string" ? currencyValue : code,
+        cash_buying_power: decimal(powerResult.cashBuyingPower),
         sellable_quantity:
-          sellable === null ? null : value(result(sellable).sellableQuantity),
+          sellable === null ? null : decimal(result(sellable).sellableQuantity),
       };
     },
   );

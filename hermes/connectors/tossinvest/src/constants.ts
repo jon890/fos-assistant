@@ -13,6 +13,10 @@ export const REQUEST_TIMEOUT_MS = 4_000;
 export const RESPONSE_MAX_BYTES = 1024 * 1024;
 /** `expires_in` 에서 이만큼을 뺀 시각까지만 받은 토큰을 쓴다. */
 export const TOKEN_MARGIN_MS = 60_000;
+/** `expires_in` 이 없거나 여유보다 짧아도 이만큼은 받은 토큰을 쓴다. 겹친 호출이 서로의 토큰을 무효로 만들지 않게 한다. */
+export const TOKEN_MIN_TTL_MS = 5_000;
+/** 서비스가 준 글 값 하나를 결과에 담을 때의 길이 상한(코드 포인트)이다. 종목 이름은 `NAME_MAX_CHARS` 다. */
+export const VALUE_MAX_CHARS = 64;
 /** 스펙의 `symbols` 형식 `^[A-Za-z0-9.,\-]+$` 에서 기호 하나를 떼고 길이 상한을 둔 것이다. */
 export const SYMBOL = /^[A-Za-z0-9.-]{1,12}$/;
 export const NAME_MAX_CHARS = 100;

@@ -4,6 +4,7 @@ import {
   FakeToss,
   credentials,
   expectFailure,
+  json,
   tool,
   withMcp,
 } from "./support.ts";
@@ -108,6 +109,62 @@ describe("get_holdings", () => {
     expect(request.headers.get("x-tossinvest-account")).toBe(accountSeq);
   });
 
+  test("객체나 배열인 값은 null 이고 64자를 넘는 글은 잘린다", async () => {
+    const { fake, server } = setup();
+    fake.on("GET", "/api/v1/holdings", {
+      result: {
+        profitLoss: { rate: ["20.00"] },
+        items: [
+          {
+            symbol: "005930",
+            quantity: { raw: "1" },
+            lastPrice: [70000],
+            currency: "x".repeat(80),
+          },
+        ],
+      },
+    });
+    await run(fake, server, async (client) => {
+      const { body } = await tool(client, "get_holdings");
+      expect((body.total as { profit_loss_rate: unknown }).profit_loss_rate).toBeNull();
+      const items = body.items as Array<Record<string, unknown>>;
+      expect(items[0]).toMatchObject({
+        symbol: "005930",
+        quantity: null,
+        last_price: null,
+        currency: "x".repeat(64),
+      });
+    });
+  });
+
+  test("10진수 칸은 자르지 않고, 64자를 넘거나 10진수 꼴이 아니면 null 이다", async () => {
+    const { fake, server } = setup();
+    fake.on("GET", "/api/v1/holdings", {
+      result: {
+        items: [
+          {
+            symbol: "005930",
+            quantity: "9".repeat(65),
+            lastPrice: "9".repeat(64),
+            averagePurchasePrice: "1,000",
+            cost: { commission: "-0.5", tax: 3 },
+          },
+        ],
+      },
+    });
+    await run(fake, server, async (client) => {
+      const { body } = await tool(client, "get_holdings");
+      const items = body.items as Array<Record<string, unknown>>;
+      expect(items[0]).toMatchObject({
+        quantity: null,
+        last_price: "9".repeat(64),
+        average_purchase_price: null,
+        commission: "-0.5",
+        tax: 3,
+      });
+    });
+  });
+
   test("100자를 넘는 종목 이름은 자른다", async () => {
     const { fake, server } = setup();
     fake.on("GET", "/api/v1/holdings", {
@@ -197,6 +254,20 @@ describe("get_buying_power", () => {
     expect(sellable[0]!.query.get("symbol")).toBe("005930");
     expect(sellable[0]!.headers.get("x-tossinvest-account")).toBe(accountSeq);
     expect(fake.seen("GET", "/api/v1/buying-power")).toHaveLength(1);
+  });
+
+  test("64자를 넘는 currency 는 잘리고 글이 아니면 요청한 통화로 돌아간다", async () => {
+    const { fake, server } = setup();
+    fake.sequence("GET", "/api/v1/buying-power", [
+      () => json({ result: { currency: "x".repeat(80), cashBuyingPower: "1" } }),
+      () => json({ result: { currency: { code: "USD" }, cashBuyingPower: "2" } }),
+    ]);
+    await run(fake, server, async (client) => {
+      const first = await tool(client, "get_buying_power", { currency: "KRW" });
+      expect(first.body.currency).toBe("x".repeat(64));
+      const second = await tool(client, "get_buying_power", { currency: "USD" });
+      expect(second.body.currency).toBe("USD");
+    });
   });
 
   test.each([

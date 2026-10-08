@@ -24,5 +24,3 @@ export const guard = async (work: () => Promise<unknown>) => {
     return fail(error);
   }
 };
-export const truncateCodePoints = (value: string, limit: number) =>
-  Array.from(value).slice(0, limit).join("");

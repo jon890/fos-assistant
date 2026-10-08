@@ -1,6 +1,7 @@
 import { z } from "zod";
-import { NAME_MAX_CHARS, QUOTE_SYMBOLS_MAX, SYMBOL } from "./constants.ts";
-import { TossinvestError, truncateCodePoints } from "./errors.ts";
+import { ACCOUNT_SEQ, NAME_MAX_CHARS, QUOTE_SYMBOLS_MAX, SYMBOL } from "./constants.ts";
+import { TossinvestError } from "./errors.ts";
+import { decimalValue, serviceValue, truncateCodePoints } from "./values.ts";
 import type { Tossinvest } from "./client.ts";
 import type { RegisterTool } from "./tool-registration.ts";
 
@@ -34,21 +35,23 @@ export function parseSymbols(value: string): string[] {
 
 export function registerReadTools(register: RegisterTool, client: Tossinvest) {
   // 확인 도구이자 선택지 도구다. 계좌가 아직 없으므로 계좌 헤더를 보내지 않는다.
+  // 순번은 자르면 값이 바뀌므로 `account` 칸 형식에 맞지 않는 계좌를 결과에서 뺀다.
   register("list_accounts", {}, { readOnlyHint: true }, async () => ({
     accounts: rows(await client.request("/api/v1/accounts"))
       .filter(
         (row: any) =>
           (typeof row.accountSeq === "string" ||
             typeof row.accountSeq === "number") &&
-          String(row.accountSeq) !== "",
+          ACCOUNT_SEQ.test(String(row.accountSeq)),
       )
       .map((row: any) => {
-        const type = typeof row.accountType === "string" ? row.accountType : "";
+        const type = serviceValue(row.accountType);
+        const known = typeof type === "string" ? ACCOUNT_TYPE_LABELS[type] : undefined;
         const digits = String(row.accountNo ?? "").replace(/\D/g, "");
         return {
           account_seq: String(row.accountSeq),
           account_type: type,
-          label: `${ACCOUNT_TYPE_LABELS[type] ?? "기타"} ****${digits.slice(-4)}`,
+          label: `${known ?? "기타"} ****${digits.slice(-4)}`,
         };
       }),
   }));
@@ -73,11 +76,11 @@ export function registerReadTools(register: RegisterTool, client: Tossinvest) {
         quotes: rows(prices)
           .filter((row: any) => typeof row.symbol === "string")
           .map((row: any) => ({
-            symbol: row.symbol,
+            symbol: serviceValue(row.symbol),
             name: names.get(row.symbol) ?? null,
-            last_price: row.lastPrice ?? null,
-            currency: typeof row.currency === "string" ? row.currency : null,
-            timestamp: row.timestamp ?? null,
+            last_price: decimalValue(row.lastPrice),
+            currency: serviceValue(row.currency),
+            timestamp: serviceValue(row.timestamp),
           })),
       };
     },
