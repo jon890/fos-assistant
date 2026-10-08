@@ -49,4 +49,9 @@ public class AgentMemoryCollection {
     public String collection() {
         return id.collection();
     }
+
+    /** 민감 항목까지 받을지 바꾼다. 붙인 시각은 그대로 둔다. */
+    public void changeAllowSensitive(boolean allowSensitive) {
+        this.allowSensitive = allowSensitive;
+    }
 }
