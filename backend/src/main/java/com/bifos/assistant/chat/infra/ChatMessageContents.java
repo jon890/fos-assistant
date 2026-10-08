@@ -33,10 +33,15 @@ public class ChatMessageContents implements MessageContentOpener {
 
     private static final Duration OWNER_TTL = Duration.ofSeconds(30);
 
+    private static final Duration WARN_INTERVAL = Duration.ofMinutes(1);
+
     private final TextCipher cipher;
     private final ConversationRepository conversations;
     private final Clock clock;
     private final ConcurrentMap<Long, Owner> owners = new ConcurrentHashMap<>();
+
+    /** 대화마다 마지막으로 풀기 실패를 경고한 시각이다. */
+    private final ConcurrentMap<Long, Instant> warned = new ConcurrentHashMap<>();
 
     /**
      * 처음 저장할 메시지의 본문을 암호화한다. 줄 번호가 있어야 하므로 {@code persist} 뒤에 부른다.
@@ -63,9 +68,23 @@ public class ChatMessageContents implements MessageContentOpener {
         }
         return cipher.open(message.contentKeyId(), owner.get(), aad(message, owner.get()), message.storedContent())
                 .orElseGet(() -> {
-                    log.warn("메시지 본문을 풀지 못했다 messageId={} conversationId={}", message.id(), message.conversationId());
+                    warnOncePerMinute(message);
                     return ChatMessage.UNREADABLE_CONTENT;
                 });
+    }
+
+    /** 한 대화의 메시지를 여럿 풀지 못해도 경고는 1분에 한 번만 남긴다. 첫 메시지의 번호를 남긴다. */
+    private void warnOncePerMinute(ChatMessage message) {
+        Instant now = clock.instant();
+        Instant last = warned.get(message.conversationId());
+        if (last != null && now.isBefore(last.plus(WARN_INTERVAL))) {
+            return;
+        }
+        if (warned.size() >= OWNER_CACHE_LIMIT) {
+            warned.clear();
+        }
+        warned.put(message.conversationId(), now);
+        log.warn("메시지 본문을 풀지 못했다 messageId={} conversationId={}", message.id(), message.conversationId());
     }
 
     private Optional<Long> ownerOf(Long conversationId) {

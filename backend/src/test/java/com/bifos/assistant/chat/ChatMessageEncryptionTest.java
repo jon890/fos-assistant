@@ -24,6 +24,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.system.CapturedOutput;
 import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 /** 메시지 본문이 저장할 때 암호화되고, 옮기거나 주인을 바꾼 암호문은 풀리지 않는지 확인한다(ADR-20261008 / data-encryption). */
 @BackendIntegrationTest
@@ -49,6 +51,9 @@ class ChatMessageEncryptionTest {
     @Autowired
     JdbcTemplate jdbc;
 
+    @Autowired
+    PlatformTransactionManager transactionManager;
+
     private AppUser owner;
     private Conversation conversation;
 
@@ -73,6 +78,30 @@ class ChatMessageEncryptionTest {
         assertThat(row.get("CONTENT_KEY_ID")).isNotNull();
         assertThat(saved.content()).isEqualTo(QUESTION);
         assertThat(contentsOf(conversation.id())).containsExactly(QUESTION);
+    }
+
+    @Test
+    @DisplayName("저장하는 네 길 모두 처음 넣는 줄에는 빈 본문만 쓰고 평문을 쓰지 않는다")
+    void insertsEmptyContentBeforeSealingOnEveryWritePath() {
+        new TransactionTemplate(transactionManager).executeWithoutResult(status -> {
+            // 같은 연결로 읽으므로 아직 내보내지 않은 암호문 고침은 보이지 않고 insert 된 글만 보인다
+            ChatMessage single = messages.save(ChatMessage.fromUser(conversation.id(), owner.id(), QUESTION, NOW));
+            assertThat(storedContentOf(single.id())).isEmpty();
+            List<ChatMessage> batch = messages.saveAll(List.of(ChatMessage.fromSystem(conversation.id(), ANSWER, NOW)));
+            assertThat(storedContentOf(batch.get(0).id())).isEmpty();
+
+            ChatMessage flushed =
+                    messages.saveAndFlush(ChatMessage.fromUser(conversation.id(), owner.id(), QUESTION, NOW));
+            List<ChatMessage> flushedBatch =
+                    messages.saveAllAndFlush(List.of(ChatMessage.fromSystem(conversation.id(), ANSWER, NOW)));
+            assertThat(storedContentOf(flushed.id())).startsWith("v1.");
+            assertThat(storedContentOf(flushedBatch.get(0).id())).startsWith("v1.");
+        });
+
+        assertThat(jdbc.queryForList(
+                        "SELECT content FROM chat_message WHERE conversation_id = ?", String.class, conversation.id()))
+                .hasSize(4)
+                .allSatisfy(content -> assertThat(content).startsWith("v1.").doesNotContain("평문-표식"));
     }
 
     @Test
@@ -143,6 +172,10 @@ class ChatMessageEncryptionTest {
         return messages.findByConversationIdOrderByIdAsc(conversationId).stream()
                 .map(ChatMessage::content)
                 .toList();
+    }
+
+    private String storedContentOf(Long messageId) {
+        return jdbc.queryForObject("SELECT content FROM chat_message WHERE id = ?", String.class, messageId);
     }
 
     private Map<String, Object> rowOf(Long messageId) {
