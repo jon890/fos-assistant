@@ -3,6 +3,7 @@ package com.bifos.assistant.hermes;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.bifos.assistant.usage.domain.ExecutionEvent;
+import java.util.HashMap;
 import java.util.Set;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -221,10 +222,14 @@ class ToolDetailRedactorTest {
         String token = "sk-" + "x".repeat(40);
         String args = "{\"url\":\"https://collector.example/?d=" + mail + "\",\"api_key\":\"" + token + "\"}";
 
-        String recorded = ToolDetailRedactor.redact(args, false);
+        // 바인딩 에이전트의 실행은 붙은 커넥터 서버의 접두사만 통째로 가린다.
+        ToolDetailScope bound = ToolDetailScope.prefixes(Set.of("mcp__mail__"));
 
-        assertThat(recorded).contains(mail).doesNotContain(token);
-        assertThat(ToolDetailRedactor.redact(args, true)).isEqualTo("[연결 도구 내용 가림]");
+        assertThat(ToolDetailRedactor.redact(args, "mcp__mail__get_message", bound, new HashMap<>()))
+                .isEqualTo("[연결 도구 내용 가림]");
+        assertThat(ToolDetailRedactor.redact(args, "web_extract", bound, new HashMap<>()))
+                .contains(mail)
+                .doesNotContain(token);
     }
 
     @Test
