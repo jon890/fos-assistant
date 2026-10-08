@@ -75,7 +75,10 @@ public interface ProactiveCheckRepository extends JpaRepository<ProactiveCheck, 
                 userId, agentId, CheckStatus.SUCCEEDED, CheckTrigger.AUTONOMY, ProblemStatus.ACCEPTED, page);
     }
 
-    /** {@link #findEvaluable(Long, Long, Pageable)} 의 조회다. 상태와 계기 값은 JPQL 에 전체 이름으로 쓰지 않고 넘긴다. */
+    /**
+     * {@link #findEvaluable(Long, Long, Pageable)} 의 조회다. 직접 부르지 않는다. 3인자 default 메서드가 상태와 계기 값을 정해 부른다. 값을
+     * JPQL 에 전체 이름으로 쓰지 않고 넘기는 까닭은 코드 규칙이 전체 이름을 막기 때문이다.
+     */
     @Query("""
             select c from ProactiveCheck c
              where c.userId = :userId and c.agentId = :agentId

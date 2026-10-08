@@ -38,6 +38,7 @@ import com.bifos.assistant.shared.auth.CurrentUserProvider;
 import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.shared.error.GlobalExceptionHandler;
 import com.bifos.assistant.testsupport.BackendIntegrationTest;
+import com.jayway.jsonpath.JsonPath;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
@@ -166,17 +167,16 @@ class ValueEvaluationOverviewTest {
                 .getResponse()
                 .getContentAsString();
         assertThat(body).doesNotContain("rootExecutionId", "executionId", "inputs");
+        long evaluationId = ((Number) JsonPath.read(body, "$.evaluation.id")).longValue();
+        long decisionId = ((Number) JsonPath.read(body, "$.decisions[0].id")).longValue();
 
         latest(agent)
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.check.id").value(check.id()))
-                .andExpect(jsonPath("$.evaluation.id")
-                        .value(evaluations
-                                .findFirstByUserIdAndCheckIdOrderByIdDesc(admin.id(), check.id())
-                                .orElseThrow()
-                                .id()))
+                .andExpect(jsonPath("$.evaluation.id").value(evaluationId))
                 .andExpect(jsonPath("$.evaluation.outcome").value("FALLBACK"))
                 .andExpect(jsonPath("$.decisions", hasSize(1)))
+                .andExpect(jsonPath("$.decisions[0].id").value(decisionId))
                 .andExpect(jsonPath("$.decisions[0].level").value("IGNORE"))
                 .andExpect(jsonPath("$.decisions[0].reasons", hasItem("EVALUATION_NOT_USABLE")));
     }
