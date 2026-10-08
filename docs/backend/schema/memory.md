@@ -1,6 +1,6 @@
 # Memory
 
-Memory 항목과 그 판, 그룹의 collection 목록, 에이전트가 받는 collection 을 저장하는 표 넷의 칸과 제약을 갖는다.
+Memory 항목과 그 판, 그룹의 collection 목록, 에이전트가 받는 collection 과 그 변경 기록을 저장하는 표의 칸과 제약을 갖는다.
 실행에 실을 항목을 고르는 규칙은 [`backend/memory.md`](../memory.md) 가 갖는다.
 
 ## memory
@@ -108,7 +108,7 @@ Memory 항목과 그 판, 그룹의 collection 목록, 에이전트가 받는 co
 
 그룹마다 `core`, `career`, `learning`, `health`, `finance`, `home`, `identity` 일곱 개로 시작한다.
 마이그레이션이 사용자가 있는 그룹에 넣고, 그 뒤에 생긴 그룹은 목록을 처음 읽을 때 넣는다.
-목록을 읽는 `MemoryCollectionService.collectionsOf` 는 `GET /api/v1/memory-collections` 가 부른다. 판을 읽는 `MemoryService.revisionsOf` 는 아직 부르는 API 가 없다. 화면과 API 를 넓힐 때 연결한다.
+목록을 읽는 `MemoryCollectionService.collectionsOf` 는 `GET /api/v1/memory-collections` 와 관리자의 `/api/v1/admin/agents/{code}/memory-collections` 가 부른다. 판을 읽는 `MemoryService.revisionsOf` 는 아직 부르는 API 가 없다. 화면과 API 를 넓힐 때 연결한다.
 
 ## agent_memory_collection
 
@@ -123,6 +123,29 @@ Memory 항목과 그 판, 그룹의 collection 목록, 에이전트가 받는 co
 
 **줄이 하나도 없는 에이전트는 Memory 를 받지 않는다.**
 에이전트를 처음 저장할 때 `core` 한 줄을 민감 허용 없이 넣는다. 옛 커넥터 에이전트에는 넣지 않고, 줄이 있어도 옛 커넥터 에이전트는 받지 않는다.
+그 뒤에는 `ADMIN` 이 관리자 영역에서 줄을 더하고 빼고 민감 허용을 바꾼다. 바꿀 때마다 `agent_memory_collection_change` 에 한 줄을 남긴다.
+`created_at` 은 그 collection 을 붙인 시각이다. 민감 허용만 바꾸면 그대로 둔다.
+
+## agent_memory_collection_change
+
+`agent_memory_collection` 의 줄 하나가 바뀐 것이 한 줄이다. 지우지 않는다. 근거는 [ADR-20261008 / agent-memory-grants-admin](../../adr/ADR-20261008-agent-memory-grants-admin.md) 에 있다.
+
+| 칸 | 타입 | 뜻 |
+| --- | --- | --- |
+| `id` | BIGINT | 기본 키 |
+| `agent_id` | BIGINT | `agent.id` |
+| `collection` | VARCHAR(64) | 바뀐 collection 의 key |
+| `change_type` | VARCHAR(20) | `GRANTED` 붙였다, `REVOKED` 뗐다, `SENSITIVE_CHANGED` 민감 허용만 바꿨다 |
+| `allow_sensitive` | BOOLEAN | `GRANTED` 와 `SENSITIVE_CHANGED` 는 바꾼 뒤의 값, `REVOKED` 는 떼기 전의 값 |
+| `changed_by_user_id` | BIGINT | 바꾼 `ADMIN`. 외래 키를 걸지 않는다 |
+| `changed_at` | DATETIME(6) | |
+
+| 색인 | 칸 | 쓰는 곳 |
+| --- | --- | --- |
+| `idx_agent_memory_collection_change_agent` | `agent_id`, `id` | 관리 화면의 최근 변경 |
+
+한 번의 저장이 여러 collection 을 바꾸면 줄도 여럿이고 `changed_at` 이 같다.
+바뀌지 않은 collection 은 남기지 않는다. 마이그레이션이 넣은 `core` 와 새 에이전트에 넣는 `core` 도 남기지 않는다. 사람이 바꾼 것만 남긴다.
 
 ## memory_capture
 
