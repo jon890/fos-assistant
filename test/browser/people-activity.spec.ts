@@ -51,53 +51,57 @@ test("관리자는 로그인과 마지막 대화 시각을 목록과 상세에�
     agents.ok(),
     `기본 에이전트를 읽지 못했다: ${agents.status()} ${await agents.text()}`,
   ).toBeTruthy();
-  const agent = ((await agents.json()) as Array<{ code?: string; ownedByMe: boolean }>).find((entry) => entry.ownedByMe);
+  const agent = (
+    (await agents.json()) as Array<{ code?: string; ownedByMe: boolean }>
+  ).find((entry) => entry.ownedByMe);
   expect(agent?.code, "기본 에이전트 번호가 없다").toBeTruthy();
   try {
-  const message = await page.request.post("/api/chat", {
-    data: { text: "활동 시각 검사", agentCode: agent!.code },
-  });
-  expect(
-    message.ok(),
-    `사용자 메시지를 만들지 못했다: ${message.status()} ${await message.text()}`,
-  ).toBeTruthy();
+    const message = await page.request.post("/api/chat", {
+      data: { text: "활동 시각 검사", agentCode: agent!.code },
+    });
+    expect(
+      message.ok(),
+      `사용자 메시지를 만들지 못했다: ${message.status()} ${await message.text()}`,
+    ).toBeTruthy();
 
-  await setSession(context, { email: TEST_EMAIL, name: "브라우저 테스트" });
-  const people = await page.request.get("/api/admin/people");
-  expect(
-    people.ok(),
-    `관리자 목록을 읽지 못했다: ${people.status()}`,
-  ).toBeTruthy();
-  const activity = (
-    (await people.json()) as Array<{
-      email: string;
-      lastLoginAt: string | null;
-      lastConversationAt: string | null;
-    }>
-  ).find((person) => person.email === user.email);
-  expect(activity?.lastLoginAt).toBeTruthy();
-  expect(activity?.lastConversationAt).toBeTruthy();
-  await page.goto("/admin/people");
-  const row = page.getByRole("row").filter({ hasText: user.email });
-  const login = row.locator("time").first();
-  const conversation = row.locator("time").nth(1);
-  await expect(login).toHaveAttribute("datetime", activity!.lastLoginAt!);
-  await expect(conversation).toHaveAttribute(
-    "datetime",
-    activity!.lastConversationAt!,
-  );
-  await expect(login).toContainText("서울 시각");
-  await expect(conversation).toContainText("서울 시각");
-  await row.getByRole("button", { name: "상세" }).click();
-  await expect(row.getByRole("button", { name: "상세" })).toHaveAttribute(
-    "aria-expanded",
-    "true",
-  );
-  await expect(page.locator('[id^="person-detail-"]')).toBeVisible();
+    await setSession(context, { email: TEST_EMAIL, name: "브라우저 테스트" });
+    const people = await page.request.get("/api/admin/people");
+    expect(
+      people.ok(),
+      `관리자 목록을 읽지 못했다: ${people.status()}`,
+    ).toBeTruthy();
+    const activity = (
+      (await people.json()) as Array<{
+        email: string;
+        lastLoginAt: string | null;
+        lastConversationAt: string | null;
+      }>
+    ).find((person) => person.email === user.email);
+    expect(activity?.lastLoginAt).toBeTruthy();
+    expect(activity?.lastConversationAt).toBeTruthy();
+    await page.goto("/admin/people");
+    const row = page.getByRole("row").filter({ hasText: user.email });
+    const login = row.locator("time").first();
+    const conversation = row.locator("time").nth(1);
+    await expect(login).toHaveAttribute("datetime", activity!.lastLoginAt!);
+    await expect(conversation).toHaveAttribute(
+      "datetime",
+      activity!.lastConversationAt!,
+    );
+    await expect(login).toContainText("서울 시각");
+    await expect(conversation).toContainText("서울 시각");
+    await row.getByRole("button", { name: "상세" }).click();
+    await expect(row.getByRole("button", { name: "상세" })).toHaveAttribute(
+      "aria-expanded",
+      "true",
+    );
+    await expect(page.locator('[id^="person-detail-"]')).toBeVisible();
   } finally {
     await setSession(context, user);
     const deleted = await page.request.delete(`/api/agents/${agent!.code}`);
-    expect(deleted.status(), "검사가 만든 기본 에이전트를 지우지 못했다").toBe(204);
+    expect(deleted.status(), "검사가 만든 기본 에이전트를 지우지 못했다").toBe(
+      204,
+    );
   }
 });
 

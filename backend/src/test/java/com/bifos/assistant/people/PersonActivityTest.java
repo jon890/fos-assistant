@@ -8,8 +8,8 @@ import com.bifos.assistant.chat.domain.ChatMessage;
 import com.bifos.assistant.chat.domain.Conversation;
 import com.bifos.assistant.chat.infra.ChatMessageRepository;
 import com.bifos.assistant.chat.infra.ConversationRepository;
-import com.bifos.assistant.people.application.PersonAccessService;
 import com.bifos.assistant.people.application.HermesProfileProvisioner;
+import com.bifos.assistant.people.application.PersonAccessService;
 import com.bifos.assistant.people.application.SignInPolicy;
 import com.bifos.assistant.people.application.model.PersonAccess;
 import com.bifos.assistant.people.domain.AllowedPerson;
@@ -28,8 +28,8 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
-import java.util.List;
 import java.util.Date;
+import java.util.List;
 import javax.crypto.SecretKey;
 import org.hibernate.SessionFactory;
 import org.hibernate.stat.Statistics;
@@ -45,8 +45,8 @@ import tools.jackson.databind.json.JsonMapper;
 @BackendIntegrationTest
 class PersonActivityTest {
 
-    private static final SecretKey KEY = Keys.hmacShaKeyFor(
-            "test-secret-test-secret-test-secret-test-secret".getBytes(StandardCharsets.UTF_8));
+    private static final SecretKey KEY =
+            Keys.hmacShaKeyFor("test-secret-test-secret-test-secret-test-secret".getBytes(StandardCharsets.UTF_8));
 
     @LocalServerPort
     int port;
@@ -94,8 +94,7 @@ class PersonActivityTest {
     void findsLastUserMessageBySenderRatherThanConversationOwner() {
         AllowedPerson allowed = people.save(AllowedPerson.of("activity@example.com", "사용자", "activity", Instant.EPOCH));
         AppUser user = users.save(AppUser.of("ACTIVITY@example.com", "사용자", 1L, UserRole.MEMBER, Instant.EPOCH));
-        AppUser owner =
-                users.save(AppUser.of("owner@example.com", "대화 주인", 1L, UserRole.MEMBER, Instant.EPOCH));
+        AppUser owner = users.save(AppUser.of("owner@example.com", "대화 주인", 1L, UserRole.MEMBER, Instant.EPOCH));
         Instant first = Instant.parse("2026-10-08T01:00:00Z");
         Instant last = Instant.parse("2026-10-08T02:00:00Z");
         Conversation firstConversation = conversations.save(Conversation.startedBy(owner.id(), "첫 대화", null, first));
@@ -131,18 +130,23 @@ class PersonActivityTest {
     @Test
     @DisplayName("가입 여부와 상태와 정규화가 달라도 사용자 메시지의 가장 최근 시각을 붙인다")
     void assemblesActivityForJoinedDisabledAndNormalizedUsers() {
-        AllowedPerson inactive = people.save(AllowedPerson.of("inactive@example.com", "미가입", "inactive", Instant.EPOCH));
+        AllowedPerson inactive =
+                people.save(AllowedPerson.of("inactive@example.com", "미가입", "inactive", Instant.EPOCH));
         AllowedPerson joined = people.save(AllowedPerson.of("joined@example.com", "가입", "joined", Instant.EPOCH));
-        AllowedPerson noMessage = people.save(AllowedPerson.of("no-message@example.com", "무대화", "no-message", Instant.EPOCH));
+        AllowedPerson noMessage =
+                people.save(AllowedPerson.of("no-message@example.com", "무대화", "no-message", Instant.EPOCH));
         AllowedPerson disabled = people.save(AllowedPerson.of("disabled@example.com", "꺼짐", "disabled", Instant.EPOCH));
         disabled.disable();
         people.save(disabled);
-        AllowedPerson duplicate = people.save(AllowedPerson.of("duplicate@example.com", "중복", "duplicate", Instant.EPOCH));
+        AllowedPerson duplicate =
+                people.save(AllowedPerson.of("duplicate@example.com", "중복", "duplicate", Instant.EPOCH));
         AppUser joinedUser = users.save(AppUser.of("JOINED@example.com", "가입", 1L, UserRole.MEMBER, Instant.EPOCH));
         users.save(AppUser.of("NO-MESSAGE@example.com", "무대화", 1L, UserRole.MEMBER, Instant.EPOCH));
         AppUser disabledUser = users.save(AppUser.of("disabled@example.com", "꺼짐", 1L, UserRole.MEMBER, Instant.EPOCH));
-        AppUser duplicateOld = users.save(AppUser.of("DUPLICATE@example.com", "중복A", 1L, UserRole.MEMBER, Instant.EPOCH));
-        AppUser duplicateNew = users.save(AppUser.of("duplicate@example.com", "중복B", 1L, UserRole.MEMBER, Instant.EPOCH));
+        AppUser duplicateOld =
+                users.save(AppUser.of("DUPLICATE@example.com", "중복A", 1L, UserRole.MEMBER, Instant.EPOCH));
+        AppUser duplicateNew =
+                users.save(AppUser.of("duplicate@example.com", "중복B", 1L, UserRole.MEMBER, Instant.EPOCH));
         Instant old = Instant.parse("2026-10-08T01:00:00Z");
         Instant recent = old.plusSeconds(60);
         Conversation conversation = conversations.save(Conversation.startedBy(joinedUser.id(), "활동", null, old));
@@ -185,7 +189,8 @@ class PersonActivityTest {
         assertThat(row.path("lastLoginAt").isNull()).isTrue();
         assertThat(row.path("lastConversationAt").isNull()).isTrue();
 
-        HttpResponse<String> updated = api("PATCH", "/api/v1/admin/people/" + existing.id(), token(admin), "{\"enabled\":false}");
+        HttpResponse<String> updated =
+                api("PATCH", "/api/v1/admin/people/" + existing.id(), token(admin), "{\"enabled\":false}");
         assertThat(updated.statusCode()).isEqualTo(200);
         JsonNode update = json.readTree(updated.body());
         assertThat(update.path("lastLoginAt").isNull()).isTrue();
@@ -202,7 +207,8 @@ class PersonActivityTest {
         assertThat(added.path("lastLoginAt").isNull()).isTrue();
         assertThat(added.path("lastConversationAt").isNull()).isTrue();
 
-        assertThat(api("GET", "/api/v1/admin/people", token(member), null).statusCode()).isEqualTo(403);
+        assertThat(api("GET", "/api/v1/admin/people", token(member), null).statusCode())
+                .isEqualTo(403);
         assertThat(api("PATCH", "/api/v1/admin/people/" + existing.id(), token(member), "{\"enabled\":true}")
                         .statusCode())
                 .isEqualTo(403);
@@ -227,7 +233,8 @@ class PersonActivityTest {
         assertThat(row.path("lastLoginAt").asString()).isEqualTo(login.toString());
         assertThat(row.path("lastConversationAt").asString()).isEqualTo(conversationAt.toString());
 
-        HttpResponse<String> updated = api("PATCH", "/api/v1/admin/people/" + person.id(), token(admin), "{\"enabled\":false}");
+        HttpResponse<String> updated =
+                api("PATCH", "/api/v1/admin/people/" + person.id(), token(admin), "{\"enabled\":false}");
         assertThat(updated.statusCode()).isEqualTo(200);
         JsonNode update = json.readTree(updated.body());
         assertThat(update.path("lastLoginAt").asString()).isEqualTo(login.toString());

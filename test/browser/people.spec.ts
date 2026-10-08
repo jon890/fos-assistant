@@ -103,10 +103,20 @@ test("사용 중지하고 다시 허용할 수 있다", async ({ page }, testInf
 
   await expect(row.getByText("켜짐", { exact: true })).toBeVisible();
 
-  await clickAndWaitForResponse(page, row.getByRole("button", { name: `${person.displayName} 사용 중지` }), "PATCH", /\/api\/admin\/people\/\d+$/);
+  await clickAndWaitForResponse(
+    page,
+    row.getByRole("button", { name: `${person.displayName} 사용 중지` }),
+    "PATCH",
+    /\/api\/admin\/people\/\d+$/,
+  );
   await expect(row.getByText("꺼짐", { exact: true })).toBeVisible();
 
-  await clickAndWaitForResponse(page, row.getByRole("button", { name: `${person.displayName} 다시 허용` }), "PATCH", /\/api\/admin\/people\/\d+$/);
+  await clickAndWaitForResponse(
+    page,
+    row.getByRole("button", { name: `${person.displayName} 다시 허용` }),
+    "PATCH",
+    /\/api\/admin\/people\/\d+$/,
+  );
   await expect(row.getByText("켜짐", { exact: true })).toBeVisible();
 });
 

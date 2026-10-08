@@ -41,7 +41,6 @@ class UserActivityMigrationTest {
                         VALUES ('migration@example.com', '사용자', 'migration-user', TRUE, CURRENT_TIMESTAMP(6))
                         """);
             }
-
         }
         Flyway.configure()
                 .dataSource(url, "sa", "")
@@ -51,8 +50,9 @@ class UserActivityMigrationTest {
 
         try (Connection connection = DriverManager.getConnection(url, "sa", "");
                 ResultSet row = connection
-                    .createStatement()
-                    .executeQuery("SELECT last_login_at FROM allowed_person WHERE email = 'migration@example.com'")) {
+                        .createStatement()
+                        .executeQuery(
+                                "SELECT last_login_at FROM allowed_person WHERE email = 'migration@example.com'")) {
             assertThat(row.next()).isTrue();
             assertThat(row.getObject(1)).isNull();
             assertThat(indexColumns(connection.getMetaData(), "CHAT_MESSAGE", "IX_CHAT_MESSAGE_SENDER_ROLE_CREATED_AT"))

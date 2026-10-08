@@ -136,7 +136,9 @@ class SignInControllerTest {
                 .isEqualTo(second);
 
         assertThat(complete(signInToken(), "mom@example.com").statusCode()).isEqualTo(204);
-        assertThat(people.findByEmailAndEnabledTrue("mom@example.com").orElseThrow().lastLoginAt())
+        assertThat(people.findByEmailAndEnabledTrue("mom@example.com")
+                        .orElseThrow()
+                        .lastLoginAt())
                 .isEqualTo(second);
 
         clock.set(first.minusSeconds(60));
@@ -164,12 +166,17 @@ class SignInControllerTest {
         users.save(AppUser.of("mom@example.com", "사용자", 1L, UserRole.MEMBER, login));
         clock.set(login.plusSeconds(60));
 
-        HttpResponse<String> response = client.send(HttpRequest.newBuilder(URI.create("http://127.0.0.1:" + port + "/api/v1/me"))
-                .header("Authorization", "Bearer " + conversationToken("mom@example.com"))
-                .GET().build(), HttpResponse.BodyHandlers.ofString());
+        HttpResponse<String> response = client.send(
+                HttpRequest.newBuilder(URI.create("http://127.0.0.1:" + port + "/api/v1/me"))
+                        .header("Authorization", "Bearer " + conversationToken("mom@example.com"))
+                        .GET()
+                        .build(),
+                HttpResponse.BodyHandlers.ofString());
 
         assertThat(response.statusCode()).isEqualTo(200);
-        assertThat(people.findByEmailAndEnabledTrue("mom@example.com").orElseThrow().lastLoginAt())
+        assertThat(people.findByEmailAndEnabledTrue("mom@example.com")
+                        .orElseThrow()
+                        .lastLoginAt())
                 .isEqualTo(login);
     }
 
