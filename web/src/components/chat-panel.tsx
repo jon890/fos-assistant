@@ -19,7 +19,7 @@
  * </ul>
  */
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
 import { ConversationSession } from "./chat/conversation-session";
 import {
@@ -36,7 +36,8 @@ export function ChatPanel({
 }) {
   const pathname = usePathname();
   // 「<에이전트>와 대화하기」 가 `/?agent=<번호>` 로 연다. 목록에 있는 에이전트일 때만 그 에이전트를 고른다.
-  const requestedAgent = agentCodeParam(useSearchParams().get("agent"));
+  // 첫 메시지를 보내면 주소가 바뀌어 쿼리가 사라지므로, 처음 받은 값만 쓰고 목록을 다시 읽지 않는다.
+  const requestedAgent = useRef(agentCodeParam(useSearchParams().get("agent")));
   const { newConversationVersion } = useConversations();
   const [agents, setAgents] = useState<AgentView[]>([]);
   const [agentsLoading, setAgentsLoading] = useState(true);
@@ -58,14 +59,16 @@ export function ChatPanel({
       .then((response) => (response.ok ? response.json() : []))
       .then((data: AgentView[]) => {
         setAgents(data);
-        const requested = data.find((agent) => agent.code === requestedAgent);
+        const requested = data.find(
+          (agent) => agent.code === requestedAgent.current,
+        );
         setAgentCode(
           (current) => current || requested?.code || data[0]?.code || "",
         );
       })
       .catch(() => setAgents([]))
       .finally(() => setAgentsLoading(false));
-  }, [requestedAgent]);
+  }, []);
 
   const currentConversation = useConversation(conversationId);
   // 대화 줄이 바뀌면 그리는 중에 그 대화의 에이전트로 맞춘다. 처음 그릴 때 이미 줄이 있으면 그때도 맞춘다.

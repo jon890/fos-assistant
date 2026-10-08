@@ -88,7 +88,7 @@ test("연결을 마치면 같은 자리에서 고른 에이전트에 붙이고 �
   page,
 }) => {
   const code = await createAgent(page, PRIVATE_NAME);
-  await createAgent(page, GROUP_NAME, "GROUP");
+  const groupCode = await createAgent(page, GROUP_NAME, "GROUP");
 
   await page.goto("/connections");
   await expect(
@@ -139,6 +139,12 @@ test("연결을 마치면 같은 자리에서 고른 에이전트에 붙이고 �
   await page.getByRole("link", { name: `${PRIVATE_NAME}와 대화하기` }).click();
   await expect(page).toHaveURL(new RegExp(`/\\?agent=${code}$`));
   await expect(page.getByRole("radio", { name: PRIVATE_NAME })).toHaveAttribute(
+    "aria-checked",
+    "true",
+  );
+  // 목록의 첫 에이전트라서 골라진 것이 아니라 주소가 고른 것임을 다른 에이전트로도 본다.
+  await page.goto(`/?agent=${groupCode}`);
+  await expect(page.getByRole("radio", { name: GROUP_NAME })).toHaveAttribute(
     "aria-checked",
     "true",
   );
@@ -245,6 +251,7 @@ test("붙일 수 있는 에이전트가 없으면 연결된 카드와 고르기 
     "이 서비스를 붙일 수 있는 내 에이전트가 없어요.",
   );
   await chooser(page).getByRole("link", { name: "에이전트 만들기" }).click();
-  await expect(page).toHaveURL(/\/agents\?new=1$/);
   await expect(page.getByRole("dialog", { name: "새 에이전트" })).toBeVisible();
+  // 창을 연 뒤 주소에서 new=1 을 지워 뒤로 가기나 새로 고침에 창이 다시 열리지 않는다.
+  await expect(page).toHaveURL(/\/agents$/);
 });

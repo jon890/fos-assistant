@@ -51,7 +51,11 @@ function connectionHref(id: string, preferredAgent: string | null): string {
 
 /** 연결됐는데 쓰는 에이전트가 없는 카드다. 눌러 들어가면 쓸 에이전트를 고르는 영역이 열린다. */
 function unused(connector: ConnectorSummary): boolean {
-  return connector.myStatus === "READY" && connector.bindings.length === 0;
+  return (
+    connector.available &&
+    connector.myStatus === "READY" &&
+    connector.bindings.length === 0
+  );
 }
 
 export function ConnectorCatalog({

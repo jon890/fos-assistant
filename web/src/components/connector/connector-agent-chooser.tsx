@@ -30,6 +30,9 @@ type Agents =
 
 type Bound = { choice: AgentChoice; view: AgentConnectionView };
 
+/** 고른 뒤 도는 일이다. 도구를 읽어 확인 창이 필요한지 보고, 붙인다. */
+type Phase = "check" | "bind";
+
 /** 내 에이전트를 읽는다. 대화 화면과 같은 목록이다. */
 async function readAgents(): Promise<Agents> {
   try {
@@ -67,7 +70,8 @@ function ChoiceRow({
 }: {
   choice: AgentChoice;
   busy: boolean;
-  pending: boolean;
+  /** 이 줄에서 도는 일이다. 도구를 읽는 중이면 `check`, 붙이는 중이면 `bind` 다. */
+  pending: Phase | null;
   onPick(): void;
 }) {
   return (
@@ -90,8 +94,8 @@ function ChoiceRow({
         <Button
           size="sm"
           disabled={busy}
-          loading={pending}
-          loadingText="붙이는 중"
+          loading={pending !== null}
+          loadingText={pending === "check" ? "확인하는 중" : "붙이는 중"}
           onClick={onPick}
         >
           이 에이전트에서 쓰기
@@ -100,6 +104,60 @@ function ChoiceRow({
         <Badge variant="success">이미 쓰고 있어요</Badge>
       ) : null}
     </li>
+  );
+}
+
+/** 후보 목록이다. 에이전트를 읽는 중이거나 읽지 못했으면 그 사실을, 붙일 수 있는 것이 없으면 만드는 길을 알린다. */
+function ChoiceList({
+  agents,
+  choices,
+  bindable,
+  pending,
+  busy,
+  onPick,
+}: {
+  agents: Agents;
+  choices: AgentChoice[];
+  bindable: boolean;
+  /** 확인 창이 떠 있지 않을 때 고른 뒤 도는 일이다. */
+  pending: { code: string; phase: Phase } | null;
+  busy: boolean;
+  onPick(choice: AgentChoice): void;
+}) {
+  if (agents.kind === "loading") {
+    return (
+      <p className="mt-3 text-sm text-muted-foreground">에이전트를 읽는 중…</p>
+    );
+  }
+  if (agents.kind === "failed") {
+    return (
+      <Notice variant="error" role="alert" className="mt-3">
+        에이전트 목록을 읽지 못했어요. 화면을 다시 열어 주세요.
+      </Notice>
+    );
+  }
+  return (
+    <>
+      {choices.length > 0 ? (
+        <ul className="mt-3 divide-y divide-border rounded-md border border-border">
+          {choices.map((choice) => (
+            <ChoiceRow
+              key={choice.code}
+              choice={choice}
+              busy={busy}
+              pending={pending?.code === choice.code ? pending.phase : null}
+              onPick={() => onPick(choice)}
+            />
+          ))}
+        </ul>
+      ) : null}
+      {bindable ? null : (
+        <p className="mt-3 text-sm text-muted-foreground">
+          이 서비스를 붙일 수 있는 내 에이전트가 없어요. 나만 쓰는 에이전트를
+          만들면 그 에이전트 화면에서 바로 붙일 수 있어요.
+        </p>
+      )}
+    </>
   );
 }
 
@@ -153,7 +211,7 @@ export function ConnectorAgentChooser({
   bindings,
   justConnected,
   preferredAgent,
-  onBound,
+  onBindingsChanged,
   onClose,
 }: {
   connectorId: string;
@@ -163,12 +221,15 @@ export function ConnectorAgentChooser({
   justConnected: boolean;
   /** 에이전트 화면에서 이 연결을 하러 왔으면 그 에이전트 번호다. */
   preferredAgent: string | null;
-  /** 붙였다. 연결 화면이 붙인 에이전트 목록을 다시 읽는다. */
-  onBound(): void;
+  /** 붙였거나 붙이다 실패했다. 실패해도 서버에 바인딩이 남았을 수 있어 연결 화면이 붙인 에이전트 목록을 다시 읽는다. */
+  onBindingsChanged(): void;
   onClose(): void;
 }) {
   const [agents, setAgents] = useState<Agents>({ kind: "loading" });
-  const [pending, setPending] = useState<string | null>(null);
+  const [pending, setPending] = useState<{
+    code: string;
+    phase: Phase;
+  } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [confirming, setConfirming] = useState<AgentChoice | null>(null);
   const [bound, setBound] = useState<Bound | null>(null);
@@ -183,19 +244,19 @@ export function ConnectorAgentChooser({
   }, [justConnected]);
 
   async function bind(choice: AgentChoice) {
-    setPending(choice.code);
+    setPending({ code: choice.code, phase: "bind" });
     setError(null);
     const result = await bindAgentConnection(choice.code, connectorId);
     setPending(null);
+    onBindingsChanged();
     if (!result.ok) return setError(result.message);
     setConfirming(null);
     setBound({ choice, view: result.data });
-    onBound();
   }
 
   async function pick(choice: AgentChoice) {
     if (pending !== null) return;
-    setPending(choice.code);
+    setPending({ code: choice.code, phase: "check" });
     setError(null);
     const risky = await shellOrFileEnabled(choice.code);
     if (risky) {
@@ -246,37 +307,14 @@ export function ConnectorAgentChooser({
             어느 에이전트에서 쓸까요? 고른 에이전트가 이 서비스의 도구를 직접
             써요.
           </p>
-          {agents.kind === "loading" ? (
-            <p className="mt-3 text-sm text-muted-foreground">
-              에이전트를 읽는 중…
-            </p>
-          ) : agents.kind === "failed" ? (
-            <Notice variant="error" role="alert" className="mt-3">
-              에이전트 목록을 읽지 못했어요. 화면을 다시 열어 주세요.
-            </Notice>
-          ) : (
-            <>
-              {choices.length > 0 ? (
-                <ul className="mt-3 divide-y divide-border rounded-md border border-border">
-                  {choices.map((choice) => (
-                    <ChoiceRow
-                      key={choice.code}
-                      choice={choice}
-                      busy={pending !== null}
-                      pending={pending === choice.code && confirming === null}
-                      onPick={() => void pick(choice)}
-                    />
-                  ))}
-                </ul>
-              ) : null}
-              {bindable ? null : (
-                <p className="mt-3 text-sm text-muted-foreground">
-                  이 서비스를 붙일 수 있는 내 에이전트가 없어요. 나만 쓰는
-                  에이전트를 만들면 그 에이전트 화면에서 바로 붙일 수 있어요.
-                </p>
-              )}
-            </>
-          )}
+          <ChoiceList
+            agents={agents}
+            choices={choices}
+            bindable={bindable}
+            pending={confirming === null ? pending : null}
+            busy={pending !== null}
+            onPick={(choice) => void pick(choice)}
+          />
           {error && confirming === null ? (
             <Notice variant="error" role="alert" className="mt-3">
               {error}

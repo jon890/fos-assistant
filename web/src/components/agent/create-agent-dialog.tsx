@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import {
@@ -49,6 +49,10 @@ export function CreateAgentDialog({
   const router = useRouter();
   const id = useId();
   const [open, setOpen] = useState(defaultOpen);
+  // 주소의 `new=1` 을 지운다. 남겨 두면 뒤로 가기나 새로 고침에 창이 다시 열린다.
+  useEffect(() => {
+    if (defaultOpen) router.replace("/agents", { scroll: false });
+  }, [defaultOpen, router]);
   const [name, setName] = useState("");
   const [visibility, setVisibility] =
     useState<AdminAgent["visibility"]>(PRIVATE_VISIBILITY);

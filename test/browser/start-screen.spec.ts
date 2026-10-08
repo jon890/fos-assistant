@@ -155,8 +155,8 @@ test("쓸 수 있는 에이전트가 없으면 입력창을 잠그고 에이전�
 
   await page.unroute("**/api/agents");
   await page.getByRole("link", { name: "에이전트 만들기" }).click();
-  await expect(page).toHaveURL(/\/agents\?new=1$/);
   await expect(page.getByRole("dialog", { name: "새 에이전트" })).toBeVisible();
+  await expect(page).toHaveURL(/\/agents$/);
 });
 
 test("에이전트가 하나면 카드 없이 그 이름과 추천 질문을 보인다", async ({ page }) => {

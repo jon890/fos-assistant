@@ -274,7 +274,7 @@ export function ConnectorConnectionPanel({
           bindings={connection.bindings}
           justConnected={justConnected}
           preferredAgent={preferredAgent}
-          onBound={() => void refreshBindings()}
+          onBindingsChanged={() => void refreshBindings()}
           onClose={() => {
             setChooser("closed");
             setJustConnected(false);
