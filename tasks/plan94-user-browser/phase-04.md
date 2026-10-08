@@ -102,6 +102,7 @@ cd backend && ./gradlew checkstyleMain checkstyleTest spotlessCheck
 | `backend/src/main/java/com/bifos/assistant/hermes/HermesConnectorClient.java` | 수정 |
 | `backend/src/main/java/com/bifos/assistant/hermes/HttpHermesConnectorClient.java` | 수정 |
 | `backend/src/main/java/com/bifos/assistant/connector/application/*.java` | 수정 |
+| `backend/src/main/java/com/bifos/assistant/connector/application/model/ConnectorSummary.java` | 수정 |
 | `backend/src/main/java/com/bifos/assistant/connector/presentation/ConnectionDtos.java` | 수정 |
 | `backend/src/test/java/com/bifos/assistant/hermes/HttpHermesConnectorClientTest.java` | 수정 |
 | `backend/src/test/java/com/bifos/assistant/**/*.java` | 수정 |
