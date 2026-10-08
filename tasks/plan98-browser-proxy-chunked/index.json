@@ -1,0 +1,9 @@
+{
+  "name": "plan98-browser-proxy-chunked",
+  "description": "브라우저 Docker proxy 요청에 Content-Length 를 붙인다",
+  "status": "pending",
+  "created_at": "2026-10-08",
+  "total_phases": 1,
+  "current_phase": 1,
+  "phases": [{"number": 1, "file": "phase-01.md", "execution_profile": "standard"}]
+}
