@@ -55,9 +55,10 @@ from .profiles import (
     _profile_plugin_files,
 )
 
-from .sandbox import (
+from .connector_output import (
     _sandbox_remove_connector_output,
 )
+
 
 
 # 스킬 색인 표식의 앞머리다. 공유 gateway 의 스킬 색인 캐시 키에는 스킬 디렉터리 내용이 없고 `skills.disabled` 가 있다.

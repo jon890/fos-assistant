@@ -21,12 +21,15 @@ from .connector_manifest import (
     _entry_mode,
 )
 
+from .connector_output import (
+    _sandbox_prepare_connector_output,
+)
+
 from .sandbox import (
     IMAGE_FILE_TOOLSETS,
     SANDBOX_OWNER_RE,
     SANDBOX_TOOLSETS,
     _sandbox_policy,
-    _sandbox_prepare_connector_output,
     _sandbox_terminal,
     _sandbox_unavailable,
     _sandbox_validate_attachment_snapshot,
