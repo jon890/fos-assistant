@@ -43,9 +43,9 @@
   `detail` JSON 은 `JsonMapper` 로 읽고, `id` 가 정수가 아니면 건너뛴다. 에이전트 번호는 `AgentExecutionRepository.findAllById` 로 한 번에 읽는다.
 - `ExecutionEventRepository` 에 위 조회 메서드를 더한다.
 
-### 2. `memory.application.MemoryService.acceptedReadableAmong` 과 `readableByTool`
+### 2. `memory.application.AcceptedMemoryLookup.acceptedReadableAmong` 과 `MemoryService.readableByTool`
 
-`Map<Long, Memory> acceptedReadableAmong(CurrentUser user, Collection<Long> ids)`. 비었으면 빈 맵. `findAllById` 뒤 `isReadableBy(user.id(), user.groupId())` 이고 `status()==MemoryStatus.ACCEPTED` 인 것만.
+`MemoryService` 가 파일 길이 상한(500줄)에 걸리므로 새 `@Service` `AcceptedMemoryLookup` 에 둔다. `Map<Long, Memory> acceptedReadableAmong(CurrentUser user, Collection<Long> ids)`. 비었으면 빈 맵. `findAllById` 뒤 `isReadableBy(user.id(), user.groupId())` 이고 `status()==MemoryStatus.ACCEPTED` 인 것만.
 `boolean readableByTool(Memory memory, MemoryAccess access)`: `bodyFor` 의 거르는 조건(요청자 판정 제외)과 같다. `bodyFor` 가 이 함수를 함께 쓰게 고쳐 두 판정이 갈라지지 않게 한다. 에이전트 번호에서 `MemoryAccess` 를 얻는 일은 부르는 쪽이 `accessOf(agentId)` 로 한다.
 
 ### 3. `chat.application.MemoryUseService` 와 `chat.application.MemoryUse`
@@ -90,6 +90,8 @@ cd backend && ./gradlew spotlessCheck checkstyleMain checkstyleTest
 | `backend/src/main/java/com/bifos/assistant/usage/application/ExecutionMemoryRefs.java` | 신규 |
 | `backend/src/main/java/com/bifos/assistant/usage/infra/ExecutionEventRepository.java` | 수정 |
 | `backend/src/main/java/com/bifos/assistant/memory/application/MemoryService.java` | 수정 |
+| `backend/src/main/java/com/bifos/assistant/memory/application/AcceptedMemoryLookup.java` | 신규 |
+| `docs/backend/memory.md` | 수정 |
 | `backend/src/main/java/com/bifos/assistant/chat/application/MemoryUse.java` | 신규 |
 | `backend/src/main/java/com/bifos/assistant/chat/application/MemoryUseService.java` | 신규 |
 | `backend/src/main/java/com/bifos/assistant/chat/presentation/MemoryUseController.java` | 신규 |
