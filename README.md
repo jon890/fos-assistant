@@ -141,10 +141,10 @@ Checks and the daily wake-up do not call value evaluation or the autonomy policy
 ### Memory
 
 - **What you say is kept at once, the rest is proposed.** A lasting fact you state yourself in your latest message is remembered by the agent right away, and the answer shows "remembered" with edit and undo. The quoted evidence must appear in that message as written. Anything from a conversation that read outside text or that includes a run no person sent (a delegated result or a scheduled task), and every sensitive entry, stays a proposal and is used only after a person accepts it ([ADR-20261007 / memory-remember](docs/adr/ADR-20261007-memory-remember.md), [`docs/backend/memory.md`](docs/backend/memory.md)).
-- **Collections and sensitive entries.** Entries belong to collections, and each agent receives only the collections it is allowed to. The body of a sensitive entry is encrypted at rest. Earlier revisions are kept when an entry is edited or deleted ([ADR-053](docs/adr/ADR-053-에이전트는-허용된-collection-의-memory-만-받는다.md), [ADR-055](docs/adr/ADR-055-민감-memory-본문은-저장할-때-암호화하고-key-는-환경-변수로-받는다.md)).
+- **Collections and sensitive entries.** Entries belong to collections, and each agent receives only the collections it is allowed to. An admin changes that allowance on the agent page in the admin area. The body of a sensitive entry is encrypted at rest. Earlier revisions are kept when an entry is edited or deleted ([ADR-053](docs/adr/ADR-053-에이전트는-허용된-collection-의-memory-만-받는다.md), [ADR-055](docs/adr/ADR-055-민감-memory-본문은-저장할-때-암호화하고-key-는-환경-변수로-받는다.md)).
 - **Read-only access for other services.** A service token bound to a user lets another service read that user's documents and nothing else ([ADR-056](docs/adr/ADR-056-다른-서비스는-사용자에-묶인-서비스-토큰으로-문서를-읽기만-한다.md)).
 
-Some Memory screens, such as editing collections and viewing earlier revisions of an entry, are not built yet. The current list is in [`docs/code-architecture.md`](docs/code-architecture.md).
+Some Memory screens, such as editing the collection list and viewing earlier revisions of an entry, are not built yet. The current list is in [`docs/code-architecture.md`](docs/code-architecture.md).
 
 ### Execution spaces
 
