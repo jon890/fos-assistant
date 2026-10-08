@@ -147,6 +147,7 @@ async def _connector_request(request):
     bind_target = request.method.upper() == "GET" or ("bind" in body if body["enabled"] else unbind)
     if not (managed or (host and bind_target)):
         return _rejected("관리 표식이 없는 profile 이다", 401)
+    stage = "status" if request.method.upper() == "GET" else "manifest"
     try:
         if request.method.upper() == "GET":
             import yaml
@@ -191,6 +192,7 @@ async def _connector_request(request):
         if body["enabled"] and "bind" in body:
             # 붙이는 요청 안에서 보관 파일을 읽는다. 보관 파일 쓰기와 같은 잠금 안이라 그 사이에 바뀌지 않는다.
             # 파일을 읽는 동안 이벤트 루프를 막지 않는다.
+            stage = "manifest"
             manifest = await asyncio.to_thread(_connector_manifest, body["plugin"])
             if manifest is None:
                 raise ValueError("쓸 수 없는 connector 는 설치하지 않는다")
@@ -210,6 +212,7 @@ async def _connector_request(request):
                 except (OSError, ValueError, RuntimeError):
                     return _sandbox_unavailable()
                 owner_attachments = _sandbox_attachment_agent_directory(sandbox, owner)
+            stage = "vault"
             stored = await asyncio.to_thread(_read_vault, body["bind"]["vault"])
             if stored is None or stored["connector"] != body["plugin"]:
                 return _rejected("그 connector 의 보관 파일이 없다")
@@ -229,10 +232,12 @@ async def _connector_request(request):
                     except (OSError, ValueError, RuntimeError) as error:
                         logger.warning("dashboard-profile-api: 커넥터 출력 디렉터리를 만들지 못해 빈 값으로 붙인다: %s",
                                        type(error).__name__)
+            stage = "bind"
             result = await asyncio.to_thread(_connector_bind_config, profile_dir, body["plugin"], True,
                                              body["bind"]["vault"], values, owner_attachments, owner_output)
             return JSONResponse({**response, **result}, status_code=200)
         if unbind:
+            stage = "bind"
             result = await asyncio.to_thread(_connector_bind_config, profile_dir, body["plugin"], False)
             return JSONResponse({**response, **result}, status_code=200)
         # 옛 설치가 사진 도구를 열면 그 에이전트 주인의 격리 실행 공간을 쓴다(ADR-091).
@@ -257,16 +262,21 @@ async def _connector_request(request):
                     return _sandbox_unavailable()
             else:
                 return _sandbox_unavailable()
+        stage = "isolated"
         result = await asyncio.to_thread(
             _connector_config, profile_dir, body["plugin"], body["enabled"], sandbox_terminal, local_execution,
             attachment_guard)
         return JSONResponse({**response, **result}, status_code=200)
     except SandboxAttachmentError:
         return _sandbox_unavailable()
-    except FileExistsError:
+    except FileExistsError as error:
+        logger.warning("dashboard-profile-api: connector 요청 실패 단계=%s id=%s exception=%s",
+                       stage, body.get("plugin", "unknown"), type(error).__name__)
         return _rejected("운영자 설정과 충돌한다", 409)
-    except Exception:
+    except Exception as error:
         # manifest 내용이나 profile 환경 변수를 응답과 로그에 싣지 않는다.
+        logger.warning("dashboard-profile-api: connector 요청 실패 단계=%s id=%s exception=%s",
+                       stage, body.get("plugin", "unknown"), type(error).__name__)
         return _rejected("connector 파일 또는 설정을 확인하지 못했다", 503)
 
 

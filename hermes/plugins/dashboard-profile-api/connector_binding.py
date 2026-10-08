@@ -14,6 +14,7 @@ from .common import (
     _atomic_private_write,
     _env_line,
     _env_line_key,
+    logger,
 )
 
 from .connector_manifest import (
@@ -42,6 +43,7 @@ from .connector_state import (
     _detached_bytes,
     _detached_servers,
     _entry_field_env,
+    _entry_manifest_mismatches,
     _remove_backup_env_copies,
     _skill_tree_files,
     _tool_map_bytes,
@@ -149,7 +151,9 @@ def _connector_bind_config(profile_dir: pathlib.Path, plugin: str, enabled: bool
     if not originals[state_path]:
         state = {}
     elif enabled:
-        state = _connector_state(json.loads(originals[state_path]), plugin)
+        # 다시 붙이기는 기록의 모양만 확인한다. 현재 manifest 와의 비교는 실행과 probe 가 계속 맡고,
+        # 설치는 같은 보관 파일로 새 실행 정의를 기록해 manifest 변경을 반영한다.
+        state = _connector_state(json.loads(originals[state_path]))
     else:
         # 떼기는 기록 전체를 지금 manifest 와 견주지 않는다. 운영자가 실행 정의를 바꾼 뒤에도 떼야 `.env` 의 비밀이 남지 않는다.
         state = json.loads(originals[state_path])
@@ -172,6 +176,11 @@ def _connector_bind_config(profile_dir: pathlib.Path, plugin: str, enabled: bool
     if enabled:
         if manifest is None:
             raise ValueError("쓸 수 없는 connector 는 설치하지 않는다")
+        if owned is not None:
+            mismatches = _entry_manifest_mismatches(plugin, owned)
+            if mismatches:
+                logger.warning("dashboard-profile-api: connector 재설치 정의 차이 단계=bind id=%s mismatches=%s",
+                               plugin, ",".join(mismatches))
         # 목록이 없는 profile 에 이름 하나만 든 목록을 만들면 내장 도구와 Control Plane MCP 가 모두 닫히고,
         # MCP 이름이 하나도 없던 목록에 이름을 더하면 운영자의 다른 MCP 서버가 막힌다.
         if not isinstance(allowed, list) or CONTROL_PLANE_MCP not in allowed:
@@ -181,19 +190,26 @@ def _connector_bind_config(profile_dir: pathlib.Path, plugin: str, enabled: bool
         if not owned and not _policy_plugin_enabled(saved):
             raise FileExistsError("정책 hook plugin 이 켜져 있지 않은 profile 이다")
         name = manifest["mcp_server"]
+        if owned is not None and owned["mcp_server"] != name:
+            raise FileExistsError("설치한 MCP 서버 이름이 지금 connector 와 다르다")
         if name in servers and (not owned or servers[name] != owned["server"]):
             raise FileExistsError("운영자가 등록하거나 바꾼 MCP 서버가 있다")
         if owned and name not in servers:
             raise FileExistsError("설치한 MCP 서버가 밖에서 지워졌다")
         field_env = [field["env"] for field in manifest["fields"]]
+        previous_owned_env = _bind_entry_env(None, owned) if owned else set()
         others = set()
         for other, entry in state.items():
             if other != plugin:
-                others |= _entry_field_env(other, entry)
+                # 현재 manifest 칸과 기록이 참조한 옛 칸 모두 다른 바인딩의 값으로 보호한다.
+                others |= _entry_field_env(other, entry) | _bind_entry_env(None, entry)
         present = {_env_line_key(line) for line in env_lines}
         for env_name in field_env:
-            if env_name in BASE_ENV_KEYS or env_name in others or (env_name in present and not owned):
+            if env_name in BASE_ENV_KEYS or env_name in others or (env_name in present and env_name not in previous_owned_env):
                 raise FileExistsError("다른 설정이 쓰는 환경 변수와 겹친다")
+        # manifest 의 칸 이름이 바뀌어도 같은 소유 기록의 옛 `${이름}` 참조 줄은 남기지 않는다.
+        # 현재 manifest 칸은 새 값으로만 쓰고, 다른 바인딩과 기본 env 가 쓰는 이름은 지우지 않는다.
+        cleanup_env = (set(field_env) | previous_owned_env) - others - BASE_ENV_KEYS
         server = _connector_server(manifest)
         # Hermes 는 빈 변수의 참조를 그대로 남긴다. 값이 없는 선택 칸은 빈 값을 명시한다.
         for field in manifest["fields"]:
@@ -220,7 +236,7 @@ def _connector_bind_config(profile_dir: pathlib.Path, plugin: str, enabled: bool
         kept = []
         for line in env_lines:
             key = _env_line_key(line)
-            if key not in field_env:
+            if key not in cleanup_env:
                 kept.append(line)
             elif key in wanted:
                 kept.append(wanted.pop(key))
