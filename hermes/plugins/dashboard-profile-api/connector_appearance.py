@@ -43,9 +43,9 @@ def _connector_icon(root: pathlib.Path, declared) -> dict | None:
     # `root` 는 링크가 없음을 앞에서 확인했다. 그러므로 푼 경로가 같으면 경로의 어느 조각도 링크가 아니다.
     if path.resolve() != path or not path.is_relative_to(root) or not path.is_file():
         raise ValueError("icon 이 plugin 안의 링크 없는 파일이 아니다")
-    # 확인과 열기 사이에 마지막 조각이 링크로 바뀌어도 따라가지 않는다. 연 파일이 일반 파일인지 다시 본다.
+    # 확인과 열기 사이에 마지막 조각이 링크나 FIFO 로 바뀌어도 따라가거나 멈추지 않는다. 연 파일이 일반 파일인지 다시 본다.
     try:
-        descriptor = os.open(path, os.O_RDONLY | os.O_NOFOLLOW)
+        descriptor = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
     except OSError:
         raise ValueError("icon 이 plugin 안의 링크 없는 파일이 아니다") from None
     with os.fdopen(descriptor, "rb") as handle:

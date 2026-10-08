@@ -73,8 +73,9 @@ def check_connector(root: pathlib.Path, repo: pathlib.Path, load_connector) -> l
     name = root.name
     problems: list[str] = []
 
+    loaded = None
     try:
-        load_connector(name, {"root": root, "command": sys.executable, "env": {}})
+        loaded = load_connector(name, {"root": root, "command": sys.executable, "env": {}})
     except Exception as error:
         problems.append("manifest 검증 실패: %s" % error)
 
@@ -90,10 +91,13 @@ def check_connector(root: pathlib.Path, repo: pathlib.Path, load_connector) -> l
     if declared.get("schema") != 2:
         problems.append("schema 가 2 가 아니다: %r" % declared.get("schema"))
 
-    # 이 저장소의 커넥터는 카드의 아이콘과 링크를 갖춘다(ADR-20261008 connector-card). 형식은 위 manifest 검증이 본다.
+    # 이 저장소의 커넥터는 카드의 아이콘과 링크를 갖춘다(ADR-20261008 connector-card).
+    # manifest 검증은 틀린 칸을 예외 없이 None 으로 버리므로, 선언했는데 None 이면 여기서 위반으로 센다.
     for key in ("icon", "link"):
         if not declared.get(key):
             problems.append("%s 칸을 선언하지 않았다: %s" % (key, name))
+        elif loaded is not None and loaded.get(key) is None:
+            problems.append("%s 칸이 검증을 통과하지 못했다: %s" % (key, name))
     icon = declared.get("icon")
     if isinstance(icon, str) and icon.endswith(".svg"):
         try:
@@ -265,6 +269,20 @@ class ContractCatchesViolationsTest(base.ConnectorGateCase):
     def test_connector_without_icon_is_reported(self):
         problems = self.broken_copy(self.edit_declaration(lambda v: v.pop("icon")))
         self.assert_reported(problems, "icon 칸을 선언하지 않았다: gmail")
+
+    def test_invalid_link_is_reported(self):
+        def change(root):
+            path = root / "connector.json"
+            declared = json.loads(path.read_text(encoding="utf-8"))
+            declared["link"] = "http://example.com/a b"
+            path.write_text(json.dumps(declared), encoding="utf-8")
+        self.assert_reported(self.broken_copy(change), "link 칸이 검증을 통과하지 못했다: gmail")
+
+    def test_unsafe_icon_is_reported(self):
+        def change(root):
+            path = root / "icon.svg"
+            path.write_text(path.read_text(encoding="utf-8").replace("</svg>", "<script/></svg>"), encoding="utf-8")
+        self.assert_reported(self.broken_copy(change), "icon 칸이 검증을 통과하지 못했다: gmail")
 
     def test_icon_svg_without_namespace_is_reported(self):
         def change(root):

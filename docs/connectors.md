@@ -91,7 +91,7 @@ plugin 디렉터리 root 에 둔다. 소유는 그 plugin 의 저장소다. 같�
 - 카탈로그는 아이콘 파일의 내용을 `icon: {media_type, data}` 로 싣는다. `media_type` 은 `image/svg+xml` 이나 `image/png` 이고 `data` 는 base64 다. 선언이 없으면 `icon: null` 이다
 - SVG 아이콘은 `xmlns="http://www.w3.org/2000/svg"` 를 선언한다. 없으면 `<img>` 가 아무것도 그리지 않는다. 색은 `currentColor` 가 아닌 고정 색이다. `<img>` 안의 SVG 는 글자색을 물려받지 않는다
 - `link` 의 모양은 ADR 의 「링크 모양」 이 갖는다. 선언이 없으면 `null` 이다
-- Control Plane 은 같은 규칙으로 다시 검사한다. 어긋나면 그 칸만 `null` 로 두고 경고 로그에 커넥터 번호와 칸 이름만 남긴다
+- Control Plane 은 같은 규칙으로 다시 검사한다. 어긋나면 그 칸만 `null` 로 두고 경고 로그에 커넥터 번호와 칸 이름만 남긴다. 대시보드는 코드가 정한 사유 글을 더하고, 둘 다 경로와 값은 싣지 않는다
 - 화면은 아이콘을 `<img>` 로만 그리고, 없으면 기본 아이콘을 보인다. 링크는 새 탭으로 열고 `rel="noopener noreferrer"` 다
 - 상표 로고 파일을 복사하지 않는다. 직접 그린 단순한 도형을 쓴다
 
