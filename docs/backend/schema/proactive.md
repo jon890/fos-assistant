@@ -170,8 +170,8 @@
 | `status` | VARCHAR(16) | `RUNNING`, `DECIDED`, `SKIPPED`, `FAILED` |
 | `skipped_reason` | VARCHAR(32) NULL | `SKIPPED` 의 까닭. `SNOOZED`, `NO_CANDIDATE`, `DAILY_LIMIT` |
 | `error_code` | VARCHAR(64) NULL | `FAILED` 의 까닭. 거절한 오류 코드, `INTERNAL_ERROR`, 기동 때 닫은 `INTERRUPTED` |
-| `evaluation_id` | BIGINT NULL FK `proactive_value_evaluation` ON DELETE SET NULL | 이 시도가 만든 평가 |
-| `created_at` | DATETIME(6) | 시도를 저장한 시각. 하루 상한을 센다 |
+| `evaluation_id` | BIGINT NULL FK `proactive_value_evaluation` ON DELETE SET NULL | 이 시도가 만든 평가. 기동 때 닫은 줄은 비어 있다 |
+| `created_at` | DATETIME(6) | 시도를 저장한 시각. 최근 20시간의 하루 상한을 센다 |
 | `finished_at` | DATETIME(6) NULL | `RUNNING` 이 아니면 채운다 |
 
 `(user_id, created_at)` 과 `status` 에 색인이 있다. 글과 원문, provider 이름은 두지 않는다. provider 는 평가의 `evidence_json` 이 갖는다.

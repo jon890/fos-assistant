@@ -1,6 +1,6 @@
 # Phase 01. 매일 루프의 표와 사용자 설정
 
-**Execution profile**: standard
+**Execution profile**: deep
 
 ## 목표
 
@@ -80,23 +80,27 @@ MySQL 과 H2 MySQL 모드에 함께 있는 문법만 쓴다.
 
 ### 8. 이 phase 를 검증하는 시험
 
-- `backend/src/test/java/com/bifos/assistant/proactive/ProactiveLoopSettingTest.java` (`@BackendIntegrationTest`, MockMvc 나 서비스 직접 호출 가운데 같은 패키지의 기존 시험이 쓰는 쪽)
-  - 줄이 없으면 `enabled = false` 이고 `available` 은 설치 설정을 따른다
-  - `@OverrideProperties("assistant.proactive-loop.enabled=true")` 에서 켜고 쉬기를 저장하면 같은 값을 다시 읽는다
-  - 설치 설정이 꺼진 채 켜기는 `PROACTIVE_LOOP_UNAVAILABLE`, 끄기는 통과한다
+설치 설정은 시험 클래스 단위로만 바꿀 수 있다(`@OverrideProperties` 는 클래스에 달고, `@Nested` 는 바깥 클래스의 값을 이어받지 않는다). 그래서 설정 조합마다 클래스를 나눈다. 서비스를 직접 부른다.
+
+- `backend/src/test/java/com/bifos/assistant/proactive/ProactiveLoopSettingTest.java` (`@BackendIntegrationTest`, `@OverrideProperties("assistant.proactive-loop.enabled=true")`)
+  - 줄이 없으면 `enabled = false`, `available = true` 다
+  - 켜고 쉬기를 저장하면 같은 값을 다시 읽는다
   - 31일 뒤 `snoozedUntil` 은 `VALIDATION_FAILED`, 지난 시각은 `snoozedUntil = null` 로 저장된다
   - 다른 사용자가 읽을 수 없는 에이전트는 `requireReadable` 의 오류다
+- `backend/src/test/java/com/bifos/assistant/proactive/ProactiveLoopSettingDisabledTest.java` (`@BackendIntegrationTest`, 설정 덮어쓰기 없음. 설치 설정 기본값 `false`)
+  - `available = false` 다
+  - 켜기는 `PROACTIVE_LOOP_UNAVAILABLE`, 끄기와 쉬기는 통과한다
 - `backend/src/test/java/com/bifos/assistant/proactive/ProactiveLoopMigrationTest.java`: 같은 패키지의 `ValueEvaluationMigrationTest.java` 와 같은 방식으로 새 마이그레이션을 적용하고, 같은 `(user_id, agent_id)` 두 줄과 같은 `source_check_id` 두 줄이 유일 제약에 걸리는지 본다
 
 ## 검증
 
 ```bash
-cd backend && ./gradlew test --tests '*ProactiveLoopSettingTest' --tests '*ProactiveLoopMigrationTest' --tests '*ArchitectureRules*'
-cd backend && ./gradlew checkstyleMain checkstyleTest spotlessCheck
+(cd backend && ./gradlew test --tests '*ProactiveLoopSettingTest' --tests '*ProactiveLoopSettingDisabledTest' --tests '*ProactiveLoopMigrationTest' --tests 'com.bifos.assistant.architecture.*')
+(cd backend && ./gradlew checkstyleMain checkstyleTest spotlessCheck)
 node scripts/check-migration-versions.mjs
 ```
 
-`ProactiveLoopSettingTest`, `ProactiveLoopMigrationTest` 가 통과하고, 구조 규칙의 `LIVE_SETTINGS` 검사가 새 설정을 받아들인다.
+`ProactiveLoopSettingTest`, `ProactiveLoopSettingDisabledTest`, `ProactiveLoopMigrationTest` 가 통과하고, 구조 규칙의 `LIVE_SETTINGS` 검사가 새 설정을 받아들인다.
 Docker 가 있으면 `scripts/check-mysql-migration.sh` 로 엔티티와 Flyway 스키마가 맞는지도 본다. 없으면 CI 의 backend job 이 본다.
 
 ## 변경 파일
@@ -119,4 +123,5 @@ Docker 가 있으면 `scripts/check-mysql-migration.sh` 로 엔티티와 Flyway 
 | `backend/src/main/java/com/bifos/assistant/shared/error/ErrorCode.java` | 수정 |
 | `backend/src/test/java/com/bifos/assistant/architecture/ArchitectureRules.java` | 수정 |
 | `backend/src/test/java/com/bifos/assistant/proactive/ProactiveLoopSettingTest.java` | 신규 |
+| `backend/src/test/java/com/bifos/assistant/proactive/ProactiveLoopSettingDisabledTest.java` | 신규 |
 | `backend/src/test/java/com/bifos/assistant/proactive/ProactiveLoopMigrationTest.java` | 신규 |

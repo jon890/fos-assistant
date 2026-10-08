@@ -57,10 +57,12 @@ sequenceDiagram
 | --- | --- | --- |
 | 1 | 설정의 `snoozed_until` 이 지금보다 뒤다 | `SKIPPED`, `SNOOZED` |
 | 2 | 그 살펴보기의 `ACCEPTED` 문제 후보가 없다 | `SKIPPED`, `NO_CANDIDATE` |
-| 3 | 그 사용자의 `SKIPPED` 가 아닌 시도 줄이 최근 24시간 안에 `max-runs-per-day` 개 이상이다 | `SKIPPED`, `DAILY_LIMIT` |
+| 3 | 그 사용자의 `SKIPPED` 가 아닌 시도 줄이 최근 20시간 안에 `max-runs-per-day` 개 이상이다 | `SKIPPED`, `DAILY_LIMIT` |
 | 4 | 위가 모두 아니다 | `RUNNING` |
 
 `NO_CANDIDATE` 는 모델을 부르지 않으므로 하루 상한에 세지 않는다. 동의한 사용자의 침묵을 조회할 수 있게 줄은 남긴다.
+하루 상한을 24시간이 아니라 20시간으로 센다. 시도 줄의 시각은 살펴보기 turn 이 끝난 뒤라 날마다 몇 분씩 다르다. 24시간으로 세면 어제보다 일찍 끝난 오늘 깨우기가 어제 줄에 걸려 빠진다.
+잠근 설정 줄 목록에서 그 에이전트의 줄을 다시 보고, 그사이 꺼졌거나 지워졌으면 시도 줄 없이 돌아간다.
 원천 살펴보기 칸의 유일 제약에 걸리면 이미 다른 처리가 그 살펴보기를 맡았으므로 아무것도 하지 않는다.
 
 ### 평가와 판정
@@ -80,6 +82,7 @@ provider 는 `assistant.proactive-loop.provider` 다. 판단 profile 이 없거�
 ### 서버가 멈췄을 때
 
 기동할 때 `ProactiveLoopRecovery` 가 `RUNNING` 시도 줄을 `FAILED`, `INTERRUPTED` 로 닫는다. 평가와 판정을 다시 부르지 않는다.
+복구한 줄의 평가 번호는 비어 있다. 평가가 시작됐는지는 같은 원천 살펴보기 번호의 `proactive_value_evaluation` 으로 찾는다.
 평가 줄의 `RUNNING` 은 가치 평가의 기동 복구가, 판정 줄의 `PENDING` 은 행동 정책의 규칙이 다룬다.
 살펴보기가 끝난 뒤 시도 줄을 저장하기 전에 멈추면 그 살펴보기는 잇지 않는다. 다음 깨우기가 새 원천이다.
 
@@ -126,15 +129,16 @@ provider 는 `assistant.proactive-loop.provider` 다. 판단 profile 이 없거�
 | --- | --- | --- |
 | `enabled` | `false` | 설치가 루프를 연다. 꺼져 있으면 사용자 설정과 상관없이 잇지 않는다 |
 | `provider` | `hermes` | 평가에 쓸 `DecisionProvider` 이름. 설치된 adapter 여야 한다 |
-| `max-runs-per-day` | `1` | 사용자 한 명의 최근 24시간 시도 상한. 1 이상 |
+| `max-runs-per-day` | `1` | 사용자 한 명의 최근 20시간 시도 상한. 1 이상 |
 
 ## 검증
 
 | 무엇 | 어디서 |
 | --- | --- |
-| 줄을 남기지 않는 조건, 건너뛰는 순서, 원천 유일, 하루 상한, 실패 코드, 다시 부르지 않음 | `ProactiveLoopCoordinatorTest` |
+| 줄을 남기지 않는 조건, 건너뛰는 순서, 원천 유일, 하루 상한, 다시 부르지 않음 | `ProactiveLoopCoordinatorTest`, `ProactiveLoopDisabledTest` |
+| provider 실패의 `FALLBACK` 과 모르는 provider 의 `FAILED` | `ProactiveLoopFallbackTest`, `ProactiveLoopUnknownProviderTest` |
 | 기동 때 `RUNNING` 닫기 | `ProactiveLoopRecoveryTest` |
-| 설정 API 의 권한과 검사 | `ProactiveLoopSettingTest` |
-| 결정적 provider 로 8일 동안 깨우기와 루프를 이어 돌려 중요한 문제의 적중, 중복, 유용한 침묵, 실패, 호출 수를 세는 합성 반복 | `DailyLoopPilotTest`. 결과는 `backend/build/reports/proactive-loop/report.md` |
+| 설정 API 의 권한과 검사 | `ProactiveLoopSettingTest`, `ProactiveLoopSettingDisabledTest` |
+| 결정적 provider 로 7일 동안 깨우기와 루프를 이어 돌려 중요한 문제의 적중, 중복, 유용한 침묵, 실패, 호출 수를 세는 합성 반복 | `DailyLoopPilotTest`. 결과는 `backend/build/reports/proactive-loop/report.md` |
 
 합성 반복의 모든 값은 합성이다. 실제 사람, 메일, 계정, 금액, 대화 내용을 쓰지 않는다.
