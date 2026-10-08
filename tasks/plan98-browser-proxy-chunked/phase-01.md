@@ -44,11 +44,15 @@ Transfer-Encoding 이 있거나 Content-Length 가 없으면 403 을 돌려주�
 
 ## 검증
 
-`cd backend && ./gradlew test --tests '*DockerProxyBrowserRuntime*Test'`
+```bash
+cd backend && ./gradlew test --tests '*DockerProxyBrowserRuntime*Test'
+```
 
 종료 코드 0. 수정 전 새 HTTP 시험은 403 으로 실패해야 한다.
 
-`cd backend && ./gradlew checkstyleMain checkstyleTest spotlessCheck`
+```bash
+cd backend && ./gradlew checkstyleMain checkstyleTest spotlessCheck
+```
 
 종료 코드 0. 무거운 검사는 공통 heavy-lock 으로 직렬화한다.
 
