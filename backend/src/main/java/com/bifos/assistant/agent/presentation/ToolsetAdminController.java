@@ -25,7 +25,9 @@ public class ToolsetAdminController {
 
     @GetMapping
     public List<AgentDtos.CatalogToolsetView> read() {
-        return catalog.read(currentUser.requireAdmin()).stream().map(AgentDtos.CatalogToolsetView::from).toList();
+        return catalog.read(currentUser.requireAdmin()).stream()
+                .map(AgentDtos.CatalogToolsetView::from)
+                .toList();
     }
 
     @PutMapping

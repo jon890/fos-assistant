@@ -14,7 +14,8 @@ async function forward(request: Request) {
     method: request.method,
     ...(body === undefined ? {} : { body }),
   });
-  if (!opened.ok) return errorResponse(opened.code, opened.message, opened.status);
+  if (!opened.ok)
+    return errorResponse(opened.code, opened.message, opened.status);
   return new Response(opened.response.body, {
     status: opened.response.status,
     headers: { "Content-Type": "application/json" },

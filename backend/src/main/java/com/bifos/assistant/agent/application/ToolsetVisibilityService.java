@@ -36,6 +36,9 @@ public class ToolsetVisibilityService {
         }
         hidden.deleteByGroupId(user.groupId());
         hidden.flush();
-        hidden.saveAll(names.stream().distinct().map(name -> ToolsetHidden.of(user.groupId(), name)).toList());
+        hidden.saveAll(names.stream()
+                .distinct()
+                .map(name -> ToolsetHidden.of(user.groupId(), name))
+                .toList());
     }
 }

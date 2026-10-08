@@ -8,8 +8,8 @@ import com.bifos.assistant.hermes.HermesToolsetClient.ToolsetCatalogEntry;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
-import java.util.HashMap;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -38,7 +38,13 @@ public class AgentToolService {
     private AgentToolsetsView read(CurrentUser user, Agent agent, boolean adminView) {
         requireOwnerOrAdmin(user, agent);
         List<String> enabled = toolsets.readEnabled(agent.apiBaseUrl(), agent.hermesProfile());
-        return response(user, agent, toolsets.readCatalog(), enabled, connectorBindings.connectorServers(agent.id()), adminView);
+        return response(
+                user,
+                agent,
+                toolsets.readCatalog(),
+                enabled,
+                connectorBindings.connectorServers(agent.id()),
+                adminView);
     }
 
     public AgentToolsetsView write(CurrentUser user, Agent agent, List<String> requested) {

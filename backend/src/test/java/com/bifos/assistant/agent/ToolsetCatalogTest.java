@@ -34,34 +34,59 @@ class ToolsetCatalogTest {
     @Test
     @DisplayName("숨김 도구의 켜진 에이전트를 세며 꺼진 에이전트와 Hermes 목록에서 사라진 숨김도 남긴다")
     void includesDisabledAgentsAndHiddenNamesMissingFromHermes() {
-        Agent agent = Agent.of("count-tools", "꺼진 비서", "count-tools", "http://runtime.test/p/count-tools",
-                CostMode.SUBSCRIPTION, CredentialScope.SHARED_HOUSEHOLD, AgentVisibility.PRIVATE, 1L, Instant.now());
+        Agent agent = Agent.of(
+                "count-tools",
+                "꺼진 비서",
+                "count-tools",
+                "http://runtime.test/p/count-tools",
+                CostMode.SUBSCRIPTION,
+                CredentialScope.SHARED_HOUSEHOLD,
+                AgentVisibility.PRIVATE,
+                1L,
+                Instant.now());
         agent.changeAccess(false, AgentVisibility.PRIVATE, 1L);
         when(visibility.hiddenFor(1L)).thenReturn(Set.of("spotify", "discord"));
-        when(toolsets.readCatalog()).thenReturn(List.of(new ToolsetCatalogEntry("spotify", "Spotify", "음악"),
-                new ToolsetCatalogEntry("memory", "Memory", "기억")));
-        when(agents.findByDeletedAtIsNullAndConnectorManagedFalseOrderByCodeAsc()).thenReturn(List.of(agent));
+        when(toolsets.readCatalog())
+                .thenReturn(List.of(
+                        new ToolsetCatalogEntry("spotify", "Spotify", "음악"),
+                        new ToolsetCatalogEntry("memory", "Memory", "기억")));
+        when(agents.findByDeletedAtIsNullAndConnectorManagedFalseOrderByCodeAsc())
+                .thenReturn(List.of(agent));
         when(toolsets.readEnabled(agent.apiBaseUrl(), agent.hermesProfile())).thenReturn(List.of("spotify"));
-        assertThat(catalog.read(admin)).satisfiesExactly(spotify -> {
-            assertThat(spotify.hidden()).isTrue();
-            assertThat(spotify.enabledAgents()).hasSize(1);
-            assertThat(spotify.enabledAgents().getFirst().code()).isEqualTo(agent.code());
-        }, discord -> {
-            assertThat(discord.name()).isEqualTo("discord");
-            assertThat(discord.hidden()).isTrue();
-            assertThat(discord.enabledAgents()).isEmpty();
-        });
+        assertThat(catalog.read(admin))
+                .satisfiesExactly(
+                        spotify -> {
+                            assertThat(spotify.hidden()).isTrue();
+                            assertThat(spotify.enabledAgents()).hasSize(1);
+                            assertThat(spotify.enabledAgents().getFirst().code())
+                                    .isEqualTo(agent.code());
+                        },
+                        discord -> {
+                            assertThat(discord.name()).isEqualTo("discord");
+                            assertThat(discord.hidden()).isTrue();
+                            assertThat(discord.enabledAgents()).isEmpty();
+                        });
     }
 
     @Test
     @DisplayName("활성 도구를 읽지 못하면 0개로 돌리지 않고 실패한다")
     void propagatesProfileReadFailuresRatherThanClaimingZeroEnabledAgents() {
-        Agent agent = Agent.of("count-failure", "실패 비서", "count-failure", "http://runtime.test/p/count-failure",
-                CostMode.SUBSCRIPTION, CredentialScope.SHARED_HOUSEHOLD, AgentVisibility.GROUP, null, Instant.now());
-        when(agents.findByDeletedAtIsNullAndConnectorManagedFalseOrderByCodeAsc()).thenReturn(List.of(agent));
+        Agent agent = Agent.of(
+                "count-failure",
+                "실패 비서",
+                "count-failure",
+                "http://runtime.test/p/count-failure",
+                CostMode.SUBSCRIPTION,
+                CredentialScope.SHARED_HOUSEHOLD,
+                AgentVisibility.GROUP,
+                null,
+                Instant.now());
+        when(agents.findByDeletedAtIsNullAndConnectorManagedFalseOrderByCodeAsc())
+                .thenReturn(List.of(agent));
         when(toolsets.readEnabled(agent.apiBaseUrl(), agent.hermesProfile()))
                 .thenThrow(new ApiException(ErrorCode.HERMES_UNAVAILABLE, "unavailable"));
-        assertThatThrownBy(() -> catalog.read(admin)).isInstanceOfSatisfying(ApiException.class,
-                ex -> assertThat(ex.code()).isEqualTo(ErrorCode.HERMES_UNAVAILABLE));
+        assertThatThrownBy(() -> catalog.read(admin))
+                .isInstanceOfSatisfying(
+                        ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.HERMES_UNAVAILABLE));
     }
 }

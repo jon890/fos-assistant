@@ -43,7 +43,11 @@ class AgentToolServiceTest {
     private final ProfileSkillFiles skillFiles = mock(ProfileSkillFiles.class);
     private final AgentConnectorBindings connectorBindings = mock(AgentConnectorBindings.class);
     private final AgentToolService service = new AgentToolService(
-            toolsets, skillFiles, mock(AgentService.class), mock(AgentRepository.class), connectorBindings,
+            toolsets,
+            skillFiles,
+            mock(AgentService.class),
+            mock(AgentRepository.class),
+            connectorBindings,
             mock(ToolsetVisibilityService.class));
     private final CurrentUser owner = new CurrentUser(1L, "owner@example.com", "주인", 1L, UserRole.MEMBER);
     private final Agent agent = Agent.of(
@@ -96,7 +100,8 @@ class AgentToolServiceTest {
                 mock(ProfileSkillFiles.class),
                 mock(AgentService.class),
                 mock(AgentRepository.class),
-                mock(AgentConnectorBindings.class), mock(ToolsetVisibilityService.class));
+                mock(AgentConnectorBindings.class),
+                mock(ToolsetVisibilityService.class));
         Agent groupAgent = Agent.of(
                 "group-tools",
                 "그룹 도구",
@@ -126,7 +131,8 @@ class AgentToolServiceTest {
                 mock(ProfileSkillFiles.class),
                 mock(AgentService.class),
                 mock(AgentRepository.class),
-                mock(AgentConnectorBindings.class), mock(ToolsetVisibilityService.class));
+                mock(AgentConnectorBindings.class),
+                mock(ToolsetVisibilityService.class));
         Agent groupAgent = Agent.of(
                 "group-read",
                 "그룹 도구",

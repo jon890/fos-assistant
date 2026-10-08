@@ -39,18 +39,28 @@ class HiddenAgentToolsTest {
     private final ToolsetVisibilityService visibility = mock(ToolsetVisibilityService.class);
     private final AgentRepository agents = mock(AgentRepository.class);
     private final ProfileSkillFiles skills = mock(ProfileSkillFiles.class);
-    private final AgentToolService service = new AgentToolService(toolsets, skills, mock(AgentService.class), agents,
-            mock(AgentConnectorBindings.class), visibility);
+    private final AgentToolService service = new AgentToolService(
+            toolsets, skills, mock(AgentService.class), agents, mock(AgentConnectorBindings.class), visibility);
     private final CurrentUser owner = new CurrentUser(1L, "owner@example.com", "주인", 1L, UserRole.MEMBER);
     private final CurrentUser admin = new CurrentUser(2L, "admin@example.com", "관리자", 1L, UserRole.ADMIN);
-    private final Agent agent = Agent.of("hidden-tools", "숨김 시험", "hidden-tools", "http://runtime.test/p/hidden-tools",
-            CostMode.SUBSCRIPTION, CredentialScope.SHARED_HOUSEHOLD, AgentVisibility.PRIVATE, 1L, Instant.now());
+    private final Agent agent = Agent.of(
+            "hidden-tools",
+            "숨김 시험",
+            "hidden-tools",
+            "http://runtime.test/p/hidden-tools",
+            CostMode.SUBSCRIPTION,
+            CredentialScope.SHARED_HOUSEHOLD,
+            AgentVisibility.PRIVATE,
+            1L,
+            Instant.now());
 
     @BeforeEach
     void setUp() {
-        when(toolsets.readCatalog()).thenReturn(List.of(new ToolsetCatalogEntry("web", "Web", "웹"),
-                new ToolsetCatalogEntry("spotify", "Spotify", "음악"),
-                new ToolsetCatalogEntry("skills", "Skills", "스킬")));
+        when(toolsets.readCatalog())
+                .thenReturn(List.of(
+                        new ToolsetCatalogEntry("web", "Web", "웹"),
+                        new ToolsetCatalogEntry("spotify", "Spotify", "음악"),
+                        new ToolsetCatalogEntry("skills", "Skills", "스킬")));
         when(visibility.hiddenFor(1L)).thenReturn(Set.of("spotify"));
         when(agents.findByCode(agent.code())).thenReturn(Optional.of(agent));
         when(agents.findByCodeForUpdate(agent.code())).thenReturn(Optional.of(agent));
@@ -60,10 +70,16 @@ class HiddenAgentToolsTest {
     @Test
     @DisplayName("관리자도 일반 경로에서는 숨긴 도구를 받지 않고 관리자 경로에서는 숨김 표시를 받는다")
     void filtersGeneralViewsAndMarksHiddenToolsInAdminViews() {
-        assertThat(service.read(owner, agent).toolsets()).extracting(AgentToolView::name).doesNotContain("spotify");
-        assertThat(service.read(admin, agent).toolsets()).extracting(AgentToolView::name).doesNotContain("spotify");
-        assertThat(service.readAsAdmin(admin, agent.code()).toolsets()).filteredOn(AgentToolView::hidden)
-                .extracting(AgentToolView::name).containsExactly("spotify");
+        assertThat(service.read(owner, agent).toolsets())
+                .extracting(AgentToolView::name)
+                .doesNotContain("spotify");
+        assertThat(service.read(admin, agent).toolsets())
+                .extracting(AgentToolView::name)
+                .doesNotContain("spotify");
+        assertThat(service.readAsAdmin(admin, agent.code()).toolsets())
+                .filteredOn(AgentToolView::hidden)
+                .extracting(AgentToolView::name)
+                .containsExactly("spotify");
     }
 
     @Test
@@ -72,7 +88,8 @@ class HiddenAgentToolsTest {
         when(toolsets.readEnabled(agent.apiBaseUrl(), agent.hermesProfile()))
                 .thenReturn(List.of("spotify"), List.of("web", "spotify"));
         assertThat(service.write(owner, agent, List.of("web")).toolsets())
-                .extracting(AgentToolView::name).doesNotContain("spotify");
+                .extracting(AgentToolView::name)
+                .doesNotContain("spotify");
         verify(toolsets).writeApiServer(agent.hermesProfile(), List.of("web", "spotify", "fos-assistant"), "u1");
     }
 
@@ -80,17 +97,18 @@ class HiddenAgentToolsTest {
     @DisplayName("숨긴 도구를 일반 PUT에 넣으면 이미 켜져 있어도 거절한다")
     void rejectsExplicitHiddenToolInGeneralRequest() {
         assertThatThrownBy(() -> service.write(owner, agent, List.of("spotify")))
-                .isInstanceOfSatisfying(ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.FORBIDDEN));
+                .isInstanceOfSatisfying(
+                        ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.FORBIDDEN));
         verify(toolsets, never()).writeApiServer(anyString(), anyList(), anyString());
     }
 
     @Test
     @DisplayName("관리자는 숨긴 도구를 관리자 경로에서 끌 수 있다")
     void letsAdminDisableHiddenTools() {
-        when(toolsets.readEnabled(agent.apiBaseUrl(), agent.hermesProfile()))
-                .thenReturn(List.of("spotify"), List.of());
+        when(toolsets.readEnabled(agent.apiBaseUrl(), agent.hermesProfile())).thenReturn(List.of("spotify"), List.of());
         assertThat(service.writeAsAdmin(admin, agent.code(), List.of()).toolsets())
-                .filteredOn(AgentToolView::hidden).allMatch(tool -> !tool.enabled());
+                .filteredOn(AgentToolView::hidden)
+                .allMatch(tool -> !tool.enabled());
         verify(toolsets).writeApiServer(agent.hermesProfile(), List.of("fos-assistant"), "u1");
     }
 
@@ -104,7 +122,7 @@ class HiddenAgentToolsTest {
         service.write(owner, agent, List.of("web"));
         verify(toolsets).writeApiServer(agent.hermesProfile(), List.of("web", "skills", "fos-assistant"), "u1");
         assertThatThrownBy(() -> service.write(owner, agent, List.of("web", "web")))
-                .isInstanceOfSatisfying(ApiException.class,
-                        ex -> assertThat(ex.code()).isEqualTo(ErrorCode.VALIDATION_FAILED));
+                .isInstanceOfSatisfying(
+                        ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.VALIDATION_FAILED));
     }
 }

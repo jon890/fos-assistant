@@ -41,10 +41,14 @@ public class ToolsetCatalogService {
         // 읽지 못한 profile을 0개로 세지 않는다. Hermes 오류는 그대로 전달해 다시 읽게 한다.
         return catalog.values().stream()
                 .map(entry -> new ToolsetCatalogView(
-                        entry.name(), entry.label(), entry.description(), hidden.contains(entry.name()),
+                        entry.name(),
+                        entry.label(),
+                        entry.description(),
+                        hidden.contains(entry.name()),
                         enabled.entrySet().stream()
                                 .filter(row -> row.getValue().contains(entry.name()))
-                                .map(row -> new EnabledToolsetAgent(row.getKey().code(), row.getKey().name()))
+                                .map(row -> new EnabledToolsetAgent(
+                                        row.getKey().code(), row.getKey().name()))
                                 .toList()))
                 .toList();
     }

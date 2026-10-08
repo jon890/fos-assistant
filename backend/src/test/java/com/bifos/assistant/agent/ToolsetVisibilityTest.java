@@ -60,12 +60,12 @@ class ToolsetVisibilityTest {
     void rejectsInvalidAndUnauthorizedSavesWithoutChangingSettings() {
         visibility.save(admin, List.of("spotify"));
         assertThatThrownBy(() -> visibility.save(admin, List.of("memory")))
-                .isInstanceOfSatisfying(ApiException.class,
-                        ex -> assertThat(ex.code()).isEqualTo(ErrorCode.VALIDATION_FAILED));
+                .isInstanceOfSatisfying(
+                        ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.VALIDATION_FAILED));
         CurrentUser member = new CurrentUser(2L, "member@example.com", "사용자", GROUP_ID, UserRole.MEMBER);
         assertThatThrownBy(() -> visibility.save(member, List.of()))
-                .isInstanceOfSatisfying(ApiException.class,
-                        ex -> assertThat(ex.code()).isEqualTo(ErrorCode.FORBIDDEN));
+                .isInstanceOfSatisfying(
+                        ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.FORBIDDEN));
         assertThat(visibility.hiddenFor(GROUP_ID)).containsExactly("spotify");
         verifyNoInteractions(toolsets);
     }
