@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useSyncExternalStore } from "react";
-import { ArrowLeft, Bot, Cpu, Globe, Plug, Receipt, Users } from "lucide-react";
+import { ArrowLeft, Bot, Cpu, Globe, Plug, Receipt, Users, Wrench } from "lucide-react";
 import { cn } from "cn";
 import { Badge } from "@/components/ui/badge";
 import { ScreenTransition } from "./screen-transition";
@@ -15,6 +15,7 @@ const LINKS = [
   { href: "/admin/people", label: "사용자", icon: Users },
   { href: "/admin/agents", label: "에이전트", icon: Bot },
   { href: "/admin/models", label: "모델", icon: Cpu },
+  { href: "/admin/tools", label: "도구", icon: Wrench },
   { href: "/admin/usage", label: "사용량과 비용", icon: Receipt },
   { href: "/admin/connections", label: "커넥터", icon: Plug },
   { href: "/admin/browsers", label: "브라우저", icon: Globe },

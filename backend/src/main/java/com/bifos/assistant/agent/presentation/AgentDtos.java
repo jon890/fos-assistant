@@ -2,6 +2,7 @@ package com.bifos.assistant.agent.presentation;
 
 import com.bifos.assistant.agent.application.AgentToolView;
 import com.bifos.assistant.agent.application.PersonaSnapshot;
+import com.bifos.assistant.agent.application.ToolsetCatalogView;
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.agent.domain.type.AgentVisibility;
 import com.bifos.assistant.agent.domain.type.CostMode;
@@ -140,7 +141,8 @@ public final class AgentDtos {
             String tier,
             boolean enabled,
             boolean editable,
-            boolean requiresPrivate) {
+            boolean requiresPrivate,
+            boolean hidden) {
         static ToolsetView from(AgentToolView source) {
             return new ToolsetView(
                     source.name(),
@@ -149,11 +151,38 @@ public final class AgentDtos {
                     source.tier().name(),
                     source.enabled(),
                     source.editable(),
-                    source.requiresPrivate());
+                    source.requiresPrivate(),
+                    source.hidden());
         }
     }
 
-    public record ToolsetsView(List<ToolsetView> toolsets, List<String> unclassifiedEnabled) {}
+    public record ToolsetsView(
+            List<ToolsetView> toolsets,
+            List<String> unclassifiedEnabled,
+            boolean shellOrFileEnabled,
+            boolean skillsEnabled) {}
+
+    public record HiddenToolsetsRequest(@NotNull List<@NotBlank String> hidden) {}
+
+    public record EnabledToolsetAgentView(String code, String name) {}
+
+    public record CatalogToolsetView(
+            String name,
+            String label,
+            String description,
+            boolean hidden,
+            List<EnabledToolsetAgentView> enabledAgents) {
+        static CatalogToolsetView from(ToolsetCatalogView source) {
+            return new CatalogToolsetView(
+                    source.name(),
+                    source.label(),
+                    source.description(),
+                    source.hidden(),
+                    source.enabledAgents().stream()
+                            .map(agent -> new EnabledToolsetAgentView(agent.code(), agent.name()))
+                            .toList());
+        }
+    }
 
     /**
      * 관리 화면이 보는 에이전트 한 줄.

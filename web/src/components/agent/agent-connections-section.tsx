@@ -15,11 +15,14 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Notice } from "@/components/ui/notice";
-import { GROUP_VISIBILITY, type AdminAgent } from "@/lib/agent";
+import {
+  GROUP_VISIBILITY,
+  type AdminAgent,
+  type AgentToolsView,
+} from "@/lib/agent";
 import {
   agentConnectionLabel,
   bindAgentConnection,
-  hasShellOrFileTool,
   listAgentConnections,
   unbindAgentConnection,
   type AgentConnectionBlock,
@@ -31,8 +34,8 @@ type Props = {
   initialConnections: AgentConnectionView[];
   initialBlockedReason: AgentConnectionBlock | null;
   visibility: AdminAgent["visibility"] | undefined;
-  /** 지금 켜진 도구 이름이다. 도구를 읽지 못했으면 null 이고 도구에 따른 안내를 하지 않는다. */
-  enabledTools: string[] | null;
+  /** 실제 활성 상태다. 도구를 읽지 못했으면 null 이고 도구에 따른 안내를 하지 않는다. */
+  toolState: AgentToolsView | null;
   /** 붙거나 떨어진 뒤 이 에이전트에 붙은 연결이 있는지 알린다. 도구 절의 위험 안내가 받는다. */
   onBoundChange(bound: boolean): void;
 };
@@ -197,7 +200,7 @@ export function AgentConnectionsSection({
   initialConnections,
   initialBlockedReason,
   visibility,
-  enabledTools,
+  toolState,
   onBoundChange,
 }: Props) {
   const [connections, setConnections] = useState(initialConnections);
@@ -214,8 +217,8 @@ export function AgentConnectionsSection({
       : visibility === GROUP_VISIBILITY
         ? "AGENT_NOT_PRIVATE"
         : null;
-  const shellOrFile = enabledTools !== null && hasShellOrFileTool(enabledTools);
-  const skillsOff = enabledTools !== null && !enabledTools.includes("skills");
+  const shellOrFile = toolState?.shellOrFileEnabled === true;
+  const skillsOff = toolState !== null && !toolState.skillsEnabled;
 
   function replace(next: AgentConnectionView) {
     const updated = connections.map((item) =>
