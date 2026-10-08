@@ -27,6 +27,7 @@
 `AllowedPerson`에 nullable Instant lastLoginAt과 매핑을 추가한다. `V20261008104501__user_activity.sql`은 allowed_person.last_login_at DATETIME(6) NULL과 chat_message의 (sender_user_id, role, created_at) 집계 인덱스를 추가한다. 기존 데이터는 NULL 유지.
 `AllowedPersonRepository`에 enabled=true인 정규화 이메일의 lastLoginAt이 NULL 또는 입력 시각보다 오래될 때만 갱신하는 @Modifying 질의를 추가한다. application의 @Transactional에서 호출한다. 동시 완료가 과거 시각으로 되돌리지 못하게 한다.
 `SignInPolicy`에 Clock 기반 완료 기록 메서드를 추가한다. admit은 readOnly 그대로 유지. 꺼졌거나 없거나 빈 주소는 거절한다.
+조건부 갱신 결과가 0건이면 enabled 행을 별도로 확인한다. 켜진 주소의 동일·과거 시각 요청은 시각을 유지하며 성공하고, 꺼졌거나 없는 주소만 거절한다.
 `SignInController`에 POST /api/v1/signin/completed {email}을 추가한다. 기존 requireSignInToken을 먼저 호출하고 완료 기록 성공은 204, 거절은 401 UNAUTHENTICATED. 이 경로도 ControlPlaneJwtFilter 제외 목록과 SecurityConfig의 permitAll 목록에 명시한다. app_user를 만들지 않는다.
 
 ### 2. 마지막 대화 집계와 관리자 응답
@@ -43,6 +44,7 @@
 
 SignInControllerTest에서 판정은 시각을 바꾸지 않음, 정상 완료 두 번이 새 시각 갱신, 일반 요청으로 시각 유지, 누락/대화용/잘못된 서명/만료 토큰 거절, 꺼짐/없는/빈 이메일 미기록과 미생성, 대소문자 정규화를 확인한다. TestClock으로 시각을 고정한다. 과거 완료 요청도 최근값 유지.
 PersonActivityTest에서 여러 사용자·여러 대화의 마지막 USER 메시지, sender와 소유자가 다른 경우, 최신 ASSISTANT/SYSTEM 배제, 메시지 없는 사용자와 아직 미가입, 꺼진 사용자, 이메일 정규화, 목록/변경 JSON null 및 MEMBER list/patch 거절을 확인한다. Hibernate Statistics로 목록 사용자 수가 증가해도 질의는 고정 3회(허용 목록/사용자/집계)인 것을 확인한다.
+동일·과거 완료 요청은 각각 204와 기존 최근 시각 불변을 확인한다. 질의 3회 시험은 늘어난 사용자마다 실제 USER 메시지를 넣은 상태로 비교한다.
 UserActivityMigrationTest는 Flyway로 모든 마이그레이션을 적용해 칸과 인덱스 및 기존 데이터 NULL을 확인한다. 기존 마이그레이션은 바꾸지 않는다.
 
 ## 검증

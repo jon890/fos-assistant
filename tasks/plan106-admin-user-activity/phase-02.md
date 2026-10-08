@@ -27,6 +27,7 @@
 `web/src/auth.ts`의 기존 signIn callback은 허용 판정만 한다. events.signIn에서 user.email이 있을 때만 새 `signin-activity.ts`의 recordSignIn(email)을 호출한다. events.session이나 jwt 일반 갱신에는 넣지 않는다.
 새 helper는 jose SignJWT로 purpose=signin, HS256, issuedAt, 2m expiry만 가진 토큰을 만들고 ASSISTANT_JWT_SECRET과 CONTROL_PLANE_BASE_URL을 실행 때 읽어 /api/v1/signin/completed에 {email}을 no-store POST한다. 일반 사용자 토큰과 이메일 subject는 넣지 않는다. 응답 실패/네트워크 실패는 던져 Auth.js EventError 로그에 남게 한다. fetch에는 5초 timeout을 주고 재시도하지 않는다. 새 파일은 Node 테스트가 직접 읽으므로 상대 경로 import 예외 목록 NODE_TEST_READ_FILES에 추가한다.
 `test/unit/signin-activity.test.ts`에서 fetch를 대역으로 바꿔 요청 주소·method·본문·no-store·timeout signal과 jwtVerify로 서명/목적/수명을 확인한다. HTTP 실패와 네트워크 실패에서 reject됨을 확인하고 env/fetch 상태를 복원한다.
+`test/unit/auth-signin.test.ts`는 TypeScript의 transpileModule과 node:vm으로 실제 auth.ts를 실행한다. require 대역은 NextAuth의 실제 설정을 회수하고 Google와 control-plane, signin-activity 의존만 대체한다. 회수한 설정의 events.signIn을 직접 호출해 이메일이 있을 때 recordSignIn에 주소가 전달되고 없으면 호출되지 않는지 확인한다. 허용 판정 callback을 부를 때는 기록되지 않고 실패 시 예외가 이벤트 경계까지 전달되는지 확인한다. auth.ts의 이벤트 연결을 지우면 이 시험이 실패해야 한다.
 
 ### 2. 목록과 펼침 상세
 
@@ -43,8 +44,9 @@ PersonList는 첫 로그인 열을 마지막 로그인과 마지막 대화 두 �
 ## 검증
 
 ```bash
-node --test test/unit/signin-activity.test.ts test/unit/relative-time.test.ts
+node --test test/unit/signin-activity.test.ts test/unit/auth-signin.test.ts test/unit/relative-time.test.ts
 cd web && pnpm typecheck
+cd web && pnpm lint
 cd web && pnpm test:browser people.spec.ts people-activity.spec.ts --repeat-each=3 --retries=0
 ```
 
@@ -65,5 +67,6 @@ cd web && pnpm test:browser people.spec.ts people-activity.spec.ts --repeat-each
 | `web/src/app/admin/people/page.tsx` | 수정 |
 | `web/eslint.config.mjs` | 수정 |
 | `test/unit/signin-activity.test.ts` | 신규 |
+| `test/unit/auth-signin.test.ts` | 신규 |
 | `test/browser/people.spec.ts` | 수정 |
 | `test/browser/people-activity.spec.ts` | 신규 |
