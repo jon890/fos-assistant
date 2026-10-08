@@ -155,8 +155,13 @@ class SourceReadRequestsTest {
         };
         stubEvents(List.of(started(1L, 1, "https://example.com/request"), completed(1L, 2, false, detail)));
 
-        assertThat(summary()).isEqualTo(new SourceReadSummary(
-                1, kind.equals("confirmed") ? List.of("https://example.com/confirmed") : List.of(), 1, true, List.of()));
+        assertThat(summary())
+                .isEqualTo(new SourceReadSummary(
+                        1,
+                        kind.equals("confirmed") ? List.of("https://example.com/confirmed") : List.of(),
+                        1,
+                        true,
+                        List.of()));
     }
 
     @Test

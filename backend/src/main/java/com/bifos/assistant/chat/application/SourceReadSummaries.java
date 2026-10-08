@@ -214,7 +214,9 @@ public class SourceReadSummaries {
             JsonNode error = result.get("error");
             if (result.path("blocked_by_policy").asBoolean(false)
                     || (error != null && !error.isNull())
-                    || (content != null && content.isString() && content.asString().isBlank())) {
+                    || (content != null
+                            && content.isString()
+                            && content.asString().isBlank())) {
                 knownOutcome = true;
                 continue;
             }
