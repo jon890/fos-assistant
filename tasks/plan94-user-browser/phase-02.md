@@ -17,7 +17,7 @@
 - 맞는 매핑이 없는 경로는 `NoResourceFoundException` 이 되어 `shared.error.GlobalExceptionHandler` 가 경로를 `log.error` 에 남기고 500 JSON 을 준다. 중계 아래에는 빈 404 를 주는 받기 매핑을 직접 둔다
 - 시험 준비: `@WebMvcTest` 와 `@AutoConfigureMockMvc` 는 `ArchitectureRules.TESTS_DO_NOT_SPLIT_CONTEXT` 가 금지한다. 컨트롤러 시험은 `backend/src/test/java/com/bifos/assistant/browser/presentation/UserBrowserControllerTest.java` 처럼 `@BackendIntegrationTest` 와 `MockMvcBuilders` 를 쓰고, 설정은 `@OverrideProperties` 로 넣는다. 실제 HTTP 시험은 `@LocalServerPort` 를 쓰는 `backend/src/test/java/com/bifos/assistant/connector/ConnectorPolicyEndpointTest.java` 를 따른다
 
-**근거 문서**: `docs/backend/user-browser.md` 의 「중계」(「받는 것」), `docs/adr/ADR-20261007-user-browser.md` 의 「중계」, `docs/adr/ADR-20261008-browser-gateway-token.md`
+**근거 문서**: `docs/backend/user-browser.md` 의 「중계」(「받는 것」), `docs/adr/ADR-20261007-user-browser.md` 의 「중계」, `backend/docs/adr/ADR-20261008-browser-gateway-token.md`
 
 ## 의도 메모
 

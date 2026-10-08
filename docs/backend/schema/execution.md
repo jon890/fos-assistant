@@ -9,7 +9,7 @@
 추천 질문을 만드는 실행은 대화 없이 한 줄만 생긴다.
 
 **이 줄은 실행이 끝난 뒤가 아니라 시작할 때 만들어진다.**
-근거는 [ADR-011](../../adr/ADR-011-실행은-시작할-때-기록하고-끝날-때-갱신한다.md)에 있다.
+근거는 [ADR-011](../../../backend/docs/adr/ADR-011-실행은-시작할-때-기록하고-끝날-때-갱신한다.md)에 있다.
 
 | 칸 | 타입 | 뜻 |
 | --- | --- | --- |
@@ -21,10 +21,10 @@
 | `retry_of_execution_id` | BIGINT NULL | 같은 turn 을 다른 모델로 다시 시도한 실행이 가리키는 직전 실행. 지금은 채우는 경로가 없어 새 실행은 늘 비어 있다 |
 | `profile_name` | VARCHAR(64) | |
 | `hermes_run_id` | VARCHAR(128) NULL | 실행을 제출한 직후에 적는다 |
-| `hermes_session_id` | VARCHAR(128) NULL | 이 실행이 속한 Hermes session. 대화 turn 은 그 대화의 루트 session 이고, 루트가 없는 옛 대화는 보낸 session 이다. 압축 교체 뒤에는 보낸 session 과 다를 수 있다. 흐름의 하위 실행과 위임한 자식은 Control Plane 이 정한 `fos-<uuid>` 다. 제출하기 전에 적는다. 최상위 session 의 MCP 호출과 최상위 자식의 등록이 서명한 루트 session 과 `profile_name` 으로 도는 실행을 찾을 때 쓴다([ADR-032](../../adr/ADR-032-mcp-토큰은-profile-을-증명하고-실제-사용자는-부모-실행에서-정한다.md)). 하위 에이전트 session 은 이 칸이 아니라 `hermes_session_binding` 으로 찾는다. 이 칸이 생기기 전의 실행과 Memory 제안, 추천 질문을 만드는 실행은 비어 있다 |
-| `delegation_key` | VARCHAR(64) NULL, 유일 | `agent_delegate` 로 만든 실행만 채운다. `v1`, 부모 실행의 `profile_name`, 루트 session, 그 호출의 session, `tool_call_id` 를 줄바꿈으로 이은 글의 SHA-256 소문자 16진수다. 같은 호출이 다시 와도 실행을 하나만 만든다. `agent_status` 와 `agent_stop` 은 이 칸이 있는 실행만 답한다. 정의는 [ADR-032](../../adr/ADR-032-mcp-토큰은-profile-을-증명하고-실제-사용자는-부모-실행에서-정한다.md) 에 있다 |
+| `hermes_session_id` | VARCHAR(128) NULL | 이 실행이 속한 Hermes session. 대화 turn 은 그 대화의 루트 session 이고, 루트가 없는 옛 대화는 보낸 session 이다. 압축 교체 뒤에는 보낸 session 과 다를 수 있다. 흐름의 하위 실행과 위임한 자식은 Control Plane 이 정한 `fos-<uuid>` 다. 제출하기 전에 적는다. 최상위 session 의 MCP 호출과 최상위 자식의 등록이 서명한 루트 session 과 `profile_name` 으로 도는 실행을 찾을 때 쓴다([ADR-032](../../../backend/docs/adr/ADR-032-mcp-토큰은-profile-을-증명하고-실제-사용자는-부모-실행에서-정한다.md)). 하위 에이전트 session 은 이 칸이 아니라 `hermes_session_binding` 으로 찾는다. 이 칸이 생기기 전의 실행과 Memory 제안, 추천 질문을 만드는 실행은 비어 있다 |
+| `delegation_key` | VARCHAR(64) NULL, 유일 | `agent_delegate` 로 만든 실행만 채운다. `v1`, 부모 실행의 `profile_name`, 루트 session, 그 호출의 session, `tool_call_id` 를 줄바꿈으로 이은 글의 SHA-256 소문자 16진수다. 같은 호출이 다시 와도 실행을 하나만 만든다. `agent_status` 와 `agent_stop` 은 이 칸이 있는 실행만 답한다. 정의는 [ADR-032](../../../backend/docs/adr/ADR-032-mcp-토큰은-profile-을-증명하고-실제-사용자는-부모-실행에서-정한다.md) 에 있다 |
 | `output_text` | MEDIUMTEXT NULL | `agent_delegate` 로 만든 실행이 끝났을 때의 답. `agent_status` 와 `agent_stop` 이 `SUCCEEDED` 와 `CANCELLED` 에서 돌려준다. 끝난 상태와 같은 저장에서 적는다. `assistant.delegation.output-max-chars`(기본 100,000자)를 넘으면 자르고 잘렸다는 한 줄을 붙인다. 다른 실행은 채우지 않는다(대화 답은 `chat_message` 가 갖는다) |
-| `result_delivered_at` | DATETIME(6) NULL | 위임 실행의 끝난 결과를 부모에게 전한 시각. 부모가 `agent_status` 나 `agent_stop` 으로 끝난 상태를 받았거나, Control Plane 이 부모 대화를 깨운 turn 에 넣었을 때 적는다. `agent_delegate` 가 줄을 만든 뒤 제출 전에 끝나 `SUBMIT_FAILED` 를 돌려줄 때도 적는다. 부모가 번호를 모르는 결과를 다시 전하지 않기 위해서다. 이 칸이 생기기 전에 끝난 위임 실행은 마이그레이션이 `finished_at`(없으면 그때 시각)으로 채워 깨우지 않는다. 그때 `RUNNING` 이던 줄은 비워 두며, 기동 정리가 끝난 상태로 적은 뒤 전한다([`turn-control.md`](../turn-control.md) 의 「기동할 때 남은 실행 정리」). 비어 있고 `SUCCEEDED` 나 `FAILED` 인 위임 실행이 깨울 대상이다([ADR-040](../../adr/ADR-040-위임-결과는-control-plane-이-부모-대화의-다음-turn-을-열어-전한다.md)). 먼저 살펴보기가 끝나면 그 트리의 위임 줄에 도는 중이어도 적는다([`proactive-check.md`](../proactive-check.md) 의 「끝날 때」). 저장소의 조건부 update 로만 채우고 엔티티 저장에서는 빠진다(`updatable = false`) |
+| `result_delivered_at` | DATETIME(6) NULL | 위임 실행의 끝난 결과를 부모에게 전한 시각. 부모가 `agent_status` 나 `agent_stop` 으로 끝난 상태를 받았거나, Control Plane 이 부모 대화를 깨운 turn 에 넣었을 때 적는다. `agent_delegate` 가 줄을 만든 뒤 제출 전에 끝나 `SUBMIT_FAILED` 를 돌려줄 때도 적는다. 부모가 번호를 모르는 결과를 다시 전하지 않기 위해서다. 이 칸이 생기기 전에 끝난 위임 실행은 마이그레이션이 `finished_at`(없으면 그때 시각)으로 채워 깨우지 않는다. 그때 `RUNNING` 이던 줄은 비워 두며, 기동 정리가 끝난 상태로 적은 뒤 전한다([`turn-control.md`](../turn-control.md) 의 「기동할 때 남은 실행 정리」). 비어 있고 `SUCCEEDED` 나 `FAILED` 인 위임 실행이 깨울 대상이다([ADR-040](../../../backend/docs/adr/ADR-040-위임-결과는-control-plane-이-부모-대화의-다음-turn-을-열어-전한다.md)). 먼저 살펴보기가 끝나면 그 트리의 위임 줄에 도는 중이어도 적는다([`proactive-check.md`](../proactive-check.md) 의 「끝날 때」). 저장소의 조건부 update 로만 채우고 엔티티 저장에서는 빠진다(`updatable = false`) |
 | `provider`, `model` | VARCHAR | 실제로 돈 provider 와 모델. Hermes 의 session 이 답한 값이고, 읽지 못하면 요청한 값이다. 기본값으로 보냈고 둘 다 읽지 못하면 비어 있다 |
 | `reasoning_effort` | VARCHAR(16) NULL | 이 실행에 요청한 effort. 기본값으로 보냈으면 비어 있다. 이 칸이 생기기 전의 실행도 비어 있다 |
 | `reasoning_defaults_checked_at` | DATETIME(6) NULL | `reasoning_effort`가 비어 있고 profile 기본값을 정상 응답으로 읽어 확인한 시각. 응답에 effort가 없어도 적어 같은 실행을 다시 조회하지 않는다. 조회 실패면 비워 다시 시도한다 |
@@ -65,7 +65,7 @@
 금액을 0 으로 채우지 않는다.
 0 은 공짜라는 뜻으로 읽히기 때문이다.
 환산액과 실제 청구액을 나눈 근거는
-[ADR-014](../../adr/ADR-014-실제-청구액과-환산액을-나눠-적는다.md)에 있다.
+[ADR-014](../../../backend/docs/adr/ADR-014-실제-청구액과-환산액을-나눠-적는다.md)에 있다.
 
 ### 사건 관측 범위
 
@@ -147,14 +147,14 @@ Hermes 가 보낸 원래 payload 를 통째로 넣지 않는다.
 | `PROVIDER_SWITCHED` | 옛 실행에만 남은 값이다. 앞 provider 가 막혀 다음 모델로 다시 시도했다는 뜻이고, 지금은 이 값을 적는 경로가 없다 |
 
 우리가 모르는 사건은 저장하지 않고 버린다. 버렸다는 사실만 로그로 남긴다.
-근거는 [ADR-013](../../adr/ADR-013-실행-사건은-우리-모델로-정규화해-저장한다.md)에 있다.
+근거는 [ADR-013](../../../backend/docs/adr/ADR-013-실행-사건은-우리-모델로-정규화해-저장한다.md)에 있다.
 
 ## subagent_usage_job
 
 native 자식 한 명의 사용량 원장 줄이자, 그 사용량을 session 에서 조회하는 작업이다.
 부모 실행이 끝나면 session 이 있는 시작 사건마다 한 줄이 생긴다.
 재조회 규칙과 합계에 더하는 규칙은 [모델 단계와 실행 기록](../../model-tiers.md) 의 「비동기 자식 사용량」 이 정한다.
-근거는 [ADR-062](../../adr/ADR-062-native-하위-에이전트-사용량은-재조회-작업-줄을-원장으로-넓혀-합계에-더한다.md) 에 있다.
+근거는 [ADR-062](../../../backend/docs/adr/ADR-062-native-하위-에이전트-사용량은-재조회-작업-줄을-원장으로-넓혀-합계에-더한다.md) 에 있다.
 
 | 칸 | 타입 | 뜻 |
 | --- | --- | --- |
@@ -170,7 +170,7 @@ native 자식 한 명의 사용량 원장 줄이자, 그 사용량을 session �
 | `next_attempt_at` | DATETIME(6) | 다음 조회 시각 |
 | `expires_at` | DATETIME(6) | 조회 기한. 부모 실행이 끝난 뒤 24시간이다 |
 | `attempts`, `backoff_attempts` | INT | 조회 횟수 |
-| `provider` | VARCHAR(64) NULL | 자식이 돈 provider. session 응답이 주지 않으면 대시보드 plugin 에서 읽고([ADR-067](../../adr/ADR-067-native-하위-에이전트의-provider-는-대시보드-plugin-이-session-저장소에서-읽어-준다.md)), 거기서도 읽지 못하면 비운다. 부모의 값으로 채우지 않는다 |
+| `provider` | VARCHAR(64) NULL | 자식이 돈 provider. session 응답이 주지 않으면 대시보드 plugin 에서 읽고([ADR-067](../../../backend/docs/adr/ADR-067-native-하위-에이전트의-provider-는-대시보드-plugin-이-session-저장소에서-읽어-준다.md)), 거기서도 읽지 못하면 비운다. 부모의 값으로 채우지 않는다 |
 | `model` | VARCHAR(128) NULL | 자식이 돈 모델 |
 | `input_tokens` | BIGINT NULL | cache 를 뺀 일반 입력 토큰 |
 | `cache_read_tokens`, `cache_write_tokens` | BIGINT NULL | cache 에서 읽은 입력과 cache 에 쓴 입력 |
@@ -208,12 +208,12 @@ native 자식 한 명의 사용량 원장 줄이자, 그 사용량을 session �
 `MODEL` 행은 실행 사건에 스킬 이름이 실려 올 때만 생긴다.
 
 스킬 본문과 참고 파일은 이 데이터베이스에 없다. Hermes 가 읽는 공유 디렉터리에만 있다.
-누가 이 이력을 어디까지 보는지와 근거는 [ADR-034](../../adr/ADR-034-올린-스킬은-control-plane-이-버전-디렉터리에-쓰고-hermes-는-읽기만-한다.md) 에 있다.
+누가 이 이력을 어디까지 보는지와 근거는 [ADR-034](../../../backend/docs/adr/ADR-034-올린-스킬은-control-plane-이-버전-디렉터리에-쓰고-hermes-는-읽기만-한다.md) 에 있다.
 
 ## hermes_session_binding
 
 Hermes `delegate_task` 가 만든 하위 에이전트 session 이 어느 FOS 실행에서 시작됐는지 적는다.
-profile 플러그인이 `subagent_start` hook 에서 등록한다. 근거는 [ADR-037](../../adr/ADR-037-hermes-하위-에이전트-session-의-주인은-만들-때-등록한-줄로-정한다.md) 에 있다.
+profile 플러그인이 `subagent_start` hook 에서 등록한다. 근거는 [ADR-037](../../../backend/docs/adr/ADR-037-hermes-하위-에이전트-session-의-주인은-만들-때-등록한-줄로-정한다.md) 에 있다.
 
 **한 번 적은 줄은 바꾸지 않는다.** 같은 대화의 다음 turn 이 시작돼도 그 하위 에이전트는 처음 origin 실행에 속한다.
 대화 session 은 여러 turn 이 이어 쓰므로 여기 적지 않는다. 최상위 session 은 `agent_execution.hermes_session_id` 로 찾는다.

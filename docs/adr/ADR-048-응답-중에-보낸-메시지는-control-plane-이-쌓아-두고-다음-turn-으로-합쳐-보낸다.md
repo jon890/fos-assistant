@@ -2,7 +2,7 @@
 
 - **status**: `accepted`
 - Date: 2026-10-01
-- [ADR-040](ADR-040-위임-결과는-control-plane-이-부모-대화의-다음-turn-을-열어-전한다.md) 의 「turn 이 닫힐 때 다음 turn 을 연다」 자리를 함께 쓴다. ADR-040 의 결정은 그대로 둔다.
+- [ADR-040](../../backend/docs/adr/ADR-040-위임-결과는-control-plane-이-부모-대화의-다음-turn-을-열어-전한다.md) 의 「turn 이 닫힐 때 다음 turn 을 연다」 자리를 함께 쓴다. ADR-040 의 결정은 그대로 둔다.
 
 ### 결정
 

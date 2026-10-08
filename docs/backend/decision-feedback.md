@@ -1,7 +1,7 @@
 # 판단 피드백
 
 사용자에게 보인 제안에 사용자가 어떻게 반응했고 실행이 어떻게 끝났는지를 남기고, 상황부터 결과까지 다시 읽는 읽기 모델을 낸다.
-결정은 [ADR-20261007 / decision-feedback](../adr/ADR-20261007-decision-feedback.md)에 있다.
+결정은 [ADR-20261007 / decision-feedback](../../backend/docs/adr/ADR-20261007-decision-feedback.md)에 있다.
 칸은 [`schema/feedback.md`](schema/feedback.md) 가 갖는다.
 이 기록은 개인화 모델이 아니다. Memory, 할 일의 억제 규칙, 지금 화면의 판정을 바꾸지 않는다.
 예외는 둘이다. 살펴보기 발견의 「관심 없음」 은 같은 점검 대화의 digest 기간 안에서만 같은 주제를 내린다([ADR-20261008 / check-finding-reaction](../adr/ADR-20261008-check-finding-reaction.md)). 아래 「살펴보기 발견의 지금 반응」 을 본다.
@@ -102,7 +102,7 @@
 - 거절은 그 제안 하나에 대한 일회성 반응이다. 같은 주제가 여러 번 거절돼도 읽기 모델은 오래 가는 선호를 만들지 않는다
 - 지금 화면의 숨기기는 상태가 바뀔 때까지만 가리므로 거절이 아니라 미루기로 읽는다. 숨긴 뒤 받아들이면 `ACCEPTED` 다
 - 첫 반응을 나중 사건이 덮지 않는다. 받아들인 뒤 그만둔 할 일은 `ACCEPTED` 이고 그만둠은 사건으로만 남는다
-- `persistentPreference` 는 사용자의 마지막 결정(받아들임, 거절, 되돌림)이 받아들임인 Memory 제안만 참이다. 첫 반응은 그대로 `ACCEPTED` 로 읽되, 받아들인 뒤 되돌리거나 거절했으면 오래 가는 선호가 아니다. 오래 가는 선호는 Memory 에만 남는다([ADR-012](../adr/ADR-012-memory-는-사람이-승인한-것만-남는다.md), [ADR-20261007 / memory-remember](../adr/ADR-20261007-memory-remember.md))
+- `persistentPreference` 는 사용자의 마지막 결정(받아들임, 거절, 되돌림)이 받아들임인 Memory 제안만 참이다. 첫 반응은 그대로 `ACCEPTED` 로 읽되, 받아들인 뒤 되돌리거나 거절했으면 오래 가는 선호가 아니다. 오래 가는 선호는 Memory 에만 남는다([ADR-012](../../backend/docs/adr/ADR-012-memory-는-사람이-승인한-것만-남는다.md), [ADR-20261007 / memory-remember](../adr/ADR-20261007-memory-remember.md))
 - 규칙 버전 2 에서 `persistentPreference` 를 마지막 결정 기준으로 바꿨다. 버전 1 은 받아들인 사건이 하나라도 있으면 참이었다
 - 에이전트와 시스템의 사건은 사용자 반응이 아니다
 

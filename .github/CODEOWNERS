@@ -1,4 +1,4 @@
-# 범용 커넥터는 디렉터리마다 소유자를 둔다 (docs/adr/ADR-064). 소유자는 서비스의 API 가 바뀌면 고치고 실제 계정으로 확인한다.
+# 범용 커넥터는 디렉터리마다 소유자를 둔다 (hermes/docs/adr/ADR-064). 소유자는 서비스의 API 가 바뀌면 고치고 실제 계정으로 확인한다.
 /hermes/connectors/gmail/ @jon890
 /hermes/connectors/gmail/tests/ @jon890
 /docs/connectors/gmail.md @jon890

@@ -5,8 +5,8 @@
 provider 를 바꿔도 Control Plane 은 profile 바인딩, 요청한 모델과 effort, 실제 실행 경로와 사용량을 같은 뜻으로 다룬다.
 지원 여부와 credential 선택, 토큰 보고 방식은 provider 에 따라 달라질 수 있다.
 [ADR-060](../adr/ADR-060-reasoning-effort-의-지원은-확인한-것만-보이고-모르면-미확인으로-둔다.md),
-[ADR-067](../adr/ADR-067-native-하위-에이전트의-provider-는-대시보드-plugin-이-session-저장소에서-읽어-준다.md),
-[ADR-088](../adr/ADR-088-대시보드-plugin-은-감싸는-경로의-바꿔-끼우기를-두고-기대는-hermes-내부-지점을-계약-시험으로-확인한다.md)과 현재 구현을 기준으로 아래 범위를 확인한다.
+[ADR-067](../../backend/docs/adr/ADR-067-native-하위-에이전트의-provider-는-대시보드-plugin-이-session-저장소에서-읽어-준다.md),
+[ADR-088](../../hermes/docs/adr/ADR-088-대시보드-plugin-은-감싸는-경로의-바꿔-끼우기를-두고-기대는-hermes-내부-지점을-계약-시험으로-확인한다.md)과 현재 구현을 기준으로 아래 범위를 확인한다.
 
 ### 가짜 Hermes 로 확인할 수 있는 것
 
@@ -92,14 +92,14 @@ token provider 등록, profile 생성의 `name`, 환경 쓰기의 `profile/key/v
 - `docker_volumes`, `docker_extra_args`, `env_passthrough`, `credential_files` 의 이름과 뜻
 - 스킬 앞머리에서 환경 값과 파일을 실행 공간에 넣는 칸의 이름(`tools/skills_tool_setup.py` 의 `_get_required_environment_variables`, `required_credential_files`). 칸이 늘면 올린 스킬 저장 검사(`SkillFrontmatter`)와 대시보드 plugin 의 커넥터 스킬 검사(`_skill_name`)에 함께 더한다
 - `HERMES_WRITE_SAFE_ROOT` 를 docker backend 의 파일 쓰기에도 경로 문자열로 적용한다
-- `execute_code` 가 RPC 로 부를 수 있는 도구(`SANDBOX_ALLOWED_TOOLS`)에 MCP 도구가 없다. 생기면 [ADR-20261008 / connector-output-files](../adr/ADR-20261008-connector-output-files.md) 를 다시 검토한다
-- gateway 가 `HERMES_EXEC_ASK` 를 켜고, 셸 위험 명령과 plugin 승인 요청이 ask 문맥에서 `approvals.unattended_mode` 를 보지 않는다. 계약 시험이 확인한다. 바뀌면 docker profile 의 `unattended_mode: approve` 가 그 둘까지 승인 없이 열므로 [ADR-20261008 / execute-code-unattended](../adr/ADR-20261008-execute-code-unattended.md) 를 다시 본다
+- `execute_code` 가 RPC 로 부를 수 있는 도구(`SANDBOX_ALLOWED_TOOLS`)에 MCP 도구가 없다. 생기면 [ADR-20261008 / connector-output-files](../../hermes/docs/adr/ADR-20261008-connector-output-files.md) 를 다시 검토한다
+- gateway 가 `HERMES_EXEC_ASK` 를 켜고, 셸 위험 명령과 plugin 승인 요청이 ask 문맥에서 `approvals.unattended_mode` 를 보지 않는다. 계약 시험이 확인한다. 바뀌면 docker profile 의 `unattended_mode: approve` 가 그 둘까지 승인 없이 열므로 [ADR-20261008 / execute-code-unattended](../../hermes/docs/adr/ADR-20261008-execute-code-unattended.md) 를 다시 본다
 
 **올린 스킬과 이름이 겹치는 스킬이 새로 생기지 않았는지 본다.**
 Hermes 를 올리면 번들 스킬이 늘 수 있다. 같은 이름이면 profile 로컬 스킬이 외부 디렉터리의 올린 스킬보다 먼저 선택되어,
 화면에 보이는 스킬과 실제로 도는 스킬이 달라진다.
 업그레이드와 배포 확인은 profile 마다 올린 스킬 이름과 Hermes 가 더 앞서 고르는 스킬 이름이 겹치지 않는지 보고, 겹치면 배포를 멈춘다.
-그 검사의 절차는 `fos-home-infra` 가 갖는다. 까닭은 [ADR-034](../adr/ADR-034-올린-스킬은-control-plane-이-버전-디렉터리에-쓰고-hermes-는-읽기만-한다.md) 의 「Hermes 를 올릴 때 이름 충돌을 본다」 에 있다.
+그 검사의 절차는 `fos-home-infra` 가 갖는다. 까닭은 [ADR-034](../../backend/docs/adr/ADR-034-올린-스킬은-control-plane-이-버전-디렉터리에-쓰고-hermes-는-읽기만-한다.md) 의 「Hermes 를 올릴 때 이름 충돌을 본다」 에 있다.
 
 **올린 Hermes 이미지의 `mcp` SDK 버전을 본다.**
 대시보드 plugin 의 커넥터 도구 호출은 Hermes 가 설치한 `mcp` Python SDK 를 쓰고, 지원 범위는 `mcp>=2.0,<3` 이다([커넥터 설치](../backend/connector-install.md) 의 「MCP SDK 계약」).
@@ -160,7 +160,7 @@ session 상세의 비캐시 입력 토큰과 혼동하지 않는다.
 
 `dashboard-profile-api` 는 공개 확장점이 아닌 Hermes 내부 지점에 기댄다.
 감싸는 미들웨어, import 하는 내부 함수, session 저장소의 칸, 감싸는 대시보드 경로가 여기 해당한다.
-목록은 [`hermes/tests/hermes_contract.py`](../../hermes/tests/hermes_contract.py) 가 갖고, 왜 공개 확장점으로 바꾸지 못하는지는 [ADR-088](../adr/ADR-088-대시보드-plugin-은-감싸는-경로의-바꿔-끼우기를-두고-기대는-hermes-내부-지점을-계약-시험으로-확인한다.md) 이 갖는다.
+목록은 [`hermes/tests/hermes_contract.py`](../../hermes/tests/hermes_contract.py) 가 갖고, 왜 공개 확장점으로 바꾸지 못하는지는 [ADR-088](../../hermes/docs/adr/ADR-088-대시보드-plugin-은-감싸는-경로의-바꿔-끼우기를-두고-기대는-hermes-내부-지점을-계약-시험으로-확인한다.md) 이 갖는다.
 
 Hermes 를 올리기 전에 새 판의 tag 로 `scripts/check-hermes-contract.sh <tag>` 를 돌린다.
 실패한 항목을 plugin 에서 고치고, `HERMES_VERSION` 을 새 tag 로 바꾼 PR 의 CI 가 통과한 뒤 이미지를 올린다.

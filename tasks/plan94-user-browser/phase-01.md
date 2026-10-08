@@ -17,7 +17,7 @@
 - 허용 목록은 `com.bifos.assistant.shared.auth.UserAccessPolicy#allowed(Long)` 이 판정한다. `UserBrowserSweeper` 가 같은 것을 쓴다
 - 서명 계산은 `com.bifos.assistant.mcp.application.McpCallContext#hmac` 처럼 `javax.crypto.Mac`(`HmacSHA256`)와 `MessageDigest.isEqual` 로 한다. `mcp` 패키지를 import 하지 말고 같은 방식으로 따로 쓴다
 
-**근거 문서**: `docs/backend/user-browser.md` 의 「설정」 과 「중계」, `docs/adr/ADR-20261008-browser-gateway-token.md`
+**근거 문서**: `docs/backend/user-browser.md` 의 「설정」 과 「중계」, `backend/docs/adr/ADR-20261008-browser-gateway-token.md`
 
 ## 의도 메모
 

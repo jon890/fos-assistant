@@ -7,7 +7,7 @@
 
 단계 1, 2(2a-1, 2a-2, 2b)를 구현했다. 남은 것은 단계 3, 4 다.
 단계 3 은 운영 코드 1,000줄 상한 때문에 둘로 나눈다. 3a 는 phase 01, 02 이고 3b 는 phase 03, 04, 05 다. 3b 는 3a 의 브랜치 위에 쌓는다.
-단계 3 의 계약은 `docs/backend/user-browser.md` 의 「중계」 와 `docs/adr/ADR-20261008-browser-gateway-token.md` 가 갖는다. 3b 의 PR 이 이 디렉터리를 지운다.
+단계 3 의 계약은 `docs/backend/user-browser.md` 의 「중계」 와 `backend/docs/adr/ADR-20261008-browser-gateway-token.md` 가 갖는다. 3b 의 PR 이 이 디렉터리를 지운다.
 
 | phase | PR | 담는 것 |
 | --- | --- | --- |

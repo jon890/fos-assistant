@@ -79,14 +79,14 @@ hermes/
 아래는 아직 만들지 않았다. 스키마와 판정은 이미 받을 수 있게 되어 있다.
 
 - collection 탭, 문서의 판 이력 화면, 출처 표시
-- 신원 항목의 들이기. 암호화와 문서 읽기 경계와 `identity` 권한을 운영에서 확인한 뒤에 연다. 조건은 [ADR-058](adr/ADR-058-기존-개인-지식-저장소는-주인이-검토한-묶음을-화면에서-올려-들여온다.md) 이 정했다
+- 신원 항목의 들이기. 암호화와 문서 읽기 경계와 `identity` 권한을 운영에서 확인한 뒤에 연다. 조건은 [ADR-058](adr/archive/ADR-058-기존-개인-지식-저장소는-주인이-검토한-묶음을-화면에서-올려-들여온다.md) 이 정했다
 - 민감 항목 본문의 완전 삭제
 - `always_inject` 칸 제거
 
-Memory 의 기본 근거는 [`adr/ADR-003-memory-권한은-주입으로-강제한다.md`](adr/ADR-003-memory-권한은-주입으로-강제한다.md) 와
-[`adr/ADR-012-memory-는-사람이-승인한-것만-남는다.md`](adr/ADR-012-memory-는-사람이-승인한-것만-남는다.md) 에 있다.
+Memory 의 기본 근거는 [`adr/ADR-003-memory-권한은-주입으로-강제한다.md`](../backend/docs/adr/ADR-003-memory-권한은-주입으로-강제한다.md) 와
+[`adr/ADR-012-memory-는-사람이-승인한-것만-남는다.md`](../backend/docs/adr/ADR-012-memory-는-사람이-승인한-것만-남는다.md) 에 있다.
 층을 나누는 근거는
-[`adr/ADR-015-memory-는-층을-나눠-싣는다.md`](adr/ADR-015-memory-는-층을-나눠-싣는다.md) 에 있다.
+[`adr/ADR-015-memory-는-층을-나눠-싣는다.md`](../backend/docs/adr/ADR-015-memory-는-층을-나눠-싣는다.md) 에 있다.
 
 ## 화면을 검증하는 방법
 
@@ -122,11 +122,11 @@ profile key 와 AI credential 은 계속 홈서버 파일에 둔다.
 - Hermes 안의 `delegate_task` 하위 에이전트가 자기 실행 줄을 남기는 경로.
   그 하위 에이전트는 Hermes 안에서만 돌고 사건으로만 보인다.
   우리 실행 줄이 생기는 자식은 `agent_delegate`, 흐름의 하위 실행, Memory 제안이다.
-  사용량과 금액은 실행 줄 없이 `subagent_usage_job` 줄에 남겨 합계에 더한다([ADR-062](adr/ADR-062-native-하위-에이전트-사용량은-재조회-작업-줄을-원장으로-넓혀-합계에-더한다.md)).
-  그 자식의 provider 는 대시보드 plugin 의 읽기 경로로 받는다([ADR-067](adr/ADR-067-native-하위-에이전트의-provider-는-대시보드-plugin-이-session-저장소에서-읽어-준다.md))
+  사용량과 금액은 실행 줄 없이 `subagent_usage_job` 줄에 남겨 합계에 더한다([ADR-062](../backend/docs/adr/ADR-062-native-하위-에이전트-사용량은-재조회-작업-줄을-원장으로-넓혀-합계에-더한다.md)).
+  그 자식의 provider 는 대시보드 plugin 의 읽기 경로로 받는다([ADR-067](../backend/docs/adr/ADR-067-native-하위-에이전트의-provider-는-대시보드-plugin-이-session-저장소에서-읽어-준다.md))
 - `agent_stop` 이 그 실행 아래의 실행까지 멈추는 것. 지금은 그 실행만 멈춘다
 - 사용자가 turn 을 중지할 때 Hermes `delegate_task` 하위 에이전트를 실제로 멈추는 것.
-  지금은 origin 실행이나 그 루트 실행이 `CANCELLED` 인 하위 에이전트의 Control Plane MCP 호출만 거절한다([ADR-037](adr/ADR-037-hermes-하위-에이전트-session-의-주인은-만들-때-등록한-줄로-정한다.md)).
+  지금은 origin 실행이나 그 루트 실행이 `CANCELLED` 인 하위 에이전트의 Control Plane MCP 호출만 거절한다([ADR-037](../backend/docs/adr/ADR-037-hermes-하위-에이전트-session-의-주인은-만들-때-등록한-줄로-정한다.md)).
   루트와 origin 사이의 중간 실행만 중지된 경우는 보지 않는다.
   멈출 수 있는 길은 profile 플러그인 쪽에 있고, 부모 run 이 끝난 뒤의 자식은 그 길로도 멈추지 못한다([`hermes/delegation.md`](hermes/delegation.md#native-하위-에이전트를-멈추는-길))
 - 여러 Control Plane 이 함께 세는 사용자 실행 한도. 지금은 한 프로세스 안의 사용자 잠금으로 세고 만든다([`backend/execution-limit.md`](backend/execution-limit.md) 의 「서버 한 대 전제」)

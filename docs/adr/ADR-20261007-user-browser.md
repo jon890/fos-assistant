@@ -40,7 +40,7 @@
 
 중계는 Control Plane 안에서 돈다. Hermes 가 닿는 내부 주소에서만 받는다.
 
-- 경로는 `/internal/browser-gateway/<접근 표식>/` 아래다. 접근 표식은 바인딩마다 다르고, 바인딩을 떼면 쓸 수 없다. 표식을 만드는 방법은 [ADR-20261008 / browser-gateway-token](ADR-20261008-browser-gateway-token.md) 이 바꿨다(처음에는 무작위 값과 해시 표였다)
+- 경로는 `/internal/browser-gateway/<접근 표식>/` 아래다. 접근 표식은 바인딩마다 다르고, 바인딩을 떼면 쓸 수 없다. 표식을 만드는 방법은 [ADR-20261008 / browser-gateway-token](../../backend/docs/adr/ADR-20261008-browser-gateway-token.md) 이 바꿨다(처음에는 무작위 값과 해시 표였다)
 - `/json/version` 과 `/json/list`, `/json/new`, `/json/close`, `/json/activate` 와 `/devtools/` 의 WebSocket 만 넘긴다. 응답의 WebSocket 주소는 중계 주소로 바꿔 쓴다
 - 브라우저가 멈춰 있으면 켠 뒤 넘긴다. 동시 수가 차 있으면 503 이다
 - Chrome 에는 컨테이너 IP 주소로 보낸다. Chrome 의 Host 검사를 중계가 지나므로 커넥터가 IP 주소만 받던 제약이 사라진다

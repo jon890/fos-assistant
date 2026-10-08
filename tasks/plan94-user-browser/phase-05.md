@@ -21,7 +21,7 @@
 - 웹의 연결 화면은 `web/src/components/connector/connector-connection-panel.tsx`, 형은 `web/src/lib/connection.ts` 의 `ConnectorSummary` 다. 「내 브라우저」 화면은 `/browser` 이고 `?url=` 로 시작 주소를 받는다(`docs/backend/user-browser.md` 의 「로그인 화면」 웹 목록)
 - 브라우저 시험 `test/browser/connector-connection.spec.ts` 는 API 응답을 가짜로 둔다(`demoConnector`)
 
-**근거 문서**: `docs/backend/user-browser.md` 의 「중계」, `docs/adr/ADR-20261007-user-browser.md`, `docs/adr/ADR-20261008-browser-gateway-token.md`, `docs/connectors/naver-blog.md`
+**근거 문서**: `docs/backend/user-browser.md` 의 「중계」, `docs/adr/ADR-20261007-user-browser.md`, `backend/docs/adr/ADR-20261008-browser-gateway-token.md`, `docs/connectors/naver-blog.md`
 
 ## 의도 메모
 

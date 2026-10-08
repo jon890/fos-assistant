@@ -145,7 +145,7 @@ API 로 만들면 wrapper 가 함께 생긴다.
 profile 생성 뒤의 공식 plugin hook 은 없다.
 그래서 대시보드 plugin `dashboard-profile-api` 는 `hermes_cli/dashboard_auth/token_auth.py` 의 `token_auth_middleware` 를 모듈 속성으로 감싼다.
 `web_server.py` 가 요청마다 이 이름을 다시 import 하므로, 감싼 다음 요청부터 토큰으로 부른 `POST /api/profiles` 의 생성 처리 앞뒤에 코드가 붙는다.
-이 방식을 유지하는 까닭은 [ADR-088](../adr/ADR-088-대시보드-plugin-은-감싸는-경로의-바꿔-끼우기를-두고-기대는-hermes-내부-지점을-계약-시험으로-확인한다.md) 이 갖는다.
+이 방식을 유지하는 까닭은 [ADR-088](../../hermes/docs/adr/ADR-088-대시보드-plugin-은-감싸는-경로의-바꿔-끼우기를-두고-기대는-hermes-내부-지점을-계약-시험으로-확인한다.md) 이 갖는다.
 
 | 필요한 동작 | 쓰는 Hermes 지점 |
 | --- | --- |
@@ -183,7 +183,7 @@ plugin 로딩은 기동 때 이뤄져 plugin 변경에는 대시보드 재시작
 다른 방식은 아래 까닭으로 쓰지 않는다.
 
 - 생성 뒤 별도 `PUT /api/config` 로 template 을 쓴다: 두 번째 요청이 빠지면 넓은 도구가 남는다.
-- 안전한 profile 을 clone 한다: 원본 `.env` 에 뒤에 추가된 값까지 복사된다([ADR-018](../adr/ADR-018-사람을-더하는-것을-control-plane-이-끝낸다.md)).
+- 안전한 profile 을 clone 한다: 원본 `.env` 에 뒤에 추가된 값까지 복사된다([ADR-018](../../backend/docs/adr/ADR-018-사람을-더하는-것을-control-plane-이-끝낸다.md)).
 - `pre_tool_call` 의 `{"action": "block"}`: 실행 시점에 더 막을 수는 있지만 모델에 실리는 도구 정의와 입력 비용을 줄이지 않는다.
 - managed scope: 프로세스 전체에 적용되므로 profile 별 template 을 대신하지 못한다.
 
@@ -253,7 +253,7 @@ token provider 하나만 있어도 이 조건을 채운다.
 ## Control Plane 이 부르는 대시보드 plugin 경로
 
 Hermes 대시보드 앞에는 우리 대시보드 plugin 이 있다. plugin 은 이 저장소의 [`hermes/plugins/dashboard-profile-api/`](../../hermes/plugins/dashboard-profile-api/) 에 있고, 서비스 토큰으로 오는 요청을 정해 둔 경로로만 받는다.
-2026-09-29 에 정했다. 사용자의 에이전트 만들기와 스킬([ADR-033](../adr/ADR-033-사용자가-에이전트를-만들고-공개해도-만든-사람이-관리한다.md), [ADR-034](../adr/ADR-034-올린-스킬은-control-plane-이-버전-디렉터리에-쓰고-hermes-는-읽기만-한다.md))이 이 계약에 기댄다.
+2026-09-29 에 정했다. 사용자의 에이전트 만들기와 스킬([ADR-033](../../backend/docs/adr/ADR-033-사용자가-에이전트를-만들고-공개해도-만든-사람이-관리한다.md), [ADR-034](../../backend/docs/adr/ADR-034-올린-스킬은-control-plane-이-버전-디렉터리에-쓰고-hermes-는-읽기만-한다.md))이 이 계약에 기댄다.
 경로마다의 요청과 응답과 인증은 [`hermes/README.md`](../../hermes/README.md) 의 「dashboard-profile-api 가 여는 것」 표가 갖는다. 커넥터 경로를 Control Plane 이 쓰는 방법은 [커넥터 설치](../backend/connector-install.md) 의 「대시보드 plugin 계약」 이 갖는다.
 이 절은 그 경로를 지날 때 Hermes 가 어떻게 동작하는지만 적는다.
 

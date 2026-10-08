@@ -4,8 +4,8 @@
 - Date: 2026-10-08
 - [ADR-20261007 / memory-remember](ADR-20261007-memory-remember.md) 의 「꺼내는 방식은 `SEARCH` 로 둔다. 다음 실행의 색인에 제목이 실리고 본문은 `memory_read` 로 읽는다」 를 개정한다.
   `memory_remember` 가 남기는 항목의 `retrieval` 은 그대로 `SEARCH` 다. 그 가운데 짧은 항목은 본문까지 실린다.
-  [ADR-015](ADR-015-memory-는-층을-나눠-싣는다.md) 의 「`SEARCH` 는 제목만 싣는다」 에 예외를 둔다. 층을 나눠 싣고 나머지는 도구로 읽는다는 결정은 그대로다.
-  [ADR-071](ADR-071-여러-출처의-문맥은-항목마다-출처와-권한과-신선도를-지닌-묶음으로-조립한다.md) 의 `source` 목록에 `MEMORY_FACTS` 와 `MEMORY_READ` 를 더한다.
+  [ADR-015](../../backend/docs/adr/ADR-015-memory-는-층을-나눠-싣는다.md) 의 「`SEARCH` 는 제목만 싣는다」 에 예외를 둔다. 층을 나눠 싣고 나머지는 도구로 읽는다는 결정은 그대로다.
+  [ADR-071](../../backend/docs/adr/ADR-071-여러-출처의-문맥은-항목마다-출처와-권한과-신선도를-지닌-묶음으로-조립한다.md) 의 `source` 목록에 `MEMORY_FACTS` 와 `MEMORY_READ` 를 더한다.
 
 ### 결정
 
@@ -69,7 +69,7 @@ ADR-20261007 이 `SEARCH` 로 고정한 까닭은 에이전트가 많이 남겨�
 - turn 당 입력이 최대 2,000자(한국어로 대략 1,000~1,500 토큰) 는다. 개인 사실 구역이 바뀌면 지시문 지문이 바뀌어 prompt cache 적중이 떨어진다.
 - 「참고한 기억」 은 실렸지만 답에 쓰지 않은 항목도 보인다. 문구로 그 차이를 밝힌다.
 - `memory_read` 로 읽은 항목은 Control Plane 이 읽기에 성공할 때 `execution_context_source` 에 `MEMORY_READ` 줄로 덧붙여 남긴다. Hermes 의 도구 시작 사건은 이 도구의 인자를 싣지 않아 사건에서는 번호를 알 수 없다. 이 기록이 실패하면 그 읽기는 「참고한 기억」 에서 빠진다.
-  [ADR-015](ADR-015-memory-는-층을-나눠-싣는다.md) 의 「어느 항목이 읽혔는지는 서버 로그에만 남기고 실행 기록 칸에는 남기지 않는다」 를 이 기록으로 넓힌다.
+  [ADR-015](../../backend/docs/adr/ADR-015-memory-는-층을-나눠-싣는다.md) 의 「어느 항목이 읽혔는지는 서버 로그에만 남기고 실행 기록 칸에는 남기지 않는다」 를 이 기록으로 넓힌다.
 - 예산과 길이 상한은 합성 측정과 운영 집계를 보고 고친다([`backend/memory-eval.md`](../backend/memory-eval.md)).
 
 ### 적용 범위

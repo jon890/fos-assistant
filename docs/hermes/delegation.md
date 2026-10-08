@@ -206,7 +206,7 @@ v0.21.5(`v2026.9.24`)의 소스로 확인했다.
 근거는 [`hermes_cli/web_server_sessions.py`](https://github.com/NousResearch/hermes-agent/blob/v2026.9.24/hermes_cli/web_server_sessions.py) 의 `_open_session_db_for_profile` 이다.
 이 함수의 읽기 전용 열기는 저장소가 비었거나 스키마가 낡았으면 쓰기 연결을 한 번 열어 고친다.
 
-Control Plane 은 이 값을 대시보드 plugin 의 읽기 경로로 받는다([ADR-067](../adr/ADR-067-native-하위-에이전트의-provider-는-대시보드-plugin-이-session-저장소에서-읽어-준다.md)).
+Control Plane 은 이 값을 대시보드 plugin 의 읽기 경로로 받는다([ADR-067](../../backend/docs/adr/ADR-067-native-하위-에이전트의-provider-는-대시보드-plugin-이-session-저장소에서-읽어-준다.md)).
 plugin 은 Hermes 의 저장소 클래스를 쓰지 않고 SQLite 의 읽기 전용 방식으로 파일을 직접 연다.
 **Hermes 버전을 올릴 때 위 표의 표 이름과 칸 이름을 다시 확인한다.**
 
@@ -290,13 +290,13 @@ gateway 의 `/stop` 과 같은 함수이고, 부모 session 이 정확히 같은
 - 한 프로세스가 여러 profile 을 multiplex 하면 기록이 공유된다. 격리는 session 이 고유한 것에만 기댄다
 
 **이 저장소는 이 길을 구현하지 않는다.** 플러그인은 이 저장소의 `hermes/plugins/fos-ctx/` 가 갖고, 이 길은 그 플러그인의 후속 작업 후보다.
-그 전까지 Control Plane 이 막는 것은 아래 표와 같다. 멈춘 turn 의 자식이 사용자의 권한을 쓰는 길은 이미 막혀 있다([ADR-037](../adr/ADR-037-hermes-하위-에이전트-session-의-주인은-만들-때-등록한-줄로-정한다.md)).
+그 전까지 Control Plane 이 막는 것은 아래 표와 같다. 멈춘 turn 의 자식이 사용자의 권한을 쓰는 길은 이미 막혀 있다([ADR-037](../../backend/docs/adr/ADR-037-hermes-하위-에이전트-session-의-주인은-만들-때-등록한-줄로-정한다.md)).
 
 그래서 Control Plane 은 지금 이만큼 막는다.
 
 | 무엇 | 지금 |
 | --- | --- |
-| 자식의 Control Plane MCP 호출(`memory_read`, `artifact_write`, `agent_list`, `agent_delegate`, `agent_status`, `agent_stop`, `follow_up_propose`, `memory_remember`) | origin 실행이나 그 루트 실행이 `CANCELLED` 면 거절한다([ADR-037](../adr/ADR-037-hermes-하위-에이전트-session-의-주인은-만들-때-등록한-줄로-정한다.md)). 다른 거절과 같은 도구 결과다 |
+| 자식의 Control Plane MCP 호출(`memory_read`, `artifact_write`, `agent_list`, `agent_delegate`, `agent_status`, `agent_stop`, `follow_up_propose`, `memory_remember`) | origin 실행이나 그 루트 실행이 `CANCELLED` 면 거절한다([ADR-037](../../backend/docs/adr/ADR-037-hermes-하위-에이전트-session-의-주인은-만들-때-등록한-줄로-정한다.md)). 다른 거절과 같은 도구 결과다 |
 | 자식의 Hermes 자체 도구(웹 검색, 터미널 등) | 막지 못한다 |
 | 자식 run 자체 | 멈추지 못한다. 동기 위임 자식만 부모 run 의 중지와 함께 멈춘다. background 자식을 멈추는 길은 위 「native 하위 에이전트를 멈추는 길」 에 있고 구현하지 않았다 |
 
@@ -314,10 +314,10 @@ v0.21.5 의 중단·미완료 응답 차이는 [「Runs 응답과 사건의 버�
 | 사건 스트림 | 중지를 보낸 뒤 10초 안에 닫혔다 |
 
 **멈춘 자리까지의 답은 조회 응답에서 얻을 수 없다.** 스트림으로 받은 조각을 모아 둔 것만이 그 답이다.
-[ADR-021](../adr/ADR-021-중지한-답은-멈춘-자리까지-남긴다.md) 이 뒤받침으로 둔 경로가 실제로 쓰이는 경로다.
+[ADR-021](../../backend/docs/adr/ADR-021-중지한-답은-멈춘-자리까지-남긴다.md) 이 뒤받침으로 둔 경로가 실제로 쓰이는 경로다.
 
 **새 대화의 session 은 Control Plane 이 첫 turn 전에 정한 `fos-<uuid>` 다.**
-뒤의 turn 은 같은 값을 이어 쓰고, 첫 turn 을 중지해도 그 값이 그대로다([ADR-031](../adr/ADR-031-mcp-호출의-부모-실행은-profile-플러그인이-서명한-루트-session-으로-잇는다.md)).
+뒤의 turn 은 같은 값을 이어 쓰고, 첫 turn 을 중지해도 그 값이 그대로다([ADR-031](../../backend/docs/adr/ADR-031-mcp-호출의-부모-실행은-profile-플러그인이-서명한-루트-session-으로-잇는다.md)).
 중지한 turn 뒤에도 session 이 같아서 다음 turn 은 중지 전의 맥락을 이어 받는다.
 
 중지한 실행은 그 session 으로 실제로 돈 모델을 읽지 못했다. Control Plane 은 그때 요청에 보낸 모델을 적는다.

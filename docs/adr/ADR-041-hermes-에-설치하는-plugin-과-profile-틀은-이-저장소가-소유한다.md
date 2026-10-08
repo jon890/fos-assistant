@@ -19,4 +19,4 @@
   - 감당할 것: 공개 CI 에 Python 검사가 더해진다. `hermes/` 에도 운영 값을 적지 않는 규칙이 걸린다.
     plugin 은 한 배포 동안 옛 Control Plane 의 호출도 받아야 하므로, 경로를 바꿀 때는 새 경로를 더하고 옛 경로를 다음 배포에서 뺀다.
     실제 Hermes 와 맞는지는 이 저장소의 CI 가 아니라 운영 저장소의 live 검사가 본다.
-  - 앞선 결정과의 관계: [ADR-019](ADR-019-페르소나는-hermes-가-갖고-control-plane-은-화면만-준다.md), [ADR-031](ADR-031-mcp-호출의-부모-실행은-profile-플러그인이-서명한-루트-session-으로-잇는다.md), [ADR-037](ADR-037-hermes-하위-에이전트-session-의-주인은-만들-때-등록한-줄로-정한다.md) 은 plugin 의 소유와 검사를 `fos-home-infra` 가 갖는다고 적었다. 이 결정 뒤로 plugin 원본과 단위 검사는 이 저장소가 갖고, 설치와 live 검사만 운영 저장소가 갖는다.
+  - 앞선 결정과의 관계: [ADR-019](../../backend/docs/adr/ADR-019-페르소나는-hermes-가-갖고-control-plane-은-화면만-준다.md), [ADR-031](../../backend/docs/adr/ADR-031-mcp-호출의-부모-실행은-profile-플러그인이-서명한-루트-session-으로-잇는다.md), [ADR-037](../../backend/docs/adr/ADR-037-hermes-하위-에이전트-session-의-주인은-만들-때-등록한-줄로-정한다.md) 은 plugin 의 소유와 검사를 `fos-home-infra` 가 갖는다고 적었다. 이 결정 뒤로 plugin 원본과 단위 검사는 이 저장소가 갖고, 설치와 live 검사만 운영 저장소가 갖는다.

@@ -150,7 +150,7 @@ H2 가 통과해도 MySQL 에서 실패할 수 있다. DDL 과 DML 을 나누는
 
 ## 실행 기록
 
-`agent_execution` 의 `RUNNING` 줄을 목록과 비용 합계에서 다루는 방법은 [ADR-011](../docs/adr/ADR-011-실행은-시작할-때-기록하고-끝날-때-갱신한다.md) 과 [ADR-004](../docs/adr/ADR-004-구독제에서도-api-가격으로-환산해-보인다.md) 가 갖는다.
+`agent_execution` 의 `RUNNING` 줄을 목록과 비용 합계에서 다루는 방법은 [ADR-011](docs/adr/ADR-011-실행은-시작할-때-기록하고-끝날-때-갱신한다.md) 과 [ADR-004](docs/adr/ADR-004-구독제에서도-api-가격으로-환산해-보인다.md) 가 갖는다.
 
 ## 테스트
 

@@ -85,7 +85,7 @@ skill_manage 로 스킬을 만들거나 고치지 않는다. 스킬 안내에 sk
 `[스킬 관리]` 단락은 스킬이 없는 에이전트에도 붙인다.
 Hermes 기본 스킬만 있어도 색인 안내문이 `skill_manage` 를 권하기 때문이다.
 단락의 글은 `skill` 패키지가 갖고 `ArtifactService.agentPreamble` 이 결과물 폴더 단락 뒤에 붙인다.
-근거는 [ADR-034](../adr/ADR-034-올린-스킬은-control-plane-이-버전-디렉터리에-쓰고-hermes-는-읽기만-한다.md) 의 「모델에게 `skill_manage` 를 쓰지 말라고 알린다」 에 있다.
+근거는 [ADR-034](../../backend/docs/adr/ADR-034-올린-스킬은-control-plane-이-버전-디렉터리에-쓰고-hermes-는-읽기만-한다.md) 의 「모델에게 `skill_manage` 를 쓰지 말라고 알린다」 에 있다.
 
 두 단락은 사진 첨부의 단락이 있으면 그 앞에 둔다. 매 turn 붙인다. 흐름으로 돈 turn 은 하위 실행의 입력 맨 앞에도 같은 단락을 붙인다. Chief 는 나눌 요청 본문 안에서 이 단락을 받는다. 두 단락만큼 입력이 조금 커지지만,
 에이전트가 이번 turn 에 파일을 만들지, 스킬을 고치려 할지 미리 알 수 없다.
@@ -226,7 +226,7 @@ web 의 서버 라우트는 브라우저의 `If-None-Match` 와 `If-Modified-Sin
 
 MCP 로 쓰는 경우의 흐름이다. 도구가 없고 파일 도구가 있는 profile 이 폴더에 직접 쓰는 경우는 그리지 않는다.
 도구 계약은 [`mcp-caller.md`](mcp-caller.md#결과물-쓰기-도구),
-권한 결정은 [ADR-028](../adr/ADR-028-결과물은-사용자의-대화-폴더에-mcp-도구로-쓴다.md) 에 있다.
+권한 결정은 [ADR-028](../../backend/docs/adr/ADR-028-결과물은-사용자의-대화-폴더에-mcp-도구로-쓴다.md) 에 있다.
 
 ```mermaid
 flowchart TD

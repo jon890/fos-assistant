@@ -22,7 +22,7 @@
 - 주소는 phase 01 의 `com.bifos.assistant.browser.application.BrowserGatewayTokens` 가 만든다. `bindingAddress(long bindingId)`, `callAddress(long userId)` 가 `Optional<String>` 이고 중계가 꺼졌으면 빈 값이다. `connector` 는 `browser` 보다 위층이라 import 해도 된다
 - 시험의 가짜 Hermes(`test/e2e/fake-hermes/connector-routes.ts`)는 본문 키를 엄격히 보지 않는다. Control Plane 은 manifest 가 `owner_browser_env` 를 선언했을 때만 새 키를 보내므로 다른 커넥터의 요청은 바뀌지 않는다
 
-**근거 문서**: `docs/backend/user-browser.md` 의 「중계」, `docs/adr/ADR-20261008-browser-gateway-token.md`, `docs/connectors.md` 의 「connector.json」 표, `docs/backend/connector-install.md` 의 「바인딩 설치」
+**근거 문서**: `docs/backend/user-browser.md` 의 「중계」, `backend/docs/adr/ADR-20261008-browser-gateway-token.md`, `docs/connectors.md` 의 「connector.json」 표, `docs/backend/connector-install.md` 의 「바인딩 설치」
 
 ## 의도 메모
 

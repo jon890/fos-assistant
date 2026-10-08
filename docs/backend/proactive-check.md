@@ -2,7 +2,7 @@
 
 사용자가 묻거나 스킬을 부르지 않아도 에이전트가 사용자의 맥락을 보고 제안이나 질문을 내거나 침묵하는 실행이다.
 진입점과 시작 전 점검, 점검 대화, 읽기 경계, 상한, 결과 계약, 분야 지침이 지킬 것이 여기 있다.
-결정은 [ADR-080](../adr/ADR-080-먼저-살펴보기는-점검-대화의-turn-하나로-돌고-읽기-경계를-control-plane-이-강제한다.md) 과 [ADR-081](../adr/ADR-081-살펴보기-결과는-답-끝의-구조화-블록으로-받고-control-plane-이-검사해-그린다.md) 에 있다.
+결정은 [ADR-080](../adr/ADR-080-먼저-살펴보기는-점검-대화의-turn-하나로-돌고-읽기-경계를-control-plane-이-강제한다.md) 과 [ADR-081](../../backend/docs/adr/ADR-081-살펴보기-결과는-답-끝의-구조화-블록으로-받고-control-plane-이-검사해-그린다.md) 에 있다.
 표와 칸은 [`schema/proactive.md`](schema/proactive.md) 가 갖는다.
 
 ## 용어
@@ -198,7 +198,7 @@ sequenceDiagram
 
 | 맥락 | 어디서 | 실리는 자리 |
 | --- | --- | --- |
-| 허용된 Memory | `ContextAssembler.assemble`. 그 에이전트가 받는 collection 만이다([ADR-053](../adr/ADR-053-에이전트는-허용된-collection-의-memory-만-받는다.md)). 보통 turn 과 같다 | `instructions` |
+| 허용된 Memory | `ContextAssembler.assemble`. 그 에이전트가 받는 collection 만이다([ADR-053](../../backend/docs/adr/ADR-053-에이전트는-허용된-collection-의-memory-만-받는다.md)). 보통 turn 과 같다 | `instructions` |
 | 지난 결과와 사용자의 논의 | 점검 대화의 Hermes session. 지난 답과 그 뒤 사용자가 받아들이거나 거절하거나 관심을 좁힌 대화가 그 안에 있다 | `session_id` |
 | 최근에 알린 발견 | 그 점검 대화의 `NEW` 발견 가운데 `digest-window` 안의 것을 `digest-max-items` 개까지. 영역, 주제 키, 제목, 원문 주소, 확인 날짜, 그 살펴보기가 끝난 뒤 지금까지 사용자가 보낸 메시지 수, 지금 반응(`받아들임`, `나중에`, `관심 없음`, `없음`) | `input`. 모델이 쓴 글에서 온 것이라 `<external-data>` 로 감싼다 |
 | 최근에 받아들인 문제 후보 | 그 점검 대화의 `ACCEPTED` 문제 후보 가운데 `digest-window` 안의 것을 `digest-max-items` 개까지. 문제 키와 문제 | `input`. 모델이 쓴 글이라 `<external-data>` 로 감싼다 |
@@ -210,7 +210,7 @@ session 을 새로 바꾼 뒤에도 최근에 알린 발견과 그 반응, 변�
 사용자가 답하지 않은 것을 선호나 거절로 읽지 말라고 지시한다. 메시지 수는 반응이 있었는지만 알린다.
 
 **지속적인 선호와 거절은 기존 Memory 제안으로 남긴다.**
-사용자가 점검 대화에서 직접 보낸 turn 은 보통 turn 이라 끝난 뒤 `MemoryProposer` 가 Memory 제안을 만든다. 사람이 받아들인 것만 다음 살펴보기의 Memory 문맥에 실린다([ADR-012](../adr/ADR-012-memory-는-사람이-승인한-것만-남는다.md)).
+사용자가 점검 대화에서 직접 보낸 turn 은 보통 turn 이라 끝난 뒤 `MemoryProposer` 가 Memory 제안을 만든다. 사람이 받아들인 것만 다음 살펴보기의 Memory 문맥에 실린다([ADR-012](../../backend/docs/adr/ADR-012-memory-는-사람이-승인한-것만-남는다.md)).
 살펴보기 turn 자신은 Memory 제안을 만들지 않는다. 새 기억 층을 두지 않는다.
 
 ### 실행에 싣는 것
@@ -272,7 +272,7 @@ session 을 새로 바꾼 뒤에도 최근에 알린 발견과 그 반응, 변�
 그 실행의 트리 루트(`AgentExecution.treeRootId()`)가 `proactive_check.root_execution_id` 에 있으면 참이다.
 살펴보기 turn 이 붙은 커넥터 서버의 도구를 직접 부르면 그 호출의 트리 루트가 살펴보기 turn 자신이고, 옛 커넥터 에이전트의 실행은 위임 자식이라 루트가 살펴보기 turn 이다. 그래서 커넥터 판정은 두 경우를 같은 기준으로 막는다.
 
-옛 커넥터 에이전트는 Memory 를 받지 않는다([ADR-045](../adr/ADR-045-커넥터-에이전트는-자기-mcp-서버만-받고-memory-와-control-plane-도구를-받지-않는다.md)). 개인화는 살펴보기를 도는 일반 에이전트가 하고, 커넥터에는 필요한 질의만 간다.
+옛 커넥터 에이전트는 Memory 를 받지 않는다([ADR-045](../../backend/docs/adr/ADR-045-커넥터-에이전트는-자기-mcp-서버만-받고-memory-와-control-plane-도구를-받지-않는다.md)). 개인화는 살펴보기를 도는 일반 에이전트가 하고, 커넥터에는 필요한 질의만 간다.
 
 ## 상한
 
@@ -302,7 +302,7 @@ session 을 새로 바꾼 뒤에도 최근에 알린 발견과 그 반응, 변�
 | `digest-window` | 30일 | 0 보다 크다 |
 | `digest-max-items` | 20 | 1 이상 |
 
-`agent_status` 의 `wait_seconds` 상한은 `assistant.delegation.status-wait-max`(기본 20초)다. 살펴보기 트리에서만 기다리고, 그 밖의 실행은 받아도 기다리지 않는다([ADR-040](../adr/ADR-040-위임-결과는-control-plane-이-부모-대화의-다음-turn-을-열어-전한다.md)).
+`agent_status` 의 `wait_seconds` 상한은 `assistant.delegation.status-wait-max`(기본 20초)다. 살펴보기 트리에서만 기다리고, 그 밖의 실행은 받아도 기다리지 않는다([ADR-040](../../backend/docs/adr/ADR-040-위임-결과는-control-plane-이-부모-대화의-다음-turn-을-열어-전한다.md)).
 
 ## 끝날 때
 
@@ -490,7 +490,7 @@ turn 이 어떻게 끝나든 잠금을 풀기 전에 `ProactiveCheckService` 가
 
 ## 문제 후보
 
-결정은 [ADR-093](../adr/ADR-093-문제-찾기는-살펴보기-결과의-문제-후보로-받고-control-plane-이-근거와-중복을-결정적으로-검사한다.md) 에 있다.
+결정은 [ADR-093](../../backend/docs/adr/ADR-093-문제-찾기는-살펴보기-결과의-문제-후보로-받고-control-plane-이-근거와-중복을-결정적으로-검사한다.md) 에 있다.
 발견이 관찰이라면 문제 후보는 그 관찰이 이 사용자에게 뜻하는 문제다. 우선순위, 실행 여부, 승인 필요 여부는 정하지 않는다.
 버전 3 블록의 `problemCandidates` 로 받고, 버전 1과 2는 후보 0개로 읽는다.
 

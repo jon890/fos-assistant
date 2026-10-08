@@ -11,7 +11,7 @@
 | `POST /v1/runs/{run_id}/steer` | 도는 실행에 지시를 더한다. 아래 「도는 실행에 지시를 더하는 `steer`」 를 본다. 우리는 아직 부르지 않는다 |
 
 **실행을 시작한 뒤 바꿀 수 있는 것은 중단과 `steer` 둘이다.** Control Plane 은 중단만 쓴다.
-끝난 위임 결과는 같은 session 에 새 실행을 제출해 전한다([ADR-040](../adr/ADR-040-위임-결과는-control-plane-이-부모-대화의-다음-turn-을-열어-전한다.md)).
+끝난 위임 결과는 같은 session 에 새 실행을 제출해 전한다([ADR-040](../../backend/docs/adr/ADR-040-위임-결과는-control-plane-이-부모-대화의-다음-turn-을-열어-전한다.md)).
 응답 중에 사용자가 보낸 메시지도 그 turn 이 끝난 뒤 새 실행으로 보낸다([ADR-048](../adr/ADR-048-응답-중에-보낸-메시지는-control-plane-이-쌓아-두고-다음-turn-으로-합쳐-보낸다.md)).
 실행 Graph 는 SSE 를 그대로 받아 그리면 되고, 이를 위해 Hermes 를 고칠 일은 없다.
 
@@ -68,7 +68,7 @@ gateway 가 내려가며 끊은 실행은 `interrupted` 로 적힌다. 그 상�
 제출할 때 `Idempotency-Key` 머리말을 주면 Hermes 가 그 run 의 상태를 디스크에 남기고, 다시 뜬 뒤에도 조회에 답한다. 도는 중에 gateway 가 죽은 run 은 `interrupted` 로 답한다.
 **Control Plane 은 이 머리말을 보내지 않는다.**
 
-Control Plane 이 다시 뜰 때 남은 실행을 이 조회로 다시 정한다([ADR-061](../adr/ADR-061-재기동-때-남은-실행은-hermes-에-물어-정하고-도는-실행에는-다시-붙는다.md)).
+Control Plane 이 다시 뜰 때 남은 실행을 이 조회로 다시 정한다([ADR-061](../../backend/docs/adr/ADR-061-재기동-때-남은-실행은-hermes-에-물어-정하고-도는-실행에는-다시-붙는다.md)).
 
 **가짜 Hermes 의 실행 조회도 이 모양으로 둔다.** 도는 실행은 `running`, 끝난 실행은 같은 답을 되풀이하고, 지운 run 과 모르는 run 은 404 다.
 
@@ -289,7 +289,7 @@ v0.21.5 의 `agent/tool_executor.py` 가 도구 하나를 실행하기 전에 `t
 
 **사건은 우리가 `GET /v1/runs/{run_id}/events` 를 열어야 받는다.**
 Hermes 는 도구를 실행했다는 로그를 남기지만 사건 스트림은 구독자가 있을 때만 읽힌다.
-Control Plane 은 한 번에 받는 경로에서도 스트림을 연다([ADR-090](../adr/ADR-090-한-번에-받는-경로도-hermes-사건-스트림을-열어-도구-사건을-남긴다.md)).
+Control Plane 은 한 번에 받는 경로에서도 스트림을 연다([ADR-090](../../backend/docs/adr/ADR-090-한-번에-받는-경로도-hermes-사건-스트림을-열어-도구-사건을-남긴다.md)).
 
 가짜 Hermes 는 허용된 커넥터 도구 호출을 위 모양(`run_id`, `timestamp`, 시작의 인자 `preview`, 완료의 결과 `preview`)으로 흘린다.
 
@@ -305,4 +305,4 @@ v2026.9.24 소스에서 확인했다. API server 가 `DELETE /api/sessions/{sess
 | 남는 것 | 압축과 분기로 이어진 자식 session 은 지우지 않고 부모 칸만 비운다. `sessions_dir` 없이 부르므로 `sessions/` 아래 기록 파일과 요청 덤프(`request_dump_<session>_*.json`)도 남는다 |
 | 인증 | 그 profile 의 key 를 `Authorization: Bearer` 로 보낸다. 실행 경로와 같다 |
 
-Control Plane 은 지운 대화를 정리할 때 이 경로를 부른다. 근거는 [ADR-20261008 / conversation-purge](../adr/ADR-20261008-conversation-purge.md) 에 있다.
+Control Plane 은 지운 대화를 정리할 때 이 경로를 부른다. 근거는 [ADR-20261008 / conversation-purge](../../backend/docs/adr/ADR-20261008-conversation-purge.md) 에 있다.

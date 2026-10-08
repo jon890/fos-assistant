@@ -61,11 +61,11 @@ Nous Research 의 [Hermes Agent](https://github.com/NousResearch/hermes-agent) �
 그러려고 여러 범용 커넥터를 연결해 자기만의 agentic workflow 를 만들 수 있게 하는 것이 목표다.
 
 - **모델에 종속되지 않는다.** 대화는 빠르게, 균형, 깊게 가운데 한 단계를 고르고, 그 단계가 실제로 어느 모델인지는 Control Plane 의 데이터베이스가 정책으로 갖는다. 런타임도 떨어져 있다. 에이전트를 돌리는 것은 Hermes Agent 이고, 이 저장소는 누가 무엇을 쓸 수 있는지 정하고 화면을 만들고 쓴 것을 기록한다.
-- **제품에 종속되지 않는다.** 커넥터는 plugin 의 `connector.json` 이 선언하고, Control Plane 은 범용 흐름만 갖는다. Control Plane 은 커넥터 뒤에 있는 서비스의 이름과 주소를 모른다. 커넥터를 더할 때는 plugin 에 `connector.json` 을 두고 Hermes 대시보드의 커넥터 목록에 한 줄을 더하며, Control Plane 과 웹은 고치지 않는다([ADR-043](docs/adr/ADR-043-커넥터는-plugin-의-connector-json-으로-선언하고-control-plane-은-범용-흐름만-갖는다.md)).
+- **제품에 종속되지 않는다.** 커넥터는 plugin 의 `connector.json` 이 선언하고, Control Plane 은 범용 흐름만 갖는다. Control Plane 은 커넥터 뒤에 있는 서비스의 이름과 주소를 모른다. 커넥터를 더할 때는 plugin 에 `connector.json` 을 두고 Hermes 대시보드의 커넥터 목록에 한 줄을 더하며, Control Plane 과 웹은 고치지 않는다([ADR-043](backend/docs/adr/ADR-043-커넥터는-plugin-의-connector-json-으로-선언하고-control-plane-은-범용-흐름만-갖는다.md)).
 - **자기 것이다.** 에이전트가 쓰는 도구와 기억, 대화가 쓰는 모델을 그 사람이 정한다.
 - **이 비서가 사용자에 대한 장기 지식의 기준 원본이다.** 에이전트와 외부 서비스는 허용된 범위만 읽는다. 서비스 토큰은 읽기 전용이고, 민감 항목의 본문은 암호화해 저장한다.
 
-범용 커넥터는 이 저장소의 `hermes/connectors/` 에 두고 여기서 유지보수한다([ADR-064](docs/adr/ADR-064-범용-커넥터는-이-저장소의-hermes-connectors-에-두고-저장소가-유지보수한다.md)).
+범용 커넥터는 이 저장소의 `hermes/connectors/` 에 두고 여기서 유지보수한다([ADR-064](hermes/docs/adr/ADR-064-범용-커넥터는-이-저장소의-hermes-connectors-에-두고-저장소가-유지보수한다.md)).
 첫 커넥터는 Gmail 이다. 메일과 필터를 찾고 읽는 것은 묻지 않고 하고, 초안 만들기와 보내기와 답장, 라벨 관리와 필터 변경은 승인한 뒤에만 한다. 메일을 휴지통으로 옮기거나 지우지 않는다.
 두 번째는 네이버 블로그다. 로그인해 둔 Chrome 에 붙어, 승인한 글을 대화에 올린 사진과 함께 네이버 블로그에 임시저장한다. 발행하지 않는다.
 한 집이나 한 조직만 쓰는 서비스의 커넥터는 그 서비스의 저장소에 둔다. 지금 붙어 있는 가계부가 그렇다.
@@ -80,7 +80,7 @@ Nous Research 의 [Hermes Agent](https://github.com/NousResearch/hermes-agent) �
 | --- | --- | --- |
 | ChatGPT, Claude 같은 호스팅 비서 앱 | 모델을 만든 회사가 운영하고 설치할 것이 없다. 예를 들어 Claude 는 [대화하는 동안 기억을 저장](<https://support.claude.com/en/articles/11817273-using-claude-s-chat-search-and-memory-to-build-on-previous-context>)하고, 사용자는 설정에서 그 기억을 읽고 고치고 지운다. | 자기 서버에서 돈다. 단계가 어느 모델인지는 자기 데이터베이스의 정책 행이 정한다. 에이전트가 바로 기억하는 것은 사용자가 대화에서 직접 말한 사실뿐이고, 나머지는 사람이 받아들이기 전에는 쓰이지 않는다. |
 | [Open WebUI](https://docs.openwebui.com/), [LibreChat](https://www.librechat.ai/docs) 같은 자체 호스팅 채팅 화면 | Open WebUI 는 스스로를 Ollama 와 OpenAI 호환 API 를 지원하는 self-hosted AI platform 이라고 소개한다. LibreChat 은 agent 와 MCP, custom endpoint 를 갖춘 self-hosted web application 이다. | 이 프로젝트는 모델 API 를 직접 부르지 않고 에이전트 런타임 위에 얹는다. 거기에 사람마다 격리된 Hermes profile, 어느 에이전트가 어느 기억을 받는지 정하는 collection, 커넥터 쓰기의 승인 단계, 에이전트 사이의 위임과 실행 트리, 사용량을 API 가격으로 환산하는 원장을 더한다. |
-| [Hermes Agent](https://hermes-agent.nousresearch.com/docs/) 를 혼자 쓰는 경우 | CLI 나 메시징 gateway 로 쓰는 자율 에이전트이고, 자체 persistent memory 와 skill 과 subagent 를 갖는다. | 여러 사람이 함께 쓰는 웹 화면을 더한다. 실행할 profile 은 요청자의 바인딩에서 꺼낸다. 기억은 Control Plane 만 거치고, Hermes 내장 memory 도구는 에이전트에 주지 않는다. 외부 서비스는 읽기 전용 서비스 토큰으로 읽고, 민감 항목은 암호화한다. 커넥터는 범용 구조 하나를 따른다([ADR-043](docs/adr/ADR-043-커넥터는-plugin-의-connector-json-으로-선언하고-control-plane-은-범용-흐름만-갖는다.md)). |
+| [Hermes Agent](https://hermes-agent.nousresearch.com/docs/) 를 혼자 쓰는 경우 | CLI 나 메시징 gateway 로 쓰는 자율 에이전트이고, 자체 persistent memory 와 skill 과 subagent 를 갖는다. | 여러 사람이 함께 쓰는 웹 화면을 더한다. 실행할 profile 은 요청자의 바인딩에서 꺼낸다. 기억은 Control Plane 만 거치고, Hermes 내장 memory 도구는 에이전트에 주지 않는다. 외부 서비스는 읽기 전용 서비스 토큰으로 읽고, 민감 항목은 암호화한다. 커넥터는 범용 구조 하나를 따른다([ADR-043](backend/docs/adr/ADR-043-커넥터는-plugin-의-connector-json-으로-선언하고-control-plane-은-범용-흐름만-갖는다.md)). |
 
 ### 맞는 사람과 맞지 않는 사람
 
@@ -115,7 +115,7 @@ Nous Research 의 [Hermes Agent](https://github.com/NousResearch/hermes-agent) �
 - **모델 단계.** 대화마다 빠르게, 균형, 깊게를 고르고, 고급에서 모델을 직접 고른다([`docs/model-tiers.md`](docs/model-tiers.md)).
 - **위임.** 요청 하나를 여러 에이전트에 나눠 돌린다. 맡긴 실행도 요청자의 권한으로만 돌고, 결과가 오면 Control Plane 이 부모 대화의 다음 turn 을 열어 전한다([`docs/backend/agent-delegation.md`](docs/backend/agent-delegation.md)).
 - **사진과 HTML 결과물.** 사진을 올려 에이전트에게 보이고, 에이전트가 만든 HTML 페이지를 옆 패널에서 본다. 그 페이지의 스크립트는 돌지 않는다. 사진은 사용자별로 저장한다([`docs/backend/attachment.md`](docs/backend/attachment.md), [`docs/backend/artifact.md`](docs/backend/artifact.md)).
-- **실행 트리와 비용 환산.** 실패한 실행까지 모두 기록한다. 실행 하나를 열면 그 안에서 부른 도구와 자식 실행이 트리로 보인다. 구독제로 돌린 실행도 API 가격으로 환산해 보여, 관리자가 설정별 비용을 견준다([`docs/frontend/activity.md`](docs/frontend/activity.md), [ADR-004](docs/adr/ADR-004-구독제에서도-api-가격으로-환산해-보인다.md)).
+- **실행 트리와 비용 환산.** 실패한 실행까지 모두 기록한다. 실행 하나를 열면 그 안에서 부른 도구와 자식 실행이 트리로 보인다. 구독제로 돌린 실행도 API 가격으로 환산해 보여, 관리자가 설정별 비용을 견준다([`docs/frontend/activity.md`](docs/frontend/activity.md), [ADR-004](backend/docs/adr/ADR-004-구독제에서도-api-가격으로-환산해-보인다.md)).
 
 ### 커넥터와 승인
 
@@ -128,7 +128,7 @@ Nous Research 의 [Hermes Agent](https://github.com/NousResearch/hermes-agent) �
 
 - **먼저 살펴보기.** 사용자가 묻지 않아도 에이전트가 사용자의 맥락을 보고 제안이나 질문을 내거나 침묵한다. 사용자는 살펴보기를 단추로 시작하거나, 매일 깨우기를 켜서 정한 시각에 돌린다. 매일 깨우기는 기본 꺼짐이다. 관리자가 쓰기 도구를 허용하지 않은 에이전트의 살펴보기는 읽기만 하고, 그 경계는 Control Plane 이 강제한다([`docs/backend/proactive-check.md`](docs/backend/proactive-check.md)).
 - **문맥 조립.** Memory, 맡긴 일의 결과, 승인한 커넥터 호출의 결과, 실행 상태, 할 일에서 모은 문맥을 항목마다 출처와 권한과 신선도를 지닌 묶음으로 조립한다([`docs/backend/context-bundle.md`](docs/backend/context-bundle.md)).
-- **문제 후보.** 살펴보기 결과에서 이 사용자가 풀 가치가 있는 문제를 후보로 받고, Control Plane 이 근거와 중복을 결정적으로 검사한다([ADR-093](docs/adr/ADR-093-문제-찾기는-살펴보기-결과의-문제-후보로-받고-control-plane-이-근거와-중복을-결정적으로-검사한다.md)).
+- **문제 후보.** 살펴보기 결과에서 이 사용자가 풀 가치가 있는 문제를 후보로 받고, Control Plane 이 근거와 중복을 결정적으로 검사한다([ADR-093](backend/docs/adr/ADR-093-문제-찾기는-살펴보기-결과의-문제-후보로-받고-control-plane-이-근거와-중복을-결정적으로-검사한다.md)).
 - **지금 화면(`/now`).** 실패한 실행, 승인과 받아들이기를 기다리는 것과 기한이 다가온 할 일, 맡긴 일, 이어서 할 대화, 살펴보기 보고를 정해진 카드에 모은다. 사용자가 묻지 않았는데 먼저 알리는 것(먼저 알리기)은 기본값이 알리지 않음이고, Control Plane 기록에서 정한 신호만 화면에 올린다. 항목마다 숨기거나 미룰 수 있다([`docs/frontend/now.md`](docs/frontend/now.md), [`docs/backend/attention.md`](docs/backend/attention.md)).
 - **할 일.** 에이전트가 사용자가 해야 하거나 끝나기를 기다리는 일을 제안하고, 사람이 받아들인 것만 챙긴다([`docs/backend/follow-up.md`](docs/backend/follow-up.md)).
 - **예약 작업.** 정한 시각에 사용자의 권한으로 에이전트를 돌린다. 그 실행이 외부에 쓰려 하면 승인 카드와 알림이 생긴다([`docs/backend/task.md`](docs/backend/task.md)).
@@ -142,15 +142,15 @@ Nous Research 의 [Hermes Agent](https://github.com/NousResearch/hermes-agent) �
 ### Memory
 
 - **말한 것은 바로, 나머지는 제안으로.** 사용자가 이번 메시지에서 직접 말한 오래 쓰일 사실은 에이전트가 바로 기억하고, 그 답 아래에 「기억했어요」 와 고치기, 되돌리기가 보인다. 사용자가 직접 말한 사실은 모델이 본문을 다듬어도 바로 저장한다. 부정이 메시지와 본문 가운데 한쪽에만 있거나 글이 민감해 보이면 제안으로 남는다. 바깥 글을 읽었거나 사람이 보내지 않은 실행(맡긴 일의 결과, 예약 작업)이 섞인 대화에서 나온 것과 민감 항목은 늘 제안으로 남고 사람이 받아들여야 쓰인다([ADR-20261007 / memory-remember](docs/adr/ADR-20261007-memory-remember.md), [ADR-20261008 / memory-remember-guard](docs/adr/ADR-20261008-memory-remember-guard.md), [`docs/backend/memory.md`](docs/backend/memory.md)).
-- **collection 과 민감 항목.** 항목은 collection 에 속하고, 에이전트는 허용된 collection 만 받고, 관리자가 관리자 영역의 에이전트 상세에서 그 허용을 고친다. 민감 항목의 본문은 암호화해 저장한다. 항목을 고치거나 지워도 그 전의 값이 남는다([ADR-053](docs/adr/ADR-053-에이전트는-허용된-collection-의-memory-만-받는다.md), [ADR-055](docs/adr/ADR-055-민감-memory-본문은-저장할-때-암호화하고-key-는-환경-변수로-받는다.md)).
-- **다른 서비스의 읽기 전용 접근.** 사용자에 묶인 서비스 토큰으로 다른 서비스가 그 사용자의 문서만 읽는다([ADR-056](docs/adr/ADR-056-다른-서비스는-사용자에-묶인-서비스-토큰으로-문서를-읽기만-한다.md)).
+- **collection 과 민감 항목.** 항목은 collection 에 속하고, 에이전트는 허용된 collection 만 받고, 관리자가 관리자 영역의 에이전트 상세에서 그 허용을 고친다. 민감 항목의 본문은 암호화해 저장한다. 항목을 고치거나 지워도 그 전의 값이 남는다([ADR-053](backend/docs/adr/ADR-053-에이전트는-허용된-collection-의-memory-만-받는다.md), [ADR-055](backend/docs/adr/ADR-055-민감-memory-본문은-저장할-때-암호화하고-key-는-환경-변수로-받는다.md)).
+- **다른 서비스의 읽기 전용 접근.** 사용자에 묶인 서비스 토큰으로 다른 서비스가 그 사용자의 문서만 읽는다([ADR-056](backend/docs/adr/ADR-056-다른-서비스는-사용자에-묶인-서비스-토큰으로-문서를-읽기만-한다.md)).
 
 collection 목록을 고치는 화면과 항목의 앞선 판을 읽는 화면처럼 Memory 의 일부 화면은 아직 만들지 않았다. 지금 목록은 [`docs/code-architecture.md`](docs/code-architecture.md) 의 「Memory 에서 아직 만들지 않은 것」 에 있다.
 
 ### 실행 공간
 
 - **사용자별 docker 실행 공간.** 셸, 파일, 코드 실행 도구는 운영 정책에 등록한 profile 에서 docker 실행 공간에서 돈다. 컨테이너는 profile 마다 하나이고, 작업 디렉터리는 사용자마다 따로 붙는다. 그 안에서는 다른 사용자의 파일과 다른 profile 의 비밀값, Hermes 설정에 닿지 않는다. 운영자가 읽기 전용으로 붙인 경로만 예외다. 정책에 등록하지 않은 profile 은 이 격리를 받지 않으며, 적용 범위는 profile 단위로 넓혀 간다([ADR-086](docs/adr/ADR-086-셸과-파일-도구는-사용자별-docker-실행-공간에서만-돈다.md), [`docs/hermes/sandbox.md`](docs/hermes/sandbox.md)).
-- **계산은 스크립트가 한다.** 커넥터가 기간 전체의 목록을 그 에이전트의 실행 공간에 읽기 전용 파일로 내고 경로만 돌려주면, 합계와 통계는 모델이 어림하지 않고 스크립트가 계산한다. 이 기능을 쓰려면 그 커넥터가 파일 출력을 선언하고, 그 profile 이 출력 경로를 둔 실행 공간 정책에 등록돼 있고, 그 에이전트에 코드 실행 도구가 켜져 있어야 한다. 이 저장소의 Gmail 과 네이버 블로그 커넥터는 파일 출력을 선언하지 않는다([ADR-20261008 / connector-output-files](docs/adr/ADR-20261008-connector-output-files.md)).
+- **계산은 스크립트가 한다.** 커넥터가 기간 전체의 목록을 그 에이전트의 실행 공간에 읽기 전용 파일로 내고 경로만 돌려주면, 합계와 통계는 모델이 어림하지 않고 스크립트가 계산한다. 이 기능을 쓰려면 그 커넥터가 파일 출력을 선언하고, 그 profile 이 출력 경로를 둔 실행 공간 정책에 등록돼 있고, 그 에이전트에 코드 실행 도구가 켜져 있어야 한다. 이 저장소의 Gmail 과 네이버 블로그 커넥터는 파일 출력을 선언하지 않는다([ADR-20261008 / connector-output-files](hermes/docs/adr/ADR-20261008-connector-output-files.md)).
 - **사용자별 브라우저(진행 중).** 사용자마다 브라우저 하나를 Control Plane 이 관리하고, 웹의 「내 브라우저」 화면에서 사용자가 직접 서비스에 로그인한다. 커넥터는 그 브라우저에 Control Plane 의 중계로만 닿는다. 코드는 들어가 있지만 기본 설정은 꺼짐이고, 아직 진행 중이다([ADR-20261007 / user-browser](docs/adr/ADR-20261007-user-browser.md), [`docs/backend/user-browser.md`](docs/backend/user-browser.md)).
 
 전체 범위와 항목별 확인 방법은 [`docs/prd.md`](docs/prd.md) 에 있다.
@@ -159,7 +159,7 @@ collection 목록을 고치는 화면과 항목의 앞선 판을 읽는 화면�
 
 - **Hermes core 를 고치지 않는다.** profile, API server, plugin hook 이라는 공식 확장 지점만 쓴다.
 - **사용자가 말하지 않은 것을 바로 기억하지 않는다.** 바로 저장하는 것은 사람이 보낸 대화에서 사용자가 직접 말한 사실뿐이고, 나머지는 사람이 받아들여야 쓰인다. Hermes 내장 memory 도구를 에이전트에 주지 않는다. 기억에 닿는 길은 Control Plane 하나다.
-- **모델의 판단만으로 행동 범위를 넓히지 않는다.** 무엇까지 할지는 Control Plane 의 결정적 규칙이 정하고, 그 규칙이 스스로 시작하는 것은 읽기 전용 살펴보기뿐이다. 커넥터의 쓰기 호출은 승인 카드나 사용자가 준 상시 허락을 거친다([ADR-20261007 / autonomy-policy](docs/adr/ADR-20261007-autonomy-policy.md)).
+- **모델의 판단만으로 행동 범위를 넓히지 않는다.** 무엇까지 할지는 Control Plane 의 결정적 규칙이 정하고, 그 규칙이 스스로 시작하는 것은 읽기 전용 살펴보기뿐이다. 커넥터의 쓰기 호출은 승인 카드나 사용자가 준 상시 허락을 거친다([ADR-20261007 / autonomy-policy](backend/docs/adr/ADR-20261007-autonomy-policy.md)).
 - **비밀값을 데이터베이스에 넣지 않는다.** AI credential 과 커넥터 토큰은 Hermes 쪽에 두고, 서비스 토큰은 해시로만 저장한다. 브라우저의 로그인 세션도 데이터베이스에 넣지 않는다. profile 을 나눴다고 AI 계정이 갈리지는 않는다. OAuth 로그인은 여러 profile 이 함께 쓸 수 있다. 무엇이 갈리고 무엇을 함께 쓰는지는 [`docs/hermes/README.md`](docs/hermes/README.md) 의 「OAuth credential 은 여기서 빠진다」 에 있다.
 - **누구나 가입하는 서비스가 아니다.** 그룹에 사람을 더하는 것은 관리자가 한다.
 - **에이전트가 만든 페이지의 스크립트를 돌리지 않는다.**

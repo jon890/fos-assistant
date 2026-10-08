@@ -55,7 +55,7 @@ Hermes 가 Control Plane 을 부를 때는 Control Plane 이 그 요청의 주�
 
 그래서 사용자는 Control Plane 이 이미 기록한 실행에서 꺼낸다.
 profile 플러그인이 도구 인자에 서명해 넣은 `_fos_ctx` 로 origin 실행 하나를 찾고, 그 실행의 `user_id` 가 요청자다. 하위 에이전트 session 은 만들 때 등록한 실행이, 최상위 session 은 지금 도는 실행이 origin 이다.
-[`backend/mcp-caller.md`](backend/mcp-caller.md#mcp-호출의-요청자를-정할-때) 의 「MCP 호출의 요청자를 정할 때」 가 그 흐름이다. 결정은 [ADR-032](adr/ADR-032-mcp-토큰은-profile-을-증명하고-실제-사용자는-부모-실행에서-정한다.md) 와 [ADR-037](adr/ADR-037-hermes-하위-에이전트-session-의-주인은-만들-때-등록한-줄로-정한다.md) 에 있다.
+[`backend/mcp-caller.md`](backend/mcp-caller.md#mcp-호출의-요청자를-정할-때) 의 「MCP 호출의 요청자를 정할 때」 가 그 흐름이다. 결정은 [ADR-032](../backend/docs/adr/ADR-032-mcp-토큰은-profile-을-증명하고-실제-사용자는-부모-실행에서-정한다.md) 와 [ADR-037](../backend/docs/adr/ADR-037-hermes-하위-에이전트-session-의-주인은-만들-때-등록한-줄로-정한다.md) 에 있다.
 
 ## 로그인 활동 기록
 
@@ -164,7 +164,7 @@ Control Plane 은 실행이 도는 동안 `assistant.chat.stream-heartbeat`(기�
 `RUN_STARTED` 와 `RUN_COMPLETED` 와 `RUN_FAILED` 는 Hermes 사건을 옮겨 적은 것이 아니라
 Control Plane 이 직접 적는 것이다.
 그래서 사건 스트림을 읽지 못한 실행에도 실행의 시작과 끝이 남는다.
-도구와 하위 에이전트 사건은 두 경로 모두 사건 스트림에서 옮겨 적는다. 한 번에 받는 경로는 화면으로 흘리지 않고 실행 기록에만 쌓으며, 답 조각 시각(`first_delta_at`)은 적지 않는다([ADR-090](adr/ADR-090-한-번에-받는-경로도-hermes-사건-스트림을-열어-도구-사건을-남긴다.md)).
+도구와 하위 에이전트 사건은 두 경로 모두 사건 스트림에서 옮겨 적는다. 한 번에 받는 경로는 화면으로 흘리지 않고 실행 기록에만 쌓으며, 답 조각 시각(`first_delta_at`)은 적지 않는다([ADR-090](../backend/docs/adr/ADR-090-한-번에-받는-경로도-hermes-사건-스트림을-열어-도구-사건을-남긴다.md)).
 
 **사건 저장이 실패해도 대화는 성공으로 끝난다.**
 사건은 관측용이고 그것 때문에 답이 사라지면 안 된다.

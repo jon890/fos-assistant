@@ -6,9 +6,9 @@
 사용자는 「연결」 화면에서 커넥터마다 계정을 한 번 연결한다. 이것이 **연결**이고 사용자와 커넥터마다 하나다.
 그 연결을 자기 에이전트의 상세에서 붙이고 뗀다. 이것이 **바인딩**이고 에이전트와 연결은 다대다다. 화면에서는 「붙이기」 와 「떼기」 라 쓴다.
 붙인 에이전트는 그 커넥터의 도구를 같은 turn 에서 직접 부른다. 붙이고 반영하는 순서는 [커넥터 설치](backend/connector-install.md) 가 갖는다.
-어떤 커넥터가 있고 무엇을 입력받는지는 plugin 의 `connector.json` 이 선언하고, Control Plane 은 서비스 이름과 주소를 모른다([ADR-043](adr/ADR-043-커넥터는-plugin-의-connector-json-으로-선언하고-control-plane-은-범용-흐름만-갖는다.md)).
+어떤 커넥터가 있고 무엇을 입력받는지는 plugin 의 `connector.json` 이 선언하고, Control Plane 은 서비스 이름과 주소를 모른다([ADR-043](../backend/docs/adr/ADR-043-커넥터는-plugin-의-connector-json-으로-선언하고-control-plane-은-범용-흐름만-갖는다.md)).
 임의 plugin 을 설치하는 화면은 없다. 연결할 수 있는 커넥터는 운영자가 대시보드 plugin 에 준 목록뿐이다.
-이 저장소가 갖는 범용 커넥터는 `hermes/connectors/` 에 있고([ADR-064](adr/ADR-064-범용-커넥터는-이-저장소의-hermes-connectors-에-두고-저장소가-유지보수한다.md)), 만드는 방법은 [커넥터 만들기](connector-authoring.md) 가 갖는다.
+이 저장소가 갖는 범용 커넥터는 `hermes/connectors/` 에 있고([ADR-064](../hermes/docs/adr/ADR-064-범용-커넥터는-이-저장소의-hermes-connectors-에-두고-저장소가-유지보수한다.md)), 만드는 방법은 [커넥터 만들기](connector-authoring.md) 가 갖는다.
 
 ## 언제 에이전트를 나누는가
 
@@ -73,16 +73,16 @@ plugin 디렉터리 root 에 둔다. 소유는 그 plugin 의 저장소다. 같�
 | `attachments` | 선택 boolean. 참이면 옛 커넥터 에이전트의 대화가 사진을 받는다. 없으면 거짓이다. 연결을 붙인 에이전트가 사진을 받는지는 그 에이전트의 설정이 정한다 |
 | `operator_env` | 사용자가 넣지 않고 운영자가 주는 env 이름. 값은 운영 설정이 갖는다. **비밀이 아닌 운영 설정만 둔다.** 값이 profile 설정과 소유 기록에 그대로 복제된다 |
 | `owner_attachments_env` | 선택. 사용자 첨부를 읽는 커넥터가 받을 env 이름 하나. 바인딩 설치가 그 에이전트 주인의 첨부 디렉터리를 넣는다. 값은 운영 정책과 Control Plane 이 정한 주인에서만 온다([ADR-20261007 / connector-owner-attachments](adr/ADR-20261007-connector-owner-attachments.md)) |
-| `owner_output_env` | 선택. 목록 도구가 계산할 데이터를 파일로 쓸 디렉터리를 받을 env 이름 하나. 바인딩 설치가 그 에이전트 실행 공간에 읽기 전용으로 붙는 그 profile 의 커넥터 출력 디렉터리를 넣는다. 실행 공간 정책에 `connector_output_root` 가 없으면 빈 값이다([ADR-20261008 / connector-output-files](adr/ADR-20261008-connector-output-files.md)) |
+| `owner_output_env` | 선택. 목록 도구가 계산할 데이터를 파일로 쓸 디렉터리를 받을 env 이름 하나. 바인딩 설치가 그 에이전트 실행 공간에 읽기 전용으로 붙는 그 profile 의 커넥터 출력 디렉터리를 넣는다. 실행 공간 정책에 `connector_output_root` 가 없으면 빈 값이다([ADR-20261008 / connector-output-files](../hermes/docs/adr/ADR-20261008-connector-output-files.md)) |
 | `single_binding` | 선택 boolean. 참이면 사용자의 그 연결은 에이전트 하나에만 붙는다. 없으면 거짓이다. 서비스가 계정마다 유효한 토큰을 하나만 두어 바인딩끼리 토큰을 깨는 커넥터가 선언한다([ADR-20261008 / connector-binding-guards](adr/ADR-20261008-connector-binding-guards.md)) |
 | `sandbox_required` | 선택 boolean. 참이면 실행 공간 정책에 등록된 profile 에만 붙는다. 없으면 거짓이다. 키에 권한 범위가 없어 셸이 읽으면 안 되는 커넥터가 선언한다([ADR-20261008 / connector-binding-guards](adr/ADR-20261008-connector-binding-guards.md)) |
-| `operator_secrets` | 운영자가 주는 비밀의 env 이름 목록. 지금은 지원하지 않는다. 비어 있지 않으면 그 커넥터를 카탈로그에 내지 않는다([ADR-046](adr/ADR-046-운영-비밀은-operator-env-와-다른-칸으로-선언하고-자식-mcp-프로세스에만-넣는다.md)) |
+| `operator_secrets` | 운영자가 주는 비밀의 env 이름 목록. 지금은 지원하지 않는다. 비어 있지 않으면 그 커넥터를 카탈로그에 내지 않는다([ADR-046](../backend/docs/adr/ADR-046-운영-비밀은-operator-env-와-다른-칸으로-선언하고-자식-mcp-프로세스에만-넣는다.md)) |
 | `errors` | 도구 오류 코드를 공통 어휘로 바꾸는 표. 키는 `^[A-Z][A-Z0-9_]{0,63}$` 이다. 값은 공통 어휘 글이거나 아래 「오류 복구 계약」 의 객체다. 표에 없는 코드는 `unavailable` 이다. `outcome_unknown` 은 쓰기를 보냈는데 됐는지 모른다는 뜻이다 |
 
 - `options.tool` 과 `verify.tool` 은 `.mcp.json` 서버의 도구 가운데 `readOnlyHint: true` 인 것만 된다. 대시보드가 도구를 부를 때 `tools/list` 로 확인한다. manifest 를 읽을 때는 도구 이름의 형식만 본다. 카탈로그는 요청마다 읽으므로 읽을 때마다 MCP 서버를 띄우지 않는다
 - `.mcp.json` 서버 env 는 `fields[].env` 와 `operator_env`, `owner_attachments_env`, `owner_output_env` 의 합과 같아야 한다. 네 이름은 겹치지 않는다. 하나라도 다르면 그 커넥터를 카탈로그에 내지 않는다
-- `toolsets` 가 목록이 아니거나, 이름이 겹치거나, `vision` 밖의 이름이 하나라도 있으면 그 커넥터를 카탈로그에 내지 않는다. 셸, 파일, 기억, 스킬, 위임 도구는 manifest 로 열리지 않는다([ADR-044](adr/ADR-044-커넥터-manifest-는-읽기-전용-이미지-도구만-열-수-있다.md))
-- `attachments` 가 참인데 `toolsets` 에 `vision` 이 없으면 그 커넥터를 카탈로그에 내지 않는다. 사진은 파일로 놓이고 에이전트가 이미지 도구로 읽기 때문이다([ADR-020](adr/ADR-020-사진은-공유-디렉터리에-두고-에이전트가-파일로-읽는다.md))
+- `toolsets` 가 목록이 아니거나, 이름이 겹치거나, `vision` 밖의 이름이 하나라도 있으면 그 커넥터를 카탈로그에 내지 않는다. 셸, 파일, 기억, 스킬, 위임 도구는 manifest 로 열리지 않는다([ADR-044](../backend/docs/adr/ADR-044-커넥터-manifest-는-읽기-전용-이미지-도구만-열-수-있다.md))
+- `attachments` 가 참인데 `toolsets` 에 `vision` 이 없으면 그 커넥터를 카탈로그에 내지 않는다. 사진은 파일로 놓이고 에이전트가 이미지 도구로 읽기 때문이다([ADR-020](../backend/docs/adr/ADR-020-사진은-공유-디렉터리에-두고-에이전트가-파일로-읽는다.md))
 - `icon` 이나 `link` 가 아래 「아이콘과 링크」 를 어기면 그 칸만 null 로 내고 경고 로그를 남긴다. 커넥터는 카탈로그에 그대로 나온다
 - 도구 결과는 MCP 응답의 첫 텍스트 칸을 JSON 으로 읽는다. `structuredContent` 가 있으면 그것을 먼저 쓴다. 실패는 `isError: true` 와 `{"error": {"code": "..."}}` 다
 
@@ -181,7 +181,7 @@ plugin 디렉터리 root 에 둔다. 소유는 그 plugin 의 저장소다. 같�
 - 대시보드가 거절한 세 경우(`CONNECTOR_BIND_CONFLICT`, `AGENT_SANDBOX_UNAVAILABLE`, `CONNECTOR_PROFILE_NOT_READY`)와 `CONNECTOR_SINGLE_BINDING` 은 대시보드가 아무것도 바꾸지 않았으므로 바인딩 행도 남지 않는다. 그 밖의 외부 실패는 바인딩을 `PENDING` 으로 남긴다. 대시보드가 반쯤 반영했을 수 있어 다음 연결 확인이 설치를 다시 보낸다
 - 붙인 바인딩은 늘 `PENDING` 이다. 뗀 서버 기록에 없는 새 이름의 붙이기는 재시작을 기다리지 않는다. 공유 gateway 의 MCP 설정 맞추기 주기가 연결하고, Control Plane 이 150초 뒤 스스로 반영을 확인해 `READY` 로 둔다([ADR-20261007 / connector-live-reload](adr/ADR-20261007-connector-live-reload.md)). 대개 몇 분 안에 쓸 수 있다
 - 대시보드가 재시작이 필요하다고 답한 붙이기만 재시작 대기가 된다. 뗀 서버 기록에 남은 이름을 다시 붙이는 것도 여기 해당한다. 관리자가 공유 gateway 를 재시작하고 반영 완료를 누르면 `READY` 가 된다
-- 붙이기는 `skills` toolset 을 켜지 않는다. 그 에이전트의 도구는 주인이 정한다([ADR-029](adr/ADR-029-에이전트-도구는-control-plane-이-등급으로-판정하고-hermes-설정-api-로-쓴다.md)). `skills` 가 꺼진 에이전트는 커넥터의 지침을 읽지 못하고, 화면이 그것을 안내한다
+- 붙이기는 `skills` toolset 을 켜지 않는다. 그 에이전트의 도구는 주인이 정한다([ADR-029](../backend/docs/adr/ADR-029-에이전트-도구는-control-plane-이-등급으로-판정하고-hermes-설정-api-로-쓴다.md)). `skills` 가 꺼진 에이전트는 커넥터의 지침을 읽지 못하고, 화면이 그것을 안내한다
 - 떼기는 그 에이전트의 실행이 판정한 `PENDING` 승인 줄을 `REJECTED`(`errorCode: connection_changed`)로 끝낸다. 상시 허락은 사용자와 커넥터에 묶여 같은 연결을 붙인 다른 에이전트에도 걸리므로 그대로 둔다. 그 에이전트의 승인 줄이 `EXECUTING` 이면 `CONNECTOR_ACTION_EXECUTING`(409)으로 거절한다
 - 떼기는 도구 목록에서 서버 이름을 빼므로 재시작을 기다리지 않고 다음 실행부터 막힌다. 떼기 전에 시작한 실행이 그 도구를 불러도 판정이 막는다
 - 옛 커넥터 에이전트에서는 떼지 않는다. `VALIDATION_FAILED` 로 거절하고, 그 에이전트를 지우면 바인딩이 함께 떨어진다
@@ -209,7 +209,7 @@ plugin 디렉터리 root 에 둔다. 소유는 그 plugin 의 저장소다. 같�
 
 ## 승인
 
-결정은 [ADR-050](adr/ADR-050-커넥터-쓰기는-control-plane-이-승인-줄을-저장하고-승인한-인자로-한-번만-실행한다.md) 에 있다.
+결정은 [ADR-050](../backend/docs/adr/ADR-050-커넥터-쓰기는-control-plane-이-승인-줄을-저장하고-승인한-인자로-한-번만-실행한다.md) 에 있다.
 
 승인과 거절은 그 요청이 나온 대화의 승인 카드에서 한다. 실행 결과는 그 대화의 알림 줄과 자동 turn 으로 온다.
 `schema: 1` 커넥터의 선언 없는 도구도 승인 줄이 생기고 같은 카드로 승인한다.
@@ -247,7 +247,7 @@ plugin 디렉터리 root 에 둔다. 소유는 그 plugin 의 저장소다. 같�
 | `DELETE /api/v1/connector-grants/{grantId}` | 없음 | 그 허락을 거둔다 |
 
 - 승인 줄 응답은 `actionId`, `connectorId`, `toolName`, `title`, `risk`, `status`, `argsJson`, `resultText`, `errorCode`, `createdAt`, `expiresAt`, `grantAllowed`, `hiddenArgs` 를 갖는다. `actionId` 는 공개 식별자(UUID)다
-- 응답의 `argsJson` 은 사용자가 읽고 승인하는 글이다. 비밀처럼 보이는 키의 값과 토큰 모양의 글은 `[가림]` 으로 바꿔 낸다([ADR-047](adr/ADR-047-도구-내용은-비밀값과-UUID를-가린-뒤-중계하고-저장한다.md) 의 규칙 가운데 비밀값 부분). UUID 는 가리지 않는다. 무엇을 고치는지 가리키는 값이라 가리면 서로 다른 대상의 요청이 같게 보이고, 이 응답은 주인만 읽는다. 길이로 자르지 않는다. 실행은 저장한 원문으로 한다
+- 응답의 `argsJson` 은 사용자가 읽고 승인하는 글이다. 비밀처럼 보이는 키의 값과 토큰 모양의 글은 `[가림]` 으로 바꿔 낸다([ADR-047](../backend/docs/adr/ADR-047-도구-내용은-비밀값과-UUID를-가린-뒤-중계하고-저장한다.md) 의 규칙 가운데 비밀값 부분). UUID 는 가리지 않는다. 무엇을 고치는지 가리키는 값이라 가리면 서로 다른 대상의 요청이 같게 보이고, 이 응답은 주인만 읽는다. 길이로 자르지 않는다. 실행은 저장한 원문으로 한다
 - 커넥터가 `identifiers` 로 선언한 맨 위 인자는 값이 문자열이거나 문자열 배열이고 문자열마다 `^[A-Za-z0-9_-]{1,256}$` 일 때 32자 이상의 덩어리를 가리는 규칙에서 빠진다([ADR-089](adr/ADR-089-커넥터는-식별자-인자를-선언하고-승인-카드는-그-값을-길이로-가리지-않는다.md)). 알려진 비밀 접두사(`sk-`, `ghp_` 와 같은 무리, `github_pat_`, `xox?-`)로 시작하는 값과 비밀 키 이름의 칸은 그래도 가린다. 중첩된 칸과 모양이 다른 값은 지금처럼 가린다. 선언은 줄을 읽을 때와 승인할 때의 카탈로그로 보고, 카탈로그를 읽지 못했으면 선언이 없는 것으로 본다
 - 상시 허락 목록은 지금 선언이 상시 허락을 닫은 도구의 줄을 내지 않는다. 판정이 그 줄을 보지 않아 효력이 없기 때문이다. 그런 줄은 1분마다 도는 정리가 거둔다. 거둔 줄은 선언이 다시 열려도 되살아나지 않는다. 카탈로그를 읽지 못했으면 낸다
 - 상시 허락 응답은 `grantId`, `connectorId`, `toolName`, `title`, `expiresAt` 을 갖는다. `title` 은 카탈로그가 선언한 이름이다
@@ -264,7 +264,7 @@ plugin 디렉터리 root 에 둔다. 소유는 그 plugin 의 저장소다. 같�
 - 사건은 줄을 커밋한 뒤에 낸다. 화면이 사건을 받고 읽었을 때 줄이 있어야 한다
 - 대화가 있는 새 승인 줄이면 같은 트랜잭션에서 `APPROVAL_REQUESTED` 알림을 만든다([`backend/notification.md`](backend/notification.md))
 - 대화에는 `approval` 사건을 낸다. 사건은 승인 요청 번호만 싣고 줄의 내용을 싣지 않는다. 화면은 그 사건을 받으면 승인 줄을 다시 읽는다. 승인 카드는 이 응답으로만 그린다. 깨우기(`assistant.delegation-wake.enabled`)가 꺼져 있어도 이 사건과 아래의 거절, 만료 알림 줄은 나간다
-- 결과가 `SUCCEEDED`, `FAILED`, `UNKNOWN` 이면 그 대화에 알림 줄을 남기고 자동 turn 을 열어 결과를 전한다. 위임 결과와 같은 잠금과 같은 연속 상한을 쓴다([ADR-040](adr/ADR-040-위임-결과는-control-plane-이-부모-대화의-다음-turn-을-열어-전한다.md)). 위임 결과가 함께 있으면 한 turn 에 모아 전한다. 사건은 다음 turn 을 정하는 자리를 지나므로 보낼 대기 메시지가 있으면 그것이 먼저 간다([대기열과 중지](backend/turn-control.md) 의 「응답 중 대기열」)
+- 결과가 `SUCCEEDED`, `FAILED`, `UNKNOWN` 이면 그 대화에 알림 줄을 남기고 자동 turn 을 열어 결과를 전한다. 위임 결과와 같은 잠금과 같은 연속 상한을 쓴다([ADR-040](../backend/docs/adr/ADR-040-위임-결과는-control-plane-이-부모-대화의-다음-turn-을-열어-전한다.md)). 위임 결과가 함께 있으면 한 turn 에 모아 전한다. 사건은 다음 turn 을 정하는 자리를 지나므로 보낼 대기 메시지가 있으면 그것이 먼저 간다([대기열과 중지](backend/turn-control.md) 의 「응답 중 대기열」)
 - 알림 줄은 결과마다 한 줄이고 이름과 상태만 쓴다. 결과 본문은 모델 입력에만 넣고 `<external-data>` 로 감싼다. `FAILED` 는 본문을 싣지 않는다. 저장한 오류 계약이 있으면 머리줄에 `오류 코드` 와 `세부` 를 더하고 다음 줄에 `복구: <안내>` 를 붙인다(「오류 복구 계약」). 입력의 머리줄은 `[출처: 승인한 동작, 동작: <title>, 상태: <상태>, 끝난 시각: <시각>]` 이고, 오래된 결과에는 신선도와 안내 한 줄이 붙는다. 형식은 [`backend/context-bundle.md`](backend/context-bundle.md) 의 「Hermes 에 넘기는 형식」 이 갖는다. 요청 번호와 도구의 원래 이름은 모델이 답에 옮겨 화면에 나오지 않게 입력에 싣지 않는다. `UNKNOWN` 은 본문 대신 다시 실행하지 말고 사용자에게 확인을 부탁하라는 글을 넣는다
 - 알림 줄 저장, 줄의 `result_delivered_at`, 자동 turn 수 증가는 한 트랜잭션이다. 연속 상한에 닿아 turn 을 열지 못한 결과는 전하지 않은 채 남고, 사용자가 메시지를 보낸 뒤의 turn 이 닫힐 때 전해진다
 - 거절과 만료는 대화의 알림 줄만 남기고 자동 turn 을 열지 않는다. 만료는 `APPROVAL_EXPIRED` 알림도 만든다. 시스템이 실행하지 않고 끝낸 줄(`errorCode` 가 `not_executable`, `connection_changed`, `hidden_args`)은 거절이 아니라 취소했다는 글로 알린다. `hidden_args` 는 가려지는 내용이 있어 취소했다는 것과 에이전트에게 그 부분을 빼거나 다시 쓰게 하라는 것을 말한다. 전했다는 표시와 알림 줄을 새 트랜잭션 하나에 넣고 표시를 먼저 적으므로, 같은 줄의 사건이 겹쳐도 알림 줄은 하나다. 그 대화의 turn 이 도는 동안에는 남기지 않고 turn 이 닫힐 때 남긴다. 도는 turn 이 없는지 보는 것과 저장하는 것 사이에 turn 이 열리지 않도록 turn 잠금을 잡은 채 저장하고, 잠금을 못 잡으면 닫힐 때로 미룬다. 답보다 먼저 알림 줄이 끼면 그 답이 알림 줄에 이어진 자동 turn 의 답으로 읽히기 때문이다
