@@ -1,7 +1,6 @@
 package com.bifos.assistant.hermes;
 
 import com.bifos.assistant.hermes.dto.ConnectorAppearance;
-import java.net.URI;
 import java.nio.ByteBuffer;
 import java.nio.charset.CharacterCodingException;
 import java.nio.charset.CodingErrorAction;
@@ -33,7 +32,19 @@ final class ConnectorAppearances {
 
     private static final int LINK_MAX_CHARS = 500;
 
+    /** 상한 바이트를 base64 로 쓴 최대 글자 수다. 이보다 긴 글은 디코딩하지 않고 버린다. */
+    private static final int ICON_MAX_BASE64_CHARS = (ICON_MAX_BYTES + 2) / 3 * 4;
+
     private static final byte[] PNG_SIGNATURE = {(byte) 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A};
+
+    /**
+     * 링크 모양이다. 대시보드가 같은 식을 {@code fullmatch} 로 쓰므로 여기서는 {@code matches()} 로 쓴다.
+     *
+     * <p>{@code java.net.URI} 같은 해석기는 언어마다 받는 범위가 달라 쓰지 않는다. 식을 바꾸면 대시보드의 식도 함께 바꾼다.
+     */
+    private static final Pattern LINK = Pattern.compile(
+            "^https://[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?(?:\\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)*"
+                    + "(?::[0-9]{1,5})?(?:[/?#](?:[A-Za-z0-9\\-._~!$&'()*+,;=:@/?#]|%[0-9A-Fa-f]{2})*)?$");
 
     /** 대시보드와 같은 금지 목록이다. 일부만 걸려도 버리므로 {@code find()} 로 쓴다. 공백과 대소문자는 ASCII 기준이다. */
     private static final Pattern SVG_FORBIDDEN = Pattern.compile(
@@ -89,12 +100,17 @@ final class ConnectorAppearances {
         if (!ICON_MEDIA_TYPES.contains(type)) {
             return null;
         }
-        byte[] bytes = Base64.getDecoder().decode(data.asString());
+        String encoded = data.asString();
+        if (encoded.length() > ICON_MAX_BASE64_CHARS) {
+            return null;
+        }
+        byte[] bytes = Base64.getDecoder().decode(encoded);
         if (bytes.length == 0 || bytes.length > ICON_MAX_BYTES) {
             return null;
         }
         boolean safe = "image/png".equals(type) ? startsWithPngSignature(bytes) : svgIsSafe(bytes);
-        return safe ? "data:" + type + ";base64," + data.asString() : null;
+        // 검사한 바이트를 다시 인코딩해 담는다. 패딩 없는 입력도 표준 base64 로 낸다.
+        return safe ? "data:" + type + ";base64," + Base64.getEncoder().encodeToString(bytes) : null;
     }
 
     private static boolean startsWithPngSignature(byte[] bytes) {
@@ -184,13 +200,6 @@ final class ConnectorAppearances {
         if (value.codePointCount(0, value.length()) > LINK_MAX_CHARS) {
             return null;
         }
-        boolean blankOrControl = value.codePoints()
-                .anyMatch(c -> Character.isWhitespace(c) || Character.isSpaceChar(c) || Character.isISOControl(c));
-        if (value.isEmpty() || blankOrControl) {
-            return null;
-        }
-        URI uri = URI.create(value);
-        boolean https = "https".equals(uri.getScheme()) && uri.getHost() != null && uri.getRawUserInfo() == null;
-        return https ? value : null;
+        return LINK.matcher(value).matches() ? value : null;
     }
 }

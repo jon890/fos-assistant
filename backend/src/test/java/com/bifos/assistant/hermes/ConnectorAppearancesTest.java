@@ -6,8 +6,10 @@ import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
 import com.bifos.assistant.hermes.dto.ConnectorAppearance;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Base64;
+import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -21,6 +23,36 @@ class ConnectorAppearancesTest {
     private static final String LINK = "https://notes.example.test/about";
     private static final int ICON_MAX_BYTES = 32 * 1024;
     private static final byte[] PNG_SIGNATURE = {(byte) 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A};
+
+    /** 링크 모양의 시험 벡터다. 대시보드의 {@code test_connector_manifest.py} 가 같은 목록을 단언한다. 한쪽을 바꾸면 다른 쪽도 바꾼다. */
+    private static final List<String> ACCEPTED_LINKS = List.of(
+            "https://mail.google.com/",
+            "https://blog.naver.com/",
+            "https://example.com",
+            "https://example.com:8443/a?b=1&c=%20#x",
+            "https://xn--9n2bp8q.com/",
+            "https://example.com/" + "a".repeat(500 - "https://example.com/".length()));
+
+    private static final List<String> REJECTED_LINKS = List.of(
+            "https://example.com/a|b",
+            "https://example.com/a\"b",
+            "https://example.com/<x>",
+            "https://example.com/{x}",
+            "https://example.com/a^b",
+            "https://example.com/%zz",
+            "https://my_host.example.com/",
+            "https://example.com:abc/",
+            "https://예시.com/한글",
+            "https://a..b/",
+            "https://-bad-.com/",
+            "http://example.com/",
+            "HTTPS://example.com/",
+            "https://user@example.com/",
+            "https://example.com/a b",
+            "https://example.com/a\\b",
+            "https://[::1]/",
+            "https://example.com/?a[]=1",
+            "https://example.com/" + "a".repeat(501 - "https://example.com/".length()));
 
     @DisplayName("SVG 와 PNG 아이콘은 data URL 로, https 링크는 그대로 담는다")
     @Test
@@ -88,6 +120,18 @@ class ConnectorAppearancesTest {
         assertThat(read).isEqualTo(new ConnectorAppearance(null, LINK));
     }
 
+    @DisplayName("패딩 없는 base64 아이콘은 디코딩한 바이트를 표준 base64 로 다시 인코딩해 담는다")
+    @Test
+    void reencodesUnpaddedIconAsStandardBase64() {
+        String padded = base64("<svg xmlns=\"http://www.w3.org/2000/svg\"/>");
+        String unpadded = padded.replace("=", "");
+
+        ConnectorAppearance read = ConnectorAppearances.read(item(icon("image/svg+xml", unpadded), null));
+
+        assertThat(unpadded).isNotEqualTo(padded);
+        assertThat(read.icon()).isEqualTo("data:image/svg+xml;base64," + padded);
+    }
+
     @DisplayName("UTF-8 이 아닌 바이트, 틀린 base64, 빈 내용, 상한 초과, 서명 없는 PNG, 모르는 형식, 객체가 아닌 아이콘은 아이콘만 버린다")
     @Test
     void dropsMalformedIconButKeepsLink() {
@@ -111,21 +155,26 @@ class ConnectorAppearancesTest {
         }
     }
 
-    @DisplayName("http 링크, 사용자 정보가 있는 링크, 501자 링크, 읽히지 않는 주소, 글이 아닌 링크는 링크만 버린다")
+    @DisplayName("링크 모양에 맞는 링크는 그대로 담는다. 500자 링크도 받는다")
+    @Test
+    void acceptsLinksOfTheLinkShape() {
+        for (String link : ACCEPTED_LINKS) {
+            assertThat(ConnectorAppearances.read(item(null, link)).link())
+                    .as("link=%s", link)
+                    .isEqualTo(link);
+        }
+    }
+
+    @DisplayName("링크 모양을 벗어난 링크, 빈 글, 글이 아닌 링크는 링크만 버리고 아이콘은 둔다")
     @Test
     void dropsInvalidLinkButKeepsIcon() {
         String data = base64("<svg/>");
-        String tooLong = "https://notes.example.test/" + "a".repeat(501 - "https://notes.example.test/".length());
-        JsonNode[] links = {
-            text("http://notes.example.test/"),
-            text("https://user@notes.example.test/"),
-            text(tooLong),
-            text("https://notes.example.test/a b"),
-            text("https://[::1"),
-            text("https:///path-only"),
-            text(""),
-            JSON.getNodeFactory().numberNode(7)
-        };
+        List<JsonNode> links = new ArrayList<>();
+        REJECTED_LINKS.forEach(link -> links.add(text(link)));
+        links.add(text("https://[::1"));
+        links.add(text("https:///path-only"));
+        links.add(text(""));
+        links.add(JSON.getNodeFactory().numberNode(7));
 
         for (JsonNode declared : links) {
             ObjectNode item = item(icon("image/svg+xml", data), null);
@@ -134,14 +183,6 @@ class ConnectorAppearancesTest {
                     .as("link=%s", declared)
                     .isEqualTo(new ConnectorAppearance("data:image/svg+xml;base64," + data, null));
         }
-    }
-
-    @DisplayName("500자 링크는 받는다")
-    @Test
-    void acceptsLinkOfExactlyMaxChars() {
-        String link = "https://notes.example.test/" + "a".repeat(500 - "https://notes.example.test/".length());
-
-        assertThat(ConnectorAppearances.read(item(null, link)).link()).isEqualTo(link);
     }
 
     @DisplayName("칸이 없거나 JSON null 이면 둘 다 null 이다")
