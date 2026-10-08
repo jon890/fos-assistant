@@ -225,8 +225,10 @@ turn 이 바꾸는 칸은 `hermes_session_id` 와 `updated_at` 뿐이므로 그 
 Hermes v0.21.5의 결과는 `results` 배열이며 항목의 `url`, `content`, `error`로 판정한다. 완료 사건의 실패 값만으로 각 페이지의 성공을 판정하지 않는다.
 근거는 [upstream 결과 정리](https://github.com/NousResearch/hermes-agent/blob/v2026.9.24/tools/web_tools_truncate.py#L153-L193)와 [완료 사건](https://github.com/NousResearch/hermes-agent/blob/v2026.9.24/gateway/platforms/api_server_runs.py#L91-L108)이다.
 URL의 인증 정보, query와 fragment는 공개하지 않는다. 가려지거나 잘린 주소, 내부 주소는 싣지 않는다.
+DNS 조회 없이 host가 있는 HTTP(S) URL만 받는다. 한 단어 host, localhost와 `.localhost`/`.local`/`.internal`, IP 리터럴은 제외한다. 주소를 정리한 뒤 path를 보존해 중복 제거한다.
 도구 내용 가리기와 요청자의 대화 소유자 확인을 거친 뒤 만든 요약은 사용자 역할과 관계없이 같은 값이다.
 사용자 메시지와 알림 줄은 `sourceReads`가 null이다.
+실행 번호가 없거나 해당 실행을 찾지 못한 비서 답은 빈 주소와 0건, `observationComplete=false`를 받는다.
 
 Hermes 가 스트림으로 보내는 사건을 우리 이름으로 옮겨 `execution_event` 에 적는다.
 화면은 우리 이름만 읽고 Hermes 의 원래 이름을 알지 않는다.

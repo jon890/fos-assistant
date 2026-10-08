@@ -28,27 +28,33 @@
 
 `SourceReadSummary` record를 `chat.application`에 만들고 `completedCount`, `urls`, `unresolvedCount`, `observationComplete`를 둔다.
 `SourceReadSummaries` 컴포넌트는 assistant 메시지의 루트와 자식 실행을 일괄 조회한다. 정확한 `web_extract`의 성공 완료만 세며 결과를 파싱한다.
-동일 URL은 순서를 유지해 중복 제거하고 오류·본문 없는 항목을 제외한다. 가림/손상/절단된 JSON은 주소를 추측하지 않는다.
+결과의 `error`가 없거나 null이고 `content`가 비어 있지 않은 문자열인 항목만 URL 근거로 삼는다. `failed=false`는 호출 집계와 파싱 조건이며 개별 페이지 성공을 보장하지 않는다.
+URL은 Java URI로 검사한다. 인증 정보·query·fragment를 제거하고 raw path는 보존한다. HTTP(S) 외 scheme, host가 없는 주소, 한 단어 host, localhost 및 .localhost/.local/.internal host, IPv4/IPv6 리터럴 전체를 거부한다. DNS 조회는 하지 않는다.
+가림 표시([가림], [항목 N])나 말줄임표(..., …)가 포함된 주소는 거부한다. 주소를 정리한 뒤 순서를 유지해 중복 제거한다. 가림/손상/절단된 JSON은 주소를 추측하지 않는다.
+요약 map은 메시지 id로 묶는다. 실행 번호가 없거나 루트를 찾지 못한 ASSISTANT 답은 completedCount=0, urls=[], unresolvedCount=0, observationComplete=false로 돌려준다. USER/SYSTEM은 map에서 제외한다.
 `ChatController`에 이 컴포넌트를 주입해 기존 messages 응답의 `MessageView.sourceReads`에 붙인다. USER/SYSTEM에는 null이다.
 기존 `ChatService`와 `ChatConversationQueries`는 바꾸지 않아 긴 파일과 기존 요약 책임을 늘리지 않는다.
 
 ### 2. web 답 아래 목록
 
 `Turn.sourceReads` optional 타입을 추가하고 새 `SourceReadList` 컴포넌트를 답 본문 뒤에 붙인다.
+message-bubble.tsx의 기존 길이 상한을 지키기 위해 Turn과 첨부/결과물/전달 타입만 message-types.ts로 옮기고 기존 bubble 경로에서 re-export해 소비자를 유지한다. 이 이동은 동작 변경 전 별도 커밋으로 기록한다.
 저장된 ASSISTANT 답만 표시하고 「이번에 연 원문」 제목과 완료 횟수·주소 수, 빈 상태 및 불완전 안내를 표시한다.
 링크는 안전한 HTTP(S)만 새 탭으로 열고 rel=noreferrer noopener를 준다. 새 의존은 더하지 않는다.
 
 ### 3. 테스트
 
 `SourceReadSummariesTest`는 성공·실패·미상·시작만·검색·동명 MCP, 혼합 결과, 중복, 잘린 JSON, 민감 URL, 불완전 관측, 자식 실행, 빈 history, USER/SYSTEM 제외와 조회 일괄 수행을 확인한다.
+`SourceReadMessagesTest`는 실제 ChatController.messages의 DTO에 ASSISTANT 요약이 붙고 USER/SYSTEM은 null인지와 남의 대화 거부를 검증한다. 기존 ChatController 생성자를 쓰는 테스트도 새 의존을 넘기도록 함께 수정한다.
 `source-reads.spec.ts`는 messages 응답에 합성 요약을 넣어 답 아래 목록, 빈 상태와 불완전 안내, 새로고침 보존, USER/SYSTEM 및 스트리밍 임시 답 제외를 확인한다.
 
 ## 검증
 
 ```bash
-cd backend && ./gradlew test --tests '*SourceReadSummariesTest'
+cd backend && ./gradlew test --tests '*SourceReadSummariesTest' --tests '*SourceReadMessagesTest'
 pnpm --dir web typecheck
-pnpm --dir web test:browser source-reads
+pnpm --dir web test:browser source-reads.spec.ts --repeat-each=3 --retries=0
+scripts/quality.sh check
 ```
 무거운 검사는 코디네이터 지시의 heavy-lock으로 감싼다. backend 전체와 전체 브라우저는 CI에서 확인한다.
 
@@ -61,7 +67,19 @@ pnpm --dir web test:browser source-reads
 | `backend/src/main/java/com/bifos/assistant/chat/presentation/ChatController.java` | 수정 |
 | `backend/src/main/java/com/bifos/assistant/chat/presentation/ChatDtos.java` | 수정 |
 | `backend/src/test/java/com/bifos/assistant/chat/application/SourceReadSummariesTest.java` | 신규 |
+| `backend/src/test/java/com/bifos/assistant/chat/SourceReadMessagesTest.java` | 신규 |
+| `backend/src/test/java/com/bifos/assistant/chat/ConversationModelChoiceTest.java` | 수정 |
+| `backend/src/test/java/com/bifos/assistant/chat/ConversationPagingTest.java` | 수정 |
+| `backend/src/test/java/com/bifos/assistant/chat/UserExecutionLimitChatTest.java` | 수정 |
+| `backend/src/test/java/com/bifos/assistant/chat/ConversationPublicIdTest.java` | 수정 |
+| `backend/src/test/java/com/bifos/assistant/chat/ConversationMissingAgentTest.java` | 수정 |
+| `backend/src/test/java/com/bifos/assistant/chat/ChatAttachmentTurnTest.java` | 수정 |
+| `backend/src/test/java/com/bifos/assistant/chat/ConversationEventControllerTest.java` | 수정 |
+| `backend/src/test/java/com/bifos/assistant/chat/ToolDetailStreamTest.java` | 수정 |
+| `backend/src/test/java/com/bifos/assistant/chat/ModelTierRequestValidationTest.java` | 수정 |
+| `backend/src/test/java/com/bifos/assistant/task/ConversationTaskLabelTest.java` | 수정 |
 | `web/src/components/chat/source-read-list.tsx` | 신규 |
+| `web/src/components/chat/message-types.ts` | 신규 |
 | `web/src/components/chat/message-bubble.tsx` | 수정 |
 | `test/browser/source-reads.spec.ts` | 신규 |
 | `docs/backend/conversation.md` | 수정 |
