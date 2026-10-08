@@ -12,6 +12,8 @@ import org.springframework.data.repository.query.Param;
 
 public interface AppUserRepository extends JpaRepository<AppUser, Long> {
 
+    List<AppUser> findByGroupIdAndRole(Long groupId, com.bifos.assistant.shared.domain.type.UserRole role);
+
     Optional<AppUser> findByEmail(String email);
 
     /**

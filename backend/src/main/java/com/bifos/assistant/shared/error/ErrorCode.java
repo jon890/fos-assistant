@@ -10,6 +10,8 @@ public enum ErrorCode {
     FORBIDDEN(HttpStatus.FORBIDDEN),
     CONVERSATION_NOT_FOUND(HttpStatus.NOT_FOUND),
     AGENT_NOT_FOUND(HttpStatus.NOT_FOUND),
+    TOOLSET_REQUEST_NOT_FOUND(HttpStatus.NOT_FOUND),
+    TOOLSET_REQUEST_UNAVAILABLE(HttpStatus.CONFLICT),
     MEMORY_NOT_FOUND(HttpStatus.NOT_FOUND),
     /** 없는 실행과 남의 실행을 같은 응답으로 숨긴다. 번호를 훑어 남의 것이 있는지 알아낼 수 없게 한다. */
     EXECUTION_NOT_FOUND(HttpStatus.NOT_FOUND),

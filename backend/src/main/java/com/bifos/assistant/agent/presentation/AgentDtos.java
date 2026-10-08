@@ -12,6 +12,8 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import java.util.List;
+import java.time.Instant;
+import java.util.UUID;
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
 
@@ -163,6 +165,18 @@ public final class AgentDtos {
             boolean skillsEnabled) {}
 
     public record HiddenToolsetsRequest(@NotNull List<@NotBlank String> hidden) {}
+
+    public record RequestToolset(@NotBlank @Size(max = 64) String toolset) {}
+
+    public record DecideToolsetRequest(@NotNull Boolean approve, @Size(max = 200) String reason) {}
+
+    public record ToolsetRequestView(UUID id, String agentCode, String agentName, boolean agentDeleted, String requesterName,
+            String toolset, String status, String reason, Instant requestedAt, Instant decidedAt) {
+        static ToolsetRequestView from(com.bifos.assistant.agent.application.ToolsetRequestView row) {
+            return new ToolsetRequestView(row.id(), row.agentCode(), row.agentName(), row.agentDeleted(), row.requesterName(),
+                    row.toolset(), row.status().name(), row.reason(), row.requestedAt(), row.decidedAt());
+        }
+    }
 
     public record EnabledToolsetAgentView(String code, String name) {}
 
