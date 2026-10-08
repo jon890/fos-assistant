@@ -180,6 +180,32 @@ LIVE_RELOAD = {
                         "disabled", "cache_key"),
 }
 
+# docker profile 의 `approvals.unattended_mode: approve` 가 `execute_code` 만 열고 셸 위험 명령과 plugin 승인 요청은 승인 카드로 남는 데 기대는 지점이다.
+# 이 지점이 바뀌면 같은 설정이 셸과 커넥터 승인까지 사람 없이 여는데 Control Plane 은 알지 못한다.
+# 실패하면 ADR-20261008 execute-code-unattended 를 다시 본다.
+UNATTENDED_APPROVAL = {
+    # gateway 가 프로세스 환경에 켜는 ask 표식이다
+    "exec_ask": ("gateway/run.py", "start_gateway", "HERMES_EXEC_ASK"),
+    # ask 문맥에서는 unattended 모드를 보지 않는 판정 함수들이다
+    "ask_first": ("tools/approval.py", ("check_all_command_guards", "_run_approval_gate"),
+                  "_unattended_contexts", "is_ask"),
+    # is_ask 를 그 환경 변수에서 계산하는 함수다
+    "ask_source": ("tools/approval.py", "_presence", "is_ask", "HERMES_EXEC_ASK"),
+    # _unattended_contexts 를 부르는 함수 전부다. 첫 칸은 대표 정의 위치이며 호출을 찾는 범위는 tools, agent, gateway 전체다.
+    # 늘면 그 함수가 ask 문맥을 먼저 보는지 확인하고 더한다
+    "callers": ("tools/approval.py", "_unattended_contexts",
+                frozenset({"check_all_command_guards", "_run_approval_gate", "check_execute_code_guard"})),
+    # 컨테이너 예외를 unattended 판정보다 먼저 보는 execute_code 판정이다
+    "execute_code": ("tools/approval.py", "check_execute_code_guard",
+                     "_should_skip_container_guards", "_unattended_contexts"),
+    # plugin 이 쓰는 키 이름과 그 키가 적용되는 플랫폼이다
+    "mode_key": ("tools/approval_context.py", "_get_unattended_approval_mode", "unattended_mode"),
+    "platform": ("tools/approval_context.py", "_UNATTENDED_APPROVAL_PLATFORMS", "api_server"),
+    # 모드를 읽는 getter 를 직접 부르는 함수다. 지금은 `getattr` 로 이름을 조립해서만 불려 직접 호출이 없다.
+    # 직접 부르는 함수가 생기면 그 호출이 ask 문맥을 먼저 보는지 확인하고 더한다. 첫 칸은 대표 정의 위치다
+    "getter_callers": ("tools/approval_context.py", "_get_unattended_approval_mode", frozenset()),
+}
+
 # 바꿔 끼우기를 공개 확장점으로 대체하지 못하게 막는 지점이다(ADR-088).
 # 상류가 이 시그니처를 바꾸면 메서드 단위 등록이나 쿠키로 넘기기가 생겼을 수 있다. 실패하면 ADR-088 의 판정을 다시 본다.
 REVISIT_SIGNALS = {
