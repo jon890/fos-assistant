@@ -2,16 +2,18 @@
 
 ## profile 접두
 
-아래 설정 우선순위와 허용 목록은 v0.21.0 의 동작이다.
-v0.21.3 은 `gateway.multiplex_profile_allowlist` 를 제거했고,
-v0.21.4 이후에는 multiplex 기본값과 gateway 실행 방식도 바뀐다.
-버전별 차이는 [「버전을 올릴 때 달라지는 계약」](upgrades.md#버전을-올릴-때-달라지는-계약) 을 따른다.
+우리가 고정한 v0.21.5 는 v0.21.0 과 아래 두 가지가 다르다.
 
-`gateway.multiplex_profiles` 를 켜면 listener 하나가 `/p/<profile>/...` 로 모든 profile 을 받는다.
+- multiplex 가 기본으로 켜진다. 명시적 `gateway.multiplex_profiles: false` 도 true 로 고친다. `gateway.standalone` 은 임시 호환 수단이다.
+- `gateway.multiplex_profile_allowlist` 는 v0.21.3 에서 제거됐다. 살아 있는 모든 profile 을 접두 아래에 제공한다.
+
+버전별 근거는 [「버전을 올릴 때 달라지는 계약」](upgrades.md#버전을-올릴-때-달라지는-계약) 을 따른다.
+
+multiplex 에서는 listener 하나가 `/p/<profile>/...` 로 모든 profile 을 받는다.
 default profile 의 listener 에는 각 경로가 접두 없는 형태와 `/p/<profile>` 접두 형태로 함께 등록된다.
 `connect()` 가 경로 표를 한 번 순회하며 두 형태를 모두 등록한다.
 
-multiplex 사용 여부는 아래 순서로 정한다.
+v0.21.0 은 multiplex 사용 여부를 아래 순서로 정했다.
 
 1. 환경 변수 `GATEWAY_MULTIPLEX_PROFILES`
 2. 기본 profile `config.yaml` 의 `gateway.multiplex_profiles`
@@ -20,9 +22,7 @@ multiplex 사용 여부는 아래 순서로 정한다.
 환경 변수에서는 `true`, `1`, `yes`, `on` 을 참으로 읽는다.
 빈 문자열이나 알 수 없는 값은 무시하고 `config.yaml` 값을 쓴다.
 
-`gateway.multiplex_profile_allowlist` 를 적지 않으면 이름이 유효하고 삭제 표시가 없는 profile 을 모두 제공한다.
-빈 목록을 적으면 기본 profile 만 제공하고, 이름을 적으면 그 profile 만 제공한다.
-허용 목록을 쓰면 profile 을 만들 때마다 목록도 고쳐야 한다.
+허용 목록이 없으므로 이름이 유효하고 삭제 표시가 없는 profile 을 모두 제공한다.
 
 **새 profile 은 gateway 를 다시 띄우지 않아도 접두 아래에 열린다.**
 접두를 검사하는 middleware 가 요청마다 profile 디렉터리를 다시 훑고 목록을 캐시하지 않기 때문이다.

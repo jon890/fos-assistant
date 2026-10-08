@@ -292,7 +292,8 @@ proxy 의 기록은 `iron-proxy.log` 에 요청마다 한 줄이다. 별도 audi
 
 ## Docker 를 다루는 길
 
-지금 운영 Hermes 컨테이너에는 Docker socket 이 없다. 실행 공간을 쓰려면 Hermes 가 컨테이너를 만들 수 있어야 한다.
+실행 공간을 쓰려면 Hermes 가 컨테이너를 만들 수 있어야 한다.
+Hermes 는 Docker 를 컨테이너 생성 요청 본문을 검사하는 socket proxy 로만 다룬다([ADR-086](../adr/ADR-086-셸과-파일-도구는-사용자별-docker-실행-공간에서만-돈다.md)).
 
 Hermes 가 쓰는 Docker API 는 `version`, `info`, `ps`, `inspect`, `image inspect`, `create`, `run`, `start`, `exec`, `rm` 이다. volume 과 network API 는 쓰지 않는다.
 
@@ -300,7 +301,7 @@ Hermes 가 쓰는 Docker API 는 `version`, `info`, `ps`, `inspect`, `image insp
 | --- | --- | --- |
 | socket 을 Hermes 에 직접 붙인다 | 동작한다 | Hermes 프로세스나 그 자식(커넥터 MCP 서버 포함)이 뚫리면 호스트 root 와 같다 |
 | 경로와 메서드만 거르는 socket proxy(containers, exec, images, info, version 만 연다) | 실행 공간이 동작한다. volume 과 network 목록은 403 | **`--privileged -v /:/host` 컨테이너 생성이 통과했다.** 호스트 파일 시스템이 보였다 |
-| 컨테이너 생성 요청 본문을 검사하는 proxy | 이 저장소에서 측정하지 않았다 | 권장. 아래 조건을 본문에서 강제한다 |
+| 컨테이너 생성 요청 본문을 검사하는 proxy | 이 저장소에서 측정하지 않았다 | 채택했다. 아래 조건을 본문에서 강제한다 |
 
 본문 검사 proxy 가 거절할 것은 이렇다.
 

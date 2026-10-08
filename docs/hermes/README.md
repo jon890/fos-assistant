@@ -102,7 +102,7 @@ LLM 호출마다 모델과 사용량을 구분해야 하면 plugin hook 을 쓴�
 ## gateway 는 s6 가 감독한다
 
 아래는 v0.21.0 과 v0.21.3 의 동작이다.
-v0.21.4 이후의 host singleton 과 multiplex 정책은 다음 절에서 구분한다.
+v0.21.4 이후의 host singleton 과 multiplex 정책은 [「연동에 영향을 주는 변경」](upgrades.md#연동에-영향을-주는-변경) 의 「v0.21.4 이후 gateway」 줄이 갖는다.
 
 이 컨테이너는 listener 주인의 gateway 하나를 돌리고 s6 가 감독한다.
 이름이 붙은 profile 은 s6 service 자리를 만들기만 하며, 개별 gateway 를 자동으로 띄우지 않는다.

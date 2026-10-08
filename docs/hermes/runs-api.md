@@ -46,7 +46,7 @@ v0.21.5 의 `gateway/platforms/api_server_runs.py` 에 `_handle_steer_run` 이 �
 
 ## 실행 조회가 답하는 기간
 
-v0.21.5 의 [`gateway/platforms/api_server_runs.py`](https://github.com/NousResearch/hermes-agent/blob/v2026.9.24/gateway/platforms/api_server_runs.py) 와 `api_server.py` 를 2026-10-02 에 소스로 읽었다. 운영 Hermes 에서 왕복으로 확인하지는 않았다.
+v0.21.5 의 [`gateway/platforms/api_server_runs.py`](https://github.com/NousResearch/hermes-agent/blob/v2026.9.24/gateway/platforms/api_server_runs.py) 와 `api_server.py` 를 소스로 읽었다. 운영 Hermes 에서 왕복으로 확인하지는 않았다.
 
 **실행 상태는 gateway 프로세스의 메모리에 있다.** `_run_statuses` 가 run 번호마다 상태 하나를 갖는다.
 
@@ -146,7 +146,7 @@ Hermes 안에서 다른 모델로 넘어가도 이 값은 바뀌지 않는다.
 실제로 돈 모델은 `GET /api/sessions/{session_id}` 의 `model` 이 담는다.
 fallback 으로 넘어간 뒤의 모델까지 그쪽에 들어 있다.
 
-**v0.21.5 에서 달라진 두 가지**(2026-09-29 운영에서 확인):
+**v0.21.5 에서 달라진 두 가지**(운영에서 확인):
 
 - `GET /api/sessions/{session_id}` 는 행을 `{"object": "session", "session": {...}}` 로 감싸고, `model` 은 `session` 안에 있다. provider 칸은 응답에 없다. Hermes 저장소에는 `billing_provider` 로 남는다. 저장소의 그 칸은 [`delegation.md`](delegation.md) 의 「자식 session 의 provider 는 저장소에만 있다」 가 적는다
 - `GET /v1/runs/{run_id}` 는 끝난 실행에 `runtime: {"provider", "model", "route_source"}` 를 싣는다. fallback 으로 넘어간 경우도 실제로 돈 값이다. 근거는 [v0.21.5 `gateway/platforms/api_server_runs.py`](https://github.com/NousResearch/hermes-agent/blob/v2026.9.24/gateway/platforms/api_server_runs.py) 의 `_served_runtime` 과 `api_server.py` 의 `_sanitize_runtime_metadata` 다
@@ -155,7 +155,7 @@ fallback 으로 넘어간 뒤의 모델까지 그쪽에 들어 있다.
 둘 중 하나라도 없으면 세션 조회, 실행의 `runtime`, 대화가 고른 값 순서로 먼저 있는 것을 칸마다 따로 채운다.
 
 `POST /api/sessions/{id}/chat` 은 응답에 `runtime` 을 담아 요청한 것과 실제로 돈 것을
-한 응답에서 대조할 수 있다. v0.21.3 까지는 그 블록이 `/v1/runs` 에 없었다. v0.21.5 는 아래처럼 실행 조회에도 싣는다.
+한 응답에서 대조할 수 있다. v0.21.3 까지는 그 블록이 `/v1/runs` 에 없었다. v0.21.5 는 위 「v0.21.5 에서 달라진 두 가지」 처럼 실행 조회에도 싣는다.
 
 `/v1/capabilities` 와 `/v1/models` 도 실제로 쓴 provider 모델을 주지 않는다.
 실제 모델을 알아야 하면 `/api/model/options` 가 그 profile 의 것을 답한다.

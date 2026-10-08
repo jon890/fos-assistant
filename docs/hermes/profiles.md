@@ -142,54 +142,53 @@ API 로 만들면 wrapper 가 함께 생긴다.
 
 ### profile 을 만드는 요청 안에서 도구 설정을 검증한다
 
-2026-09-28 에 v0.21.0 소스로 검토한 방식이다.
-**아래는 Hermes 가 제공하는 동작을 조합한 설계이며, 이 조사에서 구현하거나 실행하지 않았다.**
 profile 생성 뒤의 공식 plugin hook 은 없다.
-대신 기존 `hermes_cli/dashboard_auth/token_auth.py` 의 `token_auth_middleware` 를
-모듈 속성으로 감싸면 다음 대시보드 요청부터 기존 생성 처리 앞뒤에 코드를 둘 수 있다.
+그래서 대시보드 plugin `dashboard-profile-api` 는 `hermes_cli/dashboard_auth/token_auth.py` 의 `token_auth_middleware` 를 모듈 속성으로 감싼다.
+`web_server.py` 가 요청마다 이 이름을 다시 import 하므로, 감싼 다음 요청부터 토큰으로 부른 `POST /api/profiles` 의 생성 처리 앞뒤에 코드가 붙는다.
+이 방식을 유지하는 까닭은 [ADR-088](../adr/ADR-088-대시보드-plugin-은-감싸는-경로의-바꿔-끼우기를-두고-기대는-hermes-내부-지점을-계약-시험으로-확인한다.md) 이 갖는다.
 
-| 필요한 동작 | Hermes 근거 |
+| 필요한 동작 | 쓰는 Hermes 지점 |
 | --- | --- |
 | 생성된 profile 판별 | `hermes_cli.profiles.list_profile_names` 의 생성 전후 차이 |
-| profile 문맥 선택 | `hermes_constants.set_hermes_home_override` 와 reset. 대시보드 `_profile_scope` 와 같은 방식 |
+| profile 문맥 선택 | `hermes_constants.set_hermes_home_override` 와 `reset_hermes_home_override`. 대시보드 `_profile_scope` 와 같은 방식 |
 | 설정 저장 | `hermes_cli.config.save_config`. 원래 `model` 블록을 남기고 나머지 설정에 template 을 적용한다 |
 | 실제 API 도구 계산 | `hermes_cli.tools_config._get_platform_tools(config, "api_server")` |
 | 실패한 생성 정리 | `hermes_cli.profiles.delete_profile(name, yes=True)` |
 
 처리 순서는 다음과 같다.
+단계별 세부와 금지 toolset 목록은 `hermes/plugins/dashboard-profile-api/profiles.py` 가 갖는다.
 
-1. 생성 전 목록을 읽고 기존 생성 처리기를 호출한다. 400 이상이면 응답을 그대로 돌려준다.
-2. 새 이름이 정확히 하나인지 확인한다. 판별하지 못하면 성공으로 보고하지 않는다.
-3. 그 profile 문맥에서 설정 template 과 `.no-bundled-skills` 표식을 쓴다.
-4. `_get_platform_tools` 로 계산해 금지 도구가 없는지 확인한다.
-5. 저장이나 계산이 실패하면 새 profile 을 지우고 실패 응답을 돌려준다.
-6. 검증이 끝난 뒤 별도 요청으로 key 를 넣는다.
+1. 생성 전 목록을 읽는다. 읽지 못하면 생성 처리기를 부르지 않고 500 을 돌려준다.
+2. 기존 생성 처리기를 호출한다. 400 이상이면 응답을 그대로 돌려준다.
+3. 새 이름이 정확히 하나인지 확인한다.
+4. 그 profile 문맥에서 설정 template 과 `.no-bundled-skills` 표식, profile plugin 을 쓴다.
+5. `_get_platform_tools` 로 계산해 금지 toolset 이 없는지 확인한 뒤 관리 표식을 쓴다.
+6. 3~5 에서 하나라도 실패하면 새로 생긴 profile 을 모두 지우고 500 을 돌려준다.
+7. 공유 gateway 에 그 profile 의 plugin 을 다시 읽게 한다. 이것이 실패해도 생성은 성공이다.
+8. 검증이 끝난 뒤 Control Plane 이 별도 `PUT /api/env` 요청으로 key 를 넣는다.
 
 **clone 없이 만드는 경우 설정 검증 중에는 key 가 없어 공유 listener 의 접두 요청이 거절된다.**
-이 순서로 생성과 설정 검증을 같은 요청 안에서 끝낼 수 있다.
-이 내부 함수가 업그레이드로 달라지면 생성 성공을 반환하지 않도록 처리해야 한다.
+이 순서로 생성과 설정 검증을 같은 요청 안에서 끝낸다.
+위 내부 지점이 업그레이드로 달라지면 계산이 예외를 내고 생성이 거절되므로, 넓게 열린 profile 이 남지 않는다.
+그 지점의 이름과 인자는 `hermes/tests/hermes_contract.py` 가 고정 버전 소스와 대조한다.
 plugin 로딩은 기동 때 이뤄져 plugin 변경에는 대시보드 재시작이 필요하다.
 설정 적용만을 위해 gateway 를 다시 띄울 필요는 없다.
 
 표식은 다음 번들 동기화를 막을 뿐 이미 심은 스킬을 지우지 않는다.
 처음부터 심지 않으려면 생성 본문에 `no_skills: true` 를 준다.
 `skills` toolset 을 닫으면 이미 있는 스킬 색인은 입력에 들어가지 않는다.
-이 wrapper 는 `clone_from` 으로 이미 복사한 `.env` 를 되돌리지 않으므로,
-clone 의 key 복사 문제까지 해결하는 것으로 해석하면 안 된다.
+토큰으로 부른 생성은 본문에 `name`, `no_skills`, `description` 만 받고 `clone_from` 을 거절한다.
+그래서 아래 「`clone_from` 은 원본의 `API_SERVER_KEY` 까지 복사한다」 의 문제가 이 경로로는 생기지 않는다.
 
-별도 `PUT /api/config` 로 template 을 쓰는 방식은 두 번째 요청 누락 시 넓은 도구가 남고,
-해당 경로를 열면 모든 profile 의 설정 키를 쓸 수 있다.
-안전한 profile 을 clone 하는 방식도 원본 `.env` 에 뒤에 추가된 값이 복사될 수 있다.
-`pre_tool_call` 의 `{"action": "block"}` 은 실행 시점의 추가 차단에 쓸 수 있지만
-모델에 실리는 도구 정의와 입력 비용을 줄이지 않는다.
-managed scope 는 프로세스 전체에 적용되므로 profile 별 template 을 대신하지 못한다.
+다른 방식은 아래 까닭으로 쓰지 않는다.
+
+- 생성 뒤 별도 `PUT /api/config` 로 template 을 쓴다: 두 번째 요청이 빠지면 넓은 도구가 남는다.
+- 안전한 profile 을 clone 한다: 원본 `.env` 에 뒤에 추가된 값까지 복사된다([ADR-018](../adr/ADR-018-사람을-더하는-것을-control-plane-이-끝낸다.md)).
+- `pre_tool_call` 의 `{"action": "block"}`: 실행 시점에 더 막을 수는 있지만 모델에 실리는 도구 정의와 입력 비용을 줄이지 않는다.
+- managed scope: 프로세스 전체에 적용되므로 profile 별 template 을 대신하지 못한다.
+
 이미 존재하는 listener 주인 profile 의 접두 없는 요청은 생성 wrapper 의 대상이 아니다.
 그 범위는 `platform_toolsets.api_server` 또는 별도 실행 차단으로 정해야 한다.
-
-근거는 [v0.21.0 profiles.py](https://github.com/NousResearch/hermes-agent/blob/v2026.8.31/hermes_cli/profiles.py),
-[token_auth.py](https://github.com/NousResearch/hermes-agent/blob/v2026.8.31/hermes_cli/dashboard_auth/token_auth.py),
-[plugins.py](https://github.com/NousResearch/hermes-agent/blob/v2026.8.31/hermes_cli/plugins.py),
-`model_tools.py` 의 `_dispatch_pre_tool_call_hooks` 다.
 
 ### `clone_from` 은 원본의 `API_SERVER_KEY` 까지 복사한다
 
