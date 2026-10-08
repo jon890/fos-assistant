@@ -41,6 +41,10 @@ Control Plane 예약 작업과 매일 깨우기는 각 에이전트의 profile �
 `execute_code` 의 RPC 로 다시 Hermes 에서 도는 도구는 `web_search`, `web_extract`, `read_file`, `write_file`, `search_files`, `patch`, `terminal` 이다.
 웹 도구는 Hermes 쪽에서 주소 검사를 거치고, 나머지는 다시 컨테이너로 간다.
 
+**스크립트는 커넥터 MCP 도구를 부르지 못한다.** RPC 로 부를 수 있는 도구는 위 일곱 개(`SANDBOX_ALLOWED_TOOLS`)와 그 profile 에 켜진 도구의 교집합이고, 교집합이 비면 일곱 개 전부다.
+스텁 모듈(`hermes_tools.py`)이 그 교집합만 만들고, RPC 처리기(`tools/code_execution_rpc.py` 의 `_handle_rpc_request`)가 목록 밖 이름을 거절한다. docker 실행 공간의 원격 커널(`tools/code_kernel_remote.py`)도 같은 목록이다.
+목록은 모듈 상수라 core 를 고치지 않고는 늘지 않는다. 커넥터 데이터를 계산하는 길은 [ADR-20261008 / connector-output-files](../adr/ADR-20261008-connector-output-files.md) 가 정한다.
+
 커넥터 MCP 서버가 컨테이너 밖에서 도는 것이 비밀 격리의 근거다.
 커넥터 토큰은 MCP 프로세스의 환경에만 있고, 셸은 그 프로세스와 profile 파일을 보지 못한다.
 
@@ -126,6 +130,7 @@ proxy 검사와 유휴 정리, 복구는 이 label 로 정책의 profile 을 식
 | `/root/.hermes/external_skills/<n>` | `skills.external_dirs` | 읽기 전용 |
 | `/root/.hermes/cache/*`, `images`, `attachments` | 그 profile 의 media cache | 읽기 전용 |
 | `/root/.hermes/<상대 경로>` | `terminal.credential_files` 와 스킬이 선언한 `required_credential_files` | 읽기 전용 |
+| `<connector_output_root>/users/<sha256(주인)>/<profile>`(같은 경로) | 정책에 그 키가 있을 때 plugin 이 붙인다. 커넥터가 계산할 목록을 쓴다 | 읽기 전용 |
 | `docker_volumes` 의 나머지 | 운영자가 정한 것 | 적힌 대로 |
 
 `/workspace` 와 `/root` 밖의 파일 시스템은 이미지의 것이고 컨테이너를 지우면 사라진다.
@@ -146,6 +151,19 @@ Hermes 가 컨테이너 안에서 Docker 를 부르면 `-v` 의 원본은 Hermes
 
 공유 키는 첫 profile 의 `terminal.*` 와 마운트가 그 컨테이너의 수명 동안 이긴다.
 두 번째 방식은 `/root` 가 profile 마다 따로라서 셸 이력과 설치한 사용자 패키지는 나뉘고 `/workspace` 만 함께 쓴다.
+
+## 큰 도구 결과의 저장
+
+Hermes 는 큰 도구 결과를 모델에 그대로 넣지 않고 파일로 저장한 뒤 앞부분 1,500자와 경로를 돌려준다(`tools/tool_result_storage.py`).
+
+| 항목 | 값 |
+| --- | --- |
+| 기준 | 도구 결과 하나가 100,000자를 넘을 때. 이름이 `mcp_` 로 시작하는 MCP 도구는 50,000자(`tool_budget.mcp_result_size_chars` 로 바꾼다). 한 turn 의 도구 결과 합이 200,000자를 넘으면 큰 것부터 저장한다 |
+| 저장 위치 | 그 profile 의 `cache/spillover`. 24시간 지난 파일을 지운다 |
+| 실행 공간에서 | `cache/spillover` 는 `/root/.hermes/cache/spillover` 에 읽기 전용으로 붙는다. 그 turn 에 실행 공간 연결이 있으면 그 경로를 돌려준다 |
+| 연결이 없을 때 | **Hermes 쪽 경로를 돌려준다.** 셸이나 `execute_code` 를 아직 부르지 않은 turn 에서 목록을 먼저 부르면 실행 공간에서 열리지 않는 경로가 나온다 |
+
+그래서 계산할 데이터를 실행 공간에 넘기는 길로 이 저장에 기대지 않는다.
 
 ## 파일 도구의 쓰기 경로 검사
 
@@ -282,6 +300,10 @@ colima VM(4 CPU, 8 GiB) 에서 측정했다. 이미지는 `python:3.11-slim` 이
 
 ## 근거
 
+- [tools/code_execution_tool.py](https://github.com/NousResearch/hermes-agent/blob/v2026.9.24/tools/code_execution_tool.py)
+- [tools/code_execution_rpc.py](https://github.com/NousResearch/hermes-agent/blob/v2026.9.24/tools/code_execution_rpc.py)
+- [tools/tool_result_storage.py](https://github.com/NousResearch/hermes-agent/blob/v2026.9.24/tools/tool_result_storage.py)
+- [tools/budget_config.py](https://github.com/NousResearch/hermes-agent/blob/v2026.9.24/tools/budget_config.py)
 - [tools/terminal_tool.py](https://github.com/NousResearch/hermes-agent/blob/v2026.9.24/tools/terminal_tool.py)
 - [tools/terminal_scope.py](https://github.com/NousResearch/hermes-agent/blob/v2026.9.24/tools/terminal_scope.py)
 - [tools/environments/docker.py](https://github.com/NousResearch/hermes-agent/blob/v2026.9.24/tools/environments/docker.py)
