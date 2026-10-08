@@ -30,6 +30,7 @@
 - 한 메시지(조각의 합)가 64M 글자를 넘으면 양쪽을 닫는다. 끝없는 메시지를 막는 상한이다
 - `Origin` 은 interceptor 가 직접 보고 403 이다. Spring 의 Origin 검사는 `setAllowedOriginPatterns("*")` 로 끄고 그 자리를 interceptor 가 갖는다
 - 한쪽으로 가는 조각은 앞 조각의 보내기가 끝난 뒤에 보낸다. 순서가 섞이면 CDP 메시지가 깨진다
+- Chrome 쪽 보내기가 30초 안에 끝나지 않으면 실패하고 양쪽을 닫는다. 멈춘 Chrome 이 받는 쪽 스레드를 붙잡지 않게 한다
 
 ## 작업 항목
 
@@ -41,7 +42,7 @@
 
 - `browser.domain.CdpRelay`(신규 인터페이스): `void send(String fragment, boolean last)`(앞 보내기가 끝날 때까지 기다린 뒤 보낸다. 실패하면 런타임 예외), `void close()`
 - `browser.domain.CdpRelayConnector`(신규 인터페이스): `CdpRelay open(URI cdp, String kind, String id, CdpRelayListener listener)`. `browser.domain.CdpRelayListener`(신규 인터페이스): `void onFragment(String fragment, boolean last)`, `void onClosed()`
-- `browser.infra.WebSocketCdpRelayConnector`(신규 `@Component`): `ws://<cdp host:port>/devtools/<kind>/<id>` 로 JDK WebSocket 을 연다. `kind` 는 `page` 나 `browser`, `id` 는 `^[A-Za-z0-9-]{1,128}$` 가 아니면 `IllegalArgumentException`. 받은 조각은 `onFragment` 를 부른 뒤 `request(1)` 한다. 상대가 닫거나 오류면 `onClosed` 를 한 번 부른다
+- `browser.infra.WebSocketCdpRelayConnector`(신규 `@Component`): `ws://<cdp host:port>/devtools/<kind>/<id>` 로 JDK WebSocket 을 연다. `kind` 는 `page` 나 `browser`, `id` 는 `^[A-Za-z0-9-]{1,128}$` 가 아니면 `IllegalArgumentException`. 받은 조각은 `onFragment` 를 부른 뒤 `request(1)` 한다. 상대가 닫거나 오류면 `onClosed` 를 한 번 부른다. Chrome 쪽 보내기가 30초 안에 끝나지 않으면 실패하고 양쪽을 닫는다
 
 ### 3. 받는 쪽
 
@@ -89,6 +90,8 @@ scripts/check-mysql-migration.sh
 | `backend/src/test/java/com/bifos/assistant/browser/infra/WebSocketCdpRelayConnectorTest.java` | 신규 |
 | `backend/src/test/java/com/bifos/assistant/browser/presentation/BrowserGatewaySocketTest.java` | 신규 |
 | `backend/src/test/java/com/bifos/assistant/browser/presentation/BrowserGatewaySocketIntegrationTest.java` | 신규 |
+| `backend/src/test/java/com/bifos/assistant/browser/presentation/BrowserGatewayHandshakeTest.java` | 신규 |
+| `backend/src/main/java/com/bifos/assistant/browser/application/BrowserGateway.java` | 수정 |
 | `backend/src/test/java/com/bifos/assistant/testsupport/IntegrationTestDoubles.java` | 수정 |
 | `backend/src/test/java/com/bifos/assistant/testsupport/EchoCdpRelayConnector.java` | 신규 |
 | `backend/src/test/java/com/bifos/assistant/testsupport/IntegrationTestIsolation.java` | 수정 |
