@@ -94,7 +94,7 @@ class StoredEnumNamesTest {
                             "EXECUTION_FAILED")),
             Map.entry(
                     FeedbackSubjectType.class,
-                    List.of("FOLLOW_UP", "MEMORY", "CONNECTOR_ACTION", "CHECK", "AUTONOMY_DECISION")),
+                    List.of("FOLLOW_UP", "MEMORY", "CONNECTOR_ACTION", "CHECK", "CHECK_FINDING", "AUTONOMY_DECISION")),
             Map.entry(FeedbackActor.class, List.of("USER", "AGENT", "SYSTEM")));
 
     @Test
