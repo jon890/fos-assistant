@@ -3,6 +3,8 @@
   "id": "naver-blog",
   "title": "네이버 블로그",
   "description": "로그인해 둔 Chrome 에 붙어 승인한 글을 네이버 블로그에 임시저장합니다. 발행하지 않습니다.",
+  "icon": "icon.svg",
+  "link": "https://blog.naver.com/",
   "fields": [
     {
       "key": "cdp_url",

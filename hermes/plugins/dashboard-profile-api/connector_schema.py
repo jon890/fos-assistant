@@ -130,3 +130,28 @@ CONNECTOR_PERSONA_MAX_CHARS = 8000
 
 # `.mcp.json` 의 인자가 plugin 디렉터리를 가리키는 자리다. 그 밖의 치환은 받지 않는다.
 PLUGIN_ROOT_REF = "${CLAUDE_PLUGIN_ROOT}"
+
+
+# 커넥터 카드의 `icon` 과 `link` 규칙이다. `docs/connectors.md` 의 「아이콘과 링크」 와 같다(ADR-20261008 connector-card).
+ICON_PATH_RE = re.compile(r"^[A-Za-z0-9_][A-Za-z0-9_./-]{0,127}$")
+
+
+ICON_MAX_BYTES = 32 * 1024
+
+
+ICON_MEDIA_TYPES = {".svg": "image/svg+xml", ".png": "image/png"}
+
+
+PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
+
+
+LINK_MAX_CHARS = 500
+
+
+# 이 금지 목록은 `<img>` 앞의 두 번째 선이다(ADR-20261008 connector-card). Control Plane 의 같은 식과 같아야 한다.
+# `re.ASCII` 로 공백과 대소문자 무시를 ASCII 기준으로 둔다. Java 정규식의 기본 동작과 같게 하기 위해서다.
+SVG_FORBIDDEN_RE = re.compile(
+    r"<!doctype|<!entity|<script|<foreignobject|<iframe|<embed|<object|<set|<animate|@import|javascript:|&#|\\"
+    r"|\son[a-z]+\s*=|href\s*=(?![\s\"']*#)|url\((?![\s\"']*#)",
+    re.IGNORECASE | re.ASCII,
+)

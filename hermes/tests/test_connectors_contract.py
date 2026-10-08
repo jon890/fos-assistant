@@ -21,6 +21,8 @@ SECRET_WORDS = ("TOKEN", "SECRET", "PASSWORD", "KEY")
 ALLOWED_IMPORTS = {"mcp", "mcp_types", "anyio"}
 CLOSED_RISKS = {"DESTRUCTIVE", "FINANCIAL"}
 SERVER_TIMEOUT_SECONDS = 30
+# `<img>` 로 그리는 SVG 는 이 이름공간 선언이 없으면 아무것도 그리지 않는다.
+SVG_NAMESPACE = 'xmlns="http://www.w3.org/2000/svg"'
 
 
 def connector_dirs(connectors: pathlib.Path = CONNECTORS) -> list[pathlib.Path]:
@@ -87,6 +89,19 @@ def check_connector(root: pathlib.Path, repo: pathlib.Path, load_connector) -> l
         problems.append("이름 불일치: 디렉터리 %r, id %r, plugin name %r" % (name, declared.get("id"), plugin.get("name")))
     if declared.get("schema") != 2:
         problems.append("schema 가 2 가 아니다: %r" % declared.get("schema"))
+
+    # 이 저장소의 커넥터는 카드의 아이콘과 링크를 갖춘다(ADR-20261008 connector-card). 형식은 위 manifest 검증이 본다.
+    for key in ("icon", "link"):
+        if not declared.get(key):
+            problems.append("%s 칸을 선언하지 않았다: %s" % (key, name))
+    icon = declared.get("icon")
+    if isinstance(icon, str) and icon.endswith(".svg"):
+        try:
+            icon_text = (root / icon).read_text(encoding="utf-8")
+        except (OSError, ValueError):
+            icon_text = ""
+        if SVG_NAMESPACE not in icon_text:
+            problems.append("아이콘 SVG 가 %s 를 선언하지 않았다: %s" % (SVG_NAMESPACE, name))
 
     tools = declared.get("tools", {})
     for tool, spec in tools.items():
@@ -246,6 +261,16 @@ class ContractCatchesViolationsTest(base.ConnectorGateCase):
     def test_write_tool_without_title_is_reported(self):
         problems = self.broken_copy(self.edit_declaration(lambda v: v["tools"]["create_draft"].pop("title")))
         self.assert_reported(problems, "title")
+
+    def test_connector_without_icon_is_reported(self):
+        problems = self.broken_copy(self.edit_declaration(lambda v: v.pop("icon")))
+        self.assert_reported(problems, "icon 칸을 선언하지 않았다: gmail")
+
+    def test_icon_svg_without_namespace_is_reported(self):
+        def change(root):
+            path = root / "icon.svg"
+            path.write_text(path.read_text(encoding="utf-8").replace(" " + SVG_NAMESPACE, ""), encoding="utf-8")
+        self.assert_reported(self.broken_copy(change), "아이콘 SVG 가 %s 를 선언하지 않았다: gmail" % SVG_NAMESPACE)
 
     def test_write_tool_without_outbound_is_reported(self):
         problems = self.broken_copy(self.edit_declaration(lambda v: v["tools"]["create_draft"].pop("outbound")))

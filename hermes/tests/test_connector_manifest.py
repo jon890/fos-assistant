@@ -1,6 +1,7 @@
 """dashboard-profile-api 가 `connector.json` 을 읽어 카탈로그로 내는 규칙을 검사한다(ADR-043)."""
 
 import asyncio
+import base64
 import hashlib
 import json
 import logging
@@ -9,6 +10,7 @@ import pathlib
 import shutil
 import sys
 import tempfile
+import time
 import types
 import unittest
 from unittest import mock
@@ -135,8 +137,11 @@ class ConnectorCatalogTest(ConnectorGateCase):
         body = self.catalog()
         self.assertEqual(len(body), 1)
         entry = body[0]
-        self.assertEqual(set(entry), {"id", "schema", "title", "description", "fields", "verify", "mcp_server",
-                                      "toolsets", "attachments", "tools", "skills"})
+        self.assertEqual(set(entry), {"id", "schema", "title", "description", "icon", "link", "fields", "verify",
+                                      "mcp_server", "toolsets", "attachments", "tools", "skills"})
+        # `icon` 과 `link` 를 선언하지 않은 커넥터는 두 칸이 null 이다.
+        self.assertIsNone(entry["icon"])
+        self.assertIsNone(entry["link"])
         # 두 칸이 없는 manifest 는 내장 도구를 열지 않고 사진을 받지 않는다.
         self.assertEqual(entry["toolsets"], [])
         self.assertIs(entry["attachments"], False)
@@ -820,6 +825,158 @@ class ConnectorToolPolicyTest(ConnectorGateCase):
         self.assertEqual(manifest["call_tools"], frozenset({"list_scopes"}))
         status, body = self.request("/api/connectors/%s/call" % DEMO, "POST", {"tool": "write_note", "values": {}})
         self.assertEqual(status, 400, body)
+
+
+SVG_OPEN = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">'
+PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
+ICON_MAX_BYTES = 32 * 1024
+
+
+def svg(inner="", head=""):
+    """`head` 뒤에 `<svg>` 요소를 두고 그 안에 `inner` 를 넣은 UTF-8 바이트다."""
+    return (head + SVG_OPEN + inner + "</svg>").encode("utf-8")
+
+
+def svg_of_size(size):
+    """요소 안을 공백으로 채워 정확히 `size` 바이트인 SVG 다."""
+    empty = svg()
+    return svg(" " * (size - len(empty)))
+
+
+class ConnectorAppearanceTest(ConnectorGateCase):
+    """커넥터 카드의 `icon` 과 `link` 를 검증해 카탈로그에 싣는 규칙을 검사한다(ADR-20261008 connector-card).
+
+    `icon` 이나 `link` 가 규칙을 하나라도 어기면 그 커넥터는 카탈로그에서 빠진다. 다른 `connector.json` 칸과 같다.
+    """
+
+    def declare(self, **values):
+        self.rewrite("connector.json", lambda value: value.update(values))
+
+    def write(self, name, data: bytes):
+        path = self.connector_root / name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(data)
+
+    def catalog_icon(self, name, data: bytes):
+        """`name` 에 `data` 를 쓰고 그 파일을 선언한 뒤 카탈로그의 `icon` 칸을 돌려준다. 빠졌으면 실패다."""
+        self.write(name, data)
+        self.declare(icon=name)
+        body = self.catalog()
+        self.assertEqual([entry["id"] for entry in body], [DEMO], "아이콘 %s 를 받지 않았다" % name)
+        return body[0]["icon"]
+
+    def assert_left_out(self):
+        self.assertEqual(self.catalog(), [])
+        self.assertIsNone(self.plugin._connector_manifest(DEMO))
+
+    def test_declared_svg_icon_and_link_reach_the_catalog(self):
+        """선언한 SVG 아이콘은 `media_type` 과 파일 원본의 base64 로, 링크는 그대로 나온다."""
+        data = (DEMO_CONNECTOR / "icon.svg").read_bytes()
+        self.declare(icon="icon.svg", link="https://example.com/notes?view=card")
+        entry = self.catalog()[0]
+        self.assertEqual(entry["icon"], {"media_type": "image/svg+xml", "data": base64.b64encode(data).decode("ascii")})
+        self.assertEqual(entry["link"], "https://example.com/notes?view=card")
+
+    def test_declared_png_icon_reaches_the_catalog(self):
+        """하위 디렉터리의 PNG 아이콘은 서명만 보고 내용은 그대로 싣는다."""
+        data = PNG_SIGNATURE + bytes(range(256))
+        self.assertEqual(self.catalog_icon("assets/icon.png", data),
+                         {"media_type": "image/png", "data": base64.b64encode(data).decode("ascii")})
+
+    def test_svg_with_local_references_and_a_prolog_is_accepted(self):
+        """문서 안 참조(`#`)만 가리키는 `href` 와 `url()`, BOM 과 XML 선언과 주석 뒤의 `<svg` 는 받는다."""
+        cases = {
+            'href="#a"': svg('<use href="#a"/>'),
+            "xlink:href='#a'": svg("<use xlink:href='#a'/>"),
+            "url(#g)": svg('<rect fill="url(#g)"/>'),
+            "url('#g')": svg("<rect fill=\"url('#g')\"/>"),
+            "url( #g)": svg('<rect fill="url( #g)"/>'),
+            "BOM, XML 선언, 주석": svg(head='\ufeff<?xml version="1.0" encoding="UTF-8"?>\n<!-- 직접 그림 -->\n'),
+        }
+        for label, data in cases.items():
+            with self.subTest(label):
+                self.assertEqual(self.catalog_icon("icon.svg", data)["data"], base64.b64encode(data).decode("ascii"))
+
+    def test_icon_of_exactly_the_limit_is_accepted(self):
+        """32 KiB 정확히인 아이콘은 받는다. 아래 1 바이트 큰 파일의 거절이 크기 때문임을 보인다."""
+        data = svg_of_size(ICON_MAX_BYTES)
+        self.assertEqual(len(data), ICON_MAX_BYTES)
+        self.assertEqual(self.catalog_icon("icon.svg", data)["data"], base64.b64encode(data).decode("ascii"))
+
+    def test_link_of_exactly_the_limit_is_accepted(self):
+        link = "https://example.com/" + "a" * (500 - len("https://example.com/"))
+        self.assertEqual(len(link), 500)
+        self.declare(link=link)
+        self.assertEqual(self.catalog()[0]["link"], link)
+
+    def test_invalid_icon_or_link_leaves_the_connector_out(self):
+        """아이콘의 경로, 크기, 형식이나 링크가 하나라도 틀리면 그 커넥터는 카탈로그에 없다."""
+        outside = self.base / "outside.svg"
+        outside.write_bytes(svg())
+
+        def icon(name, data=None):
+            def change():
+                if data is not None:
+                    self.write(name, data)
+                self.declare(icon=name)
+            return change
+
+        def linked():
+            (self.connector_root / "linked.svg").symlink_to(outside)
+            self.declare(icon="linked.svg")
+
+        cases = (
+            ("absolute path", lambda: self.declare(icon=str(self.connector_root / "icon.svg"))),
+            ("../icon.svg", lambda: (outside.with_name("icon.svg").write_bytes(svg()), self.declare(icon="../icon.svg"))),
+            ("skills/../icon.svg", icon("skills/../icon.svg")),
+            ("not a string", lambda: self.declare(icon=["icon.svg"])),
+            (".gif extension", icon("icon.gif", b"GIF89a")),
+            ("missing file", icon("missing.svg")),
+            ("empty file", icon("empty.svg", b"")),
+            ("symlink outside the plugin", linked),
+            ("one byte over 32 KiB", icon("large.svg", svg_of_size(ICON_MAX_BYTES + 1))),
+            ("PNG without signature", icon("icon.png", b"not a png at all")),
+            ("SVG not UTF-8", icon("latin.svg", svg() + b"\xff")),
+            ("<script>", icon("icon.svg", svg("<script>alert(1)</script>"))),
+            ("onload=", icon("icon.svg", svg('<rect onload="alert(1)"/>'))),
+            ("<foreignObject>", icon("icon.svg", svg("<foreignObject></foreignObject>"))),
+            ("<!DOCTYPE", icon("icon.svg", svg("<!DOCTYPE svg>"))),
+            ("<set", icon("icon.svg", svg('<rect><set attributeName="fill" to="red"/></rect>'))),
+            ("<animate", icon("icon.svg", svg('<rect><animate attributeName="x"/></rect>'))),
+            ("&#", icon("icon.svg", svg("<text>&#106;</text>"))),
+            ("backslash", icon("icon.svg", svg('<rect style="fill:\\72 ed"/>'))),
+            ('href="https://..."', icon("icon.svg", svg('<use href="https://example.com/a.svg#a"/>'))),
+            ('xlink:href="javascript:..."', icon("icon.svg", svg('<a xlink:href="javascript:alert(1)"/>'))),
+            ("url(http...)", icon("icon.svg", svg('<rect fill="url(http://example.com/g)"/>'))),
+            ("does not start with svg", icon("icon.svg", b"<g/>" + svg())),
+            ("http link", lambda: self.declare(link="http://example.com/")),
+            ("upper-case scheme", lambda: self.declare(link="HTTPS://example.com/")),
+            ("https link without host", lambda: self.declare(link="https:///path")),
+            ("https link with user", lambda: self.declare(link="https://user@example.com/")),
+            ("link with a space", lambda: self.declare(link="https://example.com/a b")),
+            ("501-character link", lambda: self.declare(link="https://example.com/" + "a" * 481)),
+            ("link not a string", lambda: self.declare(link={"href": "https://example.com/"})),
+        )
+        manifest = (self.connector_root / "connector.json").read_bytes()
+        for label, change in cases:
+            with self.subTest(label):
+                change()
+                self.assert_left_out()
+                (self.connector_root / "connector.json").write_bytes(manifest)
+                self.assertEqual([entry["id"] for entry in self.catalog()], [DEMO])
+
+    def test_many_comments_before_the_root_finish_quickly(self):
+        """주석이 많은 SVG 도 1초 안에 판정한다. `<svg/>` 가 뒤따르면 받고 다른 글이면 거절한다."""
+        comments = b"<!---->" * 2000
+        started = time.monotonic()
+        self.assertIsNotNone(self.catalog_icon("icon.svg", comments + b"<svg/>"))
+        accepted = time.monotonic() - started
+        self.write("icon.svg", comments + b"X")
+        started = time.monotonic()
+        self.assert_left_out()
+        rejected = time.monotonic() - started
+        self.assertLess(accepted, 1.0, "주석 뒤 <svg/> 판정이 %.3f 초 걸렸다" % accepted)
+        self.assertLess(rejected, 1.0, "주석 뒤 X 판정이 %.3f 초 걸렸다" % rejected)
 
 
 class HermesToolNameTest(ConnectorGateCase):

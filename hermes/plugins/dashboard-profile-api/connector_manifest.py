@@ -14,6 +14,11 @@ from .common import (
     logger,
 )
 
+from .connector_appearance import (
+    _connector_icon,
+    _connector_link,
+)
+
 from .connector_policy import (
     _canonical_server_name,
     _connector_errors,
@@ -140,6 +145,8 @@ def _load_connector(connector_id: str, entry: dict) -> dict:
     if (not isinstance(declared.get("title"), str) or not declared["title"]
             or not isinstance(declared.get("description", ""), str)):
         raise ValueError("title 과 description 은 문자열이다")
+    icon = _connector_icon(root, declared.get("icon"))
+    link = _connector_link(declared.get("link"))
     fields = _connector_fields(declared.get("fields"))
     verify = declared.get("verify")
     if (not isinstance(verify, dict) or not isinstance(verify.get("tool"), str)
@@ -255,6 +262,8 @@ def _load_connector(connector_id: str, entry: dict) -> dict:
         "schema": declared["schema"],
         "title": declared["title"],
         "description": declared.get("description", ""),
+        "icon": icon,
+        "link": link,
         "fields": fields,
         "verify": {"tool": verify["tool"]},
         "mcp_server": mcp_server,
@@ -345,7 +354,7 @@ def _connector_catalog_response():
 
     return JSONResponse(
         [{"id": manifest["id"], "schema": manifest["schema"], "title": manifest["title"],
-          "description": manifest["description"],
+          "description": manifest["description"], "icon": manifest["icon"], "link": manifest["link"],
           "fields": manifest["fields"], "verify": manifest["verify"], "mcp_server": manifest["mcp_server"],
           "toolsets": manifest["toolsets"], "attachments": manifest["attachments"],
           "skills": sorted(manifest["skills"]),
