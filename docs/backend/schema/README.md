@@ -6,6 +6,7 @@ DB 색인(index)은 마이그레이션이 갖는다. 이 문서는 표마다 칸
 
 비밀값은 어느 표에도 넣지 않는다.
 AI credential 은 Hermes profile 의 `.env` 에, profile 의 API server key 는 홈서버의 파일에 있다.
+`user_data_key` 의 데이터 key 는 데이터베이스 밖의 KEK 로 감싼 채로만 둔다.
 
 | 파일 | 표 |
 | --- | --- |
@@ -20,6 +21,7 @@ AI credential 은 Hermes profile 의 `.env` 에, profile 의 API server key 는 
 | [`proactive.md`](proactive.md) | `proactive_check`, `proactive_check_finding`, `proactive_check_problem`, `proactive_value_evaluation`, `proactive_autonomy_decision`, `user_autonomy_preference`, `proactive_loop_setting`, `proactive_loop_run` |
 | [`task.md`](task.md) | `task`, `task_trigger`, `task_run` |
 | [`browser.md`](browser.md) | `user_browser` |
+| [`crypto.md`](crypto.md) | `user_data_key` |
 
 ## 마이그레이션 작성 규칙
 

@@ -132,6 +132,7 @@
 | [ADR-20261008 / conversation-purge](ADR-20261008-conversation-purge.md) | 지운 대화는 정리 작업이 본문과 Hermes session 까지 지우고, 대화 줄과 실행 줄은 본문 없이 남긴다 | backend | Accepted. `docs/backend/schema/README.md` 의 「대화를 지워도 메시지와 Hermes session 은 남긴다」 를 바꾼다 |
 | [ADR-20261008 / cron-to-task](ADR-20261008-cron-to-task.md) | Hermes cron 자동화는 예약 작업으로 옮기고, 결과는 assistant 안에서만 받는다 | backend, frontend | Accepted. ADR-076 의 예약 작업에 모델 단계와 「보고할 것 없음」 완료를 더한다 |
 | [ADR-20261008 / daily-loop](ADR-20261008-daily-loop.md) | 매일 깨우기가 끝나면 동의한 사용자의 살펴보기 한 번에 가치 평가와 행동 정책을 한 번만 잇는다 | backend, frontend | Accepted. [ADR-20261007 / value-evaluation](ADR-20261007-value-evaluation.md) 의 「살펴보기에서 자동으로 부르지 않는다」 를 매일 깨우기에 한해 바꾸고, ADR-072 와 ADR-074 의 후보 기록과 「내 차례」 항목을 넓힌다 |
+| [ADR-20261008 / data-encryption](ADR-20261008-data-encryption.md) | 사용자 본문은 서버 KEK 로 감싼 사용자별 데이터 key 로 저장할 때 암호화하고, 대화 메시지부터 적용한다 | backend | Accepted. ADR-055 의 암호문 모양과 알고리즘을 그대로 쓴다 |
 | [ADR-20261008 / default-toolsets](ADR-20261008-default-toolsets.md) | 기본 에이전트는 web 과 셸, 파일, 코드 실행을 켜고 시작하되 셸 계열은 실행 공간이 있을 때만 켠다 | 공통 | Accepted. ADR-086 의 도구 저장에 local 로 돌리지 않는 쓰기를 더한다 |
 | [ADR-20261008 / execute-code-unattended](ADR-20261008-execute-code-unattended.md) | docker 실행 공간을 쓰는 profile 은 API 경로의 `execute_code` 를 승인 없이 컨테이너에서 돌린다 | hermes | Accepted. ADR-086 의 실행 공간 설정에 `approvals.unattended_mode` 를 더한다 |
 | [ADR-20261008 / memory-facts](ADR-20261008-memory-facts.md) | 짧은 개인 기억은 본문까지 「개인 사실 구역」에 싣고, 답마다 참고한 기억을 사용자에게 보인다 | backend, frontend | Accepted. ADR-20261007 / memory-remember 의 「색인에 제목이 실린다」 를 개정하고 ADR-015 에 예외를 둔다 |
