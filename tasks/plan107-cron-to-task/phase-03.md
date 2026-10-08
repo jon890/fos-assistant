@@ -29,7 +29,7 @@ phase 01, 02 의 API 를 사용자가 화면에서 쓰게 하기 위해서다.
 
 ### 1. `web/src/lib/task.ts`
 
-- 단계 타입은 새로 만들지 않는다. `web/src/lib/model-tiers.ts` 의 `ModelTierCode` 를 import 한다
+- 단계 타입은 새로 만들지 않는다. `import type { ModelTierCode } from "./model-tiers";` 로 가져온다. `type` 을 빼면 `node --test` 가 `model-tiers.ts` 의 런타임 import(`@/components/error-message`)를 따라가 단위 검사가 실패한다(`web/AGENTS.md` 의 「상대 경로 import 예외」). `task-form.tsx` 는 node 시험 대상이 아니라 어느 형태든 된다
 - `TaskView` 에 `modelTier: ModelTierCode | null;`, `TaskRequest` 에 `modelTier: ModelTierCode | null;`
 - `REASON_TEXTS` 에 `NOTHING_TO_REPORT: "알릴 것이 없어 조용히 끝냈어요"`
 

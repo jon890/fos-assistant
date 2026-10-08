@@ -53,12 +53,12 @@
 
 - `ConversationRepository` 에 질의를 더한다. `@Modifying`(`clearAutomatically` 없음) `@Query("update Conversation c set c.modelSelectionMode = :mode, c.modelTier = :tier, c.modelProvider = null, c.model = null, c.reasoningEffort = null where c.id = :id") int chooseTierForTask(@Param("id") Long id, @Param("mode") ModelSelectionMode mode, @Param("tier") ModelTier tier);` Javadoc 에 예약 작업 발화가 부르는 경로이고, 부르는 쪽 트랜잭션의 영속성 컨텍스트를 비우지 않으려고 `clearAutomatically` 를 두지 않는다고 적는다. `updated_at` 은 바꾸지 않는다(목록 순서를 흔들지 않는다)
 - `ConversationWriter` 에 `@Transactional public int chooseTierForTask(Long id, ModelTier tier)` 를 더한다. `repository.chooseTierForTask(id, ModelSelectionMode.TIER, tier)` 다
-- `ChatService` 에 `public void chooseTierForTask(Long conversationId, ModelTier tier)` 위임을 더한다. `ChatService` 가 이미 `ConversationWriter` 를 쓰지 않으면 `ChatConversationManagement` 를 거쳐 부른다. Javadoc 에 예약 작업 발화가 부르는 경로라고 적는다
+- `ChatService` 는 `ConversationWriter` 를 갖지 않는다. `ChatConversationManagement`(이미 `ConversationWriter` 를 가진다)에 `void chooseTierForTask(Long conversationId, ModelTier tier)` 위임을 두고, `ChatService` 에 같은 이름의 public 위임을 더한다. Javadoc 에 예약 작업 발화가 부르는 경로라고 적는다
 - `TaskRunStarter.conversationFor` 가 대화 번호를 정해 돌려주기 전, 모든 갈래(줄의 대화를 다시 쓸 때, `SINGLE` 의 대화를 다시 쓰거나 새로 만들 때, `NEW_PER_RUN` 의 새 대화)에서 `task.modelTier() != null` 이면 `chat.chooseTierForTask(conversationId, task.modelTier())` 를 부른다. `task.modelTier()` 가 null 이면 부르지 않는다
 
 ### 6. 이 phase 를 검증하는 시험
 
-- `backend/src/test/java/com/bifos/assistant/task/TaskServiceTest.java`: `TaskInput` 을 만드는 보조 메서드 둘(파일 끝)에 마지막 인자를 더한다. 새 시험 둘: `BALANCED` 로 만든 작업의 `modelTier()` 가 `BALANCED` 다. 그 작업을 `modelTier` null 로 고치면 `modelTier()` 가 null 이다
+- `backend/src/test/java/com/bifos/assistant/task/TaskServiceTest.java`: `TaskInput` 을 만드는 보조 메서드 둘(파일 끝)에 마지막 인자를 더한다. 새 시험 셋: `BALANCED` 로 만든 작업의 `modelTier()` 가 `BALANCED` 다. 그 작업을 `modelTier` null 로 고치면 `modelTier()` 가 null 이다. `Task.check(...)` 로 만든 작업에 `chooseModelTier(ModelTier.FAST, now)` 를 부르면 `IllegalStateException` 이다(실패 경로)
 - `backend/src/test/java/com/bifos/assistant/task/TaskRunStarterTest.java`: 새 시험 셋.
   - `NEW_PER_RUN` 작업에 `FAST` 를 고르고 발화하면 그 대화의 `modelSelectionMode()` 가 `TIER`, `modelTier()` 가 `FAST` 다
   - `SINGLE` 작업의 대화를 미리 만들고 그 대화가 `CUSTOM` 모델을 고른 상태에서, 작업에 `DEEP` 을 고르고 발화하면 그 대화가 `TIER`, `DEEP` 이고 `modelChoice()` 의 모델이 비어 있다
@@ -66,7 +66,7 @@
   - 단계는 `tasks.findById(task.id())` 로 다시 읽은 작업에 `chooseModelTier(...)` 를 부르고 `tasks.save(...)` 로 저장한다. fixture 가 돌려준 분리된 객체를 대화가 생긴 뒤 저장하면 merge 가 `conversation_id` 를 null 로 되돌린다(`TaskRunStarter` 가 그 칸만 질의로 적는 까닭)
   - `SINGLE` 시험의 순서: 작업에 `DEEP` 을 고르고 첫 발화를 끝낸다. 그 대화를 `ChatService.chooseModel` 같은 기존 경로나 `ConversationRepository.chooseModelIfActive` 로 `CUSTOM` 으로 바꾼다. 두 번째 발화를 끝낸 뒤 같은 대화가 다시 `TIER`, `DEEP` 인지 본다
   - `NEW_PER_RUN` `FAST` 시험은 그 발화의 루트 실행(`agent_execution`, `TaskRun.executionId()`)의 단계 칸도 `FAST` 인지 단언한다. 실행 엔티티의 칸 이름은 `AgentExecution` 에서 읽는다
-- `backend/src/test/java/com/bifos/assistant/task/TaskControllerTest.java`: `POST /api/v1/tasks` 에 `"modelTier": "BALANCED"` 를 보내면 응답의 `modelTier` 가 `BALANCED` 이고, 보내지 않으면 `null` 이다. 모르는 값 `"ULTRA"` 를 보내면 400 `VALIDATION_FAILED` 다(이 파일이나 다른 컨트롤러 시험에서 enum 오류가 어떤 코드로 나오는지 먼저 확인하고 그 값으로 단언한다). 이 파일의 기존 요청 작성 방식을 따른다
+- `backend/src/test/java/com/bifos/assistant/task/TaskControllerTest.java`: `POST /api/v1/tasks` 에 `"modelTier": "BALANCED"` 를 보내면 응답의 `modelTier` 가 `BALANCED` 이고, 보내지 않으면 `null` 이다. 모르는 enum 값을 보내는 시험은 두지 않는다. 지금 전역 처리기는 읽지 못한 본문을 500 으로 내고, 그것을 400 으로 바꾸는 일은 이 계획 밖이다 이 파일의 기존 요청 작성 방식을 따른다
 
 ## 검증
 

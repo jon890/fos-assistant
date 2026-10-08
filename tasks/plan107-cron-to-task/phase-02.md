@@ -56,7 +56,7 @@
 
 ### 5. 대화 숨기기 경로
 
-- `ChatService` 에 `public void hideTaskConversation(Long conversationId, Instant now)` 를 더한다. `now.truncatedTo(ChronoUnit.MICROS)` 로 잘라 `ConversationWriter.hideFromList` 를 부른다. MySQL `DATETIME(6)` 은 남는 자리를 반올림하므로 다른 시각 칸처럼 마이크로초로 자른다. `ChatService` 가 `ConversationWriter` 를 쓰지 않으면 `ChatConversationManagement` 를 거친다
+- `ChatService` 에 `public void hideTaskConversation(Long conversationId, Instant now)` 를 더한다. `now.truncatedTo(ChronoUnit.MICROS)` 로 잘라 `ConversationWriter.hideFromList` 를 부른다. MySQL `DATETIME(6)` 은 남는 자리를 반올림하므로 다른 시각 칸처럼 마이크로초로 자른다. `ChatService` 는 `ConversationWriter` 를 갖지 않으므로 `ChatConversationManagement` 에 `void hideTaskConversation(Long conversationId, Instant now)` 위임을 두고 거친다
 
 ### 6. 발화 결과
 
@@ -100,6 +100,7 @@ bash scripts/check-mysql-migration.sh
 | `backend/src/main/java/com/bifos/assistant/chat/application/ConversationWriter.java` | 수정 |
 | `backend/src/main/java/com/bifos/assistant/chat/application/ChatConversationQueries.java` | 수정 |
 | `backend/src/main/java/com/bifos/assistant/chat/application/ChatTurnRouting.java` | 수정 |
+| `backend/src/main/java/com/bifos/assistant/chat/application/ChatConversationManagement.java` | 수정 |
 | `backend/src/main/java/com/bifos/assistant/chat/application/ChatService.java` | 수정 |
 | `backend/src/main/java/com/bifos/assistant/task/domain/TaskRun.java` | 수정 |
 | `backend/src/main/java/com/bifos/assistant/task/domain/type/TaskRunReason.java` | 수정 |
