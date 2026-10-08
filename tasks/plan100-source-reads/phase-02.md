@@ -39,6 +39,7 @@ URL은 Java URI로 검사한다. 인증 정보·query·fragment를 제거하고 
 
 `Turn.sourceReads` optional 타입을 추가하고 새 `SourceReadList` 컴포넌트를 답 본문 뒤에 붙인다.
 선행 phase가 만든 message-types.ts의 Turn에 새 필드를 둔다. 기존 bubble 경로의 re-export를 유지한다.
+message-bubble.tsx가 파일 길이 상한 이내가 됐으므로 scripts/file-length-baseline.json의 그 항목만 제거한다. 다른 기준은 바꾸지 않는다.
 저장된 ASSISTANT 답만 표시하고 「이번에 연 원문」 제목과 완료 횟수·주소 수, 빈 상태 및 불완전 안내를 표시한다.
 링크는 안전한 HTTP(S)만 새 탭으로 열고 rel=noreferrer noopener를 준다. 새 의존은 더하지 않는다.
 
@@ -82,5 +83,6 @@ scripts/quality.sh check
 | `web/src/components/chat/message-types.ts` | 수정 |
 | `web/src/components/chat/message-bubble.tsx` | 수정 |
 | `test/browser/source-reads.spec.ts` | 신규 |
+| `scripts/file-length-baseline.json` | 수정 |
 | `docs/backend/conversation.md` | 수정 |
 | `docs/frontend/chat.md` | 수정 |
