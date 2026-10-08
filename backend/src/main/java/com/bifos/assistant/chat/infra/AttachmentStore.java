@@ -35,6 +35,7 @@ public class AttachmentStore {
             "image/webp", "webp");
 
     private final Path root;
+
     public AttachmentStore(AttachmentProperties properties) {
         this.root = Path.of(properties.root()).toAbsolutePath().normalize();
     }

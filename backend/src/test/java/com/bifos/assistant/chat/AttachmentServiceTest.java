@@ -219,13 +219,16 @@ class AttachmentServiceTest {
 
         assertThat(fileOf(own)).exists();
         assertThat(fileOf(others)).exists();
-        try (InputStream mineBody = service.read(OWNER, own.conversationId(), own.id()).body();
-                InputStream otherBody = service.read(STRANGER, theirs, others.id()).body()) {
+        try (InputStream mineBody =
+                        service.read(OWNER, own.conversationId(), own.id()).body();
+                InputStream otherBody =
+                        service.read(STRANGER, theirs, others.id()).body()) {
             assertThat(mineBody.readAllBytes()).isEqualTo(IMAGE);
             assertThat(otherBody.readAllBytes()).isEqualTo(IMAGE);
         }
         assertCode(() -> service.read(OWNER, own.conversationId(), others.id()), ErrorCode.CONVERSATION_NOT_FOUND);
-        assertCode(() -> service.deleteByUser(OWNER, own.conversationId(), others.id()), ErrorCode.CONVERSATION_NOT_FOUND);
+        assertCode(
+                () -> service.deleteByUser(OWNER, own.conversationId(), others.id()), ErrorCode.CONVERSATION_NOT_FOUND);
         assertThat(attachments.findById(others.id()).orElseThrow().isVisible()).isTrue();
     }
 

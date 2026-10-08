@@ -92,7 +92,8 @@ class AttachmentStoreIsolationTest {
         ChatAttachment photo = attachment(1L, 11L, 101L);
 
         assertThatThrownBy(() -> store.open(photo))
-                .isInstanceOfSatisfying(ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.ATTACHMENT_GONE));
+                .isInstanceOfSatisfying(
+                        ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.ATTACHMENT_GONE));
         store.delete(photo);
         store.delete(photo);
 
