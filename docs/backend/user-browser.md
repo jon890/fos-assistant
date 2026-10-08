@@ -216,7 +216,7 @@ Control Plane 은 브라우저의 CDP 에 두 가지로 닿는다. 주소는 컨
 
 결정은 [ADR-20261007 / user-browser](../adr/ADR-20261007-user-browser.md) 의 「중계」 와 [ADR-20261008 / browser-gateway-token](../adr/ADR-20261008-browser-gateway-token.md) 이 갖는다.
 커넥터는 브라우저 주소를 받지 않는다. 커넥터가 받게 할 주소는 `<gateway-base-url>/<접근 표식>` 이고, 커넥터는 그 주소를 Chrome 의 CDP 주소처럼 부른다.
-바인딩 설치와 확인 도구 호출이 그 주소를 커넥터의 env 에 넣는 일과 WebSocket 받는 쪽은 아직 없다. 지금은 표식을 만들고 확인하는 것과 HTTP 창구만 있다.
+바인딩 설치와 확인 도구 호출이 그 주소를 커넥터의 env 에 넣는 일은 아직 없다. 지금은 표식을 만들고 확인하는 것과 HTTP 창구, WebSocket 중계만 있다.
 
 ### 접근 표식
 
@@ -239,11 +239,11 @@ Control Plane 은 브라우저의 CDP 에 두 가지로 닿는다. 주소는 컨
 | `GET json/list`, `GET json` | 그대로 넘긴다. 줄마다 `webSocketDebuggerUrl` 을 중계 주소로 바꾸고 `devtoolsFrontendUrl`, `devtoolsFrontendUrlCompat` 을 뺀다 |
 | `PUT json/new?<주소>` | 주소가 `http`, `https`, `about:blank` 일 때만 넘긴다. 아니면 400 이고, 이 검사는 아래 판정 순서의 1번 다음, 2번보다 먼저 한다. 응답은 `json/list` 의 한 줄처럼 바꾼다 |
 | `GET json/close/<번호>`, `GET json/activate/<번호>` | 번호가 영문자와 숫자일 때만 넘기고 Chrome 의 글을 그대로 준다. 모양이 틀린 번호의 404 도 1번 다음, 2번보다 먼저 판정한다 |
-| WebSocket `devtools/browser/<번호>`, `devtools/page/<번호>` | 아직 없다. 아래 「WebSocket」 의 계약으로 더한다. 번호가 영문자와 숫자, `-` 로 128자까지일 때만 Chrome 의 같은 경로에 붙고 양쪽 글 메시지를 그대로 잇는다. 브라우저 대상 번호는 GUID 다 |
-| 그 밖 | 빈 404. WebSocket upgrade(`Upgrade: websocket`) 요청은 이 받기에서 빠진다. 머리 값은 대소문자를 구분해 `websocket` 과 `WebSocket` 만 뺀다 |
+| WebSocket `devtools/browser/<번호>`, `devtools/page/<번호>` | 번호가 영문자와 숫자, `-` 로 128자까지일 때만 Chrome 의 같은 경로에 붙고 양쪽 글 메시지를 그대로 잇는다. 브라우저 대상 번호는 GUID 다 |
+| 그 밖 | 빈 404. WebSocket upgrade(`Upgrade: websocket`) 요청은 이 받기에서 빠지고 WebSocket 처리기가 받는다. 처리기는 devtools 경로가 아니면 빈 404 로 거절한다. 머리 값은 대소문자를 구분해 `websocket` 과 `WebSocket` 만 뺀다 |
 
 중계 주소는 `gateway-base-url` 의 scheme 을 `ws` 나 `wss` 로 바꾸고 `/<접근 표식>/devtools/<종류>/<번호>` 를 붙인 것이다.
-커넥터는 이 주소의 경로만 꺼내 자기가 받은 주소의 호스트에 붙이므로 둘이 달라도 된다. WebSocket 받는 쪽은 아직 없으므로 지금은 이 주소로 붙어도 연결되지 않는다.
+커넥터는 이 주소의 경로만 꺼내 자기가 받은 주소의 호스트에 붙이므로 둘이 달라도 된다.
 
 요청마다 이 순서로 판정한다.
 
@@ -260,11 +260,10 @@ Chrome 에는 `BrowserRuntime#cdpAddress` 가 준 컨테이너 IP 주소로, `Or
 
 ### WebSocket
 
-아직 없다. 받는 쪽을 더하는 변경이 지킬 계약이다.
-
 - 받는 쪽은 Spring WebSocket 이다. 받은 연결 하나에 Chrome 쪽 연결 하나를 열고, 한쪽이 닫히면 다른 쪽도 닫는다
 - 연결이 열려 있는 동안 `BrowserUsage` 핸들을 쥐어 자동 중지하지 않는다. 메시지가 오갈 때마다 활동을 기록한다(1분에 한 번까지 쓴다)
 - 글 메시지만 조각째 그대로 넘긴다. 모아서 넘기지 않으므로 사진 바이트가 든 큰 CDP 메시지도 세션마다 큰 버퍼를 잡지 않는다. 한쪽으로 가는 조각은 앞 조각을 보낸 뒤에 보낸다
 - 메시지 하나(조각의 합)는 64M 글자까지다. 넘으면 양쪽을 닫는다. 바이너리 메시지가 오면 닫는다
+- Chrome 쪽 보내기가 30초 안에 끝나지 않으면 양쪽을 닫는다. 멈춘 Chrome 이 요청 스레드를 붙잡지 않게 한다
 - 끄기, 지우기, 사용자 끄기, 상태 맞추기로 브라우저가 멈추면 Chrome 쪽 연결이 끊기고 받은 연결도 닫힌다
 - 표식은 열 때만 확인한다. 열린 뒤 바인딩을 떼도 그 연결은 닫힐 때까지 간다. 떼기는 도구 목록에서 서버를 빼므로 새 호출은 오지 않는다
