@@ -44,10 +44,12 @@ type Pick = { granted: boolean; allowSensitive: boolean };
 function CollectionRow({
   collection,
   row,
+  disabled,
   onPick,
 }: {
   collection: AgentMemoryCollection;
   row: Pick;
+  disabled: boolean;
   onPick(next: Pick): void;
 }) {
   const missing = missingNotice(collection, row);
@@ -69,6 +71,7 @@ function CollectionRow({
             className="size-4 accent-primary"
             aria-label={`${collection.displayName} 받음`}
             checked={row.granted}
+            disabled={disabled}
             onChange={(event) =>
               onPick({
                 granted: event.target.checked,
@@ -85,7 +88,7 @@ function CollectionRow({
             className="size-4 accent-primary"
             aria-label={`${collection.displayName} 민감 항목까지`}
             checked={row.granted && row.allowSensitive}
-            disabled={!row.granted}
+            disabled={disabled || !row.granted}
             onChange={(event) =>
               onPick({
                 granted: row.granted,
@@ -230,6 +233,7 @@ export function AgentMemorySection({ code }: Props) {
                     allowSensitive: collection.allowSensitive,
                   }
                 }
+                disabled={saving}
                 onPick={(next) => pick(collection.key, next)}
               />
             ))}
