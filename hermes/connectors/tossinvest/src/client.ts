@@ -25,6 +25,7 @@ interface Exchange {
   ok: boolean;
   data: any;
   empty: boolean;
+  retryAfterMs: number;
 }
 /** 토큰 발급 응답을 이 시각(ms)까지만 쓴다. 토큰은 프로세스 메모리에만 둔다. */
 interface CachedToken {
@@ -73,6 +74,45 @@ const isTimeout = (error: unknown) =>
   error instanceof Error &&
   (error.name === "TimeoutError" || error.name === "AbortError");
 const RETRY_CODES = new Set(["token-revoked", "expired-token"]);
+
+/** 공식 API 그룹별 간격이다. ORDER_INFO는 피크 시간의 초당 3회를 항상 적용한다. */
+const ACCOUNT_GROUPS = new Map([
+  ["/api/v1/accounts", "ACCOUNT"],
+  ["/api/v1/holdings", "ASSET"],
+  ["/api/v1/buying-power", "ORDER_INFO"],
+  ["/api/v1/sellable-quantity", "ORDER_INFO"],
+  ["/api/v1/orders", "ORDER_HISTORY"],
+]);
+const GROUP_INTERVALS = new Map([
+  ["ACCOUNT", 1_000], ["ASSET", 200], ["ORDER_INFO", 334], ["ORDER_HISTORY", 200],
+]);
+// 같은 프로세스의 모든 클라이언트가 그룹별 큐를 공유한다.
+const accountQueues = new Map<string, { tail: Promise<void>; nextAt: number }>();
+
+function queueAccount(group: string, work: () => Promise<Exchange>): Promise<Exchange> {
+  let queue = accountQueues.get(group);
+  if (!queue) {
+    queue = { tail: Promise.resolve(), nextAt: 0 };
+    accountQueues.set(group, queue);
+  }
+  const state = queue;
+  const pending = state.tail.then(async () => {
+    while (performance.now() < state.nextAt)
+      await Bun.sleep(Math.max(0, state.nextAt - performance.now()));
+    let interval = GROUP_INTERVALS.get(group) ?? 1_000;
+    try {
+      const response = await work();
+      if (response.status === 429)
+        interval = Math.max(interval, 1_000, response.retryAfterMs);
+      return response;
+    } finally {
+      // 응답이 끝난 뒤에도 간격을 둔다. 실패해도 큐는 다음 요청을 보낸다.
+      state.nextAt = performance.now() + interval;
+    }
+  });
+  state.tail = pending.then(() => {}, () => {});
+  return pending;
+}
 
 /** 토큰 발급 실패를 공통 어휘로 옮긴다. 본문 `error` 를 상태보다 먼저 본다. */
 function tokenErrorCode(exchange: Exchange): string {
@@ -142,11 +182,13 @@ export class Tossinvest {
     } catch {
       data = undefined;
     }
+    const retryAfter = Number(response.headers.get("retry-after"));
     return {
       status: response.status,
       ok: response.ok,
       data,
       empty: raw.length === 0,
+      retryAfterMs: Number.isFinite(retryAfter) && retryAfter > 0 ? retryAfter * 1_000 : 0,
     };
   }
 
@@ -221,21 +263,32 @@ export class Tossinvest {
       accept: "application/json",
     };
     if (account !== null) headers["x-tossinvest-account"] = account;
-    return this.exchange(`${this.apiBase}${path}${query ? `?${query}` : ""}`, {
+    const work = () => this.exchange(`${this.apiBase}${path}${query ? `?${query}` : ""}`, {
       method: "GET",
       headers,
     });
+    const group = ACCOUNT_GROUPS.get(path);
+    return group ? queueAccount(group, work) : work();
   }
 
-  /** API 를 한 번 부른다. 토큰이 철회됐거나 만료됐으면 다시 받아 한 번만 다시 보낸다. */
+  /** 계좌 그룹별 간격을 지킨다. 토큰 오류와 429는 각각 한 번만 재시도한다. */
   async request(path: string, options: RequestOptions = {}): Promise<any> {
     const account = options.account ? this.accountSeq() : null;
+    let rateRetried = false;
+    const send = async (token: string) => {
+      let response = await this.send(path, options, token, account);
+      if (response.status === 429 && ACCOUNT_GROUPS.has(path) && !rateRetried) {
+        rateRetried = true;
+        response = await this.send(path, options, token, account);
+      }
+      return response;
+    };
     const first = await this.token();
-    let result = await this.send(path, options, first, account);
+    let result = await send(first);
     if (result.status === 401 && RETRY_CODES.has(bodyCode(result.data))) {
       this.discard(first);
       const second = await this.token();
-      result = await this.send(path, options, second, account);
+      result = await send(second);
       // 두 번째도 철회됐으면 다른 프로세스와 토큰을 다툰 것이다. 자격 증명이 틀린 것이 아니다.
       if (result.status === 401 && bodyCode(result.data) === "token-revoked")
         throw new TossinvestError("TOSSINVEST_UNAVAILABLE");

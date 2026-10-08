@@ -71,6 +71,23 @@ MCP 서버 이름은 `tossinvest` 다. 도구는 모두 `READ` 이고 승인 없
 - `invalid-token` 과 `invalid_client` 는 다시 받지 않는다.
 - 확인 도구와 선택지 호출은 새 프로세스라 토큰을 새로 받는다. 그때 Hermes 쪽 프로세스의 토큰이 무효가 되고 다음 호출이 한 번 다시 받는다.
 
+### 계좌 조회 호출 간격
+
+공식 [OpenAPI 스펙](https://openapi.tossinvest.com/openapi-docs/latest/openapi.json)은 계좌 관련 조회를 아래 API 그룹으로 나눈다.
+
+| 엔드포인트 | 공식 호출 한도 그룹 | 공식 초당 한도 | 커넥터의 최소 간격 |
+| --- | --- | --- | --- |
+| `GET /api/v1/accounts` | `ACCOUNT` | 1회 | 1,000ms |
+| `GET /api/v1/holdings` | `ASSET` | 5회 | 200ms |
+| `GET /api/v1/buying-power`, `GET /api/v1/sellable-quantity` | `ORDER_INFO` | 6회, 09:00~09:10 KST에는 3회 | 334ms |
+| `GET /api/v1/orders` | `ORDER_HISTORY` | 5회 | 200ms |
+
+한도 수치는 공식 [연동 가이드의 Rate Limits](https://openapi.tossinvest.com/openapi-docs/overview.md#rate-limits)에서 확인했다. 공식 한도는 사전 공지 없이 바뀔 수 있다.
+커넥터는 프로세스 공용 큐를 그룹별로 두어 같은 그룹의 요청을 한 번에 하나씩 보낸다. 요청이 끝난 뒤 다음 요청까지 표의 간격을 둔다. `ORDER_INFO`는 시간대와 관계없이 피크 시간 한도를 적용한다. 새 그룹의 한도를 알 수 없으면 1초 간격을 쓴다.
+`get_buying_power`의 두 조회와 서로 다른 호출의 같은 그룹 요청, 토큰 재발급 뒤 재송도 이 큐를 거친다. 다른 그룹과 시세, 종목 정보, 토큰 발급은 서로의 큐를 기다리지 않는다.
+
+계좌 조회가 429로 거절되면 같은 그룹의 큐에서 최소 1초 기다려 한 번만 다시 보낸다. `Retry-After`가 초 단위 수치로 더 긴 대기를 요구하면 그 시간도 지킨다. 재송도 429면 `TOSSINVEST_RATE_LIMITED`로 끝낸다. 다른 프로세스와는 큐를 공유하지 않으므로 그 사이의 충돌은 이 재시도로 대응한다.
+
 ### 오류
 
 | 코드 | 공통 어휘 | 복구 | 언제 |
@@ -80,7 +97,7 @@ MCP 서버 이름은 `tossinvest` 다. 도구는 모두 `READ` 이고 승인 없
 | `TOSSINVEST_FORBIDDEN` | `forbidden` | | 그 밖의 403 |
 | `TOSSINVEST_ACCOUNT_NOT_FOUND` | `invalid_input` | `reconnect` | 고른 계좌 순번이 없다. 상태와 관계없이 `account-not-found` 면 이 코드다 |
 | `TOSSINVEST_INVALID_INPUT` | `invalid_input` | `fix_input` | 인자가 형식에 맞지 않는다, 없는 종목이다 |
-| `TOSSINVEST_RATE_LIMITED` | `unavailable` | `retry_later` | 429 |
+| `TOSSINVEST_RATE_LIMITED` | `unavailable` | `retry_later` | 계좌 조회의 한 번 재시도 뒤에도 429, 또는 계좌 조회 밖의 429 |
 | `TOSSINVEST_NETWORK`, `TOSSINVEST_UNAVAILABLE` | `unavailable` | `retry_later` | 닿지 못했거나 시간이 지났다, 5xx 와 그 밖의 4xx, 다시 보낸 호출도 `token-revoked` 였다 |
 
 결과와 오류에 토큰, secret, 계좌번호 원문, 서비스가 준 오류 원문을 싣지 않는다.
