@@ -1,8 +1,12 @@
 package com.bifos.assistant.people.infra;
 
 import com.bifos.assistant.people.domain.AllowedPerson;
+import java.time.Instant;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 public interface AllowedPersonRepository extends JpaRepository<AllowedPerson, Long> {
 
@@ -23,4 +27,12 @@ public interface AllowedPersonRepository extends JpaRepository<AllowedPerson, Lo
     boolean existsByEmail(String email);
 
     boolean existsByHermesProfile(String hermesProfile);
+
+    @Modifying
+    @Query("""
+            update AllowedPerson person set person.lastLoginAt = :at
+            where person.email = :email and person.enabled = true
+                and (person.lastLoginAt is null or person.lastLoginAt < :at)
+            """)
+    int updateLastLoginAtIfNewer(@Param("email") String email, @Param("at") Instant at);
 }

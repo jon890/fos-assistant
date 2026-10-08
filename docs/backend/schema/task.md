@@ -20,6 +20,7 @@
 | `conversation_mode` | `VARCHAR(20) NOT NULL` | `NEW_PER_RUN`, `SINGLE` |
 | `conversation_id` | `BIGINT` | `SINGLE` 일 때 결과를 쌓는 대화. 첫 발화가 만들기 전에는 비어 있다. `NEW_PER_RUN` 은 늘 비어 있다 |
 | `notify` | `VARCHAR(20) NOT NULL` | `ALWAYS`, `ON_FAILURE`, `NEVER` |
+| `model_tier` | `VARCHAR(16) NULL` | `FAST`, `BALANCED`, `DEEP`. 발화가 대화에 고를 모델 단계. 비면 대화의 선택을 건드리지 않는다. `CHECK` 는 비운다 |
 | `created_at`, `updated_at` | `DATETIME(6) NOT NULL` | |
 | `archived_at` | `DATETIME(6)` | 지운 시각. `state` 가 `ARCHIVED` 일 때만 찬다 |
 | `check_owner_user_id`, `check_agent_id` | BIGINT 생성 열 | `CHECK` 일 때만 주인과 에이전트 번호를 채운다. 두 칸의 유일 제약으로 깨우기 설정 하나를 강제한다 |
@@ -64,7 +65,7 @@
 | `owner_user_id` | `BIGINT NOT NULL` | 그 발화 때의 작업 주인. 하루 발화 수를 셀 때 조인 없이 센다 |
 | `scheduled_for` | `DATETIME(6) NOT NULL` | 발화하기로 한 예정 시각 |
 | `status` | `VARCHAR(20) NOT NULL` | `QUEUED`, `RUNNING`, `SUCCEEDED`, `FAILED`, `CANCELLED`, `SKIPPED` |
-| `reason` | `VARCHAR(32)` | `SKIPPED` 와 `FAILED` 의 까닭. `MISSED`, `DAILY_LIMIT`, `PAUSED`, `OWNER_REVOKED`, `AGENT_UNAVAILABLE`, `BUSY`, `FAILED`, `INTERRUPTED`, `UNREAD_REPORT` |
+| `reason` | `VARCHAR(32)` | `SKIPPED` 와 `FAILED` 의 까닭. `MISSED`, `DAILY_LIMIT`, `PAUSED`, `OWNER_REVOKED`, `AGENT_UNAVAILABLE`, `BUSY`, `FAILED`, `INTERRUPTED`, `UNREAD_REPORT`. `SUCCEEDED` 는 비어 있거나, 답이 `[SILENT]` 뿐이면 `NOTHING_TO_REPORT` 다 |
 | `conversation_id` | `BIGINT` | 결과를 남긴 대화. 시작 전에 끝난 줄은 비어 있을 수 있다 |
 | `execution_id` | `BIGINT` | 이 발화의 루트 `agent_execution`. turn 이 끝난 모양을 받았을 때만 찬다 |
 | `proactive_check_id` | `BIGINT NULL` | `CHECK` 발화가 연 점검 줄. 저장과 발화 연결을 한 트랜잭션으로 끝낸다. 다음 tick 과 기동 복구가 점검 결과를 동기화한다 |

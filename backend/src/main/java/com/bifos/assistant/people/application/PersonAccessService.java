@@ -1,5 +1,6 @@
 package com.bifos.assistant.people.application;
 
+import com.bifos.assistant.chat.application.UserConversationActivity;
 import com.bifos.assistant.people.application.model.PersonAccess;
 import com.bifos.assistant.people.domain.AllowedPerson;
 import com.bifos.assistant.people.infra.AllowedPersonRepository;
@@ -8,8 +9,10 @@ import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.user.domain.AppUser;
 import com.bifos.assistant.user.infra.AppUserRepository;
+import java.time.Instant;
 import java.util.List;
-import java.util.Set;
+import java.util.Map;
+import java.util.Objects;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
@@ -29,6 +32,7 @@ public class PersonAccessService {
 
     private final AllowedPersonRepository people;
     private final AppUserRepository users;
+    private final UserConversationActivity activity;
     private final ApplicationEventPublisher events;
 
     /**
@@ -39,12 +43,24 @@ public class PersonAccessService {
      */
     @Transactional(readOnly = true)
     public List<PersonAccess> list() {
-        Set<String> joined = users.findAll().stream()
-                .map(AppUser::email)
-                .map(AllowedPerson::normalizeEmail)
-                .collect(Collectors.toSet());
+        List<AppUser> foundUsers = users.findAll();
+        Map<Long, Instant> lastMessageAt =
+                activity.lastMessageAt(foundUsers.stream().map(AppUser::id).toList());
+        Map<String, List<AppUser>> usersByEmail =
+                foundUsers.stream().collect(Collectors.groupingBy(user -> AllowedPerson.normalizeEmail(user.email())));
         return people.findAll().stream()
-                .map(person -> new PersonAccess(person, joined.contains(person.email())))
+                .map(person -> {
+                    List<AppUser> matchingUsers = usersByEmail.get(person.email());
+                    Instant lastConversationAt = matchingUsers == null
+                            ? null
+                            : matchingUsers.stream()
+                                    .map(AppUser::id)
+                                    .map(lastMessageAt::get)
+                                    .filter(Objects::nonNull)
+                                    .max(Instant::compareTo)
+                                    .orElse(null);
+                    return new PersonAccess(person, matchingUsers != null, lastConversationAt);
+                })
                 .toList();
     }
 
@@ -71,6 +87,11 @@ public class PersonAccessService {
             // 아직 로그인한 적이 없는 사람은 app_user 가 없어 거둘 토큰도 없다
             joined.forEach(found -> events.publishEvent(new UserAccessRevoked(found.id())));
         }
-        return new PersonAccess(saved, !joined.isEmpty());
+        Instant lastConversationAt = joined.isEmpty()
+                ? null
+                : activity.lastMessageAt(joined.stream().map(AppUser::id).toList()).values().stream()
+                        .max(Instant::compareTo)
+                        .orElse(null);
+        return new PersonAccess(saved, !joined.isEmpty(), lastConversationAt);
     }
 }

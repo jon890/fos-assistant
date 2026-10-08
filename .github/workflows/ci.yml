@@ -59,6 +59,7 @@ jobs:
           cache: pnpm
           cache-dependency-path: web/pnpm-lock.yaml
       - run: pnpm install --frozen-lockfile
+      - run: pnpm test:node
       - run: pnpm typecheck
       - name: 웹 빌드
         env:

@@ -74,6 +74,7 @@ test("까닭을 화면 문구로 바꾸고 보이지 않을 까닭은 null 이�
   assert.equal(runReasonText("MISSED"), "서버가 꺼져 있던 동안의 실행이라 건너뛰었어요");
   assert.equal(runReasonText("PAUSED"), "작업을 멈춰 건너뛰었어요");
   assert.equal(runReasonText("DAILY_LIMIT"), "하루 실행 횟수를 다 썼어요");
+  assert.equal(runReasonText("NOTHING_TO_REPORT"), "알릴 것이 없어 조용히 끝냈어요");
   assert.equal(runReasonText("OWNER_REVOKED"), null);
   assert.equal(runReasonText(null), null);
 });

@@ -1,7 +1,1 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24">
-  <rect x="0" y="0" width="24" height="24" rx="5" fill="#2E8B57"/>
-  <rect x="4.5" y="4.5" width="11" height="15" rx="1" fill="#FFFFFF"/>
-  <path d="M7 8.5 H13 M7 11.5 H13 M7 14.5 H10.5" fill="none" stroke="#2E8B57" stroke-width="1.2" stroke-linecap="round"/>
-  <path d="M18.6 8.2 L20.3 9.9 L13.4 16.8 L11.2 17.4 L11.8 15.2 Z" fill="#F2C94C" stroke="#1F5E3B" stroke-width="0.8" stroke-linejoin="round"/>
-  <path d="M11.2 17.4 L11.5 16.3 L12.3 17.1 Z" fill="#1F5E3B"/>
-</svg>
+<svg role="img" viewBox="-4 -4 32 32" width="32" height="32" fill="#03C75A" xmlns="http://www.w3.org/2000/svg"><title>Naver</title><path d="M16.273 12.845 7.376 0H0v24h7.726V11.156L16.624 24H24V0h-7.727v12.845Z"/></svg>

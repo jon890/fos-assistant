@@ -3,21 +3,24 @@ package com.bifos.assistant.people.application;
 import com.bifos.assistant.people.domain.AllowedPerson;
 import com.bifos.assistant.people.infra.AllowedPersonRepository;
 import com.bifos.assistant.user.application.SignInRevocation;
+import java.time.Clock;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * 메일 주소 하나가 들어와도 되는지 판정한다.
+ * 메일 주소 하나의 로그인 허용 여부를 판정하고 로그인 완료 시각을 기록한다.
  *
- * <p>판정만 하고 아무것도 만들지 않는다. 이 판정은 아직 아무 사용자도 없는 시점에 돌기 때문이다.
+ * <p>사용자는 만들지 않는다. 로그인 판정은 아직 아무 사용자도 없는 시점에 돌고, 완료 기록도 허용 목록만
+ * 조건부로 갱신한다.
  */
 @Service
 @RequiredArgsConstructor
 public class SignInPolicy implements SignInRevocation {
 
     private final AllowedPersonRepository people;
+    private final Clock clock;
 
     /** 들어와도 되면 그 사람을, 아니면 비어 있는 값을 돌려준다. */
     @Transactional(readOnly = true)
@@ -36,5 +39,18 @@ public class SignInPolicy implements SignInRevocation {
             return false;
         }
         return people.existsByEmailAndEnabledFalse(AllowedPerson.normalizeEmail(email));
+    }
+
+    /** 로그인 완료 시각을 기록한다. 허용하지 않은 주소는 거절한다. */
+    @Transactional
+    public boolean recordCompletion(String email) {
+        if (email == null || email.isBlank()) {
+            return false;
+        }
+        String normalized = AllowedPerson.normalizeEmail(email);
+        if (people.updateLastLoginAtIfNewer(normalized, clock.instant()) > 0) {
+            return true;
+        }
+        return people.findByEmailAndEnabledTrue(normalized).isPresent();
     }
 }

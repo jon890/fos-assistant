@@ -80,6 +80,23 @@ test("새 작업을 저장하면 상세로 가고 목록에 시각이 사람 말
   await expect(page.getByTestId("task-item")).toContainText("매달 1일 09:00");
 });
 
+test("모델 단계를 골라 저장하면 상세와 API 에 그 단계가 남는다", async ({ page }) => {
+  await page.goto("/tasks/new");
+  await page.getByLabel("이름", { exact: true }).fill("깊은 정리");
+  await page.getByLabel("에이전트", { exact: true }).selectOption("browser");
+  await page.getByLabel("지시", { exact: true }).fill("이번 주 할 일을 정리해 줘");
+  await page.getByLabel("시각(시:분)").fill("09:00");
+  await page.getByLabel("모델 단계", { exact: true }).selectOption({ label: "균형" });
+  await page.getByRole("button", { name: "저장" }).click();
+  await expect(page).toHaveURL(/\/tasks\/[0-9a-f-]{36}$/);
+
+  await expect(page.getByLabel("모델 단계", { exact: true })).toHaveValue("BALANCED");
+  const id = page.url().split("/").pop();
+  const fetched = await page.request.get(`/api/tasks/${id}`);
+  expect(fetched.ok()).toBeTruthy();
+  expect(((await fetched.json()) as { modelTier: string | null }).modelTier).toBe("BALANCED");
+});
+
 test("멈추기와 다시 켜기가 배지를 바꾼다", async ({ page }) => {
   const id = await createTaskByApi(page, "아침 요약");
   await page.goto(`/tasks/${id}`);

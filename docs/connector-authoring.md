@@ -19,7 +19,8 @@
 ```
 hermes/connectors/<id>/
   connector.json           입력 칸, 확인 도구, 도구 정책, 아이콘과 링크
-  icon.svg                 커넥터 카드의 아이콘. 직접 그린 단순한 도형이고 상표 로고를 복사하지 않는다
+  icon.svg                 커넥터 카드의 아이콘. 출처와 사용 범위를 확인한 서비스 아이콘 또는 직접 만든 첫 글자 SVG
+  ICON-SOURCE.md           아이콘 출처, 라이선스와 내려받은 주소
   .mcp.json                MCP 서버 하나의 정의
   .claude-plugin/plugin.json
   src/server.ts            TypeScript stdio MCP 서버
