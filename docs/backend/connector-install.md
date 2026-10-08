@@ -66,7 +66,7 @@ profile 이 어떤 요청을 받는지는 두 표식이 정한다. 판정은 요
 - 커넥터의 env 이름이 그 커넥터의 소유 기록 없이 이미 `.env` 에 있지 않고, 기본 key 나 다른 바인딩 커넥터의 env 이름과 겹치지 않는다
 - 서버 이름이 운영자가 등록한 서버와 겹치지 않는다
 - 복사할 스킬 디렉터리가 그 커넥터의 소유 기록 없이 이미 있지 않다
-- manifest 가 `sandbox_required` 를 선언했으면 운영 정책이 있고 그 profile 이 정책의 `profiles` 에 있다. 아니면 409 이고 본문의 `code` 는 `sandbox_unavailable` 이다. 이 조건은 다시 설치할 때(연결 확인, 반영 완료)도 본다. 정책에서 빠진 profile 의 바인딩은 그때 `PENDING` 이 된다([ADR-20261008 / connector-binding-guards](../adr/ADR-20261008-connector-binding-guards.md))
+- manifest 가 `sandbox_required` 를 선언했으면 운영 정책이 있고 그 profile 이 정책의 `profiles` 에 있다. 아니면 409 이고 본문의 `code` 는 `sandbox_unavailable` 이다. 이 조건은 다시 설치할 때(값 다시 등록, 연결 확인, 반영 완료)도 본다. 정책에서 빠진 profile 의 바인딩은 그때 `PENDING` 이 된다([ADR-20261008 / connector-binding-guards](../adr/ADR-20261008-connector-binding-guards.md))
 
 보관 파일이 없거나 다른 커넥터의 것이면 400 이다. 보관 값이 지금 칸 선언과 맞지 않아도 400 이다.
 
