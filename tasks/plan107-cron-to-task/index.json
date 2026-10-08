@@ -1,0 +1,13 @@
+{
+  "name": "plan107-cron-to-task",
+  "description": "Hermes cron 을 예약 작업으로 옮기려고 작업별 모델 단계와 「보고할 것 없음」 완료를 더한다",
+  "status": "pending",
+  "created_at": "2026-10-08",
+  "total_phases": 3,
+  "current_phase": 1,
+  "phases": [
+    { "number": 1, "file": "phase-01.md", "execution_profile": "standard" },
+    { "number": 2, "file": "phase-02.md", "execution_profile": "standard" },
+    { "number": 3, "file": "phase-03.md", "execution_profile": "standard" }
+  ]
+}
