@@ -114,7 +114,7 @@
 | [ADR-20261007 / background-tasks](ADR-20261007-background-tasks.md) | 운영의 백그라운드 작업은 한 빈으로 띄우고, 검사는 끝날 때 모두 join 한다 | backend | Accepted |
 | [ADR-20261007 / connector-live-reload](ADR-20261007-connector-live-reload.md) | 커넥터를 붙이면 공유 gateway 의 MCP 설정 맞추기로 반영하고 Control Plane 이 두 주기 뒤 스스로 확인한다 | hermes, backend | Accepted. ADR-083 의 「붙이면 재시작 뒤 관리자 반영 완료로 READY」 를 첫 붙이기와 스킬 변경에서 대체한다 |
 | [ADR-20261007 / connector-owner-attachments](ADR-20261007-connector-owner-attachments.md) | 사용자 첨부를 읽는 커넥터는 바인딩 주인의 첨부 디렉터리를 설치가 정한 env 로만 받는다 | hermes, backend | Accepted. ADR-091 의 사용자별 첨부 경계를 커넥터 MCP 서버까지 넓힌다 |
-| [ADR-20261007 / decision-feedback](ADR-20261007-decision-feedback.md) | 판단 피드백은 제안 열쇠에 덧붙이는 사건으로 남기고 반응은 읽을 때 정한다 | backend | Accepted |
+| [ADR-20261007 / decision-feedback](ADR-20261007-decision-feedback.md) | 판단 피드백은 제안 열쇠에 덧붙이는 사건으로 남기고 반응은 읽을 때 정한다 | backend | Accepted. 살펴보기 발견의 「관심 없음」 이 되풀이 판정을 바꾸는 예외는 [ADR-20261008 / check-finding-reaction](ADR-20261008-check-finding-reaction.md) 이 둔다 |
 | [ADR-20261007 / live-properties](ADR-20261007-live-properties.md) | 운영 코드는 실행 중에 쓰는 설정을 LiveProperties 로 읽는다 | backend | Accepted |
 | [ADR-20261007 / memory-remember](ADR-20261007-memory-remember.md) | 사용자가 대화에서 직접 말한 사실은 에이전트가 바로 기억하고 그 밖은 제안으로 남긴다 | backend, frontend, hermes | Accepted. ADR-012 의 「사람이 받아들여야 저장된다」 와 「에이전트가 스스로 쓰는 경로를 두지 않는다」 를 개정한다 |
 | [ADR-20261007 / naver-blog-connector](ADR-20261007-naver-blog-connector.md) | 네이버 블로그 커넥터는 사용자의 Chrome 에 CDP 로 붙고, 임시저장은 승인한 뒤 백그라운드 작업으로 돈다 | hermes, backend | Accepted. ADR-083 의 바인딩으로 블로그 전용 profile 을 대신한다 |
@@ -123,5 +123,6 @@
 | [ADR-20261007 / test-context-base](ADR-20261007-test-context-base.md) | backend 통합 검사는 Spring 컨텍스트 하나를 함께 쓰고, 설정과 대역은 검사마다 바꿔 끼운다 | backend | Accepted |
 | [ADR-20261007 / user-browser](ADR-20261007-user-browser.md) | 사용자마다 브라우저 하나를 Control Plane 이 관리하고, 커넥터는 바인딩이 준 중계 주소로만 닿는다 | backend, frontend, hermes | Accepted. ADR-20261007 / naver-blog-connector 의 CDP 주소 연결 칸을 바꾼다 |
 | [ADR-20261007 / value-evaluation](ADR-20261007-value-evaluation.md) | 가치 판단은 축별 근거와 재평가 입력을 남기고 행동 정책과 분리한다 | backend, hermes | Accepted |
+| [ADR-20261008 / check-finding-reaction](ADR-20261008-check-finding-reaction.md) | 살펴보기 발견의 반응은 판단 피드백 사건으로 받고, 「관심 없음」 은 digest 기간 안에서만 같은 주제를 내린다 | backend, frontend | Accepted. ADR-20261007 / decision-feedback 의 「억제 규칙을 바꾸지 않는다」 에 예외를 둔다 |
 | [ADR-20261008 / connector-card](ADR-20261008-connector-card.md) | 커넥터 아이콘은 plugin 안의 파일을 카탈로그에 실어 같은 출처의 이미지로만 그리고, 링크는 https 만 받는다 | 공통 | Accepted. ADR-043 의 `connector.json` 에 화면용 선택 칸을 더한다 |
 | [ADR-20261008 / connector-output-files](ADR-20261008-connector-output-files.md) | 커넥터는 계산할 목록을 그 에이전트 실행 공간에 읽기 전용으로 붙는 파일로 내고, 계산은 스크립트가 한다 | hermes | Accepted. ADR-086 의 실행 공간에 커넥터 출력 디렉터리를 더한다 |

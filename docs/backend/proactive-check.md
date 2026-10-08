@@ -28,6 +28,8 @@
 | `GET /api/v1/agents/{code}/proactive-check/schedule` | 요청자의 매일 깨우기 설정, 다음 실행, 마지막 결과와 막는 까닭을 읽는다 |
 | `PUT /api/v1/agents/{code}/proactive-check/schedule` | `{ enabled, time, timezone }` 을 저장한다. `time` 은 `HH:mm`, `timezone` 은 IANA 이름이다 |
 | `POST /api/v1/proactive-checks/{checkId}/report/open` | 요청자 소유의 보고를 읽었다고 남기고 204 를 준다. 다시 열어도 첫 시각은 유지한다 |
+| `GET /api/v1/chat/conversations/{conversationId}/check-findings` | 요청자의 그 대화에서 「새로 알릴 것」 으로 그린 발견과 지금 반응을 오래된 것부터 준다. 아래 「발견 반응」 |
+| `PUT /api/v1/check-findings/{findingId}/reaction` | `{ "reaction": "ACCEPTED" \| "POSTPONED" \| "DISMISSED" }` 로 발견 하나에 반응하고 204 를 준다. 아래 「발견 반응」 |
 
 살펴보기 상태 조회와 수동 시작, 일정 켜기는 요청자가 그 에이전트로 대화를 시작할 수 있어야 한다(`AgentService.requireStartable`).
 일정 조회와 끄기는 읽기 권한을 확인한다. 보고 열기는 보고 소유권을 확인하며 다른 사용자의 보고는 404 로 답한다.
@@ -194,12 +196,12 @@ sequenceDiagram
 | --- | --- | --- |
 | 허용된 Memory | `ContextAssembler.assemble`. 그 에이전트가 받는 collection 만이다([ADR-053](../adr/ADR-053-에이전트는-허용된-collection-의-memory-만-받는다.md)). 보통 turn 과 같다 | `instructions` |
 | 지난 결과와 사용자의 논의 | 점검 대화의 Hermes session. 지난 답과 그 뒤 사용자가 받아들이거나 거절하거나 관심을 좁힌 대화가 그 안에 있다 | `session_id` |
-| 최근에 알린 발견 | 그 점검 대화의 `NEW` 발견 가운데 `digest-window` 안의 것을 `digest-max-items` 개까지. 영역, 주제 키, 제목, 원문 주소, 확인 날짜, 그 살펴보기가 끝난 뒤 지금까지 사용자가 보낸 메시지 수 | `input`. 모델이 쓴 글에서 온 것이라 `<external-data>` 로 감싼다 |
+| 최근에 알린 발견 | 그 점검 대화의 `NEW` 발견 가운데 `digest-window` 안의 것을 `digest-max-items` 개까지. 영역, 주제 키, 제목, 원문 주소, 확인 날짜, 그 살펴보기가 끝난 뒤 지금까지 사용자가 보낸 메시지 수, 지금 반응(`받아들임`, `나중에`, `관심 없음`, `없음`) | `input`. 모델이 쓴 글에서 온 것이라 `<external-data>` 로 감싼다 |
 | 최근에 받아들인 문제 후보 | 그 점검 대화의 `ACCEPTED` 문제 후보 가운데 `digest-window` 안의 것을 `digest-max-items` 개까지. 문제 키와 문제 | `input`. 모델이 쓴 글이라 `<external-data>` 로 감싼다 |
 | 변화 신호 | 지난 살펴보기 시각(`UNREAD_REPORT` 처럼 모델 없이 건너뛴 줄은 뺀다), 그 뒤 사용자가 점검 대화에 보낸 메시지 수, Memory 문맥이 지난 살펴보기와 같은지(`agent_execution.instructions_hash` 비교) | `input` |
 | 분야의 맥락 | 분야 지침이 정한 읽기 도구를 붙은 커넥터 서버에서 직접 불러 읽는다. 커리어는 아래 「분야 지침이 지킬 것」 | 살펴보기 turn 이 도구로 읽는다 |
 
-session 을 새로 바꾼 뒤에도 최근에 알린 발견과 변화 신호는 실리므로 같은 제안을 되풀이하지 않는다.
+session 을 새로 바꾼 뒤에도 최근에 알린 발견과 그 반응, 변화 신호는 실리므로 같은 제안을 되풀이하지 않는다.
 다른 대화의 내용은 싣지 않는다.
 사용자가 답하지 않은 것을 선호나 거절로 읽지 말라고 지시한다. 메시지 수는 반응이 있었는지만 알린다.
 
@@ -226,6 +228,7 @@ session 을 새로 바꾼 뒤에도 최근에 알린 발견과 변화 신호는 
 - 매번 모든 영역을 조사하거나 정해진 수를 채우지 않는다. 새로 알릴 것이 없으면 `NOTHING_NEW` 로 끝낸다
 - 변화 신호가 모두 그대로이고 분야의 새 후보도 없으면 조사를 줄이고 `NOTHING_NEW` 로 끝낸다
 - 최근에 알린 발견을 같은 근거로 다시 알리지 않는다. 새 원문이 있거나 마감, 적합성이 바뀌었을 때만 `changeSinceLast` 에 적고 다시 알린다
+- 최근에 알린 발견의 반응이 「관심 없음」 이면 그 주제를 다시 조사하거나 알리지 않는다
 - 사용자가 답하지 않은 것을 선호나 거절로 여기지 않는다
 - `follow_up_propose` 는 `PROPOSED` 할 일만 만든다. 사용자가 받아들여야 `OPEN` 이 되며, 이 실행은 할 일을 직접 받아들이거나 끝낼 수 없다
 - 답 끝에 아래 「결과 계약」 의 블록을 둔다
@@ -402,8 +405,10 @@ turn 이 어떻게 끝나든 잠금을 풀기 전에 `ProactiveCheckService` 가
 | 5 | `freshness` 가 `CURRENT` 다 | `FRESHNESS_UNKNOWN` |
 | 6 | `title`, `whyItMatters`, `facts` 하나, `next` 가 있다 | `INCOMPLETE` |
 | 7 | 같은 점검 대화의 `digest-window` 안 `NEW` 발견에 같은 `topicKey` 와 같은 `sourceUrl` 이 없거나, `changeSinceLast` 가 있다 | `REPEATED` |
+| 8 | 같은 점검 대화의 `digest-window` 안에 지금 반응이 「관심 없음」 인 `NEW` 발견과 `topicKey` 가 같지 않다. 원문 주소와 `changeSinceLast` 는 보지 않는다 | `REPEATED` |
 
 `alreadyAnnounced` 는 그 점검 대화에서 이미 알린 `(topicKey, sourceUrl)` 묶음이다. 입력에 싣는 최근 발견과 같은 기간이다.
+`dismissedTopics` 는 같은 기간의 `NEW` 발견 가운데 지금 반응이 「관심 없음」 인 것의 `topicKey` 다([ADR-20261008 / check-finding-reaction](../adr/ADR-20261008-check-finding-reaction.md)).
 
 `outcome` 이 `FINDINGS` 인데 `NEW` 도 질문도 없으면 「새로 알릴 것은 없어요」 한 줄 아래에 참고만 그린다. `outcome` 은 `FINDINGS` 그대로 적는다.
 `outcome` 이 `NOTHING_NEW` 여도 질문이나 `sourceFailures` 가 있으면 알림 줄 하나로 줄이지 않고 그린다. 출처를 읽지 못해 발견이 없는 결과가 정상적으로 확인했지만 변화가 없는 결과와 같아 보이지 않게 하고, 사용자에게 물을 것을 잃지 않기 위해서다. `outcome` 은 `NOTHING_NEW` 그대로 적는다. `summary` 와 `followUpCandidates` 는 아래 「그리기」 의 규칙대로 그리지 않는다.
@@ -456,6 +461,25 @@ turn 이 어떻게 끝나든 잠금을 풀기 전에 `ProactiveCheckService` 가
 | `FRESHNESS_UNKNOWN` | 지금도 유효한지 모르겠어요 |
 | `INCOMPLETE` | 근거가 부족해요 |
 | `REPEATED` | 이미 알린 것이에요 |
+
+## 발견 반응
+
+점검 대화의 살펴보기 답 아래에 「새로 알릴 것」 발견마다 제목과 단추 셋을 둔다. 결정은 [ADR-20261008 / check-finding-reaction](../adr/ADR-20261008-check-finding-reaction.md) 에 있다.
+
+| 단추 | `reaction` | 사건 | 다음 살펴보기 |
+| --- | --- | --- | --- |
+| 받아들임 | `ACCEPTED` | `ACCEPTED` | 입력의 반응이 `받아들임` 이다. 되풀이 판정은 지금과 같다 |
+| 나중에 | `POSTPONED` | `POSTPONED` | 입력의 반응이 `나중에` 다. 되풀이 판정은 지금과 같다 |
+| 관심 없음 | `DISMISSED` | `DISMISSED` | 입력의 반응이 `관심 없음` 이고, `digest-window` 동안 같은 주제 키의 발견을 「이미 알린 것」 으로 내린다 |
+
+사건은 판단 피드백 기록에 `check_finding:<발견 번호>` 로 남는다([판단 피드백](decision-feedback.md)).
+지금 반응은 그 발견의 마지막 사용자 사건이다. 다른 단추를 누르면 바뀌고, 같은 단추를 다시 누르면 사건을 더 남기지 않는다.
+「받아들임」 은 반응만 남긴다. 할 일과 Memory 를 만들지 않는다.
+
+`GET .../check-findings` 의 응답은 `{ dismissWindowDays, findings }` 다. `dismissWindowDays` 는 `digest-window` 를 하루 단위로 올림한 값이고 화면이 「관심 없음」 의 효과를 알리는 데 쓴다.
+`findings[]` 는 `id`, `checkId`, `executionId`(그 살펴보기의 루트 실행, 답 메시지의 실행 번호), `area`, `topicKey`, `title`, `reaction`(없으면 `null`)이다. 다른 대화와 같이 남의 대화는 404 다.
+`PUT .../reaction` 은 요청자의 살펴보기가 낸 `NEW` 발견만 받는다. 남의 발견, 참고로 내린 발견, 없는 발견은 404 `PROACTIVE_CHECK_NOT_FOUND`, 모르는 `reaction` 은 400 `VALIDATION_FAILED` 다.
+점검 대화를 지우면 그 대화의 사건이 함께 지워져 반응도 사라진다.
 
 ## 문제 후보
 
@@ -551,6 +575,7 @@ turn 이 어떻게 끝나든 잠금을 풀기 전에 `ProactiveCheckService` 가
 | 시간과 도구 호출 상한, 상한 중지가 실패했을 때의 다시 시도, 끝날 때의 전달 표시 | `ChatService` 와 `ProactiveCheckService` 시험 |
 | 커넥터 쓰기 거절, MCP 도구 거절, 위임 대상과 수 | 각 판정 자리의 시험 |
 | 문제 후보의 읽기와 검사. 급한 문제, 나중에 중요한 문제, 목표 없는 관찰, 중복, 할 일 없음 fixture | `ProblemJudgementTest`, `CheckResultParserTest` |
+| 발견 반응의 기록, 지금 반응, 남의 발견 거절, 「관심 없음」 주제의 되풀이 판정과 입력 | `FindingJudgementTest`, `CheckFindingReactionsTest`, `test/e2e/scenarios/proactive-check.ts`, `test/browser/proactive-check.spec.ts` |
 | 웹 도구와 붙은 커넥터의 읽기 도구 직접 호출을 거쳐 대화에 결과가 남는 합성 흐름, 쓰기 도구의 `READ_ONLY_RUN` 거절과 쓰기 허용 때의 승인 줄, 검색 결과의 지시가 쓰기로 이어지지 않음, 연결 해제 뒤의 출처 실패 | `test/e2e/scenarios/proactive-check.ts` |
 
 시험과 공개 기록에는 합성 데이터만 쓴다.
