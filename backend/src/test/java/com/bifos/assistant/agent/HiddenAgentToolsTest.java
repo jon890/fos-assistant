@@ -113,6 +113,21 @@ class HiddenAgentToolsTest {
     }
 
     @Test
+    @DisplayName("셸과 스킬을 숨겨도 연결 안내에 쓰는 실제 활성 여부는 남긴다")
+    void keepsActualEnabledFlagsWhenShellAndSkillsAreHidden() {
+        when(visibility.hiddenFor(1L)).thenReturn(Set.of("terminal", "skills", "spotify"));
+        when(toolsets.readEnabled(agent.apiBaseUrl(), agent.hermesProfile())).thenReturn(List.of("terminal", "skills"));
+        var view = service.read(owner, agent);
+        assertThat(view.toolsets()).extracting(AgentToolView::name).doesNotContain("terminal", "skills");
+        assertThat(view.shellOrFileEnabled()).isTrue();
+        assertThat(view.skillsEnabled()).isTrue();
+        when(toolsets.readEnabled(agent.apiBaseUrl(), agent.hermesProfile())).thenReturn(List.of());
+        var disabled = service.read(owner, agent);
+        assertThat(disabled.shellOrFileEnabled()).isFalse();
+        assertThat(disabled.skillsEnabled()).isFalse();
+    }
+
+    @Test
     @DisplayName("올린 스킬이 있는 숨김 skills는 보존하며 중복 요청 검증도 유지한다")
     void preservesHiddenSkillsAndStillRejectsDuplicateRequests() {
         when(visibility.hiddenFor(1L)).thenReturn(Set.of("skills"));

@@ -69,6 +69,9 @@ export type ToolsetView = {
 export type AgentToolsView = {
   toolsets: ToolsetView[];
   unclassifiedEnabled: string[];
+  /** 숨김과 무관한 실제 활성 상태다. 연결 안내가 사용한다. */
+  shellOrFileEnabled: boolean;
+  skillsEnabled: boolean;
 };
 
 export const PRIVATE_VISIBILITY: AdminAgent["visibility"] = "PRIVATE";

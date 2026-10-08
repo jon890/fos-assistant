@@ -193,7 +193,8 @@ public class AgentToolService {
                 .filter(name -> !AgentToolPolicy.CONTROL_PLANE_MCP.equals(name))
                 .filter(name -> !connectorServers.contains(name))
                 .toList();
-        return new AgentToolsetsView(views(user, agent, catalog, enabled, adminView), unclassified);
+        return new AgentToolsetsView(views(user, agent, catalog, enabled, adminView), unclassified,
+                AgentToolPolicy.hasShellOrFileToolset(enabled), enabled.contains(AgentToolPolicy.SKILLS));
     }
 
     private static Map<String, ToolsetCatalogEntry> catalogByName(List<ToolsetCatalogEntry> catalog) {
