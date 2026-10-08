@@ -474,7 +474,7 @@ provider credential 은 이 토큰으로 쓰지 못한다.
 | Control Plane MCP 등록 | 지운다 | 그대로 둔다 |
 | 지침 | 스킬 본문을 `SOUL.md` 에 쓴다 | 스킬 디렉터리를 그 profile 의 `skills/` 로 복사한다. `SOUL.md` 는 읽지도 쓰지도 않는다 |
 | 대응 파일 | `isolated` 칸 없이 쓴다 | `isolated: false` 를 싣고 소유 기록의 모든 서버와 뗀 서버 기록 `.fos-connector-detached.json` 의 서버를 싣는다 |
-| 설치의 `restart_required` | 지금과 같다 | 이미 있던 서버의 정의나 그 서버의 `.env` 값이 바뀌었을 때만 참이다. 공유 gateway 의 MCP 설정 맞추기는 이름만 비교해 같은 이름을 다시 연결하지 않는다. 새 서버, 스킬, 이름 대응만 바뀐 설치는 거짓이고 `reload_pending` 이 참이다([ADR-20261007 / connector-live-reload](../docs/adr/ADR-20261007-connector-live-reload.md)) |
+| 설치의 `restart_required` | 지금과 같다 | 이미 있던 서버의 정의나 그 서버의 `.env` 값이 바뀌었거나, 뗀 서버 기록에 남은 이름을 다시 붙이면 참이다. 공유 gateway 의 MCP 설정 맞추기는 이름만 비교해 같은 이름을 다시 연결하지 않는다. 뗀 기록에 없는 새 이름, 스킬, 이름 대응만 바뀐 설치는 거짓이고 `reload_pending` 이 참이다([ADR-20261007 / connector-live-reload](../docs/adr/ADR-20261007-connector-live-reload.md)) |
 | 떼기의 `restart_required` | 지금과 같다 | 거짓이고, 바뀐 것이 있으면 `reload_pending` 이 참이다. 도구 목록에서 이름을 빼므로 다음 실행부터 막힌다. 떼기 전에 시작한 실행의 호출은 대응에 남은 서버로 판정이 막는다 |
 | `reload_pending` | 늘 거짓이다 | 바뀐 것이 있고 `restart_required` 와 `plugin_updated` 가 모두 거짓이면 참이다. `plugin_updated` 가 참이면 그것만으로 재시작을 기다린다 |
 | 스킬 색인 표식 | 쓰지 않는다 | 스킬 파일을 바꾼 설치는 `skills.disabled` 에서 `fos-skill-index-` 로 시작하는 항목을 빼고 새 표식 하나를 더한다. gateway 가 그 profile 의 스킬 색인을 새로 만든다. 다른 이름은 그대로 두고, 문자열이면 Hermes 가 읽는 대로 목록으로 바꿔 쓴다. 고칠 수 없는 모양이면 붙이기는 409 이고 떼기는 표식 없이 뗀다 |

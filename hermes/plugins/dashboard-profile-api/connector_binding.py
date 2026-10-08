@@ -112,7 +112,8 @@ def _connector_bind_config(profile_dir: pathlib.Path, plugin: str, enabled: bool
     이미 붙은 커넥터를 다시 설치하는 것은 hook 이 꺼져 있어도 받는다. 그때 그 바인딩은 hook 상태로 `PENDING` 에 남는다.
     떼기는 그 서버와 이름과 env 와 스킬만 지운다(ADR-083).
     떼기는 서버 이름을 뗀 서버 기록에 남기고 이름 대응에 빈 `tools` 로 남긴다. 대응 파일은 지우지 않는다.
-    같은 커넥터를 다시 붙이면 그 기록을 지운다.
+    뗀 기록에 남은 이름을 다시 붙이면 gateway 가 옛 연결을 쥐고 있을 수 있어 재시작을 기다린다.
+    같은 커넥터를 같은 이름으로 다시 붙이면 그 기록을 지운다.
     공유 gateway 는 주기마다 profile 의 `mcp_servers` 이름과 살아 있는 연결을 맞춘다. 새 이름은 연결하고 빠진 이름은 끊는다.
     그래서 새 서버를 더하거나 스킬, 이름 대응만 바꾼 설치는 재시작 없이 반영되므로 `reload_pending` 을 참으로 답한다.
     이름만 비교하므로 이미 있던 서버의 정의나 그 서버의 `.env` 값을 바꾼 붙이기는 `restart_required` 를 참으로 답한다.
@@ -247,7 +248,9 @@ def _connector_bind_config(profile_dir: pathlib.Path, plugin: str, enabled: bool
         # 이 커넥터 칸의 값이 바뀌었는지다. 떠 있는 서버 프로세스는 옛 값을 쥐고 있다.
         env_changed = ([line for line in env_lines if _env_line_key(line) in field_env]
                        != [line for line in kept if _env_line_key(line) in field_env])
-        restart = previous is not None and (previous != server or env_changed)
+        # 뗀 뒤 같은 이름을 다시 붙이면 gateway 는 이름이 계속 있다고 보고 옛 연결을 쥘 수 있다.
+        # 뗀 뒤에는 옛 정의와 견줄 수 없으므로 기록을 지우기 전에 재시작을 요구한다.
+        restart = (previous is not None and (previous != server or env_changed)) or name in detached.values()
         skills = sorted(manifest["skills"])
         for skill in skills:
             if (skills_dir / skill).exists() and skill not in previous_skills:

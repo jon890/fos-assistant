@@ -90,7 +90,12 @@ class ChatDeliveryTurns {
             return;
         }
         DeliveryInput delivery = ChatDeliveryInput.deliveryInput(
-                results, resultAgents, extras, clock.instant(), contextProperties.resultStaleAfter());
+                results,
+                resultAgents,
+                chatDeliveryInput.externalAgentsOf(resultAgents),
+                extras,
+                clock.instant(),
+                contextProperties.resultStaleAfter());
         Routed routed = chatTurnRouting.route(owner, conversationId, delivery.input(), null, List.of());
         if (routed.flow() != null) {
             // 흐름은 이 입력을 받을 자리가 없다. 깨우는 쪽이 이미 거르므로 그 사이 흐름이 붙은 경우뿐이다.
