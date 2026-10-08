@@ -262,7 +262,15 @@ export function withoutResponseGuide(instructions: string): string {
   if (!instructions.startsWith(header)) return instructions;
 
   const nextSection = instructions.indexOf("\n\n", header.length);
-  return withoutMemoryGuide(nextSection < 0 ? "" : instructions.slice(nextSection + 2));
+  return withoutMemoryGuide(withoutToolCallGuide(nextSection < 0 ? "" : instructions.slice(nextSection + 2)));
+}
+
+/** 답변 형식 뒤에 붙는 로컬 MCP 단건 호출 지침이다. 빈 줄 없는 한 단락이라 그 단락만 뺀다. */
+function withoutToolCallGuide(instructions: string): string {
+  const header = "# 도구 호출\n\n";
+  if (!instructions.startsWith(header)) return instructions;
+  const nextSection = instructions.indexOf("\n\n", header.length);
+  return nextSection < 0 ? "" : instructions.slice(nextSection + 2);
 }
 
 /** `memory_remember` 를 받는 실행에 답변 형식 뒤에 붙는 「# 기억」 지침이다. 빈 줄 없는 한 단락이라 그 단락만 뺀다. */
