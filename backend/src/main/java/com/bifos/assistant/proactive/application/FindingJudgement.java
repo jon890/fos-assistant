@@ -38,12 +38,19 @@ public final class FindingJudgement {
      * @param checkStartedAt 이번 살펴보기를 시작한 시각이다
      * @param now 지금이다
      * @param alreadyAnnounced 같은 점검 대화에서 최근에 이미 알린 주제 키와 원문 주소다
+     * @param dismissedTopics 같은 기간에 알린 발견 가운데 지금 반응이 「관심 없음」 인 것의 주제 키다. 검사 순서 8 에서 원문 주소와
+     *     {@code changeSinceLast} 를 보지 않고 {@code REPEATED} 로 내린다
      */
     public static JudgedFinding judge(
-            Finding finding, Instant checkStartedAt, Instant now, Set<AnnouncedKey> alreadyAnnounced) {
+            Finding finding,
+            Instant checkStartedAt,
+            Instant now,
+            Set<AnnouncedKey> alreadyAnnounced,
+            Set<String> dismissedTopics) {
         String sourceUrl = isHttpAbsolute(finding.sourceUrl()) ? finding.sourceUrl() : null;
         Instant checkedAt = parseInstant(finding.checkedAt());
-        FindingReason reason = reasonOf(finding, sourceUrl, checkedAt, checkStartedAt, now, alreadyAnnounced);
+        FindingReason reason =
+                reasonOf(finding, sourceUrl, checkedAt, checkStartedAt, now, alreadyAnnounced, dismissedTopics);
         FindingKind kind = reason == null ? FindingKind.NEW : FindingKind.REFERENCE;
         return new JudgedFinding(finding, kind, reason, sourceUrl, checkedAt);
     }
@@ -55,7 +62,8 @@ public final class FindingJudgement {
             Instant checkedAt,
             Instant checkStartedAt,
             Instant now,
-            Set<AnnouncedKey> alreadyAnnounced) {
+            Set<AnnouncedKey> alreadyAnnounced,
+            Set<String> dismissedTopics) {
         if (sourceUrl == null) {
             return FindingReason.NO_SOURCE;
         }
@@ -76,7 +84,7 @@ public final class FindingJudgement {
         if (isIncomplete(finding)) {
             return FindingReason.INCOMPLETE;
         }
-        if (isRepeated(finding, sourceUrl, alreadyAnnounced)) {
+        if (isRepeated(finding, sourceUrl, alreadyAnnounced, dismissedTopics)) {
             return FindingReason.REPEATED;
         }
         return null;
@@ -90,11 +98,18 @@ public final class FindingJudgement {
                 || isBlank(finding.next().text());
     }
 
-    /** 주제 키가 있고 같은 주제 키와 원문 주소를 이미 알렸으며, 지난번과 달라진 점도 없을 때다. */
-    private static boolean isRepeated(Finding finding, String sourceUrl, Set<AnnouncedKey> alreadyAnnounced) {
-        return !isBlank(finding.topicKey())
-                && isBlank(finding.changeSinceLast())
-                && alreadyAnnounced.contains(new AnnouncedKey(finding.topicKey(), sourceUrl));
+    /**
+     * 주제 키가 있고 같은 주제 키와 원문 주소를 이미 알렸으며 지난번과 달라진 점도 없을 때(순서 7), 또는 그 주제 키에 지금 반응이 「관심 없음」
+     * 인 발견이 있을 때(순서 8)다. 「관심 없음」 은 사용자가 그 주제를 거절한 것이라 새 원문이나 달라진 점이 있어도 내린다.
+     */
+    private static boolean isRepeated(
+            Finding finding, String sourceUrl, Set<AnnouncedKey> alreadyAnnounced, Set<String> dismissedTopics) {
+        if (isBlank(finding.topicKey())) {
+            return false;
+        }
+        return (isBlank(finding.changeSinceLast())
+                        && alreadyAnnounced.contains(new AnnouncedKey(finding.topicKey(), sourceUrl)))
+                || dismissedTopics.contains(finding.topicKey());
     }
 
     /** {@code http} 나 {@code https} 의 절대 주소이고 host 가 있다. */

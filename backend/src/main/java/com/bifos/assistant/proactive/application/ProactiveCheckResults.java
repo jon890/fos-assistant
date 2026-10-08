@@ -8,6 +8,7 @@ import com.bifos.assistant.chat.application.model.CheckAnswer;
 import com.bifos.assistant.proactive.application.model.AnnouncedKey;
 import com.bifos.assistant.proactive.application.model.CheckResultBlock;
 import com.bifos.assistant.proactive.application.model.CheckResultRead;
+import com.bifos.assistant.proactive.application.model.FindingReaction;
 import com.bifos.assistant.proactive.application.model.JudgedFinding;
 import com.bifos.assistant.proactive.application.model.JudgedProblem;
 import com.bifos.assistant.proactive.domain.CheckReport;
@@ -91,10 +92,11 @@ class ProactiveCheckResults {
             return new CheckAnswer(NOTHING_NEW_NOTICE, true, false);
         }
         Instant now = deps.clock().instant();
-        Set<AnnouncedKey> announced =
+        Announced announced =
                 announcedSince(now.minus(deps.properties().current().digestWindow()));
         List<JudgedFinding> judged = block.findings().stream()
-                .map(finding -> FindingJudgement.judge(finding, check.startedAt(), now, announced))
+                .map(finding -> FindingJudgement.judge(
+                        finding, check.startedAt(), now, announced.keys(), announced.dismissedTopics()))
                 .toList();
         newFindings = (int)
                 judged.stream().filter(each -> each.kind() == FindingKind.NEW).count();
@@ -192,17 +194,34 @@ class ProactiveCheckResults {
                 .collect(Collectors.toSet());
     }
 
-    /** 이미 알린 주제 키와 원문 주소. 주제 키가 빈 발견은 되풀이 판정을 하지 않으므로 넣지 않는다. */
-    private Set<AnnouncedKey> announcedSince(Instant after) {
-        return deps
+    /**
+     * 그 시각 뒤에 알린 발견을 한 번 읽어 이미 알린 주제 키와 원문 주소, 그 가운데 지금 반응이 「관심 없음」 인 주제 키를 만든다. 주제 키가 빈
+     * 발견은 되풀이 판정을 하지 않으므로 넣지 않는다.
+     */
+    private Announced announcedSince(Instant after) {
+        List<ProactiveCheckFinding> recent = deps
                 .findings()
                 .findByConversationIdAndKindAndCreatedAtAfter(check.conversationId(), FindingKind.NEW, after)
                 .stream()
                 .filter(finding ->
                         finding.topicKey() != null && !finding.topicKey().isBlank())
+                .toList();
+        Set<AnnouncedKey> keys = recent.stream()
                 .map(finding -> new AnnouncedKey(finding.topicKey(), finding.sourceUrl()))
                 .collect(Collectors.toSet());
+        Map<Long, FindingReaction> reactions = deps.reactions()
+                .current(
+                        owner.id(),
+                        recent.stream().map(ProactiveCheckFinding::id).toList());
+        Set<String> dismissedTopics = recent.stream()
+                .filter(finding -> reactions.get(finding.id()) == FindingReaction.DISMISSED)
+                .map(ProactiveCheckFinding::topicKey)
+                .collect(Collectors.toSet());
+        return new Announced(keys, dismissedTopics);
     }
+
+    /** 되풀이 판정에 쓰는 이미 알린 묶음과 「관심 없음」 주제 키다. */
+    private record Announced(Set<AnnouncedKey> keys, Set<String> dismissedTopics) {}
 
     /**
      * 자동 실행으로 시작해 답, 보고, 발견, 알림 줄을 남기지 않는 살펴보기인가. 문제 후보만 남겨 다시 가치 평가와 행동 정책을 거치게

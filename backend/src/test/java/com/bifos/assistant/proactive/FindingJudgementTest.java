@@ -42,7 +42,7 @@ class FindingJudgementTest {
     }
 
     private static JudgedFinding judge(Finding finding) {
-        return FindingJudgement.judge(finding, START, NOW, Set.of());
+        return FindingJudgement.judge(finding, START, NOW, Set.of(), Set.of());
     }
 
     private static Finding with(Finding base, String sourceUrl, String checkedAt, String freshness) {
@@ -235,7 +235,7 @@ class FindingJudgementTest {
     void sameTopicKeyAndSourceUrlIsRepeated() {
         Set<AnnouncedKey> announced = Set.of(new AnnouncedKey(TOPIC, URL));
 
-        JudgedFinding judged = FindingJudgement.judge(valid(), START, NOW, announced);
+        JudgedFinding judged = FindingJudgement.judge(valid(), START, NOW, announced, Set.of());
 
         assertReference(judged, FindingReason.REPEATED);
     }
@@ -245,7 +245,7 @@ class FindingJudgementTest {
     void sameTopicKeyWithNewSourceUrlIsNew() {
         Set<AnnouncedKey> announced = Set.of(new AnnouncedKey(TOPIC, "https://example.com/old"));
 
-        JudgedFinding judged = FindingJudgement.judge(valid(), START, NOW, announced);
+        JudgedFinding judged = FindingJudgement.judge(valid(), START, NOW, announced, Set.of());
 
         assertThat(judged.kind()).isEqualTo(FindingKind.NEW);
     }
@@ -256,7 +256,7 @@ class FindingJudgementTest {
         Set<AnnouncedKey> announced = Set.of(new AnnouncedKey(TOPIC, URL));
         Finding changed = withTopic(valid(), TOPIC, URL, "마감이 사흘 남았다");
 
-        JudgedFinding judged = FindingJudgement.judge(changed, START, NOW, announced);
+        JudgedFinding judged = FindingJudgement.judge(changed, START, NOW, announced, Set.of());
 
         assertThat(judged.kind()).isEqualTo(FindingKind.NEW);
     }
@@ -268,7 +268,41 @@ class FindingJudgementTest {
 
         for (String topicKey : new String[] {null, "", "  "}) {
             JudgedFinding judged =
-                    FindingJudgement.judge(withTopic(valid(), topicKey, URL, null), START, NOW, announced);
+                    FindingJudgement.judge(withTopic(valid(), topicKey, URL, null), START, NOW, announced, Set.of());
+
+            assertThat(judged.kind()).as("topicKey=%s", topicKey).isEqualTo(FindingKind.NEW);
+        }
+    }
+
+    @Test
+    @DisplayName("관심 없음 주제와 주제 키가 같으면 원문 주소가 다르고 달라진 점이 있어도 되풀이라서 참고다")
+    void dismissedTopicIsRepeatedRegardlessOfSourceAndChange() {
+        Set<String> dismissed = Set.of(TOPIC);
+        Finding newSource = withTopic(valid(), TOPIC, "https://example.com/kafka-v2", null);
+        Finding changed = withTopic(valid(), TOPIC, "https://example.com/kafka-v2", "마감이 사흘 남았다");
+
+        assertReference(FindingJudgement.judge(newSource, START, NOW, Set.of(), dismissed), FindingReason.REPEATED);
+        assertReference(FindingJudgement.judge(changed, START, NOW, Set.of(), dismissed), FindingReason.REPEATED);
+    }
+
+    @Test
+    @DisplayName("관심 없음 주제와 주제 키가 다르면 새로 알릴 것이다")
+    void otherTopicThanDismissedIsNew() {
+        Set<String> dismissed = Set.of("study:kafka-streams");
+
+        JudgedFinding judged = FindingJudgement.judge(valid(), START, NOW, Set.of(), dismissed);
+
+        assertThat(judged.kind()).isEqualTo(FindingKind.NEW);
+    }
+
+    @Test
+    @DisplayName("주제 키가 비면 관심 없음 주제에 빈 키가 있어도 되풀이로 보지 않는다")
+    void blankTopicKeyIsNeverDismissed() {
+        Set<String> dismissed = Set.of("", "  ");
+
+        for (String topicKey : new String[] {null, "", "  "}) {
+            JudgedFinding judged =
+                    FindingJudgement.judge(withTopic(valid(), topicKey, URL, null), START, NOW, Set.of(), dismissed);
 
             assertThat(judged.kind()).as("topicKey=%s", topicKey).isEqualTo(FindingKind.NEW);
         }
@@ -280,7 +314,7 @@ class FindingJudgementTest {
         Set<AnnouncedKey> announced = Set.of(new AnnouncedKey(TOPIC, "ftp://example.com/a"));
         Finding ftp = with(valid(), "ftp://example.com/a", CHECKED_AT, "CURRENT");
 
-        JudgedFinding judged = FindingJudgement.judge(ftp, START, NOW, announced);
+        JudgedFinding judged = FindingJudgement.judge(ftp, START, NOW, announced, Set.of());
 
         assertReference(judged, FindingReason.NO_SOURCE);
     }
