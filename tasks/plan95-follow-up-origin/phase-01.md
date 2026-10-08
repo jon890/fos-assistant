@@ -10,7 +10,7 @@
 
 ## 컨텍스트
 
-`FollowUpSnapshot.proposed()`는 `FollowUp.isProposed()`에서 온다. 이 값은 `proposed_by_execution_id != null`이며 수락 뒤에도 참이다.
+`FollowUpService.snapshots()`는 `FollowUp.proposedByAgent()`를 `FollowUpSnapshot.proposed`로 옮긴다. 이 값은 `proposed_by_execution_id != null`이며 수락 뒤에도 참이다.
 `AttentionFollowUpRef.proposed`는 아직 받아들이지 않은 상태이다. 두 의미를 분리한다.
 
 **근거 문서**: `docs/frontend/now.md`의 「항목 한 줄」, `docs/backend/follow-up.md`의 「API」, `docs/backend/attention.md`의 「API」.
