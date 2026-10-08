@@ -140,6 +140,47 @@ class ProfileApiSandboxPolicyTest(support.ProfileApiRouteTest):
         self.assertEqual(self.saved_config()["terminal"], config["terminal"])
         self.assertFalse((self.sandbox_root / "user-1").exists())
 
+    def test_require_sandbox_rejects_unlisted_profile_instead_of_local(self):
+        """require_sandbox 가 참이면 정책에 없는 profile 의 셸 저장을 local 로 돌리지 않고 409 로 거절한다."""
+        path = self.root / "owner/config.yaml"
+        original = path.read_bytes()
+        self.set_sandbox_policy(self.sandbox_policy(profiles={"alice": {}}))
+        body = self.file_body()
+        body["require_sandbox"] = True
+
+        response = self.request("/api/config", "PUT", token="valid", body=body, full_response=True)
+
+        self.assertEqual(response.status_code, 409)
+        self.assertEqual(response.body["code"], "sandbox_unavailable")
+        self.assertEqual(path.read_bytes(), original)
+
+    def test_require_sandbox_still_uses_the_sandbox_for_listed_profile(self):
+        """require_sandbox 가 참이어도 정책에 있는 profile 은 평소처럼 실행 공간 설정을 쓴다."""
+        body = self.file_body()
+        body["require_sandbox"] = True
+
+        self.assertEqual(self.request("/api/config", "PUT", token="valid", body=body), 200)
+        self.assertEqual(self.saved_config()["terminal"]["backend"], "docker")
+
+    def test_require_sandbox_without_shell_toolset_keeps_terminal(self):
+        """셸 도구가 없는 저장은 require_sandbox 가 참이어도 정책을 보지 않는다."""
+        os.environ.pop("FOS_ASSISTANT_SANDBOX")
+        body = self.toolset_body()
+        body["require_sandbox"] = True
+
+        self.assertEqual(self.request("/api/config", "PUT", token="valid", body=body), 200)
+
+    def test_require_sandbox_must_be_boolean(self):
+        """require_sandbox 가 참 거짓 값이 아니면 400 이다."""
+        path = self.root / "owner/config.yaml"
+        original = path.read_bytes()
+        for value in ("true", 1, None):
+            with self.subTest(value=value):
+                body = self.file_body()
+                body["require_sandbox"] = value
+                self.assertEqual(self.request("/api/config", "PUT", token="valid", body=body), 400)
+                self.assertEqual(path.read_bytes(), original)
+
     def test_unlisted_profile_cannot_enable_media_file_tools_locally(self):
         """사진과 영상 파일 도구는 정책 profile 밖에서 host 실행으로 돌아가지 않고 409로 거절한다."""
         self.set_sandbox_policy(self.sandbox_policy(profiles={"alice": {}}))

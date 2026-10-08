@@ -128,6 +128,7 @@ API 완료 뒤 Docker 생성까지의 변경은 첨부 루트를 Hermes 에 읽�
 
 정책이 유효하고 profile 이 등록돼 있으면 plugin 은 아래 `terminal:` 전체를 쓴다.
 등록되지 않은 profile 은 셸 저장을 허용하고 `backend: local` 을 명시한다. 기존 local 옵션은 유지한다.
+요청 본문의 `require_sandbox` 가 참이면 local 로 두지 않고 409 `sandbox_unavailable` 로 거절한다. Control Plane 의 기본 도구 적용이 이 값을 보낸다.
 이미 docker 였다가 정책에서 빠지면 다음 셸 저장에서 docker 설정을 지우고 local 로 돌아간다.
 정책 자체가 없거나 잘못됐으면 등록 여부와 관계없이 셸 저장을 거절한다.
 
@@ -323,17 +324,17 @@ Control Plane 이 이 경로들을 부르는 순서와 뜻은 부르는 쪽 문�
 | `DELETE /api/profiles/<이름>` | 관리 표식이 있는 profile 을 지운다 | 없음 | 200 | 401 관리 표식이 없는 profile. 404 없는 profile. 두 번째 호출의 404 는 「이미 지움」 으로 읽는다 |
 | `PUT /api/env` | 그 profile 의 `.env` 에 정해 둔 key 한 줄을 쓴다 | `{profile, key, value}`. key 는 `API_SERVER_KEY`, `API_SERVER_MODEL_NAME`, `MCP_FOS_ASSISTANT_API_KEY` 와 카탈로그 커넥터의 `fields[].env` 뿐 | 200. 커넥터 key 는 `{profile, key, restart_required}` | 400 다른 key, `default`, 형식. 404 없는 profile |
 | `DELETE /api/env` | 관리 profile 의 커넥터 칸 key 만 지운다 | `{profile, key}` | `{profile, key, restart_required}` | |
-| `GET /api/connectors/catalog` | 운영 목록에 있고 검증을 통과한 커넥터의 manifest 를 낸다 | 없음 | `[{id, schema, title, description, icon, link, fields[], verify, mcp_server, toolsets, attachments, tools, skills}]`. 아래 「카탈로그 응답」 이 칸을 갖는다 | |
+| `GET /api/connectors/catalog` | 운영 목록에 있고 검증을 통과한 커넥터의 manifest 를 낸다 | 없음 | `[{id, schema, title, description, icon, link, fields[], verify, mcp_server, toolsets, attachments, single_binding, tools, skills}]`. 아래 「카탈로그 응답」 이 칸을 갖는다 | |
 | `POST /api/connectors/<id>/call` | 후보 값이나 보관 파일의 값으로 그 커넥터의 선택지 도구나 확인 도구를 한 번 부른다 | `{tool, values}` 또는 `{tool, vault}`. 둘 가운데 정확히 하나다 | `{ok: true, result}` 또는 `{ok: false, error: <공통 어휘>}` | 400 그 커넥터의 보관 파일이 없다 |
 | `POST /api/connectors/<id>/execute` | Control Plane 이 승인한 호출을 그 profile 의 값과 받은 인자로 한 번 실행한다 | `{profile, hermes_tool, args}` | `{ok: true, result}` 또는 `{ok: false, error: <공통 어휘>}` | 504 실행됐는지 모른다 |
 | `GET /api/connectors?profile=<p>` | 커넥터의 상태를 읽는다 | query `profile` | `{profile, policy_hook, connectors: [{plugin, enabled, configured, mode}]}`. `mode` 는 `bind` 나 `isolated` 다 | 401 관리 표식과 커넥터 표식이 모두 없다 |
-| `PUT /api/connectors` | profile 에 커넥터를 설치하고 제거한다 | `{profile, plugin, enabled, sandbox_owner?}`. 바인딩 설치는 `bind: {vault}` 를 더하고 Control Plane 이 그 에이전트의 `sandbox_owner` 를 함께 보낸다. `owner_attachments_env` 를 선언한 커넥터의 바인딩 설치와 사진 도구를 여는 옛 설치는 `sandbox_owner` 가 필요하다. `owner_output_env` 를 선언한 커넥터는 `sandbox_owner` 와 `connector_output_root` 가 있고 profile 이 정책에 등록됐을 때만 출력 디렉터리를 받고, 아니면 빈 값으로 붙는다. 떼면 그 디렉터리를 지운다 | `{profile, plugin, enabled, changed, restart_required, plugin_updated, reload_pending}`. `reload_pending` 은 바인딩 설치만 참이 될 수 있다. 옛 설치는 서버 등록과 함께 그 profile 의 API 도구 목록과 `SOUL.md` 를 다시 쓴다. 사진 도구를 여는 옛 설치는 `terminal:` 과 함께 `approvals.unattended_mode` 도 맞춘다. 바인딩 설치는 서버 이름만 더하고 뺀다 | 400 보관 파일이 없거나 다른 커넥터의 것이다. 401 표식. 409 운영자 설정과 충돌한다, 사진 도구에 실행 공간 정책이나 등록 profile 이 없다, `owner_attachments_env` 를 선언한 커넥터에 실행 공간 정책이 없거나 그 주인의 첨부 디렉터리를 링크 없이 확인하지 못했다. 400 그 커넥터에 `sandbox_owner` 가 없다 |
+| `PUT /api/connectors` | profile 에 커넥터를 설치하고 제거한다 | `{profile, plugin, enabled, sandbox_owner?}`. 바인딩 설치는 `bind: {vault}` 를 더하고 Control Plane 이 그 에이전트의 `sandbox_owner` 를 함께 보낸다. `owner_attachments_env` 를 선언한 커넥터의 바인딩 설치와 사진 도구를 여는 옛 설치는 `sandbox_owner` 가 필요하다. `owner_output_env` 를 선언한 커넥터는 `sandbox_owner` 와 `connector_output_root` 가 있고 profile 이 정책에 등록됐을 때만 출력 디렉터리를 받고, 아니면 빈 값으로 붙는다. 떼면 그 디렉터리를 지운다 | `{profile, plugin, enabled, changed, restart_required, plugin_updated, reload_pending}`. `reload_pending` 은 바인딩 설치만 참이 될 수 있다. 옛 설치는 서버 등록과 함께 그 profile 의 API 도구 목록과 `SOUL.md` 를 다시 쓴다. 사진 도구를 여는 옛 설치는 `terminal:` 과 함께 `approvals.unattended_mode` 도 맞춘다. 바인딩 설치는 서버 이름만 더하고 뺀다 | 400 보관 파일이 없거나 다른 커넥터의 것이다. 401 표식. 409 운영자 설정과 충돌한다, 사진 도구에 실행 공간 정책이나 등록 profile 이 없다, `owner_attachments_env` 를 선언한 커넥터에 실행 공간 정책이 없거나 그 주인의 첨부 디렉터리를 링크 없이 확인하지 못했다, `sandbox_required` 를 선언한 커넥터의 바인딩 설치인데 profile 이 실행 공간 정책에 없다. 실행 공간 사유의 409 는 본문 `code` 가 `sandbox_unavailable` 이고, 운영자 설정 충돌은 그 `code` 를 싣지 않는다. 400 그 커넥터에 `sandbox_owner` 가 없다 |
 | `PUT /api/connector-vault` | 연결의 칸 값을 보관 파일 하나에 쓴다 | `{vault, connector, values}`. `values` 는 `fields[].key` 를 키로 한 값이다 | `{ok: true}` | 400 형식, 운영 목록에 없는 커넥터, 칸 선언과 맞지 않는 값. 409 같은 이름의 보관 파일이 다른 커넥터의 것이다 |
 | `DELETE /api/connector-vault` | 보관 파일 하나를 지운다 | `{vault}` | `{changed}`. 없었으면 `false` 다 | 400 형식 |
 | `POST /api/connector-vault/import` | 그 커넥터를 옛 설치한 관리 profile 의 `.env` 에서 칸 값을 보관 파일로 옮긴다 | `{vault, connector, profile}` | `{ok: true}` | 400 필수 칸이 비었다. 401 관리 표식이 없다. 404 없는 profile, 설치하지 않은 커넥터. 409 다른 커넥터의 보관 파일 |
 | `POST /api/mcp/servers/<서버>/test?profile=<p>` | 그 profile 에 설치한 커넥터의 MCP 서버만 probe 한다 | 없음 | `{ok, tools: [{name}]}` | |
 | `GET /api/tools/toolsets` | 도구 이름과 설명을 읽는다 | 없음 | 200 | |
-| `PUT /api/config` (도구) | 지정한 profile 의 API 도구 목록을 쓴다. `terminal`, `file`, `code_execution`, `vision`, `image_gen`, `video_gen` 가운데 하나라도 있으면 profile 의 `terminal:` 을 실행 공간 설정으로 다시 쓴다. 같은 쓰기에서 `approvals.unattended_mode` 를 docker 면 `approve` 로 두고 local 이면 지운다(「셸 실행 공간」) | `{profile, config: {platform_toolsets: {api_server: [...]}}, sandbox_owner?}`. `sandbox_owner` 는 `^[a-z][a-z0-9-]{0,63}$` 이고 실행 공간 도구를 켜는 등록 profile 에서 필수다 | 200 | [ADR-029](../docs/adr/ADR-029-에이전트-도구는-control-plane-이-등급으로-판정하고-hermes-설정-api-로-쓴다.md) 그대로. 409 소유 기록의 바인딩 서버 이름이 목록에 빠졌다 |
+| `PUT /api/config` (도구) | 지정한 profile 의 API 도구 목록을 쓴다. `terminal`, `file`, `code_execution`, `vision`, `image_gen`, `video_gen` 가운데 하나라도 있으면 profile 의 `terminal:` 을 실행 공간 설정으로 다시 쓴다. 같은 쓰기에서 `approvals.unattended_mode` 를 docker 면 `approve` 로 두고 local 이면 지운다(「셸 실행 공간」) | `{profile, config: {platform_toolsets: {api_server: [...]}}, sandbox_owner?, require_sandbox?}`. `sandbox_owner` 는 `^[a-z][a-z0-9-]{0,63}$` 이고 실행 공간 도구를 켜는 등록 profile 에서 필수다. `require_sandbox` 는 참 거짓 값이고, 참이면 정책에 없는 profile 의 셸 도구 저장을 local 로 돌리지 않고 409 `sandbox_unavailable` 로 거절한다. Control Plane 의 기본 도구 적용이 보낸다 | 200 | [ADR-029](../docs/adr/ADR-029-에이전트-도구는-control-plane-이-등급으로-판정하고-hermes-설정-api-로-쓴다.md) 그대로. 409 소유 기록의 바인딩 서버 이름이 목록에 빠졌다 |
 | `PUT /api/config` (스킬 게시) | 지정한 profile 의 올린 스킬 경로를 쓴다 | `{profile, config: {skills: {external_dirs: [<Hermes 쪽 스킬 루트>/<profile>/<버전>]}}}`. 버전 이름은 `v[0-9]{13}-[a-z0-9]{4}` 다(`v` 뒤에 UTC 밀리초 13자리와 소문자 영숫자 4자). 목록은 0개나 1개. 0개는 게시 해제. 도구 목록을 같은 본문에 둘 수 있다 | 200 | 400 경로 형식, 다른 profile 의 prefix, 둘 이상, 심볼릭 링크, 없는 디렉터리, `skills` 도구가 꺼진 채 게시. 409 운영자가 넣은 다른 외부 경로가 있다. 404 없는 profile |
 | `GET /api/skills?profile=<p>` | 지정한 profile 의 스킬 목록을 읽는다 | query `profile` 하나 | 200 `[{name, description, category, enabled, usage, provenance}]`. `enabled` 는 전역 `skills.disabled` 만 반영 | 400 query 누락, 둘 이상, `default`. 404 |
 | `PUT /api/skills/toggle` | 지정한 profile 의 스킬 하나를 켜고 끈다 | `{profile, name, enabled}` | 200 `{ok, name, enabled}` | 400, 404 |
@@ -371,6 +372,7 @@ API server 의 session 응답은 provider 를 주지 않는다. 그 값은 Herme
 
 **카탈로그 응답.** `fields[]` 는 manifest 의 칸 그대로(`env`, `options` 포함)이고 `verify` 는 `{tool}` 이다.
 `toolsets` 와 `attachments` 는 manifest 에 없으면 빈 목록과 거짓이다. 옛 대시보드 plugin 은 두 칸을 내지 않고, Control Plane 은 없는 칸을 같은 기본값으로 읽는다.
+`single_binding` 은 boolean 이고 선언이 없으면 거짓이다. 옛 대시보드 plugin 은 이 칸을 내지 않고, Control Plane 은 없는 칸을 거짓으로 읽는다. `sandbox_required` 는 싣지 않는다. 대시보드가 바인딩 설치에서 직접 판정한다([ADR-20261008 / connector-binding-guards](../docs/adr/ADR-20261008-connector-binding-guards.md)).
 `tools` 는 `{<이름>: {risk, approval, title, grant, outbound, identifiers}}` 이고 `approval`, `grant`, `outbound`, `identifiers` 는 기본값을 채운 값이다. `schema: 1` 은 `verify.tool` 과 `options.tool` 만 `READ` 로 담는다.
 `schema` 가 없는 응답은 `1` 로 읽는다. `operator_env` 의 이름과 값, `errors` 는 담지 않는다.
 `skills` 는 바인딩 설치가 profile 에 복사할 스킬의 이름 목록이고 이름 순이다. 이름은 `SKILL.md` 앞머리의 `name` 이고, 없으면 디렉터리 이름이다. 본문은 담지 않는다.
@@ -504,6 +506,7 @@ provider credential 은 이 토큰으로 쓰지 못한다.
 **토큰으로 부른 `PUT /api/config` 는 본문을 검사한 뒤 Hermes 처리기에 넘긴다.**
 최상위에는 `profile` 과 `config` 를 두고, `sandbox_owner` 를 더할 수 있다. 형식은 `^[a-z][a-z0-9-]{0,63}$` 이다.
 `terminal`, `file`, `code_execution` 을 켜고 해당 profile 이 실행 공간 정책에 등록돼 있으면 `sandbox_owner` 가 필수다. 미등록 profile 의 local 저장에서는 생략할 수 있다.
+`require_sandbox: true` 면 미등록 profile 의 셸 저장은 local 대신 409 다.
 `vision`, `image_gen`, `video_gen` 은 미등록 profile 에서 local 로 저장하지 않고 409 로 거절한다. Hermes host에서 다른 사용자의 첨부를 직접 읽지 않게 하려는 것이다.
 `terminal:` 은 plugin 이 직접 쓰므로 본문의 `config` 에 두지 않는다.
 `config` 에는 `platform_toolsets.api_server` 와 `skills.external_dirs` 가운데 하나나 둘을 둔다.

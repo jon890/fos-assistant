@@ -18,7 +18,7 @@ Hermes 사건을 `execution_event` 로 옮겨 적는 규칙과 실행 트리를 
 | `PATCH /api/v1/chat/conversations/{id}` | 이름을 바꾼다. 본문 `{ "title": "..." }`. 바뀐 대화 한 줄을 돌려준다 |
 | `PUT /api/v1/chat/conversations/{id}/model` | 대화의 모델과 effort 를 바꾼다. 본문 `{ "provider", "model", "reasoningEffort" }`. 셋 다 null 이면 기본값으로 되돌린다. effort 는 `ModelChoice` 가 받는 값(`none`, `low` 부터 `max`)이어야 하고, `none` 은 그 모델의 `disable` 이 `SUPPORTED` 일 때만 받는다. 모델을 비웠으면 에이전트 기본 모델로 판정한다. 아니면 `VALIDATION_FAILED` 다. `none` 일 때만 대화의 에이전트와 그 목록을 읽으므로 목록을 읽지 못하면 `HERMES_UNAVAILABLE`, 에이전트를 쓸 수 없으면 그 오류가 난다. 다른 effort 의 저장은 에이전트 상태와 무관하다. 판정은 저장할 때만 한다. 저장한 뒤 에이전트 기본 모델이나 Hermes 의 지원 값이 바뀌어도 실행은 저장된 `none` 을 그대로 보내고, 실행 때 목록을 읽지 않는다. 바뀐 대화 한 줄을 돌려준다 |
 | `GET /api/v1/chat/model-options?agentCode=` | 그 에이전트의 profile 로 고를 수 있는 모델. 요청자가 쓸 수 있는 에이전트만 받는다 |
-| `DELETE /api/v1/chat/conversations/{id}` | 목록에서 숨긴다. 204 |
+| `DELETE /api/v1/chat/conversations/{id}` | 목록에서 숨긴다. 204. 본문은 정리 작업이 곧 지운다([ADR-20261008 / conversation-purge](../adr/ADR-20261008-conversation-purge.md)) |
 | `GET /api/v1/chat/conversations/{id}/messages` | 메시지 목록. 이전 판도 모두 온다 |
 | `POST /api/v1/chat/messages` | 한 번에 받는다 |
 | `POST /api/v1/chat/messages/stream` | 사건으로 받는다 |

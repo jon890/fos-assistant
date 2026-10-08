@@ -138,7 +138,7 @@ class ConnectorCatalogTest(ConnectorGateCase):
         self.assertEqual(len(body), 1)
         entry = body[0]
         self.assertEqual(set(entry), {"id", "schema", "title", "description", "icon", "link", "fields", "verify",
-                                      "mcp_server", "toolsets", "attachments", "tools", "skills"})
+                                      "mcp_server", "toolsets", "attachments", "single_binding", "tools", "skills"})
         # `icon` 과 `link` 를 선언하지 않은 커넥터는 두 칸이 null 이다.
         self.assertIsNone(entry["icon"])
         self.assertIsNone(entry["link"])
@@ -318,6 +318,39 @@ class ConnectorCatalogTest(ConnectorGateCase):
         entry = self.catalog()[0]
         self.assertEqual(entry["toolsets"], ["vision"])
         self.assertIs(entry["attachments"], False)
+
+    def test_binding_guard_declarations_reach_the_catalog_and_the_manifest(self):
+        """두 바인딩 제한 칸을 선언하지 않으면 거짓이고, 선언하면 `single_binding` 만 카탈로그에 참으로 나온다(ADR-20261008 connector-binding-guards)."""
+        entry = self.catalog()[0]
+        self.assertIs(entry["single_binding"], False)
+        manifest = self.plugin._connector_manifest(DEMO)
+        self.assertIs(manifest["single_binding"], False)
+        self.assertIs(manifest["sandbox_required"], False)
+        self.rewrite("connector.json", lambda value: value.update(single_binding=True, sandbox_required=True))
+        entry = self.catalog()[0]
+        self.assertIs(entry["single_binding"], True)
+        # `sandbox_required` 는 대시보드가 설치에서 판정한다. Control Plane 이 쓰지 않으므로 카탈로그에 싣지 않는다.
+        self.assertNotIn("sandbox_required", entry)
+        manifest = self.plugin._connector_manifest(DEMO)
+        self.assertIs(manifest["single_binding"], True)
+        self.assertIs(manifest["sandbox_required"], True)
+
+    def test_binding_guard_declaration_that_is_not_a_boolean_leaves_the_connector_out(self):
+        """두 칸 가운데 하나라도 boolean 이 아니면 그 커넥터는 카탈로그에서 빠지고 예외가 나지 않는다."""
+        original = (self.connector_root / "connector.json").read_bytes()
+        for label, change in (
+            ("single_binding is a string", lambda value: value.update(single_binding="true")),
+            ("sandbox_required is a string", lambda value: value.update(sandbox_required="true")),
+            ("single_binding is a number", lambda value: value.update(single_binding=1)),
+            ("sandbox_required is null", lambda value: value.update(sandbox_required=None)),
+        ):
+            with self.subTest(label):
+                self.rewrite("connector.json", change)
+                self.assertEqual(self.catalog(), [])
+                self.assertIsNone(self.plugin._connector_manifest(DEMO))
+                (self.connector_root / "connector.json").write_bytes(original)
+        # 되돌리면 다시 나온다. 위의 빈 목록이 고친 내용 때문이었음을 확인한다.
+        self.assertEqual([entry["id"] for entry in self.catalog()], [DEMO])
 
     def test_closed_toolsets_are_never_allowed(self):
         """셸, 파일, 기억, 스킬, 위임 도구는 manifest 로 열리지 않는다."""

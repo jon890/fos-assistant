@@ -6,6 +6,7 @@ import com.bifos.assistant.chat.domain.type.ModelSelectionMode;
 import com.bifos.assistant.model.domain.type.ModelTier;
 import jakarta.persistence.LockModeType;
 import java.time.Instant;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -19,6 +20,32 @@ import org.springframework.data.repository.query.Param;
 public interface ConversationRepository extends JpaRepository<Conversation, Long> {
 
     Optional<Conversation> findByIdAndUserIdAndDeletedAtIsNull(Long id, Long userId);
+
+    /**
+     * 지웠지만 본문을 아직 지우지 않은 대화의 번호다. 먼저 지운 대화부터 낸다(ADR-20261008 / conversation-purge).
+     *
+     * <p>{@code skipped} 는 실패해 기다리는 중인 대화다. 빼고 골라야 그 대화가 쌓여도 뒤에 지운 대화가 밀리지 않는다. 비우면 안 되므로
+     * 기다리는 대화가 없으면 없는 번호 하나를 넘긴다.
+     */
+    @Query("""
+            select c.id from Conversation c
+             where c.purgedAt is null and c.deletedAt is not null and c.id not in :skipped
+             order by c.deletedAt asc, c.id asc
+            """)
+    List<Long> findPurgeCandidates(@Param("skipped") Collection<Long> skipped, Pageable page);
+
+    /**
+     * 본문을 지운 대화로 적는다. 제목과 Hermes session 을 비운다. 줄은 남긴다. 실행 기록과 다른 표가 이 번호를 가리킨다.
+     *
+     * <p>지운 대화이고 아직 적지 않았을 때만 적는다. 트랜잭션은 {@code ConversationPurgeWriter} 가 연다.
+     */
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("""
+            update Conversation c
+               set c.title = '', c.hermesSessionId = null, c.hermesRootSessionId = null, c.purgedAt = :now
+             where c.id = :id and c.deletedAt is not null and c.purgedAt is null
+            """)
+    int markPurged(@Param("id") Long id, @Param("now") Instant now);
 
     /** 같은 대화의 첨부 upload 를 장수 확인부터 저장까지 하나씩 처리한다. */
     @Lock(LockModeType.PESSIMISTIC_WRITE)

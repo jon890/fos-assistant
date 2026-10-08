@@ -9,7 +9,7 @@ AI credential 은 Hermes profile 의 `.env` 에, profile 의 API server key 는 
 
 | 파일 | 표 |
 | --- | --- |
-| [`users-agents.md`](users-agents.md) | `app_user`, `allowed_person`, `agent`, `model_tier_definition`, `model_tier_group_setting`, `model_hidden`, `agent_token`, `service_token`, `service_token_collection` |
+| [`users-agents.md`](users-agents.md) | `app_user`, `allowed_person`, `agent`, `model_tier_definition`, `model_tier_group_setting`, `model_hidden`, `toolset_hidden`, `agent_token`, `service_token`, `service_token_collection` |
 | [`chat.md`](chat.md) | `conversation`, `chat_message`, `chat_pending_message`, `chat_attachment`, `chat_artifact`, `result_delivery`, `result_delivery_item`, `result_delivery_attempt`, `execution_question` |
 | [`execution.md`](execution.md) | `agent_execution`, `execution_event`, `subagent_usage_job`, `execution_skill_use`, `hermes_session_binding`, `execution_context_source` |
 | [`memory.md`](memory.md) | `memory`, `memory_revision`, `memory_collection`, `agent_memory_collection`, `agent_memory_collection_change`, `memory_capture` |
@@ -132,21 +132,21 @@ H2 용 `*MigrationTest` 가 데이터베이스를 만드는 메서드를 열어 
 거짓이면 운영에서 만든 profile 이라 profile 은 남긴다.
 대화와 실행 기록과 스킬 호출 이력은 남는다.
 
-대화도 지우지 않는다. 사용자가 지우면 `conversation.deleted_at` 을 적고 목록에서 숨긴다.
-메시지와 실행 기록과 Hermes session 은 그대로 둔다.
-아직 보내지 않은 대기 메시지(`chat_pending_message`)는 함께 지운다. 지운 대화에는 보낼 곳이 없다.
-사용량 화면은 지운 대화의 실행도 센다. 돈은 이미 나갔다.
-실행 기록이 에이전트와 대화를 가리키고 있고, 기록은 남아야 한다.
+대화 줄은 지우지 않는다. 사용자가 지우면 `conversation.deleted_at` 을 적고 목록에서 숨긴다.
+아직 보내지 않은 대기 메시지(`chat_pending_message`)는 그때 함께 지운다. 지운 대화에는 보낼 곳이 없다.
+그 뒤 정리 작업이 메시지, 첨부와 결과물의 파일과 행, 실행 질문 줄, 실행의 답 본문과 사건의 `detail`, Hermes session 을 지우고 `purged_at` 을 적는다.
+실행 줄과 사건 줄은 본문 없이 남는다. 사용량 화면은 지운 대화의 실행도 센다. 돈은 이미 나갔다.
+무엇을 언제 지우고 무엇을 기다리는지는 [ADR-20261008 / conversation-purge](../../adr/ADR-20261008-conversation-purge.md) 가 갖는다.
 
 사용자를 지우는 흐름은 아직 없다.
 
 페르소나는 이 데이터베이스에 없다. 본문은 그 profile 의 `SOUL.md` 가 갖는다.
 근거는 [ADR-019](../../adr/ADR-019-페르소나는-hermes-가-갖고-control-plane-은-화면만-준다.md) 에 있다.
 
-첨부도 행을 지우지 않는다. 파일만 지우고 `deleted_at` 을 적는다.
+첨부는 보관 기간이 지나면 파일만 지우고 `deleted_at` 을 적는다. 행은 대화를 지울 때 함께 지운다.
 결과물(`chat_artifact`)도 같다.
-하위 에이전트 session 등록(`hermes_session_binding`)도 지우지 않는다. 실행 기록과 함께 남는다.
 그 자리에 사진이 있었다는 것이 남아야 지난 대화를 읽을 수 있다.
+하위 에이전트 session 등록(`hermes_session_binding`)도 지우지 않는다. 실행 기록과 함께 남는다.
 
 Memory 는 줄을 지운다. 지우기 전에 마지막 값을 `memory_revision` 에 `DELETED` 로 남기므로 본문은 그 표에 남는다. 민감 항목의 판은 암호문으로 남는다.
 화면의 삭제는 목록과 주입에서 빼는 것이고, 본문을 완전히 없애는 길은 아직 없다.

@@ -245,18 +245,25 @@ export function createConfigRoutes(state: FakeHermesState, { boundServers }: Ret
           skills?: { external_dirs?: unknown };
         };
         sandbox_owner?: unknown;
+        require_sandbox?: unknown;
       };
       const configKeys = Object.keys(body.config ?? {});
       // 도구와 스킬 게시만 받는다. 둘을 한 본문에 함께 둘 수 있고, 그 밖의 키는 거절한다.
-      // 최상위에는 profile 과 config 가 있어야 하고 실행 공간 주인 sandbox_owner 만 더 둘 수 있다.
+      // 최상위에는 profile 과 config 가 있어야 하고 실행 공간 주인 sandbox_owner 와 require_sandbox 만 더 둘 수 있다.
       const bodyKeys = Object.keys(body);
       const exactKeys = bodyKeys.includes("profile") && bodyKeys.includes("config")
-        && bodyKeys.every((key) => key === "profile" || key === "config" || key === "sandbox_owner")
+        && bodyKeys.every((key) => key === "profile" || key === "config" || key === "sandbox_owner"
+          || key === "require_sandbox")
         && configKeys.length >= 1
         && configKeys.every((key) => key === "platform_toolsets" || key === "skills");
       if (body.profile === undefined || queryProfile !== null && queryProfile !== body.profile
           || !state.keys[body.profile] || !exactKeys) {
         send(response, 400, { error: "invalid configuration" });
+        return true;
+      }
+      // plugin 처럼 참 거짓 값만 받는다. 대역에는 미등록 profile 의 local 실행이 없어 값은 거절 여부를 바꾸지 않는다.
+      if (body.require_sandbox !== undefined && typeof body.require_sandbox !== "boolean") {
+        send(response, 400, { error: "require_sandbox must be a boolean" });
         return true;
       }
       // plugin 처럼 칸이 있으면 셸 도구가 없어도 모양을 본다.
