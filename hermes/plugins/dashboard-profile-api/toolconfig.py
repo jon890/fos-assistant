@@ -172,12 +172,16 @@ async def _check_config_update(request):
     조용히 지워지면 붙은 커넥터의 도구가 말없이 사라진다.
     """
     body = await _json_object(request)
-    if body is None or set(body) - {"sandbox_owner"} != {"profile", "config"}:
-        return _rejected("profile 과 config 와 sandbox_owner 만 받는다")
-    # Hermes 처리기는 config 와 profile 만 읽으므로 sandbox_owner 는 이 검사만 쓴다.
+    if body is None or set(body) - {"sandbox_owner", "require_sandbox"} != {"profile", "config"}:
+        return _rejected("profile 과 config 와 sandbox_owner, require_sandbox 만 받는다")
+    # Hermes 처리기는 config 와 profile 만 읽으므로 sandbox_owner 와 require_sandbox 는 이 검사만 쓴다.
     owner = body.get("sandbox_owner")
     if "sandbox_owner" in body and not (isinstance(owner, str) and SANDBOX_OWNER_RE.match(owner)):
         return _rejected("sandbox_owner 형식이 올바르지 않다")
+    # 참이면 정책에 없는 profile 의 셸 도구를 local 로 돌리지 않고 거절한다. 기본 도구 적용이 쓴다.
+    require_sandbox = body.get("require_sandbox", False)
+    if not isinstance(require_sandbox, bool):
+        return _rejected("require_sandbox 는 참 거짓 값이다")
     profile = body["profile"]
     rejected = _profile_rejection(profile, request)
     if rejected is not None:
@@ -201,7 +205,7 @@ async def _check_config_update(request):
         if sandbox is None:
             return _sandbox_unavailable()
         if profile not in sandbox["profiles"]:
-            if IMAGE_FILE_TOOLSETS & set(platform["api_server"]):
+            if require_sandbox or IMAGE_FILE_TOOLSETS & set(platform["api_server"]):
                 return _sandbox_unavailable()
             sandbox = None
             local_execution = True

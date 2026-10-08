@@ -9,8 +9,10 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
+import com.bifos.assistant.browser.application.model.BrowserEndpoint;
 import com.bifos.assistant.browser.application.model.UserBrowserSnapshot;
 import com.bifos.assistant.browser.domain.BrowserProfileStore;
+import com.bifos.assistant.browser.domain.UserBrowser;
 import com.bifos.assistant.browser.domain.type.UserBrowserStatus;
 import com.bifos.assistant.browser.infra.BrowserProperties;
 import com.bifos.assistant.browser.infra.UserBrowserRepository;
@@ -19,15 +21,22 @@ import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.testsupport.BackendIntegrationTest;
 import com.bifos.assistant.testsupport.FakeBrowserRuntime;
+import java.net.URI;
 import java.sql.Timestamp;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
-import java.util.HashSet;
+import java.util.Collections;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.FutureTask;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.BooleanSupplier;
 import org.assertj.core.api.ThrowableAssert.ThrowingCallable;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -43,6 +52,9 @@ import org.springframework.jdbc.core.JdbcTemplate;
 @BackendIntegrationTest
 class UserBrowserServiceTest {
 
+    /** 대역 proxy 가 켜진 컨테이너에 주는 CDP 주소다. */
+    private static final URI FAKE_CDP = URI.create("http://192.0.2.10:9999");
+
     @Autowired
     UserBrowserRepository repository;
 
@@ -50,9 +62,11 @@ class UserBrowserServiceTest {
     JdbcTemplate jdbc;
 
     private FakeBrowserRuntime runtime;
-    private final Set<String> profileDirs = new HashSet<>();
-    private final List<String> profileCalls = new ArrayList<>();
+    private final Set<String> profileDirs = ConcurrentHashMap.newKeySet();
+    private final List<String> profileCalls = Collections.synchronizedList(new ArrayList<>());
     private final AtomicBoolean cdpReady = new AtomicBoolean(true);
+    /** 대역 프로필 저장소가 디렉터리를 만들기 전에 부른다. 시험이 바꿔 끼워 만들기 도중에 멈춘다. */
+    private volatile Runnable beforeEnsure = () -> {};
 
     @BeforeEach
     void setUp() {
@@ -61,6 +75,7 @@ class UserBrowserServiceTest {
         profileDirs.clear();
         profileCalls.clear();
         cdpReady.set(true);
+        beforeEnsure = () -> {};
     }
 
     @AfterEach
@@ -433,6 +448,219 @@ class UserBrowserServiceTest {
         verify(counting, times(1)).save(any());
     }
 
+    @Test
+    @DisplayName("중계가 켜 둘 때 브라우저가 없으면 만들고 켠 뒤 그 번호와 CDP 주소를 준다")
+    void ensureRunningCreatesAndStartsMissingBrowser() {
+        UserBrowserService service = service(true, 2);
+
+        BrowserEndpoint endpoint = service.ensureRunning(101L);
+
+        var saved = repository.findByUserId(101L).orElseThrow();
+        assertThat(saved.status()).isEqualTo(UserBrowserStatus.RUNNING);
+        assertThat(endpoint).isEqualTo(new BrowserEndpoint(saved.id(), FAKE_CDP));
+        assertThat(profileDirs).containsExactly(UserBrowserService.profileKey(101L));
+    }
+
+    @Test
+    @DisplayName("다른 전이가 켜는 중이면 기다렸다가 RUNNING 이 되면 그 컨테이너의 주소를 준다")
+    void ensureRunningWaitsForConcurrentStart() {
+        UserBrowserService service = service(true, 2);
+        Long id = service.create(101L).id();
+        markStatus(101L, "STARTING", null);
+        service.sleeper = pause -> {
+            runtime.plant("other-start", UserBrowserService.profileKey(101L), true);
+            markStatus(101L, "RUNNING", "other-start");
+        };
+
+        BrowserEndpoint endpoint = service.ensureRunning(101L);
+
+        assertThat(endpoint).isEqualTo(new BrowserEndpoint(id, FAKE_CDP));
+        assertThat(repository.findByUserId(101L).orElseThrow().containerId()).isEqualTo("other-start");
+        assertThat(runtime.containers()).containsOnlyKeys("other-start");
+    }
+
+    @Test
+    @DisplayName("기다리는 사이 다른 전이가 STOPPED 로 끝나면 다시 켠다")
+    void ensureRunningStartsAgainAfterConcurrentStop() {
+        UserBrowserService service = service(true, 2);
+        service.create(101L);
+        markStatus(101L, "STOPPING", null);
+        service.sleeper = pause -> markStatus(101L, "STOPPED", null);
+
+        BrowserEndpoint endpoint = service.ensureRunning(101L);
+
+        assertThat(endpoint.cdp()).isEqualTo(FAKE_CDP);
+        assertThat(repository.findByUserId(101L).orElseThrow().status()).isEqualTo(UserBrowserStatus.RUNNING);
+        assertThat(repository.findByUserId(101L).orElseThrow().containerId()).isEqualTo("c1");
+    }
+
+    @Test
+    @DisplayName("자기 줄이 켜는 중인 채로 시간이 지나면 동시 수가 차 있어도 BROWSER_CAPACITY 가 아니라 BROWSER_BUSY 다")
+    void ensureRunningReportsBusyWhenOwnStartNeverFinishes() {
+        UserBrowserService service = service(true, 1);
+        service.create(101L);
+        markStatus(101L, "STARTING", null);
+
+        assertCode(() -> service.ensureRunning(101L), ErrorCode.BROWSER_BUSY);
+
+        assertThat(repository.findByUserId(101L).orElseThrow().status()).isEqualTo(UserBrowserStatus.STARTING);
+        assertThat(runtime.containers()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("다른 브라우저로 동시 수가 차면 BROWSER_CAPACITY 를 그대로 던지고 켜진 브라우저를 멈추지 않는다")
+    void ensureRunningPropagatesCapacity() {
+        UserBrowserService service = service(true, 1);
+        service.create(101L);
+        service.start(101L);
+
+        assertCode(() -> service.ensureRunning(102L), ErrorCode.BROWSER_CAPACITY);
+
+        assertThat(repository.findByUserId(101L).orElseThrow().status()).isEqualTo(UserBrowserStatus.RUNNING);
+        assertThat(repository.findByUserId(102L).orElseThrow().status()).isEqualTo(UserBrowserStatus.STOPPED);
+    }
+
+    @Test
+    @DisplayName("자기 줄이 켜는 중이면 동시 수가 차 있어도 켜기는 BROWSER_CAPACITY 가 아니라 BROWSER_BUSY 다")
+    void startReportsBusyBeforeCountingWhenOwnRowIsChanging() {
+        UserBrowserService service = service(true, 1);
+        service.create(101L);
+        markStatus(101L, "STARTING", null);
+
+        assertCode(() -> service.start(101L), ErrorCode.BROWSER_BUSY);
+
+        assertThat(repository.findByUserId(101L).orElseThrow().status()).isEqualTo(UserBrowserStatus.STARTING);
+        assertThat(runtime.containers()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("STOPPED 를 읽은 뒤 같은 사용자의 다른 요청이 먼저 켜기 시작하면 진 쪽은 BROWSER_CAPACITY 없이 기다려 그 주소를 받는다")
+    void ensureRunningWaitsWhenAnotherRequestStartsAfterRead() {
+        UserBrowserRepository racing = mock(UserBrowserRepository.class, delegatesTo(repository));
+        AtomicBoolean raced = new AtomicBoolean(false);
+        // 처음 STOPPED 를 읽은 직후 다른 요청이 잠금을 먼저 잡아 STARTING 으로 저장한 것처럼 바꾼다. 돌려주는 줄은 읽은 그대로다.
+        // 줄이 없는 채로 시작해 그 첫 읽기가 기다리기의 읽기가 되게 한다
+        doAnswer(call -> {
+                    Optional<UserBrowser> read = repository.findByUserId(call.getArgument(0));
+                    boolean stopped = read.map(browser -> browser.status() == UserBrowserStatus.STOPPED)
+                            .orElse(false);
+                    if (stopped && raced.compareAndSet(false, true)) {
+                        markStatus(101L, "STARTING", null);
+                    }
+                    return read;
+                })
+                .when(racing)
+                .findByUserId(any());
+        UserBrowserService service = service(true, 1, racing);
+        service.sleeper = pause -> {
+            runtime.plant("other-start", UserBrowserService.profileKey(101L), true);
+            markStatus(101L, "RUNNING", "other-start");
+        };
+
+        BrowserEndpoint endpoint = service.ensureRunning(101L);
+
+        var saved = repository.findByUserId(101L).orElseThrow();
+        assertThat(raced).as("다른 요청이 끼어든 시점을 지났는지").isTrue();
+        assertThat(endpoint).isEqualTo(new BrowserEndpoint(saved.id(), FAKE_CDP));
+        assertThat(saved.containerId()).isEqualTo("other-start");
+        assertThat(runtime.containers()).containsOnlyKeys("other-start");
+    }
+
+    @Test
+    @DisplayName("STARTING 저장이 다른 전이와 겹쳐 BROWSER_BUSY 가 나도 다시 읽어 RUNNING 이면 그 주소를 준다")
+    void ensureRunningReadsAgainAfterBusySave() {
+        UserBrowserRepository racing = mock(UserBrowserRepository.class, delegatesTo(repository));
+        AtomicBoolean raced = new AtomicBoolean(false);
+        doAnswer(call -> {
+                    UserBrowser browser = call.getArgument(0);
+                    if (browser.status() == UserBrowserStatus.STARTING && raced.compareAndSet(false, true)) {
+                        runtime.plant("other-start", UserBrowserService.profileKey(101L), true);
+                        markStatus(101L, "RUNNING", "other-start");
+                    }
+                    return repository.saveAndFlush(browser);
+                })
+                .when(racing)
+                .saveAndFlush(any());
+        UserBrowserService service = service(true, 2, racing);
+        Long id = service.create(101L).id();
+        service.sleeper = pause -> {};
+
+        BrowserEndpoint endpoint = service.ensureRunning(101L);
+
+        assertThat(raced).as("STARTING 저장이 겹쳤는지").isTrue();
+        assertThat(endpoint).isEqualTo(new BrowserEndpoint(id, FAKE_CDP));
+        assertThat(repository.findByUserId(101L).orElseThrow().containerId()).isEqualTo("other-start");
+        assertThat(runtime.containers()).containsOnlyKeys("other-start");
+    }
+
+    @Test
+    @DisplayName("브라우저가 없는 사용자의 중계 요청 둘이 함께 와도 한 번만 만들어 이긴 쪽의 프로필 디렉터리를 지우지 않는다")
+    void ensureRunningCreatesOnceForConcurrentRequests() throws Exception {
+        UserBrowserService service = service(true, 2);
+        service.sleeper = pause -> awaitUntil(() -> repository
+                .findByUserId(101L)
+                .map(browser -> browser.status() == UserBrowserStatus.RUNNING)
+                .orElse(false));
+        CountDownLatch release = new CountDownLatch(1);
+        AtomicBoolean firstEnsure = new AtomicBoolean(true);
+        // 먼저 온 요청을 만들기 도중(프로필 디렉터리를 만들기 직전)에 세운다
+        beforeEnsure = () -> {
+            if (firstEnsure.compareAndSet(true, false)) {
+                try {
+                    release.await(5, TimeUnit.SECONDS);
+                } catch (InterruptedException ex) {
+                    Thread.currentThread().interrupt();
+                }
+            }
+        };
+        FutureTask<BrowserEndpoint> first = new FutureTask<>(() -> service.ensureRunning(101L));
+        FutureTask<BrowserEndpoint> second = new FutureTask<>(() -> service.ensureRunning(101L));
+        new Thread(first).start();
+        awaitUntil(() -> !firstEnsure.get());
+        Thread secondThread = new Thread(second);
+        secondThread.start();
+        // 고친 뒤에는 두 번째 요청이 잠금에서 기다린다. 고치기 전에는 기다리지 않고 지우기까지 간다
+        awaitUntil(() -> secondThread.getState() == Thread.State.WAITING || profileCalls.size() > 1);
+        release.countDown();
+
+        BrowserEndpoint firstEndpoint = first.get(10, TimeUnit.SECONDS);
+        BrowserEndpoint secondEndpoint = second.get(10, TimeUnit.SECONDS);
+
+        assertThat(secondEndpoint).isEqualTo(firstEndpoint);
+        assertThat(profileCalls).as("프로필 저장소 호출 %s", profileCalls).containsOnlyOnce("delete");
+        assertThat(profileDirs).containsExactly(UserBrowserService.profileKey(101L));
+        assertThat(runtime.containers()).hasSize(1);
+    }
+
+    @Test
+    @DisplayName("기능이 꺼져 있으면 중계가 켜 둘 수 없어 BROWSER_DISABLED 다")
+    void ensureRunningRejectsWhenDisabled() {
+        assertCode(() -> service(false, 2).ensureRunning(101L), ErrorCode.BROWSER_DISABLED);
+        assertThat(repository.findByUserId(101L)).isEmpty();
+    }
+
+    /** 조건이 참이 될 때까지 5초까지 기다린다. 넘으면 그대로 돌아가 뒤의 단언이 실패를 알린다. */
+    private static void awaitUntil(BooleanSupplier condition) {
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
+        while (!condition.getAsBoolean() && System.nanoTime() < deadline) {
+            try {
+                Thread.sleep(5);
+            } catch (InterruptedException ex) {
+                Thread.currentThread().interrupt();
+                return;
+            }
+        }
+    }
+
+    /** 다른 요청의 전이를 흉내 낸다. 버전을 올려 이 서비스가 쥔 줄이 낡게 한다. */
+    private void markStatus(Long userId, String status, String containerId) {
+        jdbc.update(
+                "UPDATE user_browser SET status = ?, container_id = ?, version = version + 1 WHERE user_id = ?",
+                status,
+                containerId,
+                userId);
+    }
+
     private UserBrowserService service(boolean enabled, int maxRunning) {
         return service(enabled, maxRunning, repository);
     }
@@ -454,10 +682,13 @@ class UserBrowserServiceTest {
                 maxRunning,
                 Duration.ofMinutes(10),
                 Duration.ofMillis(100),
-                Duration.ofMinutes(30));
+                Duration.ofMinutes(30),
+                null,
+                null);
         BrowserProfileStore profiles = new BrowserProfileStore() {
             @Override
             public void ensure(String profileKey) {
+                beforeEnsure.run();
                 profileCalls.add("ensure");
                 profileDirs.add(profileKey);
             }
