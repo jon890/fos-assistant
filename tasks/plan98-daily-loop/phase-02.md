@@ -111,6 +111,7 @@ record `ProactiveCheckSettled(CurrentUser user, Long checkId)`. Javadoc 에 「�
 | `backend/src/main/java/com/bifos/assistant/proactive/application/ValueEvaluationService.java` | 수정 |
 | `backend/src/main/java/com/bifos/assistant/proactive/application/DecisionFeedbackExporter.java` | 수정 |
 | `backend/src/main/java/com/bifos/assistant/proactive/application/model/DecisionFeedbackExport.java` | 수정 |
+| `backend/src/test/java/com/bifos/assistant/proactive/ProactiveLoopTestSupport.java` | 신규 |
 | `backend/src/test/java/com/bifos/assistant/proactive/ProactiveLoopCoordinatorTest.java` | 신규 |
 | `backend/src/test/java/com/bifos/assistant/proactive/ProactiveLoopDisabledTest.java` | 신규 |
 | `backend/src/test/java/com/bifos/assistant/proactive/ProactiveLoopFallbackTest.java` | 신규 |
