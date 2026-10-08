@@ -18,7 +18,7 @@
 - Spring WebSocket 처리기가 `supportsPartialMessages()` 를 참으로 내면 Tomcat 은 기본 버퍼(8192 글자)가 찰 때마다 조각을 넘긴다. Spring 의 `TextMessage(CharSequence, boolean isLast)` 와 JDK 의 `WebSocket#sendText(CharSequence, boolean last)`, `Listener#onText(..., boolean last)` 가 조각을 그대로 주고받는다
 - `ServletServerContainerFactoryBean` 은 쓰지 않는다. `ServerContainer` 가 없는 MOCK 웹 환경의 `@SpringBootTest`(MySQL 검사)가 기동에서 실패한다
 - 의존성은 `backend/gradle/libs.versions.toml` 의 `spring-boot-starters` 묶음이다. 서버 WebSocket 에 `spring-boot-starter-websocket` 을 더한다(버전은 Boot BOM 이 정한다)
-- phase 02 의 컨트롤러가 `/internal/browser-gateway/{token}/**` 에 빈 404 받기 매핑을 두되 `headers = "!Upgrade"` 로 upgrade 요청은 받지 않는다. 그래서 handshake 는 WebSocket 처리기 매핑으로 간다. 이 phase 의 통합 시험이 그것을 확인한다
+- phase 02 의 컨트롤러가 `/internal/browser-gateway/{token}/**` 에 빈 404 받기 매핑을 두되 `headers = {"Upgrade!=websocket", "Upgrade!=WebSocket"}` 로 WebSocket upgrade 요청은 받지 않는다. 그래서 중계 아래의 WebSocket upgrade 요청은 모두 이 phase 의 처리기 매핑이 받아야 한다. 받지 않으면 전역 처리기가 표식이 든 경로를 로그에 남긴다. 그래서 handshake 는 WebSocket 처리기 매핑으로 간다. 이 phase 의 통합 시험이 그것을 확인한다
 - 공유 시험 컨텍스트의 `backend/src/test/java/com/bifos/assistant/testsupport/FakeBrowserRuntime.java` 는 닿지 않는 고정 CDP 주소를 준다. 그래서 통합 시험은 진짜 `WebSocketCdpRelayConnector` 대신 `backend/src/test/java/com/bifos/assistant/testsupport/IntegrationTestDoubles.java` 에 더하는 `@Primary` 가짜 `CdpRelayConnector` 를 쓴다. 검사 클래스의 `@MockitoBean` 은 `ArchitectureRules.TESTS_DO_NOT_SPLIT_CONTEXT` 가 금지한다
 - 시험 준비는 `@BackendIntegrationTest` 와 `@OverrideProperties` 를 쓴다. `@WebMvcTest`, `@AutoConfigureMockMvc` 는 금지다(`ArchitectureRules.TESTS_DO_NOT_SPLIT_CONTEXT`). 실제 서버 포트는 `@LocalServerPort`(선례 `backend/src/test/java/com/bifos/assistant/connector/ConnectorPolicyEndpointTest.java`)
 
@@ -45,8 +45,8 @@
 
 ### 3. 받는 쪽
 
-- `browser.presentation.BrowserGatewaySocketConfig`(신규 `@Configuration @EnableWebSocket`, `WebSocketConfigurer`): `registry.addHandler(handler, "/internal/browser-gateway/*/devtools/*/*").addInterceptors(handshake).setAllowedOriginPatterns("*")`
-- `browser.presentation.BrowserGatewayHandshake`(신규 `HandshakeInterceptor`): `Origin` 이 있으면 403. 경로에서 표식, 종류(`page`, `browser`), 번호(`^[A-Za-z0-9-]{1,128}$`)를 꺼낸다. 모양이 틀리면 404. `gateway.open(token)` 이 던지면 phase 02 의 표로 상태를 정한다. 통과하면 `GatewayTarget` 과 종류와 번호를 세션 속성에 둔다. 응답 본문은 비운다
+- `browser.presentation.BrowserGatewaySocketConfig`(신규 `@Configuration @EnableWebSocket`, `WebSocketConfigurer`): `registry.addHandler(handler, "/internal/browser-gateway/**")`(devtools 경로가 아니면 handshake 가 빈 404 로 거절한다).addInterceptors(handshake).setAllowedOriginPatterns("*")`
+- `browser.presentation.BrowserGatewayHandshake`(신규 `HandshakeInterceptor`): `Origin` 이 있으면 403. 경로가 `/internal/browser-gateway/<표식>/devtools/<종류>/<번호>` 모양인지 보고 표식, 종류(`page`, `browser`), 번호(`^[A-Za-z0-9-]{1,128}$`)를 꺼낸다. 모양이 틀리면(다른 하위 경로 포함) 404. `gateway.open(token)` 이 던지면 phase 02 의 표로 상태를 정한다. 통과하면 `GatewayTarget` 과 종류와 번호를 세션 속성에 둔다. 응답 본문은 비운다
 - `browser.presentation.BrowserGatewaySocket`(신규 `AbstractWebSocketHandler`):
   - `supportsPartialMessages()` 참
   - `afterConnectionEstablished`: `gateway.hold(target)` 핸들을 쥐고 `CdpRelayConnector#open` 으로 Chrome 에 붙는다. Chrome 에서 온 조각은 세션별 잠금 안에서 `session.sendMessage(new TextMessage(fragment, last))` 로 보낸다. 붙지 못하면 세션을 `CloseStatus.SERVER_ERROR` 로 닫고 핸들을 닫는다
@@ -60,7 +60,7 @@
 - `backend/src/test/java/com/bifos/assistant/browser/infra/WebSocketCdpRelayConnectorTest.java`: 가짜 WebSocket 서버로 조각 둘로 보낸 메시지가 순서대로 `onFragment` 에 오고 마지막 조각만 `last` 다, 서버가 닫으면 `onClosed` 가 한 번, GUID 모양 번호를 받는다, 번호에 `/` 가 있으면 `IllegalArgumentException`
 - `backend/src/test/java/com/bifos/assistant/browser/presentation/BrowserGatewaySocketTest.java`: 처리기를 직접 부른다. 가짜 relay 로 조각이 그대로 오가는지, 세션이 닫히면 relay 와 핸들이 닫히는지, 조각의 합이 상한을 넘으면 양쪽이 닫히는지
 - `backend/src/test/java/com/bifos/assistant/testsupport/IntegrationTestDoubles.java`: `@Bean @Primary` 로 `EchoCdpRelayConnector`(신규 시험 지원 클래스 `backend/src/test/java/com/bifos/assistant/testsupport/EchoCdpRelayConnector.java`)를 더한다. 받은 조각을 그대로 `onFragment` 로 돌려주고, 연 횟수와 받은 조각을 기록하며, 시험이 기록을 비울 수 있다. 공유 컨텍스트라 상태는 `backend/src/test/java/com/bifos/assistant/testsupport/IntegrationTestIsolation.java` 의 `reset`(다른 대역을 비우는 자리)에 `reset()` 한 줄을 더해 시험마다 비운다
-- `backend/src/test/java/com/bifos/assistant/browser/presentation/BrowserGatewaySocketIntegrationTest.java`: `@BackendIntegrationTest` 의 실제 서버(`@LocalServerPort`)에서 `@OverrideProperties` 로 중계를 켠다(`assistant.browser.enabled=true` 와 그때 필요한 값, 기반 주소, 32자 이상 비밀). 허용된 사용자를 만드는 방법은 `backend/src/test/java/com/bifos/assistant/browser/application/UserBrowserAccessRevokedTest.java` 를 따른다. 표식은 그 사용자의 호출 표식(`BrowserGatewayTokens#callAddress`)이다. JDK WebSocket 으로 `ws://localhost:<port>/internal/browser-gateway/<표식>/devtools/browser/<GUID>` 에 붙어 10만 글자 메시지가 온전히 되돌아오는지, `Origin` 을 실은 연결은 403 으로 거절되는지, 틀린 표식은 404 인지, 같은 devtools 경로의 일반 GET(upgrade 없음)은 빈 404 인지 본다
+- `backend/src/test/java/com/bifos/assistant/browser/presentation/BrowserGatewaySocketIntegrationTest.java`: `@BackendIntegrationTest` 의 실제 서버(`@LocalServerPort`)에서 `@OverrideProperties` 로 중계를 켠다(`assistant.browser.enabled=true` 와 그때 필요한 값, 기반 주소, 32자 이상 비밀). 허용된 사용자를 만드는 방법은 `backend/src/test/java/com/bifos/assistant/browser/application/UserBrowserAccessRevokedTest.java` 를 따른다. 표식은 그 사용자의 호출 표식(`BrowserGatewayTokens#callAddress`)이다. JDK WebSocket 으로 `ws://localhost:<port>/internal/browser-gateway/<표식>/devtools/browser/<GUID>` 에 붙어 10만 글자 메시지가 온전히 되돌아오는지, `Origin` 을 실은 연결은 403 으로 거절되는지, 틀린 표식은 404 인지, 중계 아래 devtools 가 아닌 경로의 WebSocket 연결은 404 인지, 같은 devtools 경로의 일반 GET(upgrade 없음)은 빈 404 인지 본다
 
 ## 검증
 

@@ -43,7 +43,7 @@
 경로와 하는 일은 근거 문서 「받는 것」 의 표를 따른다. 모두 `/internal/browser-gateway/{token}` 아래다.
 
 - `GET json/version`, `GET json`, `GET json/list`, `PUT json/new`, `GET json/close/{id}`, `GET json/activate/{id}`
-- 그 밖의 `/internal/browser-gateway/{token}/**` 는 모든 메서드에 빈 404. 이 받기 매핑에는 `headers = "!Upgrade"` 를 단다. `RequestMappingHandlerMapping`(order 0)이 WebSocket 처리기 매핑(order 1)보다 먼저 보므로, 달지 않으면 다음 phase 의 WebSocket handshake 를 이 매핑이 가로챈다
+- 그 밖의 `/internal/browser-gateway/{token}/**` 는 모든 메서드에 빈 404. 이 받기 매핑에는 `headers = {"Upgrade!=websocket", "Upgrade!=WebSocket"}` 를 단다. JDK `HttpClient` 는 평범한 요청에도 `Upgrade: h2c` 를 실으므로 `!Upgrade` 로 두면 그 요청이 매핑을 지나쳐 전역 처리기가 경로를 로그에 남긴다. `RequestMappingHandlerMapping`(order 0)이 WebSocket 처리기 매핑(order 1)보다 먼저 보므로, 달지 않으면 다음 phase 의 WebSocket handshake 를 이 매핑이 가로챈다
 - 처음에 `Origin` 머리가 있으면 403. 그다음 `gateway.open(token)`
 - `ApiException` 의 코드를 상태로 바꾼다: `BROWSER_NOT_FOUND` 404, `BROWSER_DISABLED`·`BROWSER_CAPACITY`·`BROWSER_BUSY` 503, `BROWSER_START_FAILED`·`BROWSER_STOP_FAILED` 502. 그 밖의 런타임 예외(Chrome 이 닿지 않음)는 502. 본문은 비운다. 컨트롤러 안의 `try`/`catch` 로 해서 전역 오류 처리기를 타지 않게 한다. 경고 로그에는 예외 종류만 남긴다
 - `json/new` 의 쿼리는 `request.getQueryString()` 원문이다. `URLDecoder` 로 푼 주소가 `http://`, `https://` 로 시작하거나 `about:blank` 일 때만 넘기고, 넘길 때는 원문 쿼리를 그대로 붙인다. 아니면 400
@@ -88,3 +88,5 @@ scripts/check-mysql-migration.sh
 | `backend/src/test/java/com/bifos/assistant/browser/application/GatewayRewriterTest.java` | 신규 |
 | `backend/src/test/java/com/bifos/assistant/browser/presentation/BrowserGatewayControllerTest.java` | 신규 |
 | `backend/src/test/java/com/bifos/assistant/browser/presentation/BrowserGatewaySecurityTest.java` | 신규 |
+| `backend/src/test/java/com/bifos/assistant/browser/infra/HttpCdpGatewayTest.java` | 신규 |
+| `backend/src/test/java/com/bifos/assistant/browser/application/BrowserGatewayTokensTest.java` | 수정 |
