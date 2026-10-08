@@ -106,8 +106,7 @@ public class DataKeyService implements TextCipher {
         if (cached.isPresent()) {
             return cached.get();
         }
-        UserDataKey row =
-                keys.findById(keyId).orElseThrow(() -> new IllegalStateException("data key does not exist"));
+        UserDataKey row = keys.findById(keyId).orElseThrow(() -> new IllegalStateException("data key does not exist"));
         return remember(row);
     }
 

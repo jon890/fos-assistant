@@ -92,8 +92,8 @@ class DataKeyServiceTest {
     @DisplayName("옛 KEK 로 감싼 데이터 key 는 기동 작업이 활성 KEK 로 다시 감싸고 본문은 그대로 풀린다")
     void rewrapsKeysWrappedWithOldKek() {
         Long userId = anyUserId();
-        FileKeyEncryptionKeys oldKeks = new FileKeyEncryptionKeys(new DataEncryptionProperties(
-                properties.kekFile(), "test-kek-0", true, properties.dekCacheTtl(), 10));
+        FileKeyEncryptionKeys oldKeks = new FileKeyEncryptionKeys(
+                new DataEncryptionProperties(properties.kekFile(), "test-kek-0", true, properties.dekCacheTtl(), 10));
         byte[] dataKey = new byte[32];
         Arrays.fill(dataKey, (byte) 3);
         UserDataKey row = keys.saveAndFlush(UserDataKey.wrapped(
