@@ -11,6 +11,7 @@ import com.bifos.assistant.hermes.dto.RunEvent;
 import com.bifos.assistant.shared.concurrent.BackgroundTasks;
 import com.bifos.assistant.shared.config.LiveProperties;
 import com.bifos.assistant.shared.error.ApiException;
+import com.bifos.assistant.usage.application.ExecutionConnectorCalls;
 import com.bifos.assistant.usage.application.ExecutionEventRecorder;
 import com.bifos.assistant.usage.application.ExecutionRecorder;
 import com.bifos.assistant.usage.application.UserExecutionLimiter;
@@ -35,6 +36,7 @@ class ChatRunEvents {
             Set.of("run.completed", "run.failed", "run.cancelled", "run.interrupted");
 
     private final AgentConnectorBindings connectorBindings;
+    private final ExecutionConnectorCalls connectorCalls;
     private final HermesRunsClient hermes;
     private final HermesRunEventStream eventStream;
     private final LiveProperties<HermesProperties> hermesProperties;
@@ -76,7 +78,9 @@ class ChatRunEvents {
         // 중지 유예 시간이 지나면 요청 스레드를 먼저 풀어 상태 조회와 stopped 사건으로 진행한다.
         CompletableFuture<Void> streamDone = new CompletableFuture<>();
         AtomicBoolean terminalSeen = new AtomicBoolean();
-        ToolDetailScope detailScope = toolDetailScope(pending.agent());
+        ToolDetailScope detailScope = toolDetailScope(pending.agent())
+                .withTreeHistory(
+                        at -> connectorCalls.calledBefore(pending.execution().treeRootId(), at));
         backgroundTasks.start("turn-event-stream-" + runId, () -> {
             try {
                 eventStream.open(
@@ -133,7 +137,7 @@ class ChatRunEvents {
 
     /**
      * 실행 기록에서 내용을 통째로 가릴 도구다. 옛 커넥터 에이전트는 모두 가리고, 다른 에이전트는 붙은 커넥터 서버의 도구만
-     * 가린다(ADR-083). 외부 서비스의 글이 실행 기록에 남지 않게 한다.
+     * 가린다(ADR-083). 호출 이력은 relay 에서 트리 전체를 대상으로 붙인다.
      */
     ToolDetailScope toolDetailScope(Agent agent) {
         if (agent.connectorManaged()) {

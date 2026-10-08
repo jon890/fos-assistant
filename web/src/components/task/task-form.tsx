@@ -10,6 +10,7 @@ import { NativeSelect } from "@/components/ui/native-select";
 import { Notice } from "@/components/ui/notice";
 import { Textarea } from "@/components/ui/textarea";
 import { fetchChatAgents } from "@/lib/chat-api";
+import type { ModelTierCode } from "@/lib/model-tiers";
 import { createTask, updateTask } from "@/lib/task-api";
 import {
   choiceOf,
@@ -98,6 +99,9 @@ export function TaskForm({
     task?.missedPolicy ?? "RUN_ONCE",
   );
   const [notify, setNotify] = useState<NotifyPolicy>(task?.notify ?? "ALWAYS");
+  const [modelTier, setModelTier] = useState<ModelTierCode | "">(
+    task?.modelTier ?? "",
+  );
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -154,6 +158,7 @@ export function TaskForm({
       conversationMode,
       missedPolicy,
       notify,
+      modelTier: modelTier === "" ? null : modelTier,
     };
     setSaving(true);
     setError(null);
@@ -336,6 +341,20 @@ export function TaskForm({
           <option value="ALWAYS">늘 알림</option>
           <option value="ON_FAILURE">실패만 알림</option>
           <option value="NEVER">알리지 않음</option>
+        </NativeSelect>
+      </Field>
+      <Field id="task-model-tier" label="모델 단계">
+        <NativeSelect
+          id="task-model-tier"
+          value={modelTier}
+          onChange={(event) =>
+            setModelTier(event.target.value as ModelTierCode | "")
+          }
+        >
+          <option value="">기본값</option>
+          <option value="FAST">빠르게</option>
+          <option value="BALANCED">균형</option>
+          <option value="DEEP">깊게</option>
         </NativeSelect>
       </Field>
       <div>

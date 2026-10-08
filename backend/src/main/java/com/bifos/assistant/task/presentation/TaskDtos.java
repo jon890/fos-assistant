@@ -1,6 +1,7 @@
 package com.bifos.assistant.task.presentation;
 
 import com.bifos.assistant.agent.domain.Agent;
+import com.bifos.assistant.model.domain.type.ModelTier;
 import com.bifos.assistant.proactive.application.model.CheckBlocker;
 import com.bifos.assistant.task.application.model.ProactiveSchedule;
 import com.bifos.assistant.task.application.model.ProactiveSchedule.LastCheck;
@@ -90,10 +91,11 @@ public final class TaskDtos {
     }
 
     /**
-     * 작업을 만들거나 고치는 요청이다. 뒤의 셋은 비우면 기본값이다.
+     * 작업을 만들거나 고치는 요청이다. {@code conversationMode}, {@code missedPolicy}, {@code notify} 는 비우면 기본값이다.
      *
      * @param title 앞뒤 공백을 떼고 저장한다
      * @param notifyPolicy JSON 이름은 {@code notify} 다. {@code Object.notify()} 와 겹쳐 record 이름을 달리한다
+     * @param modelTier 발화하는 대화를 고를 모델 단계. 비우면 작업의 단계를 지운다
      */
     public record TaskRequest(
             @NotBlank @Size(max = Task.TITLE_MAX) String title,
@@ -102,11 +104,19 @@ public final class TaskDtos {
             @NotNull @Valid ScheduleRequest schedule,
             ConversationMode conversationMode,
             MissedPolicy missedPolicy,
-            @JsonProperty("notify") NotifyPolicy notifyPolicy) {
+            @JsonProperty("notify") NotifyPolicy notifyPolicy,
+            ModelTier modelTier) {
 
         public TaskInput toInput() {
             return new TaskInput(
-                    title, agentCode, instruction, schedule.toInput(), conversationMode, missedPolicy, notifyPolicy);
+                    title,
+                    agentCode,
+                    instruction,
+                    schedule.toInput(),
+                    conversationMode,
+                    missedPolicy,
+                    notifyPolicy,
+                    modelTier);
         }
     }
 
@@ -148,6 +158,7 @@ public final class TaskDtos {
      * @param nextFireAt 다음 예정 시각. 없으면 null
      * @param lastFiredAt 마지막으로 처리한 예정 시각. 없으면 null
      * @param notifyPolicy JSON 이름은 {@code notify} 다
+     * @param modelTier 발화하는 대화를 고를 모델 단계. 비었으면 null
      */
     public record TaskView(
             UUID id,
@@ -162,6 +173,7 @@ public final class TaskDtos {
             ConversationMode conversationMode,
             MissedPolicy missedPolicy,
             @JsonProperty("notify") NotifyPolicy notifyPolicy,
+            ModelTier modelTier,
             Instant createdAt) {
 
         public static TaskView from(TaskDetail detail) {
@@ -181,6 +193,7 @@ public final class TaskDtos {
                     task.conversationMode(),
                     trigger.missedPolicy(),
                     task.notifyPolicy(),
+                    task.modelTier(),
                     task.createdAt());
         }
     }
