@@ -133,4 +133,5 @@
 | [ADR-20261008 / execute-code-unattended](ADR-20261008-execute-code-unattended.md) | docker 실행 공간을 쓰는 profile 은 API 경로의 `execute_code` 를 승인 없이 컨테이너에서 돌린다 | hermes | Accepted. ADR-086 의 실행 공간 설정에 `approvals.unattended_mode` 를 더한다 |
 | [ADR-20261008 / memory-facts](ADR-20261008-memory-facts.md) | 짧은 개인 기억은 본문까지 「개인 사실 구역」에 싣고, 답마다 참고한 기억을 사용자에게 보인다 | backend, frontend | Accepted. ADR-20261007 / memory-remember 의 「색인에 제목이 실린다」 를 개정하고 ADR-015 에 예외를 둔다 |
 | [ADR-20261008 / memory-remember-guard](ADR-20261008-memory-remember-guard.md) | 바로 저장은 모델이 다듬은 본문도 받고, 부정이 뒤집힌 글과 민감해 보이는 글과 오래된 대화만 제안으로 내린다 | backend, frontend | Accepted. ADR-20261007 / memory-remember 의 바로 저장 조건 2 와 5 를 개정한다 |
+| [ADR-20261008 / naver-blog-owner-browser](ADR-20261008-naver-blog-owner-browser.md) | 네이버 블로그 연결은 CDP 주소 칸을 바로 빼고, 기존 연결은 옮기는 코드 없이 다시 확인해 넘어간다 | hermes | Accepted. [ADR-20261007 / naver-blog-connector](ADR-20261007-naver-blog-connector.md) 의 연결 칸을 바꾼다 |
 | [ADR-20261008 / read-data-flow](ADR-20261008-read-data-flow.md) | 커넥터 READ 결과는 가는 곳마다 따로 판정하고, 판정하지 못하는 길은 감수로 적는다 | 공통 | Accepted. ADR-083 과 ADR-086 의 「감당할 것」 을 흐름마다 나눠 적는다 |
