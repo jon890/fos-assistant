@@ -51,8 +51,9 @@ test("관리자는 로그인과 마지막 대화 시각을 목록과 상세에�
     agents.ok(),
     `기본 에이전트를 읽지 못했다: ${agents.status()} ${await agents.text()}`,
   ).toBeTruthy();
-  const agent = ((await agents.json()) as Array<{ code?: string }>)[0];
+  const agent = ((await agents.json()) as Array<{ code?: string; ownedByMe: boolean }>).find((entry) => entry.ownedByMe);
   expect(agent?.code, "기본 에이전트 번호가 없다").toBeTruthy();
+  try {
   const message = await page.request.post("/api/chat", {
     data: { text: "활동 시각 검사", agentCode: agent!.code },
   });
@@ -93,6 +94,11 @@ test("관리자는 로그인과 마지막 대화 시각을 목록과 상세에�
     "true",
   );
   await expect(page.locator('[id^="person-detail-"]')).toBeVisible();
+  } finally {
+    await setSession(context, user);
+    const deleted = await page.request.delete(`/api/agents/${agent!.code}`);
+    expect(deleted.status(), "검사가 만든 기본 에이전트를 지우지 못했다").toBe(204);
+  }
 });
 
 test("활동 기록이 없는 사용자는 목록과 상세에서 기록 없음을 본다", async ({

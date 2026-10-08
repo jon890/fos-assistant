@@ -15,7 +15,7 @@ function baseUrl(): string {
   return value.replace(/\/$/, "");
 }
 
-/** 웹 세션이 만들어진 뒤 로그인 완료 시각을 Control Plane 에 기록한다. */
+/** 웹 세션 쿠키를 준비한 뒤 로그인 완료 시각을 Control Plane 에 기록한다. */
 export async function recordSignIn(email: string): Promise<void> {
   const token = await new SignJWT({ purpose: "signin" })
     .setProtectedHeader({ alg: "HS256" })

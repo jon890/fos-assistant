@@ -1,5 +1,5 @@
 import { expect, setSession, test } from "./fixtures.ts";
-import { isolatedUser } from "./helpers.ts";
+import { clickAndWaitForResponse, isolatedUser } from "./helpers.ts";
 import type {
   Page,
   TestInfo,
@@ -103,14 +103,10 @@ test("사용 중지하고 다시 허용할 수 있다", async ({ page }, testInf
 
   await expect(row.getByText("켜짐", { exact: true })).toBeVisible();
 
-  await row
-    .getByRole("button", { name: `${person.displayName} 사용 중지` })
-    .click();
+  await clickAndWaitForResponse(page, row.getByRole("button", { name: `${person.displayName} 사용 중지` }), "PATCH", /\/api\/admin\/people\/\d+$/);
   await expect(row.getByText("꺼짐", { exact: true })).toBeVisible();
 
-  await row
-    .getByRole("button", { name: `${person.displayName} 다시 허용` })
-    .click();
+  await clickAndWaitForResponse(page, row.getByRole("button", { name: `${person.displayName} 다시 허용` }), "PATCH", /\/api\/admin\/people\/\d+$/);
   await expect(row.getByText("켜짐", { exact: true })).toBeVisible();
 });
 
