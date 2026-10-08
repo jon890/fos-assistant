@@ -58,13 +58,13 @@ cd web && pnpm typecheck
 cd web && pnpm lint
 cd web && pnpm test:node
 bash -n scripts/check-local.sh
-node --test test/unit/quality-script.test.ts
 cd web && pnpm test:browser people.spec.ts people-activity.spec.ts --repeat-each=3 --retries=0
 ```
 
 - `node --test test/web/signin-activity.test.ts test/unit/relative-time.test.ts`가 통과한다.
 - `cd web && pnpm typecheck`가 통과한다.
 - `cd web && pnpm test:browser people.spec.ts people-activity.spec.ts --repeat-each=3 --retries=0`를 기본 빌드 서버로 실행하고 모바일·데스크톱에서 통과한다. heavy-lock으로 감싸서 실행한다.
+- 코드 리뷰에서 CI web job은 의존성 설치 뒤 test:node를 부르고, check-local의 web-test 단계는 같은 스크립트를 부르는지 실제 diff로 확인한다. 설정 문자열을 되풀이하는 별도 시험은 만들지 않는다.
 
 ## 변경 파일
 
