@@ -12,11 +12,13 @@ import lombok.NoArgsConstructor;
  *
  * <p>모델이 {@code sensitive} 를 거짓으로 줘도 건강, 금융, 신원과 신념의 낱말이나 여섯 자리 이상의 숫자열, 메일 주소가 있으면 제안으로 내린다.
  * 낱말 목록은 잘못 걸리는 경우가 있다. 잘못 걸려도 제안 카드가 될 뿐이라 넓게 잡는다. 민감도 값은 바꾸지 않는다.
+ * 생일과 기념일 같은 날짜(「1990-03-05」, 「2015.10.08」)는 숫자열로 세지 않도록 숫자열을 찾기 전에 지운다.
  */
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
-public final class MemorySensitiveHints {
+final class MemorySensitiveHints {
     private static final int MIN_DIGITS = 6;
     private static final Pattern WHITESPACE = Pattern.compile("\\s+");
+    private static final Pattern DATE = Pattern.compile("(?<!\\d)\\d{4}[-./]\\d{1,2}[-./]\\d{1,2}(?!\\d)");
     private static final Pattern DIGIT_RUN = Pattern.compile("\\d[\\d -]*\\d");
     private static final Pattern EMAIL = Pattern.compile("[^\\s@]+@[^\\s@]+\\.[^\\s@]+");
 
@@ -110,7 +112,7 @@ public final class MemorySensitiveHints {
     }
 
     private static boolean hasLongDigitRun(String text) {
-        Matcher matcher = DIGIT_RUN.matcher(text);
+        Matcher matcher = DIGIT_RUN.matcher(DATE.matcher(text).replaceAll(" "));
         while (matcher.find()) {
             if (matcher.group().chars().filter(Character::isDigit).count() >= MIN_DIGITS) {
                 return true;

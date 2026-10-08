@@ -10,8 +10,21 @@ import org.junit.jupiter.params.provider.ValueSource;
 class NegationMarkersTest {
 
     @ParameterizedTest
-    @ValueSource(strings = {"매운 음식을 못 먹는다", "먹지못해", "오이는 안 먹어", "오이 안먹어", "좋아하지 않아", "차가 없어", "교사가 아니야"})
-    @DisplayName("못, 안, 않, 없, 아니 가 부정으로 쓰이면 부정 표지로 본다")
+    @ValueSource(
+            strings = {
+                "매운 음식을 못 먹는다",
+                "먹지못해",
+                "오이는 안 먹어",
+                "오이 안먹어",
+                "좋아하지 않아",
+                "차가 없어",
+                "교사가 아니야",
+                "나 교사 아냐",
+                "교사가 아닌 사람",
+                "교사 아님",
+                "교사가 아닙니다"
+            })
+    @DisplayName("못, 안, 않, 없, 아니와 아니의 활용형 아냐, 아닌, 아님, 아닙 이 부정으로 쓰이면 부정 표지로 본다")
     void findsNegation(String text) {
         assertThat(NegationMarkers.present(text)).as("「%s」 는 부정이다", text).isTrue();
     }
