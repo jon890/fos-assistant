@@ -1,9 +1,0 @@
-{
-  "name": "plan103-source-read-requests",
-  "description": "원문 결과 확인과 열람 요청의 호출 성공을 구분한다",
-  "status": "pending",
-  "created_at": "2026-10-08",
-  "total_phases": 1,
-  "current_phase": 1,
-  "phases": [{"number": 1, "file": "phase-01.md", "execution_profile": "deep"}]
-}
