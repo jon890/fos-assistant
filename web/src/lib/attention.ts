@@ -39,6 +39,7 @@ export type AttentionItem = {
     dueAt: string | null;
     waiting: boolean;
     proposed: boolean;
+    agentProposed: boolean;
   } | null;
   /** 「보고」 카드의 다섯 칸 요약이다. 그 밖의 카드에서는 null 이다. */
   report: AttentionReport | null;
@@ -193,7 +194,7 @@ export function itemHref(item: AttentionItem): string | null {
 /** 할 일이 어디서 왔는지다. 에이전트가 제안했으면 「대화에서」, 사람이 더했으면 「직접 더함」. 할 일이 아니면 `null` */
 export function originText(item: AttentionItem): string | null {
   if (item.followUp === null) return null;
-  return item.followUp.proposed ? "대화에서" : "직접 더함";
+  return item.followUp.agentProposed ? "대화에서" : "직접 더함";
 }
 
 /**

@@ -83,7 +83,8 @@ public class FollowUpAttentionSource implements AttentionCandidates {
         boolean proposed = row.status() == FollowUpStatus.PROPOSED;
         String itemKey = "follow_up:" + row.publicId();
         List<AttentionSourceRef> sources = List.of(new AttentionSourceRef(SOURCE, itemKey, row.updatedAt()));
-        AttentionFollowUpRef ref = new AttentionFollowUpRef(row.publicId(), row.dueAt(), row.waiting(), proposed);
+        AttentionFollowUpRef ref =
+                new AttentionFollowUpRef(row.publicId(), row.dueAt(), row.waiting(), proposed, row.proposed());
         if (proposed) {
             return new AttentionCandidate(
                     CardKey.NEEDS_ME,

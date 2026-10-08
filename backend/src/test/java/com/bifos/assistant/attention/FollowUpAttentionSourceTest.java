@@ -145,7 +145,16 @@ class FollowUpAttentionSourceTest {
         assertThat(item.level()).isEqualTo(AttentionLevel.LATER);
         assertThat(item.trigger()).isEqualTo(AttentionTrigger.FOLLOW_UP_PROPOSED);
         assertThat(item.followUp().proposed()).isTrue();
+        assertThat(item.followUp().agentProposed()).isTrue();
         assertThat(view.nowCount()).as("기한이 코앞이어도 제안은 건수에 들지 않는다").isZero();
+
+        proposed.accept(NOW.plusSeconds(1));
+        followUps.save(proposed);
+
+        AttentionItem accepted = onlyItem(service.view(dad));
+        assertThat(accepted.trigger()).isEqualTo(AttentionTrigger.FOLLOW_UP_OPEN);
+        assertThat(accepted.followUp().proposed()).isFalse();
+        assertThat(accepted.followUp().agentProposed()).isTrue();
     }
 
     @Test
@@ -160,7 +169,7 @@ class FollowUpAttentionSourceTest {
         assertThat(item.level()).isEqualTo(AttentionLevel.NOW);
         assertThat(item.trigger()).isEqualTo(AttentionTrigger.FOLLOW_UP_OPEN);
         assertThat(item.why().signals()).containsExactly(AttentionSignal.DUE_SOON);
-        assertThat(item.followUp()).isEqualTo(new AttentionFollowUpRef(open.publicId(), dueAt, false, false));
+        assertThat(item.followUp()).isEqualTo(new AttentionFollowUpRef(open.publicId(), dueAt, false, false, false));
         assertThat(view.nowCount()).isEqualTo(1);
     }
 
