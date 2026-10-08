@@ -59,7 +59,7 @@
 
 - `backend/src/test/java/com/bifos/assistant/browser/infra/WebSocketCdpRelayConnectorTest.java`: 가짜 WebSocket 서버로 조각 둘로 보낸 메시지가 순서대로 `onFragment` 에 오고 마지막 조각만 `last` 다, 서버가 닫으면 `onClosed` 가 한 번, GUID 모양 번호를 받는다, 번호에 `/` 가 있으면 `IllegalArgumentException`
 - `backend/src/test/java/com/bifos/assistant/browser/presentation/BrowserGatewaySocketTest.java`: 처리기를 직접 부른다. 가짜 relay 로 조각이 그대로 오가는지, 세션이 닫히면 relay 와 핸들이 닫히는지, 조각의 합이 상한을 넘으면 양쪽이 닫히는지
-- `backend/src/test/java/com/bifos/assistant/testsupport/IntegrationTestDoubles.java`: `@Bean @Primary` 로 `EchoCdpRelayConnector`(신규 시험 지원 클래스 `backend/src/test/java/com/bifos/assistant/testsupport/EchoCdpRelayConnector.java`)를 더한다. 받은 조각을 그대로 `onFragment` 로 돌려주고, 연 횟수와 받은 조각을 기록하며, 시험이 기록을 비울 수 있다. 공유 컨텍스트라 다른 시험에 영향이 없게 상태는 시험마다 비운다
+- `backend/src/test/java/com/bifos/assistant/testsupport/IntegrationTestDoubles.java`: `@Bean @Primary` 로 `EchoCdpRelayConnector`(신규 시험 지원 클래스 `backend/src/test/java/com/bifos/assistant/testsupport/EchoCdpRelayConnector.java`)를 더한다. 받은 조각을 그대로 `onFragment` 로 돌려주고, 연 횟수와 받은 조각을 기록하며, 시험이 기록을 비울 수 있다. 공유 컨텍스트라 상태는 `backend/src/test/java/com/bifos/assistant/testsupport/IntegrationTestIsolation.java` 의 `reset`(다른 대역을 비우는 자리)에 `reset()` 한 줄을 더해 시험마다 비운다
 - `backend/src/test/java/com/bifos/assistant/browser/presentation/BrowserGatewaySocketIntegrationTest.java`: `@BackendIntegrationTest` 의 실제 서버(`@LocalServerPort`)에서 `@OverrideProperties` 로 중계를 켠다(`assistant.browser.enabled=true` 와 그때 필요한 값, 기반 주소, 32자 이상 비밀). 허용된 사용자를 만드는 방법은 `backend/src/test/java/com/bifos/assistant/browser/application/UserBrowserAccessRevokedTest.java` 를 따른다. 표식은 그 사용자의 호출 표식(`BrowserGatewayTokens#callAddress`)이다. JDK WebSocket 으로 `ws://localhost:<port>/internal/browser-gateway/<표식>/devtools/browser/<GUID>` 에 붙어 10만 글자 메시지가 온전히 되돌아오는지, `Origin` 을 실은 연결은 403 으로 거절되는지, 틀린 표식은 404 인지, 같은 devtools 경로의 일반 GET(upgrade 없음)은 빈 404 인지 본다
 
 ## 검증
@@ -90,3 +90,4 @@ scripts/check-mysql-migration.sh
 | `backend/src/test/java/com/bifos/assistant/browser/presentation/BrowserGatewaySocketIntegrationTest.java` | 신규 |
 | `backend/src/test/java/com/bifos/assistant/testsupport/IntegrationTestDoubles.java` | 수정 |
 | `backend/src/test/java/com/bifos/assistant/testsupport/EchoCdpRelayConnector.java` | 신규 |
+| `backend/src/test/java/com/bifos/assistant/testsupport/IntegrationTestIsolation.java` | 수정 |
