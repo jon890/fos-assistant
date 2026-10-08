@@ -33,7 +33,7 @@ export const ORDER_FILE_MAX_PAGES = 20;
 export const ORDER_FILE_PAGE_PAUSE_MS = 250;
 /** 파일 출력이 429 를 받고 같은 쪽을 한 번 다시 부르기 전에 쉬는 시간이다. */
 export const ORDER_FILE_RATE_LIMIT_PAUSE_MS = 1_000;
-/** 파일 출력이 시작부터 이 시간을 넘기면 다음 쪽을 부르지 않고 끝낸다. 대시보드가 승인한 호출을 기다리는 60초 안이다. */
+/** 파일 출력이 시작부터 이 시간을 넘기면 다음 쪽을 부르지 않고 끝낸다. Hermes 가 쥔 MCP 호출을 오래 붙잡지 않기 위해서다. 이미 부른 쪽은 끝까지 기다린다. */
 export const ORDER_FILE_DEADLINE_MS = 50_000;
 /** 출력 디렉터리의 자기 파일을 이 시간이 지나면 지운다. */
 export const ORDER_FILE_TTL_MS = 24 * 60 * 60 * 1000;

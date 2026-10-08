@@ -157,7 +157,7 @@ export async function writeOrdersFile(
         throw new TossinvestError("TOSSINVEST_UNAVAILABLE");
       page.set("cursor", data.nextCursor);
       await hooks.sleep(ORDER_FILE_PAGE_PAUSE_MS);
-      // 승인 호출의 60초 제한 안에 끝내지 못할 쪽은 부르지 않는다.
+      // Hermes 가 쥔 MCP 호출을 오래 붙잡지 않도록 시작부터 상한이 지났으면 다음 쪽을 부르지 않는다.
       if (hooks.now().getTime() - started.getTime() > ORDER_FILE_DEADLINE_MS)
         throw new TossinvestError("TOSSINVEST_UNAVAILABLE");
     }
