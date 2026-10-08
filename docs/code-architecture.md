@@ -79,6 +79,7 @@ hermes/
 아래는 아직 만들지 않았다. 스키마와 판정은 이미 받을 수 있게 되어 있다.
 
 - collection 탭, 문서의 판 이력 화면, 출처 표시
+- 관리자가 에이전트의 collection 과 민감 허용을 고치는 화면. API 는 [`backend/memory.md`](backend/memory.md) 의 「관리자가 에이전트의 collection 을 바꿀 때」 에 있다
 - 신원 항목의 들이기. 암호화와 문서 읽기 경계와 `identity` 권한을 운영에서 확인한 뒤에 연다. 조건은 [ADR-058](adr/ADR-058-기존-개인-지식-저장소는-주인이-검토한-묶음을-화면에서-올려-들여온다.md) 이 정했다
 - 민감 항목 본문의 완전 삭제
 - `always_inject` 칸 제거

@@ -1,4 +1,4 @@
-# Phase 03. 관리자 영역 상세의 「기억 영역」 절
+# Phase 01. 관리자 영역 상세의 「기억 영역」 절
 
 **Execution profile**: standard
 
@@ -6,7 +6,7 @@
 
 `/admin/agents/{code}` 에 「기억 영역」 절을 더한다. 관리자가 영역마다 받음과 민감 허용을 고르고, 빠진 영역의 항목 수를 보고, 저장하고, 최근 변경을 본다.
 
-**범위 외**: Control Plane API 는 Phase 02 가 만들었다. 일반 상세 `/agents/{code}` 에는 그리지 않는다.
+**범위 외**: Control Plane API 는 앞 단계 PR 이 만들었다. 일반 상세 `/agents/{code}` 에는 그리지 않는다.
 
 ## 컨텍스트
 
@@ -17,7 +17,22 @@
 - 화면 문구 규칙(해요체, 관리자 영역, 색 토큰, `Notice`, `Badge`)은 `web/AGENTS.md` 가 갖는다. `style={{` 를 쓰지 않는다.
 - `test/unit/*.test.ts` 는 `node --test` 로 web 파일을 읽는다. 그 파일은 `@/` 런타임 import 를 쓰지 못한다. 순수 함수 파일은 런타임 import 없이 쓴다(`web/src/lib/memory-source.ts` 처럼).
 
-**근거 문서**: `docs/frontend/structure.md` 의 「기억 영역 절」(문구와 상태 표), `docs/backend/memory.md` 의 「관리자가 에이전트의 collection 을 바꿀 때」, `docs/adr/ADR-20261008-agent-memory-grants-admin.md`
+**근거 문서**: 아래 「화면 상태 표」, `docs/backend/memory.md` 의 「관리자가 에이전트의 collection 을 바꿀 때」, `docs/adr/ADR-20261008-agent-memory-grants-admin.md`
+
+### 화면 상태 표
+
+이 phase 의 커밋에서 같은 표를 `docs/frontend/structure.md` 의 관리자 영역 표 아래 「기억 영역 절」 로 옮긴다. 그 문서의 `/admin/agents/{code}` 줄과 「두 상세는 같은 부품을 쓰고」 문장의 절 목록에 「기억 영역」 을 더한다. `docs/backend/memory.md` 의 「관리 영역의 화면은 아직 없다」 와 `docs/code-architecture.md` 의 「아직 만들지 않은 것」 의 화면 항목을 고친다.
+
+| 때 | 보이는 것 |
+| --- | --- |
+| 읽었다 | 영역마다 이름, 「받음」 과 「민감 항목까지」 체크박스, 「항목 N개」. 「민감 항목까지」 는 받는 영역에서만 고른다. 받음을 끄면 함께 꺼진다 |
+| 받지 않는 영역에 항목이 있다 | 그 줄에 「항목 N개가 있지만 받지 않아요.」 를 경고 색으로 보인다 |
+| 받지만 민감 항목을 허용하지 않은 영역에 민감 항목이 있다 | 그 줄에 「민감 항목 N개는 받지 않아요.」 를 경고 색으로 보인다 |
+| 그룹 목록에 없는 영역을 받고 있다 | 이름 자리에 key 를 보이고 「목록에 없는 영역」 배지를 단다 |
+| 고른 영역이 하나도 없다 | 「받는 영역이 없으면 이 에이전트는 기억을 쓰지 않아요.」 를 경고로 보인다. 저장은 막지 않는다 |
+| 수를 센 대상 | 주인이 있으면 「주인(<이름>)의 기억과 그룹 기억을 셌어요.」, 없으면 「주인이 없어 그룹 기억만 셌어요.」 |
+| 「기억 영역 저장」 을 누른다 | 고른 전체를 보낸다. 바뀐 것이 없거나 저장 중이면 단추가 꺼진다. 저장 중에는 체크박스도 꺼진다. 성공하면 응답으로 다시 그리고 「저장했어요.」 를 보인다. 실패하면 고른 값을 그대로 두고 오류를 보인다 |
+| 최근 변경 | 시각, 바꾼 사람, 「<영역> 붙임」, 「<영역> 뗌」, 「<영역> 민감 항목 허용」, 「<영역> 민감 항목 허용 끔」. 민감 허용과 함께 붙였으면 「<영역> 붙임(민감 항목 허용)」. 없으면 「아직 바꾼 기록이 없어요.」 |
 
 ## 의도 메모
 
@@ -51,7 +66,7 @@
 
 ### 3. `web/src/components/agent/agent-memory-section.tsx`
 
-`"use client"`. `AgentMemorySection({ code })`. `section` 에 `aria-label="기억 영역"`, `data-testid="agent-memory-section"`, 모델 절과 같은 테두리 클래스. 제목 「기억 영역」, 설명 「이 에이전트가 대화에 쓸 수 있는 기억의 영역이에요. 민감 항목은 영역마다 따로 허용해요.」 상태는 `docs/frontend/structure.md` 「기억 영역 절」 의 표대로다.
+`"use client"`. `AgentMemorySection({ code })`. `section` 에 `aria-label="기억 영역"`, `data-testid="agent-memory-section"`, 모델 절과 같은 테두리 클래스. 제목 「기억 영역」, 설명 「이 에이전트가 대화에 쓸 수 있는 기억의 영역이에요. 민감 항목은 영역마다 따로 허용해요.」 상태는 「화면 상태 표」 대로다.
 
 - 읽는 중: 「기억 영역을 불러오고 있어요.」 / 실패: `Notice variant="error"` 「기억 영역을 불러오지 못했어요. <메시지>」. 컴포넌트는 `fetch` 를 직접 부르지 않는다(`web/eslint.config.mjs` 가 `src/components/**` 의 전역 `fetch` 를 막는다). 작업 항목 2 의 호출 함수를 쓴다.
 - 영역 한 줄: 체크박스의 접근 이름은 「<영역> 받음」(예: 「커리어 받음」), 체크박스 「민감 항목까지」 의 접근 이름은 「<영역> 민감 항목까지」, 「항목 N개」, `listed` 가 거짓이면 `Badge variant="outline"` 「목록에 없는 영역」, `missingNotice` 가 있으면 경고 색 글(`text-warning` 같은 의미 색 토큰. 없으면 `Notice variant="warning"`).
@@ -104,3 +119,6 @@ scripts/check-local.sh agent-memory.spec.ts
 | `web/src/components/agent/agent-detail-body.tsx` | 수정 |
 | `test/unit/agent-memory.test.ts` | 신규 |
 | `test/browser/agent-memory.spec.ts` | 신규 |
+| `docs/frontend/structure.md` | 수정 |
+| `docs/backend/memory.md` | 수정 |
+| `docs/code-architecture.md` | 수정 |
