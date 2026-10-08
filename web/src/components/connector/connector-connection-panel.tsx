@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { ConnectorAgentChooser } from "@/components/connector/connector-agent-chooser";
+import { BoundAgents } from "@/components/connector/connector-bound-agents";
 import { ConnectorHeading } from "@/components/connector/connector-identity";
 import { ConnectorGrants } from "@/components/connector/connector-grants";
 import { ConnectorTools } from "@/components/connector/connector-tools";
@@ -19,25 +20,13 @@ import {
   connectionStatusLabel,
   disconnectConnection,
   readConnection,
-  readConnectors,
   readOptions,
   registerConnection,
-  type BoundAgent,
   type ConnectorConnection,
   type ConnectorField,
   type ConnectorOption,
-  type ConnectorSummary,
 } from "@/lib/connection";
-
-type Loaded =
-  | { kind: "loading" }
-  | { kind: "notFound" }
-  | { kind: "failed"; message: string }
-  | {
-      kind: "ready";
-      connector: ConnectorSummary | null;
-      connection: ConnectorConnection;
-    };
+import { fetchLoaded, formatChecked, type Loaded } from "@/lib/connection-load";
 
 type Pending = "save" | "check" | "disconnect" | `options:${string}` | null;
 
@@ -46,81 +35,6 @@ type Pending = "save" | "check" | "disconnect" | `options:${string}` | null;
  * 연결을 막 마쳤거나 사용자가 열었으면 `open` 이고, 붙인 뒤에도 결과를 보이려고 닫을 때까지 둔다.
  */
 type Chooser = "auto" | "open" | "closed";
-
-function formatChecked(value: string) {
-  return new Intl.DateTimeFormat("ko-KR", {
-    dateStyle: "medium",
-    timeStyle: "short",
-    timeZone: "Asia/Seoul",
-  }).format(new Date(value));
-}
-
-async function fetchLoaded(id: string): Promise<Loaded> {
-  const [catalog, connection] = await Promise.all([
-    readConnectors(),
-    readConnection(id),
-  ]);
-  if (!connection.ok) {
-    return connection.code === "CONNECTOR_NOT_FOUND"
-      ? { kind: "notFound" }
-      : { kind: "failed", message: connection.message };
-  }
-  // 카탈로그를 읽지 못한 것을 목록에서 빠진 것으로 보이면 일시 장애에 해제만 남는다.
-  if (!catalog.ok) return { kind: "failed", message: catalog.message };
-  const connector = catalog.data.find((item) => item.id === id) ?? null;
-  return { kind: "ready", connector, connection: connection.data };
-}
-
-/**
- * 이 연결을 붙인 에이전트 목록이다. 떼기는 에이전트 화면에서 한다.
- * `onChoose` 가 있으면 에이전트 고르기 영역을 다시 여는 단추를 둔다.
- */
-function BoundAgents({
-  bindings,
-  onChoose,
-}: {
-  bindings: BoundAgent[];
-  onChoose: (() => void) | null;
-}) {
-  return (
-    <section className="space-y-2" data-testid="connection-bindings">
-      <h2 className="text-sm font-semibold">붙인 에이전트</h2>
-      {bindings.length === 0 ? (
-        <p className="text-sm text-muted-foreground">
-          아직 이 연결을 쓰는 에이전트가 없어요.
-        </p>
-      ) : (
-        <ul className="divide-y divide-border rounded-md border border-border">
-          {bindings.map((binding) => (
-            <li
-              key={binding.agentCode}
-              className="flex flex-wrap items-center justify-between gap-2 p-3 text-sm"
-              data-testid="connection-binding"
-            >
-              <Link
-                prefetch={false}
-                href={`/agents/${binding.agentCode}`}
-                className="min-w-0 break-all text-foreground underline underline-offset-4"
-              >
-                {binding.agentName}
-              </Link>
-              {binding.restartRequired || binding.status === "PENDING" ? (
-                <Badge variant="warning">반영 대기</Badge>
-              ) : null}
-            </li>
-          ))}
-        </ul>
-      )}
-      {onChoose ? (
-        <Button size="sm" variant="outline" onClick={onChoose}>
-          {bindings.length === 0
-            ? "쓸 에이전트 고르기"
-            : "다른 에이전트에도 붙이기"}
-        </Button>
-      ) : null}
-    </section>
-  );
-}
 
 function NotFound() {
   return (
