@@ -4,11 +4,16 @@ import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.agent.infra.AgentRepository;
 import com.bifos.assistant.proactive.infra.ProactiveCheckRepository;
 import com.bifos.assistant.shared.auth.CurrentUserProvider;
+import com.bifos.assistant.shared.domain.type.UserRole;
+import com.bifos.assistant.shared.error.ApiException;
+import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.usage.domain.AgentExecution;
 import com.bifos.assistant.usage.domain.ExecutionCost;
 import com.bifos.assistant.usage.domain.type.ExecutionStatus;
 import com.bifos.assistant.usage.infra.AgentExecutionRepository;
 import com.bifos.assistant.usage.infra.SubagentUsageJobRepository;
+import com.bifos.assistant.user.domain.AppUser;
+import com.bifos.assistant.user.infra.AppUserRepository;
 import java.time.Instant;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
@@ -47,7 +52,20 @@ public class UsageTestSupportController {
     private final SubagentUsageJobRepository jobs;
     private final ProactiveCheckRepository proactiveChecks;
     private final AgentRepository agents;
+    private final AppUserRepository users;
     private final CurrentUserProvider currentUser;
+
+    /** 브라우저 검사의 관리자 화면을 다른 검사 사용자와 분리해 준비한다. */
+    @PostMapping("/admin-user")
+    public SeededAdminUser seedAdminUser(@RequestBody SeededAdminUser requested) {
+        var caller = currentUser.requireAdmin();
+        if (users.findByEmail(requested.email()).isPresent()) {
+            throw new ApiException(ErrorCode.VALIDATION_FAILED, "test admin user already exists");
+        }
+        users.save(AppUser.of(
+                requested.email(), requested.displayName(), caller.groupId(), UserRole.ADMIN, Instant.now()));
+        return requested;
+    }
 
     /**
      * 끝난 실행을 여러 건 심는다.
@@ -118,6 +136,9 @@ public class UsageTestSupportController {
             Long contextChars,
             Long estimatedCostMicros,
             Long actualCostMicros) {}
+
+    /** 관리자 권한으로 따로 심을 브라우저 검사 사용자다. */
+    public record SeededAdminUser(String email, String displayName) {}
 
     /** 가장 최근 실행을 고아 실행으로 표시한다. */
     @PostMapping("/last-execution/orphaned")

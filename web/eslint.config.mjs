@@ -11,6 +11,7 @@ import nextTs from "eslint-config-next/typescript";
 const NODE_TEST_READ_FILES = [
   "src/components/chat/activity/activity-state.ts",
   "src/components/chat/skill-command.ts",
+  "src/lib/usage-paging.ts",
 ];
 
 export default defineConfig([
