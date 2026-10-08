@@ -185,6 +185,33 @@ class UserBrowserServiceTest {
     }
 
     @Test
+    @DisplayName("남은 컨테이너를 지우지 못하면 새 컨테이너를 만들지 않고 start_failed 로 둔다")
+    void doesNotCreateWhenLeftoverCannotBeRemoved() {
+        UserBrowserService service = service(true, 2);
+        service.create(101L);
+        runtime.plant("leftover", UserBrowserService.profileKey(101L), true);
+        runtime.failingActions().add("remove");
+
+        assertCode(() -> service.start(101L), ErrorCode.BROWSER_START_FAILED);
+
+        assertThat(repository.findByUserId(101L).orElseThrow().lastError()).isEqualTo(UserBrowserService.START_FAILED);
+        assertThat(runtime.containers()).containsOnlyKeys("leftover");
+    }
+
+    @Test
+    @DisplayName("켜진 브라우저를 다시 켜면 남은 컨테이너 정리가 돌지 않아 켜진 컨테이너를 지우지 않는다")
+    void startingRunningBrowserDoesNotRemoveItsContainer() {
+        UserBrowserService service = service(true, 2);
+        service.create(101L);
+        service.start(101L);
+
+        service.start(101L);
+
+        assertThat(runtime.removed()).isEmpty();
+        assertThat(runtime.containers()).containsOnlyKeys("c1");
+    }
+
+    @Test
     @DisplayName("proxy 가 켜기를 거절하면 만든 컨테이너를 지우고 start_failed 로 둔 뒤 다시 켤 수 있다")
     void failsOnProxyErrorAndAllowsRetry() {
         UserBrowserService service = service(true, 2);
