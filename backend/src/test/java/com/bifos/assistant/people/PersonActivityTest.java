@@ -7,11 +7,13 @@ import com.bifos.assistant.chat.domain.Conversation;
 import com.bifos.assistant.chat.infra.ChatMessageRepository;
 import com.bifos.assistant.chat.infra.ConversationRepository;
 import com.bifos.assistant.people.application.PersonAccessService;
+import com.bifos.assistant.people.application.SignInPolicy;
 import com.bifos.assistant.people.application.model.PersonAccess;
 import com.bifos.assistant.people.domain.AllowedPerson;
 import com.bifos.assistant.people.infra.AllowedPersonRepository;
 import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.testsupport.BackendIntegrationTest;
+import com.bifos.assistant.testsupport.TestClock;
 import com.bifos.assistant.user.domain.AppUser;
 import com.bifos.assistant.user.infra.AppUserRepository;
 import java.time.Instant;
@@ -26,6 +28,12 @@ class PersonActivityTest {
 
     @Autowired
     PersonAccessService access;
+
+    @Autowired
+    SignInPolicy signIn;
+
+    @Autowired
+    TestClock clock;
 
     @Autowired
     AllowedPersonRepository people;
@@ -82,5 +90,31 @@ class PersonActivityTest {
 
         assertThat(result.joined()).isFalse();
         assertThat(result.lastConversationAt()).isNull();
+    }
+
+    @Test
+    @DisplayName("관리자 변경에 오래된 허용 목록 행을 저장해도 로그인 시각은 유지한다")
+    void preservesLoginTimeWhenAdminSavesStalePerson() {
+        AllowedPerson person = people.save(AllowedPerson.of("stale@example.com", "사용자", "stale", Instant.EPOCH));
+        AllowedPerson staleDisable = people.findById(person.id()).orElseThrow();
+        Instant firstLogin = Instant.parse("2026-10-08T01:00:00Z");
+        clock.set(firstLogin);
+
+        assertThat(signIn.recordCompletion("stale@example.com")).isTrue();
+        staleDisable.disable();
+        people.save(staleDisable);
+        assertThat(people.findById(person.id()).orElseThrow().lastLoginAt()).isEqualTo(firstLogin);
+
+        AllowedPerson staleEnable = people.findById(person.id()).orElseThrow();
+        AllowedPerson current = people.findById(person.id()).orElseThrow();
+        current.enable();
+        people.save(current);
+        Instant secondLogin = firstLogin.plusSeconds(60);
+        clock.set(secondLogin);
+        assertThat(signIn.recordCompletion("stale@example.com")).isTrue();
+
+        staleEnable.enable();
+        people.save(staleEnable);
+        assertThat(people.findById(person.id()).orElseThrow().lastLoginAt()).isEqualTo(secondLogin);
     }
 }
