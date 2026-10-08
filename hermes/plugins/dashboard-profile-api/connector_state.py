@@ -186,6 +186,24 @@ def _entry_matches_manifest(plugin: str, entry: dict) -> bool:
             and entry.get("mcp_server", manifest["mcp_server"]) == manifest["mcp_server"])
 
 
+def _entry_manifest_mismatches(plugin: str, entry: dict) -> tuple[str, ...]:
+    """소유 기록과 현재 manifest 가 다른 공개된 정의 칸 이름만 돌려준다."""
+    manifest = _connector_manifest(plugin)
+    if manifest is None or not isinstance(entry.get("server"), dict):
+        return ()
+    recorded = entry["server"]
+    expected = manifest["server"]
+    mismatches = [name for name in ("command", "args") if recorded.get(name) != expected.get(name)]
+    # `_server_matches` 가 선택 칸의 빈 값, 옛 운영자 env 참조, 주인별 디렉터리 값을 호환으로 인정한다.
+    # command 와 args 를 현재 값으로 맞춘 뒤에도 다르면 env 정의가 실제로 다르다.
+    comparable = {**recorded, "command": expected["command"], "args": expected["args"]}
+    if not _server_matches(manifest, comparable):
+        mismatches.append("env")
+    if entry.get("mcp_server", manifest["mcp_server"]) != manifest["mcp_server"]:
+        mismatches.append("mcp_server")
+    return tuple(mismatches)
+
+
 def _connector_allowlist(state: dict, servers: dict) -> list:
     """소유 기록의 커넥터 서버 이름과 그 커넥터들이 선언한 내장 toolset 으로 만든 API 도구 목록이다.
 
