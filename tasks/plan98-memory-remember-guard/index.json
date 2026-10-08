@@ -1,0 +1,13 @@
+{
+  "name": "plan98-memory-remember-guard",
+  "description": "memory_remember 바로 저장을 사용자 문장 그대로인 본문으로 제한하고 민감해 보이는 글과 오래된 대화를 제안으로 내린다 (이슈 #283)",
+  "status": "pending",
+  "created_at": "2026-10-08",
+  "total_phases": 3,
+  "current_phase": 1,
+  "phases": [
+    { "number": 1, "file": "phase-01.md", "execution_profile": "deep" },
+    { "number": 2, "file": "phase-02.md", "execution_profile": "standard" },
+    { "number": 3, "file": "phase-03.md", "execution_profile": "fast" }
+  ]
+}
