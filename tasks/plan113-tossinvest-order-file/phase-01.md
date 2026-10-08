@@ -86,6 +86,7 @@ node scripts/check-file-length.mjs
 | `hermes/connectors/tossinvest/connector.json` | 수정 |
 | `hermes/connectors/tossinvest/.mcp.json` | 수정 |
 | `hermes/connectors/tossinvest/src/order-file.ts` | 신규 |
+| `hermes/connectors/tossinvest/src/constants.ts` | 수정 |
 | `hermes/connectors/tossinvest/src/account-tools.ts` | 수정 |
 | `hermes/connectors/tossinvest/src/tool-registration.ts` | 수정 |
 | `hermes/connectors/tossinvest/skills/tossinvest/SKILL.md` | 수정 |
