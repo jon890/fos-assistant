@@ -122,7 +122,7 @@ public class MemoryCaptureService {
         record(saved.id(), user, request, kind, direct ? saved.revision() : null);
         if (!direct) {
             // 바로 저장은 사용자 본인의 말이라 제안이 아니다. 제안만 판단 피드백의 SURFACED 로 남긴다.
-            feedback.record(MemoryService.proposalFeedback(
+            feedback.record(MemoryProposalFeedback.of(
                     user, saved, FeedbackEventType.SURFACED, FeedbackActor.AGENT, clock.instant()));
         }
         return new MemoryRememberResult(
@@ -200,7 +200,7 @@ public class MemoryCaptureService {
             memory.restoreProposal(clock.instant());
             Memory restored = memories.save(memory);
             // 받아들임을 무른 것이다. 첫 반응은 그대로 두고, 오래 가는 선호로 읽히지 않게 사용자의 마지막 결정을 남긴다.
-            feedback.record(MemoryService.proposalFeedback(
+            feedback.record(MemoryProposalFeedback.of(
                             user, restored, FeedbackEventType.DISMISSED, FeedbackActor.USER, clock.instant())
                     .reason(FeedbackLabeler.MEMORY_UNDO));
         } else {

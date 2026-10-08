@@ -3,10 +3,8 @@ package com.bifos.assistant.memory.application;
 import com.bifos.assistant.agent.application.AgentMemoryCollectionService;
 import com.bifos.assistant.agent.application.AgentMemoryGrants;
 import com.bifos.assistant.feedback.application.DecisionFeedbackRecorder;
-import com.bifos.assistant.feedback.application.model.FeedbackEntry;
 import com.bifos.assistant.feedback.domain.type.FeedbackActor;
 import com.bifos.assistant.feedback.domain.type.FeedbackEventType;
-import com.bifos.assistant.feedback.domain.type.FeedbackSubjectType;
 import com.bifos.assistant.memory.application.model.MemoryAccess;
 import com.bifos.assistant.memory.domain.Memory;
 import com.bifos.assistant.memory.domain.MemoryCollection;
@@ -251,7 +249,8 @@ public class MemoryService {
             Instant now = clock.instant();
             Memory proposed =
                     memories.save(Memory.proposedUser(user.id(), title, content, proposedByExecutionId, dedupKey, now));
-            feedback.record(proposalFeedback(user, proposed, FeedbackEventType.SURFACED, FeedbackActor.AGENT, now));
+            feedback.record(
+                    MemoryProposalFeedback.of(user, proposed, FeedbackEventType.SURFACED, FeedbackActor.AGENT, now));
             return proposed;
         });
     }
@@ -264,7 +263,8 @@ public class MemoryService {
         memory.accept(user.id(), now);
         Memory accepted = memories.save(memory);
         if (proposal) {
-            feedback.record(proposalFeedback(user, accepted, FeedbackEventType.ACCEPTED, FeedbackActor.USER, now));
+            feedback.record(
+                    MemoryProposalFeedback.of(user, accepted, FeedbackEventType.ACCEPTED, FeedbackActor.USER, now));
         }
         return accepted;
     }
@@ -277,20 +277,10 @@ public class MemoryService {
         memory.reject(now);
         Memory rejected = memories.save(memory);
         if (proposal) {
-            feedback.record(proposalFeedback(user, rejected, FeedbackEventType.REJECTED, FeedbackActor.USER, now));
+            feedback.record(
+                    MemoryProposalFeedback.of(user, rejected, FeedbackEventType.REJECTED, FeedbackActor.USER, now));
         }
         return rejected;
-    }
-
-    /**
-     * 제안의 판단 피드백 사건이다. 열쇠는 지금 화면의 {@code itemKey} 와 같고, 판은 판 번호다. 제목과 본문은 담지 않는다. 대화는 제안한
-     * 실행에서 기록기가 채운다.
-     */
-    static FeedbackEntry proposalFeedback(
-            CurrentUser user, Memory memory, FeedbackEventType type, FeedbackActor actor, Instant now) {
-        return FeedbackEntry.of(user.id(), FeedbackSubjectType.MEMORY, memory.id(), type, actor, now)
-                .originExecution(memory.proposedByExecutionId())
-                .version(Integer.toString(memory.revision()));
     }
 
     /**
