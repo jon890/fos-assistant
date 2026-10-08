@@ -101,3 +101,4 @@ cd backend && ./gradlew checkstyleMain checkstyleTest spotlessCheck
 | `backend/src/main/java/com/bifos/assistant/proactive/presentation/CheckFindingController.java` | 신규 |
 | `backend/src/main/java/com/bifos/assistant/proactive/presentation/ProactiveCheckDtos.java` | 수정 |
 | `backend/src/test/java/com/bifos/assistant/proactive/CheckFindingReactionsTest.java` | 신규 |
+| `backend/src/test/java/com/bifos/assistant/architecture/StoredEnumNamesTest.java` | 수정 |
