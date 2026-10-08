@@ -5,21 +5,34 @@ import com.bifos.assistant.chat.domain.type.ConversationPurpose;
 import com.bifos.assistant.chat.domain.type.ModelSelectionMode;
 import com.bifos.assistant.model.domain.type.ModelTier;
 import jakarta.persistence.LockModeType;
+import jakarta.persistence.QueryHint;
 import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import org.hibernate.jpa.HibernateHints;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.jpa.repository.QueryHints;
 import org.springframework.data.repository.query.Param;
 
 public interface ConversationRepository extends JpaRepository<Conversation, Long> {
 
     Optional<Conversation> findByIdAndUserIdAndDeletedAtIsNull(Long id, Long userId);
+
+    /**
+     * 대화의 주인 번호다. 암호화한 메시지를 풀 때 AAD 를 만든다(ADR-20261008 / data-encryption).
+     *
+     * <p>본문을 꺼내는 자리는 어느 트랜잭션 안이든 될 수 있다. 그 트랜잭션의 미뤄 둔 쓰기를 이 조회가 먼저 내보내지 않게 flush 를
+     * 커밋 때로 미룬다.
+     */
+    @QueryHints(@QueryHint(name = HibernateHints.HINT_FLUSH_MODE, value = "COMMIT"))
+    @Query("select c.userId from Conversation c where c.id = :id")
+    Optional<Long> findOwnerId(@Param("id") Long id);
 
     /**
      * 지웠지만 본문을 아직 지우지 않은 대화의 번호다. 먼저 지운 대화부터 낸다(ADR-20261008 / conversation-purge).
