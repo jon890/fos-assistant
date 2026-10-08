@@ -115,10 +115,11 @@ test("대화가 있는 실패의 제목은 그 대화로 가고, 기억 제안�
   assert.equal(itemHref(item({ why: why("MEMORY_PROPOSED", []) })), "/memory");
 });
 
-test("할 일의 출처는 제안이면 「대화에서」, 사람이 더했으면 「직접 더함」, 할 일이 아니면 없다", () => {
+test("할 일의 출처는 상태와 독립적으로 에이전트 제안이면 「대화에서」다", () => {
   const followUp = { id: "f-1", dueAt: null, waiting: false };
-  assert.equal(originText(item({ followUp: { ...followUp, proposed: true } })), "대화에서");
-  assert.equal(originText(item({ followUp: { ...followUp, proposed: false } })), "직접 더함");
+  assert.equal(originText(item({ followUp: { ...followUp, proposed: true, agentProposed: true } })), "대화에서");
+  assert.equal(originText(item({ followUp: { ...followUp, proposed: false, agentProposed: true } })), "대화에서");
+  assert.equal(originText(item({ followUp: { ...followUp, proposed: false, agentProposed: false } })), "직접 더함");
   assert.equal(originText(item({ followUp: null })), null);
 });
 
@@ -204,7 +205,13 @@ test("빈 기한이나 형식이 틀린 기한은 없는 기한이다", () => {
 
 test("항목의 단추는 now.md 「동작」 표를 따른다", () => {
   const conversationId = "7b1e0000-0000-4000-8000-000000000000";
-  const followUp = { id: "0199a000-0000-7000-8000-000000000001", dueAt: null, waiting: false, proposed: true };
+  const followUp = {
+    id: "0199a000-0000-7000-8000-000000000001",
+    dueAt: null,
+    waiting: false,
+    proposed: true,
+    agentProposed: true,
+  };
   const labels = (target: AttentionItem) => itemActions(target).map((action) => [action.kind, action.label]);
   assert.deepEqual(labels(item({ why: why("FOLLOW_UP_PROPOSED", []), conversationId, followUp })), [
     ["accept", "받아들이기"],
