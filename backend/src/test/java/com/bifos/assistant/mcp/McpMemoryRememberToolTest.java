@@ -358,6 +358,23 @@ class McpMemoryRememberToolTest {
     }
 
     @Test
+    @DisplayName("기능 도입 전의 질문 없는 루트 실행이 대화에 있으면 그 뒤의 질문 turn 도 제안이다")
+    void proposesAfterLegacyRunWithoutQuestion() throws Exception {
+        otherRootRun("run-legacy");
+        String root = askedInNewRootRun();
+
+        assertThat(text(call(remember("다른 사람", "다른 사람은 홍길동이다", null), root))).isEqualTo(PROPOSED);
+    }
+
+    @Test
+    @DisplayName("질문 없는 루트 실행이 없으면 새 root 의 질문 turn 은 바로 저장한다")
+    void remembersInNewRootRunWithoutLegacyRun() throws Exception {
+        String root = askedInNewRootRun();
+
+        assertThat(text(call(remember("다른 사람", "다른 사람은 홍길동이다", null), root))).isEqualTo(REMEMBERED);
+    }
+
+    @Test
     @DisplayName("질문 줄이 다른 사람의 메시지를 가리키면 없는 줄로 보고 제안이다")
     void proposesWhenQuestionIsOthers() throws Exception {
         ChatMessage foreign =
@@ -571,6 +588,16 @@ class McpMemoryRememberToolTest {
         questions.save(ExecutionQuestion.of(dadRun.id(), question.id(), Instant.now()));
     }
 
+    /** 새 root 의 실행을 만들고 사람의 질문을 잇는다. 그 root 를 돌려준다. */
+    private String askedInNewRootRun() {
+        String root = McpCallSigner.newRoot();
+        AgentExecution run = McpCallSigner.running(executions, agents, dad.id(), conversation.id(), PROFILE, root);
+        ChatMessage question =
+                messages.save(ChatMessage.fromUser(conversation.id(), dad.id(), QUESTION, Instant.now()));
+        questions.save(ExecutionQuestion.of(run.id(), question.id(), Instant.now()));
+        return root;
+    }
+
     private void toolStarted(String toolName) {
         toolStarted(dadRun.id(), ExecutionEventType.TOOL_STARTED, toolName);
     }
@@ -647,11 +674,19 @@ class McpMemoryRememberToolTest {
     }
 
     private JsonNode call(ObjectNode arguments) throws Exception {
-        return body(send(signed(arguments))).path("result");
+        return call(arguments, dadRoot);
+    }
+
+    private JsonNode call(ObjectNode arguments, String root) throws Exception {
+        return body(send(signed(arguments, root))).path("result");
     }
 
     private String signed(ObjectNode arguments) {
-        return McpCallSigner.withContext(json.writeValueAsString(toolCall(arguments)), dadToken, dadRoot);
+        return signed(arguments, dadRoot);
+    }
+
+    private String signed(ObjectNode arguments, String root) {
+        return McpCallSigner.withContext(json.writeValueAsString(toolCall(arguments)), dadToken, root);
     }
 
     private ObjectNode toolCall(JsonNode arguments) {
