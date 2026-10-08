@@ -44,8 +44,7 @@ CI 는 PR 의 main base 와 비교한다. push 는 직전 main, 정기 실행은
 
 ### MySQL 작성 주의점
 
-운영 MySQL 에서 마이그레이션 하나가 오류 1267(Illegal mix of collations)로 실패해 서비스가 내려간 적이 있다.
-H2 로 도는 검사는 모두 통과한 상태였다. 아래 규칙은 그 일에서 나왔다.
+H2 로 도는 검사를 모두 통과해도 운영 MySQL 에서 실패할 수 있어 아래 규칙을 둔다.
 
 ### DDL 과 DML 을 한 파일에 섞지 않는다
 
@@ -67,11 +66,8 @@ MySQL 8.4 의 `utf8mb4` 기본 정렬 규칙은 `utf8mb4_0900_ai_ci` 다.
 적지 않은 표는 서버 기본값인 `utf8mb4_unicode_ci` 가 된다.
 나중에 `ALTER TABLE` 로 더한 칸은 그 표의 정렬 규칙을 따른다.
 
-적지 않고 만든 표가 여덟 있었다.
-`agent_token`, `chat_pending_message`, `execution_event`, `memory`, `model_hidden`,
-`model_tier_definition`, `model_tier_group_setting`, `subagent_usage_job`.
 두 정렬 규칙의 칸을 `=`, `<>`, `IN`, 조인 조건으로 비교하면 MySQL 이 오류 1267 로 거절한다. 줄이 하나도 없어도 거절한다.
-V58 부터 V65 까지가 이 여덟 표를 `ALTER TABLE ... CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci` 로 맞췄다.
+정렬 규칙을 적지 않고 만든 옛 표는 V58 부터 V65 까지가 `ALTER TABLE ... CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci` 로 맞췄다.
 H2 의 MySQL 모드도 이 문장을 받는다.
 
 - **새 표에는 `ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci` 를 적는다.**
@@ -92,8 +88,7 @@ H2 의 MySQL 모드도 이 문장을 받는다.
   `utf8mb4_unicode_ci` 에서 다르던 두 값이 `utf8mb4_0900_ai_ci` 에서 같아질 수 있다.
   나중에 유니코드에 들어온 결합 문자가 붙은 글자가 그렇다. 그런 줄이 있으면 그 표의 문장이 오류 1062 로 실패한다.
   세는 방법은 운영 저장소가 갖는다
-- 다시 만드는 동안 그 표에 쓰기가 막힌다. 2026-10-02 에 여덟 표의 줄은 모두 합쳐 2천 개가 안 됐고
-  가장 큰 `execution_event` 가 400KB 가 안 됐다. 같은 크기의 표를 바꾸는 데 1초가 걸리지 않는다
+- 다시 만드는 동안 그 표에 쓰기가 막힌다. 줄이 2천 개, 크기가 400KB 를 넘지 않는 표는 1초가 걸리지 않는다
 
 ### 실제 MySQL 검사를 통과해야 한다
 

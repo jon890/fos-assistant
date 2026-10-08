@@ -53,13 +53,10 @@ Memory 항목과 그 판, 그룹의 collection 목록, 에이전트가 받는 co
 
 ### 옛 판으로 되돌렸다가 다시 올릴 때
 
-새 칸에는 모두 기본값이 있어 옛 코드도 이 표에 쓴다. 다만 옛 코드는 새 칸을 모르므로, 되돌린 동안 쓴 것은 다시 올리기 전에 맞춘다.
-
-| 되돌린 동안 옛 코드가 한 일 | 다시 올리면 | 맞추는 것 |
-| --- | --- | --- |
-| `always_inject` 를 참으로 만들거나 고쳤다 | `retrieval` 이 `SEARCH` 로 남아 항상 층에서 색인으로 내려간다 | `always_inject` 가 참이고 `retrieval` 이 `SEARCH` 인 줄을 `ALWAYS` 로, 거짓이고 `ALWAYS` 인 줄을 `SEARCH` 로 고친다 |
-| 에이전트를 만들었다 | `agent_memory_collection` 에 줄이 없어 그 에이전트가 Memory 를 받지 않는다 | 줄이 하나도 없고 옛 커넥터 에이전트가 아닌 에이전트에 `core` 를 넣는다 |
-| Memory 를 고치거나 지웠다 | `memory_revision` 에 그 판이 없다 | 맞출 수 없다. 그 사이의 이력은 비어 있다 |
+V47 이전 판으로 되돌린 동안 옛 코드가 쓴 줄은 다시 올리기 전에 맞춘다.
+`always_inject` 와 `retrieval` 이 어긋난 줄은 `always_inject` 를 따라 `retrieval` 을 `ALWAYS` 나 `SEARCH` 로 고친다.
+`agent_memory_collection` 에 줄이 없는 에이전트에는 `core` 를 넣는다. 옛 커넥터 에이전트는 뺀다.
+되돌린 동안 고치거나 지운 Memory 는 `memory_revision` 에 판이 남지 않는다.
 
 근거는 [ADR-003](../../adr/ADR-003-memory-권한은-주입으로-강제한다.md), [ADR-012](../../adr/ADR-012-memory-는-사람이-승인한-것만-남는다.md),
 [ADR-052](../../adr/ADR-052-memory-는-collection-종류-꺼내는-방식-민감도-판-출처를-가진다.md),

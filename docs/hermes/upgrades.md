@@ -108,27 +108,6 @@ session 상세의 비캐시 입력 토큰과 혼동하지 않는다.
 [v0.21.5 api_server_runs.py](https://github.com/NousResearch/hermes-agent/blob/v2026.9.24/gateway/platforms/api_server_runs.py) 의
 `terminal_run_status`, `_execute_run`, `_mark_shutdown_interrupted_runs` 다.
 
-## 홈서버에서 확인한 것
-
-2026년 9월 17일에 홈서버에서 직접 확인했다.
-
-| 항목 | 결과 |
-| --- | --- |
-| 버전 | Hermes Agent v0.21.0 (2026.8.31) |
-| `run_submission`, `run_status` | true |
-| `run_events_sse`, `run_stop` | true |
-| 배치 | 공유 listener 하나가 `/p/<profile>/...` 경로로 모든 profile 을 받는다 |
-| subagent 토큰 | 부모 실행의 `usage` 에 포함되지 않는다 |
-
-**subagent 토큰이 부모에 포함되지 않으므로 실행 줄을 전부 더해야 실제 사용량이 나온다.**
-subagent 를 쓴 실행과 쓰지 않은 실행의 토큰을 견줘 확인했고,
-근거는 [ADR-016의 「자식 토큰 실측」 절](../adr/ADR-016-다중-에이전트-조율은-control-plane이-맡는다.md#자식-토큰-실측)에 있다.
-부모 usage 만 저장하면 그만큼이 기록에서 빠진다.
-
-공유 listener 를 쓰더라도 profile 마다 접두가 다르고,
-나중에는 profile 마다 다른 노드를 가리킬 수 있어야 한다.
-그래서 Control Plane 은 API server 주소를 `hermes.base-url` 이 아니라 에이전트의 `api_base_url` 에 둔다.
-
 ## 대시보드 plugin 이 기대는 내부 지점
 
 `dashboard-profile-api` 는 공개 확장점이 아닌 Hermes 내부 지점에 기댄다.
@@ -137,11 +116,6 @@ subagent 를 쓴 실행과 쓰지 않은 실행의 토큰을 견줘 확인했고
 
 Hermes 를 올리기 전에 새 판의 tag 로 `scripts/check-hermes-contract.sh <tag>` 를 돌린다.
 실패한 항목을 plugin 에서 고치고, `HERMES_VERSION` 을 새 tag 로 바꾼 PR 의 CI 가 통과한 뒤 이미지를 올린다.
-
-2026-10-06 에 이 확인을 앞선 판에 돌렸다.
-`v2026.8.31` 에는 `reload_gateway_plugins` 와 `_config_profile_scope` 가 없었다.
-`v2026.7.30` 에는 그 둘과 `list_profile_names` 가 없었다.
-지금 plugin 을 그 판에 올리면 이 지점을 쓰는 단계가 실패한다.
 
 ### MCP 설정 맞추기와 스킬 색인 캐시 키
 
