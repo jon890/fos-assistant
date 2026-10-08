@@ -43,6 +43,13 @@ public class ContextAssembler implements OmittedMemories {
             | --- | --- |
             | 예시 | 내용 |
             """.stripTrailing();
+    private static final String TOOL_CALL_INSTRUCTIONS = """
+            # 도구 호출
+
+            로컬 MCP 등록 이름이 mcp__... 인 도구를 tool_call 로 호출할 때 calls 배열에는 name 과 arguments 를 담은 정확히 한 항목만 넣는다.
+            같은 서버의 읽기 도구도 여러 개를 묶지 말고 도구마다 별도 호출한다.
+            MCP 서버 연결이 HTTP 여도 로컬 등록 이름이면 이 단건 규칙을 따른다. connectors__... HTTP 원격 도구 서버는 해당 서버의 계약을 따른다.
+            """.stripTrailing();
     /**
      * {@code memory_remember} 을 받는 에이전트에 싣는 기억 지침이다(ADR-20261007 / memory-remember). 기준과 예시는 도구 설명과 같은 뜻이다.
      */
@@ -68,19 +75,21 @@ public class ContextAssembler implements OmittedMemories {
     private final ContextProperties properties;
     private final Clock clock;
 
-    /** Memory 예산과 관계없이 모든 에이전트 실행에 공통 답변 지침을 넣는다. */
+    /** Memory 예산과 관계없이 모든 에이전트 실행에 공통 답변과 도구 호출 지침을 넣는다. */
     public AssembledContext withResponseInstructions(AssembledContext context) {
         return withResponseInstructions(context, false);
     }
 
     /**
-     * 공통 답변 지침을 넣는다. {@code memory_remember} 를 받는 실행이면 기억 지침을 그 뒤에 더한다(ADR-20261007 / memory-remember).
+     * 공통 답변과 도구 호출 지침을 넣는다. {@code memory_remember} 를 받는 실행이면 기억 지침을 그 뒤에 더한다(ADR-20261007 / memory-remember).
      *
      * @param remembers Control Plane MCP 도구를 받고 먼저 살펴보기가 아닌 실행이다. 옛 커넥터 에이전트는 거짓이다
      */
     public AssembledContext withResponseInstructions(AssembledContext context, boolean remembers) {
-        String instructions =
-                remembers ? RESPONSE_INSTRUCTIONS + SEPARATOR + MEMORY_INSTRUCTIONS : RESPONSE_INSTRUCTIONS;
+        String instructions = RESPONSE_INSTRUCTIONS + SEPARATOR + TOOL_CALL_INSTRUCTIONS;
+        if (remembers) {
+            instructions += SEPARATOR + MEMORY_INSTRUCTIONS;
+        }
         if (context.instructions() != null && !context.instructions().isBlank()) {
             instructions += SEPARATOR + context.instructions();
         }
