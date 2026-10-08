@@ -174,13 +174,15 @@ test("화면을 열어 누르고 글자를 넣고 굴리고 탭을 고르면 입
   const resize = ofType(fake.inputs, "resize")[0]!;
   expect(resize.height).toBe(Math.round((resize.width as number) * 1.5));
 
-  await screen.click();
+  // 그림이 화면보다 길 수 있어 가운데 대신 위쪽의 정한 자리를 누르고 비율을 그 자리로 견준다.
+  const box = (await screen.boundingBox())!;
+  await screen.click({ position: { x: box.width / 2, y: 20 } });
   await expect
     .poll(() => ofType(fake.inputs, "mouse").map((input) => input.action))
     .toEqual(["down", "up"]);
   for (const input of ofType(fake.inputs, "mouse")) {
     expect(input.x as number).toBeCloseTo(0.5, 1);
-    expect(input.y as number).toBeCloseTo(0.5, 1);
+    expect(input.y as number).toBeCloseTo(20 / box.height, 2);
   }
 
   await page.keyboard.insertText("안녕하세요");
@@ -194,8 +196,8 @@ test("화면을 열어 누르고 글자를 넣고 굴리고 탭을 고르면 입
     )
     .toEqual([5, "Enter", 500, 1]);
 
-  const box = (await screen.boundingBox())!;
-  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  const wheelBox = (await screen.boundingBox())!;
+  await page.mouse.move(wheelBox.x + wheelBox.width / 2, wheelBox.y + 20);
   await page.mouse.wheel(0, 120);
   await expect
     .poll(() => ofType(fake.inputs, "wheel").map((input) => input.deltaY))
@@ -263,8 +265,11 @@ test("말없이 끊기면 다시 열고, 입력이 닫힌 화면에 닿으면 �
   const fake = await fakeScreen(page);
   const screen = await openScreen(page, fake);
 
+  // 첫 재시도는 Control Plane 이 잠깐 닿지 않아 502 다. 닫지 않고 다음 대기 뒤 다시 연다.
+  await fake.fail(502, { code: "INTERNAL_ERROR", message: "unreachable" });
   await fake.end();
-  await expect.poll(fake.opens).toHaveLength(2);
+  await expect.poll(fake.opens, { timeout: 10_000 }).toHaveLength(3);
+  await expect(page.getByText("다시 열어 주세요.")).toHaveCount(0);
   await fake.push([["frame", { data: FRAME, width: 400, height: 600 }]]);
   await expect(page.getByText("다시 열어 주세요.")).toHaveCount(0);
 

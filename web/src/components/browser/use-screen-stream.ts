@@ -120,10 +120,15 @@ export function useScreenStream({
     const run = async () => {
       let url = attempt === 0 ? startUrl : null;
       let retries = 0;
+      let connected = false;
       while (!controller.signal.aborted) {
         try {
           const response = await openBrowserScreen(url, controller.signal);
-          if (!response.ok) return close(await describeFailure(response));
+          // 이미 한 번 붙은 뒤의 5xx 는 Control Plane 이 잠깐 닿지 않는 것이다. 다음 대기로 넘긴다.
+          if (!response.ok && !(connected && response.status >= 500))
+            return close(await describeFailure(response));
+          if (!response.ok) throw new Error("screen unavailable");
+          connected = true;
           generation.current += 1;
           open.current = true;
           url = null;

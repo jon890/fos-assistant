@@ -10,9 +10,15 @@ import { errorResponse } from "@/lib/api-response";
 export async function GET(request: Request) {
   const url = new URL(request.url).searchParams.get("url");
   const query = url ? `?${new URLSearchParams({ url })}` : "";
-  const opened = await requestControlPlane(`/api/v1/browser/screen${query}`, {
-    signal: request.signal,
-  });
+  let opened: Awaited<ReturnType<typeof requestControlPlane>>;
+  try {
+    opened = await requestControlPlane(`/api/v1/browser/screen${query}`, {
+      signal: request.signal,
+    });
+  } catch {
+    // Control Plane 에 닿지 못했다. 화면이 다시 열기를 판단하도록 502 JSON 으로 돌려준다.
+    return errorResponse("INTERNAL_ERROR", "화면을 열지 못했어요.", 502);
+  }
   if (!opened.ok) {
     return errorResponse(opened.code, opened.message, opened.status);
   }
