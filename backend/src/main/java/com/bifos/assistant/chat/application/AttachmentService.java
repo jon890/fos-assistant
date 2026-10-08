@@ -184,7 +184,6 @@ public class AttachmentService {
         if (!sameOwnerAndConversation) {
             throw notAttachable();
         }
-        attached.forEach(store::prepare);
         String directory = stripTrailingSlash(properties.agentRoot()) + "/users/"
                 + AttachmentStore.userDirectoryKey(ownerUserId) + "/" + conversationId;
         Map<Long, Integer> order = orderInConversation(conversationId);

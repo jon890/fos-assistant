@@ -116,7 +116,7 @@
 | [ADR-20261007 / connector-owner-attachments](ADR-20261007-connector-owner-attachments.md) | 사용자 첨부를 읽는 커넥터는 바인딩 주인의 첨부 디렉터리를 설치가 정한 env 로만 받는다 | hermes, backend | Accepted. ADR-091 의 사용자별 첨부 경계를 커넥터 MCP 서버까지 넓힌다 |
 | [ADR-20261007 / decision-feedback](ADR-20261007-decision-feedback.md) | 판단 피드백은 제안 열쇠에 덧붙이는 사건으로 남기고 반응은 읽을 때 정한다 | backend | Accepted. 살펴보기 발견의 「관심 없음」 이 되풀이 판정을 바꾸는 예외는 [ADR-20261008 / check-finding-reaction](ADR-20261008-check-finding-reaction.md) 이 둔다 |
 | [ADR-20261007 / live-properties](ADR-20261007-live-properties.md) | 운영 코드는 실행 중에 쓰는 설정을 LiveProperties 로 읽는다 | backend | Accepted |
-| [ADR-20261007 / memory-remember](ADR-20261007-memory-remember.md) | 사용자가 대화에서 직접 말한 사실은 에이전트가 바로 기억하고 그 밖은 제안으로 남긴다 | backend, frontend, hermes | Accepted. ADR-012 의 「사람이 받아들여야 저장된다」 와 「에이전트가 스스로 쓰는 경로를 두지 않는다」 를 개정한다. 색인에 제목만 실린다는 부분은 [ADR-20261008 / memory-facts](ADR-20261008-memory-facts.md) 이 개정한다 |
+| [ADR-20261007 / memory-remember](ADR-20261007-memory-remember.md) | 사용자가 대화에서 직접 말한 사실은 에이전트가 바로 기억하고 그 밖은 제안으로 남긴다 | backend, frontend, hermes | Accepted. ADR-012 의 「사람이 받아들여야 저장된다」 와 「에이전트가 스스로 쓰는 경로를 두지 않는다」 를 개정한다. 바로 저장 조건의 근거 대조와 민감도, 오래된 대화 판정은 [ADR-20261008 / memory-remember-guard](ADR-20261008-memory-remember-guard.md) 이 개정한다. 색인에 제목만 실린다는 부분은 [ADR-20261008 / memory-facts](ADR-20261008-memory-facts.md) 이 개정한다 |
 | [ADR-20261007 / naver-blog-connector](ADR-20261007-naver-blog-connector.md) | 네이버 블로그 커넥터는 사용자의 Chrome 에 CDP 로 붙고, 임시저장은 승인한 뒤 백그라운드 작업으로 돈다 | hermes, backend | Accepted. ADR-083 의 바인딩으로 블로그 전용 profile 을 대신한다 |
 | [ADR-20261007 / numbering-scheme](ADR-20261007-numbering-scheme.md) | Flyway 는 UTC 시각 버전을 쓰고 ADR 은 결정 날짜와 슬러그로 구분한다 | 공통 | Accepted |
 | [ADR-20261007 / proactive-eval](ADR-20261007-proactive-eval.md) | 먼저 살펴보기 루프는 결정적 provider 로 실제 서비스를 replay 해 측정하고 안전 경계만 CI 를 막는다 | backend | Accepted |
@@ -128,3 +128,5 @@
 | [ADR-20261008 / connector-card](ADR-20261008-connector-card.md) | 커넥터 아이콘은 plugin 안의 파일을 카탈로그에 실어 같은 출처의 이미지로만 그리고, 링크는 https 만 받는다 | 공통 | Accepted. ADR-043 의 `connector.json` 에 화면용 선택 칸을 더한다 |
 | [ADR-20261008 / connector-output-files](ADR-20261008-connector-output-files.md) | 커넥터는 계산할 목록을 그 에이전트 실행 공간에 읽기 전용으로 붙는 파일로 내고, 계산은 스크립트가 한다 | hermes | Accepted. ADR-086 의 실행 공간에 커넥터 출력 디렉터리를 더한다 |
 | [ADR-20261008 / memory-facts](ADR-20261008-memory-facts.md) | 짧은 개인 기억은 본문까지 「개인 사실 구역」에 싣고, 답마다 참고한 기억을 사용자에게 보인다 | backend, frontend | Accepted. ADR-20261007 / memory-remember 의 「색인에 제목이 실린다」 를 개정하고 ADR-015 에 예외를 둔다 |
+| [ADR-20261008 / memory-remember-guard](ADR-20261008-memory-remember-guard.md) | 바로 저장은 모델이 다듬은 본문도 받고, 부정이 뒤집힌 글과 민감해 보이는 글과 오래된 대화만 제안으로 내린다 | backend, frontend | Accepted. ADR-20261007 / memory-remember 의 바로 저장 조건 2 와 5 를 개정한다 |
+| [ADR-20261008 / read-data-flow](ADR-20261008-read-data-flow.md) | 커넥터 READ 결과는 가는 곳마다 따로 판정하고, 판정하지 못하는 길은 감수로 적는다 | 공통 | Accepted. ADR-083 과 ADR-086 의 「감당할 것」 을 흐름마다 나눠 적는다 |

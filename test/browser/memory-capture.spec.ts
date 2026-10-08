@@ -58,10 +58,7 @@ async function holdEvents(page: Page, conversationId: string) {
 }
 
 async function open(page: Page, label: string, first: Capture[]) {
-  const { conversationId, executionId } = await createConversation(
-    page,
-    label,
-  );
+  const { conversationId, executionId } = await createConversation(page, label);
   const state = { captures: first.map((c) => ({ ...c, executionId })) };
   await holdEvents(page, conversationId);
   await page.route(
@@ -91,6 +88,9 @@ test("바로 저장한 기록이 답 아래에 보이고 되돌리면 사라진�
   await expect(row).toHaveAttribute("data-kind", "CREATED");
   await expect(row).toHaveAttribute("data-status", "ACCEPTED");
   await expect(row).toContainText("기억했어요: 좋아하는 과일");
+  await expect(page.getByTestId("memory-capture-content")).toContainText(
+    "사과를 좋아해요.",
+  );
   // 기록은 답보다 늦게 읽혀 들어오지만 맨 아래 따라가기가 그 줄까지 내려간다.
   await expect(row).toBeInViewport();
   await page.getByTestId("memory-capture-undo").click();
@@ -98,6 +98,17 @@ test("바로 저장한 기록이 답 아래에 보이고 되돌리면 사라진�
   await expect(page.getByTestId("memory-captures")).toHaveCount(0);
   expect(undone).toHaveLength(1);
   expect(undone[0]).toMatch(/\/api\/memory-captures\/1\/undo$/);
+});
+
+test("민감한 기록은 본문 대신 안내를 보인다", async ({ page }) => {
+  await open(page, "기억 기록 검사 민감", [
+    capture(0, { sensitive: true, content: "" }),
+  ]);
+
+  const row = page.getByTestId("memory-capture");
+  await expect(row).toContainText("기억했어요: 좋아하는 과일");
+  await expect(row).toContainText("민감한 내용이라 여기서 보이지 않아요.");
+  await expect(page.getByTestId("memory-capture-content")).toHaveCount(0);
 });
 
 test("제안 카드를 받아들이면 기억했어요 줄로 바뀐다", async ({ page }) => {

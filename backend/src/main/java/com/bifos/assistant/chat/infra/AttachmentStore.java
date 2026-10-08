@@ -7,13 +7,11 @@ import com.bifos.assistant.shared.error.ErrorCode;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
-import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.Files;
 import java.nio.file.LinkOption;
 import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
-import java.nio.file.StandardCopyOption;
 import java.util.Map;
 import java.util.Optional;
 import org.springframework.stereotype.Component;
@@ -37,11 +35,9 @@ public class AttachmentStore {
             "image/webp", "webp");
 
     private final Path root;
-    private final boolean legacyWriteEnabled;
 
     public AttachmentStore(AttachmentProperties properties) {
         this.root = Path.of(properties.root()).toAbsolutePath().normalize();
-        this.legacyWriteEnabled = properties.legacyWriteEnabled();
     }
 
     /** 받는 형식이면 그 확장자를, 아니면 빈 값을 돌려준다. */
@@ -61,23 +57,7 @@ public class AttachmentStore {
     }
 
     public synchronized void save(ChatAttachment attachment, InputStream body) {
-        Path target = privatePath(attachment);
-        Path legacy = legacyWriteEnabled ? legacyPath(attachment) : null;
-        saveNewFile(target, body);
-        if (!legacyWriteEnabled) {
-            return;
-        }
-        boolean legacyCreated = false;
-        try (InputStream copy = Files.newInputStream(target, LinkOption.NOFOLLOW_LINKS)) {
-            saveNewFile(legacy, copy);
-            legacyCreated = true;
-        } catch (IOException | RuntimeException ex) {
-            deleteQuietly(target);
-            if (legacyCreated) {
-                deleteQuietly(legacy);
-            }
-            throw new ApiException(ErrorCode.INTERNAL_ERROR, "could not store the legacy attachment copy", ex);
-        }
+        saveNewFile(privatePath(attachment), body);
     }
 
     private static void saveNewFile(Path target, InputStream body) {
@@ -100,7 +80,6 @@ public class AttachmentStore {
      */
     public synchronized InputStream open(ChatAttachment attachment) {
         try {
-            prepare(attachment);
             return Files.newInputStream(privatePath(attachment), LinkOption.NOFOLLOW_LINKS);
         } catch (NoSuchFileException ex) {
             throw new ApiException(ErrorCode.ATTACHMENT_GONE, "this attachment is no longer kept", ex);
@@ -112,51 +91,9 @@ public class AttachmentStore {
     /** 파일을 지운다. 이미 없으면 그대로 끝난다. */
     public synchronized void delete(ChatAttachment attachment) {
         try {
-            // 되돌리기용 옛 사본도 함께 지워야 다음 읽기에서 삭제한 사진이 복구되지 않는다.
-            Files.deleteIfExists(legacyPath(attachment));
             Files.deleteIfExists(privatePath(attachment));
         } catch (IOException ex) {
             throw new UncheckedIOException("could not delete attachment " + attachment.id(), ex);
-        }
-    }
-
-    /**
-     * 옛 사진을 사용자 디렉터리에 복사한다. 첫 배포에서는 되돌리기용 원본을 남긴다(ADR-091).
-     *
-     * <p>화면 읽기와 Hermes 입력 생성도 이 메서드를 부르므로 기동 작업과 겹쳐도 부분 파일을 읽지 않는다.
-     * 같은 프로세스의 저장과 삭제도 같은 잠금을 쓴다. 여러 Control Plane 을 동시에 띄우지 않는다.
-     */
-    public synchronized void prepare(ChatAttachment attachment) {
-        Path source = legacyPath(attachment);
-        Path target = privatePath(attachment);
-        Path temporary = null;
-        try {
-            if (!Files.exists(source, LinkOption.NOFOLLOW_LINKS)) {
-                return;
-            }
-            if (!Files.isRegularFile(source, LinkOption.NOFOLLOW_LINKS)) {
-                throw new IOException("legacy attachment is not a regular file");
-            }
-            if (Files.exists(target, LinkOption.NOFOLLOW_LINKS)) {
-                if (!Files.isRegularFile(target, LinkOption.NOFOLLOW_LINKS) || Files.mismatch(source, target) != -1) {
-                    throw new IOException("private and legacy attachment copies differ");
-                }
-                return;
-            }
-            Files.createDirectories(target.getParent());
-            temporary = Files.createTempFile(target.getParent(), ".attachment-", ".tmp");
-            Files.copy(source, temporary, StandardCopyOption.REPLACE_EXISTING);
-            try {
-                Files.move(temporary, target, StandardCopyOption.ATOMIC_MOVE);
-            } catch (AtomicMoveNotSupportedException ex) {
-                Files.move(temporary, target);
-            }
-        } catch (IOException ex) {
-            throw new UncheckedIOException("could not copy legacy attachment " + attachment.id(), ex);
-        } finally {
-            if (temporary != null) {
-                deleteQuietly(temporary);
-            }
         }
     }
 
@@ -165,10 +102,6 @@ public class AttachmentStore {
                 .resolve(userDirectoryKey(attachment.uploadedByUserId()))
                 .resolve(conversationDirectory(attachment))
                 .resolve(checkedStoredName(attachment)));
-    }
-
-    private Path legacyPath(ChatAttachment attachment) {
-        return checkedPath(root.resolve(conversationDirectory(attachment)).resolve(checkedStoredName(attachment)));
     }
 
     private Path checkedPath(Path path) {

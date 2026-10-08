@@ -22,6 +22,7 @@ import com.bifos.assistant.chat.application.ConversationAccess;
 import com.bifos.assistant.chat.application.ConversationEventHub;
 import com.bifos.assistant.chat.application.ModelTierService;
 import com.bifos.assistant.chat.application.NextTurnDispatcher;
+import com.bifos.assistant.chat.application.SourceReadSummaries;
 import com.bifos.assistant.chat.application.TurnCancellation;
 import com.bifos.assistant.chat.domain.ChatPendingMessage;
 import com.bifos.assistant.chat.domain.Conversation;
@@ -178,7 +179,8 @@ class UserExecutionLimitChatTest {
                         new ChatEventStreams(Duration.ofSeconds(20)),
                         null,
                         mock(ModelTierService.class),
-                        List.of()))
+                        List.of(),
+                        mock(SourceReadSummaries.class)))
                 .setControllerAdvice(new GlobalExceptionHandler())
                 .build();
         stub().willAnswer(command -> {

