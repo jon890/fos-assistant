@@ -40,7 +40,7 @@ Control Plane 이 기대는 Hermes 쪽 코드다. Hermes 에 설치하는 plugin
 | 커넥터 | 하는 일 | 문서 |
 | --- | --- | --- |
 | `gmail` | Gmail 을 찾고 읽고, 승인받은 메일과 라벨, 자동 분류 필터를 쓴다 | [Gmail 커넥터](../docs/connectors/gmail.md) |
-| `naver-blog` | 로그인해 둔 Chrome 에 붙어 승인받은 글을 네이버 블로그에 임시저장한다. 발행하지 않는다 | [네이버 블로그 커넥터](../docs/connectors/naver-blog.md) |
+| `naver-blog` | 「내 브라우저」 에 로그인해 둔 네이버 계정으로 승인받은 글을 네이버 블로그에 임시저장한다. 발행하지 않는다 | [네이버 블로그 커넥터](../docs/connectors/naver-blog.md) |
 
 커넥터의 MCP 서버는 TypeScript 로 쓰고 의존성까지 한 JavaScript 파일로 묶어 커밋한다.
 운영 목록의 `command` 는 Bun 실행 파일이어야 한다. 서버 실행 중 패키지를 내려받지 않는다.
@@ -323,7 +323,7 @@ Control Plane 이 이 경로들을 부르는 순서와 뜻은 부르는 쪽 문�
 | `DELETE /api/profiles/<이름>` | 관리 표식이 있는 profile 을 지운다 | 없음 | 200 | 401 관리 표식이 없는 profile. 404 없는 profile. 두 번째 호출의 404 는 「이미 지움」 으로 읽는다 |
 | `PUT /api/env` | 그 profile 의 `.env` 에 정해 둔 key 한 줄을 쓴다 | `{profile, key, value}`. key 는 `API_SERVER_KEY`, `API_SERVER_MODEL_NAME`, `MCP_FOS_ASSISTANT_API_KEY` 와 카탈로그 커넥터의 `fields[].env` 뿐 | 200. 커넥터 key 는 `{profile, key, restart_required}` | 400 다른 key, `default`, 형식. 404 없는 profile |
 | `DELETE /api/env` | 관리 profile 의 커넥터 칸 key 만 지운다 | `{profile, key}` | `{profile, key, restart_required}` | |
-| `GET /api/connectors/catalog` | 운영 목록에 있고 검증을 통과한 커넥터의 manifest 를 낸다 | 없음 | `[{id, schema, title, description, icon, link, fields[], verify, mcp_server, toolsets, attachments, tools, skills}]`. 아래 「카탈로그 응답」 이 칸을 갖는다 | |
+| `GET /api/connectors/catalog` | 운영 목록에 있고 검증을 통과한 커넥터의 manifest 를 낸다 | 없음 | `[{id, schema, title, description, icon, link, fields[], verify, mcp_server, toolsets, attachments, tools, skills, owner_browser, owner_browser_login_url}]`. 아래 「카탈로그 응답」 이 칸을 갖는다 | |
 | `POST /api/connectors/<id>/call` | 후보 값이나 보관 파일의 값으로 그 커넥터의 선택지 도구나 확인 도구를 한 번 부른다 | `{tool, values}` 또는 `{tool, vault}`. 둘 가운데 정확히 하나다. 사용자 브라우저를 쓰는 커넥터면 Control Plane 이 `owner_browser` 를 더한다 | `{ok: true, result}` 또는 `{ok: false, error: <공통 어휘>}` | 400 그 커넥터의 보관 파일이 없다 |
 | `POST /api/connectors/<id>/execute` | Control Plane 이 승인한 호출을 그 profile 의 값과 받은 인자로 한 번 실행한다 | `{profile, hermes_tool, args}`. 중계 주소는 본문으로 받지 않고 설치한 서버 정의에서 읽는다 | `{ok: true, result}` 또는 `{ok: false, error: <공통 어휘>}` | 504 실행됐는지 모른다 |
 | `GET /api/connectors?profile=<p>` | 커넥터의 상태를 읽는다 | query `profile` | `{profile, policy_hook, connectors: [{plugin, enabled, configured, mode}]}`. `mode` 는 `bind` 나 `isolated` 다 | 401 관리 표식과 커넥터 표식이 모두 없다 |
@@ -369,7 +369,7 @@ API server 의 session 응답은 provider 를 주지 않는다. 그 값은 Herme
 
 **Hermes 버전을 올리면 표 이름과 칸 이름을 다시 확인한다.** 이름이 바뀌면 이 경로가 503 으로 답하고 Control Plane 은 그 자식을 가격 미확인으로 남긴다.
 
-**카탈로그 응답.** `fields[]` 는 manifest 의 칸 그대로(`env`, `options` 포함)이고 `verify` 는 `{tool}` 이다.
+**카탈로그 응답.** `fields[]` 는 manifest 의 칸 그대로(`env`, `options` 포함)이고 `verify` 는 `{tool}` 이다. `owner_browser` 는 `owner_browser_env` 를 선언했는지이고 env 이름은 내지 않는다. `owner_browser_login_url` 은 선언한 `https` 주소나 null 이다. 옛 대시보드 plugin 은 두 칸을 내지 않고 Control Plane 은 거짓과 null 로 읽는다.
 `toolsets` 와 `attachments` 는 manifest 에 없으면 빈 목록과 거짓이다. 옛 대시보드 plugin 은 두 칸을 내지 않고, Control Plane 은 없는 칸을 같은 기본값으로 읽는다.
 `tools` 는 `{<이름>: {risk, approval, title, grant, outbound, identifiers}}` 이고 `approval`, `grant`, `outbound`, `identifiers` 는 기본값을 채운 값이다. `schema: 1` 은 `verify.tool` 과 `options.tool` 만 `READ` 로 담는다.
 `schema` 가 없는 응답은 `1` 로 읽는다. `operator_env` 의 이름과 값, `errors` 는 담지 않는다.
