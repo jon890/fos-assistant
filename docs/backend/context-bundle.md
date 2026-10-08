@@ -29,7 +29,9 @@ Memory 의 층과 예산과 `memory_read` 는 [`memory.md`](memory.md) 가 그�
 | `source` | 원래 기록 | 판정 | `sensitivity` | `trust` | `bodyMode` | 쓰는 곳 |
 | --- | --- | --- | --- | --- | --- | --- |
 | `MEMORY_ALWAYS` | `memory` 의 `ALWAYS` | ADR-053 의 세 조건 | 원래 값. `SENSITIVE` 는 이 층에 오지 못한다 | `USER_APPROVED` | `INLINE` | 대화 turn 의 `instructions` |
+| `MEMORY_FACTS` | `memory` 의 `SEARCH` 가운데 짧은 개인 항목 | ADR-053 의 세 조건과 [`memory.md`](memory.md) 의 「개인 사실 구역」 후보 조건 | `NORMAL` 만 | `USER_APPROVED` | `INLINE` | 대화 turn 의 `instructions` |
 | `MEMORY_INDEX` | `memory` 의 `SEARCH` | ADR-053 의 세 조건 | 원래 값 | `USER_APPROVED` | `TITLE_ONLY` | 대화 turn 의 `instructions` |
+| `MEMORY_READ` | `memory_read` 가 본문을 내 준 항목 | `memory_read` 의 판정([`memory.md`](memory.md) 의 「본문 읽기가 갈리는 지점」) | 묶음 항목이 아니다 | 묶음 항목이 아니다 | `INLINE` | 조립이 아니라 도구 처리가 `execution_context_source` 에만 덧붙인다(「본문을 읽으면 남는 기록」) |
 | `DELEGATION_RESULT` | 끝난 위임 실행의 `output_text` | 그 대화의 주인. `AgentExecutionRepository.findUndeliveredResults` 의 조건대로 `SUCCEEDED` 나 `FAILED` 이고 아직 전하지 않았으며 부모가 루트 turn 인 위임만 | `SENSITIVE` | 옛 커넥터 에이전트의 답이면 `EXTERNAL`, 아니면 `AGENT` | `INLINE` | 자동 turn 의 `input` |
 | `CONNECTOR_RESULT` | `connector_action` 의 `result_text` | 그 대화의 주인 | `SENSITIVE` | `EXTERNAL` | `INLINE`. `UNKNOWN` 이면 `OMITTED` | 자동 turn 의 `input` |
 | `EXECUTION_STATE` | `agent_execution` 의 상태와 시각 | 실행 줄의 `user_id` | `NORMAL` | `CONTROL_PLANE` | 본문이 없다 | 지금 화면과 먼저 알리기 |
@@ -51,7 +53,7 @@ ADR-071 의 다섯 규칙을 코드에서 지키는 자리다.
 | 규칙 | 지키는 자리 |
 | --- | --- |
 | source 의 기존 판정을 통과한 것만 든다 | source 마다 기존 조회(`MemoryService.injectableFor`, `AgentExecutionRepository.findUndeliveredResults`, `ConnectorActionService.undeliveredResults`)가 항목을 만든다. 묶음은 판정을 다시 하지 않고 넓히지도 않는다 |
-| `SENSITIVE` 본문은 `instructions` 에 싣지 않는다 | `MEMORY_ALWAYS` 는 민감 항목을 받지 못하고, `MEMORY_INDEX` 는 제목만 싣는다. 결과 항목은 `input` 에만 싣는다 |
+| `SENSITIVE` 본문은 `instructions` 에 싣지 않는다 | `MEMORY_ALWAYS` 와 `MEMORY_FACTS` 은 민감 항목을 받지 못하고, `MEMORY_INDEX` 는 제목만 싣는다. 결과 항목은 `input` 에만 싣는다 |
 | `EXTERNAL` 은 감싼다 | `ExternalData.wrap` 하나로 감싼다 |
 | `USER` 와 `GROUP` 을 합치지 않는다 | 항목 하나는 원래 기록 하나다. 묶음은 항목을 합치거나 요약하지 않는다 |
 | 옛 커넥터 에이전트는 받지 않는다 | `Agent.connectorManaged()` 를 보는 지금의 분기 |
@@ -108,7 +110,7 @@ Control Plane 의 자식 실행과 구분한다. 근거는 [자식 agent 생성]
 
 | `source` | `asOf` | `FRESH` | `STALE` |
 | --- | --- | --- | --- |
-| `MEMORY_ALWAYS`, `MEMORY_INDEX` | `updated_at` | 묶음을 만든 시각과의 차이가 collection의 기준 기간 안 | 기준 기간보다 오래됨 |
+| `MEMORY_ALWAYS`, `MEMORY_FACTS`, `MEMORY_INDEX` | `updated_at` | 묶음을 만든 시각과의 차이가 collection의 기준 기간 안 | 기준 기간보다 오래됨 |
 | `DELEGATION_RESULT` | `finished_at` | 묶음을 만든 시각과의 차이가 `assistant.context.result-stale-after`(기본 6시간) 안 | 그보다 오래됨 |
 | `CONNECTOR_RESULT` | `executed_at` | 위와 같다 | 위와 같다 |
 | `EXECUTION_STATE` | 읽은 시각 | 늘 | 없다 |
@@ -202,13 +204,3 @@ Control Plane 이 구조로 알 수 있는 충돌만 `conflictsWith` 에 적는�
 옮겨 가기 전에 만든 옛 커넥터 에이전트와 직접 대화를 시작한다.
 기대: Memory 항목이 하나도 실리지 않는다. 지금과 같다.
 연결을 붙인 일반 에이전트로 시작한 대화는 그 에이전트의 collection 에 따라 Memory 항목이 실린다.
-
-## #97 의 계약과 견준 것
-
-| #97 의 계약 | 이 문서 | 충돌 |
-| --- | --- | --- |
-| 새 memory tier 를 먼저 만들지 않는다 | 묶음은 저장하지 않고 요청마다 만든다. 할 일과 실행 상태는 대화에 싣지 않는다 | 없다 |
-| USER/GROUP, ALWAYS/SEARCH/ARCHIVE 를 다시 설계하지 않는다 | Memory 의 층과 판정을 그대로 쓰고 글도 바꾸지 않는다 | 없다 |
-| 서비스 토큰은 읽기 전용이다(ADR-056) | 서비스 토큰은 묶음에 쓰이지 않는다 | 없다 |
-| 실행은 Hermes 에 맡긴다 | 묶음은 글을 만들 뿐 실행을 시작하지 않는다 | 없다 |
-| 민감 본문은 암호화하고 조립기는 풀지 않는다(ADR-055) | `SENSITIVE` 본문을 `instructions` 에 싣지 않는다 | 없다 |

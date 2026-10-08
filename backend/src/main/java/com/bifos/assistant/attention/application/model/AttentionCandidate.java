@@ -21,6 +21,8 @@ import java.util.UUID;
  * @param execution 맡긴 일 항목의 실행. 해당하지 않으면 null
  * @param actionId 승인 대기 항목의 승인 줄 공개 식별자. 해당하지 않으면 null
  * @param followUp 할 일 항목의 값. 해당하지 않으면 null
+ * @param report 보고 항목의 값. 해당하지 않으면 null
+ * @param problem 먼저 다룰 문제 항목의 값. 해당하지 않으면 null
  */
 public record AttentionCandidate(
         CardKey card,
@@ -39,7 +41,8 @@ public record AttentionCandidate(
         AttentionExecutionRef execution,
         UUID actionId,
         AttentionFollowUpRef followUp,
-        AttentionReport report) {
+        AttentionReport report,
+        AttentionProblem problem) {
 
     public AttentionCandidate(
             CardKey card,
@@ -75,6 +78,7 @@ public record AttentionCandidate(
                 execution,
                 actionId,
                 followUp,
+                null,
                 null);
     }
 }

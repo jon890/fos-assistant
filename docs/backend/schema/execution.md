@@ -129,7 +129,7 @@ Hermes 가 보낸 원래 payload 를 통째로 넣지 않는다.
 부모가 끝난 뒤에도 완료 사건이 없으면 [모델 단계와 실행 기록](../../model-tiers.md)의 재조회로 보완한다.
 `completed_child_session_id` VARCHAR(128) NULL은 자식 완료 사건의 중복 저장을 막는다.
 `(execution_id, completed_child_session_id)`가 유일하며 다른 종류의 사건은 이 칸을 비운다.
-기존 중복 완료 사건은 최신 한 줄만 키를 채우고 나머지 이력은 보존한다.
+이 칸이 생기기 전의 중복 완료 사건은 최신 한 줄에만 키가 있고 나머지 줄은 비어 있다.
 
 이 토큰은 화면이 하위 에이전트가 무엇을 썼는지 보이는 데만 쓴다.
 사용량 합계에 더하지 않는다. native 자식의 합계는 아래 `subagent_usage_job` 줄의 값으로 낸다.
@@ -185,9 +185,8 @@ native 자식 한 명의 사용량 원장 줄이자, 그 사용량을 session �
 사용자, 에이전트, 달은 부모 실행에서 얻는다. 같은 값을 여기 다시 적지 않는다.
 부모 실행의 토큰 칸과 달리 입력을 셋으로 나눠 적는다. 합계에 더할 때는 셋을 합쳐 부모의 `input_tokens` 와 같은 뜻으로 맞춘다.
 
-사용량 칸이 생기기 전에 끝난 자식은 마이그레이션이 다시 `WAITING` 으로 넣는다.
-이미 `DONE` 이던 줄과, 작업 줄 없이 시작 사건만 남은 자식이 대상이다. 조회 기한은 마이그레이션 시각에서 24시간이다.
-에이전트가 지워졌거나 profile 이 바뀐 부모의 자식은 조회하지 않고 `EXPIRED` 로 넣는다.
+사용량 칸이 생기기 전에 끝난 자식은 마이그레이션이 한 번 다시 조회하게 넣었다.
+에이전트가 지워졌거나 profile 이 바뀐 부모의 자식은 조회하지 않아 `EXPIRED` 로 남아 있다.
 
 ## execution_skill_use
 
@@ -246,12 +245,13 @@ Control Plane 이 다시 떠도 등록 줄은 그대로다. 이미 등록한 하
 ## execution_context_source
 
 실행 하나에 실은 문맥 항목의 참조다. 어느 답에 어느 기록이 들어갔는지 나중에 찾으려고 남긴다.
+조립한 항목은 실행 줄을 만들 때 한 번에 적고, `memory_read` 가 본문을 내 준 항목은 실행 중에 `MEMORY_READ` 줄로 그 뒤에 덧붙인다([`../memory.md`](../memory.md) 의 「본문을 읽으면 남는 기록」).
 제목과 본문은 남기지 않는다. 항목의 뜻은 [`../context-bundle.md`](../context-bundle.md) 가 갖는다.
 
 | 칸 | 타입 | 뜻 |
 | --- | --- | --- |
 | `execution_id` | BIGINT | 이 문맥을 받은 실행 |
-| `position` | INT | 그 실행의 문맥 안에서의 순서. 0 부터 |
+| `position` | INT | 그 실행의 문맥 안에서의 순서. 0 부터. 덧붙이는 줄은 그 실행의 마지막 순서 다음 값이다 |
 | `source` | VARCHAR(32) | 항목의 `source` |
 | `source_ref` | VARCHAR(80) | 항목의 `ref`. `memory:<번호>` 처럼 원래 기록을 가리킨다 |
 | `body_mode` | VARCHAR(16) | `INLINE`, `TITLE_ONLY`, `OMITTED` |

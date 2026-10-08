@@ -32,6 +32,20 @@ class ProfileApiSessionTest(support.ProfileApiRouteTest):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.body, {"provider": None, "model": "m1"})
 
+    def test_session_provider_is_withheld_when_only_provider_changes(self):
+        """모델 이름이 같아도 provider 가 바뀐 주 호출은 한 금액으로 환산하지 않는다."""
+        self.session_store(usage=[("m1", "p1", ""), ("m1", "p2", "")])
+        response = self.session_provider()
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.body, {"provider": None, "model": "m1"})
+
+    def test_session_provider_keeps_identical_pairs_from_repeated_calls(self):
+        """같은 모델과 provider 를 여러 번 쓴 것은 provider 교체로 세지 않는다."""
+        self.session_store(usage=[("m1", "p1", ""), ("m1", "p1", "")])
+        response = self.session_provider()
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.body, {"provider": "p1", "model": "m1"})
+
     def test_session_provider_is_withheld_when_the_single_pair_names_another_provider(self):
         """주 호출의 짝이 하나여도 그 provider 가 session 줄과 다르면 provider 를 주지 않는다."""
         self.session_store(usage=[("m1", "p2", "")])

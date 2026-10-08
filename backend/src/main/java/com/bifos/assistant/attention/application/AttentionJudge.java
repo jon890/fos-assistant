@@ -129,6 +129,7 @@ public class AttentionJudge {
                 candidate.execution(),
                 candidate.actionId(),
                 candidate.followUp(),
-                candidate.report());
+                candidate.report(),
+                candidate.problem());
     }
 }

@@ -66,6 +66,10 @@ assistant:
     max-chars: 8000
     index-budget-ratio: 4
     result-stale-after: 6h
+    # 항상 층과 색인 층 사이의 개인 사실 구역 예산이다. 0 이면 구역을 끈다
+    facts-max-chars: 2000
+    # 개인 사실 구역 후보가 될 수 있는 본문의 최대 글자 수다
+    facts-item-max-chars: 200
   memory:
     propose:
       enabled: false

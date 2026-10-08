@@ -68,7 +68,7 @@
 
 ## OpenRewrite 버전
 
-플러그인은 7.39.0 에 둔다. 7.40.0 과 7.41.0 은 Maven Central 에 없는 `rewrite-bom` 8.91.0 을 가리켜 받지 못한다.
+플러그인 버전과 고정한 까닭은 `backend/gradle/libs.versions.toml` 의 주석이 갖는다.
 
 ## 파일 길이 기준 목록
 

@@ -36,7 +36,7 @@ Control Plane 의 패키지마다 맡는 책임과 패키지 사이의 방향 �
 | `task` | 예약 작업과 시각, 발화 기록, 발화기와 예약 turn 시작([`task.md`](task.md)) |
 | `notification` | 사용자에게 대화 밖에서 알리는 줄의 저장과 읽음 표시, 사용자 단위 SSE, 오래된 줄 정리([`notification.md`](notification.md)) |
 | `followup` | 할 일의 저장과 상태 전이, 사람이 쓰는 API, 에이전트의 제안 저장([`follow-up.md`](follow-up.md)) |
-| `proactive` | 먼저 살펴보기의 시작 전 점검, 점검 대화의 살펴보기 turn, 상한, 결과 계약의 검사와 그리기, 문제 후보의 검사와 저장, 살펴보기 트리 판정([`proactive-check.md`](proactive-check.md)), 판단 피드백의 replay 읽기 모델 |
+| `proactive` | 먼저 살펴보기의 시작 전 점검, 점검 대화의 살펴보기 turn, 상한, 결과 계약의 검사와 그리기, 문제 후보의 검사와 저장, 살펴보기 트리 판정([`proactive-check.md`](proactive-check.md)), 판단 피드백의 replay 읽기 모델, 매일 루프의 이음매와 보일 판정, 판정 반응([`proactive-loop.md`](proactive-loop.md)) |
 | `attention` | 먼저 알리기의 판정과 지금 화면이 읽는 카드. 다른 패키지의 기록을 읽기만 한다([`attention.md`](attention.md)) |
 
 검사: `ArchitectureRules.SHARED_DOES_NOT_DEPEND_ON_DOMAINS`
@@ -166,18 +166,16 @@ Hermes `delegate_task` 가 만든 native 자식은 실행 줄이 없어 `subagen
 
 | 순서 | 담는 것 |
 | --- | --- |
-| 1 | 그룹 공용 Memory 중 `ACCEPTED` 이고 `retrieval` 이 `ALWAYS` 인 본문 |
-| 2 | 요청자 개인 Memory 중 `ACCEPTED` 이고 `retrieval` 이 `ALWAYS` 인 본문 |
-| 3 | `ACCEPTED` 이고 `retrieval` 이 `SEARCH` 인 항목의 제목과 번호 색인 |
+| 1 | 공통 답변 지침. 답변 형식과 도구 호출 지침이다(`ContextAssembler.withResponseInstructions`) |
+| 2 | 「# 기억」 지침. `memory_remember` 를 받는 실행에만 붙는다 |
+| 3 | Memory 문맥. 층과 그 순서는 [`memory.md`](memory.md) 의 「범위와 조립」 이 갖는다 |
 | 4 | 묻는 형식 안내(`chat/application/AskFormat`). 사용자가 직접 답하는 대화 실행에만 붙는다 |
-| 5 | 이 실행에만 필요한 문맥. 다시 생성이면 그 지시 |
+| 5 | 이 turn 에만 붙는 지시(`TurnIntent`). 다시 생성, 결과 전달, 예약 작업, 먼저 살펴보기가 저마다 지시를 붙인다 |
 
-1 부터 3 까지가 Memory 의 글자 상한 안에서 고르는 몫이고, 4 는 상한과 따로 붙는다.
+3 만 Memory 의 글자 상한 안에서 고르는 몫이고, 나머지는 상한과 따로 붙는다.
 묻는 형식은 `web/src/lib/ask.ts` 가 카드로 읽는다. 둘이 같은 형식을 말해야 한다.
 
-1 부터 3 까지는 그 에이전트가 받는 collection 의 항목만 담는다. `SENSITIVE` 항목은 그 collection 에서 민감 항목을 허용받은 에이전트에만 담는다.
-다른 사용자의 개인 Memory 와 받지 않는 collection 의 항목은 고르는 단계에서 빠진다.
-문자열을 만든 뒤에 지우는 것이 아니라 애초에 넣지 않는다.
+3 에 어느 항목이 드는지는 [`memory.md`](memory.md) 의 「에이전트의 실행에 보이는 항목」 이 갖는다.
 
 환산은 이 자리에서 한 번만 하고 쓴 가격표를 함께 적는다.
 조회할 때 다시 계산하면 가격이 바뀔 때 지난달 합계가 따라 움직인다.

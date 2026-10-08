@@ -76,3 +76,9 @@ test("비밀 요청 스킬이 있는 에이전트의 셸 도구 저장 실패는
   assert.equal(describeError("AGENT_SKILL_REQUESTS_SECRETS", "uploaded skills request secrets"),
     "이 에이전트의 스킬 가운데 환경 값이나 파일을 요청하는 것이 있어 이 도구를 켤 수 없어요. 그 스킬을 먼저 고치거나 지워 주세요.");
 });
+
+test("먼저 다룰 문제에 반응하거나 루프를 켜다 거절되면 할 일을 알린다", () => {
+  assert.equal(describeError("PROACTIVE_LOOP_UNAVAILABLE", "x"), "이 설치에서는 아직 쓸 수 없어요.");
+  assert.equal(describeError("AUTONOMY_DECISION_NOT_FOUND", "x"),
+    "이미 처리했거나 찾을 수 없는 항목이에요. 화면을 다시 열어 주세요.");
+});

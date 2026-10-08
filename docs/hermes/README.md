@@ -12,8 +12,7 @@
 | [도구 hook 과 승인](connector-policy.md) | `pre_tool_call` 로 MCP 도구를 막을 때의 계약, 등록 이름, 내장 승인 |
 | [실행 공간](sandbox.md) | 셸과 파일 도구를 profile 마다 docker 컨테이너에서 돌리는 계약과 측정 |
 | [MCP 프로세스의 환경 값](mcp-profile-credentials.md) | MCP 프로세스에 사용자별 환경 값을 전달하는 계약 |
-| [kanban](kanban.md) | 다중 에이전트 kanban 과 HTTP 호출 |
-| [버전 변경과 실측](upgrades.md) | 버전별 계약 차이와 확인 결과 |
+| [버전 변경과 실측](upgrades.md) | provider 교체의 계약 시험 범위, 버전별 계약 차이와 확인 결과 |
 
 
 NousResearch 의 Hermes Agent 를 Agent Runtime 으로 쓴다.
@@ -44,7 +43,7 @@ v0.21.0 의 `tui_gateway/methods_profiles.py` 주석이 그것을 말한다.
 
 > profile reads fall back to the global store, and token refreshes write THROUGH to it
 
-홈서버의 profile 넷은 모두 자기 `auth.json` 이 없어 한 로그인을 함께 쓰고 있다.
+자기 `auth.json` 이 없는 profile 들은 한 로그인을 함께 쓴다.
 그러므로 profile 을 나누는 것만으로 credential 이 갈렸다고 볼 수 없다.
 
 profile 이 자기 credential 을 가지려면 둘 중 하나가 있어야 한다.
@@ -100,13 +99,10 @@ Runs API 의 `usage` 는 실행 하나의 합계만 준다.
 v0.21.0 과 v0.21.3 은 cached token 을 내보내지 않지만 v0.21.5 는 cache 칸을 더한다.
 LLM 호출마다 모델과 사용량을 구분해야 하면 plugin hook 을 쓴다.
 
-이 기계에는 이미 Orca 가 설치한 `orca-status` plugin 이 있다.
-그 plugin 이 hook 사건을 HTTP 로 내보내는 구조라서 우리 plugin 을 만들 때 본보기로 쓸 수 있다.
-
 ## gateway 는 s6 가 감독한다
 
 아래는 v0.21.0 과 v0.21.3 의 동작이다.
-v0.21.4 이후의 host singleton 과 multiplex 정책은 다음 절에서 구분한다.
+v0.21.4 이후의 host singleton 과 multiplex 정책은 [「연동에 영향을 주는 변경」](upgrades.md#연동에-영향을-주는-변경) 의 「v0.21.4 이후 gateway」 줄이 갖는다.
 
 이 컨테이너는 listener 주인의 gateway 하나를 돌리고 s6 가 감독한다.
 이름이 붙은 profile 은 s6 service 자리를 만들기만 하며, 개별 gateway 를 자동으로 띄우지 않는다.
