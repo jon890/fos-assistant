@@ -132,7 +132,7 @@ Memory 는 에이전트가 실행할 때 `instructions` 로 받는 사실이다.
 ### 관리자가 에이전트의 collection 을 바꿀 때
 
 `ADMIN` 이 관리자 영역의 에이전트 상세에서 받는 collection 과 민감 허용을 바꾼다. 화면은 아래 관리자 API 를 부른다. 자동으로 붙이지 않는다.
-화면의 상태와 문구는 [`frontend/structure.md`](../frontend/structure.md) 의 「기억 영역 절」 이 갖는다.
+화면의 상태와 문구는 [`web/docs/prd.md`](../../web/docs/prd.md) 의 「기억 영역 절」 이 갖는다.
 근거는 [ADR-20261008 / agent-memory-grants-admin](../adr/ADR-20261008-agent-memory-grants-admin.md) 에 있다.
 
 | 경로 | 누가 | 무엇 |
@@ -462,7 +462,7 @@ Control Plane MCP 도구를 받는 실행의 공통 답변 지침 뒤에 「# �
 ## 답마다 참고한 기억
 
 대화의 답 아래에 그 답을 만든 실행이 본문을 받은 기억을 「참고한 기억 N개」 로 접어 보인다.
-근거는 [ADR-20261008 / memory-facts](../adr/ADR-20261008-memory-facts.md) 에 있고, 화면은 [`frontend/chat.md`](../frontend/chat.md) 의 「참고한 기억」 이 갖는다.
+근거는 [ADR-20261008 / memory-facts](../adr/ADR-20261008-memory-facts.md) 에 있고, 화면은 [`web/docs/prd.md`](../../web/docs/prd.md) 의 「참고한 기억」 이 갖는다.
 
 | 재료 | 어디서 | 넣는 것 |
 | --- | --- | --- |

@@ -347,7 +347,7 @@ sequenceDiagram
 
 ## 지금 화면을 열 때
 
-판정 표는 [`backend/attention.md`](backend/attention.md), 화면은 [`frontend/now.md`](frontend/now.md) 가 갖는다.
+판정 표는 [`backend/attention.md`](backend/attention.md), 화면은 [`web/docs/prd.md`](../web/docs/prd.md) 가 갖는다.
 
 ```mermaid
 sequenceDiagram

@@ -33,4 +33,4 @@
     - cache write 토큰에는 입력 단가를 쓴다. 가격표에 cache write 단가가 없다.
     - 표 이름은 `subagent_usage_job` 으로 둔다. 이름이 조회 작업을 가리키지만 줄의 뜻은 자식 한 명의 사용량 기록이다.
     - 한 달의 자식 줄이 수천을 넘으면 합계를 DB 에서 내도록 바꾼다.
-- **적용 범위**: `usage` 패키지의 재조회, 월 합계, 축별 합계. 화면의 완전성 표시는 [`frontend/structure.md`](../../../docs/frontend/structure.md) 가, 줄의 칸은 [`backend/schema/execution.md`](../../../docs/backend/schema/execution.md) 가 갖는다.
+- **적용 범위**: `usage` 패키지의 재조회, 월 합계, 축별 합계. 화면의 완전성 표시는 [`web/docs/code-architecture.md`](../../../web/docs/code-architecture.md) 가, 줄의 칸은 [`backend/schema/execution.md`](../../../docs/backend/schema/execution.md) 가 갖는다.

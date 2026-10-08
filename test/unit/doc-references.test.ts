@@ -125,7 +125,7 @@ const UNIQUE_HEADING_DIRECTORIES = [
   "docs",
   "docs/backend",
   "docs/backend/schema",
-  "docs/frontend",
+  "web/docs",
 ];
 
 test("코드와 프롬프트가 가리키는 문서 파일이 있다", async () => {

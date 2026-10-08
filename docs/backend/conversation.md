@@ -7,7 +7,7 @@ Hermes 사건을 `execution_event` 로 옮겨 적는 규칙과 실행 트리를 
 
 `chat` 패키지가 대화와 메시지를 갖는다.
 한 번의 대화가 지나는 길은 [`backend/packages.md`](packages.md) 의 「한 번의 대화가 지나는 길」 절이 갖는다.
-화면 흐름은 [`frontend/shell.md`](../frontend/shell.md), [`frontend/chat.md`](../frontend/chat.md), [`frontend/activity.md`](../frontend/activity.md) 가 나눠 갖는다.
+화면 흐름은 [`web/docs/code-architecture.md`](../../web/docs/code-architecture.md), [`web/docs/flow.md`](../../web/docs/flow.md), [`web/docs/flow.md`](../../web/docs/flow.md) 가 나눠 갖는다.
 
 ### 경로
 
@@ -106,7 +106,7 @@ turn 이 바꾸는 칸은 `hermes_session_id` 와 `updated_at` 뿐이므로 그 
 | `replacesMessageId` | 이 메시지가 새 판으로 대신하는 이전 메시지. 없으면 null |
 | `activity` | 작업 과정의 요약. `{ toolCount, subagentCount, durationMs }`. 사건이 없는 답과 사용자 메시지는 null |
 | `artifacts` | 그 답의 turn 이 만든 결과물 파일. [`artifact.md`](artifact.md) 의 「메시지 한 줄의 `artifacts`」 절이 모양을 갖는다 |
-| `delivery` | `SYSTEM` 줄이 결과 전달 묶음의 마지막 시도가 저장한 마지막 알림 줄일 때만 `{ id, status }` 이고, 아니면 null 이다. 오류 코드는 싣지 않는다. 화면은 [`../frontend/chat.md`](../frontend/chat.md) 의 「결과 다시 전달」 이 갖는다 |
+| `delivery` | `SYSTEM` 줄이 결과 전달 묶음의 마지막 시도가 저장한 마지막 알림 줄일 때만 `{ id, status }` 이고, 아니면 null 이다. 오류 코드는 싣지 않는다. 화면은 [`web/docs/flow.md`](../../web/docs/flow.md) 의 「결과 다시 전달」 이 갖는다 |
 
 `activity` 는 답을 만든 실행과 그 아래 자식 실행의 `execution_event` 를 모두 센다.
 예전에 provider 가 막혀 다음 모델로 넘어간 turn 은 막힌 시도가 따로 실행 줄을 갖는다. 요약은 답을 만든 실행만 세고 막힌 시도의 사건은 넣지 않는다. 지금은 Control Plane 이 provider 를 넘기지 않아 새 turn 에는 이런 줄이 생기지 않는다.
@@ -119,7 +119,7 @@ turn 이 바꾸는 칸은 `hermes_session_id` 와 `updated_at` 뿐이므로 그 
 
 흐름으로 돈 답은 하위 에이전트 사건 없이 자식 실행만 남는다. 자식 실행을 더하지 않으면 요약이 0 이 되고 블록이 사라진다.
 한 하위 에이전트가 사건과 자식 실행 둘 다 남기면 두 번 센다.
-그 겹침은 [`frontend/activity.md`](../frontend/activity.md) 의 「실행 하나를 다시 볼 때」 절에서 트리가 이미 받아들인 것과 같다.
+그 겹침은 [`web/docs/flow.md`](../../web/docs/flow.md) 의 「실행 하나를 다시 볼 때」 절에서 트리가 이미 받아들인 것과 같다.
 대화 하나를 열 때 질의가 답 수만큼 늘지 않도록, 실행 번호 목록으로 한 번에 센다.
 
 ### 화면으로 보내는 사건

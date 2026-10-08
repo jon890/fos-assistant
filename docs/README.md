@@ -58,18 +58,15 @@ frontend 는 화면의 동작과 구조이고, hermes 는 외부 런타임인 He
 | [`backend/attention.md`](backend/attention.md) | 먼저 알리기의 후보와 판정 표, 억제와 중복, 숨기기와 미루기, 지표, 지금 화면의 API |
 | [`backend/follow-up.md`](backend/follow-up.md) | 할 일의 상태, 제안 도구와 제안 억제, API |
 
-## frontend
+## web
 
 | 문서 | 소유하는 것 |
 | --- | --- |
-| [`frontend/structure.md`](frontend/structure.md) | 화면 목록, 에이전트 화면과 사용량 화면의 구성, 화면의 정체성 |
-| [`frontend/shell.md`](frontend/shell.md) | 대화 이력과 목록, 화면 틀, 로딩 표시, 밝기 모드 |
-| [`frontend/chat.md`](frontend/chat.md) | 대화 화면의 이번에 연 원문, 모델 선택, 에이전트 질문, 동작 승인, 다른 창에서 답하는 중일 때, 다시 생성, 결과 다시 전달, 메시지 동작, 참고한 기억, 새 대화 화면, 점검 대화 |
-| [`frontend/activity.md`](frontend/activity.md) | 실행 하나를 다시 보는 화면과 작업 과정 표시 |
-| [`frontend/now.md`](frontend/now.md) | 지금 화면의 카드와 이유 문구, 숨기기와 미루기, 폭별 배치 |
-| [`frontend/memory.md`](frontend/memory.md) | 기억 화면의 간략 목록과 펼침, 검토 흐름, 남긴 에이전트 표시, 숨긴 양식 |
+| [`web/docs/prd.md`](../web/docs/prd.md) | 화면마다 보이는 것과 그리지 않는 것. 관리자 영역, 에이전트 화면, 사용량 화면, 지금 화면, 기억 화면, 대화 목록, 새 대화 화면, 동작 승인, 참고한 기억, 작업 과정 블록 |
+| [`web/docs/flow.md`](../web/docs/flow.md) | 화면에서 하는 일마다 주고받는 순서. 대화 이력, 모델 고르기, 질문 카드, 다른 창에서 답하는 중일 때, 다시 생성, 결과 다시 전달, 점검 대화, 실행 다시 보기, 꺼진 사용자의 세션 |
+| [`web/docs/code-architecture.md`](../web/docs/code-architecture.md) | 화면 목록, 화면 틀, 디렉터리, 테마 토큰, 화면의 정체성, 마크다운 읽기, 밝기 모드 |
 
-화면에 관한 결정은 `adr/INDEX.md` 에서 층 칸이 frontend 인 것을 본다.
+화면에 관한 결정은 [`web/docs/adr/INDEX.md`](../web/docs/adr/INDEX.md) 에 있다.
 
 ## Hermes
 

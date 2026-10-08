@@ -36,4 +36,4 @@
       서비스 토큰은 ADR-056 대로 주인이 켜져 있는지 따로 확인한다.
     - 요청마다 허용 목록 조회가 한 번 늘어난다.
     - 관리자가 자기 줄을 끄면 그 자리에서 막힌다. 다른 관리자가 없으면 화면으로는 다시 켜지 못한다. 이 결정 전에도 다음 로그인부터는 같았다.
-- **적용 범위**: `ControlPlaneJwtFilter` 가 해석하는 경로 전체. 화면 쪽 처리는 [`docs/frontend/structure.md`](../frontend/structure.md) 의 「꺼진 사용자의 세션」 이 갖는다.
+- **적용 범위**: `ControlPlaneJwtFilter` 가 해석하는 경로 전체. 화면 쪽 처리는 [`web/docs/code-architecture.md`](../../web/docs/flow.md) 의 「꺼진 사용자의 세션」 이 갖는다.
