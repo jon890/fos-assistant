@@ -31,6 +31,20 @@ public class RootExecutionQuery {
         return new RootExecutionPage(page, idsHavingChildren(page), conversationPublicIds(page));
     }
 
+    /** 커서 다음의 루트 실행을 {@code size} 개까지 읽고, 다음 쪽이 있으면 마지막 줄의 커서를 싣는다. */
+    public RootExecutionPage page(Long userId, int size, String cursor) {
+        ExecutionCursor decoded = cursor == null ? null : ExecutionCursor.decode(cursor);
+        List<AgentExecution> fetched = executions.findRootExecutionsBefore(
+                userId,
+                decoded == null ? null : decoded.startedAt(),
+                decoded == null ? Long.MAX_VALUE : decoded.id(),
+                PageRequest.of(0, size + 1));
+        boolean hasNext = fetched.size() > size;
+        List<AgentExecution> page = hasNext ? fetched.subList(0, size) : fetched;
+        String nextCursor = hasNext ? ExecutionCursor.of(page.getLast()).encode() : null;
+        return new RootExecutionPage(page, idsHavingChildren(page), conversationPublicIds(page), nextCursor);
+    }
+
     /**
      * 목록의 대화 번호를 공개 식별자로 한 번에 바꾼다.
      *

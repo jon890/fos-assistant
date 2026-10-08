@@ -24,6 +24,13 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
 public final class UsageDtos {
 
+    /** 실행 기록 한 쪽. 다음 쪽이 없으면 {@code nextCursor} 는 null 이다. */
+    public record ExecutionPageView(List<ExecutionView> items, String nextCursor) {
+        public ExecutionPageView {
+            items = List.copyOf(items);
+        }
+    }
+
     /**
      * 한 달치 환산액과 실제 청구액.
      *

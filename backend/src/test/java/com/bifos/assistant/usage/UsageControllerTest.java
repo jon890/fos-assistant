@@ -145,6 +145,46 @@ class UsageControllerTest {
     }
 
     @Test
+    @DisplayName("페이지 응답도 MEMBER 역할의 내부 값을 가리고 다음 커서를 준다")
+    void memberExecutionPageHidesInternalValuesAndKeepsCursor() {
+        execution(null, null);
+        detailedExecution();
+
+        UsageDtos.ExecutionPageView forAdmin = controller.myExecutionPage(1, null);
+        assertThat(forAdmin.items()).singleElement().satisfies(view -> {
+            assertThat(view.provider()).isEqualTo("example-provider");
+            assertThat(view.model()).isEqualTo("example-model-large");
+            assertThat(view.inputTokens()).isEqualTo(100L);
+            assertThat(view.estimatedCostMicros()).isEqualTo(5_000L);
+        });
+        signInAs(UserRole.MEMBER);
+
+        UsageDtos.ExecutionPageView page = controller.myExecutionPage(1, null);
+
+        assertThat(page.items()).singleElement().satisfies(view -> {
+            assertThat(view.provider()).isNull();
+            assertThat(view.agentCode()).isNull();
+            assertThat(view.model()).isNull();
+            assertThat(view.inputTokens()).isNull();
+            assertThat(view.estimatedCostMicros()).isNull();
+            assertThat(view.status()).isEqualTo("FAILED");
+        });
+        assertThat(page.nextCursor()).isNotBlank();
+    }
+
+    @Test
+    @DisplayName("페이지 limit 은 1보다 작은 요청을 한 줄로 제한한다")
+    void executionPageClampsLimitToOne() {
+        execution(null, null);
+        execution(null, null);
+
+        UsageDtos.ExecutionPageView page = controller.myExecutionPage(0, null);
+
+        assertThat(page.items()).hasSize(1);
+        assertThat(page.nextCursor()).isNotBlank();
+    }
+
+    @Test
     @DisplayName("ADMIN 역할의 실행 한 줄에는 내부 값이 그대로 실린다")
     void adminExecutionRowKeepsInternalValues() {
         AgentExecution failed = detailedExecution();
