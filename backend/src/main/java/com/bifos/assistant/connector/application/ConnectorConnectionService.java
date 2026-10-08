@@ -14,6 +14,7 @@ import com.bifos.assistant.connector.infra.ConnectorBindingRepository;
 import com.bifos.assistant.connector.infra.ConnectorConnectionRepository;
 import com.bifos.assistant.hermes.HermesConnectorClient;
 import com.bifos.assistant.hermes.dto.CallResult;
+import com.bifos.assistant.hermes.dto.ConnectorAppearance;
 import com.bifos.assistant.hermes.dto.ConnectorField;
 import com.bifos.assistant.hermes.dto.ConnectorFieldOptions;
 import com.bifos.assistant.hermes.dto.ConnectorManifest;
@@ -139,6 +140,7 @@ public class ConnectorConnectionService {
                     manifest.id(),
                     manifest.title(),
                     manifest.description(),
+                    manifest.appearance(),
                     manifest.fields().stream().map(ConnectorFieldSummary::from).toList(),
                     ConnectorToolPolicies.summaries(manifest),
                     connection == null ? ConnectionStatus.DISCONNECTED : connection.status(),
@@ -151,6 +153,7 @@ public class ConnectorConnectionService {
                         connection.connectorId(),
                         connection.connectorId(),
                         "",
+                        ConnectorAppearance.NONE,
                         List.of(),
                         List.of(),
                         connection.status(),

@@ -14,6 +14,7 @@ import java.util.List;
  * @param schema manifest 의 판. 2 부터 도구마다 정책을 선언한다
  * @param tools 도구마다의 정책 선언. 카탈로그가 내지 않았으면 빈 목록
  * @param skills 바인딩 설치가 그 profile 에 복사할 스킬 이름. 옛 대시보드 plugin 은 내지 않고, 없으면 빈 목록
+ * @param appearance 카드의 아이콘과 링크. 옛 대시보드 plugin 은 내지 않고, 없으면 {@link ConnectorAppearance#NONE}
  */
 public record ConnectorManifest(
         String id,
@@ -26,13 +27,44 @@ public record ConnectorManifest(
         boolean attachments,
         int schema,
         List<ConnectorTool> tools,
-        List<String> skills) {
+        List<String> skills,
+        ConnectorAppearance appearance) {
 
     public ConnectorManifest {
+        description = description == null ? "" : description;
         fields = List.copyOf(fields);
         toolsets = List.copyOf(toolsets);
         tools = List.copyOf(tools);
         skills = List.copyOf(skills);
+        appearance = appearance == null ? ConnectorAppearance.NONE : appearance;
+    }
+
+    /** 아이콘과 링크를 내지 않는 선언이다. 새 칸을 모르는 대시보드 plugin 의 카탈로그와 검사가 쓴다. */
+    public ConnectorManifest(
+            String id,
+            String title,
+            String description,
+            List<ConnectorField> fields,
+            String verifyTool,
+            String mcpServer,
+            List<String> toolsets,
+            boolean attachments,
+            int schema,
+            List<ConnectorTool> tools,
+            List<String> skills) {
+        this(
+                id,
+                title,
+                description,
+                fields,
+                verifyTool,
+                mcpServer,
+                toolsets,
+                attachments,
+                schema,
+                tools,
+                skills,
+                ConnectorAppearance.NONE);
     }
 
     /** 스킬을 내지 않는 선언이다. 옛 대시보드 plugin 의 카탈로그와 검사가 쓴다. */

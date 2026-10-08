@@ -12,6 +12,7 @@ import static org.springframework.test.web.client.response.MockRestResponseCreat
 
 import com.bifos.assistant.hermes.HermesConnectorClient.InstallResult;
 import com.bifos.assistant.hermes.dto.CallResult;
+import com.bifos.assistant.hermes.dto.ConnectorAppearance;
 import com.bifos.assistant.hermes.dto.ConnectorCallError;
 import com.bifos.assistant.hermes.dto.ConnectorErrorDetail;
 import com.bifos.assistant.hermes.dto.ConnectorField;
@@ -19,8 +20,10 @@ import com.bifos.assistant.hermes.dto.ConnectorFieldOptions;
 import com.bifos.assistant.hermes.dto.ConnectorManifest;
 import com.bifos.assistant.hermes.dto.ConnectorRecovery;
 import com.bifos.assistant.hermes.dto.ConnectorTool;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Base64;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
@@ -108,6 +111,42 @@ class HttpHermesConnectorClientTest {
                         false,
                         1,
                         List.of()));
+        server.verify();
+    }
+
+    @DisplayName("카탈로그의 아이콘과 링크를 읽고, 칸이 없는 옛 응답은 둘 다 비우고, 틀린 아이콘은 그 칸만 버린다")
+    @Test
+    void readsIconAndLinkAndDropsOnlyTheBrokenField() {
+        String url = BASE + "/api/connectors/catalog";
+        String tail = "\"mcp_server\":\"demo\"";
+        String svg = Base64.getEncoder()
+                .encodeToString("<svg xmlns=\"http://www.w3.org/2000/svg\"/>".getBytes(StandardCharsets.UTF_8));
+        String script = Base64.getEncoder().encodeToString("<svg><script/></svg>".getBytes(StandardCharsets.UTF_8));
+        String link = ",\"link\":\"https://notes.example.test/\"";
+        server.expect(requestTo(url))
+                .andRespond(withSuccess(
+                        CATALOG.replace(
+                                tail,
+                                tail + ",\"icon\":{\"media_type\":\"image/svg+xml\",\"data\":\"" + svg + "\"}" + link),
+                        MediaType.APPLICATION_JSON));
+        server.expect(requestTo(url)).andRespond(withSuccess(CATALOG, MediaType.APPLICATION_JSON));
+        server.expect(requestTo(url))
+                .andRespond(withSuccess(
+                        CATALOG.replace(
+                                tail,
+                                tail + ",\"icon\":{\"media_type\":\"image/svg+xml\",\"data\":\"" + script + "\"}"
+                                        + link),
+                        MediaType.APPLICATION_JSON));
+
+        ConnectorManifest declared = client.readCatalog().get(0);
+        ConnectorManifest old = client.readCatalog().get(0);
+        List<ConnectorManifest> broken = client.readCatalog();
+
+        assertThat(declared.appearance())
+                .isEqualTo(new ConnectorAppearance("data:image/svg+xml;base64," + svg, "https://notes.example.test/"));
+        assertThat(old.appearance()).isEqualTo(ConnectorAppearance.NONE);
+        assertThat(broken).extracting(ConnectorManifest::id).containsExactly(DEMO);
+        assertThat(broken.get(0).appearance()).isEqualTo(new ConnectorAppearance(null, "https://notes.example.test/"));
         server.verify();
     }
 
