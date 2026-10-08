@@ -62,6 +62,7 @@ export type ToolsetView = {
   enabled: boolean;
   editable: boolean;
   requiresPrivate: boolean;
+  hidden?: boolean;
 };
 
 /** profile 에서 읽은 도구와 등급 표에 없는 켜진 도구다. */

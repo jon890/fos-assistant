@@ -11,6 +11,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Notice } from "@/components/ui/notice";
 import { Switch } from "@/components/ui/switch";
 import { describeError } from "@/components/error-message";
@@ -188,6 +189,9 @@ export function AgentToolsSection({
               >
                 <div className="min-w-0">
                   <p className="text-sm font-medium">{text.label}</p>
+                  {tool.hidden ? (
+                    <Badge variant="warning">일반 화면에서 숨김</Badge>
+                  ) : null}
                   <p className="mt-1 text-xs text-muted-foreground">
                     {text.description}
                   </p>
