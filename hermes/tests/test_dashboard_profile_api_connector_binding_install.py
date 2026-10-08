@@ -218,6 +218,64 @@ class ProfileApiConnectorBindingInstallTest(support.ProfileApiRouteTest):
         self.assertEqual(config["platform_toolsets"]["api_server"], ["delegation", "fos-assistant", "terminal", "demo"])
         self.assertEqual(config.get("terminal"), before.get("terminal"))
 
+    def test_sandbox_required_connector_is_rejected_without_a_policy(self):
+        """실행 공간 정책이 없으면 `sandbox_required` 커넥터의 바인딩 설치는 409 `sandbox_unavailable` 이고 profile 파일이 그대로다."""
+        demo, _ = self.bind_fixture()
+        self.declare_sandbox_required(demo)
+        before = self.tree("alice")
+
+        with self.without_environment("FOS_ASSISTANT_SANDBOX"):
+            response = self.bind()
+
+        self.assertEqual(response.status_code, 409, response.body)
+        self.assertEqual(response.body["code"], "sandbox_unavailable")
+        self.assertEqual(self.tree("alice"), before)
+        self.assertFalse((self.root / "alice/.fos-connectors.json").exists())
+
+    def test_sandbox_required_connector_is_rejected_on_a_profile_outside_the_policy(self):
+        """정책은 있어도 그 profile 이 `profiles` 에 없으면 같은 409 이고 profile 파일이 그대로다."""
+        demo, _ = self.bind_fixture()
+        self.declare_sandbox_required(demo)
+        policy = self.sandbox_policy()
+        policy["profiles"].pop("alice")
+        self.set_sandbox_policy(policy)
+        before = self.tree("alice")
+
+        response = self.bind()
+
+        self.assertEqual(response.status_code, 409, response.body)
+        self.assertEqual(response.body["code"], "sandbox_unavailable")
+        self.assertEqual(self.tree("alice"), before)
+        self.assertFalse((self.root / "alice/.fos-connectors.json").exists())
+
+    def test_sandbox_required_connector_binds_on_a_profile_in_the_policy(self):
+        """그 profile 이 정책에 있으면 셸이 켜져 있지 않아도 설치가 성공한다."""
+        demo, _ = self.bind_fixture()
+        self.declare_sandbox_required(demo)
+        self.set_sandbox_policy(self.sandbox_policy())
+
+        response = self.bind()
+
+        self.assertEqual(response.status_code, 200, response.body)
+        self.assertIs(response.body["changed"], True)
+        self.assertEqual(self.alice_config()["platform_toolsets"]["api_server"],
+                         ["delegation", "fos-assistant", "terminal", "demo"])
+        record = json.loads((self.root / "alice/.fos-connectors.json").read_text(encoding="utf-8"))
+        self.assertEqual(record[DEMO]["mode"], "bind")
+        self.assertIs(self.status_of()["connectors"][0]["configured"], True)
+
+    def test_connector_without_the_declaration_binds_without_a_policy(self):
+        """`sandbox_required` 를 선언하지 않은 커넥터는 정책이 없어도 지금처럼 붙는다."""
+        self.bind_fixture()
+
+        with self.without_environment("FOS_ASSISTANT_SANDBOX"):
+            response = self.bind()
+
+        self.assertEqual(response.status_code, 200, response.body)
+        self.assertIs(response.body["changed"], True)
+        self.assertEqual(self.status_of()["connectors"][0],
+                         {"plugin": DEMO, "enabled": True, "configured": True, "mode": "bind"})
+
     def test_rebinding_an_owned_connector_is_accepted_while_the_policy_hook_is_off(self):
         """이미 붙은 커넥터를 다시 설치하는 것은 fos-ctx 가 꺼져 있어도 받고, hook 상태는 거짓으로 남는다."""
         self.bind_fixture()

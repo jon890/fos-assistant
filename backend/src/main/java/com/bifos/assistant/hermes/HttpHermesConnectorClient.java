@@ -279,9 +279,9 @@ public class HttpHermesConnectorClient implements HermesConnectorClient {
     }
 
     /**
-     * 설치 요청을 보내고 409 와 401 을 각자의 예외로 바꾼다. 그 밖의 실패는 원문 없는 {@link IllegalStateException} 이다.
-     *
-     * <p>두 거절은 부르는 쪽이 사용자에게 다른 안내를 하므로 나눈다. 응답 본문은 읽지 않는다.
+     * 설치 요청을 보내고 거절을 안내가 다른 예외로 나눈다. 409 는 본문의 {@code code} 칸만 읽어
+     * {@code sandbox_unavailable} 이면 {@link ConnectorSandboxUnavailable}, 그 밖이면 {@link ConnectorInstallConflict} 다.
+     * 401 은 {@link ConnectorProfileRejected} 이고, 그 밖의 실패는 원문 없는 {@link IllegalStateException} 이다.
      */
     private InstallResult refusable(Map<String, Object> request, String profile, String connectorId, boolean enabled) {
         final JsonNode body;
@@ -296,7 +296,7 @@ public class HttpHermesConnectorClient implements HermesConnectorClient {
         } catch (HttpClientErrorException ex) {
             int status = ex.getStatusCode().value();
             if (status == HTTP_CONFLICT) {
-                throw new ConnectorInstallConflict();
+                throw ConnectorSandboxUnavailable.orConflict(ex);
             }
             if (status == HTTP_UNAUTHORIZED) {
                 throw new ConnectorProfileRejected();
@@ -443,7 +443,8 @@ public class HttpHermesConnectorClient implements HermesConnectorClient {
                 readable ? schema(schema) : SCHEMA_UNREADABLE,
                 readable ? tools(tools) : List.of(),
                 names(item.get("skills")),
-                ConnectorAppearances.read(item));
+                ConnectorAppearances.read(item),
+                optionalBoolean(item, "single_binding", false));
     }
 
     private static boolean readableSchema(JsonNode declared) {

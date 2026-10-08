@@ -128,6 +128,19 @@ V52 가 세 칸을 더했다. 값은 관리자가 화면에서 정하고 마이�
 
 `(group_id, provider, model)` 이 유일하다.
 
+## toolset_hidden
+
+그룹이 일반 에이전트 도구 화면에서 숨긴 toolset이다. 행이 없으면 모두 보인다.
+활성 도구는 Hermes profile이 갖고 이 표는 활성 상태를 저장하거나 바꾸지 않는다.
+
+| 칸 | 타입 | 뜻 |
+| --- | --- | --- |
+| `id` | BIGINT | 기본 키 |
+| `group_id` | BIGINT | 그룹 번호 |
+| `name` | VARCHAR(64) | 등급 표에 있는 toolset 이름 |
+
+`(group_id, name)`이 유일하다. FK는 없다. 새 설치에서 숨김 행을 만들지 않는다.
+
 ## agent_token
 
 Hermes 가 Control Plane 의 MCP 도구를 부를 때 쓰는 장기 토큰이다.

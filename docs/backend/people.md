@@ -53,6 +53,54 @@ profile 은 사용자마다 나누고 AI 계정은 그룹이 함께 쓴다.
 에이전트는 실행에 쓸 모델을 갖지 않는다.
 첫 로그인에 에이전트를 만들 때도 Hermes 에서 모델을 읽지 않는다.
 
+## 첫 에이전트의 기본 도구
+
+첫 로그인에 만든 에이전트에 `assistant.people.default-toolsets` 의 도구를 켠다.
+기본값은 `web`, `terminal`, `file`, `code_execution` 이다. 주인 등급이거나 실행 공간에서만 도는 도구가 아니면 기동하지 않는다.
+결정과 감당할 것은 [ADR-20261008 / default-toolsets](../adr/ADR-20261008-default-toolsets.md) 가 갖는다.
+
+`FirstAgentCreator` 가 첫 로그인의 트랜잭션이 커밋된 뒤 백그라운드 작업(`BackgroundTasks`)으로 `agent` 의 `AgentDefaultToolsets` 를 부른다.
+첫 요청은 Hermes 호출을 기다리지 않는다.
+실행 공간 주인 키 `u<사용자 번호>` 가 이때 처음 생기므로 profile 을 만들 때 켜지 않는다.
+로그인이 되돌려지면 부르지 않는다.
+
+```mermaid
+sequenceDiagram
+    participant C as Control Plane
+    participant L as Hermes 공유 listener
+    participant D as Hermes 대시보드
+
+    C->>C: 첫 로그인 커밋
+    C->>L: GET /p/{profile}/v1/toolsets
+    L-->>C: 지금 켜진 도구
+    C->>C: 그룹 공개면 셸·파일·사진 계열을, 비밀 요청 스킬이 있으면 셸·파일·사진 도구를 뺀다
+    alt 셸·파일·사진 도구가 남았다
+        C->>D: PUT /api/config (도구 목록, sandbox_owner, require_sandbox: true)
+        alt 정책에 등록된 profile
+            D-->>C: 200. docker 실행 공간으로 쓴다
+        else 정책이 없거나 등록되지 않았다
+            D-->>C: 409 sandbox_unavailable
+            C->>C: 경고 로그
+            C->>D: PUT /api/config (셸·파일·사진 도구를 뺀 목록)
+        end
+    else 남지 않았다
+        C->>D: PUT /api/config (도구 목록, sandbox_owner)
+    end
+    C->>L: GET /p/{profile}/v1/toolsets
+    C->>C: 켜지지 않은 것이 있으면 경고 로그
+```
+
+| 무엇 | 어떻게 되나 |
+| --- | --- |
+| 설정이 빈 목록이다 | Hermes 를 부르지 않는다 |
+| 기본 도구가 이미 다 켜져 있다 | 쓰지 않는다 |
+| profile 이 실행 공간 정책에 없다 | 셸·파일·사진 도구를 빼고 web 만 더한다. 경고 로그를 남긴다. 운영이 정책에 등록한 뒤 관리자가 에이전트 도구 화면에서 켠다 |
+| 정책에 없는데 셸 계열이 이미 켜져 있다 | 쓰지 않는다. 그 쓰기가 셸을 local 로 확정하기 때문이다. 경고 로그를 남긴다 |
+| Hermes 가 답하지 않거나 다른 오류로 거절한다 | 경고 로그만 남긴다. 로그인은 그대로 끝난다 |
+| 옛 plugin 이 `require_sandbox` 를 몰라 400 으로 거절한다 | 같다. 아무 도구도 켜지 않는다. plugin 을 먼저 배포한다 |
+
+켠 도구는 관리자 등급 그대로다. 주인은 셸 계열을 끄지 못하고 관리자가 끈다.
+
 ## key 를 두 곳에 같이 쓴다
 
 같은 값을 Hermes 의 `.env` 와 우리 key 디렉터리에 각각 쓴다.
@@ -128,7 +176,7 @@ sequenceDiagram
 | 같은 요청이 두 번 온다 | 뒤의 것이 이메일 유니크 제약에 걸려 거절된다 |
 | 허용 목록에 없는 사람이 로그인 | 로그인을 거절하고 토큰을 만들지 않는다 |
 | 허용 목록에는 있는데 profile 이 없어졌다 | 실행할 때 key 를 찾지 못해 실패한다. 관리자가 다시 더한다 |
-| 첫 로그인에 Hermes 가 답하지 않는다 | 첫 로그인은 모델을 읽지 않고 에이전트를 만든다. Hermes 를 부르지 않으므로 로그인도 에이전트 생성도 막히지 않는다 |
+| 첫 로그인에 Hermes 가 답하지 않는다 | 첫 로그인은 모델을 읽지 않고 에이전트를 만든다. 기본 도구는 커밋 뒤에 켜고 실패해도 로그만 남기므로 로그인도 에이전트 생성도 막히지 않는다 |
 
 에이전트를 만드는 것은 `app_user` 를 새로 저장하는 그 순간뿐이다.
 허용 목록에서 그 사람을 찾지 못해 에이전트 없이 들어온 사람은 관리자가 기존 에이전트 등록 화면에서 만든다.
@@ -200,7 +248,7 @@ sequenceDiagram
 `ACCESS_REVOKED` 는 이 판정만 내는 코드다.
 세션이 없을 때 웹이 만드는 `UNAUTHENTICATED` 와 달라, 웹이 세션을 지울지 이 코드로 판단한다.
 
-`/mcp` 와 `/internal/hermes/` 아래 경로, 서비스 토큰 경로, 로그인 경로 `/api/v1/signin/allowed`와 `/api/v1/signin/completed`는 이 필터를 지나지 않아 이 판정을 받지 않는다. 두 로그인 경로는 `SignInController`에서 전용 서명 토큰을 직접 검사한다.
+`/mcp` 와 `/internal/hermes/` 아래 경로, `/internal/browser-gateway/` 아래 경로, 서비스 토큰 경로, 로그인 경로 `/api/v1/signin/allowed`와 `/api/v1/signin/completed`는 이 필터를 지나지 않아 이 판정을 받지 않는다. 두 로그인 경로는 `SignInController`에서 전용 서명 토큰을 직접 검사한다. 브라우저 중계의 허용 목록 확인은 중계가 직접 한다([`user-browser.md`](user-browser.md) 의 「중계」).
 서비스 토큰은 주인이 켜져 있는지 따로 확인한다([`memory.md`](memory.md)).
 
 ### 아무도 없을 때
