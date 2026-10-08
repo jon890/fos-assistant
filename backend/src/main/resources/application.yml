@@ -110,6 +110,12 @@ assistant:
       approval-ttl: 24h
       # 답이 없는 승인 요청을 만료로 바꾸는 주기
       expire-cron: "0 * * * * *"
+    binding:
+      # 재시작 없이 반영될 바인딩 설치를 보낸 뒤 반영 맞추기를 스스로 돌리기까지 기다리는 시간.
+      # 공유 gateway 의 MCP 설정 맞추기 주기 둘과 연결 시간이다(ADR-20261007 / connector-live-reload)
+      apply-delay: 150s
+      # 반영 예정 시각이 지난 바인딩을 찾는 주기
+      apply-cron: "*/30 * * * * *"
   restart-reconcile:
     # 기동할 때 RUNNING 으로 남은 실행을 Hermes 에 물어 정한다(ADR-061). 끄면 그 줄이 그대로 남는다
     enabled: true

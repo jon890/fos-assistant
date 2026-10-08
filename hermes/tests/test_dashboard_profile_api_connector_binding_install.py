@@ -22,10 +22,15 @@ class ProfileApiConnectorBindingInstallTest(support.ProfileApiRouteTest):
                 response = self.bind(plugin, vault)
                 self.assertEqual(response.status_code, 200, response.body)
                 self.assertIs(response.body["changed"], True)
-                self.assertIs(response.body["restart_required"], True)
+                # 새 서버 이름은 공유 gateway 의 MCP 설정 맞추기가 연결한다. 재시작을 기다리지 않는다.
+                self.assertIs(response.body["restart_required"], False)
+                self.assertIs(response.body["reload_pending"], True)
         config = self.alice_config()
         self.assertEqual(config["platform_toolsets"]["api_server"],
                          ["delegation", "fos-assistant", "terminal", "demo", "other"])
+        markers = config["skills"]["disabled"]
+        self.assertEqual(len(markers), 1, markers)
+        self.assertTrue(markers[0].startswith("fos-skill-index-"), markers)
         self.assertEqual(config["mcp_servers"]["fos-assistant"], before["mcp_servers"]["fos-assistant"])
         self.assertEqual(config["agent"], before["agent"])
         self.assertEqual(config["mcp_servers"]["demo"]["env"],
@@ -70,6 +75,68 @@ class ProfileApiConnectorBindingInstallTest(support.ProfileApiRouteTest):
             if path.is_file():
                 self.assertNotIn(DEMO_VALUE.encode(), path.read_bytes(), path.name)
         self.assertNotIn(DEMO_VALUE, json.dumps(status))
+
+    def test_rebinding_with_changed_values_requires_restart(self):
+        """이미 있던 서버의 `.env` 값을 바꾸면 gateway 가 같은 이름을 다시 연결하지 않으므로 재시작을 기다린다."""
+        self.bind_fixture()
+        self.assertEqual(self.bind(DEMO, "c1").status_code, 200)
+
+        self.assertEqual(self.vault("PUT", vault="c1", connector=DEMO,
+                                    values={"token": "demo_new_9876543210"}).status_code, 200)
+        changed_value = self.bind(DEMO, "c1")
+        self.assertEqual(changed_value.status_code, 200, changed_value.body)
+        self.assertEqual({key: changed_value.body[key] for key in ("changed", "restart_required", "reload_pending")},
+                         {"changed": True, "restart_required": True, "reload_pending": False})
+        self.assertIn("DEMO_TOKEN=demo_new_9876543210",
+                      (self.root / "alice/.env").read_text(encoding="utf-8").splitlines())
+
+    def test_rebinding_with_the_same_values_changes_nothing(self):
+        """같은 값으로 다시 붙이면 모든 칸이 거짓이고 `config.yaml` 이 그대로다. 표식도 새로 쓰지 않는다."""
+        self.bind_fixture()
+        self.assertEqual(self.bind(DEMO, "c1").status_code, 200)
+        before = (self.root / "alice/config.yaml").read_bytes()
+
+        repeated = self.bind(DEMO, "c1")
+        self.assertEqual(repeated.status_code, 200, repeated.body)
+        self.assertEqual({key: repeated.body[key]
+                          for key in ("changed", "restart_required", "plugin_updated", "reload_pending")},
+                         {"changed": False, "restart_required": False, "plugin_updated": False,
+                          "reload_pending": False})
+        self.assertEqual((self.root / "alice/config.yaml").read_bytes(), before)
+
+    def test_mapping_skills_disabled_rejects_binding_but_detaching_still_removes_env(self):
+        """`skills.disabled` 가 사전이면 붙이기는 409 로 파일을 바꾸지 않고, 떼기는 표식 없이 칸 값을 지운다."""
+        self.bind_fixture()
+        self.assertEqual(self.bind(DEMO, "c1").status_code, 200)
+        config = self.alice_config()
+        config["skills"] = {"disabled": {"operator": True}}
+        self.write_config("alice", config)
+        before = self.tree("alice")
+
+        rejected = self.bind(OTHER, "c2")
+        self.assertEqual(rejected.status_code, 409, rejected.body)
+        self.assertEqual(self.tree("alice"), before)
+
+        removed = self.bind(DEMO, enabled=False)
+        self.assertEqual(removed.status_code, 200, removed.body)
+        self.assertIs(removed.body["changed"], True)
+        self.assertNotIn("DEMO_TOKEN", (self.root / "alice/.env").read_text(encoding="utf-8"))
+        self.assertEqual(self.alice_config()["skills"], {"disabled": {"operator": True}})
+
+    def test_string_skills_disabled_is_rewritten_as_the_list_hermes_reads(self):
+        """문자열 `skills.disabled` 는 Hermes 가 읽는 대로 목록으로 바꿔 표식과 함께 쓴다. 쉼표로 나누지 않는다."""
+        self.bind_fixture()
+        for plugin, vault, written, kept in ((DEMO, "c1", "['a', 'b']", ["a", "b"]),
+                                             (OTHER, "c2", "a,b", ["a,b"])):
+            with self.subTest(written):
+                config = self.alice_config()
+                config["skills"] = {"disabled": written}
+                self.write_config("alice", config)
+                response = self.bind(plugin, vault)
+                self.assertEqual(response.status_code, 200, response.body)
+                disabled = self.alice_config()["skills"]["disabled"]
+                self.assertEqual(disabled[:-1], kept)
+                self.assertTrue(disabled[-1].startswith("fos-skill-index-"), disabled)
 
     def test_changing_one_connector_leaves_the_other_binding_of_the_profile_usable(self):
         """한 커넥터의 실행 정의가 바뀌어도 같은 profile 의 다른 바인딩은 조회, probe, 실행, 다시 붙이기가 되고 바뀐 항목만 쓸 수 없다."""
@@ -174,8 +241,10 @@ class ProfileApiConnectorBindingInstallTest(support.ProfileApiRouteTest):
 
         installed = self.bind(profile="human")
         self.assertEqual(installed.status_code, 200, installed.body)
-        self.assertIs(installed.body["restart_required"], True)
+        # 새 서버만으로는 재시작이 필요 없지만 `fos-ctx` plugin 파일을 처음 복사했으므로 그것으로 재시작을 기다린다.
+        self.assertIs(installed.body["restart_required"], False)
         self.assertIs(installed.body["plugin_updated"], True)
+        self.assertIs(installed.body["reload_pending"], False)
         self.assertFalse((self.root / "human/SOUL.md").exists())
         self.assertEqual(self.request("/api/connectors", "GET", token="valid", query_profiles=["human"],
                                       full_response=True).body["policy_hook"], True)

@@ -1,9 +1,12 @@
 export type ConnectionStatus = "DISCONNECTED" | "PENDING" | "READY";
 
-/** 에이전트에 붙인 연결의 상태다. 붙인 직후는 관리자 반영 완료 전까지 `PENDING` 이다. */
+/**
+ * 에이전트에 붙인 연결의 상태다. 붙인 직후는 반영이 확인될 때까지 `PENDING` 이다.
+ * 재시작이 필요 없으면 Control Plane 이 스스로 확인하고, 재시작 대기면 관리자 반영 완료가 `READY` 로 만든다.
+ */
 export type BindingStatus = "PENDING" | "READY";
 
-/** 연결이 붙은 에이전트 하나다. `restartRequired` 면 관리자 반영을 기다린다. */
+/** 연결이 붙은 에이전트 하나다. `restartRequired` 면 관리자가 공유 gateway 를 재시작한 뒤 반영 완료를 눌러야 한다. */
 export type BoundAgent = {
   agentCode: string;
   agentName: string;

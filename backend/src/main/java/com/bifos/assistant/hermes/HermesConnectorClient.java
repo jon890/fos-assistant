@@ -39,8 +39,16 @@ public interface HermesConnectorClient {
      * @param restartRequired 대시보드가 답한 재시작 필요. 설치된 연결에는 늘 참이다
      * @param pluginUpdated 설치가 그 profile 의 hook plugin 파일을 바꿨는가. 떠 있는 gateway 가 옛 코드를 쥐고 있을
      *     수 있다는 뜻이다. 옛 대시보드 plugin 은 이 칸을 내지 않고, 없으면 거짓이다
+     * @param reloadPending 바인딩 설치가 재시작 없이 공유 gateway 의 MCP 설정 맞추기 주기에 반영될 것을 바꿨는가
+     *     (ADR-20261007 / connector-live-reload). 옛 대시보드 plugin 은 이 칸을 내지 않고, 없으면 거짓이다
      */
-    record InstallResult(boolean restartRequired, boolean pluginUpdated) {}
+    record InstallResult(boolean restartRequired, boolean pluginUpdated, boolean reloadPending) {
+
+        /** 반영 예정을 모르는 설치 결과다. {@code reloadPending} 은 거짓이다. */
+        public InstallResult(boolean restartRequired, boolean pluginUpdated) {
+            this(restartRequired, pluginUpdated, false);
+        }
+    }
 
     record ProbeResult(boolean ok, List<String> tools) {}
 

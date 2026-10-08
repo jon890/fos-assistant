@@ -53,6 +53,9 @@ assistant:
       # 캐시는 실제 시각으로 잰다. 앞 단계의 카탈로그를 지나가게 하려는 검사는 2ms 를 기다린다. 보관 시간 자체는 ConnectorCatalogCacheTest 가 본다
       catalog-ttl: 1ms
       catalog-failure-ttl: 1ms
+    binding:
+      # 검사가 뜰 때마다 반영 예정 확인이 함께 돌지 않게 끈다. 검사는 그 메서드를 직접 부른다
+      apply-cron: "-"
   proactive-check:
     # 아래 hermes.run-timeout(1s) 보다 짧아야 기동한다. 살펴보기 turn 을 돌리는 검사는 두 값을 함께 올린다
     max-duration: 500ms

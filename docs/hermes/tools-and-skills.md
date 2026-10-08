@@ -268,6 +268,12 @@ MCP 설정 쓰기 실패가 profile 생성 실패로 바뀌지 않는다.
 새 profile의 자동 발견 또는 이 명령을 쓸 수 없는 경우에는 공유 gateway 재시작이 확실한 적용 경로다.
 근거는 [MCP 설정 API](https://github.com/NousResearch/hermes-agent/blob/v2026.9.14/hermes_cli/web_routers/mcp.py), [MCP 재발견](https://github.com/NousResearch/hermes-agent/blob/v2026.9.14/gateway/run_turn.py)이다.
 
+공유 gateway의 housekeeping은 60초마다 served profile마다 `mcp_servers`의 이름과 살아 있는 연결을 맞춘다.
+새 이름은 연결하고 빠진 이름은 끊는다. 이름만 비교하므로 같은 이름의 정의나 env 값이 바뀐 것은 다시 연결하지 않는다.
+스킬 색인 캐시 키에는 profile 스킬 디렉터리의 내용이 없고 `skills.disabled`가 들어 있다.
+그래서 바인딩 설치는 스킬 파일을 바꿀 때 `skills.disabled`의 색인 표식(`fos-skill-index-` 앞머리)을 새 값으로 바꿔 그 profile의 다음 실행이 색인을 새로 만들게 한다.
+판정과 근거는 [ADR-20261007 / connector-live-reload](../adr/ADR-20261007-connector-live-reload.md)가 갖는다.
+
 v0.21.3에서는 공유 gateway의 MCP 연결이 profile 범위의 키를 사용한다.
 같은 서버 이름을 두 profile이 써도 서로 다른 credential의 연결을 구분하도록 고쳤다.
 이는 [profile별 공유 MCP 가시성 수정](https://github.com/NousResearch/hermes-agent/pull/106314)과 [동일 이름 연결 분리 수정](https://github.com/NousResearch/hermes-agent/pull/108352)에 해당한다.

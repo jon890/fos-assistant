@@ -187,7 +187,7 @@ test("연결 반영 확인은 관리자 영역에 있고 일반 연결 화면에
   await expect(page.getByTestId("connector-admin-panel")).toHaveCount(0);
 });
 
-test("관리자 연결 목록은 붙인 에이전트마다 한 줄이고 한 줄의 반영 완료는 그 줄만 바꾼다", async ({ context, page }, testInfo) => {
+test("관리자 연결 목록은 붙인 에이전트마다 한 줄이고 재시작이 필요 없는 바인딩은 반영 중이고 다시 확인하는 반영 완료 단추가 있다", async ({ context, page }, testInfo) => {
   // mobile 과 desktop 이 같은 Control Plane 을 쓰므로 project 마다 다른 사용자를 둔다.
   const owner = { email: `admin-bindings-${testInfo.project.name}@example.com`, name: `반영 확인 사용자 ${testInfo.project.name}` };
   await setSession(context, owner);
@@ -201,7 +201,8 @@ test("관리자 연결 목록은 붙인 에이전트마다 한 줄이고 한 줄
       const { code } = (await created.json()) as { code: string };
       codes.push(code);
       const bound = await bindDemoConnector(owner.email, code);
-      expect(bound).toMatchObject({ bound: true, status: "PENDING", restartRequired: true });
+      // 새 서버만 더한 붙이기는 재시작이 필요 없다. 반영 지연(기본 150초) 안에는 PENDING 이다.
+      expect(bound).toMatchObject({ bound: true, status: "PENDING", restartRequired: false });
     }
 
     await setSession(context, { email: "browser@example.com", name: "브라우저 테스트" });
@@ -210,16 +211,14 @@ test("관리자 연결 목록은 붙인 에이전트마다 한 줄이고 한 줄
     await expect(rows).toHaveCount(2);
     const first = rows.filter({ hasText: `에이전트 ${codes[0]}` });
     const second = rows.filter({ hasText: `에이전트 ${codes[1]}` });
-    await expect(first).toContainText("반영 대기");
-    await expect(second).toContainText("반영 대기");
-
-    await first.getByRole("button", { name: "반영 완료" }).click();
-
-    // 반영된 줄은 단추가 사라진다. 시험 서버가 선언하지 않은 도구를 하나 내므로 그 표시와 함께 목록에 남는다.
-    await expect(first).toContainText("붙음");
-    await expect(first.getByRole("button", { name: "반영 완료" })).toHaveCount(0);
-    await expect(second).toContainText("반영 대기");
-    await expect(second.getByRole("button", { name: "반영 완료" })).toBeVisible();
+    await expect(first).toContainText("반영 중");
+    await expect(second).toContainText("반영 중");
+    // 예약 확인이 실패해 남은 줄도 관리자가 다시 확인할 수 있도록 단추가 있고, 재시작을 요구하지 않는다.
+    for (const row of [first, second]) {
+      await expect(row.getByRole("button", { name: "반영 완료" })).toBeVisible();
+      await expect(row).toContainText("몇 분이 지나도 남아 있으면 눌러 다시 확인해요.");
+      await expect(row).not.toContainText("재시작한 뒤 눌러 주세요");
+    }
   } finally {
     await setSession(context, owner);
     for (const code of codes) {

@@ -1,8 +1,9 @@
 /**
  * 사용자가 한 번 연결한 계정을 자기 비공개 에이전트에 붙여, 그 에이전트가 커넥터 도구를 직접 부르는 흐름을 본다(ADR-083).
  *
- * <p>붙이기는 대역의 보관 파일 값을 그 에이전트 profile 에 바인딩 설치로 옮기고, 관리자가 공유 gateway 를 재시작한 뒤
- * 반영 완료를 눌러야 쓸 수 있다. 대역이 그 profile 의 hook 처럼 도구 호출마다 Control Plane 에 판정을 묻는다. 연결의 주인은
+ * <p>붙이기는 대역의 보관 파일 값을 그 에이전트 profile 에 바인딩 설치로 옮긴다. 새 서버를 더한 붙이기는 재시작이 필요 없어
+ * Control Plane 이 반영 지연 뒤 스스로 확인해 쓸 수 있게 하고, 값 교체처럼 재시작 대기가 된 바인딩만 관리자가 공유 gateway 를
+ * 재시작한 뒤 반영 완료를 눌러야 한다. 대역이 그 profile 의 hook 처럼 도구 호출마다 Control Plane 에 판정을 묻는다. 연결의 주인은
  * 관리자가 아닌 kid 다. 관리자인 dad 가 남의 에이전트에 붙이거나 떼지 못하는 것을 함께 보기 위해서다.
  */
 import { call, expect, expectStatus, fail, step, type Context, type Scenario } from "../harness.ts";
@@ -16,10 +17,13 @@ import {
 } from "../fake-hermes.ts";
 import { readEventStream } from "../../../web/src/lib/stream.ts";
 import {
+  awaitReady,
   bind,
   confirm,
+  connect,
   ConnectorSetup,
   connectionPath,
+  DEMO_VALUES,
   probeTool,
   requestNumber,
   useConnectorPolicy,
@@ -44,7 +48,10 @@ const CONNECTION = connectionPath(DEMO_CONNECTOR.id);
 const PREFIX = `mcp__${DEMO_CONNECTOR.mcp_server}__`;
 const CONTROL_PLANE_MCP = "fos-assistant";
 /** 연결은 쓸 수 있는데 그 에이전트에 붙인 것이 아직 반영되지 않은 호출에 Control Plane 이 답하는 글이다. 판정은 `NOT_READY` 다. */
-const BINDING_PENDING = "관리자가 반영을 마치면 이 연결을 쓸 수 있다. 지금은 실행하지 않았으니 사용자에게 반영을 기다리라고 알린다.";
+/** 반영 예정 없이 PENDING 으로 남은 바인딩의 호출에 Control Plane 이 답하는 글이다. */
+const BINDING_CHECK = "이 연결이 준비되지 않아 실행하지 않았다. 사용자에게 연결 화면에서 연결을 확인하라고 알린다.";
+const BINDING_PENDING = "이 에이전트에 붙인 연결이 아직 반영되지 않았다. 대개 몇 분 안에 저절로 반영되니 사용자에게 잠시 뒤 다시 시도하라고 알린다.";
+const BINDING_RESTART = "이 에이전트에 붙인 연결은 관리자가 반영을 마쳐야 쓸 수 있다. 지금은 실행하지 않았으니 사용자에게 관리자의 반영을 기다리라고 알린다.";
 /** 그 실행의 에이전트에 그 서버를 붙인 연결이 없어 줄을 남기지 않고 막은 호출의 글이다. */
 const NO_CONTEXT = "이 도구 호출의 실행 맥락을 확인하지 못해 실행하지 않았다.";
 const APPROVAL_PREFIX = "이 동작은 사용자의 승인이 필요하다. 승인 요청 번호는 ";
@@ -118,12 +125,12 @@ export const connectorBindingScenario: Scenario = {
       const mine = (): ConnectorToolCall[] =>
         context.hermes.connectorToolCalls().filter((entry) => entry.profile === agent.profile);
 
-      step("붙이면 대역이 보관 파일로 바인딩 설치를 받고 그 profile 의 도구 목록에 서버 이름이 더해지며 Control Plane MCP 가 남는다");
+      step("붙이면 재시작이 필요 없는 PENDING 이고 대역이 보관 파일로 바인딩 설치를 받고 그 profile 의 도구 목록에 서버 이름이 더해지며 Control Plane MCP 가 남는다");
       const requestsAtBind = context.hermes.connectorRequests().length;
       const bound = await bind(context, owner, agent.code, DEMO_CONNECTOR.id);
       expect(
-        bound.bound && bound.status === "PENDING" && bound.restartRequired && bound.connectionStatus === "READY",
-        `붙인 바인딩이 재시작 대기의 PENDING 이 아니다: ${JSON.stringify(bound)}`,
+        bound.bound && bound.status === "PENDING" && !bound.restartRequired && bound.connectionStatus === "READY",
+        `붙인 바인딩이 재시작이 필요 없는 PENDING 이 아니다: ${JSON.stringify(bound)}`,
       );
       const bindRequests = context.hermes.connectorRequests().slice(requestsAtBind);
       expect(
@@ -145,8 +152,8 @@ export const connectorBindingScenario: Scenario = {
       const pendingRow = pendingList.connections.find((connection) => connection.connectorId === DEMO_CONNECTOR.id);
       expect(
         pendingList.blockedReason === null && pendingRow?.bound === true && pendingRow.status === "PENDING"
-          && pendingRow.restartRequired && pendingRow.toolCount === Object.keys(DEMO_CONNECTOR.tools).length,
-        `에이전트의 연결 목록이 반영 대기를 보이지 않는다: ${JSON.stringify(pendingList)}`,
+          && !pendingRow.restartRequired && pendingRow.toolCount === Object.keys(DEMO_CONNECTOR.tools).length,
+        `에이전트의 연결 목록이 재시작이 필요 없는 PENDING 을 보이지 않는다: ${JSON.stringify(pendingList)}`,
       );
       const bodies = [
         JSON.stringify(bound),
@@ -169,20 +176,30 @@ export const connectorBindingScenario: Scenario = {
       expect(early.answer === `block ${BINDING_PENDING}`, `반영 전 호출이 반영 대기 글로 막히지 않았다: ${early.answer}`);
       expect(mine().length === 0, `반영 전 호출이 커넥터 서버에 닿았다: ${JSON.stringify(mine())}`);
 
-      step("관리자가 반영 완료를 누르면 READY 다");
-      await confirm(context, agent.code, DEMO_CONNECTOR.id);
-      const readyRow = (await connectionsOf(context, owner, agent.code)).connections
-        .find((connection) => connection.connectorId === DEMO_CONNECTOR.id);
-      expect(
-        readyRow?.bound === true && readyRow.status === "READY" && !readyRow.restartRequired,
-        `반영 완료 뒤 에이전트의 연결이 READY 가 아니다: ${JSON.stringify(readyRow)}`,
-      );
+      step("관리자 반영 완료 없이 Control Plane 이 스스로 확인해 READY 가 된다");
+      const readyRow = await awaitReady(context, owner, agent.code, DEMO_CONNECTOR.id);
       const connection = expectStatus(await call(context, CONNECTION, { token: owner }), 200, "연결 상태").json<ConnectionView>();
       expect(
         JSON.stringify(connection.bindings.map((binding) => [binding.agentCode, binding.status, binding.restartRequired]))
           === JSON.stringify([[agent.code, "READY", false]]),
         `연결 상태의 붙인 에이전트가 다르다: ${JSON.stringify(connection.bindings)}`,
       );
+
+      step("붙은 연결의 scope 를 비워 다시 등록하면 재시작 대기가 되고 관리자가 반영 완료를 눌러야 READY 로 돌아온다");
+      // 처음 등록한 DEMO_VALUES 에서 토큰은 그대로 두고 선택 칸인 scope 만 비운다. 대역의 scope 선택지가 "a" 하나뿐이라
+      // 다른 선택지로는 바꿀 수 없다. 이미 있던 서버의 env 가 바뀌는 값 교체이므로 떠 있는 MCP 프로세스가 옛 값을 쥐어 재시작이 필요하다.
+      await connect(context, owner, DEMO_CONNECTOR.id, { token: DEMO_VALUES.token });
+      const restartRow = (await connectionsOf(context, owner, agent.code)).connections
+        .find((row) => row.connectorId === DEMO_CONNECTOR.id);
+      expect(
+        restartRow?.bound === true && restartRow.status === "PENDING" && restartRow.restartRequired,
+        `값을 바꿔 다시 등록한 바인딩이 재시작 대기가 아니다: ${JSON.stringify(restartRow)}`,
+      );
+      const waiting = await probeTool(context, owner, agent.code, `${PREFIX}list_scopes`);
+      expect(waiting.answer === `block ${BINDING_RESTART}`, `재시작 대기 바인딩의 호출이 관리자 반영 글로 막히지 않았다: ${waiting.answer}`);
+      expect(mine().length === 0, `재시작 대기 중 호출이 커넥터 서버에 닿았다: ${JSON.stringify(mine())}`);
+      const confirmedRow = await confirm(context, agent.code, DEMO_CONNECTOR.id);
+      expect(confirmedRow.status === "READY", `관리자 반영 완료 뒤 READY 가 아니다: ${JSON.stringify(confirmedRow)}`);
 
       step("같은 에이전트의 실행이 읽기 도구를 부르면 허용되어 커넥터 서버에 닿는다");
       const read = await probeTool(context, owner, agent.code, `${PREFIX}list_scopes`);
@@ -258,7 +275,8 @@ export const connectorBindingScenario: Scenario = {
         `hook 이 꺼졌는데 연결은 READY 이고 바인딩은 PENDING 이 아니다: ${JSON.stringify(offCheck)}`,
       );
       const offProbe = await probeTool(context, owner, agent.code, `${PREFIX}list_scopes`);
-      expect(offProbe.answer === `block ${BINDING_PENDING}`, `PENDING 바인딩의 호출이 반영 대기 글로 막히지 않았다: ${offProbe.answer}`);
+      // 반영 예정 없이 PENDING 으로 내려간 바인딩은 저절로 풀리지 않아 연결 확인을 안내한다.
+      expect(offProbe.answer === `block ${BINDING_CHECK}`, `예정 없는 PENDING 바인딩의 호출이 연결 확인 글로 막히지 않았다: ${offProbe.answer}`);
       context.hermes.setPolicyHook(agent.profile, true);
       hookOff = undefined;
       const onCheck = expectStatus(

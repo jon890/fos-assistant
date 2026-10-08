@@ -166,6 +166,20 @@ OWN_ROUTES = frozenset({
     ("GET", "/api/profiles/{}/sessions/{}/provider"),
 })
 
+# 바인딩 설치가 재시작 없이 반영되는 데 기대는 지점이다(ADR-20261007 connector-live-reload).
+# 공유 gateway 의 housekeeping 이 profile 마다 `mcp_servers` 와 살아 있는 연결을 맞추고,
+# 스킬 색인 캐시 키에 `skills.disabled` 가 들어 있어 plugin 이 바꾼 색인 표식이 그 profile 의 색인을 새로 만들게 한다.
+# 이 지점이 바뀌면 붙인 커넥터가 재시작 전까지 보이지 않는데 Control Plane 은 반영됐다고 판정한다.
+LIVE_RELOAD = {
+    # housekeeping 작업 목록에 MCP 설정 맞추기 작업이 있다. 그 이름 문자열이 있는 파일이다.
+    "reconcile_chore": ("gateway/run.py", "MCP config reconcile"),
+    # 맞추기 작업을 만드는 함수와, 그 안에서 부르는 맞추기 함수다.
+    "reconciler": ("gateway/run_profile_reconcile.py", "_mcp_config_reconciler", "reconcile_mcp_servers_with_config"),
+    # 스킬 색인을 만드는 함수, 꺼진 스킬 이름을 읽는 함수, 그 결과를 담는 이름, 캐시 키를 담는 이름이다.
+    "skill_index_key": ("agent/prompt_builder.py", "_build_skills_system_prompt_inner", "get_disabled_skill_names",
+                        "disabled", "cache_key"),
+}
+
 # 바꿔 끼우기를 공개 확장점으로 대체하지 못하게 막는 지점이다(ADR-088).
 # 상류가 이 시그니처를 바꾸면 메서드 단위 등록이나 쿠키로 넘기기가 생겼을 수 있다. 실패하면 ADR-088 의 판정을 다시 본다.
 REVISIT_SIGNALS = {

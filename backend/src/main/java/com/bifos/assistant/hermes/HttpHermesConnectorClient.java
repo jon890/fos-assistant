@@ -318,7 +318,9 @@ public class HttpHermesConnectorClient implements HermesConnectorClient {
             throw new IllegalStateException();
         }
         return new InstallResult(
-                requiredBoolean(body, RESTART_REQUIRED), optionalBoolean(body, "plugin_updated", false));
+                requiredBoolean(body, RESTART_REQUIRED),
+                optionalBoolean(body, "plugin_updated", false),
+                optionalBoolean(body, "reload_pending", false));
     }
 
     @Override
@@ -584,13 +586,8 @@ public class HttpHermesConnectorClient implements HermesConnectorClient {
 
     private static boolean optionalBoolean(JsonNode node, String field, boolean fallback) {
         JsonNode value = node.get(field);
-        if (value == null || value.isNull()) {
-            return fallback;
-        }
-        if (!value.isBoolean()) {
-            throw new IllegalStateException();
-        }
-        return value.asBoolean();
+        // 칸이 있으면 필수 칸과 같게 읽는다. 불리언이 아니면 실패다.
+        return value == null || value.isNull() ? fallback : requiredBoolean(node, field);
     }
 
     private static void requireText(JsonNode node, String field, String expected) {

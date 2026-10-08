@@ -202,19 +202,35 @@ sequenceDiagram
         else 대시보드 401. 표식 없는 profile
             D-->>C: 401
             C-->>B: 409 CONNECTOR_PROFILE_NOT_READY. 바인딩 행이 남지 않는다
-        else 붙였다
-            D-->>C: restart_required
+        else 새 서버를 더했다
+            D-->>C: reload_pending
+            C->>C: apply_due_at 에 지금 더하기 150초를 적는다
             C-->>B: 바인딩 PENDING. 화면은 「반영 대기」
+        else 이미 있던 서버가 바뀌었다
+            D-->>C: restart_required
+            C-->>B: 바인딩 PENDING, 재시작 대기
         end
     end
 
-    A->>G: 공유 gateway 재시작
-    A->>C: POST /api/v1/admin/agents/{code}/connections/{connectorId}/confirm (restartRequiredSince)
-    alt 재시작 뒤에 다시 설치됐다
-        C-->>A: 409 CONNECTOR_RESTART_AGAIN
-    else
-        C->>D: 설치를 다시 보내고 상태와 policy_hook 을 읽고 MCP probe
-        C-->>A: 바인딩 READY
+    Note over G: MCP 설정 맞추기가 60초마다 새 서버 이름을 연결한다
+    C->>C: 30초마다 apply_due_at 이 지난 바인딩을 찾는다
+    C->>C: 사용자 행, 에이전트 행 차례로 잠그고 apply_due_at 을 비운다
+    C->>D: 설치를 다시 보내고 상태와 policy_hook 을 읽고 MCP probe
+    alt probe 가 도구를 냈다
+        C->>C: 바인딩 READY
+    else probe 실패
+        C->>C: 바인딩 PENDING. 다음 연결 확인이 다시 맞춘다
+    end
+
+    opt restart_required 였던 바인딩
+        A->>G: 공유 gateway 재시작
+        A->>C: POST /api/v1/admin/agents/{code}/connections/{connectorId}/confirm (restartRequiredSince)
+        alt 재시작 뒤에 다시 설치됐다
+            C-->>A: 409 CONNECTOR_RESTART_AGAIN
+        else
+            C->>D: 설치를 다시 보내고 상태와 policy_hook 을 읽고 MCP probe
+            C-->>A: 바인딩 READY
+        end
     end
 
     Note over G,H: 대화 turn 안에서 모델이 커넥터 도구를 부른다
@@ -229,9 +245,10 @@ sequenceDiagram
     C-->>B: 204. 다음 실행부터 그 도구가 막힌다
 ```
 
-- 같은 사용자의 등록, 확인, 해제, 붙이기, 떼기, 승인은 사용자 행 잠금으로 줄을 선다. 붙이기, 떼기, 반영 완료, 지우기는 그다음 에이전트 행을 잠근다. 공개 범위 변경도 같은 에이전트 행을 기다려 잠그므로 붙이기와 동시에 와도 한쪽이 다른 쪽의 커밋을 보고 판정한다
+- 같은 사용자의 등록, 확인, 해제, 붙이기, 떼기, 승인은 사용자 행 잠금으로 줄을 선다. 붙이기, 떼기, 반영 완료, 반영 예정 확인, 지우기는 그다음 에이전트 행을 잠근다. 공개 범위 변경도 같은 에이전트 행을 기다려 잠그므로 붙이기와 동시에 와도 한쪽이 다른 쪽의 커밋을 보고 판정한다
 - 대시보드의 그 밖의 실패는 바인딩을 `PENDING` 으로 남기고 502 `CONNECTOR_OPERATION_FAILED` 다. 다음 연결 확인이 설치를 다시 보낸다
-- 반영 완료 전이나 연결이 확인되지 않은 동안의 호출은 판정이 `NOT_READY` 로 막는다. 그 에이전트의 다른 도구는 그대로 돈다
+- 새 서버를 더한 붙이기는 공유 gateway 를 재시작하지 않는다. Control Plane 이 반영 예정 시각이 지나면 스스로 확인한다([ADR-20261007 / connector-live-reload](adr/ADR-20261007-connector-live-reload.md)). 관리자 반영 완료는 `restart_required` 인 바인딩에만 남는다
+- 바인딩이 `READY` 가 되기 전이나 연결이 확인되지 않은 동안의 호출은 판정이 `NOT_READY` 로 막는다. 그 에이전트의 다른 도구는 그대로 돈다
 
 ## 실행이 실패할 때
 

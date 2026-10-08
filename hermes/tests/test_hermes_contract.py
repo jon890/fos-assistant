@@ -449,6 +449,43 @@ class HermesSourceTest(unittest.TestCase):
                              if isinstance(node, ast.Constant) and isinstance(node.value, str)}
                 self.assertIn(flag, constants)
 
+    def test_live_reload_points(self):
+        """바인딩 설치가 재시작 없이 반영되는 데 기대는 MCP 설정 맞추기와 스킬 색인 캐시 키가 그대로인지 본다."""
+        revisit = "Hermes 를 올리면 재시작 없는 반영이 깨질 수 있다. ADR-20261007 connector-live-reload 를 다시 본다"
+
+        def function(tree, name):
+            found = [node for node in ast.walk(tree)
+                     if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and node.name == name]
+            self.assertTrue(found, "%s 가 없다. %s" % (name, revisit))
+            return found[0]
+
+        def calls(node, name):
+            return [call for call in ast.walk(node) if isinstance(call, ast.Call) and (
+                (isinstance(call.func, ast.Name) and call.func.id == name)
+                or (isinstance(call.func, ast.Attribute) and call.func.attr == name))]
+
+        relative, label = contract.LIVE_RELOAD["reconcile_chore"]
+        constants = {node.value for node in ast.walk(self.tree(self.root / relative))
+                     if isinstance(node, ast.Constant) and isinstance(node.value, str)}
+        self.assertTrue(label in constants, "%s 에 housekeeping 작업 %r 가 없다. %s" % (relative, label, revisit))
+
+        relative, reconciler, reconcile = contract.LIVE_RELOAD["reconciler"]
+        node = function(self.tree(self.root / relative), reconciler)
+        self.assertTrue(calls(node, reconcile), "%s 가 %s 를 부르지 않는다. %s" % (reconciler, reconcile, revisit))
+
+        relative, builder, reader, result, key = contract.LIVE_RELOAD["skill_index_key"]
+        node = function(self.tree(self.root / relative), builder)
+        reads = [statement for statement in ast.walk(node) if isinstance(statement, ast.Assign)
+                 and any(isinstance(target, ast.Name) and target.id == result for target in statement.targets)
+                 and calls(statement.value, reader)]
+        self.assertTrue(reads, "%s 가 %s 의 결과를 %s 에 담지 않는다. %s" % (builder, reader, result, revisit))
+        keys = [statement for statement in ast.walk(node) if isinstance(statement, ast.Assign)
+                and any(isinstance(target, ast.Name) and target.id == key for target in statement.targets)]
+        self.assertTrue(keys, "%s 에 %s 할당이 없다. %s" % (builder, key, revisit))
+        self.assertTrue(any(isinstance(name, ast.Name) and name.id == result
+                            for statement in keys for name in ast.walk(statement.value)),
+                        "%s 의 %s 에 %s 가 없다. %s" % (builder, key, result, revisit))
+
     def test_session_store(self):
         paths = [node for node in ast.walk(self.tree(self.root / contract.SESSION_DB_MODULE))
                  if isinstance(node, ast.BinOp) and isinstance(node.op, ast.Div)
