@@ -56,6 +56,10 @@ public class AgentMemorySettingService {
      * <p>주인 번호가 있어도 그 사용자를 찾지 못하면 주인이 없는 에이전트처럼 관리자 그룹의 항목만 센다. 그룹의 collection
      * 목록이 비어 있으면 기본 목록을 넣으므로 쓰기 트랜잭션으로 돈다.
      *
+     * <p>{@link #replace} 가 같은 클래스에서 직접 부를 때는 프록시를 거치지 않아 이 메서드의 트랜잭션이 적용되지 않는다. 그때는
+     * 트랜잭션 없이 돌아 각 읽기가 자기 트랜잭션에서 돈다. 그래서 그 사이 다른 저장이 끼면 응답이 서로 다른 시점의 값을 섞을 수
+     * 있다. 화면은 다음 읽기에서 맞춰진다.
+     *
      * @throws ApiException 없거나 지운 에이전트면 {@code AGENT_NOT_FOUND}, 커넥터 에이전트면 {@code FORBIDDEN}
      */
     @Transactional
@@ -99,7 +103,7 @@ public class AgentMemorySettingService {
      * <p><b>이 메서드에는 트랜잭션을 걸지 않는다.</b> 걸면 에이전트와 그룹 목록을 읽는 것이 잠금 전에 같은 트랜잭션에
      * 들어가, {@link AgentMemoryCollectionService#replace} 가 잠금을 기다린 뒤에도 다른 저장이 커밋하기 전의 옛 줄을 본다.
      * 그 메서드의 잠금 읽기가 자기 트랜잭션의 첫 읽기여야 한다. 그룹 목록에도 지금 받는 줄에도 없는 key 의 거절도 그 메서드가
-     * 잠금 뒤에 한다.
+     * 잠금 뒤에 한다. 응답을 만드는 {@link #settingOf} 읽기도 트랜잭션 없이 돈다.
      *
      * @param next 받을 collection 전체다. 비어 있으면 모두 뗀다
      * @throws ApiException 같은 collection 이 둘이거나 64개를 넘거나 목록에 없는 collection 이 있으면
