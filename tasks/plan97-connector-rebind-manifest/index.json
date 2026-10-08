@@ -1,9 +1,0 @@
-{
-  "name": "plan97-connector-rebind-manifest",
-  "description": "실행 정의가 바뀐 바인딩을 기존 연결 값으로 다시 설치한다",
-  "status": "pending",
-  "created_at": "2026-10-08",
-  "total_phases": 1,
-  "current_phase": 1,
-  "phases": [{"number": 1, "file": "phase-01.md", "execution_profile": "standard"}]
-}
