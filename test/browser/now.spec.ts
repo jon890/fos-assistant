@@ -429,11 +429,17 @@ test.describe("지금 화면", () => {
       /^\/api\/follow-ups\/[^/]+\/accept$/,
     );
     await expect(row).toContainText("챙기고 있는 할 일이에요", REFRESHED);
+    await expect(row).toContainText("대화에서");
+    await expect(row).not.toContainText("직접 더함");
     for (const name of ["끝냄", "그만둠", "고치기"]) {
       await expect(row.getByRole("button", { name, exact: true })).toBeVisible();
     }
     await expect(row.getByRole("button", { name: "받아들이기" })).toHaveCount(0);
     await expect(row.getByRole("button", { name: "거절" })).toHaveCount(0);
+
+    await openNow(page);
+    await expect(row).toContainText("대화에서");
+    await expect(row).not.toContainText("직접 더함");
 
     if (testInfo.project.name === "mobile") {
       await row.getByRole("button", { name: "이 항목 제어" }).click();

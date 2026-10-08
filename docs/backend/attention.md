@@ -220,7 +220,7 @@
 | 칸 | 채우는 항목 | 담는 것 |
 | --- | --- | --- |
 | `execution` | `DELEGATION_RUNNING`, `DELEGATION_FINISHED` | `{ id, status }`. `status` 는 `RUNNING`, `SUCCEEDED`, `FAILED`, `CANCELLED` |
-| `followUp` | `FOLLOW_UP_PROPOSED`, `FOLLOW_UP_OPEN` | `{ id, dueAt, waiting, proposed }`. `id` 는 할 일의 공개 식별자 |
+| `followUp` | `FOLLOW_UP_PROPOSED`, `FOLLOW_UP_OPEN` | `{ id, dueAt, waiting, proposed, agentProposed }`. `id` 는 할 일의 공개 식별자. `proposed` 는 아직 받아들이지 않은 제안인지, `agentProposed` 는 에이전트가 제안한 출처인지다 |
 | `report` | `PROACTIVE_REPORT` | `{ checkId, agentCode, changed, done, evidence, needsApproval, next }`. 보고는 `LATER` 이며 승인 대기의 건수는 기존 `APPROVAL_PENDING` 에서 센다 |
 | `actionId` | `APPROVAL_PENDING` | 승인 줄의 공개 식별자 |
 
