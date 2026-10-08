@@ -2,7 +2,7 @@
 
 - **status**: `accepted`
 - Date: 2026-10-08
-- **개정된 부분**: 「호출량」 의 「`list_orders` 는 한 쪽(100건)만 읽는다」 는 결과로 돌려줄 때만이다. `output: "file"` 은 [ADR-20261008 / connector-output-files](ADR-20261008-connector-output-files.md) 의 파일 출력으로 기간 전체를 100건씩 최대 20쪽 읽는다. 규칙은 [토스증권 커넥터](../connectors/tossinvest.md) 의 「주문 내역 파일」 이 갖는다
+- **개정된 부분**: 「호출량」 의 「한 도구 호출이 같은 API 를 여러 번 부르지 않는다」 와 「`list_orders` 는 한 쪽(100건)만 읽는다」 는 결과로 돌려줄 때만이다. `output: "file"` 은 [ADR-20261008 / connector-output-files](ADR-20261008-connector-output-files.md) 의 파일 출력으로 기간 전체를 100건씩 최대 20쪽 읽고, 쪽 사이에 쉬며, 429 면 그 쪽을 한 번만 다시 부른다. 규칙은 [토스증권 커넥터](../connectors/tossinvest.md) 의 「주문 내역 파일」 이 갖는다
 - 커넥터 계약은 [ADR-043](ADR-043-커넥터는-plugin-의-connector-json-으로-선언하고-control-plane-은-범용-흐름만-갖는다.md) 과 [ADR-049](ADR-049-커넥터-도구-호출은-profile-plugin-의-hook-이-control-plane-에-물어-판정한다.md) 를 따른다. 바인딩 제한은 [ADR-20261008 / connector-binding-guards](ADR-20261008-connector-binding-guards.md) 의 것이다.
 
 ### 결정
@@ -31,7 +31,7 @@
 - 클라이언트당 유효한 토큰이 하나다. 새로 받으면 직전 토큰이 바로 `401 token-revoked` 가 된다. 확인 도구, 선택지 호출, Hermes 가 쥔 MCP 프로세스가 서로 다른 프로세스라 서로의 토큰을 무효로 만든다
 - 키에 권한 범위가 없다. 조회만 하는 커넥터의 키로도 주문할 수 있다
 - 호출은 등록한 허용 IP 에서만 된다. 가정 회선은 공인 IP 가 바뀔 수 있다
-- 호출 한도는 클라이언트와 API 그룹마다 초당이고, 계좌 그룹은 초당 1회다. 공지 없이 바뀔 수 있다
+- 호출 한도는 클라이언트와 API 그룹마다 초당이고, 계좌 그룹은 초당 1회, 주문 내역 그룹은 초당 5회다. 공지 없이 바뀔 수 있다
 - 모의투자 환경이 없다
 
 ### 대안 기각
