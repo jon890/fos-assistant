@@ -18,6 +18,7 @@ import com.bifos.assistant.attention.application.model.AttentionView;
 import com.bifos.assistant.attention.domain.type.AttentionLevel;
 import com.bifos.assistant.attention.domain.type.AttentionTrigger;
 import com.bifos.assistant.attention.domain.type.CardKey;
+import com.bifos.assistant.attention.presentation.AttentionDtos;
 import com.bifos.assistant.chat.domain.ChatMessage;
 import com.bifos.assistant.chat.domain.Conversation;
 import com.bifos.assistant.chat.infra.ChatMessageRepository;
@@ -147,6 +148,7 @@ class FollowUpAttentionSourceTest {
         assertThat(item.followUp().proposed()).isTrue();
         assertThat(item.followUp().agentProposed()).isTrue();
         assertThat(view.nowCount()).as("기한이 코앞이어도 제안은 건수에 들지 않는다").isZero();
+        assertFollowUpResponse(view, true, true);
 
         proposed.accept(NOW.plusSeconds(1));
         followUps.save(proposed);
@@ -155,6 +157,7 @@ class FollowUpAttentionSourceTest {
         assertThat(accepted.trigger()).isEqualTo(AttentionTrigger.FOLLOW_UP_OPEN);
         assertThat(accepted.followUp().proposed()).isFalse();
         assertThat(accepted.followUp().agentProposed()).isTrue();
+        assertFollowUpResponse(service.view(dad), false, true);
     }
 
     @Test
@@ -460,5 +463,18 @@ class FollowUpAttentionSourceTest {
         List<AttentionItem> items = card(view).items();
         assertThat(items).as("나를 기다리는 카드의 항목").hasSize(1);
         return items.getFirst();
+    }
+
+    /** API 응답 DTO도 제안 상태와 에이전트 출처를 따로 낸다. */
+    private static void assertFollowUpResponse(AttentionView view, boolean proposed, boolean agentProposed) {
+        AttentionDtos.FollowUpView followUp = AttentionDtos.ViewResponse.from(view).cards().stream()
+                .filter(card -> card.key().equals("needs_me"))
+                .findFirst()
+                .orElseThrow(() -> new AssertionError("나를 기다리는 카드 응답이 없다"))
+                .items()
+                .getFirst()
+                .followUp();
+        assertThat(followUp.proposed()).isEqualTo(proposed);
+        assertThat(followUp.agentProposed()).isEqualTo(agentProposed);
     }
 }

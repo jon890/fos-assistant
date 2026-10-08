@@ -210,12 +210,17 @@ public final class AttentionDtos {
     }
 
     /** @param id 할 일의 공개 식별자 */
-    public record FollowUpView(UUID id, Instant dueAt, boolean waiting, boolean proposed) {
+    public record FollowUpView(UUID id, Instant dueAt, boolean waiting, boolean proposed, boolean agentProposed) {
 
         static FollowUpView from(AttentionFollowUpRef followUp) {
             return followUp == null
                     ? null
-                    : new FollowUpView(followUp.id(), followUp.dueAt(), followUp.waiting(), followUp.proposed());
+                    : new FollowUpView(
+                            followUp.id(),
+                            followUp.dueAt(),
+                            followUp.waiting(),
+                            followUp.proposed(),
+                            followUp.agentProposed());
         }
     }
 
