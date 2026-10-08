@@ -89,3 +89,21 @@ export function adminBrowserAction(
     ? fetch(`/api/admin/browsers/${id}/stop`, { method: "POST" })
     : fetch(`/api/admin/browsers/${id}`, { method: "DELETE" });
 }
+
+/** 로그인 화면 SSE 를 연다. 끝나지 않는 응답이라 `signal` 로 끊는다. 시작 주소는 고를 수 있다. */
+export function openBrowserScreen(
+  url: string | null,
+  signal: AbortSignal,
+): Promise<Response> {
+  const query = url ? `?${new URLSearchParams({ url })}` : "";
+  return fetch(`/api/browser/screen${query}`, { cache: "no-store", signal });
+}
+
+/** 열린 화면에 입력 하나를 보낸다. 본문 모양은 `components/browser/screen-input.ts` 가 정한다. */
+export function sendScreenInput(body: object): Promise<Response> {
+  return fetch("/api/browser/screen/input", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+}
