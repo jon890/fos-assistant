@@ -112,3 +112,5 @@ node scripts/check-file-length.mjs
 | `hermes/connectors/tossinvest/dist/tossinvest-mcp.js` | 수정 |
 | `hermes/connectors/tossinvest/tests/support.ts` | 수정 |
 | `hermes/connectors/tossinvest/tests/account-tools.test.ts` | 신규 |
+| `docs/privacy.md` | 수정 |
+| `docs/connectors/tossinvest.md` | 수정 |

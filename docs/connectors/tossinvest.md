@@ -43,13 +43,13 @@ MCP 서버 이름은 `tossinvest` 다. 도구는 모두 `READ` 이고 승인 없
 
 | 도구 | 인자 | 결과 |
 | --- | --- | --- |
-| `list_accounts` | 없음 | `{accounts: [{account_seq, account_type, label}]}`. `label` 은 `종합매매 ****1234` 꼴이다. 계좌번호 원문은 싣지 않는다 |
+| `list_accounts` | 없음 | `{accounts: [{account_seq, account_type, label}]}`. `label` 은 `종합매매 ****1234` 꼴이다. 계좌번호 원문은 싣지 않는다. 순번이 1~10자리 숫자가 아닌 계좌는 뺀다 |
 | `get_quotes` | `symbols`: 쉼표로 이은 종목 코드나 티커 1~20개 | `{quotes: [{symbol, name, last_price, currency, timestamp}]}` |
 | `get_holdings` | 없음 | `{total, items}`. 금액은 공제 전(`market_value`, `profit_loss`, `profit_loss_rate`)과 비용 공제 후(`..._after_cost`)를 함께 싣는다. `total` 의 금액은 `{krw, usd}` 이고, `items` 의 금액은 그 종목의 거래 통화 기준 글 하나다. 금액과 수량은 API 가 준 10진수 글 그대로다 |
-| `get_buying_power` | `currency`: `KRW` 나 `USD`. `symbol`: 선택 | `{currency, cash_buying_power, sellable_quantity?}` |
+| `get_buying_power` | `currency`: `KRW` 나 `USD`. `symbol`: 선택 | `{currency, cash_buying_power, sellable_quantity}`. `sellable_quantity` 는 `symbol` 을 주지 않으면 null 이다 |
 | `list_orders` | `status`: `OPEN` 이나 `CLOSED`. `from`, `to`: 선택, `YYYY-MM-DD`(한국 시각). `symbol`: 선택 | `{orders, has_more}`. 아래 「주문 내역」 |
 
-종목 기호는 `^[A-Za-z0-9.-]{1,12}$` 만 받는다. 종목 이름은 100자로 자른다. 날짜는 `from` 이 `to` 보다 늦거나 기간이 366일을 넘으면 `TOSSINVEST_INVALID_INPUT` 이다.
+종목 기호는 `^[A-Za-z0-9.-]{1,12}$` 만 받는다. 종목 이름은 100자, 그 밖에 서비스가 준 글은 64자(코드 포인트)로 자르고, 글과 숫자가 아닌 값은 null 로 둔다. 가격, 금액, 수량, 비율은 자르면 값이 바뀌므로 자르지 않는다. 10진수 꼴이 아니거나 64자를 넘으면 null 로 둔다. 날짜는 `from` 이 `to` 보다 늦거나 기간이 366일을 넘으면 `TOSSINVEST_INVALID_INPUT` 이다.
 
 ### 주문 내역
 
@@ -65,7 +65,7 @@ MCP 서버 이름은 `tossinvest` 다. 도구는 모두 `READ` 이고 승인 없
 
 ### 토큰
 
-- 토큰은 프로세스 메모리에만 둔다.
+- 토큰은 프로세스 메모리에만 둔다. `expires_in` 에서 60초 뺀 시각까지 쓴다. 그 값이 없거나 60초 이하면 `expires_in` 의 절반과 5초 가운데 긴 동안 쓴다. 매 호출이 토큰을 새로 받아 서로를 무효로 만들지 않게 하기 위해서다.
 - `401 token-revoked` 나 `expired-token` 을 받으면 토큰을 한 번 새로 받고 그 호출을 한 번만 다시 보낸다. 한 프로세스 안의 재발급은 한 번에 하나다.
 - 다시 보낸 호출도 `token-revoked` 면 다른 프로세스와 토큰을 다툰 것이라 `TOSSINVEST_UNAVAILABLE`(잠시 뒤 다시)로 끝낸다. 자격 증명이 틀린 것이 아니다.
 - `invalid-token` 과 `invalid_client` 는 다시 받지 않는다.
