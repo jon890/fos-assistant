@@ -12,8 +12,8 @@
 
 **근거 문서**: `docs/frontend/structure.md` 의 「가치 평가 절」 과 관리자 영역 표, `docs/backend/value-evaluation.md` 의 「관리자 화면이 읽는 묶음」
 
-- backend 경로(phase 01): `GET /api/v1/agents/{code}/proactive-check/evaluation`, `POST /api/v1/proactive-checks/{checkId}/evaluation-runs` 본문 `{ "provider": "hermes" }`. 응답 `{ check, evaluation, decisions }`
-  - `check`: `{ id, trigger, finishedAt, acceptedCandidates }` 또는 null
+- backend 경로(phase 01, 둘 다 `ADMIN` 만): `GET /api/v1/admin/agents/{code}/value-evaluation`, `POST /api/v1/admin/proactive-checks/{checkId}/value-evaluation-runs` 본문 `{ "provider": "hermes" }`. 응답 `{ check, evaluation, decisions }`
+  - `check`: `{ id, trigger, finishedAt, acceptedCandidates }` 또는 null. 받아들인 후보가 있는 살펴보기만 고르므로 `acceptedCandidates` 는 1 이상이다
   - `evaluation`: `{ id, replayOfId, outcome, failure, candidates: [{ id, problemKey, problem, actionType, sideEffect }], judgements: [{ candidateId, axes: [{ axis, choice, confidence, explanation, evidenceKeys }], confidence, explanation }], orderedCandidateIds, explanation }` 또는 null
   - `decisions`: `[{ id, candidateId, level, reasons, executionStatus }]`
 - 서버 컴포넌트는 `callControlPlane` 으로 읽는다(`web/src/components/agent/agent-detail-loader.tsx`). 브라우저는 `app/api/` 서버 라우트만 부른다(`web/AGENTS.md`)
@@ -25,6 +25,7 @@
 ## 의도 메모
 
 - provider 는 서버 라우트가 `hermes` 로 정한다. 브라우저 요청 본문은 읽지 않는다
+- 권한은 Control Plane 의 `requireAdmin()` 이 막는다. 웹 라우트를 `app/api/admin/` 아래에 두어 관리 경로임을 드러낸다
 - 모델이 쓴 설명은 평문으로 그린다. 마크다운으로도 그리지 않는다
 - 판정 묶음이 바뀌면 응답으로 절 상태를 통째로 바꾼다. `router.refresh()` 에 기대지 않는다
 
@@ -32,13 +33,14 @@
 
 ### 1. `web/src/lib/value-evaluation.ts` 신규
 
-응답 타입(`EvaluationOverview`, `ValueEvaluationView`, `AutonomyDecisionView` 등)과 `runValueEvaluation(checkId: number): Promise<Response>`(`POST /api/proactive-checks/{checkId}/evaluation-runs`).
+응답 타입(`EvaluationOverview`, `ValueEvaluationView`, `AutonomyDecisionView` 등)과 `runValueEvaluation(checkId: number): Promise<Response>`(`POST /api/admin/proactive-checks/{checkId}/value-evaluation-runs`).
+후보를 그릴 순서를 정하는 함수: `orderedCandidateIds` 의 순서로 두고, 거기 없는 후보는 식별자 오름차순으로 뒤에 붙인다(`FALLBACK` 이면 `orderedCandidateIds` 가 비어 식별자 순서가 된다).
 축 이름 표: `GOAL_ALIGNMENT` 목표와 맞음, `URGENCY` 시급함, `EXPECTED_BENEFIT` 기대 효과, `COST` 비용, `RISK` 위험, `EVIDENCE_QUALITY` 근거의 질.
 선택 표: `LOW` 낮음, `MEDIUM` 중간, `HIGH` 높음, `UNKNOWN` 모름. 확신도 같은 말을 쓴다.
 
-### 2. `web/src/app/api/proactive-checks/[checkId]/evaluation-runs/route.ts` 신규
+### 2. `web/src/app/api/admin/proactive-checks/[checkId]/value-evaluation-runs/route.ts` 신규
 
-`POST`. `checkId` 가 `^\d+$` 가 아니면 400 `VALIDATION_FAILED`. Control Plane 에 `{ provider: "hermes" }` 를 보내고 상태와 본문을 그대로 넘긴다.
+`POST`. `checkId` 가 `^\d+$` 가 아니면 400 `VALIDATION_FAILED`. Control Plane 의 `/api/v1/admin/proactive-checks/{checkId}/value-evaluation-runs` 에 `{ provider: "hermes" }` 를 보내고 상태와 본문을 그대로 넘긴다. 실패는 `errorResponse(result.code, result.message, result.status)`.
 
 ### 3. `web/src/components/error-message.ts`
 
@@ -46,15 +48,16 @@
 
 ### 4. `agent-detail-loader.tsx`, `agent-detail-body.tsx`
 
-- loader: `admin` 이고 살펴보기 상태 조회가 성공했을 때만 위 GET 을 읽는다. 실패하면 `{ ok: false, message }`
+- loader: `admin` 이고 살펴보기 상태 조회가 성공했을 때만 `GET /api/v1/admin/agents/{code}/value-evaluation` 을 읽는다. 살펴보기 상태 조회와 같은 `Promise.all` 묶음에 넣지 말고 그 결과를 본 뒤 읽는다. 실패하면 `{ ok: false, message: describeError(...) }`
 - body: `valueEvaluation?: Loaded<EvaluationOverview> | null` prop 을 받아, 먼저 살펴보기 절 바로 뒤에 새 절을 그린다. null 이면 그리지 않는다
 
 ### 5. `web/src/components/agent/agent-value-evaluation-section.tsx` 신규
 
 `section aria-label="가치 평가"`, 제목 「가치 평가」. `docs/frontend/structure.md` 의 「가치 평가 절」 표대로 그린다.
-- 살펴보기 없음: 「평가할 살펴보기가 없어요.」
+- 고를 살펴보기 없음: 「받아들인 문제 후보가 있는 살펴보기가 없어요.」
 - 있음: 끝난 시각(`formatWhen`), 「받아들인 문제 후보 N개」, 주 단추 「이 살펴보기 평가하기」. 누르는 동안 단추를 끄고 「평가하는 중이에요」
-- 평가: `outcome` 과 `failure` 배지, 비교 설명, 추천 순서. 후보마다 문제 글, 행동 종류와 부작용 힌트, 축 표(축, 선택, 확신, 설명), 판정의 `level`, `reasons`, `executionStatus`
+- 평가: `outcome` 과 `failure`(있을 때) 배지, 비교 설명. 후보는 작업 항목 1의 순서 함수로 늘어놓는다. 후보마다 문제 글, 행동 종류와 부작용 힌트, 축 표(축, 선택, 확신, 설명). 판단은 `judgements[].candidateId` 로 잇고, 없으면 축 표 대신 「이 후보의 판단이 없어요.」. 판정은 `decisions[].candidateId` 로 이어 그 후보 아래에 `level`, `reasons`, `executionStatus` 를 둔다. 판정이 없으면 「판정이 없어요.」
+- 평가가 아직 없으면 결과 자리를 그리지 않는다
 - 오류: 단추 아래 `Notice variant="error"`
 
 ### 6. `test/browser/admin-value-evaluation.spec.ts` 신규
@@ -64,15 +67,16 @@
 - `/admin/agents/browser` 의 「가치 평가」 절에 「받아들인 문제 후보 1개」 와 단추가 보인다. 누르고 응답을 기다린 뒤 `FALLBACK`, `PROVIDER_UNAVAILABLE`, 준비한 문제 글, `IGNORE`, `EVALUATION_NOT_USABLE` 이 보인다
 - 화면을 다시 열어도 같은 결과가 보인다
 - 일반 상세 `/agents/browser` 에는 「가치 평가」 절이 없다
+- `page.request.post('/api/admin/proactive-checks/abc/value-evaluation-runs')` 는 400 이고 본문 `code` 가 `VALIDATION_FAILED`, 없는 큰 숫자 `checkId` 는 404 이고 `VALUE_EVALUATION_NOT_FOUND`
 - 끝나면 `restore` 처럼 스킬, 도구, 점검 대화를 되돌린다
 
 ## 검증
 
 ```bash
 # cwd: 저장소 root
-cd web && pnpm lint && pnpm typecheck && pnpm format:check
+(cd web && pnpm lint && pnpm typecheck && pnpm format:check)
 ! grep -rn 'style={{' web/src/components/agent/agent-value-evaluation-section.tsx
-cd web && pnpm test:browser admin-value-evaluation.spec.ts
+(cd web && pnpm test:browser admin-value-evaluation.spec.ts --repeat-each=3 --retries=0)
 ```
 
 모두 종료 코드 0 이어야 한다.
@@ -82,10 +86,9 @@ cd web && pnpm test:browser admin-value-evaluation.spec.ts
 | 파일 | 변경 |
 |---|---|
 | `web/src/lib/value-evaluation.ts` | 신규 |
-| `web/src/app/api/proactive-checks/[checkId]/evaluation-runs/route.ts` | 신규 |
+| `web/src/app/api/admin/proactive-checks/[checkId]/value-evaluation-runs/route.ts` | 신규 |
 | `web/src/components/error-message.ts` | 수정 |
 | `web/src/components/agent/agent-detail-loader.tsx` | 수정 |
 | `web/src/components/agent/agent-detail-body.tsx` | 수정 |
 | `web/src/components/agent/agent-value-evaluation-section.tsx` | 신규 |
 | `test/browser/admin-value-evaluation.spec.ts` | 신규 |
-| `docs/frontend/structure.md` | 수정 |
