@@ -1,10 +1,10 @@
 {
   "name": "plan94-user-browser",
   "description": "사용자 브라우저 단계 3: 커넥터가 Control Plane 중계로 바인딩 주인의 브라우저에 붙는다",
-  "status": "pending",
+  "status": "in_progress",
   "created_at": "2026-10-08",
   "total_phases": 5,
-  "current_phase": 1,
+  "current_phase": 3,
   "phases": [
     {
       "number": 1,
