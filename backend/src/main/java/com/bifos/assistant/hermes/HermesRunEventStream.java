@@ -177,6 +177,13 @@ public class HermesRunEventStream {
             }
             detail = ToolDetailRedactor.redact(detail, toolName, scope, identifiers);
         }
+        String goal = firstText(root, payload, "goal");
+        if (type != null && type.toLowerCase(Locale.ROOT).startsWith("subagent.")) {
+            // 목표는 모델이 쓴 글이라 읽은 메일 본문이나 비밀값이 실릴 수 있다. 도구 내용과 같은 규칙으로 가린다.
+            // 도구 이름이 없으므로 옛 커넥터 에이전트의 실행만 통째로 가린다(ADR-047).
+            goal = ToolDetailRedactor.redact(goal, null, scope, identifiers);
+            detail = ToolDetailRedactor.redact(detail, null, scope, identifiers);
+        }
         return new RunEvent(
                 type,
                 firstText(root, payload, "delta", "text", "output"),
@@ -185,7 +192,7 @@ public class HermesRunEventStream {
                 durationMs(root, payload),
                 failed(root, payload),
                 firstText(root, payload, "subagent_id"),
-                firstText(root, payload, "goal"),
+                goal,
                 firstText(root, payload, "model"),
                 firstText(root, payload, "child_session_id"),
                 firstNumber(root, payload, "input_tokens"),

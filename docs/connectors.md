@@ -175,8 +175,8 @@ plugin 디렉터리 root 에 둔다. 소유는 그 plugin 의 저장소다. 같�
 | 그 밖의 외부 실패 | `CONNECTOR_OPERATION_FAILED`(502) |
 
 - 대시보드가 거절한 두 경우(`CONNECTOR_BIND_CONFLICT`, `CONNECTOR_PROFILE_NOT_READY`)는 대시보드가 아무것도 바꾸지 않았으므로 바인딩 행도 남지 않는다. 그 밖의 외부 실패는 바인딩을 `PENDING` 으로 남긴다. 대시보드가 반쯤 반영했을 수 있어 다음 연결 확인이 설치를 다시 보낸다
-- 붙인 바인딩은 늘 `PENDING` 이다. 새 서버를 더한 붙이기는 재시작을 기다리지 않는다. 공유 gateway 의 MCP 설정 맞추기 주기가 연결하고, Control Plane 이 150초 뒤 스스로 반영을 확인해 `READY` 로 둔다([ADR-20261007 / connector-live-reload](adr/ADR-20261007-connector-live-reload.md)). 대개 몇 분 안에 쓸 수 있다
-- 대시보드가 재시작이 필요하다고 답한 붙이기만 재시작 대기가 된다. 관리자가 공유 gateway 를 재시작하고 반영 완료를 누르면 `READY` 가 된다
+- 붙인 바인딩은 늘 `PENDING` 이다. 뗀 서버 기록에 없는 새 이름의 붙이기는 재시작을 기다리지 않는다. 공유 gateway 의 MCP 설정 맞추기 주기가 연결하고, Control Plane 이 150초 뒤 스스로 반영을 확인해 `READY` 로 둔다([ADR-20261007 / connector-live-reload](adr/ADR-20261007-connector-live-reload.md)). 대개 몇 분 안에 쓸 수 있다
+- 대시보드가 재시작이 필요하다고 답한 붙이기만 재시작 대기가 된다. 뗀 서버 기록에 남은 이름을 다시 붙이는 것도 여기 해당한다. 관리자가 공유 gateway 를 재시작하고 반영 완료를 누르면 `READY` 가 된다
 - 붙이기는 `skills` toolset 을 켜지 않는다. 그 에이전트의 도구는 주인이 정한다([ADR-029](adr/ADR-029-에이전트-도구는-control-plane-이-등급으로-판정하고-hermes-설정-api-로-쓴다.md)). `skills` 가 꺼진 에이전트는 커넥터의 지침을 읽지 못하고, 화면이 그것을 안내한다
 - 떼기는 그 에이전트의 실행이 판정한 `PENDING` 승인 줄을 `REJECTED`(`errorCode: connection_changed`)로 끝낸다. 상시 허락은 사용자와 커넥터에 묶여 같은 연결을 붙인 다른 에이전트에도 걸리므로 그대로 둔다. 그 에이전트의 승인 줄이 `EXECUTING` 이면 `CONNECTOR_ACTION_EXECUTING`(409)으로 거절한다
 - 떼기는 도구 목록에서 서버 이름을 빼므로 재시작을 기다리지 않고 다음 실행부터 막힌다. 떼기 전에 시작한 실행이 그 도구를 불러도 판정이 막는다

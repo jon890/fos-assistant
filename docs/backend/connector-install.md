@@ -84,7 +84,7 @@ manifest 가 `owner_output_env` 를 선언했으면 plugin 은 운영 정책의 
 | 이름 대응 파일 | `isolated: false` 를 싣고 소유 기록의 모든 서버를 싣는다. manifest 를 읽지 못했거나 소유 기록의 서버 이름이나 실행 정의가 지금 manifest 와 다른 서버는 소유 기록의 이름으로 빈 `tools` 다. 뗀 서버 기록의 서버도 빈 `tools` 로 싣는다 | 뗀 서버를 빈 `tools` 로 남긴다. 마지막 바인딩을 떼도 지우지 않는다 |
 | 뗀 서버 기록 `.fos-connector-detached.json` | 그 커넥터의 항목을 지운다. 남은 항목이 없으면 파일을 지운다 | `{커넥터 id: 서버 이름}` 으로 그 서버 이름을 남긴다 |
 | `fos-ctx` | 묶음에 든 판으로 맞춘다 | 건드리지 않는다 |
-| 답의 `restart_required` 와 `reload_pending` | 이미 있던 서버의 정의나 그 서버의 `.env` 값이 바뀌었으면 `restart_required` 가 참이다. 공유 gateway 의 MCP 설정 맞추기는 이름만 비교해 같은 이름을 다시 연결하지 않는다. 새 서버를 더했거나 스킬이나 이름 대응 파일만 바뀌었으면 `restart_required` 는 거짓이고 `reload_pending` 이 참이다. 새 이름은 맞추기 주기가 연결하고, 이름 대응 파일은 `fos-ctx` 가 호출마다 읽는다. `plugin_updated` 가 참이면 `reload_pending` 은 거짓이다. 바뀐 것이 없으면 모든 칸이 거짓이다([ADR-20261007 / connector-live-reload](../adr/ADR-20261007-connector-live-reload.md)) | `restart_required` 는 거짓이고, 바뀐 것이 있으면 `reload_pending` 이 참이다. 도구 목록에서 이름을 빼므로 다음 실행은 그 서버를 받지 않는다. 떼기 전에 시작한 실행의 호출은 대응에 남은 서버를 보고 판정이 막는다 |
+| 답의 `restart_required` 와 `reload_pending` | 이미 있던 서버의 정의나 그 서버의 `.env` 값이 바뀌었거나, 뗀 서버 기록에 남은 이름을 다시 붙이면 `restart_required` 가 참이다. 공유 gateway 의 MCP 설정 맞추기는 이름만 비교해 같은 이름을 다시 연결하지 않는다. 기록에 없는 새 이름을 더했거나 스킬이나 이름 대응 파일만 바뀌었으면 `restart_required` 는 거짓이고 `reload_pending` 이 참이다. 새 이름은 맞추기 주기가 연결하고, 이름 대응 파일은 `fos-ctx` 가 호출마다 읽는다. `plugin_updated` 가 참이면 `reload_pending` 은 거짓이다. 바뀐 것이 없으면 모든 칸이 거짓이다([ADR-20261007 / connector-live-reload](../adr/ADR-20261007-connector-live-reload.md)) | `restart_required` 는 거짓이고, 바뀐 것이 있으면 `reload_pending` 이 참이다. 도구 목록에서 이름을 빼므로 다음 실행은 그 서버를 받지 않는다. 떼기 전에 시작한 실행의 호출은 대응에 남은 서버를 보고 판정이 막는다 |
 
 - 붙이기는 한 묶음으로 쓴다. 실패하면 이 요청이 쓴 파일만 되돌린다
 - 떼기는 소유 기록을 지금 manifest 와 견주지 않는다. 그 항목이 객체이고 `mode` 가 `bind` 인지와 서버 이름과 스킬 이름이 경로 조각이 될 수 있는지만 본다. 운영자가 커넥터의 실행 정의를 바꾼 뒤에도 떼어야 `.env` 에 비밀이 남지 않는다
@@ -188,7 +188,9 @@ Control Plane 은 도구 목록을 직접 쓰지 않는다. 바인딩 설치가 
 새 env 이름이 이 바인딩이 소유하지 않은 기존 설정과 겹치면 409 로 거절한다. 다른 커넥터가 소유한 env 는 지우지 않는다.
 운영자가 서버를 바꾸거나 지웠으면 기존처럼 409 로 거절한다. MCP 서버 이름을 바꾸는 것은 이 재설치로 옮기지 않는다.
 조회와 실행, probe 는 계속 현재 manifest 와 맞는지 확인하므로, 재설치 전의 낡은 정의로 실행하지 않는다.
-이미 있던 서버의 정의가 바뀌면 `restart_required` 가 참이다. 관리자가 gateway 를 재시작하고 반영 완료를 눌러야 `READY` 로 돌아간다.
+이미 있던 서버의 정의가 바뀌면 `restart_required` 가 참이다. 뗀 서버 기록(`.fos-connector-detached.json`)에 남은 이름을 다시 붙여도 참이다. 공유 gateway 가 같은 이름의 옛 연결을 아직 쥐고 있을 수 있고, 떼기 뒤에는 옛 정의와 비교할 수 없기 때문이다. 같은 커넥터를 같은 이름으로 다시 붙이면 뗀 기록은 지운다. 관리자가 gateway 를 재시작하고 반영 완료를 눌러야 `READY` 로 돌아간다.
+
+`READY` 는 probe 가 새로 띄운 프로세스에서 도구를 확인했다는 뜻이다. gateway 가 쥔 연결의 정의까지 확인한 것은 아니다. 떼기와 다시 붙이기가 MCP 설정 맞추기 한 주기 안에 끝나면 gateway 는 이름이 계속 있다고 보고 옛 연결을 쓸 수 있다. 그래서 뗀 이름을 다시 붙일 때는 probe 가 통과하더라도 재시작을 기다린다.
 재설치에서 어긋난 칸 이름과 요청 실패 단계, 커넥터 id, 예외 종류를 로그에 남긴다. env 값과 경로, 비밀값, 예외 본문은 남기지 않는다.
 
 - 연결 확인과 반영 예정 확인은 재시작 대기인 바인딩과 반영 예정 시각이 아직 오지 않은 바인딩에 설치를 다시 보내지 않고 `PENDING` 으로 둔다. 관리자 반영 완료는 재시작이 끝났다고 보고 재시작 대기인 바인딩에도 다시 보낸다. 반영 예정 시각이 아직 오지 않았으면 관리자 반영 완료도 다시 보내지 않고 `PENDING` 으로 둔다. gateway 가 서버를 아직 연결하지 않았는데 probe 만 통과해 `READY` 가 되는 것을 막는다
@@ -252,8 +254,8 @@ probe 가 실패해 `PENDING` 이 되면 다시 부르지 않는다. 사용자�
 
 이미 떠 있는 MCP 프로세스는 env 파일이 바뀌어도 옛 값을 쓴다.
 공유 gateway 의 MCP 설정 맞추기는 60초마다 profile 의 `mcp_servers` 이름만 비교해 새 이름은 연결하고 빠진 이름은 끊는다.
-그래서 새 서버를 더한 붙이기와 스킬만 바뀐 설치는 `reload_pending` 을 돌려받고, 재시작 없이 「반영 예정 확인」 이 `READY` 로 둔다.
-값 교체처럼 이미 있던 서버의 정의나 값이 바뀐 설치는 `restart_required` 를, `fos-ctx` 갱신은 `plugin_updated` 를 돌려받는다. 관리자가 공유 gateway 를 재시작한 뒤 반영 완료를 누를 때까지 그 바인딩이 재시작 대기로 남는다.
+그래서 뗀 기록에 없는 새 이름을 더한 붙이기와 스킬만 바뀐 설치는 `reload_pending` 을 돌려받고, 재시작 없이 「반영 예정 확인」 이 `READY` 로 둔다.
+값 교체처럼 이미 있던 서버의 정의나 값이 바뀐 설치와, 뗀 서버 기록에 남은 이름을 다시 붙이는 설치는 `restart_required` 를, `fos-ctx` 갱신은 `plugin_updated` 를 돌려받는다. 기록에 없는 새 이름의 설치는 `reload_pending` 이다. 관리자가 공유 gateway 를 재시작한 뒤 반영 완료를 누를 때까지 재시작 대기 바인딩이 `PENDING` 으로 남는다.
 profile 하나의 MCP 를 다시 붙이는 다른 경로를 쓰지 않는 까닭은 [ADR-20261007 / connector-live-reload](../adr/ADR-20261007-connector-live-reload.md) 의 「대안 기각」 이 갖는다.
 공유 gateway 재시작은 사용자 요청에서 실행하지 않는다.
 저장된 대기 값과 설치 응답의 `restart_required`, `plugin_updated` 는 논리 OR 로 누적한다. 도중 호출이 실패해도 앞선 참을 보존한다.

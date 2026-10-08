@@ -172,13 +172,23 @@ class ProfileApiConnectorBindingDetachTest(support.ProfileApiRouteTest):
         self.bind_fixture()
         alice = self.root / "alice"
         detached = alice / self.plugin.CONNECTOR_DETACHED
-        self.assertEqual(self.bind(DEMO, "c1").status_code, 200)
-
+        # 처음 붙이는 새 이름은 gateway 가 다음 설정 맞추기에서 연결할 수 있다.
+        initial = self.bind(DEMO, "c1")
+        self.assertEqual(initial.status_code, 200, initial.body)
+        self.assertEqual({key: initial.body[key] for key in ("changed", "restart_required", "reload_pending")},
+                         {"changed": True, "restart_required": False, "reload_pending": True})
         removed = self.bind(DEMO, enabled=False)
         self.assertEqual(removed.status_code, 200, removed.body)
         self.assertNotIn("demo", self.alice_config()["mcp_servers"])
         self.assertEqual(self.tool_map(), {"v": 1, "isolated": False, "servers": {
             "demo": {"connector": DEMO, "prefix": "mcp__demo__", "tools": {}}}})
+        self.assertEqual(json.loads(detached.read_text(encoding="utf-8")), {DEMO: "demo"})
+
+        # 다른 커넥터의 새 이름은 재시작 없이 반영을 기다리고, 뗀 DEMO 기록은 보존한다.
+        other = self.bind(OTHER, "c2")
+        self.assertEqual(other.status_code, 200, other.body)
+        self.assertEqual({key: other.body[key] for key in ("changed", "restart_required", "reload_pending")},
+                         {"changed": True, "restart_required": False, "reload_pending": True})
         self.assertEqual(json.loads(detached.read_text(encoding="utf-8")), {DEMO: "demo"})
         # 대응 파일이 소유 기록과 뗀 기록으로 계산한 것과 같으므로 hook 상태는 참이다.
         self.assertIs(self.status_of()["policy_hook"], True)
@@ -205,11 +215,19 @@ class ProfileApiConnectorBindingDetachTest(support.ProfileApiRouteTest):
         self.assertEqual(self.connector().status_code, 409)
         self.assertEqual(self.tree("alice"), before)
 
-        # 같은 커넥터를 다시 붙이면 뗀 기록이 지워지고 대응이 manifest 의 도구를 싣는다.
-        self.assertEqual(self.bind(DEMO, "c1").status_code, 200)
+        # 같은 이름을 다시 붙이면 gateway 가 옛 연결을 쥐고 있을 수 있어 재시작을 기다린다.
+        rebound = self.bind(DEMO, "c1")
+        self.assertEqual(rebound.status_code, 200, rebound.body)
+        self.assertEqual({key: rebound.body[key] for key in ("changed", "restart_required", "reload_pending")},
+                         {"changed": True, "restart_required": True, "reload_pending": False})
         self.assertFalse(detached.exists())
         self.assertEqual(self.tool_map()["servers"]["demo"]["tools"], {"mcp__demo__list_scopes": "list_scopes"})
         self.assertIs(self.status_of()["policy_hook"], True)
+        # 뗀 기록이 지워진 뒤 같은 요청을 재시도하면 아무것도 바꾸지 않는다.
+        retry = self.bind(DEMO, "c1")
+        self.assertEqual(retry.status_code, 200, retry.body)
+        self.assertEqual({key: retry.body[key] for key in ("changed", "restart_required", "plugin_updated", "reload_pending")},
+                         {"changed": False, "restart_required": False, "plugin_updated": False, "reload_pending": False})
 
     def test_detaching_again_on_a_profile_with_only_the_connector_marker_succeeds(self):
         """커넥터 표식만 있는 profile 에서 떼기를 다시 보내거나 붙인 적 없는 커넥터를 떼면 바꾸지 않고 200 이다."""

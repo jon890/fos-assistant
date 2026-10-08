@@ -230,11 +230,11 @@ sequenceDiagram
         else 대시보드 401. 표식 없는 profile
             D-->>C: 401
             C-->>B: 409 CONNECTOR_PROFILE_NOT_READY. 바인딩 행이 남지 않는다
-        else 새 서버를 더했다
+        else 뗀 기록에 없는 새 서버 이름을 더했다
             D-->>C: reload_pending
             C->>C: apply_due_at 에 지금 더하기 150초를 적는다
             C-->>B: 바인딩 PENDING. 화면은 「반영 대기」
-        else 이미 있던 서버가 바뀌었다
+        else 이미 있던 서버가 바뀌었거나 뗀 기록의 이름을 다시 붙였다
             D-->>C: restart_required
             C-->>B: 바인딩 PENDING, 재시작 대기
         end
@@ -275,7 +275,7 @@ sequenceDiagram
 
 - 같은 사용자의 등록, 확인, 해제, 붙이기, 떼기, 승인은 사용자 행 잠금으로 줄을 선다. 붙이기, 떼기, 반영 완료, 반영 예정 확인, 지우기는 그다음 에이전트 행을 잠근다. 공개 범위 변경도 같은 에이전트 행을 기다려 잠그므로 붙이기와 동시에 와도 한쪽이 다른 쪽의 커밋을 보고 판정한다
 - 대시보드의 그 밖의 실패는 바인딩을 `PENDING` 으로 남기고 502 `CONNECTOR_OPERATION_FAILED` 다. 다음 연결 확인이 설치를 다시 보낸다
-- 새 서버를 더한 붙이기는 공유 gateway 를 재시작하지 않는다. Control Plane 이 반영 예정 시각이 지나면 스스로 확인한다([ADR-20261007 / connector-live-reload](adr/ADR-20261007-connector-live-reload.md)). 관리자 반영 완료는 `restart_required` 인 바인딩에만 남는다
+- 뗀 기록에 없는 새 이름을 더한 붙이기는 공유 gateway 를 재시작하지 않는다. Control Plane 이 반영 예정 시각이 지나면 스스로 확인한다([ADR-20261007 / connector-live-reload](adr/ADR-20261007-connector-live-reload.md)). 관리자 반영 완료는 `restart_required` 인 바인딩에만 남는다
 - 바인딩이 `READY` 가 되기 전이나 연결이 확인되지 않은 동안의 호출은 판정이 `NOT_READY` 로 막는다. 그 에이전트의 다른 도구는 그대로 돈다
 
 ## 실행이 실패할 때

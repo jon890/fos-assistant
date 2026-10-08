@@ -3,6 +3,7 @@ package com.bifos.assistant.hermes;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.bifos.assistant.hermes.dto.RunEvent;
+import java.util.Set;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import tools.jackson.databind.json.JsonMapper;
@@ -184,6 +185,34 @@ class HermesRunEventStreamTest {
         assertThat(event.status()).isEqualTo("failed");
         assertThat(event.durationMs()).isEqualTo(250L);
         assertThat(event.failed()).isTrue();
+    }
+
+    @Test
+    @DisplayName("하위 에이전트의 목표와 preview 는 도구 내용과 같은 규칙으로 비밀값과 UUID 를 가린다")
+    void redactsSubagentGoalAndPreviewLikeToolDetail() {
+        String id = "12345678-1234-5678-9012-123456789abc";
+        RunEvent withGoal = parse("{\"event\":\"subagent.start\",\"subagent_id\":\"sa-1\","
+                + "\"goal\":\"메일 정리 token=short-secret 대상 " + id + "\"}");
+        RunEvent withPreview = parse(
+                "{\"event\":\"subagent.complete\",\"preview\":\"Bearer small-secret 로 조회\",\"status\":\"completed\"}");
+
+        assertThat(withGoal.goal()).isEqualTo("메일 정리 token=[가림] 대상 [항목 1]");
+        assertThat(withPreview.goal()).isNull();
+        assertThat(withPreview.detail()).isEqualTo("[가림] 로 조회");
+    }
+
+    @Test
+    @DisplayName("옛 커넥터 에이전트의 하위 에이전트 목표는 통째로 가리고 연결을 붙인 에이전트는 비밀값만 가린다")
+    void hidesSubagentGoalOfConnectorAgentAndRedactsForBoundAgent() {
+        String json = "{\"event\":\"subagent.start\",\"goal\":\"받은 메일 요약 password=abc\"}";
+
+        assertThat(HermesRunEventStream.toRunEvent(mapper.readTree(json), ToolDetailScope.ALL)
+                        .goal())
+                .isEqualTo("[연결 도구 내용 가림]");
+        assertThat(HermesRunEventStream.toRunEvent(
+                                mapper.readTree(json), ToolDetailScope.prefixes(Set.of("mcp__mail__")))
+                        .goal())
+                .isEqualTo("받은 메일 요약 password=[가림]");
     }
 
     @Test
