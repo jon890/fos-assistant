@@ -1,6 +1,6 @@
 # Phase 02. 「보고할 것 없음」 완료
 
-**Execution profile**: standard
+**Execution profile**: deep
 
 ## 목표
 
@@ -26,7 +26,7 @@
 
 - 표시는 `[SILENT]` 다. Hermes cron 이 쓰던 표시라 옮기는 지시문을 그대로 쓸 수 있다. 판정은 `assistantText` 가 null 이 아니고 `strip()` 한 값이 정확히 `[SILENT]` 일 때만이다. 대소문자를 무시하지 않는다
 - 사용자가 중지(`turn.cancelled()`)했거나 실패한 turn 에는 쓰지 않는다
-- **숨김은 대화 엔티티 메서드로 적는다.** `finishSafely` 의 트랜잭션은 `run` 을 잠그고 바꾼 뒤 `notices.announce` 에 넘긴다. `clearAutomatically = true` 인 update 질의를 쓰면 그 사이 `run` 이 분리된다
+- **숨김도 조건부 update 질의로 적는다.** `Conversation` 에는 `@DynamicUpdate` 와 `@Version` 이 없어 엔티티를 읽어 바꾸면 commit 때 줄 전체가 다시 써진다. turn 이 끝나는 순간 사용자가 한 삭제(`deleteIfActive`), 이름 바꾸기, 모델 바꾸기가 되돌려지고 지운 대화가 살아날 수 있다. `finishSafely` 의 트랜잭션은 `run` 을 잠그고 바꾼 뒤 `notices.announce` 에 넘기므로 `clearAutomatically` 는 두지 않는다
 - 숨김 해제는 사용자 질문 저장과 같은 트랜잭션에서 하는 update 질의다. `resetAutoTurns` 와 같은 모양(`@Modifying` 만, `clearAutomatically` 없음)으로 둔다
 - 대화를 지우지 않는다. `deleted_at` 은 조회와 보내기까지 막아 실행 기록에서 열 수 없게 된다
 - `SINGLE` 대화는 숨기지 않는다
@@ -39,15 +39,16 @@
 
 ### 2. `Conversation`
 
-- `@Column(name = "hidden_at") private Instant hiddenAt;` 와 Javadoc. `@Getter`
-- `public void hideFromList(Instant now)`: 이미 찼으면 그대로 둔다. `updatedAt` 은 바꾸지 않는다
+`@Column(name = "hidden_at") private Instant hiddenAt;` 와 Javadoc. `@Getter`. 이 칸을 바꾸는 엔티티 메서드는 두지 않는다. 바꾸는 것은 3의 질의뿐이다
 
 ### 3. `ConversationRepository` 와 `ConversationWriter`
 
 - `findByUserIdAndDeletedAtIsNullOrderByUpdatedAtDescIdDesc` 를 `findByUserIdAndDeletedAtIsNullAndHiddenAtIsNullOrderByUpdatedAtDescIdDesc` 로 바꾸고 `ChatConversationQueries.conversationsOf` 의 호출을 고친다
 - `findPageAfter` 의 where 에 `and c.hiddenAt is null` 을 더한다
+- `@Modifying @Query("update Conversation c set c.hiddenAt = :now where c.id = :id and c.hiddenAt is null") int hideFromList(@Param("id") Long id, @Param("now") Instant now);` 를 더한다. `updated_at` 은 바꾸지 않는다
 - `@Modifying @Query("update Conversation c set c.hiddenAt = null where c.id = :id and c.hiddenAt is not null") int showInList(@Param("id") Long id);` 를 더한다. Javadoc 에 사용자가 질문하면 숨긴 대화를 다시 목록에 보인다고 적는다
-- `ConversationWriter` 에 `@Transactional public int showInList(Long id)` 위임을 더한다
+- 두 질의 모두 `clearAutomatically` 를 두지 않는다(`resetAutoTurns` 와 같은 모양)
+- `ConversationWriter` 에 `@Transactional public int hideFromList(Long id, Instant now)` 와 `@Transactional public int showInList(Long id)` 위임을 더한다
 
 ### 4. 질문 저장에서 숨김을 푼다
 
@@ -55,14 +56,13 @@
 
 ### 5. 대화 숨기기 경로
 
-- `ChatConversationManagement` 에 `void hideTaskConversation(Long conversationId, Instant now)` 를 더한다. `conversations.findById(conversationId)` 가 있으면 `hideFromList(now)` 를 부른다
-- `ChatService` 에 같은 이름의 public 위임 메서드를 더한다
+- `ChatService` 에 `public void hideTaskConversation(Long conversationId, Instant now)` 를 더한다. `now.truncatedTo(ChronoUnit.MICROS)` 로 잘라 `ConversationWriter.hideFromList` 를 부른다. MySQL `DATETIME(6)` 은 남는 자리를 반올림하므로 다른 시각 칸처럼 마이크로초로 자른다. `ChatService` 가 `ConversationWriter` 를 쓰지 않으면 `ChatConversationManagement` 를 거친다
 
 ### 6. 발화 결과
 
 - `TaskRunReason` 에 `NOTHING_TO_REPORT` 를 더한다. Javadoc: 답 전체가 `[SILENT]` 라 알릴 것 없이 끝냈다. 클래스 Javadoc 의 「`SKIPPED` 와 `FAILED` 의 까닭이다」 를 `SUCCEEDED` 의 이 까닭까지 포함하게 고친다
 - `TaskRun` 에 `public void succeedQuietly(Long executionId, Instant now)` 를 더한다. `finish(TaskRunStatus.SUCCEEDED, TaskRunReason.NOTHING_TO_REPORT, executionId, now)` 다. 기존 `succeed` 를 따라 쓴다
-- `TaskRunStarter` 에 `static final String NOTHING_TO_REPORT = "[SILENT]";` 를 둔다. `runTurn` 이 `finishSafely` 에 `turn.assistantText()` 를 넘기게 시그니처를 `finishSafely(Long runId, Long executionId, String answer, boolean cancelled, boolean failed)` 로 바꾸고 다른 호출부 둘(`start` 의 스레드 실패, `runTurn` 의 예외)은 `null` 을 넘긴다
+- `TaskRunStarter` 에 `static final String NOTHING_TO_REPORT = "[SILENT]";` 를 둔다. `runTurn` 이 `finishSafely` 에 `turn.assistantText()` 를 넘기게 시그니처를 `finishSafely(Long runId, Long executionId, String answer, boolean cancelled, boolean failed)` 로 바꾸고 다른 호출부 셋(`start` 의 스레드 실패, `runTurn` 의 `ApiException` 과 `RuntimeException`)은 `null` 을 넘긴다
 - `finishSafely` 안: `failed` 도 `cancelled` 도 아니고 `answer != null && NOTHING_TO_REPORT.equals(answer.strip())` 면 `run.succeedQuietly(executionId, now)`. 그 작업이 `ConversationMode.NEW_PER_RUN` 이고 `run.conversationId() != null` 이면 같은 트랜잭션에서 `chat.hideTaskConversation(run.conversationId(), now)` 를 부른다. 작업은 이미 읽는 `tasks.findById(run.taskId())` 를 한 번만 읽어 숨김 판정과 `notices.announce` 에 함께 쓴다
 
 ### 7. 알림
@@ -76,7 +76,7 @@
   - 같은 답의 `SINGLE` 발화: `NOTHING_TO_REPORT` 이고 알림이 없으며 대화의 `hiddenAt()` 은 비어 있다
   - 답이 `"[SILENT] 새 영상 없음"` 이면 보통 `SUCCEEDED`(`reason` null)와 `TASK_SUCCEEDED` 하나다
   - 답이 `"[silent]"` 이면 보통 완료다
-- `backend/src/test/java/com/bifos/assistant/chat/ConversationPagingTest.java` 에 하나: 대화 셋 가운데 하나에 `hideFromList` 를 적어 저장하면 `ChatService` 의 목록 첫 쪽에 둘만 오고, 이 파일의 기존 다음 쪽 요청 방식으로 읽은 쪽에도 숨긴 대화가 없다. 숨긴 대화를 `ConversationWriter.showInList` 로 풀면 다시 목록에 온다
+- `backend/src/test/java/com/bifos/assistant/chat/ConversationPagingTest.java` 에 하나: 대화 셋 가운데 하나에 `ConversationWriter.hideFromList` 를 부르면 `ChatService` 의 목록 첫 쪽에 둘만 오고, 이 파일의 기존 다음 쪽 요청 방식으로 읽은 쪽에도 숨긴 대화가 없다. 숨긴 대화를 `ConversationWriter.showInList` 로 풀면 다시 목록에 온다
 - `backend/src/test/java/com/bifos/assistant/chat/ChatServiceTest.java` 에 하나: 숨긴 대화에 사용자 질문을 보내면(이 파일의 기존 보내기 방식) 그 대화의 `hiddenAt()` 이 비고 목록에 다시 보인다
 
 ## 검증
@@ -100,7 +100,6 @@ bash scripts/check-mysql-migration.sh
 | `backend/src/main/java/com/bifos/assistant/chat/application/ConversationWriter.java` | 수정 |
 | `backend/src/main/java/com/bifos/assistant/chat/application/ChatConversationQueries.java` | 수정 |
 | `backend/src/main/java/com/bifos/assistant/chat/application/ChatTurnRouting.java` | 수정 |
-| `backend/src/main/java/com/bifos/assistant/chat/application/ChatConversationManagement.java` | 수정 |
 | `backend/src/main/java/com/bifos/assistant/chat/application/ChatService.java` | 수정 |
 | `backend/src/main/java/com/bifos/assistant/task/domain/TaskRun.java` | 수정 |
 | `backend/src/main/java/com/bifos/assistant/task/domain/type/TaskRunReason.java` | 수정 |

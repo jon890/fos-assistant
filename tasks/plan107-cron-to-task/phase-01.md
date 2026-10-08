@@ -1,6 +1,6 @@
 # Phase 01. 예약 작업의 모델 단계 칸
 
-**Execution profile**: standard
+**Execution profile**: deep
 
 ## 목표
 
@@ -22,7 +22,8 @@
 
 ## 의도 메모
 
-- **대화의 단계를 `ConversationRepository.chooseModelTierIfActive` 로 바꾸지 않는다.** 그 질의는 `clearAutomatically = true` 라 `prepare` 트랜잭션의 영속성 컨텍스트를 비운다. 그 뒤 `run.useConversation(...)` 의 변경이 반영되지 않는다. 대화 엔티티를 같은 트랜잭션에서 읽어 엔티티 메서드로 바꾼다
+- **대화의 단계를 `ConversationRepository.chooseModelTierIfActive` 로 바꾸지 않는다.** 그 질의는 `clearAutomatically = true` 라 `prepare` 트랜잭션의 영속성 컨텍스트를 비운다. 그 뒤 `run.useConversation(...)` 의 변경이 반영되지 않는다
+- **대화 엔티티를 읽어 칸을 바꾸는 dirty checking 도 쓰지 않는다.** `Conversation` 에는 `@DynamicUpdate` 와 `@Version` 이 없어 commit 때 갱신 가능한 칸 전체가 다시 써진다. 그 사이 다른 트랜잭션이 쓴 `hermes_session_id`, `updated_at`, `title`, `auto_turn_count`, `deleted_at` 이 읽은 때의 값으로 되돌아간다. `Conversation.java` 의 `autoTurnCount` Javadoc 이 「이 칸만 바꾸는 갱신은 update 질의로 한다」 고 적은 까닭이다. `resetAutoTurns` 와 같은 모양(`@Modifying` 만, `clearAutomatically` 없음)의 조건부 update 질의를 `ConversationWriter` 로 부른다. 새 대화도 IDENTITY 라 이미 insert 된 뒤여서 이 질의가 적용된다
 - 작업의 단계가 비어 있으면 대화의 선택을 건드리지 않는다. `SINGLE` 대화에서 사용자가 고른 모델을 지우지 않기 위해서다
 - 작업을 저장할 때 그룹의 단계 정의를 확인하지 않는다. 정의가 비면 그 단계는 에이전트 기본 모델로 돈다(`docs/model-tiers.md`)
 - `CHECK` 작업(`Task.check`)의 단계는 늘 비어 있다
@@ -40,8 +41,8 @@
 
 ### 3. 요청과 응답
 
-- `TaskInput` 끝에 `ModelTier modelTier` 를 더한다. Javadoc 에 비우면 작업의 단계를 지운다고 적는다
-- `TaskDtos.TaskRequest` 끝에 `ModelTier modelTier` 를 더하고 `toInput()` 에 넘긴다
+- `TaskInput` 끝에 `ModelTier modelTier` 를 더한다. Javadoc 에 비우면 작업의 단계를 지운다고 적는다. 클래스 Javadoc 의 「뒤의 셋은 비면 기본값이다」 를 「`conversationMode`, `missedPolicy`, `notifyPolicy` 는 비면 기본값이다」 로 고친다
+- `TaskDtos.TaskRequest` 끝에 `ModelTier modelTier` 를 더하고 `toInput()` 에 넘긴다. 그 record Javadoc 의 「뒤의 셋은 비우면 기본값이다」 도 같은 식으로 고친다
 - `TaskDtos.TaskView` 의 `notifyPolicy` 뒤, `createdAt` 앞에 `ModelTier modelTier` 를 더하고 `from` 에서 `task.modelTier()` 를 싣는다
 
 ### 4. `TaskService`
@@ -50,9 +51,9 @@
 
 ### 5. 대화에 단계를 고르기
 
-- `Conversation` 에 `public void chooseTierForTask(ModelTier tier)` 를 더한다. `tier` 가 null 이면 `IllegalArgumentException`. `modelSelectionMode = ModelSelectionMode.TIER`, `modelTier = tier`, `modelProvider`, `model`, `reasoningEffort` 를 null 로 둔다. `updatedAt` 은 바꾸지 않는다(목록 순서를 흔들지 않는다)
-- `ChatConversationManagement` 에 `void chooseTierForTask(Long conversationId, ModelTier tier)` 를 더한다. `conversations.findById(conversationId).orElseThrow().chooseTierForTask(tier)` 다. 부르는 쪽 트랜잭션 안에서 바뀐다
-- `ChatService` 에 같은 이름의 public 위임 메서드를 더한다. Javadoc 에 예약 작업 발화가 부르는 경로라고 적는다
+- `ConversationRepository` 에 질의를 더한다. `@Modifying`(`clearAutomatically` 없음) `@Query("update Conversation c set c.modelSelectionMode = :mode, c.modelTier = :tier, c.modelProvider = null, c.model = null, c.reasoningEffort = null where c.id = :id") int chooseTierForTask(@Param("id") Long id, @Param("mode") ModelSelectionMode mode, @Param("tier") ModelTier tier);` Javadoc 에 예약 작업 발화가 부르는 경로이고, 부르는 쪽 트랜잭션의 영속성 컨텍스트를 비우지 않으려고 `clearAutomatically` 를 두지 않는다고 적는다. `updated_at` 은 바꾸지 않는다(목록 순서를 흔들지 않는다)
+- `ConversationWriter` 에 `@Transactional public int chooseTierForTask(Long id, ModelTier tier)` 를 더한다. `repository.chooseTierForTask(id, ModelSelectionMode.TIER, tier)` 다
+- `ChatService` 에 `public void chooseTierForTask(Long conversationId, ModelTier tier)` 위임을 더한다. `ChatService` 가 이미 `ConversationWriter` 를 쓰지 않으면 `ChatConversationManagement` 를 거쳐 부른다. Javadoc 에 예약 작업 발화가 부르는 경로라고 적는다
 - `TaskRunStarter.conversationFor` 가 대화 번호를 정해 돌려주기 전, 모든 갈래(줄의 대화를 다시 쓸 때, `SINGLE` 의 대화를 다시 쓰거나 새로 만들 때, `NEW_PER_RUN` 의 새 대화)에서 `task.modelTier() != null` 이면 `chat.chooseTierForTask(conversationId, task.modelTier())` 를 부른다. `task.modelTier()` 가 null 이면 부르지 않는다
 
 ### 6. 이 phase 를 검증하는 시험
@@ -62,8 +63,10 @@
   - `NEW_PER_RUN` 작업에 `FAST` 를 고르고 발화하면 그 대화의 `modelSelectionMode()` 가 `TIER`, `modelTier()` 가 `FAST` 다
   - `SINGLE` 작업의 대화를 미리 만들고 그 대화가 `CUSTOM` 모델을 고른 상태에서, 작업에 `DEEP` 을 고르고 발화하면 그 대화가 `TIER`, `DEEP` 이고 `modelChoice()` 의 모델이 비어 있다
   - 단계가 비어 있는 `NEW_PER_RUN` 작업의 발화 대화는 `modelSelectionMode()` 가 null 이다
-  - 기존 `fixture(...)` 가 만든 작업에 `task.chooseModelTier(...)` 를 부르고 `tasks.save(task)` 로 저장한 뒤 `queued(...)` 를 만든다
-- `backend/src/test/java/com/bifos/assistant/task/TaskControllerTest.java`: `POST /api/v1/tasks` 에 `"modelTier": "BALANCED"` 를 보내면 응답의 `modelTier` 가 `BALANCED` 이고, 보내지 않으면 `null` 이다. 이 파일의 기존 요청 작성 방식을 따른다
+  - 단계는 `tasks.findById(task.id())` 로 다시 읽은 작업에 `chooseModelTier(...)` 를 부르고 `tasks.save(...)` 로 저장한다. fixture 가 돌려준 분리된 객체를 대화가 생긴 뒤 저장하면 merge 가 `conversation_id` 를 null 로 되돌린다(`TaskRunStarter` 가 그 칸만 질의로 적는 까닭)
+  - `SINGLE` 시험의 순서: 작업에 `DEEP` 을 고르고 첫 발화를 끝낸다. 그 대화를 `ChatService.chooseModel` 같은 기존 경로나 `ConversationRepository.chooseModelIfActive` 로 `CUSTOM` 으로 바꾼다. 두 번째 발화를 끝낸 뒤 같은 대화가 다시 `TIER`, `DEEP` 인지 본다
+  - `NEW_PER_RUN` `FAST` 시험은 그 발화의 루트 실행(`agent_execution`, `TaskRun.executionId()`)의 단계 칸도 `FAST` 인지 단언한다. 실행 엔티티의 칸 이름은 `AgentExecution` 에서 읽는다
+- `backend/src/test/java/com/bifos/assistant/task/TaskControllerTest.java`: `POST /api/v1/tasks` 에 `"modelTier": "BALANCED"` 를 보내면 응답의 `modelTier` 가 `BALANCED` 이고, 보내지 않으면 `null` 이다. 모르는 값 `"ULTRA"` 를 보내면 400 `VALIDATION_FAILED` 다(이 파일이나 다른 컨트롤러 시험에서 enum 오류가 어떤 코드로 나오는지 먼저 확인하고 그 값으로 단언한다). 이 파일의 기존 요청 작성 방식을 따른다
 
 ## 검증
 
@@ -86,7 +89,8 @@ bash scripts/check-mysql-migration.sh
 | `backend/src/main/java/com/bifos/assistant/task/application/TaskService.java` | 수정 |
 | `backend/src/main/java/com/bifos/assistant/task/application/TaskRunStarter.java` | 수정 |
 | `backend/src/main/java/com/bifos/assistant/task/presentation/TaskDtos.java` | 수정 |
-| `backend/src/main/java/com/bifos/assistant/chat/domain/Conversation.java` | 수정 |
+| `backend/src/main/java/com/bifos/assistant/chat/infra/ConversationRepository.java` | 수정 |
+| `backend/src/main/java/com/bifos/assistant/chat/application/ConversationWriter.java` | 수정 |
 | `backend/src/main/java/com/bifos/assistant/chat/application/ChatConversationManagement.java` | 수정 |
 | `backend/src/main/java/com/bifos/assistant/chat/application/ChatService.java` | 수정 |
 | `backend/src/test/java/com/bifos/assistant/task/TaskServiceTest.java` | 수정 |

@@ -29,13 +29,13 @@ phase 01, 02 의 API 를 사용자가 화면에서 쓰게 하기 위해서다.
 
 ### 1. `web/src/lib/task.ts`
 
-- `export type TaskModelTier = "FAST" | "BALANCED" | "DEEP";`
-- `TaskView` 에 `modelTier: TaskModelTier | null;`, `TaskRequest` 에 `modelTier: TaskModelTier | null;`
+- 단계 타입은 새로 만들지 않는다. `web/src/lib/model-tiers.ts` 의 `ModelTierCode` 를 import 한다
+- `TaskView` 에 `modelTier: ModelTierCode | null;`, `TaskRequest` 에 `modelTier: ModelTierCode | null;`
 - `REASON_TEXTS` 에 `NOTHING_TO_REPORT: "알릴 것이 없어 조용히 끝냈어요"`
 
 ### 2. `web/src/components/task/task-form.tsx`
 
-- `const [modelTier, setModelTier] = useState<TaskModelTier | "">(task?.modelTier ?? "");`
+- `const [modelTier, setModelTier] = useState<ModelTierCode | "">(task?.modelTier ?? "");`
 - 「알림」 `Field` 다음에 `<Field id="task-model-tier" label="모델 단계">` 와 `NativeSelect`. 선택지는 `""` 「기본값」, `FAST` 「빠르게」, `BALANCED` 「균형」, `DEEP` 「깊게」
 - 저장 본문에 `modelTier: modelTier === "" ? null : modelTier`
 
@@ -54,10 +54,11 @@ phase 01, 02 의 API 를 사용자가 화면에서 쓰게 하기 위해서다.
 node --test test/unit/task-schedule.test.ts
 pnpm --dir web lint
 pnpm --dir web exec tsc --noEmit
-cd web && pnpm test:browser ../test/browser/tasks.spec.ts
+cd web && pnpm format:check
+cd web && pnpm test:browser ../test/browser/tasks.spec.ts --repeat-each=3 --retries=0
 ```
 
-마지막 줄은 브라우저 검사 가운데 `tasks.spec.ts` 만 돌린다. backend 를 띄우는 방법은 `test/browser/playwright.config.ts` 가 갖는다.
+마지막 줄은 브라우저 검사 가운데 `tasks.spec.ts` 만 CI 처럼 재시도 없이 세 번 돌린다(`web/AGENTS.md` 의 「검사」). backend 를 띄우는 방법은 `test/browser/playwright.config.ts` 가 갖는다.
 
 ## 변경 파일
 
