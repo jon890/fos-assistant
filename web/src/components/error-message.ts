@@ -78,6 +78,9 @@ const MESSAGES: Record<string, string> = {
     "실행 시각을 다시 확인해 주세요. 반복 간격은 15분보다 짧을 수 없어요.",
   TASK_AGENT_NOT_SUPPORTED: "이 에이전트로는 예약 작업을 만들 수 없어요.",
   ATTENTION_ITEM_NOT_FOUND: "이미 사라진 항목이에요. 화면을 다시 열어 주세요.",
+  PROACTIVE_LOOP_UNAVAILABLE: "이 설치에서는 아직 쓸 수 없어요.",
+  AUTONOMY_DECISION_NOT_FOUND:
+    "이미 처리했거나 찾을 수 없는 항목이에요. 화면을 다시 열어 주세요.",
   FOLLOW_UP_NOT_FOUND: "이미 지워졌거나 없는 할 일이에요.",
   FOLLOW_UP_STATE_CONFLICT:
     "이미 처리했거나 같은 할 일이 있어요. 화면을 다시 열어 주세요.",

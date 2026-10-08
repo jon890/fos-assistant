@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Notice } from "@/components/ui/notice";
 import { Switch } from "@/components/ui/switch";
+import { AgentProactiveLoopSetting } from "./agent-proactive-loop-setting";
 import { formatWhen } from "@/lib/format";
 import {
   describeLastCheck,
@@ -177,6 +178,7 @@ export function AgentProactiveScheduleSection({ code }: { code: string }) {
           <LastCheckResult lastCheck={schedule.lastCheck} />
         </form>
       )}
+      <AgentProactiveLoopSetting code={code} />
     </section>
   );
 }

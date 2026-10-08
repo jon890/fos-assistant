@@ -52,6 +52,13 @@ export type ProactiveCheckSchedule = {
   blockers: ProactiveCheckBlocker[];
 };
 
+/** 매일 루프 설정이다. `available` 은 설치가 루프를 여는지이고, `snoozedUntil` 이 있으면 그때까지 쉰다. */
+export type ProactiveLoopSetting = {
+  available: boolean;
+  enabled: boolean;
+  snoozedUntil: string | null;
+};
+
 export function fetchProactiveCheckStatus(code: string): Promise<Response> {
   return fetch(`/api/agents/${code}/proactive-check`, { cache: "no-store" });
 }
@@ -67,6 +74,23 @@ export function saveProactiveCheckSchedule(
   input: Pick<ProactiveCheckSchedule, "enabled" | "time" | "timezone">,
 ): Promise<Response> {
   return fetch(`/api/agents/${code}/proactive-check/schedule`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+}
+
+export function fetchProactiveLoopSetting(code: string): Promise<Response> {
+  return fetch(`/api/agents/${code}/proactive-check/loop`, {
+    cache: "no-store",
+  });
+}
+
+export function saveProactiveLoopSetting(
+  code: string,
+  input: Pick<ProactiveLoopSetting, "enabled" | "snoozedUntil">,
+): Promise<Response> {
+  return fetch(`/api/agents/${code}/proactive-check/loop`, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(input),

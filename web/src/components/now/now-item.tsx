@@ -17,6 +17,10 @@ import {
 } from "@/lib/attention";
 import { recordAttentionEvent } from "@/lib/attention-api";
 import {
+  reactToDecision,
+  type DecisionReaction,
+} from "@/lib/decision-reaction-api";
+import {
   executionStatusLabel,
   executionStatusVariant,
 } from "@/lib/execution-status";
@@ -47,6 +51,14 @@ const FOLLOW_UP_ACTIONS: Partial<
   reject: rejectFollowUp,
   done: finishFollowUp,
   drop: dropFollowUp,
+};
+
+/** 먼저 다룰 문제에 반응을 남기는 단추와 그 반응이다. 할 일 API 가 아니라 판정 API 로 간다. */
+const DECISION_REACTIONS: Partial<
+  Record<ItemAction["kind"], DecisionReaction>
+> = {
+  "react-accept": "ACCEPTED",
+  "react-dismiss": "DISMISSED",
 };
 
 /**
@@ -82,6 +94,7 @@ export function NowItem({
   const origin = originText(item);
   const actions = itemActions(item);
   const followUp = item.followUp;
+  const problem = item.problem;
   const sources: ReactNode[] = [
     ...(item.agentName ? [item.agentName] : []),
     ...(origin ? [origin] : []),
@@ -104,6 +117,17 @@ export function NowItem({
     setPending(kind);
     setError(null);
     const result = await request(followUp.id);
+    setPending(null);
+    if (result.ok) acted();
+    else setError(result.message);
+  }
+
+  async function reactToProblem(kind: ItemAction["kind"]) {
+    const reaction = DECISION_REACTIONS[kind];
+    if (!reaction || !problem) return;
+    setPending(kind);
+    setError(null);
+    const result = await reactToDecision(problem.decisionId, reaction);
     setPending(null);
     if (result.ok) acted();
     else setError(result.message);
@@ -145,6 +169,14 @@ export function NowItem({
         onError={setError}
       />
       <p className="text-sm text-muted-foreground">{reasonText(item.why)}</p>
+      {problem?.action ? (
+        <p className="text-sm break-words">{problem.action}</p>
+      ) : null}
+      {problem?.level === "ASK_APPROVAL" ? (
+        <p className="text-sm text-muted-foreground">
+          직접 처리할 일이에요. 승인 요청이 아니에요.
+        </p>
+      ) : null}
       <p className="flex flex-wrap gap-x-1 text-xs text-muted-foreground">
         {sources.map((source, index) => (
           <Fragment key={index}>
@@ -160,8 +192,17 @@ export function NowItem({
           pending={pending}
           onOpen={opened}
           onEdit={() => setEditing(true)}
-          onChange={(kind) => void changeFollowUp(kind)}
+          onChange={(kind) =>
+            void (kind in DECISION_REACTIONS
+              ? reactToProblem(kind)
+              : changeFollowUp(kind))
+          }
         />
+      ) : null}
+      {problem ? (
+        <p className="text-xs text-muted-foreground">
+          받아들임은 기록만 해요. 할 일이나 승인을 만들지 않아요.
+        </p>
       ) : null}
       {error ? <Notice variant="error">{error}</Notice> : null}
       {followUp ? (
