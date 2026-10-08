@@ -8,7 +8,8 @@ export type NotificationKind =
   | "TASK_SKIPPED";
 
 /** 알림을 누르면 갈 곳의 종류다. 갈 곳이 없는 알림은 `null` 이다 */
-export type NotificationTargetType = "CONVERSATION" | "TASK" | "ADMIN_TOOL_REQUEST" | "TOOLSET_REQUEST";
+export type NotificationTargetType =
+  "CONVERSATION" | "TASK" | "ADMIN_TOOL_REQUEST" | "TOOLSET_REQUEST";
 
 export type NotificationView = {
   id: string;
@@ -37,8 +38,10 @@ export type NotificationEvent = {
 
 /** 알림을 누르면 갈 주소다. 갈 곳이 없으면 null 이다 */
 export function notificationHref(view: NotificationView): string | null {
-  if (view.targetType === "ADMIN_TOOL_REQUEST" && view.targetId) return `/admin/tool-requests/${view.targetId}`;
-  if (view.targetType === "TOOLSET_REQUEST" && view.targetId) return `/tool-requests/${view.targetId}`;
+  if (view.targetType === "ADMIN_TOOL_REQUEST" && view.targetId)
+    return `/admin/tool-requests/${view.targetId}`;
+  if (view.targetType === "TOOLSET_REQUEST" && view.targetId)
+    return `/tool-requests/${view.targetId}`;
   if (view.targetType === "CONVERSATION" && view.targetId) {
     return `/chat/${view.targetId}`;
   }
