@@ -39,7 +39,10 @@ always/index/omitted 항목 모두 updatedAt으로 판정한다. ContextAssemble
 기존 ContextAssemblerTest의 새 기억은 기본 180일 안이므로 FRESH가 유지된다.
 수정 시각을 통제하는 시험으로 오래된 항상/색인/생략 항목의 STALE, 새 항목과 경계 시각의 FRESH,
 collection 덮어쓰기, 기준 0 및 수정 시각 없음의 UNKNOWN을 검증한다.
-설정 누락 시 180일과 빈 맵, 원본 맵 변경이 영향을 주지 않는 것, Spring 설정 바인딩을 검증한다.
+ContextPropertiesTest는 설정 누락 시 180일과 빈 맵, 원본 맵 변경이 영향을 주지 않는 것을 검증하고,
+Spring의 Binder를 직접 사용해 기간과 collection 맵의 설정 바인딩을 검증한다.
+updatedAt은 DB의 non-null 칸이므로 시각 없음 사례는 MemoryFreshnessTest 안에서
+mock MemoryService와 mock Memory로 ContextAssembler를 구성해 UNKNOWN을 단언한다.
 `MemoryFreshnessTest`는 통합 하네스에서 실제 Memory를 저장하고 `ContextAssembler` → `ContextSourceRefs` →
 `ExecutionRecorder.start`로 기록해 `execution_context_source`의 STALE와 UNKNOWN을 모두 단언한다.
 고정 FRESH를 되돌리면 이 시험이 실패해야 한다. 실제 개인정보를 쓰지 않는다.
