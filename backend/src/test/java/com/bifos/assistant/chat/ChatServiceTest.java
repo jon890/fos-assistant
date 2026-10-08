@@ -5,7 +5,6 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.tuple;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
@@ -446,7 +445,14 @@ class ChatServiceTest {
         chat.stream(dad, null, "메모 찾아 줘", "dad", event -> {});
 
         verify(eventStream, timeout(5000))
-                .open(any(), any(), any(), any(), any(), eq(ToolDetailScope.prefixes(Set.of("mcp__demo__"))));
+                .open(
+                        any(),
+                        any(),
+                        any(),
+                        any(),
+                        any(),
+                        argThat(scope ->
+                                !scope.hideAll() && scope.hiddenPrefixes().equals(Set.of("mcp__demo__"))));
     }
 
     @Test
@@ -468,7 +474,14 @@ class ChatServiceTest {
         ChatTurn turn = chat.send(dad, null, "메모 찾아 줘", "dad");
 
         verify(eventStream)
-                .open(any(), any(), any(), any(), any(), eq(ToolDetailScope.prefixes(Set.of("mcp__demo__"))));
+                .open(
+                        any(),
+                        any(),
+                        any(),
+                        any(),
+                        any(),
+                        argThat(scope ->
+                                !scope.hideAll() && scope.hiddenPrefixes().equals(Set.of("mcp__demo__"))));
         List<ExecutionEvent> recorded = eventsOf(turn.executionId());
         assertThat(typesOf(recorded))
                 .containsExactly(
@@ -543,7 +556,7 @@ class ChatServiceTest {
 
         chat.stream(dad, null, "메모 찾아 줘", "dad", event -> {});
 
-        verify(eventStream, timeout(5000)).open(any(), any(), any(), any(), any(), eq(ToolDetailScope.ALL));
+        verify(eventStream, timeout(5000)).open(any(), any(), any(), any(), any(), argThat(ToolDetailScope::hideAll));
     }
 
     @Test

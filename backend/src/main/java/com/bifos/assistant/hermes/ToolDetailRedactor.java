@@ -86,11 +86,24 @@ public final class ToolDetailRedactor {
      */
     public static String redact(
             String detail, String toolName, ToolDetailScope scope, Map<String, String> identifiers) {
+        return redact(detail, toolName, scope, identifiers, false);
+    }
+
+    /** 커넥터 호출 뒤 일반 도구는 원문 대신 받은 내용의 길이만 남긴다. 이름은 사건의 별도 칸에 있다. */
+    public static String redact(
+            String detail,
+            String toolName,
+            ToolDetailScope scope,
+            Map<String, String> identifiers,
+            boolean afterConnector) {
         if (detail == null) {
             return null;
         }
         if (scope.hides(toolName)) {
             return CONNECTOR_HIDDEN;
+        }
+        if (afterConnector) {
+            return "[도구 내용 가림: " + detail.length() + "자]";
         }
         if (detail.length() > INPUT_LIMIT) {
             return "[긴 도구 내용 가림]";

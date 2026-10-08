@@ -19,6 +19,16 @@ public interface ConnectorActionRepository extends JpaRepository<ConnectorAction
 
     Optional<ConnectorAction> findByDedupeKey(String dedupeKey);
 
+    /** 호출 허용에 앞서 저장한 판정 줄로 자식과 형제를 포함한 트리의 커넥터 호출 이력을 확인한다. */
+    @Query("""
+            select case when count(a) > 0 then true else false end
+            from ConnectorAction a, AgentExecution e
+            where a.originExecutionId = e.id and a.userId = e.userId
+                and (e.id = :rootId or e.rootExecutionId = :rootId)
+                and a.createdAt <= :at
+            """)
+    boolean existsCallInTreeBefore(@Param("rootId") Long rootId, @Param("at") Instant at);
+
     /**
      * 승인 줄의 상태를 바꾸기 전에 그 줄을 잠그고 읽는다.
      *
