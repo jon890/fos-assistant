@@ -1,0 +1,13 @@
+{
+  "name": "plan98-daily-loop",
+  "description": "매일 깨우기 뒤 가치 평가와 행동 정책을 동의한 사용자에게 한 번 잇는 이음매, 시도 기록, 사용자 설정, 7일 합성 반복 (#286 의 backend 단계)",
+  "status": "pending",
+  "created_at": "2026-10-08",
+  "total_phases": 3,
+  "current_phase": 1,
+  "phases": [
+    { "number": 1, "file": "phase-01.md", "execution_profile": "standard" },
+    { "number": 2, "file": "phase-02.md", "execution_profile": "deep" },
+    { "number": 3, "file": "phase-03.md", "execution_profile": "standard" }
+  ]
+}

@@ -1,0 +1,140 @@
+# 매일 루프
+
+매일 깨우기로 돈 살펴보기가 끝나면, 그 살펴보기가 받아들인 문제 후보를 가치 평가와 행동 정책에 한 번 잇는다.
+결정은 [ADR-20261008 / daily-loop](../adr/ADR-20261008-daily-loop.md)에 있다.
+각 단계의 계약은 [먼저 살펴보기](proactive-check.md), [가치 평가](value-evaluation.md), [행동 정책](autonomy-policy.md), [판단 피드백](decision-feedback.md)이 갖는다.
+이 문서는 언제 잇는지와 그 시도의 기록만 갖는다.
+
+## 무엇을 잇는가
+
+| 단계 | 부르는 것 | 이 단계가 갖는 것 |
+| --- | --- | --- |
+| 관찰과 문제 찾기 | 매일 깨우기의 살펴보기(`CheckTrigger.SCHEDULED`) | 결과 블록 검사, 문제 후보의 `ACCEPTED`, `DROPPED` |
+| 가치 판단 | `ValueEvaluationService.evaluate(user, checkId, provider)` | 모델 호출 한 번, `proactive_value_evaluation` 한 줄 |
+| 행동 정책 | `AutonomyPolicyService.decide(user, evaluationId)` | 후보마다 판정 한 줄, `EXECUTE` 면 읽기 전용 살펴보기 한 번 |
+| 시도 기록 | `ProactiveLoopCoordinator` | `proactive_loop_run` 한 줄 |
+
+단추로 연 살펴보기(`MANUAL`)와 자동 실행이 연 살펴보기(`AUTONOMY`)는 잇지 않는다. 자동 실행의 문제 후보가 다시 자동 실행을 부르지 않게 하기 위해서다.
+열지 않은 보고 때문에 모델 없이 건너뛴 깨우기(`UNREAD_REPORT`)는 살펴보기 turn 이 돌지 않아 잇지 않는다.
+
+## 언제 부르는가
+
+`ProactiveCheckService` 가 살펴보기 turn 을 끝내고 점검 대화의 잠금을 푼 뒤 `ProactiveCheckSettled` 사건을 낸다.
+`ProactiveLoopCoordinator` 가 그 사건을 같은 백그라운드 스레드에서 받는다. 잠금을 푼 뒤라 자동 실행이 같은 점검 대화의 잠금을 잡을 수 있다.
+사건 처리의 실패는 로그만 남기고 살펴보기의 끝을 바꾸지 않는다.
+
+```mermaid
+sequenceDiagram
+    participant P as ProactiveCheckService
+    participant L as ProactiveLoopCoordinator
+    participant V as ValueEvaluationService
+    participant A as AutonomyPolicyService
+    P->>P: 끝날 때 정리, 점검 대화 잠금 풀기
+    P->>L: ProactiveCheckSettled(사용자, 살펴보기 번호)
+    L->>L: 조건 확인. 아니면 줄을 남기지 않는다
+    L->>L: 시도 줄 저장(원천 유일). 건너뛰면 SKIPPED 로 끝
+    L->>V: evaluate
+    V-->>L: 평가 줄(EVALUATED, INSUFFICIENT_EVIDENCE, FALLBACK)
+    L->>A: decide
+    A-->>L: 판정 줄들. EXECUTE 면 startAutonomous 를 이미 불렀다
+    L->>L: 시도 줄 DECIDED
+```
+
+### 줄을 남기지 않고 돌아가는 조건
+
+아래 가운데 하나면 시도 줄 없이 돌아간다. 동의하지 않은 사용자의 살펴보기마다 줄이 쌓이지 않게 하기 위해서다.
+
+- 살펴보기의 시작 계기가 `SCHEDULED` 가 아니다
+- 살펴보기 상태가 `SUCCEEDED` 가 아니다
+- 설치 설정 `assistant.proactive-loop.enabled` 가 거짓이다
+- 그 사용자와 에이전트의 설정 줄이 없거나 꺼져 있다
+
+### 시도 줄을 남기는 순서
+
+한 트랜잭션에서 그 사용자의 설정 줄을 모두 쓰기 잠금으로 읽은 뒤 아래 순서로 정한다. 앞에서 걸리면 뒤를 보지 않는다.
+
+| 순서 | 조건 | 시도 줄 |
+| --- | --- | --- |
+| 1 | 설정의 `snoozed_until` 이 지금보다 뒤다 | `SKIPPED`, `SNOOZED` |
+| 2 | 그 살펴보기의 `ACCEPTED` 문제 후보가 없다 | `SKIPPED`, `NO_CANDIDATE` |
+| 3 | 그 사용자의 `SKIPPED` 가 아닌 시도 줄이 최근 24시간 안에 `max-runs-per-day` 개 이상이다 | `SKIPPED`, `DAILY_LIMIT` |
+| 4 | 위가 모두 아니다 | `RUNNING` |
+
+`NO_CANDIDATE` 는 모델을 부르지 않으므로 하루 상한에 세지 않는다. 동의한 사용자의 침묵을 조회할 수 있게 줄은 남긴다.
+원천 살펴보기 칸의 유일 제약에 걸리면 이미 다른 처리가 그 살펴보기를 맡았으므로 아무것도 하지 않는다.
+
+### 평가와 판정
+
+`RUNNING` 줄을 커밋한 뒤 트랜잭션 밖에서 평가와 판정을 부른다. 모델을 기다리는 동안 트랜잭션과 잠금을 쥐지 않는다.
+provider 는 `assistant.proactive-loop.provider` 다. 판단 profile 이 없거나 꺼져 있으면 평가는 `FALLBACK / PROVIDER_UNAVAILABLE` 이고 판정은 모두 `IGNORE / EVALUATION_NOT_USABLE` 이다. 그래도 시도는 `DECIDED` 다.
+
+| 결과 | 시도 줄 |
+| --- | --- |
+| 판정까지 끝났다 | `DECIDED`, 평가 번호 |
+| 평가나 판정이 `ApiException` 으로 거절됐다. 점검 대화를 지운 경우가 여기 든다 | `FAILED`, 그 오류 코드. 평가 줄이 남았으면 평가 번호 |
+| 그 밖의 예외 | `FAILED`, `INTERNAL_ERROR` |
+
+시도는 다시 부르지 않는다. 같은 원천에서 판정이 두 번 생기지 않게 하기 위해서다.
+자동 실행의 시작과 실패는 판정 줄의 `execution_status` 가 갖는다([행동 정책](autonomy-policy.md)의 「자동 실행」).
+
+### 서버가 멈췄을 때
+
+기동할 때 `ProactiveLoopRecovery` 가 `RUNNING` 시도 줄을 `FAILED`, `INTERRUPTED` 로 닫는다. 평가와 판정을 다시 부르지 않는다.
+평가 줄의 `RUNNING` 은 가치 평가의 기동 복구가, 판정 줄의 `PENDING` 은 행동 정책의 규칙이 다룬다.
+살펴보기가 끝난 뒤 시도 줄을 저장하기 전에 멈추면 그 살펴보기는 잇지 않는다. 다음 깨우기가 새 원천이다.
+
+## 사용자 설정
+
+사용자와 에이전트마다 하나다. 줄이 없으면 꺼짐이다.
+
+| 메서드와 경로 | 하는 일 |
+| --- | --- |
+| `GET /api/v1/agents/{code}/proactive-check/loop` | `{ available, enabled, snoozedUntil }` 을 준다. `available` 은 설치 설정 `enabled` 다 |
+| `PUT /api/v1/agents/{code}/proactive-check/loop` | `{ enabled, snoozedUntil }` 을 저장하고 GET 과 같은 모양을 준다 |
+
+권한은 매일 깨우기 설정과 같다. 조회와 끄기는 `AgentService.requireReadable`, 켜기는 `AgentService.requireStartable` 이다.
+설치 설정이 꺼져 있으면 켜기는 409 `PROACTIVE_LOOP_UNAVAILABLE` 이다. 끄기와 쉬기는 늘 받는다.
+`snoozedUntil` 은 비우거나 지금부터 30일 안의 시각이다. 벗어나면 400 `VALIDATION_FAILED` 다. 지난 시각을 보내면 비운 것과 같다.
+쉬는 동안의 깨우기는 `SNOOZED` 로 남고 평가하지 않는다. 쉬기가 끝난 뒤 지난 깨우기를 몰아 잇지 않는다.
+
+매일 깨우기 자체를 끄면 살펴보기가 돌지 않으므로 루프도 돌지 않는다. 읽기 전용 자동 실행은 이 설정과 따로 [행동 정책](autonomy-policy.md)의 설치 설정과 사용자 동의가 연다.
+
+## 사용자에게 보이는 것
+
+아직 없다. 판정은 [행동 정책](autonomy-policy.md)의 수준대로 기록만 남는다. `IGNORE` 를 포함해 어떤 판정도 알림, 알림 줄, 승인 줄을 만들지 않는다.
+`SURFACE` 와 `ASK_APPROVAL` 을 지금 화면 「내 차례」 의 항목으로 보이는 일은 다음 단계다([ADR-20261008 / daily-loop](../adr/ADR-20261008-daily-loop.md)).
+
+## 기록과 조회
+
+시도 줄은 `proactive_loop_run`, 설정은 `proactive_loop_setting` 이다. 칸은 [`schema/proactive.md`](schema/proactive.md)가 갖는다.
+
+| 묻는 것 | 읽는 곳 |
+| --- | --- |
+| 그 깨우기가 이어졌는가, 왜 건너뛰었는가 | 시도 줄의 상태, 건너뛴 까닭, 오류 코드 |
+| 판단과 그 provider, 모델 | 시도 줄의 평가 번호로 `proactive_value_evaluation.evidence_json` 의 `provider` |
+| 후보마다의 수준과 까닭, 규칙 버전 | 같은 평가의 `proactive_autonomy_decision` |
+| 비용 | 원천 살펴보기 트리의 실행 줄, 평가 실행 줄(`agent_id` 와 `conversation_id` 가 빈 줄), 자동 실행한 살펴보기 트리의 실행 줄 |
+
+판단 피드백 export 의 `situation.loop` 이 시도 줄의 번호, 상태, 건너뛴 까닭, 오류 코드, 평가 번호, 시각을 싣는다([판단 피드백](decision-feedback.md)의 「replay 읽기 모델」).
+글과 원문은 시도 줄에 두지 않는다. 실제 provider 의 결과와 합성 평가([먼저 살펴보기 루프 평가](proactive-eval.md))의 결과는 평가의 provider 기록으로 구분한다.
+
+## 설정
+
+`assistant.proactive-loop` 설정이다.
+
+| 칸 | 기본값 | 뜻 |
+| --- | --- | --- |
+| `enabled` | `false` | 설치가 루프를 연다. 꺼져 있으면 사용자 설정과 상관없이 잇지 않는다 |
+| `provider` | `hermes` | 평가에 쓸 `DecisionProvider` 이름. 설치된 adapter 여야 한다 |
+| `max-runs-per-day` | `1` | 사용자 한 명의 최근 24시간 시도 상한. 1 이상 |
+
+## 검증
+
+| 무엇 | 어디서 |
+| --- | --- |
+| 줄을 남기지 않는 조건, 건너뛰는 순서, 원천 유일, 하루 상한, 실패 코드, 다시 부르지 않음 | `ProactiveLoopCoordinatorTest` |
+| 기동 때 `RUNNING` 닫기 | `ProactiveLoopRecoveryTest` |
+| 설정 API 의 권한과 검사 | `ProactiveLoopSettingTest` |
+| 결정적 provider 로 8일 동안 깨우기와 루프를 이어 돌려 중요한 문제의 적중, 중복, 유용한 침묵, 실패, 호출 수를 세는 합성 반복 | `DailyLoopPilotTest`. 결과는 `backend/build/reports/proactive-loop/report.md` |
+
+합성 반복의 모든 값은 합성이다. 실제 사람, 메일, 계정, 금액, 대화 내용을 쓰지 않는다.

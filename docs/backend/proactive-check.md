@@ -309,6 +309,8 @@ turn 이 어떻게 끝나든 잠금을 풀기 전에 `ProactiveCheckService` 가
 2. 그 트리의 위임 자식 가운데 결과를 전하지 않은 줄을 모두 전했다고 적는다(`ExecutionDeliveryWriter.markTreeDelivered`). 아직 도는 줄도 적는다
 3. `ProactiveCheckEnded(rootExecutionId)` 사건을 낸다. `orchestration` 이 받아 그 트리의 도는 위임 자식을 멈춘다
 
+잠금을 푼 뒤 `ProactiveCheckSettled` 사건을 낸다. [매일 루프](proactive-loop.md)가 받아 매일 깨우기의 문제 후보를 잇는다. 사건 처리의 실패는 살펴보기의 끝을 바꾸지 않는다.
+
 2 가 없으면 자식이 끝날 때 점검 대화에 자동 turn 이 열린다. 그 turn 은 보통 turn 이라 읽기 경계가 없다.
 자식의 답은 살펴보기 turn 이 `agent_status` 로 이미 읽었거나, 끝나기 전에 읽지 못했으면 버린다. 버린 수는 남기지 않는다.
 
@@ -529,7 +531,7 @@ turn 이 어떻게 끝나든 잠금을 풀기 전에 `ProactiveCheckService` 가
 근거는 발견의 주제 키, 검사를 통과한 원문 주소, 확인 시각만 남긴다. 원문 본문과 커넥터 응답은 남기지 않는다.
 
 후보는 대화와 보고에 그리지 않는다. 사용자에게 올릴지는 우선순위와 자율 수준을 정하는 다음 단계가 정한다.
-받아들인 후보의 가치 판단과 replay는 [가치 평가](value-evaluation.md)가, 행동 수준은 [행동 정책](autonomy-policy.md)이 맡는다. 살펴보기에서 자동으로 부르지는 않는다.
+받아들인 후보의 가치 판단과 replay는 [가치 평가](value-evaluation.md)가, 행동 수준은 [행동 정책](autonomy-policy.md)이 맡는다. 단추로 연 살펴보기는 이 둘을 자동으로 부르지 않는다. 매일 깨우기는 사용자가 켠 에이전트에서만 [매일 루프](proactive-loop.md)가 잇는다.
 다음 살펴보기는 최근에 받아들인 후보를 입력에 실어, 모델이 같은 문제 키를 다시 내지 않게 한다.
 
 예약 실행의 `NOTHING_NEW` 침묵, 「새로 알릴 것이 없어요」 알림 줄, 다섯 칸 보고는 후보와 상관없이 지금 그대로다.
