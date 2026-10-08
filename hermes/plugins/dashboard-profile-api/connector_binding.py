@@ -190,19 +190,26 @@ def _connector_bind_config(profile_dir: pathlib.Path, plugin: str, enabled: bool
         if not owned and not _policy_plugin_enabled(saved):
             raise FileExistsError("정책 hook plugin 이 켜져 있지 않은 profile 이다")
         name = manifest["mcp_server"]
+        if owned is not None and owned["mcp_server"] != name:
+            raise FileExistsError("설치한 MCP 서버 이름이 지금 connector 와 다르다")
         if name in servers and (not owned or servers[name] != owned["server"]):
             raise FileExistsError("운영자가 등록하거나 바꾼 MCP 서버가 있다")
         if owned and name not in servers:
             raise FileExistsError("설치한 MCP 서버가 밖에서 지워졌다")
         field_env = [field["env"] for field in manifest["fields"]]
+        previous_owned_env = _bind_entry_env(None, owned) if owned else set()
         others = set()
         for other, entry in state.items():
             if other != plugin:
-                others |= _entry_field_env(other, entry)
+                # 현재 manifest 칸과 기록이 참조한 옛 칸 모두 다른 바인딩의 값으로 보호한다.
+                others |= _entry_field_env(other, entry) | _bind_entry_env(None, entry)
         present = {_env_line_key(line) for line in env_lines}
         for env_name in field_env:
-            if env_name in BASE_ENV_KEYS or env_name in others or (env_name in present and not owned):
+            if env_name in BASE_ENV_KEYS or env_name in others or (env_name in present and env_name not in previous_owned_env):
                 raise FileExistsError("다른 설정이 쓰는 환경 변수와 겹친다")
+        # manifest 의 칸 이름이 바뀌어도 같은 소유 기록의 옛 `${이름}` 참조 줄은 남기지 않는다.
+        # 현재 manifest 칸은 새 값으로만 쓰고, 다른 바인딩과 기본 env 가 쓰는 이름은 지우지 않는다.
+        cleanup_env = (set(field_env) | previous_owned_env) - others - BASE_ENV_KEYS
         server = _connector_server(manifest)
         # Hermes 는 빈 변수의 참조를 그대로 남긴다. 값이 없는 선택 칸은 빈 값을 명시한다.
         for field in manifest["fields"]:
@@ -229,7 +236,7 @@ def _connector_bind_config(profile_dir: pathlib.Path, plugin: str, enabled: bool
         kept = []
         for line in env_lines:
             key = _env_line_key(line)
-            if key not in field_env:
+            if key not in cleanup_env:
                 kept.append(line)
             elif key in wanted:
                 kept.append(wanted.pop(key))

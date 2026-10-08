@@ -91,6 +91,90 @@ class ProfileApiConnectorBindingRefreshTest(support.ProfileApiRouteTest):
                 self.assertEqual(self.bind().status_code, 409)
                 self.write_config("alice", original)
 
+    def test_rebinding_rejects_manifest_server_name_change_that_matches_an_operator_server(self):
+        """새 manifest 서버 이름에 운영자가 같은 정의를 넣어도 소유 기록의 이름은 자동 이관하지 않는다."""
+        connector, _ = self.bind_fixture()
+        self.assertEqual(self.bind().status_code, 200)
+        mcp_path = connector / ".mcp.json"
+        declared = json.loads(mcp_path.read_text(encoding="utf-8"))
+        server = declared["mcpServers"].pop("demo")
+        declared["mcpServers"]["demo-renamed"] = server
+        mcp_path.write_text(json.dumps(declared), encoding="utf-8")
+        config = self.alice_config()
+        config["mcp_servers"]["demo-renamed"] = config["mcp_servers"]["demo"]
+        config["platform_toolsets"]["api_server"].append("demo-renamed")
+        self.write_config("alice", config)
+        before = self.tree("alice")
+
+        response = self.bind()
+
+        self.assertEqual(response.status_code, 409, response.body)
+        self.assertEqual(self.tree("alice"), before)
+
+    def test_rebinding_removes_renamed_field_env_and_detach_removes_the_new_secret(self):
+        """같은 보관 파일의 field env 이름을 바꾸면 옛 줄을 지우고 이후 떼기도 새 줄을 지운다."""
+        connector, _ = self.bind_fixture()
+        self.assertEqual(self.vault("PUT", vault="c1", connector=DEMO,
+                                    values={"token": "demo_ok_0123456789", "scope": "scope-a"}).status_code, 200)
+        self.assertEqual(self.bind().status_code, 200)
+        self.assertEqual(self.bind("other-notes", "c2").status_code, 200)
+        vault_before = {path.name: path.read_bytes() for path in self.hermes_root.rglob("*") if path.is_file()}
+        connector_path = connector / "connector.json"
+        declared = json.loads(connector_path.read_text(encoding="utf-8"))
+        declared["fields"][0]["env"] = "DEMO_TOKEN_RENAMED"
+        declared["fields"][1]["env"] = "DEMO_SCOPE_RENAMED"
+        connector_path.write_text(json.dumps(declared), encoding="utf-8")
+        mcp_path = connector / ".mcp.json"
+        mcp = json.loads(mcp_path.read_text(encoding="utf-8"))
+        env = mcp["mcpServers"]["demo"]["env"]
+        env.pop("DEMO_TOKEN")
+        env.pop("DEMO_SCOPE")
+        env["DEMO_TOKEN_RENAMED"] = "${DEMO_TOKEN_RENAMED}"
+        env["DEMO_SCOPE_RENAMED"] = "${DEMO_SCOPE_RENAMED:-}"
+        mcp_path.write_text(json.dumps(mcp), encoding="utf-8")
+
+        rebound = self.bind()
+
+        self.assertEqual(rebound.status_code, 200, rebound.body)
+        lines = (self.root / "alice/.env").read_text(encoding="utf-8")
+        self.assertNotIn("DEMO_TOKEN=", lines)
+        self.assertNotIn("DEMO_SCOPE=", lines)
+        self.assertIn("DEMO_TOKEN_RENAMED=demo_ok_0123456789", lines)
+        self.assertIn("DEMO_SCOPE_RENAMED=scope-a", lines)
+        self.assertIn("OTHER_TOKEN=other_1234", lines)
+        self.assertEqual({path.name: path.read_bytes() for path in self.hermes_root.rglob("*") if path.is_file()}, vault_before)
+        self.assertEqual(self.bind(enabled=False).status_code, 200)
+        after = (self.root / "alice/.env").read_text(encoding="utf-8")
+        self.assertNotIn("DEMO_TOKEN_RENAMED", after)
+        self.assertNotIn("DEMO_SCOPE_RENAMED", after)
+        self.assertIn("OTHER_TOKEN=other_1234", after)
+
+    def test_rebinding_rejects_renamed_field_env_that_an_operator_already_uses(self):
+        """새 field env 이름이 profile의 비커넥터 값과 겹치면 그 값을 덮어쓰지 않는다."""
+        connector, _ = self.bind_fixture()
+        self.assertEqual(self.bind().status_code, 200)
+        vault_before = {path.name: path.read_bytes() for path in self.hermes_root.rglob("*") if path.is_file()}
+        connector_path = connector / "connector.json"
+        declared = json.loads(connector_path.read_text(encoding="utf-8"))
+        declared["fields"][0]["env"] = "DEMO_REPLACEMENT_TOKEN"
+        connector_path.write_text(json.dumps(declared), encoding="utf-8")
+        mcp_path = connector / ".mcp.json"
+        mcp = json.loads(mcp_path.read_text(encoding="utf-8"))
+        env = mcp["mcpServers"]["demo"]["env"]
+        env.pop("DEMO_TOKEN")
+        env["DEMO_REPLACEMENT_TOKEN"] = "${DEMO_REPLACEMENT_TOKEN}"
+        mcp_path.write_text(json.dumps(mcp), encoding="utf-8")
+        env_path = self.root / "alice/.env"
+        env_path.write_text(env_path.read_text(encoding="utf-8") + "DEMO_REPLACEMENT_TOKEN=operator-value\n",
+                            encoding="utf-8")
+        before = self.tree("alice")
+
+        response = self.bind()
+
+        self.assertEqual(response.status_code, 409, response.body)
+        self.assertEqual(self.tree("alice"), before)
+        self.assertEqual({path.name: path.read_bytes() for path in self.hermes_root.rglob("*") if path.is_file()}, vault_before)
+
     def test_failure_logs_only_stage_id_exception_class_and_fixed_mismatch_names(self):
         """실패 로그는 비밀값이나 예외 본문 없이 진단에 필요한 고정 정보만 남긴다."""
         connector, _ = self.bind_fixture()
