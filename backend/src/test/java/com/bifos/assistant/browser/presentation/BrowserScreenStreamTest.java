@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import java.io.IOException;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -58,6 +59,7 @@ class BrowserScreenStreamTest {
     @DisplayName("진행 중인 프레임 쓰기가 곧 끝나면 closed 는 잠깐 기다렸다가 보낸다")
     void sendsClosedAfterShortWrite() throws InterruptedException {
         CountDownLatch writing = new CountDownLatch(1);
+        CountDownLatch release = new CountDownLatch(1);
         AtomicInteger sent = new AtomicInteger();
         SseEmitter emitter = new SseEmitter(0L) {
             @Override
@@ -65,7 +67,7 @@ class BrowserScreenStreamTest {
                 if (sent.incrementAndGet() == 1) {
                     writing.countDown();
                     try {
-                        Thread.sleep(100);
+                        release.await();
                     } catch (InterruptedException ex) {
                         Thread.currentThread().interrupt();
                         throw new IOException("interrupted", ex);
@@ -77,7 +79,10 @@ class BrowserScreenStreamTest {
         Thread writer = Thread.ofPlatform().start(() -> stream.send("frame", Map.of()));
         assertThat(writing.await(2, TimeUnit.SECONDS)).isTrue();
 
-        assertThat(stream.trySend("closed", Map.of("reason", "replaced"))).isTrue();
+        // closed 가 잠금을 기다리기 시작한 뒤에 프레임 쓰기를 끝낸다. 고정 sleep 에 기대지 않는다
+        var closing = CompletableFuture.supplyAsync(() -> stream.trySend("closed", Map.of("reason", "replaced")));
+        release.countDown();
+        assertThat(closing.join()).isTrue();
         writer.join(2000);
         assertThat(sent.get()).isEqualTo(2);
     }
