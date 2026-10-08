@@ -218,6 +218,7 @@ test("다음 쪽 실패 뒤 기존 기록을 지키고 재시도하며 빠른 �
   await expect.poll(() => requests).toBe(1);
   release();
   await expect(records(page, testInfo.project.name)).toHaveCount(52);
+  expect(requests).toBe(1);
   await page.unroute("**/api/usage/executions/page?*");
 });
 
