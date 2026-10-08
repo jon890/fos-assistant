@@ -38,7 +38,8 @@ frontend 는 화면의 동작과 구조이고, hermes 는 외부 런타임인 He
 | [`backend/connector-tool-policy.md`](backend/connector-tool-policy.md) | 커넥터 도구의 위험도와 승인 방식, 도구 호출 판정, 승인이 필요한 호출의 흐름, 사용자별 호출 제한 |
 | [`backend/conversation.md`](backend/conversation.md) | 대화와 실행 사건, 모델 단계와 자식 기록, 도구 내용 가리기 |
 | [`backend/mcp-caller.md`](backend/mcp-caller.md) | Control Plane MCP 호출의 요청자를 정하는 방법, MCP 서버와 결과물 쓰기 도구의 계약, 도구 호출의 입력 비용 |
-| [`backend/memory.md`](backend/memory.md) | Memory 의 범위와 제안과 수락, 본문을 읽는 길 |
+| [`backend/memory.md`](backend/memory.md) | Memory 의 범위와 제안과 수락, 프로필 구역, 본문을 읽는 길, 답마다 참고한 기억 |
+| [`backend/memory-eval.md`](backend/memory-eval.md) | Memory 회수의 합성 측정(가상 가족 시험 세트)과 운영 집계 SELECT 문 |
 | [`backend/people.md`](backend/people.md) | 관리자가 사용자를 더하는 절차 |
 | [`backend/skill.md`](backend/skill.md) | 스킬의 저장과 스킬 커맨드 전달 |
 | [`backend/turn-control.md`](backend/turn-control.md) | 응답 중 대기열, 중지, 기동할 때 남은 실행 정리 |

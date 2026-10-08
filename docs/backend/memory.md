@@ -2,7 +2,7 @@
 
 Memory 는 에이전트가 실행할 때 `instructions` 로 받는 사실이다.
 단일 소스는 Control Plane 데이터베이스이고, Hermes 의 내장 memory 는 쓰지 않는다.
-이 파일은 Memory 의 범위와 승인, 실행에 실을 항목을 고르고 조립하는 규칙, 색인의 본문을 `memory_read` 로 읽는 길, 에이전트가 `memory_remember` 로 기억을 남기는 길을 갖는다.
+이 파일은 Memory 의 범위와 승인, 실행에 실을 항목을 고르고 조립하는 규칙, 색인의 본문을 `memory_read` 로 읽는 길, 에이전트가 `memory_remember` 로 기억을 남기는 길, 답마다 참고한 기억을 보이는 길을 갖는다.
 
 ## 범위와 조립
 
@@ -14,6 +14,7 @@ Memory 는 에이전트가 실행할 때 `instructions` 로 받는 사실이다.
 - `ContextAssembler.assemble(user, agentId)` 가 요청자의 `USER` 항목과 요청자가 속한 그룹의 `GROUP` 항목 가운데 그 에이전트가 받는 collection 의 항목만 골라 조립한다.
   다른 사용자의 개인 항목과 받지 않는 collection 의 항목은 고르는 단계에서 빠진다.
 - 본문까지 싣는 항상 층과 제목만 싣는 색인 층으로 나눈다. `retrieval` 이 `ALWAYS` 면 항상 층에 본문을 싣고, `SEARCH` 면 제목과 번호만 색인에 싣는다. `ARCHIVE` 와 종류가 `SOURCE` 인 항목은 어느 층에도 싣지 않는다.
+  예외로 `SEARCH` 가운데 짧은 개인 항목은 두 층 사이의 사용자 프로필 구역에 본문까지 싣는다(아래 「사용자 프로필 구역」).
 - `SENSITIVE` 항목은 `ALWAYS` 로 저장하지 못한다. `MemoryService` 가 `MEMORY_SENSITIVE_ALWAYS` 로 거절한다.
 - 색인의 본문은 `memory_read` MCP 도구로 읽는다.
   요청자는 장기 토큰이 아니라 서명한 `_fos_ctx` 로 찾은 origin 실행의 사용자다([`mcp-caller.md`](mcp-caller.md)). 요청 본문은 사용자를 바꾸지 못한다.
@@ -48,7 +49,7 @@ Memory 는 에이전트가 실행할 때 `instructions` 로 받는 사실이다.
 - 공통 답변 지침과 Memory를 합친 글자 수를 실행의 `context_chars`에 남긴다.
   `instructions_hash`도 이 문자열을 대상으로 하며, turn 전용 지시는 제외한다.
   Memory가 없어도 공통 지침의 길이와 지문이 남으므로 Memory 주입 여부는 지문만으로 판단하지 않는다.
-- 조립한 Memory 문맥은 8,000자로 제한한다. 항목 하나가 남은 자리에 들어가지 않으면 그 항목만 빼고 다음 항목과 색인을 계속 담는다.
+- 조립한 Memory 문맥은 8,000자로 제한한다. 프로필 구역도 이 안에 든다. 항목 하나가 남은 자리에 들어가지 않으면 그 항목만 빼고 다음 항목과 색인을 계속 담는다.
   넘친 항목을 잘라서 싣지는 않는다. 잘린 사실은 틀린 사실이 될 수 있다.
   그래서 한 항목의 본문을 8,000자 가까이 키우지 않고 큰 본문은 색인 층에 둔다.
 - 색인 층에 쓸 자리를 먼저 떼어 두고 항상 층을 담는다. 긴 본문이 색인을 밀어내지 못한다.
@@ -56,6 +57,37 @@ Memory 는 에이전트가 실행할 때 `instructions` 로 받는 사실이다.
   색인이 빠지면 `memory_read` 로 읽을 번호도 사라져 에이전트가 나머지 Memory 에 닿을 길이 없어진다.
 - 빠진 항목 수를 실행의 `context_omitted_items` 에 남기고, `/memory` 목록의 그 항목에 표시를 단다.
   대화 화면에는 끼우지 않는다.
+  프로필 구역에 자리가 없어 색인으로 내려간 항목은 빠진 항목이 아니다. 색인에서도 빠졌을 때만 센다.
+
+### 사용자 프로필 구역
+
+짧은 개인 사실을 본문까지 매 실행에 싣는 구역이다. 모델이 `memory_read` 를 부르지 않아도 이름과 관계와 선호를 안다.
+근거는 [ADR-20261008 / memory-profile](../adr/ADR-20261008-memory-profile.md) 에 있다.
+
+| 무엇 | 규칙 |
+| --- | --- |
+| 후보 | 색인 층에 오를 항목(`MemoryService.indexedFor`) 가운데 범위 `USER`, 종류 `MEMORY`, 민감도 `NORMAL`, 본문 200자 이하. 암호문인 줄은 넣지 않는다 |
+| 예산 | `assistant.context.profile-max-chars`, 기본값 2,000자. 0 이면 구역을 끈다. 머리 줄과 구분 줄까지 센다 |
+| 본문 길이 상한 | `assistant.context.profile-item-max-chars`, 기본값 200자 |
+| 담는 순서 | 색인 몫을 먼저 떼어 두고, 항상 층, 프로필 구역, 색인 층 순으로 담는다. 프로필 구역은 항상 층이 쓰고 남은 자리와 예산 가운데 작은 쪽을 쓴다 |
+| 넘칠 때 | `updated_at` 이 최근인 것부터, 같으면 번호가 큰 것부터 고른다. 들어가지 않는 항목은 건너뛰고 다음 항목을 본다 |
+| 글로 옮길 때 | 고른 항목을 번호 순으로 늘어놓는다. 고른 집합이 같으면 글이 같아 지시문 지문이 바뀌지 않는다 |
+| 줄의 모양 | `- [번호] 제목: 본문`. 본문의 줄바꿈은 공백 하나로 바꿔 한 줄로 싣는다. 자르지 않는다. 바뀐 사실을 번호로 고치라는 안내는 `memory_remember` 를 받는 실행의 「# 기억」 지침이 갖는다 |
+| 항상 층 뒤에 자리가 모자랄 때 | 항상 층이 쓰고 남은 자리에 들어가는 만큼만 다시 고른다. 다시 고르며 빠진 후보는 색인으로 간다. 프로필 구역의 항목은 `OMITTED` 가 되지 않는다 |
+| 색인과의 관계 | 프로필 구역에 실린 항목은 색인에서 뺀다. 자리가 없어 빠진 후보는 색인에 제목으로 남는다 |
+| `memory_read` | 실린 항목도 `retrieval` 이 `SEARCH` 라 읽힌다 |
+| 문맥 묶음 | 실린 항목은 `source=MEMORY_PROFILE`, `bodyMode=INLINE` 이다. 색인으로 내려간 후보는 `MEMORY_INDEX` 다 |
+
+```text
+# 지금 묻는 사람에 대해 기억한 것
+
+아래는 대화에서 기억한 사실이다. 필요하면 번호로 memory_read 를 불러 다시 읽는다.
+
+- [12] 딸 이름: 홍길동
+- [15] 음식 선호: 매운 음식을 못 먹는다
+```
+
+`assembleForOwner` 도 같은 규칙으로 조립한다. 그래서 `/memory` 목록의 빠짐 표시는 프로필 구역과 색인에서 모두 빠진 항목에만 붙는다.
 
 ### 에이전트의 실행에 보이는 항목
 
@@ -304,7 +336,7 @@ sequenceDiagram
 
 | 입력 | 타입 | 뜻 |
 | --- | --- | --- |
-| `title` | 문자열, 1자부터 200자 | 항목 제목. 다음 실행의 색인에 실린다. 앞뒤 공백을 지운다 |
+| `title` | 문자열, 1자부터 200자 | 항목 제목. 다음 실행의 프로필 구역이나 색인에 실린다. 앞뒤 공백을 지운다 |
 | `content` | 문자열, 1자부터 2000자 | 본문. 앞뒤 공백을 지운다 |
 | `evidence` | 문자열, 선택, 500자까지 | 사용자가 이번 메시지에서 한 말을 고치지 않고 옮긴 구절. 바로 저장 판정에 쓴다 |
 | `memory_id` | 정수, 선택 | 같은 사실을 고칠 기존 항목 번호. 지시문의 색인에 있는 번호다 |
@@ -314,7 +346,7 @@ sequenceDiagram
 - 사용자와 범위를 인자로 받지 않는다. 주인은 origin 실행의 사용자이고 범위는 늘 `USER` 다
 - 「사용자가 요청했다」 같은 인자는 없다. 바로 저장 판정은 아래 조건으로만 한다
 - 선택 인자의 `null` 은 없는 것으로 본다. 모르는 키와 타입이 틀린 인자는 JSON-RPC `-32602` 다
-- 꺼내는 방식은 `SEARCH` 로 고정한다. 항상 싣기는 사람이 `/memory` 에서 켠다
+- 꺼내는 방식은 `SEARCH` 로 고정한다. 항상 싣기는 사람이 `/memory` 에서 켠다. 본문이 짧으면 다음 실행부터 프로필 구역에 본문까지 실린다([ADR-20261008 / memory-profile](../adr/ADR-20261008-memory-profile.md))
 - 먼저 살펴보기 트리에서는 받지 않는다. 옛 커넥터 에이전트의 실행은 요청자 판정에서 먼저 거절한다([ADR-045](../adr/ADR-045-커넥터-에이전트는-자기-mcp-서버만-받고-memory-와-control-plane-도구를-받지-않는다.md))
 - **fos-ctx 가 이 도구를 서명 필수로 안다.** plugin 을 먼저 배포한다
 - **실행 사건에 이 도구의 인자와 결과를 남기지 않는다.** `HermesRunEventStream` 이 시작 사건과 끝 사건의 `detail` 을 비운다. 인자에 사람에 관한 사실이 실린다
@@ -394,3 +426,44 @@ Control Plane MCP 도구를 받는 실행의 공통 답변 지침 뒤에 「# �
 | `memory.application.MemoryCaptureService` | 민감도, collection, 상한, 중복, 고치기 대상 판정과 저장, 대화의 기록 목록, 되돌리기 |
 | `chat.application.TurnQuestions` | 실행에 이어 둔 질문 원문 읽기, 질문 없이 보낸 루트 실행이 있는지 보기 |
 | `chat.presentation.MemoryCaptureController` | 대화의 기록 목록과 되돌리기 API |
+
+## 답마다 참고한 기억
+
+대화의 답 아래에 그 답을 만든 실행이 본문을 받은 기억을 「참고한 기억 N개」 로 접어 보인다.
+근거는 [ADR-20261008 / memory-profile](../adr/ADR-20261008-memory-profile.md) 에 있고, 화면은 [`frontend/chat.md`](../frontend/chat.md) 의 「참고한 기억」 이 갖는다.
+
+| 재료 | 어디서 | 넣는 것 |
+| --- | --- | --- |
+| 실행에 실은 항목 | `execution_context_source` | `source` 가 `MEMORY_ALWAYS` 나 `MEMORY_PROFILE` 이고 `body_mode` 가 `INLINE` 인 줄. 제목만 실은 `MEMORY_INDEX` 와 빠진 `OMITTED` 는 넣지 않는다 |
+| 실행이 읽은 항목 | `execution_event` | `event_type` 이 `TOOL_STARTED` 이고 `tool_name` 이 `memory_read` 로 끝나는 줄의 `detail` 에 있는 `id`. `detail` 이 비었거나 번호를 읽지 못하면 건너뛴다 |
+
+| 경로 | 하는 일 |
+| --- | --- |
+| `GET /api/v1/chat/conversations/{conversationId}/memory-uses` | 그 대화의 답 메시지(`chat_message.execution_id` 가 있는 줄)의 실행마다 위 재료를 모아 낸다. 남의 대화는 다른 대화 경로와 같은 404 다 |
+
+```json
+[
+  { "executionId": 301, "memoryId": 12, "title": "딸 이름", "scope": "USER", "via": "PROFILE" },
+  { "executionId": 301, "memoryId": 40, "title": "우리 집 규칙", "scope": "GROUP", "via": "ALWAYS" },
+  { "executionId": 301, "memoryId": 77, "title": "경력 요약", "scope": "USER", "via": "READ" }
+]
+```
+
+| 칸 | 뜻 |
+| --- | --- |
+| `executionId` | 답 메시지의 `executionId` 와 같은 값. 화면이 이 값으로 답에 붙인다 |
+| `memoryId`, `title`, `scope` | 항목의 지금 값 |
+| `via` | `ALWAYS` 는 항상 층, `PROFILE` 은 프로필 구역, `READ` 는 `memory_read` 로 읽음 |
+
+- 실행 번호 오름차순으로 내고, 한 실행 안에서는 실은 순서(`position`) 뒤에 읽은 순서(`sequence`)로 둔다. 같은 항목이 둘 다 있으면 앞의 것 하나만 남긴다.
+- 지금 요청자가 읽을 수 있고(`Memory.isReadableBy`) `ACCEPTED` 인 항목만 낸다. 지운 항목, 남의 항목, 되돌려 제안으로 돌아간 항목은 뺀다. 제목은 지금 제목이다.
+- 본문은 싣지 않는다. 민감 항목도 제목만 낸다. 제목은 `/memory` 목록에도 평문으로 보이는 값이다.
+- 맡겨서 도는 하위 실행이 읽은 항목은 넣지 않는다. 그 실행의 답 메시지가 대화에 없다.
+- 항목이 없으면 빈 배열이다.
+
+| 클래스 | 하는 일 |
+| --- | --- |
+| `chat.application.MemoryUseService` | 대화의 답 실행 번호를 모으고, 실행 기록에서 참조를 받아, 지금 볼 수 있는 항목만 제목과 함께 낸다 |
+| `usage.application.ExecutionMemoryRefs` | 실행 번호들의 `execution_context_source` 와 `memory_read` 시작 사건에서 Memory 번호와 출처를 순서대로 낸다 |
+| `memory.application.MemoryService.acceptedReadableAmong` | 번호들 가운데 요청자가 읽을 수 있는 `ACCEPTED` 항목 |
+| `chat.presentation.MemoryUseController` | `GET .../memory-uses` |
