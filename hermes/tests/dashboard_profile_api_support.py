@@ -492,6 +492,15 @@ class ProfileApiRouteTest(unittest.TestCase):
         mcp["mcpServers"][server]["env"][name] = "${%s}" % name
         (connector / ".mcp.json").write_text(json.dumps(mcp), encoding="utf-8")
 
+    def declare_owner_output(self, connector, server="demo", name="DEMO_OUTPUT_DIR"):
+        """시험 커넥터 사본이 커넥터 출력 디렉터리를 받는 env 를 선언하게 한다(ADR-20261008 connector-output-files)."""
+        declared = json.loads((connector / "connector.json").read_text(encoding="utf-8"))
+        declared["owner_output_env"] = name
+        (connector / "connector.json").write_text(json.dumps(declared), encoding="utf-8")
+        mcp = json.loads((connector / ".mcp.json").read_text(encoding="utf-8"))
+        mcp["mcpServers"][server]["env"][name] = "${%s}" % name
+        (connector / ".mcp.json").write_text(json.dumps(mcp), encoding="utf-8")
+
     def owner_attachments(self, owner):
         """정책의 `attachment_agent_root` 아래 그 주인의 첨부 디렉터리다."""
         return "%s/users/%s" % (self.attachment_agent_root, hashlib.sha256(owner.encode("utf-8")).hexdigest())

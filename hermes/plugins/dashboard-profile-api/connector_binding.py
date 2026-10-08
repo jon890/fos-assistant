@@ -26,6 +26,7 @@ from .connector_schema import (
     BIND_MODE,
     CONNECTOR_STATE,
     OWNER_ATTACHMENTS_VALUE_RE,
+    OWNER_OUTPUT_VALUE_RE,
 )
 
 from .connector_state import (
@@ -52,6 +53,10 @@ from .connector_status import (
 
 from .profiles import (
     _profile_plugin_files,
+)
+
+from .sandbox import (
+    _sandbox_remove_connector_output,
 )
 
 
@@ -95,7 +100,7 @@ def _skills_with_index_marker(skills_config) -> dict | None:
 
 def _connector_bind_config(profile_dir: pathlib.Path, plugin: str, enabled: bool,
                            vault: str | None = None, values: dict | None = None,
-                           owner_attachments: str | None = None) -> dict:
+                           owner_attachments: str | None = None, owner_output: str | None = None) -> dict:
     """일반 에이전트의 profile 에 커넥터를 붙이거나 뗀다. 실패하면 같은 요청 안에서 이 요청이 쓴 파일만 되돌린다.
 
     붙이기는 보관 파일의 값(`values`)을 그 profile `.env` 에 쓰고, 서버를 더하고, API 도구 목록에 서버 이름을 더하고,
@@ -115,6 +120,8 @@ def _connector_bind_config(profile_dir: pathlib.Path, plugin: str, enabled: bool
     `skills.disabled` 가 고칠 수 없는 모양이면 붙이기는 거절하고, 떼기는 표식 없이 뗀다(ADR-20261007 connector-live-reload).
     manifest 가 `owner_attachments_env` 를 선언했으면 `owner_attachments` 를 그 이름으로 서버 정의에 직접 넣는다.
     다시 설치할 때마다 받은 주인의 값으로 다시 쓴다(ADR-20261007 connector-owner-attachments).
+    manifest 가 `owner_output_env` 를 선언했으면 `owner_output` 을 그 이름으로 넣는다. 없거나 모양이 틀리면 빈 값이다.
+    떼기는 설정을 다 쓴 뒤 설치했던 그 출력 디렉터리를 지운다(ADR-20261008 connector-output-files).
     """
     import yaml
     if profile_dir.resolve() != profile_dir:
@@ -158,6 +165,8 @@ def _connector_bind_config(profile_dir: pathlib.Path, plugin: str, enabled: bool
     manifest = _connector_manifest(plugin) if plugin in _connector_roots() else None
     env_lines = originals[env_path].decode("utf-8").splitlines(keepends=True) if originals[env_path] else []
     previous_skills = list(owned["skills"]) if owned else []
+    # 떼면 지울 출력 디렉터리다. 설치 기록의 서버 정의에 그 모양으로 들어간 값만 본다.
+    removed_outputs = []
 
     if enabled:
         if manifest is None:
@@ -194,6 +203,10 @@ def _connector_bind_config(profile_dir: pathlib.Path, plugin: str, enabled: bool
             if not isinstance(owner_attachments, str) or not OWNER_ATTACHMENTS_VALUE_RE.match(owner_attachments):
                 raise ValueError("주인의 첨부 디렉터리 없이 사용자 첨부를 읽는 connector 를 설치하지 않는다")
             server["env"][manifest["owner_attachments_env"]] = owner_attachments
+        if manifest["owner_output_env"] is not None:
+            # 출력 디렉터리가 없어도 붙이기는 막지 않는다. 빈 값을 받은 커넥터는 파일 출력만 거절한다.
+            server["env"][manifest["owner_output_env"]] = (
+                owner_output if isinstance(owner_output, str) and OWNER_OUTPUT_VALUE_RE.match(owner_output) else "")
         # 바꾸기 전의 정의다. gateway 는 같은 이름의 서버를 다시 연결하지 않으므로 정의가 바뀌면 재시작해야 한다.
         previous = servers.get(name)
         servers[name] = server
@@ -238,6 +251,8 @@ def _connector_bind_config(profile_dir: pathlib.Path, plugin: str, enabled: bool
         if name in servers and servers[name] != owned["server"]:
             raise FileExistsError("운영자가 바꾼 MCP 서버가 있다")
         servers.pop(name, None)
+        removed_outputs = [value for value in owned["server"]["env"].values()
+                           if isinstance(value, str) and OWNER_OUTPUT_VALUE_RE.match(value)]
         if isinstance(allowed, list):
             allowed = [item for item in allowed if item != name]
         field_env = _bind_entry_env(manifest, owned)
@@ -341,6 +356,9 @@ def _connector_bind_config(profile_dir: pathlib.Path, plugin: str, enabled: bool
             except OSError:
                 pass
         raise
+    for value in removed_outputs:
+        # 커넥터가 읽은 데이터가 뗀 뒤에 남지 않게 한다. 지우지 못해도 떼기는 끝난 것이다.
+        _sandbox_remove_connector_output(value)
     # 파일을 모두 지운 스킬 디렉터리는 빈 디렉터리만 남는다. 지우지 못해도 설치는 끝난 것이다.
     for skill in previous_skills:
         for current, dirs, names in os.walk(skills_dir / skill, topdown=False):

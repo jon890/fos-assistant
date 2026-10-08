@@ -18,6 +18,7 @@ from .common import (
     _missing_profile,
     _profile_rejection,
     _rejected,
+    logger,
 )
 
 from .connector_binding import (
@@ -84,6 +85,7 @@ from .sandbox import (
     SandboxAttachmentError,
     _sandbox_attachment_agent_directory,
     _sandbox_attachment_path_identity,
+    _sandbox_connector_output_directory,
     _sandbox_policy,
     _sandbox_prepare_connector_output,
     _sandbox_terminal,
@@ -205,6 +207,18 @@ async def _connector_request(request):
                 except (OSError, ValueError, RuntimeError):
                     return _sandbox_unavailable()
                 owner_attachments = _sandbox_attachment_agent_directory(sandbox, owner)
+            owner_output = None
+            if manifest["owner_output_env"] is not None and owner is not None:
+                # 경로는 운영 정책의 루트와 Control Plane 이 정한 주인, profile, 커넥터 id 로만 만든다.
+                # 정책이나 키가 없거나 만들지 못하면 빈 값으로 붙인다. 커넥터가 파일 출력만 거절한다(ADR-20261008 connector-output-files).
+                sandbox = _sandbox_policy()
+                if sandbox is not None:
+                    try:
+                        owner_output = await asyncio.to_thread(_sandbox_connector_output_directory, sandbox,
+                                                               profile, owner, body["plugin"])
+                    except (OSError, ValueError, RuntimeError) as error:
+                        logger.warning("dashboard-profile-api: 커넥터 출력 디렉터리를 만들지 못해 빈 값으로 붙인다: %s",
+                                       type(error).__name__)
             stored = await asyncio.to_thread(_read_vault, body["bind"]["vault"])
             if stored is None or stored["connector"] != body["plugin"]:
                 return _rejected("그 connector 의 보관 파일이 없다")
@@ -212,7 +226,7 @@ async def _connector_request(request):
             if values is None:
                 return _rejected("보관 파일의 값이 지금 칸 선언과 맞지 않는다")
             result = await asyncio.to_thread(_connector_bind_config, profile_dir, body["plugin"], True,
-                                             body["bind"]["vault"], values, owner_attachments)
+                                             body["bind"]["vault"], values, owner_attachments, owner_output)
             return JSONResponse({**response, **result}, status_code=200)
         if unbind:
             result = await asyncio.to_thread(_connector_bind_config, profile_dir, body["plugin"], False)

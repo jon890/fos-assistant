@@ -176,6 +176,24 @@ class ConnectorExecuteTest(base.ConnectorGateCase):
             server = {**server, "env": {**server["env"], "DEMO_ATTACHMENT_DIR": config_value}}
         (profile / "config.yaml").write_text(yaml.safe_dump({"mcp_servers": {"demo": server}}), encoding="utf-8")
 
+    def test_child_receives_an_empty_owner_output_directory(self):
+        """출력 디렉터리를 선언한 커넥터의 승인 실행은 설치한 값이 있어도 빈 값을 받는다. 승인한 쓰기는 파일을 내지 않는다."""
+        self.rewrite("connector.json", lambda value: value.update(owner_output_env="DEMO_OUTPUT_DIR"))
+        self.rewrite(".mcp.json", lambda value: value["mcpServers"]["demo"]["env"].update(
+            DEMO_OUTPUT_DIR="${DEMO_OUTPUT_DIR}"))
+        import yaml
+        profile = self.profile_root / PROFILE
+        installed = "/output/users/" + "a" * 64 + "/alice/demo"
+        state = json.loads((profile / self.plugin.CONNECTOR_STATE).read_text(encoding="utf-8"))
+        state[base.DEMO]["server"]["env"]["DEMO_OUTPUT_DIR"] = installed
+        (profile / self.plugin.CONNECTOR_STATE).write_text(json.dumps(state), encoding="utf-8")
+        (profile / "config.yaml").write_text(yaml.safe_dump({"mcp_servers": {"demo": state[base.DEMO]["server"]}}),
+                                             encoding="utf-8")
+        with mock.patch.dict(os.environ, {"DEMO_OUTPUT_DIR": installed}):
+            status, body = self.execute("mcp__demo__env_view")
+        self.assertEqual(status, 200, body)
+        self.assertEqual(body["result"]["output"], "")
+
     def test_child_receives_the_installed_owner_attachments_directory(self):
         """선언한 커넥터의 실행은 그 profile 에 설치한 서버 정의의 주인 디렉터리를 자식 env 에 넣는다."""
         self.declare_owner_attachments()

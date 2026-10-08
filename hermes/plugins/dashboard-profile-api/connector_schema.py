@@ -52,6 +52,11 @@ OWNER_ATTACHMENTS_ENV_RE = re.compile(r"^[A-Z][A-Z0-9_]{0,63}$")
 OWNER_ATTACHMENTS_VALUE_RE = re.compile(r"^/[^$\0\r\n]*/users/[0-9a-f]{64}$")
 
 
+# 커넥터 출력 디렉터리를 받을 env 에 설치가 넣는 값의 끝 모양이다.
+# `<connector_output_root>/users/<SHA-256 16진수>/<profile>/<커넥터 id>` 다(ADR-20261008 connector-output-files).
+OWNER_OUTPUT_VALUE_RE = re.compile(r"^/[^$\0\r\n]*/users/[0-9a-f]{64}/[^/$\0\r\n]+/[^/$\0\r\n]+$")
+
+
 TOOL_NAME_RE = re.compile(r"^[A-Za-z0-9_.-]{1,128}$")
 
 
