@@ -1,6 +1,24 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { FAKE_DASHBOARD_TOKEN, startFakeHermes } from "../e2e/fake-hermes.ts";
+import { withoutResponseGuide } from "../e2e/fake-hermes/scenario-fixtures.ts";
+
+const RESPONSE_GUIDE = "# 답변 형식\n\n표 형식 안내";
+const TOOL_CALL_GUIDE = "# 도구 호출\n\n로컬 MCP 도구 단건 호출 안내";
+const MEMORY_GUIDE = "# 기억\n\nmemory_remember 안내";
+const MEMORY_BODY = "# 지금 묻는 사람에 대해 아는 것\n\n- Memory 본문";
+
+test("답변 형식 뒤의 도구 호출과 기억 지침을 빼고 Memory 본문을 보존한다", () => {
+  const instructions = [RESPONSE_GUIDE, TOOL_CALL_GUIDE, MEMORY_GUIDE, MEMORY_BODY].join("\n\n");
+
+  assert.equal(withoutResponseGuide(instructions), MEMORY_BODY);
+});
+
+test("도구 호출 또는 기억 지침이 없는 답변 형식도 Memory 본문을 보존한다", () => {
+  assert.equal(withoutResponseGuide([RESPONSE_GUIDE, TOOL_CALL_GUIDE, MEMORY_BODY].join("\n\n")), MEMORY_BODY);
+  assert.equal(withoutResponseGuide([RESPONSE_GUIDE, MEMORY_GUIDE, MEMORY_BODY].join("\n\n")), MEMORY_BODY);
+  assert.equal(withoutResponseGuide([RESPONSE_GUIDE, MEMORY_BODY].join("\n\n")), MEMORY_BODY);
+});
 
 test("대역 서버 둘의 장애, profile, 실행과 대본은 서로 섞이지 않는다", async () => {
   const first = await startFakeHermes({ browser: "first-key" });

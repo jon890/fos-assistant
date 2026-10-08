@@ -60,6 +60,22 @@ ADR-071 의 다섯 규칙을 코드에서 지키는 자리다.
 
 Runs API 는 `instructions` 와 `input` 두 글을 받는다([`../hermes/runs-api.md`](../hermes/runs-api.md)).
 
+### 공통 실행 지침
+
+`ContextAssembler.withResponseInstructions` 는 Memory 예산 밖에 답변 형식과 도구 호출 지침을 더한다.
+대화, Control Plane 이 시작한 자식 실행, 먼저 살펴보기에 같은 도구 호출 지침을 보낸다.
+새 profile 과 기존 profile 모두 다음 실행부터 받는다.
+
+로컬 MCP 도구는 같은 서버의 읽기 도구라도 각각 호출하도록 안내한다.
+Hermes 의 단건 제한과 원격 도구 구분은 [도구 hook 과 승인](../hermes/connector-policy.md#tool_call-의-단건-제한)이 갖는다.
+
+이 안내는 묶음 실행 기능이나 서버의 권한 검사를 바꾸지 않는다.
+모델이 안내를 따르는지는 배포 뒤 실제 실행의 호출과 거절 기록으로 확인한다.
+Hermes 의 네이티브 `delegate_task` 자식은 부모의 실행 지침을 자동 상속하지 않아 이 안내의 적용을 보장하지 않는다.
+Control Plane 의 자식 실행과 구분한다. 근거는 [자식 agent 생성](https://github.com/NousResearch/hermes-agent/blob/v2026.9.24/tools/delegate_tool.py#L202-L249)이다.
+
+### 항목의 형식
+
 **Memory 항목의 글은 바꾸지 않는다.** 머리말이 이미 출처(그룹과 묻는 사람)를 말하고, 색인의 `[번호]` 가 `memory_read` 의 입력이자 참조다.
 그래서 Memory 를 묶음으로 옮겨도, 아래 「충돌 표시」 가 붙는 경우를 빼면 `instructions_hash` 가 바뀌지 않는다.
 
