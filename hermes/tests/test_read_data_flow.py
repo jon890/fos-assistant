@@ -116,7 +116,7 @@ class ReadDataFlowTest(base.PluginFixture):
         self.assertEqual(self.requests, [])
 
     def test_connector_call_from_code_has_no_session_and_is_blocked(self):
-        """RF-08: `execute_code` 안에서 부른 커넥터 도구는 session 이 없어 묻지 않고 막는다."""
+        """RF-08a: `execute_code` 안에서 부른 커넥터 도구는 session 이 없어 묻지 않고 막는다."""
         result = self.plugin.pre_tool_call(tool_name="mcp__mail__send_message", args={"body": MAIL_BODY},
                                            session_id="", tool_call_id="", task_id="t")
 
