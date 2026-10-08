@@ -28,7 +28,8 @@
 | `HttpHermesConnectorClient.java` | 611 | 614 |
 | `ConnectorBindingService.java` | 594 | 612 |
 
-`HttpHermesConnectorClient.java` 는 3줄만 늘릴 수 있다. 아래 작업 항목 2 는 2줄 안에서 끝나게 썼다. 기준 파일의 값은 올리지 않는다.
+`HttpHermesConnectorClient.java` 는 3줄만 늘릴 수 있다. 기준 파일의 값은 올리지 않는다.
+backend 는 Spotless(palantir-java-format)를 `ratchetFrom("origin/main")` 으로 걸어 고친 파일 전체를 포맷 검사한다(`backend/build.gradle.kts`). 삼항식을 `refusable` 안에 쓰면 palantir 가 `?` 와 `:` 를 각각 다음 줄로 내려 줄 수가 넘친다. 그래서 409 의 판정은 새 파일 `ConnectorSandboxUnavailable` 의 정적 메서드에 두고 `refusable` 은 한 줄만 바꾼다. 이 파일의 증가는 생성자 인자 1줄이다.
 
 ## 의도 메모
 
@@ -47,16 +48,12 @@
 ### 2. `backend/src/main/java/com/bifos/assistant/hermes/HttpHermesConnectorClient.java`
 
 - 카탈로그 항목을 읽는 `new ConnectorManifest(` 호출의 끝에 `optionalBoolean(item, "single_binding", false)` 를 더한다
-- `refusable` 의 `throw new ConnectorInstallConflict();` 를 다음으로 바꾼다
-
-```java
-throw HermesCallFailure.sandboxRejection(ex).isPresent()
-        ? new ConnectorSandboxUnavailable() : new ConnectorInstallConflict();
-```
+- `refusable` 의 `throw new ConnectorInstallConflict();` 를 `throw ConnectorSandboxUnavailable.orConflict(ex);` 로 바꾼다
+- `refusable` 의 Javadoc 두 문장(「409 와 401 을 각자의 예외로 바꾼다」, 「두 거절은 … 나눈다. 응답 본문은 읽지 않는다.」)을 **줄 수를 늘리지 않고** 바꿔 쓴다. 409 의 본문 `code` 가 `sandbox_unavailable` 이면 `ConnectorSandboxUnavailable`, 그 밖의 409 는 `ConnectorInstallConflict`, 401 은 `ConnectorProfileRejected` 이고, 본문은 `code` 칸만 읽는다는 뜻을 담는다
 
 ### 3. 새 파일 `backend/src/main/java/com/bifos/assistant/hermes/ConnectorSandboxUnavailable.java`
 
-`ConnectorInstallConflict` 와 같은 모양의 `public class ConnectorSandboxUnavailable extends RuntimeException {}`. Javadoc 은 「대시보드가 바인딩 설치를 409 `sandbox_unavailable` 로 거절했다. 그 커넥터가 실행 공간을 요구하는데 profile 이 정책에 없거나, 사용자 첨부 디렉터리를 확인하지 못했다. 아무것도 바뀌지 않았다」 를 담는다.
+`ConnectorInstallConflict` 와 같은 모양의 `public class ConnectorSandboxUnavailable extends RuntimeException` 에 정적 메서드 `static RuntimeException orConflict(HttpClientErrorException ex)` 를 둔다. 같은 패키지의 `HermesCallFailure.sandboxRejection(ex).isPresent()` 이면 `new ConnectorSandboxUnavailable()`, 아니면 `new ConnectorInstallConflict()` 를 돌려준다. `HermesCallFailure` 와 `sandboxRejection` 은 package-private 이지만 같은 `com.bifos.assistant.hermes` 패키지라 부를 수 있다. Javadoc 은 「대시보드가 바인딩 설치를 409 `sandbox_unavailable` 로 거절했다. 그 커넥터가 실행 공간을 요구하는데 profile 이 정책에 없거나, 사용자 첨부 디렉터리를 확인하지 못했다. 아무것도 바뀌지 않았다」 를 담는다.
 `HermesConnectorClient.java` 의 `bindConnector` Javadoc 에 `@throws ConnectorSandboxUnavailable` 줄을 더하고, `@throws ConnectorInstallConflict` 의 설명에서 첨부 디렉터리 이야기를 뺀다.
 
 ### 4. `backend/src/main/java/com/bifos/assistant/shared/error/ErrorCode.java`
@@ -88,7 +85,7 @@ if (declared.singleBinding() && !bindings.findByConnectionId(connection.id()).is
 
 ### 7. 시험 `backend/src/test/java/com/bifos/assistant/connector/ConnectorBindingServiceTest.java`
 
-`DEMO_MANIFEST` 와 같은 모양에 `singleBinding` 만 참인 manifest 를 하나 더 두고 `readCatalog` 스텁에 넣는다.
+`DEMO_MANIFEST` 와 같은 모양에 `singleBinding` 이 참인 manifest 를 하나 더 둔다. id 는 `demo-single`, MCP 서버 이름은 `single` 이다. id 를 `DEMO_MANIFEST` 와 같게 두면 `listForAgent` 의 `Collectors.toMap(ConnectorManifest::id, ...)` 가 중복 키로 실패한다. `readCatalog` 스텁 목록에 더하고, 연결은 `connect(owner, "demo-single", VALUES)` 로 만든다.
 
 - 같은 사용자의 비공개 에이전트 둘. 첫째에 붙인 뒤 둘째에 붙이면 `CONNECTOR_SINGLE_BINDING` 이고, `bindConnector` 는 한 번만 불렸고, 바인딩 행은 하나다
 - 첫째에 다시 붙이면 거절하지 않고 지금 상태를 돌려준다
@@ -100,10 +97,11 @@ if (declared.singleBinding() && !bindings.findByConnectionId(connection.id()).is
 
 ```bash
 cd backend && ./gradlew test --tests 'com.bifos.assistant.hermes.HttpHermesConnectorClientTest' --tests 'com.bifos.assistant.connector.ConnectorBindingServiceTest' --tests 'com.bifos.assistant.connector.ConnectorBindingServiceLockTest'
+cd backend && ./gradlew spotlessCheck checkstyleMain checkstyleTest
 node scripts/check-file-length.mjs
 ```
 
-시험이 모두 통과하고, 파일 길이 검사가 위반 없이 끝난다.
+시험이 모두 통과하고, 포맷과 Checkstyle 과 파일 길이 검사가 위반 없이 끝난다. 포맷이 틀리면 `cd backend && ./gradlew spotlessApply` 로 고친 뒤 줄 수를 다시 본다.
 
 ## 변경 파일
 

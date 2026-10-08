@@ -5,7 +5,7 @@
 ## 목표
 
 붙이기가 `CONNECTOR_SINGLE_BINDING` 이나 `AGENT_SANDBOX_UNAVAILABLE` 로 끝났을 때 화면이 그 까닭을 보인다.
-지금은 두 코드 모두 문구 표에 없어 「요청을 처리하지 못했어요.」 로 보인다.
+지금은 두 코드 모두 문구 표에 없다. 붙이기 라우트가 거치는 `connectionResponse`(`web/src/lib/connection-route.ts`)가 표에 없는 코드를 `CONNECTOR_OPERATION_FAILED` 로 바꾸므로 화면에는 「연결을 마치지 못했어요.」 가 나온다. 표에 두 줄을 더하면 라우트도 코드를 그대로 넘긴다.
 
 **범위 외**: Control Plane 과 대시보드 plugin(phase 01, 02).
 

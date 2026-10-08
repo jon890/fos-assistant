@@ -51,6 +51,7 @@ if manifest["sandbox_required"]:
 
 ### 3. 시험 `hermes/tests/test_connector_manifest.py`
 
+- `test_catalog_lists_the_validated_connector_without_operator_values` 의 `assertEqual(set(entry), {...})` 키 집합에 `"single_binding"` 을 더한다. 더하지 않으면 이 기존 시험이 깨진다
 - 두 칸을 선언하지 않은 커넥터의 카탈로그 항목에 `"single_binding": False` 가 있다
 - `single_binding: true` 를 선언하면 카탈로그에 참으로 나온다
 - 둘 중 하나가 `"true"`(문자열)면 그 커넥터가 카탈로그에서 빠진다. 기존 `test_invalid_manifest_is_left_out_without_raising` 의 방식을 따른다
@@ -73,7 +74,7 @@ python3 -m unittest discover -s hermes/tests
 node scripts/check-file-length.mjs
 ```
 
-셋 다 실패 없이 끝난다.
+넷 다 실패 없이 끝난다.
 
 ## 변경 파일
 
