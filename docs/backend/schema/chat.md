@@ -29,8 +29,10 @@
 
 `hermes_session_id` 가 특정 profile 안의 값이라, 대화의 에이전트는 중간에 바뀌지 않는다.
 
-색인은 `(user_id, deleted_at, updated_at, id)` 다(V51). 점검 대화를 찾는 `(user_id, agent_id, purpose)` 도 있다(V69). 목록이 사용자의 지우지 않은 대화를 `updated_at desc, id desc` 로 쪽마다 읽는다.
+색인은 `(user_id, deleted_at, updated_at, id)` 다(V51). 점검 대화를 찾는 `(user_id, agent_id, purpose)` 도 있다(V69). 목록이 사용자의 지우지 않았고 숨기지 않은 대화를 `updated_at desc, id desc` 로 쪽마다 읽는다.
 지운 대화가 쌓여도 한 쪽을 읽는 줄 수가 쪽 크기에 머문다.
+숨긴 대화(`hidden_at`)는 색인 칸에 없어 읽은 뒤 거른다. 한 쪽을 읽을 때 그 사이에 든 숨긴 대화만큼 줄을 더 읽는다.
+숨긴 대화는 「보고할 것 없음」 으로 끝난 예약 작업만 만들고, 하루에 만드는 수는 사용자당 하루 발화 상한(`assistant.task.max-runs-per-day`, 기본 48)을 넘지 않아 색인에 더하지 않는다. 다른 경로가 대화를 숨기게 되면 색인에 `hidden_at` 을 더한다.
 
 **`agent_id` 에 FK 를 두지 않는다.** 칸도 NULL 을 받는다(V4 가 칸을 더하며 그렇게 만들었다).
 에이전트를 지우는 것은 `deleted_at` 을 적는 것이라 정상 경로에서는 행이 사라지지 않는다.

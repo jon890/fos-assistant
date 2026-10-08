@@ -314,6 +314,8 @@ public class TaskRunStarter {
      *
      * <p>단계가 빈 작업은 {@code SINGLE} 대화에서 사용자가 고른 모델을 지우지 않는다. 대화 엔티티를 읽어 고치지 않고 조건부
      * update 질의로 그 칸만 적는다. 엔티티를 고치면 commit 때 다른 트랜잭션이 쓴 칸까지 읽은 때의 값으로 되돌린다.
+     *
+     * <p>영속성 컨텍스트의 대화 엔티티는 옛 선택을 그대로 들고 있다. 이 호출 뒤 같은 트랜잭션에서 그 엔티티를 고치지 않는다.
      */
     private Long withTaskTier(Task task, Long conversationId) {
         if (task.modelTier() != null) {
