@@ -19,9 +19,9 @@ import java.lang.reflect.Field;
 import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
-import org.mockito.ArgumentCaptor;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 
 class SourceReadSummariesTest {
     private final AgentExecutionRepository executions = mock(AgentExecutionRepository.class);
@@ -226,7 +226,8 @@ class SourceReadSummariesTest {
         when(events.findByExecutionIdInOrderByExecutionIdAscSequenceAsc(any()))
                 .thenReturn(List.of(
                         completed(2L, 1, "{\"results\":[{\"url\":\"https://example.com/own\",\"content\":\"본문\"}]}"),
-                        completed(3L, 1, "{\"results\":[{\"url\":\"https://example.com/other\",\"content\":\"본문\"}]}")));
+                        completed(
+                                3L, 1, "{\"results\":[{\"url\":\"https://example.com/other\",\"content\":\"본문\"}]}")));
 
         assertThat(summaries.of(List.of(answer(10L, 1L))).get(10L))
                 .isEqualTo(new SourceReadSummary(1, List.of("https://example.com/own"), 0, true));
@@ -239,8 +240,7 @@ class SourceReadSummariesTest {
         AgentExecution firstChild = execution(2L, 1L, EventObservation.OBSERVED);
         AgentExecution secondRoot = execution(10L, null, EventObservation.OBSERVED);
         AgentExecution secondChild = execution(11L, 10L, EventObservation.OBSERVED);
-        stubExecutions(
-                List.of(firstRoot, firstChild, secondRoot, secondChild), List.of(firstChild, secondChild));
+        stubExecutions(List.of(firstRoot, firstChild, secondRoot, secondChild), List.of(firstChild, secondChild));
         when(events.findByExecutionIdInOrderByExecutionIdAscSequenceAsc(any())).thenReturn(List.of());
 
         assertThat(summaries.of(List.of(answer(100L, 1L), answer(101L, 10L))))
@@ -315,7 +315,8 @@ class SourceReadSummariesTest {
         return execution(id, root, 1L, observation);
     }
 
-    private static AgentExecution execution(Long id, Long root, Long userId, EventObservation observation) throws Exception {
+    private static AgentExecution execution(Long id, Long root, Long userId, EventObservation observation)
+            throws Exception {
         AgentExecution execution = AgentExecution.builder()
                 .userId(userId)
                 .profileName("p")
