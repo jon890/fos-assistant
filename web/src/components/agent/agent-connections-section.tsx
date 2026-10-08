@@ -14,7 +14,11 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Notice } from "@/components/ui/notice";
-import { GROUP_VISIBILITY, type AdminAgent, type AgentToolsView } from "@/lib/agent";
+import {
+  GROUP_VISIBILITY,
+  type AdminAgent,
+  type AgentToolsView,
+} from "@/lib/agent";
 import {
   agentConnectionLabel,
   bindAgentConnection,

@@ -157,8 +157,10 @@ public final class AgentDtos {
     }
 
     public record ToolsetsView(
-            List<ToolsetView> toolsets, List<String> unclassifiedEnabled,
-            boolean shellOrFileEnabled, boolean skillsEnabled) {}
+            List<ToolsetView> toolsets,
+            List<String> unclassifiedEnabled,
+            boolean shellOrFileEnabled,
+            boolean skillsEnabled) {}
 
     public record HiddenToolsetsRequest(@NotNull List<@NotBlank String> hidden) {}
 
