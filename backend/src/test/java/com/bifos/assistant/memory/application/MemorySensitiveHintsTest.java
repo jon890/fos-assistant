@@ -10,7 +10,7 @@ class MemorySensitiveHintsTest {
     @DisplayName("건강, 금융, 신원과 신념의 낱말이 본문에 있으면 민감해 보인다")
     void suspectsSensitiveWords() {
         assertThat(MemorySensitiveHints.suspected("알레르기", "아들은 땅콩 알레르기가 있어")).isTrue();
-        assertThat(MemorySensitiveHints.suspected("통장", "월급 통장은 국민은행이야")).isTrue();
+        assertThat(MemorySensitiveHints.suspected("은행", "아빠 통장은 국민은행이야")).isTrue();
         assertThat(MemorySensitiveHints.suspected("종교", "종교는 불교야")).isTrue();
     }
 

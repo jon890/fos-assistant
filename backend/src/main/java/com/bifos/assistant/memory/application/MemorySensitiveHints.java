@@ -52,6 +52,7 @@ final class MemorySensitiveHints {
             "건강검진",
             // 금융
             "계좌",
+            "통장",
             "카드번호",
             "신용카드",
             "비밀번호",
