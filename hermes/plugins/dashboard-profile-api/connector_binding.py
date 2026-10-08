@@ -14,6 +14,7 @@ from .common import (
     _atomic_private_write,
     _env_line,
     _env_line_key,
+    logger,
 )
 
 from .connector_manifest import (
@@ -42,6 +43,7 @@ from .connector_state import (
     _detached_bytes,
     _detached_servers,
     _entry_field_env,
+    _entry_manifest_mismatches,
     _remove_backup_env_copies,
     _skill_tree_files,
     _tool_map_bytes,
@@ -149,7 +151,9 @@ def _connector_bind_config(profile_dir: pathlib.Path, plugin: str, enabled: bool
     if not originals[state_path]:
         state = {}
     elif enabled:
-        state = _connector_state(json.loads(originals[state_path]), plugin)
+        # 다시 붙이기는 기록의 모양만 확인한다. 현재 manifest 와의 비교는 실행과 probe 가 계속 맡고,
+        # 설치는 같은 보관 파일로 새 실행 정의를 기록해 manifest 변경을 반영한다.
+        state = _connector_state(json.loads(originals[state_path]))
     else:
         # 떼기는 기록 전체를 지금 manifest 와 견주지 않는다. 운영자가 실행 정의를 바꾼 뒤에도 떼야 `.env` 의 비밀이 남지 않는다.
         state = json.loads(originals[state_path])
@@ -172,6 +176,11 @@ def _connector_bind_config(profile_dir: pathlib.Path, plugin: str, enabled: bool
     if enabled:
         if manifest is None:
             raise ValueError("쓸 수 없는 connector 는 설치하지 않는다")
+        if owned is not None:
+            mismatches = _entry_manifest_mismatches(plugin, owned)
+            if mismatches:
+                logger.warning("dashboard-profile-api: connector 재설치 정의 차이 단계=bind id=%s mismatches=%s",
+                               plugin, ",".join(mismatches))
         # 목록이 없는 profile 에 이름 하나만 든 목록을 만들면 내장 도구와 Control Plane MCP 가 모두 닫히고,
         # MCP 이름이 하나도 없던 목록에 이름을 더하면 운영자의 다른 MCP 서버가 막힌다.
         if not isinstance(allowed, list) or CONTROL_PLANE_MCP not in allowed:

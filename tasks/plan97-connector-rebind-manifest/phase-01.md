@@ -57,3 +57,4 @@ node scripts/check-file-length.mjs
 | `hermes/plugins/dashboard-profile-api/connector_install.py` | 수정 |
 | `hermes/tests/test_dashboard_profile_api_connector_binding_refresh.py` | 신규 |
 | `docs/backend/connector-install.md` | 수정 |
+| `hermes/README.md` | 수정 |
