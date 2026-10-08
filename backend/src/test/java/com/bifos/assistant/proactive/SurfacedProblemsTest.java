@@ -266,8 +266,8 @@ class SurfacedProblemsTest extends ProactiveLoopTestSupport {
     }
 
     @Test
-    @DisplayName("판정이 상한보다 많으면 늦은 것부터 surface-max-items 개만 나오고 반응은 상한을 보지 않는다")
-    void limitsOpenDecisionsToSurfaceMaxItems() {
+    @DisplayName("openOf 는 surface-max-items 상한을 걸지 않고 늦은 것부터 모두 낸다. 상한은 거르는 쪽이 건다")
+    void openOfDoesNotLimitBySurfaceMaxItems() {
         CurrentUser user = newUser();
         Agent agent = newAgent(user);
         Seeded oldest =
@@ -280,7 +280,7 @@ class SurfacedProblemsTest extends ProactiveLoopTestSupport {
 
         assertThat(surfaced.openOf(user.id(), BASE))
                 .extracting(SurfacedProblem::decisionId)
-                .containsExactly(latest.decisionId(), third.decisionId(), second.decisionId());
+                .containsExactly(latest.decisionId(), third.decisionId(), second.decisionId(), oldest.decisionId());
 
         surfaced.react(user, oldest.decisionId(), DecisionReaction.ACCEPTED);
 

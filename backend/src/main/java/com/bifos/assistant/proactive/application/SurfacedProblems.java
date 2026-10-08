@@ -62,7 +62,8 @@ public class SurfacedProblems {
     private final Clock clock;
 
     /**
-     * 요청자에게 지금 보일 판정을 늦게 남긴 것부터 {@code surface-max-items} 개까지 낸다. 반응은 이 상한을 보지 않는다.
+     * 요청자에게 지금 보일 판정을 늦게 남긴 것부터 모두 낸다. {@code surface-max-items} 상한은 걸지 않는다. 지운 점검 대화와 찾지 못한 에이전트는
+     * 부르는 쪽이 거른 뒤에 상한을 걸어야, 지운 판정이 최근 자리를 차지해 유효한 판정을 밀어내지 않는다.
      *
      * <p>판정을 읽고 나서 후보 줄이나 살펴보기 줄이 없거나 문제 글이 비었으면 그 판정만 뺀다.
      */
@@ -121,7 +122,6 @@ public class SurfacedProblems {
         return latestPerKey.values().stream()
                 .filter(surfaced -> !reactions.containsKey(surfaced.decision().id()))
                 .sorted(LATEST.reversed())
-                .limit(loop.surfaceMaxItems())
                 .map(Surfaced::view)
                 .toList();
     }

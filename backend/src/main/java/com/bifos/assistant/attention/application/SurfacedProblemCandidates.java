@@ -10,9 +10,11 @@ import com.bifos.assistant.attention.domain.type.AttentionTrigger;
 import com.bifos.assistant.attention.domain.type.CardKey;
 import com.bifos.assistant.chat.application.OwnConversations;
 import com.bifos.assistant.chat.domain.Conversation;
+import com.bifos.assistant.proactive.application.ProactiveLoopProperties;
 import com.bifos.assistant.proactive.application.SurfacedProblems;
 import com.bifos.assistant.proactive.application.model.SurfacedProblem;
 import com.bifos.assistant.shared.auth.CurrentUser;
+import com.bifos.assistant.shared.config.LiveProperties;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -35,6 +37,7 @@ public class SurfacedProblemCandidates implements AttentionCandidates {
     private final SurfacedProblems surfacedProblems;
     private final OwnConversations conversations;
     private final AgentService agents;
+    private final LiveProperties<ProactiveLoopProperties> properties;
 
     @Override
     public Set<CardKey> cards() {
@@ -55,6 +58,7 @@ public class SurfacedProblemCandidates implements AttentionCandidates {
     }
 
     private List<AttentionCandidate> candidates(CurrentUser user, Instant now) {
+        // 지운 점검 대화와 찾지 못한 에이전트를 거른 뒤에 상한을 건다. 정렬 순서는 openOf 가 낸 그대로다.
         List<SurfacedProblem> open = surfacedProblems.openOf(user.id(), now);
         if (open.isEmpty()) {
             return List.of();
@@ -66,6 +70,7 @@ public class SurfacedProblemCandidates implements AttentionCandidates {
         return open.stream()
                 .filter(problem ->
                         owned.containsKey(problem.conversationId()) && agentsById.containsKey(problem.agentId()))
+                .limit(properties.current().surfaceMaxItems())
                 .map(problem ->
                         candidate(problem, owned.get(problem.conversationId()), agentsById.get(problem.agentId())))
                 .toList();

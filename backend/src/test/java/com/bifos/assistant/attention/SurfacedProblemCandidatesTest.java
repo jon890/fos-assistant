@@ -268,6 +268,59 @@ class SurfacedProblemCandidatesTest {
         assertThat(card(attention.view(dad), CardKey.NEEDS_ME).items()).isEmpty();
     }
 
+    @Test
+    @DisplayName("needs_me 의 먼저 다룰 문제는 늦은 것부터 surface-max-items 개까지만 나온다")
+    void limitsItemsToSurfaceMaxItems() {
+        Seeded oldest = decidedAt("key:1", NOW.minusSeconds(400));
+        Seeded second = decidedAt("key:2", NOW.minusSeconds(300));
+        Seeded third = decidedAt("key:3", NOW.minusSeconds(200));
+        Seeded latest = decidedAt("key:4", NOW.minusSeconds(100));
+
+        assertThat(card(attention.view(dad), CardKey.NEEDS_ME).items())
+                .extracting(AttentionItem::itemKey)
+                .containsExactly(
+                        "autonomy_decision:" + latest.decisionId(),
+                        "autonomy_decision:" + third.decisionId(),
+                        "autonomy_decision:" + second.decisionId())
+                .doesNotContain("autonomy_decision:" + oldest.decisionId());
+    }
+
+    @Test
+    @DisplayName("가장 최근 판정 셋의 점검 대화를 지우면(soft delete) 그보다 오래된 유효한 판정이 needs_me 에 나온다")
+    void fillsFromOlderDecisionsWhenRecentConversationsAreDeleted() {
+        // 점검 대화는 에이전트마다 하나라 최근 셋은 서로 다른 에이전트에 둔다
+        Seeded valid = decidedAt("key:old", NOW.minusSeconds(400));
+        List<Seeded> recent = new ArrayList<>();
+        for (int i = 0; i < 3; i++) {
+            Agent other = agentOf(dad, "삭제될 에이전트 " + i);
+            recent.add(seed.decided(
+                    dad,
+                    other,
+                    new Spec(
+                            "key:recent-" + i,
+                            "최근 문제 " + i,
+                            "다음 행동을 정한다",
+                            AutonomyLevel.SURFACE,
+                            NOW.minusSeconds(300 - i))));
+        }
+        assertThat(card(attention.view(dad), CardKey.NEEDS_ME).items()).hasSize(3);
+        for (Seeded seeded : recent) {
+            jdbc.update(
+                    "UPDATE conversation SET deleted_at = ? WHERE id = ?",
+                    Timestamp.from(NOW),
+                    seeded.conversationId());
+        }
+
+        assertThat(card(attention.view(dad), CardKey.NEEDS_ME).items())
+                .extracting(AttentionItem::itemKey)
+                .containsExactly("autonomy_decision:" + valid.decisionId());
+    }
+
+    private Seeded decidedAt(String problemKey, Instant at) {
+        return seed.decided(
+                dad, career, new Spec(problemKey, "문제 " + problemKey, "다음 행동을 정한다", AutonomyLevel.SURFACE, at));
+    }
+
     private Seeded decided(String problemKey, String problem, AutonomyLevel level) {
         return seed.decided(dad, career, new Spec(problemKey, problem, "다음 행동을 정한다", level, NOW.minusSeconds(60)));
     }
