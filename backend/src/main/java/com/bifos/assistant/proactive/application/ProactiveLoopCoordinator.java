@@ -1,5 +1,6 @@
 package com.bifos.assistant.proactive.application;
 
+import com.bifos.assistant.proactive.domain.AutonomyDecision;
 import com.bifos.assistant.proactive.domain.ProactiveCheck;
 import com.bifos.assistant.proactive.domain.ProactiveLoopRun;
 import com.bifos.assistant.proactive.domain.ProactiveLoopSetting;
@@ -20,6 +21,7 @@ import com.bifos.assistant.shared.error.ErrorCode;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.List;
 import java.util.function.Consumer;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -54,6 +56,7 @@ public class ProactiveLoopCoordinator {
     private final ProactiveLoopRunRepository runs;
     private final ValueEvaluationService evaluations;
     private final AutonomyPolicyService autonomy;
+    private final SurfacedProblems surfacedProblems;
     private final LiveProperties<ProactiveLoopProperties> properties;
     private final TransactionTemplate transactions;
     private final Clock clock;
@@ -140,20 +143,25 @@ public class ProactiveLoopCoordinator {
         return runs.saveAndFlush(row);
     }
 
-    /** 트랜잭션 밖에서 평가와 판정을 부른다. 모델을 기다리는 동안 잠금을 쥐지 않는다. */
+    /**
+     * 트랜잭션 밖에서 평가와 판정을 부른다. 모델을 기다리는 동안 잠금을 쥐지 않는다. 시도를 {@code DECIDED} 로 적은 뒤에 보일 판정의
+     * {@code SURFACED} 를 남기고, 그 실패는 시도의 결과를 바꾸지 않는다.
+     */
     private void evaluateAndDecide(CurrentUser user, Long checkId, Long runId, String provider) {
         Long evaluationId = null;
+        List<AutonomyDecision> decided;
         try {
             ValueEvaluation evaluation = evaluations.evaluate(user, checkId, provider);
             evaluationId = evaluation.id();
-            autonomy.decide(user, evaluationId);
-            Long decided = evaluationId;
-            finish(runId, row -> row.decided(decided, clock.instant()));
+            decided = autonomy.decide(user, evaluationId);
+            Long decidedEvaluation = evaluationId;
+            finish(runId, row -> row.decided(decidedEvaluation, clock.instant()));
         } catch (ApiException ex) {
             String code = ex.code().name();
             Long evaluated = evaluationId;
             log.warn("매일 루프의 평가나 판정이 거절됐다 checkId={} runId={} code={}", checkId, runId, code);
             finish(runId, row -> row.failed(code, evaluated, clock.instant()));
+            return;
         } catch (RuntimeException ex) {
             Long evaluated = evaluationId;
             log.warn(
@@ -162,6 +170,17 @@ public class ProactiveLoopCoordinator {
                     runId,
                     ex.getClass().getSimpleName());
             finish(runId, row -> row.failed(INTERNAL_ERROR, evaluated, clock.instant()));
+            return;
+        }
+        for (AutonomyDecision decision : decided) {
+            try {
+                surfacedProblems.surfaced(decision);
+            } catch (RuntimeException ex) {
+                log.warn(
+                        "보인 판정의 판단 피드백을 남기지 못했다 decisionId={} error={}",
+                        decision.id(),
+                        ex.getClass().getSimpleName());
+            }
         }
     }
 

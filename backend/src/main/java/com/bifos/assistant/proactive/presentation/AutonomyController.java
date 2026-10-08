@@ -1,8 +1,11 @@
 package com.bifos.assistant.proactive.presentation;
 
 import com.bifos.assistant.proactive.application.AutonomyPolicyService;
+import com.bifos.assistant.proactive.application.SurfacedProblems;
+import com.bifos.assistant.proactive.application.model.DecisionReaction;
 import com.bifos.assistant.proactive.presentation.ProactiveCheckDtos.AutonomyDecisionResponse;
 import com.bifos.assistant.proactive.presentation.ProactiveCheckDtos.AutonomyPreferenceBody;
+import com.bifos.assistant.proactive.presentation.ProactiveCheckDtos.DecisionReactionRequest;
 import com.bifos.assistant.shared.auth.CurrentUserProvider;
 import jakarta.validation.Valid;
 import java.util.List;
@@ -22,6 +25,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class AutonomyController {
 
     private final AutonomyPolicyService autonomy;
+    private final SurfacedProblems surfacedProblems;
     private final CurrentUserProvider currentUser;
 
     @PostMapping("/api/v1/value-evaluations/{id}/autonomy-decisions")
@@ -41,5 +45,12 @@ public class AutonomyController {
     public AutonomyPreferenceBody changePreference(@Valid @RequestBody AutonomyPreferenceBody body) {
         return new AutonomyPreferenceBody(
                 autonomy.changeReadOnlyExecution(currentUser.require(), body.readOnlyExecution()));
+    }
+
+    /** 매일 루프가 보인 판정에 반응을 남긴다. 기록만 하고 할 일, 승인 줄, 실행을 만들지 않는다. */
+    @PutMapping("/api/v1/autonomy-decisions/{id}/reaction")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void react(@PathVariable Long id, @Valid @RequestBody DecisionReactionRequest body) {
+        surfacedProblems.react(currentUser.require(), id, DecisionReaction.parse(body.reaction()));
     }
 }

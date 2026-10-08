@@ -88,9 +88,9 @@
 | [ADR-069](ADR-069-사용자-전체-실행-한도는-turn-자리와-실행-줄을-사용자-잠금-하나에서-센다.md) | 사용자 전체 실행 한도는 turn 자리와 실행 줄을 사용자 잠금 하나에서 센다 | backend, frontend | Accepted |
 | [ADR-070](ADR-070-알림은-control-plane-의-notification-표가-원장이고-웹은-사용자-단위-SSE-로-받는다.md) | 알림은 Control Plane 의 `notification` 표가 원장이고 웹은 사용자 단위 SSE 로 받는다 | backend, frontend | Accepted |
 | [ADR-071](ADR-071-여러-출처의-문맥은-항목마다-출처와-권한과-신선도를-지닌-묶음으로-조립한다.md) | 여러 출처의 문맥은 항목마다 출처와 권한과 신선도를 지닌 묶음으로 조립한다 | backend | Accepted |
-| [ADR-072](ADR-072-먼저-알리기의-기본값은-알리지-않음이고-control-plane-기록에서-정한-신호만-화면-안에-올린다.md) | 먼저 알리기의 기본값은 알리지 않음이고 Control Plane 기록에서 정한 신호만 화면 안에 올린다 | backend, frontend | Accepted |
+| [ADR-072](ADR-072-먼저-알리기의-기본값은-알리지-않음이고-control-plane-기록에서-정한-신호만-화면-안에-올린다.md) | 먼저 알리기의 기본값은 알리지 않음이고 Control Plane 기록에서 정한 신호만 화면 안에 올린다 | backend, frontend | Accepted. 매일 루프 판정을 후보 기록에 더하는 부분은 [ADR-20261008 / daily-loop](ADR-20261008-daily-loop.md) 이 정한다 |
 | [ADR-073](ADR-073-할-일은-에이전트가-제안하고-사람이-받아들인-것만-챙긴다.md) | 할 일은 에이전트가 제안하고 사람이 받아들인 것만 챙긴다 | backend, frontend, hermes | Accepted |
-| [ADR-074](ADR-074-지금-화면은-원래-기록을-읽어-만든-view-이고-정해진-카드-넷만-그린다.md) | 지금 화면은 원래 기록을 읽어 만든 view 이고 정해진 카드 다섯을 그린다 | frontend | Accepted. ADR-085 에서 보고 카드를 더한다 |
+| [ADR-074](ADR-074-지금-화면은-원래-기록을-읽어-만든-view-이고-정해진-카드-넷만-그린다.md) | 지금 화면은 원래 기록을 읽어 만든 view 이고 정해진 카드 다섯을 그린다 | frontend | Accepted. ADR-085 에서 보고 카드를 더한다. 「내 차례」 에 먼저 다룰 문제 항목을 더하는 부분은 [ADR-20261008 / daily-loop](ADR-20261008-daily-loop.md) 이 정한다 |
 | [ADR-075](ADR-075-결과-전달은-묶음과-시도로-남기고-사용자가-저장된-결과만-다시-전달한다.md) | 결과 전달은 묶음과 시도로 남기고 사용자가 저장된 결과만 다시 전달한다 | backend, frontend | Accepted. ADR-040 의 「turn 이 실패해도 같은 결과로 다시 깨우지 않는다」 는 그대로 두고 사용자가 요청하는 복구를 더한다 |
 | [ADR-076](ADR-076-예약-작업은-control-plane-이-갖고-발화한-실행은-대화-turn-경로로-돈다.md) | 예약 작업은 Control Plane 이 갖고 발화한 실행은 대화 turn 경로로 돈다 | backend | Accepted |
 | [ADR-077](ADR-077-발화는-trigger-와-예정-시각의-유일-제약으로-한-번만-만들고-놓친-발화는-작업마다-정한다.md) | 발화는 trigger 와 예정 시각의 유일 제약으로 한 번만 만들고 놓친 발화는 작업마다 정한다 | backend | Accepted |
@@ -110,16 +110,16 @@
 | [ADR-091](ADR-091-사진-첨부는-사용자별로-저장하고-실행-공간에는-그-사용자만-붙인다.md) | 사진 첨부는 사용자별로 저장하고 실행 공간에는 그 사용자만 붙인다 | backend, hermes | Accepted. ADR-020 의 저장 경로와 ADR-086 의 전체 첨부 mount 를 바꾼다 |
 | [ADR-092](ADR-092-승인한-실행의-실패는-커넥터가-선언한-오류-코드와-복구-어휘와-정수-세부만-에이전트까지-전한다.md) | 승인한 실행의 실패는 커넥터가 선언한 오류 코드와 복구 어휘와 정수 세부만 에이전트까지 전한다 | backend, hermes | Accepted. ADR-043 의 공통 오류 어휘 옆에 커넥터가 선언한 코드와 복구 계약을 더하고 ADR-050 의 실패 결과 저장을 바꾼다 |
 | [ADR-093](ADR-093-문제-찾기는-살펴보기-결과의-문제-후보로-받고-control-plane-이-근거와-중복을-결정적으로-검사한다.md) | 문제 찾기는 살펴보기 결과의 문제 후보로 받고 Control Plane 이 근거와 중복을 결정적으로 검사한다 | backend | Accepted. ADR-081 의 결과 블록을 버전 3으로 넓힌다 |
-| [ADR-20261007 / autonomy-policy](ADR-20261007-autonomy-policy.md) | 행동 수준은 Control Plane 의 결정적 규칙이 정하고 첫 자동 실행은 읽기 전용 살펴보기 한 번이다 | backend | Accepted |
+| [ADR-20261007 / autonomy-policy](ADR-20261007-autonomy-policy.md) | 행동 수준은 Control Plane 의 결정적 규칙이 정하고 첫 자동 실행은 읽기 전용 살펴보기 한 번이다 | backend | Accepted. `SURFACE` 와 `ASK_APPROVAL` 의 사용자 화면을 만들지 않는다는 부분은 매일 루프 판정에 한해 [ADR-20261008 / daily-loop](ADR-20261008-daily-loop.md) 이 바꾼다 |
 | [ADR-20261007 / background-tasks](ADR-20261007-background-tasks.md) | 운영의 백그라운드 작업은 한 빈으로 띄우고, 검사는 끝날 때 모두 join 한다 | backend | Accepted |
 | [ADR-20261007 / connector-live-reload](ADR-20261007-connector-live-reload.md) | 커넥터를 붙이면 공유 gateway 의 MCP 설정 맞추기로 반영하고 Control Plane 이 두 주기 뒤 스스로 확인한다 | hermes, backend | Accepted. ADR-083 의 「붙이면 재시작 뒤 관리자 반영 완료로 READY」 를 첫 붙이기와 스킬 변경에서 대체한다 |
 | [ADR-20261007 / connector-owner-attachments](ADR-20261007-connector-owner-attachments.md) | 사용자 첨부를 읽는 커넥터는 바인딩 주인의 첨부 디렉터리를 설치가 정한 env 로만 받는다 | hermes, backend | Accepted. ADR-091 의 사용자별 첨부 경계를 커넥터 MCP 서버까지 넓힌다 |
-| [ADR-20261007 / decision-feedback](ADR-20261007-decision-feedback.md) | 판단 피드백은 제안 열쇠에 덧붙이는 사건으로 남기고 반응은 읽을 때 정한다 | backend | Accepted. 살펴보기 발견의 「관심 없음」 이 되풀이 판정을 바꾸는 예외는 [ADR-20261008 / check-finding-reaction](ADR-20261008-check-finding-reaction.md) 이 둔다 |
+| [ADR-20261007 / decision-feedback](ADR-20261007-decision-feedback.md) | 판단 피드백은 제안 열쇠에 덧붙이는 사건으로 남기고 반응은 읽을 때 정한다 | backend | Accepted. 살펴보기 발견의 「관심 없음」 이 되풀이 판정을 바꾸는 예외는 [ADR-20261008 / check-finding-reaction](ADR-20261008-check-finding-reaction.md) 이 둔다. 매일 루프 판정이 화면에 보이고 그 반응이 지금 화면 항목을 빼는 부분은 [ADR-20261008 / daily-loop](ADR-20261008-daily-loop.md) 이 바꾼다 |
 | [ADR-20261007 / live-properties](ADR-20261007-live-properties.md) | 운영 코드는 실행 중에 쓰는 설정을 LiveProperties 로 읽는다 | backend | Accepted |
 | [ADR-20261007 / memory-remember](ADR-20261007-memory-remember.md) | 사용자가 대화에서 직접 말한 사실은 에이전트가 바로 기억하고 그 밖은 제안으로 남긴다 | backend, frontend, hermes | Accepted. ADR-012 의 「사람이 받아들여야 저장된다」 와 「에이전트가 스스로 쓰는 경로를 두지 않는다」 를 개정한다. 바로 저장 조건의 근거 대조와 민감도, 오래된 대화 판정은 [ADR-20261008 / memory-remember-guard](ADR-20261008-memory-remember-guard.md) 이 개정한다. 색인에 제목만 실린다는 부분은 [ADR-20261008 / memory-facts](ADR-20261008-memory-facts.md) 이 개정한다 |
 | [ADR-20261007 / naver-blog-connector](ADR-20261007-naver-blog-connector.md) | 네이버 블로그 커넥터는 사용자의 Chrome 에 CDP 로 붙고, 임시저장은 승인한 뒤 백그라운드 작업으로 돈다 | hermes, backend | Accepted. ADR-083 의 바인딩으로 블로그 전용 profile 을 대신한다 |
 | [ADR-20261007 / numbering-scheme](ADR-20261007-numbering-scheme.md) | Flyway 는 UTC 시각 버전을 쓰고 ADR 은 결정 날짜와 슬러그로 구분한다 | 공통 | Accepted |
-| [ADR-20261007 / proactive-eval](ADR-20261007-proactive-eval.md) | 먼저 살펴보기 루프는 결정적 provider 로 실제 서비스를 replay 해 측정하고 안전 경계만 CI 를 막는다 | backend | Accepted |
+| [ADR-20261007 / proactive-eval](ADR-20261007-proactive-eval.md) | 먼저 살펴보기 루프는 결정적 provider 로 실제 서비스를 replay 해 측정하고 안전 경계만 CI 를 막는다 | backend | Accepted. 매일 루프 판정이 화면에 보이게 된 부분은 [ADR-20261008 / daily-loop](ADR-20261008-daily-loop.md) 이 바꾼다 |
 | [ADR-20261007 / test-context-base](ADR-20261007-test-context-base.md) | backend 통합 검사는 Spring 컨텍스트 하나를 함께 쓰고, 설정과 대역은 검사마다 바꿔 끼운다 | backend | Accepted |
 | [ADR-20261007 / user-browser](ADR-20261007-user-browser.md) | 사용자마다 브라우저 하나를 Control Plane 이 관리하고, 커넥터는 바인딩이 준 중계 주소로만 닿는다 | backend, frontend, hermes | Accepted. ADR-20261007 / naver-blog-connector 의 CDP 주소 연결 칸을 바꾼다 |
 | [ADR-20261007 / value-evaluation](ADR-20261007-value-evaluation.md) | 가치 판단은 축별 근거와 재평가 입력을 남기고 행동 정책과 분리한다 | backend, hermes | Accepted. 살펴보기에서 자동 호출하지 않는다는 부분은 매일 깨우기에 한해 [ADR-20261008 / daily-loop](ADR-20261008-daily-loop.md) 이 바꾼다 |
@@ -127,7 +127,7 @@
 | [ADR-20261008 / check-finding-reaction](ADR-20261008-check-finding-reaction.md) | 살펴보기 발견의 반응은 판단 피드백 사건으로 받고, 「관심 없음」 은 digest 기간 안에서만 같은 주제를 내린다 | backend, frontend | Accepted. ADR-20261007 / decision-feedback 의 「억제 규칙을 바꾸지 않는다」 와 ADR-081 의 되풀이 규칙에 예외를 둔다 |
 | [ADR-20261008 / connector-card](ADR-20261008-connector-card.md) | 커넥터 아이콘은 plugin 안의 파일을 카탈로그에 실어 같은 출처의 이미지로만 그리고, 링크는 https 만 받는다 | 공통 | Accepted. ADR-043 의 `connector.json` 에 화면용 선택 칸을 더한다 |
 | [ADR-20261008 / connector-output-files](ADR-20261008-connector-output-files.md) | 커넥터는 계산할 목록을 그 에이전트 실행 공간에 읽기 전용으로 붙는 파일로 내고, 계산은 스크립트가 한다 | hermes | Accepted. ADR-086 의 실행 공간에 커넥터 출력 디렉터리를 더한다 |
-| [ADR-20261008 / daily-loop](ADR-20261008-daily-loop.md) | 매일 깨우기가 끝나면 동의한 사용자의 살펴보기 한 번에 가치 평가와 행동 정책을 한 번만 잇는다 | backend | Accepted. [ADR-20261007 / value-evaluation](ADR-20261007-value-evaluation.md) 의 「살펴보기에서 자동으로 부르지 않는다」 를 매일 깨우기에 한해 바꾼다 |
+| [ADR-20261008 / daily-loop](ADR-20261008-daily-loop.md) | 매일 깨우기가 끝나면 동의한 사용자의 살펴보기 한 번에 가치 평가와 행동 정책을 한 번만 잇는다 | backend, frontend | Accepted. [ADR-20261007 / value-evaluation](ADR-20261007-value-evaluation.md) 의 「살펴보기에서 자동으로 부르지 않는다」 를 매일 깨우기에 한해 바꾸고, ADR-072 와 ADR-074 의 후보 기록과 「내 차례」 항목을 넓힌다 |
 | [ADR-20261008 / execute-code-unattended](ADR-20261008-execute-code-unattended.md) | docker 실행 공간을 쓰는 profile 은 API 경로의 `execute_code` 를 승인 없이 컨테이너에서 돌린다 | hermes | Accepted. ADR-086 의 실행 공간 설정에 `approvals.unattended_mode` 를 더한다 |
 | [ADR-20261008 / memory-facts](ADR-20261008-memory-facts.md) | 짧은 개인 기억은 본문까지 「개인 사실 구역」에 싣고, 답마다 참고한 기억을 사용자에게 보인다 | backend, frontend | Accepted. ADR-20261007 / memory-remember 의 「색인에 제목이 실린다」 를 개정하고 ADR-015 에 예외를 둔다 |
 | [ADR-20261008 / memory-remember-guard](ADR-20261008-memory-remember-guard.md) | 바로 저장은 모델이 다듬은 본문도 받고, 부정이 뒤집힌 글과 민감해 보이는 글과 오래된 대화만 제안으로 내린다 | backend, frontend | Accepted. ADR-20261007 / memory-remember 의 바로 저장 조건 2 와 5 를 개정한다 |

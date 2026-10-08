@@ -643,6 +643,7 @@ function startControlPlane(
       SPRING_JPA_HIBERNATE_DDL_AUTO: "validate",
       SPRING_DATASOURCE_DRIVER_CLASS_NAME: "org.h2.Driver",
       ASSISTANT_TESTSUPPORT_ENABLED: "true",
+      ASSISTANT_PROACTIVELOOP_ENABLED: "true",
     },
     detached: true,
     stdio: ["ignore", "pipe", "pipe"],

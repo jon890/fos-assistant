@@ -88,6 +88,9 @@ async function restore(page: Page) {
   await page.request.put(`/api/agents/${AGENT_CODE}/proactive-check/schedule`, {
     data: { enabled: false, time: "09:00", timezone: "Asia/Seoul" },
   });
+  await page.request.put(`/api/agents/${AGENT_CODE}/proactive-check/loop`, {
+    data: { enabled: false, snoozedUntil: null },
+  });
 }
 
 test("허용되지 않은 도구가 켜져 있으면 까닭을 알리고 단추를 끈다", async ({
@@ -155,6 +158,72 @@ test("매일 깨우기는 처음에는 꺼져 있고 시각과 시간대를 저�
       time: "08:30",
       timezone: "Asia/Seoul",
     });
+  } finally {
+    await restore(page);
+  }
+});
+
+test("매일 루프 설정을 켜고 하루 쉬면 쉬는 시각이 남고 쉬기를 끝내고 끌 수 있다", async ({
+  page,
+}) => {
+  try {
+    await prepare(page);
+    await page.goto(`/agents/${AGENT_CODE}`);
+
+    const check = section(page);
+    const toggle = check.getByRole("switch", {
+      name: "깨운 뒤 먼저 다룰 문제 고르기",
+    });
+    await expect(toggle).toHaveAttribute("aria-checked", "false");
+    await expect(check.getByRole("button", { name: "하루 쉬기" })).toHaveCount(
+      0,
+    );
+
+    const loopPath = /^\/api\/agents\/browser\/proactive-check\/loop$/;
+    await clickAndWaitForResponse(page, toggle, "PUT", loopPath);
+    await expect(toggle).toHaveAttribute("aria-checked", "true");
+    await clickAndWaitForResponse(
+      page,
+      check.getByRole("button", { name: "하루 쉬기" }),
+      "PUT",
+      loopPath,
+    );
+    await expect(check.getByText("까지 쉬어요")).toBeVisible();
+
+    const saved = await page.request.get(
+      `/api/agents/${AGENT_CODE}/proactive-check/loop`,
+    );
+    const { snoozedUntil } = (await saved.json()) as { snoozedUntil: string };
+    const hoursAhead = (Date.parse(snoozedUntil) - Date.now()) / 3_600_000;
+    expect(hoursAhead, "하루 쉬기의 쉬는 시각(시간)").toBeGreaterThan(23);
+    expect(hoursAhead).toBeLessThanOrEqual(24);
+
+    await page.reload();
+    await expect(toggle).toHaveAttribute("aria-checked", "true");
+    await expect(check.getByText("까지 쉬어요")).toBeVisible();
+
+    await clickAndWaitForResponse(
+      page,
+      check.getByRole("button", { name: "쉬기 끝내기" }),
+      "PUT",
+      loopPath,
+    );
+    await expect(check.getByText("까지 쉬어요")).toHaveCount(0);
+    await clickAndWaitForResponse(
+      page,
+      check.getByRole("button", { name: "일주일 쉬기" }),
+      "PUT",
+      loopPath,
+    );
+    await expect(check.getByText("까지 쉬어요")).toBeVisible();
+
+    await clickAndWaitForResponse(page, toggle, "PUT", loopPath);
+    await expect(toggle).toHaveAttribute("aria-checked", "false");
+    await page.reload();
+    await expect(toggle).toHaveAttribute("aria-checked", "false");
+    await expect(check.getByRole("button", { name: "하루 쉬기" })).toHaveCount(
+      0,
+    );
   } finally {
     await restore(page);
   }

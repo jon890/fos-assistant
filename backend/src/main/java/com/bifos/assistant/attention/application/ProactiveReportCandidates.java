@@ -82,6 +82,7 @@ public class ProactiveReportCandidates implements AttentionCandidates {
                 null,
                 null,
                 null,
-                view);
+                view,
+                null);
     }
 }
