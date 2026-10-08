@@ -6,6 +6,7 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
+import java.time.Instant;
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
 
@@ -49,16 +50,25 @@ public final class PeopleDtos {
      *     사람이고, 그 사람의 에이전트도 아직 없다
      */
     public record PersonView(
-            Long id, String email, String displayName, String hermesProfile, boolean enabled, boolean joined) {
+            Long id,
+            String email,
+            String displayName,
+            String hermesProfile,
+            boolean enabled,
+            boolean joined,
+            Instant lastLoginAt,
+            Instant lastConversationAt) {
 
-        static PersonView of(AllowedPerson person, boolean joined) {
+        static PersonView of(AllowedPerson person, boolean joined, Instant lastConversationAt) {
             return new PersonView(
                     person.id(),
                     person.email(),
                     person.displayName(),
                     person.hermesProfile(),
                     person.enabled(),
-                    joined);
+                    joined,
+                    person.lastLoginAt(),
+                    lastConversationAt);
         }
     }
 

@@ -50,6 +50,10 @@ public class AllowedPerson {
     @Getter
     private Instant createdAt;
 
+    @Column(name = "last_login_at")
+    @Getter
+    private Instant lastLoginAt;
+
     protected AllowedPerson() {}
 
     private AllowedPerson(String email, String displayName, String hermesProfile, Instant now) {

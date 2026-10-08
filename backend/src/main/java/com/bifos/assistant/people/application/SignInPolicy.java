@@ -3,6 +3,7 @@ package com.bifos.assistant.people.application;
 import com.bifos.assistant.people.domain.AllowedPerson;
 import com.bifos.assistant.people.infra.AllowedPersonRepository;
 import com.bifos.assistant.user.application.SignInRevocation;
+import java.time.Clock;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -18,6 +19,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class SignInPolicy implements SignInRevocation {
 
     private final AllowedPersonRepository people;
+    private final Clock clock;
 
     /** 들어와도 되면 그 사람을, 아니면 비어 있는 값을 돌려준다. */
     @Transactional(readOnly = true)
@@ -36,5 +38,18 @@ public class SignInPolicy implements SignInRevocation {
             return false;
         }
         return people.existsByEmailAndEnabledFalse(AllowedPerson.normalizeEmail(email));
+    }
+
+    /** 로그인 완료 시각을 기록한다. 허용하지 않은 주소는 거절한다. */
+    @Transactional
+    public boolean recordCompletion(String email) {
+        if (email == null || email.isBlank()) {
+            return false;
+        }
+        String normalized = AllowedPerson.normalizeEmail(email);
+        if (people.updateLastLoginAtIfNewer(normalized, clock.instant()) > 0) {
+            return true;
+        }
+        return people.findByEmailAndEnabledTrue(normalized).isPresent();
     }
 }
