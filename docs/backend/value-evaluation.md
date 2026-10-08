@@ -4,6 +4,7 @@
 결정은 [ADR-20261007 / value-evaluation](../adr/ADR-20261007-value-evaluation.md)에 있다.
 권한, 승인, 실행 여부는 [행동 정책](autonomy-policy.md)이 정한다.
 살펴보기와 매일 깨우기는 이 평가를 자동으로 부르지 않는다. 결과를 대화나 지금 화면에 올리지 않는다.
+사람이 부르는 자리는 관리자 영역 에이전트 상세의 「가치 평가」 절 하나다. 화면은 [`frontend/structure.md`](../frontend/structure.md) 의 「가치 평가 절」 이 갖는다.
 
 ## 입력과 판단 축
 
@@ -115,10 +116,27 @@ timeout 뒤 원격 실행의 끝을 확인할 때까지 요청자의 자리를 �
 | `POST /api/v1/proactive-checks/{checkId}/value-evaluations` | 요청자의 끝난 살펴보기 후보를 평가한다 |
 | `POST /api/v1/value-evaluations/{id}/replays` | 같은 입력으로 새 평가를 남긴다 |
 | `GET /api/v1/value-evaluations/{id}` | 요청자의 평가를 읽는다 |
+| `GET /api/v1/agents/{code}/proactive-check/evaluation` | 요청자가 그 에이전트로 연 마지막 성공한 살펴보기와 그 살펴보기의 마지막 평가, 그 평가의 마지막 판정 묶음을 읽는다 |
+| `POST /api/v1/proactive-checks/{checkId}/evaluation-runs` | 요청자의 끝난 살펴보기를 평가하고 곧바로 [행동 정책](autonomy-policy.md)으로 판정한 뒤 위 GET 과 같은 모양을 201 로 준다 |
 
 POST 본문은 `{ "provider": "hermes" }`다. 설치된 adapter 이름만 받는다.
 다른 사용자의 자료는 관리자에게도 `VALUE_EVALUATION_NOT_FOUND`다. 지운 대화의 평가도 읽거나 replay하지 못한다.
-응답은 평가 식별자, replay 원본, 결과 상태, 후보별 판단, 순서, 설명이다. 실행 식별자와 provider·모델 원문은 내부 기록에만 둔다.
+응답은 평가 식별자, replay 원본, 결과 상태, 실패 코드, 후보 스냅샷, 후보별 판단, 순서, 설명이다. 실행 식별자와 provider·모델 원문은 내부 기록에만 둔다.
+후보 스냅샷은 `state` 의 후보마다 식별자, 문제 키, 문제 글, 행동 종류, 부작용 힌트만 싣는다. 근거 주소와 기대 효과는 싣지 않는다.
+
+### 관리자 화면이 읽는 묶음
+
+`GET .../proactive-check/evaluation` 과 `POST .../evaluation-runs` 의 응답은 `{ check, evaluation, decisions }` 다.
+
+| 칸 | 담는 것 | 비는 때 |
+| --- | --- | --- |
+| `check` | 살펴보기 식별자, 시작 계기, 끝난 시각, 받아들인 후보 수 | 성공한 살펴보기가 없거나 그 점검 대화를 지웠다 |
+| `evaluation` | 위 평가 응답. replay 를 포함해 그 살펴보기의 가장 최근 시도다 | 아직 평가하지 않았다 |
+| `decisions` | 그 평가의 판정 가운데 마지막으로 함께 남긴 묶음. 판정 응답과 같은 모양이다 | 판정하지 않았거나 후보가 없었다 |
+
+고르는 살펴보기는 `status = SUCCEEDED` 이고 시작 계기가 `AUTONOMY` 가 아닌 가장 최근 줄이다. 자동 실행이 연 살펴보기는 사람에게 바로 보이지 않으므로 고르지 않는다.
+에이전트는 살펴보기 상태 조회와 같이 요청자가 대화를 시작할 수 있어야 한다. 아니면 그 조회와 같은 오류다.
+`POST .../evaluation-runs` 는 평가와 판정을 따로 부를 때와 같은 검사를 거친다. 평가가 끝난 뒤 판정이 실패하면 평가 줄은 남고 오류를 준다. 다시 누르면 새 평가를 만든다.
 
 다음 행동 정책은 `ValueEvaluationService.read`의 `DecisionEvidence`를 읽는다.
 `EVALUATED`도 추천일 뿐 실행 허락이 아니다. 정책은 현재 후보·근거의 유효성과 사용자 권한을 다시 확인해야 한다.
