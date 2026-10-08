@@ -28,9 +28,13 @@
 
 `docs/backend/connector-install.md` 의 응답 표와 「바인딩의 반영 맞추기」 및 뒤의 요약에서 뗀 이름의 재시작 요구와 probe 의 한계를 일치시킨다. 계획 단계에서 갱신한 반영 맞추기 절도 이 phase 커밋에 담는다.
 
+같은 판정의 기존 설명을 가진 `hermes/README.md`, `docs/backend/connector-tool-policy.md`, `docs/hermes/mcp-profile-credentials.md`, `docs/flow.md`, `docs/connectors.md`, `docs/adr/ADR-20261007-connector-live-reload.md` 에도 뗀 이름 재붙이기의 재시작 예외를 반영한다. ADR 표의 새 이름은 뗀 기록에 없는 이름으로 명시하고, 뗀 이름은 재시작 대기임을 추가한다. 저장 형식이나 설계는 바꾸지 않는다.
+
 ### 2. 회귀 테스트
 
 `hermes/tests/test_dashboard_profile_api_connector_binding_detach.py` 에 떼기 직후 동일 이름 붙이기를 검사한다. `changed=true`, `restart_required=true`, `reload_pending=false`, 뗀 기록 삭제를 확인한다. 최초 새 이름 붙이기 및 다른 커넥터의 새 이름 붙이기는 `restart_required=false`, `reload_pending=true` 임을 확인한다. 기록이 지워진 뒤 동일 요청의 재시도는 모든 변경 칸이 거짓인지 확인한다.
+
+다른 커넥터의 새 이름은 DEMO 를 떼어 기록이 남아 있는 상태에서 처음 붙여 검사한다. 새 이름의 반영 예정과 DEMO 의 뗀 기록 보존을 함께 확인한다.
 
 ## 검증
 
@@ -47,3 +51,9 @@ scripts/check-public-safe.sh
 | `hermes/plugins/dashboard-profile-api/connector_binding.py` | 수정 |
 | `hermes/tests/test_dashboard_profile_api_connector_binding_detach.py` | 수정 |
 | `docs/backend/connector-install.md` | 수정 |
+| `hermes/README.md` | 수정 |
+| `docs/backend/connector-tool-policy.md` | 수정 |
+| `docs/hermes/mcp-profile-credentials.md` | 수정 |
+| `docs/flow.md` | 수정 |
+| `docs/connectors.md` | 수정 |
+| `docs/adr/ADR-20261007-connector-live-reload.md` | 수정 |

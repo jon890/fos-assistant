@@ -254,7 +254,7 @@ probe 가 실패해 `PENDING` 이 되면 다시 부르지 않는다. 사용자�
 
 이미 떠 있는 MCP 프로세스는 env 파일이 바뀌어도 옛 값을 쓴다.
 공유 gateway 의 MCP 설정 맞추기는 60초마다 profile 의 `mcp_servers` 이름만 비교해 새 이름은 연결하고 빠진 이름은 끊는다.
-그래서 새 서버를 더한 붙이기와 스킬만 바뀐 설치는 `reload_pending` 을 돌려받고, 재시작 없이 「반영 예정 확인」 이 `READY` 로 둔다.
+그래서 뗀 기록에 없는 새 이름을 더한 붙이기와 스킬만 바뀐 설치는 `reload_pending` 을 돌려받고, 재시작 없이 「반영 예정 확인」 이 `READY` 로 둔다.
 값 교체처럼 이미 있던 서버의 정의나 값이 바뀐 설치와, 뗀 서버 기록에 남은 이름을 다시 붙이는 설치는 `restart_required` 를, `fos-ctx` 갱신은 `plugin_updated` 를 돌려받는다. 기록에 없는 새 이름의 설치는 `reload_pending` 이다. 관리자가 공유 gateway 를 재시작한 뒤 반영 완료를 누를 때까지 재시작 대기 바인딩이 `PENDING` 으로 남는다.
 profile 하나의 MCP 를 다시 붙이는 다른 경로를 쓰지 않는 까닭은 [ADR-20261007 / connector-live-reload](../adr/ADR-20261007-connector-live-reload.md) 의 「대안 기각」 이 갖는다.
 공유 gateway 재시작은 사용자 요청에서 실행하지 않는다.

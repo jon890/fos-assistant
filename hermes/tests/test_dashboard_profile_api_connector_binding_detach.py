@@ -177,19 +177,18 @@ class ProfileApiConnectorBindingDetachTest(support.ProfileApiRouteTest):
         self.assertEqual(initial.status_code, 200, initial.body)
         self.assertEqual({key: initial.body[key] for key in ("changed", "restart_required", "reload_pending")},
                          {"changed": True, "restart_required": False, "reload_pending": True})
-        # 다른 커넥터의 새 이름도 같은 반영 대기 상태다.
-        other = self.bind(OTHER, "c2")
-        self.assertEqual(other.status_code, 200, other.body)
-        self.assertEqual({key: other.body[key] for key in ("changed", "restart_required", "reload_pending")},
-                         {"changed": True, "restart_required": False, "reload_pending": True})
-
         removed = self.bind(DEMO, enabled=False)
         self.assertEqual(removed.status_code, 200, removed.body)
         self.assertNotIn("demo", self.alice_config()["mcp_servers"])
         self.assertEqual(self.tool_map(), {"v": 1, "isolated": False, "servers": {
-            "demo": {"connector": DEMO, "prefix": "mcp__demo__", "tools": {}},
-            "other": {"connector": OTHER, "prefix": "mcp__other__",
-                      "tools": {"mcp__other__list_scopes": "list_scopes"}}}})
+            "demo": {"connector": DEMO, "prefix": "mcp__demo__", "tools": {}}}})
+        self.assertEqual(json.loads(detached.read_text(encoding="utf-8")), {DEMO: "demo"})
+
+        # 다른 커넥터의 새 이름은 재시작 없이 반영을 기다리고, 뗀 DEMO 기록은 보존한다.
+        other = self.bind(OTHER, "c2")
+        self.assertEqual(other.status_code, 200, other.body)
+        self.assertEqual({key: other.body[key] for key in ("changed", "restart_required", "reload_pending")},
+                         {"changed": True, "restart_required": False, "reload_pending": True})
         self.assertEqual(json.loads(detached.read_text(encoding="utf-8")), {DEMO: "demo"})
         # 대응 파일이 소유 기록과 뗀 기록으로 계산한 것과 같으므로 hook 상태는 참이다.
         self.assertIs(self.status_of()["policy_hook"], True)
