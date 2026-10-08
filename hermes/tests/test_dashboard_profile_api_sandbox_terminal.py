@@ -2,6 +2,7 @@
 
 import hashlib
 import json
+import logging
 import os
 import pathlib
 import yaml
@@ -105,6 +106,68 @@ class ProfileApiSandboxTerminalTest(support.ProfileApiRouteTest):
         attachment_key = hashlib.sha256(b"user-1").hexdigest()
         self.assertTrue(pathlib.Path(self.attachment_agent_root, "users", attachment_key).is_dir())
         self.assertTrue((self.attachment_root / "users" / attachment_key).is_dir())
+
+    def test_shell_toolset_writes_unattended_approval_and_keeps_other_approvals(self):
+        """셸 도구를 docker 실행 공간으로 쓰면 승인 없는 실행을 켜고, 운영자가 정한 다른 승인 키는 그대로 둔다."""
+        path = self.root / "owner/config.yaml"
+        config = yaml.safe_load(path.read_text(encoding="utf-8"))
+        config["approvals"] = {"mode": "manual", "deny": ["*curl*"]}
+        path.write_text(yaml.safe_dump(config, sort_keys=False), encoding="utf-8")
+
+        self.assertEqual(self.request("/api/config", "PUT", token="valid", body=self.file_body()), 200)
+
+        self.assertEqual(self.saved_config()["approvals"],
+                         {"mode": "manual", "deny": ["*curl*"], "unattended_mode": "approve"})
+
+    def test_resaving_an_unchanged_sandbox_terminal_writes_the_missing_approval(self):
+        """terminal 이 그대로여도 승인 값이 빠졌으면 같은 저장이 다시 넣는다."""
+        self.save_sandbox_key()
+        path = self.root / "owner/config.yaml"
+        config = self.saved_config()
+        terminal = config["terminal"]
+        config.pop("approvals")
+        path.write_text(yaml.safe_dump(config, sort_keys=False), encoding="utf-8")
+
+        self.assertEqual(self.request("/api/config", "PUT", token="valid", body=self.file_body()), 200)
+
+        saved = self.saved_config()
+        self.assertEqual(saved["terminal"], terminal, "다시 저장했는데 terminal 이 바뀌었다")
+        self.assertEqual(saved["approvals"], {"unattended_mode": "approve"})
+
+    def test_vision_connector_install_writes_unattended_approval(self):
+        """사진 도구 커넥터 설치가 docker 실행 공간을 쓸 때 승인 없는 실행도 함께 켠다."""
+        root = self.connector_fixture()
+        manifest = root / "connector.json"
+        declared = json.loads(manifest.read_text(encoding="utf-8"))
+        declared["toolsets"] = ["vision"]
+        manifest.write_text(json.dumps(declared), encoding="utf-8")
+
+        self.assertEqual(self.connector().status_code, 200)
+
+        self.assertEqual(self.alice_config()["approvals"], {"unattended_mode": "approve"})
+
+    def test_non_object_approvals_rejects_the_shell_save(self):
+        """approvals 가 객체가 아니면 비어 보이는 값이라도 셸 저장을 500 으로 멈추고 설정 파일을 그대로 둔다."""
+        path = self.root / "owner/config.yaml"
+        base = yaml.safe_load(path.read_text(encoding="utf-8"))
+        # 준비가 로그를 꺼 둔다. 어느 예외로 거절했는지 읽는 동안만 켠다.
+        logging.disable(logging.NOTSET)
+        self.addCleanup(logging.disable, logging.CRITICAL)
+        for approvals in ("approve", False, []):
+            with self.subTest(approvals=approvals):
+                config = dict(base, approvals=approvals)
+                path.write_text(yaml.safe_dump(config), encoding="utf-8")
+                original = path.read_bytes()
+
+                with self.assertLogs(self.plugin.logger, level="ERROR") as logs:
+                    status = self.request("/api/config", "PUT", token="valid", body=self.file_body())
+
+                self.assertEqual(status, 500)
+                self.assertEqual(path.read_bytes(), original)
+                errors = [record.exc_info[1] for record in logs.records if record.exc_info]
+                self.assertEqual(len(errors), 1, "검증 실패 예외 로그가 하나가 아니다: %r" % errors)
+                self.assertIsInstance(errors[0], ValueError)
+                self.assertEqual(str(errors[0]), "approvals 설정이 객체가 아니다")
 
     def test_connector_output_root_mounts_the_profile_directory_read_only_at_the_same_path(self):
         """정책에 출력 루트가 있으면 그 profile 의 출력 디렉터리를 만들고 같은 경로에 읽기 전용으로 붙인다."""

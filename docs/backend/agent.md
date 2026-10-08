@@ -220,12 +220,12 @@ sequenceDiagram
             D-->>C: 409 sandbox_unavailable
             C-->>U: AGENT_SANDBOX_UNAVAILABLE
         else 이 profile 이 정책에 등록됐다
-            D->>D: terminal 설정을 docker 실행 공간으로 다시 쓴다
+            D->>D: terminal 설정을 docker 실행 공간으로 다시 쓰고 approvals.unattended_mode 를 approve 로 둔다
         else 미등록 profile 에 vision, image_gen, video_gen 을 켠다
             D-->>C: 409 sandbox_unavailable
             C-->>U: AGENT_SANDBOX_UNAVAILABLE
         else 사진 도구가 없는 미등록 profile 이다
-            D->>D: local 실행을 유지한다
+            D->>D: local 실행을 유지하고 approvals.unattended_mode 를 지운다
         end
     end
     D-->>C: 저장됐다

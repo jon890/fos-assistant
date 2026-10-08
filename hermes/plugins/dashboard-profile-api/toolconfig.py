@@ -36,6 +36,7 @@ from .sandbox import (
     _sandbox_verify_attachment_directories,
     _sandbox_workspace,
 )
+from .sandbox_approvals import _with_sandbox_approvals
 
 
 # Control Plane 이 올린 스킬을 두는 루트의 Hermes 컨테이너 쪽 경로다. Compose 가 준다.
@@ -261,6 +262,7 @@ async def _check_config_update(request):
                 _sandbox_prepare_connector_output(sandbox, profile, owner)
                 prepared = _sandbox_verify_attachment_directories(sandbox, owner)
                 updated["terminal"] = _sandbox_terminal(sandbox, profile, owner, prepared)
+                updated = _with_sandbox_approvals(saved, updated, True)
                 request.state.fos_checked_attachments = (sandbox, owner, prepared)
             except OSError:
                 return _sandbox_unavailable()
@@ -273,6 +275,7 @@ async def _check_config_update(request):
             terminal = dict(previous) if previous.get("backend", "local") == "local" else {}
             terminal["backend"] = "local"
             updated["terminal"] = terminal
+            updated = _with_sandbox_approvals(saved, updated, False)
         if skill_dirs is not None:
             # PUT /api/config 는 목록을 통째로 바꾼다. 운영자가 넣은 경로가 있으면 지우지 않고 멈춘다.
             if _operator_skill_dirs(saved, profile, root):
@@ -297,8 +300,10 @@ async def _check_config_update(request):
             return _rejected("다른 platform 의 도구 목록이 바뀐다")
         if skill_dirs and "skills" not in effective:
             return _rejected("skills 도구가 꺼진 채로 스킬을 게시할 수 없다")
-        # 처리기의 병합은 본문의 키만 쓴다. 본문에 없는 disabled_toolsets, 고정 목록, terminal 은 plugin 이 먼저 쓴다.
-        if updated.get("agent") != saved.get("agent") or updated.get("terminal") != saved.get("terminal"):
+        # 처리기의 병합은 본문의 키만 쓴다. 본문에 없는 disabled_toolsets, 고정 목록, terminal, approvals 는 plugin 이 먼저 쓴다.
+        # terminal 이 그대로여도 approvals 만 바뀌면 쓴다. 이미 docker 인 profile 을 다시 저장해 승인 값을 넣는다.
+        if (updated.get("agent") != saved.get("agent") or updated.get("terminal") != saved.get("terminal")
+                or updated.get("approvals") != saved.get("approvals")):
             request.state.fos_checked_config = (config_path, original, updated)
     except Exception:
         logger.exception("dashboard-profile-api: profile 설정을 검증하지 못했다")

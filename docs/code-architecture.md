@@ -45,7 +45,7 @@ hermes/
     dashboard-profile-api/   대시보드 plugin. profile 만들기와 지우기, env, 도구와 스킬 설정, 커넥터
       __init__.py             register 와 기존 이름 다시 내보내기
       common.py, profiles.py, session.py
-      sandbox.py, toolconfig.py, env.py
+      sandbox.py, sandbox_approvals.py, toolconfig.py, env.py
       connector_schema.py, connector_policy.py, connector_skills.py, connector_appearance.py
       connector_manifest.py, connector_vault.py
       connector_state.py, connector_status.py

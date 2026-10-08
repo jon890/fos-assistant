@@ -174,6 +174,38 @@ Hermes 는 큰 도구 결과를 모델에 그대로 넣지 않고 파일로 저�
 `read_file` 은 `.env`, `auth.json` 같은 이름을 경로 문자열로 먼저 거절한다(`agent/file_safety.py`).
 이 검사는 Hermes 스스로 「방어를 한 겹 더할 뿐 경계가 아니다」 라고 적는다. 경계는 컨테이너다.
 
+## `execute_code` 의 승인 판정
+
+`execute_code` 는 자식 프로세스를 띄우기 전에 `tools/approval.py` 의 `check_execute_code_guard` 를 거친다.
+스크립트 안의 `subprocess` 는 셸 위험 명령 판정을 거치지 않기 때문에 스크립트 전체를 한 번에 판정한다.
+아래 순서로 처음 걸리는 줄이 결과를 정한다.
+
+| 순서 | 조건 | 결과 |
+| --- | --- | --- |
+| 1 | `terminal.backend` 가 `docker` 이고 실행 공간에 호스트 경로 마운트가 없다 | 승인 |
+| 2 | `approvals.mode` 가 `off` 이거나 yolo 다 | 승인 |
+| 3 | 사람이 없는 문맥이다. `-q`, cron, 그리고 `webhook`, `msgraph_webhook`, `api_server` 플랫폼이다 | 그 문맥의 모드로 바로 정한다. `deny` 면 거절, `approve` 면 승인 |
+| 4 | gateway 나 ask 문맥이다 | 사람에게 묻는다 |
+| 5 | 그 밖 | 승인 |
+
+**우리 실행 공간은 1번을 받지 못한다.**
+`tools/terminal_tool.py` 의 `_docker_has_host_access` 는 `docker_volumes` 에 `/` 나 `~` 로 시작하는 원본이 하나라도 있으면 참이다.
+plugin 이 쓰는 `/workspace` 부터 호스트 경로다.
+
+**API 서버 경로는 3번에서 끝난다.**
+모드는 `approvals.unattended_mode` 이고 기본값은 `deny` 다.
+3번이 4번보다 앞이라, API 서버의 승인 다리(`/v1/runs/{id}/approval`)가 있어도 `execute_code` 는 승인 카드로 가지 않는다.
+그래서 plugin 은 docker 실행 공간을 쓰는 profile 에 `approve` 를 쓴다([ADR-20261008 / execute-code-unattended](../adr/ADR-20261008-execute-code-unattended.md)).
+
+**같은 모드가 셸 위험 명령과 plugin 승인 요청에는 닿지 않는다.**
+`check_all_command_guards` 와 `_run_approval_gate` 는 CLI, gateway, ask 문맥이 모두 아닐 때만 사람이 없는 문맥의 모드를 본다.
+gateway 의 `start_gateway()` 가 `HERMES_EXEC_ASK=1` 을 프로세스 환경에 넣으므로 API 서버 실행은 ask 문맥이고, 두 판정은 승인 카드로 간다.
+이 두 지점은 계약 시험(`hermes/tests/test_hermes_contract.py`)이 확인한다.
+
+모드는 판정할 때마다 그 실행의 profile 설정에서 읽는다(`tools/approval_context.py` 의 `_binary_approval_mode`).
+값을 바꾸면 gateway 를 다시 띄우지 않아도 다음 호출부터 반영된다.
+받는 값은 `approve`, `off`, `allow`, `yes` 가 승인이고 그 밖은 모두 거절이다.
+
 ## 측정 결과
 
 profile 셋을 썼다. 사용자 A 의 profile 둘, 사용자 B 의 profile 하나다.
@@ -302,6 +334,8 @@ colima VM(4 CPU, 8 GiB) 에서 측정했다. 이미지는 `python:3.11-slim` 이
 
 - [tools/code_execution_tool.py](https://github.com/NousResearch/hermes-agent/blob/v2026.9.24/tools/code_execution_tool.py)
 - [tools/code_execution_rpc.py](https://github.com/NousResearch/hermes-agent/blob/v2026.9.24/tools/code_execution_rpc.py)
+- [tools/approval.py](https://github.com/NousResearch/hermes-agent/blob/v2026.9.24/tools/approval.py)
+- [tools/approval_context.py](https://github.com/NousResearch/hermes-agent/blob/v2026.9.24/tools/approval_context.py)
 - [tools/tool_result_storage.py](https://github.com/NousResearch/hermes-agent/blob/v2026.9.24/tools/tool_result_storage.py)
 - [tools/budget_config.py](https://github.com/NousResearch/hermes-agent/blob/v2026.9.24/tools/budget_config.py)
 - [tools/terminal_tool.py](https://github.com/NousResearch/hermes-agent/blob/v2026.9.24/tools/terminal_tool.py)
