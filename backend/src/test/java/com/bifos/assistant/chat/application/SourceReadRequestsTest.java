@@ -117,6 +117,7 @@ class SourceReadRequestsTest {
             strings = {
                 "{\"results\":[]}",
                 "{\"results\":[{\"url\":\"https://example.com/error\",\"content\":\"본문\",\"error\":\"실패\"}]}",
+                "{\"results\":[{\"url\":\"https://example.com/blank\",\"content\":\"   \"}]}",
                 "{\"results\":[{\"blocked_by_policy\":true}]}",
                 "{\"success\":false,\"results\":[]}",
                 "{\"blocked_by_policy\":true,\"results\":[]}"
@@ -125,6 +126,37 @@ class SourceReadRequestsTest {
     void doesNotFallbackToRequestForExplicitNonSuccessfulResults(String detail) throws Exception {
         stubEvents(List.of(started(1L, 1, "https://example.com/request"), completed(1L, 2, false, detail)));
         assertThat(summary()).isEqualTo(new SourceReadSummary(1, List.of(), 0, true, List.of()));
+    }
+
+    @ParameterizedTest
+    @ValueSource(
+            strings = {
+                "{\"results\":[false]}",
+                "{\"results\":[{\"content\":\"본문\"}]}",
+                "{\"results\":[{\"url\":\"https://example.com/[가림]\",\"content\":\"본문\"}]}",
+                "{\"results\":[{\"url\":\"https://example.com/truncated...\",\"content\":\"본문\"}]}"
+            })
+    @DisplayName("결과 배열의 해석할 수 없는 항목은 명확한 요청 주소만 남긴다")
+    void fallsBackToRequestForUnresolvedResultItem(String detail) throws Exception {
+        stubEvents(List.of(started(1L, 1, "https://example.com/request"), completed(1L, 2, false, detail)));
+
+        assertThat(summary())
+                .isEqualTo(new SourceReadSummary(1, List.of(), 1, true, List.of("https://example.com/request")));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"error", "blocked", "confirmed"})
+    @DisplayName("판정 가능한 결과와 해석할 수 없는 항목이 섞여도 요청 주소로 대체하지 않는다")
+    void prioritizesKnownMixedResultOverRequest(String kind) throws Exception {
+        String detail = switch (kind) {
+            case "error" -> "{\"results\":[{\"content\":\"본문\",\"error\":\"실패\"},false]}";
+            case "blocked" -> "{\"results\":[{\"blocked_by_policy\":true},false]}";
+            default -> "{\"results\":[{\"url\":\"https://example.com/confirmed\",\"content\":\"본문\"},false]}";
+        };
+        stubEvents(List.of(started(1L, 1, "https://example.com/request"), completed(1L, 2, false, detail)));
+
+        assertThat(summary()).isEqualTo(new SourceReadSummary(
+                1, kind.equals("confirmed") ? List.of("https://example.com/confirmed") : List.of(), 1, true, List.of()));
     }
 
     @Test
@@ -235,7 +267,7 @@ class SourceReadRequestsTest {
     }
 
     @Test
-    @DisplayName("완결된 결과가 다른 실행에 있어도 그 실행의 요청 주소를 지우지 않는다")
+    @DisplayName("서로 다른 주소의 완결된 결과가 다른 실행에 있어도 그 실행의 요청 주소를 지우지 않는다")
     void doesNotLetOtherExecutionResultRemoveRequestedUrl() throws Exception {
         AgentExecution root = execution(1L, null, EventObservation.OBSERVED);
         AgentExecution child = execution(2L, 1L, EventObservation.OBSERVED);

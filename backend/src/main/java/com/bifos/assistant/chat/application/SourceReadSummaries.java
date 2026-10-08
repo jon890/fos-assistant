@@ -195,34 +195,42 @@ public class SourceReadSummaries {
             if (results == null || !results.isArray()) {
                 return Parsed.unknown();
             }
-            Set<String> urls = new LinkedHashSet<>();
-            boolean unresolved = false;
-            for (JsonNode result : results) {
-                if (!result.isObject()) {
-                    unresolved = true;
-                    continue;
-                }
-                if (result.path("blocked_by_policy").asBoolean(false)) {
-                    continue;
-                }
-                JsonNode content = result.get("content");
-                JsonNode error = result.get("error");
-                if (content != null
-                        && content.isString()
-                        && !content.asString().isBlank()
-                        && (error == null || error.isNull())) {
-                    String url = clean(result.path("url").asString(null));
-                    if (url == null) {
-                        unresolved = true;
-                    } else {
-                        urls.add(url);
-                    }
-                }
-            }
-            return new Parsed(true, unresolved, urls);
+            return parseResults(results);
         } catch (JacksonException ex) {
             return Parsed.unknown();
         }
+    }
+
+    private static Parsed parseResults(JsonNode results) {
+        Set<String> urls = new LinkedHashSet<>();
+        boolean knownOutcome = results.isEmpty();
+        boolean unresolved = false;
+        for (JsonNode result : results) {
+            if (!result.isObject()) {
+                unresolved = true;
+                continue;
+            }
+            JsonNode content = result.get("content");
+            JsonNode error = result.get("error");
+            if (result.path("blocked_by_policy").asBoolean(false)
+                    || (error != null && !error.isNull())
+                    || (content != null && content.isString() && content.asString().isBlank())) {
+                knownOutcome = true;
+                continue;
+            }
+            if (content == null || !content.isString()) {
+                unresolved = true;
+                continue;
+            }
+            String url = clean(result.path("url").asString(null));
+            if (url == null) {
+                unresolved = true;
+                continue;
+            }
+            knownOutcome = true;
+            urls.add(url);
+        }
+        return new Parsed(knownOutcome, unresolved, urls);
     }
 
     private static boolean hidden(String value) {

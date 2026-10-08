@@ -29,6 +29,8 @@ Hermes의 web_extract 시작 preview는 첫 URL 하나이며 완료 preview는 5
 시작이 겹치면 열린 호출 수가 0이 될 때까지 그 묶음에서 요청 주소를 쓰지 않는다. 실패나 성공 미상 완료도 시작을 소비하되 집계하지 않는다.
 결과가 missing·malformed·가림인 성공 완료이며 해당 실행이 OBSERVED이고 시작 하나가 명확하면 시작 detail의 첫 URL을 기존 정리 규칙으로 검사한다.
 완결된 results의 빈 배열·항목 오류·정책 차단, 루트 success=false·blocked_by_policy=true는 요청 주소로 대체하지 않는다.
+배열 안의 비객체·필수 URL 누락·가림·절단 때문에 판정 가능한 결과가 하나도 없으면 요청 주소 fallback을 허용한다.
+성공 URL이나 오류·차단·빈 본문 등 판정 가능한 항목이 하나라도 있으면 결과를 우선하고 미확인 항목은 unresolvedCount로 남긴다.
 가림·절단·내부 URL은 요청 주소에도 제외한다. 요청 주소는 정리한 뒤 중복 제거하고 결과 urls와 겹치면 결과를 우선한다.
 completedCount와 unresolvedCount는 기존 완료 사건 집계 의미를 유지한다.
 
@@ -45,6 +47,7 @@ Turn의 requestedUrls는 구 서버와 호환되도록 optional 목록이다.
 겹친 묶음의 열린 호출 수가 0이 된 뒤 새 단독 짝은 다시 허용한다.
 짝이 있는 실행 자체가 INCOMPLETE면 요청 주소를 숨긴다. 그 실행이 OBSERVED이고 형제만 불완전하면 요청 주소는 유지하고 전체 observationComplete=false를 표시한다.
 완결된 결과의 빈 배열·항목 오류·정책 차단과 루트 success=false·blocked_by_policy=true를 시작 URL로 대체하지 않는 테스트도 둔다.
+미확인 배열 항목만 있는 경우의 요청 주소 fallback과, 판정 가능한 결과가 섞였을 때 fallback을 하지 않는 경계도 각각 매개변수 테스트로 고정한다.
 기존 summary·controller 테스트는 새 목록을 반영한다.
 `SourceReadPreviewIntegrationTest`는 1000자 ASCII 본문을 가진 결과를 upstream의 500자 절단과 끝 ASCII ... 규칙으로 preview로 만든 뒤 plain 시작 URL과 함께 실제 HermesRunEventStream 가리기와 ExecutionEventRecorder 엔티티 변환 경로에 넣는다.
 긴 결과는 앞 497자와 ... 3자로 총 500자다. ASCII fixture를 써 Python 문자 수와 Java UTF-16 길이 차이를 피한다.

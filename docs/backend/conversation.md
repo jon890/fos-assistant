@@ -237,6 +237,8 @@ DNS 조회 없이 host가 있는 HTTP(S) URL만 받는다. 한 단어 host, loca
 같은 실행에서 같은 도구의 시작이 겹쳤거나 시작이 없으면 짝을 추측하지 않는다. 실패·성공 미상 완료에는 요청 주소도 싣지 않는다.
 시작 preview는 전체 `urls` 배열이 아니라 첫 URL 하나다. 가림이나 말줄임표가 있거나 안전한 URL이 아니면 제외한다.
 완결된 결과가 페이지별 성공이나 실패를 보여 주면 결과를 우선하고 요청 주소로 바꾸지 않는다. 같은 주소가 `urls`에도 있으면 `requestedUrls`에서 뺀다.
+배열 안의 구조가 손상됐거나 필요한 URL이 없고 가려져 결과를 하나도 판정할 수 없을 때도 요청 주소를 쓸 수 있다.
+판정 가능한 결과와 미확인 항목이 섞이면 결과를 우선하며 미확인 항목은 `unresolvedCount`로 안내한다.
 SSE에는 호출을 짝지을 ID가 없다. 근거는 [시작 preview](https://github.com/NousResearch/hermes-agent/blob/v2026.9.24/agent/display.py#L429-L435)와 [Runs SSE](https://github.com/NousResearch/hermes-agent/blob/v2026.9.24/gateway/platforms/api_server_runs.py#L83-L118)이다.
 
 Hermes 가 스트림으로 보내는 사건을 우리 이름으로 옮겨 `execution_event` 에 적는다.
