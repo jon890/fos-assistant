@@ -72,6 +72,16 @@ assistant:
     facts-max-chars: 2000
     # 개인 사실 구역 후보가 될 수 있는 본문의 최대 글자 수다
     facts-item-max-chars: 200
+  data-encryption:
+    # 사용자 본문을 저장할 때 암호화하는 KEK 목록 파일과 새로 감쌀 KEK 의 id(ADR-20261008 / data-encryption).
+    # 둘 다 비우면 새 대화 본문을 평문으로 저장한다. 값과 파일의 자리는 운영 설정이 정한다
+    kek-file: ${ASSISTANT_DATA_ENCRYPTION_KEK_FILE:}
+    active-kek-id: ${ASSISTANT_DATA_ENCRYPTION_ACTIVE_KEK_ID:}
+    # 참이면 KEK 가 없을 때 기동하지 않는다. 운영은 켠다
+    required: ${ASSISTANT_DATA_ENCRYPTION_REQUIRED:false}
+    # 푼 데이터 key 를 메모리에 두는 시간과 개수
+    dek-cache-ttl: 10m
+    dek-cache-max-entries: 1000
   memory:
     propose:
       enabled: false

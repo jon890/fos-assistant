@@ -24,6 +24,10 @@ assistant:
     purge-cron: "-"
   context:
     max-chars: 8000
+  data-encryption:
+    # 운영 값이 아니다. 검사 전용 KEK 파일이다
+    kek-file: src/test/resources/data-encryption/test-kek.keys
+    active-kek-id: test-kek-1
   memory:
     encryption:
       # 운영 값이 아니다. 글자 0123456789abcdef0123456789abcdef 의 base64 다
