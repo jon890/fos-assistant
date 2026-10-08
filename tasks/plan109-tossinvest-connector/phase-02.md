@@ -87,7 +87,6 @@ phase 01 의 `tossinvest` 커넥터에 계좌 데이터를 읽는 `READ` 도구 
 - 계좌 순번 env 가 비었으면 요청 없이 `TOSSINVEST_ACCOUNT_NOT_FOUND`. API 의 `404 account-not-found` 와 `/sellable-quantity` 의 `400 account-not-found` 도 같은 코드
 - `get_buying_power`: `symbol` 이 없으면 `/sellable-quantity` 를 부르지 않는다. 있으면 한 번 부른다. `currency` 가 `EUR` 면 요청 없이 `TOSSINVEST_INVALID_INPUT`
 - `list_orders`: `CLOSED` 는 `limit=100` 을 싣고 `hasNext` 를 `has_more` 로 옮긴다. `OPEN` 은 `limit` 과 `cursor` 를 싣지 않고, 대역이 101건을 주면 100건과 `has_more: true` 다. `from` 이 `to` 보다 늦거나 기간이 367일이면 요청 없이 `TOSSINVEST_INVALID_INPUT`
-- `tests/tossinvest.test.ts` 의 도구 수 단언(있으면)을 다섯으로 고친다
 
 ## 검증
 
@@ -111,5 +110,4 @@ node scripts/check-file-length.mjs
 | `hermes/connectors/tossinvest/skills/tossinvest/SKILL.md` | 수정 |
 | `hermes/connectors/tossinvest/dist/tossinvest-mcp.js` | 수정 |
 | `hermes/connectors/tossinvest/tests/support.ts` | 수정 |
-| `hermes/connectors/tossinvest/tests/tossinvest.test.ts` | 수정 |
 | `hermes/connectors/tossinvest/tests/account-tools.test.ts` | 신규 |

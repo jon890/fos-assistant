@@ -20,7 +20,7 @@
 ## 의도 메모
 
 - 파일 이름은 커넥터가 정한다. 최종 이름은 `orders-<UTC yyyyMMddTHHmmssZ>-<무작위 8자 hex>.jsonl` 이고, 쓰는 동안의 임시 이름은 `.orders-<같은 꼬리>.tmp` 다. 모델이 준 이름이나 경로를 쓰지 않는다
-- 임시 파일은 `wx` 플래그로 연다. 다 쓴 뒤 `link(임시, 최종)` 으로 최종 이름을 만들고 임시 파일을 지운다. `link` 는 대상이 있으면 실패하므로 기존 파일을 덮지 않는다(`rename` 은 같은 이름의 파일을 바꿔 쓴다)
+- 임시 파일은 `wx` 플래그로 연다. 다 쓴 뒤 `link(임시, 최종)` 으로 최종 이름을 만들고 임시 파일을 지운다. `link` 는 대상이 있으면 실패하므로 기존 파일을 덮지 않는다(`rename` 은 같은 이름의 파일을 바꿔 쓴다). `link` 가 실패하면 임시 파일을 지우고 `TOSSINVEST_OUTPUT_UNAVAILABLE` 로 끝낸다
 - 기간 전체를 한 파일에 쓴다. `CLOSED` 는 100건씩 최대 20쪽(2,000건)이다. 21쪽째가 필요하면 임시 파일을 지우고 `TOSSINVEST_TOO_MANY_ORDERS` 로 끝낸다. 실패하면 어떤 경우든 임시 파일을 지우고, 일부만 쓴 최종 파일을 남기지 않는다. 프로세스가 죽어 남은 임시 파일은 아래 24시간 정리와 운영의 정기 정리가 지운다
 - 쪽 사이에 250ms 를 쉰다. 429 를 받으면 1초 쉬고 그 쪽을 한 번만 다시 부른다
 - 디렉터리 env 가 비었으면 요청 없이 `TOSSINVEST_OUTPUT_UNAVAILABLE`
@@ -39,7 +39,7 @@
 
 ### 2. `hermes/connectors/tossinvest/src/order-file.ts`
 
-- `writeOrdersFile(client, directory, query, timing = { now: () => new Date(), sleep: (ms) => Bun.sleep(ms) }): Promise<{file, count, from, to, fields}>`. `from` 과 `to` 는 받은 값이고 없으면 null 이다. `fields` 는 한 줄의 칸 이름 배열이다
+- `writeOrdersFile(client, directory, query, timing = { now: () => new Date(), sleep: (ms) => Bun.sleep(ms), random: () => <crypto.getRandomValues 로 만든 4바이트의 8자 hex> }): Promise<{file, count, from, to, fields}>`. `from` 과 `to` 는 받은 값이고 없으면 null 이다. `fields` 는 한 줄의 칸 이름 배열이다
 - 위 「의도 메모」 의 이름, 쪽 상한, 쉼, 429 한 번 재시도, 임시 파일과 `link`, 24시간 정리를 담는다
 - 한 줄의 칸 만들기는 phase 02 의 `list_orders` 결과 항목을 만드는 함수를 `account-tools.ts` 에서 내보내 함께 쓴다
 
@@ -62,7 +62,7 @@
 
 - 정상: `CLOSED` 세 쪽(100, 100, 7건)을 이어 207줄 파일 하나를 쓰고, 결과에 경로, 건수 207, 기간, 칸 목록만 있고 주문 내용이 없다. 파일의 각 줄이 JSON 이고 금액이 글이다
 - 21쪽이 필요하면 `TOSSINVEST_TOO_MANY_ORDERS` 이고 디렉터리에 `orders-` 파일과 `.orders-` 임시 파일이 남지 않는다
-- 같은 최종 이름의 파일이 이미 있으면(무작위 꼬리를 고정해 만든다) 덮지 않고 실패하며 기존 파일 내용이 그대로다
+- 같은 최종 이름의 파일이 이미 있으면(`timing.random` 과 `timing.now` 를 고정해 만든다) `TOSSINVEST_OUTPUT_UNAVAILABLE` 이고, 기존 파일 내용이 그대로이며 임시 파일이 남지 않는다
 - env 가 비었으면 요청 없이 `TOSSINVEST_OUTPUT_UNAVAILABLE`. 디렉터리가 링크면 같은 코드
 - 24시간 지난 `orders-*.jsonl` 과 `.orders-*.tmp` 는 지우고, 23시간 된 파일과 다른 이름의 파일, 링크는 남긴다
 - 한 쪽이 429 면 한 번 다시 불러 이어 쓴다. 다시 부른 쪽도 429 면 `TOSSINVEST_RATE_LIMITED` 이고 파일이 남지 않는다

@@ -1,6 +1,6 @@
 {
   "name": "plan109-tossinvest-connector",
-  "description": "토스증권 Open API 를 읽기 전용으로 부르는 범용 커넥터 tossinvest 를 hermes/connectors 에 더한다. 운영 코드가 pr-size 상한을 넘으면 phase 03(파일 출력)을 다음 PR 로 나눈다",
+  "description": "토스증권 Open API 를 읽기 전용으로 부르는 범용 커넥터 tossinvest 를 hermes/connectors 에 더한다. 이 브랜치는 바인딩 제한 PR 이 머지된 뒤 main 위로 올려 PR 을 연다. 그 전에 node scripts/pr-size.mjs origin/main HEAD 로 재고, 운영 코드가 상한을 넘으면 phase 03(파일 출력)을 다음 PR 로 나눈다",
   "status": "pending",
   "created_at": "2026-10-08",
   "total_phases": 3,
