@@ -26,6 +26,7 @@ class UserActivityMigrationTest {
         Flyway.configure()
                 .dataSource(url, "sa", "")
                 .locations("classpath:db/migration")
+                .target("20261008104500")
                 .load()
                 .migrate();
     }
@@ -41,12 +42,19 @@ class UserActivityMigrationTest {
                         """);
             }
 
-            try (ResultSet row = connection
+        }
+        Flyway.configure()
+                .dataSource(url, "sa", "")
+                .locations("classpath:db/migration")
+                .load()
+                .migrate();
+
+        try (Connection connection = DriverManager.getConnection(url, "sa", "");
+                ResultSet row = connection
                     .createStatement()
                     .executeQuery("SELECT last_login_at FROM allowed_person WHERE email = 'migration@example.com'")) {
-                assertThat(row.next()).isTrue();
-                assertThat(row.getObject(1)).isNull();
-            }
+            assertThat(row.next()).isTrue();
+            assertThat(row.getObject(1)).isNull();
             assertThat(indexColumns(connection.getMetaData(), "CHAT_MESSAGE", "IX_CHAT_MESSAGE_SENDER_ROLE_CREATED_AT"))
                     .containsExactly("SENDER_USER_ID", "ROLE", "CREATED_AT");
         }

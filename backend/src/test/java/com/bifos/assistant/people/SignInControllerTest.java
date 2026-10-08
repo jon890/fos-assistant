@@ -4,8 +4,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.bifos.assistant.people.domain.AllowedPerson;
 import com.bifos.assistant.people.infra.AllowedPersonRepository;
+import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.testsupport.BackendIntegrationTest;
 import com.bifos.assistant.testsupport.TestClock;
+import com.bifos.assistant.user.domain.AppUser;
 import com.bifos.assistant.user.infra.AppUserRepository;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
@@ -133,6 +135,10 @@ class SignInControllerTest {
                         .lastLoginAt())
                 .isEqualTo(second);
 
+        assertThat(complete(signInToken(), "mom@example.com").statusCode()).isEqualTo(204);
+        assertThat(people.findByEmailAndEnabledTrue("mom@example.com").orElseThrow().lastLoginAt())
+                .isEqualTo(second);
+
         clock.set(first.minusSeconds(60));
         assertThat(complete(signInToken(), "mom@example.com").statusCode()).isEqualTo(204);
         assertThat(people.findByEmailAndEnabledTrue("mom@example.com")
@@ -147,6 +153,24 @@ class SignInControllerTest {
                         .lastLoginAt())
                 .isEqualTo(second);
         assertThat(users.count()).isZero();
+    }
+
+    @Test
+    @DisplayName("일반 인증 요청은 기록된 로그인 시각을 갱신하지 않는다")
+    void ordinaryRequestDoesNotRecordAnotherLogin() throws Exception {
+        Instant login = Instant.parse("2026-10-08T01:00:00Z");
+        clock.set(login);
+        assertThat(complete(signInToken(), "mom@example.com").statusCode()).isEqualTo(204);
+        users.save(AppUser.of("mom@example.com", "사용자", 1L, UserRole.MEMBER, login));
+        clock.set(login.plusSeconds(60));
+
+        HttpResponse<String> response = client.send(HttpRequest.newBuilder(URI.create("http://127.0.0.1:" + port + "/api/v1/me"))
+                .header("Authorization", "Bearer " + conversationToken("mom@example.com"))
+                .GET().build(), HttpResponse.BodyHandlers.ofString());
+
+        assertThat(response.statusCode()).isEqualTo(200);
+        assertThat(people.findByEmailAndEnabledTrue("mom@example.com").orElseThrow().lastLoginAt())
+                .isEqualTo(login);
     }
 
     @Test
@@ -168,6 +192,7 @@ class SignInControllerTest {
         person.disable();
         people.save(person);
         assertThat(complete(signInToken(), "mom@example.com").statusCode()).isEqualTo(401);
+        assertThat(people.findById(person.id()).orElseThrow().lastLoginAt()).isNull();
         assertThat(users.count()).isZero();
     }
 

@@ -46,8 +46,8 @@ public final class PeopleDtos {
     /**
      * 관리 화면이 보는 한 사람이다.
      *
-     * @param joined 그 메일 주소의 {@code app_user} 가 있는가. 거짓이면 아직 한 번도 들어오지 않은
-     *     사람이고, 그 사람의 에이전트도 아직 없다
+     * @param joined 그 메일 주소의 {@code app_user} 가 있는가. 로그인 완료 기록만 있고 일반 요청으로
+     *     사용자와 기본 에이전트가 아직 만들어지지 않았으면 거짓이다
      */
     public record PersonView(
             Long id,
