@@ -49,9 +49,11 @@ async def env_view() -> dict:
 
     `attachments` 는 `owner_attachments_env` 를 `DEMO_ATTACHMENT_DIR` 로 선언한 시험이 받은 값이다. 없으면 null 이다.
     `output` 은 `owner_output_env` 를 `DEMO_OUTPUT_DIR` 로 선언한 시험이 받은 값이다. 없으면 null 이다.
+    `browser` 는 `owner_browser_env` 를 `DEMO_BROWSER_URL` 로 선언한 시험이 받은 값이다. 없으면 null 이다.
     """
     return {"names": sorted(os.environ), "path": os.environ.get("PATH", ""),
-            "attachments": os.environ.get("DEMO_ATTACHMENT_DIR"), "output": os.environ.get("DEMO_OUTPUT_DIR")}
+            "attachments": os.environ.get("DEMO_ATTACHMENT_DIR"), "output": os.environ.get("DEMO_OUTPUT_DIR"),
+            "browser": os.environ.get("DEMO_BROWSER_URL")}
 
 
 @server.tool(annotations=ToolAnnotations(read_only_hint=False))

@@ -57,6 +57,15 @@ OWNER_ATTACHMENTS_VALUE_RE = re.compile(r"^/[^$\0\r\n]*/users/[0-9a-f]{64}$")
 OWNER_OUTPUT_VALUE_RE = re.compile(r"^/[^$\0\r\n]*/users/[0-9a-f]{64}/[^/$\0\r\n]+/[^/$\0\r\n]+$")
 
 
+# 사용자 브라우저 중계 주소를 받을 env 에 설치와 확인 호출이 넣는 값의 모양이다.
+# `<gateway-base-url>/<접근 표식>` 이다. 이 모양이 아니면 빈 값을 넣는다(ADR-20261008 browser-gateway-token).
+OWNER_BROWSER_VALUE_RE = re.compile(r"^https?://[A-Za-z0-9.-]{1,253}(:[0-9]{1,5})?(/[A-Za-z0-9._~-]{1,128}){1,8}$")
+
+
+# 로그인 안내에 쓸 주소의 상한이다.
+OWNER_BROWSER_LOGIN_URL_MAX_CHARS = 512
+
+
 TOOL_NAME_RE = re.compile(r"^[A-Za-z0-9_.-]{1,128}$")
 
 

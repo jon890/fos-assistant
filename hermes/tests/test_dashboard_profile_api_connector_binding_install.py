@@ -258,3 +258,89 @@ class ProfileApiConnectorBindingInstallTest(support.ProfileApiRouteTest):
                                       full_response=True).body["connectors"][0]["enabled"], False)
         self.assertEqual(yaml.safe_load((self.root / "human/config.yaml").read_text())["platform_toolsets"],
                          {"api_server": ["web", "fos-assistant"]})
+
+
+# 바인딩 설치가 받는 브라우저 중계 주소의 모양이다. `<gateway-base-url>/<바인딩 표식>` 이다.
+BROWSER_ADDRESS = "http://cp.example.test/internal/browser-gateway/b1." + "a" * 64
+
+
+class ProfileApiConnectorBindingBrowserTest(support.ProfileApiRouteTest):
+    """`owner_browser_env` 를 선언한 커넥터의 바인딩 설치를 검사한다(ADR-20261008 browser-gateway-token)."""
+
+    def test_binding_writes_the_relay_address_into_the_server_definition(self):
+        """받은 중계 주소를 서버 정의 env 에 넣고 `.env` 에는 쓰지 않는다. 같은 주소로 다시 설치하면 재시작이 필요 없다."""
+        demo, _ = self.bind_fixture()
+        self.declare_owner_browser(demo)
+
+        response = self.bind(browser=BROWSER_ADDRESS)
+
+        self.assertEqual(response.status_code, 200, response.body)
+        server = self.alice_config()["mcp_servers"]["demo"]
+        self.assertEqual(server["env"]["DEMO_BROWSER_URL"], BROWSER_ADDRESS)
+        record = json.loads((self.root / "alice/.fos-connectors.json").read_text(encoding="utf-8"))
+        self.assertEqual(record[DEMO]["server"], server)
+        self.assertNotIn("DEMO_BROWSER_URL", (self.root / "alice/.env").read_text(encoding="utf-8"))
+        self.assertNotIn(BROWSER_ADDRESS, json.dumps(response.body))
+        self.assertIs(self.status_of()["connectors"][0]["configured"], True)
+        before = (self.root / "alice/config.yaml").read_bytes()
+
+        repeated = self.bind(browser=BROWSER_ADDRESS)
+
+        self.assertEqual(repeated.status_code, 200, repeated.body)
+        self.assertEqual({key: repeated.body[key] for key in ("changed", "restart_required")},
+                         {"changed": False, "restart_required": False})
+        self.assertEqual((self.root / "alice/config.yaml").read_bytes(), before)
+
+    def test_binding_without_an_address_writes_an_empty_value(self):
+        """중계가 꺼져 주소가 빈 값으로 오거나 오지 않아도 붙이기는 막지 않고 빈 값을 넣는다."""
+        demo, _ = self.bind_fixture()
+        self.declare_owner_browser(demo)
+
+        for label, browser in (("empty", ""), ("missing", None)):
+            with self.subTest(label):
+                response = self.bind(browser=browser)
+
+                self.assertEqual(response.status_code, 200, response.body)
+                self.assertEqual(self.alice_config()["mcp_servers"]["demo"]["env"]["DEMO_BROWSER_URL"], "")
+                self.assertIs(self.status_of()["connectors"][0]["configured"], True)
+
+    def test_connector_without_the_declaration_ignores_the_address(self):
+        """선언하지 않은 커넥터는 주소를 받아도 서버 정의 env 에 이름을 더하지 않는다."""
+        self.bind_fixture()
+
+        response = self.bind(browser=BROWSER_ADDRESS)
+
+        self.assertEqual(response.status_code, 200, response.body)
+        self.assertNotIn("DEMO_BROWSER_URL", self.alice_config()["mcp_servers"]["demo"]["env"])
+
+    def test_malformed_address_is_rejected_before_anything_changes(self):
+        """문자열이 아니거나 중계 주소 모양이 아닌 `owner_browser` 는 400 이고 profile 을 바꾸지 않는다."""
+        demo, _ = self.bind_fixture()
+        self.declare_owner_browser(demo)
+        before = self.tree("alice")
+        for label, value in (
+            ("not a string", 1),
+            ("ftp scheme", "ftp://cp.example.test/internal/browser-gateway/b1"),
+            ("no path", "http://cp.example.test"),
+            ("query", BROWSER_ADDRESS + "?x=1"),
+            ("trailing newline", BROWSER_ADDRESS + "\n"),
+        ):
+            with self.subTest(label):
+                self.assertEqual(self.bind(browser=value).status_code, 400)
+                self.assertEqual(self.tree("alice"), before)
+
+    def test_vault_with_a_field_no_longer_declared_still_binds(self):
+        """지금 manifest 에 없는 칸이 남은 보관 파일로도 설치된다. 남은 칸만 `.env` 에 쓴다. 보관 파일을 쓰는 검사는 그대로 거절한다."""
+        self.bind_fixture()
+        vault = self.hermes_root / "connector-vault" / "c3.json"
+        vault.write_text(json.dumps({"v": 1, "connector": DEMO,
+                                     "values": {"token": DEMO_VALUE, "retired": "old-value"}}), encoding="utf-8")
+
+        response = self.bind(vault="c3")
+
+        self.assertEqual(response.status_code, 200, response.body)
+        env = (self.root / "alice/.env").read_text(encoding="utf-8")
+        self.assertIn("DEMO_TOKEN=" + DEMO_VALUE, env.splitlines())
+        self.assertNotIn("old-value", env)
+        written = self.vault("PUT", vault="c4", connector=DEMO, values={"token": DEMO_VALUE, "retired": "old-value"})
+        self.assertEqual(written.status_code, 400)

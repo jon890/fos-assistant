@@ -39,6 +39,7 @@ from .connector_schema import (
     BIND_MODE,
     CONNECTOR_ID_RE,
     CONNECTOR_STATE,
+    OWNER_BROWSER_VALUE_RE,
 )
 
 from .connector_state import (
@@ -118,17 +119,24 @@ async def _connector_request(request):
         # `bind` 는 바인딩 설치에서만 뜻이 있다. 떼기는 소유 기록의 설치 방식을 따른다.
         # `sandbox_owner` 는 사진 도구를 여는 옛 설치와, 사용자 첨부를 읽는 커넥터의 바인딩 설치에서 쓴다(ADR-091, ADR-20261007 connector-owner-attachments).
         # 바인딩 설치는 API 도구 목록의 내장 toolset 을 바꾸지 않는다. 그 값으로 주인의 첨부 디렉터리만 정한다.
+        # `owner_browser` 는 그 바인딩의 브라우저 중계 주소다. 선언한 커넥터의 바인딩 설치만 쓴다(ADR-20261008 browser-gateway-token).
         if (body is None
-                or not {"profile", "plugin", "enabled"} <= set(body) <= {"profile", "plugin", "enabled", "bind", "sandbox_owner"}
+                or not {"profile", "plugin", "enabled"} <= set(body)
+                <= {"profile", "plugin", "enabled", "bind", "sandbox_owner", "owner_browser"}
                 or not isinstance(body["plugin"], str) or not CONNECTOR_ID_RE.match(body["plugin"])
                 or not isinstance(body["enabled"], bool)
                 or (body["enabled"] and body["plugin"] not in roots)
                 or ("bind" in body and (not isinstance(bind, dict) or set(bind) != {"vault"}
                                         or not isinstance(bind["vault"], str) or not VAULT_ID_RE.match(bind["vault"])))):
-            return _rejected("profile, 알려진 plugin, enabled 와 바인딩이면 bind.vault, 그리고 sandbox_owner 만 받는다")
+            return _rejected("profile, 알려진 plugin, enabled 와 바인딩이면 bind.vault, 그리고 sandbox_owner, owner_browser 만 받는다")
         owner = body.get("sandbox_owner")
         if owner is not None and not (isinstance(owner, str) and SANDBOX_OWNER_RE.match(owner)):
             return _rejected("sandbox_owner 형식이 올바르지 않다")
+        # 중계가 꺼진 Control Plane 은 빈 값을 보낸다. 설치는 막지 않고 빈 값을 넣는다.
+        if "owner_browser" in body and not (isinstance(body["owner_browser"], str)
+                                            and (body["owner_browser"] == ""
+                                                 or OWNER_BROWSER_VALUE_RE.fullmatch(body["owner_browser"]))):
+            return _rejected("owner_browser 형식이 올바르지 않다")
     profile = body["profile"]
     rejected = _profile_rejection(profile, request)
     if rejected is not None:
@@ -216,7 +224,9 @@ async def _connector_request(request):
             stored = await asyncio.to_thread(_read_vault, body["bind"]["vault"])
             if stored is None or stored["connector"] != body["plugin"]:
                 return _rejected("그 connector 의 보관 파일이 없다")
-            values = _vault_values(manifest, stored["values"])
+            # 지금 manifest 에 없는 칸은 버린다. 칸을 뺀 커넥터의 옛 연결도 다시 설치된다. 남은 값은 지금처럼 검사한다.
+            fields = {field["key"] for field in manifest["fields"]}
+            values = _vault_values(manifest, {key: value for key, value in stored["values"].items() if key in fields})
             if values is None:
                 return _rejected("보관 파일의 값이 지금 칸 선언과 맞지 않는다")
             owner_output = None
@@ -234,7 +244,8 @@ async def _connector_request(request):
                                        type(error).__name__)
             stage = "bind"
             result = await asyncio.to_thread(_connector_bind_config, profile_dir, body["plugin"], True,
-                                             body["bind"]["vault"], values, owner_attachments, owner_output)
+                                             body["bind"]["vault"], values, owner_attachments, owner_output,
+                                             body.get("owner_browser"))
             return JSONResponse({**response, **result}, status_code=200)
         if unbind:
             stage = "bind"

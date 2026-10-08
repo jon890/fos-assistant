@@ -1,9 +1,11 @@
 package com.bifos.assistant.connector.application;
 
+import com.bifos.assistant.browser.application.BrowserGatewayTokens;
 import com.bifos.assistant.connector.domain.ConnectorBinding;
 import com.bifos.assistant.hermes.HermesConnectorClient;
 import com.bifos.assistant.hermes.HermesConnectorClient.ConnectorState;
 import com.bifos.assistant.hermes.HermesConnectorClient.InstallResult;
+import com.bifos.assistant.hermes.dto.ConnectorManifest;
 import java.time.Instant;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -18,19 +20,31 @@ import org.springframework.stereotype.Component;
 public class ConnectorBindingInstalls {
     private final HermesConnectorClient connector;
     private final ConnectorBindingProperties properties;
+    private final BrowserGatewayTokens tokens;
 
     /** 설치를 그 방식대로 한 번 다시 보내고 대시보드의 답을 돌려준다. 답을 읽는 규칙은 {@link #record} 가 갖는다. */
-    InstallResult sendAgain(ConnectorBinding binding, String connectorId, boolean legacy) {
+    InstallResult sendAgain(ConnectorBinding binding, ConnectorManifest manifest, boolean legacy) {
         String profile = binding.agent().hermesProfile();
         if (legacy) {
             return connector.putConnector(
-                    profile, connectorId, true, binding.agent().sandboxOwner());
+                    profile, manifest.id(), true, binding.agent().sandboxOwner());
         }
         return connector.bindConnector(
                 profile,
-                connectorId,
+                manifest.id(),
                 binding.connection().vault(),
-                binding.agent().sandboxOwner());
+                binding.agent().sandboxOwner(),
+                ownerBrowser(binding, manifest));
+    }
+
+    /**
+     * 바인딩 설치에 실을 브라우저 중계 주소다. 사용자 브라우저를 쓰지 않는 커넥터는 null 이라 본문에 키가 없다.
+     *
+     * <p>주소에는 그 바인딩의 표식이 들어간다. 같은 바인딩은 늘 같은 주소라 다시 설치해도 서버 정의가 바뀌지 않는다. 중계가 꺼졌으면
+     * 빈 값이다. 설치는 막지 않고 커넥터가 브라우저에 닿지 못한다고 답한다(ADR-20261008 / browser-gateway-token).
+     */
+    String ownerBrowser(ConnectorBinding binding, ConnectorManifest manifest) {
+        return manifest.ownerBrowser() ? tokens.bindingAddress(binding.id()).orElse("") : null;
     }
 
     /**

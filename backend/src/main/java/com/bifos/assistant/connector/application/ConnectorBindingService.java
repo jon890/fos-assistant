@@ -205,7 +205,11 @@ public class ConnectorBindingService implements AgentConnectorDetacher {
         binding.beginInstall(now);
         try {
             InstallResult installed = connector.bindConnector(
-                    agent.hermesProfile(), connectorId, connection.vault(), agent.sandboxOwner());
+                    agent.hermesProfile(),
+                    connectorId,
+                    connection.vault(),
+                    agent.sandboxOwner(),
+                    installs.ownerBrowser(binding, declared));
             installs.record(binding, installed, false, now);
         } catch (ConnectorInstallConflict ex) {
             throw new ApiException(
@@ -396,7 +400,11 @@ public class ConnectorBindingService implements AgentConnectorDetacher {
                 binding.installed(restart || installed.restartRequired() || installed.pluginUpdated(), now);
             } else {
                 InstallResult installed = connector.bindConnector(
-                        profile, manifest.id(), binding.connection().vault(), agent.sandboxOwner());
+                        profile,
+                        manifest.id(),
+                        binding.connection().vault(),
+                        agent.sandboxOwner(),
+                        installs.ownerBrowser(binding, manifest));
                 installs.record(binding, installed, false, now);
             }
             if (binding.mcpServer() == null) {
@@ -479,7 +487,7 @@ public class ConnectorBindingService implements AgentConnectorDetacher {
                 return false;
             }
             step = STEP_INSTALL;
-            if (installs.record(binding, installs.sendAgain(binding, declared.id(), legacy), legacy, now)) {
+            if (installs.record(binding, installs.sendAgain(binding, declared, legacy), legacy, now)) {
                 return false;
             }
             step = STEP_INSTALL_STATE;

@@ -10,6 +10,7 @@ import com.bifos.assistant.hermes.dto.ConnectorTool;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -41,6 +42,8 @@ public class HttpHermesConnectorClient implements HermesConnectorClient {
     private static final String RESTART_REQUIRED = "restart_required";
     private static final String VAULT = "vault";
     private static final String CONNECTOR = "connector";
+    private static final String TOOL = "tool";
+    private static final String OWNER_BROWSER = "owner_browser";
     private static final String VAULT_PATH = "/api/connector-vault";
     private static final int HTTP_CONFLICT = 409;
     private static final int HTTP_UNAUTHORIZED = 401;
@@ -91,27 +94,34 @@ public class HttpHermesConnectorClient implements HermesConnectorClient {
     }
 
     @Override
-    public CallResult call(String connectorId, String tool, Map<String, String> values) {
+    public CallResult call(String connectorId, String tool, Map<String, String> values, String ownerBrowser) {
+        return postCall(connectorId, withOwnerBrowser(Map.of(TOOL, tool, "values", values), ownerBrowser));
+    }
+
+    @Override
+    public CallResult callWithVault(String connectorId, String tool, String vault, String ownerBrowser) {
+        return postCall(connectorId, withOwnerBrowser(Map.of(TOOL, tool, VAULT, vault), ownerBrowser));
+    }
+
+    private CallResult postCall(String connectorId, Map<String, Object> request) {
         JsonNode body = request(() -> client.post()
                 .uri(baseUrl + "/api/connectors/{id}/call", connectorId)
                 .header(AUTHORIZATION, bearer())
                 .contentType(MediaType.APPLICATION_JSON)
-                .body(Map.of("tool", tool, "values", values))
+                .body(request)
                 .retrieve()
                 .body(JsonNode.class));
         return callResult(body);
     }
 
-    @Override
-    public CallResult callWithVault(String connectorId, String tool, String vault) {
-        JsonNode body = request(() -> client.post()
-                .uri(baseUrl + "/api/connectors/{id}/call", connectorId)
-                .header(AUTHORIZATION, bearer())
-                .contentType(MediaType.APPLICATION_JSON)
-                .body(Map.of("tool", tool, VAULT, vault))
-                .retrieve()
-                .body(JsonNode.class));
-        return callResult(body);
+    /** 중계 주소가 null 이면 키를 싣지 않는다. 사용자 브라우저를 쓰지 않는 커넥터의 요청 본문은 그대로다. */
+    private static Map<String, Object> withOwnerBrowser(Map<String, Object> request, String ownerBrowser) {
+        if (ownerBrowser == null) {
+            return request;
+        }
+        Map<String, Object> body = new LinkedHashMap<>(request);
+        body.put(OWNER_BROWSER, ownerBrowser);
+        return body;
     }
 
     private static CallResult callResult(JsonNode body) {
@@ -247,7 +257,8 @@ public class HttpHermesConnectorClient implements HermesConnectorClient {
     }
 
     @Override
-    public InstallResult bindConnector(String profile, String connectorId, String vault, String sandboxOwner) {
+    public InstallResult bindConnector(
+            String profile, String connectorId, String vault, String sandboxOwner, String ownerBrowser) {
         // 대시보드는 주인의 첨부 디렉터리를 만들지 않고 링크 없이 있는지만 본다(ADR-091, ADR-20261007 connector-owner-attachments).
         // 만들기는 최선 노력이다. 첨부를 선언하지 않은 커넥터의 붙이기가 첨부 루트 문제로 멈추지 않게 하고, 선언한 커넥터는
         // 대시보드가 디렉터리를 확인하지 못해 409 로 거절하므로 경계는 그대로다.
@@ -257,17 +268,19 @@ public class HttpHermesConnectorClient implements HermesConnectorClient {
             log.warn("커넥터 주인의 첨부 디렉터리를 만들지 못해 확인을 대시보드에 맡긴다 profile={} connector={}", profile, connectorId);
         }
         return refusable(
-                Map.of(
-                        PROFILE,
-                        profile,
-                        PLUGIN,
-                        connectorId,
-                        ENABLED,
-                        true,
-                        "bind",
-                        Map.of(VAULT, vault),
-                        "sandbox_owner",
-                        sandboxOwner),
+                withOwnerBrowser(
+                        Map.of(
+                                PROFILE,
+                                profile,
+                                PLUGIN,
+                                connectorId,
+                                ENABLED,
+                                true,
+                                "bind",
+                                Map.of(VAULT, vault),
+                                "sandbox_owner",
+                                sandboxOwner),
+                        ownerBrowser),
                 profile,
                 connectorId,
                 true);
@@ -443,7 +456,15 @@ public class HttpHermesConnectorClient implements HermesConnectorClient {
                 readable ? schema(schema) : SCHEMA_UNREADABLE,
                 readable ? tools(tools) : List.of(),
                 names(item.get("skills")),
-                ConnectorAppearances.read(item));
+                ConnectorAppearances.read(item),
+                optionalBoolean(item, "owner_browser", false),
+                loginUrl(item));
+    }
+
+    /** 로그인 안내 주소다. 문자열이고 {@code https://} 로 시작할 때만 읽고, 아니면 null 이다. 카탈로그 전체를 버리지 않는다. */
+    private static String loginUrl(JsonNode item) {
+        String value = text(item, "owner_browser_login_url");
+        return value != null && value.startsWith("https://") ? value : null;
     }
 
     private static boolean readableSchema(JsonNode declared) {

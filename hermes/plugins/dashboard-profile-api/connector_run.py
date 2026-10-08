@@ -49,6 +49,7 @@ from .connector_schema import (
     CONNECTOR_STATE,
     OUTCOME_UNKNOWN,
     OWNER_ATTACHMENTS_VALUE_RE,
+    OWNER_BROWSER_VALUE_RE,
 )
 
 from .connector_state import (
@@ -84,6 +85,8 @@ async def _connector_call_request(request, connector_id: str):
     """후보 값이나 보관 파일의 값으로 선택지 도구나 확인 도구를 한 번 부른다. 값을 디스크와 응답과 로그에 남기지 않는다.
 
     본문은 `values` 와 `vault` 가운데 정확히 하나를 갖는다. `vault` 는 그 커넥터의 보관 파일이어야 한다.
+    보관 파일의 키 가운데 지금 manifest 의 칸에 없는 것은 버린다. 칸을 뺀 커넥터의 옛 연결도 확인된다.
+    `owner_browser` 는 선택이다. 요청자의 호출 표식을 실은 중계 주소이고, `owner_browser_env` 를 선언한 커넥터만 쓴다.
     """
     from starlette.responses import JSONResponse
     global _connector_calls
@@ -95,7 +98,7 @@ async def _connector_call_request(request, connector_id: str):
     if manifest is None:
         return _rejected("없는 connector 다", 404)
     body = await _json_object(request)
-    if (body is None or set(body) not in ({"tool", "values"}, {"tool", "vault"})
+    if (body is None or set(body) - {"owner_browser"} not in ({"tool", "values"}, {"tool", "vault"})
             or ("values" in body and not isinstance(body["values"], dict))
             or ("vault" in body and (not isinstance(body["vault"], str) or not VAULT_ID_RE.match(body["vault"])))):
         return _rejected("tool 과, values 나 vault 가운데 하나만 필요하다")
@@ -111,7 +114,8 @@ async def _connector_call_request(request, connector_id: str):
             return failed("unavailable")
         if stored is None or stored["connector"] != connector_id:
             return _rejected("이 커넥터의 보관 파일이 없다")
-        candidates = stored["values"]
+        known = {field["key"] for field in manifest["fields"]}
+        candidates = {key: value for key, value in stored["values"].items() if key in known}
     else:
         candidates = body["values"]
     fields = {field["key"]: field for field in manifest["fields"]}
@@ -132,6 +136,11 @@ async def _connector_call_request(request, connector_id: str):
     if manifest["owner_output_env"] is not None:
         # 확인 도구와 선택지는 파일을 내지 않는다(ADR-20261008 connector-output-files).
         env[manifest["owner_output_env"]] = ""
+    if manifest["owner_browser_env"] is not None:
+        # 바인딩이 없는 호출이라 요청자의 호출 표식 주소를 쓴다. 없거나 모양이 틀리면 빈 값이다(ADR-20261008 browser-gateway-token).
+        owner_browser = body.get("owner_browser")
+        env[manifest["owner_browser_env"]] = (
+            owner_browser if isinstance(owner_browser, str) and OWNER_BROWSER_VALUE_RE.fullmatch(owner_browser) else "")
     # 대시보드 프로세스의 PATH 를 물려주지 않는다. 실행 파일이 있는 디렉터리만 준다.
     env["PATH"] = os.path.dirname(server["command"])
 
@@ -199,6 +208,26 @@ def _installed_owner_attachments(profile_dir: pathlib.Path, manifest: dict) -> s
     return value
 
 
+def _installed_owner_browser(profile_dir: pathlib.Path, manifest: dict) -> str:
+    """그 profile 에 설치한 서버 정의(`config.yaml` 의 `mcp_servers`)가 가진 브라우저 중계 주소다.
+
+    바인딩 설치가 그 바인딩의 표식으로 넣은 값이다. 값이 없거나 `<gateway-base-url>/<접근 표식>` 모양이 아니면 빈 값이다.
+    빈 값을 받은 커넥터는 브라우저에 닿지 못한다고 답한다(ADR-20261008 browser-gateway-token).
+    """
+    import yaml
+    config_path = profile_dir / "config.yaml"
+    if config_path.is_symlink() or not config_path.is_file():
+        return ""
+    config = yaml.safe_load(config_path.read_text(encoding="utf-8")) or {}
+    servers = config.get("mcp_servers") if isinstance(config, dict) else None
+    server = servers.get(manifest["mcp_server"]) if isinstance(servers, dict) else None
+    env = server.get("env") if isinstance(server, dict) else None
+    value = env.get(manifest["owner_browser_env"]) if isinstance(env, dict) else None
+    if not isinstance(value, str) or not OWNER_BROWSER_VALUE_RE.fullmatch(value):
+        return ""
+    return value
+
+
 async def _connector_execute_request(request, connector_id: str):
     """Control Plane 이 승인한 호출을 그 profile 의 값과 받은 인자로 한 번 실행한다(ADR-050).
 
@@ -247,6 +276,8 @@ async def _connector_execute_request(request, connector_id: str):
         env_text = env_path.read_text(encoding="utf-8") if env_path.is_file() else ""
         owner_attachments = (_installed_owner_attachments(profile_dir, manifest)
                              if manifest["owner_attachments_env"] is not None else None)
+        owner_browser = (_installed_owner_browser(profile_dir, manifest)
+                         if manifest["owner_browser_env"] is not None else None)
     except Exception as error:
         # 자식을 띄우기 전이다. 실행되지 않았다. profile 의 값이 섞일 수 있어 예외의 종류만 남긴다.
         logger.warning("dashboard-profile-api: 커넥터 %s 를 실행할 profile 을 확인하지 못했다: %s",
@@ -261,6 +292,8 @@ async def _connector_execute_request(request, connector_id: str):
     if manifest["owner_output_env"] is not None:
         # 승인한 쓰기는 파일을 내지 않는다. 파일 출력은 승인 없이 도는 읽기 도구만 쓴다(ADR-20261008 connector-output-files).
         env[manifest["owner_output_env"]] = ""
+    if owner_browser is not None:
+        env[manifest["owner_browser_env"]] = owner_browser
     # 대시보드 프로세스의 PATH 를 물려주지 않는다. 실행 파일이 있는 디렉터리만 준다.
     env["PATH"] = os.path.dirname(server["command"])
 

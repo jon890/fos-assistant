@@ -8,7 +8,9 @@ import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.nullable;
 import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.doThrow;
@@ -24,6 +26,7 @@ import com.bifos.assistant.agent.domain.type.AgentVisibility;
 import com.bifos.assistant.agent.domain.type.CostMode;
 import com.bifos.assistant.agent.domain.type.CredentialScope;
 import com.bifos.assistant.agent.infra.AgentRepository;
+import com.bifos.assistant.browser.application.BrowserGatewayTokens;
 import com.bifos.assistant.connector.application.ConnectorBindingApplier;
 import com.bifos.assistant.connector.application.ConnectorBindingService;
 import com.bifos.assistant.connector.application.ConnectorConnectionService;
@@ -48,6 +51,7 @@ import com.bifos.assistant.hermes.HermesSkillClient;
 import com.bifos.assistant.hermes.HermesSkillClient.HermesSkill;
 import com.bifos.assistant.hermes.HermesToolsetClient;
 import com.bifos.assistant.hermes.dto.CallResult;
+import com.bifos.assistant.hermes.dto.ConnectorAppearance;
 import com.bifos.assistant.hermes.dto.ConnectorField;
 import com.bifos.assistant.hermes.dto.ConnectorManifest;
 import com.bifos.assistant.hermes.dto.ConnectorTool;
@@ -56,6 +60,7 @@ import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.testsupport.BackendIntegrationTest;
+import com.bifos.assistant.testsupport.OverrideProperties;
 import com.bifos.assistant.user.domain.AppUser;
 import com.bifos.assistant.user.infra.AppUserRepository;
 import java.nio.ByteBuffer;
@@ -90,11 +95,19 @@ import tools.jackson.databind.json.JsonMapper;
  * 차례를 볼 수 있다. 대시보드의 커넥터, 스킬, 도구 목록 경로만 대역이다.
  */
 @BackendIntegrationTest
+@OverrideProperties({
+    "assistant.browser.gateway-base-url=" + ConnectorBindingServiceTest.GATEWAY,
+    "assistant.browser.gateway-secret=0123456789abcdef0123456789abcdef-binding"
+})
 class ConnectorBindingServiceTest {
+    /** 브라우저 중계의 주소 앞부분이다. 중계를 켜야 사용자 브라우저를 쓰는 커넥터에 주소가 실린다. */
+    static final String GATEWAY = "http://cp.example.test/internal/browser-gateway";
+
     private static final JsonMapper MAPPER = JsonMapper.builder().build();
     private static final String DEMO = "demo-notes";
     private static final String PLAIN = "demo-plain";
     private static final String SKILLED = "demo-skilled";
+    private static final String BROWSER = "demo-browser";
     private static final String TOKEN = "demo_ok_0123456789";
     private static final Map<String, String> VALUES = Map.of("token", TOKEN);
     private static final ConnectorManifest DEMO_MANIFEST = new ConnectorManifest(
@@ -127,6 +140,22 @@ class ConnectorBindingServiceTest {
             1,
             List.of(),
             List.of("demo-guide"));
+    /** 사용자 브라우저를 쓰는 커넥터다(ADR-20261008 / browser-gateway-token). */
+    private static final ConnectorManifest BROWSER_MANIFEST = new ConnectorManifest(
+            BROWSER,
+            "브라우저 메모",
+            "",
+            List.of(),
+            "ping",
+            "browser",
+            List.of(),
+            false,
+            1,
+            List.of(),
+            List.of(),
+            ConnectorAppearance.NONE,
+            true,
+            "https://login.example.test/sign-in");
     /** 설정의 반영 예정 지연 기본값이다. gateway 의 MCP 설정 맞추기 60초 두 주기와 연결 시간이다. */
     private static final Duration APPLY_DELAY = Duration.ofSeconds(150);
     /** 이 시각 뒤의 설치는 모두 관리자가 본 뒤의 설치다. */
@@ -171,12 +200,16 @@ class ConnectorBindingServiceTest {
     @Autowired
     HermesToolsetClient toolsets;
 
+    @Autowired
+    BrowserGatewayTokens tokens;
+
     @BeforeEach
     void setUp() {
-        when(connector.readCatalog()).thenReturn(List.of(DEMO_MANIFEST, PLAIN_MANIFEST, SKILLED_MANIFEST));
-        when(connector.call(anyString(), anyString(), anyMap()))
+        when(connector.readCatalog())
+                .thenReturn(List.of(DEMO_MANIFEST, PLAIN_MANIFEST, SKILLED_MANIFEST, BROWSER_MANIFEST));
+        when(connector.call(anyString(), anyString(), anyMap(), nullable(String.class)))
                 .thenReturn(CallResult.success(MAPPER.readTree("{\"ok\":true}")));
-        when(connector.bindConnector(anyString(), anyString(), anyString(), anyString()))
+        when(connector.bindConnector(anyString(), anyString(), anyString(), anyString(), nullable(String.class)))
                 .thenReturn(new InstallResult(true, false));
         when(connector.unbindConnector(anyString(), anyString())).thenReturn(new InstallResult(false, false));
         when(connector.putConnector(anyString(), anyString(), anyBoolean(), anyString()))
@@ -207,7 +240,7 @@ class ConnectorBindingServiceTest {
         AgentConnectionView bound = service.bind(owner, agent.code(), DEMO);
 
         verify(connector, times(1))
-                .bindConnector(agent.hermesProfile(), DEMO, connection.vault(), agent.sandboxOwner());
+                .bindConnector(agent.hermesProfile(), DEMO, connection.vault(), agent.sandboxOwner(), null);
         assertThat(bound.bound()).isTrue();
         assertThat(bound.status()).isEqualTo(BindingStatus.PENDING);
         assertThat(bound.restartRequired()).isTrue();
@@ -221,7 +254,8 @@ class ConnectorBindingServiceTest {
         assertThat(service.bind(owner, agent.code(), DEMO).status())
                 .as("다시 붙이기")
                 .isEqualTo(BindingStatus.PENDING);
-        verify(connector, times(1)).bindConnector(anyString(), anyString(), anyString(), anyString());
+        verify(connector, times(1))
+                .bindConnector(anyString(), anyString(), anyString(), anyString(), nullable(String.class));
     }
 
     @Test
@@ -230,7 +264,7 @@ class ConnectorBindingServiceTest {
         CurrentUser owner = user(UserRole.MEMBER, 1L);
         connect(owner, DEMO, VALUES);
         Agent agent = agent(owner, AgentVisibility.PRIVATE);
-        when(connector.bindConnector(anyString(), anyString(), anyString(), anyString()))
+        when(connector.bindConnector(anyString(), anyString(), anyString(), anyString(), nullable(String.class)))
                 .thenReturn(new InstallResult(false, false, true));
 
         Instant before = Instant.now();
@@ -255,17 +289,18 @@ class ConnectorBindingServiceTest {
         CurrentUser owner = user(UserRole.MEMBER, 1L);
         connect(owner, DEMO, VALUES);
         Agent agent = agent(owner, AgentVisibility.PRIVATE);
-        when(connector.bindConnector(anyString(), anyString(), anyString(), anyString()))
+        when(connector.bindConnector(anyString(), anyString(), anyString(), anyString(), nullable(String.class)))
                 .thenReturn(new InstallResult(false, false, true));
         service.bind(owner, agent.code(), DEMO);
         Instant due = onlyBinding().applyDueAt();
-        when(connector.callWithVault(anyString(), anyString(), anyString()))
+        when(connector.callWithVault(anyString(), anyString(), anyString(), nullable(String.class)))
                 .thenReturn(CallResult.success(MAPPER.readTree("{\"ok\":true}")));
         clearInvocations(connector);
 
         connectionService.check(owner, DEMO);
 
-        verify(connector, never()).bindConnector(anyString(), anyString(), anyString(), anyString());
+        verify(connector, never())
+                .bindConnector(anyString(), anyString(), anyString(), anyString(), nullable(String.class));
         verify(connector, never()).probe(anyString(), anyString());
         ConnectorBinding stored = onlyBinding();
         assertThat(stored.status()).isEqualTo(BindingStatus.PENDING);
@@ -278,20 +313,20 @@ class ConnectorBindingServiceTest {
         CurrentUser owner = user(UserRole.MEMBER, 1L);
         connect(owner, DEMO, VALUES);
         Agent agent = agent(owner, AgentVisibility.PRIVATE);
-        when(connector.bindConnector(anyString(), anyString(), anyString(), anyString()))
+        when(connector.bindConnector(anyString(), anyString(), anyString(), anyString(), nullable(String.class)))
                 .thenReturn(new InstallResult(false, false, true));
         service.bind(owner, agent.code(), DEMO);
         assertThat(applier.applyDue()).as("예정 시각 전").isZero();
         jdbc.update("UPDATE agent_connector_binding SET apply_due_at = ?", Timestamp.from(LONG_AGO));
         // gateway 가 이미 연결했으므로 다시 보낸 설치는 바뀐 것이 없다.
-        when(connector.bindConnector(anyString(), anyString(), anyString(), anyString()))
+        when(connector.bindConnector(anyString(), anyString(), anyString(), anyString(), nullable(String.class)))
                 .thenReturn(new InstallResult(false, false));
         clearInvocations(connector);
 
         assertThat(applier.applyDue()).isEqualTo(1);
 
         InOrder order = inOrder(connector);
-        order.verify(connector).bindConnector(anyString(), eq(DEMO), anyString(), anyString());
+        order.verify(connector).bindConnector(anyString(), eq(DEMO), anyString(), anyString(), nullable(String.class));
         order.verify(connector).readConnector(agent.hermesProfile(), DEMO);
         order.verify(connector).probe(agent.hermesProfile(), "demo");
         ConnectorBinding stored = onlyBinding();
@@ -306,11 +341,11 @@ class ConnectorBindingServiceTest {
         CurrentUser owner = user(UserRole.MEMBER, 1L);
         connect(owner, DEMO, VALUES);
         Agent agent = agent(owner, AgentVisibility.PRIVATE);
-        when(connector.bindConnector(anyString(), anyString(), anyString(), anyString()))
+        when(connector.bindConnector(anyString(), anyString(), anyString(), anyString(), nullable(String.class)))
                 .thenReturn(new InstallResult(false, false, true));
         service.bind(owner, agent.code(), DEMO);
         jdbc.update("UPDATE agent_connector_binding SET apply_due_at = ?", Timestamp.from(LONG_AGO));
-        when(connector.bindConnector(anyString(), anyString(), anyString(), anyString()))
+        when(connector.bindConnector(anyString(), anyString(), anyString(), anyString(), nullable(String.class)))
                 .thenReturn(new InstallResult(false, false));
         when(connector.probe(anyString(), anyString())).thenReturn(new ProbeResult(false, List.of()));
 
@@ -321,7 +356,8 @@ class ConnectorBindingServiceTest {
         assertThat(stored.applyDueAt()).isNull();
         clearInvocations(connector);
         assertThat(applier.applyDue()).as("다시 부르기").isZero();
-        verify(connector, never()).bindConnector(anyString(), anyString(), anyString(), anyString());
+        verify(connector, never())
+                .bindConnector(anyString(), anyString(), anyString(), anyString(), nullable(String.class));
     }
 
     @Test
@@ -330,7 +366,7 @@ class ConnectorBindingServiceTest {
         CurrentUser owner = user(UserRole.MEMBER, 1L);
         connect(owner, DEMO, VALUES);
         Agent agent = agent(owner, AgentVisibility.PRIVATE);
-        when(connector.bindConnector(anyString(), anyString(), anyString(), anyString()))
+        when(connector.bindConnector(anyString(), anyString(), anyString(), anyString(), nullable(String.class)))
                 .thenReturn(new InstallResult(false, false, true));
         service.bind(owner, agent.code(), DEMO);
         jdbc.update("UPDATE agent_connector_binding SET apply_due_at = ?", Timestamp.from(LONG_AGO));
@@ -359,7 +395,8 @@ class ConnectorBindingServiceTest {
 
         assertThat(applier.applyDue()).isZero();
 
-        verify(connector, never()).bindConnector(anyString(), anyString(), anyString(), anyString());
+        verify(connector, never())
+                .bindConnector(anyString(), anyString(), anyString(), anyString(), nullable(String.class));
         ConnectorBinding stored = onlyBinding();
         assertThat(stored.status()).isEqualTo(BindingStatus.PENDING);
         assertThat(stored.restartRequired()).isTrue();
@@ -371,7 +408,7 @@ class ConnectorBindingServiceTest {
         CurrentUser owner = user(UserRole.MEMBER, 1L);
         connect(owner, DEMO, VALUES);
         Agent agent = agent(owner, AgentVisibility.PRIVATE);
-        when(connector.bindConnector(anyString(), anyString(), anyString(), anyString()))
+        when(connector.bindConnector(anyString(), anyString(), anyString(), anyString(), nullable(String.class)))
                 .thenReturn(new InstallResult(false, false, true));
         service.bind(owner, agent.code(), DEMO);
         jdbc.update("UPDATE agent_connector_binding SET apply_due_at = ?", Timestamp.from(LONG_AGO));
@@ -380,7 +417,8 @@ class ConnectorBindingServiceTest {
 
         assertThat(applier.applyDue()).as("지워진 에이전트는 대상이 아니다").isZero();
 
-        verify(connector, never()).bindConnector(anyString(), anyString(), anyString(), anyString());
+        verify(connector, never())
+                .bindConnector(anyString(), anyString(), anyString(), anyString(), nullable(String.class));
         verify(connector, never()).probe(anyString(), anyString());
         ConnectorBinding stored = onlyBinding();
         assertThat(stored.applyDueAt()).as("비운 예정").isNull();
@@ -394,7 +432,7 @@ class ConnectorBindingServiceTest {
         CurrentUser owner = user(UserRole.MEMBER, 1L);
         connect(owner, DEMO, VALUES);
         Agent agent = agent(owner, AgentVisibility.PRIVATE);
-        when(connector.bindConnector(anyString(), anyString(), anyString(), anyString()))
+        when(connector.bindConnector(anyString(), anyString(), anyString(), anyString(), nullable(String.class)))
                 .thenReturn(new InstallResult(false, false, true));
         service.bind(owner, agent.code(), DEMO);
         jdbc.update("UPDATE agent_connector_binding SET apply_due_at = ?", Timestamp.from(LONG_AGO));
@@ -403,7 +441,8 @@ class ConnectorBindingServiceTest {
 
         assertThat(applier.applyDue()).isZero();
 
-        verify(connector, never()).bindConnector(anyString(), anyString(), anyString(), anyString());
+        verify(connector, never())
+                .bindConnector(anyString(), anyString(), anyString(), anyString(), nullable(String.class));
         ConnectorBinding stored = onlyBinding();
         assertThat(stored.status()).isEqualTo(BindingStatus.PENDING);
         assertThat(stored.applyDueAt()).as("커밋된 비운 예정").isNull();
@@ -426,22 +465,24 @@ class ConnectorBindingServiceTest {
         service.bind(first, firstAgent.code(), DEMO);
         service.bind(second, secondAgent.code(), DEMO);
 
-        verify(connector).bindConnector(firstAgent.hermesProfile(), DEMO, firstConnection.vault(), firstOwner);
-        verify(connector).bindConnector(secondAgent.hermesProfile(), DEMO, secondConnection.vault(), secondOwner);
+        verify(connector).bindConnector(firstAgent.hermesProfile(), DEMO, firstConnection.vault(), firstOwner, null);
+        verify(connector).bindConnector(secondAgent.hermesProfile(), DEMO, secondConnection.vault(), secondOwner, null);
 
         // 관리자 반영 완료가 설치를 다시 보낼 때도 그 에이전트 주인의 값이다. 반영 완료를 하는 관리자는 주인과 다른 사용자다.
         // user() 의 둘째 인자는 그룹이라, 관리자는 그 에이전트와 같은 그룹 2 에 두고 사용자 id 만 주인과 다르다.
         assertThat(admin.id()).isNotEqualTo(second.id());
         String adminOwner = "u" + admin.id();
-        when(connector.bindConnector(anyString(), anyString(), anyString(), anyString()))
+        when(connector.bindConnector(anyString(), anyString(), anyString(), anyString(), nullable(String.class)))
                 .thenReturn(new InstallResult(false, false));
         Instant shown = shownTo(admin);
         clearInvocations(connector);
         service.confirmApplied(admin, secondAgent.code(), DEMO, shown);
 
-        verify(connector).bindConnector(secondAgent.hermesProfile(), DEMO, secondConnection.vault(), secondOwner);
-        verify(connector, never()).bindConnector(anyString(), anyString(), anyString(), eq(firstOwner));
-        verify(connector, never()).bindConnector(anyString(), anyString(), anyString(), eq(adminOwner));
+        verify(connector).bindConnector(secondAgent.hermesProfile(), DEMO, secondConnection.vault(), secondOwner, null);
+        verify(connector, never())
+                .bindConnector(anyString(), anyString(), anyString(), eq(firstOwner), nullable(String.class));
+        verify(connector, never())
+                .bindConnector(anyString(), anyString(), anyString(), eq(adminOwner), nullable(String.class));
     }
 
     @Test
@@ -466,7 +507,8 @@ class ConnectorBindingServiceTest {
         assertCode(() -> service.listForAgent(admin, privateAgent.code()), ErrorCode.FORBIDDEN);
         assertCode(() -> service.bind(owner, "no-such-agent", DEMO), ErrorCode.AGENT_NOT_FOUND);
         assertThat(bindings.count()).isZero();
-        verify(connector, never()).bindConnector(anyString(), anyString(), anyString(), anyString());
+        verify(connector, never())
+                .bindConnector(anyString(), anyString(), anyString(), anyString(), nullable(String.class));
     }
 
     @Test
@@ -486,7 +528,8 @@ class ConnectorBindingServiceTest {
         connectionService.disconnect(owner, DEMO);
         assertCode(() -> service.bind(owner, ordinary.code(), DEMO), ErrorCode.CONNECTOR_NOT_CONNECTED);
         assertThat(bindings.count()).isZero();
-        verify(connector, never()).bindConnector(anyString(), anyString(), anyString(), anyString());
+        verify(connector, never())
+                .bindConnector(anyString(), anyString(), anyString(), anyString(), nullable(String.class));
     }
 
     @Test
@@ -540,7 +583,8 @@ class ConnectorBindingServiceTest {
                             ApiException.class,
                             ex -> assertThat(ex.code()).isEqualTo(ErrorCode.AGENT_CONNECTIONS_REQUIRE_PRIVATE));
             assertThat(bindings.count()).isZero();
-            verify(connector, never()).bindConnector(anyString(), anyString(), anyString(), anyString());
+            verify(connector, never())
+                    .bindConnector(anyString(), anyString(), anyString(), anyString(), nullable(String.class));
         } finally {
             release.countDown();
             pool.shutdownNow();
@@ -556,13 +600,13 @@ class ConnectorBindingServiceTest {
 
         doThrow(new ConnectorInstallConflict())
                 .when(connector)
-                .bindConnector(anyString(), anyString(), anyString(), anyString());
+                .bindConnector(anyString(), anyString(), anyString(), anyString(), nullable(String.class));
         assertCode(() -> service.bind(owner, agent.code(), DEMO), ErrorCode.CONNECTOR_BIND_CONFLICT);
         assertThat(bindings.count()).isZero();
 
         doThrow(new ConnectorProfileRejected())
                 .when(connector)
-                .bindConnector(anyString(), anyString(), anyString(), anyString());
+                .bindConnector(anyString(), anyString(), anyString(), anyString(), nullable(String.class));
         assertCode(() -> service.bind(owner, agent.code(), DEMO), ErrorCode.CONNECTOR_PROFILE_NOT_READY);
         assertThat(bindings.count()).isZero();
     }
@@ -575,7 +619,7 @@ class ConnectorBindingServiceTest {
         Agent agent = agent(owner, AgentVisibility.PRIVATE);
         doThrow(new IllegalStateException())
                 .when(connector)
-                .bindConnector(anyString(), anyString(), anyString(), anyString());
+                .bindConnector(anyString(), anyString(), anyString(), anyString(), nullable(String.class));
 
         assertThatThrownBy(() -> service.bind(owner, agent.code(), DEMO)).isInstanceOf(ConnectorOperationFailure.class);
 
@@ -595,7 +639,8 @@ class ConnectorBindingServiceTest {
         assertCode(() -> service.bind(owner, agent.code(), SKILLED), ErrorCode.SKILL_NAME_TAKEN);
 
         assertThat(bindings.count()).isZero();
-        verify(connector, never()).bindConnector(anyString(), anyString(), anyString(), anyString());
+        verify(connector, never())
+                .bindConnector(anyString(), anyString(), anyString(), anyString(), nullable(String.class));
 
         when(skills.list(agent.hermesProfile())).thenReturn(List.of());
         assertThat(service.bind(owner, agent.code(), SKILLED).skills()).containsExactly("demo-guide");
@@ -609,11 +654,65 @@ class ConnectorBindingServiceTest {
 
         ConnectorConnection connection = connect(owner, PLAIN, Map.of());
 
-        verify(connector).call(PLAIN, "ping", Map.of());
+        verify(connector).call(PLAIN, "ping", Map.of(), null);
         verify(connector).putVault(connection.vault(), PLAIN, Map.of());
         assertThat(connection.status()).isEqualTo(ConnectionStatus.READY);
         assertThat(service.bind(owner, agent.code(), PLAIN).bound()).isTrue();
-        verify(connector).bindConnector(agent.hermesProfile(), PLAIN, connection.vault(), agent.sandboxOwner());
+        verify(connector).bindConnector(agent.hermesProfile(), PLAIN, connection.vault(), agent.sandboxOwner(), null);
+    }
+
+    @Test
+    @DisplayName("사용자 브라우저를 쓰는 커넥터는 연결 등록에 호출 표식 주소를, 붙이기에 그 바인딩의 표식 주소를 싣는다")
+    void browserConnectorCarriesCallAddressOnRegisterAndBindingAddressOnBind() {
+        CurrentUser owner = user(UserRole.MEMBER, 1L);
+        Agent agent = agent(owner, AgentVisibility.PRIVATE);
+
+        ConnectorConnection connection = connect(owner, BROWSER, Map.of());
+        service.bind(owner, agent.code(), BROWSER);
+
+        verify(connector)
+                .call(
+                        eq(BROWSER),
+                        eq("ping"),
+                        eq(Map.of()),
+                        argThat(address -> address != null && address.startsWith(GATEWAY + "/u" + owner.id() + ".")));
+        ConnectorBinding binding = onlyBinding();
+        String expected = tokens.bindingAddress(binding.id()).orElseThrow();
+        assertThat(expected).startsWith(GATEWAY + "/b" + binding.id() + ".");
+        verify(connector)
+                .bindConnector(agent.hermesProfile(), BROWSER, connection.vault(), agent.sandboxOwner(), expected);
+    }
+
+    @Test
+    @DisplayName("연결 확인은 확인 도구에 호출 표식 주소를 싣고, 다시 보내는 설치에 붙이기 때와 같은 바인딩 주소를 싣는다")
+    void connectionCheckResendsTheSameBindingAddress() {
+        when(connector.bindConnector(anyString(), anyString(), anyString(), anyString(), nullable(String.class)))
+                .thenReturn(new InstallResult(false, false));
+        when(connector.callWithVault(anyString(), anyString(), anyString(), nullable(String.class)))
+                .thenReturn(CallResult.success(MAPPER.readTree("{\"ok\":true}")));
+        CurrentUser owner = user(UserRole.MEMBER, 1L);
+        Agent agent = agent(owner, AgentVisibility.PRIVATE);
+        ConnectorConnection connection = connect(owner, BROWSER, Map.of());
+        service.bind(owner, agent.code(), BROWSER);
+        String expected = tokens.bindingAddress(onlyBinding().id()).orElseThrow();
+
+        connectionService.check(owner, BROWSER);
+
+        verify(connector)
+                .callWithVault(
+                        eq(BROWSER),
+                        eq("ping"),
+                        eq(connection.vault()),
+                        argThat(address -> address != null && address.startsWith(GATEWAY + "/u" + owner.id() + ".")));
+        verify(connector, times(2))
+                .bindConnector(agent.hermesProfile(), BROWSER, connection.vault(), agent.sandboxOwner(), expected);
+        verify(connector, never())
+                .bindConnector(
+                        anyString(),
+                        eq(BROWSER),
+                        anyString(),
+                        anyString(),
+                        argThat(address -> address == null || !address.equals(expected)));
     }
 
     @Test
@@ -689,7 +788,7 @@ class ConnectorBindingServiceTest {
         service.bind(owner, agent.code(), DEMO);
         Instant shown = shownTo(admin);
         // 재시작한 뒤에는 설치를 다시 보내도 바뀐 것이 없다.
-        when(connector.bindConnector(anyString(), anyString(), anyString(), anyString()))
+        when(connector.bindConnector(anyString(), anyString(), anyString(), anyString(), nullable(String.class)))
                 .thenReturn(new InstallResult(false, false));
 
         AgentConnectionView confirmed = service.confirmApplied(admin, agent.code(), DEMO, shown);
@@ -697,7 +796,7 @@ class ConnectorBindingServiceTest {
         assertThat(confirmed.status()).isEqualTo(BindingStatus.READY);
         assertThat(confirmed.restartRequired()).isFalse();
         InOrder order = inOrder(connector);
-        order.verify(connector).bindConnector(anyString(), eq(DEMO), anyString(), anyString());
+        order.verify(connector).bindConnector(anyString(), eq(DEMO), anyString(), anyString(), nullable(String.class));
         order.verify(connector).readConnector(agent.hermesProfile(), DEMO);
         order.verify(connector).probe(agent.hermesProfile(), "demo");
         assertThat(onlyBinding().status()).isEqualTo(BindingStatus.READY);
@@ -733,7 +832,7 @@ class ConnectorBindingServiceTest {
         CurrentUser admin = user(UserRole.ADMIN, 1L);
         connect(owner, DEMO, VALUES);
         Agent agent = agent(owner, AgentVisibility.PRIVATE);
-        when(connector.bindConnector(anyString(), anyString(), anyString(), anyString()))
+        when(connector.bindConnector(anyString(), anyString(), anyString(), anyString(), nullable(String.class)))
                 .thenReturn(new InstallResult(false, false));
         service.bind(owner, agent.code(), DEMO);
         assertThat(shownTo(admin)).isNull();
@@ -749,7 +848,7 @@ class ConnectorBindingServiceTest {
         CurrentUser admin = user(UserRole.ADMIN, 1L);
         connect(owner, DEMO, VALUES);
         Agent agent = agent(owner, AgentVisibility.PRIVATE);
-        when(connector.bindConnector(anyString(), anyString(), anyString(), anyString()))
+        when(connector.bindConnector(anyString(), anyString(), anyString(), anyString(), nullable(String.class)))
                 .thenReturn(new InstallResult(false, false, true));
         service.bind(owner, agent.code(), DEMO);
         Instant due = onlyBinding().applyDueAt();
@@ -759,7 +858,8 @@ class ConnectorBindingServiceTest {
         assertThatThrownBy(() -> service.confirmApplied(admin, agent.code(), DEMO, shown))
                 .isInstanceOf(ConnectorOperationFailure.class);
 
-        verify(connector, never()).bindConnector(anyString(), anyString(), anyString(), anyString());
+        verify(connector, never())
+                .bindConnector(anyString(), anyString(), anyString(), anyString(), nullable(String.class));
         verify(connector, never()).probe(anyString(), anyString());
         ConnectorBinding stored = onlyBinding();
         assertThat(stored.status()).isEqualTo(BindingStatus.PENDING);
@@ -773,19 +873,19 @@ class ConnectorBindingServiceTest {
         CurrentUser admin = user(UserRole.ADMIN, 1L);
         connect(owner, DEMO, VALUES);
         Agent agent = agent(owner, AgentVisibility.PRIVATE);
-        when(connector.bindConnector(anyString(), anyString(), anyString(), anyString()))
+        when(connector.bindConnector(anyString(), anyString(), anyString(), anyString(), nullable(String.class)))
                 .thenReturn(new InstallResult(false, false, true));
         service.bind(owner, agent.code(), DEMO);
         assertThat(onlyBinding().applyDueAt()).isNotNull();
         // 값을 다시 등록하면 붙은 바인딩에 설치를 다시 보내고, 이미 있던 서버의 값이 바뀌어 재시작이 필요하다.
-        when(connector.bindConnector(anyString(), anyString(), anyString(), anyString()))
+        when(connector.bindConnector(anyString(), anyString(), anyString(), anyString(), nullable(String.class)))
                 .thenReturn(new InstallResult(true, false, false));
         connect(owner, DEMO, VALUES);
         ConnectorBinding waiting = onlyBinding();
         assertThat(waiting.restartRequired()).isTrue();
         assertThat(waiting.applyDueAt()).isNull();
         Instant shown = shownTo(admin);
-        when(connector.bindConnector(anyString(), anyString(), anyString(), anyString()))
+        when(connector.bindConnector(anyString(), anyString(), anyString(), anyString(), nullable(String.class)))
                 .thenReturn(new InstallResult(false, false));
 
         AgentConnectionView confirmed = service.confirmApplied(admin, agent.code(), DEMO, shown);
@@ -821,7 +921,7 @@ class ConnectorBindingServiceTest {
         Agent agent = agent(owner, AgentVisibility.PRIVATE);
         service.bind(owner, agent.code(), DEMO);
         Instant shown = shownTo(admin);
-        when(connector.bindConnector(anyString(), anyString(), anyString(), anyString()))
+        when(connector.bindConnector(anyString(), anyString(), anyString(), anyString(), nullable(String.class)))
                 .thenReturn(new InstallResult(false, false));
 
         when(connector.readConnector(anyString(), anyString()))

@@ -15,6 +15,9 @@ import java.util.List;
  * @param tools 도구마다의 정책 선언. 카탈로그가 내지 않았으면 빈 목록
  * @param skills 바인딩 설치가 그 profile 에 복사할 스킬 이름. 옛 대시보드 plugin 은 내지 않고, 없으면 빈 목록
  * @param appearance 카드의 아이콘과 링크. 옛 대시보드 plugin 은 내지 않고, 없으면 {@link ConnectorAppearance#NONE}
+ * @param ownerBrowser 참이면 그 커넥터는 사용자 브라우저를 쓴다. 설치와 확인 호출이 중계 주소를 싣는다
+ *     (ADR-20261008 / browser-gateway-token). 옛 대시보드 plugin 은 내지 않고, 없으면 거짓
+ * @param ownerBrowserLoginUrl 사용자가 브라우저에서 먼저 로그인할 곳. 선언하지 않았으면 null
  */
 public record ConnectorManifest(
         String id,
@@ -28,7 +31,9 @@ public record ConnectorManifest(
         int schema,
         List<ConnectorTool> tools,
         List<String> skills,
-        ConnectorAppearance appearance) {
+        ConnectorAppearance appearance,
+        boolean ownerBrowser,
+        String ownerBrowserLoginUrl) {
 
     public ConnectorManifest {
         description = description == null ? "" : description;
@@ -37,6 +42,37 @@ public record ConnectorManifest(
         tools = List.copyOf(tools);
         skills = List.copyOf(skills);
         appearance = appearance == null ? ConnectorAppearance.NONE : appearance;
+    }
+
+    /** 사용자 브라우저를 쓰지 않는 선언이다. 새 칸을 모르는 대시보드 plugin 의 카탈로그와 검사가 쓴다. */
+    public ConnectorManifest(
+            String id,
+            String title,
+            String description,
+            List<ConnectorField> fields,
+            String verifyTool,
+            String mcpServer,
+            List<String> toolsets,
+            boolean attachments,
+            int schema,
+            List<ConnectorTool> tools,
+            List<String> skills,
+            ConnectorAppearance appearance) {
+        this(
+                id,
+                title,
+                description,
+                fields,
+                verifyTool,
+                mcpServer,
+                toolsets,
+                attachments,
+                schema,
+                tools,
+                skills,
+                appearance,
+                false,
+                null);
     }
 
     /** 아이콘과 링크를 내지 않는 선언이다. 새 칸을 모르는 대시보드 plugin 의 카탈로그와 검사가 쓴다. */

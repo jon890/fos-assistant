@@ -178,6 +178,44 @@ class HttpHermesConnectorClientTest {
         server.verify();
     }
 
+    @DisplayName("카탈로그의 owner_browser 와 로그인 주소를 읽고, 칸이 없는 옛 카탈로그는 거짓과 null 이며 https 가 아닌 주소는 버린다")
+    @Test
+    void readsOwnerBrowserAndLoginUrl() {
+        String url = BASE + "/api/connectors/catalog";
+        String tail = "\"mcp_server\":\"demo\"";
+        server.expect(requestTo(url))
+                .andRespond(withSuccess(
+                        CATALOG.replace(
+                                tail,
+                                tail + ",\"owner_browser\":true,"
+                                        + "\"owner_browser_login_url\":\"https://login.example.test/sign-in\""),
+                        MediaType.APPLICATION_JSON));
+        server.expect(requestTo(url)).andRespond(withSuccess(CATALOG, MediaType.APPLICATION_JSON));
+        server.expect(requestTo(url))
+                .andRespond(withSuccess(
+                        CATALOG.replace(
+                                tail,
+                                tail + ",\"owner_browser\":true,"
+                                        + "\"owner_browser_login_url\":\"http://login.example.test/\""),
+                        MediaType.APPLICATION_JSON));
+        server.expect(requestTo(url))
+                .andRespond(withSuccess(
+                        CATALOG.replace(tail, tail + ",\"owner_browser\":\"true\""), MediaType.APPLICATION_JSON));
+
+        ConnectorManifest declared = client.readCatalog().get(0);
+        ConnectorManifest old = client.readCatalog().get(0);
+        ConnectorManifest plainHttp = client.readCatalog().get(0);
+
+        assertThat(declared.ownerBrowser()).isTrue();
+        assertThat(declared.ownerBrowserLoginUrl()).isEqualTo("https://login.example.test/sign-in");
+        assertThat(old.ownerBrowser()).isFalse();
+        assertThat(old.ownerBrowserLoginUrl()).isNull();
+        assertThat(plainHttp.ownerBrowser()).isTrue();
+        assertThat(plainHttp.ownerBrowserLoginUrl()).isNull();
+        assertThatThrownBy(() -> client.readCatalog()).isInstanceOf(IllegalStateException.class);
+        server.verify();
+    }
+
     @DisplayName("카탈로그의 schema 와 tools 를 받은 글자 그대로 읽고, title 이 없으면 null 이다")
     @Test
     void readsSchemaAndToolPolicies() {
@@ -357,8 +395,10 @@ class HttpHermesConnectorClientTest {
         server.expect(requestTo(BASE + "/api/connectors"))
                 .andRespond(withSuccess(body + "}", MediaType.APPLICATION_JSON));
 
-        assertThat(client.bindConnector(PROFILE, DEMO, "c7", "u1")).isEqualTo(new InstallResult(false, false, true));
-        assertThat(client.bindConnector(PROFILE, DEMO, "c7", "u1")).isEqualTo(new InstallResult(false, false, false));
+        assertThat(client.bindConnector(PROFILE, DEMO, "c7", "u1", null))
+                .isEqualTo(new InstallResult(false, false, true));
+        assertThat(client.bindConnector(PROFILE, DEMO, "c7", "u1", null))
+                .isEqualTo(new InstallResult(false, false, false));
         server.verify();
     }
 
@@ -440,7 +480,7 @@ class HttpHermesConnectorClientTest {
                         "{\"ok\":true,\"result\":{\"scopes\":[{\"id\":\"a\",\"name\":\"범위 A\"}]}}",
                         MediaType.APPLICATION_JSON));
 
-        CallResult result = client.call(DEMO, "list_scopes", Map.of("token", TOKEN));
+        CallResult result = client.call(DEMO, "list_scopes", Map.of("token", TOKEN), null);
 
         assertThat(result.ok()).isTrue();
         assertThat(result.error()).isNull();
@@ -458,10 +498,10 @@ class HttpHermesConnectorClientTest {
         }
 
         assertThat(List.of(
-                        client.call(DEMO, "list_scopes", Map.of()),
-                        client.call(DEMO, "list_scopes", Map.of()),
-                        client.call(DEMO, "list_scopes", Map.of()),
-                        client.call(DEMO, "list_scopes", Map.of())))
+                        client.call(DEMO, "list_scopes", Map.of(), null),
+                        client.call(DEMO, "list_scopes", Map.of(), null),
+                        client.call(DEMO, "list_scopes", Map.of(), null),
+                        client.call(DEMO, "list_scopes", Map.of(), null)))
                 .extracting(CallResult::error)
                 .containsExactly(
                         ConnectorCallError.CREDENTIAL_REJECTED,
@@ -599,7 +639,7 @@ class HttpHermesConnectorClientTest {
                 .andRespond(withStatus(HttpStatus.BAD_REQUEST).body(TOKEN).contentType(MediaType.TEXT_PLAIN));
 
         for (int attempt = 0; attempt < 4; attempt++) {
-            assertThatThrownBy(() -> client.call(DEMO, "list_scopes", Map.of("token", TOKEN)))
+            assertThatThrownBy(() -> client.call(DEMO, "list_scopes", Map.of("token", TOKEN), null))
                     .isInstanceOf(IllegalStateException.class)
                     .satisfies(error -> {
                         assertThat(error.getCause()).isNull();
@@ -859,8 +899,8 @@ class HttpHermesConnectorClientTest {
                 .andRespond(
                         withSuccess("{\"ok\":false,\"error\":\"credential_rejected\"}", MediaType.APPLICATION_JSON));
 
-        assertThat(client.callWithVault(DEMO, "list_scopes", "c7").ok()).isTrue();
-        assertThat(client.callWithVault(DEMO, "list_scopes", "c7").error())
+        assertThat(client.callWithVault(DEMO, "list_scopes", "c7", null).ok()).isTrue();
+        assertThat(client.callWithVault(DEMO, "list_scopes", "c7", null).error())
                 .isEqualTo(ConnectorCallError.CREDENTIAL_REJECTED);
         server.verify();
     }
@@ -890,8 +930,56 @@ class HttpHermesConnectorClientTest {
                                 + "\"restart_required\":false}",
                         MediaType.APPLICATION_JSON));
 
-        assertThat(client.bindConnector(PROFILE, DEMO, "c7", "u1")).isEqualTo(new InstallResult(true, false));
+        assertThat(client.bindConnector(PROFILE, DEMO, "c7", "u1", null)).isEqualTo(new InstallResult(true, false));
         assertThat(client.unbindConnector(PROFILE, DEMO)).isEqualTo(new InstallResult(false, false));
+        server.verify();
+    }
+
+    @DisplayName("중계 주소를 주면 도구 호출과 바인딩 설치의 본문에 owner_browser 를 싣는다. 빈 값도 그대로 싣는다")
+    @Test
+    void sendsOwnerBrowserOnlyWhenGiven() {
+        String binding = "http://cp.example.test/internal/browser-gateway/b7." + "a".repeat(64);
+        String call = "http://cp.example.test/internal/browser-gateway/u1.1700000300." + "c".repeat(64);
+        String ok = "{\"ok\":true,\"result\":{\"scopes\":[]}}";
+        server.expect(requestTo(BASE + "/api/connectors/demo-notes/call"))
+                .andExpect(content()
+                        .json(
+                                "{\"tool\":\"list_scopes\",\"values\":{},\"owner_browser\":\"" + call + "\"}",
+                                JsonCompareMode.STRICT))
+                .andRespond(withSuccess(ok, MediaType.APPLICATION_JSON));
+        server.expect(requestTo(BASE + "/api/connectors/demo-notes/call"))
+                .andExpect(content()
+                        .json(
+                                "{\"tool\":\"list_scopes\",\"vault\":\"c7\",\"owner_browser\":\"" + call + "\"}",
+                                JsonCompareMode.STRICT))
+                .andRespond(withSuccess(ok, MediaType.APPLICATION_JSON));
+        server.expect(requestTo(BASE + "/api/connectors"))
+                .andExpect(content()
+                        .json(
+                                "{\"profile\":\"user-demo\",\"plugin\":\"demo-notes\",\"enabled\":true,"
+                                        + "\"bind\":{\"vault\":\"c7\"},\"sandbox_owner\":\"u1\","
+                                        + "\"owner_browser\":\"" + binding + "\"}",
+                                JsonCompareMode.STRICT))
+                .andRespond(withSuccess(
+                        "{\"profile\":\"user-demo\",\"plugin\":\"demo-notes\",\"enabled\":true,"
+                                + "\"restart_required\":false}",
+                        MediaType.APPLICATION_JSON));
+        server.expect(requestTo(BASE + "/api/connectors"))
+                .andExpect(content()
+                        .json(
+                                "{\"profile\":\"user-demo\",\"plugin\":\"demo-notes\",\"enabled\":true,"
+                                        + "\"bind\":{\"vault\":\"c7\"},\"sandbox_owner\":\"u1\","
+                                        + "\"owner_browser\":\"\"}",
+                                JsonCompareMode.STRICT))
+                .andRespond(withSuccess(
+                        "{\"profile\":\"user-demo\",\"plugin\":\"demo-notes\",\"enabled\":true,"
+                                + "\"restart_required\":false}",
+                        MediaType.APPLICATION_JSON));
+
+        assertThat(client.call(DEMO, "list_scopes", Map.of(), call).ok()).isTrue();
+        assertThat(client.callWithVault(DEMO, "list_scopes", "c7", call).ok()).isTrue();
+        assertThat(client.bindConnector(PROFILE, DEMO, "c7", "u1", binding)).isEqualTo(new InstallResult(false, false));
+        assertThat(client.bindConnector(PROFILE, DEMO, "c7", "u1", "")).isEqualTo(new InstallResult(false, false));
         server.verify();
     }
 
@@ -905,7 +993,7 @@ class HttpHermesConnectorClientTest {
                                 + "\"restart_required\":false}",
                         MediaType.APPLICATION_JSON));
 
-        assertThat(client.bindConnector(PROFILE, DEMO, "c7", "u3")).isEqualTo(new InstallResult(false, false));
+        assertThat(client.bindConnector(PROFILE, DEMO, "c7", "u3", null)).isEqualTo(new InstallResult(false, false));
         assertThat(attachmentRoot.resolve("users").resolve(SandboxAttachmentDirectory.key("u3")))
                 .isDirectory();
         server.verify();
@@ -929,8 +1017,8 @@ class HttpHermesConnectorClientTest {
                 .andExpect(content().json("{\"enabled\":true,\"sandbox_owner\":\"u5\"}"))
                 .andRespond(withStatus(HttpStatus.CONFLICT));
 
-        assertThat(client.bindConnector(PROFILE, DEMO, "c7", "u5")).isEqualTo(new InstallResult(true, false));
-        assertThatThrownBy(() -> client.bindConnector(PROFILE, DEMO, "c7", "u5"))
+        assertThat(client.bindConnector(PROFILE, DEMO, "c7", "u5", null)).isEqualTo(new InstallResult(true, false));
+        assertThatThrownBy(() -> client.bindConnector(PROFILE, DEMO, "c7", "u5", null))
                 .isInstanceOf(ConnectorInstallConflict.class);
         assertThat(Files.isSymbolicLink(users.resolve(SandboxAttachmentDirectory.key("u5"))))
                 .isTrue();
@@ -950,13 +1038,13 @@ class HttpHermesConnectorClientTest {
         server.expect(requestTo(BASE + "/api/connectors"))
                 .andRespond(withStatus(HttpStatus.BAD_REQUEST).body(detail).contentType(MediaType.APPLICATION_JSON));
 
-        assertThatThrownBy(() -> client.bindConnector(PROFILE, DEMO, "c7", "u1"))
+        assertThatThrownBy(() -> client.bindConnector(PROFILE, DEMO, "c7", "u1", null))
                 .isInstanceOfSatisfying(ConnectorInstallConflict.class, ex -> assertNoDetail(ex));
-        assertThatThrownBy(() -> client.bindConnector(PROFILE, DEMO, "c7", "u1"))
+        assertThatThrownBy(() -> client.bindConnector(PROFILE, DEMO, "c7", "u1", null))
                 .isInstanceOfSatisfying(ConnectorProfileRejected.class, ex -> assertNoDetail(ex));
         assertThatThrownBy(() -> client.unbindConnector(PROFILE, DEMO))
                 .isInstanceOfSatisfying(ConnectorInstallConflict.class, ex -> assertNoDetail(ex));
-        assertThatThrownBy(() -> client.bindConnector(PROFILE, DEMO, "c7", "u1"))
+        assertThatThrownBy(() -> client.bindConnector(PROFILE, DEMO, "c7", "u1", null))
                 .isInstanceOfSatisfying(IllegalStateException.class, ex -> assertNoDetail(ex));
         server.verify();
     }

@@ -55,11 +55,20 @@ public interface HermesConnectorClient {
     /** 운영 목록에 있고 검증을 통과한 커넥터의 manifest 다. 요청마다 대시보드에서 읽는다. */
     List<ConnectorManifest> readCatalog();
 
-    /** 후보 값으로 선택지 도구나 확인 도구를 한 번 부른다. 대시보드는 값을 저장하지 않는다. */
-    CallResult call(String connectorId, String tool, Map<String, String> values);
+    /**
+     * 후보 값으로 선택지 도구나 확인 도구를 한 번 부른다. 대시보드는 값을 저장하지 않는다.
+     *
+     * @param ownerBrowser 요청자의 호출 표식을 실은 브라우저 중계 주소(ADR-20261008 / browser-gateway-token). null 이면 본문에
+     *     키를 싣지 않는다. 사용자 브라우저를 쓰는 커넥터에만 넘긴다
+     */
+    CallResult call(String connectorId, String tool, Map<String, String> values, String ownerBrowser);
 
-    /** 보관 파일의 값으로 선택지 도구나 확인 도구를 한 번 부른다. 값은 Control Plane 을 거치지 않는다. */
-    CallResult callWithVault(String connectorId, String tool, String vault);
+    /**
+     * 보관 파일의 값으로 선택지 도구나 확인 도구를 한 번 부른다. 값은 Control Plane 을 거치지 않는다.
+     *
+     * @param ownerBrowser {@link #call} 과 같다
+     */
+    CallResult callWithVault(String connectorId, String tool, String vault, String ownerBrowser);
 
     /**
      * 연결의 칸 값을 보관 파일에 쓴다. 같은 이름의 보관 파일이 있으면 바꾼다.
@@ -104,10 +113,13 @@ public interface HermesConnectorClient {
      * 만들지 못해도 경고만 남기고 요청을 보낸다. 첨부를 선언한 커넥터면 대시보드가 디렉터리를 확인하지 못해 409 로 거절한다.
      *
      * @param sandboxOwner 그 에이전트의 실행 공간 주인. {@code Agent#sandboxOwner()} 의 값이다
+     * @param ownerBrowser 그 바인딩의 표식을 실은 브라우저 중계 주소(ADR-20261008 / browser-gateway-token). 중계가 꺼졌으면 빈 값이다.
+     *     null 이면 본문에 키를 싣지 않는다. 사용자 브라우저를 쓰는 커넥터에만 넘긴다
      * @throws ConnectorInstallConflict 대시보드가 409 로 답했을 때. 그 profile 의 설정과 충돌하거나 첨부 디렉터리를 확인하지 못했다
      * @throws ConnectorProfileRejected 대시보드가 401 로 답했을 때. 그 profile 이 커넥터를 받지 않는다
      */
-    InstallResult bindConnector(String profile, String connectorId, String vault, String sandboxOwner);
+    InstallResult bindConnector(
+            String profile, String connectorId, String vault, String sandboxOwner, String ownerBrowser);
 
     /**
      * 그 profile 에 붙인 커넥터를 뗀다. 요청은 옛 설치를 끄는 것과 같다. 대시보드가 소유 기록의 방식으로 떼는 법을 고른다.

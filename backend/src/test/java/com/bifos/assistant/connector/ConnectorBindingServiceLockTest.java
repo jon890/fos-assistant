@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.nullable;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -121,9 +122,9 @@ class ConnectorBindingServiceLockTest {
     @BeforeEach
     void setUp() {
         when(connector.readCatalog()).thenReturn(List.of(DEMO_MANIFEST));
-        when(connector.call(anyString(), anyString(), anyMap()))
+        when(connector.call(anyString(), anyString(), anyMap(), nullable(String.class)))
                 .thenReturn(CallResult.success(MAPPER.readTree("{\"ok\":true}")));
-        when(connector.bindConnector(anyString(), anyString(), anyString(), anyString()))
+        when(connector.bindConnector(anyString(), anyString(), anyString(), anyString(), nullable(String.class)))
                 .thenReturn(new InstallResult(true, false));
         when(connector.putConnector(anyString(), anyString(), anyBoolean(), anyString()))
                 .thenReturn(new InstallResult(false, false));
@@ -160,7 +161,7 @@ class ConnectorBindingServiceLockTest {
         Instant shown = shownTo(admin);
         CountDownLatch locked = new CountDownLatch(1);
         CountDownLatch release = new CountDownLatch(1);
-        when(connector.bindConnector(anyString(), anyString(), anyString(), anyString()))
+        when(connector.bindConnector(anyString(), anyString(), anyString(), anyString(), nullable(String.class)))
                 .thenAnswer(invocation -> {
                     locked.countDown();
                     assertThat(release.await(10, TimeUnit.SECONDS)).isTrue();
@@ -209,7 +210,7 @@ class ConnectorBindingServiceLockTest {
         service.bind(owner, agent.code(), DEMO);
         CountDownLatch locked = new CountDownLatch(1);
         CountDownLatch release = new CountDownLatch(1);
-        when(connector.bindConnector(anyString(), anyString(), anyString(), anyString()))
+        when(connector.bindConnector(anyString(), anyString(), anyString(), anyString(), nullable(String.class)))
                 .thenAnswer(invocation -> {
                     locked.countDown();
                     assertThat(release.await(10, TimeUnit.SECONDS)).isTrue();

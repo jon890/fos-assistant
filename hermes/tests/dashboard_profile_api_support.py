@@ -475,12 +475,14 @@ class ProfileApiRouteTest(unittest.TestCase):
         return self.request(path, method, token="valid", full_response=True, body=body,
                             query_profiles=[body["profile"]] if "profile" in body else ())
 
-    def bind(self, plugin=DEMO, vault="c1", profile="alice", enabled=True, owner=None):
+    def bind(self, plugin=DEMO, vault="c1", profile="alice", enabled=True, owner=None, browser=None):
         body = {"profile": profile, "plugin": plugin, "enabled": enabled}
         if enabled:
             body["bind"] = {"vault": vault}
         if owner is not None:
             body["sandbox_owner"] = owner
+        if browser is not None:
+            body["owner_browser"] = browser
         return self.request("/api/connectors", "PUT", token="valid", full_response=True, body=body)
 
     def declare_owner_attachments(self, connector, server="demo", name="DEMO_ATTACHMENT_DIR"):
@@ -496,6 +498,15 @@ class ProfileApiRouteTest(unittest.TestCase):
         """시험 커넥터 사본이 커넥터 출력 디렉터리를 받는 env 를 선언하게 한다(ADR-20261008 connector-output-files)."""
         declared = json.loads((connector / "connector.json").read_text(encoding="utf-8"))
         declared["owner_output_env"] = name
+        (connector / "connector.json").write_text(json.dumps(declared), encoding="utf-8")
+        mcp = json.loads((connector / ".mcp.json").read_text(encoding="utf-8"))
+        mcp["mcpServers"][server]["env"][name] = "${%s}" % name
+        (connector / ".mcp.json").write_text(json.dumps(mcp), encoding="utf-8")
+
+    def declare_owner_browser(self, connector, server="demo", name="DEMO_BROWSER_URL"):
+        """시험 커넥터 사본이 브라우저 중계 주소를 받는 env 를 선언하게 한다(ADR-20261008 browser-gateway-token)."""
+        declared = json.loads((connector / "connector.json").read_text(encoding="utf-8"))
+        declared["owner_browser_env"] = name
         (connector / "connector.json").write_text(json.dumps(declared), encoding="utf-8")
         mcp = json.loads((connector / ".mcp.json").read_text(encoding="utf-8"))
         mcp["mcpServers"][server]["env"][name] = "${%s}" % name
