@@ -12,7 +12,7 @@
 
 ## 컨텍스트
 
-**근거 문서**: `docs/adr/ADR-20261008-data-encryption.md`, `docs/backend/schema/README.md` 의 「본문 칸과 운영 조회」, `docs/backend/schema/chat.md` 의 「chat_message」, `docs/backend/schema/crypto.md`
+**근거 문서**: `backend/docs/adr/ADR-20261008-data-encryption.md`, `docs/backend/schema/README.md` 의 「본문 칸과 운영 조회」, `docs/backend/schema/chat.md` 의 「chat_message」, `docs/backend/schema/crypto.md`
 
 - 따를 본보기는 메시지다.
   - 엔티티: `backend/src/main/java/com/bifos/assistant/chat/domain/ChatMessage.java` 의 `storedContent`, `contentKeyId`, `content()`, `detachPlainForSealing()`, `seal(...)`, `attachOpener(...)`

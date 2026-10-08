@@ -11,7 +11,7 @@
 
 ## 컨텍스트
 
-**근거 문서**: `docs/adr/ADR-20261008-data-encryption.md`, `docs/backend/schema/README.md` 의 「본문 칸과 운영 조회」, `docs/backend/schema/chat.md` 의 「conversation」, `docs/backend/schema/task.md`
+**근거 문서**: `backend/docs/adr/ADR-20261008-data-encryption.md`, `docs/backend/schema/README.md` 의 「본문 칸과 운영 조회」, `docs/backend/schema/chat.md` 의 「conversation」, `docs/backend/schema/task.md`
 
 - 본보기는 메시지다. `backend/src/main/java/com/bifos/assistant/chat/domain/ChatMessage.java` 의 저장 칸(`storedContent`)과 옆 칸(`contentKeyId`), 처음 꺼낼 때 푸는 `content()`, `backend/src/main/java/com/bifos/assistant/chat/infra/ChatMessageLoadListener.java` 의 `POST_LOAD` 등록, `backend/src/main/java/com/bifos/assistant/chat/infra/ChatMessageContents.java` 의 AAD 와 주인 조회를 따른다
 - 대화 제목
