@@ -1,0 +1,11 @@
+{
+  "name": "plan110-connector-vault-encryption",
+  "description": "대시보드 plugin 의 커넥터 보관 파일을 운영 key 로 암호화하고, profile .env 의 평문은 감당할 것으로 남긴다",
+  "status": "pending",
+  "created_at": "2026-10-08",
+  "total_phases": 1,
+  "current_phase": 1,
+  "phases": [
+    { "number": 1, "file": "phase-01.md", "execution_profile": "standard" }
+  ]
+}
