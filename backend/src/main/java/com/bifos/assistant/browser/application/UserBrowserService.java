@@ -6,6 +6,7 @@ import com.bifos.assistant.browser.application.model.UserBrowserSnapshot;
 import com.bifos.assistant.browser.domain.BrowserProfileStore;
 import com.bifos.assistant.browser.domain.BrowserRuntime;
 import com.bifos.assistant.browser.domain.CdpProbe;
+import com.bifos.assistant.browser.domain.RuntimeContainer;
 import com.bifos.assistant.browser.domain.UserBrowser;
 import com.bifos.assistant.browser.domain.type.UserBrowserStatus;
 import com.bifos.assistant.browser.infra.BrowserProperties;
@@ -238,6 +239,7 @@ public class UserBrowserService {
         String failure = START_FAILED;
         try {
             profiles.ensure(browser.profileKey());
+            removeLeftovers(browser.profileKey());
             containerId = runtime.create(browser.profileKey());
             runtime.start(containerId);
             Optional<String> notReady = awaitReady(browser.id(), containerId);
@@ -263,6 +265,20 @@ public class UserBrowserService {
         browser.markFailed(failure, clock.instant());
         save(browser);
         throw new ApiException(ErrorCode.BROWSER_START_FAILED, "user browser did not start: " + failure);
+    }
+
+    /**
+     * 프로필은 한 번에 한 컨테이너만 쓴다. 그 키의 남은 컨테이너를 만들기 전에 지운다.
+     *
+     * <p>이미지는 시작할 때 Chrome 의 프로필 잠금 파일을 지운다. 남은 컨테이너가 돌고 있으면 두 Chrome 이 한 프로필을 함께 쓰게 된다. 실패한
+     * 켜기에서 지우지 못한 컨테이너는 번호 없이 남아 상태 맞추기가 지울 때까지 돈다. 지우지 못하면 켜기를 멈춘다.
+     */
+    private void removeLeftovers(String profileKey) {
+        for (RuntimeContainer container : runtime.list()) {
+            if (profileKey.equals(container.profileKey())) {
+                runtime.remove(container.id());
+            }
+        }
     }
 
     /** CDP 가 답하면 비어 있고, 답하지 않으면 실패 코드다. 컨테이너가 끝났으면 시간을 다 기다리지 않는다. */

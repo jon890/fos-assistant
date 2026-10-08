@@ -158,6 +158,33 @@ class UserBrowserServiceTest {
     }
 
     @Test
+    @DisplayName("켜기 전에 같은 프로필 키의 남은 컨테이너를 지우고 다른 키의 컨테이너는 둔다")
+    void removesLeftoverContainersOfSameProfileBeforeStart() {
+        UserBrowserService service = service(true, 2);
+        service.create(101L);
+        runtime.plant("leftover", UserBrowserService.profileKey(101L), true);
+        runtime.plant("other", UserBrowserService.profileKey(102L), true);
+
+        assertThat(service.start(101L).status()).isEqualTo(UserBrowserStatus.RUNNING);
+
+        assertThat(runtime.removed()).containsExactly("leftover");
+        assertThat(runtime.containers()).containsOnlyKeys("other", "c1");
+    }
+
+    @Test
+    @DisplayName("남은 컨테이너를 확인하지 못하면 새 컨테이너를 만들지 않고 start_failed 로 둔다")
+    void doesNotCreateWhenLeftoversCannotBeChecked() {
+        UserBrowserService service = service(true, 2);
+        service.create(101L);
+        runtime.failingActions().add("list");
+
+        assertCode(() -> service.start(101L), ErrorCode.BROWSER_START_FAILED);
+
+        assertThat(repository.findByUserId(101L).orElseThrow().lastError()).isEqualTo(UserBrowserService.START_FAILED);
+        assertThat(runtime.containers()).isEmpty();
+    }
+
+    @Test
     @DisplayName("proxy 가 켜기를 거절하면 만든 컨테이너를 지우고 start_failed 로 둔 뒤 다시 켤 수 있다")
     void failsOnProxyErrorAndAllowsRetry() {
         UserBrowserService service = service(true, 2);
