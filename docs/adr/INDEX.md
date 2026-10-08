@@ -133,3 +133,4 @@
 | [ADR-20261008 / memory-facts](ADR-20261008-memory-facts.md) | 짧은 개인 기억은 본문까지 「개인 사실 구역」에 싣고, 답마다 참고한 기억을 사용자에게 보인다 | backend, frontend | Accepted. ADR-20261007 / memory-remember 의 「색인에 제목이 실린다」 를 개정하고 ADR-015 에 예외를 둔다 |
 | [ADR-20261008 / memory-remember-guard](ADR-20261008-memory-remember-guard.md) | 바로 저장은 모델이 다듬은 본문도 받고, 부정이 뒤집힌 글과 민감해 보이는 글과 오래된 대화만 제안으로 내린다 | backend, frontend | Accepted. ADR-20261007 / memory-remember 의 바로 저장 조건 2 와 5 를 개정한다 |
 | [ADR-20261008 / read-data-flow](ADR-20261008-read-data-flow.md) | 커넥터 READ 결과는 가는 곳마다 따로 판정하고, 판정하지 못하는 길은 감수로 적는다 | 공통 | Accepted. ADR-083 과 ADR-086 의 「감당할 것」 을 흐름마다 나눠 적는다 |
+| [ADR-20261008 / tossinvest-connector](ADR-20261008-tossinvest-connector.md) | 토스증권 커넥터는 읽기 도구만 두고, 토큰은 프로세스 메모리에서 한 번에 하나만 다시 받는다 | hermes | Accepted. ADR-20261008 / connector-binding-guards 의 두 선언과 ADR-20261008 / connector-output-files 의 파일 출력을 쓴다 |

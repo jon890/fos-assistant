@@ -1,0 +1,139 @@
+# 토스증권 커넥터
+
+사용자의 토스증권 계좌를 읽는 범용 커넥터다. 코드는 [`hermes/connectors/tossinvest/`](../../hermes/connectors/tossinvest) 에 있다.
+이 문서는 도구와 정책, 보안, 설정 안내, 실제 계정으로 확인하는 절차를 갖는다.
+결정은 [ADR-20261008 / tossinvest-connector](../adr/ADR-20261008-tossinvest-connector.md) 에 있다.
+커넥터 공통 계약은 [커넥터 연결](../connectors.md) 과 [커넥터 도구 정책](../backend/connector-tool-policy.md) 이 갖는다.
+
+**이 커넥터는 주문하지 않는다.** 주문, 정정, 취소 도구가 없다. 매수와 매도는 사용자가 토스증권 앱이나 웹에서 한다.
+
+## 등록 칸
+
+| 칸 | env | 비밀 | 무엇 |
+| --- | --- | --- | --- |
+| `client_id` | `TOSSINVEST_CLIENT_ID` | 아니다 | 토스증권 WTS 의 설정 > Open API 에서 받은 client ID |
+| `client_secret` | `TOSSINVEST_CLIENT_SECRET` | 그렇다 | 그 client 의 secret |
+| `account` | `TOSSINVEST_ACCOUNT_SEQ` | 아니다 | 읽을 계좌. 선택지 도구 `list_accounts` 가 계좌 순번과 끝 네 자리를 보이고, 계좌가 하나면 화면이 고른다 |
+
+셋 다 필수다. 운영자가 주는 값(`operator_env`)은 없다.
+확인 도구는 `list_accounts` 다. 등록할 때 두 값으로 토큰을 받고 계좌 목록을 읽어 보고, 읽히면 저장한다.
+
+| 선언 | 값 | 까닭 |
+| --- | --- | --- |
+| `single_binding` | 참 | 토스증권은 client 마다 유효한 토큰이 하나다. 두 에이전트에 붙이면 서로의 토큰을 무효로 만든다 |
+| `sandbox_required` | 참 | 키에 권한 범위가 없어 조회용 키로도 주문할 수 있다. 셸이 `.env` 를 읽는 profile 에 붙이지 않는다 |
+| `owner_output_env` | `TOSSINVEST_OUTPUT_DIR` | 주문 내역을 실행 공간에 파일로 낸다 |
+
+규칙은 [ADR-20261008 / connector-binding-guards](../adr/ADR-20261008-connector-binding-guards.md) 와 [ADR-20261008 / connector-output-files](../adr/ADR-20261008-connector-output-files.md) 가 갖는다.
+
+## 도구와 정책
+
+MCP 서버 이름은 `tossinvest` 다. 도구는 모두 `READ` 이고 승인 없이 돈다. 서버의 도구에도 `readOnlyHint` 를 참으로 둔다.
+
+| 도구 | 부르는 API | 하는 일 |
+| --- | --- | --- |
+| `list_accounts` | `GET /api/v1/accounts` | 계좌 순번, 계좌 유형, 계좌번호 끝 네 자리를 읽는다 |
+| `get_quotes` | `GET /api/v1/prices`, `GET /api/v1/stocks` | 종목 20개까지의 현재가와 이름을 읽는다 |
+| `get_holdings` | `GET /api/v1/holdings` | 보유 종목과 평가, 손익을 읽는다 |
+| `get_buying_power` | `GET /api/v1/buying-power`, `GET /api/v1/sellable-quantity` | 통화별 주문 가능 현금과, 종목을 주면 그 종목의 매도 가능 수량을 읽는다 |
+| `list_orders` | `GET /api/v1/orders` | 미체결이나 끝난 주문을 기간으로 읽는다. 파일로 낼 수 있다 |
+
+계좌 데이터(보유, 잔고, 주문)도 `READ` 다. 연결이 붙은 에이전트는 주인만 쓰고, 메일 본문을 `READ` 로 둔 Gmail 커넥터와 같은 판단이다. 먼저 살펴보기와 예약 작업이 계좌를 읽는다.
+
+### 도구의 인자와 결과
+
+| 도구 | 인자 | 결과 |
+| --- | --- | --- |
+| `list_accounts` | 없음 | `{accounts: [{account_seq, account_type, label}]}`. `label` 은 `종합매매 ****1234` 꼴이다. 계좌번호 원문은 싣지 않는다 |
+| `get_quotes` | `symbols`: 쉼표로 이은 종목 코드나 티커 1~20개 | `{quotes: [{symbol, name, last_price, currency, timestamp}]}` |
+| `get_holdings` | 없음 | `{total: {...}, items: [{symbol, name, market, currency, quantity, last_price, average_purchase_price, market_value, profit_loss, profit_loss_rate, daily_profit_loss, daily_profit_loss_rate}]}`. 금액과 수량은 API 가 준 10진수 글 그대로다 |
+| `get_buying_power` | `currency`: `KRW` 나 `USD`. `symbol`: 선택 | `{currency, cash_buying_power, sellable_quantity?}` |
+| `list_orders` | `status`: `OPEN` 이나 `CLOSED`. `from`, `to`: 선택, `YYYY-MM-DD`(한국 시각). `symbol`: 선택. `output`: 선택, `"file"` | 아래 「주문 내역」 |
+
+종목 기호는 `^[A-Za-z0-9.]{1,12}$` 만 받는다. 날짜는 `from` 이 `to` 보다 늦거나 기간이 366일을 넘으면 `TOSSINVEST_INVALID_INPUT` 이다.
+
+### 주문 내역
+
+`output` 이 없으면 주문 100건까지를 결과에 담고 `has_more` 로 더 있는지 알린다.
+`output: "file"` 이면 기간 전체를 한 파일에 쓴다. 끝난 주문은 커서로 100건씩 최대 20쪽까지 돈다. 넘으면 일부만 쓰지 않고 `TOSSINVEST_TOO_MANY_ORDERS` 로 끝낸다.
+
+파일은 `TOSSINVEST_OUTPUT_DIR` 아래 `orders-<UTC 시각>-<난수>.jsonl` 이고, 한 줄이 주문 하나다.
+
+| 칸 | 뜻 |
+| --- | --- |
+| `order_id`, `symbol`, `side`, `order_type`, `status`, `currency` | API 값 그대로 |
+| `price`, `quantity`, `order_amount` | API 가 준 10진수 글. 없으면 null |
+| `filled_quantity`, `average_filled_price`, `filled_amount`, `commission`, `tax` | `execution` 의 값. 10진수 글이거나 null |
+| `ordered_at`, `filled_at`, `canceled_at`, `settlement_date` | API 값 그대로 |
+
+결과는 `{file, count, from, to, fields}` 다. 항목 내용은 담지 않는다.
+금액은 10진수 글로 둔다. 미국 주식의 달러 금액과 소수점 수량이 있어 정수로 바꾸면 값이 바뀐다. 스크립트는 `decimal` 로 더한다.
+쓸 때마다 그 디렉터리에서 24시간 지난 자기 파일을 지운다. 값이 비었으면(실행 공간 정책에 출력 루트가 없다) `TOSSINVEST_OUTPUT_UNAVAILABLE` 로 거절한다.
+
+### 토큰
+
+- 토큰은 프로세스 메모리에만 둔다.
+- `401 token-revoked` 나 `expired-token` 을 받으면 토큰을 한 번 새로 받고 그 호출을 한 번만 다시 보낸다. 한 프로세스 안의 재발급은 한 번에 하나다.
+- `invalid-token` 과 `invalid_client` 는 다시 받지 않는다.
+- 확인 도구와 선택지 호출은 새 프로세스라 토큰을 새로 받는다. 그때 Hermes 쪽 프로세스의 토큰이 무효가 되고 다음 호출이 한 번 다시 받는다.
+
+### 오류
+
+| 코드 | 공통 어휘 | 복구 | 언제 |
+| --- | --- | --- | --- |
+| `TOSSINVEST_UNAUTHORIZED` | `credential_rejected` | `reconnect` | client ID 나 secret 이 틀렸다(`invalid_client`), 토큰을 다시 받아도 거절됐다 |
+| `TOSSINVEST_IP_NOT_ALLOWED` | `forbidden` | `reconnect` | `403 ip-not-allowed`. 허용 IP 가 바뀌었을 수 있다 |
+| `TOSSINVEST_FORBIDDEN` | `forbidden` | | 그 밖의 403 |
+| `TOSSINVEST_ACCOUNT_NOT_FOUND` | `invalid_input` | `reconnect` | 고른 계좌 순번이 없다 |
+| `TOSSINVEST_INVALID_INPUT` | `invalid_input` | | 인자가 형식에 맞지 않는다 |
+| `TOSSINVEST_TOO_MANY_ORDERS` | `invalid_input` | | 파일 출력이 2,000건을 넘는다. 기간을 줄인다 |
+| `TOSSINVEST_OUTPUT_UNAVAILABLE` | `unavailable` | | 출력 디렉터리가 없다 |
+| `TOSSINVEST_RATE_LIMITED` | `unavailable` | `retry_later` | 429 |
+| `TOSSINVEST_NETWORK`, `TOSSINVEST_UNAVAILABLE` | `unavailable` | `retry_later` | 닿지 못했거나 5xx |
+
+결과와 오류에 토큰, secret, 계좌번호 원문, 서비스가 준 오류 원문을 싣지 않는다.
+
+## 서버와 검사
+
+`src/server.ts` 가 stdio MCP 서버이고 `dist/tossinvest-mcp.js` 로 묶어 커밋한다. 검사는 `tests/` 에서 로컬 HTTP 대역으로 돈다. 실제 서비스에 닿지 않는다.
+대역은 받은 요청의 메서드와 경로를 허용 목록과 견준다. 목록은 위 다섯 도구가 부르는 `GET` 과 `POST /oauth2/token` 뿐이다. `POST /api/v1/orders` 같은 다른 경로가 오면 시험이 실패한다.
+
+## 보안
+
+- **돈이 움직이는 도구가 없다.** 그러나 키 자체는 주문할 수 있다. 키가 새면 허용 IP 에서 주문할 수 있다. 실행 공간도 같은 공인 IP 로 나가므로 허용 IP 는 셸에 샌 키를 막지 못한다. 그래서 `sandbox_required` 다.
+- 외부 글이 모델을 속였을 때 닿는 범위: 이 커넥터에는 쓰는 도구가 없다. 속은 모델이 할 수 있는 것은 읽은 계좌 데이터를 다른 도구(셸, 웹)로 내보내는 것이다. 그 길은 [READ 데이터 흐름](../read-data-flow.md) 의 RF-08, RF-09 와 같다.
+- 보유와 잔고가 모델 공급자에게 간다(RF-20). 사용자가 받아들였다.
+- 토스증권 이용 약관은 시세의 제3자 제공을 금지한다. 모델 공급자 전송이 여기 드는지는 확인하지 못했다.
+
+## 설정 안내
+
+### 1. client 받기
+
+1. 토스증권 WTS 에 로그인해 설정 > Open API 에서 client 를 만든다. **이 커넥터 전용 client 를 따로 만든다.** 같은 client 를 다른 프로그램에서 쓰면 서로의 토큰을 무효로 만든다.
+2. 같은 화면의 허용 IP 관리에 Hermes 가 밖으로 나가는 공인 IP 를 등록한다. 어떤 IP 인지는 운영자에게 묻는다.
+
+### 2. 연결 화면에 넣기
+
+client ID 와 secret 을 넣으면 계좌 목록이 뜬다. 읽을 계좌를 고르고 저장한다.
+그 뒤 실행 공간이 있는 자기 비공개 에이전트 하나에 붙인다. 실행 공간이 없는 에이전트에는 붙지 않는다.
+
+### 3. 허용 IP 가 바뀌었을 때
+
+가정 회선은 공인 IP 가 바뀔 수 있다. 바뀌면 모든 호출이 `TOSSINVEST_IP_NOT_ALLOWED` 로 실패하고, 에이전트가 허용 IP 를 확인하라고 안내한다.
+WTS 에서 허용 IP 를 고친 뒤 연결 화면에서 연결 확인을 누른다. IP 가 바뀌었다는 알림은 운영이 한다.
+연결 상태는 저절로 바뀌지 않는다. 연결 확인이 같은 오류로 실패해야 연결이 `PENDING` 이 된다.
+
+### 4. 끊기
+
+연결을 해제하면 보관 파일과 붙은 profile 의 값이 지워진다. 토스증권 WTS 에서 그 client 도 지운다.
+
+## 실제 계정으로 확인하기
+
+배포 뒤 소유자가 자기 계정으로 한 번 확인한다. 계좌번호, 금액, 종목은 어디에도 적지 않는다.
+
+1. 연결 화면에서 등록하고, 계좌가 끝 네 자리로 보이는지 본다
+2. 실행 공간이 없는 에이전트에 붙이면 거절되는지, 있는 에이전트에 붙는지 본다
+3. 같은 연결을 두 번째 에이전트에 붙이면 거절되는지 본다
+4. 대화에서 보유 종목, 현재가, 주문 가능 현금, 이번 달 끝난 주문을 묻는다
+5. 이번 달 끝난 주문을 파일로 받아 스크립트로 건수를 세게 한다
+6. 연결 확인을 누른 직후 대화에서 다시 보유 종목을 물어, 토큰을 한 번 다시 받고 성공하는지 본다
