@@ -148,6 +148,14 @@ PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
 LINK_MAX_CHARS = 500
 
 
+# 링크 모양이다. Control Plane 이 같은 식을 `matches()` 로 쓰므로 여기서는 `fullmatch` 로 쓴다.
+# URL 해석기는 언어마다 받는 범위가 달라 쓰지 않는다. 식을 바꾸면 Control Plane 의 식도 함께 바꾼다.
+LINK_RE = re.compile(
+    r"^https://[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)*"
+    r"(?::[0-9]{1,5})?(?:[/?#](?:[A-Za-z0-9\-._~!$&'()*+,;=:@/?#]|%[0-9A-Fa-f]{2})*)?$"
+)
+
+
 # 이 금지 목록은 `<img>` 앞의 두 번째 선이다(ADR-20261008 connector-card). Control Plane 의 같은 식과 같아야 한다.
 # `re.ASCII` 로 공백과 대소문자 무시를 ASCII 기준으로 둔다. Java 정규식의 기본 동작과 같게 하기 위해서다.
 SVG_FORBIDDEN_RE = re.compile(

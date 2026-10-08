@@ -123,6 +123,20 @@ def _read_connector_json(root: pathlib.Path, relative: str):
     return json.loads(path.read_text(encoding="utf-8"))
 
 
+def _appearance_or_none(connector_id: str, name: str, read):
+    """카드 칸 하나를 읽는다. 틀리면 그 칸만 None 으로 두고 경고를 남긴다(ADR-20261008 connector-card).
+
+    카탈로그는 도구 정책 판정과 바인딩 설치도 먹이므로, 장식 칸 하나 때문에 커넥터를 빼지 않는다.
+    로그에는 경로와 값을 싣지 않고 직접 낸 사유만 적는다.
+    """
+    try:
+        return read()
+    except Exception as error:
+        reason = str(error) if type(error) is ValueError else type(error).__name__
+        logger.warning("dashboard-profile-api: 커넥터 %r 의 %s 칸을 버렸다: %s", connector_id, name, reason)
+        return None
+
+
 def _load_connector(connector_id: str, entry: dict) -> dict:
     """plugin 디렉터리의 `connector.json`, `.mcp.json`, `plugin.json` 을 읽어 검증한다. 틀리면 예외다.
 
@@ -145,8 +159,8 @@ def _load_connector(connector_id: str, entry: dict) -> dict:
     if (not isinstance(declared.get("title"), str) or not declared["title"]
             or not isinstance(declared.get("description", ""), str)):
         raise ValueError("title 과 description 은 문자열이다")
-    icon = _connector_icon(root, declared.get("icon"))
-    link = _connector_link(declared.get("link"))
+    icon = _appearance_or_none(connector_id, "icon", lambda: _connector_icon(root, declared.get("icon")))
+    link = _appearance_or_none(connector_id, "link", lambda: _connector_link(declared.get("link")))
     fields = _connector_fields(declared.get("fields"))
     verify = declared.get("verify")
     if (not isinstance(verify, dict) or not isinstance(verify.get("tool"), str)

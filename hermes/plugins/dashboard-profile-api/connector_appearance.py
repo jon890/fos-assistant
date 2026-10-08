@@ -8,14 +8,16 @@
 from __future__ import annotations
 
 import base64
+import os
 import pathlib
-import urllib.parse
+import stat
 
 from .connector_schema import (
     ICON_MAX_BYTES,
     ICON_MEDIA_TYPES,
     ICON_PATH_RE,
     LINK_MAX_CHARS,
+    LINK_RE,
     PNG_SIGNATURE,
     SVG_FORBIDDEN_RE,
 )
@@ -41,7 +43,14 @@ def _connector_icon(root: pathlib.Path, declared) -> dict | None:
     # `root` 는 링크가 없음을 앞에서 확인했다. 그러므로 푼 경로가 같으면 경로의 어느 조각도 링크가 아니다.
     if path.resolve() != path or not path.is_relative_to(root) or not path.is_file():
         raise ValueError("icon 이 plugin 안의 링크 없는 파일이 아니다")
-    with path.open("rb") as handle:
+    # 확인과 열기 사이에 마지막 조각이 링크로 바뀌어도 따라가지 않는다. 연 파일이 일반 파일인지 다시 본다.
+    try:
+        descriptor = os.open(path, os.O_RDONLY | os.O_NOFOLLOW)
+    except OSError:
+        raise ValueError("icon 이 plugin 안의 링크 없는 파일이 아니다") from None
+    with os.fdopen(descriptor, "rb") as handle:
+        if not stat.S_ISREG(os.fstat(handle.fileno()).st_mode):
+            raise ValueError("icon 이 plugin 안의 링크 없는 파일이 아니다")
         # 상한보다 한 바이트 더 읽어, 큰 파일을 끝까지 읽지 않고 넘침을 안다.
         data = handle.read(ICON_MAX_BYTES + 1)
     if not data or len(data) > ICON_MAX_BYTES:
@@ -92,16 +101,6 @@ def _connector_link(declared) -> str | None:
     """선언한 링크를 그대로 돌려준다. 선언이 없으면 None, 틀리면 예외다. 예외 글에 링크를 싣지 않는다."""
     if declared is None:
         return None
-    if (not isinstance(declared, str) or len(declared) > LINK_MAX_CHARS
-            or any(char.isspace() or ord(char) < 0x20 or 0x7f <= ord(char) <= 0x9f for char in declared)):
-        raise ValueError("link 는 공백과 제어 문자가 없는 %d자 이하의 글이다" % LINK_MAX_CHARS)
-    try:
-        parts = urllib.parse.urlsplit(declared)
-        hostname, username, password = parts.hostname, parts.username, parts.password
-    except ValueError:
-        raise ValueError("link 를 URL 로 읽지 못한다") from None
-    # `urlsplit` 은 scheme 을 소문자로 바꾼다. Control Plane 은 원문 그대로 `https` 인지 보므로 원문의 앞부분도 본다.
-    if (parts.scheme != "https" or not declared.startswith("https:") or not hostname
-            or username is not None or password is not None):
-        raise ValueError("link 는 사용자 정보가 없는 https 주소다")
+    if not isinstance(declared, str) or len(declared) > LINK_MAX_CHARS or not LINK_RE.fullmatch(declared):
+        raise ValueError("link 는 %d자 이하이고 링크 모양에 맞는 https 주소다" % LINK_MAX_CHARS)
     return declared

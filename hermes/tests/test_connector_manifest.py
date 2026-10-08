@@ -843,10 +843,42 @@ def svg_of_size(size):
     return svg(" " * (size - len(empty)))
 
 
+# 링크 모양의 시험 벡터다. Control Plane 의 `ConnectorAppearancesTest` 가 같은 목록을 단언한다. 한쪽을 바꾸면 다른 쪽도 바꾼다.
+ACCEPTED_LINKS = (
+    "https://mail.google.com/",
+    "https://blog.naver.com/",
+    "https://example.com",
+    "https://example.com:8443/a?b=1&c=%20#x",
+    "https://xn--9n2bp8q.com/",
+    "https://example.com/" + "a" * (500 - len("https://example.com/")),
+)
+REJECTED_LINKS = (
+    "https://example.com/a|b",
+    'https://example.com/a"b',
+    "https://example.com/<x>",
+    "https://example.com/{x}",
+    "https://example.com/a^b",
+    "https://example.com/%zz",
+    "https://my_host.example.com/",
+    "https://example.com:abc/",
+    "https://예시.com/한글",
+    "https://a..b/",
+    "https://-bad-.com/",
+    "http://example.com/",
+    "HTTPS://example.com/",
+    "https://user@example.com/",
+    "https://example.com/a b",
+    "https://example.com/a\\b",
+    "https://[::1]/",
+    "https://example.com/?a[]=1",
+    "https://example.com/" + "a" * (501 - len("https://example.com/")),
+)
+
+
 class ConnectorAppearanceTest(ConnectorGateCase):
     """커넥터 카드의 `icon` 과 `link` 를 검증해 카탈로그에 싣는 규칙을 검사한다(ADR-20261008 connector-card).
 
-    `icon` 이나 `link` 가 규칙을 하나라도 어기면 그 커넥터는 카탈로그에서 빠진다. 다른 `connector.json` 칸과 같다.
+    `icon` 이나 `link` 가 규칙을 하나라도 어기면 그 칸만 null 이고 커넥터는 카탈로그에 그대로 나온다.
     """
 
     def declare(self, **values):
@@ -865,9 +897,21 @@ class ConnectorAppearanceTest(ConnectorGateCase):
         self.assertEqual([entry["id"] for entry in body], [DEMO], "아이콘 %s 를 받지 않았다" % name)
         return body[0]["icon"]
 
-    def assert_left_out(self):
-        self.assertEqual(self.catalog(), [])
-        self.assertIsNone(self.plugin._connector_manifest(DEMO))
+    def catalog_entry(self):
+        """카탈로그에 시험 커넥터 하나만 있음을 확인하고 그 항목을 돌려준다."""
+        body = self.catalog()
+        self.assertEqual([entry["id"] for entry in body], [DEMO])
+        return body[0]
+
+    def warnings_while(self, action):
+        """`action` 을 부르는 동안 남은 경고 로그를 한 글로 돌려준다. 준비가 로그를 꺼 두므로 그동안만 켠다."""
+        logging.disable(logging.NOTSET)
+        try:
+            with self.assertLogs(self.plugin.logger, level="WARNING") as logs:
+                action()
+        finally:
+            logging.disable(logging.CRITICAL)
+        return "\n".join(logs.output)
 
     def test_declared_svg_icon_and_link_reach_the_catalog(self):
         """선언한 SVG 아이콘은 `media_type` 과 파일 원본의 base64 로, 링크는 그대로 나온다."""
@@ -903,16 +947,31 @@ class ConnectorAppearanceTest(ConnectorGateCase):
         self.assertEqual(len(data), ICON_MAX_BYTES)
         self.assertEqual(self.catalog_icon("icon.svg", data)["data"], base64.b64encode(data).decode("ascii"))
 
-    def test_link_of_exactly_the_limit_is_accepted(self):
-        link = "https://example.com/" + "a" * (500 - len("https://example.com/"))
-        self.assertEqual(len(link), 500)
-        self.declare(link=link)
-        self.assertEqual(self.catalog()[0]["link"], link)
+    def test_links_of_the_link_shape_are_accepted(self):
+        """링크 모양에 맞는 링크는 그대로 나온다. 500자 링크도 받는다."""
+        for link in ACCEPTED_LINKS:
+            with self.subTest(link=link[:60]):
+                self.declare(link=link)
+                self.assertEqual(self.catalog_entry()["link"], link)
 
-    def test_invalid_icon_or_link_leaves_the_connector_out(self):
-        """아이콘의 경로, 크기, 형식이나 링크가 하나라도 틀리면 그 커넥터는 카탈로그에 없다."""
+    def test_links_outside_the_link_shape_are_dropped(self):
+        """링크 모양을 벗어난 링크는 그 칸만 null 이고 아이콘과 커넥터는 남는다."""
+        icon = (DEMO_CONNECTOR / "icon.svg").read_bytes()
+        expected_icon = {"media_type": "image/svg+xml", "data": base64.b64encode(icon).decode("ascii")}
+        for link in REJECTED_LINKS:
+            with self.subTest(link=link[:60]):
+                self.declare(icon="icon.svg", link=link)
+                entry = self.catalog_entry()
+                self.assertIsNone(entry["link"], "링크 %r 를 받았다" % link)
+                self.assertEqual(entry["icon"], expected_icon)
+        self.declare(link={"href": "https://example.com/"})
+        self.assertIsNone(self.catalog_entry()["link"])
+
+    def test_invalid_icon_drops_only_the_icon(self):
+        """아이콘의 경로, 크기, 형식이 하나라도 틀리면 아이콘 칸만 null 이고 링크와 커넥터는 남는다."""
         outside = self.base / "outside.svg"
         outside.write_bytes(svg())
+        link = "https://example.com/notes"
 
         def icon(name, data=None):
             def change():
@@ -949,21 +1008,36 @@ class ConnectorAppearanceTest(ConnectorGateCase):
             ('xlink:href="javascript:..."', icon("icon.svg", svg('<a xlink:href="javascript:alert(1)"/>'))),
             ("url(http...)", icon("icon.svg", svg('<rect fill="url(http://example.com/g)"/>'))),
             ("does not start with svg", icon("icon.svg", b"<g/>" + svg())),
-            ("http link", lambda: self.declare(link="http://example.com/")),
-            ("upper-case scheme", lambda: self.declare(link="HTTPS://example.com/")),
-            ("https link without host", lambda: self.declare(link="https:///path")),
-            ("https link with user", lambda: self.declare(link="https://user@example.com/")),
-            ("link with a space", lambda: self.declare(link="https://example.com/a b")),
-            ("501-character link", lambda: self.declare(link="https://example.com/" + "a" * 481)),
-            ("link not a string", lambda: self.declare(link={"href": "https://example.com/"})),
         )
-        manifest = (self.connector_root / "connector.json").read_bytes()
+        original = (self.connector_root / "icon.svg").read_bytes()
         for label, change in cases:
             with self.subTest(label):
+                self.declare(link=link)
                 change()
-                self.assert_left_out()
-                (self.connector_root / "connector.json").write_bytes(manifest)
-                self.assertEqual([entry["id"] for entry in self.catalog()], [DEMO])
+                entry = self.catalog_entry()
+                self.assertIsNone(entry["icon"], "%s 아이콘을 받았다" % label)
+                self.assertEqual(entry["link"], link)
+                (self.connector_root / "icon.svg").write_bytes(original)
+
+    def test_dropped_field_is_logged_without_path_or_value(self):
+        """버린 칸은 커넥터 번호, 칸 이름, 직접 낸 사유만 경고 로그에 남는다. 경로와 링크 값은 없다."""
+        secret_link = "https://example.com/a|private"
+        self.declare(icon="missing-private.svg", link=secret_link)
+        output = self.warnings_while(self.catalog_entry)
+        self.assertIn("커넥터 %r 의 icon 칸을 버렸다" % DEMO, output)
+        self.assertIn("커넥터 %r 의 link 칸을 버렸다" % DEMO, output)
+        for leaked in ("missing-private", "private", str(self.base)):
+            self.assertNotIn(leaked, output)
+
+    def test_dot_dot_segment_is_rejected_by_the_path_rule(self):
+        """`assets/../icon.svg` 는 정규식을 통과하고 가리키는 파일도 있지만 `..` 조각 때문에 경로 규칙에서 거절한다."""
+        (self.connector_root / "assets").mkdir()
+        self.assertTrue((self.connector_root / "assets/../icon.svg").is_file())
+        self.declare(icon="assets/../icon.svg")
+        entries = []
+        output = self.warnings_while(lambda: entries.append(self.catalog_entry()))
+        self.assertIsNone(entries[0]["icon"])
+        self.assertIn("icon 칸을 버렸다: icon 은 plugin 디렉터리 기준 상대 경로다", output)
 
     def test_many_comments_before_the_root_finish_quickly(self):
         """주석이 많은 SVG 도 1초 안에 판정한다. `<svg/>` 가 뒤따르면 받고 다른 글이면 거절한다."""
@@ -973,7 +1047,7 @@ class ConnectorAppearanceTest(ConnectorGateCase):
         accepted = time.monotonic() - started
         self.write("icon.svg", comments + b"X")
         started = time.monotonic()
-        self.assert_left_out()
+        self.assertIsNone(self.catalog_entry()["icon"])
         rejected = time.monotonic() - started
         self.assertLess(accepted, 1.0, "주석 뒤 <svg/> 판정이 %.3f 초 걸렸다" % accepted)
         self.assertLess(rejected, 1.0, "주석 뒤 X 판정이 %.3f 초 걸렸다" % rejected)

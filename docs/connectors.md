@@ -80,7 +80,7 @@ plugin 디렉터리 root 에 둔다. 소유는 그 plugin 의 저장소다. 같�
 - `.mcp.json` 서버 env 는 `fields[].env` 와 `operator_env`, `owner_attachments_env` 의 합과 같아야 한다. 세 이름은 겹치지 않는다. 하나라도 다르면 그 커넥터를 카탈로그에 내지 않는다
 - `toolsets` 가 목록이 아니거나, 이름이 겹치거나, `vision` 밖의 이름이 하나라도 있으면 그 커넥터를 카탈로그에 내지 않는다. 셸, 파일, 기억, 스킬, 위임 도구는 manifest 로 열리지 않는다([ADR-044](adr/ADR-044-커넥터-manifest-는-읽기-전용-이미지-도구만-열-수-있다.md))
 - `attachments` 가 참인데 `toolsets` 에 `vision` 이 없으면 그 커넥터를 카탈로그에 내지 않는다. 사진은 파일로 놓이고 에이전트가 이미지 도구로 읽기 때문이다([ADR-020](adr/ADR-020-사진은-공유-디렉터리에-두고-에이전트가-파일로-읽는다.md))
-- `icon` 이나 `link` 가 아래 「아이콘과 링크」 를 어기면 그 커넥터를 카탈로그에 내지 않는다
+- `icon` 이나 `link` 가 아래 「아이콘과 링크」 를 어기면 그 칸만 null 로 내고 경고 로그를 남긴다. 커넥터는 카탈로그에 그대로 나온다
 - 도구 결과는 MCP 응답의 첫 텍스트 칸을 JSON 으로 읽는다. `structuredContent` 가 있으면 그것을 먼저 쓴다. 실패는 `isError: true` 와 `{"error": {"code": "..."}}` 다
 
 ### 아이콘과 링크
@@ -89,8 +89,9 @@ plugin 디렉터리 root 에 둔다. 소유는 그 plugin 의 저장소다. 같�
 
 - `icon` 은 `^[A-Za-z0-9_][A-Za-z0-9_./-]{0,127}$` 이고 `..` 조각이 없다. 가리키는 파일은 plugin 안에 있고 그 경로의 어느 조각도 링크가 아니며 32 KiB 이하다
 - 카탈로그는 아이콘 파일의 내용을 `icon: {media_type, data}` 로 싣는다. `media_type` 은 `image/svg+xml` 이나 `image/png` 이고 `data` 는 base64 다. 선언이 없으면 `icon: null` 이다
-- `link` 는 선언이 없으면 `null` 이다
-- Control Plane 은 같은 규칙으로 다시 검사한다. 어긋나면 그 칸만 `null` 로 두고 경고 로그에 커넥터 번호만 남긴다
+- SVG 아이콘은 `xmlns="http://www.w3.org/2000/svg"` 를 선언한다. 없으면 `<img>` 가 아무것도 그리지 않는다. 색은 `currentColor` 가 아닌 고정 색이다. `<img>` 안의 SVG 는 글자색을 물려받지 않는다
+- `link` 의 모양은 ADR 의 「링크 모양」 이 갖는다. 선언이 없으면 `null` 이다
+- Control Plane 은 같은 규칙으로 다시 검사한다. 어긋나면 그 칸만 `null` 로 두고 경고 로그에 커넥터 번호와 칸 이름만 남긴다
 - 화면은 아이콘을 `<img>` 로만 그리고, 없으면 기본 아이콘을 보인다. 링크는 새 탭으로 열고 `rel="noopener noreferrer"` 다
 - 상표 로고 파일을 복사하지 않는다. 직접 그린 단순한 도형을 쓴다
 
