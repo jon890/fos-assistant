@@ -13,9 +13,9 @@ API 경로의 `execute_code` 가 docker 실행 공간에서만 승인 없이 돌
 
 - `hermes/plugins/dashboard-profile-api/toolconfig.py` 의 셸 계열 도구 저장 검사가 `updated["terminal"]` 을 두 곳에서 쓴다.
   `if sandbox is not None:` 분기에서 `_sandbox_terminal(sandbox, profile, owner, prepared)` 를, `elif local_execution:` 분기에서 local `terminal` 을 쓴다.
-  그 뒤 `if updated.get("agent") != saved.get("agent") or updated.get("terminal") != saved.get("terminal"):` 일 때만 `request.state.fos_checked_config` 를 둬 처리기 앞에서 설정을 쓴다(`routes.py` 의 `_write_checked_config`).
+  그 뒤 `if updated.get("agent") != saved.get("agent") or updated.get("terminal") != saved.get("terminal"):` 일 때만 `request.state.fos_checked_config` 를 둔다. `routes.py` 가 처리기 앞에서 `toolconfig.py` 의 `_write_checked_config` 로 그 설정을 쓴다.
 - `hermes/plugins/dashboard-profile-api/connector_isolated.py` 의 `_connector_config` 가 사진 도구 옛 설치에서 같은 일을 한다. `if sandbox_terminal is not None:` 와 `elif local_execution:` 분기다. 이 함수는 바뀐 `updated` 를 통째로 YAML 로 쓴다.
-- 실행 공간 설정 helper 는 `hermes/plugins/dashboard-profile-api/sandbox.py` 가 갖는다(`_sandbox_terminal`).
+- 실행 공간 설정 helper 는 `hermes/plugins/dashboard-profile-api/sandbox.py` 가 갖는다(`_sandbox_terminal`). 그 파일은 388줄이고 `scripts/check-file-length.mjs` 가 `hermes/` 아래 `.py` 를 400줄로 제한한다. 그래서 새 helper 는 새 모듈 `sandbox_approvals.py` 에 둔다.
 - Hermes 는 `approvals.unattended_mode` 를 판정할 때마다 그 profile 설정에서 읽고, 값 `approve` 를 승인으로 본다.
 
 **근거 문서**: `docs/adr/ADR-20261008-execute-code-unattended.md`, `hermes/README.md` 의 「셸 실행 공간」, `docs/hermes/sandbox.md` 의 「`execute_code` 의 승인 판정」
@@ -30,7 +30,9 @@ API 경로의 `execute_code` 가 docker 실행 공간에서만 승인 없이 돌
 
 ## 작업 항목
 
-### 1. `hermes/plugins/dashboard-profile-api/sandbox.py` 에 helper 를 더한다
+### 1. 새 모듈 `hermes/plugins/dashboard-profile-api/sandbox_approvals.py` 에 helper 를 둔다
+
+모듈 머리에 `from __future__ import annotations` 를 두고, 다른 plugin 모듈을 import 하지 않는다.
 
 ```python
 # docker 실행 공간에서만 API 경로의 execute_code 를 승인 없이 돌린다(ADR-20261008 / execute-code-unattended).
@@ -50,13 +52,14 @@ def _with_sandbox_approvals(saved: dict, updated: dict, docker: bool) -> dict:
 - docker 분기에서 `updated["terminal"] = _sandbox_terminal(...)` 바로 뒤에 `updated = _with_sandbox_approvals(saved, updated, True)`.
 - local 분기에서 `updated["terminal"] = terminal` 바로 뒤에 `updated = _with_sandbox_approvals(saved, updated, False)`.
 - `fos_checked_config` 를 두는 조건에 `or updated.get("approvals") != saved.get("approvals")` 를 더한다. 바로 위 주석에 approvals 를 함께 적는다.
-- `from .sandbox import` 목록에 `_with_sandbox_approvals` 를 더한다.
+- `from .sandbox_approvals import _with_sandbox_approvals` 를 더한다.
 
 ### 3. `hermes/plugins/dashboard-profile-api/connector_isolated.py` 가 helper 를 부른다
 
 - `if sandbox_terminal is not None:` 분기에서 terminal 을 쓴 뒤 `updated = _with_sandbox_approvals(saved, updated, True)`.
 - `elif local_execution:` 분기에서 terminal 을 쓴 뒤 `updated = _with_sandbox_approvals(saved, updated, False)`.
-- import 를 더한다.
+- `from .sandbox_approvals import _with_sandbox_approvals` 를 더한다.
+- `elif local_execution:` 분기는 지금 라우트로 닿지 않는다(`connector_install.py` 가 `local_execution` 을 False 로만 넘긴다). 「local 을 쓰는 곳은 언제나 키를 지운다」 는 불변식을 지키려고 같은 호출을 넣는다. 이 분기의 시험은 두지 않는다.
 
 ### 4. 이 phase 를 검증하는 시험
 
@@ -76,19 +79,22 @@ def _with_sandbox_approvals(saved: dict, updated: dict, docker: bool) -> dict:
 
 ## 검증
 
+로컬 준비: `web/node_modules` 가 없으면 `pnpm --dir web install --frozen-lockfile` 을 먼저 돌린다(`scripts/quality.sh` 가 그것을 쓴다).
+`bun` 이 없는 머신에서는 `test_connectors_contract` 가 「커넥터 실행 파일을 찾지 못한다」 로 5건 실패한다. CI 는 Bun 을 설치하고 돈다. 그 5건 말고 실패가 없으면 통과로 본다.
+
 ```bash
 python3 -m unittest discover -s hermes/tests -p 'test_dashboard_profile_api_sandbox_*.py' -v
 python3 -m unittest discover -s hermes/tests
 scripts/quality.sh check
 ```
 
-기대값: 세 명령 모두 종료 코드 0. 위 여섯 시험이 첫 명령의 출력에 `ok` 로 나온다.
+기대값: 첫 명령과 셋째 명령은 종료 코드 0. 둘째 명령은 `test_connectors_contract` 의 위 5건 말고 실패와 오류가 없다(bun 이 있으면 종료 코드 0). 위 여섯 시험이 첫 명령의 출력에 `ok` 로 나온다.
 
 ## 변경 파일
 
 | 파일 | 변경 |
 |---|---|
-| `hermes/plugins/dashboard-profile-api/sandbox.py` | 수정 |
+| `hermes/plugins/dashboard-profile-api/sandbox_approvals.py` | 신규 |
 | `hermes/plugins/dashboard-profile-api/toolconfig.py` | 수정 |
 | `hermes/plugins/dashboard-profile-api/connector_isolated.py` | 수정 |
 | `hermes/tests/test_dashboard_profile_api_sandbox_terminal.py` | 수정 |
