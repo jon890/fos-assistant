@@ -318,8 +318,16 @@ class DailyLoopPilotTest {
         assertThat(day.evaluationOutcome()).isEqualTo(DecisionOutcome.EVALUATED.name());
         assertThat(day.evaluationTotal()).as("1일 뒤 평가 수").isEqualTo(1);
         assertThat(day.levels()).containsOnlyKeys(DEADLINE, BACKLOG);
-        assertThat(day.levels().get(DEADLINE)).as("중요한 후보는 침묵하지 않는다").isNotEqualTo(AutonomyLevel.IGNORE.name());
+        assertThat(importantLevels(day)).as("1일 중요한 후보").isNotEmpty().doesNotContain(AutonomyLevel.IGNORE.name());
         assertLevelsAllowed(day, false);
+    }
+
+    /** 그날 판정을 받은 후보 가운데 fixture 가 중요하다고 적은 것의 수준이다. */
+    private static List<String> importantLevels(DayResult day) {
+        return day.levels().entrySet().stream()
+                .filter(each -> truthOf(each.getKey()).important())
+                .map(Map.Entry::getValue)
+                .toList();
     }
 
     private void assertDay2(DayResult day) {
@@ -360,9 +368,10 @@ class DailyLoopPilotTest {
         assertThat(day.acceptedKeys()).containsExactly(DEADLINE);
         assertThat(day.levels().values().stream().filter(AutonomyLevel.EXECUTE.name()::equals))
                 .as("6일 EXECUTE 수")
-                .hasSizeLessThanOrEqualTo(1);
+                .hasSize(1);
         assertLevelsAllowed(day, true);
-        assertThat(day.autonomousStarted()).as("6일 자동 실행 살펴보기 수").isLessThanOrEqualTo(1);
+        assertThat(day.autonomousStarted()).as("6일 자동 실행 살펴보기 수").isEqualTo(1);
+        assertThat(before.autonomousStarted()).as("재발행 전 자동 실행 수").isEqualTo(1);
         assertThat(after).as("같은 끝 사건을 다시 낸 뒤의 시도, 평가, 판정, 자동 실행 수").isEqualTo(before);
         List<Long> autonomousChecks = checksOfAgent().stream()
                 .filter(check -> check.trigger() == CheckTrigger.AUTONOMY)
@@ -483,6 +492,8 @@ class DailyLoopPilotTest {
         Map<String, String> levels = new LinkedHashMap<>();
         decided.forEach(
                 each -> levels.put(keys.get(each.candidateId()), each.level().name()));
+        int modelCalls = provider.calls() - callsBefore;
+        EvalDataset.ProviderProfile profile = DATASET.providers().get(PROVIDER);
         return new DayResult(
                 day,
                 label,
@@ -501,7 +512,10 @@ class DailyLoopPilotTest {
                         .filter(each -> each.status() == ProblemStatus.DROPPED)
                         .map(each -> each.problemKey() + ":" + each.dropReason())
                         .toList(),
-                provider.calls() - callsBefore,
+                modelCalls,
+                profile.latencyMs() * modelCalls,
+                (profile.inputTokens() + profile.outputTokens()) * modelCalls,
+                profile.costMicroUsd() * modelCalls,
                 (int) decided.stream()
                         .filter(each -> each.executionStatus() == AutonomyExecutionStatus.STARTED)
                         .count(),
@@ -605,11 +619,10 @@ class DailyLoopPilotTest {
     private Summary summarize(List<DayResult> days) {
         List<Integer> importantDays = List.of(1, 5, 6);
         List<Integer> silentDays = List.of(2, 3, 4, 7);
-        Map<Integer, String> importantKeys = Map.of(1, DEADLINE, 5, SUBMIT, 6, DEADLINE);
         long hits = importantDays.stream()
                 .filter(day -> {
-                    String level = days.get(day - 1).levels().get(importantKeys.get(day));
-                    return level != null && !level.equals(AutonomyLevel.IGNORE.name());
+                    List<String> levels = importantLevels(days.get(day - 1));
+                    return !levels.isEmpty() && !levels.contains(AutonomyLevel.IGNORE.name());
                 })
                 .count();
         long duplicatesPassed =
@@ -626,7 +639,6 @@ class DailyLoopPilotTest {
                         || DecisionOutcome.FALLBACK.name().equals(day.evaluationOutcome()))
                 .count();
         int calls = days.stream().mapToInt(DayResult::modelCalls).sum();
-        EvalDataset.ProviderProfile profile = DATASET.providers().get(PROVIDER);
         return new Summary(
                 importantDays.size(),
                 hits,
@@ -635,9 +647,9 @@ class DailyLoopPilotTest {
                 silentKept,
                 failures,
                 calls,
-                profile.latencyMs() * calls,
-                (profile.inputTokens() + profile.outputTokens()) * calls,
-                profile.costMicroUsd() * calls);
+                days.stream().mapToLong(DayResult::simulatedLatencyMs).sum(),
+                days.stream().mapToLong(DayResult::simulatedTokens).sum(),
+                days.stream().mapToLong(DayResult::simulatedCostMicroUsd).sum());
     }
 
     private void writeReport(List<DayResult> days, Summary summary) {
@@ -646,10 +658,11 @@ class DailyLoopPilotTest {
         md.append("합성 provider 결과이며 실제 provider 결과가 아니다.\n");
         md.append("provider 는 `").append(PROVIDER).append("` 이고 비용과 지연은 fixture 에 적은 값에 호출 수를 곱한 흉내 값이다.\n\n");
         md.append("## 날마다\n\n");
-        md.append("| 날 | 상황 | 시도 | 까닭 | 평가 | 후보별 수준 | 버린 후보 | 모델 호출 | 자동 실행 | 알림 | 할 일 | 승인 줄 |\n");
-        md.append("| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |\n");
+        md.append(
+                "| 날 | 상황 | 시도 | 까닭 | 평가 | 후보별 수준 | 버린 후보 | 모델 호출 | 흉내 지연(ms) | 흉내 토큰 | 흉내 비용(micro USD) | 자동 실행 | 알림 | 할 일 | 승인 줄 |\n");
+        md.append("| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |\n");
         for (DayResult day : days) {
-            md.append("| %d | %s | %s | %s | %s | %s | %s | %d | %d | %d | %d | %d |\n"
+            md.append("| %d | %s | %s | %s | %s | %s | %s | %d | %d | %d | %d | %d | %d | %d | %d |\n"
                     .formatted(
                             day.day(),
                             day.label(),
@@ -661,6 +674,9 @@ class DailyLoopPilotTest {
                                     ? "-"
                                     : day.droppedKeys().toString(),
                             day.modelCalls(),
+                            day.simulatedLatencyMs(),
+                            day.simulatedTokens(),
+                            day.simulatedCostMicroUsd(),
                             day.autonomousStarted(),
                             day.notificationDelta(),
                             day.followUpDelta(),
@@ -786,6 +802,9 @@ class DailyLoopPilotTest {
             List<String> acceptedKeys,
             List<String> droppedKeys,
             int modelCalls,
+            long simulatedLatencyMs,
+            long simulatedTokens,
+            long simulatedCostMicroUsd,
             int autonomousStarted,
             boolean reportSurfaced,
             long evaluationTotal,

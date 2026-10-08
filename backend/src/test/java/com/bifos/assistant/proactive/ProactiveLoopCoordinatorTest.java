@@ -214,6 +214,34 @@ class ProactiveLoopCoordinatorTest extends ProactiveLoopTestSupport {
         assertThat(evaluationCount(user)).as("평가 수").isEqualTo(1);
     }
 
+    @Test
+    @DisplayName("19시간 안에 건너뛴 시도만 있으면 하루 상한에 세지 않아 DECIDED 다")
+    void ignoresSkippedRunsForDailyLimit() throws InterruptedException {
+        CurrentUser user = newUser();
+        Agent agent = newAgent(user);
+        saveSetting(user, agent, true, null);
+        saveEarlierSkippedRun(user, agent, BASE.minus(Duration.ofHours(19)), LoopSkippedReason.NO_CANDIDATE);
+
+        Long checkId = wake(user, agent, candidateOutput());
+
+        ProactiveLoopRun run = loopRuns.findBySourceCheckId(checkId).orElseThrow();
+        assertThat(run.status()).as("오늘 시도 상태").isEqualTo(LoopRunStatus.DECIDED);
+        assertThat(evaluationCount(user)).as("평가 수").isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("하루 상한에 닿았어도 받아들인 후보가 없으면 NO_CANDIDATE 가 먼저다")
+    void prefersNoCandidateOverDailyLimit() throws InterruptedException {
+        CurrentUser user = newUser();
+        Agent agent = newAgent(user);
+        saveSetting(user, agent, true, null);
+        saveEarlierDecidedRun(user, agent, BASE.minus(Duration.ofHours(19)));
+
+        Long checkId = wake(user, agent, nothingNewOutput());
+
+        assertSkipped(user, checkId, LoopSkippedReason.NO_CANDIDATE);
+    }
+
     private void assertSkipped(CurrentUser user, Long checkId, LoopSkippedReason reason) {
         ProactiveLoopRun run = loopRuns.findBySourceCheckId(checkId).orElseThrow();
         assertThat(run.status()).as("시도 상태").isEqualTo(LoopRunStatus.SKIPPED);

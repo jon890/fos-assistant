@@ -25,6 +25,7 @@ import com.bifos.assistant.proactive.domain.ProactiveLoopRun;
 import com.bifos.assistant.proactive.domain.ProactiveLoopSetting;
 import com.bifos.assistant.proactive.domain.type.CheckOutcome;
 import com.bifos.assistant.proactive.domain.type.CheckTrigger;
+import com.bifos.assistant.proactive.domain.type.LoopSkippedReason;
 import com.bifos.assistant.proactive.infra.ProactiveCheckRepository;
 import com.bifos.assistant.proactive.infra.ProactiveLoopRunRepository;
 import com.bifos.assistant.proactive.infra.ProactiveLoopSettingRepository;
@@ -176,15 +177,24 @@ abstract class ProactiveLoopTestSupport {
      * @param at 앞선 시도를 저장한 시각
      */
     ProactiveLoopRun saveEarlierDecidedRun(CurrentUser user, Agent agent, Instant at) {
+        ProactiveLoopRun run = ProactiveLoopRun.running(user.id(), saveEarlierCheck(user, agent, at), at);
+        run.decided(null, at);
+        return loopRuns.save(run);
+    }
+
+    /** {@link #saveEarlierDecidedRun} 과 같되 평가하지 않고 건너뛴 앞선 시도다. */
+    ProactiveLoopRun saveEarlierSkippedRun(CurrentUser user, Agent agent, Instant at, LoopSkippedReason reason) {
+        return loopRuns.save(ProactiveLoopRun.skipped(user.id(), saveEarlierCheck(user, agent, at), reason, at));
+    }
+
+    /** 앞선 시도의 원천이 될 다른 매일 깨우기 살펴보기다. 보고가 없어 이번 깨우기를 막지 않는다. */
+    private Long saveEarlierCheck(CurrentUser user, Agent agent, Instant at) {
         Long conversationId =
                 checkConversations.findOrCreate(user, agent).conversation().id();
         ProactiveCheck earlier =
                 ProactiveCheck.started(user.id(), agent.id(), conversationId, CheckTrigger.SCHEDULED, false, at);
         earlier.succeed(CheckOutcome.NOTHING_NEW, 0, 0, null, 0, 0, 0, 0, 0, at);
-        earlier = checks.save(earlier);
-        ProactiveLoopRun run = ProactiveLoopRun.running(user.id(), earlier.id(), at);
-        run.decided(null, at);
-        return loopRuns.save(run);
+        return checks.save(earlier).id();
     }
 
     /** 매일 깨우기 한 번을 돌리고 루프까지 끝나기를 기다린다. 이번 살펴보기 번호를 돌려준다. */

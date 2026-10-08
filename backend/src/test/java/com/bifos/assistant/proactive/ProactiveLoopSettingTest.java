@@ -2,16 +2,23 @@ package com.bifos.assistant.proactive;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.AdditionalAnswers.delegatesTo;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.mock;
 
+import com.bifos.assistant.agent.application.AgentService;
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.agent.domain.type.AgentVisibility;
 import com.bifos.assistant.agent.domain.type.CostMode;
 import com.bifos.assistant.agent.domain.type.CredentialScope;
 import com.bifos.assistant.agent.infra.AgentRepository;
+import com.bifos.assistant.proactive.application.ProactiveLoopProperties;
 import com.bifos.assistant.proactive.application.ProactiveLoopSettingService;
 import com.bifos.assistant.proactive.application.model.LoopSettingView;
+import com.bifos.assistant.proactive.domain.ProactiveLoopSetting;
 import com.bifos.assistant.proactive.infra.ProactiveLoopSettingRepository;
 import com.bifos.assistant.shared.auth.CurrentUser;
+import com.bifos.assistant.shared.config.LiveProperties;
 import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
@@ -20,6 +27,7 @@ import com.bifos.assistant.testsupport.OverrideProperties;
 import com.bifos.assistant.testsupport.TestClock;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -27,6 +35,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.transaction.support.TransactionTemplate;
 
 /** 설치가 매일 루프를 연 상태에서 사용자 설정의 저장, 쉬기 범위, 권한을 본다. */
 @BackendIntegrationTest
@@ -53,6 +62,15 @@ class ProactiveLoopSettingTest {
 
     @Autowired
     TestClock clock;
+
+    @Autowired
+    AgentService agentService;
+
+    @Autowired
+    LiveProperties<ProactiveLoopProperties> properties;
+
+    @Autowired
+    TransactionTemplate transactions;
 
     private Agent agent;
 
@@ -115,6 +133,37 @@ class ProactiveLoopSettingTest {
                 .satisfies(row -> {
                     assertThat(row.id()).isEqualTo(id);
                     assertThat(row.enabled()).isFalse();
+                });
+    }
+
+    @Test
+    @DisplayName("처음 저장이 다른 요청과 겹쳐 유일 제약에 걸리면 새 트랜잭션에서 먼저 저장된 줄을 다시 읽어 바꾼다")
+    void retriesOnConcurrentFirstSave() {
+        Long existingId = settings.save(ProactiveLoopSetting.of(OWNER.id(), agent.id(), false, null, NOW))
+                .id();
+        // 첫 읽기만 줄이 없다고 답해, 다른 요청이 그사이 먼저 저장한 상황을 만든다. 저장은 실제 표로 가므로 실제 유일 제약에 걸린다.
+        ProactiveLoopSettingRepository racing = mock(ProactiveLoopSettingRepository.class, delegatesTo(settings));
+        doAnswer(invocation -> Optional.empty())
+                .doAnswer(invocation ->
+                        settings.findByUserIdAndAgentId(invocation.getArgument(0), invocation.getArgument(1)))
+                .when(racing)
+                .findByUserIdAndAgentId(OWNER.id(), agent.id());
+        ProactiveLoopSettingService racingService =
+                new ProactiveLoopSettingService(agentService, racing, properties, clock, transactions);
+        Instant snooze = NOW.plus(Duration.ofDays(1));
+
+        LoopSettingView view = racingService.update(OWNER, agent.code(), true, snooze);
+
+        assertThat(view).isEqualTo(new LoopSettingView(true, true, snooze));
+        assertThat(settings.findAll().stream()
+                        .filter(row -> row.agentId().equals(agent.id()))
+                        .toList())
+                .as("설정 줄은 하나이고 먼저 저장된 줄이 바뀐다")
+                .singleElement()
+                .satisfies(row -> {
+                    assertThat(row.id()).isEqualTo(existingId);
+                    assertThat(row.enabled()).isTrue();
+                    assertThat(row.snoozedUntil()).isEqualTo(snooze);
                 });
     }
 

@@ -72,14 +72,34 @@ public class ProactiveLoopCoordinator {
         try {
             run = transactions.execute(status -> begin(check, loop.maxRunsPerDay()));
         } catch (DataIntegrityViolationException ex) {
-            // 원천 살펴보기의 유일 제약이다. 이미 다른 처리가 이 살펴보기를 맡았다.
-            log.info("이미 이어진 살펴보기라 매일 루프를 건너뛴다 checkId={}", check.id());
+            skipOnViolation(check.id(), ex);
             return;
         }
         if (run == null || run.status() != LoopRunStatus.RUNNING) {
             return;
         }
         evaluateAndDecide(event.user(), check.id(), run.id(), loop.provider());
+    }
+
+    /**
+     * 시도 줄을 저장하지 못했다. 그 원천의 줄이 있으면 원천 유일 제약이고 이미 다른 처리가 이 살펴보기를 맡았다. 없으면 점검 대화나 살펴보기가
+     * 지워진 것처럼 원천 중복이 아닌 저장 실패다. 어느 쪽이든 다시 부르지 않는다.
+     */
+    private void skipOnViolation(Long checkId, DataIntegrityViolationException ex) {
+        boolean taken;
+        try {
+            taken = runs.findBySourceCheckId(checkId).isPresent();
+        } catch (RuntimeException readFailure) {
+            taken = false;
+        }
+        if (taken) {
+            log.info("이미 이어진 살펴보기라 매일 루프를 건너뛴다 checkId={}", checkId);
+        } else {
+            log.warn(
+                    "매일 루프 시도 줄을 저장하지 못했다 checkId={} error={}",
+                    checkId,
+                    ex.getClass().getSimpleName());
+        }
     }
 
     /** 잠그기 전 읽기다. 동의하지 않은 사용자의 살펴보기마다 잠금을 잡지 않게 먼저 거른다. */

@@ -13,8 +13,10 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 /**
  * 사용자가 에이전트마다 매일 루프를 켜고 끄고 쉬게 하는 설정을 관리한다. 뜻은 {@code docs/backend/proactive-loop.md} 의 「사용자 설정」 이
@@ -33,6 +35,7 @@ public class ProactiveLoopSettingService {
     private final ProactiveLoopSettingRepository settings;
     private final LiveProperties<ProactiveLoopProperties> properties;
     private final Clock clock;
+    private final TransactionTemplate transactions;
 
     @Transactional(readOnly = true)
     public LoopSettingView get(CurrentUser user, String agentCode) {
@@ -42,7 +45,10 @@ public class ProactiveLoopSettingService {
         return view(row, clock.instant());
     }
 
-    @Transactional
+    /**
+     * 설정을 저장한다. 같은 사용자와 에이전트의 처음 저장이 동시에 오면 늦은 쪽이 유일 제약에 걸린다. 그 트랜잭션은 롤백되므로 새 트랜잭션에서 먼저
+     * 저장된 줄을 다시 읽어 바꾼다.
+     */
     public LoopSettingView update(CurrentUser user, String agentCode, boolean enabled, Instant snoozedUntil) {
         Agent agent = enabled ? agents.requireStartable(user, agentCode) : agents.requireReadable(user, agentCode);
         if (enabled && !properties.current().enabled()) {
@@ -54,13 +60,23 @@ public class ProactiveLoopSettingService {
             throw new ApiException(ErrorCode.VALIDATION_FAILED, "snoozedUntil must be within 30 days");
         }
         Instant snooze = snoozedUntil != null && snoozedUntil.isAfter(now) ? snoozedUntil : null;
-        ProactiveLoopSetting row = settings.findByUserIdAndAgentId(user.id(), agent.id())
+        try {
+            return transactions.execute(status -> save(user.id(), agent.id(), enabled, snooze, now));
+        } catch (DataIntegrityViolationException ex) {
+            // 다른 요청이 같은 줄을 먼저 만들었다. 앞 트랜잭션은 롤백됐으므로 새 트랜잭션에서 그 줄을 다시 읽어 바꾼다.
+            return transactions.execute(status -> save(user.id(), agent.id(), enabled, snooze, now));
+        }
+    }
+
+    /** 있으면 바꾸고 없으면 만든다. 유일 제약 위반이 이 트랜잭션 안에서 드러나도록 곧바로 flush 한다. */
+    private LoopSettingView save(Long userId, Long agentId, boolean enabled, Instant snooze, Instant now) {
+        ProactiveLoopSetting row = settings.findByUserIdAndAgentId(userId, agentId)
                 .map(existing -> {
                     existing.change(enabled, snooze, now);
                     return existing;
                 })
-                .orElseGet(() -> ProactiveLoopSetting.of(user.id(), agent.id(), enabled, snooze, now));
-        return view(settings.save(row), now);
+                .orElseGet(() -> ProactiveLoopSetting.of(userId, agentId, enabled, snooze, now));
+        return view(settings.saveAndFlush(row), now);
     }
 
     private LoopSettingView view(ProactiveLoopSetting row, Instant now) {
