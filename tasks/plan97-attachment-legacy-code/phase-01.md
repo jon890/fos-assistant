@@ -52,6 +52,7 @@
 업로드 정상 시험에서 첨부 루트 자식이 `users` 하나인 것을 확인한다.
 두 사용자의 첨부는 각 사용자 경로에서 읽히며 남의 대화 접근은 거절되는 회귀 시험을 유지한다.
 현재 저장·읽기·입력 안내·장수·삭제 시험을 유지한다.
+`AttachmentCleanerTest`의 옛 사본 삭제·보존 단언 두 개만 제거한다. 사용자 경로의 만료 삭제와 살아 있는 파일 보존, 행의 삭제 시각 검증은 유지한다.
 `CollationMixQueryMysqlTest`에서 사라지는 `AttachmentBackfill` 대역·import·설명만 제거한다.
 
 ### 4. 문서 일치 확인
@@ -82,6 +83,7 @@ Gradle 명령은 공통 규칙의 heavy-lock으로 감싸 실행한다. 무거�
 | `backend/src/main/resources/application.yml` | 수정 |
 | `backend/src/test/java/com/bifos/assistant/chat/infra/AttachmentStoreIsolationTest.java` | 수정 |
 | `backend/src/test/java/com/bifos/assistant/chat/AttachmentServiceTest.java` | 수정 |
+| `backend/src/test/java/com/bifos/assistant/chat/AttachmentCleanerTest.java` | 수정 |
 | `backend/src/test/java/com/bifos/assistant/CollationMixQueryMysqlTest.java` | 수정 |
 | `docs/backend/attachment.md` | 수정 |
 | `docs/adr/ADR-091-사진-첨부는-사용자별로-저장하고-실행-공간에는-그-사용자만-붙인다.md` | 수정 |
