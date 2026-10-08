@@ -42,7 +42,24 @@ function toolSummary(tools: ConnectorSummary["tools"]): string {
   return [`도구 ${tools.length}개`, ...parts].join(" · ");
 }
 
-export function ConnectorCatalog() {
+/** 연결 하나의 화면 주소다. 에이전트 화면에서 왔으면 그 에이전트를 실어 보낸다. */
+function connectionHref(id: string, preferredAgent: string | null): string {
+  return preferredAgent === null
+    ? `/connections/${id}`
+    : `/connections/${id}?agent=${preferredAgent}`;
+}
+
+/** 연결됐는데 쓰는 에이전트가 없는 카드다. 눌러 들어가면 쓸 에이전트를 고르는 영역이 열린다. */
+function unused(connector: ConnectorSummary): boolean {
+  return connector.myStatus === "READY" && connector.bindings.length === 0;
+}
+
+export function ConnectorCatalog({
+  preferredAgent,
+}: {
+  /** 에이전트 화면의 「외부 서비스 연결하기」 로 왔으면 그 에이전트 번호다. */
+  preferredAgent: string | null;
+}) {
   const [connectors, setConnectors] = useState<ConnectorSummary[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -59,6 +76,12 @@ export function ConnectorCatalog() {
       <p className="mt-1 mb-4 text-sm text-muted-foreground">
         쓰는 서비스의 계정을 연결하면 에이전트가 그 서비스로 일을 도와요.
       </p>
+      {preferredAgent !== null ? (
+        <Notice variant="info" className="mb-4">
+          보던 에이전트에서 쓸 서비스를 골라 연결해 주세요. 연결이 끝나면 그
+          에이전트에 바로 붙일 수 있어요.
+        </Notice>
+      ) : null}
       {error ? (
         <Notice variant="error" role="alert">
           서비스 목록을 읽지 못했어요. {error}
@@ -87,7 +110,7 @@ export function ConnectorCatalog() {
                           <Link
                             data-slot="card-link"
                             prefetch={false}
-                            href={`/connections/${connector.id}`}
+                            href={connectionHref(connector.id, preferredAgent)}
                             className="after:absolute after:inset-0 focus-visible:outline-none"
                           >
                             {connector.title}
@@ -121,7 +144,17 @@ export function ConnectorCatalog() {
                         지금은 쓸 수 없어요.
                       </p>
                     )}
-                    {connector.myStatus === "DISCONNECTED" ? null : (
+                    {connector.myStatus === "DISCONNECTED" ? null : unused(
+                        connector,
+                      ) ? (
+                      <p
+                        className="text-sm text-foreground"
+                        data-testid="connector-binding-count"
+                      >
+                        아직 쓰는 에이전트가 없어요. 눌러서 쓸 에이전트를 골라
+                        주세요.
+                      </p>
+                    ) : (
                       <p
                         className="text-sm text-muted-foreground"
                         data-testid="connector-binding-count"

@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { ConnectorAgentChooser } from "@/components/connector/connector-agent-chooser";
 import { ConnectorHeading } from "@/components/connector/connector-identity";
 import { ConnectorGrants } from "@/components/connector/connector-grants";
 import { ConnectorTools } from "@/components/connector/connector-tools";
@@ -40,6 +41,12 @@ type Loaded =
 
 type Pending = "save" | "check" | "disconnect" | `options:${string}` | null;
 
+/**
+ * 에이전트 고르기 영역의 상태다. `auto` 는 연결됐고 아직 쓰는 에이전트가 없을 때만 보인다.
+ * 연결을 막 마쳤거나 사용자가 열었으면 `open` 이고, 붙인 뒤에도 결과를 보이려고 닫을 때까지 둔다.
+ */
+type Chooser = "auto" | "open" | "closed";
+
 function formatChecked(value: string) {
   return new Intl.DateTimeFormat("ko-KR", {
     dateStyle: "medium",
@@ -64,14 +71,23 @@ async function fetchLoaded(id: string): Promise<Loaded> {
   return { kind: "ready", connector, connection: connection.data };
 }
 
-/** 이 연결을 붙인 에이전트 목록이다. 붙이기와 떼기는 에이전트 화면에서 한다. */
-function BoundAgents({ bindings }: { bindings: BoundAgent[] }) {
+/**
+ * 이 연결을 붙인 에이전트 목록이다. 떼기는 에이전트 화면에서 한다.
+ * `onChoose` 가 있으면 에이전트 고르기 영역을 다시 여는 단추를 둔다.
+ */
+function BoundAgents({
+  bindings,
+  onChoose,
+}: {
+  bindings: BoundAgent[];
+  onChoose: (() => void) | null;
+}) {
   return (
     <section className="space-y-2" data-testid="connection-bindings">
       <h2 className="text-sm font-semibold">붙인 에이전트</h2>
       {bindings.length === 0 ? (
         <p className="text-sm text-muted-foreground">
-          아직 이 연결을 쓰는 에이전트가 없어요. 에이전트 화면에서 붙여요.
+          아직 이 연결을 쓰는 에이전트가 없어요.
         </p>
       ) : (
         <ul className="divide-y divide-border rounded-md border border-border">
@@ -95,6 +111,13 @@ function BoundAgents({ bindings }: { bindings: BoundAgent[] }) {
           ))}
         </ul>
       )}
+      {onChoose ? (
+        <Button size="sm" variant="outline" onClick={onChoose}>
+          {bindings.length === 0
+            ? "쓸 에이전트 고르기"
+            : "다른 에이전트에도 붙이기"}
+        </Button>
+      ) : null}
     </section>
   );
 }
@@ -113,12 +136,21 @@ function NotFound() {
   );
 }
 
-export function ConnectorConnectionPanel({ id }: { id: string }) {
+export function ConnectorConnectionPanel({
+  id,
+  preferredAgent,
+}: {
+  id: string;
+  /** 에이전트 화면에서 이 연결을 하러 왔으면 그 에이전트 번호다. 고르기 영역이 맨 앞에 둔다. */
+  preferredAgent: string | null;
+}) {
   const [loaded, setLoaded] = useState<Loaded>({ kind: "loading" });
   const [values, setValues] = useState<Record<string, string>>({});
   const [options, setOptions] = useState<Record<string, ConnectorOption[]>>({});
   const [pending, setPending] = useState<Pending>(null);
   const [error, setError] = useState<string | null>(null);
+  const [chooser, setChooser] = useState<Chooser>("auto");
+  const [justConnected, setJustConnected] = useState(false);
   const busy = pending !== null;
 
   const validId = CONNECTOR_ID_PATTERN.test(id);
@@ -230,7 +262,24 @@ export function ConnectorConnectionPanel({ id }: { id: string }) {
     const result = await registerConnection(id, submitted);
     setPending(null);
     if (!result.ok) return setError(result.message);
-    setLoaded({ kind: "ready", connector, connection: result.data });
+    showConnected(result.data);
+  }
+
+  /** 새 연결 상태를 그린다. 이번에 처음 연결됐으면 같은 자리에서 쓸 에이전트를 고르게 한다. */
+  function showConnected(next: ConnectorConnection) {
+    if (next.status === "READY" && connection.status !== "READY") {
+      setJustConnected(true);
+      setChooser("open");
+    }
+    setLoaded({ kind: "ready", connector, connection: next });
+  }
+
+  async function refreshBindings() {
+    // 붙인 결과를 보이는 동안 영역이 닫히지 않게 연 채로 둔다.
+    setChooser("open");
+    const fresh = await readConnection(id);
+    if (fresh.ok)
+      setLoaded({ kind: "ready", connector, connection: fresh.data });
   }
 
   async function act(kind: "check" | "disconnect") {
@@ -272,10 +321,22 @@ export function ConnectorConnectionPanel({ id }: { id: string }) {
     }
     setPending(null);
     if (!result.ok) return setError(result.message);
-    setLoaded({ kind: "ready", connector, connection: result.data });
+    if (kind === "check") showConnected(result.data);
+    else setLoaded({ kind: "ready", connector, connection: result.data });
   }
 
   const status = connection.status;
+  const canChoose = available && status === "READY";
+  const preferredUnbound =
+    preferredAgent !== null &&
+    !connection.bindings.some(
+      (binding) => binding.agentCode === preferredAgent,
+    );
+  const chooserShown =
+    canChoose &&
+    (chooser === "open" ||
+      (chooser === "auto" &&
+        (connection.bindings.length === 0 || preferredUnbound)));
   const shown = fields.flatMap((field) => {
     if (!field.secret) {
       const value = connection.values[field.key];
@@ -292,6 +353,20 @@ export function ConnectorConnectionPanel({ id }: { id: string }) {
 
   return (
     <div className="mx-auto w-full max-w-2xl">
+      {chooserShown ? (
+        <ConnectorAgentChooser
+          connectorId={id}
+          title={title}
+          bindings={connection.bindings}
+          justConnected={justConnected}
+          preferredAgent={preferredAgent}
+          onBound={() => void refreshBindings()}
+          onClose={() => {
+            setChooser("closed");
+            setJustConnected(false);
+          }}
+        />
+      ) : null}
       <Card>
         <CardHeader>
           <ConnectorHeading connector={connector} title={title} />
@@ -321,7 +396,12 @@ export function ConnectorConnectionPanel({ id }: { id: string }) {
             </Notice>
           ) : null}
           {status !== "DISCONNECTED" ? (
-            <BoundAgents bindings={connection.bindings} />
+            <BoundAgents
+              bindings={connection.bindings}
+              onChoose={
+                canChoose && !chooserShown ? () => setChooser("open") : null
+              }
+            />
           ) : null}
           {available ? (
             <form onSubmit={save} className="space-y-3">

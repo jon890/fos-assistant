@@ -40,10 +40,15 @@ const MAX_NAME_CHARS = 100;
  * <p>만드는 데 몇 초 걸리므로 요청이 도는 동안 단추를 막고 창도 닫히지 않게 한다. 성공하면 상세로 옮겨 가며
  * 이 창이 사라지므로 그때까지 진행 중인 채로 둔다.
  */
-export function CreateAgentDialog() {
+export function CreateAgentDialog({
+  defaultOpen = false,
+}: {
+  /** 처음부터 창을 연다. 「에이전트 만들기」 링크가 `/agents?new=1` 로 열 때다. */
+  defaultOpen?: boolean;
+}) {
   const router = useRouter();
   const id = useId();
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(defaultOpen);
   const [name, setName] = useState("");
   const [visibility, setVisibility] =
     useState<AdminAgent["visibility"]>(PRIVATE_VISIBILITY);

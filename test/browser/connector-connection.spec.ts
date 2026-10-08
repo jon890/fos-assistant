@@ -127,7 +127,7 @@ test("카드에서 연결 화면으로 들어가 값을 등록하고 확인한 �
   await page.getByRole("button", { name: "연결 다시 확인" }).click();
   await expect(page.getByTestId("connection-status")).toHaveText("연결됨");
   await expect(page.getByTestId("connection-bindings")).toContainText(
-    "아직 이 연결을 쓰는 에이전트가 없어요. 에이전트 화면에서 붙여요.",
+    "아직 이 연결을 쓰는 에이전트가 없어요.",
   );
   await expect(page.getByRole("link", { name: "에이전트 열기" })).toHaveCount(
     0,
