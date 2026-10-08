@@ -16,6 +16,8 @@ public interface AgentRepository extends JpaRepository<Agent, Long> {
 
     List<Agent> findByEnabledTrueOrderByCodeAsc();
 
+    List<Agent> findByDeletedAtIsNullAndConnectorManagedFalseOrderByCodeAsc();
+
     /**
      * 에이전트 한 줄을 쓰기 잠금으로 읽는다.
      *

@@ -166,4 +166,9 @@ public final class AgentToolPolicy {
     public static boolean hasSandboxToolset(List<String> enabled) {
         return enabled.stream().anyMatch(SANDBOX_TOOLSETS::contains);
     }
+
+    /** 연결을 붙일 때 셸과 파일 접근 위험을 알려야 하는 도구가 켜졌는가. */
+    public static boolean hasShellOrFileToolset(List<String> enabled) {
+        return enabled.contains("terminal") || enabled.contains("file") || enabled.contains("code_execution");
+    }
 }

@@ -15,6 +15,7 @@ const LINKS = [
   { href: "/admin/people", label: "사용자" },
   { href: "/admin/agents", label: "에이전트" },
   { href: "/admin/models", label: "모델" },
+  { href: "/admin/tools", label: "도구" },
   { href: "/admin/usage", label: "사용량과 비용" },
   { href: "/admin/connections", label: "커넥터" },
   { href: "/admin/browsers", label: "브라우저" },
