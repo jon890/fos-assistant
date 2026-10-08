@@ -16,7 +16,7 @@ Memory 는 에이전트가 실행할 때 `instructions` 로 받는 사실이다.
 - 본문까지 싣는 항상 층과 제목만 싣는 색인 층으로 나눈다. `retrieval` 이 `ALWAYS` 면 항상 층에 본문을 싣고, `SEARCH` 면 제목과 번호만 색인에 싣는다. `ARCHIVE` 와 종류가 `SOURCE` 인 항목은 어느 층에도 싣지 않는다.
   예외로 `SEARCH` 가운데 짧은 개인 항목은 두 층 사이의 개인 사실 구역에 본문까지 싣는다(아래 「개인 사실 구역」).
 - `SENSITIVE` 항목은 `ALWAYS` 로 저장하지 못한다. `MemoryService` 가 `MEMORY_SENSITIVE_ALWAYS` 로 거절한다.
-- 색인의 본문은 `memory_read` MCP 도구로 읽는다.
+- 색인의 본문은 `memory_read` MCP 도구로 읽는다. 본문을 내 주면 그 실행의 `execution_context_source` 에 `MEMORY_READ` 줄을 덧붙인다(아래 「본문을 읽으면 남는 기록」).
   요청자는 장기 토큰이 아니라 서명한 `_fos_ctx` 로 찾은 origin 실행의 사용자다([`mcp-caller.md`](mcp-caller.md)). 요청 본문은 사용자를 바꾸지 못한다.
   collection 과 민감도는 그 origin 실행의 에이전트로 판정한다.
   Control Plane 은 접근할 수 없는 항목과 없는 항목을 같은 응답으로 숨긴다. 받지 않는 collection 의 항목과 허용받지 않은 민감 항목도 같은 응답이다.
@@ -72,7 +72,7 @@ Memory 는 에이전트가 실행할 때 `instructions` 로 받는 사실이다.
 | 담는 순서 | 색인 몫은 지금처럼 개인 사실 후보를 빼기 전의 색인 대상 전체로 계산해 먼저 떼어 둔다. 그 뒤 항상 층을 담고, 개인 사실 구역은 항상 층과 같은 자리(상한에서 색인 몫을 뺀 자리)의 남은 부분과 예산 가운데 작은 쪽 안에서 고른다. 마지막으로 색인 층을 담는다 |
 | 넘칠 때 | `updated_at` 이 최근인 것부터, 같으면 번호가 큰 것부터 고른다. 들어가지 않는 항목은 건너뛰고 다음 항목을 본다. 고르기는 한 번만 한다 |
 | 글로 옮길 때 | 고른 항목을 번호 순으로 늘어놓는다. 고른 집합이 같으면 글이 같아 지시문 지문이 바뀌지 않는다 |
-| 줄의 모양 | `- [번호] 제목: 본문`. 본문의 줄바꿈은 공백 하나로 바꿔 한 줄로 싣는다. 자르지 않는다. 바뀐 사실을 번호로 고치라는 안내는 `memory_remember` 를 받는 실행의 「# 기억」 지침이 갖는다 |
+| 줄의 모양 | `- [번호] 제목: 본문`. 제목과 본문의 줄바꿈은 공백 하나로 바꿔 한 줄로 싣는다. 색인 줄의 제목도 같다. 모델이 정한 제목이 지시문에 머리 줄을 끼우지 못하게 하려는 것이다. 자르지 않는다. 바뀐 사실을 번호로 고치라는 안내는 `memory_remember` 를 받는 실행의 「# 기억」 지침이 갖는다 |
 | 색인 몫과의 관계 | 고른 항목은 색인에서 빠지므로 색인은 떼어 둔 몫보다 짧아질 뿐 길어지지 않는다. 그래서 색인 전체가 몫(상한의 1/4) 안에 들면 개인 사실 구역이 색인을 밀어내지 못한다. 색인이 몫보다 길면 지금은 넘친 색인 줄이 항상 층이 남긴 빈자리를 쓰지만, 이제는 개인 사실 구역이 그 자리를 먼저 쓴다. 항상 층이 자리를 다 쓰면 구역이 비고 후보는 모두 색인에 남는다 |
 | 색인과의 관계 | 개인 사실 구역에 실린 항목은 색인에서 뺀다. 고르지 못한 후보는 색인에 제목으로 남고 `OMITTED` 가 아니다 |
 | `memory_read` | 실린 항목도 `retrieval` 이 `SEARCH` 라 읽힌다 |
@@ -222,6 +222,15 @@ sequenceDiagram
 
 볼 수 없는 항목과 없는 항목은 **같은 응답**으로 답한다.
 다르게 답하면 그 항목이 있다는 사실 자체가 새어 나간다.
+
+### 본문을 읽으면 남는 기록
+
+`memory_read` 가 본문을 내 주면 Control Plane 이 그 호출의 origin 실행의 `execution_context_source` 마지막 줄 뒤에 `source=MEMORY_READ`, `source_ref=memory:<번호>`, `body_mode=INLINE`, `freshness=UNKNOWN` 줄을 하나 덧붙인다.
+읽지 못한 호출은 남기지 않는다. 답마다 참고한 기억이 이 줄을 읽는다.
+
+- 실행 사건(`execution_event`)에서 번호를 읽지 않는 까닭은 Hermes 의 `tool.started` 사건이 이 도구의 인자를 싣지 않기 때문이다. 그 사건의 `preview` 는 주요 인자 하나뿐이고 `id` 는 그 목록에 없다([`../hermes/runs-api.md`](../hermes/runs-api.md) 의 「붙은 커넥터 서버의 도구 사건」).
+- 저장은 새 트랜잭션에서 하고 실패해도 도구 결과를 바꾸지 않는다. 같은 실행의 읽기가 겹쳐 순서 번호가 부딪치면 한 번 다시 읽어 시도하고, 그래도 실패하면 실행 번호만 경고 로그로 남긴다. 관측용 기록이기 때문이다.
+- 이 줄은 조립 결과가 아니라 실행 뒤의 기록이다. `context_chars` 와 `instructions_hash`, `context_omitted_items` 에 들지 않는다.
 
 ### 본문 읽기가 갈리는 지점
 
@@ -471,8 +480,8 @@ Control Plane MCP 도구를 받는 실행의 공통 답변 지침 뒤에 「# �
 
 | 재료 | 어디서 | 넣는 것 |
 | --- | --- | --- |
-| 실행에 실은 항목 | `execution_context_source` | `source` 가 `MEMORY_ALWAYS` 나 `MEMORY_FACTS` 이고 `body_mode` 가 `INLINE` 인 줄. 제목만 실은 `MEMORY_INDEX` 와 빠진 `OMITTED` 는 넣지 않는다 |
-| 실행이 읽은 항목 | `execution_event` | `event_type` 이 `TOOL_STARTED` 이고 `tool_name` 이 `memory_read` 로 끝나는 줄의 `detail` 에 있는 `id`. `detail` 이 비었거나 번호를 읽지 못하면 건너뛴다. 사건에는 읽기가 거절됐는지 남지 않으므로, 그 항목이 지금 `memory_read` 로 읽히는 항목인지(`SEARCH` 이고 출처 원문이 아니며 그 실행의 에이전트가 받는 collection 과 민감 허용을 지나는지) 다시 판정해 지나는 것만 넣는다 |
+| 실행에 실은 항목 | `execution_context_source` | `source` 가 `MEMORY_ALWAYS` 나 `MEMORY_FACTS` 이고 `body_mode` 가 `INLINE` 인 줄. 데이터베이스가 `source` 와 `body_mode` 로 고른다. 제목만 실은 `MEMORY_INDEX` 와 빠진 `OMITTED` 는 넣지 않는다 |
+| 실행이 읽은 항목 | `execution_context_source` | `source` 가 `MEMORY_READ` 인 줄. `memory_read` 가 본문을 내 준 때에만 Control Plane 이 그 실행의 마지막 줄 뒤에 덧붙인다(아래 「본문을 읽으면 남는 기록」). 읽지 못한 호출은 남지 않는다. 지금 권한으로 다시 판정해, 그 실행의 에이전트가 지금도 `memory_read` 로 읽을 수 있는 항목(`SEARCH` 이고 출처 원문이 아니며 받는 collection 과 민감 허용을 지나는 것)만 넣는다 |
 
 | 경로 | 하는 일 |
 | --- | --- |
@@ -492,16 +501,17 @@ Control Plane MCP 도구를 받는 실행의 공통 답변 지침 뒤에 「# �
 | `memoryId`, `title`, `scope` | 항목의 지금 값 |
 | `via` | `ALWAYS` 는 항상 층, `FACTS` 는 개인 사실 구역, `READ` 는 `memory_read` 로 읽음 |
 
-- 실행 번호 오름차순으로 내고, 한 실행 안에서는 실은 순서(`position`) 뒤에 읽은 순서(`sequence`)로 둔다. 같은 항목이 둘 다 있으면 앞의 것 하나만 남긴다.
+- 실행 번호 오름차순으로 내고, 한 실행 안에서는 `execution_context_source` 의 `position` 순서로 둔다. 읽은 항목은 덧붙인 줄이라 실은 항목 뒤에 온다. 같은 항목이 둘 다 있으면 앞의 것 하나만 남긴다.
 - 지금 요청자가 읽을 수 있고(`Memory.isReadableBy`) `ACCEPTED` 인 항목만 낸다. 지운 항목, 남의 항목, 되돌려 제안으로 돌아간 항목은 뺀다. 제목은 지금 제목이다.
 - 본문은 싣지 않는다. 민감 항목도 제목만 낸다. 제목은 `/memory` 목록에도 평문으로 보이는 값이다.
-- 맡겨서 도는 하위 실행이 읽은 항목은 넣지 않는다. 그 실행의 답 메시지가 대화에 없다.
+- Control Plane 이 맡겨서 도는 하위 실행이 읽은 항목은 넣지 않는다. 그 실행의 답 메시지가 대화에 없다. Hermes 안의 하위 에이전트는 부모의 origin 실행을 물려받으므로, 그 하위 에이전트가 읽은 항목은 origin 실행의 답에 「찾아 읽음」 으로 붙는다.
 - 항목이 없으면 빈 배열이다.
 
 | 클래스 | 하는 일 |
 | --- | --- |
 | `chat.application.MemoryUseService` | 대화의 답 실행 번호를 모으고, 실행 기록에서 참조를 받아, 지금 볼 수 있는 항목만 제목과 함께 낸다 |
-| `usage.application.ExecutionMemoryRefs` | 실행 번호들의 `execution_context_source` 와 `memory_read` 시작 사건에서 Memory 번호와 출처, 그 실행의 에이전트 번호를 순서대로 낸다 |
+| `usage.application.ExecutionMemoryRefs` | 실행 번호들의 `execution_context_source` 에서 `MEMORY_ALWAYS`, `MEMORY_FACTS`, `MEMORY_READ` 줄을 골라 Memory 번호와 출처(`MemoryUseVia`), 그 실행의 에이전트 번호를 순서대로 낸다 |
+| `usage.application.ExecutionContextSourceWriter.append` | 실행 하나의 마지막 줄 뒤에 한 줄을 덧붙인다. `memory_read` 가 부른다 |
 | `memory.application.AcceptedMemoryLookup.acceptedReadableAmong` | 번호들 가운데 요청자가 읽을 수 있는 `ACCEPTED` 항목 |
 | `memory.application.MemoryService.readableByTool` | 한 항목이 그 `MemoryAccess` 의 `memory_read` 로 읽히는 항목인지. `bodyFor` 와 같은 조건이다 |
 | `chat.presentation.MemoryUseController` | `GET .../memory-uses` |

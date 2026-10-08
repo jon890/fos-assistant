@@ -20,13 +20,11 @@ import com.bifos.assistant.memory.infra.MemoryRepository;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.testsupport.BackendIntegrationTest;
+import com.bifos.assistant.usage.application.model.MemoryUseVia;
 import com.bifos.assistant.usage.domain.AgentExecution;
 import com.bifos.assistant.usage.domain.ExecutionContextSource;
-import com.bifos.assistant.usage.domain.ExecutionEvent;
-import com.bifos.assistant.usage.domain.type.ExecutionEventType;
 import com.bifos.assistant.usage.infra.AgentExecutionRepository;
 import com.bifos.assistant.usage.infra.ExecutionContextSourceRepository;
-import com.bifos.assistant.usage.infra.ExecutionEventRepository;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
@@ -45,7 +43,6 @@ import org.springframework.jdbc.core.JdbcTemplate;
 @BackendIntegrationTest
 class MemoryUseServiceTest {
     private static final String PROFILE = "chat-memory-use";
-    private static final String READ_TOOL = "mcp__fos_assistant__memory_read";
 
     @Autowired
     MemoryUseService service;
@@ -72,9 +69,6 @@ class MemoryUseServiceTest {
     ExecutionContextSourceRepository contextSources;
 
     @Autowired
-    ExecutionEventRepository events;
-
-    @Autowired
     JdbcTemplate jdbc;
 
     private CurrentUser dad;
@@ -82,7 +76,6 @@ class MemoryUseServiceTest {
     private Conversation conversation;
     private final List<Long> createdMemoryIds = new ArrayList<>();
     private final List<Long> conversationIds = new ArrayList<>();
-    private int nextSequence;
 
     @BeforeEach
     void setUp() {
@@ -90,7 +83,6 @@ class MemoryUseServiceTest {
         dad = new CurrentUser(suffix, "dad-" + suffix + "@example.com", "아빠", 1L, UserRole.ADMIN);
         kid = new CurrentUser(suffix + 1, "kid-" + suffix + "@example.com", "아이", 1L, UserRole.MEMBER);
         conversation = newConversation(dad);
-        nextSequence = 1;
     }
 
     @AfterEach
@@ -98,10 +90,6 @@ class MemoryUseServiceTest {
         for (Long conversationId : conversationIds) {
             jdbc.update(
                     "DELETE FROM execution_context_source WHERE execution_id IN"
-                            + " (SELECT id FROM agent_execution WHERE conversation_id = ?)",
-                    conversationId);
-            jdbc.update(
-                    "DELETE FROM execution_event WHERE execution_id IN"
                             + " (SELECT id FROM agent_execution WHERE conversation_id = ?)",
                     conversationId);
             jdbc.update("DELETE FROM chat_message WHERE conversation_id = ?", conversationId);
@@ -115,7 +103,7 @@ class MemoryUseServiceTest {
     }
 
     @Test
-    @DisplayName("본문을 받은 개인 사실과 항상 층과 읽은 항목만 실은 순서와 읽은 순서로 나오고 제목만 실은 줄과 빠진 줄은 나오지 않는다")
+    @DisplayName("본문을 받은 개인 사실과 항상 층과 읽은 항목만 기록한 순서로 나오고 제목만 실은 줄과 빠진 줄은 나오지 않는다")
     void listsOnlyLoadedAndReadItemsInOrder() {
         Memory fact = memory(dad, MemoryScope.USER, "딸 이름", "딸 이름은 하나다", MemoryRetrieval.SEARCH);
         Memory always = memory(dad, MemoryScope.GROUP, "우리 집 규칙", "저녁은 같이 먹는다", MemoryRetrieval.ALWAYS);
@@ -127,7 +115,7 @@ class MemoryUseServiceTest {
         source(run, 1, "MEMORY_ALWAYS", always, "INLINE");
         source(run, 2, "MEMORY_INDEX", indexed, "TITLE_ONLY");
         source(run, 3, "MEMORY_ALWAYS", omitted, "OMITTED");
-        started(run, READ_TOOL, "{\"id\":" + read.id() + "}");
+        source(run, 4, "MEMORY_READ", read, "INLINE");
 
         List<MemoryUse> uses = service.usesOf(dad, conversation.id());
 
@@ -135,9 +123,9 @@ class MemoryUseServiceTest {
                 .extracting(
                         MemoryUse::executionId, MemoryUse::memoryId, MemoryUse::title, MemoryUse::scope, MemoryUse::via)
                 .containsExactly(
-                        tuple(run.id(), fact.id(), "딸 이름", MemoryScope.USER, "FACTS"),
-                        tuple(run.id(), always.id(), "우리 집 규칙", MemoryScope.GROUP, "ALWAYS"),
-                        tuple(run.id(), read.id(), "경력 요약", MemoryScope.USER, "READ"));
+                        tuple(run.id(), fact.id(), "딸 이름", MemoryScope.USER, MemoryUseVia.FACTS),
+                        tuple(run.id(), always.id(), "우리 집 규칙", MemoryScope.GROUP, MemoryUseVia.ALWAYS),
+                        tuple(run.id(), read.id(), "경력 요약", MemoryScope.USER, MemoryUseVia.READ));
     }
 
     @Test
@@ -146,12 +134,12 @@ class MemoryUseServiceTest {
         Memory fact = memory(dad, MemoryScope.USER, "딸 이름", "딸 이름은 하나다", MemoryRetrieval.SEARCH);
         AgentExecution run = answeredRun(conversation, true);
         source(run, 0, "MEMORY_FACTS", fact, "INLINE");
-        started(run, READ_TOOL, "{\"id\":" + fact.id() + "}");
-        started(run, READ_TOOL, "{\"id\":" + fact.id() + "}");
+        source(run, 1, "MEMORY_READ", fact, "INLINE");
+        source(run, 2, "MEMORY_READ", fact, "INLINE");
 
         assertThat(service.usesOf(dad, conversation.id()))
                 .extracting(MemoryUse::memoryId, MemoryUse::via)
-                .containsExactly(tuple(fact.id(), "FACTS"));
+                .containsExactly(tuple(fact.id(), MemoryUseVia.FACTS));
     }
 
     @Test
@@ -181,7 +169,7 @@ class MemoryUseServiceTest {
         source(run, 1, "MEMORY_FACTS", foreign, "INLINE");
         source(run, 2, "MEMORY_FACTS", reverted, "INLINE");
         source(run, 3, "MEMORY_FACTS", renamed, "INLINE");
-        started(run, READ_TOOL, "{\"id\":" + foreign.id() + "}");
+        source(run, 4, "MEMORY_READ", foreign, "INLINE");
         memoryService.delete(dad, deleted.id());
         Memory proposal = memories.findById(reverted.id()).orElseThrow();
         proposal.restoreProposal(Instant.now());
@@ -194,21 +182,22 @@ class MemoryUseServiceTest {
     }
 
     @Test
-    @DisplayName("detail 이 비었거나 id 가 정수가 아니거나 JSON 이 아닌 사건은 건너뛰고 memory_read 가 아닌 도구도 건너뛴다")
-    void skipsEventsWithoutReadableId() {
+    @DisplayName("MEMORY_READ 이지만 body_mode 가 INLINE 이 아닌 줄과 memory: 가 아닌 ref 는 건너뛴다")
+    void skipsReadRowsThatAreNotInlineOrNotMemoryRefs() {
         Memory read = memory(dad, MemoryScope.USER, "읽은 항목", "읽은 본문", MemoryRetrieval.SEARCH);
-        Memory other = memory(dad, MemoryScope.USER, "다른 도구", "다른 본문", MemoryRetrieval.SEARCH);
+        Memory titleOnly = memory(dad, MemoryScope.USER, "제목만", "제목만 본문", MemoryRetrieval.SEARCH);
+        Memory omitted = memory(dad, MemoryScope.USER, "빠진 읽기", "빠진 본문", MemoryRetrieval.SEARCH);
         AgentExecution run = answeredRun(conversation, true);
-        started(run, READ_TOOL, null);
-        started(run, READ_TOOL, "{\"id\":\"x\"}");
-        started(run, READ_TOOL, "{\"id\":");
-        started(run, READ_TOOL, "{}");
-        started(run, "mcp__gmail__read_message", "{\"id\":" + other.id() + "}");
-        started(run, "memory_read", "{\"id\":" + read.id() + "}");
+        source(run, 0, "MEMORY_READ", titleOnly, "TITLE_ONLY");
+        source(run, 1, "MEMORY_READ", omitted, "OMITTED");
+        sourceRef(run, 2, "MEMORY_READ", "connector:" + read.id(), "INLINE");
+        sourceRef(run, 3, "MEMORY_READ", "memory:x", "INLINE");
+        sourceRef(run, 4, "MEMORY_READ", "memory:", "INLINE");
+        source(run, 5, "MEMORY_READ", read, "INLINE");
 
         assertThat(service.usesOf(dad, conversation.id()))
                 .extracting(MemoryUse::memoryId, MemoryUse::via)
-                .containsExactly(tuple(read.id(), "READ"));
+                .containsExactly(tuple(read.id(), MemoryUseVia.READ));
     }
 
     @Test
@@ -233,8 +222,9 @@ class MemoryUseServiceTest {
         Memory always = memory(dad, "core", MemorySensitivity.NORMAL, MemoryRetrieval.ALWAYS, "항상");
         Memory readable = memory(dad, "core", MemorySensitivity.NORMAL, MemoryRetrieval.SEARCH, "읽힘");
         AgentExecution run = answeredRun(conversation, true);
-        for (Memory memory : List.of(career, sensitive, always, readable)) {
-            started(run, READ_TOOL, "{\"id\":" + memory.id() + "}");
+        List<Memory> reads = List.of(career, sensitive, always, readable);
+        for (int position = 0; position < reads.size(); position++) {
+            source(run, position, "MEMORY_READ", reads.get(position), "INLINE");
         }
 
         assertThat(service.usesOf(dad, conversation.id()))
@@ -249,11 +239,11 @@ class MemoryUseServiceTest {
         Memory read = memory(dad, MemoryScope.USER, "읽은 항목", "읽은 본문", MemoryRetrieval.SEARCH);
         AgentExecution run = answeredRun(conversation, true, false);
         source(run, 0, "MEMORY_FACTS", fact, "INLINE");
-        started(run, READ_TOOL, "{\"id\":" + read.id() + "}");
+        source(run, 1, "MEMORY_READ", read, "INLINE");
 
         assertThat(service.usesOf(dad, conversation.id()))
                 .extracting(MemoryUse::memoryId, MemoryUse::via)
-                .containsExactly(tuple(fact.id(), "FACTS"));
+                .containsExactly(tuple(fact.id(), MemoryUseVia.FACTS));
     }
 
     private Conversation newConversation(CurrentUser owner) {
@@ -306,18 +296,11 @@ class MemoryUseServiceTest {
     }
 
     private void source(AgentExecution run, int position, String source, Memory memory, String bodyMode) {
-        contextSources.save(ExecutionContextSource.of(
-                run.id(), position, source, "memory:" + memory.id(), bodyMode, "FRESH", Instant.now()));
+        sourceRef(run, position, source, "memory:" + memory.id(), bodyMode);
     }
 
-    private void started(AgentExecution run, String toolName, String detail) {
-        events.save(ExecutionEvent.builder()
-                .executionId(run.id())
-                .sequence(nextSequence++)
-                .eventType(ExecutionEventType.TOOL_STARTED)
-                .toolName(toolName)
-                .detail(detail)
-                .occurredAt(Instant.now())
-                .build());
+    private void sourceRef(AgentExecution run, int position, String source, String ref, String bodyMode) {
+        contextSources.save(
+                ExecutionContextSource.of(run.id(), position, source, ref, bodyMode, "FRESH", Instant.now()));
     }
 }

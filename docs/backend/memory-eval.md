@@ -30,14 +30,13 @@ CI 의 backend 검사(`./gradlew test`)에 함께 돈다.
 | `backend/src/test/resources/memory-eval/family-cases.json` | 시험 세트. 가상 이름만 쓴다 |
 | `backend/src/test/java/com/bifos/assistant/context/eval/MemoryEvalDataset.java` | 시험 세트를 읽고 참조가 맞는지 검사한다 |
 | `backend/src/test/java/com/bifos/assistant/context/eval/MemoryEvalScoreboard.java` | 사례마다의 판정을 모아 지표와 보고서를 만든다 |
-| `backend/src/test/java/com/bifos/assistant/context/eval/MemoryRecallEvalTest.java` | 사례마다 사용자와 에이전트와 Memory 를 새로 넣고 조립해 판정한다. 실패 조건을 단언한다 |
+| `backend/src/test/java/com/bifos/assistant/context/eval/MemoryRecallEvalTest.java` | 에이전트는 시험 시작에 한 번 만들고 사용자는 저장하지 않는다. 사례와 측정 모드마다 Memory 를 넣고 조립해 판정한다. 실패 조건을 단언한다 |
 
 사례 하나는 이렇게 돈다.
 
-1. 앞 사례의 Memory 를 모두 지운다.
-2. 사례의 Memory 를 표에 직접 넣는다. 시각은 시험 시계 기준 `updatedDaysAgo` 일 전이다.
-3. 묻는 사람과 에이전트로 `ContextAssembler.assemble` 을 부른다. 측정 모드마다 한 번씩 부른다.
-4. 조립 결과의 문맥 묶음에서 항목마다 상태를 읽는다. 본문으로 실렸으면 `INLINE`, 제목만이면 `TITLE_ONLY`, 자리가 없어 빠졌으면 `OMITTED`, 묶음에 없으면 `ABSENT` 다.
+1. 측정 모드마다 앞의 Memory 를 모두 지우고 사례의 Memory 를 표에 직접 넣는다. 시각은 시험 시계 기준 `updatedDaysAgo` 일 전이다. 사용자는 표에 넣지 않고 요청자 값으로만 만든다.
+2. 묻는 사람과 시험 시작에 만든 에이전트로 그 모드의 `ContextAssembler.assemble` 을 부른다.
+3. 조립 결과의 문맥 묶음에서 항목마다 상태를 읽는다. 본문으로 실렸으면 `INLINE`, 제목만이면 `TITLE_ONLY`, 자리가 없어 빠졌으면 `OMITTED`, 묶음에 없으면 `ABSENT` 다.
 
 Hermes 대역도 모델도 부르지 않는다. 그래서 빠르고 결과가 늘 같다.
 
@@ -100,7 +99,7 @@ Hermes 대역도 모델도 부르지 않는다. 그래서 빠르고 결과가 �
 | `agents[].collections` | 그 에이전트가 받는 collection 과 민감 허용 |
 | `cases[].question` | 사람이 읽으라고 둔 질문. 판정에 쓰지 않는다 |
 | `memories[]` | `key`, `scope`, `title`, `content`. `USER` 면 `owner`, `GROUP` 이면 `group` 을 준다. 선택 칸은 `collection`(기본 `core`), `retrieval`(기본 `SEARCH`), `status`(기본 `ACCEPTED`, 그 밖에 `PROPOSED`, `REJECTED`), `sensitivity`(기본 `NORMAL`), `entryType`(기본 `MEMORY`, 그 밖에 `DOCUMENT`), `documentKey`(`DOCUMENT` 일 때 필수), `updatedDaysAgo`(기본 0) |
-| `filler` | 선택. `{ "owner", "count", "contentChars", "updatedDaysAgo" }`. 제목이 「보조 사실 {n}」(n 은 1부터)이고 본문이 `contentChars` 글자인 `USER` 의 `ACCEPTED`, `SEARCH` 항목을 그 수만큼 지어 넣는다. `updatedDaysAgo` 의 기본값은 0 이다. `LOAD` 와 `TEMPORAL` 이 쓴다. 판정 대상이 아니다 |
+| `filler` | 선택. `{ "owner", "count", "contentChars", "updatedDaysAgo" }`. 제목이 「보조 사실 {n}」(n 은 1부터)이고 본문이 `contentChars` 글자인 `USER` 의 `ACCEPTED`, `SEARCH` 항목을 그 수만큼 지어 넣는다. `updatedDaysAgo` 의 기본값은 0 이다. 항목이 많은 상황을 만들 때(`LOAD`, `TEMPORAL`, 일부 `BOUNDARY`) 쓴다. 판정 대상이 아니다 |
 | `expect` | 답에 필요한 항목의 `key` |
 | `forbidden[]` | `{ "memory", "kind" }`. 실리면 안 되는 항목. `kind` 는 아래 표 |
 
@@ -176,7 +175,7 @@ WHERE parent_execution_id IS NULL
   AND started_at >= NOW() - INTERVAL 30 DAY;
 ```
 
-**실행마다 실린 층별 항목 수.** `MEMORY_FACTS` 은 개인 사실 구역이 생긴 뒤부터 나온다.
+**실행마다 실린 층별 항목 수.** `MEMORY_FACTS` 은 개인 사실 구역이 생긴 뒤부터 나온다. `MEMORY_READ` 는 실린 층이 아니라 `memory_read` 로 본문을 읽은 기록이라 읽기 성공 수로 읽는다.
 
 ```sql
 SELECT s.source,

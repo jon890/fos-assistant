@@ -12,6 +12,8 @@ public enum ContextSource {
     MEMORY_FACTS,
     /** 제목만 싣는 Memory 색인 층의 줄. */
     MEMORY_INDEX,
+    /** memory_read 로 본문을 읽은 항목. 조립이 아니라 도구 처리가 실행 기록에 덧붙인다. */
+    MEMORY_READ,
     /** 끝난 위임 실행의 결과. */
     DELEGATION_RESULT,
     /** 승인한 커넥터 동작의 결과. */

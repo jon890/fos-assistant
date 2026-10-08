@@ -437,7 +437,11 @@ public final class ChatDtos {
     public record MemoryUseView(Long executionId, Long memoryId, String title, String scope, String via) {
         static MemoryUseView from(MemoryUse use) {
             return new MemoryUseView(
-                    use.executionId(), use.memoryId(), use.title(), use.scope().name(), use.via());
+                    use.executionId(),
+                    use.memoryId(),
+                    use.title(),
+                    use.scope().name(),
+                    use.via().name());
         }
     }
 }

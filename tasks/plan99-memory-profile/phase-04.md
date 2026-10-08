@@ -53,13 +53,13 @@
 
 ### 5. 연결
 
-- `use-conversation-session-state.ts`: `const memoryUses = useMemoryUses(conversationId, memoryCaptureKey);` 를 더하고 돌려준다. 
+- `use-conversation-session-state.ts`: `const memoryUses = useMemoryUses(conversationId, memoryCaptureKey);` 를 더하고 돌려준다.
 - `conversation-session-view.tsx`: `memoryUses={memoryUses.uses}` 를 `MessageList` 로 넘긴다. `onMemoryCapturesChanged` 에서 `memoryCaptures.changed` 뒤에 `memoryUses.reload()` 도 불러, 기억 기록을 되돌리거나 고치거나 받아들인 뒤 참고한 기억을 다시 읽는다(상태 훅의 함수 길이 상한 때문에 view 에 둔다). `conversation-session-view-types.ts` 의 `Pick` 에 `memoryUses` 를 더한다.
 - `message-list.tsx`: prop `memoryUses?: MemoryUse[]`(기본 `[]`)을 받아 `MemoryCaptureList` 바로 뒤에 `<MemoryUseList uses={memoryUses.filter((use) => use.executionId === turn.executionId)} />` 를 둔다. `capturesVersion` 옆에 `usesVersion`(`${executionId}:${memoryId}` 를 이은 글)을 두고 `contentVersion` 에 넣어, 접힌 줄이 새로 나타나면 맨 아래 따라가기가 보게 한다. 펼치고 접는 상태는 `MemoryUseList` 안에만 두고 `contentVersion` 에 넣지 않는다.
 
 ### 6. `execution-detail.tsx`
 
-`CONTEXT_SOURCE_LABELS` 에 `MEMORY_FACTS: "기억(개인 사실)"` 을 `MEMORY_ALWAYS` 와 `MEMORY_INDEX` 사이에 더한다.
+`CONTEXT_SOURCE_LABELS` 에 `MEMORY_FACTS: "기억(개인 사실)"` 을 `MEMORY_ALWAYS` 와 `MEMORY_INDEX` 사이에 더한다. `MEMORY_READ: "기억(찾아 읽음)"` 을 `MEMORY_INDEX` 뒤에 더한다.
 
 ### 7. `test/browser/memory-use.spec.ts`
 

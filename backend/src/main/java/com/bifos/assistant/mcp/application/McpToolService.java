@@ -20,6 +20,8 @@ import com.bifos.assistant.shared.config.LiveProperties;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.shared.util.ExternalData;
+import com.bifos.assistant.usage.application.ContextSourceRef;
+import com.bifos.assistant.usage.application.ExecutionContextSourceWriter;
 import com.bifos.assistant.usage.application.ExecutionDeliveryWriter;
 import com.bifos.assistant.usage.domain.AgentExecution;
 import com.bifos.assistant.usage.domain.DelegationKey;
@@ -74,6 +76,9 @@ public class McpToolService {
     private final LiveProperties<DelegationProperties> delegationProperties;
 
     private final ExecutionDeliveryWriter deliveryWriter;
+    /** {@code memory_read} 로 본문을 낸 항목을 그 실행의 문맥 기록 끝에 덧붙인다. */
+    private final ExecutionContextSourceWriter contextSourceWriter;
+
     private final AgentRepository agents;
     private final AgentConnectorBindings bindings;
     private final FollowUpService followUps;
@@ -86,7 +91,7 @@ public class McpToolService {
                         "name",
                         "memory_read",
                         "description",
-                        "지금 묻는 사람의 Memory 항목 본문을 번호로 읽는다. 번호는 지시문의 색인에 있다.",
+                        "지금 묻는 사람의 Memory 항목 본문을 번호로 읽는다. 번호는 지시문의 개인 사실 구역이나 색인에 있다.",
                         "inputSchema",
                         Map.of(
                                 "type",
@@ -229,8 +234,12 @@ public class McpToolService {
         try {
             Memory memory = memories.bodyFor(
                     user, memories.accessOf(caller.originExecution().agentId()), id);
+            String content = memories.contentOf(memory);
             log.info("memory read userId={} memoryId={} executionId={}", user.id(), id, caller.executionId());
-            return result(memories.contentOf(memory), false);
+            // 본문을 낸 호출만 남긴다. 「참고한 기억」 이 이 줄을 읽는다
+            contextSourceWriter.append(
+                    caller.executionId(), new ContextSourceRef("MEMORY_READ", "memory:" + id, "INLINE", "UNKNOWN"));
+            return result(content, false);
         } catch (ApiException ex) {
             if (ex.code() == ErrorCode.MEMORY_NOT_FOUND) {
                 return result("Memory 항목을 읽을 수 없습니다.", true);

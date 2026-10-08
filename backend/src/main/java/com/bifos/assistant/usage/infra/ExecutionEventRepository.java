@@ -78,12 +78,6 @@ public interface ExecutionEventRepository extends JpaRepository<ExecutionEvent, 
     List<ExecutionEvent> findByExecutionIdInOrderByExecutionIdAscSequenceAsc(Collection<Long> executionIds);
 
     /**
-     * 실행들의 그 종류 사건만 일어난 순서대로 읽는다. 다른 사건의 칸은 읽지 않는다. 실행 번호가 비어 있으면 부르지 않는다.
-     */
-    List<ExecutionEvent> findByExecutionIdInAndEventTypeOrderByExecutionIdAscSequenceAsc(
-            Collection<Long> executionIds, ExecutionEventType eventType);
-
-    /**
      * 그 대화의 실행 가운데 바깥 글을 읽었을 수 있는 도구나 하위 에이전트를 시작한 것이 있는가(ADR-20261007 / memory-remember).
      *
      * <p>Hermes session 은 대화의 앞 turn 들을 이력으로 이어 가므로 지금 실행 하나가 아니라 대화 전체를 본다.

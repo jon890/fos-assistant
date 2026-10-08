@@ -28,7 +28,7 @@
 
 - `retrieval` 을 바꾸지 않는다. 개인 사실 구역은 조립 단계의 선택이다. `memory_read`(`MemoryService.bodyFor`)는 `SEARCH` 만 보므로 그대로 읽힌다.
 - LLM 요약을 쓰지 않는다. 기존 조회 결과를 그대로 늘어놓는다.
-- 자르지 않는다. 200자를 넘는 본문은 후보가 아니다. 줄바꿈만 공백으로 바꾼다.
+- 자르지 않는다. 200자를 넘는 본문은 후보가 아니다. 제목과 본문의 줄바꿈만 공백으로 바꾼다. 색인 줄의 제목도 같은 규칙을 쓴다(모델이 정한 제목이 지시문에 머리 줄을 끼우지 못하게 한다). 줄바꿈이 있는 제목은 개인 사실 구역을 꺼도 색인 글과 지문이 달라진다.
 - 고른 뒤 번호 순으로 늘어놓아, 같은 집합이면 같은 글이 되게 한다(지시문 지문 안정).
 - 예산이 0 이면 구역 전체를 끈다. 합성 측정의 `factsOff` 모드가 이 값을 쓴다.
 
@@ -53,7 +53,7 @@
   1. 색인 몫 `indexBudget` 은 지금처럼 `indexedFor` 결과 전체(개인 사실 후보를 빼기 전)로 계산한다. 이렇게 해야 개인 사실 구역이 색인을 밀어내지 못한다.
   2. `builder.limit(maxChars - indexBudget)` 뒤 항상 층 둘을 담는다.
   3. 남은 자리(`limit` 에서 지금 글 길이를 뺀 값. 그 사이 구분 줄도 센다)와 `factsMaxChars` 가운데 작은 값을 예산으로 후보를 **한 번** 고른다.
-  4. 고른 항목을 번호 오름차순으로 `- [번호] 제목: 본문`(본문의 `\r\n`, `\n`, `\r` 은 공백 하나) 줄로 담는다. 항목은 `memoryItem(memory, ContextSource.MEMORY_FACTS, ContextBodyMode.INLINE, List.of(), memory.title(), memory.content(), memoryFreshness(memory, now))`. 고르기와 담기는 같은 길이 계산(`ContextBuilder.next` 의 머리와 구분 줄 규칙)을 쓴다. 그래도 들어가지 않는 항목이 있으면 예외를 던지지 않고 경고 로그(번호만)를 남긴 뒤 그 항목을 색인 대상으로 돌린다.
+  4. 고른 항목을 번호 오름차순으로 `- [번호] 제목: 본문`(제목과 본문의 `\r\n`, `\n`, `\r` 은 공백 하나. `indexLine` 의 제목도 같다) 줄로 담는다. 항목은 `memoryItem(memory, ContextSource.MEMORY_FACTS, ContextBodyMode.INLINE, List.of(), memory.title(), memory.content(), memoryFreshness(memory, now))`. 고르기와 담기는 같은 길이 계산(`ContextBuilder.next` 의 머리와 구분 줄 규칙)을 쓴다. 그래도 들어가지 않는 항목이 있으면 예외를 던지지 않고 경고 로그(번호만)를 남긴 뒤 그 항목을 색인 대상으로 돌린다.
   5. 색인 대상 = `indexedFor` 결과 − 4 에서 실제로 담은 항목. 마지막에 한 번 계산한다. `builder.limit(maxChars)` 뒤 지금처럼 담는다. `sameNameDocuments` 는 색인 대상으로 계산한다.
 - 클래스 Javadoc 과 `assemble(CurrentUser, Long)` 의 Javadoc 에 층 순서를 고친다.
 
@@ -66,6 +66,7 @@
 - 같은 항목 집합을 두 번 조립하면 `instructionsHash()` 가 같다. `JdbcTemplate` 으로 항목 하나의 `updated_at` 만 바꿔 고르는 차례가 달라져도, 예산 안에 모두 들어 고른 집합이 같으면 지문이 같다.
 - `ContextProperties` 의 `factsMaxChars=0` 으로 만든 `new ContextAssembler(memories, properties, clock)` 는 지금과 같은 글을 낸다(개인 사실 구역 머리가 없다).
 - 다른 에이전트가 받지 않는 collection 의 짧은 항목은 개인 사실 구역에도 없다.
+- 제목에 줄바꿈이 있는 개인 사실 줄과 색인 줄은 한 줄로 실린다(`flattensLineBreaksInTitlesOfFactAndIndexLines`).
 
 ### 5. 기대값이 바뀌는 기존 시험
 

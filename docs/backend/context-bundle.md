@@ -31,6 +31,7 @@ Memory 의 층과 예산과 `memory_read` 는 [`memory.md`](memory.md) 가 그�
 | `MEMORY_ALWAYS` | `memory` 의 `ALWAYS` | ADR-053 의 세 조건 | 원래 값. `SENSITIVE` 는 이 층에 오지 못한다 | `USER_APPROVED` | `INLINE` | 대화 turn 의 `instructions` |
 | `MEMORY_FACTS` | `memory` 의 `SEARCH` 가운데 짧은 개인 항목 | ADR-053 의 세 조건과 [`memory.md`](memory.md) 의 「개인 사실 구역」 후보 조건 | `NORMAL` 만 | `USER_APPROVED` | `INLINE` | 대화 turn 의 `instructions` |
 | `MEMORY_INDEX` | `memory` 의 `SEARCH` | ADR-053 의 세 조건 | 원래 값 | `USER_APPROVED` | `TITLE_ONLY` | 대화 turn 의 `instructions` |
+| `MEMORY_READ` | `memory_read` 가 본문을 내 준 항목 | `memory_read` 의 판정([`memory.md`](memory.md) 의 「본문 읽기가 갈리는 지점」) | 묶음 항목이 아니다 | 묶음 항목이 아니다 | `INLINE` | 조립이 아니라 도구 처리가 `execution_context_source` 에만 덧붙인다(「본문을 읽으면 남는 기록」) |
 | `DELEGATION_RESULT` | 끝난 위임 실행의 `output_text` | 그 대화의 주인. `AgentExecutionRepository.findUndeliveredResults` 의 조건대로 `SUCCEEDED` 나 `FAILED` 이고 아직 전하지 않았으며 부모가 루트 turn 인 위임만 | `SENSITIVE` | 옛 커넥터 에이전트의 답이면 `EXTERNAL`, 아니면 `AGENT` | `INLINE` | 자동 turn 의 `input` |
 | `CONNECTOR_RESULT` | `connector_action` 의 `result_text` | 그 대화의 주인 | `SENSITIVE` | `EXTERNAL` | `INLINE`. `UNKNOWN` 이면 `OMITTED` | 자동 turn 의 `input` |
 | `EXECUTION_STATE` | `agent_execution` 의 상태와 시각 | 실행 줄의 `user_id` | `NORMAL` | `CONTROL_PLANE` | 본문이 없다 | 지금 화면과 먼저 알리기 |

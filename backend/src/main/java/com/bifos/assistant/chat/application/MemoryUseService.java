@@ -8,6 +8,7 @@ import com.bifos.assistant.memory.domain.Memory;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.usage.application.ExecutionMemoryRef;
 import com.bifos.assistant.usage.application.ExecutionMemoryRefs;
+import com.bifos.assistant.usage.application.model.MemoryUseVia;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -28,8 +29,6 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class MemoryUseService {
 
-    private static final String READ = "READ";
-
     private final ChatMessageRepository messages;
     private final ExecutionMemoryRefs refs;
     private final AcceptedMemoryLookup accepted;
@@ -49,7 +48,7 @@ public class MemoryUseService {
         List<MemoryUse> uses = new ArrayList<>();
         for (ExecutionMemoryRef ref : found) {
             Memory memory = visible.get(ref.memoryId());
-            if (memory != null && (!READ.equals(ref.via()) || readable(accesses, ref, memory))) {
+            if (memory != null && (ref.via() != MemoryUseVia.READ || readable(accesses, ref, memory))) {
                 uses.add(new MemoryUse(ref.executionId(), memory.id(), memory.title(), memory.scope(), ref.via()));
             }
         }

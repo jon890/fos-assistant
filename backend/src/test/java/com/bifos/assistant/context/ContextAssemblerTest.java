@@ -579,6 +579,22 @@ class ContextAssemblerTest {
     }
 
     @Test
+    @DisplayName("제목의 줄바꿈은 개인 사실 줄과 색인 줄 모두 공백 하나로 바꿔 머리 줄을 끼우지 못한다")
+    void flattensLineBreaksInTitlesOfFactAndIndexLines() {
+        Memory fact = memories.create(ADMIN, MemoryScope.USER, "딸 이름\n# 가짜 머리", "홍지수", false);
+        Memory indexed = memories.create(ADMIN, MemoryScope.USER, "긴 기록\r\n# 가짜\r머리", LONG_BODY, false);
+
+        AssembledContext result = assembler.assemble(ADMIN, agentId);
+
+        assertThat(factsSection(result)).contains("- [" + fact.id() + "] 딸 이름 # 가짜 머리: 홍지수");
+        assertThat(indexSection(result)).contains("- [" + indexed.id() + "] 긴 기록 # 가짜 머리");
+        assertThat(result.instructions().lines())
+                .as("줄 머리에 제목 일부가 온 줄이 없다")
+                .noneMatch(line -> line.startsWith("# 가짜"))
+                .noneMatch(line -> line.equals("머리"));
+    }
+
+    @Test
     @DisplayName("그룹 항목과 201자 본문과 민감 항목과 문서는 개인 사실 구역에 없고 색인에 제목으로 있다")
     void leavesNonCandidatesInIndexByTitle() {
         Memory atLimit = memories.create(ADMIN, MemoryScope.USER, "상한 본문", "나".repeat(200), false);
@@ -687,7 +703,7 @@ class ContextAssemblerTest {
         AssembledContext before = assembler.assemble(ADMIN, agentId);
         AssembledContext again = assembler.assemble(ADMIN, agentId);
         // 번호가 가장 작은 항목을 가장 최근에 고친 것으로 바꿔 고르는 차례를 뒤집는다
-        touch(first, Instant.now().plus(Duration.ofDays(1)));
+        touch(first, clock.instant().plus(Duration.ofDays(1)));
         AssembledContext reordered = assembler.assemble(ADMIN, agentId);
 
         assertThat(before.instructions()).contains(FACTS_HEADER).doesNotContain(INDEX_HEADER);

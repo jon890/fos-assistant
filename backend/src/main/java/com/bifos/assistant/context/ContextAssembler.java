@@ -18,6 +18,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -82,6 +83,8 @@ public class ContextAssembler implements OmittedMemories {
     /** 제목과 항목, 항목과 항목 사이에 넣는 구분 줄이다. */
     private static final String SEPARATOR = "\n\n";
 
+    private static final Pattern LINE_BREAK = Pattern.compile("\\r\\n|\\n|\\r");
+
     private final MemoryService memories;
     private final ContextProperties properties;
     private final Clock clock;
@@ -112,7 +115,8 @@ public class ContextAssembler implements OmittedMemories {
      *
      * <p>색인 층에 쓸 자리를 먼저 떼어 두고 항상 층과 개인 사실 구역을 담은 뒤 색인 층을 담는다. 그러지 않으면 본문이 긴
      * 항목 하나가 상한을 거의 채워 색인이 통째로 빠지고, 색인이 없으면 {@code memory_read} 로 읽을 번호도 사라져 에이전트가
-     * 나머지 Memory 에 닿을 길이 없어진다. 개인 사실 구역은 떼어 둔 자리를 쓰지 않으므로 색인을 밀어내지 못한다.
+     * 나머지 Memory 에 닿을 길이 없어진다. 개인 사실 구역은 떼어 둔 자리를 쓰지 않으므로, 색인 전체가 몫(상한의 1/4) 안에 들 때는
+     * 색인을 밀어내지 못한다. 몫보다 긴 색인은 몫까지만 떼어 두므로 남는 줄이 빠질 수 있다.
      *
      * <p>싣는 것은 요청자가 볼 수 있고 그 에이전트가 받는 collection 의 항목뿐이다(ADR-053). 커넥터 에이전트와
      * 찾지 못한 에이전트는 아무것도 받지 않는다.
@@ -142,7 +146,8 @@ public class ContextAssembler implements OmittedMemories {
         List<Memory> always = memories.alwaysInjectedFor(user, access);
         List<Memory> indexed = memories.indexedFor(user, access);
         long maxChars = properties.maxChars();
-        // 개인 사실 후보를 빼기 전의 색인 전체로 몫을 정한다. 구역에 실린 항목은 색인에서 빠지므로 색인은 몫보다 길어지지 않는다
+        // 개인 사실 후보를 빼기 전의 색인 전체로 몫을 정한다. 색인 전체가 몫(상한의 1/4) 안에 들 때는 구역에 실린 항목이
+        // 색인에서 빠지므로 색인은 떼어 둔 자리보다 길어지지 않는다
         long indexBudget =
                 Math.min(indexLength(indexed, sameNameDocuments(indexed)), maxChars / properties.indexBudgetRatio());
 
@@ -224,10 +229,14 @@ public class ContextAssembler implements OmittedMemories {
         return chosen;
     }
 
-    /** 개인 사실 한 줄이다. 본문의 줄바꿈은 공백 하나로 바꾸고 자르지 않는다. */
+    /** 개인 사실 한 줄이다. 제목과 본문의 줄바꿈은 공백 하나로 바꾸고 자르지 않는다. */
     private static String factLine(Memory memory) {
-        return "- [" + memory.id() + "] " + memory.title() + ": "
-                + memory.content().replaceAll("\\r\\n|\\n|\\r", " ");
+        return "- [" + memory.id() + "] " + oneLine(memory.title()) + ": " + oneLine(memory.content());
+    }
+
+    /** 줄바꿈을 공백 하나로 바꾼다. 모델이 정한 제목이나 본문이 지시문에 머리 줄을 끼우지 못하게 한다. */
+    private static String oneLine(String text) {
+        return LINE_BREAK.matcher(text).replaceAll(" ");
     }
 
     private void appendAlways(
@@ -325,9 +334,9 @@ public class ContextAssembler implements OmittedMemories {
         });
     }
 
-    /** 색인 한 줄이다. 같은 이름의 문서가 다른 범위에 있으면 그 번호를 줄 끝에 적는다. */
+    /** 색인 한 줄이다. 제목의 줄바꿈은 공백 하나로 바꾼다. 같은 이름의 문서가 다른 범위에 있으면 그 번호를 줄 끝에 적는다. */
     private static String indexLine(Long memoryId, String title, List<Memory> sameNames) {
-        StringBuilder line = new StringBuilder("- [" + memoryId + "] " + title);
+        StringBuilder line = new StringBuilder("- [" + memoryId + "] " + oneLine(title));
         for (Memory other : sameNames) {
             String kind = other.scope() == MemoryScope.GROUP ? "그룹" : "개인";
             line.append(" (같은 이름의 ")
