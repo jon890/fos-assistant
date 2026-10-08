@@ -96,6 +96,18 @@ class BrowserGatewayTokensTest {
     }
 
     @Test
+    @DisplayName("WebSocket 중계 주소 앞부분은 http 기반이면 ws, https 기반이면 wss 로 바꾸고 표식을 붙인다")
+    void buildsRelayBase() {
+        String token = token(tokens(BASE, SECRET, NOW).bindingAddress(42L).orElseThrow());
+
+        assertThat(tokens(BASE, SECRET, NOW).relayBase(token))
+                .contains("ws://control-plane.example.test/internal/browser-gateway/" + token);
+        assertThat(tokens("https://control-plane.example.test/internal/browser-gateway", SECRET, NOW)
+                        .relayBase(token))
+                .contains("wss://control-plane.example.test/internal/browser-gateway/" + token);
+    }
+
+    @Test
     @DisplayName("중계 설정 가운데 하나라도 비면 주소를 만들지 않고 맞는 표식도 받지 않는다")
     void staysOffWithoutGatewaySettings() {
         String token = token(tokens(BASE, SECRET, NOW).bindingAddress(42L).orElseThrow());
@@ -107,6 +119,7 @@ class BrowserGatewayTokensTest {
             assertThat(off.bindingAddress(42L)).isEmpty();
             assertThat(off.callAddress(7L)).isEmpty();
             assertThat(off.verify(token)).isEmpty();
+            assertThat(off.relayBase(token)).isEmpty();
         }
     }
 

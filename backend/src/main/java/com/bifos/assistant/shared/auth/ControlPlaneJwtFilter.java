@@ -41,6 +41,7 @@ import tools.jackson.databind.ObjectMapper;
 public class ControlPlaneJwtFilter extends OncePerRequestFilter {
     private static final String BEARER = "Bearer ";
     private static final String SERVICE_API_PREFIX = "/api/v1/service/";
+    private static final String BROWSER_GATEWAY_PREFIX = "/internal/browser-gateway/";
 
     /**
      * 이 필터가 해석하지 않는 경로다.
@@ -51,6 +52,8 @@ public class ControlPlaneJwtFilter extends OncePerRequestFilter {
      * 사용자가 없는 시점에 돌므로 여기를 지나면 안 된다. 이 필터는 토큰을 받으면 그 자리에서
      * {@code app_user} 를 만들고, 그러면 허용되지 않은 주소로도 사용자가 생긴다. 그 경로는 토큰을
      * 스스로 검사한다. {@code /api/v1/service/} 아래는 서비스 토큰을 쓰는 다른 인증 경계다(ADR-056).
+     * {@code /internal/browser-gateway/} 아래는 커넥터가 부르는 브라우저 중계이고, 경로에 든 접근 표식이 인증이다. 하위 경로가 많아
+     * 접두사로 건너뛴다.
      *
      * <p>꺼진 사용자를 401 로 거절하는 판정도 이 경로들에는 걸리지 않는다. 그 밖의 경로는
      * {@code permitAll} 이어도 이 필터가 막는다.
@@ -84,7 +87,9 @@ public class ControlPlaneJwtFilter extends OncePerRequestFilter {
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
         String uri = request.getRequestURI();
-        return UNFILTERED_PATHS.contains(uri) || uri.startsWith(SERVICE_API_PREFIX);
+        return UNFILTERED_PATHS.contains(uri)
+                || uri.startsWith(SERVICE_API_PREFIX)
+                || uri.startsWith(BROWSER_GATEWAY_PREFIX);
     }
 
     @Override

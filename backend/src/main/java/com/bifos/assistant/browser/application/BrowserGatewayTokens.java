@@ -70,6 +70,24 @@ public class BrowserGatewayTokens {
     }
 
     /**
+     * 그 표식으로 받은 요청의 WebSocket 중계 주소 앞부분이다. {@code gateway-base-url} 의 scheme 을 {@code ws} 나 {@code wss} 로
+     * 바꾸고 {@code /<표식>} 을 붙인다. 중계가 꺼졌으면 비어 있다.
+     *
+     * <p>표식은 확인하지 않는다. {@link #verify(String)} 를 지난 표식만 넘긴다.
+     */
+    public Optional<String> relayBase(String token) {
+        BrowserProperties current = properties.current();
+        if (!current.gatewayEnabled()) {
+            return Optional.empty();
+        }
+        String base = current.gatewayBaseUrl();
+        String websocket = base.startsWith("https://")
+                ? "wss://" + base.substring("https://".length())
+                : "ws://" + base.substring("http://".length());
+        return Optional.of(websocket + "/" + token);
+    }
+
+    /**
      * 표식을 확인한다. 모양과 서명이 맞고, 호출 표식이면 만료 전일 때만 값을 준다.
      *
      * <p>어느 까닭으로 거절했는지는 돌려주지 않는다. 중계가 꺼졌으면 비어 있다.

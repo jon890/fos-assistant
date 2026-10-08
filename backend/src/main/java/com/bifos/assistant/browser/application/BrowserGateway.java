@@ -51,6 +51,11 @@ public class BrowserGateway {
         return new GatewayTarget(userId, endpoint.browserId(), endpoint.cdp());
     }
 
+    /** {@link #open(String)} 을 지난 표식의 WebSocket 중계 주소 앞부분이다. 중계가 꺼졌으면 비어 있다. */
+    public Optional<String> relayBase(String token) {
+        return tokens.relayBase(token);
+    }
+
     /** 중계 연결이 열려 있는 동안 쥐는 핸들이다. 쥐고 있는 동안 자동 중지하지 않는다. WebSocket 이 쓴다. */
     public BrowserUsageHandle hold(GatewayTarget target) {
         return usage.open(target.browserId());
