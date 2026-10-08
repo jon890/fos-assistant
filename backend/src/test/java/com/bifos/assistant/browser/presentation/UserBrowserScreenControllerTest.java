@@ -28,6 +28,7 @@ import java.time.Clock;
 import java.time.Duration;
 import java.util.List;
 import java.util.Optional;
+import java.util.OptionalInt;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -256,6 +257,11 @@ class UserBrowserScreenControllerTest {
             @Override
             public Optional<URI> cdpAddress(String containerId) {
                 return Optional.of(URI.create("http://192.0.2.10:9999"));
+            }
+
+            @Override
+            public OptionalInt exitCode(String containerId) {
+                return OptionalInt.empty();
             }
 
             @Override
