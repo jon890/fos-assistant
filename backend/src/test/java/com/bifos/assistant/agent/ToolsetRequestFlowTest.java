@@ -196,6 +196,8 @@ class ToolsetRequestFlowTest {
         assertThat(enabled.get()).contains("image_gen");
         assertThat(service.read(owner, row.id(), false).status()).isEqualTo(ToolsetRequestStatus.PENDING);
         assertThat(notifications.page(owner, null, 100).items()).isEmpty();
+        assertThat(service.request(owner, agent.code(), "image_gen").id()).isEqualTo(row.id());
+        assertThat(notifications.page(admin, null, 100).items()).hasSize(1);
         service.decide(admin, row.id(), true, null);
         assertThat(enabled.get().stream().filter("image_gen"::equals)).hasSize(1);
         assertThat(notifications.page(owner, null, 100).items()).hasSize(1);

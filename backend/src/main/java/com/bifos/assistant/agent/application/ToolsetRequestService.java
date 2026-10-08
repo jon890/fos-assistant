@@ -49,16 +49,16 @@ public class ToolsetRequestService {
         if (ineligible(agent, user.id(), user.groupId(), toolset) != null) {
             throw new ApiException(ErrorCode.TOOLSET_REQUEST_UNAVAILABLE, "this toolset cannot be requested");
         }
-        AgentToolsetsView current = tools.read(user, agent);
-        if (current.toolsets().stream().noneMatch(item -> item.name().equals(toolset) && !item.enabled())) {
-            throw new ApiException(
-                    ErrorCode.TOOLSET_REQUEST_UNAVAILABLE, "this toolset is unavailable or already enabled");
-        }
         AgentToolsetRequest pending = requests.findByAgentIdAndGroupIdAndRequesterUserIdAndToolsetAndPendingSlot(
                         agent.id(), user.groupId(), user.id(), toolset, 1)
                 .orElse(null);
         if (pending != null) {
             return view(pending, agent);
+        }
+        AgentToolsetsView current = tools.read(user, agent);
+        if (current.toolsets().stream().noneMatch(item -> item.name().equals(toolset) && !item.enabled())) {
+            throw new ApiException(
+                    ErrorCode.TOOLSET_REQUEST_UNAVAILABLE, "this toolset is unavailable or already enabled");
         }
         AgentToolsetRequest row = requests.saveAndFlush(
                 AgentToolsetRequest.of(user.groupId(), agent.id(), user.id(), toolset, clock.instant()));
