@@ -13,10 +13,23 @@ import {
 } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import {
+  ConnectorIcon,
+  ConnectorLink,
+} from "@/components/connector/connector-identity";
+import {
   connectionStatusLabel,
   readConnectors,
+  toolRiskCounts,
   type ConnectorSummary,
 } from "@/lib/connection";
+
+/** 「도구 3개 · 조회 1 · 쓰기 2」 처럼 도구 수와 위험도별 수를 한 줄로 만든다. */
+function toolSummary(tools: ConnectorSummary["tools"]): string {
+  const parts = toolRiskCounts(tools).map(
+    ({ label, count }) => `${label} ${count}`,
+  );
+  return [`도구 ${tools.length}개`, ...parts].join(" · ");
+}
 
 export function ConnectorCatalog() {
   const [connectors, setConnectors] = useState<ConnectorSummary[] | null>(null);
@@ -50,44 +63,67 @@ export function ConnectorCatalog() {
         <ul className="space-y-3">
           {connectors.map((connector) => (
             <li key={connector.id}>
-              <Link
-                prefetch={false}
-                href={`/connections/${connector.id}`}
+              <Card
                 data-testid="connector-card"
-                className="block rounded-lg focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+                className="relative transition-colors hover:bg-accent has-[[data-slot=card-link]:focus-visible]:ring-3 has-[[data-slot=card-link]:focus-visible]:ring-ring/50"
               >
-                <Card className="transition-colors hover:bg-accent">
-                  <CardHeader>
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <CardTitle>{connector.title}</CardTitle>
-                      <Badge variant="outline">
-                        {connectionStatusLabel(connector.myStatus)}
-                      </Badge>
+                <CardHeader>
+                  <div className="flex min-w-0 items-start gap-3">
+                    <ConnectorIcon icon={connector.icon} />
+                    <div className="min-w-0 flex-1 space-y-1">
+                      <div className="flex min-w-0 flex-wrap items-center justify-between gap-2">
+                        <CardTitle className="min-w-0 break-words">
+                          <Link
+                            data-slot="card-link"
+                            prefetch={false}
+                            href={`/connections/${connector.id}`}
+                            className="after:absolute after:inset-0 focus-visible:outline-none"
+                          >
+                            {connector.title}
+                          </Link>
+                        </CardTitle>
+                        <Badge variant="outline">
+                          {connectionStatusLabel(connector.myStatus)}
+                        </Badge>
+                      </div>
+                      {connector.description ? (
+                        <CardDescription className="break-words">
+                          {connector.description}
+                        </CardDescription>
+                      ) : null}
                     </div>
-                    {connector.description ? (
-                      <CardDescription>{connector.description}</CardDescription>
-                    ) : null}
-                  </CardHeader>
-                  {connector.available &&
-                  connector.myStatus === "DISCONNECTED" ? null : (
-                    <CardContent className="space-y-1">
-                      {connector.available ? null : (
-                        <p className="text-sm text-muted-foreground">
-                          지금은 쓸 수 없어요.
-                        </p>
-                      )}
-                      {connector.myStatus === "DISCONNECTED" ? null : (
-                        <p
-                          className="text-sm text-muted-foreground"
-                          data-testid="connector-binding-count"
-                        >
-                          붙인 에이전트 {connector.bindings.length}개
-                        </p>
-                      )}
-                    </CardContent>
+                  </div>
+                </CardHeader>
+                <CardContent className="min-w-0 space-y-1">
+                  {connector.available ? (
+                    connector.tools.length > 0 ? (
+                      <p
+                        className="text-sm text-muted-foreground"
+                        data-testid="connector-tool-summary"
+                      >
+                        {toolSummary(connector.tools)}
+                      </p>
+                    ) : null
+                  ) : (
+                    <p className="text-sm text-muted-foreground">
+                      지금은 쓸 수 없어요.
+                    </p>
                   )}
-                </Card>
-              </Link>
+                  {connector.myStatus === "DISCONNECTED" ? null : (
+                    <p
+                      className="text-sm text-muted-foreground"
+                      data-testid="connector-binding-count"
+                    >
+                      붙인 에이전트 {connector.bindings.length}개
+                    </p>
+                  )}
+                  <ConnectorLink
+                    link={connector.link}
+                    title={connector.title}
+                    className="relative z-10"
+                  />
+                </CardContent>
+              </Card>
             </li>
           ))}
         </ul>
