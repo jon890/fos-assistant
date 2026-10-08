@@ -6,6 +6,7 @@ import com.bifos.assistant.memory.application.model.MemoryAccess;
 import com.bifos.assistant.memory.domain.Memory;
 import com.bifos.assistant.memory.domain.type.MemoryEntryType;
 import com.bifos.assistant.memory.domain.type.MemoryScope;
+import com.bifos.assistant.memory.domain.type.MemorySensitivity;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import java.time.Clock;
 import java.time.Duration;
@@ -27,6 +28,9 @@ import org.springframework.stereotype.Service;
  *
  * <p>Memory 를 먼저 문맥 묶음의 항목으로 만들고, 그 항목을 지금과 같은 글로 옮긴다(ADR-071). 같은 이름의 개인 문서와 그룹
  * 문서에 붙는 충돌 표시를 빼면 글이 바뀌지 않아 {@code instructions_hash} 도 그대로다.
+ *
+ * <p>층은 그룹 항상 층, 개인 항상 층, 개인 사실 구역, 색인 층 순서다. 개인 사실 구역은 색인에 오를 짧은 개인 항목을 본문까지 싣는다
+ * (ADR-20261008 / memory-facts). 그 구역에 실은 항목은 색인에서 뺀다.
  */
 @Service
 @Slf4j
@@ -60,6 +64,13 @@ public class ContextAssembler implements OmittedMemories {
             남길 것은 가족 구성, 이름과 관계, 선호, 상황, 결정이다. 작업 기록, 한 번만 쓰일 요청, 대화 요약은 남기지 않는다.
             사용자의 말에 있는 부정(못, 안, 않, 없, 아니)은 content 에 그대로 살린다. 이미 기억한 사실이 바뀌었으면 그 번호를 memory_id 로 주어 고친다.
             도구 결과가 제안으로 남았다고 하면 사용자가 받아들여야 기억한다는 것을 답에서 알린다. 사용자가 기억해 달라고 했으면 기억했는지 답에서 알린다.
+            """.stripTrailing();
+
+    /** 개인 사실 구역의 머리다. {@code docs/backend/memory.md} 의 「개인 사실 구역」 예시와 글자까지 같다. */
+    private static final String FACTS_HEADER = """
+            # 지금 묻는 사람에 대해 기억한 것
+
+            아래는 이 사람에 대해 기억한 짧은 사실이다. 필요하면 번호로 memory_read 를 불러 다시 읽는다.
             """.stripTrailing();
 
     private static final String INDEX_HEADER = """
@@ -99,9 +110,9 @@ public class ContextAssembler implements OmittedMemories {
     /**
      * 고르는 자리를 여기 하나로 모은다. 항목이 많아지면 이 클래스에서 검색으로 바꾼다.
      *
-     * <p>색인 층에 쓸 자리를 먼저 떼어 두고 항상 층을 담는다. 그러지 않으면 본문이 긴 항목 하나가
-     * 상한을 거의 채워 색인이 통째로 빠지고, 색인이 없으면 {@code memory_read} 로 읽을 번호도
-     * 사라져 에이전트가 나머지 Memory 에 닿을 길이 없어진다.
+     * <p>색인 층에 쓸 자리를 먼저 떼어 두고 항상 층과 개인 사실 구역을 담은 뒤 색인 층을 담는다. 그러지 않으면 본문이 긴
+     * 항목 하나가 상한을 거의 채워 색인이 통째로 빠지고, 색인이 없으면 {@code memory_read} 로 읽을 번호도 사라져 에이전트가
+     * 나머지 Memory 에 닿을 길이 없어진다. 개인 사실 구역은 떼어 둔 자리를 쓰지 않으므로 색인을 밀어내지 못한다.
      *
      * <p>싣는 것은 요청자가 볼 수 있고 그 에이전트가 받는 collection 의 항목뿐이다(ADR-053). 커넥터 에이전트와
      * 찾지 못한 에이전트는 아무것도 받지 않는다.
@@ -130,17 +141,93 @@ public class ContextAssembler implements OmittedMemories {
         Instant now = clock.instant();
         List<Memory> always = memories.alwaysInjectedFor(user, access);
         List<Memory> indexed = memories.indexedFor(user, access);
-        Map<Long, List<Memory>> sameNames = sameNameDocuments(indexed);
         long maxChars = properties.maxChars();
-        long indexBudget = Math.min(indexLength(indexed, sameNames), maxChars / properties.indexBudgetRatio());
+        // 개인 사실 후보를 빼기 전의 색인 전체로 몫을 정한다. 구역에 실린 항목은 색인에서 빠지므로 색인은 몫보다 길어지지 않는다
+        long indexBudget =
+                Math.min(indexLength(indexed, sameNameDocuments(indexed)), maxChars / properties.indexBudgetRatio());
 
         ContextBuilder builder = new ContextBuilder(maxChars);
         builder.limit(maxChars - indexBudget);
         appendAlways(builder, GROUP_HEADER, always, MemoryScope.GROUP, now);
         appendAlways(builder, USER_HEADER, always, MemoryScope.USER, now);
+        Set<Long> facts = appendFacts(builder, indexed, now);
+        List<Memory> rest =
+                indexed.stream().filter(memory -> !facts.contains(memory.id())).toList();
         builder.limit(maxChars);
-        appendIndex(builder, indexed, sameNames, now);
+        appendIndex(builder, rest, sameNameDocuments(rest), now);
         return builder.build();
+    }
+
+    /**
+     * 개인 사실 구역을 담고 실은 항목의 번호를 돌려준다.
+     *
+     * <p>예산은 항상 층 뒤에 남은 자리와 {@code factsMaxChars} 가운데 작은 쪽이다. 고르기는 한 번만 하고, 고른 항목을 번호 순으로
+     * 담는다. 고르기와 담기가 같은 길이 계산을 쓰므로 고른 항목은 모두 들어간다. 그래도 들어가지 않는 항목은 빠진 항목으로 세지 않고
+     * 색인으로 돌린다.
+     */
+    private Set<Long> appendFacts(ContextBuilder builder, List<Memory> indexed, Instant now) {
+        long budget = Math.min(builder.room(), properties.factsMaxChars());
+        if (budget <= 0) {
+            return Set.of();
+        }
+        List<Memory> chosen =
+                chooseFacts(indexed.stream().filter(this::factCandidate).toList(), budget, builder.isEmpty());
+        Set<Long> placed = new HashSet<>();
+        chosen.stream().sorted(Comparator.comparing(Memory::id)).forEach(memory -> {
+            ContextItem item = memoryItem(
+                    memory,
+                    ContextSource.MEMORY_FACTS,
+                    ContextBodyMode.INLINE,
+                    List.of(),
+                    memory.title(),
+                    memory.content(),
+                    memoryFreshness(memory, now));
+            if (builder.appendIfFits(FACTS_HEADER, factLine(memory), item)) {
+                placed.add(memory.id());
+            } else {
+                log.warn("memory facts returned an item to the index memoryId={}", memory.id());
+            }
+        });
+        return placed;
+    }
+
+    /** 색인에 오를 항목 가운데 본문이 짧은 개인 평문 항목만 개인 사실 구역의 후보다. */
+    private boolean factCandidate(Memory memory) {
+        return memory.scope() == MemoryScope.USER
+                && memory.entryType() == MemoryEntryType.MEMORY
+                && memory.sensitivity() == MemorySensitivity.NORMAL
+                && !memory.sealed()
+                && memory.content().length() <= properties.factsItemMaxChars();
+    }
+
+    /**
+     * 최근에 고친 것부터, 같으면 번호가 큰 것부터 보며 머리와 구분 줄을 포함한 구역 글이 예산 안이면 담고 아니면 건너뛴다.
+     *
+     * @param startsEmpty 구역 앞에 담은 글이 없다. 글이 있으면 구역 앞의 구분 줄도 센다
+     */
+    private static List<Memory> chooseFacts(List<Memory> candidates, long budget, boolean startsEmpty) {
+        Comparator<Memory> recentFirst = Comparator.comparing(
+                        Memory::updatedAt, Comparator.nullsFirst(Comparator.<Instant>naturalOrder()))
+                .thenComparing(Memory::id)
+                .reversed();
+        List<Memory> chosen = new ArrayList<>();
+        long used = 0;
+        for (Memory memory : candidates.stream().sorted(recentFirst).toList()) {
+            boolean first = chosen.isEmpty();
+            long cost = ContextBuilder.next(startsEmpty && first, !first, FACTS_HEADER, factLine(memory))
+                    .length();
+            if (used + cost <= budget) {
+                chosen.add(memory);
+                used += cost;
+            }
+        }
+        return chosen;
+    }
+
+    /** 개인 사실 한 줄이다. 본문의 줄바꿈은 공백 하나로 바꾸고 자르지 않는다. */
+    private static String factLine(Memory memory) {
+        return "- [" + memory.id() + "] " + memory.title() + ": "
+                + memory.content().replaceAll("\\r\\n|\\n|\\r", " ");
     }
 
     private void appendAlways(
@@ -318,6 +405,31 @@ public class ContextAssembler implements OmittedMemories {
             this.limit = Math.max(0, Math.min(limit, maxChars));
         }
 
+        /** 지금 층에 남은 자리다. */
+        private long room() {
+            return Math.max(0, limit - selected.length());
+        }
+
+        private boolean isEmpty() {
+            return selected.isEmpty();
+        }
+
+        /**
+         * 남은 자리에 들어가면 담고 참을 돌려준다. 들어가지 않으면 아무것도 남기지 않고 거짓을 돌려준다.
+         *
+         * <p>{@link #append} 와 달리 빠진 항목으로 세지 않는다. 그 항목은 부르는 쪽이 다른 층으로 돌린다.
+         */
+        private boolean appendIfFits(String header, String line, ContextItem item) {
+            String added = next(selected, selectedHeaders, header, line);
+            if (selected.length() + added.length() > limit) {
+                return false;
+            }
+            appendTo(full, fullHeaders, header, line);
+            appendTo(selected, selectedHeaders, header, line);
+            items.add(item);
+            return true;
+        }
+
         /**
          * 항목 하나를 담는다.
          *
@@ -340,8 +452,13 @@ public class ContextAssembler implements OmittedMemories {
         }
 
         private static String next(StringBuilder value, Set<String> headers, String header, String item) {
-            String prefix = value.isEmpty() ? "" : SEPARATOR;
-            return prefix + (headers.contains(header) ? item : header + SEPARATOR + item);
+            return next(value.isEmpty(), headers.contains(header), header, item);
+        }
+
+        /** 앞 글이 비었는지와 머리가 이미 있는지로 다음에 붙을 글을 만든다. 담기와 고르기가 같은 규칙을 쓴다. */
+        private static String next(boolean empty, boolean headed, String header, String item) {
+            String prefix = empty ? "" : SEPARATOR;
+            return prefix + (headed ? item : header + SEPARATOR + item);
         }
 
         private static void appendTo(StringBuilder value, Set<String> headers, String header, String item) {

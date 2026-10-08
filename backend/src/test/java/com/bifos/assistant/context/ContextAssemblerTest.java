@@ -18,6 +18,9 @@ import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.shared.util.Sha256;
 import com.bifos.assistant.testsupport.BackendIntegrationTest;
+import com.bifos.assistant.testsupport.TestClock;
+import java.sql.Timestamp;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.Set;
@@ -34,6 +37,12 @@ class ContextAssemblerTest {
     private static final CurrentUser ADMIN = user(1L, 10L, UserRole.ADMIN);
     private static final CurrentUser MEMBER = user(2L, 10L, UserRole.MEMBER);
     private static final String AGENT_CODE = "context-assembler-test";
+    private static final String FACTS_HEADER =
+            "# 지금 묻는 사람에 대해 기억한 것\n\n" + "아래는 이 사람에 대해 기억한 짧은 사실이다. 필요하면 번호로 memory_read 를 불러 다시 읽는다.";
+    private static final String INDEX_HEADER = "# 더 물어볼 수 있는 것";
+
+    /** 개인 사실 구역의 본문 길이 상한(200자)을 넘어 색인에만 남는 본문이다. */
+    private static final String LONG_BODY = "색".repeat(201);
 
     @Autowired
     ContextAssembler assembler;
@@ -49,6 +58,12 @@ class ContextAssemblerTest {
 
     @Autowired
     JdbcTemplate jdbc;
+
+    @Autowired
+    ContextProperties properties;
+
+    @Autowired
+    TestClock clock;
 
     /** core collection 을 받는 보통 에이전트의 번호다. 저장하면 core 가 딸려 온다(ADR-053). */
     private Long agentId;
@@ -228,7 +243,8 @@ class ContextAssemblerTest {
     void shipsIndexAndRestEvenIfFirstItemExceedsLimit() {
         Memory tooLong = memories.create(ADMIN, MemoryScope.GROUP, "너무 긴 항목", "가".repeat(9_000), true);
         Memory shortOne = memories.create(ADMIN, MemoryScope.GROUP, "짧은 항목", "짧은 내용", true);
-        Memory indexed = memories.create(ADMIN, MemoryScope.USER, "색인만 하는 제목", "색인 본문", false);
+        // 본문이 개인 사실 구역의 상한을 넘어 색인에만 오른다
+        Memory indexed = memories.create(ADMIN, MemoryScope.USER, "색인만 하는 제목", LONG_BODY, false);
 
         AssembledContext result = assembler.assemble(ADMIN, agentId);
 
@@ -244,7 +260,8 @@ class ContextAssemblerTest {
     @DisplayName("항상 층이 상한을 거의 채워도 색인 층을 싣는다")
     void shipsIndexLayerEvenWhenAlwaysLayerNearlyFillsLimit() {
         memories.create(ADMIN, MemoryScope.GROUP, "거의 상한", "가".repeat(7_960), true);
-        Memory indexed = memories.create(ADMIN, MemoryScope.USER, "색인 제목", "색인 본문", false);
+        // 짧은 본문이면 항상 층이 빠진 자리를 개인 사실 구역이 쓴다. 색인에만 오르게 해 색인이 밀려나지 않는지 본다
+        Memory indexed = memories.create(ADMIN, MemoryScope.USER, "색인 제목", LONG_BODY, false);
 
         AssembledContext result = assembler.assemble(ADMIN, agentId);
 
@@ -312,7 +329,7 @@ class ContextAssemblerTest {
     @Test
     @DisplayName("항상 층 뒤에 색인 층을 id 오름차순으로 넣는다")
     void putsIndexLayerAfterAlwaysLayerInIdAscendingOrder() {
-        Memory first = memories.create(ADMIN, MemoryScope.USER, "먼저 저장", "본문", false);
+        Memory first = memories.create(ADMIN, MemoryScope.USER, "먼저 저장", LONG_BODY, false);
         Memory second = memories.create(ADMIN, MemoryScope.GROUP, "나중 저장", "본문", false);
 
         AssembledContext result = assembler.assemble(ADMIN, agentId);
@@ -417,9 +434,10 @@ class ContextAssemblerTest {
                 + "- 주간 회의는 화요일 10시\n\n"
                 + "# 지금 묻는 사람에 대해 아는 것\n\n"
                 + "- 아침에는 차를 마신다\n\n"
+                + FACTS_HEADER + "\n\n"
+                + "- [" + firstIndexed.id() + "] 장보기 목록: 우유와 달걀\n\n"
                 + "# 더 물어볼 수 있는 것\n\n"
                 + "아래는 제목만 적은 것이다. 필요하면 memory_read 도구로 본문을 읽는다.\n\n"
-                + "- [" + firstIndexed.id() + "] 장보기 목록\n\n"
                 + "- [" + secondIndexed.id() + "] 여행 계획";
 
         AssembledContext result = assembler.assemble(ADMIN, agentId);
@@ -430,7 +448,7 @@ class ContextAssemblerTest {
     }
 
     @Test
-    @DisplayName("묶음은 글에 실은 순서대로 항상 층 항목과 제목만 실은 색인 항목을 갖는다")
+    @DisplayName("묶음은 글에 실은 순서대로 항상 층 항목과 개인 사실 항목과 제목만 실은 색인 항목을 갖는다")
     void bundlesItemsInRenderedOrder() {
         Memory group = memories.create(ADMIN, MemoryScope.GROUP, "그룹 회의", "주간 회의는 화요일 10시", true);
         Memory personal = memories.create(ADMIN, MemoryScope.USER, "아침 습관", "아침에는 차를 마신다", true);
@@ -444,14 +462,14 @@ class ContextAssemblerTest {
                 .containsExactly(
                         tuple(ContextSource.MEMORY_ALWAYS, "memory:" + group.id(), ContextBodyMode.INLINE),
                         tuple(ContextSource.MEMORY_ALWAYS, "memory:" + personal.id(), ContextBodyMode.INLINE),
-                        tuple(ContextSource.MEMORY_INDEX, "memory:" + firstIndexed.id(), ContextBodyMode.TITLE_ONLY),
+                        tuple(ContextSource.MEMORY_FACTS, "memory:" + firstIndexed.id(), ContextBodyMode.INLINE),
                         tuple(ContextSource.MEMORY_INDEX, "memory:" + secondIndexed.id(), ContextBodyMode.TITLE_ONLY));
         assertThat(items)
                 .extracting(ContextItem::title, ContextItem::body)
                 .containsExactly(
                         tuple(null, "주간 회의는 화요일 10시"),
                         tuple(null, "아침에는 차를 마신다"),
-                        tuple("장보기 목록", null),
+                        tuple("장보기 목록", "우유와 달걀"),
                         tuple("여행 계획", null));
         assertThat(items)
                 .extracting(ContextItem::scope, ContextItem::ownerUserId)
@@ -474,7 +492,8 @@ class ContextAssemblerTest {
     void keepsOmittedItemInBundleAtItsPlace() {
         Memory tooLong = memories.create(ADMIN, MemoryScope.GROUP, "너무 긴 항목", "가".repeat(9_000), true);
         Memory shortOne = memories.create(ADMIN, MemoryScope.GROUP, "짧은 항목", "짧은 내용", true);
-        Memory indexed = memories.create(ADMIN, MemoryScope.USER, "색인만 하는 제목", "색인 본문", false);
+        // 본문이 개인 사실 구역의 상한을 넘어 색인에만 오른다
+        Memory indexed = memories.create(ADMIN, MemoryScope.USER, "색인만 하는 제목", LONG_BODY, false);
 
         AssembledContext result = assembler.assemble(ADMIN, agentId);
 
@@ -531,6 +550,235 @@ class ContextAssemblerTest {
         assertThat(result.bundle().items())
                 .allSatisfy(item -> assertThat(item.toString())
                         .isEqualTo("ContextItem[source=" + item.source() + ", ref=" + item.ref() + "]"));
+    }
+
+    @Test
+    @DisplayName("짧은 개인 색인 항목은 개인 사실 구역에 본문까지 한 줄로 싣고 색인에서 뺀다")
+    void placesShortPersonalItemInFactsSectionInsteadOfIndex() {
+        Memory always = memories.create(ADMIN, MemoryScope.USER, "아침 습관", "아침에는 차를 마신다", true);
+        Memory fact = memories.create(ADMIN, MemoryScope.USER, "딸 이름", "홍지수\n둘째는\r\n아직\r없다", false);
+        Memory indexed = memories.create(ADMIN, MemoryScope.USER, "긴 기록", LONG_BODY, false);
+
+        AssembledContext result = assembler.assemble(ADMIN, agentId);
+
+        assertThat(result.instructions())
+                .containsSubsequence(
+                        "- 아침에는 차를 마신다",
+                        FACTS_HEADER,
+                        "- [" + fact.id() + "] 딸 이름: 홍지수 둘째는 아직 없다",
+                        INDEX_HEADER,
+                        "- [" + indexed.id() + "] 긴 기록");
+        assertThat(indexSection(result)).doesNotContain("[" + fact.id() + "]");
+        assertThat(result.bundle().items())
+                .extracting(ContextItem::source, ContextItem::ref, ContextItem::bodyMode)
+                .containsExactly(
+                        tuple(ContextSource.MEMORY_ALWAYS, "memory:" + always.id(), ContextBodyMode.INLINE),
+                        tuple(ContextSource.MEMORY_FACTS, "memory:" + fact.id(), ContextBodyMode.INLINE),
+                        tuple(ContextSource.MEMORY_INDEX, "memory:" + indexed.id(), ContextBodyMode.TITLE_ONLY));
+        assertThat(result.omittedMemoryIds()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("그룹 항목과 201자 본문과 민감 항목과 문서는 개인 사실 구역에 없고 색인에 제목으로 있다")
+    void leavesNonCandidatesInIndexByTitle() {
+        Memory atLimit = memories.create(ADMIN, MemoryScope.USER, "상한 본문", "나".repeat(200), false);
+        Memory group = memories.create(ADMIN, MemoryScope.GROUP, "그룹 사실", "그룹 본문", false);
+        Memory overLimit = memories.create(ADMIN, MemoryScope.USER, "넘친 본문", "다".repeat(201), false);
+        Memory sensitive = memories.create(
+                ADMIN,
+                MemoryScope.USER,
+                "민감 사실",
+                "민감 본문",
+                Memory.DEFAULT_COLLECTION,
+                MemoryRetrieval.SEARCH,
+                MemorySensitivity.SENSITIVE);
+        Long document = insertDocument("USER", ADMIN.id(), null, "short-note", "짧은 문서");
+
+        // 민감 항목은 이 시험의 에이전트가 받지 않으므로 collection 과 민감도를 거르지 않는 주인 조립으로 본다
+        AssembledContext result = assembler.assembleForOwner(ADMIN);
+
+        assertThat(factsSection(result))
+                .contains("- [" + atLimit.id() + "] 상한 본문: " + atLimit.content())
+                .doesNotContain(
+                        "[" + group.id() + "]",
+                        "[" + overLimit.id() + "]",
+                        "[" + sensitive.id() + "]",
+                        "[" + document + "]");
+        assertThat(indexSection(result))
+                .contains(
+                        "- [" + group.id() + "] 그룹 사실",
+                        "- [" + overLimit.id() + "] 넘친 본문",
+                        "- [" + sensitive.id() + "] 민감 사실",
+                        "- [" + document + "] 짧은 문서")
+                .doesNotContain("그룹 본문", "다".repeat(201), "민감 본문", "문서 본문");
+        assertThat(result.bundle().items())
+                .filteredOn(item -> item.source() == ContextSource.MEMORY_INDEX)
+                .extracting(ContextItem::ref, ContextItem::bodyMode)
+                .containsExactly(
+                        tuple("memory:" + group.id(), ContextBodyMode.TITLE_ONLY),
+                        tuple("memory:" + overLimit.id(), ContextBodyMode.TITLE_ONLY),
+                        tuple("memory:" + sensitive.id(), ContextBodyMode.TITLE_ONLY),
+                        tuple("memory:" + document, ContextBodyMode.TITLE_ONLY));
+    }
+
+    @Test
+    @DisplayName("개인 사실 구역 예산을 넘으면 최근에 고친 것부터 담고 빠진 후보는 색인에 제목으로 남아 빠진 항목이 아니다")
+    void choosesRecentFactsWithinBudgetAndLeavesRestInIndex() {
+        Memory newest = memories.create(ADMIN, MemoryScope.USER, "가장 최근", "라".repeat(50), false);
+        Memory longer = memories.create(ADMIN, MemoryScope.USER, "두 번째", "마".repeat(200), false);
+        Memory third = memories.create(ADMIN, MemoryScope.USER, "세 번째", "바".repeat(50), false);
+        Memory oldest = memories.create(ADMIN, MemoryScope.USER, "가장 오래", "사".repeat(50), false);
+        // 번호가 작을수록 최근에 고친 것으로 둔다. 번호 순으로 고르면 다른 집합이 나온다
+        Instant base = Instant.parse("2026-10-01T00:00:00Z");
+        touch(newest, base);
+        touch(longer, base.minus(Duration.ofDays(1)));
+        touch(third, base.minus(Duration.ofDays(2)));
+        touch(oldest, base.minus(Duration.ofDays(3)));
+        // 가장 최근 것과 세 번째가 꼭 들어가는 예산이다. 두 번째는 넘쳐 건너뛰고 가장 오래된 것은 자리가 없다
+        int budget = FACTS_HEADER.length()
+                + 2
+                + factLine(newest).length()
+                + 2
+                + factLine(third).length();
+
+        AssembledContext result = assemblerWithFactsBudget(budget).assemble(ADMIN, agentId);
+
+        assertThat(result.instructions())
+                .startsWith(
+                        FACTS_HEADER + "\n\n" + factLine(newest) + "\n\n" + factLine(third) + "\n\n" + INDEX_HEADER);
+        assertThat(result.bundle().items())
+                .extracting(ContextItem::source, ContextItem::ref, ContextItem::bodyMode)
+                .containsExactly(
+                        tuple(ContextSource.MEMORY_FACTS, "memory:" + newest.id(), ContextBodyMode.INLINE),
+                        tuple(ContextSource.MEMORY_FACTS, "memory:" + third.id(), ContextBodyMode.INLINE),
+                        tuple(ContextSource.MEMORY_INDEX, "memory:" + longer.id(), ContextBodyMode.TITLE_ONLY),
+                        tuple(ContextSource.MEMORY_INDEX, "memory:" + oldest.id(), ContextBodyMode.TITLE_ONLY));
+        assertThat(result.omittedMemoryIds()).isEmpty();
+        assertThat(result.omittedItems()).isZero();
+    }
+
+    @Test
+    @DisplayName("항상 층이 색인 몫 밖의 자리를 거의 다 쓰면 개인 사실 구역이 비고 후보는 색인에 제목으로 남는다")
+    void leavesFactsEmptyWhenAlwaysLayerUsesNearlyAllRoom() {
+        Memory always = memories.create(ADMIN, MemoryScope.GROUP, "거의 상한", "가".repeat(7_850), true);
+        Memory candidate = memories.create(ADMIN, MemoryScope.USER, "짧은 사실", "짧은 본문", false);
+
+        AssembledContext result = assembler.assemble(ADMIN, agentId);
+
+        assertThat(result.instructions())
+                .contains(always.content(), INDEX_HEADER, "- [" + candidate.id() + "] 짧은 사실")
+                .doesNotContain(FACTS_HEADER, "짧은 본문");
+        assertThat(result.bundle().items())
+                .extracting(ContextItem::source, ContextItem::ref, ContextItem::bodyMode)
+                .containsExactly(
+                        tuple(ContextSource.MEMORY_ALWAYS, "memory:" + always.id(), ContextBodyMode.INLINE),
+                        tuple(ContextSource.MEMORY_INDEX, "memory:" + candidate.id(), ContextBodyMode.TITLE_ONLY));
+        assertThat(result.omittedMemoryIds()).isEmpty();
+        assertThat(assembler.omittedFor(ADMIN)).isEmpty();
+    }
+
+    @Test
+    @DisplayName("고른 집합이 같으면 고르는 차례가 바뀌어도 글과 지문이 같다")
+    void keepsSameTextAndHashWhenSameFactsAreChosen() {
+        Memory first = memories.create(ADMIN, MemoryScope.USER, "딸 이름", "홍지수", false);
+        memories.create(ADMIN, MemoryScope.USER, "음식 선호", "매운 음식을 못 먹는다", false);
+        memories.create(ADMIN, MemoryScope.USER, "출근 방법", "지하철로 다닌다", false);
+
+        AssembledContext before = assembler.assemble(ADMIN, agentId);
+        AssembledContext again = assembler.assemble(ADMIN, agentId);
+        // 번호가 가장 작은 항목을 가장 최근에 고친 것으로 바꿔 고르는 차례를 뒤집는다
+        touch(first, Instant.now().plus(Duration.ofDays(1)));
+        AssembledContext reordered = assembler.assemble(ADMIN, agentId);
+
+        assertThat(before.instructions()).contains(FACTS_HEADER).doesNotContain(INDEX_HEADER);
+        assertThat(again.instructionsHash()).isEqualTo(before.instructionsHash());
+        assertThat(reordered.instructions()).isEqualTo(before.instructions());
+        assertThat(reordered.instructionsHash()).isEqualTo(before.instructionsHash());
+    }
+
+    @Test
+    @DisplayName("개인 사실 구역 예산이 0 이면 구역 없이 짧은 개인 항목도 색인에 제목으로 싣는다")
+    void rendersPreviousTextWhenFactsBudgetIsZero() {
+        memories.create(ADMIN, MemoryScope.GROUP, "그룹 회의", "주간 회의는 화요일 10시", true);
+        memories.create(ADMIN, MemoryScope.USER, "아침 습관", "아침에는 차를 마신다", true);
+        Memory firstIndexed = memories.create(ADMIN, MemoryScope.USER, "장보기 목록", "우유와 달걀", false);
+        Memory secondIndexed = memories.create(ADMIN, MemoryScope.GROUP, "여행 계획", "가을에 바다", false);
+        String expected = "# 우리 그룹이 함께 아는 것\n\n"
+                + "- 주간 회의는 화요일 10시\n\n"
+                + "# 지금 묻는 사람에 대해 아는 것\n\n"
+                + "- 아침에는 차를 마신다\n\n"
+                + "# 더 물어볼 수 있는 것\n\n"
+                + "아래는 제목만 적은 것이다. 필요하면 memory_read 도구로 본문을 읽는다.\n\n"
+                + "- [" + firstIndexed.id() + "] 장보기 목록\n\n"
+                + "- [" + secondIndexed.id() + "] 여행 계획";
+
+        AssembledContext result = assemblerWithFactsBudget(0).assemble(ADMIN, agentId);
+
+        assertThat(result.instructions()).isEqualTo(expected);
+        assertThat(result.instructionsHash()).isEqualTo(Sha256.hex16(expected));
+        assertThat(result.bundle().items()).noneMatch(item -> item.source() == ContextSource.MEMORY_FACTS);
+    }
+
+    @Test
+    @DisplayName("에이전트가 받지 않는 collection 의 짧은 개인 항목은 개인 사실 구역에도 없다")
+    void leavesOutFactsOfCollectionsTheAgentDoesNotReceive() {
+        Memory core = memories.create(ADMIN, MemoryScope.USER, "기본 사실", "기본 본문", false);
+        Memory career = memories.create(
+                ADMIN,
+                MemoryScope.USER,
+                "커리어 사실",
+                "커리어 본문",
+                "career",
+                MemoryRetrieval.SEARCH,
+                MemorySensitivity.NORMAL);
+
+        AssembledContext result = assembler.assemble(ADMIN, agentId);
+
+        assertThat(result.instructions())
+                .contains(FACTS_HEADER, "- [" + core.id() + "] 기본 사실: 기본 본문")
+                .doesNotContain("커리어 사실", "커리어 본문");
+        assertThat(result.bundle().items()).extracting(ContextItem::ref).doesNotContain("memory:" + career.id());
+    }
+
+    /** 개인 사실 구역 예산만 바꾼 조립기다. 나머지 설정은 운영 바인딩 값을 쓴다. */
+    private ContextAssembler assemblerWithFactsBudget(int factsMaxChars) {
+        return new ContextAssembler(
+                memories,
+                new ContextProperties(
+                        properties.maxChars(),
+                        properties.indexBudgetRatio(),
+                        properties.resultStaleAfter(),
+                        properties.memoryStaleAfter(),
+                        properties.memoryCollectionStaleAfter(),
+                        factsMaxChars,
+                        properties.factsItemMaxChars()),
+                clock);
+    }
+
+    private void touch(Memory memory, Instant updatedAt) {
+        jdbc.update("UPDATE memory SET updated_at = ? WHERE id = ?", Timestamp.from(updatedAt), memory.id());
+    }
+
+    private static String factLine(Memory memory) {
+        return "- [" + memory.id() + "] " + memory.title() + ": " + memory.content();
+    }
+
+    /** 개인 사실 구역 머리부터 색인 머리 앞까지다. 구역이 없으면 빈 글이다. */
+    private static String factsSection(AssembledContext result) {
+        String text = result.instructions();
+        int start = text.indexOf(FACTS_HEADER);
+        if (start < 0) {
+            return "";
+        }
+        int end = text.indexOf(INDEX_HEADER, start);
+        return end < 0 ? text.substring(start) : text.substring(start, end);
+    }
+
+    /** 색인 머리부터 끝까지다. 색인이 없으면 빈 글이다. */
+    private static String indexSection(AssembledContext result) {
+        String text = result.instructions();
+        int start = text.indexOf(INDEX_HEADER);
+        return start < 0 ? "" : text.substring(start);
     }
 
     /** 문서를 저장소에 바로 넣는다. 그룹 문서는 서비스로 만들 수 없어 표에 직접 쓴다. */

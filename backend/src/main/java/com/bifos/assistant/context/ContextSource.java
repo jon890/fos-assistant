@@ -8,6 +8,8 @@ package com.bifos.assistant.context;
 public enum ContextSource {
     /** 본문까지 싣는 Memory 항상 층의 줄. */
     MEMORY_ALWAYS,
+    /** 본문까지 싣는 Memory 개인 사실 구역의 줄. */
+    MEMORY_FACTS,
     /** 제목만 싣는 Memory 색인 층의 줄. */
     MEMORY_INDEX,
     /** 끝난 위임 실행의 결과. */

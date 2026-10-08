@@ -14,6 +14,7 @@ import com.bifos.assistant.context.AssembledContext;
 import com.bifos.assistant.context.ContextAssembler;
 import com.bifos.assistant.context.ContextBodyMode;
 import com.bifos.assistant.context.ContextItem;
+import com.bifos.assistant.context.ContextProperties;
 import com.bifos.assistant.context.eval.MemoryEvalDataset.Case;
 import com.bifos.assistant.context.eval.MemoryEvalDataset.Filler;
 import com.bifos.assistant.context.eval.MemoryEvalDataset.Forbidden;
@@ -21,6 +22,7 @@ import com.bifos.assistant.context.eval.MemoryEvalDataset.MemorySeed;
 import com.bifos.assistant.context.eval.MemoryEvalScoreboard.CaseVerdict;
 import com.bifos.assistant.context.eval.MemoryEvalScoreboard.ItemState;
 import com.bifos.assistant.context.eval.MemoryEvalScoreboard.ItemVerdict;
+import com.bifos.assistant.memory.application.MemoryService;
 import com.bifos.assistant.memory.domain.Memory;
 import com.bifos.assistant.memory.domain.MemoryPlacement;
 import com.bifos.assistant.memory.domain.StoredContent;
@@ -63,6 +65,7 @@ class MemoryRecallEvalTest {
     private static final Instant BASE = Instant.parse("2026-11-02T00:00:00Z");
     private static final String AGENT_CODE_PREFIX = "memory-eval-";
     private static final String FACTS_OFF = "factsOff";
+    private static final String FACTS_ON = "factsOn";
 
     /** 사용자 번호와 그룹 번호가 다른 시험이나 운영 줄과 겹치지 않게 큰 수에서 시작한다. */
     private static final long USER_ID_BASE = 910_000L;
@@ -70,7 +73,10 @@ class MemoryRecallEvalTest {
     private static final long GROUP_ID_BASE = 920_000L;
 
     @Autowired
-    ContextAssembler assembler;
+    MemoryService memoryService;
+
+    @Autowired
+    ContextProperties properties;
 
     @Autowired
     MemoryRepository memories;
@@ -105,7 +111,8 @@ class MemoryRecallEvalTest {
         clock.set(BASE);
         Map<String, Long> agentIds = createAgents();
         Map<String, ContextAssembler> assemblers = new LinkedHashMap<>();
-        assemblers.put(FACTS_OFF, assembler);
+        assemblers.put(FACTS_OFF, new ContextAssembler(memoryService, withFactsMaxChars(0), clock));
+        assemblers.put(FACTS_ON, new ContextAssembler(memoryService, properties, clock));
         MemoryEvalScoreboard scoreboard = new MemoryEvalScoreboard(DATASET.version());
 
         for (Case each : DATASET.cases()) {
@@ -124,6 +131,20 @@ class MemoryRecallEvalTest {
         assertThat(markdown).startsWith(MemoryEvalScoreboard.HEADLINE);
         assertThat(scoreboard.metrics(FACTS_OFF, null).cases())
                 .isEqualTo(DATASET.cases().size());
+        assertThat(scoreboard.metrics(FACTS_ON, null).cases())
+                .isEqualTo(DATASET.cases().size());
+    }
+
+    /** 주입받은 설정에서 개인 사실 구역 예산만 바꾼다. 0 이면 구역을 끈다. */
+    private ContextProperties withFactsMaxChars(int factsMaxChars) {
+        return new ContextProperties(
+                properties.maxChars(),
+                properties.indexBudgetRatio(),
+                properties.resultStaleAfter(),
+                properties.memoryStaleAfter(),
+                properties.memoryCollectionStaleAfter(),
+                factsMaxChars,
+                properties.factsItemMaxChars());
     }
 
     @Test
