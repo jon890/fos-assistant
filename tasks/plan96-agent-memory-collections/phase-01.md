@@ -40,10 +40,10 @@ CREATE TABLE agent_memory_collection_change (
     PRIMARY KEY (id),
     KEY idx_agent_memory_collection_change_agent (agent_id, id),
     CONSTRAINT fk_agent_memory_collection_change_agent FOREIGN KEY (agent_id) REFERENCES agent(id)
-) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4;
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci;
 ```
 
-머리에 한국어 주석 한 줄(무엇을 남기는 표인지, ADR-20261008 / agent-memory-grants-admin). `changed_by_user_id` 에는 외래 키를 걸지 않는다.
+새 표의 정렬 규칙 규칙은 `docs/backend/schema/README.md` 의 「마이그레이션 작성 규칙」 이 갖는다. 머리에 한국어 주석 한 줄(무엇을 남기는 표인지, ADR-20261008 / agent-memory-grants-admin). `changed_by_user_id` 에는 외래 키를 걸지 않는다.
 
 ### 2. `agent.domain.type.AgentMemoryCollectionChangeType`
 
@@ -66,35 +66,39 @@ CREATE TABLE agent_memory_collection_change (
 - `Agent requireEditableAgent(String code)`: `agents.findByCode(code)`. 없거나 `isDeleted()` 면 `ApiException(AGENT_NOT_FOUND, "no such agent")`. `connectorManaged()` 면 `ApiException(FORBIDDEN, "connector-managed agents receive no memory")`. `@Transactional(readOnly = true)`.
 - `List<AgentMemoryCollection> rowsOf(Long agentId)`: `grants.findByIdAgentId(agentId)`. 읽기 전용.
 - `List<AgentMemoryCollectionChange> recentChangesOf(Long agentId)`: `changes.findTop10ByAgentIdOrderByIdDesc(agentId)`. 읽기 전용.
-- `void replace(Long agentId, Map<String, Boolean> next, Long changedByUserId)`: `@Transactional`. 순서:
-  1. `agents.findByIdForUpdate(agentId)` 로 잠근다. 없거나 지웠거나 커넥터 에이전트면 위와 같은 예외.
-  2. 지금 줄을 `rowsOf` 로 읽어 collection 으로 묶는다.
-  3. `next` 에만 있으면 `AgentMemoryCollection.of(agentId, key, allow, now)` 를 저장하고 `GRANTED` 기록(allow).
-  4. 지금 줄에만 있으면 지우고 `REVOKED` 기록(지우기 전의 `allowSensitive`).
-  5. 둘 다 있고 민감 허용이 다르면 `changeAllowSensitive` 후 `SENSITIVE_CHANGED` 기록(바꾼 뒤의 값).
-  6. 기록은 collection key 순서로 넣는다. 모든 기록의 `changedAt` 은 `clock.instant()` 한 값이다.
-  7. 바꾼 뒤 `log.info("agent memory collections changed agentId={} by={} granted={} revoked={} sensitiveChanged={}", ...)`. collection key 만 남기고 항목 내용은 남기지 않는다.
+- `void replace(Long agentId, Map<String, Boolean> next, Set<String> listedCollections, Long changedByUserId)`: `@Transactional`. `listedCollections` 는 그룹의 collection 목록 key 다. 순서:
+  1. `agents.findByIdForUpdate(agentId)` 로 잠근다. **이 잠금 읽기가 트랜잭션의 첫 읽기여야 한다.** 바깥 트랜잭션 안에서 부르지 않는다. 잠금 전에 읽은 줄이 영속성 문맥과 REPEATABLE READ 스냅샷에 남으면, 잠금을 기다린 뒤에도 다른 저장이 커밋한 줄을 보지 못해 같은 key 를 다시 넣다 기본 키 충돌이 난다(`AgentRepository.findIdByCode` 의 Javadoc 이 같은 함정을 적는다). Javadoc 에 이 조건을 적는다. 없거나 지웠거나 커넥터 에이전트면 위와 같은 예외.
+  2. 지금 줄을 `grants.findByIdAgentId` 로 읽어 collection 으로 묶는다.
+  3. `next` 의 key 가 `listedCollections` 에도 지금 줄에도 없으면 `ApiException(VALIDATION_FAILED, "no such memory collection")`. 잠금 뒤에 검사해야 동시에 뗀 줄을 기준으로 판정하지 않는다.
+  4. `next` 에만 있으면 `AgentMemoryCollection.of(agentId, key, allow, now)` 를 저장하고 `GRANTED` 기록(allow).
+  5. 지금 줄에만 있으면 지우고 `REVOKED` 기록(지우기 전의 `allowSensitive`).
+  6. 둘 다 있고 민감 허용이 다르면 `changeAllowSensitive` 후 `SENSITIVE_CHANGED` 기록(바꾼 뒤의 값).
+  7. 기록은 collection key 순서로 넣는다. 모든 기록의 `changedAt` 은 `clock.instant()` 한 값이다.
+  8. 바꾼 뒤 `log.info("agent memory collections changed agentId={} by={} granted={} revoked={} sensitiveChanged={}", ...)`. collection key 만 남기고 항목 내용은 남기지 않는다.
 
   클래스 Javadoc 의 첫 문장에 「관리자가 고른 목록으로 바꾸고 변경을 기록한다」 를 더한다. 새 필드 `AgentMemoryCollectionChangeRepository changes` 를 생성자 주입에 더한다.
 
 ### 7. 이 phase 를 검증하는 `backend/src/test/java/com/bifos/assistant/agent/AgentMemoryCollectionServiceTest.java`
 
-기존 시험에 더한다. `@BackendIntegrationTest`. 각 시험은 `agents.save(agent())` 로 새 에이전트를 만들어 쓴다.
+기존 시험에 더한다. `@BackendIntegrationTest`. `LISTED` 는 시험 안의 상수 `Set.of("core", "career", "health")` 다. 각 시험은 `agents.save(agent())` 로 새 에이전트를 만들어 쓴다.
 
-- 「관리자가 고른 목록으로 바꾸면 붙이고 떼고 민감 허용을 바꾸고 한 번에 기록한다」: 새 에이전트(core 만) → `replace(id, {career:true}, 7L)`. `grantsOf` 가 `career` 만, 민감 `career`. 기록 2줄: `career GRANTED true`, `core REVOKED false`, 둘 다 `changedByUserId` 7. 이어 `replace(id, {career:false}, 7L)` → `SENSITIVE_CHANGED false` 한 줄이 더해지고 `career` 줄의 `createdAt` 이 그대로다.
-- 「바뀐 것이 없으면 기록하지 않는다」: `replace(id, {core:false}, 7L)` → 기록 0줄.
-- 「빈 목록이면 모두 떼어 그 에이전트는 아무것도 받지 않는다」: `replace(id, {}, 7L)` → `grantsOf` 빈 값.
+- 「관리자가 고른 목록으로 바꾸면 붙이고 떼고 민감 허용을 바꾸고 한 번에 기록한다」: 새 에이전트(core 만) → `replace(id, {career:true}, LISTED, 7L)`. `grantsOf` 가 `career` 만, 민감 `career`. 기록 2줄: `career GRANTED true`, `core REVOKED false`, 둘 다 `changedByUserId` 7. 이어 `replace(id, {career:false}, LISTED, 7L)` → `SENSITIVE_CHANGED false` 한 줄이 더해지고 `career` 줄의 `createdAt` 이 그대로다.
+- 「바뀐 것이 없으면 기록하지 않는다」: `replace(id, {core:false}, LISTED, 7L)` → 기록 0줄.
+- 「빈 목록이면 모두 떼어 그 에이전트는 아무것도 받지 않는다」: `replace(id, {}, LISTED, 7L)` → `grantsOf` 빈 값.
+- 「그룹 목록에도 지금 줄에도 없는 collection 은 거절한다」: `replace(id, {nope:false}, LISTED, 7L)` → `VALIDATION_FAILED`, 줄과 기록이 그대로다. 목록에 없지만 지금 받는 줄의 key 는 그대로 둘 수 있다.
+- 「두 관리자가 동시에 저장하면 하나씩 돌고 기록이 둘 다 남는다」: 두 스레드가 `replace(id, {career:true}, ...)` 와 `replace(id, {career:false, core:false}, ...)` 를 동시에 부른다. 둘 다 예외 없이 끝나고, 최종 줄은 둘 중 나중 값이며 기록 수는 두 저장의 변경 합이다. H2 는 MySQL 의 스냅샷 문제를 재현하지 못하므로 이 시험은 잠금 경로가 빠지지 않았음만 지킨다.
 - 「옛 커넥터 에이전트와 지운 에이전트는 바꾸지 못한다」: 커넥터 에이전트를 만드는 방법은 같은 파일의 기존 시험(`grantsOf` 가 커넥터 에이전트에 빈 값을 내는 시험)을 따른다. `FORBIDDEN`, 지운 에이전트는 `AGENT_NOT_FOUND`.
 
 ## 검증
 
 ```bash
 cd backend && ./gradlew test --tests 'com.bifos.assistant.agent.AgentMemoryCollectionServiceTest' --tests 'com.bifos.assistant.architecture.*'
-cd backend && ./gradlew checkstyleMain checkstyleTest
+cd backend && ./gradlew checkstyleMain checkstyleTest spotlessCheck
+node --test test/unit/migration-collation.test.ts test/unit/migration-versions.test.ts
 node scripts/check-migration-versions.mjs
 ```
 
-모두 종료 코드 0. Docker 가 있으면 `scripts/check-mysql-migration.sh` 로 Flyway 스키마와 엔티티가 맞는지도 본다(없으면 CI 의 backend job 이 본다).
+모두 종료 코드 0. `spotlessCheck` 가 처음 고친 파일의 포맷 차이를 내면 `./gradlew spotlessApply` 결과를 기능 변경과 다른 커밋으로 나눈다고 team-lead 에게 보고한다. Docker 가 있으면 `scripts/check-mysql-migration.sh` 로 Flyway 스키마와 엔티티가 맞는지도 본다(없으면 CI 의 backend job 이 본다).
 
 ## 변경 파일
 

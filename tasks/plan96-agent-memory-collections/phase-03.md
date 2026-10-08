@@ -36,9 +36,16 @@
 - `draftChanged(setting, draft): boolean`.
 - `missingNotice(collection, draftRow): string | null` — 받지 않고 `entryCount > 0` 이면 「항목 N개가 있지만 받지 않아요.」, 받고 민감 허용이 꺼졌고 `sensitiveEntryCount > 0` 이면 「민감 항목 N개는 받지 않아요.」, 아니면 null.
 - `countedForLabel(setting)` — 「주인(<이름>)의 기억과 그룹 기억을 셌어요.」 또는 「주인이 없어 그룹 기억만 셌어요.」
-- `changeLabel(change, displayName)` — 「<영역> 붙임」, 「<영역> 붙임(민감 항목 허용)」, 「<영역> 뗌」, 「<영역> 민감 항목 허용」, 「<영역> 민감 항목 허용 끔」.
+- `changeLabel(change, displayName)` — `displayName` 은 지금 응답의 `collections` 에서 그 key 의 이름이고, 없으면 key 그대로다. 「<영역> 붙임」, 「<영역> 붙임(민감 항목 허용)」, 「<영역> 뗌」, 「<영역> 민감 항목 허용」, 「<영역> 민감 항목 허용 끔」.
 
-### 2. `web/src/app/api/admin/agents/[code]/memory-collections/route.ts`
+### 2. `web/src/lib/agent-memory-api.ts`
+
+`memoryRequest`(`web/src/lib/memory-api.ts`)로 호출 함수 둘을 둔다. 선례는 `web/src/lib/service-token-api.ts` 다.
+
+- `getAgentMemorySetting(code): Promise<MemoryApiResult<AgentMemorySetting>>` — `GET /api/admin/agents/${code}/memory-collections`, 실패 문구 「기억 영역을 불러오지 못했어요.」
+- `saveAgentMemorySetting(code, collections): Promise<MemoryApiResult<AgentMemorySetting>>` — `PUT`, 본문 `{ collections }`, 실패 문구 「기억 영역을 저장하지 못했어요.」
+
+### 2-1. `web/src/app/api/admin/agents/[code]/memory-collections/route.ts`
 
 `GET` 과 `PUT`. 둘 다 코드 형식 검사 뒤 `callControlPlane` 으로 `/api/v1/admin/agents/${code}/memory-collections` 를 부르고, 실패면 `errorResponse(result.code, result.message, result.status)`, 성공이면 `NextResponse.json(result.data)`. PUT 은 `readJsonBody` 로 본문을 받는다.
 
@@ -46,11 +53,11 @@
 
 `"use client"`. `AgentMemorySection({ code })`. `section` 에 `aria-label="기억 영역"`, `data-testid="agent-memory-section"`, 모델 절과 같은 테두리 클래스. 제목 「기억 영역」, 설명 「이 에이전트가 대화에 쓸 수 있는 기억의 영역이에요. 민감 항목은 영역마다 따로 허용해요.」 상태는 `docs/frontend/structure.md` 「기억 영역 절」 의 표대로다.
 
-- 읽는 중: 「기억 영역을 불러오고 있어요.」 / 실패: `Notice variant="error"` 「기억 영역을 불러오지 못했어요. <메시지>」. 요청 실패 문구는 `describeFailure`(`@/components/error-message`)로 만든다.
-- 영역 한 줄: 체크박스 「받음」 의 접근 이름은 영역 이름(예: 「경력 받음」), 체크박스 「민감 항목까지」 의 접근 이름은 「<영역> 민감 항목까지」, 「항목 N개」, `listed` 가 거짓이면 `Badge variant="outline"` 「목록에 없는 영역」, `missingNotice` 가 있으면 경고 색 글(`text-warning` 같은 의미 색 토큰. 없으면 `Notice variant="warning"`).
+- 읽는 중: 「기억 영역을 불러오고 있어요.」 / 실패: `Notice variant="error"` 「기억 영역을 불러오지 못했어요. <메시지>」. 컴포넌트는 `fetch` 를 직접 부르지 않는다(`web/eslint.config.mjs` 가 `src/components/**` 의 전역 `fetch` 를 막는다). 작업 항목 2 의 호출 함수를 쓴다.
+- 영역 한 줄: 체크박스의 접근 이름은 「<영역> 받음」(예: 「커리어 받음」), 체크박스 「민감 항목까지」 의 접근 이름은 「<영역> 민감 항목까지」, 「항목 N개」, `listed` 가 거짓이면 `Badge variant="outline"` 「목록에 없는 영역」, `missingNotice` 가 있으면 경고 색 글(`text-warning` 같은 의미 색 토큰. 없으면 `Notice variant="warning"`).
 - 받는 영역이 없으면 `Notice variant="warning"` 「받는 영역이 없으면 이 에이전트는 기억을 쓰지 않아요.」
 - `countedForLabel` 한 줄(`text-muted-foreground`).
-- 단추 「기억 영역 저장」: `draftChanged` 가 거짓이거나 저장 중이면 `disabled`. `PUT /api/admin/agents/${code}/memory-collections` 에 `{ collections: grantsOf(draft) }`. 성공하면 응답으로 상태와 초안을 바꾸고 `role="status"` 로 「저장했어요.」. 실패하면 초안을 두고 `Notice variant="error" role="alert"`.
+- 단추 「기억 영역 저장」: `draftChanged` 가 거짓이거나 저장 중이면 `disabled`. `saveAgentMemorySetting(code, grantsOf(draft))`. 성공하면 응답으로 상태와 초안을 바꾸고 `role="status"` 로 「저장했어요.」. 실패하면 초안을 두고 `Notice variant="error" role="alert"`.
 - 「최근 변경」 소제목과 목록: 각 줄 `<time dateTime=...>` 로 시각(`Asia/Seoul`, 월 일 시:분), 바꾼 사람(null 이면 「알 수 없는 사용자」), `changeLabel`. 비었으면 「아직 바꾼 기록이 없어요.」
 
 ### 4. `web/src/components/agent/agent-detail-body.tsx`
@@ -70,7 +77,7 @@
 
 `./fixtures.ts` 의 `test`, `expect`, `PERSONA_EMPTY_AGENT_CODE` 를 쓴다(아무도 대화하지 않는 에이전트다). `./memory-page.ts` 의 `createDocument`, `cleanupMemories` 로 `career` 문서 하나(민감)를 만든다. 시험이 끝나면 `try/finally` 에서 `PUT /api/admin/agents/<code>/memory-collections` 로 `[{ collection: "core", allowSensitive: false }]` 를 되돌리고 문서를 지운다.
 
-- 「관리자가 빠진 영역을 보고 붙이면 다시 열어도 남고 최근 변경에 보인다」: `/admin/agents/<code>` 를 연다 → 절 안 「경력」 줄에 「항목 1개가 있지만 받지 않아요.」 → 「경력 받음」 과 「경력 민감 항목까지」 를 켠다 → 「기억 영역 저장」 을 `clickAndWaitForResponse` 로 누르고 「저장했어요.」 → 다시 열면 두 체크박스가 켜져 있고 안내가 없고 최근 변경에 「경력 붙임(민감 항목 허용)」.
+- 「관리자가 빠진 영역을 보고 붙이면 다시 열어도 남고 최근 변경에 보인다」: `/admin/agents/<code>` 를 연다 → 절 안 「커리어」 줄에 「항목 1개가 있지만 받지 않아요.」 → 「커리어 받음」 과 「커리어 민감 항목까지」 를 켠다 → 「기억 영역 저장」 을 `clickAndWaitForResponse` 로 누르고 「저장했어요.」 → 다시 열면 두 체크박스가 켜져 있고 안내가 없고 최근 변경 목록의 첫 줄(`.first()`)에 「커리어 붙임(민감 항목 허용)」. 반복 실행에서 같은 기록이 쌓이므로 `getByText` 로 전체에서 찾지 않는다.
 - 「저장이 실패하면 고른 값이 남고 오류를 보인다」: `page.route` 로 그 PUT 을 409 `{code:"AGENT_BUSY", message:"busy"}` 로 바꿔 누른 뒤 오류 `alert` 와 켜 둔 체크박스가 남는지 본다.
 
 `clickAndWaitForResponse` 와 준비 대기는 `web/AGENTS.md` 의 「브라우저 시험의 독립성과 대기」 를 따른다. 그 도우미의 위치는 `test/browser/` 안에서 `grep -rn "export async function clickAndWaitForResponse" test/browser` 로 찾는다.
@@ -91,6 +98,7 @@ scripts/check-local.sh agent-memory.spec.ts
 | 파일 | 변경 |
 |---|---|
 | `web/src/lib/agent-memory.ts` | 신규 |
+| `web/src/lib/agent-memory-api.ts` | 신규 |
 | `web/src/app/api/admin/agents/[code]/memory-collections/route.ts` | 신규 |
 | `web/src/components/agent/agent-memory-section.tsx` | 신규 |
 | `web/src/components/agent/agent-detail-body.tsx` | 수정 |

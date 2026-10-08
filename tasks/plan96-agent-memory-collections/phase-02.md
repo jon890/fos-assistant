@@ -10,7 +10,7 @@
 
 ## 컨텍스트
 
-- Phase 01 이 `AgentMemoryCollectionService` 에 `requireEditableAgent(String code)`, `rowsOf(Long)`, `recentChangesOf(Long)`, `replace(Long, Map<String, Boolean>, Long)` 를 만들었다.
+- Phase 01 이 `AgentMemoryCollectionService` 에 `requireEditableAgent(String code)`, `rowsOf(Long)`, `recentChangesOf(Long)`, `replace(Long agentId, Map<String, Boolean> next, Set<String> listedCollections, Long changedByUserId)` 를 만들었다. `replace` 는 잠금 뒤에 목록에 없는 key 를 거절한다.
 - 새 코드는 `memory` 패키지에 둔다. `memory` 는 `agent` 와 `user` 를 써도 되고 `agent` 는 `memory` 를 쓰지 못한다(`TopLevelPackageOrder.ORDER`).
 - 그룹의 collection 목록은 `memory.application.MemoryCollectionService.collectionsOf(Long groupId)` 가 낸다. `MemoryCollection` 의 접근자는 `backend/src/main/java/com/bifos/assistant/memory/domain/MemoryCollection.java` 에서 읽어 쓴다.
 - 요청자는 `CurrentUserProvider.requireAdmin()` 으로 받는다(`ADMIN` 이 아니면 `FORBIDDEN`). `CurrentUser` 는 `id`, `email`, `displayName`, `groupId`, `role` 이다.
@@ -62,7 +62,7 @@ List<MemoryCollectionCount> countLoadableByCollection(@Param("userId") Long user
 ### 3. `memory.application.AgentMemorySettingService`
 
 - `AgentMemorySetting settingOf(CurrentUser admin, String code)`: `requireEditableAgent(code)` → 셈 대상 정하기 → `collectionsOf(groupId)` → `rowsOf(agentId)` → `countLoadableByCollection` → `recentChangesOf(agentId)` 와 바꾼 사용자 이름(`AppUserRepository.findAllById`). 목록 순서는 그룹 목록 순서, 목록에 없는 받는 key 는 key 순서로 뒤에(`listed=false`, `displayName=key`). `@Transactional` (collectionsOf 가 쓰기를 할 수 있다).
-- `AgentMemorySetting replace(CurrentUser admin, String code, List<AgentMemoryGrantInput> next)`: 겹치는 collection, 64개 초과, 그룹 목록과 지금 받는 줄 어디에도 없는 key 면 `ApiException(VALIDATION_FAILED, ...)`. 통과하면 `Map` 으로 바꿔 `AgentMemoryCollectionService.replace(agentId, map, admin.id())` 를 부르고 `settingOf` 를 돌려준다.
+- `AgentMemorySetting replace(CurrentUser admin, String code, List<AgentMemoryGrantInput> next)`: **`@Transactional` 을 달지 않는다.** 겹치는 collection 이나 64개 초과면 `ApiException(VALIDATION_FAILED, ...)`. `requireEditableAgent(code)` 와 셈 대상 그룹의 `collectionsOf(groupId)` 를 읽고, `Map` 과 그룹 목록 key 집합으로 `AgentMemoryCollectionService.replace(agentId, map, listedKeys, admin.id())` 를 부른 뒤 `settingOf` 를 돌려준다. 목록에 없는 key 의 판정은 Phase 01 의 `replace` 가 잠금 뒤에 한다. 이 메서드에 트랜잭션을 걸면 잠금 전의 읽기가 같은 트랜잭션에 들어가 잠금을 기다린 뒤에도 옛 줄을 본다(`AgentRepository.findIdByCode` 의 Javadoc 과 Phase 01 의 `replace` Javadoc). 메서드 Javadoc 에 이 까닭을 적는다.
 
 ### 4. `memory.presentation.MemoryDtos` 에 모양 더하기
 
@@ -76,7 +76,7 @@ List<MemoryCollectionCount> countLoadableByCollection(@Param("userId") Long user
 
 ### 6. 이 phase 를 검증하는 `backend/src/test/java/com/bifos/assistant/memory/AgentMemorySettingTest.java`
 
-`@BackendIntegrationTest`. 컨트롤러를 `new AgentMemorySettingController(service, currentUser)` 로 만들고 `CurrentUserProvider` 는 대역이되 `requireAdmin()` 이 `MEMBER` 에게 `ApiException(FORBIDDEN)` 을 던지게 한다(`backend/src/test/java/com/bifos/assistant/memory/MemoryDocumentTest.java` 의 `as(...)` 모양). 이름과 메일은 합성 값(`admin@example.com`, 「관리자A」).
+`@BackendIntegrationTest`. 통합 시험은 H2 하나를 함께 쓰므로 시험마다 고유한 그룹 id(예: 시험마다 다른 큰 수)와 고유한 메일(`<uuid>@example.com`)로 사용자를 만들고, 넣은 memory 줄은 끝에 지운다. 다른 시험이 그룹 `1` 에 남긴 항목이 수를 흔들지 않게 한다. 컨트롤러를 `new AgentMemorySettingController(service, currentUser)` 로 만들고 `CurrentUserProvider` 는 대역이되 `requireAdmin()` 이 `MEMBER` 에게 `ApiException(FORBIDDEN)` 을 던지게 한다(`backend/src/test/java/com/bifos/assistant/memory/MemoryDocumentTest.java` 의 `as(...)` 모양). 이름과 메일은 합성 값(`admin@example.com`, 「관리자A」).
 
 - 「주인의 항목과 그룹 항목을 collection 마다 세고 받지 않는 collection 도 낸다」: 주인 사용자 A 의 비공개 에이전트, A 의 `career` `DOCUMENT` 둘(하나 `SENSITIVE`), `ARCHIVE` 하나, `PROPOSED` 하나, 다른 사용자의 `career` 하나, 그룹 `core` 하나. 응답 `countedFor=OWNER`, `career.entryCount=2`, `career.sensitiveEntryCount=1`, `career.granted=false`, `core.granted=true`, 다른 사용자의 것은 세지 않는다. 항목은 저장소나 `JdbcTemplate` 으로 넣는다.
 - 「바꾸면 응답이 바뀐 값과 기록을 낸다」: PUT `[career true]` → `career.granted && allowSensitive`, `core.granted=false`, `changes[0]` 의 `changedByName` 이 관리자 이름.
@@ -88,10 +88,10 @@ List<MemoryCollectionCount> countLoadableByCollection(@Param("userId") Long user
 
 ```bash
 cd backend && ./gradlew test --tests 'com.bifos.assistant.memory.AgentMemorySettingTest' --tests 'com.bifos.assistant.agent.AgentMemoryCollectionServiceTest' --tests 'com.bifos.assistant.architecture.*'
-cd backend && ./gradlew checkstyleMain checkstyleTest
+cd backend && ./gradlew checkstyleMain checkstyleTest spotlessCheck
 ```
 
-모두 종료 코드 0. Docker 가 있으면 `scripts/check-mysql-migration.sh` 로 `RepositoryQueryMysqlTest` 를 돌려 새 집계 쿼리가 MySQL 에서 실행되는지 본다(없으면 CI 의 backend job 이 본다).
+모두 종료 코드 0. `spotlessCheck` 가 처음 고친 파일의 포맷 차이를 내면 `./gradlew spotlessApply` 결과를 기능 변경과 다른 커밋으로 나눈다고 team-lead 에게 보고한다. Docker 가 있으면 `scripts/check-mysql-migration.sh` 로 `RepositoryQueryMysqlTest` 를 돌려 새 집계 쿼리가 MySQL 에서 실행되는지 본다(없으면 CI 의 backend job 이 본다).
 
 ## 변경 파일
 

@@ -115,7 +115,7 @@ Memory 는 에이전트가 실행할 때 `instructions` 로 받는 사실이다.
   "ownerName": "사용자A",
   "collections": [
     { "key": "core", "displayName": "기본", "listed": true, "granted": true, "allowSensitive": false, "entryCount": 12, "sensitiveEntryCount": 0 },
-    { "key": "career", "displayName": "경력", "listed": true, "granted": false, "allowSensitive": false, "entryCount": 3, "sensitiveEntryCount": 1 }
+    { "key": "career", "displayName": "커리어", "listed": true, "granted": false, "allowSensitive": false, "entryCount": 3, "sensitiveEntryCount": 1 }
   ],
   "changes": [
     { "collection": "career", "changeType": "GRANTED", "allowSensitive": true, "changedByName": "관리자A", "changedAt": "2026-10-08T05:00:00Z" }
@@ -138,9 +138,9 @@ sequenceDiagram
     participant C as Control Plane
     participant D as 데이터베이스
     W->>C: PUT memory-collections (전체 목록)
-    C->>C: ADMIN 인가, 지우지 않은 에이전트인가, 옛 커넥터 에이전트가 아닌가
-    C->>C: 그룹 목록이나 지금 받는 줄에 있는 collection 인가, 겹치지 않는가
-    C->>D: 에이전트 행을 쓰기 잠금으로 읽는다
+    C->>C: ADMIN 인가, 지우지 않은 에이전트인가, 옛 커넥터 에이전트가 아닌가, collection 이 겹치지 않는가
+    C->>D: 새 트랜잭션의 첫 읽기로 에이전트 행을 쓰기 잠금으로 읽는다
+    C->>D: 지금 줄을 읽고, 그룹 목록이나 지금 줄에 없는 collection 이면 거절한다
     C->>D: 지금 줄과 비교해 붙이고, 떼고, 민감 허용을 바꾼다
     C->>D: 바뀐 collection 마다 agent_memory_collection_change 한 줄
     C-->>W: GET 과 같은 응답
@@ -153,7 +153,7 @@ sequenceDiagram
 | 옛 커넥터 에이전트다 | `FORBIDDEN`. 줄이 있어도 받지 않으므로 바꾸지 않는다 |
 | 그룹 목록에도 지금 받는 줄에도 없는 collection, 같은 collection 이 둘, 64개 넘는 목록 | `VALIDATION_FAILED` |
 | 바뀐 것이 없다 | 아무것도 쓰지 않고 지금 값을 낸다 |
-| 두 관리자가 동시에 저장한다 | 잠금을 기다려 하나씩 돈다. 나중 저장이 이기고 기록은 둘 다 남는다 |
+| 두 관리자가 동시에 저장한다 | 잠금을 기다려 하나씩 돈다. 나중 저장이 이기고 기록은 둘 다 남는다. 잠금 읽기가 트랜잭션의 첫 읽기라 나중 저장은 앞 저장이 커밋한 줄을 보고 비교한다 |
 
 바꾼 값은 다음 실행의 조립과 `memory_read` 판정부터 쓰인다. 저장하는 쪽이 따로 비울 캐시가 없다.
 
