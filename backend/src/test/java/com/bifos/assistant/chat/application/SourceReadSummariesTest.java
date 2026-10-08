@@ -19,9 +19,11 @@ import java.lang.reflect.Field;
 import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
+import java.util.Set;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.mockito.ArgumentCaptor;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 class SourceReadSummariesTest {
     private final AgentExecutionRepository executions = mock(AgentExecutionRepository.class);
@@ -177,6 +179,25 @@ class SourceReadSummariesTest {
                 .isEqualTo(new SourceReadSummary(1, List.of("https://example.com/read"), 0, true));
     }
 
+    @ParameterizedTest
+    @ValueSource(strings = {
+        "https://localhost./read",
+        "https://service.internal./read",
+        "https://intranet./read",
+        "https://10.0.0.1./read"
+    })
+    @DisplayName("끝 점이 있는 내부와 한 낱말과 IPv4 host는 URL로 보내지 않는다")
+    void rejectsUnsafeDnsAbsoluteHosts(String url) throws Exception {
+        AgentExecution root = execution(1L, null, EventObservation.OBSERVED);
+        stubExecutions(List.of(root), List.of());
+        when(events.findByExecutionIdInOrderByExecutionIdAscSequenceAsc(any()))
+                .thenReturn(List.of(completed(
+                        1L, 1, "{\"results\":[{\"url\":\"" + url + "\",\"content\":\"본문\"}]}")));
+
+        assertThat(summaries.of(List.of(answer(10L, 1L))).get(10L))
+                .isEqualTo(new SourceReadSummary(1, List.of(), 1, true));
+    }
+
     @Test
     @DisplayName("트리의 실행 하나라도 사건 관측이 불완전하면 불완전으로 표시한다")
     void marksSummaryIncompleteWhenAChildObservationIsIncomplete() throws Exception {
@@ -247,16 +268,9 @@ class SourceReadSummariesTest {
                 .containsEntry(100L, new SourceReadSummary(0, List.of(), 0, true))
                 .containsEntry(101L, new SourceReadSummary(0, List.of(), 0, true));
 
-        ArgumentCaptor<Collection<Long>> executionIds = ArgumentCaptor.forClass(Collection.class);
-        verify(executions, times(2)).findAllById(executionIds.capture());
-        assertThat(executionIds.getAllValues())
-                .allSatisfy(ids -> assertThat(ids).containsExactlyInAnyOrder(1L, 10L));
-        ArgumentCaptor<Collection<Long>> rootIds = ArgumentCaptor.forClass(Collection.class);
-        verify(executions).findByRootExecutionIdIn(rootIds.capture());
-        assertThat(rootIds.getValue()).containsExactlyInAnyOrder(1L, 10L);
-        ArgumentCaptor<Collection<Long>> eventIds = ArgumentCaptor.forClass(Collection.class);
-        verify(events).findByExecutionIdInOrderByExecutionIdAscSequenceAsc(eventIds.capture());
-        assertThat(eventIds.getValue()).containsExactlyInAnyOrder(1L, 2L, 10L, 11L);
+        verify(executions, times(2)).findAllById(Set.of(1L, 10L));
+        verify(executions).findByRootExecutionIdIn(Set.of(1L, 10L));
+        verify(events).findByExecutionIdInOrderByExecutionIdAscSequenceAsc(Set.of(1L, 2L, 10L, 11L));
     }
 
     @Test
