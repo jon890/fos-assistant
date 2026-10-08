@@ -2,6 +2,7 @@
 
 정한 시각에 사용자의 권한으로 에이전트를 돌리는 일을 갖는다. 작업을 만들고 고치는 규칙, 발화와 시작, 결과와 알림, 화면이다.
 근거는 [ADR-076](../adr/ADR-076-예약-작업은-control-plane-이-갖고-발화한-실행은-대화-turn-경로로-돈다.md), [ADR-077](../adr/ADR-077-발화는-trigger-와-예정-시각의-유일-제약으로-한-번만-만들고-놓친-발화는-작업마다-정한다.md), [ADR-078](../adr/ADR-078-예약-작업의-결과는-실행마다-새-대화가-기본이고-목록은-작업으로-묶는다.md), [ADR-079](../adr/ADR-079-예약-작업은-사용자당-10개-최소-간격-15분-하루-48번으로-제한한다.md) 이다.
+Hermes cron 을 대신하며 모델 단계와 「보고할 것 없음」 을 더한 근거는 [ADR-20261008 / cron-to-task](../adr/ADR-20261008-cron-to-task.md) 다.
 칸은 [`schema/task.md`](schema/task.md) 가 갖는다.
 
 **아래의 일반 예약 작업은 `task.kind = TURN` 이다.**
@@ -24,6 +25,7 @@
 | 대화 방식 | `NEW_PER_RUN`, `SINGLE` | `NEW_PER_RUN` |
 | 놓친 발화 | `RUN_ONCE`, `SKIP` | `RUN_ONCE` |
 | 알림 | `ALWAYS`, `ON_FAILURE`, `NEVER` | `ALWAYS` |
+| 모델 단계 | `FAST`, `BALANCED`, `DEEP` 이나 비움. 아래 「모델 단계」 | 비움 |
 
 상태는 셋이다.
 
@@ -46,6 +48,18 @@
 `CRON` 의 예정 시각은 그 작업의 시간대로 계산한다. Spring `CronExpression` 의 계산을 따른다. 서머타임이 있는 시간대에서 없는 시각은 그날 건너뛰고, 겹친 시각은 두 번 돈다. 두 번의 예정 시각은 서로 다른 순간이라 발화 기록도 두 줄이다.
 다음 시각이 없는 cron(예: `0 9 31 2 *`)은 `TASK_SCHEDULE_INVALID` 로 거절한다.
 `ONCE` 는 한 번 발화하면 `next_fire_at` 이 비고 작업은 `ACTIVE` 로 남는다. 화면은 「다음 실행 없음」 으로 보인다.
+
+### 모델 단계
+
+작업마다 어느 단계로 돌지 정한다. 화면 이름은 「빠르게」, 「균형」, 「깊게」 이고 단계의 뜻은 [모델 단계와 실행 기록](../model-tiers.md) 이 갖는다.
+
+| 작업의 `model_tier` | 발화가 대화에 하는 일 |
+| --- | --- |
+| 비어 있다 | 대화의 모델 선택을 건드리지 않는다. 새 대화는 선택이 없어 사용자 기본 단계, 그룹 기본 단계, 에이전트 기본 모델 순서로 돈다 |
+| 값이 있다 | 새 대화는 그 단계를 고른 대화(`model_selection_mode = TIER`)로 만든다. 다시 쓰는 대화(`SINGLE`, 잠금을 기다린 줄)는 turn 을 열기 전에 그 단계로 바꾼다 |
+
+`SINGLE` 대화에서 사용자가 고른 모델은 작업에 단계가 있으면 다음 발화가 그 단계로 바꾼다. 단계가 비어 있으면 그대로 둔다.
+단계 정의가 비어 있으면 그 단계는 에이전트 기본 모델로 돈다. 작업을 저장할 때 단계 정의를 확인하지 않는다.
 
 사용자당 보관하지 않은 작업은 `assistant.task.max-per-user`(기본 10)개까지다. 넘으면 `TASK_LIMIT_REACHED` 다.
 
@@ -122,10 +136,23 @@ turn 은 위임 결과를 전하는 자동 turn 과 같은 모양으로 돈다(`
 | turn 이 끝난 모양 | `task_run` | 알림 |
 | --- | --- | --- |
 | 답을 마쳤다 | `SUCCEEDED`, 루트 실행 번호 | `ALWAYS` 면 `TASK_SUCCEEDED` |
+| 답 전체가 `[SILENT]` 다 | `SUCCEEDED`(`NOTHING_TO_REPORT`), 루트 실행 번호. 아래 「보고할 것 없음」 | 없음 |
 | 사용자가 중지했다 | `CANCELLED`, 루트 실행 번호 | 없음 |
 | 예외로 끝났다 | `FAILED`(`FAILED`) | `NEVER` 가 아니면 `TASK_FAILED` |
 
 쓰기 도구를 불러 승인을 기다리는 turn 도 답을 마치면 `SUCCEEDED` 다. 승인은 [커넥터 도구 정책](connector-tool-policy.md) 의 「승인이 필요한 호출」 그대로 따로 살고, [알림](notification.md) 의 `APPROVAL_REQUESTED` 가 사람을 부른다.
+
+### 보고할 것 없음
+
+새 글이 없는 날처럼 에이전트가 알릴 것이 없다고 판단하면 조용히 끝낸다.
+지시문에 「알릴 것이 없으면 다른 글 없이 `[SILENT]` 만 답한다」 를 적는다.
+
+- 판정은 turn 의 마지막 답 글에서 앞뒤 공백을 뗀 값이 정확히 `[SILENT]` 일 때만이다. 대소문자도 같아야 한다. 다른 글이 붙으면 보통 완료다
+- 그 발화는 `SUCCEEDED` 이고 `reason` 은 `NOTHING_TO_REPORT` 다. 알림 설정과 관계없이 `TASK_SUCCEEDED` 를 만들지 않는다
+- 대화 방식이 `NEW_PER_RUN` 이면 같은 트랜잭션에서 그 대화의 `hidden_at` 을 적는다. 대화 목록에서 빠지고, 작업의 실행 기록에서 눌러 열 수 있다
+- `SINGLE` 대화는 숨기지 않는다. 다른 날의 결과가 함께 있기 때문이다
+- 사용자가 숨긴 대화에 질문을 보내면 `hidden_at` 을 비워 다시 목록에 보인다
+- 사용자가 중지했거나 turn 이 실패한 발화는 답 글이 `[SILENT]` 여도 이 규칙을 쓰지 않는다
 
 ### 기동할 때
 
@@ -144,7 +171,7 @@ turn 은 위임 결과를 전하는 자동 turn 과 같은 모양으로 돈다(`
 | `TASK_FAILED` | 「작업 이름」 실행이 실패했어요 | 까닭 한 줄 | 대화가 있으면 그 대화, 없으면 그 작업 |
 | `TASK_SKIPPED` | 「작업 이름」 실행을 건너뛰었어요 | 까닭 한 줄 | 그 작업 |
 
-알림 설정이 `ON_FAILURE` 면 `TASK_FAILED` 와 `TASK_SKIPPED` 만, `NEVER` 면 아무것도 만들지 않는다. 알림은 `task_run` 의 상태를 바꾸는 트랜잭션 안에서 만든다.
+알림 설정이 `ON_FAILURE` 면 `TASK_FAILED` 와 `TASK_SKIPPED` 만, `NEVER` 면 아무것도 만들지 않는다. `NOTHING_TO_REPORT` 로 끝난 발화는 `ALWAYS` 여도 알리지 않는다. 알림은 `task_run` 의 상태를 바꾸는 트랜잭션 안에서 만든다.
 까닭 한 줄은 화면 문구다. 오류 코드와 내부 원인은 넣지 않는다.
 
 | `reason` | 까닭 한 줄 |
@@ -170,15 +197,16 @@ turn 은 위임 결과를 전하는 자동 turn 과 같은 모양으로 돈다(`
 | DELETE | `/tasks/{taskId}` | | 204. 보관한다 |
 | GET | `/tasks/{taskId}/runs?limit=` | | `List<TaskRunView>`. 예정 시각의 역순. `limit` 기본 20, 상한 100. 1 에서 100 밖이면 400 `VALIDATION_FAILED` |
 
-`TaskRequest` 는 `title`, `agentCode`, `instruction`, `schedule`, `conversationMode`, `missedPolicy`, `notify` 이다. 뒤의 셋은 비우면 기본값이다.
+`TaskRequest` 는 `title`, `agentCode`, `instruction`, `schedule`, `conversationMode`, `missedPolicy`, `notify`, `modelTier` 이다. `conversationMode`, `missedPolicy`, `notify` 는 비우면 기본값이다. `modelTier` 는 `FAST`, `BALANCED`, `DEEP` 이나 `null` 이고, 고칠 때 비우면 작업의 단계를 지운다.
 `schedule` 은 `{ type: "CRON", cron, timeZone }` 이나 `{ type: "ONCE", fireAt, timeZone }` 이다. `fireAt` 은 시간대 없는 날짜와 시각(`2026-11-01T09:00`)이고 `timeZone` 으로 해석한다. `timeZone` 을 비우면 기본 시간대다.
 
 `ScheduleView` 는 요청과 같은 모양이다. `{ type, cron, fireAt, timeZone }` 이고, `fireAt` 은 저장한 UTC 시각을 그 작업의 시간대로 바꾼 시간대 없는 날짜와 시각이다.
 
-`TaskView` 는 `id`, `title`, `agentCode`, `agentName`, `instruction`, `state`, `schedule`, `nextFireAt`, `lastFiredAt`, `conversationMode`, `missedPolicy`, `notify`, `createdAt` 이다.
-`TaskRunView` 는 `id`, `scheduledFor`, `status`, `reason`, `conversationId`, `startedAt`, `finishedAt` 이다. `conversationId` 는 대화의 공개 식별자다.
+`TaskView` 는 `id`, `title`, `agentCode`, `agentName`, `instruction`, `state`, `schedule`, `nextFireAt`, `lastFiredAt`, `conversationMode`, `missedPolicy`, `notify`, `modelTier`, `createdAt` 이다.
+`TaskRunView` 는 `id`, `scheduledFor`, `status`, `reason`, `conversationId`, `startedAt`, `finishedAt` 이다. `conversationId` 는 대화의 공개 식별자다. 목록에서 숨긴 대화도 그대로 준다.
 
-대화 목록(`GET /api/v1/chat/conversations`)의 `ConversationView` 에 `taskId` 와 `taskTitle` 을 더한다. 작업이 만든 대화가 아니면 둘 다 비어 있다. 보관한 작업의 대화도 작업 이름을 보인다.
+대화 목록(`GET /api/v1/chat/conversations`)은 `hidden_at` 이 찬 대화를 주지 않는다. 대화 하나를 읽는 경로는 숨긴 대화도 준다.
+`ConversationView` 에 `taskId` 와 `taskTitle` 을 더한다. 작업이 만든 대화가 아니면 둘 다 비어 있다. 보관한 작업의 대화도 작업 이름을 보인다.
 
 ## 화면
 
@@ -187,6 +215,9 @@ turn 은 위임 결과를 전하는 자동 turn 과 같은 모양으로 돈다(`
 | `/tasks` | 내 예약 작업 목록. 줄마다 이름, 에이전트, 시각을 사람 말로 적은 것, 다음 실행, 상태. 위에 「새 작업」. 없으면 「아직 예약 작업이 없어요.」 |
 | `/tasks/new` | 작업 만들기 |
 | `/tasks/{id}` | 작업 고치기, 멈추기와 다시 켜기, 지우기, 최근 실행 목록. 실행 줄을 누르면 그 대화로 간다 |
+
+작업 만들기와 고치기에는 「모델 단계」 고르기가 있다. 「기본값」(비움), 「빠르게」, 「균형」, 「깊게」 다.
+실행 줄의 까닭이 `NOTHING_TO_REPORT` 면 「알릴 것이 없어 조용히 끝냈어요」 를 보인다.
 
 시각을 고르는 칸은 「매일」, 「매주」(요일), 「매달」(날짜), 「한 번」(날짜), 「직접 입력」(cron) 중 하나와 시각이다. 앞의 넷은 화면이 5필드 cron 이나 `ONCE` 로 바꿔 보낸다. 서버는 cron 만 안다.
 에이전트 고르기 목록은 새 대화 화면과 같은 목록(`GET /api/v1/agents`)에서 `runsTasks` 가 거짓인 에이전트를 뺀 것이다. `runsTasks` 는 흐름이 붙지 않은 에이전트에서 참이고, 서버의 `TASK_AGENT_NOT_SUPPORTED` 판정(`KnownFlows.known`)과 같은 값이다. 흐름 이름은 내보내지 않는다. 고치는 작업의 지금 에이전트는 목록에서 빠졌어도 맨 앞에 붙여 고른 값이 사라지지 않게 한다. 그래도 서버가 거절하면 화면은 「이 에이전트로는 예약 작업을 만들 수 없어요.」 를 보인다.
