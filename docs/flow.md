@@ -222,9 +222,14 @@ sequenceDiagram
         C-->>B: 409 AGENT_CONNECTIONS_REQUIRE_PRIVATE
     else 연결이 READY 가 아니거나 보관 파일에 값이 없다
         C-->>B: 409 CONNECTOR_NOT_CONNECTED
+    else single_binding 커넥터이고 그 연결이 다른 에이전트에 붙어 있다
+        C-->>B: 409 CONNECTOR_SINGLE_BINDING
     else 붙일 수 있다
         C->>D: PUT /api/connectors (bind: vault)
-        alt 대시보드 409. 운영자 설정이나 다른 커넥터와 충돌
+        alt 대시보드 409 sandbox_unavailable. 실행 공간이 필요한데 정책에 없는 profile
+            D-->>C: 409 (code: sandbox_unavailable)
+            C-->>B: 409 AGENT_SANDBOX_UNAVAILABLE. 바인딩 행이 남지 않는다
+        else 대시보드 409. 운영자 설정이나 다른 커넥터와 충돌
             D-->>C: 409
             C-->>B: 409 CONNECTOR_BIND_CONFLICT. 바인딩 행이 남지 않는다
         else 대시보드 401. 표식 없는 profile

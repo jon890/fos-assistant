@@ -19,6 +19,7 @@ Control Plane 이 대시보드 plugin 의 커넥터 경로로 연결을 등록�
 - `call` 의 시간 제한은 10초, 동시 실행은 대시보드 프로세스 전체에서 4개다. 시간을 넘기면 자식 프로세스를 끝내고 `unavailable` 이다. 이미 4개가 돌고 있으면 기다리지 않고 `unavailable` 이다
 - Control Plane 은 카탈로그의 `fields[].env` 로 `PUT /api/env` 의 key 를 정하고 `verify.tool` 로 확인 도구를 부른다. `env` 이름은 Control Plane 의 응답에 담지 않는다
 - 카탈로그는 커넥터마다 `icon` 과 `link` 를 낸다. Control Plane 은 [커넥터 연결](../connectors.md) 의 「아이콘과 링크」 규칙으로 다시 검사하고, 어긋난 칸만 null 로 읽는다
+- 카탈로그는 커넥터마다 `single_binding` 을 boolean 으로 낸다. 선언이 없으면 거짓이다. Control Plane 은 칸이 없으면 거짓으로 읽고, boolean 이 아니면 `attachments` 와 같이 카탈로그 읽기를 실패로 다룬다([ADR-20261008 / connector-binding-guards](../adr/ADR-20261008-connector-binding-guards.md))
 - 카탈로그는 커넥터마다 `skills`(바인딩 설치가 복사할 스킬 이름 목록)를 낸다. 입력 칸이 없는 커넥터(빈 `fields`)도 받는다. 그 커넥터의 보관 파일은 빈 `values` 다
 - 운영 목록에서 빠진 커넥터도 그 profile 에 소유 기록이 남아 있으면 `PUT /api/connectors` 의 `enabled: false` 를 받는다. 이때 대시보드가 그 기록의 서버 env 가 참조하던 key 를 profile `.env` 에서 지운다. `GET /api/connectors` 는 그 기록을 `configured: false` 로 낸다
 - 운영 목록에도 없고 소유 기록도 없는 plugin 의 `enabled: false` 는 끌 것이 없으므로 `changed: false` 로 성공한다. `enabled: true` 는 거절한다. `GET /api/connectors` 는 그런 plugin 을 목록에 넣지 않고, Control Plane 은 목록에 없는 것을 설치 안 됨(`enabled: false`, `configured: false`)으로 읽는다. 카탈로그에서 빠진 연결의 해제와 반영 완료가 끝까지 가게 하기 위해서다
@@ -65,12 +66,13 @@ profile 이 어떤 요청을 받는지는 두 표식이 정한다. 판정은 요
 - 커넥터의 env 이름이 그 커넥터의 소유 기록 없이 이미 `.env` 에 있지 않고, 기본 key 나 다른 바인딩 커넥터의 env 이름과 겹치지 않는다
 - 서버 이름이 운영자가 등록한 서버와 겹치지 않는다
 - 복사할 스킬 디렉터리가 그 커넥터의 소유 기록 없이 이미 있지 않다
+- manifest 가 `sandbox_required` 를 선언했으면 운영 정책이 있고 그 profile 이 정책의 `profiles` 에 있다. 아니면 409 이고 본문의 `code` 는 `sandbox_unavailable` 이다. 이 조건은 다시 설치할 때(연결 확인, 반영 완료)도 본다. 정책에서 빠진 profile 의 바인딩은 그때 `PENDING` 이 된다([ADR-20261008 / connector-binding-guards](../adr/ADR-20261008-connector-binding-guards.md))
 
 보관 파일이 없거나 다른 커넥터의 것이면 400 이다. 보관 값이 지금 칸 선언과 맞지 않아도 400 이다.
 
 Control Plane 은 바인딩 설치 요청에 그 에이전트의 `sandbox_owner` 를 늘 함께 보낸다. 연결 확인과 반영 완료가 다시 설치할 때도 같다.
 보내기 전에 그 주인의 첨부 디렉터리를 최선 노력으로 만든다. 만들지 못해도 경고 로그만 남기고 요청을 보낸다. 선언하지 않은 커넥터의 붙이기가 첨부 루트 문제로 막히지 않게 하려는 것이다.
-manifest 가 `owner_attachments_env` 를 선언했으면 plugin 은 운영 정책의 `attachment_agent_root` 아래 `users/<SHA-256(sandbox_owner)>` 를 그 env 의 값으로 서버 정의에 직접 넣는다([ADR-20261007 / connector-owner-attachments](../adr/ADR-20261007-connector-owner-attachments.md)). `sandbox_owner` 가 없으면 400, 운영 정책이 없거나 그 디렉터리를 중간 링크 없이 확인하지 못하면 409 다. Control Plane 이 디렉터리를 만들지 못한 경우도 이 409 가 되고, 붙이기는 `CONNECTOR_BIND_CONFLICT` 로 끝난다. 선언하지 않은 커넥터는 `sandbox_owner` 를 쓰지 않는다.
+manifest 가 `owner_attachments_env` 를 선언했으면 plugin 은 운영 정책의 `attachment_agent_root` 아래 `users/<SHA-256(sandbox_owner)>` 를 그 env 의 값으로 서버 정의에 직접 넣는다([ADR-20261007 / connector-owner-attachments](../adr/ADR-20261007-connector-owner-attachments.md)). `sandbox_owner` 가 없으면 400, 운영 정책이 없거나 그 디렉터리를 중간 링크 없이 확인하지 못하면 409 다. Control Plane 이 디렉터리를 만들지 못한 경우도 이 409 가 된다. 409 의 본문 `code` 는 `sandbox_unavailable` 이고 붙이기는 `AGENT_SANDBOX_UNAVAILABLE` 로 끝난다. 선언하지 않은 커넥터는 `sandbox_owner` 를 쓰지 않는다.
 manifest 가 `owner_output_env` 를 선언했으면 plugin 은 운영 정책의 `connector_output_root` 아래 `users/<SHA-256(sandbox_owner)>/<profile>/<커넥터 id>` 를 링크 없이 만들고 그 env 의 값으로 서버 정의에 직접 넣는다. 정책이나 그 키, `sandbox_owner` 가 없거나, profile 이 정책에 등록되지 않았거나, 디렉터리를 만들지 못하면 빈 값을 넣고 붙이기는 그대로 한다. 디렉터리는 보관 파일을 확인한 뒤에 만든다. 커넥터는 파일 출력만 거절한다. 떼면 설치한 그 디렉터리를 지운다([ADR-20261008 / connector-output-files](../adr/ADR-20261008-connector-output-files.md)).
 
 | 무엇 | 붙일 때 | 뗄 때(`enabled: false`) |
@@ -154,7 +156,7 @@ Control Plane 은 도구 목록을 직접 쓰지 않는다. 바인딩 설치가 
 1. 사용자 행을 잠그고, 에이전트 행을 잠근다. 에이전트 행 잠금은 기다린다. 공개 범위 변경이나 주인 변경이 잠금을 쥐고 있으면 그 커밋을 본 뒤 판정한다
 2. 그 에이전트의 주인인지, 옛 커넥터 에이전트가 아닌지, `PRIVATE` 인지, 내 연결이 `READY` 이고 값이 보관 파일에 있는지 본다
 3. 이미 붙어 있으면 지금 상태를 돌려준다
-4. 카탈로그에서 manifest 를 읽고, 커넥터의 스킬 이름이 그 profile 의 스킬(올린 스킬과 Hermes 스킬)과 겹치지 않는지 본다
+4. 카탈로그에서 manifest 를 읽는다. `single_binding` 이 참이고 그 연결의 바인딩이 다른 에이전트에 있으면 `CONNECTOR_SINGLE_BINDING` 으로 끝낸다. 사용자 행 잠금 안이라 같은 사용자의 다른 붙이기와 겹치지 않는다. 그다음 커넥터의 스킬 이름이 그 profile 의 스킬(올린 스킬과 Hermes 스킬)과 겹치지 않는지 본다
 5. 바인딩 행을 `PENDING` 으로 만들고 manifest 의 MCP 서버 이름을 적는다
 6. `PUT /api/connectors` 에 `bind: {vault}` 를 실어 보낸다. 대시보드가 보관 파일의 값을 그 profile 의 `.env` 로 복사하고 서버와 스킬을 설치한다
 7. 답의 `restart_required` 나 `plugin_updated` 가 참이면 재시작 대기로 두고 그 시각을 `restart_required_since` 에 적는다. 둘 다 거짓이고 `reload_pending` 이 참이면 지금에서 `assistant.connector.binding.apply-delay`(기본 150초) 뒤를 반영 예정 시각 `apply_due_at` 에 적는다
@@ -162,7 +164,7 @@ Control Plane 은 도구 목록을 직접 쓰지 않는다. 바인딩 설치가 
 붙인 바인딩은 늘 `PENDING` 이다.
 반영 예정이면 그 시각이 지난 뒤 아래 「반영 예정 확인」 이 `READY` 로 바꾼다. 150초는 공유 gateway 의 MCP 설정 맞추기 주기(60초) 둘과 연결 시간이다([ADR-20261007 / connector-live-reload](../adr/ADR-20261007-connector-live-reload.md)).
 재시작 대기면 관리자가 공유 gateway 를 재시작하고 반영 완료를 누를 때 `READY` 가 된다.
-대시보드가 409 나 401 로 거절하면 대시보드는 아무것도 바꾸지 않았고 트랜잭션이 되돌려져 바인딩 행도 남지 않는다. 오류는 [커넥터 연결](../connectors.md) 의 「붙이기와 떼기」 가 갖는다.
+대시보드가 409 나 401 로 거절하면 대시보드는 아무것도 바꾸지 않았고 트랜잭션이 되돌려져 바인딩 행도 남지 않는다. 409 본문의 `code` 가 `sandbox_unavailable` 이면 `AGENT_SANDBOX_UNAVAILABLE`, 그 밖의 409 는 `CONNECTOR_BIND_CONFLICT` 다. 오류는 [커넥터 연결](../connectors.md) 의 「붙이기와 떼기」 가 갖는다.
 그 밖의 외부 실패는 바인딩을 `PENDING` 으로 남기고 `CONNECTOR_OPERATION_FAILED` 로 끝낸다. 대시보드가 반쯤 반영했을 수 있어 다음 연결 확인이 설치를 다시 보낸다.
 
 ### 떼기
