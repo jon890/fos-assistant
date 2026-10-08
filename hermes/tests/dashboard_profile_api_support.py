@@ -215,6 +215,8 @@ class ProfileApiRouteTest(unittest.TestCase):
         self.attachment_root.mkdir()
         self.attachment_agent_root = str(base / "agent-attachments")
         pathlib.Path(self.attachment_agent_root).mkdir()
+        # 커넥터 출력 루트다. 기본 정책에는 넣지 않는다. 넣는 검사만 `sandbox_policy(connector_output_root=...)` 로 준다.
+        self.connector_output_root = str(base / "connector-output")
         # Control Plane 이 Hermes 를 부르기 전에 주인의 첨부 디렉터리를 만든다. plugin 은 만들지 않는다(ADR-091).
         for owner in ("user-1", "user-2", "user-a", "user-b"):
             self.prepare_attachment_directory(owner)
@@ -648,8 +650,14 @@ class ProfileApiRouteTest(unittest.TestCase):
             body["sandbox_owner"] = owner
         return body
 
+    def connector_output_directory(self, owner, profile, connector=None):
+        """정책의 `connector_output_root` 아래 그 profile 의 커넥터 출력 디렉터리다(ADR-20261008 connector-output-files)."""
+        directory = "%s/users/%s/%s" % (self.connector_output_root, hashlib.sha256(owner.encode("utf-8")).hexdigest(),
+                                        profile)
+        return directory if connector is None else "%s/%s" % (directory, connector)
+
     def expected_terminal(self, owner, mounts, extra_args=("--network=sandbox-net",), cpu=2, memory=2048,
-                          profile="owner"):
+                          profile="owner", connector_output=False):
         """`hermes/README.md` 의 「셸 실행 공간」 YAML 을 그대로 옮긴 기대값이다.
 
         `docker_shared_container_key` 는 그 칸을 뺀 나머지를 키 정렬 JSON 으로 만든 sha256 앞 12자를 붙인다.
@@ -673,7 +681,8 @@ class ProfileApiRouteTest(unittest.TestCase):
                     self.attachment_agent_root,
                     hashlib.sha256(owner.encode("utf-8")).hexdigest(),
                 ),
-            ] + [m + ":ro" for m in mounts],
+            ] + (["%s:%s:ro" % ((self.connector_output_directory(owner, profile),) * 2)] if connector_output else [])
+              + [m + ":ro" for m in mounts],
             "docker_forward_env": [],
             "env_passthrough": [],
             "credential_files": [],

@@ -85,6 +85,7 @@ from .sandbox import (
     _sandbox_attachment_agent_directory,
     _sandbox_attachment_path_identity,
     _sandbox_policy,
+    _sandbox_prepare_connector_output,
     _sandbox_terminal,
     _sandbox_unavailable,
     _sandbox_verify_attachment_directories,
@@ -230,6 +231,7 @@ async def _connector_request(request):
                     return _rejected("격리할 사진 도구에는 sandbox_owner 가 필요하다")
                 try:
                     os.makedirs(_sandbox_workspace(sandbox, owner), exist_ok=True)
+                    _sandbox_prepare_connector_output(sandbox, profile, owner)
                     prepared = _sandbox_verify_attachment_directories(sandbox, owner)
                     sandbox_terminal = _sandbox_terminal(sandbox, profile, owner, prepared)
                     attachment_guard = (sandbox, owner, prepared)

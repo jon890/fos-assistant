@@ -106,6 +106,45 @@ class ProfileApiSandboxTerminalTest(support.ProfileApiRouteTest):
         self.assertTrue(pathlib.Path(self.attachment_agent_root, "users", attachment_key).is_dir())
         self.assertTrue((self.attachment_root / "users" / attachment_key).is_dir())
 
+    def test_connector_output_root_mounts_the_profile_directory_read_only_at_the_same_path(self):
+        """정책에 출력 루트가 있으면 그 profile 의 출력 디렉터리를 만들고 같은 경로에 읽기 전용으로 붙인다."""
+        self.set_sandbox_policy(self.sandbox_policy(connector_output_root=self.connector_output_root))
+        self.assertEqual(self.request("/api/config", "PUT", token="valid", body=self.file_body()), 200)
+
+        self.assertEqual(self.saved_config()["terminal"], self.expected_terminal(
+            "user-1", ["/srv/shared:/opt/shared", "/srv/owner-skills:/opt/owner-skills"], connector_output=True))
+        directory = pathlib.Path(self.connector_output_directory("user-1", "owner"))
+        self.assertTrue(directory.is_dir())
+        self.assertEqual(directory.stat().st_mode & 0o777, 0o700)
+        # 같은 사용자의 다른 profile 디렉터리는 붙지 않는다.
+        volumes = self.saved_config()["terminal"]["docker_volumes"]
+        self.assertFalse(any(self.connector_output_directory("user-1", "blog") in volume for volume in volumes))
+
+    def test_connector_output_root_change_changes_the_container_key(self):
+        """출력 루트를 넣으면 셸 설정이 바뀌므로 키도 바뀐다. 빼면 처음 키로 돌아간다."""
+        first = self.save_sandbox_key()
+        self.set_sandbox_policy(self.sandbox_policy(connector_output_root=self.connector_output_root))
+        self.assertNotEqual(self.save_sandbox_key(), first)
+        self.set_sandbox_policy(self.sandbox_policy())
+        self.assertEqual(self.save_sandbox_key(), first)
+
+    def test_connector_output_directory_through_a_link_is_unavailable(self):
+        """출력 디렉터리 경로에 링크가 섞이면 409 로 거절하고 설정을 그대로 둔다."""
+        elsewhere = pathlib.Path(self.connector_output_root).parent / "elsewhere"
+        elsewhere.mkdir()
+        users = pathlib.Path(self.connector_output_root, "users")
+        users.mkdir(parents=True)
+        (users / hashlib.sha256(b"user-1").hexdigest()).symlink_to(elsewhere)
+        self.set_sandbox_policy(self.sandbox_policy(connector_output_root=self.connector_output_root))
+        path = self.root / "owner/config.yaml"
+        original = path.read_bytes()
+
+        response = self.request("/api/config", "PUT", token="valid", body=self.file_body(), full_response=True)
+
+        self.assertEqual(response.status_code, 409)
+        self.assertEqual(response.body["code"], "sandbox_unavailable")
+        self.assertEqual(path.read_bytes(), original)
+
     def test_vision_connector_is_not_installed_without_the_owners_attachment_directory(self):
         """사진 커넥터 설치도 Control Plane 이 만든 디렉터리가 없으면 거절하고 만들지 않는다."""
         root = self.connector_fixture()

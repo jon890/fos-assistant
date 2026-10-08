@@ -26,8 +26,8 @@ SANDBOX_NETWORK_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$")
 SANDBOX_RESERVED_PATHS = ("/workspace", "/root")
 # hermes/README.md 의 「셸 실행 공간」 계약 표에 있는 최상위 키다. 그 밖의 키가 있으면 정책 전체를 틀린 것으로 본다.
 SANDBOX_POLICY_KEYS = frozenset({
-    "image", "workspace_root", "attachment_root", "attachment_agent_root", "network", "cpu",
-    "memory_mb", "read_only_mounts", "profiles",
+    "image", "workspace_root", "attachment_root", "attachment_agent_root", "connector_output_root", "network",
+    "cpu", "memory_mb", "read_only_mounts", "profiles",
 })
 SANDBOX_PROFILE_KEYS = frozenset({"read_only_mounts", "env", "network"})
 # 비밀값은 넣지 않는다. 운영 정책이 경로와 Backend 주소만 명시한다.
@@ -102,6 +102,22 @@ def _sandbox_attachment_roots_ok(attachment_root: str, attachment_agent_root: st
                    for reserved in SANDBOX_RESERVED_PATHS)
 
 
+def _sandbox_connector_output_root_ok(root: str, workspace_root: str, attachment_root: str,
+                                      attachment_agent_root: str) -> bool:
+    """커넥터 출력 루트가 사용자 workspace, 첨부 경로, 예약 경로와 겹치지 않는지 본다(ADR-20261008 connector-output-files)."""
+    return not any(_sandbox_paths_overlap(root, other)
+                   for other in (workspace_root, attachment_root, attachment_agent_root, *SANDBOX_RESERVED_PATHS))
+
+
+def _sandbox_connector_output_mount_overlaps(mount: str, connector_output_root: Optional[str]) -> bool:
+    """운영 마운트가 커넥터 출력 루트를 원본이나 대상으로 덮는지 본다. 덮으면 다른 profile 의 출력이 보인다."""
+    if connector_output_root is None:
+        return False
+    source, target = mount.split(":")
+    return (_sandbox_paths_overlap(source, connector_output_root)
+            or _sandbox_paths_overlap(target, connector_output_root))
+
+
 def _sandbox_env_ok(value) -> bool:
     """운영 정책의 환경 값은 허용한 경로와 인증정보 없는 URL 만 받는다."""
     if not isinstance(value, dict):
@@ -129,7 +145,7 @@ def _sandbox_env_ok(value) -> bool:
 
 
 def _sandbox_profiles(value, workspace_root: str, attachment_root: str, attachment_agent_root: str,
-                      default_network) -> Optional[dict]:
+                      default_network, connector_output_root: Optional[str] = None) -> Optional[dict]:
     """정책에 등록된 profile 만 검증한다. 빈 목록은 모두 기존 실행을 유지한다."""
     if not isinstance(value, dict):
         return None
@@ -142,6 +158,7 @@ def _sandbox_profiles(value, workspace_root: str, attachment_root: str, attachme
         if (not _sandbox_mounts_ok(mounts)
                 or any(_sandbox_mount_overlaps(mount, workspace_root)
                        or _sandbox_attachment_mount_overlaps(mount, attachment_root, attachment_agent_root)
+                       or _sandbox_connector_output_mount_overlaps(mount, connector_output_root)
                        for mount in mounts)):
             return None
         env = settings.get("env", {})
@@ -209,12 +226,20 @@ def _sandbox_policy() -> Optional[dict]:
     attachment_agent_root = value["attachment_agent_root"]
     if not _sandbox_attachment_roots_ok(attachment_root, attachment_agent_root, workspace_root):
         return invalid("attachment_root 또는 attachment_agent_root")
+    # 선택 키다. 없으면 커넥터 출력 디렉터리를 붙이지 않고 셸 설정과 지문이 그대로다.
+    connector_output_root = value.get("connector_output_root")
+    if connector_output_root is not None and (
+            not _sandbox_path_ok(connector_output_root)
+            or not _sandbox_connector_output_root_ok(connector_output_root, workspace_root, attachment_root,
+                                                     attachment_agent_root)):
+        return invalid("connector_output_root")
     if any(_sandbox_mount_overlaps(mount, workspace_root)
            or _sandbox_attachment_mount_overlaps(mount, attachment_root, attachment_agent_root)
+           or _sandbox_connector_output_mount_overlaps(mount, connector_output_root)
            for mount in read_only_mounts):
         return invalid("read_only_mounts")
     profiles = _sandbox_profiles(value.get("profiles"), workspace_root, attachment_root,
-                                 attachment_agent_root, network)
+                                 attachment_agent_root, network, connector_output_root)
     if profiles is None:
         return invalid("profiles")
     return {
@@ -222,6 +247,7 @@ def _sandbox_policy() -> Optional[dict]:
         "workspace_root": value["workspace_root"],
         "attachment_root": attachment_root,
         "attachment_agent_root": attachment_agent_root,
+        "connector_output_root": connector_output_root,
         "network": network,
         "cpu": cpu,
         "memory_mb": memory_mb,
@@ -245,6 +271,29 @@ def _sandbox_attachment_directory(policy: dict, owner: str) -> str:
 
 def _sandbox_attachment_agent_directory(policy: dict, owner: str) -> str:
     return "%s/users/%s" % (policy["attachment_agent_root"].rstrip("/"), _sandbox_attachment_key(owner))
+
+
+def _sandbox_connector_output_profile_directory(policy: dict, profile: str, owner: str) -> Optional[str]:
+    """그 profile 의 커넥터 출력 디렉터리다. 실행 공간에 같은 경로로 읽기 전용으로 붙는다. 정책에 키가 없으면 None 이다."""
+    root = policy.get("connector_output_root")
+    if root is None:
+        return None
+    return "%s/users/%s/%s" % (root.rstrip("/"), _sandbox_attachment_key(owner), profile)
+
+
+def _sandbox_make_private_directory(directory: str) -> None:
+    """디렉터리를 만들고 실제 경로가 그 경로 그대로인지 본다. 링크가 섞였으면 거절한다."""
+    os.makedirs(directory, mode=0o700, exist_ok=True)
+    path = pathlib.Path(directory)
+    if path.resolve(strict=True) != path or not path.is_dir():
+        raise OSError("connector output directory resolves elsewhere")
+
+
+def _sandbox_prepare_connector_output(policy: dict, profile: str, owner: str) -> None:
+    """셸 설정이 붙일 커넥터 출력 디렉터리를 미리 만든다. 없으면 Docker 가 root 소유로 만들어 커넥터가 쓰지 못한다."""
+    directory = _sandbox_connector_output_profile_directory(policy, profile, owner)
+    if directory is not None:
+        _sandbox_make_private_directory(directory)
 
 
 class SandboxAttachmentError(OSError):
@@ -310,6 +359,10 @@ def _sandbox_terminal(policy: dict, profile: str, owner: str, attachment_snapsho
     _sandbox_validate_attachment_snapshot(policy, owner, attachment_snapshot)
     settings = policy["profiles"][profile]
     mounts = policy["read_only_mounts"] + settings["read_only_mounts"]
+    # 커넥터가 Hermes 쪽에서 쓴 경로를 스크립트가 그대로 열도록 같은 경로에 읽기 전용으로 붙인다.
+    # 실행 공간이 쓰지 못하므로 링크를 바꿔 끼워 커넥터의 쓰기를 다른 곳으로 돌릴 수 없다(ADR-20261008 connector-output-files).
+    output = _sandbox_connector_output_profile_directory(policy, profile, owner)
+    output_mounts = ["%s:%s:ro" % (output, output)] if output is not None else []
     network = settings["network"]
     extra_args = ["--label=fos-sandbox-profile=%s" % profile]
     if network:
@@ -329,7 +382,7 @@ def _sandbox_terminal(policy: dict, profile: str, owner: str, attachment_snapsho
             "%s:/workspace" % _sandbox_workspace(policy, owner),
             "%s:%s:ro" % (_sandbox_attachment_directory(policy, owner),
                             _sandbox_attachment_agent_directory(policy, owner)),
-        ] + ["%s:ro" % m for m in mounts],
+        ] + output_mounts + ["%s:ro" % m for m in mounts],
         "docker_forward_env": [],
         "env_passthrough": [],
         "credential_files": [],
