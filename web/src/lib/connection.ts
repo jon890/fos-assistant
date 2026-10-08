@@ -47,6 +47,10 @@ export type ConnectorSummary = {
   id: string;
   title: string;
   description: string;
+  /** `data:image/svg+xml` 나 `data:image/png` 의 base64 글이다. 옛 Control Plane 은 내지 않는다. */
+  icon: string | null;
+  /** 서비스 소개 주소(`https://`)다. 옛 Control Plane 은 내지 않는다. */
+  link: string | null;
   fields: ConnectorField[];
   tools: ConnectorTool[];
   myStatus: ConnectionStatus;
@@ -250,4 +254,50 @@ export function toolPolicyLabel(tool: ConnectorTool): string {
   if (toolBlocked(tool)) return "아직 쓸 수 없어요";
   if (tool.approval === "NONE") return "바로 실행해요";
   return tool.grant ? "실행 전에 물어봐요" : "실행할 때마다 물어봐요";
+}
+
+const ICON_DATA_URL =
+  /^data:image\/(svg\+xml|png);base64,[A-Za-z0-9+/]+={0,2}$/;
+
+/**
+ * 서버가 검증한 아이콘도 화면이 한 번 더 모양을 본다. 모양이 틀리면 null 이라 기본 아이콘으로 그린다.
+ * `<img>` 의 `src` 로만 쓰므로 SVG 안의 스크립트는 실행되지 않는다.
+ */
+export function connectorIconSrc(
+  icon: string | null | undefined,
+): string | null {
+  return icon && ICON_DATA_URL.test(icon) ? icon : null;
+}
+
+/** 로그인 정보가 없는 `https://` 주소만 링크로 쓴다. 그 밖에는 null 이라 링크를 그리지 않는다. */
+export function connectorLinkHref(
+  link: string | null | undefined,
+): string | null {
+  if (!link) return null;
+  try {
+    const url = new URL(link);
+    if (url.protocol !== "https:" || url.username || url.password) return null;
+    return url.href;
+  } catch {
+    return null;
+  }
+}
+
+const TOOL_RISK_ORDER: ToolRisk[] = [
+  "READ",
+  "SENSITIVE",
+  "WRITE",
+  "DESTRUCTIVE",
+  "FINANCIAL",
+];
+
+/** 위험도별 도구 수다. 위험도 순서로 늘어놓고 0개인 것은 뺀다. */
+export function toolRiskCounts(
+  tools: ConnectorTool[],
+): { risk: ToolRisk; label: string; count: number }[] {
+  return TOOL_RISK_ORDER.map((risk) => ({
+    risk,
+    label: toolRiskLabel(risk),
+    count: tools.filter((tool) => tool.risk === risk).length,
+  })).filter(({ count }) => count > 0);
 }

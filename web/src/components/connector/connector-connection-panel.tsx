@@ -4,13 +4,8 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { ConnectorHeading } from "@/components/connector/connector-identity";
 import { ConnectorGrants } from "@/components/connector/connector-grants";
 import { ConnectorTools } from "@/components/connector/connector-tools";
 import { Input } from "@/components/ui/input";
@@ -299,10 +294,7 @@ export function ConnectorConnectionPanel({ id }: { id: string }) {
     <div className="mx-auto w-full max-w-2xl">
       <Card>
         <CardHeader>
-          <CardTitle>{title}</CardTitle>
-          {connector?.description ? (
-            <CardDescription>{connector.description}</CardDescription>
-          ) : null}
+          <ConnectorHeading connector={connector} title={title} />
         </CardHeader>
         <CardContent className="space-y-5">
           <div className="flex flex-wrap items-center justify-between gap-2 rounded-md bg-muted px-3 py-2 text-sm">

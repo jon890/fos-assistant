@@ -32,6 +32,8 @@ plugin 디렉터리 root 에 둔다. 소유는 그 plugin 의 저장소다. 같�
   "id": "fos-accountbook",
   "title": "가계부",
   "description": "가족 가계부의 수입과 지출을 조회하고 기록합니다.",
+  "icon": "icon.svg",
+  "link": "https://accountbook.example.com/about",
   "fields": [
     { "key": "token", "env": "ACCOUNTBOOK_API_TOKEN", "label": "연동 토큰",
       "description": "가계부 설정 화면에서 발급합니다.",
@@ -58,6 +60,8 @@ plugin 디렉터리 root 에 둔다. 소유는 그 plugin 의 저장소다. 같�
 | `schema` | `1` 이나 `2`. `2` 는 [커넥터 도구 정책](backend/connector-tool-policy.md) 의 「도구 정책」 이 적은 `tools` 를 선언한다 |
 | `id` | 커넥터 번호. `^[a-z0-9][a-z0-9-]{0,63}$`. 운영 목록의 이름과 같아야 한다 |
 | `title`, `description` | 화면에 그대로 보인다 |
+| `icon` | 선택. 커넥터 카드의 아이콘 파일. plugin 디렉터리 기준 상대 경로이고 `.svg` 나 `.png` 다. 아래 「아이콘과 링크」 가 규칙을 갖는다 |
+| `link` | 선택. 커넥터 소개나 그 서비스의 `https://` 주소. 카드가 새 탭으로 연다 |
 | `fields[].key` | 칸 번호. 요청의 `values` 와 저장의 키다. `^[a-z][a-z0-9_]{0,31}$`, 커넥터 안에서 유일 |
 | `fields[].env` | 이 칸 값을 쓸 profile `.env` 이름. `.mcp.json` 의 서버 env 가 `${이름}` 으로 참조해야 한다 |
 | `fields[].secret` | 참이면 화면이 가리고 응답에 원문을 담지 않는다. 저장하는 것은 아래 「저장과 비밀값」 이 갖는다 |
@@ -77,7 +81,20 @@ plugin 디렉터리 root 에 둔다. 소유는 그 plugin 의 저장소다. 같�
 - `.mcp.json` 서버 env 는 `fields[].env` 와 `operator_env`, `owner_attachments_env`, `owner_output_env` 의 합과 같아야 한다. 네 이름은 겹치지 않는다. 하나라도 다르면 그 커넥터를 카탈로그에 내지 않는다
 - `toolsets` 가 목록이 아니거나, 이름이 겹치거나, `vision` 밖의 이름이 하나라도 있으면 그 커넥터를 카탈로그에 내지 않는다. 셸, 파일, 기억, 스킬, 위임 도구는 manifest 로 열리지 않는다([ADR-044](adr/ADR-044-커넥터-manifest-는-읽기-전용-이미지-도구만-열-수-있다.md))
 - `attachments` 가 참인데 `toolsets` 에 `vision` 이 없으면 그 커넥터를 카탈로그에 내지 않는다. 사진은 파일로 놓이고 에이전트가 이미지 도구로 읽기 때문이다([ADR-020](adr/ADR-020-사진은-공유-디렉터리에-두고-에이전트가-파일로-읽는다.md))
+- `icon` 이나 `link` 가 아래 「아이콘과 링크」 를 어기면 그 칸만 null 로 내고 경고 로그를 남긴다. 커넥터는 카탈로그에 그대로 나온다
 - 도구 결과는 MCP 응답의 첫 텍스트 칸을 JSON 으로 읽는다. `structuredContent` 가 있으면 그것을 먼저 쓴다. 실패는 `isError: true` 와 `{"error": {"code": "..."}}` 다
+
+### 아이콘과 링크
+
+결정은 [ADR-20261008 / connector-card](adr/ADR-20261008-connector-card.md) 에 있다. 검사 규칙은 그 ADR 의 표와 목록이 갖는다.
+
+- `icon` 은 `^[A-Za-z0-9_][A-Za-z0-9_./-]{0,127}$` 이고 `..` 조각이 없다. 가리키는 파일은 plugin 안에 있고 그 경로의 어느 조각도 링크가 아니며 32 KiB 이하다
+- 카탈로그는 아이콘 파일의 내용을 `icon: {media_type, data}` 로 싣는다. `media_type` 은 `image/svg+xml` 이나 `image/png` 이고 `data` 는 base64 다. 선언이 없으면 `icon: null` 이다
+- SVG 아이콘은 `xmlns="http://www.w3.org/2000/svg"` 를 선언한다. 없으면 `<img>` 가 아무것도 그리지 않는다. 색은 `currentColor` 가 아닌 고정 색이다. `<img>` 안의 SVG 는 글자색을 물려받지 않는다
+- `link` 의 모양은 ADR 의 「링크 모양」 이 갖는다. 선언이 없으면 `null` 이다
+- Control Plane 은 같은 규칙으로 다시 검사한다. 어긋나면 그 칸만 `null` 로 두고 경고 로그에 커넥터 번호와 칸 이름만 남긴다. 대시보드는 코드가 정한 사유 글을 더하고, 둘 다 경로와 값은 싣지 않는다
+- 화면은 아이콘을 `<img>` 로만 그리고, 없으면 기본 아이콘을 보인다. 링크는 새 탭으로 열고 `rel="noopener noreferrer"` 다
+- 상표 로고 파일을 복사하지 않는다. 직접 그린 단순한 도형을 쓴다
 
 공통 오류 어휘는 다섯이다.
 
@@ -113,7 +130,7 @@ plugin 디렉터리 root 에 둔다. 소유는 그 plugin 의 저장소다. 같�
 
 | 경로 | 요청 | 결과 |
 | --- | --- | --- |
-| `GET /api/v1/connectors` | 없음 | `[{id, title, description, fields[], tools[], myStatus, available, bindings[]}]`. `fields[]` 는 `key, label, description, secret, required, pattern, hasOptions, autoSelectSingle` 만 담는다. `tools[]` 는 `name, title, risk, approval, grant` 이고 `schema: 1` 은 빈 목록이다. `risk` 와 `approval` 은 `READ`, `NONE` 같은 대문자 enum 이름이고 `grant` 는 그 도구에 상시 허락을 줄 수 있는지다. `bindings[]` 는 내 연결이 붙은 에이전트다 |
+| `GET /api/v1/connectors` | 없음 | `[{id, title, description, icon, link, fields[], tools[], myStatus, available, bindings[]}]`. `icon` 은 `data:image/svg+xml;base64,...` 나 `data:image/png;base64,...` 의 data URL 이거나 null 이고, `link` 는 `https://` 주소이거나 null 이다. `fields[]` 는 `key, label, description, secret, required, pattern, hasOptions, autoSelectSingle` 만 담는다. `tools[]` 는 `name, title, risk, approval, grant` 이고 `schema: 1` 은 빈 목록이다. `risk` 와 `approval` 은 `READ`, `NONE` 같은 대문자 enum 이름이고 `grant` 는 그 도구에 상시 허락을 줄 수 있는지다. `bindings[]` 는 내 연결이 붙은 에이전트다 |
 | `GET /api/v1/connections/{id}` | 없음 | 자기 연결 상태 |
 | `POST /api/v1/connections/{id}/options/{fieldKey}` | `{values}` | `[{value, label}]`. 아무것도 저장하지 않는다 |
 | `POST /api/v1/connections/{id}` | `{values}` | 등록 또는 값 교체. 확인 도구가 통과해야 보관 파일에 쓰고, 붙은 바인딩마다 설치를 다시 보낸다. 입력 칸이 없는 커넥터는 빈 `values` 다 |
@@ -131,7 +148,7 @@ plugin 디렉터리 root 에 둔다. 소유는 그 plugin 의 저장소다. 같�
 - `blockedReason` 은 붙일 수 없는 까닭이다. 그룹에 공개된 에이전트는 `AGENT_NOT_PRIVATE`, 옛 커넥터 에이전트는 `LEGACY_AGENT` 이고, 붙일 수 있으면 null 이다
 - 관리자 목록 항목은 `connectorId`, `userId`, `displayName`, `agentCode`, `status`, `restartRequired`, `restartRequiredSince`, `undeclaredTools` 만 담는다. `status` 는 바인딩 상태다. 다른 사용자의 칸 값과 비밀 앞부분은 넣지 않는다
 - 모르는 `id` 는 `CONNECTOR_NOT_FOUND`(404) 다. 운영 목록에서 빠진 커넥터의 기존 연결은 읽기와 해제만 된다
-- 목록의 `available` 은 그 커넥터가 지금 카탈로그에 있는지다. 카탈로그에서 빠졌지만 내 연결이 `DISCONNECTED` 가 아닌 커넥터는 `available: false`, 빈 `fields`, 빈 `description` 으로 함께 낸다. 이때 `title` 은 커넥터 번호다. 화면이 해제하러 들어갈 길을 남기기 위해서다
+- 목록의 `available` 은 그 커넥터가 지금 카탈로그에 있는지다. 카탈로그에서 빠졌지만 내 연결이 `DISCONNECTED` 가 아닌 커넥터는 `available: false`, 빈 `fields`, 빈 `description`, null `icon` 과 `link` 로 함께 낸다. 이때 `title` 은 커넥터 번호다. 화면이 해제하러 들어갈 길을 남기기 위해서다
 - `values` 의 키는 그 커넥터의 `fields[].key` 만 받는다. 모르는 키, 필수 칸 누락, `pattern` 불일치는 `VALIDATION_FAILED` 다. 비밀이 아닌 칸의 값은 500자까지, 비밀 칸의 값은 4096자까지다. 저장할 칸 값 전체가 `fields` 열에 들어가지 않아도 같은 오류다. 외부에 반영하기 전에 검사한다
 - 선택지와 확인은 후보 값을 저장하지 않고 응답에 되돌려 담지 않는다
 - 외부 설치, 확인, 해제가 실패하면 `CONNECTOR_OPERATION_FAILED`(502) 다

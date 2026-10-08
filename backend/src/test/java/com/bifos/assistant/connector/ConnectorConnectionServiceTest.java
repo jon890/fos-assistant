@@ -49,6 +49,7 @@ import com.bifos.assistant.hermes.HermesConnectorClient.InstallResult;
 import com.bifos.assistant.hermes.HermesConnectorClient.ProbeResult;
 import com.bifos.assistant.hermes.HermesToolsetClient;
 import com.bifos.assistant.hermes.dto.CallResult;
+import com.bifos.assistant.hermes.dto.ConnectorAppearance;
 import com.bifos.assistant.hermes.dto.ConnectorCallError;
 import com.bifos.assistant.hermes.dto.ConnectorField;
 import com.bifos.assistant.hermes.dto.ConnectorFieldOptions;
@@ -544,13 +545,48 @@ class ConnectorConnectionServiceTest {
                                 PIN,
                                 "검사용 번호",
                                 "",
+                                ConnectorAppearance.NONE,
                                 service.catalog(other).get(0).fields(),
                                 List.of(),
                                 ConnectionStatus.DISCONNECTED,
                                 true,
                                 List.of()),
                         new ConnectorSummary(
-                                DEMO, DEMO, "", List.of(), List.of(), ConnectionStatus.READY, false, List.of()));
+                                DEMO,
+                                DEMO,
+                                "",
+                                ConnectorAppearance.NONE,
+                                List.of(),
+                                List.of(),
+                                ConnectionStatus.READY,
+                                false,
+                                List.of()));
+    }
+
+    @Test
+    @DisplayName("카탈로그 항목은 커넥터 선언의 아이콘과 링크를 그대로 싣는다")
+    void catalogCarriesManifestAppearance() {
+        CurrentUser user = user(UserRole.MEMBER, 1L);
+        ConnectorAppearance appearance =
+                new ConnectorAppearance("data:image/png;base64,iVBORw0KGgo=", "https://notes.example.test/");
+        when(connector.readCatalog())
+                .thenReturn(List.of(new ConnectorManifest(
+                        PIN,
+                        PIN_MANIFEST.title(),
+                        PIN_MANIFEST.description(),
+                        PIN_MANIFEST.fields(),
+                        PIN_MANIFEST.verifyTool(),
+                        PIN_MANIFEST.mcpServer(),
+                        List.of(),
+                        false,
+                        1,
+                        List.of(),
+                        List.of(),
+                        appearance)));
+
+        assertThat(service.catalog(user))
+                .extracting(ConnectorSummary::appearance)
+                .containsExactly(appearance);
     }
 
     @Test

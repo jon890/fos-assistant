@@ -79,10 +79,18 @@ public final class ConnectionDtos {
         }
     }
 
+    /**
+     * 카탈로그의 커넥터 하나와 내 연결 상태다.
+     *
+     * @param icon 검증을 통과한 아이콘의 data URL. 없거나 틀렸으면 null
+     * @param link 검증을 통과한 {@code https://} 링크. 없거나 틀렸으면 null
+     */
     public record ConnectorView(
             String id,
             String title,
             String description,
+            String icon,
+            String link,
             List<ConnectorFieldView> fields,
             List<ConnectorToolView> tools,
             String myStatus,
@@ -93,6 +101,8 @@ public final class ConnectionDtos {
                     value.id(),
                     value.title(),
                     value.description(),
+                    value.appearance().icon(),
+                    value.appearance().link(),
                     value.fields().stream().map(ConnectorFieldView::from).toList(),
                     value.tools().stream().map(ConnectorToolView::from).toList(),
                     value.myStatus().name(),

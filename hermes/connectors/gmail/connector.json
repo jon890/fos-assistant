@@ -3,6 +3,8 @@
   "id": "gmail",
   "title": "Gmail",
   "description": "Gmail 의 메일과 라벨, 필터를 읽고 승인한 초안, 메일, 라벨과 필터를 만듭니다.",
+  "icon": "icon.svg",
+  "link": "https://mail.google.com/",
   "fields": [
     { "key": "client_id", "env": "GMAIL_OAUTH_CLIENT_ID", "label": "OAuth 클라이언트 ID",
       "description": "Google Cloud 콘솔의 「사용자 인증 정보」 에서 만든 데스크톱 앱 클라이언트의 ID 입니다.",
