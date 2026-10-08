@@ -49,4 +49,5 @@ description: 토스증권 계좌와 시세를 읽는다. 주문하지 않는다.
 - `TOSSINVEST_UNAUTHORIZED`: client 값이 바뀌었거나 철회됐다. 연결 화면에서 다시 등록하라고 안내한다
 - `TOSSINVEST_ACCOUNT_NOT_FOUND`: 연결한 계좌를 찾지 못했다. 연결 화면에서 계좌를 다시 골라 달라고 안내한다
 - `TOSSINVEST_INVALID_INPUT`: 종목 기호나 인자를 확인한다
+- `TOSSINVEST_TOO_MANY_ORDERS`: 파일 출력이 2,000건을 넘었다. 기간을 나눠 다시 파일로 받고 스크립트에서 합친다
 - `TOSSINVEST_RATE_LIMITED`, `TOSSINVEST_NETWORK`, `TOSSINVEST_UNAVAILABLE`: 잠시 뒤 다시 시도한다

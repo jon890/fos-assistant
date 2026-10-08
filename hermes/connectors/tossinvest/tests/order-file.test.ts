@@ -1,10 +1,10 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { mkdtemp, readdir, readFile, rm, symlink, utimes, writeFile } from "node:fs/promises";
+import { mkdtemp, open, readdir, readFile, rm, symlink, utimes, writeFile, type FileHandle } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { basename, join } from "node:path";
 import { Tossinvest } from "../src/client.ts";
 import { orderQuery } from "../src/orders.ts";
-import { writeOrdersFile, type OrderFileTiming } from "../src/order-file.ts";
+import { writeOrdersFile, type OrderFileHooks } from "../src/order-file.ts";
 import { createTossinvestServer } from "../src/server.ts";
 import {
   FakeToss,
@@ -78,20 +78,39 @@ function pages(sizes: number[]) {
 let directory: string;
 let fake: FakeToss;
 let sleeps: number[];
-let timing: OrderFileTiming;
+let hooks: OrderFileHooks;
 
 beforeEach(async () => {
   directory = await mkdtemp(join(tmpdir(), "tossinvest-orders-"));
   fake = new FakeToss();
   sleeps = [];
-  timing = {
+  hooks = {
     now: () => fixedNow,
     sleep: async (ms) => {
       sleeps.push(ms);
     },
     random: () => "0badf00d",
+    open: (path) => open(path, "wx"),
   };
 });
+
+/** 실제 임시 파일을 열되 `method` 의 첫 호출만 실패하게 한다. 그 뒤는 실제로 닫혀 fd 가 새지 않는다. */
+function failingOnce(method: "appendFile" | "datasync" | "close"): OrderFileHooks["open"] {
+  let failed = false;
+  return async (path) => {
+    const handle = await open(path, "wx");
+    return new Proxy(handle, {
+      get(target, property) {
+        if (property === method && !failed) {
+          failed = true;
+          return () => Promise.reject(new Error("fake-io-failure"));
+        }
+        const field = Reflect.get(target, property) as unknown;
+        return typeof field === "function" ? (field as Function).bind(target) : field;
+      },
+    }) as FileHandle;
+  };
+}
 
 afterEach(async () => {
   fake.stop();
@@ -104,10 +123,11 @@ const env = (outputDir: string | undefined) => ({
   TOSSINVEST_OUTPUT_DIR: outputDir,
 });
 
-const client = () => new Tossinvest({ apiBase: fake.url, env: env(directory) });
+const client = (seq = accountSeq) =>
+  new Tossinvest({ apiBase: fake.url, env: { ...env(directory), TOSSINVEST_ACCOUNT_SEQ: seq } });
 
 const write = (input: Record<string, string>, dir = directory) =>
-  writeOrdersFile(client(), dir, orderQuery(input), timing);
+  writeOrdersFile(client(), dir, orderQuery(input), hooks);
 
 async function expectCode(code: string, work: Promise<unknown>) {
   await expect(work).rejects.toMatchObject({ code });
@@ -328,6 +348,49 @@ describe("list_orders output=file", () => {
     expect(fake.seen("GET", "/api/v1/orders")).toHaveLength(3);
     expect(sleeps).toEqual([250, 1000]);
     expect(await ownFiles()).toEqual([]);
+  });
+
+  test.each(["appendFile", "datasync", "close"] as const)(
+    "임시 파일의 %s 가 실패하면 TOSSINVEST_OUTPUT_UNAVAILABLE 이고 파일이 남지 않는다",
+    async (method) => {
+      hooks.open = failingOnce(method);
+      fake.on("GET", "/api/v1/orders", { result: { orders: orders(0, 3), hasNext: false } });
+      await expectCode("TOSSINVEST_OUTPUT_UNAVAILABLE", write({ status: "CLOSED" }));
+      expect(await ownFiles()).toEqual([]);
+    },
+  );
+
+  test("계좌 순번이 틀리면 디렉터리를 만지기 전에 TOSSINVEST_ACCOUNT_NOT_FOUND 로 끝난다", async () => {
+    const expired = join(directory, "orders-20291231T000000Z-aaaaaaaa.jsonl");
+    await writeFile(expired, "old\n");
+    const seconds = (fixedNow.getTime() - 25 * HOUR_MS) / 1000;
+    await utimes(expired, seconds, seconds);
+    await expectCode(
+      "TOSSINVEST_ACCOUNT_NOT_FOUND",
+      writeOrdersFile(client("seq-7"), directory, orderQuery({ status: "CLOSED" }), hooks),
+    );
+    expect(fake.requests).toHaveLength(0);
+    expect(await readdir(directory)).toEqual([basename(expired)]);
+    expect(await readFile(expired, "utf8")).toBe("old\n");
+  });
+
+  test("시작부터 50초가 지나면 다음 쪽을 부르지 않고 TOSSINVEST_UNAVAILABLE 로 끝나며 파일이 남지 않는다", async () => {
+    fake.routes.set("GET /api/v1/orders", pages([100, 100, 7]));
+    let calls = 0;
+    // 첫 호출은 시작 시각이고, 그 뒤는 50초에서 1ms 지난 시각이다.
+    hooks.now = () => (calls++ === 0 ? fixedNow : new Date(fixedNow.getTime() + 50_001));
+    await expectCode("TOSSINVEST_UNAVAILABLE", write({ status: "CLOSED" }));
+    expect(fake.seen("GET", "/api/v1/orders")).toHaveLength(1);
+    expect(await ownFiles()).toEqual([]);
+  });
+
+  test("정확히 50초까지는 다음 쪽을 부른다", async () => {
+    fake.routes.set("GET /api/v1/orders", pages([100, 7]));
+    let calls = 0;
+    hooks.now = () => (calls++ === 0 ? fixedNow : new Date(fixedNow.getTime() + 50_000));
+    const result = await write({ status: "CLOSED" });
+    expect(result.count).toBe(107);
+    expect(fake.seen("GET", "/api/v1/orders")).toHaveLength(2);
   });
 
   test("서비스 오류로 중간에 끊기면 그 코드로 끝나고 파일이 남지 않는다", async () => {

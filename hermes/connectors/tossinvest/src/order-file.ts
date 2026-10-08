@@ -1,7 +1,8 @@
-import { link, lstat, open, readdir, unlink } from "node:fs/promises";
+import { link, lstat, open, readdir, unlink, type FileHandle } from "node:fs/promises";
 import { join } from "node:path";
 import type { Tossinvest } from "./client.ts";
 import {
+  ORDER_FILE_DEADLINE_MS,
   ORDER_FILE_MAX_PAGES,
   ORDER_FILE_PAGE_PAUSE_MS,
   ORDER_FILE_RATE_LIMIT_PAUSE_MS,
@@ -11,12 +12,14 @@ import {
 import { TossinvestError } from "./errors.ts";
 import { isObject, orderRow } from "./orders.ts";
 
-/** 시각, 쉼, 난수다. 시험은 이것을 고정해 쉼 없이 돌린다. */
-export interface OrderFileTiming {
+/** 시각, 쉼, 난수, 임시 파일 열기다. 시험은 이것을 고정해 쉼 없이 돌리고, 파일 쓰기의 실패를 흉내 낸다. */
+export interface OrderFileHooks {
   now: () => Date;
   sleep: (ms: number) => Promise<void>;
   /** 파일 이름 꼬리에 붙는 8자 hex 다. */
   random: () => string;
+  /** 임시 파일을 새로 만든다. 이미 있으면(링크 포함) 실패해야 한다. */
+  open: (path: string) => Promise<FileHandle>;
 }
 
 export interface OrderFileResult {
@@ -35,10 +38,11 @@ const hex8 = () =>
     byte.toString(16).padStart(2, "0"),
   ).join("");
 
-export const defaultTiming: OrderFileTiming = {
+export const defaultHooks: OrderFileHooks = {
   now: () => new Date(),
   sleep: (ms) => Bun.sleep(ms),
   random: hex8,
+  open: (path) => open(path, "wx"),
 };
 
 const unavailable = () => new TossinvestError("TOSSINVEST_OUTPUT_UNAVAILABLE");
@@ -87,7 +91,7 @@ async function removeExpired(directory: string, now: Date) {
 async function fetchPage(
   client: Tossinvest,
   query: URLSearchParams,
-  timing: OrderFileTiming,
+  hooks: OrderFileHooks,
 ): Promise<Record<string, any>> {
   const call = () => client.request("/api/v1/orders", { query, account: true });
   let data: any;
@@ -96,7 +100,7 @@ async function fetchPage(
   } catch (error) {
     if (!(error instanceof TossinvestError) || error.code !== "TOSSINVEST_RATE_LIMITED")
       throw error;
-    await timing.sleep(ORDER_FILE_RATE_LIMIT_PAUSE_MS);
+    await hooks.sleep(ORDER_FILE_RATE_LIMIT_PAUSE_MS);
     data = await call();
   }
   return isObject(data?.result) ? data.result : {};
@@ -105,24 +109,27 @@ async function fetchPage(
 /**
  * 기간 전체의 주문을 JSON Lines 파일 하나로 쓰고 경로와 건수, 기간, 칸 목록만 돌려준다.
  * 끝난 주문은 100건씩 최대 20쪽을 돌고, 미체결은 한 번에 전량이다. 어떤 실패든 임시 파일을 지우고 일부만 쓴 파일을 남기지 않는다.
+ * 시작부터 `ORDER_FILE_DEADLINE_MS` 가 지나면 다음 쪽을 부르지 않고 `TOSSINVEST_UNAVAILABLE` 로 끝낸다.
  */
 export async function writeOrdersFile(
   client: Tossinvest,
   directory: string,
   query: URLSearchParams,
-  timing: OrderFileTiming = defaultTiming,
+  hooks: OrderFileHooks = defaultHooks,
 ): Promise<OrderFileResult> {
+  // 계좌 순번이 틀리면 요청도 못 하므로 디렉터리를 만지기 전에 거절한다.
+  client.accountSeq();
   await ensureDirectory(directory);
-  const now = timing.now();
-  await removeExpired(directory, now);
+  const started = hooks.now();
+  await removeExpired(directory, started);
 
   // 이름은 커넥터가 정한다. 임시 파일은 `wx` 로 새로 만들고, 최종 이름은 `link` 로 만들어 기존 파일을 덮지 않는다.
-  const tail = `${stamp(now)}-${timing.random()}`;
+  const tail = `${stamp(started)}-${hooks.random()}`;
   const temp = join(directory, `.orders-${tail}.tmp`);
   const file = join(directory, `orders-${tail}.jsonl`);
-  let handle;
+  let handle: FileHandle;
   try {
-    handle = await open(temp, "wx");
+    handle = await hooks.open(temp);
   } catch {
     throw unavailable();
   }
@@ -133,11 +140,12 @@ export async function writeOrdersFile(
   let count = 0;
   try {
     for (let pages = 1; ; pages += 1) {
-      const data = await fetchPage(client, page, timing);
+      const data = await fetchPage(client, page, hooks);
       const orders = Array.isArray(data.orders) ? data.orders.filter(isObject) : [];
       const lines = orders.map((row) => `${JSON.stringify(orderRow(row))}\n`).join("");
       try {
-        if (lines) await handle.write(lines);
+        // `write` 는 일부만 쓰고 돌아올 수 있다. `appendFile` 은 전체를 쓸 때까지 반복한다.
+        if (lines) await handle.appendFile(lines);
       } catch {
         throw unavailable();
       }
@@ -148,10 +156,15 @@ export async function writeOrdersFile(
       if (typeof data.nextCursor !== "string" || data.nextCursor === "")
         throw new TossinvestError("TOSSINVEST_UNAVAILABLE");
       page.set("cursor", data.nextCursor);
-      await timing.sleep(ORDER_FILE_PAGE_PAUSE_MS);
+      await hooks.sleep(ORDER_FILE_PAGE_PAUSE_MS);
+      // 승인 호출의 60초 제한 안에 끝내지 못할 쪽은 부르지 않는다.
+      if (hooks.now().getTime() - started.getTime() > ORDER_FILE_DEADLINE_MS)
+        throw new TossinvestError("TOSSINVEST_UNAVAILABLE");
     }
-    await handle.close();
+    // 최종 이름을 만들기 전에 내용이 디스크에 닿게 한다. 닫기가 실패하면 쓰기가 끝났다고 볼 수 없다.
     try {
+      await handle.datasync();
+      await handle.close();
       await link(temp, file);
     } catch {
       throw unavailable();

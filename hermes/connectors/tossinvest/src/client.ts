@@ -201,8 +201,8 @@ export class Tossinvest {
     if (this.cached?.value === token) this.cached = null;
   }
 
-  /** 고른 계좌 순번이다. 비었거나 형식이 틀리면 요청하기 전에 거절한다. */
-  private accountSeq(): string {
+  /** 고른 계좌 순번이다. 비었거나 형식이 틀리면 요청하기 전에 거절한다. 파일 출력은 디렉터리를 만지기 전에 이것을 먼저 부른다. */
+  accountSeq(): string {
     const seq = this.env.TOSSINVEST_ACCOUNT_SEQ ?? "";
     if (!ACCOUNT_SEQ.test(seq))
       throw new TossinvestError("TOSSINVEST_ACCOUNT_NOT_FOUND");
