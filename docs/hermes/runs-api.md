@@ -292,3 +292,17 @@ Hermes 는 도구를 실행했다는 로그를 남기지만 사건 스트림은 
 Control Plane 은 한 번에 받는 경로에서도 스트림을 연다([ADR-090](../adr/ADR-090-한-번에-받는-경로도-hermes-사건-스트림을-열어-도구-사건을-남긴다.md)).
 
 가짜 Hermes 는 허용된 커넥터 도구 호출을 위 모양(`run_id`, `timestamp`, 시작의 인자 `preview`, 완료의 결과 `preview`)으로 흘린다.
+
+## session 을 지우는 경로
+
+v2026.9.24 소스에서 확인했다. API server 가 `DELETE /api/sessions/{session_id}` 를 연다(`gateway/platforms/api_server.py` 의 `_handle_delete_session`).
+`/p/<profile>/` 접두로 부르면 그 profile 의 `state.db` 에서 지운다.
+
+| 무엇 | 동작 |
+| --- | --- |
+| 응답 | 200 `{"object": "hermes.session.deleted", "id": ..., "deleted": true}`. 모르는 session 은 404 `session_not_found` 다 |
+| 함께 지우는 것 | 그 session 의 메시지와 위임으로 만든 자식 session(`delegate_task`)이 한 쓰기 트랜잭션에서 지워진다(`hermes_state_sessions.py` 의 `delete_session`) |
+| 남는 것 | 압축과 분기로 이어진 자식 session 은 지우지 않고 부모 칸만 비운다. `sessions_dir` 없이 부르므로 `sessions/` 아래 기록 파일과 요청 덤프(`request_dump_<session>_*.json`)도 남는다 |
+| 인증 | 그 profile 의 key 를 `Authorization: Bearer` 로 보낸다. 실행 경로와 같다 |
+
+Control Plane 은 지운 대화를 정리할 때 이 경로를 부른다. 근거는 [ADR-20261008 / conversation-purge](../adr/ADR-20261008-conversation-purge.md) 에 있다.

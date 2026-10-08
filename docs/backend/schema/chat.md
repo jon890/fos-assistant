@@ -22,6 +22,7 @@
 | `model_tier` | VARCHAR(16) NULL | 이 대화에서 고른 모델 단계 |
 | `updated_at` | DATETIME(6) | 목록 정렬에 쓴다. 같은 값이면 `id` 가 큰 쪽이 앞이다 |
 | `deleted_at` | DATETIME(6) NULL | 사용자가 지운 시각. 채워지면 목록과 조회와 보내기에서 없는 대화와 같다 |
+| `purged_at` | DATETIME(6) NULL | 지운 대화의 본문을 정리 작업이 실제로 지운 시각. 이때 `title` 과 두 session 칸을 비운다. 채워진 대화에는 메시지를 저장하지 않는다. 근거는 [ADR-20261008 / conversation-purge](../../adr/ADR-20261008-conversation-purge.md) |
 | `auto_turn_count` | INT NOT NULL DEFAULT 0 | 마지막 사용자 질문 뒤로 Control Plane 이 위임 결과를 전하려고 연 turn 수. 사용자 질문을 저장할 때 0 으로 돌린다. `assistant.delegation-wake.max-auto-turns`(기본 10)에 닿으면 더 깨우지 않는다 |
 | `purpose` | VARCHAR(16) NOT NULL DEFAULT 'CHAT' | `CHAT` 은 보통 대화, `CHECK` 는 먼저 살펴보기의 점검 대화다. 만들 때 정하고 바뀌지 않는다. 사용자와 에이전트마다 지우지 않은 점검 대화 가운데 `id` 가 가장 큰 것을 쓴다([`proactive-check.md`](../proactive-check.md)) |
 | `task_id` | BIGINT NULL | 이 대화를 만든 예약 작업. 사용자가 연 대화는 비어 있다. 외래 키를 두지 않는다. 뜻은 [`task.md`](task.md) 의 「conversation 에 더하는 칸」 |
@@ -30,6 +31,7 @@
 
 색인은 `(user_id, deleted_at, updated_at, id)` 다(V51). 점검 대화를 찾는 `(user_id, agent_id, purpose)` 도 있다(V69). 목록이 사용자의 지우지 않은 대화를 `updated_at desc, id desc` 로 쪽마다 읽는다.
 지운 대화가 쌓여도 한 쪽을 읽는 줄 수가 쪽 크기에 머문다.
+정리 작업이 지웠지만 본문이 남은 대화를 찾는 `(purged_at, deleted_at)` 도 있다.
 
 **`agent_id` 에 FK 를 두지 않는다.** 칸도 NULL 을 받는다(V4 가 칸을 더하며 그렇게 만들었다).
 에이전트를 지우는 것은 `deleted_at` 을 적는 것이라 정상 경로에서는 행이 사라지지 않는다.
@@ -129,12 +131,14 @@ turn 이 도는 동안 사용자가 보낸 메시지 하나가 한 행이다. �
 | `deleted_at` | DATETIME(6) NULL | 파일을 실제로 지운 시각. 비어 있으면 아직 있다 |
 | `created_at` | DATETIME(6) | |
 
-**행을 지우지 않는다.** 파일을 지우고 `deleted_at` 만 적는다.
+**보관 기간으로는 행을 지우지 않는다.** 파일을 지우고 `deleted_at` 만 적는다.
 그래야 지난 대화를 열었을 때 그 자리에 사진이 있었다는 것이 남고,
 화면이 「보관 기간이 지나 볼 수 없습니다」를 보일 수 있다.
 
 `deleted_at` 이 비어 있는지가 볼 수 있는지를 정한다. `expires_at` 은 언제 지울지만 정한다.
 둘로 판정하면 지우는 일이 늦었을 때 화면과 디스크가 어긋난다.
+
+사용자가 대화를 지우면 정리 작업이 그 대화의 첨부 파일과 행을 함께 지운다. 지운 대화는 다시 열 수 없어 자리를 남길 까닭이 없다.
 
 `message_id` 가 비어 있는 행은 올렸지만 보내지 않은 것이다.
 그 행도 `expires_at` 이 지나면 함께 지운다.
@@ -165,7 +169,7 @@ turn 이 도는 동안 사용자가 보낸 메시지 하나가 한 행이다. �
 `(message_id, path)` 에 유일 제약이 있다. 같은 파일을 다음 turn 이 다시 고치면 그 turn 의 답에 새 행이 생긴다.
 화면은 답마다 그 답의 행을 보인다. 파일은 하나이므로 옛 답에서 열어도 지금 내용이 보인다.
 
-**행을 지우지 않는다.** 첨부와 같다. 파일이 지워지면 `deleted_at` 을 적어 화면이 「보관 기간이 지나 볼 수 없습니다」를 보인다.
+**보관 기간으로는 행을 지우지 않는다.** 첨부와 같다. 사용자가 대화를 지우면 정리 작업이 폴더와 행을 함께 지운다. 파일이 지워지면 `deleted_at` 을 적어 화면이 「보관 기간이 지나 볼 수 없습니다」를 보인다.
 근거는 [ADR-027](../../adr/ADR-027-에이전트가-만든-html-은-대화별-폴더에-두고-스크립트-없이-보인다.md) 에 있다.
 지운 뒤 표시에 실패한 행을 다시 맞추는 규칙은 [`docs/backend/artifact.md`](../artifact.md) 의 「지운 표시를 다시 맞추기」 가 갖는다.
 
