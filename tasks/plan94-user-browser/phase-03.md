@@ -45,7 +45,7 @@
 
 ### 3. 받는 쪽
 
-- `browser.presentation.BrowserGatewaySocketConfig`(신규 `@Configuration @EnableWebSocket`, `WebSocketConfigurer`): `registry.addHandler(handler, "/internal/browser-gateway/**")`(devtools 경로가 아니면 handshake 가 빈 404 로 거절한다).addInterceptors(handshake).setAllowedOriginPatterns("*")`
+- `browser.presentation.BrowserGatewaySocketConfig`(신규 `@Configuration @EnableWebSocket`, `WebSocketConfigurer`): `registry.addHandler(handler, "/internal/browser-gateway/**").addInterceptors(handshake).setAllowedOriginPatterns("*")`. devtools 경로가 아니면 handshake 가 빈 404 로 거절한다
 - `browser.presentation.BrowserGatewayHandshake`(신규 `HandshakeInterceptor`): `Origin` 이 있으면 403. 경로가 `/internal/browser-gateway/<표식>/devtools/<종류>/<번호>` 모양인지 보고 표식, 종류(`page`, `browser`), 번호(`^[A-Za-z0-9-]{1,128}$`)를 꺼낸다. 모양이 틀리면(다른 하위 경로 포함) 404. `gateway.open(token)` 이 던지면 phase 02 의 표로 상태를 정한다. 통과하면 `GatewayTarget` 과 종류와 번호를 세션 속성에 둔다. 응답 본문은 비운다
 - `browser.presentation.BrowserGatewaySocket`(신규 `AbstractWebSocketHandler`):
   - `supportsPartialMessages()` 참
