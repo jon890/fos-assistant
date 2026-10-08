@@ -6,12 +6,26 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import com.bifos.assistant.browser.domain.CdpRelay;
 import com.bifos.assistant.browser.domain.CdpRelayListener;
 import com.bifos.assistant.browser.infra.WebSocketCdpConnectorTest.FakeCdpServer;
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.io.OutputStream;
+import java.net.InetAddress;
+import java.net.InetSocketAddress;
+import java.net.ServerSocket;
+import java.net.Socket;
 import java.net.URI;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.time.Duration;
+import java.util.Base64;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -21,6 +35,7 @@ import org.junit.jupiter.api.Test;
 class WebSocketCdpRelayConnectorTest {
 
     private static final String BROWSER_ID = "0a1b2c3d-1111-2222-3333-444455556666";
+    private static final Duration SHORT_SEND_TIMEOUT = Duration.ofMillis(300);
 
     private FakeCdpServer server;
     private WebSocketCdpRelayConnector connector;
@@ -88,8 +103,32 @@ class WebSocketCdpRelayConnectorTest {
         assertThat(listener.closedOnce.await(2, TimeUnit.SECONDS)).isTrue();
         assertThatThrownBy(() -> relay.send("{}", true)).isInstanceOf(IllegalStateException.class);
         relay.close();
-        Thread.sleep(200);
-        assertThat(listener.closed.get()).isEqualTo(1);
+        assertThat(server.awaitDisconnected()).as("서버 쪽 끊김").isTrue();
+        assertThat(listener.closed.get()).as("닫힘 알림 수").isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("Chrome 쪽이 읽지 않아 보내기가 정한 시간 안에 끝나지 않으면 보내기가 실패한다")
+    void sendFailsWhenChromeStopsReading() throws Exception {
+        WebSocketCdpRelayConnector slow = new WebSocketCdpRelayConnector(SHORT_SEND_TIMEOUT);
+        try (SilentServer silent = new SilentServer()) {
+            CompletableFuture<Void> accepted = silent.acceptAsync();
+            CdpRelay relay = slow.open(silent.address(), "page", "PAGE1", new Recording());
+            accepted.get(2, TimeUnit.SECONDS);
+            // 소켓 버퍼를 넘는 조각이라 상대가 읽지 않으면 보내기가 끝나지 않는다
+            String fragment = "a".repeat(16 * 1024 * 1024);
+
+            long started = System.nanoTime();
+            assertThatThrownBy(() -> relay.send(fragment, true))
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasCauseInstanceOf(TimeoutException.class);
+            Duration elapsed = Duration.ofNanos(System.nanoTime() - started);
+
+            assertThat(elapsed).as("실패하기까지 걸린 시간").isLessThan(Duration.ofSeconds(5));
+            relay.close();
+        } finally {
+            slow.close();
+        }
     }
 
     @Test
@@ -133,6 +172,64 @@ class WebSocketCdpRelayConnectorTest {
         CdpRelay relay = connector.open(server.address(), kind, id, listener);
         accepted.get(2, TimeUnit.SECONDS);
         return relay;
+    }
+
+    /** handshake 만 받고 아무것도 읽지 않는 WebSocket 서버다. 멈춘 Chrome 을 흉내 낸다. */
+    private static final class SilentServer implements AutoCloseable {
+
+        private static final String GUID = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
+
+        private final ServerSocket server;
+        private volatile Socket socket;
+
+        SilentServer() throws IOException {
+            server = new ServerSocket();
+            // 받는 창을 작게 두어 읽지 않으면 곧 보내기가 막히게 한다
+            server.setReceiveBufferSize(4096);
+            server.bind(new InetSocketAddress(InetAddress.getLoopbackAddress(), 0), 1);
+        }
+
+        URI address() {
+            return URI.create("http://127.0.0.1:" + server.getLocalPort());
+        }
+
+        CompletableFuture<Void> acceptAsync() {
+            return CompletableFuture.runAsync(() -> {
+                try {
+                    socket = server.accept();
+                    handshake(socket);
+                } catch (IOException | NoSuchAlgorithmException ex) {
+                    throw new IllegalStateException(ex);
+                }
+            });
+        }
+
+        @Override
+        public void close() throws IOException {
+            if (socket != null) {
+                socket.close();
+            }
+            server.close();
+        }
+
+        private static void handshake(Socket socket) throws IOException, NoSuchAlgorithmException {
+            BufferedReader in =
+                    new BufferedReader(new InputStreamReader(socket.getInputStream(), StandardCharsets.US_ASCII));
+            String key = null;
+            for (String line = in.readLine(); line != null && !line.isEmpty(); line = in.readLine()) {
+                if (line.toLowerCase().startsWith("sec-websocket-key:")) {
+                    key = line.substring(line.indexOf(':') + 1).trim();
+                }
+            }
+            String accept = Base64.getEncoder()
+                    .encodeToString(MessageDigest.getInstance("SHA-1")
+                            .digest((key + GUID).getBytes(StandardCharsets.US_ASCII)));
+            OutputStream out = socket.getOutputStream();
+            out.write(("HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\n"
+                            + "Sec-WebSocket-Accept: " + accept + "\r\n\r\n")
+                    .getBytes(StandardCharsets.US_ASCII));
+            out.flush();
+        }
     }
 
     private record Fragment(String text, boolean last) {}

@@ -7,6 +7,7 @@ import com.bifos.assistant.browser.application.model.GatewayTarget;
 import com.bifos.assistant.shared.auth.UserAccessPolicy;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
+import java.time.Duration;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -59,6 +60,11 @@ public class BrowserGateway {
     /** 중계 연결이 열려 있는 동안 쥐는 핸들이다. 쥐고 있는 동안 자동 중지하지 않는다. WebSocket 이 쓴다. */
     public BrowserUsageHandle hold(GatewayTarget target) {
         return usage.open(target.browserId());
+    }
+
+    /** 중계 연결이 이만큼 아무것도 주고받지 않으면 닫는다. 반쯤 끊긴 연결이 {@link #hold} 의 핸들을 계속 쥐지 않게 한다. */
+    public Duration idleTimeout() {
+        return browsers.idleTimeout();
     }
 
     /** 중계로 메시지가 오갔다. 1분에 한 번까지 활동을 기록한다. */

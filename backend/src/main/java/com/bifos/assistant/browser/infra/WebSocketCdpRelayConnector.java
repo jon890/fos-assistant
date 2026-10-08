@@ -18,6 +18,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.regex.Pattern;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 /**
@@ -40,6 +41,16 @@ public class WebSocketCdpRelayConnector implements CdpRelayConnector, AutoClosea
 
     private final HttpClient client =
             HttpClient.newBuilder().connectTimeout(CONNECT_TIMEOUT).build();
+    private final Duration sendTimeout;
+
+    @Autowired
+    public WebSocketCdpRelayConnector() {
+        this(SEND_TIMEOUT);
+    }
+
+    WebSocketCdpRelayConnector(Duration sendTimeout) {
+        this.sendTimeout = sendTimeout;
+    }
 
     @Override
     public CdpRelay open(URI cdp, String kind, String id, CdpRelayListener listener) {
@@ -53,7 +64,7 @@ public class WebSocketCdpRelayConnector implements CdpRelayConnector, AutoClosea
             throw new IllegalArgumentException("cdp address is not valid");
         }
         URI address = URI.create("ws://" + cdp.getRawAuthority() + "/devtools/" + kind + "/" + id);
-        Relay relay = new Relay(listener);
+        Relay relay = new Relay(listener, sendTimeout);
         CompletableFuture<WebSocket> opening =
                 client.newWebSocketBuilder().connectTimeout(CONNECT_TIMEOUT).buildAsync(address, relay);
         try {
@@ -89,6 +100,7 @@ public class WebSocketCdpRelayConnector implements CdpRelayConnector, AutoClosea
     private static final class Relay implements WebSocket.Listener, CdpRelay {
 
         private final CdpRelayListener listener;
+        private final Duration sendTimeout;
         private final AtomicBoolean ended = new AtomicBoolean();
 
         private volatile WebSocket socket;
@@ -157,7 +169,7 @@ public class WebSocketCdpRelayConnector implements CdpRelayConnector, AutoClosea
                 throw new IllegalStateException("cdp relay is closed");
             }
             try {
-                socket.sendText(fragment, last).get(SEND_TIMEOUT.toMillis(), TimeUnit.MILLISECONDS);
+                socket.sendText(fragment, last).get(sendTimeout.toMillis(), TimeUnit.MILLISECONDS);
             } catch (InterruptedException ex) {
                 Thread.currentThread().interrupt();
                 throw new IllegalStateException("cdp relay send interrupted", ex);

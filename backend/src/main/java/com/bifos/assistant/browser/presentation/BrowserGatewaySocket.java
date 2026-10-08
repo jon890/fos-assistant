@@ -6,6 +6,7 @@ import com.bifos.assistant.browser.application.model.GatewayTarget;
 import com.bifos.assistant.browser.domain.CdpRelay;
 import com.bifos.assistant.browser.domain.CdpRelayConnector;
 import com.bifos.assistant.browser.domain.CdpRelayListener;
+import jakarta.websocket.Session;
 import java.io.IOException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.ReentrantLock;
@@ -17,6 +18,7 @@ import org.springframework.web.socket.BinaryMessage;
 import org.springframework.web.socket.CloseStatus;
 import org.springframework.web.socket.TextMessage;
 import org.springframework.web.socket.WebSocketSession;
+import org.springframework.web.socket.adapter.NativeWebSocketSession;
 import org.springframework.web.socket.handler.AbstractWebSocketHandler;
 
 /**
@@ -26,7 +28,8 @@ import org.springframework.web.socket.handler.AbstractWebSocketHandler;
  * 큰 버퍼를 잡지 않는다. 한쪽으로 가는 조각은 앞 조각을 보낸 뒤에 보낸다. 한 메시지(조각의 합)가 상한을 넘거나 바이너리 메시지가 오면 양쪽을
  * 닫는다. 한쪽이 닫히면 다른 쪽도 닫는다.
  *
- * <p>연결이 열려 있는 동안 {@link BrowserGateway#hold} 의 핸들을 쥐어 자동 중지를 막는다. 표식과 경로는 로그에 싣지 않고, 닫는 까닭은
+ * <p>연결이 열려 있는 동안 {@link BrowserGateway#hold} 의 핸들을 쥐어 자동 중지를 막는다. 아무것도 오가지 않은 채
+ * {@link BrowserGateway#idleTimeout} 이 지나면 컨테이너가 세션을 닫고 핸들도 놓는다. 표식과 경로는 로그에 싣지 않고, 닫는 까닭은
  * 종류만 남긴다.
  */
 @Slf4j
@@ -60,29 +63,59 @@ public class BrowserGatewaySocket extends AbstractWebSocketHandler {
         return true;
     }
 
+    /**
+     * 핸들을 쥐고 Chrome 쪽에 붙는다. 실패는 여기서 끝낸다. 던지면 Spring 이 표식이 든 세션 주소를 ERROR 로그에 남긴다.
+     */
     @Override
     public void afterConnectionEstablished(WebSocketSession session) {
-        GatewayTarget target = (GatewayTarget) session.getAttributes().get(BrowserGatewayHandshake.TARGET);
-        String kind = (String) session.getAttributes().get(BrowserGatewayHandshake.KIND);
-        String id = (String) session.getAttributes().get(BrowserGatewayHandshake.TARGET_ID);
-        if (target == null || kind == null || id == null) {
-            // handshake 판정을 지나지 않은 세션이다
-            closeQuietly(session, CloseStatus.SERVER_ERROR);
-            return;
-        }
-        Link link = new Link(session, target, gateway.hold(target));
-        session.getAttributes().put(LINK, link);
-        CdpRelay relay;
+        Link link = null;
         try {
-            relay = connector.open(target.cdp(), kind, id, link);
+            GatewayTarget target = (GatewayTarget) session.getAttributes().get(BrowserGatewayHandshake.TARGET);
+            String kind = (String) session.getAttributes().get(BrowserGatewayHandshake.KIND);
+            String id = (String) session.getAttributes().get(BrowserGatewayHandshake.TARGET_ID);
+            if (target == null || kind == null || id == null) {
+                // handshake 판정을 지나지 않은 세션이다
+                closeQuietly(session, CloseStatus.SERVER_ERROR);
+                return;
+            }
+            link = new Link(session, target, gateway.hold(target));
+            session.getAttributes().put(LINK, link);
+            limitIdle(session);
+            CdpRelay relay;
+            try {
+                relay = connector.open(target.cdp(), kind, id, link);
+            } catch (RuntimeException ex) {
+                log.warn(
+                        "browser gateway relay connect failed error={}",
+                        ex.getClass().getSimpleName());
+                link.close(CloseStatus.SERVER_ERROR, "connect_failed");
+                return;
+            }
+            link.attach(relay);
         } catch (RuntimeException ex) {
             log.warn(
-                    "browser gateway relay connect failed error={}",
+                    "browser gateway socket setup failed error={}",
                     ex.getClass().getSimpleName());
-            link.close(CloseStatus.SERVER_ERROR, "connect_failed");
+            if (link != null) {
+                link.close(CloseStatus.SERVER_ERROR, "setup_failed");
+            } else {
+                closeQuietly(session, CloseStatus.SERVER_ERROR);
+            }
+        }
+    }
+
+    /**
+     * 아무것도 주고받지 않는 세션을 자동 중지와 같은 유휴 시간이 지나면 닫게 한다. 반쯤 끊긴 연결이 핸들을 계속 쥐지 않게 한다. 컨테이너의
+     * 세션을 꺼내지 못하면 건너뛴다.
+     */
+    private void limitIdle(WebSocketSession session) {
+        if (!(session instanceof NativeWebSocketSession wrapper)) {
             return;
         }
-        link.attach(relay);
+        Session container = wrapper.getNativeSession(Session.class);
+        if (container != null) {
+            container.setMaxIdleTimeout(gateway.idleTimeout().toMillis());
+        }
     }
 
     @Override
