@@ -40,6 +40,21 @@ Hermes 는 MCP 도구를 `mcp__<서버>__<도구>` 로 등록한다.
 [plugin 의 직접 MCP 호출](https://github.com/NousResearch/hermes-agent/blob/v2026.9.24/hermes_cli/plugins.py#L509),
 [코드 실행 RPC](https://github.com/NousResearch/hermes-agent/blob/v2026.9.24/tools/code_execution_rpc.py#L28)
 
+## `tool_call` 의 단건 제한
+
+`v2026.9.24` 의 `tool_call` 은 `calls` 배열을 받고, 각 항목은 `name` 과 `arguments` 를 갖는다.
+로컬 MCP 도구(`mcp__...`)를 부를 때는 배열에 정확히 한 항목만 넣는다.
+같은 서버의 읽기 도구라도 여러 개를 묶지 않고 도구마다 별도 `tool_call` 로 부른다.
+로컬 도구가 섞인 다건 배열은 실제 도구 실행 전에 `exactly one entry for local tools` 오류로 거절된다.
+
+`connectors__` 이름을 쓰는 HTTP 원격 도구 서버의 호출만 묶을 수 있다.
+MCP 연결 전송 방식이 HTTP 라도 Hermes 에 로컬 도구로 등록된 `mcp__...` 는 단건 규칙을 따른다.
+두 이름을 한 배열로 섞을 수도 없다.
+
+근거는 [호출 스키마](https://github.com/NousResearch/hermes-agent/blob/v2026.9.24/tools/tool_search.py#L310-L334),
+[중계 검증](https://github.com/NousResearch/hermes-agent/blob/v2026.9.24/tools/tool_search.py#L543-L572)이다.
+Control Plane 이 이 제한을 공통 실행 지침에 싣는 범위는 [문맥 묶음](../backend/context-bundle.md#공통-실행-지침)이 갖는다.
+
 ## 막히는 것과 통과하는 것
 
 같은 stdio MCP 서버에서 실행으로 확인했다.

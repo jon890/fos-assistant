@@ -71,40 +71,87 @@ class ContextAssemblerTest {
     }
 
     @Test
-    @DisplayName("Memory 없이도 GFM 표 지침과 길이와 지문을 보낸다")
+    @DisplayName("Memory 없이도 GFM 표와 로컬 MCP 단건 호출 지침과 길이와 지문을 보낸다")
     void addsResponseInstructionsWithoutMemory() {
         AssembledContext result = assembler.withResponseInstructions(AssembledContext.empty());
 
-        assertThat(result.instructions()).contains("GFM", "| --- | --- |");
+        assertThat(result.instructions())
+                .contains(
+                        "GFM",
+                        "| --- | --- |",
+                        "tool_call",
+                        "calls 배열",
+                        "name 과 arguments",
+                        "정확히 한 항목",
+                        "같은 서버의 읽기 도구",
+                        "별도 호출",
+                        "HTTP 여도",
+                        "connectors__... HTTP 원격 도구 서버");
         assertThat(result.chars()).isEqualTo(result.instructions().length());
         assertThat(result.instructionsHash()).isNotNull();
     }
 
     @Test
-    @DisplayName("memory_remember 를 받는 실행에만 기억 지침을 표 지침 뒤에 싣는다")
+    @DisplayName("기억 여부와 관계없이 로컬 MCP 단건 호출 지침을 답변 형식 뒤에 싣는다")
     void addsMemoryInstructionsOnlyWhenRemembering() {
         AssembledContext remembering = assembler.withResponseInstructions(AssembledContext.empty(), true);
         AssembledContext plain = assembler.withResponseInstructions(AssembledContext.empty(), false);
 
         assertThat(remembering.instructions())
                 .startsWith("# 답변 형식")
-                .contains("# 기억", "memory_remember", "evidence", "작업 기록");
-        assertThat(plain.instructions()).doesNotContain("# 기억").doesNotContain("memory_remember");
+                .contains(
+                        "# 도구 호출",
+                        "calls 배열",
+                        "name 과 arguments",
+                        "같은 서버의 읽기 도구",
+                        "별도 호출",
+                        "connectors__... HTTP 원격 도구 서버",
+                        "# 기억",
+                        "memory_remember",
+                        "evidence",
+                        "작업 기록")
+                .containsSubsequence("# 답변 형식", "# 도구 호출", "# 기억");
+        assertThat(plain.instructions())
+                .contains(
+                        "# 도구 호출",
+                        "calls 배열",
+                        "name 과 arguments",
+                        "같은 서버의 읽기 도구",
+                        "별도 호출",
+                        "connectors__... HTTP 원격 도구 서버")
+                .doesNotContain("# 기억", "memory_remember");
         assertThat(assembler.withResponseInstructions(AssembledContext.empty()).instructions())
                 .isEqualTo(plain.instructions());
     }
 
     @Test
-    @DisplayName("공통 표 지침은 Memory 예산 밖에 두고 누락 항목을 보존한다")
+    @DisplayName("공통 지침은 Memory 예산 밖에 두고 본문과 누락 번호와 묶음을 보존한다")
     void keepsMemoryBudgetAndOmissionsIndependent() {
         String body = "가".repeat(8_000);
-        AssembledContext memory = new AssembledContext(body, body.length(), List.of(3L));
+        ContextBundle bundle = new ContextBundle(List.of(new ContextItem(
+                ContextSource.MEMORY_ALWAYS,
+                "memory:3",
+                MemoryScope.USER,
+                ADMIN.id(),
+                MemorySensitivity.NORMAL,
+                ContextTrust.USER_APPROVED,
+                Instant.EPOCH,
+                ContextFreshness.FRESH,
+                ContextBodyMode.INLINE,
+                List.of(),
+                "기억 제목",
+                body)));
+        AssembledContext memory = new AssembledContext(body, body.length(), List.of(3L), bundle);
 
         AssembledContext result = assembler.withResponseInstructions(memory);
 
-        assertThat(result.instructions()).startsWith("# 답변 형식").endsWith(body);
+        assertThat(result.instructions())
+                .startsWith("# 답변 형식")
+                .contains("# 도구 호출", "calls 배열", "name 과 arguments")
+                .endsWith(body);
         assertThat(result.chars()).isEqualTo(result.instructions().length()).isGreaterThan(8_000);
         assertThat(result.omittedMemoryIds()).containsExactly(3L);
+        assertThat(result.bundle()).isEqualTo(bundle);
         assertThat(result.instructionsHash()).isNotEqualTo(memory.instructionsHash());
     }
 
