@@ -9,6 +9,7 @@ import com.bifos.assistant.attention.application.model.AttentionCard;
 import com.bifos.assistant.attention.application.model.AttentionConfidence;
 import com.bifos.assistant.attention.application.model.AttentionControl;
 import com.bifos.assistant.attention.application.model.AttentionItem;
+import com.bifos.assistant.attention.application.model.AttentionProblem;
 import com.bifos.assistant.attention.application.model.AttentionView;
 import com.bifos.assistant.attention.application.model.CardStatus;
 import com.bifos.assistant.attention.domain.type.AttentionLevel;
@@ -63,6 +64,39 @@ class AttentionJudgeTest {
                 .extracting(AttentionItem::level)
                 .containsExactly(AttentionLevel.LATER);
         assertThat(card(cards, CardKey.NEEDS_ME).nowCount()).isZero();
+    }
+
+    @Test
+    @DisplayName("먼저 다룰 문제 후보의 판정 값은 항목에 그대로 실리고 다른 후보의 값은 null 이다")
+    void carriesProblemOntoItem() {
+        AttentionProblem problem = new AttentionProblem(7L, "SURFACE", "공고 요건을 정리한다");
+        AttentionCandidate surfaced = new AttentionCandidate(
+                CardKey.NEEDS_ME,
+                "autonomy_decision:7",
+                "s",
+                AttentionTrigger.PROBLEM_SURFACED,
+                false,
+                false,
+                List.of(),
+                AttentionConfidence.MODEL_INFERRED,
+                "지원 마감이 내일이다",
+                null,
+                null,
+                NOW,
+                List.of(),
+                null,
+                null,
+                null,
+                null,
+                problem);
+        AttentionCandidate plain =
+                candidate(CardKey.NEEDS_ME, "memory:1", "s", false, AttentionConfidence.MODEL_INFERRED);
+
+        List<AttentionCard> cards = judge(Map.of(CardKey.NEEDS_ME, List.of(surfaced, plain)));
+
+        assertThat(card(cards, CardKey.NEEDS_ME).items())
+                .extracting(AttentionItem::itemKey, AttentionItem::problem)
+                .containsExactlyInAnyOrder(tuple("autonomy_decision:7", problem), tuple("memory:1", null));
     }
 
     @Test

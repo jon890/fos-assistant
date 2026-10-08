@@ -22,7 +22,7 @@ import org.springframework.transaction.support.TransactionTemplate;
  * 사용자가 에이전트마다 매일 루프를 켜고 끄고 쉬게 하는 설정을 관리한다. 뜻은 {@code docs/backend/proactive-loop.md} 의 「사용자 설정」 이
  * 갖는다.
  *
- * <p>설치 설정이 꺼져 있어도 끄기와 쉬기는 받는다. 켜기만 막는다.
+ * <p>설치 설정이 꺼져 있어도 끄기와 쉬기, 이미 켠 줄을 켠 채 두는 요청은 받는다. 꺼진 줄을 켜는 요청만 막는다.
  */
 @Service
 @RequiredArgsConstructor
@@ -51,7 +51,7 @@ public class ProactiveLoopSettingService {
      */
     public LoopSettingView update(CurrentUser user, String agentCode, boolean enabled, Instant snoozedUntil) {
         Agent agent = enabled ? agents.requireStartable(user, agentCode) : agents.requireReadable(user, agentCode);
-        if (enabled && !properties.current().enabled()) {
+        if (enabled && !properties.current().enabled() && !alreadyEnabled(user.id(), agent.id())) {
             throw new ApiException(
                     ErrorCode.PROACTIVE_LOOP_UNAVAILABLE, "this installation does not enable the daily loop");
         }
@@ -66,6 +66,13 @@ public class ProactiveLoopSettingService {
             // 다른 요청이 같은 줄을 먼저 만들었다. 앞 트랜잭션은 롤백됐으므로 새 트랜잭션에서 그 줄을 다시 읽어 바꾼다.
             return transactions.execute(status -> save(user.id(), agent.id(), enabled, snooze, now));
         }
+    }
+
+    /** 이미 켠 줄을 켠 채 두는 요청은 설치 설정이 꺼져 있어도 받는다. 꺼진 줄을 켜는 요청만 막는다. */
+    private boolean alreadyEnabled(Long userId, Long agentId) {
+        return settings.findByUserIdAndAgentId(userId, agentId)
+                .map(ProactiveLoopSetting::enabled)
+                .orElse(false);
     }
 
     /** 있으면 바꾸고 없으면 만든다. 유일 제약 위반이 이 트랜잭션 안에서 드러나도록 곧바로 flush 한다. */

@@ -23,6 +23,8 @@ public enum ErrorCode {
     PROACTIVE_LOOP_UNAVAILABLE(HttpStatus.CONFLICT),
     /** 없는 보고와 다른 사용자의 보고를 같은 응답으로 숨긴다. */
     PROACTIVE_CHECK_NOT_FOUND(HttpStatus.NOT_FOUND),
+    /** 반응할 판정이 없다. 남의 판정이거나 매일 루프가 보인 판정이 아니다. */
+    AUTONOMY_DECISION_NOT_FOUND(HttpStatus.NOT_FOUND),
     /** 대기 메시지가 상한에 닿았다. 개수가 찼거나, 더하면 합친 글이 메시지 길이 상한을 넘는다. */
     PENDING_QUEUE_FULL(HttpStatus.CONFLICT),
     /** 취소하려는 대기 메시지가 이미 보내졌거나 없다. 남의 대화의 대기 메시지도 같은 응답으로 숨긴다. */

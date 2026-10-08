@@ -10,6 +10,7 @@ import com.bifos.assistant.agent.domain.type.CredentialScope;
 import com.bifos.assistant.agent.infra.AgentRepository;
 import com.bifos.assistant.proactive.application.ProactiveLoopSettingService;
 import com.bifos.assistant.proactive.application.model.LoopSettingView;
+import com.bifos.assistant.proactive.domain.ProactiveLoopSetting;
 import com.bifos.assistant.proactive.infra.ProactiveLoopSettingRepository;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.domain.type.UserRole;
@@ -27,7 +28,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
 
-/** 설치 설정 기본값(꺼짐)에서 켜기만 막고 끄기와 쉬기는 받는지 본다. */
+/** 설치 설정 기본값(꺼짐)에서 꺼진 줄을 켜는 요청만 막고 끄기, 쉬기, 이미 켠 줄을 켠 채 두는 요청은 받는지 본다. */
 @BackendIntegrationTest
 class ProactiveLoopSettingDisabledTest {
 
@@ -102,5 +103,36 @@ class ProactiveLoopSettingDisabledTest {
                     assertThat(row.enabled()).isFalse();
                     assertThat(row.snoozedUntil()).isEqualTo(snooze);
                 });
+    }
+
+    @Test
+    @DisplayName("이미 켠 줄을 켠 채 두는 요청은 설치가 루프를 열지 않아도 받고 쉬기를 저장한다")
+    void acceptsKeepingEnabledLineEnabled() {
+        settings.save(ProactiveLoopSetting.of(OWNER.id(), agent.id(), true, null, NOW));
+        Instant snooze = NOW.plus(Duration.ofDays(2));
+
+        LoopSettingView view = service.update(OWNER, agent.code(), true, snooze);
+
+        assertThat(view).isEqualTo(new LoopSettingView(false, true, snooze));
+        assertThat(settings.findByUserIdAndAgentId(OWNER.id(), agent.id()).orElseThrow())
+                .satisfies(row -> {
+                    assertThat(row.enabled()).isTrue();
+                    assertThat(row.snoozedUntil()).isEqualTo(snooze);
+                });
+    }
+
+    @Test
+    @DisplayName("꺼진 줄을 켜는 요청은 줄이 있어도 PROACTIVE_LOOP_UNAVAILABLE 로 거절하고 줄을 그대로 둔다")
+    void rejectsEnablingDisabledLine() {
+        settings.save(ProactiveLoopSetting.of(OWNER.id(), agent.id(), false, null, NOW));
+
+        assertThatThrownBy(() -> service.update(OWNER, agent.code(), true, null))
+                .isInstanceOfSatisfying(
+                        ApiException.class,
+                        ex -> assertThat(ex.code()).isEqualTo(ErrorCode.PROACTIVE_LOOP_UNAVAILABLE));
+        assertThat(settings.findByUserIdAndAgentId(OWNER.id(), agent.id())
+                        .orElseThrow()
+                        .enabled())
+                .isFalse();
     }
 }

@@ -5,6 +5,7 @@ import com.bifos.assistant.attention.application.model.AttentionExecutionRef;
 import com.bifos.assistant.attention.application.model.AttentionFollowUpRef;
 import com.bifos.assistant.attention.application.model.AttentionItem;
 import com.bifos.assistant.attention.application.model.AttentionMetric;
+import com.bifos.assistant.attention.application.model.AttentionProblem;
 import com.bifos.assistant.attention.application.model.AttentionReport;
 import com.bifos.assistant.attention.application.model.AttentionSignal;
 import com.bifos.assistant.attention.application.model.AttentionSourceRef;
@@ -138,7 +139,7 @@ public final class AttentionDtos {
     }
 
     /**
-     * 항목 하나다. 해당하지 않는 {@code execution}, {@code actionId}, {@code followUp}, {@code report} 은 null 로 낸다. 화면이 {@code itemKey}
+     * 항목 하나다. 해당하지 않는 {@code execution}, {@code actionId}, {@code followUp}, {@code report}, {@code problem} 은 null 로 낸다. 화면이 {@code itemKey}
      * 를 잘라 식별자를 얻지 않게 하려는 것이다.
      *
      * @param attention {@code NOW} 나 {@code LATER}
@@ -158,7 +159,8 @@ public final class AttentionDtos {
             ExecutionView execution,
             UUID actionId,
             FollowUpView followUp,
-            ReportView report) {
+            ReportView report,
+            ProblemView problem) {
 
         static ItemView from(AttentionItem item) {
             return new ItemView(
@@ -174,7 +176,19 @@ public final class AttentionDtos {
                     ExecutionView.from(item.execution()),
                     item.actionId(),
                     FollowUpView.from(item.followUp()),
-                    ReportView.from(item.report()));
+                    ReportView.from(item.report()),
+                    ProblemView.from(item.problem()));
+        }
+    }
+
+    /**
+     * @param level {@code SURFACE} 나 {@code ASK_APPROVAL}
+     * @param action 제안한 다음 행동 글. 모델이 쓴 글이라 평문으로 그린다. 비었을 수 있다
+     */
+    public record ProblemView(Long decisionId, String level, String action) {
+
+        static ProblemView from(AttentionProblem problem) {
+            return problem == null ? null : new ProblemView(problem.decisionId(), problem.level(), problem.action());
         }
     }
 

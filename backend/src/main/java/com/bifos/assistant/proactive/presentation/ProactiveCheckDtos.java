@@ -234,4 +234,7 @@ public final class ProactiveCheckDtos {
      * @param reaction {@code ACCEPTED}, {@code POSTPONED}, {@code DISMISSED} 가운데 하나
      */
     public record FindingReactionRequest(@NotBlank String reaction) {}
+
+    /** @param reaction {@code ACCEPTED} 나 {@code DISMISSED}. 모르는 값은 서비스가 400 으로 거절한다 */
+    public record DecisionReactionRequest(@NotBlank String reaction) {}
 }
