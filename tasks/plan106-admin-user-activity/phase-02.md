@@ -25,9 +25,9 @@
 ### 1. 로그인 완료 이벤트와 테스트
 
 `web/src/auth.ts`의 기존 signIn callback은 허용 판정만 한다. events.signIn에서 user.email이 있을 때만 새 `signin-activity.ts`의 recordSignIn(email)을 호출한다. events.session이나 jwt 일반 갱신에는 넣지 않는다.
-새 helper는 jose SignJWT로 purpose=signin, HS256, issuedAt, 2m expiry만 가진 토큰을 만들고 ASSISTANT_JWT_SECRET과 CONTROL_PLANE_BASE_URL을 실행 때 읽어 /api/v1/signin/completed에 {email}을 no-store POST한다. 일반 사용자 토큰과 이메일 subject는 넣지 않는다. 응답 실패/네트워크 실패는 던져 Auth.js EventError 로그에 남게 한다. fetch에는 5초 timeout을 주고 재시도하지 않는다. 새 파일은 Node 테스트가 직접 읽으므로 상대 경로 import 예외 목록 NODE_TEST_READ_FILES에 추가한다.
-`test/unit/signin-activity.test.ts`에서 fetch를 대역으로 바꿔 요청 주소·method·본문·no-store·timeout signal과 jwtVerify로 서명/목적/수명을 확인한다. HTTP 실패와 네트워크 실패에서 reject됨을 확인하고 env/fetch 상태를 복원한다.
-`test/unit/auth-signin.test.ts`는 TypeScript의 transpileModule과 node:vm으로 실제 auth.ts를 실행한다. require 대역은 NextAuth의 실제 설정을 회수하고 Google와 control-plane, signin-activity 의존만 대체한다. 회수한 설정의 events.signIn을 직접 호출해 이메일이 있을 때 recordSignIn에 주소가 전달되고 없으면 호출되지 않는지 확인한다. 허용 판정 callback을 부를 때는 기록되지 않고 실패 시 예외가 이벤트 경계까지 전달되는지 확인한다. auth.ts의 이벤트 연결을 지우면 이 시험이 실패해야 한다.
+새 helper는 jose SignJWT로 purpose=signin, HS256, issuedAt, 2m expiry만 가진 토큰을 만들고 ASSISTANT_JWT_SECRET과 CONTROL_PLANE_BASE_URL을 실행 때 읽어 /api/v1/signin/completed에 {email}을 no-store POST한다. 일반 사용자 토큰과 이메일 subject는 넣지 않는다. 응답 실패/네트워크 실패는 던져 Auth.js EventError 로그에 남게 한다. fetch에는 5초 timeout을 주고 재시도하지 않는다. bare package import만 사용하며 NODE_TEST_READ_FILES 예외는 추가하지 않는다.
+`test/web/signin-activity.test.ts`에서 fetch를 대역으로 바꿔 요청 주소·method·본문·no-store·timeout signal과 jwtVerify로 서명/목적/수명을 확인한다. HTTP 실패와 네트워크 실패에서 reject됨을 확인하고 env/fetch 상태를 복원한다.
+`test/web/auth-signin.test.ts`는 TypeScript의 transpileModule과 node:vm으로 실제 auth.ts를 실행한다. require 대역은 NextAuth의 실제 설정을 회수하고 Google와 control-plane, signin-activity 의존만 대체한다. 회수한 설정의 events.signIn을 직접 호출해 이메일이 있을 때 recordSignIn에 주소가 전달되고 없으면 호출되지 않는지 확인한다. 허용 판정 callback을 부를 때는 기록되지 않고 실패 시 예외가 이벤트 경계까지 전달되는지 확인한다. auth.ts의 이벤트 연결을 지우면 이 시험이 실패해야 한다.
 
 ### 2. 목록과 펼침 상세
 
@@ -41,16 +41,28 @@ PersonList는 첫 로그인 열을 마지막 로그인과 마지막 대화 두 �
 기존 people.spec.ts의 미가입 단언을 두 칸 「기록 없음」과 상세의 joined 여부로 갱신한다. newcomer 생성은 helpers.isolatedUser 기반으로 반복 실행과 폭마다 겹치지 않게 한다. 상태 변경 요청은 clickAndWaitForResponse를 사용한다.
 새 people-activity.spec.ts는 실제 Control Plane API로 허용 사용자, signin 완료(서명한 signin 토큰) 및 사용자 메시지를 만든 뒤 관리자 페이지에서 두 시각·time datetime·펼침 상세를 확인한다. 기록 없는 사용자와 MEMBER API/화면 거절도 확인한다. 마지막 시각을 응답에서 읽어 단언하고 임의 sleep은 쓰지 않는다.
 
+### 4. 웹 Node 시험의 CI와 로컬 연결
+
+기존 unit CI는 웹 의존성을 설치하지 않는다. 따라서 로그인 Node 시험은 test/web에 두며 기존 unit job은 유지한다.
+`web/package.json`에 `test:node` 스크립트로 `node --test '../test/web/**/*.test.ts'`를 둔다.
+`.github/workflows/ci.yml`의 web job에서 pnpm install 다음에 `pnpm test:node`로 실행한다.
+`scripts/check-local.sh`에는 web-typecheck 다음에 `step web-test pnpm --dir "${ROOT}/web" test:node`를 둔다.
+명령은 package.json 한 곳이 소유한다. 실행 중인 phase에서 두 로그인 테스트를 실제로 실행한다.
+코디네이터의 명시적 지시에 따라 이 세 설정 파일은 phase 구현·시험 커밋과 분리한 설정 커밋 하나로 남긴다.
+
 ## 검증
 
 ```bash
-node --test test/unit/signin-activity.test.ts test/unit/auth-signin.test.ts test/unit/relative-time.test.ts
+node --test test/web/signin-activity.test.ts test/web/auth-signin.test.ts test/unit/relative-time.test.ts
 cd web && pnpm typecheck
 cd web && pnpm lint
+cd web && pnpm test:node
+bash -n scripts/check-local.sh
+node --test test/unit/quality-script.test.ts
 cd web && pnpm test:browser people.spec.ts people-activity.spec.ts --repeat-each=3 --retries=0
 ```
 
-- `node --test test/unit/signin-activity.test.ts test/unit/relative-time.test.ts`가 통과한다.
+- `node --test test/web/signin-activity.test.ts test/unit/relative-time.test.ts`가 통과한다.
 - `cd web && pnpm typecheck`가 통과한다.
 - `cd web && pnpm test:browser people.spec.ts people-activity.spec.ts --repeat-each=3 --retries=0`를 기본 빌드 서버로 실행하고 모바일·데스크톱에서 통과한다. heavy-lock으로 감싸서 실행한다.
 
@@ -65,8 +77,10 @@ cd web && pnpm test:browser people.spec.ts people-activity.spec.ts --repeat-each
 | `web/src/components/admin/person-activity.tsx` | 신규 |
 | `web/src/app/admin/people/people-admin-panel.tsx` | 수정 |
 | `web/src/app/admin/people/page.tsx` | 수정 |
-| `web/eslint.config.mjs` | 수정 |
-| `test/unit/signin-activity.test.ts` | 신규 |
-| `test/unit/auth-signin.test.ts` | 신규 |
+| `web/package.json` | 수정 |
+| `.github/workflows/ci.yml` | 수정 |
+| `scripts/check-local.sh` | 수정 |
+| `test/web/signin-activity.test.ts` | 신규 |
+| `test/web/auth-signin.test.ts` | 신규 |
 | `test/browser/people.spec.ts` | 수정 |
 | `test/browser/people-activity.spec.ts` | 신규 |
