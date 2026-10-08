@@ -127,6 +127,25 @@ class HermesToolsetRequestTest {
     }
 
     @Test
+    @DisplayName("기본 도구 쓰기는 실행 공간이 없으면 local 로 돌리지 말라는 칸을 함께 보낸다")
+    void sandboxRequiredWriteSendsRequireSandbox() throws Exception {
+        client.writeApiServerInSandbox("kid", List.of("terminal", "fos-assistant"), "u7");
+
+        assertThat(calls)
+                .singleElement()
+                .satisfies(call -> assertThat(new ObjectMapper().readValue(call.body(), Map.class))
+                        .isEqualTo(Map.of(
+                                "profile",
+                                "kid",
+                                "config",
+                                Map.of("platform_toolsets", Map.of("api_server", List.of("terminal", "fos-assistant"))),
+                                "sandbox_owner",
+                                "u7",
+                                "require_sandbox",
+                                true)));
+    }
+
+    @Test
     @DisplayName("409 의 code 가 sandbox_unavailable 이면 실행 공간이 없다는 오류다")
     void conflictWithSandboxUnavailableCodeIsSandboxUnavailable() {
         status = 409;

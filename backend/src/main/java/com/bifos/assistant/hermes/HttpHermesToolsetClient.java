@@ -3,6 +3,7 @@ package com.bifos.assistant.hermes;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -96,20 +97,31 @@ public class HttpHermesToolsetClient implements HermesToolsetClient {
 
     @Override
     public void writeApiServer(String profileName, List<String> toolsets, String sandboxOwner) {
+        writeConfig(profileName, toolsets, sandboxOwner, false);
+    }
+
+    @Override
+    public void writeApiServerInSandbox(String profileName, List<String> toolsets, String sandboxOwner) {
+        writeConfig(profileName, toolsets, sandboxOwner, true);
+    }
+
+    private void writeConfig(String profileName, List<String> toolsets, String sandboxOwner, boolean requireSandbox) {
         attachmentDirectory.ensure(sandboxOwner);
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("profile", profileName);
+        body.put("config", Map.of("platform_toolsets", Map.of("api_server", toolsets)));
+        body.put("sandbox_owner", sandboxOwner);
+        // 참일 때만 싣는다. 이 칸을 모르는 옛 plugin 이 사람의 도구 저장까지 400 으로 거절하지 않게 한다.
+        if (requireSandbox) {
+            body.put("require_sandbox", true);
+        }
         try {
             restClient
                     .put()
                     .uri(dashboardBaseUrl + "/api/config")
                     .header("Authorization", "Bearer " + dashboardToken)
                     .contentType(MediaType.APPLICATION_JSON)
-                    .body(Map.of(
-                            "profile",
-                            profileName,
-                            "config",
-                            Map.of("platform_toolsets", Map.of("api_server", toolsets)),
-                            "sandbox_owner",
-                            sandboxOwner))
+                    .body(body)
                     .retrieve()
                     .toBodilessEntity();
         } catch (RestClientException ex) {

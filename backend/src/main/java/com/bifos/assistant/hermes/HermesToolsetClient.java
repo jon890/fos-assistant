@@ -21,4 +21,14 @@ public interface HermesToolsetClient {
      *     AGENT_SANDBOX_UNAVAILABLE} 이다. 첨부 디렉터리를 준비하지 못했을 때도 같다. 그때 목록은 바뀌지 않았다
      */
     void writeApiServer(String profileName, List<String> toolsets, String sandboxOwner);
+
+    /**
+     * {@link #writeApiServer} 와 같되, 실행 공간 정책에 없는 profile 의 셸 도구를 local 로 돌리지 않는다.
+     *
+     * <p>사람이 고르지 않은 기본 도구를 켤 때 쓴다. 격리되지 않은 셸이 다른 profile 의 {@code .env} 에 닿지 않게 한다(ADR-086).
+     *
+     * @throws com.bifos.assistant.shared.error.ApiException 정책이 없거나 그 profile 이 정책에 없으면 {@code
+     *     AGENT_SANDBOX_UNAVAILABLE} 이다. 그때 목록은 바뀌지 않았다
+     */
+    void writeApiServerInSandbox(String profileName, List<String> toolsets, String sandboxOwner);
 }
