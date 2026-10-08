@@ -297,6 +297,7 @@ sequenceDiagram
 에이전트는 Control Plane MCP 도구 `memory_remember` 로 사람에 관한 오래 쓰일 사실을 남긴다.
 바로 저장(`ACCEPTED`)할지 제안(`PROPOSED`)으로 둘지는 Control Plane 이 실행의 출처로 정한다.
 결정과 프롬프트 주입을 막는 근거는 [ADR-20261007 / memory-remember](../adr/ADR-20261007-memory-remember.md) 에 있다.
+`evidence` 를 판정에서 빼고 부정이 뒤집힌 글과 민감해 보이는 글과 오래된 대화를 제안으로 내리는 근거는 [ADR-20261008 / memory-remember-guard](../adr/ADR-20261008-memory-remember-guard.md) 에 있다.
 
 ### 도구 계약
 
@@ -305,8 +306,8 @@ sequenceDiagram
 | 입력 | 타입 | 뜻 |
 | --- | --- | --- |
 | `title` | 문자열, 1자부터 200자 | 항목 제목. 다음 실행의 색인에 실린다. 앞뒤 공백을 지운다 |
-| `content` | 문자열, 1자부터 2000자 | 본문. 앞뒤 공백을 지운다 |
-| `evidence` | 문자열, 선택, 500자까지 | 사용자가 이번 메시지에서 한 말을 고치지 않고 옮긴 구절. 바로 저장 판정에 쓴다 |
+| `content` | 문자열, 1자부터 2000자 | 본문. 앞뒤 공백을 지운다. 사용자의 말을 다듬어 써도 된다. 부정은 그대로 살린다 |
+| `evidence` | 문자열, 선택, 500자까지 | 판정에 쓰지 않는다. 앞선 도구 정의로 부르는 모델이 인자 오류를 받지 않게 받기만 한다 |
 | `memory_id` | 정수, 선택 | 같은 사실을 고칠 기존 항목 번호. 지시문의 색인에 있는 번호다 |
 | `collection` | 문자열, 선택 | 둘 collection. 없으면 `core`. 그 에이전트가 받는 collection 이어야 한다 |
 | `sensitive` | 참거짓, 선택 | 민감한 내용이면 참. 참이면 늘 제안이고 본문은 암호문으로 저장한다 |
@@ -321,28 +322,62 @@ sequenceDiagram
 
 ### 바로 저장 판정
 
-여섯 조건을 모두 만족하면 바로 저장하고, 하나라도 어긋나면 제안으로 내린다. 거절하지 않는다.
+일곱 조건을 모두 만족하면 바로 저장하고, 하나라도 어긋나면 제안으로 내린다. 거절하지 않는다.
+모델이 준 `evidence` 와 `sensitive=false` 는 바로 저장의 근거가 되지 못한다. 본문이 질문 원문과 글자 그대로 같을 필요는 없다.
 4 와 5 는 지금 실행 하나가 아니라 대화 전체를 본다. Hermes session 이 앞 turn 의 도구 결과와 맡긴 일의 결과를 이력으로 이어 가므로, 앞 turn 에서 읽은 바깥 글이 뒤 turn 의 짧은 대답(「응 그래」)을 근거로 저장을 시킬 수 있다.
 
 | 순서 | 조건 | 어디서 본다 |
 | --- | --- | --- |
 | 1 | origin 실행이 루트 실행이다(`parent_execution_id` 가 없다) | `agent_execution` |
 | 2 | 그 실행이 사람이 보낸 turn 이다. 새 질문과 다시 생성만 해당한다 | `execution_question` 의 줄과 그 줄이 가리키는 그 사용자의 `USER` 메시지 |
-| 3 | `evidence` 를 NFC 로 맞추고 연속 공백을 하나로 줄인 글이 같은 방식으로 맞춘 질문 원문에 들어 있다. 공백을 뺀 길이가 2자 이상이다 | `chat_message.content` |
+| 3 | 아래 「부정 표지」 가 질문 원문과 본문에 함께 있거나 함께 없다 | `chat_message.content`, 인자 `content` |
 | 4 | 그 대화의 어느 실행에도 아래 「안쪽 도구」 밖의 `TOOL_STARTED` 사건이나 `SUBAGENT_STARTED` 사건이 없다 | `execution_event` 와 `agent_execution.conversation_id` |
-| 5 | 그 대화에 사람의 질문 없이 Hermes 로 보낸 루트 실행이 없다. 맡긴 일의 결과를 전하는 turn 과 예약 작업 turn 이 여기 걸린다. 그 대화의 첫 `execution_question` 보다 앞선 실행은 보지 않는다 | `agent_execution` 과 `execution_question` |
+| 5 | 그 대화에 사람의 질문 없이 Hermes 로 보낸 루트 실행이 없다. 맡긴 일의 결과를 전하는 turn 과 예약 작업 turn, `execution_question` 이 생기기 전의 실행, 질문 줄을 남기지 못한 실행이 여기 걸린다 | `agent_execution` 과 `execution_question` |
 | 6 | 민감하지 않다 | 인자 `sensitive` |
+| 7 | 제목과 본문에 아래 「민감해 보이는 글」 이 없다 | 인자 `title`, `content` |
+
+1 부터 5 는 `McpMemoryRemember` 가, 6 과 7 은 `MemoryCaptureService` 가 본다.
 
 안쪽 도구는 바깥 글을 읽지 않는다고 보는 도구다. `mcp__fos_assistant__` 의 `memory_read`, `memory_remember`, `follow_up_propose`, `agent_list`, `agent_delegate`, `artifact_write` 와 Hermes 의 `todo`, `tool_search`, `tool_describe` 다. `tool_search` 와 `tool_describe` 는 도구 정의만 읽는다. 실행을 중계하는 `tool_call` 은 이 목록에 넣지 않는다.
 `agent_status` 와 `agent_stop` 은 맡긴 실행의 답을 돌려주므로 넣지 않는다. `skill_view` 도 넣지 않는다. 같은 toolset 의 `skill_manage` 가 다른 대화에서 읽은 글을 스킬에 써 둘 수 있다.
+
+#### 부정 표지
+
+질문 원문과 본문을 NFC 로 맞추고 연속 공백을 하나로 줄인 뒤 아래 가운데 하나라도 있는지 본다. 한쪽에만 있으면 뜻이 뒤집혔을 수 있어 제안으로 내린다.
+문장을 나누지 않고 글 전체를 본다. 질문의 다른 문장에 있는 부정도 센다.
+
+| 표지 | 찾는 모양 |
+| --- | --- |
+| 않 | 글 어디든 |
+| 없 | 글 어디든 |
+| 아니 | 글 어디든. 활용형 「아냐」, 「아닌」, 「아님」, 「아닙」 도 본다 |
+| 못 | 낱말의 처음이나 「지」 바로 뒤(「못 먹어」, 「먹지못해」) |
+| 안 | 낱말로 떨어진 「안」, 낱말 처음의 「안」 바로 뒤에 몇몇 동사가 붙은 것(「안먹어」, 「안해」, 「안돼」). 「안경」, 「안녕」 은 보지 않는다 |
+
+정확한 모양은 `mcp.application.NegationMarkers` 가 갖는다.
+
+#### 민감해 보이는 글
+
+제목과 본문의 공백을 빼고 아래를 찾는다. 하나라도 있으면 모델이 `sensitive` 를 거짓으로 주었어도 제안으로 내린다.
+민감도는 모델이 준 값 그대로 저장해 사람이 제안 카드에서 본문을 읽고 정한다.
+
+| 갈래 | 예 |
+| --- | --- |
+| 건강 | 병원, 진단, 질환, 수술, 복용, 우울, 임신, 알레르기 |
+| 금융 | 계좌, 통장, 카드번호, 비밀번호, 대출, 연봉, 재산, 주식, 보험 |
+| 신원과 신념 | 주민번호, 여권, 종교, 정당, 성적 지향, 국적, 전과 |
+| 숫자와 주소 | 숫자가 여섯 개 이상 이어진 열(사이의 공백과 하이픈 허용), 메일 주소. 생일과 기념일이 걸리지 않게 `1990-03-05` 같은 날짜 모양은 숫자열에서 뺀다 |
+
+낱말 목록 전체는 `memory.application.MemorySensitiveHints` 가 갖는다. 잘못 걸려도 제안 카드가 될 뿐이다.
+
 한 실행 3개 상한과 같은 글의 중복 확인은 잠그지 않는다. 한 실행이 도구를 나란히 부르면 상한을 넘거나 도구 오류가 날 수 있다. 할 일 제안과 같은 수준으로 둔다.
 
 이 판정 뒤에 공통으로 본다.
 
 - 한 실행이 남긴 기록이 이미 3개면 저장하지 않는다
 - `collection` 이 그 에이전트가 받는 collection 이 아니면 저장하지 않는다
-- 같은 사용자의 같은 제목과 본문(`proposal_dedup_key`)이 있으면 새 줄을 만들지 않는다. 그 줄이 제안이고 지금이 바로 저장 조건이면 받아들인다
-- `memory_id` 를 주면 바로 저장 조건일 때만 그 항목의 본문을 고친다. 요청자의 `USER` 범위 `MEMORY` 항목이고 `ACCEPTED` 이고 민감하지 않고 그 에이전트가 받는 collection 이어야 한다. 제목과 꺼내는 방식은 그대로다
+- 같은 사용자의 같은 제목과 본문(`proposal_dedup_key`)이 있으면 새 줄을 만들지 않는다. 그 줄이 제안이고 지금이 바로 저장 조건(7 까지)이면 받아들인다
+- `memory_id` 를 주면 바로 저장 조건(7 까지)일 때만 그 항목의 본문을 고친다. 요청자의 `USER` 범위 `MEMORY` 항목이고 `ACCEPTED` 이고 민감하지 않고 그 에이전트가 받는 collection 이어야 한다. 제목과 꺼내는 방식은 그대로다
 
 ### 결과
 
@@ -376,8 +411,8 @@ Control Plane MCP 도구를 받는 실행의 공통 답변 지침 뒤에 「# �
 
 | 기록 | 화면 | 누르면 |
 | --- | --- | --- |
-| `CREATED`, 항목이 `ACCEPTED` | 「기억했어요: 제목」 [고치기] [되돌리기] | 고치기는 `PATCH /api/v1/memories/{id}`, 되돌리기는 새 항목을 지우고 기존 제안을 받아들였으면 제안 상태로 돌린다. 그 뒤에 고쳤으면 409 `MEMORY_REVISION_CONFLICT` 다 |
-| `UPDATED`, 항목이 `ACCEPTED` | 「기억을 고쳤어요: 제목」 [고치기] [되돌리기] | 되돌리기는 고치기 전의 판으로 돌린다. 그 뒤에 다시 바뀌었으면 409 `MEMORY_REVISION_CONFLICT` 다 |
+| `CREATED`, 항목이 `ACCEPTED` | 「기억했어요: 제목」 과 그 아래 본문 전문(민감 항목은 본문 대신 안내), [고치기] [되돌리기] | 고치기는 `PATCH /api/v1/memories/{id}`, 되돌리기는 새 항목을 지우고 기존 제안을 받아들였으면 제안 상태로 돌린다. 그 뒤에 고쳤으면 409 `MEMORY_REVISION_CONFLICT` 다 |
+| `UPDATED`, 항목이 `ACCEPTED` | 「기억을 고쳤어요: 제목」 과 그 아래 본문 전문(민감 항목은 본문 대신 안내), [고치기] [되돌리기] | 되돌리기는 고치기 전의 판으로 돌린다. 그 뒤에 다시 바뀌었으면 409 `MEMORY_REVISION_CONFLICT` 다 |
 | `PROPOSED`, 항목이 `PROPOSED` | 제안 카드 [받아들이기] [고쳐서 받아들이기] [거절] | `/accept`, `PATCH` 뒤 `/accept`, `/reject`. `/memory` 의 제안 목록에도 보인다 |
 
 | 경로 | 하는 일 |
@@ -391,6 +426,8 @@ Control Plane MCP 도구를 받는 실행의 공통 답변 지침 뒤에 「# �
 | 클래스 | 하는 일 |
 | --- | --- |
 | `mcp.application.McpMemoryRemember` | 도구 정의, 인자 값 검사, 바로 저장 판정의 1부터 5 |
+| `mcp.application.NegationMarkers` | 글에 부정 표지가 있는지 판정 |
+| `memory.application.MemorySensitiveHints` | 제목과 본문에 민감해 보이는 낱말과 숫자열이 있는지 판정 |
 | `memory.application.MemoryCaptureService` | 민감도, collection, 상한, 중복, 고치기 대상 판정과 저장, 대화의 기록 목록, 되돌리기 |
 | `chat.application.TurnQuestions` | 실행에 이어 둔 질문 원문 읽기, 질문 없이 보낸 루트 실행이 있는지 보기 |
 | `chat.presentation.MemoryCaptureController` | 대화의 기록 목록과 되돌리기 API |
