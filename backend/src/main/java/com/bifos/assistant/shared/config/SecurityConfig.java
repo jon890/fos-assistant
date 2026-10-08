@@ -43,7 +43,7 @@ public class SecurityConfig {
                         .permitAll()
                         // 로그인 판정은 아직 아무 사용자도 없는 시점에 돈다.
                         // 그 경로가 받는 토큰은 따로라 SignInController 가 직접 검사한다.
-                        .requestMatchers("/api/v1/signin/allowed")
+                        .requestMatchers("/api/v1/signin/allowed", "/api/v1/signin/completed")
                         .permitAll()
                         // 다른 서비스가 서비스 토큰으로 부르는 경로다(ADR-056). 인증은 memory 의 인터셉터가 한다.
                         .requestMatchers("/api/v1/service/**")

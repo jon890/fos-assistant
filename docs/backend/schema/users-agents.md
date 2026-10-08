@@ -28,6 +28,7 @@
 | `hermes_profile` | VARCHAR(64) | 유일하다. 관리자가 적는다 |
 | `enabled` | BOOLEAN | 내리면 들어오지 못한다 |
 | `created_at` | DATETIME(6) | |
+| `last_login_at` | DATETIME(6) NULL | 웹 로그인 성공 이벤트를 마지막으로 기록한 서버 시각. 판정과 일반 요청은 갱신하지 않는다. 기존 기록은 복원하지 않는다 |
 
 `app_user` 와 나누어 둔다. 둘이 뜻하는 것이 다르다.
 

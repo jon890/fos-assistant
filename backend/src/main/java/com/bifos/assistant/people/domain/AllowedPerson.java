@@ -50,6 +50,11 @@ public class AllowedPerson {
     @Getter
     private Instant createdAt;
 
+    /** 로그인 완료 기록만 조건부 갱신하므로 관리자 변경이 이 값을 덮어쓰지 않는다. */
+    @Column(name = "last_login_at", updatable = false)
+    @Getter
+    private Instant lastLoginAt;
+
     protected AllowedPerson() {}
 
     private AllowedPerson(String email, String displayName, String hermesProfile, Instant now) {
