@@ -62,7 +62,7 @@
 - 짧은 개인 `SEARCH` 항목이 개인 사실 구역에 `- [번호] 제목: 본문` 으로 실리고 색인에는 없다. 묶음 항목이 `MEMORY_FACTS`, `INLINE`.
 - 그룹 항목, 201자 본문, 민감 항목, `DOCUMENT` 는 개인 사실 구역에 없고 색인에 제목으로 있다.
 - 예산을 넘으면 최근에 고친 것부터 담고, 빠진 후보는 색인에 `TITLE_ONLY` 로 남으며 `omittedMemoryIds` 에 없다.
-- 항상 층이 거의 다 채운 경우(`shipsIndexLayerEvenWhenAlwaysLayerNearlyFillsLimit` 와 같은 준비) 개인 사실 구역이 비고, 후보는 색인에 `TITLE_ONLY` 로 남아 `OMITTED` 가 되지 않는다. 기존 그 시험도 고치지 않고 통과한다.
+- 항상 층이 실제로 들어가면서 자리를 거의 다 쓰는 경우(항상 층 본문을 「상한 − 색인 몫」 이하이면서 남는 자리가 개인 사실 줄 하나보다 작게, 예: 7,850자 안팎으로 맞춘다) 개인 사실 구역이 비고, 후보는 색인에 `TITLE_ONLY` 로 남아 `OMITTED` 가 되지 않는다.
 - 같은 항목 집합을 두 번 조립하면 `instructionsHash()` 가 같다. `JdbcTemplate` 으로 항목 하나의 `updated_at` 만 바꿔 고르는 차례가 달라져도, 예산 안에 모두 들어 고른 집합이 같으면 지문이 같다.
 - `ContextProperties` 의 `factsMaxChars=0` 으로 만든 `new ContextAssembler(memories, properties, clock)` 는 지금과 같은 글을 낸다(개인 사실 구역 머리가 없다).
 - 다른 에이전트가 받지 않는 collection 의 짧은 항목은 개인 사실 구역에도 없다.
@@ -71,7 +71,7 @@
 
 짧은 개인 `SEARCH` 항목이 이제 개인 사실 구역으로 가므로 아래 시험의 기대값을 고친다. 시험이 지키려던 성질(색인이 밀려나지 않는다, 묶음 순서가 글 순서와 같다, 제목과 본문을 실행 기록에 남기지 않는다)은 그대로 단언한다.
 
-- `ContextAssemblerTest`: `shipsIndexAndRestEvenIfFirstItemExceedsLimit`, `rendersSameTextAndHashFromItemsWithoutConflict`, `bundlesItemsInRenderedOrder`, `keepsOmittedItemInBundleAtItsPlace`. 색인 항목을 쓰던 준비는 본문을 201자 이상으로 바꿔 색인에 남기거나, 기대값에 개인 사실 줄을 넣는다.
+- `ContextAssemblerTest`: `shipsIndexLayerEvenWhenAlwaysLayerNearlyFillsLimit`(항상 층이 넘쳐 빠진 자리를 개인 사실 구역이 쓰므로 색인 머리가 사라진다. 색인 항목 본문을 201자 이상으로 바꿔 「항상 층이 색인을 밀어내지 못한다」 는 원래 뜻을 지킨다), `shipsIndexAndRestEvenIfFirstItemExceedsLimit`, `rendersSameTextAndHashFromItemsWithoutConflict`, `bundlesItemsInRenderedOrder`, `keepsOmittedItemInBundleAtItsPlace`. 색인 항목을 쓰던 준비는 본문을 201자 이상으로 바꿔 색인에 남기거나, 기대값에 개인 사실 줄을 넣는다.
 - `backend/src/test/java/com/bifos/assistant/chat/ChatServiceTest.java` 의 `recordsAlwaysAndIndexSourcesOfTurnWithoutTitleOrBody`: 색인 항목의 본문을 201자 이상으로 바꿔 `MEMORY_INDEX, TITLE_ONLY` 를 지키고, 짧은 개인 항목 하나를 더해 `MEMORY_FACTS, INLINE` 이 실행 기록에 제목과 본문 없이 남는 것을 함께 단언한다.
 - `test/e2e/scenarios/memory.ts` 의 「Memory 구역은 항상 층 본문과 색인이 정해진 모양 그대로다」 단계: `userIndexed` 의 본문을 201자 이상으로 바꿔 기존 모양을 글자 그대로 지킨다. 짧은 개인 항목 하나(`alwaysInject: false`)를 더해, 기대 글의 개인 항목 항상 층과 색인 머리 사이에 `docs/backend/memory.md` 예시와 같은 머리 두 문단과 `- [번호] 제목: 본문` 줄을 넣는다. 끝의 「색인에만 싣는 항목의 본문이 없다」 단언은 `userIndexed`, `groupIndexed` 에 대해 그대로 둔다. 그 단계가 만든 항목은 끝에서 지운다.
 

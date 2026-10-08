@@ -73,7 +73,7 @@ Memory 는 에이전트가 실행할 때 `instructions` 로 받는 사실이다.
 | 넘칠 때 | `updated_at` 이 최근인 것부터, 같으면 번호가 큰 것부터 고른다. 들어가지 않는 항목은 건너뛰고 다음 항목을 본다. 고르기는 한 번만 한다 |
 | 글로 옮길 때 | 고른 항목을 번호 순으로 늘어놓는다. 고른 집합이 같으면 글이 같아 지시문 지문이 바뀌지 않는다 |
 | 줄의 모양 | `- [번호] 제목: 본문`. 본문의 줄바꿈은 공백 하나로 바꿔 한 줄로 싣는다. 자르지 않는다. 바뀐 사실을 번호로 고치라는 안내는 `memory_remember` 를 받는 실행의 「# 기억」 지침이 갖는다 |
-| 색인 몫과의 관계 | 고른 항목은 색인에서 빠지므로 색인은 떼어 둔 몫보다 짧아질 뿐 길어지지 않는다. 그래서 개인 사실 구역이 색인을 밀어내지 못한다. 항상 층이 자리를 다 쓰면 구역이 비고 후보는 모두 색인에 남는다 |
+| 색인 몫과의 관계 | 고른 항목은 색인에서 빠지므로 색인은 떼어 둔 몫보다 짧아질 뿐 길어지지 않는다. 그래서 색인 전체가 몫(상한의 1/4) 안에 들면 개인 사실 구역이 색인을 밀어내지 못한다. 색인이 몫보다 길면 지금은 넘친 색인 줄이 항상 층이 남긴 빈자리를 쓰지만, 이제는 개인 사실 구역이 그 자리를 먼저 쓴다. 항상 층이 자리를 다 쓰면 구역이 비고 후보는 모두 색인에 남는다 |
 | 색인과의 관계 | 개인 사실 구역에 실린 항목은 색인에서 뺀다. 고르지 못한 후보는 색인에 제목으로 남고 `OMITTED` 가 아니다 |
 | `memory_read` | 실린 항목도 `retrieval` 이 `SEARCH` 라 읽힌다 |
 | 문맥 묶음 | 실린 항목은 `source=MEMORY_FACTS`, `bodyMode=INLINE` 이다. 색인으로 내려간 후보는 `MEMORY_INDEX` 다 |
@@ -466,5 +466,5 @@ Control Plane MCP 도구를 받는 실행의 공통 답변 지침 뒤에 「# �
 | `chat.application.MemoryUseService` | 대화의 답 실행 번호를 모으고, 실행 기록에서 참조를 받아, 지금 볼 수 있는 항목만 제목과 함께 낸다 |
 | `usage.application.ExecutionMemoryRefs` | 실행 번호들의 `execution_context_source` 와 `memory_read` 시작 사건에서 Memory 번호와 출처, 그 실행의 에이전트 번호를 순서대로 낸다 |
 | `memory.application.MemoryService.acceptedReadableAmong` | 번호들 가운데 요청자가 읽을 수 있는 `ACCEPTED` 항목 |
-| `memory.application.MemoryService.readableByTool` | 한 항목이 그 에이전트의 `memory_read` 로 읽히는 항목인지. `bodyFor` 와 같은 조건이다 |
+| `memory.application.MemoryService.readableByTool` | 한 항목이 그 `MemoryAccess` 의 `memory_read` 로 읽히는 항목인지. `bodyFor` 와 같은 조건이다 |
 | `chat.presentation.MemoryUseController` | `GET .../memory-uses` |

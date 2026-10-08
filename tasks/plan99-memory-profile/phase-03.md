@@ -46,12 +46,12 @@
 ### 2. `memory.application.MemoryService.acceptedReadableAmong` 과 `readableByTool`
 
 `Map<Long, Memory> acceptedReadableAmong(CurrentUser user, Collection<Long> ids)`. 비었으면 빈 맵. `findAllById` 뒤 `isReadableBy(user.id(), user.groupId())` 이고 `status()==MemoryStatus.ACCEPTED` 인 것만.
-`boolean readableByTool(Memory memory, Long agentId)`: `bodyFor` 의 거르는 조건(요청자 판정 제외)과 같다. `agentId` 가 null 이면 거짓. `bodyFor` 가 이 함수를 함께 쓰게 고쳐 두 판정이 갈라지지 않게 한다.
+`boolean readableByTool(Memory memory, MemoryAccess access)`: `bodyFor` 의 거르는 조건(요청자 판정 제외)과 같다. `bodyFor` 가 이 함수를 함께 쓰게 고쳐 두 판정이 갈라지지 않게 한다. 에이전트 번호에서 `MemoryAccess` 를 얻는 일은 부르는 쪽이 `accessOf(agentId)` 로 한다.
 
 ### 3. `chat.application.MemoryUseService` 와 `chat.application.MemoryUse`
 
 - `MemoryUse` record: `Long executionId`, `Long memoryId`, `String title`, `MemoryScope scope`, `String via`.
-- `List<MemoryUse> usesOf(CurrentUser user, Long conversationId)`: `findAssistantExecutionIds` 로 답 실행 번호를 모아 `ExecutionMemoryRefs.of`, 그 번호들로 `acceptedReadableAmong`, 맵에 있는 것만 지금 제목과 범위로 낸다. `READ` 는 `readableByTool(memory, ref.agentId())` 도 참이어야 한다. `@Transactional(readOnly = true)`.
+- `List<MemoryUse> usesOf(CurrentUser user, Long conversationId)`: `findAssistantExecutionIds` 로 답 실행 번호를 모아 `ExecutionMemoryRefs.of`, 그 번호들로 `acceptedReadableAmong`, 맵에 있는 것만 지금 제목과 범위로 낸다. `READ` 는 `readableByTool(memory, access)` 도 참이어야 한다. `access` 는 실행의 에이전트 번호마다 `accessOf(agentId)` 를 한 번만 불러 모아 둔다(에이전트와 grant 를 읽는 조회다). 에이전트 번호가 없으면 `READ` 를 내지 않는다. `@Transactional(readOnly = true)`.
 
 ### 4. `chat.presentation.MemoryUseController` 와 `ChatDtos.MemoryUseView`
 
