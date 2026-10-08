@@ -1,5 +1,5 @@
 {
-  "name": "plan109-data-encryption-columns",
+  "name": "plan112-data-encryption-columns",
   "description": "메시지 밖의 사용자 본문 칸(대기 메시지, 위임 답, 대화 제목, 예약 작업)을 같은 데이터 key 로 암호화하고, 이미 있는 평문 줄을 배치로 옮긴다",
   "status": "pending",
   "created_at": "2026-10-08",
