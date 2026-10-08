@@ -1,5 +1,6 @@
 package com.bifos.assistant.browser.application;
 
+import com.bifos.assistant.browser.application.model.BrowserEndpoint;
 import com.bifos.assistant.browser.application.model.BrowserScreenInput;
 import com.bifos.assistant.browser.application.model.BrowserScreenSink;
 import com.bifos.assistant.browser.application.model.UserBrowserSnapshot;
@@ -25,6 +26,7 @@ import java.util.Optional;
 import java.util.OptionalInt;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.locks.ReentrantLock;
+import java.util.function.Consumer;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -70,6 +72,8 @@ public class UserBrowserService {
     private final ReentrantLock startLock = new ReentrantLock();
     /** 사용자마다 마지막으로 활동을 기록한 시각이다. 간격 안의 입력은 DB 를 읽지 않고 거른다. */
     private final Map<Long, Instant> touched = new ConcurrentHashMap<>();
+    /** 중계가 다른 전이를 기다리는 동안 쉬는 함수다. 시험이 바꿔 끼워 그 사이에 줄을 바꾼다. */
+    Consumer<Duration> sleeper = UserBrowserService::sleep;
 
     /** 프로필 디렉터리 이름이다. 첨부 디렉터리 키와 같은 계산이지만 루트가 다르다. */
     public static String profileKey(Long userId) {
@@ -224,6 +228,68 @@ public class UserBrowserService {
                 .orElseThrow(() -> new ApiException(ErrorCode.BROWSER_START_FAILED, "user browser has no cdp address"));
         touch(userId);
         screens.open(started.id(), userId, address, url, sink);
+    }
+
+    /**
+     * 중계가 쓸 브라우저를 켜 둔다. 없으면 만들고 꺼져 있으면 켠다. 동시 수와 자동 중지는 화면으로 켤 때와 같다.
+     *
+     * <p>다른 전이가 진행 중이면 {@code start-timeout} 까지 0.5초마다 줄을 다시 읽는다. {@code RUNNING} 이 되면 넘어가고,
+     * {@code STOPPED} 나 {@code FAILED} 가 되면 다시 켠다.
+     *
+     * @throws ApiException 동시 수가 찼으면 {@code BROWSER_CAPACITY}, 켜지 못했거나 CDP 주소가 없으면 {@code BROWSER_START_FAILED},
+     *     기다려도 {@code RUNNING} 이 되지 않으면 {@code BROWSER_BUSY}
+     */
+    public BrowserEndpoint ensureRunning(Long userId) {
+        requireEnabled();
+        if (browsers.findByUserId(userId).isEmpty()) {
+            try {
+                create(userId);
+            } catch (ApiException ex) {
+                // 그 사이 다른 요청이 먼저 만들었다. 그 줄을 켠다
+                if (ex.code() != ErrorCode.BROWSER_EXISTS) {
+                    throw ex;
+                }
+            }
+        }
+        UserBrowser running = awaitRunning(userId);
+        URI address = Optional.ofNullable(running.containerId())
+                .flatMap(runtime::cdpAddress)
+                .orElseThrow(() -> new ApiException(ErrorCode.BROWSER_START_FAILED, "user browser has no cdp address"));
+        return new BrowserEndpoint(running.id(), address);
+    }
+
+    /**
+     * 줄이 {@code RUNNING} 이 될 때까지 켜거나 기다린다.
+     *
+     * <p>{@code start} 는 동시 수를 전이보다 먼저 센다. 자기 줄이 {@code STARTING} 이나 {@code STOPPING} 인데 부르면 동시 수가 찼을 때
+     * {@code BROWSER_BUSY} 대신 {@code BROWSER_CAPACITY} 가 난다. 그래서 그 두 상태에서는 부르지 않고 기다린다.
+     */
+    private UserBrowser awaitRunning(Long userId) {
+        Instant deadline = clock.instant().plus(properties.current().startTimeout());
+        ApiException busy = null;
+        while (true) {
+            UserBrowser browser = owned(userId);
+            UserBrowserStatus status = browser.status();
+            if (status == UserBrowserStatus.RUNNING) {
+                return browser;
+            }
+            if (status != UserBrowserStatus.STARTING && status != UserBrowserStatus.STOPPING) {
+                try {
+                    start(userId);
+                    return owned(userId);
+                } catch (ApiException ex) {
+                    if (ex.code() != ErrorCode.BROWSER_BUSY) {
+                        throw ex;
+                    }
+                    busy = ex;
+                }
+            }
+            Duration left = Duration.between(clock.instant(), deadline);
+            if (left.isNegative() || left.isZero()) {
+                throw busy != null ? busy : new ApiException(ErrorCode.BROWSER_BUSY, "user browser is still changing");
+            }
+            sleeper.accept(left.compareTo(POLL_INTERVAL) < 0 ? left : POLL_INTERVAL);
+        }
     }
 
     /** 요청자의 열린 화면에 입력을 보내고 활동을 기록한다. 열린 화면이 없으면 {@code BROWSER_SCREEN_CLOSED} 다. */
