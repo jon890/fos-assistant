@@ -52,7 +52,9 @@ cd web && pnpm typecheck
 
 ```bash
 scripts/quality.sh check
-``` 브라우저 spec은 team-lead가 공용 heavy-lock으로 묶어 실행한다.
+```
+
+브라우저 spec은 team-lead가 공용 heavy-lock으로 묶어 실행한다.
 
 ```bash
 pnpm --dir web test:browser usage-executions-paging.spec.ts --repeat-each=3 --retries=0
