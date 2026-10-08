@@ -113,6 +113,7 @@ token 과 API key 값 자체는 받지 않는다. 파일을 읽게 할 경우 �
 마운트 대상이 `attachment_agent_root` 와 같거나 그 아래이거나 그 상위여도 정책 전체를 읽지 못한 것으로 본다.
 마운트 원본이나 대상이 `connector_output_root` 와 겹쳐도 같다. 다른 profile 의 출력이 보이기 때문이다.
 `connector_output_root` 를 넣거나 빼면 등록된 profile 의 `terminal:` 이 바뀌어 다음 셸 저장에서 컨테이너 키가 바뀐다. 그 저장 전까지는 출력 디렉터리가 붙지 않는다.
+셸 저장과 사진 도구 옛 설치는 그 profile 의 출력 디렉터리를 링크 없이 만들지 못하면 409 로 거절한다. 바인딩 설치는 같은 실패를 빈 값으로 넘긴다.
 이 검사는 경로 조각 기준으로 한다. 다른 사용자의 workspace나 첨부를 공통 마운트로 보이게 하면 안 되기 때문이다.
 표에 없는 최상위 키나 profile 설정 키, 허용 목록에 없는 env 가 있어도 정책 전체를 거절한다.
 기존 `profile_mounts` 는 `profiles[profile].read_only_mounts` 로 옮겨야 한다.
