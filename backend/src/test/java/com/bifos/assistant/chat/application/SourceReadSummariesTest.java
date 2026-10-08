@@ -180,19 +180,19 @@ class SourceReadSummariesTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {
-        "https://localhost./read",
-        "https://service.internal./read",
-        "https://intranet./read",
-        "https://10.0.0.1./read"
-    })
+    @ValueSource(
+            strings = {
+                "https://localhost./read",
+                "https://service.internal./read",
+                "https://intranet./read",
+                "https://10.0.0.1./read"
+            })
     @DisplayName("끝 점이 있는 내부와 한 낱말과 IPv4 host는 URL로 보내지 않는다")
     void rejectsUnsafeDnsAbsoluteHosts(String url) throws Exception {
         AgentExecution root = execution(1L, null, EventObservation.OBSERVED);
         stubExecutions(List.of(root), List.of());
         when(events.findByExecutionIdInOrderByExecutionIdAscSequenceAsc(any()))
-                .thenReturn(List.of(completed(
-                        1L, 1, "{\"results\":[{\"url\":\"" + url + "\",\"content\":\"본문\"}]}")));
+                .thenReturn(List.of(completed(1L, 1, "{\"results\":[{\"url\":\"" + url + "\",\"content\":\"본문\"}]}")));
 
         assertThat(summaries.of(List.of(answer(10L, 1L))).get(10L))
                 .isEqualTo(new SourceReadSummary(1, List.of(), 1, true));
