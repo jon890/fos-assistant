@@ -60,7 +60,8 @@ import tools.jackson.databind.node.ObjectNode;
  * 실제 HTTP 경계에서 {@code memory_remember} 의 계약을 확인한다. 계약은 {@code docs/backend/memory.md} 의 「에이전트가 기억을
  * 남기는 길」 이 갖는다(ADR-20261007 / memory-remember).
  *
- * <p>바로 저장은 사람이 보낸 turn 의 루트 실행이고, 근거 인용이 질문 원문에 있고, 그 실행이 바깥 도구를 부르지 않았을 때만이다.
+ * <p>바로 저장은 사람이 보낸 turn 의 루트 실행이고, 부정 표지가 질문과 본문에 함께 있거나 함께 없고, 그 실행이 바깥 도구를 부르지
+ * 않았을 때만이다(ADR-20261008 / memory-remember-guard).
  */
 @BackendIntegrationTest
 class McpMemoryRememberToolTest {
@@ -155,11 +156,11 @@ class McpMemoryRememberToolTest {
         assertThat(tool.path("inputSchema").path("required").toString()).isEqualTo("[\"title\",\"content\"]");
         assertThat(tool.path("inputSchema").path("additionalProperties").asBoolean())
                 .isFalse();
-        assertThat(tool.path("description").asString()).contains("작업 기록").contains("evidence");
+        assertThat(tool.path("description").asString()).contains("작업 기록").contains("부정은 content 에 그대로 살린다");
     }
 
     @Test
-    @DisplayName("사람이 보낸 turn 에서 근거가 질문 원문에 있으면 바로 ACCEPTED 로 저장하고 기록을 남긴다")
+    @DisplayName("사람이 보낸 turn 에서 부정이 뒤집히지 않은 본문은 바로 ACCEPTED 로 저장하고 기록을 남긴다")
     void remembersDirectlyFromHumanTurn() throws Exception {
         askedInThisTurn();
 
@@ -180,22 +181,50 @@ class McpMemoryRememberToolTest {
     }
 
     @Test
-    @DisplayName("근거가 없거나 질문에 없으면 제안으로 내린다")
-    void proposesWithoutMatchingEvidence() throws Exception {
+    @DisplayName("근거가 없거나 질문에 없어도 다듬은 본문은 바로 저장한다")
+    void remembersRefinedContentRegardlessOfEvidence() throws Exception {
         askedInThisTurn();
 
-        assertThat(text(call(remember("취미", "등산을 좋아한다", null)))).isEqualTo(PROPOSED);
-        assertThat(text(call(remember("직업", "교사다", "나는 교사야")))).isEqualTo(PROPOSED);
+        assertThat(text(call(remember("취미", "등산을 좋아한다", null)))).isEqualTo(REMEMBERED);
+        assertThat(text(call(remember("직업", "교사다", "나는 교사야")))).isEqualTo(REMEMBERED);
 
-        assertThat(memories.findAll().stream()
-                        .filter(memory -> dad.id().equals(memory.ownerUserId()))
-                        .map(Memory::status))
-                .containsOnly(MemoryStatus.PROPOSED);
-        assertThat(captures.findAll().stream()
-                        .filter(capture -> dad.id().equals(capture.userId()))
-                        .map(MemoryCapture::kind))
-                .containsOnly(MemoryCaptureKind.PROPOSED);
-        assertThat(feedbackEvents()).containsExactly("SURFACED|AGENT", "SURFACED|AGENT");
+        assertThat(memoriesOfDad())
+                .extracting(Memory::status)
+                .containsExactly(MemoryStatus.ACCEPTED, MemoryStatus.ACCEPTED);
+        assertThat(capturesOfDad())
+                .extracting(MemoryCapture::kind)
+                .containsExactly(MemoryCaptureKind.CREATED, MemoryCaptureKind.CREATED);
+        assertThat(feedbackEvents()).as("바로 저장은 판단 피드백을 남기지 않는다").isEmpty();
+    }
+
+    @Test
+    @DisplayName("질문의 부정이 본문에서 사라지면 제안으로 내린다")
+    void proposesWhenContentDropsNegation() throws Exception {
+        askedInThisTurn("매운 음식을 못 먹는다.");
+
+        assertThat(text(call(remember("매운 음식", "매운 음식을 좋아한다", "매운 음식")))).isEqualTo(PROPOSED);
+
+        assertThat(onlyMemory().status()).isEqualTo(MemoryStatus.PROPOSED);
+    }
+
+    @Test
+    @DisplayName("질문에 없던 부정이 본문에 생기면 제안으로 내린다")
+    void proposesWhenContentAddsNegation() throws Exception {
+        askedInThisTurn("매운 음식 좋아해.");
+
+        assertThat(text(call(remember("매운 음식", "매운 음식을 못 먹는다", null)))).isEqualTo(PROPOSED);
+
+        assertThat(onlyMemory().status()).isEqualTo(MemoryStatus.PROPOSED);
+    }
+
+    @Test
+    @DisplayName("질문의 부정이 다른 표지로라도 본문에 살아 있으면 바로 저장한다")
+    void remembersWhenNegationKept() throws Exception {
+        askedInThisTurn("나는 오이를 안 먹어.");
+
+        assertThat(text(call(remember("오이", "오이를 먹지 않는다", null)))).isEqualTo(REMEMBERED);
+
+        assertThat(onlyMemory().status()).isEqualTo(MemoryStatus.ACCEPTED);
     }
 
     /** 판단 피드백을 {@code 종류|주체} 로 남긴 순서대로 읽는다. */
@@ -209,7 +238,7 @@ class McpMemoryRememberToolTest {
     }
 
     @Test
-    @DisplayName("사람이 보낸 질문이 이어지지 않은 실행은 근거가 맞아도 제안이다")
+    @DisplayName("사람이 보낸 질문이 이어지지 않은 실행은 본문이 맞아도 제안이다")
     void proposesFromRunWithoutQuestion() throws Exception {
         messages.save(ChatMessage.fromUser(conversation.id(), dad.id(), QUESTION, Instant.now()));
 
@@ -347,9 +376,9 @@ class McpMemoryRememberToolTest {
     @Test
     @DisplayName("기존 제안을 바로 저장한 기록을 되돌리면 항목을 보존하고 승인 전 상태로 돌아간다")
     void restoresProposalWhenUndoingAcceptance() throws Exception {
-        askedInThisTurn();
         call(remember("다른 사람", "다른 사람은 홍길동이다", null));
         Long memoryId = onlyMemory().id();
+        askedInThisTurn();
         call(remember("다른 사람", "다른 사람은 홍길동이다", "다른 사람은 홍길동이야"));
         MemoryCapture accepted = capturesOfDad().stream()
                 .filter(capture -> capture.kind() == MemoryCaptureKind.CREATED)
@@ -420,6 +449,7 @@ class McpMemoryRememberToolTest {
         Long memoryId = onlyMemory().id();
         ObjectNode arguments = remember("다른 사람", "다른 사람은 홍길동이다", null);
         arguments.put("memory_id", memoryId);
+        toolStarted("web_search");
 
         JsonNode result = call(arguments);
 
@@ -447,7 +477,7 @@ class McpMemoryRememberToolTest {
     void listsAndUndoesCreatedCapture() throws Exception {
         askedInThisTurn();
         call(remember("다른 사람", "다른 사람은 홍길동이다", "다른 사람은 홍길동이야"));
-        call(remember("취미", "등산을 좋아한다", null));
+        call(remember("취미", "등산을 좋아하지 않는다", null));
 
         List<CapturedMemory> listed = captureService.capturesOf(currentDad(), conversation.id());
         assertThat(listed)
@@ -495,8 +525,11 @@ class McpMemoryRememberToolTest {
     }
 
     private void askedInThisTurn() {
-        ChatMessage question =
-                messages.save(ChatMessage.fromUser(conversation.id(), dad.id(), QUESTION, Instant.now()));
+        askedInThisTurn(QUESTION);
+    }
+
+    private void askedInThisTurn(String text) {
+        ChatMessage question = messages.save(ChatMessage.fromUser(conversation.id(), dad.id(), text, Instant.now()));
         questions.save(ExecutionQuestion.of(dadRun.id(), question.id(), Instant.now()));
     }
 
