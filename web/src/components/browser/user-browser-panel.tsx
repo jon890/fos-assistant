@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Notice } from "@/components/ui/notice";
 import { describeFailure } from "@/components/error-message";
+import { BrowserScreen } from "@/components/browser/browser-screen";
 import { DeleteBrowserDialog } from "@/components/browser/delete-browser-dialog";
 import {
   browserAction,
@@ -36,13 +37,40 @@ async function readView(): Promise<BrowserView | null> {
   }
 }
 
-/** 사용자 한 사람의 브라우저를 만들고, 켜고, 끄고, 지운다. 오류 코드는 그리지 않는다. */
-export function UserBrowserPanel() {
+/** 다시 읽은 상태다. 읽지 못하면 지금 그린 상태를 둔다. */
+function keepView(setView: (view: BrowserView) => void) {
+  return (next: BrowserView | null) => {
+    if (next !== null) setView(next);
+  };
+}
+
+/** 상태를 아직 그릴 수 없을 때의 안내다. */
+function notReady(view: BrowserView | null, loadError: boolean) {
+  if (view === null && loadError) {
+    return (
+      <Notice variant="error" role="alert">
+        브라우저 상태를 읽지 못했어요. 화면을 다시 열어 주세요.
+      </Notice>
+    );
+  }
+  if (view === null) {
+    return <p className="text-sm text-muted-foreground">불러오는 중…</p>;
+  }
+  return <Notice variant="info">아직 준비 중이에요.</Notice>;
+}
+
+/**
+ * 사용자 한 사람의 브라우저를 만들고, 켜고, 끄고, 지운다. 오류 코드는 그리지 않는다.
+ * 켜져 있거나 꺼져 있으면 로그인 화면을 연다. `startUrl` 은 이 페이지에서 처음 연 화면만 간다.
+ */
+export function UserBrowserPanel({ startUrl }: { startUrl: string | null }) {
   const [view, setView] = useState<BrowserView | null>(null);
   const [loadError, setLoadError] = useState(false);
   const [pending, setPending] = useState<BrowserAction | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [confirming, setConfirming] = useState(false);
+  const [screen, setScreen] = useState(false);
+  const [startUsed, setStartUsed] = useState(false);
 
   function apply(next: BrowserView | null) {
     if (next === null) setLoadError(true);
@@ -55,6 +83,9 @@ export function UserBrowserPanel() {
   useEffect(() => {
     void readView().then(apply);
   }, []);
+
+  // 화면을 열면 Control Plane 이 브라우저를 켜므로 상태를 다시 읽는다.
+  const reread = useCallback(() => void readView().then(keepView(setView)), []);
 
   const status = view?.exists ? view.status : undefined;
   const moving = status === "STARTING" || status === "STOPPING";
@@ -81,19 +112,7 @@ export function UserBrowserPanel() {
     setConfirming(false);
   }
 
-  if (loadError && view === null) {
-    return (
-      <Notice variant="error" role="alert">
-        브라우저 상태를 읽지 못했어요. 화면을 다시 열어 주세요.
-      </Notice>
-    );
-  }
-  if (view === null) {
-    return <p className="text-sm text-muted-foreground">불러오는 중…</p>;
-  }
-  if (!view.enabled) {
-    return <Notice variant="info">아직 준비 중이에요.</Notice>;
-  }
+  if (view === null || !view.enabled) return notReady(view, loadError);
 
   const minutes = Math.max(1, Math.round((view.idleTimeoutSeconds ?? 0) / 60));
 
@@ -148,6 +167,15 @@ export function UserBrowserPanel() {
                 켜기
               </Button>
             ) : null}
+            {!screen && (status === "RUNNING" || status === "STOPPED") ? (
+              <Button
+                variant="outline"
+                disabled={pending !== null}
+                onClick={() => setScreen(true)}
+              >
+                화면 열기
+              </Button>
+            ) : null}
             {status === "RUNNING" || status === "FAILED" ? (
               <Button
                 variant="outline"
@@ -169,6 +197,16 @@ export function UserBrowserPanel() {
           </div>
         </section>
       )}
+      {screen && status !== undefined ? (
+        <BrowserScreen
+          startUrl={startUsed ? null : startUrl}
+          onOpen={reread}
+          onClose={() => {
+            setScreen(false);
+            setStartUsed(true);
+          }}
+        />
+      ) : null}
       {error ? (
         <Notice variant="error" role="alert">
           {error}
