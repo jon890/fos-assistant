@@ -30,9 +30,10 @@ type Props = {
 };
 
 /**
- * 관리자 영역 에이전트 상세에서 내가 연 마지막 살펴보기를 평가하고 결과를 읽기만 하는 절이다.
+ * 관리자 영역 에이전트 상세에서 내가 연 마지막 살펴보기를 평가하고 결과를 보이는 절이다.
  *
- * <p>평가 결과를 고치거나 승인하는 동작과 자동 실행 동의를 바꾸는 칸은 없다. 모델이 쓴 설명은 평문으로 그린다.
+ * <p>단추는 판정까지 부르므로 자동 실행 설정과 동의가 켜져 있으면 읽기 전용 살펴보기가 시작될 수 있다.
+ * 평가 결과를 고치거나 승인하는 동작과 자동 실행 동의를 바꾸는 칸은 없다. 모델이 쓴 설명은 평문으로 그린다.
  * 판정 묶음이 바뀌면 누른 응답으로 절 상태를 통째로 바꾼다.
  */
 export function AgentValueEvaluationSection({ initialOverview }: Props) {
@@ -65,8 +66,9 @@ export function AgentValueEvaluationSection({ initialOverview }: Props) {
     >
       <h2 className="font-semibold">가치 평가</h2>
       <p className="mt-1 text-sm text-muted-foreground">
-        내가 연 마지막 살펴보기에서 받아들인 문제 후보의 가치를 평가하고, 행동
-        정책이 어떻게 판정하는지 읽어요. 읽기만 하고 실행하지 않아요.
+        내가 연 마지막 살펴보기에서 받아들인 문제 후보를 평가하고, 행동 정책
+        판정을 보여 드려요. 자동 실행 설정과 내 동의가 모두 켜져 있으면 판정에
+        따라 읽기 전용 살펴보기가 한 번 시작될 수 있어요.
       </p>
       {check === null ? (
         <p className="mt-4 text-sm">
@@ -80,6 +82,7 @@ export function AgentValueEvaluationSection({ initialOverview }: Props) {
           </p>
           <div className="mt-3 flex flex-wrap items-center gap-3">
             <Button
+              disabled={evaluation?.outcome === "RUNNING"}
               loading={running}
               loadingText="평가하는 중이에요"
               onClick={() => void run(check.id)}
@@ -177,7 +180,8 @@ function CandidateCard({
             </TableBody>
           </Table>
           <p className="mt-2 text-sm text-muted-foreground">
-            종합 확신 {LEVEL_LABELS[judgement.confidence]}
+            종합 확신{" "}
+            {LEVEL_LABELS[judgement.confidence] ?? judgement.confidence}
           </p>
           {judgement.explanation ? (
             <p className="mt-1 text-sm break-words whitespace-pre-wrap">
