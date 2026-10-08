@@ -3,15 +3,16 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
+import { Bot, Brain, CalendarClock, ChartColumn, Plug } from "lucide-react";
 import { fetchMemories } from "@/lib/memory-api";
 import { NavPending } from "./nav-pending";
 
 const LINKS = [
-  { href: "/agents", label: "에이전트" },
-  { href: "/connections", label: "외부 서비스 연결" },
-  { href: "/tasks", label: "예약 작업" },
-  { href: "/memory", label: "기억" },
-  { href: "/usage", label: "사용량" },
+  { href: "/agents", label: "에이전트", icon: Bot },
+  { href: "/connections", label: "외부 서비스 연결", icon: Plug },
+  { href: "/tasks", label: "예약 작업", icon: CalendarClock },
+  { href: "/memory", label: "기억", icon: Brain },
+  { href: "/usage", label: "사용량", icon: ChartColumn },
 ] as const;
 
 export function MainNav({ onNavigate }: { onNavigate(href: string): void }) {
@@ -46,12 +47,13 @@ export function MainNav({ onNavigate }: { onNavigate(href: string): void }) {
               ? "page"
               : undefined
           }
-          className={`rounded-md px-3 py-2 text-sm hover:bg-accent hover:text-foreground ${
+          className={`flex items-center gap-2 rounded-md px-3 py-2 text-sm hover:bg-accent hover:text-foreground ${
             pathname === link.href || pathname.startsWith(`${link.href}/`)
               ? "bg-accent font-medium text-foreground"
               : "text-muted-foreground"
           }`}
         >
+          <link.icon aria-hidden="true" className="size-4 shrink-0" />
           {link.label}
           {link.href === "/memory" && proposalCount > 0 ? (
             <span

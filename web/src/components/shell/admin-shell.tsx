@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useSyncExternalStore } from "react";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Bot, Cpu, Globe, Plug, Receipt, Users } from "lucide-react";
 import { cn } from "cn";
 import { Badge } from "@/components/ui/badge";
 import { ScreenTransition } from "./screen-transition";
@@ -12,12 +12,12 @@ import { ScreenTransition } from "./screen-transition";
 export const LAST_CONVERSATION_KEY = "last-conversation-path";
 
 const LINKS = [
-  { href: "/admin/people", label: "사용자" },
-  { href: "/admin/agents", label: "에이전트" },
-  { href: "/admin/models", label: "모델" },
-  { href: "/admin/usage", label: "사용량과 비용" },
-  { href: "/admin/connections", label: "커넥터" },
-  { href: "/admin/browsers", label: "브라우저" },
+  { href: "/admin/people", label: "사용자", icon: Users },
+  { href: "/admin/agents", label: "에이전트", icon: Bot },
+  { href: "/admin/models", label: "모델", icon: Cpu },
+  { href: "/admin/usage", label: "사용량과 비용", icon: Receipt },
+  { href: "/admin/connections", label: "커넥터", icon: Plug },
+  { href: "/admin/browsers", label: "브라우저", icon: Globe },
 ] as const;
 
 function under(pathname: string, href: string): boolean {
@@ -93,12 +93,13 @@ export function AdminShell({
                 href={link.href}
                 aria-current={current ? "page" : undefined}
                 className={cn(
-                  "shrink-0 rounded-md px-3 py-2 text-sm whitespace-nowrap hover:bg-accent hover:text-foreground",
+                  "flex shrink-0 items-center gap-2 rounded-md px-3 py-2 text-sm whitespace-nowrap hover:bg-accent hover:text-foreground",
                   current
                     ? "bg-accent font-medium text-foreground"
                     : "text-muted-foreground",
                 )}
               >
+                <link.icon aria-hidden="true" className="size-4 shrink-0" />
                 {link.label}
               </Link>
             );
