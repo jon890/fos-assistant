@@ -88,6 +88,20 @@ test("아이콘과 링크 칸이 없거나 모양이 틀리면 기본 아이콘�
   }
 });
 
+test("본문에 그릴 줄이 없는 카드는 빈 본문을 그리지 않는다", async ({
+  page,
+}) => {
+  // 도구, 링크, 아이콘이 없고 연결하지 않은 카드는 도구 요약, 붙인 에이전트 수, 링크가 모두 없다.
+  const bare = connector("bare-card");
+  await listConnectors(page, [bare, rich]);
+  await page.goto("/connections");
+  const cards = page.getByTestId("connector-card");
+  await expect(cards).toHaveCount(2);
+  await expect(cards.nth(0).locator("[data-slot=card-content]")).toHaveCount(0);
+  // 같은 선택자가 본문이 있는 카드에서는 잡힌다.
+  await expect(cards.nth(1).locator("[data-slot=card-content]")).toHaveCount(1);
+});
+
 test("카드의 설명 글을 눌러도 상세 화면으로 간다", async ({ page }) => {
   await listConnectors(page, [rich]);
   await page.route("**/api/connections/rich-card", (route) =>

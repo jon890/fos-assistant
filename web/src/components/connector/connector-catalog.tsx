@@ -18,10 +18,21 @@ import {
 } from "@/components/connector/connector-identity";
 import {
   connectionStatusLabel,
+  connectorLinkHref,
   readConnectors,
   toolRiskCounts,
   type ConnectorSummary,
 } from "@/lib/connection";
+
+/** 카드 본문에 그릴 줄이 하나라도 있는지 본다. 없으면 빈 본문이 카드 아래 여백만 남기므로 본문을 그리지 않는다. */
+function hasCardContent(connector: ConnectorSummary): boolean {
+  return (
+    !connector.available ||
+    connector.tools.length > 0 ||
+    connector.myStatus !== "DISCONNECTED" ||
+    connectorLinkHref(connector.link) !== null
+  );
+}
 
 /** 「도구 3개 · 조회 1 · 쓰기 2」 처럼 도구 수와 위험도별 수를 한 줄로 만든다. */
 function toolSummary(tools: ConnectorSummary["tools"]): string {
@@ -94,35 +105,37 @@ export function ConnectorCatalog() {
                     </div>
                   </div>
                 </CardHeader>
-                <CardContent className="min-w-0 space-y-1">
-                  {connector.available ? (
-                    connector.tools.length > 0 ? (
+                {hasCardContent(connector) ? (
+                  <CardContent className="min-w-0 space-y-1">
+                    {connector.available ? (
+                      connector.tools.length > 0 ? (
+                        <p
+                          className="text-sm text-muted-foreground"
+                          data-testid="connector-tool-summary"
+                        >
+                          {toolSummary(connector.tools)}
+                        </p>
+                      ) : null
+                    ) : (
+                      <p className="text-sm text-muted-foreground">
+                        지금은 쓸 수 없어요.
+                      </p>
+                    )}
+                    {connector.myStatus === "DISCONNECTED" ? null : (
                       <p
                         className="text-sm text-muted-foreground"
-                        data-testid="connector-tool-summary"
+                        data-testid="connector-binding-count"
                       >
-                        {toolSummary(connector.tools)}
+                        붙인 에이전트 {connector.bindings.length}개
                       </p>
-                    ) : null
-                  ) : (
-                    <p className="text-sm text-muted-foreground">
-                      지금은 쓸 수 없어요.
-                    </p>
-                  )}
-                  {connector.myStatus === "DISCONNECTED" ? null : (
-                    <p
-                      className="text-sm text-muted-foreground"
-                      data-testid="connector-binding-count"
-                    >
-                      붙인 에이전트 {connector.bindings.length}개
-                    </p>
-                  )}
-                  <ConnectorLink
-                    link={connector.link}
-                    title={connector.title}
-                    className="relative z-10"
-                  />
-                </CardContent>
+                    )}
+                    <ConnectorLink
+                      link={connector.link}
+                      title={connector.title}
+                      className="relative z-10"
+                    />
+                  </CardContent>
+                ) : null}
               </Card>
             </li>
           ))}
