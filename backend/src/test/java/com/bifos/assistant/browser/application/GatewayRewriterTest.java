@@ -22,9 +22,9 @@ class GatewayRewriterTest {
     void rewritesPageTarget() {
         JsonNode target = json("""
                 {"id":"PAGE1","type":"page","url":"https://example.com/",
-                 "webSocketDebuggerUrl":"ws://10.0.0.5:9222/devtools/page/PAGE1",
-                 "devtoolsFrontendUrl":"/devtools/inspector.html?ws=10.0.0.5:9222/devtools/page/PAGE1",
-                 "devtoolsFrontendUrlCompat":"/devtools/inspector.html?ws=10.0.0.5:9222/devtools/page/PAGE1"}""");
+                 "webSocketDebuggerUrl":"ws://192.0.2.10:9999/devtools/page/PAGE1",
+                 "devtoolsFrontendUrl":"/devtools/inspector.html?ws=192.0.2.10:9999/devtools/page/PAGE1",
+                 "devtoolsFrontendUrlCompat":"/devtools/inspector.html?ws=192.0.2.10:9999/devtools/page/PAGE1"}""");
 
         JsonNode rewritten = GatewayRewriter.rewrite(target, RELAY);
 
@@ -41,7 +41,7 @@ class GatewayRewriterTest {
     void rewritesBrowserTargetWithGuid() {
         JsonNode version = json("""
                 {"Browser":"Chrome/140.0.0.0",
-                 "webSocketDebuggerUrl":"ws://10.0.0.5:9222/devtools/browser/0a1b2c3d-1111-2222-3333-444455556666"}""");
+                 "webSocketDebuggerUrl":"ws://192.0.2.10:9999/devtools/browser/0a1b2c3d-1111-2222-3333-444455556666"}""");
 
         JsonNode rewritten = GatewayRewriter.rewrite(version, RELAY);
 
@@ -54,10 +54,10 @@ class GatewayRewriterTest {
     @DisplayName("경로 모양이 다르면 WebSocket 주소 칸을 뺀다")
     void dropsUnexpectedSocketPaths() {
         for (String address : new String[] {
-            "ws://10.0.0.5:9222/devtools/page/../browser/X",
-            "ws://10.0.0.5:9222/devtools/worker/W1",
-            "ws://10.0.0.5:9222/devtools/page/a.b",
-            "ws://10.0.0.5:9222/devtools/page/" + "a".repeat(129),
+            "ws://192.0.2.10:9999/devtools/page/../browser/X",
+            "ws://192.0.2.10:9999/devtools/worker/W1",
+            "ws://192.0.2.10:9999/devtools/page/a.b",
+            "ws://192.0.2.10:9999/devtools/page/" + "a".repeat(129),
             "not a url"
         }) {
             JsonNode target = JSON.createObjectNode().put("id", "X").put("webSocketDebuggerUrl", address);
@@ -75,7 +75,8 @@ class GatewayRewriterTest {
     @DisplayName("번호가 128자이면 바꾼다")
     void acceptsLongestTargetId() {
         String id = "a".repeat(128);
-        JsonNode target = JSON.createObjectNode().put("webSocketDebuggerUrl", "ws://10.0.0.5:9222/devtools/page/" + id);
+        JsonNode target =
+                JSON.createObjectNode().put("webSocketDebuggerUrl", "ws://192.0.2.10:9999/devtools/page/" + id);
 
         assertThat(GatewayRewriter.rewrite(target, RELAY)
                         .path("webSocketDebuggerUrl")
@@ -86,7 +87,7 @@ class GatewayRewriterTest {
     @Test
     @DisplayName("https 기반 주소의 중계 주소는 wss 로 시작하고 http 기반은 ws 로 시작한다")
     void followsGatewaySchemeForRelay() {
-        JsonNode target = JSON.createObjectNode().put("webSocketDebuggerUrl", "ws://10.0.0.5:9222/devtools/page/P1");
+        JsonNode target = JSON.createObjectNode().put("webSocketDebuggerUrl", "ws://192.0.2.10:9999/devtools/page/P1");
         String secure = relayBase("https://control-plane.example.test/internal/browser-gateway");
         String plain = relayBase("http://control-plane.example.test/internal/browser-gateway");
 

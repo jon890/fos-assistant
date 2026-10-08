@@ -46,7 +46,7 @@ class BrowserGatewayControllerTest {
     private static final String TOKEN = "b1." + "0".repeat(64);
     private static final String BASE = "/internal/browser-gateway/" + TOKEN;
     private static final String RELAY = "ws://control-plane.example.test/internal/browser-gateway/" + TOKEN;
-    private static final URI CDP = URI.create("http://10.0.0.5:9222");
+    private static final URI CDP = URI.create("http://192.0.2.10:9999");
     private static final GatewayTarget TARGET = new GatewayTarget(7L, 70L, CDP);
 
     private final BrowserGateway gateway = mock(BrowserGateway.class);
@@ -66,7 +66,7 @@ class BrowserGatewayControllerTest {
     void rewritesVersion() throws Exception {
         chrome.answer("GET /json/version", 200, """
                 {"Browser":"Chrome/140.0.0.0",
-                 "webSocketDebuggerUrl":"ws://10.0.0.5:9222/devtools/browser/0a1b2c3d-1111-2222-3333-444455556666"}""");
+                 "webSocketDebuggerUrl":"ws://192.0.2.10:9999/devtools/browser/0a1b2c3d-1111-2222-3333-444455556666"}""");
 
         mvc.perform(get(BASE + "/json/version"))
                 .andExpect(status().isOk())
@@ -82,9 +82,9 @@ class BrowserGatewayControllerTest {
     @DisplayName("json 과 json/list 는 줄마다 주소를 바꾸고 DevTools 화면 주소를 뺀다")
     void rewritesEveryListRow() throws Exception {
         chrome.answer("GET /json/list", 200, """
-                [{"id":"PAGE1","type":"page","webSocketDebuggerUrl":"ws://10.0.0.5:9222/devtools/page/PAGE1",
-                  "devtoolsFrontendUrl":"/devtools/inspector.html?ws=10.0.0.5:9222/devtools/page/PAGE1"},
-                 {"id":"PAGE2","type":"page","webSocketDebuggerUrl":"ws://10.0.0.5:9222/devtools/page/PAGE2"}]""");
+                [{"id":"PAGE1","type":"page","webSocketDebuggerUrl":"ws://192.0.2.10:9999/devtools/page/PAGE1",
+                  "devtoolsFrontendUrl":"/devtools/inspector.html?ws=192.0.2.10:9999/devtools/page/PAGE1"},
+                 {"id":"PAGE2","type":"page","webSocketDebuggerUrl":"ws://192.0.2.10:9999/devtools/page/PAGE2"}]""");
 
         for (String path : List.of("/json", "/json/list")) {
             mvc.perform(get(BASE + path))
@@ -109,6 +109,40 @@ class BrowserGatewayControllerTest {
 
         verifyNoInteractions(gateway);
         assertThat(chrome.calls).isEmpty();
+    }
+
+    @Test
+    @DisplayName("Sec-Fetch-Site 나 Sec-Fetch-Mode 머리가 있으면 Origin 이 없어도 표식을 보기 전에 빈 본문의 403 이다")
+    void rejectsBrowserFetchMetadata() throws Exception {
+        for (String name : List.of("Sec-Fetch-Site", "Sec-Fetch-Mode")) {
+            String value = "Sec-Fetch-Site".equals(name) ? "cross-site" : "no-cors";
+            for (String path : List.of(
+                    "/json/version", "/json/list", "/json/close/PAGE1", "/json/activate/PAGE1", "/json/protocol")) {
+                mvc.perform(get(BASE + path).header(name, value))
+                        .andExpect(status().isForbidden())
+                        .andExpect(content().bytes(new byte[0]));
+            }
+            mvc.perform(put(URI.create(BASE + "/json/new?about:blank")).header(name, value))
+                    .andExpect(status().isForbidden());
+        }
+
+        verifyNoInteractions(gateway);
+        assertThat(chrome.calls).isEmpty();
+    }
+
+    @Test
+    @DisplayName("활동을 기록하지 못해도 Chrome 의 답을 그대로 준다")
+    void answersEvenWhenTouchFails() throws Exception {
+        chrome.answer("GET /json/activate/PAGE1", 200, "Target activated");
+        doThrow(new IllegalStateException("database is unavailable"))
+                .when(gateway)
+                .touch(TARGET);
+
+        mvc.perform(get(BASE + "/json/activate/PAGE1"))
+                .andExpect(status().isOk())
+                .andExpect(content().string("Target activated"));
+
+        assertThat(chrome.calls).containsExactly(CDP + " GET /json/activate/PAGE1");
     }
 
     @Test
@@ -151,10 +185,10 @@ class BrowserGatewayControllerTest {
     @DisplayName("json/new 는 풀어 읽은 주소가 http, https, about:blank 일 때만 원문 쿼리 그대로 넘기고 아니면 400 이다")
     void opensOnlyWebAddresses() throws Exception {
         chrome.answer("PUT /json/new?https%3A%2F%2Fexample.com%2Fa%3Fb%3D1", 200, """
-                {"id":"NEW1","type":"page","webSocketDebuggerUrl":"ws://10.0.0.5:9222/devtools/page/NEW1",
+                {"id":"NEW1","type":"page","webSocketDebuggerUrl":"ws://192.0.2.10:9999/devtools/page/NEW1",
                  "devtoolsFrontendUrl":"/devtools/inspector.html"}""");
         chrome.answer("PUT /json/new?about:blank", 200, """
-                {"id":"NEW2","type":"page","webSocketDebuggerUrl":"ws://10.0.0.5:9222/devtools/page/NEW2"}""");
+                {"id":"NEW2","type":"page","webSocketDebuggerUrl":"ws://192.0.2.10:9999/devtools/page/NEW2"}""");
 
         mvc.perform(put(URI.create(BASE + "/json/new?https%3A%2F%2Fexample.com%2Fa%3Fb%3D1")))
                 .andExpect(status().isOk())

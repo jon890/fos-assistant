@@ -47,6 +47,8 @@ public class BrowserGatewayController {
 
     private static final JsonMapper JSON = JsonMapper.builder().build();
     private static final int OK = 200;
+    private static final String SEC_FETCH_SITE = "Sec-Fetch-Site";
+    private static final String SEC_FETCH_MODE = "Sec-Fetch-Mode";
 
     private final BrowserGateway gateway;
     private final CdpGatewayHttp cdp;
@@ -105,6 +107,9 @@ public class BrowserGatewayController {
      * <p>WebSocket 으로 올리자는 요청({@code Upgrade: websocket})은 받지 않는다. 이 처리기 매핑이 WebSocket 처리기 매핑보다 먼저
      * 보므로, 받으면 WebSocket handshake 를 여기서 가로챈다. {@code Upgrade} 머리 전체를 빼지는 않는다. JDK {@code HttpClient} 는
      * 평범한 요청에도 {@code Upgrade: h2c} 를 실으므로, 그 요청이 이 매핑을 지나치면 전역 오류 처리기가 표식이 든 경로를 로그에 남긴다.
+     *
+     * <p>머리 조건은 값의 대소문자를 구분해 비교하므로 {@code websocket} 과 {@code WebSocket} 만 뺀다. JDK 와 Bun 의 WebSocket
+     * 클라이언트는 {@code websocket} 으로 보낸다.
      */
     @RequestMapping(
             value = "/**",
@@ -132,14 +137,28 @@ public class BrowserGatewayController {
         try {
             GatewayTarget target = gateway.open(token);
             ResponseEntity<byte[]> response = call.apply(target);
-            gateway.touch(target);
+            touch(target);
             return response;
         } catch (ApiException ex) {
-            log.warn("browser gateway refused code={}", ex.code());
+            if (ex.code() == ErrorCode.BROWSER_NOT_FOUND) {
+                // 거절한 까닭은 BrowserGateway 가 한 줄 남겼다
+                log.debug("browser gateway refused code={}", ex.code());
+            } else {
+                log.warn("browser gateway refused code={}", ex.code());
+            }
             return empty(statusOf(ex.code()));
         } catch (RuntimeException ex) {
             log.warn("browser gateway failed kind={}", ex.getClass().getSimpleName());
             return empty(HttpStatus.BAD_GATEWAY);
+        }
+    }
+
+    /** 활동을 기록한다. 기록하지 못해도 Chrome 의 답은 이미 받았으므로 응답을 바꾸지 않는다. */
+    private void touch(GatewayTarget target) {
+        try {
+            gateway.touch(target);
+        } catch (RuntimeException ex) {
+            log.warn("browser gateway touch failed kind={}", ex.getClass().getSimpleName());
         }
     }
 
@@ -187,9 +206,16 @@ public class BrowserGatewayController {
         return address.startsWith("http://") || address.startsWith("https://") || "about:blank".equals(address);
     }
 
-    /** 브라우저 페이지가 보낸 요청이다. 커넥터는 {@code Origin} 을 보내지 않는다. */
+    /**
+     * 브라우저가 보낸 요청이다. 커넥터는 {@code Origin} 도 {@code Sec-Fetch-*} 도 보내지 않는다.
+     *
+     * <p>브라우저는 no-cors {@code GET} 에 {@code Origin} 을 싣지 않는다. 그래서 {@code Sec-Fetch-Site} 나 {@code Sec-Fetch-Mode}
+     * 가 있어도 거절해 페이지가 {@code json/close}, {@code json/activate} 를 부르지 못하게 한다.
+     */
     private static boolean fromPage(HttpServletRequest request) {
-        return request.getHeader(HttpHeaders.ORIGIN) != null;
+        return request.getHeader(HttpHeaders.ORIGIN) != null
+                || request.getHeader(SEC_FETCH_SITE) != null
+                || request.getHeader(SEC_FETCH_MODE) != null;
     }
 
     private static HttpStatus statusOf(ErrorCode code) {

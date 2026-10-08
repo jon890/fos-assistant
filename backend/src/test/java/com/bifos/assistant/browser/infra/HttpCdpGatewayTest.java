@@ -11,8 +11,11 @@ import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -22,6 +25,9 @@ class HttpCdpGatewayTest {
 
     private final List<String> requests = new CopyOnWriteArrayList<>();
     private final HttpCdpGateway gateway = new HttpCdpGateway();
+    /** 본문을 멈춘 처리기를 풀어 준다. 서버를 멈추기 전에 풀어야 처리 스레드가 끝난다. */
+    private final CountDownLatch stalled = new CountDownLatch(1);
+
     private HttpServer server;
     private URI cdp;
 
@@ -34,6 +40,7 @@ class HttpCdpGatewayTest {
 
     @AfterEach
     void tearDown() {
+        stalled.countDown();
         gateway.close();
         server.stop(0);
     }
@@ -76,6 +83,37 @@ class HttpCdpGatewayTest {
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageNotContaining("127.0.0.1")
                 .hasMessageNotContaining("xxx");
+    }
+
+    @Test
+    @DisplayName("머리만 보내고 본문을 멈추면 시간 제한 안에 주소를 싣지 않고 실패한다")
+    void failsWhenBodyStalls() {
+        server.createContext("/json/list", exchange -> {
+            exchange.getResponseHeaders().set("Content-Type", "application/json");
+            exchange.sendResponseHeaders(200, 100);
+            exchange.getResponseBody().write("[".getBytes(StandardCharsets.UTF_8));
+            exchange.getResponseBody().flush();
+            try {
+                stalled.await(10, TimeUnit.SECONDS);
+            } catch (InterruptedException ex) {
+                Thread.currentThread().interrupt();
+            }
+            exchange.close();
+        });
+        HttpCdpGateway quick = new HttpCdpGateway(Duration.ofMillis(300));
+        long started = System.nanoTime();
+
+        try {
+            assertThatThrownBy(() -> quick.get(cdp, "/json/list"))
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessageNotContaining("127.0.0.1");
+        } finally {
+            quick.close();
+        }
+
+        assertThat(Duration.ofNanos(System.nanoTime() - started))
+                .as("본문을 기다린 시간")
+                .isLessThan(Duration.ofSeconds(3));
     }
 
     @Test

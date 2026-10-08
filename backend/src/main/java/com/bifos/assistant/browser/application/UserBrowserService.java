@@ -125,8 +125,8 @@ public class UserBrowserService {
     /**
      * 브라우저를 켠다. 이미 켜져 있으면 그대로 돌려준다.
      *
-     * @throws ApiException 동시 수가 찼으면 {@code BROWSER_CAPACITY}, 켜지 못했으면 {@code BROWSER_START_FAILED}, 실패한 줄에 남은
-     *     컨테이너를 지우지 못했으면 {@code BROWSER_STOP_FAILED}
+     * @throws ApiException 다른 전이가 진행 중이면 {@code BROWSER_BUSY}, 동시 수가 찼으면 {@code BROWSER_CAPACITY}, 켜지 못했으면
+     *     {@code BROWSER_START_FAILED}, 실패한 줄에 남은 컨테이너를 지우지 못했으면 {@code BROWSER_STOP_FAILED}
      */
     public UserBrowserSnapshot start(Long userId) {
         requireEnabled();
@@ -137,6 +137,11 @@ public class UserBrowserService {
             browser = owned(userId);
             if (browser.status() == UserBrowserStatus.RUNNING) {
                 return UserBrowserSnapshot.of(browser);
+            }
+            // 자기 줄의 다른 전이가 진행 중이다. 세기 전에 거절해야 그 줄이 동시 수를 채웠을 때 BROWSER_CAPACITY 가 아니라 기다릴 수 있는
+            // BROWSER_BUSY 가 된다
+            if (browser.status() == UserBrowserStatus.STARTING || browser.status() == UserBrowserStatus.STOPPING) {
+                throw new ApiException(ErrorCode.BROWSER_BUSY, "user browser is changing");
             }
             // 끄다 실패해 컨테이너가 남은 FAILED 도 돌고 있을 수 있어 함께 센다
             long running = browsers.countByStatusIn(COUNTED)
@@ -241,15 +246,19 @@ public class UserBrowserService {
      */
     public BrowserEndpoint ensureRunning(Long userId) {
         requireEnabled();
-        if (browsers.findByUserId(userId).isEmpty()) {
-            try {
+        // 확인과 만들기를 한 잠금에 묶는다. 함께 온 중계 요청이 이긴 쪽의 프로필 디렉터리를 지우지 않는다
+        startLock.lock();
+        try {
+            if (browsers.findByUserId(userId).isEmpty()) {
                 create(userId);
-            } catch (ApiException ex) {
-                // 그 사이 다른 요청이 먼저 만들었다. 그 줄을 켠다
-                if (ex.code() != ErrorCode.BROWSER_EXISTS) {
-                    throw ex;
-                }
             }
+        } catch (ApiException ex) {
+            // 잠금 밖의 API 만들기가 먼저 만들었다. 그 줄을 켠다
+            if (ex.code() != ErrorCode.BROWSER_EXISTS) {
+                throw ex;
+            }
+        } finally {
+            startLock.unlock();
         }
         UserBrowser running = awaitRunning(userId);
         URI address = Optional.ofNullable(running.containerId())
@@ -261,8 +270,8 @@ public class UserBrowserService {
     /**
      * 줄이 {@code RUNNING} 이 될 때까지 켜거나 기다린다.
      *
-     * <p>{@code start} 는 동시 수를 전이보다 먼저 센다. 자기 줄이 {@code STARTING} 이나 {@code STOPPING} 인데 부르면 동시 수가 찼을 때
-     * {@code BROWSER_BUSY} 대신 {@code BROWSER_CAPACITY} 가 난다. 그래서 그 두 상태에서는 부르지 않고 기다린다.
+     * <p>자기 줄이 {@code STARTING} 이나 {@code STOPPING} 이면 {@code start} 를 부르지 않고 기다린다. 읽은 뒤에 다른 요청이 그 전이를
+     * 시작했으면 {@code start} 가 잠금 안에서 다시 읽어 {@code BROWSER_BUSY} 를 던지므로 그때도 기다린다.
      */
     private UserBrowser awaitRunning(Long userId) {
         Instant deadline = clock.instant().plus(properties.current().startTimeout());

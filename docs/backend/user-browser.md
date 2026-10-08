@@ -240,14 +240,14 @@ Control Plane 은 브라우저의 CDP 에 두 가지로 닿는다. 주소는 컨
 | `PUT json/new?<주소>` | 주소가 `http`, `https`, `about:blank` 일 때만 넘긴다. 아니면 400 이고, 이 검사는 아래 판정 순서보다 먼저 한다. 응답은 `json/list` 의 한 줄처럼 바꾼다 |
 | `GET json/close/<번호>`, `GET json/activate/<번호>` | 번호가 영문자와 숫자일 때만 넘기고 Chrome 의 글을 그대로 준다 |
 | WebSocket `devtools/browser/<번호>`, `devtools/page/<번호>` | 아직 없다. 아래 「WebSocket」 의 계약으로 더한다. 번호가 영문자와 숫자, `-` 로 128자까지일 때만 Chrome 의 같은 경로에 붙고 양쪽 글 메시지를 그대로 잇는다. 브라우저 대상 번호는 GUID 다 |
-| 그 밖 | 빈 404. WebSocket upgrade(`Upgrade: websocket`) 요청은 이 받기에서 빠진다 |
+| 그 밖 | 빈 404. WebSocket upgrade(`Upgrade: websocket`) 요청은 이 받기에서 빠진다. 머리 값은 대소문자를 구분해 `websocket` 과 `WebSocket` 만 빼며, JDK 와 Bun 의 클라이언트는 `websocket` 으로 보낸다 |
 
 중계 주소는 `gateway-base-url` 의 scheme 을 `ws` 나 `wss` 로 바꾸고 `/<접근 표식>/devtools/<종류>/<번호>` 를 붙인 것이다.
 커넥터는 이 주소의 경로만 꺼내 자기가 받은 주소의 호스트에 붙이므로 둘이 달라도 된다.
 
 요청마다 이 순서로 판정한다.
 
-1. `Origin` 머리가 있으면 403 이다. 브라우저 페이지가 이 경로를 부르지 못하게 한다
+1. `Origin`, `Sec-Fetch-Site`, `Sec-Fetch-Mode` 머리 가운데 하나라도 있으면 403 이다. 브라우저가 보낸 요청이다. 브라우저는 no-cors `GET` 에 `Origin` 을 싣지 않으므로 `Sec-Fetch-*` 로도 막아 페이지가 `json/close`, `json/activate` 를 부르지 못하게 한다
 2. 중계가 꺼졌거나(두 설정 가운데 하나가 비었다) 기능이 꺼졌으면 503 이다
 3. 표식을 확인한다. 모양이 틀렸거나, 서명이 맞지 않거나, 바인딩이 없거나, 호출 표식이 만료됐으면 404 다. 어느 까닭인지 응답으로 구분하지 않는다
 4. 주인이 허용 목록에서 꺼져 있으면 404 다
