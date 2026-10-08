@@ -234,6 +234,30 @@ class HermesModelCatalogTest {
         assertThat(paths).isEmpty();
     }
 
+    @Test
+    @DisplayName("같은 모델 이름도 provider 별로 reasoning 지원을 읽고 이름으로 추정하지 않는다")
+    void keepsCapabilitiesSeparateForSameModelAcrossProviders() {
+        respondWith(200, """
+                {"providers": [
+                  {"slug": "openai-codex", "authenticated": true, "models": ["shared-model"],
+                   "capabilities": {"shared-model": {"reasoning": false, "can_disable_reasoning": true}}},
+                  {"slug": "anthropic", "authenticated": true, "models": ["shared-model"],
+                   "capabilities": {"shared-model": {"reasoning": true, "can_disable_reasoning": false}}},
+                  {"slug": "openrouter", "authenticated": true, "models": ["shared-model"]}
+                ]}
+                """);
+
+        HermesModelCatalog catalog = client.readCatalog(baseUrl(), "dad");
+
+        assertThat(catalog.providers()).extracting(HermesModelCatalog.Provider::slug)
+                .containsExactly("openai-codex", "anthropic", "openrouter");
+        assertThat(catalog.providers()).extracting(provider -> provider.reasoning().get("shared-model"))
+                .containsExactly(
+                        new ReasoningCapability(UNSUPPORTED, SUPPORTED),
+                        new ReasoningCapability(SUPPORTED, UNSUPPORTED),
+                        ReasoningCapability.UNKNOWN_ALL);
+    }
+
     private void respondWith(int status, String body) {
         this.status = status;
         this.responseBody = body;

@@ -32,6 +32,7 @@ class HermesRunRequestTest {
 
     private final HermesProfileKeyStore keyStore = mock(HermesProfileKeyStore.class);
     private final AtomicReference<String> receivedBody = new AtomicReference<>();
+    private final AtomicReference<String> receivedAuthorization = new AtomicReference<>();
     private final HttpHermesRunsClient client = new HttpHermesRunsClient(
             keyStore,
             new HermesProperties(
@@ -55,6 +56,7 @@ class HermesRunRequestTest {
         // 받은 POST /v1/runs 본문을 저장하고 실행 번호를 돌려준다.
         server.createContext("/p/dad/v1/runs", exchange -> {
             receivedBody.set(new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8));
+            receivedAuthorization.set(exchange.getRequestHeaders().getFirst("Authorization"));
             byte[] payload = "{\"run_id\":\"run-1\",\"status\":\"queued\"}".getBytes(StandardCharsets.UTF_8);
             exchange.getResponseHeaders().set("Content-Type", "application/json");
             exchange.sendResponseHeaders(200, payload.length);
@@ -129,6 +131,23 @@ class HermesRunRequestTest {
                 .isEqualTo(ErrorCode.VALIDATION_FAILED);
         verifyNoInteractions(keyStore);
         assertThat(receivedBody.get()).isNull();
+    }
+
+    @Test
+    @DisplayName("provider 를 바꿔도 profile key 는 같고 모델과 effort 는 요청값 그대로 보낸다")
+    void keepsProfileKeyAndRequestedEffortWhenProviderChanges() {
+        for (String provider : new String[] {"openai-codex", "anthropic", "openrouter", "custom-provider"}) {
+            client.submit(command(provider, "shared-model", "max"));
+
+            JsonNode body = submittedBody();
+            assertThat(body.path("provider").asString()).isEqualTo(provider);
+            assertThat(body.path("model").asString()).isEqualTo("shared-model");
+            assertThat(body.path("model_options").path("reasoning").path("effort").asString())
+                    .isEqualTo("max");
+            assertThat(receivedAuthorization.get()).isEqualTo("Bearer dad-key");
+            assertThat(body.propertyNames())
+                    .containsExactlyInAnyOrder("input", "provider", "model", "model_options");
+        }
     }
 
     private JsonNode submittedBody() {
