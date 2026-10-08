@@ -427,6 +427,15 @@ public class ChatService {
         return chatConversationManagement.chooseModelTier(user, conversationId, mode, tier);
     }
 
+    /**
+     * 예약 작업 발화가 그 대화를 작업의 단계로 고르게 한다. 고른 모델과 effort 는 지운다.
+     *
+     * <p>주인과 대화는 부르는 쪽이 이미 정했다. 부르는 쪽의 트랜잭션이 있으면 그 안에서 바꾼다.
+     */
+    public void chooseTierForTask(Long conversationId, ModelTier tier) {
+        chatConversationManagement.chooseTierForTask(conversationId, tier);
+    }
+
     @Transactional
     public void delete(CurrentUser user, Long conversationId) {
         chatConversationManagement.delete(user, conversationId);

@@ -1,5 +1,6 @@
 package com.bifos.assistant.task.domain;
 
+import com.bifos.assistant.model.domain.type.ModelTier;
 import com.bifos.assistant.task.domain.type.ConversationMode;
 import com.bifos.assistant.task.domain.type.NotifyPolicy;
 import com.bifos.assistant.task.domain.type.TaskKind;
@@ -90,6 +91,11 @@ public class Task {
     @Column(name = "notify", nullable = false, length = 20)
     private NotifyPolicy notifyPolicy;
 
+    /** 발화하는 대화를 고를 모델 단계. 비면 대화의 선택을 건드리지 않는다. {@code CHECK} 작업은 늘 비어 있다. */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "model_tier", length = 16)
+    private ModelTier modelTier;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
@@ -147,6 +153,15 @@ public class Task {
     public void edit(
             Long agentId, String title, String instruction, ConversationMode mode, NotifyPolicy notify, Instant now) {
         apply(agentId, title, instruction, mode, notify, now);
+    }
+
+    /** 모델 단계를 고른다. null 이면 단계를 지운다. {@code TURN} 작업만 고를 수 있다. */
+    public void chooseModelTier(ModelTier tier, Instant now) {
+        if (kind != TaskKind.TURN) {
+            throw new IllegalStateException("only TURN tasks can choose a model tier");
+        }
+        modelTier = tier;
+        updatedAt = micros(now);
     }
 
     /**

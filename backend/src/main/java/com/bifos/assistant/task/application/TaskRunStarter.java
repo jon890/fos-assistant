@@ -284,7 +284,7 @@ public class TaskRunStarter {
                         .findByIdAndUserIdAndDeletedAtIsNull(run.conversationId(), task.ownerUserId())
                         .filter(conversation -> conversation.agentId().equals(task.agentId()))
                         .isPresent()) {
-            return run.conversationId();
+            return withTaskTier(task, run.conversationId());
         }
         if (run.conversationId() != null && task.conversationMode() == ConversationMode.NEW_PER_RUN) {
             chat.discardEmptyTaskConversation(run.conversationId());
@@ -303,6 +303,19 @@ public class TaskRunStarter {
                     .id();
         }
         run.useConversation(conversationId);
+        return withTaskTier(task, conversationId);
+    }
+
+    /**
+     * 작업이 단계를 골랐으면 그 대화가 그 단계를 고르게 한다. 비었으면 대화의 선택을 건드리지 않는다.
+     *
+     * <p>단계가 빈 작업은 {@code SINGLE} 대화에서 사용자가 고른 모델을 지우지 않는다. 대화 엔티티를 읽어 고치지 않고 조건부
+     * update 질의로 그 칸만 적는다. 엔티티를 고치면 commit 때 다른 트랜잭션이 쓴 칸까지 읽은 때의 값으로 되돌린다.
+     */
+    private Long withTaskTier(Task task, Long conversationId) {
+        if (task.modelTier() != null) {
+            chat.chooseTierForTask(conversationId, task.modelTier());
+        }
         return conversationId;
     }
 

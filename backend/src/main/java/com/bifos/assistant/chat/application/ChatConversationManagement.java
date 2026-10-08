@@ -94,6 +94,11 @@ class ChatConversationManagement {
         return access.requireOwn(user, conversationId);
     }
 
+    /** 예약 작업 발화가 그 대화를 작업의 단계로 고르게 한다. 부르는 쪽의 트랜잭션이 있으면 그 안에서 바꾼다. */
+    void chooseTierForTask(Long conversationId, ModelTier tier) {
+        conversationWriter.chooseTierForTask(conversationId, tier);
+    }
+
     void delete(CurrentUser user, Long conversationId) {
         access.requireOwn(user, conversationId);
         if (conversationWriter.deleteIfActive(conversationId, user.id(), clock.instant()) == 0) {

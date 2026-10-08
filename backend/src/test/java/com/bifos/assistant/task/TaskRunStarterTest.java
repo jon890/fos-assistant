@@ -21,6 +21,7 @@ import com.bifos.assistant.chat.application.TurnIntent;
 import com.bifos.assistant.chat.domain.ChatMessage;
 import com.bifos.assistant.chat.domain.Conversation;
 import com.bifos.assistant.chat.domain.type.MessageRole;
+import com.bifos.assistant.chat.domain.type.ModelSelectionMode;
 import com.bifos.assistant.chat.infra.ChatMessageRepository;
 import com.bifos.assistant.chat.infra.ConversationRepository;
 import com.bifos.assistant.hermes.HermesRunEventStream;
@@ -31,6 +32,7 @@ import com.bifos.assistant.hermes.HermesToolsetClient;
 import com.bifos.assistant.hermes.StubHermesRunsClient;
 import com.bifos.assistant.hermes.dto.HermesRunResult;
 import com.bifos.assistant.hermes.dto.TokenUsage;
+import com.bifos.assistant.model.domain.type.ModelTier;
 import com.bifos.assistant.notification.domain.Notification;
 import com.bifos.assistant.notification.domain.type.NotificationKind;
 import com.bifos.assistant.notification.domain.type.NotificationTargetType;
@@ -64,6 +66,7 @@ import com.bifos.assistant.testsupport.LongProactiveCheckTimeouts;
 import com.bifos.assistant.testsupport.SmallExecutionLimit;
 import com.bifos.assistant.usage.application.TurnSlot;
 import com.bifos.assistant.usage.application.UserExecutionLimiter;
+import com.bifos.assistant.usage.infra.AgentExecutionRepository;
 import com.bifos.assistant.user.domain.AppUser;
 import com.bifos.assistant.user.infra.AppUserRepository;
 import java.time.Duration;
@@ -172,6 +175,9 @@ class TaskRunStarterTest {
 
     @Autowired
     ProactiveCheckRepository checks;
+
+    @Autowired
+    AgentExecutionRepository executions;
 
     private final List<Long> createdUsers = new ArrayList<>();
     private final List<Long> createdChecks = new ArrayList<>();
@@ -738,6 +744,85 @@ class TaskRunStarterTest {
         assertThat(task.title()).as("사용자가 바꾼 이름").isEqualTo(renamed);
         assertThat(task.conversationId()).as("작업에 적은 대화").isNotNull().isEqualTo(finished.conversationId());
         assertPausedWithoutSubmission(fixture, run);
+    }
+
+    @Test
+    @DisplayName("FAST 를 고른 NEW_PER_RUN 작업의 발화 대화와 루트 실행은 FAST 단계다")
+    void usesTaskTierForNewPerRunConversation() {
+        Fixture fixture = fixture(ConversationMode.NEW_PER_RUN, NotifyPolicy.NEVER);
+        chooseTier(fixture, ModelTier.FAST);
+        TaskRun run = queued(fixture, SCHEDULED, NOW);
+
+        starter.startQueued(NOW);
+
+        TaskRun finished = awaitFinished(run);
+        assertThat(finished.status()).isEqualTo(TaskRunStatus.SUCCEEDED);
+        Conversation conversation =
+                conversations.findById(finished.conversationId()).orElseThrow();
+        assertThat(conversation.modelSelectionMode()).as("대화의 선택 방식").isEqualTo(ModelSelectionMode.TIER);
+        assertThat(conversation.modelTier()).as("대화의 단계").isEqualTo(ModelTier.FAST);
+        assertThat(executions.findById(finished.executionId()).orElseThrow().modelTier())
+                .as("루트 실행의 단계")
+                .isEqualTo(ModelTier.FAST);
+    }
+
+    @Test
+    @DisplayName("DEEP 을 고른 SINGLE 작업은 사용자가 그 대화에서 모델을 골라도 다음 발화가 DEEP 단계로 되돌린다")
+    void returnsSingleConversationToTaskTier() {
+        Fixture fixture = fixture(ConversationMode.SINGLE, NotifyPolicy.NEVER);
+        chooseTier(fixture, ModelTier.DEEP);
+        TaskRun first = queued(fixture, SCHEDULED, NOW);
+        starter.startQueued(NOW);
+        Long conversationId = awaitFinished(first).conversationId();
+        new TransactionTemplate(transactionManager)
+                .executeWithoutResult(status -> assertThat(conversations.chooseModelIfActive(
+                                conversationId,
+                                fixture.owner().id(),
+                                "custom-provider",
+                                "custom-model",
+                                null,
+                                ModelSelectionMode.CUSTOM))
+                        .as("사용자가 고른 모델")
+                        .isEqualTo(1));
+        assertThat(conversations.findById(conversationId).orElseThrow().modelSelectionMode())
+                .as("사용자가 고른 뒤의 선택 방식")
+                .isEqualTo(ModelSelectionMode.CUSTOM);
+
+        Instant nextMonth = Instant.parse("2026-12-01T00:00:00Z");
+        TaskRun second = queued(fixture, nextMonth, nextMonth);
+        starter.startQueued(nextMonth);
+        TaskRun finished = awaitFinished(second);
+
+        assertThat(finished.status()).isEqualTo(TaskRunStatus.SUCCEEDED);
+        assertThat(finished.conversationId()).as("두 번째 발화의 대화").isEqualTo(conversationId);
+        Conversation conversation = conversations.findById(conversationId).orElseThrow();
+        assertThat(conversation.modelSelectionMode()).as("대화의 선택 방식").isEqualTo(ModelSelectionMode.TIER);
+        assertThat(conversation.modelTier()).as("대화의 단계").isEqualTo(ModelTier.DEEP);
+        assertThat(conversation.modelChoice().provider()).as("고른 provider").isNull();
+        assertThat(conversation.modelChoice().model()).as("고른 모델").isNull();
+    }
+
+    @Test
+    @DisplayName("단계가 빈 NEW_PER_RUN 작업의 발화 대화는 선택 방식이 비어 있다")
+    void keepsSelectionEmptyWithoutTaskTier() {
+        Fixture fixture = fixture(ConversationMode.NEW_PER_RUN, NotifyPolicy.NEVER);
+        TaskRun run = queued(fixture, SCHEDULED, NOW);
+
+        starter.startQueued(NOW);
+
+        TaskRun finished = awaitFinished(run);
+        assertThat(finished.status()).isEqualTo(TaskRunStatus.SUCCEEDED);
+        Conversation conversation =
+                conversations.findById(finished.conversationId()).orElseThrow();
+        assertThat(conversation.modelSelectionMode()).as("대화의 선택 방식").isNull();
+        assertThat(conversation.modelTier()).as("대화의 단계").isNull();
+    }
+
+    /** 다시 읽은 작업에 단계를 고른다. fixture 의 분리된 객체를 저장하면 merge 가 다른 칸을 그 때의 값으로 덮는다. */
+    private void chooseTier(Fixture fixture, ModelTier tier) {
+        Task task = tasks.findById(fixture.task().id()).orElseThrow();
+        task.chooseModelTier(tier, NOW);
+        tasks.save(task);
     }
 
     /** 그 사용자의 turn 자리 둘을 먼저 얻어 한도를 채운다. 정리 단계가 돌려준다. */

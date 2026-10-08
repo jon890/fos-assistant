@@ -174,6 +174,21 @@ public interface ConversationRepository extends JpaRepository<Conversation, Long
             @Param("mode") ModelSelectionMode mode,
             @Param("tier") ModelTier tier);
 
+    /**
+     * 대화가 그 단계를 고르게 한다. 고른 모델과 effort 는 지운다. 예약 작업 발화가 부르는 경로다.
+     *
+     * <p>발화 준비 트랜잭션 안에서 불리므로 {@code clearAutomatically} 를 두지 않는다. 영속성 컨텍스트를 비우면 그 뒤 발화 기록의
+     * 변경이 반영되지 않는다. 대화 목록의 순서를 흔들지 않도록 {@code updatedAt} 은 바꾸지 않는다. 트랜잭션은 {@code
+     * ConversationWriter} 가 연다.
+     */
+    @Modifying
+    @Query("""
+            update Conversation c set c.modelSelectionMode = :mode, c.modelTier = :tier,
+                c.modelProvider = null, c.model = null, c.reasoningEffort = null
+             where c.id = :id
+            """)
+    int chooseTierForTask(@Param("id") Long id, @Param("mode") ModelSelectionMode mode, @Param("tier") ModelTier tier);
+
     /** 그 사용자의 지우지 않은 대화일 때만 지운 시각을 적는다. 트랜잭션은 {@code ConversationWriter} 가 연다. */
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query("""
