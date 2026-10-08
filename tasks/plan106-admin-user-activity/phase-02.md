@@ -31,7 +31,7 @@
 
 ### 2. 목록과 펼침 상세
 
-`Person`에 nullable lastLoginAt와 lastConversationAt을 추가한다. 기존 joined는 상세의 첫 로그인 여부에 유지한다.
+`Person`에 nullable lastLoginAt와 lastConversationAt을 추가한다. 기존 joined는 app_user 존재 여부로 유지한다. 상세의 로그인 이력은 joined 또는 lastLoginAt이 있을 때 「로그인한 적 있음」으로 보인다. 완료 기록만 있고 일반 요청으로 사용자가 아직 만들어지지 않은 경우도 포함한다.
 페이지에서 readAt을 new Date().toISOString()으로 만들어 PeopleAdminPanel/PersonList에 내려 hydration의 상대 기준을 고정한다. reload 때 기준도 새로 설정한다.
 새 `PersonActivity`는 null이면 「기록 없음」, 값이 있으면 기존 formatRelative와 formatFullTime을 재사용해 time dateTime과 상대/정확한 시각을 함께 표시한다. 정확한 시각은 초까지 확인할 수 있어야 하며 시간대는 「서울 시각」으로 적는다. formatFullTime은 기존 동작을 유지하고 이 컴포넌트에서 초를 추가하는 Intl.DateTimeFormat을 사용해도 된다.
 PersonList는 첫 로그인 열을 마지막 로그인과 마지막 대화 두 열로 대체한다. 사용자별 「상세」 단추와 펼침 행을 두어 aria-expanded/aria-controls를 붙이고 이름·이메일·profile·첫 로그인 여부·두 시각을 표시한다. 추가 요청은 하지 않는다. 모바일에서는 표 가로 스크롤이 작동해야 하며 일반 사용자 영역에는 표시하지 않는다.
