@@ -35,10 +35,17 @@ import tools.jackson.databind.node.ArrayNode;
  *
  * <p>오류는 이 컨트롤러 안에서 상태 코드로 바꾸고 전역 오류 처리기로 보내지 않는다. 전역 처리기는 요청 경로를 로그에 남기는데, 이 경로에는
  * 접근 표식이 들어 있다. 같은 까닭으로 로그에는 오류 코드나 예외 종류만 남긴다.
+ *
+ * <p>WebSocket 으로 올리자는 요청({@code Upgrade: websocket})은 어느 경로든 받지 않는다. 이 처리기 매핑이 WebSocket 처리기 매핑보다
+ * 먼저 보므로, 받으면 WebSocket handshake 를 여기서 가로챈다. 그 요청은 모두 {@link BrowserGatewaySocketConfig} 의 매핑이 받는다.
+ * {@code Upgrade} 머리 전체를 빼지는 않는다. JDK {@code HttpClient} 는 평범한 요청에도 {@code Upgrade: h2c} 를 실으므로, 그 요청이
+ * 이 매핑을 지나치면 전역 오류 처리기가 표식이 든 경로를 로그에 남긴다.
  */
 @Slf4j
 @RestController
-@RequestMapping("/internal/browser-gateway/{token}")
+@RequestMapping(
+        value = "/internal/browser-gateway/{token}",
+        headers = {"Upgrade!=websocket", "Upgrade!=WebSocket"})
 @RequiredArgsConstructor
 public class BrowserGatewayController {
 
@@ -104,16 +111,15 @@ public class BrowserGatewayController {
     /**
      * 그 밖의 경로는 모든 메서드에 빈 404 다.
      *
-     * <p>WebSocket 으로 올리자는 요청({@code Upgrade: websocket})은 받지 않는다. 이 처리기 매핑이 WebSocket 처리기 매핑보다 먼저
-     * 보므로, 받으면 WebSocket handshake 를 여기서 가로챈다. {@code Upgrade} 머리 전체를 빼지는 않는다. JDK {@code HttpClient} 는
-     * 평범한 요청에도 {@code Upgrade: h2c} 를 실으므로, 그 요청이 이 매핑을 지나치면 전역 오류 처리기가 표식이 든 경로를 로그에 남긴다.
+     * <p>WebSocket 으로 올리자는 요청({@code Upgrade: websocket})은 클래스의 머리 조건이 뺀다. 이 처리기 매핑이 WebSocket 처리기
+     * 매핑보다 먼저 보므로, 받으면 WebSocket handshake 를 여기서 가로챈다. {@code Upgrade} 머리 전체를 빼지는 않는다. JDK
+     * {@code HttpClient} 는 평범한 요청에도 {@code Upgrade: h2c} 를 실으므로, 그 요청이 이 매핑을 지나치면 전역 오류 처리기가 표식이 든
+     * 경로를 로그에 남긴다.
      *
      * <p>머리 조건은 값의 대소문자를 구분해 비교하므로 {@code websocket} 과 {@code WebSocket} 만 뺀다. JDK 와 Bun 의 WebSocket
      * 클라이언트는 {@code websocket} 으로 보낸다.
      */
-    @RequestMapping(
-            value = "/**",
-            headers = {"Upgrade!=websocket", "Upgrade!=WebSocket"})
+    @RequestMapping("/**")
     public ResponseEntity<byte[]> unknown(HttpServletRequest request) {
         return empty(fromPage(request) ? HttpStatus.FORBIDDEN : HttpStatus.NOT_FOUND);
     }
@@ -146,7 +152,7 @@ public class BrowserGatewayController {
             } else {
                 log.warn("browser gateway refused code={}", ex.code());
             }
-            return empty(statusOf(ex.code()));
+            return empty(BrowserGatewayStatus.of(ex.code()));
         } catch (RuntimeException ex) {
             log.warn("browser gateway failed kind={}", ex.getClass().getSimpleName());
             return empty(HttpStatus.BAD_GATEWAY);
@@ -216,15 +222,6 @@ public class BrowserGatewayController {
         return request.getHeader(HttpHeaders.ORIGIN) != null
                 || request.getHeader(SEC_FETCH_SITE) != null
                 || request.getHeader(SEC_FETCH_MODE) != null;
-    }
-
-    private static HttpStatus statusOf(ErrorCode code) {
-        return switch (code) {
-            case BROWSER_NOT_FOUND -> HttpStatus.NOT_FOUND;
-            case BROWSER_DISABLED, BROWSER_CAPACITY, BROWSER_BUSY -> HttpStatus.SERVICE_UNAVAILABLE;
-            // BROWSER_START_FAILED, BROWSER_STOP_FAILED 와 그 밖의 코드는 브라우저 쪽 실패다
-            default -> HttpStatus.BAD_GATEWAY;
-        };
     }
 
     private static ResponseEntity<byte[]> empty(HttpStatus status) {
