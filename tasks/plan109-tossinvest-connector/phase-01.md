@@ -23,7 +23,7 @@
 - 서버 생성 함수는 `createTossinvestServer(options: TossinvestOptions = {})` 다. `TossinvestOptions` 는 `{ apiBase?: string; timeoutMs?: number; env?: Env }` 이고 기본 `apiBase` 는 `https://openapi.tossinvest.com` 이다. 시험은 `apiBase` 에 대역 주소를 준다. 운영에서는 이 값을 env 로 받지 않는다(`operator_env` 를 두지 않는다)
 - API 계약은 토스증권 공식 문서 `https://openapi.tossinvest.com/openapi-docs/overview.md` 와 `faq.md`, `latest/openapi.json` 이 갖는다. 이 phase 가 쓰는 것을 아래에 옮겨 둔다. 시험은 실제 서비스에 닿지 않는다
 - 공통 검사 `hermes/tests/test_connectors_contract.py` 가 `hermes/connectors/` 아래 디렉터리를 모두 찾아 계약을 본다. 무엇을 보는지는 `docs/connector-authoring.md` 의 「공통 검사」 표다
-- Bun 은 `1.3.14` 가 PATH 에 있어야 한다. `scripts/check-connectors.sh` 가 버전을 확인한다
+- Bun 은 `1.3.14` 가 PATH 에 있어야 한다. `scripts/check-connectors.sh` 가 버전을 확인하고, 공통 검사는 PATH 의 `bun` 으로 서버를 띄운다
 
 ### 토스증권 API 가운데 이 phase 가 쓰는 것
 
@@ -41,8 +41,25 @@
 
 - **토큰은 프로세스 메모리에만 둔다.** 파일에 쓰지 않는다. `expires_in` 에서 60초를 뺀 시각까지 쓴다
 - **한 프로세스 안의 재발급은 한 번에 하나다.** 진행 중인 발급 Promise 하나를 두고, 그동안 오는 호출은 같은 Promise 를 기다린다. 동시 호출이 각자 받으면 서로를 무효로 만든다
-- `401 token-revoked` 와 `401 expired-token` 이면 토큰을 버리고 다시 받아 그 요청을 **한 번만** 다시 보낸다. 다시 보낸 요청도 401 이면 `TOSSINVEST_UNAUTHORIZED` 다. `invalid-token`, `login-user-not-found`, `edge-blocked` 는 다시 받지 않고 `TOSSINVEST_UNAUTHORIZED` 다
-- 토큰 발급이 `invalid_client` 면 `TOSSINVEST_UNAUTHORIZED`, `access_denied` 나 403 이면 `TOSSINVEST_IP_NOT_ALLOWED` 다. API 의 `403 ip-not-allowed` 도 `TOSSINVEST_IP_NOT_ALLOWED` 다
+- `401 token-revoked` 와 `401 expired-token` 이면 토큰을 버리고 다시 받아 그 요청을 **한 번만** 다시 보낸다. 다시 보낸 요청이 또 `token-revoked` 면 다른 프로세스와 토큰을 다툰 것이라 `TOSSINVEST_UNAVAILABLE`(다시 시도)이고, 그 밖의 401 이면 `TOSSINVEST_UNAUTHORIZED` 다
+- 오류는 아래 표의 위에서부터 처음 맞는 줄로 옮긴다. 본문 `code`(토큰 발급은 `error`)를 상태보다 먼저 본다
+
+| 어디 | 상태 | 본문 | 오류 코드 |
+| --- | --- | --- | --- |
+| 토큰 발급 | 403 | `error` 가 `access_denied` | `TOSSINVEST_IP_NOT_ALLOWED` |
+| 토큰 발급 | 400, 401, 그 밖의 403 | `invalid_request`, `unsupported_grant_type`, `invalid_client`, `edge-blocked` 등 | `TOSSINVEST_UNAUTHORIZED`. client 값이 틀렸거나 형식이 맞지 않는다 |
+| API | 아무 상태 | `code` 가 `ip-not-allowed` | `TOSSINVEST_IP_NOT_ALLOWED` |
+| API | 아무 상태 | `code` 가 `account-not-found` | `TOSSINVEST_ACCOUNT_NOT_FOUND`. 스펙은 이 코드를 400 과 404 로 모두 낸다 |
+| API | 401 | `code` 가 `token-revoked`, `expired-token` | 위의 다시 받기. 두 번째에도 실패하면 위 문장대로 |
+| API | 401 | 그 밖 | `TOSSINVEST_UNAUTHORIZED` |
+| API | 403 | 그 밖 | `TOSSINVEST_FORBIDDEN` |
+| API | 400 | 아무 것 | `TOSSINVEST_INVALID_INPUT` |
+| API | 404 | `code` 가 `stock-not-found` | `TOSSINVEST_INVALID_INPUT` |
+| 둘 다 | 429 | 아무 것 | `TOSSINVEST_RATE_LIMITED` |
+| 둘 다 | 그 밖의 4xx, 5xx | 아무 것 | `TOSSINVEST_UNAVAILABLE` |
+| 둘 다 | 연결 실패, 시간 초과, 응답이 1MB 를 넘음, JSON 이 아님 | | `TOSSINVEST_NETWORK` 나 `TOSSINVEST_UNAVAILABLE`. 연결 실패와 시간 초과만 `NETWORK` 다 |
+
+- 서비스가 준 글(종목 이름)은 100자(코드 포인트)로 자른다(`docs/connector-authoring.md` 의 「MCP 서버」)
 - 결과와 오류에 토큰, secret, 계좌번호 원문, 서비스의 `message` 를 싣지 않는다. 계좌번호는 끝 네 자리만 `label` 에 싣는다
 - `list_accounts` 는 확인 도구이자 선택지 도구다. 그때 `TOSSINVEST_ACCOUNT_SEQ` 는 비어 있다. 이 도구는 계좌 헤더를 보내지 않는다
 - `get_quotes` 는 계좌와 무관하다. 계좌 헤더를 보내지 않는다
@@ -53,7 +70,7 @@
 
 ### 1. 패키지와 빌드 파일
 
-`hermes/connectors/tossinvest/` 아래에 `package.json`, `tsconfig.json`, `scripts/build.ts`, `scripts/check-bundle.ts`, `.claude-plugin/plugin.json`(`{"name": "tossinvest", "description": "토스증권 계좌와 시세를 읽는 커넥터 plugin", "skills": "./skills"}`), `.mcp.json` 을 만든다.
+`hermes/connectors/tossinvest/` 아래에 `.gitignore`(`node_modules/` 한 줄. 본보기 `hermes/connectors/gmail/.gitignore` 와 같다), `package.json`, `tsconfig.json`, `scripts/build.ts`, `scripts/check-bundle.ts`, `.claude-plugin/plugin.json`(`{"name": "tossinvest", "description": "토스증권 계좌와 시세를 읽는 커넥터 plugin", "skills": "./skills"}`), `.mcp.json` 을 만든다.
 `.mcp.json` 의 서버 이름은 `tossinvest`, `command` 는 `bun`, `args` 는 `["${CLAUDE_PLUGIN_ROOT}/dist/tossinvest-mcp.js"]`, `env` 는 `TOSSINVEST_CLIENT_ID`, `TOSSINVEST_CLIENT_SECRET`, `TOSSINVEST_ACCOUNT_SEQ` 를 `${이름}` 으로 잇는다.
 `bun install` 로 `bun.lock` 을 만든다.
 
@@ -110,17 +127,17 @@
 
 | 파일 | 담는 것 |
 | --- | --- |
-| `constants.ts` | `MINIMUM_BUN_VERSION`, `PROXY_ENVIRONMENT_KEYS`, `API_BASE = "https://openapi.tossinvest.com"`, `REQUEST_TIMEOUT_MS = 4_000`, `RESPONSE_MAX_BYTES = 1024 * 1024`, `TOKEN_MARGIN_MS = 60_000`, `SYMBOL = /^[A-Za-z0-9.]{1,12}$/`, `QUOTE_SYMBOLS_MAX = 20` |
+| `constants.ts` | `MINIMUM_BUN_VERSION`, `PROXY_ENVIRONMENT_KEYS`, `API_BASE = "https://openapi.tossinvest.com"`, `REQUEST_TIMEOUT_MS = 4_000`, `RESPONSE_MAX_BYTES = 1024 * 1024`, `TOKEN_MARGIN_MS = 60_000`, `SYMBOL = /^[A-Za-z0-9.-]{1,12}$/`(스펙의 `symbols` 형식 `^[A-Za-z0-9.,\-]+$` 에 길이 상한을 둔다), `NAME_MAX_CHARS = 100`, `QUOTE_SYMBOLS_MAX = 20` |
 | `runtime.ts` | gmail 의 것과 같다 |
 | `errors.ts` | `TossinvestError(code)`, `guard`. 모르는 예외는 `TOSSINVEST_UNAVAILABLE` |
-| `client.ts` | `class Tossinvest`. 토큰 캐시와 발급 직렬화, `request(path, {query?, account?})`, 상태 코드와 오류 `code` 를 위 「의도 메모」 대로 오류 코드로 옮긴다. 429 는 `TOSSINVEST_RATE_LIMITED`, 404 `account-not-found` 는 `TOSSINVEST_ACCOUNT_NOT_FOUND`, 400 과 404 `stock-not-found` 는 `TOSSINVEST_INVALID_INPUT`, 그 밖의 403 은 `TOSSINVEST_FORBIDDEN`, 5xx 는 `TOSSINVEST_UNAVAILABLE`, 연결 실패와 시간 초과는 `TOSSINVEST_NETWORK`. client ID 나 secret 이 비어 있으면 요청 없이 `TOSSINVEST_UNAUTHORIZED` |
+| `client.ts` | `class Tossinvest`. 토큰 캐시와 발급 직렬화, `request(path, {query?})`, 위 「의도 메모」 의 오류 표. client ID 나 secret 이 비어 있으면 요청 없이 `TOSSINVEST_UNAUTHORIZED`. 계좌 헤더는 phase 02 가 더한다 |
 | `tool-registration.ts` | gmail 과 같은 모양. 도구 설명은 아래 표 |
 | `read-tools.ts` | `list_accounts`, `get_quotes` 등록 |
 | `server.ts` | `createTossinvestServer`, `runTossinvestServer`, 시작부 |
 
 | 도구 | 입력 | 결과 | 설명 |
 | --- | --- | --- | --- |
-| `list_accounts` | 없음 | `{accounts: [{account_seq: "<숫자 글>", account_type, label}]}`. `label` 은 계좌 유형의 한국어 이름(종합매매, 해외파생, 연금저축, 국내복귀투자)과 `****` 와 계좌번호 끝 네 자리다 | 「연결한 토스증권 계좌의 순번과 유형, 끝 네 자리를 읽습니다.」 |
+| `list_accounts` | 없음 | `{accounts: [{account_seq: "<숫자 글>", account_type, label}]}`. `label` 은 계좌 유형의 한국어 이름(종합매매, 해외파생, 연금저축, 국내복귀투자. 표에 없는 유형은 「기타」)과 `****` 와 계좌번호 끝 네 자리다. `account_type` 은 API 값 그대로다 | 「연결한 토스증권 계좌의 순번과 유형, 끝 네 자리를 읽습니다.」 |
 | `get_quotes` | `symbols`: 쉼표로 이은 종목 코드나 티커 | `{quotes: [{symbol, name, last_price, currency, timestamp}]}`. `/prices` 와 `/stocks` 를 같은 `symbols` 로 부르고 `symbol` 로 잇는다. 이름이 없으면 null | 「종목 코드나 티커 20개까지의 현재가와 이름을 읽습니다. 예: symbols 에 005930,AAPL 을 넣습니다.」 |
 
 - `symbols` 는 쉼표로 나누고 공백을 뗀 뒤 비지 않은 것만 남긴다. 1~20개이고 각각 `SYMBOL` 에 맞아야 한다. 아니면 요청 없이 `TOSSINVEST_INVALID_INPUT`
@@ -156,9 +173,11 @@
 - `get_quotes` 정상: 두 API 를 같은 `symbols` 로 부르고 이름을 잇는다. 기호가 틀리거나 21개면 요청 없이 `TOSSINVEST_INVALID_INPUT`
 - 토큰 캐시: 두 번 불러도 토큰 요청은 한 번이다
 - 재발급 직렬화: 토큰이 없는 상태에서 두 도구를 동시에 불러도 토큰 요청은 한 번이다
-- `token-revoked`: 첫 API 요청이 `401 {error:{code:"token-revoked"}}` 면 토큰을 다시 받아 한 번만 다시 보내고 성공한다. 다시 보낸 요청도 401 이면 `TOSSINVEST_UNAUTHORIZED` 이고 API 요청은 모두 둘이다
+- `token-revoked`: 첫 API 요청이 `401 {error:{code:"token-revoked"}}` 면 토큰을 다시 받아 한 번만 다시 보내고 성공한다. 다시 보낸 요청이 `401 invalid-token` 이면 `TOSSINVEST_UNAUTHORIZED` 이고 API 요청은 모두 둘이다
 - `invalid-token` 은 다시 받지 않고 `TOSSINVEST_UNAUTHORIZED`
-- 토큰 발급 `400 {error:"invalid_client"}` 는 `TOSSINVEST_UNAUTHORIZED`, `403 {error:"access_denied"}` 와 API 의 `403 ip-not-allowed` 는 `TOSSINVEST_IP_NOT_ALLOWED`
+- 토큰 발급 `401 {error:"invalid_client"}` 와 `400 {error:"invalid_request"}` 는 `TOSSINVEST_UNAUTHORIZED`, `403 {error:"access_denied"}` 와 API 의 `403 ip-not-allowed` 는 `TOSSINVEST_IP_NOT_ALLOWED`
+- 다시 보낸 요청도 `token-revoked` 면 `TOSSINVEST_UNAVAILABLE`
+- 이름이 100자를 넘는 종목은 잘린 이름이 나온다
 - 429 는 `TOSSINVEST_RATE_LIMITED`, 500 은 `TOSSINVEST_UNAVAILABLE`, 응답하지 않는 대역은 `TOSSINVEST_NETWORK`
 - 오류 결과에 서비스의 `message` 글이 없다
 
@@ -177,6 +196,7 @@ node scripts/check-file-length.mjs
 
 | 파일 | 변경 |
 |---|---|
+| `hermes/connectors/tossinvest/.gitignore` | 신규 |
 | `hermes/connectors/tossinvest/package.json` | 신규 |
 | `hermes/connectors/tossinvest/bun.lock` | 신규 |
 | `hermes/connectors/tossinvest/tsconfig.json` | 신규 |

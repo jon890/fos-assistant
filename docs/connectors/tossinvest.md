@@ -46,18 +46,18 @@ MCP 서버 이름은 `tossinvest` 다. 도구는 모두 `READ` 이고 승인 없
 | --- | --- | --- |
 | `list_accounts` | 없음 | `{accounts: [{account_seq, account_type, label}]}`. `label` 은 `종합매매 ****1234` 꼴이다. 계좌번호 원문은 싣지 않는다 |
 | `get_quotes` | `symbols`: 쉼표로 이은 종목 코드나 티커 1~20개 | `{quotes: [{symbol, name, last_price, currency, timestamp}]}` |
-| `get_holdings` | 없음 | `{total: {...}, items: [{symbol, name, market, currency, quantity, last_price, average_purchase_price, market_value, profit_loss, profit_loss_rate, daily_profit_loss, daily_profit_loss_rate}]}`. 금액과 수량은 API 가 준 10진수 글 그대로다 |
+| `get_holdings` | 없음 | `{total, items}`. 금액은 공제 전(`market_value`, `profit_loss`, `profit_loss_rate`)과 비용 공제 후(`..._after_cost`)를 함께 싣는다. `total` 의 금액은 `{krw, usd}` 이고, `items` 의 금액은 그 종목의 거래 통화 기준 글 하나다. 금액과 수량은 API 가 준 10진수 글 그대로다 |
 | `get_buying_power` | `currency`: `KRW` 나 `USD`. `symbol`: 선택 | `{currency, cash_buying_power, sellable_quantity?}` |
 | `list_orders` | `status`: `OPEN` 이나 `CLOSED`. `from`, `to`: 선택, `YYYY-MM-DD`(한국 시각). `symbol`: 선택. `output`: 선택, `"file"` | 아래 「주문 내역」 |
 
-종목 기호는 `^[A-Za-z0-9.]{1,12}$` 만 받는다. 날짜는 `from` 이 `to` 보다 늦거나 기간이 366일을 넘으면 `TOSSINVEST_INVALID_INPUT` 이다.
+종목 기호는 `^[A-Za-z0-9.-]{1,12}$` 만 받는다. 종목 이름은 100자로 자른다. 날짜는 `from` 이 `to` 보다 늦거나 기간이 366일을 넘으면 `TOSSINVEST_INVALID_INPUT` 이다.
 
 ### 주문 내역
 
-`output` 이 없으면 주문 100건까지를 결과에 담고 `has_more` 로 더 있는지 알린다.
+`output` 이 없으면 주문 100건까지를 결과에 담고 `has_more` 로 더 있는지 알린다. 미체결(`OPEN`)은 API 가 전량을 주므로 앞 100건만 담는다.
 `output: "file"` 이면 기간 전체를 한 파일에 쓴다. 끝난 주문은 커서로 100건씩 최대 20쪽까지 돈다. 넘으면 일부만 쓰지 않고 `TOSSINVEST_TOO_MANY_ORDERS` 로 끝낸다.
 
-파일은 `TOSSINVEST_OUTPUT_DIR` 아래 `orders-<UTC 시각>-<난수>.jsonl` 이고, 한 줄이 주문 하나다.
+파일은 `TOSSINVEST_OUTPUT_DIR` 아래 `orders-<UTC 시각>-<난수>.jsonl` 이고, 한 줄이 주문 하나다. 쓰는 동안은 `.orders-<같은 꼬리>.tmp` 에 쓰고, 다 쓴 뒤 기존 파일을 덮지 않는 방법으로 최종 이름을 만든다. 실패하면 임시 파일을 지운다.
 
 | 칸 | 뜻 |
 | --- | --- |
@@ -68,12 +68,13 @@ MCP 서버 이름은 `tossinvest` 다. 도구는 모두 `READ` 이고 승인 없
 
 결과는 `{file, count, from, to, fields}` 다. 항목 내용은 담지 않는다.
 금액은 10진수 글로 둔다. 미국 주식의 달러 금액과 소수점 수량이 있어 정수로 바꾸면 값이 바뀐다. 스크립트는 `decimal` 로 더한다.
-쓸 때마다 그 디렉터리에서 24시간 지난 자기 파일을 지운다. 값이 비었으면(실행 공간 정책에 출력 루트가 없다) `TOSSINVEST_OUTPUT_UNAVAILABLE` 로 거절한다.
+쓸 때마다 그 디렉터리에서 24시간 지난 자기 파일(`orders-*.jsonl`, `.orders-*.tmp`)을 지운다. 값이 비었으면(실행 공간 정책에 출력 루트가 없다) `TOSSINVEST_OUTPUT_UNAVAILABLE` 로 거절한다.
 
 ### 토큰
 
 - 토큰은 프로세스 메모리에만 둔다.
 - `401 token-revoked` 나 `expired-token` 을 받으면 토큰을 한 번 새로 받고 그 호출을 한 번만 다시 보낸다. 한 프로세스 안의 재발급은 한 번에 하나다.
+- 다시 보낸 호출도 `token-revoked` 면 다른 프로세스와 토큰을 다툰 것이라 `TOSSINVEST_UNAVAILABLE`(잠시 뒤 다시)로 끝낸다. 자격 증명이 틀린 것이 아니다.
 - `invalid-token` 과 `invalid_client` 는 다시 받지 않는다.
 - 확인 도구와 선택지 호출은 새 프로세스라 토큰을 새로 받는다. 그때 Hermes 쪽 프로세스의 토큰이 무효가 되고 다음 호출이 한 번 다시 받는다.
 
@@ -81,15 +82,15 @@ MCP 서버 이름은 `tossinvest` 다. 도구는 모두 `READ` 이고 승인 없
 
 | 코드 | 공통 어휘 | 복구 | 언제 |
 | --- | --- | --- | --- |
-| `TOSSINVEST_UNAUTHORIZED` | `credential_rejected` | `reconnect` | client ID 나 secret 이 틀렸다(`invalid_client`), 토큰을 다시 받아도 거절됐다 |
-| `TOSSINVEST_IP_NOT_ALLOWED` | `forbidden` | `reconnect` | `403 ip-not-allowed`. 허용 IP 가 바뀌었을 수 있다 |
+| `TOSSINVEST_UNAUTHORIZED` | `credential_rejected` | `reconnect` | 토큰 발급이 400, 401, `access_denied` 아닌 403 으로 거절됐다(client ID 나 secret 이 틀렸거나 형식이 맞지 않는다), API 가 `token-revoked` 와 `expired-token` 밖의 401 로 답했다 |
+| `TOSSINVEST_IP_NOT_ALLOWED` | `forbidden` | `reconnect` | API 의 `ip-not-allowed`, 토큰 발급의 403 `access_denied`. 허용 IP 가 바뀌었을 수 있다 |
 | `TOSSINVEST_FORBIDDEN` | `forbidden` | | 그 밖의 403 |
-| `TOSSINVEST_ACCOUNT_NOT_FOUND` | `invalid_input` | `reconnect` | 고른 계좌 순번이 없다 |
-| `TOSSINVEST_INVALID_INPUT` | `invalid_input` | | 인자가 형식에 맞지 않는다 |
-| `TOSSINVEST_TOO_MANY_ORDERS` | `invalid_input` | | 파일 출력이 2,000건을 넘는다. 기간을 줄인다 |
+| `TOSSINVEST_ACCOUNT_NOT_FOUND` | `invalid_input` | `reconnect` | 고른 계좌 순번이 없다. 상태와 관계없이 `account-not-found` 면 이 코드다 |
+| `TOSSINVEST_INVALID_INPUT` | `invalid_input` | `fix_input` | 인자가 형식에 맞지 않는다, 없는 종목이다 |
+| `TOSSINVEST_TOO_MANY_ORDERS` | `invalid_input` | `fix_input` | 파일 출력이 2,000건을 넘는다. 기간을 줄인다 |
 | `TOSSINVEST_OUTPUT_UNAVAILABLE` | `unavailable` | | 출력 디렉터리가 없다 |
 | `TOSSINVEST_RATE_LIMITED` | `unavailable` | `retry_later` | 429 |
-| `TOSSINVEST_NETWORK`, `TOSSINVEST_UNAVAILABLE` | `unavailable` | `retry_later` | 닿지 못했거나 5xx |
+| `TOSSINVEST_NETWORK`, `TOSSINVEST_UNAVAILABLE` | `unavailable` | `retry_later` | 닿지 못했거나 시간이 지났다, 5xx 와 그 밖의 4xx, 다시 보낸 호출도 `token-revoked` 였다 |
 
 결과와 오류에 토큰, secret, 계좌번호 원문, 서비스가 준 오류 원문을 싣지 않는다.
 

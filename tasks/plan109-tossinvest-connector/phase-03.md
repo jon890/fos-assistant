@@ -1,6 +1,6 @@
 # Phase 03. 주문 내역을 실행 공간의 파일로 낸다
 
-**Execution profile**: standard
+**Execution profile**: deep
 
 ## 목표
 
@@ -19,11 +19,12 @@
 
 ## 의도 메모
 
-- 파일 이름은 커넥터가 정한다. `orders-<UTC yyyyMMddTHHmmssZ>-<무작위 8자 hex>.jsonl`. 모델이 준 이름이나 경로를 쓰지 않는다. 기존 파일을 덮지 않는다(`wx` 플래그로 연다)
-- 기간 전체를 한 파일에 쓴다. `CLOSED` 는 100건씩 최대 20쪽(2,000건)이다. 21쪽째가 필요하면 쓰던 임시 파일을 지우고 `TOSSINVEST_TOO_MANY_ORDERS` 로 끝낸다. 일부만 쓴 파일을 남기지 않는다. 다 쓴 뒤 최종 이름으로 바꾼다
+- 파일 이름은 커넥터가 정한다. 최종 이름은 `orders-<UTC yyyyMMddTHHmmssZ>-<무작위 8자 hex>.jsonl` 이고, 쓰는 동안의 임시 이름은 `.orders-<같은 꼬리>.tmp` 다. 모델이 준 이름이나 경로를 쓰지 않는다
+- 임시 파일은 `wx` 플래그로 연다. 다 쓴 뒤 `link(임시, 최종)` 으로 최종 이름을 만들고 임시 파일을 지운다. `link` 는 대상이 있으면 실패하므로 기존 파일을 덮지 않는다(`rename` 은 같은 이름의 파일을 바꿔 쓴다)
+- 기간 전체를 한 파일에 쓴다. `CLOSED` 는 100건씩 최대 20쪽(2,000건)이다. 21쪽째가 필요하면 임시 파일을 지우고 `TOSSINVEST_TOO_MANY_ORDERS` 로 끝낸다. 실패하면 어떤 경우든 임시 파일을 지우고, 일부만 쓴 최종 파일을 남기지 않는다. 프로세스가 죽어 남은 임시 파일은 아래 24시간 정리와 운영의 정기 정리가 지운다
 - 쪽 사이에 250ms 를 쉰다. 429 를 받으면 1초 쉬고 그 쪽을 한 번만 다시 부른다
 - 디렉터리 env 가 비었으면 요청 없이 `TOSSINVEST_OUTPUT_UNAVAILABLE`
-- 쓸 때마다 그 디렉터리에서 이름이 `orders-` 로 시작하고 `.jsonl` 로 끝나며 수정 시각이 24시간 지난 정규 파일을 지운다. 다른 이름과 링크는 건드리지 않는다
+- 쓸 때마다 그 디렉터리에서 `orders-*.jsonl` 과 `.orders-*.tmp` 가운데 수정 시각이 24시간 지난 정규 파일을 지운다. 다른 이름과 링크는 건드리지 않는다
 - 디렉터리가 링크이거나 디렉터리가 아니면 `TOSSINVEST_OUTPUT_UNAVAILABLE` 다. 커넥터는 실행 공간 밖에서 돌고, 이 디렉터리는 실행 공간에서 읽기 전용이다
 - 파일에는 자격 증명과 서비스의 오류 원문을 쓰지 않는다. 계좌 순번도 쓰지 않는다
 - 한 줄의 칸은 phase 02 의 `list_orders` 결과 항목과 같다. 금액과 수량은 10진수 글 그대로다
@@ -38,13 +39,14 @@
 
 ### 2. `hermes/connectors/tossinvest/src/order-file.ts`
 
-- `writeOrdersFile(client, directory, query): Promise<{file, count, from, to, fields}>`. `from` 과 `to` 는 받은 값이고 없으면 null 이다. `fields` 는 한 줄의 칸 이름 배열이다
-- 위 「의도 메모」 의 이름, 쪽 상한, 쉼, 429 한 번 재시도, 임시 파일과 최종 이름 바꾸기, 24시간 정리를 담는다
-- 시험이 시각과 쉼을 바꿀 수 있게 `now` 와 `sleep` 을 인자로 받는다
+- `writeOrdersFile(client, directory, query, timing = { now: () => new Date(), sleep: (ms) => Bun.sleep(ms) }): Promise<{file, count, from, to, fields}>`. `from` 과 `to` 는 받은 값이고 없으면 null 이다. `fields` 는 한 줄의 칸 이름 배열이다
+- 위 「의도 메모」 의 이름, 쪽 상한, 쉼, 429 한 번 재시도, 임시 파일과 `link`, 24시간 정리를 담는다
+- 한 줄의 칸 만들기는 phase 02 의 `list_orders` 결과 항목을 만드는 함수를 `account-tools.ts` 에서 내보내 함께 쓴다
 
-### 3. `hermes/connectors/tossinvest/src/account-tools.ts`
+### 3. `hermes/connectors/tossinvest/src/account-tools.ts` 와 `src/tool-registration.ts`
 
-`list_orders` 의 입력에 `output`(선택, `"file"` 만)을 더한다. 있으면 `writeOrdersFile` 을 부르고 그 결과만 돌려준다. 디렉터리는 `TossinvestOptions.env` 의 `TOSSINVEST_OUTPUT_DIR` 이다. 도구 설명에 「output 에 file 을 주면 기간 전체를 실행 공간의 파일로 쓰고 경로만 돌려줍니다. 합계는 그 파일을 스크립트로 읽어 계산합니다.」 를 더한다.
+- `account-tools.ts`: `list_orders` 의 입력에 `output`(선택, `"file"` 만)을 더한다. 있으면 `writeOrdersFile` 을 부르고 그 결과만 돌려준다. 디렉터리는 `TossinvestOptions.env` 의 `TOSSINVEST_OUTPUT_DIR` 이다
+- `tool-registration.ts`: `descriptions` 표의 `list_orders` 설명에 「output 에 file 을 주면 기간 전체를 실행 공간의 파일로 쓰고 경로만 돌려줍니다. 합계는 그 파일을 스크립트로 읽어 계산합니다.」 를 더한다
 
 ### 4. `hermes/connectors/tossinvest/skills/tossinvest/SKILL.md`
 
@@ -56,12 +58,13 @@
 
 ### 6. 시험 `hermes/connectors/tossinvest/tests/order-file.test.ts`
 
-임시 디렉터리를 만들어 `TOSSINVEST_OUTPUT_DIR` 로 준다.
+임시 디렉터리를 만들어 `TOSSINVEST_OUTPUT_DIR` 로 준다. 정상 경로 하나는 MCP 도구로 부르고, 쪽 상한, 429, 정리 시험은 `writeOrdersFile` 을 바로 불러 `sleep` 을 즉시 끝나는 함수로, `now` 를 고정 시각으로 준다. 쉼을 실제로 기다리면 bun test 의 기본 제한 시간 5초에 걸린다.
 
 - 정상: `CLOSED` 세 쪽(100, 100, 7건)을 이어 207줄 파일 하나를 쓰고, 결과에 경로, 건수 207, 기간, 칸 목록만 있고 주문 내용이 없다. 파일의 각 줄이 JSON 이고 금액이 글이다
-- 21쪽이 필요하면 `TOSSINVEST_TOO_MANY_ORDERS` 이고 디렉터리에 `orders-` 파일이 남지 않는다
+- 21쪽이 필요하면 `TOSSINVEST_TOO_MANY_ORDERS` 이고 디렉터리에 `orders-` 파일과 `.orders-` 임시 파일이 남지 않는다
+- 같은 최종 이름의 파일이 이미 있으면(무작위 꼬리를 고정해 만든다) 덮지 않고 실패하며 기존 파일 내용이 그대로다
 - env 가 비었으면 요청 없이 `TOSSINVEST_OUTPUT_UNAVAILABLE`. 디렉터리가 링크면 같은 코드
-- 24시간 지난 `orders-*.jsonl` 은 지우고, 23시간 된 파일과 다른 이름의 파일은 남긴다
+- 24시간 지난 `orders-*.jsonl` 과 `.orders-*.tmp` 는 지우고, 23시간 된 파일과 다른 이름의 파일, 링크는 남긴다
 - 한 쪽이 429 면 한 번 다시 불러 이어 쓴다. 다시 부른 쪽도 429 면 `TOSSINVEST_RATE_LIMITED` 이고 파일이 남지 않는다
 - 파일과 결과 어디에도 토큰, secret, 계좌 순번이 없다
 
@@ -84,6 +87,7 @@ node scripts/check-file-length.mjs
 | `hermes/connectors/tossinvest/.mcp.json` | 수정 |
 | `hermes/connectors/tossinvest/src/order-file.ts` | 신규 |
 | `hermes/connectors/tossinvest/src/account-tools.ts` | 수정 |
+| `hermes/connectors/tossinvest/src/tool-registration.ts` | 수정 |
 | `hermes/connectors/tossinvest/skills/tossinvest/SKILL.md` | 수정 |
 | `hermes/connectors/tossinvest/dist/tossinvest-mcp.js` | 수정 |
 | `hermes/connectors/tossinvest/tests/order-file.test.ts` | 신규 |

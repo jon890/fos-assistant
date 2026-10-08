@@ -15,7 +15,7 @@
 | 바인딩 | `single_binding: true`, `sandbox_required: true` |
 | 자격 증명 | `client_id`, `client_secret` 과 계좌 순번. 계좌번호 원문은 받지 않고 결과에도 끝 네 자리만 싣는다 |
 | 토큰 | 프로세스 메모리에만 둔다. 파일에 두지 않는다 |
-| 토큰 재발급 | `401 token-revoked` 와 `expired-token` 이면 토큰을 다시 받아 그 호출을 한 번만 다시 보낸다. 한 프로세스 안의 재발급은 한 번에 하나다. `invalid-token` 과 `invalid_client` 는 다시 받지 않는다 |
+| 토큰 재발급 | `401 token-revoked` 와 `expired-token` 이면 토큰을 다시 받아 그 호출을 한 번만 다시 보낸다. 한 프로세스 안의 재발급은 한 번에 하나다. 다시 보낸 호출도 `token-revoked` 면 자격 증명 문제가 아니라 다툼이므로 다시 시도할 오류로 끝낸다. `invalid-token` 과 `invalid_client` 는 다시 받지 않는다 |
 | 허용 IP 거절 | `403 ip-not-allowed` 는 따로 둔 오류 코드로 끝낸다. 공통 어휘 `forbidden`, 복구 `reconnect` 다. 연결 확인이 같은 코드로 실패하면 연결이 `PENDING` 이 된다 |
 | 계산 | `list_orders` 는 `output: "file"` 이면 기간 전체를 JSON Lines 로 쓰고 경로, 건수, 기간, 칸 목록만 돌려준다. 금액과 수량은 API 가 준 10진수 글 그대로 둔다. 미국 주식의 달러 금액과 소수점 수량이 있어 정수로 바꾸면 값이 바뀐다. 스크립트는 10진수로 더한다 |
 | 호출량 | 한 도구 호출이 부르는 API 수에 상한을 둔다. `list_orders` 의 페이지는 100건씩 최대 20쪽이다. 넘으면 일부만 쓰지 않고 오류로 끝낸다 |
