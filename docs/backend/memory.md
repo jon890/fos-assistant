@@ -101,7 +101,8 @@ Memory 는 에이전트가 실행할 때 `instructions` 로 받는 사실이다.
 
 ### 관리자가 에이전트의 collection 을 바꿀 때
 
-`ADMIN` 이 아래 관리자 API 로 받는 collection 과 민감 허용을 바꾼다. 자동으로 붙이지 않는다. 관리자 영역의 화면은 아직 없다.
+`ADMIN` 이 관리자 영역의 에이전트 상세에서 받는 collection 과 민감 허용을 바꾼다. 화면은 아래 관리자 API 를 부른다. 자동으로 붙이지 않는다.
+화면의 상태와 문구는 [`frontend/structure.md`](../frontend/structure.md) 의 「기억 영역 절」 이 갖는다.
 근거는 [ADR-20261008 / agent-memory-grants-admin](../adr/ADR-20261008-agent-memory-grants-admin.md) 에 있다.
 
 | 경로 | 누가 | 무엇 |

@@ -18,7 +18,7 @@ import type { EvaluationOverview } from "@/lib/value-evaluation";
 /**
  * 에이전트 상세 화면을 읽어 그린다. 일반 화면과 관리자 영역이 함께 쓴다.
  *
- * <p>`admin` 이 참이면 관리자 목록과 관리 경로를 읽어 「모델」 절과 「관리」 절을 더한다.
+ * <p>`admin` 이 참이면 관리자 목록과 관리 경로를 읽어 「모델」, 「기억 영역」, 「관리」 절을 더한다.
  * 거짓이면 역할과 상관없이 내가 쓸 수 있는 에이전트 목록만 읽는다.
  */
 export async function loadAgentDetail(

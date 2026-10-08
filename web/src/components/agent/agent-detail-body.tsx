@@ -6,6 +6,7 @@ import { Notice } from "@/components/ui/notice";
 import { AgentAccessSection } from "./agent-access-section";
 import { AgentAdminSection } from "./agent-admin-section";
 import { AgentConnectionsSection } from "./agent-connections-section";
+import { AgentMemorySection } from "./agent-memory-section";
 import { AgentModelSection } from "./agent-model-section";
 import { AgentProactiveCheckSection } from "./agent-proactive-check-section";
 import { AgentProactiveScheduleSection } from "./agent-proactive-schedule-section";
@@ -247,6 +248,7 @@ export function AgentDetailBody({
         </section>
       )}
       {adminAgent ? <AgentModelSection code={code} /> : null}
+      {adminAgent ? <AgentMemorySection code={code} /> : null}
       {adminAgent && visibility ? (
         <AgentAdminSection initialAgent={adminAgent} visibility={visibility} />
       ) : null}
