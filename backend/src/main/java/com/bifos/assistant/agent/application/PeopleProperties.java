@@ -1,12 +1,14 @@
 package com.bifos.assistant.agent.application;
 
+import com.bifos.assistant.agent.domain.AgentToolPolicy;
 import com.bifos.assistant.agent.domain.type.CostMode;
 import com.bifos.assistant.agent.domain.type.CredentialScope;
+import java.util.List;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.validation.annotation.Validated;
 
 /**
- * 첫 로그인에 만드는 에이전트의 과금 설정이다.
+ * 첫 로그인에 만드는 에이전트의 과금 설정과 기본 도구다.
  *
  * <p>Hermes 를 부르는 값이 아니라 {@code HermesProperties} 에 두지 않는다. 두 값이 사람마다 다르지
  * 않은 근거는 {@code docs/adr/ADR-002-profile은-나누고-ai-계정은-가족이-함께-쓴다.md} 에 있다.
@@ -19,14 +21,24 @@ import org.springframework.validation.annotation.Validated;
  *
  * @param defaultCostMode 그 에이전트의 비용 방식
  * @param defaultCredentialScope 그 에이전트가 쓰는 AI 계정의 범위
+ * @param defaultToolsets 그 에이전트에 켜는 도구. 없으면 profile 틀의 도구만 남는다. 주인 등급이나 실행 공간 도구가 아니면
+ *     기동하지 않는다. 셸 계열을 언제 빼는지는 {@link AgentDefaultToolsets} 가 정한다
  */
 @Validated
 @ConfigurationProperties(prefix = "assistant.people")
-public record PeopleProperties(CostMode defaultCostMode, CredentialScope defaultCredentialScope) {
+public record PeopleProperties(
+        CostMode defaultCostMode, CredentialScope defaultCredentialScope, List<String> defaultToolsets) {
 
     public PeopleProperties {
         defaultCostMode = defaultCostMode == null ? CostMode.SUBSCRIPTION : defaultCostMode;
         defaultCredentialScope =
                 defaultCredentialScope == null ? CredentialScope.SHARED_HOUSEHOLD : defaultCredentialScope;
+        defaultToolsets = defaultToolsets == null ? List.of() : List.copyOf(defaultToolsets);
+        for (String name : defaultToolsets) {
+            if (!AgentToolPolicy.allowedAsDefault(name)) {
+                throw new IllegalArgumentException(
+                        "assistant.people.default-toolsets allows only owner-tier and sandbox toolsets: " + name);
+            }
+        }
     }
 }
