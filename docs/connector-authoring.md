@@ -72,6 +72,8 @@ docs/connectors/<id>.md                 도구와 정책, 보안, 설정 안내,
 - 결과와 로그와 오류 글에 자격 증명과 서비스가 준 오류 원문을 싣지 않는다. 오류는 코드만 내고 `errors` 표로 공통 어휘에 잇는다
 - 그 일을 하는 가장 작은 OAuth scope 나 권한을 쓴다. 고른 것과 더 작은 것을 못 쓰는 까닭을 커넥터 문서에 적는다
 - `operator_env` 와 `operator_secrets` 를 두지 않는다
+- **서비스가 권한 범위를 나누지 못해, 쓰는 도구가 없어도 키 하나로 돈이 움직이거나 되돌리기 어려운 일을 할 수 있으면 `"sandbox_required": true` 를 선언한다.** 실행 공간이 없는 profile 의 셸은 `.env` 를 읽기 때문이다([ADR-20261008 / connector-binding-guards](adr/ADR-20261008-connector-binding-guards.md))
+- **서비스가 계정이나 클라이언트마다 유효한 토큰을 하나만 두면 `"single_binding": true` 를 선언한다.** 여러 에이전트의 MCP 프로세스가 번갈아 토큰을 받아 서로의 호출을 깨기 때문이다. 한 프로세스 안에서도 토큰을 다시 받는 일은 한 번에 하나만 한다
 
 ### 사용자 첨부를 읽는 커넥터
 

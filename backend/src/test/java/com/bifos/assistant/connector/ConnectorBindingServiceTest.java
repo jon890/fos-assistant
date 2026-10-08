@@ -40,6 +40,7 @@ import com.bifos.assistant.connector.infra.ConnectorBindingRepository;
 import com.bifos.assistant.connector.infra.ConnectorConnectionRepository;
 import com.bifos.assistant.hermes.ConnectorInstallConflict;
 import com.bifos.assistant.hermes.ConnectorProfileRejected;
+import com.bifos.assistant.hermes.ConnectorSandboxUnavailable;
 import com.bifos.assistant.hermes.HermesConnectorClient;
 import com.bifos.assistant.hermes.HermesConnectorClient.ConnectorState;
 import com.bifos.assistant.hermes.HermesConnectorClient.InstallResult;
@@ -48,6 +49,7 @@ import com.bifos.assistant.hermes.HermesSkillClient;
 import com.bifos.assistant.hermes.HermesSkillClient.HermesSkill;
 import com.bifos.assistant.hermes.HermesToolsetClient;
 import com.bifos.assistant.hermes.dto.CallResult;
+import com.bifos.assistant.hermes.dto.ConnectorAppearance;
 import com.bifos.assistant.hermes.dto.ConnectorField;
 import com.bifos.assistant.hermes.dto.ConnectorManifest;
 import com.bifos.assistant.hermes.dto.ConnectorTool;
@@ -95,6 +97,7 @@ class ConnectorBindingServiceTest {
     private static final String DEMO = "demo-notes";
     private static final String PLAIN = "demo-plain";
     private static final String SKILLED = "demo-skilled";
+    private static final String SINGLE = "demo-single";
     private static final String TOKEN = "demo_ok_0123456789";
     private static final Map<String, String> VALUES = Map.of("token", TOKEN);
     private static final ConnectorManifest DEMO_MANIFEST = new ConnectorManifest(
@@ -111,6 +114,21 @@ class ConnectorBindingServiceTest {
                     new ConnectorTool("list_scopes", "READ", "none", null, null),
                     new ConnectorTool("write_note", "WRITE", "required", null, null)),
             List.of());
+    /** 연결 하나를 에이전트 하나에만 붙이라고 선언한 커넥터다. 칸과 도구는 {@link #DEMO_MANIFEST} 와 같다. */
+    private static final ConnectorManifest SINGLE_MANIFEST = new ConnectorManifest(
+            SINGLE,
+            "에이전트 하나에만 붙는 메모",
+            "",
+            DEMO_MANIFEST.fields(),
+            "list_scopes",
+            "single",
+            List.of(),
+            false,
+            2,
+            DEMO_MANIFEST.tools(),
+            List.of(),
+            ConnectorAppearance.NONE,
+            true);
     /** 입력 칸이 없는 일반 MCP 서버다. */
     private static final ConnectorManifest PLAIN_MANIFEST =
             new ConnectorManifest(PLAIN, "칸 없는 서버", "", List.of(), "ping", "plain", List.of(), false, 1, List.of());
@@ -173,7 +191,8 @@ class ConnectorBindingServiceTest {
 
     @BeforeEach
     void setUp() {
-        when(connector.readCatalog()).thenReturn(List.of(DEMO_MANIFEST, PLAIN_MANIFEST, SKILLED_MANIFEST));
+        when(connector.readCatalog())
+                .thenReturn(List.of(DEMO_MANIFEST, PLAIN_MANIFEST, SKILLED_MANIFEST, SINGLE_MANIFEST));
         when(connector.call(anyString(), anyString(), anyMap()))
                 .thenReturn(CallResult.success(MAPPER.readTree("{\"ok\":true}")));
         when(connector.bindConnector(anyString(), anyString(), anyString(), anyString()))
@@ -565,6 +584,82 @@ class ConnectorBindingServiceTest {
                 .bindConnector(anyString(), anyString(), anyString(), anyString());
         assertCode(() -> service.bind(owner, agent.code(), DEMO), ErrorCode.CONNECTOR_PROFILE_NOT_READY);
         assertThat(bindings.count()).isZero();
+    }
+
+    @Test
+    @DisplayName("대시보드가 409 sandbox_unavailable 로 거절하면 AGENT_SANDBOX_UNAVAILABLE 이고 바인딩 행이 남지 않는다")
+    void dashboardSandboxRefusalLeavesNoRow() {
+        CurrentUser owner = user(UserRole.MEMBER, 1L);
+        connect(owner, DEMO, VALUES);
+        Agent agent = agent(owner, AgentVisibility.PRIVATE);
+        doThrow(new ConnectorSandboxUnavailable())
+                .when(connector)
+                .bindConnector(anyString(), anyString(), anyString(), anyString());
+
+        assertCode(() -> service.bind(owner, agent.code(), DEMO), ErrorCode.AGENT_SANDBOX_UNAVAILABLE);
+
+        assertThat(bindings.count()).isZero();
+    }
+
+    @Test
+    @DisplayName("single_binding 커넥터의 연결은 다른 에이전트에 붙어 있으면 거절하고, 같은 에이전트에 다시 붙이면 지금 상태다")
+    void singleBindingRefusesSecondAgentButNotTheSameAgent() {
+        CurrentUser owner = user(UserRole.MEMBER, 1L);
+        ConnectorConnection connection = connect(owner, SINGLE, VALUES);
+        Agent first = agent(owner, AgentVisibility.PRIVATE);
+        Agent second = agent(owner, AgentVisibility.PRIVATE);
+        service.bind(owner, first.code(), SINGLE);
+
+        assertCode(() -> service.bind(owner, second.code(), SINGLE), ErrorCode.CONNECTOR_SINGLE_BINDING);
+
+        verify(connector, times(1)).bindConnector(anyString(), anyString(), anyString(), anyString());
+        assertThat(onlyBinding().id())
+                .isEqualTo(bindings.findByAgentIdAndConnectionId(first.id(), connection.id())
+                        .orElseThrow()
+                        .id());
+        AgentConnectionView again = service.bind(owner, first.code(), SINGLE);
+        assertThat(again.bound()).isTrue();
+        assertThat(again.status()).isEqualTo(BindingStatus.PENDING);
+        verify(connector, times(1)).bindConnector(anyString(), anyString(), anyString(), anyString());
+        assertThat(bindings.findByConnectionId(connection.id())).hasSize(1);
+    }
+
+    @Test
+    @DisplayName("single_binding 커넥터의 연결을 첫째 에이전트에서 떼면 둘째 에이전트에 붙는다")
+    void singleBindingAllowsSecondAgentAfterUnbind() {
+        CurrentUser owner = user(UserRole.MEMBER, 1L);
+        ConnectorConnection connection = connect(owner, SINGLE, VALUES);
+        Agent first = agent(owner, AgentVisibility.PRIVATE);
+        Agent second = agent(owner, AgentVisibility.PRIVATE);
+        service.bind(owner, first.code(), SINGLE);
+
+        service.unbind(owner, first.code(), SINGLE);
+        AgentConnectionView bound = service.bind(owner, second.code(), SINGLE);
+
+        assertThat(bound.bound()).isTrue();
+        assertThat(onlyBinding().id())
+                .isEqualTo(bindings.findByAgentIdAndConnectionId(second.id(), connection.id())
+                        .orElseThrow()
+                        .id());
+        verify(connector).bindConnector(second.hermesProfile(), SINGLE, connection.vault(), second.sandboxOwner());
+    }
+
+    @Test
+    @DisplayName("single_binding 을 선언하지 않은 커넥터의 연결은 두 에이전트에 붙는다")
+    void connectorWithoutSingleBindingAttachesToTwoAgents() {
+        CurrentUser owner = user(UserRole.MEMBER, 1L);
+        ConnectorConnection connection = connect(owner, DEMO, VALUES);
+        Agent first = agent(owner, AgentVisibility.PRIVATE);
+        Agent second = agent(owner, AgentVisibility.PRIVATE);
+
+        service.bind(owner, first.code(), DEMO);
+        service.bind(owner, second.code(), DEMO);
+
+        assertThat(bindings.findByConnectionId(connection.id())).hasSize(2);
+        assertThat(bindings.findByAgentIdAndConnectionId(first.id(), connection.id()))
+                .isPresent();
+        assertThat(bindings.findByAgentIdAndConnectionId(second.id(), connection.id()))
+                .isPresent();
     }
 
     @Test
