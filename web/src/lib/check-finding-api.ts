@@ -12,7 +12,7 @@ export type CheckFinding = {
   checkId: number;
   executionId: number;
   area: string;
-  topicKey: string;
+  topicKey: string | null;
   title: string;
   reaction: FindingReaction | null;
 };

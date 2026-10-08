@@ -394,7 +394,7 @@ turn 이 어떻게 끝나든 잠금을 풀기 전에 `ProactiveCheckService` 가
 
 ### 검사
 
-`FindingJudgement.judge(finding, checkStartedAt, now, alreadyAnnounced)` 가 발견마다 `NEW` 와 `REFERENCE` 를 정한다. 첫 번째로 걸린 까닭 하나를 남긴다.
+`FindingJudgement.judge(finding, checkStartedAt, now, alreadyAnnounced, dismissedTopics)` 가 발견마다 `NEW` 와 `REFERENCE` 를 정한다. 첫 번째로 걸린 까닭 하나를 남긴다.
 
 | 순서 | 조건 | 걸리면 까닭 |
 | --- | --- | --- |
@@ -475,6 +475,7 @@ turn 이 어떻게 끝나든 잠금을 풀기 전에 `ProactiveCheckService` 가
 사건은 판단 피드백 기록에 `check_finding:<발견 번호>` 로 남는다([판단 피드백](decision-feedback.md)).
 지금 반응은 그 발견의 마지막 사용자 사건이다. 다른 단추를 누르면 바뀌고, 같은 단추를 다시 누르면 사건을 더 남기지 않는다.
 「받아들임」 은 반응만 남긴다. 할 일과 Memory 를 만들지 않는다.
+주제 키(`topicKey`)가 빈 발견은 「관심 없음」 이어도 되풀이 판정에 쓰이지 않는다. 같은 주제를 가릴 열쇠가 없기 때문이다. 반응은 그대로 남는다.
 
 `GET .../check-findings` 의 응답은 `{ dismissWindowDays, findings }` 다. `dismissWindowDays` 는 `digest-window` 를 하루 단위로 올림한 값이고 화면이 「관심 없음」 의 효과를 알리는 데 쓴다.
 `findings[]` 는 `id`, `checkId`, `executionId`(그 살펴보기의 루트 실행, 답 메시지의 실행 번호), `area`, `topicKey`, `title`, `reaction`(없으면 `null`)이다. 다른 대화와 같이 남의 대화는 404 다.

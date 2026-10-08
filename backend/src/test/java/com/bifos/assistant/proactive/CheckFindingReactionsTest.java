@@ -110,6 +110,7 @@ class CheckFindingReactionsTest {
     @BeforeEach
     void setUp() {
         Instant now = Instant.now().truncatedTo(ChronoUnit.MICROS);
+        deleteLeftoverLargeIdMember();
         owner = largeIdMember();
         other = member(now);
         String code = "finding-" + UUID.randomUUID().toString().substring(0, 8);
@@ -139,19 +140,10 @@ class CheckFindingReactionsTest {
 
     @AfterEach
     void tearDown() {
-        for (Long userId : List.of(owner.id(), other.id())) {
-            jdbc.update("DELETE FROM decision_feedback_event WHERE user_id = ?", userId);
-            jdbc.update(
-                    "DELETE FROM proactive_check_finding WHERE check_id IN (SELECT id FROM proactive_check WHERE user_id = ?)",
-                    userId);
-            jdbc.update("DELETE FROM proactive_check WHERE user_id = ?", userId);
-            jdbc.update("DELETE FROM agent_execution WHERE user_id = ?", userId);
-            jdbc.update("DELETE FROM conversation WHERE user_id = ?", userId);
-        }
+        deleteRowsOf(owner.id());
+        deleteRowsOf(other.id());
         jdbc.update("DELETE FROM agent WHERE owner_user_id = ?", owner.id());
-        for (Long userId : List.of(owner.id(), other.id())) {
-            jdbc.update("DELETE FROM app_user WHERE id = ?", userId);
-        }
+        jdbc.update("DELETE FROM app_user WHERE id IN (?, ?)", owner.id(), other.id());
     }
 
     @Test
@@ -345,6 +337,35 @@ class CheckFindingReactionsTest {
                 .status(ExecutionStatus.SUCCEEDED)
                 .startedAt(now)
                 .build();
+    }
+
+    /** 그 사용자의 발견 반응 시험 줄을 지운다. 에이전트와 사용자 줄은 부르는 쪽이 지운다. */
+    private void deleteRowsOf(Long userId) {
+        jdbc.update("DELETE FROM decision_feedback_event WHERE user_id = ?", userId);
+        jdbc.update(
+                "DELETE FROM proactive_check_finding WHERE check_id IN (SELECT id FROM proactive_check WHERE user_id = ?)",
+                userId);
+        jdbc.update("DELETE FROM proactive_check WHERE user_id = ?", userId);
+        jdbc.update("DELETE FROM agent_execution WHERE user_id = ?", userId);
+        jdbc.update("DELETE FROM conversation WHERE user_id = ?", userId);
+    }
+
+    /**
+     * 앞 실행이 정리 전에 멈춰 남긴 큰 번호 사용자와 그 줄을 지운다. 번호를 직접 정해 넣으므로 남아 있으면 키가 겹친다. 그때의 다른 사용자 줄도
+     * 이 사용자의 에이전트를 가리키므로 에이전트로 찾아 함께 지운다.
+     */
+    private void deleteLeftoverLargeIdMember() {
+        String agentsOfUser = "SELECT id FROM agent WHERE owner_user_id = ?";
+        jdbc.update(
+                "DELETE FROM proactive_check_finding WHERE check_id IN"
+                        + " (SELECT id FROM proactive_check WHERE agent_id IN (" + agentsOfUser + "))",
+                LARGE_USER_ID);
+        jdbc.update("DELETE FROM proactive_check WHERE agent_id IN (" + agentsOfUser + ")", LARGE_USER_ID);
+        jdbc.update("DELETE FROM agent_execution WHERE agent_id IN (" + agentsOfUser + ")", LARGE_USER_ID);
+        jdbc.update("DELETE FROM conversation WHERE agent_id IN (" + agentsOfUser + ")", LARGE_USER_ID);
+        deleteRowsOf(LARGE_USER_ID);
+        jdbc.update("DELETE FROM agent WHERE owner_user_id = ?", LARGE_USER_ID);
+        jdbc.update("DELETE FROM app_user WHERE id = ?", LARGE_USER_ID);
     }
 
     /** 번호를 직접 정해 넣는다. 저장소의 자동 번호로는 큰 번호를 만들 수 없다. */

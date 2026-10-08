@@ -527,6 +527,8 @@ class ProactiveCheckTurnTest {
     @Test
     @DisplayName("관심 없음으로 반응한 발견의 주제는 다음 살펴보기 입력에 반응이 실리고 원문과 달라진 점이 새로워도 이미 알린 참고로 내려간다")
     void dismissedFindingTopicIsCarriedAndMarkedRepeat() {
+        // 반응이 없으면 같은 topicKey 의 다른 sourceUrl 이나 changeSinceLast 가 있는 발견은 NEW 다. 그 대조는 FindingJudgementTest 의
+        // sameTopicKeyWithNewSourceUrlIsNew, repeatedWithChangeSinceLastIsNew 가 보인다.
         stub().willAnswer(command -> answer(findingsBlock(TOPIC_KEY, SOURCE_URL, null)));
         Conversation conversation = runCheck();
         ProactiveCheckFinding announced = findingsOf(conversation).getFirst();

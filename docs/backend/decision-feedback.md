@@ -78,7 +78,7 @@
 
 반응은 저장하지 않는다. replay 읽기 모델이 제안 하나의 사건을 그때마다 읽는다. 규칙 버전은 `FeedbackLabeler.VERSION` 이고 지금은 2다.
 
-1. 사용자 사건 가운데 처음 나온 `ACCEPTED`, `APPROVED` 는 `ACCEPTED`, 처음 나온 `REJECTED` 와 할 일의 그만둠(`DISMISSED`)은 `DECLINED` 다
+1. 사용자 사건 가운데 처음 나온 `ACCEPTED`, `APPROVED` 는 `ACCEPTED`, 처음 나온 `REJECTED` 와 할 일의 그만둠, 살펴보기 발견의 「관심 없음」(`DISMISSED`)은 `DECLINED` 다
 2. 그런 사건이 없고 `POSTPONED` 나 지금 화면의 숨기기(`DISMISSED`, `ATTENTION_HIDE`)가 있으면 `DEFERRED` 다
 3. 그것도 없고 `SURFACED` 가 있으면 `NO_RESPONSE` 다
 4. 보인 기록이 없으면 `NOT_SURFACED` 다
@@ -106,7 +106,7 @@
 ### 살펴보기 발견의 지금 반응
 
 발견의 지금 반응은 그 발견의 사용자 사건 가운데 마지막 `ACCEPTED`, `POSTPONED`, `DISMISSED` 다. 사용자가 단추를 바꾸면 지금 반응도 바뀐다.
-위 첫 반응 규칙과 다르다. 지금 반응은 replay 에 쓰지 않고 다음 살펴보기의 입력과 되풀이 판정에만 쓴다([먼저 살펴보기](proactive-check.md)의 「살펴보기가 읽는 맥락」 과 「검사」).
+위 첫 반응 규칙과 다르다. replay 는 첫 반응 규칙대로 「받아들임」 을 `ACCEPTED`, 「관심 없음」 을 `DECLINED`, 「나중에」 를 `DEFERRED` 로 읽는다. 지금 반응은 replay 에 쓰지 않고 다음 살펴보기의 입력과 되풀이 판정에만 쓴다([먼저 살펴보기](proactive-check.md)의 「살펴보기가 읽는 맥락」 과 「검사」).
 「관심 없음」 이 그 발견의 주제를 내리는 것은 그 발견을 알린 시각부터 같은 점검 대화의 `digest-window` 안뿐이다. 기간이 지나면 같은 주제를 다시 알릴 수 있다.
 
 ## replay 읽기 모델
