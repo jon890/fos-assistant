@@ -61,6 +61,7 @@ MCP 설정 감시는 `config.yaml`의 수정 시각과 크기를 보며 `.env` �
 공유 gateway는 60초마다 profile마다 `mcp_servers`의 이름과 살아 있는 연결을 맞춘다.
 `config.yaml`에 새 이름을 더하면 다음 맞추기 주기가 그 서버를 연결하고, 이름을 빼면 그 서버만 끊는다.
 같은 이름의 정의나 `.env` 값을 바꾼 것은 이름이 같아 다시 연결하지 않는다. 이 교체는 여전히 재시작을 기다린다.
+뗀 서버 기록에 남은 이름을 다시 붙여도 gateway 가 옛 연결을 쥐고 있을 수 있다. 정의와 값이 같아도 `restart_required` 를 참으로 답하고 재시작을 기다린다.
 바인딩 설치는 이 차이로 `reload_pending`과 `restart_required`를 나눠 답한다([ADR-20261007 / connector-live-reload](../adr/ADR-20261007-connector-live-reload.md)).
 재시작이 필요한 동안에는 에이전트를 활성화하지 않는다.
 

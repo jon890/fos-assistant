@@ -1,5 +1,6 @@
 package com.bifos.assistant.mcp.application;
 
+import com.bifos.assistant.agent.application.AgentConnectorBindings;
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.agent.infra.AgentRepository;
 import com.bifos.assistant.chat.application.ArtifactWriteRequest;
@@ -74,6 +75,7 @@ public class McpToolService {
 
     private final ExecutionDeliveryWriter deliveryWriter;
     private final AgentRepository agents;
+    private final AgentConnectorBindings bindings;
     private final FollowUpService followUps;
     private final McpMemoryRemember memoryRemember;
     private final Clock clock;
@@ -438,12 +440,14 @@ public class McpToolService {
         return status;
     }
 
-    /** 연결용 에이전트의 실행이거나 에이전트를 찾지 못한 실행이다. */
+    /** 옛 연결용 에이전트나 연결이 붙은 에이전트의 실행이거나, 에이전트를 찾지 못한 실행이다(ADR-20261008 / read-data-flow). */
     private boolean isExternalResult(AgentExecution execution) {
         if (execution.agentId() == null) {
             return true;
         }
-        return agents.findById(execution.agentId()).map(Agent::connectorManaged).orElse(true);
+        return agents.findById(execution.agentId())
+                .map(agent -> agent.connectorManaged() || bindings.hasBindings(agent.id()))
+                .orElse(true);
     }
 
     private static Map<String, Object> failure(String code, String message) {

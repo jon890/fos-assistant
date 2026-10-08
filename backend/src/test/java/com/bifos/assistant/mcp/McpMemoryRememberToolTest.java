@@ -298,6 +298,17 @@ class McpMemoryRememberToolTest {
     }
 
     @Test
+    @DisplayName("붙은 커넥터의 READ 도구를 시작한 대화의 기억은 근거가 질문에 있어도 제안이다")
+    void proposesAfterConnectorReadTool() throws Exception {
+        // docs/read-data-flow.md 의 RF-13 이다. 메일 본문의 숨은 지시가 사용자의 말을 근거로 내세워도 바로 저장되지 않는다.
+        askedInThisTurn();
+        toolStarted("mcp__gmail__get_message");
+
+        assertThat(text(call(remember("다른 사람", "다른 사람은 홍길동이다", "다른 사람은 홍길동이야"))))
+                .isEqualTo(PROPOSED);
+    }
+
+    @Test
     @DisplayName("Hermes 도구 정의 검색과 설명을 읽어도 바로 저장하고 중계 실행은 제안이다")
     void remembersAfterToolDiscoveryButProposesAfterRelay() throws Exception {
         askedInThisTurn();
