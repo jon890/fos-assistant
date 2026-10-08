@@ -7,6 +7,7 @@ import com.bifos.assistant.usage.domain.CostByDay;
 import com.bifos.assistant.usage.domain.CostByFingerprint;
 import com.bifos.assistant.usage.domain.CostByModel;
 import com.bifos.assistant.usage.domain.ExecutionAgentRef;
+import com.bifos.assistant.usage.domain.ExecutionSessionRef;
 import com.bifos.assistant.usage.domain.MonthlyCost;
 import com.bifos.assistant.usage.domain.MonthlyCostDetail;
 import com.bifos.assistant.usage.domain.type.ExecutionStatus;
@@ -412,4 +413,23 @@ public interface AgentExecutionRepository extends JpaRepository<AgentExecution, 
             """)
     List<ConversationDelivery> findLastDeliveredByConversation(
             @Param("conversationIds") Collection<Long> conversationIds);
+
+    /** 그 대화에 그 상태의 실행이 있는가. 지운 대화의 정리가 도는 실행을 기다릴 때 쓴다. */
+    boolean existsByConversationIdAndStatus(Long conversationId, ExecutionStatus status);
+
+    /** 그 대화의 실행이 보낸 Hermes session 을 겹치지 않게 읽는다. 지운 대화의 session 을 Hermes 에서 지울 때 쓴다. */
+    @Query("""
+            select distinct new com.bifos.assistant.usage.domain.ExecutionSessionRef(e.agentId, e.profileName, e.hermesSessionId)
+              from AgentExecution e
+             where e.conversationId = :conversationId and e.hermesSessionId is not null
+            """)
+    List<ExecutionSessionRef> findSessionRefs(@Param("conversationId") Long conversationId);
+
+    /** 그 대화 실행의 답 본문을 비운다. 토큰과 금액은 남긴다. 트랜잭션은 {@code ConversationExecutionPurge} 가 연다. */
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("""
+            update AgentExecution e set e.outputText = null
+             where e.conversationId = :conversationId and e.outputText is not null
+            """)
+    int clearOutputsOf(@Param("conversationId") Long conversationId);
 }

@@ -2,6 +2,7 @@ package com.bifos.assistant.chat.infra;
 
 import com.bifos.assistant.chat.domain.ExecutionQuestion;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -22,4 +23,12 @@ public interface ExecutionQuestionRepository extends JpaRepository<ExecutionQues
                 and not exists (select q2.executionId from ExecutionQuestion q2 where q2.executionId = e.id)
             """)
     boolean existsRunWithoutQuestion(@Param("conversationId") Long conversationId);
+
+    /** 그 대화의 실행에 이은 질문 줄을 모두 지운다. 트랜잭션은 {@code ConversationPurgeWriter} 가 연다. */
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("""
+            delete from ExecutionQuestion q
+             where q.executionId in (select e.id from AgentExecution e where e.conversationId = :conversationId)
+            """)
+    int deleteAllOf(@Param("conversationId") Long conversationId);
 }

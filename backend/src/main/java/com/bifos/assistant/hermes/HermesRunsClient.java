@@ -22,6 +22,14 @@ public interface HermesRunsClient {
     void stop(String apiBaseUrl, String profileName, String runId);
 
     /**
+     * 그 session 과 메시지를 Hermes 에서 지운다. 위임한 자식 session 은 Hermes 가 함께 지운다.
+     *
+     * <p>Hermes 가 그 session 을 모르면(404) 이미 지운 것으로 보고 조용히 끝낸다. 닿지 못했거나 다른 오류면 ApiException 을
+     * 던진다.
+     */
+    void deleteSession(String apiBaseUrl, String profileName, String sessionId);
+
+    /**
      * 실행 하나의 지금 상태를 한 번 읽는다. 기다리지 않는다.
      *
      * <p>Hermes 가 그 run 을 모르면(404) NOT_FOUND 다. 닿지 못했거나 다른 오류면 ApiException 을 던진다.
