@@ -38,9 +38,14 @@ public class ChatMessage {
 
     // @Lob 대신 칸 정의를 직접 적는다. 크기 없는 @Lob 문자열은 MySQL 에서 tinytext 로 잡혀 마이그레이션이 만든
     // LONGTEXT 와 달라지고 기동 검증이 실패한다.
-    /** 저장한 본문. {@link #contentKeyId} 가 있으면 암호문이다(ADR-20261008 / data-encryption). */
+    /**
+     * 칸에 저장된 글 그대로다. {@link #contentKeyId} 가 있으면 암호문이다(ADR-20261008 / data-encryption).
+     *
+     * <p>본문을 내는 곳은 {@link #content()} 를 쓴다.
+     */
     @Column(name = "content", nullable = false, columnDefinition = "LONGTEXT")
-    private String content;
+    @Getter
+    private String storedContent;
 
     /** 본문을 암호화한 데이터 key({@code user_data_key.id}). 비어 있으면 {@link #content} 는 평문이다. */
     @Column(name = "content_key_id")
@@ -86,7 +91,7 @@ public class ChatMessage {
             Instant now) {
         this.conversationId = conversationId;
         this.role = role;
-        this.content = content;
+        this.storedContent = content;
         this.senderUserId = senderUserId;
         this.executionId = executionId;
         this.replacesMessageId = replacesMessageId;
@@ -100,7 +105,7 @@ public class ChatMessage {
      */
     public String content() {
         if (contentKeyId == null) {
-            return content;
+            return storedContent;
         }
         String opened = plain;
         if (opened == null) {
@@ -108,11 +113,6 @@ public class ChatMessage {
             plain = opened;
         }
         return opened;
-    }
-
-    /** 칸에 저장된 글 그대로다. {@link #contentKeyId} 가 있으면 암호문이다. */
-    public String storedContent() {
-        return content;
     }
 
     public void attachOpener(MessageContentOpener opener) {
@@ -128,15 +128,15 @@ public class ChatMessage {
      * @return 뺀 평문
      */
     public String detachPlainForSealing() {
-        String detached = content;
+        String detached = storedContent;
         this.plain = detached;
-        this.content = "";
+        this.storedContent = "";
         return detached;
     }
 
     /** 암호문과 그 데이터 key 를 적는다. 푼 본문은 그대로 둔다. */
     public void seal(String sealedContent, Long keyId) {
-        this.content = sealedContent;
+        this.storedContent = sealedContent;
         this.contentKeyId = keyId;
     }
 
