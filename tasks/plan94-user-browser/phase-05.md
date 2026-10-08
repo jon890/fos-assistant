@@ -26,7 +26,7 @@
 ## 의도 메모
 
 - 사용자 결정(2026-10-08): 일반 사용자는 서버 안의 주소를 알 수 없고 알아서도 안 된다. 연결 칸에는 `blog_id` 만 남는다
-- 기존 연결의 보관 파일에 남은 `cdp_url` 은 대시보드가 버린다(phase 03). 사용자는 「내 브라우저」 에서 로그인한 뒤 연결 확인을 누른다. 자동 이관 코드는 두지 않는다
+- 기존 연결의 보관 파일에 남은 `cdp_url` 은 대시보드가 버린다(phase 04). 사용자는 「내 브라우저」 에서 로그인한 뒤 연결 확인을 누른다. 자동 이관 코드는 두지 않는다
 - 중계가 404, 502, 503 을 주면 지금처럼 `NAVER_BLOG_BROWSER_UNREACHABLE`(`unavailable`)이다. 오류 글에 주소를 싣지 않는 규칙은 그대로다
 
 ## 작업 항목
@@ -42,7 +42,7 @@
 - `src/server.ts`: `keys` 의 `NAVER_BLOG_CDP_URL` 을 `NAVER_BLOG_BROWSER_URL` 로. 잠금은 `acquireLock(dir, blogId, jobId)`. `save_draft` 가 작업을 띄우기 전에 브라우저를 확인하는 `sessionStatus` 호출은 `timeoutMs: 45_000` 으로 부른다. 브라우저를 켜는 시간(최대 30초)을 기다리기 위해서다
 - `src/jobs.ts`: `lockFile(dir, blogId)` 로 바꾸고 해시 대상을 블로그 아이디로. 주석의 「CDP 주소마다」 를 「블로그마다」 로
 - `skills/naver-blog/SKILL.md`: 로그인이 필요하다는 오류(`NAVER_BLOG_LOGIN_REQUIRED`, `login_required`)이면 사용자에게 「내 브라우저」 화면에서 네이버에 로그인한 뒤 다시 시도하라고 안내하게 한 줄. 브라우저에 닿지 않는다는 오류(`unavailable`)는 브라우저를 켜는 중일 수 있으니 잠시 뒤 한 번 다시 부르라는 한 줄
-- `tests/contracts.test.ts`: `CDP_URL_PATTERN` 대신 `BROWSER_URL_PATTERN` 이 대시보드의 `OWNER_BROWSER_VALUE_RE` 와 같은 식인지 견준다(`hermes/plugins/dashboard-profile-api/connector_schema.py` 에서 정규식 글을 읽어 비교한다)
+- `tests/contracts.test.ts`: `CDP_URL_PATTERN` 대신 `BROWSER_URL_PATTERN` 이 대시보드의 `OWNER_BROWSER_VALUE_RE` 와 같은 식인지 견준다(`hermes/plugins/dashboard-profile-api/connector_schema.py` 에서 정규식 글을 읽어 비교한다. JS `source` 의 `\/` 같은 이스케이프를 풀어 맞춘 뒤 견준다)
 - 시험(`tests/`): env 이름을 바꾸고, 가짜 CDP 서버가 받은 WebSocket 요청에 `Origin` 이 없는지 단언하는 시험을 하나 더한다. `Origin` 을 확인하던 기존 단언은 지운다. 주소가 경로를 가진 중계 모양(`http://127.0.0.1:<포트>/internal/browser-gateway/b1.<64자>`)일 때 `/json/version` 과 WebSocket 경로가 그 아래로 가는지 본다. 가짜 CDP 서버가 그 접두사를 받도록 고친다. `wsUrlFor` 가 접두사 밖 경로(`/devtools/page/x` 를 접두사 없이 준 경우)를 거절하는지 본다
 - `PATH="$HOME/.bun/bin:$PATH" bun run build` 로 `dist/naver-blog-mcp.js` 를 다시 만든다
 

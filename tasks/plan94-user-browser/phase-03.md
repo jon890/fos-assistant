@@ -18,6 +18,8 @@
 - Spring WebSocket 처리기가 `supportsPartialMessages()` 를 참으로 내면 Tomcat 은 기본 버퍼(8192 글자)가 찰 때마다 조각을 넘긴다. Spring 의 `TextMessage(CharSequence, boolean isLast)` 와 JDK 의 `WebSocket#sendText(CharSequence, boolean last)`, `Listener#onText(..., boolean last)` 가 조각을 그대로 주고받는다
 - `ServletServerContainerFactoryBean` 은 쓰지 않는다. `ServerContainer` 가 없는 MOCK 웹 환경의 `@SpringBootTest`(MySQL 검사)가 기동에서 실패한다
 - 의존성은 `backend/gradle/libs.versions.toml` 의 `spring-boot-starters` 묶음이다. 서버 WebSocket 에 `spring-boot-starter-websocket` 을 더한다(버전은 Boot BOM 이 정한다)
+- phase 02 의 컨트롤러가 `/internal/browser-gateway/{token}/**` 에 빈 404 받기 매핑을 두되 `headers = "!Upgrade"` 로 upgrade 요청은 받지 않는다. 그래서 handshake 는 WebSocket 처리기 매핑으로 간다. 이 phase 의 통합 시험이 그것을 확인한다
+- 공유 시험 컨텍스트의 `backend/src/test/java/com/bifos/assistant/testsupport/FakeBrowserRuntime.java` 는 닿지 않는 고정 CDP 주소를 준다. 그래서 통합 시험은 진짜 `WebSocketCdpRelayConnector` 대신 `backend/src/test/java/com/bifos/assistant/testsupport/IntegrationTestDoubles.java` 에 더하는 `@Primary` 가짜 `CdpRelayConnector` 를 쓴다. 검사 클래스의 `@MockitoBean` 은 `ArchitectureRules.TESTS_DO_NOT_SPLIT_CONTEXT` 가 금지한다
 - 시험 준비는 `@BackendIntegrationTest` 와 `@OverrideProperties` 를 쓴다. `@WebMvcTest`, `@AutoConfigureMockMvc` 는 금지다(`ArchitectureRules.TESTS_DO_NOT_SPLIT_CONTEXT`). 실제 서버 포트는 `@LocalServerPort`(선례 `backend/src/test/java/com/bifos/assistant/connector/ConnectorPolicyEndpointTest.java`)
 
 **근거 문서**: `docs/backend/user-browser.md` 의 「중계」(「WebSocket」), `docs/adr/ADR-20261007-user-browser.md` 의 「중계」
@@ -57,7 +59,8 @@
 
 - `backend/src/test/java/com/bifos/assistant/browser/infra/WebSocketCdpRelayConnectorTest.java`: 가짜 WebSocket 서버로 조각 둘로 보낸 메시지가 순서대로 `onFragment` 에 오고 마지막 조각만 `last` 다, 서버가 닫으면 `onClosed` 가 한 번, GUID 모양 번호를 받는다, 번호에 `/` 가 있으면 `IllegalArgumentException`
 - `backend/src/test/java/com/bifos/assistant/browser/presentation/BrowserGatewaySocketTest.java`: 처리기를 직접 부른다. 가짜 relay 로 조각이 그대로 오가는지, 세션이 닫히면 relay 와 핸들이 닫히는지, 조각의 합이 상한을 넘으면 양쪽이 닫히는지
-- `backend/src/test/java/com/bifos/assistant/browser/presentation/BrowserGatewaySocketIntegrationTest.java`: `@BackendIntegrationTest` 의 실제 서버에서 `@OverrideProperties` 로 중계를 켜고(기반 주소와 32자 이상 비밀), `BrowserGateway` 가 쓰는 브라우저와 `CdpRelayConnector` 를 가짜로 둔다(브라우저 시험의 기존 가짜 런타임이나 시험 설정을 따른다). JDK WebSocket 으로 `ws://localhost:<port>/internal/browser-gateway/<유효한 바인딩 표식>/devtools/browser/<GUID>` 에 붙어 10만 글자 메시지가 양쪽으로 온전히 오가는지, `Origin` 을 실은 연결은 403 으로 거절되는지, 틀린 표식은 404 인지 본다
+- `backend/src/test/java/com/bifos/assistant/testsupport/IntegrationTestDoubles.java`: `@Bean @Primary` 로 `EchoCdpRelayConnector`(신규 시험 지원 클래스 `backend/src/test/java/com/bifos/assistant/testsupport/EchoCdpRelayConnector.java`)를 더한다. 받은 조각을 그대로 `onFragment` 로 돌려주고, 연 횟수와 받은 조각을 기록하며, 시험이 기록을 비울 수 있다. 공유 컨텍스트라 다른 시험에 영향이 없게 상태는 시험마다 비운다
+- `backend/src/test/java/com/bifos/assistant/browser/presentation/BrowserGatewaySocketIntegrationTest.java`: `@BackendIntegrationTest` 의 실제 서버(`@LocalServerPort`)에서 `@OverrideProperties` 로 중계를 켠다(`assistant.browser.enabled=true` 와 그때 필요한 값, 기반 주소, 32자 이상 비밀). 허용된 사용자를 만드는 방법은 `backend/src/test/java/com/bifos/assistant/browser/application/UserBrowserAccessRevokedTest.java` 를 따른다. 표식은 그 사용자의 호출 표식(`BrowserGatewayTokens#callAddress`)이다. JDK WebSocket 으로 `ws://localhost:<port>/internal/browser-gateway/<표식>/devtools/browser/<GUID>` 에 붙어 10만 글자 메시지가 온전히 되돌아오는지, `Origin` 을 실은 연결은 403 으로 거절되는지, 틀린 표식은 404 인지, 같은 devtools 경로의 일반 GET(upgrade 없음)은 빈 404 인지 본다
 
 ## 검증
 
@@ -85,3 +88,5 @@ scripts/check-mysql-migration.sh
 | `backend/src/test/java/com/bifos/assistant/browser/infra/WebSocketCdpRelayConnectorTest.java` | 신규 |
 | `backend/src/test/java/com/bifos/assistant/browser/presentation/BrowserGatewaySocketTest.java` | 신규 |
 | `backend/src/test/java/com/bifos/assistant/browser/presentation/BrowserGatewaySocketIntegrationTest.java` | 신규 |
+| `backend/src/test/java/com/bifos/assistant/testsupport/IntegrationTestDoubles.java` | 수정 |
+| `backend/src/test/java/com/bifos/assistant/testsupport/EchoCdpRelayConnector.java` | 신규 |

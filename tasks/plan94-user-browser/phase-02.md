@@ -43,7 +43,7 @@
 경로와 하는 일은 근거 문서 「받는 것」 의 표를 따른다. 모두 `/internal/browser-gateway/{token}` 아래다.
 
 - `GET json/version`, `GET json`, `GET json/list`, `PUT json/new`, `GET json/close/{id}`, `GET json/activate/{id}`
-- 그 밖의 `/internal/browser-gateway/{token}/**` 는 모든 메서드에 빈 404(가장 낮은 우선순위로 매핑한다)
+- 그 밖의 `/internal/browser-gateway/{token}/**` 는 모든 메서드에 빈 404. 이 받기 매핑에는 `headers = "!Upgrade"` 를 단다. `RequestMappingHandlerMapping`(order 0)이 WebSocket 처리기 매핑(order 1)보다 먼저 보므로, 달지 않으면 다음 phase 의 WebSocket handshake 를 이 매핑이 가로챈다
 - 처음에 `Origin` 머리가 있으면 403. 그다음 `gateway.open(token)`
 - `ApiException` 의 코드를 상태로 바꾼다: `BROWSER_NOT_FOUND` 404, `BROWSER_DISABLED`·`BROWSER_CAPACITY`·`BROWSER_BUSY` 503, `BROWSER_START_FAILED`·`BROWSER_STOP_FAILED` 502. 그 밖의 런타임 예외(Chrome 이 닿지 않음)는 502. 본문은 비운다. 컨트롤러 안의 `try`/`catch` 로 해서 전역 오류 처리기를 타지 않게 한다. 경고 로그에는 예외 종류만 남긴다
 - `json/new` 의 쿼리는 `request.getQueryString()` 원문이다. `URLDecoder` 로 푼 주소가 `http://`, `https://` 로 시작하거나 `about:blank` 일 때만 넘기고, 넘길 때는 원문 쿼리를 그대로 붙인다. 아니면 400
@@ -59,7 +59,7 @@
 ### 5. 시험
 
 - `backend/src/test/java/com/bifos/assistant/browser/application/GatewayRewriterTest.java`: 페이지 주소와 GUID 모양 브라우저 주소(`/devtools/browser/0a1b2c3d-1111-2222-3333-444455556666`)가 바뀐다, 경로 모양이 다르면 칸을 뺀다, `https` 기반은 `wss` 가 된다, `devtoolsFrontendUrl` 이 빠진다
-- `backend/src/test/java/com/bifos/assistant/browser/presentation/BrowserGatewayControllerTest.java`: `@BackendIntegrationTest` 와 `MockMvcBuilders`, `BrowserGateway` 와 `CdpGatewayHttp` 를 가짜로(이 저장소의 `@MockitoBean` 이나 시험 설정 방식을 따른다). `json/version` 이 중계 주소로 바뀐다, `Origin` 이 있으면 403, `BROWSER_NOT_FOUND` 는 빈 본문 404, `BROWSER_CAPACITY` 는 503, `json/new?file:///etc/passwd` 는 400, `json/close/a.b` 는 404, 매핑에 없는 `json/protocol` 은 빈 404
+- `backend/src/test/java/com/bifos/assistant/browser/presentation/BrowserGatewayControllerTest.java`: `UserBrowserControllerTest` 169~189줄처럼 `MockMvcBuilders.standaloneSetup(new BrowserGatewayController(mock(BrowserGateway.class), 가짜 CdpGatewayHttp))` 로 만든다. 검사 클래스의 `@MockitoBean` 필드는 금지다(`ArchitectureRules`). `json/version` 이 중계 주소로 바뀐다, `Origin` 이 있으면 403, `BROWSER_NOT_FOUND` 는 빈 본문 404, `BROWSER_CAPACITY` 는 503, `json/new?file:///etc/passwd` 는 400, `json/close/a.b` 는 404, 매핑에 없는 `json/protocol` 은 빈 404, `Upgrade` 머리가 있는 요청은 받기 매핑에 걸리지 않는다
 - `backend/src/test/java/com/bifos/assistant/browser/presentation/BrowserGatewaySecurityTest.java`: `@BackendIntegrationTest` 의 실제 서버에 `@LocalServerPort` 로 JWT 없이 `GET /internal/browser-gateway/b1.<0 64자>/json/version` 을 보내 401 이 아니라 중계의 판정(시험 설정에서 중계가 꺼져 있으면 503)을 받는지 본다
 
 ## 검증
