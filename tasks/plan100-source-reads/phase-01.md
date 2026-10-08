@@ -29,6 +29,9 @@ message-bubble.tsx는 이 파일의 타입을 import하고 동일 이름을 re-e
 ```bash
 pnpm --dir web typecheck
 node --test test/unit/message-versions.test.ts
+node scripts/check-file-length.mjs
+pnpm --dir web lint
+pnpm --dir web format:check
 ```
 
 ## 변경 파일
