@@ -1,5 +1,6 @@
 import type { Page } from "../../web/node_modules/@playwright/test/index.js";
 import { CONVERSATION_URL, expect, test } from "./fixtures.ts";
+import { clickAndWaitForResponse } from "./helpers.ts";
 
 const AGENT_CODE = "browser";
 const SKILL_NAME = "proactive-check";
@@ -408,6 +409,51 @@ test("단추 하나로 살펴보기를 시작하고 결과와 배지를 보며 �
     await expect(
       page.getByRole("button", { name: "지금 살펴보기" }),
     ).toBeEnabled();
+  } finally {
+    await restore(page);
+  }
+});
+
+test("점검 대화의 발견에 관심 없음을 누르면 눌린 상태가 남고 다시 열어도 그대로다", async ({
+  page,
+}) => {
+  try {
+    await prepare(page);
+    await page.goto(`/agents/${AGENT_CODE}`);
+    await section(page).getByRole("button", { name: "지금 살펴보기" }).click();
+    await expect(page).toHaveURL(CONVERSATION_URL);
+
+    // 발견은 답을 보낸 뒤에 저장되므로 화면이 다시 읽어 그릴 때까지 기다린다.
+    const finding = page
+      .getByTestId("check-findings")
+      .getByTestId("check-finding")
+      .first();
+    const dismiss = finding.getByRole("button", {
+      name: "관심 없음",
+      exact: true,
+    });
+    await expect(dismiss).toHaveAttribute("aria-pressed", "false");
+    const response = await clickAndWaitForResponse(
+      page,
+      dismiss,
+      "PUT",
+      /^\/api\/check-findings\/\d+\/reaction$/,
+    );
+    expect(response.status(), "반응 저장은 본문 없이 204 로 끝나야 한다").toBe(
+      204,
+    );
+    await expect(dismiss).toHaveAttribute("aria-pressed", "true");
+    await expect(
+      finding.getByRole("button", { name: "받아들임", exact: true }),
+    ).toHaveAttribute("aria-pressed", "false");
+
+    await page.reload();
+    await expect(dismiss).toHaveAttribute("aria-pressed", "true");
+    await expect(
+      page
+        .getByTestId("check-findings")
+        .getByText("일 동안 다시 알리지 않아요", { exact: false }),
+    ).toBeVisible();
   } finally {
     await restore(page);
   }
