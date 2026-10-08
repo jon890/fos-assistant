@@ -21,6 +21,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.OptionalInt;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.locks.ReentrantLock;
 import lombok.RequiredArgsConstructor;
@@ -47,6 +48,8 @@ public class UserBrowserService {
     public static final String START_FAILED = "start_failed";
     /** 켰지만 CDP 가 정한 시간 안에 답하지 않았다. */
     public static final String START_TIMEOUT = "start_timeout";
+    /** 켜는 도중 컨테이너가 끝났다. 종료 코드는 로그에만 남긴다. */
+    public static final String START_EXITED = "start_exited";
     /** 멈추거나 지우다 proxy 호출이 실패했다. */
     public static final String STOP_FAILED = "stop_failed";
 
@@ -237,11 +240,12 @@ public class UserBrowserService {
             profiles.ensure(browser.profileKey());
             containerId = runtime.create(browser.profileKey());
             runtime.start(containerId);
-            if (awaitReady(containerId)) {
+            Optional<String> notReady = awaitReady(browser.id(), containerId);
+            if (notReady.isEmpty()) {
                 browser.markRunning(containerId, clock.instant());
                 return UserBrowserSnapshot.of(save(browser));
             }
-            failure = START_TIMEOUT;
+            failure = notReady.get();
         } catch (ApiException ex) {
             if (ex.code() == ErrorCode.BROWSER_BUSY) {
                 // 다른 전이가 이 줄을 먼저 바꿨다. 띄운 컨테이너만 거두고 그 전이의 결과를 둔다
@@ -261,16 +265,26 @@ public class UserBrowserService {
         throw new ApiException(ErrorCode.BROWSER_START_FAILED, "user browser did not start: " + failure);
     }
 
-    private boolean awaitReady(String containerId) {
+    /** CDP 가 답하면 비어 있고, 답하지 않으면 실패 코드다. 컨테이너가 끝났으면 시간을 다 기다리지 않는다. */
+    private Optional<String> awaitReady(Long browserId, String containerId) {
         Instant deadline = clock.instant().plus(properties.current().startTimeout());
         while (true) {
             Optional<URI> address = runtime.cdpAddress(containerId);
             if (address.isPresent() && cdp.ready(address.get())) {
-                return true;
+                return Optional.empty();
+            }
+            if (address.isEmpty()) {
+                // 끝난 컨테이너는 망 주소가 비어 있다. 종료 코드만 남기고 Chrome 의 출력은 남기지 않는다
+                OptionalInt exit = runtime.exitCode(containerId);
+                if (exit.isPresent()) {
+                    log.warn(
+                            "user browser container exited during start id={} exitCode={}", browserId, exit.getAsInt());
+                    return Optional.of(START_EXITED);
+                }
             }
             Duration left = Duration.between(clock.instant(), deadline);
             if (left.isNegative() || left.isZero()) {
-                return false;
+                return Optional.of(START_TIMEOUT);
             }
             sleep(left.compareTo(POLL_INTERVAL) < 0 ? left : POLL_INTERVAL);
         }

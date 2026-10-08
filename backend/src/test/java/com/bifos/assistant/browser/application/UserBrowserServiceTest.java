@@ -140,6 +140,24 @@ class UserBrowserServiceTest {
     }
 
     @Test
+    @DisplayName("켜는 도중 컨테이너가 끝나면 시간을 기다리지 않고 start_exited 로 두며 컨테이너를 지운다")
+    void failsFastWhenContainerExits() {
+        UserBrowserService service = service(true, 2);
+        service.create(101L);
+        runtime.exitOnStart(21);
+
+        assertCode(() -> service.start(101L), ErrorCode.BROWSER_START_FAILED);
+
+        var saved = repository.findByUserId(101L).orElseThrow();
+        assertThat(saved.status()).isEqualTo(UserBrowserStatus.FAILED);
+        assertThat(saved.lastError()).isEqualTo(UserBrowserService.START_EXITED);
+        assertThat(runtime.removed()).containsExactly("c1");
+
+        runtime.exitOnStart(null);
+        assertThat(service.start(101L).status()).isEqualTo(UserBrowserStatus.RUNNING);
+    }
+
+    @Test
     @DisplayName("proxy 가 켜기를 거절하면 만든 컨테이너를 지우고 start_failed 로 둔 뒤 다시 켤 수 있다")
     void failsOnProxyErrorAndAllowsRetry() {
         UserBrowserService service = service(true, 2);
