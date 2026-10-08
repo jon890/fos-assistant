@@ -3,6 +3,7 @@ package com.bifos.assistant.browser.domain;
 import java.net.URI;
 import java.util.List;
 import java.util.Optional;
+import java.util.OptionalInt;
 
 /**
  * 브라우저 컨테이너를 만들고 켜고 멈추고 지운다. 구현은 브라우저 전용 Docker socket proxy 를 부른다.
@@ -24,6 +25,9 @@ public interface BrowserRuntime {
 
     /** 그 컨테이너의 CDP 주소다. 컨테이너가 없거나 브라우저 망의 주소가 없으면 비어 있다. */
     Optional<URI> cdpAddress(String containerId);
+
+    /** 그 컨테이너가 끝났으면 종료 코드다. 돌고 있거나 없으면 비어 있다. */
+    OptionalInt exitCode(String containerId);
 
     /** 브라우저 라벨이 붙은 컨테이너를 꺼진 것까지 모두 돌려준다. */
     List<RuntimeContainer> list();

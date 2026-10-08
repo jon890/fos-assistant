@@ -8,6 +8,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.OptionalInt;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -25,6 +26,10 @@ public final class FakeBrowserRuntime implements BrowserRuntime {
     private final Set<String> failingActions = ConcurrentHashMap.newKeySet();
     /** 이 컨테이너를 멈추려 하면 실패한다. */
     private final Set<String> failingStops = ConcurrentHashMap.newKeySet();
+    /** 끝난 컨테이너의 종료 코드다. */
+    private final Map<String, Integer> exits = new LinkedHashMap<>();
+    /** 비어 있지 않으면 켠 컨테이너가 곧바로 이 코드로 끝난다. */
+    private Integer exitOnStart;
 
     private int sequence;
 
@@ -40,7 +45,10 @@ public final class FakeBrowserRuntime implements BrowserRuntime {
     public synchronized void start(String containerId) {
         fail("start");
         RuntimeContainer found = containers.get(containerId);
-        containers.put(containerId, new RuntimeContainer(containerId, found.profileKey(), true));
+        containers.put(containerId, new RuntimeContainer(containerId, found.profileKey(), exitOnStart == null));
+        if (exitOnStart != null) {
+            exits.put(containerId, exitOnStart);
+        }
     }
 
     @Override
@@ -64,9 +72,15 @@ public final class FakeBrowserRuntime implements BrowserRuntime {
 
     @Override
     public synchronized Optional<URI> cdpAddress(String containerId) {
-        return containers.containsKey(containerId)
+        return containers.containsKey(containerId) && !exits.containsKey(containerId)
                 ? Optional.of(URI.create("http://192.0.2.10:9999"))
                 : Optional.empty();
+    }
+
+    @Override
+    public synchronized OptionalInt exitCode(String containerId) {
+        Integer code = containers.containsKey(containerId) ? exits.get(containerId) : null;
+        return code == null ? OptionalInt.empty() : OptionalInt.of(code);
     }
 
     @Override
@@ -95,6 +109,11 @@ public final class FakeBrowserRuntime implements BrowserRuntime {
         return failingStops;
     }
 
+    /** 비어 있지 않으면 다음 켜기부터 컨테이너가 곧바로 이 종료 코드로 끝난다. */
+    public synchronized void exitOnStart(Integer code) {
+        exitOnStart = code;
+    }
+
     /** 표에 없는 컨테이너를 심는다. */
     public synchronized void plant(String id, String profileKey, boolean running) {
         containers.put(id, new RuntimeContainer(id, profileKey, running));
@@ -106,6 +125,8 @@ public final class FakeBrowserRuntime implements BrowserRuntime {
         removed.clear();
         failingActions.clear();
         failingStops.clear();
+        exits.clear();
+        exitOnStart = null;
         sequence = 0;
     }
 

@@ -16,6 +16,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.List;
 import java.util.Optional;
+import java.util.OptionalInt;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -194,5 +195,21 @@ class DockerProxyBrowserRuntimeTest {
 
         assertThat(runtime.cdpAddress("abc")).contains(URI.create("http://192.0.2.10:9999"));
         assertThat(runtime.cdpAddress("gone")).isEqualTo(Optional.empty());
+    }
+
+    @Test
+    @DisplayName("끝난 컨테이너는 종료 코드를 주고 돌고 있거나 없는 컨테이너는 비어 있다")
+    void readsExitCodeOnlyForFinishedContainers() {
+        server.expect(requestTo(BASE + "/containers/done/json"))
+                .andRespond(
+                        withSuccess("{\"State\":{\"Status\":\"exited\",\"ExitCode\":21}}", MediaType.APPLICATION_JSON));
+        server.expect(requestTo(BASE + "/containers/live/json"))
+                .andRespond(
+                        withSuccess("{\"State\":{\"Status\":\"running\",\"ExitCode\":0}}", MediaType.APPLICATION_JSON));
+        server.expect(requestTo(BASE + "/containers/gone/json")).andRespond(withStatus(HttpStatus.NOT_FOUND));
+
+        assertThat(runtime.exitCode("done")).isEqualTo(OptionalInt.of(21));
+        assertThat(runtime.exitCode("live")).isEqualTo(OptionalInt.empty());
+        assertThat(runtime.exitCode("gone")).isEqualTo(OptionalInt.empty());
     }
 }

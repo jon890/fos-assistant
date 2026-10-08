@@ -10,6 +10,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.OptionalInt;
 import java.util.function.Supplier;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -107,29 +108,29 @@ public class DockerProxyBrowserRuntime implements BrowserRuntime {
 
     @Override
     public Optional<URI> cdpAddress(String containerId) {
-        JsonNode body;
-        try {
-            body = call(
-                    "inspect",
-                    () -> client.get()
-                            .uri(path("/containers/{id}/json"), containerId)
-                            .retrieve()
-                            .body(JsonNode.class));
-        } catch (MissingContainer ex) {
-            return Optional.empty();
-        }
         BrowserProperties settings = properties.current();
-        String ip = body == null
-                ? ""
-                : body.path("NetworkSettings")
+        String ip = inspect(containerId)
+                .map(body -> body.path("NetworkSettings")
                         .path("Networks")
                         .path(settings.network())
                         .path("IPAddress")
-                        .asString("");
+                        .asString(""))
+                .orElse("");
         if (ip.isBlank()) {
             return Optional.empty();
         }
         return Optional.of(URI.create("http://" + ip + ":" + settings.cdpPort()));
+    }
+
+    /** 끝난 컨테이너는 Docker 가 {@code exited} 나 {@code dead} 로 보여 준다. 그 밖의 상태는 아직 끝나지 않은 것이다. */
+    @Override
+    public OptionalInt exitCode(String containerId) {
+        Optional<JsonNode> state = inspect(containerId).map(body -> body.path("State"));
+        String status = state.map(node -> node.path("Status").asString("")).orElse("");
+        if (!"exited".equals(status) && !"dead".equals(status)) {
+            return OptionalInt.empty();
+        }
+        return OptionalInt.of(state.get().path("ExitCode").asInt(-1));
     }
 
     @Override
@@ -179,6 +180,20 @@ public class DockerProxyBrowserRuntime implements BrowserRuntime {
         body.put("Labels", Map.of(BROWSER_LABEL, "1", USER_LABEL, profileKey));
         body.put("HostConfig", hostConfig);
         return body;
+    }
+
+    /** 그 컨테이너의 inspect 본문이다. proxy 가 그 컨테이너를 모르면 비어 있다. */
+    private Optional<JsonNode> inspect(String containerId) {
+        try {
+            return Optional.ofNullable(call(
+                    "inspect",
+                    () -> client.get()
+                            .uri(path("/containers/{id}/json"), containerId)
+                            .retrieve()
+                            .body(JsonNode.class)));
+        } catch (MissingContainer ex) {
+            return Optional.empty();
+        }
     }
 
     private String path(String path) {
