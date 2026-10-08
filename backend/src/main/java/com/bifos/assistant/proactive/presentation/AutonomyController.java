@@ -16,7 +16,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
-/** 요청자의 평가만 판정하고 요청자의 동의만 읽고 바꾼다. 화면은 아직 없다(ADR-20261007 autonomy-policy). */
+/** 요청자의 평가만 판정하고 요청자의 동의만 읽고 바꾼다. 관리자 영역의 가치 평가 절이 결과를 읽는다(ADR-20261007 autonomy-policy). */
 @RestController
 @RequiredArgsConstructor
 public class AutonomyController {
