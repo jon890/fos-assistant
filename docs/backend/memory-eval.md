@@ -37,7 +37,7 @@ CI 의 backend 검사(`./gradlew test`)에 함께 돈다.
 1. 앞 사례의 Memory 를 모두 지운다.
 2. 사례의 Memory 를 표에 직접 넣는다. 시각은 시험 시계 기준 `updatedDaysAgo` 일 전이다.
 3. 묻는 사람과 에이전트로 `ContextAssembler.assemble` 을 부른다. 측정 모드마다 한 번씩 부른다.
-4. 조립 결과의 문맥 묶음에서 항목마다 상태를 읽는다. 본문으로 실렸으면 `INLINE`, 제목만이면 `TITLE_ONLY`, 빠졌거나 없으면 `ABSENT` 다.
+4. 조립 결과의 문맥 묶음에서 항목마다 상태를 읽는다. 본문으로 실렸으면 `INLINE`, 제목만이면 `TITLE_ONLY`, 자리가 없어 빠졌으면 `OMITTED`, 묶음에 없으면 `ABSENT` 다.
 
 Hermes 대역도 모델도 부르지 않는다. 그래서 빠르고 결과가 늘 같다.
 
@@ -45,14 +45,15 @@ Hermes 대역도 모델도 부르지 않는다. 그래서 빠르고 결과가 �
 
 | 모드 | 뜻 |
 | --- | --- |
-| `profileOff` | 프로필 구역을 끈 조립. 프로필 구역이 생기기 전의 동작과 같다 |
-| `profileOn` | 운영 기본값의 조립. 프로필 구역 2,000자, 항목 200자 |
+| `factsOff` | 개인 사실 구역을 끈 조립. 개인 사실 구역이 생기기 전의 동작과 같다 |
+| `factsOn` | 운영 기본값의 조립. 개인 사실 구역 2,000자, 항목 200자 |
 
 모드는 `ContextProperties` 만 바꾼 `ContextAssembler` 를 시험 안에서 따로 만들어 고른다. Spring 컨텍스트를 바꾸지 않는다.
 
 ### 시험 세트
 
 범주는 LongMemEval(arXiv 2410.10813)의 다섯 능력에 권한 경계와 부하를 더했다.
+질문을 판정에 쓰지 않으므로 이 측정은 그 능력 자체(여러 사실을 엮어 답하기, 모르면 모른다고 하기)를 재지 못한다. 범주는 「그 능력에 필요한 사실이 글에 실리는가」 를 사례로 나누는 이름이다.
 
 | 범주 | 뜻 | 예 |
 | --- | --- | --- |
@@ -69,8 +70,9 @@ Hermes 대역도 모델도 부르지 않는다. 그래서 빠르고 결과가 �
   "version": 1,
   "note": "합성 시험 세트. 이름과 사실은 모두 지어낸 것이다",
   "users": [
-    { "key": "parentA", "role": "ADMIN" },
-    { "key": "childA", "role": "MEMBER" }
+    { "key": "parentA", "role": "ADMIN", "group": "home" },
+    { "key": "childA", "role": "MEMBER", "group": "home" },
+    { "key": "neighborA", "role": "ADMIN", "group": "other" }
   ],
   "agents": [
     { "key": "general", "collections": [{ "collection": "core", "allowSensitive": false }] }
@@ -94,17 +96,17 @@ Hermes 대역도 모델도 부르지 않는다. 그래서 빠르고 결과가 �
 
 | 칸 | 뜻 |
 | --- | --- |
-| `users[].key`, `role` | 사례에서 부르는 이름과 역할. 모두 같은 그룹이다 |
+| `users[].key`, `role`, `group` | 사례에서 부르는 이름과 역할, 그룹 이름. 그룹 이름이 같으면 같은 그룹이다. 다른 그룹의 `GROUP` 항목을 시험하려고 그룹을 둘 둔다 |
 | `agents[].collections` | 그 에이전트가 받는 collection 과 민감 허용 |
 | `cases[].question` | 사람이 읽으라고 둔 질문. 판정에 쓰지 않는다 |
-| `memories[]` | `key`, `owner`(USER 범위일 때), `scope`, `title`, `content`. 선택 칸은 `collection`(기본 `core`), `retrieval`(기본 `SEARCH`), `status`(기본 `ACCEPTED`), `sensitivity`(기본 `NORMAL`), `entryType`(기본 `MEMORY`), `updatedDaysAgo`(기본 0) |
-| `filler` | 선택. `{ "owner", "count", "contentChars" }`. 짧은 `USER` 항목을 그 수만큼 지어 넣는다. `LOAD` 와 `TEMPORAL` 이 쓴다 |
+| `memories[]` | `key`, `scope`, `title`, `content`. `USER` 면 `owner`, `GROUP` 이면 `group` 을 준다. 선택 칸은 `collection`(기본 `core`), `retrieval`(기본 `SEARCH`), `status`(기본 `ACCEPTED`, 그 밖에 `PROPOSED`, `REJECTED`), `sensitivity`(기본 `NORMAL`), `entryType`(기본 `MEMORY`, 그 밖에 `DOCUMENT`), `documentKey`(`DOCUMENT` 일 때 필수), `updatedDaysAgo`(기본 0) |
+| `filler` | 선택. `{ "owner", "count", "contentChars", "updatedDaysAgo" }`. 제목이 「보조 사실 {n}」(n 은 1부터)이고 본문이 `contentChars` 글자인 `USER` 의 `ACCEPTED`, `SEARCH` 항목을 그 수만큼 지어 넣는다. `updatedDaysAgo` 의 기본값은 0 이다. `LOAD` 와 `TEMPORAL` 이 쓴다. 판정 대상이 아니다 |
 | `expect` | 답에 필요한 항목의 `key` |
 | `forbidden[]` | `{ "memory", "kind" }`. 실리면 안 되는 항목. `kind` 는 아래 표 |
 
 | `forbidden.kind` | 뜻 | 실리면 |
 | --- | --- | --- |
-| `BOUNDARY` | 남의 항목, 권한 밖 collection, 민감 허용 없는 민감 항목, 제안, 거절, 보관 | 실패. 제목만 실려도 실패다 |
+| `BOUNDARY` | 남의 항목, 다른 그룹의 항목, 권한 밖 collection, 민감 허용 없는 민감 항목, 제안, 거절, 보관 | 실패. 묶음에 그 항목이 있으면 `OMITTED` 여도 실패다. 고르는 단계를 지났다는 뜻이기 때문이다 |
 | `SUPERSEDED` | 새 값이 따로 있는 옛 값 | 오기억 노출로 센다 |
 | `DISTRACTOR` | 질문과 비슷하지만 다른 사람이나 다른 것의 사실 | 오기억 노출로 센다 |
 
@@ -120,12 +122,14 @@ Hermes 대역도 모델도 부르지 않는다. 그래서 빠르고 결과가 �
 | 회수율(본문) | `expect` 항목 가운데 `INLINE` 인 수 / `expect` 항목 수 |
 | 회수율(제목 이상) | `INLINE` 이나 `TITLE_ONLY` 인 수 / `expect` 항목 수 |
 | 오기억 노출률 | `SUPERSEDED` 와 `DISTRACTOR` 항목 가운데 `INLINE` 인 수 / 그 항목 수 |
-| 권한 경계 노출 | `BOUNDARY` 항목 가운데 `ABSENT` 가 아닌 수 |
+| 권한 경계 노출 | `BOUNDARY` 항목 가운데 `ABSENT` 가 아닌 수. `OMITTED` 도 센다 |
 | 실행당 Memory 글자 수 | 조립 결과의 `chars`. 공통 답변 지침은 빼고 센다. 평균, 중앙값, 최댓값 |
 | 빠진 항목 | 조립 결과의 `omittedItems` 합 |
 
+분모가 0 인 지표는 숫자 대신 「해당 없음」 으로 낸다. `ABSTENTION` 은 `expect` 가 없어 회수율이 늘 해당 없음이다.
+
 **실패 조건은 권한 경계 노출 하나다.** 어느 모드에서든 0 이 아니면 시험이 실패한다.
-나머지 지표는 보고서에만 남긴다. 기준선이 아직 없고, 프로필 구역이 오기억 노출을 늘리는 것은 알고 고른 비용이기 때문이다([ADR-20261008 / memory-profile](../adr/ADR-20261008-memory-profile.md)).
+나머지 지표는 보고서에만 남긴다. 기준선이 아직 없고, 개인 사실 구역이 오기억 노출을 늘리는 것은 알고 고른 비용이기 때문이다([ADR-20261008 / memory-facts](../adr/ADR-20261008-memory-facts.md)).
 
 ## 운영 집계
 
@@ -172,7 +176,7 @@ WHERE parent_execution_id IS NULL
   AND started_at >= NOW() - INTERVAL 30 DAY;
 ```
 
-**실행마다 실린 층별 항목 수.** `MEMORY_PROFILE` 은 프로필 구역이 생긴 뒤부터 나온다.
+**실행마다 실린 층별 항목 수.** `MEMORY_FACTS` 은 개인 사실 구역이 생긴 뒤부터 나온다.
 
 ```sql
 SELECT s.source,
@@ -186,7 +190,7 @@ WHERE s.source LIKE 'MEMORY\_%'
 GROUP BY s.source, s.body_mode;
 ```
 
-**`memory_read` 호출률.** 대화의 루트 실행 가운데 `memory_read` 를 한 번이라도 부른 비율이다. 프로필 구역이 이 값을 줄이는지 본다.
+**`memory_read` 호출률.** 대화의 루트 실행 가운데 `memory_read` 를 한 번이라도 부른 비율이다. 개인 사실 구역이 이 값을 줄이는지 본다.
 
 ```sql
 SELECT COUNT(*) AS executions,

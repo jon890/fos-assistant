@@ -8,7 +8,7 @@
   **항상 층만으로 기본 대화가 성립해야 한다.** 도구는 보조다.
 - **대체된 부분**: 「적용 범위」 의 `always_inject` 한 칸은 [ADR-052](ADR-052-memory-는-collection-종류-꺼내는-방식-민감도-판-출처를-가진다.md) 이 `retrieval`(`ALWAYS`, `SEARCH`, `ARCHIVE`)로 넓혔다.
   참은 `ALWAYS`, 거짓은 `SEARCH` 다. 층을 나눠 싣는 결정은 그대로다.
-  `SEARCH` 가운데 본문이 짧은 개인 항목은 예산이 고정된 사용자 프로필 구역에 본문까지 싣는 예외를 [ADR-20261008 / memory-profile](ADR-20261008-memory-profile.md) 이 둔다.
+  `SEARCH` 가운데 본문이 짧은 개인 항목은 예산이 고정된 개인 사실 구역에 본문까지 싣는 예외를 [ADR-20261008 / memory-facts](ADR-20261008-memory-facts.md) 이 둔다.
 
 ### 맥락
 
