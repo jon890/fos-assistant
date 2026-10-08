@@ -53,7 +53,8 @@ public class TaskNotices {
         }
         switch (run.status()) {
             case SUCCEEDED -> {
-                if (policy == NotifyPolicy.ALWAYS) {
+                // 「보고할 것 없음」 으로 끝낸 발화는 알림 설정과 관계없이 알리지 않는다.
+                if (policy == NotifyPolicy.ALWAYS && run.reason() != TaskRunReason.NOTHING_TO_REPORT) {
                     notifications.notify(
                             task.ownerUserId(),
                             NotificationKind.TASK_SUCCEEDED,

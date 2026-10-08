@@ -8,7 +8,7 @@ import { Notice } from "@/components/ui/notice";
 import { createPerson, fetchPeople, setPersonEnabled } from "@/lib/people-api";
 import type { Person } from "@/lib/people";
 
-type Props = { initialPeople: Person[] };
+type Props = { initialPeople: Person[]; initialReadAt: string };
 
 type Failure = { code: string; message: string };
 
@@ -16,8 +16,9 @@ async function payload<T>(response: Response): Promise<T> {
   return (await response.json()) as T;
 }
 
-export function PeopleAdminPanel({ initialPeople }: Props) {
+export function PeopleAdminPanel({ initialPeople, initialReadAt }: Props) {
   const [people, setPeople] = useState(initialPeople);
+  const [readAt, setReadAt] = useState(initialReadAt);
   const [error, setError] = useState<string | null>(null);
   /** 도는 요청이다. 누른 단추에만 회전 표시를 두려고 더하기인지 누구를 켜고 끄는지 기억한다. */
   const [pending, setPending] = useState<
@@ -29,6 +30,7 @@ export function PeopleAdminPanel({ initialPeople }: Props) {
     const response = await fetchPeople();
     if (!response.ok) throw await payload<Failure>(response);
     setPeople(await payload<Person[]>(response));
+    setReadAt(new Date().toISOString());
   }
 
   async function create(event: React.FormEvent<HTMLFormElement>) {
@@ -96,6 +98,7 @@ export function PeopleAdminPanel({ initialPeople }: Props) {
         people={people}
         busy={busy}
         pendingId={pending?.action === "enabled" ? pending.id : null}
+        readAt={readAt}
         onEnabledChange={(person) => void changeEnabled(person)}
       />
     </div>

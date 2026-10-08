@@ -10,6 +10,10 @@ export type Person = {
   hermesProfile: string;
   /** 거짓이면 로그인할 수 없다. 이미 만들어진 profile 과 에이전트는 그대로 남는다. */
   enabled: boolean;
-  /** 거짓이면 아직 한 번도 들어오지 않은 사람이다. 그 사람의 에이전트도 아직 없다. */
+  /** 일반 요청으로 app_user와 기본 에이전트가 만들어졌는지 나타낸다. */
   joined: boolean;
+  /** 마지막으로 로그인 완료를 기록한 시각이다. */
+  lastLoginAt: string | null;
+  /** 마지막으로 사용자가 보낸 대화 메시지의 시각이다. */
+  lastConversationAt: string | null;
 };

@@ -87,13 +87,14 @@ public interface ConversationRepository extends JpaRepository<Conversation, Long
 
     Optional<Conversation> findByPublicIdAndUserIdAndDeletedAtIsNull(UUID publicId, Long userId);
 
-    /** 그 사용자의 지우지 않은 대화를 최근 것부터 첫 쪽만큼 읽는다. 개수는 {@code pageable} 이 정한다. */
-    List<Conversation> findByUserIdAndDeletedAtIsNullOrderByUpdatedAtDescIdDesc(Long userId, Pageable pageable);
+    /** 그 사용자의 지우지 않았고 목록에서 숨기지 않은 대화를 최근 것부터 첫 쪽만큼 읽는다. 개수는 {@code pageable} 이 정한다. */
+    List<Conversation> findByUserIdAndDeletedAtIsNullAndHiddenAtIsNullOrderByUpdatedAtDescIdDesc(
+            Long userId, Pageable pageable);
 
-    /** {@code (updatedAt, id)} 로 정한 자리 바로 다음 줄부터 읽는다. 정렬은 첫 쪽과 같다. */
+    /** {@code (updatedAt, id)} 로 정한 자리 바로 다음 줄부터 읽는다. 정렬과 숨긴 대화를 빼는 것은 첫 쪽과 같다. */
     @Query("""
             select c from Conversation c
-             where c.userId = :userId and c.deletedAt is null
+             where c.userId = :userId and c.deletedAt is null and c.hiddenAt is null
                and (c.updatedAt < :updatedAt or (c.updatedAt = :updatedAt and c.id < :id))
              order by c.updatedAt desc, c.id desc
             """)
@@ -200,6 +201,41 @@ public interface ConversationRepository extends JpaRepository<Conversation, Long
             @Param("userId") Long userId,
             @Param("mode") ModelSelectionMode mode,
             @Param("tier") ModelTier tier);
+
+    /**
+     * 대화가 그 단계를 고르게 한다. 고른 모델과 effort 는 지운다. 예약 작업 발화가 부르는 경로다.
+     *
+     * <p>발화 준비 트랜잭션 안에서 불리므로 {@code clearAutomatically} 를 두지 않는다. 영속성 컨텍스트를 비우면 그 뒤 발화 기록의
+     * 변경이 반영되지 않는다. 대화 목록의 순서를 흔들지 않도록 {@code updatedAt} 은 바꾸지 않는다. 트랜잭션은 {@code
+     * ConversationWriter} 가 연다.
+     */
+    @Modifying
+    @Query("""
+            update Conversation c set c.modelSelectionMode = :mode, c.modelTier = :tier,
+                c.modelProvider = null, c.model = null, c.reasoningEffort = null
+             where c.id = :id
+            """)
+    int chooseTierForTask(@Param("id") Long id, @Param("mode") ModelSelectionMode mode, @Param("tier") ModelTier tier);
+
+    /**
+     * 대화를 목록에서만 뺀다. 이미 숨겼으면 줄을 건드리지 않고 0 을 돌려준다. 예약 작업이 「보고할 것 없음」 으로 끝났을 때 쓴다.
+     *
+     * <p>발화 결과를 적는 트랜잭션 안에서 불리므로 {@code clearAutomatically} 를 두지 않는다. 대화 목록의 순서를 흔들지 않도록
+     * {@code updatedAt} 은 바꾸지 않는다. 트랜잭션은 {@code ConversationWriter} 가 연다.
+     */
+    @Modifying
+    @Query("update Conversation c set c.hiddenAt = :now where c.id = :id and c.hiddenAt is null")
+    int hideFromList(@Param("id") Long id, @Param("now") Instant now);
+
+    /**
+     * 숨긴 대화를 다시 목록에 보인다. 사용자가 질문하면 부른다. 숨기지 않았으면 줄을 건드리지 않고 0 을 돌려준다.
+     *
+     * <p>질문 저장 트랜잭션 안에서 불리므로 {@code clearAutomatically} 를 두지 않는다. 트랜잭션은 {@code ConversationWriter}
+     * 가 연다.
+     */
+    @Modifying
+    @Query("update Conversation c set c.hiddenAt = null where c.id = :id and c.hiddenAt is not null")
+    int showInList(@Param("id") Long id);
 
     /** 그 사용자의 지우지 않은 대화일 때만 지운 시각을 적는다. 트랜잭션은 {@code ConversationWriter} 가 연다. */
     @Modifying(flushAutomatically = true, clearAutomatically = true)
