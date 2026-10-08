@@ -227,6 +227,44 @@ class McpMemoryRememberToolTest {
         assertThat(onlyMemory().status()).isEqualTo(MemoryStatus.ACCEPTED);
     }
 
+    @Test
+    @DisplayName("모델이 sensitive 를 주지 않아도 본문이 민감해 보이면 일반 민감도의 제안으로 내린다")
+    void proposesSensitiveLookingContent() throws Exception {
+        askedInThisTurn("아빠 계좌는 국민은행이야.");
+
+        assertThat(text(call(remember("아빠 계좌", "아빠 계좌는 국민은행이야", null)))).isEqualTo(PROPOSED);
+
+        Memory memory = onlyMemory();
+        assertThat(memory.status()).isEqualTo(MemoryStatus.PROPOSED);
+        assertThat(memory.sensitivity()).isEqualTo(MemorySensitivity.NORMAL);
+    }
+
+    @Test
+    @DisplayName("바로 저장한 항목을 민감해 보이는 본문으로 고치려 하면 고치지 않고 확인하라고 답한다")
+    void refusesUpdateToSensitiveLookingContent() throws Exception {
+        askedInThisTurn();
+        call(remember("다른 사람", "다른 사람은 홍길동이다", null));
+        Long memoryId = onlyMemory().id();
+        ObjectNode arguments = remember("다른 사람", "다른 사람의 계좌는 국민은행이다", null);
+        arguments.put("memory_id", memoryId);
+
+        JsonNode result = call(arguments);
+
+        assertThat(result.path("isError").asBoolean()).isTrue();
+        assertThat(text(result)).startsWith("지금은 기존 기억을 고칠 수 없다");
+        assertThat(memories.findById(memoryId).orElseThrow().content()).isEqualTo("다른 사람은 홍길동이다");
+    }
+
+    @Test
+    @DisplayName("질문에만 민감한 낱말이 있으면 제목과 본문만 보므로 바로 저장한다")
+    void remembersWhenOnlyQuestionLooksSensitive() throws Exception {
+        askedInThisTurn("어제 병원에 다녀왔어. 다른 사람은 홍길동이야.");
+
+        assertThat(text(call(remember("다른 사람", "다른 사람은 홍길동이야", null)))).isEqualTo(REMEMBERED);
+
+        assertThat(onlyMemory().status()).isEqualTo(MemoryStatus.ACCEPTED);
+    }
+
     /** 판단 피드백을 {@code 종류|주체} 로 남긴 순서대로 읽는다. */
     private List<String> feedbackEvents() {
         return jdbc

@@ -43,7 +43,8 @@ import org.springframework.transaction.annotation.Transactional;
  * 에이전트가 {@code memory_remember} 로 남기는 기록을 저장하고, 대화에 그릴 기록을 내고, 사람이 되돌린다(ADR-20261007 / memory-remember).
  *
  * <p>바로 저장할지는 부르는 쪽이 실행의 출처로 판정해 {@link MemoryRememberRequest#direct()} 로 넘긴다. 이 클래스는 그 위에
- * 민감도와 collection 과 한 실행의 상한을 다시 본다. 민감 항목은 바로 저장 조건이어도 제안이다.
+ * 민감도와 collection 과 한 실행의 상한을 다시 본다. 민감 항목은 바로 저장 조건이어도 제안이고,
+ * 모델이 일반으로 주어도 민감해 보이는 글이면 제안이다.
  */
 @Service
 @Slf4j
@@ -79,7 +80,9 @@ public class MemoryCaptureService {
             return MemoryRememberResult.of(MemoryRememberOutcome.COLLECTION_NOT_ALLOWED);
         }
         MemorySensitivity sensitivity = request.sensitivity();
-        boolean direct = request.direct() && sensitivity == MemorySensitivity.NORMAL;
+        boolean direct = request.direct()
+                && sensitivity == MemorySensitivity.NORMAL
+                && !MemorySensitiveHints.suspected(request.title(), request.content());
         String dedupKey = MemoryService.proposalDedupKey(user.id(), request.title(), request.content());
         if (sensitivity == MemorySensitivity.NORMAL) {
             Optional<Memory> existing = memories.findByProposalDedupKey(dedupKey);
@@ -225,7 +228,9 @@ public class MemoryCaptureService {
 
     /** 고칠 항목은 요청자의 개인 MEMORY 항목이고 승인됐고 일반 민감도이며 이 에이전트가 받는 collection 에 있다. */
     private MemoryRememberResult update(CurrentUser user, MemoryAccess access, MemoryRememberRequest request) {
-        if (!request.direct() || request.sensitivity() != MemorySensitivity.NORMAL) {
+        if (!request.direct()
+                || request.sensitivity() != MemorySensitivity.NORMAL
+                || MemorySensitiveHints.suspected(request.title(), request.content())) {
             return MemoryRememberResult.of(MemoryRememberOutcome.UPDATE_NEEDS_CONFIRMATION);
         }
         Optional<Memory> found = memories.findByIdForUpdate(request.memoryId());
