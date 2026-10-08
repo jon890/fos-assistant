@@ -137,7 +137,7 @@ Nous Research 의 [Hermes Agent](https://github.com/NousResearch/hermes-agent) �
 가치 평가는 문제 후보를 축마다 근거를 남겨 견주고([`docs/backend/value-evaluation.md`](docs/backend/value-evaluation.md)), 행동 정책은 모델을 부르지 않는 규칙으로 무시, 보이기, 승인, 실행을 정한다([`docs/backend/autonomy-policy.md`](docs/backend/autonomy-policy.md)).
 판단 피드백은 제안에 대한 사용자 반응과 실행 결과를 사건으로 남긴다([`docs/backend/decision-feedback.md`](docs/backend/decision-feedback.md)).
 판단 피드백은 살펴보기 보고, 할 일, Memory 제안, 승인 줄이 생길 때 이미 기록된다.
-가치 평가와 행동 정책은 살펴보기와 매일 깨우기가 아직 자동으로 부르지 않는다. 이 둘을 실제 사용에 잇는 일은 진행 중이다.
+가치 평가와 행동 정책은 살펴보기와 매일 깨우기가 아직 자동으로 부르지 않는다. 지금은 관리자가 관리자 영역의 에이전트 상세에서 살펴보기 한 건에 대해 돌려 읽는다([`docs/frontend/structure.md`](docs/frontend/structure.md)). 이 둘을 실제 사용에 잇는 일은 진행 중이다.
 
 ### Memory
 

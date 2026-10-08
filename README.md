@@ -136,7 +136,7 @@ Value evaluation, an autonomy policy, and decision feedback are built as well.
 Value evaluation compares problem candidates axis by axis and keeps the evidence for each ([`docs/backend/value-evaluation.md`](docs/backend/value-evaluation.md)), and the autonomy policy decides, by rules that never call a model, whether to ignore, surface, ask for approval, or execute ([`docs/backend/autonomy-policy.md`](docs/backend/autonomy-policy.md)).
 Decision feedback records how a user reacted to a suggestion and how the run ended ([`docs/backend/decision-feedback.md`](docs/backend/decision-feedback.md)).
 Decision feedback is already recorded when a check report, a follow-up, a Memory proposal, or an approval request is created.
-Checks and the daily wake-up do not call value evaluation or the autonomy policy automatically yet. Wiring those two into real use is in progress.
+Checks and the daily wake-up do not call value evaluation or the autonomy policy automatically yet. For now an administrator runs and reads them for one check from the agent detail in the admin area ([`docs/frontend/structure.md`](docs/frontend/structure.md)). Wiring those two into real use is in progress.
 
 ### Memory
 
