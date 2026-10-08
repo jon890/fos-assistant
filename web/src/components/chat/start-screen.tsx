@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import type { AgentView } from "@/lib/agent";
 import { Button } from "@/components/ui/button";
 import { Notice } from "@/components/ui/notice";
@@ -51,9 +52,16 @@ export function StartScreenHeader({
           <Skeleton className={`${AGENT_CARD_HEIGHT} w-44 shrink-0`} />
         </div>
       ) : agents.length === 0 ? (
-        <Notice variant="info" className="text-center">
-          사용할 수 있는 에이전트가 없어요. 관리자에게 등록을 요청해 주세요.
-        </Notice>
+        // 사용자는 자기 에이전트를 직접 만들 수 있다. 관리자에게 미루지 않고 만드는 길로 보낸다.
+        <div className="flex flex-col items-center gap-3">
+          <Notice variant="info" className="text-center">
+            아직 쓸 수 있는 에이전트가 없어요. 에이전트를 만들면 바로 대화할 수
+            있어요.
+          </Notice>
+          <Button asChild>
+            <Link href="/agents?new=1">에이전트 만들기</Link>
+          </Button>
+        </div>
       ) : only ? (
         <p className="text-center text-sm font-medium">{only.name}</p>
       ) : (

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState, type RefObject } from "react";
-import { PanelLeftClose } from "lucide-react";
+import { PanelLeftClose, ShieldCheck, SquarePen } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { TooltipButton } from "@/components/ui/tooltip-button";
@@ -76,7 +76,7 @@ export function Sidebar({
       <Button
         asChild
         variant="outline"
-        className="mb-2 shrink-0 justify-start bg-background hover:bg-accent"
+        className="mb-2 shrink-0 justify-start gap-2 bg-background px-3 hover:bg-accent"
       >
         <Link
           href="/"
@@ -86,7 +86,7 @@ export function Sidebar({
             onNavigate("/");
           }}
         >
-          새 대화
+          <SquarePen aria-hidden="true" />새 대화
         </Link>
       </Button>
       {/* 주요 화면 메뉴가 아니다. 대화 목록이 길어도 스크롤 없이 보이도록 「새 대화」 바로 아래에 둔다. */}
@@ -133,8 +133,9 @@ export function Sidebar({
               href="/admin"
               data-testid="admin-entry"
               onClick={() => onNavigate("/admin")}
-              className="rounded-md px-2 py-1.5 text-xs text-muted-foreground hover:bg-accent hover:text-foreground"
+              className="flex items-center gap-1 rounded-md px-2 py-1.5 text-xs text-muted-foreground hover:bg-accent hover:text-foreground"
             >
+              <ShieldCheck aria-hidden="true" className="size-3.5 shrink-0" />
               관리자
               <NavPending />
             </Link>

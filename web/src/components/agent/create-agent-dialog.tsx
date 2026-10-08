@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import {
@@ -40,10 +40,19 @@ const MAX_NAME_CHARS = 100;
  * <p>만드는 데 몇 초 걸리므로 요청이 도는 동안 단추를 막고 창도 닫히지 않게 한다. 성공하면 상세로 옮겨 가며
  * 이 창이 사라지므로 그때까지 진행 중인 채로 둔다.
  */
-export function CreateAgentDialog() {
+export function CreateAgentDialog({
+  defaultOpen = false,
+}: {
+  /** 처음부터 창을 연다. 「에이전트 만들기」 링크가 `/agents?new=1` 로 열 때다. */
+  defaultOpen?: boolean;
+}) {
   const router = useRouter();
   const id = useId();
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(defaultOpen);
+  // 주소의 `new=1` 을 지운다. 남겨 두면 뒤로 가기나 새로 고침에 창이 다시 열린다.
+  useEffect(() => {
+    if (defaultOpen) router.replace("/agents", { scroll: false });
+  }, [defaultOpen, router]);
   const [name, setName] = useState("");
   const [visibility, setVisibility] =
     useState<AdminAgent["visibility"]>(PRIVATE_VISIBILITY);

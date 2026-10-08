@@ -143,15 +143,20 @@ test("공백 없이 글자에 붙은 @ 에서는 목록이 뜨지 않는다", as
   await expect(page.getByRole("listbox", { name: "에이전트 고르기" })).toHaveCount(0);
 });
 
-test("쓸 수 있는 에이전트가 없으면 알리고 입력창을 잠근다", async ({ page }) => {
+test("쓸 수 있는 에이전트가 없으면 입력창을 잠그고 에이전트를 만드는 길로 안내한다", async ({ page }) => {
   await page.route("**/api/agents", async (route) => {
     await route.fulfill({ json: [] });
   });
   await page.goto("/");
 
-  await expect(page.getByText("사용할 수 있는 에이전트가 없어요. 관리자에게 등록을 요청해 주세요.")).toBeVisible();
+  await expect(page.getByText("아직 쓸 수 있는 에이전트가 없어요. 에이전트를 만들면 바로 대화할 수 있어요.")).toBeVisible();
   await expect(composer(page)).toBeDisabled();
   await expect(page.getByRole("radiogroup", { name: "에이전트" })).toHaveCount(0);
+
+  await page.unroute("**/api/agents");
+  await page.getByRole("link", { name: "에이전트 만들기" }).click();
+  await expect(page.getByRole("dialog", { name: "새 에이전트" })).toBeVisible();
+  await expect(page).toHaveURL(/\/agents$/);
 });
 
 test("에이전트가 하나면 카드 없이 그 이름과 추천 질문을 보인다", async ({ page }) => {

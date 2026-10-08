@@ -45,6 +45,15 @@ export type PersonaView = {
 /** 에이전트 코드 형식이다. 백엔드의 `AgentDtos` 와 `HermesProfileName` 이 두는 64자 상한을 같이 둔다. */
 export const AGENT_CODE_PATTERN = /^[a-z0-9][a-z0-9-]{0,63}$/;
 
+/** 주소 쿼리의 에이전트 번호를 읽는다. 하나뿐이고 형식이 맞을 때만 돌려준다. */
+export function agentCodeParam(
+  value: string | string[] | null | undefined,
+): string | null {
+  return typeof value === "string" && AGENT_CODE_PATTERN.test(value)
+    ? value
+    : null;
+}
+
 /**
  * 새 대화 화면에 보일 추천 질문이다. `GENERATING` 은 Control Plane 이 만드는 중이라 `prompts` 가 비어 있다.
  */

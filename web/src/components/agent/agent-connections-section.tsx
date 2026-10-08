@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
+import { Plug } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogCancel,
@@ -52,8 +53,8 @@ const RISK_MESSAGE =
 const SHELL_RISK_MESSAGE =
   "격리를 적용하지 않은 에이전트는 연결 도구의 승인 없이 그 서비스를 부를 수 있어요. 격리한 에이전트도 연결 도구로 읽은 내용을 인터넷으로 보낼 수 있어요.";
 
-/** 붙이기 확인 창이다. 요청이 도는 동안 닫히지 않고, 실패하면 창이 남아 까닭을 보인다. */
-function BindConfirm({
+/** 붙이기 확인 창이다. 요청이 도는 동안 닫히지 않고, 실패하면 창이 남아 까닭을 보인다. 연결 화면의 에이전트 고르기도 쓴다. */
+export function BindConfirm({
   title,
   busy,
   error,
@@ -145,7 +146,7 @@ function ConnectionRow({
         </p>
         {!view.bound && !ready && !blocked ? (
           <p className="mt-1 text-xs text-muted-foreground">
-            연결 화면에서 연결을 확인해 주세요.
+            서비스 연결에서 연결을 확인해 주세요.
           </p>
         ) : null}
         {view.skills.length > 0 && skillsOff ? (
@@ -272,29 +273,35 @@ export function AgentConnectionsSection({
       aria-label="이 에이전트가 쓰는 연결"
       className="mx-auto mt-8 w-full max-w-2xl rounded-md border border-border p-4"
     >
-      <h2 className="font-semibold">이 에이전트가 쓰는 연결</h2>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h2 className="font-semibold">이 에이전트가 쓰는 연결</h2>
+        {/* 이 에이전트를 실어 보내, 연결을 마치면 연결 화면이 이 에이전트에 붙이기를 먼저 권한다. 붙일 수 없는 에이전트에는 두지 않는다. */}
+        {blockedReason ? null : (
+          <Button asChild size="sm" variant="outline">
+            <Link href={`/connections?agent=${code}`}>
+              <Plug aria-hidden="true" />
+              외부 서비스 연결하기
+            </Link>
+          </Button>
+        )}
+      </div>
       {connections.length === 0 ? (
-        <p className="mt-2 text-sm text-muted-foreground">
-          아직 연결한 계정이 없어요.{" "}
-          <Link
-            href="/connections"
-            className="text-foreground underline underline-offset-4"
-          >
-            연결 화면
-          </Link>
-          에서 먼저 연결해요.
-        </p>
+        <>
+          <p className="mt-2 text-sm text-muted-foreground">
+            {blockedReason
+              ? "아직 연결한 계정이 없어요."
+              : "아직 연결한 계정이 없어요. 서비스 계정을 연결하면 이 에이전트에 바로 붙일 수 있어요."}
+          </p>
+          {blockedReason ? (
+            <Notice variant="info" role="status" className="mt-4">
+              {BLOCKED_MESSAGES[blockedReason]}
+            </Notice>
+          ) : null}
+        </>
       ) : (
         <>
           <p className="mt-1 text-sm text-muted-foreground">
-            붙인 연결의 도구를 이 에이전트가 직접 써요. 계정은{" "}
-            <Link
-              href="/connections"
-              className="text-foreground underline underline-offset-4"
-            >
-              연결 화면
-            </Link>
-            에서 연결해요.
+            붙인 연결의 도구를 이 에이전트가 직접 써요.
           </p>
           {blockedReason ? (
             <Notice variant="info" role="status" className="mt-4">
