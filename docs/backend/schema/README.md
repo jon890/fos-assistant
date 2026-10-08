@@ -23,6 +23,36 @@ AI credential 은 Hermes profile 의 `.env` 에, profile 의 API server key 는 
 | [`browser.md`](browser.md) | `user_browser` |
 | [`crypto.md`](crypto.md) | `user_data_key` |
 
+## 본문 칸과 운영 조회
+
+사용자가 쓴 글이나 모델이 만든 글을 담는 칸이다. 저장 시 암호화의 대상이고, 운영 조회 계정이 읽지 않는 칸이다.
+근거는 [ADR-20261008 / data-encryption](../../adr/ADR-20261008-data-encryption.md) 에 있다.
+
+| 표 | 칸 | 암호화 |
+| --- | --- | --- |
+| `chat_message` | `content` | 함. 옆 칸 `content_key_id`. 이 결정 앞의 줄은 평문이다 |
+| `chat_pending_message` | `content` | 아직 |
+| `conversation` | `title` | 아직 |
+| `agent_execution` | `output_text` | 아직 |
+| `execution_event` | `detail` | 아직 |
+| `connector_action` | `args_json`, `result_text` | 아직 |
+| `notification` | `title`, `body` | 아직 |
+| `follow_up` | `title` | 아직 |
+| `task` | `title`, `instruction` | 아직 |
+| `proactive_check` | `report_json` | 아직 |
+| `proactive_check_problem` | `problem`, `related_goal`, `action_text`, `expected_benefit`, `risk`, `change_since_last` | 아직 |
+| `proactive_value_evaluation` | `evidence_json` | 아직 |
+| `memory`, `memory_revision` | `title`, `content` | 민감 항목의 `content` 만 함([ADR-055](../../adr/ADR-055-민감-memory-본문은-저장할-때-암호화하고-key-는-환경-변수로-받는다.md)) |
+
+**운영 조회 계정의 계약.** 운영자가 데이터베이스를 살피는 계정에는 위 칸의 SELECT 를 주지 않는다.
+MySQL 의 칸 단위 권한(`GRANT SELECT (칸, ...) ON 표`)으로 위 칸을 뺀 칸만 준다.
+Control Plane 이 쓰는 애플리케이션 계정과 운영 조회 계정을 나눈다. 애플리케이션 계정의 비밀번호는 운영 조회에 쓰지 않는다.
+본문 칸을 읽어야 하는 장애 대응은 따로 둔 계정으로 하고, 그 계정을 쓴 기록을 데이터베이스 밖에 남긴다.
+계정과 권한, 기록을 만드는 일은 운영 저장소 `fos-home-infra` 가 맡는다.
+**이 표에 칸을 더하면 운영 조회 계정의 권한도 함께 고친다.** 새 표는 처음부터 본문 칸을 뺀 권한으로 준다.
+
+Control Plane 의 API 에는 관리자에게 남의 메시지 본문을 주는 경로가 없다. 다만 관리자의 실행 화면은 비밀값을 가린 도구 원문(`execution_event.detail`)을 보인다([ADR-038](../../adr/ADR-038-도구의-명령-원문은-관리자에게만-보내고-사용자에게는-사람-말로-보인다.md)).
+
 ## 마이그레이션 작성 규칙
 
 ### 새 버전은 UTC 작성 시각으로 정한다
