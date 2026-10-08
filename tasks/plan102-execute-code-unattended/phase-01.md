@@ -43,7 +43,7 @@ def _with_sandbox_approvals(saved: dict, updated: dict, docker: bool) -> dict:
     """terminal 을 쓰는 같은 쓰기에서 `approvals.unattended_mode` 를 맞춘 설정을 돌려준다."""
 ```
 
-- `saved.get("approvals") or {}` 가 dict 가 아니면 `ValueError("approvals 설정이 객체가 아니다")`.
+- `saved.get("approvals")` 가 `None` 이면 빈 객체로 보고, 그 밖의 비 dict 값(`false`, `[]` 포함)은 `ValueError("approvals 설정이 객체가 아니다")`.
 - `UNATTENDED_APPROVAL_KEY` 를 뺀 나머지 키를 순서대로 복사하고, `docker` 면 `"approve"` 를 넣는다.
 - 결과가 비면 `updated` 에서 `approvals` 를 뺀 dict 를, 아니면 `approvals` 를 바꾼 dict 를 새로 만들어 돌려준다. 인자를 바꾸지 않는다.
 
@@ -61,7 +61,10 @@ def _with_sandbox_approvals(saved: dict, updated: dict, docker: bool) -> dict:
 - `from .sandbox_approvals import _with_sandbox_approvals` 를 더한다.
 - `elif local_execution:` 분기는 지금 라우트로 닿지 않는다(`connector_install.py` 가 `local_execution` 을 False 로만 넘긴다). 「local 을 쓰는 곳은 언제나 키를 지운다」 는 불변식을 지키려고 같은 호출을 넣는다. 이 분기의 시험은 두지 않는다.
 
-### 4. `hermes/README.md` 의 「plugin 파일 안내」 표에 새 모듈을 더한다
+### 4. 모듈 목록과 API 표에 새 모듈과 승인 설정 쓰기를 더한다
+
+- `docs/code-architecture.md` 의 `hermes/` 트리에서 `sandbox.py, toolconfig.py, env.py` 줄에 `sandbox_approvals.py` 를 더한다.
+- `hermes/README.md` 의 `PUT /api/connectors` 행, `PUT /api/config` (도구) 행, 도구 목록 검사 규칙에 `approvals.unattended_mode` 를 docker 면 `approve` 로 두고 local 이면 지운다고 적는다.
 
 `sandbox.py`, `toolconfig.py`, `env.py` 줄의 모듈 칸에 `sandbox_approvals.py` 를 넣고, 맡는 것 칸에 「실행 공간과 함께 쓰는 승인 설정」 을 더한다.
 
@@ -72,7 +75,7 @@ def _with_sandbox_approvals(saved: dict, updated: dict, docker: bool) -> dict:
 - `test_shell_toolset_writes_unattended_approval_and_keeps_other_approvals`: 저장 전 설정에 `approvals: {mode: manual, deny: ["*curl*"]}` 를 두고 셸 도구를 저장한다. 저장된 `approvals` 가 `{mode: manual, deny: ["*curl*"], unattended_mode: approve}` 다.
 - `test_resaving_an_unchanged_sandbox_terminal_writes_the_missing_approval`: 한 번 저장한 뒤 파일에서 `approvals` 만 지우고 같은 요청을 다시 보낸다. `approvals.unattended_mode` 가 `approve` 로 돌아온다.
 - `test_vision_connector_install_writes_unattended_approval`: 기존 `test_vision_connector_uses_the_trusted_owners_sandbox_terminal` 과 같은 준비로 사진 도구 커넥터를 설치하면 `alice_config()["approvals"] == {"unattended_mode": "approve"}` 다.
-- `test_non_object_approvals_rejects_the_shell_save`: `approvals: "approve"` 인 설정에 셸 도구를 저장하면 500 이고 파일 바이트가 그대로다.
+- `test_non_object_approvals_rejects_the_shell_save`: `approvals` 가 `"approve"`, `False`, `[]` 인 설정(subTest 셋)에 셸 도구를 저장하면 500 이고 파일 바이트가 그대로다. 예외 로그가 한 건이고 그 예외가 `ValueError("approvals 설정이 객체가 아니다")` 다.
 
 `hermes/tests/test_dashboard_profile_api_sandbox_policy.py` 에 더한다.
 
@@ -101,6 +104,7 @@ scripts/quality.sh check
 | `hermes/plugins/dashboard-profile-api/sandbox_approvals.py` | 신규 |
 | `hermes/plugins/dashboard-profile-api/toolconfig.py` | 수정 |
 | `hermes/plugins/dashboard-profile-api/connector_isolated.py` | 수정 |
+| `docs/code-architecture.md` | 수정 |
 | `hermes/README.md` | 수정 |
 | `hermes/tests/test_dashboard_profile_api_sandbox_terminal.py` | 수정 |
 | `hermes/tests/test_dashboard_profile_api_sandbox_policy.py` | 수정 |
