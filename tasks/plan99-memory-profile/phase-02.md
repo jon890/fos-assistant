@@ -105,3 +105,4 @@ cd backend && ./gradlew spotlessCheck checkstyleMain checkstyleTest
 | `backend/src/test/java/com/bifos/assistant/context/eval/MemoryRecallEvalTest.java` | 수정 |
 | `backend/src/test/java/com/bifos/assistant/chat/ChatServiceTest.java` | 수정 |
 | `test/e2e/scenarios/memory.ts` | 수정 |
+| `test/e2e/scenarios/memory-remember-mcp.ts` | 수정 |
