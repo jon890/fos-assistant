@@ -37,12 +37,13 @@ export function BrowserScreenToolbar({
 }) {
   function navigate(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!webUrl(address)) {
+    const url = webUrl(address);
+    if (!url) {
       onNotice("http:// 나 https:// 로 시작하는 주소를 넣어 주세요.");
       return;
     }
     onNotice(null);
-    send({ type: "navigate", url: address });
+    send({ type: "navigate", url });
   }
 
   const active = tabs.find((tab) => tab.active);
@@ -83,7 +84,6 @@ export function BrowserScreenToolbar({
         <Button
           variant="outline"
           size="sm"
-          className="md:hidden"
           disabled={disabled}
           onClick={onKeyboard}
         >

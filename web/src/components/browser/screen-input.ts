@@ -68,6 +68,17 @@ export function wheel(point: Point, box: Box, deltaY: number): ScreenInput {
   };
 }
 
+/** 휠 값을 CSS 픽셀로 바꾼다. 줄 단위면 16배, 쪽 단위면 그림 높이배다. */
+export function wheelDelta(
+  deltaY: number,
+  deltaMode: number,
+  pageHeight: number,
+): number {
+  if (deltaMode === 1) return deltaY * 16;
+  if (deltaMode === 2) return deltaY * pageHeight;
+  return deltaY;
+}
+
 /**
  * 터치 끌기를 휠로 바꾼다. 위로 끌면 아래로 굴린다.
  * 그림에서 끈 거리를 프레임의 CSS 픽셀로 늘린다.
@@ -125,16 +136,19 @@ export function resizeFor(width: number): ScreenInput {
   };
 }
 
-/** 화면이 열 수 있는 주소인가. `http` 와 `https` 이고 host 가 있어야 한다. */
-export function webUrl(value: string | null | undefined): boolean {
-  if (!value || value.length > 2048) return false;
+/**
+ * 화면이 열 수 있는 주소면 `new URL` 로 정규화한 주소이고 아니면 `null` 이다.
+ * `http` 와 `https` 이고 host 가 있어야 하며 2048자를 넘지 않아야 한다.
+ */
+export function webUrl(value: string | null | undefined): string | null {
+  if (!value) return null;
   try {
     const url = new URL(value);
-    return (
+    const web =
       (url.protocol === "http:" || url.protocol === "https:") &&
-      url.hostname !== ""
-    );
+      url.hostname !== "";
+    return web && url.href.length <= 2048 ? url.href : null;
   } catch {
-    return false;
+    return null;
   }
 }

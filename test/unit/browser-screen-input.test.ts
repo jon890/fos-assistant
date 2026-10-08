@@ -11,6 +11,7 @@ import {
   textInputs,
   webUrl,
   wheel,
+  wheelDelta,
 } from "../../web/src/components/browser/screen-input.ts";
 
 const box = { left: 100, top: 50, width: 400, height: 600 };
@@ -143,13 +144,23 @@ test("크기는 폭의 1.5배 높이이고 계약의 범위로 자른다", () =>
   });
 });
 
-test("시작 주소는 host 가 있는 http 와 https 만 받는다", () => {
-  assert.equal(webUrl("https://example.com/login"), true);
-  assert.equal(webUrl("http://example.com"), true);
-  assert.equal(webUrl("javascript:alert(1)"), false);
-  assert.equal(webUrl("file:///etc/hosts"), false);
-  assert.equal(webUrl("example.com"), false);
-  assert.equal(webUrl(""), false);
-  assert.equal(webUrl(null), false);
-  assert.equal(webUrl(`https://example.com/${"a".repeat(2048)}`), false);
+test("주소는 host 가 있는 http 와 https 만 받고 정규화해 돌려준다", () => {
+  assert.equal(
+    webUrl("https://example.com/login"),
+    "https://example.com/login",
+  );
+  assert.equal(webUrl("http://EXAMPLE.com"), "http://example.com/");
+  assert.equal(webUrl("https://example.com/a b"), "https://example.com/a%20b");
+  assert.equal(webUrl("javascript:alert(1)"), null);
+  assert.equal(webUrl("file:///etc/hosts"), null);
+  assert.equal(webUrl("example.com"), null);
+  assert.equal(webUrl(""), null);
+  assert.equal(webUrl(null), null);
+  assert.equal(webUrl(`https://example.com/${"a".repeat(2048)}`), null);
+});
+
+test("휠 값은 픽셀이면 그대로, 줄이면 16배, 쪽이면 그림 높이배다", () => {
+  assert.equal(wheelDelta(30, 0, 600), 30);
+  assert.equal(wheelDelta(3, 1, 600), 48);
+  assert.equal(wheelDelta(-1, 2, 600), -600);
 });
