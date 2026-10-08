@@ -3,7 +3,7 @@ import { mkdtemp, readdir, readFile, rm, symlink, utimes, writeFile } from "node
 import { tmpdir } from "node:os";
 import { basename, join } from "node:path";
 import { Tossinvest } from "../src/client.ts";
-import { orderQuery } from "../src/account-tools.ts";
+import { orderQuery } from "../src/orders.ts";
 import { writeOrdersFile, type OrderFileTiming } from "../src/order-file.ts";
 import { createTossinvestServer } from "../src/server.ts";
 import {

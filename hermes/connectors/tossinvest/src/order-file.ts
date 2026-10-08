@@ -1,6 +1,5 @@
 import { link, lstat, open, readdir, unlink } from "node:fs/promises";
 import { join } from "node:path";
-import { orderRow } from "./account-tools.ts";
 import type { Tossinvest } from "./client.ts";
 import {
   ORDER_FILE_MAX_PAGES,
@@ -10,6 +9,7 @@ import {
   ORDERS_MAX,
 } from "./constants.ts";
 import { TossinvestError } from "./errors.ts";
+import { isObject, orderRow } from "./orders.ts";
 
 /** 시각, 쉼, 난수다. 시험은 이것을 고정해 쉼 없이 돌린다. */
 export interface OrderFileTiming {
@@ -42,9 +42,6 @@ export const defaultTiming: OrderFileTiming = {
 };
 
 const unavailable = () => new TossinvestError("TOSSINVEST_OUTPUT_UNAVAILABLE");
-
-const isObject = (value: unknown): value is Record<string, any> =>
-  Boolean(value) && typeof value === "object" && !Array.isArray(value);
 
 /** `2026-10-08T01:02:03.456Z` 를 `20261008T010203Z` 로 줄인다. */
 const stamp = (date: Date) =>
