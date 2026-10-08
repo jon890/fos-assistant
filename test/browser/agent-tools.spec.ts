@@ -236,6 +236,8 @@ test("저장 뒤 도구가 빠지면 다시 읽은 상태와 안내를 보인다
       },
     ],
     unclassifiedEnabled: ["profile-only-tool"],
+    shellOrFileEnabled: false,
+    skillsEnabled: false,
   };
   let failed = false;
   await page.route(`**/api/agents/${AGENT_CODE}/tools`, async (route) => {

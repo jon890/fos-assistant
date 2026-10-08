@@ -53,6 +53,7 @@ public class AgentToolController {
 
     private static AgentDtos.ToolsetsView view(AgentToolsetsView source) {
         return new AgentDtos.ToolsetsView(
-                source.toolsets().stream().map(ToolsetView::from).toList(), source.unclassifiedEnabled());
+                source.toolsets().stream().map(ToolsetView::from).toList(), source.unclassifiedEnabled(),
+                source.shellOrFileEnabled(), source.skillsEnabled());
     }
 }
