@@ -3,7 +3,16 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useSyncExternalStore } from "react";
-import { ArrowLeft, Bot, Cpu, Globe, Plug, Receipt, Users, Wrench } from "lucide-react";
+import {
+  ArrowLeft,
+  Bot,
+  Cpu,
+  Globe,
+  Plug,
+  Receipt,
+  Users,
+  Wrench,
+} from "lucide-react";
 import { cn } from "cn";
 import { Badge } from "@/components/ui/badge";
 import { ScreenTransition } from "./screen-transition";
