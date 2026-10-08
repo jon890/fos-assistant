@@ -1,9 +1,0 @@
-{
-  "name": "plan95-follow-up-origin",
-  "description": "할 일의 출처와 미수락 상태를 분리해 수락 뒤에도 출처를 유지한다",
-  "status": "pending",
-  "created_at": "2026-10-08",
-  "total_phases": 1,
-  "current_phase": 1,
-  "phases": [{ "number": 1, "file": "phase-01.md", "execution_profile": "deep" }]
-}
