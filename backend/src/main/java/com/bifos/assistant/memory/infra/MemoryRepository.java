@@ -1,6 +1,7 @@
 package com.bifos.assistant.memory.infra;
 
 import com.bifos.assistant.memory.domain.Memory;
+import com.bifos.assistant.memory.domain.MemoryCollectionCount;
 import com.bifos.assistant.memory.domain.type.MemoryEntryType;
 import com.bifos.assistant.memory.domain.type.MemoryScope;
 import com.bifos.assistant.memory.domain.type.MemorySensitivity;
@@ -40,4 +41,23 @@ public interface MemoryRepository extends JpaRepository<Memory, Long>, JpaSpecif
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select m from Memory m where m.id = :id")
     Optional<Memory> findByIdForUpdate(@Param("id") Long id);
+
+    /**
+     * 한 사용자와 그 그룹의 실릴 수 있는 항목을 collection 과 민감도마다 센다.
+     *
+     * <p>실릴 수 있는 항목은 {@code ACCEPTED} 이고 {@code SOURCE} 도 {@code ARCHIVE} 도 아닌 줄이다. collection 과
+     * 민감도는 거르지 않는다. 범위는 그 사용자의 {@code USER} 항목과 그 그룹의 {@code GROUP} 항목이다.
+     *
+     * @param userId 항목 주인이다. null 이면 {@code USER} 조건이 참이 되지 않아 그룹 항목만 센다
+     * @param groupId 셀 그룹이다
+     */
+    @Query("select new com.bifos.assistant.memory.domain.MemoryCollectionCount(m.collection, m.sensitivity, count(m))"
+            + " from Memory m"
+            + " where m.status = com.bifos.assistant.memory.domain.type.MemoryStatus.ACCEPTED"
+            + " and m.entryType <> com.bifos.assistant.memory.domain.type.MemoryEntryType.SOURCE"
+            + " and m.retrieval <> com.bifos.assistant.memory.domain.type.MemoryRetrieval.ARCHIVE"
+            + " and ((m.scope = com.bifos.assistant.memory.domain.type.MemoryScope.USER and m.ownerUserId = :userId)"
+            + " or (m.scope = com.bifos.assistant.memory.domain.type.MemoryScope.GROUP and m.groupId = :groupId))"
+            + " group by m.collection, m.sensitivity")
+    List<MemoryCollectionCount> countLoadableByCollection(@Param("userId") Long userId, @Param("groupId") Long groupId);
 }

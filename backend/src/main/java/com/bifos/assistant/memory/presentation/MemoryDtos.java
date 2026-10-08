@@ -1,5 +1,9 @@
 package com.bifos.assistant.memory.presentation;
 
+import com.bifos.assistant.memory.application.model.AgentMemoryGrantInput;
+import com.bifos.assistant.memory.application.model.AgentMemorySetting;
+import com.bifos.assistant.memory.application.model.AgentMemorySettingChange;
+import com.bifos.assistant.memory.application.model.AgentMemorySettingCollection;
 import com.bifos.assistant.memory.application.model.MemorySource;
 import com.bifos.assistant.memory.application.model.ServiceTokenGrant;
 import com.bifos.assistant.memory.application.model.ServiceTokenSnapshot;
@@ -191,4 +195,67 @@ public final class MemoryDtos {
     /** 서비스가 읽는 문서다. 본문은 평문이고 {@code revision} 은 지금 값의 판 번호다(ADR-056). */
     public record ServiceDocumentView(
             String collection, String documentKey, String title, String content, int revision, Instant updatedAt) {}
+
+    /** 에이전트에 줄 collection 하나다. */
+    public record AgentMemoryGrantBody(
+            @NotBlank @Size(max = 64) String collection, boolean allowSensitive) {
+        AgentMemoryGrantInput toInput() {
+            return new AgentMemoryGrantInput(collection, allowSensitive);
+        }
+    }
+
+    /** 에이전트가 받을 collection 전체다. 빈 목록이면 모두 뗀다. */
+    public record ReplaceAgentMemoryRequest(
+            @NotNull @Size(max = 64) List<@Valid @NotNull AgentMemoryGrantBody> collections) {}
+
+    /** 관리자가 보는 에이전트의 Memory collection 설정이다. 칸의 뜻은 {@code docs/backend/memory.md} 가 갖는다. */
+    public record AgentMemorySettingView(
+            String countedFor,
+            String ownerName,
+            List<AgentMemoryCollectionView> collections,
+            List<AgentMemoryChangeView> changes) {
+        static AgentMemorySettingView from(AgentMemorySetting setting) {
+            return new AgentMemorySettingView(
+                    setting.countedFor().name(),
+                    setting.ownerName(),
+                    setting.collections().stream()
+                            .map(AgentMemoryCollectionView::from)
+                            .toList(),
+                    setting.changes().stream().map(AgentMemoryChangeView::from).toList());
+        }
+    }
+
+    /** 설정 화면의 collection 한 줄이다. 항목의 제목과 번호는 담지 않고 수만 담는다. */
+    public record AgentMemoryCollectionView(
+            String key,
+            String displayName,
+            boolean listed,
+            boolean granted,
+            boolean allowSensitive,
+            long entryCount,
+            long sensitiveEntryCount) {
+        static AgentMemoryCollectionView from(AgentMemorySettingCollection collection) {
+            return new AgentMemoryCollectionView(
+                    collection.key(),
+                    collection.displayName(),
+                    collection.listed(),
+                    collection.granted(),
+                    collection.allowSensitive(),
+                    collection.entryCount(),
+                    collection.sensitiveEntryCount());
+        }
+    }
+
+    /** 받는 collection 이 바뀐 기록 한 줄이다. */
+    public record AgentMemoryChangeView(
+            String collection, String changeType, boolean allowSensitive, String changedByName, Instant changedAt) {
+        static AgentMemoryChangeView from(AgentMemorySettingChange change) {
+            return new AgentMemoryChangeView(
+                    change.collection(),
+                    change.changeType(),
+                    change.allowSensitive(),
+                    change.changedByName(),
+                    change.changedAt());
+        }
+    }
 }
