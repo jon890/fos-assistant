@@ -11,6 +11,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Notice } from "@/components/ui/notice";
 import { Switch } from "@/components/ui/switch";
 import { describeError } from "@/components/error-message";
@@ -40,8 +41,8 @@ type Props = {
   visibility: AdminAgent["visibility"] | undefined;
   /** 이 에이전트에 붙은 연결이 있다. 셸과 파일 도구를 켤 때 그 연결의 위험을 함께 알린다. */
   hasConnections?: boolean;
-  /** 저장하거나 다시 읽은 뒤 켜진 도구 이름을 알린다. 연결 절의 위험 안내가 받는다. */
-  onToolsChange?(enabled: string[]): void;
+  /** 저장하거나 다시 읽은 뒤 실제 도구 상태를 알린다. 연결 절의 안내가 받는다. */
+  onToolsChange?(view: AgentToolsView): void;
 };
 
 /** 관리자 도구를 켤 때 그 도구가 실제로 닿는 대상을 짧게 알린다. */
@@ -95,9 +96,7 @@ export function AgentToolsSection({
   function apply(view: AgentToolsView) {
     setTools(view.toolsets);
     setUnclassifiedEnabled(view.unclassifiedEnabled);
-    onToolsChange?.(
-      view.toolsets.filter((tool) => tool.enabled).map((tool) => tool.name),
-    );
+    onToolsChange?.(view);
   }
 
   async function reload(): Promise<AgentToolsView | null> {
@@ -188,6 +187,9 @@ export function AgentToolsSection({
               >
                 <div className="min-w-0">
                   <p className="text-sm font-medium">{text.label}</p>
+                  {tool.hidden ? (
+                    <Badge variant="warning">일반 화면에서 숨김</Badge>
+                  ) : null}
                   <p className="mt-1 text-xs text-muted-foreground">
                     {text.description}
                   </p>

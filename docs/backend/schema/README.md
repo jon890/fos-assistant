@@ -9,7 +9,7 @@ AI credential 은 Hermes profile 의 `.env` 에, profile 의 API server key 는 
 
 | 파일 | 표 |
 | --- | --- |
-| [`users-agents.md`](users-agents.md) | `app_user`, `allowed_person`, `agent`, `model_tier_definition`, `model_tier_group_setting`, `model_hidden`, `agent_token`, `service_token`, `service_token_collection` |
+| [`users-agents.md`](users-agents.md) | `app_user`, `allowed_person`, `agent`, `model_tier_definition`, `model_tier_group_setting`, `model_hidden`, `toolset_hidden`, `agent_token`, `service_token`, `service_token_collection` |
 | [`chat.md`](chat.md) | `conversation`, `chat_message`, `chat_pending_message`, `chat_attachment`, `chat_artifact`, `result_delivery`, `result_delivery_item`, `result_delivery_attempt`, `execution_question` |
 | [`execution.md`](execution.md) | `agent_execution`, `execution_event`, `subagent_usage_job`, `execution_skill_use`, `hermes_session_binding`, `execution_context_source` |
 | [`memory.md`](memory.md) | `memory`, `memory_revision`, `memory_collection`, `agent_memory_collection`, `agent_memory_collection_change`, `memory_capture` |

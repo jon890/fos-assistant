@@ -48,6 +48,9 @@ public class SecurityConfig {
                         // 다른 서비스가 서비스 토큰으로 부르는 경로다(ADR-056). 인증은 memory 의 인터셉터가 한다.
                         .requestMatchers("/api/v1/service/**")
                         .permitAll()
+                        // 커넥터가 부르는 브라우저 중계다. 경로의 접근 표식이 인증이고 BrowserGateway 가 확인한다.
+                        .requestMatchers("/internal/browser-gateway/**")
+                        .permitAll()
                         .anyRequest()
                         .authenticated())
                 .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class)

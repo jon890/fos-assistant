@@ -2,6 +2,7 @@
 
 - **status**: `accepted`
 - Date: 2026-10-07
+- **대체된 부분**: 디렉터리를 확인하지 못했을 때 붙이기가 끝나는 오류 코드는 [ADR-20261008 / connector-binding-guards](ADR-20261008-connector-binding-guards.md) 가 `CONNECTOR_BIND_CONFLICT` 에서 `AGENT_SANDBOX_UNAVAILABLE` 로 바꾼다. 거절한다는 결정은 그대로다.
 - [ADR-091](ADR-091-사진-첨부는-사용자별로-저장하고-실행-공간에는-그-사용자만-붙인다.md) 의 사용자별 첨부 경계를 커넥터 MCP 서버까지 넓힌다. [ADR-20261007 / naver-blog-connector](ADR-20261007-naver-blog-connector.md) 의 「다른 사용자의 첨부 디렉터리를 가리키는 것은 막지 못한다」 를 이 결정이 막는다.
 
 ### 결정

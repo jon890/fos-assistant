@@ -42,6 +42,14 @@ assistant:
   agents:
     # 사용자 한 사람이 만들 수 있는 에이전트 수. 지운 것은 세지 않고 ADMIN 은 세지 않는다
     max-per-user: 5
+  people:
+    # 첫 로그인에 만든 기본 에이전트에 켜는 도구다. 셸 계열은 실행 공간 정책에 등록된 profile 에서만 켜고,
+    # 등록되지 않았으면 빼고 나머지만 켠다(ADR-20261008-default-toolsets)
+    default-toolsets:
+      - web
+      - terminal
+      - file
+      - code_execution
   chat:
     stop-stream-grace: 10s
     # 사건이 없는 동안 SSE 주석 줄을 보내는 간격. 앞단 프록시가 약 100초 동안 바이트가 없으면 연결을 끊는다
@@ -265,6 +273,9 @@ assistant:
     sweep-interval: 1m
     # 로그인 화면 하나가 열려 있을 수 있는 시간. 넘으면 화면을 닫는다
     screen-timeout: 30m
+    # 커넥터가 브라우저에 닿는 중계의 주소와 접근 표식의 서명 비밀. 둘 중 하나라도 비면 중계만 꺼진다
+    gateway-base-url: ${ASSISTANT_BROWSER_GATEWAY_BASE_URL:}
+    gateway-secret: ${ASSISTANT_BROWSER_GATEWAY_SECRET:}
   decision-feedback:
     # 판단 피드백 사건을 남기는 기간. 지난 줄은 cleanup-cron 에 지운다
     retention: 365d

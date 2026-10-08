@@ -30,12 +30,8 @@ export async function loadAgentDetail(
   if (!session?.user?.email) redirect("/signin");
 
   const agentsResult = await callControlPlane<AgentView[]>("/api/v1/agents");
-  // 관리자 영역은 자기 에이전트에도 일반 경로를 쓴다. 목록에 없는 다른 사람의 비공개 에이전트만 관리 경로로 읽는다.
-  const useAdminTools =
-    admin &&
-    !(
-      agentsResult.ok && agentsResult.data.some((agent) => agent.code === code)
-    );
+  // 관리자 영역에서는 자기 에이전트도 관리 경로로 읽어 숨긴 도구를 확인하고 끌 수 있게 한다.
+  const useAdminTools = admin;
   // 예전 방식의 연결 에이전트는 살펴보기를 하지 않고 다른 연결을 받지 않으므로 둘 다 읽지 않는다.
   const listedAgent = agentsResult.ok
     ? agentsResult.data.find((agent) => agent.code === code)
