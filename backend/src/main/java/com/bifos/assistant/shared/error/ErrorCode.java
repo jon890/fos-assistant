@@ -213,6 +213,8 @@ public enum ErrorCode {
     CONNECTOR_NOT_CONNECTED(HttpStatus.CONFLICT),
     /** 대시보드가 그 profile 의 설정이나 이미 붙은 다른 커넥터와 충돌해 붙이기를 거절했다. 아무것도 바뀌지 않았다. */
     CONNECTOR_BIND_CONFLICT(HttpStatus.CONFLICT),
+    /** 커넥터가 연결 하나를 에이전트 하나에만 붙이라고 선언했고 그 연결이 이미 다른 에이전트에 붙어 있다. 먼저 뗀다. */
+    CONNECTOR_SINGLE_BINDING(HttpStatus.CONFLICT),
     /** 그 에이전트의 profile 이 아직 커넥터를 받을 준비가 되지 않았다. 운영자가 표식을 둔 뒤에 붙인다. */
     CONNECTOR_PROFILE_NOT_READY(HttpStatus.CONFLICT),
     /**

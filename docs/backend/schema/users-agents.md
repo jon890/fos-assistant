@@ -28,6 +28,7 @@
 | `hermes_profile` | VARCHAR(64) | 유일하다. 관리자가 적는다 |
 | `enabled` | BOOLEAN | 내리면 들어오지 못한다 |
 | `created_at` | DATETIME(6) | |
+| `last_login_at` | DATETIME(6) NULL | 웹 로그인 성공 이벤트를 마지막으로 기록한 서버 시각. 판정과 일반 요청은 갱신하지 않는다. 기존 기록은 복원하지 않는다 |
 
 `app_user` 와 나누어 둔다. 둘이 뜻하는 것이 다르다.
 
@@ -126,6 +127,19 @@ V52 가 세 칸을 더했다. 값은 관리자가 화면에서 정하고 마이�
 | `model` | VARCHAR(128) | 빈 문자열이면 그 provider 전체를 숨긴 것이다. NULL 은 유일 제약이 겹침을 막지 못해 쓰지 않는다 |
 
 `(group_id, provider, model)` 이 유일하다.
+
+## toolset_hidden
+
+그룹이 일반 에이전트 도구 화면에서 숨긴 toolset이다. 행이 없으면 모두 보인다.
+활성 도구는 Hermes profile이 갖고 이 표는 활성 상태를 저장하거나 바꾸지 않는다.
+
+| 칸 | 타입 | 뜻 |
+| --- | --- | --- |
+| `id` | BIGINT | 기본 키 |
+| `group_id` | BIGINT | 그룹 번호 |
+| `name` | VARCHAR(64) | 등급 표에 있는 toolset 이름 |
+
+`(group_id, name)`이 유일하다. FK는 없다. 새 설치에서 숨김 행을 만들지 않는다.
 
 ## agent_token
 

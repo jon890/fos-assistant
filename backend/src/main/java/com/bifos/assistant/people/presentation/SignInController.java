@@ -13,6 +13,7 @@ import io.jsonwebtoken.security.Keys;
 import java.nio.charset.StandardCharsets;
 import javax.crypto.SecretKey;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
@@ -22,7 +23,8 @@ import org.springframework.web.bind.annotation.RestController;
 /**
  * 웹 계층이 로그인을 받아들이기 전에 묻는 자리다.
  *
- * <p>이 경로는 사용자를 만들지 않는다. 판정만 한다. 다른 경로는 토큰을 받으면 그 자리에서
+ * <p>이 경로는 사용자를 만들지 않는다. 허용 여부를 판정하고 로그인 완료 시각만 기록한다. 다른 경로는 토큰을
+ * 받으면 그 자리에서
  * {@code app_user} 를 만드는데, 허용되지 않은 주소가 그 경로를 타면 사용자가 생긴다.
  *
  * <p>그래서 이 경로는 {@code ControlPlaneJwtFilter} 를 건너뛰고 Spring Security 에서도 열려 있다.
@@ -53,6 +55,18 @@ public class SignInController {
         return policy.admit(request.email()).map(SignInCheckView::of).orElseGet(SignInCheckView::rejected);
     }
 
+    /** 웹 세션을 만든 뒤 로그인 완료 시각만 기록한다. */
+    @PostMapping("/completed")
+    public ResponseEntity<Void> completed(
+            @RequestHeader(name = HttpHeaders.AUTHORIZATION, required = false) String authorization,
+            @RequestBody SignInCheckRequest request) {
+        requireSignInToken(authorization);
+        if (!policy.recordCompletion(request.email())) {
+            throw new ApiException(ErrorCode.UNAUTHENTICATED, "this address is not allowed to sign in");
+        }
+        return ResponseEntity.noContent().build();
+    }
+
     /**
      * 웹 계층이 서명한 로그인 판정용 토큰인지 본다.
      *
@@ -65,7 +79,11 @@ public class SignInController {
         String token = authorization.substring(BEARER.length()).trim();
         Claims claims;
         try {
-            claims = Jwts.parser().verifyWith(key).build().parseSignedClaims(token).getPayload();
+            claims = Jwts.parser()
+                    .verifyWith(key)
+                    .build()
+                    .parseSignedClaims(token)
+                    .getPayload();
         } catch (JwtException | IllegalArgumentException ex) {
             throw new ApiException(ErrorCode.UNAUTHENTICATED, "this token is not usable here");
         }

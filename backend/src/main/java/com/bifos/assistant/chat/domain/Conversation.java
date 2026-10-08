@@ -138,6 +138,16 @@ public class Conversation {
     @Getter
     private Instant deletedAt;
 
+    /**
+     * 목록에서만 뺀 시각이다. 비면 목록에 보인다. 예약 작업이 「보고할 것 없음」 으로 끝낸 {@code NEW_PER_RUN} 대화에 적는다.
+     *
+     * <p>조회와 보내기는 그대로 된다. 사용자가 질문을 보내면 비운다. 이 칸은 {@code ConversationRepository} 의 update 질의로만
+     * 바꾼다.
+     */
+    @Column(name = "hidden_at")
+    @Getter
+    private Instant hiddenAt;
+
     private Conversation(Long userId, String title, Long agentId, ConversationPurpose purpose, Instant now) {
         this.userId = userId;
         this.title = title;

@@ -185,6 +185,31 @@ class ConversationPagingTest {
     }
 
     @Test
+    @DisplayName("목록에서 숨긴 대화는 첫 쪽과 다음 쪽 어디에도 나오지 않고 숨김을 풀면 다시 나온다")
+    void excludesHiddenConversationFromEveryPageUntilShown() {
+        CurrentUser dad = member("paging-dad");
+        Long oldest = started(dad, 1).id();
+        Long hidden = started(dad, 2).id();
+        Long newest = started(dad, 3).id();
+        assertThat(conversationWriter.hideFromList(hidden, BASE.plusSeconds(10)))
+                .as("숨긴 대화 수")
+                .isEqualTo(1);
+
+        ConversationPage all = chat.conversationsOf(dad, null, 10);
+        ConversationPage head = chat.conversationsOf(dad, null, 1);
+        ConversationPage tail = chat.conversationsOf(dad, head.nextCursor(), 1);
+
+        assertThat(ids(all)).as("숨긴 뒤 첫 쪽").containsExactly(newest, oldest);
+        assertThat(ids(head)).as("한 줄씩 읽은 첫 쪽").containsExactly(newest);
+        assertThat(ids(tail)).as("한 줄씩 읽은 다음 쪽").containsExactly(oldest);
+        assertThat(tail.nextCursor()).as("다음 쪽 뒤의 cursor").isNull();
+
+        assertThat(conversationWriter.showInList(hidden)).as("숨김을 푼 대화 수").isEqualTo(1);
+
+        assertThat(ids(chat.conversationsOf(dad, null, 10))).as("숨김을 푼 뒤 첫 쪽").containsExactly(newest, hidden, oldest);
+    }
+
+    @Test
     @DisplayName("한 쪽의 크기는 상한을 넘지 않고 1 보다 작아지지 않는다")
     void limitIsClamped() {
         CurrentUser dad = member("paging-dad");

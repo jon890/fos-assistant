@@ -244,6 +244,8 @@ class ChatTurnRouting {
             attachments.attach(saved.id(), conversation.id(), attachmentIds);
             // 사람이 질문했으니 사용자의 질문 없이 연 turn 의 수를 새로 센다.
             conversationWriter.resetAutoTurns(conversation.id());
+            // 사람이 질문했으니 「보고할 것 없음」 으로 숨긴 대화를 다시 목록에 보인다.
+            conversationWriter.showInList(conversation.id());
             // 대기 행을 지우는 것과 그 글을 사용자 메시지로 남기는 것은 함께 남거나 함께 빠진다.
             // 지운 수가 읽은 수와 다르면 읽은 뒤 취소된 행이 있다. 취소한 글을 보내지 않게 되돌린다.
             if (!pendingIds.isEmpty() && pendingMessages.deleteAllByIdIn(pendingIds) != pendingIds.size()) {

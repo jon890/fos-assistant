@@ -143,6 +143,11 @@ public class TaskRun {
         finish(TaskRunStatus.SUCCEEDED, null, executionId, now);
     }
 
+    /** turn 이 답을 마쳤지만 답 전체가 {@code [SILENT]} 라 알릴 것이 없다. */
+    public void succeedQuietly(Long executionId, Instant now) {
+        finish(TaskRunStatus.SUCCEEDED, TaskRunReason.NOTHING_TO_REPORT, executionId, now);
+    }
+
     /** 사용자가 turn 을 중지했다. */
     public void cancel(Long executionId, Instant now) {
         finish(TaskRunStatus.CANCELLED, null, executionId, now);

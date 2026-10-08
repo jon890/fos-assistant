@@ -6,6 +6,8 @@ import {
   test,
 } from "./fixtures.ts";
 import { TEST_EMAIL } from "./settings.ts";
+import type { AgentToolsView } from "../../web/src/lib/agent.ts";
+import type { CatalogToolset } from "../../web/src/lib/toolset-catalog.ts";
 import type {
   BrowserContext,
   Page,
@@ -195,6 +197,10 @@ test("셸 도구와 연결을 함께 쓰면 붙일 때와 도구를 켤 때 그 
 }) => {
   // 명령 실행 도구는 관리자만 켠다. 관리자가 자기 에이전트에 연결을 붙인다.
   await loginAs(context, page, { email: TEST_EMAIL, name: "브라우저 테스트" });
+  const catalogResponse = await page.request.get("/api/admin/toolsets");
+  expect(catalogResponse.ok()).toBeTruthy();
+  const catalog = await catalogResponse.json() as CatalogToolset[];
+  const originalHidden = catalog.filter((tool) => tool.hidden).map((tool) => tool.name);
   await connectDemoConnector(TEST_EMAIL);
   const code = await createAgent(page);
   try {
@@ -227,6 +233,21 @@ test("셸 도구와 연결을 함께 쓰면 붙일 때와 도구를 켤 때 그 
       "true",
     );
 
+    // 선택 목록에서 셸과 스킬을 숨겨도 실제 활성 상태와 연결의 위험 안내는 남는다.
+    const enabled = await (await page.request.get(`/api/admin/agents/${code}/tools`)).json() as AgentToolsView;
+    expect((await page.request.put(`/api/admin/agents/${code}/tools`, {
+      data: { enabled: [...new Set([...enabled.toolsets.filter((tool) => tool.enabled).map((tool) => tool.name), "skills"])] },
+    })).ok()).toBeTruthy();
+    expect((await page.request.put("/api/admin/toolsets", {
+      data: { hidden: [...new Set([...originalHidden, "terminal", "skills"])] },
+    })).ok()).toBeTruthy();
+    await page.reload();
+    await expect(terminal.getByRole("switch")).toHaveCount(0);
+    const hidden = await (await page.request.get(`/api/agents/${code}/tools`)).json() as AgentToolsView;
+    expect(hidden.toolsets.some((tool) => ["terminal", "skills"].includes(tool.name))).toBe(false);
+    expect(hidden.shellOrFileEnabled).toBe(true);
+    expect(hidden.skillsEnabled).toBe(true);
+
     // 셸 도구가 켜진 에이전트에 다시 붙이면 붙이기 확인 창이 셸 위험을 알린다.
     await row.getByRole("button", { name: "떼기" }).click();
     await expect(row.getByTestId("agent-connection-state")).toHaveText(
@@ -237,6 +258,7 @@ test("셸 도구와 연결을 함께 쓰면 붙일 때와 도구를 켤 때 그 
     await bindDialog.getByRole("button", { name: "취소" }).click();
     await expect(bindDialog).toBeHidden();
   } finally {
+    expect((await page.request.put("/api/admin/toolsets", { data: { hidden: originalHidden } })).ok()).toBeTruthy();
     const deleted = await page.request.delete(`/api/agents/${code}`);
     expect(
       deleted.status(),

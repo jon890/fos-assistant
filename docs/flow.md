@@ -57,6 +57,35 @@ Hermes 가 Control Plane 을 부를 때는 Control Plane 이 그 요청의 주�
 profile 플러그인이 도구 인자에 서명해 넣은 `_fos_ctx` 로 origin 실행 하나를 찾고, 그 실행의 `user_id` 가 요청자다. 하위 에이전트 session 은 만들 때 등록한 실행이, 최상위 session 은 지금 도는 실행이 origin 이다.
 [`backend/mcp-caller.md`](backend/mcp-caller.md#mcp-호출의-요청자를-정할-때) 의 「MCP 호출의 요청자를 정할 때」 가 그 흐름이다. 결정은 [ADR-032](adr/ADR-032-mcp-토큰은-profile-을-증명하고-실제-사용자는-부모-실행에서-정한다.md) 와 [ADR-037](adr/ADR-037-hermes-하위-에이전트-session-의-주인은-만들-때-등록한-줄로-정한다.md) 에 있다.
 
+## 로그인 활동 기록
+
+```mermaid
+sequenceDiagram
+    participant W as NextAuth
+    participant C as Control Plane
+    W->>C: POST /api/v1/signin/allowed (signin 서명 토큰)
+    C-->>W: 허용 여부
+    alt 허용된 로그인
+        W->>W: 세션 쿠키 준비
+        W->>C: events.signIn에서 POST /api/v1/signin/completed
+        alt 서명이 유효하고 허용 목록이 켜져 있음
+            C->>C: last_login_at을 더 최근 시각으로 갱신
+            C-->>W: 204
+        else 서명 오류 또는 꺼졌거나 없는 주소
+            C-->>W: 401 (기록하지 않음)
+        end
+        opt 기록 요청 실패
+            W->>W: 오류 로그 (로그인은 계속)
+        end
+    else 로그인 거절
+        W->>W: 세션과 활동 기록을 만들지 않음
+    end
+```
+
+일반 요청과 세션 갱신은 로그인 활동을 기록하지 않는다.
+관리자 목록은 기록이 없을 때 「기록 없음」을 보인다.
+응답과 저장 계약은 [`backend/people.md`](backend/people.md#관리자에게-보이는-최근-활동)가 갖는다.
+
 ## 대화 한 번
 
 ```mermaid
@@ -222,9 +251,14 @@ sequenceDiagram
         C-->>B: 409 AGENT_CONNECTIONS_REQUIRE_PRIVATE
     else 연결이 READY 가 아니거나 보관 파일에 값이 없다
         C-->>B: 409 CONNECTOR_NOT_CONNECTED
+    else single_binding 커넥터이고 그 연결이 다른 에이전트에 붙어 있다
+        C-->>B: 409 CONNECTOR_SINGLE_BINDING
     else 붙일 수 있다
         C->>D: PUT /api/connectors (bind: vault)
-        alt 대시보드 409. 운영자 설정이나 다른 커넥터와 충돌
+        alt 대시보드 409 sandbox_unavailable. 실행 공간이 필요한데 정책에 없는 profile
+            D-->>C: 409 (code: sandbox_unavailable)
+            C-->>B: 409 AGENT_SANDBOX_UNAVAILABLE. 바인딩 행이 남지 않는다
+        else 대시보드 409. 운영자 설정이나 다른 커넥터와 충돌
             D-->>C: 409
             C-->>B: 409 CONNECTOR_BIND_CONFLICT. 바인딩 행이 남지 않는다
         else 대시보드 401. 표식 없는 profile

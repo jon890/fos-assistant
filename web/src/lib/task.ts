@@ -1,5 +1,7 @@
 /** 예약 작업 화면이 쓰는 모양과 시각 변환이다. 서버는 5필드 cron 과 `ONCE` 만 안다. */
 
+import type { ModelTierCode } from "./model-tiers";
+
 export type TaskState = "ACTIVE" | "PAUSED" | "ARCHIVED";
 export type ConversationMode = "NEW_PER_RUN" | "SINGLE";
 export type MissedPolicy = "RUN_ONCE" | "SKIP";
@@ -28,6 +30,7 @@ export type TaskView = {
   conversationMode: ConversationMode;
   missedPolicy: MissedPolicy;
   notify: NotifyPolicy;
+  modelTier: ModelTierCode | null;
   createdAt: string;
 };
 
@@ -56,6 +59,7 @@ export type TaskRequest = {
   conversationMode: ConversationMode;
   missedPolicy: MissedPolicy;
   notify: NotifyPolicy;
+  modelTier: ModelTierCode | null;
 };
 
 /** 화면에서 고르는 시각이다. `weekday` 는 0(일)부터 6(토)까지다 */
@@ -172,9 +176,10 @@ const REASON_TEXTS: Record<string, string> = {
   AGENT_UNAVAILABLE: "에이전트를 쓸 수 없어요. 작업의 에이전트를 확인해 주세요",
   FAILED: "실행 중에 문제가 생겼어요",
   INTERRUPTED: "서버가 다시 시작돼 실행이 끊겼어요",
+  NOTHING_TO_REPORT: "알릴 것이 없어 조용히 끝냈어요",
 };
 
-/** 실행이 건너뛰어졌거나 실패한 까닭을 화면 문구로 바꾼다. 보이지 않을 까닭은 null 이다. */
+/** 실행이 건너뛰어졌거나 실패한 까닭과 조용히 끝낸 까닭을 화면 문구로 바꾼다. 보이지 않을 까닭은 null 이다. */
 export function runReasonText(reason: string | null): string | null {
   if (reason === null) return null;
   return REASON_TEXTS[reason] ?? null;

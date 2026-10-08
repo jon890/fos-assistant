@@ -39,7 +39,7 @@ public class PeopleAdminController {
     public List<PersonView> list() {
         currentUser.requireAdmin();
         return access.list().stream()
-                .map(entry -> PersonView.of(entry.person(), entry.joined()))
+                .map(entry -> PersonView.of(entry.person(), entry.joined(), entry.lastConversationAt()))
                 .toList();
     }
 
@@ -48,7 +48,7 @@ public class PeopleAdminController {
         currentUser.requireAdmin();
         AllowedPerson person = registrar.register(request.email(), request.displayName(), request.hermesProfile());
         // 방금 더한 사람은 아직 로그인하지 않았다. 사용자를 다시 뒤지지 않고 거짓으로 둔다.
-        return PersonView.of(person, false);
+        return PersonView.of(person, false, null);
     }
 
     /**
@@ -62,6 +62,6 @@ public class PeopleAdminController {
     public PersonView update(@PathVariable Long id, @Valid @RequestBody UpdatePersonRequest request) {
         currentUser.requireAdmin();
         PersonAccess result = access.setEnabled(id, request.enabled());
-        return PersonView.of(result.person(), result.joined());
+        return PersonView.of(result.person(), result.joined(), result.lastConversationAt());
     }
 }
