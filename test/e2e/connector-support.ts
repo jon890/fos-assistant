@@ -1,9 +1,9 @@
 /**
  * 연결을 에이전트에 붙여 커넥터 도구를 부르는 시나리오들이 함께 쓰는 준비다.
  *
- * <p>연결 등록, 비공개 에이전트 만들기, 붙이기, 관리자 반영 완료를 차례로 한다(ADR-083). 붙인 바인딩은 공유 gateway 를
- * 재시작해야 쓸 수 있으므로 관리자인 dad 가 반영 완료를 눌러 `READY` 로 만든다. 만든 것은 {@link ConnectorSetup} 이 적어 두고
- * 시나리오 끝에서 되돌린다.
+ * <p>연결 등록, 비공개 에이전트 만들기, 붙이기, 반영 확인을 차례로 한다(ADR-083). 새 서버를 더한 붙이기는 재시작이 필요 없어
+ * Control Plane 이 반영 지연 뒤 스스로 확인해 `READY` 로 만든다(ADR-20261007 / connector-live-reload). 값 교체처럼 재시작 대기가 된
+ * 바인딩만 관리자인 dad 가 반영 완료를 눌러야 한다. 만든 것은 {@link ConnectorSetup} 이 적어 두고 시나리오 끝에서 되돌린다.
  */
 import { call, expect, expectStatus, fail, type Context } from "./harness.ts";
 import { CONNECTOR_TOOL_PROBE, DEMO_CONNECTOR, DEMO_TOKEN_OK } from "./fake-hermes.ts";
@@ -87,7 +87,7 @@ export async function createPrivateAgent(context: Context, token: string, name: 
   return { code: created.code, profile };
 }
 
-/** 내 연결을 내 에이전트에 붙인다. 붙인 바인딩은 반영 완료 전까지 `PENDING` 이다. */
+/** 내 연결을 내 에이전트에 붙인다. 붙인 바인딩은 반영이 확인될 때까지 `PENDING` 이다. */
 export async function bind(context: Context, token: string, agentCode: string, connectorId: string): Promise<AgentConnectionView> {
   return expectStatus(
     await call(context, `/agents/${agentCode}/connections/${connectorId}`, { method: "PUT", token }),
@@ -118,14 +118,31 @@ export async function confirm(context: Context, agentCode: string, connectorId: 
   return confirmed;
 }
 
-/** 붙이고 반영 완료까지 한다. */
+/** 붙이고 Control Plane 이 스스로 확인해 `READY` 가 될 때까지 기다린다. 관리자 반영 완료는 누르지 않는다. */
 export async function attach(context: Context, token: string, agentCode: string, connectorId: string): Promise<void> {
   const bound = await bind(context, token, agentCode, connectorId);
   expect(
-    bound.bound && bound.status === "PENDING" && bound.restartRequired,
-    `붙인 바인딩이 재시작 대기의 PENDING 이 아니다: ${JSON.stringify(bound)}`,
+    bound.bound && bound.status === "PENDING" && !bound.restartRequired,
+    `붙인 바인딩이 재시작이 필요 없는 PENDING 이 아니다: ${JSON.stringify(bound)}`,
   );
-  await confirm(context, agentCode, connectorId);
+  await awaitReady(context, token, agentCode, connectorId);
+}
+
+/** 그 바인딩이 관리자 반영 완료 없이 `READY` 가 될 때까지 40초 안에서 기다린다. */
+export async function awaitReady(context: Context, token: string, agentCode: string, connectorId: string): Promise<AgentConnectionView> {
+  const deadline = Date.now() + 40_000;
+  let last: AgentConnectionView | undefined;
+  while (Date.now() < deadline) {
+    const listed = expectStatus(
+      await call(context, `/agents/${agentCode}/connections`, { token }),
+      200,
+      "에이전트의 연결 목록",
+    ).json<AgentConnectionsView>();
+    last = listed.connections.find((connection) => connection.connectorId === connectorId);
+    if (last?.bound === true && last.status === "READY" && !last.restartRequired) return last;
+    await new Promise((resolve) => setTimeout(resolve, 500));
+  }
+  return fail(`${agentCode} 의 ${connectorId} 가 40초 안에 READY 가 되지 않았다: ${JSON.stringify(last)}`);
 }
 
 /**

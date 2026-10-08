@@ -315,7 +315,7 @@ Control Plane 이 이 경로들을 부르는 순서와 뜻은 부르는 쪽 문�
 | `POST /api/connectors/<id>/call` | 후보 값이나 보관 파일의 값으로 그 커넥터의 선택지 도구나 확인 도구를 한 번 부른다 | `{tool, values}` 또는 `{tool, vault}`. 둘 가운데 정확히 하나다 | `{ok: true, result}` 또는 `{ok: false, error: <공통 어휘>}` | 400 그 커넥터의 보관 파일이 없다 |
 | `POST /api/connectors/<id>/execute` | Control Plane 이 승인한 호출을 그 profile 의 값과 받은 인자로 한 번 실행한다 | `{profile, hermes_tool, args}` | `{ok: true, result}` 또는 `{ok: false, error: <공통 어휘>}` | 504 실행됐는지 모른다 |
 | `GET /api/connectors?profile=<p>` | 커넥터의 상태를 읽는다 | query `profile` | `{profile, policy_hook, connectors: [{plugin, enabled, configured, mode}]}`. `mode` 는 `bind` 나 `isolated` 다 | 401 관리 표식과 커넥터 표식이 모두 없다 |
-| `PUT /api/connectors` | profile 에 커넥터를 설치하고 제거한다 | `{profile, plugin, enabled, sandbox_owner?}`. 바인딩 설치는 `bind: {vault}` 를 더하고 Control Plane 이 그 에이전트의 `sandbox_owner` 를 함께 보낸다. `owner_attachments_env` 를 선언한 커넥터의 바인딩 설치와 사진 도구를 여는 옛 설치는 `sandbox_owner` 가 필요하다 | `{profile, plugin, enabled, changed, restart_required, plugin_updated}`. 옛 설치는 서버 등록과 함께 그 profile 의 API 도구 목록과 `SOUL.md` 를 다시 쓴다. 바인딩 설치는 서버 이름만 더하고 뺀다 | 400 보관 파일이 없거나 다른 커넥터의 것이다. 401 표식. 409 운영자 설정과 충돌한다, 사진 도구에 실행 공간 정책이나 등록 profile 이 없다, `owner_attachments_env` 를 선언한 커넥터에 실행 공간 정책이 없거나 그 주인의 첨부 디렉터리를 링크 없이 확인하지 못했다. 400 그 커넥터에 `sandbox_owner` 가 없다 |
+| `PUT /api/connectors` | profile 에 커넥터를 설치하고 제거한다 | `{profile, plugin, enabled, sandbox_owner?}`. 바인딩 설치는 `bind: {vault}` 를 더하고 Control Plane 이 그 에이전트의 `sandbox_owner` 를 함께 보낸다. `owner_attachments_env` 를 선언한 커넥터의 바인딩 설치와 사진 도구를 여는 옛 설치는 `sandbox_owner` 가 필요하다 | `{profile, plugin, enabled, changed, restart_required, plugin_updated, reload_pending}`. `reload_pending` 은 바인딩 설치만 참이 될 수 있다. 옛 설치는 서버 등록과 함께 그 profile 의 API 도구 목록과 `SOUL.md` 를 다시 쓴다. 바인딩 설치는 서버 이름만 더하고 뺀다 | 400 보관 파일이 없거나 다른 커넥터의 것이다. 401 표식. 409 운영자 설정과 충돌한다, 사진 도구에 실행 공간 정책이나 등록 profile 이 없다, `owner_attachments_env` 를 선언한 커넥터에 실행 공간 정책이 없거나 그 주인의 첨부 디렉터리를 링크 없이 확인하지 못했다. 400 그 커넥터에 `sandbox_owner` 가 없다 |
 | `PUT /api/connector-vault` | 연결의 칸 값을 보관 파일 하나에 쓴다 | `{vault, connector, values}`. `values` 는 `fields[].key` 를 키로 한 값이다 | `{ok: true}` | 400 형식, 운영 목록에 없는 커넥터, 칸 선언과 맞지 않는 값. 409 같은 이름의 보관 파일이 다른 커넥터의 것이다 |
 | `DELETE /api/connector-vault` | 보관 파일 하나를 지운다 | `{vault}` | `{changed}`. 없었으면 `false` 다 | 400 형식 |
 | `POST /api/connector-vault/import` | 그 커넥터를 옛 설치한 관리 profile 의 `.env` 에서 칸 값을 보관 파일로 옮긴다 | `{vault, connector, profile}` | `{ok: true}` | 400 필수 칸이 비었다. 401 관리 표식이 없다. 404 없는 profile, 설치하지 않은 커넥터. 409 다른 커넥터의 보관 파일 |
@@ -464,8 +464,10 @@ provider credential 은 이 토큰으로 쓰지 못한다.
 | Control Plane MCP 등록 | 지운다 | 그대로 둔다 |
 | 지침 | 스킬 본문을 `SOUL.md` 에 쓴다 | 스킬 디렉터리를 그 profile 의 `skills/` 로 복사한다. `SOUL.md` 는 읽지도 쓰지도 않는다 |
 | 대응 파일 | `isolated` 칸 없이 쓴다 | `isolated: false` 를 싣고 소유 기록의 모든 서버와 뗀 서버 기록 `.fos-connector-detached.json` 의 서버를 싣는다 |
-| 설치의 `restart_required` | 지금과 같다 | 바뀐 것이 있으면 참이다. 떠 있는 profile 에 더한 MCP 서버는 gateway 를 다시 띄워야 보인다 |
-| 떼기의 `restart_required` | 지금과 같다 | 거짓이다. 도구 목록에서 이름을 빼므로 다음 실행부터 막힌다. 떼기 전에 시작한 실행의 호출은 대응에 남은 서버로 판정이 막는다 |
+| 설치의 `restart_required` | 지금과 같다 | 이미 있던 서버의 정의나 그 서버의 `.env` 값이 바뀌었을 때만 참이다. 공유 gateway 의 MCP 설정 맞추기는 이름만 비교해 같은 이름을 다시 연결하지 않는다. 새 서버, 스킬, 이름 대응만 바뀐 설치는 거짓이고 `reload_pending` 이 참이다([ADR-20261007 / connector-live-reload](../docs/adr/ADR-20261007-connector-live-reload.md)) |
+| 떼기의 `restart_required` | 지금과 같다 | 거짓이고, 바뀐 것이 있으면 `reload_pending` 이 참이다. 도구 목록에서 이름을 빼므로 다음 실행부터 막힌다. 떼기 전에 시작한 실행의 호출은 대응에 남은 서버로 판정이 막는다 |
+| `reload_pending` | 늘 거짓이다 | 바뀐 것이 있고 `restart_required` 와 `plugin_updated` 가 모두 거짓이면 참이다. `plugin_updated` 가 참이면 그것만으로 재시작을 기다린다 |
+| 스킬 색인 표식 | 쓰지 않는다 | 스킬 파일을 바꾼 설치는 `skills.disabled` 에서 `fos-skill-index-` 로 시작하는 항목을 빼고 새 표식 하나를 더한다. gateway 가 그 profile 의 스킬 색인을 새로 만든다. 다른 이름은 그대로 두고, 문자열이면 Hermes 가 읽는 대로 목록으로 바꿔 쓴다. 고칠 수 없는 모양이면 붙이기는 409 이고 떼기는 표식 없이 뗀다 |
 
 **보관 파일은 연결의 칸 값을 연결마다 하나씩 둔다.**
 대시보드의 HERMES_HOME 아래 `connector-vault/<vault>.json` 이고, 디렉터리는 700, 파일은 600 이다.

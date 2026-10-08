@@ -79,6 +79,15 @@ public class ConnectorBinding {
     @Column(name = "restart_required_since")
     private Instant restartRequiredSince;
 
+    /**
+     * 반영 예정 시각이다(ADR-20261007 / connector-live-reload).
+     *
+     * <p>재시작 없이 공유 gateway 의 MCP 설정 맞추기 주기가 반영할 설치를 보냈을 때 적는다. 이 시각이 지나면 Control Plane 이
+     * 반영 맞추기를 스스로 한 번 돌린다. 예정이 없으면 비어 있다.
+     */
+    @Column(name = "apply_due_at")
+    private Instant applyDueAt;
+
     @Column(name = "desired_enabled", nullable = false)
     private boolean desiredEnabled;
 
@@ -130,9 +139,11 @@ public class ConnectorBinding {
         pending(now);
     }
 
+    /** 반영을 확인했다. 재시작 대기와 반영 예정을 함께 푼다. */
     public void ready(Instant now) {
         this.status = BindingStatus.READY;
         this.restartRequired = false;
+        this.applyDueAt = null;
         this.checkedAt = now;
         this.updatedAt = now;
         if (agent.connectorManaged()) {
@@ -146,6 +157,18 @@ public class ConnectorBinding {
         if (agent.connectorManaged()) {
             disableConnectorAgent();
         }
+    }
+
+    /** 반영 예정 시각을 적는다. 이미 더 늦은 예정이 있으면 그 값을 둔다. 앞선 설치가 아직 반영되지 않았을 수 있기 때문이다. */
+    public void scheduleApply(Instant dueAt) {
+        if (this.applyDueAt == null || this.applyDueAt.isBefore(dueAt)) {
+            this.applyDueAt = dueAt;
+        }
+    }
+
+    /** 예정한 확인을 시작하기 전에 비운다. 확인은 한 번만 시도한다. */
+    public void clearApplyDue() {
+        this.applyDueAt = null;
     }
 
     /** 앞선 대기 값을 지우지 않고 논리 OR 로 누적한다. */

@@ -189,7 +189,9 @@ manifest 를 읽지 못해 바인딩의 서버 이름으로 고른 호출은 아
 - 먼저 살펴보기 트리인지는 origin 실행으로 `ProactiveCheckGuard.isCheckTree` 가 정한다. 그 트리에서는 위험도가 `READ` 이고 승인 방식이 `none` 인 도구만 허용한다. 상시 허락이 있어도 나머지를 거절하고 승인 줄을 만들지 않는다. `READ` 라도 manifest 가 승인을 요구하면 거절한다. 사람이 보지 않는 실행에서 승인 요청이 쌓이지 않게 하기 위해서다([ADR-080](../adr/ADR-080-먼저-살펴보기는-점검-대화의-turn-하나로-돌고-읽기-경계를-control-plane-이-강제한다.md))
 - 판정은 Hermes 와 DB 를 모르는 함수 하나가 한다. 모델의 인자와 서버의 `readOnlyHint` 는 판정에 들어가지 않는다
 - Control Plane 은 hook 이 보낸 `tool` 을 그대로 믿지 않는다. 카탈로그의 `mcp_server` 와 `tool` 로 등록 이름을 다시 계산해 `hermes_tool` 과 다르면 `tool` 이 없는 호출로 읽는다. `tool` 이 도구 이름 형식(`^[A-Za-z0-9_.-]{1,128}$`)이 아닌 요청은 서명이 틀린 요청처럼 403 으로 거절한다
-- `NOT_READY` 가운데 연결은 `READY` 인데 바인딩이 아직 반영되지 않은 호출은 모델에게 다른 글을 준다. 관리자가 반영을 마치면 쓸 수 있으니 기다리라는 글이다. 연결 확인을 다시 해도 풀리지 않기 때문이다
+- `NOT_READY` 가운데 연결은 `READY` 인데 바인딩이 아직 반영되지 않았고 반영 예정이 남은 호출은 모델에게 다른 글을 준다. 대개 몇 분 안에 저절로 반영되니 잠시 뒤 다시 시도하라는 글이다. 붙인 직후에는 공유 gateway 의 MCP 설정 맞추기와 Control Plane 의 반영 예정 확인을 기다려야 하기 때문이다([ADR-20261007 / connector-live-reload](../adr/ADR-20261007-connector-live-reload.md))
+- 그 바인딩이 재시작 대기이면 저절로 풀리지 않으므로 관리자의 반영을 기다리라는 글을 준다. 재시작 대기는 관리자 반영 완료가 있어야 풀린다
+- 재시작 대기도 아니고 반영 예정도 없는 바인딩은 연결 화면에서 연결을 확인하라는 일반 글을 준다. 반영 예정 확인이 한 번 실패했거나 정책 hook 이 꺼진 경우라 저절로 풀리지 않는다
 - 허용한 호출이 다시 왔을 때 그 줄의 에이전트에 그 연결이 지금도 붙어 있고 연결과 바인딩이 모두 `READY` 가 아니면 처음의 허용을 돌려주지 않고 막는다. 해제하거나 뗀 연결에 앞의 허용이 나가지 않게 한다
 - 같은 호출이 다시 오면 처음 판정을 그대로 돌려준다. 같은 호출인지는 profile, 루트 session, session, `tool_call_id` 로 만든 `dedupe_key` 로 안다
 - `dedupe_key` 가 같아도 `hermes_tool` 이나 `args_json` 의 해시가 처음 줄과 다르면 처음 판정을 돌려주지 않고 막는다. 새 줄은 남기지 않는다. 한 session 에서 같은 `tool_call_id` 가 되풀이될 때 앞의 허용이 다른 도구나 다른 인자에 나가지 않게 한다
@@ -206,7 +208,7 @@ manifest 를 읽지 못해 바인딩의 서버 이름으로 고른 호출은 아
 
 설치는 그 profile 의 `fos-ctx` 를 묶음의 판으로 바꾼다. 파일이 바뀌었으면 `plugin_updated: true` 로 답한다. 떠 있는 gateway 가 옛 코드를 쥐고 있을 수 있기 때문이다.
 옛 설치에서는 선택 칸의 `PUT /api/env` 와 `DELETE /api/env` 도 설치를 다시 쓰고 `fos-ctx` 를 묶음의 판으로 맞춘다. 옛 설치된 커넥터의 env 응답은 늘 `restart_required` 가 참이라 이 경우도 재시작 대기가 된다.
-Control Plane 은 `plugin_updated` 가 참인 바인딩을 재시작 대기로 둔다. 관리자가 공유 gateway 를 재시작하고 반영 완료를 누르면 풀린다. 옛 설치의 `restart_required` 는 늘 참이라 옛 커넥터 에이전트의 바인딩에는 이 신호로 쓰지 못한다. 바인딩 설치는 바뀐 것이 있을 때만 `restart_required` 가 참이다.
+Control Plane 은 `plugin_updated` 가 참인 바인딩을 재시작 대기로 둔다. 관리자가 공유 gateway 를 재시작하고 반영 완료를 누르면 풀린다. 옛 설치의 `restart_required` 는 늘 참이라 옛 커넥터 에이전트의 바인딩에는 이 신호로 쓰지 못한다. 바인딩 설치는 이미 있던 서버의 정의나 값이 바뀐 경우에만 `restart_required` 가 참이다. 새 서버, 스킬, 이름 대응만 바뀌면 `reload_pending` 이다([커넥터 설치](connector-install.md) 의 「바인딩 설치」).
 서버 정의의 `tools.exclude` 가 manifest 로 계산한 것과 다를 때도 `policy_hook` 은 거짓이다. 소유 기록과 지금 manifest 의 같음 판정은 `tools` 를 보지 않는다. 옛 기록을 가진 연결이 끊기지 않고, 다시 보낸 설치가 덮어쓴다.
 서버 이름이나 실행 정의가 지금 manifest 와 다른 바인딩 항목은 이 `tools.exclude` 비교에서 뺀다. 그 서버는 대응에 빈 `tools` 로 실려 모든 호출이 막히고, 그 항목만 `configured` 가 거짓이다.
 연결 확인과 관리자 반영 완료는 설치를 다시 보낸 뒤에 `policy_hook` 을 읽는다. 옛 판의 `fos-ctx` 를 가진 바인딩은 연결 확인 한 번으로 새 판이 되고 재시작 대기가 된다.

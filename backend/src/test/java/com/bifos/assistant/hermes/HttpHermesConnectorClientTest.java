@@ -308,6 +308,21 @@ class HttpHermesConnectorClientTest {
         server.verify();
     }
 
+    @DisplayName("바인딩 설치 응답의 reload_pending 을 읽고, 없으면 거짓이다")
+    @Test
+    void readsReloadPendingFromBindResponse() {
+        String body =
+                "{\"profile\":\"user-demo\",\"plugin\":\"demo-notes\",\"enabled\":true,\"restart_required\":false";
+        server.expect(requestTo(BASE + "/api/connectors"))
+                .andRespond(withSuccess(body + ",\"reload_pending\":true}", MediaType.APPLICATION_JSON));
+        server.expect(requestTo(BASE + "/api/connectors"))
+                .andRespond(withSuccess(body + "}", MediaType.APPLICATION_JSON));
+
+        assertThat(client.bindConnector(PROFILE, DEMO, "c7", "u1")).isEqualTo(new InstallResult(false, false, true));
+        assertThat(client.bindConnector(PROFILE, DEMO, "c7", "u1")).isEqualTo(new InstallResult(false, false, false));
+        server.verify();
+    }
+
     @DisplayName("첨부를 올린 적 없는 주인의 커넥터도 보내기 전에 첨부 디렉터리를 만들어 설치한다")
     @Test
     void putConnectorCreatesTheOwnersAttachmentDirectoryFirst() {

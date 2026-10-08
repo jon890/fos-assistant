@@ -10,6 +10,25 @@ import dashboard_profile_api_support as support
 
 
 class ProfileApiConnectorBindingDetachTest(support.ProfileApiRouteTest):
+    def test_detaching_replaces_the_skill_index_marker_and_keeps_operator_names(self):
+        """떼면 재시작 없이 반영되고, 색인 표식만 새 값으로 바뀌며 운영자가 넣은 다른 이름은 남는다."""
+        self.bind_fixture()
+        self.assertEqual(self.bind(DEMO, "c1").status_code, 200)
+        config = self.alice_config()
+        old_marker = config["skills"]["disabled"][0]
+        config["skills"]["disabled"] = ["operator-skill", old_marker]
+        self.write_config("alice", config)
+
+        removed = self.bind(DEMO, enabled=False)
+        self.assertEqual(removed.status_code, 200, removed.body)
+        self.assertEqual({key: removed.body[key] for key in ("changed", "restart_required", "reload_pending")},
+                         {"changed": True, "restart_required": False, "reload_pending": True})
+        disabled = self.alice_config()["skills"]["disabled"]
+        self.assertEqual(len(disabled), 2, disabled)
+        self.assertEqual(disabled[0], "operator-skill")
+        self.assertTrue(disabled[1].startswith("fos-skill-index-"), disabled)
+        self.assertNotEqual(disabled[1], old_marker)
+
     def test_detaching_one_binding_removes_only_its_name_env_and_skills(self):
         """하나를 떼면 그 서버와 이름과 env 와 스킬만 빠지고 다른 바인딩은 남으며 재시작이 필요 없다."""
         self.bind_fixture()
