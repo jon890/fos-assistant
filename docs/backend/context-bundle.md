@@ -66,14 +66,16 @@ Runs API 는 `instructions` 와 `input` 두 글을 받는다([`../hermes/runs-ap
 대화, Control Plane 이 시작한 자식 실행, 먼저 살펴보기에 같은 도구 호출 지침을 보낸다.
 새 profile 과 기존 profile 모두 다음 실행부터 받는다.
 
-Hermes 의 `tool_call` 로 로컬 MCP 도구(`mcp__...`)를 부를 때 `tools` 배열에는 항목 하나만 넣는다.
+Hermes 의 `tool_call` 로 로컬 MCP 도구(`mcp__...`)를 부를 때 `calls` 배열에는 항목 하나만 넣는다.
 같은 서버의 읽기 도구라도 여러 개를 한 배열로 보내지 않고 도구마다 별도 호출한다.
-이는 Hermes 의 단건 제한에 맞추는 안내다. HTTP 원격 도구 서버의 묶음 규칙은 그 서버의 계약을 따른다.
+이는 Hermes 의 단건 제한에 맞추는 안내다. `connectors__` 이름을 쓰는 HTTP 원격 도구 서버의 묶음 규칙은 그 서버의 계약을 따른다.
 MCP 연결 전송 방식이 HTTP 라도 Hermes 에 로컬 도구로 등록된 `mcp__...` 는 이 단건 규칙을 따른다.
+근거는 [v2026.9.24 의 호출 검증](https://github.com/NousResearch/hermes-agent/blob/v2026.9.24/tools/tool_search.py#L543-L572)이다.
 
 이 안내는 묶음 실행 기능이나 서버의 권한 검사를 바꾸지 않는다.
 모델이 안내를 따르는지는 배포 뒤 실제 실행의 호출과 거절 기록으로 확인한다.
-Hermes 가 직접 만든 자식의 지침 상속은 Hermes 의 계약이며, Control Plane 의 자식 실행과 구분한다.
+Hermes 의 네이티브 `delegate_task` 자식은 부모의 실행 지침을 자동 상속하지 않아 이 안내의 적용을 보장하지 않는다.
+Control Plane 의 자식 실행과 구분한다. 근거는 [자식 agent 생성](https://github.com/NousResearch/hermes-agent/blob/v2026.9.24/tools/delegate_tool.py#L202-L249)이다.
 
 ### 항목의 형식
 

@@ -28,7 +28,7 @@
 ### 1. ContextAssembler 의 공통 도구 호출 지침
 
 `backend/src/main/java/com/bifos/assistant/context/ContextAssembler.java` 에 한국어 도구 호출 지침 상수를 추가한다.
-로컬 MCP 등록 이름 mcp__... 를 tool_call 로 부를 때 tools 배열은 정확히 항목 하나만 넣고,
+로컬 MCP 등록 이름 mcp__... 를 tool_call 로 부를 때 calls 배열은 정확히 항목 하나만 넣고,
 같은 서버의 읽기 도구도 여러 개를 묶지 않으며 도구마다 별도 호출한다고 적는다.
 MCP 서버 연결이 HTTP 여도 로컬 등록 이름에는 단건 규칙이 적용되고, HTTP 원격 도구 서버 규칙은 해당 계약을 따른다고 구분한다.
 withResponseInstructions 에서 답변 형식 뒤, 선택적 기억 지침 앞에 공통 도구 호출 지침을 붙인다.
@@ -38,7 +38,7 @@ Memory 예산, 누락 번호, bundle 을 그대로 보존하고 chars 와 instru
 ### 2. 공통 지침 테스트
 
 `backend/src/test/java/com/bifos/assistant/context/ContextAssemblerTest.java` 의 공통 지침 검사를 확장한다.
-빈 문맥, remembers=false, remembers=true 모두에 tools 배열 단건·같은 서버 읽기 도구·별도 호출·HTTP 구분 안내가 들어가는지 확인한다.
+빈 문맥, remembers=false, remembers=true 모두에 calls 배열 단건·같은 서버 읽기 도구·별도 호출·HTTP 구분 안내가 들어가는지 확인한다.
 기억 지침 조건과 기존 답변 형식이 유지되고, 기존 Memory 본문·누락 번호·bundle 과 지침을 포함한 chars·hash 가 유지되는지 확인한다.
 각 테스트는 한국어 DisplayName 과 동사로 시작하는 영문 메서드명을 쓴다.
 안내를 제거하면 테스트가 실패해야 한다. 추가 지침 때문에 기억 본문이나 누락 목록을 잃는 회귀도 실패해야 한다.
