@@ -89,9 +89,29 @@
 
 | 경로 | 누가 | 무엇 |
 | --- | --- | --- |
-| `GET /api/v1/agents/{code}/tools` | 그 에이전트의 주인 또는 `ADMIN` | 응답 `{ "toolsets": [...], "unclassifiedEnabled": [...] }`. `toolsets` 는 등급 표에 있는 이름, 설명, 등급, 켜짐과 요청자의 변경 가능 여부다 |
-| `PUT /api/v1/agents/{code}/tools` | 주인은 주인 등급, `ADMIN` 은 전부 | 본문 `{ "enabled": ["web", "vision"] }`. 켤 toolset 전체다. 바꿀 수 없는 등급은 지금 값과 같아야 한다. 응답은 `GET` 과 같은 모양이다 |
-| `GET`, `PUT /api/v1/admin/agents/{code}/tools` | `ADMIN` | 위와 같은 모양. 다른 사람의 비공개 에이전트는 이 경로로만 다룬다 |
+| `GET /api/v1/agents/{code}/tools` | 그 에이전트의 주인 또는 `ADMIN` | 응답 `{ "toolsets": [...], "unclassifiedEnabled": [...] }`. 숨기지 않은 등급 표의 이름, 설명, 등급, 켜짐과 요청자의 변경 가능 여부다 |
+| `PUT /api/v1/agents/{code}/tools` | 주인은 주인 등급, `ADMIN` 은 전부 | 본문 `{ "enabled": ["web", "vision"] }`. 화면에 보이는 도구 중 켤 목록이다. 숨긴 도구는 현재 상태를 보존한다. 바꿀 수 없는 등급은 지금 값과 같아야 한다. 응답은 `GET` 과 같은 모양이다 |
+| `GET`, `PUT /api/v1/admin/agents/{code}/tools` | `ADMIN` | 숨긴 도구도 `hidden` 표시와 함께 읽고 변경한다. 다른 사람의 비공개 에이전트는 이 경로로만 다룬다 |
+
+### 화면에 보일 도구
+
+그룹별 숨김 목록은 `toolset_hidden` 표가 갖는다. 기본값은 모두 보임이다.
+활성 목록의 사본은 저장하지 않는다. 숨김을 저장해도 Hermes 설정과 실행 권한은 바뀌지 않는다.
+근거는 [ADR-20261008 / tool-catalog-visibility](../adr/ADR-20261008-tool-catalog-visibility.md)에 있다.
+
+| 경로 | 하는 일 |
+| --- | --- |
+| `GET /api/v1/admin/toolsets` | 등급 표에 있는 도구의 이름과 설명, `hidden`, `enabledAgents`(code, name)를 읽는다. 활성 에이전트 수는 그 목록 길이다 |
+| `PUT /api/v1/admin/toolsets` | ADMIN이 `{ "hidden": ["toolset 이름"] }`으로 그룹의 숨김 목록 전체를 바꾼다. 성공은 204다. 등급 표 밖의 이름은 400으로 거절한다 |
+
+일반 에이전트 도구 GET과 PUT 응답은 숨긴 도구를 제외한다. ADMIN도 일반 경로에서는 같은 목록을 받는다.
+일반 PUT에 숨긴 이름을 명시하면 403이다. 숨긴 도구가 이미 켜져 있으면 다른 도구를 저장할 때
+그 활성 상태를 보존한다. 숨긴 ADMIN 도구와 `skills`도 같으며, 원래의 등급과 스킬 조건을 그대로 검사한다.
+관리자 에이전트 도구 GET과 PUT은 숨긴 도구도 `hidden` 표시와 함께 반환하고 관리자가 끌 수 있게 한다.
+
+관리자 카탈로그는 설치의 지우지 않은 일반 에이전트를 센다. 사용 여부가 꺼진 에이전트도 포함하며
+커넥터 관리 에이전트는 제외한다. profile 조회 실패는 전체 조회 실패로 전달한다.
+Hermes 목록에서 사라진 숨김 이름은 관리 목록에 남아 숨김을 해제할 수 있다.
 
 ## 에이전트 만들기와 지우기
 

@@ -9,4 +9,5 @@ public record AgentToolView(
         AgentToolPolicy.Tier tier,
         boolean enabled,
         boolean editable,
-        boolean requiresPrivate) {}
+        boolean requiresPrivate,
+        boolean hidden) {}
