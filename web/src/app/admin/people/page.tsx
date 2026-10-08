@@ -14,5 +14,10 @@ export default async function PeopleAdminPage() {
     return <p className="text-sm">{result.message}</p>;
   }
 
-  return <PeopleAdminPanel initialPeople={result.data} initialReadAt={new Date().toISOString()} />;
+  return (
+    <PeopleAdminPanel
+      initialPeople={result.data}
+      initialReadAt={new Date().toISOString()}
+    />
+  );
 }

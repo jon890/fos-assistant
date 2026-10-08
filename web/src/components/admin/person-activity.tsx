@@ -24,7 +24,11 @@ function fullTimeWithSeconds(value: string): string {
 export function PersonActivity({ value, readAt }: Props) {
   if (!value) return <>기록 없음</>;
   return (
-    <time dateTime={value} className="block" title={`${fullTimeWithSeconds(value)} 서울 시각`}>
+    <time
+      dateTime={value}
+      className="block"
+      title={`${fullTimeWithSeconds(value)} 서울 시각`}
+    >
       <span>{formatRelative(value, new Date(readAt))}</span>
       <span className="mt-0.5 block text-xs text-muted-foreground">
         {fullTimeWithSeconds(value)} 서울 시각

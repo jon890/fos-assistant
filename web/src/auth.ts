@@ -12,7 +12,9 @@ import { recordSignIn } from "@/lib/signin-activity";
 function requireEnv(name: string): string {
   const value = process.env[name];
   if (!value || value.trim().length === 0) {
-    throw new Error(`${name} is not set; the web tier cannot sign anyone in without it`);
+    throw new Error(
+      `${name} is not set; the web tier cannot sign anyone in without it`,
+    );
   }
   return value;
 }
