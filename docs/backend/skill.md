@@ -57,7 +57,7 @@ Hermes 가 스킬을 읽는 방식은 [`hermes/skills.md`](../hermes/skills.md) 
 - 이름이 그 에이전트의 켜진 스킬 목록에 있으면 Hermes 에 보낼 입력만 사용자가 이 스킬을 호출했으니 `skill_view` 로 읽고 그 절차대로 다음을 하라는 글로 바꾼다. 저장하는 메시지는 사용자가 친 글 그대로다
 - 없으면 Hermes 에 보내지 않고 400 `SKILL_COMMAND_UNKNOWN` 다
 - 켜진 스킬 목록은 에이전트마다 30초 캐시한다. 스킬 저장, 지우기, 켜고 끄기가 Hermes 에 반영되면 `SkillsChanged` 로 그 에이전트의 캐시를 비운다. `skills` toolset 변경은 캐시를 비우지 않아 30초 뒤에 반영된다
-- `skills` toolset 이 꺼진 에이전트는 켜진 스킬이 없는 것으로 보고 커맨드를 `SKILL_COMMAND_UNKNOWN` 으로 거절한다([ADR-035](../../backend/docs/adr/ADR-035-대화창의-스킬-커맨드는-control-plane-이-해석해-hermes-에-넘긴다.md) 의 「감당할 것」)
+- `skills` toolset 이 꺼진 에이전트는 켜진 스킬이 없는 것으로 보고 커맨드를 `SKILL_COMMAND_UNKNOWN` 으로 거절한다([ADR-035](../../backend/docs/adr/ADR-035-대화창의-스킬-커맨드는-control-plane-이-해석해-hermes-에-넘긴다.md) 의 「결과」)
 - 이름은 대화를 만들기 전에 확인한다. 거절한 커맨드는 대화도 메시지도 실행도 남기지 않는다. 목록을 읽다 Hermes 가 실패하면 그 오류로 거절하고 캐시에 두지 않는다
 - 흐름이 붙은 에이전트에서는 커맨드를 해석하지 않고 글 그대로 보낸다. 입력창도 `/` 목록을 띄우지 않는다
 
