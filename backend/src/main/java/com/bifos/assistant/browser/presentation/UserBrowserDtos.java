@@ -1,11 +1,19 @@
 package com.bifos.assistant.browser.presentation;
 
+import com.bifos.assistant.browser.application.model.BrowserScreenInput;
+import com.bifos.assistant.browser.application.model.BrowserScreenInput.Kind;
 import com.bifos.assistant.browser.application.model.UserBrowserSnapshot;
+import com.bifos.assistant.shared.error.ApiException;
+import com.bifos.assistant.shared.error.ErrorCode;
 import com.fasterxml.jackson.annotation.JsonInclude;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Locale;
+import java.util.regex.Pattern;
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
+import tools.jackson.databind.json.JsonMapper;
 
 /** 사용자 브라우저 경로의 응답 모양이다. 계약은 {@code docs/backend/user-browser.md} 의 「API」 가 갖는다. */
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
@@ -65,6 +73,102 @@ public final class UserBrowserDtos {
                     browser.lastError(),
                     browser.startedAt(),
                     browser.lastActiveAt());
+        }
+    }
+
+    /** 화면 입력의 본문이다. 칸은 {@code type} 마다 필요한 것만 쓴다. 오류 메시지에는 칸 이름만 싣고 값은 싣지 않는다. */
+    public record ScreenInputRequest(
+            String type,
+            String action,
+            Double x,
+            Double y,
+            String button,
+            Integer deltaY,
+            String key,
+            String text,
+            String url,
+            String id,
+            Integer width,
+            Integer height) {
+
+        private static final JsonMapper JSON = JsonMapper.builder().build();
+        private static final Pattern TARGET_ID = Pattern.compile("^[A-Za-z0-9]{1,128}$");
+        private static final int MAX_TEXT = 500;
+        private static final int MAX_WHEEL = 2000;
+        /** 본문의 바이트 상한이다. 가장 긴 입력(주소 2048자)도 넉넉히 들어간다. */
+        private static final int MAX_BODY = 8 * 1024;
+
+        /** 본문을 읽고 검사한다. 8KB 를 넘거나 JSON 이 아니거나 모양이 틀리면 값을 싣지 않은 {@code VALIDATION_FAILED} 다. */
+        static BrowserScreenInput parse(String body) {
+            if (body != null && body.getBytes(StandardCharsets.UTF_8).length > MAX_BODY) {
+                throw invalid("body");
+            }
+            ScreenInputRequest request;
+            try {
+                request = body == null ? null : JSON.readValue(body, ScreenInputRequest.class);
+            } catch (RuntimeException ex) {
+                throw invalid("body");
+            }
+            if (request == null || request.type() == null) {
+                throw invalid("type");
+            }
+            return request.toInput();
+        }
+
+        private BrowserScreenInput toInput() {
+            Kind kind;
+            try {
+                kind = Kind.valueOf(type.toUpperCase(Locale.ROOT));
+            } catch (IllegalArgumentException ex) {
+                throw invalid("type");
+            }
+            switch (kind) {
+                case MOUSE -> {
+                    require("action", "down".equals(action) || "up".equals(action) || "move".equals(action));
+                    require("button", button == null || "left".equals(button));
+                    requireRatio();
+                }
+                case WHEEL -> {
+                    requireRatio();
+                    require("deltaY", deltaY != null && Math.abs(deltaY) <= MAX_WHEEL);
+                }
+                case KEY -> require("key", key != null && BrowserScreenInput.KEYS.containsKey(key));
+                case TEXT -> require("text", text != null && !text.isEmpty() && text.length() <= MAX_TEXT);
+                case NAVIGATE -> require("url", BrowserScreenInput.webUrl(url));
+                case TAB -> require("id", id != null && TARGET_ID.matcher(id).matches());
+                case RESIZE -> {
+                    require("width", width != null && width >= 320 && width <= 1600);
+                    require("height", height != null && height >= 320 && height <= 2000);
+                }
+                case BACK, RELOAD -> {}
+            }
+            return new BrowserScreenInput(
+                    kind,
+                    action,
+                    x == null ? 0 : x,
+                    y == null ? 0 : y,
+                    deltaY == null ? 0 : deltaY,
+                    key,
+                    text,
+                    url,
+                    id,
+                    width == null ? 0 : width,
+                    height == null ? 0 : height);
+        }
+
+        private void requireRatio() {
+            require("x", x != null && x >= 0 && x <= 1);
+            require("y", y != null && y >= 0 && y <= 1);
+        }
+
+        private static void require(String field, boolean valid) {
+            if (!valid) {
+                throw invalid(field);
+            }
+        }
+
+        private static ApiException invalid(String field) {
+            return new ApiException(ErrorCode.VALIDATION_FAILED, "screen input " + field + " is not valid");
         }
     }
 }

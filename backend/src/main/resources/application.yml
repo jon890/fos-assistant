@@ -253,6 +253,8 @@ assistant:
     start-timeout: 30s
     # 자동 중지와 상태 맞추기를 도는 간격. 기동 때도 한 번 돈다
     sweep-interval: 1m
+    # 로그인 화면 하나가 열려 있을 수 있는 시간. 넘으면 화면을 닫는다
+    screen-timeout: 30m
   decision-feedback:
     # 판단 피드백 사건을 남기는 기간. 지난 줄은 cleanup-cron 에 지운다
     retention: 365d

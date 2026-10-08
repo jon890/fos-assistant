@@ -8,6 +8,9 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.bifos.assistant.browser.application.BrowserScreens;
+import com.bifos.assistant.browser.application.BrowserUsage;
+import com.bifos.assistant.browser.application.FakeCdp;
 import com.bifos.assistant.browser.application.UserBrowserService;
 import com.bifos.assistant.browser.domain.BrowserProfileStore;
 import com.bifos.assistant.browser.domain.BrowserRuntime;
@@ -169,7 +172,12 @@ class UserBrowserControllerTest {
                 profiles(),
                 address -> true,
                 LiveProperties.fixed(BrowserProperties.class, properties(enabled)),
-                Clock.systemUTC());
+                Clock.systemUTC(),
+                new BrowserScreens(
+                        new FakeCdp(),
+                        new FakeCdp(),
+                        new BrowserUsage(),
+                        LiveProperties.fixed(BrowserProperties.class, properties(enabled))));
         CurrentUserProvider currentUser = new CurrentUserProvider();
         UserDisplayNameService names = mock(UserDisplayNameService.class);
         when(names.find(MEMBER.id())).thenReturn("아이");
@@ -251,6 +259,7 @@ class UserBrowserControllerTest {
                 128,
                 2,
                 Duration.ofMinutes(10),
-                Duration.ofMillis(100));
+                Duration.ofMillis(100),
+                Duration.ofMinutes(30));
     }
 }

@@ -256,6 +256,8 @@ public enum ErrorCode {
     BROWSER_EXISTS(HttpStatus.CONFLICT),
     /** proxy 가 컨테이너를 멈추거나 지우지 못했다. 줄은 {@code FAILED} 로 두고 다시 끌 수 있다. */
     BROWSER_STOP_FAILED(HttpStatus.BAD_GATEWAY),
+    /** 요청자의 브라우저에 열린 로그인 화면이 없다. 입력을 보내기 전에 화면을 연다. */
+    BROWSER_SCREEN_CLOSED(HttpStatus.CONFLICT),
     INTERNAL_ERROR(HttpStatus.INTERNAL_SERVER_ERROR);
 
     private final HttpStatus status;

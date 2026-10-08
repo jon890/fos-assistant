@@ -1,5 +1,7 @@
 package com.bifos.assistant.browser.application;
 
+import com.bifos.assistant.browser.application.model.BrowserScreenInput;
+import com.bifos.assistant.browser.application.model.BrowserScreenSink;
 import com.bifos.assistant.browser.application.model.UserBrowserSnapshot;
 import com.bifos.assistant.browser.domain.BrowserProfileStore;
 import com.bifos.assistant.browser.domain.BrowserRuntime;
@@ -17,7 +19,9 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.locks.ReentrantLock;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -47,6 +51,8 @@ public class UserBrowserService {
     public static final String STOP_FAILED = "stop_failed";
 
     private static final Duration POLL_INTERVAL = Duration.ofMillis(500);
+    // 활동을 다시 기록하기까지의 간격이다. UserBrowser.touch 와 같다
+    private static final Duration TOUCH_INTERVAL = Duration.ofMinutes(1);
     private static final List<UserBrowserStatus> COUNTED =
             List.of(UserBrowserStatus.STARTING, UserBrowserStatus.RUNNING);
 
@@ -56,7 +62,10 @@ public class UserBrowserService {
     private final CdpProbe cdp;
     private final LiveProperties<BrowserProperties> properties;
     private final Clock clock;
+    private final BrowserScreens screens;
     private final ReentrantLock startLock = new ReentrantLock();
+    /** 사용자마다 마지막으로 활동을 기록한 시각이다. 간격 안의 입력은 DB 를 읽지 않고 거른다. */
+    private final Map<Long, Instant> touched = new ConcurrentHashMap<>();
 
     /** 프로필 디렉터리 이름이다. 첨부 디렉터리 키와 같은 계산이지만 루트가 다르다. */
     public static String profileKey(Long userId) {
@@ -179,19 +188,45 @@ public class UserBrowserService {
     /**
      * 화면 입력이나 중계 통신이 있었다. 켜져 있을 때만 마지막 활동 시각을 1분에 한 번까지 쓴다.
      *
-     * <p>다른 전이와 겹쳐 저장하지 못하면 이번 기록은 버린다. 다음 활동이 다시 쓴다.
+     * <p>1분 안이면 DB 를 읽지 않는다. 다른 전이와 겹쳐 저장하지 못하면 이번 기록은 버린다. 다음 활동이 다시 쓴다.
      */
     public void touch(Long userId) {
+        Instant now = clock.instant();
+        Instant last = touched.get(userId);
+        if (last != null && !now.isBefore(last) && now.isBefore(last.plus(TOUCH_INTERVAL))) {
+            return;
+        }
         browsers.findByUserId(userId)
                 .filter(browser -> browser.status() == UserBrowserStatus.RUNNING)
-                .filter(browser -> browser.touch(clock.instant()))
                 .ifPresent(browser -> {
+                    if (!browser.touch(now)) {
+                        touched.put(userId, browser.lastActiveAt());
+                        return;
+                    }
                     try {
                         browsers.save(browser);
+                        touched.put(userId, now);
                     } catch (OptimisticLockingFailureException ex) {
                         log.debug("user browser touch skipped id={}", browser.id());
                     }
                 });
+    }
+
+    /** 로그인 화면을 열고 앞의 화면은 닫는다. 꺼져 있으면 켜고, 탭에 붙지 못했으면 {@code BROWSER_START_FAILED} 다. 활동은 열기 전에 기록한다. */
+    public void openScreen(Long userId, String url, BrowserScreenSink sink) {
+        UserBrowserSnapshot started = start(userId);
+        URI address = Optional.ofNullable(owned(userId).containerId())
+                .flatMap(runtime::cdpAddress)
+                .orElseThrow(() -> new ApiException(ErrorCode.BROWSER_START_FAILED, "user browser has no cdp address"));
+        touch(userId);
+        screens.open(started.id(), userId, address, url, sink);
+    }
+
+    /** 요청자의 열린 화면에 입력을 보내고 활동을 기록한다. 열린 화면이 없으면 {@code BROWSER_SCREEN_CLOSED} 다. */
+    public void screenInput(Long userId, BrowserScreenInput input) {
+        requireEnabled();
+        screens.input(userId, input);
+        touch(userId);
     }
 
     /** 컨테이너를 만들고 켜고 CDP 를 기다린다. 실패하면 컨테이너를 지우고 {@code FAILED} 로 둔다. */
@@ -245,6 +280,9 @@ public class UserBrowserService {
         if (browser.status() == UserBrowserStatus.STOPPED) {
             return browser;
         }
+        // 화면이 먼저 닫혀야 멈춘 브라우저에 붙은 화면이 남지 않는다
+        screens.close(browser.id());
+        touched.remove(browser.userId());
         browser.beginStop(clock.instant());
         UserBrowser stopping = save(browser);
         try {

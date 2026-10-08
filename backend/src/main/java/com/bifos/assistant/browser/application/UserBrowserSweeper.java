@@ -42,6 +42,7 @@ public class UserBrowserSweeper {
     static final Duration STUCK_AFTER = Duration.ofMinutes(2);
 
     private final UserBrowserService service;
+    private final BrowserScreens screens;
     private final UserBrowserRepository browsers;
     private final BrowserRuntime runtime;
     private final BrowserUsage usage;
@@ -206,6 +207,7 @@ public class UserBrowserSweeper {
     }
 
     private void reset(UserBrowser browser, String reason) {
+        screens.close(browser.id());
         browser.resetStopped(clock.instant());
         try {
             browsers.saveAndFlush(browser);

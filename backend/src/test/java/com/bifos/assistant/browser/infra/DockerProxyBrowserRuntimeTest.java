@@ -59,7 +59,8 @@ class DockerProxyBrowserRuntimeTest {
                                 128,
                                 2,
                                 Duration.ofMinutes(10),
-                                Duration.ofSeconds(30))),
+                                Duration.ofSeconds(30),
+                                Duration.ofMinutes(30))),
                 builder);
     }
 
@@ -81,7 +82,8 @@ class DockerProxyBrowserRuntimeTest {
                         128,
                         2,
                         Duration.ofMinutes(10),
-                        Duration.ofSeconds(30)))
+                        Duration.ofSeconds(30),
+                        Duration.ofMinutes(30)))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("profile-mount");
     }
