@@ -142,3 +142,36 @@
 | `updated_at` | DATETIME(6) | |
 
 다른 종류의 자동 실행을 열 때 칸을 더한다. 한 칸이 여러 종류의 허락을 뜻하지 않게 한다.
+
+## `proactive_loop_setting`
+
+사용자가 에이전트마다 매일 루프를 켠 설정이다. [매일 루프](../proactive-loop.md)의 「사용자 설정」 이 뜻을 갖는다.
+
+| 칸 | 타입 | 뜻 |
+| --- | --- | --- |
+| `id` | BIGINT PK | |
+| `user_id` | BIGINT FK `app_user` ON DELETE CASCADE | 설정한 사용자 |
+| `agent_id` | BIGINT FK `agent` ON DELETE CASCADE | 그 사용자의 깨우기가 도는 에이전트 |
+| `enabled` | BOOLEAN | 매일 루프를 켰다. 줄이 없으면 꺼짐이다 |
+| `snoozed_until` | DATETIME(6) NULL | 이 시각 전의 깨우기는 잇지 않는다 |
+| `updated_at` | DATETIME(6) | |
+
+`(user_id, agent_id)` 는 유일하다. 하루 상한을 셀 때 그 사용자의 줄을 모두 쓰기 잠금으로 읽는다.
+
+## `proactive_loop_run`
+
+매일 깨우기 살펴보기 하나를 잇는 시도다. 상태와 순서는 [매일 루프](../proactive-loop.md)가 갖는다.
+
+| 칸 | 타입 | 뜻 |
+| --- | --- | --- |
+| `id` | BIGINT PK | |
+| `user_id` | BIGINT FK `app_user` ON DELETE CASCADE | 살펴보기를 연 사용자 |
+| `source_check_id` | BIGINT UNIQUE FK `proactive_check` ON DELETE CASCADE | 이은 매일 깨우기 살펴보기. 하나에 시도 하나다 |
+| `status` | VARCHAR(16) | `RUNNING`, `DECIDED`, `SKIPPED`, `FAILED` |
+| `skipped_reason` | VARCHAR(32) NULL | `SKIPPED` 의 까닭. `SNOOZED`, `NO_CANDIDATE`, `DAILY_LIMIT` |
+| `error_code` | VARCHAR(64) NULL | `FAILED` 의 까닭. 거절한 오류 코드, `INTERNAL_ERROR`, 기동 때 닫은 `INTERRUPTED` |
+| `evaluation_id` | BIGINT NULL FK `proactive_value_evaluation` ON DELETE SET NULL | 이 시도가 만든 평가. 기동 때 닫은 줄은 비어 있다 |
+| `created_at` | DATETIME(6) | 시도를 저장한 시각. 최근 20시간의 하루 상한을 센다 |
+| `finished_at` | DATETIME(6) NULL | `RUNNING` 이 아니면 채운다 |
+
+`(user_id, created_at)` 과 `status` 에 색인이 있다. 글과 원문, provider 이름은 두지 않는다. provider 는 평가의 `evidence_json` 이 갖는다.

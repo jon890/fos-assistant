@@ -11,7 +11,10 @@ import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
-/** 평가와 replay 만 제공한다. 살펴보기와 매일 깨우기에서 자동으로 부르지 않는다. */
+/**
+ * 평가와 replay 만 제공한다. 단추로 연 살펴보기에서는 자동으로 부르지 않는다. 매일 깨우기는 동의한 사용자에게만 {@code
+ * ProactiveLoopCoordinator} 가 한 번 부른다.
+ */
 @Service
 @RequiredArgsConstructor
 public class ValueEvaluationService {

@@ -214,6 +214,7 @@ class DecisionFeedbackFlowTest {
 
         DecisionFeedbackExport export = exporter.export(owner, Duration.ofDays(30));
 
+        assertThat(export.version()).as("읽기 모델의 모양 버전").isEqualTo(2);
         DecisionRecord decision = record(export, "check:" + reported.id());
         assertThat(decision.situation().reportSurfaced()).isTrue();
         Map<String, Subject> subjects =
@@ -241,6 +242,7 @@ class DecisionFeedbackFlowTest {
         DecisionRecord silence = record(export, "check:" + silent.id());
         assertThat(silence.situation().reportSurfaced()).isFalse();
         assertThat(silence.situation().outcome()).isEqualTo(CheckOutcome.NOTHING_NEW);
+        assertThat(silence.situation().loop()).as("매일 루프 시도가 없는 살펴보기").isNull();
         assertThat(silence.subjects()).isEmpty();
 
         assertThat(export.toString()).doesNotContain(FIRST_TITLE, SECOND_TITLE, "합성 분야의 공고만 본다");
