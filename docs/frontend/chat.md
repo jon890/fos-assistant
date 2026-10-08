@@ -424,6 +424,6 @@ sequenceDiagram
 | --- | --- |
 | 발견 한 줄 | 제목과 단추 「받아들임」, 「나중에」, 「관심 없음」. 지금 반응의 단추는 눌린 상태(`aria-pressed`)다 |
 | 단추를 누른다 | `PUT /api/v1/check-findings/{번호}/reaction`. 처리하는 동안 그 줄의 단추를 끄고, 끝나면 목록을 다시 읽는다. 실패하면 그 줄 아래에 「반응을 남기지 못했어요. 잠시 뒤 다시 눌러 주세요.」 를 보인다 |
-| 목록 아래 | 「관심 없음을 고른 주제는 {dismissWindowDays}일 동안 다시 알리지 않아요.」 |
+| 목록 아래 | 「관심 없음을 고른 주제는 그 발견을 알린 날부터 {dismissWindowDays}일 동안 다시 알리지 않아요.」 |
 
 동작의 뜻은 [`backend/proactive-check.md`](../backend/proactive-check.md) 의 「발견 반응」 이 갖는다.

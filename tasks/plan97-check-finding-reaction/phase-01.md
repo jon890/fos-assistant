@@ -35,7 +35,7 @@
 ### 2. `proactive/application/model/FindingReaction.java` 신규
 
 저장하지 않는 enum `ACCEPTED`, `POSTPONED`, `DISMISSED`. `FeedbackEventType eventType()` 로 같은 이름의 사건을 준다. `static FindingReaction of(FeedbackEventType)` 은 셋이 아니면 null.
-`static FindingReaction parse(String)` 은 모르는 값이면 `ApiException(ErrorCode.VALIDATION_FAILED, "unknown reaction")` 을 던진다.
+`static FindingReaction parse(String)` 은 null 이거나 모르는 값이면 `ApiException(ErrorCode.VALIDATION_FAILED, "unknown reaction")` 을 던진다.
 
 ### 3. `proactive/application/model/CheckFindingView.java` 신규
 
@@ -50,9 +50,9 @@
 
 의존: `ProactiveCheckFindingRepository`, `ProactiveCheckRepository`, `FeedbackEventRepository`, `DecisionFeedbackRecorder`, `ConversationAccess`, `LiveProperties<ProactiveCheckProperties>`, `Clock`.
 
-- `List<CheckFindingView> list(CurrentUser user, Long conversationId)`: 그 대화의 `NEW` 발견을 번호 순으로 읽고, 요청자의 살펴보기(`check.userId() == user.id()`)가 낸 것만 남겨 지금 반응과 함께 낸다.
+- `List<CheckFindingView> list(CurrentUser user, UUID conversationId)`: 먼저 `conversations.requireOwnId(user, conversationId)` 로 대화 번호를 얻는다(남의 대화는 `CONVERSATION_NOT_FOUND`). 그 대화의 `NEW` 발견을 번호 순으로 읽고, 요청자의 살펴보기(`Objects.equals(check.userId(), user.id())`, 둘 다 `Long`)가 낸 것만 남겨 지금 반응과 함께 낸다.
 - `long dismissWindowDays()`: `digestWindow` 를 하루 단위로 올림한 값. 1 보다 작으면 1.
-- `void react(CurrentUser user, Long findingId, FindingReaction reaction)`: 발견이 없거나 `NEW` 가 아니거나 그 살펴보기가 요청자의 것이 아니면 `ApiException(ErrorCode.PROACTIVE_CHECK_NOT_FOUND, "no such check finding")`. 지금 반응과 같으면 아무것도 하지 않는다. 아니면 `FeedbackEntry.of(user.id(), CHECK_FINDING, findingId, reaction.eventType(), USER, clock.instant()).conversation(check.conversationId()).originExecution(check.rootExecutionId()).sourceCheck(check.id())` 를 `record` 한다.
+- `void react(CurrentUser user, Long findingId, FindingReaction reaction)`: 발견이 없거나 `NEW` 가 아니거나 그 살펴보기가 요청자의 것이 아니면(`Objects.equals` 로 견준다) `ApiException(ErrorCode.PROACTIVE_CHECK_NOT_FOUND, "no such check finding")`. 지금 반응과 같으면 아무것도 하지 않는다. 아니면 `FeedbackEntry.of(user.id(), CHECK_FINDING, findingId, reaction.eventType(), USER, clock.instant()).conversation(check.conversationId()).originExecution(check.rootExecutionId()).sourceCheck(check.id())` 를 `record` 한다.
 - `Map<Long, FindingReaction> current(Long userId, Collection<Long> findingIds)`: 열쇠 목록으로 사건을 읽고 발견마다 `actor == USER` 인 마지막 `ACCEPTED`, `POSTPONED`, `DISMISSED` 를 준다. 비면 빈 맵. phase 02 도 쓴다.
 - `void surfaced(ProactiveCheck check)`: 그 살펴보기의 `NEW` 발견마다 `SURFACED` 를 `SYSTEM` 으로 같은 연결 칸과 함께 남긴다.
 
@@ -62,9 +62,9 @@
 
 ### 7. `proactive/presentation/CheckFindingController.java` 신규, `ProactiveCheckDtos.java`
 
-- `GET /api/v1/chat/conversations/{conversationId}/check-findings` (`UUID` 경로) → `CheckFindingsResponse(long dismissWindowDays, List<CheckFindingView> findings)`. 대화 번호는 `ConversationAccess.requireOwnId` 로 얻는다.
-- `PUT /api/v1/check-findings/{findingId}/reaction` 본문 `FindingReactionRequest(@NotBlank String reaction)` → 204.
-- 두 record 는 `ProactiveCheckDtos` 에 둔다(`ArchitectureRules.CONTROLLERS_HAVE_NO_NESTED_RECORDS`).
+- `GET /api/v1/chat/conversations/{conversationId}/check-findings` (`UUID` 경로) → `CheckFindingsResponse(long dismissWindowDays, List<CheckFindingView> findings)`. 소유 확인은 서비스 `list` 가 한다.
+- `PUT /api/v1/check-findings/{findingId}/reaction` 본문 `@Valid @RequestBody FindingReactionRequest(@NotBlank String reaction)`, `@ResponseStatus(HttpStatus.NO_CONTENT)` → 204. 본보기는 `ProactiveCheckReportController.open` 이다.
+- 두 record 는 `ProactiveCheckDtos` 에 둔다(`ArchitectureRules.CONTROLLERS_HAVE_NO_NESTED_RECORDS`). 클래스 Javadoc 의 「실행 번호…는 싣지 않는다」 에 예외 한 줄을 더한다: 발견 목록의 `executionId` 는 답 메시지에 이미 보이는 실행 번호이고 답 아래 자리를 정하는 데만 쓴다(`ChatDtos.MemoryCaptureView` 와 같다).
 
 ### 8. 이 phase 를 검증하는 `backend/src/test/java/com/bifos/assistant/proactive/CheckFindingReactionsTest.java` 신규
 
@@ -73,10 +73,11 @@
 - 「관심 없음」 을 누르면 `check_finding:<번호>` `DISMISSED` 사건이 `USER`, 점검 대화, 살펴보기 번호와 함께 남고 목록의 반응이 `DISMISSED` 다
 - 같은 단추를 다시 누르면 사건이 늘지 않고, 「나중에」 로 바꾸면 지금 반응이 `POSTPONED` 다
 - 남의 발견과 `REFERENCE` 발견은 `PROACTIVE_CHECK_NOT_FOUND`, 모르는 값은 `VALIDATION_FAILED` 다
-- 목록은 남의 대화를 `CONVERSATION_NOT_FOUND` 로 거절하고 `REFERENCE` 발견을 싣지 않는다
+- `list` 는 남의 대화 공개 식별자를 `CONVERSATION_NOT_FOUND` 로 거절하고 `REFERENCE` 발견을 싣지 않는다
+- 사용자 번호가 127 보다 큰 경우에도 주인 판정이 맞는다(`Long` 값 비교)
 - `surfaced` 가 `NEW` 발견마다 `SURFACED` 를 남긴다
 
-`DecisionFeedbackFlowTest` 가 사건 수를 세는 단언이 있으면 발견 `SURFACED` 가 늘린 수만큼 고친다.
+`DecisionFeedbackFlowTest` 는 고치지 않는다. 발견 줄을 만드는 시험이 없어 사건 수가 바뀌지 않는다. 검증 명령으로 회귀만 본다.
 
 ## 검증
 
@@ -100,4 +101,3 @@ cd backend && ./gradlew checkstyleMain checkstyleTest spotlessCheck
 | `backend/src/main/java/com/bifos/assistant/proactive/presentation/CheckFindingController.java` | 신규 |
 | `backend/src/main/java/com/bifos/assistant/proactive/presentation/ProactiveCheckDtos.java` | 수정 |
 | `backend/src/test/java/com/bifos/assistant/proactive/CheckFindingReactionsTest.java` | 신규 |
-| `backend/src/test/java/com/bifos/assistant/proactive/DecisionFeedbackFlowTest.java` | 수정 |

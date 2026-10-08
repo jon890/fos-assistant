@@ -49,8 +49,8 @@
 ### 6. 이 phase 를 검증하는 시험
 
 - `FindingJudgementTest`: 「관심 없음」 주제와 같은 `topicKey` 는 원문 주소가 달라도, `changeSinceLast` 가 있어도 `REPEATED` 다. 다른 주제는 `NEW` 다.
-- `CheckFindingReactionsTest` 에 통합 사례 하나를 더한다: 「관심 없음」 반응을 남긴 뒤 같은 점검 대화의 다음 살펴보기 입력에 `반응 관심 없음` 이 실리고, 같은 주제의 다른 원문 발견이 `REFERENCE`, `REPEATED` 로 저장된다. 다음 살펴보기는 `ProactiveCheckTurnTest` 가 대역 Hermes 로 살펴보기를 돌리는 방식을 따른다. 그 방식이 이 클래스에 맞지 않으면 사례를 `ProactiveCheckTurnTest` 에 둔다.
-- `test/e2e/scenarios/proactive-check.ts`: 「맥락 반영」 단계 뒤에 단계 하나를 더한다. `GET /chat/conversations/{id}/check-findings` 에서 `WEB_ONLY` 의 마지막 발견을 찾아 `PUT /check-findings/{id}/reaction` 으로 `DISMISSED` 를 보내 204, 다른 사용자(`context.tokens.kid`)의 같은 요청은 404. 그 뒤 `WEB_ONLY.topicKey` 와 다른 주소, `changeSinceLast` 를 가진 발견으로 살펴보기를 돌리면 답에 `- {제목}: 이미 알린 것이에요` 가 있고, 입력에 `· 반응 관심 없음` 이 있다. `/decision-feedback/export` 의 `subjects` 에 그 열쇠가 `DECLINED` 로 있다.
+- `ProactiveCheckTurnTest` 에 통합 사례 하나를 더한다. 그 파일의 `runCheck()`, `awaitIdle()`, `findingsBlock(topicKey, sourceUrl, changeSinceLast)` 와 준비, 정리 메서드를 그대로 쓴다. `CheckFindingReactions` 를 `@Autowired` 로 받는다. 첫 살펴보기로 발견 하나를 알리고, 그 `NEW` 발견에 `react(owner, id, FindingReaction.DISMISSED)` 를 부른 뒤, 같은 `topicKey` 와 다른 `sourceUrl`, `changeSinceLast` 가 있는 발견으로 다시 돌린다. 두 번째 입력에 `· 반응 관심 없음` 이 있고 두 번째 발견이 `REFERENCE`, `REPEATED` 로 저장된다. 반응이 없는 같은 조건이면 `NEW` 다(기존 시험이 이미 보이면 그 시험을 근거로 적는다).
+- `test/e2e/scenarios/proactive-check.ts`: 「맥락 반영」 단계 뒤에 단계 하나를 더한다. `GET /chat/conversations/{id}/check-findings` 에서 `WEB_ONLY` 의 마지막 발견을 찾아 `PUT /check-findings/{id}/reaction` 으로 `DISMISSED` 를 보내 204, 다른 사용자(`context.tokens.kid`)의 같은 요청은 404. 그 뒤 `WEB_ONLY.topicKey` 와 다른 주소, `changeSinceLast` 를 가진 발견으로 살펴보기를 돌리면 답에 `- {제목}: 이미 알린 것이에요` 가 있고, 입력에 `· 반응 관심 없음` 이 있다. `GET /decision-feedback/export` 의 `records` 를 펼친 `records[].subjects[]` 가운데 `subjectKey === "check_finding:<번호>"` 인 것의 `label` 이 `DECLINED` 다.
 
 ## 검증
 
@@ -75,5 +75,5 @@ cd backend && ./gradlew checkstyleMain checkstyleTest spotlessCheck
 | `backend/src/test/java/com/bifos/assistant/proactive/CheckAnswerRendererTest.java` | 수정 |
 | `backend/src/test/java/com/bifos/assistant/proactive/ProblemJudgementTest.java` | 수정 |
 | `backend/src/test/java/com/bifos/assistant/proactive/CheckReportFactoryTest.java` | 수정 |
-| `backend/src/test/java/com/bifos/assistant/proactive/CheckFindingReactionsTest.java` | 수정 |
+| `backend/src/test/java/com/bifos/assistant/proactive/ProactiveCheckTurnTest.java` | 수정 |
 | `test/e2e/scenarios/proactive-check.ts` | 수정 |
