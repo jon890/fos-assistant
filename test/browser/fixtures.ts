@@ -629,6 +629,8 @@ function startControlPlane(
       // 스킬 디렉터리도 두 루트에 같은 경로를 준다. 대역이 게시된 경로의 SKILL.md 를 같은 기계에서 읽는다.
       ASSISTANT_SKILL_ROOT: skillRoot,
       ASSISTANT_SKILL_AGENT_ROOT: skillRoot,
+      // 첫 로그인의 기본 도구는 backend 시험이 확인한다. 화면 시험의 도구 초기 상태를 바꾸지 않게 비운다.
+      ASSISTANT_PEOPLE_DEFAULTTOOLSETS: "",
       HERMES_DASHBOARD_BASE_URL: dashboardBaseUrl,
       HERMES_DASHBOARD_TOKEN: FAKE_DASHBOARD_TOKEN,
       // 장애 시험의 11초 지연이 실제 읽기 timeout 을 넘도록 시험 서버의 한도를 명시한다.

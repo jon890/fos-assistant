@@ -128,6 +128,7 @@ API 완료 뒤 Docker 생성까지의 변경은 첨부 루트를 Hermes 에 읽�
 
 정책이 유효하고 profile 이 등록돼 있으면 plugin 은 아래 `terminal:` 전체를 쓴다.
 등록되지 않은 profile 은 셸 저장을 허용하고 `backend: local` 을 명시한다. 기존 local 옵션은 유지한다.
+요청 본문의 `require_sandbox` 가 참이면 local 로 두지 않고 409 `sandbox_unavailable` 로 거절한다. Control Plane 의 기본 도구 적용이 이 값을 보낸다.
 이미 docker 였다가 정책에서 빠지면 다음 셸 저장에서 docker 설정을 지우고 local 로 돌아간다.
 정책 자체가 없거나 잘못됐으면 등록 여부와 관계없이 셸 저장을 거절한다.
 
@@ -333,7 +334,7 @@ Control Plane 이 이 경로들을 부르는 순서와 뜻은 부르는 쪽 문�
 | `POST /api/connector-vault/import` | 그 커넥터를 옛 설치한 관리 profile 의 `.env` 에서 칸 값을 보관 파일로 옮긴다 | `{vault, connector, profile}` | `{ok: true}` | 400 필수 칸이 비었다. 401 관리 표식이 없다. 404 없는 profile, 설치하지 않은 커넥터. 409 다른 커넥터의 보관 파일 |
 | `POST /api/mcp/servers/<서버>/test?profile=<p>` | 그 profile 에 설치한 커넥터의 MCP 서버만 probe 한다 | 없음 | `{ok, tools: [{name}]}` | |
 | `GET /api/tools/toolsets` | 도구 이름과 설명을 읽는다 | 없음 | 200 | |
-| `PUT /api/config` (도구) | 지정한 profile 의 API 도구 목록을 쓴다. `terminal`, `file`, `code_execution`, `vision`, `image_gen`, `video_gen` 가운데 하나라도 있으면 profile 의 `terminal:` 을 실행 공간 설정으로 다시 쓴다. 같은 쓰기에서 `approvals.unattended_mode` 를 docker 면 `approve` 로 두고 local 이면 지운다(「셸 실행 공간」) | `{profile, config: {platform_toolsets: {api_server: [...]}}, sandbox_owner?}`. `sandbox_owner` 는 `^[a-z][a-z0-9-]{0,63}$` 이고 실행 공간 도구를 켜는 등록 profile 에서 필수다 | 200 | [ADR-029](../docs/adr/ADR-029-에이전트-도구는-control-plane-이-등급으로-판정하고-hermes-설정-api-로-쓴다.md) 그대로. 409 소유 기록의 바인딩 서버 이름이 목록에 빠졌다 |
+| `PUT /api/config` (도구) | 지정한 profile 의 API 도구 목록을 쓴다. `terminal`, `file`, `code_execution`, `vision`, `image_gen`, `video_gen` 가운데 하나라도 있으면 profile 의 `terminal:` 을 실행 공간 설정으로 다시 쓴다. 같은 쓰기에서 `approvals.unattended_mode` 를 docker 면 `approve` 로 두고 local 이면 지운다(「셸 실행 공간」) | `{profile, config: {platform_toolsets: {api_server: [...]}}, sandbox_owner?, require_sandbox?}`. `sandbox_owner` 는 `^[a-z][a-z0-9-]{0,63}$` 이고 실행 공간 도구를 켜는 등록 profile 에서 필수다. `require_sandbox` 는 참 거짓 값이고, 참이면 정책에 없는 profile 의 셸 도구 저장을 local 로 돌리지 않고 409 `sandbox_unavailable` 로 거절한다. Control Plane 의 기본 도구 적용이 보낸다 | 200 | [ADR-029](../docs/adr/ADR-029-에이전트-도구는-control-plane-이-등급으로-판정하고-hermes-설정-api-로-쓴다.md) 그대로. 409 소유 기록의 바인딩 서버 이름이 목록에 빠졌다 |
 | `PUT /api/config` (스킬 게시) | 지정한 profile 의 올린 스킬 경로를 쓴다 | `{profile, config: {skills: {external_dirs: [<Hermes 쪽 스킬 루트>/<profile>/<버전>]}}}`. 버전 이름은 `v[0-9]{13}-[a-z0-9]{4}` 다(`v` 뒤에 UTC 밀리초 13자리와 소문자 영숫자 4자). 목록은 0개나 1개. 0개는 게시 해제. 도구 목록을 같은 본문에 둘 수 있다 | 200 | 400 경로 형식, 다른 profile 의 prefix, 둘 이상, 심볼릭 링크, 없는 디렉터리, `skills` 도구가 꺼진 채 게시. 409 운영자가 넣은 다른 외부 경로가 있다. 404 없는 profile |
 | `GET /api/skills?profile=<p>` | 지정한 profile 의 스킬 목록을 읽는다 | query `profile` 하나 | 200 `[{name, description, category, enabled, usage, provenance}]`. `enabled` 는 전역 `skills.disabled` 만 반영 | 400 query 누락, 둘 이상, `default`. 404 |
 | `PUT /api/skills/toggle` | 지정한 profile 의 스킬 하나를 켜고 끈다 | `{profile, name, enabled}` | 200 `{ok, name, enabled}` | 400, 404 |
@@ -505,6 +506,7 @@ provider credential 은 이 토큰으로 쓰지 못한다.
 **토큰으로 부른 `PUT /api/config` 는 본문을 검사한 뒤 Hermes 처리기에 넘긴다.**
 최상위에는 `profile` 과 `config` 를 두고, `sandbox_owner` 를 더할 수 있다. 형식은 `^[a-z][a-z0-9-]{0,63}$` 이다.
 `terminal`, `file`, `code_execution` 을 켜고 해당 profile 이 실행 공간 정책에 등록돼 있으면 `sandbox_owner` 가 필수다. 미등록 profile 의 local 저장에서는 생략할 수 있다.
+`require_sandbox: true` 면 미등록 profile 의 셸 저장은 local 대신 409 다.
 `vision`, `image_gen`, `video_gen` 은 미등록 profile 에서 local 로 저장하지 않고 409 로 거절한다. Hermes host에서 다른 사용자의 첨부를 직접 읽지 않게 하려는 것이다.
 `terminal:` 은 plugin 이 직접 쓰므로 본문의 `config` 에 두지 않는다.
 `config` 에는 `platform_toolsets.api_server` 와 `skills.external_dirs` 가운데 하나나 둘을 둔다.
