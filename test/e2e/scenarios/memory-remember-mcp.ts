@@ -53,8 +53,14 @@ async function captures(context: Context, conversationId: string): Promise<Captu
   ).json<Capture[]>();
 }
 
+/** 색인 줄의 모양이다. 개인 사실 줄도 이것으로 시작하므로 어느 구역에도 없음을 볼 때 쓴다. */
 function indexLine(memory: { id: number; title: string }): string {
   return `- [${memory.id}] ${memory.title}`;
+}
+
+/** 짧은 개인 항목이 실리는 개인 사실 구역의 줄이다. */
+function factLine(memory: { id: number; title: string; content: string }): string {
+  return `${indexLine(memory)}: ${memory.content}`;
 }
 
 export const memoryRememberMcpScenario: Scenario = {
@@ -160,19 +166,19 @@ export const memoryRememberMcpScenario: Scenario = {
         `CREATED 기록이 아니다: ${JSON.stringify(directCaptures)}`);
       const directCapture = directCaptures[0]!;
 
-      step("다음 turn 의 instructions 에 기억 지침과 저장한 제목의 색인이 실린다");
+      step("다음 turn 의 instructions 에 기억 지침과 저장한 사실이 개인 사실 구역에 본문까지 실린다");
       await send(context, "색인 확인용 안부", direct.conversationId);
       const instructions = context.hermes.lastSubmittedInstructions();
       expect(instructions !== undefined, "다음 turn 의 요청에 instructions 가 없다");
       expect(instructions.includes("# 기억"), `공통 지침에 「# 기억」 절이 없다:\n${instructions}`);
-      expect(instructions.includes("# 더 물어볼 수 있는 것"), `색인 절이 없다:\n${instructions}`);
-      expect(instructions.includes(indexLine(savedMemory)), `색인에 저장한 제목이 없다:\n${instructions}`);
+      expect(instructions.includes("# 지금 묻는 사람에 대해 기억한 것"), `개인 사실 구역이 없다:\n${instructions}`);
+      expect(instructions.includes(factLine(savedMemory)), `개인 사실 구역에 저장한 사실이 없다:\n${instructions}`);
 
-      step("부정이 사라진 본문은 제안으로 남고 받아들이면 색인에 실린다");
+      step("부정이 사라진 본문은 제안으로 남고 받아들이면 개인 사실 구역에 실린다");
       context.hermes.setMemoryRememberCall(NEGATED_TEXT, { title: NEGATED_TITLE, content: "강아지는 고기를 좋아한다" });
       const negated = await send(context, NEGATED_TEXT, direct.conversationId);
       expect(negated.assistantText.startsWith(PROPOSED),
-        `부정이 사라진 본문은 제안으로 남고 받아들이면 색인에 실린다: ${negated.assistantText}`);
+        `부정이 사라진 본문이 제안으로 남지 않았다: ${negated.assistantText}`);
       const proposed = (await memories(context)).filter((m) => m.title === NEGATED_TITLE);
       expect(proposed.length === 1 && proposed[0]!.status === "PROPOSED", `제안이 아니다: ${JSON.stringify(proposed)}`);
       const proposedMemory = proposed[0]!;
@@ -182,15 +188,15 @@ export const memoryRememberMcpScenario: Scenario = {
         `PROPOSED 기록이 아니다: ${JSON.stringify(proposedCaptures)}`);
       await send(context, "제안 승인 전 확인", direct.conversationId);
       expect(!(context.hermes.lastSubmittedInstructions() ?? "").includes(indexLine(proposedMemory)),
-        "승인 전 제안이 색인에 실렸다");
+        "승인 전 제안이 instructions 에 실렸다");
       expectStatus(
         await call(context, `/memories/${proposedMemory.id}/accept`, { method: "POST", token: context.tokens.dad }),
         200,
         "제안 받아들이기",
       );
       await send(context, "제안 승인 뒤 확인", direct.conversationId);
-      expect((context.hermes.lastSubmittedInstructions() ?? "").includes(indexLine(proposedMemory)),
-        "받아들인 제안이 색인에 실리지 않았다");
+      expect((context.hermes.lastSubmittedInstructions() ?? "").includes(factLine(proposedMemory)),
+        "받아들인 제안이 개인 사실 구역에 실리지 않았다");
 
       step("같은 대화의 앞 turn 이 바깥 도구를 썼으면 근거가 있어도 제안으로 내려간다");
       context.hermes.setOutsideToolRun(OUTSIDE_SEARCH_TEXT);

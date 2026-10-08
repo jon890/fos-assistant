@@ -246,12 +246,13 @@ Control Plane 이 다시 떠도 등록 줄은 그대로다. 이미 등록한 하
 ## execution_context_source
 
 실행 하나에 실은 문맥 항목의 참조다. 어느 답에 어느 기록이 들어갔는지 나중에 찾으려고 남긴다.
+조립한 항목은 실행 줄을 만들 때 한 번에 적고, `memory_read` 가 본문을 내 준 항목은 실행 중에 `MEMORY_READ` 줄로 그 뒤에 덧붙인다([`../memory.md`](../memory.md) 의 「본문을 읽으면 남는 기록」).
 제목과 본문은 남기지 않는다. 항목의 뜻은 [`../context-bundle.md`](../context-bundle.md) 가 갖는다.
 
 | 칸 | 타입 | 뜻 |
 | --- | --- | --- |
 | `execution_id` | BIGINT | 이 문맥을 받은 실행 |
-| `position` | INT | 그 실행의 문맥 안에서의 순서. 0 부터 |
+| `position` | INT | 그 실행의 문맥 안에서의 순서. 0 부터. 덧붙이는 줄은 그 실행의 마지막 순서 다음 값이다 |
 | `source` | VARCHAR(32) | 항목의 `source` |
 | `source_ref` | VARCHAR(80) | 항목의 `ref`. `memory:<번호>` 처럼 원래 기록을 가리킨다 |
 | `body_mode` | VARCHAR(16) | `INLINE`, `TITLE_ONLY`, `OMITTED` |

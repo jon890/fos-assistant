@@ -34,6 +34,7 @@ export function ConversationSessionView({
   setSelectedVersions,
   deliveryRetrying,
   memoryCaptures,
+  memoryUses,
   displayName,
   error,
   observing,
@@ -206,7 +207,12 @@ export function ConversationSessionView({
             // 다른 turn 이 도는 동안에는 보내도 서버가 막으므로 단추도 막는다.
             deliveryRetrying={deliveryRetrying || sending}
             memoryCaptures={memoryCaptures.captures}
-            onMemoryCapturesChanged={memoryCaptures.changed}
+            onMemoryCapturesChanged={(removedId) => {
+              // 기억 기록을 되돌리거나 고치거나 받아들이면 참고한 기억도 바뀐다
+              memoryCaptures.changed(removedId);
+              memoryUses.reload();
+            }}
+            memoryUses={memoryUses.uses}
             checkFindings={checkFindings.findings}
             dismissWindowDays={checkFindings.dismissWindowDays}
             onCheckFindingsChanged={checkFindings.changed}

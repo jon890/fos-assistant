@@ -128,7 +128,13 @@ class MemoryFreshnessTest {
         ContextAssembler configured = new ContextAssembler(
                 memories,
                 new ContextProperties(
-                        8_000, 4, Duration.ofHours(6), Duration.ZERO, Map.of("career", Duration.ofDays(30))),
+                        8_000,
+                        4,
+                        Duration.ofHours(6),
+                        Duration.ZERO,
+                        Map.of("career", Duration.ofDays(30)),
+                        null,
+                        null),
                 clock);
 
         assertThat(configured.assembleForOwner(USER).bundle().items())
@@ -154,7 +160,7 @@ class MemoryFreshnessTest {
         when(mockedMemories.indexedFor(any(), any())).thenReturn(List.of());
         ContextAssembler mockedAssembler = new ContextAssembler(
                 mockedMemories,
-                new ContextProperties(8_000, 4, Duration.ofHours(6), Duration.ofDays(180), Map.of()),
+                new ContextProperties(8_000, 4, Duration.ofHours(6), Duration.ofDays(180), Map.of(), null, null),
                 Clock.fixed(NOW, ZoneOffset.UTC));
 
         assertThat(mockedAssembler.assembleForOwner(USER).bundle().items())
@@ -174,7 +180,13 @@ class MemoryFreshnessTest {
         ContextAssembler configured = new ContextAssembler(
                 memories,
                 new ContextProperties(
-                        8_000, 4, Duration.ofHours(6), Duration.ofDays(180), Map.of("disabled", Duration.ZERO)),
+                        8_000,
+                        4,
+                        Duration.ofHours(6),
+                        Duration.ofDays(180),
+                        Map.of("disabled", Duration.ZERO),
+                        null,
+                        null),
                 clock);
         AssembledContext context = configured.assembleForOwner(USER);
         Conversation conversation = conversations.save(Conversation.startedBy(USER.id(), "신선도", null, NOW));

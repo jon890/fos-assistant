@@ -378,11 +378,14 @@ class ChatServiceTest {
     }
 
     @Test
-    @DisplayName("turn 에 실은 항상 층과 색인 항목의 참조를 제목과 본문 없이 실행에 남긴다")
+    @DisplayName("turn 에 실은 항상 층과 개인 사실과 색인 항목의 참조를 제목과 본문 없이 실행에 남긴다")
     void recordsAlwaysAndIndexSourcesOfTurnWithoutTitleOrBody() {
         CurrentUser dad = member("dad@example.com", "dad");
         Memory always = memories.create(dad, MemoryScope.USER, "자전거 보관", "자전거는 지하 2층 보관대에 둔다", true);
-        Memory indexed = memories.create(dad, MemoryScope.USER, "화분 물 주기", "평문-표식-7391 화분은 열흘마다 물을 준다", false);
+        Memory fact = memories.create(dad, MemoryScope.USER, "아침 음료", "사실-표식-5208 아침에는 보리차를 마신다", false);
+        // 본문이 개인 사실 구역의 상한(200자)을 넘어 색인에만 오른다
+        Memory indexed = memories.create(
+                dad, MemoryScope.USER, "화분 물 주기", "평문-표식-7391 화분은 열흘마다 물을 준다. " + "물".repeat(200), false);
         stub().willReturn(HermesRunResult.of("run-1", "sess-1", "completed", "네", "dad", null, TokenUsage.empty()));
 
         ChatTurn turn = chat.send(dad, null, "주말 계획", "dad");
@@ -396,15 +399,16 @@ class ChatServiceTest {
                         ExecutionContextSource::bodyMode)
                 .containsExactly(
                         tuple(0, "MEMORY_ALWAYS", "memory:" + always.id(), "INLINE"),
-                        tuple(1, "MEMORY_INDEX", "memory:" + indexed.id(), "TITLE_ONLY"));
+                        tuple(1, "MEMORY_FACTS", "memory:" + fact.id(), "INLINE"),
+                        tuple(2, "MEMORY_INDEX", "memory:" + indexed.id(), "TITLE_ONLY"));
         // 표의 모든 칸을 읽어 어느 칸에도 제목과 본문이 없는지 본다.
         List<Map<String, Object>> rows =
                 jdbc.queryForList("select * from execution_context_source where execution_id = ?", turn.executionId());
-        assertThat(rows).hasSize(2);
+        assertThat(rows).hasSize(3);
         assertThat(rows.stream().flatMap(row -> row.values().stream()).map(String::valueOf))
                 .as("실행 %s 의 문맥 참조 줄의 칸 값", turn.executionId())
-                .noneSatisfy(value ->
-                        assertThat(value).containsAnyOf("자전거 보관", "자전거는 지하 2층 보관대에 둔다", "화분 물 주기", "평문-표식-7391"));
+                .noneSatisfy(value -> assertThat(value)
+                        .containsAnyOf("자전거 보관", "자전거는 지하 2층 보관대에 둔다", "아침 음료", "사실-표식-5208", "화분 물 주기", "평문-표식-7391"));
     }
 
     @Test

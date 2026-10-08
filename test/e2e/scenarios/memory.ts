@@ -253,10 +253,20 @@ export const memoryScenario: Scenario = {
       await call(context, "/memories", {
         method: "POST",
         token: context.tokens.dad,
-        body: { scope: "USER", title: "지원 이력", content: "색인으로만 실리는 본문", alwaysInject: false },
+        // 본문이 개인 사실 구역의 상한(200자)을 넘어 색인에만 실린다
+        body: { scope: "USER", title: "지원 이력", content: `색인으로만 실리는 본문 ${"가".repeat(200)}`, alwaysInject: false },
       }),
       200,
       "색인에만 싣는 개인 Memory 생성",
+    ).json<MemoryView>();
+    const userFact = expectStatus(
+      await call(context, "/memories", {
+        method: "POST",
+        token: context.tokens.dad,
+        body: { scope: "USER", title: "딸 이름", content: "딸 이름은 홍지수다", alwaysInject: false },
+      }),
+      200,
+      "개인 사실 구역에 싣는 개인 Memory 생성",
     ).json<MemoryView>();
     const groupIndexed = expectStatus(
       await call(context, "/memories", {
@@ -281,6 +291,9 @@ export const memoryScenario: Scenario = {
       `- ${groupAlways.content}`,
       "# 지금 묻는 사람에 대해 아는 것",
       `- ${userAlways.content}`,
+      "# 지금 묻는 사람에 대해 기억한 것",
+      "아래는 이 사람에 대해 기억한 짧은 사실이다. 필요하면 번호로 memory_read 를 불러 다시 읽는다.",
+      `- [${userFact.id}] ${userFact.title}: ${userFact.content}`,
       "# 더 물어볼 수 있는 것",
       "아래는 제목만 적은 것이다. 필요하면 memory_read 도구로 본문을 읽는다.",
       `- [${userIndexed.id}] ${userIndexed.title}`,
@@ -296,7 +309,7 @@ export const memoryScenario: Scenario = {
       !shaped.includes(userIndexed.content) && !shaped.includes(groupIndexed.content),
       "색인에만 싣는 항목의 본문이 instructions 에 들어갔다",
     );
-    for (const memory of [groupAlways, userAlways, userIndexed, groupIndexed]) {
+    for (const memory of [groupAlways, userAlways, userIndexed, userFact, groupIndexed]) {
       expectStatus(
         await call(context, `/memories/${memory.id}`, { method: "DELETE", token: context.tokens.dad }),
         200,
