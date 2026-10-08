@@ -15,6 +15,7 @@ import com.bifos.assistant.chat.application.AttachmentService;
 import com.bifos.assistant.chat.application.ChatService;
 import com.bifos.assistant.chat.application.ConversationAccess;
 import com.bifos.assistant.chat.application.ModelTierService;
+import com.bifos.assistant.chat.application.SourceReadSummaries;
 import com.bifos.assistant.chat.domain.ChatAttachment;
 import com.bifos.assistant.chat.domain.Conversation;
 import com.bifos.assistant.chat.domain.type.ModelSelectionMode;
@@ -323,7 +324,7 @@ class ConversationModelChoiceTest {
                 new ChatEventStreams(Duration.ofSeconds(20)),
                 null,
                 mock(ModelTierService.class),
-                List.of());
+                List.of(), mock(SourceReadSummaries.class));
     }
 
     private static void rejected(Runnable action) {

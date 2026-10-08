@@ -14,6 +14,7 @@ import com.bifos.assistant.chat.application.ChatService;
 import com.bifos.assistant.chat.application.ConversationAccess;
 import com.bifos.assistant.chat.application.ConversationTaskLabels;
 import com.bifos.assistant.chat.application.ModelTierService;
+import com.bifos.assistant.chat.application.SourceReadSummaries;
 import com.bifos.assistant.chat.domain.Conversation;
 import com.bifos.assistant.chat.infra.ConversationRepository;
 import com.bifos.assistant.chat.presentation.ChatController;
@@ -110,7 +111,7 @@ class ConversationTaskLabelTest {
                 new ChatEventStreams(Duration.ofSeconds(20)),
                 null,
                 mock(ModelTierService.class),
-                taskLabels);
+                taskLabels, mock(SourceReadSummaries.class));
     }
 
     @AfterEach

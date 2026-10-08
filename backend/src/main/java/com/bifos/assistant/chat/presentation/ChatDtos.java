@@ -1,6 +1,7 @@
 package com.bifos.assistant.chat.presentation;
 
 import com.bifos.assistant.chat.application.ActivitySummary;
+import com.bifos.assistant.chat.application.SourceReadSummary;
 import com.bifos.assistant.chat.application.AgentModelSettings;
 import com.bifos.assistant.chat.application.HiddenModels;
 import com.bifos.assistant.chat.application.ModelOptions;
@@ -81,7 +82,8 @@ public final class ChatDtos {
             List<ArtifactView> artifacts,
             ActivitySummary activity,
             String status,
-            DeliveryView delivery) {}
+            DeliveryView delivery,
+            SourceReadSummary sourceReads) {}
 
     /**
      * 알림 줄 아래에 그리는 전달 묶음이다(ADR-075). 오류 코드는 싣지 않는다. 원인은 관리자 영역의 실행 상세가 보인다.

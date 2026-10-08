@@ -18,6 +18,7 @@ import com.bifos.assistant.agent.infra.AgentRepository;
 import com.bifos.assistant.chat.application.ChatService;
 import com.bifos.assistant.chat.application.ConversationAccess;
 import com.bifos.assistant.chat.application.ModelTierService;
+import com.bifos.assistant.chat.application.SourceReadSummaries;
 import com.bifos.assistant.chat.domain.Conversation;
 import com.bifos.assistant.chat.infra.ChatMessageRepository;
 import com.bifos.assistant.chat.infra.ConversationRepository;
@@ -108,7 +109,7 @@ class ConversationMissingAgentTest {
                         new ChatEventStreams(Duration.ofSeconds(20)),
                         null,
                         mock(ModelTierService.class),
-                        List.of()))
+                        List.of(), mock(SourceReadSummaries.class)))
                 .setControllerAdvice(new GlobalExceptionHandler())
                 .build();
         AppUser user = users.save(AppUser.of("dad@example.com", "dad", 1L, UserRole.MEMBER, Instant.now()));

@@ -24,6 +24,13 @@ export type MessageDelivery = {
   status: "DELIVERING" | "DELIVERED" | "FAILED" | "STOPPED";
 };
 
+export type SourceReadSummary = {
+  completedCount: number;
+  urls: string[];
+  unresolvedCount: number;
+  observationComplete: boolean;
+};
+
 export type Turn = {
   id: number | string;
   /** `SYSTEM` 은 대화에 남는 알림 줄이다. 위임 결과가 도착했거나 자동 turn 한도에 닿았을 때 생긴다 */
@@ -45,4 +52,5 @@ export type Turn = {
   replacesMessageId?: number | null;
   /** 이 알림 줄이 결과 묶음의 마지막 알림 줄이면 그 묶음의 상태 */
   delivery?: MessageDelivery | null;
+  sourceReads?: SourceReadSummary | null;
 };

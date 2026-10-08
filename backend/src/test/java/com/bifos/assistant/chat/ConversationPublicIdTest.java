@@ -21,6 +21,7 @@ import com.bifos.assistant.agent.infra.AgentRepository;
 import com.bifos.assistant.chat.application.ChatService;
 import com.bifos.assistant.chat.application.ConversationAccess;
 import com.bifos.assistant.chat.application.ModelTierService;
+import com.bifos.assistant.chat.application.SourceReadSummaries;
 import com.bifos.assistant.chat.domain.Conversation;
 import com.bifos.assistant.chat.infra.ChatMessageRepository;
 import com.bifos.assistant.chat.infra.ConversationRepository;
@@ -133,7 +134,7 @@ class ConversationPublicIdTest {
                         new ChatEventStreams(Duration.ofSeconds(20)),
                         null,
                         mock(ModelTierService.class),
-                        List.of()))
+                        List.of(), mock(SourceReadSummaries.class)))
                 .setControllerAdvice(new GlobalExceptionHandler())
                 .build();
     }
