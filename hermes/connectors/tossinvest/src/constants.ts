@@ -27,3 +27,11 @@ export const ACCOUNT_SEQ = /^[0-9]{1,10}$/;
 export const ORDERS_MAX = 100;
 /** `from` 과 `to` 를 모두 포함해 센 기간의 상한이다. */
 export const ORDER_PERIOD_MAX_DAYS = 366;
+/** 파일 출력이 끝난 주문을 100건씩 도는 쪽 수의 상한이다. 넘으면 일부만 쓰지 않고 거절한다. */
+export const ORDER_FILE_MAX_PAGES = 20;
+/** 파일 출력이 쪽 사이에 쉬는 시간이다. 호출 한도가 `ORDER_HISTORY` 그룹 초당 5회다. */
+export const ORDER_FILE_PAGE_PAUSE_MS = 250;
+/** 파일 출력이 429 를 받고 같은 쪽을 한 번 다시 부르기 전에 쉬는 시간이다. */
+export const ORDER_FILE_RATE_LIMIT_PAUSE_MS = 1_000;
+/** 출력 디렉터리의 자기 파일을 이 시간이 지나면 지운다. */
+export const ORDER_FILE_TTL_MS = 24 * 60 * 60 * 1000;

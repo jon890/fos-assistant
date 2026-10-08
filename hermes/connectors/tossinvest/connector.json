@@ -19,6 +19,7 @@
   ],
   "verify": { "tool": "list_accounts" },
   "single_binding": true,
+  "owner_output_env": "TOSSINVEST_OUTPUT_DIR",
   "sandbox_required": true,
   "default_tool_policy": "deny",
   "tools": {
@@ -34,6 +35,8 @@
     "TOSSINVEST_FORBIDDEN": "forbidden",
     "TOSSINVEST_ACCOUNT_NOT_FOUND": { "category": "invalid_input", "recovery": "reconnect" },
     "TOSSINVEST_INVALID_INPUT": { "category": "invalid_input", "recovery": "fix_input" },
+    "TOSSINVEST_TOO_MANY_ORDERS": { "category": "invalid_input", "recovery": "fix_input" },
+    "TOSSINVEST_OUTPUT_UNAVAILABLE": "unavailable",
     "TOSSINVEST_RATE_LIMITED": { "category": "unavailable", "recovery": "retry_later" },
     "TOSSINVEST_NETWORK": { "category": "unavailable", "recovery": "retry_later" },
     "TOSSINVEST_UNAVAILABLE": { "category": "unavailable", "recovery": "retry_later" }

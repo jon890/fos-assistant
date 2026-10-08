@@ -8,6 +8,7 @@ import {
 import { TossinvestError } from "./errors.ts";
 import { decimalValue as decimal, serviceValue as value, truncateCodePoints } from "./values.ts";
 import type { Tossinvest } from "./client.ts";
+import { writeOrdersFile } from "./order-file.ts";
 import type { RegisterTool } from "./tool-registration.ts";
 
 const CURRENCIES = new Set(["KRW", "USD"]);
@@ -61,6 +62,7 @@ export interface OrderInput {
   from?: string;
   to?: string;
   symbol?: string;
+  output?: string;
 }
 
 /**
@@ -208,10 +210,17 @@ export function registerAccountTools(register: RegisterTool, client: Tossinvest)
       from: z.string().optional(),
       to: z.string().optional(),
       symbol: z.string().optional(),
+      output: z.string().optional(),
     },
     { readOnlyHint: true },
     async (input) => {
       const query = orderQuery(input);
+      // 파일 출력은 `file` 하나뿐이다. 다른 값은 요청 없이 거절한다.
+      const output = optional(input.output);
+      if (output !== null && output !== "file")
+        throw new TossinvestError("TOSSINVEST_INVALID_INPUT");
+      if (output === "file")
+        return writeOrdersFile(client, client.env.TOSSINVEST_OUTPUT_DIR ?? "", query);
       const closed = query.get("status") === "CLOSED";
       // 끝난 주문은 한 쪽만 읽는다. 미체결은 API 가 커서와 limit 없이 전량을 준다.
       if (closed) query.set("limit", String(ORDERS_MAX));
