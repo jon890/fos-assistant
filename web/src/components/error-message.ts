@@ -90,6 +90,9 @@ const MESSAGES: Record<string, string> = {
   BROWSER_STOP_FAILED: "브라우저를 끄지 못했어요. 잠시 뒤 다시 꺼 주세요.",
   BROWSER_EXISTS: "이미 브라우저가 있어요. 화면을 다시 열어 주세요.",
   BROWSER_SCREEN_CLOSED: "화면이 닫혔어요. 다시 열어 주세요.",
+  VALUE_EVALUATION_NOT_FOUND: "평가할 살펴보기를 찾지 못했어요.",
+  VALUE_EVALUATION_STATE_CONFLICT:
+    "아직 평가할 수 없는 살펴보기예요. 끝난 뒤 다시 눌러 주세요.",
 };
 
 export function describeError(code: string, fallback: string): string {
