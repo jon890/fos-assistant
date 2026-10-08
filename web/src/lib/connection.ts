@@ -102,7 +102,7 @@ export const CONNECTION_ERROR_MESSAGES: Record<string, string> = {
   CONNECTOR_RATE_LIMITED: "요청이 많아요. 잠시 뒤 다시 해 주세요.",
   CONNECTOR_ACTION_EXECUTING:
     "승인한 동작을 실행하는 중이에요. 끝난 뒤 다시 시도해 주세요.",
-  CONNECTOR_NOT_CONNECTED: "연결 화면에서 연결을 확인해 주세요.",
+  CONNECTOR_NOT_CONNECTED: "서비스 연결에서 연결을 확인해 주세요.",
   CONNECTOR_PROFILE_NOT_READY:
     "이 에이전트는 아직 연결을 받을 준비가 되지 않았어요. 관리자에게 알려 주세요.",
   CONNECTOR_BIND_CONFLICT: "이 에이전트의 다른 연결이나 스킬과 이름이 겹쳐요.",

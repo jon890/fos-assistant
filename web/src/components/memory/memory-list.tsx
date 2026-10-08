@@ -54,7 +54,7 @@ export function MemoryList({
   readAt: string;
   /** 「문서」 탭에 그릴 절이다. 문서를 읽지 못했으면 비어 있고 탭을 보이지 않는다. */
   documents?: React.ReactNode;
-  /** 목록 아래 접어 두는 절이다. 외부 서비스 연결이 들어온다. */
+  /** 목록 아래 접어 두는 절이다. 문서 읽기 토큰이 들어온다. */
   advanced?: React.ReactNode;
 }) {
   const [memories, setMemories] = useState(initialMemories);
@@ -182,7 +182,7 @@ export function MemoryList({
       {advanced ? (
         <details className="group mt-10 rounded-md border border-border">
           <summary className="cursor-pointer list-none px-4 py-3 text-sm font-medium outline-none hover:bg-muted focus-visible:ring-3 focus-visible:ring-inset focus-visible:ring-ring/50">
-            외부 서비스 연결
+            문서 읽기 토큰
           </summary>
           <div className="border-t border-border px-4 pt-4">{advanced}</div>
         </details>

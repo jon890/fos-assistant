@@ -91,9 +91,11 @@ test("이름만 넣어 에이전트를 만들면 상세로 가고 그 에이전�
   await expect(page.getByRole("textbox", { name: `${NAME} 성격` })).toBeVisible();
   await expect(accessSection(page).getByText("나만", { exact: true })).toBeVisible();
 
-  // 새 대화 화면에서 그 에이전트로 보낸 질문이 답으로 끝난다.
+  // 상세의 「대화하기」 가 그 에이전트를 고른 새 대화 화면을 열고, 그 에이전트로 보낸 질문이 답으로 끝난다.
+  const code = new URL(page.url()).pathname.split("/").at(-1);
   const question = "받아쓰기 연습을 도와줘";
-  await page.goto("/");
+  await page.getByRole("link", { name: "대화하기", exact: true }).click();
+  await expect(page).toHaveURL(new RegExp(`/\\?agent=${code}$`));
   await expect(page.getByRole("main").getByText(NAME, { exact: true })).toBeVisible();
   await page.getByRole("textbox", { name: "메시지" }).fill(question);
   await page.getByRole("button", { name: "보내기" }).click();

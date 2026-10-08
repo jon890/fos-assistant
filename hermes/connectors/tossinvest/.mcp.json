@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "tossinvest": {
+      "command": "bun",
+      "args": ["${CLAUDE_PLUGIN_ROOT}/dist/tossinvest-mcp.js"],
+      "env": {
+        "TOSSINVEST_CLIENT_ID": "${TOSSINVEST_CLIENT_ID}",
+        "TOSSINVEST_CLIENT_SECRET": "${TOSSINVEST_CLIENT_SECRET}",
+        "TOSSINVEST_ACCOUNT_SEQ": "${TOSSINVEST_ACCOUNT_SEQ}"
+      }
+    }
+  }
+}

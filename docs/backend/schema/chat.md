@@ -64,13 +64,18 @@ FK 를 더하려면 이미 행이 없는 대화를 먼저 정리해야 하고, �
 | --- | --- | --- |
 | `conversation_id` | BIGINT | |
 | `role` | VARCHAR(20) | `USER`, `ASSISTANT`, `SYSTEM`. `SYSTEM` 은 위임 결과가 도착했다는 알림 줄이다 |
-| `content` | LONGTEXT | |
+| `content` | LONGTEXT | 본문. `content_key_id` 가 있으면 대화 주인의 데이터 key 로 암호화한 `v1.<IV>.<암호문과 태그>` 다 |
+| `content_key_id` | BIGINT NULL | 본문을 암호화한 데이터 key(`user_data_key.id`). 비어 있으면 `content` 는 평문이다. 외래 키를 두지 않는다 |
 | `sender_user_id` | BIGINT NULL | 이 줄을 쓴 사람. `ASSISTANT` 와 `SYSTEM` 은 비어 있다 |
 | `execution_id` | BIGINT NULL | 이 답을 만든 실행. `USER` 와 `SYSTEM` 은 비어 있다 |
 | `replaces_message_id` | BIGINT NULL | 이 메시지가 새 판으로 대신하는 이전 메시지. 같은 대화, 같은 `role` 이다 |
 
 `content` 를 `LONGTEXT` 로 못 박는다.
 길이를 주지 않은 `@Lob` 문자열을 Hibernate 가 MySQL 에서 `tinytext` 로 기대해 기동이 실패한다.
+
+**본문은 저장할 때 암호화한다.** KEK 설정이 있으면 새 메시지를 빈 글로 넣고 같은 트랜잭션에서 암호문으로 고친다.
+AAD 는 `chat_message:<id>:conversation:<conversation_id>:user:<대화 주인>` 이라 암호문을 다른 줄로 옮기거나 대화 주인을 바꾸면 풀리지 않는다.
+풀지 못한 본문은 「읽을 수 없는 메시지입니다.」 로 낸다. 본문은 `ChatMessage.content()` 로만 꺼낸다. 근거와 위협 모델은 [ADR-20261008 / data-encryption](../../adr/ADR-20261008-data-encryption.md) 에 있다.
 
 `replaces_message_id` 는 다시 생성이 채운다. 다시 생성한 답은 이전 답을 가리킨다.
 예전에는 수정한 사용자 메시지가 고치기 전 메시지를 가리켰다. 수정을 없앴지만 그 줄은 남아 있고 화면이 계속 넘겨 볼 수 있다.

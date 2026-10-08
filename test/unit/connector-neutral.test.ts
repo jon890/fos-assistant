@@ -18,7 +18,7 @@ const EXCLUDED = new Set([
   "web/src/app/connections/accountbook/page.tsx",
 ]);
 
-const FORBIDDEN = ["accountbook", "ACCOUNTBOOK_", "fab_", "가계부", "gmail", "googleapis", "naver", "네이버"].map((word) => word.toLowerCase());
+const FORBIDDEN = ["accountbook", "ACCOUNTBOOK_", "fab_", "가계부", "gmail", "googleapis", "naver", "네이버", "tossinvest", "TOSSINVEST_", "토스증권"].map((word) => word.toLowerCase());
 
 /** 금지 낱말이 든 파일의 경로를 돌려준다. 읽는 방법을 받아 파일 없이도 시험한다. */
 export function findForbidden(files: readonly string[], read: (file: string) => string): string[] {
