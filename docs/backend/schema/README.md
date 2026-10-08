@@ -17,7 +17,7 @@ AI credential 은 Hermes profile 의 `.env` 에, profile 의 API server key 는 
 | [`attention.md`](attention.md) | `follow_up`, `attention_control`, `attention_event` |
 | [`notification.md`](notification.md) | `notification` |
 | [`feedback.md`](feedback.md) | `decision_feedback_event` |
-| [`proactive.md`](proactive.md) | `proactive_check`, `proactive_check_finding`, `proactive_check_problem`, `proactive_value_evaluation`, `proactive_autonomy_decision`, `user_autonomy_preference` |
+| [`proactive.md`](proactive.md) | `proactive_check`, `proactive_check_finding`, `proactive_check_problem`, `proactive_value_evaluation`, `proactive_autonomy_decision`, `user_autonomy_preference`, `proactive_loop_setting`, `proactive_loop_run` |
 | [`task.md`](task.md) | `task`, `task_trigger`, `task_run` |
 | [`browser.md`](browser.md) | `user_browser` |
 

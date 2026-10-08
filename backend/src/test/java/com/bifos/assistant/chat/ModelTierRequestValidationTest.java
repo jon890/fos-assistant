@@ -8,6 +8,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.bifos.assistant.chat.application.ChatService;
 import com.bifos.assistant.chat.application.ModelTierService;
+import com.bifos.assistant.chat.application.SourceReadSummaries;
 import com.bifos.assistant.chat.presentation.ChatController;
 import com.bifos.assistant.shared.error.GlobalExceptionHandler;
 import java.util.List;
@@ -23,8 +24,8 @@ class ModelTierRequestValidationTest {
 
     private final ChatService chat = mock(ChatService.class);
     private final ModelTierService tiers = mock(ModelTierService.class);
-    private final MockMvc mvc = MockMvcBuilders.standaloneSetup(
-                    new ChatController(chat, null, null, null, null, null, null, tiers, List.of()))
+    private final MockMvc mvc = MockMvcBuilders.standaloneSetup(new ChatController(
+                    chat, null, null, null, null, null, null, tiers, List.of(), mock(SourceReadSummaries.class)))
             .setControllerAdvice(new GlobalExceptionHandler())
             .build();
 

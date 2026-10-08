@@ -11,6 +11,8 @@ import com.bifos.assistant.chat.application.ConversationTaskLabels;
 import com.bifos.assistant.chat.application.ModelOptionsService;
 import com.bifos.assistant.chat.application.ModelTierOptions;
 import com.bifos.assistant.chat.application.ModelTierService;
+import com.bifos.assistant.chat.application.SourceReadSummaries;
+import com.bifos.assistant.chat.application.SourceReadSummary;
 import com.bifos.assistant.chat.application.model.DeliveryState;
 import com.bifos.assistant.chat.application.model.TaskLabel;
 import com.bifos.assistant.chat.domain.ChatArtifact;
@@ -80,6 +82,7 @@ public class ChatController {
     private final ModelOptionsService modelOptions;
     private final ModelTierService modelTiers;
     private final List<ConversationTaskLabels> taskLabels;
+    private final SourceReadSummaries sourceReads;
 
     @Autowired
     public ChatController(
@@ -91,7 +94,8 @@ public class ChatController {
             ChatEventStreams streams,
             ModelOptionsService modelOptions,
             ModelTierService modelTiers,
-            List<ConversationTaskLabels> taskLabels) {
+            List<ConversationTaskLabels> taskLabels,
+            SourceReadSummaries sourceReads) {
         this.chat = chat;
         this.currentUser = currentUser;
         this.userNames = userNames;
@@ -101,6 +105,7 @@ public class ChatController {
         this.modelOptions = modelOptions;
         this.modelTiers = modelTiers;
         this.taskLabels = taskLabels;
+        this.sourceReads = sourceReads;
     }
 
     @PostMapping("/messages")
@@ -342,6 +347,7 @@ public class ChatController {
         Map<Long, List<ChatAttachment>> attached = chat.attachmentsByMessage(user, number);
         Map<Long, List<ChatArtifact>> produced = chat.artifactsByMessage(history);
         Map<Long, DeliveryState> deliveries = chat.deliveryStates(number);
+        Map<Long, SourceReadSummary> sourceReadByMessage = sourceReads.of(history);
         return history.stream()
                 .map(it -> new MessageView(
                         it.id(),
@@ -364,7 +370,8 @@ public class ChatController {
                         it.executionId() == null || statuses.get(it.executionId()) == null
                                 ? null
                                 : statuses.get(it.executionId()).name(),
-                        deliveryOf(it, deliveries)))
+                        deliveryOf(it, deliveries),
+                        it.role() == MessageRole.ASSISTANT ? sourceReadByMessage.get(it.id()) : null))
                 .toList();
     }
 

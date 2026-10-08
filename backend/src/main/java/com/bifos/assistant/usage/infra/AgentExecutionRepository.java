@@ -63,6 +63,21 @@ public interface AgentExecutionRepository extends JpaRepository<AgentExecution, 
      */
     List<AgentExecution> findByUserIdAndRootExecutionIdIsNullOrderByIdDesc(Long userId, Pageable pageable);
 
+    /** 시작 시각과 번호를 함께 써서 루트 실행을 안정적으로 다음 쪽부터 읽는다. */
+    @Query("""
+            select e from AgentExecution e
+            where e.userId = :userId and e.rootExecutionId is null
+              and (:startedAt is null
+                or e.startedAt < :startedAt
+                or (e.startedAt = :startedAt and e.id < :id))
+            order by e.startedAt desc, e.id desc
+            """)
+    List<AgentExecution> findRootExecutionsBefore(
+            @Param("userId") Long userId,
+            @Param("startedAt") Instant startedAt,
+            @Param("id") long id,
+            Pageable pageable);
+
     List<AgentExecution> findByStatus(ExecutionStatus status);
 
     /** 사용자 에이전트와 대화에 묶이지 않은 시스템 실행이다. 기동 때 원격 종료를 확인한다. */

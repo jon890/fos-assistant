@@ -126,9 +126,10 @@ Hermes 의 실행 조회가 무엇을 얼마 동안 답하는지는 [`hermes/run
 | `chat.application.RecoveredRunRecorder` | Hermes 의 답 하나를 실행 줄과 대화에 적는다. 이미 끝난 줄이면 아무것도 하지 않는다 |
 | `chat.application.RestartReconcileProperties` | `assistant.restart-reconcile.enabled` 와 `max-wait`. `max-wait` 을 비우면 `hermes.run-timeout` 이다 |
 | `proactive.application.ValueEvaluationRecovery` | 남은 평가를 한 줄씩 `FALLBACK / INTERRUPTED`로 닫고 시스템 판단 실행을 `FAILED / DECISION_INTERRUPTED`로 적는다. 원격 run이 있으면 종료 확인 자리를 먼저 쥔다 |
+| `proactive.application.ProactiveLoopRecovery` | 남은 `RUNNING` 매일 루프 시도를 `FAILED / INTERRUPTED` 로 닫고 평가와 판정을 다시 부르지 않는다([매일 루프](proactive-loop.md)의 「서버가 멈췄을 때」) |
 | `hermes.HermesRunsClient.lookupRun` | 실행 하나의 지금 상태를 한 번 읽는다. 끝났다, 돈다, 모른다(404) 가운데 하나다. 닿지 못하면 예외다 |
 
-가치 평가 복구는 `Integer.MIN_VALUE` phase로 먼저 돈다.
+가치 평가 복구는 `Integer.MIN_VALUE` phase로 먼저 돈다. 매일 루프 복구도 같은 phase 이며, 두 복구 사이의 순서에 기대지 않는다.
 `ProactiveCheckRecovery`는 `RestartReconciler.PHASE - 1`, `RestartReconciler`는 `PHASE`다.
 시스템 판단의 에이전트 없는 실행 줄을 `RestartReconciler`가 잡기 전에 닫기 위해서다.
 평가 복구의 한 줄이나 목록 조회가 실패해도 다른 복구와 서버 기동을 이어 간다. 실패한 줄은 식별자와 오류 종류만 기록한다.

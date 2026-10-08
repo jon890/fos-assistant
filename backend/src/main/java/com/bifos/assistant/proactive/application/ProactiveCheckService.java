@@ -268,6 +268,27 @@ public class ProactiveCheckService {
                 turns.close(handle);
             }
         }
+        settled(owner, conversationId, run);
+    }
+
+    /**
+     * 잠금을 푼 뒤 끝났다는 사건을 낸다. 받는 쪽(매일 루프)이 실패해도 로그만 남기고 살펴보기의 끝은 바꾸지 않는다. 잠금을 푼 뒤라 받는 쪽이
+     * 같은 점검 대화의 잠금을 다시 잡을 수 있다.
+     */
+    private void settled(CurrentUser owner, Long conversationId, ProactiveCheckRun run) {
+        Long checkId = run.check().id();
+        if (checkId == null) {
+            return;
+        }
+        try {
+            events.publishEvent(new ProactiveCheckSettled(owner, checkId));
+        } catch (RuntimeException ex) {
+            log.warn(
+                    "끝난 살펴보기의 뒤처리가 실패했다 conversationId={} checkId={} error={}",
+                    conversationId,
+                    checkId,
+                    ex.getClass().getSimpleName());
+        }
     }
 
     /**

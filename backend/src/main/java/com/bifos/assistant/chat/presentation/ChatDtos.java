@@ -6,6 +6,7 @@ import com.bifos.assistant.chat.application.HiddenModels;
 import com.bifos.assistant.chat.application.ModelOptions;
 import com.bifos.assistant.chat.application.PendingQueue;
 import com.bifos.assistant.chat.application.RunningTurn;
+import com.bifos.assistant.chat.application.SourceReadSummary;
 import com.bifos.assistant.chat.application.StarterSuggestions;
 import com.bifos.assistant.chat.application.model.LatencyRow;
 import com.bifos.assistant.chat.application.model.LatencyStat;
@@ -81,7 +82,8 @@ public final class ChatDtos {
             List<ArtifactView> artifacts,
             ActivitySummary activity,
             String status,
-            DeliveryView delivery) {}
+            DeliveryView delivery,
+            SourceReadSummary sourceReads) {}
 
     /**
      * 알림 줄 아래에 그리는 전달 묶음이다(ADR-075). 오류 코드는 싣지 않는다. 원인은 관리자 영역의 실행 상세가 보인다.

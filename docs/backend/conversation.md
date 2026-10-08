@@ -171,6 +171,16 @@ turn 이 바꾸는 칸은 `hermes_session_id` 와 `updated_at` 뿐이므로 그 
 도구 사건이 아닌 사건의 `detail` 가운데 하위 에이전트의 목표와 실패 코드는 모두에게 싣는다. 목표는 아래 「도구 내용 가리기」 의 규칙으로 가린 값이다.
 넘어간 모델 이름은 아래 절의 규칙을 따른다.
 
+#### 실행 기록의 페이징
+
+`GET /api/v1/usage/executions?limit=`는 기존 배열 응답과 번호 역순을 유지한다. 오래된 기록까지 읽는 화면은 `GET /api/v1/usage/executions/page?limit=&cursor=`를 쓴다.
+
+새 응답은 `{ "items": [...], "nextCursor": "..." }`다. 첫 쪽은 `cursor`를 생략한다. 다음 쪽은 `nextCursor`를 그대로 넘기며, 마지막 쪽이면 `null`이다. `limit` 기본값은 50이고 1~200으로 제한한다. 읽을 수 없는 커서는 `VALIDATION_FAILED`다.
+
+로그인한 사용자의 루트 실행만 `startedAt desc, id desc`로 읽는다. 같은 시작 시각의 실행도 번호로 구분해 빠짐없이 읽는다. 커서에 사용자 식별자가 없으며, 다른 사용자의 커서를 받아도 요청자의 실행만 조회한다. 실행 한 줄의 내부 값은 아래 역할별 규칙을 그대로 따른다. 자식 여부와 스킬 이름, 대화 공개 식별자는 해당 쪽의 실행에만 일괄로 붙인다.
+
+다음 쪽 유무는 한 줄을 더 읽어서 판단한다. 전체 건수는 매 조회마다 전체 루트를 세는 비용을 피하려고 응답에 넣지 않는다. 여러 사용자를 모아 보는 별도 실행 목록 API는 없다.
+
 #### 역할에 따라 응답에서 빼는 값
 
 **화면이 `MEMBER` 역할 사용자에게 그리지 않는 내부 값은 Control Plane 도 보내지 않는다.**
@@ -207,6 +217,39 @@ turn 이 바꾸는 칸은 `hermes_session_id` 와 `updated_at` 뿐이므로 그 
 판정은 도구 이름 전체로 한다. `mcp__{서버}__web_search` 처럼 다른 MCP 서버가 같은 이름을 붙인 도구는 공개하지 않는다.
 
 ## 실행 사건
+
+### 답에서 확인할 수 있는 원문 열람
+
+메시지 이력의 비서 답은 `sourceReads`를 받는다. Control Plane이 답에 연결된 실행과 그 아래의 같은 사용자 자손 실행에 저장된 사건으로 만든다.
+조상 실행, 형제 실행과 다른 사용자의 실행은 포함하지 않는다.
+답 본문에 있는 링크나 모델의 설명은 근거로 쓰지 않는다. 기존 답도 같은 사건으로 계산하며 새로운 저장 모델은 만들지 않는다.
+
+| 칸 | 뜻 |
+| --- | --- |
+| `completedCount` | 이름이 정확히 `web_extract`이고 `TOOL_COMPLETED`, `failed=false`인 사건 수. 페이지 수가 아니라 도구 호출 수다 |
+| `urls` | 위 완료 사건의 완결된 결과 JSON에서 내용이 있고 오류가 없는 항목의 HTTP(S) 주소. 같은 주소는 한 번만 싣는다 |
+| `requestedUrls` | 결과를 확인할 수 없는 성공 완료 호출에서, 같은 실행의 시작 사건과 명확히 짝지어진 첫 요청 주소. 페이지별 성공을 뜻하지 않는다 |
+| `unresolvedCount` | 성공 완료 사건 가운데 결과 형식이나 가림, 절단 때문에 결과 주소를 확인하지 못한 사건 수. 요청 주소를 남긴 호출도 포함한다 |
+| `observationComplete` | 답에 연결된 실행과 그 아래의 같은 사용자 자손 실행이 모두 `OBSERVED`인지. 아니면 기록에 없는 열람을 판정할 수 없다 |
+
+검색, 시작 사건, 실패하거나 성공 여부가 없는 완료 사건, 이름이 비슷한 MCP 도구는 열람으로 세지 않는다.
+결과에서 확인한 URL과 호출 성공만 확인한 요청 URL을 구분한다. 여러 URL을 받은 호출에서 항목별 오류도 제외한다.
+Hermes v0.21.5의 결과는 `results` 배열이며 항목의 `url`, `content`, `error`로 판정한다. 완료 사건의 실패 값만으로 각 페이지의 성공을 판정하지 않는다.
+근거는 [upstream 결과 정리](https://github.com/NousResearch/hermes-agent/blob/v2026.9.24/tools/web_tools_truncate.py#L153-L193)와 [완료 사건](https://github.com/NousResearch/hermes-agent/blob/v2026.9.24/gateway/platforms/api_server_runs.py#L91-L108)이다.
+URL의 인증 정보, query와 fragment는 공개하지 않는다. 가려지거나 잘린 주소, 내부 주소는 싣지 않는다.
+DNS 조회 없이 host가 있는 HTTP(S) URL만 받는다. 한 단어 host, localhost와 `.localhost`/`.local`/`.internal`, IP 리터럴은 제외한다. 주소를 정리한 뒤 path를 보존해 중복 제거한다.
+도구 내용 가리기와 요청자의 대화 소유자 확인을 거친 뒤 만든 요약은 사용자 역할과 관계없이 같은 값이다.
+사용자 메시지와 알림 줄은 `sourceReads`가 null이다.
+실행 번호가 없거나 해당 실행을 찾지 못한 비서 답은 빈 주소와 0건, `observationComplete=false`를 받는다.
+
+긴 원문 결과는 500자 preview에서 잘리고, JSON을 읽지 못하면 가리기 과정에서 통째로 `[가림]`이 될 수 있다.
+그때는 관측 상태가 `OBSERVED`인 실행의 시작과 성공 완료 사건이 하나씩 명확히 짝일 때만 `requestedUrls`를 만든다.
+같은 실행에서 같은 도구의 시작이 겹쳤거나 시작이 없으면 짝을 추측하지 않는다. 실패·성공 미상 완료에는 요청 주소도 싣지 않는다.
+시작 preview는 전체 `urls` 배열이 아니라 첫 URL 하나다. 가림이나 말줄임표가 있거나 안전한 URL이 아니면 제외한다.
+완결된 결과가 페이지별 성공이나 실패를 보여 주면 결과를 우선하고 요청 주소로 바꾸지 않는다. 같은 주소가 `urls`에도 있으면 `requestedUrls`에서 뺀다.
+배열 안의 구조가 손상됐거나 필요한 URL이 없고 가려져 결과를 하나도 판정할 수 없을 때도 요청 주소를 쓸 수 있다.
+판정 가능한 결과와 미확인 항목이 섞이면 결과를 우선하며 미확인 항목은 `unresolvedCount`로 안내한다.
+SSE에는 호출을 짝지을 ID가 없다. 근거는 [시작 preview](https://github.com/NousResearch/hermes-agent/blob/v2026.9.24/agent/display.py#L429-L435)와 [Runs SSE](https://github.com/NousResearch/hermes-agent/blob/v2026.9.24/gateway/platforms/api_server_runs.py#L83-L118)이다.
 
 Hermes 가 스트림으로 보내는 사건을 우리 이름으로 옮겨 `execution_event` 에 적는다.
 화면은 우리 이름만 읽고 Hermes 의 원래 이름을 알지 않는다.
