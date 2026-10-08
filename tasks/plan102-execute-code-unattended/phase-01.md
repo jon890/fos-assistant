@@ -61,7 +61,11 @@ def _with_sandbox_approvals(saved: dict, updated: dict, docker: bool) -> dict:
 - `from .sandbox_approvals import _with_sandbox_approvals` 를 더한다.
 - `elif local_execution:` 분기는 지금 라우트로 닿지 않는다(`connector_install.py` 가 `local_execution` 을 False 로만 넘긴다). 「local 을 쓰는 곳은 언제나 키를 지운다」 는 불변식을 지키려고 같은 호출을 넣는다. 이 분기의 시험은 두지 않는다.
 
-### 4. 이 phase 를 검증하는 시험
+### 4. `hermes/README.md` 의 「plugin 파일 안내」 표에 새 모듈을 더한다
+
+`sandbox.py`, `toolconfig.py`, `env.py` 줄의 모듈 칸에 `sandbox_approvals.py` 를 넣고, 맡는 것 칸에 「실행 공간과 함께 쓰는 승인 설정」 을 더한다.
+
+### 5. 이 phase 를 검증하는 시험
 
 `hermes/tests/test_dashboard_profile_api_sandbox_terminal.py` 에 더한다.
 
@@ -97,5 +101,6 @@ scripts/quality.sh check
 | `hermes/plugins/dashboard-profile-api/sandbox_approvals.py` | 신규 |
 | `hermes/plugins/dashboard-profile-api/toolconfig.py` | 수정 |
 | `hermes/plugins/dashboard-profile-api/connector_isolated.py` | 수정 |
+| `hermes/README.md` | 수정 |
 | `hermes/tests/test_dashboard_profile_api_sandbox_terminal.py` | 수정 |
 | `hermes/tests/test_dashboard_profile_api_sandbox_policy.py` | 수정 |
