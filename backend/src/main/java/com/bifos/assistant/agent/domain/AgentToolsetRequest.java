@@ -21,8 +21,11 @@ import org.hibernate.type.SqlTypes;
 
 /** 도구 사용 요청과 결정 이력이다. PENDING만 pendingSlot을 채워 DB에서도 중복을 막는다. */
 @Entity
-@Table(name = "agent_toolset_request", uniqueConstraints = @UniqueConstraint(
-        columnNames = {"group_id", "agent_id", "requester_user_id", "toolset", "pending_slot"}))
+@Table(
+        name = "agent_toolset_request",
+        uniqueConstraints =
+                @UniqueConstraint(
+                        columnNames = {"group_id", "agent_id", "requester_user_id", "toolset", "pending_slot"}))
 @Getter
 @Accessors(fluent = true)
 @NoArgsConstructor(access = AccessLevel.PROTECTED)

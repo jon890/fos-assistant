@@ -24,7 +24,9 @@ public class ToolsetRequestController {
 
     @GetMapping("/agents/{code}/tool-requests")
     public List<ToolsetRequestView> list(@PathVariable String code) {
-        return requests.list(currentUser.require(), code, false).stream().map(ToolsetRequestView::from).toList();
+        return requests.list(currentUser.require(), code, false).stream()
+                .map(ToolsetRequestView::from)
+                .toList();
     }
 
     @PostMapping("/agents/{code}/tool-requests")
@@ -34,7 +36,9 @@ public class ToolsetRequestController {
 
     @GetMapping("/admin/agents/{code}/tool-requests")
     public List<ToolsetRequestView> listAdmin(@PathVariable String code) {
-        return requests.list(currentUser.requireAdmin(), code, true).stream().map(ToolsetRequestView::from).toList();
+        return requests.list(currentUser.requireAdmin(), code, true).stream()
+                .map(ToolsetRequestView::from)
+                .toList();
     }
 
     @GetMapping("/tool-requests/{id}")

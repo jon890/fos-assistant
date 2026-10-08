@@ -15,8 +15,8 @@ import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
-import com.bifos.assistant.user.domain.AppUser;
 import com.bifos.assistant.user.application.SignInRevocation;
+import com.bifos.assistant.user.domain.AppUser;
 import com.bifos.assistant.user.infra.AppUserRepository;
 import java.time.Clock;
 import java.util.ArrayList;
@@ -51,10 +51,12 @@ public class ToolsetRequestService {
         }
         AgentToolsetsView current = tools.read(user, agent);
         if (current.toolsets().stream().noneMatch(item -> item.name().equals(toolset) && !item.enabled())) {
-            throw new ApiException(ErrorCode.TOOLSET_REQUEST_UNAVAILABLE, "this toolset is unavailable or already enabled");
+            throw new ApiException(
+                    ErrorCode.TOOLSET_REQUEST_UNAVAILABLE, "this toolset is unavailable or already enabled");
         }
         AgentToolsetRequest pending = requests.findByAgentIdAndGroupIdAndRequesterUserIdAndToolsetAndPendingSlot(
-                agent.id(), user.groupId(), user.id(), toolset, 1).orElse(null);
+                        agent.id(), user.groupId(), user.id(), toolset, 1)
+                .orElse(null);
         if (pending != null) {
             return view(pending, agent);
         }
@@ -62,8 +64,11 @@ public class ToolsetRequestService {
                 AgentToolsetRequest.of(user.groupId(), agent.id(), user.id(), toolset, clock.instant()));
         for (AppUser admin : users.findByGroupIdAndRole(user.groupId(), UserRole.ADMIN)) {
             if (!access.revoked(admin.email())) {
-                notifications.notify(admin.id(), NotificationKind.TOOLSET_REQUESTED,
-                        "도구 사용 요청이 있어요", user.displayName() + "님이 「" + agent.name() + "」의 도구 사용을 요청했어요.",
+                notifications.notify(
+                        admin.id(),
+                        NotificationKind.TOOLSET_REQUESTED,
+                        "도구 사용 요청이 있어요",
+                        user.displayName() + "님이 「" + agent.name() + "」의 도구 사용을 요청했어요.",
                         new NotificationTarget(NotificationTargetType.ADMIN_TOOL_REQUEST, row.publicId()));
             }
         }
@@ -81,7 +86,8 @@ public class ToolsetRequestService {
         }
         return requests.findByAgentIdAndGroupIdOrderByRequestedAtDescIdDesc(agent.id(), user.groupId()).stream()
                 .filter(row -> adminView || Objects.equals(row.requesterUserId(), user.id()))
-                .map(row -> view(row, agent)).toList();
+                .map(row -> view(row, agent))
+                .toList();
     }
 
     @Transactional(readOnly = true)
@@ -99,8 +105,12 @@ public class ToolsetRequestService {
         if (row.status() != ToolsetRequestStatus.PENDING) {
             return view(row, agent);
         }
-        if (!approve && (reason == null || reason.isBlank() || reason.strip().length() > 200
-                || reason.contains("\n") || reason.contains("\r"))) {
+        if (!approve
+                && (reason == null
+                        || reason.isBlank()
+                        || reason.strip().length() > 200
+                        || reason.contains("\n")
+                        || reason.contains("\r"))) {
             throw new ApiException(ErrorCode.VALIDATION_FAILED, "a rejection needs one line of at most 200 characters");
         }
         String invalid = ineligible(agent, row.requesterUserId(), row.groupId(), row.toolset());
@@ -116,7 +126,9 @@ public class ToolsetRequestService {
                 reason = "이 도구를 더 이상 사용할 수 없어요.";
             } else {
                 List<String> desired = new ArrayList<>(current.toolsets().stream()
-                        .filter(AgentToolView::enabled).map(AgentToolView::name).toList());
+                        .filter(AgentToolView::enabled)
+                        .map(AgentToolView::name)
+                        .toList());
                 if (!desired.contains(row.toolset())) {
                     desired.add(row.toolset());
                 }
@@ -130,11 +142,14 @@ public class ToolsetRequestService {
         }
         row.finish(result, user.id(), reason, clock.instant());
         requests.saveAndFlush(row);
-        String body = result == ToolsetRequestStatus.APPROVED
-                ? "「" + agent.name() + "」에서 요청한 도구를 다음 실행부터 쓸 수 있어요." : reason;
-        notifications.notify(row.requesterUserId(), NotificationKind.TOOLSET_REQUEST_DECIDED,
+        String body =
+                result == ToolsetRequestStatus.APPROVED ? "「" + agent.name() + "」에서 요청한 도구를 다음 실행부터 쓸 수 있어요." : reason;
+        notifications.notify(
+                row.requesterUserId(),
+                NotificationKind.TOOLSET_REQUEST_DECIDED,
                 result == ToolsetRequestStatus.APPROVED ? "도구 사용 요청이 승인됐어요" : "도구 사용 요청 결과가 있어요",
-                body, new NotificationTarget(NotificationTargetType.TOOLSET_REQUEST, row.publicId()));
+                body,
+                new NotificationTarget(NotificationTargetType.TOOLSET_REQUEST, row.publicId()));
         return view(row, agent);
     }
 
@@ -166,7 +181,8 @@ public class ToolsetRequestService {
 
     private void requireCurrent(CurrentUser user, boolean admin) {
         AppUser actual = users.findById(user.id()).orElseThrow(ToolsetRequestService::notFound);
-        if (!Objects.equals(actual.groupId(), user.groupId()) || access.revoked(actual.email())
+        if (!Objects.equals(actual.groupId(), user.groupId())
+                || access.revoked(actual.email())
                 || (admin && (!user.isAdmin() || !actual.isAdmin()))) {
             throw new ApiException(ErrorCode.FORBIDDEN, "current permissions do not allow this action");
         }
@@ -174,11 +190,16 @@ public class ToolsetRequestService {
 
     private String ineligible(Agent agent, Long requester, Long groupId, String toolset) {
         AppUser owner = users.findById(requester).orElse(null);
-        if (agent.isDeleted() || agent.connectorManaged() || !Objects.equals(agent.ownerUserId(), requester)
-                || owner == null || !Objects.equals(owner.groupId(), groupId) || access.revoked(owner.email())) {
+        if (agent.isDeleted()
+                || agent.connectorManaged()
+                || !Objects.equals(agent.ownerUserId(), requester)
+                || owner == null
+                || !Objects.equals(owner.groupId(), groupId)
+                || access.revoked(owner.email())) {
             return "에이전트의 주인이나 사용 권한이 바뀌어 요청이 만료됐어요.";
         }
-        if (!AgentToolPolicy.isKnown(toolset) || AgentToolPolicy.tierOf(toolset) != AgentToolPolicy.Tier.ADMIN
+        if (!AgentToolPolicy.isKnown(toolset)
+                || AgentToolPolicy.tierOf(toolset) != AgentToolPolicy.Tier.ADMIN
                 || visibility.hiddenFor(groupId).contains(toolset)) {
             return "지금은 이 도구를 요청할 수 없어요.";
         }
@@ -205,9 +226,19 @@ public class ToolsetRequestService {
     }
 
     private ToolsetRequestView view(AgentToolsetRequest row, Agent agent) {
-        String name = users.findById(row.requesterUserId()).map(AppUser::displayName).orElse("사용자");
-        return new ToolsetRequestView(row.publicId(), agent.code(), agent.name(), agent.isDeleted(), name, row.toolset(),
-                row.status(), row.reason(), row.requestedAt(), row.decidedAt());
+        String name =
+                users.findById(row.requesterUserId()).map(AppUser::displayName).orElse("사용자");
+        return new ToolsetRequestView(
+                row.publicId(),
+                agent.code(),
+                agent.name(),
+                agent.isDeleted(),
+                name,
+                row.toolset(),
+                row.status(),
+                row.reason(),
+                row.requestedAt(),
+                row.decidedAt());
     }
 
     private static ApiException notFound() {

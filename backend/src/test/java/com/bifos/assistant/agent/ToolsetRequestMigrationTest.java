@@ -22,9 +22,14 @@ class ToolsetRequestMigrationTest {
     @BeforeEach
     void setUp() throws SQLException {
         database = createDatabase();
-        Flyway.configure().dataSource(database.url(), database.username(), database.password())
-                .locations("classpath:db/migration").outOfOrder(true).load().migrate();
-        try (Connection connection = connect(); Statement statement = connection.createStatement()) {
+        Flyway.configure()
+                .dataSource(database.url(), database.username(), database.password())
+                .locations("classpath:db/migration")
+                .outOfOrder(true)
+                .load()
+                .migrate();
+        try (Connection connection = connect();
+                Statement statement = connection.createStatement()) {
             statement.executeUpdate("""
                     INSERT INTO app_user (id, email, display_name, group_id, role, created_at)
                     VALUES (1, 'request@example.com', '요청자', 1, 'MEMBER', CURRENT_TIMESTAMP)
@@ -39,8 +44,8 @@ class ToolsetRequestMigrationTest {
     }
 
     Database createDatabase() {
-        return new Database("jdbc:h2:mem:toolset-request-" + UUID.randomUUID()
-                + ";MODE=MySQL;DB_CLOSE_DELAY=-1", "sa", "");
+        return new Database(
+                "jdbc:h2:mem:toolset-request-" + UUID.randomUUID() + ";MODE=MySQL;DB_CLOSE_DELAY=-1", "sa", "");
     }
 
     @Test
@@ -48,13 +53,15 @@ class ToolsetRequestMigrationTest {
     void rejectsDuplicatePendingAndKeepsFinishedHistory() throws SQLException {
         insert("PENDING", 1);
         assertThatThrownBy(() -> insert("PENDING", 1)).isInstanceOf(SQLException.class);
-        try (Connection connection = connect(); Statement statement = connection.createStatement()) {
+        try (Connection connection = connect();
+                Statement statement = connection.createStatement()) {
             statement.executeUpdate("UPDATE agent_toolset_request SET status = 'REJECTED', pending_slot = NULL");
         }
         insert("PENDING", 1);
         insert("REJECTED", null);
         insert("APPROVED", null);
-        try (Connection connection = connect(); Statement statement = connection.createStatement();
+        try (Connection connection = connect();
+                Statement statement = connection.createStatement();
                 var result = statement.executeQuery("SELECT COUNT(*) FROM agent_toolset_request")) {
             assertThat(result.next()).isTrue();
             assertThat(result.getInt(1)).isEqualTo(4);
@@ -71,9 +78,12 @@ class ToolsetRequestMigrationTest {
 
     private void insert(String state, Integer slot) throws SQLException {
         UUID id = UUID.randomUUID();
-        byte[] bytes = ByteBuffer.allocate(16).putLong(id.getMostSignificantBits())
-                .putLong(id.getLeastSignificantBits()).array();
-        try (Connection connection = connect(); PreparedStatement statement = connection.prepareStatement("""
+        byte[] bytes = ByteBuffer.allocate(16)
+                .putLong(id.getMostSignificantBits())
+                .putLong(id.getLeastSignificantBits())
+                .array();
+        try (Connection connection = connect();
+                PreparedStatement statement = connection.prepareStatement("""
                 INSERT INTO agent_toolset_request (public_id, group_id, agent_id, requester_user_id,
                     toolset, status, pending_slot, requested_at)
                 VALUES (?, 1, 1, 1, 'image_gen', ?, ?, CURRENT_TIMESTAMP)
