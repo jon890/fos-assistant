@@ -2,6 +2,7 @@
 
 - **status**: `accepted`
 - Date: 2026-10-08
+- **개정된 부분**: 「호출량」 의 「`list_orders` 는 한 쪽(100건)만 읽는다」 는 결과로 돌려줄 때만이다. `output: "file"` 은 [ADR-20261008 / connector-output-files](ADR-20261008-connector-output-files.md) 의 파일 출력으로 기간 전체를 100건씩 최대 20쪽 읽는다. 규칙은 [토스증권 커넥터](../connectors/tossinvest.md) 의 「주문 내역 파일」 이 갖는다
 - 커넥터 계약은 [ADR-043](ADR-043-커넥터는-plugin-의-connector-json-으로-선언하고-control-plane-은-범용-흐름만-갖는다.md) 과 [ADR-049](ADR-049-커넥터-도구-호출은-profile-plugin-의-hook-이-control-plane-에-물어-판정한다.md) 를 따른다. 바인딩 제한은 [ADR-20261008 / connector-binding-guards](ADR-20261008-connector-binding-guards.md) 의 것이다.
 
 ### 결정

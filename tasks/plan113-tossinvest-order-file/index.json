@@ -1,0 +1,15 @@
+{
+  "name": "plan113-tossinvest-order-file",
+  "description": "토스증권 커넥터의 list_orders 에 기간 전체를 실행 공간의 파일로 내는 output: file 을 더한다",
+  "status": "pending",
+  "created_at": "2026-10-08",
+  "total_phases": 1,
+  "current_phase": 1,
+  "phases": [
+    {
+      "number": 1,
+      "file": "phase-01.md",
+      "execution_profile": "deep"
+    }
+  ]
+}
