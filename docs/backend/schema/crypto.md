@@ -9,7 +9,7 @@
 | 칸 | 타입 | 뜻 |
 | --- | --- | --- |
 | `id` | BIGINT | 본문 칸 옆의 `*_key_id` 가 가리키는 번호 |
-| `user_id` | BIGINT | 이 key 의 주인. `app_user` 의 외래 키다 |
+| `user_id` | BIGINT | 이 key 의 주인. 외래 키를 두지 않는다. `conversation` 과 `agent_execution` 도 사용자에 외래 키가 없어, 메시지 저장이 이 표 때문에 실패하지 않게 한다 |
 | `kek_id` | VARCHAR(32) | 감싼 KEK 의 id. KEK 를 바꾸면 기동 작업이 새 id 로 다시 감싼다 |
 | `wrapped_key` | VARCHAR(255) | `v1.<IV>.<감싼 key 와 태그>`. AAD 는 `user_data_key:user:<user_id>` 다 |
 | `created_at` | DATETIME(6) | |
