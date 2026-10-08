@@ -178,6 +178,25 @@ class HttpHermesConnectorClientTest {
         server.verify();
     }
 
+    @DisplayName("카탈로그의 single_binding 을 읽고, 칸이 없으면 거짓이며 boolean 이 아니면 거절한다")
+    @Test
+    void readsDeclaredSingleBinding() {
+        String url = BASE + "/api/connectors/catalog";
+        String tail = "\"mcp_server\":\"demo\"";
+        server.expect(requestTo(url))
+                .andRespond(withSuccess(
+                        CATALOG.replace(tail, tail + ",\"single_binding\":true"), MediaType.APPLICATION_JSON));
+        server.expect(requestTo(url)).andRespond(withSuccess(CATALOG, MediaType.APPLICATION_JSON));
+        server.expect(requestTo(url))
+                .andRespond(withSuccess(
+                        CATALOG.replace(tail, tail + ",\"single_binding\":\"true\""), MediaType.APPLICATION_JSON));
+
+        assertThat(client.readCatalog().get(0).singleBinding()).isTrue();
+        assertThat(client.readCatalog().get(0).singleBinding()).isFalse();
+        assertThatThrownBy(() -> client.readCatalog()).isInstanceOf(IllegalStateException.class);
+        server.verify();
+    }
+
     @DisplayName("카탈로그의 schema 와 tools 를 받은 글자 그대로 읽고, title 이 없으면 null 이다")
     @Test
     void readsSchemaAndToolPolicies() {
@@ -958,6 +977,25 @@ class HttpHermesConnectorClientTest {
                 .isInstanceOfSatisfying(ConnectorInstallConflict.class, ex -> assertNoDetail(ex));
         assertThatThrownBy(() -> client.bindConnector(PROFILE, DEMO, "c7", "u1"))
                 .isInstanceOfSatisfying(IllegalStateException.class, ex -> assertNoDetail(ex));
+        server.verify();
+    }
+
+    @DisplayName("바인딩 설치의 409 는 본문 code 가 sandbox_unavailable 일 때만 실행 공간 거절이고 그 밖은 설치 충돌이다")
+    @Test
+    void mapsSandboxUnavailableConflictByBodyCode() {
+        server.expect(requestTo(BASE + "/api/connectors"))
+                .andRespond(withStatus(HttpStatus.CONFLICT)
+                        .body("{\"detail\":\"x\",\"code\":\"sandbox_unavailable\"}")
+                        .contentType(MediaType.APPLICATION_JSON));
+        server.expect(requestTo(BASE + "/api/connectors"))
+                .andRespond(withStatus(HttpStatus.CONFLICT)
+                        .body("{\"detail\":\"x\"}")
+                        .contentType(MediaType.APPLICATION_JSON));
+
+        assertThatThrownBy(() -> client.bindConnector(PROFILE, DEMO, "c7", "u1"))
+                .isInstanceOfSatisfying(ConnectorSandboxUnavailable.class, ex -> assertNoDetail(ex));
+        assertThatThrownBy(() -> client.bindConnector(PROFILE, DEMO, "c7", "u1"))
+                .isInstanceOfSatisfying(ConnectorInstallConflict.class, ex -> assertNoDetail(ex));
         server.verify();
     }
 
