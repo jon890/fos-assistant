@@ -5,3 +5,6 @@
 /hermes/connectors/naver-blog/ @jon890
 /hermes/connectors/naver-blog/tests/ @jon890
 /docs/connectors/naver-blog.md @jon890
+/hermes/connectors/tossinvest/ @jon890
+/hermes/connectors/tossinvest/tests/ @jon890
+/docs/connectors/tossinvest.md @jon890
