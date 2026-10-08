@@ -27,6 +27,8 @@ export type MessageDelivery = {
 export type SourceReadSummary = {
   completedCount: number;
   urls: string[];
+  /** 결과에서 주소를 확인하지 못한 성공 호출의 요청 주소다. 구 서버 응답에는 없다. */
+  requestedUrls?: string[];
   unresolvedCount: number;
   observationComplete: boolean;
 };

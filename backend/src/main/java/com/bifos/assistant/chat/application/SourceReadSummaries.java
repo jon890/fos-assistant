@@ -95,7 +95,7 @@ public class SourceReadSummaries {
     }
 
     private static SourceReadSummary missing() {
-        return new SourceReadSummary(0, List.of(), 0, false);
+        return new SourceReadSummary(0, List.of(), 0, false, List.of());
     }
 
     private static SourceReadSummary summarize(
@@ -118,21 +118,63 @@ public class SourceReadSummaries {
         int unresolved = 0;
         boolean observed = true;
         Set<String> urls = new LinkedHashSet<>();
+        Set<String> requestedUrls = new LinkedHashSet<>();
         for (AgentExecution execution : tree) {
             observed &= execution.eventObservation() == EventObservation.OBSERVED;
-            for (ExecutionEvent event : eventRows.getOrDefault(execution.id(), List.of())) {
-                if (event.eventType() != ExecutionEventType.TOOL_COMPLETED
-                        || !"web_extract".equals(event.toolName())
-                        || !Boolean.FALSE.equals(event.failed())) {
-                    continue;
+            ExecutionReads reads = reads(eventRows.getOrDefault(execution.id(), List.of()), execution.eventObservation());
+            completed += reads.completed;
+            unresolved += reads.unresolved;
+            urls.addAll(reads.urls);
+            requestedUrls.addAll(reads.requestedUrls);
+        }
+        requestedUrls.removeAll(urls);
+        return new SourceReadSummary(completed, List.copyOf(urls), unresolved, observed, List.copyOf(requestedUrls));
+    }
+
+    private static ExecutionReads reads(List<ExecutionEvent> events, EventObservation observation) {
+        int completed = 0;
+        int unresolved = 0;
+        int open = 0;
+        boolean overlapping = false;
+        String startUrl = null;
+        Set<String> urls = new LinkedHashSet<>();
+        Set<String> requestedUrls = new LinkedHashSet<>();
+        for (ExecutionEvent event : events) {
+            if (!"web_extract".equals(event.toolName())) {
+                continue;
+            }
+            if (event.eventType() == ExecutionEventType.TOOL_STARTED) {
+                if (open == 0) {
+                    startUrl = clean(event.detail());
+                } else {
+                    overlapping = true;
                 }
-                Parsed parsed = parse(event.detail());
-                completed++;
-                unresolved += parsed.unresolved ? 1 : 0;
-                urls.addAll(parsed.urls);
+                open++;
+                continue;
+            }
+            if (event.eventType() != ExecutionEventType.TOOL_COMPLETED) {
+                continue;
+            }
+            boolean paired = open == 1 && !overlapping;
+            if (open > 0) {
+                open--;
+                if (open == 0) {
+                    overlapping = false;
+                    startUrl = paired ? startUrl : null;
+                }
+            }
+            if (!Boolean.FALSE.equals(event.failed())) {
+                continue;
+            }
+            Parsed parsed = parse(event.detail());
+            completed++;
+            unresolved += parsed.unresolved ? 1 : 0;
+            urls.addAll(parsed.urls);
+            if (paired && observation == EventObservation.OBSERVED && !parsed.resultKnown && startUrl != null) {
+                requestedUrls.add(startUrl);
             }
         }
-        return new SourceReadSummary(completed, List.copyOf(urls), unresolved, observed);
+        return new ExecutionReads(completed, unresolved, urls, requestedUrls);
     }
 
     private static Parsed parse(String detail) {
@@ -176,7 +218,7 @@ public class SourceReadSummaries {
                     }
                 }
             }
-            return new Parsed(unresolved, urls);
+            return new Parsed(true, unresolved, urls);
         } catch (JacksonException ex) {
             return Parsed.unknown();
         }
@@ -220,13 +262,15 @@ public class SourceReadSummaries {
         }
     }
 
-    private record Parsed(boolean unresolved, Set<String> urls) {
+    private record Parsed(boolean resultKnown, boolean unresolved, Set<String> urls) {
         static Parsed empty() {
-            return new Parsed(false, Set.of());
+            return new Parsed(true, false, Set.of());
         }
 
         static Parsed unknown() {
-            return new Parsed(true, Set.of());
+            return new Parsed(false, true, Set.of());
         }
     }
+
+    private record ExecutionReads(int completed, int unresolved, Set<String> urls, Set<String> requestedUrls) {}
 }

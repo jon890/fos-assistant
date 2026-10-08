@@ -71,7 +71,7 @@ class SourceReadMessagesTest {
         when(chat.attachmentsByMessage(user, 4L)).thenReturn(Map.of());
         when(chat.artifactsByMessage(any())).thenReturn(Map.of());
         when(chat.deliveryStates(4L)).thenReturn(Map.of());
-        SourceReadSummary missing = new SourceReadSummary(0, List.of(), 0, false);
+        SourceReadSummary missing = new SourceReadSummary(0, List.of(), 0, false, List.of());
         when(sourceReads.of(List.of(userMessage, assistant, system))).thenReturn(Map.of(11L, missing));
 
         List<MessageView> result = controller.messages(conversationId);

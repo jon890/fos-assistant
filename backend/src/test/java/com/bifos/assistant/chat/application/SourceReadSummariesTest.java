@@ -45,7 +45,7 @@ class SourceReadSummariesTest {
                         completed(1L, 3, "{\"results\":[]}")));
 
         assertThat(summaries.of(List.of(answer(10L, 1L))).get(10L))
-                .isEqualTo(new SourceReadSummary(3, List.of("https://example.com/a%2Fb"), 1, true));
+                .isEqualTo(new SourceReadSummary(3, List.of("https://example.com/a%2Fb"), 1, true, List.of()));
     }
 
     @Test
@@ -68,7 +68,7 @@ class SourceReadSummariesTest {
                         event(1L, 5, ExecutionEventType.TOOL_COMPLETED, "web_extract", null, "{\"results\":[]}")));
 
         assertThat(summaries.of(List.of(answer(10L, 1L))).get(10L))
-                .isEqualTo(new SourceReadSummary(0, List.of(), 0, true));
+                .isEqualTo(new SourceReadSummary(0, List.of(), 0, true, List.of()));
     }
 
     @Test
@@ -85,7 +85,7 @@ class SourceReadSummariesTest {
                                         "{\"results\":[{\"url\":\"https://example.com/kept\",\"content\":\"본문 [가림]\"},{\"url\":\"https://example.com/error\",\"content\":\"본문\",\"error\":\"실패\"},{\"url\":\"https://example.com/empty\",\"content\":\"   \"}]}")));
 
         assertThat(summaries.of(List.of(answer(10L, 1L))).get(10L))
-                .isEqualTo(new SourceReadSummary(1, List.of("https://example.com/kept"), 0, true));
+                .isEqualTo(new SourceReadSummary(1, List.of("https://example.com/kept"), 0, true, List.of()));
     }
 
     @Test
@@ -108,7 +108,7 @@ class SourceReadSummariesTest {
 
         assertThat(summaries.of(List.of(answer(10L, 1L))).get(10L))
                 .isEqualTo(
-                        new SourceReadSummary(2, List.of("https://example.com/a", "https://example.com/b"), 0, true));
+                        new SourceReadSummary(2, List.of("https://example.com/a", "https://example.com/b"), 0, true, List.of()));
     }
 
     @Test
@@ -121,7 +121,7 @@ class SourceReadSummariesTest {
                         1L, 1, "{\"results\":[{\"url\":\"https://example.com/truncated\",\"content\":\"본문\"}")));
 
         assertThat(summaries.of(List.of(answer(10L, 1L))).get(10L))
-                .isEqualTo(new SourceReadSummary(1, List.of(), 1, true));
+                .isEqualTo(new SourceReadSummary(1, List.of(), 1, true, List.of()));
     }
 
     @Test
@@ -133,7 +133,7 @@ class SourceReadSummariesTest {
                 .thenReturn(List.of(completed(1L, 1, "  \n\t")));
 
         assertThat(summaries.of(List.of(answer(10L, 1L))).get(10L))
-                .isEqualTo(new SourceReadSummary(1, List.of(), 1, true));
+                .isEqualTo(new SourceReadSummary(1, List.of(), 1, true, List.of()));
     }
 
     @Test
@@ -146,7 +146,7 @@ class SourceReadSummariesTest {
                         1L, 1, "{\"results\":[{\"url\":\"https://example.com/kept\",\"content\":\"본문\"}, false]}")));
 
         assertThat(summaries.of(List.of(answer(10L, 1L))).get(10L))
-                .isEqualTo(new SourceReadSummary(1, List.of("https://example.com/kept"), 1, true));
+                .isEqualTo(new SourceReadSummary(1, List.of("https://example.com/kept"), 1, true, List.of()));
     }
 
     @Test
@@ -163,7 +163,7 @@ class SourceReadSummariesTest {
                                         "{\"results\":[{\"url\":\"https://user:secret@example.com/path\",\"content\":\"본문\"},{\"url\":\"https://10.0.0.1/private\",\"content\":\"본문\"},{\"url\":\"https://service.internal/path\",\"content\":\"본문\"},{\"url\":\"https://example.com/[가림]\",\"content\":\"본문\"}]}")));
 
         assertThat(summaries.of(List.of(answer(10L, 1L))).get(10L))
-                .isEqualTo(new SourceReadSummary(1, List.of("https://example.com/path"), 1, true));
+                .isEqualTo(new SourceReadSummary(1, List.of("https://example.com/path"), 1, true, List.of()));
     }
 
     @Test
@@ -176,7 +176,7 @@ class SourceReadSummariesTest {
                         1L, 1, "{\"results\":[{\"url\":\"https://EXAMPLE.com./read\",\"content\":\"본문\"}]}")));
 
         assertThat(summaries.of(List.of(answer(10L, 1L))).get(10L))
-                .isEqualTo(new SourceReadSummary(1, List.of("https://example.com/read"), 0, true));
+                .isEqualTo(new SourceReadSummary(1, List.of("https://example.com/read"), 0, true, List.of()));
     }
 
     @ParameterizedTest
@@ -195,7 +195,7 @@ class SourceReadSummariesTest {
                 .thenReturn(List.of(completed(1L, 1, "{\"results\":[{\"url\":\"" + url + "\",\"content\":\"본문\"}]}")));
 
         assertThat(summaries.of(List.of(answer(10L, 1L))).get(10L))
-                .isEqualTo(new SourceReadSummary(1, List.of(), 1, true));
+                .isEqualTo(new SourceReadSummary(1, List.of(), 1, true, List.of()));
     }
 
     @Test
@@ -209,7 +209,7 @@ class SourceReadSummariesTest {
                         completed(2L, 1, "{\"results\":[{\"url\":\"https://example.com/read\",\"content\":\"본문\"}]}")));
 
         assertThat(summaries.of(List.of(answer(10L, 1L))).get(10L))
-                .isEqualTo(new SourceReadSummary(1, List.of("https://example.com/read"), 0, false));
+                .isEqualTo(new SourceReadSummary(1, List.of("https://example.com/read"), 0, false, List.of()));
     }
 
     @Test
@@ -234,7 +234,7 @@ class SourceReadSummariesTest {
 
         assertThat(summaries.of(List.of(answer(10L, 2L))).get(10L))
                 .isEqualTo(new SourceReadSummary(
-                        2, List.of("https://example.com/child", "https://example.com/descendant"), 0, true));
+                        2, List.of("https://example.com/child", "https://example.com/descendant"), 0, true, List.of()));
     }
 
     @Test
@@ -251,7 +251,7 @@ class SourceReadSummariesTest {
                                 3L, 1, "{\"results\":[{\"url\":\"https://example.com/other\",\"content\":\"본문\"}]}")));
 
         assertThat(summaries.of(List.of(answer(10L, 1L))).get(10L))
-                .isEqualTo(new SourceReadSummary(1, List.of("https://example.com/own"), 0, true));
+                .isEqualTo(new SourceReadSummary(1, List.of("https://example.com/own"), 0, true, List.of()));
     }
 
     @Test
@@ -265,8 +265,8 @@ class SourceReadSummariesTest {
         when(events.findByExecutionIdInOrderByExecutionIdAscSequenceAsc(any())).thenReturn(List.of());
 
         assertThat(summaries.of(List.of(answer(100L, 1L), answer(101L, 10L))))
-                .containsEntry(100L, new SourceReadSummary(0, List.of(), 0, true))
-                .containsEntry(101L, new SourceReadSummary(0, List.of(), 0, true));
+                .containsEntry(100L, new SourceReadSummary(0, List.of(), 0, true, List.of()))
+                .containsEntry(101L, new SourceReadSummary(0, List.of(), 0, true, List.of()));
 
         verify(executions, times(2)).findAllById(Set.of(1L, 10L));
         verify(executions).findByRootExecutionIdIn(Set.of(1L, 10L));
@@ -286,7 +286,7 @@ class SourceReadSummariesTest {
 
         assertThat(summaries.of(List.of(user, system, answer(10L, 1L))))
                 .containsOnlyKeys(10L)
-                .containsEntry(10L, new SourceReadSummary(0, List.of(), 0, true));
+                .containsEntry(10L, new SourceReadSummary(0, List.of(), 0, true, List.of()));
     }
 
     @Test
@@ -299,7 +299,7 @@ class SourceReadSummariesTest {
     @DisplayName("실행 번호가 없는 비서 답은 관측하지 못한 빈 요약을 받는다")
     void marksAssistantWithoutExecutionAsUnobserved() throws Exception {
         assertThat(summaries.of(List.of(answer(11L, null))).get(11L))
-                .isEqualTo(new SourceReadSummary(0, List.of(), 0, false));
+                .isEqualTo(new SourceReadSummary(0, List.of(), 0, false, List.of()));
     }
 
     @Test
@@ -308,7 +308,7 @@ class SourceReadSummariesTest {
         when(executions.findAllById(any())).thenReturn(List.of());
 
         assertThat(summaries.of(List.of(answer(11L, 99L))).get(11L))
-                .isEqualTo(new SourceReadSummary(0, List.of(), 0, false));
+                .isEqualTo(new SourceReadSummary(0, List.of(), 0, false, List.of()));
     }
 
     private void stubExecutions(List<AgentExecution> rows, List<AgentExecution> children) {
