@@ -16,7 +16,7 @@
 token 파일을 실행 공간에 읽기 전용으로 붙인 profile 의 셸은 그 token 으로 Backend 의 모든 API 를 부를 수 있다.
 읽기 전용 마운트는 token 유출이나 API 쓰기를 막지 않는다.
 
-**Hermes 예약 작업은 기본 profile 의 설정과 cron 저장소를 따른다.**
+**Hermes 예약 작업은 기본 profile 의 설정과 cron 저장소를 따른다.** Control Plane 예약 작업으로 옮긴다([ADR-20261008 / cron-to-task](../adr/ADR-20261008-cron-to-task.md)).
 named profile 저장은 기본 profile 설정과 cron 저장소를 바꾸지 않는다.
 예약 작업 이름이나 지시문에 역할 이름을 넣어도 실행 profile 은 바뀌지 않는다.
 script 를 지정한 예약 작업의 subprocess 는 Hermes 프로세스에서 돈다. terminal backend 를 바꾸는 것으로 격리되지 않는다.

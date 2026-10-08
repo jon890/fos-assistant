@@ -9,10 +9,13 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
+import java.time.Clock;
+import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.Locale;
 import java.util.Map;
 import java.util.function.Consumer;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
@@ -48,15 +51,23 @@ public class HermesRunEventStream {
     private final RestClient restClient;
     private final HermesProfileKeyStore keyStore;
     private final ObjectMapper objectMapper;
+    private final Clock clock;
 
     public HermesRunEventStream(
             HermesProfileKeyStore keyStore, HermesProperties properties, ObjectMapper objectMapper) {
+        this(keyStore, properties, objectMapper, Clock.systemUTC());
+    }
+
+    @Autowired
+    public HermesRunEventStream(
+            HermesProfileKeyStore keyStore, HermesProperties properties, ObjectMapper objectMapper, Clock clock) {
         SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
         factory.setConnectTimeout(properties.connectTimeout());
         factory.setReadTimeout(properties.runTimeout());
         this.restClient = RestClient.builder().requestFactory(factory).build();
         this.keyStore = keyStore;
         this.objectMapper = objectMapper;
+        this.clock = clock;
     }
 
     public void open(String apiBaseUrl, String profileName, String runId, Consumer<RunEvent> onEvent) {
@@ -101,13 +112,13 @@ public class HermesRunEventStream {
     }
 
     private void readEvents(InputStream body, Consumer<RunEvent> onEvent, ToolDetailScope scope) throws IOException {
-        Map<String, String> identifiers = new LinkedHashMap<>();
+        DetailState state = new DetailState(clock);
         try (BufferedReader reader = new BufferedReader(new InputStreamReader(body, StandardCharsets.UTF_8))) {
             StringBuilder data = new StringBuilder();
             String line;
             while ((line = reader.readLine()) != null) {
                 if (line.isEmpty()) {
-                    emit(data, onEvent, scope, identifiers);
+                    emit(data, onEvent, scope, state);
                     continue;
                 }
                 if (line.startsWith(":")) {
@@ -120,12 +131,11 @@ public class HermesRunEventStream {
                     data.append(line.substring(5).stripLeading());
                 }
             }
-            emit(data, onEvent, scope, identifiers);
+            emit(data, onEvent, scope, state);
         }
     }
 
-    private void emit(
-            StringBuilder data, Consumer<RunEvent> onEvent, ToolDetailScope scope, Map<String, String> identifiers)
+    private void emit(StringBuilder data, Consumer<RunEvent> onEvent, ToolDetailScope scope, DetailState state)
             throws IOException {
         if (data.isEmpty()) {
             return;
@@ -133,7 +143,7 @@ public class HermesRunEventStream {
         String raw = data.toString();
         data.setLength(0);
         try {
-            onEvent.accept(toRunEvent(objectMapper.readTree(raw), scope, identifiers));
+            onEvent.accept(toRunEvent(objectMapper.readTree(raw), scope, state));
         } catch (JacksonException ex) {
             throw new IOException("Hermes sent an invalid event");
         }
@@ -150,14 +160,18 @@ public class HermesRunEventStream {
     }
 
     static RunEvent toRunEvent(JsonNode root, ToolDetailScope scope) {
-        return toRunEvent(root, scope, new LinkedHashMap<>());
+        return toRunEvent(root, scope, new DetailState(Clock.systemUTC()));
     }
 
-    private static RunEvent toRunEvent(JsonNode root, ToolDetailScope scope, Map<String, String> identifiers) {
+    private static RunEvent toRunEvent(JsonNode root, ToolDetailScope scope, DetailState state) {
         JsonNode payload = root.path("data");
         String type = firstText(root, payload, "event", "type");
         String toolName = firstText(root, payload, "tool", "tool_name", "toolName", "name");
         String detail = firstDetail(root, payload);
+        boolean toolEvent = type != null && type.toLowerCase(Locale.ROOT).startsWith("tool.");
+        boolean subagentEvent = type != null && type.toLowerCase(Locale.ROOT).startsWith("subagent.");
+        boolean afterConnector =
+                (toolEvent || subagentEvent) && state.afterConnector(scope, toolEvent ? toolName : null, root, payload);
         if (memoryReadResult(type, toolName)) {
             // 결과에 Memory 본문이 실린다. 인자를 담은 tool.started 의 preview 만 실행 사건에 남긴다(ADR-071)
             detail = null;
@@ -170,19 +184,22 @@ public class HermesRunEventStream {
             detail = null;
         }
         String skillName = null;
-        if (type != null && type.toLowerCase(Locale.ROOT).startsWith("tool.")) {
+        if (toolEvent) {
             // 긴 스킬 이름은 token 으로 보여 가려진다. 스킬 사용 기록에 넘길 이름은 가리기 전에 꺼내 검증한다.
-            if (!scope.hideAll() && SKILL_VIEW_STARTED.equalsIgnoreCase(type) && SKILL_VIEW_TOOL.equals(toolName)) {
+            if (!scope.hideAll()
+                    && !afterConnector
+                    && SKILL_VIEW_STARTED.equalsIgnoreCase(type)
+                    && SKILL_VIEW_TOOL.equals(toolName)) {
                 skillName = HermesSkillName.fromPreview(detail);
             }
-            detail = ToolDetailRedactor.redact(detail, toolName, scope, identifiers);
+            detail = ToolDetailRedactor.redact(detail, toolName, scope, state.identifiers, afterConnector);
         }
         String goal = firstText(root, payload, "goal");
-        if (type != null && type.toLowerCase(Locale.ROOT).startsWith("subagent.")) {
+        if (subagentEvent) {
             // 목표는 모델이 쓴 글이라 읽은 메일 본문이나 비밀값이 실릴 수 있다. 도구 내용과 같은 규칙으로 가린다.
-            // 도구 이름이 없으므로 옛 커넥터 에이전트의 실행만 통째로 가린다(ADR-047).
-            goal = ToolDetailRedactor.redact(goal, null, scope, identifiers);
-            detail = ToolDetailRedactor.redact(detail, null, scope, identifiers);
+            // 커넥터 호출 뒤에는 자식에게 넘기는 목표도 길이만 남긴다.
+            goal = ToolDetailRedactor.redact(goal, null, scope, state.identifiers, afterConnector);
+            detail = ToolDetailRedactor.redact(detail, null, scope, state.identifiers, afterConnector);
         }
         return new RunEvent(
                 type,
@@ -199,6 +216,34 @@ public class HermesRunEventStream {
                 firstNumber(root, payload, "output_tokens"),
                 firstText(root, payload, "status"),
                 skillName);
+    }
+
+    /** 번호표와 커넥터 호출 여부는 스트림마다 따로 둔다. 다른 트리로 이어지지 않는다. */
+    private static final class DetailState {
+        private final Map<String, String> identifiers = new LinkedHashMap<>();
+        private final Clock clock;
+        private boolean connectorCalled;
+
+        private DetailState(Clock clock) {
+            this.clock = clock;
+        }
+
+        boolean afterConnector(ToolDetailScope scope, String toolName, JsonNode root, JsonNode payload) {
+            if (scope.hides(toolName)) {
+                connectorCalled = true;
+            }
+            if (!connectorCalled) {
+                JsonNode timestamp = number(root, "timestamp");
+                if (timestamp == null) {
+                    timestamp = number(payload, "timestamp");
+                }
+                Instant at = timestamp == null
+                        ? clock.instant()
+                        : Instant.ofEpochMilli((long) Math.ceil(timestamp.asDouble() * 1000));
+                connectorCalled = scope.connectorCalledInTree().test(at);
+            }
+            return connectorCalled;
+        }
     }
 
     /** {@code memory_read} 도구의 사건 가운데 시작이 아닌 것이다. Hermes 가 뒤에 결과를 싣기 시작해도 본문을 남기지 않는다. */

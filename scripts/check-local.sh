@@ -97,6 +97,7 @@ step backend         bash -c "cd '${ROOT}/backend' && ./gradlew test"
 step migration-versions bash -c "cd '${ROOT}' && node scripts/check-migration-versions.mjs"
 step mysql-migration "${ROOT}/scripts/check-mysql-migration.sh"
 step web-typecheck   pnpm --dir "${ROOT}/web" typecheck
+step web-test        pnpm --dir "${ROOT}/web" test:node
 step web-build       build_web
 if [ "${skip_browser}" = false ]; then
   step browser       pnpm --dir "${ROOT}/web" test:browser "$@"

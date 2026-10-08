@@ -1,6 +1,8 @@
 package com.bifos.assistant.chat.application;
 
+import com.bifos.assistant.chat.domain.type.ModelSelectionMode;
 import com.bifos.assistant.chat.infra.ConversationRepository;
+import com.bifos.assistant.model.domain.type.ModelTier;
 import java.time.Instant;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -52,6 +54,21 @@ public class ConversationWriter {
     @Transactional
     public int renameIfActive(Long id, Long userId, String title, Instant now) {
         return repository.renameIfActive(id, userId, title, now);
+    }
+
+    @Transactional
+    public int chooseTierForTask(Long id, ModelTier tier) {
+        return repository.chooseTierForTask(id, ModelSelectionMode.TIER, tier);
+    }
+
+    @Transactional
+    public int hideFromList(Long id, Instant now) {
+        return repository.hideFromList(id, now);
+    }
+
+    @Transactional
+    public int showInList(Long id) {
+        return repository.showInList(id);
     }
 
     @Transactional

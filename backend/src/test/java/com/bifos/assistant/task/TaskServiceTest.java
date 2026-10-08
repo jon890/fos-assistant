@@ -10,6 +10,7 @@ import com.bifos.assistant.agent.domain.type.CredentialScope;
 import com.bifos.assistant.agent.infra.AgentRepository;
 import com.bifos.assistant.chat.domain.Conversation;
 import com.bifos.assistant.chat.infra.ConversationRepository;
+import com.bifos.assistant.model.domain.type.ModelTier;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.shared.error.ApiException;
@@ -310,6 +311,42 @@ class TaskServiceTest {
     }
 
     @Test
+    @DisplayName("모델 단계를 골라 만든 작업은 그 단계를 저장한다")
+    void storesModelTierOnCreate() {
+        CurrentUser owner = member();
+        Agent agent = agentOf(owner, AgentVisibility.PRIVATE);
+
+        TaskDetail created = service.create(owner, withTier(cron("단계 작업", agent, "0 9 1 * *"), ModelTier.BALANCED));
+
+        assertThat(created.task().modelTier()).isEqualTo(ModelTier.BALANCED);
+        assertThat(tasks.findById(created.task().id()).orElseThrow().modelTier())
+                .isEqualTo(ModelTier.BALANCED);
+    }
+
+    @Test
+    @DisplayName("단계를 비우고 고치면 작업의 단계가 지워진다")
+    void clearsModelTierOnUpdateWithoutIt() {
+        CurrentUser owner = member();
+        Agent agent = agentOf(owner, AgentVisibility.PRIVATE);
+        TaskDetail created = service.create(owner, withTier(cron("단계 작업", agent, "0 9 1 * *"), ModelTier.BALANCED));
+
+        TaskDetail updated = service.update(owner, created.task().publicId(), cron("단계 작업", agent, "0 9 1 * *"));
+
+        assertThat(updated.task().modelTier()).isNull();
+        assertThat(tasks.findById(created.task().id()).orElseThrow().modelTier())
+                .isNull();
+    }
+
+    @Test
+    @DisplayName("매일 깨우기 작업은 모델 단계를 고를 수 없다")
+    void rejectsModelTierForCheckTask() {
+        Task check = Task.check(1L, 1L, "매일 깨우기", NOW);
+
+        assertThatThrownBy(() -> check.chooseModelTier(ModelTier.FAST, NOW)).isInstanceOf(IllegalStateException.class);
+        assertThat(check.modelTier()).isNull();
+    }
+
+    @Test
     @DisplayName("발화 기록의 limit 은 1 이상 100 이하이고 밖이면 VALIDATION_FAILED 다")
     void runsLimitBounds() {
         CurrentUser owner = member();
@@ -386,6 +423,7 @@ class TaskServiceTest {
                 new ScheduleInput(TriggerType.CRON, cron, null, null),
                 null,
                 null,
+                null,
                 null);
     }
 
@@ -397,7 +435,20 @@ class TaskServiceTest {
                 new ScheduleInput(TriggerType.ONCE, null, fireAt, SEOUL.getId()),
                 ConversationMode.SINGLE,
                 MissedPolicy.SKIP,
-                NotifyPolicy.ON_FAILURE);
+                NotifyPolicy.ON_FAILURE,
+                null);
+    }
+
+    private static TaskInput withTier(TaskInput input, ModelTier tier) {
+        return new TaskInput(
+                input.title(),
+                input.agentCode(),
+                input.instruction(),
+                input.schedule(),
+                input.conversationMode(),
+                input.missedPolicy(),
+                input.notifyPolicy(),
+                tier);
     }
 
     private CurrentUser member() {

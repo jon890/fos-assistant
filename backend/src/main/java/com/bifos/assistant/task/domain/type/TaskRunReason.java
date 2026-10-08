@@ -1,7 +1,8 @@
 package com.bifos.assistant.task.domain.type;
 
 /**
- * {@code SKIPPED} 와 {@code FAILED} 발화의 까닭이다. DB 에 이름 그대로 저장된다.
+ * {@code SKIPPED} 와 {@code FAILED} 발화의 까닭, 그리고 알릴 것 없이 끝낸 {@code SUCCEEDED} 발화의 까닭이다. DB 에 이름 그대로
+ * 저장된다.
  *
  * <p>언제 붙는지는 {@code docs/backend/task.md} 의 「발화와 시작」 이 갖는다.
  */
@@ -23,5 +24,7 @@ public enum TaskRunReason {
     /** turn 이 예외로 끝났다. */
     FAILED,
     /** 도는 중에 서버가 다시 시작됐다. */
-    INTERRUPTED
+    INTERRUPTED,
+    /** 답 전체가 {@code [SILENT]} 라 알릴 것 없이 끝냈다. {@code SUCCEEDED} 발화에 붙는다. */
+    NOTHING_TO_REPORT
 }

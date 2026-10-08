@@ -9,6 +9,7 @@ import com.sun.net.httpserver.HttpServer;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
@@ -40,6 +41,8 @@ class ToolDetailEventStreamTest {
 
     /** 붙은 커넥터 서버의 도구와 다른 도구가 한 실행에서 함께 돈다. */
     private static final String MIXED_RAW = """
+            data: {"event":"tool.started","tool":"web_search","preview":"호출-전-1180 Bearer short-secret"}
+
             data: {"event":"tool.started","tool":"mcp__demo__list_notes","preview":"{\\"query\\": \\"외부-글-4821\\"}"}
 
             data: {"event":"tool.completed","tool":"mcp__demo__list_notes","result":"외부-결과-4821"}
@@ -97,19 +100,24 @@ class ToolDetailEventStreamTest {
     }
 
     @Test
-    @DisplayName("일반 에이전트의 스트림은 붙은 커넥터 서버의 도구 내용만 가리고 다른 도구는 지금처럼 남긴다")
-    void hidesOnlyAttachedConnectorToolDetailsForOrdinaryAgent() throws IOException {
+    @DisplayName("붙은 커넥터 호출 전에는 비밀값만 가리고 호출 뒤 일반 도구는 길이만 남긴다")
+    void hidesOtherToolDetailsAfterAttachedConnectorCall() throws IOException {
         HttpServer server = startServer(MIXED_RAW);
         try {
             List<RunEvent> events = read(server, ToolDetailScope.prefixes(Set.of("mcp__demo__")));
 
             assertThat(events)
                     .extracting(RunEvent::detail)
-                    .containsExactly("[연결 도구 내용 가림]", "[연결 도구 내용 가림]", "검색-결과-1180", "다른-서버-3307");
+                    .containsExactly(
+                            "호출-전-1180 [가림]", "[연결 도구 내용 가림]", "[연결 도구 내용 가림]", "[도구 내용 가림: 10자]", "[도구 내용 가림: 10자]");
             assertThat(events)
                     .extracting(RunEvent::toolName)
                     .containsExactly(
-                            "mcp__demo__list_notes", "mcp__demo__list_notes", "web_search", "mcp__demoother__list");
+                            "web_search",
+                            "mcp__demo__list_notes",
+                            "mcp__demo__list_notes",
+                            "web_search",
+                            "mcp__demoother__list");
         } finally {
             server.stop(0);
         }
@@ -130,9 +138,51 @@ class ToolDetailEventStreamTest {
                     .containsExactly("mcp__demo__list_notes", "mcp__demo__list_notes", "terminal", "terminal");
             assertThat(events)
                     .extracting(RunEvent::detail)
-                    .containsExactly("[연결 도구 내용 가림]", "[연결 도구 내용 가림]", "ls", "없다");
+                    .containsExactly("[연결 도구 내용 가림]", "[연결 도구 내용 가림]", "[도구 내용 가림: 2자]", "[도구 내용 가림: 2자]");
             assertThat(events).extracting(RunEvent::durationMs).containsExactly(null, 50L, null, 100L);
             assertThat(events).extracting(RunEvent::failed).containsExactly(null, false, null, true);
+        } finally {
+            server.stop(0);
+        }
+    }
+
+    @Test
+    @DisplayName("연결 없는 실행은 일반 도구 내용에 기존 비밀값 가림과 500자 상한을 쓴다")
+    void keepsExistingRuleWithoutBindings() throws IOException {
+        String raw = "data: {\"event\":\"tool.started\",\"tool\":\"terminal\",\"preview\":\"Bearer tiny "
+                + "가".repeat(600) + "\"}\n\n";
+        HttpServer server = startServer(raw);
+        try {
+            assertThat(read(server, ToolDetailScope.NONE).getFirst().detail())
+                    .startsWith("[가림] ")
+                    .hasSize(500)
+                    .endsWith("…");
+        } finally {
+            server.stop(0);
+        }
+    }
+
+    @Test
+    @DisplayName("자식이나 형제의 커넥터 호출 뒤에는 연결 없는 부모도 목표와 일반 도구를 가린다")
+    void usesTreeHistoryAtEventTimeAndDoesNotLeakIntoNextStream() throws IOException {
+        String raw = """
+                data: {"event":"tool.started","timestamp":1000,"tool":"agent_delegate","preview":"호출 전"}
+
+                data: {"event":"subagent.start","timestamp":1002,"goal":"메일 본문 전달"}
+
+                data: {"event":"tool.completed","timestamp":1003,"tool":"agent_status","result":"메일 본문 반환"}
+
+                """;
+        HttpServer server = startServer(raw);
+        try {
+            ToolDetailScope scope =
+                    ToolDetailScope.NONE.withTreeHistory(at -> !at.isBefore(Instant.ofEpochSecond(1001)));
+            List<RunEvent> events = read(server, scope);
+            assertThat(events).extracting(RunEvent::detail).containsExactly("호출 전", null, "[도구 내용 가림: 8자]");
+            assertThat(events.get(1).goal()).isEqualTo("[도구 내용 가림: 8자]");
+            assertThat(read(server, ToolDetailScope.NONE))
+                    .extracting(RunEvent::detail)
+                    .containsExactly("호출 전", null, "메일 본문 반환");
         } finally {
             server.stop(0);
         }

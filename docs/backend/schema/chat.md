@@ -23,15 +23,18 @@
 | `updated_at` | DATETIME(6) | 목록 정렬에 쓴다. 같은 값이면 `id` 가 큰 쪽이 앞이다 |
 | `deleted_at` | DATETIME(6) NULL | 사용자가 지운 시각. 채워지면 목록과 조회와 보내기에서 없는 대화와 같다 |
 | `purged_at` | DATETIME(6) NULL | 지운 대화의 본문을 정리 작업이 실제로 지운 시각. 이때 `title` 과 두 session 칸을 비운다. 채워진 대화에는 메시지를 저장하지 않는다. 근거는 [ADR-20261008 / conversation-purge](../../adr/ADR-20261008-conversation-purge.md) |
+| `hidden_at` | DATETIME(6) NULL | 목록에서만 뺀 시각. 예약 작업이 「보고할 것 없음」 으로 끝난 `NEW_PER_RUN` 대화에 적는다. 조회와 보내기는 그대로 되고, 사용자가 질문을 보내면 비운다([`task.md`](../task.md) 의 「보고할 것 없음」) |
 | `auto_turn_count` | INT NOT NULL DEFAULT 0 | 마지막 사용자 질문 뒤로 Control Plane 이 위임 결과를 전하려고 연 turn 수. 사용자 질문을 저장할 때 0 으로 돌린다. `assistant.delegation-wake.max-auto-turns`(기본 10)에 닿으면 더 깨우지 않는다 |
 | `purpose` | VARCHAR(16) NOT NULL DEFAULT 'CHAT' | `CHAT` 은 보통 대화, `CHECK` 는 먼저 살펴보기의 점검 대화다. 만들 때 정하고 바뀌지 않는다. 사용자와 에이전트마다 지우지 않은 점검 대화 가운데 `id` 가 가장 큰 것을 쓴다([`proactive-check.md`](../proactive-check.md)) |
 | `task_id` | BIGINT NULL | 이 대화를 만든 예약 작업. 사용자가 연 대화는 비어 있다. 외래 키를 두지 않는다. 뜻은 [`task.md`](task.md) 의 「conversation 에 더하는 칸」 |
 
 `hermes_session_id` 가 특정 profile 안의 값이라, 대화의 에이전트는 중간에 바뀌지 않는다.
 
-색인은 `(user_id, deleted_at, updated_at, id)` 다(V51). 점검 대화를 찾는 `(user_id, agent_id, purpose)` 도 있다(V69). 목록이 사용자의 지우지 않은 대화를 `updated_at desc, id desc` 로 쪽마다 읽는다.
+색인은 `(user_id, deleted_at, updated_at, id)` 다(V51). 점검 대화를 찾는 `(user_id, agent_id, purpose)` 도 있다(V69). 목록이 사용자의 지우지 않았고 숨기지 않은 대화를 `updated_at desc, id desc` 로 쪽마다 읽는다.
 지운 대화가 쌓여도 한 쪽을 읽는 줄 수가 쪽 크기에 머문다.
 정리 작업이 지웠지만 본문이 남은 대화를 찾는 `(purged_at, deleted_at)` 도 있다.
+숨긴 대화(`hidden_at`)는 색인 칸에 없어 읽은 뒤 거른다. 한 쪽을 읽을 때 그 사이에 든 숨긴 대화만큼 줄을 더 읽는다.
+숨긴 대화는 「보고할 것 없음」 으로 끝난 예약 작업만 만들고, 하루에 만드는 수는 사용자당 하루 발화 상한(`assistant.task.max-runs-per-day`, 기본 48)을 넘지 않아 색인에 더하지 않는다. 다른 경로가 대화를 숨기게 되면 색인에 `hidden_at` 을 더한다.
 
 **`agent_id` 에 FK 를 두지 않는다.** 칸도 NULL 을 받는다(V4 가 칸을 더하며 그렇게 만들었다).
 에이전트를 지우는 것은 `deleted_at` 을 적는 것이라 정상 경로에서는 행이 사라지지 않는다.

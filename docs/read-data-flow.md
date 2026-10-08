@@ -70,7 +70,7 @@ flowchart LR
 | 실행 공간 | 등록한 profile 의 셸, 파일 도구, `execute_code` 가 profile `.env`, 연결 보관 파일, 대응 파일, 다른 사용자의 파일에 닿지 않는다 | 밖으로 나가는 요청. 실행 공간을 적용하지 않은 profile. 컨테이너 밖에서 도는 web, browser 도구 |
 | 바인딩의 주인과 공개 범위 | 연결이 붙은 에이전트는 `PRIVATE` 이고 주인이 자기 연결만 붙인다. 남이 주인의 계정으로 외부 서비스를 부르지 못한다 | 주인 자신의 실행 안에서 글이 어디로 가는지 |
 | `memory_remember` 의 바깥 도구 확인 | 그 대화의 도구가 모두 안쪽 목록(`McpMemoryRemember.INTERNAL_TOOLS`)에 들 때만 바로 저장할 수 있다. 커넥터 도구, 웹, 하위 에이전트, 맡긴 실행의 답을 돌려주는 `agent_status` 가 하나라도 있으면 제안으로 둔다. 나머지 조건은 [`backend/memory.md`](backend/memory.md) 의 「바로 저장 판정」 이 갖는다. | 사건 저장이 실패해 도구 시작 줄이 빠진 대화 |
-| 도구 내용 가림 | 커넥터 도구의 입력과 결과는 실행 기록에 `[연결 도구 내용 가림]` 만 남는다. 다른 도구는 비밀 모양을 가리고 500자로 자른다 | 비밀 모양이 아닌 본문. 하위 에이전트의 목표 |
+| 도구 내용 가림 | 커넥터 도구의 입력과 결과는 실행 기록에 `[연결 도구 내용 가림]`만 남는다. 실행 트리에서 커넥터 호출 뒤에는 일반 도구 내용과 하위 에이전트 목표도 길이만 남긴다. 호출 전에는 비밀 모양을 가리고 500자로 자른다 | 이미 저장된 사건. 이전 turn에서 읽은 본문. Hermes가 보내기 전에 자른 원문 길이 |
 
 ## 흐름 판정 코드
 
@@ -116,7 +116,7 @@ flowchart LR
 | RF-13 | `memory_remember` 로 | 사용자 승인 | `PROPOSAL_ONLY` | Control Plane. 대화에 바깥 도구가 있으면 제안이다 | `McpMemoryRememberToolTest` 의 커넥터 READ 시험과 바깥 도구 시험 |
 | RF-14 | `follow_up_propose` 로 | 사용자 승인 | `PROPOSAL_ONLY` | Control Plane. 사람이 받아들여야 할 일이 된다 | `McpFollowUpToolTest` |
 | RF-15 | `agent_delegate` 의 `task` 로 다른 에이전트에 | 허용. 결과가 돌아올 때 감싸지 않는다 | `SAME_OWNER_SINK`, `OPEN_GAP` | Control Plane. 대상은 요청자 소유이거나 그룹 공개 에이전트다. 자식 실행은 요청자 명의이고 대상 에이전트의 도구로 돈다. 그 도구로 가는 흐름은 이 표의 다른 줄이 정한다. 결과는 다음 turn 전달과 `agent_status` 두 길로 돌아온다 | `test_read_data_flow` `test_control_plane_sinks_keep_body_and_get_signed_context` |
-| RF-16 | 실행 기록의 도구 내용으로 | 커넥터 도구는 허용(가림). 다른 도구의 인자로 다시 실린 본문은 열린 틈 | `REDACTED_RECORD`, `OPEN_GAP` | `ToolDetailRedactor` | `ToolDetailRedactorTest` 의 연결 도구 시험과 다른 도구 인자 시험 |
+| RF-16 | 실행 기록의 도구 내용으로 | 허용(가림). 트리에서 커넥터 호출 뒤에는 일반 도구도 이름과 받은 내용의 길이만 남긴다(#319) | `REDACTED_RECORD` | `ToolDetailRedactor`, `HermesRunEventStream`. 커넥터 정책 기록으로 루트와 자식, 형제를 함께 확인한다. 이력 조회 실패도 가린다 | `ToolDetailRedactorTest`의 다른 도구 인자 시험, `ToolDetailEventStreamTest`의 호출 전후와 트리 이력 시험, `ConnectorCallHistoryTest` |
 | RF-17 | 승인 줄로 | 허용 | `SAME_OWNER_SINK` | 승인 줄에 인자 원문이 16KB 까지, 결과 글이 남는다. 주인 화면은 가린 인자를 받는다 | `ConnectorActionServiceTest` |
 | RF-18 | `fos-ctx` 와 backend 로그로 | 허용(가림) | `REDACTED_RECORD` | hook 은 인자와 결과 본문을 로그에 남기지 않는다. backend 는 도구 인자와 결과를 로그에 남기는 줄이 없다(코드 확인, 시험 없음). Hermes core 의 로그는 확인하지 않았다 | `test_fos_ctx` 의 `test_logs_hide_token_signature_and_args`, `test_unreadable_tool_map_returns_none_without_leaking` |
 | RF-19 | 커넥터 출력 파일로 | 허용 | `SAME_OWNER_SINK` | 그 profile 의 실행 공간에만 읽기 전용으로 붙는다. 셸이 읽은 뒤는 RF-08 과 같다 | `test_dashboard_profile_api_connector_binding_output`, `test_dashboard_profile_api_sandbox_terminal` 의 출력 디렉터리 읽기 전용 시험 |
@@ -146,9 +146,8 @@ RF-21은 Hermes v0.21.5(태그 `v2026.9.24`)의 소스로 확인했다.
 
 | 틈 | 지금 | 고칠 방향 |
 | --- | --- | --- |
-| 하위 에이전트의 목표 | 실행 기록이 하위 에이전트 사건의 목표를 가리지 않고 저장한다(`ExecutionEventRecorder`). 목표에서 만든 하위 에이전트 이름도 앞 128자가 그대로 남는다. 목표에 READ 본문이나 비밀값이 실리면 그대로 남는다 | 도구 내용과 같은 가림을 건다 |
+| 이전 turn의 본문 | 커넥터 호출 뒤 일반 도구와 하위 에이전트 목표는 가리지만, 새 실행 트리는 이전 turn에서 읽은 본문까지 추적하지 않는다. 이미 저장된 사건도 다시 가리지 않는다 | 대화 이력을 포함한 가림 범위는 별도 결정이 필요하다 |
 | 바인딩 에이전트의 위임 결과 | 위임 결과를 `ExternalData` 로 감싸는 판정이 옛 커넥터 에이전트(`connectorManaged`)만 본다. 다음 turn 으로 전하는 길(`ChatDeliveryInput.isExternalResult`)과 `agent_status` 의 답(`McpToolService`)이 같다. 연결을 붙인 일반 에이전트의 결과는 두 길 모두 감싸지 않는다 | 두 길 모두 연결이 붙은 에이전트의 결과도 감싼다 |
-| 다른 도구 인자로 다시 실린 본문 | READ 본문이 `agent_delegate`, `artifact_write`, `web_search` 같은 일반 도구의 인자로 다시 실리면 비밀 모양만 가린 앞 500자가 실행 기록에 남고 관리자에게 보인다 | 후속에서 정한다 |
 
 ## 실행 공간이 해결한 것과 남은 것
 

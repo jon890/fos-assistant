@@ -84,6 +84,7 @@ public class TaskService {
         Schedule schedule = validated(input.schedule(), now);
         Task task = tasks.save(Task.create(
                 user.id(), agent.id(), title(input.title()), input.instruction(), modeOf(input), notifyOf(input), now));
+        task.chooseModelTier(input.modelTier(), now);
         MissedPolicy missed = missedOf(input);
         TaskTrigger trigger = triggers.save(
                 schedule.type() == TriggerType.CRON
@@ -105,6 +106,7 @@ public class TaskService {
         TaskTrigger trigger = requireTrigger(task);
         Agent agent = requireAgent(user, input.agentCode());
         task.edit(agent.id(), title(input.title()), input.instruction(), modeOf(input), notifyOf(input), now);
+        task.chooseModelTier(input.modelTier(), now);
         if (!sameSchedule(trigger, input.schedule())) {
             Schedule schedule = validated(input.schedule(), now);
             trigger.reschedule(
