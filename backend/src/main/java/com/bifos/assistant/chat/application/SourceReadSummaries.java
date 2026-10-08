@@ -215,8 +215,7 @@ public class SourceReadSummaries {
             if (result.path("blocked_by_policy").asBoolean(false)
                     || (error != null && !error.isNull())
                     || (content != null
-                            && content.isString()
-                            && content.asString().isBlank())) {
+                            && (content.isNull() || (content.isString() && content.asString().isBlank())))) {
                 knownOutcome = true;
                 continue;
             }

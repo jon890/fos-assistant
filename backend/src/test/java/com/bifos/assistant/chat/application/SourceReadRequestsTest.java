@@ -118,6 +118,7 @@ class SourceReadRequestsTest {
                 "{\"results\":[]}",
                 "{\"results\":[{\"url\":\"https://example.com/error\",\"content\":\"본문\",\"error\":\"실패\"}]}",
                 "{\"results\":[{\"url\":\"https://example.com/blank\",\"content\":\"   \"}]}",
+                "{\"results\":[{\"url\":\"https://example.com/empty\",\"content\":null}]}",
                 "{\"results\":[{\"blocked_by_policy\":true}]}",
                 "{\"success\":false,\"results\":[]}",
                 "{\"blocked_by_policy\":true,\"results\":[]}"
