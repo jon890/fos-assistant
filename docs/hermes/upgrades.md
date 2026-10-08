@@ -62,7 +62,7 @@ v0.21.3 은 `v2026.9.14`, commit `345cd2b057a452236de401d3534b8502a7465e8d` 이�
 | --- | --- | --- |
 | v0.21.1 내부 모듈 | 큰 파일을 분리했다. 내부 함수를 import 하는 plugin 은 모듈 위치를 확인해야 한다 | [release note](https://github.com/NousResearch/hermes-agent/releases/tag/v2026.9.7) |
 | v0.21.2 DB | 중복 writer, 정상 DB 손상 오판, profile DB 혼선과 불필요한 기동 write lock 을 고쳤다 | [release note](https://github.com/NousResearch/hermes-agent/releases/tag/v2026.9.11), `SessionDB`, `hermes_state_registry.acquire` |
-| v0.21.3 완료 전달 | 공유 profile 문맥 누락을 고쳤다. API 완료는 여전히 delivery 기록이며 자동 모델 실행이 아니다 | [「공유 listener 의 완료 watcher 결함과 수정」](delegation.md#공유-listener-의-완료-watcher-결함과-수정) |
+| v0.21.3 완료 전달 | 공유 profile 문맥 누락을 고쳤다. v0.21.0 의 완료 watcher 는 요청 profile 문맥을 잃고 listener 주인 profile 의 DB 에서 부모를 찾아, 없으면 완료 결과를 버렸다. v0.21.3 은 완료 사건의 profile 문맥에서 부모 판정과 결과 주입을 하고 보조 profile 의 미전달 기록도 복구한다. API 완료는 여전히 delivery 기록이며 자동 모델 실행이 아니다 | [commit `c632437c3bb3`](https://github.com/NousResearch/hermes-agent/commit/c632437c3bb3fcd19e755882ce346b270ef3d151) |
 | v0.21.3 공유 제공 | `gateway.multiplex_profile_allowlist` 를 제거했다. 살아 있는 모든 profile 을 공유 제공한다 | [commit `9848e22ed659`](https://github.com/NousResearch/hermes-agent/commit/9848e22ed659d2e90ff3126f4dfcf78d9028efeb), `config_migrations` v43 |
 | v0.21.3 cron·curator | `cron.model_drift_guard` 를 없애고 생성 당시 모델로 cron 을 실행한다. curator 의 이전 기본 기간을 stale 30→14일, archive 90→30일로 바꾼다. 명시한 다른 값은 보존한다 | `config_migrations` v42·v44, [commit `be2f7e9c3616`](https://github.com/NousResearch/hermes-agent/commit/be2f7e9c3616) |
 | v0.21.3 DB schema | 29→30 migration 과 자식 transcript 의 trigram 검색 제외가 있다. 첫 DB open 이 index·DDL 을 바꿀 수 있다 | [commit `2b55ded1ac5f`](https://github.com/NousResearch/hermes-agent/commit/2b55ded1ac5f3b41cdc580974e745631dac1bb53), `hermes_state_schema` 의 `_init_schema`, `_reconcile_columns` |
@@ -156,27 +156,6 @@ session 상세의 비캐시 입력 토큰과 혼동하지 않는다.
 [v0.21.5 api_server_runs.py](https://github.com/NousResearch/hermes-agent/blob/v2026.9.24/gateway/platforms/api_server_runs.py) 의
 `terminal_run_status`, `_execute_run`, `_mark_shutdown_interrupted_runs` 다.
 
-## 홈서버에서 확인한 것
-
-2026년 9월 17일에 홈서버에서 직접 확인했다.
-
-| 항목 | 결과 |
-| --- | --- |
-| 버전 | Hermes Agent v0.21.0 (2026.8.31) |
-| `run_submission`, `run_status` | true |
-| `run_events_sse`, `run_stop` | true |
-| 배치 | 공유 listener 하나가 `/p/<profile>/...` 경로로 모든 profile 을 받는다 |
-| subagent 토큰 | 부모 실행의 `usage` 에 포함되지 않는다 |
-
-**subagent 토큰이 부모에 포함되지 않으므로 실행 줄을 전부 더해야 실제 사용량이 나온다.**
-subagent 를 쓴 실행과 쓰지 않은 실행의 토큰을 견줘 확인했고,
-근거는 [ADR-016의 「자식 토큰 실측」 절](../adr/ADR-016-다중-에이전트-조율은-control-plane이-맡는다.md#자식-토큰-실측)에 있다.
-부모 usage 만 저장하면 그만큼이 기록에서 빠진다.
-
-공유 listener 를 쓰더라도 profile 마다 접두가 다르고,
-나중에는 profile 마다 다른 노드를 가리킬 수 있어야 한다.
-그래서 Control Plane 은 API server 주소를 `hermes.base-url` 이 아니라 에이전트의 `api_base_url` 에 둔다.
-
 ## 대시보드 plugin 이 기대는 내부 지점
 
 `dashboard-profile-api` 는 공개 확장점이 아닌 Hermes 내부 지점에 기댄다.
@@ -185,11 +164,6 @@ subagent 를 쓴 실행과 쓰지 않은 실행의 토큰을 견줘 확인했고
 
 Hermes 를 올리기 전에 새 판의 tag 로 `scripts/check-hermes-contract.sh <tag>` 를 돌린다.
 실패한 항목을 plugin 에서 고치고, `HERMES_VERSION` 을 새 tag 로 바꾼 PR 의 CI 가 통과한 뒤 이미지를 올린다.
-
-2026-10-06 에 이 확인을 앞선 판에 돌렸다.
-`v2026.8.31` 에는 `reload_gateway_plugins` 와 `_config_profile_scope` 가 없었다.
-`v2026.7.30` 에는 그 둘과 `list_profile_names` 가 없었다.
-지금 plugin 을 그 판에 올리면 이 지점을 쓰는 단계가 실패한다.
 
 ### MCP 설정 맞추기와 스킬 색인 캐시 키
 

@@ -180,7 +180,7 @@ FOS 실행 #105 같은 대화의 다음 turn          ← 돌아도 S1 은 #100 
 | 항목 | 계약 |
 | --- | --- |
 | 서버 이름 | `fos-assistant` |
-| Hermes 가 보이는 도구 이름 | `mcp__fos_assistant__<도구>`. 예: `mcp__fos_assistant__artifact_write`, `mcp__fos_assistant__memory_read` (v0.21.5, 2026-09-29 운영에서 확인) |
+| Hermes 가 보이는 도구 이름 | `mcp__fos_assistant__<도구>`. 예: `mcp__fos_assistant__artifact_write`, `mcp__fos_assistant__memory_read` |
 | 경로 | `/mcp` |
 | 프로토콜 | Streamable HTTP `2025-03-26` |
 | 인증 | profile마다 다른 Bearer 토큰. 토큰은 그 profile 을 증명할 뿐 사용자를 정하지 않는다 |
@@ -203,8 +203,7 @@ FOS 실행 #105 같은 대화의 다음 turn          ← 돌아도 S1 은 #100 
 | `follow_up_propose` | [`follow-up.md`](follow-up.md) 의 「제안 도구」 |
 | `memory_remember` | [`memory.md`](memory.md) 의 「에이전트가 기억을 남기는 길」 |
 
-**Hermes 는 MCP 도구 이름 앞에 서버 이름을 붙인다.** 처음에는 Memory 만 담아 서버 이름이 `fos-assistant-memory` 였다.
-결과물 쓰기가 같은 서버에 들어오면서 `mcp__fos_assistant_memory__artifact_write` 처럼 Memory 와 무관한 도구에 Memory 가 붙어 2026-09-29 에 `fos-assistant` 로 바꿨다.
+**Hermes 는 MCP 도구 이름 앞에 서버 이름을 붙인다.** 그래서 서버 이름에 특정 기능의 이름을 넣지 않는다.
 Control Plane 이 여는 도구는 모두 이 서버 하나에 둔다.
 
 **서버 이름을 바꿀 때는 등록 이름과 허용 목록을 한 번에 바꾼다.**
@@ -217,27 +216,19 @@ MCP 서버를 등록하는 설정 틀은 이 저장소의 `hermes/profile-templa
 `platform_toolsets.api_server` 의 `no_mcp` 는 API server 로 들어온 실행에서 MCP 도구를 통째로 막는다.
 `no_mcp` 대신 서버 이름을 허용 목록으로 적으면 그 서버의 도구만 모델에 전달하고 나머지는 막는다.
 
-도구가 없던 profile 에 MCP 서버를 처음 열면 Hermes 가 `tool_search`, `tool_describe`, `tool_call` 중계를 함께 싣는다.
-도구 정의가 약 59 토큰이어도 중계 때문에 입력이 약 1,800 토큰 늘 수 있다.
+도구가 없던 profile 에 MCP 서버를 처음 열면 Hermes 가 `tool_search`, `tool_describe`, `tool_call` 중계를 함께 실어 입력이 도구 정의보다 크게(약 1,800 토큰) 늘 수 있다.
 이미 이 중계를 쓰는 profile 은 MCP 서버를 더해도 서버의 도구 정의만큼만 늘어난다.
 
 ### 입력 비용은 API 콜 수가 정한다
 
 실행의 입력 토큰은 provider 에 보낸 모든 API 콜의 입력을 더한 값이다.
 추가 API 콜 하나는 그 시점의 전체 프롬프트 하나만큼 들기 때문에 대화가 길수록 도구 호출도 비싸진다.
+`memory_read` 를 부른 턴은 API 콜이 한두 번 늘고, 한 턴에 항목을 몇 개 읽든 늘어나는 콜 수는 같다.
+그래서 항목 수보다 도구를 부르는 턴 수가 입력 비용을 정한다.
 
-도구를 부르지 않는 턴은 API 콜이 한 번이고, `memory_read` 를 부른 턴은 두 번이나 세 번이었다.
-한 턴에서 항목을 한 개 읽든 세 개를 병렬로 읽든 API 콜 수는 같았다.
-항목 수보다 도구를 부르는 턴 수가 입력 비용을 정한다.
-
-Memory 색인 한 줄은 약 12 토큰이고, 항상 층(`retrieval` 이 `ALWAYS`)의 본문은 한 글자당 약 0.49 토큰이다.
-항상 층은 API 콜 수를 늘리지 않는다.
-
-#### 도구와 항상 층을 고르는 기준
-
-항목이 필요한 실행 하나만 비교하면 항상 층(`ALWAYS`)이 도구보다 싸다.
-항상 층은 API 콜을 늘리지 않지만, 도구는 현재 문맥 전체를 담은 API 콜을 한 번이나 두 번 더 만들기 때문이다.
-
+항상 층(`retrieval` 이 `ALWAYS`)은 API 콜을 늘리지 않고 본문 길이만큼만 입력을 늘린다(한 글자당 약 0.49 토큰).
+Memory 색인 한 줄은 약 12 토큰이다.
+그래서 항목이 필요한 실행 하나만 비교하면 항상 층이 도구보다 싸다.
 항목이 필요 없는 실행에도 본문을 싣는 비용까지 포함하면 사용 빈도가 손익분기를 정한다.
 아래 값보다 본문이 길면 도구가 유리하다.
 
@@ -311,15 +302,8 @@ DNS 검사 뒤 원래 호스트 URL 을 일반 HTTP 클라이언트로 다시 �
 클라이언트가 이름을 다시 풀면 검사한 IP 와 연결한 IP 가 달라질 수 있다.
 연결 시점에도 IP 를 고정하고 원래 호스트 인증을 유지해야 한다.
 
-Hermes v0.21.0 의 태그는 `v2026.8.31` 이다.
-[해당 버전의 이미지 생성 소스](https://github.com/NousResearch/hermes-agent/blob/v2026.8.31/tools/image_generation_tool.py) 는
-FAL 응답의 첫 이미지 URL 을 `success`, `image` 결과로 돌려준다.
-소스는 출력 호스트를 고정하지 않는다.
-[FAL 공식 응답 예시](https://fal.ai/models/fal-ai/flux/dev/api#output) 의 `images[].url` 은 빈 값이다.
-이 근거로는 실제 출력 호스트를 확정할 수 없어 허용 목록의 기본값을 비워 둔다.
+**허용 목록의 기본값은 비워 둔다.** Hermes 이미지 생성 도구([`tools/image_generation_tool.py`](https://github.com/NousResearch/hermes-agent/blob/v2026.8.31/tools/image_generation_tool.py))는 FAL 응답의 이미지 URL 을 그대로 돌려주고 출력 호스트를 고정하지 않아, 실제 출력 호스트를 코드로 확정할 수 없다.
 운영 호스트 확인과 설정은 `fos-home-infra` 에서 맡는다.
 
-[같은 버전의 파일 안전 소스](https://github.com/NousResearch/hermes-agent/blob/v2026.8.31/agent/file_safety.py) 의
-`get_safe_write_roots()` 는 `HERMES_WRITE_SAFE_ROOT` 를 프로세스 환경에서 읽는다.
-이 값은 profile 별 쓰기 권한을 정하지 못한다.
+**결과물 폴더의 경계로 Hermes 의 `HERMES_WRITE_SAFE_ROOT` 를 쓰지 않는다.** `get_safe_write_roots()`([`agent/file_safety.py`](https://github.com/NousResearch/hermes-agent/blob/v2026.8.31/agent/file_safety.py))가 프로세스 환경에서 읽는 값이라 profile 별 쓰기 권한을 정하지 못한다.
 읽기 거절 규칙도 결과물 폴더만 읽게 하는 경계가 아니다.

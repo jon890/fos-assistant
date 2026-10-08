@@ -42,15 +42,7 @@ Control Plane 이 올린 스킬을 저장하고 게시하는 규칙은 [`backend
 본문은 `skill_view` 로 읽을 때 들어가고, 조건부 스킬은 `_skill_should_show` 가
 도구와 platform 으로 거른다.
 
-`o200k_base` 로 색인을 계산한 크기다. provider 의 토크나이저에 따라 달라질 수 있다.
-
-| 설명 구성 | 스킬 수 | 전체 색인 | 스킬 한 줄 | 고정 부분 |
-| --- | --- | --- | --- | --- |
-| 한국어 위주 | 6 | 476 토큰 | 33~42 토큰 | 238 토큰 |
-| 한국어·영어 혼합 | 7 | 490 토큰 | 18~44 토큰 | 292 토큰 |
-
-스킬 하나는 API 호출 한 번의 입력에 대략 20~45 토큰을 더한다.
-한국어 설명은 40 토큰 안팎이며 실행 안의 API 호출마다 다시 실린다.
+스킬 하나는 API 호출 한 번의 입력에 대략 20~45 토큰(`o200k_base` 기준)을 더하고, 실행 안의 API 호출마다 다시 실린다.
 
 **`skills` 는 읽기 전용 toolset 이 아니다.**
 `skill_manage` 는 profile 로컬 스킬을 만들고 고친다.
@@ -85,78 +77,18 @@ v0.21.5 소스로 확인했다. **`skill_view` 를 두고 `skill_manage` 만 도
 [agent/system_prompt.py](https://github.com/NousResearch/hermes-agent/blob/v2026.9.24/agent/system_prompt.py) 의 `_tool_guidance_block`,
 [agent/prompt_builder.py](https://github.com/NousResearch/hermes-agent/blob/v2026.9.24/agent/prompt_builder.py) 다.
 
-### 스킬 수를 줄인 실측
+### 입력 비용은 스킬 색인보다 도구 정의가 더 크다
 
-**다만 스킬이 입력 비용의 대부분은 아니다.**
-같은 문장을 `career` profile 에 보내 스킬 97개일 때와 6개일 때를 측정했다.
-
-| 스킬 수 | 입력 토큰 |
-| --- | --- |
-| 97 | 14,949 |
-| 6 | 12,388 |
-
-줄어든 것이 2,561 토큰으로 17% 였다.
-
-### 도구 정의가 더 크다
-
-같은 방법으로 도구 범위를 바꿔 가며 측정한 것이다.
-바이트는 `hermes prompt-size --platform api_server --json` 이 보고한 값이고,
-이 명령은 API 를 부르지 않고 계산한다.
-
-| 구성 | 도구 수 | 도구 정의 바이트 | 입력 토큰 |
-| --- | --- | --- | --- |
-| 전부 열림 | 18 | 31,147 | 12,388 |
-| terminal·file·skills·memory·web | 14 | 20,364 | 10,180 |
-| terminal·file·skills·memory | 12 | 18,454 | 9,792 |
-| 전부 잠금 | 0 | 2 | 4,278 |
-
-도구를 전부 잠그면 65.5% 가 줄어든다.
-이 값은 도구 정의 JSON 만이 아니라 system prompt 의 도구 안내까지 함께 줄어든 결과다.
-system prompt 가 22,799 글자에서 13,123 글자로 줄었다.
-
-`career` 에서 실제로 뺄 수 있는 것은 2,596 토큰, 21% 다.
-`career-os` 스킬이 `bun` 을 부르므로 `terminal` 이, 파일을 읽으므로 `file` 이 필요하다.
-`sync-profile` 이 쓰는 브라우저는 Hermes 의 browser toolset 이 아니라
-외부 스크립트이고 `terminal` 로 돌리므로 그 toolset 은 빼도 된다.
-
-비용을 줄이려면 스킬만 보지 말고 도구 설정을 함께 본다.
-
-### 실행 한 번의 비용은 이보다 훨씬 크다
-
-위 숫자는 짧은 대화 한 번의 고정 비용이다.
-실제 작업을 시키면 그 고정 비용이 턴마다 다시 실린다.
-
-`career` 에 포지션 추천을 한 번 시킨 실측이다.
-
-| 항목 | 값 |
-| --- | --- |
-| 입력 | 3,460,816 토큰 |
-| 출력 | 15,301 토큰 |
-| `gpt-5.6-sol` 공개 가격 환산 | 14.15달러 |
-
-짧은 대화 한 번의 279배다. 그 실행은 활성 공고 122건을 비교했다.
-`career` 의 `max_turns` 는 60 이다.
+스킬 수를 줄이는 것보다 도구를 잠그는 것이 입력 토큰을 훨씬 많이 줄인다.
+한 profile 에서 스킬을 97개에서 6개로 줄이면 입력이 17% 줄었고, 도구를 모두 잠그면 도구 안내까지 빠져 65.5% 줄었다.
+비용을 줄이려면 도구 설정을 함께 본다.
 
 v0.21.0 과 v0.21.3 Runs API 의 `usage` 에는 cache 항목이 없다.
 `input_tokens`, `output_tokens`, `total_tokens` 뿐이다.
 `cached_input_tokens` 가 실행 기록에서 비어 있는 것은
 prompt cache 가 붙지 않아서가 아니라 이 API 가 보고하지 않기 때문이다.
 
-에이전트 정의 저장소의 스킬은 `.claude/skills` 에 있어 `trust` 가 보는 경로가 아니다.
-그래서 심볼릭 링크를 쓴다. 구조는 `skills/<범주>/<스킬>` 이다.
-
-```
-~/.hermes/profiles/<profile>/skills/<범주>/<스킬>
-  -> <컨테이너에 마운트된 에이전트 정의 저장소>/<범주>/.claude/skills/<스킬>
-```
-
-마운트 경로는 `fos-home-infra` 가 정한다.
-
-링크 대상은 **컨테이너 안의 경로**여야 한다. 호스트 경로로 걸면 컨테이너 안에서 끊긴 링크가 된다.
-붙인 뒤 gateway 를 다시 띄워야 인식된다. 대시보드 `GET /api/skills?profile=` 로 확인한다.
-API server 의 `GET /v1/skills` 는 v0.21.5 에서 늘 500 이다. 아래 「스킬 커맨드와 API server」 를 본다.
-실측으로 확인했다.
-이미 연결한 스킬의 본문과 색인 변경은 「변경이 적용되는 시점」 에서 구분한다.
+이미 연결한 스킬의 본문과 색인 변경이 언제 적용되는지는 [`tools-and-skills.md`](tools-and-skills.md#변경이-적용되는-시점) 의 「변경이 적용되는 시점」 이 갖는다.
 
 ## 스킬 커맨드와 API server
 

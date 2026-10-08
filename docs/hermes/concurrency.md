@@ -2,16 +2,18 @@
 
 ## profile 접두
 
-아래 설정 우선순위와 허용 목록은 v0.21.0 의 동작이다.
-v0.21.3 은 `gateway.multiplex_profile_allowlist` 를 제거했고,
-v0.21.4 이후에는 multiplex 기본값과 gateway 실행 방식도 바뀐다.
-버전별 차이는 [「버전을 올릴 때 달라지는 계약」](upgrades.md#버전을-올릴-때-달라지는-계약) 을 따른다.
+우리가 고정한 v0.21.5 는 v0.21.0 과 아래 두 가지가 다르다.
 
-`gateway.multiplex_profiles` 를 켜면 listener 하나가 `/p/<profile>/...` 로 모든 profile 을 받는다.
+- multiplex 가 기본으로 켜진다. 명시적 `gateway.multiplex_profiles: false` 도 true 로 고친다. `gateway.standalone` 은 임시 호환 수단이다.
+- `gateway.multiplex_profile_allowlist` 는 v0.21.3 에서 제거됐다. 살아 있는 모든 profile 을 접두 아래에 제공한다.
+
+버전별 근거는 [「버전을 올릴 때 달라지는 계약」](upgrades.md#버전을-올릴-때-달라지는-계약) 을 따른다.
+
+multiplex 에서는 listener 하나가 `/p/<profile>/...` 로 모든 profile 을 받는다.
 default profile 의 listener 에는 각 경로가 접두 없는 형태와 `/p/<profile>` 접두 형태로 함께 등록된다.
 `connect()` 가 경로 표를 한 번 순회하며 두 형태를 모두 등록한다.
 
-multiplex 사용 여부는 아래 순서로 정한다.
+v0.21.0 은 multiplex 사용 여부를 아래 순서로 정했다.
 
 1. 환경 변수 `GATEWAY_MULTIPLEX_PROFILES`
 2. 기본 profile `config.yaml` 의 `gateway.multiplex_profiles`
@@ -20,9 +22,7 @@ multiplex 사용 여부는 아래 순서로 정한다.
 환경 변수에서는 `true`, `1`, `yes`, `on` 을 참으로 읽는다.
 빈 문자열이나 알 수 없는 값은 무시하고 `config.yaml` 값을 쓴다.
 
-`gateway.multiplex_profile_allowlist` 를 적지 않으면 이름이 유효하고 삭제 표시가 없는 profile 을 모두 제공한다.
-빈 목록을 적으면 기본 profile 만 제공하고, 이름을 적으면 그 profile 만 제공한다.
-허용 목록을 쓰면 profile 을 만들 때마다 목록도 고쳐야 한다.
+허용 목록이 없으므로 이름이 유효하고 삭제 표시가 없는 profile 을 모두 제공한다.
 
 **새 profile 은 gateway 를 다시 띄우지 않아도 접두 아래에 열린다.**
 접두를 검사하는 middleware 가 요청마다 profile 디렉터리를 다시 훑고 목록을 캐시하지 않기 때문이다.
@@ -159,27 +159,11 @@ Hermes 는 그 executor 를 만들지도 크기를 정하지도 않으므로 Pyt
 429 판정은 요청을 받는 자리에서 하고, pool 에 넘기는 것은 그보다 뒤다.
 그래서 `max_concurrent_runs` 가 pool 크기보다 크면 넘친 실행도 `202` 로 받아들여지고,
 pool 앞에서 순서를 기다린다.
-
-pool 16, 한도 40 인 gateway 에 실행 24개를 동시에 보내 측정했다.
-
-| 무엇 | 결과 |
-| --- | --- |
-| 응답 코드 | 24개 전부 202. 429 는 없었다 |
-| 제출 응답 시간 | 최대 0.07초 |
-| 실제로 시작한 시각 | 16개는 즉시, 나머지 8개는 30.0초 뒤 |
-
-30.0초는 앞선 16개가 LLM 응답을 받아 자리를 비운 시각이다.
+pool 크기를 넘은 실행은 앞선 실행이 LLM 응답을 받아 자리를 비운 뒤에야 시작한다.
 
 **기다리는 실행도 상태 조회가 `running` 으로 답한다.**
 `_run_and_close()` 가 pool 에 넘기기 전에 상태를 `running` 으로 올리기 때문이다.
 `queued` 상태는 정의돼 있지만 이 대기 구간에서는 드러나지 않는다.
-
-| 시각 | `GET /v1/runs/{id}` 의 상태 분포 |
-| --- | --- |
-| 6초 | `running` 24 |
-| 30초 | `running` 24 |
-| 36초 | `completed` 16, `running` 8 |
-| 66초 | `completed` 24 |
 
 **사용자가 겪는 것은 실패가 아니라 느림이다.**
 호출한 쪽은 자기 실행이 시작조차 하지 않았다는 것을 알 수 없고,
@@ -188,53 +172,25 @@ pool 16, 한도 40 인 gateway 에 실행 24개를 동시에 보내 측정했다
 ## pool 은 실행만 쓰는 것이 아니다
 
 `asyncio.to_thread` 도 같은 기본 executor 를 쓴다.
-gateway 코드에서 `api_server.py` 가 36곳, `run.py` 가 46곳에서 이것을 부르고,
-세션 저장소를 읽고 쓰는 일이 모두 여기 해당한다.
+gateway 코드의 여러 곳이 이것을 부르고, 세션 저장소를 읽고 쓰는 일이 모두 여기 해당한다.
 
 **실행이 pool 을 채우면 세션 저장소를 읽는 요청도 함께 밀린다.**
-pool 16 인 gateway 에 실행 24개를 보내고 그동안 두 경로의 응답 시간을 측정했다.
-
-| 경로 | 한가할 때 | 실행 24개가 pool 을 채운 동안 |
-| --- | --- | --- |
-| `/v1/capabilities` | 1.1 ms | 1.1 ms |
-| `/api/sessions` | 11 ms 부터 16 ms | **30,521 ms** |
-
-`/v1/capabilities` 는 pool 을 지나지 않아 영향이 없고,
-`/api/sessions` 는 실행 하나가 자리를 비울 때까지 그대로 기다렸다.
-30.5초는 그 gateway 의 LLM 응답 시간과 같다.
-**운영에서 실행 하나는 이보다 훨씬 오래 자리를 잡는다.**
-
-같은 부하를 pool 64 인 gateway 에 보내면 `/api/sessions` 가 12 ms 부터 15 ms 를 유지했다.
+pool 을 지나는 `/api/sessions` 는 실행 하나가 자리를 비울 때까지 기다리고, pool 을 지나지 않는 `/v1/capabilities` 는 영향이 없다.
+측정에서 `/api/sessions` 는 십여 ms 에서 LLM 응답 시간과 같은 30초로 늘었다.
+운영에서 실행 하나는 이보다 훨씬 오래 자리를 잡는다.
 
 ## pool 은 plugin 으로 키울 수 있다
 
 hook 목록에 gateway 가 뜰 때 도는 것은 없다.
-대신 plugin 모듈이 gateway 프로세스 안에서 import 되는 것을 쓴다.
-`BaseEventLoop.run_in_executor` 를 감싸, 기본 executor 가 처음 필요해지는 순간에
-원하는 크기의 것을 먼저 꽂아 넣으면 된다.
-
-```python
-original = asyncio.base_events.BaseEventLoop.run_in_executor
-
-def run_in_executor(self, executor, func, *args):
-    if executor is None and not installed:
-        self.set_default_executor(
-            concurrent.futures.ThreadPoolExecutor(max_workers=target))
-    return original(self, executor, func, *args)
-```
+대신 gateway 프로세스 안에서 import 되는 plugin 모듈이 `BaseEventLoop.run_in_executor` 를 감싸,
+기본 executor 가 처음 필요해지는 순간에 원하는 크기의 것을 먼저 꽂아 넣으면 된다.
 
 **Hermes core 를 고치지 않으므로 ADR-001 의 제약 안이다.**
 plugin 은 `plugins.enabled` 에 이름이 있어야 로드된다. 그 키가 없으면 어떤 사용자 plugin 도 켜지지 않는다.
+이 저장소의 `hermes/plugins/` 에는 이 plugin 이 없다.
 
-pool 을 키운 gateway 에서 측정한 값이다. CPU 를 2.0 으로 제한한 컨테이너에서 측정했다.
-
-| pool | 동시에 보낸 실행 | 결과 |
-| --- | --- | --- |
-| 64 | 32 | 전부 1.1초 안에 시작, 38초에 완료 |
-| 64 | 64 | 전부 즉시 시작, 38초에 완료 |
-| 160 | 120 | 전부 5초 안에 시작, 42초에 완료 |
-
-**막힌 곳이 pool 뿐이었다는 뜻이다.**
+pool 을 64 로 키우면 실행 64개가 모두 즉시 시작했다.
+막힌 곳이 pool 뿐이었다는 뜻이다.
 
 ## pool 말고 걸리는 것
 
@@ -260,16 +216,11 @@ Control Plane 이 대기 시간을 넘겨 먼저 끝낸 run 은 Hermes 가 끝�
 
 ## 스레드를 늘리는 비용
 
-스레드 자체는 거의 들지 않는다. 늘어나는 것은 동시에 도는 실행이 쥔 것이다.
-
-| 무엇 | 측정값 |
-| --- | --- |
-| idle 스레드 하나의 상주 메모리 | 22 kB 부터 32 kB |
-| 동시 실행 하나 | 약 3.1 MB |
-| 실행 하나가 쓰는 스레드 수 | 약 3개 |
-| profile 하나가 처음 실행할 때의 일회성 증가 | 약 50 MB |
+스레드 자체는 거의 들지 않는다. idle 스레드 하나의 상주 메모리는 수십 kB 다.
+늘어나는 것은 동시에 도는 실행이 쥔 것이다.
 
 pool 을 키우는 것만으로는 메모리가 늘지 않는다. 스레드를 필요할 때 만들기 때문이다.
 드는 것은 동시에 도는 실행 수가 정한다.
 
+동시 실행 하나는 적어도 약 3.1 MB 를 쓰고, profile 하나가 처음 실행할 때 약 50 MB 가 한 번 는다.
 **3.1 MB 는 하한이다.** 스킬만 올리고 MCP 서버와 대화 기록이 없는 profile 에서 측정한 값이다.

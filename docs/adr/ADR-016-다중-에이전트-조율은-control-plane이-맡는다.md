@@ -75,7 +75,7 @@ delegation toolset도 비활성 상태라 부모가 `delegate_task`를 사용할
 | 결과 합치기 | 확인: `swarm`이 verifier와 synthesizer Task를 만든다 | 확인: 같은 Task를 API로 만들 수 있다 | 판단: Reviewer와 Synthesizer를 의존 Task로 실행한다 |
 | 부모와 루트 연결 | 확인: Kanban 안의 Task와 run은 연결되지만 `agent_execution`과는 연결되지 않는다 | 판단: Plugin이 Kanban 식별자와 실행 식별자를 따로 연결해야 한다 | 확인: 기존 `parent_execution_id`와 `root_execution_id`에 직접 기록할 수 있다 |
 | 사용량과 비용 | 확인: `task_runs`에는 토큰과 비용 칸이 없다 | 판단: Plugin hook으로 실행별 사용량을 따로 모아야 한다 | 확인: 각 Task를 top-level Runs API 실행으로 만들면 기존 실행 기록에 usage를 남길 수 있다 |
-| 사용자, Memory와 credential 경계 | 확인: `tenant`는 문자열이고 assignee profile은 호출자가 정한다 | 판단: Plugin이 Control Plane의 권한 검사를 다시 구현해야 한다 | 확인: 기존 바인딩 확인, Memory 주입과 profile key 조회 경로를 실행마다 그대로 쓸 수 있다 |
+| 사용자, Memory와 credential 경계 | 확인: `tenant`는 문자열이고 assignee profile은 호출자가 정한다. worker 는 작업 본문과 몇 가지 환경 변수만 받아, Task 본문에 넣지 않고 Memory 를 주입할 입구가 없다 | 판단: Plugin이 Control Plane의 권한 검사를 다시 구현해야 한다 | 확인: 기존 바인딩 확인, Memory 주입과 profile key 조회 경로를 실행마다 그대로 쓸 수 있다 |
 
 ### 자식 토큰 실측
 
