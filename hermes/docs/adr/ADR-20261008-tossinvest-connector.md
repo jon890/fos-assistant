@@ -1,8 +1,8 @@
-## ADR-20261008: 토스증권 커넥터는 읽기 도구만 두고, 토큰은 프로세스 메모리에서 한 번에 하나만 다시 받는다
+## ADR-20261008 / tossinvest-connector: 토스증권 커넥터는 읽기 도구만 두고, 토큰은 프로세스 메모리에서 한 번에 하나만 다시 받는다
 
 - **status**: `accepted`
 - Date: 2026-10-08
-- 커넥터 계약은 [ADR-043](ADR-043-커넥터는-plugin-의-connector-json-으로-선언하고-control-plane-은-범용-흐름만-갖는다.md) 과 [ADR-049](ADR-049-커넥터-도구-호출은-profile-plugin-의-hook-이-control-plane-에-물어-판정한다.md) 를 따른다. 바인딩 제한은 [ADR-20261008 / connector-binding-guards](ADR-20261008-connector-binding-guards.md) 의 것이다.
+- 커넥터 계약은 [ADR-043](../../../backend/docs/adr/ADR-043-커넥터는-plugin-의-connector-json-으로-선언하고-control-plane-은-범용-흐름만-갖는다.md) 과 [ADR-049](../../../backend/docs/adr/ADR-049-커넥터-도구-호출은-profile-plugin-의-hook-이-control-plane-에-물어-판정한다.md) 를 따른다. 바인딩 제한은 [ADR-20261008 / connector-binding-guards](../../../docs/adr/ADR-20261008-connector-binding-guards.md) 의 것이다.
 
 ### 결정
 
@@ -23,7 +23,7 @@
 ### 맥락
 
 사용자는 토스증권 계좌를 에이전트가 읽고, 주식 브리핑 스킬과 이어 매일 보고를 받기로 했다(2026-10-08).
-주문 실행은 [ADR-049](ADR-049-커넥터-도구-호출은-profile-plugin-의-hook-이-control-plane-에-물어-판정한다.md) 가 `FINANCIAL` 을 fail-closed wrapper 뒤에서만 열기로 했으므로 이번 범위가 아니다.
+주문 실행은 [ADR-049](../../../backend/docs/adr/ADR-049-커넥터-도구-호출은-profile-plugin-의-hook-이-control-plane-에-물어-판정한다.md) 가 `FINANCIAL` 을 fail-closed wrapper 뒤에서만 열기로 했으므로 이번 범위가 아니다.
 
 토스증권 Open API 공식 문서에서 확인한 것이 결정의 모양을 정했다.
 
@@ -35,7 +35,7 @@
 
 ### 대안 기각
 
-- **토큰을 파일에 두어 프로세스끼리 나눈다**: 커넥터는 자격 증명을 파일에 두지 않는다([커넥터 만들기](../connector-authoring.md)). 실행 공간에 보이는 출력 디렉터리에 두면 셸이 토큰을 읽는다.
+- **토큰을 파일에 두어 프로세스끼리 나눈다**: 커넥터는 자격 증명을 파일에 두지 않는다([커넥터 만들기](../../../docs/connector-authoring.md)). 실행 공간에 보이는 출력 디렉터리에 두면 셸이 토큰을 읽는다.
 - **계좌 도구를 `SENSITIVE` 로 둔다**: 호출마다 승인이 필요하고, 쓰기를 허용하지 않은 먼저 살펴보기와 매일 깨우기가 계좌를 보지 못한다. 연결이 붙은 에이전트는 주인만 쓰므로 승인이 막아 줄 상대가 없다.
 - **주문 초안을 승인 카드로 보이는 도구를 둔다**: 승인 카드는 승인하는 순간 실행하는 장치다(ADR-050). 실행하지 않는 카드는 주문 실행을 열 때 카드의 뜻을 섞는다. 주문 초안은 결과물과 할 일 제안으로 낸다.
 - **화면 자동화로 붙는다**: 공식 API 로 필요한 것이 모두 되고, 토스증권 이용약관은 앱과 웹이 아닌 매체의 접근을 이용 제한 사유로 둔다.
@@ -53,4 +53,4 @@
   - 시세의 제3자 제공 금지 조항이 모델 공급자 전송에 걸리는지는 확인하지 못했다.
   - API 가 바뀐 것은 대역 시험이 알지 못한다. 소유자가 배포 뒤 실제 계정으로 확인한다.
 
-- **적용 범위**: `hermes/connectors/tossinvest/`, [토스증권 커넥터](../connectors/tossinvest.md).
+- **적용 범위**: `hermes/connectors/tossinvest/`, [토스증권 커넥터](../../../docs/connectors/tossinvest.md).

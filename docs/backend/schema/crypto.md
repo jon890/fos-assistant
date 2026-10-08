@@ -4,7 +4,7 @@
 
 사용자 한 명의 데이터 key(DEK)를 KEK 로 감싼 것이다. 사용자마다 한 줄이다.
 원문 key 는 저장하지 않는다. KEK 는 데이터베이스 밖의 서버 파일에 있고, 이 표에는 어느 KEK 로 감쌌는지만 적는다.
-근거와 위협 모델은 [ADR-20261008 / data-encryption](../../adr/ADR-20261008-data-encryption.md) 에 있다.
+근거와 위협 모델은 [ADR-20261008 / data-encryption](../../../backend/docs/adr/ADR-20261008-data-encryption.md) 에 있다.
 
 | 칸 | 타입 | 뜻 |
 | --- | --- | --- |

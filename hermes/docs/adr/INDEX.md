@@ -13,3 +13,4 @@ Hermes 에 설치하는 plugin 과 profile 틀, 커넥터(`hermes/`) 한 층의 
 | [ADR-088](ADR-088-대시보드-plugin-은-감싸는-경로의-바꿔-끼우기를-두고-기대는-hermes-내부-지점을-계약-시험으로-확인한다.md) | 대시보드 plugin 은 감싸는 경로의 바꿔 끼우기를 두고, 기대는 Hermes 내부 지점을 계약 시험으로 확인한다 | Accepted. ADR-041 의 plugin 을 기능 모듈로 나누는 경계를 정한다 |
 | [ADR-20261008 / connector-output-files](ADR-20261008-connector-output-files.md) | 커넥터는 계산할 목록을 그 에이전트 실행 공간에 읽기 전용으로 붙는 파일로 내고, 계산은 스크립트가 한다 | Accepted. ADR-086 의 실행 공간에 커넥터 출력 디렉터리를 더한다 |
 | [ADR-20261008 / execute-code-unattended](ADR-20261008-execute-code-unattended.md) | docker 실행 공간을 쓰는 profile 은 API 경로의 `execute_code` 를 승인 없이 컨테이너에서 돌린다 | Accepted. ADR-086 의 실행 공간 설정에 `approvals.unattended_mode` 를 더한다 |
+| [ADR-20261008 / tossinvest-connector](ADR-20261008-tossinvest-connector.md) | 토스증권 커넥터는 읽기 도구만 두고, 토큰은 프로세스 메모리에서 한 번에 하나만 다시 받는다 | Accepted. ADR-20261008 / connector-binding-guards 의 두 선언을 쓴다 |

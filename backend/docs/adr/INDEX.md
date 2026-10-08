@@ -65,6 +65,7 @@ Control Plane(`backend/`) 한 층의 코드가 지키는 결정이다.
 | [ADR-20261007 / test-context-base](ADR-20261007-test-context-base.md) | backend 통합 검사는 Spring 컨텍스트 하나를 함께 쓰고, 설정과 대역은 검사마다 바꿔 끼운다 | Accepted |
 | [ADR-20261008 / browser-gateway-token](ADR-20261008-browser-gateway-token.md) | 브라우저 중계의 접근 표식은 바인딩 번호에서 HMAC 으로 만들고 표에 두지 않는다 | Accepted. [ADR-20261007 / user-browser](../../../docs/adr/ADR-20261007-user-browser.md) 의 무작위 표식과 해시 표를 바꾼다 |
 | [ADR-20261008 / conversation-purge](ADR-20261008-conversation-purge.md) | 지운 대화는 정리 작업이 본문과 Hermes session 까지 지우고, 대화 줄과 실행 줄은 본문 없이 남긴다 | Accepted. `docs/backend/schema/README.md` 의 「대화를 지워도 메시지와 Hermes session 은 남긴다」 를 바꾼다 |
+| [ADR-20261008 / data-encryption](ADR-20261008-data-encryption.md) | 사용자 본문은 서버 KEK 로 감싼 사용자별 데이터 key 로 저장할 때 암호화하고, 대화 메시지부터 적용한다 | Accepted. ADR-055 의 암호문 모양과 알고리즘을 그대로 쓴다 |
 
 ## 보관
 
