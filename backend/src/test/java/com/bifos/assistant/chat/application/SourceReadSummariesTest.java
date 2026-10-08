@@ -107,8 +107,8 @@ class SourceReadSummariesTest {
                                         "{\"results\":[{\"url\":\"https://example.com/a#two\",\"content\":\"본문\"},{\"url\":\"https://example.com/b\",\"content\":\"본문\"}]}")));
 
         assertThat(summaries.of(List.of(answer(10L, 1L))).get(10L))
-                .isEqualTo(
-                        new SourceReadSummary(2, List.of("https://example.com/a", "https://example.com/b"), 0, true, List.of()));
+                .isEqualTo(new SourceReadSummary(
+                        2, List.of("https://example.com/a", "https://example.com/b"), 0, true, List.of()));
     }
 
     @Test

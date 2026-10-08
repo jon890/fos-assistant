@@ -23,6 +23,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
+
 class SourceReadRequestsTest {
     private final AgentExecutionRepository executions = mock(AgentExecutionRepository.class);
     private final ExecutionEventRepository events = mock(ExecutionEventRepository.class);
@@ -143,7 +144,8 @@ class SourceReadRequestsTest {
                 started(1L, 1, "https://example.com/same"),
                 completed(1L, 2, false, "[가림]"),
                 completed(1L, 3, false, result("https://example.com/same"))));
-        assertThat(summary()).isEqualTo(new SourceReadSummary(2, List.of("https://example.com/same"), 1, true, List.of()));
+        assertThat(summary())
+                .isEqualTo(new SourceReadSummary(2, List.of("https://example.com/same"), 1, true, List.of()));
     }
 
     @Test
@@ -152,9 +154,7 @@ class SourceReadRequestsTest {
         AgentExecution root = execution(1L, null, EventObservation.OBSERVED);
         AgentExecution child = execution(2L, 1L, EventObservation.OBSERVED);
         stubExecutions(List.of(root, child), List.of(child));
-        stubEvents(List.of(
-                started(1L, 1, "https://example.com/root-request"),
-                completed(2L, 1, false, "[가림]")));
+        stubEvents(List.of(started(1L, 1, "https://example.com/root-request"), completed(2L, 1, false, "[가림]")));
         assertThat(summary()).isEqualTo(new SourceReadSummary(1, List.of(), 1, true, List.of()));
     }
 
@@ -162,8 +162,7 @@ class SourceReadRequestsTest {
     @DisplayName("요청 주소에서는 query와 fragment를 빼고 path만 보낸다")
     void removesQueryAndFragmentFromRequestedUrl() throws Exception {
         stubEvents(List.of(
-                started(1L, 1, "https://example.com/path?access=private#section"),
-                completed(1L, 2, false, "[가림]")));
+                started(1L, 1, "https://example.com/path?access=private#section"), completed(1L, 2, false, "[가림]")));
         assertThat(summary())
                 .isEqualTo(new SourceReadSummary(1, List.of(), 1, true, List.of("https://example.com/path")));
     }
@@ -171,9 +170,7 @@ class SourceReadRequestsTest {
     @Test
     @DisplayName("손상된 성공 완료는 명확히 짝인 시작 주소를 요청 주소로 남긴다")
     void keepsRequestedUrlForMalformedCompletion() throws Exception {
-        stubEvents(List.of(
-                started(1L, 1, "https://example.com/malformed"),
-                completed(1L, 2, false, "{\"results\":[")));
+        stubEvents(List.of(started(1L, 1, "https://example.com/malformed"), completed(1L, 2, false, "{\"results\":[")));
         assertThat(summary())
                 .isEqualTo(new SourceReadSummary(1, List.of(), 1, true, List.of("https://example.com/malformed")));
     }
@@ -204,11 +201,7 @@ class SourceReadRequestsTest {
                 completed(1L, 4, false, "[가림]")));
         assertThat(summary())
                 .isEqualTo(new SourceReadSummary(
-                        2,
-                        List.of(),
-                        2,
-                        true,
-                        List.of("https://example.com/first", "https://example.com/second")));
+                        2, List.of(), 2, true, List.of("https://example.com/first", "https://example.com/second")));
     }
 
     @Test
@@ -279,9 +272,7 @@ class SourceReadRequestsTest {
     @Test
     @DisplayName("성공 완료 뒤에 남은 시작은 다음 완료에 거꾸로 짝짓지 않는다")
     void doesNotPairStartCreatedAfterSuccessfulCompletion() throws Exception {
-        stubEvents(List.of(
-                completed(1L, 1, false, "[가림]"),
-                started(1L, 2, "https://example.com/late-start")));
+        stubEvents(List.of(completed(1L, 1, false, "[가림]"), started(1L, 2, "https://example.com/late-start")));
 
         assertThat(summary()).isEqualTo(new SourceReadSummary(1, List.of(), 1, true, List.of()));
     }
@@ -292,9 +283,11 @@ class SourceReadRequestsTest {
 
     private void stubExecutions(List<AgentExecution> rows, List<AgentExecution> children) {
         doAnswer(invocation -> {
-            Collection<Long> ids = invocation.getArgument(0);
-            return rows.stream().filter(row -> ids.contains(row.id())).toList();
-        }).when(executions).findAllById(any());
+                    Collection<Long> ids = invocation.getArgument(0);
+                    return rows.stream().filter(row -> ids.contains(row.id())).toList();
+                })
+                .when(executions)
+                .findAllById(any());
         when(executions.findByRootExecutionIdIn(any())).thenReturn(children);
     }
 

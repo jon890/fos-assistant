@@ -121,7 +121,8 @@ public class SourceReadSummaries {
         Set<String> requestedUrls = new LinkedHashSet<>();
         for (AgentExecution execution : tree) {
             observed &= execution.eventObservation() == EventObservation.OBSERVED;
-            ExecutionReads reads = reads(eventRows.getOrDefault(execution.id(), List.of()), execution.eventObservation());
+            ExecutionReads reads =
+                    reads(eventRows.getOrDefault(execution.id(), List.of()), execution.eventObservation());
             completed += reads.completed;
             unresolved += reads.unresolved;
             urls.addAll(reads.urls);

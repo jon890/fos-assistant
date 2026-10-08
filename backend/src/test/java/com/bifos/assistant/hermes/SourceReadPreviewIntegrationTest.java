@@ -45,18 +45,21 @@ class SourceReadPreviewIntegrationTest {
         assertThat(runEvent.detail()).isEqualTo("[가림]");
         assertThat(saved.get(1).failed()).isFalse();
         assertThat(saved.get(1).detail()).isEqualTo("[가림]");
-        assertThat(summary(saved)).isEqualTo(new SourceReadSummary(1, List.of(), 1, true, List.of("https://example.com/hidden")));
+        assertThat(summary(saved))
+                .isEqualTo(new SourceReadSummary(1, List.of(), 1, true, List.of("https://example.com/hidden")));
     }
 
     @Test
     @DisplayName("온전한 원문 미리보기는 같은 저장 경로에서 공개 URL을 보낸다")
     void exposesUrlFromCompletePreview() throws Exception {
-        RunEvent runEvent = HermesRunEventStream.toRunEvent(
-                event(result("https://example.com/visible", "short content")));
-        List<ExecutionEvent> saved = records(HermesRunEventStream.toRunEvent(started("https://example.com/visible")), runEvent);
+        RunEvent runEvent =
+                HermesRunEventStream.toRunEvent(event(result("https://example.com/visible", "short content")));
+        List<ExecutionEvent> saved =
+                records(HermesRunEventStream.toRunEvent(started("https://example.com/visible")), runEvent);
 
         assertThat(saved.get(1).failed()).isFalse();
-        assertThat(summary(saved)).isEqualTo(new SourceReadSummary(1, List.of("https://example.com/visible"), 0, true, List.of()));
+        assertThat(summary(saved))
+                .isEqualTo(new SourceReadSummary(1, List.of("https://example.com/visible"), 0, true, List.of()));
     }
 
     private static JsonNode event(String preview) throws Exception {
@@ -66,13 +69,12 @@ class SourceReadPreviewIntegrationTest {
     }
 
     private static JsonNode started(String preview) throws Exception {
-        return JSON.readTree("{\"event\":\"tool.started\",\"tool\":\"web_extract\",\"preview\":\""
-                + preview
-                + "\"}");
+        return JSON.readTree("{\"event\":\"tool.started\",\"tool\":\"web_extract\",\"preview\":\"" + preview + "\"}");
     }
 
     private static String result(String url, String content) throws Exception {
-        return JSON.writeValueAsString(JSON.readTree("""
+        return JSON.writeValueAsString(
+                JSON.readTree("""
                 {"results":[{"url":%s,"title":"example title","content":%s,"error":null}]}
                 """.formatted(JSON.writeValueAsString(url), JSON.writeValueAsString(content))));
     }
