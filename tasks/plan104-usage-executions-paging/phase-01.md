@@ -24,13 +24,13 @@
 
 ### 1. backend 커서 목록
 
-`AgentExecutionRepository`에 사용자와 루트만 고르는 keyset 쿼리를 추가한다. 정렬은 startedAt desc, id desc, 조건은 startedAt가 경계보다 작거나 같은 시각의 id가 작은 줄이다. 첫 쪽과 다음 쪽은 모두 limit+1로 읽는다. `ExecutionCursor`는 마지막으로 반환한 줄의 Instant와 양수 id를 encode/decode하며 잘못된 값은 VALIDATION_FAILED다. `RootExecutionPage`에 nextCursor를 추가하고 기존 `RootExecutionQuery.page` 시그니처와 동작을 유지하면서 cursor 인자 overload를 더한다. 새 페이지의 부가 정보 조회는 반환한 items에만 수행한다.
+`AgentExecutionRepository`에 사용자와 루트만 고르는 keyset 쿼리를 추가한다. 정렬은 startedAt desc, id desc, 조건은 `(startedAt < cursor.startedAt) OR (startedAt = cursor.startedAt AND id < cursor.id)`다. 첫 쪽과 다음 쪽은 모두 limit+1로 읽는다. `ExecutionCursor`는 마지막으로 반환한 줄의 Instant와 양수 id를 encode/decode하며 잘못된 값은 VALIDATION_FAILED다. `RootExecutionPage`에 nextCursor를 추가하고 기존 `RootExecutionQuery.page` 시그니처와 동작을 유지하면서 cursor 인자 overload를 더한다. 새 페이지의 부가 정보 조회는 반환한 items에만 수행한다.
 
 `UsageDtos.ExecutionPageView(List<ExecutionView> items, String nextCursor)`와 `UsageController.myExecutionPage(int limit, String cursor)`를 `/executions/page`에 추가한다. 기존 배열 API와 같은 변환 helper를 공유해 MEMBER 내부 값 가림, 에이전트/스킬/대화 일괄 조회를 유지한다. limit 기본 50이며 1~200 범위로 제한한다.
 
 ### 2. 화면과 호출
 
-`web/src/lib/usage-paging.ts`에 UsageExecutionPage, 요청 함수, 순서를 유지하며 id 중복을 제거하는 페이지 병합 함수를 둔다. 타입 import만 execution-list를 참조한다. 요청 함수는 `/api/usage/executions/page`를 쓰고 cursor를 URLSearchParams로 인코딩한다. `web/src/app/api/usage/executions/page/route.ts`는 cursor와 limit만 전달하고 기존 서버 인증을 이용한다.
+`web/src/lib/usage-paging.ts`에 UsageExecutionPage, 요청 함수, 순서를 유지하며 id 중복을 제거하는 페이지 병합 함수를 둔다. 타입 import만 execution-list를 참조한다. `web/eslint.config.mjs`의 NODE_TEST_READ_FILES에 새 lib 파일을 등록한다. 요청 함수는 `/api/usage/executions/page`를 쓰고 cursor를 URLSearchParams로 인코딩한다. `web/src/app/api/usage/executions/page/route.ts`는 cursor와 limit만 전달하고 기존 서버 인증을 이용한다.
 
 `PagedExecutionList`는 initialPage와 isAdmin을 받고 기존 ExecutionList 위에 상태를 둔다. 더 보기, 불러오는 중, 실패 안내와 재시도를 구현한다. ref로 동시 클릭을 막고 finally에서 풀며 실패 때 rows와 cursor를 유지한다. 마지막 쪽이면 단추를 없앤다. initialPage가 바뀌면 새 페이지로 재설정하는 키나 동등한 처리를 한다. Notice와 Button을 재사용한다. `UsageScreen`은 새 페이지 API를 읽고 실행 기록 탭에 이 부품을 쓴다. 표/카드/트리는 변경하지 않는다.
 
@@ -48,7 +48,11 @@ node --test test/unit/usage-executions-paging.test.ts
 cd web && pnpm typecheck
 ```
 
-각 명령의 기대값은 종료 코드 0이다. 브라우저 spec은 team-lead가 공용 heavy-lock으로 묶어 실행한다.
+각 명령의 기대값은 종료 코드 0이다. 포맷은 기능 커밋 뒤 별도 커밋으로 처리하며 team-lead가 누적 품질 검사를 수행한다.
+
+```bash
+scripts/quality.sh check
+``` 브라우저 spec은 team-lead가 공용 heavy-lock으로 묶어 실행한다.
 
 ```bash
 pnpm --dir web test:browser usage-executions-paging.spec.ts --repeat-each=3 --retries=0
@@ -66,6 +70,7 @@ pnpm --dir web test:browser usage-executions-paging.spec.ts --repeat-each=3 --re
 | `backend/src/main/java/com/bifos/assistant/usage/presentation/UsageDtos.java` | 수정 |
 | `backend/src/test/java/com/bifos/assistant/usage/ExecutionPagingTest.java` | 신규 |
 | `web/src/lib/usage-paging.ts` | 신규 |
+| `web/eslint.config.mjs` | 수정 |
 | `web/src/app/api/usage/executions/page/route.ts` | 신규 |
 | `web/src/components/usage/paged-execution-list.tsx` | 신규 |
 | `web/src/components/usage/usage-screen.tsx` | 수정 |
