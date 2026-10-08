@@ -59,9 +59,9 @@ public record BrowserProperties(
 
     /**
      * 대시보드가 커넥터 env 에 넣기 전에 중계 주소를 검사하는 식이다. 대시보드 plugin 의 {@code connector_schema.py} 에 있는
-     * {@code OWNER_BROWSER_VALUE_RE} 와 같은 글이어야 한다. 한쪽을 고치면 다른 쪽도 고친다.
+     * {@code OWNER_BROWSER_VALUE_RE} 와 같은 글이어야 한다. 한쪽을 고치면 다른 쪽도 고친다. {@code BrowserPropertiesTest} 가 두 글을 견준다.
      */
-    private static final Pattern OWNER_BROWSER_VALUE =
+    static final Pattern OWNER_BROWSER_VALUE =
             Pattern.compile("^https?://[A-Za-z0-9.-]{1,253}(:[0-9]{1,5})?(/[A-Za-z0-9._~-]{1,128}){1,8}$");
 
     /** 바인딩 표식과 같은 모양의 견본이다. 번호 1 에 소문자 16진수 64자를 붙인다. */

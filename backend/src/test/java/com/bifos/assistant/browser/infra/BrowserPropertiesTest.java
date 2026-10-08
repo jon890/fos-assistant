@@ -3,7 +3,12 @@ package com.bifos.assistant.browser.infra;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.Duration;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -93,5 +98,16 @@ class BrowserPropertiesTest {
                 Duration.ofMinutes(30),
                 gatewayBaseUrl,
                 gatewaySecret);
+    }
+
+    @Test
+    @DisplayName("중계 주소의 모양 검사는 대시보드 plugin 의 정규식과 같은 글이다")
+    void matchesDashboardOwnerBrowserPattern() throws IOException {
+        String schema = Files.readString(Path.of("../hermes/plugins/dashboard-profile-api/connector_schema.py"));
+        Matcher declared = Pattern.compile("OWNER_BROWSER_VALUE_RE = re\\.compile\\(r\"([^\"]+)\"\\)")
+                .matcher(schema);
+
+        assertThat(declared.find()).as("대시보드에 OWNER_BROWSER_VALUE_RE 가 있어야 한다").isTrue();
+        assertThat(BrowserProperties.OWNER_BROWSER_VALUE.pattern()).isEqualTo(declared.group(1));
     }
 }
