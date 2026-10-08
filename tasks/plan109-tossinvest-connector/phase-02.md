@@ -104,6 +104,7 @@ node scripts/check-file-length.mjs
 |---|---|
 | `hermes/connectors/tossinvest/src/account-tools.ts` | 신규 |
 | `hermes/connectors/tossinvest/src/client.ts` | 수정 |
+| `hermes/connectors/tossinvest/src/constants.ts` | 수정 |
 | `hermes/connectors/tossinvest/src/server.ts` | 수정 |
 | `hermes/connectors/tossinvest/src/tool-registration.ts` | 수정 |
 | `hermes/connectors/tossinvest/connector.json` | 수정 |
