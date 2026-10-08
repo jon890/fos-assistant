@@ -195,13 +195,18 @@ public class MemoryService {
      */
     public Memory bodyFor(CurrentUser user, MemoryAccess access, Long id) {
         Memory memory = requireReadable(user, id);
-        if (memory.status() != MemoryStatus.ACCEPTED
-                || memory.retrieval() != MemoryRetrieval.SEARCH
-                || memory.entryType() == MemoryEntryType.SOURCE
-                || !access.allows(memory.collection(), memory.sensitivity())) {
+        if (!readableByTool(memory, access)) {
             throw notFound();
         }
         return memory;
+    }
+
+    /** 한 항목이 그 접근 범위의 {@code memory_read} 로 읽히는 항목인가. {@link #bodyFor} 가 같은 판정을 쓴다. */
+    public boolean readableByTool(Memory memory, MemoryAccess access) {
+        return memory.status() == MemoryStatus.ACCEPTED
+                && memory.retrieval() == MemoryRetrieval.SEARCH
+                && memory.entryType() != MemoryEntryType.SOURCE
+                && access.allows(memory.collection(), memory.sensitivity());
     }
 
     /** 지금 화면이 만드는 항목이다. core collection 에 민감하지 않게 둔다. */

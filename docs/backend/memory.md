@@ -502,6 +502,6 @@ Control Plane MCP 도구를 받는 실행의 공통 답변 지침 뒤에 「# �
 | --- | --- |
 | `chat.application.MemoryUseService` | 대화의 답 실행 번호를 모으고, 실행 기록에서 참조를 받아, 지금 볼 수 있는 항목만 제목과 함께 낸다 |
 | `usage.application.ExecutionMemoryRefs` | 실행 번호들의 `execution_context_source` 와 `memory_read` 시작 사건에서 Memory 번호와 출처, 그 실행의 에이전트 번호를 순서대로 낸다 |
-| `memory.application.MemoryService.acceptedReadableAmong` | 번호들 가운데 요청자가 읽을 수 있는 `ACCEPTED` 항목 |
+| `memory.application.AcceptedMemoryLookup.acceptedReadableAmong` | 번호들 가운데 요청자가 읽을 수 있는 `ACCEPTED` 항목 |
 | `memory.application.MemoryService.readableByTool` | 한 항목이 그 `MemoryAccess` 의 `memory_read` 로 읽히는 항목인지. `bodyFor` 와 같은 조건이다 |
 | `chat.presentation.MemoryUseController` | `GET .../memory-uses` |
