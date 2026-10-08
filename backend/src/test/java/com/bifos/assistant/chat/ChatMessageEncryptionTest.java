@@ -2,6 +2,7 @@ package com.bifos.assistant.chat;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.bifos.assistant.chat.application.UserConversationActivity;
 import com.bifos.assistant.chat.domain.ChatMessage;
 import com.bifos.assistant.chat.domain.Conversation;
 import com.bifos.assistant.chat.infra.ChatMessageRepository;
@@ -47,6 +48,9 @@ class ChatMessageEncryptionTest {
 
     @Autowired
     DataKeyService dataKeys;
+
+    @Autowired
+    UserConversationActivity activity;
 
     @Autowired
     JdbcTemplate jdbc;
@@ -152,6 +156,19 @@ class ChatMessageEncryptionTest {
         dataKeys.forgetCachedKeys();
 
         assertThat(contentsOf(conversation.id())).containsExactly(ChatMessage.UNREADABLE_CONTENT);
+    }
+
+    @Test
+    @DisplayName("관리자 활동의 마지막 대화 시각은 본문을 풀지 않고 보낸 시각만 읽는다")
+    void lastMessageAtDoesNotOpenContent(CapturedOutput output) {
+        ChatMessage saved = messages.save(ChatMessage.fromUser(conversation.id(), owner.id(), QUESTION, NOW));
+
+        jdbc.update("DELETE FROM user_data_key WHERE id = ?", rowOf(saved.id()).get("CONTENT_KEY_ID"));
+        jdbc.update("UPDATE chat_message SET content = ? WHERE id = ?", "v1.깨진.암호문", saved.id());
+        dataKeys.forgetCachedKeys();
+
+        assertThat(activity.lastMessageAt(List.of(owner.id()))).containsEntry(owner.id(), NOW);
+        assertThat(output.getAll()).doesNotContain("풀지 못했다");
     }
 
     @Test
