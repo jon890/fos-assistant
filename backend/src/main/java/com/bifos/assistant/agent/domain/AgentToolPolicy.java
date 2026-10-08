@@ -166,4 +166,24 @@ public final class AgentToolPolicy {
     public static boolean hasSandboxToolset(List<String> enabled) {
         return enabled.stream().anyMatch(SANDBOX_TOOLSETS::contains);
     }
+
+    /**
+     * 첫 로그인의 기본 도구로 둘 수 있는가. 주인 등급이거나 실행 공간에서만 도는 도구다.
+     *
+     * <p>{@code browser}, {@code session_search} 같은 나머지 관리자 등급은 실행 공간 밖에서 돌아 기본값이 될 수 없다.
+     * {@code session_search} 는 다른 profile 의 대화까지 읽는다.
+     */
+    public static boolean allowedAsDefault(String name) {
+        return OWNER_TOOLSETS.contains(name) || SANDBOX_TOOLSETS.contains(name);
+    }
+
+    /** 사용자별 실행 공간에서 도는 셸·파일·사진 toolset 을 뺀 목록이다. 실행 공간이 없는 profile 에 기본 도구를 켤 때 쓴다. */
+    public static List<String> withoutSandboxToolsets(List<String> names) {
+        return names.stream().filter(name -> !SANDBOX_TOOLSETS.contains(name)).toList();
+    }
+
+    /** 연결을 붙일 때 셸과 파일 접근 위험을 알려야 하는 도구가 켜졌는가. */
+    public static boolean hasShellOrFileToolset(List<String> enabled) {
+        return enabled.contains("terminal") || enabled.contains("file") || enabled.contains("code_execution");
+    }
 }

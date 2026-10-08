@@ -64,6 +64,7 @@ from .connector_schema import (
     TOOL_RISKS,
     TOOL_RISK_DEFAULTS,
     TOOL_TITLE_MAX_CHARS,
+    _connector_binding_flags,
 )
 
 from .connector_owner_env import (
@@ -294,6 +295,7 @@ def _load_connector(connector_id: str, entry: dict) -> dict:
         "error_contracts": error_contracts,
         "toolsets": list(toolsets),
         "attachments": attachments,
+        **_connector_binding_flags(declared),
         "persona": persona,
         "skills": installed_skills,
         # 대시보드가 `call` 로 부를 수 있는 도구다. 도구 정책인 `tools` 와 뜻이 다르다.
@@ -389,7 +391,7 @@ def _connector_catalog_response():
           "toolsets": manifest["toolsets"], "attachments": manifest["attachments"],
           "owner_browser": manifest["owner_browser_env"] is not None,
           "owner_browser_login_url": manifest["owner_browser_login_url"],
-          "skills": sorted(manifest["skills"]),
+          "single_binding": manifest["single_binding"], "skills": sorted(manifest["skills"]),
           # 사람 말 제목이 없는 도구는 `title` 을 내지 않는다. 읽는 쪽이 도구 이름을 보인다.
           "tools": {name: {key: value for key, value in policy.items() if value is not None}
                     for name, policy in manifest["tools"].items()}}

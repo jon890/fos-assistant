@@ -115,7 +115,9 @@ public interface HermesConnectorClient {
      * @param sandboxOwner 그 에이전트의 실행 공간 주인. {@code Agent#sandboxOwner()} 의 값이다
      * @param ownerBrowser 그 바인딩의 표식을 실은 브라우저 중계 주소(ADR-20261008 / browser-gateway-token). 중계가 꺼졌으면 빈 값이다.
      *     null 이면 본문에 키를 싣지 않는다. 사용자 브라우저를 쓰는 커넥터에만 넘긴다
-     * @throws ConnectorInstallConflict 대시보드가 409 로 답했을 때. 그 profile 의 설정과 충돌하거나 첨부 디렉터리를 확인하지 못했다
+     * @throws ConnectorInstallConflict 대시보드가 409 로 답했을 때. 그 profile 의 설정과 충돌한다
+     * @throws ConnectorSandboxUnavailable 대시보드가 409 {@code sandbox_unavailable} 로 답했을 때. 그 profile 에 실행 공간이 없거나
+     *     첨부 디렉터리를 확인하지 못했다
      * @throws ConnectorProfileRejected 대시보드가 401 로 답했을 때. 그 profile 이 커넥터를 받지 않는다
      */
     InstallResult bindConnector(

@@ -86,6 +86,22 @@ public class HttpHermesRunsClient implements HermesRunsClient {
         }
     }
 
+    @Override
+    public void deleteSession(String apiBaseUrl, String profileName, String sessionId) {
+        try {
+            restClient
+                    .delete()
+                    .uri(apiBaseUrl + "/api/sessions/{sessionId}", sessionId)
+                    .header("Authorization", "Bearer " + keyStore.resolve(profileName))
+                    .retrieve()
+                    .toBodilessEntity();
+        } catch (HttpClientErrorException.NotFound ex) {
+            log.info("이미 없는 Hermes session 이다 profile={} sessionId={}", profileName, sessionId);
+        } catch (RestClientException ex) {
+            throw HermesCallFailure.of(ex, "could not delete the Hermes session");
+        }
+    }
+
     /**
      * 실행 하나를 한 번 읽는다. 종료 상태가 아닌 {@code status} 는 값이 없거나 모르는 값이어도 도는 것으로 본다.
      * 모르는 값을 실패로 읽으면 도는 실행을 잃기 때문이다.

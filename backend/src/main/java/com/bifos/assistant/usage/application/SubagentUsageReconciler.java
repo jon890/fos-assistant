@@ -45,6 +45,10 @@ import org.springframework.transaction.support.TransactionTemplate;
 @Service
 @Slf4j
 public class SubagentUsageReconciler {
+
+    /** 끝난 부모 실행의 자식 시작 사건을 작업 줄로 옮기는 기간이다. 이보다 오래된 시작 사건은 작업 줄이 생기지 않는다. */
+    static final Duration DISCOVERY_WINDOW = Duration.ofHours(24);
+
     private static final int EVENT_MODEL_LIMIT = 128;
 
     /** 자식이 끝난 뒤 이 시간 동안만 닿지 않는 대시보드를 기다린다. 지나면 provider 없이 적는다. */
@@ -133,7 +137,7 @@ public class SubagentUsageReconciler {
     /** 종료 직후 재기동된 경우에도 시작 사건을 다시 훑어 누락 작업을 만든다. */
     void discover(Instant now) {
         for (ExecutionEvent start :
-                events.findUnscheduledChildren(now.minus(Duration.ofHours(24)), PageRequest.of(0, 20))) {
+                events.findUnscheduledChildren(now.minus(DISCOVERY_WINDOW), PageRequest.of(0, 20))) {
             transaction.executeWithoutResult(status -> {
                 AgentExecution parent = executions.lockById(start.executionId()).orElse(null);
                 if (parent == null || parent.finishedAt() == null) {

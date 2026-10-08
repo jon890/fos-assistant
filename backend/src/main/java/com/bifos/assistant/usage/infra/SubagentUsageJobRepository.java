@@ -48,4 +48,12 @@ public interface SubagentUsageJobRepository extends JpaRepository<SubagentUsageJ
             """)
     List<SubagentLedgerRow> findLedgerRows(
             @Param("userId") Long userId, @Param("from") Instant from, @Param("to") Instant to);
+
+    /** 그 대화의 실행이 낳은 자식 사용량을 아직 읽는 중인가. 다 읽기 전에 Hermes session 을 지우면 사용량을 잃는다. */
+    @Query("""
+            select case when count(j) > 0 then true else false end from SubagentUsageJob j
+             where j.status = 'WAITING'
+               and j.executionId in (select e.id from AgentExecution e where e.conversationId = :conversationId)
+            """)
+    boolean existsWaitingInConversation(@Param("conversationId") Long conversationId);
 }

@@ -98,12 +98,8 @@ export function AgentDetailBody({
 }: Props) {
   const [visibility, setVisibility] = useState(initialVisibility);
   // 도구 절과 연결 절이 서로의 위험을 알린다. 도구 절이 켜진 도구를, 연결 절이 붙은 연결이 있는지를 알려 준다.
-  const [enabledTools, setEnabledTools] = useState<string[] | null>(
-    tools?.ok
-      ? tools.data.initialTools.toolsets
-          .filter((tool) => tool.enabled)
-          .map((tool) => tool.name)
-      : null,
+  const [toolState, setToolState] = useState<AgentToolsView | null>(
+    tools?.ok ? tools.data.initialTools : null,
   );
   const [hasConnections, setHasConnections] = useState(
     connections?.ok === true &&
@@ -169,7 +165,7 @@ export function AgentDetailBody({
           admin={tools.data.admin}
           visibility={visibility}
           hasConnections={hasConnections}
-          onToolsChange={setEnabledTools}
+          onToolsChange={setToolState}
         />
       ) : (
         <section
@@ -188,7 +184,7 @@ export function AgentDetailBody({
           initialConnections={connections.data.connections}
           initialBlockedReason={connections.data.blockedReason}
           visibility={visibility}
-          enabledTools={enabledTools}
+          toolState={toolState}
           onBoundChange={setHasConnections}
         />
       ) : (

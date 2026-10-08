@@ -15,6 +15,7 @@ import com.bifos.assistant.connector.infra.ConnectorBindingRepository;
 import com.bifos.assistant.connector.infra.ConnectorConnectionRepository;
 import com.bifos.assistant.hermes.ConnectorInstallConflict;
 import com.bifos.assistant.hermes.ConnectorProfileRejected;
+import com.bifos.assistant.hermes.ConnectorSandboxUnavailable;
 import com.bifos.assistant.hermes.HermesConnectorClient;
 import com.bifos.assistant.hermes.HermesConnectorClient.InstallResult;
 import com.bifos.assistant.hermes.HermesConnectorClient.ProbeResult;
@@ -175,6 +176,9 @@ public class ConnectorBindingService implements AgentConnectorDetacher {
      * <p>대시보드가 409 나 401 로 거절하면 대시보드는 아무것도 바꾸지 않았고, 이 트랜잭션이 되돌려져 바인딩 행도 남지 않는다.
      * 그 밖의 외부 실패는 바인딩을 {@code PENDING} 으로 남기고 연결 실패로 끝낸다. 대시보드가 반쯤 반영했을 수 있어 다음 연결
      * 확인이 그 바인딩의 설치를 다시 보낸다.
+     *
+     * <p>커넥터가 {@code single_binding} 을 선언했고 그 연결이 이미 다른 에이전트에 붙어 있으면 설치 전에 거절한다.
+     * 대시보드가 409 {@code sandbox_unavailable} 로 거절하면 실행 공간이 없다는 다른 오류로 옮긴다.
      */
     @Transactional(noRollbackFor = ConnectorOperationFailure.class)
     public AgentConnectionView bind(CurrentUser user, String agentCode, String connectorId) {
@@ -198,6 +202,10 @@ public class ConnectorBindingService implements AgentConnectorDetacher {
             return view(connection, existing.get(), manifest.orElse(null));
         }
         ConnectorManifest declared = manifest.orElseThrow(ConnectorErrors::notFound);
+        if (declared.singleBinding()
+                && !bindings.findByConnectionId(connection.id()).isEmpty()) {
+            throw new ApiException(ErrorCode.CONNECTOR_SINGLE_BINDING, "this connection is attached to another agent");
+        }
         requireSkillNamesFree(agent, declared);
         Instant now = now();
         ConnectorBinding binding =
@@ -211,6 +219,10 @@ public class ConnectorBindingService implements AgentConnectorDetacher {
                     agent.sandboxOwner(),
                     installs.ownerBrowser(binding, declared));
             installs.record(binding, installed, false, now);
+        } catch (ConnectorSandboxUnavailable ex) {
+            throw new ApiException(
+                    ErrorCode.AGENT_SANDBOX_UNAVAILABLE,
+                    "the agent profile has no isolated workspace for this connector");
         } catch (ConnectorInstallConflict ex) {
             throw new ApiException(
                     ErrorCode.CONNECTOR_BIND_CONFLICT, "the agent profile conflicts with this connector");

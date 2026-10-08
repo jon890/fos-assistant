@@ -177,3 +177,16 @@ SVG_FORBIDDEN_RE = re.compile(
     r"|\son[a-z]+\s*=|href\s*=(?![\s\"']*#)|url\((?![\s\"']*#)",
     re.IGNORECASE | re.ASCII,
 )
+
+
+def _connector_binding_flags(declared: dict) -> dict:
+    """`connector.json` 의 바인딩 제한 선언 둘이다. 없으면 거짓이다(ADR-20261008 connector-binding-guards).
+
+    `single_binding` 은 Control Plane 이 에이전트 하나에만 붙게 판정할 때 쓴다. 카탈로그에 싣는다.
+    `sandbox_required` 는 바인딩 설치가 실행 공간 정책에 등록된 profile 에만 붙일 때 쓴다. 카탈로그에 싣지 않는다.
+    """
+    single_binding = declared.get("single_binding", False)
+    sandbox_required = declared.get("sandbox_required", False)
+    if not isinstance(single_binding, bool) or not isinstance(sandbox_required, bool):
+        raise ValueError("single_binding 과 sandbox_required 는 boolean 이다")
+    return {"single_binding": single_binding, "sandbox_required": sandbox_required}

@@ -108,6 +108,10 @@ export const CONNECTION_ERROR_MESSAGES: Record<string, string> = {
   CONNECTOR_PROFILE_NOT_READY:
     "이 에이전트는 아직 연결을 받을 준비가 되지 않았어요. 관리자에게 알려 주세요.",
   CONNECTOR_BIND_CONFLICT: "이 에이전트의 다른 연결이나 스킬과 이름이 겹쳐요.",
+  CONNECTOR_SINGLE_BINDING:
+    "이 연결은 다른 에이전트에 붙어 있어요. 그 에이전트에서 뗀 뒤 붙여 주세요.",
+  AGENT_SANDBOX_UNAVAILABLE:
+    "격리된 실행 공간이 준비된 에이전트에만 붙일 수 있어요. 관리자에게 알려 주세요.",
   SKILL_NAME_TAKEN: "이 에이전트의 다른 연결이나 스킬과 이름이 겹쳐요.",
   CONNECTOR_RESTART_AGAIN:
     "재시작한 뒤에 다시 설치됐어요. 한 번 더 재시작한 뒤 눌러 주세요.",

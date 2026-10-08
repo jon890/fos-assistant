@@ -70,6 +70,7 @@ class ConnectorBindingGatewayOffTest {
             List.of(),
             List.of(),
             ConnectorAppearance.NONE,
+            false,
             true,
             "https://login.example.test/sign-in");
 
