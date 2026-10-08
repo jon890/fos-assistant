@@ -3,7 +3,8 @@
 English | [한국어](README.ko.md)
 
 A personal AI assistant that belongs to the person using it, not to a model vendor or to any one product.
-It is a self-hosted Control Plane and web app on top of [Hermes Agent](https://github.com/NousResearch/hermes-agent) by Nous Research, where you connect general-purpose connectors and your own agents into an agentic workflow of your own, backed by a memory that only keeps what a person has approved.
+It is a self-hosted Control Plane and web app on top of [Hermes Agent](https://github.com/NousResearch/hermes-agent) by Nous Research, where you connect general-purpose connectors and your own agents into an agentic workflow of your own, backed by a memory that only keeps what you said, wrote, or accepted yourself.
+Agents can look ahead and make suggestions before you ask, but how far they may act is decided by Control Plane rules, not by the model.
 People who share a purpose, a family for example, use it together as a group, each with their own agents.
 
 The product name is not final. For now it is called `fos-assistant`.
@@ -25,7 +26,7 @@ Everything shown is made-up demo data: the pictures are taken by a script agains
 
 ![Approval card for a connector write, showing the title and body of the note with approve and reject buttons](docs/images/tour-04-approval.png)
 
-**Decide what is remembered.** An agent can only propose a memory. It is used in later conversations after you accept it.
+**Decide what is remembered.** A fact you state yourself in a conversation that has not read outside text is remembered right away, and you can edit or undo it under the answer. Any other memory an agent leaves stays a proposal and is used in later conversations only after you accept it.
 
 ![Memory screen with two proposed memories waiting for accept or reject, above the accepted group and personal memories](docs/images/tour-05-memory.png)
 
@@ -51,6 +52,7 @@ Everything shown is made-up demo data: the pictures are taken by a script agains
 </details>
 
 To take the pictures again, run `pnpm screenshots` in `web/`. The script is `test/screenshots/tour.shots.ts`.
+The Now screen (`/now`), the connections screen, and the scheduled tasks screen are not in this tour yet.
 
 ## Why this exists
 
@@ -75,7 +77,7 @@ The table says what each one is, in its own documentation's words where possible
 
 | Option | What it is | What is different here |
 | --- | --- | --- |
-| Hosted assistant apps, such as ChatGPT or Claude | Run by the model vendor, with nothing to install. Claude, for example, [saves memory as you chat](<https://support.claude.com/en/articles/11817273-using-claude-s-chat-search-and-memory-to-build-on-previous-context>) and lets you read, edit, and delete it in settings. | It runs on your own server. Which model a tier means is a policy row in your database. An agent can only propose a memory, and nothing is used until a person accepts it. |
+| Hosted assistant apps, such as ChatGPT or Claude | Run by the model vendor, with nothing to install. Claude, for example, [saves memory as you chat](<https://support.claude.com/en/articles/11817273-using-claude-s-chat-search-and-memory-to-build-on-previous-context>) and lets you read, edit, and delete it in settings. | It runs on your own server. Which model a tier means is a policy row in your database. The only memory an agent keeps right away is a fact you stated yourself in a conversation. Everything else is used only after a person accepts it. |
 | Self-hosted chat UIs, such as [Open WebUI](https://docs.openwebui.com/) or [LibreChat](https://www.librechat.ai/docs) | Open WebUI calls itself "a self-hosted AI platform" with "support for Ollama and OpenAI-compatible APIs". LibreChat is "a self-hosted web application" with agents, MCP, and custom endpoints. | This project does not call model APIs itself. It sits on an agent runtime and adds one isolated Hermes profile per person, collections that decide which agent receives which memory, an approval step for connector writes, delegation between agents with a run tree, and a ledger that converts usage to API prices. |
 | [Hermes Agent](https://hermes-agent.nousresearch.com/docs/) on its own | An autonomous agent you reach from the CLI or a messaging gateway, with its own persistent memory, skills, and subagents. | It adds a web app for a group of people. The profile a run uses comes from the requester's binding. Memory goes through the Control Plane only, and Hermes' built-in memory tool is not given to agents. Outside services read through read-only service tokens, and sensitive entries are encrypted. Connectors follow one generic structure ([ADR-043](docs/adr/ADR-043-커넥터는-plugin-의-connector-json-으로-선언하고-control-plane-은-범용-흐름만-갖는다.md)). |
 
@@ -85,7 +87,7 @@ It fits you if:
 
 - you run your own server and want a family or another small group to share one assistant, each person with their own agents and memory,
 - you want to change the model behind a conversation without changing the product you use,
-- you want agents and connectors to do recurring work, with a person approving what gets written and remembered.
+- you want agents and connectors to do recurring work, with a person approving what gets written outside and memory keeping only what a person said or accepted.
 
 It does not fit you yet if:
 
@@ -105,24 +107,59 @@ Adding a user is a single decision by an administrator, and it must not slow any
 
 ## What it does
 
-- **Connectors with approval.** A connector hands an agent the tools of an outside service and widens what that agent can do. Connect your account once, then attach that connection to any of your private agents, and the agent calls the service's tools directly. A call that writes to that service runs only after you approve it, once, with exactly the arguments you approved.
-- **Delegation.** One request can fan out to several agents, and the child runs still execute with the requester's permissions only.
-- **Agents you build and share.** Create an agent from the web UI, write its persona, and choose its tools. Publish it to your group and others can talk to it, while each person's memory and conversations stay private.
-- **Skills and `/commands`.** Upload skills to an agent and call one directly by typing `/` in the composer.
-- **Model tiers.** Pick fast, balanced, or deep per conversation, or choose a model directly under advanced options.
-- **Approval-based Memory.** An agent can only propose a memory. Nothing reaches a conversation until a person accepts it. Entries belong to collections, and each agent receives only the collections it is allowed to. Earlier revisions are kept when an entry is edited or deleted.
-- **Run tree and cost.** Every run is recorded, including the ones that fail. Open a run to see its tool calls and child runs as a tree. Runs made on a subscription are also shown converted to API prices, so an administrator can compare settings.
-- **Photos and HTML results.** Attach photos for an agent to read, and open the HTML pages an agent produces in a side panel. Scripts in those pages do not run.
-- **Read-only access for other services.** A service token bound to a user lets another service read that user's documents and nothing else.
+### Conversations and agents
+
+- **Agents you build and share.** Create an agent from the web UI, write its persona, and choose its tools. Publish it to your group and others can talk to it, while each person's memory and conversations stay private ([`docs/backend/agent.md`](docs/backend/agent.md)).
+- **Skills and `/commands`.** Upload skills to an agent and call one directly by typing `/` in the composer ([`docs/backend/skill.md`](docs/backend/skill.md)).
+- **Model tiers.** Pick fast, balanced, or deep per conversation, or choose a model directly under advanced options ([`docs/model-tiers.md`](docs/model-tiers.md)).
+- **Delegation.** One request can fan out to several agents. The child runs execute with the requester's permissions only, and when a result arrives the Control Plane opens the next turn of the parent conversation to deliver it ([`docs/backend/agent-delegation.md`](docs/backend/agent-delegation.md)).
+- **Photos and HTML results.** Attach photos for an agent to read, and open the HTML pages an agent produces in a side panel. Scripts in those pages do not run. Photos are stored per user ([`docs/backend/attachment.md`](docs/backend/attachment.md), [`docs/backend/artifact.md`](docs/backend/artifact.md)).
+- **Run tree and cost.** Every run is recorded, including the ones that fail. Open a run to see its tool calls and child runs as a tree. Runs made on a subscription are also shown converted to API prices, so an administrator can compare settings ([`docs/frontend/activity.md`](docs/frontend/activity.md), [ADR-004](docs/adr/ADR-004-구독제에서도-api-가격으로-환산해-보인다.md)).
+
+### Connectors and approval
+
+- **Connect once, attach to several agents.** A connector hands an agent the tools of an outside service and widens what that agent can do. Connect your account once on the connections screen, then attach that connection to any of your private agents, and the agent calls the service's tools directly ([`docs/connectors.md`](docs/connectors.md), [ADR-083](docs/adr/ADR-083-커넥터는-사용자가-한-번-연결하고-자기-에이전트에-여럿-붙여-그-에이전트가-도구를-직접-부른다.md)).
+- **Attaching needs no restart.** A newly attached connector is picked up by runs shortly afterwards, without restarting the shared gateway, so nobody else's conversation is cut off in the meantime ([ADR-20261007 / connector-live-reload](docs/adr/ADR-20261007-connector-live-reload.md)).
+- **Connector cards.** The connections screen shows each connector as a card with its icon, an about link, and a summary of its tools. Icons come only from files inside the plugin, and no outside address is fetched ([ADR-20261008 / connector-card](docs/adr/ADR-20261008-connector-card.md), [`docs/connectors.md`](docs/connectors.md)).
+- **Writes wait on an approval card.** A call that writes to an outside service waits on a card that shows exactly what will be sent, and runs only after you approve it, once, with exactly the arguments you approved. A tool that allows a standing grant runs without a card while the grant you gave lasts, and tools that send data out have standing grants closed. Approvals for the same tool are grouped, and approval requests and expiries reach you as notifications on any screen ([`docs/backend/connector-tool-policy.md`](docs/backend/connector-tool-policy.md), [`docs/backend/notification.md`](docs/backend/notification.md)).
+
+### Proactive checks and the Now screen
+
+- **Proactive checks.** Without being asked, an agent looks at your context and makes a suggestion, asks a question, or stays silent. You start a check with a button, or turn on a daily wake-up that runs it at a time you choose. The daily wake-up is off by default. Unless an administrator allows write tools for the agent, a check only reads, and the Control Plane enforces that boundary ([`docs/backend/proactive-check.md`](docs/backend/proactive-check.md)).
+- **Context assembly.** Context gathered from Memory, delegated results, results of approved connector calls, run state, and follow-ups is assembled into a bundle where every item carries its source, permissions, and freshness ([`docs/backend/context-bundle.md`](docs/backend/context-bundle.md)).
+- **Problem candidates.** A check's result can name problems worth solving for this user as candidates, and the Control Plane checks their evidence and duplicates deterministically ([ADR-093](docs/adr/ADR-093-문제-찾기는-살펴보기-결과의-문제-후보로-받고-control-plane-이-근거와-중복을-결정적으로-검사한다.md)).
+- **The Now screen (`/now`).** Failed runs, things waiting for your approval or acceptance and follow-ups coming due, delegated work, conversations to continue, and check reports are collected into a fixed set of cards. For proactive notices, things shown without being asked, the default is not to notify, and only signals defined from Control Plane records reach the screen. Each item can be hidden or snoozed ([`docs/frontend/now.md`](docs/frontend/now.md), [`docs/backend/attention.md`](docs/backend/attention.md)).
+- **Follow-ups.** An agent proposes things you need to do or are waiting on, and only the ones a person accepts are tracked ([`docs/backend/follow-up.md`](docs/backend/follow-up.md)).
+- **Scheduled tasks.** An agent runs at a set time with your permissions. If that run tries to write to an outside service, an approval card and a notification appear ([`docs/backend/task.md`](docs/backend/task.md)).
+
+Value evaluation, an autonomy policy, and decision feedback are built as well.
+Value evaluation compares problem candidates axis by axis and keeps the evidence for each ([`docs/backend/value-evaluation.md`](docs/backend/value-evaluation.md)), and the autonomy policy decides, by rules that never call a model, whether to ignore, surface, ask for approval, or execute ([`docs/backend/autonomy-policy.md`](docs/backend/autonomy-policy.md)).
+Decision feedback records how a user reacted to a suggestion and how the run ended ([`docs/backend/decision-feedback.md`](docs/backend/decision-feedback.md)).
+Decision feedback is already recorded when a check report, a follow-up, a Memory proposal, or an approval request is created.
+Checks and the daily wake-up do not call value evaluation or the autonomy policy automatically yet. For now an administrator runs and reads them for one check from the agent detail in the admin area ([`docs/frontend/structure.md`](docs/frontend/structure.md)). Wiring those two into real use is in progress.
+
+### Memory
+
+- **What you say is kept at once, the rest is proposed.** A lasting fact you state yourself in your latest message is remembered by the agent right away, and the answer shows "remembered" with edit and undo. The quoted evidence must appear in that message as written. Anything from a conversation that read outside text or that includes a run no person sent (a delegated result or a scheduled task), and every sensitive entry, stays a proposal and is used only after a person accepts it ([ADR-20261007 / memory-remember](docs/adr/ADR-20261007-memory-remember.md), [`docs/backend/memory.md`](docs/backend/memory.md)).
+- **Collections and sensitive entries.** Entries belong to collections, and each agent receives only the collections it is allowed to. The body of a sensitive entry is encrypted at rest. Earlier revisions are kept when an entry is edited or deleted ([ADR-053](docs/adr/ADR-053-에이전트는-허용된-collection-의-memory-만-받는다.md), [ADR-055](docs/adr/ADR-055-민감-memory-본문은-저장할-때-암호화하고-key-는-환경-변수로-받는다.md)).
+- **Read-only access for other services.** A service token bound to a user lets another service read that user's documents and nothing else ([ADR-056](docs/adr/ADR-056-다른-서비스는-사용자에-묶인-서비스-토큰으로-문서를-읽기만-한다.md)).
 
 Some Memory screens, such as editing collections and viewing earlier revisions of an entry, are not built yet. The current list is in [`docs/code-architecture.md`](docs/code-architecture.md).
+
+### Execution spaces
+
+- **An execution space per user, in docker.** For profiles registered in the operator's policy, the shell, file, and code execution tools run in an execution space in docker. There is one container per profile, and each user gets a separate working directory. Inside it, other users' files, other profiles' secrets, and the Hermes settings are out of reach. The only exception is paths the operator mounts read-only. Profiles not registered in the policy do not get this isolation, and coverage is extended one profile at a time ([ADR-086](docs/adr/ADR-086-셸과-파일-도구는-사용자별-docker-실행-공간에서만-돈다.md), [`docs/hermes/sandbox.md`](docs/hermes/sandbox.md)).
+- **Scripts do the arithmetic.** When a connector writes the full list for a period as a read-only file in that agent's execution space and returns only the path, totals and statistics are computed by a script instead of being estimated by the model. This needs a connector that declares file output, a profile registered in an execution space policy that sets an output path, and an agent with the code execution tool on. The Gmail and Naver Blog connectors in this repository do not declare file output ([ADR-20261008 / connector-output-files](docs/adr/ADR-20261008-connector-output-files.md)).
+- **A browser per user (in progress).** The Control Plane manages one browser per user, and the user signs in to services directly on the web app's "My browser" screen. Connectors reach that browser only through the Control Plane's relay. The code is in, but it is off by default and still in progress ([ADR-20261007 / user-browser](docs/adr/ADR-20261007-user-browser.md), [`docs/backend/user-browser.md`](docs/backend/user-browser.md)).
+
 The full scope, with how each item is verified, is in [`docs/prd.md`](docs/prd.md).
 
 ## What it does not do
 
 - **It does not modify Hermes core.** Only the official extension points are used: profiles, the API server, and plugin hooks.
-- **It does not remember what no person has seen.** Hermes' built-in memory tool is not given to agents. The Control Plane is the only path to memory.
-- **It does not store secrets in the database.** AI credentials and connector tokens stay on the Hermes side, and service tokens are stored only as hashes. Separate profiles do not by themselves mean separate AI accounts: an OAuth login can be shared across profiles. How credentials are separated or shared is in [`docs/hermes/README.md`](docs/hermes/README.md).
+- **It does not remember right away what you did not say.** The only thing stored at once is a fact you stated yourself in a conversation a person sent. Everything else is used only after a person accepts it. Hermes' built-in memory tool is not given to agents. The Control Plane is the only path to memory.
+- **It does not widen what it does on a model's judgment alone.** Deterministic Control Plane rules decide how far to go, and the only thing those rules start on their own is a read-only check. A connector write call goes through an approval card or a standing grant you gave ([ADR-20261007 / autonomy-policy](docs/adr/ADR-20261007-autonomy-policy.md)).
+- **It does not store secrets in the database.** AI credentials and connector tokens stay on the Hermes side, and service tokens are stored only as hashes. Browser login sessions are not stored in the database either. Separate profiles do not by themselves mean separate AI accounts: an OAuth login can be shared across profiles. How credentials are separated or shared is in [`docs/hermes/README.md`](docs/hermes/README.md).
 - **It is not an open sign-up service.** An administrator adds people to a group.
 - **It does not run scripts in agent-made pages.**
 - **It does not carry operating procedures.** Deployment and host-specific values belong to whoever runs it.
@@ -139,17 +176,19 @@ flowchart LR
     subgraph H[Hermes Agent]
         A[API server]
         P[Profile per user]
-        G["Plugins (hermes/)"]
+        G["Plugins and connectors (hermes/)"]
     end
     P -. "MCP calls, signed by a plugin" .-> C
+    P --> S["Execution space per user (docker)"]
 ```
 
 | Layer | Responsibility |
 | --- | --- |
 | Hermes Agent | Agent execution, tool calls, subagents, sessions |
-| Control Plane (`backend/`) | Users, agent access, Memory access, model routing, usage accounting |
-| Web (`web/`) | Conversations, run status, Memory review, usage |
-| Hermes add-ons (`hermes/`) | The plugins and profile template installed into your Hermes |
+| Control Plane (`backend/`) | Users, agent access, Memory access, model routing, connector approvals, scheduled tasks and proactive checks, notifications, usage accounting |
+| Web (`web/`) | Conversations, run status, approval cards, connections, the Now screen, Memory review, usage |
+| Hermes add-ons (`hermes/`) | The plugins and profile template installed into your Hermes, and the general-purpose connectors |
+| Execution space per user | Runs the shell, file, and code execution tools. Applies only to profiles registered in the operator's policy |
 
 The profile a run uses is always taken from the requester's binding.
 The request body cannot choose it.
@@ -161,8 +200,9 @@ One family actually uses it, and that is the only deployment so far.
 
 - The public API and the database schema can still change without notice.
 - Some decisions are recorded but not implemented yet. The [ADR index](docs/adr/INDEX.md) marks them.
+- In progress: the per-user browser, wiring value evaluation and the autonomy policy of proactive checks into real use, and applying execution spaces to more profiles.
 - There is no step-by-step self-hosting guide yet.
-- The roadmap is tracked in [issue #97](https://github.com/jon890/fos-assistant/issues/97).
+- The roadmap is tracked in [issue #219](https://github.com/jon890/fos-assistant/issues/219).
 
 ## Getting started
 
