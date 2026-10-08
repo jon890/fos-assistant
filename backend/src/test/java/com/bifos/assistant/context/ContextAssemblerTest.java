@@ -108,7 +108,7 @@ class ContextAssemblerTest {
                         "connectors__... HTTP 원격 도구 서버",
                         "# 기억",
                         "memory_remember",
-                        "evidence",
+                        "그대로 살린다",
                         "작업 기록")
                 .containsSubsequence("# 답변 형식", "# 도구 호출", "# 기억");
         assertThat(plain.instructions())
