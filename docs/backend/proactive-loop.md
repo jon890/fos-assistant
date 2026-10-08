@@ -38,6 +38,7 @@ sequenceDiagram
     L->>A: decide
     A-->>L: 판정 줄들. EXECUTE 면 startAutonomous 를 이미 불렀다
     L->>L: 시도 줄 DECIDED
+    L->>L: SURFACE, ASK_APPROVAL 판정마다 SURFACED 사건
 ```
 
 ### 줄을 남기지 않고 돌아가는 조건
@@ -126,6 +127,7 @@ provider 는 `assistant.proactive-loop.provider` 다. 판단 profile 이 없거�
 3. 그 가운데 `SURFACE`, `ASK_APPROVAL` 만 남긴다
 4. 같은 문제 키는 가장 늦게 남긴 판정 하나만 남긴다
 5. 남은 판정에 지금 반응이 있으면 뺀다. 그래서 새 판정에 「관심 없음」 을 누르면 같은 키의 옛 판정이 대신 나오지 않는다
+6. 가장 늦은 것부터 `surface-max-items` 개까지만 보인다. 같은 「내 차례」 카드의 할 일과 Memory 제안이 카드 상한 밖으로 밀리지 않게 하기 위해서다
 
 원천 살펴보기나 후보 줄이 없거나, 문제 글이 비었거나, 에이전트를 찾지 못한 판정은 그 줄만 빼고 나머지를 보인다.
 이 목록을 읽다 예외가 나면 이 항목만 비우고 로그를 남긴다. 같은 「내 차례」 카드의 승인 대기, 할 일, Memory 제안을 가리지 않기 위해서다.
@@ -155,6 +157,7 @@ provider 는 `assistant.proactive-loop.provider` 다. 판단 profile 이 없거�
 | `provider` | `hermes` | 평가에 쓸 `DecisionProvider` 이름. 설치된 adapter 여야 한다 |
 | `max-runs-per-day` | `1` | 사용자 한 명의 최근 20시간 시도 상한. 1 이상 |
 | `surface-window` | `7d` | 이 기간 안의 시도가 낸 판정만 지금 화면에 보인다. 0 보다 크다 |
+| `surface-max-items` | `3` | 지금 화면에 보이는 먼저 다룰 문제의 수. 1 이상 |
 
 ## 검증
 

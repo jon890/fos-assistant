@@ -37,7 +37,7 @@
 - 빈 카드는 머리와 비었을 때의 한 줄만 그린다. 다섯 카드가 모두 비면 카드 대신 `EmptyState` 하나로 「지금 확인할 것이 없어요」 를 그린다. 설명 문구는 「실패한 일, 내가 확인할 일, 맡긴 일이 생기면 여기에 보여요.」 다
 - 다섯 카드가 모두 비어도 그 빈 화면 아래에 「할 일 더하기」 를 둔다. 「내 차례」 카드 끝의 것과 같은 `Dialog` 를 연다
 - `status: UNAVAILABLE` 인 카드는 항목 대신 `Notice`(경고)로 「이 카드를 불러오지 못했어요. 잠시 뒤에 다시 열어 주세요」 를 그린다
-- `moreCount` 가 있으면 카드 끝에 「N개 더 있어요」 를 그린다. 실패와 맡긴 일은 `/usage?tab=executions` 로 가는 링크이고, 내 차례와 이어서 하기는 링크 없이 글만 그린다. 내 차례는 승인 대기, 기억 제안, 할 일이 섞여 한 화면으로 보낼 곳이 없고, 이어서 하기의 나머지 대화는 사이드바 목록에 있다
+- `moreCount` 가 있으면 카드 끝에 「N개 더 있어요」 를 그린다. 실패와 맡긴 일은 `/usage?tab=executions` 로 가는 링크이고, 내 차례와 이어서 하기는 링크 없이 글만 그린다. 내 차례는 승인 대기, 기억 제안, 할 일, 먼저 다룰 문제가 섞여 한 화면으로 보낼 곳이 없고, 이어서 하기의 나머지 대화는 사이드바 목록에 있다
 
 부품은 `web/src/components/ui/` 의 `Card`, `CardHeader`, `CardTitle`, `CardAction`, `CardContent`, `Badge`, `EmptyState`, `Notice`, `DropdownMenu`, `Dialog` 를 쓴다.
 실행의 상태 문구와 색은 `web/src/lib/execution-status.ts` 를 쓴다.

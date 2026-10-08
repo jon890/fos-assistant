@@ -4,7 +4,8 @@
 결정은 [ADR-20261007 / decision-feedback](../adr/ADR-20261007-decision-feedback.md)에 있다.
 칸은 [`schema/feedback.md`](schema/feedback.md) 가 갖는다.
 이 기록은 개인화 모델이 아니다. Memory, 할 일의 억제 규칙, 지금 화면의 판정을 바꾸지 않는다.
-예외는 살펴보기 발견의 「관심 없음」 하나다. 같은 점검 대화의 digest 기간 안에서만 같은 주제를 내린다([ADR-20261008 / check-finding-reaction](../adr/ADR-20261008-check-finding-reaction.md)). 아래 「살펴보기 발견의 지금 반응」 을 본다.
+예외는 둘이다. 살펴보기 발견의 「관심 없음」 은 같은 점검 대화의 digest 기간 안에서만 같은 주제를 내린다([ADR-20261008 / check-finding-reaction](../adr/ADR-20261008-check-finding-reaction.md)). 아래 「살펴보기 발견의 지금 반응」 을 본다.
+매일 루프가 보인 먼저 다룰 문제는 그 판정에 사용자의 「받아들임」 이나 「관심 없음」 이 있으면 지금 화면에서 빠진다([매일 루프](proactive-loop.md)의 「사용자에게 보이는 것」).
 
 ## 이어지는 기록
 
@@ -80,7 +81,7 @@
 
 반응은 저장하지 않는다. replay 읽기 모델이 제안 하나의 사건을 그때마다 읽는다. 규칙 버전은 `FeedbackLabeler.VERSION` 이고 지금은 2다.
 
-1. 사용자 사건 가운데 처음 나온 `ACCEPTED`, `APPROVED` 는 `ACCEPTED`, 처음 나온 `REJECTED` 와 할 일의 그만둠, 살펴보기 발견의 「관심 없음」(`DISMISSED`)은 `DECLINED` 다
+1. 사용자 사건 가운데 처음 나온 `ACCEPTED`, `APPROVED` 는 `ACCEPTED`, 처음 나온 `REJECTED` 와 할 일의 그만둠, 살펴보기 발견과 매일 루프 판정의 「관심 없음」(`DISMISSED`)은 `DECLINED` 다
 2. 그런 사건이 없고 `POSTPONED` 나 지금 화면의 숨기기(`DISMISSED`, `ATTENTION_HIDE`)가 있으면 `DEFERRED` 다
 3. 그것도 없고 `SURFACED` 가 있으면 `NO_RESPONSE` 다
 4. 보인 기록이 없으면 `NOT_SURFACED` 다

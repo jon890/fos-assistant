@@ -34,7 +34,7 @@
 | `DELEGATION_RUNNING` | `delegated` | 주인의 위임 실행. `delegation_key` 가 있다 | `RUNNING`. 요청자의 지우지 않은 대화에 속한다 | 시작한 지 `long-running-after` 를 넘었다 | 끝남 | `execution:<번호>` | `status` | `CONTROL_PLANE` |
 | `DELEGATION_FINISHED` | `delegated` | 주인의 위임 실행 | 끝났고 `finished_at` 이 `delegated-window` 안. 요청자의 지우지 않은 대화에 속한다 | 아니다 | 없다 | `execution:<번호>` | `status` | `CONTROL_PLANE` |
 | `CONVERSATION_RECENT` | `continue` | 주인의 대화. `deleted_at` 이 비어 있다 | `updated_at` 순으로 `continue-count` 개 | 아니다 | 없다 | `conversation:<대화 공개 식별자>` | `updated_at` | `CONTROL_PLANE` |
-| `PROBLEM_SURFACED` | `needs_me` | 요청자의 [매일 루프](proactive-loop.md) 시도(`DECIDED`)가 만든 평가의 `proactive_autonomy_decision` 가운데 `SURFACE`, `ASK_APPROVAL` 판정 | 시도가 `surface-window` 안에 있고, 원천 점검 대화를 지우지 않았고, 그 판정에 사용자의 「받아들임」 이나 「관심 없음」 이 없다. 같은 문제 키는 가장 최근 판정 하나만 | 아니다 | 받아들임, 관심 없음, 점검 대화 삭제, 창이 지남 | `autonomy_decision:<번호>` | 판정 번호 | `MODEL_INFERRED` |
+| `PROBLEM_SURFACED` | `needs_me` | 요청자의 [매일 루프](proactive-loop.md) 시도(`DECIDED`)가 만든 평가의 `proactive_autonomy_decision` 가운데 `SURFACE`, `ASK_APPROVAL` 판정 | 시도가 `surface-window` 안에 있고, 원천 점검 대화를 지우지 않았고, 그 판정에 사용자의 「받아들임」 이나 「관심 없음」 이 없다. 같은 문제 키는 가장 최근 판정 하나만, 최근 것부터 `surface-max-items` 개까지 | 아니다 | 받아들임, 관심 없음, 점검 대화 삭제, 창이 지남 | `autonomy_decision:<번호>` | 판정 번호 | `MODEL_INFERRED` |
 | `PROACTIVE_REPORT` | `reports` | 요청자의 `proactive_check` | 검사를 거친 보고가 있고 점검 대화가 지워지지 않았다 | 아니다 | 보고 열람 | `proactive_check:<번호>` | 보고 번호와 완료 시각 | `MODEL_INFERRED` |
 
 **같은 대화에 실패한 turn 과 결과 전달 실패가 함께 있으면 한 항목으로 합친다.**
@@ -215,7 +215,7 @@
 
 **건수는 서버가 한 가지로 센다.** 카드의 `nowCount` 는 그 카드에서 `NOW` 인 항목 수이고 상한으로 자르기 전에 센다. 응답 맨 위의 `nowCount` 와 `summary` 의 `nowCount` 는 카드 `nowCount` 의 합이다. 화면은 카드 배지와 사이드바와 홈의 한 줄에 이 값만 쓰고, 보이는 항목을 다시 세지 않는다. 그래서 사이드바의 수는 늘 카드 배지의 합과 같다. 상한 때문에 보이지 않는 `NOW` 항목은 `moreCount` 에 함께 든다. 이어서 하기 카드의 `moreCount` 는 최근 대화 `continue-count` 더하기 `max-items-per-card` 개 안에서 센 수다. 화면은 이 수를 링크 없는 글로만 그린다.
 
-`title` 은 대화 제목이나 할 일 제목이나 승인 줄의 동작 이름이다. 화면은 평문으로 그린다(ADR-009).
+`title` 은 대화 제목이나 할 일 제목이나 승인 줄의 동작 이름이고, 먼저 다룰 문제면 모델이 쓴 문제 글이다. 화면은 평문으로 그린다(ADR-009).
 `channel` 은 그 항목을 보이는 길이다. 화면 안에서만 보이므로 값은 늘 `IN_APP` 하나다(ADR-072).
 
 항목 종류에 따라 아래 칸을 더 채운다. 해당하지 않으면 `null` 이다. 화면이 `itemKey` 를 잘라 식별자를 얻지 않게 하려는 것이다.
