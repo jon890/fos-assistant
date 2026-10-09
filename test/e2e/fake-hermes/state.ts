@@ -86,6 +86,7 @@ export function createFakeHermesState(
   const emptyUntilStopped = new Map<string, ServerResponse>();
   let lastSubmittedInstructions: string | undefined;
   let lastSubmittedInput: string | undefined;
+  let lastSubmittedImages: { label: string; url: string }[] = [];
   let holdNextConfig = false;
   let sandboxUnavailable = false;
   let lastSandboxOwner: string | null = null;
@@ -151,6 +152,7 @@ export function createFakeHermesState(
     emptyUntilStopped,
     lastSubmittedInstructions: lastSubmittedInstructions as string | undefined,
     lastSubmittedInput: lastSubmittedInput as string | undefined,
+    lastSubmittedImages,
     holdNextConfig,
     sandboxUnavailable,
     lastSandboxOwner: lastSandboxOwner as string | null,
@@ -263,8 +265,10 @@ export type ProactiveScript = {
 export type FakeHermes = {
   readonly baseUrl: string;
   lastSubmittedInstructions(): string | undefined;
-  /** 마지막 실행 요청의 `input`. Control Plane 이 사용자가 쓴 글 앞에 덧붙인 것까지 담는다 */
+  /** 마지막 실행 요청의 입력 글. 목록 입력이면 마지막 항목의 첫 글 파트다. Control Plane 이 사용자가 쓴 글 앞에 덧붙인 것까지 담는다 */
   lastSubmittedInput(): string | undefined;
+  /** 마지막 실행 요청의 마지막 항목에 실린 이미지다. 이름표 글과 주소를 파트 순서대로 담는다 */
+  lastSubmittedImages(): readonly { label: string; url: string }[];
   /** 모델 목록 조회를 받은 횟수다. 들고 있는 동안 다시 묻지 않는 것을 이 수로 본다. */
   modelOptionsCalls(): number;
   /** 마지막 실행 요청이 실어 온 provider, 모델, reasoning effort */

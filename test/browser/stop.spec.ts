@@ -44,7 +44,7 @@ test("답을 만드는 동안 중지 단추를 보이고 중지한 답을 남긴
   await expect(page.getByTestId("stopped-mark")).toBeVisible();
 });
 
-test("사진을 실은 실행 중에는 사진을 지우거나 다음 사진을 고를 수 없다", async ({
+test("실행 중 보낸 사진은 내 메시지에 남고 다음 사진을 고를 수 없다", async ({
   page,
   hermes,
 }) => {
@@ -70,9 +70,12 @@ test("사진을 실은 실행 중에는 사진을 지우거나 다음 사진을 
   await hermes.waitForHeldRun();
   await expect(page.getByTestId("attachment-input")).toBeDisabled();
   await expect(page.getByRole("button", { name: "사진 첨부" })).toBeDisabled();
-  await expect(
-    page.getByRole("button", { name: "사진 지우기" }),
-  ).toBeDisabled();
+  await expect(page.getByTestId("attachment-previews")).toHaveCount(0);
+  const sentPhoto = page.getByTestId("user-message").getByRole("img");
+  await expect(sentPhoto).toBeVisible();
+  await expect(page.getByRole("button", { name: "사진 지우기" })).toHaveCount(
+    0,
+  );
   await page
     .getByTestId("composer-shell")
     .getByRole("button", { name: "중지" })
@@ -80,6 +83,9 @@ test("사진을 실은 실행 중에는 사진을 지우거나 다음 사진을 
   await expect(page.getByTestId("stopped-mark")).toBeVisible({
     timeout: 30_000,
   });
+  await expect(sentPhoto).toBeVisible();
+  await expect(page.getByTestId("attachment-input")).toBeEnabled();
+  await expect(page.getByRole("button", { name: "사진 첨부" })).toBeEnabled();
   const attachment = await page.request.get(
     `/api/chat/conversations/${conversationId}/attachments/${attachmentId}`,
   );
