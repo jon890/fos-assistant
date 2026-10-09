@@ -306,6 +306,7 @@ public class AttachmentService {
                 + photoGuidance(directory, photos, embedImages)
                 + (embedImages
                         ? "작은 글자·가격·품번을 묻거나 지난 사진을 다시 물으면 attachment_inspect로 원본을 자동 조회한다.\n"
+                                + "GIF/WebP는 첫 표시 프레임만 본다. 움직임과 뒤 프레임을 확인했다고 답하지 않는다.\n"
                                 + "attachment_id는 위 참조를 쓰며 한 번에 한 장씩 본다. 큰 원본은 EXIF 표시 원본 좌표"
                                 + " region=[x1,y1,x2,y2]로 필요한 영역을 먼저 조회한다. 오른쪽·아래 끝은 제외한다.\n"
                                 + "큰 사진의 위치를 모르면 overview=true로 축소 전체 개요를 먼저 보고 원본 region을 고른다."
