@@ -6,26 +6,17 @@ Hermes cron 을 대신하며 모델 단계와 「보고할 것 없음」 을 더
 칸은 [`schema/task.md`](schema/task.md) 가 갖는다.
 
 **아래의 일반 예약 작업은 `task.kind = TURN` 이다.**
-매일 깨우기는 같은 발화 표를 쓰는 `CHECK` 이고, 사용자당 작업 10개 상한과 일반 목록에서 뺀다.
+매일 깨우기는 같은 발화 표를 쓰는 `CHECK` 이고, 사용자당 작업 수 상한과 일반 목록에서 뺀다.
 설정과 실행 경계는 [`proactive-check.md`](proactive-check.md)의 「매일 깨우기」가 갖는다.
 `CHECK` 는 작업 지시문과 대화 방식 대신 사용자별 점검 대화에서 `ProactiveCheckService.start(SCHEDULED)` 를 부른다.
 
-예: 「매달 1일 오전 9시에 커리어 커넥터로 지난달 기록을 보고 프로필 변경안을 만들어 줘」.
-이 작업은 매달 1일 9시에 새 대화를 열고, 에이전트가 변경안을 쓰려고 커넥터의 쓰기 도구를 부르면 승인 카드와 승인 요청 알림이 생긴다. 사용자가 알림을 눌러 그 대화에서 승인하면 실행된다.
-
 ## 작업
 
-| 칸 | 받는 값 | 기본 |
-| --- | --- | --- |
-| 이름 | 앞뒤 공백을 뗀 1자에서 100자 | |
-| 에이전트 | 주인이 대화를 시작할 수 있는 에이전트(`AgentService.requireStartable`). 흐름이 붙은 에이전트는 400 `TASK_AGENT_NOT_SUPPORTED` 로 거절한다 | |
-| 지시 | 1자에서 8000자. 대화 메시지 상한과 같다. 발화마다 이 글이 사용자 메시지로 들어간다. `/이름` 으로 시작하면 사람이 보낸 메시지처럼 그 에이전트의 스킬 커맨드로 돈다. 그 에이전트에 켜진 스킬이 아니면 그 발화는 `FAILED` 로 닫힌다 | |
-| 시각 | `CRON` 이나 `ONCE`. 아래 「시각」 | |
-| 시간대 | IANA 이름 | `assistant.task.default-time-zone`(기본 `Asia/Seoul`) |
-| 대화 방식 | `NEW_PER_RUN`, `SINGLE` | `NEW_PER_RUN` |
-| 놓친 발화 | `RUN_ONCE`, `SKIP` | `RUN_ONCE` |
-| 알림 | `ALWAYS`, `ON_FAILURE`, `NEVER` | `ALWAYS` |
-| 모델 단계 | `FAST`, `BALANCED`, `DEEP` 이나 비움. 아래 「모델 단계」 | 비움 |
+칸과 받는 값, 기본값은 `TaskDtos.TaskRequest` 와 `TaskService` 가 갖는다. 아래는 코드만 읽어서는 알기 어려운 규칙이다.
+
+- 에이전트는 주인이 대화를 시작할 수 있는 에이전트(`AgentService.requireStartable`)여야 하고, 흐름이 붙은 에이전트는 거절한다
+- 지시는 발화마다 사용자 메시지로 들어가고, 상한은 대화 메시지 상한과 같다. `/이름` 으로 시작하면 사람이 보낸 메시지처럼 그 에이전트의 스킬 커맨드로 돈다. 그 에이전트에 켜진 스킬이 아니면 그 발화는 `FAILED` 로 닫힌다
+- 보관하지 않은 작업 수는 사용자마다 `assistant.task.max-per-user` 로 제한한다
 
 상태는 셋이다.
 
@@ -40,13 +31,12 @@ Hermes cron 을 대신하며 모델 단계와 「보고할 것 없음」 을 더
 
 ### 시각
 
-| 종류 | 값 | 검사 |
-| --- | --- | --- |
-| `CRON` | 표준 5필드 cron(`분 시 일 월 요일`). 예: 매달 1일 9시는 `0 9 1 * *` | 앞뒤 공백을 뗀 글이 100자를 넘으면 `TASK_SCHEDULE_INVALID`. 저장 칸(`task_trigger.cron_expr`)의 길이다. 필드가 다섯이 아니거나 읽지 못하면 `TASK_SCHEDULE_INVALID`. 지금부터 1년 안의 예정 시각을 펼쳐 이어지는 두 시각의 간격이 `assistant.task.min-interval`(기본 15분)보다 짧으면 `TASK_SCHEDULE_INVALID` |
-| `ONCE` | 그 시간대의 날짜와 시각 하나 | 지금보다 뒤가 아니면 `TASK_SCHEDULE_INVALID` |
+`CRON` 은 표준 5필드 cron(`분 시 일 월 요일`)이고 `ONCE` 는 그 시간대의 날짜와 시각 하나다. 검사와 오류는 `TaskSchedule` 이 갖는다.
+`CRON` 은 지금부터 1년 안의 예정 시각을 펼쳐, 이어지는 두 시각의 간격이 `assistant.task.min-interval` 보다 짧으면 거절한다. 식의 길이 상한은 저장 칸(`task_trigger.cron_expr`)의 길이다.
+`ONCE` 는 지금보다 뒤여야 한다.
 
 `CRON` 의 예정 시각은 그 작업의 시간대로 계산한다. Spring `CronExpression` 의 계산을 따른다. 서머타임이 있는 시간대에서 없는 시각은 그날 건너뛰고, 겹친 시각은 두 번 돈다. 두 번의 예정 시각은 서로 다른 순간이라 발화 기록도 두 줄이다.
-다음 시각이 없는 cron(예: `0 9 31 2 *`)은 `TASK_SCHEDULE_INVALID` 로 거절한다.
+다음 시각이 없는 cron(예: `0 9 31 2 *`)도 거절한다.
 `ONCE` 는 한 번 발화하면 `next_fire_at` 이 비고 작업은 `ACTIVE` 로 남는다. 화면은 「다음 실행 없음」 으로 보인다.
 
 ### 모델 단계
@@ -61,8 +51,6 @@ Hermes cron 을 대신하며 모델 단계와 「보고할 것 없음」 을 더
 `SINGLE` 대화에서 사용자가 고른 모델은 작업에 단계가 있으면 다음 발화가 그 단계로 바꾼다. 단계가 비어 있으면 그대로 둔다.
 단계 정의가 비어 있으면 그 단계는 에이전트 기본 모델로 돈다. 작업을 저장할 때 단계 정의를 확인하지 않는다.
 그 단계의 모델을 그 에이전트가 제공하지 않거나 그룹이 숨겼으면 대화와 같이 Hermes 에 보내기 전에 거절되고, 발화는 `FAILED`(`FAILED`)로 끝나 `TASK_FAILED` 를 알린다.
-
-사용자당 보관하지 않은 작업은 `assistant.task.max-per-user`(기본 10)개까지다. 넘으면 `TASK_LIMIT_REACHED` 다.
 
 ## 발화와 시작
 
@@ -89,7 +77,7 @@ sequenceDiagram
     S->>N: 작업의 알림 설정에 따라 TASK_SUCCEEDED, TASK_FAILED
 ```
 
-발화기와 시작 단계는 같은 예약 작업이 차례로 부른다. `assistant.task.dispatch-cron`(기본 30초마다)이 정한다.
+발화기와 시작 단계는 같은 예약 작업이 차례로 부른다. `assistant.task.dispatch-cron` 이 정한다.
 
 ### 발화
 
@@ -97,10 +85,10 @@ sequenceDiagram
 
 | 상황 | 처리 |
 | --- | --- |
-| 예정 시각이 지난 지 `assistant.task.missed-grace`(기본 2분) 안이다 | 그 시각으로 `QUEUED` 를 만든다 |
+| 예정 시각이 지난 지 `assistant.task.missed-grace` 안이다 | 그 시각으로 `QUEUED` 를 만든다 |
 | 그보다 늦었고 놓친 발화가 `RUN_ONCE` 다 | 지금 앞의 예정 시각 가운데 가장 늦은 것 하나로 `QUEUED` 를 만든다 |
 | 그보다 늦었고 `SKIP` 이다 | 그 시각으로 `SKIPPED`(`MISSED`)를 하나 남긴다. 알리지 않는다 |
-| 그 사용자의 24시간 안 발화가 `assistant.task.max-runs-per-day`(기본 48)번에 닿았다 | `SKIPPED`(`DAILY_LIMIT`)로 남기고 알린다 |
+| 그 사용자의 24시간 안 발화가 `assistant.task.max-runs-per-day` 에 닿았다 | `SKIPPED`(`DAILY_LIMIT`)로 남기고 알린다 |
 | 같은 `(trigger_id, scheduled_for)` 줄이 이미 있다 | 새로 만들지 않는다. `next_fire_at` 만 옮긴다 |
 
 어느 경우든 같은 트랜잭션에서 `last_fired_at` 을 그 예정 시각으로, `next_fire_at` 을 지금 뒤의 첫 예정 시각으로 옮긴다. `ONCE` 는 비운다.
@@ -122,7 +110,7 @@ sequenceDiagram
 | 작업이 `PAUSED` 나 `ARCHIVED` 가 됐다 | `SKIPPED`(`PAUSED`). 알리지 않는다 |
 | 주인이 허용 목록에서 꺼졌다(ADR-059) | `SKIPPED`(`OWNER_REVOKED`). 알리지 않는다. 볼 사람이 없다 |
 | 에이전트를 지웠거나 껐거나 주인이 더는 쓸 수 없거나 흐름이 붙었다 | `SKIPPED`(`AGENT_UNAVAILABLE`)와 알림 |
-| 그 줄을 만든 때(`created_at`)에서 `assistant.task.start-timeout`(기본 10분)이 지났다 | `SKIPPED`(`BUSY`)와 알림. 예정 시각이 아니라 만든 때부터 잰다. 놓친 발화로 늦게 만든 줄도 10분 동안 열 기회를 갖는다 |
+| 그 줄을 만든 때(`created_at`)에서 `assistant.task.start-timeout` 이 지났다 | `SKIPPED`(`BUSY`)와 알림. 예정 시각이 아니라 만든 때부터 센다. 놓친 발화로 늦게 만든 줄도 그만큼 열 기회를 갖는다 |
 | 대화를 준비한다 | `NEW_PER_RUN` 은 그 줄이 대화를 아직 갖지 않았거나, 그 대화가 지워졌거나, 그 대화의 에이전트가 지금 작업의 에이전트와 다르면 새 대화를 만들어 줄에 적는다. 에이전트가 달라 버린 앞 대화는 메시지가 없으면 지운다. `SINGLE` 은 작업의 대화가 있고 지워지지 않았고 에이전트가 같으면 그것을, 아니면 새 대화를 만들어 작업에 적는다. 새 대화의 제목은 작업 이름이고 `task_id` 가 그 작업이다 |
 | turn 잠금이 `CONVERSATION_BUSY` 나 `USER_BUSY` 다 | `QUEUED` 로 두고 다음 tick 에 다시 본다. 이미 만든 대화는 줄에 남아 다시 쓴다 |
 | 잠금을 얻었다 | 줄과 작업을 차례로 잠그고 다시 읽는다. 작업이 `ACTIVE` 가 아니면 `SKIPPED`(`PAUSED`)로 닫고 잠금을 푼다. `ACTIVE` 면 `RUNNING` 과 `started_at` 을 적고 가상 스레드에서 turn 을 돌린다 |
@@ -165,50 +153,20 @@ turn 은 위임 결과를 전하는 자동 turn 과 같은 모양으로 돈다(`
 
 ## 알림
 
-[알림](notification.md) 의 종류에 셋을 더한다. 받는 사람은 작업 주인이다.
-
-| `kind` | 제목 | 본문 | 누르면 |
-| --- | --- | --- | --- |
-| `TASK_SUCCEEDED` | 「작업 이름」 실행을 마쳤어요 | 빈 문자열 | 그 대화 |
-| `TASK_FAILED` | 「작업 이름」 실행이 실패했어요 | 까닭 한 줄 | 대화가 있으면 그 대화, 없으면 그 작업 |
-| `TASK_SKIPPED` | 「작업 이름」 실행을 건너뛰었어요 | 까닭 한 줄 | 그 작업 |
+[알림](notification.md) 의 종류에 `TASK_SUCCEEDED`, `TASK_FAILED`, `TASK_SKIPPED` 셋을 더한다. 받는 사람은 작업 주인이다.
+제목과 까닭 한 줄, 누르면 가는 곳은 `TaskNotices` 가 갖는다.
+`TASK_FAILED` 는 대화가 있으면 그 대화로, 없으면 그 작업으로 간다. `TASK_SKIPPED` 는 그 작업으로 간다.
 
 알림 설정이 `ON_FAILURE` 면 `TASK_FAILED` 와 `TASK_SKIPPED` 만, `NEVER` 면 아무것도 만들지 않는다. `NOTHING_TO_REPORT` 로 끝난 발화는 `ALWAYS` 여도 알리지 않는다. 알림은 `task_run` 의 상태를 바꾸는 트랜잭션 안에서 만든다.
-까닭 한 줄은 화면 문구다. 오류 코드와 내부 원인은 넣지 않는다.
-
-| `reason` | 까닭 한 줄 |
-| --- | --- |
-| `BUSY` | 다른 대화가 오래 돌고 있어 시작하지 못했어요 |
-| `DAILY_LIMIT` | 하루 실행 횟수를 다 썼어요 |
-| `AGENT_UNAVAILABLE` | 에이전트를 쓸 수 없어요. 작업의 에이전트를 확인해 주세요 |
-| `FAILED` | 실행 중에 문제가 생겼어요 |
-| `INTERRUPTED` | 서버가 다시 시작돼 실행이 끊겼어요 |
+까닭 한 줄은 화면 문구다. 오류 코드와 내부 원인은 넣지 않는다. 까닭이 없는 `reason` 은 알리지 않는다.
 
 ## API
 
-모두 `/api/v1` 아래이고 로그인한 사용자 자신의 작업만 다룬다. 남의 작업, 없는 작업, 지운 작업은 같은 404 `TASK_NOT_FOUND` 다.
-
-| 메서드 | 경로 | 본문 | 응답 |
-| --- | --- | --- | --- |
-| GET | `/tasks` | | `List<TaskView>`. 보관하지 않은 작업, 만든 순서의 역순 |
-| POST | `/tasks` | `TaskRequest` | `TaskView` |
-| GET | `/tasks/{taskId}` | | `TaskView` |
-| PUT | `/tasks/{taskId}` | `TaskRequest` | `TaskView` |
-| POST | `/tasks/{taskId}/pause` | | `TaskView` |
-| POST | `/tasks/{taskId}/resume` | | `TaskView` |
-| DELETE | `/tasks/{taskId}` | | 204. 보관한다 |
-| GET | `/tasks/{taskId}/runs?limit=` | | `List<TaskRunView>`. 예정 시각의 역순. `limit` 기본 20, 상한 100. 1 에서 100 밖이면 400 `VALIDATION_FAILED` |
-
-`TaskRequest` 는 `title`, `agentCode`, `instruction`, `schedule`, `conversationMode`, `missedPolicy`, `notify`, `modelTier` 이다. `conversationMode`, `missedPolicy`, `notify` 는 비우면 기본값이다. `modelTier` 는 `FAST`, `BALANCED`, `DEEP` 이나 `null` 이고, 고칠 때 비우면 작업의 단계를 지운다.
-`schedule` 은 `{ type: "CRON", cron, timeZone }` 이나 `{ type: "ONCE", fireAt, timeZone }` 이다. `fireAt` 은 시간대 없는 날짜와 시각(`2026-11-01T09:00`)이고 `timeZone` 으로 해석한다. `timeZone` 을 비우면 기본 시간대다.
-
-`ScheduleView` 는 요청과 같은 모양이다. `{ type, cron, fireAt, timeZone }` 이고, `fireAt` 은 저장한 UTC 시각을 그 작업의 시간대로 바꾼 시간대 없는 날짜와 시각이다.
-
-`TaskView` 는 `id`, `title`, `agentCode`, `agentName`, `instruction`, `state`, `schedule`, `nextFireAt`, `lastFiredAt`, `conversationMode`, `missedPolicy`, `notify`, `modelTier`, `createdAt` 이다.
-`TaskRunView` 는 `id`, `scheduledFor`, `status`, `reason`, `conversationId`, `startedAt`, `finishedAt` 이다. `conversationId` 는 대화의 공개 식별자다. 목록에서 숨긴 대화도 그대로 준다.
-
-대화 목록(`GET /api/v1/chat/conversations`)은 `hidden_at` 이 찬 대화를 주지 않는다. 대화 하나를 읽는 경로는 숨긴 대화도 준다.
-`ConversationView` 에 `taskId` 와 `taskTitle` 을 더한다. 작업이 만든 대화가 아니면 둘 다 비어 있다. 보관한 작업의 대화도 작업 이름을 보인다.
+경로와 요청, 응답 모양은 `TaskController` 와 `TaskDtos` 가 갖는다.
+로그인한 사용자 자신의 작업만 다룬다. 남의 작업, 없는 작업, 지운 작업은 같은 404 로 답한다.
+`modelTier` 를 고칠 때 비우면 작업의 단계를 지운다. `conversationMode`, `missedPolicy`, `notify` 는 비우면 기본값이다.
+`fireAt` 은 시간대 없는 날짜와 시각이고 `timeZone` 으로 해석한다. 응답의 `fireAt` 은 저장한 UTC 시각을 그 작업의 시간대로 바꾼 값이다.
+실행 목록의 `conversationId` 는 목록에서 숨긴 대화도 그대로 준다. 작업의 실행 기록에서 숨긴 대화를 열 수 있게 하려는 것이다.
 
 ## 화면
 
@@ -230,15 +188,7 @@ turn 은 위임 결과를 전하는 자동 turn 과 같은 모양으로 돈다(`
 
 ## 설정
 
-| 키 | 기본 | 뜻 |
-| --- | --- | --- |
-| `assistant.task.dispatch-cron` | `*/30 * * * * *` | 발화기와 시작 단계가 도는 때. 검사에서는 `-` 로 끈다 |
-| `assistant.task.missed-grace` | `2m` | 이만큼 늦은 예정 시각은 놓친 것으로 보지 않는다 |
-| `assistant.task.start-timeout` | `10m` | `QUEUED` 줄이 만들어진 뒤 이만큼 열리지 못하면 `SKIPPED`(`BUSY`) |
-| `assistant.task.max-per-user` | `10` | 사용자당 보관하지 않은 작업 수 |
-| `assistant.task.min-interval` | `15m` | 반복 시각의 최소 간격 |
-| `assistant.task.max-runs-per-day` | `48` | 사용자당 24시간 안의 발화 수 |
-| `assistant.task.default-time-zone` | `Asia/Seoul` | 시간대를 비운 작업의 시간대 |
+키와 기본값은 `application.yml` 의 `assistant.task` 가, 뜻은 `TaskProperties` 의 Javadoc 이 갖는다.
 
 ## 다음 단계
 

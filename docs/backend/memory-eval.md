@@ -25,12 +25,7 @@ CI 의 backend 검사(`./gradlew test`)에 함께 돈다.
 
 ### 구조
 
-| 파일 | 하는 일 |
-| --- | --- |
-| `backend/src/test/resources/memory-eval/family-cases.json` | 시험 세트. 가상 이름만 쓴다 |
-| `backend/src/test/java/com/bifos/assistant/context/eval/MemoryEvalDataset.java` | 시험 세트를 읽고 참조가 맞는지 검사한다 |
-| `backend/src/test/java/com/bifos/assistant/context/eval/MemoryEvalScoreboard.java` | 사례마다의 판정을 모아 지표와 보고서를 만든다 |
-| `backend/src/test/java/com/bifos/assistant/context/eval/MemoryRecallEvalTest.java` | 에이전트는 시험 시작에 한 번 만들고 사용자는 저장하지 않는다. 사례와 측정 모드마다 Memory 를 넣고 조립해 판정한다. 실패 조건을 단언한다 |
+시험 세트는 `backend/src/test/resources/memory-eval/family-cases.json` 이고 가상 이름만 쓴다. 읽기와 판정, 보고서는 `context/eval` 의 시험 클래스가 한다.
 
 사례 하나는 이렇게 돈다.
 
@@ -45,7 +40,7 @@ Hermes 대역도 모델도 부르지 않는다. 그래서 빠르고 결과가 �
 | 모드 | 뜻 |
 | --- | --- |
 | `factsOff` | 개인 사실 구역을 끈 조립. 개인 사실 구역이 생기기 전의 동작과 같다 |
-| `factsOn` | 운영 기본값의 조립. 개인 사실 구역 2,000자, 항목 200자 |
+| `factsOn` | 운영 기본값의 조립. 기본값은 `ContextProperties` 가 갖는다 |
 
 모드는 `ContextProperties` 만 바꾼 `ContextAssembler` 를 시험 안에서 따로 만들어 고른다. Spring 컨텍스트를 바꾸지 않는다.
 
@@ -64,34 +59,7 @@ Hermes 대역도 모델도 부르지 않는다. 그래서 빠르고 결과가 �
 | `BOUNDARY` | 남의 항목과 권한 밖 항목이 실리지 않는다 | 다른 사용자의 개인 항목, 받지 않는 collection, 민감 허용 없는 민감 항목, 제안, 거절, 보관 |
 | `LOAD` | 항목이 많을 때 실리는 글자와 빠지는 항목 | 짧은 사실 120개 |
 
-```json
-{
-  "version": 1,
-  "note": "합성 시험 세트. 이름과 사실은 모두 지어낸 것이다",
-  "users": [
-    { "key": "parentA", "role": "ADMIN", "group": "home" },
-    { "key": "childA", "role": "MEMBER", "group": "home" },
-    { "key": "neighborA", "role": "ADMIN", "group": "other" }
-  ],
-  "agents": [
-    { "key": "general", "collections": [{ "collection": "core", "allowSensitive": false }] }
-  ],
-  "cases": [
-    {
-      "id": "IE-01",
-      "category": "INFORMATION_EXTRACTION",
-      "asker": "parentA",
-      "agent": "general",
-      "question": "우리 딸 이름이 뭐였지?",
-      "memories": [
-        { "key": "m1", "owner": "parentA", "scope": "USER", "title": "딸 이름", "content": "딸 이름은 홍지수다", "updatedDaysAgo": 3 }
-      ],
-      "expect": ["m1"],
-      "forbidden": []
-    }
-  ]
-}
-```
+칸의 모양을 보여 주는 예는 `family-cases.json` 자체다.
 
 | 칸 | 뜻 |
 | --- | --- |
@@ -204,8 +172,3 @@ WHERE e.parent_execution_id IS NULL
   AND e.conversation_id IS NOT NULL
   AND e.started_at >= NOW() - INTERVAL 30 DAY;
 ```
-
-## 기준값
-
-합성 측정의 첫 기준값은 이 문서를 만든 PR 의 보고서에 있다. 숫자를 이 문서에 옮겨 적지 않는다. 시험 세트를 고치면 숫자가 바뀐다.
-운영 집계의 숫자는 운영 저장소에 남긴다.
