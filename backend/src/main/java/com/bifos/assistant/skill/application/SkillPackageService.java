@@ -78,10 +78,10 @@ public class SkillPackageService {
                 user, code, new SkillBundle(checked.name(), checked.skillMd(), checked.files()), baseDigest);
     }
 
-    /** 바이트를 읽지 않은 채 크기 상한을 넘은 zip 의 올리기다. 권한을 본 뒤 거절한다. */
-    public void uploadTooLarge(CurrentUser user, String code) {
+    /** 바이트를 읽지 않은 채 크기 상한을 넘은 zip 의 올리기다. 권한을 본 뒤 호출자가 던질 거절을 돌려준다. */
+    public ApiException uploadTooLarge(CurrentUser user, String code) {
         skills.requireManageable(user, code);
-        throw new ApiException(ErrorCode.SKILL_PACKAGE_INVALID, ZIP_TOO_LARGE.name());
+        return new ApiException(ErrorCode.SKILL_PACKAGE_INVALID, ZIP_TOO_LARGE.name());
     }
 
     /**

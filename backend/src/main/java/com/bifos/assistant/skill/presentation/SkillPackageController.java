@@ -44,8 +44,7 @@ public class SkillPackageController {
             @RequestParam("file") MultipartFile file,
             @RequestParam(value = "baseDigest", required = false) String baseDigest) {
         if (file.getSize() > SkillPackageZip.MAX_ZIP_BYTES) {
-            // 권한을 본 뒤 언제나 던진다. 바이트를 읽는 아래 줄에 오지 않는다.
-            packages.uploadTooLarge(currentUser.require(), code);
+            throw packages.uploadTooLarge(currentUser.require(), code);
         }
         return SkillDetailView.from(packages.upload(currentUser.require(), code, bytesOf(file), baseDigest));
     }

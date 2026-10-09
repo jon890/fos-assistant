@@ -285,7 +285,24 @@ class SkillPackageServiceTest {
     void tooLargeZipForEditor() {
         assertThat(packages.previewTooLarge(OWNER, OWNED).problems())
                 .containsExactly(new SkillPackageProblem(SkillPackageReason.ZIP_TOO_LARGE, null));
-        assertMessage(() -> packages.uploadTooLarge(OWNER, OWNED), ErrorCode.SKILL_PACKAGE_INVALID, "ZIP_TOO_LARGE");
+        assertMessage(
+                () -> {
+                    throw packages.uploadTooLarge(OWNER, OWNED);
+                },
+                ErrorCode.SKILL_PACKAGE_INVALID,
+                "ZIP_TOO_LARGE");
+    }
+
+    @Test
+    @DisplayName("묶음 검사를 거치지 않고 비밀 요청 칸이 있는 묶음을 바로 저장하면 VALIDATION_FAILED 이고 저장하지 않는다")
+    void saveUploadedRejectsSecretRequestWithoutPackageCheck() {
+        String skillMd = "---\nname: weekly-plan\ndescription: 이번 주 계획을 세운다\n"
+                + "required_environment_variables:\n  - name: EXAMPLE_TOKEN\n---\n# 본문\n";
+        SkillBundle bundle = new SkillBundle("weekly-plan", skillMd, List.of());
+
+        assertCode(() -> skills.saveUploaded(OWNER, OWNED, bundle, null), ErrorCode.VALIDATION_FAILED);
+        assertThat(store.currentVersion(OWNED_PROFILE)).isEmpty();
+        assertThat(store.readPending(OWNED_PROFILE)).isEmpty();
     }
 
     @Test

@@ -231,6 +231,8 @@ public class SkillService {
     /** 검사를 마친 묶음을 행 잠금 안에서 지금 스킬의 지문과 {@code baseDigest} 가 같을 때만 저장한다. */
     @Transactional
     public SkillDetail saveUploaded(CurrentUser user, String code, SkillBundle bundle, String baseDigest) {
+        // 묶음 검사를 거치지 않은 호출자가 와도 앞머리 규칙이 빠지지 않게 잠금 전에 다시 본다.
+        SkillFrontmatter frontmatter = requireSkillMd(bundle.name(), bundle.skillMd());
         Agent agent = requireEditableLocked(user, code);
         String profile = agent.hermesProfile();
         Map<String, SkillBundle> current = store.readCurrent(profile);
@@ -241,8 +243,7 @@ public class SkillService {
             throw new ApiException(ErrorCode.SKILL_CHANGED, "the skill changed after the preview");
         }
         if (uploaded == null) {
-            newSkills.requireCreatable(
-                    profile, bundle.name(), SkillFrontmatter.parse(bundle.skillMd()), current, pending);
+            newSkills.requireCreatable(profile, bundle.name(), frontmatter, current, pending);
         }
         return saveBundle(user, agent, current, bundle, uploaded);
     }

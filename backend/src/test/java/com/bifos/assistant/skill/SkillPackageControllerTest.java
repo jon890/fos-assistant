@@ -5,7 +5,6 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
-import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -99,14 +98,15 @@ class SkillPackageControllerTest {
     @Test
     @DisplayName("올리기는 multipart 의 file 과 baseDigest 를 그대로 넘기고 저장한 스킬을 준다")
     void uploadPassesFileAndBaseDigest() throws Exception {
-        when(packages.upload(eq(OWNER), eq("dad"), aryEq(ZIP), eq("abc123")))
-                .thenReturn(new SkillDetail("weekly-plan", "이번 주 계획", "---\n", List.of(), null));
+        SkillDetail saved = new SkillDetail("weekly-plan", "이번 주 계획", "---\n", List.of(), null);
+        when(packages.upload(eq(OWNER), eq("dad"), aryEq(ZIP), eq("abc123"))).thenReturn(saved);
+        when(packages.upload(eq(OWNER), eq("dad"), aryEq(ZIP), isNull())).thenReturn(saved);
 
         mvc.perform(multipart(UPLOAD_PATH).file(file(ZIP)).param("baseDigest", "abc123"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.name").value("weekly-plan"));
 
-        mvc.perform(multipart(UPLOAD_PATH).file(file(ZIP)));
+        mvc.perform(multipart(UPLOAD_PATH).file(file(ZIP))).andExpect(status().isOk());
         verify(packages).upload(eq(OWNER), eq("dad"), aryEq(ZIP), isNull());
     }
 
@@ -125,9 +125,8 @@ class SkillPackageControllerTest {
                         List.of(),
                         List.of(),
                         List.of(new SkillPackageProblem(SkillPackageReason.ZIP_TOO_LARGE, null))));
-        doThrow(new ApiException(ErrorCode.SKILL_PACKAGE_INVALID, "ZIP_TOO_LARGE"))
-                .when(packages)
-                .uploadTooLarge(OWNER, "dad");
+        when(packages.uploadTooLarge(OWNER, "dad"))
+                .thenReturn(new ApiException(ErrorCode.SKILL_PACKAGE_INVALID, "ZIP_TOO_LARGE"));
 
         mvc.perform(multipart(PREVIEW_PATH).file(file(oversized)))
                 .andExpect(status().isOk())
