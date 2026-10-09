@@ -1,5 +1,6 @@
 package com.bifos.assistant.hermes;
 
+import com.bifos.assistant.hermes.dto.HermesImage;
 import com.bifos.assistant.hermes.dto.HermesRunCommand;
 import com.bifos.assistant.hermes.dto.HermesRunLookup;
 import com.bifos.assistant.hermes.dto.HermesRunResult;
@@ -8,7 +9,9 @@ import com.bifos.assistant.hermes.dto.SubagentSessionUsage;
 import com.bifos.assistant.hermes.dto.TokenUsage;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import lombok.extern.slf4j.Slf4j;
@@ -224,9 +227,28 @@ public class HttpHermesRunsClient implements HermesRunsClient {
         return value == null || value.isBlank();
     }
 
+    /**
+     * 사진이 없으면 글 그대로, 있으면 user 메시지 하나의 목록으로 싣는다.
+     *
+     * <p>{@code /v1/runs} 는 마지막 항목의 {@code content} 를 정규화하지 않고 에이전트에 넘기므로 정규화한 모양
+     * ({@code image_url} 파트)으로 보낸다. 모양의 근거는 ADR-20261009 / native-image-input 에 있다.
+     */
+    private static Object input(HermesRunCommand command) {
+        if (command.images().isEmpty()) {
+            return command.input();
+        }
+        List<Map<String, Object>> content = new ArrayList<>();
+        content.add(Map.of("type", "text", "text", command.input()));
+        for (HermesImage image : command.images()) {
+            content.add(Map.of("type", "text", "text", image.label()));
+            content.add(Map.of("type", "image_url", "image_url", Map.of("url", image.dataUrl())));
+        }
+        return List.of(Map.of("role", "user", "content", content));
+    }
+
     private JsonNode submitRequest(HermesRunCommand command, String apiKey) {
         Map<String, Object> body = new HashMap<>();
-        body.put("input", command.input());
+        body.put("input", input(command));
         if (!isBlank(command.provider()) && !isBlank(command.model())) {
             body.put("provider", command.provider());
             body.put("model", command.model());

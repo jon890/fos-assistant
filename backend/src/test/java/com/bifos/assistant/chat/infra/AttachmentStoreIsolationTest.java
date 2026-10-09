@@ -130,6 +130,81 @@ class AttachmentStoreIsolationTest {
         assertThat(fileOf(bob)).exists();
     }
 
+    @Test
+    @DisplayName("줄인 사본은 원본과 같은 폴더의 {id}.small.jpg 에 쓰고 같은 바이트로 읽는다")
+    void storesSmallCopyBesideOriginal() throws IOException {
+        ChatAttachment photo = attachment(1L, 11L, 101L);
+        store.save(photo, new ByteArrayInputStream(new byte[] {1}));
+
+        store.saveSmall(photo, new byte[] {7, 8, 9});
+
+        assertThat(store.hasSmall(photo)).isTrue();
+        assertThat(store.readSmall(photo)).containsExactly(7, 8, 9);
+        Path small = fileOf(photo).resolveSibling("1.small.jpg");
+        assertThat(Files.readAllBytes(small)).containsExactly(7, 8, 9);
+        assertThat(fileOf(photo).resolveSibling("1.small.jpg.tmp")).doesNotExist();
+    }
+
+    @Test
+    @DisplayName("사본이 이미 있으면 다시 쓰지 않는다")
+    void keepsExistingSmallCopy() {
+        ChatAttachment photo = attachment(1L, 11L, 101L);
+        store.save(photo, new ByteArrayInputStream(new byte[] {1}));
+        store.saveSmall(photo, new byte[] {7});
+
+        store.saveSmall(photo, new byte[] {8});
+
+        assertThat(store.readSmall(photo)).containsExactly(7);
+    }
+
+    @Test
+    @DisplayName("지우기는 원본과 사본과 남은 임시 파일을 함께 지운다")
+    void deletesOriginalAndSmallCopyTogether() throws IOException {
+        ChatAttachment photo = attachment(1L, 11L, 101L);
+        store.save(photo, new ByteArrayInputStream(new byte[] {1}));
+        store.saveSmall(photo, new byte[] {7});
+        Path temporary = fileOf(photo).resolveSibling("1.small.jpg.tmp");
+        Files.write(temporary, new byte[] {9});
+
+        store.delete(photo);
+
+        assertThat(fileOf(photo)).doesNotExist();
+        assertThat(fileOf(photo).resolveSibling("1.small.jpg")).doesNotExist();
+        assertThat(temporary).doesNotExist();
+        assertThat(store.hasSmall(photo)).isFalse();
+        assertThatThrownBy(() -> store.readSmall(photo))
+                .isInstanceOfSatisfying(
+                        ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.ATTACHMENT_GONE));
+    }
+
+    @Test
+    @DisplayName("원본을 지운 뒤에는 사본을 쓰지 않는다")
+    void skipsSmallCopyAfterOriginalIsDeleted() {
+        ChatAttachment photo = attachment(1L, 11L, 101L);
+        store.save(photo, new ByteArrayInputStream(new byte[] {1}));
+        store.delete(photo);
+
+        store.saveSmall(photo, new byte[] {7});
+
+        assertThat(store.hasSmall(photo)).isFalse();
+        assertThat(fileOf(photo).resolveSibling("1.small.jpg")).doesNotExist();
+    }
+
+    @Test
+    @DisplayName("사본 경로가 남의 파일 링크면 사본 쓰기와 읽기를 거절한다")
+    void refusesSmallCopySymlink() throws IOException {
+        ChatAttachment alice = attachment(1L, 11L, 101L);
+        ChatAttachment bob = attachment(2L, 22L, 202L);
+        store.save(alice, new ByteArrayInputStream(new byte[] {1}));
+        store.save(bob, new ByteArrayInputStream(new byte[] {2}));
+        Path link = fileOf(alice).resolveSibling("1.small.jpg");
+        Files.createSymbolicLink(link, fileOf(bob));
+
+        assertThatThrownBy(() -> store.saveSmall(alice, new byte[] {7})).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> store.readSmall(alice)).isInstanceOf(IllegalArgumentException.class);
+        assertThat(Files.readAllBytes(fileOf(bob))).containsExactly((byte) 2);
+    }
+
     private Path fileOf(ChatAttachment attachment) {
         return root.resolve("users")
                 .resolve(AttachmentStore.userDirectoryKey(attachment.uploadedByUserId()))

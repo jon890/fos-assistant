@@ -6,6 +6,7 @@ import { useMemoryCaptures } from "./use-memory-captures";
 import { useMemoryUses } from "./use-memory-uses";
 import { type ActivityState } from "./activity/activity-state";
 import type { Turn } from "./message-bubble";
+import type { OutgoingMessage } from "./composer-attachment-utils";
 import { useConversations } from "@/components/shell/conversations-provider";
 import { useShellDisplayName } from "@/components/shell/app-shell";
 import {
@@ -24,6 +25,7 @@ export function useConversationSessionState({
   const [turns, setTurns] = useState<Turn[]>([]);
   const conversationIdRef = useRef<string | null>(initialConversationId);
   const [draft, setDraft] = useState("");
+  const [outgoing, setOutgoing] = useState<OutgoingMessage | null>(null);
   const [sending, setSending] = useState(false);
   const [activity, setActivity] = useState<ActivityState | null>(null);
   const [liveExpanded, setLiveExpanded] = useState(false);
@@ -137,6 +139,8 @@ export function useConversationSessionState({
     conversationIdRef,
     draft,
     setDraft,
+    outgoing,
+    setOutgoing,
     sending,
     setSending,
     activity,

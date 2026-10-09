@@ -18,6 +18,7 @@ import type { ConversationSessionState } from "./use-conversation-session-state"
 import type { ConversationHistory } from "./use-conversation-history";
 import type { ConversationQueue } from "./use-conversation-queue";
 import type { ConversationEvents } from "./use-conversation-events";
+import type { MessageAttachment } from "./message-types";
 
 type Context = Pick<
   ConversationSessionState,
@@ -82,10 +83,11 @@ export function useConversationSend({
   consumeTurnStream,
   finishSentTurn,
 }: Context) {
-  /** 전송이 실제로 끝났는지를 돌려준다. `Composer` 는 이 값을 보고 실패했을 때 미리보기를 남긴다 */
+  /** 메시지가 받아들여졌는지 돌려준다. 거절된 사진 메시지는 말풍선에서 다시 보낼 수 있게 남긴다. */
   async function send(
     attachmentIds: number[],
     replacementText?: string,
+    attachments?: MessageAttachment[],
   ): Promise<boolean> {
     const text = (replacementText ?? draft).trim();
     if (
@@ -94,7 +96,6 @@ export function useConversationSend({
       (conversationId === null && agentCode.length === 0)
     )
       return false;
-
     const version = selectionVersion.current;
     const pendingId = `pending-${Date.now()}`;
     const assistantPendingId = `assistant-${Date.now()}`;
@@ -125,9 +126,14 @@ export function useConversationSend({
     };
     setTurns((previous) => [
       ...previous,
-      { id: pendingId, role: "USER", content: text, senderName: null },
+      {
+        id: pendingId,
+        role: "USER",
+        content: text,
+        senderName: null,
+        attachments,
+      },
     ]);
-
     const restoreFailedMessage = () => {
       if (selectionVersion.current !== version) return;
       if (replacementText === undefined) setDraft(text);
@@ -251,14 +257,12 @@ export function useConversationSend({
       reportRejected(code, message);
       return false;
     };
-
     const requestBody = {
       conversationId,
       text,
       agentCode,
       attachmentIds,
     };
-
     const sendWithoutStream = async () => {
       const response = await sendChatMessage(requestBody);
       const payload = await readPayload<
@@ -289,7 +293,6 @@ export function useConversationSend({
       ]);
       return true;
     };
-
     try {
       let response: Response;
       try {
@@ -297,7 +300,6 @@ export function useConversationSend({
       } catch {
         return await sendWithoutStream();
       }
-
       if (!response.ok) {
         if ([404, 405, 415, 501].includes(response.status)) {
           return await sendWithoutStream();
@@ -390,5 +392,9 @@ export function useConversationSend({
   return { send };
 }
 export type ConversationSend = {
-  send(attachmentIds: number[], replacementText?: string): Promise<boolean>;
+  send(
+    attachmentIds: number[],
+    replacementText?: string,
+    attachments?: MessageAttachment[],
+  ): Promise<boolean>;
 };
