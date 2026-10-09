@@ -1,0 +1,20 @@
+{
+  "name": "plan114-skill-package-backend",
+  "description": "스킬 저장이 넓은 경로와 scripts 와 이전 버전을 다루고, scripts 는 실행 공간이 있는 에이전트에만 받으며, plugin 이 스킬 디렉터리를 실행 공간에 붙인다. zip 받기는 다음 plan",
+  "status": "pending",
+  "created_at": "2026-10-09",
+  "total_phases": 2,
+  "current_phase": 1,
+  "phases": [
+    {
+      "number": 1,
+      "file": "phase-01.md",
+      "execution_profile": "deep"
+    },
+    {
+      "number": 2,
+      "file": "phase-02.md",
+      "execution_profile": "deep"
+    }
+  ]
+}
