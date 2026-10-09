@@ -70,11 +70,11 @@ public final class WorkspaceUsageWalker {
             return count(attributes.isRegularFile() ? attributes.size() : 0);
         }
 
-        /** 읽지 못한 항목이다. 디렉터리면 그 아래를 세지 못했으므로 일부만 센 것이다. */
+        /** 읽지 못한 항목이다. 항목으로 세고, 디렉터리면 그 아래를 세지 못했으므로 일부만 센 것이다. */
         @Override
         public FileVisitResult visitFileFailed(Path file, IOException ex) {
             partial = true;
-            return FileVisitResult.CONTINUE;
+            return file.equals(start) ? FileVisitResult.CONTINUE : count(0);
         }
 
         @Override
