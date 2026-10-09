@@ -142,6 +142,7 @@ grep -rn 'style={{' web/src/components/workspace/
 | 파일 | 변경 |
 |---|---|
 | `docs/code-architecture.md` | 수정 |
+| `docs/flow.md` | 수정 |
 | `docs/frontend/structure.md` | 수정 |
 | `docs/frontend/shell.md` | 수정 |
 | `web/src/app/api/workspace/route.ts` | 신규 |
