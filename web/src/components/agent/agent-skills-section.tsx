@@ -15,6 +15,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Notice } from "@/components/ui/notice";
 import { Switch } from "@/components/ui/switch";
+import { useAdminView } from "@/components/shell/app-shell";
 import { describeError, describeFailure } from "@/components/error-message";
 import {
   deleteSkill,
@@ -104,6 +105,7 @@ function usageText(skill: SkillItemView): string | null {
 
 /** 에이전트가 쓸 수 있는 스킬을 보이고, 관리하는 사람은 켜고 끄고 올리고 지운다. */
 export function AgentSkillsSection({ code, initialSkills }: Props) {
+  const admin = useAdminView();
   const [list, setList] = useState(initialSkills);
   const [pendingName, setPendingName] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -113,7 +115,7 @@ export function AgentSkillsSection({ code, initialSkills }: Props) {
 
   async function reload(): Promise<string | null> {
     try {
-      const response = await fetchAgentSkills(code);
+      const response = await fetchAgentSkills(code, admin);
       if (!response.ok) return await describeFailure(response, SKILL_FAILURES);
       setList((await response.json()) as SkillListView);
       return null;
@@ -126,7 +128,7 @@ export function AgentSkillsSection({ code, initialSkills }: Props) {
     setPendingName(skill.name);
     setError(null);
     try {
-      const response = await setSkillEnabled(code, skill.name, !skill.enabled);
+      const response = await setSkillEnabled(code, skill.name, !skill.enabled, admin);
       setError(
         response.ok
           ? await reload()
@@ -193,7 +195,7 @@ export function AgentSkillsSection({ code, initialSkills }: Props) {
           {error}
         </Notice>
       ) : null}
-      {list.skills.length === 0 ? (
+      {list.skills.filter((skill) => admin || skill.source === "UPLOADED").length === 0 ? (
         <Notice variant="info" className="mt-4">
           {editable && !list.skillsToolsetEnabled
             ? "스킬을 추가하면 스킬 도구가 함께 켜져요."
@@ -201,7 +203,7 @@ export function AgentSkillsSection({ code, initialSkills }: Props) {
         </Notice>
       ) : (
         <ul className="mt-4 divide-y divide-border rounded-md border border-border">
-          {list.skills.map((skill) => {
+          {list.skills.filter((skill) => admin || skill.source === "UPLOADED").map((skill) => {
             const usage = usageText(skill);
             const uploaded = skill.source === "UPLOADED";
             return (
@@ -211,9 +213,13 @@ export function AgentSkillsSection({ code, initialSkills }: Props) {
               >
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-2">
-                    <p className="text-sm font-medium break-all">
-                      {skill.name}
-                    </p>
+                    {editable && uploaded ? (
+                      <Link prefetch={false} href={`/agents/${code}/skills/${skill.name}`}
+                        className="text-sm font-medium break-all underline underline-offset-4"
+                        aria-label={`${skill.name} 내용 고치기`}>
+                        {skill.name}
+                      </Link>
+                    ) : <p className="text-sm font-medium break-all">{skill.name}</p>}
                     <Badge variant="outline">
                       {uploaded ? "올린 스킬" : "기본 스킬"}
                     </Badge>
@@ -236,7 +242,7 @@ export function AgentSkillsSection({ code, initialSkills }: Props) {
                           href={`/agents/${code}/skills/${skill.name}`}
                           aria-label={`${skill.name} 편집`}
                         >
-                          편집
+                          내용 고치기
                         </Link>
                       </Button>
                       <Button

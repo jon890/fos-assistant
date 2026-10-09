@@ -9,7 +9,8 @@ import { fetchAgentSkills, saveSkill } from "@/lib/agent-api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { NativeSelect } from "@/components/ui/native-select";
+import { SkillFilesEditor, type SkillFileEntry } from "./skill-files-editor";
+import { SkillChanges } from "./skill-changes";
 import { Notice } from "@/components/ui/notice";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -29,16 +30,8 @@ type Props = {
   initial: SkillDetailView | null;
 };
 
-type Directory = "references" | "templates";
-
-/** 참고 파일 한 줄이다. `content` 가 없으면 서버가 지금 갖고 있는 내용을 그대로 둔다. */
-type FileEntry = {
-  key: number;
-  directory: Directory;
-  fileName: string;
-  size: number;
-  content?: string;
-};
+type FileEntry = SkillFileEntry;
+type Directory = FileEntry["directory"];
 
 /** 백엔드가 받는 참고 파일 이름이다. `SkillStore` 의 경로 규칙과 같다. */
 const FILE_NAME_PATTERN = /^[a-z0-9][a-z0-9._-]{0,99}$/;
@@ -68,6 +61,7 @@ const NEW_SKILL_TEMPLATE = "---\nname: \ndescription: \n---\n\n";
 /** 이 화면에서만 뜻이 정해지는 오류 코드의 문구다. 나머지는 공용 문구를 쓴다. */
 const SAVE_FAILURES: Record<string, string> = {
   FORBIDDEN: "이 에이전트의 스킬을 관리할 수 없어요.",
+  SKILL_NAME_TAKEN: "이미 쓰고 있는 이름이에요. 다른 스킬 이름을 골라 주세요.",
   HERMES_UNAVAILABLE:
     "저장하지 못했어요. 바뀐 내용이 반영되지 않았을 수 있으니 다시 저장해 주세요.",
   // 백엔드 메시지는 영어라서 화면에 그대로 보이지 않게 한다. 화면이 먼저 거르지 못한 경우에만 여기까지 온다.
@@ -122,7 +116,7 @@ function formatSize(bytes: number): string {
 function entriesOf(initial: SkillDetailView | null): FileEntry[] {
   return (initial?.files ?? []).map((file, index) => {
     const [directory, fileName] = file.path.split("/") as [Directory, string];
-    return { key: index, directory, fileName, size: file.size };
+    return { key: index, directory, fileName, size: file.size, content: file.content };
   });
 }
 
@@ -181,12 +175,8 @@ export function SkillEditor({ code, initial }: Props) {
     if (rejected.length > 0) setFileError(rejected.join(" "));
   }
 
-  function changeDirectory(key: number, directory: Directory) {
-    setFiles((current) =>
-      current.map((entry) =>
-        entry.key === key ? { ...entry, directory } : entry,
-      ),
-    );
+  function changeFile(key: number, changes: Partial<FileEntry>) {
+    setFiles((current) => current.map((entry) => entry.key === key ? { ...entry, ...changes } : entry));
   }
 
   function removeFile(key: number) {
@@ -301,7 +291,8 @@ export function SkillEditor({ code, initial }: Props) {
         skillMd: body,
         files: files.map((entry) => {
           const path = `${entry.directory}/${entry.fileName}`;
-          return entry.content === undefined
+          const previous = initial?.files.find((file) => file.path === path);
+          return entry.content === undefined || previous?.content === entry.content
             ? { path }
             : { path, content: entry.content };
         }),
@@ -394,60 +385,7 @@ export function SkillEditor({ code, initial }: Props) {
         <p className="mt-1 text-xs text-muted-foreground">
           md, txt, json, yaml, yml, csv 파일을 올릴 수 있어요. 최대 20개예요.
         </p>
-        {files.length > 0 ? (
-          <ul className="mt-2 divide-y divide-border rounded-md border border-border">
-            {files.map((entry) => {
-              const path = `${entry.directory}/${entry.fileName}`;
-              return (
-                <li
-                  key={entry.key}
-                  className="flex items-center justify-between gap-3 p-3"
-                >
-                  <div className="flex min-w-0 flex-wrap items-center gap-2">
-                    {entry.content === undefined ? (
-                      <span className="text-sm break-all">{path}</span>
-                    ) : (
-                      <>
-                        <NativeSelect
-                          value={entry.directory}
-                          onChange={(event) =>
-                            changeDirectory(
-                              entry.key,
-                              event.target.value as Directory,
-                            )
-                          }
-                          aria-label={`${entry.fileName} 위치`}
-                          className="w-auto"
-                        >
-                          <option value="references">references/</option>
-                          <option value="templates">templates/</option>
-                        </NativeSelect>
-                        <span className="text-sm break-all">
-                          {entry.fileName}
-                        </span>
-                      </>
-                    )}
-                    <span className="text-xs text-muted-foreground">
-                      {formatSize(entry.size)}
-                    </span>
-                  </div>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    aria-label={`${path} 빼기`}
-                    onClick={() => removeFile(entry.key)}
-                  >
-                    빼기
-                  </Button>
-                </li>
-              );
-            })}
-          </ul>
-        ) : (
-          <p className="mt-2 text-sm text-muted-foreground">
-            아직 참고 파일이 없어요.
-          </p>
-        )}
+        <SkillFilesEditor files={files} onChange={changeFile} onRemove={removeFile} />
         <div className="mt-3">
           <Label htmlFor={fileId} className="mb-2">
             참고 파일 올리기
@@ -472,6 +410,7 @@ export function SkillEditor({ code, initial }: Props) {
         ) : null}
       </section>
 
+      <SkillChanges initial={initial} body={body} files={files} />
       {error ? (
         <Notice variant="error" role="alert" className="mt-4 break-all">
           {error}
