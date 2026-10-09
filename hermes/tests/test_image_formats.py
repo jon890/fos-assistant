@@ -61,7 +61,7 @@ class ImageFormatsTest(unittest.TestCase):
         with Image.open(io.BytesIO(convert(raw, "image/webp", None))) as result:
             self.assertEqual(result.getpixel((1, 1)), (255, 0, 0, 255))
         corrupted = bytearray(raw)
-        offset = corrupted.index(b"ANMF") + 8
+        offset = corrupted.rindex(b"ANMF") + 8
         corrupted[offset + 6:offset + 9] = (10000).to_bytes(3, "little")
         with patch.object(Image, "open", side_effect=AssertionError("must reject before codec")):
             with self.assertRaises(ValueError):
