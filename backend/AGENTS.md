@@ -121,11 +121,7 @@ Javadoc 본문은 포맷하지 않는다. 한국어 Javadoc 의 줄바꿈이 바
 엔티티를 바꾸면 마이그레이션도 함께 바꾼다. 둘이 어긋나면 운영 기동이 실패한다.
 `@Lob` 문자열은 `columnDefinition` 으로 길이를 정한다.
 
-새 파일의 버전은 UTC 작성 시각 14자리다: `V<YYYYMMDDHHMMSS>__<설명>.sql`.
-기존 숫자 버전은 그대로 두고, 합칠 때 main 의 다음 번호로 옮기지 않는다.
-운영과 시험은 `spring.flyway.out-of-order=true` 를 쓴다.
-서로 의존하는 마이그레이션은 한 PR 에 두고 버전 순서로 적용되게 한다.
-`scripts/check-migration-versions.mjs` 가 main 대비 새 파일의 형식, 버전 중복, 미래 시각을 검사한다.
+새 파일의 버전 규칙은 [`backend/docs/data-schema.md`](docs/data-schema.md) 의 「마이그레이션 작성 규칙」 이 갖는다.
 
 **다만 마이그레이션 검사는 모든 마이그레이션을 H2 의 MySQL 모드에서 돌린다.**
 `GroupRenameMigrationTest` 같은 `*MigrationTest` 가 그렇다.
