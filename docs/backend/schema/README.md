@@ -1,12 +1,10 @@
 # 저장 모델
 
 Control Plane 의 표와 칸이 무엇을 뜻하는지를 갖는다. 표는 주제별로 아래 파일에 나눠 적는다.
-MySQL 8.4 에 둔다. 마이그레이션은 `backend/src/main/resources/db/migration/` 이 소유하고 이 문서는 뜻을 적는다.
-DB 색인(index)은 마이그레이션이 갖는다. 이 문서는 표마다 칸과 유일 제약과 FK 만 적는다.
+MySQL 8.4 에 둔다. 표와 칸, 타입, 색인(index)은 마이그레이션 `backend/src/main/resources/db/migration/` 이 소유하고, 상태 값은 엔티티의 enum 이 갖는다.
+이 문서는 코드만으로 알 수 없는 것만 적는다. 칸의 뜻, 유일 제약과 FK 를 두거나 두지 않는 까닭, 지울 때 함께 지워지는 것이다.
 
-비밀값은 어느 표에도 넣지 않는다.
-AI credential 은 Hermes profile 의 `.env` 에, profile 의 API server key 는 홈서버의 파일에 있다.
-`user_data_key` 의 데이터 key 는 데이터베이스 밖의 KEK 로 감싼 채로만 둔다.
+비밀값은 어느 표에도 넣지 않는다. 어디에 두는지는 [`../../code-architecture.md`](../../code-architecture.md) 의 「비밀값을 두는 곳」 이 갖는다.
 
 | 파일 | 표 |
 | --- | --- |
@@ -57,16 +55,11 @@ Control Plane 의 API 에는 관리자에게 남의 메시지 본문을 주는 �
 
 ### 새 버전은 UTC 작성 시각으로 정한다
 
-새 파일은 `V<YYYYMMDDHHMMSS>__<설명>.sql` 형식이다. UTC 시각 14자리를 쓴다.
+버전 형식, 숫자 버전 유지, `out-of-order`, 겹칠 때 새 파일만 다시 정하는 규칙은 루트 [`AGENTS.md`](../../../AGENTS.md) 의 「Flyway 버전과 ADR 식별자」 가 갖는다.
+적용된 파일을 고치지 않는 규칙은 같은 문서의 「용어」 절이 갖는다.
 작성 시각은 `date -u +%Y%m%d%H%M%S` 로 얻는다.
-전환 PR 이 머지될 때 main 에 있는 숫자 버전은 이름과 내용을 그대로 유지한다.
-운영에 적용된 파일은 주석도 고치지 않는다. 배포 뒤 `test/unit/migration-checksums.json` 에 추가하는 규칙도 같다.
-
-운영과 시험에 `spring.flyway.out-of-order=true` 를 둔다.
-높은 시각 버전이 먼저 배포되어도 나중에 들어온 낮은 시각 버전을 적용한다.
-**서로 의존하는 마이그레이션은 한 PR 에 둔다.** 그 안에서는 의존하는 파일의 시각을 더 크게 정한다.
+서로 의존하는 마이그레이션은 한 PR 안에서 의존하는 파일의 시각을 더 크게 정한다.
 다른 PR 의 미적용 스키마에 기대는 SQL 은 만들지 않는다.
-버전이 겹치면 적용 전인 새 파일만 새 시각으로 바꾼다.
 
 `node scripts/check-migration-versions.mjs [기준 ref]` 는 기본으로 `origin/main` 과 비교한다.
 새 파일의 시각 형식과 유효한 UTC 날짜, 지금보다 1일 넘게 미래인지 검사하고 모든 파일의 버전 중복을 찾는다.
@@ -129,16 +122,10 @@ H2 의 MySQL 모드도 이 문장을 받는다.
 scripts/check-mysql-migration.sh
 ```
 
-Docker 로 일회용 MySQL 8.4 를 띄우고 `mysql` 태그가 붙은 검사를 돌린다. CI 의 `backend` job 도 이 스크립트를 돌린다.
-마이그레이션뿐 아니라 저장소 쿼리도 이 서버에서 실행한다. 그 검사는 [`backend/AGENTS.md`](../../../backend/AGENTS.md) 의 「저장소 쿼리는 실제 MySQL 에서도 실행한다」 가 갖는다.
-서버를 운영처럼 `--collation-server=utf8mb4_unicode_ci` 로 띄운다. 정렬 규칙을 적지 않은 표가 생기면 그 표만 다른 정렬 규칙이 돼 검사가 실패한다.
-
-| 검사 | 확인하는 것 |
-| --- | --- |
-| `MysqlMigrationTest` | 빈 데이터베이스에서 Flyway 가 처음부터 끝까지 적용되고 Hibernate 의 `ddl-auto: validate` 가 통과한다. 서버 기본 정렬 규칙이 운영과 같고, 모든 표와 문자열 칸의 정렬 규칙이 `utf8mb4_0900_ai_ci` 하나다 |
-| `CollationUnifyMysqlMigrationTest` | 줄이 있는 여덟 표가 V58 부터 V65 까지를 지나며 줄과 칸 타입과 유일 색인을 그대로 둔 채 정렬 규칙만 바뀐다. 새 정렬 규칙에서 겹치는 줄이 있으면 그 표에서 멈추고 그 표는 그대로 남는다 |
-| `SubagentUsageLedgerMysqlMigrationTest` | 줄이 있는 상태에서 V55 부터 끝까지 적용되고 결과가 H2 와 같다 |
-| `MemorySourceUniqueMysqlMigrationTest` | 줄이 있는 `memory` 표에 V55 의 유일 색인이 만들어지고 결과가 H2 와 같다 |
+Docker 로 일회용 MySQL 8.4 를 띄우고 `mysql` 태그가 붙은 검사를 모두 돌린다. CI 의 `backend` job 도 이 스크립트를 돌린다.
+검사의 목록은 `backend/src/test` 에서 `@Tag("mysql")` 이 붙은 클래스이고, 무엇을 확인하는지는 각 클래스의 Javadoc 이 갖는다.
+마이그레이션뿐 아니라 저장소 쿼리와 잠금도 이 서버에서 실행한다. 저장소 쿼리 검사는 [`backend/AGENTS.md`](../../../backend/AGENTS.md) 의 「저장소 쿼리는 실제 MySQL 에서도 실행한다」 가 갖는다.
+서버를 운영처럼 `--collation-server=utf8mb4_unicode_ci` 로 띄운다. 정렬 규칙을 적지 않은 표가 생기면 그 표만 다른 정렬 규칙이 돼 `MysqlMigrationTest` 가 실패한다.
 
 **줄을 넣거나 고치는 마이그레이션을 쓰면 그 검사를 실제 MySQL 에서도 돌린다.**
 H2 용 `*MigrationTest` 가 데이터베이스를 만드는 메서드를 열어 두고, `mysql` 태그를 단 하위 클래스가 `MysqlTestDatabase` 로 바꿔 끼운다.
@@ -148,12 +135,10 @@ H2 용 `*MigrationTest` 가 데이터베이스를 만드는 메서드를 열어 
 
 선택의 우선순위와 초기값은 [모델 단계와 실행 기록](../../model-tiers.md)이 정한다.
 표와 칸은 [`users-agents.md`](users-agents.md), [`chat.md`](chat.md), [`execution.md`](execution.md) 의 각 절에 있다.
-비밀값은 그 표들에 저장하지 않는다.
 
 `conversation.model_selection_mode` 의 null 은 사용자와 그룹 기본값을 따른다는 뜻이다.
 단계와 요청값은 실행 시작 시 복사하고 실제 제공사와 모델은 완료 시 갱신한다.
 이전 실행의 `reasoning_effort_source` 는 null 로 두고 추정해 채우지 않는다.
-끝난 실행의 재조회는 `finished_at` 색인을 쓴다.
 재조회 작업의 완료 사건은 기존 `(execution_id, sequence)` 유일 제약을 지키며 같은 자식 완료를 중복 저장하지 않는다.
 실행이나 사용자 삭제에 의한 cascade를 추가하지 않는다. 기존 실행 기록과 같은 보존 규칙을 따른다.
 
@@ -165,15 +150,17 @@ H2 용 `*MigrationTest` 가 데이터베이스를 만드는 메서드를 열어 
 대화와 실행 기록과 스킬 호출 이력은 남는다.
 
 대화 줄은 지우지 않는다. 사용자가 지우면 `conversation.deleted_at` 을 적고 목록에서 숨긴다.
-아직 보내지 않은 대기 메시지(`chat_pending_message`)는 그때 함께 지운다. 지운 대화에는 보낼 곳이 없다.
+같은 트랜잭션에서 두 가지를 함께 지운다.
+아직 보내지 않은 대기 메시지(`chat_pending_message`)는 지운 대화에 보낼 곳이 없어 지운다.
+판단 피드백 사건(`decision_feedback_event`)은 그 대화의 사건과, 그 사건이 가리키는 제안의 다른 사건까지 지운다. 사용자의 기록이라 대화와 함께 없앤다.
+까닭과 예외는 [`../decision-feedback.md`](../decision-feedback.md) 의 「보관과 삭제」 가 갖는다.
 그 뒤 정리 작업이 메시지, 첨부와 결과물의 파일과 행, 실행 질문 줄, 실행의 답 본문과 사건의 `detail`, Hermes session 을 지우고 `purged_at` 을 적는다.
 실행 줄과 사건 줄은 본문 없이 남는다. 사용량 화면은 지운 대화의 실행도 센다. 돈은 이미 나갔다.
 무엇을 언제 지우고 무엇을 기다리는지는 [ADR-20261008 / conversation-purge](../../../backend/docs/adr/ADR-20261008-conversation-purge.md) 가 갖는다.
 
 사용자를 지우는 흐름은 아직 없다.
 
-페르소나는 이 데이터베이스에 없다. 본문은 그 profile 의 `SOUL.md` 가 갖는다.
-근거는 [ADR-019](../../../backend/docs/adr/ADR-019-페르소나는-hermes-가-갖고-control-plane-은-화면만-준다.md) 에 있다.
+페르소나는 이 데이터베이스에 없다. 본문은 그 profile 의 `SOUL.md` 가 갖는다([ADR-019](../../../backend/docs/adr/ADR-019-페르소나는-hermes-가-갖고-control-plane-은-화면만-준다.md)).
 
 첨부는 보관 기간이 지나면 파일만 지우고 `deleted_at` 을 적는다. 행은 대화를 지울 때 함께 지운다.
 결과물(`chat_artifact`)도 같다.

@@ -82,7 +82,7 @@
 | 일 | 처리 |
 | --- | --- |
 | 사용자 줄을 지움 | FK `ON DELETE CASCADE` 로 함께 지운다 |
-| 대화를 지움 | `ChatService.delete` 가 같은 트랜잭션에서 그 대화의 사건과, 그 사건이 가리키는 제안의 다른 사건을 지운다 |
+| 대화를 지움 | `ChatConversationManagement.delete` 가 같은 트랜잭션에서 그 대화의 사건과, 그 사건이 가리키는 제안의 다른 사건을 지운다 |
 | 보관 기간이 지남 | 마지막 사건이 `assistant.decision-feedback.retention` 보다 오래된 제안의 사건을 `cleanup-cron` 에 모두 지운다. 사건 단위로 지우면 나중 사건만 남아 첫 반응을 잘못 읽는다. 검사에서는 `-` 로 끈다 |
 | 살펴보기, 판정, 실행 줄을 지움 | 그 번호 칸만 비운다(`ON DELETE SET NULL`) |
 
