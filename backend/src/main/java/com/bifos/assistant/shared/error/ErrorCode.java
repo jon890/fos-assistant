@@ -283,6 +283,12 @@ public enum ErrorCode {
     WORKSPACE_PREVIEW_TOO_LARGE(HttpStatus.CONTENT_TOO_LARGE),
     /** 미리보기를 정하지 않은 확장자다. 내려받기는 받는다. */
     WORKSPACE_PREVIEW_UNSUPPORTED(HttpStatus.UNSUPPORTED_MEDIA_TYPE),
+    /** 지우기 도우미의 socket 이 설정되지 않았다. 상태 조회의 {@code deletable} 이 거짓이다. */
+    WORKSPACE_DELETE_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE),
+    /** 디렉터리 안의 항목이 지우기 상한을 넘는다. 아무것도 지우지 않았다. */
+    WORKSPACE_DELETE_TOO_MANY(HttpStatus.CONFLICT),
+    /** 도우미가 실패했거나 제한 시간 안에 답하지 않았다. 일부가 지워졌을 수 있다. */
+    WORKSPACE_DELETE_FAILED(HttpStatus.BAD_GATEWAY),
     INTERNAL_ERROR(HttpStatus.INTERNAL_SERVER_ERROR);
 
     private final HttpStatus status;

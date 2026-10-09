@@ -2,6 +2,7 @@ package com.bifos.assistant.workspace.presentation;
 
 import com.bifos.assistant.workspace.application.model.WorkspaceAgent;
 import com.bifos.assistant.workspace.application.model.WorkspaceStatus;
+import com.bifos.assistant.workspace.domain.WorkspaceDeletion;
 import com.bifos.assistant.workspace.domain.WorkspaceEntry;
 import com.bifos.assistant.workspace.domain.WorkspaceListing;
 import java.util.List;
@@ -59,6 +60,19 @@ public final class WorkspaceDtos {
                     entry.modifiedAt().toString(),
                     entry.readable(),
                     entry.openable());
+        }
+    }
+
+    /**
+     * 지우기의 결과다.
+     *
+     * @param entries 지운 항목 수
+     * @param bytes 지운 일반 파일의 크기 합
+     */
+    public record DeletionView(String kind, long entries, long bytes) {
+
+        static DeletionView of(WorkspaceDeletion deletion) {
+            return new DeletionView(deletion.kind().name(), deletion.entries(), deletion.bytes());
         }
     }
 }

@@ -486,5 +486,29 @@ sequenceDiagram
     end
 ```
 
+```mermaid
+sequenceDiagram
+    participant B as 브라우저
+    participant C as Control Plane
+    participant H as 권한 도우미
+
+    B->>C: GET /api/v1/workspace 로 도는 실행 수를 다시 읽는다
+    B->>B: 확인 창. 도는 실행이 있으면 다시 생길 수 있다고 알린다
+    B->>C: DELETE /api/v1/workspace/entries?path=
+    C->>C: 경로 규칙, 읽기 마운트에서 있는지 확인
+    C->>H: {owner, path, max_entries} 한 줄
+    alt 지웠다
+        H-->>C: ok, kind, entries, bytes
+        C->>C: INFO 로그 한 줄
+        C-->>B: 200. 목록을 다시 읽는다
+    else 항목이 너무 많다
+        H-->>C: TOO_MANY_ENTRIES
+        C-->>B: 409. 아무것도 지우지 않았다고 알린다
+    else 도우미가 실패했거나 답하지 않았다
+        C-->>B: 502. 목록을 다시 읽어 남은 것을 보인다
+    end
+```
+
 상태와 목록은 브라우저가 읽고, 실패는 그 자리의 다시 읽기로 다룬다.
+두 탭에서 같은 것을 지우면 늦은 쪽은 404 를 받고 목록을 다시 읽는다.
 목록을 연 사이 에이전트가 파일을 바꾸면 다음 읽기에 보인다. 화면은 스스로 다시 읽지 않는다.

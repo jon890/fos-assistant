@@ -247,7 +247,10 @@ class WorkspaceControllerTest {
         WorkspaceService service = new WorkspaceService(
                 LiveProperties.fixed(WorkspaceProperties.class, new WorkspaceProperties(rootValue, "")),
                 agentService,
-                limiter);
+                limiter,
+                (owner, path, maxEntries) -> {
+                    throw new AssertionError("이 시험은 지우지 않는다");
+                });
         return MockMvcBuilders.standaloneSetup(new WorkspaceController(service, new CurrentUserProvider()))
                 .setControllerAdvice(new GlobalExceptionHandler())
                 .build();
