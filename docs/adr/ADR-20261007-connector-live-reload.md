@@ -1,4 +1,4 @@
-## ADR-20261007: 커넥터를 붙이면 공유 gateway 의 MCP 설정 맞추기로 반영하고 Control Plane 이 두 주기 뒤 스스로 확인한다
+## ADR-20261007 / connector-live-reload: 커넥터를 붙이면 공유 gateway 의 MCP 설정 맞추기로 반영하고 Control Plane 이 두 주기 뒤 스스로 확인한다
 
 - **status**: `accepted`
 - Date: 2026-10-07

@@ -8,7 +8,7 @@
   provider 이름별로 effort 를 바꾸는 규칙은 두지 않는다. 받은 값을 어떻게 전달하고 줄이고 빼는지는 Hermes 가 정한다.
 - **맥락**: effort 선택지는 고정 목록(`low` 부터 `max`)이었고, Hermes 가 지원 여부를 밝히지 않은 모델은 backend 가 참으로 채웠다.
   화면은 확인된 지원과 모르는 것을 구분하지 못했다. `none` 과 `minimal` 은 요청 검증에서 거절돼 reasoning 을 끄는 길도 없었다.
-  Hermes v2026.9.24 소스를 읽어 확인한 것은 [Runs API 문서](../hermes/runs-api.md)의 「reasoning effort 는 `model_options` 로 그 실행에만 준다」에 있다.
+  Hermes v2026.9.24 소스를 읽어 확인한 것은 [Runs API 문서](../../hermes/docs/hermes-contract.md)의 「reasoning effort 는 `model_options` 로 그 실행에만 준다」에 있다.
   `none` 은 요청 단위로 reasoning 을 끄고, 모르는 값은 버려 profile 설정으로 돈다.
   `/api/model/options` 의 `capabilities` 는 모델별 `reasoning` 과, aggregator provider 에 한해 `can_disable_reasoning` 을 준다.
   상류는 `supported_efforts` 를 일부러 내보내지 않는다. 실제 지원보다 적게 알려 주기 때문이다.

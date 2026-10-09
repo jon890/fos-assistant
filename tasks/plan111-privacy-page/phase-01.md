@@ -12,7 +12,7 @@
 
 ## 컨텍스트
 
-**근거 문서**: `docs/privacy.md`, `docs/adr/ADR-20261008-data-encryption.md` 의 「위협 모델」, `docs/adr/ADR-20261008-conversation-purge.md`, `docs/frontend/structure.md` 의 화면 목록
+**근거 문서**: `docs/privacy.md`, `backend/docs/adr/ADR-20261008-data-encryption.md` 의 「위협 모델」, `backend/docs/adr/ADR-20261008-conversation-purge.md`, `web/docs/code-architecture.md` 의 화면 목록
 
 - 페이지는 `web/src/app/**/page.tsx` 이다. `signin` 말고는 모든 페이지가 `auth()` 로 로그인을 확인하고 없으면 redirect 한다(예: `web/src/app/page.tsx`). middleware 는 없다. 그래서 새 페이지에서 `auth()` 를 부르지 않으면 로그인 없이 열린다
 - 로그인 화면은 `web/src/app/signin/page.tsx` 다. `Card` 와 `Button` 부품(`web/src/components/ui/`)을 쓰고, 앱 이름은 `appName()`(`web/src/lib/app-name.ts`)으로 실행할 때 읽는다
@@ -51,7 +51,7 @@
 
 ### 4. 문서
 
-`docs/frontend/structure.md` 의 화면 목록에 `/privacy` 를 더하고 로그인 없이 열린다고 적는다.
+`web/docs/code-architecture.md` 의 화면 목록에 `/privacy` 를 더하고 로그인 없이 열린다고 적는다.
 
 ## 검증
 
@@ -71,4 +71,4 @@ scripts/check-local.sh privacy-page
 | `web/src/app/privacy/page.tsx` | 신규 |
 | `web/src/app/signin/page.tsx` | 수정 |
 | `test/browser/privacy-page.spec.ts` | 신규 |
-| `docs/frontend/structure.md` | 수정 |
+| `web/docs/code-architecture.md` | 수정 |

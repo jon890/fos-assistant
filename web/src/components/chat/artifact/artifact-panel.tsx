@@ -17,7 +17,7 @@ import { artifactName } from "@/lib/artifact-name";
  * <p>`allow-same-origin` 이 있어야 HTML 이 상대 경로로 부르는 사진에 로그인 쿠키가 간다. 스크립트가 돌지 않으므로
  * 같은 출처여도 문서가 앱의 API 를 부르지 못한다. `target="_blank"` 링크는 새 탭에서 sandbox 없이 열린다.
  */
-const FRAME_SANDBOX =
+export const FRAME_SANDBOX =
   "allow-same-origin allow-popups allow-popups-to-escape-sandbox";
 
 /** `name` 은 답 아래 줄이 보인 이름이다. 없을 때만 경로 하나로 이름을 정한다. */

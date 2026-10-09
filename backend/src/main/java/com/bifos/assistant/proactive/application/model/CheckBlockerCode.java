@@ -1,6 +1,6 @@
 package com.bifos.assistant.proactive.application.model;
 
-/** 살펴보기를 시작하지 못하게 막는 까닭이다. 뜻은 {@code docs/backend/proactive-check.md} 의 「시작 전 점검」 이 갖는다. */
+/** 살펴보기를 시작하지 못하게 막는 까닭이다. 보는 순서와 허용 toolset 목록은 {@code ProactiveCheckReadiness} 가 갖는다. */
 public enum CheckBlockerCode {
     /** 설정으로 꺼 두었다. */
     DISABLED,

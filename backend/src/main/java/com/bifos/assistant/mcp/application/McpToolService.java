@@ -356,8 +356,7 @@ public class McpToolService {
     }
 
     /**
-     * 할 일을 {@code PROPOSED} 로 제안하고 그 결과를 한 줄 글로 돌려준다. 글은 {@code docs/backend/follow-up.md} 의 「제안 도구」
-     * 표가 갖는다.
+     * 할 일을 {@code PROPOSED} 로 제안하고 그 결과를 한 줄 글로 돌려준다. 결과마다의 글과 {@code isError} 는 이 메서드가 갖는다.
      *
      * <p>주인과 대화는 origin 실행에서 정한다. 인자로 받지 않는다(ADR-032). 값이 틀린 인자는 모델이 고쳐 다시 부를 수 있게
      * {@code isError} 와 무엇이 틀렸는지 한 줄로 답한다.

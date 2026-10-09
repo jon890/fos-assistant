@@ -12,7 +12,7 @@
 
 ## 컨텍스트
 
-**근거 문서**: `docs/adr/ADR-20261008-data-encryption.md`, `docs/backend/schema/README.md` 의 「본문 칸과 운영 조회」, `docs/backend/schema/chat.md` 의 「chat_message」, `docs/backend/schema/crypto.md`
+**근거 문서**: `backend/docs/adr/ADR-20261008-data-encryption.md`, `backend/docs/data-schema.md` 의 「본문 칸과 운영 조회」, `backend/docs/data-schema.md` 의 「chat_message」, `backend/docs/data-schema.md`
 
 - 따를 본보기는 메시지다.
   - 엔티티: `backend/src/main/java/com/bifos/assistant/chat/domain/ChatMessage.java` 의 `storedContent`, `contentKeyId`, `content()`, `detachPlainForSealing()`, `seal(...)`, `attachOpener(...)`
@@ -47,7 +47,7 @@ ALTER TABLE chat_pending_message ADD COLUMN content_key_id BIGINT NULL;
 ALTER TABLE agent_execution ADD COLUMN output_key_id BIGINT NULL;
 ```
 
-외래 키를 두지 않는다(`docs/backend/schema/crypto.md`).
+외래 키를 두지 않는다(`backend/docs/data-schema.md`).
 
 ### 2. 대기 메시지
 
@@ -106,6 +106,6 @@ scripts/check-mysql-migration.sh
 | `backend/src/main/java/com/bifos/assistant/mcp/application/McpToolService.java` | 수정 |
 | `backend/src/test/java/com/bifos/assistant/chat/PendingMessageEncryptionTest.java` | 신규 |
 | `backend/src/test/java/com/bifos/assistant/usage/ExecutionOutputEncryptionTest.java` | 신규 |
-| `docs/backend/schema/chat.md` | 수정 |
-| `docs/backend/schema/execution.md` | 수정 |
-| `docs/backend/schema/README.md` | 수정 |
+| `backend/docs/data-schema.md` | 수정 |
+| `backend/docs/data-schema.md` | 수정 |
+| `backend/docs/data-schema.md` | 수정 |

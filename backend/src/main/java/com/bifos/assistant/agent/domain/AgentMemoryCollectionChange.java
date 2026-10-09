@@ -18,7 +18,7 @@ import lombok.experimental.Accessors;
 /**
  * 에이전트가 받는 collection 한 줄이 바뀐 기록이다(ADR-20261008 / agent-memory-grants-admin).
  *
- * <p>사람이 바꾼 것만 남기고 지우지 않는다. 칸의 뜻은 {@code docs/backend/schema/memory.md} 의
+ * <p>사람이 바꾼 것만 남기고 지우지 않는다. 칸의 뜻은 {@code backend/docs/data-schema.md} 의
  * 「agent_memory_collection_change」 가 갖는다.
  */
 @Entity

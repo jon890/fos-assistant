@@ -22,7 +22,7 @@ import {
   type AttentionWhy,
 } from "../../web/src/lib/attention.ts";
 
-const NOW_DOC = join(import.meta.dirname, "../../docs/frontend/now.md");
+const NOW_DOC = join(import.meta.dirname, "../../web/docs/prd.md");
 
 function why(trigger: string, signals: string[]): AttentionWhy {
   return { trigger, signals, confidence: "CONTROL_PLANE", sources: [] };
@@ -52,10 +52,14 @@ function card(key: AttentionCardKey, overrides: Partial<AttentionCard> = {}): At
   return { key, status: "OK", nowCount: 0, moreCount: 0, items: [], ...overrides };
 }
 
-/** `docs/frontend/now.md` 「이유 문구」 표의 줄을 읽는다. 문서와 코드의 문구가 같은지 이 표로 본다. */
+/** `web/docs/prd.md` 「이유 문구」 표의 줄을 읽는다. 문서와 코드의 문구가 같은지 이 표로 본다. */
 async function reasonRows(): Promise<{ trigger: string; signals: string[]; text: string }[]> {
   const doc = await readFile(NOW_DOC, "utf-8");
-  const section = doc.split("## 이유 문구")[1]?.split("\n## ")[0] ?? "";
+  // 「이유 문구」 헤딩부터 같은 단계 이상의 다음 헤딩 앞까지다.
+  const start = /^(#{2,4}) 이유 문구$/m.exec(doc);
+  const rest = start ? doc.slice(start.index + start[0].length) : "";
+  const next = start ? new RegExp(`^#{1,${start[1].length}} `, "m").exec(rest) : null;
+  const section = next ? rest.slice(0, next.index) : rest;
   const rows = section
     .split("\n")
     .filter((line) => /^\| `[A-Z_]+` \|/.test(line))
@@ -65,11 +69,11 @@ async function reasonRows(): Promise<{ trigger: string; signals: string[]; text:
       signals: signal === "없음" ? [] : [signal.replace(/\s*만$/, "").replaceAll("`", "")],
       text,
     }));
-  assert.ok(rows.length > 0, "now.md 에서 「이유 문구」 표를 찾지 못했다");
+  assert.ok(rows.length > 0, "web/docs/prd.md 에서 「이유 문구」 표를 찾지 못했다");
   return rows;
 }
 
-test("이유 문구는 now.md 「이유 문구」 표의 줄마다 그 문구다", async () => {
+test("이유 문구는 web/docs/prd.md 「이유 문구」 표의 줄마다 그 문구다", async () => {
   for (const row of await reasonRows()) {
     assert.equal(
       reasonText(why(row.trigger, row.signals)),
@@ -204,7 +208,7 @@ test("빈 기한이나 형식이 틀린 기한은 없는 기한이다", () => {
   assert.equal(seoulInputToIso("내일"), null);
 });
 
-test("항목의 단추는 now.md 「동작」 표를 따른다", () => {
+test("항목의 단추는 web/docs/prd.md 「동작」 표를 따른다", () => {
   const conversationId = "7b1e0000-0000-4000-8000-000000000000";
   const followUp = {
     id: "0199a000-0000-7000-8000-000000000001",

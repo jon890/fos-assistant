@@ -10,13 +10,18 @@ frontend 는 화면의 동작과 구조이고, hermes 는 외부 런타임인 He
 | 문서 | 소유하는 것 |
 | --- | --- |
 | [`prd.md`](prd.md) | 제품의 목적과 범위, 범위 밖, 아직 정하지 않은 것 |
-| [`code-architecture.md`](code-architecture.md) | 패키지 경계, 사용자와 profile, 에이전트, 대화의 층, Hermes 쪽 코드의 배치, 비밀값을 두는 곳, 아직 만들지 않은 것 |
+<<<<<<< HEAD
+| [`code-architecture.md`](code-architecture.md) | 패키지 경계, 사용자와 profile, 에이전트, 대화의 층, 비밀값을 두는 곳, 아직 만들지 않은 것 |
 | [`flow.md`](flow.md) | 화면 전환과 호출 순서, 두 방향의 토큰, 실행이 실패할 때의 흐름 |
+=======
+| [`code-architecture.md`](code-architecture.md) | 패키지 경계, 사용자와 profile, 에이전트, 대화의 층, Hermes 쪽 코드의 배치, 비밀값을 두는 곳, 아직 만들지 않은 것 |
+| [`flow.md`](flow.md) | 화면 전환과 호출 순서, 두 방향의 토큰, 실행이 실패할 때의 흐름, 파일 공간을 열고 지울 때의 흐름 |
+>>>>>>> docs-restructure-2-web
 | [`connectors.md`](connectors.md) | 커넥터의 정의, 언제 에이전트를 나누는가, 커넥터 선언 파일, 연결과 붙이기 API, 승인, 토큰 저장 |
-| [`connector-authoring.md`](connector-authoring.md) | 범용 커넥터를 만드는 방법, 갖출 것, PR 에 필요한 것, 공통 검사 |
-| [`connectors/gmail.md`](connectors/gmail.md) | Gmail 커넥터의 도구와 정책, 보안, 설정 안내, 실제 계정 확인 |
-| [`connectors/naver-blog.md`](connectors/naver-blog.md) | 네이버 블로그 커넥터의 도구와 정책, 초안의 모양, 임시저장 글 읽기, 임시저장 작업, 보안, 설정 안내, 실제 계정 확인 |
-| [`connectors/tossinvest.md`](connectors/tossinvest.md) | 토스증권 커넥터의 도구, 토큰과 허용 IP, 보안, 설정 안내, 실제 계정 확인 |
+| [`hermes/connectors/README.md`](../hermes/connectors/README.md) | 범용 커넥터를 만드는 방법, 갖출 것, PR 에 필요한 것, 공통 검사 |
+| [`hermes/connectors/gmail/README.md`](../hermes/connectors/gmail/README.md) | Gmail 커넥터의 도구와 정책, 보안, 설정 안내, 실제 계정 확인 |
+| [`hermes/connectors/naver-blog/README.md`](../hermes/connectors/naver-blog/README.md) | 네이버 블로그 커넥터의 도구와 정책, 초안의 모양, 임시저장 글 읽기, 임시저장 작업, 보안, 설정 안내, 실제 계정 확인 |
+| [`hermes/connectors/tossinvest/README.md`](../hermes/connectors/tossinvest/README.md) | 토스증권 커넥터의 도구, 토큰과 허용 IP, 보안, 설정 안내, 실제 계정 확인 |
 | [`self-hosting.md`](self-hosting.md) | 기술 스택, 개별 실행, 주요 환경 변수 |
 | [`privacy.md`](privacy.md) | 개인정보 처리 안내. 커넥터 데이터가 어디로 가고 어디에 남는가 |
 | [`read-data-flow.md`](read-data-flow.md) | 커넥터 READ 결과가 모델, 셸, 웹, 다른 커넥터, Memory, 결과물, 기록으로 가는 길의 신뢰 경계, 보호 수단이 보장하는 범위, 흐름 판정 표, 실행 공간이 해결한 것과 남은 것 |
@@ -27,10 +32,10 @@ frontend 는 화면의 동작과 구조이고, hermes 는 외부 런타임인 He
 
 | 문서 | 소유하는 것 |
 | --- | --- |
-| [`backend/packages.md`](backend/packages.md) | backend 패키지의 책임, 한 번의 대화가 지나는 길, 가격표 |
-| [`backend/testing.md`](backend/testing.md) | Spring 통합 검사의 공통 기반 주석, 설정 바꾸기, 검사 사이에 남기지 않는 것, 컨텍스트 수 확인 |
-| [`backend/quality.md`](backend/quality.md) | 구조 규칙과 코드 규칙의 기준 파일을 갱신하는 방법, 뺀 규칙의 까닭 · 언어 공통 파일 길이 기준 목록 |
-| [`backend/schema/README.md`](backend/schema/README.md) | 표와 칸의 뜻. 표를 주제별 파일로 나눈 색인이 있다 |
+| [`backend/docs/code-architecture.md`](../backend/docs/code-architecture.md) | backend 패키지의 책임, 한 번의 대화가 지나는 길, 가격표와 실행 공간 파일의 경로 규칙, 지우기 도우미 계약과 관리자 용량 |
+| [`backend/docs/code-architecture.md`](../backend/docs/code-architecture.md) | Spring 통합 검사의 공통 기반 주석, 설정 바꾸기, 검사 사이에 남기지 않는 것, 컨텍스트 수 확인 |
+| [`backend/docs/code-architecture.md`](../backend/docs/code-architecture.md) | 구조 규칙과 코드 규칙의 기준 파일을 갱신하는 방법, 뺀 규칙의 까닭 · 언어 공통 파일 길이 기준 목록 |
+| [`backend/docs/data-schema.md`](../backend/docs/data-schema.md) | 표와 칸의 뜻. 표를 주제별 파일로 나눈 색인이 있다 |
 | [`backend/agent.md`](backend/agent.md) | 페르소나, 에이전트 도구, 에이전트를 만들고 지우는 규칙 |
 | [`backend/agent-delegation.md`](backend/agent-delegation.md) | `agent_*` 도구로 다른 에이전트에게 맡기는 경로와 결과 도착, 끝나지 않은 결과 전달과 다시 전달 |
 | [`backend/artifact.md`](backend/artifact.md) | 에이전트가 만든 결과물 파일의 저장과 조회 |
@@ -58,22 +63,21 @@ frontend 는 화면의 동작과 구조이고, hermes 는 외부 런타임인 He
 | [`backend/attention.md`](backend/attention.md) | 먼저 알리기의 후보와 판정 표, 억제와 중복, 숨기기와 미루기, 지표, 지금 화면의 API |
 | [`backend/follow-up.md`](backend/follow-up.md) | 할 일의 상태, 제안 도구와 제안 억제, API |
 
-## frontend
+## web
 
 | 문서 | 소유하는 것 |
 | --- | --- |
-| [`frontend/structure.md`](frontend/structure.md) | 화면 목록, 에이전트 화면과 사용량 화면의 구성, 화면의 정체성 |
-| [`frontend/shell.md`](frontend/shell.md) | 대화 이력과 목록, 화면 틀, 로딩 표시, 밝기 모드 |
-| [`frontend/chat.md`](frontend/chat.md) | 대화 화면의 이번에 연 원문, 모델 선택, 에이전트 질문, 동작 승인, 다른 창에서 답하는 중일 때, 다시 생성, 결과 다시 전달, 메시지 동작, 참고한 기억, 새 대화 화면, 점검 대화 |
-| [`frontend/activity.md`](frontend/activity.md) | 실행 하나를 다시 보는 화면과 작업 과정 표시 |
-| [`frontend/now.md`](frontend/now.md) | 지금 화면의 카드와 이유 문구, 숨기기와 미루기, 폭별 배치 |
-| [`frontend/memory.md`](frontend/memory.md) | 기억 화면의 간략 목록과 펼침, 검토 흐름, 남긴 에이전트 표시, 숨긴 양식 |
+| [`web/docs/prd.md`](../web/docs/prd.md) | 화면마다 보이는 것과 그리지 않는 것. 관리자 영역, 에이전트 화면, 사용량 화면, 지금 화면, 기억 화면, 대화 목록, 새 대화 화면, 동작 승인, 참고한 기억, 작업 과정 블록 |
+| [`web/docs/flow.md`](../web/docs/flow.md) | 화면에서 하는 일마다 주고받는 순서. 대화 이력, 모델 고르기, 질문 카드, 다른 창에서 답하는 중일 때, 다시 생성, 결과 다시 전달, 점검 대화, 실행 다시 보기, 꺼진 사용자의 세션 |
+| [`web/docs/code-architecture.md`](../web/docs/code-architecture.md) | 화면 목록, 화면 틀, 디렉터리, 테마 토큰, 화면의 정체성, 마크다운 읽기, 밝기 모드 |
 
-화면에 관한 결정은 `adr/INDEX.md` 에서 층 칸이 frontend 인 것을 본다.
+화면에 관한 결정은 [`web/docs/adr/INDEX.md`](../web/docs/adr/INDEX.md) 에 있다.
 
 ## Hermes
 
 | 문서 | 소유하는 것 |
 | --- | --- |
-| [`hermes/README.md`](hermes/README.md) | Hermes 의 확장 지점과 `docs/hermes/` 개별 문서의 색인 |
-| [`../hermes/README.md`](../hermes/README.md) | Hermes 에 설치하는 plugin 과 profile 틀, 설치 묶음과 운영 값, 대시보드 plugin 이 여는 경로 목록 |
+| [`hermes/AGENTS.md`](../hermes/AGENTS.md) | hermes 모듈의 규칙과 문서 목록 |
+| [`hermes/docs/code-architecture.md`](../hermes/docs/code-architecture.md) | hermes 모듈의 구조와 배포 순서 |
+| [`hermes/docs/hermes-contract.md`](../hermes/docs/hermes-contract.md) | Hermes 의 동작 계약. profile, Runs API, 동시 실행, 위임, 도구 hook, 실행 공간, 스킬, 설정 API, 올릴 때 |
+| [`hermes/README.md`](../hermes/README.md) | 설치 묶음과 운영 값, 검사 |

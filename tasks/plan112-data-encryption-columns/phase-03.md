@@ -11,7 +11,7 @@ KEK 를 넣기 전에 저장한 평문 줄을 조금씩 암호화한다. 대상�
 
 ## 컨텍스트
 
-**근거 문서**: `docs/adr/ADR-20261008-data-encryption.md` 의 「결정」 표(「이 결정 앞의 평문 메시지」 줄)와 「결과」, `docs/backend/schema/README.md` 의 「본문 칸과 운영 조회」
+**근거 문서**: `backend/docs/adr/ADR-20261008-data-encryption.md` 의 「결정」 표(「이 결정 앞의 평문 메시지」 줄)와 「결과」, `backend/docs/data-schema.md` 의 「본문 칸과 운영 조회」
 
 - 평문 줄은 옆 key 칸이 null 이고 본문이 빈 글이 아닌 줄이다. 대상은 다섯 칸이다
 
@@ -51,7 +51,7 @@ KEK 를 넣기 전에 저장한 평문 줄을 조금씩 암호화한다. 대상�
 
 ### 3. 운영 문서
 
-`docs/self-hosting.md` 의 환경 변수 표에 세 설정을, `docs/adr/ADR-20261008-data-encryption.md` 의 「결정」 표에 배치와 되돌리기 줄을 더한다. 「이 결정 앞의 판으로 되돌리지 않는다」 를 「`UNSEAL` 로 모두 되돌린 뒤에만 내린다」 로 바꾼다.
+`docs/self-hosting.md` 의 환경 변수 표에 세 설정을, `backend/docs/adr/ADR-20261008-data-encryption.md` 의 「결정」 표에 배치와 되돌리기 줄을 더한다. 「이 결정 앞의 판으로 되돌리지 않는다」 를 「`UNSEAL` 로 모두 되돌린 뒤에만 내린다」 로 바꾼다.
 
 ### 4. 시험
 
@@ -93,4 +93,4 @@ scripts/check-mysql-migration.sh
 | `backend/src/test/java/com/bifos/assistant/usage/ExecutionOutputBackfillTest.java` | 신규 |
 | `backend/src/test/java/com/bifos/assistant/task/TaskPlaintextBackfillTest.java` | 신규 |
 | `docs/self-hosting.md` | 수정 |
-| `docs/adr/ADR-20261008-data-encryption.md` | 수정 |
+| `backend/docs/adr/ADR-20261008-data-encryption.md` | 수정 |

@@ -19,8 +19,19 @@ import lombok.NoArgsConstructor;
 /**
  * 발견마다 「새로 알릴 것」 과 「참고」 를 정한다. 모델이 쓴 값을 믿지 않고 Control Plane 이 확인한다.
  *
- * <p>검사는 아래 순서이고 처음 걸린 까닭 하나만 남긴다. 순서와 조건은 {@code docs/backend/proactive-check.md} 의
- * 「검사」 가 갖는다.
+ * <p>검사는 아래 순서이고 처음 걸린 까닭 하나만 남긴다. 조건을 정한 결정은 ADR-081 의 조건 표가 갖는다.
+ *
+ * <ol>
+ *   <li>원문 주소가 {@code http} 나 {@code https} 의 절대 주소다. 아니면 {@link FindingReason#NO_SOURCE}
+ *   <li>확인 시각을 읽을 수 있고 시작 5분 전부터 지금 5분 뒤 사이다({@code CLOCK_SKEW}). 아니면
+ *       {@link FindingReason#NOT_CHECKED_NOW}
+ *   <li>{@code freshness} 가 {@code CLOSED} 가 아니다. 아니면 {@link FindingReason#CLOSED}
+ *   <li>{@code freshness} 가 {@code STALE} 이 아니다. 아니면 {@link FindingReason#STALE}
+ *   <li>{@code freshness} 가 {@code CURRENT} 다. 아니면 {@link FindingReason#FRESHNESS_UNKNOWN}
+ *   <li>제목, 이유, 사실 하나, 다음 행동이 있다. 아니면 {@link FindingReason#INCOMPLETE}
+ *   <li>최근에 알린 발견에 같은 주제 키와 같은 원문 주소가 없거나 달라진 점이 있다. 아니면 {@link FindingReason#REPEATED}
+ *   <li>최근에 알린 발견 가운데 지금 반응이 「관심 없음」 인 것과 주제 키가 같지 않다. 아니면 {@link FindingReason#REPEATED}
+ * </ol>
  */
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
 public final class FindingJudgement {

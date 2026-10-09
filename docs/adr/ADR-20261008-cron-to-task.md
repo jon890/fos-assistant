@@ -1,8 +1,8 @@
-## ADR-20261008: Hermes cron 자동화는 예약 작업으로 옮기고, 결과는 assistant 안에서만 받는다
+## ADR-20261008 / cron-to-task: Hermes cron 자동화는 예약 작업으로 옮기고, 결과는 assistant 안에서만 받는다
 
 - **status**: `accepted`
 - Date: 2026-10-08
-- [ADR-076](ADR-076-예약-작업은-control-plane-이-갖고-발화한-실행은-대화-turn-경로로-돈다.md) 의 예약 작업이 Hermes cron 을 대신한다. 예약 작업에 모델 단계 칸과 「보고할 것 없음」 완료를 더한다.
+- [ADR-076](../../backend/docs/adr/ADR-076-예약-작업은-control-plane-이-갖고-발화한-실행은-대화-turn-경로로-돈다.md) 의 예약 작업이 Hermes cron 을 대신한다. 예약 작업에 모델 단계 칸과 「보고할 것 없음」 완료를 더한다.
 
 ### 결정
 

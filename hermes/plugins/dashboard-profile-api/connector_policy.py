@@ -78,7 +78,7 @@ def _canonical_server_name(server: str) -> str:
 def _hermes_tool_name(server: str, tool: str) -> str:
     """Hermes 가 MCP 도구에 붙이는 등록 이름이다. `tools/mcp_tool_schema.py` 의 `mcp_prefixed_tool_name` 과 같은 규칙이다.
 
-    규칙은 `docs/hermes/connector-policy.md` 의 「MCP 도구의 등록 이름」 이 갖는다.
+    규칙은 `hermes/docs/hermes-contract.md` 의 「MCP 도구의 등록 이름」 이 갖는다.
     글자를 바꾸고 줄이므로 서로 다른 도구가 같은 등록 이름이 될 수 있다.
     """
     full = "mcp__%s__%s" % (re.sub(r"[^A-Za-z0-9_]", "_", server), re.sub(r"[^A-Za-z0-9_]", "_", tool))

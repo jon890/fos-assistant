@@ -142,7 +142,7 @@ public final class ConnectionDtos {
     }
 
     /**
-     * 도구 호출 판정의 응답이다. 칸은 {@code docs/backend/connector-tool-policy.md} 의 「도구 호출 판정」 과 같다.
+     * 도구 호출 판정의 응답이다.
      *
      * @param decision {@code allow} 나 {@code block}
      * @param message {@code block} 일 때 모델에게 보일 글. {@code allow} 이면 빈 글이다

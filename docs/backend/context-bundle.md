@@ -1,25 +1,19 @@
 # 문맥 묶음
 
 Control Plane 이 여러 기록에서 모은 문맥의 항목 모델, source 마다의 판정, Hermes 에 넘기는 형식, 로그와 저장 규칙을 갖는다.
-결정은 [ADR-071](../adr/ADR-071-여러-출처의-문맥은-항목마다-출처와-권한과-신선도를-지닌-묶음으로-조립한다.md) 에 있다.
+결정은 [ADR-071](../../backend/docs/adr/ADR-071-여러-출처의-문맥은-항목마다-출처와-권한과-신선도를-지닌-묶음으로-조립한다.md) 에 있다.
 
 Memory 의 층과 예산과 `memory_read` 는 [`memory.md`](memory.md) 가 그대로 갖는다. 이 문서는 그 위에 얹는 항목 모델만 갖는다.
 
 ## 항목의 칸
 
-| 칸 | 타입 | 뜻 |
-| --- | --- | --- |
-| `source` | enum | 아래 「참여하는 source」 의 값 하나 |
-| `ref` | 문자열 | 원래 기록의 참조. `memory:<번호>`, `execution:<번호>`, `connector_action:<공개 식별자>`, `follow_up:<공개 식별자>`, `conversation:<공개 식별자>` |
-| `scope` | `USER`, `GROUP` | 원래 기록의 범위. 범위가 없는 기록은 `USER` 다 |
-| `ownerUserId` | 숫자 | `USER` 항목의 주인. `GROUP` 이면 비어 있다 |
-| `sensitivity` | `NORMAL`, `SENSITIVE` | 원래 기록의 값. 칸이 없는 기록은 아래 표의 값이다 |
-| `trust` | `USER_APPROVED`, `CONTROL_PLANE`, `AGENT`, `EXTERNAL` | 그 글을 누가 썼는가 |
-| `asOf` | 시각 | 그 내용이 참이던 시각 |
-| `freshness` | `FRESH`, `STALE`, `UNKNOWN` | 아래 「신선도」 가 정한다 |
-| `bodyMode` | `INLINE`, `TITLE_ONLY`, `OMITTED` | 본문을 싣는 방식. `OMITTED` 는 예산이나 민감도 때문에 빠진 항목이다 |
-| `conflictsWith` | 참조 목록 | Control Plane 이 구조로 알 수 있는 충돌 상대. 대부분 비어 있다 |
-| `title`, `body` | 문자열 | 글로 옮길 때만 쓴다. 저장하지 않고 로그에 내지 않는다 |
+칸 이름은 `ContextItem` 이, 값과 그 뜻은 각 enum(`ContextSource`, `ContextTrust`, `ContextFreshness`, `ContextBodyMode`)이 갖는다. 칸마다의 결정은 ADR-071 의 결정 표가 갖는다.
+코드만 읽어서는 알기 어려운 것은 아래다.
+
+- `ref` 는 원래 기록의 참조이고 `<표 이름>:<번호나 공개 식별자>` 형식이다. 예: `memory:<번호>`, `execution:<번호>`, `connector_action:<공개 식별자>`, `follow_up:<공개 식별자>`, `conversation:<공개 식별자>`
+- `scope` 는 원래 기록의 범위다. 범위가 없는 기록은 `USER` 다
+- `sensitivity` 는 원래 기록의 값이다. 칸이 없는 기록은 아래 「참여하는 source」 표의 값이다
+- `conflictsWith` 는 대부분 비어 있다. 아래 「충돌 표시」 의 경우에만 찬다
 
 **항목 타입의 `toString` 은 `source` 와 `ref` 만 낸다.** Java record 의 기본 `toString` 은 모든 칸을 내므로, 항목이나 묶음을 로그에 넘기면 본문이 그대로 남는다.
 `AssembledContext` 도 같은 이유로 `toString` 이 `instructions` 를 내지 않고 글자 수와 항목 수만 낸다.
@@ -40,11 +34,11 @@ Memory 의 층과 예산과 `memory_read` 는 [`memory.md`](memory.md) 가 그�
 **`EXECUTION_STATE` 와 `FOLLOW_UP` 은 대화 turn 에 싣지 않는다.** 지금 화면과 먼저 알리기가 「왜 보였는가」 의 `sources` 에 이 `source` 이름과 `ref` 형식을 쓴다. 판정은 `attention` 이 요청자의 기록만 읽는 조회로 하고, 이 문서의 항목 타입을 import 하지 않아도 된다. 대화마다 실으면 할 일이 지식처럼 쓰여 새 Memory 층이 된다([ADR-073](../adr/ADR-073-할-일은-에이전트가-제안하고-사람이-받아들인-것만-챙긴다.md)).
 
 **커넥터의 실시간 데이터는 source 가 아니다.** Control Plane 은 커넥터를 직접 부르지 않는다.
-일정 같은 커넥터 데이터는 연결을 붙인 에이전트가 turn 안에서 직접 부른 도구의 결과로 들어온다. 그 결과는 묶음을 거치지 않고 Hermes 의 도구 결과 자리에 놓이며 `fos-ctx` 가 `<external-data>` 로 감싼다([`../hermes/fos-ctx.md`](../hermes/fos-ctx.md)).
+일정 같은 커넥터 데이터는 연결을 붙인 에이전트가 turn 안에서 직접 부른 도구의 결과로 들어온다. 그 결과는 묶음을 거치지 않고 Hermes 의 도구 결과 자리에 놓이며 `fos-ctx` 가 `<external-data>` 로 감싼다([`hermes/plugins/fos-ctx/README.md`](../../hermes/plugins/fos-ctx/README.md)).
 묶음에 드는 것은 승인한 호출의 결과(`CONNECTOR_RESULT`)와 남아 있는 옛 커넥터 에이전트의 위임 결과(`DELEGATION_RESULT`)뿐이다.
 일정 커넥터가 생기면 그 결과를 읽는 source 를 이 표에 더한다.
 
-**옛 커넥터 에이전트의 실행에는 묶음을 주지 않는다.** `ChatService` 와 `AgentRunner` 가 지금처럼 빈 문맥으로 돌린다([ADR-045](../adr/ADR-045-커넥터-에이전트는-자기-mcp-서버만-받고-memory-와-control-plane-도구를-받지-않는다.md)). 연결을 붙인 일반 에이전트는 보통 에이전트와 같은 묶음을 받는다.
+**옛 커넥터 에이전트의 실행에는 묶음을 주지 않는다.** `ChatService` 와 `AgentRunner` 가 지금처럼 빈 문맥으로 돌린다([ADR-045](../../backend/docs/adr/ADR-045-커넥터-에이전트는-자기-mcp-서버만-받고-memory-와-control-plane-도구를-받지-않는다.md)). 연결을 붙인 일반 에이전트는 보통 에이전트와 같은 묶음을 받는다.
 
 ## 권한과 민감도를 지키는 규칙
 
@@ -60,7 +54,7 @@ ADR-071 의 다섯 규칙을 코드에서 지키는 자리다.
 
 ## Hermes 에 넘기는 형식
 
-Runs API 는 `instructions` 와 `input` 두 글을 받는다([`../hermes/runs-api.md`](../hermes/runs-api.md)).
+Runs API 는 `instructions` 와 `input` 두 글을 받는다([`hermes/docs/hermes-contract.md`](../../hermes/docs/hermes-contract.md)).
 
 ### 공통 실행 지침
 
@@ -69,7 +63,7 @@ Runs API 는 `instructions` 와 `input` 두 글을 받는다([`../hermes/runs-ap
 새 profile 과 기존 profile 모두 다음 실행부터 받는다.
 
 로컬 MCP 도구는 같은 서버의 읽기 도구라도 각각 호출하도록 안내한다.
-Hermes 의 단건 제한과 원격 도구 구분은 [도구 hook 과 승인](../hermes/connector-policy.md#tool_call-의-단건-제한)이 갖는다.
+Hermes 의 단건 제한과 원격 도구 구분은 [도구 hook 과 승인](../../hermes/docs/hermes-contract.md#tool_call-의-단건-제한)이 갖는다.
 
 이 안내는 묶음 실행 기능이나 서버의 권한 검사를 바꾸지 않는다.
 모델이 안내를 따르는지는 배포 뒤 실제 실행의 호출과 거절 기록으로 확인한다.
@@ -81,46 +75,26 @@ Control Plane 의 자식 실행과 구분한다. 근거는 [자식 agent 생성]
 **Memory 항목의 글은 바꾸지 않는다.** 머리말이 이미 출처(그룹과 묻는 사람)를 말하고, 색인의 `[번호]` 가 `memory_read` 의 입력이자 참조다.
 그래서 Memory 를 묶음으로 옮겨도, 아래 「충돌 표시」 가 붙는 경우를 빼면 `instructions_hash` 가 바뀌지 않는다.
 
-**결과 항목에는 아래 형식의 출처 머리줄을 붙인다.** 자동 turn 과 다시 전달이 같은 형식을 쓴다.
-시각은 `Asia/Seoul` 의 `yyyy-MM-dd HH:mm` 다.
-
-```
-맡긴 일의 결과가 도착했다.
-
-[출처: 맡긴 일, 에이전트: 조사 도우미, 실행 번호: 412, 상태: SUCCEEDED, 끝난 시각: 2026-10-03 14:05]
-(결과 본문)
-
-승인한 동작의 결과가 도착했다.
-[출처: 승인한 동작, 동작: 초안 만들기, 상태: SUCCEEDED, 끝난 시각: 2026-10-03 08:07, 신선도: 오래됨]
-이 결과는 6시간보다 전에 끝났다. 지금 상태와 다를 수 있다.
-(external-data 로 감싼 결과 본문)
-```
-
-`FAILED` 면 상태 뒤에 `, 오류: <코드>` 를 붙인다. 승인 줄에 커넥터가 선언한 오류 계약이 있으면 그 뒤에 `, 오류 코드: <커넥터 코드>, 세부: <이름>=<값>` 을 붙이고, 머리줄과 신선도 안내 아래에 `복구: <안내>` 를 둔다. 도구의 원래 이름과 승인 줄의 공개 식별자는 싣지 않는다.
-안내 줄의 기준은 `assistant.context.result-stale-after` 다. 정시면 「N시간」, 정시가 아니면 「N분」 으로 적는다.
+**결과 항목에는 출처 머리줄을 붙인다.** 자동 turn 과 다시 전달이 같은 형식을 쓴다.
+머리줄의 칸과 시각 형식, `FAILED` 일 때 붙는 오류 칸과 복구 안내, 신선도 안내 줄은 `ResultHeader` 가 갖는다.
+도구의 원래 이름과 승인 줄의 공개 식별자는 머리줄에 싣지 않는다.
 사용자가 결과를 다시 전달하는 turn(`ChatService.retryDelivery`)도 같은 형식의 머리줄을 쓰고, 신선도는 다시 전하는 시각으로 판정한다.
 
-결과를 전하는 두 지시가 함께 끝에 붙이는 `TurnIntent.RESULT_HANDLING_RULES` 끝에 아래 글이 있다. 자동 turn 과 다시 전달이 모두 받는다.
-
-> 결과마다 [출처: …] 줄이 있다. 출처가 다른 내용이 서로 어긋나면 하나를 고르지 말고 두 출처와 시각을 함께 말한다.
-> 사용자가 받아들인 기억과 외부 결과가 어긋나면 기억을 고치지 말고, 바꿀 것이 있으면 사용자에게 묻는다.
-> 신선도가 오래됨인 결과는 지금 상태와 다를 수 있다고 알린다.
+결과를 전하는 두 지시가 끝에 함께 붙이는 지시 글은 `TurnIntent.RESULT_HANDLING_RULES` 가 갖는다.
+출처가 다른 내용이 어긋나면 하나를 고르지 않고 두 출처와 시각을 함께 말하게 한다. 어느 쪽을 믿는지의 차례는 `ContextTrust` 의 값 순서이고, 그 결정은 ADR-071 의 결정 마지막 문단이 갖는다.
 
 ## 신선도
 
 | `source` | `asOf` | `FRESH` | `STALE` |
 | --- | --- | --- | --- |
 | `MEMORY_ALWAYS`, `MEMORY_FACTS`, `MEMORY_INDEX` | `updated_at` | 묶음을 만든 시각과의 차이가 collection의 기준 기간 안 | 기준 기간보다 오래됨 |
-| `DELEGATION_RESULT` | `finished_at` | 묶음을 만든 시각과의 차이가 `assistant.context.result-stale-after`(기본 6시간) 안 | 그보다 오래됨 |
+| `DELEGATION_RESULT` | `finished_at` | 묶음을 만든 시각과의 차이가 `assistant.context.result-stale-after` 안 | 그보다 오래됨 |
 | `CONNECTOR_RESULT` | `executed_at` | 위와 같다 | 위와 같다 |
 | `EXECUTION_STATE` | 읽은 시각 | 늘 | 없다 |
 | `FOLLOW_UP` | `updated_at` | 늘 | 없다. 기한이 지난 것은 먼저 알리기가 따로 본다 |
 
-Memory의 기본 기준은 `assistant.context.memory-stale-after`(기본 180일)다.
-`assistant.context.memory-collection-stale-after`는 collection 이름을 키, 기간을 값으로 받으며 기본 기준을 덮어쓴다.
-예를 들어 `career: 30d`를 지정하면 그 collection의 항목은 수정한 지 30일을 넘었을 때 `STALE`이다.
-기준과 정확히 같은 시각은 `FRESH`다. 기준이 0 이하이거나 `updated_at`이 없으면 `UNKNOWN`이다.
-기본 기준을 0으로 두면 별도 기준을 지정하지 않은 collection은 `UNKNOWN`이다.
+Memory 의 기준 기간은 `assistant.context.memory-stale-after` 이고, `assistant.context.memory-collection-stale-after` 에 collection 별 기준을 적으면 그것을 먼저 쓴다.
+기본값과 경계 값의 처리는 `ContextProperties` 가 갖는다. 기준이 0 이하이거나 `updated_at` 이 없으면 `UNKNOWN` 이다.
 
 Memory는 실행 조립 시각 하나로 항상 층, 색인 층, 예산 때문에 생략한 항목을 모두 판정한다.
 신선도는 내용이 여전히 참이라는 보증이 아니며, 사용자 승인(`trust`)과 별개다.
@@ -128,41 +102,25 @@ Memory는 실행 조립 시각 하나로 항상 층, 색인 층, 예산 때문�
 판정 값은 문맥 묶음과 `execution_context_source.freshness`에 남는다. 이미 저장한 실행 기록은 다시 판정하지 않는다.
 
 `asOf` 가 비어 있으면 `UNKNOWN` 이다. 결과 머리줄에 「끝난 시각: 모름」 을 적는다.
-결과는 보통 몇 초 안에 전해져 `STALE` 이 되지 않는다. 결과 전달을 다시 하는 경로(#162)가 몇 시간 뒤에 전할 때 `STALE` 이 붙는다.
+결과는 보통 몇 초 안에 전해져 `STALE` 이 되지 않는다. 결과 전달을 다시 하는 경로가 몇 시간 뒤에 전할 때 `STALE` 이 붙는다.
 
 ## 충돌 표시
 
 Control Plane 이 구조로 알 수 있는 충돌만 `conflictsWith` 에 적는다.
 
-| 경우 | 표시 |
-| --- | --- |
-| 같은 `collection` 과 `document_key` 의 `USER` 문서와 `GROUP` 문서가 둘 다 색인에 오른다 | 두 색인 줄 끝에 `(같은 이름의 그룹 문서 [번호] 가 있다)` 와 `(같은 이름의 개인 문서 [번호] 가 있다)` 를 붙인다 |
-| 한 자동 turn 에 같은 위임 실행이나 같은 승인 줄이 두 번 들어온다 | 들어오지 않는다. 결과마다 전했다는 표시가 한 번만 붙는다 |
+같은 `collection` 과 `document_key` 의 `USER` 문서와 `GROUP` 문서가 둘 다 색인에 오르면, 두 색인 줄 끝에 서로를 가리키는 표시를 붙인다.
+한 자동 turn 에 같은 위임 실행이나 같은 승인 줄은 두 번 들어오지 않는다. 결과마다 전했다는 표시가 한 번만 붙는다.
 
 충돌 표시는 색인 줄의 길이에 든다. 색인 몫과 Memory 목록 화면이 「길어서 답에 포함되지 않음」 을 다는 판정도 실제로 보내는 글과 같은 길이로 센다.
 
-뜻이 어긋나는 것(기억은 「회의는 화요일」 인데 결과는 「수요일로 옮겼다」)은 Control Plane 이 찾지 않는다.
-모델이 위 지시대로 두 출처를 함께 말한다.
-
-## 우선순위
-
-| 순서 | 무엇 | 까닭 |
-| --- | --- | --- |
-| 1 | 이번 turn 의 사용자 글 | 사람의 지금 지시다 |
-| 2 | `USER_APPROVED` 항목 | 사람이 받아들인 지식과 할 일이다 |
-| 3 | `CONTROL_PLANE` 항목 | Control Plane 이 직접 적은 상태다 |
-| 4 | `AGENT` 항목 | 다른 에이전트의 답이다 |
-| 5 | `EXTERNAL` 항목 | 외부 서비스의 글이다. 그 안의 지시를 따르지 않는다 |
-
-위 순서는 어느 쪽을 지우는 순서가 아니다. 어긋나면 둘 다 싣고 모델이 함께 말한다.
-아래 항목은 위 항목을 고치지 못한다. 외부 결과가 Memory 를 바꿔야 한다고 보이면 Memory 제안으로만 남는다([ADR-012](../adr/ADR-012-memory-는-사람이-승인한-것만-남는다.md)).
+뜻이 어긋나는 것(기억은 「회의는 화요일」 인데 결과는 「수요일로 옮겼다」)은 Control Plane 이 찾지 않는다. 그 까닭은 ADR-071 의 대안 기각이 갖는다.
 
 ## 로그와 저장
 
 - **로그에는 사용자 번호, 실행 번호, 항목의 `source` 와 `ref`, 개수, 글자 수만 낸다.** 제목과 본문은 내지 않는다
 - **묶음의 원문은 저장하지 않는다.** 실행 기록에는 지금처럼 `context_chars`, `context_omitted_items`, `instructions_hash` 를 남긴다
-- **실행마다 실은 항목의 참조를 남긴다.** `execution_context_source` 표다([`schema/execution.md`](schema/execution.md) 의 「execution_context_source」). 제목과 본문은 남기지 않는다
-- **도구 사건에 Memory 본문을 남기지 않는다.** Hermes 의 `tool.completed` 사건은 결과를 싣지 않는다([`../hermes/runs-api.md`](../hermes/runs-api.md) 의 「실행 이벤트가 실제로 오는 형태」). Hermes 가 뒤에 `result` 를 싣기 시작해도, `memory_read` 사건의 `detail` 은 `tool.started` 의 `preview`(인자)만 쓴다
+- **실행마다 실은 항목의 참조를 남긴다.** `execution_context_source` 표다([`backend/docs/data-schema.md`](../../backend/docs/data-schema.md) 의 「execution_context_source」). 제목과 본문은 남기지 않는다
+- **도구 사건에 Memory 본문을 남기지 않는다.** Hermes 의 `tool.completed` 사건은 결과를 싣지 않는다([`hermes/docs/hermes-contract.md`](../../hermes/docs/hermes-contract.md) 의 「실행 이벤트가 실제로 오는 형태」). Hermes 가 뒤에 `result` 를 싣기 시작해도, `memory_read` 사건의 `detail` 은 `tool.started` 의 `preview`(인자)만 쓴다
 
 ## 합성 시나리오
 

@@ -2,8 +2,6 @@
 
 매일 깨우기로 돈 살펴보기가 끝나면, 그 살펴보기가 받아들인 문제 후보를 가치 평가와 행동 정책에 한 번 잇는다.
 결정은 [ADR-20261008 / daily-loop](../adr/ADR-20261008-daily-loop.md)에 있다.
-각 단계의 계약은 [먼저 살펴보기](proactive-check.md), [가치 평가](value-evaluation.md), [행동 정책](autonomy-policy.md), [판단 피드백](decision-feedback.md)이 갖는다.
-이 문서는 언제 잇는지와 그 시도의 기록만 갖는다.
 
 ## 무엇을 잇는가
 
@@ -13,9 +11,6 @@
 | 가치 판단 | `ValueEvaluationService.evaluate(user, checkId, provider)` | 모델 호출 한 번, `proactive_value_evaluation` 한 줄 |
 | 행동 정책 | `AutonomyPolicyService.decide(user, evaluationId)` | 후보마다 판정 한 줄, `EXECUTE` 면 읽기 전용 살펴보기 한 번 |
 | 시도 기록 | `ProactiveLoopCoordinator` | `proactive_loop_run` 한 줄 |
-
-단추로 연 살펴보기(`MANUAL`)와 자동 실행이 연 살펴보기(`AUTONOMY`)는 잇지 않는다. 자동 실행의 문제 후보가 다시 자동 실행을 부르지 않게 하기 위해서다.
-열지 않은 보고 때문에 모델 없이 건너뛴 깨우기(`UNREAD_REPORT`)는 살펴보기 turn 이 돌지 않아 잇지 않는다.
 
 ## 언제 부르는가
 
@@ -62,7 +57,6 @@ sequenceDiagram
 | 4 | 위가 모두 아니다 | `RUNNING` |
 
 `NO_CANDIDATE` 는 모델을 부르지 않으므로 하루 상한에 세지 않는다. 동의한 사용자의 침묵을 조회할 수 있게 줄은 남긴다.
-하루 상한을 24시간이 아니라 20시간으로 센다. 시도 줄의 시각은 살펴보기 turn 이 끝난 뒤라 날마다 몇 분씩 다르다. 24시간으로 세면 어제보다 일찍 끝난 오늘 깨우기가 어제 줄에 걸려 빠진다.
 잠근 설정 줄 목록에서 그 에이전트의 줄을 다시 보고, 그사이 꺼졌거나 지워졌으면 시도 줄 없이 돌아간다.
 원천 살펴보기 칸의 유일 제약에 걸리면 이미 다른 처리가 그 살펴보기를 맡았으므로 아무것도 하지 않는다.
 
@@ -77,7 +71,6 @@ provider 는 `assistant.proactive-loop.provider` 다. 판단 profile 이 없거�
 | 평가나 판정이 `ApiException` 으로 거절됐다. 점검 대화를 지운 경우가 여기 든다 | `FAILED`, 그 오류 코드. 평가가 끝나 번호를 받았으면 평가 번호. 평가 도중 예외로 끝났으면 비어 있고, 평가 줄은 같은 원천 살펴보기 번호로 찾는다 |
 | 그 밖의 예외 | `FAILED`, `INTERNAL_ERROR` |
 
-시도는 다시 부르지 않는다. 같은 원천에서 판정이 두 번 생기지 않게 하기 위해서다.
 자동 실행의 시작과 실패는 판정 줄의 `execution_status` 가 갖는다([행동 정책](autonomy-policy.md)의 「자동 실행」).
 
 ### 서버가 멈췄을 때
@@ -85,37 +78,26 @@ provider 는 `assistant.proactive-loop.provider` 다. 판단 profile 이 없거�
 기동할 때 `ProactiveLoopRecovery` 가 `RUNNING` 시도 줄을 `FAILED`, `INTERRUPTED` 로 닫는다. 평가와 판정을 다시 부르지 않는다.
 복구한 줄의 평가 번호는 비어 있다. 평가가 시작됐는지는 같은 원천 살펴보기 번호의 `proactive_value_evaluation` 으로 찾는다.
 평가 줄의 `RUNNING` 은 가치 평가의 기동 복구가, 판정 줄의 `PENDING` 은 행동 정책의 규칙이 다룬다.
-살펴보기가 끝난 뒤 시도 줄을 저장하기 전에 멈추면 그 살펴보기는 잇지 않는다. 다음 깨우기가 새 원천이다.
 
 ## 사용자 설정
 
-사용자와 에이전트마다 하나다. 줄이 없으면 꺼짐이다.
-
-| 메서드와 경로 | 하는 일 |
-| --- | --- |
-| `GET /api/v1/agents/{code}/proactive-check/loop` | `{ available, enabled, snoozedUntil }` 을 준다. `available` 은 설치 설정 `enabled` 다 |
-| `PUT /api/v1/agents/{code}/proactive-check/loop` | `{ enabled, snoozedUntil }` 을 저장하고 GET 과 같은 모양을 준다 |
+사용자와 에이전트마다 하나다. 줄이 없으면 꺼짐이다. 경로는 `ProactiveLoopController` 가 갖는다.
 
 권한은 매일 깨우기 설정과 같다. 조회와 끄기는 `AgentService.requireReadable`, 켜기는 `AgentService.requireStartable` 이다.
 설치 설정이 꺼져 있으면 꺼진 줄을 켜는 요청은 409 `PROACTIVE_LOOP_UNAVAILABLE` 이다. 끄기와 쉬기, 이미 켠 줄을 켠 채 두는 요청은 늘 받는다.
-`snoozedUntil` 은 비우거나 지금부터 30일 안의 시각이다. 벗어나면 400 `VALIDATION_FAILED` 다. 지난 시각을 보내면 비운 것과 같다.
+`snoozedUntil` 은 비우거나 `ProactiveLoopSettingService.MAX_SNOOZE` 안의 시각이다. 벗어나면 400 `VALIDATION_FAILED` 다. 지난 시각을 보내면 비운 것과 같다.
 쉬는 동안의 깨우기는 `SNOOZED` 로 남고 평가하지 않는다. 쉬기가 끝난 뒤 지난 깨우기를 몰아 잇지 않는다.
 
 매일 깨우기 자체를 끄면 살펴보기가 돌지 않으므로 루프도 돌지 않는다. 읽기 전용 자동 실행은 이 설정과 따로 [행동 정책](autonomy-policy.md)의 설치 설정과 사용자 동의가 연다.
 
 ## 사용자에게 보이는 것
 
-매일 루프가 낸 `SURFACE` 와 `ASK_APPROVAL` 판정만 지금 화면 「내 차례」 카드의 「먼저 다룰 문제」 항목으로 보인다. 항목과 판정 규칙은 [`attention.md`](attention.md)의 「후보와 trigger」 의 `PROBLEM_SURFACED` 줄, 화면은 [`../frontend/now.md`](../frontend/now.md)가 갖는다.
-`IGNORE` 는 아무것도 만들지 않는다. 어떤 판정도 알림(`notification`), 알림 줄, 승인 줄을 만들지 않는다. 항목은 `LATER` 라 건수에 세지 않는다.
+매일 루프가 낸 `SURFACE` 와 `ASK_APPROVAL` 판정만 지금 화면 「내 차례」 카드의 「먼저 다룰 문제」 항목으로 보인다. 항목과 판정 규칙은 [`attention.md`](attention.md)의 「후보와 trigger」 의 `PROBLEM_SURFACED` 줄, 화면은 [`web/docs/prd.md`](../../web/docs/prd.md)가 갖는다.
 관리자 화면이나 판정 API 로 낸 판정은 보이지 않는다. 사용자가 켠 루프가 아니기 때문이다.
 
 판정을 남긴 뒤 `ProactiveLoopCoordinator` 가 `SURFACE`, `ASK_APPROVAL` 판정마다 판단 피드백 `SURFACED` 를 남긴다([판단 피드백](decision-feedback.md)).
 
-| 메서드와 경로 | 하는 일 |
-| --- | --- |
-| `PUT /api/v1/autonomy-decisions/{id}/reaction` | `{ "reaction": "ACCEPTED" \| "DISMISSED" }` 를 남기고 204 를 준다 |
-
-**「받아들임」 은 반응을 기록할 뿐이다.** 할 일, 승인 줄, 실행을 만들지 않는다. `ASK_APPROVAL` 도 승인이 아니다. 외부에 쓰는 일은 지금처럼 커넥터 도구 승인 경로만 거친다.
+반응 경로는 `AutonomyController` 가 갖는다.
 요청자의 매일 루프가 낸 `SURFACE`, `ASK_APPROVAL` 판정만 받는다. 남의 판정, 없는 판정, 다른 수준의 판정, 루프 밖의 판정은 404 `AUTONOMY_DECISION_NOT_FOUND`, 모르는 `reaction` 은 400 `VALIDATION_FAILED` 다.
 지금 반응은 그 판정의 마지막 사용자 `ACCEPTED`, `DISMISSED` 다. 지금 화면의 숨기기(`ATTENTION_HIDE`)와 미루기는 지금 반응이 아니다. 지금 반응과 같은 단추를 다시 누르면 사건을 더 남기지 않는다.
 반응이 있는 판정은 항목에서 빠진다. 점검 대화를 지우면 그 대화의 사건과 함께 항목도 사라진다.
@@ -135,7 +117,7 @@ provider 는 `assistant.proactive-loop.provider` 다. 판단 profile 이 없거�
 
 ## 기록과 조회
 
-시도 줄은 `proactive_loop_run`, 설정은 `proactive_loop_setting` 이다. 칸은 [`schema/proactive.md`](schema/proactive.md)가 갖는다.
+시도 줄은 `proactive_loop_run`, 설정은 `proactive_loop_setting` 이다. 저장 모델은 [`backend/docs/data-schema.md`](../../backend/docs/data-schema.md)가 갖는다.
 
 | 묻는 것 | 읽는 곳 |
 | --- | --- |
@@ -144,32 +126,12 @@ provider 는 `assistant.proactive-loop.provider` 다. 판단 profile 이 없거�
 | 후보마다의 수준과 까닭, 규칙 버전 | 같은 평가의 `proactive_autonomy_decision` |
 | 비용 | 원천 살펴보기 트리의 실행 줄, 평가 실행 줄(`agent_id` 와 `conversation_id` 가 빈 줄), 자동 실행한 살펴보기 트리의 실행 줄 |
 
-판단 피드백 export 의 `situation.loop` 이 시도 줄의 번호, 상태, 건너뛴 까닭, 오류 코드, 평가 번호, 시각을 싣는다([판단 피드백](decision-feedback.md)의 「replay 읽기 모델」).
-글과 원문은 시도 줄에 두지 않는다. 실제 provider 의 결과와 합성 평가([먼저 살펴보기 루프 평가](proactive-eval.md))의 결과는 평가의 provider 기록으로 구분한다.
-
 ## 설정
 
-`assistant.proactive-loop` 설정이다.
-
-| 칸 | 기본값 | 뜻 |
-| --- | --- | --- |
-| `enabled` | `false` | 설치가 루프를 연다. 꺼져 있으면 사용자 설정과 상관없이 잇지 않는다 |
-| `provider` | `hermes` | 평가에 쓸 `DecisionProvider` 이름. 설치된 adapter 여야 한다 |
-| `max-runs-per-day` | `1` | 사용자 한 명의 최근 20시간 시도 상한. 1 이상 |
-| `surface-window` | `7d` | 이 기간 안의 시도가 낸 판정만 지금 화면에 보인다. 0 보다 크다 |
-| `surface-max-items` | `3` | 지금 화면에 보이는 먼저 다룰 문제의 수. 1 이상 |
+키와 기본값, 검사는 `ProactiveLoopProperties` 가 갖는다.
 
 ## 검증
 
-| 무엇 | 어디서 |
-| --- | --- |
-| 줄을 남기지 않는 조건, 건너뛰는 순서, 원천 유일, 하루 상한, 다시 부르지 않음 | `ProactiveLoopCoordinatorTest`, `ProactiveLoopDisabledTest` |
-| provider 실패의 `FALLBACK` 과 모르는 provider 의 `FAILED` | `ProactiveLoopFallbackTest`, `ProactiveLoopUnknownProviderTest` |
-| 기동 때 `RUNNING` 닫기 | `ProactiveLoopRecoveryTest` |
-| 설정 API 의 권한과 검사 | `ProactiveLoopSettingTest`, `ProactiveLoopSettingDisabledTest` |
-| 판정의 `SURFACED`, 고르는 규칙, 반응과 그 거절 | `SurfacedProblemsTest` |
-| 지금 화면 항목, 숨기기와 미루기의 사건, 한 줄이 깨져도 카드가 남음 | `SurfacedProblemCandidatesTest` |
-| 화면의 항목과 반응, 루프 설정 | `test/browser/now.spec.ts`, `test/browser/proactive-check.spec.ts` |
-| 결정적 provider 로 7일 동안 깨우기와 루프를 이어 돌려 중요한 문제의 적중, 중복, 유용한 침묵, 실패, 호출 수를 세는 합성 반복 | `DailyLoopPilotTest`. 결과는 `backend/build/reports/proactive-loop/report.md` |
+결정적 provider 로 7일 동안 깨우기와 루프를 이어 돌려 중요한 문제의 적중, 중복, 유용한 침묵, 실패, 호출 수를 세는 합성 반복은 `DailyLoopPilotTest` 가 맡는다. 결과는 `backend/build/reports/proactive-loop/report.md` 에 남는다.
 
 합성 반복의 모든 값은 합성이다. 실제 사람, 메일, 계정, 금액, 대화 내용을 쓰지 않는다.

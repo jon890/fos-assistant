@@ -4,7 +4,7 @@ backend 는 Spring Boot 4, Java 21, MySQL, Flyway 이고 web 은 Next.js 16, Rea
 검사는 backend 의 JUnit, `test/e2e`(가짜 Hermes), `test/browser`(Playwright), `test/unit`(node:test) 입니다.
 
 기본은 **직접** 검토한다. 변경이 크면 backend, web, hermes 등 디렉터리별로 하위 에이전트에 나눠 읽게 한다. 각 에이전트에 담당 경로와 관련 지침을 주고, 디렉터리 사이의 계약과 결과 취합은 당신이 맡는다.
-점검 기준은 저장소의 지침이 소유한다. 루트 `AGENTS.md`, `backend/AGENTS.md`, `web/AGENTS.md`, `docs/` 와 `docs/adr/` 이다. `docs/` 의 색인은 `docs/README.md` 다.
+점검 기준은 저장소의 지침이 소유한다. 루트 `AGENTS.md`, `backend/AGENTS.md`, `web/AGENTS.md`, `docs/` 와 ADR 이다. ADR 은 `docs/adr/` 와 `backend/docs/adr/`, `web/docs/adr/`, `hermes/docs/adr/` 에 있다. `docs/` 의 색인은 `docs/README.md` 다.
 diff 가 건드리는 영역의 지침을 먼저 읽는다. 판정 기준을 이 프롬프트에 옮겨 적지 않는다. 아래는 그 지침 가운데 리뷰에서 특히 볼 곳을 가리킬 뿐이다.
 그 뒤 GitHub review API 를 한 번 호출해 **요약과 인라인을 리뷰 하나로 묶어 게시**한다.
 요약은 리뷰의 `body` 에, 인라인 발견사항은 같은 리뷰의 `comments` 배열에 담는다.
@@ -88,7 +88,7 @@ FINDING_END
 | --- | --- |
 | `위험:마이그레이션` | 엔티티와 마이그레이션이 같이 바뀌었는가, 이미 적용된 파일을 고치지 않았는가, 번호가 겹치지 않는가, 기존 행에 새 칸이 NOT NULL 로 들어가 기동이 실패하지 않는가 |
 | `위험:보안` | 남의 자료에 닿는 경로가 없는가, 요청 본문이 profile 이나 사용자를 정하지 못하는가, 서버 라우트가 토큰을 브라우저로 흘리지 않는가, 권한 없는 쪽이 없는 것과 같은 응답을 받는가 |
-| `위험:Hermes연동` | Hermes 가 실제로 주는 칸과 모양을 `docs/hermes/` 와 대조했는가, 가짜 Hermes 가 실제보다 너그럽게 답하도록 바뀌지 않았는가 |
+| `위험:Hermes연동` | Hermes 가 실제로 주는 칸과 모양을 `hermes/docs/hermes-contract.md` 와 대조했는가, 가짜 Hermes 가 실제보다 너그럽게 답하도록 바뀌지 않았는가 |
 | `위험:배포설정` | 새 환경 변수와 설정에 기본값이 없어 기동이 멈추지 않는가, 공개 저장소에 적으면 안 되는 값이 들어가지 않았는가 |
 
 요약 `body` 의 첫 평가 줄 아래에 `위험 라벨: ...` 한 줄을 그대로 옮겨 적는다.

@@ -1,7 +1,7 @@
 # 흐름
 
 화면 전환과 호출 순서를 담는다.
-모듈 배치는 [`code-architecture.md`](code-architecture.md), 저장 모델은 [`backend/schema/README.md`](backend/schema/README.md)가 가진다.
+모듈 배치는 [`code-architecture.md`](code-architecture.md), 저장 모델은 [`backend/docs/data-schema.md`](../backend/docs/data-schema.md)가 가진다.
 
 ## 두 방향과 두 토큰
 
@@ -55,7 +55,7 @@ Hermes 가 Control Plane 을 부를 때는 Control Plane 이 그 요청의 주�
 
 그래서 사용자는 Control Plane 이 이미 기록한 실행에서 꺼낸다.
 profile 플러그인이 도구 인자에 서명해 넣은 `_fos_ctx` 로 origin 실행 하나를 찾고, 그 실행의 `user_id` 가 요청자다. 하위 에이전트 session 은 만들 때 등록한 실행이, 최상위 session 은 지금 도는 실행이 origin 이다.
-[`backend/mcp-caller.md`](backend/mcp-caller.md#mcp-호출의-요청자를-정할-때) 의 「MCP 호출의 요청자를 정할 때」 가 그 흐름이다. 결정은 [ADR-032](adr/ADR-032-mcp-토큰은-profile-을-증명하고-실제-사용자는-부모-실행에서-정한다.md) 와 [ADR-037](adr/ADR-037-hermes-하위-에이전트-session-의-주인은-만들-때-등록한-줄로-정한다.md) 에 있다.
+[`backend/mcp-caller.md`](backend/mcp-caller.md#mcp-호출의-요청자를-정할-때) 의 「MCP 호출의 요청자를 정할 때」 가 그 흐름이다. 결정은 [ADR-032](../backend/docs/adr/ADR-032-mcp-토큰은-profile-을-증명하고-실제-사용자는-부모-실행에서-정한다.md) 와 [ADR-037](../backend/docs/adr/ADR-037-hermes-하위-에이전트-session-의-주인은-만들-때-등록한-줄로-정한다.md) 에 있다.
 
 ## 로그인 활동 기록
 
@@ -164,7 +164,7 @@ Control Plane 은 실행이 도는 동안 `assistant.chat.stream-heartbeat`(기�
 `RUN_STARTED` 와 `RUN_COMPLETED` 와 `RUN_FAILED` 는 Hermes 사건을 옮겨 적은 것이 아니라
 Control Plane 이 직접 적는 것이다.
 그래서 사건 스트림을 읽지 못한 실행에도 실행의 시작과 끝이 남는다.
-도구와 하위 에이전트 사건은 두 경로 모두 사건 스트림에서 옮겨 적는다. 한 번에 받는 경로는 화면으로 흘리지 않고 실행 기록에만 쌓으며, 답 조각 시각(`first_delta_at`)은 적지 않는다([ADR-090](adr/ADR-090-한-번에-받는-경로도-hermes-사건-스트림을-열어-도구-사건을-남긴다.md)).
+도구와 하위 에이전트 사건은 두 경로 모두 사건 스트림에서 옮겨 적는다. 한 번에 받는 경로는 화면으로 흘리지 않고 실행 기록에만 쌓으며, 답 조각 시각(`first_delta_at`)은 적지 않는다([ADR-090](../backend/docs/adr/ADR-090-한-번에-받는-경로도-hermes-사건-스트림을-열어-도구-사건을-남긴다.md)).
 
 **사건 저장이 실패해도 대화는 성공으로 끝난다.**
 사건은 관측용이고 그것 때문에 답이 사라지면 안 된다.
@@ -347,7 +347,7 @@ sequenceDiagram
 
 ## 지금 화면을 열 때
 
-판정 표는 [`backend/attention.md`](backend/attention.md), 화면은 [`frontend/now.md`](frontend/now.md) 가 갖는다.
+판정 표는 [`backend/attention.md`](backend/attention.md), 화면은 [`web/docs/prd.md`](../web/docs/prd.md) 가 갖는다.
 
 ```mermaid
 sequenceDiagram
@@ -442,3 +442,76 @@ sequenceDiagram
 ```
 
 받아들이기 전의 제안은 지금 화면에 보이지만 건수에 세지 않는다.
+
+## 파일 공간을 열 때
+
+경로 규칙과 API 는 [`backend/docs/code-architecture.md`](../backend/docs/code-architecture.md) 의 「실행 공간 파일」, 결정은 [ADR-20261009 / workspace-explorer](adr/ADR-20261009-workspace-explorer.md) 가 갖는다.
+
+```mermaid
+sequenceDiagram
+    participant B as 브라우저
+    participant W as Next.js 서버 라우트
+    participant C as Control Plane
+    participant D as 읽기 전용 마운트
+
+    B->>W: /files 를 연다(페이지만 받는다. 서버에서 읽는 것은 없다)
+    B->>W: GET /api/workspace
+    W->>C: GET /api/v1/workspace
+    alt 루트가 설정되지 않았거나 디렉터리가 아니다
+        C-->>B: available false. 「파일 공간을 쓸 수 없어요」
+    else 사용자 디렉터리가 없다
+        C-->>B: exists false. 「아직 에이전트가 만든 파일이 없어요」
+    else
+        C-->>B: 상태와 함께 쓰는 에이전트
+        B->>W: 목록 ?path=
+        W->>C: GET /api/v1/workspace/entries?path=
+        C->>D: u<번호> 부터 조각마다 링크를 따라가지 않고 연다
+        alt 경로 규칙에 어긋난다
+            C-->>B: 400. 목록 대신 오류 안내와 맨 위로 가기
+        else 없거나 링크를 지난다
+            C-->>B: 404. 「찾을 수 없어요」 와 맨 위로 가기
+        else
+            C-->>B: 1,000 줄까지와 truncated
+        end
+    end
+    opt 파일을 고른다
+        B->>B: 확장자와 크기로 미리보기 종류를 정한다
+        alt 미리보기가 있다
+            B->>W: GET /api/workspace/files/<경로>
+            W->>C: 같은 경로
+            C-->>B: 본문과 머리글. HTML 은 스크립트 없는 iframe
+        else 형식이 없거나 크다
+            B->>B: 「미리보기가 없어요」 와 내려받기
+        end
+    end
+```
+
+```mermaid
+sequenceDiagram
+    participant B as 브라우저
+    participant W as Next.js 서버 라우트
+    participant C as Control Plane
+    participant H as 권한 도우미
+
+    B->>W: GET /api/workspace 로 도는 실행 수를 다시 읽는다
+    W->>C: GET /api/v1/workspace
+    B->>B: 확인 창. 도는 실행이 있으면 다시 생길 수 있다고 알린다
+    B->>W: DELETE /api/workspace/entries?path=
+    W->>C: DELETE /api/v1/workspace/entries?path=
+    C->>C: 경로 규칙, 읽기 마운트에서 있는지 확인
+    C->>H: {owner, path, max_entries} 한 줄
+    alt 지웠다
+        H-->>C: ok, kind, entries, bytes
+        C->>C: INFO 로그 한 줄
+        C-->>B: 200. 목록을 다시 읽는다
+    else 항목이 너무 많다
+        H-->>C: TOO_MANY_ENTRIES
+        C-->>B: 409. 아무것도 지우지 않았다고 알린다
+    else 도우미가 실패했거나 답하지 않았다
+        C-->>B: 502. 목록을 다시 읽어 남은 것을 보인다
+    end
+```
+
+상태와 목록은 브라우저가 읽고, 실패는 그 자리의 다시 읽기로 다룬다.
+두 탭에서 같은 것을 지우면 늦은 쪽은 404 를 받고 목록을 다시 읽는다.
+목록을 연 사이 에이전트가 파일을 바꾸면 다음 읽기에 보인다. 화면은 스스로 다시 읽지 않는다.

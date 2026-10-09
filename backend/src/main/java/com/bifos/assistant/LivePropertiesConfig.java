@@ -15,6 +15,7 @@ import com.bifos.assistant.proactive.application.ProactiveLoopProperties;
 import com.bifos.assistant.shared.config.LiveProperties;
 import com.bifos.assistant.usage.application.UserExecutionProperties;
 import com.bifos.assistant.usage.infra.PricingProperties;
+import com.bifos.assistant.workspace.infra.WorkspaceProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -93,6 +94,11 @@ public class LivePropertiesConfig {
     @Bean
     public LiveProperties<BrowserProperties> browserPropertiesLive(BrowserProperties value) {
         return LiveProperties.fixed(BrowserProperties.class, value);
+    }
+
+    @Bean
+    public LiveProperties<WorkspaceProperties> workspacePropertiesLive(WorkspaceProperties value) {
+        return LiveProperties.fixed(WorkspaceProperties.class, value);
     }
 
     /** {@code runTimeout()} 과 {@code pollInterval()} 을 읽는 곳만 쓴다. 나머지 칸은 {@link HermesProperties} 를 그대로 주입받는다. */

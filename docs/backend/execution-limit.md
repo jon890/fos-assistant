@@ -31,26 +31,16 @@ Control Plane 이 Hermes 에 실행을 맡기는 길은 `HermesRunsClient.submit
 Hermes 를 부르지만 실행을 시작하지 않는 것은 세지 않는다.
 커넥터 도구 호출(`/api/connectors/...`), 실행 조회, 중지, 사용량 재조회가 그렇다.
 
-### 세지 못하는 실행
-
-| 실행 | 까닭 |
-| --- | --- |
-| Hermes native 하위 에이전트(`delegate_task`) | Hermes 가 스스로 띄운다. Control Plane 은 사건과 사용량 원장으로만 본다([ADR-062](../adr/ADR-062-native-하위-에이전트-사용량은-재조회-작업-줄을-원장으로-넓혀-합계에-더한다.md)) |
-| Hermes cron | Control Plane 을 거치지 않는다 |
-| Hermes 대시보드나 CLI 에서 직접 연 실행 | Control Plane 을 거치지 않는다 |
-
-**이 한도는 Hermes 에 동시에 맡기는 실행 수의 상한이다.**
-OS 격리나 CPU, 메모리, 비용의 상한을 보장하지 않는다.
-실행 하나가 쓰는 메모리는 도구와 대화 길이에 따라 크게 달라진다([`hermes/concurrency.md`](../hermes/concurrency.md) 의 「스레드를 늘리는 비용」).
+Control Plane 이 제출하지 않는 실행(Hermes native 하위 에이전트, Hermes cron, 대시보드나 CLI 에서 직접 연 실행)은 세지 못한다. 이 한도가 OS 격리나 CPU, 메모리, 비용의 상한이 아니라는 점과 함께 [ADR-069](../adr/ADR-069-사용자-전체-실행-한도는-turn-자리와-실행-줄을-사용자-잠금-하나에서-센다.md) 의 결과가 감당할 것으로 적는다.
 
 ## 한도끼리의 관계
 
 | 한도 | 단위 | 값 | 닿으면 | 세는 곳 |
 | --- | --- | --- | --- | --- |
 | 대화 잠금 | 대화 하나 | turn 1개 | `CONVERSATION_BUSY`. 화면은 글만 보낸 경우 대기 메시지로 넣는다 | `TurnCancellation` 메모리 |
-| 루트당 위임 | 실행 트리 하나 | `assistant.delegation.max-concurrent-children`, 기본 4 | `TOO_MANY_CHILDREN` | `RUNNING` 이고 `delegation_key` 가 있는 실행 줄 |
-| 서버 전체 위임 | Control Plane 프로세스 | `assistant.delegation.max-active`, 기본 16 | `BUSY` | `AgentDelegationService` 의 semaphore |
-| **사용자 실행** | 사용자 한 명 | `assistant.user-execution.max-running`, 기본 4 | turn 은 `USER_BUSY`, 위임은 `BUSY`, 백그라운드는 건너뛴다 | `UserExecutionLimiter` 가 아래 「세는 방법」 으로 |
+| 루트당 위임 | 실행 트리 하나 | `assistant.delegation.max-concurrent-children` | `TOO_MANY_CHILDREN` | `RUNNING` 이고 `delegation_key` 가 있는 실행 줄 |
+| 서버 전체 위임 | Control Plane 프로세스 | `assistant.delegation.max-active` | `BUSY` | `AgentDelegationService` 의 semaphore |
+| **사용자 실행** | 사용자 한 명 | `assistant.user-execution.max-running` | turn 은 `USER_BUSY`, 위임은 `BUSY`, 백그라운드는 건너뛴다 | `UserExecutionLimiter` 가 아래 「세는 방법」 으로 |
 | Hermes listener | 공유 listener 하나 | `gateway.api_server.max_concurrent_runs`, 기본 10 | Hermes 가 429. Control Plane 은 `HERMES_BUSY` 로 적는다 | Hermes |
 
 **사용자 한도는 그 아래 한도들보다 작게 둔다.**
@@ -69,23 +59,14 @@ OS 격리나 CPU, 메모리, 비용의 상한을 보장하지 않는다.
 
 ## 세는 방법
 
-`usage.application.UserExecutionLimiter` 가 사용자 한 명이 쥔 자리를 아래 셋의 합으로 센다.
-
-| 자리 | 얻을 때 | 돌려줄 때 |
-| --- | --- | --- |
-| turn 자리 | `TurnCancellation.open` 이 대화 잠금을 잡기 직전. 잠금을 잡지 못하면 곧바로 돌려준다 | `TurnCancellation.close` 가 잠금을 풀 때. 한 번만 돌려준다 |
-| 실행 줄 | `ExecutionRecorder` 가 `RUNNING` 줄을 만들 때 | 그 줄이 `SUCCEEDED`, `FAILED`, `CANCELLED` 로 적힐 때. 따로 돌려주지 않는다 |
-| 원격 종료 확인 자리 | 실행 줄을 먼저 끝냈는데 Hermes 의 run 이 끝났는지 모를 때 | 실행 조회가 끝났다거나 404 라고 답할 때, 또는 상한 시간이 지났을 때 |
+`usage.application.UserExecutionLimiter` 가 센다.
+세는 세 자리(turn 자리, 실행 줄, 원격 종료 확인 자리)와, 사용자 잠금 하나 안에서 판정하고 실행 줄을 커밋까지 끝내는 규칙은 [ADR-069](../adr/ADR-069-사용자-전체-실행-한도는-turn-자리와-실행-줄을-사용자-잠금-하나에서-센다.md) 의 결정이 갖는다.
 
 실행 줄은 `RUNNING` 이고 대화 turn 의 루트 줄이 아닌 것만 센다.
 대화 turn 의 루트 줄은 `parent_execution_id` 가 비고 `conversation_id` 가 있는 줄이다. 그 turn 은 turn 자리로 이미 세었다.
 흐름의 Chief 도 대화 turn 의 루트 줄이다. 그래서 Chief 가 끝난 뒤 자식이 시작하기 전에도 그 turn 은 자리 하나를 쥔다.
 추천 질문과 시스템 판단 줄은 대화가 없어 루트 줄이어도 센다.
 
-**판정과 자리 만들기는 사용자 잠금 하나 안에서 한다.**
-turn 자리를 얻을 때와 실행 줄을 만들 때 모두 같은 잠금을 잡고, 셋을 더해 판정하고, 통과하면 그 안에서 자리를 만든다.
-두 경로가 각자 세고 각자 만들면 합이 한도를 넘는다.
-실행 줄의 저장은 그 잠금 안에서 커밋까지 끝난다.
 부르는 쪽(`ChatTurnRunner.runTurn`, `AgentRunner.run`, `MemoryProposer`, `StarterSuggestionService`, `HermesDecisionProvider`)은 트랜잭션을 열지 않는다.
 트랜잭션 안에서 부르면 잠금을 푼 뒤에 커밋되어 다른 스레드가 그 줄을 세지 못한다. `UserExecutionLimiter` 는 그 경우 예외를 던진다.
 
@@ -185,11 +166,7 @@ flowchart TD
 
 ## 설정
 
-| 설정 | 기본값 | 검사 |
-| --- | --- | --- |
-| `assistant.user-execution.max-running` | 4 | 1 이상. 아니면 기동하지 않는다 |
-| `assistant.user-execution.background-reserve` | 1 | 0 이상이고 `max-running` 보다 작다 |
-| `assistant.user-execution.remote-end-max-wait` | 비우면 `hermes.run-timeout` | 비우지 않으면 0 보다 크다 |
+설정 키와 기본값, 검사는 `application.yml` 과 `UserExecutionProperties` 가 갖는다.
 
 `max-running` 이 1 이고 `background-reserve` 가 0 이면 백그라운드 실행이 사용자 turn 과 같은 자리를 다툰다.
 `background-reserve` 를 `max-running` 보다 1 작게 두면 백그라운드 실행은 그 사용자가 쥔 자리가 없을 때만 돈다.

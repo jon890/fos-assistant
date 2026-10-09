@@ -41,7 +41,6 @@ public enum ErrorCode {
     MEMORY_SENSITIVE_ALWAYS(HttpStatus.BAD_REQUEST),
     /** 민감 본문을 암호화하거나 풀 key 가 없다. 평문으로 내려 저장하지 않는다(ADR-055). */
     MEMORY_ENCRYPTION_UNAVAILABLE(HttpStatus.CONFLICT),
-    /** 들이는 사이에 같은 출처나 같은 이름의 줄이 먼저 들어왔다. 다시 올리면 그 항목이 DUPLICATE 나 CONFLICT 로 나온다(ADR-058). */
     /** 같은 주인과 collection 에 같은 이름의 문서가 이미 있다(ADR-057). */
     MEMORY_DOCUMENT_EXISTS(HttpStatus.CONFLICT),
     /** 화면이 읽은 판이 지금 판이 아니다. 그 사이에 다른 수정이 있었다(ADR-057). */
@@ -273,6 +272,22 @@ public enum ErrorCode {
     BROWSER_STOP_FAILED(HttpStatus.BAD_GATEWAY),
     /** 요청자의 브라우저에 열린 로그인 화면이 없다. 입력을 보내기 전에 화면을 연다. */
     BROWSER_SCREEN_CLOSED(HttpStatus.CONFLICT),
+    /** 실행 공간 루트가 설정되지 않았거나 디렉터리가 아니다. 상태 조회 말고 모든 파일 공간 경로가 이 코드다. */
+    WORKSPACE_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE),
+    /** 없는 경로, 링크를 지나는 경로, 본문을 줄 수 없는 종류를 같은 응답으로 숨긴다. 남의 공간은 경로로 닿을 수 없다. */
+    WORKSPACE_ENTRY_NOT_FOUND(HttpStatus.NOT_FOUND),
+    /** Control Plane 이 읽을 권한이 없거나 하드 링크가 둘 이상인 파일이다. */
+    WORKSPACE_ENTRY_UNREADABLE(HttpStatus.FORBIDDEN),
+    /** 미리보기 크기 상한을 넘는다. 내려받기는 상한이 없다. */
+    WORKSPACE_PREVIEW_TOO_LARGE(HttpStatus.CONTENT_TOO_LARGE),
+    /** 미리보기를 정하지 않은 확장자다. 내려받기는 받는다. */
+    WORKSPACE_PREVIEW_UNSUPPORTED(HttpStatus.UNSUPPORTED_MEDIA_TYPE),
+    /** 지우기 도우미의 socket 이 설정되지 않았다. 상태 조회의 {@code deletable} 이 거짓이다. */
+    WORKSPACE_DELETE_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE),
+    /** 디렉터리 안의 항목이 지우기 상한을 넘는다. 아무것도 지우지 않았다. */
+    WORKSPACE_DELETE_TOO_MANY(HttpStatus.CONFLICT),
+    /** 도우미가 실패했거나 제한 시간 안에 답하지 않았다. 일부가 지워졌을 수 있다. */
+    WORKSPACE_DELETE_FAILED(HttpStatus.BAD_GATEWAY),
     INTERNAL_ERROR(HttpStatus.INTERNAL_SERVER_ERROR);
 
     private final HttpStatus status;

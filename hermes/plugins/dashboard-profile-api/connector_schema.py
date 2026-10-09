@@ -27,14 +27,15 @@ ISOLATED_MODE = "isolated"
 CONNECTOR_SKILL_PARTS = ("references", "templates")
 
 
-# 커넥터 스킬 하나의 상한이다. Control Plane 이 올린 스킬에 거는 제한과 같다(`docs/backend/skill.md`).
+# 커넥터 스킬 하나의 상한이다. Control Plane 이 올린 스킬에 거는 제한과 같다.
+# 그 값은 `SkillService` 의 `MAX_FILES` 와 `MAX_CHARS_PER_FILE` 이 갖는다. 바꾸면 함께 고친다.
 CONNECTOR_SKILL_MAX_FILES = 20
 
 
 CONNECTOR_SKILL_MAX_CHARS = 100_000
 
 
-# `connector.json` 의 형식 규칙이다. `docs/connectors.md` 의 「connector.json」 표와 같다.
+# `connector.json` 의 형식 규칙이다. `hermes/connectors/README.md` 의 「connector.json」 표와 같다.
 CONNECTOR_ID_RE = re.compile(r"^[a-z0-9][a-z0-9-]{0,63}$")
 
 
@@ -146,7 +147,7 @@ CONNECTOR_PERSONA_MAX_CHARS = 8000
 PLUGIN_ROOT_REF = "${CLAUDE_PLUGIN_ROOT}"
 
 
-# 커넥터 카드의 `icon` 과 `link` 규칙이다. `docs/connectors.md` 의 「아이콘과 링크」 와 같다(ADR-20261008 connector-card).
+# 커넥터 카드의 `icon` 과 `link` 규칙이다. `hermes/connectors/README.md` 의 「아이콘과 링크」 와 같다(ADR-20261008 connector-card).
 ICON_PATH_RE = re.compile(r"^[A-Za-z0-9_][A-Za-z0-9_./-]{0,127}$")
 
 

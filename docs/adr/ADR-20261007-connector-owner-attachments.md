@@ -1,4 +1,4 @@
-## ADR-20261007: 사용자 첨부를 읽는 커넥터는 바인딩 주인의 첨부 디렉터리를 설치가 정한 env 로만 받는다
+## ADR-20261007 / connector-owner-attachments: 사용자 첨부를 읽는 커넥터는 바인딩 주인의 첨부 디렉터리를 설치가 정한 env 로만 받는다
 
 - **status**: `accepted`
 - Date: 2026-10-07
@@ -42,4 +42,4 @@ ADR-091 은 `vision` 실행 공간에 그 주인의 디렉터리 하나만 붙�
   - 옛 대시보드 plugin 은 모르는 칸을 가진 manifest 를 카탈로그에서 뺀다. plugin 과 backend 를 한 배포로 올린다.
   - 등록 화면의 확인 도구는 사용자 첨부를 읽지 못한다. 확인 도구가 첨부를 읽을 일은 없다.
 
-- **적용 범위**: 대시보드 plugin 의 manifest 검증, 바인딩 설치, 실행 경로. backend 의 바인딩 설치 요청. 계약은 [커넥터 연결](../connectors.md) 의 「connector.json」 과 [커넥터 설치](../backend/connector-install.md) 의 「바인딩 설치」, 만드는 쪽의 규칙은 [커넥터 만들기](../connector-authoring.md) 가 갖는다.
+- **적용 범위**: 대시보드 plugin 의 manifest 검증, 바인딩 설치, 실행 경로. backend 의 바인딩 설치 요청. 계약은 [커넥터 연결](../../hermes/connectors/README.md) 의 「connector.json」 과 [커넥터 설치](../backend/connector-install.md) 의 「바인딩 설치」, 만드는 쪽의 규칙은 [커넥터 만들기](../../hermes/connectors/README.md) 가 갖는다.

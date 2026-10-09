@@ -45,7 +45,7 @@ public class HermesProfileProvisioner implements ProfileProvisioning {
      * <p>{@code .env} 에 넣는 것은 {@code MCP_FOS_ASSISTANT_API_KEY}, {@code API_SERVER_MODEL_NAME},
      * {@code API_SERVER_KEY} 셋뿐이다. listener 설정을 함께 적으면 공유 listener 를 쓰는 구성에서
      * gateway 가 뜰 때 그 profile 을 건너뛰고, 그 사람이 처음 대화할 때에야 드러난다. 근거는
-     * {@code docs/hermes/profiles.md} 의 「공유 listener 를 쓰는 profile 에는 listener 설정을 넣지
+     * {@code hermes/docs/hermes-contract.md} 의 「공유 listener 를 쓰는 profile 에는 listener 설정을 넣지
      * 않는다」가 갖는다.
      *
      * <p>MCP 토큰은 profile 을 만든 직후 가장 먼저 넣는다. profile 이 만들어지면 MCP 등록이 이미 붙어

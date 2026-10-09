@@ -34,59 +34,19 @@ Hermes 가 Control Plane 을 부르는 반대 방향도 있고 토큰이 서로 
 둘은 만드는 방법이 달라 설정도 다르다.
 `fos-home-infra` 가 그 차이를 소유한다.
 
-## Hermes 쪽 코드 (`hermes/`)
-
-Control Plane 이 기대는 Hermes 쪽 코드는 이 저장소가 갖는다.
-근거는 [ADR-041](adr/ADR-041-hermes-에-설치하는-plugin-과-profile-틀은-이-저장소가-소유한다.md) 에 있다.
-
-```
-hermes/
-  plugins/
-    dashboard-profile-api/   대시보드 plugin. profile 만들기와 지우기, env, 도구와 스킬 설정, 커넥터
-      __init__.py             register 와 기존 이름 다시 내보내기
-      common.py, profiles.py, session.py
-      sandbox.py, sandbox_approvals.py, toolconfig.py, env.py
-      connector_schema.py, connector_policy.py, connector_skills.py, connector_appearance.py
-      connector_manifest.py, connector_vault.py
-      connector_state.py, connector_status.py
-      connector_isolated.py, connector_binding.py, connector_install.py
-      connector_mcp.py, connector_run.py, connector_output.py
-      routes.py               인증 provider 와 토큰 경로 연결
-    fos-ctx/                 profile plugin. Control Plane MCP 호출에 _fos_ctx 서명을 붙이고, 바인딩 profile 과 옛 설치 profile 의 커넥터 도구 호출을 Control Plane 에 물어 막는다
-      __init__.py             register 와 기존 이름 다시 내보내기
-      context.py              서명과 루트 session, 호출 문맥
-      connector_policy.py     이름 대응과 정책 질의
-      subagent.py, hooks.py   자식 등록과 hook 진입점
-  connectors/
-    <커넥터 이름>/            범용 커넥터 하나. connector.json, .mcp.json, MCP 서버, 스킬 (ADR-064)
-  profile-template/
-    config.yaml.template     새 profile 의 설정 틀. 안전한 도구 목록, Control Plane MCP 등록, fos-ctx 켜기
-  bundle.sh                  설치 묶음을 만든다
-  tests/                     Python unittest. Hermes 모듈은 가짜로 끼운다
-```
-
-**서비스 이름은 `hermes/connectors/` 와 그 검사와 문서에만 둔다.** `backend/src/main`, `web/src`, `hermes/plugins` 는 어느 서비스도 모른다. `test/unit/connector-neutral.test.ts` 가 본다.
-
-**운영 값은 코드에 두지 않는다.** 설치 묶음을 만들 때와 프로세스의 환경 변수로 받는다.
-묶음을 Hermes 에 넣고 대시보드를 다시 띄우는 것은 운영 저장소가 한다.
-설치 묶음의 모양, 운영 값의 목록, 검사 방법은 [`hermes/README.md`](../hermes/README.md) 가 갖는다.
-
-**plugin 은 한 배포 동안 옛 Control Plane 의 호출도 받는다.** 운영은 plugin 을 먼저 올리고 Control Plane 을 올린다.
-경로나 요청 모양을 바꿀 때는 새 것을 더하고, 옛 것은 그다음 배포에서 뺀다.
-
 ## Memory 에서 아직 만들지 않은 것
 
 아래는 아직 만들지 않았다. 스키마와 판정은 이미 받을 수 있게 되어 있다.
 
 - collection 탭, 문서의 판 이력 화면, 출처 표시
-- 신원 항목의 들이기. 암호화와 문서 읽기 경계와 `identity` 권한을 운영에서 확인한 뒤에 연다. 조건은 [ADR-058](adr/ADR-058-기존-개인-지식-저장소는-주인이-검토한-묶음을-화면에서-올려-들여온다.md) 이 정했다
+- 신원 항목의 들이기. 암호화와 문서 읽기 경계와 `identity` 권한을 운영에서 확인한 뒤에 연다. 조건은 [ADR-058](adr/archive/ADR-058-기존-개인-지식-저장소는-주인이-검토한-묶음을-화면에서-올려-들여온다.md) 이 정했다
 - 민감 항목 본문의 완전 삭제
 - `always_inject` 칸 제거
 
-Memory 의 기본 근거는 [`adr/ADR-003-memory-권한은-주입으로-강제한다.md`](adr/ADR-003-memory-권한은-주입으로-강제한다.md) 와
-[`adr/ADR-012-memory-는-사람이-승인한-것만-남는다.md`](adr/ADR-012-memory-는-사람이-승인한-것만-남는다.md) 에 있다.
+Memory 의 기본 근거는 [`backend/docs/adr/ADR-003-memory-권한은-주입으로-강제한다.md`](../backend/docs/adr/ADR-003-memory-권한은-주입으로-강제한다.md) 와
+[`backend/docs/adr/ADR-012-memory-는-사람이-승인한-것만-남는다.md`](../backend/docs/adr/ADR-012-memory-는-사람이-승인한-것만-남는다.md) 에 있다.
 층을 나누는 근거는
-[`adr/ADR-015-memory-는-층을-나눠-싣는다.md`](adr/ADR-015-memory-는-층을-나눠-싣는다.md) 에 있다.
+[`backend/docs/adr/ADR-015-memory-는-층을-나눠-싣는다.md`](../backend/docs/adr/ADR-015-memory-는-층을-나눠-싣는다.md) 에 있다.
 
 ## 화면을 검증하는 방법
 
@@ -108,11 +68,11 @@ Memory 의 기본 근거는 [`adr/ADR-003-memory-권한은-주입으로-강제�
 
 | 값 | 두는 곳 |
 | --- | --- |
-| 사용자의 AI credential | Hermes 쪽. provider API key 는 profile `.env` 에 둔다. OAuth 로그인은 profile 에 자기 `auth.json` 이 없으면 여러 profile 이 Hermes 루트의 것을 함께 쓴다([`hermes/README.md`](hermes/README.md)) |
+| 사용자의 AI credential | Hermes 쪽. provider API key 는 profile `.env` 에 둔다. OAuth 로그인은 profile 에 자기 `auth.json` 이 없으면 여러 profile 이 Hermes 루트의 것을 함께 쓴다([`hermes/README.md`](../hermes/docs/hermes-contract.md)) |
 | profile 의 API server key | 홈서버의 mode 600 파일. 파일 이름이 profile 이름이다 |
 | Hermes 대시보드를 부를 토큰 | Control Plane 의 환경 변수와 그 plugin 의 환경 변수 |
 | 웹과 Control Plane 이 나눠 가지는 HMAC 비밀값 | 두 서비스의 환경 변수 |
-| 사용자 본문을 감싸는 KEK | 홈서버 파일. 데이터베이스 백업과 다른 자리에 둔다([ADR-20261008 / data-encryption](adr/ADR-20261008-data-encryption.md)) |
+| 사용자 본문을 감싸는 KEK | 홈서버 파일. 데이터베이스 백업과 다른 자리에 둔다([ADR-20261008 / data-encryption](../backend/docs/adr/ADR-20261008-data-encryption.md)) |
 | 사용자별 데이터 key | `user_data_key` 에 KEK 로 감싼 채로 둔다. 푼 key 는 Control Plane 메모리에만 있다 |
 
 데이터베이스에는 어떤 비밀값도 원문으로 넣지 않는다.
@@ -124,13 +84,13 @@ profile key 와 AI credential 은 계속 홈서버 파일에 둔다.
 - Hermes 안의 `delegate_task` 하위 에이전트가 자기 실행 줄을 남기는 경로.
   그 하위 에이전트는 Hermes 안에서만 돌고 사건으로만 보인다.
   우리 실행 줄이 생기는 자식은 `agent_delegate`, 흐름의 하위 실행, Memory 제안이다.
-  사용량과 금액은 실행 줄 없이 `subagent_usage_job` 줄에 남겨 합계에 더한다([ADR-062](adr/ADR-062-native-하위-에이전트-사용량은-재조회-작업-줄을-원장으로-넓혀-합계에-더한다.md)).
-  그 자식의 provider 는 대시보드 plugin 의 읽기 경로로 받는다([ADR-067](adr/ADR-067-native-하위-에이전트의-provider-는-대시보드-plugin-이-session-저장소에서-읽어-준다.md))
+  사용량과 금액은 실행 줄 없이 `subagent_usage_job` 줄에 남겨 합계에 더한다([ADR-062](../backend/docs/adr/ADR-062-native-하위-에이전트-사용량은-재조회-작업-줄을-원장으로-넓혀-합계에-더한다.md)).
+  그 자식의 provider 는 대시보드 plugin 의 읽기 경로로 받는다([ADR-067](../backend/docs/adr/ADR-067-native-하위-에이전트의-provider-는-대시보드-plugin-이-session-저장소에서-읽어-준다.md))
 - `agent_stop` 이 그 실행 아래의 실행까지 멈추는 것. 지금은 그 실행만 멈춘다
 - 사용자가 turn 을 중지할 때 Hermes `delegate_task` 하위 에이전트를 실제로 멈추는 것.
-  지금은 origin 실행이나 그 루트 실행이 `CANCELLED` 인 하위 에이전트의 Control Plane MCP 호출만 거절한다([ADR-037](adr/ADR-037-hermes-하위-에이전트-session-의-주인은-만들-때-등록한-줄로-정한다.md)).
+  지금은 origin 실행이나 그 루트 실행이 `CANCELLED` 인 하위 에이전트의 Control Plane MCP 호출만 거절한다([ADR-037](../backend/docs/adr/ADR-037-hermes-하위-에이전트-session-의-주인은-만들-때-등록한-줄로-정한다.md)).
   루트와 origin 사이의 중간 실행만 중지된 경우는 보지 않는다.
-  멈출 수 있는 길은 profile 플러그인 쪽에 있고, 부모 run 이 끝난 뒤의 자식은 그 길로도 멈추지 못한다([`hermes/delegation.md`](hermes/delegation.md#native-하위-에이전트를-멈추는-길))
+  멈출 수 있는 길은 profile 플러그인 쪽에 있고, 부모 run 이 끝난 뒤의 자식은 그 길로도 멈추지 못한다([`hermes/docs/hermes-contract.md`](../hermes/docs/hermes-contract.md#native-하위-에이전트를-멈추는-길))
 - 여러 Control Plane 이 함께 세는 사용자 실행 한도. 지금은 한 프로세스 안의 사용자 잠금으로 세고 만든다([`backend/execution-limit.md`](backend/execution-limit.md) 의 「서버 한 대 전제」)
 - Hermes native 하위 에이전트와 cron 을 사용자 실행 한도에 넣는 것. Control Plane 이 제출하지 않아 세지 못한다
 - 스킬 zip 묶음의 받기와 미리보기, 올리기와 그 화면. 지금은 저장 기반(넓힌 경로, scripts 와 실행 공간, 이전 버전)만 있다([ADR-20261009 / skill-package](adr/ADR-20261009-skill-package.md))
