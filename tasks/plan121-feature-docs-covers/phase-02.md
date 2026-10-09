@@ -32,7 +32,7 @@ covers: `backend/src/main/java/com/bifos/assistant/connector/`, `web/src/compone
 ## 의도 메모
 
 - covers 는 「이 경로를 바꾸면 이 문서를 볼 차례」 라는 뜻이다. 그 기능의 흐름과 갈리는 지점을 실제로 가진 코드만 넣는다. `shared/`, `web/src/components/ui/` 처럼 모든 기능이 쓰는 곳은 넣지 않는다. 넣으면 모든 PR 이 경고를 받아 경고가 무시된다.
-- **패키지가 한 기능보다 넓으면 파일 이름 glob 으로 가른다.** 예: attachment 는 `backend/src/main/java/com/bifos/assistant/chat/**/Artifact*`, `backend/src/main/java/com/bifos/assistant/chat/**/*Attachment*` 를 갖는다. chat 기능은 `chat/` 디렉터리 전체를 갖고, 다른 기능의 glob 과 겹쳐도 된다(그 파일을 바꾼 PR 은 두 문서 중 하나를 고치면 각자 판정한다).
+- **패키지가 한 기능보다 넓으면 파일 이름 glob 으로 나눈다.** 예: attachment 는 `backend/src/main/java/com/bifos/assistant/chat/**/Artifact*`, `backend/src/main/java/com/bifos/assistant/chat/**/*Attachment*` 를 갖는다. chat 기능은 `chat/` 디렉터리 전체를 갖고, 다른 기능의 glob 과 겹쳐도 된다(그 파일을 바꾼 PR 은 두 문서 중 하나를 고치면 각자 판정한다).
 - 하나의 기능에도 들지 않는 공용 클래스는 넣지 않는다.
 - 한 기능의 covers 는 보통 열 개 안쪽이다. 넘으면 회신에 까닭을 적는다.
 
