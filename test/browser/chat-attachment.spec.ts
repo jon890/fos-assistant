@@ -38,7 +38,7 @@ async function expectImageLoaded(locator: Locator): Promise<void> {
     .toBeGreaterThan(0);
 }
 
-test("사진을 고르면 미리보기가 붙고 올리는 동안 보내기가 잠긴다", async ({
+test("사진을 고르면 미리보기가 붙고 올리는 동안에도 보내기를 누를 수 있다", async ({
   page,
 }, testInfo) => {
   await openNewConversation(page, testInfo);
@@ -68,7 +68,7 @@ test("사진을 고르면 미리보기가 붙고 올리는 동안 보내기가 �
 
     await expect(page.getByTestId("attachment-previews")).toBeVisible();
     await expect(page.getByTestId("attachment-uploading")).toBeVisible();
-    await expect(send).toBeDisabled();
+    await expect(send).toBeEnabled();
 
     await expect.poll(() => releaseUpload !== null).toBe(true);
     releaseUpload?.();

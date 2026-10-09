@@ -36,6 +36,8 @@ export type Props = Pick<
   | "pending"
   | "pendingBusy"
   | "draft"
+  | "outgoing"
+  | "setOutgoing"
   | "setDraft"
   | "conversationIdRef"
   | "refresh"
