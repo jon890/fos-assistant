@@ -6,16 +6,16 @@
 ## 상태
 
 단계 1, 2(2a-1, 2a-2, 2b)를 구현했다. 남은 것은 단계 3, 4 다.
-단계 3 은 운영 코드 1,000줄 상한 때문에 둘로 나눈다. 3a 는 phase 01, 02 이고 3b 는 phase 03, 04, 05 다. 3b 는 3a 의 브랜치 위에 쌓는다.
-단계 3 의 계약은 `docs/backend/user-browser.md` 의 「중계」 와 `backend/docs/adr/ADR-20261008-browser-gateway-token.md` 가 갖는다. 3b 의 PR 이 이 디렉터리를 지운다.
+단계 3 은 운영 코드 1,000줄 상한 때문에 셋으로 나눈다. 3a 는 phase 01, 02, 3b 는 phase 03, 3c 는 phase 04, 05 다. 뒤 PR 은 앞 PR 의 브랜치 위에 쌓는다.
+단계 3 의 계약은 `docs/backend/user-browser.md` 의 「중계」 와 `backend/docs/adr/ADR-20261008-browser-gateway-token.md` 가 갖는다. 3c 의 PR 이 이 디렉터리를 지운다.
 
 | phase | PR | 담는 것 |
 | --- | --- | --- |
 | 01 | 3a | 중계 설정, 접근 표식, 주인의 브라우저를 만들고 켜는 서비스 |
 | 02 | 3a | 중계의 HTTP 창구와 보안 설정 |
 | 03 | 3b | 중계의 WebSocket(조각째 잇기) |
-| 04 | 3b | `owner_browser_env` 배선. 대시보드 plugin 과 Control Plane 의 설치, 확인 호출, 카탈로그 |
-| 05 | 3b | 네이버 블로그 커넥터의 `cdp_url` 을 빼고 중계로 붙기, 웹 안내, 문서 |
+| 04 | 3c | `owner_browser_env` 배선. 대시보드 plugin 과 Control Plane 의 설치, 확인 호출, 카탈로그 |
+| 05 | 3c | 네이버 블로그 커넥터의 `cdp_url` 을 빼고 중계로 붙기, 웹 안내, 문서 |
 
 ## 단계와 PR
 

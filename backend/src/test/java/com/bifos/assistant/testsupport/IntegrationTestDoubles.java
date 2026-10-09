@@ -115,6 +115,13 @@ public class IntegrationTestDoubles {
         return address -> true;
     }
 
+    /** 받은 조각을 되돌려 주는 Chrome 쪽 중계다. 운영 코드는 중계 WebSocket 이 열릴 때만 부른다. */
+    @Bean
+    @Primary
+    EchoCdpRelayConnector echoCdpRelayConnector() {
+        return new EchoCdpRelayConnector();
+    }
+
     /**
      * 운영의 {@link LiveProperties} 빈을 모두 {@link OverridableLiveProperties} 로 감싼다. 빈 이름과 정의는 그대로라, 제네릭 타입으로
      * 주입받는 곳은 {@code @Bean} 메서드의 반환형으로 같은 빈을 받는다.

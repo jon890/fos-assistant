@@ -19,7 +19,7 @@ Control Plane 의 패키지마다 맡는 책임과 패키지 사이의 방향 �
 | `shared/concurrent` | 요청 밖 작업을 띄우는 `BackgroundTasks`. 직접 가상 스레드를 띄우지 않는 까닭은 [ADR-20261007 / background-tasks](../../backend/docs/adr/ADR-20261007-background-tasks.md) |
 | `shared/domain/type` | 모든 패키지가 권한 판정에 읽는 역할 값 |
 | `user` | 사용자와 첫 로그인 처리 |
-| `browser` | 사용자마다 하나씩 두는 브라우저의 상태와 전이, 브라우저 proxy 로 컨테이너 켜기와 끄기, 자동 중지와 상태 맞추기, 브라우저 중계의 접근 표식과 HTTP 창구([`user-browser.md`](user-browser.md)) |
+| `browser` | 사용자마다 하나씩 두는 브라우저의 상태와 전이, 브라우저 proxy 로 컨테이너 켜기와 끄기, 자동 중지와 상태 맞추기, 브라우저 중계의 접근 표식과 HTTP 창구, WebSocket([`user-browser.md`](user-browser.md)) |
 | `model` | 모델 선택을 담는 값과 모델 단계 값. 서비스는 아직 `chat` 에 있다 |
 | `agent` | 에이전트 등록과 사용자의 만들기·지우기, 공개 범위, Hermes profile 연결, 페르소나, 도구, 에이전트가 받는 Memory collection |
 | `hermes` | Runs API 호출과 profile key 조회, 대시보드 호출 |
