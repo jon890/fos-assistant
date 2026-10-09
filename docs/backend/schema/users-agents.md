@@ -141,6 +141,32 @@ V52 가 세 칸을 더했다. 값은 관리자가 화면에서 정하고 마이�
 
 `(group_id, name)`이 유일하다. FK는 없다. 새 설치에서 숨김 행을 만들지 않는다.
 
+## agent_toolset_request
+
+에이전트 주인의 관리자 등급 도구 사용 요청과 결정 이력이다.
+도구의 활성 여부는 Hermes가 갖고 이 표는 요청 결과를 기록한다.
+
+| 칸 | 타입 | 뜻 |
+| --- | --- | --- |
+| `id` | BIGINT | 내부 기본 키 |
+| `public_id` | BINARY(16) | API와 화면이 쓰는 UUID. 유일하다 |
+| `group_id` | BIGINT | 요청 당시 그룹 |
+| `agent_id` | BIGINT | 요청한 에이전트 |
+| `requester_user_id` | BIGINT | 요청 당시 주인 |
+| `toolset` | VARCHAR(64) | 요청한 ADMIN 등급 도구 |
+| `status` | VARCHAR(20) | PENDING, APPROVED, REJECTED, CANCELLED, EXPIRED |
+| `pending_slot` | INT NULL | PENDING일 때 1, 끝났으면 NULL |
+| `requested_at` | TIMESTAMP(6) | 요청 시각 |
+| `decided_at` | TIMESTAMP(6) NULL | 승인, 거절, 취소 또는 만료 시각 |
+| `decided_by_user_id` | BIGINT NULL | 결정한 관리자. 요청자가 취소하면 NULL |
+| `reason` | VARCHAR(200) NULL | 거절 사유 한 줄 또는 조건 변경으로 만료된 사유 |
+
+`(group_id, agent_id, requester_user_id, toolset, pending_slot)`이 유일하다.
+끝난 요청의 NULL 슬롯은 서로 겹쳐도 저장되므로 여러 번의 요청 이력이 남는다.
+CHECK 제약은 상태와 슬롯을 함께 검사한다.
+`agent_id`는 `agent.id`를, 요청자와 결정 관리자는 `app_user.id`를 FK로 가리킨다.
+에이전트를 지워도 행과 요청 이력을 남긴다.
+
 ## agent_token
 
 Hermes 가 Control Plane 의 MCP 도구를 부를 때 쓰는 장기 토큰이다.

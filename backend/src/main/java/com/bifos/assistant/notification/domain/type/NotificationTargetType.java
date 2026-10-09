@@ -5,5 +5,9 @@ public enum NotificationTargetType {
     /** 대화. 공개 식별자로 가리킨다. */
     CONVERSATION,
     /** 예약 작업. 공개 식별자로 가리킨다. */
-    TASK
+    TASK,
+    /** 관리자 영역의 도구 사용 요청이다. */
+    ADMIN_TOOL_REQUEST,
+    /** 요청자가 읽는 도구 사용 요청의 결과다. */
+    TOOLSET_REQUEST
 }
