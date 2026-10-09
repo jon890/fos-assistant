@@ -47,6 +47,8 @@ export type SkillDetailView = {
   description: string;
   body: string;
   files: SkillFileView[];
+  /** 이전 버전을 남긴 시각(ISO 문자열)이다. 이전 버전이 없으면 null 이다. */
+  previousSavedAt: string | null;
 };
 
 /**

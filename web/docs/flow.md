@@ -406,6 +406,18 @@ flowchart TD
 | 「올리기」 나 「덮어쓰기」 를 누른다 | 같은 `File` 과 미리보기의 `baseDigest` 로 `POST /api/v1/agents/{code}/skill-packages`. 도는 동안 단추를 끄고 창이 닫히지 않는다. 성공하면 창을 닫고 스킬 목록을 다시 읽는다 |
 | 올리기가 거절됐다 | 창이 남아 까닭을 보인다. `SKILL_CHANGED` 는 파일을 다시 고르라는 안내, `SKILL_SCRIPTS_NEED_SANDBOX` 는 미리보기의 실행 공간 안내와 같은 문구다 |
 
+## 이전 버전 되돌리기 화면
+
+올린 스킬의 편집 화면은 상세 응답의 `previousSavedAt` 이 있을 때만 편집기 위에 「이전 버전: <시각>」 과 「이전 버전으로」 단추를 보인다.
+이전 버전을 언제 남기고 무엇을 맞바꾸는지는 [`backend/docs/flow.md`](../../backend/docs/flow.md) 의 「이전 버전」 이 갖는다.
+
+| 때 | 하는 일 |
+| --- | --- |
+| 「이전 버전으로」 를 누른다 | 확인 창을 연다. 제목은 「이전 버전으로 되돌릴까요?」 이고, 지금 버전과 이전 버전을 맞바꾸며 저장하지 않은 편집은 사라진다고 알린다 |
+| 「되돌리기」 를 누른다 | `POST /api/v1/agents/{code}/skills/{name}/restore-previous`. 도는 동안 단추를 끄고 창이 닫히지 않는다 |
+| 되돌리기가 성공했다 | 창을 닫고 화면을 다시 읽는다. 편집기는 `previousSavedAt` 을 key 로 받아 맞바꾼 내용으로 다시 그려진다 |
+| 되돌리기가 거절됐다 | 창이 남아 까닭을 보인다. `SKILL_NOT_FOUND` 는 「되돌릴 이전 버전이 없어요.」, 나머지는 공용 문구다 |
+
 ## 점검 대화
 
 먼저 살펴보기의 결과가 남는 대화다([`backend/docs/flow.md`](../../backend/docs/flow.md)).
