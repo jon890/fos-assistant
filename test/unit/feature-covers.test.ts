@@ -1,10 +1,10 @@
 import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, readdirSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import test from "node:test";
-import { coveredBy, parseCovers, staleFeatures } from "../../scripts/check-feature-covers.mjs";
+import { coveredBy, coversProblems, parseCovers, staleFeatures } from "../../scripts/check-feature-covers.mjs";
 
 const script = resolve(import.meta.dirname, "../../scripts/check-feature-covers.mjs");
 
@@ -44,6 +44,29 @@ test("coveredBy 는 디렉터리와 파일, glob 경로를 구분해 맞춘다",
   assert.equal(coveredBy("a/x/Other.java", "a/**/Art*"), false);
   assert.equal(coveredBy("a/c.ts", "a/*.ts"), true);
   assert.equal(coveredBy("a/b/c.ts", "a/*.ts"), false);
+});
+
+test("coversProblems 는 covers 가 없는 기능 파일과 추적 파일이 없는 경로를 낸다", () => {
+  const docs = new Map([
+    ["docs/features/chat.md", "# 있는\n\n설명이다.\n\ncovers: `src/있는/`\n\n## 요구\n"],
+    ["docs/features/connector.md", "# 없는\n\n설명이다.\n\n## 요구\n"],
+    ["docs/features/memory.md", "# 낡은\n\n설명이다.\n\ncovers: `src/없는.ts`\n\n## 요구\n"],
+  ]);
+  assert.deepEqual(coversProblems(docs, ["src/있는/file.ts"]), [
+    "docs/features/connector.md: covers 줄이 없다.",
+    "docs/features/memory.md: covers 경로 src/없는.ts와 맞는 추적 파일이 없다.",
+  ]);
+});
+
+test("저장소의 모든 기능 파일 covers 는 추적 파일과 맞는다", () => {
+  const featuresDir = resolve(import.meta.dirname, "../../docs/features");
+  const docs = new Map(
+    readdirSync(featuresDir)
+      .filter((name) => name.endsWith(".md"))
+      .map((name) => [`docs/features/${name}`, readFileSync(join(featuresDir, name), "utf8")]),
+  );
+  const tracked = execFileSync("git", ["ls-files", "-z"], { encoding: "utf8" }).split("\0").filter(Boolean);
+  assert.deepEqual(coversProblems(docs, tracked), []);
 });
 
 test("staleFeatures 는 covers 아래만 바뀌고 기능 파일은 그대로인 기능만 이름 순서로 낸다", () => {

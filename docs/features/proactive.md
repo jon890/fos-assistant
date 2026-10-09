@@ -2,6 +2,8 @@
 
 사용자가 묻지 않아도 에이전트가 사용자의 맥락을 살펴 문제 후보를 찾고, 가치를 평가해 할 행동을 정하는 기능이다.
 
+covers: `backend/src/main/java/com/bifos/assistant/proactive/`, `backend/src/main/java/com/bifos/assistant/task/`, `web/src/components/agent/agent-proactive-*`, `web/src/components/agent/agent-value-evaluation-section.tsx`, `web/src/app/admin/agents/[code]/`, `web/src/lib/proactive-check.ts`, `web/src/lib/value-evaluation.ts`, `hermes/plugins/dashboard-profile-api/profiles.py`
+
 ## 요구
 
 사용자가 모든 기록을 직접 훑은 뒤 묻는 대신, 비서가 지금 봐야 할 것만 골라 보인다.

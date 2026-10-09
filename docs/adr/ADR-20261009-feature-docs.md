@@ -19,16 +19,18 @@
    API 목록, 표와 칸 목록, 커넥터 도구 목록, 설정 값 목록이 여기 든다.
 4. 기능 파일 머리에 다루는 코드 경로를 `covers:` 로 적는다.
    PR 이 그 경로를 바꾸고 기능 파일을 건드리지 않으면 CI 가 경고만 낸다.
-   `covers:` 줄과 그 검사는 이 ADR 을 받은 뒤의 PR 이 넣는다. 처음 옮길 때는 아직 없다.
+   검사는 `scripts/check-feature-covers.mjs` 가 하고 CI 의 unit job 에서 PR 에만 돈다.
 5. 기능 파일은 500줄을 넘으면 알림을 낸다. 실패로 막지 않는다.
 
 `docs/features/` 는 루트에만 둔다. 모듈 아래 `features/` 는 만들지 않는다. 기능은 여러 모듈을 가로지르기 때문이다.
 기능 파일 이름은 소문자 영문과 숫자, 하이픈이다(`agent-skill.md`). `features/` 아래에 하위 디렉터리를 두지 않는다.
 
-세 검사가 이 자리를 지킨다.
+다섯 검사가 이 자리를 지킨다.
 
 - `test/unit/doc-files.test.ts`: `docs/features/` 아래에는 위 이름 규칙에 맞는 `.md` 만 통과한다.
 - `test/unit/doc-code-references.test.ts`: 기능 파일도 백틱으로 적은 코드 이름이 코드에 있는지 본다.
+- `scripts/check-feature-covers.mjs`: covers 경로를 바꾸고 기능 파일을 고치지 않은 PR 에 경고만 낸다.
+- `test/unit/feature-covers.test.ts`: 모든 기능 파일에 covers 가 있고 각 경로가 추적 파일과 맞는지 본다.
 - `scripts/check-file-length.mjs`: 기능 파일이 500줄을 넘으면 `알림:` 을 낸다.
 
 ### 맥락
@@ -50,4 +52,4 @@
 코드 주석과 문서가 기능 파일 이름까지 적어야 한다.
 기능을 다른 파일로 옮기면 참조를 함께 고친다. `doc-references` 테스트가 놓친 참조를 잡는다.
 기능 경계가 애매한 절은 주로 바뀌는 코드가 있는 기능에 둔다.
-처음 옮길 때는 문장을 바꾸지 않아 기능 파일에 API 표 같은 코드 값의 복사본이 남아 있다. 결정 3 에 맞게 줄이는 것은 다음 PR 이 한다.
+코드 값의 복사본은 앞 PR 이 줄였고, 남은 것은 그 기능을 고치는 PR 이 이어 줄인다.

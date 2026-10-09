@@ -80,6 +80,29 @@ export function staleFeatures(changed, features) {
 }
 
 /**
+ * 기능 파일의 covers 줄과 저장소가 추적하는 파일이 서로 맞는지 확인한다.
+ * @param {Map<string, string>} docs 기능 파일 경로와 본문
+ * @param {string[]} tracked 저장소가 추적하는 root 기준 파일 경로
+ * @returns {string[]}
+ */
+export function coversProblems(docs, tracked) {
+  const problems = [];
+  for (const [feature, markdown] of docs) {
+    const covers = parseCovers(markdown);
+    if (!covers.length) {
+      problems.push(`${feature}: covers 줄이 없다.`);
+      continue;
+    }
+    for (const path of covers) {
+      if (!tracked.some((file) => coveredBy(file, path))) {
+        problems.push(`${feature}: covers 경로 ${path}와 맞는 추적 파일이 없다.`);
+      }
+    }
+  }
+  return problems;
+}
+
+/**
  * 경고 문장이다. 바뀐 파일은 처음 셋과 나머지 개수만 적는다.
  * @param {string[]} files
  * @returns {string}
@@ -95,7 +118,7 @@ function escapeCommand(text) {
   return text.replace(/%/g, "%25").replace(/\r/g, "%0D").replace(/\n/g, "%0A");
 }
 
-/** 현재 작업 디렉터리의 `docs/features/*.md` 와 그 covers 경로를 읽는다. */
+/** 현재 작업 디렉터리의 기능 파일과 그 covers 경로를 읽는다. */
 function readFeatures() {
   const features = new Map();
   if (!existsSync(FEATURES_DIR)) return features;

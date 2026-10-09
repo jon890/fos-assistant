@@ -2,6 +2,8 @@
 
 에이전트가 실행할 때 받는 사용자의 기억을 남기고 고르고 보이는 기능이다.
 
+covers: `backend/src/main/java/com/bifos/assistant/memory/`, `web/src/components/memory/`, `web/src/app/memory/`, `web/src/components/chat/memory-*`, `web/src/components/chat/use-memory-*`, `web/src/lib/memory-api.ts`, `web/src/lib/memory-capture-api.ts`, `web/src/lib/memory-use-api.ts`, `hermes/plugins/fos-ctx/`
+
 ## 요구
 
 - Memory 는 에이전트가 실행할 때 `instructions` 로 받는 사실이다. 단일 소스는 Control Plane 데이터베이스이고 Hermes 의 내장 memory 는 쓰지 않는다. 권한은 주입으로 강제한다([ADR-003](../../backend/docs/adr/ADR-003-memory-권한은-주입으로-강제한다.md))

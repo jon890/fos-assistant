@@ -2,6 +2,8 @@
 
 에이전트 실행의 사건과 실행 트리를 기록해 다시 보이고, 한 사용자가 동시에 맡길 수 있는 실행의 수를 한도로 막는 기능이다.
 
+covers: `backend/src/main/java/com/bifos/assistant/orchestration/`, `web/src/components/execution/`, `web/src/app/executions/`, `web/src/lib/usage-api.ts`
+
 ## 요구
 
 - 답을 만드는 동안 에이전트가 무엇을 했는지를 답 위의 블록 하나로 보인다. 도구나 하위 에이전트를 쓴 답 위에 접힌 한 줄이 보이고, 모델 이름과 토큰은 대화에 보이지 않는다.
