@@ -20,7 +20,7 @@ Control Plane(`backend/`) 한 층의 코드가 지키는 결정이다.
 | [ADR-015](ADR-015-memory-는-층을-나눠-싣는다.md) | Memory 는 층을 나눠 싣는다 | Accepted. ADR-003 의 조회 방식을 보완. `always_inject` 칸은 ADR-052 이 `retrieval` 로 넓힌다. 짧은 개인 `SEARCH` 항목의 본문을 싣는 예외는 [ADR-20261008 / memory-facts](../../../docs/adr/ADR-20261008-memory-facts.md) 이 둔다 |
 | [ADR-018](ADR-018-사람을-더하는-것을-control-plane-이-끝낸다.md) | 사람을 더하는 것을 Control Plane 이 끝낸다 | Accepted. 여는 경로를 둘로 한정한다는 서술은 당시의 맥락이다. 첫 로그인의 모델 읽기는 ADR-030 이 대체한다 |
 | [ADR-019](ADR-019-페르소나는-hermes-가-갖고-control-plane-은-화면만-준다.md) | 페르소나는 Hermes 가 갖고 Control Plane 은 화면만 준다 | Accepted. plugin 소유는 ADR-041 이 대체한다 |
-| [ADR-020](ADR-020-사진은-공유-디렉터리에-두고-에이전트가-파일로-읽는다.md) | 사진은 공유 디렉터리에 두고 에이전트가 파일로 읽는다 | Accepted. 저장 경로는 ADR-091 이 사용자별 디렉터리로 바꾼다 |
+| [ADR-020](ADR-020-사진은-공유-디렉터리에-두고-에이전트가-파일로-읽는다.md) | 사진은 공유 디렉터리에 두고 에이전트가 파일로 읽는다 | Accepted. 대화 본문에 사진을 싣지 못한다는 맥락은 [ADR-20261009 / native-image-input](ADR-20261009-native-image-input.md) 이 바꾼다. 저장 경로는 ADR-091 이 사용자별 디렉터리로 바꾼다 |
 | [ADR-021](ADR-021-중지한-답은-멈춘-자리까지-남긴다.md) | 중지한 답은 멈춘 자리까지 남긴다 | Accepted. ADR-008 에 예외를 둔다 |
 | [ADR-028](ADR-028-결과물은-사용자의-대화-폴더에-mcp-도구로-쓴다.md) | 결과물은 사용자의 대화 폴더에 MCP 도구로 쓴다 | Accepted. MCP 토큰이 정한 사용자는 ADR-032 가 대체한다 |
 | [ADR-029](ADR-029-에이전트-도구는-control-plane-이-등급으로-판정하고-hermes-설정-api-로-쓴다.md) | 에이전트 도구는 Control Plane 이 등급으로 판정하고 Hermes 설정 API 로 쓴다 | Accepted. ADR-007 에 더한다. 연결용 에이전트의 도구 목록은 ADR-044 와 ADR-045 가 대체했고, 그 예외 부분은 ADR-083 이 대체한다 |
@@ -66,6 +66,7 @@ Control Plane(`backend/`) 한 층의 코드가 지키는 결정이다.
 | [ADR-20261008 / browser-gateway-token](ADR-20261008-browser-gateway-token.md) | 브라우저 중계의 접근 표식은 바인딩 번호에서 HMAC 으로 만들고 표에 두지 않는다 | Accepted. [ADR-20261007 / user-browser](../../../docs/adr/ADR-20261007-user-browser.md) 의 무작위 표식과 해시 표를 바꾼다 |
 | [ADR-20261008 / conversation-purge](ADR-20261008-conversation-purge.md) | 지운 대화는 정리 작업이 본문과 Hermes session 까지 지우고, 대화 줄과 실행 줄은 본문 없이 남긴다 | Accepted. `docs/backend/schema/README.md` 의 「대화를 지워도 메시지와 Hermes session 은 남긴다」 를 바꾼다 |
 | [ADR-20261008 / data-encryption](ADR-20261008-data-encryption.md) | 사용자 본문은 서버 KEK 로 감싼 사용자별 데이터 key 로 저장할 때 암호화하고, 대화 메시지부터 적용한다 | Accepted. ADR-055 의 암호문 모양과 알고리즘을 그대로 쓴다 |
+| [ADR-20261009 / native-image-input](ADR-20261009-native-image-input.md) | 사진마다 줄인 사본 파일을 원본 옆에 두고, 이번 메시지의 사진은 그 사본을 실행 입력에 직접 싣는다 | Accepted. ADR-020 의 「대화 본문에 사진을 실을 수 없다」 를 바꾼다 |
 
 ## 보관
 

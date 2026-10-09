@@ -7,6 +7,59 @@ import {
   summarizeExecution,
 } from "../../scripts/review-execution-summary.mjs";
 
+test("Draft 는 자동 리뷰를 건너뛰고 Ready 와 일반 PR, 권한 있는 댓글은 리뷰한다", () => {
+  const workflow = readFileSync(
+    ".github/workflows/claude-code-review.yml",
+    "utf8",
+  );
+  assert.match(workflow, /types: \[opened, ready_for_review\]/);
+  const condition = workflow.split("    if: |\n")[1].split("    runs-on:")[0];
+  const evaluate = new Function(
+    "github",
+    "contains",
+    "fromJSON",
+    "startsWith",
+    "format",
+    `return (${condition.replaceAll("\\", "\\\\")});`,
+  );
+  const repository = "example/repo";
+  const eligible = (event_name, event, actor = "human") =>
+    evaluate(
+      { event_name, event, actor, repository },
+      (values, value) => values.includes(value),
+      JSON.parse,
+      (value, prefix) => value.startsWith(prefix),
+      (template, value) => template.replace("{0}", value),
+    );
+  const pr = (draft = false, source = repository) => ({
+    pull_request: { draft, head: { repo: { full_name: source } } },
+  });
+  assert.equal(eligible("pull_request", pr(true)), false);
+  assert.equal(eligible("pull_request", pr()), true);
+  assert.equal(eligible("pull_request", pr(false, "fork/repo")), false);
+  assert.equal(eligible("pull_request", pr(), "dependabot[bot]"), false);
+  assert.equal(eligible("pull_request", pr(), "claude[bot]"), false);
+  const comment = (body, author_association = "OWNER") => ({
+    issue: { pull_request: {} },
+    comment: { body, author_association },
+  });
+  for (const body of [
+    "/review",
+    "/review now",
+    "/review\t",
+    "/review\n",
+    "/review\r",
+  ]) {
+    assert.equal(eligible("issue_comment", comment(body)), true);
+  }
+  assert.equal(eligible("issue_comment", comment("/review", "NONE")), false);
+  assert.equal(eligible("issue_comment", comment("/review-other")), false);
+
+  const ci = readFileSync(".github/workflows/ci.yml", "utf8");
+  assert.match(ci, /types: \[opened, synchronize, reopened\]/);
+  assert.doesNotMatch(ci, /ready_for_review|pull_request\.draft/);
+});
+
 test("실행 진단은 본문과 도구 입력을 제외하고 필요한 값만 남긴다", () => {
   const messages = [
     {

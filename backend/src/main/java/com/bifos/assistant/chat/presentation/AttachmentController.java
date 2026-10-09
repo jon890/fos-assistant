@@ -33,8 +33,7 @@ public class AttachmentController {
     private final ConversationAccess access;
 
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    public AttachmentView upload(
-            @PathVariable UUID conversationId, @RequestParam("file") MultipartFile file) {
+    public AttachmentView upload(@PathVariable UUID conversationId, @RequestParam("file") MultipartFile file) {
         CurrentUser user = currentUser.require();
         ChatAttachment saved = attachments.upload(
                 user,
@@ -43,6 +42,8 @@ public class AttachmentController {
                 file.getContentType(),
                 file.getSize(),
                 file);
+        // 업로드 트랜잭션이 끝난 뒤에 사본을 만든다.
+        attachments.prepareSmall(saved);
         return view(saved);
     }
 
@@ -50,8 +51,7 @@ public class AttachmentController {
     public ResponseEntity<InputStreamResource> read(
             @PathVariable UUID conversationId, @PathVariable Long attachmentId) {
         CurrentUser user = currentUser.require();
-        AttachmentContent content =
-                attachments.read(user, access.requireOwnId(user, conversationId), attachmentId);
+        AttachmentContent content = attachments.read(user, access.requireOwnId(user, conversationId), attachmentId);
         return ResponseEntity.ok()
                 .contentType(MediaType.parseMediaType(content.contentType()))
                 .contentLength(content.byteSize())

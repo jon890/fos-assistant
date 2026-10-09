@@ -2,13 +2,20 @@ import type { AgentView } from "@/lib/agent";
 import { type ModelChoice } from "./model-picker";
 import type { Conversation } from "@/components/shell/conversations-provider";
 import { type ModelTierCode } from "@/lib/model-tiers";
+import type { MessageAttachment } from "./message-types";
+import type { OutgoingMessage } from "./composer-attachment-utils";
 
 export type Props = {
   value: string;
   disabled: boolean;
   onChange(value: string): void;
-  /** 전송이 실제로 끝났는지를 돌려준다. 실패하면 미리보기를 지우지 않는다 */
-  onSend(attachmentIds: number[]): Promise<boolean>;
+  /** 메시지가 받아들여졌는지 돌려준다. 거절되면 내 메시지에서 다시 보낼 수 있게 남긴다. */
+  onSend(
+    attachmentIds: number[],
+    text?: string,
+    attachments?: MessageAttachment[],
+  ): Promise<boolean>;
+  onOutgoingChange(message: OutgoingMessage | null): void;
   /** 대화가 아직 없으면 null. 사진을 고르면 이 값이 없는 채로 첫 사진을 올릴 수 없다 */
   conversationId: string | null;
   agentCode: string;
