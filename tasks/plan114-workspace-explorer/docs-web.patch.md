@@ -1,5 +1,18 @@
+diff --git a/docs/code-architecture.md b/docs/code-architecture.md
+index 620e39b..31cdada 100644
+--- a/docs/code-architecture.md
++++ b/docs/code-architecture.md
+@@ -222,7 +222,7 @@ profile key 와 AI credential 은 계속 홈서버 파일에 둔다.
+ 
+ ## 아직 만들지 않은 것
+ 
+-- 「파일 공간」 화면과 그 web 서버 라우트(`/api/workspace/...`), 실행 공간 파일의 지우기. 경로와 흐름은 위 「실행 공간 파일」 과 [`flow.md`](flow.md) 의 「파일 공간을 열 때」 에 먼저 적었다
++- 실행 공간 파일의 지우기. 화면은 지우기 단추를 그리지 않는다
+ - Hermes 안의 `delegate_task` 하위 에이전트가 자기 실행 줄을 남기는 경로.
+   그 하위 에이전트는 Hermes 안에서만 돌고 사건으로만 보인다.
+   우리 실행 줄이 생기는 자식은 `agent_delegate`, 흐름의 하위 실행, Memory 제안이다.
 diff --git a/docs/frontend/shell.md b/docs/frontend/shell.md
-index 08eea1d9..4c871667 100644
+index 08eea1d..4c87166 100644
 --- a/docs/frontend/shell.md
 +++ b/docs/frontend/shell.md
 @@ -152,6 +152,9 @@ ChatGPT 의 배치를 따른다. 위쪽 가로 메뉴를 두지 않고 왼쪽 
@@ -29,7 +42,7 @@ index 08eea1d9..4c871667 100644
  전에는 메뉴와 이름이 한 덩어리였고 줄어들지 않아, 가로로 돌린 전화기나 키보드가 올라온 화면에서 아래쪽이 화면 밖으로 잘렸다.
  관리자 입구가 그 줄에 있으므로 이 줄만은 늘 보이게 한다.
 diff --git a/docs/frontend/structure.md b/docs/frontend/structure.md
-index 72cca3b9..606af2d0 100644
+index 72cca3b..b666ab5 100644
 --- a/docs/frontend/structure.md
 +++ b/docs/frontend/structure.md
 @@ -22,7 +22,8 @@

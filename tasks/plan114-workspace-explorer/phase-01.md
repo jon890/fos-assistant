@@ -223,7 +223,7 @@ scripts/check-local.sh --skip-browser
 ```
 
 - 첫 줄의 세 묶음이 모두 통과한다. `WorkspaceTreeTest` 의 링크, 하드 링크, 특수 파일 검사가 Linux CI 에서 건너뛰지 않는다.
-- `git grep -n "assistant.sandbox-workspace" backend/src/main/resources/application.yml` 이 한 줄 이상이다.
+- `git grep -n "sandbox-workspace:" backend/src/main/resources/application.yml` 이 한 줄 이상이다.
 
 ## 변경 파일
 

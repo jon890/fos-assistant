@@ -1,5 +1,5 @@
 diff --git a/docs/backend/packages.md b/docs/backend/packages.md
-index 1491801a..5206b13d 100644
+index 1cef514..ca4347f 100644
 --- a/docs/backend/packages.md
 +++ b/docs/backend/packages.md
 @@ -38,7 +38,7 @@ Control Plane 의 패키지마다 맡는 책임과 패키지 사이의 방향 
@@ -21,18 +21,18 @@ index 1491801a..5206b13d 100644
  
  ### proactive
 diff --git a/docs/code-architecture.md b/docs/code-architecture.md
-index 4497f584..50f61430 100644
+index dff8f2a..c365555 100644
 --- a/docs/code-architecture.md
 +++ b/docs/code-architecture.md
-@@ -142,6 +142,7 @@ Memory 의 기본 근거는 [`adr/ADR-003-memory-권한은-주입으로-강제
+@@ -145,6 +145,7 @@ Memory 의 기본 근거는 [`adr/ADR-003-memory-권한은-주입으로-강제
  | `GET /api/v1/workspace/files/{경로}` | 미리보기 본문 | 아래 「본문 머리글」. 경로의 조각마다 URL 인코딩한다 |
  | `GET /api/v1/workspace/files/{경로}?download=1` | 내려받기 | 크기 상한 없이 스트림으로 준다 |
  | `DELETE /api/v1/workspace/entries?path=` | 지우기 | 아래 「지우기」 |
 +| `GET /api/v1/admin/workspaces` | 사용자별 용량. `ADMIN` 만 | 아래 「관리자 용량」 |
  
- 본문 경로의 오류는 아래와 같다.
+ 본문 경로의 오류는 아래와 같다. 루트 확인(503), 경로 검사(400) 다음에, 미리보기는 확장자(415), 크기(413), 종류(404), 읽기 권한(403) 차례로 판정한다. 내려받기는 종류와 읽기 권한만 본다.
  
-@@ -223,6 +224,16 @@ Control Plane 은 경로 규칙을 먼저 검사하고 읽기 마운트에서 
+@@ -229,6 +230,16 @@ Control Plane 은 경로 규칙을 먼저 검사하고 읽기 마운트에서 
  - 요청마다 시각, 주인 키, 경로, 종류, 지운 항목 수, 결과를 감사 기록 한 줄로 남긴다. 파일 본문은 읽지도 남기지도 않는다
  - 실행 공간 루트만 쓰기로 붙이고, 지우는 데 필요한 권한만 갖는다
  
@@ -50,7 +50,7 @@ index 4497f584..50f61430 100644
  
  테스트는 확인하는 대상을 나눠 둔다.
 diff --git a/docs/frontend/shell.md b/docs/frontend/shell.md
-index 4c871667..ace0f28d 100644
+index 4c87166..ace0f28 100644
 --- a/docs/frontend/shell.md
 +++ b/docs/frontend/shell.md
 @@ -238,7 +238,7 @@ ChatGPT 의 배치를 따른다. 위쪽 가로 메뉴를 두지 않고 왼쪽 
@@ -63,7 +63,7 @@ index 4c871667..ace0f28d 100644
  
  **「사용 화면으로 돌아가기」 는 마지막으로 보던 대화로 간다.**
 diff --git a/docs/frontend/structure.md b/docs/frontend/structure.md
-index 642123e5..bc1afeef 100644
+index 1c3687d..35cd361 100644
 --- a/docs/frontend/structure.md
 +++ b/docs/frontend/structure.md
 @@ -37,6 +37,7 @@
@@ -83,7 +83,7 @@ index 642123e5..bc1afeef 100644
  대화 화면도 같다. 작업 과정의 「원본 보기」, 모델이 바뀌었다는 표시, 오류 코드는 일반 화면에 그리지 않는다.
  실패한 실행의 원인은 `/admin/usage` 의 실행 기록에서 그 실행을 열어 본다.
 diff --git a/docs/prd.md b/docs/prd.md
-index dd8c0b48..8998775b 100644
+index dd8c0b4..8998775 100644
 --- a/docs/prd.md
 +++ b/docs/prd.md
 @@ -67,6 +67,7 @@

@@ -1,5 +1,5 @@
 diff --git a/docs/README.md b/docs/README.md
-index 7223b8bb..55f02874 100644
+index 7223b8b..55f0287 100644
 --- a/docs/README.md
 +++ b/docs/README.md
 @@ -10,8 +10,8 @@ frontend 는 화면의 동작과 구조이고, hermes 는 외부 런타임인 He
@@ -14,7 +14,7 @@ index 7223b8bb..55f02874 100644
  | [`connector-authoring.md`](connector-authoring.md) | 범용 커넥터를 만드는 방법, 갖출 것, PR 에 필요한 것, 공통 검사 |
  | [`connectors/gmail.md`](connectors/gmail.md) | Gmail 커넥터의 도구와 정책, 보안, 설정 안내, 실제 계정 확인 |
 diff --git a/docs/backend/packages.md b/docs/backend/packages.md
-index 577c49e1..1491801a 100644
+index f0e179f..1cef514 100644
 --- a/docs/backend/packages.md
 +++ b/docs/backend/packages.md
 @@ -38,7 +38,7 @@ Control Plane 의 패키지마다 맡는 책임과 패키지 사이의 방향 
@@ -27,19 +27,19 @@ index 577c49e1..1491801a 100644
  검사: `ArchitectureRules.SHARED_DOES_NOT_DEPEND_ON_DOMAINS`
  
 diff --git a/docs/code-architecture.md b/docs/code-architecture.md
-index c8900099..4497f584 100644
+index 31cdada..dff8f2a 100644
 --- a/docs/code-architecture.md
 +++ b/docs/code-architecture.md
 @@ -99,7 +99,7 @@ Memory 의 기본 근거는 [`adr/ADR-003-memory-권한은-주입으로-강제
  | 키 | 환경 변수 | 비었을 때 |
  | --- | --- | --- |
- | `assistant.sandbox-workspace.root` | `ASSISTANT_SANDBOX_WORKSPACE_ROOT` | 기동한다. 모든 경로가 `WORKSPACE_UNAVAILABLE` 이고 상태 조회는 `available: false` 다 |
+ | `assistant.sandbox-workspace.root` | `ASSISTANT_SANDBOX_WORKSPACE_ROOT` | 기동한다. 상태 조회 밖의 모든 경로가 503 `WORKSPACE_UNAVAILABLE` 이고 상태 조회는 `available: false` 다 |
 -| `assistant.sandbox-workspace.delete-socket` | `ASSISTANT_SANDBOX_WORKSPACE_DELETE_SOCKET` | 기동한다. 상태 조회의 `deletable` 이 거짓이고 화면은 지우기를 열지 않는다 |
 +| `assistant.sandbox-workspace.delete-socket` | `ASSISTANT_SANDBOX_WORKSPACE_DELETE_SOCKET` | 기동한다. 지우기가 `WORKSPACE_DELETE_UNAVAILABLE` 이고 상태 조회는 `deletable: false` 다 |
  
  `root` 는 실행 공간 정책의 `workspace_root` 와 같은 디렉터리를 Control Plane 에서 본 경로다. 읽기 전용으로 붙인다.
- 붙이는 일은 `fos-home-infra` 가 한다. 루트가 디렉터리가 아니어도 `WORKSPACE_UNAVAILABLE` 이다.
-@@ -129,7 +129,7 @@ Memory 의 기본 근거는 [`adr/ADR-003-memory-권한은-주입으로-강제
+ 붙이는 일은 `fos-home-infra` 가 한다. 루트가 링크가 아닌 디렉터리가 아니어도 `WORKSPACE_UNAVAILABLE` 이다.
+@@ -132,7 +132,7 @@ Memory 의 기본 근거는 [`adr/ADR-003-memory-권한은-주입으로-강제
  | `OTHER` | FIFO, 소켓, 장치 | 주지 않는다 |
  
  `readable` 이 거짓이면 화면은 「읽을 수 없음」 을 보인다. 권한이 없는 파일, 하드 링크가 둘 이상인 파일, `LINK`, `OTHER` 가 그렇다.
@@ -48,15 +48,15 @@ index c8900099..4497f584 100644
  
  ### API
  
-@@ -141,6 +141,7 @@ Memory 의 기본 근거는 [`adr/ADR-003-memory-권한은-주입으로-강제
- | `GET /api/v1/workspace/entries?path=` | 디렉터리 하나의 목록 | `{path, entries: [{name, kind, size, modifiedAt, readable, openable}], truncated}`. 디렉터리를 먼저, 그다음 이름 순서다. 1,000 줄까지 주고 더 있으면 `truncated` 가 참이다. `size` 는 `FILE` 만 채운다. 사용자 디렉터리가 아직 없으면 빈 목록이다 |
+@@ -144,6 +144,7 @@ Memory 의 기본 근거는 [`adr/ADR-003-memory-권한은-주입으로-강제
+ | `GET /api/v1/workspace/entries?path=` | 디렉터리 하나의 목록 | `{path, entries: [{name, kind, size, modifiedAt, readable, openable}], truncated}`. 디렉터리를 읽는 순서로 1,001개까지 읽고, 그 가운데 1,000개를 디렉터리 먼저, 이름 순서로 준다. 1,001번째가 있으면 `truncated` 가 참이고, 그때는 순서상 앞선 항목도 빠질 수 있다. `size` 는 `FILE` 만 채운다. 사용자 디렉터리가 아직 없으면 빈 목록이다 |
  | `GET /api/v1/workspace/files/{경로}` | 미리보기 본문 | 아래 「본문 머리글」. 경로의 조각마다 URL 인코딩한다 |
  | `GET /api/v1/workspace/files/{경로}?download=1` | 내려받기 | 크기 상한 없이 스트림으로 준다 |
 +| `DELETE /api/v1/workspace/entries?path=` | 지우기 | 아래 「지우기」 |
  
- 본문 경로의 오류는 아래와 같다.
+ 본문 경로의 오류는 아래와 같다. 루트 확인(503), 경로 검사(400) 다음에, 미리보기는 확장자(415), 크기(413), 종류(404), 읽기 권한(403) 차례로 판정한다. 내려받기는 종류와 읽기 권한만 본다.
  
-@@ -180,9 +181,48 @@ HTML 이 상대 경로로 부르는 CSS 와 사진은 같은 `files/` 아래 주
+@@ -186,9 +187,48 @@ HTML 이 상대 경로로 부르는 CSS 와 사진은 같은 `files/` 아래 주
  
  ### 로그와 기록
  
@@ -106,8 +106,16 @@ index c8900099..4497f584 100644
  ## 화면을 검증하는 방법
  
  테스트는 확인하는 대상을 나눠 둔다.
+@@ -222,7 +262,6 @@ profile key 와 AI credential 은 계속 홈서버 파일에 둔다.
+ 
+ ## 아직 만들지 않은 것
+ 
+-- 실행 공간 파일의 지우기. 화면은 지우기 단추를 그리지 않는다
+ - Hermes 안의 `delegate_task` 하위 에이전트가 자기 실행 줄을 남기는 경로.
+   그 하위 에이전트는 Hermes 안에서만 돌고 사건으로만 보인다.
+   우리 실행 줄이 생기는 자식은 `agent_delegate`, 흐름의 하위 실행, Memory 제안이다.
 diff --git a/docs/flow.md b/docs/flow.md
-index 47a48863..472f7fbc 100644
+index 47a4886..472f7fb 100644
 --- a/docs/flow.md
 +++ b/docs/flow.md
 @@ -485,4 +485,28 @@ sequenceDiagram
@@ -140,7 +148,7 @@ index 47a48863..472f7fbc 100644
 +두 탭에서 같은 것을 지우면 늦은 쪽은 404 를 받고 목록을 다시 읽는다.
  목록을 연 사이 에이전트가 파일을 바꾸면 다음 읽기에 보인다. 화면은 스스로 다시 읽지 않는다.
 diff --git a/docs/frontend/structure.md b/docs/frontend/structure.md
-index 606af2d0..642123e5 100644
+index b666ab5..1c3687d 100644
 --- a/docs/frontend/structure.md
 +++ b/docs/frontend/structure.md
 @@ -23,7 +23,7 @@
@@ -172,3 +180,15 @@ index 606af2d0..642123e5 100644
  ## 꺼진 사용자의 세션
  
  관리자가 끈 사용자가 세션을 가진 채 요청하면 Control Plane 이 401 과 `ACCESS_REVOKED` 로 답한다.
+diff --git a/docs/self-hosting.md b/docs/self-hosting.md
+index 23c15a5..d672e8a 100644
+--- a/docs/self-hosting.md
++++ b/docs/self-hosting.md
+@@ -55,6 +55,7 @@ Hermes 에 설치하는 묶음과 그때 받는 값은 [`hermes/README.md`](../h
+ | `ASSISTANT_ARTIFACT_ROOT` | Backend | 에이전트가 만든 결과물 파일을 두는 디렉터리. Control Plane 이 읽고 오래된 것을 지운다. 비면 기동이 실패한다 |
+ | `ASSISTANT_ARTIFACT_AGENT_ROOT` | Backend | 같은 디렉터리를 Hermes 컨테이너에서 보는 경로. 실행 입력에 적는다. 비면 기동이 실패한다 |
+ | `ASSISTANT_SANDBOX_WORKSPACE_ROOT` | Backend | 셸 실행 공간 정책의 `workspace_root` 를 Control Plane 에서 본 경로. 읽기 전용으로 붙인다. 비면 「파일 공간」 을 쓸 수 없다고 보이고 기동은 한다([`code-architecture.md`](code-architecture.md) 의 「실행 공간 파일」) |
++| `ASSISTANT_SANDBOX_WORKSPACE_DELETE_SOCKET` | Backend | 실행 공간 파일을 지우는 권한 도우미의 unix socket 경로. 비면 지우기를 열지 않는다 |
+ | `ASSISTANT_SKILL_ROOT` | Backend | 에이전트에 올린 스킬을 profile 별 버전 디렉터리로 두는 디렉터리. Control Plane 이 쓴다. 비면 기동이 실패한다 |
+ | `ASSISTANT_SKILL_AGENT_ROOT` | Backend | 같은 디렉터리를 Hermes 컨테이너에서 읽기 전용으로 보는 경로. `skills.external_dirs` 에 적는다. 비면 기동이 실패한다 |
+ | `ASSISTANT_SKILL_MAX_PER_AGENT` | Backend | 에이전트 하나에 올릴 수 있는 스킬 수. 기본 30. 새 스킬을 만들 때만 본다 |
