@@ -27,6 +27,7 @@ from .connector_schema import (
     BIND_MODE,
     CONNECTOR_STATE,
     OWNER_ATTACHMENTS_VALUE_RE,
+    OWNER_BROWSER_VALUE_RE,
     OWNER_OUTPUT_VALUE_RE,
 )
 
@@ -103,7 +104,8 @@ def _skills_with_index_marker(skills_config) -> dict | None:
 
 def _connector_bind_config(profile_dir: pathlib.Path, plugin: str, enabled: bool,
                            vault: str | None = None, values: dict | None = None,
-                           owner_attachments: str | None = None, owner_output: str | None = None) -> dict:
+                           owner_attachments: str | None = None, owner_output: str | None = None,
+                           owner_browser: str | None = None) -> dict:
     """일반 에이전트의 profile 에 커넥터를 붙이거나 뗀다. 실패하면 같은 요청 안에서 이 요청이 쓴 파일만 되돌린다.
 
     붙이기는 보관 파일의 값(`values`)을 그 profile `.env` 에 쓰고, 서버를 더하고, API 도구 목록에 서버 이름을 더하고,
@@ -126,6 +128,7 @@ def _connector_bind_config(profile_dir: pathlib.Path, plugin: str, enabled: bool
     다시 설치할 때마다 받은 주인의 값으로 다시 쓴다(ADR-20261007 connector-owner-attachments).
     manifest 가 `owner_output_env` 를 선언했으면 `owner_output` 을 그 이름으로 넣는다. 없거나 모양이 틀리면 빈 값이다.
     떼기는 설정을 다 쓴 뒤 설치했던 그 출력 디렉터리를 지운다(ADR-20261008 connector-output-files).
+    manifest 가 `owner_browser_env` 를 선언했으면 `owner_browser`(그 바인딩의 중계 주소)를 그 이름으로 넣는다. 없거나 모양이 틀리면 빈 값이다(ADR-20261008 browser-gateway-token).
     """
     import yaml
     if profile_dir.resolve() != profile_dir:
@@ -225,6 +228,12 @@ def _connector_bind_config(profile_dir: pathlib.Path, plugin: str, enabled: bool
             # 출력 디렉터리가 없어도 붙이기는 막지 않는다. 빈 값을 받은 커넥터는 파일 출력만 거절한다.
             server["env"][manifest["owner_output_env"]] = (
                 owner_output if isinstance(owner_output, str) and OWNER_OUTPUT_VALUE_RE.fullmatch(owner_output) else "")
+        if manifest["owner_browser_env"] is not None:
+            # 중계가 꺼져 주소가 없어도 붙이기는 막지 않는다. 빈 값을 받은 커넥터는 브라우저에 닿지 못한다고 답한다.
+            # 같은 바인딩은 늘 같은 주소를 받으므로 다시 설치해도 서버 정의가 바뀌지 않는다.
+            server["env"][manifest["owner_browser_env"]] = (
+                owner_browser if isinstance(owner_browser, str) and OWNER_BROWSER_VALUE_RE.fullmatch(owner_browser)
+                else "")
         # 바꾸기 전의 정의다. gateway 는 같은 이름의 서버를 다시 연결하지 않으므로 정의가 바뀌면 재시작해야 한다.
         previous = servers.get(name)
         servers[name] = server

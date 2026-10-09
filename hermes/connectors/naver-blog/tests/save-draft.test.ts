@@ -6,7 +6,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { inputFile, readState, stateFile } from "../src/jobs.ts";
 import { createServer, type ServerDeps } from "../src/server.ts";
-import type { Env } from "../src/session.ts";
+import { type Env, sessionStatus } from "../src/session.ts";
 import { FakeCdp, upstreamText } from "./fake-cdp.ts";
 
 /** 같은 작업 프로세스를 가짜 `runDraft` 로 돌리는 시험 전용 진입 파일. */
@@ -50,7 +50,7 @@ async function setup({
   cleanups.push(() => rm(jobDir, { recursive: true, force: true }));
   await writeFile(join(photoDir, "101.jpg"), photo);
   const env: Env = {
-    NAVER_BLOG_CDP_URL: cdp.url,
+    NAVER_BLOG_BROWSER_URL: cdp.url,
     NAVER_BLOG_ID: "example-blog",
     NAVER_BLOG_ATTACHMENT_DIR: attachmentDir,
     NAVER_BLOG_JOB_DIR: jobDir,
@@ -65,7 +65,7 @@ async function setup({
   cleanups.push(() => server.close());
   cleanups.push(() => client.close());
 
-  /** 도구를 부르고, 결과 글에 CDP 주소와 사진 디렉터리, 브라우저 원문이 없는지 함께 본다. */
+  /** 도구를 부르고, 결과 글에 중계 주소와 사진 디렉터리, 브라우저 원문이 없는지 함께 본다. */
   const call = async (name: string, args: Record<string, unknown>) => {
     const result = await client.callTool({ name, arguments: args });
     const text = (result.content as Array<{ text: string }>)[0]?.text ?? "";
@@ -124,6 +124,25 @@ test("save_draft 는 다른 프로세스 묶음의 작업 프로세스를 띄우
     `${started.body.job_id}.finished`,
     `${started.body.job_id}.json`,
   ]);
+});
+
+test("save_draft 는 중계가 꺼진 브라우저를 켤 시간을 두어 45초 제한으로 로그인을 확인한다", async () => {
+  const timeouts: Array<number | undefined> = [];
+  const { call, draft } = await setup({
+    deps: {
+      workerEntry: FAKE_WORKER_ENTRY,
+      checkSession: (env, options) => {
+        timeouts.push(options?.timeoutMs);
+        return sessionStatus(env, options);
+      },
+    },
+  });
+
+  const started = await call("save_draft", draft);
+
+  expect(started.isError).toBe(false);
+  expect(timeouts).toEqual([45_000]);
+  await call("draft_job", { job_id: started.body.job_id, wait_seconds: 4 });
 });
 
 test("로그인 쿠키가 없으면 작업을 만들지 않고 NAVER_BLOG_LOGIN_REQUIRED 다", async () => {

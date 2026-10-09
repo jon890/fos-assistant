@@ -8,13 +8,21 @@ export type CdpHandler = (params: any, target: string) => unknown;
 
 type SocketData = { target: string };
 
+/** 바인딩 표식을 실은 중계 주소의 경로. 서명 자리는 시험용 16진수 64자다. */
+export const GATEWAY_PATH = `/internal/browser-gateway/b1.${"ab".repeat(32)}`;
+
 /**
- * 실제 Chrome 대신 디버깅 HTTP 창구와 WebSocket 명령에 답하는 대역이다.
+ * 실제 Chrome 대신 Control Plane 중계처럼 디버깅 HTTP 창구와 WebSocket 명령에 답하는 대역이다.
+ * 경로는 중계 주소의 경로(`prefix`) 아래만 받고, 중계처럼 `Origin` 머리가 있는 요청을 403 으로 거절한다.
  * 받은 CDP 메서드를 기록하고, 허용 목록 밖의 메서드는 위반으로 남긴다.
  */
 export class FakeCdp {
   readonly calls: CdpCall[] = [];
+  /** 접두사를 뗀 요청. `GET /json/version` 모양이다. */
   readonly httpRequests: string[] = [];
+  /** 접두사를 포함한 요청 경로. WebSocket 연결 요청도 든다. */
+  readonly paths: string[] = [];
+  /** WebSocket 연결 요청마다 받은 `Origin` 머리. 없으면 빈 글이다. */
   readonly origins: string[] = [];
   readonly violations: string[] = [];
   /** `/json/new` 로 연 주소. */
@@ -28,6 +36,8 @@ export class FakeCdp {
   private readonly targets = new Map<string, string>();
   private readonly sockets = new Map<string, ServerWebSocket<SocketData>>();
   private nextTarget = 1;
+  /** 중계 주소의 경로. 끝 `/` 가 없다. */
+  readonly prefix = GATEWAY_PATH;
   readonly server: ReturnType<typeof Bun.serve<SocketData, never>>;
 
   constructor({ allowed = ["Storage.getCookies"] }: { allowed?: string[] } = {}) {
@@ -45,9 +55,9 @@ export class FakeCdp {
     });
   }
 
-  /** 시험이 연결 칸에 넣을 주소. 포트는 시험마다 운영체제가 고른다. */
+  /** 시험이 중계 주소 env 에 넣을 주소. 포트는 시험마다 운영체제가 고른다. */
   get url() {
-    return `http://${this.server.hostname}:${this.server.port}`;
+    return `http://${this.server.hostname}:${this.server.port}${this.prefix}`;
   }
 
   /** 메서드마다 답을 정한다. 처리 함수가 던지면 CDP 오류로 답한다. */
@@ -82,27 +92,30 @@ export class FakeCdp {
 
   private http(request: Request, server: Bun.Server<SocketData>) {
     const url = new URL(request.url);
-    this.httpRequests.push(`${request.method} ${url.pathname}`);
-    const socketPath = /^\/devtools\/(browser|page)\/([A-Za-z0-9-]+)$/.exec(
-      url.pathname,
-    );
+    this.paths.push(url.pathname);
+    if (!url.pathname.startsWith(`${this.prefix}/`)) {
+      this.violations.push(`HTTP ${request.method} ${url.pathname}`);
+      return new Response(null, { status: 404 });
+    }
+    const pathname = url.pathname.slice(this.prefix.length);
+    this.httpRequests.push(`${request.method} ${pathname}`);
+    const socketPath = /^\/devtools\/(browser|page)\/([A-Za-z0-9-]+)$/.exec(pathname);
     if (socketPath) {
       this.origins.push(request.headers.get("origin") ?? "");
-      if (request.headers.get("origin") !== `http://localhost:${server.port}`)
-        return new Response("origin rejected", { status: 403 });
+      if (request.headers.has("origin")) return new Response(null, { status: 403 });
       if (server.upgrade(request, { data: { target: `${socketPath[1]}/${socketPath[2]}` } }))
         return undefined;
       return new Response("upgrade failed", { status: 400 });
     }
     if (this.hangHttp) return new Promise<Response>(() => {});
-    const base = `ws://${this.server.hostname}:${this.server.port}`;
-    if (request.method === "GET" && url.pathname === "/json/version")
+    const base = `ws://${this.server.hostname}:${this.server.port}${this.prefix}`;
+    if (request.method === "GET" && pathname === "/json/version")
       return Response.json({
         Browser: "Chrome/0.0.0.0",
         webSocketDebuggerUrl:
           this.debuggerUrl ?? `${base}/devtools/browser/fake-browser`,
       });
-    if (request.method === "GET" && url.pathname === "/json/list")
+    if (request.method === "GET" && pathname === "/json/list")
       return Response.json(
         [...this.targets].map(([id, page]) => ({
           id,
@@ -111,7 +124,7 @@ export class FakeCdp {
           webSocketDebuggerUrl: `${base}/devtools/page/${id}`,
         })),
       );
-    if (request.method === "PUT" && url.pathname === "/json/new") {
+    if (request.method === "PUT" && pathname === "/json/new") {
       const id = `page-${this.nextTarget++}`;
       const page = decodeURIComponent(url.search.slice(1));
       this.opened.push(page);
@@ -123,12 +136,12 @@ export class FakeCdp {
         webSocketDebuggerUrl: `${base}/devtools/page/${id}`,
       });
     }
-    const close = /^\/json\/close\/([A-Za-z0-9-]+)$/.exec(url.pathname);
+    const close = /^\/json\/close\/([A-Za-z0-9-]+)$/.exec(pathname);
     if (request.method === "GET" && close) {
       this.targets.delete(close[1]!);
       return new Response("Target is closing");
     }
-    this.violations.push(`HTTP ${request.method} ${url.pathname}`);
+    this.violations.push(`HTTP ${request.method} ${pathname}`);
     return new Response(upstreamText, { status: 404 });
   }
 
@@ -154,10 +167,10 @@ export class FakeCdp {
   }
 }
 
-/** 이미 닫힌 포트의 주소. 띄웠다 닫아 운영체제가 고른 포트를 쓴다. */
+/** 이미 닫힌 포트의 중계 주소. 띄웠다 닫아 운영체제가 고른 포트를 쓴다. */
 export function closedPortUrl() {
   const server = Bun.serve({ hostname: "127.0.0.1", port: 0, fetch: () => new Response("") });
-  const url = `http://${server.hostname}:${server.port}`;
+  const url = `http://${server.hostname}:${server.port}${GATEWAY_PATH}`;
   server.stop(true);
   return url;
 }

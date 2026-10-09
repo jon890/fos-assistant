@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { ErrorNotice, LoginNotice } from "@/components/connector/browser-login";
 import { ConnectorAgentChooser } from "@/components/connector/connector-agent-chooser";
 import { BoundAgents } from "@/components/connector/connector-bound-agents";
 import { ConnectorHeading } from "@/components/connector/connector-identity";
@@ -22,6 +23,7 @@ import {
   readConnection,
   readOptions,
   registerConnection,
+  type ConnectionFailure,
   type ConnectorConnection,
   type ConnectorField,
   type ConnectorOption,
@@ -62,7 +64,7 @@ export function ConnectorConnectionPanel({
   const [values, setValues] = useState<Record<string, string>>({});
   const [options, setOptions] = useState<Record<string, ConnectorOption[]>>({});
   const [pending, setPending] = useState<Pending>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | ConnectionFailure | null>(null);
   const [chooser, setChooser] = useState<Chooser>("auto");
   const [justConnected, setJustConnected] = useState(false);
   const busy = pending !== null;
@@ -97,6 +99,7 @@ export function ConnectorConnectionPanel({
   const available = connector?.available === true;
   const fields = available ? connector.fields : [];
   const title = connector?.title ?? id;
+  const loginUrl = connector?.ownerBrowserLoginUrl;
   const secretsFilled = fields
     .filter((field) => field.secret)
     .every((field) => values[field.key]?.trim());
@@ -175,7 +178,7 @@ export function ConnectorConnectionPanel({
     setError(null);
     const result = await registerConnection(id, submitted);
     setPending(null);
-    if (!result.ok) return setError(result.message);
+    if (!result.ok) return setError(result);
     showConnected(result.data);
   }
 
@@ -234,7 +237,7 @@ export function ConnectorConnectionPanel({
       return setError("값을 다시 입력해 연결해 주세요.");
     }
     setPending(null);
-    if (!result.ok) return setError(result.message);
+    if (!result.ok) return setError(kind === "check" ? result : result.message);
     if (kind === "check") showConnected(result.data);
     else setLoaded({ kind: "ready", connector, connection: result.data });
   }
@@ -319,6 +322,7 @@ export function ConnectorConnectionPanel({
           ) : null}
           {available ? (
             <form onSubmit={save} className="space-y-3">
+              <LoginNotice url={loginUrl} />
               {fields.map((field) => (
                 <div key={field.key} className="space-y-2">
                   <Label htmlFor={`connector-field-${field.key}`}>
@@ -426,11 +430,7 @@ export function ConnectorConnectionPanel({
               연결 해제
             </Button>
           ) : null}
-          {error ? (
-            <Notice variant="error" role="alert">
-              {error}
-            </Notice>
-          ) : null}
+          <ErrorNotice error={error} loginUrl={loginUrl} />
         </CardContent>
       </Card>
     </div>

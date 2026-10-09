@@ -4,10 +4,11 @@ import { expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { createServer, isSupportedBunVersion } from "../src/server.ts";
-import { BLOG_ID_PATTERN, CDP_URL_PATTERN } from "../src/session.ts";
+import { BLOG_ID_PATTERN, BROWSER_URL_PATTERN } from "../src/session.ts";
 
 const root = join(import.meta.dir, "..");
 const manifest = JSON.parse(readFileSync(join(root, "connector.json"), "utf8"));
+const CONNECTOR_SCHEMA = join(root, "../../plugins/dashboard-profile-api/connector_schema.py");
 
 async function listTools() {
   const client = new Client({ name: "naver-blog-test", version: "1.0.0" });
@@ -33,8 +34,23 @@ test("서버가 다시 검사하는 정규식은 연결 칸의 정규식과 같�
   const pattern = (key: string) =>
     new RegExp(manifest.fields.find((field: { key: string }) => field.key === key).pattern).source;
 
-  expect(CDP_URL_PATTERN.source).toBe(pattern("cdp_url"));
   expect(BLOG_ID_PATTERN.source).toBe(pattern("blog_id"));
+});
+
+test("중계 주소 정규식은 대시보드가 설치할 때 쓰는 OWNER_BROWSER_VALUE_RE 와 같은 식이다", () => {
+  const schema = readFileSync(CONNECTOR_SCHEMA, "utf8");
+  const declared = /^OWNER_BROWSER_VALUE_RE = re\.compile\(r"(.+)"\)$/m.exec(schema)?.[1];
+  // JS 의 source 는 `/` 를 `\/` 로 적는다. 그 이스케이프만 풀어 Python 글과 견준다.
+  const ours = BROWSER_URL_PATTERN.source.replaceAll("\\/", "/");
+
+  expect(declared).toBeDefined();
+  expect(ours).toBe(declared!);
+});
+
+test("중계 주소 env 와 로그인 안내 주소를 선언하고 연결 칸에는 블로그 아이디만 둔다", () => {
+  expect(manifest.owner_browser_env).toBe("NAVER_BLOG_BROWSER_URL");
+  expect(manifest.owner_browser_login_url).toBe("https://nid.naver.com/nidlogin.login");
+  expect(manifest.fields.map((field: { key: string }) => field.key)).toEqual(["blog_id"]);
 });
 
 test("manifest 도구 선언은 MCP 서버 도구와 정확히 같다", async () => {

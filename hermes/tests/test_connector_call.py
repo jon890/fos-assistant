@@ -29,6 +29,8 @@ SLOW_TOKEN = "demo_slow_0123456789"
 # 시험 도구가 `errors` 표에서 `outcome_unknown` 인 코드로 끝나게 하는 토큰이다.
 LOST_TOKEN = "demo_lost_0123456789"
 SCOPES = {"scopes": [{"id": "a", "name": "A"}]}
+# 확인 호출이 받는 중계 주소의 모양이다. `<gateway-base-url>/<호출 표식>` 이다.
+CALL_ADDRESS = "http://cp.example.test/internal/browser-gateway/u1.1700000300." + "c" * 64
 UNAVAILABLE = (200, {"ok": False, "error": "unavailable"})
 INVALID = (200, {"ok": False, "error": "invalid_input"})
 # 대시보드 프로세스에만 있어야 하는 값이다. 서비스 토큰과 다른 커넥터의 값 구실이다. 자식에게 넘어가면 안 된다.
@@ -242,6 +244,46 @@ class ConnectorCallTest(base.ConnectorGateCase):
         self.assertEqual(status, 200)
         self.assertTrue(body["ok"], body)
         self.assertEqual(body["result"]["output"], "")
+
+    def test_child_receives_the_callers_relay_address(self):
+        """브라우저 중계 주소를 선언한 커넥터의 확인 도구는 요청의 `owner_browser` 를 그 env 로 받는다. 모양이 틀리거나 없으면 빈 값이다(ADR-20261008 browser-gateway-token)."""
+        self.rewrite("connector.json", lambda value: value.update(
+            verify={"tool": "env_view"}, owner_browser_env="DEMO_BROWSER_URL"))
+        self.rewrite(".mcp.json", lambda value: value["mcpServers"]["demo"]["env"].update(
+            DEMO_BROWSER_URL="${DEMO_BROWSER_URL}"))
+        self.store_vault("c1", token=OK_TOKEN)
+        for label, body, expected in (
+            ("values", {"tool": "env_view", "values": {"token": OK_TOKEN}, "owner_browser": CALL_ADDRESS},
+             CALL_ADDRESS),
+            ("vault", {"tool": "env_view", "vault": "c1", "owner_browser": CALL_ADDRESS}, CALL_ADDRESS),
+            ("malformed", {"tool": "env_view", "vault": "c1", "owner_browser": "file:///etc/passwd"}, ""),
+            ("not a string", {"tool": "env_view", "vault": "c1", "owner_browser": 1}, ""),
+            ("missing", {"tool": "env_view", "vault": "c1"}, ""),
+        ):
+            with self.subTest(label):
+                # 대시보드 프로세스에 같은 이름이 있어도 자식에게 가지 않는다.
+                with mock.patch.dict(os.environ, {"DEMO_BROWSER_URL": "http://parent.example.test/gw/x"}):
+                    status, answer = self.request(CALL, "POST", body)
+                self.assertEqual(status, 200, answer)
+                self.assertTrue(answer["ok"], answer)
+                self.assertEqual(answer["result"]["browser"], expected)
+
+    def test_connector_without_the_declaration_ignores_the_relay_address(self):
+        """선언하지 않은 커넥터는 `owner_browser` 를 받아도 자식에게 넘기지 않는다."""
+        self.rewrite("connector.json", lambda value: value.update(verify={"tool": "env_view"}))
+        status, body = self.request(CALL, "POST", {"tool": "env_view", "values": {"token": OK_TOKEN},
+                                                   "owner_browser": CALL_ADDRESS})
+        self.assertEqual(status, 200, body)
+        self.assertTrue(body["ok"], body)
+        self.assertNotIn("DEMO_BROWSER_URL", body["result"]["names"])
+        self.assertIsNone(body["result"]["browser"])
+
+    def test_vault_keys_the_manifest_no_longer_declares_are_dropped(self):
+        """보관 파일의 키 가운데 지금 칸에 없는 것은 버리고 부른다. 후보 값의 모르는 칸은 그대로 invalid_input 이다."""
+        self.store_vault("c5", token=OK_TOKEN, retired="old-value")
+        self.assertEqual(self.request(CALL, "POST", {"tool": "list_scopes", "vault": "c5"}),
+                         (200, {"ok": True, "result": SCOPES}))
+        self.assertEqual(self.call(retired="old-value"), INVALID)
 
     def test_fifth_concurrent_call_is_refused_without_waiting(self):
         """이미 4개가 돌고 있으면 다섯 번째는 기다리지 않고 unavailable 이고, 자리가 나면 다시 받는다."""

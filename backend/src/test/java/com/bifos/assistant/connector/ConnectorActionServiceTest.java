@@ -8,6 +8,7 @@ import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.nullable;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -1217,7 +1218,7 @@ class ConnectorActionServiceTest {
     void registeringAgainRejectsPendingActionsAndRevokesGrants() {
         when(connector.putConnector(anyString(), anyString(), anyBoolean(), anyString()))
                 .thenReturn(new InstallResult(false, false));
-        when(connector.call(anyString(), anyString(), anyMap()))
+        when(connector.call(anyString(), anyString(), anyMap(), nullable(String.class)))
                 .thenReturn(CallResult.success(JSON.readTree("{\"scopes\":[]}")));
         service.approve(me, ask(WRITE, ARGS).actionId(), GrantPeriod.DAYS_30);
         UUID waiting = ask("send_note", ARGS).actionId();
@@ -1239,7 +1240,7 @@ class ConnectorActionServiceTest {
     @Test
     @DisplayName("승인한 호출이 실행되는 동안 값을 다시 등록하면 CONNECTOR_ACTION_EXECUTING 이고 env 를 바꾸지 않는다")
     void registeringWhileAnApprovedCallExecutesIsRefused() throws Exception {
-        when(connector.call(anyString(), anyString(), anyMap()))
+        when(connector.call(anyString(), anyString(), anyMap(), nullable(String.class)))
                 .thenReturn(CallResult.success(JSON.readTree("{\"scopes\":[]}")));
         UUID actionId = ask(WRITE, ARGS).actionId();
         CountDownLatch executing = new CountDownLatch(1);
@@ -1278,7 +1279,7 @@ class ConnectorActionServiceTest {
     void registeringAfterTheApprovedCallFinishedIsAccepted() {
         when(connector.putConnector(anyString(), anyString(), anyBoolean(), anyString()))
                 .thenReturn(new InstallResult(false, false));
-        when(connector.call(anyString(), anyString(), anyMap()))
+        when(connector.call(anyString(), anyString(), anyMap(), nullable(String.class)))
                 .thenReturn(CallResult.success(JSON.readTree("{\"scopes\":[]}")));
         service.approve(me, ask(WRITE, ARGS).actionId(), null);
 
@@ -1304,7 +1305,7 @@ class ConnectorActionServiceTest {
     void staleExecutionBecomesUnknown() {
         when(connector.putConnector(anyString(), anyString(), anyBoolean(), anyString()))
                 .thenReturn(new InstallResult(false, false));
-        when(connector.call(anyString(), anyString(), anyMap()))
+        when(connector.call(anyString(), anyString(), anyMap(), nullable(String.class)))
                 .thenReturn(CallResult.success(JSON.readTree("{\"scopes\":[]}")));
         ask(WRITE, ARGS);
         Instant decided = Instant.parse("2026-10-01T00:00:00Z");

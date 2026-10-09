@@ -138,7 +138,8 @@ class ConnectorCatalogTest(ConnectorGateCase):
         self.assertEqual(len(body), 1)
         entry = body[0]
         self.assertEqual(set(entry), {"id", "schema", "title", "description", "icon", "link", "fields", "verify",
-                                      "mcp_server", "toolsets", "attachments", "single_binding", "tools", "skills"})
+                                      "mcp_server", "toolsets", "attachments", "single_binding", "owner_browser",
+                                      "owner_browser_login_url", "tools", "skills"})
         # `icon` 과 `link` 를 선언하지 않은 커넥터는 두 칸이 null 이다.
         self.assertIsNone(entry["icon"])
         self.assertIsNone(entry["link"])
@@ -573,6 +574,110 @@ class ConnectorOwnerOutputTest(ConnectorGateCase):
                 self.assertIsNone(self.plugin._connector_manifest(DEMO))
                 for name, data in originals.items():
                     (self.connector_root / name).write_bytes(data)
+
+
+class ConnectorOwnerBrowserTest(ConnectorGateCase):
+    """사용자 브라우저를 쓰는 커넥터가 `owner_browser_env` 와 로그인 안내 주소를 선언하는 규칙을 검사한다(ADR-20261008 browser-gateway-token)."""
+
+    NAME = "DEMO_BROWSER_URL"
+    LOGIN = "https://login.example.test/sign-in"
+    ADDRESS = "http://cp.example.test/internal/browser-gateway/b1." + "a" * 64
+
+    def declare(self, name=NAME, reference=None, **extra):
+        self.rewrite("connector.json", lambda value: value.update(owner_browser_env=name, **extra))
+        self.rewrite(".mcp.json", lambda value: value["mcpServers"]["demo"]["env"].update(
+            {name if isinstance(name, str) else self.NAME: reference or "${%s}" % name}))
+
+    def test_declaration_reaches_the_manifest_and_the_catalog_shows_only_the_flag(self):
+        """바른 선언은 manifest 에 담기고 서버 정의의 값은 빈 글이다. 카탈로그는 사용 여부와 로그인 주소만 내고 env 이름은 내지 않는다."""
+        manifest = self.plugin._connector_manifest(DEMO)
+        self.assertIsNone(manifest["owner_browser_env"])
+        self.assertIsNone(manifest["owner_browser_login_url"])
+        entry = self.catalog()[0]
+        self.assertIs(entry["owner_browser"], False)
+        self.assertIsNone(entry["owner_browser_login_url"])
+
+        self.declare(owner_browser_login_url=self.LOGIN)
+
+        manifest = self.plugin._connector_manifest(DEMO)
+        self.assertEqual(manifest["owner_browser_env"], self.NAME)
+        self.assertEqual(manifest["owner_browser_login_url"], self.LOGIN)
+        self.assertEqual(manifest["server"]["env"][self.NAME], "")
+        body = self.catalog()
+        self.assertEqual([entry["id"] for entry in body], [DEMO])
+        self.assertIs(body[0]["owner_browser"], True)
+        self.assertEqual(body[0]["owner_browser_login_url"], self.LOGIN)
+        self.assertNotIn(self.NAME, json.dumps(body))
+        self.assertNotIn("owner_browser_env", body[0])
+
+    def test_declaration_without_a_login_url_is_accepted(self):
+        """로그인 안내 주소는 선택이다. 없으면 카탈로그에 null 로 낸다."""
+        self.declare()
+        self.assertEqual(self.plugin._connector_manifest(DEMO)["owner_browser_env"], self.NAME)
+        self.assertIsNone(self.catalog()[0]["owner_browser_login_url"])
+
+    def test_invalid_declaration_leaves_the_connector_out(self):
+        """선언이 다른 env 와 겹치거나, `.mcp.json` 에 없거나, 로그인 주소가 틀리면 카탈로그에서 빠진다."""
+        originals = {name: (self.connector_root / name).read_bytes() for name in ("connector.json", ".mcp.json")}
+
+        def same_as_output():
+            self.rewrite("connector.json", lambda value: value.update(owner_output_env=self.NAME))
+            self.declare()
+
+        def same_as_attachments():
+            self.rewrite("connector.json", lambda value: value.update(owner_attachments_env=self.NAME))
+            self.declare()
+
+        cases = (
+            ("overlaps a field env", lambda: self.rewrite(
+                "connector.json", lambda value: value.update(owner_browser_env="DEMO_TOKEN"))),
+            ("overlaps an operator env", lambda: self.rewrite(
+                "connector.json", lambda value: value.update(owner_browser_env="DEMO_BASE"))),
+            ("overlaps owner_output_env", same_as_output),
+            ("overlaps owner_attachments_env", same_as_attachments),
+            ("missing from .mcp.json", lambda: self.rewrite(
+                "connector.json", lambda value: value.update(owner_browser_env=self.NAME))),
+            ("lower case name", lambda: self.declare("demo_browser_url")),
+            ("not a string", lambda: self.declare(["DEMO_BROWSER_URL"])),
+            ("a base key", lambda: self.declare("API_SERVER_KEY")),
+            ("server env is a literal address", lambda: self.declare(reference=self.ADDRESS)),
+            ("login url over http", lambda: self.declare(owner_browser_login_url="http://login.example.test/")),
+            ("login url with a space", lambda: self.declare(owner_browser_login_url="https://login.example.test/a b")),
+            ("login url with a control character",
+             lambda: self.declare(owner_browser_login_url="https://login.example.test/\x7f")),
+            ("login url over 512 characters",
+             lambda: self.declare(owner_browser_login_url="https://login.example.test/" + "a" * 486)),
+            ("login url not a string", lambda: self.declare(owner_browser_login_url=["https://login.example.test/"])),
+            ("login url without the env", lambda: self.rewrite(
+                "connector.json", lambda value: value.update(owner_browser_login_url=self.LOGIN))),
+        )
+        for label, change in cases:
+            with self.subTest(label):
+                change()
+                self.assertEqual(self.catalog(), [])
+                self.assertIsNone(self.plugin._connector_manifest(DEMO))
+                for name, data in originals.items():
+                    (self.connector_root / name).write_bytes(data)
+        # 512자는 받는다. 위의 513자 거절이 길이 때문이었음을 확인한다.
+        self.declare(owner_browser_login_url="https://login.example.test/" + "a" * 485)
+        self.assertEqual(len(self.plugin._connector_manifest(DEMO)["owner_browser_login_url"]), 512)
+
+    def test_installed_value_matches_when_empty_or_shaped_like_a_relay_address(self):
+        """설치 기록의 값은 빈 값이거나 중계 주소 모양이면 지금 manifest 와 같다고 본다. 참조나 다른 모양은 다르다."""
+        self.declare()
+        manifest = self.plugin._connector_manifest(DEMO)
+        for label, value, expected in (
+            ("empty", "", True),
+            ("relay address", self.ADDRESS, True),
+            ("https relay with a port", "https://cp.example.test:8443/gw/u1.2." + "b" * 64, True),
+            ("profile env reference", "${DEMO_BROWSER_URL}", False),
+            ("websocket scheme", "ws://cp.example.test/gw/b1", False),
+            ("no path", "http://cp.example.test", False),
+            ("trailing newline", self.ADDRESS + "\n", False),
+        ):
+            with self.subTest(label):
+                server = {**manifest["server"], "env": {**manifest["server"]["env"], self.NAME: value}}
+                self.assertIs(self.plugin._server_matches(manifest, server), expected)
 
 
 class ConnectorFieldlessAndSkillTest(ConnectorGateCase):
