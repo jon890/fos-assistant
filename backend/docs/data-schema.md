@@ -1149,6 +1149,7 @@ V47 이전 판으로 되돌린 동안 옛 코드가 쓴 줄은 다시 올리기 
 
 | 옛 경로 | 지금 자리 |
 | --- | --- |
+| `docs/backend/schema/README.md` | 이 파일의 머리와 「마이그레이션 작성 규칙」 |
 | `docs/backend/schema/attention.md` | 이 파일 「할 일과 먼저 알리기 표」 |
 | `docs/backend/schema/browser.md` | 이 파일 「사용자 브라우저 표」 |
 | `docs/backend/schema/chat.md` | 이 파일 「대화 표」 |
