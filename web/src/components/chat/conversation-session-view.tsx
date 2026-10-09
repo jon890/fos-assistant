@@ -42,6 +42,8 @@ export function ConversationSessionView({
   pending,
   pendingBusy,
   draft,
+  outgoing,
+  setOutgoing,
   setDraft,
   conversationIdRef,
   refresh,
@@ -158,6 +160,7 @@ export function ConversationSessionView({
         {startScreen ? null : (
           <MessageList
             turns={turns}
+            outgoing={outgoing}
             loading={messagesLoading}
             sending={sending}
             activity={activity}
@@ -278,7 +281,10 @@ export function ConversationSessionView({
           <Composer
             value={draft}
             onChange={setDraft}
-            onSend={(attachmentIds) => submit(attachmentIds)}
+            onSend={(attachmentIds, text, attachments) =>
+              submit(attachmentIds, text, attachments)
+            }
+            onOutgoingChange={setOutgoing}
             disabled={conversationId === null && agents.length === 0}
             conversationId={conversationId}
             agentCode={agentMissing ? "" : agentCode}
