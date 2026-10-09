@@ -21,7 +21,7 @@
 | env | 선언 | 값 |
 | --- | --- | --- |
 | `NAVER_BLOG_ATTACHMENT_DIR` | `owner_attachments_env` | 바인딩 설치가 그 에이전트 주인의 첨부 디렉터리를 넣는다([ADR-20261007 / connector-owner-attachments](../adr/ADR-20261007-connector-owner-attachments.md)) |
-| `NAVER_BLOG_BROWSER_URL` | `owner_browser_env` | 주인의 「내 브라우저」 로 가는 Control Plane 중계 주소다. 바인딩 설치는 그 바인딩의 표식 주소를, 확인 도구 호출은 요청자의 호출 표식 주소를 넣는다. 중계가 꺼졌으면 빈 값이다([ADR-20261008 / browser-gateway-token](../adr/ADR-20261008-browser-gateway-token.md)) |
+| `NAVER_BLOG_BROWSER_URL` | `owner_browser_env` | 주인의 「내 브라우저」 로 가는 Control Plane 중계 주소다. 바인딩 설치는 그 바인딩의 표식 주소를, 확인 도구 호출은 요청자의 호출 표식 주소를 넣는다. 중계가 꺼졌으면 빈 값이다([ADR-20261008 / browser-gateway-token](../../backend/docs/adr/ADR-20261008-browser-gateway-token.md)) |
 
 커넥터는 중계 주소를 Chrome 의 CDP 주소처럼 부른다. 중계 계약은 [사용자 브라우저](../backend/user-browser.md) 의 「중계」 가 갖는다.
 `connector.json` 의 `owner_browser_login_url` 은 네이버 로그인 화면 주소다. 연결 화면이 그 주소를 「내 브라우저에서 로그인」 링크로 연다.
@@ -232,7 +232,7 @@ CDP 는 Bun 의 WebSocket 으로 직접 부르고 브라우저 자동화 라이�
 
 ### 기존 연결 옮기기
 
-브라우저 연결 주소 칸이 없어졌다. 자동으로 옮기는 코드는 없다. 까닭은 [ADR-20261007 / user-browser](../adr/ADR-20261007-user-browser.md) 의 「네이버 블로그 이행」 이 갖는다.
+브라우저 연결 주소 칸이 없어졌다. 자동으로 옮기는 코드는 없다. 까닭은 [ADR-20261007 / user-browser](../adr/ADR-20261007-user-browser.md) 의 「네이버 블로그 이행(2026-10-08 추가)」 이 갖는다.
 보관 파일에 남은 옛 `cdp_url` 값은 대시보드가 읽을 때 버려 쓰이지 않고, 사용자가 블로그 아이디를 다시 등록하면 보관 파일이 새로 쓰여 사라진다.
 
 1. 배포 뒤 사용자는 「내 브라우저」 에서 네이버에 로그인하고 「연결」 화면에서 연결 확인을 한 번 누른다

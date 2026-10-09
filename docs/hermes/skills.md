@@ -109,7 +109,7 @@ prompt cache 가 붙지 않아서가 아니라 이 API 가 보고하지 않기 �
 - API server 는 gateway 의 명령 처리와 `pre_gateway_dispatch` hook 을 거치지 않는다. `/<스킬> 할 일` 이 평문으로 모델에 간다
 - API server 실행은 `platform="api_server"` 로 묶여 `skill_view` 와 색인이 `skills.platform_disabled.api_server` 를 적용받는다
 
-그래서 웹 입력창의 스킬 커맨드는 Control Plane 이 해석한다. 결정은 [ADR-035](../adr/ADR-035-대화창의-스킬-커맨드는-control-plane-이-해석해-hermes-에-넘긴다.md) 에 있다.
+그래서 웹 입력창의 스킬 커맨드는 Control Plane 이 해석한다. 결정은 [ADR-035](../../backend/docs/adr/ADR-035-대화창의-스킬-커맨드는-control-plane-이-해석해-hermes-에-넘긴다.md) 에 있다.
 Control Plane 이 「`skill_view` 로 읽고 따르라」는 입력으로 바꿔 보내면 아래 조건이 걸린다.
 
 | 조건 | 까닭 |

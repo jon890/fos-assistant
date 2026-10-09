@@ -14,9 +14,9 @@ Control Plane 의 패키지마다 맡는 책임과 패키지 사이의 방향 �
 | --- | --- |
 | `shared/auth` | 토큰 검사와 현재 사용자, profile 토큰 필터의 타입, 토큰의 주소를 현재 사용자로 바꾸는 port |
 | `shared/error` | 오류 코드와 응답 형태 |
-| `shared/config` | 시계, 스케줄링, 보안 필터 설정, 실행 중에 쓰는 설정을 읽는 `LiveProperties`([ADR-20261007 / live-properties](../adr/ADR-20261007-live-properties.md)). 그 빈을 만드는 `LivePropertiesConfig` 는 기능 패키지의 설정을 가져오므로 루트 패키지에 둔다 |
+| `shared/config` | 시계, 스케줄링, 보안 필터 설정, 실행 중에 쓰는 설정을 읽는 `LiveProperties`([ADR-20261007 / live-properties](../../backend/docs/adr/ADR-20261007-live-properties.md)). 그 빈을 만드는 `LivePropertiesConfig` 는 기능 패키지의 설정을 가져오므로 루트 패키지에 둔다 |
 | `shared/util` | 외부 서비스의 글을 감싸는 함수와 문자열 지문, 에이전트가 만든 파일에 붙이는 `Content-Security-Policy` 값(`SandboxedContentPolicy`) |
-| `shared/concurrent` | 요청 밖 작업을 띄우는 `BackgroundTasks`. 직접 가상 스레드를 띄우지 않는 까닭은 [ADR-20261007 / background-tasks](../adr/ADR-20261007-background-tasks.md) |
+| `shared/concurrent` | 요청 밖 작업을 띄우는 `BackgroundTasks`. 직접 가상 스레드를 띄우지 않는 까닭은 [ADR-20261007 / background-tasks](../../backend/docs/adr/ADR-20261007-background-tasks.md) |
 | `shared/domain/type` | 모든 패키지가 권한 판정에 읽는 역할 값 |
 | `user` | 사용자와 첫 로그인 처리 |
 | `browser` | 사용자마다 하나씩 두는 브라우저의 상태와 전이, 브라우저 proxy 로 컨테이너 켜기와 끄기, 자동 중지와 상태 맞추기, 브라우저 중계의 접근 표식과 HTTP 창구, WebSocket([`user-browser.md`](user-browser.md)) |
@@ -86,7 +86,7 @@ Control Plane 의 패키지마다 맡는 책임과 패키지 사이의 방향 �
 거꾸로 써야 하면 아래 패키지에 port 를 두고 위 패키지가 구현한다.
 새 최상위 패키지를 만들면 이 순서의 자리를 정하고 `TopLevelPackageOrder.ORDER` 에 넣는다.
 `shared` 는 순서 밖이고 어느 패키지도 쓰지 않는다.
-`crypto` 는 맨 아래다. 사용자별 데이터 key 와 KEK 를 갖고, 본문을 저장하는 패키지가 `crypto.domain` 의 `TextCipher` 로 암호화한다. 메시지 저장은 `infra` 에서 일어나 port 를 `application` 이 아니라 `domain` 에 둔다([ADR-20261008 / data-encryption](../adr/ADR-20261008-data-encryption.md)).
+`crypto` 는 맨 아래다. 사용자별 데이터 key 와 KEK 를 갖고, 본문을 저장하는 패키지가 `crypto.domain` 의 `TextCipher` 로 암호화한다. 메시지 저장은 `infra` 에서 일어나 port 를 `application` 이 아니라 `domain` 에 둔다([ADR-20261008 / data-encryption](../../backend/docs/adr/ADR-20261008-data-encryption.md)).
 `task` 는 `attention` 바로 아래다. 예약 turn 을 열려고 `chat` 을, 에이전트와 주인을 다시 확인하려고 `agent` 와 `user` 를, 결과를 알리려고 `notification` 을 쓴다. 대화 목록이 작업 이름을 보이려고 `chat` 에 port(`ConversationTaskLabels`)를 두고 `task` 가 구현한다.
 `followup` 은 `chat` 바로 위다. 대화 주인을 확인하고 공개 식별자를 얻으려고 `chat` 을 쓰고, 제안 도구(`mcp`)와 먼저 알리기(`attention`)가 `followup` 을 쓴다.
 `browser` 는 `user` 바로 위다. 관리자 목록의 사용자 이름을 읽으려고 `user` 를 쓰고, 사용자를 끈 사건(`shared.auth.UserAccessRevoked`)을 받는다. 커넥터 바인딩이 브라우저 중계를 쓰게 되므로 `connector` 보다 아래에 둔다. 중계가 바인딩 표식의 주인을 찾으려고 `browser` 에 port(`BrowserGrantOwners`)를 두고 `connector` 가 구현한다.
@@ -112,7 +112,7 @@ Control Plane 의 패키지마다 맡는 책임과 패키지 사이의 방향 �
 
 `connector`는 커넥터 카탈로그와 사용자별 연결의 등록, 확인, 해제와 비밀값을 제외한 상태를 소유한다.
 연결을 에이전트에 붙이고 떼는 바인딩(`agent_connector_binding`)과 관리자 반영 완료도 이 패키지가 갖는다. `ConnectorConnectionService` 가 연결을, `ConnectorBindingService` 가 바인딩을 맡는다([ADR-083](../adr/ADR-083-커넥터는-사용자가-한-번-연결하고-자기-에이전트에-여럿-붙여-그-에이전트가-도구를-직접-부른다.md)).
-특정 서비스의 이름, 주소, env 이름, 토큰 형식을 코드에 두지 않는다. 모두 대시보드 plugin 이 내는 manifest 에서 온다([ADR-043](../adr/ADR-043-커넥터는-plugin-의-connector-json-으로-선언하고-control-plane-은-범용-흐름만-갖는다.md)).
+특정 서비스의 이름, 주소, env 이름, 토큰 형식을 코드에 두지 않는다. 모두 대시보드 plugin 이 내는 manifest 에서 온다([ADR-043](../../backend/docs/adr/ADR-043-커넥터는-plugin-의-connector-json-으로-선언하고-control-plane-은-범용-흐름만-갖는다.md)).
 카탈로그, 도구 호출, 설치, env, MCP probe 는 `hermes`의 `HermesConnectorClient` 가 HTTP로 호출한다.
 `connector.application` 의 `ConnectorCallLimiter` 가 선택지 조회, 등록, 연결 확인을 사용자별로 제한한다. 한도는 `ConnectorProperties`(`assistant.connector`)가 갖고 상태는 JVM 메모리에 둔다. Control Plane 이 한 대라는 전제다.
 `agent` 가 바인딩을 알아야 하는 자리는 `agent.application` 에 둔 port 둘로 부른다. `connector` 가 `agent` 보다 위라서다.
@@ -122,13 +122,13 @@ Control Plane 의 패키지마다 맡는 책임과 패키지 사이의 방향 �
 | `AgentConnectorBindings` | `hasBindings`, `connectorServers`, `connectorToolPrefixes`. 저장한 바인딩만 읽고 대시보드를 부르지 않는다 | `ConnectorBindingLookup` | 공개 범위 변경과 관리자 수정(비공개 유지), 도구 저장과 스킬 게시(붙은 서버 이름을 함께 보낸다), 실행 기록의 도구 내용 가림, 먼저 살펴보기의 시작 전 점검과 지시 |
 | `AgentConnectorDetacher` | `detachAll`. 그 에이전트의 바인딩을 모두 뗀다 | `ConnectorBindingService` | 에이전트 지우기 |
 
-옛 커넥터 에이전트가 남아 있는 동안 그 실행에는 Memory 문맥을 주지 않는다. `ChatService` 와 `AgentRunner` 가 `Agent.connectorManaged()` 를 보고 빈 문맥으로 돌린다. `AgentMemoryCollectionService` 도 옛 커넥터 에이전트에 받는 collection 을 주지 않는다. `McpCallerResolver` 는 origin 실행의 에이전트가 옛 커넥터 에이전트이면 Control Plane MCP 호출을 거절한다([ADR-045](../adr/ADR-045-커넥터-에이전트는-자기-mcp-서버만-받고-memory-와-control-plane-도구를-받지-않는다.md)). 연결을 붙인 일반 에이전트에는 이 경계가 걸리지 않는다.
+옛 커넥터 에이전트가 남아 있는 동안 그 실행에는 Memory 문맥을 주지 않는다. `ChatService` 와 `AgentRunner` 가 `Agent.connectorManaged()` 를 보고 빈 문맥으로 돌린다. `AgentMemoryCollectionService` 도 옛 커넥터 에이전트에 받는 collection 을 주지 않는다. `McpCallerResolver` 는 origin 실행의 에이전트가 옛 커넥터 에이전트이면 Control Plane MCP 호출을 거절한다([ADR-045](../../backend/docs/adr/ADR-045-커넥터-에이전트는-자기-mcp-서버만-받고-memory-와-control-plane-도구를-받지-않는다.md)). 연결을 붙인 일반 에이전트에는 이 경계가 걸리지 않는다.
 웹은 `components/connector`와 `app/connections`, `app/connections/[id]`, 대응 서버 라우트가 맡는다. 입력 칸은 manifest 의 `fields` 로 그린다.
 `test/unit/connector-neutral.test.ts` 가 `backend/src/main` 과 `web/src` 와 `hermes/plugins` 에 특정 서비스 이름이 들어오지 않았는지 본다.
 예외는 셋이다. 옛 표를 만든 V36 과 그 행을 옮기는 V38 은 이관 기록이라 이름을 갖는다. `web/src/app/connections/accountbook/page.tsx` 는 전용 화면이 있던 옛 주소를 새 연결 화면으로 넘기려고 커넥터 번호를 갖는다. 이 페이지는 옛 주소로 들어오는 사용자가 없어지면 지운다.
 계약은 [커넥터 연결](../connectors.md)에 있다.
 
-`connector` 는 커넥터 도구 호출의 판정과 그 기록도 소유한다([ADR-049](../adr/ADR-049-커넥터-도구-호출은-profile-plugin-의-hook-이-control-plane-에-물어-판정한다.md)).
+`connector` 는 커넥터 도구 호출의 판정과 그 기록도 소유한다([ADR-049](../../backend/docs/adr/ADR-049-커넥터-도구-호출은-profile-plugin-의-hook-이-control-plane-에-물어-판정한다.md)).
 
 | 클래스 | 하는 일 |
 | --- | --- |
@@ -184,7 +184,7 @@ Hermes `delegate_task` 가 만든 native 자식은 실행 줄이 없어 `subagen
 
 환산은 이 자리에서 한 번만 하고 쓴 가격표를 함께 적는다.
 조회할 때 다시 계산하면 가격이 바뀔 때 지난달 합계가 따라 움직인다.
-근거는 [`adr/ADR-004-구독제에서도-api-가격으로-환산해-보인다.md`](../adr/ADR-004-구독제에서도-api-가격으로-환산해-보인다.md) 에 있다.
+근거는 [`adr/ADR-004-구독제에서도-api-가격으로-환산해-보인다.md`](../../backend/docs/adr/ADR-004-구독제에서도-api-가격으로-환산해-보인다.md) 에 있다.
 
 ## 가격표
 

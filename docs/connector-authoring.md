@@ -1,7 +1,7 @@
 # 커넥터 만들기
 
 이 저장소가 유지보수하는 범용 커넥터를 만들고 PR 로 올리는 방법이다.
-어떤 커넥터를 여기 두는지와 그 근거는 [ADR-064](adr/ADR-064-범용-커넥터는-이-저장소의-hermes-connectors-에-두고-저장소가-유지보수한다.md) 가 갖는다.
+어떤 커넥터를 여기 두는지와 그 근거는 [ADR-064](../hermes/docs/adr/ADR-064-범용-커넥터는-이-저장소의-hermes-connectors-에-두고-저장소가-유지보수한다.md) 가 갖는다.
 `connector.json` 의 형식은 [커넥터 연결](connectors.md) 이, 위험도와 승인은 [커넥터 도구 정책](backend/connector-tool-policy.md) 이 갖는다.
 따라 할 본보기는 [`hermes/connectors/gmail/`](../hermes/connectors/gmail) 이고 그 문서는 [Gmail 커넥터](connectors/gmail.md) 다.
 
@@ -89,7 +89,7 @@ docs/connectors/<id>.md                 도구와 정책, 보안, 설정 안내,
 
 ### 계산할 목록을 파일로 내는 커넥터
 
-합계와 통계는 집계 도구를 따로 만들지 않는다. 목록 도구가 기간 전체를 파일로 쓰고, 모델이 `execute_code` 스크립트로 그 파일을 읽어 계산한다([ADR-20261008 / connector-output-files](adr/ADR-20261008-connector-output-files.md)).
+합계와 통계는 집계 도구를 따로 만들지 않는다. 목록 도구가 기간 전체를 파일로 쓰고, 모델이 `execute_code` 스크립트로 그 파일을 읽어 계산한다([ADR-20261008 / connector-output-files](../hermes/docs/adr/ADR-20261008-connector-output-files.md)).
 스크립트는 커넥터 도구를 부르지 못하고, 모델이 받은 목록을 코드에 옮겨 적으면 토큰이 늘고 옮기다 틀리기 때문이다.
 
 - `owner_output_env` 에 env 이름 하나를 선언한다. 값은 바인딩 설치가 넣는 디렉터리다. 그 디렉터리는 그 에이전트의 실행 공간에 같은 경로로 읽기 전용으로 붙는다
@@ -104,7 +104,7 @@ docs/connectors/<id>.md                 도구와 정책, 보안, 설정 안내,
 
 ### 사용자 브라우저를 쓰는 커넥터
 
-사용자가 로그인해 둔 브라우저로 서비스를 다루는 커넥터는 `owner_browser_env` 에 env 이름 하나를 선언하고, 그 env 의 주소를 Chrome 의 CDP 주소처럼 부른다([ADR-20261008 / browser-gateway-token](adr/ADR-20261008-browser-gateway-token.md)).
+사용자가 로그인해 둔 브라우저로 서비스를 다루는 커넥터는 `owner_browser_env` 에 env 이름 하나를 선언하고, 그 env 의 주소를 Chrome 의 CDP 주소처럼 부른다([ADR-20261008 / browser-gateway-token](../backend/docs/adr/ADR-20261008-browser-gateway-token.md)).
 커넥터는 브라우저 주소를 직접 받지 않는다. 값은 Control Plane 의 중계 주소이고, 중계가 그 주소의 표식으로 어느 사용자의 브라우저인지 고른다.
 
 - 바인딩 설치는 그 바인딩의 표식 주소를 넣는다. 같은 바인딩은 늘 같은 주소라 다시 설치해도 서버 정의가 바뀌지 않는다

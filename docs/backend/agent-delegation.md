@@ -4,7 +4,7 @@ Hermes 가 Control Plane MCP 의 `agent_list`, `agent_delegate`, `agent_status`,
 이 파일은 그 네 도구의 계약과 위임 실행의 시작과 조회와 중지, 끝난 결과가 부모 대화에 도착하는 흐름을 갖는다.
 요청자를 정하는 앞부분과 하위 에이전트 session 등록은 [`mcp-caller.md`](mcp-caller.md) 가 갖는다.
 하위 에이전트가 `agent_delegate` 를 부르면 새 FOS 자식의 `parent_execution_id` 는 그 하위 에이전트의 origin 실행이다. 하위 에이전트 몫의 실행 줄은 만들지 않는다.
-결정은 [ADR-017](../adr/ADR-017-무엇을-할지는-hermes-가-정하고-control-plane-은-경계만-갖는다.md), [ADR-031](../adr/ADR-031-mcp-호출의-부모-실행은-profile-플러그인이-서명한-루트-session-으로-잇는다.md), [ADR-032](../adr/ADR-032-mcp-토큰은-profile-을-증명하고-실제-사용자는-부모-실행에서-정한다.md) 에 있다.
+결정은 [ADR-017](../adr/ADR-017-무엇을-할지는-hermes-가-정하고-control-plane-은-경계만-갖는다.md), [ADR-031](../../backend/docs/adr/ADR-031-mcp-호출의-부모-실행은-profile-플러그인이-서명한-루트-session-으로-잇는다.md), [ADR-032](../../backend/docs/adr/ADR-032-mcp-토큰은-profile-을-증명하고-실제-사용자는-부모-실행에서-정한다.md) 에 있다.
 
 ## 도구 계약
 
@@ -12,7 +12,7 @@ Hermes 가 Control Plane MCP 의 `agent_list`, `agent_delegate`, `agent_status`,
 | --- | --- | --- |
 | `agent_list` | 없다 | `[{"code":"...","name":"..."}]` 를 글로 준다 |
 | `agent_delegate` | `agent_code`, `task` 문자열 둘만 | 제출까지만 기다린 뒤 `{"execution_id":123,"status":"RUNNING"}` 을 준다. 거절하면 `{"code":"...","message":"..."}` 를 준다. 코드는 `AGENT_UNAVAILABLE`(없거나 쓸 수 없음), `AGENT_DISABLED`, `DEPTH_EXCEEDED`, `TOO_MANY_CHILDREN`, `BUSY`, `SUBMIT_FAILED`, `CHECK_TARGET`, `CHECK_LIMIT` 여덟이다. 뒤의 둘은 먼저 살펴보기에서만 나온다 |
-| `agent_status` | `execution_id` 정수 하나, 선택 `wait_seconds` 정수 | `{"execution_id":123,"status":"SUCCEEDED","output":"..."}` 처럼 준다. `wait_seconds` 를 주면 먼저 살펴보기 트리에서만 그 실행이 끝나기를 그 초만큼 기다린 뒤 답한다. 0 부터 `assistant.delegation.status-wait-max`(기본 20초)까지 받고 넘으면 그 값으로 줄인다. 살펴보기 트리가 아니면 받되 기다리지 않는다([ADR-040](../adr/ADR-040-위임-결과는-control-plane-이-부모-대화의-다음-turn-을-열어-전한다.md)). 물을 수 없는 실행은 모두 `NOT_FOUND` 하나다 |
+| `agent_status` | `execution_id` 정수 하나, 선택 `wait_seconds` 정수 | `{"execution_id":123,"status":"SUCCEEDED","output":"..."}` 처럼 준다. `wait_seconds` 를 주면 먼저 살펴보기 트리에서만 그 실행이 끝나기를 그 초만큼 기다린 뒤 답한다. 0 부터 `assistant.delegation.status-wait-max`(기본 20초)까지 받고 넘으면 그 값으로 줄인다. 살펴보기 트리가 아니면 받되 기다리지 않는다([ADR-040](../../backend/docs/adr/ADR-040-위임-결과는-control-plane-이-부모-대화의-다음-turn-을-열어-전한다.md)). 물을 수 없는 실행은 모두 `NOT_FOUND` 하나다 |
 | `agent_stop` | `execution_id` 정수 하나 | `agent_status` 와 같은 모양을 준다. 5초 안에 `CANCELLED` 가 적히지 않으면 `"status":"RUNNING","stop_requested":true` 다 |
 
 물을 수 있고 멈출 수 있는 실행의 범위와 거절 코드마다의 조건은 아래 「위임이 갈리는 지점」 이 갖는다.
@@ -40,7 +40,7 @@ Hermes 가 Control Plane MCP 의 `agent_list`, `agent_delegate`, `agent_status`,
 
 ## 위임 결과로 부모 대화를 깨우기
 
-결정은 [ADR-040](../adr/ADR-040-위임-결과는-control-plane-이-부모-대화의-다음-turn-을-열어-전한다.md), 흐름은 아래 「위임 결과가 도착했을 때」 에 있다.
+결정은 [ADR-040](../../backend/docs/adr/ADR-040-위임-결과는-control-plane-이-부모-대화의-다음-turn-을-열어-전한다.md), 흐름은 아래 「위임 결과가 도착했을 때」 에 있다.
 
 | 자리 | 맡는 것 |
 | --- | --- |
@@ -49,7 +49,7 @@ Hermes 가 Control Plane MCP 의 `agent_list`, `agent_delegate`, `agent_status`,
 | `chat.application.DelegationWakeService` | 그 대화를 깨울지 정하고, 자동 turn 을 새 가상 스레드에서 연다. 사건과 turn 종료를 직접 듣지 않는다. 위임 결과와 `AutoTurnResultSource` 들의 결과 가운데 하나라도 있으면 깨운다 |
 | `chat.application.AutoTurnResultSource` | 위임 결과 말고 자동 turn 에 실을 결과를 내는 쪽의 인터페이스다. 전하지 않은 결과, 전했다는 표시, 기동 때 훑을 대화를 낸다. 전달 묶음의 항목에 적을 출처 이름(`source()`)과, 다시 전달할 때 이미 전한 결과를 열쇠로 다시 읽는 `resultsFor` 도 낸다. `chat` 은 구현을 모른다. 구현이 없어도 깨우기는 돈다 |
 | `chat.application.ConversationNotices` | turn 을 열지 않고 알림 줄만 저장하고 `system` 사건을 낸다. 지운 대화에는 아무것도 하지 않는다 |
-| `connector.application.ConnectorActionResultSource` | `AutoTurnResultSource` 의 구현이다. 승인해 실행한 호출의 결과(`SUCCEEDED`, `FAILED`, `UNKNOWN`)를 알림 줄 글과 모델 입력 단락으로 낸다([ADR-050](../adr/ADR-050-커넥터-쓰기는-control-plane-이-승인-줄을-저장하고-승인한-인자로-한-번만-실행한다.md)) |
+| `connector.application.ConnectorActionResultSource` | `AutoTurnResultSource` 의 구현이다. 승인해 실행한 호출의 결과(`SUCCEEDED`, `FAILED`, `UNKNOWN`)를 알림 줄 글과 모델 입력 단락으로 낸다([ADR-050](../../backend/docs/adr/ADR-050-커넥터-쓰기는-control-plane-이-승인-줄을-저장하고-승인한-인자로-한-번만-실행한다.md)) |
 | `connector.application.ConnectorActionListener` | `ConnectorActionChanged` 를 받아 그 대화에 `approval` 사건을 내고, 거절과 만료의 알림 줄을 남기고, 깨우기 서비스를 부른다. 방향은 `connector` 에서 `chat` 으로 하나다 |
 | `chat.application.DelegationWakeProperties` | `assistant.delegation-wake.enabled`, `max-auto-turns`. 테스트 profile 은 끈다. 같은 H2 와 대역 Hermes 를 쓰는 다른 검사에서 자동 turn 이 열리지 않게 하기 위해서다 |
 | `chat.application.ChatService` | `TurnIntent.DelegationResults` 로 도는 자동 turn. 사용자 질문 대신 `SYSTEM` 알림 줄들을 저장하고, 결과를 적은 글을 Hermes 입력으로 넣는다. 위임 결과 뒤에 `AutoTurnResultSource` 의 단락을 잇고, 알림 줄과 같은 트랜잭션에서 그쪽에 전했다고 적는다. 사용자 질문을 저장할 때 `auto_turn_count` 를 0 으로 돌린다 |
@@ -158,7 +158,7 @@ sequenceDiagram
 | `agent_stop` 으로 물을 수 없는 실행을 멈추려 한다 | `agent_status` 와 같은 판정이다. 남의 실행, 다른 대화의 실행, 위임이 아닌 실행, 없는 번호는 모두 `NOT_FOUND` 하나로 답하고 멈추지 않는다 |
 | `agent_stop` 이 도는 실행에 온다 | 그 실행의 중지 표시를 켜고, run 번호가 있으면 Hermes 에 중지를 보낸다. 번호가 붙기 전이면 붙는 자리에서 보낸다. `CANCELLED` 가 적히기를 5초까지 기다려 `CANCELLED` 를 주고, 그 안에 적히지 않으면 `RUNNING` 과 `stop_requested: true` 를 준다 |
 | 멈춘 실행이 그때까지 답을 받았다 | 그 답을 `CANCELLED` 와 같은 저장에서 `output_text` 에 적는다. 받은 답이 없으면 비운다 |
-| `agent_stop` 으로 멈춘 실행이 다시 맡긴 실행이 있다 | 그 실행은 멈추지 않는다. 멈춘 실행 자신이 origin 인 Hermes 하위 에이전트의 Control Plane MCP 호출은 거절된다([ADR-037](../adr/ADR-037-hermes-하위-에이전트-session-의-주인은-만들-때-등록한-줄로-정한다.md)) |
+| `agent_stop` 으로 멈춘 실행이 다시 맡긴 실행이 있다 | 그 실행은 멈추지 않는다. 멈춘 실행 자신이 origin 인 Hermes 하위 에이전트의 Control Plane MCP 호출은 거절된다([ADR-037](../../backend/docs/adr/ADR-037-hermes-하위-에이전트-session-의-주인은-만들-때-등록한-줄로-정한다.md)) |
 | `agent_stop` 이 이 서버가 돌리지 않는 `RUNNING` 위임 실행에 온다(서버가 다시 떠 끊긴 실행) | run 번호가 있으면 Hermes 에 중지만 보내고 기다리지 않는다. 중지를 보냈으면 `RUNNING` 과 `stop_requested: true` 를 준다. run 번호가 없거나 보내지 못하면 `RUNNING` 만 준다. 그 줄은 기동 정리가 끝낸다 |
 | `agent_stop` 이 끝난 실행에 온다 | 멈추지 않고 끝난 상태를 그대로 돌려준다 |
 | 멈추기와 끝나기가 겹친다 | 먼저 적힌 쪽이 남는다. 끝난 뒤 온 중지는 끝난 상태를 돌려준다 |
@@ -171,7 +171,7 @@ sequenceDiagram
 ## 위임 결과가 도착했을 때
 
 맡긴 자식이 끝나면 Control Plane 이 부모 대화의 다음 turn 을 연다. 부모는 맡긴 뒤 기다리지 않는다. 먼저 살펴보기 트리는 예외다([ADR-080](../adr/ADR-080-먼저-살펴보기는-점검-대화의-turn-하나로-돌고-읽기-경계를-control-plane-이-강제한다.md)).
-결정은 [ADR-040](../adr/ADR-040-위임-결과는-control-plane-이-부모-대화의-다음-turn-을-열어-전한다.md) 에 있다.
+결정은 [ADR-040](../../backend/docs/adr/ADR-040-위임-결과는-control-plane-이-부모-대화의-다음-turn-을-열어-전한다.md) 에 있다.
 
 ```mermaid
 sequenceDiagram

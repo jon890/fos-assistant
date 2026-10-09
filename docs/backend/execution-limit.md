@@ -35,7 +35,7 @@ Hermes 를 부르지만 실행을 시작하지 않는 것은 세지 않는다.
 
 | 실행 | 까닭 |
 | --- | --- |
-| Hermes native 하위 에이전트(`delegate_task`) | Hermes 가 스스로 띄운다. Control Plane 은 사건과 사용량 원장으로만 본다([ADR-062](../adr/ADR-062-native-하위-에이전트-사용량은-재조회-작업-줄을-원장으로-넓혀-합계에-더한다.md)) |
+| Hermes native 하위 에이전트(`delegate_task`) | Hermes 가 스스로 띄운다. Control Plane 은 사건과 사용량 원장으로만 본다([ADR-062](../../backend/docs/adr/ADR-062-native-하위-에이전트-사용량은-재조회-작업-줄을-원장으로-넓혀-합계에-더한다.md)) |
 | Hermes cron | Control Plane 을 거치지 않는다 |
 | Hermes 대시보드나 CLI 에서 직접 연 실행 | Control Plane 을 거치지 않는다 |
 

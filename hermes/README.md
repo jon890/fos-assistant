@@ -33,7 +33,7 @@ Control Plane 이 기대는 Hermes 쪽 코드다. Hermes 에 설치하는 plugin
 
 ## 범용 커넥터
 
-`hermes/connectors/<커넥터 이름>/` 은 이 저장소가 유지보수하는 커넥터다([ADR-064](../docs/adr/ADR-064-범용-커넥터는-이-저장소의-hermes-connectors-에-두고-저장소가-유지보수한다.md)).
+`hermes/connectors/<커넥터 이름>/` 은 이 저장소가 유지보수하는 커넥터다([ADR-064](docs/adr/ADR-064-범용-커넥터는-이-저장소의-hermes-connectors-에-두고-저장소가-유지보수한다.md)).
 대시보드 plugin 이 읽는 plugin 디렉터리 모양 그대로이고, 운영자가 아래 「커넥터」 의 운영 목록에 그 디렉터리를 올려야 카탈로그에 나온다.
 설치 묶음에는 들어가지 않는다.
 
@@ -86,7 +86,7 @@ plugin 디렉터리의 모든 `*.py` 와 `plugin.yaml`, 주소를 채운 `defaul
 | `workspace_root` | 예 | 사용자 디렉터리를 둘 절대 경로. **Docker 호스트와 Hermes 컨테이너에서 같은 경로**여야 한다. 사용자 디렉터리 `<workspace_root>/<sandbox_owner>` 가 `/workspace` 에 붙는다 |
 | `attachment_root` | 예 | Docker 호스트에서 첨부를 사용자별로 둔 절대 경로. Hermes에서도 그 경로를 검증할 수 있어야 한다. `<attachment_root>/users/<sha256(sandbox_owner UTF-8)>` 만 읽기 전용으로 붙는다 |
 | `attachment_agent_root` | 예 | Hermes와 실행 컨테이너가 함께 보는 첨부 절대 경로. `<attachment_agent_root>/users/<sha256(sandbox_owner UTF-8)>` 가 위 원본의 실행 공간 경로다. Docker 호스트와 Hermes의 경로는 달라도 된다 |
-| `connector_output_root` | 아니오 | 커넥터가 계산할 목록을 파일로 쓰는 절대 경로. **Docker 호스트와 Hermes 컨테이너에서 같은 경로**여야 한다. `<connector_output_root>/users/<sha256(sandbox_owner UTF-8)>/<profile>` 이 같은 경로에 읽기 전용으로 붙는다. 없으면 붙이지 않고 커넥터의 `owner_output_env` 는 빈 값이다([ADR-20261008 / connector-output-files](../docs/adr/ADR-20261008-connector-output-files.md)) |
+| `connector_output_root` | 아니오 | 커넥터가 계산할 목록을 파일로 쓰는 절대 경로. **Docker 호스트와 Hermes 컨테이너에서 같은 경로**여야 한다. `<connector_output_root>/users/<sha256(sandbox_owner UTF-8)>/<profile>` 이 같은 경로에 읽기 전용으로 붙는다. 없으면 붙이지 않고 커넥터의 `owner_output_env` 는 빈 값이다([ADR-20261008 / connector-output-files](docs/adr/ADR-20261008-connector-output-files.md)) |
 | `skill_root` | 아니오 | Docker 호스트에서 올린 스킬 루트의 절대 경로. Hermes 쪽 경로 `FOS_ASSISTANT_SKILL_AGENT_ROOT` 와 같은 디렉터리여야 한다. 있으면 `<skill_root>/<profile>` 을 `<FOS_ASSISTANT_SKILL_AGENT_ROOT>/<profile>` 에 읽기 전용으로 붙인다. 없으면 붙이지 않고 `scripts/` 가 든 스킬의 게시를 409 로 거절한다([ADR-20261009 / skill-package](../docs/adr/ADR-20261009-skill-package.md)) |
 | `network` | 아니오 | 실행 공간을 붙일 Docker 망 이름. 없으면 Docker 기본 망이다 |
 | `cpu` | 아니오 | 0 보다 크고 8 이하. 기본 1 |
@@ -174,7 +174,7 @@ terminal:
 docker `terminal:` 을 쓰는 같은 설정 쓰기에서 `approvals.unattended_mode: approve` 도 쓴다. `approvals` 의 다른 키는 그대로 둔다.
 `backend: local` 을 쓸 때는 `approvals.unattended_mode` 를 지운다. 남은 `approvals` 가 비면 블록째 지운다.
 그래서 API 경로의 `execute_code` 는 docker 실행 공간에서만 승인 없이 돈다. 셸 위험 명령과 커넥터 승인은 그대로 승인 카드로 간다.
-판정 경로는 [실행 공간](../docs/hermes/sandbox.md) 의 「`execute_code` 의 승인 판정」, 결정은 [ADR-20261008 / execute-code-unattended](../docs/adr/ADR-20261008-execute-code-unattended.md) 가 갖는다.
+판정 경로는 [실행 공간](../docs/hermes/sandbox.md) 의 「`execute_code` 의 승인 판정」, 결정은 [ADR-20261008 / execute-code-unattended](docs/adr/ADR-20261008-execute-code-unattended.md) 가 갖는다.
 
 **기존 Hermes 예약 작업은 기본 profile(local)에 남으며 아직 격리되지 않았다.**
 named profile 의 도구 저장은 기본 profile 설정과 예약 작업을 바꾸지 않는다.
@@ -196,7 +196,7 @@ Python 3.13 과 PyYAML 과 `mcp` SDK, 커넥터를 실행할 Bun 이 있어야 �
 `tests/test_connectors_contract.py` 는 `connectors/` 아래 커넥터를 모두 찾아 계약을 본다. 커넥터 전용 시험은 각 커넥터의 `tests/` 에 있다.
 타입 검사와 전용 시험, 묶음 파일 비교는 저장소 루트의 `bash scripts/check-connectors.sh` 로 돌린다.
 
-`dashboard-profile-api` 가 기대는 Hermes 내부 지점은 `tests/hermes_contract.py` 가 한곳에 선언한다([ADR-088](../docs/adr/ADR-088-대시보드-plugin-은-감싸는-경로의-바꿔-끼우기를-두고-기대는-hermes-내부-지점을-계약-시험으로-확인한다.md)).
+`dashboard-profile-api` 가 기대는 Hermes 내부 지점은 `tests/hermes_contract.py` 가 한곳에 선언한다([ADR-088](docs/adr/ADR-088-대시보드-plugin-은-감싸는-경로의-바꿔-끼우기를-두고-기대는-hermes-내부-지점을-계약-시험으로-확인한다.md)).
 이 절 첫 명령의 시험은 plugin 이 쓰는 Hermes 이름이 모두 선언에 있는지만 본다.
 선언한 지점이 실제 Hermes 소스에 그대로인지는 아래 명령이 본다. CI 의 hermes job 이 계약의 판으로 돌린다.
 상류 저장소에서 tag 하나를 받으므로 네트워크가 필요하다. 계약의 판이면 tag 가 `HERMES_COMMIT` 을 가리키는지도 본다.
@@ -340,7 +340,7 @@ Control Plane 이 이 경로들을 부르는 순서와 뜻은 부르는 쪽 문�
 | `POST /api/connector-vault/import` | 그 커넥터를 옛 설치한 관리 profile 의 `.env` 에서 칸 값을 보관 파일로 옮긴다 | `{vault, connector, profile}` | `{ok: true}` | 400 필수 칸이 비었다. 401 관리 표식이 없다. 404 없는 profile, 설치하지 않은 커넥터. 409 다른 커넥터의 보관 파일 |
 | `POST /api/mcp/servers/<서버>/test?profile=<p>` | 그 profile 에 설치한 커넥터의 MCP 서버만 probe 한다 | 없음 | `{ok, tools: [{name}]}` | |
 | `GET /api/tools/toolsets` | 도구 이름과 설명을 읽는다 | 없음 | 200 | |
-| `PUT /api/config` (도구) | 지정한 profile 의 API 도구 목록을 쓴다. `terminal`, `file`, `code_execution`, `vision`, `image_gen`, `video_gen` 가운데 하나라도 있으면 profile 의 `terminal:` 을 실행 공간 설정으로 다시 쓴다. 같은 쓰기에서 `approvals.unattended_mode` 를 docker 면 `approve` 로 두고 local 이면 지운다(「셸 실행 공간」) | `{profile, config: {platform_toolsets: {api_server: [...]}}, sandbox_owner?, require_sandbox?}`. `sandbox_owner` 는 `^[a-z][a-z0-9-]{0,63}$` 이고 실행 공간 도구를 켜는 등록 profile 에서 필수다. `require_sandbox` 는 참 거짓 값이고, 참이면 정책에 없는 profile 의 셸 도구 저장을 local 로 돌리지 않고 409 `sandbox_unavailable` 로 거절한다. Control Plane 의 기본 도구 적용이 보낸다 | 200 | [ADR-029](../docs/adr/ADR-029-에이전트-도구는-control-plane-이-등급으로-판정하고-hermes-설정-api-로-쓴다.md) 그대로. 409 소유 기록의 바인딩 서버 이름이 목록에 빠졌다 |
+| `PUT /api/config` (도구) | 지정한 profile 의 API 도구 목록을 쓴다. `terminal`, `file`, `code_execution`, `vision`, `image_gen`, `video_gen` 가운데 하나라도 있으면 profile 의 `terminal:` 을 실행 공간 설정으로 다시 쓴다. 같은 쓰기에서 `approvals.unattended_mode` 를 docker 면 `approve` 로 두고 local 이면 지운다(「셸 실행 공간」) | `{profile, config: {platform_toolsets: {api_server: [...]}}, sandbox_owner?, require_sandbox?}`. `sandbox_owner` 는 `^[a-z][a-z0-9-]{0,63}$` 이고 실행 공간 도구를 켜는 등록 profile 에서 필수다. `require_sandbox` 는 참 거짓 값이고, 참이면 정책에 없는 profile 의 셸 도구 저장을 local 로 돌리지 않고 409 `sandbox_unavailable` 로 거절한다. Control Plane 의 기본 도구 적용이 보낸다 | 200 | [ADR-029](../backend/docs/adr/ADR-029-에이전트-도구는-control-plane-이-등급으로-판정하고-hermes-설정-api-로-쓴다.md) 그대로. 409 소유 기록의 바인딩 서버 이름이 목록에 빠졌다 |
 | `PUT /api/config` (스킬 게시) | 지정한 profile 의 올린 스킬 경로를 쓴다 | `{profile, config: {skills: {external_dirs: [<Hermes 쪽 스킬 루트>/<profile>/<버전>]}}, sandbox_owner?, require_sandbox?}`. 버전 이름은 `v[0-9]{13}-[a-z0-9]{4}` 다(`v` 뒤에 UTC 밀리초 13자리와 소문자 영숫자 4자). 목록은 0개나 1개. 0개는 게시 해제. 도구 목록을 같은 본문에 둘 수 있다. `scripts/` 가 든 스킬을 게시할 때 Control Plane 은 지금 도구 목록과 `require_sandbox: true` 를 함께 보낸다. 그때 plugin 은 목록에 실행 공간 도구가 있고, profile 이 정책에 등록돼 있고, 정책에 `skill_root` 가 있어야 받는다. 이 판정이 없는 옛 plugin 은 `require_sandbox` 를 셸 도구에만 적용해 그대로 받으므로, 이 판정을 가진 plugin 을 Control Plane 보다 먼저 배포한다 | 200 | 400 경로 형식, 다른 profile 의 prefix, 둘 이상, 심볼릭 링크, 없는 디렉터리, `skills` 도구가 꺼진 채 게시. 409 운영자가 넣은 다른 외부 경로가 있다. 409 `sandbox_unavailable` 은 `require_sandbox` 인데 위 셋 가운데 하나가 없다. 404 없는 profile |
 | `GET /api/skills?profile=<p>` | 지정한 profile 의 스킬 목록을 읽는다 | query `profile` 하나 | 200 `[{name, description, category, enabled, usage, provenance}]`. `enabled` 는 전역 `skills.disabled` 만 반영 | 400 query 누락, 둘 이상, `default`. 404 |
 | `PUT /api/skills/toggle` | 지정한 profile 의 스킬 하나를 켜고 끈다 | `{profile, name, enabled}` | 200 `{ok, name, enabled}` | 400, 404 |
@@ -355,7 +355,7 @@ Control Plane 이 이 경로들을 부르는 순서와 뜻은 부르는 쪽 문�
 ### 자식 session 의 provider
 
 API server 의 session 응답은 provider 를 주지 않는다. 그 값은 Hermes 의 session 저장소에만 있다.
-이 경로는 그 값을 Control Plane 에 읽어 준다. 근거는 [ADR-067](../docs/adr/ADR-067-native-하위-에이전트의-provider-는-대시보드-plugin-이-session-저장소에서-읽어-준다.md) 에,
+이 경로는 그 값을 Control Plane 에 읽어 준다. 근거는 [ADR-067](../backend/docs/adr/ADR-067-native-하위-에이전트의-provider-는-대시보드-plugin-이-session-저장소에서-읽어-준다.md) 에,
 저장소의 어느 칸이 무엇을 뜻하는지는 [`../docs/hermes/delegation.md`](../docs/hermes/delegation.md) 의 「자식 session 의 provider 는 저장소에만 있다」 에 있다.
 
 | 항목 | 값 |
@@ -414,7 +414,7 @@ provider credential 은 이 토큰으로 쓰지 못한다.
 
 **plugin 은 커넥터의 이름을 코드에 두지 않는다.**
 운영 목록의 plugin 디렉터리마다 `connector.json` 을 읽어 카탈로그로 내고, 선택지와 확인 도구를 대신 부른다.
-`connector.json` 의 형식은 [커넥터 연결](../docs/connectors.md) 의 「connector.json」 이 소유한다. 커넥터 경로가 설치와 확인에서 뜻하는 것은 [커넥터 설치](../docs/backend/connector-install.md) 의 「대시보드 plugin 계약」 이 소유한다. 근거는 [ADR-043](../docs/adr/ADR-043-커넥터는-plugin-의-connector-json-으로-선언하고-control-plane-은-범용-흐름만-갖는다.md) 에 있다.
+`connector.json` 의 형식은 [커넥터 연결](../docs/connectors.md) 의 「connector.json」 이 소유한다. 커넥터 경로가 설치와 확인에서 뜻하는 것은 [커넥터 설치](../docs/backend/connector-install.md) 의 「대시보드 plugin 계약」 이 소유한다. 근거는 [ADR-043](../backend/docs/adr/ADR-043-커넥터는-plugin-의-connector-json-으로-선언하고-control-plane-은-범용-흐름만-갖는다.md) 에 있다.
 
 **운영 목록은 환경 변수 `FOS_ASSISTANT_CONNECTOR_ROOTS` 로 받는다.** 커넥터 이름마다 값 하나를 둔 JSON object 다.
 
@@ -461,7 +461,7 @@ provider credential 은 이 토큰으로 쓰지 못한다.
 - 인자와 결과를 로그에 싣지 않는다
 - 실행되지 않은 것이 분명한 실패는 `{ok: false}` 로, 시간 초과와 도구 호출을 보낸 뒤의 실패는 504 로 답한다. 504 는 실행됐는지 모른다는 뜻이다
 - 도구가 `errors` 표에서 `outcome_unknown` 인 코드로 실패해도 504 로 답한다. `call` 에서는 그 코드를 `unavailable` 로 돌려준다
-- 요청과 응답은 [커넥터 연결](../docs/connectors.md) 의 「승인」 이 소유한다. 근거는 [ADR-050](../docs/adr/ADR-050-커넥터-쓰기는-control-plane-이-승인-줄을-저장하고-승인한-인자로-한-번만-실행한다.md) 에 있다
+- 요청과 응답은 [커넥터 연결](../docs/connectors.md) 의 「승인」 이 소유한다. 근거는 [ADR-050](../backend/docs/adr/ADR-050-커넥터-쓰기는-control-plane-이-승인-줄을-저장하고-승인한-인자로-한-번만-실행한다.md) 에 있다
 
 **소유 기록 `.fos-connectors.json` 은 설치할 때의 서버 정의를 갖는다.** 옛 설치는 요청마다 지금의 manifest 와 같은지 검증한다. 아래 표는 옛 설치의 판정이다.
 

@@ -18,7 +18,7 @@ Hermes 사건을 `execution_event` 로 옮겨 적는 규칙과 실행 트리를 
 | `PATCH /api/v1/chat/conversations/{id}` | 이름을 바꾼다. 본문 `{ "title": "..." }`. 바뀐 대화 한 줄을 돌려준다 |
 | `PUT /api/v1/chat/conversations/{id}/model` | 대화의 모델과 effort 를 바꾼다. 본문 `{ "provider", "model", "reasoningEffort" }`. 셋 다 null 이면 기본값으로 되돌린다. effort 는 `ModelChoice` 가 받는 값(`none`, `low` 부터 `max`)이어야 하고, `none` 은 그 모델의 `disable` 이 `SUPPORTED` 일 때만 받는다. 모델을 비웠으면 에이전트 기본 모델로 판정한다. 아니면 `VALIDATION_FAILED` 다. `none` 일 때만 대화의 에이전트와 그 목록을 읽으므로 목록을 읽지 못하면 `HERMES_UNAVAILABLE`, 에이전트를 쓸 수 없으면 그 오류가 난다. 다른 effort 의 저장은 에이전트 상태와 무관하다. 판정은 저장할 때만 한다. 저장한 뒤 에이전트 기본 모델이나 Hermes 의 지원 값이 바뀌어도 실행은 저장된 `none` 을 그대로 보내고, 실행 때 목록을 읽지 않는다. 바뀐 대화 한 줄을 돌려준다 |
 | `GET /api/v1/chat/model-options?agentCode=` | 그 에이전트의 profile 로 고를 수 있는 모델. 요청자가 쓸 수 있는 에이전트만 받는다 |
-| `DELETE /api/v1/chat/conversations/{id}` | 목록에서 숨긴다. 204. 본문은 정리 작업이 곧 지운다([ADR-20261008 / conversation-purge](../adr/ADR-20261008-conversation-purge.md)) |
+| `DELETE /api/v1/chat/conversations/{id}` | 목록에서 숨긴다. 204. 본문은 정리 작업이 곧 지운다([ADR-20261008 / conversation-purge](../../backend/docs/adr/ADR-20261008-conversation-purge.md)) |
 | `GET /api/v1/chat/conversations/{id}/messages` | 메시지 목록. 이전 판도 모두 온다 |
 | `POST /api/v1/chat/messages` | 한 번에 받는다 |
 | `POST /api/v1/chat/messages/stream` | 사건으로 받는다 |
@@ -65,9 +65,9 @@ web 은 입력창 아래의 `chat/model-picker.tsx` 로 고른다.
 `replace` 는 한 줄만 바꾸므로, 버린 응답이 있으면 목록을 한 번 더 읽어 다른 줄의 제목과 순서를 맞춘다.
 기존 대화는 목록에 그 줄이 오기 전까지 단추를 막는다(`Composer` 의 `modelChoiceUnknown`). 적힌 모델을 모르는 채 저장하면 그 모델을 지우기 때문이다.
 목록을 저장하지 않는 까닭은
-[ADR-030](../adr/ADR-030-모델과-effort-는-대화가-고르고-기본값은-hermes-profile-이-갖는다.md) 에 있다.
+[ADR-030](../../backend/docs/adr/ADR-030-모델과-effort-는-대화가-고르고-기본값은-hermes-profile-이-갖는다.md) 에 있다.
 기본 모델과 숨김을 DB 에 두는 까닭은
-[ADR-054](../adr/ADR-054-에이전트-기본-모델과-모델-숨김은-control-plane-db-가-갖는다.md) 에 있다.
+[ADR-054](../../backend/docs/adr/ADR-054-에이전트-기본-모델과-모델-숨김은-control-plane-db-가-갖는다.md) 에 있다.
 
 실행을 보낼 때 `chat/application/ModelTierService` 가 대화의 선택, 단계, 에이전트 기본 모델 차례로 세 값을 정하고 `model/domain/ModelChoice` 에 담는다.
 모델이 비어 있으면 `/v1/runs` 에 `provider`, `model` 을 빼고,
@@ -262,14 +262,14 @@ Hermes 가 스트림으로 보내는 사건을 우리 이름으로 옮겨 `execu
 화면에 흘리는 것과 사건을 저장하는 것이 같은 스트림을 두 가지로 쓴다.
 저장하는 답은 스트림이 아니라 실행 결과에서 가져온다.
 
-**한 번에 받는 경로(`POST /api/v1/chat/messages`)도 같은 스트림을 열어 도구와 하위 에이전트 사건을 저장한다**([ADR-090](../adr/ADR-090-한-번에-받는-경로도-hermes-사건-스트림을-열어-도구-사건을-남긴다.md)).
+**한 번에 받는 경로(`POST /api/v1/chat/messages`)도 같은 스트림을 열어 도구와 하위 에이전트 사건을 저장한다**([ADR-090](../../backend/docs/adr/ADR-090-한-번에-받는-경로도-hermes-사건-스트림을-열어-도구-사건을-남긴다.md)).
 흘릴 곳이 없으므로 저장만 하고, 답 조각 시각(`first_delta_at`)은 적지 않아 첫 반응 시간 통계에 들지 않는다.
 스트림을 읽지 못하면 경고만 남기고 답과 실행의 시작과 끝은 그대로 남는다.
 붙은 커넥터 서버의 도구도 두 경로에서 같다. 도구 이름, 걸린 시간, 실패 여부가 남고 내용은 가려진다.
 한 번에 받는 경로는 스트림을 기다리는 시간에도 `hermes.run-timeout` 상한을 둔다. 넘으면 스트림을 닫고 결과 조회로 넘어간다.
 흐름(`Flow`)의 단계 실행은 이 스트림을 열지 않아 도구 사건이 남지 않는다.
 
-근거는 [`adr/ADR-013-실행-사건은-우리-모델로-정규화해-저장한다.md`](../adr/ADR-013-실행-사건은-우리-모델로-정규화해-저장한다.md) 에 있다.
+근거는 [`adr/ADR-013-실행-사건은-우리-모델로-정규화해-저장한다.md`](../../backend/docs/adr/ADR-013-실행-사건은-우리-모델로-정규화해-저장한다.md) 에 있다.
 
 ### 실행의 시작과 끝은 Hermes 사건을 기다리지 않는다
 
@@ -358,7 +358,7 @@ flowchart TD
 `HermesRunEventStream`은 이 값을 가린 뒤 `RunEvent.detail`에 넣는다.
 SSE와 실행 기록은 같은 가린 값을 쓰며, 대화의 작업 과정도 이 실행 기록을 조회한다.
 관리자도 가리기 전 원문을 받지 않는다.
-근거는 [ADR-047](../adr/ADR-047-도구-내용은-비밀값과-UUID를-가린-뒤-중계하고-저장한다.md)에 있다.
+근거는 [ADR-047](../../backend/docs/adr/ADR-047-도구-내용은-비밀값과-UUID를-가린-뒤-중계하고-저장한다.md)에 있다.
 
 | 대상 | 처리 |
 | --- | --- |

@@ -4,7 +4,7 @@ Control Plane MCP 의 토큰은 profile 만 증명하고, 사용자가 걸린 �
 origin 실행은 하위 에이전트 session 이면 만들 때 등록한 실행이고, 최상위 session 이면 그 루트 session 으로 도는 실행이다.
 토큰이 요청자를 정하지 못하는 까닭은 GROUP 에이전트에서 여러 사용자가 같은 profile 을 쓰기 때문이다. 요청 본문에 사용자 번호를 넣어도 사용자를 바꿀 수 없다.
 이 파일은 요청자를 정하는 클래스와 흐름, 하위 에이전트 session 등록, Control Plane MCP 서버와 결과물 쓰기 도구의 계약을 갖는다.
-결정은 [ADR-032](../adr/ADR-032-mcp-토큰은-profile-을-증명하고-실제-사용자는-부모-실행에서-정한다.md) 와 [ADR-037](../adr/ADR-037-hermes-하위-에이전트-session-의-주인은-만들-때-등록한-줄로-정한다.md) 에 있다.
+결정은 [ADR-032](../../backend/docs/adr/ADR-032-mcp-토큰은-profile-을-증명하고-실제-사용자는-부모-실행에서-정한다.md) 와 [ADR-037](../../backend/docs/adr/ADR-037-hermes-하위-에이전트-session-의-주인은-만들-때-등록한-줄로-정한다.md) 에 있다.
 
 ## 어느 클래스가 무엇을 하나
 
@@ -103,12 +103,12 @@ sequenceDiagram
 | 경우 | 결과 |
 | --- | --- |
 | 토큰이 없거나, 모르는 토큰이거나, 폐기됐다 | HTTP 401 |
-| profile 이 빈 토큰이다 | HTTP 401. 옛 토큰을 사용자로 돌리던 경로는 지웠다([ADR-032](../adr/ADR-032-mcp-토큰은-profile-을-증명하고-실제-사용자는-부모-실행에서-정한다.md) 의 「옛 토큰에서 옮겨 가는 길」) |
+| profile 이 빈 토큰이다 | HTTP 401. 옛 토큰을 사용자로 돌리던 경로는 지웠다([ADR-032](../../backend/docs/adr/ADR-032-mcp-토큰은-profile-을-증명하고-실제-사용자는-부모-실행에서-정한다.md) 의 「옛 토큰에서 옮겨 가는 길」) |
 | `_fos_ctx` 가 없거나 모양이 틀렸거나 서명이 맞지 않는다 | 거절한다 |
 | 서명이 맞고 그 호출의 session 에 하위 에이전트 등록이 있다 | 등록의 origin 실행의 사용자로 돈다. origin 실행이 `SUCCEEDED` 나 `FAILED` 로 끝났어도, 같은 대화의 다음 turn 이 돌고 있어도 같다 |
-| 등록이 있는데 origin 실행이나 그 실행 트리의 루트 실행이 `CANCELLED` 다 | 거절한다. 사용자가 turn 이나 흐름을 중지해도 Hermes 하위 에이전트는 계속 돌 수 있어서다. 흐름을 멈출 때 이미 끝난 자식 실행에서 만든 하위 에이전트도 루트가 중지돼 거절된다. Control Plane MCP 도구만 막고, 하위 에이전트의 Hermes 자체 도구와 run 은 멈추지 못한다([ADR-037](../adr/ADR-037-hermes-하위-에이전트-session-의-주인은-만들-때-등록한-줄로-정한다.md)) |
+| 등록이 있는데 origin 실행이나 그 실행 트리의 루트 실행이 `CANCELLED` 다 | 거절한다. 사용자가 turn 이나 흐름을 중지해도 Hermes 하위 에이전트는 계속 돌 수 있어서다. 흐름을 멈출 때 이미 끝난 자식 실행에서 만든 하위 에이전트도 루트가 중지돼 거절된다. Control Plane MCP 도구만 막고, 하위 에이전트의 Hermes 자체 도구와 run 은 멈추지 못한다([ADR-037](../../backend/docs/adr/ADR-037-hermes-하위-에이전트-session-의-주인은-만들-때-등록한-줄로-정한다.md)) |
 | 등록의 루트 session 이 서명한 루트와 다르다 | 거절한다 |
-| 등록이 없고 그 호출의 session 이 루트와 다르다 | 거절한다. 등록이 빠진 하위 에이전트와 `compression.in_place: false` 로 교체된 최상위 session 이 여기 온다. 둘을 나눌 수 없어 추측하지 않는다([ADR-037](../adr/ADR-037-hermes-하위-에이전트-session-의-주인은-만들-때-등록한-줄로-정한다.md)) |
+| 등록이 없고 그 호출의 session 이 루트와 다르다 | 거절한다. 등록이 빠진 하위 에이전트와 `compression.in_place: false` 로 교체된 최상위 session 이 여기 온다. 둘을 나눌 수 없어 추측하지 않는다([ADR-037](../../backend/docs/adr/ADR-037-hermes-하위-에이전트-session-의-주인은-만들-때-등록한-줄로-정한다.md)) |
 | 등록이 없고 session 이 루트와 같지만 그 루트 session 으로 도는 실행이 없다 | 거절한다. 끝난 실행, Memory 제안 실행, Control Plane 이 시작하지 않은 run(Hermes cron, 다른 채팅 플랫폼 gateway)이 여기 온다. 요청자를 알 수 없어서다 |
 | 그 루트 session 으로 도는 실행이 다른 profile 의 것이다 | 거절한다 |
 | 도는 실행이 둘 이상이다 | 거절한다. 가장 최근 것을 고르지 않는다 |
@@ -122,7 +122,7 @@ sequenceDiagram
 ### 하위 에이전트 session 을 등록할 때
 
 Hermes 의 하위 에이전트는 부모 run 보다 오래 살 수 있다. 그래서 만들어지는 순간 주인을 적는다.
-계약은 [`hermes/fos-ctx.md`](../hermes/fos-ctx.md#하위-에이전트-session-등록-계약), 결정은 [ADR-037](../adr/ADR-037-hermes-하위-에이전트-session-의-주인은-만들-때-등록한-줄로-정한다.md) 에 있다.
+계약은 [`hermes/fos-ctx.md`](../hermes/fos-ctx.md#하위-에이전트-session-등록-계약), 결정은 [ADR-037](../../backend/docs/adr/ADR-037-hermes-하위-에이전트-session-의-주인은-만들-때-등록한-줄로-정한다.md) 에 있다.
 
 ```mermaid
 sequenceDiagram
@@ -190,7 +190,7 @@ FOS 실행 #105 같은 대화의 다음 turn          ← 돌아도 S1 은 #100 
 **먼저 살펴보기 트리에서는 `memory_read`, `agent_list`, `agent_delegate`, `agent_status`, `agent_stop` 만 받는다.** 쓰기 도구를 허용한 살펴보기는 그 살펴보기의 점검 대화에 쓰는 `artifact_write` 만 더 받는다([ADR-082](../adr/ADR-082-먼저-살펴보기의-쓰기-도구는-관리자가-에이전트마다-켜고-커넥터-쓰기는-승인-카드로-보낸다.md)).
 요청자를 정한 뒤 `ProactiveCheckGuard.checkOf` 가 살펴보기 줄을 찾으면 나머지 도구는 「먼저 살펴보기에서는 쓸 수 없는 도구입니다.」 오류 결과(`isError: true`)다. 읽기 경계의 살펴보기에서는 지금 `artifact_write`, `follow_up_propose`, `memory_remember` 가 여기 걸린다.
 `memory_remember` 는 쓰기 도구를 허용한 살펴보기에서도 받지 않는다. 살펴보기는 바깥 글을 읽는 실행이라 기억을 남기면 프롬프트 주입의 길이 된다([ADR-20261007 / memory-remember](../adr/ADR-20261007-memory-remember.md)).
-`follow_up_propose` 는 쓰기 도구를 허용한 살펴보기에서도 받지 않는다. 살펴보기의 할 일 후보는 결과 안의 문장으로만 낸다([ADR-081](../adr/ADR-081-살펴보기-결과는-답-끝의-구조화-블록으로-받고-control-plane-이-검사해-그린다.md)). 살펴보기가 그 도구로 제안하게 하는 일은 ADR-080 의 「다음 단계」 다.
+`follow_up_propose` 는 쓰기 도구를 허용한 살펴보기에서도 받지 않는다. 살펴보기의 할 일 후보는 결과 안의 문장으로만 낸다([ADR-081](../../backend/docs/adr/ADR-081-살펴보기-결과는-답-끝의-구조화-블록으로-받고-control-plane-이-검사해-그린다.md)). 살펴보기가 그 도구로 제안하게 하는 일은 ADR-080 의 「다음 단계」 다.
 새 도구를 더하면 살펴보기에서 받을지 함께 정한다([`proactive-check.md`](proactive-check.md) 의 「읽기 경계」).
 
 도구마다의 인자와 결과는 아래가 갖는다.
@@ -247,7 +247,7 @@ profile 의 도구 구성이나 대화 길이가 달라지면 손익분기도 �
 `artifact_write` 는 일반 파일 도구가 없는 profile 에 결과물 저장만 연다.
 `fos-assistant` 서버가 등록된 profile 에서만 보인다. 다른 도구와 같은 서버에 있어 Hermes 서버 등록과 허용 목록을 따로 두지 않는다.
 실행 입력은 이 도구가 있으면 MCP 로 저장하고, 도구가 없고 파일 도구가 있으면 대화 폴더에 직접 쓰도록 안내한다.
-결정은 [ADR-028](../adr/ADR-028-결과물은-사용자의-대화-폴더에-mcp-도구로-쓴다.md) 에 있다.
+결정은 [ADR-028](../../backend/docs/adr/ADR-028-결과물은-사용자의-대화-폴더에-mcp-도구로-쓴다.md) 에 있다.
 
 | 인자 | 계약 |
 | --- | --- |

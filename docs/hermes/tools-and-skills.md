@@ -156,7 +156,7 @@ Control Plane이 주인을 검사해 정확한 profile만 보낼 수는 있지�
 
 도구 선택값을 저장할 때는 제품이 허용한 이름만 받아 목록 전체를 계산하고, `memory`를 항상 제거해야 한다.
 Control Plane MCP(`fos-assistant`)의 서버 이름은 API 허용 목록에 계속 남겨야 한다. 연결을 붙인 에이전트의 profile 도 같고, 그 목록에는 붙인 커넥터의 서버 이름이 함께 있다. 도구 저장은 그 이름을 함께 보내고, 대시보드 plugin 은 그 이름이 빠진 목록을 거절한다([`../backend/connector-install.md`](../backend/connector-install.md) 의 「바인딩 설치」).
-남아 있는 옛 커넥터 에이전트의 profile 은 예외다. 그 목록은 설치한 커넥터의 MCP 서버 이름과 그 커넥터의 manifest 가 선언한 읽기 전용 이미지 도구(`vision`)만 갖고 대시보드 plugin 의 설치가 쓴다([ADR-045](../adr/ADR-045-커넥터-에이전트는-자기-mcp-서버만-받고-memory-와-control-plane-도구를-받지-않는다.md)).
+남아 있는 옛 커넥터 에이전트의 profile 은 예외다. 그 목록은 설치한 커넥터의 MCP 서버 이름과 그 커넥터의 manifest 가 선언한 읽기 전용 이미지 도구(`vision`)만 갖고 대시보드 plugin 의 설치가 쓴다([ADR-045](../../backend/docs/adr/ADR-045-커넥터-에이전트는-자기-mcp-서버만-받고-memory-와-control-plane-도구를-받지-않는다.md)).
 등록된 MCP 서버 이름이 하나도 없는 목록은 모든 활성 MCP 서버를 통과시킬 수 있으므로, 알 수 없는 이름만 남은 목록을 허용해서는 안 된다.
 `_get_platform_tools`로 저장 뒤 실제 목록을 계산해 허용 목록과 대조한다.
 새 plugin toolset은 저장 목록에 없어도 자동으로 켜질 수 있고, `agent.disabled_toolsets`는 마지막에 적용되므로 둘 다 확인해야 한다.
@@ -190,7 +190,7 @@ v0.21.0과 비교하면 v0.21.3의 설정 가능한 목록에 `connections`와 `
 
 `kanban`, `subagent`, `tool` 에서 시작한 세션만 목록에서 뺀다.
 근거는 [v0.21.3 `tools/session_search_tool.py`](https://github.com/NousResearch/hermes-agent/blob/v2026.9.14/tools/session_search_tool.py) 의 `_resolve_profile_db`, `_dispatch` 와 도구 설명의 `profile` 항목이다.
-그래서 이 도구는 관리자 등급이고 켜진 에이전트는 비공개로만 둔다([ADR-029](../adr/ADR-029-에이전트-도구는-control-plane-이-등급으로-판정하고-hermes-설정-api-로-쓴다.md)).
+그래서 이 도구는 관리자 등급이고 켜진 에이전트는 비공개로만 둔다([ADR-029](../../backend/docs/adr/ADR-029-에이전트-도구는-control-plane-이-등급으로-판정하고-hermes-설정-api-로-쓴다.md)).
 
 ### 스킬 파일과 색인 적용 시점
 
@@ -209,7 +209,7 @@ v0.21.5 의 `tools/skill_manager_tool.py` 의 `_validate_frontmatter(content, ne
 
 이름 64자(`MAX_NAME_LENGTH`)와 설명 1024자는 `tools/skills_tool_plugin.py` 에도 같은 값으로 있다.
 색인은 `agent/skill_utils.py` 의 `extract_skill_description` 이 같은 방법으로 앞뒤를 뺀 설명을 60자에서 잘라 57자에 `...` 을 붙인다.
-Control Plane 이 저장 규칙을 이 검사에 맞추는 까닭은 [ADR-034](../adr/ADR-034-올린-스킬은-control-plane-이-버전-디렉터리에-쓰고-hermes-는-읽기만-한다.md) 의 「저장할 수 있는 스킬은 Hermes 가 제대로 고를 수 있는 스킬이다」 에 있다.
+Control Plane 이 저장 규칙을 이 검사에 맞추는 까닭은 [ADR-034](../../backend/docs/adr/ADR-034-올린-스킬은-control-plane-이-버전-디렉터리에-쓰고-hermes-는-읽기만-한다.md) 의 「저장할 수 있는 스킬은 Hermes 가 제대로 고를 수 있는 스킬이다」 에 있다.
 근거는 [v0.21.5 skill_manager_tool.py](https://github.com/NousResearch/hermes-agent/blob/v2026.9.24/tools/skill_manager_tool.py), [skill_utils.py](https://github.com/NousResearch/hermes-agent/blob/v2026.9.24/agent/skill_utils.py), [skills_tool_plugin.py](https://github.com/NousResearch/hermes-agent/blob/v2026.9.24/tools/skills_tool_plugin.py) 다.
 이 두 HTTP 경로에는 `references/`, `templates/`, `assets/`, `scripts/` 파일 인자가 없다.
 `skill_manage(write_file)`는 해당 네 하위 디렉터리의 텍스트 파일을 다루며 파일당 1 MiB와 100,000자 제한이 있지만, 대시보드 HTTP 경로로 노출되지 않았다.

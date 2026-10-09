@@ -28,7 +28,7 @@ Control Plane 이 그 값으로 요청자를 정하는 순서는 [`backend/mcp-c
 
 ### 부모 실행을 잇는 방법
 
-v0.21.5(`v2026.9.24`) 격리 환경에서 측정했다. 결정은 [ADR-031](../adr/ADR-031-mcp-호출의-부모-실행은-profile-플러그인이-서명한-루트-session-으로-잇는다.md) 에 있다.
+v0.21.5(`v2026.9.24`) 격리 환경에서 측정했다. 결정은 [ADR-031](../../backend/docs/adr/ADR-031-mcp-호출의-부모-실행은-profile-플러그인이-서명한-루트-session-으로-잇는다.md) 에 있다.
 
 **MCP 호출에 run 맥락을 실을 수 있는 공개 경로는 profile 플러그인의 `pre_tool_call` hook 하나다.**
 
@@ -57,7 +57,7 @@ v0.21.5(`v2026.9.24`) 격리 환경에서 측정했다. 결정은 [ADR-031](../a
 
 **플러그인은 profile 마다 둔다.** profile 디렉터리의 `plugins/` 에 두고 그 profile 설정에서 켜야 그 profile 의 호출에 붙는다. plugin 원본은 이 저장소의 [`hermes/plugins/fos-ctx/`](../../hermes/plugins/fos-ctx/) 에 있고, 대시보드 plugin 이 새 profile 을 만들 때 그 profile 로 복사한다.
 
-**hook 이 끼우지 못한 호출도 서버에 도착한다.** 플러그인이 빠졌거나 hook 이 값을 돌려주지 않으면 원래 인자 그대로 간다. 그래서 서버는 서명이 없거나 틀린 호출을 거절한다. `memory_read`, `artifact_write`, `follow_up_propose`, `memory_remember`, `agent_*` 가 모두 그렇다([ADR-032](../adr/ADR-032-mcp-토큰은-profile-을-증명하고-실제-사용자는-부모-실행에서-정한다.md)).
+**hook 이 끼우지 못한 호출도 서버에 도착한다.** 플러그인이 빠졌거나 hook 이 값을 돌려주지 않으면 원래 인자 그대로 간다. 그래서 서버는 서명이 없거나 틀린 호출을 거절한다. `memory_read`, `artifact_write`, `follow_up_propose`, `memory_remember`, `agent_*` 가 모두 그렇다([ADR-032](../../backend/docs/adr/ADR-032-mcp-토큰은-profile-을-증명하고-실제-사용자는-부모-실행에서-정한다.md)).
 
 #### `_fos_ctx` 계약
 
@@ -111,7 +111,7 @@ hook 은 Control Plane MCP 의 모든 도구 인자에 `_fos_ctx` 를 덮어쓴�
 
 Hermes 는 401 이면 다시 연결해 같은 인자로 한 번 더 보낸다. session 이 만료되면 읽기 전용 도구만 다시 보내고 쓰기 도구는 `outcome_uncertain` 으로 끝낸다.
 hook 이 넣은 `tool_call_id` 는 인자에 들어 있어 다시 보낼 때도 같다. 그래서 **profile, 루트 session, 그 호출의 session, `tool_call_id`** 로 같은 위임을 두 번 만들지 않는 키를 계산한다.
-`tool_call_id` 가 루트 아래 모든 session 에서 유일하다는 보장은 없다. 하위 에이전트마다 session 이 달라, session 을 빼면 다른 하위 에이전트의 같은 번호가 같은 위임으로 잘못 합쳐진다. 정의는 [ADR-032 의 「`delegation_key`」](../adr/ADR-032-mcp-토큰은-profile-을-증명하고-실제-사용자는-부모-실행에서-정한다.md#delegation_key) 에 있다.
+`tool_call_id` 가 루트 아래 모든 session 에서 유일하다는 보장은 없다. 하위 에이전트마다 session 이 달라, session 을 빼면 다른 하위 에이전트의 같은 번호가 같은 위임으로 잘못 합쳐진다. 정의는 [ADR-032 의 「`delegation_key`」](../../backend/docs/adr/ADR-032-mcp-토큰은-profile-을-증명하고-실제-사용자는-부모-실행에서-정한다.md#delegation_key) 에 있다.
 JSON-RPC 의 `id` 는 연결마다 새로 매겨져 이 용도로 쓰지 않는다.
 
 #### 공유 profile 에서 두 사용자의 호출을 실제로 확인하는 절차
@@ -154,7 +154,7 @@ v0.21.5(`v2026.9.24`, commit `f97608f178d1ffeca59860195ab7da295f7c8e5f`)의 소�
 
 Control Plane 은 `/v1/runs` 에 `session_id` 만 보낸다. 그래서 **모델이 부른 하위 에이전트는 부모 FOS 실행이 끝난 뒤에도 돈다.**
 부모 실행의 `RUNNING` 으로 요청자를 찾으면 그 뒤의 호출은 거절되거나 같은 대화의 다음 turn 에 붙는다.
-그래서 하위 에이전트 session 은 만들어질 때 등록한다([ADR-037](../adr/ADR-037-hermes-하위-에이전트-session-의-주인은-만들-때-등록한-줄로-정한다.md)).
+그래서 하위 에이전트 session 은 만들어질 때 등록한다([ADR-037](../../backend/docs/adr/ADR-037-hermes-하위-에이전트-session-의-주인은-만들-때-등록한-줄로-정한다.md)).
 
 **등록이 첫 MCP 호출보다 먼저 끝나는 근거는 hook 이 동기라는 것이다.** 자식은 hook 이 돌아온 뒤에 시작하므로 자식의 첫 도구 호출은 등록 응답 뒤에 온다.
 실제 실행에서 시각으로 한 번 더 확인한다. 등록이 늦거나 실패하면 그 자식의 호출은 거절된다. 추측으로 이어 붙이지 않는다.
@@ -224,7 +224,7 @@ profile 플러그인이 `subagent_start` hook 에서 부른다. 모델 도구가
 등록과 origin 판정, [위임](delegation.md#취소가-아래로-내려가지-않는다) 의 「취소가 아래로 내려가지 않는다」 가 적은 취소 차단은 토큰이 profile 을 증명하는 것을 전제로 한다.
 `agent_token` 에는 사용자 칸이 없고, 폐기되지 않은 토큰은 늘 `profile_name` 을 갖는다. profile 이 빈 토큰은 `/mcp` 와 등록 경로 모두 인증에서 `401` 이다.
 
-사용자 기준으로 발급하던 옛 토큰의 경로는 지웠다. 순서와 근거는 [ADR-032](../adr/ADR-032-mcp-토큰은-profile-을-증명하고-실제-사용자는-부모-실행에서-정한다.md) 의 「옛 토큰에서 옮겨 가는 길」 에 있다.
+사용자 기준으로 발급하던 옛 토큰의 경로는 지웠다. 순서와 근거는 [ADR-032](../../backend/docs/adr/ADR-032-mcp-토큰은-profile-을-증명하고-실제-사용자는-부모-실행에서-정한다.md) 의 「옛 토큰에서 옮겨 가는 길」 에 있다.
 
 #### 하위 에이전트를 실제로 확인하는 절차
 

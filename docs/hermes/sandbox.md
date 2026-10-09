@@ -39,7 +39,7 @@ Control Plane 예약 작업과 매일 깨우기는 각 에이전트의 profile �
 
 **스크립트는 커넥터 MCP 도구를 부르지 못한다.** RPC 로 부를 수 있는 도구는 위 일곱 개(`SANDBOX_ALLOWED_TOOLS`)와 그 profile 에 켜진 도구의 교집합이고, 교집합이 비면 일곱 개 전부다.
 스텁 모듈(`hermes_tools.py`)이 그 교집합만 만들고, RPC 처리기(`tools/code_execution_rpc.py` 의 `_handle_rpc_request`)가 목록 밖 이름을 거절한다. docker 실행 공간의 원격 커널(`tools/code_kernel_remote.py`)도 같은 목록이다.
-목록은 모듈 상수라 core 를 고치지 않고는 늘지 않는다. 커넥터 데이터를 계산하는 길은 [ADR-20261008 / connector-output-files](../adr/ADR-20261008-connector-output-files.md) 가 정한다.
+목록은 모듈 상수라 core 를 고치지 않고는 늘지 않는다. 커넥터 데이터를 계산하는 길은 [ADR-20261008 / connector-output-files](../../hermes/docs/adr/ADR-20261008-connector-output-files.md) 가 정한다.
 
 커넥터 MCP 서버가 컨테이너 밖에서 도는 것이 비밀 격리의 근거다.
 커넥터 토큰은 MCP 프로세스의 환경에만 있고, 셸은 그 프로세스와 profile 파일을 보지 못한다.
@@ -200,7 +200,7 @@ plugin 이 쓰는 `/workspace` 부터 호스트 경로다.
 **API 서버 경로는 3번에서 끝난다.**
 모드는 `approvals.unattended_mode` 이고 기본값은 `deny` 다.
 3번이 4번보다 앞이라, API 서버의 승인 다리(`/v1/runs/{id}/approval`)가 있어도 `execute_code` 는 승인 카드로 가지 않는다.
-그래서 plugin 은 docker 실행 공간을 쓰는 profile 에 `approve` 를 쓴다([ADR-20261008 / execute-code-unattended](../adr/ADR-20261008-execute-code-unattended.md)).
+그래서 plugin 은 docker 실행 공간을 쓰는 profile 에 `approve` 를 쓴다([ADR-20261008 / execute-code-unattended](../../hermes/docs/adr/ADR-20261008-execute-code-unattended.md)).
 
 **같은 모드가 셸 위험 명령과 plugin 승인 요청에는 닿지 않는다.**
 `check_all_command_guards` 와 `_run_approval_gate` 는 CLI, gateway, ask 문맥이 모두 아닐 때만 사람이 없는 문맥의 모드를 본다.

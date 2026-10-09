@@ -218,7 +218,7 @@ Control Plane 은 브라우저의 CDP 에 두 가지로 닿는다. 주소는 컨
 
 ## 중계
 
-결정은 [ADR-20261007 / user-browser](../adr/ADR-20261007-user-browser.md) 의 「중계」 와 [ADR-20261008 / browser-gateway-token](../adr/ADR-20261008-browser-gateway-token.md) 이 갖는다.
+결정은 [ADR-20261007 / user-browser](../adr/ADR-20261007-user-browser.md) 의 「중계」 와 [ADR-20261008 / browser-gateway-token](../../backend/docs/adr/ADR-20261008-browser-gateway-token.md) 이 갖는다.
 커넥터는 브라우저 주소를 받지 않는다. 바인딩 설치와 확인 도구 호출이 `<gateway-base-url>/<접근 표식>` 을 커넥터의 env 에 넣고, 커넥터는 그 주소를 Chrome 의 CDP 주소처럼 부른다. 넣는 자리는 아래 「커넥터에 건네기」 가 갖는다.
 
 ### 접근 표식

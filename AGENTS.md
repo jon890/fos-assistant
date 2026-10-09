@@ -123,9 +123,10 @@ key 값 자체를 적지 않는 것은 당연하고, **그것이 어디 있고 �
 `spring.flyway.out-of-order=true` 로 낮은 시각 버전이 나중에 머지되어도 적용한다.
 작성 규칙은 [`docs/backend/schema/README.md`](docs/backend/schema/README.md) 가 갖는다.
 
-새 ADR 은 `docs/adr/ADR-<YYYYMMDD>-<슬러그>.md` 로 만든다.
+새 ADR 은 그 결정을 지키는 코드가 있는 모듈의 `docs/adr/ADR-<YYYYMMDD>-<슬러그>.md` 로 만든다.
+backend 는 `backend/docs/adr/`, 화면은 `web/docs/adr/`, `hermes/` 는 `hermes/docs/adr/` 이고, 여러 모듈에 걸치면 루트 `docs/adr/` 다.
 기존 숫자 ADR 은 그대로 두며, 같은 날의 새 ADR 은 슬러그로 구분한다.
-제목과 링크, 목록 정렬은 [`docs/adr/INDEX.md`](docs/adr/INDEX.md) 의 작성 규칙을 따른다.
+둘 곳과 제목, 링크, 목록 정렬은 [`docs/adr/INDEX.md`](docs/adr/INDEX.md) 의 규칙을 따른다.
 
 구현자는 push 전에 `scripts/check-local.sh` 로 로컬 검사를 돌린다.
 로컬 브라우저 검사는 고친 화면과 그 컴포넌트를 쓰는 화면의 spec 을 인자로 준다. 전체 브라우저 검사는 Draft PR 의 CI 에서 돌린다.

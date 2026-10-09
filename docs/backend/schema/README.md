@@ -26,7 +26,7 @@ AI credential 은 Hermes profile 의 `.env` 에, profile 의 API server key 는 
 ## 본문 칸과 운영 조회
 
 사용자가 쓴 글이나 모델이 만든 글을 담는 칸이다. 저장 시 암호화의 대상이고, 운영 조회 계정이 읽지 않는 칸이다.
-근거는 [ADR-20261008 / data-encryption](../../adr/ADR-20261008-data-encryption.md) 에 있다.
+근거는 [ADR-20261008 / data-encryption](../../../backend/docs/adr/ADR-20261008-data-encryption.md) 에 있다.
 
 | 표 | 칸 | 암호화 |
 | --- | --- | --- |
@@ -42,7 +42,7 @@ AI credential 은 Hermes profile 의 `.env` 에, profile 의 API server key 는 
 | `proactive_check` | `report_json` | 아직 |
 | `proactive_check_problem` | `problem`, `related_goal`, `action_text`, `expected_benefit`, `risk`, `change_since_last` | 아직 |
 | `proactive_value_evaluation` | `evidence_json` | 아직 |
-| `memory`, `memory_revision` | `title`, `content` | 민감 항목의 `content` 만 함([ADR-055](../../adr/ADR-055-민감-memory-본문은-저장할-때-암호화하고-key-는-환경-변수로-받는다.md)) |
+| `memory`, `memory_revision` | `title`, `content` | 민감 항목의 `content` 만 함([ADR-055](../../../backend/docs/adr/ADR-055-민감-memory-본문은-저장할-때-암호화하고-key-는-환경-변수로-받는다.md)) |
 
 **운영 조회 계정의 계약.** 운영자가 데이터베이스를 살피는 계정에는 위 칸의 SELECT 를 주지 않는다.
 MySQL 의 칸 단위 권한(`GRANT SELECT (칸, ...) ON 표`)으로 위 칸을 뺀 칸만 준다.
@@ -168,12 +168,12 @@ H2 용 `*MigrationTest` 가 데이터베이스를 만드는 메서드를 열어 
 아직 보내지 않은 대기 메시지(`chat_pending_message`)는 그때 함께 지운다. 지운 대화에는 보낼 곳이 없다.
 그 뒤 정리 작업이 메시지, 첨부와 결과물의 파일과 행, 실행 질문 줄, 실행의 답 본문과 사건의 `detail`, Hermes session 을 지우고 `purged_at` 을 적는다.
 실행 줄과 사건 줄은 본문 없이 남는다. 사용량 화면은 지운 대화의 실행도 센다. 돈은 이미 나갔다.
-무엇을 언제 지우고 무엇을 기다리는지는 [ADR-20261008 / conversation-purge](../../adr/ADR-20261008-conversation-purge.md) 가 갖는다.
+무엇을 언제 지우고 무엇을 기다리는지는 [ADR-20261008 / conversation-purge](../../../backend/docs/adr/ADR-20261008-conversation-purge.md) 가 갖는다.
 
 사용자를 지우는 흐름은 아직 없다.
 
 페르소나는 이 데이터베이스에 없다. 본문은 그 profile 의 `SOUL.md` 가 갖는다.
-근거는 [ADR-019](../../adr/ADR-019-페르소나는-hermes-가-갖고-control-plane-은-화면만-준다.md) 에 있다.
+근거는 [ADR-019](../../../backend/docs/adr/ADR-019-페르소나는-hermes-가-갖고-control-plane-은-화면만-준다.md) 에 있다.
 
 첨부는 보관 기간이 지나면 파일만 지우고 `deleted_at` 을 적는다. 행은 대화를 지울 때 함께 지운다.
 결과물(`chat_artifact`)도 같다.

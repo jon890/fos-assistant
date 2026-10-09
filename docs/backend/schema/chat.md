@@ -22,7 +22,7 @@
 | `model_tier` | VARCHAR(16) NULL | 이 대화에서 고른 모델 단계 |
 | `updated_at` | DATETIME(6) | 목록 정렬에 쓴다. 같은 값이면 `id` 가 큰 쪽이 앞이다 |
 | `deleted_at` | DATETIME(6) NULL | 사용자가 지운 시각. 채워지면 목록과 조회와 보내기에서 없는 대화와 같다 |
-| `purged_at` | DATETIME(6) NULL | 지운 대화의 본문을 정리 작업이 실제로 지운 시각. 이때 `title` 과 두 session 칸을 비운다. 채워진 대화에는 메시지를 저장하지 않는다. 근거는 [ADR-20261008 / conversation-purge](../../adr/ADR-20261008-conversation-purge.md) |
+| `purged_at` | DATETIME(6) NULL | 지운 대화의 본문을 정리 작업이 실제로 지운 시각. 이때 `title` 과 두 session 칸을 비운다. 채워진 대화에는 메시지를 저장하지 않는다. 근거는 [ADR-20261008 / conversation-purge](../../../backend/docs/adr/ADR-20261008-conversation-purge.md) |
 | `hidden_at` | DATETIME(6) NULL | 목록에서만 뺀 시각. 예약 작업이 「보고할 것 없음」 으로 끝난 `NEW_PER_RUN` 대화에 적는다. 조회와 보내기는 그대로 되고, 사용자가 질문을 보내면 비운다([`task.md`](../task.md) 의 「보고할 것 없음」) |
 | `auto_turn_count` | INT NOT NULL DEFAULT 0 | 마지막 사용자 질문 뒤로 Control Plane 이 위임 결과를 전하려고 연 turn 수. 사용자 질문을 저장할 때 0 으로 돌린다. `assistant.delegation-wake.max-auto-turns`(기본 10)에 닿으면 더 깨우지 않는다 |
 | `purpose` | VARCHAR(16) NOT NULL DEFAULT 'CHAT' | `CHAT` 은 보통 대화, `CHECK` 는 먼저 살펴보기의 점검 대화다. 만들 때 정하고 바뀌지 않는다. 사용자와 에이전트마다 지우지 않은 점검 대화 가운데 `id` 가 가장 큰 것을 쓴다([`proactive-check.md`](../proactive-check.md)) |
@@ -54,7 +54,7 @@ FK 를 더하려면 이미 행이 없는 대화를 먼저 정리해야 하고, �
 새 대화는 셋 다 비어 있다. 고를 수 있는 모델 목록은 저장하지 않는다.
 
 작업 영역(workspace)은 제거됐다.
-근거는 [ADR-010](../../adr/ADR-010-작업-영역을-제거하고-에이전트가-그-자리를-갖는다.md)에 있다.
+근거는 [ADR-010](../../../backend/docs/adr/ADR-010-작업-영역을-제거하고-에이전트가-그-자리를-갖는다.md)에 있다.
 
 ## chat_message
 
@@ -75,7 +75,7 @@ FK 를 더하려면 이미 행이 없는 대화를 먼저 정리해야 하고, �
 
 **본문은 저장할 때 암호화한다.** KEK 설정이 있으면 새 메시지를 빈 글로 넣고 같은 트랜잭션에서 암호문으로 고친다.
 AAD 는 `chat_message:<id>:conversation:<conversation_id>:user:<대화 주인>` 이라 암호문을 다른 줄로 옮기거나 대화 주인을 바꾸면 풀리지 않는다.
-풀지 못한 본문은 「읽을 수 없는 메시지입니다.」 로 낸다. 본문은 `ChatMessage.content()` 로만 꺼낸다. 근거와 위협 모델은 [ADR-20261008 / data-encryption](../../adr/ADR-20261008-data-encryption.md) 에 있다.
+풀지 못한 본문은 「읽을 수 없는 메시지입니다.」 로 낸다. 본문은 `ChatMessage.content()` 로만 꺼낸다. 근거와 위협 모델은 [ADR-20261008 / data-encryption](../../../backend/docs/adr/ADR-20261008-data-encryption.md) 에 있다.
 
 `replaces_message_id` 는 다시 생성이 채운다. 다시 생성한 답은 이전 답을 가리킨다.
 예전에는 수정한 사용자 메시지가 고치기 전 메시지를 가리켰다. 수정을 없앴지만 그 줄은 남아 있고 화면이 계속 넘겨 볼 수 있다.
@@ -84,10 +84,10 @@ AAD 는 `chat_message:<id>:conversation:<conversation_id>:user:<대화 주인>` 
 근거는 [ADR-022](../../adr/ADR-022-다시-생성과-수정은-같은-session-에-판으로-쌓는다.md) 에 있다.
 
 중지한 실행의 답도 한 줄로 남는다.
-근거는 [ADR-021](../../adr/ADR-021-중지한-답은-멈춘-자리까지-남긴다.md) 에 있다.
+근거는 [ADR-021](../../../backend/docs/adr/ADR-021-중지한-답은-멈춘-자리까지-남긴다.md) 에 있다.
 
 `SYSTEM` 줄은 Control Plane 이 부모 대화를 깨울 때 한 줄 남긴다. 사용자가 결과를 다시 전달할 때도 한 줄 남긴다. 본문은 어느 에이전트의 결과가 도착했는지 알리는 짧은 글이고, 자식의 답 전문은 넣지 않는다.
-다시 생성의 대상이 아니다. 근거는 [ADR-040](../../adr/ADR-040-위임-결과는-control-plane-이-부모-대화의-다음-turn-을-열어-전한다.md) 에 있다.
+다시 생성의 대상이 아니다. 근거는 [ADR-040](../../../backend/docs/adr/ADR-040-위임-결과는-control-plane-이-부모-대화의-다음-turn-을-열어-전한다.md) 에 있다.
 
 `sender_user_id` 는 화면이 보낸 사람 이름을 보이기 위한 것이다.
 대화는 여전히 주인 한 사람의 것이고, 여러 사람이 같은 대화를 읽고 쓰는 것은 아직 만들지 않았다.
@@ -157,7 +157,7 @@ turn 이 도는 동안 사용자가 보낸 메시지 하나가 한 행이다. �
 한 사용자가 남의 대화의 첨부를 읽지 못한다.
 `conversation.user_id` 가 그 경계를 갖고, 첨부는 그 대화를 통해서만 닿는다.
 
-근거는 [ADR-020](../../adr/ADR-020-사진은-공유-디렉터리에-두고-에이전트가-파일로-읽는다.md) 에 있다.
+근거는 [ADR-020](../../../backend/docs/adr/ADR-020-사진은-공유-디렉터리에-두고-에이전트가-파일로-읽는다.md) 에 있다.
 
 ## chat_artifact
 

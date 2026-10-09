@@ -6,7 +6,7 @@
 
 ## 도구 정책
 
-`schema: 2` 는 그 MCP 서버의 도구마다 위험도와 승인 방식을 선언한다([ADR-049](../adr/ADR-049-커넥터-도구-호출은-profile-plugin-의-hook-이-control-plane-에-물어-판정한다.md)).
+`schema: 2` 는 그 MCP 서버의 도구마다 위험도와 승인 방식을 선언한다([ADR-049](../../backend/docs/adr/ADR-049-커넥터-도구-호출은-profile-plugin-의-hook-이-control-plane-에-물어-판정한다.md)).
 
 ```json
 {
@@ -240,7 +240,7 @@ Control Plane 은 `policy_hook` 이 참이 아니면 그 바인딩을 `READY` �
 ## 커넥터 도구를 부를 때
 
 연결을 붙인 에이전트의 모델이 커넥터 MCP 도구를 부르면 그 profile 의 `fos-ctx` hook 이 Control Plane 에 묻는다. 남아 있는 옛 커넥터 에이전트도 같다.
-근거는 [ADR-049](../adr/ADR-049-커넥터-도구-호출은-profile-plugin-의-hook-이-control-plane-에-물어-판정한다.md) 이고, 요청과 응답과 판정 순서는 위 「도구 호출 판정」 이 갖는다.
+근거는 [ADR-049](../../backend/docs/adr/ADR-049-커넥터-도구-호출은-profile-plugin-의-hook-이-control-plane-에-물어-판정한다.md) 이고, 요청과 응답과 판정 순서는 위 「도구 호출 판정」 이 갖는다.
 
 ```mermaid
 sequenceDiagram
@@ -282,7 +282,7 @@ sequenceDiagram
 
 ## 승인이 필요한 호출
 
-판정이 「승인 필요」 인 호출의 흐름이다. 근거는 [ADR-050](../adr/ADR-050-커넥터-쓰기는-control-plane-이-승인-줄을-저장하고-승인한-인자로-한-번만-실행한다.md) 이다.
+판정이 「승인 필요」 인 호출의 흐름이다. 근거는 [ADR-050](../../backend/docs/adr/ADR-050-커넥터-쓰기는-control-plane-이-승인-줄을-저장하고-승인한-인자로-한-번만-실행한다.md) 이다.
 승인과 거절은 그 요청이 나온 대화의 승인 카드에서 한다.
 새 승인 줄이 생기면 `APPROVAL_REQUESTED` 알림이 함께 생겨, 사용자가 다른 화면에 있어도 그 대화로 올 수 있다([`notification.md`](notification.md)).
 

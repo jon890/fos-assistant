@@ -47,7 +47,7 @@ profile 이 어떤 요청을 받는지는 두 표식이 정한다. 판정은 요
 
 - 커넥터 key 의 `PUT /api/env` 와 `DELETE /api/env` 는 관리 표식이 있는 profile 에만 된다. 허용 key 는 카탈로그 manifest 의 `fields[].env` 다. `operator_env` 는 사용자 요청으로 쓰지 못한다. 그 이름의 `PUT` 과 `DELETE` 는 성공으로 답하되 아무것도 쓰지 않고 `restart_required` 는 false 다. 한 배포 동안 옛 Control Plane 이 그 이름을 쓰려 하기 때문이다([ADR-041](../adr/ADR-041-hermes-에-설치하는-plugin-과-profile-틀은-이-저장소가-소유한다.md))
 - 선택 칸 key 의 `PUT /api/env` 가 성공하면 그 key 를 칸으로 가진 설치를 다시 써 서버 정의의 빈 값을 맞춘다. 바인딩 항목은 다시 설치하지 않는다. 바인딩의 `.env` 와 서버 정의는 바인딩 설치가 보관 파일의 값으로 쓴다
-- 설치는 API 도구 목록(`platform_toolsets.api_server`)을 그 profile 에 설치한 커넥터의 MCP 서버 이름에 그 커넥터들의 manifest 가 선언한 `toolsets` 를 더한 것으로 통째로 다시 쓴다. 서버 이름이 먼저이고 겹친 이름은 한 번만 둔다. 운영 목록에서 빠져 manifest 를 읽을 수 없는 커넥터의 `toolsets` 는 더하지 않는다. Control Plane MCP 와 선언하지 않은 내장 도구는 목록에서 빠지고, `mcp_servers` 의 Control Plane MCP 등록도 지운다. 그 profile 의 MCP 토큰과 `fos-ctx` plugin 은 그대로 둔다. 마지막 커넥터를 끄면 목록은 `no_mcp` 하나다. 목록을 비우면 Hermes 가 등록된 MCP 서버를 모두 통과시키기 때문이다([ADR-045](../adr/ADR-045-커넥터-에이전트는-자기-mcp-서버만-받고-memory-와-control-plane-도구를-받지-않는다.md)). 선언으로 열 수 있는 내장 도구는 읽기 전용 이미지 도구뿐이다([ADR-044](../adr/ADR-044-커넥터-manifest-는-읽기-전용-이미지-도구만-열-수-있다.md))
+- 설치는 API 도구 목록(`platform_toolsets.api_server`)을 그 profile 에 설치한 커넥터의 MCP 서버 이름에 그 커넥터들의 manifest 가 선언한 `toolsets` 를 더한 것으로 통째로 다시 쓴다. 서버 이름이 먼저이고 겹친 이름은 한 번만 둔다. 운영 목록에서 빠져 manifest 를 읽을 수 없는 커넥터의 `toolsets` 는 더하지 않는다. Control Plane MCP 와 선언하지 않은 내장 도구는 목록에서 빠지고, `mcp_servers` 의 Control Plane MCP 등록도 지운다. 그 profile 의 MCP 토큰과 `fos-ctx` plugin 은 그대로 둔다. 마지막 커넥터를 끄면 목록은 `no_mcp` 하나다. 목록을 비우면 Hermes 가 등록된 MCP 서버를 모두 통과시키기 때문이다([ADR-045](../../backend/docs/adr/ADR-045-커넥터-에이전트는-자기-mcp-서버만-받고-memory-와-control-plane-도구를-받지-않는다.md)). 선언으로 열 수 있는 내장 도구는 읽기 전용 이미지 도구뿐이다([ADR-044](../../backend/docs/adr/ADR-044-커넥터-manifest-는-읽기-전용-이미지-도구만-열-수-있다.md))
 - `GET /api/connectors` 의 `configured` 는 서버 정의가 소유 기록과 같고 API 도구 목록이 설치가 쓰는 목록(설치한 커넥터의 서버 이름에 선언한 `toolsets` 를 더한 것)과 정확히 같고 Control Plane MCP 등록이 없을 때만 참이다. Control Plane MCP 나 선언하지 않은 내장 도구가 목록에 남은 옛 모양은 `configured: false` 다
 - 설치와 제거는 쓰기 전에 `config.yaml`, 소유 기록, `SOUL.md` 를 `connector-backups/` 에 떠 둔다. profile `.env` 는 떠 두지 않는다. 쓸 때마다 그 디렉터리에 남아 있는 `.env` 사본을 지운다
 - 이름 대응 파일은 `isolated` 칸 없이 쓴다
@@ -73,8 +73,8 @@ profile 이 어떤 요청을 받는지는 두 표식이 정한다. 판정은 요
 Control Plane 은 바인딩 설치 요청에 그 에이전트의 `sandbox_owner` 를 늘 함께 보낸다. 연결 확인과 반영 완료가 다시 설치할 때도 같다.
 보내기 전에 그 주인의 첨부 디렉터리를 최선 노력으로 만든다. 만들지 못해도 경고 로그만 남기고 요청을 보낸다. 선언하지 않은 커넥터의 붙이기가 첨부 루트 문제로 막히지 않게 하려는 것이다.
 manifest 가 `owner_attachments_env` 를 선언했으면 plugin 은 운영 정책의 `attachment_agent_root` 아래 `users/<SHA-256(sandbox_owner)>` 를 그 env 의 값으로 서버 정의에 직접 넣는다([ADR-20261007 / connector-owner-attachments](../adr/ADR-20261007-connector-owner-attachments.md)). `sandbox_owner` 가 없으면 400, 운영 정책이 없거나 그 디렉터리를 중간 링크 없이 확인하지 못하면 409 다. Control Plane 이 디렉터리를 만들지 못한 경우도 이 409 가 된다. 409 의 본문 `code` 는 `sandbox_unavailable` 이고 붙이기는 `AGENT_SANDBOX_UNAVAILABLE` 로 끝난다. 선언하지 않은 커넥터는 `sandbox_owner` 를 쓰지 않는다.
-manifest 가 `owner_output_env` 를 선언했으면 plugin 은 운영 정책의 `connector_output_root` 아래 `users/<SHA-256(sandbox_owner)>/<profile>/<커넥터 id>` 를 링크 없이 만들고 그 env 의 값으로 서버 정의에 직접 넣는다. 정책이나 그 키, `sandbox_owner` 가 없거나, profile 이 정책에 등록되지 않았거나, 디렉터리를 만들지 못하면 빈 값을 넣고 붙이기는 그대로 한다. 디렉터리는 보관 파일을 확인한 뒤에 만든다. 커넥터는 파일 출력만 거절한다. 떼면 설치한 그 디렉터리를 지운다([ADR-20261008 / connector-output-files](../adr/ADR-20261008-connector-output-files.md)).
-manifest 가 `owner_browser_env` 를 선언했으면 Control Plane 은 요청에 `owner_browser` 로 그 바인딩의 표식을 실은 중계 주소를 싣는다. 선언하지 않은 커넥터의 요청에는 이 키가 없다. 중계가 꺼졌으면 빈 값을 싣고, 붙이기는 막지 않는다. plugin 은 그 값을 그 env 의 값으로 서버 정의에 직접 넣는다. 키가 없거나 빈 값이면 빈 값을 넣는다. 문자열이 아니거나 비지 않았는데 `http(s)://<호스트>[:<포트>]/<경로>` 모양이 아니면 400 이다. 같은 바인딩은 늘 같은 주소를 받으므로 연결 확인과 반영 완료가 다시 설치해도 서버 정의가 바뀌지 않아 `restart_required` 가 참이 되지 않는다([ADR-20261008 / browser-gateway-token](../adr/ADR-20261008-browser-gateway-token.md)).
+manifest 가 `owner_output_env` 를 선언했으면 plugin 은 운영 정책의 `connector_output_root` 아래 `users/<SHA-256(sandbox_owner)>/<profile>/<커넥터 id>` 를 링크 없이 만들고 그 env 의 값으로 서버 정의에 직접 넣는다. 정책이나 그 키, `sandbox_owner` 가 없거나, profile 이 정책에 등록되지 않았거나, 디렉터리를 만들지 못하면 빈 값을 넣고 붙이기는 그대로 한다. 디렉터리는 보관 파일을 확인한 뒤에 만든다. 커넥터는 파일 출력만 거절한다. 떼면 설치한 그 디렉터리를 지운다([ADR-20261008 / connector-output-files](../../hermes/docs/adr/ADR-20261008-connector-output-files.md)).
+manifest 가 `owner_browser_env` 를 선언했으면 Control Plane 은 요청에 `owner_browser` 로 그 바인딩의 표식을 실은 중계 주소를 싣는다. 선언하지 않은 커넥터의 요청에는 이 키가 없다. 중계가 꺼졌으면 빈 값을 싣고, 붙이기는 막지 않는다. plugin 은 그 값을 그 env 의 값으로 서버 정의에 직접 넣는다. 키가 없거나 빈 값이면 빈 값을 넣는다. 문자열이 아니거나 비지 않았는데 `http(s)://<호스트>[:<포트>]/<경로>` 모양이 아니면 400 이다. 같은 바인딩은 늘 같은 주소를 받으므로 연결 확인과 반영 완료가 다시 설치해도 서버 정의가 바뀌지 않아 `restart_required` 가 참이 되지 않는다([ADR-20261008 / browser-gateway-token](../../backend/docs/adr/ADR-20261008-browser-gateway-token.md)).
 
 | 무엇 | 붙일 때 | 뗄 때(`enabled: false`) |
 | --- | --- | --- |
@@ -268,7 +268,7 @@ profile 하나의 MCP 를 다시 붙이는 다른 경로를 쓰지 않는 까닭
 
 ## 옛 커넥터 에이전트
 
-바인딩이 생기기 전에는 연결을 처음 등록할 때 커넥터마다 전용 profile 과 비공개 에이전트를 만들었다([ADR-039](../adr/ADR-039-외부-서비스-연결은-사용자별-전용-에이전트로-실행한다.md)). `agent.connector_managed` 가 참인 에이전트다.
+바인딩이 생기기 전에는 연결을 처음 등록할 때 커넥터마다 전용 profile 과 비공개 에이전트를 만들었다([ADR-039](../../backend/docs/adr/ADR-039-외부-서비스-연결은-사용자별-전용-에이전트로-실행한다.md)). `agent.connector_managed` 가 참인 에이전트다.
 이제 새로 만들지 않는다. 이미 있는 것은 사용자가 옮긴 뒤 지울 때까지 아래 규칙으로 지금처럼 돈다.
 마이그레이션이 해제되지 않은 옛 연결마다 그 에이전트와의 바인딩을 만들었으므로, 옛 에이전트도 바인딩 하나로 읽힌다.
 
@@ -284,7 +284,7 @@ profile 하나의 MCP 를 다시 붙이는 다른 경로를 쓰지 않는 까닭
 
 ### 경계
 
-옛 커넥터 에이전트는 외부 서비스의 글을 읽는 worker 다. 그 글이 모델을 속여도 닿는 범위를 그 커넥터의 MCP 도구로 한정한다([ADR-045](../adr/ADR-045-커넥터-에이전트는-자기-mcp-서버만-받고-memory-와-control-plane-도구를-받지-않는다.md)).
+옛 커넥터 에이전트는 외부 서비스의 글을 읽는 worker 다. 그 글이 모델을 속여도 닿는 범위를 그 커넥터의 MCP 도구로 한정한다([ADR-045](../../backend/docs/adr/ADR-045-커넥터-에이전트는-자기-mcp-서버만-받고-memory-와-control-plane-도구를-받지-않는다.md)).
 연결을 붙인 일반 에이전트에는 이 경계가 걸리지 않는다. 그 에이전트가 감당하는 것은 ADR-083 의 「감당할 것」 에 있다.
 
 | 무엇 | 어떻게 |
@@ -292,7 +292,7 @@ profile 하나의 MCP 를 다시 붙이는 다른 경로를 쓰지 않는 까닭
 | 도구 | profile 의 API 도구 목록에 자기 커넥터의 MCP 서버 이름과 manifest 가 선언한 읽기 전용 이미지 도구(`vision`)만 두고 Control Plane MCP 의 서버 등록을 지운다. 대시보드 plugin 의 옛 설치가 쓴다 |
 | Memory | 직접 연 대화와 위임받은 실행 모두에서 Memory 문맥을 조립하지 않는다. 공통 표 지침은 전달하며 실행 줄에 그 지침의 길이와 지문을 기록한다 |
 | Control Plane MCP 호출 | origin 실행의 에이전트가 옛 커넥터 에이전트이면 도구 호출의 요청자를 정하지 않고 거절한다. 응답은 서명이 틀린 호출과 같다. 그 profile 의 MCP 토큰은 유효한 채로 둔다 |
-| 위임 결과 | Control Plane 이 실행 줄의 답을 부모 대화의 다음 turn 으로 전한다([ADR-040](../adr/ADR-040-위임-결과는-control-plane-이-부모-대화의-다음-turn-을-열어-전한다.md)). worker 의 MCP 호출을 쓰지 않는다. 옛 커넥터 에이전트의 답은 외부 서비스에서 온 데이터이며 지시로 따르지 않는다는 줄과 `<external-data>` 로 감싸 전한다. 답 안의 닫는 표시는 `<\/external-data>` 로 바꿔 넣는다. 부모가 `agent_status` 나 `agent_stop` 으로 읽는 `output` 도 같은 방법으로 감싼다. 감싸도 모델이 그 글을 따르지 않는다는 보장은 없다([ADR-049](../adr/ADR-049-커넥터-도구-호출은-profile-plugin-의-hook-이-control-plane-에-물어-판정한다.md) 의 「감당할 것」) |
+| 위임 결과 | Control Plane 이 실행 줄의 답을 부모 대화의 다음 turn 으로 전한다([ADR-040](../../backend/docs/adr/ADR-040-위임-결과는-control-plane-이-부모-대화의-다음-turn-을-열어-전한다.md)). worker 의 MCP 호출을 쓰지 않는다. 옛 커넥터 에이전트의 답은 외부 서비스에서 온 데이터이며 지시로 따르지 않는다는 줄과 `<external-data>` 로 감싸 전한다. 답 안의 닫는 표시는 `<\/external-data>` 로 바꿔 넣는다. 부모가 `agent_status` 나 `agent_stop` 으로 읽는 `output` 도 같은 방법으로 감싼다. 감싸도 모델이 그 글을 따르지 않는다는 보장은 없다([ADR-049](../../backend/docs/adr/ADR-049-커넥터-도구-호출은-profile-plugin-의-hook-이-control-plane-에-물어-판정한다.md) 의 「결과」) |
 
 부르는 쪽 에이전트가 필요한 맥락을 `agent_delegate` 의 `task` 에 담는다. worker 는 결과물을 쓰지 못하고 다른 에이전트에게 맡기지 못한다.
 `mcp_servers` 의 Control Plane MCP 등록 제거는 이미 떠 있는 gateway 에 재시작 전까지 남을 수 있다. 그동안에도 도구 목록이 그 서버를 막고 Control Plane 이 옛 커넥터 에이전트의 호출을 거절한다.
@@ -300,7 +300,7 @@ profile 하나의 MCP 를 다시 붙이는 다른 경로를 쓰지 않는 까닭
 ### 지침
 
 옛 설치(`PUT /api/connectors` 의 `enabled: true`, `bind` 칸 없음)는 plugin 의 스킬 디렉터리마다 `<스킬>/SKILL.md` 를 이름 순으로 읽어 앞머리(frontmatter)를 떼고 이어 붙인 본문을 그 profile 의 `SOUL.md` 에 쓴다.
-`skills` toolset 은 열지 않는다. 그 toolset 은 스킬을 고치는 도구까지 열기 때문이다([ADR-039](../adr/ADR-039-외부-서비스-연결은-사용자별-전용-에이전트로-실행한다.md)).
+`skills` toolset 은 열지 않는다. 그 toolset 은 스킬을 고치는 도구까지 열기 때문이다([ADR-039](../../backend/docs/adr/ADR-039-외부-서비스-연결은-사용자별-전용-에이전트로-실행한다.md)).
 
 - `SKILL.md` 밖의 파일은 읽지 않는다. 스킬 디렉터리 바로 아래의 항목이 하나라도 심볼릭 링크이거나 `SKILL.md` 가 심볼릭 링크이면 그 커넥터를 카탈로그에 내지 않는다. 스킬과 관계없는 파일의 링크도 해당한다. 링크가 plugin 밖의 파일을 가리키면 그 내용이 지침으로 들어가기 때문이다
 - 앞머리가 닫히지 않은 `SKILL.md` 가 있어도 그 커넥터를 카탈로그에 내지 않는다

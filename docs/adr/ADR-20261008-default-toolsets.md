@@ -1,8 +1,8 @@
-## ADR-20261008: 기본 에이전트는 web 과 셸, 파일, 코드 실행을 켜고 시작하되 셸 계열은 실행 공간이 있을 때만 켠다
+## ADR-20261008 / default-toolsets: 기본 에이전트는 web 과 셸, 파일, 코드 실행을 켜고 시작하되 셸 계열은 실행 공간이 있을 때만 켠다
 
 - **status**: `accepted`
 - Date: 2026-10-08
-- [ADR-086](ADR-086-셸과-파일-도구는-사용자별-docker-실행-공간에서만-돈다.md) 의 도구 저장에 「local 로 돌리지 않는」 쓰기를 더한다. [ADR-029](ADR-029-에이전트-도구는-control-plane-이-등급으로-판정하고-hermes-설정-api-로-쓴다.md) 의 등급 표는 바꾸지 않는다.
+- [ADR-086](ADR-086-셸과-파일-도구는-사용자별-docker-실행-공간에서만-돈다.md) 의 도구 저장에 「local 로 돌리지 않는」 쓰기를 더한다. [ADR-029](../../backend/docs/adr/ADR-029-에이전트-도구는-control-plane-이-등급으로-판정하고-hermes-설정-api-로-쓴다.md) 의 등급 표는 바꾸지 않는다.
 
 ### 결정
 
@@ -53,7 +53,7 @@ local 셸은 Hermes 프로세스의 사용자로 돌아 다른 profile 의 `.env
   - 사람의 도구 저장과 같은 plugin 검사(커넥터 서버 이름, 비밀 요청 스킬, memory 금지)를 지난다.
 - 감당할 것:
   - **연결이 붙은 기본 에이전트에서 READ 결과를 셸이 인터넷으로 보낼 수 있다.** [커넥터 READ 데이터의 흐름](../read-data-flow.md) 의 RF-08 이다. 지금까지는 관리자가 셸을 켠 에이전트에만 있던 길이 모든 기본 에이전트로 넓어진다. web 의 RF-09 는 2026-10-08 사용자 결정 #320 으로 이미 감당하기로 했다.
-  - `execute_code` 는 [ADR-20261008 / execute-code-unattended](ADR-20261008-execute-code-unattended.md) 에 따라 실행 공간에서 승인 없이 돈다.
+  - `execute_code` 는 [ADR-20261008 / execute-code-unattended](../../hermes/docs/adr/ADR-20261008-execute-code-unattended.md) 에 따라 실행 공간에서 승인 없이 돈다.
   - 같은 사용자의 에이전트끼리 `/workspace` 를 함께 쓴다. 웹 도구가 없는 에이전트가 쓴 파일도 기본 에이전트의 셸이 읽어 보낼 수 있다.
   - 에이전트 주인은 셸 계열을 스스로 끄지 못한다. 관리자 등급이기 때문이다. 끄려면 관리자에게 말한다.
   - 셸 계열이 켜진 기본 에이전트는 주인을 바꾸지 못한다(`AGENT_OWNER_CHANGE_REQUIRES_SHELL_OFF`).

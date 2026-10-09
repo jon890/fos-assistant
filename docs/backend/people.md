@@ -14,9 +14,9 @@ Google 동의 화면의 테스트 사용자에 주소를 더하는 것만 사람
 
 순서와 어긋나는 지점은 아래 「사람을 더할 때」 가 갖는다.
 profile 을 사람마다 나누는 근거는
-[`adr/ADR-002-profile은-나누고-ai-계정은-가족이-함께-쓴다.md`](../adr/ADR-002-profile은-나누고-ai-계정은-가족이-함께-쓴다.md) 에 있다.
+[`adr/ADR-002-profile은-나누고-ai-계정은-가족이-함께-쓴다.md`](../../backend/docs/adr/ADR-002-profile은-나누고-ai-계정은-가족이-함께-쓴다.md) 에 있다.
 Control Plane 이 Hermes 를 고치는 호출을 하게 된 근거는
-[`adr/ADR-018-사람을-더하는-것을-control-plane-이-끝낸다.md`](../adr/ADR-018-사람을-더하는-것을-control-plane-이-끝낸다.md) 에 있다.
+[`adr/ADR-018-사람을-더하는-것을-control-plane-이-끝낸다.md`](../../backend/docs/adr/ADR-018-사람을-더하는-것을-control-plane-이-끝낸다.md) 에 있다.
 
 ## 어느 패키지가 무엇을 하나
 
@@ -47,7 +47,7 @@ Control Plane 이 Hermes 를 고치는 호출을 하게 된 근거는
 Hermes 를 부르는 값이 아니라 `hermes` 쪽에 두지 않는다.
 
 두 값이 사람마다 다르지 않은 근거는
-[`adr/ADR-002-profile은-나누고-ai-계정은-가족이-함께-쓴다.md`](../adr/ADR-002-profile은-나누고-ai-계정은-가족이-함께-쓴다.md) 에 있다.
+[`adr/ADR-002-profile은-나누고-ai-계정은-가족이-함께-쓴다.md`](../../backend/docs/adr/ADR-002-profile은-나누고-ai-계정은-가족이-함께-쓴다.md) 에 있다.
 profile 은 사용자마다 나누고 AI 계정은 그룹이 함께 쓴다.
 
 에이전트는 실행에 쓸 모델을 갖지 않는다.

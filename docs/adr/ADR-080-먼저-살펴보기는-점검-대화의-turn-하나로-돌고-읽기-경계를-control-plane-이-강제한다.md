@@ -30,7 +30,7 @@
 
   `skills` toolset 에 함께 든 `skill_manage` 는 fos-ctx 의 `pre_tool_call` 이 이미 모든 실행에서 막는다.
 
-  **살펴보기 트리만 위임 결과를 한 turn 안에서 기다린다.** `agent_status` 의 `wait_seconds` 는 살펴보기 트리에서만 기다린다. 살펴보기는 끝난 뒤 자동 turn 을 열지 않으므로 [ADR-040](ADR-040-위임-결과는-control-plane-이-부모-대화의-다음-turn-을-열어-전한다.md) 의 「부모는 기다리지 않는다」 의 예외다. 기다리는 동안 같은 profile 의 다른 MCP 호출이 기다린다([`hermes/fos-ctx.md`](../hermes/fos-ctx.md)). 그 밖의 실행은 ADR-040 그대로다.
+  **살펴보기 트리만 위임 결과를 한 turn 안에서 기다린다.** `agent_status` 의 `wait_seconds` 는 살펴보기 트리에서만 기다린다. 살펴보기는 끝난 뒤 자동 turn 을 열지 않으므로 [ADR-040](../../backend/docs/adr/ADR-040-위임-결과는-control-plane-이-부모-대화의-다음-turn-을-열어-전한다.md) 의 「부모는 기다리지 않는다」 의 예외다. 기다리는 동안 같은 profile 의 다른 MCP 호출이 기다린다([`hermes/fos-ctx.md`](../hermes/fos-ctx.md)). 그 밖의 실행은 ADR-040 그대로다.
 
   **한 번의 살펴보기에 상한 셋을 강제한다.** 시간과 도구 호출 수는 Control Plane 이 넘는 순간 그 turn 을 중지하고, 위임 수는 맡길 때 거절한다.
   값은 `assistant.proactive-check` 설정이 갖는다. 사용량과 비용은 기존 실행 줄에 그대로 남고, 살펴보기 한 번의 상태와 셈은 `proactive_check` 에 남는다.
@@ -43,7 +43,7 @@
   Memory 문맥(보통 turn 과 같다), 점검 대화의 session, 최근에 알린 발견과 그 뒤의 사용자 메시지 수, 지난 살펴보기 뒤의 변화 신호를 싣는다.
   변화 신호는 Memory 문맥의 해시가 지난 살펴보기와 같은지, 지난 살펴보기 뒤 사용자가 보낸 메시지 수, 지난 살펴보기 시각이다.
   바뀐 것이 없고 새 후보도 없으면 조사를 줄이고 `NOTHING_NEW` 로 끝내라고 지시한다. 사람이 누른 살펴보기는 모델을 건너뛰지 않는다.
-  사용자가 점검 대화에서 밝힌 지속적인 선호나 거절은 그 turn 의 기존 Memory 제안과 수락 경로로 남긴다([ADR-012](ADR-012-memory-는-사람이-승인한-것만-남는다.md)). 새 기억 층을 두지 않고, 답하지 않은 것을 선호로 남기지 않는다.
+  사용자가 점검 대화에서 밝힌 지속적인 선호나 거절은 그 turn 의 기존 Memory 제안과 수락 경로로 남긴다([ADR-012](../../backend/docs/adr/ADR-012-memory-는-사람이-승인한-것만-남는다.md)). 새 기억 층을 두지 않고, 답하지 않은 것을 선호로 남기지 않는다.
 
   **점검 대화의 Hermes session 은 살펴보기 횟수로 바꾼다.**
   같은 session 으로 돈 살펴보기가 `session-max-checks`(기본 14)에 닿으면 다음 살펴보기는 새 session 으로 시작한다.
@@ -55,7 +55,7 @@
   사용자는 에이전트가 자기 맥락을 보고 할 일을 먼저 제시하는 비서를 원한다(#165). 첫 분야는 커리어다.
   `/v1/runs` 는 toolset 을 받지 않고 toolset 은 profile 설정이다([`hermes/runs-api.md`](../hermes/runs-api.md), [`hermes/tools-and-skills.md`](../hermes/tools-and-skills.md)).
   그래서 「이 실행에서만 쓰기 도구를 뺀다」 는 Hermes 에서 할 수 없다.
-  내장 `delegate_task` 의 자식은 Control Plane 이 세지 못해([ADR-062](ADR-062-native-하위-에이전트-사용량은-재조회-작업-줄을-원장으로-넓혀-합계에-더한다.md)) 위임 상한을 강제할 수 없다.
+  내장 `delegate_task` 의 자식은 Control Plane 이 세지 못해([ADR-062](../../backend/docs/adr/ADR-062-native-하위-에이전트-사용량은-재조회-작업-줄을-원장으로-넓혀-합계에-더한다.md)) 위임 상한을 강제할 수 없다.
   먼저 알리기([ADR-072](ADR-072-먼저-알리기의-기본값은-알리지-않음이고-control-plane-기록에서-정한-신호만-화면-안에-올린다.md))는 판정이 실행을 시작하지 않는다고 정했다.
   처음에는 사람이 누른 실행만 열었다. ADR-085 에서 사용자가 켠 매일 깨우기도 같은 점검 경로를 열도록 개정한다.
   맥락을 기억해 다음 제안에 반영하지 않으면 같은 제안을 되풀이하며 토큰만 쓴다(2026-10-04 사용자 원칙). 그래서 지난 결과와 사용자의 반응과 변화 신호를 살펴보기마다 싣는다.

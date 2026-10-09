@@ -6,7 +6,7 @@
 ## 페르소나
 
 에이전트의 성격이다. 본문은 그 profile 의 `SOUL.md` 가 갖고 이 저장소는 화면만 준다.
-근거는 [`adr/ADR-019-페르소나는-hermes-가-갖고-control-plane-은-화면만-준다.md`](../adr/ADR-019-페르소나는-hermes-가-갖고-control-plane-은-화면만-준다.md) 에 있다.
+근거는 [`adr/ADR-019-페르소나는-hermes-가-갖고-control-plane-은-화면만-준다.md`](../../backend/docs/adr/ADR-019-페르소나는-hermes-가-갖고-control-plane-은-화면만-준다.md) 에 있다.
 
 - **본문을 데이터베이스에 두지 않는다.** 읽을 때도 쓸 때도 Hermes 대시보드를 부른다.
 - 정본이 하나라 어긋날 것이 없다. 반영 상태도 다시 반영하는 경로도 두지 않는다.
@@ -25,7 +25,7 @@
 
 **주인은 공개해도 주인이다.** 그룹에 공개한 에이전트도 만든 사람이 계속 고친다.
 주인이 비어 있는 에이전트(이 규칙 전에 운영에서 등록한 그룹 공개 에이전트)는 `ADMIN` 만 고친다.
-근거는 [ADR-033](../adr/ADR-033-사용자가-에이전트를-만들고-공개해도-만든-사람이-관리한다.md) 에 있다.
+근거는 [ADR-033](../../backend/docs/adr/ADR-033-사용자가-에이전트를-만들고-공개해도-만든-사람이-관리한다.md) 에 있다.
 
 판정은 `AgentService.isEditableBy` 하나다. 성격, 도구, 스킬, 공개 범위, 지우기가 모두 이것을 부른다.
 
@@ -47,7 +47,7 @@
 
 코드는 `chat` 패키지에 있다. 대화와 메시지를 읽고 실행을 적기 때문이다(ADR-068). 주소는 `/api/v1/agents/{code}/starters` 그대로다.
 새 대화 화면에 보이는 추천 질문 넷까지다. 사람이 적지 않고 모델이 만든다.
-근거는 [ADR-036](../adr/ADR-036-추천-질문은-사용자의-대화-이력으로-모델이-만들고-메모리에만-둔다.md) 에 있다.
+근거는 [ADR-036](../../backend/docs/adr/ADR-036-추천-질문은-사용자의-대화-이력으로-모델이-만들고-메모리에만-둔다.md) 에 있다.
 
 - **`(사용자, 에이전트)` 마다 다르다.** 그 사용자의 최근 대화 첫 질문들을 모델이 요약한다. 이력이 없으면 그 에이전트의 성격과 켜진 도구와 스킬 이름으로 할 수 있는 일을 만든다
 - **backend 메모리에만 둔다.** 재시작하면 비고 다시 만든다
@@ -74,7 +74,7 @@
 ## 에이전트 도구
 
 에이전트가 쓸 toolset 이다. 목록은 그 profile 설정의 `platform_toolsets.api_server` 가 갖고, 이 저장소는 등급 판정과 화면을 준다.
-데이터베이스에 사본을 두지 않는다. 근거는 [`adr/ADR-029-에이전트-도구는-control-plane-이-등급으로-판정하고-hermes-설정-api-로-쓴다.md`](../adr/ADR-029-에이전트-도구는-control-plane-이-등급으로-판정하고-hermes-설정-api-로-쓴다.md) 에 있다.
+데이터베이스에 사본을 두지 않는다. 근거는 [`adr/ADR-029-에이전트-도구는-control-plane-이-등급으로-판정하고-hermes-설정-api-로-쓴다.md`](../../backend/docs/adr/ADR-029-에이전트-도구는-control-plane-이-등급으로-판정하고-hermes-설정-api-로-쓴다.md) 에 있다.
 
 - 등급 표는 코드 한 곳(`agent/domain/AgentToolPolicy`)이 갖는다. 표와 이유는 ADR-029 의 「도구 등급」 이다
 - 설정을 쓸 때 대시보드 plugin 은 허용 목록 밖의 이름을 거절한다. Hermes 를 올릴 때 `fos-home-infra` 의 기능 검사는 모든 profile 의 켜진 목록을 허용 목록과 대조한다. 실행마다 검사하지 않는다
@@ -118,7 +118,7 @@ Hermes 목록에서 사라진 숨김 이름은 관리 목록에 남아 숨김을
 
 ## 에이전트 만들기와 지우기
 
-모든 사용자가 화면에서 자기 에이전트를 만든다. 근거는 [ADR-033](../adr/ADR-033-사용자가-에이전트를-만들고-공개해도-만든-사람이-관리한다.md) 에 있다.
+모든 사용자가 화면에서 자기 에이전트를 만든다. 근거는 [ADR-033](../../backend/docs/adr/ADR-033-사용자가-에이전트를-만들고-공개해도-만든-사람이-관리한다.md) 에 있다.
 
 | 경로 | 하는 일 | 거절 |
 | --- | --- | --- |
@@ -135,7 +135,7 @@ Hermes 목록에서 사라진 숨김 이름은 관리 목록에 남아 숨김을
 1. 주인의 `app_user` 행을 잠그고 그 사용자의 지우지 않은 에이전트 수가 `assistant.agents.max-per-user`(기본 5)보다 적은지 본다. `ADMIN` 은 세지 않는다
 2. `code` 와 profile 이름을 만든다. 둘 다 사용자가 넣은 이름과 무관한 무작위 값이다
 3. `POST /api/profiles` 로 profile 을 `no_skills` 로 만든다. plugin 이 이 안에서 안전한 기본 도구, Control Plane MCP 등록, 서명 plugin, 관리 표식을 붙인다
-4. 그 profile 에 묶인 MCP 토큰을 발급해 `PUT /api/env` 로 `MCP_FOS_ASSISTANT_API_KEY` 에 넣는다([ADR-032](../adr/ADR-032-mcp-토큰은-profile-을-증명하고-실제-사용자는-부모-실행에서-정한다.md))
+4. 그 profile 에 묶인 MCP 토큰을 발급해 `PUT /api/env` 로 `MCP_FOS_ASSISTANT_API_KEY` 에 넣는다([ADR-032](../../backend/docs/adr/ADR-032-mcp-토큰은-profile-을-증명하고-실제-사용자는-부모-실행에서-정한다.md))
 5. `API_SERVER_MODEL_NAME` 과 `API_SERVER_KEY` 를 넣고 key 파일을 쓴다
 6. 그 key 로 도구 목록을 읽는다. 셸·파일 등급이 켜져 있으면 plugin 틀이 적용되지 않은 것으로 보고 거두고 `HERMES_PROVISION_FAILED`. 도구 목록에는 MCP 서버 이름이 없어 MCP 등록은 3 이 성공한 것으로 믿는다
 7. 에이전트 행을 `profile_managed = true` 로 저장한다
@@ -145,7 +145,7 @@ profile 을 만드는 도중의 실패는 key 파일, profile 순으로 모두 �
 만든 뒤의 실패와 지우기는 profile, key 파일 순으로 거두고, 하나라도 실패하면 거기서 멈춘다.
 profile 을 거두지 못하면 에이전트를 지우지 않고 그 오류를 올린다.
 새 profile 은 재시작 없이 공유 listener 에서 답한다. MCP 도구는 첫 연결까지 1~2분 걸릴 수 있다.
-새 profile 은 그룹 공용 credential 로 돈다([ADR-002](../adr/ADR-002-profile은-나누고-ai-계정은-가족이-함께-쓴다.md)).
+새 profile 은 그룹 공용 credential 로 돈다([ADR-002](../../backend/docs/adr/ADR-002-profile은-나누고-ai-계정은-가족이-함께-쓴다.md)).
 
 **지우기는 에이전트 행을 지우지 않는다.** `deleted_at` 을 적고 끈다.
 붙은 연결을 먼저 모두 뗀다. 사람이 만든 profile 은 거두지 않으므로 떼지 않으면 그 profile 에 커넥터 서버와 값이 남는다. 순서는 [`connector-install.md`](connector-install.md) 의 「설치와 실패 처리」 가 갖는다.

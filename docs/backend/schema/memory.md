@@ -58,10 +58,10 @@ V47 이전 판으로 되돌린 동안 옛 코드가 쓴 줄은 다시 올리기 
 `agent_memory_collection` 에 줄이 없는 에이전트에는 `core` 를 넣는다. 옛 커넥터 에이전트는 뺀다.
 되돌린 동안 고치거나 지운 Memory 는 `memory_revision` 에 판이 남지 않는다.
 
-근거는 [ADR-003](../../adr/ADR-003-memory-권한은-주입으로-강제한다.md), [ADR-012](../../adr/ADR-012-memory-는-사람이-승인한-것만-남는다.md),
-[ADR-052](../../adr/ADR-052-memory-는-collection-종류-꺼내는-방식-민감도-판-출처를-가진다.md),
-[ADR-053](../../adr/ADR-053-에이전트는-허용된-collection-의-memory-만-받는다.md),
-[ADR-058](../../adr/ADR-058-기존-개인-지식-저장소는-주인이-검토한-묶음을-화면에서-올려-들여온다.md) 에 있다.
+근거는 [ADR-003](../../../backend/docs/adr/ADR-003-memory-권한은-주입으로-강제한다.md), [ADR-012](../../../backend/docs/adr/ADR-012-memory-는-사람이-승인한-것만-남는다.md),
+[ADR-052](../../../backend/docs/adr/ADR-052-memory-는-collection-종류-꺼내는-방식-민감도-판-출처를-가진다.md),
+[ADR-053](../../../backend/docs/adr/ADR-053-에이전트는-허용된-collection-의-memory-만-받는다.md),
+[ADR-058](../../adr/archive/ADR-058-기존-개인-지식-저장소는-주인이-검토한-묶음을-화면에서-올려-들여온다.md) 에 있다.
 
 ## memory_revision
 
@@ -109,7 +109,7 @@ V47 이전 판으로 되돌린 동안 옛 코드가 쓴 줄은 다시 올리기 
 
 ## agent_memory_collection
 
-에이전트가 받는 collection 하나가 한 줄이다. 근거는 [ADR-053](../../adr/ADR-053-에이전트는-허용된-collection-의-memory-만-받는다.md) 에 있다.
+에이전트가 받는 collection 하나가 한 줄이다. 근거는 [ADR-053](../../../backend/docs/adr/ADR-053-에이전트는-허용된-collection-의-memory-만-받는다.md) 에 있다.
 
 | 칸 | 타입 | 뜻 |
 | --- | --- | --- |

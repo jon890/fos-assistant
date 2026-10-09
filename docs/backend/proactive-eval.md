@@ -1,7 +1,7 @@
 # 먼저 살펴보기 루프 평가
 
 문제 찾기부터 판단 피드백까지 이어진 루프가 쓸모 있고 안전한지 합성 fixture 로 측정한다.
-새 기능이 아니라 측정 도구다. 결정은 [ADR-20261007 / proactive-eval](../adr/ADR-20261007-proactive-eval.md)에 있다.
+새 기능이 아니라 측정 도구다. 결정은 [ADR-20261007 / proactive-eval](../../backend/docs/adr/ADR-20261007-proactive-eval.md)에 있다.
 각 단계의 계약은 [먼저 살펴보기](proactive-check.md), [가치 평가](value-evaluation.md), [행동 정책](autonomy-policy.md), [판단 피드백](decision-feedback.md)이 갖는다.
 
 ## 무엇을 돌리는가
