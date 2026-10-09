@@ -114,7 +114,7 @@ token 과 API key 값 자체는 받지 않는다. 파일을 읽게 할 경우 �
 공통 또는 profile 별 마운트 원본이 `workspace_root` 또는 `attachment_root` 와 같거나 그 아래이거나 그 상위이면 정책 전체를 읽지 못한 것으로 본다.
 마운트 대상이 `attachment_agent_root` 와 같거나 그 아래이거나 그 상위여도 정책 전체를 읽지 못한 것으로 본다.
 마운트 원본이나 대상이 `connector_output_root` 와 겹쳐도 같다. 다른 profile 의 출력이 보이기 때문이다.
-`skill_root` 는 `workspace_root`, `attachment_root`, `connector_output_root` 와 겹칠 수 없다. 공통 또는 profile 별 마운트의 원본이 `skill_root` 와 겹치거나 대상이 Hermes 스킬 루트와 겹쳐도 정책 전체를 읽지 못한 것으로 본다. 다른 profile 의 스킬이 보이기 때문이다.
+`skill_root` 는 `workspace_root`, `attachment_root`, `connector_output_root` 와 겹칠 수 없다. `skill_root` 가 있으면 Hermes 쪽 스킬 루트 `FOS_ASSISTANT_SKILL_AGENT_ROOT` 도 있어야 하고, 그 경로가 `/workspace`, `/root`, `attachment_agent_root`, `connector_output_root` 와 겹치면 정책 전체를 읽지 못한 것으로 본다. 스킬 마운트의 대상이 그 경로다. 공통 또는 profile 별 마운트의 원본이 `skill_root` 와 겹치거나 대상이 Hermes 스킬 루트와 겹쳐도 정책 전체를 읽지 못한 것으로 본다. 다른 profile 의 스킬이 보이기 때문이다.
 스킬 마운트는 Hermes 쪽 `<FOS_ASSISTANT_SKILL_AGENT_ROOT>/<profile>` 이 링크 없는 디렉터리일 때만 붙인다. 없는 원본을 붙이면 Docker 가 빈 디렉터리를 만들거나 socket proxy 가 컨테이너 생성을 거절하기 때문이다. Control Plane 은 스킬을 처음 저장할 때 그 디렉터리를 만들고 에이전트를 지울 때까지 남긴다.
 `connector_output_root` 를 넣거나 빼면 등록된 profile 의 `terminal:` 이 바뀌어 다음 셸 저장에서 컨테이너 키가 바뀐다. 그 저장 전까지는 출력 디렉터리가 붙지 않는다.
 셸 저장과 사진 도구 옛 설치는 그 profile 의 출력 디렉터리를 링크 없이 만들지 못하면 409 로 거절한다. 바인딩 설치는 같은 실패를 빈 값으로 넘긴다.
