@@ -159,20 +159,22 @@ Memory 의 기본 근거는 [`adr/ADR-003-memory-권한은-주입으로-강제�
 | --- | --- | --- |
 | `html`, `htm` | `text/html; charset=utf-8` | 5 MiB |
 | `png`, `jpg`, `jpeg`, `gif`, `webp` | 그 사진 형식 | 20 MiB |
+| `css` | `text/css; charset=utf-8`. HTML 미리보기가 상대 경로로 부르는 스타일이 적용되게 한다 | 1 MiB |
 | `csv`, `tsv` 와 아래 글 확장자, 확장자가 없는 이름 | `text/plain; charset=utf-8` | 1 MiB |
 
-글 확장자는 `txt`, `md`, `markdown`, `log`, `json`, `jsonl`, `yaml`, `yml`, `toml`, `ini`, `cfg`, `conf`, `env`, `py`, `js`, `mjs`, `cjs`, `ts`, `tsx`, `jsx`, `java`, `kt`, `go`, `rs`, `rb`, `sh`, `bash`, `zsh`, `sql`, `xml`, `svg`, `css`, `scss` 다.
+글 확장자는 `txt`, `md`, `markdown`, `log`, `json`, `jsonl`, `yaml`, `yml`, `toml`, `ini`, `cfg`, `conf`, `env`, `py`, `js`, `mjs`, `cjs`, `ts`, `tsx`, `jsx`, `java`, `kt`, `go`, `rs`, `rb`, `sh`, `bash`, `zsh`, `sql`, `xml`, `svg`, `scss` 다.
 SVG 는 스크립트를 품을 수 있어 사진이 아니라 글로 보인다.
+확장자는 이름의 마지막 `.` 뒤를 소문자로 읽는다. `.` 으로 시작하고 다른 `.` 이 없는 이름은 그 뒤 전체가 확장자다. `.env` 는 `env` 라 글이고, `.gitignore` 는 `gitignore` 라 미리보기가 없다. `.` 이 없는 이름(`Makefile`)은 확장자가 없는 이름이다.
 
 | 머리글 | 미리보기 | 내려받기 |
 | --- | --- | --- |
 | `Content-Type` | 위 표 | `application/octet-stream` |
-| `Content-Disposition` | `inline; filename*=UTF-8''<이름>` | `attachment; filename="<ASCII 대체 이름>"; filename*=UTF-8''<이름>` |
+| `Content-Disposition` | `inline; filename="<ASCII 로 옮긴 이름>"; filename*=UTF-8''<이름>` | `attachment; filename="<ASCII 로 옮긴 이름>"; filename*=UTF-8''<이름>` |
 | `Content-Security-Policy` | HTML 은 결과물과 같은 값([`backend/artifact.md`](backend/artifact.md) 의 「경로」). 그 밖은 `sandbox; default-src 'none'` | `sandbox; default-src 'none'` |
 | `X-Content-Type-Options` | `nosniff` | `nosniff` |
 | `Cache-Control` | `private, no-store` | `private, no-store` |
 
-ASCII 대체 이름은 ASCII 가 아닌 글자와 `"`, `\` 를 `_` 로 바꾼 것이다.
+`Content-Disposition` 은 Spring 의 `ContentDisposition` 에 이름과 UTF-8 을 주어 만든다. ASCII 로 옮긴 이름과 `"`, `\` 의 escape 는 Spring 이 정한다.
 web 서버 라우트는 이 다섯 머리글과 `Content-Length` 만 옮긴다.
 HTML 이 상대 경로로 부르는 CSS 와 사진은 같은 `files/` 아래 주소라 주인 확인 뒤에 받는다.
 
