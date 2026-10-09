@@ -208,7 +208,7 @@ async def _connector_request(request):
             connectors.extend({"plugin": plugin, "enabled": True, "configured": False, "mode": _entry_mode(entry)}
                               for plugin, entry in state.items() if plugin not in roots)
             # 거짓이면 어느 조건인지 이름만 남긴다. profile 이름, 경로, 파일 내용은 남기지 않는다.
-            failure = _policy_hook_failure(profile_dir, config, state)
+            failure = _policy_hook_failure(profile_dir, config, state, drift)
             if failure is not None:
                 logger.warning("dashboard-profile-api: policy_hook 거짓 조건=%s", failure)
             return JSONResponse({"profile": body["profile"], "connectors": connectors,

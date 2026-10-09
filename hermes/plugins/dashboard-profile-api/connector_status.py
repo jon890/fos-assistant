@@ -20,6 +20,9 @@ from .profiles import (
     _profile_plugin_files,
 )
 
+# `_policy_hook_failure` 가 이름 대응의 차이를 받지 않았음을 나타낸다. 받은 값 `None` 은 모양이 다르다는 뜻이라 구분한다.
+_UNSET = object()
+
 
 def _bind_skills_installed(profile_dir: pathlib.Path, manifest: dict, entry: dict) -> bool:
     """소유 기록의 스킬이 plugin 의 스킬과 같고, 설치한 파일이 plugin 의 본문과 같은지 본다. 읽다가 예외가 나면 거짓이다."""
@@ -92,10 +95,11 @@ def _tool_map_drift(profile_dir: pathlib.Path, state: dict) -> set[str] | None:
         return None
 
 
-def _policy_hook_failure(profile_dir: pathlib.Path, config: dict, state: dict) -> str | None:
+def _policy_hook_failure(profile_dir: pathlib.Path, config: dict, state: dict, drift=_UNSET) -> str | None:
     """그 profile 에서 커넥터 도구 호출이 정책 hook 을 거치지 않는 첫 조건의 이름이다. 모두 통과하면 `None` 이다.
 
     조건은 `docs/backend/connector-tool-policy.md` 의 「hook 이 켜져 있는지」 가 갖는다. 확인한 시점의 파일만 본다.
+    `drift` 는 같은 요청에서 이미 계산한 `_tool_map_drift` 의 값이다. 주지 않으면 여기서 계산한다.
 
     - `plugin_config`: 설정이 `fos-ctx` 를 켜지 않았거나 도구 덮어쓰기를 막지 않는다
     - `plugin_bundle`: 대시보드 묶음의 `fos-ctx` 를 읽지 못한다
@@ -116,7 +120,7 @@ def _policy_hook_failure(profile_dir: pathlib.Path, config: dict, state: dict) -
                 return "plugin_files"
         if (profile_dir / CONNECTOR_DETACHED).is_symlink():
             return "detached"
-        if _tool_map_drift(profile_dir, state) is None:
+        if (_tool_map_drift(profile_dir, state) if drift is _UNSET else drift) is None:
             return "tool_map"
         return None
     except Exception:

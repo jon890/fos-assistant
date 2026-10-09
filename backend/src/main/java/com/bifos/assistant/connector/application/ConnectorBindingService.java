@@ -219,7 +219,7 @@ public class ConnectorBindingService implements AgentConnectorDetacher {
             throw new ApiException(
                     ErrorCode.CONNECTOR_PROFILE_NOT_READY, "the agent profile does not accept connectors yet");
         } catch (RuntimeException ex) {
-            warn(STEP_INSTALL, connectorId, ex);
+            ConnectorBindingInstalls.warn(STEP_INSTALL, connectorId, ex);
             binding.pending(now);
             bindings.save(binding);
             throw new ConnectorOperationFailure();
@@ -251,7 +251,7 @@ public class ConnectorBindingService implements AgentConnectorDetacher {
         try {
             detach(binding.get(), Optional.empty());
         } catch (RuntimeException ex) {
-            warn(STEP_DETACH, connectorId, ex);
+            ConnectorBindingInstalls.warn(STEP_DETACH, connectorId, ex);
             throw new ConnectorOperationFailure();
         }
     }
@@ -356,7 +356,7 @@ public class ConnectorBindingService implements AgentConnectorDetacher {
                         connector.importVault(
                                 connection.vault(), connectorId, binding.agent().hermesProfile());
                     } catch (RuntimeException ex) {
-                        warn(STEP_VAULT_IMPORT, connectorId, ex);
+                        ConnectorBindingInstalls.warn(STEP_VAULT_IMPORT, connectorId, ex);
                         throw new ConnectorOperationFailure();
                     }
                     connection.markVaultStored();
@@ -368,7 +368,7 @@ public class ConnectorBindingService implements AgentConnectorDetacher {
             try {
                 detach(binding, manifest);
             } catch (RuntimeException ex) {
-                warn(STEP_DETACH, connectorId, ex);
+                ConnectorBindingInstalls.warn(STEP_DETACH, connectorId, ex);
                 throw new ConnectorOperationFailure();
             }
         }
@@ -413,7 +413,7 @@ public class ConnectorBindingService implements AgentConnectorDetacher {
             }
             return false;
         } catch (RuntimeException ex) {
-            warn(step, manifest.id(), ex);
+            ConnectorBindingInstalls.warn(step, manifest.id(), ex);
             binding.pending(now);
             return true;
         }
@@ -560,15 +560,6 @@ public class ConnectorBindingService implements AgentConnectorDetacher {
 
     private static ApiException notBound() {
         return new ApiException(ErrorCode.VALIDATION_FAILED, "this agent has no such connection");
-    }
-
-    /** 실패한 단계와 커넥터 번호와 예외 종류만 남긴다. 예외 메시지와 원격 응답에는 칸 값이 섞일 수 있어 적지 않는다. */
-    private static void warn(String step, String connectorId, RuntimeException ex) {
-        log.warn(
-                "connector {} failed at {}: {}",
-                connectorId,
-                step,
-                ex.getClass().getSimpleName());
     }
 
     private Instant now() {

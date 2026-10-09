@@ -72,6 +72,8 @@ import tools.jackson.databind.json.JsonMapper;
  *
  * <p>테스트 클래스에 트랜잭션을 두지 않는다. 점검이 바인딩마다 여는 트랜잭션과 주기 끝의 알림 트랜잭션이 실제로 돌아야 한다. 대시보드의
  * 커넥터 경로만 대역이다.
+ *
+ * <p>점검 위치와 연속 어긋남 횟수는 점검 컴포넌트의 필드다. Spring 이 만든 하나를 함께 쓰면 앞 시험의 값이 남으므로 시험마다 새로 만든다.
  */
 @BackendIntegrationTest
 @ExtendWith(OutputCaptureExtension.class)
@@ -107,10 +109,10 @@ class ConnectorBindingDriftTest {
     private static final String CONFIRM_ONLY_BODY = "반영을 확인하지 못했어요";
 
     @Autowired
-    ConnectorBindingApplier applier;
+    ConnectorBindingService service;
 
     @Autowired
-    ConnectorBindingService service;
+    ConnectorBindingProperties properties;
 
     @Autowired
     ConnectorConnectionService connectionService;
@@ -151,6 +153,7 @@ class ConnectorBindingDriftTest {
     @Autowired
     JdbcTemplate jdbc;
 
+    private ConnectorBindingApplier applier;
     private CurrentUser owner;
     private AppUser admin;
     private AppUser revokedAdmin;
@@ -189,6 +192,12 @@ class ConnectorBindingDriftTest {
                 agent.id());
         demo = binding(DEMO);
         plain = binding(PLAIN);
+        // 점검은 READY 바인딩 전체를 읽는다. 다른 검사가 남긴 것이 있으면 읽는 순서와 호출 수가 달라진다.
+        assertThat(bindings.findReadyAfter(BindingStatus.READY, 0L, PageRequest.of(0, 100)))
+                .extracting(ReadyBinding::bindingId)
+                .as("이 검사가 만든 READY 바인딩만 있다")
+                .containsExactly(demo.id(), plain.id());
+        applier = applier(properties);
         clearInvocations(connector);
     }
 
@@ -319,38 +328,70 @@ class ConnectorBindingDriftTest {
     }
 
     @Test
+    @DisplayName("잠금 확인에 실패해 건너뛴 주기는 연속 어긋남에 들지 않아 확인이 통과한 첫 주기에 설치를 다시 보낸다")
+    void doesNotCountRunsSkippedByLockCheck() {
+        when(connector.readConnector(agent.hermesProfile(), DEMO)).thenReturn(DRIFTED);
+        // 에이전트 주인이 연결 사용자와 다르면 잠금 확인이 실패한다.
+        jdbc.update("UPDATE agent SET owner_user_id = ? WHERE id = ?", admin.id(), agent.id());
+
+        assertThat(applier.resyncDrifted()).as("첫 번째 건너뜀").isZero();
+        assertThat(applier.resyncDrifted()).as("두 번째 건너뜀").isZero();
+        verify(connector, never())
+                .bindConnector(anyString(), anyString(), anyString(), anyString(), nullable(String.class));
+        assertThat(reload(demo).status()).isEqualTo(BindingStatus.READY);
+
+        jdbc.update("UPDATE agent SET owner_user_id = ? WHERE id = ?", owner.id(), agent.id());
+
+        assertThat(applier.resyncDrifted()).as("확인이 통과한 첫 주기").isEqualTo(1);
+        verify(connector, times(1))
+                .bindConnector(eq(agent.hermesProfile()), eq(DEMO), anyString(), anyString(), nullable(String.class));
+    }
+
+    @Test
+    @DisplayName("잠근 뒤 READY 가 아니게 된 바인딩은 연속 어긋남을 지워 다시 READY 가 되면 처음부터 센다")
+    void resetsStreakWhenBindingIsNoLongerReadyAfterLock() {
+        // 두 주기는 다시 맞춰 READY 가 된다. 세 번째 주기는 점검이 읽은 뒤 잠그기 전에 다른 경로가 PENDING 으로 바꾼다.
+        when(connector.readConnector(agent.hermesProfile(), DEMO))
+                .thenReturn(DRIFTED, INSTALLED, DRIFTED, INSTALLED)
+                .thenAnswer(invocation -> {
+                    setStatus(demo, BindingStatus.PENDING);
+                    return DRIFTED;
+                })
+                .thenReturn(DRIFTED, INSTALLED);
+        when(connector.bindConnector(anyString(), anyString(), anyString(), anyString(), nullable(String.class)))
+                .thenReturn(new InstallResult(false, false));
+        assertThat(applier.resyncDrifted()).as("첫 번째").isEqualTo(1);
+        assertThat(applier.resyncDrifted()).as("두 번째").isEqualTo(1);
+        assertThat(applier.resyncDrifted()).as("READY 가 아니게 된 주기").isZero();
+        assertThat(reload(demo).status()).isEqualTo(BindingStatus.PENDING);
+        setStatus(demo, BindingStatus.READY);
+
+        assertThat(applier.resyncDrifted()).as("다시 READY 가 된 뒤 첫 어긋남").isEqualTo(1);
+
+        verify(connector, times(3))
+                .bindConnector(eq(agent.hermesProfile()), eq(DEMO), anyString(), anyString(), nullable(String.class));
+        assertThat(reload(demo).status()).isEqualTo(BindingStatus.READY);
+        assertThat(notificationsOf(admin.id())).isEmpty();
+    }
+
+    @Test
     @DisplayName("한 주기에 읽는 수가 1 이면 READY 바인딩을 번호 순으로 하나씩 보고 끝까지 읽은 뒤 처음으로 돌아간다")
     void readsOneBindingPerRunWhenBatchIsOne() {
-        ConnectorBindingApplier single = new ConnectorBindingApplier(
-                service,
-                bindings,
-                agents,
-                users,
-                connector,
-                transactions,
-                clock,
-                notifications,
-                access,
-                new ConnectorBindingProperties(Duration.ofSeconds(150), 1));
-        // 다른 검사가 남긴 READY 바인딩이 있어도 번호 순서는 같다.
-        List<ReadyBinding> ready = bindings.findReadyAfter(BindingStatus.READY, 0L, PageRequest.of(0, 1_000));
-        assertThat(ready)
-                .extracting(ReadyBinding::bindingId)
-                .as("이 검사의 바인딩")
-                .containsSubsequence(demo.id(), plain.id());
+        ConnectorBindingApplier single = applier(new ConnectorBindingProperties(Duration.ofSeconds(150), 1));
 
-        for (ReadyBinding expected : ready) {
+        // 바인딩 번호는 DEMO 가 앞이다. 준비에서 단언했다.
+        for (String expected : List.of(DEMO, PLAIN)) {
             clearInvocations(connector);
             single.resyncDrifted();
             verify(connector, times(1)).readConnector(anyString(), anyString());
-            verify(connector).readConnector(expected.profile(), expected.connectorId());
+            verify(connector).readConnector(agent.hermesProfile(), expected);
         }
         clearInvocations(connector);
         single.resyncDrifted();
         verify(connector, never()).readConnector(anyString(), anyString());
         single.resyncDrifted();
         verify(connector, times(1)).readConnector(anyString(), anyString());
-        verify(connector).readConnector(ready.get(0).profile(), ready.get(0).connectorId());
+        verify(connector).readConnector(agent.hermesProfile(), DEMO);
     }
 
     @Test
@@ -359,6 +400,15 @@ class ConnectorBindingDriftTest {
         assertThatThrownBy(() -> new ConnectorBindingProperties(Duration.ofSeconds(150), 0))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("drift-batch");
+    }
+
+    private ConnectorBindingApplier applier(ConnectorBindingProperties settings) {
+        return new ConnectorBindingApplier(
+                service, bindings, agents, users, connector, transactions, clock, notifications, access, settings);
+    }
+
+    private void setStatus(ConnectorBinding binding, BindingStatus status) {
+        jdbc.update("UPDATE agent_connector_binding SET status = ? WHERE id = ?", status.name(), binding.id());
     }
 
     private ConnectorBinding binding(String connectorId) {

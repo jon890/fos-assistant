@@ -1,4 +1,4 @@
-## ADR-20261009: 서버 정의의 `tools` 어긋남은 그 커넥터만 막고, Control Plane 이 어긋난 바인딩을 찾아 다시 설치한다
+## ADR-20261009 / connector-install-drift: 서버 정의의 `tools` 어긋남은 그 커넥터만 막고, Control Plane 이 어긋난 바인딩을 찾아 다시 설치한다
 
 - **status**: `accepted`
 - Date: 2026-10-09

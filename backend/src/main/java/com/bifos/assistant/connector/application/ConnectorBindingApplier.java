@@ -66,7 +66,7 @@ public class ConnectorBindingApplier {
     /** 다음 점검이 이 번호 뒤의 바인딩부터 읽는다. 0 이면 처음부터다. */
     private long driftCursor;
 
-    /** 바인딩 번호마다 다시 맞춰도 연속으로 어긋난 횟수다. 어긋나지 않은 것을 보면 지운다. */
+    /** 바인딩 번호마다 다시 맞춰도 연속으로 어긋난 횟수다. 어긋나지 않았거나 잠근 뒤 {@code READY} 가 아닌 것을 보면 지운다. */
     private final Map<Long, Integer> driftStreak = new HashMap<>();
 
     /** 30초마다 돈다. 검사에서는 {@code -} 로 끄고 본체를 직접 부른다. */
@@ -132,25 +132,31 @@ public class ConnectorBindingApplier {
             bindings.save(binding);
             return false;
         }
+        return resyncWithCatalog(binding, now) != null;
+    }
+
+    /**
+     * 카탈로그에서 manifest 를 찾아 반영 맞추기를 돌리고 바인딩을 저장한다. 트랜잭션 안에서만 부른다.
+     *
+     * <p>카탈로그를 읽지 못하면 바인딩을 {@code PENDING} 으로 두고 저장한다. 예외를 밖으로 던지면 트랜잭션이 되돌려져 비운 반영 예정이
+     * 살아나 매 주기 다시 집거나, 어긋난 바인딩이 {@code READY} 로 남는다. 사용자의 연결 확인이나 관리자 반영 완료가 다시 맞추게 둔다.
+     *
+     * @return 반영 맞추기의 결과. 카탈로그를 읽지 못해 돌리지 않았으면 null 이다
+     */
+    private ResyncOutcome resyncWithCatalog(ConnectorBinding binding, Instant now) {
         String connectorId = binding.connection().connectorId();
         Optional<ConnectorManifest> manifest;
         try {
             manifest = ConnectorManifests.find(connector, connectorId);
         } catch (RuntimeException ex) {
-            // 예외를 밖으로 던지면 트랜잭션이 되돌려져 비운 예정이 살아나고 매 주기 다시 집는다.
-            // 단계와 커넥터 번호와 예외 종류만 남긴다. 예외 메시지에는 칸 값이 섞일 수 있다.
-            log.warn(
-                    "connector {} failed at {}: {}",
-                    connectorId,
-                    "catalog",
-                    ex.getClass().getSimpleName());
+            ConnectorBindingInstalls.warn("catalog", connectorId, ex);
             binding.pending(now);
             bindings.save(binding);
-            return false;
+            return null;
         }
-        service.resync(binding, manifest, false);
+        ResyncOutcome outcome = service.resync(binding, manifest, false);
         bindings.save(binding);
-        return true;
+        return outcome;
     }
 
     /** 10분마다 돈다. 검사에서는 {@code -} 로 끄고 본체를 직접 부른다. */
@@ -166,10 +172,11 @@ public class ConnectorBindingApplier {
      * 처음부터다. 바인딩마다 트랜잭션 밖에서 설치 상태를 읽는다. 사용자 행과 에이전트 행 잠금을 쥔 채 대시보드를 부르지 않기 위해서다.
      * 읽지 못하면 경고만 남기고 건너뛴다. 반영 맞추기의 설치 판정을 통과하면 어긋나지 않은 것이라 연속 횟수를 지운다.
      *
-     * <p>어긋났으면 연속 횟수를 하나 올리고, 트랜잭션을 열어 {@link #applyDue} 와 같은 차례로 잠근 뒤 바인딩을 다시 읽는다. 지워졌거나
-     * 그 사이 {@code READY} 가 아니게 됐거나 잠금 확인이 실패하면 건너뛴다. 다시 맞춘 바인딩은 {@code READY} 가 아니어서 다음 주기의
-     * 대상이 아니다. 다시 맞춰 {@code READY} 가 됐는데 연속으로 {@value #DRIFT_STREAK_LIMIT} 번째 어긋나면 설치를 보내지 않고
-     * {@code PENDING} 으로만 둔다. 한 바인딩의 실패는 경고로 남기고 다음 바인딩으로 간다.
+     * <p>어긋났으면 트랜잭션을 열어 {@link #applyDue} 와 같은 차례로 잠근 뒤 바인딩을 다시 읽는다. 지워졌거나 그 사이 {@code READY} 가
+     * 아니게 됐으면 연속 횟수를 지우고 건너뛴다. 잠금 확인이 실패하면 횟수를 그대로 두고 건너뛴다. 다시 맞춘 바인딩은 {@code READY} 가
+     * 아니어서 다음 주기의 대상이 아니다. 다시 맞춰 {@code READY} 가 됐는데 이번에 처리하면 연속 {@value #DRIFT_STREAK_LIMIT} 번째
+     * 어긋남이면 설치를 보내지 않고 {@code PENDING} 으로만 둔다. 연속 횟수는 반영 맞추기를 돌렸거나 상한이라 {@code PENDING} 으로 둔
+     * 트랜잭션이 커밋된 뒤에만 올린다. 한 바인딩의 실패는 경고로 남기고 다음 바인딩으로 간다.
      *
      * <p>재시작 대기나 {@code PENDING} 으로 남은 바인딩은 연결 사용자의 그룹마다 세고, 주기 끝에 그룹마다 따로 트랜잭션을 열어 차단되지
      * 않은 관리자마다 알림 한 건을 남긴다. 반영 예정 시각을 적은 바인딩은 반영 예정 확인이 맡으므로 세지 않는다. 알림은 바인딩 상태와
@@ -189,11 +196,7 @@ public class ConnectorBindingApplier {
                 reason = ConnectorBindingInstalls.notInstalledReason(
                         connector.readConnector(candidate.profile(), candidate.connectorId()), candidate.legacy());
             } catch (RuntimeException ex) {
-                // 예외 메시지와 원격 응답에는 칸 값이 섞일 수 있어 예외 종류만 남긴다.
-                log.warn(
-                        "connector {} failed at drift-check: {}",
-                        candidate.connectorId(),
-                        ex.getClass().getSimpleName());
+                ConnectorBindingInstalls.warn("drift-check", candidate.connectorId(), ex);
                 continue;
             }
             if (reason == ResyncOutcome.READY) {
@@ -201,11 +204,15 @@ public class ConnectorBindingApplier {
                 continue;
             }
             log.warn("connector {} drifted: {}", candidate.connectorId(), reason);
-            int streak = driftStreak.merge(candidate.bindingId(), 1, Integer::sum);
+            // 이번에 처리하면 몇 번째 연속 어긋남인가. 커밋된 처리만 센다.
+            int streak = driftStreak.getOrDefault(candidate.bindingId(), 0) + 1;
             try {
                 Drifted drifted = transactions.execute(status -> resyncDriftedLocked(candidate, streak));
                 if (drifted == null) {
                     continue;
+                }
+                if (drifted.counted()) {
+                    driftStreak.put(candidate.bindingId(), streak);
                 }
                 if (drifted.resynced()) {
                     resynced++;
@@ -238,34 +245,26 @@ public class ConnectorBindingApplier {
                         .filter(found -> Objects.equals(found.ownerUserId(), candidate.userId()))
                         .isPresent();
         ConnectorBinding binding = bindings.findById(candidate.bindingId()).orElse(null);
-        if (!target || binding == null || binding.status() != BindingStatus.READY) {
+        if (binding == null || binding.status() != BindingStatus.READY) {
+            // 지워졌거나 다른 경로가 상태를 바꿨다. 이어지던 어긋남이 아니므로 횟수를 지운다.
+            driftStreak.remove(candidate.bindingId());
+            return null;
+        }
+        if (!target) {
             return null;
         }
         Instant now = clock.instant();
         if (streak >= DRIFT_STREAK_LIMIT) {
             binding.pending(now);
             bindings.save(binding);
-            return Drifted.pending(owner.groupId(), binding);
+            return Drifted.pending(owner.groupId(), binding, true);
         }
-        String connectorId = binding.connection().connectorId();
-        Optional<ConnectorManifest> manifest;
-        try {
-            manifest = ConnectorManifests.find(connector, connectorId);
-        } catch (RuntimeException ex) {
-            // 예외를 밖으로 던지면 트랜잭션이 되돌려져 어긋난 바인딩이 READY 로 남는다. 관리자가 반영 완료로 다시 확인하게 둔다.
-            log.warn(
-                    "connector {} failed at {}: {}",
-                    connectorId,
-                    "catalog",
-                    ex.getClass().getSimpleName());
-            binding.pending(now);
-            bindings.save(binding);
-            return Drifted.pending(owner.groupId(), binding);
+        ResyncOutcome outcome = resyncWithCatalog(binding, now);
+        if (outcome == null) {
+            return Drifted.pending(owner.groupId(), binding, false);
         }
-        ResyncOutcome outcome = service.resync(binding, manifest, false);
-        bindings.save(binding);
         boolean adminTodo = outcome != ResyncOutcome.READY && outcome != ResyncOutcome.APPLY_SCHEDULED;
-        return new Drifted(owner.groupId(), true, adminTodo, binding.restartRequired());
+        return new Drifted(owner.groupId(), true, adminTodo, binding.restartRequired(), true);
     }
 
     /** 한 그룹의 차단되지 않은 관리자마다 알림 한 건을 남긴다. 그룹마다 트랜잭션을 따로 연다. */
@@ -301,12 +300,14 @@ public class ConnectorBindingApplier {
      * @param resynced 반영 맞추기를 돌렸는가
      * @param adminTodo 관리자가 할 일이 남았는가. 재시작 대기나 {@code PENDING} 으로 남았다
      * @param restartRequired 재시작 대기인가
+     * @param counted 연속 어긋남 횟수에 넣는가. 반영 맞추기를 돌렸거나 연속 상한이라 {@code PENDING} 으로만 뒀다
      */
-    private record Drifted(Long groupId, boolean resynced, boolean adminTodo, boolean restartRequired) {
+    private record Drifted(
+            Long groupId, boolean resynced, boolean adminTodo, boolean restartRequired, boolean counted) {
 
         /** 반영 맞추기를 돌리지 않고 {@code PENDING} 으로만 둔 바인딩이다. */
-        static Drifted pending(Long groupId, ConnectorBinding binding) {
-            return new Drifted(groupId, false, true, binding.restartRequired());
+        static Drifted pending(Long groupId, ConnectorBinding binding, boolean counted) {
+            return new Drifted(groupId, false, true, binding.restartRequired(), counted);
         }
     }
 

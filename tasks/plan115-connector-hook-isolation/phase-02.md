@@ -37,6 +37,9 @@ enum 값: `READY`, `RESTART_PENDING`, `APPLY_SCHEDULED`, `CATALOG_MISSING`, `NOT
 
 ### 2. `ConnectorBindingInstalls`
 
+구현 중 정한 것: 까닭을 더하면 `ConnectorBindingService.java` 가 파일 길이 점검의 상한을 넘어, 설치 확인과 probe 본체를 `ConnectorBindingInstalls.resync(binding, declared, now)` 로 옮기고 `installedHere` 를 지웠다. 이동만 하는 커밋을 먼저 두고 까닭으로 바꾸는 커밋을 뒤에 둔다.
+
+
 `static ResyncOutcome notInstalledReason(ConnectorState state, boolean legacy)` 를 더한다. 반영됐으면 `READY`, `policyHook` 만 거짓이면 `POLICY_HOOK_OFF`, 그 밖은 `NOT_INSTALLED` 다. `installedHere` 는 `notInstalledReason(...) == ResyncOutcome.READY` 로 둔다.
 
 ### 3. `ConnectorBindingService`

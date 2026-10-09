@@ -2,6 +2,7 @@
 
 import json
 import os
+import sys
 import yaml
 from unittest import mock
 from plugin_loading import patch_plugin
@@ -253,6 +254,23 @@ class ProfileApiConnectorBindingInstallTest(support.ProfileApiRouteTest):
 
         self.assertIs(status["policy_hook"], False)
         self.assertEqual(warnings, ["dashboard-profile-api: policy_hook 거짓 조건=tool_map"])
+
+    def test_status_compares_the_tool_map_once(self):
+        """상태 조회 한 번은 이름 대응을 한 번만 견주고, 그 값으로 항목과 `policy_hook` 을 함께 판정한다."""
+        self.bind_fixture()
+        self.assertEqual(self.bind(DEMO, "c1").status_code, 200)
+        self.assertEqual(self.bind(OTHER, "c2").status_code, 200)
+
+        # 이 이름은 패키지가 내보내지 않으므로 그것을 쓰는 두 하위 모듈에 같은 대역을 넣는다.
+        modules = [sys.modules[f"{self.plugin.__name__}.{name}"] for name in ("connector_status", "connector_install")]
+        drift = mock.Mock(wraps=modules[0]._tool_map_drift)
+        with mock.patch.object(modules[0], "_tool_map_drift", drift), \
+                mock.patch.object(modules[1], "_tool_map_drift", drift):
+            status = self.status_of()
+
+        self.assertEqual(drift.call_count, 1, drift.call_args_list)
+        self.assertEqual([entry["configured"] for entry in status["connectors"]], [True, True])
+        self.assertIs(status["policy_hook"], True)
 
     def test_disabled_policy_plugin_is_logged_by_condition_name_only(self):
         """`plugins.disabled` 에 fos-ctx 가 있으면 `policy_hook` 이 거짓이고 조건 이름만 경고 한 줄로 남긴다. profile 이름은 남기지 않는다."""
