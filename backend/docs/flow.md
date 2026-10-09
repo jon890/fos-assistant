@@ -3106,19 +3106,7 @@ Control Plane 은 도구 목록을 직접 쓰지 않는다. 바인딩 설치가 
 - `POST /api/mcp/servers/<서버>/test` 의 probe 가 도구를 내야 `READY` 다. 선언하지 않은 도구 수를 연결에 적는다. `READY` 가 되면 재시작 대기와 반영 예정 시각을 함께 비운다
 - 켜진 내장 도구는 보지 않는다. 붙인 에이전트의 도구는 주인이 정한다
 - 외부 호출이 실패하면 예외로 알리지 않고 그 바인딩만 `PENDING` 으로 둔다. 부른 쪽이 실패를 모아 `CONNECTOR_OPERATION_FAILED` 로 끝낸다
-- `READY` 가 아닌 결과는 까닭 하나로 끝난다. 외부 호출 실패가 아닌 까닭은 커넥터 id 와 까닭 이름만 담은 로그 한 줄을 남긴다
-
-| 까닭 이름 | 언제 |
-| --- | --- |
-| `RESTART_PENDING` | 재시작 대기라 다시 보내지 않았거나, 다시 보낸 설치가 재시작을 요구했다 |
-| `APPLY_SCHEDULED` | 반영 예정 시각 전이거나, 다시 보낸 설치가 `reload_pending` 이다 |
-| `CATALOG_MISSING` | 카탈로그에서 빠진 커넥터다 |
-| `NOT_INSTALLED` | 다시 읽은 설치가 꺼져 있거나 `configured` 가 거짓이거나 방식이 다르다 |
-| `POLICY_HOOK_OFF` | 다시 읽은 설치의 `policy_hook` 이 거짓이다 |
-| `PROBE_FAILED` | probe 가 실패했다 |
-| `NO_TOOLS` | probe 가 도구를 하나도 내지 않았다 |
-| `TOOLSETS_DIFFER` | 옛 바인딩의 켜진 내장 도구가 manifest 의 선언과 다르다 |
-| `CALL_FAILED` | 외부 호출이 실패했다. 단계와 예외 종류를 경고로 남긴다 |
+- `READY` 가 아닌 결과는 `ResyncOutcome` 의 까닭 하나로 끝난다. 외부 호출 실패가 아닌 까닭은 커넥터 id 와 까닭 이름만 담은 로그 한 줄을 남긴다. 외부 호출 실패는 단계와 예외 종류를 경고로 남긴다
 
 #### 반영 예정 확인
 
@@ -3141,16 +3129,16 @@ probe 가 실패해 `PENDING` 이 되면 다시 부르지 않는다. 사용자�
 #### 정의 어긋남 점검
 
 manifest 가 바뀐 뒤 설치가 다시 보내지지 않은 바인딩을 Control Plane 이 찾아 다시 맞춘다([ADR-20261009 / connector-install-drift](../../docs/adr/ADR-20261009-connector-install-drift.md)).
-`ConnectorBindingApplier` 가 `assistant.connector.binding.drift-cron`(기본 10분)마다 돈다. 배포나 커넥터 동기화 뒤 운영자가 할 일은 없다.
+`ConnectorBindingApplier` 가 `assistant.connector.binding.drift-cron` 주기로 돈다. 배포나 커넥터 동기화 뒤 운영자가 할 일은 없다.
 
-1. 트랜잭션 밖에서 `READY` 바인딩을 번호 순으로 `assistant.connector.binding.drift-batch`(기본 20)개까지 읽는다. 앞 주기가 멈춘 번호 뒤부터 읽고, 끝까지 읽었으면 다음 주기는 처음부터다
+1. 트랜잭션 밖에서 `READY` 바인딩을 번호 순으로 `assistant.connector.binding.drift-batch` 가 정한 수까지 읽는다. 앞 주기가 멈춘 번호 뒤부터 읽고, 끝까지 읽었으면 다음 주기는 처음부터다
 2. 바인딩마다 트랜잭션 밖에서 `GET /api/connectors` 로 그 커넥터의 설치를 읽는다. 읽지 못하면 경고 로그를 남기고 건너뛴다. 「바인딩의 반영 맞추기」 의 설치 판정(켜짐, `configured`, `policy_hook`, 바인딩 방식)을 통과하면 어긋나지 않은 것이다
 3. 어긋났으면 커넥터 id 와 어긋난 조건 이름을 로그에 남긴다. 트랜잭션을 열고 「반영 예정 확인」 과 같은 차례로 잠근 뒤 바인딩을 다시 읽는다. 지워졌거나 `READY` 가 아니면 건너뛴다
 4. 「바인딩의 반영 맞추기」 를 한다. 서버 정의가 바뀌므로 대개 재시작 대기가 된다
 5. 다시 맞춘 바인딩 가운데 재시작 대기나 `PENDING` 으로 남은 것이 있으면 연결 주인의 그룹 관리자마다 알림 한 건을 남긴다. 반영 예정 시각을 적은 바인딩은 반영 예정 확인이 맡으므로 세지 않는다
 
 다시 맞춘 바인딩은 `READY` 가 아니어서 다음 주기의 대상이 아니다. 그래서 같은 어긋남에 설치를 되풀이해 보내지 않는다.
-다시 맞춰 `READY` 가 됐는데 다음 주기에 또 어긋나면 바인딩마다 센다. 연속 3번째에는 설치를 보내지 않고 `PENDING` 으로만 두고 알린다. 어긋나지 않은 것을 보면 센 값을 지운다.
+다시 맞춰 `READY` 가 됐는데 다음 주기에 또 어긋나면 바인딩마다 센다. 연속 횟수가 상한(`ConnectorBindingApplier` 가 갖는다)에 이르면 설치를 보내지 않고 `PENDING` 으로만 두고 알린다. 어긋나지 않은 것을 보면 센 값을 지운다.
 점검 위치와 센 값은 JVM 메모리에 둔다. Control Plane 이 한 대라는 전제다.
 
 | 알림에 담는 것 | 본문 |
@@ -3166,7 +3154,7 @@ manifest 가 바뀐 뒤 설치가 다시 보내지지 않은 바인딩을 Contro
 1. 관리자인지 본다. 에이전트 번호와 주인은 트랜잭션 밖에서 읽는다. 트랜잭션의 첫 읽기가 잠금이어야 MySQL 의 REPEATABLE READ 에서 등록이 커밋한 재시작 시각을 보기 때문이다
 2. 주인의 사용자 행, 에이전트 행을 붙이기와 같은 차례로 잠근다. 잠근 뒤 그 에이전트의 주인이 바뀌었으면 `AGENT_BUSY` 다. 그다음 지금 주인이 관리자와 같은 그룹인지 보고, 아니면 `AGENT_NOT_FOUND` 다. 403 과 404 가 갈리면 다른 그룹의 에이전트 코드가 있는지 드러나기 때문이다. 그 뒤 바인딩을 새로 읽는다
 3. 바인딩의 `restart_required_since` 가 요청의 `restartRequiredSince` 보다 늦거나 요청이 비었으면 `CONNECTOR_RESTART_AGAIN` 으로 거절한다. 관리자가 재시작한 뒤에 다시 설치된 바인딩이다. 바인딩에 그 시각이 없으면 요청을 보지 않는다
-4. 위 「바인딩의 반영 맞추기」 를 한다. 반영 예정 시각이 아직 오지 않은 바인딩은 설치를 다시 보내지 않는다. `READY` 가 되지 않으면 `CONNECTOR_OPERATION_FAILED` 로 끝낸다
+4. 위 「바인딩의 반영 맞추기」 를 한다. 반영 예정 시각이 아직 오지 않은 바인딩은 설치를 다시 보내지 않는다. `READY` 가 되지 않으면 바인딩 상태를 커밋한 뒤 까닭에 따라 끝낸다. 외부 호출 실패만 502 `CONNECTOR_OPERATION_FAILED` 이고, 나머지는 설치 상태, 도구 확인, 반영 예정, 재시작 대기마다 다른 409 이며 카탈로그에서 빠졌으면 404 다. 까닭과 오류 코드의 대응은 `ConnectorErrors.notApplied` 가 갖는다
 
 #### 에이전트의 공개 범위, 주인, 삭제
 
@@ -6075,7 +6063,7 @@ WHERE e.parent_execution_id IS NULL
 - 그다음 지금 주인이 관리자와 같은 그룹이어야 한다. 아니면 `AGENT_NOT_FOUND`(404)다. 다른 그룹의 에이전트가 있는지 드러내지 않는다
 - 바인딩의 재시작 대기 시각이 본문의 `restartRequiredSince` 보다 늦거나 본문이 비었으면 `CONNECTOR_RESTART_AGAIN`(409)으로 거절한다. 관리자가 목록을 본 뒤에 다시 설치된 바인딩이라 재시작한 gateway 가 아직 보지 못했을 수 있기 때문이다. 화면은 성공하든 거절되든 목록을 다시 읽어 바뀐 값을 받는다
 - 바인딩에 재시작 대기 시각이 없으면 본문을 보지 않는다. 재시작이 필요 없던 바인딩의 다시 확인이 이 경우다
-- 받으면 설치를 한 번 다시 보내 반영됐는지 본다. 그래도 `READY` 가 되지 않으면 까닭에 따라 끝낸다. 외부 호출 실패는 `CONNECTOR_OPERATION_FAILED`(502), 설치 상태가 맞지 않으면 `CONNECTOR_INSTALL_MISMATCH`(409), probe 가 도구를 확인하지 못하면 `CONNECTOR_TOOLS_UNVERIFIED`(409), 반영 예정이면 `CONNECTOR_APPLY_SCHEDULED`(409), 다시 재시작이 필요하면 `CONNECTOR_RESTART_AGAIN`(409), 카탈로그에 없으면 `CONNECTOR_NOT_FOUND`(404)다. 까닭 이름과 대응은 위 「관리자 반영 완료」 가 갖는다
+- 받으면 설치를 한 번 다시 보내 반영됐는지 본다. 그래도 `READY` 가 되지 않으면 까닭에 따라 끝낸다. 외부 호출 실패만 `CONNECTOR_OPERATION_FAILED`(502)이고 나머지 갈래는 위 「관리자 반영 완료」 가 갖는다
 
 ## 커넥터 승인
 

@@ -294,13 +294,13 @@ sequenceDiagram
             alt 반영을 확인했다
                 C-->>A: 바인딩 READY
             else 확인하지 못했다
-                C-->>A: 까닭별 오류. 대응 표는 backend/docs/flow.md 의 「관리자 반영 완료」 가 갖는다. 외부 호출 실패만 502
+                C-->>A: 까닭별 409 나 404. 외부 호출 실패만 502
             end
         end
     end
 
     Note over C,D: manifest 가 바뀐 뒤 어긋난 설치를 찾는다
-    C->>D: 10분마다 READY 바인딩의 설치 상태를 읽는다
+    C->>D: 주기마다 READY 바인딩의 설치 상태를 읽는다
     opt 설치가 어긋났다
         C->>D: 사용자 행, 에이전트 행을 잠그고 설치를 다시 보낸다
         C->>C: 대개 재시작 대기. 그룹 관리자에게 CONNECTOR_REINSTALLED 알림
