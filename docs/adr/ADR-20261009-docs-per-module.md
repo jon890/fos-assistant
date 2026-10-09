@@ -33,7 +33,7 @@ API 경로와 응답 칸의 목록, 설정 키 표, enum 값 목록, 마이그�
 문서는 코드만 읽어서는 알 수 없는 것을 적는다. 왜 그렇게 했는지, 어느 분기에서 무엇이 갈리는지, 지울 때 무엇이 함께 지워지는지다.
 화면 문구처럼 확인 기준이 되는 값은 시험이 문서를 읽어 코드와 맞춰 볼 때만 남긴다(`attention.test.ts` 의 「이유 문구」 표).
 
-이 결정으로 `docs/frontend/` 의 여섯 파일을 `web/docs/` 의 셋으로, `docs/hermes/` 와 커넥터 문서를 hermes 모듈의 계약 문서와 코드 옆 README 로 옮겼다. backend 와 루트 문서는 열린 작업이 끝나는 대로 같은 방식으로 옮긴다.
+이 결정으로 `docs/frontend/` 의 여섯 파일을 `web/docs/` 의 셋으로, `docs/hermes/` 와 커넥터 문서를 hermes 모듈의 계약 문서와 코드 옆 README 로 옮겼다. backend 는 저장 모델과 패키지 문서를 `backend/docs/` 의 `data-schema.md` 와 `code-architecture.md` 로 옮겼고, 기능 문서와 루트 문서는 같은 방식으로 이어 옮긴다.
 
 ### 맥락
 
