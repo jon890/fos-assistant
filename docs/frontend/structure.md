@@ -39,6 +39,7 @@
 | `/admin/executions/{id}` | 실제 모델과 토큰, 금액, 시각 구간, 오류 코드, 도구 원본, 실은 문맥 항목의 참조가 보이는 실행 하나. 참조의 뜻은 [`backend/context-bundle.md`](../backend/context-bundle.md) 의 「로그와 저장」 이 갖는다 |
 | `/admin/connections` | 반영을 기다리는 연결의 반영 완료 |
 | `/admin/browsers` | 모든 사용자 브라우저의 사용자 이름, 상태, 마지막 사용 시각, 오류 코드와 끄기, 지우기 |
+| `/admin/workspaces` | 실행 공간마다 주인 이름, 용량, 항목 수와 일부만 셌는지. 파일 이름은 보이지 않는다 |
 
 `/admin` 아래는 `ADMIN` 만 연다.
 
@@ -57,6 +58,7 @@
 | 사용량과 비용 | `/admin/usage`, `/admin/executions/{id}` | 금액과 모델과 토큰, 「사용량 내역」, 「설정별 사용량」 탭, 실행 상세의 내부 값 | `/usage` 와 `/executions/{id}` 가 `ADMIN` 에게 더 그리던 것 |
 | 커넥터 | `/admin/connections` | 반영을 기다리는 바인딩의 「반영 완료」. 재시작 대기 바인딩은 공유 gateway 를 재시작한 뒤 누른다 | `/connections` 아래의 관리자 패널 |
 | 브라우저 | `/admin/browsers` | 모든 사용자 브라우저의 상태와 오류 코드, 끄기와 지우기 | 없음. `/browser` 는 내 브라우저만 보이고 오류 코드를 그리지 않는다 |
+| 파일 공간 | `/admin/workspaces` | 실행 공간마다 용량과 항목 수 | 없음. `/files` 는 내 공간만 보이고 관리자도 남의 공간을 열지 못한다 |
 
 대화 화면도 같다. 작업 과정의 「원본 보기」, 모델이 바뀌었다는 표시, 오류 코드는 일반 화면에 그리지 않는다.
 실패한 실행의 원인은 `/admin/usage` 의 실행 기록에서 그 실행을 열어 본다.
