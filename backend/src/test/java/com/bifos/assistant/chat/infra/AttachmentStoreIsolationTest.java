@@ -200,8 +200,7 @@ class AttachmentStoreIsolationTest {
         Path link = fileOf(alice).resolveSibling("1.small.jpg");
         Files.createSymbolicLink(link, fileOf(bob));
 
-        assertThatThrownBy(() -> store.saveSmall(alice, new byte[] {7}))
-                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> store.saveSmall(alice, new byte[] {7})).isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> store.readSmall(alice)).isInstanceOf(IllegalArgumentException.class);
         assertThat(Files.readAllBytes(fileOf(bob))).containsExactly((byte) 2);
     }
