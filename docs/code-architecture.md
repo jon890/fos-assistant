@@ -98,7 +98,7 @@ Memory 의 기본 근거는 [`adr/ADR-003-memory-권한은-주입으로-강제�
 
 | 키 | 환경 변수 | 비었을 때 |
 | --- | --- | --- |
-| `assistant.sandbox-workspace.root` | `ASSISTANT_SANDBOX_WORKSPACE_ROOT` | 기동한다. 상태 조회 밖의 모든 경로가 503 `WORKSPACE_UNAVAILABLE` 이고 상태 조회는 `available: false` 다 |
+| `assistant.sandbox-workspace.root` | `ASSISTANT_SANDBOX_WORKSPACE_ROOT` | 기동한다. 상태 조회와 관리자 용량은 `available: false` 이고, 그 밖의 경로가 503 `WORKSPACE_UNAVAILABLE` 이다 |
 | `assistant.sandbox-workspace.delete-socket` | `ASSISTANT_SANDBOX_WORKSPACE_DELETE_SOCKET` | 기동한다. 지우기가 `WORKSPACE_DELETE_UNAVAILABLE` 이고 상태 조회는 `deletable: false` 다 |
 
 `root` 는 실행 공간 정책의 `workspace_root` 와 같은 디렉터리를 Control Plane 에서 본 경로다. 읽기 전용으로 붙인다.
@@ -146,7 +146,7 @@ Memory 의 기본 근거는 [`adr/ADR-003-memory-권한은-주입으로-강제�
 | `GET /api/v1/workspace/files/{경로}` | 미리보기 본문 | 아래 「본문 머리글」. 경로의 조각마다 URL 인코딩한다 |
 | `GET /api/v1/workspace/files/{경로}?download=1` | 내려받기 | 크기 상한 없이 스트림으로 준다 |
 | `DELETE /api/v1/workspace/entries?path=` | 지우기 | 아래 「지우기」 |
-| `GET /api/v1/admin/workspaces` | 사용자별 용량. `ADMIN` 만 | 아래 「관리자 용량」 |
+| `GET /api/v1/admin/workspaces` | 실행 공간별 용량(사용자, 주인 없는 에이전트). `ADMIN` 만 | 아래 「관리자 용량」 |
 
 본문 경로의 오류는 아래와 같다. 루트 확인(503), 경로 검사(400) 다음에, 미리보기는 확장자(415), 크기(413), 종류(404), 읽기 권한(403) 차례로 판정한다. 내려받기는 종류와 읽기 권한만 본다.
 
@@ -237,12 +237,15 @@ Control Plane 은 경로 규칙을 먼저 검사하고 읽기 마운트에서 �
 ### 관리자 용량
 
 `GET /api/v1/admin/workspaces` 는 `{available, spaces: [{kind, id, name, bytes, entries, partial}]}` 를 준다.
-`kind` 는 `USER`(디렉터리 `u<번호>`) 나 `AGENT`(디렉터리 `a<번호>`) 이고 `name` 은 사용자 이름이나 에이전트 이름이다. 이름을 찾지 못하면 빈 값이다.
-그 밖의 이름을 가진 디렉터리는 세지 않는다. 파일 이름과 경로는 응답에 없다.
+`kind` 는 `USER`(디렉터리 `u<번호>`) 나 `AGENT`(디렉터리 `a<번호>`) 이고 `name` 은 사용자 이름이나 에이전트 이름이다. 이름을 찾지 못하면 `null` 이다.
+번호는 0 으로 시작하지 않는다(`u01` 은 세지 않는다). 그 밖의 이름을 가진 디렉터리는 세지 않는다. 파일 이름과 경로는 응답에 없다.
 
 요청할 때 링크를 따라가지 않고 센다. `bytes` 는 일반 파일 크기의 합이다.
-공간 하나에 항목 200,000 개, 요청 전체에 30초를 넘기면 거기서 멈추고 `partial` 을 참으로 둔다. 읽지 못한 디렉터리가 있어도 `partial` 이 참이다.
+공간 하나에 항목 200,000 개, 요청 전체에 30초를 넘기면 거기서 멈추고 `partial` 을 참으로 둔다. 시간은 항목 사이에서 확인하므로 디렉터리 하나를 여는 데 걸린 시간만큼은 넘길 수 있다. 읽지 못한 디렉터리는 항목으로 세고 `partial` 을 참으로 둔다.
+공간은 `USER`, `AGENT` 순서와 번호 순서로 센다. 30초가 지난 뒤의 공간은 세지 않고 `bytes` 와 `entries` 를 0, `partial` 을 참으로 두어 응답에 넣는다.
 줄은 `bytes` 가 큰 순서다.
+
+루트가 설정되지 않았거나 링크가 아닌 디렉터리가 아니면 200 과 `available` 거짓, 빈 `spaces` 다. 루트 바로 아래를 읽지 못하면 500 `INTERNAL_ERROR` 이고 로그에는 예외 종류만 남는다.
 
 ## 화면을 검증하는 방법
 
