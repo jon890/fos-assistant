@@ -169,6 +169,46 @@ test("연결된 서비스도 다시 확인하면 확인 시각을 갱신한다",
   await expect(check).toBeEnabled();
 });
 
+for (const [code, message] of [
+  ["CONNECTOR_CREDENTIAL_REJECTED", "입력한 값을 확인하지 못했어요."],
+  ["CONNECTOR_OPERATION_FAILED", "연결을 마치지 못했어요."],
+  ["CONNECTOR_UNAVAILABLE", "서비스에 닿지 못했어요. 잠시 뒤 다시 해 주세요."],
+] as const) {
+  test(`연결된 서비스의 확인이 ${code}로 실패하면 준비 중으로 바뀌고 에이전트 고르기가 닫힌다`, async ({
+    page,
+  }) => {
+    let checked = false;
+    await page.route(`**/api/connections/${DEMO_ID}`, (route) =>
+      route.fulfill({ json: checked ? pending : ready }),
+    );
+    await page.route(`**/api/connections/${DEMO_ID}/check`, (route) => {
+      checked = true;
+      return route.fulfill({
+        status: 502,
+        json: { code, message: "raw upstream" },
+      });
+    });
+    await page.goto(`/connections/${DEMO_ID}`);
+    const badge = page.getByTestId("connection-status");
+    const chooser = page.getByTestId("connector-agent-chooser");
+    await expect(badge).toHaveText("연결됨");
+    await expect(chooser).toBeVisible();
+    const check = page.getByRole("button", { name: "연결 다시 확인" });
+    await clickAndWaitForResponse(
+      page,
+      check,
+      "POST",
+      /\/connections\/demo-notes\/check$/,
+    );
+    await expect(badge).toHaveText("준비 중");
+    await expect(badge).toHaveAttribute("data-variant", "warning");
+    await expect(chooser).toHaveCount(0);
+    await expect(page.getByRole("main").getByRole("alert")).toHaveText(message);
+    await expect(page.getByText("raw upstream")).toHaveCount(0);
+    await expect(check).toBeEnabled();
+  });
+}
+
 for (const [status, label, variant] of [
   ["READY", "연결됨", "success"],
   ["PENDING", "준비 중", "warning"],
