@@ -208,11 +208,18 @@ test("흐름이 붙은 에이전트라 받지 않으면 까닭을 알린다", as
 });
 
 test("다른 창에서 쌓은 대기 메시지가 보인다", async ({ page, hermes }) => {
+  // `started`는 보내는 스트림에서 온다. 대화 사건의 연결도 열려야 다른 창의 변경을 받을 수 있다.
+  const connected = page.waitForResponse(
+    (response) =>
+      /\/api\/chat\/conversations\/[^/]+\/events$/.test(response.url()) &&
+      response.ok(),
+  );
   const conversationId = await beginHeldTurn(
     page,
     hermes,
     "대기 다른 창 첫 질문",
   );
+  await connected;
   const added = await page.request.post(
     `/api/chat/conversations/${conversationId}/pending`,
     {
@@ -227,6 +234,49 @@ test("다른 창에서 쌓은 대기 메시지가 보인다", async ({ page, her
   );
   await expect(stopButton(page)).toBeVisible();
 
+  await releaseAndSettle(page, hermes, 2);
+});
+
+test("대화 사건 연결 직전에 쌓인 대기 메시지도 연결 뒤에 보인다", async ({
+  page,
+  hermes,
+}) => {
+  let openEvents: (() => Promise<void>) | undefined;
+  let readInitialQueue = false;
+  await page.route("**/api/chat/conversations/*/events", (route) => {
+    openEvents = () => route.continue();
+  });
+  await page.route(PENDING_ROUTE, (route) => {
+    if (route.request().method() !== "GET" || readInitialQueue)
+      return route.continue();
+    readInitialQueue = true;
+    return route.fulfill({ json: { held: false, items: [] } });
+  });
+  const conversationId = await beginHeldTurn(
+    page,
+    hermes,
+    "사건 연결 전 대기 메시지",
+  );
+  await expect
+    .poll(() => readInitialQueue && openEvents !== undefined)
+    .toBe(true);
+  const added = await page.request.post(
+    `/api/chat/conversations/${conversationId}/pending`,
+    {
+      data: { text: "연결되기 전에 쌓은 글" },
+    },
+  );
+  expect(added.status()).toBe(201);
+  const connected = page.waitForResponse(
+    (response) =>
+      response.url().endsWith(`/conversations/${conversationId}/events`) &&
+      response.ok(),
+  );
+  await openEvents!();
+  await connected;
+  await expect(page.getByTestId("pending-item")).toContainText(
+    "연결되기 전에 쌓은 글",
+  );
   await releaseAndSettle(page, hermes, 2);
 });
 
@@ -347,6 +397,8 @@ test("대화 단위 SSE 가 다시 붙으면 대기 줄을 다시 읽는다", as
       if (eventRequests === 1) {
         // 대기 줄이 화면에 보인 뒤에 첫 연결을 사건 없이 닫는다. 화면이 잠시 뒤 다시 연다.
         await expect(page.getByTestId("pending-item")).toHaveCount(1);
+      } else {
+        // 첫 연결 뒤의 초기 읽기는 옛 줄을 받는다. 끊긴 사이의 변화는 다시 연결할 때부터 보인다.
         sentWhileDisconnected = true;
       }
       // 다시 붙은 연결도 응답을 준다. 화면은 응답 머리글을 받아야 다시 붙었다고 본다. 붙잡아 두면 끝내 붙지 않는다.
