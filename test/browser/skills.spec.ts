@@ -48,7 +48,7 @@ test("주인이 스킬을 쓰고 참고 파일을 올려 저장하고, 고쳐도
       mimeType: "text/markdown",
       buffer: Buffer.from("월요일은 장보기"),
     });
-    await expect(page.getByRole("region", { name: "참고 파일" }).getByText("guide.md")).toBeVisible();
+    await expect(page.getByRole("region", { name: "참고 파일" }).getByText("references/guide.md", { exact: true })).toBeVisible();
     await page.getByRole("button", { name: "저장", exact: true }).click();
 
     await expect(page).toHaveURL(new RegExp(`/agents/${PERSONA_AGENT_CODE}$`));
@@ -58,7 +58,7 @@ test("주인이 스킬을 쓰고 참고 파일을 올려 저장하고, 고쳐도
 
     // 설명만 고치고 저장한다. 손대지 않은 참고 파일은 내용을 다시 보내지 않고 목록에 남아야 한다.
     await row.getByRole("link", { name: `${NAME} 편집` }).click();
-    await expect(page.getByRole("region", { name: "참고 파일" }).getByText("references/guide.md")).toBeVisible();
+    await expect(page.getByRole("region", { name: "참고 파일" }).getByText("references/guide.md", { exact: true })).toBeVisible();
     await page.getByRole("textbox", { name: "SKILL.md 본문" }).fill(skillMd(NAME, "다음 주 계획을 세워요"));
     await page.getByRole("button", { name: "저장", exact: true }).click();
 
@@ -66,10 +66,10 @@ test("주인이 스킬을 쓰고 참고 파일을 올려 저장하고, 고쳐도
     await expect(skillRow(page, NAME).getByText("다음 주 계획을 세워요")).toBeVisible();
     const saved = await page.request.get(`/api/agents/${PERSONA_AGENT_CODE}/skills/${NAME}`);
     const detail = (await saved.json()) as { files: { path: string; size: number }[] };
-    expect(detail.files).toEqual([{ path: "references/guide.md", size: Buffer.byteLength("월요일은 장보기") }]);
+    expect(detail.files).toEqual([{ path: "references/guide.md", size: Buffer.byteLength("월요일은 장보기"), content: "월요일은 장보기" }]);
 
     await skillRow(page, NAME).getByRole("link", { name: `${NAME} 편집` }).click();
-    await expect(page.getByRole("region", { name: "참고 파일" }).getByText("references/guide.md")).toBeVisible();
+    await expect(page.getByRole("region", { name: "참고 파일" }).getByText("references/guide.md", { exact: true })).toBeVisible();
     await page.getByRole("link", { name: "취소", exact: true }).click();
 
     await skillRow(page, NAME).getByRole("button", { name: `${NAME} 삭제` }).click();
@@ -310,7 +310,7 @@ test("Hermes 기본 스킬과 같은 이름은 저장하지 않고 오류를 보
   await page.getByRole("textbox", { name: "SKILL.md 본문" }).fill(skillMd("hermes-help", "겹치는 이름"));
   await page.getByRole("button", { name: "저장", exact: true }).click();
 
-  await expect(page.getByRole("alert").filter({ hasText: "같은 이름의 기본 스킬이 있어요." })).toBeVisible();
+  await expect(page.getByRole("alert").filter({ hasText: "이미 쓰고 있는 이름이에요. 다른 스킬 이름을 골라 주세요." })).toBeVisible();
   await expect(page).toHaveURL(new RegExp(`/skills/new$`));
 });
 
@@ -366,8 +366,8 @@ test("미리보기는 앞머리를 빼고 마크다운으로 그리며 들어온
   await expect(page.getByRole("textbox", { name: "SKILL.md 본문" })).toHaveValue(/name: preview-skill/);
 });
 
-test("관리하는 사람이 Hermes 기본 스킬을 끄고 켠다", async ({ page }) => {
-  await page.goto(`/agents/${PERSONA_AGENT_CODE}`);
+test("관리자 영역에서만 Hermes 기본 스킬을 끄고 켠다", async ({ page }) => {
+  await page.goto(`/admin/agents/${PERSONA_AGENT_CODE}`);
   const row = skillRow(page, "hermes-help");
   await expect(row.getByText("기본 스킬")).toBeVisible();
   // Hermes 기본 스킬에는 편집과 삭제가 없다.
@@ -380,7 +380,7 @@ test("관리하는 사람이 Hermes 기본 스킬을 끄고 켠다", async ({ pa
     await page.reload();
     await expect(skillRow(page, "hermes-help").getByRole("switch")).toHaveAttribute("aria-checked", "false");
   } finally {
-    const restore = await page.request.put(`/api/agents/${PERSONA_AGENT_CODE}/skills/hermes-help/enabled`, {
+    const restore = await page.request.put(`/api/admin/agents/${PERSONA_AGENT_CODE}/skills/hermes-help/enabled`, {
       data: { enabled: true },
     });
     expect(restore.ok()).toBeTruthy();
@@ -389,7 +389,7 @@ test("관리하는 사람이 Hermes 기본 스킬을 끄고 켠다", async ({ pa
 
 test("점과 밑줄이 든 Hermes 스킬도 끄고 켠다", async ({ page }) => {
   const name = "note_taking.v2";
-  await page.goto(`/agents/${PERSONA_AGENT_CODE}`);
+  await page.goto(`/admin/agents/${PERSONA_AGENT_CODE}`);
   const row = skillRow(page, name);
   await expect(row.getByText("기본 스킬")).toBeVisible();
   try {
@@ -399,14 +399,100 @@ test("점과 밑줄이 든 Hermes 스킬도 끄고 켠다", async ({ page }) => 
     await page.reload();
     await expect(skillRow(page, name).getByRole("switch")).toHaveAttribute("aria-checked", "false");
   } finally {
-    const restore = await page.request.put(`/api/agents/${PERSONA_AGENT_CODE}/skills/${name}/enabled`, {
+    const restore = await page.request.put(`/api/admin/agents/${PERSONA_AGENT_CODE}/skills/${name}/enabled`, {
       data: { enabled: true },
     });
     expect(restore.ok()).toBeTruthy();
   }
 });
 
-test("가족용 에이전트를 다른 사용자가 열면 목록과 부르는 방법만 있고 편집 단추가 없다", async ({ context, page }) => {
+test("관리자도 일반 화면에서는 기본 스킬을 보지 못하고 일반 사용자에게 관리자 경로는 닫힌다", async ({ context, page }) => {
+  await page.goto(`/agents/${PERSONA_AGENT_CODE}`);
+  await expect(skillRow(page, "hermes-help")).toHaveCount(0);
+  await expect(skillRow(page, "note_taking.v2")).toHaveCount(0);
+  const listed = await page.request.get(`/api/agents/${PERSONA_AGENT_CODE}/skills`);
+  expect((await listed.json()).skills.every((skill: { source: string }) => skill.source === "UPLOADED")).toBeTruthy();
+  await setSession(context, { email: "member@example.com", name: "일반 사용자" });
+  expect((await page.request.get("/api/me")).ok()).toBeTruthy();
+  expect((await page.request.get(`/api/admin/agents/${PERSONA_AGENT_CODE}/skills`)).status()).toBe(403);
+  expect((await page.request.put(`/api/admin/agents/${PERSONA_AGENT_CODE}/skills/hermes-help/enabled`, {
+    data: { enabled: false },
+  })).status()).toBe(403);
+});
+
+test("기존 스킬의 본문과 참고 파일을 고치고 더하고 지우며 저장 전 비교한다", async ({ page }) => {
+  const name = "editable-files";
+  try {
+    await page.request.put(`/api/agents/${PERSONA_AGENT_CODE}/skills/${name}`, {
+      data: { skillMd: skillMd(name, "고치기 전"), files: [
+        { path: "references/guide.md", content: "원래 안내" },
+        { path: "templates/remove.md", content: "지울 양식" },
+      ] },
+    });
+    await page.goto(`/agents/${PERSONA_AGENT_CODE}`);
+    await skillRow(page, name).getByRole("link", { name: `${name} 내용 고치기` }).click();
+    await page.getByRole("textbox", { name: "SKILL.md 본문" }).fill(skillMd(name, "고친 뒤"));
+    await page.getByText("references/guide.md 내용 고치기", { exact: true }).click();
+    await expect(page.getByRole("textbox", { name: "references/guide.md 본문" })).toHaveValue("원래 안내");
+    await page.getByRole("textbox", { name: "references/guide.md 본문" }).fill("고친 안내");
+    await page.getByRole("button", { name: "templates/remove.md 빼기" }).click();
+    await page.getByLabel("참고 파일 올리기").setInputFiles({
+      name: "new.md", mimeType: "text/markdown", buffer: Buffer.from("새 양식"),
+    });
+    await page.getByLabel("new.md 위치").selectOption("templates");
+    const changes = page.getByRole("region", { name: "저장 전 바뀐 점" });
+    await expect(changes.getByText("SKILL.md · 수정", { exact: true })).toBeVisible();
+    await expect(changes.getByText("templates/remove.md · 삭제", { exact: true })).toBeVisible();
+    await expect(changes.getByText("templates/new.md · 추가", { exact: true })).toBeVisible();
+    await changes.getByText("references/guide.md · 수정", { exact: true }).click();
+    await expect(changes.getByText("원래 안내", { exact: true })).toBeVisible();
+    await expect(changes.getByText("고친 안내", { exact: true })).toBeVisible();
+    await page.getByRole("button", { name: "저장", exact: true }).click();
+    await expect(page).toHaveURL(new RegExp(`/agents/${PERSONA_AGENT_CODE}$`));
+    await skillRow(page, name).getByRole("link", { name: `${name} 편집` }).click();
+    await expect(page.getByRole("textbox", { name: "SKILL.md 본문" })).toHaveValue(skillMd(name, "고친 뒤"));
+    await page.getByText("references/guide.md 내용 고치기", { exact: true }).click();
+    await expect(page.getByRole("textbox", { name: "references/guide.md 본문" })).toHaveValue("고친 안내");
+    const saved = await page.request.get(`/api/agents/${PERSONA_AGENT_CODE}/skills/${name}`);
+    expect((await saved.json()).files).toEqual([
+      { path: "references/guide.md", size: Buffer.byteLength("고친 안내"), content: "고친 안내" },
+      { path: "templates/new.md", size: Buffer.byteLength("새 양식"), content: "새 양식" },
+    ]);
+  } finally {
+    await removeSkill(page, PERSONA_AGENT_CODE, name);
+  }
+});
+
+test("일반 사용자가 자기 에이전트에 스킬을 만들고 고치고 지운다", async ({ context, page, isolatedMember }) => {
+  await setSession(context, isolatedMember);
+  expect((await page.request.get("/api/me")).ok()).toBeTruthy();
+  const created = await page.request.post("/api/agents", { data: { name: "스킬 편집 비서" } });
+  expect(created.ok()).toBeTruthy();
+  const { code } = await created.json() as { code: string };
+  try {
+    await page.goto(`/agents/${code}`);
+    await expect(skillsSection(page).getByText("기본 스킬")).toHaveCount(0);
+    await skillsSection(page).getByRole("link", { name: "스킬 추가" }).click();
+    await page.getByLabel("스킬 이름").fill("my-plan");
+    await page.getByRole("textbox", { name: "SKILL.md 본문" }).fill(skillMd("my-plan", "내 계획"));
+    await page.getByRole("button", { name: "저장", exact: true }).click();
+    await expect(page).toHaveURL(new RegExp(`/agents/${code}$`));
+    await skillRow(page, "my-plan").getByRole("link", { name: "my-plan 내용 고치기" }).click();
+    await page.getByRole("textbox", { name: "SKILL.md 본문" }).fill(skillMd("my-plan", "고친 계획"));
+    await page.getByRole("button", { name: "저장", exact: true }).click();
+    await expect(page).toHaveURL(new RegExp(`/agents/${code}$`));
+    await expect(skillRow(page, "my-plan").getByText("고친 계획")).toBeVisible();
+    expect((await page.request.put(`/api/agents/${code}/skills/hermes-help/enabled`, { data: { enabled: false } })).status()).toBe(404);
+    await skillRow(page, "my-plan").getByRole("button", { name: "my-plan 삭제" }).click();
+    await page.getByRole("alertdialog").getByRole("button", { name: "지우기" }).click();
+    await expect(skillRow(page, "my-plan")).toHaveCount(0);
+  } finally {
+    await removeSkill(page, code, "my-plan");
+    await page.request.delete(`/api/agents/${code}`);
+  }
+});
+
+test("그룹 에이전트를 다른 사용자가 열면 목록과 부르는 방법만 있고 편집 단추가 없다", async ({ context, page }) => {
   const name = "shared-skill";
   await setSession(context, { email: "member@example.com", name: "가족 사용자" });
   expect((await page.request.get("/api/me")).ok()).toBeTruthy();
@@ -420,6 +506,7 @@ test("가족용 에이전트를 다른 사용자가 열면 목록과 부르는 �
     const section = skillsSection(page);
     await expect(skillRow(page, name).getByText("함께 쓰는 스킬")).toBeVisible();
     await expect(section.getByText("으로 부를 수 있어요.")).toBeVisible();
+    await expect(skillRow(page, "hermes-help")).toHaveCount(0);
     await expect(section.getByRole("link", { name: "스킬 추가" })).toHaveCount(0);
     await expect(section.getByRole("link", { name: /편집/ })).toHaveCount(0);
     await expect(section.getByRole("button")).toHaveCount(0);

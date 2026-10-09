@@ -74,7 +74,7 @@ public final class SkillDtos {
      * 올린 스킬 하나를 편집 화면이 받는 것이다.
      *
      * @param body {@code SKILL.md} 원문 전체. 앞머리를 포함한다
-     * @param files 참고 파일의 경로와 UTF-8 크기
+     * @param files 참고 파일의 경로와 UTF-8 크기와 편집할 원문
      */
     public record SkillDetailView(String name, String description, String body, List<SkillFileView> files) {
         static SkillDetailView from(SkillDetail detail) {
@@ -83,12 +83,12 @@ public final class SkillDtos {
                     detail.description(),
                     detail.body(),
                     detail.files().stream()
-                            .map(file -> new SkillFileView(file.path(), file.size()))
+                            .map(file -> new SkillFileView(file.path(), file.size(), file.content()))
                             .toList());
         }
     }
 
-    public record SkillFileView(String path, long size) {}
+    public record SkillFileView(String path, long size, String content) {}
 
     /**
      * 스킬 하나를 통째로 쓰는 요청이다.

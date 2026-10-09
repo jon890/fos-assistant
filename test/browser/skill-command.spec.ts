@@ -5,6 +5,8 @@ import { expect, FLOW_AGENT_CODE, PERSONA_AGENT_CODE, test } from "./fixtures.ts
 const SKILL_AGENT_CODE = PERSONA_AGENT_CODE;
 const SKILL_AGENT_NAME = "성격 비서";
 const NAME = "weekly-plan";
+const OTHER_NAME = "shopping-plan";
+const DISABLED_NAME = "weekly-plan-off";
 
 function composer(page: Page) {
   return page.getByRole("textbox", { name: "메시지" });
@@ -51,18 +53,28 @@ test.describe("스킬을 올린 에이전트", () => {
 
   test.afterEach(async ({ page }) => {
     await page.request.delete(`/api/agents/${SKILL_AGENT_CODE}/skills/${NAME}`);
+    await page.request.delete(`/api/agents/${SKILL_AGENT_CODE}/skills/${OTHER_NAME}`);
+    await page.request.delete(`/api/agents/${SKILL_AGENT_CODE}/skills/${DISABLED_NAME}`);
   });
 
   test("맨 앞 / 에서 켜진 스킬 목록이 뜨고 글자로 걸러지며 Esc 는 목록만 닫고 Enter 로 /이름 을 넣는다", async ({ page }) => {
+    await putSkill(page, SKILL_AGENT_CODE, OTHER_NAME);
+    await putSkill(page, SKILL_AGENT_CODE, DISABLED_NAME);
+    const disabled = await page.request.put(`/api/agents/${SKILL_AGENT_CODE}/skills/${DISABLED_NAME}/enabled`, {
+      data: { enabled: false },
+    });
+    expect(disabled.ok()).toBeTruthy();
     await startWith(page, SKILL_AGENT_NAME);
     const input = composer(page);
 
     await input.fill("/");
     const list = skillList(page);
     await expect(list.getByRole("option", { name: `/${NAME}` })).toBeVisible();
-    // Hermes 기본 스킬 가운데 커맨드 이름 규칙에 맞는 것은 보이고, 점과 밑줄이 든 것은 빠진다.
-    await expect(list.getByRole("option", { name: "/hermes-help" })).toBeVisible();
+    // 일반 API 를 쓰므로 켜진 업로드 스킬만 보이고 기본 스킬과 꺼진 스킬은 빠진다.
+    await expect(list.getByRole("option")).toHaveText([`/${OTHER_NAME}`, `/${NAME}`]);
+    await expect(list.getByRole("option", { name: "/hermes-help" })).toHaveCount(0);
     await expect(list.getByRole("option", { name: /note_taking/ })).toHaveCount(0);
+    await expect(list.getByRole("option", { name: `/${DISABLED_NAME}`, exact: true })).toHaveCount(0);
 
     await input.fill("/week");
     await expect(list.getByRole("option")).toHaveText([`/${NAME}`]);
@@ -95,6 +107,20 @@ test.describe("스킬을 올린 에이전트", () => {
     const userMessage = page.getByTestId("user-message").last();
     await expect(userMessage.getByTestId("skill-chip")).toHaveText(`/${NAME}`);
     await expect(userMessage.locator("p")).toContainText("이번 주 계획");
+    await expect(page.getByRole("button", { name: "답 다시 만들기" })).toBeVisible();
+    await expect(input).toHaveValue("");
+    await expect(page.getByTestId("skill-command-notice")).toHaveCount(0);
+  });
+
+  test("목록에서 숨긴 기본 스킬도 이름을 직접 입력하면 커맨드로 실행한다", async ({ page }) => {
+    await startWith(page, SKILL_AGENT_NAME);
+    const input = composer(page);
+    await input.fill("/hermes-help 사용법");
+    await input.press("Enter");
+
+    const userMessage = page.getByTestId("user-message").last();
+    await expect(userMessage.getByTestId("skill-chip")).toHaveText("/hermes-help");
+    await expect(userMessage.locator("p")).toContainText("사용법");
     await expect(page.getByRole("button", { name: "답 다시 만들기" })).toBeVisible();
     await expect(input).toHaveValue("");
     await expect(page.getByTestId("skill-command-notice")).toHaveCount(0);

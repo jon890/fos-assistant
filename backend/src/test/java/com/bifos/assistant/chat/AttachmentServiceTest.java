@@ -76,6 +76,31 @@ class AttachmentServiceTest {
     }
 
     @Test
+    @DisplayName("MPO 업로드는 첫 JPEG를 저장하고 저장 크기를 행에 기록한다")
+    void storesFirstMpoImageAndActualByteSize() throws IOException {
+        byte[] mpo;
+        byte[] expected;
+        try (InputStream input = getClass().getResourceAsStream("/attachments/synthetic.mpo")) {
+            mpo = input.readAllBytes();
+        }
+        try (InputStream input = getClass().getResourceAsStream("/attachments/first.jpg")) {
+            expected = input.readAllBytes();
+        }
+        ChatAttachment saved = upload(OWNER, mine, "image/jpeg", mpo);
+        assertThat(Files.readAllBytes(fileOf(saved))).isEqualTo(expected);
+        assertThat(attachments.findById(saved.id()).orElseThrow().byteSize()).isEqualTo(expected.length);
+        assertThat(service.read(OWNER, mine, saved.id()).byteSize()).isEqualTo(expected.length);
+    }
+
+    @Test
+    @DisplayName("깨진 JPEG도 업로드를 막지 않고 원본을 저장한다")
+    void storesMalformedJpegUnchanged() throws IOException {
+        ChatAttachment saved = upload(OWNER, mine, "image/jpeg", IMAGE);
+        assertThat(Files.readAllBytes(fileOf(saved))).isEqualTo(IMAGE);
+        assertThat(saved.byteSize()).isEqualTo(IMAGE.length);
+    }
+
+    @Test
     @DisplayName("자기 대화에 올리면 행이 생기고 파일이 그 자리에 있다")
     void uploadToOwnConversationCreatesRowAndFileInPlace() throws IOException {
         ChatAttachment saved = upload(OWNER, mine, "image/png", IMAGE);
