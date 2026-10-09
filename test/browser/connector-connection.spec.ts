@@ -194,12 +194,16 @@ for (const [code, message] of [
     await expect(badge).toHaveText("연결됨");
     await expect(chooser).toBeVisible();
     const check = page.getByRole("button", { name: "연결 다시 확인" });
-    await clickAndWaitForResponse(
-      page,
-      check,
-      "POST",
-      /\/connections\/demo-notes\/check$/,
+    const responsePromise = page.waitForResponse(
+      (response) =>
+        response.request().method() === "POST" &&
+        new URL(response.url()).pathname ===
+          `/api/connections/${DEMO_ID}/check`,
     );
+    await check.click();
+    const response = await responsePromise;
+    expect(await response.finished()).toBeNull();
+    expect(response.status()).toBe(502);
     await expect(badge).toHaveText("준비 중");
     await expect(badge).toHaveAttribute("data-variant", "warning");
     await expect(chooser).toHaveCount(0);
