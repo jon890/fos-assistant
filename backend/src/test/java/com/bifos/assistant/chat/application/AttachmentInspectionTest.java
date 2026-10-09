@@ -14,6 +14,24 @@ import org.junit.jupiter.api.Test;
 
 class AttachmentInspectionTest {
     @Test
+    @DisplayName("PNG 영역 출력의 바이트 한도를 넘으면 손상 오류 대신 영역 재조회 한도 오류를 보존한다")
+    void encodedRegionAboveByteLimitPreservesLimitError() throws Exception {
+        BufferedImage image = new BufferedImage(2100, 1900, BufferedImage.TYPE_INT_RGB);
+        java.util.Random random = new java.util.Random(42);
+        for (int y = 0; y < image.getHeight(); y++) {
+            for (int x = 0; x < image.getWidth(); x++) {
+                image.setRGB(x, y, random.nextInt());
+            }
+        }
+        ByteArrayOutputStream source = new ByteArrayOutputStream();
+        ImageIO.write(image, "png", source);
+        assertThat(source.size()).isGreaterThan(AttachmentInspection.MAX_OUTPUT_BYTES);
+        assertThatThrownBy(() -> AttachmentInspection.inspect(source.toByteArray(), "image/png", List.of(0, 0, 2100, 1900)))
+                .isInstanceOf(ApiException.class)
+                .extracting(error -> ((ApiException) error).code())
+                .isEqualTo(com.bifos.assistant.shared.error.ErrorCode.ATTACHMENT_INSPECTION_LIMIT);
+    }
+    @Test
     @DisplayName("원본 바이트와 영역의 픽셀을 그대로 보존한다")
     void preservesOriginalBytesAndCropPixels() throws Exception {
         BufferedImage image = new BufferedImage(2000, 1000, BufferedImage.TYPE_INT_RGB);

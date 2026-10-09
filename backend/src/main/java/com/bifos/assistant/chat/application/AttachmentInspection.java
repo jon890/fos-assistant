@@ -20,8 +20,10 @@ import java.util.function.BooleanSupplier;
 import javax.imageio.ImageIO;
 import javax.imageio.ImageReadParam;
 import javax.imageio.ImageReader;
+import javax.imageio.IIOImage;
 import javax.imageio.stream.ImageInputStream;
 import javax.imageio.stream.MemoryCacheImageInputStream;
+import javax.imageio.stream.MemoryCacheImageOutputStream;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
@@ -138,17 +140,32 @@ public class AttachmentInspection {
                     return new InspectedImage(mime, original);
                 }
                 BufferedImage display = AgentImageResizer.draw(decoded, orientation, Integer.MAX_VALUE);
-                ByteArrayOutputStream output = new ByteArrayOutputStream() {
+                ByteArrayOutputStream output = new ByteArrayOutputStream();
+                try (var encoded = new MemoryCacheImageOutputStream(output) {
                     @Override
-                    public synchronized void write(byte[] bytes, int offset, int length) {
-                        if ((long) count + length > MAX_OUTPUT_BYTES) {
+                    public void write(int value) throws IOException {
+                        if (getStreamPosition() + 1 > MAX_OUTPUT_BYTES) {
+                            throw limit();
+                        }
+                        super.write(value);
+                    }
+
+                    @Override
+                    public void write(byte[] bytes, int offset, int length) throws IOException {
+                        if (getStreamPosition() + length > MAX_OUTPUT_BYTES) {
                             throw limit();
                         }
                         super.write(bytes, offset, length);
                     }
-                };
-                if (!ImageIO.write(display, "png", output)) {
-                    throw invalid("could not encode original region");
+                }) {
+                    var writer = ImageIO.getImageWritersByFormatName("png").next();
+                    try {
+                        writer.setOutput(encoded);
+                        writer.write(new IIOImage(display, null, null));
+                        encoded.flush();
+                    } finally {
+                        writer.dispose();
+                    }
                 }
                 return new InspectedImage("image/png", output.toByteArray());
             } catch (IOException ex) {
