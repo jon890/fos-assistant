@@ -41,7 +41,7 @@
 ### 지켜야 하는 것
 
 - **다른 곳이 「절 이름」 으로 가리키는 헤딩은 이름을 바꾸지 않는다.** 아래 「보존 헤딩」 은 ADR 이 가리키는데 어느 테스트도 확인하지 않으므로(`doc-links` 는 `adr/` 안의 「」 를 건너뛰고 `doc-references` 는 `docs/` 를 읽지 않는다) 반드시 남긴다. 코드 주석과 다른 문서가 그 이름으로 가리킨다. 본문이 다 지워지는 절도 헤딩은 남기고 한두 문장(결정이나 갈리는 지점, 없으면 「코드는 `<클래스>` 가 갖는다」)을 둔다.
-  다른 곳이 가리키지 않는 헤딩은 합치거나 지우거나 이름을 바꿔도 된다. 가리키는지는 `node --test test/unit/doc-references.test.ts test/unit/doc-links.test.ts` 로 확인하고, 다음 줄에 「절」 이 오는 주석은 `git grep -n -A1 "data-schema.md"` 로, ADR 의 상대 링크는 `git grep -n -E 'data-schema.md' -- '*adr/*.md'` 로 직접 본다.
+  다른 곳이 가리키지 않는 헤딩은 합치거나 지우거나 이름을 바꿔도 된다. 가리키는지는 `node --test test/unit/doc-references.test.ts test/unit/doc-links.test.ts` 로 확인하고, 다음 줄에 「절」 이 오는 주석은 `git grep -n -A1 "data-schema.md"` 로, ADR 의 상대 링크는 `git grep -n -E 'data-schema.md' -- '*adr/*.md'` 로, 앵커로만 가리키는 링크는 `git grep -n -E 'data-schema.md#' -- '*.md' ':!tasks/*'` 로 직접 본다. 앵커가 가리키는 헤딩도 남긴다(`doc-links` 는 앵커를 보지 않는다).
   절 이름에 붙은 `(화면)`, `(화면 흐름)`, `(전체 흐름)` 표시는 그 절을 합쳐 없애면 함께 사라진다. 이 phase 파일 안의 링크만 남은 절로 고친다. 다른 파일이 그 이름을 가리키면 그 헤딩은 남긴다.
 - 남기는 문장에 적힌 클래스, 메서드, 경로, 오류 코드, 설정 키는 코드에서 실제 정의를 찾아 맞는지 확인한다. `test/unit/doc-code-references.test.ts` 가 경로, API, 설정 키, `클래스.멤버`, 환경 변수를 본다. 클래스 이름 단독과 대문자 값은 알림만 내므로 직접 `git grep` 으로 확인한다.
 - 옮긴 문장 중 「아래 「X」」, 「위 「X」」 처럼 이제 다른 기능 파일에 있는 절을 가리키는 곳은 그 파일로의 링크로 바꾼다. 다른 phase 파일로 새로 거는 링크는 그 파일의 「보존 헤딩」 이나 `##` 첫 절만 가리킨다. 다른 phase 가 그사이 헤딩을 합칠 수 있기 때문이다.
@@ -92,6 +92,7 @@
 
 1. `node --test test/unit/doc-code-references.test.ts 2>&1 | grep '알림:' | grep data-schema` 결과를 scratchpad 에 저장한다.
 2. 「지울 때」 와 각 표 절의 키, 유일 제약, 함께 지워지는 것, 암호화 칸 문장 목록을 scratchpad 에 뽑아 둔다.
+3. 「검증」 의 다섯째 명령과 `git grep -n -E 'data-schema.md#' -- '*.md' ':!tasks/*'` 를 작업 전에 돌려, 출력의 「」 와 앵커 가운데 지금 이 파일에 있는 헤딩 이름만 뽑아 저장한다.
 
 ### 1. `backend/docs/data-schema.md` 를 줄인다
 
@@ -116,7 +117,7 @@ git grep -n -E 'data-schema\.md' -- '*adr/*.md' 'backend/src/main/resources/db/m
 ```
 
 - 첫 두 줄은 종료 코드 0 이다. 넷째 줄은 600 이하다.
-- 다섯째 줄이 낸 「」 절 이름이 모두 이 파일에 있다. 「옛 문서 경로」 표가 남아 있다.
+- 작업 항목 0 의 3 에서 저장한 헤딩 이름과 「보존 헤딩」 이 작업 뒤에도 모두 이 파일에 있다. 「옛 문서 경로」 표가 남아 있다.
 
 ## 변경 파일
 
