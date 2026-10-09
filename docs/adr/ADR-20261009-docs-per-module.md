@@ -19,12 +19,21 @@
 
 새 주제가 생겨도 새 파일을 만들지 않고 위 파일의 `##` 절로 더한다. `##` 하나가 기능이나 화면 하나다.
 
+예외는 아래만 둔다.
+
+| 예외 | 까닭 |
+| --- | --- |
+| `docs/privacy.md` | 바깥 주소가 고정이다. Google OAuth 동의 화면이 이 경로를 가리킨다 |
+| `hermes/docs/hermes-contract.md` | 우리 모듈이 아니라 upstream Hermes 의 동작이다. `hermes/tests/hermes_contract.py` 와 짝이고 Hermes 를 올릴 때만 바뀐다 |
+| 코드 옆 README(`hermes/README.md`, plugin 의 README, `hermes/connectors/` 의 README) | 그 디렉터리를 고치는 PR 의 diff 에 함께 보인다 |
+| `README.md`, `README.ko.md`, `AGENTS.md` | 문서가 아니라 입구와 규칙이다 |
+
 **코드와 설정이 이미 가진 값을 문서에 옮겨 적지 않는다.**
 API 경로와 응답 칸의 목록, 설정 키 표, enum 값 목록, 마이그레이션의 칸 표, 상수와 클래스 값이 여기 든다.
 문서는 코드만 읽어서는 알 수 없는 것을 적는다. 왜 그렇게 했는지, 어느 분기에서 무엇이 갈리는지, 지울 때 무엇이 함께 지워지는지다.
 화면 문구처럼 확인 기준이 되는 값은 시험이 문서를 읽어 코드와 맞춰 볼 때만 남긴다(`attention.test.ts` 의 「이유 문구」 표).
 
-이 결정으로 `docs/frontend/` 의 여섯 파일을 `web/docs/` 의 셋으로 옮겼다. backend, hermes, 루트 문서는 열린 작업이 끝나는 대로 같은 방식으로 옮긴다.
+이 결정으로 `docs/frontend/` 의 여섯 파일을 `web/docs/` 의 셋으로, `docs/hermes/` 와 커넥터 문서를 hermes 모듈의 계약 문서와 코드 옆 README 로 옮겼다. backend 와 루트 문서는 열린 작업이 끝나는 대로 같은 방식으로 옮긴다.
 
 ### 맥락
 

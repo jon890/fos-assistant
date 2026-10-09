@@ -72,6 +72,7 @@ frontend 는 화면의 동작과 구조이고, hermes 는 외부 런타임인 He
 
 | 문서 | 소유하는 것 |
 | --- | --- |
+| [`hermes/AGENTS.md`](../hermes/AGENTS.md) | hermes 모듈의 규칙과 문서 목록 |
 | [`hermes/docs/code-architecture.md`](../hermes/docs/code-architecture.md) | hermes 모듈의 구조와 배포 순서 |
 | [`hermes/docs/hermes-contract.md`](../hermes/docs/hermes-contract.md) | Hermes 의 동작 계약. profile, Runs API, 동시 실행, 위임, 도구 hook, 실행 공간, 스킬, 설정 API, 올릴 때 |
 | [`hermes/README.md`](../hermes/README.md) | 설치 묶음과 운영 값, 검사 |

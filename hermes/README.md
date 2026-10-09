@@ -1,7 +1,7 @@
 # Hermes 쪽 코드
 
 Hermes 에 설치하는 plugin 과 profile 틀, 범용 커넥터다. 이 파일은 설치 묶음과 운영 값, 검사를 갖는다.
-모듈 구조는 [`hermes/docs/code-architecture.md`](docs/code-architecture.md), Hermes 의 동작은 [`hermes/docs/hermes-contract.md`](docs/hermes-contract.md) 가 갖는다.
+모듈의 규칙과 문서는 [`hermes/AGENTS.md`](AGENTS.md) 가 가리킨다.
 
 ## 설치 묶음
 
