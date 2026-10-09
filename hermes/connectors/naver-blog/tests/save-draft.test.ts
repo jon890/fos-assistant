@@ -211,6 +211,58 @@ test("작업 프로세스가 시작을 알리지 않으면 NAVER_BLOG_START_UNKN
   expect(second).toEqual({ isError: true, body: { error: { code: "NAVER_BLOG_BUSY" } } });
 });
 
+/** 읽은 글을 고친 덮어쓰기 인자. 기존 사진 줄은 그 글 안의 구성요소를 가리킨다. */
+const OVERWRITE = {
+  draft_id: "224000000001",
+  revision: "0123456789abcdef",
+  changes: "제목: 가상국수 다녀온 날 → 가상국수 다시 간 날",
+  title: "가상국수 다시 간 날",
+  category: "가상국수로그",
+  tags: ["점심"],
+  body: "가상국수에 또 다녀왔어요\n[기존 사진 1]",
+};
+
+test("overwrite_draft 는 새 사진 줄이 든 본문이면 작업을 만들지 않고 NAVER_BLOG_INVALID_INPUT 이다", async () => {
+  const { cdp, jobDir, call } = await setup();
+
+  const result = await call("overwrite_draft", { ...OVERWRITE, body: `${OVERWRITE.body}\n[사진 1: 101.jpg]` });
+
+  expect(result).toEqual({ isError: true, body: { error: { code: "NAVER_BLOG_INVALID_INPUT" } } });
+  expect(cdp.httpRequests).toEqual([]);
+  expect(await readdir(jobDir)).toEqual([]);
+});
+
+test("overwrite_draft 는 덮어쓰기 작업 프로세스를 띄우고 draft_job 이 succeeded 와 사본 결과를 돌려준다", async () => {
+  const { jobDir, call } = await setup();
+
+  const started = await call("overwrite_draft", OVERWRITE);
+
+  expect(started.isError).toBe(false);
+  expect(started.body).toEqual({ job_id: expect.stringMatching(/^[0-9a-f-]{36}$/), status: "running" });
+
+  const job = await call("draft_job", { job_id: started.body.job_id, wait_seconds: 4 });
+
+  expect(job.isError).toBe(false);
+  expect(job.body).toMatchObject({
+    job_id: started.body.job_id,
+    status: "succeeded",
+    save_clicked: false,
+    error: null,
+    result: {
+      draft_id: OVERWRITE.draft_id,
+      backup_draft_id: "1",
+      backup_title: "[덮어쓰기 전 원본] x",
+      saved_before: 1,
+      saved_after: 1,
+      state: null,
+    },
+  });
+  expect((await readdir(jobDir)).sort()).toEqual([
+    `${started.body.job_id}.finished`,
+    `${started.body.job_id}.json`,
+  ]);
+});
+
 test("없는 작업 번호면 NAVER_BLOG_JOB_NOT_FOUND 다", async () => {
   const { call } = await setup();
 

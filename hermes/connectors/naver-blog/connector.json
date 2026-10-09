@@ -27,6 +27,7 @@
     "read_draft": { "risk": "READ" },
     "render_draft": { "risk": "READ" },
     "save_draft": { "risk": "WRITE", "title": "네이버 블로그에 임시저장", "outbound": false },
+    "overwrite_draft": { "risk": "WRITE", "title": "네이버 블로그 임시저장 글 덮어쓰기", "outbound": false, "grant": false },
     "draft_job": { "risk": "READ" }
   },
   "errors": {
