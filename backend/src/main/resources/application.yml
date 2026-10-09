@@ -21,8 +21,8 @@ spring:
     multipart:
       # 기본 상한 1MB 로는 휴대폰 사진 대부분이 서비스 판정 전에 걸린다.
       # 한 장 상한 10MB 보다 조금 크게 두어, 조금 넘는 것은 서비스가 입력 오류로 거절하게 한다
-      max-file-size: 11MB
-      max-request-size: 12MB
+      max-file-size: 21MB
+      max-request-size: 22MB
 
 server:
   port: ${SERVER_PORT:8080}
@@ -191,7 +191,7 @@ assistant:
     # 디렉터리를 다른 마운트 지점으로 보는 것이다. 에이전트에게는 이 경로를 알린다. 기본값이 없다
     agent-root: ${ASSISTANT_ATTACHMENT_AGENT_ROOT}
     max-files: 30
-    max-bytes: 10485760
+    max-bytes: 20971520
     retention-days: 30
     # 보관 기간이 지난 사진을 지우는 시각. Control Plane 의 시간대를 따른다
     cleanup-cron: "0 0 4 * * *"

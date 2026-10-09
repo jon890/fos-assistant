@@ -218,7 +218,7 @@ export function useComposerAttachments({
     }
     if (oversize.length > 0) {
       notices.push(
-        `사진 한 장은 10MB까지 올릴 수 있어요. ${oversize.length}장은 올리지 못했어요.`,
+        `사진 한 장은 20MB까지 올릴 수 있어요. ${oversize.length}장은 올리지 못했어요.`,
       );
     }
     setPickNotice(notices.length > 0 ? notices.join(" ") : null);

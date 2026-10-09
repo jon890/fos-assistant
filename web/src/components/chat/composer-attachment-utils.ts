@@ -5,7 +5,7 @@ export const ACCEPTED_TYPES = [
   "image/webp",
 ];
 export const MAX_ATTACHMENTS = 30;
-export const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024;
+export const MAX_ATTACHMENT_BYTES = 20 * 1024 * 1024;
 /** 미리보기의 긴 변 길이다. 열 장에 33MB 였던 실측이 있어 원본을 그대로 그리지 않는다 */
 export const THUMBNAIL_MAX_SIDE = 192;
 
