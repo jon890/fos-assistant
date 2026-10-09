@@ -6,7 +6,7 @@ Control Plane 이다. Spring Boot 4 와 MySQL 을 쓴다.
 공개 저장소에 무엇을 적지 않는지도 그 문서가 정한다.
 
 - 패키지와 경계: [`backend/docs/code-architecture.md`](docs/code-architecture.md)
-- 기능의 흐름: [`backend/docs/flow.md`](docs/flow.md)
+- 기능의 흐름: [`docs/features/`](../docs/features/)
 - 표와 칸: [`backend/docs/data-schema.md`](docs/data-schema.md)
 - Hermes 호출: [`hermes/docs/hermes-contract.md`](../hermes/docs/hermes-contract.md)
 

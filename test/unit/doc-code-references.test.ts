@@ -397,10 +397,10 @@ function resolveMember(token: string, index: CodeIndex): boolean | undefined {
   return files.some((file) => declaresMember(index.read(file), member));
 }
 
-/** 검사하는 문서다. 루트와 모듈의 `docs/` 바로 아래 문서와, 코드 옆 `README.md` 다. ADR 과 `tasks/` 는 뺀다. */
+/** 검사하는 문서다. 루트와 모듈의 `docs/` 바로 아래 문서와, 루트 `docs/features/` 의 기능 문서와, 코드 옆 `README.md` 다. ADR 과 `tasks/` 는 뺀다. */
 export function isTargetDocument(file: string): boolean {
   if (/(^|\/)adr\//.test(file) || file.startsWith("tasks/")) return false;
-  return /^(?:(?:backend|web|hermes)\/)?docs\/[^/]+\.md$/.test(file) || /.\/README\.md$/.test(file);
+  return /^(?:(?:backend|web|hermes)\/)?docs\/[^/]+\.md$/.test(file) || /^docs\/features\/[^/]+\.md$/.test(file) || /.\/README\.md$/.test(file);
 }
 
 /**
@@ -570,6 +570,7 @@ test("YAML 은 들여쓰기로 펼치고 목록과 블록 문자열 안은 키�
 
 test("검사 대상은 docs 바로 아래 문서와 코드 옆 README 이고 ADR 과 tasks 는 뺀다", () => {
   assert.equal(isTargetDocument("backend/docs/flow.md"), true);
+  assert.equal(isTargetDocument("docs/features/chat.md"), true);
   assert.equal(isTargetDocument("hermes/plugins/fos-ctx/README.md"), true);
   assert.equal(isTargetDocument("README.md"), false);
   assert.equal(isTargetDocument("backend/docs/adr/INDEX.md"), false);

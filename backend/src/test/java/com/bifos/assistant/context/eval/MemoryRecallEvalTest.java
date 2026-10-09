@@ -51,7 +51,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 /**
- * 가상 가족 시험 세트를 {@link ContextAssembler} 로 조립해 Memory 회수를 측정한다. 방법과 지표는 {@code backend/docs/flow.md} 의
+ * 가상 가족 시험 세트를 {@link ContextAssembler} 로 조립해 Memory 회수를 측정한다. 방법과 지표는 {@code docs/features/memory.md} 의
  * 「합성 측정」 이 갖는다.
  *
  * <p>모델도 Hermes 대역도 부르지 않는다. 조립한 문맥 묶음에서 항목마다 상태를 읽어 판정한다. 실패 조건은 권한 경계 노출 하나이고, 나머지 지표는

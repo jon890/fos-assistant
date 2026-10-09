@@ -41,6 +41,22 @@ test("루트와 모듈의 docs 바로 아래 문서는 1000줄이고 ADR 과 그
   for (const file of ["docs/adr/ADR-001-x.md", "backend/docs/adr/INDEX.md", "hermes/README.md", "README.md", "docs/images/a.md"]) assert.equal(limitFor(file), null, file);
 });
 
+test("기능 문서는 500줄이고 하위 디렉터리의 문서는 보지 않는다", () => {
+  assert.equal(limitFor("docs/features/chat.md"), 500);
+  for (const file of ["docs/features/x/chat.md", "backend/docs/features/chat.md"]) assert.equal(limitFor(file), null, file);
+});
+
+test("기능 문서는 500줄을 넘어도 실패하지 않고 알림 하나를 낸다", (t) => {
+  const f = fixture(t);
+  f.put("docs/features/chat.md", 500);
+  assert.deepEqual(checkFileLengths(f.root), { errors: [], notices: [], checked: 1 });
+  f.put("docs/features/chat.md", 501);
+  const result = checkFileLengths(f.root);
+  assert.deepEqual(result.errors, []);
+  assert.equal(result.notices.length, 1);
+  assert.match(result.notices[0], /docs\/features\/chat\.md: 501줄 > 500줄/);
+});
+
 test("모듈 문서는 한도를 넘어도 실패하지 않고 알린다", (t) => {
   const f = fixture(t);
   f.put("backend/docs/flow.md", 1001);

@@ -189,7 +189,7 @@ public final class ArchitectureRules {
      * 이름이 {@code Client} 로 끝나는 타입과 {@code HermesRunEventStream}, {@code HermesProfileKeyStore} 가 대상이다.
      * {@code hermes.HermesProfileName} 같은 이름 규칙 값은 허용한다.
      *
-     * <p>근거: {@code backend/docs/flow.md} 「다른 에이전트에게 맡기기」 의 「MCP 쪽은 Hermes 를 부르지 않는다」.
+     * <p>근거: {@code docs/features/agent-skill.md} 「다른 에이전트에게 맡기기」 의 「MCP 쪽은 Hermes 를 부르지 않는다」.
      */
     public static final ArchRule MCP_DOES_NOT_CALL_HERMES = noClasses()
             .that()
@@ -204,7 +204,7 @@ public final class ArchitectureRules {
     /**
      * {@code orchestration} 은 {@code ChatService} 에 의존하지 않는다.
      *
-     * <p>근거: {@code backend/docs/flow.md} 「중지」 의 「{@code ChatService} 와 흐름이 서로를 부르지 않게」.
+     * <p>근거: {@code docs/features/chat.md} 「중지」 의 「{@code ChatService} 와 흐름이 서로를 부르지 않게」.
      */
     public static final ArchRule ORCHESTRATION_DOES_NOT_CALL_CHAT_SERVICE = noClasses()
             .that()
@@ -217,7 +217,7 @@ public final class ArchitectureRules {
     /**
      * {@code hermes} 는 {@code people} 에 의존하지 않는다.
      *
-     * <p>근거: {@code backend/docs/flow.md} 「사용자를 더할 때」 의
+     * <p>근거: {@code docs/features/users.md} 「사용자를 더할 때」 의
      * 「{@code hermes} 는 부르는 방법만 알고 순서를 모른다」.
      */
     public static final ArchRule HERMES_DOES_NOT_DEPEND_ON_PEOPLE = noClasses()

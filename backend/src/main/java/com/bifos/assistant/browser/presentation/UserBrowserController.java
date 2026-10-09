@@ -20,7 +20,7 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 /**
- * 사람이 웹에서 쓰는 내 브라우저 경로다. 계약은 {@code backend/docs/flow.md} 의 「API(사용자 브라우저)」 가 갖는다.
+ * 사람이 웹에서 쓰는 내 브라우저 경로다. 계약은 {@code docs/features/user-browser.md} 의 「API(사용자 브라우저)」 가 갖는다.
  *
  * <p>주인은 웹 토큰의 사용자다. 요청 본문으로 사용자나 브라우저를 받지 않는다.
  */

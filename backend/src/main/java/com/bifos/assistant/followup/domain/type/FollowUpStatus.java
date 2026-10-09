@@ -1,6 +1,6 @@
 package com.bifos.assistant.followup.domain.type;
 
-/** 할 일의 상태다. {@code follow_up.status} 가 이 이름을 저장한다. 전이는 {@code backend/docs/flow.md} 의 「상태」 가 갖는다. */
+/** 할 일의 상태다. {@code follow_up.status} 가 이 이름을 저장한다. 전이는 {@code docs/features/attention.md} 의 「상태」 가 갖는다. */
 public enum FollowUpStatus {
     /** 에이전트가 제안했다. 사람이 받아들이거나 거절한다. */
     PROPOSED,

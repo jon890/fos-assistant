@@ -30,7 +30,7 @@ import tools.jackson.databind.node.ArrayNode;
 /**
  * 브라우저 중계의 HTTP 창구다. 커넥터가 Chrome 의 CDP 주소처럼 부르는 {@code /internal/browser-gateway/<접근 표식>/} 아래를 받는다.
  *
- * <p>계약은 {@code backend/docs/flow.md} 의 「받는 것」 이다. 사용자 JWT 는 보지 않고 접근 표식이 인증이다. 판정은
+ * <p>계약은 {@code docs/features/user-browser.md} 의 「받는 것」 이다. 사용자 JWT 는 보지 않고 접근 표식이 인증이다. 판정은
  * {@link BrowserGateway} 가 한다. 오류 응답의 본문은 비운다. 커넥터는 상태 코드만 본다.
  *
  * <p>오류는 이 컨트롤러 안에서 상태 코드로 바꾸고 전역 오류 처리기로 보내지 않는다. 전역 처리기는 요청 경로를 로그에 남기는데, 이 경로에는

@@ -3,7 +3,7 @@ package com.bifos.assistant.attention.application.model;
 import com.bifos.assistant.attention.domain.type.AttentionTrigger;
 
 /**
- * 한 {@code trigger} 의 지표 한 줄이다. 셈은 {@code backend/docs/flow.md} 의 「지표(먼저 알리기와 지금 화면의 판정)」 가 갖는다.
+ * 한 {@code trigger} 의 지표 한 줄이다. 셈은 {@code docs/features/attention.md} 의 「지표(먼저 알리기와 지금 화면의 판정)」 가 갖는다.
  *
  * <p>항목 하나는 같은 사용자의 같은 {@code (itemKey, stateKey)} 다. 제목, 항목 열쇠, 사용자 번호를 담지 않는다.
  *

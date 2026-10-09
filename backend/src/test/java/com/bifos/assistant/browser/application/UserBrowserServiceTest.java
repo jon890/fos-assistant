@@ -46,7 +46,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 /**
- * 켜기, 끄기, 지우기의 순서와 동시 수, 실패 처리를 실제 DB 와 대역 proxy 로 본다. 규칙은 {@code backend/docs/flow.md} 의
+ * 켜기, 끄기, 지우기의 순서와 동시 수, 실패 처리를 실제 DB 와 대역 proxy 로 본다. 규칙은 {@code docs/features/user-browser.md} 의
  * 「상태 전이」 다.
  */
 @BackendIntegrationTest

@@ -15,7 +15,7 @@ import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
 import tools.jackson.databind.json.JsonMapper;
 
-/** 사용자 브라우저 경로의 응답 모양이다. 계약은 {@code backend/docs/flow.md} 의 「API(사용자 브라우저)」 가 갖는다. */
+/** 사용자 브라우저 경로의 응답 모양이다. 계약은 {@code docs/features/user-browser.md} 의 「API(사용자 브라우저)」 가 갖는다. */
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
 public final class UserBrowserDtos {
 

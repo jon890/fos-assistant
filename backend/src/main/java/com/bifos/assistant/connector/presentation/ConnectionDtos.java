@@ -17,7 +17,7 @@ import java.util.Map;
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
 
-/** 커넥터 연결 경로의 요청과 응답 모양이다. 칸은 {@code backend/docs/flow.md} 의 「커넥터 연결 API」 와 같다. */
+/** 커넥터 연결 경로의 요청과 응답 모양이다. 칸은 {@code docs/features/connector.md} 의 「커넥터 연결 API」 와 같다. */
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
 public final class ConnectionDtos {
 

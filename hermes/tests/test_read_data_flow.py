@@ -1,6 +1,6 @@
 """커넥터 READ 결과가 다른 도구로 흘러가는 길에서 fos-ctx 가 무엇을 하고 무엇을 하지 않는지 합성 값으로 고정한다.
 
-흐름 번호(RF-xx)와 판정은 `docs/flow.md` 의 「흐름 판정 표」 가 갖는다.
+흐름 번호(RF-xx)와 판정은 `docs/features/connector-policy.md` 의 「흐름 판정 표」 가 갖는다.
 이 파일은 Hermes 쪽 hook 만 본다. Control Plane 이 내리는 판정은 그 표가 가리키는 backend 시험이 본다.
 메일 본문과 주소는 모두 지어낸 값이다.
 """

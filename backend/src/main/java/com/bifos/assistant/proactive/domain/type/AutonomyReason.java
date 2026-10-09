@@ -1,7 +1,7 @@
 package com.bifos.assistant.proactive.domain.type;
 
 /**
- * 행동 수준을 정한 까닭이다. 조건은 {@code backend/docs/flow.md} 의 「까닭 코드와 수준」 표와 같다.
+ * 행동 수준을 정한 까닭이다. 조건은 {@code docs/features/proactive.md} 의 「까닭 코드와 수준」 표와 같다.
  *
  * <p>선언 순서가 저장하는 순서다. 묶음은 수준을 정하는 순서로 쓰인다.
  */

@@ -19,7 +19,7 @@ import tools.jackson.databind.json.JsonMapper;
 /**
  * 연결용 profile 의 hook 이 커넥터 도구 호출 전에 판정을 묻는 경로다(ADR-049).
  *
- * <p>계약은 {@code backend/docs/flow.md} 의 「도구 호출 판정」 이 갖는다. 인증은 {@code /mcp} 와 같은 profile 토큰이고
+ * <p>계약은 {@code docs/features/connector-policy.md} 의 「도구 호출 판정」 이 갖는다. 인증은 {@code /mcp} 와 같은 profile 토큰이고
  * 모델 도구가 아니다. 본문을 문자열로 받아 여기서 읽는다. JSON 이 아닌 본문도 다른 거절과 같은
  * {@link ErrorCode#CONNECTOR_POLICY_REJECTED} 로 끝나야 하기 때문이다. 막는 판정은 오류가 아니라 200 의
  * {@code block} 으로 답한다.

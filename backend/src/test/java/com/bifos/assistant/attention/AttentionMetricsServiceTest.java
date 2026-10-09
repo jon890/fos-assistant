@@ -35,7 +35,7 @@ import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 
 /**
- * 지표 사건을 {@code trigger} 별로 세는 것과 보관 기간 정리를 본다. 셈은 {@code backend/docs/flow.md} 의 「지표(먼저 알리기와 지금 화면의 판정)」 다.
+ * 지표 사건을 {@code trigger} 별로 세는 것과 보관 기간 정리를 본다. 셈은 {@code docs/features/attention.md} 의 「지표(먼저 알리기와 지금 화면의 판정)」 다.
  *
  * <p>지표는 모든 사용자의 사건을 세므로 검사마다 사건 표를 비운다. 사건은 저장소로 바로 넣는다. 시각은 이 검사의 시계가 정한다.
  */

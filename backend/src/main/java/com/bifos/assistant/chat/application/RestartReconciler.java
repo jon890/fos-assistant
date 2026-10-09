@@ -48,7 +48,7 @@ import org.springframework.transaction.support.TransactionTemplate;
  * Hermes session 으로 돌아 대화의 session 과 겹치지 않으므로 잠금을 잡지 않는다.
  *
  * <p>내려갈 때 묻던 스레드는 줄을 적지 않고 잠금도 풀지 않고 끝난다. 줄이 {@code RUNNING} 으로 남아 다음 기동이
- * 다시 정한다. 갈리는 지점의 표는 {@code backend/docs/flow.md} 의 「기동할 때 남은 실행 정리」 가 갖는다.
+ * 다시 정한다. 갈리는 지점의 표는 {@code docs/features/chat.md} 의 「기동할 때 남은 실행 정리」 가 갖는다.
  */
 @Slf4j
 @Component

@@ -1,6 +1,6 @@
 package com.bifos.assistant.followup.application.model;
 
-/** 에이전트가 할 일을 제안한 결과다. 뜻은 {@code backend/docs/flow.md} 의 「제안 억제」 가 갖는다. */
+/** 에이전트가 할 일을 제안한 결과다. 뜻은 {@code docs/features/attention.md} 의 「제안 억제」 가 갖는다. */
 public enum FollowUpProposalOutcome {
     /** 새 {@code PROPOSED} 줄을 만들었다. */
     CREATED,
