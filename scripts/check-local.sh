@@ -9,7 +9,8 @@
 #
 # 사용법: scripts/check-local.sh [--skip-browser] [브라우저 spec ...]
 # 인자는 브라우저 검사에만 넘긴다. 인자가 없으면 브라우저 검사 전체를 돌린다.
-# push 전 로컬 확인에서는 고친 화면의 spec 만 준다. CI 가 돌지 못하면 머지 전에 인자 없이 전체를 돌린다.
+# 로컬 확인에서는 고친 화면과 그 컴포넌트를 쓰는 화면의 spec 을 준다. 전체는 Draft CI 가 확인한다.
+# CI 가 돌지 못하면 머지 전에 인자 없이 전체를 돌린다.
 set -Eeuo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"

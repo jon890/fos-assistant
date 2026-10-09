@@ -127,16 +127,23 @@ key 값 자체를 적지 않는 것은 당연하고, **그것이 어디 있고 �
 기존 숫자 ADR 은 그대로 두며, 같은 날의 새 ADR 은 슬러그로 구분한다.
 제목과 링크, 목록 정렬은 [`docs/adr/INDEX.md`](docs/adr/INDEX.md) 의 작성 규칙을 따른다.
 
-구현자는 push 전에 `scripts/check-local.sh` 로 로컬 검사를 돌린다. 브라우저 검사는 고친 화면의 spec 만 인자로 준다.
+구현자는 push 전에 `scripts/check-local.sh` 로 로컬 검사를 돌린다.
+로컬 브라우저 검사는 고친 화면과 그 컴포넌트를 쓰는 화면의 spec 을 인자로 준다. 전체 브라우저 검사는 Draft PR 의 CI 에서 돌린다.
 돌리는 명령과 순서, 작업 폴더, `pnpm build` 의 자리표시자 환경 변수는 그 스크립트가 갖는다.
 
 ```bash
 # cwd: 저장소 root
-# push 전 확인. 브라우저 검사는 고친 화면의 spec 만 돌린다
+# push 전 확인. 고친 화면과 그 컴포넌트를 쓰는 화면의 spec 을 준다
 scripts/check-local.sh usage-breakdown memory-document
 # 인자가 없으면 브라우저 검사까지 전체를 돌린다
 scripts/check-local.sh
 ```
+
+Draft CI 가 전체 통과하면 Ready 직전에 최신 main 을 작업 브랜치에 merge 한다.
+합친 뒤 `scripts/check-local.sh` 로 관련 화면의 spec 을 포함해 다시 검사하고 push 한다.
+코디네이터가 충돌을 직접 풀었을 때도 같은 검사를 거친다.
+새 커밋의 Draft CI 전체 통과를 확인한 뒤 `gh pr ready` 로 리뷰를 시작한다.
+main 에 새 커밋이 없으면 같은 head 의 CI 결과를 쓰며 Ready 전환만으로 CI 를 다시 돌리지 않는다.
 
 **머지 판정은 PR 의 CI 결과로 한다. 머지마다 승인을 받지 않는다.** 다음 순서로 확인한다.
 
@@ -160,11 +167,13 @@ PR 실패는 그 PR 에서 고친다. 모인 실패 이슈는 고치거나 까�
 
 크기 검사는 lock 파일, 빌드 결과물, 시험 스냅샷과 기계가 만드는 기준 파일을 제외한다. 제외 경로와 통과·큰 PR·실패를 나누는 수치는 `scripts/pr-size.mjs`가 소유한다. 시험과 문서는 따로 세어 검사 결과에 표시하며 실패 판정에는 쓰지 않는다. 운영 코드가 큰 PR에는 `규모:큼` 라벨이 붙고, 작아지면 제거된다. `규모:예외` 라벨이 있으면 상한을 넘어도 통과한다. 이 예외 라벨은 사람이나 코디네이터만 붙인다. 구현 워커는 스스로 예외를 붙이지 않는다. 포크 PR은 크기를 검사하되 자동 라벨은 붙이지 않는다.
 
-브랜치를 push 하고 PR 을 연다. main 에 로컬에서 바로 머지하지 않는다.
+브랜치를 push 하고 `gh pr create --draft` 로 Draft PR 을 연다. main 에 로컬에서 바로 머지하지 않는다.
+Draft CI 전체 통과 후 「확인」 절에 따라 최신 main 을 합치고 다시 검사한 뒤 `gh pr ready` 로 Ready 로 바꾼다.
 **계획서만으로 PR 을 열지 않는다. 예외는 없다.** ADR, 설계 문서, 계획서(`docs/`, `tasks/`)와 그 구현을 한 브랜치에서 끝낸 뒤 한 PR 로 올린다.
 구현이 여러 단계로 나뉘어도 설계만 먼저 머지하지 않는다. 한 PR 이 너무 커지면 구현을 단계별 PR 로 나누되, 각 PR 이 그 단계의 설계와 구현을 함께 담는다.
 
-PR 을 열면 Claude 코드 리뷰가 돈다. 리뷰 기준은 `.github/workflows/code-review-prompt.txt` 가 갖는다.
+Draft PR 을 Ready 로 바꾸면 Claude 코드 리뷰가 돈다. Draft 가 아닌 PR 을 바로 열 때도 리뷰가 돈다.
+리뷰 기준은 `.github/workflows/code-review-prompt.txt` 가 갖는다.
 
 | 무엇 | 어떻게 |
 | --- | --- |
