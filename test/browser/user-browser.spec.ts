@@ -226,7 +226,7 @@ test("연결 화면에서 내 브라우저로 간다", async ({ page }) => {
   });
   await page.goto("/connections");
 
-  await page.getByRole("link", { name: "내 브라우저" }).click();
+  await page.getByRole("main").getByRole("link", { name: "내 브라우저" }).click();
   await expect(page).toHaveURL(/\/browser$/);
   await expect(page.getByRole("heading", { name: "내 브라우저" })).toBeVisible();
 });
