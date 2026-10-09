@@ -131,8 +131,8 @@ pnpm test:browser <spec 이름 일부>
 BROWSER_WEB_SERVER=dev pnpm test:browser
 ```
 
-브라우저 시험을 쓰거나 고칠 때는 [`test/browser/README.md`](../test/browser/README.md) 를 읽는다.
-개발 서버와 빌드한 서버의 미리 읽기 차이, 시험의 독립성과 대기, 반복 실행, 화면 갱신이 멎을 때 확인할 것을 그 파일이 갖는다.
+브라우저 테스트를 쓰거나 고칠 때는 [`test/browser/README.md`](../test/browser/README.md) 를 읽는다.
+개발 서버와 빌드한 서버의 미리 읽기 차이, 테스트의 독립성과 대기, 반복 실행, 화면 갱신이 멎을 때 확인할 것을 그 파일이 갖는다.
 
 **줄 수가 정해지지 않은 목록의 링크는 `prefetch={false}` 를 준다.**
 기본값으로 두면 빌드한 서버가 보이는 링크마다 화면을 미리 읽어, 한 화면에서 요청이 수십 개 한꺼번에 나간다.

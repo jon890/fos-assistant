@@ -42,7 +42,7 @@ gh pr create --draft --title "$TITLE" --body-file "$BODY_FILE"
 gh pr checks "$PR" --watch
 ```
 
-실패하면 이 PR 에서 고치고 다시 기다린다. 다른 화면의 시험이 깨졌어도 이 PR 에서 고친다.
+실패하면 이 PR 에서 고치고 다시 기다린다. 다른 화면의 테스트가 깨졌어도 이 PR 에서 고친다.
 
 ## 3. main 합치고 Ready
 
