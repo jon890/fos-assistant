@@ -27,8 +27,8 @@ sequenceDiagram
     W->>C: 글과 첨부 번호로 보내기
     C->>C: 번호가 이 대화의 것인지 확인하고 대화의 결과물 폴더를 만든다
     C->>H: 결과물 폴더 단락과 사진 자리를 앞에 붙인 input. 이번 메시지 사진의 사본은 이미지로 싣는다
-    opt 싣지 못한 사진, 지난 메시지의 사진
-        H->>H: vision_analyze 로 사본 파일을 본다
+    opt 지난 메시지의 사진
+        H->>H: vision_analyze 로 사본 파일을 한 장씩 본다
     end
     alt artifact_write 도구가 있다
         H->>C: artifact_write 로 HTML 과 사진 저장을 요청한다
