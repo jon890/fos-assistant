@@ -84,8 +84,7 @@ public final class MpoJpegNormalizer {
     }
 
     private static boolean decodes(byte[] candidate) {
-        try (MemoryCacheImageInputStream input =
-                new MemoryCacheImageInputStream(new ByteArrayInputStream(candidate))) {
+        try (MemoryCacheImageInputStream input = new MemoryCacheImageInputStream(new ByteArrayInputStream(candidate))) {
             Iterator<ImageReader> readers = ImageIO.getImageReaders(input);
             if (!readers.hasNext()) {
                 return false;

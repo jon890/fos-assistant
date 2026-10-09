@@ -2,8 +2,8 @@ package com.bifos.assistant.chat.application;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import java.io.IOException;
 import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.util.Arrays;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -59,8 +59,7 @@ class MpoJpegNormalizerTest {
     @DisplayName("MPF와 SOI EOI만 있고 디코딩할 수 없는 JPEG는 원본을 유지한다")
     void preservesUndecodableFirstImage() {
         byte[] invalid = {
-            (byte) 0xff, (byte) 0xd8, (byte) 0xff, (byte) 0xe2, 0, 6,
-            'M', 'P', 'F', 0, (byte) 0xff, (byte) 0xd9
+            (byte) 0xff, (byte) 0xd8, (byte) 0xff, (byte) 0xe2, 0, 6, 'M', 'P', 'F', 0, (byte) 0xff, (byte) 0xd9
         };
         assertThat(MpoJpegNormalizer.normalize(invalid)).isSameAs(invalid);
     }
