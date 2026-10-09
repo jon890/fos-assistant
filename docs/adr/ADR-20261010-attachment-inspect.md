@@ -77,7 +77,8 @@ Linux helper는 Pillow open 전에 주소 공간 1.5GiB를 적용한다. 60M은 
 `POST /internal/hermes/attachment-inspect/validate`는 같은 서명·시각·Origin·ROLE_MCP 경계를 검사하고
 현재 실행·루트 취소·대화·첨부 상태를 SQL로 확인한 뒤 204만 반환한다. 조회 예산을 소비하지 않고
 bytes·새 proof·grant·lease를 만들지 않는다. 원 proof의 60초·실행 한 시간 기한을 연장하지 않는다.
-plugin은 대기·변환 중 약 500ms마다 검증하고 종료 직전에도 검증해 관측된 삭제·만료·취소 결과를 버린다.
+개요는 대기부터, 기본 GIF/WebP는 MIME 수신부터 약 500ms마다 검증하고 종료 직전에도 검증해 관측된 삭제·만료·취소 결과를 버린다.
+기본 JPEG/PNG는 기존 CP의 decode 전후 검증을 유지하므로 옛 CP에서도 동작한다.
 마지막 검증과 provider 전송 사이의 짧은 경쟁과 이미 보낸 픽셀의 회수는 이 HTTP 경계가 보장하지 않는다.
 
 plugin은 30초 timeout과 제한된 HTTP 읽기를 쓰고 redirect를 따르지 않는다.

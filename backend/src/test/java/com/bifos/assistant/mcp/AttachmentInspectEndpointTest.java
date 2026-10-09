@@ -6,7 +6,6 @@ import com.bifos.assistant.agent.domain.type.CostMode;
 import com.bifos.assistant.chat.application.AttachmentService;
 import com.bifos.assistant.chat.domain.ChatAttachment;
 import com.bifos.assistant.chat.domain.Conversation;
-import com.bifos.assistant.chat.infra.ChatAttachmentRepository;
 import com.bifos.assistant.chat.infra.ConversationRepository;
 import com.bifos.assistant.mcp.application.AgentTokenService;
 import com.bifos.assistant.shared.auth.CurrentUser;
@@ -52,9 +51,6 @@ class AttachmentInspectEndpointTest {
 
     @Autowired
     AttachmentService attachments;
-
-    @Autowired
-    ChatAttachmentRepository rows;
 
     @Autowired
     ConversationRepository conversations;

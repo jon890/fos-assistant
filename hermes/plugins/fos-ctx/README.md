@@ -60,7 +60,8 @@ Linux helper는 Pillow open 전에 RLIMIT_AS 1.5GiB와 부모 종료 SIGKILL을 
 
 `POST /internal/hermes/attachment-inspect/validate`는 원본과 같은 토큰·Origin·서명·freshness 경계를 거쳐 204를 반환한다.
 본문은 원본 요청과 같고 bytes·새 grant·lease는 반환하지 않는다. `consume`도 호출하지 않는다.
-대기·변환 중 약 500ms 간격과 종료 직전에 상태를 확인한다. 삭제·만료·취소를 관측하면 결과를 버린다.
+개요 모드는 대기부터, GIF/WebP 기본 원본은 MIME 수신부터 약 500ms 간격과 종료 직전에 상태를 확인한다.
+기본 JPEG/PNG는 변환하지 않으며 옛 CP의 decode 전후 상태 검증으로 동작한다. 삭제·만료·취소를 관측하면 결과를 버린다.
 마지막 검증 뒤 provider 전송 전 경쟁까지 원자적으로 막거나 이미 보낸 픽셀을 회수하지는 못한다.
 여러 gateway 프로세스에는 별도 슬롯이 생긴다. 실제 topology와 peak RSS·자동 조회는 운영 왕복으로 확인한다.
 

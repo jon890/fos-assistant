@@ -139,7 +139,7 @@ WebP 사본이 최초 입력에 없으면 첫 답변 전에 원본 도구를 자
 
 plugin은 profile과 reload 사이에 프로세스별 FIFO 하나를 공유한다. 원본 수신 전에 차례를 기다리므로
 대기 요청마다 큰 원본 bytes를 쌓지 않는다. 큐 15초를 포함한 전체 기한은 30초다.
-원본 조회와 같은 서명으로 `/internal/hermes/attachment-inspect/validate`를 반복 호출하고 결과 반환 전에도 확인한다.
+GIF/WebP 변환과 네 형식의 개요는 같은 서명으로 `/internal/hermes/attachment-inspect/validate`를 반복 호출하고 결과 반환 전에도 확인한다.
 상태 확인은 조회 예산을 소비하지 않으며 실행·첨부 상태를 SQL로 다시 판정한다.
 실패한 helper는 terminate·kill·wait를 거친 뒤 슬롯을 반환한다. Linux 주소 공간 한도는 1.5GiB이며
 한도 안의 모든 60M 픽셀 처리가 성공한다는 뜻은 아니다. 제한 불가 환경은 판독 실패다.

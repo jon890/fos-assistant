@@ -2,7 +2,6 @@
 import ast
 import copy
 import hashlib
-import io
 import importlib
 import json
 import logging
@@ -91,8 +90,3 @@ class NativeImageContractTest(unittest.TestCase):
             self.assertIn("첫 프레임", fallback)
             self.assertIn("축소한 전체 개요", fallback)
 
-    @staticmethod
-    def response():
-        class Response(io.BytesIO):
-            headers = {"Content-Type": "image/png", "Content-Length": "12"}
-        return Response(b"\x89PNG\r\n\x1a\nmore")

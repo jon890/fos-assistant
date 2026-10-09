@@ -113,13 +113,20 @@ def supervise(url, token, args, deadline, validate):
     request = json.dumps({"url": url, "token": token, "args": args, "parent_pid": os.getpid()}).encode()
     if len(request) > 65536:
         raise ValueError("request limit")
-    with shared_runtime().slot(deadline, validate):
+    needs_validation = bool(args.get("overview"))
+
+    def check():
+        if needs_validation:
+            validate()
+
+    # 기본 JPEG/PNG는 CP의 기존 decode 전후 검증을 유지해 옛 CP와 함께 동작한다.
+    with shared_runtime().slot(deadline, check):
         process = subprocess.Popen([sys.executable, str(Path(__file__).with_name("image_helper.py"))],
                                    stdin=subprocess.PIPE, stdout=subprocess.PIPE,
                                    stderr=subprocess.DEVNULL, start_new_session=True)
         try:
             output = bytearray()
-            offset, next_check = 0, 0
+            offset, next_check, received = 0, 0, False
             os.set_blocking(process.stdin.fileno(), False)
             os.set_blocking(process.stdout.fileno(), False)
             with selectors.DefaultSelector() as selector:
@@ -130,7 +137,7 @@ def supervise(url, token, args, deadline, validate):
                     if now >= deadline:
                         raise TimeoutError("image handler timeout")
                     if now >= next_check:
-                        validate()
+                        check()
                         next_check = time.monotonic() + .5
                     for key, _ in selector.select(min(.1, max(0, deadline - time.monotonic()))):
                         if key.fileobj is process.stdin:
@@ -147,8 +154,19 @@ def supervise(url, token, args, deadline, validate):
                                 raise ValueError("helper output limit")
                             else:
                                 output.extend(chunk)
+                                if not received and len(output) >= 4:
+                                    length = struct.unpack("!I", output[:4])[0]
+                                    if length > 65536:
+                                        raise ValueError("helper metadata limit")
+                                    if len(output) >= 4 + length:
+                                        first = json.loads(output[4:4 + length])
+                                        received = True
+                                        if first.get("phase") == "received":
+                                            needs_validation = bool(first["requires_validation"])
+                                            del output[:4 + length]
+                                            next_check = 0
             process.wait(timeout=max(.001, deadline - time.monotonic()))
-            validate()
+            check()
             if time.monotonic() >= deadline:
                 raise TimeoutError("image handler deadline")
             if process.returncode or len(output) < 4:

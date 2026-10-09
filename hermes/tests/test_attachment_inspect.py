@@ -1,6 +1,5 @@
 """원본 조회 hook과 native 이미지 반환의 회귀 검사다."""
 import importlib
-import io
 import json
 import os
 import sqlite3
@@ -42,8 +41,6 @@ class AttachmentInspectTest(unittest.TestCase):
         self.assertIsInstance(self.inspect.handle({"attachment_id": 7}), str)
 
     def test_native_envelope_and_failure(self):
-        class Response(io.BytesIO):
-            headers = {"Content-Type": "image/png", "Content-Length": "12"}
         args = {"attachment_id": 7, "_fos_ctx": {"v": 1}, "_fos_inspect": {"sig": "proof"}}
         with patch.dict(os.environ, {"FOS_ATTACHMENT_INSPECT_URL": "http://example.test/internal/hermes/attachment-inspect"}), \
              patch.object(self.inspect, "_read_token", return_value="fake"), \
@@ -67,19 +64,6 @@ class AttachmentInspectTest(unittest.TestCase):
         self.plugin.register(Context())
         self.assertEqual(registered["name"], "attachment_inspect")
         self.assertFalse(registered.get("override", False))
-
-    def test_bad_or_rejected_http_response_never_returns_native_success(self):
-        args = {"attachment_id": 7, "_fos_ctx": {}, "_fos_inspect": {}}
-        for mime, length, body in [("image/png", 12, b"corrupt-data"),
-                                   ("image/png", 20, b"\x89PNG\r\n\x1a\nmore"),
-                                   ("text/plain", 12, b"\x89PNG\r\n\x1a\nmore"),
-                                   ("image/png", self.inspect.MAX_BYTES + 1, b"x")]:
-            class Response(io.BytesIO):
-                headers = {"Content-Type": mime, "Content-Length": str(length)}
-            with patch.dict(os.environ, {"FOS_ATTACHMENT_INSPECT_URL": "http://example.test/internal/hermes/attachment-inspect"}), \
-                 patch.object(self.inspect, "_read_token", return_value="fake"), \
-                 patch.object(self.inspect, "supervise", return_value=({"code": "original_unavailable"}, b"")):
-                self.assertIsInstance(self.inspect.handle(args), str)
 
     def test_top_level_compression_and_subagent_chains_are_distinct(self):
         context = importlib.import_module(self.plugin.__name__ + ".context")

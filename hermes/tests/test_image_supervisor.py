@@ -51,7 +51,7 @@ class ImageSupervisorTest(unittest.TestCase):
                 raise PermissionError("revoked")
         with patch.object(self.module.subprocess, "Popen", side_effect=self.start_hung):
             with self.assertRaises(PermissionError):
-                self.module.supervise("http://example.test", "fake-token", {}, start + 3, validate)
+                self.module.supervise("http://example.test", "fake-token", {"overview": True}, start + 3, validate)
         self.assert_reaped()
 
     def test_real_http_mime_caps_and_magic_and_first_frame(self):

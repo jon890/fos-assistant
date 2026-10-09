@@ -1,6 +1,5 @@
 """인증 정보는 익명 pipe로만 받고 한도가 있는 원본 수신·변환 결과만 보낸다."""
 import ctypes
-import io
 import json
 import os
 import resource
@@ -60,6 +59,8 @@ def main():
         length = int(response.headers.get("Content-Length", "0"))
         if mime not in {"image/gif", "image/webp", "image/jpeg", "image/png"} or not 0 < length <= limit:
             raise ValueError("invalid response")
+        emit({"phase": "received", "requires_validation": mime in {"image/gif", "image/webp"}
+              or bool(request["args"].get("overview"))})
         raw = response.read(limit + 1)
         if len(raw) != length:
             raise ValueError("response length mismatch")
