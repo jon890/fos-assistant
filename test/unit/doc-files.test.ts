@@ -9,6 +9,9 @@ const REPO_ROOT = join(import.meta.dirname, "../../");
 /** 루트와 모듈의 `docs/` 바로 아래에 둘 수 있는 이름이다. 규칙은 ADR-20261009 / docs-per-module 이 정한다. */
 const FIXED_NAMES = new Set(["prd.md", "flow.md", "code-architecture.md", "data-schema.md"]);
 
+/** 루트 `docs/features/` 아래 기능 문서의 이름이다. 규칙은 ADR-20261009 / feature-docs 가 정한다. */
+const FEATURE_DOC = /^[a-z0-9]+(?:-[a-z0-9]+)*\.md$/;
+
 /** 정해진 이름 밖에 두는 문서와 그 까닭이다. 까닭이 없으면 더하지 않는다. */
 export const EXCEPTIONS: Record<string, string> = {
   "docs/privacy.md": "바깥 주소가 고정이다. Google OAuth 동의 화면이 이 경로를 가리킨다",
@@ -33,6 +36,9 @@ export function problemOf(file: string): string | undefined {
   if (inDocs) {
     const rest = inDocs[2];
     if (rest.startsWith("images/")) return undefined;
+    if (!inDocs[1] && rest.startsWith("features/")) {
+      return FEATURE_DOC.test(rest.slice("features/".length)) ? undefined : "docs/features/ 아래에는 소문자 영문과 숫자, 하이픈 이름의 .md 만 둔다";
+    }
     if (rest.includes("/")) return "docs 아래에 하위 디렉터리를 두지 않는다";
     if (FIXED_NAMES.has(rest) || file in EXCEPTIONS) return undefined;
     return "정해진 이름이 아니다. 새 주제는 prd, flow, code-architecture, data-schema 의 절로 더한다";
@@ -64,10 +70,10 @@ test("예외 목록의 파일이 있다", () => {
 });
 
 test("모듈 docs 의 정해진 이름과 예외는 통과하고 새 주제 파일은 실패한다", () => {
-  for (const file of ["docs/prd.md", "backend/docs/data-schema.md", "web/docs/flow.md", "docs/privacy.md", "docs/adr/INDEX.md", "backend/docs/adr/archive/ADR-006-x.md"]) {
+  for (const file of ["docs/prd.md", "backend/docs/data-schema.md", "web/docs/flow.md", "docs/privacy.md", "docs/adr/INDEX.md", "backend/docs/adr/archive/ADR-006-x.md", "docs/features/agent-skill.md"]) {
     assert.equal(problemOf(file), undefined, file);
   }
-  for (const file of ["docs/connectors.md", "backend/docs/memory.md", "web/docs/frontend/chat.md", "notes.md", "hermes/plugins/x/NOTES.md"]) {
+  for (const file of ["docs/connectors.md", "backend/docs/memory.md", "web/docs/frontend/chat.md", "docs/features/x/y.md", "backend/docs/features/x.md", "docs/features/Chat.md", "notes.md", "hermes/plugins/x/NOTES.md"]) {
     assert.notEqual(problemOf(file), undefined, file);
   }
 });

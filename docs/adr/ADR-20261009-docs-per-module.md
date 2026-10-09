@@ -6,6 +6,8 @@
 
 ### 결정
 
+**대체된 부분**: 모듈의 `prd.md` 와 `flow.md` 를 두는 부분은 [ADR-20261009 / feature-docs](ADR-20261009-feature-docs.md) 가 대체한다.
+
 모듈(`backend/`, `web/`, `hermes/`)마다 `docs/` 에 아래 파일만 둔다.
 여러 모듈에 걸친 것은 루트 `docs/` 의 같은 이름 파일이 갖는다.
 

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // 파일 전체 길이는 빈 줄과 주석을 포함한다. 기존 긴 파일은 기준값보다 늘어나지 못한다.
-// 모듈 문서의 한도는 ADR-20261009 / docs-per-module 이 정하고, 넘으면 실패가 아니라 알림이다.
+// 모듈 문서의 한도는 ADR-20261009 / docs-per-module 이, 기능 문서의 한도는 ADR-20261009 / feature-docs 가 정하고, 넘으면 실패가 아니라 알림이다.
 import { existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -19,10 +19,13 @@ export function lineCount(text) {
 
 /** 루트와 모듈의 `docs/` 바로 아래 문서다. ADR 은 `adr/` 아래라 빠진다. */
 const MODULE_DOC = /^(?:(?:backend|web|hermes)\/)?docs\/[^/]+\.md$/;
+/** 루트 `docs/features/` 의 기능 문서다. */
+const FEATURE_DOC = /^docs\/features\/[^/]+\.md$/;
 const SCAN_DIRS = ["backend/src/main", "web/src", "hermes", "scripts", "docs", "backend/docs", "web/docs"];
 
 export function limitFor(file) {
   if (MODULE_DOC.test(file)) return 1000;
+  if (FEATURE_DOC.test(file)) return 500;
   const parts = file.split("/");
   if (parts.some((part) => SKIP_DIRS.has(part)) || /\.(test|spec)\.[cm]?[jt]sx?$/.test(file)) return null;
   if (file.startsWith("backend/src/main/") && file.endsWith(".java")) return 500;
@@ -77,8 +80,8 @@ export function checkFileLengths(root, { update = false } = {}) {
     const count = lineCount(readFileSync(join(root, file), "utf8"));
     counts.set(file, count);
     const allowed = baseline.files[file] ?? limitFor(file);
-    // 모듈 문서는 정해진 파일이라 나눌 수 없다. 새 기능은 그 파일의 절로 더하므로 넘으면 알리기만 한다.
-    if (count > allowed && MODULE_DOC.test(file)) notices.push(`${file}: ${count}줄 > ${allowed}줄. 코드가 가진 값의 복사본을 지워 줄인다.`);
+    // 모듈 문서는 정해진 파일이라 나눌 수 없고 기능 문서는 새 주제를 절로 더한다. 넘으면 알리기만 한다.
+    if (count > allowed && (MODULE_DOC.test(file) || FEATURE_DOC.test(file))) notices.push(`${file}: ${count}줄 > ${allowed}줄. 코드가 가진 값의 복사본을 지워 줄인다.`);
     else if (count > allowed) errors.push(`${file}: ${count}줄 > ${allowed}줄. 파일을 나눈다.`);
   }
   for (const [file, previous] of Object.entries(baseline.files)) {
