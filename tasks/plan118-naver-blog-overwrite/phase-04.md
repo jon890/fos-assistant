@@ -86,6 +86,7 @@ export async function runOverwrite(
    `documentToDraft(editorDocument(pageB))` 의 제목과 본문이 사본 제목과 원래 본문(`content.body`)인지 본다.
    `settings(pageB, {title: 사본 제목, category, tags, body: content.body}, <임의 해시>)` 로 원래 카테고리와 태그를 넣는다.
    `clickSave(pageB)` 로 저장 단추를 누르고, `page.times.saveSeconds` 동안 `tempDrafts(pageB, blogId)` 를 다시 읽는다. 원래 글의 제목이나 `saved_at` 이 `before` 와 달라지거나, `before` 에 없던 글이 하나 생기고 그 제목이 사본 제목이면 기다림을 끝낸다.
+   목록에서 원래 글을 찾지 못하면(200개 경계로 밀려난 경우) 바뀐 것으로 보지 않고 새 사본만 본다.
    기다림이 끝나면 원래 글의 변경을 먼저 본다. 바뀌었으면 `backup_failed` 이고 `extra.original_changed` 가 참이다. 이때 새 사본 글이 보였으면 `extra.backup_draft_id` 도 싣는다.
    원래 글이 그대로이고 새 사본 글이 없으면 `backup_failed`(extra 없음)다. 탭 B 를 닫는다
 5. `apply`: `expected = documentToDraft(3 에서 만든 문서)` 를 기억하고 `setDocument(pageA, 3 에서 만든 문서)`. 다시 읽은 문서의 `documentId` 가 `input.draft_id` 이고 `documentToDraft` 의 제목과 본문이 `expected` 와 같은지 본다. 아니면 `editor_failed`
