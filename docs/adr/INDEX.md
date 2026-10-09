@@ -50,7 +50,7 @@
 | [ADR-031](ADR-031-mcp-호출의-부모-실행은-profile-플러그인이-서명한-루트-session-으로-잇는다.md) | MCP 호출의 부모 실행은 profile 플러그인이 서명한 루트 session 으로 잇는다 | backend | Accepted. ADR-017 의 부모 잇기를 정한다. 일부는 ADR-032 가 대체한다 |
 | [ADR-032](ADR-032-mcp-토큰은-profile-을-증명하고-실제-사용자는-부모-실행에서-정한다.md) | MCP 토큰은 profile 을 증명하고 실제 사용자는 부모 실행에서 정한다 | backend | Accepted. ADR-003, ADR-017, ADR-028 의 요청자 판정과 ADR-031 의 일부를 대체한다. 하위 에이전트 session 의 요청자는 ADR-037 이 대체한다 |
 | [ADR-033](ADR-033-사용자가-에이전트를-만들고-공개해도-만든-사람이-관리한다.md) | 사용자가 에이전트를 만들고, 공개해도 만든 사람이 관리한다 | backend | Accepted. 연결용 에이전트의 일반 편집 권한은 ADR-039 가 대체한다 |
-| [ADR-034](ADR-034-올린-스킬은-control-plane-이-버전-디렉터리에-쓰고-hermes-는-읽기만-한다.md) | 올린 스킬은 Control Plane 이 버전 디렉터리에 쓰고 Hermes 는 읽기만 한다 | backend | Accepted |
+| [ADR-034](ADR-034-올린-스킬은-control-plane-이-버전-디렉터리에-쓰고-hermes-는-읽기만-한다.md) | 올린 스킬은 Control Plane 이 버전 디렉터리에 쓰고 Hermes 는 읽기만 한다 | backend | Accepted. 스크립트를 받지 않는다는 부분은 [ADR-20261009 / skill-package](ADR-20261009-skill-package.md) 가 대체한다 |
 | [ADR-035](ADR-035-대화창의-스킬-커맨드는-control-plane-이-해석해-hermes-에-넘긴다.md) | 대화창의 스킬 커맨드는 Control Plane 이 해석해 Hermes 에 넘긴다 | backend | Accepted |
 | [ADR-036](ADR-036-추천-질문은-사용자의-대화-이력으로-모델이-만들고-메모리에만-둔다.md) | 추천 질문은 사용자의 대화 이력으로 모델이 만들고 메모리에만 둔다 | backend | Accepted |
 | [ADR-037](ADR-037-hermes-하위-에이전트-session-의-주인은-만들-때-등록한-줄로-정한다.md) | Hermes 하위 에이전트 session 의 주인은 만들 때 등록한 줄로 정한다 | backend | Accepted. ADR-031, ADR-032 의 하위 에이전트 session 판정을 대체한다 |
@@ -140,4 +140,5 @@
 | [ADR-20261008 / read-data-flow](ADR-20261008-read-data-flow.md) | 커넥터 READ 결과는 가는 곳마다 따로 판정하고, 판정하지 못하는 길은 감수로 적는다 | 공통 | Accepted. ADR-083 과 ADR-086 의 「감당할 것」 을 흐름마다 나눠 적는다 |
 | [ADR-20261008 / tossinvest-connector](ADR-20261008-tossinvest-connector.md) | 토스증권 커넥터는 읽기 도구만 두고, 토큰은 프로세스 메모리에서 한 번에 하나만 다시 받는다 | hermes | Accepted. ADR-20261008 / connector-binding-guards 의 두 선언을 쓴다 |
 | [ADR-20261008 / tool-catalog-visibility](ADR-20261008-tool-catalog-visibility.md) | 관리자는 그룹의 도구 선택 목록을 정하고 숨김은 활성 상태를 바꾸지 않는다 | backend, frontend | Accepted. ADR-029의 도구 조회와 저장에 그룹별 숨김을 더한다 |
+| [ADR-20261009 / skill-package](ADR-20261009-skill-package.md) | 스킬은 zip 묶음으로도 올리고, 스크립트는 실행 공간이 있는 에이전트에만 받는다 | 공통 | Accepted. ADR-034 의 스크립트 기각을 대체한다 |
 | [ADR-20261009 / tool-request-flow](ADR-20261009-tool-request-flow.md) | 도구 사용 요청은 따로 저장하고 관리자는 반영을 확인한 뒤 승인한다 | backend, frontend | Accepted. ADR-029의 관리자 도구 변경에 주인의 요청과 결정 이력을 더한다 |

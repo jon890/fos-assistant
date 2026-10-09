@@ -87,6 +87,7 @@ plugin 디렉터리의 모든 `*.py` 와 `plugin.yaml`, 주소를 채운 `defaul
 | `attachment_root` | 예 | Docker 호스트에서 첨부를 사용자별로 둔 절대 경로. Hermes에서도 그 경로를 검증할 수 있어야 한다. `<attachment_root>/users/<sha256(sandbox_owner UTF-8)>` 만 읽기 전용으로 붙는다 |
 | `attachment_agent_root` | 예 | Hermes와 실행 컨테이너가 함께 보는 첨부 절대 경로. `<attachment_agent_root>/users/<sha256(sandbox_owner UTF-8)>` 가 위 원본의 실행 공간 경로다. Docker 호스트와 Hermes의 경로는 달라도 된다 |
 | `connector_output_root` | 아니오 | 커넥터가 계산할 목록을 파일로 쓰는 절대 경로. **Docker 호스트와 Hermes 컨테이너에서 같은 경로**여야 한다. `<connector_output_root>/users/<sha256(sandbox_owner UTF-8)>/<profile>` 이 같은 경로에 읽기 전용으로 붙는다. 없으면 붙이지 않고 커넥터의 `owner_output_env` 는 빈 값이다([ADR-20261008 / connector-output-files](../docs/adr/ADR-20261008-connector-output-files.md)) |
+| `skill_root` | 아니오 | Docker 호스트에서 올린 스킬 루트의 절대 경로. Hermes 쪽 경로 `FOS_ASSISTANT_SKILL_AGENT_ROOT` 와 같은 디렉터리여야 한다. 있으면 `<skill_root>/<profile>` 을 `<FOS_ASSISTANT_SKILL_AGENT_ROOT>/<profile>` 에 읽기 전용으로 붙인다. 없으면 붙이지 않고 `scripts/` 가 든 스킬의 게시를 409 로 거절한다([ADR-20261009 / skill-package](../docs/adr/ADR-20261009-skill-package.md)) |
 | `network` | 아니오 | 실행 공간을 붙일 Docker 망 이름. 없으면 Docker 기본 망이다 |
 | `cpu` | 아니오 | 0 보다 크고 8 이하. 기본 1 |
 | `memory_mb` | 아니오 | 256 이상 16384 이하의 정수. 기본 1024 |
@@ -113,6 +114,8 @@ token 과 API key 값 자체는 받지 않는다. 파일을 읽게 할 경우 �
 공통 또는 profile 별 마운트 원본이 `workspace_root` 또는 `attachment_root` 와 같거나 그 아래이거나 그 상위이면 정책 전체를 읽지 못한 것으로 본다.
 마운트 대상이 `attachment_agent_root` 와 같거나 그 아래이거나 그 상위여도 정책 전체를 읽지 못한 것으로 본다.
 마운트 원본이나 대상이 `connector_output_root` 와 겹쳐도 같다. 다른 profile 의 출력이 보이기 때문이다.
+`skill_root` 는 `workspace_root`, `attachment_root`, `connector_output_root` 와 겹칠 수 없다. 공통 또는 profile 별 마운트의 원본이 `skill_root` 와 겹치거나 대상이 Hermes 스킬 루트와 겹쳐도 정책 전체를 읽지 못한 것으로 본다. 다른 profile 의 스킬이 보이기 때문이다.
+스킬 마운트는 Hermes 쪽 `<FOS_ASSISTANT_SKILL_AGENT_ROOT>/<profile>` 이 링크 없는 디렉터리일 때만 붙인다. 없는 원본을 붙이면 Docker 가 빈 디렉터리를 만들거나 socket proxy 가 컨테이너 생성을 거절하기 때문이다. Control Plane 은 스킬을 처음 저장할 때 그 디렉터리를 만들고 에이전트를 지울 때까지 남긴다.
 `connector_output_root` 를 넣거나 빼면 등록된 profile 의 `terminal:` 이 바뀌어 다음 셸 저장에서 컨테이너 키가 바뀐다. 그 저장 전까지는 출력 디렉터리가 붙지 않는다.
 셸 저장과 사진 도구 옛 설치는 그 profile 의 출력 디렉터리를 링크 없이 만들지 못하면 409 로 거절한다. 바인딩 설치는 같은 실패를 빈 값으로 넘긴다.
 이 검사는 경로 조각 기준으로 한다. 다른 사용자의 workspace나 첨부를 공통 마운트로 보이게 하면 안 되기 때문이다.
@@ -151,6 +154,8 @@ terminal:
     - <attachment_root>/users/<sha256(sandbox_owner UTF-8)>:<attachment_agent_root>/users/<sha256(sandbox_owner UTF-8)>:ro
     # connector_output_root 가 있을 때만. plugin 이 저장 전에 그 디렉터리를 링크 없이 만든다
     - <connector_output_root>/users/<sha256(sandbox_owner UTF-8)>/<profile>:<같은 경로>:ro
+    # skill_root 가 있고 Hermes 쪽 profile 스킬 디렉터리가 있을 때만
+    - <skill_root>/<profile>:<FOS_ASSISTANT_SKILL_AGENT_ROOT>/<profile>:ro
     - <read_only_mounts 의 각 항목>:ro
     - <profiles[profile].read_only_mounts 의 각 항목>:ro
   docker_forward_env: []
@@ -336,7 +341,7 @@ Control Plane 이 이 경로들을 부르는 순서와 뜻은 부르는 쪽 문�
 | `POST /api/mcp/servers/<서버>/test?profile=<p>` | 그 profile 에 설치한 커넥터의 MCP 서버만 probe 한다 | 없음 | `{ok, tools: [{name}]}` | |
 | `GET /api/tools/toolsets` | 도구 이름과 설명을 읽는다 | 없음 | 200 | |
 | `PUT /api/config` (도구) | 지정한 profile 의 API 도구 목록을 쓴다. `terminal`, `file`, `code_execution`, `vision`, `image_gen`, `video_gen` 가운데 하나라도 있으면 profile 의 `terminal:` 을 실행 공간 설정으로 다시 쓴다. 같은 쓰기에서 `approvals.unattended_mode` 를 docker 면 `approve` 로 두고 local 이면 지운다(「셸 실행 공간」) | `{profile, config: {platform_toolsets: {api_server: [...]}}, sandbox_owner?, require_sandbox?}`. `sandbox_owner` 는 `^[a-z][a-z0-9-]{0,63}$` 이고 실행 공간 도구를 켜는 등록 profile 에서 필수다. `require_sandbox` 는 참 거짓 값이고, 참이면 정책에 없는 profile 의 셸 도구 저장을 local 로 돌리지 않고 409 `sandbox_unavailable` 로 거절한다. Control Plane 의 기본 도구 적용이 보낸다 | 200 | [ADR-029](../docs/adr/ADR-029-에이전트-도구는-control-plane-이-등급으로-판정하고-hermes-설정-api-로-쓴다.md) 그대로. 409 소유 기록의 바인딩 서버 이름이 목록에 빠졌다 |
-| `PUT /api/config` (스킬 게시) | 지정한 profile 의 올린 스킬 경로를 쓴다 | `{profile, config: {skills: {external_dirs: [<Hermes 쪽 스킬 루트>/<profile>/<버전>]}}}`. 버전 이름은 `v[0-9]{13}-[a-z0-9]{4}` 다(`v` 뒤에 UTC 밀리초 13자리와 소문자 영숫자 4자). 목록은 0개나 1개. 0개는 게시 해제. 도구 목록을 같은 본문에 둘 수 있다 | 200 | 400 경로 형식, 다른 profile 의 prefix, 둘 이상, 심볼릭 링크, 없는 디렉터리, `skills` 도구가 꺼진 채 게시. 409 운영자가 넣은 다른 외부 경로가 있다. 404 없는 profile |
+| `PUT /api/config` (스킬 게시) | 지정한 profile 의 올린 스킬 경로를 쓴다 | `{profile, config: {skills: {external_dirs: [<Hermes 쪽 스킬 루트>/<profile>/<버전>]}}, sandbox_owner?, require_sandbox?}`. 버전 이름은 `v[0-9]{13}-[a-z0-9]{4}` 다(`v` 뒤에 UTC 밀리초 13자리와 소문자 영숫자 4자). 목록은 0개나 1개. 0개는 게시 해제. 도구 목록을 같은 본문에 둘 수 있다. `scripts/` 가 든 스킬을 게시할 때 Control Plane 은 지금 도구 목록과 `require_sandbox: true` 를 함께 보낸다. 그때 plugin 은 목록에 실행 공간 도구가 있고, profile 이 정책에 등록돼 있고, 정책에 `skill_root` 가 있어야 받는다 | 200 | 400 경로 형식, 다른 profile 의 prefix, 둘 이상, 심볼릭 링크, 없는 디렉터리, `skills` 도구가 꺼진 채 게시. 409 운영자가 넣은 다른 외부 경로가 있다. 409 `sandbox_unavailable` 은 `require_sandbox` 인데 위 셋 가운데 하나가 없다. 404 없는 profile |
 | `GET /api/skills?profile=<p>` | 지정한 profile 의 스킬 목록을 읽는다 | query `profile` 하나 | 200 `[{name, description, category, enabled, usage, provenance}]`. `enabled` 는 전역 `skills.disabled` 만 반영 | 400 query 누락, 둘 이상, `default`. 404 |
 | `PUT /api/skills/toggle` | 지정한 profile 의 스킬 하나를 켜고 끈다 | `{profile, name, enabled}` | 200 `{ok, name, enabled}` | 400, 404 |
 | `GET PUT /api/profiles/<이름>/soul` | 그 profile 의 SOUL.md 를 읽고 쓴다 | `PUT` 은 `{content}` | 200 | |
