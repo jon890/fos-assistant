@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { EmptyState } from "@/components/ui/empty-state";
-import { formatWhen } from "@/lib/format";
+import { agentLabel, formatWhen } from "@/lib/format";
 import type { SkillUsageRow } from "@/lib/skill";
 
 function SkillUsageContent({ row }: { row: SkillUsageRow }) {
@@ -9,7 +9,7 @@ function SkillUsageContent({ row }: { row: SkillUsageRow }) {
       <span className="min-w-0">
         <span className="block truncate font-medium">{row.skillName}</span>
         <span className="block truncate text-xs text-muted-foreground">
-          {row.agentName}
+          {agentLabel(row.agentName)}
         </span>
       </span>
       <span className="shrink-0 text-right text-sm">
@@ -46,7 +46,7 @@ export function SkillUsageList({ rows }: { rows: SkillUsageRow[] }) {
       <ul className="grid gap-3" data-testid="skill-usage-list">
         {rows.map((row, index) => (
           // 에이전트 코드는 관리자에게만 와서 key 로 쓰지 않는다. 이름이 같은 에이전트가 있어도 겹치지 않게 순번을 붙인다.
-          <li key={`${row.agentName}/${row.skillName}/${index}`}>
+          <li key={`${agentLabel(row.agentName)}/${row.skillName}/${index}`}>
             {row.lastConversationId ? (
               <Link
                 prefetch={false}

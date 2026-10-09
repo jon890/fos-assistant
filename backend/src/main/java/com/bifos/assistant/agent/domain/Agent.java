@@ -123,7 +123,8 @@ public class Agent {
     /**
      * 지운 시각. 비어 있으면 지우지 않았다.
      *
-     * <p>행은 지우지 않는다. 대화, 실행, 사용량이 {@code agent_id} 로 이 에이전트의 이름을 읽기 때문이다.
+     * <p>지운 지 {@code assistant.agents.purge-after} 가 지나면 정리 작업이 행을 지운다(ADR-20261009 / agent-purge). 대화, 실행,
+     * 사용량은 행이 없어도 「지운 에이전트」 로 그린다.
      */
     @Column(name = "deleted_at")
     @Getter

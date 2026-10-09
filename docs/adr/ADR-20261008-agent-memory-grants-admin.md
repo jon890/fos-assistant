@@ -3,6 +3,7 @@
 - **status**: `accepted`
 - Date: 2026-10-08
 - [ADR-053](../../backend/docs/adr/ADR-053-에이전트는-허용된-collection-의-memory-만-받는다.md) 의 「다음」 에 적은 관리 경로를 정한다. 판정 규칙은 바꾸지 않는다.
+- **대체된 부분**: 기록을 지우지 않는다는 것은 에이전트 행이 남아 있는 동안만이다. 지운 에이전트를 7일 뒤 정리할 때 함께 지운다([ADR-20261009 / agent-purge](../../backend/docs/adr/ADR-20261009-agent-purge.md)).
 
 ### 결정
 

@@ -50,6 +50,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.jdbc.core.JdbcTemplate;
 
 /**
  * 스킬 호출 이력을 누가 어디까지 보는지 본다(ADR-034).
@@ -111,6 +112,9 @@ class SkillUsageQueryTest {
 
     @Autowired
     HermesToolsetClient toolsets;
+
+    @Autowired
+    JdbcTemplate jdbc;
 
     private final CurrentUserProvider currentUser = mock(CurrentUserProvider.class);
     private UsageController controller;
@@ -247,6 +251,27 @@ class SkillUsageQueryTest {
             assertThat(usage.lastInvokedAt()).isEqualTo(T2);
             assertThat(usage.lastConversationId()).isNull();
         });
+    }
+
+    @Test
+    @DisplayName("에이전트 행이 없는 호출도 이름 없이 합계에 남는다")
+    void callOfAgentWithoutRowStaysInTotalWithoutName() {
+        AgentExecution purged = execution(dad, dadFirst);
+        use(purged, "purged-skill", SkillUseSource.MODEL, T3.plusSeconds(60));
+        jdbc.update("UPDATE agent_execution SET agent_id = ? WHERE id = ?", Long.MAX_VALUE - 1, purged.id());
+        AgentExecution withoutAgent = execution(dad, dadFirst);
+        use(withoutAgent, "no-agent-skill", SkillUseSource.MODEL, T3.plusSeconds(120));
+        jdbc.update("UPDATE agent_execution SET agent_id = NULL WHERE id = ?", withoutAgent.id());
+
+        List<UserSkillUsage> usages = query.byUser(dad.id());
+
+        assertThat(usages)
+                .extracting(
+                        UserSkillUsage::agentCode,
+                        UserSkillUsage::agentName,
+                        UserSkillUsage::skillName,
+                        UserSkillUsage::count)
+                .containsExactly(tuple(null, null, "purged-skill", 1L), tuple(AGENT_CODE, "가족 비서", "shopping", 2L));
     }
 
     @Test
