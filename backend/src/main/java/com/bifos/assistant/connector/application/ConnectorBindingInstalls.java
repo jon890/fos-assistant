@@ -161,6 +161,10 @@ public class ConnectorBindingInstalls {
 
     /** 실패한 단계와 커넥터 번호와 예외 종류만 남긴다. 예외 메시지와 원격 응답에는 칸 값이 섞일 수 있어 적지 않는다. */
     static void warn(String step, String connectorId, RuntimeException ex) {
-        log.warn("connector {} failed at {}: {}", connectorId, step, ex.getClass().getSimpleName());
+        log.warn(
+                "connector {} failed at {}: {}",
+                connectorId,
+                step,
+                ex.getClass().getSimpleName());
     }
 }
