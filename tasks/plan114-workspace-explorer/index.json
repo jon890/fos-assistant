@@ -1,0 +1,14 @@
+{
+  "name": "plan114-workspace-explorer",
+  "description": "사이드바 「고급」 의 「파일 공간」 에서 사용자가 자기 실행 공간 /workspace 를 보고 내려받고 지운다 — 에이전트가 만든 파일을 볼 길이 없어서",
+  "status": "pending",
+  "created_at": "2026-10-09",
+  "total_phases": 4,
+  "current_phase": 1,
+  "phases": [
+    { "number": 1, "file": "phase-01.md", "execution_profile": "deep" },
+    { "number": 2, "file": "phase-02.md", "execution_profile": "deep" },
+    { "number": 3, "file": "phase-03.md", "execution_profile": "deep" },
+    { "number": 4, "file": "phase-04.md", "execution_profile": "standard" }
+  ]
+}
