@@ -1,7 +1,7 @@
 package com.bifos.assistant.chat.application;
 
-import com.bifos.assistant.chat.domain.ChatAttachment;
 import com.bifos.assistant.agent.application.AgentToolService;
+import com.bifos.assistant.chat.domain.ChatAttachment;
 import com.bifos.assistant.chat.domain.Conversation;
 import com.bifos.assistant.chat.infra.ArtifactStore;
 import com.bifos.assistant.context.AssembledContext;
@@ -154,7 +154,8 @@ class ChatTurnRunner {
                         agentTools.ensureAttachmentInspection(routed.agent());
                     } catch (RuntimeException ex) {
                         executions.fail(pending.execution(), "ATTACHMENT_INSPECTION_UNAVAILABLE");
-                        chatRunEvents.append(pending, ExecutionEventType.RUN_FAILED, "ATTACHMENT_INSPECTION_UNAVAILABLE");
+                        chatRunEvents.append(
+                                pending, ExecutionEventType.RUN_FAILED, "ATTACHMENT_INSPECTION_UNAVAILABLE");
                         throw ex;
                     }
                 }

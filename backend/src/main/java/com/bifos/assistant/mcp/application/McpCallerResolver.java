@@ -2,8 +2,8 @@ package com.bifos.assistant.mcp.application;
 
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.agent.infra.AgentRepository;
-import com.bifos.assistant.orchestration.application.SessionOwnerResolver;
 import com.bifos.assistant.orchestration.application.DelegationParentResolver;
+import com.bifos.assistant.orchestration.application.SessionOwnerResolver;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;

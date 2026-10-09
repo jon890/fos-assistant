@@ -886,12 +886,14 @@ class ChatServiceTest {
     @DisplayName("원본 도구의 실패가 대화 사건에도 실패로 전달된다")
     void attachmentInspectionFailureIsRelayedAsFailure() {
         CurrentUser dad = member("dad@example.com", "dad");
-        stub().willReturn(HermesRunResult.of("run-1", "sess-1", "completed", "사진을 판독하지 못했다", "dad", null, TokenUsage.empty()));
+        stub().willReturn(HermesRunResult.of(
+                "run-1", "sess-1", "completed", "사진을 판독하지 못했다", "dad", null, TokenUsage.empty()));
         hermesStreams(new RunEvent("tool.completed", null, "attachment_inspect", "원본 조회 실패", 500L, true));
         List<ChatEvent> relayed = new ArrayList<>();
         chat.stream(dad, null, "사진의 작은 글자는?", "dad", relayed::add);
         assertThat(relayed.stream().filter(event -> "tool".equals(event.type())).toList())
-                .extracting(ChatEvent::failed).containsExactly(true);
+                .extracting(ChatEvent::failed)
+                .containsExactly(true);
     }
 
     @Test

@@ -15,8 +15,10 @@ import tools.jackson.databind.JsonNode;
 /** 원본 조회에 허용하는 첨부 번호와 표시 좌표다. 서명할 인자는 두 정수 표현만 사용한다. */
 public record AttachmentInspectRequest(long attachmentId, List<Integer> region) {
     public static AttachmentInspectRequest from(JsonNode body) {
-        if (body == null || !body.isObject()
-                || !Set.of("attachment_id", "region", "_fos_ctx", "_fos_inspect").containsAll(body.propertyNames())) {
+        if (body == null
+                || !body.isObject()
+                || !Set.of("attachment_id", "region", "_fos_ctx", "_fos_inspect")
+                        .containsAll(body.propertyNames())) {
             throw invalid();
         }
         JsonNode id = body.get("attachment_id");
@@ -45,10 +47,12 @@ public record AttachmentInspectRequest(long attachmentId, List<Integer> region) 
     }
 
     public String digest() {
-        String coordinates = region == null ? "" : region.stream().map(String::valueOf).collect(Collectors.joining(","));
+        String coordinates =
+                region == null ? "" : region.stream().map(String::valueOf).collect(Collectors.joining(","));
         try {
-            return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256")
-                    .digest((attachmentId + "\n" + coordinates).getBytes(StandardCharsets.UTF_8)));
+            return HexFormat.of()
+                    .formatHex(MessageDigest.getInstance("SHA-256")
+                            .digest((attachmentId + "\n" + coordinates).getBytes(StandardCharsets.UTF_8)));
         } catch (NoSuchAlgorithmException ex) {
             throw new IllegalStateException(ex);
         }

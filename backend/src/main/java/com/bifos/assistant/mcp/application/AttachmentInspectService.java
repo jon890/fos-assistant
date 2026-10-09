@@ -31,15 +31,23 @@ public class AttachmentInspectService {
     public InspectedImage inspect(McpPrincipal principal, JsonNode body) {
         AttachmentInspectRequest request = AttachmentInspectRequest.from(body);
         JsonNode proof = body.get("_fos_inspect");
-        if (proof == null || !proof.isObject() || !proof.has("top_level") || !proof.get("top_level").isBoolean()) {
+        if (proof == null
+                || !proof.isObject()
+                || !proof.has("top_level")
+                || !proof.get("top_level").isBoolean()) {
             throw invalid();
         }
-        McpCaller caller = callers.resolveAttachmentInspection(principal, body.get("_fos_ctx"), proof.get("top_level").booleanValue());
+        McpCaller caller = callers.resolveAttachmentInspection(
+                principal, body.get("_fos_ctx"), proof.get("top_level").booleanValue());
         AgentExecution execution = caller.originExecution();
         requireRunning(execution);
         verify(principal, caller, request, body.get("_fos_inspect"));
         consume(caller, request.attachmentId());
-        InspectedImage result = attachments.inspect(caller.user(), execution.conversationId(), request.attachmentId(), request.region(),
+        InspectedImage result = attachments.inspect(
+                caller.user(),
+                execution.conversationId(),
+                request.attachmentId(),
+                request.region(),
                 () -> active(execution.id()));
         if (!active(execution.id())) {
             throw invalid();
@@ -52,8 +60,9 @@ public class AttachmentInspectService {
         if (!executions.existsByIdAndStatus(executionId, ExecutionStatus.RUNNING)) {
             return false;
         }
-        return execution.rootExecutionId() == null || (executions.existsById(execution.rootExecutionId())
-                && !executions.existsByIdAndStatus(execution.rootExecutionId(), ExecutionStatus.CANCELLED));
+        return execution.rootExecutionId() == null
+                || (executions.existsById(execution.rootExecutionId())
+                        && !executions.existsByIdAndStatus(execution.rootExecutionId(), ExecutionStatus.CANCELLED));
     }
 
     private void verify(McpPrincipal principal, McpCaller caller, AttachmentInspectRequest request, JsonNode proof) {
@@ -62,21 +71,35 @@ public class AttachmentInspectService {
         }
         JsonNode issued = proof.get("issued_at_ms");
         JsonNode sig = proof.get("sig");
-        if (issued == null || !issued.isIntegralNumber() || !issued.canConvertToLong()
-                || sig == null || !sig.isTextual() || !McpCallContext.SIGNATURE.matcher(sig.asString()).matches()) {
+        if (issued == null
+                || !issued.isIntegralNumber()
+                || !issued.canConvertToLong()
+                || sig == null
+                || !sig.isTextual()
+                || !McpCallContext.SIGNATURE.matcher(sig.asString()).matches()) {
             throw invalid();
         }
         long timestamp = issued.longValue();
         long now = clock.millis();
         if (Instant.ofEpochMilli(timestamp).isBefore(caller.originExecution().startedAt())
-                || timestamp > now || timestamp < now - 60_000
+                || timestamp > now
+                || timestamp < now - 60_000
                 || caller.originExecution().startedAt().isBefore(clock.instant().minusSeconds(3600))) {
             throw invalid();
         }
         McpCallContext context = caller.context();
-        String signed = String.join("\n", "v1-attachment-inspect", context.rootSessionId(), context.sessionId(),
-                context.toolCallId(), Long.toString(timestamp), request.digest(), proof.get("top_level").booleanValue() ? "1" : "0");
-        if (!MessageDigest.isEqual(McpCallContext.hmac(principal.tokenHash(), signed), HexFormat.of().parseHex(sig.asString()))) {
+        String signed = String.join(
+                "\n",
+                "v1-attachment-inspect",
+                context.rootSessionId(),
+                context.sessionId(),
+                context.toolCallId(),
+                Long.toString(timestamp),
+                request.digest(),
+                proof.get("top_level").booleanValue() ? "1" : "0");
+        if (!MessageDigest.isEqual(
+                McpCallContext.hmac(principal.tokenHash(), signed),
+                HexFormat.of().parseHex(sig.asString()))) {
             throw invalid();
         }
     }

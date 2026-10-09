@@ -6,6 +6,7 @@ import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import java.awt.Dimension;
 import java.awt.Rectangle;
+import java.awt.geom.NoninvertibleTransformException;
 import java.awt.geom.Point2D;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayInputStream;
@@ -41,8 +42,11 @@ public class AttachmentInspection {
         }
         try (InputStream in = store.open(attachment)) {
             byte[] header = in.readNBytes(256 * 1024);
-            return AgentImageResizer.dimensions(header).map(size -> AgentImageResizer.orientation(header) >= 5
-                    ? size.height + "x" + size.width : size.width + "x" + size.height).orElse("확인 불가");
+            return AgentImageResizer.dimensions(header)
+                    .map(size -> AgentImageResizer.orientation(header) >= 5
+                            ? size.height + "x" + size.width
+                            : size.width + "x" + size.height)
+                    .orElse("확인 불가");
         } catch (IOException | RuntimeException ex) {
             return "확인 불가";
         }
@@ -167,18 +171,25 @@ public class AttachmentInspection {
         if (region == null) {
             return new Rectangle(0, 0, width, height);
         }
-        if (region.size() != 4 || region.stream().anyMatch(n -> n == null || n < 0)
-                || region.get(2) <= region.get(0) || region.get(3) <= region.get(1)
-                || region.get(2) > display.width || region.get(3) > display.height) {
+        if (region.size() != 4
+                || region.stream().anyMatch(n -> n == null || n < 0)
+                || region.get(2) <= region.get(0)
+                || region.get(3) <= region.get(1)
+                || region.get(2) > display.width
+                || region.get(3) > display.height) {
             throw invalid("region is outside original display coordinates");
         }
         try {
-            var inverse = AgentImageResizer.orientationTransform(orientation, width, height).createInverse();
+            var inverse = AgentImageResizer.orientationTransform(orientation, width, height)
+                    .createInverse();
             Point2D first = inverse.transform(new Point2D.Double(region.get(0), region.get(1)), null);
             Point2D last = inverse.transform(new Point2D.Double(region.get(2), region.get(3)), null);
-            return new Rectangle((int) Math.min(first.getX(), last.getX()), (int) Math.min(first.getY(), last.getY()),
-                    (int) Math.abs(first.getX() - last.getX()), (int) Math.abs(first.getY() - last.getY()));
-        } catch (java.awt.geom.NoninvertibleTransformException ex) {
+            return new Rectangle(
+                    (int) Math.min(first.getX(), last.getX()),
+                    (int) Math.min(first.getY(), last.getY()),
+                    (int) Math.abs(first.getX() - last.getX()),
+                    (int) Math.abs(first.getY() - last.getY()));
+        } catch (NoninvertibleTransformException ex) {
             throw invalid("invalid image orientation");
         }
     }
@@ -188,6 +199,7 @@ public class AttachmentInspection {
     }
 
     private static ApiException limit() {
-        return new ApiException(ErrorCode.ATTACHMENT_INSPECTION_LIMIT, "select a smaller region in original display coordinates");
+        return new ApiException(
+                ErrorCode.ATTACHMENT_INSPECTION_LIMIT, "select a smaller region in original display coordinates");
     }
 }

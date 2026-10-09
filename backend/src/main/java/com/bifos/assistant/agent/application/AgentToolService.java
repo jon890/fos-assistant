@@ -43,7 +43,8 @@ public class AgentToolService {
         List<String> desired = new ArrayList<>(enabled);
         desired.add(AgentToolPolicy.ATTACHMENT_INSPECTION);
         toolsets.writeApiServer(agent.hermesProfile(), desired, agent.sandboxOwner());
-        if (!toolsets.readEnabled(agent.apiBaseUrl(), agent.hermesProfile()).contains(AgentToolPolicy.ATTACHMENT_INSPECTION)) {
+        if (!toolsets.readEnabled(agent.apiBaseUrl(), agent.hermesProfile())
+                .contains(AgentToolPolicy.ATTACHMENT_INSPECTION)) {
             throw new ApiException(ErrorCode.AGENT_TOOLS_NOT_APPLIED, "original inspection tool was not applied");
         }
     }

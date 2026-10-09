@@ -17,11 +17,12 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import javax.imageio.ImageIO;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 class AttachmentInspectionQueueTest {
     @Test
-    @org.junit.jupiter.api.DisplayName("병렬 원본 조회는 디코딩 차례를 기다리고 취소된 조회는 파일을 열지 않는다")
+    @DisplayName("병렬 원본 조회는 디코딩 차례를 기다리고 취소된 조회는 파일을 열지 않는다")
     void parallelReadsWaitForDecodeSlotAndCancellationDoesNotFetch() throws Exception {
         ByteArrayOutputStream encoded = new ByteArrayOutputStream();
         ImageIO.write(new BufferedImage(8, 6, BufferedImage.TYPE_INT_RGB), "png", encoded);

@@ -15,6 +15,7 @@ import com.bifos.assistant.chat.infra.ChatAttachmentRepository;
 import com.bifos.assistant.chat.infra.ChatMessageRepository;
 import com.bifos.assistant.chat.infra.ConversationRepository;
 import com.bifos.assistant.hermes.HermesRunsClient;
+import com.bifos.assistant.hermes.HermesToolsetClient;
 import com.bifos.assistant.hermes.StubHermesRunsClient;
 import com.bifos.assistant.hermes.dto.HermesRunResult;
 import com.bifos.assistant.hermes.dto.TokenUsage;
@@ -29,6 +30,8 @@ import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentMatchers;
+import org.mockito.Mockito;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -36,11 +39,11 @@ import org.springframework.transaction.annotation.Transactional;
 @BackendIntegrationTest
 class RegenerateDeletedAttachmentTest {
     @Autowired
-    com.bifos.assistant.hermes.HermesToolsetClient attachmentTools;
+    HermesToolsetClient attachmentTools;
 
-    @org.junit.jupiter.api.BeforeEach
+    @BeforeEach
     void enableOriginalInspectionTool() {
-        org.mockito.Mockito.when(attachmentTools.readEnabled(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any()))
+        Mockito.when(attachmentTools.readEnabled(ArgumentMatchers.any(), ArgumentMatchers.any()))
                 .thenReturn(List.of("fos-assistant", "fos-attachments"));
     }
 

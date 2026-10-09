@@ -127,7 +127,8 @@ class HermesRunEventStreamTest {
                 .isTrue();
         assertThat(parse("{\"event\": \"tool.completed\", \"error\": false}").failed())
                 .isFalse();
-        RunEvent inspection = parse("{\"event\":\"tool.completed\",\"tool\":\"attachment_inspect\",\"error\":true,\"duration\":0.5}");
+        RunEvent inspection =
+                parse("{\"event\":\"tool.completed\",\"tool\":\"attachment_inspect\",\"error\":true,\"duration\":0.5}");
         assertThat(inspection.toolName()).isEqualTo("attachment_inspect");
         assertThat(inspection.failed()).isTrue();
     }

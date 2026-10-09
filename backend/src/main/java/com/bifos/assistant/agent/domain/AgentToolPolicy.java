@@ -153,7 +153,9 @@ public final class AgentToolPolicy {
                     ErrorCode.AGENT_TOOLS_REQUIRE_PRIVATE, "shell and file toolsets require a private agent");
         }
         result.add(CONTROL_PLANE_MCP);
-        if (!agent.connectorManaged() && agent.acceptsAttachments() && currentlyEnabled.contains(ATTACHMENT_INSPECTION)) {
+        if (!agent.connectorManaged()
+                && agent.acceptsAttachments()
+                && currentlyEnabled.contains(ATTACHMENT_INSPECTION)) {
             result.add(ATTACHMENT_INSPECTION);
         }
         result.addAll(connectorServers);

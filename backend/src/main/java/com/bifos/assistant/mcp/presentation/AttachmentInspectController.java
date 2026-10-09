@@ -27,8 +27,10 @@ public class AttachmentInspectController {
             throw new ApiException(ErrorCode.MCP_CALL_CONTEXT_INVALID, "call context is invalid");
         }
         InspectedImage image = inspections.inspect(mcp, body);
-        return ResponseEntity.ok().cacheControl(CacheControl.noStore())
-                .contentType(MediaType.parseMediaType(image.contentType())).contentLength(image.bytes().length)
+        return ResponseEntity.ok()
+                .cacheControl(CacheControl.noStore())
+                .contentType(MediaType.parseMediaType(image.contentType()))
+                .contentLength(image.bytes().length)
                 .body(image.bytes());
     }
 }

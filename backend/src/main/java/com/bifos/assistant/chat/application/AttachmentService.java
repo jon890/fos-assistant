@@ -20,8 +20,8 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.stream.Collectors;
 import java.util.function.BooleanSupplier;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.core.io.InputStreamSource;
 import org.springframework.stereotype.Service;
@@ -55,7 +55,8 @@ public class AttachmentService {
     }
 
     /** decode 차례를 기다리는 동안에도 실행 취소를 검사한다. */
-    public InspectedImage inspect(CurrentUser user, Long conversationId, Long attachmentId, List<Integer> region, BooleanSupplier active) {
+    public InspectedImage inspect(
+            CurrentUser user, Long conversationId, Long attachmentId, List<Integer> region, BooleanSupplier active) {
         ChatAttachment attachment = requireInspectable(user, conversationId, attachmentId);
         InspectedImage result = inspection.read(attachment, region, active);
         requireInspectable(user, conversationId, attachmentId);
@@ -70,8 +71,9 @@ public class AttachmentService {
         if (!attachment.isVisible() || !attachment.expiresAt().isAfter(clock.instant())) {
             throw new ApiException(ErrorCode.ATTACHMENT_GONE, "this attachment is no longer kept");
         }
-        if (!attachments.existsByIdAndConversationIdAndUploadedByUserIdAndMessageIdIsNotNullAndDeletedAtIsNullAndExpiresAtAfter(
-                attachmentId, conversationId, user.id(), clock.instant())) {
+        if (!attachments
+                .existsByIdAndConversationIdAndUploadedByUserIdAndMessageIdIsNotNullAndDeletedAtIsNullAndExpiresAtAfter(
+                        attachmentId, conversationId, user.id(), clock.instant())) {
             throw new ApiException(ErrorCode.ATTACHMENT_GONE, "this attachment is no longer kept");
         }
         return attachment;
@@ -233,7 +235,9 @@ public class AttachmentService {
      * 이것을 쓰지 않는다.
      */
     public AgentInput agentInput(Long conversationId, List<ChatAttachment> attached, String text, boolean embedImages) {
-        List<ChatAttachment> sent = allOf(conversationId).stream().filter(it -> it.messageId() != null).toList();
+        List<ChatAttachment> sent = allOf(conversationId).stream()
+                .filter(it -> it.messageId() != null)
+                .toList();
         if (sent.isEmpty()) {
             return new AgentInput(text, List.of());
         }
@@ -249,11 +253,10 @@ public class AttachmentService {
                 + AttachmentStore.userDirectoryKey(ownerUserId) + "/" + conversationId;
         Map<Long, Integer> order = orderInConversation(conversationId);
         String files = sent.stream()
-                .map(it ->
-                        "- " + order.get(it.id()) + "번째 사진: attachment_id=" + it.id() + ", 원본 표시 크기="
-                                + (it.expiresAt().isAfter(clock.instant()) ? inspection.displaySize(it) : "보관 종료")
-                                + ", 파일=" + it.storedName() + " (올린 이름: " + it.originalName() + ")"
-                                + (it.isVisible() && it.expiresAt().isAfter(clock.instant()) ? "" : " [보관 종료]"))
+                .map(it -> "- " + order.get(it.id()) + "번째 사진: attachment_id=" + it.id() + ", 원본 표시 크기="
+                        + (it.expiresAt().isAfter(clock.instant()) ? inspection.displaySize(it) : "보관 종료")
+                        + ", 파일=" + it.storedName() + " (올린 이름: " + it.originalName() + ")"
+                        + (it.isVisible() && it.expiresAt().isAfter(clock.instant()) ? "" : " [보관 종료]"))
                 .collect(Collectors.joining("\n"));
         List<AgentPhoto> photos = images.photos(attached, order, embedImages);
         String input = "[이 대화의 사진 참조]\n"
