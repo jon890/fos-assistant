@@ -222,6 +222,11 @@ async def _check_config_update(request):
             rejected = _skill_dir_rejection(profile, entry, root)
             if rejected is not None:
                 return rejected
+    # 실행 공간이 있어야 하는 스킬 게시다. 셸 도구가 켜져 있고, 정책에 등록된 profile 이고,
+    # 스킬 디렉터리를 붙일 `skill_root` 가 있어야 스크립트가 실행 공간 안에서 돈다(ADR-20261009 skill-package).
+    if require_sandbox and skills is not None and (
+            sandbox is None or sandbox.get("skill_root") is None):
+        return _sandbox_unavailable()
 
     try:
         import yaml
