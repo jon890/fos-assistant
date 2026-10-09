@@ -2,7 +2,7 @@
 
 에이전트 실행의 사건과 실행 트리를 기록해 다시 보이고, 한 사용자가 동시에 맡길 수 있는 실행의 수를 한도로 막는 기능이다.
 
-covers: `backend/src/main/java/com/bifos/assistant/orchestration/`, `web/src/components/execution/`, `web/src/app/executions/`, `web/src/lib/usage-api.ts`
+covers: `backend/src/main/java/com/bifos/assistant/orchestration/`, `backend/src/main/java/com/bifos/assistant/usage/`, `web/src/components/execution/`, `web/src/components/usage/`, `web/src/app/executions/`, `web/src/app/usage/`, `web/src/lib/usage-api.ts`
 
 ## 요구
 

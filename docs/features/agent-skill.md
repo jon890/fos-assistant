@@ -2,7 +2,7 @@
 
 사용자가 에이전트를 만들고 고치고, 에이전트가 다른 에이전트에게 일을 맡기고, 스킬을 붙여 쓰는 기능이다.
 
-covers: `backend/src/main/java/com/bifos/assistant/skill/`, `backend/src/main/java/com/bifos/assistant/agent/**/ProfileSkillFiles.java`, `web/src/components/agent/skill-*`, `web/src/app/agents/[code]/skills/`
+covers: `backend/src/main/java/com/bifos/assistant/skill/`, `backend/src/main/java/com/bifos/assistant/agent/`, `web/src/components/agent/`, `web/src/app/agents/`, `web/src/lib/agent-api.ts`
 
 ## 요구
 

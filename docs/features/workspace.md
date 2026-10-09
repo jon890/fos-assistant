@@ -2,7 +2,7 @@
 
 사용자가 에이전트의 실행 공간에 있는 파일을 화면에서 열어 보는 기능이다.
 
-covers: `backend/src/main/java/com/bifos/assistant/workspace/`, `web/src/components/workspace/`, `web/src/app/admin/workspaces/`
+covers: `backend/src/main/java/com/bifos/assistant/workspace/`, `web/src/components/workspace/`, `web/src/app/admin/workspaces/`, `web/src/app/files/`, `web/src/lib/workspace-api.ts`, `web/src/lib/workspace-file.ts`
 
 ## 요구
 

@@ -2,7 +2,7 @@
 
 대화마다 모델과 단계를 고르고, 실행이 쓴 토큰과 사용량을 기록해 보이는 기능이다.
 
-covers: `backend/src/main/java/com/bifos/assistant/model/`, `backend/src/main/java/com/bifos/assistant/usage/`, `backend/src/main/java/com/bifos/assistant/chat/**/Model*`, `web/src/components/usage/`, `web/src/app/usage/`, `web/src/app/admin/usage/`, `web/src/lib/usage-api.ts`, `web/src/lib/provider-label.ts`
+covers: `backend/src/main/java/com/bifos/assistant/model/`, `backend/src/main/java/com/bifos/assistant/usage/`, `backend/src/main/java/com/bifos/assistant/chat/**/Model*`, `web/src/components/usage/`, `web/src/app/usage/`, `web/src/app/admin/usage/`, `web/src/lib/usage-api.ts`, `web/src/lib/provider-label.ts`, `web/src/components/chat/model-picker.tsx`, `web/src/components/chat/use-composer-model.ts`, `web/src/lib/chat-api.ts`
 
 ## 요구
 
