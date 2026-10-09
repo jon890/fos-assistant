@@ -12,7 +12,9 @@ import java.util.Optional;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 public interface ProactiveCheckRepository extends JpaRepository<ProactiveCheck, Long> {
 
@@ -65,6 +67,15 @@ public interface ProactiveCheckRepository extends JpaRepository<ProactiveCheck, 
 
     /** 그 사용자의 그 루트 실행들의 살펴보기. 제안을 낸 실행에서 살펴보기를 찾는다. */
     List<ProactiveCheck> findByUserIdAndRootExecutionIdIn(Long userId, Collection<Long> rootExecutionIds);
+
+    /**
+     * 지운 에이전트를 정리할 때 그 에이전트의 살펴보기를 모두 지운다. 지운 행 수를 돌려준다.
+     *
+     * <p>자식 표의 줄은 MySQL FK 의 {@code ON DELETE CASCADE} 와 {@code ON DELETE SET NULL} 이 함께 지우거나 비운다.
+     */
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("delete from ProactiveCheck c where c.agentId = :agentId")
+    int deleteAllOfAgent(@Param("agentId") Long agentId);
 
     /**
      * 그 사용자가 그 에이전트로 연, 평가할 수 있는 살펴보기를 최근 것부터 읽는다. 끝났고 자동 실행이 연 줄이 아니며 받아들인 문제 후보가 있고 점검

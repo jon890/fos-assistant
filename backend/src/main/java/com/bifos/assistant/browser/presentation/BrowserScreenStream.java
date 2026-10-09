@@ -8,7 +8,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.MediaType;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
-/** 로그인 화면의 사건을 시간 제한 없는 SSE 하나로 한 번에 하나씩 흘린다. 동작은 {@code backend/docs/flow.md} 가 갖는다. */
+/** 로그인 화면의 사건을 시간 제한 없는 SSE 하나로 한 번에 하나씩 흘린다. 동작은 {@code docs/features/user-browser.md} 가 갖는다. */
 @Slf4j
 final class BrowserScreenStream implements BrowserScreenSink {
 

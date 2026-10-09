@@ -29,8 +29,8 @@ import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /**
- * 지금 화면의 숨기기, 미루기, 되돌리기와 사용자가 항목에 한 일의 사건을 받는다. 계약은 {@code backend/docs/flow.md} 의
- * 「API」 가 갖는다.
+ * 지금 화면의 숨기기, 미루기, 되돌리기와 사용자가 항목에 한 일의 사건을 받는다. 계약은 {@code docs/features/attention.md} 의
+ * 「API(먼저 알리기와 지금 화면의 판정)」 가 갖는다.
  *
  * <p>메서드에 {@code @Transactional} 을 붙이지 않는다. 제어 줄은 여기서 연 트랜잭션 안에서 저장하고, 같은 요청이 동시에 와 유일
  * 제약에 걸리면 그 트랜잭션 밖에서 다시 읽어 고친다. 메서드 전체를 한 트랜잭션으로 묶으면 예외를 잡아도 rollback-only 로 남아 커밋할

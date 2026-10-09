@@ -109,6 +109,11 @@ public interface ConnectorActionRepository extends JpaRepository<ConnectorAction
             """)
     int markDelivered(@Param("publicIds") Collection<UUID> publicIds, @Param("now") Instant now);
 
+    /** 지운 에이전트를 정리할 때 그 에이전트를 가리키는 줄의 에이전트를 비운다. 승인 이력이므로 줄은 남긴다. 바뀐 행 수를 돌려준다. */
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("update ConnectorAction a set a.agentId = null where a.agentId = :agentId")
+    int clearAgentOf(@Param("agentId") Long agentId);
+
     /** 그 연결에 그 상태의 승인 줄이 있는가. */
     boolean existsByUserIdAndConnectorIdAndStatus(Long userId, String connectorId, ActionStatus status);
 

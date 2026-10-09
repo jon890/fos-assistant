@@ -33,7 +33,7 @@ import lombok.experimental.Accessors;
 import lombok.extern.slf4j.Slf4j;
 import tools.jackson.databind.JsonNode;
 
-/** 로그인 화면 하나다. CDP 연결, 받는 쪽, 사용 핸들을 하나씩 쥔다. 계약은 {@code backend/docs/flow.md} 의 「로그인 화면」 이다. */
+/** 로그인 화면 하나다. CDP 연결, 받는 쪽, 사용 핸들을 하나씩 쥔다. 계약은 {@code docs/features/user-browser.md} 의 「로그인 화면」 이다. */
 @Slf4j
 @RequiredArgsConstructor(access = AccessLevel.PACKAGE)
 @Accessors(fluent = true)

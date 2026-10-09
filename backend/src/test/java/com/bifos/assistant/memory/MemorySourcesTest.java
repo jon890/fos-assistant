@@ -29,27 +29,30 @@ class MemorySourcesTest {
     private final MemorySources sources = new MemorySources(executions, agents);
 
     @Test
-    @DisplayName("볼 수 있는 에이전트는 이름을, 볼 수 없거나 모르는 에이전트는 이름 없이, 지운 에이전트는 지웠다고 싣는다")
+    @DisplayName("볼 수 있는 에이전트는 이름을, 볼 수 없거나 모르는 에이전트는 이름 없이, 지운 에이전트와 행이 사라진 에이전트는 지웠다고 싣는다")
     void describesSourceByVisibility() {
         Memory direct = memory(1L, null);
         Memory visible = memory(2L, 20L);
         Memory hidden = memory(3L, 30L);
         Memory deleted = memory(4L, 40L);
         Memory unknownExecution = memory(5L, 50L);
-        when(executions.agentIdsOf(any())).thenReturn(Map.of(20L, 200L, 30L, 300L, 40L, 400L));
+        Memory purged = memory(6L, 60L);
+        when(executions.agentIdsOf(any())).thenReturn(Map.of(20L, 200L, 30L, 300L, 40L, 400L, 60L, 600L));
         Map<Long, Agent> byId = new HashMap<>();
         byId.put(200L, agent("집안일 도우미", true, false));
         byId.put(300L, agent("다른 사람 비서", false, false));
         byId.put(400L, agent("옛 비서", true, true));
         when(agents.byIds(any())).thenReturn(byId);
 
-        Map<Long, MemorySource> result = sources.of(USER, List.of(direct, visible, hidden, deleted, unknownExecution));
+        Map<Long, MemorySource> result =
+                sources.of(USER, List.of(direct, visible, hidden, deleted, unknownExecution, purged));
 
         assertThat(result).doesNotContainKey(1L);
         assertThat(result.get(2L)).isEqualTo(new MemorySource("집안일 도우미", false));
         assertThat(result.get(3L)).isEqualTo(MemorySource.UNNAMED);
         assertThat(result.get(4L)).isEqualTo(new MemorySource(null, true));
         assertThat(result.get(5L)).isEqualTo(MemorySource.UNNAMED);
+        assertThat(result.get(6L)).as("에이전트 번호는 있는데 행이 없으면 지운 에이전트다").isEqualTo(new MemorySource(null, true));
     }
 
     private static Memory memory(Long id, Long executionId) {

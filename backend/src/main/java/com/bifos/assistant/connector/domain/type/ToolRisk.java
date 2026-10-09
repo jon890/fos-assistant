@@ -3,7 +3,7 @@ package com.bifos.assistant.connector.domain.type;
 /**
  * 커넥터 도구 하나가 외부에 끼치는 영향의 등급이다(ADR-049).
  *
- * <p>값과 기본 승인 방식과 하한은 {@code backend/docs/flow.md} 의 「도구 정책」 표와 같다.
+ * <p>값과 기본 승인 방식과 하한은 {@code docs/features/connector-policy.md} 의 「도구 정책」 표와 같다.
  */
 public enum ToolRisk {
     READ(ToolApproval.NONE, ToolApproval.NONE),

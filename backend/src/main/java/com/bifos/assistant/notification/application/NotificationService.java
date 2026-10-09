@@ -27,7 +27,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 /**
  * 알림을 만들고 읽고 읽음으로 표시한다(ADR-070).
  *
- * <p>계약은 {@code backend/docs/flow.md} 가 갖는다. 알림과 그 원인은 한 트랜잭션이다. 줄은 원인을 저장하는
+ * <p>계약은 {@code docs/features/attention.md} 가 갖는다. 알림과 그 원인은 한 트랜잭션이다. 줄은 원인을 저장하는
  * 트랜잭션 안에서 만들고, 사건은 그 트랜잭션이 커밋한 뒤에 그 사용자의 구독자에게 보낸다. 화면이 사건을 받고 다시 읽을 때
  * 줄이 있어야 한다.
  *

@@ -41,7 +41,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 /**
- * 에이전트의 할 일 제안과 네 억제 규칙을 실제 DB 로 본다. 규칙은 {@code backend/docs/flow.md} 의 「제안 억제」 다.
+ * 에이전트의 할 일 제안과 네 억제 규칙을 실제 DB 로 본다. 규칙은 {@code docs/features/attention.md} 의 「제안 억제」 다.
  *
  * <p>시각은 이 검사의 시계가 정한다. 사용자, 대화, 실행은 검사마다 새로 만들어 다른 검사의 줄과 섞이지 않게 하고, 끝나면 지운다.
  */

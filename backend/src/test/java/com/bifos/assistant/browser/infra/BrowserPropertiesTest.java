@@ -12,7 +12,7 @@ import java.util.regex.Pattern;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
-/** 중계 설정 두 개의 확인을 본다. 규칙은 {@code backend/docs/flow.md} 의 「설정(사용자 브라우저)」 이다. */
+/** 중계 설정 두 개의 확인을 본다. 규칙은 {@code docs/features/user-browser.md} 의 「설정(사용자 브라우저)」 이다. */
 class BrowserPropertiesTest {
 
     private static final String BASE = "https://control-plane.example.test/internal/browser-gateway";

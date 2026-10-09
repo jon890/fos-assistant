@@ -91,7 +91,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 /**
  * 시작 단계가 {@code QUEUED} 발화를 작업 주인의 대화 turn 으로 여는지 실제 DB 와 가짜 Hermes 로 본다. 규칙은
- * {@code backend/docs/flow.md} 의 「시작」 과 「알림(예약 작업)」 이다.
+ * {@code docs/features/schedule.md} 의 「시작」 과 「알림(예약 작업)」 이다.
  *
  * <p>사용자 실행 한도를 2 로 두고, 자리를 채울 때는 그 사용자의 turn 자리 둘을 먼저 얻어 둔다. 시각은 검사가
  * {@link TaskRunStarter#startQueued} 에 넘기는 값이 정한다. turn 은 가상 스레드에서 돌므로 발화 줄이 끝날 때까지 기다린다.

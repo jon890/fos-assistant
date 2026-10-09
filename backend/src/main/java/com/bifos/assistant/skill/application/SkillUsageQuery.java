@@ -49,7 +49,7 @@ public class SkillUsageQuery {
 
     /**
      * 그 사용자의 실행에서 부른 것을 에이전트와 스킬 이름으로 묶는다. 횟수는 실행 수다. 마지막 호출이 최근인
-     * 것부터다.
+     * 것부터다. 행이 없는 에이전트는 이름 없이 낸다.
      *
      * <p>마지막 호출이 속한 대화의 공개 식별자를 함께 준다. 그 대화를 지웠으면 비운다. 지운 대화는 화면에서
      * 열 수 없어 가리켜도 갈 곳이 없다.
@@ -74,14 +74,15 @@ public class SkillUsageQuery {
                 .toList());
         List<UserSkillUsage> usages = new ArrayList<>();
         for (Map.Entry<GroupKey, Group> entry : groups.entrySet()) {
-            Agent agent = agentsById.get(entry.getKey().agentId());
-            if (agent == null) {
+            Long agentId = entry.getKey().agentId();
+            if (agentId == null) {
                 continue;
             }
+            Agent agent = agentsById.get(agentId);
             Group group = entry.getValue();
             usages.add(new UserSkillUsage(
-                    agent.code(),
-                    agent.name(),
+                    agent == null ? null : agent.code(),
+                    agent == null ? null : agent.name(),
                     entry.getKey().skillName(),
                     group.count,
                     group.lastInvokedAt,
@@ -89,7 +90,7 @@ public class SkillUsageQuery {
         }
         usages.sort(Comparator.comparing(UserSkillUsage::lastInvokedAt)
                 .reversed()
-                .thenComparing(UserSkillUsage::agentCode)
+                .thenComparing(UserSkillUsage::agentCode, Comparator.nullsLast(Comparator.naturalOrder()))
                 .thenComparing(UserSkillUsage::skillName));
         return usages;
     }

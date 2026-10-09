@@ -23,4 +23,4 @@
     - 발화기 간격(기본 30초)만큼 늦게 돈다.
     - `RUNNING` 으로 바꾼 뒤 서버가 내려가면 그 발화는 다시 돌리지 않고 `FAILED`(`INTERRUPTED`)로 닫는다. 쓰기가 두 번 일어날 수 있어서다. 다시 하기 규칙은 다음 단계에서 정한다.
     - `QUEUED` 줄이 `assistant.task.start-timeout`(기본 10분) 안에 열리지 못하면 `SKIPPED`(`BUSY`)로 닫는다.
-- **적용 범위**: 발화기와 시작 단계의 갈리는 지점은 [`backend/docs/flow.md`](../flow.md) 가 갖는다.
+- **적용 범위**: 발화기와 시작 단계의 갈리는 지점은 [`docs/features/schedule.md`](../../../docs/features/schedule.md) 가 갖는다.

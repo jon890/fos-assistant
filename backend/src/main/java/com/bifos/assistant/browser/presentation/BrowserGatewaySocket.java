@@ -24,7 +24,7 @@ import org.springframework.web.socket.handler.AbstractWebSocketHandler;
 /**
  * 브라우저 중계의 WebSocket 이다. 받은 연결 하나에 Chrome 쪽 연결 하나를 열고 양쪽 글 메시지를 조각째 그대로 잇는다.
  *
- * <p>계약은 {@code backend/docs/flow.md} 의 「WebSocket」 이다. 조각을 모으지 않으므로 사진 바이트가 든 큰 CDP 메시지도 세션마다
+ * <p>계약은 {@code docs/features/user-browser.md} 의 「WebSocket」 이다. 조각을 모으지 않으므로 사진 바이트가 든 큰 CDP 메시지도 세션마다
  * 큰 버퍼를 잡지 않는다. 한쪽으로 가는 조각은 앞 조각을 보낸 뒤에 보낸다. 한 메시지(조각의 합)가 상한을 넘거나 바이너리 메시지가 오면 양쪽을
  * 닫는다. 한쪽이 닫히면 다른 쪽도 닫는다.
  *

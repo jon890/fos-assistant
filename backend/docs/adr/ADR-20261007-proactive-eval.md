@@ -16,7 +16,7 @@ CI 는 실제 모델과 Hermes 를 부를 수 없다. 같은 입력에 같은 �
 
 **실제 서비스를 그대로 쓰고 바깥 둘만 대역으로 둔다.**
 대역 Hermes 가 fixture 의 결과 블록을 답하고, 결정적 provider 가 fixture 에 기록한 판단을 낸다.
-살펴보기 turn, 문제 찾기, 판단 검사, 행동 정책, 자동 실행 시작, 판단 피드백 export 는 운영 코드다. 시험은 `ProactiveEvalGateTest` 이고 계약은 [`backend/docs/flow.md`](../flow.md) 가 갖는다.
+살펴보기 turn, 문제 찾기, 판단 검사, 행동 정책, 자동 실행 시작, 판단 피드백 export 는 운영 코드다. 시험은 `ProactiveEvalGateTest` 이고 계약은 [`docs/features/proactive.md`](../../../docs/features/proactive.md) 가 갖는다.
 
 **provider 는 `DecisionProvider` port 의 구현으로만 바꾼다.**
 같은 fixture 를 판단 기록 둘(`fixture-a`, `fixture-b`)과 실패 넷(준비 안 됨, timeout, 예외, 형식 오류)으로 다시 돌린다.

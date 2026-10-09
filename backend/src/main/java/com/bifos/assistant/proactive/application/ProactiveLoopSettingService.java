@@ -19,7 +19,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /**
- * 사용자가 에이전트마다 매일 루프를 켜고 끄고 쉬게 하는 설정을 관리한다. 뜻은 {@code backend/docs/flow.md} 의 「사용자 설정」 이
+ * 사용자가 에이전트마다 매일 루프를 켜고 끄고 쉬게 하는 설정을 관리한다. 뜻은 {@code docs/features/proactive.md} 의 「사용자 설정」 이
  * 갖는다.
  *
  * <p>설치 설정이 꺼져 있어도 끄기와 쉬기, 이미 켠 줄을 켠 채 두는 요청은 받는다. 꺼진 줄을 켜는 요청만 막는다.

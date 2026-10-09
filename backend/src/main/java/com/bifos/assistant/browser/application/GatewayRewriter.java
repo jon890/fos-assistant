@@ -9,7 +9,7 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.node.ObjectNode;
 
 /**
- * Chrome 의 CDP 대상 한 줄을 중계 주소로 바꾼다({@code backend/docs/flow.md} 의 「받는 것」).
+ * Chrome 의 CDP 대상 한 줄을 중계 주소로 바꾼다({@code docs/features/user-browser.md} 의 「받는 것」).
  *
  * <p>{@code webSocketDebuggerUrl} 은 경로가 {@code /devtools/page/<번호>} 나 {@code /devtools/browser/<번호>} 일 때만 중계 주소로
  * 바꾸고, 아니면 그 칸을 뺀다. 브라우저 대상 번호는 GUID 라 {@code -} 가 든다. 컨테이너 주소가 나가지 않도록 DevTools 화면 주소 두 칸도 뺀다.

@@ -54,7 +54,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 /**
- * 할 일이 나를 기다리는 카드에 어떻게 올라오는지 실제 DB 로 본다. 규칙은 {@code backend/docs/flow.md} 의 「후보와 trigger」 다.
+ * 할 일이 나를 기다리는 카드에 어떻게 올라오는지 실제 DB 로 본다. 규칙은 {@code docs/features/attention.md} 의 「후보와 trigger」 다.
  *
  * <p>시각은 이 검사의 시계가 정한다. 사용자는 검사마다 새로 만들고 끝나면 그 사용자의 줄을 지운다.
  */

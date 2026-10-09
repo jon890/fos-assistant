@@ -15,7 +15,7 @@ import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
 
 /**
- * 시나리오 실행 결과를 지표로 센다. 지표의 정의는 {@code backend/docs/flow.md} 의 「지표(먼저 살펴보기 루프 평가)」 가 갖는다.
+ * 시나리오 실행 결과를 지표로 센다. 지표의 정의는 {@code docs/features/proactive.md} 의 「지표(먼저 살펴보기 루프 평가)」 가 갖는다.
  *
  * <p>판단(ranking)과 최종 행동 수준(policy)을 따로 센다. 실제 시간은 기계마다 다르므로 비교 지표에 넣지 않고, provider 가 기록한 흉내
  * 지연과 비용만 센다.

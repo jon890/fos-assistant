@@ -51,7 +51,7 @@ Hermes 는 자식을 만드는 자리에서 부모 스레드로 이 hook 을 동
 ### 커넥터 도구 호출을 묻는다
 
 profile 디렉터리에 이름 대응 파일 `.fos-connector-tools.json` 이 있으면 fos-ctx 는 그 profile 의 커넥터 MCP 도구 호출마다 Control Plane 에 묻고 답대로 한다.
-경로와 인증, 서명할 글, Control Plane 이 판정하는 단계는 [`backend/docs/flow.md`](../../../backend/docs/flow.md) 의 「도구 호출 판정」 이 소유한다.
+경로와 인증, 서명할 글, Control Plane 이 판정하는 단계는 [`docs/features/connector-policy.md`](../../../docs/features/connector-policy.md) 의 「도구 호출 판정」 이 소유한다.
 요청 칸은 Control Plane 의 `ConnectorPolicyRequest` 가, 응답 칸은 `ConnectionDtos.ConnectorPolicyResponse` 가, 판정 조건과 순서는 `ToolPolicyDecision` 이 갖는다.
 대응 파일이 없는 profile 에서는 아래 처리를 하지 않는다.
 
@@ -115,7 +115,7 @@ key 는 그 profile `.env` 의 MCP 토큰에서 나온다. terminal backend 가 
 
 Hermes 의 MCP 도구 호출에 실행을 가리키는 값을 싣는 방법과 그 근거가 된 Hermes 동작을 갖는다.
 profile 플러그인이 붙이는 `_fos_ctx` 의 서명 계약과 하위 에이전트 session 등록 계약이 여기 있다.
-Control Plane 이 그 값으로 요청자를 정하는 순서는 [`backend/docs/flow.md`](../../../backend/docs/flow.md) 가 갖는다.
+Control Plane 이 그 값으로 요청자를 정하는 순서는 [`docs/features/mcp.md`](../../../docs/features/mcp.md) 가 갖는다.
 
 ### 하위 에이전트에 사진을 넘길 때
 
@@ -209,7 +209,7 @@ hook 은 Control Plane MCP 의 모든 도구 인자에 `_fos_ctx` 를 덮어쓴�
 | 기대 `sig` | `b28a128dbb642aba7a8b4c35dcb237e2feb5a452305ec275909c32a00ae1b25b` |
 | 같은 칸에 도구 이름만 `agent_status` 일 때 | `62109c6c99e7ed4638e4343f1e5b6b22a3f55dd974560916149986866c253236` |
 
-서버는 모든 도구에서 `_fos_ctx` 로 요청자를 정한다. 서명을 확인한 뒤 보는 순서는 [`backend/docs/flow.md`](../../../backend/docs/flow.md#mcp-호출의-요청자를-정할-때) 의 「MCP 호출의 요청자를 정할 때」 가 갖는다.
+서버는 모든 도구에서 `_fos_ctx` 로 요청자를 정한다. 서명을 확인한 뒤 보는 순서는 [`docs/features/mcp.md`](../../../docs/features/mcp.md#mcp-호출의-요청자를-정할-때) 의 「MCP 호출의 요청자를 정할 때」 가 갖는다.
 도구 인자 검사에 넘기기 전에 `_fos_ctx` 는 떼어 낸다. 도구 규격이 그 키를 모르기 때문이다.
 플러그인에 요구하는 동작이다. 서명할 수 없으면 `memory_read`, `artifact_write`, `follow_up_propose`, `memory_remember`, `agent_*` 를 모두 Hermes 쪽에서 막는다. 플러그인은 이 저장소의 `hermes/plugins/fos-ctx/` 가 갖고 `hermes/tests/test_fos_ctx.py` 가 그 동작을 검사한다. 다만 profile 에 실제로 설치되어 켜졌는지는 이 저장소가 확인하지 못한다. 그래서 서버도 서명이 없는 호출을 거절한다. 플러그인이 막지 못해도 서버에서 같은 조건으로 막힌다.
 
@@ -218,7 +218,7 @@ hook 은 Control Plane MCP 의 모든 도구 인자에 `_fos_ctx` 를 덮어쓴�
 같은 profile 의 MCP 연결 하나가 `_rpc_lock` 으로 호출을 직렬로 보낸다(`tools/mcp_tool.py`).
 한 run 의 도구 호출이 오래 걸리면 같은 profile 의 다른 run 이 기다린다.
 그래서 `agent_delegate` 는 제출까지만 기다리고, `agent_status` 는 저장된 값만 읽는다.
-예외는 먼저 살펴보기 트리의 `agent_status` 다. `wait_seconds` 를 주면 `assistant.delegation.status-wait-max`(기본 20초)까지 기다리고, 그동안 같은 profile 의 다른 MCP 호출이 기다린다. 살펴보기 트리가 아닌 호출은 `wait_seconds` 를 받아도 기다리지 않는다([`backend/docs/flow.md`](../../../backend/docs/flow.md)).
+예외는 먼저 살펴보기 트리의 `agent_status` 다. `wait_seconds` 를 주면 `assistant.delegation.status-wait-max`(기본 20초)까지 기다리고, 그동안 같은 profile 의 다른 MCP 호출이 기다린다. 살펴보기 트리가 아닌 호출은 `wait_seconds` 를 받아도 기다리지 않는다([`docs/features/agent-skill.md`](../../../docs/features/agent-skill.md)).
 
 ##### 재시도와 `tool_call_id`
 
@@ -359,7 +359,7 @@ Hermes 를 올릴 때도 이 표를 다시 돌린다. `subagent_start` 가 사�
 
 일반 에이전트의 profile 에 커넥터를 붙이면 그 profile 에서 `fos-ctx` 가 두 가지 일을 함께 한다([ADR-083](../../../docs/adr/ADR-083-커넥터는-사용자가-한-번-연결하고-자기-에이전트에-여럿-붙여-그-에이전트가-도구를-직접-부른다.md)).
 Control Plane MCP 호출에는 지금처럼 `_fos_ctx` 를 붙이고, 커넥터 MCP 도구 호출은 Control Plane 에 판정을 묻는다.
-이름 대응 파일의 `isolated` 가 `false` 인 profile 이 바인딩 profile 이다. 칸의 뜻은 [`backend/docs/flow.md`](../../../backend/docs/flow.md) 의 「이름 대응」 이 갖는다.
+이름 대응 파일의 `isolated` 가 `false` 인 profile 이 바인딩 profile 이다. 칸의 뜻은 [`docs/features/connector-policy.md`](../../../docs/features/connector-policy.md) 의 「이름 대응」 이 갖는다.
 
 | 도구 | 바인딩 profile 에서 하는 것 |
 | --- | --- |

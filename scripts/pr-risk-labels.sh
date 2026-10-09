@@ -39,7 +39,7 @@ while IFS= read -r path; do
     backend/src/main/java/com/bifos/assistant/hermes/* | \
     test/e2e/fake-hermes.ts | \
     test/e2e/fake-hermes/* | \
-    backend/docs/flow.md | \
+    docs/features/* | \
     hermes/*)
       hermes=1 ;;
   esac

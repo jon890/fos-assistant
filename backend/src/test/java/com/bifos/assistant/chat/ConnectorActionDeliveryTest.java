@@ -69,7 +69,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 /**
  * 승인 줄이 생기거나 끝났을 때 그 요청이 나온 대화에 무엇이 전해지는지 본다(ADR-050).
  *
- * <p>계약은 {@code backend/docs/flow.md} 의 「커넥터 승인」 이다. 승인해 실행하는 길은 {@code ConnectorActionServiceTest} 와
+ * <p>계약은 {@code docs/features/connector-policy.md} 의 「커넥터 승인」 이다. 승인해 실행하는 길은 {@code ConnectorActionServiceTest} 와
  * e2e 가 본다. 여기서는 끝난 줄을 직접 넣고 사건을 내, 알림 줄과 자동 turn 과 전했다는 표시만 본다. 자동 turn 은
  * 테스트 스레드 밖에서 돌므로 끝날 때까지 기다린 뒤 단언한다.
  */

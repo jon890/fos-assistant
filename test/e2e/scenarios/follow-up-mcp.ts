@@ -1,7 +1,7 @@
 /**
  * 에이전트가 대화 중에 `follow_up_propose` 로 할 일을 제안하고, 같은 제안과 거절한 제안이 되풀이되지 않는 것을 실제 대화 turn 으로 본다.
  *
- * <p>계약은 `backend/docs/flow.md` 의 「제안 도구」 와 「제안 억제」 가 갖는다. 주인과 대화는 서명한 `_fos_ctx` 로 찾은
+ * <p>계약은 `docs/features/attention.md` 의 「제안 도구」 와 「제안 억제」 가 갖는다. 주인과 대화는 서명한 `_fos_ctx` 로 찾은
  * origin 실행에서 정한다(ADR-032). 가짜 Hermes 가 run 마다 그 run 의 session 으로 서명해 부른다.
  */
 import { call, expect, expectStatus, fail, step, type Context, type Scenario } from "../harness.ts";

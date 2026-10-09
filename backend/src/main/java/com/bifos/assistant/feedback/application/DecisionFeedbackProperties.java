@@ -5,7 +5,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.validation.annotation.Validated;
 
 /**
- * 판단 피드백 기록의 보관 설정이다. 뜻은 {@code backend/docs/flow.md} 의 「보관과 삭제」 가 갖는다.
+ * 판단 피드백 기록의 보관 설정이다. 뜻은 {@code docs/features/proactive.md} 의 「보관과 삭제」 가 갖는다.
  *
  * <p>값이 없거나 0 이하면 기본값으로 둔다.
  *

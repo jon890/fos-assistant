@@ -11,6 +11,7 @@ import java.util.Optional;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -53,4 +54,9 @@ public interface ConnectorBindingRepository extends JpaRepository<ConnectorBindi
             + " where b.status = :status and b.id > :after"
             + " order by b.id")
     List<ReadyBinding> findReadyAfter(@Param("status") BindingStatus status, @Param("after") Long after, Pageable page);
+
+    /** 지운 에이전트를 정리할 때 그 에이전트의 바인딩을 모두 지운다. 에이전트를 지울 때 이미 떼서 보통 없다. 지운 행 수를 돌려준다. */
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("delete from ConnectorBinding b where b.agent.id = :agentId")
+    int deleteAllOfAgent(@Param("agentId") Long agentId);
 }
