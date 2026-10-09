@@ -9,6 +9,10 @@ export function SourceReadList({
   const hasUrls = sourceReads.urls.length > 0;
   const hasRequestedUrls = requestedUrls.length > 0;
 
+  if (sourceReads.completedCount === 0 && !hasUrls && !hasRequestedUrls) {
+    return null;
+  }
+
   return (
     <section
       data-testid="source-reads"

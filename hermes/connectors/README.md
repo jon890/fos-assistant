@@ -122,7 +122,7 @@ hermes/connectors/<id>/
 
 - TypeScript 로 쓰고 `@modelcontextprotocol/sdk` 와 `zod` 를 포함해 의존성을 한 JavaScript 파일로 묶어 커밋한다. 실행할 때 패키지를 내려받지 않는다
 - `.mcp.json` 의 `command` 는 `bun`, 인자는 `${CLAUDE_PLUGIN_ROOT}/dist/<id>-mcp.js` 하나다. 실제 실행 파일은 운영 목록이 정한다. Python MCP 서버는 허용하지 않는다
-- 빌드는 Bun `1.3.14` 와 lockfile 로 고정한다. 런타임은 검증한 최소 버전 이상을 허용한다. `scripts/build.ts` 는 `target: "bun"` 을 쓰고 `scripts/check-bundle.ts` 는 임시 디렉터리에 다시 빌드해 커밋된 파일과 바이트를 비교한 뒤 임시 파일을 지운다
+- 빌드는 Bun `1.3.14` 와 lockfile 로 고정한다. 런타임은 검증한 최소 버전 이상을 허용한다. `hermes/connectors/<id>/scripts/build.ts` 는 `target: "bun"` 을 쓰고 `hermes/connectors/<id>/scripts/check-bundle.ts` 는 임시 디렉터리에 다시 빌드해 커밋된 파일과 바이트를 비교한 뒤 임시 파일을 지운다
 - 사용자 컴퓨터에서 한 번 돌리는 자격 증명 발급 스크립트는 Python 표준 라이브러리를 써도 된다. 서버 실행 의존성에는 포함하지 않는다
 - 외부 호출에는 제한 시간을 둔다. 대시보드가 확인 도구를 기다리는 시간은 10초, 승인한 호출을 기다리는 시간은 60초다
 - 외부에서 온 글을 결과에 담을 때 길이를 자른다
