@@ -7,6 +7,7 @@ import com.bifos.assistant.chat.infra.ChatAttachmentRepository;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.time.Clock;
@@ -73,6 +74,19 @@ public class AttachmentService {
             throw new ApiException(ErrorCode.VALIDATION_FAILED, "too many images are waiting to be sent");
         }
 
+        byte[] jpeg = null;
+        if ("image/jpeg".equals(normalizedType)) {
+            try (InputStream in = body.getInputStream()) {
+                jpeg = in.readNBytes(Math.toIntExact(properties.maxBytes() + 1));
+                if (jpeg.length > properties.maxBytes()) {
+                    throw new ApiException(ErrorCode.VALIDATION_FAILED, "the image is larger than the limit");
+                }
+                jpeg = MpoJpegNormalizer.normalize(jpeg);
+                byteSize = jpeg.length;
+            } catch (IOException ex) {
+                throw new ApiException(ErrorCode.INTERNAL_ERROR, "could not read the uploaded image", ex);
+            }
+        }
         Instant now = clock.instant();
         ChatAttachment attachment = attachments.save(ChatAttachment.of(
                 conversationId,
@@ -84,7 +98,7 @@ public class AttachmentService {
                 now));
         attachment.nameStoredFile(AttachmentStore.storedName(attachment.id(), extension));
 
-        try (InputStream in = body.getInputStream()) {
+        try (InputStream in = jpeg == null ? body.getInputStream() : new ByteArrayInputStream(jpeg)) {
             store.save(attachment, in);
         } catch (IOException ex) {
             throw new ApiException(ErrorCode.INTERNAL_ERROR, "could not read the uploaded image", ex);

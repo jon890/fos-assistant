@@ -53,7 +53,7 @@ export function useScreenStream({
   const generation = useRef(0);
   const stream = useRef<AbortController | null>(null);
   const queue = useRef<Promise<void>>(Promise.resolve());
-  const sentWidth = useRef(0);
+  const sentSize = useRef("");
 
   const close = useCallback((message: string) => {
     open.current = false;
@@ -87,9 +87,17 @@ export function useScreenStream({
 
   const resize = useCallback(() => {
     const width = areaRef.current?.clientWidth ?? 0;
-    if (width === 0 || width === sentWidth.current) return;
-    sentWidth.current = width;
-    send(resizeFor(width));
+    const height = areaRef.current?.clientHeight ?? 0;
+    const size = `${width}:${height}`;
+    if (
+      !open.current ||
+      width === 0 ||
+      height === 0 ||
+      size === sentSize.current
+    )
+      return;
+    sentSize.current = size;
+    send(resizeFor(width, height));
   }, [areaRef, send]);
 
   useEffect(() => {
@@ -133,7 +141,7 @@ export function useScreenStream({
           open.current = true;
           url = null;
           onOpen();
-          sentWidth.current = 0;
+          sentSize.current = "";
           resize();
           await readEventStream<unknown>(response, (data, name) => {
             retries = 0;

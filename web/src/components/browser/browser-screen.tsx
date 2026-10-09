@@ -4,9 +4,17 @@ import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Notice } from "@/components/ui/notice";
 import { BrowserScreenToolbar } from "@/components/browser/browser-screen-toolbar";
-import { screenKey, textInputs } from "@/components/browser/screen-input";
+import {
+  screenKey,
+  textInputs,
+  type ScreenInput,
+} from "@/components/browser/screen-input";
 import { useScreenPointer } from "@/components/browser/use-screen-pointer";
 import { useScreenStream } from "@/components/browser/use-screen-stream";
+import { useScreenFullscreen } from "./use-screen-fullscreen";
+import { ScreenScrollControls } from "./screen-scroll-controls";
+import { cn } from "cn";
+import { ScreenFrame } from "./screen-frame";
 
 /** 조합 중 Enter 와 조합이 끝난 뒤의 Enter 가 같은 누름이라고 보는 간격이다. */
 const ENTER_DEDUP_MS = 100;
@@ -29,9 +37,8 @@ export function BrowserScreen({
   const imgRef = useRef<HTMLImageElement>(null);
   const keysRef = useRef<HTMLInputElement>(null);
   const addressRef = useRef<HTMLInputElement>(null);
-  const composing = useRef(false);
-  const pendingEnter = useRef(false);
-  const enterSentAt = useRef(-Infinity);
+  const { screenRef, dialogRef, triggerRef, expanded, toggle, closeOverlay } =
+    useScreenFullscreen();
   const { frame, tabs, closed, notice, setNotice, send, reopen } =
     useScreenStream({ startUrl, onOpen, areaRef, addressRef, setAddress });
   const pointer = useScreenPointer({
@@ -42,6 +49,103 @@ export function BrowserScreen({
     frameHeight: frame?.height ?? 0,
   });
 
+  return (
+    <dialog
+      ref={dialogRef}
+      open
+      aria-label="내 브라우저 크게 보기"
+      onCancel={(event) => {
+        event.preventDefault();
+        closeOverlay();
+      }}
+      className={cn(
+        "static m-0 max-h-none w-full max-w-none border-0 bg-background p-0 text-foreground",
+        expanded && "fixed inset-0 h-dvh",
+      )}
+    >
+      <section
+        ref={screenRef}
+        aria-label="로그인 화면"
+        role={expanded ? "dialog" : undefined}
+        aria-modal={expanded ? true : undefined}
+        className={cn(
+          "flex flex-col gap-3 bg-background",
+          expanded && "fixed inset-0 z-50 h-dvh w-full overflow-y-auto p-3",
+        )}
+      >
+        <Button
+          ref={triggerRef}
+          size="sm"
+          variant="outline"
+          className="self-end"
+          onClick={() => void toggle()}
+        >
+          {expanded ? "전체 화면 닫기" : "전체 화면"}
+        </Button>
+        {closed ? (
+          <Notice variant="info" role="status">
+            <span>{closed}</span>
+            <Button size="sm" className="ml-2" onClick={reopen}>
+              다시 열기
+            </Button>
+          </Notice>
+        ) : null}
+        <BrowserScreenToolbar
+          address={address}
+          onAddress={setAddress}
+          addressRef={addressRef}
+          tabs={tabs}
+          disabled={closed !== null}
+          send={send}
+          onNotice={setNotice}
+          onKeyboard={() => keysRef.current?.focus()}
+          onClose={onClose}
+        />
+        {notice ? (
+          <Notice variant="error" role="alert">
+            {notice}
+          </Notice>
+        ) : null}
+        <div
+          className={cn(
+            "flex min-h-0 flex-col gap-2 md:flex-row",
+            expanded && "flex-1",
+          )}
+        >
+          <ScreenFrame
+            areaRef={areaRef}
+            imgRef={imgRef}
+            expanded={expanded}
+            frame={frame}
+            closed={closed !== null}
+            pointer={pointer}
+          >
+            <ScreenKeyboard keysRef={keysRef} send={send} closed={closed} />
+          </ScreenFrame>
+          <ScreenScrollControls
+            send={send}
+            height={frame?.height ?? 0}
+            disabled={!frame || closed !== null}
+          />
+        </div>
+      </section>
+    </dialog>
+  );
+}
+
+/** 글자 조합과 키 입력은 프레임 크기나 전체 화면 전환과 독립적으로 유지한다. */
+function ScreenKeyboard({
+  keysRef,
+  send,
+  closed,
+}: {
+  keysRef: React.RefObject<HTMLInputElement | null>;
+  send: (input: ScreenInput) => void;
+  closed: string | null;
+}) {
+  const composing = useRef(false);
+  const pendingEnter = useRef(false);
+  const enterSentAt = useRef(-Infinity);
   // 휴대폰의 Backspace 는 keydown 에 키 이름이 오지 않아 beforeinput 으로 잡는다.
   useEffect(() => {
     const keys = keysRef.current;
@@ -55,7 +159,7 @@ export function BrowserScreen({
     };
     keys.addEventListener("beforeinput", onBeforeInput);
     return () => keys.removeEventListener("beforeinput", onBeforeInput);
-  }, [closed, send]);
+  }, [closed, send, keysRef]);
 
   // 조합을 마친 글자만 보내고 입력칸을 비운다. 조합 중인 한글은 조합이 끝난 뒤 보낸다.
   function flushText() {
@@ -99,70 +203,22 @@ export function BrowserScreen({
   }
 
   return (
-    <section aria-label="로그인 화면" className="space-y-3">
-      {closed ? (
-        <Notice variant="info" role="status">
-          <span>{closed}</span>
-          <Button size="sm" className="ml-2" onClick={reopen}>
-            다시 열기
-          </Button>
-        </Notice>
-      ) : null}
-      <BrowserScreenToolbar
-        address={address}
-        onAddress={setAddress}
-        addressRef={addressRef}
-        tabs={tabs}
-        disabled={closed !== null}
-        send={send}
-        onNotice={setNotice}
-        onKeyboard={() => keysRef.current?.focus()}
-        onClose={onClose}
-      />
-      {notice ? (
-        <Notice variant="error" role="alert">
-          {notice}
-        </Notice>
-      ) : null}
-      <div
-        ref={areaRef}
-        className="relative min-h-40 touch-none overflow-hidden rounded-md border border-border bg-muted select-none"
-      >
-        <input
-          ref={keysRef}
-          aria-label="화면에 글자 넣기"
-          autoCapitalize="off"
-          autoComplete="off"
-          autoCorrect="off"
-          spellCheck={false}
-          className="absolute top-0 left-0 size-px text-base opacity-0"
-          onKeyDown={keyDown}
-          onInput={(event) => {
-            if (!(event.nativeEvent as InputEvent).isComposing) flushText();
-          }}
-          onCompositionStart={() => {
-            composing.current = true;
-          }}
-          onCompositionEnd={compositionEnd}
-        />
-        {frame ? (
-          // eslint-disable-next-line @next/next/no-img-element -- 프레임은 SSE 로 받은 data URL 이라 이미지 최적화를 거치지 않는다.
-          <img
-            ref={imgRef}
-            src={`data:image/jpeg;base64,${frame.data}`}
-            width={frame.width}
-            height={frame.height}
-            alt="내 브라우저 화면"
-            draggable={false}
-            className="block h-auto w-full"
-            {...pointer}
-          />
-        ) : closed ? null : (
-          <p className="p-4 text-sm text-muted-foreground">
-            화면을 여는 중이에요…
-          </p>
-        )}
-      </div>
-    </section>
+    <input
+      ref={keysRef}
+      aria-label="화면에 글자 넣기"
+      autoCapitalize="off"
+      autoComplete="off"
+      autoCorrect="off"
+      spellCheck={false}
+      className="absolute top-0 left-0 size-px text-base opacity-0"
+      onKeyDown={keyDown}
+      onInput={(event) => {
+        if (!(event.nativeEvent as InputEvent).isComposing) flushText();
+      }}
+      onCompositionStart={() => {
+        composing.current = true;
+      }}
+      onCompositionEnd={compositionEnd}
+    />
   );
 }
