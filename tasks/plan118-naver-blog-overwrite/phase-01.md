@@ -53,7 +53,7 @@
   - `validateRenderOptions(input)` 와 `validateOverwrite(input, input.base)` 의 문장을 모은다. `validateDraft` 와 `checkPhotoFiles` 는 부르지 않는다
   - `kind` 가 `package` 면 「덮어쓰기 미리보기는 kind preview 만 받습니다.」 문장을 더한다
   - `photo_dir` 이 있으면 「덮어쓰기에는 photo_dir 을 주지 않습니다.」 문장을 더한다
-  - 만든 `changes` 가 `CHANGES_MAX` 자를 넘으면 「바뀌는 내용이 너무 깁니다. 나눠 고쳐 주세요.」 문장을 더한다
+  - 만든 `changes` 의 `changes.length`(UTF-16 길이, phase 05 의 zod 검사와 같은 셈)가 `CHANGES_MAX` 를 넘으면 「바뀌는 내용이 너무 깁니다. 나눠 고쳐 주세요.」 문장을 더한다
   - 문장이 있으면 지금처럼 `{problems, html: null, assets: []}`
   - 없으면 `previewHtml` 결과에 `changes: draftChanges(input.base, input)` 와 `base_revision: draftRevision(input.base)` 를 더해 돌려준다
 - `previewHtml` 에 선택 인자 `changes?: string` 을 더한다. 있으면 `<article>` 앞에 `<section class="changes"><h2>바뀌는 내용</h2><pre>…</pre></section>` 을 넣는다(`escapeHtml` 로 감싼다). `PREVIEW_STYLE` 에 `.changes` 의 테두리와 `pre{white-space:pre-wrap}` 을 더한다

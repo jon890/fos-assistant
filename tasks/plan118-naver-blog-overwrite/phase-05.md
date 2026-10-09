@@ -40,14 +40,14 @@
 
 - `saveDraft` 의 검사 뒤 부분(연결 읽기부터 시작 확인까지)을 `startJob(env, input: Record<string, unknown>, deps)` 로 꺼내 `saveDraft` 가 부르게 한다. 새 글 입력 파일은 지금 모양 그대로다
 - `overwriteDraft(env, input, deps)`: `validateOverwrite(네 칸)` 에 문장이 있으면 `ToolError("NAVER_BLOG_INVALID_INPUT")`. 아니면 `startJob(env, {kind: "overwrite", draft_id, revision, changes, title, category, tags, body}, deps)`
-- `overwrite_draft` 를 등록한다. `inputSchema`: `draft_id`(`DRAFT_ID_PATTERN`), `revision`(`/^[0-9a-f]{16}$/`), `changes`(문자열, 1자 이상 `CHANGES_MAX` 자까지. `src/overwrite-draft.ts` 의 상수), 그리고 `overwriteContentShape` 의 네 칸. 설명: 「read_draft 로 읽고 render_draft 의 base 로 미리 본 임시저장 글을 고칩니다. 고치기 전에 원래 글을 [덮어쓰기 전 원본] 사본으로 남깁니다. 발행하지 않습니다. 결과는 draft_job 으로 읽습니다.」
+- `overwrite_draft` 를 등록한다. `inputSchema`: `draft_id`(`DRAFT_ID_PATTERN`), `revision`(`/^[0-9a-f]{16}$/`), `changes`(문자열, `changes.length`(UTF-16 길이)로 1 이상 `CHANGES_MAX` 이하. zod 의 `.min(1).max(CHANGES_MAX)` 가 같은 길이로 센다. `CHANGES_MAX` 는 `src/overwrite-draft.ts` 의 상수), 그리고 `overwriteContentShape` 의 네 칸. 설명: 「read_draft 로 읽고 render_draft 의 base 로 미리 본 임시저장 글을 고칩니다. 고치기 전에 원래 글을 [덮어쓰기 전 원본] 사본으로 남깁니다. 발행하지 않습니다. 결과는 draft_job 으로 읽습니다.」
 
 ### 3. `src/worker.ts` 수정
 
 - 입력 파일을 읽는 함수가 `{kind: "save", draft}` 나 `{kind: "overwrite", input}` 을 돌려주게 한다. `kind` 가 없으면 `save` 다. `overwrite` 는 일곱 칸의 타입을 모두 확인한다. 모양이 틀리면 지금처럼 `editor_failed` 로 끝낸다
 - `WorkerDeps` 에 `runOverwrite: typeof runOverwrite` 를 더하고 기본값을 넣는다
 - `overwrite` 면 `deps.runOverwrite(deps.env, input, onStage, controller.signal)` 의 결과를 그대로 `result` 로 쓴다. 단계 기록과 `save_clicking` 처리, 시간 상한, 실패와 `unknown` 판정은 새 글과 같은 코드를 지난다
-- 시간 상한으로 끝날 때 잡은 예외가 `EditorError` 면 그 `extra` 를 `{code: "timeout", stage}` 오류에 합친다. 새 글 작업에는 `extra` 가 없어 결과가 바뀌지 않는다
+- 시간 상한으로 끝날 때 잡은 예외가 `EditorError` 이고 `extra.backup_draft_id` 가 있으면 그 칸 하나만 `{code: "timeout", stage}` 오류에 더한다. 다른 `extra` 칸은 더하지 않는다
 - `tests/fake-worker-entry.ts` 에 `fakeRunOverwrite` 를 더해 `runWorker(jobFile, {runDraft: fakeRunDraft, runOverwrite: fakeRunOverwrite})` 로 넘긴다. `open` 단계를 알리고 잠깐 기다린 뒤 `{draft_id, backup_draft_id: "1", backup_title: "[덮어쓰기 전 원본] x", saved_before: 1, saved_after: 1, state: null}` 를 돌려준다
 
 ### 4. `skills/naver-blog/SKILL.md` 수정
@@ -58,7 +58,7 @@
 2. 고친 네 칸과 `base`(읽은 네 칸)로 `render_draft` 를 불러 미리보기를 보인다. 미리보기 맨 위의 바뀌는 내용을 사용자에게 함께 알린다
 3. 사용자가 확인하면 `overwrite_draft` 를 `draft_id`, `revision`(받은 `base_revision`), `changes`(받은 `changes`)와 고친 네 칸 그대로 부른다
 4. `draft_job` 결과가 `succeeded` 면 고쳤다는 것과, 원래 글을 `backup_title` 이라는 사본으로 남겼고 확인한 뒤 네이버에서 지우면 된다는 것을 알린다
-5. `draft_changed`, `changes_mismatch` 면 다시 읽어 1 부터 한다. `component_not_found` 면 본문의 기존 구성요소 줄을 읽은 그대로 둔다. `backup_failed` 면 원래 글은 그대로라고 알리고 멈춘다. `error.backup_draft_id` 가 있으면 그 사본이 남았다고 알린다
+5. `draft_changed`, `changes_mismatch` 면 다시 읽어 1 부터 한다. `component_not_found` 면 본문의 기존 구성요소 줄을 읽은 그대로 둔다. `backup_failed` 면 원래 글은 그대로라고 알리고 멈춘다. 다만 `error.original_changed` 가 참이면 원래 글의 제목이 사본 제목으로 바뀌었으니 네이버에서 제목을 되돌려 달라고 알린다. 내용은 그대로다. `error.backup_draft_id` 가 있으면 그 사본이 남았다고 알린다
 
 새 사진, 스티커, 지도는 덮어쓰기로 넣지 않는다는 것과, 같은 도구를 다시 부르지 않는다는 「승인과 작업 결과」 의 규칙이 덮어쓰기에도 같다는 것을 적는다.
 

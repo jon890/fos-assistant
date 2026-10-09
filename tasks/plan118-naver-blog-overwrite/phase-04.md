@@ -85,8 +85,9 @@ export async function runOverwrite(
    탭 B 를 열어 `open(pageB)` 하고 `setDocument(pageB, 사본 문서)` 로 넣는다.
    `documentToDraft(editorDocument(pageB))` 의 제목과 본문이 사본 제목과 원래 본문(`content.body`)인지 본다.
    `settings(pageB, {title: 사본 제목, category, tags, body: content.body}, <임의 해시>)` 로 원래 카테고리와 태그를 넣는다.
-   `clickSave(pageB)` 로 저장 단추를 누르고, `page.times.saveSeconds` 동안 `tempDrafts(pageB, blogId)` 를 다시 읽어 `before` 에 없던 글이 하나 생기고 그 제목이 사본 제목인지 본다. 아니면 `backup_failed`(extra 없음).
-   같은 목록에서 원래 글의 제목이나 `saved_at` 이 `before` 와 다르면 사본이 생겼어도 `backup_failed` 이고 `extra` 는 `{original_changed: true}` 다. 탭 B 를 닫는다
+   `clickSave(pageB)` 로 저장 단추를 누르고, `page.times.saveSeconds` 동안 `tempDrafts(pageB, blogId)` 를 다시 읽는다. 원래 글의 제목이나 `saved_at` 이 `before` 와 달라지거나, `before` 에 없던 글이 하나 생기고 그 제목이 사본 제목이면 기다림을 끝낸다.
+   기다림이 끝나면 원래 글의 변경을 먼저 본다. 바뀌었으면 `backup_failed` 이고 `extra.original_changed` 가 참이다. 이때 새 사본 글이 보였으면 `extra.backup_draft_id` 도 싣는다.
+   원래 글이 그대로이고 새 사본 글이 없으면 `backup_failed`(extra 없음)다. 탭 B 를 닫는다
 5. `apply`: `expected = documentToDraft(3 에서 만든 문서)` 를 기억하고 `setDocument(pageA, 3 에서 만든 문서)`. 다시 읽은 문서의 `documentId` 가 `input.draft_id` 이고 `documentToDraft` 의 제목과 본문이 `expected` 와 같은지 본다. 아니면 `editor_failed`
 6. `settings`: `removeTags(pageA, 지울 태그)` 로 고친 글에 없는 태그의 칩을 지운다. 그 뒤 `settings(pageA, {…고친 글, tags: 새로 더할 태그}, <임의 해시>)`
 7. `save`: 편집기 문서를 다시 읽은 제목과 본문이 5 의 `expected` 와 같고, `readSettings` 의 카테고리가 `input.category` 와 같고 태그 집합이 `input.tags` 의 집합과 같은지 본다. 아니면 `editor_failed`.
@@ -104,6 +105,8 @@ export async function runOverwrite(
 - `clickSave(page)`: `buttonFinder("button", "저장")` 을 `page.mouseClick` 으로 누른다. 못 찾으면 `false`
 - `removeTags(page, tags)`: `openSettings`, 태그마다 `[...document.querySelectorAll('span[id^="tag-item-"][aria-label]')].find(e => e.getAttribute('aria-label') === <태그 JSON>)?.querySelector('button')` 를 `mouseClick` 하고 `settingsState(page)` 의 `tags` 에서 그 태그가 빠질 때까지 `waitUntil`, 끝나면 `closeSettings`. 칩이나 단추를 못 찾거나 빠지지 않으면 `editor_failed`
 - `withTitle(doc, title)`: 복제한 문서의 제목 구성요소 `title` 을 문단 하나(원래 첫 문단과 첫 노드의 `id` 를 쓴다)로 바꾼다
+
+도우미 넷(`setDocument`, `clickSave`, `removeTags`, `withTitle`)은 `src/editor/overwrite-page.ts` 에 두고 `overwrite.ts` 가 가져다 쓴다. 두 파일 모두 400줄 상한 안에 둔다.
 
 결과는 `{draft_id, backup_draft_id, backup_title, saved_before: savedBefore + 1, saved_after: 7 에서 읽은 tempDraftCount, state}` 다. 덮어쓰기는 수를 바꾸지 않으므로 두 수가 같다.
 
@@ -150,6 +153,7 @@ node scripts/check-file-length.mjs
 | `hermes/connectors/naver-blog/src/editor/settings.ts` | 수정 |
 | `hermes/connectors/naver-blog/src/editor/drafts.ts` | 수정 |
 | `hermes/connectors/naver-blog/src/editor/overwrite.ts` | 신규 |
+| `hermes/connectors/naver-blog/src/editor/overwrite-page.ts` | 신규 |
 | `hermes/connectors/naver-blog/tests/fake-cdp.ts` | 수정 |
 | `hermes/connectors/naver-blog/tests/overwrite.test.ts` | 신규 |
 | `hermes/connectors/naver-blog/dist/naver-blog-mcp.js` | 수정 |
