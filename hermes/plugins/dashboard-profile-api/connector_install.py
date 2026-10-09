@@ -67,7 +67,9 @@ from .connector_state import (
 from .connector_status import (
     _bind_skills_installed,
     _policy_hook_active,
+    _policy_hook_failure,
     _policy_plugin_enabled,
+    _tool_map_drift,
 )
 
 from .connector_vault import (
@@ -173,6 +175,9 @@ async def _connector_request(request):
             # 그 profile 의 커넥터가 모두 `configured: false` 다.
             allowed = (config.get("platform_toolsets") or {}).get("api_server")
             isolated = (expected is not None and CONTROL_PLANE_MCP not in servers and allowed == expected)
+            # 이름 대응에서 `tools` 만 계산한 것과 다른 서버들이다. 모양이 달라 `None` 이면 `policy_hook` 이 거짓이므로
+            # 여기서는 항목을 거짓으로 만들지 않는다.
+            drift = _tool_map_drift(profile_dir, state)
             connectors = []
             for plugin in roots:
                 manifest = _connector_manifest(plugin)
@@ -181,21 +186,33 @@ async def _connector_request(request):
                 mode = _entry_mode(entry)
                 if entry is None or manifest is None or servers.get(manifest["mcp_server"]) != entry["server"]:
                     configured = False
-                elif mode == BIND_MODE:
-                    # Control Plane MCP 등록이 있어도 된다. 바인딩 설치는 그 등록과 다른 도구 이름을 그대로 둔다.
-                    # 기록이 지금 manifest 와 다르면 그 항목만 거짓이다. 같은 profile 의 다른 항목은 따로 판정한다.
-                    configured = (isinstance(allowed, list) and manifest["mcp_server"] in allowed
-                                  and _entry_matches_manifest(plugin, entry)
-                                  and _bind_skills_installed(profile_dir, manifest, entry))
                 else:
-                    configured = isolated
+                    # 서버 정의의 `tools` 와 이름 대응의 그 서버 항목이 지금 manifest 와 맞는지는 그 항목만 본다.
+                    # 기록과 manifest 의 같음 판정(`_entry_matches_manifest`)은 `tools` 를 보지 않는다. 옛 기록을 가진
+                    # 연결의 실행과 probe, 떼기가 끊기지 않게 하고, 상태 조회만 다시 설치할 때까지 거짓으로 답한다.
+                    tools_current = (entry["server"].get("tools") == manifest["server"].get("tools")
+                                     and (drift is None or manifest["mcp_server"] not in drift))
+                    if mode == BIND_MODE:
+                        # Control Plane MCP 등록이 있어도 된다. 바인딩 설치는 그 등록과 다른 도구 이름을 그대로 둔다.
+                        # 기록이나 `tools` 가 지금 manifest 와 다르면 그 항목만 거짓이다. `policy_hook` 은 보지 않는다.
+                        # 같은 profile 의 다른 항목은 따로 판정한다(ADR-20261009 connector-install-drift).
+                        configured = (isinstance(allowed, list) and manifest["mcp_server"] in allowed
+                                      and _entry_matches_manifest(plugin, entry)
+                                      and _bind_skills_installed(profile_dir, manifest, entry)
+                                      and tools_current)
+                    else:
+                        configured = isolated and tools_current
                 connectors.append({"plugin": plugin, "enabled": entry is not None, "configured": configured,
                                    "mode": mode})
             # 운영 목록에서 빠진 커넥터의 기록은 설치를 끌 수 있게 보이되 쓸 수 있다고 답하지 않는다.
             connectors.extend({"plugin": plugin, "enabled": True, "configured": False, "mode": _entry_mode(entry)}
                               for plugin, entry in state.items() if plugin not in roots)
+            # 거짓이면 어느 조건인지 이름만 남긴다. profile 이름, 경로, 파일 내용은 남기지 않는다.
+            failure = _policy_hook_failure(profile_dir, config, state)
+            if failure is not None:
+                logger.warning("dashboard-profile-api: policy_hook 거짓 조건=%s", failure)
             return JSONResponse({"profile": body["profile"], "connectors": connectors,
-                                 "policy_hook": _policy_hook_active(profile_dir, config, state)}, status_code=200)
+                                 "policy_hook": failure is None}, status_code=200)
         response = {key: body[key] for key in ("profile", "plugin", "enabled", "bind") if key in body}
         if body["enabled"] and "bind" in body:
             # 붙이는 요청 안에서 보관 파일을 읽는다. 보관 파일 쓰기와 같은 잠금 안이라 그 사이에 바뀌지 않는다.

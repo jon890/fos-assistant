@@ -1,6 +1,7 @@
 """dashboard-profile-api 의 connector_install_legacy 분기를 검사한다."""
 
 import json
+from unittest import mock
 from dashboard_profile_api_support import LEGACY, LEGACY_BASE
 import dashboard_profile_api_support as support
 
@@ -55,10 +56,15 @@ class ProfileApiConnectorInstallLegacyTest(support.ProfileApiRouteTest):
         legacy = self.legacy_fixture()
         self.declare_tools(self.root.parent / "legacy-connector",
                            {"list_families": {"risk": "READ"}, "purge": {"risk": "DESTRUCTIVE"}})
-        status = self.connector_status()
+        # 서버 정의의 `tools` 어긋남은 그 항목만 거짓으로 만든다. `policy_hook` 이 거짓인 것은 앞선 판이 이름 대응 파일을
+        # 쓰지 않았기 때문이다. 서버 목록을 확인할 수 없으면 profile 단위로 막는다.
+        with mock.patch.object(self.plugin.logger, "warning") as warning:
+            status = self.connector_status()
         self.assertEqual(status.status_code, 200)
         self.assertEqual(status.body["connectors"], [{"plugin": LEGACY, "enabled": True, "configured": False, "mode": "isolated"}])
         self.assertIs(status.body["policy_hook"], False)
+        self.assertEqual([call.args[0] % call.args[1:] for call in warning.call_args_list],
+                         ["dashboard-profile-api: policy_hook 거짓 조건=tool_map"])
         self.assertNotIn("tools", legacy)
 
         installed = self.connector(plugin=LEGACY)
