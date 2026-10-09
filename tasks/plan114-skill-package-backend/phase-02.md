@@ -66,7 +66,7 @@
 - `test_dashboard_profile_api_sandbox_policy.py`: `skill_root` 가 있는 정책을 받고, 상대 경로, `workspace_root` 아래, `attachment_root` 위, `connector_output_root` 와 같은 값이면 정책 전체를 거절한다. 공통 마운트 원본이 `skill_root` 아래이거나 profile 마운트 대상이 Hermes 스킬 루트 아래이면 거절한다. Hermes 스킬 루트 환경 변수가 없거나 `/workspace` 아래, `attachment_agent_root` 아래이면 거절한다. `skill_root` 가 없는 정책은 profile 마운트 대상이 Hermes 스킬 루트 아래여도 지금처럼 받는다
 - `test_dashboard_profile_api_sandbox_terminal.py`: 정책에 `skill_root` 가 있고 Hermes 스킬 루트 아래 그 profile 디렉터리가 있으면 셸 저장이 스킬 마운트를 커넥터 출력 다음에 넣고 지문이 키와 맞는다. 디렉터리가 없거나 링크이거나 정책에 키가 없으면 마운트가 없다. 디렉터리가 생긴 뒤 다시 저장하면 키가 바뀐다
 - `test_dashboard_profile_api_toolconfig.py`: `require_sandbox: true` 인 스킬 게시가 `skill_root` 없는 정책에서 409 `sandbox_unavailable`, 도구 목록이 없거나 셸 도구가 없을 때 409, 미등록 profile 에서 409 이고 설정 파일이 바뀌지 않는다. 등록된 profile, 셸 도구, `skill_root` 가 있으면 200 이고 `external_dirs` 와 스킬 마운트가 든 `terminal` 이 함께 쓰인다. `require_sandbox` 없는 게시는 기존 시험 그대로 통과한다
-- 지원 파일에 정책을 덮어쓰는 도우미가 없으면 `dashboard_profile_api_support.py` 에 `skill_root` 를 넣은 정책을 쓰는 도우미를 더한다
+- 정책은 `dashboard_profile_api_support.py` 의 기존 `sandbox_policy(skill_root=…)` 와 `set_sandbox_policy` 로 바꾼다. 새 도우미를 만들지 않는다
 
 ## 검증
 

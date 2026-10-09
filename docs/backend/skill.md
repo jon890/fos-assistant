@@ -144,6 +144,7 @@ sequenceDiagram
 | 파일 경로가 경로 규칙에 맞지 않거나 상한을 넘는다 | `VALIDATION_FAILED` |
 | 저장하는 스킬에 `scripts/` 가 있는데 그 에이전트에 `terminal` 이 꺼져 있다 | `SKILL_SCRIPTS_NEED_SANDBOX`. 버전 디렉터리를 쓰기 전에 거절한다 |
 | 저장하는 스킬에 `scripts/` 가 있는데 plugin 이 실행 공간이 없다고 거절한다 | `SKILL_SCRIPTS_NEED_SANDBOX`. 대시보드의 409 `sandbox_unavailable` 이다. 4xx 이므로 새 디렉터리를 지운다 |
+| 저장하는 스킬에 `scripts/` 가 있는데 주인의 첨부 디렉터리를 준비하지 못한다 | `AGENT_SANDBOX_UNAVAILABLE` 그대로다. 셸 유무가 원인이 아니라서 바꾸지 않는다. 새 디렉터리를 지운다 |
 | 함께 실리는 다른 스킬에 `scripts/` 가 있다 | 보지 않는다. 셸이 꺼진 에이전트도 다른 스킬을 고칠 수 있다 |
 | 앞머리 뒤에 본문이 없다 | `VALIDATION_FAILED`. 새 스킬이든 고치는 스킬이든 같다 |
 | 앞머리에 비밀 요청 칸이 있다 | `VALIDATION_FAILED`. 새 스킬이든 고치는 스킬이든 같다. 이미 올라간 스킬은 읽기와 목록에서 그대로 보인다 |
