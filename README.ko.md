@@ -116,7 +116,7 @@ Nous Research 의 [Hermes Agent](https://github.com/NousResearch/hermes-agent) �
 - **모델 단계.** 대화마다 빠르게, 균형, 깊게를 고르고, 고급에서 모델을 직접 고른다([`docs/model-tiers.md`](docs/model-tiers.md)).
 - **위임.** 요청 하나를 여러 에이전트에 나눠 돌린다. 맡긴 실행도 요청자의 권한으로만 돌고, 결과가 오면 Control Plane 이 부모 대화의 다음 turn 을 열어 전한다([`docs/backend/agent-delegation.md`](docs/backend/agent-delegation.md)).
 - **사진과 HTML 결과물.** 사진을 올려 에이전트에게 보이고, 에이전트가 만든 HTML 페이지를 옆 패널에서 본다. 그 페이지의 스크립트는 돌지 않는다. 사진은 사용자별로 저장한다([`docs/backend/attachment.md`](docs/backend/attachment.md), [`docs/backend/artifact.md`](docs/backend/artifact.md)).
-- **실행 트리와 비용 환산.** 실패한 실행까지 모두 기록한다. 실행 하나를 열면 그 안에서 부른 도구와 자식 실행이 트리로 보인다. 구독제로 돌린 실행도 API 가격으로 환산해 보여, 관리자가 설정별 비용을 견준다([`docs/frontend/activity.md`](docs/frontend/activity.md), [ADR-004](backend/docs/adr/ADR-004-구독제에서도-api-가격으로-환산해-보인다.md)).
+- **실행 트리와 비용 환산.** 실패한 실행까지 모두 기록한다. 실행 하나를 열면 그 안에서 부른 도구와 자식 실행이 트리로 보인다. 구독제로 돌린 실행도 API 가격으로 환산해 보여, 관리자가 설정별 비용을 견준다([`web/docs/flow.md`](web/docs/flow.md), [ADR-004](backend/docs/adr/ADR-004-구독제에서도-api-가격으로-환산해-보인다.md)).
 
 ### 커넥터와 승인
 
@@ -130,7 +130,7 @@ Nous Research 의 [Hermes Agent](https://github.com/NousResearch/hermes-agent) �
 - **먼저 살펴보기.** 사용자가 묻지 않아도 에이전트가 사용자의 맥락을 보고 제안이나 질문을 내거나 침묵한다. 사용자는 살펴보기를 단추로 시작하거나, 매일 깨우기를 켜서 정한 시각에 돌린다. 매일 깨우기는 기본 꺼짐이다. 관리자가 쓰기 도구를 허용하지 않은 에이전트의 살펴보기는 읽기만 하고, 그 경계는 Control Plane 이 강제한다([`docs/backend/proactive-check.md`](docs/backend/proactive-check.md)).
 - **문맥 조립.** Memory, 맡긴 일의 결과, 승인한 커넥터 호출의 결과, 실행 상태, 할 일에서 모은 문맥을 항목마다 출처와 권한과 신선도를 지닌 묶음으로 조립한다([`docs/backend/context-bundle.md`](docs/backend/context-bundle.md)).
 - **문제 후보.** 살펴보기 결과에서 이 사용자가 풀 가치가 있는 문제를 후보로 받고, Control Plane 이 근거와 중복을 결정적으로 검사한다([ADR-093](backend/docs/adr/ADR-093-문제-찾기는-살펴보기-결과의-문제-후보로-받고-control-plane-이-근거와-중복을-결정적으로-검사한다.md)).
-- **지금 화면(`/now`).** 실패한 실행, 승인과 받아들이기를 기다리는 것과 기한이 다가온 할 일, 맡긴 일, 이어서 할 대화, 살펴보기 보고를 정해진 카드에 모은다. 사용자가 묻지 않았는데 먼저 알리는 것(먼저 알리기)은 기본값이 알리지 않음이고, Control Plane 기록에서 정한 신호만 화면에 올린다. 항목마다 숨기거나 미룰 수 있다([`docs/frontend/now.md`](docs/frontend/now.md), [`docs/backend/attention.md`](docs/backend/attention.md)).
+- **지금 화면(`/now`).** 실패한 실행, 승인과 받아들이기를 기다리는 것과 기한이 다가온 할 일, 맡긴 일, 이어서 할 대화, 살펴보기 보고를 정해진 카드에 모은다. 사용자가 묻지 않았는데 먼저 알리는 것(먼저 알리기)은 기본값이 알리지 않음이고, Control Plane 기록에서 정한 신호만 화면에 올린다. 항목마다 숨기거나 미룰 수 있다([`web/docs/prd.md`](web/docs/prd.md), [`docs/backend/attention.md`](docs/backend/attention.md)).
 - **할 일.** 에이전트가 사용자가 해야 하거나 끝나기를 기다리는 일을 제안하고, 사람이 받아들인 것만 챙긴다([`docs/backend/follow-up.md`](docs/backend/follow-up.md)).
 - **예약 작업.** 정한 시각에 사용자의 권한으로 에이전트를 돌린다. 그 실행이 외부에 쓰려 하면 승인 카드와 알림이 생긴다([`docs/backend/task.md`](docs/backend/task.md)).
 
@@ -138,7 +138,7 @@ Nous Research 의 [Hermes Agent](https://github.com/NousResearch/hermes-agent) �
 가치 평가는 문제 후보를 축마다 근거를 남겨 견주고([`docs/backend/value-evaluation.md`](docs/backend/value-evaluation.md)), 행동 정책은 모델을 부르지 않는 규칙으로 무시, 보이기, 승인, 실행을 정한다([`docs/backend/autonomy-policy.md`](docs/backend/autonomy-policy.md)).
 판단 피드백은 제안에 대한 사용자 반응과 실행 결과를 사건으로 남긴다([`docs/backend/decision-feedback.md`](docs/backend/decision-feedback.md)).
 판단 피드백은 살펴보기 보고, 할 일, Memory 제안, 승인 줄이 생길 때 이미 기록된다.
-가치 평가와 행동 정책은 살펴보기와 매일 깨우기가 아직 자동으로 부르지 않는다. 지금은 관리자가 관리자 영역의 에이전트 상세에서 살펴보기 한 건에 대해 돌려 읽는다([`docs/frontend/structure.md`](docs/frontend/structure.md)). 이 둘을 실제 사용에 잇는 일은 진행 중이다.
+가치 평가와 행동 정책은 살펴보기와 매일 깨우기가 아직 자동으로 부르지 않는다. 지금은 관리자가 관리자 영역의 에이전트 상세에서 살펴보기 한 건에 대해 돌려 읽는다([`web/docs/prd.md`](web/docs/prd.md)). 이 둘을 실제 사용에 잇는 일은 진행 중이다.
 
 ### Memory
 

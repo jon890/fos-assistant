@@ -74,4 +74,4 @@ ADR-20261007 이 `SEARCH` 로 고정한 까닭은 에이전트가 많이 남겨�
 
 ### 적용 범위
 
-조립 규칙과 「참고한 기억」 API 는 [`backend/memory.md`](../backend/memory.md) 의 「범위와 조립」 과 「답마다 참고한 기억」 이, 화면은 [`frontend/chat.md`](../frontend/chat.md) 의 「참고한 기억」 이 갖는다.
+조립 규칙과 「참고한 기억」 API 는 [`backend/memory.md`](../backend/memory.md) 의 「범위와 조립」 과 「답마다 참고한 기억」 이, 화면은 [`web/docs/prd.md`](../../web/docs/prd.md) 의 「참고한 기억」 이 갖는다.

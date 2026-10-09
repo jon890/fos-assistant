@@ -1,7 +1,7 @@
 /**
  * 지금 화면이 읽는 `GET /api/v1/attention` 응답의 모양과, 그 응답을 화면 글로 바꾸는 순수 함수다.
  *
- * <p>칸은 `docs/backend/attention.md` 의 「API」 가 정한다. 문구는 `docs/frontend/now.md` 의 「카드」 와 「이유 문구」 표 그대로다.
+ * <p>칸은 `docs/backend/attention.md` 의 「API」 가 정한다. 문구는 `web/docs/prd.md` 의 「카드」 와 「이유 문구」 표 그대로다.
  * 이유 문구를 서버가 보내지 않고 여기서 정하는 것은 모델이 쓴 글로 이유를 만들지 않기 위해서다.
  *
  * <p>단위 테스트가 `node --test` 로 직접 읽으므로 다른 모듈을 import 하지 않는다.
@@ -341,7 +341,7 @@ export type ItemAction = {
 };
 
 /**
- * 항목의 단추다. `docs/frontend/now.md` 의 「동작」 표를 `trigger` 로 고른다.
+ * 항목의 단추다. `web/docs/prd.md` 의 「동작」 표를 `trigger` 로 고른다.
  *
  * <p>결과 전달 실패도 「대화 열기」 뿐이다. 다시 전달은 그 대화의 알림 줄이 한다.
  * `link` 단추는 갈 곳(`itemHref`)이 없으면 내지 않는다. 할 일 단추는 보낼 식별자(`followUp`)가 없으면 내지 않는다.
