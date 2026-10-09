@@ -3,6 +3,7 @@
 import json
 import os
 import yaml
+from unittest import mock
 from plugin_loading import patch_plugin
 from dashboard_profile_api_support import DEMO, DEMO_BASE, DEMO_VALUE, OTHER, OTHER_BASE, OTHER_VALUE
 import dashboard_profile_api_support as support
@@ -177,6 +178,95 @@ class ProfileApiConnectorBindingInstallTest(support.ProfileApiRouteTest):
         status = self.status_of()
         self.assertEqual(status["connectors"], expected)
         self.assertIs(status["policy_hook"], True)
+
+    def warnings_of_status(self, profile="alice"):
+        """상태 조회의 본문과, 그 조회가 남긴 경고 줄을 인자를 채운 문자열로 돌려준다."""
+        with mock.patch.object(self.plugin.logger, "warning") as warning:
+            status = self.status_of(profile)
+        return status, [call.args[0] % call.args[1:] for call in warning.call_args_list]
+
+    def test_stale_tools_exclude_marks_only_that_connector_unconfigured(self):
+        """승인 방식만 올라 서버 정의의 `tools.exclude` 만 어긋나면 그 커넥터 항목만 거짓이고 같은 profile 의 다른 바인딩과 hook 은 참이다."""
+        demo, _ = self.bind_fixture()
+        self.declare_tools(demo, {"list_scopes": {"risk": "READ"}, "purge": {"risk": "WRITE"}})
+        self.assertEqual(self.bind(DEMO, "c1").status_code, 200)
+        self.assertEqual(self.bind(OTHER, "c2").status_code, 200)
+        self.assertNotIn("tools", self.alice_config()["mcp_servers"]["demo"])
+        tool_map = self.tool_map()
+
+        # 도구 이름이 같아 이름 대응은 그대로다. 늘 승인이 필요해진 `purge` 가 서버 정의에서 빠져 있지 않다.
+        self.declare_tools(demo, {"list_scopes": {"risk": "READ"}, "purge": {"risk": "DESTRUCTIVE"}})
+        status, warnings = self.warnings_of_status()
+        self.assertEqual(status["connectors"], [
+            {"plugin": DEMO, "enabled": True, "configured": False, "mode": "bind"},
+            {"plugin": OTHER, "enabled": True, "configured": True, "mode": "bind"}])
+        self.assertIs(status["policy_hook"], True)
+        self.assertEqual(warnings, [])
+        self.assertEqual(self.tool_map(), tool_map)
+
+        # 다시 붙이면 서버 정의가 바뀌므로 gateway 를 재시작해야 반영된다.
+        rebound = self.bind(DEMO, "c1")
+        self.assertEqual(rebound.status_code, 200, rebound.body)
+        self.assertIs(rebound.body["restart_required"], True)
+        self.assertEqual(self.alice_config()["mcp_servers"]["demo"]["tools"], {"exclude": ["purge"]})
+        status = self.status_of()
+        self.assertEqual([entry["configured"] for entry in status["connectors"]], [True, True])
+        self.assertIs(status["policy_hook"], True)
+
+    def test_added_tool_marks_only_that_connector_unconfigured(self):
+        """도구가 더해져 이름 대응의 그 서버 `tools` 만 계산한 것과 다르면 그 커넥터 항목만 거짓이고 hook 은 참이다."""
+        demo, _ = self.bind_fixture()
+        self.assertEqual(self.bind(DEMO, "c1").status_code, 200)
+        self.assertEqual(self.bind(OTHER, "c2").status_code, 200)
+        tool_map = self.tool_map()
+
+        # 확인 도구 `list_scopes` 를 남겨야 manifest 가 유효하다. 늘 승인이 필요한 도구가 없어 서버 정의는 그대로다.
+        self.declare_tools(demo, {"list_scopes": {"risk": "READ"}, "list_tags": {"risk": "READ"}})
+        self.assertEqual(self.tool_map(), tool_map)
+        self.assertEqual(tool_map["servers"]["demo"]["tools"], {"mcp__demo__list_scopes": "list_scopes"})
+        self.assertNotIn("tools", self.alice_config()["mcp_servers"]["demo"])
+        status, warnings = self.warnings_of_status()
+        self.assertEqual(status["connectors"], [
+            {"plugin": DEMO, "enabled": True, "configured": False, "mode": "bind"},
+            {"plugin": OTHER, "enabled": True, "configured": True, "mode": "bind"}])
+        self.assertIs(status["policy_hook"], True)
+        self.assertEqual(warnings, [])
+
+        self.assertEqual(self.bind(DEMO, "c1").status_code, 200)
+        self.assertEqual(self.tool_map()["servers"]["demo"]["tools"], {
+            "mcp__demo__list_scopes": "list_scopes", "mcp__demo__list_tags": "list_tags"})
+        self.assertEqual(self.tool_map()["servers"]["other"], tool_map["servers"]["other"])
+        status = self.status_of()
+        self.assertEqual([entry["configured"] for entry in status["connectors"]], [True, True])
+        self.assertIs(status["policy_hook"], True)
+
+    def test_tool_map_missing_a_server_turns_the_policy_hook_off(self):
+        """이름 대응에서 서버가 빠지면 그 서버의 호출이 판정 없이 나가므로 profile 단위 `policy_hook` 이 거짓이고 조건 이름을 남긴다."""
+        self.bind_fixture()
+        self.assertEqual(self.bind(DEMO, "c1").status_code, 200)
+        self.assertEqual(self.bind(OTHER, "c2").status_code, 200)
+        tool_map = self.tool_map()
+        del tool_map["servers"]["other"]
+        (self.root / "alice" / self.plugin.CONNECTOR_TOOL_MAP).write_text(json.dumps(tool_map), encoding="utf-8")
+
+        status, warnings = self.warnings_of_status()
+
+        self.assertIs(status["policy_hook"], False)
+        self.assertEqual(warnings, ["dashboard-profile-api: policy_hook 거짓 조건=tool_map"])
+
+    def test_disabled_policy_plugin_is_logged_by_condition_name_only(self):
+        """`plugins.disabled` 에 fos-ctx 가 있으면 `policy_hook` 이 거짓이고 조건 이름만 경고 한 줄로 남긴다. profile 이름은 남기지 않는다."""
+        self.bind_fixture()
+        self.assertEqual(self.bind(DEMO, "c1").status_code, 200)
+        config = self.alice_config()
+        config["plugins"]["disabled"] = ["fos-ctx"]
+        self.write_config("alice", config)
+
+        status, warnings = self.warnings_of_status()
+
+        self.assertIs(status["policy_hook"], False)
+        self.assertEqual(warnings, ["dashboard-profile-api: policy_hook 거짓 조건=plugin_config"])
+        self.assertNotIn("alice", warnings[0])
 
     def test_binding_needs_the_policy_hook_plugin_turned_on(self):
         """profile 설정에서 fos-ctx 가 켜져 있지 않거나 도구 덮어쓰기를 허용하면 바인딩 설치는 409 이고 아무것도 바꾸지 않는다."""

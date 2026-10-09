@@ -96,6 +96,7 @@ ADR 끼리의 링크와 문서의 링크는 옮기는 커밋에서 함께 고친
 | [ADR-20261008 / read-data-flow](ADR-20261008-read-data-flow.md) | 커넥터 READ 결과는 가는 곳마다 따로 판정하고, 판정하지 못하는 길은 감수로 적는다 | 공통 | Accepted. ADR-083 과 ADR-086 의 「감당할 것」 을 흐름마다 나눠 적는다 |
 | [ADR-20261008 / tool-catalog-visibility](ADR-20261008-tool-catalog-visibility.md) | 관리자는 그룹의 도구 선택 목록을 정하고 숨김은 활성 상태를 바꾸지 않는다 | backend, frontend | Accepted. ADR-029의 도구 조회와 저장에 그룹별 숨김을 더한다 |
 | [ADR-20261009 / adr-per-module](ADR-20261009-adr-per-module.md) | ADR 은 지키는 코드의 모듈에 두고, 여러 모듈에 걸친 것과 작성 규칙만 루트에 둔다 | 공통 | Accepted. ADR-20261007 / numbering-scheme 의 ADR 제목 머리와 파일을 옮기지 않는다는 부분을 개정한다 |
+| [ADR-20261009 / connector-install-drift](ADR-20261009-connector-install-drift.md) | 서버 정의의 `tools` 어긋남은 그 커넥터만 막고, Control Plane 이 어긋난 바인딩을 찾아 다시 설치한다 | 공통 | Accepted. ADR-083 의 바인딩 판정과 ADR-20261007 / connector-live-reload 의 반영 예정 확인을 보완한다 |
 | [ADR-20261009 / docs-per-module](ADR-20261009-docs-per-module.md) | 문서는 모듈마다 정해진 파일 몇 개로 두고, 코드가 가진 값은 옮겨 적지 않는다 | 공통 | Accepted. ADR-20261009 / adr-per-module 의 자리 규칙을 문서 전체로 넓힌다. 모듈 prd 와 flow 를 두는 부분은 [ADR-20261009 / feature-docs](ADR-20261009-feature-docs.md) 가 대체한다 |
 | [ADR-20261009 / feature-docs](ADR-20261009-feature-docs.md) | 문서는 기능마다 한 파일로 두고 모듈 docs 에는 모듈 안의 규칙만 남긴다 | 공통 | Accepted. ADR-20261009 / docs-per-module 의 모듈 prd 와 flow 를 두는 부분을 대체한다 |
 | [ADR-20261009 / skill-package](ADR-20261009-skill-package.md) | 스킬은 zip 묶음으로도 올리고, 스크립트는 실행 공간이 있는 에이전트에만 받는다 | 공통 | Accepted. ADR-034 의 스크립트 기각을 대체한다 |

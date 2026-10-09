@@ -609,6 +609,20 @@ class ConnectorPolicyEndpointTest {
     }
 
     @Test
+    @DisplayName("연결은 READY 이고 바인딩이 반영 대기이면 approval 이 always 인 도구도 NOT_READY 로 막혀 승인 줄이 없다")
+    void alwaysApprovalToolOfPendingBindingIsBlockedAsNotReady() throws Exception {
+        bind(agent, connection(owner, DEMO, true), false);
+
+        HttpResponse<String> response = ask("mcp__demo__purge_notes", "purge_notes");
+
+        assertBlocked(response, NOT_READY_CHECK_MESSAGE);
+        Map<String, Object> row = onlyRow();
+        assertThat(row.get("DENY_REASON")).isEqualTo("NOT_READY");
+        assertThat(row.get("DECISION")).isEqualTo("DENIED");
+        assertThat(row.get("PASSED")).isEqualTo(false);
+    }
+
+    @Test
     @DisplayName("연결은 READY 인데 그 에이전트의 바인딩이 재시작 대기면 block 이고 관리자 반영을 기다리라는 글과 NOT_READY 줄을 남긴다")
     void restartWaitingBindingOfReadyConnectionIsBlockedWithRestartMessage() throws Exception {
         ConnectorBinding binding = ConnectorBinding.pending(agent, connection(owner, DEMO, true), "demo", NOW);

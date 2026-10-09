@@ -9,5 +9,7 @@ public enum NotificationTargetType {
     /** 관리자 영역의 도구 사용 요청이다. */
     ADMIN_TOOL_REQUEST,
     /** 요청자가 읽는 도구 사용 요청의 결과다. */
-    TOOLSET_REQUEST
+    TOOLSET_REQUEST,
+    /** 관리자의 「연결 반영 확인」 목록 화면이다. 목록이라 공개 식별자 없이 가리킨다. */
+    ADMIN_CONNECTIONS
 }

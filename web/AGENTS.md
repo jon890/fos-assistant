@@ -24,6 +24,8 @@
 `globals.css` 의 `@theme` 에 토큰을 선언하고 `bg-muted` 나 `ml-3` 같은 Tailwind 클래스로 쓴다.
 
 인라인 스타일에는 `hover:` 와 `md:` 와 `disabled:` 를 붙일 수 없다.
+값이 이어지는 수라서 클래스로 만들 수 없는 것만 예외다.
+그 줄 바로 위에 왜 인라인인지 주석으로 남긴다. `test/unit/design-tokens.test.ts` 가 주석 없는 `style={{` 를 막는다.
 
 **강조 색(`primary`)은 주 단추, 지금 고른 것, 초점 테두리에만 쓴다.**
 링크와 숫자는 글자색으로, 상태는 의미 색(`success`, `warning`, `info`, `destructive`)으로 그린다.
@@ -34,16 +36,6 @@
 - 모서리에 `rounded-3xl` 과 임의 값(`rounded-[…]`)을 쓰지 않는다. `test/unit/design-tokens.test.ts` 가 확인한다
 - 안내와 오류 상자는 `components/ui/notice.tsx` 의 `Notice` 로, 상태 배지는 `Badge` 의 의미 색 변형으로 그린다
 - 움직임의 길이와 곡선은 토큰(`duration-fast`, `duration-base`, `duration-slow`, `ease-out`, `ease-spring`)만 쓴다
-
-고쳤으면 아래가 아무것도 내지 않아야 한다.
-
-```bash
-# cwd: 저장소 root
-grep -rn 'style={{' web/src/
-```
-
-값이 이어지는 수라서 클래스로 만들 수 없는 것만 예외다.
-그때는 왜 인라인인지 주석으로 남긴다.
 
 ## 화면 밖에서 오는 글은 마크다운으로 읽는다
 

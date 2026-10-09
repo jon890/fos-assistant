@@ -189,7 +189,7 @@ provider credential 은 이 토큰으로 쓰지 못한다.
 운영자가 그 profile 에 두고 plugin 은 쓰지 않는다. 표식만 있는 profile 은 바인딩 설치와 떼기, 상태 조회, probe, 바인딩 항목의 실행만 받는다. 소유 기록에 없는 커넥터의 떼기도 바인딩 떼기로 받아 `changed: false` 로 답한다. 옛 설치와 커넥터 칸 key 의 `PUT /api/env`, `DELETE /api/env` 는 401 이다. 바인딩의 env 는 설치와 떼기가 쓰고 지운다.
 
 설치와 제거는 Hermes 등록 이름과 원래 도구 이름의 대응을 그 profile 의 `.fos-connector-tools.json` 에 다시 쓰고, 설치는 `approval: always` 인 도구를 서버 정의의 `tools.exclude` 에 넣고 profile 의 `fos-ctx` 를 묶음의 판으로 맞춘 뒤 파일이 바뀌었는지를 `plugin_updated` 로 답한다.
-`GET /api/connectors` 는 `policy_hook` 을 함께 낸다. `fos-ctx` 가 켜져 있고 묶음의 판과 같고 대응 파일과 `tools.exclude` 가 지금 manifest 와 맞을 때만 참이며, 조건은 [커넥터 도구 정책](../../../docs/features/connector-policy.md) 의 「hook 이 켜져 있는지」 가 갖는다.
+`GET /api/connectors` 는 `policy_hook` 을 함께 낸다. `fos-ctx` 가 켜져 있고 묶음의 판과 같고 대응 파일의 모양(서버 목록, `connector`, `prefix`)이 지금 manifest 로 계산한 것과 맞을 때만 참이다. 서버 정의의 `tools.exclude` 와 대응 파일의 서버별 `tools` 가 어긋나면 그 커넥터 항목만 `configured` 가 거짓이며, 조건은 [커넥터 도구 정책](../../../docs/features/connector-policy.md) 의 「hook 이 켜져 있는지」 가 갖는다.
 
 **한 배포 동안 옛 Control Plane 의 호출과 옛 소유 기록의 필드 모양·운영자 env 표현을 받는다**([ADR-041](../../../docs/adr/ADR-041-hermes-에-설치하는-plugin-과-profile-틀은-이-저장소가-소유한다.md)). 옛 설치는 실행 정의의 command·args 가 지금 manifest 와 다른 기록을 받지 않는다. 바인딩은 위 재설치 경로로 새 정의를 적용한다.
 
