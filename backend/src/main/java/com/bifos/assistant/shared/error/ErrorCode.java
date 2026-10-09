@@ -185,6 +185,10 @@ public enum ErrorCode {
      * 바뀌지 않았다. 근거는 ADR-20261009-skill-package 다.
      */
     SKILL_SCRIPTS_NEED_SANDBOX(HttpStatus.CONFLICT),
+    /** 미리보기 뒤에 지금 스킬이 바뀌었거나, 덮어쓰기를 확인받지 않았다. 스킬은 바뀌지 않았다. */
+    SKILL_CHANGED(HttpStatus.CONFLICT),
+    /** 올린 스킬 묶음이 검사를 통과하지 못했다. 메시지에 첫 문제의 까닭과 경로가 있다. */
+    SKILL_PACKAGE_INVALID(HttpStatus.BAD_REQUEST),
     /**
      * 메시지가 {@code /이름} 으로 시작했는데 그 이름이 그 에이전트의 켜진 스킬이 아니다.
      *

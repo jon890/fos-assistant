@@ -26,6 +26,7 @@ import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.TreeMap;
 import lombok.RequiredArgsConstructor;
@@ -219,6 +220,30 @@ public class SkillService {
             newSkills.requireCreatable(profile, name, frontmatter, current, pending);
         }
         SkillBundle bundle = bundleOf(name, skillMd, inputs, uploaded);
+        return saveBundle(user, agent, current, bundle, uploaded);
+    }
+
+    /** 편집자인지만 본다. 잠금은 잡지 않는다. 스킬 묶음의 미리보기와 올리기가 zip 을 풀기 전에 부른다. */
+    public Agent requireManageable(CurrentUser user, String code) {
+        return requireEditable(user, code);
+    }
+
+    /** 검사를 마친 묶음을 행 잠금 안에서 지금 스킬의 지문과 {@code baseDigest} 가 같을 때만 저장한다. */
+    @Transactional
+    public SkillDetail saveUploaded(CurrentUser user, String code, SkillBundle bundle, String baseDigest) {
+        Agent agent = requireEditableLocked(user, code);
+        String profile = agent.hermesProfile();
+        Map<String, SkillBundle> current = store.readCurrent(profile);
+        Map<String, SkillBundle> pending = store.readPending(profile);
+        SkillBundle uploaded = uploadedBundle(current, pending, bundle.name());
+        String base = baseDigest == null || baseDigest.isBlank() ? null : baseDigest;
+        if (!Objects.equals(uploaded == null ? null : uploaded.digest(), base)) {
+            throw new ApiException(ErrorCode.SKILL_CHANGED, "the skill changed after the preview");
+        }
+        if (uploaded == null) {
+            newSkills.requireCreatable(
+                    profile, bundle.name(), SkillFrontmatter.parse(bundle.skillMd()), current, pending);
+        }
         return saveBundle(user, agent, current, bundle, uploaded);
     }
 
