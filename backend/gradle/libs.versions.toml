@@ -21,6 +21,7 @@ spring-boot-starter-security = { module = "org.springframework.boot:spring-boot-
 spring-boot-starter-validation = { module = "org.springframework.boot:spring-boot-starter-validation" }
 spring-boot-starter-actuator = { module = "org.springframework.boot:spring-boot-starter-actuator" }
 spring-boot-starter-flyway = { module = "org.springframework.boot:spring-boot-starter-flyway" }
+spring-boot-starter-websocket = { module = "org.springframework.boot:spring-boot-starter-websocket" }
 spring-boot-starter-test = { module = "org.springframework.boot:spring-boot-starter-test" }
 
 mysql-connector-j = { module = "com.mysql:mysql-connector-j", version.ref = "mysql-connector" }
@@ -52,7 +53,8 @@ spring-boot-starters = [
   "spring-boot-starter-security",
   "spring-boot-starter-validation",
   "spring-boot-starter-actuator",
-  "spring-boot-starter-flyway"
+  "spring-boot-starter-flyway",
+  "spring-boot-starter-websocket"
 ]
 spring-test = ["spring-boot-starter-test", "spring-security-test"]
 

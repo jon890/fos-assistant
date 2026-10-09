@@ -5,6 +5,9 @@ import { useEffect, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { ErrorNotice, LoginNotice } from "@/components/connector/browser-login";
+import { ConnectorAgentChooser } from "@/components/connector/connector-agent-chooser";
+import { BoundAgents } from "@/components/connector/connector-bound-agents";
 import { ConnectorHeading } from "@/components/connector/connector-identity";
 import { ConnectorGrants } from "@/components/connector/connector-grants";
 import { ConnectorTools } from "@/components/connector/connector-tools";
@@ -18,86 +21,22 @@ import {
   connectionStatusLabel,
   disconnectConnection,
   readConnection,
-  readConnectors,
   readOptions,
   registerConnection,
-  type BoundAgent,
+  type ConnectionFailure,
   type ConnectorConnection,
   type ConnectorField,
   type ConnectorOption,
-  type ConnectorSummary,
 } from "@/lib/connection";
-
-type Loaded =
-  | { kind: "loading" }
-  | { kind: "notFound" }
-  | { kind: "failed"; message: string }
-  | {
-      kind: "ready";
-      connector: ConnectorSummary | null;
-      connection: ConnectorConnection;
-    };
+import { fetchLoaded, formatChecked, type Loaded } from "@/lib/connection-load";
 
 type Pending = "save" | "check" | "disconnect" | `options:${string}` | null;
 
-function formatChecked(value: string) {
-  return new Intl.DateTimeFormat("ko-KR", {
-    dateStyle: "medium",
-    timeStyle: "short",
-    timeZone: "Asia/Seoul",
-  }).format(new Date(value));
-}
-
-async function fetchLoaded(id: string): Promise<Loaded> {
-  const [catalog, connection] = await Promise.all([
-    readConnectors(),
-    readConnection(id),
-  ]);
-  if (!connection.ok) {
-    return connection.code === "CONNECTOR_NOT_FOUND"
-      ? { kind: "notFound" }
-      : { kind: "failed", message: connection.message };
-  }
-  // 카탈로그를 읽지 못한 것을 목록에서 빠진 것으로 보이면 일시 장애에 해제만 남는다.
-  if (!catalog.ok) return { kind: "failed", message: catalog.message };
-  const connector = catalog.data.find((item) => item.id === id) ?? null;
-  return { kind: "ready", connector, connection: connection.data };
-}
-
-/** 이 연결을 붙인 에이전트 목록이다. 붙이기와 떼기는 에이전트 화면에서 한다. */
-function BoundAgents({ bindings }: { bindings: BoundAgent[] }) {
-  return (
-    <section className="space-y-2" data-testid="connection-bindings">
-      <h2 className="text-sm font-semibold">붙인 에이전트</h2>
-      {bindings.length === 0 ? (
-        <p className="text-sm text-muted-foreground">
-          아직 이 연결을 쓰는 에이전트가 없어요. 에이전트 화면에서 붙여요.
-        </p>
-      ) : (
-        <ul className="divide-y divide-border rounded-md border border-border">
-          {bindings.map((binding) => (
-            <li
-              key={binding.agentCode}
-              className="flex flex-wrap items-center justify-between gap-2 p-3 text-sm"
-              data-testid="connection-binding"
-            >
-              <Link
-                prefetch={false}
-                href={`/agents/${binding.agentCode}`}
-                className="min-w-0 break-all text-foreground underline underline-offset-4"
-              >
-                {binding.agentName}
-              </Link>
-              {binding.restartRequired || binding.status === "PENDING" ? (
-                <Badge variant="warning">반영 대기</Badge>
-              ) : null}
-            </li>
-          ))}
-        </ul>
-      )}
-    </section>
-  );
-}
+/**
+ * 에이전트 고르기 영역의 상태다. `auto` 는 연결됐고 아직 쓰는 에이전트가 없을 때만 보인다.
+ * 연결을 막 마쳤거나 사용자가 열었으면 `open` 이고, 붙인 뒤에도 결과를 보이려고 닫을 때까지 둔다.
+ */
+type Chooser = "auto" | "open" | "closed";
 
 function NotFound() {
   return (
@@ -107,18 +46,27 @@ function NotFound() {
         href="/connections"
         className="text-sm text-foreground underline underline-offset-4"
       >
-        연결 목록으로 돌아가기
+        서비스 연결로 돌아가기
       </Link>
     </div>
   );
 }
 
-export function ConnectorConnectionPanel({ id }: { id: string }) {
+export function ConnectorConnectionPanel({
+  id,
+  preferredAgent,
+}: {
+  id: string;
+  /** 에이전트 화면에서 이 연결을 하러 왔으면 그 에이전트 번호다. 고르기 영역이 맨 앞에 둔다. */
+  preferredAgent: string | null;
+}) {
   const [loaded, setLoaded] = useState<Loaded>({ kind: "loading" });
   const [values, setValues] = useState<Record<string, string>>({});
   const [options, setOptions] = useState<Record<string, ConnectorOption[]>>({});
   const [pending, setPending] = useState<Pending>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | ConnectionFailure | null>(null);
+  const [chooser, setChooser] = useState<Chooser>("auto");
+  const [justConnected, setJustConnected] = useState(false);
   const busy = pending !== null;
 
   const validId = CONNECTOR_ID_PATTERN.test(id);
@@ -151,6 +99,7 @@ export function ConnectorConnectionPanel({ id }: { id: string }) {
   const available = connector?.available === true;
   const fields = available ? connector.fields : [];
   const title = connector?.title ?? id;
+  const loginUrl = connector?.ownerBrowserLoginUrl;
   const secretsFilled = fields
     .filter((field) => field.secret)
     .every((field) => values[field.key]?.trim());
@@ -229,8 +178,25 @@ export function ConnectorConnectionPanel({ id }: { id: string }) {
     setError(null);
     const result = await registerConnection(id, submitted);
     setPending(null);
-    if (!result.ok) return setError(result.message);
-    setLoaded({ kind: "ready", connector, connection: result.data });
+    if (!result.ok) return setError(result);
+    showConnected(result.data);
+  }
+
+  /** 새 연결 상태를 그린다. 이번에 처음 연결됐으면 같은 자리에서 쓸 에이전트를 고르게 한다. */
+  function showConnected(next: ConnectorConnection) {
+    if (next.status === "READY" && connection.status !== "READY") {
+      setJustConnected(true);
+      setChooser("open");
+    }
+    setLoaded({ kind: "ready", connector, connection: next });
+  }
+
+  async function refreshBindings() {
+    // 붙인 결과를 보이는 동안 영역이 닫히지 않게 연 채로 둔다.
+    setChooser("open");
+    const fresh = await readConnection(id);
+    if (fresh.ok)
+      setLoaded({ kind: "ready", connector, connection: fresh.data });
   }
 
   async function act(kind: "check" | "disconnect") {
@@ -271,11 +237,23 @@ export function ConnectorConnectionPanel({ id }: { id: string }) {
       return setError("값을 다시 입력해 연결해 주세요.");
     }
     setPending(null);
-    if (!result.ok) return setError(result.message);
-    setLoaded({ kind: "ready", connector, connection: result.data });
+    if (!result.ok) return setError(kind === "check" ? result : result.message);
+    if (kind === "check") showConnected(result.data);
+    else setLoaded({ kind: "ready", connector, connection: result.data });
   }
 
   const status = connection.status;
+  const canChoose = available && status === "READY";
+  const preferredUnbound =
+    preferredAgent !== null &&
+    !connection.bindings.some(
+      (binding) => binding.agentCode === preferredAgent,
+    );
+  const chooserShown =
+    canChoose &&
+    (chooser === "open" ||
+      (chooser === "auto" &&
+        (connection.bindings.length === 0 || preferredUnbound)));
   const shown = fields.flatMap((field) => {
     if (!field.secret) {
       const value = connection.values[field.key];
@@ -292,6 +270,20 @@ export function ConnectorConnectionPanel({ id }: { id: string }) {
 
   return (
     <div className="mx-auto w-full max-w-2xl">
+      {chooserShown ? (
+        <ConnectorAgentChooser
+          connectorId={id}
+          title={title}
+          bindings={connection.bindings}
+          justConnected={justConnected}
+          preferredAgent={preferredAgent}
+          onBindingsChanged={() => void refreshBindings()}
+          onClose={() => {
+            setChooser("closed");
+            setJustConnected(false);
+          }}
+        />
+      ) : null}
       <Card>
         <CardHeader>
           <ConnectorHeading connector={connector} title={title} />
@@ -321,10 +313,16 @@ export function ConnectorConnectionPanel({ id }: { id: string }) {
             </Notice>
           ) : null}
           {status !== "DISCONNECTED" ? (
-            <BoundAgents bindings={connection.bindings} />
+            <BoundAgents
+              bindings={connection.bindings}
+              onChoose={
+                canChoose && !chooserShown ? () => setChooser("open") : null
+              }
+            />
           ) : null}
           {available ? (
             <form onSubmit={save} className="space-y-3">
+              <LoginNotice url={loginUrl} />
               {fields.map((field) => (
                 <div key={field.key} className="space-y-2">
                   <Label htmlFor={`connector-field-${field.key}`}>
@@ -432,11 +430,7 @@ export function ConnectorConnectionPanel({ id }: { id: string }) {
               연결 해제
             </Button>
           ) : null}
-          {error ? (
-            <Notice variant="error" role="alert">
-              {error}
-            </Notice>
-          ) : null}
+          <ErrorNotice error={error} loginUrl={loginUrl} />
         </CardContent>
       </Card>
     </div>

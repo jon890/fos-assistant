@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
+import { Inbox } from "lucide-react";
 import { nowLinkLabel } from "@/lib/attention";
 import { ATTENTION_CHANGED_EVENT, readNowCount } from "@/lib/attention-api";
 import { NavPending } from "./nav-pending";
@@ -43,12 +44,13 @@ export function NowLink({ onNavigate }: { onNavigate(href: string): void }) {
       aria-label={nowLinkLabel(nowCount)}
       aria-current={current ? "page" : undefined}
       onClick={() => onNavigate("/now")}
-      className={`mb-4 flex shrink-0 items-center rounded-md px-3 py-2 text-sm hover:bg-accent hover:text-foreground ${
+      className={`mb-4 flex shrink-0 items-center gap-2 rounded-md px-3 py-2 text-sm hover:bg-accent hover:text-foreground ${
         current
           ? "bg-accent font-medium text-foreground"
           : "text-muted-foreground"
       }`}
     >
+      <Inbox aria-hidden="true" className="size-4 shrink-0" />
       지금 볼 것
       {nowCount > 0 ? (
         <span

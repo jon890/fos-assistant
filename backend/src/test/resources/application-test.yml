@@ -19,8 +19,15 @@ spring:
 assistant:
   usage:
     reconcile-cron: "-"
+  chat:
+    # 검사가 뜰 때마다 지운 대화의 정리가 함께 돌지 않게 끈다. 검사는 그 메서드를 직접 부른다
+    purge-cron: "-"
   context:
     max-chars: 8000
+  data-encryption:
+    # 운영 값이 아니다. 검사 전용 KEK 파일이다
+    kek-file: src/test/resources/data-encryption/test-kek.keys
+    active-kek-id: test-kek-1
   memory:
     encryption:
       # 운영 값이 아니다. 글자 0123456789abcdef0123456789abcdef 의 base64 다

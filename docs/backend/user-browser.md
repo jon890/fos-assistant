@@ -88,7 +88,7 @@ env 로 받는다. 기본값이 있는 값은 코드를 바꾸지 않고 설치 
 | `assistant.browser.start-timeout` | | 켠 뒤 CDP 가 답하기를 기다리는 시간 | `30s` |
 | `assistant.browser.sweep-interval` | | 자동 중지와 상태 맞추기를 도는 간격 | `1m` |
 | `assistant.browser.screen-timeout` | | 로그인 화면 하나가 열려 있을 수 있는 시간. 넘으면 `closed`(`timeout`) | `30m` |
-| `assistant.browser.gateway-base-url` | `ASSISTANT_BROWSER_GATEWAY_BASE_URL` | Hermes 가 중계에 닿는 주소. `http` 나 `https` 이고 끝이 `/internal/browser-gateway` 다. 아래 「중계」 | 없음 |
+| `assistant.browser.gateway-base-url` | `ASSISTANT_BROWSER_GATEWAY_BASE_URL` | Hermes 가 중계에 닿는 주소. `http` 나 `https` 이고 끝이 `/internal/browser-gateway` 다. 호스트는 영문자와 숫자, `.`, `-` 만 쓰고 경로 조각은 영문자와 숫자, `.`, `_`, `~`, `-` 만 쓴다. 아래 「중계」 | 없음 |
 | `assistant.browser.gateway-secret` | `ASSISTANT_BROWSER_GATEWAY_SECRET` | 접근 표식을 서명하는 비밀값. 32자 이상. 운영 비밀값이다 | 없음 |
 
 이미지, 망, 자원, 프로필 루트는 proxy 정책이 강제한다. Control Plane 은 정책과 같은 값을 운영 설정으로 받아 생성 요청에 싣는다.
@@ -215,15 +215,14 @@ Control Plane 은 브라우저의 CDP 에 두 가지로 닿는다. 주소는 컨
 ## 중계
 
 결정은 [ADR-20261007 / user-browser](../adr/ADR-20261007-user-browser.md) 의 「중계」 와 [ADR-20261008 / browser-gateway-token](../adr/ADR-20261008-browser-gateway-token.md) 이 갖는다.
-커넥터는 브라우저 주소를 받지 않는다. 커넥터가 받게 할 주소는 `<gateway-base-url>/<접근 표식>` 이고, 커넥터는 그 주소를 Chrome 의 CDP 주소처럼 부른다.
-바인딩 설치와 확인 도구 호출이 그 주소를 커넥터의 env 에 넣는 일과 WebSocket 받는 쪽은 아직 없다. 지금은 표식을 만들고 확인하는 것과 HTTP 창구만 있다.
+커넥터는 브라우저 주소를 받지 않는다. 바인딩 설치와 확인 도구 호출이 `<gateway-base-url>/<접근 표식>` 을 커넥터의 env 에 넣고, 커넥터는 그 주소를 Chrome 의 CDP 주소처럼 부른다. 넣는 자리는 아래 「커넥터에 건네기」 가 갖는다.
 
 ### 접근 표식
 
 | 종류 | 모양 | 서명할 글 | 브라우저 | 언제 무효 |
 | --- | --- | --- | --- | --- |
 | 바인딩 | `b<바인딩 번호>.<서명>` | `v1\nbinding\n<바인딩 번호>` | 그 바인딩의 연결 주인(`connector_connection.user_id`) | 바인딩 줄이 없다 |
-| 호출 | `u<사용자 번호>.<만료 epoch 초>.<서명>` | `v1\ncall\n<사용자 번호>\n<만료 epoch 초>` | 그 사용자 | 만료가 지났다. 만료는 만든 때부터 5분이다. 연결 등록과 확인에 쓸 표식이고, 아직 발급하는 쪽이 없다 |
+| 호출 | `u<사용자 번호>.<만료 epoch 초>.<서명>` | `v1\ncall\n<사용자 번호>\n<만료 epoch 초>` | 그 사용자 | 만료가 지났다. 만료는 만든 때부터 5분이다. 연결 등록과 확인, 선택지 호출에 쓴다 |
 
 서명은 `gateway-secret` 의 UTF-8 바이트를 key 로 한 HMAC-SHA256 의 소문자 16진수 64자다. 번호는 1 이상의 10진수이고 앞자리 0 을 받지 않는다.
 같은 바인딩은 늘 같은 표식을 받는다. 그래서 다시 설치해도 서버 정의가 바뀌지 않는다.
@@ -239,15 +238,15 @@ Control Plane 은 브라우저의 CDP 에 두 가지로 닿는다. 주소는 컨
 | `GET json/list`, `GET json` | 그대로 넘긴다. 줄마다 `webSocketDebuggerUrl` 을 중계 주소로 바꾸고 `devtoolsFrontendUrl`, `devtoolsFrontendUrlCompat` 을 뺀다 |
 | `PUT json/new?<주소>` | 주소가 `http`, `https`, `about:blank` 일 때만 넘긴다. 아니면 400 이고, 이 검사는 아래 판정 순서의 1번 다음, 2번보다 먼저 한다. 응답은 `json/list` 의 한 줄처럼 바꾼다 |
 | `GET json/close/<번호>`, `GET json/activate/<번호>` | 번호가 영문자와 숫자일 때만 넘기고 Chrome 의 글을 그대로 준다. 모양이 틀린 번호의 404 도 1번 다음, 2번보다 먼저 판정한다 |
-| WebSocket `devtools/browser/<번호>`, `devtools/page/<번호>` | 아직 없다. 아래 「WebSocket」 의 계약으로 더한다. 번호가 영문자와 숫자, `-` 로 128자까지일 때만 Chrome 의 같은 경로에 붙고 양쪽 글 메시지를 그대로 잇는다. 브라우저 대상 번호는 GUID 다 |
-| 그 밖 | 빈 404. WebSocket upgrade(`Upgrade: websocket`) 요청은 이 받기에서 빠진다. 머리 값은 대소문자를 구분해 `websocket` 과 `WebSocket` 만 뺀다 |
+| WebSocket `devtools/browser/<번호>`, `devtools/page/<번호>` | 번호가 영문자와 숫자, `-` 로 128자까지일 때만 Chrome 의 같은 경로에 붙고 양쪽 글 메시지를 그대로 잇는다. 브라우저 대상 번호는 GUID 다 |
+| 그 밖 | 빈 404. WebSocket upgrade(`Upgrade: websocket`) 요청은 이 받기에서 빠지고 WebSocket 처리기가 받는다. 처리기는 devtools 경로가 아니면 빈 404 로 거절한다. 머리 값은 대소문자를 구분해 `websocket` 과 `WebSocket` 만 뺀다 |
 
 중계 주소는 `gateway-base-url` 의 scheme 을 `ws` 나 `wss` 로 바꾸고 `/<접근 표식>/devtools/<종류>/<번호>` 를 붙인 것이다.
-커넥터는 이 주소의 경로만 꺼내 자기가 받은 주소의 호스트에 붙이므로 둘이 달라도 된다. WebSocket 받는 쪽은 아직 없으므로 지금은 이 주소로 붙어도 연결되지 않는다.
+커넥터는 이 주소의 경로만 꺼내 자기가 받은 주소의 호스트에 붙이므로 둘이 달라도 된다.
 
 요청마다 이 순서로 판정한다.
 
-1. `Origin`, `Sec-Fetch-Site`, `Sec-Fetch-Mode` 머리 가운데 하나라도 있으면 403 이다. 브라우저가 보낸 요청이다. 브라우저는 no-cors `GET` 에 `Origin` 을 싣지 않으므로 `Sec-Fetch-*` 로도 막아 페이지가 `json/close`, `json/activate` 를 부르지 못하게 한다
+1. `Origin`, `Sec-Fetch-Site`, `Sec-Fetch-Mode` 머리 가운데 하나라도 있으면 403 이다. 브라우저가 보낸 요청이다. 브라우저는 no-cors `GET` 에 `Origin` 을 싣지 않으므로 `Sec-Fetch-*` 로도 막아 페이지가 `json/close`, `json/activate` 를 부르지 못하게 한다. WebSocket handshake 는 `Origin` 만 본다. 브라우저의 WebSocket 은 늘 `Origin` 을 싣는다
 2. 중계가 꺼졌거나(두 설정 가운데 하나가 비었다) 기능이 꺼졌으면 503 이다
 3. 표식을 확인한다. 모양이 틀렸거나, 서명이 맞지 않거나, 바인딩이 없거나, 호출 표식이 만료됐으면 404 다. 어느 까닭인지 응답으로 구분하지 않는다
 4. 주인이 허용 목록에서 꺼져 있으면 404 다
@@ -260,11 +259,26 @@ Chrome 에는 `BrowserRuntime#cdpAddress` 가 준 컨테이너 IP 주소로, `Or
 
 ### WebSocket
 
-아직 없다. 받는 쪽을 더하는 변경이 지킬 계약이다.
-
 - 받는 쪽은 Spring WebSocket 이다. 받은 연결 하나에 Chrome 쪽 연결 하나를 열고, 한쪽이 닫히면 다른 쪽도 닫는다
-- 연결이 열려 있는 동안 `BrowserUsage` 핸들을 쥐어 자동 중지하지 않는다. 메시지가 오갈 때마다 활동을 기록한다(1분에 한 번까지 쓴다)
+- handshake 는 브라우저를 켜기 전에 형식을 본다. `GET` 이 아니거나 `Upgrade` 가 `websocket`(대소문자 무시)이 아니면 빈 400 이다
+- 연결이 열려 있는 동안 `BrowserUsage` 핸들을 쥐어 자동 중지하지 않는다. 받은 쪽(커넥터)에서 온 메시지가 끝날 때마다 활동을 기록한다(1분에 한 번까지 쓴다). Chrome 이 보내기만 하는 동안은 활동을 기록하지 않지만, 그동안에도 핸들이 자동 중지를 막는다
+- 받은 세션은 `idle-timeout` 동안 아무것도 주고받지 않으면 닫힌다. 반쯤 끊긴 연결이 핸들을 계속 쥐지 않게 한다
 - 글 메시지만 조각째 그대로 넘긴다. 모아서 넘기지 않으므로 사진 바이트가 든 큰 CDP 메시지도 세션마다 큰 버퍼를 잡지 않는다. 한쪽으로 가는 조각은 앞 조각을 보낸 뒤에 보낸다
-- 메시지 하나(조각의 합)는 64M 글자까지다. 넘으면 양쪽을 닫는다. 바이너리 메시지가 오면 닫는다
+- 받은 쪽(커넥터)에서 온 메시지 하나(조각의 합)는 64M 글자까지다. 넘으면 양쪽을 닫는다. 바이너리 메시지가 오면 닫는다
+- Chrome 쪽 보내기가 30초 안에 끝나지 않으면 양쪽을 닫는다. 멈춘 Chrome 이 요청 스레드를 붙잡지 않게 한다
 - 끄기, 지우기, 사용자 끄기, 상태 맞추기로 브라우저가 멈추면 Chrome 쪽 연결이 끊기고 받은 연결도 닫힌다
 - 표식은 열 때만 확인한다. 열린 뒤 바인딩을 떼도 그 연결은 닫힐 때까지 간다. 떼기는 도구 목록에서 서버를 빼므로 새 호출은 오지 않는다
+- `org.springframework.web.socket` 로그를 DEBUG 로 올리지 않는다. 표식이 든 주소가 로그에 남는다
+
+### 커넥터에 건네기
+
+`connector.json` 이 `owner_browser_env` 를 선언한 커넥터에만 중계 주소를 싣는다. 다른 커넥터의 요청은 바뀌지 않는다.
+
+| 호출 | 싣는 주소 | 만드는 곳 |
+| --- | --- | --- |
+| 바인딩 설치(붙이기, 값 교체, 연결 확인, 반영 완료의 다시 설치) | 그 바인딩의 표식 주소 | `BrowserGatewayTokens#bindingAddress` |
+| 확인 도구와 선택지 호출(연결 등록, 연결 확인, 선택지 조회) | 요청자의 호출 표식 주소 | `BrowserGatewayTokens#callAddress` |
+| 승인한 실행 | 싣지 않는다. 대시보드가 설치한 서버 정의의 값을 쓴다 | |
+
+중계가 꺼졌으면 빈 값을 싣는다. 설치는 막지 않고, 커넥터가 브라우저에 닿지 못한다고 답해 연결 확인이 실패로 보인다.
+요청 본문의 칸과 대시보드가 값을 넣는 규칙은 [커넥터 설치](connector-install.md) 의 「바인딩 설치」 와 [`hermes/README.md`](../../hermes/README.md) 의 커넥터 경로가 갖는다.

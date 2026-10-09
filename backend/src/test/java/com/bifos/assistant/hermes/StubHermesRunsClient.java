@@ -60,6 +60,11 @@ public class StubHermesRunsClient implements HermesRunsClient {
     private final Map<String, AtomicInteger> lookupFailuresLeft = new ConcurrentHashMap<>();
     private final List<String> lookups = new CopyOnWriteArrayList<>();
 
+    /** 지우라고 받은 session 을 받은 순서대로 담는다. {@code failSessionDeletes} 를 걸면 받지 않고 그 예외를 던진다. */
+    private final List<SessionLookup> deletedSessions = new CopyOnWriteArrayList<>();
+
+    private volatile RuntimeException sessionDeleteFailure;
+
     public void willReturn(HermesRunResult result) {
         this.nextResult = result;
         this.nextFailure = null;
@@ -182,6 +187,8 @@ public class StubHermesRunsClient implements HermesRunsClient {
         sessionLookups.clear();
         subagentUsageLookups.clear();
         subagentUsages.clear();
+        deletedSessions.clear();
+        sessionDeleteFailure = null;
         stopped.clear();
         onStop = runId -> {};
         lookupAnswers.clear();
@@ -248,6 +255,24 @@ public class StubHermesRunsClient implements HermesRunsClient {
     public SessionRuntime readSessionRuntime(String apiBaseUrl, String profileName, String sessionId) {
         sessionLookups.add(new SessionLookup(apiBaseUrl, profileName, sessionId));
         return sessionRuntime;
+    }
+
+    @Override
+    public void deleteSession(String apiBaseUrl, String profileName, String sessionId) {
+        RuntimeException failure = sessionDeleteFailure;
+        if (failure != null) {
+            throw failure;
+        }
+        deletedSessions.add(new SessionLookup(apiBaseUrl, profileName, sessionId));
+    }
+
+    public List<SessionLookup> deletedSessions() {
+        return List.copyOf(deletedSessions);
+    }
+
+    /** 다음 session 삭제부터 그 예외를 던진다. null 을 주면 다시 받는다. */
+    public void failSessionDeletes(RuntimeException failure) {
+        this.sessionDeleteFailure = failure;
     }
 
     @Override

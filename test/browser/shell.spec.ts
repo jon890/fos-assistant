@@ -54,6 +54,32 @@ test("새 대화에서 보내면 주소와 목록이 바뀌고 다시 열 수 �
   await expect(page.getByTestId("user-message").last()).toContainText(title);
 });
 
+test("모바일 머리줄 제목을 누르면 홈으로 가고 새 대화 상태로 돌아간다", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== "mobile");
+  const title = `모바일 홈 제목 ${Date.now()}`;
+  const id = await createConversation(page, title);
+  await page.goto(`/chat/${id}`);
+  const home = page.locator("header").getByRole("link", { name: "검사용 비서 홈", exact: true });
+  await expect(home).toHaveText("브라우저 비서");
+  await expect(home).toHaveAttribute("href", "/");
+  const bounds = await home.boundingBox();
+  expect(bounds?.height).toBeGreaterThanOrEqual(44);
+  await expect(page.getByTestId("user-message")).toHaveCount(1);
+  await page.getByRole("textbox", { name: "메시지" }).fill("홈으로 가기 전 입력");
+  await home.click();
+  await expect(page).toHaveURL(/\/$/);
+  await expect(page.getByTestId("user-message")).toHaveCount(0);
+  await expect(page.getByRole("textbox", { name: "메시지" })).toHaveValue("");
+  await page.getByRole("textbox", { name: "메시지" }).fill("홈에서 비울 입력");
+  await home.click();
+  await expect(page).toHaveURL(/\/$/);
+  await expect(page.getByRole("textbox", { name: "메시지" })).toHaveValue("");
+  await page.goto("/usage");
+  await expect(home).toHaveText("검사용 비서");
+  await home.click();
+  await expect(page).toHaveURL(/\/$/);
+});
+
 test("시작 사건 뒤 새 대화를 누르면 기존 메시지와 입력이 비고 다음 대화가 생긴다", async ({ page }, testInfo) => {
   await page.goto("/");
   await send(page, `첫 대화 ${testInfo.project.name} ${Date.now()}`);
@@ -112,7 +138,7 @@ test("사이드바는 일반 화면에 있고 로그인 화면에는 없다", as
   // 사이드바는 맨 위의 「새 대화」 와 「지금 볼 것」, 대화 목록, 주요 화면 메뉴, 맨 아래 줄이다. 관리자 입구는 메뉴가 아니라 맨 아래 줄에 있다.
   await expect(sidebar.getByRole("navigation", { name: "대화 목록" })).toBeVisible();
   const menu = sidebar.getByRole("navigation", { name: "주요 화면" });
-  await expect(menu.getByRole("link")).toHaveText([/^에이전트/, /^연결/, /^예약 작업/, /^기억/, /^사용량/]);
+  await expect(menu.getByRole("link")).toHaveText([/^에이전트/, /^외부 서비스 연결/, /^예약 작업/, /^기억/, /^사용량/]);
   await expect(sidebar.getByRole("link", { name: /^지금 볼 것/ })).toBeVisible();
   await expect(menu.getByRole("link", { name: /^지금 볼 것/ })).toHaveCount(0);
   await expect(sidebar.getByTestId("admin-entry")).toBeVisible();

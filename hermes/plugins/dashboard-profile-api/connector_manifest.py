@@ -51,6 +51,8 @@ from .connector_schema import (
     OUTCOME_UNKNOWN,
     OWNER_ATTACHMENTS_ENV_RE,
     OWNER_ATTACHMENTS_VALUE_RE,
+    OWNER_BROWSER_LOGIN_URL_MAX_CHARS,
+    OWNER_BROWSER_VALUE_RE,
     OWNER_OUTPUT_VALUE_RE,
     PLUGIN_ROOT_REF,
     SECRET_ARGUMENT_NAMES,
@@ -63,6 +65,10 @@ from .connector_schema import (
     TOOL_RISK_DEFAULTS,
     TOOL_TITLE_MAX_CHARS,
     _connector_binding_flags,
+)
+
+from .connector_owner_env import (
+    _connector_owner_env,
 )
 
 from .connector_skills import (
@@ -177,23 +183,8 @@ def _load_connector(connector_id: str, entry: dict) -> dict:
         raise ValueError("operator_env 는 칸과 겹치지 않는 env 이름 목록이다")
     if set(operator_env) - set(entry["env"]):
         raise ValueError("operator_env 의 값이 운영 목록에 없다")
-    # 사용자 첨부를 읽는 커넥터가 받을 env 이름이다. 값은 바인딩 설치가 그 에이전트 주인의 디렉터리로 넣는다(ADR-20261007 connector-owner-attachments).
-    owner_attachments_env = declared.get("owner_attachments_env")
-    if owner_attachments_env is not None and (
-            not isinstance(owner_attachments_env, str) or not OWNER_ATTACHMENTS_ENV_RE.match(owner_attachments_env)
-            or owner_attachments_env in BASE_ENV_KEYS or owner_attachments_env in field_env
-            or owner_attachments_env in operator_env):
-        raise ValueError("owner_attachments_env 는 칸과 운영자 env 와 겹치지 않는 env 이름 하나다")
-    owner_env = {owner_attachments_env} if owner_attachments_env is not None else set()
-    # 목록 도구가 계산할 데이터를 파일로 쓸 디렉터리를 받는 env 이름이다. 값은 바인딩 설치가 넣는다(ADR-20261008 connector-output-files).
-    owner_output_env = declared.get("owner_output_env")
-    if owner_output_env is not None and (
-            not isinstance(owner_output_env, str) or not OWNER_ATTACHMENTS_ENV_RE.match(owner_output_env)
-            or owner_output_env in BASE_ENV_KEYS or owner_output_env in field_env
-            or owner_output_env in operator_env or owner_output_env in owner_env):
-        raise ValueError("owner_output_env 는 칸과 운영자 env, owner_attachments_env 와 겹치지 않는 env 이름 하나다")
-    if owner_output_env is not None:
-        owner_env.add(owner_output_env)
+    (owner_attachments_env, owner_output_env, owner_browser_env, owner_browser_login_url,
+     owner_env) = _connector_owner_env(declared, field_env, operator_env)
     operator_secrets = declared.get("operator_secrets", [])
     if not isinstance(operator_secrets, list) or any(not isinstance(name, str) for name in operator_secrets):
         raise ValueError("operator_secrets 는 env 이름 목록이다")
@@ -231,7 +222,8 @@ def _load_connector(connector_id: str, entry: dict) -> dict:
         raise ValueError("MCP 서버 정의 모양이 올바르지 않다")
     optional_env = frozenset(field["env"] for field in fields if field.get("required", True) is False)
     if set(server["env"]) != field_env | set(operator_env) | owner_env:
-        raise ValueError("MCP 서버 env 가 fields 와 operator_env, owner_attachments_env, owner_output_env 의 합과 다르다")
+        raise ValueError("MCP 서버 env 가 fields 와 operator_env, owner_attachments_env, owner_output_env, "
+                         "owner_browser_env 의 합과 다르다")
     for name, value in server["env"].items():
         # 비밀값 원문이나 다른 변수의 참조를 받지 않는다. 선택 칸만 빈 기본값 참조를 쓸 수 있다.
         if value != "${%s}" % name and not (name in optional_env and value == "${%s:-}" % name):
@@ -274,6 +266,7 @@ def _load_connector(connector_id: str, entry: dict) -> dict:
     env.update({name: entry["env"][name] for name in operator_env})
     # 주인의 첨부 디렉터리와 커넥터 출력 디렉터리도 profile `.env` 를 거치지 않는다. 바인딩 설치가 이 빈 값을 그 디렉터리로 바꾼다.
     # 주인을 모르는 설치는 빈 값 그대로 두어 커넥터가 사용자 첨부를 읽지 않고 파일을 쓰지 않는다.
+    # 브라우저 중계 주소도 같다. 바인딩 설치가 이 빈 값을 그 바인딩의 중계 주소로 바꾼다.
     env.update({name: "" for name in owner_env})
     option_tools = {field["options"]["tool"] for field in fields if "options" in field}
     tools = _connector_tools(declared, verify["tool"], option_tools, mcp_server)
@@ -295,6 +288,8 @@ def _load_connector(connector_id: str, entry: dict) -> dict:
         "operator_env": frozenset(operator_env),
         "owner_attachments_env": owner_attachments_env,
         "owner_output_env": owner_output_env,
+        "owner_browser_env": owner_browser_env,
+        "owner_browser_login_url": owner_browser_login_url,
         "optional_env": optional_env,
         "errors": errors,
         "error_contracts": error_contracts,
@@ -355,6 +350,7 @@ def _server_matches(manifest: dict, server: dict) -> bool:
     주인의 첨부 디렉터리 env 는 설치마다 그 주인의 값이라 manifest 와 견주지 않는다. 빈 값이거나
     `<루트>/users/<64자리 16진수>` 모양인지만 본다. 참조(`${...}`)를 받으면 profile `.env` 가 경로를 정하게 된다(ADR-20261007 connector-owner-attachments).
     커넥터 출력 디렉터리 env 도 같다. `<루트>/users/<64자리 16진수>/<profile>/<id>` 모양인지만 본다(ADR-20261008 connector-output-files).
+    브라우저 중계 주소 env 도 같다. 빈 값이거나 `<gateway-base-url>/<접근 표식>` 모양인지만 본다(ADR-20261008 browser-gateway-token).
     """
     expected = manifest["server"]
     if (server["command"] != expected["command"] or server["args"] != expected["args"]
@@ -368,6 +364,9 @@ def _server_matches(manifest: dict, server: dict) -> bool:
         elif name == manifest["owner_output_env"]:
             if value != "" and not OWNER_OUTPUT_VALUE_RE.fullmatch(value):
                 return False
+        elif name == manifest["owner_browser_env"]:
+            if value != "" and not (isinstance(value, str) and OWNER_BROWSER_VALUE_RE.fullmatch(value)):
+                return False
         elif name in manifest["operator_env"]:
             if value not in (reference, expected["env"][name]):
                 return False
@@ -380,6 +379,8 @@ def _connector_catalog_response():
     """검증을 통과한 커넥터의 카탈로그다. 운영자 env 의 이름과 값, 오류 대응 표, 스킬 본문은 담지 않는다.
 
     `skills` 는 바인딩 설치가 profile 에 복사할 스킬의 이름이다. 이름 순이다.
+    `owner_browser` 는 사용자 브라우저를 쓰는 커넥터인지이고, `owner_browser_login_url` 은 로그인 안내 주소나 null 이다.
+    env 이름은 내지 않는다.
     """
     from starlette.responses import JSONResponse
 
@@ -388,6 +389,8 @@ def _connector_catalog_response():
           "description": manifest["description"], "icon": manifest["icon"], "link": manifest["link"],
           "fields": manifest["fields"], "verify": manifest["verify"], "mcp_server": manifest["mcp_server"],
           "toolsets": manifest["toolsets"], "attachments": manifest["attachments"],
+          "owner_browser": manifest["owner_browser_env"] is not None,
+          "owner_browser_login_url": manifest["owner_browser_login_url"],
           "single_binding": manifest["single_binding"], "skills": sorted(manifest["skills"]),
           # 사람 말 제목이 없는 도구는 `title` 을 내지 않는다. 읽는 쪽이 도구 이름을 보인다.
           "tools": {name: {key: value for key, value in policy.items() if value is not None}

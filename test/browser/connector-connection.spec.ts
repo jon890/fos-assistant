@@ -127,7 +127,7 @@ test("카드에서 연결 화면으로 들어가 값을 등록하고 확인한 �
   await page.getByRole("button", { name: "연결 다시 확인" }).click();
   await expect(page.getByTestId("connection-status")).toHaveText("연결됨");
   await expect(page.getByTestId("connection-bindings")).toContainText(
-    "아직 이 연결을 쓰는 에이전트가 없어요. 에이전트 화면에서 붙여요.",
+    "아직 이 연결을 쓰는 에이전트가 없어요.",
   );
   await expect(page.getByRole("link", { name: "에이전트 열기" })).toHaveCount(
     0,
@@ -865,7 +865,7 @@ test("붙인 에이전트는 이름과 반영 대기로 보이고 상세로 이�
   await page.goto("/connections");
   await expect(
     page.getByText(
-      "계정을 한 번 연결하고, 에이전트 화면에서 그 에이전트가 쓸 연결을 붙여요.",
+      "쓰는 서비스의 계정을 연결하면 에이전트가 그 서비스로 일을 도와요.",
     ),
   ).toBeVisible();
   await expect(page.getByTestId("connector-binding-count")).toHaveText(
@@ -929,4 +929,111 @@ test("입력 칸이 없는 커넥터는 입력 없이 연결하기 단추만 보
   await page.getByRole("button", { name: "연결하기" }).click();
   await expect(page.getByTestId("connection-status")).toHaveText("연결됨");
   expect(submitted).toEqual({ values: {} });
+});
+
+const LOGIN_URL = "https://login.example.test/sign-in?from=connector";
+const LOGIN_HREF = `/browser?url=${encodeURIComponent(LOGIN_URL)}`;
+const browserConnector = {
+  ...demoConnector,
+  fields: [],
+  ownerBrowserLoginUrl: LOGIN_URL,
+};
+
+test("내 브라우저 로그인을 쓰는 커넥터는 칸 위에 안내와 로그인 링크를 보인다", async ({
+  page,
+}) => {
+  await page.route("**/api/connectors", (route) =>
+    route.fulfill({ json: [browserConnector] }),
+  );
+  await page.route(`**/api/connections/${DEMO_ID}`, (route) =>
+    route.fulfill({ json: disconnected }),
+  );
+  await page.goto(`/connections/${DEMO_ID}`);
+  const notice = page.getByTestId("browser-login-notice");
+  await expect(notice).toContainText(
+    "이 커넥터는 「내 브라우저」에 로그인한 계정을 써요.",
+  );
+  await expect(
+    notice.getByRole("link", { name: "내 브라우저에서 로그인" }),
+  ).toHaveAttribute("href", LOGIN_HREF);
+  expect(LOGIN_HREF).toBe(
+    "/browser?url=https%3A%2F%2Flogin.example.test%2Fsign-in%3Ffrom%3Dconnector",
+  );
+});
+
+test("로그인할 곳이 없거나 https 주소가 아니면 안내와 링크를 보이지 않는다", async ({
+  page,
+}) => {
+  for (const ownerBrowserLoginUrl of [null, "http://login.example.test/"]) {
+    await page.route("**/api/connectors", (route) =>
+      route.fulfill({ json: [{ ...browserConnector, ownerBrowserLoginUrl }] }),
+    );
+    await page.route(`**/api/connections/${DEMO_ID}`, (route) => {
+      if (route.request().method() !== "POST")
+        return route.fulfill({ json: disconnected });
+      return route.fulfill({
+        status: 400,
+        json: { code: "CONNECTOR_CREDENTIAL_REJECTED", message: "raw" },
+      });
+    });
+    await page.goto(`/connections/${DEMO_ID}`);
+    await page.getByRole("button", { name: "연결하기" }).click();
+    await expect(page.getByRole("main").getByRole("alert")).toHaveText(
+      "입력한 값을 확인하지 못했어요.",
+    );
+    await expect(page.getByTestId("browser-login-notice")).toHaveCount(0);
+    await expect(page.getByTestId("browser-login-link")).toHaveCount(0);
+    await page.unrouteAll();
+  }
+});
+
+test("등록이 값을 확인하지 못해 거절되면 오류 문구 옆에 로그인 링크를 보인다", async ({
+  page,
+}) => {
+  await page.route("**/api/connectors", (route) =>
+    route.fulfill({ json: [browserConnector] }),
+  );
+  await page.route(`**/api/connections/${DEMO_ID}`, (route) => {
+    if (route.request().method() !== "POST")
+      return route.fulfill({ json: disconnected });
+    return route.fulfill({
+      status: 400,
+      json: { code: "CONNECTOR_CREDENTIAL_REJECTED", message: "raw" },
+    });
+  });
+  await page.goto(`/connections/${DEMO_ID}`);
+  await page.getByRole("button", { name: "연결하기" }).click();
+  const alert = page.getByRole("main").getByRole("alert");
+  await expect(alert).toContainText("입력한 값을 확인하지 못했어요.");
+  await expect(
+    alert.getByRole("link", { name: "내 브라우저에서 로그인" }),
+  ).toHaveAttribute("href", LOGIN_HREF);
+});
+
+test("연결 확인이 값을 확인하지 못해 거절되면 로그인 링크를 보이고 다른 실패에는 보이지 않는다", async ({
+  page,
+}) => {
+  let code = "CONNECTOR_CREDENTIAL_REJECTED";
+  await page.route("**/api/connectors", (route) =>
+    route.fulfill({ json: [browserConnector] }),
+  );
+  await page.route(`**/api/connections/${DEMO_ID}`, (route) =>
+    route.fulfill({ json: pending }),
+  );
+  await page.route(`**/api/connections/${DEMO_ID}/check`, (route) =>
+    route.fulfill({ status: 400, json: { code, message: "raw" } }),
+  );
+  await page.goto(`/connections/${DEMO_ID}`);
+  const alert = page.getByRole("main").getByRole("alert");
+  await page.getByRole("button", { name: "연결 다시 확인" }).click();
+  await expect(
+    alert.getByRole("link", { name: "내 브라우저에서 로그인" }),
+  ).toHaveAttribute("href", LOGIN_HREF);
+
+  code = "CONNECTOR_UNAVAILABLE";
+  await page.getByRole("button", { name: "연결 다시 확인" }).click();
+  await expect(alert).toHaveText(
+    "서비스에 닿지 못했어요. 잠시 뒤 다시 해 주세요.",
+  );
+  await expect(alert.getByRole("link")).toHaveCount(0);
 });

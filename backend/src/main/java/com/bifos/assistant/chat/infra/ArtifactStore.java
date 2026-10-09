@@ -3,6 +3,7 @@ package com.bifos.assistant.chat.infra;
 import static com.bifos.assistant.chat.infra.ArtifactPathPolicy.validation;
 
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.nio.file.DirectoryStream;
 import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
@@ -232,6 +233,43 @@ public class ArtifactStore {
             }
         }
         return removed;
+    }
+
+    /**
+     * 지운 대화의 결과물 폴더를 통째로 지운다(ADR-20261008 / conversation-purge).
+     *
+     * <p>보관 기간과 상관없이 모든 파일과 하위 폴더를 지운다. 심볼릭 링크는 따라가지 않고 링크만 지운다. 폴더가 없으면
+     * 그대로 끝낸다. 하나라도 지우지 못하면 예외를 던져 부르는 쪽이 나중에 다시 시도하게 한다.
+     */
+    public void deleteFolder(Long conversationId) {
+        Path folder = paths.folderOf(conversationId);
+        ReentrantLock lock = lockOf(conversationId);
+        lock.lock();
+        try {
+            if (!Files.exists(folder, LinkOption.NOFOLLOW_LINKS)) {
+                return;
+            }
+            Files.walkFileTree(folder, new SimpleFileVisitor<>() {
+                @Override
+                public FileVisitResult visitFile(Path file, BasicFileAttributes attributes) throws IOException {
+                    Files.deleteIfExists(file);
+                    return FileVisitResult.CONTINUE;
+                }
+
+                @Override
+                public FileVisitResult postVisitDirectory(Path directory, IOException ex) throws IOException {
+                    if (ex != null) {
+                        throw ex;
+                    }
+                    Files.deleteIfExists(directory);
+                    return FileVisitResult.CONTINUE;
+                }
+            });
+        } catch (IOException ex) {
+            throw new UncheckedIOException("could not delete the artifact folder " + conversationId, ex);
+        } finally {
+            lock.unlock();
+        }
     }
 
     /**

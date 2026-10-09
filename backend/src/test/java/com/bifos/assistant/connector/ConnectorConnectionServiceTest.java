@@ -10,6 +10,7 @@ import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.nullable;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.inOrder;
@@ -23,6 +24,7 @@ import com.bifos.assistant.agent.domain.type.AgentVisibility;
 import com.bifos.assistant.agent.domain.type.CostMode;
 import com.bifos.assistant.agent.domain.type.CredentialScope;
 import com.bifos.assistant.agent.infra.AgentRepository;
+import com.bifos.assistant.browser.application.BrowserGatewayTokens;
 import com.bifos.assistant.connector.application.ConnectorActionService;
 import com.bifos.assistant.connector.application.ConnectorBindingService;
 import com.bifos.assistant.connector.application.ConnectorCallLimiter;
@@ -186,18 +188,21 @@ class ConnectorConnectionServiceTest {
     @Autowired
     HermesToolsetClient toolsets;
 
+    @Autowired
+    BrowserGatewayTokens tokens;
+
     @BeforeEach
     void setUp() {
         when(toolsets.readEnabled(anyString(), anyString())).thenReturn(List.of());
         when(connector.readCatalog()).thenReturn(List.of(DEMO_MANIFEST, PIN_MANIFEST));
-        when(connector.call(anyString(), anyString(), anyMap()))
+        when(connector.call(anyString(), anyString(), anyMap(), nullable(String.class)))
                 .thenReturn(CallResult.success(MAPPER.readTree(
                         "{\"scopes\":[{\"id\":\"a\",\"name\":\"범위 A\"},{\"id\":\"b\",\"name\":\"범위 B\"}]}")));
-        when(connector.callWithVault(anyString(), anyString(), anyString()))
+        when(connector.callWithVault(anyString(), anyString(), anyString(), nullable(String.class)))
                 .thenReturn(CallResult.success(MAPPER.readTree("{\"scopes\":[]}")));
         when(connector.putConnector(anyString(), anyString(), anyBoolean(), anyString()))
                 .thenReturn(new InstallResult(false, false));
-        when(connector.bindConnector(anyString(), anyString(), anyString(), anyString()))
+        when(connector.bindConnector(anyString(), anyString(), anyString(), anyString(), nullable(String.class)))
                 .thenReturn(new InstallResult(false, false));
         when(connector.unbindConnector(anyString(), anyString())).thenReturn(new InstallResult(false, false));
         when(connector.readConnector(anyString(), anyString())).thenReturn(state(HermesConnectorClient.MODE_BIND));
@@ -220,7 +225,7 @@ class ConnectorConnectionServiceTest {
         ConnectionSnapshot registered = service.register(user, DEMO, VALUES);
 
         InOrder order = inOrder(connector, users);
-        order.verify(connector).call(DEMO, "list_scopes", VALUES);
+        order.verify(connector).call(DEMO, "list_scopes", VALUES, null);
         order.verify(users).findByIdForUpdate(user.id());
         order.verify(connector).putVault(stored(user).vault(), DEMO, VALUES);
         assertThat(registered.status()).isEqualTo(ConnectionStatus.READY);
@@ -274,7 +279,7 @@ class ConnectorConnectionServiceTest {
         ConnectorBinding bound = readyBinding(ordinary, connection, "demo");
         Agent legacy = agent(user, true);
         ConnectorBinding legacyBound = readyBinding(legacy, connection, null);
-        when(connector.bindConnector(anyString(), anyString(), anyString(), anyString()))
+        when(connector.bindConnector(anyString(), anyString(), anyString(), anyString(), nullable(String.class)))
                 .thenReturn(new InstallResult(true, false));
         when(connector.putConnector(anyString(), anyString(), anyBoolean(), anyString()))
                 .thenReturn(new InstallResult(true, false));
@@ -283,7 +288,8 @@ class ConnectorConnectionServiceTest {
         ConnectionSnapshot registered = service.register(user, DEMO, replaced);
 
         verify(connector).putVault(connection.vault(), DEMO, replaced);
-        verify(connector).bindConnector(ordinary.hermesProfile(), DEMO, connection.vault(), ordinary.sandboxOwner());
+        verify(connector)
+                .bindConnector(ordinary.hermesProfile(), DEMO, connection.vault(), ordinary.sandboxOwner(), null);
         // 옛 바인딩은 받은 값을 지금처럼 그 profile 의 env 에 쓴다.
         verify(connector).putEnv(legacy.hermesProfile(), "DEMO_TOKEN", OTHER_TOKEN);
         verify(connector).deleteEnv(legacy.hermesProfile(), "DEMO_SCOPE");
@@ -314,8 +320,10 @@ class ConnectorConnectionServiceTest {
         ConnectorBinding fineBinding = readyBinding(fine, connection, "demo");
         doThrow(new IllegalStateException())
                 .when(connector)
-                .bindConnector(eq(broken.hermesProfile()), anyString(), anyString(), anyString());
-        when(connector.bindConnector(eq(fine.hermesProfile()), anyString(), anyString(), anyString()))
+                .bindConnector(
+                        eq(broken.hermesProfile()), anyString(), anyString(), anyString(), nullable(String.class));
+        when(connector.bindConnector(
+                        eq(fine.hermesProfile()), anyString(), anyString(), anyString(), nullable(String.class)))
                 .thenReturn(new InstallResult(true, false));
 
         ConnectionSnapshot registered = service.register(user, DEMO, Map.of("token", OTHER_TOKEN));
@@ -361,7 +369,9 @@ class ConnectorConnectionServiceTest {
         assertVerifyFailure(user, values, ConnectorCallError.FORBIDDEN, ErrorCode.CONNECTOR_FORBIDDEN);
         assertVerifyFailure(user, values, ConnectorCallError.INVALID_INPUT, ErrorCode.VALIDATION_FAILED);
         assertVerifyFailure(user, values, ConnectorCallError.UNAVAILABLE, ErrorCode.CONNECTOR_UNAVAILABLE);
-        doThrow(new IllegalStateException()).when(connector).call(anyString(), anyString(), anyMap());
+        doThrow(new IllegalStateException())
+                .when(connector)
+                .call(anyString(), anyString(), anyMap(), nullable(String.class));
         assertCode(() -> service.register(user, DEMO, values), ErrorCode.CONNECTOR_UNAVAILABLE);
 
         assertThat(connections.count()).isZero();
@@ -384,7 +394,7 @@ class ConnectorConnectionServiceTest {
                 () -> service.register(user, DEMO, Map.of("token", TOKEN, "scope", "a\nOTHER=b")),
                 ErrorCode.VALIDATION_FAILED);
 
-        verify(connector, never()).call(anyString(), anyString(), anyMap());
+        verify(connector, never()).call(anyString(), anyString(), anyMap(), nullable(String.class));
         assertThat(connections.count()).isZero();
     }
 
@@ -463,7 +473,7 @@ class ConnectorConnectionServiceTest {
         CurrentUser user = user(UserRole.MEMBER, 1L);
 
         assertCode(() -> service.register(user, PIN, Map.of("pin", "1".repeat(4097))), ErrorCode.VALIDATION_FAILED);
-        verify(connector, never()).call(anyString(), anyString(), anyMap());
+        verify(connector, never()).call(anyString(), anyString(), anyMap(), nullable(String.class));
         assertThat(connections.count()).isZero();
 
         ConnectionSnapshot registered = service.register(user, PIN, Map.of("pin", "1".repeat(4096)));
@@ -489,7 +499,7 @@ class ConnectorConnectionServiceTest {
         values.put("k8", "v".repeat(lastLength + 1));
 
         assertCode(() -> service.register(user, "demo-wide", values), ErrorCode.VALIDATION_FAILED);
-        verify(connector, never()).call(anyString(), anyString(), anyMap());
+        verify(connector, never()).call(anyString(), anyString(), anyMap(), nullable(String.class));
         verify(connector, never()).putVault(anyString(), anyString(), anyMap());
         assertThat(connections.count()).isZero();
 
@@ -609,7 +619,7 @@ class ConnectorConnectionServiceTest {
         service.register(user, DEMO, VALUES);
         List<Boolean> transactionActive = new ArrayList<>();
         Map<String, String> replaced = Map.of("token", OTHER_TOKEN);
-        when(connector.call(DEMO, "list_scopes", replaced)).thenAnswer(invocation -> {
+        when(connector.call(DEMO, "list_scopes", replaced, null)).thenAnswer(invocation -> {
             transactionActive.add(TransactionSynchronizationManager.isActualTransactionActive());
             // 확인이 도는 동안 같은 사용자의 해제가 먼저 끝난다.
             assertThat(service.disconnect(user, DEMO).status()).isEqualTo(ConnectionStatus.DISCONNECTED);
@@ -637,7 +647,7 @@ class ConnectorConnectionServiceTest {
         // 기본 한도는 같은 사용자의 겹친 등록을 거절한다. 동시 한도를 올린 설정에서도 행이 하나임을 본다.
         ConnectorConnectionService relaxed = serviceLimitedTo(2, 1000);
         Map<String, String> outer = Map.of("token", OTHER_TOKEN);
-        when(connector.call(DEMO, "list_scopes", outer)).thenAnswer(invocation -> {
+        when(connector.call(DEMO, "list_scopes", outer, null)).thenAnswer(invocation -> {
             relaxed.register(user, DEMO, VALUES);
             return CallResult.success(MAPPER.readTree("{\"scopes\":[]}"));
         });
@@ -667,7 +677,7 @@ class ConnectorConnectionServiceTest {
         List<ConnectorOption> options = service.options(user, DEMO, "scope", VALUES);
 
         assertThat(options).containsExactly(new ConnectorOption("a", "범위 A"), new ConnectorOption("b", "범위 B"));
-        verify(connector).call(DEMO, "list_scopes", VALUES);
+        verify(connector).call(DEMO, "list_scopes", VALUES, null);
         assertThat(connections.count()).isZero();
     }
 
@@ -677,13 +687,13 @@ class ConnectorConnectionServiceTest {
         CurrentUser user = user(UserRole.MEMBER, 1L);
 
         assertCode(() -> service.options(user, DEMO, "token", VALUES), ErrorCode.VALIDATION_FAILED);
-        verify(connector, never()).call(anyString(), anyString(), anyMap());
+        verify(connector, never()).call(anyString(), anyString(), anyMap(), nullable(String.class));
 
-        when(connector.call(anyString(), anyString(), anyMap()))
+        when(connector.call(anyString(), anyString(), anyMap(), nullable(String.class)))
                 .thenReturn(CallResult.failure(ConnectorCallError.CREDENTIAL_REJECTED));
         assertCode(() -> service.options(user, DEMO, "scope", VALUES), ErrorCode.CONNECTOR_CREDENTIAL_REJECTED);
 
-        when(connector.call(anyString(), anyString(), anyMap()))
+        when(connector.call(anyString(), anyString(), anyMap(), nullable(String.class)))
                 .thenReturn(CallResult.success(MAPPER.readTree("{\"other\":[]}")));
         assertCode(() -> service.options(user, DEMO, "scope", VALUES), ErrorCode.CONNECTOR_UNAVAILABLE);
     }
@@ -767,15 +777,16 @@ class ConnectorConnectionServiceTest {
         CurrentUser user = user(UserRole.MEMBER, 1L);
         service.register(user, DEMO, VALUES);
         List<Boolean> transactionActive = new ArrayList<>();
-        when(connector.callWithVault(anyString(), anyString(), anyString())).thenAnswer(invocation -> {
-            transactionActive.add(TransactionSynchronizationManager.isActualTransactionActive());
-            return CallResult.success(MAPPER.readTree("{\"scopes\":[]}"));
-        });
+        when(connector.callWithVault(anyString(), anyString(), anyString(), nullable(String.class)))
+                .thenAnswer(invocation -> {
+                    transactionActive.add(TransactionSynchronizationManager.isActualTransactionActive());
+                    return CallResult.success(MAPPER.readTree("{\"scopes\":[]}"));
+                });
 
         ConnectionSnapshot checked = service.check(user, DEMO);
 
         assertThat(transactionActive).containsExactly(false);
-        verify(connector).callWithVault(DEMO, "list_scopes", stored(user).vault());
+        verify(connector).callWithVault(DEMO, "list_scopes", stored(user).vault(), null);
         assertThat(checked.status()).isEqualTo(ConnectionStatus.READY);
     }
 
@@ -785,16 +796,19 @@ class ConnectorConnectionServiceTest {
         CurrentUser user = user(UserRole.MEMBER, 1L);
         service.register(user, DEMO, VALUES);
         readyBinding(agent(user, false), stored(user), "demo");
-        when(connector.callWithVault(anyString(), anyString(), anyString()))
+        when(connector.callWithVault(anyString(), anyString(), anyString(), nullable(String.class)))
                 .thenReturn(CallResult.failure(ConnectorCallError.CREDENTIAL_REJECTED));
 
         assertCode(() -> service.check(user, DEMO), ErrorCode.CONNECTOR_CREDENTIAL_REJECTED);
 
         assertThat(stored(user).status()).isEqualTo(ConnectionStatus.PENDING);
         assertThat(bindings.findAll()).extracting(ConnectorBinding::status).containsExactly(BindingStatus.READY);
-        verify(connector, never()).bindConnector(anyString(), anyString(), anyString(), anyString());
+        verify(connector, never())
+                .bindConnector(anyString(), anyString(), anyString(), anyString(), nullable(String.class));
 
-        doThrow(new IllegalStateException()).when(connector).callWithVault(anyString(), anyString(), anyString());
+        doThrow(new IllegalStateException())
+                .when(connector)
+                .callWithVault(anyString(), anyString(), anyString(), nullable(String.class));
         assertCode(() -> service.check(user, DEMO), ErrorCode.CONNECTOR_UNAVAILABLE);
     }
 
@@ -811,7 +825,7 @@ class ConnectorConnectionServiceTest {
 
         InOrder order = inOrder(connector);
         order.verify(connector).importVault(connection.vault(), DEMO, legacy.hermesProfile());
-        order.verify(connector).callWithVault(DEMO, "list_scopes", connection.vault());
+        order.verify(connector).callWithVault(DEMO, "list_scopes", connection.vault(), null);
         order.verify(connector).putConnector(legacy.hermesProfile(), DEMO, true, legacy.sandboxOwner());
         assertThat(checked.status()).isEqualTo(ConnectionStatus.READY);
         assertThat(stored(user).vaultStored()).isTrue();
@@ -819,7 +833,8 @@ class ConnectorConnectionServiceTest {
         assertThat(resynced.mcpServer()).isEqualTo("demo");
         assertThat(resynced.status()).isEqualTo(BindingStatus.READY);
         assertThat(agentEnabled(legacy)).isTrue();
-        verify(connector, never()).bindConnector(anyString(), anyString(), anyString(), anyString());
+        verify(connector, never())
+                .bindConnector(anyString(), anyString(), anyString(), anyString(), nullable(String.class));
     }
 
     @Test
@@ -834,7 +849,7 @@ class ConnectorConnectionServiceTest {
 
         ConnectionSnapshot checked = service.check(user, DEMO);
 
-        verify(connector, never()).callWithVault(anyString(), anyString(), anyString());
+        verify(connector, never()).callWithVault(anyString(), anyString(), anyString(), nullable(String.class));
         assertThat(checked.status()).isEqualTo(ConnectionStatus.READY);
         assertThat(stored(user).vaultStored()).isFalse();
     }
@@ -851,7 +866,7 @@ class ConnectorConnectionServiceTest {
                 .extracting(BoundAgentSummary::status)
                 .containsExactly(BindingStatus.READY);
         verify(connector)
-                .bindConnector(agent.hermesProfile(), DEMO, stored(user).vault(), agent.sandboxOwner());
+                .bindConnector(agent.hermesProfile(), DEMO, stored(user).vault(), agent.sandboxOwner(), null);
         verify(connector).probe(agent.hermesProfile(), "demo");
 
         when(connector.readConnector(anyString(), anyString())).thenReturn(state(HermesConnectorClient.MODE_ISOLATED));
@@ -881,7 +896,8 @@ class ConnectorConnectionServiceTest {
 
         ConnectionSnapshot checked = service.check(user, DEMO);
 
-        verify(connector, never()).bindConnector(anyString(), anyString(), anyString(), anyString());
+        verify(connector, never())
+                .bindConnector(anyString(), anyString(), anyString(), anyString(), nullable(String.class));
         assertThat(checked.bindings())
                 .extracting(BoundAgentSummary::status, BoundAgentSummary::restartRequired)
                 .containsExactly(tuple(BindingStatus.PENDING, true));
@@ -902,7 +918,8 @@ class ConnectorConnectionServiceTest {
         assertThat(checked.mcpServer()).isEqualTo("demo");
         assertThat(checked.status()).isEqualTo(BindingStatus.PENDING);
         assertThat(checked.restartRequired()).isTrue();
-        verify(connector, never()).bindConnector(anyString(), anyString(), anyString(), anyString());
+        verify(connector, never())
+                .bindConnector(anyString(), anyString(), anyString(), anyString(), nullable(String.class));
     }
 
     @Test
@@ -914,7 +931,7 @@ class ConnectorConnectionServiceTest {
         assertCode(() -> service.check(user, DEMO), ErrorCode.CONNECTOR_NOT_CONNECTED);
 
         verify(connector, never()).importVault(anyString(), anyString(), anyString());
-        verify(connector, never()).callWithVault(anyString(), anyString(), anyString());
+        verify(connector, never()).callWithVault(anyString(), anyString(), anyString(), nullable(String.class));
         assertThat(stored(user).status()).isEqualTo(ConnectionStatus.PENDING);
         assertThat(stored(user).vaultStored()).isFalse();
 
@@ -933,8 +950,9 @@ class ConnectorConnectionServiceTest {
 
         ConnectionSnapshot checked = service.check(user, DEMO);
 
-        verify(connector, never()).callWithVault(anyString(), anyString(), anyString());
-        verify(connector, never()).bindConnector(anyString(), anyString(), anyString(), anyString());
+        verify(connector, never()).callWithVault(anyString(), anyString(), anyString(), nullable(String.class));
+        verify(connector, never())
+                .bindConnector(anyString(), anyString(), anyString(), anyString(), nullable(String.class));
         assertThat(checked.status()).isEqualTo(ConnectionStatus.PENDING);
         assertThat(stored(user).status()).isEqualTo(ConnectionStatus.PENDING);
         assertThat(checked.bindings()).extracting(BoundAgentSummary::status).containsExactly(BindingStatus.PENDING);
@@ -946,7 +964,7 @@ class ConnectorConnectionServiceTest {
         CurrentUser user = user(UserRole.MEMBER, 1L);
         service.register(user, DEMO, VALUES);
         ConnectorBinding binding = pendingBinding(agent(user, false), stored(user));
-        when(connector.bindConnector(anyString(), anyString(), anyString(), anyString()))
+        when(connector.bindConnector(anyString(), anyString(), anyString(), anyString(), nullable(String.class)))
                 .thenReturn(new InstallResult(true, false));
 
         ConnectionSnapshot checked = service.check(user, DEMO);
@@ -983,8 +1001,9 @@ class ConnectorConnectionServiceTest {
 
         ConnectionSnapshot checked = service.check(user, DEMO);
 
-        verify(connector, never()).callWithVault(anyString(), anyString(), anyString());
-        verify(connector, never()).bindConnector(anyString(), anyString(), anyString(), anyString());
+        verify(connector, never()).callWithVault(anyString(), anyString(), anyString(), nullable(String.class));
+        verify(connector, never())
+                .bindConnector(anyString(), anyString(), anyString(), anyString(), nullable(String.class));
         assertThat(checked.status()).isEqualTo(ConnectionStatus.PENDING);
         assertThat(checked.bindings()).extracting(BoundAgentSummary::status).containsExactly(BindingStatus.PENDING);
     }
@@ -1067,8 +1086,8 @@ class ConnectorConnectionServiceTest {
         assertCode(() -> limited.check(user, DEMO), ErrorCode.CONNECTOR_RATE_LIMITED);
 
         // 등록의 확인 한 번과 받아들인 선택지 조회 한 번이다.
-        verify(connector, times(2)).call(DEMO, "list_scopes", VALUES);
-        verify(connector, never()).callWithVault(anyString(), anyString(), anyString());
+        verify(connector, times(2)).call(DEMO, "list_scopes", VALUES, null);
+        verify(connector, never()).callWithVault(anyString(), anyString(), anyString(), nullable(String.class));
         // 직접 만든 서비스는 프록시를 거치지 않아 해제의 트랜잭션을 여기서 연다.
         ConnectionSnapshot disconnected =
                 new TransactionTemplate(transactionManager).execute(status -> limited.disconnect(user, DEMO));
@@ -1236,12 +1255,14 @@ class ConnectorConnectionServiceTest {
                         new ConnectorProperties(maxConcurrentCalls, callsPerMinute),
                         Clock.fixed(Instant.parse("2026-01-01T00:00:00Z"), ZoneOffset.UTC)),
                 approvals,
+                tokens,
                 Clock.systemUTC());
     }
 
     private void assertVerifyFailure(
             CurrentUser user, Map<String, String> values, ConnectorCallError error, ErrorCode expected) {
-        when(connector.call(anyString(), anyString(), anyMap())).thenReturn(CallResult.failure(error));
+        when(connector.call(anyString(), anyString(), anyMap(), nullable(String.class)))
+                .thenReturn(CallResult.failure(error));
         assertCode(() -> service.register(user, DEMO, values), expected);
     }
 

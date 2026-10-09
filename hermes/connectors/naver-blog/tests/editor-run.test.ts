@@ -54,7 +54,7 @@ async function setup() {
     photo_dir: photoDir,
   };
   const env = {
-    NAVER_BLOG_CDP_URL: cdp.url,
+    NAVER_BLOG_BROWSER_URL: cdp.url,
     NAVER_BLOG_ID: "example-blog",
     NAVER_BLOG_ATTACHMENT_DIR: photoDir,
   };

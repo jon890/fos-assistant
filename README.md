@@ -66,7 +66,8 @@ To get there, the goal is to let you connect general-purpose connectors into an 
 
 General-purpose connectors live in this repository under `hermes/connectors/` and are maintained here ([ADR-064](docs/adr/ADR-064-범용-커넥터는-이-저장소의-hermes-connectors-에-두고-저장소가-유지보수한다.md)).
 The first one is Gmail: it searches and reads your mail and filters without asking, and creates drafts, sends, replies, manages labels and changes filters only after you approve. It never moves mail to the trash or deletes it.
-The second is Naver Blog: it attaches to a Chrome you have signed in to and, after you approve, saves a post with your chat photos as a Naver Blog draft. It never publishes.
+The second is Naver Blog: it uses the Naver account you signed in to in "My browser" and, after you approve, saves a post with your chat photos as a Naver Blog draft. It never publishes.
+The third is Toss Securities: it reads your own holdings, quotes, buying power and order history. It never places orders, and one connection attaches to a single agent that has an execution space.
 A connector for a service that only one household or organization uses, such as the household account book attached today, stays in its own repository.
 Growing the set of general-purpose connectors is where the work is headed. It is not done yet.
 

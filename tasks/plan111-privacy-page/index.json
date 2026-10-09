@@ -1,0 +1,11 @@
+{
+  "name": "plan111-privacy-page",
+  "description": "친구에게 보여 줄 안내 화면 /privacy 를 로그인 없이 열리게 두고, 운영자가 볼 수 있는 것과 없는 것을 사실대로 적는다",
+  "status": "pending",
+  "created_at": "2026-10-08",
+  "total_phases": 1,
+  "current_phase": 1,
+  "phases": [
+    { "number": 1, "file": "phase-01.md", "execution_profile": "standard" }
+  ]
+}

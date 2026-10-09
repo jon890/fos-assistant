@@ -7,10 +7,16 @@ import { callControlPlane } from "@/lib/control-plane";
 import { CreateAgentDialog } from "@/components/agent/create-agent-dialog";
 import type { AgentView } from "@/lib/agent";
 
-export default async function AgentsPage() {
+export default async function AgentsPage({
+  searchParams,
+}: {
+  /** `new=1` 이면 「새 에이전트」 창을 열어 둔다. */
+  searchParams: Promise<{ new?: string | string[] }>;
+}) {
   const session = await auth();
   if (!session?.user?.email) redirect("/signin");
 
+  const { new: openNew } = await searchParams;
   const result = await callControlPlane<AgentView[]>("/api/v1/agents");
   if (!result.ok) return <p className="text-sm">{result.message}</p>;
 
@@ -18,7 +24,7 @@ export default async function AgentsPage() {
     <div className="mx-auto w-full max-w-2xl">
       <div className="mb-6 flex items-center justify-between gap-3">
         <h1 className="text-xl font-semibold">에이전트</h1>
-        <CreateAgentDialog />
+        <CreateAgentDialog defaultOpen={openNew === "1"} />
       </div>
       {result.data.length === 0 ? (
         <EmptyState

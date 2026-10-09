@@ -57,6 +57,8 @@ export type ConnectorSummary = {
   available: boolean;
   /** 이 연결을 붙인 내 에이전트들이다. */
   bindings: BoundAgent[];
+  /** 「내 브라우저」 에서 먼저 로그인할 `https://` 주소다. 선언하지 않았으면 null 이다. 옛 Control Plane 은 내지 않는다. */
+  ownerBrowserLoginUrl: string | null;
 };
 
 export type ConnectorOption = { value: string; label: string };
@@ -102,7 +104,7 @@ export const CONNECTION_ERROR_MESSAGES: Record<string, string> = {
   CONNECTOR_RATE_LIMITED: "요청이 많아요. 잠시 뒤 다시 해 주세요.",
   CONNECTOR_ACTION_EXECUTING:
     "승인한 동작을 실행하는 중이에요. 끝난 뒤 다시 시도해 주세요.",
-  CONNECTOR_NOT_CONNECTED: "연결 화면에서 연결을 확인해 주세요.",
+  CONNECTOR_NOT_CONNECTED: "서비스 연결에서 연결을 확인해 주세요.",
   CONNECTOR_PROFILE_NOT_READY:
     "이 에이전트는 아직 연결을 받을 준비가 되지 않았어요. 관리자에게 알려 주세요.",
   CONNECTOR_BIND_CONFLICT: "이 에이전트의 다른 연결이나 스킬과 이름이 겹쳐요.",
@@ -129,8 +131,18 @@ export function connectionErrorMessage(code: string): string {
     : FALLBACK_MESSAGE;
 }
 
-export type ConnectionCallResult<T> =
-  { ok: true; data: T } | { ok: false; code: string; message: string };
+export type ConnectionFailure = { ok: false; code: string; message: string };
+
+export type ConnectionCallResult<T> = { ok: true; data: T } | ConnectionFailure;
+
+/** 「내 브라우저」 에서 그 주소를 여는 화면 주소다. `https://` 주소일 때만 주고 아니면 null 이다. */
+export function browserLoginHref(
+  url: string | null | undefined,
+): string | null {
+  return url?.startsWith("https://")
+    ? `/browser?url=${encodeURIComponent(url)}`
+    : null;
+}
 
 export async function connectionCall<T>(
   path: string,

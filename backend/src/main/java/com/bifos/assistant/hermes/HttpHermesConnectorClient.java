@@ -6,10 +6,10 @@ import com.bifos.assistant.hermes.dto.ConnectorErrorDetail;
 import com.bifos.assistant.hermes.dto.ConnectorField;
 import com.bifos.assistant.hermes.dto.ConnectorFieldOptions;
 import com.bifos.assistant.hermes.dto.ConnectorManifest;
-import com.bifos.assistant.hermes.dto.ConnectorTool;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -41,6 +41,8 @@ public class HttpHermesConnectorClient implements HermesConnectorClient {
     private static final String RESTART_REQUIRED = "restart_required";
     private static final String VAULT = "vault";
     private static final String CONNECTOR = "connector";
+    private static final String TOOL = "tool";
+    private static final String OWNER_BROWSER = "owner_browser";
     private static final String VAULT_PATH = "/api/connector-vault";
     private static final int HTTP_CONFLICT = 409;
     private static final int HTTP_UNAUTHORIZED = 401;
@@ -91,27 +93,34 @@ public class HttpHermesConnectorClient implements HermesConnectorClient {
     }
 
     @Override
-    public CallResult call(String connectorId, String tool, Map<String, String> values) {
+    public CallResult call(String connectorId, String tool, Map<String, String> values, String ownerBrowser) {
+        return postCall(connectorId, withOwnerBrowser(Map.of(TOOL, tool, "values", values), ownerBrowser));
+    }
+
+    @Override
+    public CallResult callWithVault(String connectorId, String tool, String vault, String ownerBrowser) {
+        return postCall(connectorId, withOwnerBrowser(Map.of(TOOL, tool, VAULT, vault), ownerBrowser));
+    }
+
+    private CallResult postCall(String connectorId, Map<String, Object> request) {
         JsonNode body = request(() -> client.post()
                 .uri(baseUrl + "/api/connectors/{id}/call", connectorId)
                 .header(AUTHORIZATION, bearer())
                 .contentType(MediaType.APPLICATION_JSON)
-                .body(Map.of("tool", tool, "values", values))
+                .body(request)
                 .retrieve()
                 .body(JsonNode.class));
         return callResult(body);
     }
 
-    @Override
-    public CallResult callWithVault(String connectorId, String tool, String vault) {
-        JsonNode body = request(() -> client.post()
-                .uri(baseUrl + "/api/connectors/{id}/call", connectorId)
-                .header(AUTHORIZATION, bearer())
-                .contentType(MediaType.APPLICATION_JSON)
-                .body(Map.of("tool", tool, VAULT, vault))
-                .retrieve()
-                .body(JsonNode.class));
-        return callResult(body);
+    /** 중계 주소가 null 이면 키를 싣지 않는다. 사용자 브라우저를 쓰지 않는 커넥터의 요청 본문은 그대로다. */
+    private static Map<String, Object> withOwnerBrowser(Map<String, Object> request, String ownerBrowser) {
+        if (ownerBrowser == null) {
+            return request;
+        }
+        Map<String, Object> body = new LinkedHashMap<>(request);
+        body.put(OWNER_BROWSER, ownerBrowser);
+        return body;
     }
 
     private static CallResult callResult(JsonNode body) {
@@ -247,7 +256,8 @@ public class HttpHermesConnectorClient implements HermesConnectorClient {
     }
 
     @Override
-    public InstallResult bindConnector(String profile, String connectorId, String vault, String sandboxOwner) {
+    public InstallResult bindConnector(
+            String profile, String connectorId, String vault, String sandboxOwner, String ownerBrowser) {
         // 대시보드는 주인의 첨부 디렉터리를 만들지 않고 링크 없이 있는지만 본다(ADR-091, ADR-20261007 connector-owner-attachments).
         // 만들기는 최선 노력이다. 첨부를 선언하지 않은 커넥터의 붙이기가 첨부 루트 문제로 멈추지 않게 하고, 선언한 커넥터는
         // 대시보드가 디렉터리를 확인하지 못해 409 로 거절하므로 경계는 그대로다.
@@ -257,17 +267,19 @@ public class HttpHermesConnectorClient implements HermesConnectorClient {
             log.warn("커넥터 주인의 첨부 디렉터리를 만들지 못해 확인을 대시보드에 맡긴다 profile={} connector={}", profile, connectorId);
         }
         return refusable(
-                Map.of(
-                        PROFILE,
-                        profile,
-                        PLUGIN,
-                        connectorId,
-                        ENABLED,
-                        true,
-                        "bind",
-                        Map.of(VAULT, vault),
-                        "sandbox_owner",
-                        sandboxOwner),
+                withOwnerBrowser(
+                        Map.of(
+                                PROFILE,
+                                profile,
+                                PLUGIN,
+                                connectorId,
+                                ENABLED,
+                                true,
+                                "bind",
+                                Map.of(VAULT, vault),
+                                "sandbox_owner",
+                                sandboxOwner),
+                        ownerBrowser),
                 profile,
                 connectorId,
                 true);
@@ -430,7 +442,7 @@ public class HttpHermesConnectorClient implements HermesConnectorClient {
         JsonNode schema = item.get("schema");
         JsonNode tools = item.get("tools");
         // 판이나 도구 선언의 모양이 틀리면 둘을 함께 버린다. 도구만 비우면 도구를 선언하지 않는 판으로 읽혀 통과한다.
-        boolean readable = readableSchema(schema) && readableTools(tools);
+        boolean readable = readableSchema(schema) && ConnectorCatalogTools.readable(tools);
         return new ConnectorManifest(
                 requiredText(item, "id"),
                 requiredText(item, "title"),
@@ -441,82 +453,27 @@ public class HttpHermesConnectorClient implements HermesConnectorClient {
                 names(item.get("toolsets")),
                 optionalBoolean(item, "attachments", false),
                 readable ? schema(schema) : SCHEMA_UNREADABLE,
-                readable ? tools(tools) : List.of(),
+                readable ? ConnectorCatalogTools.read(tools) : List.of(),
                 names(item.get("skills")),
                 ConnectorAppearances.read(item),
-                optionalBoolean(item, "single_binding", false));
+                optionalBoolean(item, "single_binding", false),
+                optionalBoolean(item, "owner_browser", false),
+                loginUrl(item));
+    }
+
+    /** 로그인 안내 주소다. 문자열이고 {@code https://} 로 시작할 때만 읽고, 아니면 null 이다. 카탈로그 전체를 버리지 않는다. */
+    private static String loginUrl(JsonNode item) {
+        String value = text(item, "owner_browser_login_url");
+        return value != null && value.startsWith("https://") ? value : null;
     }
 
     private static boolean readableSchema(JsonNode declared) {
         return declared == null || declared.isNull() || declared.isInt();
     }
 
-    private static boolean readableTools(JsonNode declared) {
-        return declared == null || declared.isNull() || declared.isObject();
-    }
-
     /** 옛 대시보드 plugin 은 이 칸을 내지 않는다. 없으면 도구를 선언하지 않는 판이다. */
     private static int schema(JsonNode declared) {
         return declared == null || declared.isNull() ? SCHEMA_WITHOUT_TOOLS : declared.asInt();
-    }
-
-    /**
-     * 도구 이름을 키로 하는 객체를 읽는다. 옛 대시보드 plugin 은 이 칸을 내지 않고, 없으면 빈 목록이다.
-     *
-     * <p>위험도와 승인 방식은 글자 그대로 담고 없으면 null 로 둔다. 뜻을 읽고 거르는 것은 부르는 쪽이 한다. 여기서
-     * 거절하면 선언이 틀린 커넥터 하나 때문에 카탈로그 전체를 읽지 못한다. 객체가 아닌 값은 부르는 쪽이 먼저 거른다.
-     */
-    private static List<ConnectorTool> tools(JsonNode declared) {
-        if (declared == null || declared.isNull()) {
-            return List.of();
-        }
-        List<ConnectorTool> tools = new ArrayList<>();
-        for (Map.Entry<String, JsonNode> entry : declared.properties()) {
-            JsonNode policy = entry.getValue();
-            tools.add(new ConnectorTool(
-                    entry.getKey(),
-                    text(policy, "risk"),
-                    text(policy, "approval"),
-                    text(policy, "title"),
-                    grant(policy),
-                    identifiers(policy)));
-        }
-        return List.copyOf(tools);
-    }
-
-    /**
-     * 상시 허락을 줄 수 있는지의 선언이다(ADR-065). 칸이 없으면 null 이고 받는 쪽이 승인 방식으로 정한다.
-     *
-     * <p>boolean 이 아닌 값은 거절하지 않고 거짓으로 읽는다. 형식은 대시보드 plugin 이 검사하고, 여기서는 읽을 수 없는
-     * 선언이 상시 허락을 여는 쪽으로 읽히지 않게만 한다.
-     */
-    private static Boolean grant(JsonNode policy) {
-        JsonNode value = policy == null ? null : policy.get("grant");
-        if (value == null) {
-            return null;
-        }
-        return value.isBoolean() && value.asBoolean();
-    }
-
-    /**
-     * 식별자 인자의 선언이다(ADR-089). 칸이 없으면 빈 목록이다.
-     *
-     * <p>문자열 배열이 아니면 거절하지 않고 빈 목록으로 읽는다. 형식은 대시보드 plugin 이 검사하고, 여기서는 읽을 수
-     * 없는 선언이 가림을 푸는 쪽으로 읽히지 않게만 한다.
-     */
-    private static List<String> identifiers(JsonNode policy) {
-        JsonNode value = policy == null ? null : policy.get("identifiers");
-        if (value == null || !value.isArray()) {
-            return List.of();
-        }
-        List<String> identifiers = new ArrayList<>();
-        for (JsonNode name : value) {
-            if (!name.isString()) {
-                return List.of();
-            }
-            identifiers.add(name.asString());
-        }
-        return List.copyOf(identifiers);
     }
 
     /** 이름 목록 칸({@code toolsets}, {@code skills})을 읽는다. 옛 대시보드 plugin 은 이 칸을 내지 않고, 없으면 빈 목록이다. */

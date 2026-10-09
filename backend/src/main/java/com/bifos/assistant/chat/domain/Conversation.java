@@ -138,6 +138,11 @@ public class Conversation {
     @Getter
     private Instant deletedAt;
 
+    /** 지운 대화의 본문을 실제로 지운 시각이다. 비어 있으면 아직 지우지 않았다. */
+    @Column(name = "purged_at")
+    @Getter
+    private Instant purgedAt;
+
     /**
      * 목록에서만 뺀 시각이다. 비면 목록에 보인다. 예약 작업이 「보고할 것 없음」 으로 끝낸 {@code NEW_PER_RUN} 대화에 적는다.
      *

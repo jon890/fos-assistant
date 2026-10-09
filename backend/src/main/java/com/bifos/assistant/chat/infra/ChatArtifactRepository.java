@@ -46,4 +46,9 @@ public interface ChatArtifactRepository extends JpaRepository<ChatArtifact, Long
 
     /** 지운 표시가 없고 {@code createdBefore} 보다 앞서 만든 행이다. 파일이 없는데 행이 살아 있는 것을 찾을 때 쓴다. */
     List<ChatArtifact> findByDeletedAtIsNullAndCreatedAtBefore(Instant createdBefore);
+
+    /** 그 대화의 결과물 행을 모두 지운다. 파일은 부르는 쪽이 먼저 지운다. 트랜잭션은 {@code ConversationPurgeWriter} 가 연다. */
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("delete from ChatArtifact a where a.conversationId = :conversationId")
+    int deleteAllOf(@Param("conversationId") Long conversationId);
 }

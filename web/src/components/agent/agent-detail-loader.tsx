@@ -163,6 +163,11 @@ export async function loadAgentDetail(
     adminAgent !== undefined ||
     (connectorManaged && listed?.ownedByMe === true);
   const listHref = admin ? "/admin/agents" : "/agents";
+  // 일반 화면에서 내가 쓸 수 있는 목록에 든 에이전트만 대화를 연다. 예전 방식의 연결 에이전트는 쓰던 에이전트로 옮기는 중이라 두지 않는다.
+  const chatHref =
+    !admin && listed !== undefined && !connectorManaged
+      ? `/?agent=${code}`
+      : null;
 
   if (!personaResult.ok) {
     if (personaResult.code === "AGENT_NOT_FOUND" && adminAgent) {
@@ -216,6 +221,7 @@ export async function loadAgentDetail(
       adminError={adminError}
       connectorManaged={connectorManaged}
       listHref={listHref}
+      chatHref={chatHref}
     />
   );
 }

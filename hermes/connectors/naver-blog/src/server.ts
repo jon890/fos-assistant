@@ -63,11 +63,14 @@ export type ServerDeps = {
   workerEntry: string;
   /** 작업 프로세스가 시작을 알리기를 기다리는 시간. */
   startWaitMs: number;
+  /** `save_draft` 가 작업을 띄우기 전에 브라우저와 로그인을 확인하는 함수. */
+  checkSession: typeof sessionStatus;
 };
 
 const DEFAULT_SERVER_DEPS: ServerDeps = {
   workerEntry: process.argv[1] ?? "",
   startWaitMs: 5_000,
+  checkSession: sessionStatus,
 };
 
 /**
@@ -75,7 +78,7 @@ const DEFAULT_SERVER_DEPS: ServerDeps = {
  * 작업 프로세스가 사진을 읽을 때도 같은 첨부 디렉터리로 다시 검사하도록 그 env 를 함께 넘긴다.
  */
 function workerEnvironment(env: Env) {
-  const keys = ["PATH", "HOME", "NAVER_BLOG_CDP_URL", "NAVER_BLOG_ID", ATTACHMENT_DIR_ENV];
+  const keys = ["PATH", "HOME", "NAVER_BLOG_BROWSER_URL", "NAVER_BLOG_ID", ATTACHMENT_DIR_ENV];
   if (env.NAVER_BLOG_JOB_DIR) keys.push("NAVER_BLOG_JOB_DIR");
   const picked: Record<string, string> = {};
   for (const key of keys) {
@@ -94,11 +97,12 @@ async function saveDraft(env: Env, input: DraftInput, deps: ServerDeps) {
   if (validateDraft(input).length) throw new ToolError("NAVER_BLOG_INVALID_INPUT");
   if ((await checkPhotoFiles(input, env[ATTACHMENT_DIR_ENV])).length)
     throw new ToolError("NAVER_BLOG_PHOTO_INVALID");
-  const { cdpUrl } = readConnection(env);
-  await sessionStatus(env);
+  const { blogId } = readConnection(env);
+  // 중계가 꺼진 브라우저를 켜는 데 30초까지 걸려 확인 도구의 8초보다 길게 기다린다.
+  await deps.checkSession(env, { timeoutMs: 45_000 });
   const dir = await openJobDir(env);
   const jobId = randomUUID();
-  await acquireLock(dir, cdpUrl, jobId);
+  await acquireLock(dir, blogId, jobId);
   const path = stateFile(dir, jobId);
   try {
     await createState(dir, {
@@ -171,7 +175,7 @@ export function createServer(env: Env = process.env, overrides: Partial<ServerDe
     "session_status",
     {
       description:
-        "연결한 Chrome 에 붙는지와 네이버 로그인 쿠키가 있는지 확인합니다. 탭을 열지 않습니다.",
+        "내 브라우저에 붙는지와 네이버 로그인 쿠키가 있는지 확인합니다. 탭을 열지 않습니다.",
       inputSchema: {},
       annotations: { readOnlyHint: true },
     },

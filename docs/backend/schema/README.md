@@ -6,6 +6,7 @@ DB 색인(index)은 마이그레이션이 갖는다. 이 문서는 표마다 칸
 
 비밀값은 어느 표에도 넣지 않는다.
 AI credential 은 Hermes profile 의 `.env` 에, profile 의 API server key 는 홈서버의 파일에 있다.
+`user_data_key` 의 데이터 key 는 데이터베이스 밖의 KEK 로 감싼 채로만 둔다.
 
 | 파일 | 표 |
 | --- | --- |
@@ -20,6 +21,37 @@ AI credential 은 Hermes profile 의 `.env` 에, profile 의 API server key 는 
 | [`proactive.md`](proactive.md) | `proactive_check`, `proactive_check_finding`, `proactive_check_problem`, `proactive_value_evaluation`, `proactive_autonomy_decision`, `user_autonomy_preference`, `proactive_loop_setting`, `proactive_loop_run` |
 | [`task.md`](task.md) | `task`, `task_trigger`, `task_run` |
 | [`browser.md`](browser.md) | `user_browser` |
+| [`crypto.md`](crypto.md) | `user_data_key` |
+
+## 본문 칸과 운영 조회
+
+사용자가 쓴 글이나 모델이 만든 글을 담는 칸이다. 저장 시 암호화의 대상이고, 운영 조회 계정이 읽지 않는 칸이다.
+근거는 [ADR-20261008 / data-encryption](../../adr/ADR-20261008-data-encryption.md) 에 있다.
+
+| 표 | 칸 | 암호화 |
+| --- | --- | --- |
+| `chat_message` | `content` | 함. 옆 칸 `content_key_id`. 이 결정 앞의 줄은 평문이다 |
+| `chat_pending_message` | `content` | 아직 |
+| `conversation` | `title` | 아직 |
+| `agent_execution` | `output_text` | 아직 |
+| `execution_event` | `detail` | 아직 |
+| `connector_action` | `args_json`, `result_text` | 아직 |
+| `notification` | `title`, `body` | 아직 |
+| `follow_up` | `title` | 아직 |
+| `task` | `title`, `instruction` | 아직 |
+| `proactive_check` | `report_json` | 아직 |
+| `proactive_check_problem` | `problem`, `related_goal`, `action_text`, `expected_benefit`, `risk`, `change_since_last` | 아직 |
+| `proactive_value_evaluation` | `evidence_json` | 아직 |
+| `memory`, `memory_revision` | `title`, `content` | 민감 항목의 `content` 만 함([ADR-055](../../adr/ADR-055-민감-memory-본문은-저장할-때-암호화하고-key-는-환경-변수로-받는다.md)) |
+
+**운영 조회 계정의 계약.** 운영자가 데이터베이스를 살피는 계정에는 위 칸의 SELECT 를 주지 않는다.
+MySQL 의 칸 단위 권한(`GRANT SELECT (칸, ...) ON 표`)으로 위 칸을 뺀 칸만 준다.
+Control Plane 이 쓰는 애플리케이션 계정과 운영 조회 계정을 나눈다. 애플리케이션 계정의 비밀번호는 운영 조회에 쓰지 않는다.
+본문 칸을 읽어야 하는 장애 대응은 따로 둔 계정으로 하고, 그 계정을 쓴 기록을 데이터베이스 밖에 남긴다.
+계정과 권한, 기록을 만드는 일은 운영 저장소 `fos-home-infra` 가 맡는다.
+**이 표에 칸을 더하면 운영 조회 계정의 권한도 함께 고친다.** 새 표는 처음부터 본문 칸을 뺀 권한으로 준다.
+
+Control Plane 의 API 에는 관리자에게 남의 메시지 본문을 주는 경로가 없다. 다만 관리자의 실행 화면은 비밀값을 가린 도구 원문(`execution_event.detail`)을 보인다([ADR-038](../../adr/ADR-038-도구의-명령-원문은-관리자에게만-보내고-사용자에게는-사람-말로-보인다.md)).
 
 ## 마이그레이션 작성 규칙
 
@@ -132,21 +164,21 @@ H2 용 `*MigrationTest` 가 데이터베이스를 만드는 메서드를 열어 
 거짓이면 운영에서 만든 profile 이라 profile 은 남긴다.
 대화와 실행 기록과 스킬 호출 이력은 남는다.
 
-대화도 지우지 않는다. 사용자가 지우면 `conversation.deleted_at` 을 적고 목록에서 숨긴다.
-메시지와 실행 기록과 Hermes session 은 그대로 둔다.
-아직 보내지 않은 대기 메시지(`chat_pending_message`)는 함께 지운다. 지운 대화에는 보낼 곳이 없다.
-사용량 화면은 지운 대화의 실행도 센다. 돈은 이미 나갔다.
-실행 기록이 에이전트와 대화를 가리키고 있고, 기록은 남아야 한다.
+대화 줄은 지우지 않는다. 사용자가 지우면 `conversation.deleted_at` 을 적고 목록에서 숨긴다.
+아직 보내지 않은 대기 메시지(`chat_pending_message`)는 그때 함께 지운다. 지운 대화에는 보낼 곳이 없다.
+그 뒤 정리 작업이 메시지, 첨부와 결과물의 파일과 행, 실행 질문 줄, 실행의 답 본문과 사건의 `detail`, Hermes session 을 지우고 `purged_at` 을 적는다.
+실행 줄과 사건 줄은 본문 없이 남는다. 사용량 화면은 지운 대화의 실행도 센다. 돈은 이미 나갔다.
+무엇을 언제 지우고 무엇을 기다리는지는 [ADR-20261008 / conversation-purge](../../adr/ADR-20261008-conversation-purge.md) 가 갖는다.
 
 사용자를 지우는 흐름은 아직 없다.
 
 페르소나는 이 데이터베이스에 없다. 본문은 그 profile 의 `SOUL.md` 가 갖는다.
 근거는 [ADR-019](../../adr/ADR-019-페르소나는-hermes-가-갖고-control-plane-은-화면만-준다.md) 에 있다.
 
-첨부도 행을 지우지 않는다. 파일만 지우고 `deleted_at` 을 적는다.
+첨부는 보관 기간이 지나면 파일만 지우고 `deleted_at` 을 적는다. 행은 대화를 지울 때 함께 지운다.
 결과물(`chat_artifact`)도 같다.
-하위 에이전트 session 등록(`hermes_session_binding`)도 지우지 않는다. 실행 기록과 함께 남는다.
 그 자리에 사진이 있었다는 것이 남아야 지난 대화를 읽을 수 있다.
+하위 에이전트 session 등록(`hermes_session_binding`)도 지우지 않는다. 실행 기록과 함께 남는다.
 
 Memory 는 줄을 지운다. 지우기 전에 마지막 값을 `memory_revision` 에 `DELETED` 로 남기므로 본문은 그 표에 남는다. 민감 항목의 판은 암호문으로 남는다.
 화면의 삭제는 목록과 주입에서 빼는 것이고, 본문을 완전히 없애는 길은 아직 없다.

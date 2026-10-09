@@ -22,6 +22,7 @@ final class TopLevelPackageOrder extends ArchCondition<JavaClass> {
 
     /** 최상위 패키지의 층 순서. 아래에서 위로 적는다. */
     static final List<String> ORDER = List.of(
+            "crypto",
             "hermes",
             "user",
             "browser",
