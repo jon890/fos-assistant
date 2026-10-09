@@ -104,7 +104,9 @@ public class SkillService {
 
     /** 관리자 영역에서만 Hermes 번들과 커넥터 스킬을 함께 읽는다. */
     public SkillList adminList(CurrentUser user, String code) {
-        if (!user.isAdmin()) throw forbidden();
+        if (!user.isAdmin()) {
+            throw forbidden();
+        }
         Agent agent = agents.requireReadable(user, code);
         return assemble(agent, true, usage.byAgent(agent.id()));
     }
@@ -263,7 +265,9 @@ public class SkillService {
 
     /** 기본 스킬의 켜고 끄기는 관리자 경로에서만 받는다. 설정은 그 profile 의 모든 실행에 적용된다. */
     public void adminToggle(CurrentUser user, String code, String name, boolean enabled) {
-        if (!user.isAdmin()) throw forbidden();
+        if (!user.isAdmin()) {
+            throw forbidden();
+        }
         toggle(requireEditable(user, code), name, enabled);
     }
 
