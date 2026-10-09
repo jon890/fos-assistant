@@ -9,7 +9,11 @@ type SourceReads = {
   observationComplete: boolean;
 };
 
-async function openWithSourceReads(page: Page, sourceReads: SourceReads) {
+async function openWithSourceReads(
+  page: Page,
+  sourceReads: SourceReads,
+  includeStoredAnswer = false,
+) {
   const created = await page.request.post("/api/chat", {
     data: { text: "원문 열람 검사", agentCode: "browser" },
   });
@@ -41,6 +45,14 @@ async function openWithSourceReads(page: Page, sourceReads: SourceReads) {
         content: "알림 줄",
         senderName: null,
       });
+      if (includeStoredAnswer) {
+        turns.push({
+          id: 999_998,
+          role: "ASSISTANT",
+          content: "저장된 답",
+          senderName: null,
+        });
+      }
       for (const turn of turns) {
         if (turn.role !== "ASSISTANT") {
           turn.sourceReads = {
@@ -121,6 +133,37 @@ test("확인한 주소가 없으면 빈 상태를 표시한다", async ({ page }
   await expect(reads).toContainText("열람 도구 완료 2회 · 확인한 주소 0개");
   await expect(reads).toContainText("기록에서 확인한 원문 주소가 없어요.");
 });
+
+for (const [observation, observationComplete] of [
+  ["완전한 관측", true],
+  ["불완전한 관측", false],
+] as const) {
+  test(`열람 흔적이 없는 저장된 답은 ${observation}에서도 원문 목록을 숨긴다`, async ({
+    page,
+  }) => {
+    await openWithSourceReads(
+      page,
+      {
+        completedCount: 0,
+        urls: [],
+        unresolvedCount: 0,
+        observationComplete,
+      },
+      true,
+    );
+
+    await expect(
+      page.getByTestId("assistant-message").filter({ hasText: "저장된 답" }),
+    ).toBeVisible();
+    await expect(page.getByTestId("source-reads")).toHaveCount(0);
+
+    await page.reload();
+    await expect(
+      page.getByTestId("assistant-message").filter({ hasText: "저장된 답" }),
+    ).toBeVisible();
+    await expect(page.getByTestId("source-reads")).toHaveCount(0);
+  });
+}
 
 test("요청 주소만 있으면 빈 상태 없이 호출 성공 근거를 보인다", async ({
   page,
