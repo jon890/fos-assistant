@@ -14,10 +14,16 @@ class ResultLimit(ValueError):
 
 
 class LimitedWriter(io.BytesIO):
+    def __init__(self):
+        super().__init__()
+        self.written = 0
+
     def write(self, data):
-        if self.tell() + len(data) > MAX_OUTPUT:
+        if self.written + len(data) > MAX_OUTPUT:
             raise OverflowError("PNG limit")
-        return super().write(data)
+        written = super().write(data)
+        self.written += written
+        return written
 
 
 def convert(raw, mime, region, overview=False, details=None):

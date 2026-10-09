@@ -74,7 +74,7 @@ class ImageSupervisorTest(unittest.TestCase):
         thread.start()
         try:
             url = "http://127.0.0.1:" + str(server.server_port)
-            metadata, body = self.module.supervise(url, "fake-token", {}, time.monotonic() + 3, lambda: None)
+            metadata, body = self.module.supervise(url, "fake-token", {}, time.monotonic() + 3, lambda: self.fail("old CP JPEG/PNG must not require validate"))
             self.assertEqual(metadata["mime"], "image/png")
             self.assertEqual(body, png)
             for mime, length, body in [("image/png", len(png) + 1, png),
@@ -157,3 +157,27 @@ class ImageSupervisorTest(unittest.TestCase):
                 os.kill(child_pid, signal.SIGKILL)
             except ProcessLookupError:
                 pass
+
+    def test_validation_http_accepts_only_204_without_returning_bytes(self):
+        class Handler(BaseHTTPRequestHandler):
+            status = 204
+            def do_POST(self):
+                self.rfile.read(int(self.headers["Content-Length"]))
+                self.send_response(self.status)
+                self.end_headers()
+            def log_message(self, *args):
+                pass
+        server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+        thread = threading.Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+        try:
+            url = "http://127.0.0.1:" + str(server.server_port)
+            self.module.check_status(url, "fake-token", {}, time.monotonic() + 3)
+            for status in (200, 401, 403, 404, 410):
+                Handler.status = status
+                with self.assertRaises(PermissionError):
+                    self.module.check_status(url, "fake-token", {}, time.monotonic() + 3)
+        finally:
+            server.shutdown()
+            server.server_close()
+            thread.join()
