@@ -328,13 +328,16 @@ class ChatAttachmentTurnTest {
 
         HermesRunCommand command = stub().received().getFirst();
         assertThat(command.images()).hasSize(30);
-        assertThat(command.images().stream().mapToLong(image -> image.dataUrl().length()).sum())
+        assertThat(command.images().stream()
+                        .mapToLong(image -> image.dataUrl().length())
+                        .sum())
                 .isLessThanOrEqualTo(7L * 1024 * 1024);
         for (int i = 0; i < photos.size(); i++) {
             HermesImage image = command.images().get(i);
             assertThat(image.label()).isEqualTo((i + 1) + "번째 사진");
             assertThat(imageSize(image)).as(image.label()).isEqualTo(new Dimension(1600, 1200));
-            assertThat(Base64.getDecoder().decode(image.dataUrl().substring(image.dataUrl().indexOf(',') + 1)))
+            assertThat(Base64.getDecoder()
+                            .decode(image.dataUrl().substring(image.dataUrl().indexOf(',') + 1)))
                     .as("바이트 여유가 있으면 재인코딩하지 않는다")
                     .isEqualTo(Files.readAllBytes(privateDirectory(conversationId)
                             .resolve(photos.get(i).id() + ".small.jpg")));
