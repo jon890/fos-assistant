@@ -183,8 +183,10 @@ class ConnectorBindingDriftTest {
         service.bind(owner, agent.code(), DEMO);
         service.bind(owner, agent.code(), PLAIN);
         // 붙이기는 재시작 대기로 끝난다. 관리자가 반영 완료를 마친 READY 바인딩으로 둔다.
-        jdbc.update("UPDATE agent_connector_binding SET status = 'READY', restart_required = FALSE,"
-                + " restart_required_since = NULL, apply_due_at = NULL WHERE agent_id = ?", agent.id());
+        jdbc.update(
+                "UPDATE agent_connector_binding SET status = 'READY', restart_required = FALSE,"
+                        + " restart_required_since = NULL, apply_due_at = NULL WHERE agent_id = ?",
+                agent.id());
         demo = binding(DEMO);
         plain = binding(PLAIN);
         clearInvocations(connector);

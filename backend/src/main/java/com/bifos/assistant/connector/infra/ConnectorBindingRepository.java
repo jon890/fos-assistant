@@ -52,6 +52,5 @@ public interface ConnectorBindingRepository extends JpaRepository<ConnectorBindi
             + " from ConnectorBinding b"
             + " where b.status = :status and b.id > :after"
             + " order by b.id")
-    List<ReadyBinding> findReadyAfter(
-            @Param("status") BindingStatus status, @Param("after") Long after, Pageable page);
+    List<ReadyBinding> findReadyAfter(@Param("status") BindingStatus status, @Param("after") Long after, Pageable page);
 }

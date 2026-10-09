@@ -179,8 +179,7 @@ public class ConnectorBindingApplier {
      */
     public int resyncDrifted() {
         int batch = properties.driftBatch();
-        List<ReadyBinding> ready =
-                bindings.findReadyAfter(BindingStatus.READY, driftCursor, PageRequest.of(0, batch));
+        List<ReadyBinding> ready = bindings.findReadyAfter(BindingStatus.READY, driftCursor, PageRequest.of(0, batch));
         driftCursor = ready.size() < batch ? 0L : ready.get(ready.size() - 1).bindingId();
         int resynced = 0;
         Map<Long, AdminTodo> todos = new LinkedHashMap<>();
@@ -212,8 +211,7 @@ public class ConnectorBindingApplier {
                     resynced++;
                 }
                 if (drifted.adminTodo()) {
-                    todos.merge(
-                            drifted.groupId(), new AdminTodo(1, drifted.restartRequired()), AdminTodo::plus);
+                    todos.merge(drifted.groupId(), new AdminTodo(1, drifted.restartRequired()), AdminTodo::plus);
                 }
             } catch (RuntimeException ex) {
                 log.warn(
@@ -273,10 +271,8 @@ public class ConnectorBindingApplier {
     /** 한 그룹의 차단되지 않은 관리자마다 알림 한 건을 남긴다. 그룹마다 트랜잭션을 따로 연다. */
     private void notifyAdmins(Long groupId, AdminTodo todo) {
         String body = todo.restartRequired()
-                ? "커넥터 정의가 바뀌어 연결 " + todo.count()
-                        + "개를 다시 설치했어요. 공유 gateway 를 재시작한 뒤 「연결 반영 확인」에서 반영 완료를 눌러 주세요."
-                : "커넥터 정의가 바뀐 연결 " + todo.count()
-                        + "개의 반영을 확인하지 못했어요. 「연결 반영 확인」에서 반영 완료를 눌러 다시 확인해 주세요.";
+                ? "커넥터 정의가 바뀌어 연결 " + todo.count() + "개를 다시 설치했어요. 공유 gateway 를 재시작한 뒤 「연결 반영 확인」에서 반영 완료를 눌러 주세요."
+                : "커넥터 정의가 바뀐 연결 " + todo.count() + "개의 반영을 확인하지 못했어요. 「연결 반영 확인」에서 반영 완료를 눌러 다시 확인해 주세요.";
         try {
             transactions.executeWithoutResult(status -> {
                 for (AppUser admin : users.findByGroupIdAndRole(groupId, UserRole.ADMIN)) {
