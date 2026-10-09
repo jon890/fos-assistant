@@ -182,3 +182,83 @@ test("같은 블로그에 돌고 있는 저장 작업이 있으면 탭을 열지
   expect((error as ToolError).code).toBe("NAVER_BLOG_BUSY");
   expect(cdp.opened).toEqual([]);
 });
+
+const DRAFT_NOTICE = "작성 중인 글이 있습니다. 이어서 작성하시겠습니까?";
+
+test("「작성 중인 글」 알림이 떠 있으면 목록은 알림을 닫지 않고 읽는다", async () => {
+  const { cdp, editor, env, otherTab } = await setup();
+  editor.popup = DRAFT_NOTICE;
+
+  const result = await listDrafts(env, TIMES);
+
+  expect(result.count).toBe(2);
+  expect(editor.popup).toBe(DRAFT_NOTICE);
+  expectOnlyOwnTabClosed(cdp, otherTab);
+});
+
+test("「작성 중인 글」 알림이 떠 있으면 글을 불러오지 않고 NAVER_BLOG_EDITOR_IN_USE 다", async () => {
+  const { cdp, editor, env, otherTab } = await setup();
+  editor.popup = DRAFT_NOTICE;
+
+  const error = await readDraft(env, "224000000001", TIMES).catch((caught) => caught);
+
+  expect((error as ToolError).code).toBe("NAVER_BLOG_EDITOR_IN_USE");
+  expect(editor.popup).toBe(DRAFT_NOTICE);
+  expect(editor.loaded).toBeNull();
+  expectOnlyOwnTabClosed(cdp, otherTab);
+});
+
+test("제목이 맞아도 다른 글이 불러와지면 문서 번호 대조로 실패한다", async () => {
+  const { cdp, editor, env, otherTab } = await setup();
+  editor.loadInstead = DRAFTS[1];
+
+  const error = await readDraft(env, "224000000001", TIMES).catch((caught) => caught);
+
+  expect((error as ToolError).code).toBe("NAVER_BLOG_UNAVAILABLE");
+  expectOnlyOwnTabClosed(cdp, otherTab);
+});
+
+test("목록 화면에 그 차례의 단추가 없으면 누르지 않고 실패한다", async () => {
+  const { cdp, editor, env, otherTab } = await setup();
+  editor.listTitles = ["가상국수 다녀온 날"];
+
+  const error = await readDraft(env, "224000000002", TIMES).catch((caught) => caught);
+
+  expect((error as ToolError).code).toBe("NAVER_BLOG_UNAVAILABLE");
+  expect(editor.loaded).toBeNull();
+  expectOnlyOwnTabClosed(cdp, otherTab);
+});
+
+test("제목이 빈 글은 화면 제목과 견주지 않고 문서 번호로 확인해 읽는다", async () => {
+  const { editor, env } = await setup();
+  const untitled = { ...DRAFTS[1]!, logNo: 224000000003, title: "", components: [{ "@ctype": "documentTitle", title: [paragraph("")] }] };
+  editor.drafts = [...DRAFTS, untitled];
+  editor.listTitles = ["가상국수 다녀온 날", "두 번째 글", "제목 없음"];
+
+  const result = await readDraft(env, "224000000003", TIMES);
+
+  expect(result).toMatchObject({ draft_id: "224000000003", title: "", body: "" });
+});
+
+test("편집기 문서의 모양이 다르면 원문 없이 NAVER_BLOG_UNAVAILABLE 이다", async () => {
+  const { cdp, editor, env, otherTab } = await setup();
+  editor.drafts = [{ ...DRAFTS[0]!, components: [{ "@ctype": "text", value: [paragraph(upstreamText)] }] }];
+
+  const error = await readDraft(env, "224000000001", TIMES).catch((caught) => caught);
+
+  expect((error as ToolError).code).toBe("NAVER_BLOG_UNAVAILABLE");
+  expect(String(error)).not.toContain(upstreamText);
+  expectOnlyOwnTabClosed(cdp, otherTab);
+});
+
+test("시간 상한이 지나면 멈추고 연 탭을 닫는다", async () => {
+  const { cdp, editor, env, otherTab } = await setup();
+  editor.hangList = true;
+
+  const started = performance.now();
+  const error = await listDrafts(env, { ...TIMES, limitMs: 300 }).catch((caught) => caught);
+
+  expect((error as ToolError).code).toBe("NAVER_BLOG_UNAVAILABLE");
+  expect(performance.now() - started).toBeLessThan(5_000);
+  expectOnlyOwnTabClosed(cdp, otherTab);
+});

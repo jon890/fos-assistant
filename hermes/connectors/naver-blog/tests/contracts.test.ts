@@ -80,6 +80,7 @@ test("작업 오류 코드는 공통 어휘에 이어진다", () => {
     NAVER_BLOG_BUSY: "unavailable",
     NAVER_BLOG_JOB_NOT_FOUND: "invalid_input",
     NAVER_BLOG_DRAFT_NOT_FOUND: "invalid_input",
+    NAVER_BLOG_EDITOR_IN_USE: "unavailable",
     NAVER_BLOG_START_UNKNOWN: "outcome_unknown",
   });
 });

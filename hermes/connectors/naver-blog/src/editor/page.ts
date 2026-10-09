@@ -8,7 +8,6 @@ export type EditorErrorCode =
   | "place_not_unique"
   | "photo_upload_failed"
   | "editor_failed"
-  | "draft_not_found"
   | "save_unconfirmed";
 
 /** 편집기 단계의 실패. `message` 에는 CDP 주소와 파일 경로, 초안 본문을 싣지 않는다. */

@@ -11,7 +11,7 @@ export type DraftContent = {
 const lines = (body: string) => body.replace(/\r\n/g, "\n").split("\n");
 
 /**
- * 글 네 칸의 지문. `read_draft` 가 돌려주고 덮어쓰기 작업이 불러온 글로 다시 계산해 대조한다.
+ * 글 네 칸의 지문. `read_draft` 가 돌려준다. 두 번 읽은 글이 같은지 이 값으로 견준다.
  * 줄 끝 `\r` 은 지문에 넣지 않는다.
  */
 export function draftRevision(content: DraftContent) {

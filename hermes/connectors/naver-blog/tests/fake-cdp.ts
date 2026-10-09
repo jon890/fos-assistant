@@ -4,6 +4,8 @@ import type { ServerWebSocket } from "bun";
 export const upstreamText = "upstream-error-text-for-tests";
 
 export type CdpCall = { target: string; method: string; params: any };
+/** 처리 함수가 이 값을 돌려주면 답하지 않는다. 멈춘 페이지를 흉내 낸다. */
+export const NO_REPLY = Symbol("no-reply");
 export type CdpHandler = (params: any, target: string) => unknown;
 
 type SocketData = { target: string };
@@ -160,7 +162,9 @@ export class FakeCdp {
     // 답을 정하지 않은 메서드는 답하지 않는다. 시험이 시간 초과를 이렇게 만든다.
     if (!handler) return;
     try {
-      reply({ result: handler(message.params ?? {}, target) ?? {} });
+      const result = handler(message.params ?? {}, target);
+      if (result === NO_REPLY) return;
+      reply({ result: result ?? {} });
     } catch {
       reply({ error: { code: -32000, message: upstreamText } });
     }
@@ -270,6 +274,10 @@ export class FakeEditor {
   listTitles?: string[];
   /** 편집기에 불러온 글. */
   loaded: FakeDraft | null = null;
+  /** 글 단추를 누르면 이 글이 대신 불러와진다. 다른 글이 불러와진 편집기를 만든다. */
+  loadInstead?: FakeDraft;
+  /** 참이면 목록 응답을 부르는 식에 답하지 않는다. */
+  hangList = false;
   listOpen = false;
 
   private readonly storage = new Map<string, string>();
@@ -314,6 +322,7 @@ export class FakeEditor {
     cdp.on("Runtime.evaluate", (params) => {
       const expression = String(params.expression);
       this.scripts.push(expression);
+      if (this.hangList && expression.includes("TempPostList.naver")) return NO_REPLY;
       const value = this.evaluate(expression);
       return { result: value === undefined ? { type: "undefined" } : { value } };
     });
@@ -460,7 +469,7 @@ export class FakeEditor {
       const draft = this.drafts[indexIn(finder, "tpb*s.tlist")];
       if (!this.listOpen || !draft) return null;
       return () => {
-        this.loaded = draft;
+        this.loaded = this.loadInstead ?? draft;
         this.listOpen = false;
         this.category = draft.category;
         this.tags = [...draft.tags];
@@ -493,7 +502,8 @@ export class FakeEditor {
         editorVersion: 4,
       }));
       const body = { isSuccess: true, result: { totalCount: tempPostList.length, tempPostList } };
-      return JSON.stringify({ status: this.listStatus, text: `\n${JSON.stringify(body)}` });
+      const text = this.listStatus === 200 ? `\n${JSON.stringify(body)}` : upstreamText;
+      return JSON.stringify({ status: this.listStatus, text });
     }
     if (expression.includes("getDocumentData"))
       return JSON.stringify(

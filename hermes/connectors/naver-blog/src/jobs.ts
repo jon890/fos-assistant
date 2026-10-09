@@ -359,7 +359,7 @@ export function finishStale(dir: string, state: JobState) {
 
 type LockBody = { job_id?: unknown; created_at?: unknown };
 
-async function readLock(path: string): Promise<{ jobId: string | null; createdAt: number } | null> {
+export async function readLock(path: string): Promise<{ jobId: string | null; createdAt: number } | null> {
   let raw: string;
   let modified: number;
   try {
@@ -418,19 +418,6 @@ export async function acquireLock(dir: string, blogId: string, jobId: string) {
     await removeStaleLock(path, lock.jobId);
   }
   throw new ToolError("NAVER_BLOG_BUSY");
-}
-
-/**
- * 그 블로그의 잠금을 살아 있는 작업이 쥐고 있으면 `NAVER_BLOG_BUSY` 다. 잠금을 만들거나 지우지 않는다.
- * 읽기 도구가 저장 작업과 같은 편집기를 함께 쓰지 않게 탭을 열기 전에 부른다.
- */
-export async function assertIdle(dir: string, blogId: string) {
-  const lock = await readLock(lockFile(dir, blogId));
-  if (!lock) return;
-  const holder = lock.jobId && JOB_ID_PATTERN.test(lock.jobId)
-    ? await readState(dir, lock.jobId)
-    : null;
-  if (jobAlive(holder, lock.createdAt)) throw new ToolError("NAVER_BLOG_BUSY");
 }
 
 /**
