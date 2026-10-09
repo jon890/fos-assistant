@@ -193,6 +193,16 @@ export const EDITOR_METHODS = [
 
 export type FakePlace = { name: string; address: string };
 
+/** 임시저장 글 하나. `components` 는 편집기 문서의 구성요소 JSON 이다. */
+export type FakeDraft = {
+  logNo: number;
+  title: string;
+  modiDate: number;
+  components: unknown[];
+  category: string;
+  tags: string[];
+};
+
 const TITLE_SELECTOR = JSON.stringify(".se-documentTitle .se-text-paragraph");
 const BODY_SELECTOR = JSON.stringify(".se-component.se-text .se-text-paragraph");
 
@@ -252,6 +262,15 @@ export class FakeEditor {
   publishDiagnosis = { publish_button: "shown", covered_by: null as string | null, layers: [] as string[] };
   /** 발행 단추를 누른 수. */
   publishClicks = 0;
+  /** 임시저장 목록 API 가 돌려줄 글. 목록 화면도 이 차례로 놓인다. */
+  drafts: FakeDraft[] = [];
+  /** 목록 API 의 HTTP 상태. */
+  listStatus = 200;
+  /** 목록 화면이 보일 제목. 비우면 `drafts` 의 제목이다. 차례가 어긋난 화면을 만든다. */
+  listTitles?: string[];
+  /** 편집기에 불러온 글. */
+  loaded: FakeDraft | null = null;
+  listOpen = false;
 
   private readonly storage = new Map<string, string>();
   private focused: "title" | "body" | "search" | "tag" | null = null;
@@ -435,6 +454,18 @@ export class FakeEditor {
         this.results = [];
       };
     }
+    if (finder.includes("임시저장된 글 보기")) return () => (this.listOpen = true);
+    if (finder.includes("tpb*s.close")) return () => (this.listOpen = false);
+    if (finder.includes("tpb*s.tlist")) {
+      const draft = this.drafts[indexIn(finder, "tpb*s.tlist")];
+      if (!this.listOpen || !draft) return null;
+      return () => {
+        this.loaded = draft;
+        this.listOpen = false;
+        this.category = draft.category;
+        this.tags = [...draft.tags];
+      };
+    }
     if (finder.includes('data-click-area=\\"tpb.publish\\"')) return this.publishAction;
     if (finder.includes("label[for]")) {
       const name = quoted(finder, "===");
@@ -453,6 +484,29 @@ export class FakeEditor {
 
   /** 식 하나에 화면 상태로 답한다. */
   private evaluate(expression: string): unknown {
+    if (expression.includes("TempPostList.naver")) {
+      const tempPostList = this.drafts.map(({ logNo, title, modiDate }) => ({
+        blogNo: 1,
+        logNo,
+        title,
+        modiDate,
+        editorVersion: 4,
+      }));
+      const body = { isSuccess: true, result: { totalCount: tempPostList.length, tempPostList } };
+      return JSON.stringify({ status: this.listStatus, text: `\n${JSON.stringify(body)}` });
+    }
+    if (expression.includes("getDocumentData"))
+      return JSON.stringify(
+        this.loaded
+          ? { document: { components: this.loaded.components }, documentId: String(this.loaded.logNo) }
+          : { document: { components: [] }, documentId: "" },
+      );
+    if (expression.includes("tpb*s.tlist") && !expression.includes("JSON.stringify({x: r.left")) {
+      const index = indexIn(expression, "tpb*s.tlist");
+      const title = (this.listTitles ?? this.drafts.map((draft) => draft.title))[index];
+      if (expression.includes('querySelector("strong")')) return this.listOpen ? (title ?? "") : "";
+      return this.listOpen && title !== undefined;
+    }
     if (expression.includes("sessionStorage")) {
       const storage = {
         getItem: (key: string) => this.storage.get(key) ?? null,

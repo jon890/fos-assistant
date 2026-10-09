@@ -421,6 +421,19 @@ export async function acquireLock(dir: string, blogId: string, jobId: string) {
 }
 
 /**
+ * 그 블로그의 잠금을 살아 있는 작업이 쥐고 있으면 `NAVER_BLOG_BUSY` 다. 잠금을 만들거나 지우지 않는다.
+ * 읽기 도구가 저장 작업과 같은 편집기를 함께 쓰지 않게 탭을 열기 전에 부른다.
+ */
+export async function assertIdle(dir: string, blogId: string) {
+  const lock = await readLock(lockFile(dir, blogId));
+  if (!lock) return;
+  const holder = lock.jobId && JOB_ID_PATTERN.test(lock.jobId)
+    ? await readState(dir, lock.jobId)
+    : null;
+  if (jobAlive(holder, lock.createdAt)) throw new ToolError("NAVER_BLOG_BUSY");
+}
+
+/**
  * 묵었다고 판정한 잠금을 지운다. 판정한 뒤 다른 호출이 그 잠금을 지우고 새로 만들었을 수 있어,
  * 임시 이름으로 옮긴 뒤 내용이 판정한 `jobId` 와 같을 때만 지운다. 다르면 제자리로 되돌린다.
  *

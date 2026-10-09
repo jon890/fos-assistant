@@ -12,6 +12,8 @@ import {
   type DraftInput,
   validateDraft,
 } from "./draft.ts";
+import { listDrafts, readDraft } from "./drafts.ts";
+import { DRAFT_ID_PATTERN } from "./editor/drafts.ts";
 import { guard, ToolError } from "./errors.ts";
 import {
   acquireLock,
@@ -167,7 +169,7 @@ async function draftJob(env: Env, jobId: string, waitSeconds: number) {
   }
 }
 
-/** 도구 넷을 등록한 서버. 시험은 이 서버를 InMemoryTransport 로 부른다. */
+/** 도구를 등록한 서버. 시험은 이 서버를 InMemoryTransport 로 부른다. */
 export function createServer(env: Env = process.env, overrides: Partial<ServerDeps> = {}) {
   const deps = { ...DEFAULT_SERVER_DEPS, ...overrides };
   const server = new McpServer({ name: "fos-naver-blog", version: "1.0.0" });
@@ -180,6 +182,28 @@ export function createServer(env: Env = process.env, overrides: Partial<ServerDe
       annotations: { readOnlyHint: true },
     },
     () => guard(() => sessionStatus(env)),
+  );
+  server.registerTool(
+    "list_drafts",
+    {
+      description:
+        "네이버 블로그의 임시저장 글 목록(draft_id, 제목, 고친 시각)을 읽습니다. 글을 바꾸지 않습니다.",
+      inputSchema: {},
+      annotations: { readOnlyHint: true },
+    },
+    () => guard(() => listDrafts(env)),
+  );
+  server.registerTool(
+    "read_draft",
+    {
+      description:
+        "임시저장 글 하나의 제목, 카테고리, 태그, 본문과 지문(revision)을 읽습니다. 본문에서 사진, 스티커, 지도는 [기존 사진 1] 같은 줄입니다. 글을 바꾸지 않습니다.",
+      inputSchema: {
+        draft_id: z.string().regex(DRAFT_ID_PATTERN).describe("list_drafts 가 돌려준 draft_id"),
+      },
+      annotations: { readOnlyHint: true },
+    },
+    ({ draft_id }) => guard(() => readDraft(env, draft_id)),
   );
   server.registerTool(
     "render_draft",

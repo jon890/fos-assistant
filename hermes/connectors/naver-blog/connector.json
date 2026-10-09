@@ -2,7 +2,7 @@
   "schema": 2,
   "id": "naver-blog",
   "title": "네이버 블로그",
-  "description": "「내 브라우저」 에 로그인해 둔 네이버 계정으로 승인한 글을 임시저장합니다. 발행하지 않습니다.",
+  "description": "「내 브라우저」 에 로그인해 둔 네이버 계정의 임시저장 글을 읽고, 승인한 글을 임시저장합니다. 발행하지 않습니다.",
   "icon": "icon.svg",
   "link": "https://blog.naver.com/",
   "fields": [
@@ -23,6 +23,8 @@
   "default_tool_policy": "deny",
   "tools": {
     "session_status": { "risk": "READ" },
+    "list_drafts": { "risk": "READ" },
+    "read_draft": { "risk": "READ" },
     "render_draft": { "risk": "READ" },
     "save_draft": { "risk": "WRITE", "title": "네이버 블로그에 임시저장", "outbound": false },
     "draft_job": { "risk": "READ" }
@@ -34,6 +36,7 @@
     "NAVER_BLOG_BROWSER_UNREACHABLE": "unavailable",
     "NAVER_BLOG_BUSY": "unavailable",
     "NAVER_BLOG_JOB_NOT_FOUND": "invalid_input",
+    "NAVER_BLOG_DRAFT_NOT_FOUND": "invalid_input",
     "NAVER_BLOG_START_UNKNOWN": "outcome_unknown",
     "NAVER_BLOG_UNAVAILABLE": "unavailable"
   }
