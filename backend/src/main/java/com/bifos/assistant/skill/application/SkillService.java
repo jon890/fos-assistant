@@ -23,7 +23,6 @@ import com.bifos.assistant.skill.infra.SkillProperties;
 import com.bifos.assistant.skill.infra.SkillPublisher;
 import com.bifos.assistant.skill.infra.SkillStore;
 import java.time.Instant;
-import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -86,6 +85,7 @@ public class SkillService {
     private final SkillUsageQuery usage;
     private final ApplicationEventPublisher events;
     private final SkillProperties properties;
+    private final NewSkillRules newSkills;
 
     /**
      * 일반 화면에 보일 올린 스킬 목록이다. 관리자 역할도 기본·커넥터 스킬은 받지 않는다.
@@ -137,7 +137,7 @@ public class SkillService {
     private SkillList assemble(Agent agent, boolean editable, Map<String, SkillUsageSummary> usages) {
         String profile = agent.hermesProfile();
         Map<String, SkillBundle> uploaded = store.readCurrent(profile);
-        Set<String> uploadedNames = uploadedNames(uploaded, store.readPending(profile));
+        Set<String> uploadedNames = NewSkillRules.uploadedNames(uploaded, store.readPending(profile));
         Map<String, SkillListItem> items = new TreeMap<>();
         for (HermesSkill skill : publisher.list(profile)) {
             SkillSource source = uploadedNames.contains(skill.name()) ? SkillSource.UPLOADED : SkillSource.HERMES;
@@ -216,7 +216,7 @@ public class SkillService {
         Map<String, SkillBundle> pending = store.readPending(profile);
         SkillBundle uploaded = uploadedBundle(current, pending, name);
         if (uploaded == null) {
-            requireCreatable(profile, name, frontmatter, current, pending);
+            newSkills.requireCreatable(profile, name, frontmatter, current, pending);
         }
         SkillBundle bundle = bundleOf(name, skillMd, inputs, uploaded);
         return saveBundle(user, agent, current, bundle, uploaded);
@@ -245,28 +245,6 @@ public class SkillService {
                 .orElseThrow(SkillService::notFound);
         requireSkillMd(name, previous.skillMd());
         return saveBundle(user, agent, current, previous, uploaded);
-    }
-
-    /** 새 스킬일 때만 하는 검사다. Hermes 기본 스킬 이름, 올린 스킬 수 한도, 새 스킬 설명 60자를 본다. */
-    private void requireCreatable(
-            String profile,
-            String name,
-            SkillFrontmatter frontmatter,
-            Map<String, SkillBundle> current,
-            Map<String, SkillBundle> pending) {
-        if (publisher.list(profile).stream().anyMatch(s -> s.name().equals(name))) {
-            throw new ApiException(ErrorCode.SKILL_NAME_TAKEN, "Hermes already has a skill with this name");
-        }
-        int max = properties.maxPerAgent();
-        if (uploadedNames(current, pending).size() >= max) {
-            throw new ApiException(
-                    ErrorCode.VALIDATION_FAILED, "an agent can have at most " + max + " uploaded skills");
-        }
-        if (frontmatter.indexedDescriptionLength() > MAX_NEW_DESCRIPTION_CHARS) {
-            throw new ApiException(
-                    ErrorCode.VALIDATION_FAILED,
-                    "a new skill description can be at most " + MAX_NEW_DESCRIPTION_CHARS + " characters");
-        }
     }
 
     /**
@@ -401,12 +379,6 @@ public class SkillService {
             Map<String, SkillBundle> current, Map<String, SkillBundle> pending, String name) {
         SkillBundle bundle = current.get(name);
         return bundle != null ? bundle : pending.get(name);
-    }
-
-    private static Set<String> uploadedNames(Map<String, SkillBundle> current, Map<String, SkillBundle> pending) {
-        Set<String> names = new HashSet<>(current.keySet());
-        names.addAll(pending.keySet());
-        return names;
     }
 
     /**

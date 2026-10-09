@@ -588,6 +588,30 @@ test("재시작한 뒤 다시 설치된 바인딩의 반영 완료는 한 번 �
   await expect(panel.getByRole("button", { name: "반영 완료" })).toBeVisible();
 });
 
+test("반영 완료가 설치 상태 어긋남으로 거절되면 그 까닭의 문구를 보인다", async ({
+  page,
+}) => {
+  await page.route("**/api/admin/connections", (route) =>
+    route.fulfill({ json: [adminBinding("agent-first")] }),
+  );
+  await page.route("**/api/admin/agents/*/connections/*/confirm", (route) =>
+    route.fulfill({
+      status: 409,
+      json: { code: "CONNECTOR_INSTALL_MISMATCH", message: "raw upstream" },
+    }),
+  );
+  await page.goto("/admin/connections");
+  const panel = page.getByTestId("connector-admin-panel");
+  await expect(panel.getByRole("listitem")).toHaveCount(1);
+
+  await panel.getByRole("button", { name: "반영 완료" }).click();
+
+  await expect(panel.getByRole("alert")).toHaveText(
+    "설치 상태가 맞지 않아요. 서버 로그에서 까닭을 확인해 주세요.",
+  );
+  await expect(page.getByText("raw upstream")).toHaveCount(0);
+});
+
 test("연결 화면이 도구마다 위험도와 실행 방식을 보인다", async ({ page }) => {
   await page.route(`**/api/connections/${DEMO_ID}`, (route) =>
     route.fulfill({ json: disconnected }),
