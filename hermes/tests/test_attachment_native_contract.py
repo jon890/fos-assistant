@@ -24,6 +24,11 @@ class NativeImageContractTest(unittest.TestCase):
         self.plugin = load_ctx(self.addCleanup)
         self.inspect = importlib.import_module(self.plugin.__name__ + ".attachment_inspect")
 
+    def test_pillow_is_already_pinned_in_runtime_core(self):
+        import tomllib
+        project = tomllib.loads((pathlib.Path(os.environ["HERMES_SOURCE"]) / "pyproject.toml").read_text())
+        self.assertIn("Pillow==" + contract.NATIVE_IMAGE_PILLOW_VERSION, project["project"]["dependencies"])
+
     def test_plugin_result_reaches_responses_as_native_image(self):
         source = pathlib.Path(os.environ["HERMES_SOURCE"])
         relative, name, call = contract.NATIVE_ATTACHMENT_REGISTRATION
@@ -56,8 +61,8 @@ class NativeImageContractTest(unittest.TestCase):
         with patch.dict(sys.modules, {prep.__name__: prep}), \
              patch.dict(os.environ, {"FOS_ATTACHMENT_INSPECT_URL": "http://example.test/internal/hermes/attachment-inspect"}), \
              patch.object(self.inspect, "_read_token", return_value="fake"), \
-             patch.object(self.inspect, "_open", return_value=self.response()):
-            envelope = self.inspect.handle({"attachment_id": 7, "_fos_ctx": {}, "_fos_inspect": {}})
+             patch.object(self.inspect, "supervise", return_value=({"mime": "image/png", "first_frame": True, "overview": True, "display_width": 5000, "display_height": 4000, "result_width": 1600, "result_height": 1280}, b"\x89PNG\r\n\x1a\nmore")):
+            envelope = self.inspect.handle({"attachment_id": 7, "overview": True, "_fos_ctx": {}, "_fos_inspect": {}})
             normalized = env["_normalize_handler_result"]("attachment_inspect", envelope)
             self.assertIs(normalized, envelope)
             persisted = env["_persist_multimodal_text_parts"](normalized, "attachment_inspect", "actual", None, None)
@@ -83,6 +88,8 @@ class NativeImageContractTest(unittest.TestCase):
             fallback = env["_tool_result_content_for_active_model"](model, "attachment_inspect", normalized)
             self.assertIsInstance(fallback, str)
             self.assertIn("판독 실패", fallback)
+            self.assertIn("첫 프레임", fallback)
+            self.assertIn("축소한 전체 개요", fallback)
 
     @staticmethod
     def response():

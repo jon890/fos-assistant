@@ -82,6 +82,22 @@ class AttachmentInspectServiceTest {
     }
 
     @Test
+    @DisplayName("반복 상태 확인은 사진 예산을 소비하지 않고 변조와 취소를 거절한다")
+    void validatesWithoutConsumingAndRejectsChangedProofAndCancelledExecution() {
+        ObjectNode body = request(NOW);
+        service.inspect(principal, body);
+        for (int count = 0; count < 61; count++) {
+            service.validate(principal, body);
+        }
+        service.inspect(principal, body);
+        assertThatThrownBy(() -> service.inspect(principal, body)).isInstanceOf(ApiException.class);
+        assertThatThrownBy(() -> service.validate(principal, body.deepCopy().put("attachment_id", 8)))
+                .isInstanceOf(ApiException.class);
+        when(execution.status()).thenReturn(ExecutionStatus.CANCELLED);
+        assertThatThrownBy(() -> service.validate(principal, body)).isInstanceOf(ApiException.class);
+    }
+
+    @Test
     @DisplayName("현재 실행은 지난 사진을 읽고 옛 서명은 다음 실행에서 거절한다")
     void currentExecutionCanReadPastAttachmentButOldProofCannotCrossTurn() {
         assertThat(service.inspect(principal, request(NOW)).bytes()).containsExactly(1);

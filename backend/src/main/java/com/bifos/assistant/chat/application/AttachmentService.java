@@ -11,6 +11,7 @@ import com.bifos.assistant.shared.error.ErrorCode;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -58,9 +59,48 @@ public class AttachmentService {
     public InspectedImage inspect(
             CurrentUser user, Long conversationId, Long attachmentId, List<Integer> region, BooleanSupplier active) {
         ChatAttachment attachment = requireInspectable(user, conversationId, attachmentId);
-        InspectedImage result = inspection.read(attachment, region, active);
+        InspectedImage result = "image/gif".equals(attachment.contentType())
+                        || "image/webp".equals(attachment.contentType())
+                ? readRaw(attachment)
+                : inspection.read(attachment, region, active);
         requireInspectable(user, conversationId, attachmentId);
         return result;
+    }
+
+    /** 명시적으로 요청한 개요는 원본을 그대로 넘겨 Pillow에서 표시 방향으로 줄인다. */
+    public InspectedImage inspectOverview(CurrentUser user, Long conversationId, Long attachmentId) {
+        ChatAttachment attachment = requireInspectable(user, conversationId, attachmentId);
+        InspectedImage result = readRaw(attachment);
+        requireInspectable(user, conversationId, attachmentId);
+        return result;
+    }
+
+    /** 변환 진행 중에도 원본을 읽지 않고 SQL 상태만 다시 확인한다. */
+    public void validateInspection(CurrentUser user, Long conversationId, Long attachmentId) {
+        requireInspectable(user, conversationId, attachmentId);
+    }
+
+    private InspectedImage readRaw(ChatAttachment attachment) {
+        int limit = 20 * 1024 * 1024;
+        try (InputStream in = store.open(attachment)) {
+            byte[] raw = in.readNBytes(limit + 1);
+            boolean magic = switch (attachment.contentType()) {
+                case "image/gif" -> raw.length >= 6
+                        && new String(raw, 0, 6, StandardCharsets.US_ASCII).matches("GIF8[79]a");
+                case "image/webp" -> raw.length >= 12 && raw[0] == 'R' && raw[1] == 'I' && raw[2] == 'F' && raw[3] == 'F'
+                        && raw[8] == 'W' && raw[9] == 'E' && raw[10] == 'B' && raw[11] == 'P';
+                case "image/jpeg" -> raw.length >= 2 && raw[0] == (byte) 0xff && raw[1] == (byte) 0xd8;
+                case "image/png" -> raw.length >= 8 && java.util.Arrays.equals(java.util.Arrays.copyOf(raw, 8),
+                        new byte[] {(byte) 0x89, 'P', 'N', 'G', 13, 10, 26, 10});
+                default -> false;
+            };
+            if (raw.length == 0 || raw.length > limit || raw.length != attachment.byteSize() || !magic) {
+                throw new ApiException(ErrorCode.ATTACHMENT_INSPECTION_FAILED, "invalid original image");
+            }
+            return new InspectedImage(attachment.contentType(), raw);
+        } catch (IOException ex) {
+            throw new ApiException(ErrorCode.ATTACHMENT_INSPECTION_FAILED, "could not read original image", ex);
+        }
     }
 
     private ChatAttachment requireInspectable(CurrentUser user, Long conversationId, Long attachmentId) {
@@ -268,7 +308,9 @@ public class AttachmentService {
                         ? "작은 글자·가격·품번을 묻거나 지난 사진을 다시 물으면 attachment_inspect로 원본을 자동 조회한다.\n"
                                 + "attachment_id는 위 참조를 쓰며 한 번에 한 장씩 본다. 큰 원본은 EXIF 표시 원본 좌표"
                                 + " region=[x1,y1,x2,y2]로 필요한 영역을 먼저 조회한다. 오른쪽·아래 끝은 제외한다.\n"
-                                + "한도 오류는 작은 영역으로 한 번만 다시 조회한다. 사진마다 최대 3회, 실행 전체 최대 90회다.\n"
+                                + "큰 사진의 위치를 모르면 overview=true로 축소 전체 개요를 먼저 보고 원본 region을 고른다."
+                                + " overview와 region은 함께 쓰지 않는다. 개요만 보고 작은 글자를 읽었다고 하지 않는다.\n"
+                                + "한도 오류는 개요 또는 작은 영역으로 다시 조회한다. 사진마다 최대 3회, 실행 전체 최대 90회다.\n"
                                 + "native 이미지가 없거나 만료·삭제·거절이면 보았다고 하지 말고 판독 실패를 알린다."
                                 + " 사용자에게 재업로드나 분할 전송을 요구하지 않는다. read_file로 사진을 읽지 않는다.\n"
                         : "지난 메시지의 사진은 같은 폴더의 {첨부 번호}.small.jpg 를, 없으면 원본을 vision_analyze 로 본다."

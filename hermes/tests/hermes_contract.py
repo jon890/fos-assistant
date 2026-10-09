@@ -25,7 +25,10 @@ HERMES_REPOSITORY = "https://github.com/NousResearch/hermes-agent"
 HERMES_PACKAGES = frozenset({"hermes_cli", "hermes_constants", "hermes_state", "gateway", "toolsets", "plugins"})
 # plugin 이 import 해도 되는 제3자 패키지다. 표준 라이브러리와 이것과 Hermes 밖의 import 가 생기면 시험이 실패한다.
 # Hermes 의 다른 최상위 패키지(`agent`, `tools` 등)를 쓰기 시작하면 HERMES_PACKAGES 에 더하고 지점을 선언한다.
-THIRD_PARTY_PACKAGES = frozenset({"yaml", "mcp", "starlette"})
+# GIF/WebP helper는 Hermes core가 이미 고정한 Pillow를 쓴다. 새 의존성을 추가하지 않는다.
+NATIVE_IMAGE_PILLOW_VERSION = "12.3.0"
+
+THIRD_PARTY_PACKAGES = frozenset({"yaml", "mcp", "starlette", "PIL"})
 
 
 @dataclass(frozen=True)
