@@ -254,6 +254,33 @@ test("저장 단추를 누른 뒤 그 글이 고쳐지지 않으면 save_unconfi
   expectTabsClosed(cdp, otherTab, 2);
 });
 
+test("저장 뒤 목록이 그 글의 고친 시각을 주지 않으면 성공으로 보지 않고 save_unconfirmed 다", async () => {
+  const { cdp, editor, otherTab, run } = await setup();
+  editor.loseModiDateOnUpdate = true;
+
+  const error = await failure(run(inputFor(EDITED)));
+
+  const backup = editor.drafts.find((draft) => !DRAFTS.some((known) => known.logNo === draft.logNo));
+  expect(error.code).toBe("save_unconfirmed");
+  expect(error.extra).toEqual({ backup_draft_id: String(backup?.logNo) });
+  expectTabsClosed(cdp, otherTab, 2);
+});
+
+test("저장 단추 직전 알림이 실패하면 단추를 누르지 않고 원래 글은 그대로다", async () => {
+  const { cdp, editor, otherTab, run } = await setup();
+
+  const error = await failure(
+    run(inputFor(EDITED), (stage) => {
+      if (stage === "save_clicking") throw new Error("작업이 이미 끝났다");
+    }),
+  );
+
+  expect(error.code).toBe("editor_failed");
+  expect(error.stage).toBe("save");
+  expect(findDraft(editor, ORIGINAL_ID)).toEqual(DRAFTS[0]);
+  expectTabsClosed(cdp, otherTab, 2);
+});
+
 test("사본을 만든 뒤 중단되면 같은 코드와 문장에 사본 번호를 더해 멈추고 원래 글은 그대로다", async () => {
   const { cdp, editor, otherTab } = await setup();
   const controller = new AbortController();

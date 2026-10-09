@@ -7,10 +7,12 @@ import {
   type Block,
   type DraftInput,
 } from "./draft.ts";
+import { cardWouldMask } from "./card-mask.ts";
 import { draftChanges, draftRevision } from "./changes.ts";
 import { EXISTING_LINE } from "./document.ts";
 import {
   CHANGES_MAX,
+  maskedProblem,
   overwriteContentShape,
   validateOverwrite,
   type OverwriteContent,
@@ -116,12 +118,16 @@ export async function renderDraft(
  * 승인 카드에 올릴 바뀌는 내용과 원래 글의 지문을 함께 돌려준다.
  */
 function renderOverwrite(input: RenderInput, base: OverwriteContent): RenderResult {
-  const problems = [...validateRenderOptions(input), ...validateOverwrite(input, base)];
+  const changes = draftChanges(base, input);
+  const problems = [...validateRenderOptions(input), ...validateOverwrite(input, base, changes)];
   if (input.kind === "package") problems.push("덮어쓰기 미리보기는 kind preview 만 받습니다.");
   if (input.photo_dir !== undefined) problems.push("덮어쓰기에는 photo_dir 을 주지 않습니다.");
-  const changes = draftChanges(base, input);
   // 덮어쓰기 도구의 인자 검사와 같은 셈(UTF-16 길이)이다.
   if (changes.length > CHANGES_MAX) problems.push("바뀌는 내용이 너무 깁니다. 나눠 고쳐 주세요.");
+  // 바뀌는 내용에는 원래 글의 줄도 실린다. 그 줄이 가려져도 승인할 수 없다.
+  // 고친 글의 칸에서 이미 알렸으면 같은 까닭을 두 번 적지 않는다.
+  else if (cardWouldMask(changes) && !problems.some((problem) => problem.includes("승인 카드가 가리는")))
+    problems.push(maskedProblem("바뀌는 내용"));
   if (problems.length > 0) return { problems, html: null, assets: [] };
 
   const folder = input.artifact_path.slice(0, -"index.html".length);

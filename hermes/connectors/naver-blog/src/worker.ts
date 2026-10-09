@@ -208,7 +208,7 @@ export async function runWorker(jobFile: string, overrides: Partial<WorkerDeps> 
             outcome = {
               status: "unknown",
               error: controller.signal.aborted && !(error instanceof EditorError)
-                ? timeoutOf(error, stage)
+                ? { code: "timeout", stage }
                 : errorOf(error, stage),
             };
           } else if (controller.signal.aborted) {

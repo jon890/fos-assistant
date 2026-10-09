@@ -298,6 +298,8 @@ export class FakeEditor {
   documentId = "";
   /** 참이면 불러온 글의 저장 단추가 그 글을 고치지 않는다. 저장되지 않은 덮어쓰기를 만든다. */
   ignoreUpdate = false;
+  /** 참이면 글을 고칠 때 고친 시각을 읽을 수 없는 값으로 둔다. 목록이 `saved_at: null` 을 준다. */
+  loseModiDateOnUpdate = false;
   /** 참이면 새 글의 저장 단추가 새 글 대신 불러온 글을 고친다. 사본 저장이 원래 글을 고친 상황을 만든다. */
   backupUpdatesLoaded = false;
 
@@ -536,7 +538,9 @@ export class FakeEditor {
     const target = this.drafts.find((draft) => String(draft.logNo) === this.documentId);
     if (target) {
       if (this.ignoreUpdate) return;
-      Object.assign(target, content, { modiDate: target.modiDate + 1000 });
+      Object.assign(target, content, {
+        modiDate: this.loseModiDateOnUpdate ? Number.NaN : target.modiDate + 1000,
+      });
       return;
     }
     if (this.documentId) return;

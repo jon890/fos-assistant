@@ -163,7 +163,8 @@ async function confirmSaved(page: EditorPage, blogId: string, draftId: string, b
   for (let i = 0; i < SAVE_TRIES; i++) {
     await page.sleep(interval);
     const target = (await tempDrafts(page, blogId)).find((draft) => draft.draft_id === draftId);
-    if (!target || target.saved_at === before) continue;
+    // 고친 시각을 읽지 못했으면 저장을 확인한 것이 아니다. 수는 사본을 만든 뒤 이미 맞다.
+    if (!target || target.saved_at === null || target.saved_at === before) continue;
     const count = await tempDraftCount(page, blogId);
     if (count === expected) return count;
   }
@@ -264,6 +265,7 @@ export async function runOverwrite(
     if (!targetBefore?.saved_at)
       throw page.fail("editor_failed", "목록에서 그 글의 고친 시각을 읽지 못해 저장하지 않는다");
 
+    page.throwIfAborted();
     await onStage("save_clicking");
     let savedAfter: number | null;
     try {

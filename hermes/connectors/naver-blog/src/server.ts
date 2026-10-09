@@ -30,6 +30,7 @@ import {
   stateFile,
   writeInput,
 } from "./jobs.ts";
+import { cardWouldMask } from "./card-mask.ts";
 import { CHANGES_MAX, overwriteContentShape, validateOverwrite } from "./overwrite-draft.ts";
 import { renderDraft, renderShape, type RenderInput } from "./render.ts";
 import { readConnection, sessionStatus, type Env } from "./session.ts";
@@ -164,7 +165,7 @@ async function saveDraft(env: Env, input: DraftInput, deps: ServerDeps) {
 /** 고친 글의 모양을 검사한 뒤 `kind: "overwrite"` 입력 파일로 덮어쓰기 작업을 띄운다. */
 async function overwriteDraft(env: Env, input: OverwriteInput, deps: ServerDeps) {
   const { draft_id, revision, changes, title, category, tags, body } = input;
-  if (validateOverwrite({ title, category, tags, body }).length)
+  if (validateOverwrite({ title, category, tags, body }).length || cardWouldMask(changes))
     throw new ToolError("NAVER_BLOG_INVALID_INPUT");
   return startJob(
     env,

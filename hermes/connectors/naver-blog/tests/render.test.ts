@@ -258,7 +258,7 @@ const overwriteInput = (extra: Partial<RenderInput> = {}): RenderInput => ({
   ...extra,
 });
 
-test("base 를 주면 바뀌는 내용과 원래 글의 지문을 돌려주고 미리보기 맨 위에 바뀌는 내용을 보인다", async () => {
+test("base 를 주면 바뀌는 내용과 원래 글의 지문을 돌려주고 본문 위에 바뀌는 내용을 보인다", async () => {
   const request = overwriteInput();
   const result = await renderDraft(request, attachmentDir);
 
@@ -292,6 +292,20 @@ test.each([
   expect(result.html).toBeNull();
   expect(result.assets).toEqual([]);
   expect(result.problems).toEqual([problem]);
+});
+
+test("바뀐 줄 옆의 원래 줄이 승인 카드에 가려지면 덮어쓸 수 없다는 problems 다", async () => {
+  const hidden = `링크 https://example.com/${"x".repeat(32)}`;
+  const base = { ...BASE, body: BASE.body.replace("끝", hidden) };
+  const result = await renderDraft(
+    overwriteInput({ base, body: overwriteInput().body.replace("끝", hidden) }),
+    attachmentDir,
+  );
+
+  expect(result.html).toBeNull();
+  expect(result.problems).toEqual([
+    expect.stringContaining("본문 5번째 줄에 승인 카드가 가리는"),
+  ]);
 });
 
 test("base 를 주어도 원래 글과 같으면 바뀐 것이 없다는 problems 다", async () => {
