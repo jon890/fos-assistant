@@ -141,3 +141,4 @@
 | [ADR-20261008 / tossinvest-connector](ADR-20261008-tossinvest-connector.md) | 토스증권 커넥터는 읽기 도구만 두고, 토큰은 프로세스 메모리에서 한 번에 하나만 다시 받는다 | hermes | Accepted. ADR-20261008 / connector-binding-guards 의 두 선언을 쓴다 |
 | [ADR-20261008 / tool-catalog-visibility](ADR-20261008-tool-catalog-visibility.md) | 관리자는 그룹의 도구 선택 목록을 정하고 숨김은 활성 상태를 바꾸지 않는다 | backend, frontend | Accepted. ADR-029의 도구 조회와 저장에 그룹별 숨김을 더한다 |
 | [ADR-20261009 / tool-request-flow](ADR-20261009-tool-request-flow.md) | 도구 사용 요청은 따로 저장하고 관리자는 반영을 확인한 뒤 승인한다 | backend, frontend | Accepted. ADR-029의 관리자 도구 변경에 주인의 요청과 결정 이력을 더한다 |
+| [ADR-20261009 / workspace-explorer](ADR-20261009-workspace-explorer.md) | 실행 공간 파일은 Control Plane 이 읽기 전용으로 붙여 주인에게만 보이고, 지우기는 운영의 권한 도우미에 맡긴다 | backend, frontend | Accepted. ADR-086 의 사용자별 `/workspace` 를 사람이 보는 길이다. HTML 미리보기는 ADR-027 의 격리를 쓴다 |

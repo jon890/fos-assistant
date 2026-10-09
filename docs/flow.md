@@ -442,3 +442,47 @@ sequenceDiagram
 ```
 
 받아들이기 전의 제안은 지금 화면에 보이지만 건수에 세지 않는다.
+
+## 파일 공간을 열 때
+
+경로 규칙과 API 는 [`code-architecture.md`](code-architecture.md) 의 「실행 공간 파일」, 결정은 [ADR-20261009 / workspace-explorer](adr/ADR-20261009-workspace-explorer.md) 가 갖는다.
+
+```mermaid
+sequenceDiagram
+    participant B as 브라우저
+    participant W as Next.js 서버 라우트
+    participant C as Control Plane
+    participant D as 읽기 전용 마운트
+
+    B->>W: /files 를 연다
+    W->>C: GET /api/v1/workspace
+    alt 루트가 설정되지 않았거나 디렉터리가 아니다
+        C-->>B: available false. 「파일 공간을 쓸 수 없어요」
+    else 사용자 디렉터리가 없다
+        C-->>B: exists false. 「아직 에이전트가 만든 파일이 없어요」
+    else
+        C-->>B: 상태와 함께 쓰는 에이전트
+        B->>W: 목록 ?path=
+        W->>C: GET /api/v1/workspace/entries?path=
+        C->>D: u<번호> 부터 조각마다 링크를 따라가지 않고 연다
+        alt 경로 규칙에 어긋난다
+            C-->>B: 400. 목록 대신 오류 안내와 맨 위로 가기
+        else 없거나 링크를 지난다
+            C-->>B: 404. 「찾을 수 없어요」 와 맨 위로 가기
+        else
+            C-->>B: 1,000 줄까지와 truncated
+        end
+    end
+    opt 파일을 고른다
+        B->>B: 확장자와 크기로 미리보기 종류를 정한다
+        alt 미리보기가 있다
+            B->>W: GET /api/workspace/files/<경로>
+            W->>C: 같은 경로
+            C-->>B: 본문과 머리글. HTML 은 스크립트 없는 iframe
+        else 형식이 없거나 크다
+            B->>B: 「미리보기가 없어요」 와 내려받기
+        end
+    end
+```
+
+목록을 연 사이 에이전트가 파일을 바꾸면 다음 읽기에 보인다. 화면은 스스로 다시 읽지 않는다.
