@@ -36,6 +36,11 @@ test("언어별 범위와 시험 및 생성물 제외를 판정한다", () => {
   for (const file of ["backend/src/test/java/App.java", "test/helper.ts", "web/src/a.test.ts", "web/src/a.spec.tsx", "hermes/tests/helper.py", "hermes/plugins/test_demo.py", "hermes/plugins/demo_test.py", "hermes/connectors/demo/tests/helper.py", "hermes/plugins/demo/dist/a.py", "scripts/bundle/tool.mjs", "scripts/node_modules/tool/index.mjs", "hermes/connectors/demo/scripts/build.ts", "web/out/page.tsx"]) assert.equal(limitFor(file), null, file);
 });
 
+test("루트와 모듈의 docs 바로 아래 문서는 1000줄이고 ADR 과 그 밖의 Markdown 은 보지 않는다", () => {
+  for (const file of ["docs/prd.md", "backend/docs/flow.md", "web/docs/prd.md", "hermes/docs/hermes-contract.md"]) assert.equal(limitFor(file), 1000, file);
+  for (const file of ["docs/adr/ADR-001-x.md", "backend/docs/adr/INDEX.md", "hermes/README.md", "README.md", "docs/images/a.md"]) assert.equal(limitFor(file), null, file);
+});
+
 test("새 파일은 상한까지 통과하고 한 줄만 초과해도 실패한다", (t) => {
   const f = fixture(t);
   f.put("backend/src/main/App.java", 500);

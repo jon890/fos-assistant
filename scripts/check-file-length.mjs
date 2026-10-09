@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 // 파일 전체 길이는 빈 줄과 주석을 포함한다. 기존 긴 파일은 기준값보다 늘어나지 못한다.
-import { readdirSync, readFileSync, writeFileSync } from "node:fs";
+// 모듈 문서의 한도는 ADR-20261009 / docs-per-module 이 정한다.
+import { existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -16,7 +17,12 @@ export function lineCount(text) {
   return lines.length - (lines.at(-1) === "" ? 1 : 0);
 }
 
+/** 루트와 모듈의 `docs/` 바로 아래 문서다. ADR 은 `adr/` 아래라 빠진다. */
+const MODULE_DOC = /^(?:(?:backend|web|hermes)\/)?docs\/[^/]+\.md$/;
+const SCAN_DIRS = ["backend/src/main", "web/src", "hermes", "scripts", "docs", "backend/docs", "web/docs"];
+
 export function limitFor(file) {
+  if (MODULE_DOC.test(file)) return 1000;
   const parts = file.split("/");
   if (parts.some((part) => SKIP_DIRS.has(part)) || /\.(test|spec)\.[cm]?[jt]sx?$/.test(file)) return null;
   if (file.startsWith("backend/src/main/") && file.endsWith(".java")) return 500;
@@ -65,7 +71,7 @@ export function checkFileLengths(root, { update = false } = {}) {
   const counts = new Map();
   const errors = [];
   const notices = [];
-  for (const file of ["backend/src/main", "web/src", "hermes", "scripts"]
+  for (const file of SCAN_DIRS.filter((directory) => existsSync(join(root, directory)))
     .flatMap((directory) => sourceFiles(root, directory)).sort()) {
     if (file in baseline.exclusions) continue;
     const count = lineCount(readFileSync(join(root, file), "utf8"));

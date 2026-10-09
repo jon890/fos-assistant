@@ -4,6 +4,8 @@
     "hermes/connectors/gmail/src/html-entities.ts": "HTML 문자 참조를 변환하는 데이터 표다. 실행 로직을 나눌 대상이 아니다."
   },
   "files": {
+    "backend/docs/data-schema.md": 1161,
+    "backend/docs/flow.md": 6039,
     "backend/src/main/java/com/bifos/assistant/chat/application/RestartReconciler.java": 615,
     "backend/src/main/java/com/bifos/assistant/connector/application/ConnectorBindingService.java": 608,
     "backend/src/main/java/com/bifos/assistant/hermes/HttpHermesConnectorClient.java": 569,
@@ -12,6 +14,7 @@
     "backend/src/main/java/com/bifos/assistant/usage/domain/AgentExecution.java": 665,
     "hermes/connectors/naver-blog/src/editor/page.ts": 511,
     "hermes/connectors/naver-blog/src/jobs.ts": 469,
+    "hermes/docs/hermes-contract.md": 2482,
     "web/src/components/agent/skill-editor.tsx": 495,
     "web/src/components/chat/conversation-session.tsx": 2242,
     "web/src/components/chat/model-picker.tsx": 691,

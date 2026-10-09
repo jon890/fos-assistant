@@ -25,8 +25,14 @@
 | --- | --- |
 | `docs/privacy.md` | 바깥 주소가 고정이다. Google OAuth 동의 화면이 이 경로를 가리킨다 |
 | `hermes/docs/hermes-contract.md` | 우리 모듈이 아니라 upstream Hermes 의 동작이다. `hermes/tests/hermes_contract.py` 와 짝이고 Hermes 를 올릴 때만 바뀐다 |
-| 코드 옆 README(`hermes/README.md`, plugin 의 README, `hermes/connectors/` 의 README) | 그 디렉터리를 고치는 PR 의 diff 에 함께 보인다 |
+| 코드 옆 README(`hermes/README.md`, plugin 의 README, `hermes/connectors/` 의 README 등) | 그 디렉터리를 고치는 PR 의 diff 에 함께 보인다 |
+| `docs/self-hosting.md` | 정리 전이다. 구현 전인 계획서가 이 파일의 환경 변수 표를 고친다. 그 계획이 끝나면 README 와 설정 파일 주석으로 옮긴다 |
 | `README.md`, `README.ko.md`, `AGENTS.md` | 문서가 아니라 입구와 규칙이다 |
+
+두 검사가 이 결정을 지킨다.
+
+- `test/unit/doc-files.test.ts`: 정해진 이름과 위 예외 밖에 `.md` 가 생기면 실패한다. 예외는 그 파일의 목록에 까닭과 함께 더한다.
+- `scripts/check-file-length.mjs`: 루트와 모듈 `docs/` 바로 아래 문서는 한 파일 1,000줄까지다. 이미 넘은 파일은 `scripts/file-length-baseline.json` 의 기준값보다 늘지 못하고, 줄면 기준값을 낮춘다. ADR 은 보지 않는다.
 
 **코드와 설정이 이미 가진 값을 문서에 옮겨 적지 않는다.**
 API 경로와 응답 칸의 목록, 설정 키 표, enum 값 목록, 마이그레이션의 칸 표, 상수와 클래스 값이 여기 든다.
