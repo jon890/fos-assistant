@@ -8,6 +8,7 @@ import {
   Bot,
   Cpu,
   Globe,
+  HardDrive,
   Plug,
   Receipt,
   Users,
@@ -28,6 +29,7 @@ const LINKS = [
   { href: "/admin/usage", label: "사용량과 비용", icon: Receipt },
   { href: "/admin/connections", label: "커넥터", icon: Plug },
   { href: "/admin/browsers", label: "브라우저", icon: Globe },
+  { href: "/admin/workspaces", label: "파일 공간", icon: HardDrive },
 ] as const;
 
 function under(pathname: string, href: string): boolean {
