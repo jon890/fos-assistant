@@ -19,8 +19,8 @@ import org.springframework.stereotype.Component;
 /**
  * 끝난 발화를 작업 주인에게 알린다.
  *
- * <p>무엇을 언제 알리는지와 문구는 {@code docs/backend/task.md} 의 「알림」 이 갖는다. 작업의 알림 설정을 지킨다. 알림은 발화의
- * 상태를 바꾸는 트랜잭션 안에서 만들어야 하므로 부르는 쪽 트랜잭션 안에서만 부른다.
+ * <p>무엇을 언제 알리는지는 {@code docs/backend/task.md} 의 「알림」 이, 제목과 까닭 한 줄과 누르면 가는 곳은 이 클래스가 갖는다.
+ * 작업의 알림 설정을 지킨다. 알림은 발화의 상태를 바꾸는 트랜잭션 안에서 만들어야 하므로 부르는 쪽 트랜잭션 안에서만 부른다.
  */
 @Component
 @RequiredArgsConstructor

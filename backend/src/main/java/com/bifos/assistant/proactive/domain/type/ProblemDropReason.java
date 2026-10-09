@@ -1,6 +1,6 @@
 package com.bifos.assistant.proactive.domain.type;
 
-/** 문제 후보를 버린 까닭이다. 판정 순서와 조건은 {@code docs/backend/proactive-check.md} 의 「후보 검사」 가 갖는다. */
+/** 문제 후보를 버린 까닭이다. 판정 순서와 조건은 {@code ProblemJudgement} 가 갖는다(ADR-093). */
 public enum ProblemDropReason {
     /** 문제 키, 문제, 행동, 기대 효과 가운데 빈 것이 있거나 정해진 값 밖의 값이 있다. */
     INCOMPLETE,
