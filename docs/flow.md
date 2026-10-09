@@ -294,7 +294,7 @@ sequenceDiagram
             alt 반영을 확인했다
                 C-->>A: 바인딩 READY
             else 확인하지 못했다
-                C-->>A: 까닭별 409 (CONNECTOR_INSTALL_MISMATCH, CONNECTOR_TOOLS_UNVERIFIED, CONNECTOR_APPLY_SCHEDULED), 외부 호출 실패만 502
+                C-->>A: 까닭별 오류. 대응 표는 connector-install.md 의 「관리자 반영 완료」 가 갖는다. 외부 호출 실패만 502
             end
         end
     end

@@ -328,6 +328,27 @@ class ConnectorBindingDriftTest {
     }
 
     @Test
+    @DisplayName("상한으로 PENDING 이 된 바인딩이 관리자 반영 완료로 READY 가 된 뒤 다시 어긋나면 1 부터 세어 설치를 다시 보낸다")
+    void countsFromOneAfterLimitPendingBindingBecomesReadyAgain() {
+        // 앞 세 주기는 상한 시험과 같다. 네 번째 주기는 READY 로 되돌린 뒤 어긋난 읽기와 다시 보낸 뒤 맞는 읽기다.
+        when(connector.readConnector(agent.hermesProfile(), DEMO))
+                .thenReturn(DRIFTED, INSTALLED, DRIFTED, INSTALLED, DRIFTED, DRIFTED, INSTALLED);
+        when(connector.bindConnector(anyString(), anyString(), anyString(), anyString(), nullable(String.class)))
+                .thenReturn(new InstallResult(false, false));
+        assertThat(applier.resyncDrifted()).as("첫 번째").isEqualTo(1);
+        assertThat(applier.resyncDrifted()).as("두 번째").isEqualTo(1);
+        assertThat(applier.resyncDrifted()).as("상한").isZero();
+        assertThat(reload(demo).status()).isEqualTo(BindingStatus.PENDING);
+        setStatus(demo, BindingStatus.READY);
+
+        assertThat(applier.resyncDrifted()).as("READY 로 되돌린 뒤 첫 어긋남").isEqualTo(1);
+
+        verify(connector, times(3))
+                .bindConnector(eq(agent.hermesProfile()), eq(DEMO), anyString(), anyString(), nullable(String.class));
+        assertThat(reload(demo).status()).isEqualTo(BindingStatus.READY);
+    }
+
+    @Test
     @DisplayName("잠금 확인에 실패해 건너뛴 주기는 연속 어긋남에 들지 않아 확인이 통과한 첫 주기에 설치를 다시 보낸다")
     void doesNotCountRunsSkippedByLockCheck() {
         when(connector.readConnector(agent.hermesProfile(), DEMO)).thenReturn(DRIFTED);

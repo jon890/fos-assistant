@@ -66,7 +66,7 @@ public class ConnectorBindingApplier {
     /** 다음 점검이 이 번호 뒤의 바인딩부터 읽는다. 0 이면 처음부터다. */
     private long driftCursor;
 
-    /** 바인딩 번호마다 다시 맞춰도 연속으로 어긋난 횟수다. 어긋나지 않았거나 잠근 뒤 {@code READY} 가 아닌 것을 보면 지운다. */
+    /** 바인딩 번호마다 다시 맞춰도 연속으로 어긋난 횟수다. 어긋나지 않았거나 잠근 뒤 {@code READY} 가 아닌 것을 보거나 상한으로 {@code PENDING} 이 되면 지운다. */
     private final Map<Long, Integer> driftStreak = new HashMap<>();
 
     /** 30초마다 돈다. 검사에서는 {@code -} 로 끄고 본체를 직접 부른다. */
@@ -175,8 +175,8 @@ public class ConnectorBindingApplier {
      * <p>어긋났으면 트랜잭션을 열어 {@link #applyDue} 와 같은 차례로 잠근 뒤 바인딩을 다시 읽는다. 지워졌거나 그 사이 {@code READY} 가
      * 아니게 됐으면 연속 횟수를 지우고 건너뛴다. 잠금 확인이 실패하면 횟수를 그대로 두고 건너뛴다. 다시 맞춘 바인딩은 {@code READY} 가
      * 아니어서 다음 주기의 대상이 아니다. 다시 맞춰 {@code READY} 가 됐는데 이번에 처리하면 연속 {@value #DRIFT_STREAK_LIMIT} 번째
-     * 어긋남이면 설치를 보내지 않고 {@code PENDING} 으로만 둔다. 연속 횟수는 반영 맞추기를 돌렸거나 상한이라 {@code PENDING} 으로 둔
-     * 트랜잭션이 커밋된 뒤에만 올린다. 한 바인딩의 실패는 경고로 남기고 다음 바인딩으로 간다.
+     * 어긋남이면 설치를 보내지 않고 {@code PENDING} 으로만 둔다. 연속 횟수는 반영 맞추기를 돌린 트랜잭션이 커밋된 뒤에만 올린다. 상한이라
+     * {@code PENDING} 으로 둔 트랜잭션이 커밋되면 횟수를 지워, 관리자 반영 완료로 다시 {@code READY} 가 된 뒤 어긋나면 1 부터 센다. 한 바인딩의 실패는 경고로 남기고 다음 바인딩으로 간다.
      *
      * <p>재시작 대기나 {@code PENDING} 으로 남은 바인딩은 연결 사용자의 그룹마다 세고, 주기 끝에 그룹마다 따로 트랜잭션을 열어 차단되지
      * 않은 관리자마다 알림 한 건을 남긴다. 반영 예정 시각을 적은 바인딩은 반영 예정 확인이 맡으므로 세지 않는다. 알림은 바인딩 상태와
@@ -212,7 +212,12 @@ public class ConnectorBindingApplier {
                     continue;
                 }
                 if (drifted.counted()) {
-                    driftStreak.put(candidate.bindingId(), streak);
+                    if (streak >= DRIFT_STREAK_LIMIT) {
+                        // 상한으로 PENDING 이 됐다. 관리자 반영 완료로 READY 가 된 뒤 다시 어긋나면 1 부터 센다.
+                        driftStreak.remove(candidate.bindingId());
+                    } else {
+                        driftStreak.put(candidate.bindingId(), streak);
+                    }
                 }
                 if (drifted.resynced()) {
                     resynced++;
@@ -300,7 +305,7 @@ public class ConnectorBindingApplier {
      * @param resynced 반영 맞추기를 돌렸는가
      * @param adminTodo 관리자가 할 일이 남았는가. 재시작 대기나 {@code PENDING} 으로 남았다
      * @param restartRequired 재시작 대기인가
-     * @param counted 연속 어긋남 횟수에 넣는가. 반영 맞추기를 돌렸거나 연속 상한이라 {@code PENDING} 으로만 뒀다
+     * @param counted 연속 어긋남 횟수를 바꾸는가. 반영 맞추기를 돌렸으면 올리고, 연속 상한이라 {@code PENDING} 으로만 뒀으면 지운다
      */
     private record Drifted(
             Long groupId, boolean resynced, boolean adminTodo, boolean restartRequired, boolean counted) {
