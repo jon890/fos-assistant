@@ -136,6 +136,12 @@ Control Plane 이 권한을 확인한 에이전트에서 profile 과 접두와 k
 `gateway.max_concurrent_sessions` 는 다른 것이다.
 그쪽은 platform 대화 turn 을 제한하고 `/v1/runs` 에는 걸리지 않는다.
 
+**에이전트를 나눈 한 턴이 같은 순간에 쓰는 자리는 최대 2 이고, 나누지 않은 대화는 1 이다.**
+`ResearchAndBuildFlow` 는 한 턴을 Chief, Researcher 와 Engineer, Synthesizer 의 세 단계로 나눈다.
+Control Plane 이 앞 단계의 실행이 끝난 뒤에 다음 단계를 띄우므로 단계끼리 겹치지 않는다.
+부모가 자식을 기다리는 동안에는 자리를 잡지 않는다.
+둘이 겹치는 것은 Researcher 와 Engineer 뿐이다.
+
 ## 한도 위에 thread pool 이 하나 더 있다
 
 `max_concurrent_runs` 를 통과한 실행은 곧바로 도는 것이 아니라 thread pool 을 한 번 더 지난다.
@@ -146,10 +152,11 @@ result, usage = await asyncio.get_running_loop().run_in_executor(None, _run_sync
 
 `None` 은 그 event loop 의 기본 executor 를 쓰라는 뜻이다.
 Hermes 는 그 executor 를 만들지도 크기를 정하지도 않으므로 Python 의 기본값이 그대로 쓰인다.
-기본값은 `min(32, os.cpu_count() + 4)` 다.
+기본값은 `min(32, os.process_cpu_count() + 4)` 다. Hermes 이미지의 Python 3.13 에서 `ThreadPoolExecutor` 가 이 식을 쓴다.
 
-**`os.cpu_count()` 는 컨테이너에 준 CPU 한도가 아니라 호스트의 코어 수를 본다.**
-그래서 pool 크기는 컨테이너 설정으로 바꿀 수 없고, 호스트를 옮기면 값이 달라진다.
+**`os.process_cpu_count()` 는 CPU affinity 를 보고, 컨테이너의 `cpus` 는 여기에 들어가지 않는다.**
+Docker 의 `cpus` 는 affinity 를 줄이지 않고 CPU 시간 할당량만 정한다. 그래서 affinity 는 호스트 코어 수 그대로다.
+pool 크기는 컨테이너 설정으로 바꿀 수 없고, 호스트를 옮기면 값이 달라진다.
 
 이 크기는 CPU 를 쓰는 일을 가정한 값이다.
 실행이 자리를 잡고 있는 시간의 대부분은 LLM 응답을 기다리는 시간이고 그동안 CPU 를 쓰지 않는다.
@@ -224,3 +231,12 @@ pool 을 키우는 것만으로는 메모리가 늘지 않는다. 스레드를 �
 
 동시 실행 하나는 적어도 약 3.1 MB 를 쓰고, profile 하나가 처음 실행할 때 약 50 MB 가 한 번 는다.
 **3.1 MB 는 하한이다.** 스킬만 올리고 MCP 서버와 대화 기록이 없는 profile 에서 측정한 값이다.
+
+## 측정을 되풀이할 때
+
+- 측정용 gateway 는 운영과 다른 `HERMES_HOME` 을 임시 디렉터리에 따로 두고 s6 에 등록하지 않는다. 운영 gateway 의 상태와 섞이면 결과를 믿을 수 없다.
+- s6 gateway 가 이미 있으면 `HERMES_HOME` 이 달라도 기동을 거부하므로 `--force` 가 필요하다. `--force` 로 띄운 gateway 를 `kill -9` 로 내리지 않는다. 운영 gateway 가 함께 재시작된 적이 있다. TERM 한 번이면 내려간다.
+- 공식 이미지는 root 로 띄운 gateway 를 거부한다. root 가 아닌 사용자로 띄운다.
+- LLM 대신 OpenAI 형태로 답하는 stub 을 두고 요청마다 고정 시간(예: 30초)을 붙잡게 한다. 그 경계로 어느 실행이 언제 시작했는지 읽을 수 있다.
+- 부하 대역의 `POST /v1/runs` 제출이 동기로 막히면 한도를 채울 만큼 동시에 들어가지 못한다. 운영의 제출은 기다리지 않고 `run_id` 와 `status: started` 를 돌려준다. 이 차이를 맞추기 전에는 429 가 나오지 않거나 조회가 실패한 것을 pool 의 성질로 읽지 않는다.
+- 정리 스크립트가 띄운 프로세스 번호(`$!`)가 비면 TERM 을 아무에게도 보내지 못해 gateway 가 고아로 남는다. 명령줄 탐색으로도 내릴 수 있게 한다.
