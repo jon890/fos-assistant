@@ -78,10 +78,14 @@ covers: `backend/src/main/java/com/bifos/assistant/connector/`, `web/src/compone
 - `staleFeatures`: (1) covers 아래 파일만 바뀌면 그 기능이 나온다. (2) 기능 파일도 함께 바뀌면 나오지 않는다. (3) covers 밖 파일만 바뀌면 나오지 않는다. (4) 두 기능이 같은 경로를 가지면 둘 다 나온다.
 - 스크립트를 임시 git 저장소(`mkdtemp` 아래 `git init`, cwd 를 그 저장소로)에서 돌려 경고 줄이 나오고 종료 코드가 0 인지 본다. 이때 env 의 `GITHUB_STEP_SUMMARY` 를 임시 파일로 바꿔 넘기고 그 파일에 같은 경고가 적혔는지 단언한다. 부모의 값이 그대로 넘어가 CI 요약에 가짜 경고가 붙지 않게 한다. 이름을 바꿔 covers 밖으로 옮긴 경우도 경고가 나오는지 본다. 없는 base 를 주면 `알림:` 과 함께 0 이다.
 
+### 4. `test/unit/file-length.test.ts` 의 예시 이름
+
+PR #385 리뷰(P5)가 짚은 것이다. 테스트 「루트와 모듈의 docs 바로 아래 문서는 1000줄이고…」 의 입력 `backend/docs/flow.md`, `web/docs/prd.md` 와 테스트 「모듈 문서는 한도를 넘어도 실패하지 않고 알린다」 의 `backend/docs/flow.md`(그 알림 문구 단언 포함)를 지금 둘 수 있는 이름(`backend/docs/data-schema.md`, `web/docs/code-architecture.md`)으로 바꾼다. 판정은 같으므로 단언 값은 그대로다.
+
 ## 검증
 
 ```bash
-node --test test/unit/feature-covers.test.ts
+node --test test/unit/feature-covers.test.ts test/unit/file-length.test.ts
 node --test 'test/unit/**/*.test.ts'
 node scripts/check-feature-covers.mjs origin/main
 node scripts/check-file-length.mjs
@@ -101,3 +105,4 @@ node scripts/check-file-length.mjs
 | `scripts/check-feature-covers.mjs` | 신규 |
 | `test/unit/feature-covers.test.ts` | 신규 |
 | `.github/workflows/ci.yml` | 수정 |
+| `test/unit/file-length.test.ts` | 수정 |
