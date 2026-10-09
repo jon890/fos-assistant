@@ -3,6 +3,7 @@ package com.bifos.assistant.agent.presentation;
 import com.bifos.assistant.agent.application.AgentToolView;
 import com.bifos.assistant.agent.application.PersonaSnapshot;
 import com.bifos.assistant.agent.application.ToolsetCatalogView;
+import com.bifos.assistant.agent.application.ToolsetRequestView;
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.agent.domain.type.AgentVisibility;
 import com.bifos.assistant.agent.domain.type.CostMode;
@@ -11,7 +12,9 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
+import java.time.Instant;
 import java.util.List;
+import java.util.UUID;
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
 
@@ -163,6 +166,37 @@ public final class AgentDtos {
             boolean skillsEnabled) {}
 
     public record HiddenToolsetsRequest(@NotNull List<@NotBlank String> hidden) {}
+
+    public record RequestToolset(@NotBlank @Size(max = 64) String toolset) {}
+
+    public record DecideToolsetRequest(
+            @NotNull Boolean approve, @Size(max = 200) String reason) {}
+
+    public record ToolsetRequestResponse(
+            UUID id,
+            String agentCode,
+            String agentName,
+            boolean agentDeleted,
+            String requesterName,
+            String toolset,
+            String status,
+            String reason,
+            Instant requestedAt,
+            Instant decidedAt) {
+        static ToolsetRequestResponse from(ToolsetRequestView row) {
+            return new ToolsetRequestResponse(
+                    row.id(),
+                    row.agentCode(),
+                    row.agentName(),
+                    row.agentDeleted(),
+                    row.requesterName(),
+                    row.toolset(),
+                    row.status().name(),
+                    row.reason(),
+                    row.requestedAt(),
+                    row.decidedAt());
+        }
+    }
 
     public record EnabledToolsetAgentView(String code, String name) {}
 
