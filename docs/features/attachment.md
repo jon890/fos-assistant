@@ -144,9 +144,16 @@ sequenceDiagram
 | 다음 턴에서 원본 자동 재조회 | Hermes 기록에는 이미지 대신 자리표시자가 남고 기존 안내는 사본을 먼저 읽는다. 대화·첨부 순번으로 원본을 다시 찾고 권한을 재검증해 입력에 보충해야 한다 |
 
 최소 확장 후보는 Control Plane이 실행의 요청자와 대화에 묶인 첨부 참조를 발급하고,
-Hermes plugin이 그 참조를 원본 이미지로 조립하는 것이다. 사용자나 모델이 임의 파일 경로나 외부 주소를 정하지 못하게 한다.
+profile plugin의 전용 조회 도구가 그 참조를 원본 이미지로 조립하는 것이다. 사용자나 모델이 임의 파일 경로나 외부 주소를 정하지 못하게 한다.
 전체 원본을 매 호출에 넣기보다 필요한 사진을 고르는 보충 도구와 native 입력을 잇는 계약을 먼저 검증한다.
 서른 장을 비교해야 하는 질문에서는 선택한 사진만으로 답의 근거가 충분한지도 확인한다.
+
+MCP의 `ImageContent`만 반환하는 구현으로는 충분하지 않다. 현재 Hermes의
+[`mcp_tool_handlers.py`](https://github.com/NousResearch/hermes-agent/blob/v2026.9.24/tools/mcp_tool_handlers.py)는 이미지를 캐시하고 `MEDIA:` 문자열로 렌더링한다.
+이는 화면 전달 경로이며 모델에 native 이미지를 보충하는 계약이 아니다. `transform_tool_result`도 문자열 반환만 받는다.
+반면 plugin의 `register_tool`과 [`tools/registry.py`](https://github.com/NousResearch/hermes-agent/blob/v2026.9.24/tools/registry.py)는
+`_multimodal`과 `content`를 가진 도구 결과를 지원한다. 이 결과가 같은 모델에 전달되는 경로를 먼저 검증하면 전체 요청 middleware보다 작은 확장이 될 수 있다.
+plugin의 모든 읽기는 Control Plane에서 요청자와 실행·대화 권한을 다시 판정하고, 다음 턴에도 같은 판정을 거쳐야 한다.
 
 상류의 [`llm_request` middleware](https://github.com/NousResearch/hermes-agent/blob/v2026.9.24/hermes_cli/middleware.py)는 요청을 바꿀 수 있으며,
 [`turn_api_request.py`](https://github.com/NousResearch/hermes-agent/blob/v2026.9.24/agent/turn_api_request.py)는 재시도마다 이 경로를 거친다.
