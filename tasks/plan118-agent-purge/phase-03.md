@@ -73,6 +73,7 @@ cd web && pnpm exec tsc --noEmit && pnpm lint
 | `web/src/lib/skill.ts` | 수정 |
 | `web/src/components/usage/skill-usage-list.tsx` | 수정 |
 | `web/src/components/task/task-list.tsx` | 수정 |
+| `test/browser/tasks.spec.ts` | 수정 |
 | `backend/src/test/java/com/bifos/assistant/usage/UsageBreakdownTest.java` | 수정 |
 | `backend/src/test/java/com/bifos/assistant/memory/MemorySourcesTest.java` | 수정 |
 | `backend/src/test/java/com/bifos/assistant/skill/SkillUsageQueryTest.java` | 수정 |
