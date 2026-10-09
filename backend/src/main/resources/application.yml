@@ -20,7 +20,7 @@ spring:
   servlet:
     multipart:
       # 기본 상한 1MB 로는 휴대폰 사진 대부분이 서비스 판정 전에 걸린다.
-      # 한 장 상한 10MB 보다 조금 크게 두어, 조금 넘는 것은 서비스가 입력 오류로 거절하게 한다
+      # 한 장 상한 20MB 보다 조금 크게 두어, 조금 넘는 것은 서비스가 입력 오류로 거절하게 한다
       max-file-size: 21MB
       max-request-size: 22MB
 
@@ -30,7 +30,7 @@ server:
     # 요청 상한을 넘은 본문은 읽기 전에 거절되고, 남은 본문이 이 값보다 크면 Tomcat 이 연결을 끊는다.
     # 그러면 입력 오류 응답이 클라이언트에 닿지 못한다. 요청 상한보다 넉넉히 두어 사진 몇 장 크기까지는
     # 응답을 돌려준다
-    max-swallow-size: 16MB
+    max-swallow-size: 24MB
 
 management:
   endpoints:

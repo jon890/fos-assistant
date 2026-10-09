@@ -197,7 +197,7 @@ class AttachmentUploadLimitTest {
     void createsSmallCopiesForConcurrentUploads() throws Exception {
         int count = 6;
         byte[] content = png(2400, 1800);
-        assertThat(content.length).as("업로드 상한 안").isLessThan(properties.maxBytes());
+        assertThat((long) content.length).as("업로드 상한 안").isLessThan(properties.maxBytes());
         ExecutorService executor = Executors.newFixedThreadPool(count);
         try {
             CountDownLatch ready = new CountDownLatch(count);
