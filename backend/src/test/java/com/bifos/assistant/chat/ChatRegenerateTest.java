@@ -455,11 +455,12 @@ class ChatRegenerateTest {
                 .orElseThrow();
         assertThat(chief.input())
                 .doesNotContain("이미지로 함께 실은")
-                .containsPattern("- 1번째 사진: .*/" + conversationId + "/"
-                        + AttachmentStore.smallName(attachment.id()) + "\\n");
-        assertThat(flowCommands).allSatisfy(command -> assertThat(command.images())
-                .as("flow command %s", command.profileName())
-                .isEmpty());
+                .containsPattern(
+                        "- 1번째 사진: .*/" + conversationId + "/" + AttachmentStore.smallName(attachment.id()) + "\\n");
+        assertThat(flowCommands)
+                .allSatisfy(command -> assertThat(command.images())
+                        .as("flow command %s", command.profileName())
+                        .isEmpty());
         store.delete(attachment);
     }
 

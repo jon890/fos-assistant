@@ -201,8 +201,7 @@ public class AttachmentService {
      * <p>사진이 없으면 한 글자도 붙이지 않는다. 붙이면 그만큼이 매 실행에 실린다. 저장하는 메시지 본문에는
      * 이것을 쓰지 않는다.
      */
-    public AgentInput agentInput(
-            Long conversationId, List<ChatAttachment> attached, String text, boolean embedImages) {
+    public AgentInput agentInput(Long conversationId, List<ChatAttachment> attached, String text, boolean embedImages) {
         if (attached == null || attached.isEmpty()) {
             return new AgentInput(text, List.of());
         }
@@ -243,8 +242,7 @@ public class AttachmentService {
     private static String photoGuidance(String directory, List<AgentPhoto> photos) {
         StringBuilder guidance =
                 new StringBuilder("사진은 모두 ").append(photos.size()).append("장이다.\n");
-        List<AgentPhoto> embedded =
-                photos.stream().filter(AgentPhoto::embedded).toList();
+        List<AgentPhoto> embedded = photos.stream().filter(AgentPhoto::embedded).toList();
         if (!embedded.isEmpty()) {
             guidance.append("이 메시지에 이미지로 함께 실은 사진: ")
                     .append(embedded.stream()

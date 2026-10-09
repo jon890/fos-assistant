@@ -223,9 +223,7 @@ class ChatAttachmentTurnTest {
                     .append(")\n");
         }
         // 이미지가 아닌 바이트라 사본이 생기지 않는다. 아무것도 싣지 않고 사진마다 원본 경로로 안내한다.
-        expected.append("\n")
-                .append("사진은 모두 30장이다.\n")
-                .append("싣지 못한 사진은 아래 경로를 답에 필요한 만큼 vision_analyze 로 확인한다.\n");
+        expected.append("\n").append("사진은 모두 30장이다.\n").append("싣지 못한 사진은 아래 경로를 답에 필요한 만큼 vision_analyze 로 확인한다.\n");
         for (int i = 0; i < selected.size(); i++) {
             expected.append("- ")
                     .append(i + 1)
@@ -235,8 +233,7 @@ class ChatAttachmentTurnTest {
                     .append(selected.get(i).id())
                     .append(".png\n");
         }
-        expected.append(
-                        "지난 메시지의 사진은 같은 폴더의 {첨부 번호}.small.jpg 를, 없으면 원본을 vision_analyze 로 본다. read_file 로 읽지 않는다.\n")
+        expected.append("지난 메시지의 사진은 같은 폴더의 {첨부 번호}.small.jpg 를, 없으면 원본을 vision_analyze 로 본다. read_file 로 읽지 않는다.\n")
                 .append("파일을 올리거나 고치는 도구에는 위 목록의 원본 파일을 쓴다.\n")
                 .append("사용자에게 사진을 가리킬 때는 파일 이름 대신 몇 번째 사진인지로 적는다.\n")
                 .append("\n")
@@ -271,8 +268,8 @@ class ChatAttachmentTurnTest {
                 .contains(
                         "사진은 모두 2장이다.\n",
                         "이 메시지에 이미지로 함께 실은 사진: 1번째 사진. 이미 보이므로 파일로 다시 읽지 않아도 된다.\n",
-                        "싣지 못한 사진은 아래 경로를 답에 필요한 만큼 vision_analyze 로 확인한다.\n"
-                                + "- 2번째 사진: " + agentDirectory(conversationId) + "/" + broken.id() + ".png\n",
+                        "싣지 못한 사진은 아래 경로를 답에 필요한 만큼 vision_analyze 로 확인한다.\n" + "- 2번째 사진: "
+                                + agentDirectory(conversationId) + "/" + broken.id() + ".png\n",
                         "파일을 올리거나 고치는 도구에는 위 목록의 원본 파일을 쓴다.\n")
                 .doesNotContain("- 1번째 사진: " + agentDirectory(conversationId));
     }
@@ -298,8 +295,8 @@ class ChatAttachmentTurnTest {
         assertThat(command.images())
                 .extracting(HermesImage::label)
                 .containsExactly(
-                        "1번째 사진", "2번째 사진", "3번째 사진", "4번째 사진", "5번째 사진", "6번째 사진", "7번째 사진",
-                        "8번째 사진", "9번째 사진", "10번째 사진");
+                        "1번째 사진", "2번째 사진", "3번째 사진", "4번째 사진", "5번째 사진", "6번째 사진", "7번째 사진", "8번째 사진", "9번째 사진",
+                        "10번째 사진");
         assertThat(command.input())
                 .contains("이 메시지에 이미지로 함께 실은 사진: 1번째, 2번째, 3번째, 4번째, 5번째, 6번째, 7번째, 8번째, 9번째, 10번째 사진.");
         List<String> smallLines = command.input()
@@ -333,10 +330,10 @@ class ChatAttachmentTurnTest {
                 photos.stream().map(ChatAttachment::id).toList());
 
         HermesRunCommand command = stub().received().getFirst();
-        assertThat(command.images())
-                .extracting(HermesImage::label)
-                .containsExactly("1번째 사진", "2번째 사진", "3번째 사진");
-        assertThat(command.images().stream().mapToLong(image -> image.dataUrl().length()).sum())
+        assertThat(command.images()).extracting(HermesImage::label).containsExactly("1번째 사진", "2번째 사진", "3번째 사진");
+        assertThat(command.images().stream()
+                        .mapToLong(image -> image.dataUrl().length())
+                        .sum())
                 .isLessThanOrEqualTo(7L * 1024 * 1024);
         assertThat(command.input())
                 .contains(

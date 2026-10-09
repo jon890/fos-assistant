@@ -130,11 +130,7 @@ public class AttachmentImages {
 
     /** 이미 {@code acceptedImages} 장, {@code acceptedEncodedBytes} 길이를 담았을 때 다음 사진을 더 담을 수 있으면 참이다. */
     static boolean admits(
-            int acceptedImages,
-            long acceptedEncodedBytes,
-            long nextEncodedBytes,
-            int maxImages,
-            long maxEncodedBytes) {
+            int acceptedImages, long acceptedEncodedBytes, long nextEncodedBytes, int maxImages, long maxEncodedBytes) {
         return acceptedImages < maxImages && acceptedEncodedBytes + nextEncodedBytes <= maxEncodedBytes;
     }
 

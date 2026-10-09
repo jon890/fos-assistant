@@ -91,15 +91,7 @@ class HermesRunRequestTest {
     void sendsListInputWithTextLabelAndImageWhenImagesGiven() {
         String dataUrl = "data:image/jpeg;base64,AAAA";
         client.submit(new HermesRunCommand(
-                "dad",
-                baseUrl,
-                "안녕",
-                null,
-                null,
-                null,
-                null,
-                null,
-                List.of(new HermesImage("1번째 사진", dataUrl))));
+                "dad", baseUrl, "안녕", null, null, null, null, null, List.of(new HermesImage("1번째 사진", dataUrl))));
 
         JsonNode input = submittedBody().path("input");
         assertThat(input.isArray()).as("input: %s", input).isTrue();
