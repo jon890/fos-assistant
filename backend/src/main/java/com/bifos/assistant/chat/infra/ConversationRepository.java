@@ -60,6 +60,9 @@ public interface ConversationRepository extends JpaRepository<Conversation, Long
             """)
     int markPurged(@Param("id") Long id, @Param("now") Instant now);
 
+    /** 그 에이전트에 사용자가 지웠지만 본문을 아직 지우지 않은 대화가 있는가. 지운 에이전트 정리를 미룰 때 본다(ADR-20261009 / agent-purge). */
+    boolean existsByAgentIdAndDeletedAtIsNotNullAndPurgedAtIsNull(Long agentId);
+
     /** 같은 대화의 첨부 upload 를 장수 확인부터 저장까지 하나씩 처리한다. */
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("""

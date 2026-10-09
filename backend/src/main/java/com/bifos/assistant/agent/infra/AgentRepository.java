@@ -7,6 +7,7 @@ import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.jpa.repository.QueryHints;
 import org.springframework.data.repository.query.Param;
@@ -53,4 +54,13 @@ public interface AgentRepository extends JpaRepository<Agent, Long> {
 
     /** 그 사용자가 주인인 지우지 않은 에이전트 수다. 사용자당 상한을 이 수로 센다. 커넥터 연결용 에이전트는 세지 않는다. */
     long countByOwnerUserIdAndDeletedAtIsNullAndConnectorManagedFalse(Long ownerUserId);
+
+    /**
+     * 정리 기한이 지난 지운 에이전트의 행을 지운다(ADR-20261009 / agent-purge). 지운 행 수를 돌려준다.
+     *
+     * <p>{@code AgentPurgeWriter} 가 행을 잠그고 딸린 줄을 모두 지우거나 비운 뒤에만 부른다.
+     */
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("delete from Agent a where a.id = :id")
+    int deletePurged(@Param("id") Long id);
 }

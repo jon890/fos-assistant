@@ -185,7 +185,7 @@ public class ConversationPurger {
         for (ExecutionSessionRef ref : unique.values()) {
             Agent agent = ref.agentId() == null ? null : byId.get(ref.agentId());
             if (agent == null) {
-                // 주소를 알 길이 없다. 에이전트 줄은 지우지 않으므로 에이전트 없이 돈 실행만 여기 온다.
+                // 주소를 알 길이 없다. 지운 에이전트는 7일 뒤 행이 사라진다. 관리형 profile 의 session 은 profile 과 함께 이미 지워졌다.
                 log.warn(
                         "주소를 몰라 Hermes session 을 지우지 못했다 conversationId={} profile={}",
                         conversation.id(),

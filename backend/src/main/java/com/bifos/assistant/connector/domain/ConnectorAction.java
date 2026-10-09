@@ -70,8 +70,12 @@ public class ConnectorAction {
     @Column(name = "user_id", nullable = false)
     private Long userId;
 
-    /** 판정한 실행의 에이전트다. 승인한 호출은 이 에이전트의 profile 에서 실행한다. 옛 줄은 옛 커넥터 에이전트를 가리킨다. */
-    @Column(name = "agent_id", nullable = false)
+    /**
+     * 판정한 실행의 에이전트다. 승인한 호출은 이 에이전트의 profile 에서 실행한다. 옛 줄은 옛 커넥터 에이전트를 가리킨다.
+     *
+     * <p>지운 에이전트를 정리하면 비어 있다(ADR-20261009 / agent-purge).
+     */
+    @Column(name = "agent_id")
     private Long agentId;
 
     @Column(name = "connector_id", nullable = false, length = 64)
