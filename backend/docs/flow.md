@@ -835,6 +835,7 @@ Control Plane 이 한 대라서 그것으로 된다. 대화 잠금([`backend/doc
 - 파일 이름은 `{첨부 번호}.{확장자}` 다. 올릴 때의 이름을 파일 이름으로 쓰지 않는다.
 - **행을 지우지 않는다.** 파일을 지우고 `deleted_at` 을 적는다.
 - 받는 형식은 `image/jpeg`, `image/png`, `image/gif`, `image/webp` 넷이다. HEIC 는 받지 않는다.
+- 새로 올리는 MPO는 재인코딩 없이 첫 JPEG만 남기고 MPF 정보를 제거한다. 디코딩 검증에 실패하면 원본을 저장하며, `byte_size`는 저장한 바이트 수다. 기존 첨부는 바꾸지 않는다.
 - multipart 상한과 Tomcat 의 `max-swallow-size` 를 서비스 상한보다 크게 두는 까닭은 `application.yml` 의 주석이 갖는다.
 - 상한은 한 번 보낼 때 30장, 한 장 10MB 다. 장수는 아직 메시지에 묶이지 않은 첨부만 센다. 보관 기간은 30일이다.
   10장 33MB 실측을 비례로 계산하면 30장은 약 100MB 이고, 모든 사진이 한 장 상한이면 최대 300MiB 가 저장될 수 있다.
@@ -2421,18 +2422,25 @@ Hermes 가 스킬을 읽는 방식은 [`hermes/docs/hermes-contract.md`](../../h
 
 ```
 <ASSISTANT_SKILL_ROOT>/<profile>/<버전>/<스킬>/SKILL.md
+                                          FORMS.md 같은 맨 위 .md, .txt
                                           references/…
                                           templates/…
+                                          scripts/…
+                                          assets/…
+<ASSISTANT_SKILL_ROOT>/<profile>/.previous/<스킬>/   이전 버전 하나. Hermes 는 읽지 않는다
 ```
+
+`scripts/` 아래 파일은 755, 나머지 파일은 644 로 쓴다. 올리는 쪽이 준 실행 비트는 보지 않는다.
 
 - 저장할 때마다 그 profile 의 올린 스킬 전체를 새 버전 디렉터리에 쓰고, 그 profile 의 `skills.external_dirs` 를 `ASSISTANT_SKILL_AGENT_ROOT` 아래 새 버전 경로로 바꾼다. 쓰는 도중에는 옛 버전이 쓰인다
 - 설정 쓰기가 4xx 로 거절되면 새 디렉터리를 지운다. timeout 과 5xx 는 Hermes 가 이미 반영했을 수 있어 표식 없이 남기고, 다음 게시가 성공한 뒤 그보다 오래된 표식 없는 디렉터리를 지운다. 실패한 저장의 변경은 어느 쪽이든 반영되지 않으므로 다시 저장한다. 표식 있는 옛 버전은 최근 3개만 남긴다
 - 게시에 성공하면 그 버전 디렉터리에 표식 파일 `.published` 를 쓴다. 지금 버전은 표식이 있는 가장 새 디렉터리다
 - 같은 에이전트의 저장은 기다리는 에이전트 행 잠금으로 한 번에 하나씩 돈다. 잠금부터 표식 쓰기까지 한 트랜잭션이다. 그동안 같은 에이전트의 도구 변경과 관리자 수정은 곧바로 `AGENT_BUSY` 이고, 주인의 공개 범위 변경은 저장이 끝날 때까지 기다린다
 - 스킬을 저장하면 그 에이전트의 `skills` toolset 을 함께 켠다. 올린 스킬이 있는 동안은 `skills` 를 끄지 못한다
-- 마지막 남은 스킬을 지우면 새 버전을 쓰지 않고 빈 `external_dirs` 를 게시한 뒤 그 profile 의 버전 디렉터리를 모두 지운다. `skills` toolset 은 그대로 둔다
+- 마지막 남은 스킬을 지우면 새 버전을 쓰지 않고 빈 `external_dirs` 를 게시한 뒤 그 profile 의 버전 디렉터리와 이전 버전을 모두 지운다. profile 디렉터리는 비운 채 남긴다. 실행 공간이 그 디렉터리를 붙이고 있어서다(「스크립트와 실행 공간」). 에이전트를 지울 때만 profile 디렉터리까지 지운다. `skills` toolset 은 그대로 둔다
 
-이름, 파일, 크기, 앞머리, 본문, 개수의 제한 값은 `SkillService` 와 `SkillProperties` 가 갖는다. 어기면 모두 `VALIDATION_FAILED` 다.
+이름, 파일, 경로, 크기, 앞머리, 본문, 개수의 제한 값은 `SkillService` 와 `SkillProperties` 가 갖는다. 어기면 모두 `VALIDATION_FAILED` 다.
+`scripts/` 아래 파일은 「스크립트와 실행 공간」 의 조건을 갖춘 에이전트에만 받고, 저장하는 그 스킬만 본다.
 아래는 값만으로는 알 수 없는 것이다.
 
 - 60자와 개수는 Hermes 색인이 설명을 자르지 않고 커지지 않게 하려는 것이다([ADR-034](adr/ADR-034-올린-스킬은-control-plane-이-버전-디렉터리에-쓰고-hermes-는-읽기만-한다.md) 의 「저장할 수 있는 스킬은 Hermes 가 제대로 고를 수 있는 스킬이다」). 이미 올린 스킬은 설명이 60자를 넘거나 개수가 한도에 닿아도 고칠 수 있다
@@ -2441,7 +2449,11 @@ Hermes 가 스킬을 읽는 방식은 [`hermes/docs/hermes-contract.md`](../../h
 - 앞머리에 비밀 요청 칸을 두지 못한다. Hermes 는 스킬을 읽을 때 이 칸의 이름으로 profile 의 환경 값과 파일을 셸 실행 공간에 넣는다([ADR-086](../../docs/adr/ADR-086-셸과-파일-도구는-사용자별-docker-실행-공간에서만-돈다.md))
 
 경로와 요청, 응답 칸은 `SkillController` 가 갖는다.
-목록은 대시보드 `GET /api/skills?profile=` 에서 읽는다. 켜고 끄기는 전역 토글만 쓰고 `skills.platform_disabled.api_server` 는 쓰지 않는다([`hermes/docs/hermes-contract.md`](../../hermes/docs/hermes-contract.md) 의 「스킬 커맨드와 API server」).
+저장하면 바로 앞 버전을 이전 버전으로 남기고, 관리하는 사람은 그 둘을 맞바꿔 되돌릴 수 있다. 지우면 이전 버전도 함께 지운다.
+일반 경로는 관리자 역할로 요청해도 올린 스킬(`UPLOADED`)만 준다. Hermes 번들과 커넥터가 설치한 스킬의 이름과 설명, 켜고 끄기는 관리자 영역의 경로에서만 다룬다.
+공개된 에이전트의 올린 스킬 목록은 그 에이전트를 쓸 수 있는 사람도 읽지만, 원문은 주인과 관리자만 읽는다.
+숨긴 스킬 이름과 새 스킬 이름이 겹치면 저장은 `SKILL_NAME_TAKEN` 으로 거절하고 화면은 다른 이름을 고르라고 안내한다.
+목록은 대시보드 `GET /api/skills?profile=` 에서 읽는다. 켜고 끄기는 지정한 profile 의 모든 platform 에 적용되는 `skills.disabled` 만 쓰고 `skills.platform_disabled.api_server` 는 쓰지 않는다([`hermes/docs/hermes-contract.md`](../../hermes/docs/hermes-contract.md) 의 「스킬 커맨드와 API server」).
 출처는 Hermes 가 올린 스킬과 모델이 만든 로컬 스킬을 모두 `agent` 로 주므로 쓰지 않는다. 올린 스킬 이름이 `UPLOADED`, 나머지가 `HERMES` 다.
 올린 스킬 이름은 지금 버전과, 지금 버전보다 새로 쓰였지만 표식이 없는 버전에 있는 이름이다. 표식 없는 버전은 게시가 timeout 이나 5xx 로 끝난 것이라 Hermes 가 이미 가리키고 있을 수 있다.
 그 이름은 목록에서 올린 스킬로 보이고, 원문 읽기와 같은 이름으로 다시 저장하기와 지우기가 된다. 다시 저장할 때 본문을 생략한 파일은 그 버전의 내용을 쓴다. 지우면 지금 버전을 다시 게시해 Hermes 가 그 버전에서 벗어난다.
@@ -2452,6 +2464,7 @@ Hermes 가 스킬을 읽는 방식은 [`hermes/docs/hermes-contract.md`](../../h
 
 입력창 맨 앞의 `/<이름>` 을 Control Plane 이 해석한다. 근거는 [ADR-035](adr/ADR-035-대화창의-스킬-커맨드는-control-plane-이-해석해-hermes-에-넘긴다.md) 에 있다.
 
+- 입력창의 `/` 목록은 일반 스킬 API 를 쓰므로 켜진 업로드 스킬만 보여 준다. 기본·커넥터 스킬은 목록에 보이지 않지만, 이름 규칙에 맞는 켜진 스킬을 직접 입력하면 Control Plane 의 전체 목록으로 확인해 실행한다
 - 메시지 내용이 `/이름` 다음에 공백이나 끝이 오는 모양일 때만 커맨드다. 모양은 `SkillCommand` 가 갖는다. 새 요청 칸은 없다
 - 이름에 `.` 이나 `_` 가 든 Hermes 기본 스킬은 커맨드로 부르지 못하고 글 그대로 보낸다. 입력창의 `/` 목록에도 뜨지 않는다. 호출 이력은 Hermes 이름 규칙을 따르므로 모델이 스스로 읽으면 `MODEL` 로 남는다
 - 이름이 그 에이전트의 켜진 스킬 목록에 있으면 Hermes 에 보낼 입력만 사용자가 이 스킬을 호출했으니 `skill_view` 로 읽고 그 절차대로 다음을 하라는 글로 바꾼다. 저장하는 메시지는 사용자가 친 글 그대로다
@@ -2484,6 +2497,9 @@ Hermes 가 스킬을 읽는 방식은 [`hermes/docs/hermes-contract.md`](../../h
 | 권한 판정과 저장 순서 | `skill/application/SkillService` |
 | 호출 이력 적기와 읽기 | `skill/application/SkillUseRecorder`, `skill/application/SkillUsageQuery` |
 | 버전 디렉터리 쓰기와 지우기 | `skill/infra/SkillStore` |
+| 이전 버전 쓰기와 읽기, 지우기 | `skill/infra/PreviousSkillStore` |
+| 스킬 이름과 파일 경로 규칙 | `skill/infra/SkillFilePaths` |
+| 앞머리와 파일, 크기 입력 검사 | `skill/application/SkillInputRules` |
 | `external_dirs` 게시와 대시보드 스킬 목록 | `skill/infra/SkillPublisher`, 호출은 `hermes` |
 | 커맨드 판별과 입력 바꾸기 | `chat/application/SkillCommand` |
 | 커맨드로 부를 수 있는 이름과 그 캐시 | `skill/application/SkillCommandCatalog`, 비우기는 `SkillsChanged` |
@@ -2504,12 +2520,14 @@ sequenceDiagram
     C->>C: 에이전트 행을 잠근다
     C->>F: 표식이 있는 가장 새 버전 디렉터리를 찾는다
     C->>C: 새 스킬이면 설명 60자와 올린 스킬 수 한도를 본다
+    C->>C: 저장하는 스킬에 scripts/ 가 있으면 terminal 이 켜졌는지 본다. 꺼졌으면 여기서 거절한다
     C->>F: 지금 버전의 올린 스킬 전체와 이번 변경을 새 버전 디렉터리에 쓴다
     C->>C: skills toolset 을 함께 켜므로 주인의 첨부 사용자 디렉터리를 만든다 (ADR-091)
-    C->>D: skills.external_dirs 를 새 버전으로, skills toolset 을 켠다, sandbox_owner
+    C->>D: skills.external_dirs 를 새 버전으로, skills toolset 을 켠다, sandbox_owner. scripts/ 가 있으면 지금 도구 목록과 require_sandbox 도
     Note over C,D: skills 를 켜는 목록에 셸·파일 도구가 있으면 plugin 이 실행 공간 설정을 다시 쓰거나 409 로 거절한다
     alt 설정 쓰기 성공
         C->>F: 새 버전에 게시 표식을 쓰고 오래된 버전을 지운다 (표식 있는 최근 3개 남김)
+        C->>F: 이미 있던 스킬이면 바뀌기 전 스킬을 .previous 에 쓴다
         C-->>U: 저장한 스킬
     else 대시보드가 4xx 로 거절
         C->>F: 새 버전 디렉터리를 지운다
@@ -2529,7 +2547,11 @@ sequenceDiagram
 | 관리하는 사람이 아니다 | `FORBIDDEN`. 화면에는 편집 단추가 없다 |
 | Hermes 기본 스킬과 이름이 같다 | `SKILL_NAME_TAKEN` |
 | timeout 뒤 같은 이름으로 다시 저장한다 | 표식 없는 버전에 있는 이름은 올린 스킬로 보고 받는다. Hermes 목록에 먼저 떠 있어도 `SKILL_NAME_TAKEN` 이 아니다 |
-| 파일 경로가 `references/`, `templates/` 밖이거나 상한을 넘는다 | `VALIDATION_FAILED` |
+| 파일 경로가 경로 규칙에 맞지 않거나 상한을 넘는다 | `VALIDATION_FAILED` |
+| 저장하는 스킬에 `scripts/` 가 있는데 그 에이전트에 `terminal` 이 꺼져 있다 | `SKILL_SCRIPTS_NEED_SANDBOX`. 버전 디렉터리를 쓰기 전에 거절한다 |
+| 저장하는 스킬에 `scripts/` 가 있는데 plugin 이 실행 공간이 없다고 거절한다 | `SKILL_SCRIPTS_NEED_SANDBOX`. 대시보드의 409 `sandbox_unavailable` 이다. 4xx 이므로 새 디렉터리를 지운다. plugin 은 실행 공간 디렉터리를 준비하다 난 파일 오류도 같은 409 로 주므로, 그 경우도 이 코드로 안내된다 |
+| 저장하는 스킬에 `scripts/` 가 있는데 주인의 첨부 디렉터리를 준비하지 못한다 | `AGENT_SANDBOX_UNAVAILABLE` 그대로다. 셸 유무가 원인이 아니라서 바꾸지 않는다. 새 디렉터리를 지운다 |
+| 함께 실리는 다른 스킬에 `scripts/` 가 있다 | 보지 않는다. 셸이 꺼진 에이전트도 다른 스킬을 고칠 수 있다 |
 | 앞머리 뒤에 본문이 없다 | `VALIDATION_FAILED`. 새 스킬이든 고치는 스킬이든 같다 |
 | 앞머리에 비밀 요청 칸이 있다 | `VALIDATION_FAILED`. 새 스킬이든 고치는 스킬이든 같다. 이미 올라간 스킬은 읽기와 목록에서 그대로 보인다 |
 | 함께 실리는 기존 스킬에 비밀 요청 칸이 있다 | `VALIDATION_FAILED`. 메시지에 그 스킬 이름이 있다. 저장 검사가 생기기 전에 올린 스킬이 새 버전에 다시 실리지 않게 버전 디렉터리를 쓰기 전에 거절한다. 그 스킬 자체를 고쳐 저장하거나 지우는 것은 된다. 지우기는 이 검사를 하지 않는다 |
@@ -2541,6 +2563,36 @@ sequenceDiagram
 | 지운다 | 그 스킬을 뺀 새 버전을 같은 방법으로 게시한다. 호출 이력은 남는다 |
 | Hermes 안에서 모델이 올린 스킬을 고치려 한다 | 읽기 전용이라 실패한다. 실행 입력 앞 단락이 `skill_manage` 를 쓰지 말라고 알리고, 서명 plugin 이 `skill_manage` 호출을 막는다 |
 | Hermes 를 올려 같은 이름의 번들 스킬이나 로컬 스킬이 생긴다 | 업그레이드와 배포 확인의 이름 충돌 검사가 배포를 멈춘다. 검사는 `fos-home-infra` 가 갖는다 |
+
+**화면 편집기는 아직 `references/`, `templates/` 아래 한 단계 경로만 다룬다.** API 로 넓힌 경로(맨 위 `.md`/`.txt`, `scripts/`, `assets/`, 여러 조각)의 스킬을 편집기에서 저장하면 경로가 잘리거나 거절된다. 편집기가 넓힌 경로를 다루는 것은 화면 PR 에서 한다.
+
+### 스크립트와 실행 공간
+
+`scripts/` 가 든 스킬은 스크립트를 사용자별 docker 실행 공간에서 돌릴 수 있는 에이전트에만 올라간다([ADR-086](../../docs/adr/ADR-086-셸과-파일-도구는-사용자별-docker-실행-공간에서만-돈다.md)).
+
+| 조건 | 누가 보나 | 어기면 |
+| --- | --- | --- |
+| 그 에이전트의 API 도구에 `terminal` 이 켜져 있다 | Control Plane 이 저장 전에 본다 | 409 `SKILL_SCRIPTS_NEED_SANDBOX` |
+| 그 profile 이 실행 공간 정책에 등록돼 있다 | 대시보드 plugin. 게시를 지금 도구 목록과 `require_sandbox: true` 로 보낸다 | 409 `SKILL_SCRIPTS_NEED_SANDBOX` |
+| 실행 공간 정책에 `skill_root` 가 있다 | 대시보드 plugin | 409 `SKILL_SCRIPTS_NEED_SANDBOX` |
+
+plugin 은 셸 설정을 쓸 때 `<skill_root>/<profile>` 을 Hermes 의 스킬 루트 경로 `<FOS_ASSISTANT_SKILL_AGENT_ROOT>/<profile>` 에 읽기 전용으로 붙인다.
+버전 디렉터리 하나가 아니라 profile 디렉터리라서 다시 올린 스크립트가 같은 컨테이너에서 다음 호출부터 보인다.
+경로가 Hermes 와 같아서 `skill_view` 가 알려 준 스킬 디렉터리로 모델이 스크립트를 그대로 부른다. 정책과 마운트의 모양은 [`hermes/README.md`](../../hermes/README.md) 의 「셸 실행 공간」 이 갖는다.
+
+셸을 나중에 끄거나 profile 이 정책에서 빠져도 올린 스크립트 스킬은 남는다. 셸이 꺼지면 스크립트는 돌지 않는다.
+
+### 이전 버전
+
+- 이미 있는 스킬을 저장하면 게시에 성공한 뒤 바뀌기 전 스킬을 `.previous/<스킬>` 에 통째로 쓴다. 편집기 저장과 되돌리기가 모두 같다
+- 임시 디렉터리에 다 쓴 뒤 옮긴다. 쓰다 실패하면 경고 로그만 남기고 저장은 성공으로 둔다. 게시가 이미 끝났기 때문이다
+- 남긴 시각은 그 디렉터리의 `.saved-at` 파일에 UTC 밀리초로 쓰고 `previousSavedAt` 으로 보인다. 응답은 이 파일만 읽는다. 읽지 못하면 경고 로그를 남기고 `null` 로 보이며 읽기와 저장은 막지 않는다. 「이전 버전으로」 는 본문까지 읽으므로 그때는 오류다
+- 바꿔 쓸 때는 옛 이전 버전을 임시 이름으로 옮긴 뒤 새것을 옮기고 옛것을 지운다. 새것을 옮기지 못하면 옛것을 제자리로 되돌린다. 되돌리기도 실패하거나 두 이동 사이에 프로세스가 멈추면 이전 버전이 없어지고, 옛것은 `.old-` 이름으로 남았다가 다음 쓰기 때 지워진다. 두 이동 사이에 잠금 없는 읽기는 이전 버전이 없다고 볼 수 있다
+- 앞선 쓰기가 중단돼 `.previous` 아래 남은 `.old-`, `.tmp-` 항목은 다음 쓰기를 시작할 때 지운다
+- 「이전 버전으로」 는 이전 버전을 기존 저장 경로로 저장한다. 이미 있는 스킬이라 새 스킬의 설명 60자와 개수 한도는 보지 않는다. 비밀 요청 칸과 `scripts/` 조건은 본다. 성공하면 바뀌기 전 스킬이 새 이전 버전이다
+- 스킬을 지우면 이전 버전도 지운다. 게시가 끝난 뒤라 이 지우기가 실패해도 경고 로그만 남긴다
+- `.previous` 가 링크이면 지우지 않고 거절한다. 마지막 스킬을 지울 때는 버전 디렉터리 비우기가 이 거절로 오류가 된다. 그때 Hermes 는 이미 빈 `external_dirs` 를 받았다
+- 새 스킬을 만들면 게시가 끝난 뒤 같은 이름의 남은 이전 버전을 지운다. 지운 스킬의 이전 버전이 새 스킬의 것으로 보이지 않게 하려는 것이다
 
 ### 스킬 커맨드로 보낼 때
 
@@ -3645,7 +3697,7 @@ SSE 자체의 시간 제한은 두지 않고 화면의 수명은 `screen-timeout
 화면은 `Page.startScreencast` 로 JPEG 프레임을 받고, SSE 에 쓴 뒤에 ack 한다.
 받는 쪽이 읽지 않으면 ack 도 멈추므로 Chrome 이 프레임을 더 보내지 않는다.
 2초마다 탭 목록을 보고 바뀌면 `tabs` 를 보낸다. 새 탭이 생기면(로그인 팝업) screencast 를 그 탭으로 옮기고, 붙은 탭이 사라지면 남은 탭으로 옮긴다.
-탭을 옮기면 마지막 `resize` 값을 새 탭에 다시 보낸다.
+크기 변경은 서버에서 150ms 동안 모아 마지막 값만 현재 탭에 적용한다. 탭을 옮기면 마지막 `resize` 값을 screencast 전에 새 탭에 다시 보낸다. 닫힌 화면의 예약은 취소한다.
 붙은 탭의 연결이 끊기면 다시 잇는다. 프레임 없이 연이어 3번을 넘게 끊기면 `closed`(`stopped`)로 닫는다.
 SSE 쓰기가 실패하거나 SSE 가 끊기면 화면을 닫는다.
 15초마다 SSE 에 주석 `ping` 을 보낸다. 쓰지 못하면 끊긴 것으로 보고 `closed` 없이 닫는다. 그래서 말없이 끊긴 화면이 `screen-timeout` 까지 자동 중지를 막지 않는다.
@@ -3656,7 +3708,8 @@ SSE 끝내기도 막힌 쓰기를 기다리지 않는다. emitter 의 `complete(
 
 사건(`frame`, `tabs`, `closed`)의 본문은 `BrowserScreenSession` 이 만든다.
 `POST /api/v1/browser/screen/input` 은 요청자의 열린 화면에만 닿는다. 없으면 `BROWSER_SCREEN_CLOSED` 다.
-입력의 `type` 과 칸, 범위, 본문 크기 상한은 `UserBrowserDtos` 의 검사가 갖고, 각 입력이 부르는 CDP 명령은 `BrowserScreenSession` 이 갖는다. 모양이 틀리면 오류 메시지에 칸 이름만 싣는다.
+입력의 `type` 과 칸, 범위, 본문 크기 상한은 `UserBrowserDtos` 의 검사가 갖고, 각 입력이 부르는 CDP 명령은 `BrowserScreenSession` 이 갖는다.
+`scroll` 입력은 `Runtime.evaluate` 로 페이지 처음과 끝에 쓰는 고정 식만 실행한다. 요청자가 식을 정하지 못한다. 모양이 틀리면 오류 메시지에 칸 이름만 싣는다.
 
 좌표는 프레임 그림 안의 비율이다. 서버가 마지막 프레임의 `deviceWidth`, `deviceHeight` 를 곱해 CSS 픽셀로 바꾸고, 프레임이 아직 없으면 그 입력을 버린다.
 휴대폰의 탭과 끌기는 웹이 `mouse` 와 `wheel` 로 바꿔 보낸다. 그래서 `touch` 는 받지 않는다.
@@ -3664,7 +3717,10 @@ SSE 끝내기도 막힌 쓰기를 기다리지 않는다. emitter 의 `complete(
 
 웹(`web/src/components/browser/`)이 화면을 그리고 입력을 만드는 방식이다. 변환은 `screen-input.ts` 의 순수 함수가 갖는다.
 
-- 프레임은 `<img>` 의 data URL 로 그리고 그림 칸의 폭에 맞춘다. 열 때와 그림 칸의 폭이 바뀔 때 `resize` 를 보낸다. 폭은 그림 칸의 CSS 폭, 높이는 폭의 1.5배이고 위 표의 범위로 자른다
+- 내 브라우저 페이지는 본문 폭 제한 없이 가로 폭을 채운다. 프레임은 `<img>` 의 data URL 로 그리고 화면 높이에 맞춘 칸을 채운다. 열 때와 칸의 폭이나 높이가 바뀔 때 `resize` 를 보낸다. 두 값은 실제 칸의 CSS 크기이고 위 표의 범위로 자른다. 웹은 변경을 300ms 동안 모은다
+- 「전체 화면」은 Fullscreen API 를 쓰고, 지원하지 않거나 거절되면 고정 오버레이를 dialog 의 최상위 레이어에 띄운다. 닫기와 Escape 로 돌아오며 배경은 입력을 받지 않는다
+- 좁은 폭에서도 `mobile` false 를 유지한다. 반응형 배치는 폭을 따르되 기기 에뮬레이션으로 로그인 사이트의 동작을 바꾸지 않는다
+- 「위로」와 「아래로」는 한 화면 높이의 `wheel` 을 보내고, 길게 누르면 350ms마다 반복한다. 「처음으로」와 「끝으로」는 문서 스크롤 위치를 옮긴다. PageUp, PageDown, Space 는 원격 키 입력으로 보내며 원격 입력칸에 초점이 있으면 그 칸의 키 동작을 따른다
 - 포인터 이벤트 하나로 마우스와 터치를 받고, 여러 손가락이면 첫 포인터만 따른다. 마우스는 누름 `down`, 뗌 `up`, 누른 채 움직임 `move`(초당 20번까지)이고, 취소되면 마지막 자리에서 `up` 을 보낸다. 휠은 `wheel` 이고 줄 단위는 16배, 쪽 단위는 그림 높이배로 픽셀로 바꾼다
 - 터치는 움직임 없이(10 CSS 픽셀 이내) 떼면 그 자리의 `down` 과 `up` 이다. 끌면 끈 거리를 프레임의 CSS 픽셀로 늘려 반대 부호의 `wheel` 로 보낸다. 그림 위에서는 화면의 기본 스크롤과 확대를 막는다
 - 글자는 숨긴 입력칸이 받는다. 마우스로 그림을 누르면 초점이 가고, 휴대폰은 「키보드」 단추로 연다. 조합 중이면 보내지 않고, `compositionend` 뒤 한 박자 미뤄 조합을 마친 글자를 보내고 입력칸을 비운다. 500자(UTF-16 단위)를 넘으면 나눠 보낸다

@@ -20,6 +20,8 @@ public final class AgentToolPolicy {
     public static final String SKILLS = "skills";
     /** 사진을 읽는 toolset 이다. 사진을 받는 커넥터는 이것을 함께 선언한다(ADR-044). */
     public static final String VISION = "vision";
+    /** 실행 공간의 셸 toolset 이다. {@code scripts/} 가 든 스킬은 이것이 켜진 에이전트에만 저장한다(ADR-20261009-skill-package). */
+    public static final String TERMINAL = "terminal";
     /** Control Plane 이 여는 MCP 서버의 Hermes 등록 이름이며, 도구 저장 때 허용 목록에 늘 남긴다. */
     public static final String CONTROL_PLANE_MCP = "fos-assistant";
 
