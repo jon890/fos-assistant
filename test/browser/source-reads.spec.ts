@@ -9,50 +9,74 @@ type SourceReads = {
   observationComplete: boolean;
 };
 
-async function openWithSourceReads(page: Page, sourceReads: SourceReads) {
+async function openWithSourceReads(
+  page: Page,
+  sourceReads: SourceReads,
+  includeStoredAnswer = false,
+) {
   const created = await page.request.post("/api/chat", {
     data: { text: "원문 열람 검사", agentCode: "browser" },
   });
   expect(created.ok()).toBeTruthy();
-  const { conversationId } = await created.json() as { conversationId: string };
-  await page.route(`**/api/chat/conversations/${conversationId}/messages`, async (route) => {
-    const response = await route.fetch();
-    const turns = await response.json() as Array<Record<string, unknown>>;
-    turns.push({
-      id: "temporary-source-read",
-      role: "ASSISTANT",
-      content: "임시 답",
-      senderName: null,
-      sourceReads: {
-        completedCount: 99,
-        urls: ["https://evil.example"],
-        requestedUrls: ["https://evil.example/requested"],
-        unresolvedCount: 0,
-        observationComplete: true,
-      },
-    });
-    turns.push({ id: 999_999, role: "SYSTEM", content: "알림 줄", senderName: null });
-    for (const turn of turns) {
-      if (turn.role !== "ASSISTANT") {
-        turn.sourceReads = {
+  const { conversationId } = (await created.json()) as {
+    conversationId: string;
+  };
+  await page.route(
+    `**/api/chat/conversations/${conversationId}/messages`,
+    async (route) => {
+      const response = await route.fetch();
+      const turns = (await response.json()) as Array<Record<string, unknown>>;
+      turns.push({
+        id: "temporary-source-read",
+        role: "ASSISTANT",
+        content: "임시 답",
+        senderName: null,
+        sourceReads: {
           completedCount: 99,
           urls: ["https://evil.example"],
           requestedUrls: ["https://evil.example/requested"],
           unresolvedCount: 0,
           observationComplete: true,
-        };
+        },
+      });
+      turns.push({
+        id: 999_999,
+        role: "SYSTEM",
+        content: "알림 줄",
+        senderName: null,
+      });
+      if (includeStoredAnswer) {
+        turns.push({
+          id: 999_998,
+          role: "ASSISTANT",
+          content: "저장된 답",
+          senderName: null,
+        });
       }
-      if (turn.role === "ASSISTANT") {
-        turn.sourceReads = sourceReads;
+      for (const turn of turns) {
+        if (turn.role !== "ASSISTANT") {
+          turn.sourceReads = {
+            completedCount: 99,
+            urls: ["https://evil.example"],
+            requestedUrls: ["https://evil.example/requested"],
+            unresolvedCount: 0,
+            observationComplete: true,
+          };
+        }
+        if (turn.role === "ASSISTANT") {
+          turn.sourceReads = sourceReads;
+        }
       }
-    }
-    await route.fulfill({ response, json: turns });
-  });
+      await route.fulfill({ response, json: turns });
+    },
+  );
   await page.goto(`/chat/${conversationId}`);
   return page.getByTestId("source-reads");
 }
 
-test("저장된 답의 원문 목록은 완료 수와 주소 수를 구분하고 새 탭으로 연다", async ({ page }) => {
+test("저장된 답의 원문 목록은 완료 수와 주소 수를 구분하고 새 탭으로 연다", async ({
+  page,
+}) => {
   const reads = await openWithSourceReads(page, {
     completedCount: 2,
     urls: ["https://example.com/path"],
@@ -77,16 +101,25 @@ test("저장된 답의 원문 목록은 완료 수와 주소 수를 구분하고
   await expect(requestedLink).toHaveAttribute("target", "_blank");
   await expect(requestedLink).toHaveAttribute("rel", "noreferrer noopener");
   await expect(reads).toContainText("페이지별 성공은 확인하지 못했어요.");
-  await expect(reads).toContainText("일부 열람 결과에서 주소를 확인하지 못했어요.");
+  await expect(reads).toContainText(
+    "일부 열람 결과에서 주소를 확인하지 못했어요.",
+  );
   await expect(reads).toContainText("열람 기록을 모두 확인하지 못했어요.");
-  await expect(page.getByTestId("user-message")).not.toContainText("이번에 연 원문");
-  await expect(page.getByTestId("system-message")).not.toContainText("이번에 연 원문");
-  await expect(page.getByTestId("assistant-message").filter({ hasText: "임시 답" }))
-    .not.toContainText("이번에 연 원문");
+  await expect(page.getByTestId("user-message")).not.toContainText(
+    "이번에 연 원문",
+  );
+  await expect(page.getByTestId("system-message")).not.toContainText(
+    "이번에 연 원문",
+  );
+  await expect(
+    page.getByTestId("assistant-message").filter({ hasText: "임시 답" }),
+  ).not.toContainText("이번에 연 원문");
   await expect(page.getByTestId("source-reads")).toHaveCount(1);
 
   await page.reload();
-  await expect(page.getByTestId("source-reads")).toContainText("확인한 주소 1개");
+  await expect(page.getByTestId("source-reads")).toContainText(
+    "확인한 주소 1개",
+  );
 });
 
 test("확인한 주소가 없으면 빈 상태를 표시한다", async ({ page }) => {
@@ -101,7 +134,40 @@ test("확인한 주소가 없으면 빈 상태를 표시한다", async ({ page }
   await expect(reads).toContainText("기록에서 확인한 원문 주소가 없어요.");
 });
 
-test("요청 주소만 있으면 빈 상태 없이 호출 성공 근거를 보인다", async ({ page }) => {
+for (const [observation, observationComplete] of [
+  ["완전한 관측", true],
+  ["불완전한 관측", false],
+] as const) {
+  test(`열람 흔적이 없는 저장된 답은 ${observation}에서도 원문 목록을 숨긴다`, async ({
+    page,
+  }) => {
+    await openWithSourceReads(
+      page,
+      {
+        completedCount: 0,
+        urls: [],
+        unresolvedCount: 0,
+        observationComplete,
+      },
+      true,
+    );
+
+    await expect(
+      page.getByTestId("assistant-message").filter({ hasText: "저장된 답" }),
+    ).toBeVisible();
+    await expect(page.getByTestId("source-reads")).toHaveCount(0);
+
+    await page.reload();
+    await expect(
+      page.getByTestId("assistant-message").filter({ hasText: "저장된 답" }),
+    ).toBeVisible();
+    await expect(page.getByTestId("source-reads")).toHaveCount(0);
+  });
+}
+
+test("요청 주소만 있으면 빈 상태 없이 호출 성공 근거를 보인다", async ({
+  page,
+}) => {
   const reads = await openWithSourceReads(page, {
     completedCount: 1,
     urls: [],
