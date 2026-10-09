@@ -269,7 +269,7 @@ plugin 디렉터리 root 에 둔다. 소유는 그 plugin 의 저장소다. 같�
 - `options.tool` 과 `verify.tool` 은 `.mcp.json` 서버의 도구 가운데 `readOnlyHint: true` 인 것만 된다. 대시보드가 도구를 부를 때 `tools/list` 로 확인한다. manifest 를 읽을 때는 도구 이름의 형식만 본다. 카탈로그는 요청마다 읽으므로 읽을 때마다 MCP 서버를 띄우지 않는다
 - `.mcp.json` 서버 env 는 `fields[].env` 와 `operator_env`, `owner_attachments_env`, `owner_output_env`, `owner_browser_env` 의 합과 같아야 한다. 다섯 이름은 겹치지 않는다. 하나라도 다르면 그 커넥터를 카탈로그에 내지 않는다
 - `toolsets` 가 목록이 아니거나, 이름이 겹치거나, `vision` 밖의 이름이 하나라도 있으면 그 커넥터를 카탈로그에 내지 않는다. 셸, 파일, 기억, 스킬, 위임 도구는 manifest 로 열리지 않는다([ADR-044](../../backend/docs/adr/ADR-044-커넥터-manifest-는-읽기-전용-이미지-도구만-열-수-있다.md))
-- `attachments` 가 참인데 `toolsets` 에 `vision` 이 없으면 그 커넥터를 카탈로그에 내지 않는다. 이번 메시지의 사진 10장까지는 실행 입력에 실리지만, 싣지 못한 사진과 지난 메시지의 사진은 에이전트가 이미지 도구로 사본 파일을 보기 때문이다([ADR-020](../../backend/docs/adr/ADR-020-사진은-공유-디렉터리에-두고-에이전트가-파일로-읽는다.md), [ADR-20261009 / native-image-input](../../backend/docs/adr/ADR-20261009-native-image-input.md))
+- `attachments` 가 참인데 `toolsets` 에 `vision` 이 없으면 그 커넥터를 카탈로그에 내지 않는다. 이번 메시지의 사진은 실행 입력에 실리지만, 작은 글씨를 다시 볼 때와 싣지 못한 사진, 지난 메시지의 사진은 에이전트가 이미지 도구로 사본 파일을 보기 때문이다([ADR-020](../../backend/docs/adr/ADR-020-사진은-공유-디렉터리에-두고-에이전트가-파일로-읽는다.md), [ADR-20261009 / native-image-input](../../backend/docs/adr/ADR-20261009-native-image-input.md))
 - `icon` 이나 `link` 가 아래 「아이콘과 링크」 를 어기면 그 칸만 null 로 내고 경고 로그를 남긴다. 커넥터는 카탈로그에 그대로 나온다
 - 도구 결과는 MCP 응답의 첫 텍스트 칸을 JSON 으로 읽는다. `structuredContent` 가 있으면 그것을 먼저 쓴다. 실패는 `isError: true` 와 `{"error": {"code": "..."}}` 다
 
