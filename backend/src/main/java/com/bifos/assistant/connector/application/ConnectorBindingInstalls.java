@@ -1,24 +1,36 @@
 package com.bifos.assistant.connector.application;
 
+import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.browser.application.BrowserGatewayTokens;
 import com.bifos.assistant.connector.domain.ConnectorBinding;
 import com.bifos.assistant.hermes.HermesConnectorClient;
 import com.bifos.assistant.hermes.HermesConnectorClient.ConnectorState;
 import com.bifos.assistant.hermes.HermesConnectorClient.InstallResult;
+import com.bifos.assistant.hermes.HermesConnectorClient.ProbeResult;
+import com.bifos.assistant.hermes.HermesToolsetClient;
 import com.bifos.assistant.hermes.dto.ConnectorManifest;
 import java.time.Instant;
+import java.util.Set;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 /**
  * 바인딩의 설치를 다시 보내고, 대시보드의 답과 읽은 설치 상태를 그 바인딩의 방식대로 판정한다(ADR-083).
  *
- * <p>붙이기와 값 바꾸기, 반영 맞추기가 {@link ConnectorBindingService} 안에서 함께 쓴다. 외부 호출의 실패는 부른 쪽이 다룬다.
+ * <p>붙이기와 값 바꾸기, 반영 맞추기가 {@link ConnectorBindingService} 안에서 함께 쓴다. 외부 호출의 실패는 {@link #sendAgain} 과 {@link
+ * #record} 에서는 부른 쪽이 다루고, {@link #resync} 에서는 이 클래스가 경고로 남기고 실패로 돌려준다.
  */
+@Slf4j
 @Component
 @RequiredArgsConstructor
 public class ConnectorBindingInstalls {
+    private static final String STEP_INSTALL = "install";
+    private static final String STEP_INSTALL_STATE = "install-state";
+    private static final String STEP_PROBE = "probe";
+
     private final HermesConnectorClient connector;
+    private final HermesToolsetClient toolsets;
     private final ConnectorBindingProperties properties;
     private final BrowserGatewayTokens tokens;
 
@@ -77,5 +89,65 @@ public class ConnectorBindingInstalls {
         return legacy
                 ? configured
                 : configured && state.enabled() && HermesConnectorClient.MODE_BIND.equals(state.mode());
+    }
+
+    /**
+     * 재시작과 반영 예정 시각을 이미 넘긴 바인딩의 설치를 한 번 다시 보내고 그 profile 에 반영됐는지 본다. 쓸 수 있으면 바인딩을
+     * {@code READY}, 아니면 {@code PENDING} 으로 둔다.
+     *
+     * <p>외부 호출이 실패하면 예외로 알리지 않고 참을 돌려준다. 실패한 단계와 커넥터 번호와 예외 종류만 경고로 남긴다. 예외 메시지와
+     * 원격 응답에는 칸 값이 섞일 수 있어 적지 않는다.
+     *
+     * @return 외부 호출이 실패했는가
+     */
+    boolean resync(ConnectorBinding binding, ConnectorManifest declared, Instant now) {
+        Agent agent = binding.agent();
+        boolean legacy = agent.connectorManaged();
+        String profile = agent.hermesProfile();
+        String step = STEP_INSTALL_STATE;
+        try {
+            // 옛 설치가 꺼져 있으면 다시 보내지 않는다.
+            if (legacy
+                    && (!binding.desiredEnabled()
+                            || !connector.readConnector(profile, declared.id()).enabled())) {
+                binding.pending(now);
+                return false;
+            }
+            step = STEP_INSTALL;
+            if (record(binding, sendAgain(binding, declared, legacy), legacy, now)) {
+                return false;
+            }
+            step = STEP_INSTALL_STATE;
+            if (!installedHere(connector.readConnector(profile, declared.id()), legacy)) {
+                binding.pending(now);
+                return false;
+            }
+            step = STEP_PROBE;
+            ProbeResult probe = connector.probe(profile, binding.mcpServer());
+            binding.connection().recordUndeclaredTools(ConnectorToolPolicies.undeclared(declared, probe.tools()));
+            boolean usable = probe.ok()
+                    && !probe.tools().isEmpty()
+                    && (!legacy
+                            || Set.copyOf(declared.toolsets())
+                                    .equals(Set.copyOf(toolsets.readEnabled(agent.apiBaseUrl(), profile))));
+            if (usable) {
+                binding.ready(now);
+            } else {
+                binding.pending(now);
+            }
+            if (legacy) {
+                // 사진 단추는 있는데 이미지 도구가 없는 상태를 만들지 않는다. 선언한 toolset 이 켜졌을 때만 받는다.
+                agent.acceptConnectorAttachments(usable && declared.attachments());
+            }
+            return false;
+        } catch (RuntimeException ex) {
+            log.warn(
+                    "connector {} failed at {}: {}",
+                    declared.id(),
+                    step,
+                    ex.getClass().getSimpleName());
+            binding.pending(now);
+            return true;
+        }
     }
 }

@@ -18,9 +18,7 @@ import com.bifos.assistant.hermes.ConnectorProfileRejected;
 import com.bifos.assistant.hermes.ConnectorSandboxUnavailable;
 import com.bifos.assistant.hermes.HermesConnectorClient;
 import com.bifos.assistant.hermes.HermesConnectorClient.InstallResult;
-import com.bifos.assistant.hermes.HermesConnectorClient.ProbeResult;
 import com.bifos.assistant.hermes.HermesSkillClient.HermesSkill;
-import com.bifos.assistant.hermes.HermesToolsetClient;
 import com.bifos.assistant.hermes.dto.ConnectorField;
 import com.bifos.assistant.hermes.dto.ConnectorManifest;
 import com.bifos.assistant.shared.auth.CurrentUser;
@@ -67,8 +65,6 @@ import org.springframework.transaction.support.TransactionTemplate;
 public class ConnectorBindingService implements AgentConnectorDetacher {
     private static final String STEP_ENV = "env";
     private static final String STEP_INSTALL = "install";
-    private static final String STEP_INSTALL_STATE = "install-state";
-    private static final String STEP_PROBE = "probe";
     private static final String STEP_DETACH = "detach";
     private static final String STEP_VAULT_IMPORT = "vault-import";
 
@@ -77,7 +73,6 @@ public class ConnectorBindingService implements AgentConnectorDetacher {
     private final AgentRepository agents;
     private final AppUserRepository users;
     private final HermesConnectorClient connector;
-    private final HermesToolsetClient toolsets;
     private final SkillPublisher skills;
     private final ConnectorActionService approvals;
     private final TransactionTemplate transactions;
@@ -99,7 +94,6 @@ public class ConnectorBindingService implements AgentConnectorDetacher {
             AgentRepository agents,
             AppUserRepository users,
             HermesConnectorClient connector,
-            HermesToolsetClient toolsets,
             SkillPublisher skills,
             ConnectorActionService approvals,
             PlatformTransactionManager transactionManager,
@@ -110,7 +104,6 @@ public class ConnectorBindingService implements AgentConnectorDetacher {
                 agents,
                 users,
                 connector,
-                toolsets,
                 skills,
                 approvals,
                 transactionManager,
@@ -124,7 +117,6 @@ public class ConnectorBindingService implements AgentConnectorDetacher {
             AgentRepository agents,
             AppUserRepository users,
             HermesConnectorClient connector,
-            HermesToolsetClient toolsets,
             SkillPublisher skills,
             ConnectorActionService approvals,
             PlatformTransactionManager transactionManager,
@@ -135,7 +127,6 @@ public class ConnectorBindingService implements AgentConnectorDetacher {
         this.agents = agents;
         this.users = users;
         this.connector = connector;
-        this.toolsets = toolsets;
         this.skills = skills;
         this.approvals = approvals;
         this.transactions = new TransactionTemplate(transactionManager);
@@ -479,51 +470,7 @@ public class ConnectorBindingService implements AgentConnectorDetacher {
             binding.pending(now);
             return false;
         }
-        ConnectorManifest declared = manifest.get();
-        Agent agent = binding.agent();
-        boolean legacy = agent.connectorManaged();
-        String profile = agent.hermesProfile();
-        String step = STEP_INSTALL_STATE;
-        try {
-            // 옛 설치가 꺼져 있으면 다시 보내지 않는다.
-            if (legacy
-                    && (!binding.desiredEnabled()
-                            || !connector.readConnector(profile, declared.id()).enabled())) {
-                binding.pending(now);
-                return false;
-            }
-            step = STEP_INSTALL;
-            if (installs.record(binding, installs.sendAgain(binding, declared, legacy), legacy, now)) {
-                return false;
-            }
-            step = STEP_INSTALL_STATE;
-            if (!ConnectorBindingInstalls.installedHere(connector.readConnector(profile, declared.id()), legacy)) {
-                binding.pending(now);
-                return false;
-            }
-            step = STEP_PROBE;
-            ProbeResult probe = connector.probe(profile, binding.mcpServer());
-            binding.connection().recordUndeclaredTools(ConnectorToolPolicies.undeclared(declared, probe.tools()));
-            boolean usable = probe.ok()
-                    && !probe.tools().isEmpty()
-                    && (!legacy
-                            || Set.copyOf(declared.toolsets())
-                                    .equals(Set.copyOf(toolsets.readEnabled(agent.apiBaseUrl(), profile))));
-            if (usable) {
-                binding.ready(now);
-            } else {
-                binding.pending(now);
-            }
-            if (legacy) {
-                // 사진 단추는 있는데 이미지 도구가 없는 상태를 만들지 않는다. 선언한 toolset 이 켜졌을 때만 받는다.
-                agent.acceptConnectorAttachments(usable && declared.attachments());
-            }
-            return false;
-        } catch (RuntimeException ex) {
-            warn(step, declared.id(), ex);
-            binding.pending(now);
-            return true;
-        }
+        return installs.resync(binding, manifest.get(), now);
     }
 
     /** 스킬 이름이 그 profile 에 이미 있으면 붙이지 않는다. 올린 스킬과 Hermes 스킬을 함께 본다. */
