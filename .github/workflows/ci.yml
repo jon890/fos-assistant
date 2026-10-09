@@ -240,6 +240,11 @@ jobs:
           # PR 은 main 의 base, push 는 직전 main, 정기 실행은 현재 main 과 비교한다.
           MIGRATION_BASE: ${{ github.event.pull_request.base.sha || github.event.before || github.sha }}
         run: node scripts/check-migration-versions.mjs "$MIGRATION_BASE"
+      - name: 기능 문서 covers 검사
+        if: github.event_name == 'pull_request'
+        env:
+          FEATURE_BASE: ${{ github.event.pull_request.base.sha }}
+        run: node scripts/check-feature-covers.mjs "$FEATURE_BASE"
 
   hermes:
     name: hermes
