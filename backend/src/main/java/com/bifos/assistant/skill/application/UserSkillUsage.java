@@ -6,8 +6,8 @@ import java.util.UUID;
 /**
  * 사용자 하나가 에이전트 하나에서 스킬 하나를 부른 합계다. 그 사용자 자신이 본다.
  *
- * @param agentCode 에이전트 code
- * @param agentName 에이전트 이름
+ * @param agentCode 에이전트 code. 에이전트 행이 없으면 {@code null}
+ * @param agentName 에이전트 이름. 에이전트 행이 없으면 {@code null}
  * @param skillName 스킬 이름
  * @param count 호출 수
  * @param lastInvokedAt 마지막 호출 시각
@@ -20,5 +20,4 @@ public record UserSkillUsage(
         String skillName,
         long count,
         Instant lastInvokedAt,
-        UUID lastConversationId) {
-}
+        UUID lastConversationId) {}

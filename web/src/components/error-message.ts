@@ -54,6 +54,9 @@ const MESSAGES: Record<string, string> = {
   AGENT_SKILL_REQUESTS_SECRETS:
     "이 에이전트의 스킬 가운데 환경 값이나 파일을 요청하는 것이 있어 이 도구를 켤 수 없어요. 그 스킬을 먼저 고치거나 지워 주세요.",
   SKILL_NAME_TAKEN: "같은 이름의 기본 스킬이 있어요.",
+  SKILL_SCRIPTS_NEED_SANDBOX:
+    "이 에이전트는 실행 공간이 없어 스크립트가 든 스킬을 올릴 수 없어요. 도구에서 셸을 켜 주세요.",
+  SKILL_CHANGED: "그사이 스킬이 바뀌었어요. 스킬을 다시 열어 확인해 주세요.",
   SKILL_NOT_FOUND:
     "스킬을 찾지 못했어요. 이미 지워졌는지 목록에서 확인해 주세요.",
   SKILL_COMMAND_UNKNOWN:

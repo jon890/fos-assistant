@@ -8,6 +8,7 @@ import { buttonVariants } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Notice } from "@/components/ui/notice";
 import { Skeleton } from "@/components/ui/skeleton";
+import { agentLabel } from "@/lib/format";
 import { fetchTasks } from "@/lib/task-api";
 import { describeSchedule, type TaskView } from "@/lib/task";
 
@@ -86,7 +87,7 @@ export function TaskList() {
                     {task.title}
                   </span>
                   <span className="mt-0.5 block text-sm text-muted-foreground">
-                    {task.agentName ?? "에이전트 없음"} ·{" "}
+                    {agentLabel(task.agentName)} ·{" "}
                     {describeSchedule(task.schedule)}
                   </span>
                   <span className="mt-0.5 block text-xs text-muted-foreground">

@@ -47,6 +47,68 @@ export type SkillDetailView = {
   description: string;
   body: string;
   files: SkillFileView[];
+  /** 이전 버전을 남긴 시각(ISO 문자열)이다. 이전 버전이 없으면 null 이다. */
+  previousSavedAt: string | null;
+};
+
+/**
+ * 스킬 묶음 문제의 까닭이다. 백엔드 `SkillPackageReason` 과 같은 값이며 함께 고친다.
+ * 받기가 내는 값(`NOT_ZIP` 부터 `UNSAFE_ENTRY`)과 검사, 에이전트 판정이 내는 값이 섞여 있다.
+ */
+export type SkillPackageReason =
+  | "NOT_ZIP"
+  | "ZIP_TOO_LARGE"
+  | "TOO_MANY_ENTRIES"
+  | "UNPACKED_TOO_LARGE"
+  | "UNSAFE_ENTRY"
+  | "NO_SKILL_MD"
+  | "PATH_NOT_ALLOWED"
+  | "NESTED_SKILL_MD"
+  | "NOT_TEXT"
+  | "FILE_TOO_LARGE"
+  | "TOO_MANY_FILES"
+  | "TOTAL_TOO_LARGE"
+  | "SECRET_VALUE"
+  | "FRONTMATTER_INVALID"
+  | "NAME_INVALID"
+  | "NO_BODY"
+  | "SECRET_REQUEST"
+  | "DESCRIPTION_TOO_LONG"
+  | "NAME_TAKEN"
+  | "LIMIT_REACHED"
+  | "SCRIPTS_NEED_SANDBOX";
+
+/** 묶음의 파일 하나가 지금 스킬과 견줘 어떻게 바뀌는가다. 백엔드 `SkillPackageChange` 와 같다. */
+export type SkillPackageChange = "ADDED" | "CHANGED" | "SAME" | "REMOVED";
+
+/** 묶음의 문제 하나다. 묶음 전체의 문제면 `path` 가 null 이다. */
+export type SkillPackageProblemView = {
+  reason: SkillPackageReason;
+  path: string | null;
+};
+
+/** 묶음의 파일 하나다. `REMOVED` 면 크기는 지금 스킬의 크기다. */
+export type SkillPackageFileView = {
+  path: string;
+  size: number;
+  change: SkillPackageChange;
+};
+
+/**
+ * 스킬 묶음 미리보기다. 문제가 있어도 같은 모양으로 오고, `problems` 가 비어야 올릴 수 있다.
+ * 앞머리를 읽지 못했으면 `name` 과 `description`, `skillMdHead` 가 null 이다.
+ * `baseDigest` 는 같은 이름의 지금 스킬이 있을 때만 차 있고 덮어쓸 때 함께 보낸다.
+ */
+export type SkillPackagePreviewView = {
+  name: string | null;
+  description: string | null;
+  skillMdHead: string | null;
+  existing: boolean;
+  baseDigest: string | null;
+  hasScripts: boolean;
+  files: SkillPackageFileView[];
+  ignored: string[];
+  problems: SkillPackageProblemView[];
 };
 
 /**
@@ -54,10 +116,11 @@ export type SkillDetailView = {
  *
  * <p>`lastConversationId` 는 마지막 호출이 속한 대화의 공개 식별자이고, 그 대화를 지웠으면 null 이다.
  * `agentCode` 는 관리자에게만 오고 그 밖의 사용자에게는 null 이다.
+ * 행이 없는 에이전트는 `agentName` 이 null 이다.
  */
 export type SkillUsageRow = {
   agentCode: string | null;
-  agentName: string;
+  agentName: string | null;
   skillName: string;
   count: number;
   lastInvokedAt: string;

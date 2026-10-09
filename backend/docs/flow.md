@@ -1968,15 +1968,15 @@ profile 을 거두지 못하면 에이전트를 지우지 않고 그 오류를 �
 새 profile 은 재시작 없이 공유 listener 에서 답한다. MCP 도구는 첫 연결까지 1~2분 걸릴 수 있다.
 새 profile 은 그룹 공용 credential 로 돈다([ADR-002](adr/ADR-002-profile은-나누고-ai-계정은-가족이-함께-쓴다.md)).
 
-**지우기는 에이전트 행을 지우지 않는다.** `deleted_at` 을 적고 끈다.
+**지우기는 에이전트 행을 바로 지우지 않는다.** `deleted_at` 을 적고 끈다. 행은 7일 뒤 정리 작업이 지운다(아래 「지운 에이전트 정리」).
 붙은 연결을 먼저 모두 뗀다. 사람이 만든 profile 은 거두지 않으므로 떼지 않으면 그 profile 에 커넥터 서버와 값이 남는다. 순서는 [`backend/docs/flow.md`](flow.md) 의 「설치와 실패 처리」 가 갖는다.
 `profile_managed` 가 참이면 MCP 토큰을 먼저 폐기하고, profile 과 key 파일, 올린 스킬 디렉터리를 지운다. 거짓이면 profile 을 남긴다.
 지우는 사이 주인이 바뀌었으면 `AGENT_BUSY` 로 멈춘다.
 지운 에이전트의 대화는 읽기만 된다. 새 turn 과 다시 생성은 `AGENT_NOT_FOUND` 다.
 
 **대화나 실행이 가리키는 에이전트 행이 아예 없어도 지운 에이전트와 같게 다룬다.**
-`conversation.agent_id` 와 `agent_execution.agent_id` 에 FK 가 없어 행이 사라진 대화와 실행이 남을 수 있다.
-운영에서 그런 대화 하나 때문에 대화 목록 전체가 `AGENT_NOT_FOUND` 로 실패한 적이 있다.
+`conversation.agent_id` 와 `agent_execution.agent_id` 에 FK 가 없고, 지운 에이전트는 7일 뒤 행이 사라진다.
+정리 작업 앞에도 운영에서 행이 없는 대화 하나 때문에 대화 목록 전체가 `AGENT_NOT_FOUND` 로 실패한 적이 있다.
 
 | 경로의 모양 | 에이전트 행이 없을 때 |
 | --- | --- |
@@ -1991,8 +1991,9 @@ profile 을 거두지 못하면 에이전트를 지우지 않고 그 오류를 �
 실행 트리는 에이전트가 없는 노드를 `실행 #번호` 로 그린다.
 대화 목록과 실행 기록은 에이전트를 줄마다 읽지 않고 한 번에 읽는다(`AgentService.byIds`).
 실행 트리는 노드마다 읽는다. 깊이와 노드 수에 상한이 있어 한 번에 읽는 이득이 작다.
-내가 부른 스킬 합계(`SkillUsageQuery.byUser`)는 에이전트를 찾지 못한 묶음을 뺀다.
-사용량 요약의 에이전트별 합계는 에이전트 표를 `left join` 해 행이 없는 실행을 에이전트 번호로 묶어 보인다.
+내가 부른 스킬 합계(`SkillUsageQuery.byUser`)는 에이전트를 찾지 못한 묶음도 이름 없이 내고, 화면이 「지운 에이전트」 로 그린다.
+사용량 요약의 에이전트별 합계는 에이전트 표를 `left join` 해 행이 없는 실행을 에이전트 번호로 묶고, 그 줄의 이름을 「지운 에이전트」 로 낸다.
+기억의 출처는 실행에 에이전트 번호가 있는데 행이 없으면 「지운 에이전트가 남김」 이다. 실행에 에이전트가 없으면 「에이전트가 남김」 이다.
 
 | 무엇 | 어디 |
 | --- | --- |
@@ -2001,7 +2002,46 @@ profile 을 거두지 못하면 에이전트를 지우지 않고 그 오류를 �
 | 허용 목록이 쥔 profile 이름인지 확인 | `agent/application/ReservedProfileNames` port 로 묻는다. 구현은 `people/application/AllowedPersonProfileNames` 다 |
 | 올린 스킬이 있는지 확인하고 지울 때 스킬 디렉터리 지우기 | `agent/application/ProfileSkillFiles` port 로 부른다. 구현은 `skill/application/ProfileSkillFilesAdapter` 다 |
 | 에이전트에 적는 흐름 이름 확인 | `agent/application/KnownFlows` port 로 묻는다. 구현은 `chat/application/FlowRegistry` 다 |
+| 지운 에이전트 정리의 차례와 재시도 | `agent/application/AgentPurger` |
+| 정리의 데이터베이스 트랜잭션 | `agent/application/AgentPurgeWriter` |
+| 위 패키지의 딸린 줄을 기다리고 지우기 | `agent/application/AgentPurgeParticipant` port 로 부른다. 구현은 `chat/application/ConversationAgentPurge`, `proactive/application/ProactiveAgentPurge`, `connector/application/ConnectorAgentPurge` 다 |
 | 대시보드 호출 | `hermes` |
+
+#### 지운 에이전트 정리
+
+`AgentPurger` 가 `assistant.agents.purge-cron` 마다 돈다. 결정과 까닭은 [ADR-20261009 / agent-purge](adr/ADR-20261009-agent-purge.md) 가 갖는다.
+
+```mermaid
+flowchart TD
+    A[지운 지 purge-after 가 지난 에이전트를<br/>지운 순서대로 20개, 실패해 기다리는 간격 안의 것은 빼고] --> B{후보가 있나}
+    B -- 없다 --> Z[끝. 로그 없음]
+    B -- 있다 --> R{읽기 트랜잭션: 지금 지울 수 있나<br/>지웠지만 정리되지 않은 대화가 없나}
+    R -- 아니다 --> J
+    R -- 그렇다 --> C{profile_managed}
+    C -- 참 --> D[profile 거두기<br/>대시보드 404 와 없는 파일은 끝난 것]
+    C -- 거짓 --> E
+    D -- 실패 --> F[기다리는 간격을 두 배로<br/>다섯 번째면 error 로그]
+    D -- 성공 --> S[스킬 디렉터리 지우기<br/>실패해도 warn 로그만 남기고 계속]
+    S --> E[트랜잭션: 에이전트 행을 쓰기 잠금]
+    E --> G{지운 에이전트가 맞나<br/>purge-after 가 지났나}
+    G -- 아니다 --> H[건너뜀]
+    G -- 맞다 --> I{참여자 가운데 기다리라는 곳이 있나<br/>지웠지만 정리되지 않은 대화}
+    I -- 있다 --> J[다음 차례로 미룸]
+    I -- 없다 --> K[참여자가 딸린 줄을 지우거나 비움<br/>agent 의 설정과 요청 줄을 지움<br/>에이전트 행을 지움]
+    K -- 실패 --> F
+```
+
+| 갈리는 지점 | 어떻게 되나 |
+| --- | --- |
+| 사용자가 지웠지만 아직 정리되지 않은 대화가 있다 | 미룬다. profile 을 거두기 전에 읽기 트랜잭션으로 먼저 보므로 Hermes 를 부르지 않는다. 쓰기 트랜잭션에서 한 번 더 본다. 대화 정리가 끝나면 다음 차례에 지운다. 실패로 세지 않는다 |
+| 정리 작업이 대기 여부를 본 뒤 사용자가 그 에이전트의 대화를 지운다 | 행이 먼저 지워지면 대화 정리는 Hermes session 을 지우지 못하고 경고 로그만 남긴다 |
+| 같은 에이전트를 두 차례가 함께 본다 | 쓰기 잠금을 먼저 잡은 쪽이 지우고, 뒤쪽은 행이 없어 건너뛴다 |
+| profile 거두기는 성공하고 트랜잭션이 실패했다 | 행이 남는다. 다음 차례가 거두기부터 다시 하고, 이미 거둔 것은 끝난 것으로 본다 |
+| 서버를 다시 띄웠다 | 기다리는 간격이 사라져 실패하던 에이전트를 곧바로 다시 본다 |
+| 한 차례가 20초를 넘겼다 | 남은 후보를 다음 차례로 넘긴다. 다른 주기 작업과 scheduler 스레드를 함께 쓰기 때문이다 |
+
+`AgentPurger` 자신의 로그는 정리한 수, 미룬 수, 실패한 수와 실패한 에이전트 번호만 남긴다. 이름과 profile 이름은 적지 않는다.
+profile 거두기를 하는 대시보드 클라이언트는 지금처럼 profile 이름을 로그에 남긴다. 이미 지운 profile 이면 404 를 받아 「이미 없다」 는 info 로그가 남는다.
 
 ### 페르소나를 고칠 때
 
@@ -2538,6 +2578,8 @@ Hermes 가 스킬을 읽는 방식은 [`hermes/docs/hermes-contract.md`](../../h
 | zip 받기(묶음 형식을 경로와 바이트 목록으로) | `skill/application/SkillPackageZip` |
 | 묶음 검사(경로, 글 파일, 크기, 비밀값, 앞머리) | `skill/application/SkillPackageCheck` |
 | 지금 스킬의 지문 | `skill/domain/SkillBundle` 의 `digest()` |
+| 미리보기와 올리기 | `skill/application/SkillPackageService`, 저장은 `SkillService` |
+| 미리보기의 파일별 바뀜과 `SKILL.md` 앞부분 | `skill/application/SkillPackageDiff` |
 | `external_dirs` 게시와 대시보드 스킬 목록 | `skill/infra/SkillPublisher`, 호출은 `hermes` |
 | 커맨드 판별과 입력 바꾸기 | `chat/application/SkillCommand` |
 | 커맨드로 부를 수 있는 이름과 그 캐시 | `skill/application/SkillCommandCatalog`, 비우기는 `SkillsChanged` |
@@ -2636,7 +2678,7 @@ plugin 은 셸 설정을 쓸 때 `<skill_root>/<profile>` 을 Hermes 의 스킬 
 
 관리하는 사람이 스킬 하나를 zip 묶음으로 올리는 길의 앞부분이다. 근거는 [ADR-20261009 / skill-package](../../docs/adr/ADR-20261009-skill-package.md) 에 있다.
 받기는 묶음의 형식을 경로와 바이트의 목록으로 바꾸고, 검사는 그 목록만 보고 판정한다. GitHub 가져오기를 더하면 받기 하나만 더하고 검사는 그대로 쓴다.
-미리보기와 올리기 경로는 아직 열지 않았다.
+화면은 같은 zip 을 미리보기와 올리기에 한 번씩 보낸다. 서버는 그 사이에 아무것도 남기지 않는다. 그 두 경로는 아래 「스킬 묶음 미리보기와 올리기」 절이 갖는다.
 
 #### 묶음 받기
 
@@ -2667,6 +2709,75 @@ JDK 의 `ZipInputStream` 은 항목의 unix mode 를 주지 않아 심볼릭 링
 문제는 하나에서 끝내지 않고 단계 순서대로 모은다. 화면이 한 번에 모두 보여야 하기 때문이다. 문제의 수 상한은 `SkillPackageCheck` 가, 문제의 까닭 값은 `SkillPackageReason` 이 갖는다.
 검사의 문제 경로는 감싼 폴더를 벗긴 뒤의 경로이고 받기의 문제 경로는 zip 에 적힌 원래 이름이다. 둘 다 응답과 로그를 어지럽히지 않게 정해진 길이에서 자른다.
 덮어쓰기 확인에 쓸 지금 스킬의 지문은 `SkillBundle.digest()` 다. 경로 순으로 `경로 NUL 내용 NUL` 을 이은 UTF-8 의 SHA-256 이고 `SKILL.md` 도 그 경로로 넣는다.
+
+### 스킬 묶음 미리보기와 올리기
+
+경로와 요청, 응답 칸은 `SkillPackageController` 와 `SkillDtos` 가 갖는다. 미리보기와 올리기 모두 관리하는 사람만 하고, 권한을 본 뒤에야 zip 을 푼다.
+
+```mermaid
+sequenceDiagram
+    participant U as 사용자 브라우저
+    participant C as Control Plane
+    participant F as 스킬 공유 디렉터리
+    participant D as Hermes 대시보드
+
+    U->>C: POST /api/v1/agents/{code}/skill-packages/preview (zip)
+    C->>C: 권한, 받기, 검사
+    C->>F: 같은 이름의 지금 스킬을 읽는다
+    C->>D: 기본 스킬 이름, scripts 가 있으면 켜진 도구
+    C-->>U: 파일과 바뀐 표시, 문제 목록, 지금 스킬의 지문
+    U->>U: 문제가 없으면 확인. 덮어쓰기면 바뀐 파일을 보고 한 번 더 확인
+    U->>C: POST /api/v1/agents/{code}/skill-packages (zip, baseDigest)
+    C->>C: 권한, 받기와 검사를 다시 한다
+    C->>C: 에이전트 행을 잠그고 지금 스킬의 지문을 baseDigest 와 견준다
+    C->>F: 새 버전 디렉터리를 쓴다
+    C->>D: external_dirs. scripts 가 있으면 도구 목록과 require_sandbox 를 함께
+    alt 게시 성공
+        C->>F: 표식, 옛 버전 정리, 바뀌기 전 스킬을 이전 버전으로
+        C-->>U: 저장한 스킬
+    else 실행 공간이 없다
+        C->>F: 새 버전 디렉터리를 지운다
+        C-->>U: 409 SKILL_SCRIPTS_NEED_SANDBOX
+    end
+```
+
+#### 묶음 미리보기
+
+미리보기는 문제가 있어도 200 으로 답한다. 화면이 문제를 모두 한 번에 보여야 하고, 공통 오류 응답에 세부 칸을 더하지 않으려는 것이다.
+요청의 파일 크기가 zip 상한을 넘으면 바이트를 읽지 않고 권한만 본 뒤 `ZIP_TOO_LARGE` 하나만 든 미리보기를 준다.
+
+검사의 문제 뒤에 에이전트에 따른 판정을 붙인다. 앞머리 이름이 이름 규칙에 맞을 때만 본다.
+
+- 같은 이름의 올린 스킬이 없으면 Hermes 기본 스킬과 같은 이름(`NAME_TAKEN`), 개수 한도(`LIMIT_REACHED`), 새 스킬 설명 60자(`DESCRIPTION_TOO_LONG`)를 본다. 규칙은 편집기 저장과 같은 `NewSkillRules` 다
+- `scripts/` 가 있으면 그 에이전트의 API 도구에 `terminal` 이 켜져 있어야 한다(`SCRIPTS_NEED_SANDBOX`)
+
+같은 이름의 올린 스킬은 지금 버전, 없으면 표식 없는 더 새 버전에서 찾는다. 있으면 그 지문을 `baseDigest` 로 준다.
+파일 목록은 `SKILL.md` 를 첫 줄로 두고 지금 스킬과 내용을 견줘 더해짐, 바뀜, 같음을 붙인다. 지금 스킬에만 있는 파일은 지워짐으로 지금 크기와 함께 뒤에 붙인다.
+`SKILL.md` 앞부분도 함께 준다. 화면은 마크다운으로 그리지 않고 글 그대로 보인다.
+
+#### 묶음 올리기
+
+올리기는 받기와 검사, 에이전트에 따른 판정을 다시 한다. 문제가 있으면 400 `SKILL_PACKAGE_INVALID` 이고 메시지에 첫 문제가 있다.
+문제가 `SCRIPTS_NEED_SANDBOX` 하나뿐이면 409 `SKILL_SCRIPTS_NEED_SANDBOX` 다. plugin 이 거절한 경우와 같은 코드라 화면이 같은 까닭을 보인다.
+그 뒤 에이전트 행을 잠근 채 지금 스킬의 지문을 `baseDigest` 와 견주고 편집기 저장과 같은 경로로 저장한다. 미리보기와 올리기 사이의 다른 저장을 막는 것은 이 비교 하나다.
+
+| 지금 스킬 | `baseDigest` | 결과 |
+| --- | --- | --- |
+| 없다 | 없다 | 새로 만든다 |
+| 없다 | 있다 | 409 `SKILL_CHANGED`. 미리보기 뒤에 지워졌다 |
+| 있다 | 없다 | 409 `SKILL_CHANGED`. 덮어쓰기를 확인받지 않았다 |
+| 있다 | 같다 | 덮어쓴다. 바뀌기 전 스킬이 이전 버전이 된다 |
+| 있다 | 다르다 | 409 `SKILL_CHANGED`. 미리보기 뒤에 누가 고쳤다 |
+
+- `baseDigest` 가 비었거나 공백뿐이면 없는 것으로 본다
+- 새 스킬은 잠금 안에서 Hermes 기본 스킬 이름과 개수 한도, 설명 60자를 한 번 더 본다. 미리보기 뒤에 바뀌어 어기면 편집기 저장과 같은 `SKILL_NAME_TAKEN`, `VALIDATION_FAILED` 다
+- 저장 직전에 앞머리 규칙도 한 번 더 본다. 묶음 검사를 거치지 않은 호출자가 생겨도 비밀 요청 칸이 빠지지 않게 하려는 것이다
+- 파일 크기가 zip 상한을 넘으면 바이트를 읽지 않고 권한만 본 뒤 `SKILL_PACKAGE_INVALID` 다
+
+#### GitHub 가져오기 자리
+
+아직 만들지 않았다. 공개 저장소의 한 디렉터리를 내려받아 받기와 같은 경로·바이트 목록을 만드는 받기 하나를 더한다.
+검사와 미리보기, 올리기와 지문 확인은 그대로 쓴다.
 
 ### 스킬 커맨드로 보낼 때
 

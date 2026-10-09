@@ -17,6 +17,9 @@ spring:
     out-of-order: true
 
 assistant:
+  agents:
+    # 검사가 뜰 때마다 지운 에이전트의 정리가 함께 돌지 않게 끈다. 검사는 그 메서드를 직접 부른다
+    purge-cron: "-"
   usage:
     reconcile-cron: "-"
   chat:

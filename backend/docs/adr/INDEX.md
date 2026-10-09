@@ -27,7 +27,7 @@ Control Plane(`backend/`) 한 층의 코드가 지키는 결정이다.
 | [ADR-030](ADR-030-모델과-effort-는-대화가-고르고-기본값은-hermes-profile-이-갖는다.md) | 모델과 effort 는 대화가 고르고 기본값은 Hermes profile 이 갖는다 | Accepted. ADR-007 의 모델 부분을 대체한다. 기본값을 profile 에 두는 부분은 ADR-054 가 대체한다 |
 | [ADR-031](ADR-031-mcp-호출의-부모-실행은-profile-플러그인이-서명한-루트-session-으로-잇는다.md) | MCP 호출의 부모 실행은 profile 플러그인이 서명한 루트 session 으로 잇는다 | Accepted. ADR-017 의 부모 잇기를 정한다. 일부는 ADR-032 가 대체한다. 하위 에이전트 session 의 주인은 ADR-037 이 정한다 |
 | [ADR-032](ADR-032-mcp-토큰은-profile-을-증명하고-실제-사용자는-부모-실행에서-정한다.md) | MCP 토큰은 profile 을 증명하고 실제 사용자는 부모 실행에서 정한다 | Accepted. ADR-003, ADR-017, ADR-028 의 요청자 판정과 ADR-031 의 일부를 대체한다. 하위 에이전트 session 의 요청자는 ADR-037 이 대체한다 |
-| [ADR-033](ADR-033-사용자가-에이전트를-만들고-공개해도-만든-사람이-관리한다.md) | 사용자가 에이전트를 만들고, 공개해도 만든 사람이 관리한다 | Accepted. 연결용 에이전트의 일반 편집 권한은 ADR-039 가 대체한다 |
+| [ADR-033](ADR-033-사용자가-에이전트를-만들고-공개해도-만든-사람이-관리한다.md) | 사용자가 에이전트를 만들고, 공개해도 만든 사람이 관리한다 | Accepted. 연결용 에이전트의 일반 편집 권한은 ADR-039 가 대체한다. 지운 에이전트의 행을 남긴다는 부분은 [ADR-20261009 / agent-purge](ADR-20261009-agent-purge.md) 가 7일 뒤에 한해 대체한다 |
 | [ADR-034](ADR-034-올린-스킬은-control-plane-이-버전-디렉터리에-쓰고-hermes-는-읽기만-한다.md) | 올린 스킬은 Control Plane 이 버전 디렉터리에 쓰고 Hermes 는 읽기만 한다 | Accepted. 스크립트를 받지 않는다는 부분은 [ADR-20261009 / skill-package](../../../docs/adr/ADR-20261009-skill-package.md) 가 대체한다 |
 | [ADR-035](ADR-035-대화창의-스킬-커맨드는-control-plane-이-해석해-hermes-에-넘긴다.md) | 대화창의 스킬 커맨드는 Control Plane 이 해석해 Hermes 에 넘긴다 | Accepted |
 | [ADR-036](ADR-036-추천-질문은-사용자의-대화-이력으로-모델이-만들고-메모리에만-둔다.md) | 추천 질문은 사용자의 대화 이력으로 모델이 만들고 메모리에만 둔다 | Accepted |
@@ -66,6 +66,7 @@ Control Plane(`backend/`) 한 층의 코드가 지키는 결정이다.
 | [ADR-20261008 / browser-gateway-token](ADR-20261008-browser-gateway-token.md) | 브라우저 중계의 접근 표식은 바인딩 번호에서 HMAC 으로 만들고 표에 두지 않는다 | Accepted. [ADR-20261007 / user-browser](../../../docs/adr/ADR-20261007-user-browser.md) 의 무작위 표식과 해시 표를 바꾼다 |
 | [ADR-20261008 / conversation-purge](ADR-20261008-conversation-purge.md) | 지운 대화는 정리 작업이 본문과 Hermes session 까지 지우고, 대화 줄과 실행 줄은 본문 없이 남긴다 | Accepted. `backend/docs/data-schema.md` 의 「대화를 지워도 메시지와 Hermes session 은 남긴다」 를 바꾼다 |
 | [ADR-20261008 / data-encryption](ADR-20261008-data-encryption.md) | 사용자 본문은 서버 KEK 로 감싼 사용자별 데이터 key 로 저장할 때 암호화하고, 대화 메시지부터 적용한다 | Accepted. ADR-055 의 암호문 모양과 알고리즘을 그대로 쓴다 |
+| [ADR-20261009 / agent-purge](ADR-20261009-agent-purge.md) | 지운 에이전트는 7일 뒤 정리 작업이 행을 지우고, 설정과 권한은 함께 지우되 대화와 실행과 승인 이력은 남긴다 | Accepted. ADR-033 이 기각한 「지우면 에이전트 행도 지운다」 를 7일 뒤에 한해 뒤집는다 |
 | [ADR-20261009 / native-image-input](ADR-20261009-native-image-input.md) | 사진마다 줄인 사본 파일을 원본 옆에 두고, 이번 메시지의 사진은 그 사본을 실행 입력에 직접 싣는다 | Accepted. ADR-020 의 「대화 본문에 사진을 실을 수 없다」 를 바꾼다 |
 
 ## 보관
