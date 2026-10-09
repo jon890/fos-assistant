@@ -91,8 +91,8 @@ class ChatAttachmentTurnTest {
     private static final byte[] IMAGE = "not really a png".getBytes(StandardCharsets.UTF_8);
 
     /** 지시문에서 「입력에 싣지 못한 사진: …번째 사진. 」 뒤에 붙는 안내다. */
-    private static final String NOT_EMBEDDED_GUIDANCE = "이 사진은 도구로 읽지 말고, 사용자에게 볼 수 없었다고 알리고 다시 보내 달라고 한다."
-            + " WebP 처럼 읽지 못하는 형식이면 JPEG 나 PNG 로 바꿔 달라고 한다.\n";
+    private static final String NOT_EMBEDDED_GUIDANCE =
+            "이 사진은 도구로 읽지 말고, 사용자에게 볼 수 없었다고 알리고 다시 보내 달라고 한다." + " WebP 처럼 읽지 못하는 형식이면 JPEG 나 PNG 로 바꿔 달라고 한다.\n";
 
     @Autowired
     ChatService chat;

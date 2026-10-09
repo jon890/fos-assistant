@@ -114,7 +114,11 @@ class AttachmentImagesTest {
         assertThat(AttachmentImages.sendWaitNanos(deadline, deadline - TimeUnit.SECONDS.toNanos(2)))
                 .as("마감이 2초 남으면 2초")
                 .isEqualTo(TimeUnit.SECONDS.toNanos(2));
-        assertThat(AttachmentImages.sendWaitNanos(deadline, deadline)).as("마감 시각이면 0").isZero();
-        assertThat(AttachmentImages.sendWaitNanos(deadline, deadline + 1)).as("마감이 지나면 0").isZero();
+        assertThat(AttachmentImages.sendWaitNanos(deadline, deadline))
+                .as("마감 시각이면 0")
+                .isZero();
+        assertThat(AttachmentImages.sendWaitNanos(deadline, deadline + 1))
+                .as("마감이 지나면 0")
+                .isZero();
     }
 }
