@@ -114,7 +114,12 @@ sequenceDiagram
 ### 시작 전 점검
 
 `ProactiveCheckReadiness` 가 까닭을 차례로 보고 걸린 것을 모두 모은다. `AGENT_NOT_SUPPORTED` 면 스킬과 toolset 은 보지 않고 Hermes 를 부르지 않는다.
-까닭 코드의 뜻은 `CheckBlockerCode` 가, 허용 목록은 `ProactiveCheckReadiness.ALLOWED_TOOLSETS` 가 갖는다. 허용 목록에서 뺀 까닭은 아래다.
+
+사진이 있는 일반 turn에서 자동 추가하는 내부 `fos-attachments`도 읽기 전용과 쓰기 허용 모두 받는다.
+이 도구는 현재 실행의 같은 대화에서 보낸 사진만 읽으며 사용자 설정에 노출하지 않는다.
+원본 도구 때문에 살펴보기 준비 상태가 막히지 않게 한다.
+권한과 조회 한도는 [원본 사진 조회](attachment.md)의 계약을 따른다.
+까닭 코드의 뜻은 `CheckBlockerCode` 가, 허용 판정은 `ProactiveCheckReadiness` 가 갖는다. 허용 목록에서 뺀 까닭은 아래다.
 
 | 빠진 toolset | 까닭 |
 | --- | --- |
