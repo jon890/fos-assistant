@@ -44,6 +44,7 @@ public class AttachmentService {
     private final AttachmentStore store;
     private final AttachmentProperties properties;
     private final Clock clock;
+    private final AttachmentImages images;
 
     /**
      * 사진 한 장을 올린다.
@@ -104,6 +105,16 @@ public class AttachmentService {
             throw new ApiException(ErrorCode.INTERNAL_ERROR, "could not read the uploaded image", ex);
         }
         return attachment;
+    }
+
+    /**
+     * 올린 사진의 줄인 사본을 만든다. 만들지 못해도 실패하지 않는다.
+     *
+     * <p>트랜잭션 밖에서 부른다. 화면은 고른 사진을 모두 동시에 올리므로, 업로드 트랜잭션 안에서 디코딩하면 동시
+     * 업로드들이 디코딩하는 동안 데이터베이스 연결을 쥔다.
+     */
+    public void prepareSmall(ChatAttachment attachment) {
+        images.prepareSmall(attachment);
     }
 
     /** 사진 한 장의 본문을 연다. 지워졌으면 있었다는 것만 알린다. */

@@ -12,6 +12,8 @@ import java.nio.file.Files;
 import java.nio.file.LinkOption;
 import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
+import java.nio.file.StandardOpenOption;
 import java.util.Map;
 import java.util.Optional;
 import org.springframework.stereotype.Component;
@@ -23,6 +25,10 @@ import org.springframework.stereotype.Component;
  * Hermes 를 부르기 전에 그 디렉터리를 만드는 일만 {@link SandboxAttachmentDirectory} 가 맡는다. 경로는
  * {@code {root}/users/{사용자 디렉터리 키}/{대화 번호}/{첨부 번호}.{확장자}} 이고, 확장자는 올릴 때의 파일 이름이 아니라
  * {@code content_type} 에서 만든다. 올린 이름이 경로를 벗어나게 만들 수 있기 때문이다.
+ *
+ * <p>같은 폴더에 에이전트에게 보일 줄인 사본 {@code {첨부 번호}.small.jpg} 를 둔다. 사본은 임시 파일
+ * {@code {첨부 번호}.small.jpg.tmp} 에 쓴 뒤 옮겨, 실행 공간이 반쯤 쓴 사본을 읽지 않게 한다. 원본을 지울 때
+ * 사본과 남은 임시 파일을 함께 지운다. 근거는 ADR-20261009 / native-image-input 에 있다.
  */
 @Component
 public class AttachmentStore {
@@ -48,6 +54,11 @@ public class AttachmentStore {
     /** 디스크에 둘 이름이다. */
     public static String storedName(Long attachmentId, String extension) {
         return attachmentId + "." + extension;
+    }
+
+    /** 원본 옆에 둘 줄인 사본의 이름이다. */
+    public static String smallName(Long attachmentId) {
+        return attachmentId + ".small.jpg";
     }
 
     /** 실행 주인 {@code u<사용자 번호>} 의 디렉터리 키다. Hermes 를 부르기 전에 만드는 디렉터리와 같은 규칙을 쓴다. */
@@ -88,10 +99,56 @@ public class AttachmentStore {
         }
     }
 
-    /** 파일을 지운다. 이미 없으면 그대로 끝난다. */
-    public synchronized void delete(ChatAttachment attachment) {
+    /**
+     * 줄인 사본을 원본 옆에 쓴다. 원본이 없거나 사본이 이미 있으면 아무것도 쓰지 않는다.
+     *
+     * <p>사본은 lock 밖에서 디코딩해 만들므로 그 사이 원본이 지워졌을 수 있다. 원본 없이 사본을 쓰면 지운 시각이
+     * 적힌 행이라 다시 지울 경로가 없어 사본이 디스크에 남는다. 그래서 같은 lock 안에서 원본을 먼저 본다.
+     */
+    public synchronized void saveSmall(ChatAttachment attachment, byte[] jpeg) {
+        Path original = privatePath(attachment);
+        Path target = smallPath(attachment);
+        Path temporary = temporarySmallPath(attachment);
+        if (!Files.exists(original, LinkOption.NOFOLLOW_LINKS) || Files.exists(target, LinkOption.NOFOLLOW_LINKS)) {
+            return;
+        }
         try {
-            Files.deleteIfExists(privatePath(attachment));
+            // 앞선 쓰기가 남긴 임시 파일이 있으면 지우고 새로 만든다.
+            Files.deleteIfExists(temporary);
+            Files.write(temporary, jpeg, StandardOpenOption.CREATE_NEW, StandardOpenOption.WRITE);
+            Files.move(temporary, target, StandardCopyOption.ATOMIC_MOVE);
+        } catch (IOException ex) {
+            deleteQuietly(temporary);
+            throw new UncheckedIOException("could not store the small copy of attachment " + attachment.id(), ex);
+        }
+    }
+
+    /** 줄인 사본이 있는지 본다. */
+    public synchronized boolean hasSmall(ChatAttachment attachment) {
+        return Files.isRegularFile(smallPath(attachment), LinkOption.NOFOLLOW_LINKS);
+    }
+
+    /** 줄인 사본을 읽는다. 없으면 지워진 첨부로 알린다. */
+    public synchronized byte[] readSmall(ChatAttachment attachment) {
+        try (InputStream in = Files.newInputStream(smallPath(attachment), LinkOption.NOFOLLOW_LINKS)) {
+            return in.readAllBytes();
+        } catch (NoSuchFileException ex) {
+            throw new ApiException(ErrorCode.ATTACHMENT_GONE, "this attachment is no longer kept", ex);
+        } catch (IOException ex) {
+            throw new UncheckedIOException("could not read the small copy of attachment " + attachment.id(), ex);
+        }
+    }
+
+    /** 원본과 줄인 사본, 쓰다 남은 임시 파일을 지운다. 이미 없으면 그대로 끝난다. */
+    public synchronized void delete(ChatAttachment attachment) {
+        // 경로 검사를 먼저 모두 지나야 지우기 시작한다. 하나만 거절되면 원본만 지워진 채 남는다.
+        Path original = privatePath(attachment);
+        Path small = smallPath(attachment);
+        Path temporary = temporarySmallPath(attachment);
+        try {
+            Files.deleteIfExists(original);
+            Files.deleteIfExists(small);
+            Files.deleteIfExists(temporary);
         } catch (IOException ex) {
             throw new UncheckedIOException("could not delete attachment " + attachment.id(), ex);
         }
@@ -102,6 +159,14 @@ public class AttachmentStore {
                 .resolve(userDirectoryKey(attachment.uploadedByUserId()))
                 .resolve(conversationDirectory(attachment))
                 .resolve(checkedStoredName(attachment)));
+    }
+
+    private Path smallPath(ChatAttachment attachment) {
+        return checkedPath(privatePath(attachment).resolveSibling(smallName(attachment.id())));
+    }
+
+    private Path temporarySmallPath(ChatAttachment attachment) {
+        return checkedPath(privatePath(attachment).resolveSibling(smallName(attachment.id()) + ".tmp"));
     }
 
     private Path checkedPath(Path path) {

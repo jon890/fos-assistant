@@ -43,6 +43,8 @@ public class AttachmentController {
                 file.getContentType(),
                 file.getSize(),
                 file);
+        // 업로드 트랜잭션이 끝난 뒤에 사본을 만든다.
+        attachments.prepareSmall(saved);
         return view(saved);
     }
 
