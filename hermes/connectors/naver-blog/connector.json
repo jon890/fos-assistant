@@ -2,7 +2,7 @@
   "schema": 2,
   "id": "naver-blog",
   "title": "네이버 블로그",
-  "description": "「내 브라우저」 에 로그인해 둔 네이버 계정의 임시저장 글을 읽고, 승인한 글을 임시저장합니다. 발행하지 않습니다.",
+  "description": "「내 브라우저」 에 로그인해 둔 네이버 계정의 임시저장 글을 읽고 고치며, 승인한 글을 임시저장합니다. 발행하지 않습니다.",
   "icon": "icon.svg",
   "link": "https://blog.naver.com/",
   "fields": [
