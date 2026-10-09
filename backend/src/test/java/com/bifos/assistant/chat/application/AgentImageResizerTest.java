@@ -139,6 +139,24 @@ class AgentImageResizerTest {
     }
 
     @Test
+    @DisplayName("긴 변이 이미 원하는 길이인 사본도 품질을 낮추면 같은 크기로 다시 인코딩해 바이트가 준다")
+    void reencodesAtLowerQualityWithoutChangingSize() throws IOException {
+        // 단색은 다시 인코딩해도 거의 줄지 않으므로 잡음을 섞은 768×576 사진을 쓴다.
+        byte[] copy = AgentImageResizer.toJpeg(png(noisyGradient(768, 576))).orElseThrow();
+
+        byte[] lower = AgentImageResizer.shrink(copy, 768, 0.4f).orElseThrow();
+        BufferedImage result = jpegOf(lower);
+
+        assertThat(result.getWidth()).isEqualTo(768);
+        assertThat(result.getHeight()).isEqualTo(576);
+        assertThat(lower.length).as("품질 0.4 로 다시 인코딩한 바이트 수").isLessThan(copy.length);
+        assertThat(AgentImageResizer.shrink(copy, 768, AgentImageResizer.QUALITY)
+                        .orElseThrow())
+                .as("품질이 그대로면 받은 바이트를 그대로 돌려준다")
+                .containsExactly(copy);
+    }
+
+    @Test
     @DisplayName("이미지가 아닌 바이트는 다시 줄이지 못해 빈 값이다")
     void returnsEmptyWhenShrinkingNonImageBytes() {
         assertThat(AgentImageResizer.shrink(new byte[] {1, 2, 3, 4, 5, 6, 7, 8}, 1024))

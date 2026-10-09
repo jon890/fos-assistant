@@ -225,19 +225,18 @@ class ChatAttachmentTurnTest {
                     .append(photo.originalName())
                     .append(")\n");
         }
-        // 이미지가 아닌 바이트라 사본이 생기지 않는다. 아무것도 싣지 않고 사진마다 원본 경로로 안내한다.
-        expected.append("\n").append("사진은 모두 30장이다.\n").append("싣지 못한 사진은 아래 경로를 답에 필요한 만큼 vision_analyze 로 확인한다.\n");
-        for (int i = 0; i < selected.size(); i++) {
-            expected.append("- ")
-                    .append(i + 1)
-                    .append("번째 사진: ")
-                    .append(agentDirectory(conversationId))
-                    .append("/")
-                    .append(selected.get(i).id())
-                    .append(".png\n");
+        // 이미지가 아닌 바이트라 사본이 생기지 않는다. 아무것도 싣지 않고 싣지 못한 사진의 순번을 한 줄로 안내한다.
+        List<String> ordinals = new ArrayList<>();
+        for (int i = 1; i <= selected.size(); i++) {
+            ordinals.add(i + "번째");
         }
+        expected.append("\n")
+                .append("사진은 모두 30장이다.\n")
+                .append("입력에 싣지 못한 사진: ")
+                .append(String.join(", ", ordinals))
+                .append(" 사진. 이 사진은 도구로 읽지 말고, 사용자에게 볼 수 없었다고 알리고 JPEG 나 PNG 로 다시 올려 달라고 한다.\n");
         expected.append("지난 메시지의 사진은 같은 폴더의 {첨부 번호}.small.jpg 를, 없으면 원본을 vision_analyze 로 본다. read_file 로 읽지 않는다.\n")
-                .append("vision_analyze 는 한 번에 한 장씩, 앞 호출의 결과를 받은 뒤 다음 사진을 부른다.\n")
+                .append("지난 사진을 vision_analyze 로 볼 때는 한 번에 한 장씩, 앞 호출의 결과를 받은 뒤 다음 사진을 부른다.\n")
                 .append("파일을 올리거나 고치는 도구에는 위 목록의 원본 파일을 쓴다.\n")
                 .append("사용자에게 사진을 가리킬 때는 파일 이름 대신 몇 번째 사진인지로 적는다.\n")
                 .append("\n")
@@ -257,8 +256,8 @@ class ChatAttachmentTurnTest {
     }
 
     @Test
-    @DisplayName("사진과 이미지가 아닌 파일을 함께 보내면 사진만 이미지로 싣고 나머지는 원본 경로로 안내한다")
-    void embedsOnlyDecodableImageAndGuidesOtherByOriginalPath() throws IOException {
+    @DisplayName("사진과 이미지가 아닌 파일을 함께 보내면 사진만 이미지로 싣고 나머지는 싣지 못했다고 안내한다")
+    void embedsOnlyDecodableImageAndGuidesOtherAsNotEmbedded() throws IOException {
         Long conversationId = chat.startEmpty(dad, "dad").id();
         ChatAttachment real = uploadPng(dad, conversationId, "진짜.png", png(8, 6));
         ChatAttachment broken = upload(dad, conversationId, "깨진.png");
@@ -272,10 +271,10 @@ class ChatAttachmentTurnTest {
                 .contains(
                         "사진은 모두 2장이다.\n",
                         "이 메시지에 이미지로 함께 실은 사진: 1번째 사진. 이미 보이므로 파일로 다시 읽지 않아도 된다.\n",
-                        "싣지 못한 사진은 아래 경로를 답에 필요한 만큼 vision_analyze 로 확인한다.\n" + "- 2번째 사진: "
-                                + agentDirectory(conversationId) + "/" + broken.id() + ".png\n",
+                        "입력에 싣지 못한 사진: 2번째 사진. 이 사진은 도구로 읽지 말고, 사용자에게 볼 수 없었다고 알리고"
+                                + " JPEG 나 PNG 로 다시 올려 달라고 한다.\n",
                         "파일을 올리거나 고치는 도구에는 위 목록의 원본 파일을 쓴다.\n")
-                .doesNotContain("- 1번째 사진: " + agentDirectory(conversationId));
+                .doesNotContain("싣지 못한 사진은 아래 경로를", "- 1번째 사진: " + agentDirectory(conversationId));
     }
 
     @Test
@@ -307,7 +306,7 @@ class ChatAttachmentTurnTest {
     }
 
     @Test
-    @DisplayName("1600×1200 사진 열한 장을 보내면 모두 긴 변 1280 으로 줄여 싣고 그 긴 변을 알린다")
+    @DisplayName("1600×1200 사진 열한 장을 보내면 모두 긴 변 1280 으로 줄여 싣고 줄였다는 안내는 붙이지 않는다")
     void elevenFullSizeImagesAreAllEmbeddedAtSmallerLongSide() throws IOException {
         Long conversationId = chat.startEmpty(dad, "dad").id();
         byte[] png = png(1600, 1200);
@@ -328,9 +327,7 @@ class ChatAttachmentTurnTest {
         for (HermesImage image : command.images()) {
             assertThat(imageSize(image)).as(image.label()).isEqualTo(new Dimension(1280, 960));
         }
-        assertThat(command.input())
-                .contains("사진이 많아 긴 변 1280px 로 줄여 실었다. 작은 글씨나 세부가 필요한 사진만 같은 폴더의 {첨부 번호}.small.jpg 를"
-                        + " vision_analyze 로 본다.\n");
+        assertThat(command.input()).doesNotContain("사진이 많아 긴 변");
     }
 
     @Test
@@ -363,12 +360,47 @@ class ChatAttachmentTurnTest {
         for (HermesImage image : command.images()) {
             assertThat(longSide(image)).as(image.label()).isEqualTo(1280);
         }
-        assertThat(command.input()).contains("사진이 많아 긴 변 1280px 로 줄여 실었다.");
+        assertThat(command.input()).doesNotContain("사진이 많아 긴 변");
     }
 
     @Test
-    @DisplayName("가장 작은 단계에서도 바이트 상한에 닿으면 앞부분만 싣고 뒤의 더 작은 사본도 싣지 않는다")
-    void doesNotEmbedSmallerImageAfterEncodedBytesLimitWasReached() throws IOException {
+    @DisplayName("잡음 사진 서른 장은 768 단계에서 품질을 0.4 까지 낮춰 모두 싣는다")
+    void embedsThirtyNoiseImagesByLoweringQualityAtSmallestStep() throws IOException {
+        Long conversationId = chat.startEmpty(dad, "dad").id();
+        byte[] noise = noisePng(768, 640);
+        List<ChatAttachment> photos = new ArrayList<>();
+        for (int i = 1; i <= properties.maxFiles(); i++) {
+            photos.add(uploadPng(dad, conversationId, "잡음-" + i + ".png", noise));
+        }
+
+        chat.send(
+                dad,
+                conversationId,
+                "서른 장",
+                null,
+                photos.stream().map(ChatAttachment::id).toList());
+
+        // 사본이 이미 768×640 이라 1600 부터 768 까지 사본 그대로 넘친다. 768 단계는 품질 0.85 에서 약 14.9MB,
+        // 0.6 에서 약 8.3MB 로 넘치고, 0.4 에서 약 6.2MB 로 들어간다.
+        HermesRunCommand command = stub().received().getFirst();
+        List<String> expectedLabels = new ArrayList<>();
+        for (int i = 1; i <= properties.maxFiles(); i++) {
+            expectedLabels.add(i + "번째 사진");
+        }
+        assertThat(command.images()).extracting(HermesImage::label).containsExactlyElementsOf(expectedLabels);
+        assertThat(command.images().stream()
+                        .mapToLong(image -> image.dataUrl().length())
+                        .sum())
+                .isLessThanOrEqualTo(7L * 1024 * 1024);
+        for (HermesImage image : command.images()) {
+            assertThat(longSide(image)).as(image.label()).isEqualTo(768);
+        }
+        assertThat(command.input()).doesNotContain("입력에 싣지 못한 사진");
+    }
+
+    @Test
+    @DisplayName("잡음 사진 스물네 장과 작은 사진 한 장은 768 단계의 낮춘 품질로 스물다섯 장 모두 싣는다")
+    void embedsAllTwentyFiveImagesAtSmallestStepWithLowerQuality() throws IOException {
         Long conversationId = chat.startEmpty(dad, "dad").id();
         byte[] noise = noisePng(1600, 1200);
         List<ChatAttachment> photos = new ArrayList<>();
@@ -384,23 +416,24 @@ class ChatAttachmentTurnTest {
                 null,
                 photos.stream().map(ChatAttachment::id).toList());
 
-        // 잡음 한 장의 768 단계 주소는 약 342KB 라 스물두 장부터 7MB 를 넘고, 앞의 약 스물한 장이 실린다.
+        // 잡음 한 장의 768 단계 주소는 품질 0.85 에서 약 342KB 라 스물네 장이 7MB 를 넘고, 품질 0.6 에서 약 200KB 라
+        // 스물다섯 장이 모두 든다.
         HermesRunCommand command = stub().received().getFirst();
         List<HermesImage> images = command.images();
-        List<String> leadingLabels = new ArrayList<>();
-        for (int i = 1; i <= images.size(); i++) {
-            leadingLabels.add(i + "번째 사진");
+        List<String> expectedLabels = new ArrayList<>();
+        for (int i = 1; i <= 25; i++) {
+            expectedLabels.add(i + "번째 사진");
         }
-        assertThat(images).extracting(HermesImage::label).containsExactlyElementsOf(leadingLabels);
-        assertThat(images).isNotEmpty().hasSizeLessThan(25);
+        assertThat(images).extracting(HermesImage::label).containsExactlyElementsOf(expectedLabels);
         assertThat(images.stream().mapToLong(image -> image.dataUrl().length()).sum())
                 .isLessThanOrEqualTo(7L * 1024 * 1024);
-        for (HermesImage image : images) {
+        for (HermesImage image : images.subList(0, 24)) {
             assertThat(longSide(image)).as(image.label()).isEqualTo(768);
         }
-        assertThat(command.input())
-                .contains("- 25번째 사진: " + agentDirectory(conversationId) + "/"
-                        + AttachmentStore.smallName(photos.get(24).id()) + "\n");
+        assertThat(imageSize(images.get(24)))
+                .as("작은 사진은 키우지 않는다")
+                .isEqualTo(new Dimension(8, 6));
+        assertThat(command.input()).doesNotContain("입력에 싣지 못한 사진");
     }
 
     @Test
@@ -437,8 +470,8 @@ class ChatAttachmentTurnTest {
     }
 
     @Test
-    @DisplayName("원본도 사본도 없는 사진을 보내도 실행은 돌고 원본 경로로 안내한다")
-    void runsAndGuidesByOriginalPathWhenFilesAreGone() throws IOException {
+    @DisplayName("원본도 사본도 없는 사진을 보내도 실행은 돌고 싣지 못했다고 안내한다")
+    void runsAndGuidesAsNotEmbeddedWhenFilesAreGone() throws IOException {
         Long conversationId = chat.startEmpty(dad, "dad").id();
         ChatAttachment photo = uploadPng(dad, conversationId, "a.png", png(8, 6));
         store.delete(photo);
@@ -449,7 +482,10 @@ class ChatAttachmentTurnTest {
         HermesRunCommand command = stub().received().getFirst();
         assertThat(command.images()).isEmpty();
         assertThat(command.input())
-                .contains("- 1번째 사진: " + agentDirectory(conversationId) + "/" + photo.id() + ".png\n")
+                .contains(
+                        "- 1번째 사진: " + photo.id() + ".png (올린 이름: a.png)\n",
+                        "입력에 싣지 못한 사진: 1번째 사진. 이 사진은 도구로 읽지 말고, 사용자에게 볼 수 없었다고 알리고"
+                                + " JPEG 나 PNG 로 다시 올려 달라고 한다.\n")
                 .doesNotContain("이미지로 함께 실은 사진");
     }
 

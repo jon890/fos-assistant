@@ -19,8 +19,8 @@ import org.springframework.stereotype.Component;
 
 /**
  * 사진마다 에이전트에게 보일 줄인 사본을 만들고, 보내는 메시지의 사진을 실행 입력에 어느 크기로 얼마나 실을지 고른다.
- * 화소 합과 {@code data:} 주소 길이 합의 예산 안에서 모든 사진을 같은 긴 변 단계로 싣는다. 근거는 ADR-20261009 /
- * native-image-input 에 있다.
+ * 화소 합과 {@code data:} 주소 길이 합의 예산 안에서 모든 사진을 같은 긴 변 단계로 싣는다. 가장 작은 단계에서도 길이 합이
+ * 넘치면 JPEG 품질을 차례로 낮춘다({@link #SMALLEST_QUALITIES}). 근거는 ADR-20261009 / native-image-input 에 있다.
  *
  * <p>사본은 최선 노력이다. 만들지 못해도 부른 쪽은 실패하지 않고, 경고 로그에는 첨부 번호와 예외 종류만 남긴다.
  * 사진 본문과 올린 이름은 남기지 않는다.
@@ -41,8 +41,8 @@ public class AttachmentImages {
 
     /**
      * 보낼 때 사본을 만들려고 디코딩 차례를 기다리는 시간(초)이다. 보낼 때는 실행 기록을 만들기 전이라 사본 없는 사진마다
-     * 30초를 기다리면 실행 시작이 크게 늦고 그동안 사용자가 중지할 수도 없다. 차례를 얻지 못한 사진은 싣지 않고 원본 경로로
-     * 안내한다.
+     * 30초를 기다리면 실행 시작이 크게 늦고 그동안 사용자가 중지할 수도 없다. 차례를 얻지 못한 사진은 싣지 않고 싣지 못한
+     * 사진으로 안내한다.
      */
     static final long SEND_WAIT_SECONDS = 5;
 
@@ -54,6 +54,13 @@ public class AttachmentImages {
 
     /** 사진을 싣는 긴 변 단계(px)다. 큰 것부터 본다. */
     static final List<Integer> LONG_SIDES = List.of(AgentImageResizer.LONG_SIDE, 1280, 1024, 768);
+
+    /**
+     * 가장 작은 단계(768)에서 {@code data:} 주소 길이 합이 넘칠 때 차례로 낮추는 JPEG 품질이다. 큰 단계에서 품질을 낮추기보다
+     * 긴 변을 줄이는 쪽이 글씨 판독에 덜 해로워 가장 작은 단계에서만 낮춘다. 완전한 잡음 사진 30장도 품질 0.4 면 예산 안에
+     * 든다. 근거는 ADR-20261009 / native-image-input 의 「상한의 근거」 에 있다.
+     */
+    static final List<Float> SMALLEST_QUALITIES = List.of(AgentImageResizer.QUALITY, 0.6f, 0.4f);
 
     /**
      * 한 턴에 싣는 {@code data:} 주소 길이 합의 상한이다. Hermes 요청 본문 상한 10MB 에서 기억 문맥과 지시문, 입력 글의
@@ -117,11 +124,12 @@ public class AttachmentImages {
      * <p>{@code embed} 가 참이면 사본이 없는 사진은 디코딩 차례를 {@link #SEND_WAIT_SECONDS} 초까지 기다려 한 번 만들어
      * 본다. 사본을 읽고 크기를 안 사진을 모두 같은 긴 변 단계({@link #LONG_SIDES})로 싣는다. 화소 합이
      * {@link #MAX_PIXELS} 안에 드는 가장 큰 단계부터 보고, {@code data:} 주소 길이 합이 {@link #MAX_ENCODED_BYTES} 를 넘으면
-     * 한 단계 내린다. 1600 단계는 사본을 그대로 싣고, 그보다 작은 단계는 사본을 다시 줄여 싣는다. 다시 줄인 것은 파일로
-     * 남기지 않는다.
+     * 한 단계 내린다. 가장 작은 단계에서도 넘치면 JPEG 품질을 {@link #SMALLEST_QUALITIES} 차례로 낮춘다. 1600 단계는 사본을
+     * 그대로 싣고, 그보다 작은 단계와 낮춘 품질은 사본을 다시 줄여 싣는다. 다시 줄인 것은 파일로 남기지 않는다.
      *
-     * <p>가장 작은 단계에서도 넘치면 앞 사진부터 두 상한까지 담는다. 한 번 상한에 닿으면 그 뒤 사진은 더 작아도 싣지 않는다.
-     * 화면 순서와 실린 순서를 같게 두기 위해서다. 싣지 못한 사진도 사본을 만들어 본다. 경로로 안내할 사본이 있어야 한다.
+     * <p>가장 작은 단계의 가장 낮은 품질에서도 넘치면 앞 사진부터 두 상한까지 담는다. 한 번 상한에 닿으면 그 뒤 사진은 더
+     * 작아도 싣지 않는다. 화면 순서와 실린 순서를 같게 두기 위해서다. 싣지 못한 사진도 사본을 만들어 둔다. 다음 메시지에서
+     * 지난 메시지의 사진으로 볼 사본이 있어야 한다. 싣지 못한 사진은 지시문이 싣지 못했다고 안내한다.
      *
      * <p>{@code embed} 가 거짓이면 사본을 만들지도 싣지도 않고, 있는 사본만 본다.
      *
@@ -203,37 +211,57 @@ public class AttachmentImages {
 
     /**
      * 후보를 한 단계로 싣는다. 실은 사진의 {@code data:} 주소를 {@code dataUrls} 의 제자리에 채우고 그 단계를 돌려준다.
-     * 가장 작은 단계보다 큰 단계는 만든 주소를 모두 담을 수 있을 때만 고른다.
+     * 가장 작은 단계보다 큰 단계는 품질 {@link AgentImageResizer#QUALITY} 로 만든 주소를 모두 담을 수 있을 때만 고른다.
+     * 가장 작은 단계는 {@link #SMALLEST_QUALITIES} 를 차례로 보며, 마지막 품질 앞까지는 모두 담을 수 있을 때만 확정하고
+     * 마지막 품질에서만 앞에서부터 담는다.
      */
     private int embedCandidates(List<Candidate> candidates, String[] dataUrls) {
         int first = LONG_SIDES.indexOf(
                 chooseLongSide(candidates.stream().map(Candidate::size).toList(), MAX_PIXELS));
         for (int step = first; step < LONG_SIDES.size() - 1; step++) {
             int longSide = LONG_SIDES.get(step);
-            List<String> encoded = encodeAt(candidates, longSide, MAX_ENCODED_BYTES);
-            if (encoded != null) {
-                List<String> admitted = admitInOrder(candidates, encoded, longSide);
-                if (admitted.equals(encoded)) {
-                    place(candidates, admitted, dataUrls);
-                    return longSide;
-                }
+            if (placeAll(candidates, longSide, AgentImageResizer.QUALITY, dataUrls)) {
+                return longSide;
             }
         }
         int smallest = LONG_SIDES.getLast();
-        List<String> encoded = encodeAt(candidates, smallest, Long.MAX_VALUE);
+        for (int i = 0; i < SMALLEST_QUALITIES.size() - 1; i++) {
+            if (placeAll(candidates, smallest, SMALLEST_QUALITIES.get(i), dataUrls)) {
+                return smallest;
+            }
+        }
+        List<String> encoded = encodeAt(candidates, smallest, SMALLEST_QUALITIES.getLast(), Long.MAX_VALUE);
         place(candidates, admitInOrder(candidates, encoded, smallest), dataUrls);
         return smallest;
     }
 
     /**
-     * 후보마다 긴 변 {@code longSide} 의 {@code data:} 주소를 만든다. 만들지 못한 사진의 자리는 null 이다. 길이 합이
-     * {@code maxEncodedBytes} 를 넘으면 남은 사진을 줄이지 않고 null 을 돌려준다. 이 단계로는 모두 싣지 못하기 때문이다.
+     * 긴 변 {@code longSide}, 품질 {@code quality} 로 만든 주소를 모두 담을 수 있으면 {@code dataUrls} 에 채우고 참을
+     * 돌려준다. 하나라도 담지 못하면 아무것도 채우지 않고 거짓이다.
      */
-    private List<String> encodeAt(List<Candidate> candidates, int longSide, long maxEncodedBytes) {
+    private boolean placeAll(List<Candidate> candidates, int longSide, float quality, String[] dataUrls) {
+        List<String> encoded = encodeAt(candidates, longSide, quality, MAX_ENCODED_BYTES);
+        if (encoded == null) {
+            return false;
+        }
+        List<String> admitted = admitInOrder(candidates, encoded, longSide);
+        if (!admitted.equals(encoded)) {
+            return false;
+        }
+        place(candidates, admitted, dataUrls);
+        return true;
+    }
+
+    /**
+     * 후보마다 긴 변 {@code longSide}, 품질 {@code quality} 의 {@code data:} 주소를 만든다. 만들지 못한 사진의 자리는 null
+     * 이다. 길이 합이 {@code maxEncodedBytes} 를 넘으면 남은 사진을 줄이지 않고 null 을 돌려준다. 이 단계로는 모두 싣지
+     * 못하기 때문이다.
+     */
+    private List<String> encodeAt(List<Candidate> candidates, int longSide, float quality, long maxEncodedBytes) {
         List<String> encoded = new ArrayList<>(candidates.size());
         long total = 0;
         for (Candidate candidate : candidates) {
-            String dataUrl = encodedAt(candidate, longSide);
+            String dataUrl = encodedAt(candidate, longSide, quality);
             if (dataUrl != null) {
                 total += dataUrl.length();
                 if (total > maxEncodedBytes) {
@@ -246,12 +274,14 @@ public class AttachmentImages {
     }
 
     /**
-     * 사본 하나를 긴 변 {@code longSide} 의 {@code data:} 주소로 만든다. 줄일 필요가 없으면 사본을 그대로 쓰고, 줄여야 하면
-     * 디코딩 차례를 얻어 다시 줄인다. 차례를 얻지 못했거나 줄이지 못했으면 null 이다.
+     * 사본 하나를 긴 변 {@code longSide}, 품질 {@code quality} 의 {@code data:} 주소로 만든다. 크기가 그대로이고 품질이
+     * {@link AgentImageResizer#QUALITY} 이면 사본을 그대로 쓰고, 아니면 디코딩 차례를 얻어 다시 줄인다. 차례를 얻지
+     * 못했거나 줄이지 못했으면 null 이다.
      */
-    private String encodedAt(Candidate candidate, int longSide) {
+    private String encodedAt(Candidate candidate, int longSide, float quality) {
         Dimension size = candidate.size();
-        if (AgentImageResizer.scaledSize(size.width, size.height, longSide).equals(size)) {
+        if (quality == AgentImageResizer.QUALITY
+                && AgentImageResizer.scaledSize(size.width, size.height, longSide).equals(size)) {
             return dataUrl(candidate.copy());
         }
         try {
@@ -259,12 +289,13 @@ public class AttachmentImages {
                 return null;
             }
             try {
-                Optional<byte[]> shrunk = AgentImageResizer.shrink(candidate.copy(), longSide);
+                Optional<byte[]> shrunk = AgentImageResizer.shrink(candidate.copy(), longSide, quality);
                 if (shrunk.isEmpty()) {
                     log.warn(
-                            "could not shrink the small copy attachmentId={} longSide={}",
+                            "could not shrink the small copy attachmentId={} longSide={} quality={}",
                             candidate.attachmentId(),
-                            longSide);
+                            longSide,
+                            quality);
                 }
                 return shrunk.map(AttachmentImages::dataUrl).orElse(null);
             } finally {

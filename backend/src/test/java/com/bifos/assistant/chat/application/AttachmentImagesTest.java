@@ -23,6 +23,12 @@ class AttachmentImagesTest {
     }
 
     @Test
+    @DisplayName("가장 작은 단계에서 차례로 낮추는 JPEG 품질은 0.85, 0.6, 0.4 이다")
+    void smallestStepQualitiesDescendFromDefault() {
+        assertThat(AttachmentImages.SMALLEST_QUALITIES).containsExactly(0.85f, 0.6f, 0.4f);
+    }
+
+    @Test
     @DisplayName("4:3 사진 열 장은 1600 단계에 든다")
     void tenLandscapePhotosFitAtFullSize() {
         assertThat(AttachmentImages.chooseLongSide(photos(10, 1600, 1200), MAX_PIXELS))

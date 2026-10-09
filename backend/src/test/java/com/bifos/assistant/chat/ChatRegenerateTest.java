@@ -456,6 +456,7 @@ class ChatRegenerateTest {
                     .orElseThrow();
             assertThat(chief.input())
                     .doesNotContain("이미지로 함께 실은")
+                    .contains("싣지 못한 사진은 아래 경로를 답에 필요한 만큼 vision_analyze 로 확인한다.\n")
                     .containsPattern("- 1번째 사진: .*/" + conversationId + "/" + AttachmentStore.smallName(attachment.id())
                             + "\\n");
             assertThat(flowCommands)

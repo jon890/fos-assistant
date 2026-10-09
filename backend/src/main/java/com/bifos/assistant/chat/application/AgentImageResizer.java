@@ -57,7 +57,7 @@ final class AgentImageResizer {
             if (decoded == null) {
                 return Optional.empty();
             }
-            return Optional.of(encode(draw(decoded, orientation(original), LONG_SIDE)));
+            return Optional.of(encode(draw(decoded, orientation(original), LONG_SIDE), QUALITY));
         } catch (IOException | RuntimeException ex) {
             return Optional.empty();
         }
@@ -101,10 +101,19 @@ final class AgentImageResizer {
     }
 
     /**
-     * {@link #toJpeg} 가 만든 사본 JPEG 를 긴 변 {@code longSide} 로 다시 줄인다. 사본은 EXIF 가 없고 이미 바로 서 있어
-     * 방향을 읽지 않는다. 긴 변이 이미 {@code longSide} 이하이면 받은 바이트를 그대로 돌려준다. 읽거나 쓰지 못하면 빈 값이다.
+     * {@link #toJpeg} 가 만든 사본 JPEG 를 긴 변 {@code longSide} 로 다시 줄인다. 품질은 {@link #QUALITY} 다. 긴 변이 이미
+     * {@code longSide} 이하이면 받은 바이트를 그대로 돌려준다. 읽거나 쓰지 못하면 빈 값이다.
      */
     static Optional<byte[]> shrink(byte[] jpeg, int longSide) {
+        return shrink(jpeg, longSide, QUALITY);
+    }
+
+    /**
+     * {@link #toJpeg} 가 만든 사본 JPEG 를 긴 변 {@code longSide}, JPEG 품질 {@code quality} 로 다시 줄인다. 사본은 EXIF 가
+     * 없고 이미 바로 서 있어 방향을 읽지 않는다. 긴 변이 이미 {@code longSide} 이하이고 품질이 {@link #QUALITY} 이면 받은
+     * 바이트를 그대로 돌려준다. 긴 변이 이하라도 품질이 다르면 같은 크기로 다시 인코딩한다. 읽거나 쓰지 못하면 빈 값이다.
+     */
+    static Optional<byte[]> shrink(byte[] jpeg, int longSide, float quality) {
         if (jpeg == null || jpeg.length == 0) {
             return Optional.empty();
         }
@@ -113,10 +122,10 @@ final class AgentImageResizer {
             if (decoded == null) {
                 return Optional.empty();
             }
-            if (Math.max(decoded.getWidth(), decoded.getHeight()) <= longSide) {
+            if (Math.max(decoded.getWidth(), decoded.getHeight()) <= longSide && quality == QUALITY) {
                 return Optional.of(jpeg);
             }
-            return Optional.of(encode(draw(decoded, DEFAULT_ORIENTATION, longSide)));
+            return Optional.of(encode(draw(decoded, DEFAULT_ORIENTATION, longSide), quality));
         } catch (IOException | RuntimeException ex) {
             return Optional.empty();
         }
@@ -229,7 +238,7 @@ final class AgentImageResizer {
         };
     }
 
-    private static byte[] encode(BufferedImage image) throws IOException {
+    private static byte[] encode(BufferedImage image, float quality) throws IOException {
         Iterator<ImageWriter> writers = ImageIO.getImageWritersByFormatName("jpeg");
         if (!writers.hasNext()) {
             throw new IOException("no jpeg writer");
@@ -239,7 +248,7 @@ final class AgentImageResizer {
         try (ImageOutputStream output = new MemoryCacheImageOutputStream(bytes)) {
             ImageWriteParam parameters = writer.getDefaultWriteParam();
             parameters.setCompressionMode(ImageWriteParam.MODE_EXPLICIT);
-            parameters.setCompressionQuality(QUALITY);
+            parameters.setCompressionQuality(quality);
             writer.setOutput(output);
             writer.write(null, new IIOImage(image, null, null), parameters);
         } finally {
