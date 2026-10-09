@@ -44,7 +44,7 @@ phase 02 의 문서 변경이 들어간 브랜치에서 적용한다. 그 앞에
 git apply tasks/plan114-workspace-explorer/docs-delete.patch.md
 ```
 
-`docs/code-architecture.md`, `docs/flow.md`, `docs/backend/packages.md`, `docs/README.md`, `docs/frontend/structure.md` 가 바뀐다. 화면 문서의 변경은 phase 04 가 구현한다.
+`docs/code-architecture.md`, `docs/flow.md`, `docs/backend/packages.md`, `docs/README.md`, `docs/frontend/structure.md`, `docs/self-hosting.md` 가 바뀐다. 화면 문서의 변경은 phase 04 가 구현한다.
 
 ### 2. `workspace/domain/WorkspaceDeleter.java` 와 `WorkspaceDeletion.java` 신규
 
@@ -127,6 +127,7 @@ scripts/check-local.sh --skip-browser
 | `docs/backend/packages.md` | 수정 |
 | `docs/README.md` | 수정 |
 | `docs/frontend/structure.md` | 수정 |
+| `docs/self-hosting.md` | 수정 |
 | `backend/src/main/java/com/bifos/assistant/workspace/domain/WorkspaceDeleter.java` | 신규 |
 | `backend/src/main/java/com/bifos/assistant/workspace/domain/WorkspaceDeletion.java` | 신규 |
 | `backend/src/main/java/com/bifos/assistant/workspace/infra/UnixSocketWorkspaceDeleter.java` | 신규 |
