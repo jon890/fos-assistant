@@ -31,6 +31,9 @@ BASE_ENV_KEYS = frozenset({"API_SERVER_KEY", "API_SERVER_MODEL_NAME", "MCP_FOS_A
 # 올린 스킬 이름이다. fos-assistant 의 스킬 이름 규칙보다 넓어 Hermes 기본 스킬도 켜고 끌 수 있다.
 SKILL_NAME_RE = re.compile(r"^[a-z0-9][a-z0-9._-]{0,63}$")
 
+# Control Plane 이 올린 스킬을 두는 루트의 Hermes 컨테이너 쪽 경로다. Compose 가 준다.
+SKILL_ROOT_ENV = "FOS_ASSISTANT_SKILL_AGENT_ROOT"
+
 
 def _rejected(detail: str, status_code: int = 400):
     from starlette.responses import JSONResponse
@@ -45,6 +48,13 @@ async def _json_object(request):
     except (ValueError, UnicodeDecodeError):
         return None
     return body if isinstance(body, dict) else None
+
+
+def _skill_root() -> Optional[pathlib.Path]:
+    raw = os.environ.get(SKILL_ROOT_ENV, "").strip()
+    if not raw or not os.path.isabs(raw):
+        return None
+    return pathlib.Path(raw)
 
 
 def _profile_rejection(profile, request) -> Optional[object]:

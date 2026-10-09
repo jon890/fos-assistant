@@ -1,4 +1,5 @@
 import { expect, test } from "./fixtures.ts";
+import { clickAndWaitForResponse } from "./helpers.ts";
 
 const DEMO_ID = "demo-notes";
 const SCOPE_ID = "scope-a";
@@ -139,6 +140,99 @@ test("카드에서 연결 화면으로 들어가 값을 등록하고 확인한 �
     ),
   ).toBe(true);
 });
+
+test("연결된 서비스도 다시 확인하면 확인 시각을 갱신한다", async ({ page }) => {
+  await page.route(`**/api/connections/${DEMO_ID}`, (route) =>
+    route.fulfill({ json: ready }),
+  );
+  const checkedAt = "2026-10-01T12:00:00Z";
+  let checks = 0;
+  await page.route(`**/api/connections/${DEMO_ID}/check`, (route) => {
+    checks += 1;
+    return route.fulfill({ json: { ...ready, checkedAt } });
+  });
+  await page.goto(`/connections/${DEMO_ID}`);
+  await expect(page.getByTestId("connection-status")).toHaveText("연결됨");
+  const before = await page.getByText(/마지막 확인:/).textContent();
+  const check = page.getByRole("button", { name: "연결 다시 확인" });
+  await expect(check).toBeVisible();
+  await expect(check).toHaveAttribute("data-variant", "outline");
+  await clickAndWaitForResponse(
+    page,
+    check,
+    "POST",
+    /\/connections\/demo-notes\/check$/,
+  );
+  expect(checks).toBe(1);
+  await expect(page.getByTestId("connection-status")).toHaveText("연결됨");
+  await expect(page.getByText(/마지막 확인:/)).not.toHaveText(before!);
+  await expect(check).toBeEnabled();
+});
+
+for (const [code, message] of [
+  ["CONNECTOR_CREDENTIAL_REJECTED", "입력한 값을 확인하지 못했어요."],
+  ["CONNECTOR_OPERATION_FAILED", "연결을 마치지 못했어요."],
+  ["CONNECTOR_UNAVAILABLE", "서비스에 닿지 못했어요. 잠시 뒤 다시 해 주세요."],
+] as const) {
+  test(`연결된 서비스의 확인이 ${code}로 실패하면 준비 중으로 바뀌고 에이전트 고르기가 닫힌다`, async ({
+    page,
+  }) => {
+    let checked = false;
+    await page.route(`**/api/connections/${DEMO_ID}`, (route) =>
+      route.fulfill({ json: checked ? pending : ready }),
+    );
+    await page.route(`**/api/connections/${DEMO_ID}/check`, (route) => {
+      checked = true;
+      return route.fulfill({
+        status: 502,
+        json: { code, message: "raw upstream" },
+      });
+    });
+    await page.goto(`/connections/${DEMO_ID}`);
+    const badge = page.getByTestId("connection-status");
+    const chooser = page.getByTestId("connector-agent-chooser");
+    await expect(badge).toHaveText("연결됨");
+    await expect(chooser).toBeVisible();
+    const check = page.getByRole("button", { name: "연결 다시 확인" });
+    const responsePromise = page.waitForResponse(
+      (response) =>
+        response.request().method() === "POST" &&
+        new URL(response.url()).pathname ===
+          `/api/connections/${DEMO_ID}/check`,
+    );
+    await check.click();
+    const response = await responsePromise;
+    expect(await response.finished()).toBeNull();
+    expect(response.status()).toBe(502);
+    await expect(badge).toHaveText("준비 중");
+    await expect(badge).toHaveAttribute("data-variant", "warning");
+    await expect(chooser).toHaveCount(0);
+    await expect(page.getByRole("main").getByRole("alert")).toHaveText(message);
+    await expect(page.getByText("raw upstream")).toHaveCount(0);
+    await expect(check).toBeEnabled();
+  });
+}
+
+for (const [status, label, variant] of [
+  ["READY", "연결됨", "success"],
+  ["PENDING", "준비 중", "warning"],
+  ["DISCONNECTED", "연결 안 됨", "outline"],
+] as const) {
+  test(`상세에서 ${label} 상태를 글자와 의미 색으로 구분한다`, async ({
+    page,
+  }) => {
+    await page.route(`**/api/connections/${DEMO_ID}`, (route) =>
+      route.fulfill({ json: { ...ready, status } }),
+    );
+    await page.goto(`/connections/${DEMO_ID}`);
+    const badge = page.getByTestId("connection-status");
+    await expect(badge).toHaveText(label);
+    await expect(badge).toHaveAttribute("data-variant", variant);
+    await expect(
+      page.getByRole("button", { name: "연결 다시 확인" }),
+    ).toHaveCount(status === "DISCONNECTED" ? 0 : 1);
+  });
+}
 
 test("등록이 거절되면 비밀 칸을 비우고 정해 둔 문구만 보인다", async ({
   page,
@@ -449,9 +543,7 @@ test("재시작 대기가 아닌 PENDING 바인딩은 반영 중으로 보이고
     }),
   );
   await page.goto("/admin/connections");
-  const rows = page
-    .getByTestId("connector-admin-panel")
-    .getByRole("listitem");
+  const rows = page.getByTestId("connector-admin-panel").getByRole("listitem");
   await expect(rows).toHaveCount(2);
   const live = rows.filter({ hasText: "에이전트 agent-live" });
   const restart = rows.filter({ hasText: "에이전트 agent-restart" });
