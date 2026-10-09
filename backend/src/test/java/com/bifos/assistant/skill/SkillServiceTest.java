@@ -1021,6 +1021,29 @@ class SkillServiceTest {
     }
 
     @Test
+    @DisplayName("스킬을 지우고 같은 이름으로 새로 만들면 이전 버전이 없고 남아 있던 이전 버전도 새 스킬의 것이 되지 않는다")
+    void recreatingDeletedSkillHasNoPreviousEvenIfStalePreviousWasLeft() {
+        skills.save(OWNER, OWNED, "shopping", skillMd("shopping"), List.of());
+        skills.save(OWNER, OWNED, "weekly-plan", skillMd("weekly-plan"), List.of());
+        skills.save(OWNER, OWNED, "weekly-plan", skillMd("weekly-plan") + "\n고침", List.of());
+        skills.delete(OWNER, OWNED, "weekly-plan");
+
+        SkillDetail recreated = skills.save(OWNER, OWNED, "weekly-plan", skillMd("weekly-plan"), List.of());
+
+        assertThat(recreated.previousSavedAt()).isNull();
+        assertCode(() -> skills.restorePrevious(OWNER, OWNED, "weekly-plan"), ErrorCode.SKILL_NOT_FOUND);
+
+        // 지우기에서 이전 버전 지우기가 실패해 남은 것처럼 둔다.
+        store.writePrevious(OWNED_PROFILE, new SkillBundle("cooking", skillMd("cooking") + "\n지운 스킬", List.of()));
+
+        SkillDetail created = skills.save(OWNER, OWNED, "cooking", skillMd("cooking"), List.of());
+
+        assertThat(created.previousSavedAt()).as("새 스킬은 남은 이전 버전을 지운다").isNull();
+        assertThat(store.readPrevious(OWNED_PROFILE, "cooking")).isEmpty();
+        assertCode(() -> skills.restorePrevious(OWNER, OWNED, "cooking"), ErrorCode.SKILL_NOT_FOUND);
+    }
+
+    @Test
     @DisplayName("지우면 그 스킬의 이전 버전도 지우고 마지막 스킬을 지운 뒤에도 profile 디렉터리는 남는다")
     void deleteRemovesPreviousAndKeepsProfileDirectoryAfterLastSkill() {
         skills.save(OWNER, OWNED, "weekly-plan", skillMd("weekly-plan"), List.of());

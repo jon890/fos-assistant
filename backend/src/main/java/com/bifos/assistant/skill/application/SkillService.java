@@ -249,6 +249,7 @@ public class SkillService {
      *
      * <p>{@code scripts/} 판정은 저장하는 그 스킬에만 한다. 함께 실리는 다른 스킬은 보지 않는다. 셸을 끈 에이전트도 다른
      * 스킬을 고칠 수 있어야 하기 때문이다. 이전 버전 쓰기는 게시가 성공한 뒤라 실패해도 저장을 실패로 바꾸지 않는다.
+     * 새 스킬이면 같은 이름으로 남은 이전 버전을 지운다. 지운 스킬의 이전 버전이 새 스킬의 것으로 보이지 않게 한다.
      *
      * @param replaced 저장 전에 있던 같은 이름의 스킬. 새 스킬이면 {@code null} 이다
      */
@@ -267,6 +268,8 @@ public class SkillService {
         events.publishEvent(new SkillsChanged(agent.id()));
         if (replaced != null) {
             writePreviousQuietly(profile, replaced);
+        } else {
+            deletePreviousQuietly(profile, bundle.name());
         }
         return detailOf(bundle, previousSavedAt(profile, bundle.name()));
     }
@@ -279,10 +282,22 @@ public class SkillService {
         }
     }
 
-    /** 이전 버전을 남긴 시각이다. 없거나 읽지 못하면 {@code null} 이고 읽기와 저장을 막지 않는다. */
+    /** 게시가 끝난 뒤 이전 버전을 지운다. 실패해도 저장과 지우기를 실패로 바꾸지 않고 경고 로그만 남긴다. */
+    private void deletePreviousQuietly(String profile, String name) {
+        try {
+            store.deletePrevious(profile, name);
+        } catch (RuntimeException ex) {
+            log.warn("스킬의 이전 버전을 지우지 못했다 profile={} skill={}", profile, name, ex);
+        }
+    }
+
+    /**
+     * 이전 버전을 남긴 시각이다. 남긴 시각 파일만 읽는다. 없거나 읽지 못하면 {@code null} 이고 읽기와 저장을 막지
+     * 않는다.
+     */
     private Instant previousSavedAt(String profile, String name) {
         try {
-            return store.readPrevious(profile, name).map(PreviousSkill::savedAt).orElse(null);
+            return store.previousSavedAt(profile, name).orElse(null);
         } catch (RuntimeException ex) {
             log.warn("스킬의 이전 버전을 읽지 못했다 profile={} skill={}", profile, name, ex);
             return null;
@@ -294,7 +309,8 @@ public class SkillService {
      *
      * <p>남는 스킬이 없으면 새 버전을 쓰지 않고 빈 {@code external_dirs} 를 게시한 뒤 그 profile 의 버전
      * 디렉터리와 이전 버전을 모두 지운다. 게시가 성공한 뒤라 Hermes 가 가리키는 디렉터리가 없다. profile 디렉터리는
-     * 실행 공간이 붙이고 있으므로 남긴다. 게시가 끝나면 그 스킬의 이전 버전도 지운다.
+     * 실행 공간이 붙이고 있으므로 남긴다. 게시가 끝나면 그 스킬의 이전 버전도 지운다. 이전 버전 지우기가 실패해도 지우기는
+     * 성공으로 두고 {@link SkillsChanged} 를 낸다. Hermes 는 이미 그 스킬을 내려놓았다.
      *
      * <p>표식 없는 더 새 버전에만 있는 스킬도 지운다. 지금 버전을 다시 게시하면 Hermes 가 그 버전에서
      * 벗어난다.
@@ -315,7 +331,7 @@ public class SkillService {
         } else {
             publishVersion(user, agent, remaining, false);
         }
-        store.deletePrevious(profile, name);
+        deletePreviousQuietly(profile, name);
         events.publishEvent(new SkillsChanged(agent.id()));
     }
 

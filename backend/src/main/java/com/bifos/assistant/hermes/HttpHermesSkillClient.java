@@ -122,7 +122,9 @@ public class HttpHermesSkillClient implements HermesSkillClient {
         body.put("profile", profile);
         body.put("config", config);
         body.put("sandbox_owner", sandboxOwner);
-        // 참일 때만 싣는다. 이 칸을 모르는 옛 plugin 이 보통 스킬 게시까지 400 으로 거절하지 않게 한다.
+        // scripts/ 가 든 스킬을 게시할 때만 싣는다. 이 칸을 받는 옛 plugin 도 셸 도구의 실행 공간 정책만 보고 스킬 게시의
+        // skill_root 는 판정하지 않는다. 그래서 plugin 을 먼저 배포하지 않으면 스크립트 스킬이 skill_root 판정 없이 통과한다.
+        // plugin 을 먼저 배포한 뒤 이 Control Plane 을 배포한다.
         if (requireSandbox) {
             body.put("require_sandbox", true);
         }

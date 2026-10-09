@@ -44,6 +44,7 @@
 - **정책에 `skill_root` 가 있을 때만** 아래를 더 검사한다. 없으면 지금과 같다
   - 공통 `read_only_mounts` 와 `_sandbox_profiles` 의 profile 별 마운트에서, 원본이 `skill_root` 와 겹치거나 대상이 `_skill_root()` 와 겹치면 정책 전체를 거절한다. `_sandbox_profiles` 에 `skill_root` 인자를 더하고 부르는 곳을 함께 고친다
   - `_skill_root()` 가 없으면(환경 변수 없음) `invalid("skill_root")` 다. 마운트 대상을 정할 수 없다
+  - `_skill_root()` 도 `_sandbox_path_ok` 를 통과해야 한다. 마운트 문자열에 `:` 이나 제어 문자가 들어가지 않게 한다
   - `_skill_root()` 가 `SANDBOX_RESERVED_PATHS`(`/workspace`, `/root`), `attachment_agent_root`, `connector_output_root`(있으면)와 `_sandbox_paths_overlap` 이면 `invalid("skill_root")` 다. 새 마운트 대상이 예약 경로나 다른 사용자의 자리와 겹치지 않게 한다
 - 돌려주는 dict 에 `"skill_root": skill_root` 를 더한다
 
@@ -93,6 +94,7 @@ python3 -m unittest discover -s hermes/tests
 | `hermes/plugins/dashboard-profile-api/toolconfig.py` | 수정 |
 | `hermes/plugins/dashboard-profile-api/sandbox.py` | 수정 |
 | `hermes/tests/dashboard_profile_api_support.py` | 수정 |
+| `hermes/README.md` | 수정 |
 | `hermes/tests/test_dashboard_profile_api_sandbox_policy.py` | 수정 |
 | `hermes/tests/test_dashboard_profile_api_sandbox_terminal.py` | 수정 |
 | `hermes/tests/test_dashboard_profile_api_toolconfig.py` | 수정 |

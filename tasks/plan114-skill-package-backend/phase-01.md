@@ -130,3 +130,6 @@ cd backend && ./gradlew qualityCheck
 | `backend/src/test/java/com/bifos/assistant/skill/SkillServiceTest.java` | 수정 |
 | `backend/src/test/java/com/bifos/assistant/skill/SkillControllerTest.java` | 수정 |
 | `backend/src/test/java/com/bifos/assistant/hermes/HermesSkillRequestTest.java` | 수정 |
+| `docs/backend/skill.md` | 수정 |
+| `docs/code-architecture.md` | 수정 |
+| `docs/adr/ADR-20261009-skill-package.md` | 수정 |
