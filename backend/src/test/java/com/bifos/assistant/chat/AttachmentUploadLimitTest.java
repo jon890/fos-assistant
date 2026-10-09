@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.bifos.assistant.chat.domain.Conversation;
 import com.bifos.assistant.chat.infra.AttachmentProperties;
+import com.bifos.assistant.chat.infra.AttachmentStore;
 import com.bifos.assistant.chat.infra.ChatAttachmentRepository;
 import com.bifos.assistant.chat.infra.ConversationRepository;
 import com.bifos.assistant.shared.domain.type.UserRole;
@@ -12,6 +13,7 @@ import com.bifos.assistant.user.domain.AppUser;
 import com.bifos.assistant.user.infra.AppUserRepository;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
+import java.awt.image.BufferedImage;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.net.URI;
@@ -32,6 +34,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
+import javax.imageio.ImageIO;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -173,18 +176,70 @@ class AttachmentUploadLimitTest {
         assertThat(attachments.findByConversationIdOrderByIdAsc(conversationId)).isEmpty();
     }
 
+    @Test
+    @DisplayName("실제 PNG 를 올리면 원본 옆에 줄인 사본이 생기고 이미지가 아닌 바이트는 사본 없이 올라간다")
+    void createsSmallCopyForRealPngOnly() throws Exception {
+        HttpResponse<String> photo = upload(1, png(640, 480), "image/png");
+        HttpResponse<String> broken = upload(2, new byte[] {1, 2, 3, 4, 5, 6, 7, 8}, "image/png");
+
+        assertThat(photo.statusCode()).as(photo.body()).isEqualTo(200);
+        assertThat(broken.statusCode()).as(broken.body()).isEqualTo(200);
+        long photoId = id(photo);
+        long brokenId = id(broken);
+        assertThat(conversationDirectory().resolve(photoId + ".png")).exists();
+        assertThat(conversationDirectory().resolve(photoId + ".small.jpg")).exists();
+        assertThat(conversationDirectory().resolve(brokenId + ".png")).exists();
+        assertThat(conversationDirectory().resolve(brokenId + ".small.jpg")).doesNotExist();
+    }
+
+    @Test
+    @DisplayName("동시에 올린 사진 여섯 장 모두 차례를 기다려 줄인 사본이 생긴다")
+    void createsSmallCopiesForConcurrentUploads() throws Exception {
+        int count = 6;
+        byte[] content = png(2400, 1800);
+        assertThat(content.length).as("업로드 상한 안").isLessThan(10 * MB);
+        ExecutorService executor = Executors.newFixedThreadPool(count);
+        try {
+            CountDownLatch ready = new CountDownLatch(count);
+            CountDownLatch start = new CountDownLatch(1);
+            List<Future<HttpResponse<String>>> responses = IntStream.rangeClosed(1, count)
+                    .mapToObj(number -> executor.submit(() -> {
+                        ready.countDown();
+                        start.await();
+                        return upload(number, content, "image/png");
+                    }))
+                    .toList();
+            ready.await();
+            start.countDown();
+
+            List<HttpResponse<String>> completed =
+                    responses.stream().map(this::await).toList();
+            assertThat(completed).extracting(HttpResponse::statusCode).containsOnly(200);
+            assertThat(completed)
+                    .extracting(response -> conversationDirectory().resolve(id(response) + ".small.jpg"))
+                    .hasSize(count)
+                    .allSatisfy(small -> assertThat(small).exists());
+        } finally {
+            executor.shutdownNow();
+        }
+    }
+
     private HttpResponse<String> upload(int size) throws Exception {
         return upload(size, size);
     }
 
     private HttpResponse<String> upload(int requestNumber, int size) throws Exception {
-        String boundary = "attachment-boundary-" + requestNumber + "-" + size;
-        ByteArrayOutputStream body = new ByteArrayOutputStream(size + 512);
+        return upload(requestNumber, new byte[size], "image/jpeg");
+    }
+
+    private HttpResponse<String> upload(int requestNumber, byte[] content, String contentType) throws Exception {
+        String boundary = "attachment-boundary-" + requestNumber + "-" + content.length;
+        ByteArrayOutputStream body = new ByteArrayOutputStream(content.length + 512);
         body.write(("--" + boundary + "\r\n"
                         + "Content-Disposition: form-data; name=\"file\"; filename=\"photo.jpg\"\r\n"
-                        + "Content-Type: image/jpeg\r\n\r\n")
+                        + "Content-Type: " + contentType + "\r\n\r\n")
                 .getBytes(StandardCharsets.UTF_8));
-        body.write(new byte[size]);
+        body.write(content);
         body.write(("\r\n--" + boundary + "--\r\n").getBytes(StandardCharsets.UTF_8));
 
         HttpRequest request = HttpRequest.newBuilder(URI.create("http://localhost:" + port
@@ -194,6 +249,31 @@ class AttachmentUploadLimitTest {
                 .POST(HttpRequest.BodyPublishers.ofByteArray(body.toByteArray()))
                 .build();
         return client.send(request, HttpResponse.BodyHandlers.ofString());
+    }
+
+    private long id(HttpResponse<String> response) {
+        return json.readTree(response.body()).path("id").asLong();
+    }
+
+    private Path conversationDirectory() {
+        return Path.of(properties.root())
+                .toAbsolutePath()
+                .resolve("users")
+                .resolve(AttachmentStore.userDirectoryKey(user.id()))
+                .resolve(conversationId.toString());
+    }
+
+    /** 가로세로 그라데이션을 그린 실제 PNG 다. */
+    private static byte[] png(int width, int height) throws IOException {
+        BufferedImage image = new BufferedImage(width, height, BufferedImage.TYPE_INT_RGB);
+        for (int y = 0; y < height; y++) {
+            for (int x = 0; x < width; x++) {
+                image.setRGB(x, y, ((x * 255 / width) << 16) | ((y * 255 / height) << 8) | 128);
+            }
+        }
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        ImageIO.write(image, "png", out);
+        return out.toByteArray();
     }
 
     private String code(HttpResponse<String> response) {

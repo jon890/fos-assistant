@@ -3,6 +3,7 @@
 import { describePendingFailure } from "./conversation-session-helpers";
 import type { ConversationSessionState } from "./use-conversation-session-state";
 import type { ConversationSend } from "./use-conversation-send";
+import type { MessageAttachment } from "./message-types";
 
 type Context = Pick<
   ConversationSessionState,
@@ -93,9 +94,10 @@ export function useConversationQueue({
   async function submit(
     attachmentIds: number[],
     replacementText?: string,
+    attachments?: MessageAttachment[],
   ): Promise<boolean> {
     if (!sending && !pending.queue.held)
-      return send(attachmentIds, replacementText);
+      return send(attachmentIds, replacementText, attachments);
     if (attachmentIds.length > 0) {
       // 답이 오는 동안은 사진 첨부가 잠겨 있다. 여기 오는 것은 멈춰 둔 대기 줄이 있을 때 사진을 붙인 경우다.
       if (!sending)

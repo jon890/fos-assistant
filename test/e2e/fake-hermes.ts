@@ -78,6 +78,7 @@ export function startFakeHermes(
         baseUrl: `http://127.0.0.1:${address.port}`,
         lastSubmittedInstructions: () => state.lastSubmittedInstructions,
         lastSubmittedInput: () => state.lastSubmittedInput,
+        lastSubmittedImages: () => state.lastSubmittedImages,
         modelOptionsCalls: () => state.modelOptionsCalls,
         lastSubmittedRuntime: () => state.lastSubmittedRuntime,
         blockProvider: (provider: string) => state.blockedProviders.add(provider),
