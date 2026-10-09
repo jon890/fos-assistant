@@ -69,8 +69,7 @@ public class ArtifactController {
 
     /** 200 과 304 가 같은 코드로 붙이는 머리글이다. */
     private static ResponseEntity.BodyBuilder common(ResponseEntity.BodyBuilder builder, ArtifactFile file) {
-        return builder
-                .eTag(file.etag())
+        return builder.eTag(file.etag())
                 .lastModified(file.lastModified())
                 .header("X-Content-Type-Options", "nosniff")
                 .header("Content-Security-Policy", CONTENT_SECURITY_POLICY)
