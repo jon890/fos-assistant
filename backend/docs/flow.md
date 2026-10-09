@@ -1964,15 +1964,15 @@ profile 을 거두지 못하면 에이전트를 지우지 않고 그 오류를 �
 새 profile 은 재시작 없이 공유 listener 에서 답한다. MCP 도구는 첫 연결까지 1~2분 걸릴 수 있다.
 새 profile 은 그룹 공용 credential 로 돈다([ADR-002](adr/ADR-002-profile은-나누고-ai-계정은-가족이-함께-쓴다.md)).
 
-**지우기는 에이전트 행을 지우지 않는다.** `deleted_at` 을 적고 끈다.
+**지우기는 에이전트 행을 바로 지우지 않는다.** `deleted_at` 을 적고 끈다. 행은 7일 뒤 정리 작업이 지운다(아래 「지운 에이전트 정리」).
 붙은 연결을 먼저 모두 뗀다. 사람이 만든 profile 은 거두지 않으므로 떼지 않으면 그 profile 에 커넥터 서버와 값이 남는다. 순서는 [`backend/docs/flow.md`](flow.md) 의 「설치와 실패 처리」 가 갖는다.
 `profile_managed` 가 참이면 MCP 토큰을 먼저 폐기하고, profile 과 key 파일, 올린 스킬 디렉터리를 지운다. 거짓이면 profile 을 남긴다.
 지우는 사이 주인이 바뀌었으면 `AGENT_BUSY` 로 멈춘다.
 지운 에이전트의 대화는 읽기만 된다. 새 turn 과 다시 생성은 `AGENT_NOT_FOUND` 다.
 
 **대화나 실행이 가리키는 에이전트 행이 아예 없어도 지운 에이전트와 같게 다룬다.**
-`conversation.agent_id` 와 `agent_execution.agent_id` 에 FK 가 없어 행이 사라진 대화와 실행이 남을 수 있다.
-운영에서 그런 대화 하나 때문에 대화 목록 전체가 `AGENT_NOT_FOUND` 로 실패한 적이 있다.
+`conversation.agent_id` 와 `agent_execution.agent_id` 에 FK 가 없고, 지운 에이전트는 7일 뒤 행이 사라진다.
+정리 작업 앞에도 운영에서 행이 없는 대화 하나 때문에 대화 목록 전체가 `AGENT_NOT_FOUND` 로 실패한 적이 있다.
 
 | 경로의 모양 | 에이전트 행이 없을 때 |
 | --- | --- |
@@ -1987,8 +1987,9 @@ profile 을 거두지 못하면 에이전트를 지우지 않고 그 오류를 �
 실행 트리는 에이전트가 없는 노드를 `실행 #번호` 로 그린다.
 대화 목록과 실행 기록은 에이전트를 줄마다 읽지 않고 한 번에 읽는다(`AgentService.byIds`).
 실행 트리는 노드마다 읽는다. 깊이와 노드 수에 상한이 있어 한 번에 읽는 이득이 작다.
-내가 부른 스킬 합계(`SkillUsageQuery.byUser`)는 에이전트를 찾지 못한 묶음을 뺀다.
-사용량 요약의 에이전트별 합계는 에이전트 표를 `left join` 해 행이 없는 실행을 에이전트 번호로 묶어 보인다.
+내가 부른 스킬 합계(`SkillUsageQuery.byUser`)는 에이전트를 찾지 못한 묶음도 이름 없이 내고, 화면이 「지운 에이전트」 로 그린다.
+사용량 요약의 에이전트별 합계는 에이전트 표를 `left join` 해 행이 없는 실행을 에이전트 번호로 묶고, 그 줄의 이름을 「지운 에이전트」 로 낸다.
+기억의 출처는 실행에 에이전트 번호가 있는데 행이 없으면 「지운 에이전트가 남김」 이다. 실행에 에이전트가 없으면 「에이전트가 남김」 이다.
 
 | 무엇 | 어디 |
 | --- | --- |
@@ -1997,7 +1998,46 @@ profile 을 거두지 못하면 에이전트를 지우지 않고 그 오류를 �
 | 허용 목록이 쥔 profile 이름인지 확인 | `agent/application/ReservedProfileNames` port 로 묻는다. 구현은 `people/application/AllowedPersonProfileNames` 다 |
 | 올린 스킬이 있는지 확인하고 지울 때 스킬 디렉터리 지우기 | `agent/application/ProfileSkillFiles` port 로 부른다. 구현은 `skill/application/ProfileSkillFilesAdapter` 다 |
 | 에이전트에 적는 흐름 이름 확인 | `agent/application/KnownFlows` port 로 묻는다. 구현은 `chat/application/FlowRegistry` 다 |
+| 지운 에이전트 정리의 차례와 재시도 | `agent/application/AgentPurger` |
+| 정리의 데이터베이스 트랜잭션 | `agent/application/AgentPurgeWriter` |
+| 위 패키지의 딸린 줄을 기다리고 지우기 | `agent/application/AgentPurgeParticipant` port 로 부른다. 구현은 `chat/application/ConversationAgentPurge`, `proactive/application/ProactiveAgentPurge`, `connector/application/ConnectorAgentPurge` 다 |
 | 대시보드 호출 | `hermes` |
+
+#### 지운 에이전트 정리
+
+`AgentPurger` 가 `assistant.agents.purge-cron` 마다 돈다. 결정과 까닭은 [ADR-20261009 / agent-purge](adr/ADR-20261009-agent-purge.md) 가 갖는다.
+
+```mermaid
+flowchart TD
+    A[지운 지 purge-after 가 지난 에이전트를<br/>지운 순서대로 20개, 실패해 기다리는 간격 안의 것은 빼고] --> B{후보가 있나}
+    B -- 없다 --> Z[끝. 로그 없음]
+    B -- 있다 --> R{읽기 트랜잭션: 지금 지울 수 있나<br/>지웠지만 정리되지 않은 대화가 없나}
+    R -- 아니다 --> J
+    R -- 그렇다 --> C{profile_managed}
+    C -- 참 --> D[profile 거두기<br/>대시보드 404 와 없는 파일은 끝난 것]
+    C -- 거짓 --> E
+    D -- 실패 --> F[기다리는 간격을 두 배로<br/>다섯 번째면 error 로그]
+    D -- 성공 --> S[스킬 디렉터리 지우기<br/>실패해도 warn 로그만 남기고 계속]
+    S --> E[트랜잭션: 에이전트 행을 쓰기 잠금]
+    E --> G{지운 에이전트가 맞나<br/>purge-after 가 지났나}
+    G -- 아니다 --> H[건너뜀]
+    G -- 맞다 --> I{참여자 가운데 기다리라는 곳이 있나<br/>지웠지만 정리되지 않은 대화}
+    I -- 있다 --> J[다음 차례로 미룸]
+    I -- 없다 --> K[참여자가 딸린 줄을 지우거나 비움<br/>agent 의 설정과 요청 줄을 지움<br/>에이전트 행을 지움]
+    K -- 실패 --> F
+```
+
+| 갈리는 지점 | 어떻게 되나 |
+| --- | --- |
+| 사용자가 지웠지만 아직 정리되지 않은 대화가 있다 | 미룬다. profile 을 거두기 전에 읽기 트랜잭션으로 먼저 보므로 Hermes 를 부르지 않는다. 쓰기 트랜잭션에서 한 번 더 본다. 대화 정리가 끝나면 다음 차례에 지운다. 실패로 세지 않는다 |
+| 정리 작업이 대기 여부를 본 뒤 사용자가 그 에이전트의 대화를 지운다 | 행이 먼저 지워지면 대화 정리는 Hermes session 을 지우지 못하고 경고 로그만 남긴다 |
+| 같은 에이전트를 두 차례가 함께 본다 | 쓰기 잠금을 먼저 잡은 쪽이 지우고, 뒤쪽은 행이 없어 건너뛴다 |
+| profile 거두기는 성공하고 트랜잭션이 실패했다 | 행이 남는다. 다음 차례가 거두기부터 다시 하고, 이미 거둔 것은 끝난 것으로 본다 |
+| 서버를 다시 띄웠다 | 기다리는 간격이 사라져 실패하던 에이전트를 곧바로 다시 본다 |
+| 한 차례가 20초를 넘겼다 | 남은 후보를 다음 차례로 넘긴다. 다른 주기 작업과 scheduler 스레드를 함께 쓰기 때문이다 |
+
+`AgentPurger` 자신의 로그는 정리한 수, 미룬 수, 실패한 수와 실패한 에이전트 번호만 남긴다. 이름과 profile 이름은 적지 않는다.
+profile 거두기를 하는 대시보드 클라이언트는 지금처럼 profile 이름을 로그에 남긴다. 이미 지운 profile 이면 404 를 받아 「이미 없다」 는 info 로그가 남는다.
 
 ### 페르소나를 고칠 때
 

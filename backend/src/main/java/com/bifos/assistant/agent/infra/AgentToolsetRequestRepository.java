@@ -46,4 +46,9 @@ public interface AgentToolsetRequestRepository extends JpaRepository<AgentToolse
 
     Optional<AgentToolsetRequest> findByAgentIdAndGroupIdAndRequesterUserIdAndToolsetAndPendingSlot(
             Long agentId, Long groupId, Long requesterUserId, String toolset, Integer pendingSlot);
+
+    /** 지운 에이전트를 정리할 때 그 에이전트의 도구 요청을 모두 지운다. 지운 행 수를 돌려준다. */
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("delete from AgentToolsetRequest r where r.agentId = :agentId")
+    int deleteAllOfAgent(@Param("agentId") Long agentId);
 }
