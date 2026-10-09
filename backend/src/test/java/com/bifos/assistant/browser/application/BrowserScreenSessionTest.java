@@ -352,7 +352,9 @@ class BrowserScreenSessionTest {
         await(() -> !cdp.sent("Emulation.setDeviceMetricsOverride").isEmpty());
         assertThat(cdp.sent("Emulation.setDeviceMetricsOverride")).hasSize(1);
         assertThat(cdp.sent("Emulation.setDeviceMetricsOverride").get(0).params())
-                .containsEntry("width", 1200).containsEntry("height", 800).containsEntry("mobile", false);
+                .containsEntry("width", 1200)
+                .containsEntry("height", 800)
+                .containsEntry("mobile", false);
         session.input(new BrowserScreenInput(Kind.RESIZE, null, 0, 0, 0, null, null, null, null, 390, 844));
         session.close(null);
         scheduler.shutdown();
@@ -366,12 +368,17 @@ class BrowserScreenSessionTest {
         BrowserScreenSession session = open(Duration.ofMinutes(30), Duration.ofHours(1), null);
         session.input(new BrowserScreenInput(Kind.SCROLL, "top", 0, 0, 0, null, null, null, null, 0, 0));
         session.input(new BrowserScreenInput(Kind.SCROLL, "bottom", 0, 0, 0, null, null, null, null, 0, 0));
-        assertThat(cdp.sent("Runtime.evaluate")).extracting(sent -> sent.params().get("expression"))
+        assertThat(cdp.sent("Runtime.evaluate"))
+                .extracting(sent -> sent.params().get("expression"))
                 .containsExactly("window.scrollTo(0, 0)", "window.scrollTo(0, document.documentElement.scrollHeight)");
-        for (String key : List.of("PageUp", "PageDown", "Space")) session.input(input(Kind.KEY, key, null, null));
+        for (String key : List.of("PageUp", "PageDown", "Space")) {
+            session.input(input(Kind.KEY, key, null, null));
+        }
         assertThat(cdp.sent("Input.dispatchKeyEvent")).hasSize(6);
         assertThat(cdp.sent("Input.dispatchKeyEvent").get(4).params())
-                .containsEntry("key", " ").containsEntry("code", "Space").containsEntry("text", " ");
+                .containsEntry("key", " ")
+                .containsEntry("code", "Space")
+                .containsEntry("text", " ");
     }
 
     /** 붙은 탭을 끊고 다시 붙어 screencast 를 시작하기까지 기다린다. 붙기가 끝나기 전에 다시 끊으면 경합이 된다. */

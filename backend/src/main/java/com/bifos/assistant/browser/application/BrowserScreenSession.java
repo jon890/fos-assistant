@@ -43,7 +43,6 @@ public class BrowserScreenSession {
     static final Map<String, Object> SCREENCAST =
             Map.of("format", "jpeg", "quality", 60, "maxWidth", 1600, "maxHeight", 2000);
 
-    // closed 의 까닭이다. 다른 화면이 열렸다, 브라우저가 멈췄다, 시간이 지났다
     static final String REPLACED = "replaced";
     static final String STOPPED = "stopped";
     static final String TIMEOUT = "timeout";
@@ -119,8 +118,15 @@ public class BrowserScreenSession {
             case MOUSE -> mouse(current, input);
             case WHEEL -> wheel(current, input);
             // 사용자가 스크립트를 정하지 못한다. 페이지 처음과 끝에 쓰는 고정 식만 실행한다.
-            case SCROLL -> command(current, "Runtime.evaluate", Map.of("expression", "window.scrollTo(0, "
-                    + ("top".equals(input.action()) ? "0" : "document.documentElement.scrollHeight") + ")"));
+            case SCROLL ->
+                command(
+                        current,
+                        "Runtime.evaluate",
+                        Map.of(
+                                "expression",
+                                "window.scrollTo(0, "
+                                        + ("top".equals(input.action()) ? "0" : "document.documentElement.scrollHeight")
+                                        + ")"));
             case KEY -> key(current, input.key());
             case TEXT -> command(current, "Input.insertText", Map.of("text", input.text()));
             case NAVIGATE -> command(current, "Page.navigate", Map.of("url", input.url()));
@@ -139,7 +145,9 @@ public class BrowserScreenSession {
         synchronized (lock) {
             tasks.forEach(task -> task.cancel(false));
             tasks.clear();
-            if (resizeTask != null) resizeTask.cancel(false);
+            if (resizeTask != null) {
+                resizeTask.cancel(false);
+            }
             current = connection;
             connection = null;
             generation++;
@@ -158,17 +166,24 @@ public class BrowserScreenSession {
     /** 150ms 안에 겹친 크기 변경은 마지막 것만 현재 탭에 적용한다. */
     private void resize(BrowserScreenInput input) {
         synchronized (lock) {
-            if (closed.get()) return;
+            if (closed.get()) {
+                return;
+            }
             metrics = Map.of("width", input.width(), "height", input.height(), "deviceScaleFactor", 1, "mobile", false);
-            if (resizeTask != null) resizeTask.cancel(false);
-            resizeTask = scheduler.schedule(() -> {
-                synchronized (lock) {
-                    if (!closed.get() && connection != null) {
-                        command(connection, "Emulation.setDeviceMetricsOverride", metrics);
-                    }
-                    resizeTask = null;
-                }
-            }, 150, TimeUnit.MILLISECONDS);
+            if (resizeTask != null) {
+                resizeTask.cancel(false);
+            }
+            resizeTask = scheduler.schedule(
+                    () -> {
+                        synchronized (lock) {
+                            if (!closed.get() && connection != null) {
+                                command(connection, "Emulation.setDeviceMetricsOverride", metrics);
+                            }
+                            resizeTask = null;
+                        }
+                    },
+                    150,
+                    TimeUnit.MILLISECONDS);
         }
     }
 
@@ -178,7 +193,9 @@ public class BrowserScreenSession {
         CdpConnection previous;
         Map<String, Object> resized = metrics;
         synchronized (lock) {
-            if (resizeTask != null) resizeTask.cancel(false);
+            if (resizeTask != null) {
+                resizeTask.cancel(false);
+            }
             resizeTask = null;
             attached = ++generation;
             previous = connection;
@@ -425,20 +442,20 @@ public class BrowserScreenSession {
         return params;
     }
 
-    /** 특수 키를 누르고 뗀다. 글자를 만드는 Enter 만 {@code text} 를 싣는다. */
+    /** 특수 키를 누르고 뗀다. 글자를 만드는 Enter 와 Space 는 {@code text} 를 싣는다. */
     private void key(CdpConnection current, String name) {
         Integer keyCode = BrowserScreenInput.KEYS.get(name);
         if (keyCode == null) {
             return;
         }
         boolean space = "Space".equals(name);
-        Map<String, Object> up = Map.of("type", "keyUp", "key", space ? " " : name, "code", name, "windowsVirtualKeyCode", keyCode);
+        Map<String, Object> up =
+                Map.of("type", "keyUp", "key", space ? " " : name, "code", name, "windowsVirtualKeyCode", keyCode);
         Map<String, Object> down = new HashMap<>(up);
         down.put("type", "Enter".equals(name) || space ? "keyDown" : "rawKeyDown");
-        if ("Enter".equals(name)) {
-            down.put("text", "\r");
+        if ("Enter".equals(name) || space) {
+            down.put("text", space ? " " : "\r");
         }
-        if (space) down.put("text", " ");
         command(current, "Input.dispatchKeyEvent", down);
         command(current, "Input.dispatchKeyEvent", up);
     }
