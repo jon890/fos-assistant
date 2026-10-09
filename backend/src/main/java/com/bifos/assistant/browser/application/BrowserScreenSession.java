@@ -41,7 +41,7 @@ public class BrowserScreenSession {
 
     /** screencast 인자다. 프레임 하나가 수백 KB 다. */
     static final Map<String, Object> SCREENCAST =
-            Map.of("format", "jpeg", "quality", 60, "maxWidth", 1280, "maxHeight", 2000);
+            Map.of("format", "jpeg", "quality", 60, "maxWidth", 1600, "maxHeight", 2000);
 
     // closed 의 까닭이다. 다른 화면이 열렸다, 브라우저가 멈췄다, 시간이 지났다
     static final String REPLACED = "replaced";
@@ -77,6 +77,7 @@ public class BrowserScreenSession {
     private int reconnects;
     private volatile Map<String, Object> metrics;
     private volatile Viewport viewport;
+    private ScheduledFuture<?> resizeTask;
 
     boolean closed() {
         return closed.get();
@@ -117,16 +118,15 @@ public class BrowserScreenSession {
             case TAB -> guard("tab switch", () -> selectTab(input.targetId()));
             case MOUSE -> mouse(current, input);
             case WHEEL -> wheel(current, input);
+            // 사용자가 스크립트를 정하지 못한다. 페이지 처음과 끝에 쓰는 고정 식만 실행한다.
+            case SCROLL -> command(current, "Runtime.evaluate", Map.of("expression", "window.scrollTo(0, "
+                    + ("top".equals(input.action()) ? "0" : "document.documentElement.scrollHeight") + ")"));
             case KEY -> key(current, input.key());
             case TEXT -> command(current, "Input.insertText", Map.of("text", input.text()));
             case NAVIGATE -> command(current, "Page.navigate", Map.of("url", input.url()));
             case BACK -> back(current);
             case RELOAD -> command(current, "Page.reload", Map.of());
-            case RESIZE -> {
-                metrics = Map.of(
-                        "width", input.width(), "height", input.height(), "deviceScaleFactor", 1, "mobile", false);
-                command(current, "Emulation.setDeviceMetricsOverride", metrics);
-            }
+            case RESIZE -> resize(input);
         }
     }
 
@@ -139,6 +139,7 @@ public class BrowserScreenSession {
         synchronized (lock) {
             tasks.forEach(task -> task.cancel(false));
             tasks.clear();
+            if (resizeTask != null) resizeTask.cancel(false);
             current = connection;
             connection = null;
             generation++;
@@ -154,12 +155,31 @@ public class BrowserScreenSession {
         ended.accept(this);
     }
 
+    /** 150ms 안에 겹친 크기 변경은 마지막 것만 현재 탭에 적용한다. */
+    private void resize(BrowserScreenInput input) {
+        synchronized (lock) {
+            if (closed.get()) return;
+            metrics = Map.of("width", input.width(), "height", input.height(), "deviceScaleFactor", 1, "mobile", false);
+            if (resizeTask != null) resizeTask.cancel(false);
+            resizeTask = scheduler.schedule(() -> {
+                synchronized (lock) {
+                    if (!closed.get() && connection != null) {
+                        command(connection, "Emulation.setDeviceMetricsOverride", metrics);
+                    }
+                    resizeTask = null;
+                }
+            }, 150, TimeUnit.MILLISECONDS);
+        }
+    }
+
     /** 그 탭에 붙는다. 앞의 연결은 닫는다. 세대가 바뀐 뒤의 사건과 명령 실패는 버린다. */
     private void attach(String id, String url) {
         long attached;
         CdpConnection previous;
         Map<String, Object> resized = metrics;
         synchronized (lock) {
+            if (resizeTask != null) resizeTask.cancel(false);
+            resizeTask = null;
             attached = ++generation;
             previous = connection;
             connection = null;
@@ -411,12 +431,14 @@ public class BrowserScreenSession {
         if (keyCode == null) {
             return;
         }
-        Map<String, Object> up = Map.of("type", "keyUp", "key", name, "code", name, "windowsVirtualKeyCode", keyCode);
+        boolean space = "Space".equals(name);
+        Map<String, Object> up = Map.of("type", "keyUp", "key", space ? " " : name, "code", name, "windowsVirtualKeyCode", keyCode);
         Map<String, Object> down = new HashMap<>(up);
-        down.put("type", "Enter".equals(name) ? "keyDown" : "rawKeyDown");
+        down.put("type", "Enter".equals(name) || space ? "keyDown" : "rawKeyDown");
         if ("Enter".equals(name)) {
             down.put("text", "\r");
         }
+        if (space) down.put("text", " ");
         command(current, "Input.dispatchKeyEvent", down);
         command(current, "Input.dispatchKeyEvent", up);
     }

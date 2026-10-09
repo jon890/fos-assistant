@@ -112,6 +112,8 @@ class UserBrowserScreenControllerTest {
             "{\"type\":\"tab\",\"id\":\"../browser\"}",
             "{\"type\":\"resize\",\"width\":100,\"height\":800}",
             "{\"type\":\"evaluate\",\"text\":\"secret-value\"}",
+            "{\"type\":\"scroll\",\"action\":\"secret-value\"}",
+            "{\"type\":\"scroll\"}",
             "{\"type\":\"touch\"}",
             "{\"type\":\"text\",\"text\":secret-value}",
             "{\"type\":\"mouse\",\"action\":\"down\",\"x\":\"secret-value\",\"y\":0.5}",

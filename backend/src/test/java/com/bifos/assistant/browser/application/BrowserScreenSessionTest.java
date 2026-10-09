@@ -60,7 +60,7 @@ class BrowserScreenSessionTest {
         assertThat(cdp.sent("Page.startScreencast").get(0).params())
                 .containsEntry("format", "jpeg")
                 .containsEntry("quality", 60)
-                .containsEntry("maxWidth", 1280)
+                .containsEntry("maxWidth", 1600)
                 .containsEntry("maxHeight", 2000);
         assertThat(sink.data("tabs"))
                 .containsExactly(
@@ -124,7 +124,7 @@ class BrowserScreenSessionTest {
 
     @Test
     @DisplayName("키, 글자, 주소, 뒤로, 새로고침, 크기 입력을 정한 CDP 명령으로 바꾼다")
-    void mapsInputsToCommands() {
+    void mapsInputsToCommands() throws InterruptedException {
         BrowserScreenSession session = open(Duration.ofMinutes(30), Duration.ofHours(1), null);
 
         session.input(input(Kind.KEY, "Enter", null, null));
@@ -144,6 +144,7 @@ class BrowserScreenSessionTest {
         assertThat(cdp.sent("Page.navigate").get(0).params()).containsEntry("url", "https://example.com/next");
         assertThat(cdp.sent("Page.navigateToHistoryEntry").get(0).params()).containsEntry("entryId", 11);
         assertThat(cdp.sent("Page.reload")).hasSize(1);
+        await(() -> !cdp.sent("Emulation.setDeviceMetricsOverride").isEmpty());
         assertThat(cdp.sent("Emulation.setDeviceMetricsOverride").get(0).params())
                 .containsEntry("width", 390)
                 .containsEntry("height", 844)
@@ -324,11 +325,12 @@ class BrowserScreenSessionTest {
 
     @Test
     @DisplayName("마지막 크기 입력을 기억했다가 탭을 옮기면 screencast 전에 새 탭에 다시 보낸다")
-    void reappliesResizeAfterTabSwitch() {
+    void reappliesResizeAfterTabSwitch() throws InterruptedException {
         cdp.pages.add(new CdpTarget("T2", "둘째", "https://example.com/b"));
         BrowserScreenSession session = open(Duration.ofMinutes(30), Duration.ofHours(1), null);
 
         session.input(new BrowserScreenInput(Kind.RESIZE, null, 0, 0, 0, null, null, null, null, 390, 844));
+        await(() -> !cdp.sent("Emulation.setDeviceMetricsOverride").isEmpty());
         session.input(input(Kind.TAB, null, null, null, "T2"));
 
         List<FakeCdp.Sent> resized = cdp.sent("Emulation.setDeviceMetricsOverride");
@@ -338,6 +340,38 @@ class BrowserScreenSessionTest {
                         .filter(command -> command.targetId().equals("T2"))
                         .map(FakeCdp.Sent::method))
                 .containsExactly("Page.enable", "Emulation.setDeviceMetricsOverride", "Page.startScreencast");
+    }
+
+    @Test
+    @DisplayName("연이은 크기 변경은 마지막 값만 적용하고 닫힌 뒤에는 보내지 않는다")
+    void debouncesViewportAndCancelsOnClose() throws InterruptedException {
+        BrowserScreenSession session = open(Duration.ofMinutes(30), Duration.ofHours(1), null);
+        session.input(new BrowserScreenInput(Kind.RESIZE, null, 0, 0, 0, null, null, null, null, 500, 600));
+        session.input(new BrowserScreenInput(Kind.RESIZE, null, 0, 0, 0, null, null, null, null, 1200, 800));
+        assertThat(cdp.sent("Emulation.setDeviceMetricsOverride")).isEmpty();
+        await(() -> !cdp.sent("Emulation.setDeviceMetricsOverride").isEmpty());
+        assertThat(cdp.sent("Emulation.setDeviceMetricsOverride")).hasSize(1);
+        assertThat(cdp.sent("Emulation.setDeviceMetricsOverride").get(0).params())
+                .containsEntry("width", 1200).containsEntry("height", 800).containsEntry("mobile", false);
+        session.input(new BrowserScreenInput(Kind.RESIZE, null, 0, 0, 0, null, null, null, null, 390, 844));
+        session.close(null);
+        scheduler.shutdown();
+        assertThat(scheduler.awaitTermination(2, TimeUnit.SECONDS)).isTrue();
+        assertThat(cdp.sent("Emulation.setDeviceMetricsOverride")).hasSize(1);
+    }
+
+    @Test
+    @DisplayName("페이지 처음과 끝은 고정 식만 실행하고 페이지 키와 공백도 누르고 뗀다")
+    void scrollsPageAndDispatchesPageKeys() {
+        BrowserScreenSession session = open(Duration.ofMinutes(30), Duration.ofHours(1), null);
+        session.input(new BrowserScreenInput(Kind.SCROLL, "top", 0, 0, 0, null, null, null, null, 0, 0));
+        session.input(new BrowserScreenInput(Kind.SCROLL, "bottom", 0, 0, 0, null, null, null, null, 0, 0));
+        assertThat(cdp.sent("Runtime.evaluate")).extracting(sent -> sent.params().get("expression"))
+                .containsExactly("window.scrollTo(0, 0)", "window.scrollTo(0, document.documentElement.scrollHeight)");
+        for (String key : List.of("PageUp", "PageDown", "Space")) session.input(input(Kind.KEY, key, null, null));
+        assertThat(cdp.sent("Input.dispatchKeyEvent")).hasSize(6);
+        assertThat(cdp.sent("Input.dispatchKeyEvent").get(4).params())
+                .containsEntry("key", " ").containsEntry("code", "Space").containsEntry("text", " ");
     }
 
     /** 붙은 탭을 끊고 다시 붙어 screencast 를 시작하기까지 기다린다. 붙기가 끝나기 전에 다시 끊으면 경합이 된다. */
