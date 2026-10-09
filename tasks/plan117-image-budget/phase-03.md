@@ -45,6 +45,7 @@
 - `encodeAt` 도 품질을 받아 넘긴다
 - `embedCandidates`: 768 보다 큰 단계는 지금처럼 품질 `QUALITY` 로 모두 담기는지 본다. 768 단계에서는 `SMALLEST_QUALITIES` 를 차례로 시도하며, 마지막 품질 앞까지는 모두 담길 때만 확정한다. 마지막 품질(0.4)에서만 앞에서부터 담는다(지금의 768 처리와 같다)
 - 클래스 Javadoc 과 `photos` Javadoc 에 품질 단계를 적는다
+- 바뀐 결정과 어긋나는 Javadoc 을 고친다: `photos` Javadoc 의 「싣지 못한 사진도 사본을 만들어 본다. 경로로 안내할 사본이 있어야 한다」 와 `SEND_WAIT_SECONDS` Javadoc 의 「원본 경로로 안내한다」. 지난 메시지의 사진을 볼 사본을 미리 만들어 두는 것과 「싣지 못한 사진으로 안내한다」 로 바꾼다
 
 ### 3. `AttachmentService.java` 의 지시문
 
@@ -66,19 +67,19 @@
 ### 5. 이 phase 를 검증하는 테스트
 
 `backend/src/test/java/com/bifos/assistant/chat/application/AgentImageResizerTest.java`
-- `shrink(jpeg, longSide, quality)`: 긴 변 768 사본을 768, 품질 0.4 로 부르면 크기는 같고 바이트가 받은 것보다 작다. 품질 `QUALITY` 로 부르면 받은 바이트와 같은 내용이다
+- `shrink(jpeg, longSide, quality)`: 같은 파일의 `noisyGradient` 로 만든 이미지를 `toJpeg` 로 긴 변 768 사본으로 만든 뒤(단색은 다시 인코딩해도 거의 줄지 않는다) 768, 품질 0.4 로 부르면 크기는 같고 바이트가 받은 것보다 작다. 품질 `QUALITY` 로 부르면 받은 바이트와 같은 내용이다
 
 `backend/src/test/java/com/bifos/assistant/chat/application/AttachmentImagesTest.java`
 - `SMALLEST_QUALITIES` 가 0.85, 0.6, 0.4 이다
 
 `backend/src/test/java/com/bifos/assistant/chat/ChatAttachmentTurnTest.java`
-- 새 테스트: `noisePng(1600, 1200)` 을 `properties.maxFiles()` 장(30) 올려 보내면 모두 실리고(이름표 1번째부터 30번째), data URL 길이 합이 7MB 이하이며, 실린 사진의 긴 변이 768 이고, 지시문에 `입력에 싣지 못한 사진` 이 없다
+- 새 테스트: `noisePng(768, 640)` 을 `properties.maxFiles()` 장(30) 올려 보내면 모두 실리고(이름표 1번째부터 30번째), data URL 길이 합이 7MB 이하이며, 실린 사진의 긴 변이 768 이고, 지시문에 `입력에 싣지 못한 사진` 이 없다. 이 사진은 품질 0.4 단계를 지난다. 주석에 측정값을 적는다: 사본이 이미 768×640 이라 1600 부터 768 까지 사본 그대로 넘치고, 768 품질 0.85 에서 약 14.9MB, 0.6 에서 약 8.3MB 로 넘치며, 0.4 에서 약 6.2MB 로 들어간다
 - 잡음 스물네 장과 작은 사진 한 장을 보내는 기존 테스트는 이제 스물다섯 장이 모두 실린다. 「뒤의 더 작은 사본도 싣지 않는다」 를 확인하던 그 테스트를 「스물다섯 장이 모두 768px 로 실린다」 로 바꾼다. 「한 번 예산에 닿으면 뒤 사진을 싣지 않는다」 규칙은 `AttachmentImagesTest` 의 `admits` 단언이 계속 확인한다
-- 열한 장 테스트에서 「사진이 많아 긴 변 1280px 로 줄여 실었다.」 단언을 지우고, 그 줄이 없다는 것을 단언한다. 긴 변 1280 단언은 그대로 둔다
+- 열한 장 테스트와 잡음 다섯 장 테스트(「사본 합이 7MB 를 넘으면 한 단계 줄여 모든 사진을 싣는다」)에서 「사진이 많아 긴 변 1280px 로 줄여 실었다.」 단언을 지우고, `사진이 많아 긴 변` 이 없다는 것을 단언한다. 두 테스트의 긴 변 1280 단언은 그대로 둔다
 - 「사진과 이미지가 아닌 파일을 함께 보내면…」 테스트의 기대를 바꾼다: `입력에 싣지 못한 사진: 2번째 사진. 이 사진은 도구로 읽지 말고, 사용자에게 볼 수 없었다고 알리고 JPEG 나 PNG 로 다시 올려 달라고 한다.\n` 가 있고, `싣지 못한 사진은 아래 경로를` 이 없다
 - 「사진 서른 장을 붙이면 Hermes와 다시 생성 입력과 말풍선이 선택 순서를 지킨다」(이미지가 아닌 바이트 서른 장, 아무것도 싣지 않는다)의 기대 문자열을 새 문구로 바꾼다: 경로 목록 대신 「입력에 싣지 못한 사진: 1번째, …, 30번째 사진. …」 한 줄, 그리고 바뀐 「지난 사진을 vision_analyze 로 볼 때는 …」 줄
-- 「원본도 사본도 없는 사진을 보내도 실행은 돌고 원본 경로로 안내한다」 테스트가 경로 안내를 단언하면 새 문구로 바꾼다. 위 첫 줄의 파일 목록(`- 1번째 사진: {첨부 번호}.png (올린 이름: …)`)은 그대로라 원본 이름은 입력에 남는다
-- 흐름 경로(`embed` 거짓)의 안내를 확인하는 테스트가 있으면 그대로 통과해야 한다. 없으면 `ChatRegenerateTest` 나 흐름 테스트에서 `싣지 못한 사진은 아래 경로를` 이 그대로인지 하나 더한다
+- 「원본도 사본도 없는 사진을 보내도 실행은 돌고 원본 경로로 안내한다」 테스트의 경로 단언(`"- 1번째 사진: " + agentDirectory(...) + "/" + id + ".png\n"`)을 바꾼다. 새 기대: 입력 첫 머리의 파일 목록 줄 `- 1번째 사진: {첨부 번호}.png (올린 이름: a.png)` 와 `입력에 싣지 못한 사진: 1번째 사진. 이 사진은 도구로 읽지 말고, 사용자에게 볼 수 없었다고 알리고 JPEG 나 PNG 로 다시 올려 달라고 한다.\n` 가 있다. 이 테스트의 `@DisplayName` 의 「원본 경로로 안내한다」 와, 「사진과 이미지가 아닌 파일을 함께 보내면…」 테스트 `@DisplayName` 의 「나머지는 원본 경로로 안내한다」 를 「싣지 못했다고 안내한다」 로 바꾼다
+- 흐름 경로: `ChatRegenerateTest.flowRegenerationGuidesBySmallCopyPathWithoutEmbedding` 에 `.contains("싣지 못한 사진은 아래 경로를 답에 필요한 만큼 vision_analyze 로 확인한다.\n")` 를 더한다
 
 `test/unit/attachment-limit.test.ts` (신규)
 - `web/src/components/chat/composer-attachment-utils.ts` 의 `MAX_ATTACHMENTS`, `backend/src/main/java/com/bifos/assistant/chat/infra/AttachmentProperties.java` 의 `DEFAULT_MAX_FILES`, `backend/src/main/resources/application.yml` 의 `max-files` 를 파일 글에서 정규식으로 읽어 셋이 같은 수인지 단언한다. 어느 하나를 찾지 못하면 실패한다. 파일 경로는 `import.meta.dirname` 기준으로 저장소 루트를 찾는다
