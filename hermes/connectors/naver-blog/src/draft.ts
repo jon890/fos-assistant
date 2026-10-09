@@ -2,6 +2,7 @@ import { constants, type Stats } from "node:fs";
 import { lstat, open, realpath } from "node:fs/promises";
 import { isAbsolute, join } from "node:path";
 import { z } from "zod";
+import { EXISTING_LINE } from "./document.ts";
 import { ToolError } from "./errors.ts";
 
 /** `render_draft` 와 임시저장 도구가 함께 받는 다섯 칸. 길이와 개수는 `validateDraft` 가 문장으로 알린다. */
@@ -118,6 +119,13 @@ export function validateDraft(input: DraftInput): string[] {
   const bodyLength = length(input.body);
   if (bodyLength > BODY_MAX)
     problems.push(`본문은 ${BODY_MAX}자까지입니다. 지금 ${bodyLength}자입니다.`);
+
+  // `read_draft` 가 돌려준 기존 구성요소 줄은 그 글 안에서만 뜻이 있다. 새 글에 넣으면 글자로 들어간다.
+  const existing = input.body.split("\n").filter((raw) => EXISTING_LINE.test(raw.replace(/\r$/, "")));
+  if (existing.length)
+    problems.push(
+      `${existing[0]} 같은 기존 구성요소 줄은 새 글에 넣을 수 없습니다. 그 줄을 지우거나 [사진 N: 파일 이름] 으로 바꿉니다.`,
+    );
 
   const blocks = parseBody(input.body);
   const images = blocks.filter((block) => block.type === "image");

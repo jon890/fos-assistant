@@ -23,6 +23,7 @@ import {
   setSkillEnabled,
 } from "@/lib/agent-api";
 import { formatWhen } from "@/lib/format";
+import { SkillPackageUpload } from "./skill-package-upload";
 import type { SkillItemView, SkillListView } from "@/lib/skill";
 
 type Props = {
@@ -188,11 +189,17 @@ export function AgentSkillsSection({ code, initialSkills }: Props) {
           )}
         </div>
         {editable ? (
-          <Button asChild size="sm" variant="outline">
-            <Link prefetch={false} href={`/agents/${code}/skills/new`}>
-              스킬 추가
-            </Link>
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button asChild size="sm" variant="outline">
+              <Link prefetch={false} href={`/agents/${code}/skills/new`}>
+                스킬 추가
+              </Link>
+            </Button>
+            <SkillPackageUpload
+              code={code}
+              onUploaded={async () => setError(await reload())}
+            />
+          </div>
         ) : null}
       </div>
       {error ? (

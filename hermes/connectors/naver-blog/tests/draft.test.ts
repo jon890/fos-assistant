@@ -115,6 +115,13 @@ test("대소문자와 앞뒤 공백만 다른 태그가 두 번 오면 둘째 �
   expect(problems).toEqual([expect.stringContaining("3번째 태그가 1번째 태그와 같습니다")]);
 });
 
+test("read_draft 의 기존 구성요소 줄은 새 글에서 문장으로 알리고, 비슷한 글 줄은 받는다", () => {
+  const problems = validateDraft(draft("안녕하세요\n[기존 사진 2]\n[기존 구성요소 1: quotation]"));
+
+  expect(problems).toEqual([expect.stringContaining("[기존 사진 2] 같은 기존 구성요소 줄은 새 글에 넣을 수 없습니다")]);
+  expect(validateDraft(draft("[기존 사진] 은 없다\n[기존 사진 0]"))).toEqual([]);
+});
+
 test("20,000자 본문은 받는다", () => {
   expect(validateDraft(draft("가".repeat(20_000)))).toEqual([]);
 });

@@ -56,10 +56,13 @@ H2 로 도는 검사를 모두 통과해도 운영 MySQL 에서 실패할 수 �
 
 ### 새 버전은 UTC 작성 시각으로 정한다
 
-버전 형식, 숫자 버전 유지, `out-of-order`, 겹칠 때 새 파일만 다시 정하는 규칙은 루트 [`AGENTS.md`](../../AGENTS.md) 의 「Flyway 버전과 ADR 식별자」 가, 적용된 파일을 고치지 않는 규칙은 같은 문서의 「용어」 절이 갖는다.
-작성 시각은 `date -u +%Y%m%d%H%M%S` 로 얻는다.
-서로 의존하는 마이그레이션은 한 PR 안에서 의존하는 파일의 시각을 더 크게 정한다. 다른 PR 의 미적용 스키마에 기대는 SQL 은 만들지 않는다.
-검사는 `node scripts/check-migration-versions.mjs [기준 ref]` 가 한다. 결정 근거는 [ADR-20261007 / numbering-scheme](../../docs/adr/ADR-20261007-numbering-scheme.md) 에 있다.
+새 마이그레이션은 UTC 작성 시각으로 `V<YYYYMMDDHHMMSS>__<설명>.sql` 을 만든다. 작성 시각은 `date -u +%Y%m%d%H%M%S` 로 얻는다.
+이미 main 에 있는 숫자 버전은 그대로 두며, 합칠 때 다음 숫자로 옮기지 않는다.
+같은 시각이 겹치면 아직 적용하지 않은 새 파일의 시각을 다시 정한다.
+운영과 테스트는 `spring.flyway.out-of-order=true` 로 낮은 시각 버전이 나중에 머지되어도 적용한다.
+서로 의존하는 마이그레이션은 한 PR 에 두고, 의존하는 파일의 시각을 더 크게 정한다. 다른 PR 의 미적용 스키마에 기대는 SQL 은 만들지 않는다.
+적용된 파일을 고치지 않는 규칙은 루트 [`AGENTS.md`](../../AGENTS.md) 의 「용어」 절이 갖는다.
+검사는 `node scripts/check-migration-versions.mjs [기준 ref]` 가 하고, 무엇을 어느 기준과 비교하는지는 그 스크립트와 CI 가 갖는다. 결정 근거는 [ADR-20261007 / numbering-scheme](../../docs/adr/ADR-20261007-numbering-scheme.md) 에 있다.
 
 ### DDL 과 DML 을 한 파일에 섞지 않는다
 
