@@ -155,7 +155,7 @@ sequenceDiagram
 | timeout 뒤 같은 이름으로 다시 저장한다 | 표식 없는 버전에 있는 이름은 올린 스킬로 보고 받는다. Hermes 목록에 먼저 떠 있어도 `SKILL_NAME_TAKEN` 이 아니다 |
 | 파일 경로가 경로 규칙에 맞지 않거나 상한을 넘는다 | `VALIDATION_FAILED` |
 | 저장하는 스킬에 `scripts/` 가 있는데 그 에이전트에 `terminal` 이 꺼져 있다 | `SKILL_SCRIPTS_NEED_SANDBOX`. 버전 디렉터리를 쓰기 전에 거절한다 |
-| 저장하는 스킬에 `scripts/` 가 있는데 plugin 이 실행 공간이 없다고 거절한다 | `SKILL_SCRIPTS_NEED_SANDBOX`. 대시보드의 409 `sandbox_unavailable` 이다. 4xx 이므로 새 디렉터리를 지운다 |
+| 저장하는 스킬에 `scripts/` 가 있는데 plugin 이 실행 공간이 없다고 거절한다 | `SKILL_SCRIPTS_NEED_SANDBOX`. 대시보드의 409 `sandbox_unavailable` 이다. 4xx 이므로 새 디렉터리를 지운다. plugin 은 실행 공간 디렉터리를 준비하다 난 파일 오류도 같은 409 로 주므로, 그 경우도 이 코드로 안내된다 |
 | 저장하는 스킬에 `scripts/` 가 있는데 주인의 첨부 디렉터리를 준비하지 못한다 | `AGENT_SANDBOX_UNAVAILABLE` 그대로다. 셸 유무가 원인이 아니라서 바꾸지 않는다. 새 디렉터리를 지운다 |
 | 함께 실리는 다른 스킬에 `scripts/` 가 있다 | 보지 않는다. 셸이 꺼진 에이전트도 다른 스킬을 고칠 수 있다 |
 | 앞머리 뒤에 본문이 없다 | `VALIDATION_FAILED`. 새 스킬이든 고치는 스킬이든 같다 |
@@ -169,6 +169,8 @@ sequenceDiagram
 | 지운다 | 그 스킬을 뺀 새 버전을 같은 방법으로 게시한다. 호출 이력은 남는다 |
 | Hermes 안에서 모델이 올린 스킬을 고치려 한다 | 읽기 전용이라 실패한다. 실행 입력 앞 단락이 `skill_manage` 를 쓰지 말라고 알리고, 서명 plugin 이 `skill_manage` 호출을 막는다 |
 | Hermes 를 올려 같은 이름의 번들 스킬이나 로컬 스킬이 생긴다 | 업그레이드와 배포 확인의 이름 충돌 검사가 배포를 멈춘다. 검사는 `fos-home-infra` 가 갖는다 |
+
+**화면 편집기는 아직 `references/`, `templates/` 아래 한 단계 경로만 다룬다.** API 로 넓힌 경로(맨 위 `.md`/`.txt`, `scripts/`, `assets/`, 여러 조각)의 스킬을 편집기에서 저장하면 경로가 잘리거나 거절된다. 편집기가 넓힌 경로를 다루는 것은 화면 PR 에서 한다.
 
 ## 스크립트와 실행 공간
 
