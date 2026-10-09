@@ -657,6 +657,7 @@ v0.21.0 의 `gateway/platforms/api_server_runs.py` 가 보내는 것을 실측�
 | `reasoning.available` | `text` 에 그때까지의 답 전체 |
 | `run.completed` | `output` 과 `usage` |
 | `run.failed`, `run.cancelled` | 끝 |
+| `run.interrupted` | 끝. v0.21.5 부터 온다. `ChatRunEvents` 는 이것도 끝 사건으로 본다 |
 
 `data:` 줄의 JSON 안에 `event` 가 들어 있다. SSE 의 `event:` 줄로 오지 않는다.
 10초마다 `: keepalive` 주석이 온다.
@@ -1971,6 +1972,7 @@ v0.21.0 과 v0.21.3 Runs API 의 `usage` 에는 cache 항목이 없다.
 `input_tokens`, `output_tokens`, `total_tokens` 뿐이다.
 `cached_input_tokens` 가 실행 기록에서 비어 있는 것은
 prompt cache 가 붙지 않아서가 아니라 이 API 가 보고하지 않기 때문이다.
+v0.21.5 부터는 `usage` 에 cache 칸이 오고 `HttpHermesRunsClient` 가 `cache_read_tokens` 를 읽는다.
 
 이미 연결한 스킬의 본문과 색인 변경이 언제 적용되는지는 [`hermes/docs/hermes-contract.md`](hermes-contract.md#변경이-적용되는-시점) 의 「변경이 적용되는 시점」 이 갖는다.
 
@@ -2087,7 +2089,7 @@ plugin 이 본문을 먼저 읽은 뒤 처리기가 다시 읽는 방식은 v0.2
 | 연결된 디렉터리 안의 스킬 추가·삭제, 색인 설명 변경 | gateway 재시작 뒤 | `agent/prompt_builder.py` 의 `_SKILLS_PROMPT_CACHE` 키에 디렉터리 내용이 없다 |
 | 대시보드로 스킬 생성·수정 | gateway 색인은 재시작 뒤 | `create_skill` 이 비우는 캐시는 대시보드 프로세스에만 있다 |
 | `SKILL.md` 본문 | 다음 `skill_view`. 재시작이 필요 없다 | `skill_view` 가 파일을 직접 읽는다 |
-| `mcp_servers` 추가 | gateway 재시작 뒤 | `_discover_gateway_mcp_tools` 가 기동 때 도구를 발견한다 |
+| `mcp_servers` 추가 | gateway 의 MCP 설정 맞추기 작업의 다음 주기. 재시작이 필요 없다 | `gateway/run_profile_reconcile.py` 의 `reconcile_mcp_servers_with_config`. 기대는 지점은 `hermes_contract.py` 의 `LIVE_RELOAD` 가 확인한다([ADR-20261007 / connector-live-reload](../../docs/adr/ADR-20261007-connector-live-reload.md)) |
 | 이미 연결된 MCP 서버의 허용 목록 | 다음 실행 | `_get_platform_tools` 가 실행마다 교집합을 만든다 |
 | `approvals.mode`, `deny`, `timeout`, `cron_mode`, `unattended_mode`, `single_query_mode` | 다음 명령 판정 | `tools/approval.py` 의 읽기 함수가 `load_config_readonly()` 를 부른다 |
 | `delegation.subagent_auto_approve` | 다음 위임 | `tools/delegate_tool.py` 의 `_get_subagent_approval_callback` |

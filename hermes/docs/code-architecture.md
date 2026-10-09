@@ -28,6 +28,7 @@ Control Plane 이 기대는 Hermes 쪽 코드다. Hermes 에 설치하는 plugin
 | `dashboard-profile-api` | `connector_state.py`, `connector_status.py` | 소유 기록과 도구 이름 대응, 스킬과 정책 hook 상태 확인 |
 | `dashboard-profile-api` | `connector_isolated.py`, `connector_binding.py`, `connector_install.py` | 옛 설치, 바인딩 설치, 요청 처리와 probe |
 | `dashboard-profile-api` | `connector_mcp.py`, `connector_run.py` | MCP 호출과 결과 해석, call·execute 요청과 공유 동시 호출 한도 |
+| `dashboard-profile-api` | `connector_output.py`, `connector_owner_env.py` | 바인딩마다 만드는 커넥터 출력 디렉터리, 주인 env 검증 |
 | `dashboard-profile-api` | `routes.py` | 인증 provider, 경로 표, 토큰 미들웨어 |
 | `fos-ctx` | `context.py` | 서명, 토큰 읽기, 루트 session 조회, 호출 문맥 |
 | `fos-ctx` | `connector_policy.py` | 이름 대응 파일, 정책 질의, 서버 선택 |
@@ -61,20 +62,7 @@ Control Plane 이 기대는 Hermes 쪽 코드는 이 저장소가 갖는다.
 hermes/
   plugins/
     dashboard-profile-api/   대시보드 plugin. profile 만들기와 지우기, env, 도구와 스킬 설정, 커넥터
-      __init__.py             register 와 기존 이름 다시 내보내기
-      common.py, profiles.py, session.py
-      sandbox.py, sandbox_approvals.py, toolconfig.py, env.py
-      connector_schema.py, connector_policy.py, connector_skills.py, connector_appearance.py
-      connector_manifest.py, connector_vault.py
-      connector_state.py, connector_status.py
-      connector_isolated.py, connector_binding.py, connector_install.py
-      connector_mcp.py, connector_run.py, connector_output.py
-      routes.py               인증 provider 와 토큰 경로 연결
     fos-ctx/                 profile plugin. Control Plane MCP 호출에 _fos_ctx 서명을 붙이고, 바인딩 profile 과 옛 설치 profile 의 커넥터 도구 호출을 Control Plane 에 물어 막는다
-      __init__.py             register 와 기존 이름 다시 내보내기
-      context.py              서명과 루트 session, 호출 문맥
-      connector_policy.py     이름 대응과 정책 질의
-      subagent.py, hooks.py   자식 등록과 hook 진입점
   connectors/
     <커넥터 이름>/            범용 커넥터 하나. connector.json, .mcp.json, MCP 서버, 스킬 (ADR-064)
   profile-template/
