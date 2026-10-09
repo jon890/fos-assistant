@@ -36,7 +36,7 @@ import lombok.NoArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
 /**
- * 실행 공간의 파일 시스템을 읽는 유일한 곳이다. 규칙은 {@code docs/code-architecture.md} 의 「경로 규칙」 이 갖는다.
+ * 실행 공간의 파일 시스템을 읽는 유일한 곳이다. 규칙은 {@code backend/docs/code-architecture.md} 의 「경로 규칙」 이 갖는다.
  *
  * <p>링크를 따라가지 않는다. 주인 디렉터리부터 조각마다 링크가 아닌 디렉터리인지 보고 연다. {@link SecureDirectoryStream} 이
  * 있으면 앞 디렉터리의 핸들에서 다음 조각을 열어, 판정한 뒤 다른 것으로 바뀐 경로를 따라가지 않는다. 없는 운영체제는 조각마다 경로로

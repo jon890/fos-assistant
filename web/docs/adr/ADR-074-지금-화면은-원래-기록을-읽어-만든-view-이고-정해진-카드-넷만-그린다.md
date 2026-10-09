@@ -39,7 +39,7 @@
     - 홈의 첫 반응 시간이 지금과 같다.
     - 지금 화면을 지워도 원래 기록과 다른 화면이 그대로다.
   - 감당할 것:
-    - 화면을 열 때마다 여러 기록을 읽는다. 항목 수와 기간에 상한을 둔다([`backend/attention.md`](../../../docs/backend/attention.md)).
+    - 화면을 열 때마다 여러 기록을 읽는다. 항목 수와 기간에 상한을 둔다([`backend/docs/flow.md`](../../../backend/docs/flow.md)).
     - 카드를 더하려면 코드와 이 결정을 고쳐야 한다. 오늘과 다음, 비용 이상, 중요 맥락이 그 후보다.
     - 고정이 없어 사용자가 원하는 항목을 늘 위에 두지 못한다.
-- **적용 범위**: 화면의 배치와 폭별 동작, 문구는 [`web/docs/prd.md`](../prd.md), 응답과 판정은 [`backend/attention.md`](../../../docs/backend/attention.md) 가 갖는다.
+- **적용 범위**: 화면의 배치와 폭별 동작, 문구는 [`web/docs/prd.md`](../prd.md), 응답과 판정은 [`backend/docs/flow.md`](../../../backend/docs/flow.md) 가 갖는다.

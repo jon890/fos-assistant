@@ -5,7 +5,7 @@
 #   scripts/quality.sh fix    사람이 판단하지 않아도 되는 것만 고친 뒤 check 를 돌린다. 새 위반을 기준 파일에 더하지 않는다.
 #
 # 규칙은 backend 는 ArchitectureRules.java 와 backend/config/checkstyle/ 이, web 은 web/eslint.config.mjs 가 갖는다.
-# 기준 파일을 다루는 방법은 docs/backend/quality.md 와 web/AGENTS.md 에 있다.
+# 기준 파일을 다루는 방법은 backend/docs/code-architecture.md 와 web/AGENTS.md 에 있다.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"

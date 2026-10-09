@@ -5,7 +5,7 @@
 <!--
   기존 위반이다. (파일, 규칙) 단위로 두고, 위반을 고치면 그 줄을 지운다.
   Checkstyle 은 쓰지 않는 줄을 알리지 않으므로 고친 사람이 직접 지운다.
-  새 위반은 여기에 더하지 않고 고친다. 갱신 방법은 docs/backend/quality.md 의 「코드 규칙의 기준 파일」 절에 있다.
+  새 위반은 여기에 더하지 않고 고친다. 갱신 방법은 backend/docs/code-architecture.md 의 「코드 규칙의 기준 파일」 절에 있다.
 -->
 <suppressions>
 </suppressions>

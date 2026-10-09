@@ -42,7 +42,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 
 /**
  * 매일 루프의 판정을 지금 화면에 보일 문제로 고르는 규칙, 판단 피드백 {@code SURFACED}, 사용자 반응과 그 거절을 본다. 규칙은
- * {@code docs/backend/proactive-loop.md} 의 「사용자에게 보이는 것」 이 갖는다.
+ * {@code backend/docs/flow.md} 의 「사용자에게 보이는 것」 이 갖는다.
  */
 @BackendIntegrationTest
 @LongProactiveCheckTimeouts

@@ -29,7 +29,7 @@ import org.hibernate.type.SqlTypes;
 /**
  * 예약 작업 하나다(ADR-076).
  *
- * <p>칸의 뜻은 {@code docs/backend/schema/task.md} 의 「task」 가 갖는다. 시각은 {@link TaskTrigger} 가 따로 갖는다. 지우면 줄을
+ * <p>칸의 뜻은 {@code backend/docs/data-schema.md} 의 「task」 가 갖는다. 시각은 {@link TaskTrigger} 가 따로 갖는다. 지우면 줄을
  * 남기고 {@code ARCHIVED} 로 둔다. 발화 기록과 대화가 이 줄을 가리킨다.
  *
  * <p>시각 칸은 {@code DATETIME(6)} 이라 마이크로초까지만 둔다. 메모리의 값과 DB 에서 다시 읽은 값이 같아야 한다.

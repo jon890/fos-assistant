@@ -56,7 +56,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 /**
  * 기동 정리가 도는 중이던 발화를 닫고, 그 정리가 끝나기 전에는 발화기가 돌지 않는지 본다. 규칙은
- * {@code docs/backend/task.md} 의 「기동할 때」 다.
+ * {@code backend/docs/flow.md} 의 「기동할 때」 다.
  *
  * <p>{@code @SpringBootTest} 컨텍스트는 이미 기동 사건을 지나 정리가 끝난 것으로 적혀 있다. 그래서 끝나기 전의 모습은
  * {@link TaskRunRecovery} 와 {@link TaskDispatcher} 를 직접 만들어 본다.

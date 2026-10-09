@@ -1,6 +1,6 @@
 package com.bifos.assistant.browser.domain.type;
 
-/** 사용자 브라우저의 상태다. {@code user_browser.status} 가 이 이름을 저장한다. 전이는 {@code docs/backend/user-browser.md} 의 「상태 전이」 가 갖는다. */
+/** 사용자 브라우저의 상태다. {@code user_browser.status} 가 이 이름을 저장한다. 전이는 {@code backend/docs/flow.md} 의 「상태 전이」 가 갖는다. */
 public enum UserBrowserStatus {
     /** 컨테이너가 없다. 프로필 디렉터리만 있다. */
     STOPPED,

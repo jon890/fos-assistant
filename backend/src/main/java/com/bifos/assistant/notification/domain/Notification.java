@@ -26,7 +26,7 @@ import org.hibernate.type.SqlTypes;
 /**
  * 사용자에게 대화 밖에서 알리는 줄 하나다(ADR-070).
  *
- * <p>칸의 뜻은 {@code docs/backend/schema/notification.md} 가 갖는다. 받는 사람은 번호로만 둔다. 갈 곳은 지워져도 이 줄을
+ * <p>칸의 뜻은 {@code backend/docs/data-schema.md} 가 갖는다. 받는 사람은 번호로만 둔다. 갈 곳은 지워져도 이 줄을
  * 남기므로 갈 곳에는 외래 키를 걸지 않는다.
  */
 @Entity
@@ -73,7 +73,10 @@ public class Notification {
     @Column(name = "body", nullable = false, length = BODY_MAX)
     private String body;
 
-    /** 갈 곳이 없으면 비운다. {@code targetPublicId} 와 함께 채우거나 함께 비운다. */
+    /**
+     * 갈 곳이 없으면 비운다. {@code targetPublicId} 와 함께 채우거나 함께 비운다. 목록 화면을 가리키는 {@code ADMIN_CONNECTIONS} 만
+     * 이 칸을 채우고 {@code targetPublicId} 를 비운다.
+     */
     @Enumerated(EnumType.STRING)
     @Column(name = "target_type", length = 20)
     private NotificationTargetType targetType;

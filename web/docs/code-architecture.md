@@ -26,12 +26,12 @@
 | `/connections` | 「외부 서비스 연결」. 커넥터 카드 목록. [`web/docs/prd.md`](prd.md) 의 「연결 뒤 에이전트 고르기」 를 따른다. 카드마다 아이콘, 이름, 연결 상태, 설명, 링크, 도구 수와 위험도별 수, 붙인 에이전트 수를 보인다([ADR-20261008 / connector-card](../../docs/adr/ADR-20261008-connector-card.md)) |
 | `/connections/{id}` | 커넥터 하나의 연결 화면. 머리에 아이콘, 이름, 설명, 링크를 보이고, 계정을 연결하고, 이 연결을 붙인 에이전트를 보인다 |
 | `/connections/accountbook` | 옛 주소. `/connections/{id}` 로 넘긴다 |
-| `/browser` | 내 브라우저. 만들기, 켜기, 끄기, 지우기와 자동 중지 안내, 켜져 있거나 꺼져 있을 때 로그인 화면(「화면 열기」). `?url=` 은 화면을 열 때 갈 시작 주소이고 `http`, `https` 가 아니면 무시한다. 사이드바 「고급」 의 「내 브라우저」 와 `/connections` 위쪽의 「내 브라우저」 링크로 간다([`../backend/user-browser.md`](../../docs/backend/user-browser.md)) |
+| `/browser` | 내 브라우저. 만들기, 켜기, 끄기, 지우기와 자동 중지 안내, 켜져 있거나 꺼져 있을 때 로그인 화면(「화면 열기」). `?url=` 은 화면을 열 때 갈 시작 주소이고 `http`, `https` 가 아니면 무시한다. 사이드바 「고급」 의 「내 브라우저」 와 `/connections` 위쪽의 「내 브라우저」 링크로 간다([`backend/docs/flow.md`](../../backend/docs/flow.md)) |
 | `/files` | 파일 공간. 내 에이전트들이 함께 쓰는 실행 공간의 목록, 미리보기, 내려받기, 지우기. `?path=` 는 연 디렉터리이고 `?file=` 은 미리 보는 파일이다. 사이드바 「고급」 의 「파일 공간」 으로 간다. [`prd.md`](prd.md) 의 「파일 공간」 |
-| `/tasks` | 내 예약 작업 목록과 「새 작업」([`docs/backend/task.md`](../../docs/backend/task.md) 의 「화면」) |
+| `/tasks` | 내 예약 작업 목록과 「새 작업」([`backend/docs/flow.md`](../../backend/docs/flow.md) 의 「화면(예약 작업)」) |
 | `/tasks/new` | 예약 작업 만들기 |
 | `/tasks/{id}` | 예약 작업 하나. 고치기, 멈추기와 다시 켜기, 지우기, 최근 실행 |
-| `/notifications` | 내 알림 목록. 알림 단추가 이 화면으로 온다([`docs/backend/notification.md`](../../docs/backend/notification.md) 의 「화면」) |
+| `/notifications` | 내 알림 목록. 알림 단추가 이 화면으로 온다([`backend/docs/flow.md`](../../backend/docs/flow.md) 의 「화면(알림)」) |
 | `/admin` | 관리자 영역의 첫 주소. `/admin/people` 로 넘긴다 |
 | `/admin/people` | 사용자 관리 |
 | `/admin/agents` | 그룹의 모든 에이전트와 운영 profile 등록 |
@@ -39,7 +39,7 @@
 | `/admin/models` | 그룹 모델 설정과 모델 숨김 |
 | `/admin/tools` | 그룹의 화면에 보일 도구와 도구마다 켜진 에이전트 수 |
 | `/admin/usage` | 금액, 모델, 토큰이 보이는 사용량 |
-| `/admin/executions/{id}` | 실제 모델과 토큰, 금액, 시각 구간, 오류 코드, 도구 원본, 실은 문맥 항목의 참조가 보이는 실행 하나. 참조의 뜻은 [`docs/backend/context-bundle.md`](../../docs/backend/context-bundle.md) 의 「로그와 저장」 이 갖는다 |
+| `/admin/executions/{id}` | 실제 모델과 토큰, 금액, 시각 구간, 오류 코드, 도구 원본, 실은 문맥 항목의 참조가 보이는 실행 하나. 참조의 뜻은 [`backend/docs/flow.md`](../../backend/docs/flow.md) 의 「로그와 저장」 이 갖는다 |
 | `/admin/connections` | 반영을 기다리는 연결의 반영 완료 |
 | `/admin/browsers` | 모든 사용자 브라우저의 사용자 이름, 상태, 마지막 사용 시각, 오류 코드와 끄기, 지우기 |
 | `/admin/workspaces` | 실행 공간마다 주인, 용량, 항목 수와 일부만 셌는지. 주인은 사용자 이름이거나 「에이전트 · <이름>」 이고 이름이 없으면 「알 수 없음」 이다. 일부만 센 공간에 「일부만 셈」 배지. 루트가 없으면 「파일 공간을 쓸 수 없어요」, 공간이 없으면 「아직 실행 공간이 없어요」, 실패는 「불러오지 못했어요」 와 다시 읽기. 관리자 영역이지만 오류 코드와 파일 이름은 그리지 않는다 |
@@ -113,7 +113,7 @@ ChatGPT 의 배치를 따른다. 위쪽 가로 메뉴를 두지 않고 왼쪽 �
 전에는 메뉴와 이름이 한 덩어리였고 줄어들지 않아, 가로로 돌린 전화기나 키보드가 올라온 화면에서 아래쪽이 화면 밖으로 잘렸다.
 관리자 입구가 그 줄에 있으므로 이 줄만은 늘 보이게 한다.
 알림 단추도 이 줄에 둔다. 좁은 화면에서는 서랍을 열지 않아도 보이게 머리의 「새 대화」 옆에 하나 더 둔다.
-알림 단추의 동작은 [`docs/backend/notification.md`](../../docs/backend/notification.md) 의 「화면」 이 갖는다.
+알림 단추의 동작은 [`backend/docs/flow.md`](../../backend/docs/flow.md) 의 「화면(알림)」 이 갖는다.
 
 ### 관리자 입구
 

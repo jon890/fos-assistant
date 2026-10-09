@@ -37,6 +37,13 @@ test("도구 요청 알림은 관리자 확인 경로로, 결과 알림은 요�
   assert.equal(notificationHref(view({ kind: "TOOLSET_REQUEST_DECIDED", targetType: "TOOLSET_REQUEST" })), `/tool-requests/${CONVERSATION_ID}`);
 });
 
+test("연결 다시 설치 알림은 공개 식별자 없이 관리자 연결 반영 확인 목록으로 간다", () => {
+  assert.equal(
+    notificationHref(view({ kind: "CONNECTOR_REINSTALLED", targetType: "ADMIN_CONNECTIONS", targetId: null })),
+    "/admin/connections",
+  );
+});
+
 test("읽지 않은 알림이 없으면 배지를 그리지 않는다", () => {
   assert.equal(unreadBadge(0), null);
   assert.equal(unreadBadge(-1), null);

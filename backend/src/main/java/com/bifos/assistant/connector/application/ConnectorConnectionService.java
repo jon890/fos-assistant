@@ -8,6 +8,7 @@ import com.bifos.assistant.connector.application.model.ConnectorFieldSummary;
 import com.bifos.assistant.connector.application.model.ConnectorOperationFailure;
 import com.bifos.assistant.connector.application.model.ConnectorOption;
 import com.bifos.assistant.connector.application.model.ConnectorSummary;
+import com.bifos.assistant.connector.application.model.ResyncOutcome;
 import com.bifos.assistant.connector.domain.ConnectorBinding;
 import com.bifos.assistant.connector.domain.ConnectorConnection;
 import com.bifos.assistant.connector.domain.type.ConnectionStatus;
@@ -48,7 +49,7 @@ import tools.jackson.databind.JsonNode;
  *
  * <p>서비스의 이름, env 이름, MCP 서버 이름을 갖지 않는다. 모두 대시보드가 내는 manifest 에서 꺼낸다. 카탈로그는 요청마다
  * 다시 읽는다. 운영자가 목록을 바꾸면 바로 반영되어야 하고 호출이 드물기 때문이다. 순서와 실패 처리는
- * {@code docs/backend/connector-install.md} 의 「설치와 실패 처리」 가 갖는다.
+ * {@code backend/docs/flow.md} 의 「설치와 실패 처리」 가 갖는다.
  */
 @Slf4j
 @Service
@@ -405,7 +406,7 @@ public class ConnectorConnectionService {
         }
         boolean failed = false;
         for (ConnectorBinding binding : bound) {
-            failed |= bindingService.resync(binding, manifest, false);
+            failed |= bindingService.resync(binding, manifest, false) == ResyncOutcome.CALL_FAILED;
         }
         bindings.saveAll(bound);
         ConnectionSnapshot stored = ConnectionSnapshot.from(connections.save(connection), bound);

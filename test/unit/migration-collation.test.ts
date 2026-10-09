@@ -67,6 +67,6 @@ test(`V${LAST_UNCHECKED_VERSION} 뒤의 마이그레이션은 CREATE TABLE 에 �
     violations,
     [],
     "CREATE TABLE 끝에 `ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci` 를 적는다. " +
-      "까닭은 docs/backend/schema/README.md 의 「마이그레이션 작성 규칙」 에 있다.",
+      "까닭은 backend/docs/data-schema.md 의 「마이그레이션 작성 규칙」 에 있다.",
   );
 });

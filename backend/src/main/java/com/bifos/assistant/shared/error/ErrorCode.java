@@ -231,6 +231,12 @@ public enum ErrorCode {
      * <p>재시작한 뒤에 들어온 설치는 떠 있는 gateway 가 아직 보지 못했기 때문이다.
      */
     CONNECTOR_RESTART_AGAIN(HttpStatus.CONFLICT),
+    /** 관리자 반영 완료가 다시 읽은 설치에서 켜짐, configured, 정책 hook, 방식 가운데 하나가 맞지 않음을 봤다. */
+    CONNECTOR_INSTALL_MISMATCH(HttpStatus.CONFLICT),
+    /** 관리자 반영 완료의 probe 가 실패했거나 도구를 내지 않았거나, 옛 바인딩의 켜진 내장 도구가 선언과 다르다. */
+    CONNECTOR_TOOLS_UNVERIFIED(HttpStatus.CONFLICT),
+    /** 반영 예정 시각 전이거나 다시 보낸 설치가 아직 반영 중이다. 몇 분 뒤 다시 누른다. */
+    CONNECTOR_APPLY_SCHEDULED(HttpStatus.CONFLICT),
     /** 없는 알림과 남의 알림을 같은 응답으로 숨긴다. 번호를 훑어 남의 것이 있는지 알아낼 수 없게 한다(ADR-070). */
     NOTIFICATION_NOT_FOUND(HttpStatus.NOT_FOUND),
     /**

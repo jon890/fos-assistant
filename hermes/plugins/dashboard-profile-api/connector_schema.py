@@ -27,7 +27,8 @@ ISOLATED_MODE = "isolated"
 CONNECTOR_SKILL_PARTS = ("references", "templates")
 
 
-# 커넥터 스킬 하나의 상한이다. Control Plane 이 올린 스킬에 거는 제한과 같다(`docs/backend/skill.md`).
+# 커넥터 스킬 하나의 상한이다. Control Plane 이 올린 스킬에 거는 제한과 같다.
+# 그 값은 `SkillService` 의 `MAX_FILES` 와 `MAX_CHARS_PER_FILE` 이 갖는다. 바꾸면 함께 고친다.
 CONNECTOR_SKILL_MAX_FILES = 20
 
 
@@ -98,7 +99,7 @@ CONNECTOR_TOOLSETS = frozenset({"vision"})
 
 
 # `connector.json` 의 `schema: 2` 가 도구마다 선언하는 위험도와 승인 방식이다(ADR-049).
-# 표는 `docs/backend/connector-tool-policy.md` 의 「도구 정책」 과 같다.
+# 표는 `backend/docs/flow.md` 의 「도구 정책」 과 같다.
 TOOL_RISKS = ("READ", "SENSITIVE", "WRITE", "DESTRUCTIVE", "FINANCIAL")
 
 

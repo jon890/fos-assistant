@@ -4,7 +4,7 @@
     "https://checkstyle.org/dtds/configuration_1_3.dtd">
 <!--
   백엔드 코드 규칙이다. Gradle 의 checkstyleMain, checkstyleTest 가 읽는다.
-  넣은 규칙의 까닭은 이 파일의 주석이 갖는다. 뺀 규칙의 까닭과 기준 파일 갱신 방법은 docs/backend/quality.md 에 있다.
+  넣은 규칙의 까닭은 이 파일의 주석이 갖는다. 뺀 규칙의 까닭과 기준 파일 갱신 방법은 backend/docs/code-architecture.md 에 있다.
 
   파일 셋
   - checkstyle.xml  이 파일. 규칙을 둔다

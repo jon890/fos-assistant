@@ -6,7 +6,7 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
 import org.springframework.validation.annotation.Validated;
 
 /**
- * 매일 루프의 설치 설정이다. 뜻은 {@code docs/backend/proactive-loop.md} 의 「설정」 이 갖는다.
+ * 매일 루프의 설치 설정이다.
  *
  * @param enabled 설치가 매일 루프를 연다. 기본은 꺼짐이고, 꺼져 있으면 사용자 설정과 상관없이 잇지 않는다
  * @param provider 평가에 쓸 {@code DecisionProvider} 이름. 설치된 adapter 여야 한다

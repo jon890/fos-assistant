@@ -22,7 +22,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * 사용자가 자기 실행 공간을 보는 경로다. 계약은 {@code docs/code-architecture.md} 의 「실행 공간 파일」 이 갖는다.
+ * 사용자가 자기 실행 공간을 보는 경로다. 계약은 {@code backend/docs/code-architecture.md} 의 「실행 공간 파일」 이 갖는다.
  *
  * <p>주인은 웹 토큰의 사용자다. 경로 변수와 인자는 그 사용자 디렉터리 안의 상대 경로뿐이다.
  */

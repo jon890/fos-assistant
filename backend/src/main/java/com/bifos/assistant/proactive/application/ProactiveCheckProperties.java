@@ -8,15 +8,16 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.validation.annotation.Validated;
 
 /**
- * 먼저 살펴보기의 설정이다(ADR-080). 칸과 기본값의 뜻은 {@code docs/backend/proactive-check.md} 의 「설정」 이 갖는다.
+ * 먼저 살펴보기의 설정이다(ADR-080). 기본값은 각 칸의 {@code @DefaultValue} 가, 범위 검사는 생성자가 갖는다.
  *
  * @param enabled 꺼 두면 살펴보기를 시작하지 않는다
  * @param maxDuration 살펴보기 turn 하나가 돌 수 있는 시간. {@code hermes.run-timeout} 보다 짧아야 한다
  * @param maxToolCalls 살펴보기 turn 하나가 시작할 수 있는 도구 호출 수
  * @param maxDelegations 살펴보기 트리에서 맡길 수 있는 위임 자식 수. 0 이면 맡기지 않는다
  * @param sessionMaxChecks 점검 대화의 루트 session 하나로 보내는 살펴보기 수. 닿으면 session 을 바꾼다
- * @param digestWindow 최근에 알린 발견으로 읽는 기간
- * @param digestMaxItems 다음 살펴보기의 입력에 싣는 최근 발견 수
+ * @param digestWindow 최근에 알린 발견과 받아들인 문제 후보로 읽는 기간. 발견과 후보의 중복 검사, 「관심 없음」 이 같은 주제를
+ *     내리는 기간도 이 값이다
+ * @param digestMaxItems 다음 살펴보기의 입력에 싣는 최근 발견 수와 받아들인 문제 후보 수. 둘을 따로 센다
  */
 @Validated
 @ConfigurationProperties(prefix = "assistant.proactive-check")

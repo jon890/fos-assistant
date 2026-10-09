@@ -7,10 +7,16 @@ Hermes Agent 를 Agent Runtime 으로 두고 이 저장소는 Control Plane 과 
 
 | 문서 | 언제 보는지 |
 | --- | --- |
-| [`docs/README.md`](docs/README.md) | 문서 전체의 색인. 제품 범위, 경계, Hermes 연동, ADR 을 여기서 찾는다 |
+| [`docs/prd.md`](docs/prd.md) | 제품의 목적과 범위, 범위 밖, 아직 만들지 않은 것 |
+| [`docs/code-architecture.md`](docs/code-architecture.md) | 모듈의 경계, 사용자와 profile, 에이전트, 대화의 층, 비밀값을 두는 곳 |
+| [`docs/flow.md`](docs/flow.md) | 화면과 Control Plane, Hermes 를 가로지르는 흐름 |
+| [`docs/adr/INDEX.md`](docs/adr/INDEX.md) | 되돌리기 어려운 결정과 그 근거 |
 | [`backend/AGENTS.md`](backend/AGENTS.md) | Control Plane 을 고칠 때 |
 | [`web/AGENTS.md`](web/AGENTS.md) | 화면을 고칠 때 |
 | [`hermes/AGENTS.md`](hermes/AGENTS.md) | Hermes 에 설치하는 plugin 과 profile 틀, 커넥터를 고칠 때 |
+
+모듈마다 `docs/` 에 `prd.md`, `flow.md`, `code-architecture.md` 를 두고, 저장하는 모듈은 `data-schema.md` 를 더 둔다.
+새 주제는 새 파일 대신 그 파일의 절로 더한다. 정해진 파일 밖의 예외와 까닭은 [ADR-20261009 / docs-per-module](docs/adr/ADR-20261009-docs-per-module.md) 이 갖고, `test/unit/doc-files.test.ts` 가 지킨다.
 
 ## 용어
 
@@ -122,7 +128,7 @@ key 값 자체를 적지 않는 것은 당연하고, **그것이 어디 있고 �
 같은 시각이 겹치면 아직 적용하지 않은 새 파일의 시각을 다시 정한다.
 서로 의존하는 마이그레이션은 한 PR 에 두고 시각 순서로 적용되게 한다.
 `spring.flyway.out-of-order=true` 로 낮은 시각 버전이 나중에 머지되어도 적용한다.
-작성 규칙은 [`docs/backend/schema/README.md`](docs/backend/schema/README.md) 가 갖는다.
+작성 규칙은 [`backend/docs/data-schema.md`](backend/docs/data-schema.md) 가 갖는다.
 
 새 ADR 은 그 결정을 지키는 코드가 있는 모듈의 `docs/adr/ADR-<YYYYMMDD>-<슬러그>.md` 로 만든다.
 backend 는 `backend/docs/adr/`, 화면은 `web/docs/adr/`, `hermes/` 는 `hermes/docs/adr/` 이고, 여러 모듈에 걸치면 루트 `docs/adr/` 다.

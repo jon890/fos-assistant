@@ -30,7 +30,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
-/** 관리자 용량이 실행 공간을 어떻게 고르고 세는지 실제 임시 디렉터리로 본다. 계약은 {@code docs/code-architecture.md} 의 「관리자 용량」 이다. */
+/** 관리자 용량이 실행 공간을 어떻게 고르고 세는지 실제 임시 디렉터리로 본다. 계약은 {@code backend/docs/code-architecture.md} 의 「관리자 용량」 이다. */
 class WorkspaceUsageServiceTest {
 
     private static final Instant NOW = Instant.parse("2026-10-09T00:00:00Z");

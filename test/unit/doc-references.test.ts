@@ -8,7 +8,13 @@ import { headingTexts, normalizeHeading, sectionNames } from "./markdown.ts";
 
 const REPO_ROOT = join(import.meta.dirname, "../../");
 
-const SELF = "test/unit/doc-references.test.ts";
+/** 문서 경로를 예시 문자열로만 쓰는 시험 파일이다. 그 경로는 실제 문서를 가리키지 않는다. */
+const PATH_FIXTURE_FILES = new Set([
+  "test/unit/doc-references.test.ts",
+  "test/unit/doc-files.test.ts",
+  "test/unit/file-length.test.ts",
+  "test/unit/doc-code-references.test.ts",
+]);
 
 const CODE_EXTENSIONS = [
   ".java",
@@ -33,6 +39,9 @@ const CODE_EXTENSIONS = [
  */
 const REFERENCE =
   /(?<![\w.-]|[\w-]\/)((?:(?:backend|web|hermes)\/)?docs\/[^\s`'"()[\]{}<>」,]+?\.md|(?:(?:backend|web|hermes)\/)?AGENTS\.md|hermes\/(?:[\w.-]+\/)*README\.md)(?:[`})]{0,2} ?(?:의)? ?「([^」]+)」)?/g;
+
+/** 첫 절 뒤에 쉼표나 「와」, 「과」 로 이어 적은 절이다. */
+const MORE_SECTION = /^\s*(?:,|와|과|및)\s*「([^」]+)」/;
 
 /** Markdown 링크의 대상 앞부분이다. 링크 안의 경로는 그 파일 자리 기준으로 푼다. */
 const LINK_PREFIX = /\]\(((?:\.\.\/)*)$/;
@@ -60,6 +69,13 @@ export function findDocReferences(text: string, file = "README.md"): DocReferenc
         : match[1];
       if (path.includes("NNN") || path.includes("%")) continue;
       found.push({ path, section: match[2], line: index + 1 });
+      if (match[2] === undefined) continue;
+      // 「A」, 「B」 와 「C」 처럼 이어 적은 절도 같은 문서의 절로 읽는다
+      let rest = lineText.slice((match.index ?? 0) + match[0].length);
+      for (let more = MORE_SECTION.exec(rest); more; more = MORE_SECTION.exec(rest)) {
+        found.push({ path, section: more[1], line: index + 1 });
+        rest = rest.slice(more[0].length);
+      }
     }
   });
   return found;
@@ -82,7 +98,7 @@ function targetFiles(): string[] {
     if (!match) continue;
     const [, mode, file] = match;
     if (mode === "120000") continue;
-    if (file === SELF) continue;
+    if (PATH_FIXTURE_FILES.has(file)) continue;
     if (/(^|\/)docs\//.test(file) || file.startsWith("tasks/")) continue;
     if (file.startsWith("backend/src/main/resources/db/migration/")) continue;
     const isCode = CODE_EXTENSIONS.some((extension) => file.endsWith(extension));
@@ -123,8 +139,7 @@ export function duplicateHeadings(markdown: string): string[] {
 /** 같은 헤딩이 되풀이되면 안 되는 문서 디렉터리다. 하위 디렉터리는 따로 적는다. */
 const UNIQUE_HEADING_DIRECTORIES = [
   "docs",
-  "docs/backend",
-  "docs/backend/schema",
+  "backend/docs",
   "web/docs",
   "hermes/docs",
 ];
@@ -200,6 +215,13 @@ test("AGENTS.md 는 하위 경로와 절 이름까지 읽는다", () => {
   const [reference] = findDocReferences("{@code backend/AGENTS.md} 「패키지 배치」");
   assert.equal(reference.path, "backend/AGENTS.md");
   assert.equal(reference.section, "패키지 배치");
+});
+
+test("쉼표와 「와」 로 이어 적은 절도 같은 문서의 절로 읽는다", () => {
+  const sections = findDocReferences("{@code docs/flow.md} 의 「작업」, 「시각」, 「API」 와 「알림」 이 갖는다").map(
+    (reference) => reference.section,
+  );
+  assert.deepEqual(sections, ["작업", "시각", "API", "알림"]);
 });
 
 test("모듈의 docs 경로를 루트 docs 로 읽지 않는다", () => {

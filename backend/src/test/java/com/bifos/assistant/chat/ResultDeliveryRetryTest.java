@@ -79,7 +79,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 /**
  * 사용자가 실패하거나 중지한 결과 전달을 다시 전달하면 저장된 결과만 다시 읽어 부모에 넘기는지 본다(ADR-075).
  *
- * <p>계약은 {@code docs/backend/agent-delegation.md} 의 「다시 전달할 때」 와 「다시 전달이 갈리는 지점」 이다. 첫 자동 turn
+ * <p>계약은 {@code backend/docs/flow.md} 의 「다시 전달할 때」 와 「다시 전달이 갈리는 지점」 이다. 첫 자동 turn
  * 은 테스트 스레드 밖의 가상 스레드에서 돌아 끝날 때까지 기다린다. 다시 전달은 테스트 스레드에서 부른다.
  *
  * <p>구성은 {@link ResultDeliveryRecordTest} 와 같게 둔다. 같은 Spring 컨텍스트를 써서 컨텍스트 수를 늘리지 않는다.

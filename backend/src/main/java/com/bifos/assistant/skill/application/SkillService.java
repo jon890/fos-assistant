@@ -23,7 +23,6 @@ import com.bifos.assistant.skill.infra.SkillProperties;
 import com.bifos.assistant.skill.infra.SkillPublisher;
 import com.bifos.assistant.skill.infra.SkillStore;
 import java.time.Instant;
-import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -44,7 +43,9 @@ import org.springframework.web.client.RestClientResponseException;
  *
  * <p>같은 에이전트의 저장은 기다리는 행 잠금으로 한 번에 하나씩 돈다. 잠금은 트랜잭션이 끝날 때 풀리므로
  * {@link #save} 와 {@link #delete} 는 잠금부터 표식 쓰기와 옛 버전 정리까지 한 트랜잭션이다. 그동안
- * 같은 에이전트의 도구와 공개 범위 변경은 {@code AGENT_BUSY} 로 거절된다.
+ * 같은 에이전트의 도구와 기본 모델 변경은 기다리지 않는 잠금이라 {@code AGENT_BUSY} 로 바로 거절되고,
+ * 주인의 공개 범위 변경과 에이전트 지우기는 잠금이 풀릴 때까지 기다린다.
+ * 관리자 수정도 기다리지 않는 잠금이라 {@code AGENT_BUSY} 로 바로 거절된다.
  *
  * <p>저장, 지우기, 켜고 끄기가 Hermes 에 반영되면 {@link SkillsChanged} 를 낸다. 커맨드가 부를 수 있는 이름의
  * 캐시({@link SkillCommandCatalog})가 그것을 받아 비운다. catalog 를 직접 받지 않는 것은 catalog 가 이
@@ -84,6 +85,7 @@ public class SkillService {
     private final SkillUsageQuery usage;
     private final ApplicationEventPublisher events;
     private final SkillProperties properties;
+    private final NewSkillRules newSkills;
 
     /**
      * 일반 화면에 보일 올린 스킬 목록이다. 관리자 역할도 기본·커넥터 스킬은 받지 않는다.
@@ -135,7 +137,7 @@ public class SkillService {
     private SkillList assemble(Agent agent, boolean editable, Map<String, SkillUsageSummary> usages) {
         String profile = agent.hermesProfile();
         Map<String, SkillBundle> uploaded = store.readCurrent(profile);
-        Set<String> uploadedNames = uploadedNames(uploaded, store.readPending(profile));
+        Set<String> uploadedNames = NewSkillRules.uploadedNames(uploaded, store.readPending(profile));
         Map<String, SkillListItem> items = new TreeMap<>();
         for (HermesSkill skill : publisher.list(profile)) {
             SkillSource source = uploadedNames.contains(skill.name()) ? SkillSource.UPLOADED : SkillSource.HERMES;
@@ -214,7 +216,7 @@ public class SkillService {
         Map<String, SkillBundle> pending = store.readPending(profile);
         SkillBundle uploaded = uploadedBundle(current, pending, name);
         if (uploaded == null) {
-            requireCreatable(profile, name, frontmatter, current, pending);
+            newSkills.requireCreatable(profile, name, frontmatter, current, pending);
         }
         SkillBundle bundle = bundleOf(name, skillMd, inputs, uploaded);
         return saveBundle(user, agent, current, bundle, uploaded);
@@ -243,28 +245,6 @@ public class SkillService {
                 .orElseThrow(SkillService::notFound);
         requireSkillMd(name, previous.skillMd());
         return saveBundle(user, agent, current, previous, uploaded);
-    }
-
-    /** 새 스킬일 때만 하는 검사다. Hermes 기본 스킬 이름, 올린 스킬 수 한도, 새 스킬 설명 60자를 본다. */
-    private void requireCreatable(
-            String profile,
-            String name,
-            SkillFrontmatter frontmatter,
-            Map<String, SkillBundle> current,
-            Map<String, SkillBundle> pending) {
-        if (publisher.list(profile).stream().anyMatch(s -> s.name().equals(name))) {
-            throw new ApiException(ErrorCode.SKILL_NAME_TAKEN, "Hermes already has a skill with this name");
-        }
-        int max = properties.maxPerAgent();
-        if (uploadedNames(current, pending).size() >= max) {
-            throw new ApiException(
-                    ErrorCode.VALIDATION_FAILED, "an agent can have at most " + max + " uploaded skills");
-        }
-        if (frontmatter.indexedDescriptionLength() > MAX_NEW_DESCRIPTION_CHARS) {
-            throw new ApiException(
-                    ErrorCode.VALIDATION_FAILED,
-                    "a new skill description can be at most " + MAX_NEW_DESCRIPTION_CHARS + " characters");
-        }
     }
 
     /**
@@ -399,12 +379,6 @@ public class SkillService {
             Map<String, SkillBundle> current, Map<String, SkillBundle> pending, String name) {
         SkillBundle bundle = current.get(name);
         return bundle != null ? bundle : pending.get(name);
-    }
-
-    private static Set<String> uploadedNames(Map<String, SkillBundle> current, Map<String, SkillBundle> pending) {
-        Set<String> names = new HashSet<>(current.keySet());
-        names.addAll(pending.keySet());
-        return names;
     }
 
     /**

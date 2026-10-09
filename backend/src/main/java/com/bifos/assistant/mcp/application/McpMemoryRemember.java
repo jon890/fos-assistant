@@ -21,7 +21,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 /**
- * Control Plane MCP 도구 {@code memory_remember} 의 정의와 처리다(ADR-20261007 / memory-remember). 계약은 {@code docs/backend/memory.md} 의
+ * Control Plane MCP 도구 {@code memory_remember} 의 정의와 처리다(ADR-20261007 / memory-remember). 계약은 {@code backend/docs/flow.md} 의
  * 「에이전트가 기억을 남기는 길」 이 갖는다.
  */
 @Service
@@ -99,8 +99,8 @@ public class McpMemoryRemember {
     }
 
     /**
-     * 사람에 관한 사실 하나를 바로 저장하거나 제안으로 남기고 그 결과를 한 줄 글로 돌려준다(ADR-20261007 / memory-remember). 글은
-     * {@code docs/backend/memory.md} 의 「에이전트가 기억을 남기는 길」 표가 갖는다.
+     * 사람에 관한 사실 하나를 바로 저장하거나 제안으로 남기고 그 결과를 한 줄 글로 돌려준다(ADR-20261007 / memory-remember). 결과마다의
+     * 글과 {@code isError} 는 이 메서드 끝의 {@code switch} 가 갖는다.
      *
      * <p>주인은 origin 실행의 사용자다. 바로 저장할지는 모델의 인자가 아니라 실행의 출처로 정한다. 사람이 보낸 turn 의 루트
      * 실행이고, 부정 표지가 질문과 본문에 함께 있거나 함께 없고(ADR-20261008 / memory-remember-guard), 그 실행이 아직 바깥

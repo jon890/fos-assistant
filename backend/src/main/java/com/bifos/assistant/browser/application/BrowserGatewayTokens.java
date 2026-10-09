@@ -21,8 +21,9 @@ import org.springframework.stereotype.Component;
 /**
  * 브라우저 중계의 접근 표식을 만들고 확인한다(ADR-20261008 / browser-gateway-token).
  *
- * <p>표식은 {@code gateway-secret} 로 번호를 HMAC-SHA256 한 값이고 표에 두지 않는다. 같은 바인딩은 늘 같은 표식을 받는다. 모양은
- * {@code docs/backend/user-browser.md} 의 「접근 표식」 이 갖는다. 표식과 서명과 비밀값은 로그와 예외 메시지에 싣지 않는다.
+ * <p>표식은 {@code gateway-secret} 로 번호를 HMAC-SHA256 한 값이고 표에 두지 않는다. 같은 바인딩은 늘 같은 표식을 받는다. 모양과
+ * 서명할 글, 만료는 ADR-20261008 / browser-gateway-token 의 「결정」 이 갖고, 형식 검사와 비교는 이 클래스가 갖는다. 표식과 서명과
+ * 비밀값은 로그와 예외 메시지에 싣지 않는다.
  */
 @Component
 @RequiredArgsConstructor

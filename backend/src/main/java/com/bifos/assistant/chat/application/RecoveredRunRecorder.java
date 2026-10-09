@@ -37,7 +37,7 @@ import org.springframework.transaction.support.TransactionTemplate;
  * 기동할 때 {@code RUNNING} 으로 남은 실행 줄 하나에 Hermes 의 답을 적는다(ADR-061).
  *
  * <p>실행 줄은 보통 turn 과 같은 기록 경로({@link ExecutionRecorder})로 적는다. 종류마다 함께 적는 것이 다르고,
- * 그 표는 {@code docs/backend/turn-control.md} 의 「기동할 때 남은 실행 정리」 가 갖는다.
+ * 그 표는 {@code backend/docs/flow.md} 의 「기동할 때 남은 실행 정리」 가 갖는다.
  *
  * <p><b>같은 실행을 몇 번 적으려 해도 한 번만 적힌다.</b> 근거는 실행 줄 하나다. 트랜잭션에서 그 줄을 잠그고
  * {@code RUNNING} 이 아니면 아무것도 하지 않는다. 메시지와 session 은 그 트랜잭션 안에서만 적는다. 끝 사건과

@@ -11,7 +11,7 @@ KEK 를 넣기 전에 저장한 평문 줄을 조금씩 암호화한다. 대상�
 
 ## 컨텍스트
 
-**근거 문서**: `backend/docs/adr/ADR-20261008-data-encryption.md` 의 「결정」 표(「이 결정 앞의 평문 메시지」 줄)와 「결과」, `docs/backend/schema/README.md` 의 「본문 칸과 운영 조회」
+**근거 문서**: `backend/docs/adr/ADR-20261008-data-encryption.md` 의 「결정」 표(「이 결정 앞의 평문 메시지」 줄)와 「결과」, `backend/docs/data-schema.md` 의 「본문 칸과 운영 조회」
 
 - 평문 줄은 옆 key 칸이 null 이고 본문이 빈 글이 아닌 줄이다. 대상은 다섯 칸이다
 

@@ -1,7 +1,7 @@
 import { ATTENTION_CHANGED_EVENT } from "@/lib/attention-api";
 import { memoryRequest, type MemoryApiResult } from "@/lib/memory-api";
 
-/** 할 일 요청이다. 계약은 `docs/backend/follow-up.md` 의 「API」 가 갖는다. */
+/** 할 일 요청이다. 계약은 `backend/docs/flow.md` 의 「API(할 일)」 가 갖는다. */
 
 /** 할 일 하나다. 제목은 모델이 쓴 글일 수 있어 평문으로만 그린다. */
 export type FollowUpView = {

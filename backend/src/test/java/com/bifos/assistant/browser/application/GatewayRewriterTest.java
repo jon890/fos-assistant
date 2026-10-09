@@ -11,7 +11,7 @@ import org.junit.jupiter.api.Test;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
-/** CDP 대상 한 줄을 중계 주소로 바꾸는 규칙을 본다. 규칙은 {@code docs/backend/user-browser.md} 의 「받는 것」 이다. */
+/** CDP 대상 한 줄을 중계 주소로 바꾸는 규칙을 본다. 규칙은 {@code backend/docs/flow.md} 의 「받는 것」 이다. */
 class GatewayRewriterTest {
 
     private static final JsonMapper JSON = JsonMapper.builder().build();

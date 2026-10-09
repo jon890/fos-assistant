@@ -17,7 +17,7 @@ import java.util.Map;
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
 
-/** 커넥터 연결 경로의 요청과 응답 모양이다. 칸은 {@code docs/connectors.md} 의 「Control Plane API」 와 같다. */
+/** 커넥터 연결 경로의 요청과 응답 모양이다. 칸은 {@code backend/docs/flow.md} 의 「커넥터 연결 API」 와 같다. */
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
 public final class ConnectionDtos {
 
@@ -142,7 +142,7 @@ public final class ConnectionDtos {
     }
 
     /**
-     * 도구 호출 판정의 응답이다. 칸은 {@code docs/backend/connector-tool-policy.md} 의 「도구 호출 판정」 과 같다.
+     * 도구 호출 판정의 응답이다.
      *
      * @param decision {@code allow} 나 {@code block}
      * @param message {@code block} 일 때 모델에게 보일 글. {@code allow} 이면 빈 글이다

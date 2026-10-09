@@ -1,4 +1,4 @@
-// 파일 공간 화면의 순수 함수다. 미리보기 확장자와 상한은 `docs/code-architecture.md` 의 「본문 머리글」 표와 같다.
+// 파일 공간 화면의 순수 함수다. 미리보기 확장자와 상한은 `backend/docs/code-architecture.md` 의 「본문 머리글」 표와 같다.
 // Control Plane 도 같은 상한으로 413 을 내므로 화면은 상한을 넘는 파일을 요청하지 않는다.
 // `test/unit/workspace-file.test.ts` 가 `node --test` 로 직접 읽으므로 import 는 상대 경로만 쓴다.
 

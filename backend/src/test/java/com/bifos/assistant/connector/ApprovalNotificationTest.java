@@ -63,7 +63,7 @@ import tools.jackson.databind.json.JsonMapper;
 /**
  * 승인이 필요한 커넥터 호출이 새 승인 줄을 만들 때와 그 줄이 만료될 때 알림을 남기는지 실제 DB 로 확인한다(ADR-070).
  *
- * <p>계약은 {@code docs/backend/notification.md} 의 「알림 종류」 다. 승인 카드가 뜰 대화가 있어야 알림이 생기므로 실제
+ * <p>계약은 {@code backend/docs/flow.md} 의 「알림 종류」 다. 승인 카드가 뜰 대화가 있어야 알림이 생기므로 실제
  * 대화를 저장하고 실행이 그 대화 번호를 갖게 준비한다.
  */
 @BackendIntegrationTest

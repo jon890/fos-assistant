@@ -7,7 +7,7 @@ import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
 
 /**
- * 할 일 경로의 요청과 응답 모양이다. 계약은 {@code docs/backend/follow-up.md} 의 「API」 가 갖는다.
+ * 할 일 경로의 요청과 응답 모양이다. 계약은 {@code backend/docs/flow.md} 의 「API(할 일)」 가 갖는다.
  *
  * <p>시각과 UUID 는 글로 받아 컨트롤러가 읽는다. 본문의 Jackson 변환 오류는 400 이 아니라 500 으로 끝나기 때문이다.
  */

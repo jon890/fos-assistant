@@ -22,7 +22,7 @@ import org.springframework.web.socket.WebSocketHandler;
 
 /**
  * 브라우저 중계의 WebSocket handshake 판정이 handshake 모양을 브라우저를 켜기 전에 보는지 확인한다. 계약은
- * {@code docs/backend/user-browser.md} 의 「WebSocket」 이다.
+ * {@code backend/docs/flow.md} 의 「WebSocket」 이다.
  */
 class BrowserGatewayHandshakeTest {
 

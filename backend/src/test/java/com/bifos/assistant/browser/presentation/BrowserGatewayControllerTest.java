@@ -37,7 +37,7 @@ import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
 /**
- * 브라우저 중계의 HTTP 창구가 돌려주는 상태 코드와 응답을 본다. 계약은 {@code docs/backend/user-browser.md} 의 「받는 것」 이다.
+ * 브라우저 중계의 HTTP 창구가 돌려주는 상태 코드와 응답을 본다. 계약은 {@code backend/docs/flow.md} 의 「받는 것」 이다.
  *
  * <p>표식 판정은 대역 {@link BrowserGateway} 가, Chrome 은 경로마다 정한 응답을 주는 대역이 맡는다.
  */

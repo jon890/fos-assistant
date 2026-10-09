@@ -61,5 +61,5 @@ replay 읽기 모델이 사건을 `ACCEPTED`, `DECLINED`, `DEFERRED`, `NO_RESPON
 
 ### 근거와 결과
 
-사건 종류, 기록 지점, 반응 읽기 규칙, replay 읽기 모델은 [판단 피드백](../../../docs/backend/decision-feedback.md)이 갖는다.
-칸은 [`schema/feedback.md`](../../../docs/backend/schema/feedback.md) 가 갖는다.
+사건 종류, 기록 지점, 반응 읽기 규칙, replay 읽기 모델은 [판단 피드백](../flow.md)이 갖는다.
+칸은 [`backend/docs/data-schema.md`](../data-schema.md) 가 갖는다.

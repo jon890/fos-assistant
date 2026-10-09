@@ -13,7 +13,7 @@ import tools.jackson.databind.node.ObjectNode;
 /**
  * {@link ConnectionFields} 를 JSON 텍스트 열로 읽고 쓴다.
  *
- * <p>MySQL {@code JSON} 타입을 쓰지 않는 까닭은 {@code docs/backend/schema/connector.md} 의 「connector_connection」 에 있다.
+ * <p>MySQL {@code JSON} 타입을 쓰지 않는 까닭은 {@code backend/docs/data-schema.md} 의 「connector_connection」 에 있다.
  * {@code domain} 이 {@code infra} 를 가리키지 않도록 그 타입의 모든 칸에 자동으로 적용한다.
  */
 @Converter(autoApply = true)
