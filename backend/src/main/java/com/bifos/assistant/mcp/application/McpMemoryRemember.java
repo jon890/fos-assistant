@@ -21,7 +21,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 /**
- * Control Plane MCP 도구 {@code memory_remember} 의 정의와 처리다(ADR-20261007 / memory-remember). 계약은 {@code backend/docs/flow.md} 의
+ * Control Plane MCP 도구 {@code memory_remember} 의 정의와 처리다(ADR-20261007 / memory-remember). 계약은 {@code docs/features/memory.md} 의
  * 「에이전트가 기억을 남기는 길」 이 갖는다.
  */
 @Service

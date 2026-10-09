@@ -2,12 +2,11 @@
 
 화면이다. Next.js 와 Tailwind 를 쓴다.
 
-화면 문서는 이 모듈의 `docs/` 에 셋이 있다.
+화면 문서는 이 모듈의 `docs/` 에 있는 `code-architecture.md` 하나와 루트 `docs/features/` 의 기능 파일이다.
 
 | 문서 | 언제 보는지 |
 | --- | --- |
-| [`web/docs/prd.md`](docs/prd.md) | 화면마다 누구에게 보이는 것과 그리지 않는 것 |
-| [`web/docs/flow.md`](docs/flow.md) | 화면에서 하는 일마다 Control Plane 과 주고받는 순서 |
+| [`docs/features/`](../docs/features/) | 기능마다 화면이 누구에게 보이는 것과 그리지 않는 것, 화면에서 하는 일마다 Control Plane 과 주고받는 순서 |
 | [`web/docs/code-architecture.md`](docs/code-architecture.md) | 화면 목록과 화면 틀, 부품을 두는 자리 |
 | [`web/docs/adr/INDEX.md`](docs/adr/INDEX.md) | 화면에 관한 결정 |
 
@@ -63,7 +62,7 @@ grep -rn 'style={{' web/src/
 - 사용자가 할 일은 사용자가 주어로 읽히게 쓴다. 「잠시 뒤 다시 보내 주세요.」. 「다시 보낸다」 는 비서가 스스로 하는 일로 읽힌다
 - 일반 사용자에게 보이는 오류는 할 일만 알린다. Hermes, profile, API key 같은 내부 원인은 로그와 관리 화면에 남긴다
 - 모델 이름, 토큰 수, 금액, 오류 코드, 에이전트 코드 같은 내부 값은 관리자 영역(`/admin` 아래)에서만 그린다. 그릴지는 `useAdminView()` 로 읽는다. 역할이 `ADMIN` 이어도 일반 화면에서는 거짓이다
-- 관리 동작과 관리자 전용 표시는 [`web/docs/prd.md`](docs/prd.md) 의 「관리자 영역」 절을 따른다
+- 관리 동작과 관리자 전용 표시는 [`docs/features/users.md`](../docs/features/users.md) 의 「관리자 영역」 절을 따른다
 - 버튼과 제목은 명사구나 짧은 동사구로 쓰고 질문형 제목을 쓰지 않는다. 확인 창 제목은 예외다. 「토큰을 폐기할까요?」 처럼 묻는다
 
 화면에서 쓰는 말이다. docs 와 코드 식별자는 원래 이름을 그대로 쓴다.
@@ -78,7 +77,7 @@ grep -rn 'style={{' web/src/
 | 실행 트리 | 작업 과정 |
 | 하위 에이전트 | 도우미 |
 | 설정 지문 | 설정별 사용량. 비교는 「설정 차이」, 값은 「설정 구분값」 |
-| provider | 모델 제공사. 표시 규칙은 [`backend/docs/flow.md`](../backend/docs/flow.md) 가 갖는다 |
+| provider | 모델 제공사. 표시 규칙은 [`docs/features/model-usage.md`](../docs/features/model-usage.md) 가 갖는다 |
 | Hermes API 주소 | 에이전트 연결 주소 |
 | credential 범위 | AI 계정 사용 범위 |
 | Hermes profile | profile (관리자 영역에서만) |

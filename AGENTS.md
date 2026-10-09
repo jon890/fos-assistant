@@ -9,13 +9,13 @@ Hermes Agent 를 Agent Runtime 으로 두고 이 저장소는 Control Plane 과 
 | --- | --- |
 | [`docs/prd.md`](docs/prd.md) | 제품의 목적과 범위, 범위 밖, 아직 만들지 않은 것 |
 | [`docs/code-architecture.md`](docs/code-architecture.md) | 모듈의 경계, 사용자와 profile, 에이전트, 대화의 층, 비밀값을 두는 곳 |
-| [`docs/flow.md`](docs/flow.md) | 화면과 Control Plane, Hermes 를 가로지르는 흐름 |
+| [`docs/features/`](docs/features/) | 기능마다 요구와 화면, Control Plane, Hermes 를 가로지르는 흐름 |
 | [`docs/adr/INDEX.md`](docs/adr/INDEX.md) | 되돌리기 어려운 결정과 그 근거 |
 | [`backend/AGENTS.md`](backend/AGENTS.md) | Control Plane 을 고칠 때 |
 | [`web/AGENTS.md`](web/AGENTS.md) | 화면을 고칠 때 |
 | [`hermes/AGENTS.md`](hermes/AGENTS.md) | Hermes 에 설치하는 plugin 과 profile 틀, 커넥터를 고칠 때 |
 
-모듈마다 `docs/` 에 `prd.md`, `flow.md`, `code-architecture.md` 를 두고, 저장하는 모듈은 `data-schema.md` 를 더 둔다.
+기능 파일은 `docs/features/` 에 두고, 모듈 `docs/` 에는 `code-architecture.md` 와 backend 의 `data-schema.md` 만 둔다.
 새 주제는 새 파일 대신 그 파일의 절로 더한다. 정해진 파일 밖의 예외와 까닭은 [ADR-20261009 / docs-per-module](docs/adr/ADR-20261009-docs-per-module.md) 이 갖고, `test/unit/doc-files.test.ts` 가 지킨다.
 
 ## 용어

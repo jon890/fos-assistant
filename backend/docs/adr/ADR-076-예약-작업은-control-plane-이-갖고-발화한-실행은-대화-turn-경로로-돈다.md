@@ -24,4 +24,4 @@
     - 대화 잠금과 사용자 실행 한도가 프로세스 메모리에 있어 **Control Plane 한 대 전제**가 하나 는다.
     - 사용자가 다른 대화로 한도를 다 쓰고 있으면 예약 실행이 기다리다 건너뛴다.
     - 작업 하나가 대화 목록에 대화를 하나씩 더한다. 목록은 작업으로 묶어 보인다([ADR-078](../../../docs/adr/ADR-078-예약-작업의-결과는-실행마다-새-대화가-기본이고-목록은-작업으로-묶는다.md)).
-- **적용 범위**: 흐름과 갈리는 지점은 [`backend/docs/flow.md`](../flow.md) 가, 칸은 [`backend/docs/data-schema.md`](../data-schema.md) 가 갖는다. 실패의 다시 하기와 일시 정지, 작업 범위 미리 허락, 에이전트의 작업 제안, webhook 은 다음 단계다.
+- **적용 범위**: 흐름과 갈리는 지점은 [`docs/features/schedule.md`](../../../docs/features/schedule.md) 가, 칸은 [`backend/docs/data-schema.md`](../data-schema.md) 가 갖는다. 실패의 다시 하기와 일시 정지, 작업 범위 미리 허락, 에이전트의 작업 제안, webhook 은 다음 단계다.

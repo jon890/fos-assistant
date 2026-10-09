@@ -44,7 +44,7 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 /**
- * 할 일의 만들기, 상태 전이, 고치기, 주인 판정을 실제 DB 로 본다. 규칙은 {@code backend/docs/flow.md} 의 「상태」 와 「API(할 일)」 다.
+ * 할 일의 만들기, 상태 전이, 고치기, 주인 판정을 실제 DB 로 본다. 규칙은 {@code docs/features/attention.md} 의 「상태」 와 「API(할 일)」 다.
  *
  * <p>사용자는 검사마다 새로 만들어 다른 검사의 줄과 섞이지 않게 하고, 끝나면 그 사용자의 줄을 지운다.
  */

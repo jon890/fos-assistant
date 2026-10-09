@@ -19,7 +19,7 @@ import tools.jackson.databind.DeserializationFeature;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
- * Memory 회수 합성 측정의 시험 세트다. 칸의 뜻은 {@code backend/docs/flow.md} 의 「시험 세트」 가 갖는다. 모든 값은 합성이다.
+ * Memory 회수 합성 측정의 시험 세트다. 칸의 뜻은 {@code docs/features/memory.md} 의 「시험 세트」 가 갖는다. 모든 값은 합성이다.
  *
  * @param version 시험 세트 형식의 판
  * @param note 시험 세트의 안내 글

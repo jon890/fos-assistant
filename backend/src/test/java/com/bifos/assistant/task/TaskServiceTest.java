@@ -52,7 +52,7 @@ import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /**
- * 예약 작업을 만들고 고치고 멈추고 지우는 규칙을 실제 DB 로 본다. 규칙은 {@code backend/docs/flow.md} 의 「작업」 과 「시각」 이다.
+ * 예약 작업을 만들고 고치고 멈추고 지우는 규칙을 실제 DB 로 본다. 규칙은 {@code docs/features/schedule.md} 의 「작업」 과 「시각」 이다.
  *
  * <p>시각은 이 검사의 시계가 정한다. 사용자와 에이전트는 검사마다 새로 만들어 다른 검사의 줄과 섞이지 않게 한다.
  */

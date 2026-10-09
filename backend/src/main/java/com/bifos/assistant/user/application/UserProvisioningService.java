@@ -16,7 +16,7 @@ import org.springframework.transaction.annotation.Transactional;
  *
  * <p>사용자를 새로 만드는 그 순간에 그 사람의 에이전트도 함께 만든다. 자기만 보는 에이전트는 주인이
  * 있어야 하는데, 주인은 그 사람이 로그인하기 전에는 존재하지 않기 때문이다. 순서와 어긋나는 지점은
- * {@code backend/docs/flow.md} 의 「사람을 더할 때」가 갖는다.
+ * {@code docs/features/users.md} 의 「사람을 더할 때」가 갖는다.
  */
 @Service
 @RequiredArgsConstructor

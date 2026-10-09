@@ -34,7 +34,7 @@ import org.springframework.transaction.support.TransactionTemplate;
  * 매일 깨우기 살펴보기가 끝나면 동의한 사용자에게만 가치 평가와 행동 정책을 한 번 잇는다(ADR-20261008 / daily-loop).
  *
  * <p>언제 부르는지와 시도 줄만 갖는다. 평가와 판정의 검사, 저장, 실패 처리는 {@link ValueEvaluationService} 와
- * {@link AutonomyPolicyService} 가 갖는다. 순서와 조건은 {@code backend/docs/flow.md} 의 「언제 부르는가」 가 갖는다.
+ * {@link AutonomyPolicyService} 가 갖는다. 순서와 조건은 {@code docs/features/proactive.md} 의 「언제 부르는가」 가 갖는다.
  *
  * <p>사건은 살펴보기 turn 을 돌린 백그라운드 스레드에서 동기로 받는다. 시도는 다시 부르지 않는다. 실패한 시도는 {@code FAILED} 로 끝이다.
  */

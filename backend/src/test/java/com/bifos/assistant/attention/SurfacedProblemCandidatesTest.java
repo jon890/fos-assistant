@@ -57,7 +57,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 
 /**
  * 매일 루프가 보인 판정이 「내 차례」 카드의 먼저 다룰 문제 항목으로 나오는지, 숨기기와 미루기의 판단 피드백 사건이 남는지를 실제 DB 로
- * 본다. 규칙은 {@code backend/docs/flow.md} 의 「후보와 trigger」 의 {@code PROBLEM_SURFACED} 줄이다.
+ * 본다. 규칙은 {@code docs/features/attention.md} 의 「후보와 trigger」 의 {@code PROBLEM_SURFACED} 줄이다.
  *
  * <p>소스 전체가 실패하는 경우는 컨텍스트를 나누는 대역이 필요해 단언하지 않고, 한 줄의 글이 비어도 나머지 항목과 카드가 남는지로
  * 본다. 모든 값은 합성이다.

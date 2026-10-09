@@ -133,7 +133,7 @@ H2 용 `*MigrationTest` 가 데이터베이스를 만드는 메서드를 열어 
 
 ## 모델 단계와 재조회
 
-선택의 우선순위와 초기값은 [모델 단계와 실행 기록](flow.md)이 정한다.
+선택의 우선순위와 초기값은 [모델 단계와 실행 기록](../../docs/features/model-usage.md)이 정한다.
 표와 칸은 [`backend/docs/data-schema.md`](data-schema.md), [`backend/docs/data-schema.md`](data-schema.md), [`backend/docs/data-schema.md`](data-schema.md) 의 각 절에 있다.
 
 `conversation.model_selection_mode` 의 null 은 사용자와 그룹 기본값을 따른다는 뜻이다.
@@ -153,7 +153,7 @@ H2 용 `*MigrationTest` 가 데이터베이스를 만드는 메서드를 열어 
 같은 트랜잭션에서 두 가지를 함께 지운다.
 아직 보내지 않은 대기 메시지(`chat_pending_message`)는 지운 대화에 보낼 곳이 없어 지운다.
 판단 피드백 사건(`decision_feedback_event`)은 그 대화의 사건과, 그 사건이 가리키는 제안의 다른 사건까지 지운다. 사용자의 기록이라 대화와 함께 없앤다.
-까닭과 예외는 [`backend/docs/flow.md`](flow.md) 의 「보관과 삭제」 가 갖는다.
+까닭과 예외는 [`docs/features/proactive.md`](../../docs/features/proactive.md) 의 「보관과 삭제」 가 갖는다.
 그 뒤 정리 작업이 메시지, 첨부와 결과물의 파일과 행, 실행 질문 줄, 실행의 답 본문과 사건의 `detail`, Hermes session 을 지우고 `purged_at` 을 적는다.
 실행 줄과 사건 줄은 본문 없이 남는다. 사용량 화면은 지운 대화의 실행도 센다. 돈은 이미 나갔다.
 무엇을 언제 지우고 무엇을 기다리는지는 [ADR-20261008 / conversation-purge](adr/ADR-20261008-conversation-purge.md) 가 갖는다.
@@ -248,7 +248,7 @@ Memory 는 줄을 지운다. 지우기 전에 마지막 값을 `memory_revision`
 
 ### model_tier_definition
 
-그룹이 정한 모델 단계의 mapping 이다. 선택의 우선순위와 초기값은 [모델 단계와 실행 기록](flow.md) 이 정한다.
+그룹이 정한 모델 단계의 mapping 이다. 선택의 우선순위와 초기값은 [모델 단계와 실행 기록](../../docs/features/model-usage.md) 이 정한다.
 
 - `provider` 가 비면 요청한 에이전트의 기본 provider 로 해석한다
 - `model` 이 비면 그 단계는 에이전트 기본 모델로 돈다
@@ -320,7 +320,7 @@ Hermes 가 Control Plane 의 MCP 도구를 부를 때 쓰는 장기 토큰이다
 
 대화와 메시지, 대기 메시지, 사진 첨부, 결과물, 결과 전달 기록, 실행과 질문의 연결을 저장하는 표 아홉을 다룬다.
 칸과 타입, 색인은 마이그레이션과 각 표의 엔티티가 갖는다. 이 문서는 코드만으로 알 수 없는 칸의 뜻, 유일 제약과 FK 를 두지 않는 까닭, 지울 때 함께 지워지는 것을 적는다.
-이 표들을 읽고 쓰는 경로는 [`backend/docs/flow.md`](flow.md) 와 그 옆의 문서들이 갖는다.
+이 표들을 읽고 쓰는 경로는 [`docs/features/chat.md`](../../docs/features/chat.md) 와 그 옆의 문서들이 갖는다.
 
 ### conversation
 
@@ -332,14 +332,14 @@ Hermes 가 Control Plane 의 MCP 도구를 부를 때 쓰는 장기 토큰이다
 | `hermes_session_id` | 다음 turn 에 보낼 Hermes session. 새 대화는 첫 turn 을 보내기 전에 Control Plane 이 `fos-<uuid>` 로 정해 적는다. 그 전의 대화는 첫 실행이 돌려준 값이다. 압축 교체로 Hermes 가 다른 session 을 돌려주면 그 값으로 바뀐다. 특정 profile 안의 값이다 |
 | `hermes_root_session_id` | 그 대화의 루트 session. 새 대화는 첫 turn 을 보내기 전에 `hermes_session_id` 와 같은 `fos-<uuid>` 를 적고, 압축 교체에도 바뀌지 않는다. MCP `agent_*` 호출이 들고 오는 서명한 루트 session 이 이 값이다. 이 칸이 생기기 전의 대화는 비어 있다 |
 | `title` | 첫 메시지의 앞부분. 사진을 먼저 올리려고 만든 대화는 첫 메시지 전까지 비어 있다 |
-| `model_provider`, `model` | 이 대화에서 직접 고른 provider 와 모델. 함께 채우거나 함께 비운다. 비면 어느 모델로 도는지는 [모델 단계와 실행 기록](flow.md) 의 「모델 선택」 이 정한다 |
+| `model_provider`, `model` | 이 대화에서 직접 고른 provider 와 모델. 함께 채우거나 함께 비운다. 비면 어느 모델로 도는지는 [모델 단계와 실행 기록](../../docs/features/model-usage.md) 의 「모델 선택」 이 정한다 |
 | `reasoning_effort` | 이 대화에서 고른 effort. `none` 은 reasoning 끄기이고 비어 있음(미지정)과 다르다 |
 | `model_selection_mode` | 비어 있으면 사용자와 그룹 기본값을 따른다 |
 | `deleted_at` | 사용자가 지운 시각. 채워지면 목록과 조회와 보내기에서 없는 대화와 같다 |
 | `purged_at` | 지운 대화의 본문을 정리 작업이 실제로 지운 시각. 이때 `title` 과 두 session 칸을 비운다. 채워진 대화에는 메시지를 저장하지 않는다. 근거는 [ADR-20261008 / conversation-purge](adr/ADR-20261008-conversation-purge.md) |
-| `hidden_at` | 목록에서만 뺀 시각. 예약 작업이 「보고할 것 없음」 으로 끝난 `NEW_PER_RUN` 대화에 적는다. 조회와 보내기는 그대로 되고, 사용자가 질문을 보내면 비운다([`backend/docs/flow.md`](flow.md) 의 「보고할 것 없음」) |
+| `hidden_at` | 목록에서만 뺀 시각. 예약 작업이 「보고할 것 없음」 으로 끝난 `NEW_PER_RUN` 대화에 적는다. 조회와 보내기는 그대로 되고, 사용자가 질문을 보내면 비운다([`docs/features/schedule.md`](../../docs/features/schedule.md) 의 「보고할 것 없음」) |
 | `auto_turn_count` | 마지막 사용자 질문 뒤로 Control Plane 이 위임 결과를 전하려고 연 turn 수. 사용자 질문을 저장할 때 0 으로 돌린다. `assistant.delegation-wake.max-auto-turns` 에 닿으면 더 깨우지 않는다 |
-| `purpose` | `CHAT` 은 보통 대화, `CHECK` 는 먼저 살펴보기의 점검 대화다. 만들 때 정하고 바뀌지 않는다. 사용자와 에이전트마다 지우지 않은 점검 대화 가운데 `id` 가 가장 큰 것을 쓴다([`backend/docs/flow.md`](flow.md)) |
+| `purpose` | `CHAT` 은 보통 대화, `CHECK` 는 먼저 살펴보기의 점검 대화다. 만들 때 정하고 바뀌지 않는다. 사용자와 에이전트마다 지우지 않은 점검 대화 가운데 `id` 가 가장 큰 것을 쓴다([`docs/features/proactive.md`](../../docs/features/proactive.md)) |
 | `task_id` | 이 대화를 만든 예약 작업. 사용자가 연 대화는 비어 있다. 외래 키를 두지 않는다. 뜻은 [`backend/docs/data-schema.md`](data-schema.md) 의 「conversation 에 더하는 칸」 |
 
 `hermes_session_id` 가 특정 profile 안의 값이라, 대화의 에이전트는 중간에 바뀌지 않는다.
@@ -350,7 +350,7 @@ Hermes 가 Control Plane 의 MCP 도구를 부를 때 쓰는 장기 토큰이다
 **`agent_id` 에 FK 를 두지 않는다.** 칸도 NULL 을 받는다(V4 가 칸을 더하며 그렇게 만들었다).
 에이전트를 지우는 것은 `deleted_at` 을 적는 것이라 정상 경로에서는 행이 사라지지 않는다.
 그래도 행이 없는 대화가 운영에서 나왔고, 그 대화를 읽는 경로는 행이 없어도 실패하지 않게 고쳤다
-([`backend/docs/flow.md`](flow.md) 의 「에이전트 만들기와 지우기」 절).
+([`docs/features/agent-skill.md`](../../docs/features/agent-skill.md) 의 「에이전트 만들기와 지우기」 절).
 FK 를 더하려면 이미 행이 없는 대화를 먼저 정리해야 하고, 그 정리는 대화 이력을 지우거나 가짜 에이전트 행을 만드는 일이 된다.
 행이 사라진 원인을 찾은 뒤 다시 판단한다.
 
@@ -452,12 +452,12 @@ turn 이 도는 동안 사용자가 보낸 메시지 하나가 한 행이다. �
 
 **보관 기간으로는 행을 지우지 않는다.** 첨부와 같다. 사용자가 대화를 지우면 정리 작업이 폴더와 행을 함께 지운다. 파일이 지워지면 `deleted_at` 을 적어 화면이 「보관 기간이 지나 볼 수 없습니다」를 보인다.
 근거는 [ADR-027](../../docs/adr/ADR-027-에이전트가-만든-html-은-대화별-폴더에-두고-스크립트-없이-보인다.md) 에 있다.
-지운 뒤 표시에 실패한 행을 다시 맞추는 규칙은 [`backend/docs/flow.md`](flow.md) 의 「지운 표시를 다시 맞추기」 가 갖는다.
+지운 뒤 표시에 실패한 행을 다시 맞추는 규칙은 [`docs/features/attachment.md`](../../docs/features/attachment.md) 의 「지운 표시를 다시 맞추기」 가 갖는다.
 
 ### result_delivery
 
 자동 turn 하나가 부모 대화에 넘긴 결과들의 묶음이다. 그 turn 이 알림 줄을 저장할 때 생긴다. 엔티티는 `ResultDelivery` 다.
-결정은 [ADR-075](../../docs/adr/ADR-075-결과-전달은-묶음과-시도로-남기고-사용자가-저장된-결과만-다시-전달한다.md), 상태가 바뀌는 흐름은 [`backend/docs/flow.md`](flow.md) 의 「결과 전달이 끝나지 않았을 때」 에 있다.
+결정은 [ADR-075](../../docs/adr/ADR-075-결과-전달은-묶음과-시도로-남기고-사용자가-저장된-결과만-다시-전달한다.md), 상태가 바뀌는 흐름은 [`docs/features/agent-skill.md`](../../docs/features/agent-skill.md) 의 「결과 전달이 끝나지 않았을 때」 에 있다.
 
 | 칸 | 뜻 |
 | --- | --- |
@@ -511,7 +511,7 @@ turn 이 도는 동안 사용자가 보낸 메시지 하나가 한 행이다. �
 - 새 질문과 다시 생성의 실행에만 남긴다. 예약 작업, 먼저 살펴보기, 맡긴 일의 결과를 전하는 turn, 맡겨서 도는 실행은 줄이 없다
 - 외래 키를 걸지 않는다. 읽는 쪽(`TurnQuestions`)은 메시지가 없거나, `USER` 가 아니거나, 그 실행의 사용자가 보낸 것이 아니면 없는 줄로 본다
 - 줄을 남기지 못해도 turn 은 잇는다. 그 실행의 `memory_remember` 는 제안으로만 남는다
-- 질문 줄이 없는 루트 실행이 대화에 하나라도 있으면 그 대화의 `memory_remember` 는 그 뒤로 늘 제안으로 남는다. 줄을 남기지 못한 실행과 이 표가 생기기 전의 실행도 센다. 판정은 [`backend/docs/flow.md`](flow.md) 의 「바로 저장 판정」 5 와 [ADR-20261008 / memory-remember-guard](../../docs/adr/ADR-20261008-memory-remember-guard.md) 가 갖는다
+- 질문 줄이 없는 루트 실행이 대화에 하나라도 있으면 그 대화의 `memory_remember` 는 그 뒤로 늘 제안으로 남는다. 줄을 남기지 못한 실행과 이 표가 생기기 전의 실행도 센다. 판정은 [`docs/features/memory.md`](../../docs/features/memory.md) 의 「바로 저장 판정」 5 와 [ADR-20261008 / memory-remember-guard](../../docs/adr/ADR-20261008-memory-remember-guard.md) 가 갖는다
 
 ## 실행 표
 
@@ -538,7 +538,7 @@ turn 이 도는 동안 사용자가 보낸 메시지 하나가 한 행이다. �
 | `hermes_session_id` | 이 실행이 속한 Hermes session. 대화 turn 은 그 대화의 루트 session 이고, 루트가 없는 옛 대화는 보낸 session 이다. 압축 교체 뒤에는 보낸 session 과 다를 수 있다. 흐름의 하위 실행과 위임한 자식은 Control Plane 이 정한 `fos-<uuid>` 다. 제출하기 전에 적는다. 최상위 session 의 MCP 호출과 최상위 자식의 등록이 서명한 루트 session 과 `profile_name` 으로 도는 실행을 찾을 때 쓴다([ADR-032](adr/ADR-032-mcp-토큰은-profile-을-증명하고-실제-사용자는-부모-실행에서-정한다.md)). 하위 에이전트 session 은 이 칸이 아니라 `hermes_session_binding` 으로 찾는다. 이 칸이 생기기 전의 실행과 Memory 제안, 추천 질문을 만드는 실행은 비어 있다 |
 | `delegation_key` | `agent_delegate` 로 만든 실행만 채운다. 유일하다. 같은 호출이 다시 와도 실행을 하나만 만든다. `agent_status` 와 `agent_stop` 은 이 칸이 있는 실행만 답한다. 값을 만드는 규칙은 [ADR-032](adr/ADR-032-mcp-토큰은-profile-을-증명하고-실제-사용자는-부모-실행에서-정한다.md) 에 있다 |
 | `output_text` | `agent_delegate` 로 만든 실행이 끝났을 때의 답. `agent_status` 와 `agent_stop` 이 `SUCCEEDED` 와 `CANCELLED` 에서 돌려준다. 끝난 상태와 같은 저장에서 적는다. `assistant.delegation.output-max-chars` 를 넘으면 자르고 잘렸다는 한 줄을 붙인다. 다른 실행은 채우지 않는다(대화 답은 `chat_message` 가 갖는다) |
-| `result_delivered_at` | 위임 실행의 끝난 결과를 부모에게 전한 시각. 부모가 `agent_status` 나 `agent_stop` 으로 끝난 상태를 받았거나, Control Plane 이 부모 대화를 깨운 turn 에 넣었을 때 적는다. `agent_delegate` 가 줄을 만든 뒤 제출 전에 끝나 `SUBMIT_FAILED` 를 돌려줄 때도 적는다. 부모가 번호를 모르는 결과를 다시 전하지 않기 위해서다. 이 칸이 생기기 전에 끝난 위임 실행은 마이그레이션이 `finished_at`(없으면 그때 시각)으로 채워 깨우지 않는다. 그때 `RUNNING` 이던 줄은 비워 두며, 기동 정리가 끝난 상태로 적은 뒤 전한다([`backend/docs/flow.md`](flow.md) 의 「기동할 때 남은 실행 정리」). 비어 있고 `SUCCEEDED` 나 `FAILED` 인 위임 실행이 깨울 대상이다([ADR-040](adr/ADR-040-위임-결과는-control-plane-이-부모-대화의-다음-turn-을-열어-전한다.md)). 먼저 살펴보기가 끝나면 그 트리의 위임 줄에 도는 중이어도 적는다([`backend/docs/flow.md`](flow.md) 의 「끝날 때」). 저장소의 조건부 update 로만 채우고 엔티티 저장에서는 빠진다(`updatable = false`) |
+| `result_delivered_at` | 위임 실행의 끝난 결과를 부모에게 전한 시각. 부모가 `agent_status` 나 `agent_stop` 으로 끝난 상태를 받았거나, Control Plane 이 부모 대화를 깨운 turn 에 넣었을 때 적는다. `agent_delegate` 가 줄을 만든 뒤 제출 전에 끝나 `SUBMIT_FAILED` 를 돌려줄 때도 적는다. 부모가 번호를 모르는 결과를 다시 전하지 않기 위해서다. 이 칸이 생기기 전에 끝난 위임 실행은 마이그레이션이 `finished_at`(없으면 그때 시각)으로 채워 깨우지 않는다. 그때 `RUNNING` 이던 줄은 비워 두며, 기동 정리가 끝난 상태로 적은 뒤 전한다([`docs/features/chat.md`](../../docs/features/chat.md) 의 「기동할 때 남은 실행 정리」). 비어 있고 `SUCCEEDED` 나 `FAILED` 인 위임 실행이 깨울 대상이다([ADR-040](adr/ADR-040-위임-결과는-control-plane-이-부모-대화의-다음-turn-을-열어-전한다.md)). 먼저 살펴보기가 끝나면 그 트리의 위임 줄에 도는 중이어도 적는다([`docs/features/proactive.md`](../../docs/features/proactive.md) 의 「끝날 때」). 저장소의 조건부 update 로만 채우고 엔티티 저장에서는 빠진다(`updatable = false`) |
 | `provider`, `model` | 실제로 돈 provider 와 모델. Hermes 의 session 이 답한 값이고, 읽지 못하면 요청한 값이다. 기본값으로 보냈고 둘 다 읽지 못하면 비어 있다 |
 | `reasoning_effort` | 이 실행에 요청한 effort. 기본값으로 보냈으면 비어 있다. 이 칸이 생기기 전의 실행도 비어 있다 |
 | `reasoning_defaults_checked_at` | `reasoning_effort`가 비어 있고 profile 기본값을 정상 응답으로 읽어 확인한 시각. 응답에 effort가 없어도 적어 같은 실행을 다시 조회하지 않는다. 조회 실패면 비워 다시 시도한다 |
@@ -590,7 +590,7 @@ turn 이 도는 동안 사용자가 보낸 메시지 하나가 한 행이다. �
 아직 안 끝난 것과 가격을 모르는 것이 한 숫자에 섞인다.
 
 기동할 때 `RUNNING` 으로 남아 있는 줄은 Hermes 에 물어 정한다.
-절차는 [`backend/docs/flow.md`](flow.md) 의 「기동할 때 남은 실행 정리」 가 갖는다.
+절차는 [`docs/features/chat.md`](../../docs/features/chat.md) 의 「기동할 때 남은 실행 정리」 가 갖는다.
 그 경로가 실패로 적을 때 쓰는 `error_code` 넷(`ORPHANED`, `REMOTE_RUN_LOST`, `RECONCILE_TIMEOUT`, `RECONCILE_UNREACHABLE`)의 뜻은 [ADR-061](adr/ADR-061-재기동-때-남은-실행은-hermes-에-물어-정하고-도는-실행에는-다시-붙는다.md) 의 결정이 갖는다.
 넷 모두 사용량 목록에서 「중간에 중단됨」 으로 보인다.
 
@@ -620,7 +620,7 @@ Hermes 가 보낸 원래 payload 를 통째로 넣지 않는다. 엔티티는 `E
 `child_session_id` 를 `hermes_session_id` 에, `goal` 을 `detail` 에 옮긴다.
 싣지 않는 버전에서는 이 칸들이 비고 `detail` 에 `preview` 가 들어간다.
 
-부모가 끝난 뒤에도 완료 사건이 없으면 [모델 단계와 실행 기록](flow.md)의 재조회로 보완한다.
+부모가 끝난 뒤에도 완료 사건이 없으면 [모델 단계와 실행 기록](../../docs/features/model-usage.md)의 재조회로 보완한다.
 `completed_child_session_id`는 자식 완료 사건의 중복 저장을 막는다.
 `(execution_id, completed_child_session_id)`가 유일하며 다른 종류의 사건은 이 칸을 비운다.
 이 칸이 생기기 전의 중복 완료 사건은 최신 한 줄에만 키가 있고 나머지 줄은 비어 있다.
@@ -634,7 +634,7 @@ Hermes 가 보낸 원래 payload 를 통째로 넣지 않는다. 엔티티는 `E
 
 native 자식 한 명의 사용량 원장 줄이자, 그 사용량을 session 에서 조회하는 작업이다.
 부모 실행이 끝나면 session 이 있는 시작 사건마다 한 줄이 생긴다.
-재조회 규칙과 합계에 더하는 규칙은 [모델 단계와 실행 기록](flow.md) 의 「비동기 자식 사용량」 이 정한다.
+재조회 규칙과 합계에 더하는 규칙은 [모델 단계와 실행 기록](../../docs/features/model-usage.md) 의 「비동기 자식 사용량」 이 정한다.
 근거는 [ADR-062](adr/ADR-062-native-하위-에이전트-사용량은-재조회-작업-줄을-원장으로-넓혀-합계에-더한다.md) 에 있다. 엔티티는 `SubagentUsageJob` 이다.
 
 | 칸 | 뜻 |
@@ -702,8 +702,8 @@ Control Plane 이 다시 떠도 등록 줄은 그대로다. 이미 등록한 하
 ### execution_context_source
 
 실행 하나에 실은 문맥 항목의 참조다. 어느 답에 어느 기록이 들어갔는지 나중에 찾으려고 남긴다.
-조립한 항목은 실행 줄을 만들 때 한 번에 적고, `memory_read` 가 본문을 내 준 항목은 실행 중에 `MEMORY_READ` 줄로 그 뒤에 덧붙인다([`backend/docs/flow.md`](flow.md) 의 「본문을 읽으면 남는 기록」).
-제목과 본문은 남기지 않는다. 항목의 뜻은 [`backend/docs/flow.md`](flow.md) 가 갖는다. 표는 `V70__execution_context_source.sql` 이 만들고 엔티티는 `ExecutionContextSource` 다.
+조립한 항목은 실행 줄을 만들 때 한 번에 적고, `memory_read` 가 본문을 내 준 항목은 실행 중에 `MEMORY_READ` 줄로 그 뒤에 덧붙인다([`docs/features/memory.md`](../../docs/features/memory.md) 의 「본문을 읽으면 남는 기록」).
+제목과 본문은 남기지 않는다. 항목의 뜻은 [`docs/features/memory.md`](../../docs/features/memory.md) 가 갖는다. 표는 `V70__execution_context_source.sql` 이 만들고 엔티티는 `ExecutionContextSource` 다.
 
 | 칸 | 뜻 |
 | --- | --- |
@@ -719,7 +719,7 @@ Control Plane 이 다시 떠도 등록 줄은 그대로다. 이미 등록한 하
 
 Memory 항목과 그 판, 그룹의 collection 목록, 에이전트가 받는 collection 과 그 변경 기록을 저장하는 표에서 마이그레이션만 읽어서는 알 수 없는 칸의 뜻과 제약의 까닭을 갖는다.
 칸과 타입, 색인은 마이그레이션(`V7__memory.sql`, `V47__memory_v2.sql` 과 그 뒤의 Memory 마이그레이션)이 갖고, 값의 목록은 각 enum 이 갖는다.
-실행에 실을 항목을 고르는 규칙은 [`backend/docs/flow.md`](flow.md) 가 갖는다.
+실행에 실을 항목을 고르는 규칙은 [`docs/features/memory.md`](../../docs/features/memory.md) 가 갖는다.
 
 ### memory
 
@@ -818,7 +818,7 @@ V47 이전 판으로 되돌린 동안 옛 코드가 쓴 줄은 다시 올리기 
 ### memory_capture
 
 에이전트가 `memory_remember` 로 남긴 기록 한 줄이다. 대화의 답 아래에 「기억했어요」 와 제안 카드를 그리고, 되돌리기가 무엇을 되돌릴지 정한다.
-도구와 API 는 [`backend/docs/flow.md`](flow.md) 의 「에이전트가 기억을 남기는 길」 이 갖는다.
+도구와 API 는 [`docs/features/memory.md`](../../docs/features/memory.md) 의 「에이전트가 기억을 남기는 길」 이 갖는다.
 
 - `memory_id` 는 만들거나 고친 항목이다. 되돌리거나 사람이 지우면 `memory` 에 없는 번호가 되므로 외래 키를 걸지 않는다
 - `user_id` 는 origin 실행의 사용자이고, `execution_id` 는 기록을 남긴 origin 실행이다. 한 실행의 상한을 `execution_id` 로 센다
@@ -854,7 +854,7 @@ V47 이전 판으로 되돌린 동안 옛 코드가 쓴 줄은 다시 올리기 
 
 `agent.connector_managed` 는 바인딩이 생기기 전에 연결마다 만든 옛 커넥터 에이전트를 표시한다. 지금은 새로 참이 되지 않는다.
 이 값이 참인 에이전트는 일반 설정 편집과 공개 범위 변경을 막고 사용자당 에이전트 상한에 세지 않는다. 지우기는 받는다. 사용자가 새 방식으로 옮긴 뒤 그 에이전트를 지울 길이 이것뿐이다.
-남아 있는 동안의 규칙은 [커넥터 설치](flow.md) 의 「옛 커넥터 에이전트」 가 갖는다.
+남아 있는 동안의 규칙은 [커넥터 설치](../../docs/features/connector.md) 의 「옛 커넥터 에이전트」 가 갖는다.
 
 `agent.connector_attachments` 는 그 옛 커넥터 에이전트가 사진을 받는지다.
 선언은 plugin 의 `connector.json` 에 있다. Control Plane 이 연결 확인과 관리자 반영 완료에서 선언한 toolset 이 켜진 것을 확인했을 때만 참으로 둔다.
@@ -911,7 +911,7 @@ V47 이전 판으로 되돌린 동안 옛 코드가 쓴 줄은 다시 올리기 
 
 사용자마다 하나씩 두는 브라우저의 표에서 코드만으로 알 수 없는 것을 적는다.
 칸과 타입, 제약은 `V20261007051418__user_browser.sql` 이 갖는다.
-상태 전이와 API 는 [`backend/docs/flow.md`](flow.md) 가 갖고, 결정은 [ADR-20261007 / user-browser](../../docs/adr/ADR-20261007-user-browser.md) 가 갖는다.
+상태 전이와 API 는 [`docs/features/user-browser.md`](../../docs/features/user-browser.md) 가 갖고, 결정은 [ADR-20261007 / user-browser](../../docs/adr/ADR-20261007-user-browser.md) 가 갖는다.
 
 ### user_browser
 
@@ -927,7 +927,7 @@ V47 이전 판으로 되돌린 동안 옛 코드가 쓴 줄은 다시 올리기 
 
 할 일, 사용자의 숨기기와 미루기, 먼저 알리기의 지표 사건을 저장하는 표에서 마이그레이션만 읽어서는 알 수 없는 칸의 뜻과 제약의 까닭을 갖는다.
 칸과 타입, 색인은 `V71__attention_control_event.sql` 과 `V72__follow_up.sql` 이 갖는다.
-뜻과 판정은 [`backend/docs/flow.md`](flow.md) 와 [`backend/docs/flow.md`](flow.md) 가 갖는다.
+뜻과 판정은 [`docs/features/attention.md`](../../docs/features/attention.md) 와 [`docs/features/attention.md`](../../docs/features/attention.md) 가 갖는다.
 
 ### follow_up
 
@@ -969,7 +969,7 @@ V47 이전 판으로 되돌린 동안 옛 코드가 쓴 줄은 다시 올리기 
 
 사용자에게 대화 밖에서 알리는 줄을 저장하는 표에서 코드만으로 알 수 없는 것을 적는다.
 칸과 타입, 길이는 마이그레이션이, 종류와 갈 곳의 값은 엔티티의 enum 이 갖는다.
-언제 만들고 화면이 어떻게 받는지는 [`backend/docs/flow.md`](flow.md) 가 갖는다.
+언제 만들고 화면이 어떻게 받는지는 [`docs/features/attention.md`](../../docs/features/attention.md) 가 갖는다.
 
 ### notification
 
@@ -986,7 +986,7 @@ V47 이전 판으로 되돌린 동안 옛 코드가 쓴 줄은 다시 올리기 
 
 예약 작업과 그 시각, 발화 한 번을 저장하는 표 셋에서 마이그레이션만 읽어서는 알 수 없는 칸의 뜻과 제약의 까닭을 갖는다.
 칸과 타입은 `V68__task.sql`, `V77__ProactiveScheduleTask`, `V20261008104800__task_model_tier.sql` 이 갖고, 값의 목록은 각 enum 이 갖는다.
-언제 발화하고 어떻게 시작하는지는 [`backend/docs/flow.md`](flow.md) 가 갖는다.
+언제 발화하고 어떻게 시작하는지는 [`docs/features/schedule.md`](../../docs/features/schedule.md) 가 갖는다.
 
 ### task
 
@@ -1038,14 +1038,14 @@ V47 이전 판으로 되돌린 동안 옛 코드가 쓴 줄은 다시 올리기 
 
 먼저 살펴보기 한 번과 그 발견, 문제 후보, 가치 평가, 행동 정책의 판정과 사용자 선호, 매일 루프의 설정과 시도를 저장하는 표 여덟이다.
 칸과 타입, FK, 색인은 마이그레이션이 갖는다. 이 문서는 칸 표로 알 수 없는 까닭과 지울 때의 연쇄를 갖는다.
-이 표들을 읽고 쓰는 경로는 [`backend/docs/flow.md`](flow.md) 가 갖는다.
+이 표들을 읽고 쓰는 경로는 [`docs/features/proactive.md`](../../docs/features/proactive.md) 가 갖는다.
 점검 대화는 [`backend/docs/data-schema.md`](data-schema.md) 의 `conversation.purpose` 로 가린다.
 
 ### proactive_check
 
 살펴보기 한 번이다. 시작할 때 만들고 끝날 때 갱신한다. 실행별 토큰과 금액은 `agent_execution` 이 갖는다.
 깨우기 예산을 측정할 트리 토큰 합계만 여기에도 남긴다.
-살펴보기 한 번의 비용은 `root_execution_id` 로 그 트리의 실행 줄을 합쳐 얻는다([`backend/docs/flow.md`](flow.md) 의 「비용과 효과」).
+살펴보기 한 번의 비용은 `root_execution_id` 로 그 트리의 실행 줄을 합쳐 얻는다([`docs/features/proactive.md`](../../docs/features/proactive.md) 의 「비용과 효과」).
 
 `root_execution_id` 는 유일하다. 살펴보기 트리를 가리는 기준이라 실행 줄 하나가 두 살펴보기에 속하지 않게 한다. 실행 줄을 만들기 전에 실패하면 비어 있다.
 `writes_allowed` 는 시작할 때 그 에이전트의 「먼저 살펴보기에 쓰기 도구 허용」 값을 옮겨 적는다. 도중에 관리자가 바꿔도 그 살펴보기의 경계는 옮겨 적은 값이 정한다(ADR-082).
@@ -1068,7 +1068,7 @@ V47 이전 판으로 되돌린 동안 옛 코드가 쓴 줄은 다시 올리기 
 
 결과 블록 버전 3의 문제 후보 하나다([ADR-093](adr/ADR-093-문제-찾기는-살펴보기-결과의-문제-후보로-받고-control-plane-이-근거와-중복을-결정적으로-검사한다.md)).
 받아들인 것과 버린 것을 모두 남긴다. 다음 살펴보기의 중복 판정과 입력에 쓰고, 우선순위를 정하는 다음 단계가 읽는다.
-칸의 뜻과 검사는 [`backend/docs/flow.md`](flow.md) 의 「문제 후보」 가 갖는다.
+칸의 뜻과 검사는 [`docs/features/proactive.md`](../../docs/features/proactive.md) 의 「문제 후보」 가 갖는다.
 살펴보기 줄을 지우면 함께 지운다(`ON DELETE CASCADE`).
 
 후보의 글은 모델이 쓴 글이고 대화에 그리지 않는다. 다섯 칸 보고(`report_json`)처럼 검사한 모양을 그대로 남긴다.
@@ -1076,12 +1076,12 @@ V47 이전 판으로 되돌린 동안 옛 코드가 쓴 줄은 다시 올리기 
 
 ### `proactive_value_evaluation`
 
-가치 평가 시도 하나다. [가치 평가](flow.md)가 입력과 결과, replay 계약을 갖는다.
+가치 평가 시도 하나다. [가치 평가](../../docs/features/proactive.md)가 입력과 결과, replay 계약을 갖는다.
 후보가 나온 살펴보기나 요청 사용자를 지우면 평가도 함께 지운다. 전체 개인 문맥과 원시 모델 응답을 저장하지 않는다.
 
 ### `proactive_autonomy_decision`
 
-행동 정책의 판정 하나다. [행동 정책](flow.md)이 수준과 까닭, 실행 키 계약을 갖는다.
+행동 정책의 판정 하나다. [행동 정책](../../docs/features/proactive.md)이 수준과 까닭, 실행 키 계약을 갖는다.
 
 `execution_key` 는 유일하다. 원천 살펴보기 하나에서 자동 실행이 한 번만 열리게 하는 장치다. `EXECUTE` 만 채운다.
 `candidate_id` 는 FK 가 없다. 평가 스냅샷의 후보 식별자라 지금의 후보 줄이 지워져도 판정이 남는다.
@@ -1095,14 +1095,14 @@ V47 이전 판으로 되돌린 동안 옛 코드가 쓴 줄은 다시 올리기 
 
 ### `proactive_loop_setting`
 
-사용자가 에이전트마다 매일 루프를 켠 설정이다. [매일 루프](flow.md)의 「사용자 설정」 이 뜻을 갖는다.
+사용자가 에이전트마다 매일 루프를 켠 설정이다. [매일 루프](../../docs/features/proactive.md)의 「사용자 설정」 이 뜻을 갖는다.
 줄이 없으면 꺼짐이다. 사용자나 에이전트를 지우면 함께 지운다.
 
 `(user_id, agent_id)` 는 유일하다. 하루 상한을 셀 때 그 사용자의 줄을 모두 쓰기 잠금으로 읽는다.
 
 ### `proactive_loop_run`
 
-매일 깨우기 살펴보기 하나를 잇는 시도다. 상태와 순서는 [매일 루프](flow.md)가 갖는다.
+매일 깨우기 살펴보기 하나를 잇는 시도다. 상태와 순서는 [매일 루프](../../docs/features/proactive.md)가 갖는다.
 
 `source_check_id` 는 유일하다. 살펴보기 하나에 시도 하나라서, 서버가 도중에 멈춰도 같은 원천에서 평가와 판정이 두 번 생기지 않는다.
 사용자나 원천 살펴보기를 지우면 함께 지운다. 이 시도가 만든 평가를 지우면 `evaluation_id` 만 비운다(`ON DELETE SET NULL`). 기동 때 닫은 줄도 비어 있다.
@@ -1111,7 +1111,7 @@ V47 이전 판으로 되돌린 동안 옛 코드가 쓴 줄은 다시 올리기 
 ## 판단 피드백 표
 
 판단 피드백 사건을 저장하는 표다. 칸과 타입, FK, 색인은 `V20261007044901__decision_feedback_event.sql` 이 갖는다.
-사건의 뜻, 기록 지점, 반응 읽기, 보관은 [`backend/docs/flow.md`](flow.md) 가 갖는다.
+사건의 뜻, 기록 지점, 반응 읽기, 보관은 [`docs/features/proactive.md`](../../docs/features/proactive.md) 가 갖는다.
 
 ### decision_feedback_event
 
@@ -1159,4 +1159,4 @@ V47 이전 판으로 되돌린 동안 옛 코드가 쓴 줄은 다시 올리기 
 | `docs/backend/schema/proactive.md` | 이 파일 「먼저 살펴보기 표」 | <!-- ref-ignore: 적용된 마이그레이션 주석이 가리키는 옛 경로다 -->
 | `docs/backend/schema/task.md` | 이 파일 「예약 작업 표」 | <!-- ref-ignore: 적용된 마이그레이션 주석이 가리키는 옛 경로다 -->
 | `docs/backend/schema/users-agents.md` | 이 파일 「사용자와 에이전트 표」 | <!-- ref-ignore: 적용된 마이그레이션 주석이 가리키는 옛 경로다 -->
-| `docs/backend/user-browser.md` | [`backend/docs/flow.md`](flow.md) 「사용자 브라우저」 | <!-- ref-ignore: 적용된 마이그레이션 주석이 가리키는 옛 경로다 -->
+| `docs/backend/user-browser.md` | [`docs/features/user-browser.md`](../../docs/features/user-browser.md) 「사용자 브라우저」 | <!-- ref-ignore: 적용된 마이그레이션 주석이 가리키는 옛 경로다 -->

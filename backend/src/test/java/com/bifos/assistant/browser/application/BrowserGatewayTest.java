@@ -29,7 +29,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
-/** 중계의 판정 순서를 본다. 규칙은 {@code backend/docs/flow.md} 의 「받는 것」 이다. 브라우저 서비스는 대역이다. */
+/** 중계의 판정 순서를 본다. 규칙은 {@code docs/features/user-browser.md} 의 「받는 것」 이다. 브라우저 서비스는 대역이다. */
 class BrowserGatewayTest {
 
     private static final String BASE = "http://control-plane.example.test/internal/browser-gateway";

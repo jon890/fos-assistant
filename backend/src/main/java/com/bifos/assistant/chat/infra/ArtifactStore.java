@@ -199,7 +199,7 @@ public class ArtifactStore {
      * 안에서 새로 훑어 한다. 판정 뒤 바뀐 파일을 옛 판정으로 지우지 않으려는 것이다. 한 파일이나 한 대화가 실패해도
      * 나머지를 계속한다. 하나 때문에 그날 치가 통째로 멈추면 디스크가 계속 찬다. 빈 폴더는 남긴다.
      *
-     * <p>잠금 밖에서 Hermes 가 직접 쓰는 경우의 보호 경계는 {@code backend/docs/flow.md} 의 「보관 기간이 지난
+     * <p>잠금 밖에서 Hermes 가 직접 쓰는 경우의 보호 경계는 {@code docs/features/attachment.md} 의 「보관 기간이 지난
      * 파일을 지울 때」 에 있다.
      *
      * @return 지운 파일들의 대화 번호와 상대 경로

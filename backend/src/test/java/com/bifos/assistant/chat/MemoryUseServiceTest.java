@@ -37,7 +37,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 /**
- * 대화의 답마다 그 실행이 본문을 받은 기억을 지금 볼 수 있는 것만 내는지 확인한다. 계약은 {@code backend/docs/flow.md} 의
+ * 대화의 답마다 그 실행이 본문을 받은 기억을 지금 볼 수 있는 것만 내는지 확인한다. 계약은 {@code docs/features/memory.md} 의
  * 「답마다 참고한 기억」 이 갖는다(ADR-20261008 / memory-facts).
  */
 @BackendIntegrationTest

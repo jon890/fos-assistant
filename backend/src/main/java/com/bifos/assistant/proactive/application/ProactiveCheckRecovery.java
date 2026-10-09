@@ -16,7 +16,7 @@ import org.springframework.stereotype.Component;
 
 /**
  * 서버가 도중에 내려가 {@code RUNNING} 으로 남은 먼저 살펴보기를 기동할 때 닫는다(ADR-080). 규칙은
- * {@code backend/docs/flow.md} 의 「끝날 때」 가 갖는다.
+ * {@code docs/features/proactive.md} 의 「끝날 때」 가 갖는다.
  *
  * <p>그 줄을 {@code FAILED}, {@code error_code = INTERRUPTED} 로 적고, 루트 실행이 있으면 그 트리의 위임 결과를 전했다고 적은 뒤
  * {@link ProactiveCheckEnded} 를 낸다. {@code orchestration} 이 받아 그 트리의 도는 위임 자식을 멈춘다. 기동 때는 이 서버가 돌리는

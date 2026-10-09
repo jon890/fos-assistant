@@ -8,7 +8,7 @@
  * <p>하위 에이전트 session 등록 본문도 여기서 만든다. 계약은 같은 문서의 「하위 에이전트 session 등록 계약」 이 정한다.
  * key 는 `_fos_ctx` 와 같고 서명할 글만 `v1-subagent`, 루트, 부모, 자식 session 을 줄바꿈 하나로 이은 것이다.
  *
- * <p>커넥터 도구 호출의 판정 요청 본문도 여기서 만든다. 계약은 `backend/docs/flow.md` 의 「도구 호출 판정」 이 정한다.
+ * <p>커넥터 도구 호출의 판정 요청 본문도 여기서 만든다. 계약은 `docs/features/connector-policy.md` 의 「도구 호출 판정」 이 정한다.
  * key 는 같고 서명할 글은 `v1-connector-policy`, 등록 이름, 루트 session, session, 도구 호출 id, 인자 글의 SHA-256 을
  * 줄바꿈 하나로 이은 것이다.
  */

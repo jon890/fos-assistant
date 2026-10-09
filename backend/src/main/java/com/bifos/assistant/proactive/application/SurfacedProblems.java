@@ -44,7 +44,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * 매일 루프가 낸 {@code SURFACE}, {@code ASK_APPROVAL} 판정을 지금 화면에 보일 문제로 읽고, 그 판정의 {@code SURFACED} 와 사용자
- * 반응을 판단 피드백 사건으로 남긴다. 고르는 순서와 규칙은 {@code backend/docs/flow.md} 의 「사용자에게 보이는 것」 이 갖는다.
+ * 반응을 판단 피드백 사건으로 남긴다. 고르는 순서와 규칙은 {@code docs/features/proactive.md} 의 「사용자에게 보이는 것」 이 갖는다.
  *
  * <p>사건 열쇠는 {@code autonomy_decision:<판정 번호>} 다. 반응은 기록만 하고 할 일, 승인 줄, 실행을 만들지 않는다.
  */

@@ -26,7 +26,7 @@ const CLOSED: Record<string, string> = {
 const LOST = "화면 연결이 끊겼어요. 다시 열어 주세요.";
 
 /**
- * 로그인 화면 SSE 의 수명과 입력 전송이다. 동작은 `backend/docs/flow.md` 의 「로그인 화면」 이 갖는다.
+ * 로그인 화면 SSE 의 수명과 입력 전송이다. 동작은 `docs/features/user-browser.md` 의 「로그인 화면」 이 갖는다.
  * 시작 주소는 첫 연결에만 쓴다. 다시 열 때는 지금 탭을 그대로 본다.
  */
 export function useScreenStream({

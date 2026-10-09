@@ -73,4 +73,4 @@
     - 셸 도구가 이미 켜진 profile 에 남은 옛 스킬만 운영이 점검한다. 두 검사는 새 저장에서만 돌아, 그 스킬은 고치거나 지울 때까지 계속 값을 실행 공간에 넣는다.
     - Hermes 를 올릴 때 terminal backend 계약을 다시 본다. 확인 항목은 [`hermes/docs/hermes-contract.md`](../../hermes/docs/hermes-contract.md) 가 갖는다.
 
-- **적용 범위**: 대시보드 plugin 의 `PUT /api/config`, `HermesToolsetClient`, `HermesSkillClient`, `AgentToolService`, `AgentAdminService` 와 `AgentLifecycleService` 의 주인 변경 검사, `SkillPublisher`, `Agent` 의 실행 공간 주인 키, 올린 스킬 저장 검사, 에이전트 도구 화면의 확인 문구. 흐름은 [`backend/docs/flow.md`](../../backend/docs/flow.md) 의 「에이전트 도구를 고를 때」 가 갖는다.
+- **적용 범위**: 대시보드 plugin 의 `PUT /api/config`, `HermesToolsetClient`, `HermesSkillClient`, `AgentToolService`, `AgentAdminService` 와 `AgentLifecycleService` 의 주인 변경 검사, `SkillPublisher`, `Agent` 의 실행 공간 주인 키, 올린 스킬 저장 검사, 에이전트 도구 화면의 확인 문구. 흐름은 [`docs/features/agent-skill.md`](../features/agent-skill.md) 의 「에이전트 도구를 고를 때」 가 갖는다.

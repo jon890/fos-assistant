@@ -13,7 +13,7 @@ import org.springframework.stereotype.Component;
  *
  * <p>그 답은 결과 블록의 JSON 이 섞인, 검사하지 않은 글이다. 대신 알림 줄 하나를 남긴다. 성공으로 끝났으면 실패 알림 줄이고, 취소로
  * 끝났으면 사용자가 멈췄을 때와 같은 멈춤 알림 줄이다. 사용자가 점검 대화에서 직접 보낸
- * 보통 turn 은 살펴보기 줄의 루트가 아니므로 답이 그대로 남는다. 규칙은 {@code backend/docs/flow.md} 의 「끝날 때」 가
+ * 보통 turn 은 살펴보기 줄의 루트가 아니므로 답이 그대로 남는다. 규칙은 {@code docs/features/proactive.md} 의 「끝날 때」 가
  * 갖는다.
  */
 @Component
