@@ -467,33 +467,63 @@ Control Plane 이 다시 뜰 때 남은 실행을 이 조회로 다시 정한다
 
 **가짜 Hermes 의 실행 조회도 이 모양으로 둔다.** 도는 실행은 `running`, 끝난 실행은 같은 답을 되풀이하고, 지운 run 과 모르는 run 은 404 다.
 
-### `/v1/runs` 는 이미지를 받지 않는다
+### `/v1/runs` 에 사진을 싣는 법
 
-v0.21.3 에서 확인했다. `content` 에 이미지를 담은 항목을 해석하는 자리가 경로마다 다르다.
+v0.21.5(`v2026.9.24`)의 소스를 읽어 확인했다. 운영 Hermes 에서 왕복으로 확인하는 방법은 아래 「운영에서 확인할 것」 에 있다.
 
-| 경로 | 이미지 항목 |
+**`input` 의 마지막 항목의 `content` 를 목록으로 보내면 그대로 에이전트에 간다.**
+[`api_server_runs.py`](https://github.com/NousResearch/hermes-agent/blob/v2026.9.24/gateway/platforms/api_server_runs.py) 의 `_handle_runs` 가 `raw_input[-1].get("content")` 를 꺼내 `run_conversation` 에 넘긴다.
+다른 경로가 부르는 정규화 함수(`api_server.py` 의 `_normalize_multimodal_content`)는 부르지 않는다.
+그래서 `data:image/` 확인, `file` 파트 거절, 글 64KB 자르기가 이 경로에는 없다. **보내는 쪽이 정규화한 모양(`{"type": "image_url", "image_url": {"url": ...}}`)으로 보낸다.**
+
+```text
+"input": [
+  {"role": "user", "content": [
+    {"type": "text", "text": "<입력 글>"},
+    {"type": "text", "text": "1번째 사진"},
+    {"type": "image_url", "image_url": {"url": "data:image/jpeg;base64,..."}}
+  ]}
+]
+```
+
+| 무엇 | 동작 |
 | --- | --- |
-| `POST /v1/chat/completions` | 받는다 |
-| `POST /v1/responses` | 받는다 |
-| `POST /api/sessions/{id}/chat` | 받는다 |
-| `POST /v1/runs` | 받지 않는다 |
+| 마지막이 아닌 `input` 항목 | 목록이면 글 파트만 이어 붙이고 이미지는 버린다(`_resolve_conversation_history`). 사진은 마지막 항목에만 싣는다 |
+| 요청 본문 `conversation_history` | `str()` 로 바뀐다. 목록을 넣으면 base64 가 글로 모델에 간다. 쓰지 않는다 |
+| 요청 본문 상한 | 10MB(`MAX_REQUEST_BYTES`, `client_max_size`). `Content-Length` 로 판정해 넘으면 413 이다 |
+| provider 로 가는 모양 | Chat Completions 는 파트를 그대로 보낸다. Responses(codex 계열)는 `input_image` 로, Anthropic 은 base64 이미지 블록으로, Gemini native 는 `inlineData` 로 바꾼다 |
+| 모델이 이미지를 받지 않는다 | 요청마다 그 모델의 vision 지원을 판정한다(`image_routing.py` 의 `_lookup_supports_vision`, config 재정의, models.dev 순서). 지원하지 않거나 판정하지 못하면 보조 vision 모델의 설명 글로 바꿔 보낸다(`vision_message_prep.py`) |
+| 상류가 이미지를 거절한다 | 오류 문구로 알아보고 그 요청 사본에서 이미지를 뗀 뒤 다시 시도한다(`turn_recovery.py`). 너무 크다는 거절은 줄여 한 번 다시 시도한다 |
+| fallback provider 로 넘어갔다 | 위 판정이 넘어간 모델 기준으로 다시 돈다 |
+| session 기록 | 이미지 파트는 `[screenshot]` 글로 저장된다(`session_persistence.py` 의 `_durable_content`). 다음 실행의 기록에 이미지가 다시 실리지 않는다 |
+| 같은 턴의 도구 루프 | 모델을 다시 부를 때마다 사용자가 올린 이미지가 다시 실린다. 요청에서 빼는 정책은 도구 결과 이미지에만 적용된다 |
+| 압축이 그 턴에 돈다 | 원본 파트가 기록에 남을 수 있다. 압축은 가장 최근 이미지 메시지 앞의 이미지를 「[Attached image — stripped after compression]」 으로 바꾼다 |
+| API 오류 | 요청 전체를 `request_dump_*.json` 으로 남긴다. base64 가 들어간다 |
+| `pre_llm_call`, `post_llm_call` hook | `user_message` 로 목록을 그대로 받는다. 우리 plugin 은 두 hook 을 쓰지 않는다 |
+| 사용량 | 이미지 토큰을 따로 나누지 않는다. provider 가 준 입력 토큰에 섞인다 |
+| `detail` | Responses 만 옮기고 Anthropic, Gemini 는 무시한다. Control Plane 은 보내지 않는다 |
 
-앞의 셋은 본문을 `{"type": "image_url"}` 모양으로 정규화하는 함수를 지난다.
-그 함수는 `http(s)` 주소와 `data:image/...` 두 가지만 받고,
-그 밖의 `data:` 와 파일 항목은 400 으로 거절한다.
+Control Plane 이 이 모양으로 사진을 싣는 결정은 [ADR-20261009 / native-image-input](../../backend/docs/adr/ADR-20261009-native-image-input.md) 에 있다.
 
-`/v1/runs` 는 그 함수를 부르지 않는다.
-`input` 의 마지막 항목에서 `content` 를 꺼내 그대로 쓴다.
-검사하는 자리가 없으므로 이미지 항목을 넣어도 거절되지 않고, 해석된다는 보장도 없다.
+**가짜 Hermes 도 목록 `input` 을 받는다.** 마지막 항목의 첫 글 파트를 입력 글로 읽고, 이미지 파트를 그 앞의 이름표 글과 함께 따로 기억한다.
 
-**그래서 사진을 대화 본문에 실어 보내는 길이 없다.**
-Control Plane 은 `/v1/runs` 를 쓰고, 그것을 버리면 `run_id` 와 사건 스트림과 실행 기록을 함께 버린다.
+#### 운영에서 확인할 것
+
+배포한 뒤 사진을 붙여 한 번 보내 본다. 실제 명령은 `fos-home-infra` 가 갖는다.
+
+- 답이 사진 내용을 말하고, 그 실행의 도구 사건에 `vision_analyze` 가 없다
+- 그 실행에 413 이나 `invalid_image_url` 같은 오류가 없다
+- 다음 메시지에서 지난 사진을 물으면 에이전트가 `vision_analyze` 로 사본 파일을 본다
+- 11장 이상을 보내면 11번째부터 사본 파일을 `vision_analyze` 로 보고, 잘림 오류가 없다
 
 ### 이미지 파일은 `vision_analyze` 로 본다
 
 `read_file` 이 이미지 확장자를 만나면 내용을 돌려주지 않고 `vision_analyze` 를 쓰라는 안내를 낸다.
-에이전트가 사진을 보는 길은 대화 본문이 아니라 이 도구다.
-그러므로 사진을 에이전트가 닿는 자리에 놓아 두면 모델이 그것을 읽는다.
+입력에 싣지 못한 사진과 지난 메시지의 사진은 이 도구로 원본 옆의 줄인 사본(`{첨부 번호}.small.jpg`)을 본다. 사본은 대개 1MB 아래다.
+
+실행 공간(Docker)의 파일은 컨테이너 안에서 `head -c <50MB+1> < 경로 | base64` 로 읽는다(`tools/image_source.py`).
+운영에서 3MB 를 넘는 사진이 가끔 「image file is truncated」 로 실패했다. Pillow 가 디코딩하다 바이트가 모자란 것이다.
+어디서 잘리는지는 확인하지 못했다. 파이프의 종료 코드가 마지막 명령의 것이라 읽기 오류가 가려진다.
 
 ### 모델은 실행마다 정한다
 
@@ -841,6 +871,12 @@ Control Plane 이 권한을 확인한 에이전트에서 profile 과 접두와 k
 `gateway.max_concurrent_sessions` 는 다른 것이다.
 그쪽은 platform 대화 turn 을 제한하고 `/v1/runs` 에는 걸리지 않는다.
 
+**에이전트를 나눈 한 턴이 같은 순간에 쓰는 자리는 최대 2 이고, 나누지 않은 대화는 1 이다.**
+`ResearchAndBuildFlow` 는 한 턴을 Chief, Researcher 와 Engineer, Synthesizer 의 세 단계로 나눈다.
+Control Plane 이 앞 단계의 실행이 끝난 뒤에 다음 단계를 띄우므로 단계끼리 겹치지 않는다.
+부모가 자식을 기다리는 동안에는 자리를 잡지 않는다.
+둘이 겹치는 것은 Researcher 와 Engineer 뿐이다.
+
 ### 한도 위에 thread pool 이 하나 더 있다
 
 `max_concurrent_runs` 를 통과한 실행은 곧바로 도는 것이 아니라 thread pool 을 한 번 더 지난다.
@@ -851,10 +887,11 @@ result, usage = await asyncio.get_running_loop().run_in_executor(None, _run_sync
 
 `None` 은 그 event loop 의 기본 executor 를 쓰라는 뜻이다.
 Hermes 는 그 executor 를 만들지도 크기를 정하지도 않으므로 Python 의 기본값이 그대로 쓰인다.
-기본값은 `min(32, os.cpu_count() + 4)` 다.
+기본값은 `min(32, os.process_cpu_count() + 4)` 다. Hermes 이미지의 Python 3.13 에서 `ThreadPoolExecutor` 가 이 식을 쓴다.
 
-**`os.cpu_count()` 는 컨테이너에 준 CPU 한도가 아니라 호스트의 코어 수를 본다.**
-그래서 pool 크기는 컨테이너 설정으로 바꿀 수 없고, 호스트를 옮기면 값이 달라진다.
+**`os.process_cpu_count()` 는 CPU affinity 를 보고, 컨테이너의 `cpus` 는 여기에 들어가지 않는다.**
+Docker 의 `cpus` 는 affinity 를 줄이지 않고 CPU 시간 할당량만 정한다. 그래서 affinity 는 호스트 코어 수 그대로다.
+pool 크기는 컨테이너 설정으로 바꿀 수 없고, 호스트를 옮기면 값이 달라진다.
 
 이 크기는 CPU 를 쓰는 일을 가정한 값이다.
 실행이 자리를 잡고 있는 시간의 대부분은 LLM 응답을 기다리는 시간이고 그동안 CPU 를 쓰지 않는다.
@@ -929,6 +966,15 @@ pool 을 키우는 것만으로는 메모리가 늘지 않는다. 스레드를 �
 
 동시 실행 하나는 적어도 약 3.1 MB 를 쓰고, profile 하나가 처음 실행할 때 약 50 MB 가 한 번 는다.
 **3.1 MB 는 하한이다.** 스킬만 올리고 MCP 서버와 대화 기록이 없는 profile 에서 측정한 값이다.
+
+### 측정을 되풀이할 때
+
+- 측정용 gateway 는 운영과 다른 `HERMES_HOME` 을 임시 디렉터리에 따로 두고 s6 에 등록하지 않는다. 운영 gateway 의 상태와 섞이면 결과를 믿을 수 없다.
+- s6 gateway 가 이미 있으면 `HERMES_HOME` 이 달라도 기동을 거부하므로 `--force` 가 필요하다. `--force` 로 띄운 gateway 를 `kill -9` 로 내리지 않는다. 운영 gateway 가 함께 재시작된 적이 있다. TERM 한 번이면 내려간다.
+- 공식 이미지는 root 로 띄운 gateway 를 거부한다. root 가 아닌 사용자로 띄운다.
+- LLM 대신 OpenAI 형태로 답하는 stub 을 두고 요청마다 고정 시간(예: 30초)을 붙잡게 한다. 그 경계로 어느 실행이 언제 시작했는지 읽을 수 있다.
+- 부하 대역의 `POST /v1/runs` 제출이 동기로 막히면 한도를 채울 만큼 동시에 들어가지 못한다. 운영의 제출은 기다리지 않고 `run_id` 와 `status: started` 를 돌려준다. 이 차이를 맞추기 전에는 429 가 나오지 않거나 조회가 실패한 것을 pool 의 성질로 읽지 않는다.
+- 정리 스크립트가 띄운 프로세스 번호(`$!`)가 비면 TERM 을 아무에게도 보내지 못해 gateway 가 고아로 남는다. 명령줄 탐색으로도 내릴 수 있게 한다.
 
 ## 위임
 
@@ -1423,7 +1469,7 @@ hook 이 `{"action": "approve", "message": "<사유>", "rule_key": "<키>"}` 를
 - 대시보드 plugin 을 올린 뒤 카탈로그에 커넥터가 그대로 있는지. 스킬 본문 검증이 새로 생겨, 전에는 나오던 커넥터가 빠질 수 있다
 - Control Plane 을 옛 판으로 되돌렸다가 다시 올렸으면 사진을 받는 연결을 한 번 연결 확인한다. 옛 판은 `vision` 을 선언 밖의 도구로 보고 목록에서 뺀다
 - 떠 있는 공유 gateway 가 바뀐 `SOUL.md` 를 재시작 없이 다음 실행부터 읽는지. 읽지 않으면 지침 갱신에도 재시작과 관리자 반영 완료가 필요하다
-- `file` toolset 없이 `vision` 만 켠 에이전트에서 `vision_analyze` 가 실행 입력에 적힌 사진 경로를 읽는지. 읽지 못하면 사진 단추는 보이지만 에이전트가 사진을 보지 못한다
+- `file` toolset 없이 `vision` 만 켠 에이전트에서 `vision_analyze` 가 입력에 싣지 못한 사진의 사본 경로를 읽는지. 읽지 못하면 11번째부터의 사진과 지난 메시지의 사진을 에이전트가 보지 못한다
 
 ### 승인 방식 `smart` 는 추론 모델에서 `manual` 과 같아진다
 

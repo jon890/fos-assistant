@@ -2,11 +2,16 @@
 
 import { useId, useRef, useState } from "react";
 import { Props } from "./composer-types";
-import { AttachmentItem } from "./composer-attachment-utils";
+import {
+  AttachmentItem,
+  type OutgoingMessage,
+} from "./composer-attachment-utils";
 export function useComposerState({ disabled, value }: Props) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [items, setItems] = useState<AttachmentItem[]>([]);
+  const [outgoing, setOutgoing] = useState<OutgoingMessage | null>(null);
+  const outgoingRef = useRef<OutgoingMessage | null>(null);
   const [pickNotice, setPickNotice] = useState<string | null>(null);
   /** 빈 대화를 만드는 요청이 도는 중이다. 아직 첨부 목록에 아무것도 없어 `items` 로는 알 수 없다 */
   const [creatingConversation, setCreatingConversation] = useState(false);
@@ -43,12 +48,20 @@ export function useComposerState({ disabled, value }: Props) {
   const uploading = items.some((item) => item.status === "uploading");
   const hasBlockingAttachment = items.some((item) => item.status !== "done");
   const blocking = creatingConversation || hasBlockingAttachment || savingModel;
-  const sendDisabled = disabled || value.trim().length === 0 || blocking;
+  const sendDisabled =
+    disabled ||
+    value.trim().length === 0 ||
+    creatingConversation ||
+    savingModel ||
+    outgoing !== null;
   return {
     textareaRef,
     fileInputRef,
     items,
     setItems,
+    outgoing,
+    setOutgoing,
+    outgoingRef,
     pickNotice,
     setPickNotice,
     creatingConversation,

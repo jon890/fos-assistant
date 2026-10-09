@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { Badge } from "@/components/ui/badge";
+import { ConnectionBadge } from "@/components/connector/connection-badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { ErrorNotice, LoginNotice } from "@/components/connector/browser-login";
@@ -18,7 +18,6 @@ import { Notice } from "@/components/ui/notice";
 import {
   CONNECTOR_ID_PATTERN,
   checkConnection,
-  connectionStatusLabel,
   disconnectConnection,
   readConnection,
   readOptions,
@@ -222,22 +221,21 @@ export function ConnectorConnectionPanel({
       }
       return setError(result.message);
     }
-    if (
-      !result.ok &&
-      kind === "check" &&
-      result.code === "CONNECTOR_NOT_CONNECTED"
-    ) {
-      // 확인할 값이 남아 있지 않다. 서버가 연결을 준비 중으로 커밋했으므로 다시 읽어 상태를 맞춘다.
-      // 이 화면이 연결 화면이므로 공통 문구 대신 값을 다시 넣으라고 알린다.
+    if (!result.ok && kind === "check") {
+      // 확인이 실패하면 서버가 연결을 준비 중으로 저장할 수 있으므로 오류 코드와 관계없이 상태를 다시 읽는다.
       const fresh = await readConnection(id);
       setPending(null);
       if (fresh.ok) {
         setLoaded({ kind: "ready", connector, connection: fresh.data });
       }
-      return setError("값을 다시 입력해 연결해 주세요.");
+      return setError(
+        result.code === "CONNECTOR_NOT_CONNECTED"
+          ? "값을 다시 입력해 연결해 주세요."
+          : result,
+      );
     }
     setPending(null);
-    if (!result.ok) return setError(kind === "check" ? result : result.message);
+    if (!result.ok) return setError(result.message);
     if (kind === "check") showConnected(result.data);
     else setLoaded({ kind: "ready", connector, connection: result.data });
   }
@@ -292,9 +290,10 @@ export function ConnectorConnectionPanel({
           <div className="flex flex-wrap items-center justify-between gap-2 rounded-md bg-muted px-3 py-2 text-sm">
             <span>
               상태{" "}
-              <Badge variant="outline" data-testid="connection-status">
-                {connectionStatusLabel(status)}
-              </Badge>
+              <ConnectionBadge
+                status={status}
+                data-testid="connection-status"
+              />
             </span>
             {shown.map(({ field, value }) => (
               <span key={field.key} className="break-all">
@@ -393,7 +392,7 @@ export function ConnectorConnectionPanel({
               </Button>
             </form>
           ) : null}
-          {available && status === "PENDING" ? (
+          {available && status !== "DISCONNECTED" ? (
             <Button
               disabled={busy}
               variant="outline"

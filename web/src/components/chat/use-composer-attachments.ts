@@ -21,27 +21,28 @@ type Context = Pick<
   ComposerState,
   | "itemsRef"
   | "items"
+  | "outgoingRef"
+  | "setOutgoing"
   | "mountedRef"
   | "pendingRemovalRef"
   | "sendingItemsRef"
   | "setItems"
   | "setPickNotice"
-  | "sendDisabled"
 > &
-  Pick<Props, "running" | "onSend"> &
+  Pick<Props, "running"> &
   Pick<ComposerModel, "ensureConversationId">;
 
 export function useComposerAttachments({
   itemsRef,
   items,
+  outgoingRef,
+  setOutgoing,
   mountedRef,
   pendingRemovalRef,
   sendingItemsRef,
   setItems,
   setPickNotice,
-  sendDisabled,
   running,
-  onSend,
   ensureConversationId,
 }: Context) {
   useLayoutEffect(() => {
@@ -56,7 +57,10 @@ export function useComposerAttachments({
       // 대화를 바꿔 이 Composer 가 사라진다. 메시지에 묶이지 않은 첨부가 남으면 원래 대화의 상한을
       // 보관 기간 내내 차지하므로 여기서 지운다. 올리는 중인 것은 `uploadOne` 이 응답을 받은 뒤 지운다.
       const sending = new Set(sendingItemsRef.current.map((item) => item.key));
-      for (const item of itemsRef.current) {
+      for (const item of [
+        ...itemsRef.current,
+        ...(outgoingRef.current?.items ?? []),
+      ]) {
         if (item.previewUrl) URL.revokeObjectURL(item.previewUrl);
         if (
           item.status === "done" &&
@@ -68,6 +72,7 @@ export function useComposerAttachments({
         }
       }
       itemsRef.current = [];
+      outgoingRef.current = null;
       pendingRemoval.clear();
     };
   }, []);
@@ -78,6 +83,16 @@ export function useComposerAttachments({
     );
     itemsRef.current = updated;
     setItems(updated);
+    if (outgoingRef.current) {
+      const outgoing = {
+        ...outgoingRef.current,
+        items: outgoingRef.current.items.map((item) =>
+          item.key === key ? { ...item, ...patch } : item,
+        ),
+      };
+      outgoingRef.current = outgoing;
+      setOutgoing(outgoing);
+    }
   }
 
   /** 지우는 단추가 눌린 첨부다. 업로드 응답이 오면 DELETE 로 마무리한다 */
@@ -109,10 +124,19 @@ export function useComposerAttachments({
     targetConversationId: string,
     key: string,
   ) {
-    const thumbnail = buildThumbnail(file).catch(() => "");
+    const current = [
+      ...itemsRef.current,
+      ...(outgoingRef.current?.items ?? []),
+    ].find((item) => item.key === key);
+    const thumbnail = current?.previewUrl
+      ? Promise.resolve("")
+      : buildThumbnail(file).catch(() => "");
     void thumbnail.then((previewUrl) => {
       if (!previewUrl) return;
-      const item = itemsRef.current.find((candidate) => candidate.key === key);
+      const item = [
+        ...itemsRef.current,
+        ...(outgoingRef.current?.items ?? []),
+      ].find((candidate) => candidate.key === key);
       if (!mountedRef.current || !item || pendingRemovalRef.current.has(key)) {
         URL.revokeObjectURL(previewUrl);
         return;
@@ -162,7 +186,7 @@ export function useComposerAttachments({
   }
 
   async function handleFiles(event: ChangeEvent<HTMLInputElement>) {
-    if (running) return;
+    if (running || outgoingRef.current) return;
     const files = Array.from(event.target.files ?? []);
     event.target.value = "";
     if (files.length === 0) return;
@@ -201,8 +225,9 @@ export function useComposerAttachments({
 
     if (toUpload.length === 0) return;
 
-    const newItems = toUpload.map(() => ({
+    const newItems = toUpload.map((file) => ({
       key: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+      file,
       previewUrl: "",
       status: "uploading" as const,
       attachmentId: null,
@@ -252,37 +277,6 @@ export function useComposerAttachments({
     setItems((previous) => previous.filter((item) => item.key !== key));
   }
 
-  async function trySend() {
-    if (sendDisabled) return;
-    const sendingItems = items.filter(
-      (item): item is AttachmentItem & { attachmentId: number } =>
-        item.status === "done" && item.attachmentId !== null,
-    );
-    sendingItemsRef.current = sendingItems;
-    let succeeded = false;
-    try {
-      succeeded = await onSend(sendingItems.map((item) => item.attachmentId));
-    } finally {
-      sendingItemsRef.current = [];
-    }
-    if (!mountedRef.current) {
-      // 기다리는 동안 이 Composer 가 사라졌다. 실패로 끝나도 지우지 않는다. 서버가 메시지를 저장하고 첨부를
-      // 묶은 뒤에 스트림만 끊긴 경우도 실패로 오므로, 지우면 보낸 사진이 사라질 수 있다. 묶이지 않았다면
-      // 보관 기간이 지나 정리된다.
-      for (const item of sendingItems) {
-        if (item.previewUrl) URL.revokeObjectURL(item.previewUrl);
-      }
-      return;
-    }
-    if (!succeeded) return;
-    for (const item of items) {
-      if (item.previewUrl) URL.revokeObjectURL(item.previewUrl);
-    }
-    // 보낸 첨부는 메시지에 묶였다. 이 뒤에 unmount 정리가 돌아도 지우지 않게 ref 를 먼저 비운다.
-    itemsRef.current = [];
-    setItems([]);
-    setPickNotice(null);
-  }
   return {
     updateItem,
     finalizeRemovalIfRequested,
@@ -290,7 +284,6 @@ export function useComposerAttachments({
     uploadOne,
     handleFiles,
     removeItem,
-    trySend,
   };
 }
 export type ComposerAttachments = ReturnType<typeof useComposerAttachments>;
