@@ -38,7 +38,7 @@ Control Plane 의 패키지마다 맡는 책임과 패키지 사이의 방향 �
 | `followup` | 할 일의 저장과 상태 전이, 사람이 쓰는 API, 에이전트의 제안 저장([`follow-up.md`](follow-up.md)) |
 | `proactive` | 먼저 살펴보기의 시작 전 점검, 점검 대화의 살펴보기 turn, 상한, 결과 계약의 검사와 그리기, 문제 후보의 검사와 저장, 살펴보기 트리 판정([`proactive-check.md`](proactive-check.md)), 판단 피드백의 replay 읽기 모델, 매일 루프의 이음매와 보일 판정, 판정 반응([`proactive-loop.md`](proactive-loop.md)) |
 | `attention` | 먼저 알리기의 판정과 지금 화면이 읽는 카드. 다른 패키지의 기록을 읽기만 한다([`attention.md`](attention.md)) |
-| `workspace` | 사용자 실행 공간의 파일 목록과 본문([`../code-architecture.md`](../code-architecture.md) 의 「실행 공간 파일」) |
+| `workspace` | 사용자 실행 공간의 파일 목록과 본문, 권한 도우미로 지우기([`../code-architecture.md`](../code-architecture.md) 의 「실행 공간 파일」) |
 
 검사: `ArchitectureRules.SHARED_DOES_NOT_DEPEND_ON_DOMAINS`
 

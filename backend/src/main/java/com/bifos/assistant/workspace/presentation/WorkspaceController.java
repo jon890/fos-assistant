@@ -4,6 +4,7 @@ import com.bifos.assistant.shared.auth.CurrentUserProvider;
 import com.bifos.assistant.shared.util.SandboxedContentPolicy;
 import com.bifos.assistant.workspace.application.WorkspaceService;
 import com.bifos.assistant.workspace.application.model.WorkspaceFile;
+import com.bifos.assistant.workspace.presentation.WorkspaceDtos.DeletionView;
 import com.bifos.assistant.workspace.presentation.WorkspaceDtos.ListingView;
 import com.bifos.assistant.workspace.presentation.WorkspaceDtos.StatusView;
 import java.nio.charset.StandardCharsets;
@@ -13,6 +14,7 @@ import org.springframework.http.ContentDisposition;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -40,6 +42,12 @@ public class WorkspaceController {
     @GetMapping("/entries")
     public ListingView entries(@RequestParam(required = false) String path) {
         return ListingView.of(workspace.list(currentUser.require(), path));
+    }
+
+    /** 경로 하나를 지운다. 이름에 주소 조각으로 쓸 수 없는 문자가 있어도 인자로 받으므로 지울 수 있다. */
+    @DeleteMapping("/entries")
+    public DeletionView delete(@RequestParam(required = false) String path) {
+        return DeletionView.of(workspace.delete(currentUser.require(), path));
     }
 
     /**

@@ -99,7 +99,7 @@ Memory 의 기본 근거는 [`adr/ADR-003-memory-권한은-주입으로-강제�
 | 키 | 환경 변수 | 비었을 때 |
 | --- | --- | --- |
 | `assistant.sandbox-workspace.root` | `ASSISTANT_SANDBOX_WORKSPACE_ROOT` | 기동한다. 상태 조회 밖의 모든 경로가 503 `WORKSPACE_UNAVAILABLE` 이고 상태 조회는 `available: false` 다 |
-| `assistant.sandbox-workspace.delete-socket` | `ASSISTANT_SANDBOX_WORKSPACE_DELETE_SOCKET` | 기동한다. 상태 조회의 `deletable` 이 거짓이고 화면은 지우기를 열지 않는다 |
+| `assistant.sandbox-workspace.delete-socket` | `ASSISTANT_SANDBOX_WORKSPACE_DELETE_SOCKET` | 기동한다. 지우기가 `WORKSPACE_DELETE_UNAVAILABLE` 이고 상태 조회는 `deletable: false` 다 |
 
 `root` 는 실행 공간 정책의 `workspace_root` 와 같은 디렉터리를 Control Plane 에서 본 경로다. 읽기 전용으로 붙인다.
 붙이는 일은 `fos-home-infra` 가 한다. 루트가 링크가 아닌 디렉터리가 아니어도 `WORKSPACE_UNAVAILABLE` 이다.
@@ -132,7 +132,7 @@ Memory 의 기본 근거는 [`adr/ADR-003-memory-권한은-주입으로-강제�
 | `OTHER` | FIFO, 소켓, 장치 | 주지 않는다 |
 
 `readable` 이 거짓이면 화면은 「읽을 수 없음」 을 보인다. 권한이 없는 파일, 하드 링크가 둘 이상인 파일, `LINK`, `OTHER` 가 그렇다.
-`openable` 은 이름이 주소 조각으로 쓸 수 있는지다. `%`, `;`, `\` 가 든 이름은 Control Plane 의 요청 방화벽이 주소에서 거절하므로 미리보기와 내려받기를 열지 않는다. 목록은 `path` 인자로 열므로 그런 이름의 디렉터리도 연다.
+`openable` 은 이름이 주소 조각으로 쓸 수 있는지다. `%`, `;`, `\` 가 든 이름은 Control Plane 의 요청 방화벽이 주소에서 거절하므로 미리보기와 내려받기를 열지 않는다. 목록과 지우기는 `path` 인자로 하므로 그런 이름의 디렉터리도 열고 지운다.
 그런 디렉터리 안의 파일은 자기 이름이 괜찮아도 주소가 그 디렉터리 이름을 지나므로, 화면이 미리보기와 내려받기를 열지 않는다.
 
 ### API
@@ -145,6 +145,7 @@ Memory 의 기본 근거는 [`adr/ADR-003-memory-권한은-주입으로-강제�
 | `GET /api/v1/workspace/entries?path=` | 디렉터리 하나의 목록 | `{path, entries: [{name, kind, size, modifiedAt, readable, openable}], truncated}`. 디렉터리를 읽는 순서로 1,001개까지 읽고, 그 가운데 1,000개를 디렉터리 먼저, 이름 순서로 준다. 1,001번째가 있으면 `truncated` 가 참이고, 그때는 순서상 앞선 항목도 빠질 수 있다. `size` 는 `FILE` 만 채운다. 사용자 디렉터리가 아직 없으면 빈 목록이다 |
 | `GET /api/v1/workspace/files/{경로}` | 미리보기 본문 | 아래 「본문 머리글」. 경로의 조각마다 URL 인코딩한다 |
 | `GET /api/v1/workspace/files/{경로}?download=1` | 내려받기 | 크기 상한 없이 스트림으로 준다 |
+| `DELETE /api/v1/workspace/entries?path=` | 지우기 | 아래 「지우기」 |
 
 본문 경로의 오류는 아래와 같다. 루트 확인(503), 경로 검사(400) 다음에, 미리보기는 확장자(415), 크기(413), 종류(404), 읽기 권한(403) 차례로 판정한다. 내려받기는 종류와 읽기 권한만 본다.
 
@@ -187,8 +188,50 @@ HTML 이 상대 경로로 부르는 CSS 와 사진은 같은 `files/` 아래 주
 
 ### 로그와 기록
 
-본문은 로그와 실행 기록에 남기지 않는다.
+본문은 로그와 실행 기록에 남기지 않는다. 도우미를 부른 지우기마다 사용자 번호, 상대 경로, 종류, 지운 항목 수, 결과를 `INFO` 로그 한 줄로 남긴다. 실패하면 일부가 지워졌을 수 있어 지운 항목 수를 `-` 로 적는다. 경로의 제어 문자는 `\uXXXX` 로 바꿔 로그 줄을 끊지 못하게 한다. 도우미를 부르기 전에 끝난 요청은 남기지 않는다.
 목록과 본문의 오류 로그는 사용자 번호와 오류 종류만 남기고 경로를 남기지 않는다.
+
+### 지우기
+
+**지우기는 경로 하나를 받는다.** 빈 경로(사용자 디렉터리 자체)는 400 `VALIDATION_FAILED` 다.
+Control Plane 은 경로 규칙을 먼저 검사하고 읽기 마운트에서 그 경로가 있는지 본 뒤 운영의 권한 도우미를 부른다.
+
+| 판정 | 응답 |
+| --- | --- |
+| 지운다 | 200 `{kind, entries, bytes}`. `entries` 는 지운 항목 수, `bytes` 는 지운 일반 파일의 크기 합이다 |
+| 도우미 socket 이 설정되지 않았다 | 503 `WORKSPACE_DELETE_UNAVAILABLE` |
+| 없는 경로, 링크를 지나는 경로 | 404 `WORKSPACE_ENTRY_NOT_FOUND` |
+| 상위 디렉터리를 Control Plane 이 읽지 못한다 | 403 `WORKSPACE_ENTRY_UNREADABLE`. 도우미를 부르지 않는다 |
+| 디렉터리 안의 항목이 10,000 개를 넘는다 | 409 `WORKSPACE_DELETE_TOO_MANY`. 아무것도 지우지 않는다 |
+| 도우미가 실패했거나 30초 안에 답하지 않았다 | 502 `WORKSPACE_DELETE_FAILED` |
+
+루트 확인(503 `WORKSPACE_UNAVAILABLE`)과 예상하지 못한 입출력 오류(500)는 위 「API」 절과 같다.
+
+**권한 도우미와의 계약.** 도우미는 `fos-home-infra` 가 만들고 운영한다. 이 저장소는 아래 계약만 갖는다.
+
+- socket 은 unix stream socket 이다. Control Plane 만 열 수 있게 둔다. 망에 열지 않는다
+- 요청 하나에 연결 하나다. Control Plane 이 UTF-8 JSON 한 줄을 `\n` 으로 끝내 보내고, 도우미가 JSON 한 줄로 답한 뒤 연결을 닫는다
+- 요청은 `{"version": 1, "owner": "u12", "path": "reports/a.csv", "max_entries": 10000}` 이다
+- 성공 답은 `{"ok": true, "kind": "FILE", "entries": 1, "bytes": 2048}` 이다. `kind` 는 목록의 `kind` 와 같은 네 값이다
+- 실패 답은 `{"ok": false, "code": "<코드>"}` 이다. 코드는 아래 표의 다섯이다
+
+| 코드 | 뜻 | Control Plane 응답 |
+| --- | --- | --- |
+| `INVALID_REQUEST` | 주인 키나 경로가 규칙에 맞지 않는다 | 502 `WORKSPACE_DELETE_FAILED` |
+| `NOT_FOUND` | 없는 경로 | 404 `WORKSPACE_ENTRY_NOT_FOUND` |
+| `LINK_IN_PATH` | 중간 조각이 링크이거나 디렉터리가 아니다 | 404 `WORKSPACE_ENTRY_NOT_FOUND` |
+| `TOO_MANY_ENTRIES` | 디렉터리 안의 항목이 `max_entries` 를 넘는다. 아무것도 지우지 않았다 | 409 `WORKSPACE_DELETE_TOO_MANY` |
+| `FAILED` | 지우다 실패했다. 일부가 지워졌을 수 있다 | 502 `WORKSPACE_DELETE_FAILED` |
+
+도우미가 지킬 것은 아래와 같다.
+
+- 주인 키는 `^[a-z][a-z0-9-]{0,63}$` 이고, 지우는 범위는 `<workspace_root>/<주인 키>` 아래뿐이다. 주인 디렉터리 자체는 지우지 않는다
+- 경로 규칙은 위 「경로 규칙」 과 같다
+- 주인 디렉터리부터 조각마다 링크를 따라가지 않고 디렉터리 핸들로 연다. 마지막 조각이 링크면 링크만 지운다
+- 디렉터리는 먼저 안의 항목을 링크를 따라가지 않고 센다. `max_entries` 를 넘으면 지우지 않고 답한다. 넘지 않으면 안쪽부터 지운다
+- 지우는 크기에는 상한을 두지 않는다. 지우는 비용은 항목 수를 따르고 파일 크기를 따르지 않는다
+- 요청마다 시각, 주인 키, 경로, 종류, 지운 항목 수, 결과를 감사 기록 한 줄로 남긴다. 파일 본문은 읽지도 남기지도 않는다
+- 실행 공간 루트만 쓰기로 붙이고, 지우는 데 필요한 권한만 갖는다
 
 ## 화면을 검증하는 방법
 
@@ -223,7 +266,6 @@ profile key 와 AI credential 은 계속 홈서버 파일에 둔다.
 
 ## 아직 만들지 않은 것
 
-- 실행 공간 파일의 지우기. 화면은 지우기 단추를 그리지 않는다
 - Hermes 안의 `delegate_task` 하위 에이전트가 자기 실행 줄을 남기는 경로.
   그 하위 에이전트는 Hermes 안에서만 돌고 사건으로만 보인다.
   우리 실행 줄이 생기는 자식은 `agent_delegate`, 흐름의 하위 실행, Memory 제안이다.

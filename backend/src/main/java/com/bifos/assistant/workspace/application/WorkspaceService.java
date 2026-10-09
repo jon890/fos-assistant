@@ -11,6 +11,8 @@ import com.bifos.assistant.workspace.application.model.WorkspaceAgent;
 import com.bifos.assistant.workspace.application.model.WorkspaceFile;
 import com.bifos.assistant.workspace.application.model.WorkspacePreview;
 import com.bifos.assistant.workspace.application.model.WorkspaceStatus;
+import com.bifos.assistant.workspace.domain.WorkspaceDeleter;
+import com.bifos.assistant.workspace.domain.WorkspaceDeletion;
 import com.bifos.assistant.workspace.domain.WorkspaceEntry;
 import com.bifos.assistant.workspace.domain.WorkspaceListing;
 import com.bifos.assistant.workspace.domain.WorkspaceOpenedFile;
@@ -28,8 +30,8 @@ import org.springframework.stereotype.Service;
 /**
  * 요청자의 실행 공간 디렉터리 {@code u<사용자 번호>} 를 읽는다. 계약은 {@code docs/code-architecture.md} 의 「실행 공간 파일」 이 갖는다.
  *
- * <p>주인 디렉터리는 요청자로만 정한다. 요청 값은 그 디렉터리 안의 상대 경로뿐이다. 오류 로그에는 사용자 번호와 예외 종류만 남기고
- * 경로를 남기지 않는다.
+ * <p>주인 디렉터리는 요청자로만 정한다. 요청 값은 그 디렉터리 안의 상대 경로뿐이다. 읽기의 오류 로그에는 사용자 번호와 예외 종류만
+ * 남기고 경로를 남기지 않는다. 지우기는 도우미의 결과마다 경로를 포함한 {@code INFO} 로그 한 줄을 남긴다.
  */
 @Service
 @Slf4j
@@ -38,10 +40,12 @@ public class WorkspaceService {
 
     private static final int LIST_LIMIT = 1_000;
     private static final String DOWNLOAD_TYPE = "application/octet-stream";
+    private static final int DELETE_LIMIT = 10_000;
 
     private final LiveProperties<WorkspaceProperties> properties;
     private final AgentService agents;
     private final UserExecutionLimiter limiter;
+    private final WorkspaceDeleter deleter;
 
     public WorkspaceStatus status(CurrentUser user) {
         List<WorkspaceAgent> shared = agents.readableBy(user).stream()
@@ -105,12 +109,73 @@ public class WorkspaceService {
         }
     }
 
+    /**
+     * 경로 하나를 운영의 권한 도우미로 지운다. 읽기 마운트에서 없는 경로는 도우미를 부르지 않는다. 도우미도 같은 검사를 다시 한다.
+     */
+    public WorkspaceDeletion delete(CurrentUser user, String rawPath) {
+        if (!properties.current().deletable()) {
+            throw new ApiException(ErrorCode.WORKSPACE_DELETE_UNAVAILABLE, "workspace delete is not configured");
+        }
+        Path ownerDir = requireOwnerDir(user);
+        WorkspacePath path = WorkspacePath.parse(rawPath);
+        if (path.isRoot()) {
+            throw new ApiException(ErrorCode.VALIDATION_FAILED, "workspace delete needs a path");
+        }
+        WorkspaceEntry entry;
+        try {
+            entry = WorkspaceTree.stat(ownerDir, path).orElseThrow(WorkspaceService::notFound);
+        } catch (IOException ex) {
+            throw readFailed(user, ex);
+        }
+        try {
+            WorkspaceDeletion deleted = deleter.delete(ownerKey(user), path, DELETE_LIMIT);
+            logDelete(user, path, deleted.kind().name(), String.valueOf(deleted.entries()), "OK");
+            return deleted;
+        } catch (ApiException ex) {
+            // 도우미가 실패하면 일부가 지워졌을 수 있어 지운 항목 수를 모른다.
+            logDelete(user, path, entry.kind().name(), "-", ex.code().name());
+            throw ex;
+        }
+    }
+
+    private static void logDelete(CurrentUser user, WorkspacePath path, String kind, String entries, String result) {
+        log.info(
+                "workspace delete user={} path={} kind={} entries={} result={}",
+                user.id(),
+                escapeForLog(path.value()),
+                kind,
+                entries,
+                result);
+    }
+
     /** 루트가 설정되었고 링크가 아닌 디렉터리일 때만 요청자의 디렉터리를 준다. */
     private static Optional<Path> ownerDir(WorkspaceProperties current, CurrentUser user) {
         if (!current.available() || !WorkspaceTree.isDirectoryNoFollow(current.rootPath())) {
             return Optional.empty();
         }
-        return Optional.of(current.rootPath().resolve("u" + user.id()));
+        return Optional.of(current.rootPath().resolve(ownerKey(user)));
+    }
+
+    /** 실행 공간의 주인 키다. 요청자로만 만든다. */
+    private static String ownerKey(CurrentUser user) {
+        return "u" + user.id();
+    }
+
+    /**
+     * 로그 줄을 끊거나 꾸밀 수 있는 문자를 역슬래시, {@code u}, 대문자 16진수 네 자리로 바꾼다. C0 제어 문자와 DEL, C1 제어 문자, 줄 구분자
+     * U+2028 과 문단 구분자 U+2029 가 대상이다.
+     */
+    static String escapeForLog(String value) {
+        StringBuilder escaped = new StringBuilder(value.length());
+        for (int i = 0; i < value.length(); i++) {
+            char c = value.charAt(i);
+            if (c < 0x20 || (c >= 0x7f && c <= 0x9f) || c == 0x2028 || c == 0x2029) {
+                escaped.append(String.format("\\u%04X", (int) c));
+            } else {
+                escaped.append(c);
+            }
+        }
+        return escaped.toString();
     }
 
     private Path requireOwnerDir(CurrentUser user) {
