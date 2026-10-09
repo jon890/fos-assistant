@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
+  addressable,
   crumbs,
   explorerHref,
   fileUrl,
@@ -61,6 +62,22 @@ test("경로 줄은 「파일 공간」 부터 연 디렉터리까지다", () =>
   assert.deepEqual(crumbs(""), [{ name: "파일 공간", path: "" }]);
 });
 
+test("경로 줄은 빈 조각을 건너뛴다", () => {
+  assert.deepEqual(crumbs("a//b/"), [
+    { name: "파일 공간", path: "" },
+    { name: "a", path: "a" },
+    { name: "b", path: "a/b" },
+  ]);
+});
+
+test("어느 조각에든 %, ;, \\ 가 있으면 주소로 쓸 수 없다", () => {
+  assert.equal(addressable("보고서/a.txt"), true);
+  assert.equal(addressable(""), true);
+  assert.equal(addressable("50%/a.txt"), false);
+  assert.equal(addressable("a;b/c.txt"), false);
+  assert.equal(addressable("a\\b/c.txt"), false);
+});
+
 test("경로를 잇고 화면 주소를 만든다", () => {
   assert.equal(joinPath("", "a.txt"), "a.txt");
   assert.equal(joinPath("a", "b.txt"), "a/b.txt");
@@ -87,6 +104,11 @@ test("따옴표 안의 이중 따옴표는 따옴표 하나다", () => {
   assert.deepEqual(rows, [['a"b', "c"]]);
 });
 
+test("빈 따옴표 칸도 칸이고 그 뒤의 따옴표는 글자다", () => {
+  const { rows } = parseDelimited('"",x\n""\n""a"', ",", 1000);
+  assert.deepEqual(rows, [["", "x"], [""], ['a"']]);
+});
+
 test("탭으로 나누고 CRLF 줄바꿈을 읽는다", () => {
   const { rows } = parseDelimited("a\tb\r\n1\t2", "\t", 1000);
   assert.deepEqual(rows, [
@@ -106,4 +128,9 @@ test("크기를 읽기 쉬운 단위로 바꾼다", () => {
   assert.equal(formatSize(512), "512 B");
   assert.equal(formatSize(1536), "1.5 KB");
   assert.equal(formatSize(Math.round(3.2 * MIB)), "3.2 MB");
+});
+
+test("반올림해 1,024 가 되면 다음 단위로 보인다", () => {
+  assert.equal(formatSize(1_048_575), "1.0 MB");
+  assert.equal(formatSize(1023 * 1024), "1023.0 KB");
 });

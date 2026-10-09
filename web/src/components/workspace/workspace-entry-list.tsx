@@ -18,6 +18,7 @@ import {
 import { formatFullTime } from "@/lib/format";
 import type { WorkspaceEntry } from "@/lib/workspace-api";
 import {
+  addressable,
   explorerHref,
   fileUrl,
   formatSize,
@@ -48,7 +49,12 @@ function EntryRow({
 }) {
   const Icon = ICONS[entry.kind];
   const target = joinPath(path, entry.name);
-  const openable = entry.kind === "FILE" && entry.readable && entry.openable;
+  // 디렉터리 경로를 주소로 쓸 수 없으면 그 안의 파일도 주소로 열 수 없다.
+  const openable =
+    entry.kind === "FILE" &&
+    entry.readable &&
+    entry.openable &&
+    addressable(path);
   const href =
     entry.kind === "DIRECTORY" && entry.readable
       ? explorerHref(target)
@@ -79,7 +85,7 @@ function EntryRow({
         )}
         {entry.kind === "LINK" ? <Badge variant="outline">링크</Badge> : null}
         {entry.readable ? null : <Badge variant="outline">읽을 수 없음</Badge>}
-        {entry.kind === "FILE" && entry.readable && !entry.openable ? (
+        {entry.kind === "FILE" && entry.readable && !openable ? (
           <Badge variant="warning">주소로 열 수 없는 이름</Badge>
         ) : null}
       </TableCell>

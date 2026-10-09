@@ -1,9 +1,5 @@
-/**
- * 파일 공간 화면이 쓰는 순수 함수다. `test/unit/workspace-file.test.ts` 가 `node --test` 로 직접 읽는다.
- *
- * <p>미리보기 확장자와 상한은 `docs/code-architecture.md` 의 「본문 머리글」 표와 같다. Control Plane 도 같은
- * 상한으로 413 을 내므로, 화면은 상한을 넘는 파일을 요청하지 않는다.
- */
+// 파일 공간 화면의 순수 함수다. 미리보기 확장자와 상한은 `docs/code-architecture.md` 의 「본문 머리글」 표와 같다.
+// Control Plane 도 같은 상한으로 413 을 내므로 화면은 상한을 넘는 파일을 요청하지 않는다.
 
 export type WorkspaceEntryKind = "DIRECTORY" | "FILE" | "LINK" | "OTHER";
 
@@ -53,12 +49,19 @@ export function joinPath(dir: string, name: string): string {
   return dir === "" ? name : `${dir}/${name}`;
 }
 
-/** 경로 줄의 조각이다. 맨 앞은 사용자 디렉터리 자체인 「파일 공간」 이다. */
+/**
+ * 경로의 모든 조각을 주소 조각으로 쓸 수 있는가. `%`, `;`, `\` 가 든 이름은 Control Plane 의 요청 방화벽이 주소에서
+ * 거절하므로, 그런 디렉터리 안의 파일도 미리보기와 내려받기를 열 수 없다.
+ */
+export function addressable(path: string): boolean {
+  return !/[%;\\]/.test(path);
+}
+
+/** 경로 줄의 조각이다. 맨 앞은 사용자 디렉터리 자체인 「파일 공간」 이다. 빈 조각은 건너뛴다. */
 export function crumbs(path: string): { name: string; path: string }[] {
   const result = [{ name: "파일 공간", path: "" }];
-  if (path === "") return result;
   let current = "";
-  for (const name of path.split("/")) {
+  for (const name of path.split("/").filter((part) => part !== "")) {
     current = joinPath(current, name);
     result.push({ name, path: current });
   }
@@ -88,13 +91,19 @@ export function parseDelimited(
   let row: string[] = [];
   let cell = "";
   let quoted = false;
+  // 이 칸에서 글자를 읽었는지다. 빈 따옴표 칸(`""`)도 읽은 것으로 센다. 따옴표는 칸의 첫 글자일 때만 감싸기다.
+  let started = false;
   let index = 0;
 
-  const endRow = () => {
+  const endCell = () => {
     row.push(cell);
+    cell = "";
+    started = false;
+  };
+  const endRow = () => {
+    endCell();
     rows.push(row);
     row = [];
-    cell = "";
   };
 
   while (index < text.length) {
@@ -110,28 +119,30 @@ export function parseDelimited(
       index += 1;
       continue;
     }
-    if (char === '"' && cell === "") quoted = true;
-    else if (char === delimiter) {
-      row.push(cell);
-      cell = "";
-    } else if (char === "\r" && text[index + 1] === "\n") {
+    if (char === '"' && !started) quoted = started = true;
+    else if (char === delimiter) endCell();
+    else if (char === "\r" && text[index + 1] === "\n") {
       endRow();
       index += 1;
     } else if (char === "\n" || char === "\r") endRow();
-    else cell += char;
+    else {
+      cell += char;
+      started = true;
+    }
     if (rows.length > maxRows) break;
     index += 1;
   }
-  if (rows.length <= maxRows && (cell !== "" || row.length > 0)) endRow();
+  if (rows.length <= maxRows && (started || row.length > 0)) endRow();
 
   const truncated = rows.length > maxRows;
   return { rows: truncated ? rows.slice(0, maxRows) : rows, truncated };
 }
 
-/** 바이트 수를 읽기 쉬운 크기로 바꾼다. 1 KB 는 1,024 바이트다. */
+/** 바이트 수를 읽기 쉬운 크기로 바꾼다. 1 KB 는 1,024 바이트이고, 반올림해 1,024 가 되면 다음 단위로 보인다. */
 export function formatSize(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < MIB) return `${(bytes / 1024).toFixed(1)} KB`;
-  if (bytes < 1024 * MIB) return `${(bytes / MIB).toFixed(1)} MB`;
-  return `${(bytes / (1024 * MIB)).toFixed(1)} GB`;
+  const units = ["B", "KB", "MB", "GB", "TB"];
+  let unit = 0;
+  while (unit < 4 && Number((bytes / 1024 ** unit).toFixed(1)) >= 1024) unit++;
+  const value = unit === 0 ? `${bytes}` : (bytes / 1024 ** unit).toFixed(1);
+  return `${value} ${units[unit]}`;
 }

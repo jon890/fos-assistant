@@ -32,6 +32,14 @@ const ROOT_ENTRIES = [
     readable: true,
     openable: true,
   },
+  {
+    name: "50%",
+    kind: "DIRECTORY",
+    size: null,
+    modifiedAt: MODIFIED_AT,
+    readable: true,
+    openable: false,
+  },
   file("50%.txt", 10, { openable: false }),
   file("a.txt", 30),
   file("b.csv", 40),
@@ -94,7 +102,7 @@ async function fakeWorkspaceRoutes(page: Page, state: FakeWorkspace) {
       if (failure !== undefined)
         return json(route, { code: "FAILED", message: "실패" }, failure);
       const entries =
-        path === "" ? ROOT_ENTRIES : path === "보고서" ? [file("1월.txt", 20)] : [];
+        path === "" ? ROOT_ENTRIES : path === "보고서" ? [file("1월.txt", 20)] : path === "50%" ? [file("a.txt", 30)] : [];
       return json(route, { path, entries, truncated: false });
     },
   );
@@ -142,7 +150,8 @@ test("사이드바의 「고급」 묶음에서 파일 공간을 열면 함께 �
   await expect(agents).toContainText("글쓰기 도우미");
   await expect(agents.getByRole("listitem").filter({ hasText: "가족 비서" })).toContainText("그룹 공개");
   await expect(page.getByText("다른 사람이 이 에이전트를 쓰면 그 파일도 여기 생겨요")).toBeVisible();
-  // 지우기는 아직 없다.
+  // 지우기는 아직 없다. 목록이 그려진 뒤에 센다.
+  await expect(entryRow(page, "a.txt")).toBeVisible();
   await expect(page.getByRole("main").getByRole("button", { name: /지우기/ })).toHaveCount(0);
 });
 
@@ -213,6 +222,22 @@ test("내려받기는 download=1 이고 링크와 주소로 열 수 없는 이�
   const unaddressable = entryRow(page, "50%.txt");
   await expect(unaddressable).toContainText("주소로 열 수 없는 이름");
   await expect(unaddressable.getByRole("link")).toHaveCount(0);
+});
+
+test("주소로 쓸 수 없는 이름의 디렉터리는 열리지만 그 안의 파일은 미리보기와 내려받기를 열지 않는다", async ({ page }) => {
+  await fakeWorkspaceRoutes(page, { available: true });
+  await page.goto("/files");
+
+  await entryRow(page, "50%").getByRole("link", { name: "50%", exact: true }).click();
+  await expect(crumbNav(page).getByText("50%")).toHaveAttribute("aria-current", "page");
+  const inside = entryRow(page, "a.txt");
+  await expect(inside).toContainText("주소로 열 수 없는 이름");
+  await expect(inside.getByRole("link")).toHaveCount(0);
+
+  // 주소에 파일을 직접 적어도 미리보기를 열지 않는다.
+  await page.goto(`/files?path=${encodeURIComponent("50%")}&file=${encodeURIComponent("50%/a.txt")}`);
+  await expect(entryRow(page, "a.txt")).toContainText("주소로 열 수 없는 이름");
+  await expect(page.getByTestId("workspace-preview")).toHaveCount(0);
 });
 
 test("목록이 400 이면 경로 안내와 맨 위로 가기가 보인다", async ({ page }) => {

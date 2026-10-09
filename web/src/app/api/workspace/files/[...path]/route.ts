@@ -20,14 +20,6 @@ const FORWARDED_HEADERS = [
   "content-length",
 ];
 
-function badRequest() {
-  return errorResponse(
-    "VALIDATION_FAILED",
-    "파일 경로가 올바르지 않아요.",
-    400,
-  );
-}
-
 /**
  * 실행 공간 안의 파일 본문을 그대로 흘려보낸다. 주인과 경로 규칙은 Control Plane 이 한 번 더 판정한다.
  *
@@ -39,7 +31,11 @@ export async function GET(request: Request, context: RouteContext) {
     path.length === 0 ||
     path.some((segment) => segment === "" || segment === "..")
   )
-    return badRequest();
+    return errorResponse(
+      "VALIDATION_FAILED",
+      "파일 경로가 올바르지 않아요.",
+      400,
+    );
 
   const download =
     new URL(request.url).searchParams.get("download") === "1"

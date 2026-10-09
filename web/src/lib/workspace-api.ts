@@ -1,8 +1,4 @@
-/**
- * 파일 공간의 서버 라우트를 부른다. 응답을 읽고 실패를 문구로 바꾸는 일은 부르는 쪽이 한다.
- *
- * <p>응답 모양은 `docs/code-architecture.md` 의 「실행 공간 파일」 의 「API」 가 갖는다.
- */
+/** 파일 공간의 서버 라우트를 부른다. 실패를 문구로 바꾸는 일은 부르는 쪽이 한다. 응답 모양은 `docs/code-architecture.md` 가 갖는다. */
 import { fileUrl, type WorkspaceEntryKind } from "@/lib/workspace-file";
 
 /** 이 공간을 함께 쓰는 에이전트 하나다. `shared` 는 그룹에 공개했는지다. */

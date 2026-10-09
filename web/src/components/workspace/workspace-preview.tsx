@@ -18,7 +18,6 @@ import {
 const TABLE_MAX_ROWS = 1000;
 
 type Props = {
-  /** 사용자 디렉터리 안의 상대 경로다. */
   path: string;
   name: string;
   size: number | null;
@@ -170,7 +169,6 @@ export function WorkspacePreview({ path, name, size, wide, onClose }: Props) {
         if (!open) onClose();
       }}
     >
-      {/* 닫기 단추는 머리의 「닫기」 하나만 둔다. */}
       <SheetContent
         side="right"
         data-testid="workspace-preview"

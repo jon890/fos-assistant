@@ -15,10 +15,16 @@ import {
   type WorkspaceListing,
   type WorkspaceStatus,
 } from "@/lib/workspace-api";
-import { crumbs, explorerHref, joinPath } from "@/lib/workspace-file";
+import {
+  addressable,
+  crumbs,
+  explorerHref,
+  joinPath,
+} from "@/lib/workspace-file";
 
 /** 읽은 결과다. 실패하면 응답 상태를 둔다. 연결이 끊긴 실패는 0 이다. */
 type Read<T> = { ok: true; data: T } | { ok: false; status: number };
+type Listing = { path: string; read: Read<WorkspaceListing> };
 
 async function readJson<T>(request: () => Promise<Response>): Promise<Read<T>> {
   try {
@@ -125,10 +131,7 @@ export function WorkspaceExplorer() {
   const [attempt, setAttempt] = useState(0);
   const [status, setStatus] = useState<Read<WorkspaceStatus> | null>(null);
   // `path` 는 이 목록이 어느 디렉터리의 것인지다. 주소가 바뀌면 새 목록이 올 때까지 불러오는 중으로 그린다.
-  const [listing, setListing] = useState<{
-    path: string;
-    read: Read<WorkspaceListing>;
-  } | null>(null);
+  const [listing, setListing] = useState<Listing | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -185,6 +188,7 @@ export function WorkspaceExplorer() {
         entry.kind === "FILE" &&
         entry.readable &&
         entry.openable &&
+        addressable(path) &&
         joinPath(path, entry.name) === file,
     );
     content = (
