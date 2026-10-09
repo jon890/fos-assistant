@@ -33,7 +33,10 @@ function sse(events: [string, unknown][]): string {
  * `page.route` 는 응답을 한 번에 보내고 닫으므로 SSE 는 화면의 `fetch` 를 바꿔 흉내 낸다.
  * 입력 POST 는 `page.route` 로 받아 본문을 모은다.
  */
-async function fakeScreen(page: Page) {
+async function fakeScreen(
+  page: Page,
+  onInput?: (input: Input) => Promise<void>,
+) {
   const inputs: Input[] = [];
   const state: { reply: Reply } = { reply: { status: 204 } };
   await page.addInitScript(() => {
@@ -97,8 +100,10 @@ async function fakeScreen(page: Page) {
       }),
     }),
   );
-  await page.route("**/api/browser/screen/input", (route) => {
-    inputs.push(route.request().postDataJSON() as Input);
+  await page.route("**/api/browser/screen/input", async (route) => {
+    const input = route.request().postDataJSON() as Input;
+    inputs.push(input);
+    await onInput?.(input);
     const { status, body } = state.reply;
     return route.fulfill(
       body === undefined
@@ -133,6 +138,160 @@ async function fakeScreen(page: Page) {
 }
 
 type Fake = Awaited<ReturnType<typeof fakeScreen>>;
+
+test("화면 폭을 넓히고 전체 화면에서 크기를 맞춘 뒤 닫는다", async ({
+  page,
+}) => {
+  const fake = await fakeScreen(page);
+  const screen = await openScreen(page, fake);
+  const initial = (await screen.boundingBox())!;
+  expect(initial.width).toBeGreaterThan(
+    page.viewportSize()!.width > 700 ? 672 : 300,
+  );
+  expect(initial.height).toBeLessThan(page.viewportSize()!.height);
+  await page.getByRole("button", { name: "전체 화면", exact: true }).click();
+  await expect(page.getByRole("dialog", { name: "로그인 화면" })).toBeVisible();
+  await expect
+    .poll(async () => {
+      const size = await screen.evaluate((img) => ({
+        width: img.parentElement!.clientWidth,
+        height: img.parentElement!.clientHeight,
+      }));
+      const resize = ofType(fake.inputs, "resize").at(-1);
+      return (
+        resize?.width === size.width &&
+        resize?.height === Math.max(320, size.height)
+      );
+    })
+    .toBe(true);
+  await page.getByRole("button", { name: "전체 화면 닫기" }).click();
+  await expect(page.getByRole("dialog", { name: "로그인 화면" })).toHaveCount(
+    0,
+  );
+  await expect(
+    page.getByRole("button", { name: "전체 화면", exact: true }),
+  ).toBeFocused();
+});
+
+test("전체 화면 API 가 막혀도 오버레이를 열고 Escape 로 닫는다", async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    Element.prototype.requestFullscreen = () =>
+      Promise.reject(new Error("unsupported"));
+  });
+  const fake = await fakeScreen(page);
+  await openScreen(page, fake);
+  await page.getByRole("button", { name: "전체 화면", exact: true }).click();
+  const dialog = page.getByRole("dialog", { name: "로그인 화면" });
+  await expect(dialog).toBeVisible();
+  const box = (await dialog.boundingBox())!;
+  expect(box.x).toBe(0);
+  expect(box.width).toBe(page.viewportSize()!.width);
+  expect(box.height).toBe(page.viewportSize()!.height);
+  await page.keyboard.press("Escape");
+  await expect(dialog).toHaveCount(0);
+  await expect
+    .poll(() =>
+      page.locator("dialog").evaluate((element) => element.matches(":modal")),
+    )
+    .toBe(false);
+  await page.getByRole("button", { name: "전체 화면", exact: true }).click();
+  await expect(dialog).toBeVisible();
+  await page.getByRole("button", { name: "전체 화면 닫기" }).click();
+  await expect(dialog).toHaveCount(0);
+});
+
+test("휠과 터치 드래그는 실제 CDP 페이지의 스크롤 위치를 바꾼다", async ({
+  page,
+}) => {
+  const remote = await page.context().newPage();
+  await remote.setViewportSize({ width: 400, height: 600 });
+  await remote.setContent(
+    '<html><body><p>스크롤 시험</p><div style="height:10000px"></div></body></html>',
+  );
+  const cdp = await remote.context().newCDPSession(remote);
+  const fake = await fakeScreen(page, async (input) => {
+    if (input.type === "wheel")
+      await cdp.send("Input.dispatchMouseEvent", {
+        type: "mouseWheel",
+        x: Number(input.x) * 400,
+        y: Number(input.y) * 600,
+        deltaX: 0,
+        deltaY: Number(input.deltaY),
+      });
+  });
+  const screen = await openScreen(page, fake);
+  const box = (await screen.boundingBox())!;
+  await page.mouse.move(box.x + box.width / 2, box.y + 20);
+  await page.mouse.wheel(0, 120);
+  await expect
+    .poll(() => remote.evaluate(() => window.scrollY))
+    .toBeGreaterThan(0);
+  const before = await remote.evaluate(() => window.scrollY);
+  const touch = (clientY: number) => ({
+    pointerType: "touch",
+    pointerId: 7,
+    button: 0,
+    clientX: box.x + box.width / 2,
+    clientY,
+  });
+  await screen.dispatchEvent("pointerdown", touch(box.y + 140));
+  await screen.dispatchEvent("pointermove", touch(box.y + 40));
+  await screen.dispatchEvent("pointerup", touch(box.y + 40));
+  await expect
+    .poll(() => remote.evaluate(() => window.scrollY))
+    .toBeGreaterThan(before);
+  await remote.close();
+});
+
+test("휠은 본문을 움직이지 않고 단추와 페이지 키도 원격으로 간다", async ({
+  page,
+}) => {
+  const fake = await fakeScreen(page);
+  const screen = await openScreen(page, fake);
+  await screen.click();
+  const scrollTop = await page
+    .locator("main")
+    .evaluate((main) => main.scrollTop);
+  const box = (await screen.boundingBox())!;
+  await page.mouse.move(box.x + box.width / 2, box.y + 20);
+  await page.mouse.wheel(0, 120);
+  await expect.poll(() => ofType(fake.inputs, "wheel").length).toBe(1);
+  expect(await page.locator("main").evaluate((main) => main.scrollTop)).toBe(
+    scrollTop,
+  );
+  await page.getByRole("button", { name: "아래로", exact: true }).click();
+  await page.getByRole("button", { name: "위로", exact: true }).click();
+  await expect
+    .poll(() => ofType(fake.inputs, "wheel").map((input) => input.deltaY))
+    .toEqual([120, 600, -600]);
+  await page.getByRole("button", { name: "처음으로" }).click();
+  await page.getByRole("button", { name: "끝으로" }).click();
+  await expect
+    .poll(() => ofType(fake.inputs, "scroll"))
+    .toEqual([
+      { type: "scroll", action: "top" },
+      { type: "scroll", action: "bottom" },
+    ]);
+  await page.getByLabel("화면에 글자 넣기").focus();
+  await page.keyboard.press("PageUp");
+  await page.keyboard.press("PageDown");
+  await page.keyboard.press("Space");
+  await expect
+    .poll(() => ofType(fake.inputs, "key").map((input) => input.key))
+    .toEqual(["PageUp", "PageDown", "Space"]);
+  const down = page.getByRole("button", { name: "아래로", exact: true });
+  await down.hover();
+  await page.mouse.down();
+  await expect
+    .poll(() => ofType(fake.inputs, "wheel").length)
+    .toBeGreaterThanOrEqual(6);
+  await page.mouse.up();
+  const count = ofType(fake.inputs, "wheel").length;
+  await page.waitForTimeout(450);
+  expect(ofType(fake.inputs, "wheel")).toHaveLength(count);
+});
 
 function ofType(inputs: Input[], type: string): Input[] {
   return inputs.filter((input) => input.type === type);
@@ -172,7 +331,8 @@ test("화면을 열어 누르고 글자를 넣고 굴리고 탭을 고르면 입
     "https://example.com/login",
   );
   const resize = ofType(fake.inputs, "resize")[0]!;
-  expect(resize.height).toBe(Math.round((resize.width as number) * 1.5));
+  expect(resize.height).toBeGreaterThanOrEqual(320);
+  expect(resize.height).toBeLessThanOrEqual(page.viewportSize()!.height);
 
   // 그림이 화면보다 길 수 있어 가운데 대신 위쪽의 정한 자리를 누르고 비율을 그 자리로 견준다.
   const box = (await screen.boundingBox())!;

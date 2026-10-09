@@ -6,6 +6,7 @@
 export type ScreenInput =
   | { type: "mouse"; action: "down" | "up" | "move"; x: number; y: number }
   | { type: "wheel"; x: number; y: number; deltaY: number }
+  | { type: "scroll"; action: "top" | "bottom" }
   | { type: "key"; key: string }
   | { type: "text"; text: string }
   | { type: "navigate"; url: string }
@@ -28,6 +29,11 @@ const KEYS = new Set([
   "ArrowRight",
   "ArrowDown",
   "Delete",
+  "PageUp",
+  "PageDown",
+  "Home",
+  "End",
+  "Space",
 ]);
 
 /** 휠 한 번의 `deltaY` 상한이다. */
@@ -105,6 +111,7 @@ export function isTap(start: Point, end: Point): boolean {
 
 /** 특수 키면 입력이고 아니면 `null` 이다. */
 export function screenKey(key: string): ScreenInput | null {
+  if (key === " ") key = "Space";
   return KEYS.has(key) ? { type: "key", key } : null;
 }
 
@@ -126,13 +133,13 @@ export function textInputs(text: string): ScreenInput[] {
   return inputs;
 }
 
-/** 그림 칸의 폭으로 정한 브라우저 크기다. 높이는 폭의 1.5배이고 둘 다 계약의 범위로 자른다. */
-export function resizeFor(width: number): ScreenInput {
+/** 그림 칸의 실제 폭과 높이를 계약의 범위로 자른 브라우저 크기다. */
+export function resizeFor(width: number, height: number): ScreenInput {
   const w = Math.round(clamp(width, 320, 1600));
   return {
     type: "resize",
     width: w,
-    height: Math.round(clamp(w * 1.5, 320, 2000)),
+    height: Math.round(clamp(height, 320, 2000)),
   };
 }
 

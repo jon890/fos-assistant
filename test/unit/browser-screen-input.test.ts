@@ -98,18 +98,15 @@ test("특수 키는 key 로 보내고 모르는 키는 보내지 않는다", () 
     "ArrowLeft",
     "ArrowRight",
     "Delete",
+    "PageUp",
+    "PageDown",
+    "Home",
+    "End",
+    "Space",
   ]) {
     assert.deepEqual(screenKey(key), { type: "key", key });
   }
-  for (const key of [
-    "a",
-    "가",
-    "Shift",
-    "Process",
-    "Unidentified",
-    "F5",
-    "Home",
-  ]) {
+  for (const key of ["a", "가", "Shift", "Process", "Unidentified", "F5"]) {
     assert.equal(screenKey(key), null);
   }
 });
@@ -129,19 +126,28 @@ test("글자는 상한 길이로 나눠 보내고 서로게이트 쌍을 쪼개�
   );
 });
 
-test("크기는 폭의 1.5배 높이이고 계약의 범위로 자른다", () => {
-  assert.deepEqual(resizeFor(390), { type: "resize", width: 390, height: 585 });
-  assert.deepEqual(resizeFor(200), { type: "resize", width: 320, height: 480 });
-  assert.deepEqual(resizeFor(1500), {
+test("크기는 그림 칸의 실제 폭과 높이이고 계약의 범위로 자른다", () => {
+  assert.deepEqual(resizeFor(390, 844), {
+    type: "resize",
+    width: 390,
+    height: 844,
+  });
+  assert.deepEqual(resizeFor(200, 200), {
+    type: "resize",
+    width: 320,
+    height: 320,
+  });
+  assert.deepEqual(resizeFor(1500, 900), {
     type: "resize",
     width: 1500,
-    height: 2000,
+    height: 900,
   });
-  assert.deepEqual(resizeFor(3000), {
+  assert.deepEqual(resizeFor(3000, 3000), {
     type: "resize",
     width: 1600,
     height: 2000,
   });
+  assert.deepEqual(screenKey(" "), { type: "key", key: "Space" });
 });
 
 test("주소는 host 가 있는 http 와 https 만 받고 정규화해 돌려준다", () => {
