@@ -34,7 +34,7 @@ description: 네이버 블로그의 임시저장 글을 읽고 고치며, 대화
 ## 임시저장 글 고치기
 
 1. `read_draft` 로 그 글을 읽는다
-2. 고친 네 칸과 `base`(읽은 `title`, `category`, `tags`, `body`)로 `render_draft` 를 불러 미리보기를 보인다. 미리보기 맨 위의 바뀌는 내용을 사용자에게 함께 알린다
+2. 고친 네 칸과 `base`(읽은 `title`, `category`, `tags`, `body`)로 `render_draft` 를 불러 미리보기를 보인다. 미리보기 본문 위의 바뀌는 내용을 사용자에게 함께 알린다
    - `problems` 와 `html` 은 아래 「새 글 쓰기」 의 3 처럼 다룬다
 3. 사용자가 확인하면 `overwrite_draft` 를 `draft_id`, `revision`(받은 `base_revision`), `changes`(받은 `changes`)와 고친 네 칸 그대로 부른다
 4. `draft_job` 결과가 `succeeded` 면 고쳤다는 것을 알린다. 원래 글을 `backup_title` 이라는 사본으로 남겼고, 확인한 뒤 네이버에서 지우면 된다는 것도 알린다
@@ -42,10 +42,11 @@ description: 네이버 블로그의 임시저장 글을 읽고 고치며, 대화
 
 | `error.code` | 할 일 |
 | --- | --- |
+| `draft_not_found` | 그 글이 목록에 없다. `list_drafts` 로 다시 찾아 1 부터 한다 |
 | `draft_changed`, `changes_mismatch` | 그 글을 다시 읽어 1 부터 한다 |
 | `component_not_found` | 본문의 기존 구성요소 줄을 읽은 그대로 두고 2 부터 한다 |
 | `backup_failed` | 원래 글은 그대로라고 알리고 멈춘다. `error.original_changed` 가 참이면 원래 글의 제목이 사본 제목으로 바뀌었으니 네이버에서 제목을 되돌려 달라고 알린다. 내용은 그대로다 |
-| `editor_failed` | 원래 글은 그대로라고 알리고 멈춘다. 수동 등록용 묶음은 만들지 않는다 |
+| `editor_failed` | 저장 단추를 누르기 전에 멈췄다고 알리고 멈춘다. 수동 등록용 묶음은 만들지 않는다 |
 | 그 밖의 것 | 아래 「승인과 작업 결과」 의 표를 따른다 |
 
 `error.backup_draft_id` 가 있으면 원래 글의 사본이 남았다고 알린다. `unknown` 일 때도 같다.

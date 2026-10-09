@@ -62,7 +62,7 @@ MCP 서버 이름은 `naver-blog` 다.
 | `list_drafts` | 없음 | `{count, drafts: [{draft_id, title, saved_at}]}`. 네이버 목록의 차례 그대로이고 앞의 200개까지, 제목은 200자까지다. `draft_id` 는 숫자로 된 글자, `saved_at` 은 ISO 시각이고 읽지 못하면 `null` 이다 |
 | `read_draft` | `draft_id` | `{draft_id, revision, title, category, tags, body}`. 아래 「임시저장 글 읽기」 를 본다 |
 | `save_draft` | 아래 「초안」 의 다섯 칸 | `{job_id, status: "running"}`. `job_id` 는 UUID 다 |
-| `overwrite_draft` | `draft_id`, `revision`, `changes`, `title`, `category`, `tags`, `body` | `{job_id, status: "running"}`. 아래 「임시저장 글 덮어쓰기」 를 본다 |
+| `overwrite_draft` | `draft_id`(`read_draft` 와 같은 모양), `revision`(16자리 16진수), `changes`(1자에서 100,000자), `title`, `category`, `tags`, `body` | `{job_id, status: "running"}`. 아래 「임시저장 글 덮어쓰기」 를 본다 |
 | `draft_job` | `job_id`, `wait_seconds`(0~50, 기본 45) | 아래 「작업」 의 상태 |
 
 ## 임시저장 글 읽기
@@ -121,7 +121,7 @@ MCP 서버 이름은 `naver-blog` 다.
 | `changes` | 바뀌는 내용 글. 100,000자를 넘으면 `problems` 다. 제목과 카테고리는 `제목: <원래> → <새>`, 태그는 `뺀 태그:`, `더한 태그:` 줄, 본문은 `본문:` 아래에 바뀐 줄을 `- `, `+ ` 로, 그 앞뒤 한 줄을 공백 두 칸으로 적는다. 건너뛴 자리는 `…` 한 줄이다. 바뀐 것이 없으면 `problems` 다 |
 | `base_revision` | `base` 의 지문. `read_draft` 의 `revision` 과 같은 계산이다 |
 
-미리보기 HTML 은 맨 위에 바뀌는 내용을 보이고, 기존 구성요소 줄을 이름표로 그린다.
+미리보기 HTML 은 제목과 태그 아래, 본문 위에 바뀌는 내용을 보이고, 기존 구성요소 줄을 이름표로 그린다.
 
 ### 덮어쓰기 도구
 
@@ -145,7 +145,7 @@ MCP 서버 이름은 `naver-blog` 다.
 
 | `status` | `result` 나 `error` |
 | --- | --- |
-| `succeeded` | `{draft_id, backup_draft_id, backup_title, saved_before, saved_after, state}`. `state` 는 `{revision}` 이고 읽지 못하면 `null` 이다 |
+| `succeeded` | `{draft_id, backup_draft_id, backup_title, saved_before, saved_after, state}`. `saved_before` 는 사본을 만든 뒤의 임시저장 수라 덮어쓰기가 맞으면 `saved_after` 와 같다. `state` 는 `{revision}` 이고 읽지 못하면 `null` 이다 |
 | `failed` | 아래 오류. 사본을 만든 뒤면 `error.backup_draft_id` 가 붙는다. `original_changed` 가 아니면 원래 글은 바뀌지 않았다 |
 | `unknown` | 저장 단추를 누른 뒤 확인하지 못했다. `error.backup_draft_id` 가 붙는다. 다시 덮어쓰지 않는다 |
 
@@ -272,13 +272,13 @@ MCP 서버 이름은 `naver-blog` 다.
 | `NAVER_BLOG_DRAFT_NOT_FOUND` | `invalid_input` | 그 `draft_id` 의 글이 임시저장 목록에 없다 |
 | `NAVER_BLOG_EDITOR_IN_USE` | `unavailable` | 글쓰기 화면에 「작성 중인 글이 있습니다」 알림이 떠 있어 글을 불러오지 않았다 |
 | `NAVER_BLOG_LOGIN_REQUIRED` | `credential_rejected` | 브라우저에 네이버 로그인 쿠키가 없다 |
-| `NAVER_BLOG_BUSY` | `unavailable` | 그 블로그에 돌고 있는 작업이 있다. 저장 작업과 읽기 도구 모두 이 코드로 거절한다 |
+| `NAVER_BLOG_BUSY` | `unavailable` | 그 블로그에 돌고 있는 작업이 있다. 새 글 저장, 덮어쓰기, 읽기 도구 모두 이 코드로 거절한다 |
 | `NAVER_BLOG_BROWSER_UNREACHABLE` | `unavailable` | 중계에 닿지 않거나, 브라우저를 켜지 못했다(동시 수가 찼다). 중계가 404, 502, 503 을 주거나 중계 주소가 비었을 때도 이 코드다 |
 | `NAVER_BLOG_START_UNKNOWN` | `outcome_unknown` | 작업 프로세스를 띄웠는데 5초 안에 시작을 알리지 않았다. 늦게 시작할 수 있어 다시 부르지 않는다 |
 | `NAVER_BLOG_UNAVAILABLE` | `unavailable` | 그 밖의 실패 |
 
 꺼진 브라우저를 켜는 데 30초까지 걸린다. 연결 확인은 10초 제한이라 처음 한 번 `NAVER_BLOG_BROWSER_UNREACHABLE` 로 실패할 수 있다. 잠시 뒤 다시 누르면 된다.
-`save_draft` 는 브라우저를 확인할 때 45초까지 기다린다.
+`save_draft` 와 `overwrite_draft` 는 브라우저를 확인할 때 45초까지 기다린다.
 
 오류 글에 중계 주소, 파일 경로, 브라우저가 준 오류 원문을 싣지 않는다.
 
@@ -308,7 +308,7 @@ CDP 는 Bun 의 WebSocket 으로 직접 부르고 브라우저 자동화 라이�
 
 | 무엇 | 어떻게 |
 | --- | --- |
-| 브라우저 | 커넥터는 글쓰기 주소 하나만 새 탭으로 연다. 그 탭 안에서 같은 출처의 임시저장 목록 응답만 받는다. 발행, 글 삭제, 설정 변경 단추를 누르는 코드가 없다 |
+| 브라우저 | 커넥터는 글쓰기 주소 하나만 새 탭으로 연다. 그 탭 안에서 같은 출처의 임시저장 목록 응답만 받는다. 발행, 글 삭제 단추를 누르는 코드가 없다. 발행 설정에서는 카테고리 고르기, 태그 넣기, 덮어쓸 때의 태그 칩 지우기 단추만 누른다 |
 | 파일 | 바인딩 주인의 첨부 디렉터리(`NAVER_BLOG_ATTACHMENT_DIR`) 아래, 사진 디렉터리 바로 아래의 이미지 파일만 읽는다. 경로는 링크 없이 그 디렉터리 아래여야 해서 속은 모델이 다른 사용자의 첨부 디렉터리를 가리켜도 읽지 않는다. 확장자와 이미지 서명이 맞지 않으면 올리지 않는다. 그 사진은 주인 자신의 임시저장 글로만 간다 |
 | 덮어쓰기 | 승인 뒤에만 시작하고 상시 허락이 없다. 카드에 지문과 바뀌는 내용, 고친 글이 보이고, 작업이 그 둘을 지금 글로 다시 대조한다. 고치기 전에 원래 글을 사본으로 남긴다 |
 | 쓰기 | 임시저장은 승인 뒤에만 시작한다. 카드에 제목, 카테고리, 태그, 본문이 글로 보인다. 사진 디렉터리는 사용자 디렉터리 키가 가려져 보인다. 상시 허락을 주면 속은 모델이 임시저장 글을 만들 수 있다. 그 글은 계정 밖으로 나가지 않고 지울 수 있다 |
@@ -359,7 +359,7 @@ CDP 는 Bun 의 WebSocket 으로 직접 부르고 브라우저 자동화 라이�
 4. 네이버의 임시저장 목록에서 그 글을 열어 제목, 본문, 사진 두 장의 `문서 너비`, 스티커, 지도, 카테고리, 태그가 남았는지 본다
 5. 대화에서 임시저장 글 목록을 묻는다. `list_drafts` 가 3 의 글을 맨 앞에 돌려준다
 6. 그 글을 읽게 한다. `read_draft` 의 제목, 카테고리, 태그가 네이버 화면과 같고, 본문에 `[기존 사진 1]`, `[기존 사진 2]`, `[기존 스티커 1]`, `[기존 지도 1]` 이 글 줄 사이 제자리에 있다. 임시저장 수는 그대로다
-7. 그 글의 본문 한 줄과 태그 하나를 고치게 한다. 미리보기 맨 위에 바뀌는 줄이 보이고, 승인 카드의 `changes` 가 같다
+7. 그 글의 본문 한 줄과 태그 하나를 고치게 한다. 미리보기의 본문 위에 바뀌는 줄이 보이고, 승인 카드의 `changes` 가 같다
 8. 덮어쓰기를 승인한다. 작업 상태가 `succeeded` 이고 `saved_before` 와 `saved_after` 가 같다. 네이버 목록에 `[덮어쓰기 전 원본]` 사본이 하나 늘었다
 9. 원래 글을 열어 고친 줄과 태그가 들어갔고 사진 두 장, 스티커, 지도와 바뀌지 않은 문단의 꾸밈이 그대로인지 본다. 사본을 열어 고치기 전 글인지 본다
 10. 원래 글과 사본을 지운다
