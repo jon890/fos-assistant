@@ -7,7 +7,7 @@
 사이드바에 「고급」 묶음을 두고 그 아래 「파일 공간」 과 「내 브라우저」 를 둔다.
 `/files` 화면에서 phase 01 의 세 경로로 목록을 보고, 글과 CSV 표와 사진과 HTML 을 미리 보고, 내려받는다.
 
-**범위 외**: 지우기 단추와 확인 창(phase 04), 관리자 화면(phase 04), backend(phase 01, phase 03).
+**범위 외**: 지우기 단추와 확인 창(phase 04), 관리자 화면(phase 06), backend(phase 01, 03, 05).
 
 ## 컨텍스트
 
@@ -23,7 +23,7 @@ API 와 머리글은 `docs/code-architecture.md` 의 「실행 공간 파일」,
 - 브라우저 검사: `test/browser/user-browser.spec.ts` 가 `page.route` 로 `/api/browser` 를 가짜로 답한다. 두 폭(`mobile`, `desktop`)에서 돈다.
 - 순수 함수 검사: `test/unit/*.test.ts` 는 `node --test` 로 web 파일을 직접 읽는다. 그 파일은 상대 경로 import 를 쓰고 `web/eslint.config.mjs` 의 `NODE_TEST_READ_FILES` 에 든다(`web/AGENTS.md` 「상대 경로 import 예외」).
 
-`test/browser/shell.spec.ts` 의 「사이드바는 일반 화면에 있고 로그인 화면에는 없다」 는 주요 화면 메뉴의 링크를 정확히 다섯으로 단언한다. 이 phase 가 링크를 더하므로 그 단언을 고친다.
+`test/browser/shell.spec.ts` 의 「사이드바는 일반 화면에 있고 로그인 화면에는 없다」 는 주요 화면 메뉴의 링크를 정확히 다섯으로 단언한다. `test/browser/admin-area.spec.ts` 는 낮은 화면에서 주요 화면 메뉴의 마지막 링크를 「사용량」 으로 찾아 스크롤한다. 이 phase 가 링크를 더하므로 두 단언을 고친다.
 
 ## 의도 메모
 
@@ -41,7 +41,7 @@ API 와 머리글은 `docs/code-architecture.md` 의 「실행 공간 파일」,
 ### 1. 화면 문서 적용
 
 ```bash
-git apply tasks/plan114-workspace-explorer/docs-stage2.patch
+git apply tasks/plan114-workspace-explorer/docs-web.patch.md
 ```
 
 `docs/frontend/structure.md` 와 `docs/frontend/shell.md` 가 바뀐다. 이 phase 의 구현은 그 문서와 같아야 한다.
@@ -74,8 +74,8 @@ export function formatSize(bytes: number): string; // "512 B", "1.5 KB", "3.2 MB
 
 ### 5. 화면 부품 `web/src/components/workspace/`
 
-- `workspace-explorer.tsx`(클라이언트): `useSearchParams` 의 `path`, `file` 로 상태를 정한다. 상태와 목록을 읽고 머리, 경로 줄, 목록, 미리보기를 그린다. 상태 표(`available` 거짓, 비었음, 404, 그 밖의 실패)는 `docs/frontend/structure.md` 「파일 공간」 의 문구를 쓴다. 문구는 해요체다.
-- `workspace-entry-list.tsx`: 목록 표. 줄마다 `lucide-react` 아이콘(`Folder`, `File`, `Link2`, `FileQuestion`), 이름, 크기(`formatSize`), 바뀐 시각, 「내려받기」 링크(`fileUrl(path, true)`). `readable` 이 거짓이면 「읽을 수 없음」, `LINK` 는 「링크」 를 붙이고 누르지 못한다. `truncated` 면 끝에 「1,000개까지만 보여요」.
+- `workspace-explorer.tsx`(클라이언트): `useSearchParams` 의 `path`, `file` 로 상태를 정한다. 상태와 목록을 읽고 머리, 경로 줄, 목록, 미리보기를 그린다. 상태 표(`available` 거짓, 비었음, 400, 404, 그 밖의 실패)는 `docs/frontend/structure.md` 「파일 공간」 의 문구를 쓴다. 문구는 해요체다.
+- `workspace-entry-list.tsx`: 목록 표. 파일 이름을 눌러 미리보기를 여는 것과 「내려받기」 는 `kind` 가 `FILE` 이고 `readable` 과 `openable` 이 둘 다 참일 때만 연다. `openable` 이 거짓이면 「주소로 열 수 없는 이름」 을 붙인다. 줄마다 `lucide-react` 아이콘(`Folder`, `File`, `Link2`, `FileQuestion`), 이름, 크기(`formatSize`), 바뀐 시각, 「내려받기」 링크(`fileUrl(path, true)`). `readable` 이 거짓이면 「읽을 수 없음」, `LINK` 는 「링크」 를 붙이고 누르지 못한다. `truncated` 면 끝에 「1,000개까지만 보여요」.
 - `workspace-preview.tsx`: 넓은 화면은 목록 옆 `aside`, 좁은 화면은 `Sheet`. 머리에 이름, 「내려받기」, 「닫기」. 본문은 `previewKind` 로 고른다. 글은 `fetch(fileUrl(path))` 로 받아 NUL 이 있으면 「글 파일이 아니에요」. 표는 `parseDelimited(text, ..., 1000)` 을 `csv-table.tsx` 로 그린다. 사진은 `<img>`, HTML 은 `sandbox={FRAME_SANDBOX}` 의 iframe 에 흰 바탕(결과물 패널과 같은 주석을 단다). `none` 은 「미리보기가 없어요」 와 내려받기.
 - `csv-table.tsx`: `components/ui/table.tsx` 로 그린다. 첫 줄이 머리다.
 - `web/src/components/chat/artifact/artifact-panel.tsx` 의 `FRAME_SANDBOX` 를 `export` 한다. 값은 바꾸지 않는다.
@@ -103,7 +103,7 @@ const ADVANCED_LINKS = [
 
 `test/unit/workspace-file.test.ts`
 
-- `previewKind`: `a.csv`, `a.TSV` 는 `table`, `a.html` 은 `html`, `a.svg` 와 `Makefile` 과 `.env` 는 `text`, `a.png` 는 `image`, `a.bin` 은 `none`, 1 MiB 를 넘는 `a.txt` 와 20 MiB 를 넘는 `a.png` 는 `none`.
+- `previewKind`: backend 의 `WorkspacePreviewPolicyTest` 와 같은 예시를 쓴다. `a.csv`, `a.TSV` 는 `table`, `a.html` 은 `html`, `a.svg`, `a.css`, `a.TXT`, `Makefile`, `.env` 는 `text`, `.gitignore` 는 `none`, `a.png` 는 `image`, `a.bin` 은 `none`, 1 MiB 를 넘는 `a.txt` 와 20 MiB 를 넘는 `a.png` 는 `none`.
 - `fileUrl("보고서/1월 결과.csv", true)` 가 조각마다 인코딩되고 `?download=1` 로 끝난다.
 - `crumbs("a/b")` 가 세 조각이다.
 - `parseDelimited`: `"a,\"b,c\"\n1,\"x\ny\"\n"` 가 두 줄 두 칸이고 따옴표 안 쉼표와 줄바꿈을 지킨다. `""` 가 `"` 하나가 된다. `maxRows` 를 넘으면 `truncated`.
@@ -115,8 +115,12 @@ const ADVANCED_LINKS = [
 - `a.txt` 를 누르면 미리보기에 글이 보이고, `b.csv` 는 표의 머리와 칸이 보이고, `c.html` 은 `sandbox` 가 `FRAME_SANDBOX` 값인 iframe 이다. `d.bin` 은 「미리보기가 없어요」.
 - 「내려받기」 링크의 `href` 가 `download=1` 로 끝난다.
 - 링크 줄은 「링크」 표시가 있고 눌러도 미리보기가 열리지 않는다.
+- `openable: false` 인 `50%.txt` 줄은 「주소로 열 수 없는 이름」 이 붙고 「내려받기」 가 없다.
+- 목록 400 이면 「경로가 올바르지 않아요.」 와 맨 위로 가기.
 - `available: false` 면 「파일 공간을 쓸 수 없어요. 관리자에게 알려 주세요.」, 목록 404 면 「찾을 수 없어요. 지워졌을 수 있어요.」 와 맨 위로 가기.
 - 지우기 단추가 없다(phase 04 전).
+
+`test/browser/admin-area.spec.ts`: 낮은 화면의 마지막 링크를 `{ name: "내 브라우저", exact: true }` 로 바꾸고 주석의 뜻은 그대로 둔다.
 
 `test/browser/shell.spec.ts`: 주요 화면 메뉴 단언을 `[/^에이전트/, /^외부 서비스 연결/, /^예약 작업/, /^기억/, /^사용량/, /^파일 공간/, /^내 브라우저/]` 로 바꾸고, 「고급」 묶음이 `group` 역할로 보이는지 한 줄 더한다.
 
@@ -125,8 +129,8 @@ const ADVANCED_LINKS = [
 ```bash
 node --test test/unit/workspace-file.test.ts
 cd web && pnpm lint && pnpm format:check && pnpm typecheck
-cd web && pnpm test:browser workspace-files.spec.ts shell.spec.ts --repeat-each=3 --retries=0
-scripts/check-local.sh workspace-files.spec.ts shell.spec.ts
+cd web && pnpm test:browser workspace-files.spec.ts shell.spec.ts admin-area.spec.ts --repeat-each=3 --retries=0
+scripts/check-local.sh workspace-files.spec.ts shell.spec.ts admin-area.spec.ts
 grep -rn 'style={{' web/src/components/workspace/
 ```
 
@@ -155,3 +159,4 @@ grep -rn 'style={{' web/src/components/workspace/
 | `test/unit/workspace-file.test.ts` | 신규 |
 | `test/browser/workspace-files.spec.ts` | 신규 |
 | `test/browser/shell.spec.ts` | 수정 |
+| `test/browser/admin-area.spec.ts` | 수정 |
