@@ -1015,7 +1015,8 @@ class ConnectorBindingServiceTest {
     }
 
     @Test
-    @DisplayName("반영 완료에서 다시 읽은 설치가 configured 가 아니면 CONNECTOR_INSTALL_MISMATCH, probe 가 실패하면 CONNECTOR_TOOLS_UNVERIFIED 이고 PENDING 과 재시작 대기로 남는다")
+    @DisplayName(
+            "반영 완료에서 다시 읽은 설치가 configured 가 아니면 CONNECTOR_INSTALL_MISMATCH, probe 가 실패하면 CONNECTOR_TOOLS_UNVERIFIED 이고 PENDING 과 재시작 대기로 남는다")
     void confirmAppliedKeepsRestartWaitWhenNotConfiguredOrProbeFails() {
         CurrentUser owner = user(UserRole.MEMBER, 1L);
         CurrentUser admin = user(UserRole.ADMIN, 1L);
@@ -1028,7 +1029,8 @@ class ConnectorBindingServiceTest {
 
         when(connector.readConnector(anyString(), anyString()))
                 .thenReturn(new ConnectorState("p", true, false, false, true, HermesConnectorClient.MODE_BIND));
-        assertCode(() -> service.confirmApplied(admin, agent.code(), DEMO, shown), ErrorCode.CONNECTOR_INSTALL_MISMATCH);
+        assertCode(
+                () -> service.confirmApplied(admin, agent.code(), DEMO, shown), ErrorCode.CONNECTOR_INSTALL_MISMATCH);
         assertThat(onlyBinding())
                 .extracting(ConnectorBinding::status, ConnectorBinding::restartRequired)
                 .containsExactly(BindingStatus.PENDING, true);
@@ -1036,7 +1038,8 @@ class ConnectorBindingServiceTest {
         when(connector.readConnector(anyString(), anyString()))
                 .thenReturn(new ConnectorState("p", true, true, false, true, HermesConnectorClient.MODE_BIND));
         when(connector.probe(anyString(), anyString())).thenReturn(new ProbeResult(false, List.of()));
-        assertCode(() -> service.confirmApplied(admin, agent.code(), DEMO, shown), ErrorCode.CONNECTOR_TOOLS_UNVERIFIED);
+        assertCode(
+                () -> service.confirmApplied(admin, agent.code(), DEMO, shown), ErrorCode.CONNECTOR_TOOLS_UNVERIFIED);
         assertThat(onlyBinding())
                 .extracting(ConnectorBinding::status, ConnectorBinding::restartRequired)
                 .containsExactly(BindingStatus.PENDING, true);
@@ -1056,7 +1059,8 @@ class ConnectorBindingServiceTest {
         when(connector.readConnector(anyString(), anyString()))
                 .thenReturn(new ConnectorState("p", true, true, false, false, HermesConnectorClient.MODE_BIND));
 
-        assertCode(() -> service.confirmApplied(admin, agent.code(), DEMO, shown), ErrorCode.CONNECTOR_INSTALL_MISMATCH);
+        assertCode(
+                () -> service.confirmApplied(admin, agent.code(), DEMO, shown), ErrorCode.CONNECTOR_INSTALL_MISMATCH);
 
         assertThat(onlyBinding().status()).isEqualTo(BindingStatus.PENDING);
         verify(connector, never()).probe(anyString(), anyString());
@@ -1076,7 +1080,8 @@ class ConnectorBindingServiceTest {
                 .thenReturn(new InstallResult(false, false));
         when(connector.probe(anyString(), anyString())).thenReturn(new ProbeResult(true, List.of()));
 
-        assertCode(() -> service.confirmApplied(admin, agent.code(), DEMO, shown), ErrorCode.CONNECTOR_TOOLS_UNVERIFIED);
+        assertCode(
+                () -> service.confirmApplied(admin, agent.code(), DEMO, shown), ErrorCode.CONNECTOR_TOOLS_UNVERIFIED);
 
         assertThat(onlyBinding().status()).isEqualTo(BindingStatus.PENDING);
         assertThat(output.getOut()).contains("connector demo-notes not applied: NO_TOOLS");
@@ -1094,7 +1099,8 @@ class ConnectorBindingServiceTest {
         when(connector.bindConnector(anyString(), anyString(), anyString(), anyString(), nullable(String.class)))
                 .thenThrow(new IllegalStateException());
 
-        assertCode(() -> service.confirmApplied(admin, agent.code(), DEMO, shown), ErrorCode.CONNECTOR_OPERATION_FAILED);
+        assertCode(
+                () -> service.confirmApplied(admin, agent.code(), DEMO, shown), ErrorCode.CONNECTOR_OPERATION_FAILED);
 
         assertThat(onlyBinding().status()).isEqualTo(BindingStatus.PENDING);
         assertThat(output.getOut()).doesNotContain("not applied");

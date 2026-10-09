@@ -1,8 +1,8 @@
 package com.bifos.assistant.connector.application;
 
+import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.browser.application.BrowserGatewayTokens;
 import com.bifos.assistant.connector.application.model.ResyncOutcome;
-import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.connector.domain.ConnectorBinding;
 import com.bifos.assistant.hermes.HermesConnectorClient;
 import com.bifos.assistant.hermes.HermesConnectorClient.ConnectorState;
