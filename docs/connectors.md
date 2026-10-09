@@ -74,13 +74,15 @@ plugin 디렉터리 root 에 둔다. 소유는 그 plugin 의 저장소다. 같�
 | `operator_env` | 사용자가 넣지 않고 운영자가 주는 env 이름. 값은 운영 설정이 갖는다. **비밀이 아닌 운영 설정만 둔다.** 값이 profile 설정과 소유 기록에 그대로 복제된다 |
 | `owner_attachments_env` | 선택. 사용자 첨부를 읽는 커넥터가 받을 env 이름 하나. 바인딩 설치가 그 에이전트 주인의 첨부 디렉터리를 넣는다. 값은 운영 정책과 Control Plane 이 정한 주인에서만 온다([ADR-20261007 / connector-owner-attachments](adr/ADR-20261007-connector-owner-attachments.md)) |
 | `owner_output_env` | 선택. 목록 도구가 계산할 데이터를 파일로 쓸 디렉터리를 받을 env 이름 하나. 바인딩 설치가 그 에이전트 실행 공간에 읽기 전용으로 붙는 그 profile 의 커넥터 출력 디렉터리를 넣는다. 실행 공간 정책에 `connector_output_root` 가 없으면 빈 값이다([ADR-20261008 / connector-output-files](adr/ADR-20261008-connector-output-files.md)) |
+| `owner_browser_env` | 선택. 사용자 브라우저를 쓰는 커넥터가 중계 주소를 받을 env 이름 하나. 바인딩 설치는 그 바인딩의 표식 주소를, 확인 도구와 선택지 호출은 요청자의 호출 표식 주소를 넣는다. 중계가 꺼졌으면 빈 값이다([ADR-20261008 / browser-gateway-token](adr/ADR-20261008-browser-gateway-token.md)) |
+| `owner_browser_login_url` | 선택. `owner_browser_env` 가 있을 때만 받는다. 사용자가 브라우저에서 먼저 로그인할 곳이고 화면이 안내에만 쓴다. `https://` 로 시작하고 512자 이하이며 빈칸과 제어 문자가 없다 |
 | `single_binding` | 선택 boolean. 참이면 사용자의 그 연결은 에이전트 하나에만 붙는다. 없으면 거짓이다. 서비스가 계정마다 유효한 토큰을 하나만 두어 바인딩끼리 토큰을 깨는 커넥터가 선언한다([ADR-20261008 / connector-binding-guards](adr/ADR-20261008-connector-binding-guards.md)) |
 | `sandbox_required` | 선택 boolean. 참이면 실행 공간 정책에 등록된 profile 에만 붙는다. 없으면 거짓이다. 키에 권한 범위가 없어 셸이 읽으면 안 되는 커넥터가 선언한다([ADR-20261008 / connector-binding-guards](adr/ADR-20261008-connector-binding-guards.md)) |
 | `operator_secrets` | 운영자가 주는 비밀의 env 이름 목록. 지금은 지원하지 않는다. 비어 있지 않으면 그 커넥터를 카탈로그에 내지 않는다([ADR-046](adr/ADR-046-운영-비밀은-operator-env-와-다른-칸으로-선언하고-자식-mcp-프로세스에만-넣는다.md)) |
 | `errors` | 도구 오류 코드를 공통 어휘로 바꾸는 표. 키는 `^[A-Z][A-Z0-9_]{0,63}$` 이다. 값은 공통 어휘 글이거나 아래 「오류 복구 계약」 의 객체다. 표에 없는 코드는 `unavailable` 이다. `outcome_unknown` 은 쓰기를 보냈는데 됐는지 모른다는 뜻이다 |
 
 - `options.tool` 과 `verify.tool` 은 `.mcp.json` 서버의 도구 가운데 `readOnlyHint: true` 인 것만 된다. 대시보드가 도구를 부를 때 `tools/list` 로 확인한다. manifest 를 읽을 때는 도구 이름의 형식만 본다. 카탈로그는 요청마다 읽으므로 읽을 때마다 MCP 서버를 띄우지 않는다
-- `.mcp.json` 서버 env 는 `fields[].env` 와 `operator_env`, `owner_attachments_env`, `owner_output_env` 의 합과 같아야 한다. 네 이름은 겹치지 않는다. 하나라도 다르면 그 커넥터를 카탈로그에 내지 않는다
+- `.mcp.json` 서버 env 는 `fields[].env` 와 `operator_env`, `owner_attachments_env`, `owner_output_env`, `owner_browser_env` 의 합과 같아야 한다. 다섯 이름은 겹치지 않는다. 하나라도 다르면 그 커넥터를 카탈로그에 내지 않는다
 - `toolsets` 가 목록이 아니거나, 이름이 겹치거나, `vision` 밖의 이름이 하나라도 있으면 그 커넥터를 카탈로그에 내지 않는다. 셸, 파일, 기억, 스킬, 위임 도구는 manifest 로 열리지 않는다([ADR-044](adr/ADR-044-커넥터-manifest-는-읽기-전용-이미지-도구만-열-수-있다.md))
 - `attachments` 가 참인데 `toolsets` 에 `vision` 이 없으면 그 커넥터를 카탈로그에 내지 않는다. 사진은 파일로 놓이고 에이전트가 이미지 도구로 읽기 때문이다([ADR-020](adr/ADR-020-사진은-공유-디렉터리에-두고-에이전트가-파일로-읽는다.md))
 - `icon` 이나 `link` 가 아래 「아이콘과 링크」 를 어기면 그 칸만 null 로 내고 경고 로그를 남긴다. 커넥터는 카탈로그에 그대로 나온다
@@ -132,7 +134,7 @@ plugin 디렉터리 root 에 둔다. 소유는 그 plugin 의 저장소다. 같�
 
 | 경로 | 요청 | 결과 |
 | --- | --- | --- |
-| `GET /api/v1/connectors` | 없음 | `[{id, title, description, icon, link, fields[], tools[], myStatus, available, bindings[]}]`. `icon` 은 `data:image/svg+xml;base64,...` 나 `data:image/png;base64,...` 의 data URL 이거나 null 이고, `link` 는 `https://` 주소이거나 null 이다. `fields[]` 는 `key, label, description, secret, required, pattern, hasOptions, autoSelectSingle` 만 담는다. `tools[]` 는 `name, title, risk, approval, grant` 이고 `schema: 1` 은 빈 목록이다. `risk` 와 `approval` 은 `READ`, `NONE` 같은 대문자 enum 이름이고 `grant` 는 그 도구에 상시 허락을 줄 수 있는지다. `bindings[]` 는 내 연결이 붙은 에이전트다 |
+| `GET /api/v1/connectors` | 없음 | `[{id, title, description, icon, link, fields[], tools[], myStatus, available, bindings[], ownerBrowserLoginUrl}]`. `icon` 은 `data:image/svg+xml;base64,...` 나 `data:image/png;base64,...` 의 data URL 이거나 null 이고, `link` 는 `https://` 주소이거나 null 이다. `fields[]` 는 `key, label, description, secret, required, pattern, hasOptions, autoSelectSingle` 만 담는다. `tools[]` 는 `name, title, risk, approval, grant` 이고 `schema: 1` 은 빈 목록이다. `risk` 와 `approval` 은 `READ`, `NONE` 같은 대문자 enum 이름이고 `grant` 는 그 도구에 상시 허락을 줄 수 있는지다. `bindings[]` 는 내 연결이 붙은 에이전트다. `ownerBrowserLoginUrl` 은 manifest 의 `owner_browser_login_url` 이거나 null 이다 |
 | `GET /api/v1/connections/{id}` | 없음 | 자기 연결 상태 |
 | `POST /api/v1/connections/{id}/options/{fieldKey}` | `{values}` | `[{value, label}]`. 아무것도 저장하지 않는다 |
 | `POST /api/v1/connections/{id}` | `{values}` | 등록 또는 값 교체. 확인 도구가 통과해야 보관 파일에 쓰고, 붙은 바인딩마다 설치를 다시 보낸다. 입력 칸이 없는 커넥터는 빈 `values` 다 |
@@ -284,7 +286,7 @@ plugin 디렉터리 root 에 둔다. 소유는 그 plugin 의 저장소다. 같�
 - Control Plane 은 승인 줄의 에이전트(판정한 실행의 에이전트)에 붙은 바인딩의 profile 로 보낸다([ADR-083](adr/ADR-083-커넥터는-사용자가-한-번-연결하고-자기-에이전트에-여럿-붙여-그-에이전트가-도구를-직접-부른다.md))
 - 그 profile 에 그 커넥터의 소유 기록이 있어야 한다. 관리 표식이 있거나, 커넥터 표식만 있으면 그 항목이 바인딩 설치여야 한다
 - 커넥터 MCP 서버를 자식으로 한 번 띄워 `tools/list` 를 읽고, 등록 이름이 `hermes_tool` 과 같은 도구가 정확히 하나일 때 그 도구를 `args` 로 부른다. `schema: 2` 는 그 도구가 `tools` 에 있어야 한다
-- 자식의 env 는 그 profile `.env` 에서 manifest 의 `fields[].env` 만 꺼내고 운영 목록의 `env` 를 더한다. `owner_attachments_env` 를 선언한 커넥터는 설치한 서버 정의의 그 값을 더한다. `owner_output_env` 는 빈 값이다. 승인한 쓰기는 파일을 내지 않는다. 나머지 값은 넘기지 않는다
+- 자식의 env 는 그 profile `.env` 에서 manifest 의 `fields[].env` 만 꺼내고 운영 목록의 `env` 를 더한다. `owner_attachments_env` 를 선언한 커넥터는 설치한 서버 정의의 그 값을 더한다. `owner_output_env` 는 빈 값이다. 승인한 쓰기는 파일을 내지 않는다. `owner_browser_env` 를 선언한 커넥터는 설치한 서버 정의의 중계 주소를 더하고, 그 값이 중계 주소 모양이 아니면 빈 값이다. 나머지 값은 넘기지 않는다
 - 시간 제한은 60초, 동시 실행은 `call` 과 같은 한도를 함께 쓴다
 - 도구가 `errors` 표에 있는 코드로 실패하면 `code` 에 그 코드를 싣는다. 객체 항목이면 `recovery` 와 `details` 도 싣는다(「오류 복구 계약」). Control Plane 은 같은 규칙으로 다시 검증해 `FAILED` 줄의 `result_text` 에 `{"kind": "connector_error", "code", "details", "recovery"}` 로 저장한다
 - 도구가 `errors` 표에서 `outcome_unknown` 인 코드로 실패하면 504 로 답한다. 시간 초과와 같이 실행됐는지 모른다는 뜻이다

@@ -3,20 +3,27 @@ import { ToolError } from "./errors.ts";
 
 export type Env = Record<string, string | undefined>;
 
-/** connector.json 의 연결 칸과 같은 정규식이다. 호스트를 IPv4 와 localhost 로 한정한다. */
-export const CDP_URL_PATTERN =
-  /^https?:\/\/([0-9]{1,3}(\.[0-9]{1,3}){3}|localhost)(:[0-9]{1,5})?\/?$/;
+/**
+ * 바인딩 설치와 확인 호출이 넣는 중계 주소의 모양이다. `<gateway-base-url>/<접근 표식>` 이다.
+ * 대시보드의 `OWNER_BROWSER_VALUE_RE` 와 같은 식이다(ADR-20261008 browser-gateway-token).
+ */
+export const BROWSER_URL_PATTERN =
+  /^https?:\/\/[A-Za-z0-9.-]{1,253}(:[0-9]{1,5})?(\/[A-Za-z0-9._~-]{1,128}){1,8}$/;
 export const BLOG_ID_PATTERN = /^[A-Za-z0-9_-]{1,50}$/;
 
 const LOGIN_COOKIES = ["NID_AUT", "NID_SES"];
 const NAVER_DOMAINS = new Set(["naver.com", ".naver.com"]);
 
-/** 연결 값을 다시 검사한다. 등록 화면을 거치지 않은 값도 같은 모양만 받는다. */
+/**
+ * 연결 값을 다시 검사한다. 등록 화면을 거치지 않은 값도 같은 모양만 받는다.
+ * 중계 주소가 비었으면 중계가 꺼진 것이라 브라우저에 닿지 못한다고 답한다.
+ */
 export function readConnection(env: Env) {
-  const cdpUrl = env.NAVER_BLOG_CDP_URL ?? "";
+  const cdpUrl = env.NAVER_BLOG_BROWSER_URL ?? "";
   const blogId = env.NAVER_BLOG_ID ?? "";
-  if (!CDP_URL_PATTERN.test(cdpUrl) || !BLOG_ID_PATTERN.test(blogId))
-    throw new ToolError("NAVER_BLOG_INVALID_INPUT");
+  if (!BLOG_ID_PATTERN.test(blogId)) throw new ToolError("NAVER_BLOG_INVALID_INPUT");
+  if (!cdpUrl) throw new ToolError("NAVER_BLOG_BROWSER_UNREACHABLE");
+  if (!BROWSER_URL_PATTERN.test(cdpUrl)) throw new ToolError("NAVER_BLOG_INVALID_INPUT");
   return { cdpUrl, blogId };
 }
 
@@ -32,19 +39,14 @@ export async function sessionStatus(
   const deadline = Date.now() + timeoutMs;
   const remaining = () => Math.max(1, deadline - Date.now());
 
-  const version = await httpJson(cdpUrl, "/json/version", {
-    timeoutMs: Math.min(remaining(), 5_000),
-  });
+  // 중계는 꺼진 브라우저를 켜느라 이 요청을 붙잡을 수 있어 남은 시간을 모두 쓴다.
+  const version = await httpJson(cdpUrl, "/json/version", { timeoutMs: remaining() });
   const debuggerUrl = (version as { webSocketDebuggerUrl?: unknown } | null)
     ?.webSocketDebuggerUrl;
   if (typeof debuggerUrl !== "string")
     throw new ToolError("NAVER_BLOG_BROWSER_UNREACHABLE");
 
-  const session = await CdpSession.connect(
-    wsUrlFor(cdpUrl, debuggerUrl),
-    cdpUrl,
-    remaining(),
-  );
+  const session = await CdpSession.connect(wsUrlFor(cdpUrl, debuggerUrl), remaining());
   try {
     const { cookies } = await session.send<{ cookies?: unknown }>(
       "Storage.getCookies",

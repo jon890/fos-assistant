@@ -232,6 +232,49 @@ class ConnectorExecuteTest(base.ConnectorGateCase):
         (self.profile_root / PROFILE / "config.yaml").unlink()
         self.assertEqual(self.execute("mcp__demo__env_view")[1]["result"]["attachments"], "")
 
+    def install_owner_browser(self, name, value, config_value=None):
+        """브라우저 중계 주소를 선언하고 그 profile 의 설치한 서버 정의(`config.yaml` 과 소유 기록)에 값을 둔다.
+
+        `config_value` 를 주면 `config.yaml` 에만 그 값을 둔다. 실행 경로는 `config.yaml` 의 값을 읽는다.
+        """
+        import yaml
+        self.rewrite("connector.json", lambda declared: declared.update(owner_browser_env="DEMO_BROWSER_URL"))
+        self.rewrite(".mcp.json", lambda declared: declared["mcpServers"]["demo"]["env"].update(
+            DEMO_BROWSER_URL="${DEMO_BROWSER_URL}"))
+        profile = self.profile_root / name
+        state = json.loads((profile / self.plugin.CONNECTOR_STATE).read_text(encoding="utf-8"))
+        state[base.DEMO]["server"]["env"]["DEMO_BROWSER_URL"] = value
+        (profile / self.plugin.CONNECTOR_STATE).write_text(json.dumps(state), encoding="utf-8")
+        server = state[base.DEMO]["server"]
+        if config_value is not None:
+            server = {**server, "env": {**server["env"], "DEMO_BROWSER_URL": config_value}}
+        (profile / "config.yaml").write_text(yaml.safe_dump({"mcp_servers": {"demo": server}}), encoding="utf-8")
+
+    def test_child_receives_the_installed_relay_address(self):
+        """선언한 커넥터의 승인 실행은 그 profile 에 설치한 서버 정의의 중계 주소를 자식 env 에 넣는다(ADR-20261008 browser-gateway-token)."""
+        self.install("bob")
+        alice = "http://cp.example.test/internal/browser-gateway/b1." + "a" * 64
+        bob = "http://cp.example.test/internal/browser-gateway/b2." + "b" * 64
+        self.install_owner_browser(PROFILE, alice)
+        self.install_owner_browser("bob", bob)
+        with mock.patch.dict(os.environ, {"DEMO_BROWSER_URL": "http://parent.example.test/gw/x"}):
+            answers = {name: self.execute("mcp__demo__env_view", profile=name) for name in (PROFILE, "bob")}
+        for name, expected in ((PROFILE, alice), ("bob", bob)):
+            status, body = answers[name]
+            self.assertEqual(status, 200, body)
+            self.assertEqual(body["result"]["browser"], expected, name)
+
+    def test_child_receives_an_empty_relay_address_when_the_installed_value_is_not_usable(self):
+        """설치한 값이 비었거나 중계 주소 모양이 아니면 빈 값이다."""
+        valid = "http://cp.example.test/internal/browser-gateway/b1." + "a" * 64
+        for label, value in (("empty", ""), ("profile env reference", "${DEMO_BROWSER_URL}"),
+                             ("websocket scheme", "ws://cp.example.test/gw/b1")):
+            with self.subTest(label):
+                self.install_owner_browser(PROFILE, valid, config_value=value)
+                status, body = self.execute("mcp__demo__env_view")
+                self.assertEqual(status, 200, body)
+                self.assertEqual(body["result"]["browser"], "")
+
     def test_token_comes_from_the_requested_profile(self):
         """다른 profile 의 값으로 실행하지 않는다. 토큰이 거절되는 profile 은 그 오류를 받는다."""
         self.install("bob", token=call_base.BAD_TOKEN)

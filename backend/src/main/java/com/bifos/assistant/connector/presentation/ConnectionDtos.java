@@ -84,6 +84,7 @@ public final class ConnectionDtos {
      *
      * @param icon 검증을 통과한 아이콘의 data URL. 없거나 틀렸으면 null
      * @param link 검증을 통과한 {@code https://} 링크. 없거나 틀렸으면 null
+     * @param ownerBrowserLoginUrl 사용자 브라우저에서 먼저 로그인할 {@code https://} 주소. 선언하지 않았으면 null
      */
     public record ConnectorView(
             String id,
@@ -95,7 +96,8 @@ public final class ConnectionDtos {
             List<ConnectorToolView> tools,
             String myStatus,
             boolean available,
-            List<BoundAgentView> bindings) {
+            List<BoundAgentView> bindings,
+            String ownerBrowserLoginUrl) {
         static ConnectorView from(ConnectorSummary value) {
             return new ConnectorView(
                     value.id(),
@@ -107,7 +109,8 @@ public final class ConnectionDtos {
                     value.tools().stream().map(ConnectorToolView::from).toList(),
                     value.myStatus().name(),
                     value.available(),
-                    value.bindings().stream().map(BoundAgentView::from).toList());
+                    value.bindings().stream().map(BoundAgentView::from).toList(),
+                    value.ownerBrowserLoginUrl());
         }
     }
 

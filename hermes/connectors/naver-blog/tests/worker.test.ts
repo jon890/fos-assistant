@@ -15,10 +15,11 @@ import {
 } from "../src/jobs.ts";
 import type { Env } from "../src/session.ts";
 import { runWorker } from "../src/worker.ts";
+import { GATEWAY_PATH } from "./fake-cdp.ts";
 import { fakeRunDraft } from "./fake-worker-entry.ts";
 
-const CDP_URL = "http://127.0.0.1:9";
-const ENV = { NAVER_BLOG_CDP_URL: CDP_URL, NAVER_BLOG_ID: "example-blog" };
+const BLOG_ID = "example-blog";
+const ENV = { NAVER_BLOG_BROWSER_URL: `http://127.0.0.1:9${GATEWAY_PATH}`, NAVER_BLOG_ID: BLOG_ID };
 const INPUT = {
   title: "가상국수 다녀온 날",
   category: "가상국수로그",
@@ -48,7 +49,7 @@ async function queuedJob(input: Record<string, unknown> = INPUT, env: Env = ENV)
   const dir = await mkdtemp(join(tmpdir(), "naver-blog-worker-"));
   cleanups.push(() => rm(dir, { recursive: true, force: true }));
   const jobId = randomUUID();
-  await acquireLock(dir, CDP_URL, jobId);
+  await acquireLock(dir, BLOG_ID, jobId);
   await createState(dir, {
     job_id: jobId,
     status: "running",
@@ -207,7 +208,7 @@ test("작업 디렉터리 확인이 실패하면 상태를 쓰지 않고 입력�
   expect(called).toBe(false);
   expect(await readState(dir, jobId)).toEqual(before);
   expect((await readdir(dir)).sort()).toEqual(
-    [`${jobId}.input.json`, `${jobId}.json`, lockFile(dir, CDP_URL).slice(dir.length + 1)].sort(),
+    [`${jobId}.input.json`, `${jobId}.json`, lockFile(dir, BLOG_ID).slice(dir.length + 1)].sort(),
   );
 });
 

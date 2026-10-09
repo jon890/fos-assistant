@@ -12,13 +12,6 @@ export const PROXY_ENVIRONMENT_KEYS = [
 
 const HTTP_TIMEOUT_MS = 5_000;
 const COMMAND_TIMEOUT_MS = 30_000;
-/** Chrome 허용 목록과 맞추도록 CDP 주소의 포트로 loopback HTTP Origin 을 만든다. */
-export function websocketOriginFor(cdpUrl: string) {
-  // HTTP Origin 의 기본 포트 규칙을 적용하고, HTTPS 주소에 명시한 포트도 보존한다.
-  const origin = new URL(cdpUrl.replace(/^https:/, "http:"));
-  origin.hostname = "localhost";
-  return origin.origin;
-}
 
 /** 테스트처럼 이미 실행 중인 프로세스에서도 다음 요청이 프록시 값을 읽지 않게 한다. */
 export function clearProxyEnvironment() {
@@ -65,8 +58,10 @@ export async function httpJson(
 }
 
 /**
- * Chrome 이 준 `webSocketDebuggerUrl` 의 경로만 꺼내 `cdp_url` 의 호스트와 포트에 붙인다.
- * Chrome 은 자기 loopback 주소를 적으므로 중계 너머에서는 그 호스트로 닿지 않는다.
+ * 브라우저가 준 `webSocketDebuggerUrl` 의 경로만 꺼내 받은 주소의 호스트와 포트에 붙인다.
+ * 중계가 적는 호스트는 커넥터가 닿는 호스트와 다를 수 있어서다.
+ * 받은 주소에 경로(중계의 접근 표식)가 있으면 그 경로 아래의 `devtools/` 만 받는다.
+ * 다른 경로를 받으면 표식 밖의 창구로 붙게 되므로 닿지 않음으로 끝낸다.
  */
 export function wsUrlFor(cdpUrl: string, webSocketDebuggerUrl: string) {
   let base: URL;
@@ -77,7 +72,8 @@ export function wsUrlFor(cdpUrl: string, webSocketDebuggerUrl: string) {
   } catch {
     throw unreachable();
   }
-  if (!debuggerPath.startsWith("/devtools/")) throw unreachable();
+  const prefix = base.pathname.replace(/\/+$/, "");
+  if (!debuggerPath.startsWith(`${prefix}/devtools/`)) throw unreachable();
   const scheme = base.protocol === "https:" ? "wss:" : "ws:";
   return `${scheme}//${base.host}${debuggerPath}`;
 }
@@ -102,16 +98,16 @@ export class CdpSession {
     socket.addEventListener("error", () => this.shutdown());
   }
 
-  /** 대상 하나에 붙는다. 브라우저 대상에는 Page 도메인이 없어 붙자마자 아무것도 켜지 않는다. */
-  static connect(wsUrl: string, cdpUrl: string, timeoutMs = COMMAND_TIMEOUT_MS) {
+  /**
+   * 대상 하나에 붙는다. 브라우저 대상에는 Page 도메인이 없어 붙자마자 아무것도 켜지 않는다.
+   * `Origin` 머리를 싣지 않는다. 중계는 `Origin` 이 있는 요청을 브라우저 페이지의 요청으로 보고 거절한다.
+   */
+  static connect(wsUrl: string, timeoutMs = COMMAND_TIMEOUT_MS) {
     clearProxyEnvironment();
     return new Promise<CdpSession>((resolve, reject) => {
       let socket: WebSocket;
       try {
-        // Bun 의 WebSocket 은 두 번째 인자로 headers 를 받는다. tsconfig 의 lib 에서 DOM 을 빼 bun-types 선언을 쓴다.
-        socket = new WebSocket(wsUrl, {
-          headers: { Origin: websocketOriginFor(cdpUrl) },
-        });
+        socket = new WebSocket(wsUrl);
       } catch {
         reject(unreachable());
         return;
