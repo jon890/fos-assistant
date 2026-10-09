@@ -383,6 +383,7 @@ test("20MB 사진도 화면에서 서버까지 올라간다", async ({ page }, t
 
   const response = await uploaded;
   expect(response.ok()).toBe(true);
+  expect((await response.json()).byteSize).toBe(buffer.length);
   await expect(page.getByTestId("attachment-uploading")).toHaveCount(0);
   await expect(
     page.getByTestId("attachment-previews").locator("> div"),
