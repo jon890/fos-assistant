@@ -158,7 +158,7 @@ class AttachmentUploadLimitTest {
     @Test
     @DisplayName("한 장 상한을 조금 넘으면 서비스가 입력 오류로 거절한다")
     void serviceRejectsAsInputErrorWhenSlightlyOverPerImageLimit() throws Exception {
-        HttpResponse<String> response = upload(20 * MB + 100 * KB);
+        HttpResponse<String> response = upload(20 * MB + 1);
 
         assertThat(response.statusCode()).as(response.body()).isEqualTo(400);
         assertThat(code(response)).isEqualTo("VALIDATION_FAILED");
@@ -168,12 +168,15 @@ class AttachmentUploadLimitTest {
     @Test
     @DisplayName("요청 상한을 넘어도 500 이 아니라 입력 오류다")
     void overRequestLimitIsInputErrorNot500() throws Exception {
-        // 넘는 양을 수백 KB 로 둔다. 많이 넘기면 서버가 남은 본문을 읽지 않고 연결을 끊어 응답을 받지 못한다.
-        HttpResponse<String> response = upload(22 * MB + 300 * KB);
+        // 두 파일은 각각 파일 상한 안이다. 여분 파일로 요청 합계 상한만 넘기는지 확인한다.
+        HttpResponse<String> within = upload(1, new byte[20 * MB], "image/jpeg", new byte[MB]);
+        assertThat(within.statusCode()).as(within.body()).isEqualTo(200);
+
+        HttpResponse<String> response = upload(2, new byte[20 * MB], "image/jpeg", new byte[2 * MB + 300 * KB]);
 
         assertThat(response.statusCode()).as(response.body()).isEqualTo(400);
         assertThat(code(response)).isEqualTo("VALIDATION_FAILED");
-        assertThat(attachments.findByConversationIdOrderByIdAsc(conversationId)).isEmpty();
+        assertThat(attachments.findByConversationIdOrderByIdAsc(conversationId)).hasSize(1);
     }
 
     @Test
@@ -233,6 +236,11 @@ class AttachmentUploadLimitTest {
     }
 
     private HttpResponse<String> upload(int requestNumber, byte[] content, String contentType) throws Exception {
+        return upload(requestNumber, content, contentType, new byte[0]);
+    }
+
+    private HttpResponse<String> upload(int requestNumber, byte[] content, String contentType, byte[] extra)
+            throws Exception {
         String boundary = "attachment-boundary-" + requestNumber + "-" + content.length;
         ByteArrayOutputStream body = new ByteArrayOutputStream(content.length + 512);
         body.write(("--" + boundary + "\r\n"
@@ -240,6 +248,13 @@ class AttachmentUploadLimitTest {
                         + "Content-Type: " + contentType + "\r\n\r\n")
                 .getBytes(StandardCharsets.UTF_8));
         body.write(content);
+        if (extra.length > 0) {
+            body.write(("\r\n--" + boundary + "\r\n"
+                            + "Content-Disposition: form-data; name=\"extra\"; filename=\"extra.bin\"\r\n"
+                            + "Content-Type: application/octet-stream\r\n\r\n")
+                    .getBytes(StandardCharsets.UTF_8));
+            body.write(extra);
+        }
         body.write(("\r\n--" + boundary + "--\r\n").getBytes(StandardCharsets.UTF_8));
 
         HttpRequest request = HttpRequest.newBuilder(URI.create("http://localhost:" + port
