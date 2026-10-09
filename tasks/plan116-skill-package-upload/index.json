@@ -1,0 +1,30 @@
+{
+  "name": "plan116-skill-package-upload",
+  "description": "스킬 zip 묶음을 받아 검사하고 미리보기와 올리기 API 를 연다. 받기와 검사를 나눠 GitHub 가져오기가 검사 이하를 그대로 쓰게 한다",
+  "status": "in_progress",
+  "created_at": "2026-10-09",
+  "total_phases": 4,
+  "current_phase": 4,
+  "phases": [
+    {
+      "number": 1,
+      "file": "phase-01.md",
+      "execution_profile": "fast"
+    },
+    {
+      "number": 2,
+      "file": "phase-02.md",
+      "execution_profile": "deep"
+    },
+    {
+      "number": 3,
+      "file": "phase-03.md",
+      "execution_profile": "deep"
+    },
+    {
+      "number": 4,
+      "file": "phase-04.md",
+      "execution_profile": "deep"
+    }
+  ]
+}
