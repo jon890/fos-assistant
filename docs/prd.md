@@ -206,7 +206,7 @@ Memory 의 기본 근거는 [`backend/docs/adr/ADR-003-memory-권한은-주입�
   멈출 수 있는 길은 profile 플러그인 쪽에 있고, 부모 run 이 끝난 뒤의 자식은 그 길로도 멈추지 못한다([`hermes/docs/hermes-contract.md`](../hermes/docs/hermes-contract.md#native-하위-에이전트를-멈추는-길))
 - 여러 Control Plane 이 함께 세는 사용자 실행 한도. 지금은 한 프로세스 안의 사용자 잠금으로 세고 만든다([`backend/docs/flow.md`](../backend/docs/flow.md) 의 「서버 한 대 전제」)
 - Hermes native 하위 에이전트와 cron 을 사용자 실행 한도에 넣는 것. Control Plane 이 제출하지 않아 세지 못한다
-- 스킬 zip 묶음의 미리보기와 올리기, 그 화면과 GitHub 가져오기. 지금은 저장 기반(넓힌 경로, scripts 와 실행 공간, 이전 버전)과 묶음 받기·검사 구성요소만 있다([ADR-20261009 / skill-package](adr/ADR-20261009-skill-package.md))
+- GitHub 가져오기([ADR-20261009 / skill-package](adr/ADR-20261009-skill-package.md))
 - `connector_action` 줄의 보관 기한과 정리. 지금은 도구 호출마다 남긴 줄을 지우지 않는다
 - 커넥터 연결에 다시 인증이 필요하다는 알림. 연결 상태에 재인증 상태가 없고, 토큰이 거절된 것을 연결 상태로 옮기는 지점도 없다. 그 상태를 정한 뒤 알림 종류를 더한다([`backend/docs/flow.md`](../backend/docs/flow.md))
 - 예약 작업의 실패 다시 하기와 일시 정지, 도구 미리 허락, 작업 제안. 목록과 넣지 않기로 한 것은 [`backend/docs/flow.md`](../backend/docs/flow.md) 의 「다음 단계」 가 갖는다

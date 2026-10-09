@@ -2534,6 +2534,8 @@ Hermes 가 스킬을 읽는 방식은 [`hermes/docs/hermes-contract.md`](../../h
 | zip 받기(묶음 형식을 경로와 바이트 목록으로) | `skill/application/SkillPackageZip` |
 | 묶음 검사(경로, 글 파일, 크기, 비밀값, 앞머리) | `skill/application/SkillPackageCheck` |
 | 지금 스킬의 지문 | `skill/domain/SkillBundle` 의 `digest()` |
+| 미리보기와 올리기 | `skill/application/SkillPackageService`, 저장은 `SkillService` |
+| 미리보기의 파일별 바뀜과 `SKILL.md` 앞부분 | `skill/application/SkillPackageDiff` |
 | `external_dirs` 게시와 대시보드 스킬 목록 | `skill/infra/SkillPublisher`, 호출은 `hermes` |
 | 커맨드 판별과 입력 바꾸기 | `chat/application/SkillCommand` |
 | 커맨드로 부를 수 있는 이름과 그 캐시 | `skill/application/SkillCommandCatalog`, 비우기는 `SkillsChanged` |
@@ -2632,7 +2634,7 @@ plugin 은 셸 설정을 쓸 때 `<skill_root>/<profile>` 을 Hermes 의 스킬 
 
 관리하는 사람이 스킬 하나를 zip 묶음으로 올리는 길의 앞부분이다. 근거는 [ADR-20261009 / skill-package](../../docs/adr/ADR-20261009-skill-package.md) 에 있다.
 받기는 묶음의 형식을 경로와 바이트의 목록으로 바꾸고, 검사는 그 목록만 보고 판정한다. GitHub 가져오기를 더하면 받기 하나만 더하고 검사는 그대로 쓴다.
-미리보기와 올리기 경로는 아직 열지 않았다.
+화면은 같은 zip 을 미리보기와 올리기에 한 번씩 보낸다. 서버는 그 사이에 아무것도 남기지 않는다. 그 두 경로는 아래 「스킬 묶음 미리보기와 올리기」 절이 갖는다.
 
 #### 묶음 받기
 
@@ -2663,6 +2665,75 @@ JDK 의 `ZipInputStream` 은 항목의 unix mode 를 주지 않아 심볼릭 링
 문제는 하나에서 끝내지 않고 단계 순서대로 모은다. 화면이 한 번에 모두 보여야 하기 때문이다. 문제의 수 상한은 `SkillPackageCheck` 가, 문제의 까닭 값은 `SkillPackageReason` 이 갖는다.
 검사의 문제 경로는 감싼 폴더를 벗긴 뒤의 경로이고 받기의 문제 경로는 zip 에 적힌 원래 이름이다. 둘 다 응답과 로그를 어지럽히지 않게 정해진 길이에서 자른다.
 덮어쓰기 확인에 쓸 지금 스킬의 지문은 `SkillBundle.digest()` 다. 경로 순으로 `경로 NUL 내용 NUL` 을 이은 UTF-8 의 SHA-256 이고 `SKILL.md` 도 그 경로로 넣는다.
+
+### 스킬 묶음 미리보기와 올리기
+
+경로와 요청, 응답 칸은 `SkillPackageController` 와 `SkillDtos` 가 갖는다. 미리보기와 올리기 모두 관리하는 사람만 하고, 권한을 본 뒤에야 zip 을 푼다.
+
+```mermaid
+sequenceDiagram
+    participant U as 사용자 브라우저
+    participant C as Control Plane
+    participant F as 스킬 공유 디렉터리
+    participant D as Hermes 대시보드
+
+    U->>C: POST /api/v1/agents/{code}/skill-packages/preview (zip)
+    C->>C: 권한, 받기, 검사
+    C->>F: 같은 이름의 지금 스킬을 읽는다
+    C->>D: 기본 스킬 이름, scripts 가 있으면 켜진 도구
+    C-->>U: 파일과 바뀐 표시, 문제 목록, 지금 스킬의 지문
+    U->>U: 문제가 없으면 확인. 덮어쓰기면 바뀐 파일을 보고 한 번 더 확인
+    U->>C: POST /api/v1/agents/{code}/skill-packages (zip, baseDigest)
+    C->>C: 권한, 받기와 검사를 다시 한다
+    C->>C: 에이전트 행을 잠그고 지금 스킬의 지문을 baseDigest 와 견준다
+    C->>F: 새 버전 디렉터리를 쓴다
+    C->>D: external_dirs. scripts 가 있으면 도구 목록과 require_sandbox 를 함께
+    alt 게시 성공
+        C->>F: 표식, 옛 버전 정리, 바뀌기 전 스킬을 이전 버전으로
+        C-->>U: 저장한 스킬
+    else 실행 공간이 없다
+        C->>F: 새 버전 디렉터리를 지운다
+        C-->>U: 409 SKILL_SCRIPTS_NEED_SANDBOX
+    end
+```
+
+#### 묶음 미리보기
+
+미리보기는 문제가 있어도 200 으로 답한다. 화면이 문제를 모두 한 번에 보여야 하고, 공통 오류 응답에 세부 칸을 더하지 않으려는 것이다.
+요청의 파일 크기가 zip 상한을 넘으면 바이트를 읽지 않고 권한만 본 뒤 `ZIP_TOO_LARGE` 하나만 든 미리보기를 준다.
+
+검사의 문제 뒤에 에이전트에 따른 판정을 붙인다. 앞머리 이름이 이름 규칙에 맞을 때만 본다.
+
+- 같은 이름의 올린 스킬이 없으면 Hermes 기본 스킬과 같은 이름(`NAME_TAKEN`), 개수 한도(`LIMIT_REACHED`), 새 스킬 설명 60자(`DESCRIPTION_TOO_LONG`)를 본다. 규칙은 편집기 저장과 같은 `NewSkillRules` 다
+- `scripts/` 가 있으면 그 에이전트의 API 도구에 `terminal` 이 켜져 있어야 한다(`SCRIPTS_NEED_SANDBOX`)
+
+같은 이름의 올린 스킬은 지금 버전, 없으면 표식 없는 더 새 버전에서 찾는다. 있으면 그 지문을 `baseDigest` 로 준다.
+파일 목록은 `SKILL.md` 를 첫 줄로 두고 지금 스킬과 내용을 견줘 더해짐, 바뀜, 같음을 붙인다. 지금 스킬에만 있는 파일은 지워짐으로 지금 크기와 함께 뒤에 붙인다.
+`SKILL.md` 앞부분도 함께 준다. 화면은 마크다운으로 그리지 않고 글 그대로 보인다.
+
+#### 묶음 올리기
+
+올리기는 받기와 검사, 에이전트에 따른 판정을 다시 한다. 문제가 있으면 400 `SKILL_PACKAGE_INVALID` 이고 메시지에 첫 문제가 있다.
+문제가 `SCRIPTS_NEED_SANDBOX` 하나뿐이면 409 `SKILL_SCRIPTS_NEED_SANDBOX` 다. plugin 이 거절한 경우와 같은 코드라 화면이 같은 까닭을 보인다.
+그 뒤 에이전트 행을 잠근 채 지금 스킬의 지문을 `baseDigest` 와 견주고 편집기 저장과 같은 경로로 저장한다. 미리보기와 올리기 사이의 다른 저장을 막는 것은 이 비교 하나다.
+
+| 지금 스킬 | `baseDigest` | 결과 |
+| --- | --- | --- |
+| 없다 | 없다 | 새로 만든다 |
+| 없다 | 있다 | 409 `SKILL_CHANGED`. 미리보기 뒤에 지워졌다 |
+| 있다 | 없다 | 409 `SKILL_CHANGED`. 덮어쓰기를 확인받지 않았다 |
+| 있다 | 같다 | 덮어쓴다. 바뀌기 전 스킬이 이전 버전이 된다 |
+| 있다 | 다르다 | 409 `SKILL_CHANGED`. 미리보기 뒤에 누가 고쳤다 |
+
+- `baseDigest` 가 비었거나 공백뿐이면 없는 것으로 본다
+- 새 스킬은 잠금 안에서 Hermes 기본 스킬 이름과 개수 한도, 설명 60자를 한 번 더 본다. 미리보기 뒤에 바뀌어 어기면 편집기 저장과 같은 `SKILL_NAME_TAKEN`, `VALIDATION_FAILED` 다
+- 저장 직전에 앞머리 규칙도 한 번 더 본다. 묶음 검사를 거치지 않은 호출자가 생겨도 비밀 요청 칸이 빠지지 않게 하려는 것이다
+- 파일 크기가 zip 상한을 넘으면 바이트를 읽지 않고 권한만 본 뒤 `SKILL_PACKAGE_INVALID` 다
+
+#### GitHub 가져오기 자리
+
+아직 만들지 않았다. 공개 저장소의 한 디렉터리를 내려받아 받기와 같은 경로·바이트 목록을 만드는 받기 하나를 더한다.
+검사와 미리보기, 올리기와 지문 확인은 그대로 쓴다.
 
 ### 스킬 커맨드로 보낼 때
 

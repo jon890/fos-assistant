@@ -26,19 +26,29 @@ public class NewSkillRules {
             SkillFrontmatter frontmatter,
             Map<String, SkillBundle> current,
             Map<String, SkillBundle> pending) {
-        if (publisher.list(profile).stream().anyMatch(s -> s.name().equals(name))) {
+        if (hermesNameTaken(profile, name)) {
             throw new ApiException(ErrorCode.SKILL_NAME_TAKEN, "Hermes already has a skill with this name");
         }
-        int max = properties.maxPerAgent();
-        if (uploadedNames(current, pending).size() >= max) {
+        if (limitReached(current, pending)) {
             throw new ApiException(
-                    ErrorCode.VALIDATION_FAILED, "an agent can have at most " + max + " uploaded skills");
+                    ErrorCode.VALIDATION_FAILED,
+                    "an agent can have at most " + properties.maxPerAgent() + " uploaded skills");
         }
         if (frontmatter.indexedDescriptionLength() > SkillService.MAX_NEW_DESCRIPTION_CHARS) {
             throw new ApiException(
                     ErrorCode.VALIDATION_FAILED,
                     "a new skill description can be at most " + SkillService.MAX_NEW_DESCRIPTION_CHARS + " characters");
         }
+    }
+
+    /** Hermes 목록에 그 이름의 스킬이 있다. 올린 스킬도 목록에 있으므로 새 스킬일 때만 뜻이 있다. */
+    public boolean hermesNameTaken(String profile, String name) {
+        return publisher.list(profile).stream().anyMatch(s -> s.name().equals(name));
+    }
+
+    /** 올린 스킬 수가 {@code assistant.skill.max-per-agent} 에 닿았다. */
+    public boolean limitReached(Map<String, SkillBundle> current, Map<String, SkillBundle> pending) {
+        return uploadedNames(current, pending).size() >= properties.maxPerAgent();
     }
 
     public static Set<String> uploadedNames(Map<String, SkillBundle> current, Map<String, SkillBundle> pending) {
