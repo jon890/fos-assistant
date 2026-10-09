@@ -15,7 +15,7 @@ frontend 는 화면의 동작과 구조이고, hermes 는 외부 런타임인 He
 | [`connectors.md`](connectors.md) | 커넥터의 정의, 언제 에이전트를 나누는가, 커넥터 선언 파일, 연결과 붙이기 API, 승인, 토큰 저장 |
 | [`connector-authoring.md`](connector-authoring.md) | 범용 커넥터를 만드는 방법, 갖출 것, PR 에 필요한 것, 공통 검사 |
 | [`connectors/gmail.md`](connectors/gmail.md) | Gmail 커넥터의 도구와 정책, 보안, 설정 안내, 실제 계정 확인 |
-| [`connectors/naver-blog.md`](connectors/naver-blog.md) | 네이버 블로그 커넥터의 도구와 정책, 초안의 모양, 임시저장 작업, 보안, 설정 안내, 실제 계정 확인 |
+| [`connectors/naver-blog.md`](connectors/naver-blog.md) | 네이버 블로그 커넥터의 도구와 정책, 초안의 모양, 임시저장 글 읽기, 임시저장 작업, 보안, 설정 안내, 실제 계정 확인 |
 | [`connectors/tossinvest.md`](connectors/tossinvest.md) | 토스증권 커넥터의 도구, 토큰과 허용 IP, 보안, 설정 안내, 실제 계정 확인 |
 | [`self-hosting.md`](self-hosting.md) | 기술 스택, 개별 실행, 주요 환경 변수 |
 | [`privacy.md`](privacy.md) | 개인정보 처리 안내. 커넥터 데이터가 어디로 가고 어디에 남는가 |
