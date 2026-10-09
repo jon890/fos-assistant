@@ -249,7 +249,7 @@ How this project uses Hermes is described in [`hermes/docs/hermes-contract.md`](
 - [`AGENTS.md`](AGENTS.md) has the rules of the repository, including what must never be written into a public repository.
 - The reading order of the documents is in the 「읽기 순서」 section of [`AGENTS.md`](AGENTS.md). Each module keeps its documents in its own `docs/` directory.
 - [`docs/adr/INDEX.md`](docs/adr/INDEX.md) lists the decisions that are hard to reverse.
-- Run `scripts/check-local.sh` before pushing, passing the browser specs for the screens you changed; with no arguments it runs the whole browser suite. Merge decisions use the required PR CI checks run against the current main merged with the PR. If CI cannot run, run the full local checks. See the 「확인」 section of [`AGENTS.md`](AGENTS.md).
+- Run `scripts/check-local.sh` before pushing, passing the browser specs for the screens you changed; with no arguments it runs the whole browser suite. Merge decisions use the required PR CI checks run against the current main merged with the PR. If CI cannot run, run the full local checks. See the 「확인」 section of [`AGENTS.md`](AGENTS.md) and [`.claude/skills/pr-merge/SKILL.md`](.claude/skills/pr-merge/SKILL.md).
 
 ### Contributing a connector
 

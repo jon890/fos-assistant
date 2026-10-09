@@ -2530,6 +2530,12 @@ Hermes 가 스킬을 읽는 방식은 [`hermes/docs/hermes-contract.md`](../../h
 | 이전 버전 쓰기와 읽기, 지우기 | `skill/infra/PreviousSkillStore` |
 | 스킬 이름과 파일 경로 규칙 | `skill/infra/SkillFilePaths` |
 | 앞머리와 파일, 크기 입력 검사 | `skill/application/SkillInputRules` |
+| 새 스킬만 보는 검사(Hermes 기본 스킬 이름, 개수 한도, 설명 60자) | `skill/application/NewSkillRules` |
+| zip 받기(묶음 형식을 경로와 바이트 목록으로) | `skill/application/SkillPackageZip` |
+| 묶음 검사(경로, 글 파일, 크기, 비밀값, 앞머리) | `skill/application/SkillPackageCheck` |
+| 지금 스킬의 지문 | `skill/domain/SkillBundle` 의 `digest()` |
+| 미리보기와 올리기 | `skill/application/SkillPackageService`, 저장은 `SkillService` |
+| 미리보기의 파일별 바뀜과 `SKILL.md` 앞부분 | `skill/application/SkillPackageDiff` |
 | `external_dirs` 게시와 대시보드 스킬 목록 | `skill/infra/SkillPublisher`, 호출은 `hermes` |
 | 커맨드 판별과 입력 바꾸기 | `chat/application/SkillCommand` |
 | 커맨드로 부를 수 있는 이름과 그 캐시 | `skill/application/SkillCommandCatalog`, 비우기는 `SkillsChanged` |
@@ -2623,6 +2629,111 @@ plugin 은 셸 설정을 쓸 때 `<skill_root>/<profile>` 을 Hermes 의 스킬 
 - 스킬을 지우면 이전 버전도 지운다. 게시가 끝난 뒤라 이 지우기가 실패해도 경고 로그만 남긴다
 - `.previous` 가 링크이면 지우지 않고 거절한다. 마지막 스킬을 지울 때는 버전 디렉터리 비우기가 이 거절로 오류가 된다. 그때 Hermes 는 이미 빈 `external_dirs` 를 받았다
 - 새 스킬을 만들면 게시가 끝난 뒤 같은 이름의 남은 이전 버전을 지운다. 지운 스킬의 이전 버전이 새 스킬의 것으로 보이지 않게 하려는 것이다
+
+### 스킬 묶음 받기와 검사
+
+관리하는 사람이 스킬 하나를 zip 묶음으로 올리는 길의 앞부분이다. 근거는 [ADR-20261009 / skill-package](../../docs/adr/ADR-20261009-skill-package.md) 에 있다.
+받기는 묶음의 형식을 경로와 바이트의 목록으로 바꾸고, 검사는 그 목록만 보고 판정한다. GitHub 가져오기를 더하면 받기 하나만 더하고 검사는 그대로 쓴다.
+화면은 같은 zip 을 미리보기와 올리기에 한 번씩 보낸다. 서버는 그 사이에 아무것도 남기지 않는다. 그 두 경로는 아래 「스킬 묶음 미리보기와 올리기」 절이 갖는다.
+
+#### 묶음 받기
+
+`SkillPackageZip` 이 zip 을 메모리에서 읽는다. 디스크에 풀지 않는다. zip 크기, 항목 수, 풀린 크기의 상한 값은 그 클래스가 갖는다.
+JDK 의 `ZipInputStream` 은 항목의 unix mode 를 주지 않아 심볼릭 링크를 가려내지 못한다. 그래서 Apache Commons Compress 의 `ZipFile` 로 중앙 디렉터리를 읽는다.
+처음 걸린 문제 하나로 끝내고, 읽다 난 예외는 문제로 바꿔 500 으로 올리지 않는다.
+
+- 풀린 크기는 항목 머리의 크기 칸을 믿지 않고 실제로 풀며 센다. 모든 항목의 합계가 상한을 넘는 순간 멈추므로 압축률은 따로 보지 않는다
+- 압축 방식은 저장(STORED)과 DEFLATE 만 받는다. 라이브러리가 읽을 수 있다고 답하는 ZSTD, XZ 는 그 선택 의존이 없어 읽을 때 오류가 난다
+- 라이브러리가 CRC 를 확인하지 않아 풀며 계산해 견준다
+- 심볼릭 링크와 장치 파일 같은 특수 항목, 암호를 건 항목, 같은 경로의 항목 둘을 거절한다. 디렉터리 항목은 목록에 넣지 않는다
+- 경로는 `/` 로 시작하거나 드라이브 글자, 빈 조각, `.`, `..`, 제어 문자, 방향·서식 제어 문자, 줄과 문단 구분 문자가 있으면 거절한다
+- `\` 는 항목의 원래 이름 바이트에서 찾는다. 라이브러리가 FAT 항목 이름의 `\` 를 `/` 로 바꿔 주기 때문이다. zip 의 Unicode 경로 추가 칸은 쓰지 않는다. 그 칸으로 원래 이름과 다른 이름을 보이게 할 수 있어서다
+- 이름은 정규화하지 않는다. 검사의 경로 규칙이 ASCII 만 받으므로 정규화로 같아지는 두 이름이 남지 않는다. zip 안의 zip 은 풀지 않고 글 파일이 아니어서 검사에서 거절된다
+
+#### 묶음 검사
+
+`SkillPackageCheck` 가 받기의 목록만 보고 아래 순서로 판정한다. 에이전트는 보지 않는다.
+
+1. 조각 하나라도 `.` 으로 시작하는 항목(`.DS_Store`, `.git/…`)과 `__MACOSX/` 아래 항목을 빼고, 뺀 항목의 원래 경로를 따로 모은다
+2. 남은 항목이 모두 같은 맨 위 디렉터리 하나 아래에 있고 맨 위에 `SKILL.md` 가 없으면 그 디렉터리를 벗긴다. 한 번만 벗긴다
+3. 맨 위에 `SKILL.md` 가 있어야 한다
+4. 경로 규칙, 파일 수, 파일 크기, 합계는 편집기 저장과 같다. 묶음으로 올린 스킬을 편집기에서 고칠 수 있어야 하기 때문이다. 맨 위가 아닌 자리의 `SKILL.md` 는 따로 `NESTED_SKILL_MD` 로, 맨 위의 `skill.md` 처럼 대소문자만 다른 파일은 경로 규칙 위반으로 낸다
+5. 파일이 UTF-8 로 어긋남 없이 읽히고 NUL 이 없어야 한다. 그림 같은 바이너리 파일은 받지 않는다
+6. 모든 파일에서 비밀값처럼 보이는 글을 찾는다. 서비스 접두사(`sk-`, `ghp_` 같은 GitHub 토큰, `github_pat_`, `xox…-`, `AIza`)로 시작하는 key 와 `-----BEGIN … PRIVATE KEY-----` 줄이다. 도구 내용 가리기의 접두사 목록과 같되 `task-runner` 같은 낱말 안의 `sk-` 를 잡지 않게 앞 경계와 길이를 더했고 대소문자를 구분한다
+7. `SKILL.md` 앞머리는 편집기 저장과 같은 규칙으로 본다. 이름은 앞머리의 `name` 이다. 이름 규칙, 비밀 요청 칸, 본문, 설명 길이다
+
+문제는 하나에서 끝내지 않고 단계 순서대로 모은다. 화면이 한 번에 모두 보여야 하기 때문이다. 문제의 수 상한은 `SkillPackageCheck` 가, 문제의 까닭 값은 `SkillPackageReason` 이 갖는다.
+검사의 문제 경로는 감싼 폴더를 벗긴 뒤의 경로이고 받기의 문제 경로는 zip 에 적힌 원래 이름이다. 둘 다 응답과 로그를 어지럽히지 않게 정해진 길이에서 자른다.
+덮어쓰기 확인에 쓸 지금 스킬의 지문은 `SkillBundle.digest()` 다. 경로 순으로 `경로 NUL 내용 NUL` 을 이은 UTF-8 의 SHA-256 이고 `SKILL.md` 도 그 경로로 넣는다.
+
+### 스킬 묶음 미리보기와 올리기
+
+경로와 요청, 응답 칸은 `SkillPackageController` 와 `SkillDtos` 가 갖는다. 미리보기와 올리기 모두 관리하는 사람만 하고, 권한을 본 뒤에야 zip 을 푼다.
+
+```mermaid
+sequenceDiagram
+    participant U as 사용자 브라우저
+    participant C as Control Plane
+    participant F as 스킬 공유 디렉터리
+    participant D as Hermes 대시보드
+
+    U->>C: POST /api/v1/agents/{code}/skill-packages/preview (zip)
+    C->>C: 권한, 받기, 검사
+    C->>F: 같은 이름의 지금 스킬을 읽는다
+    C->>D: 기본 스킬 이름, scripts 가 있으면 켜진 도구
+    C-->>U: 파일과 바뀐 표시, 문제 목록, 지금 스킬의 지문
+    U->>U: 문제가 없으면 확인. 덮어쓰기면 바뀐 파일을 보고 한 번 더 확인
+    U->>C: POST /api/v1/agents/{code}/skill-packages (zip, baseDigest)
+    C->>C: 권한, 받기와 검사를 다시 한다
+    C->>C: 에이전트 행을 잠그고 지금 스킬의 지문을 baseDigest 와 견준다
+    C->>F: 새 버전 디렉터리를 쓴다
+    C->>D: external_dirs. scripts 가 있으면 도구 목록과 require_sandbox 를 함께
+    alt 게시 성공
+        C->>F: 표식, 옛 버전 정리, 바뀌기 전 스킬을 이전 버전으로
+        C-->>U: 저장한 스킬
+    else 실행 공간이 없다
+        C->>F: 새 버전 디렉터리를 지운다
+        C-->>U: 409 SKILL_SCRIPTS_NEED_SANDBOX
+    end
+```
+
+#### 묶음 미리보기
+
+미리보기는 문제가 있어도 200 으로 답한다. 화면이 문제를 모두 한 번에 보여야 하고, 공통 오류 응답에 세부 칸을 더하지 않으려는 것이다.
+요청의 파일 크기가 zip 상한을 넘으면 바이트를 읽지 않고 권한만 본 뒤 `ZIP_TOO_LARGE` 하나만 든 미리보기를 준다.
+
+검사의 문제 뒤에 에이전트에 따른 판정을 붙인다. 앞머리 이름이 이름 규칙에 맞을 때만 본다.
+
+- 같은 이름의 올린 스킬이 없으면 Hermes 기본 스킬과 같은 이름(`NAME_TAKEN`), 개수 한도(`LIMIT_REACHED`), 새 스킬 설명 60자(`DESCRIPTION_TOO_LONG`)를 본다. 규칙은 편집기 저장과 같은 `NewSkillRules` 다
+- `scripts/` 가 있으면 그 에이전트의 API 도구에 `terminal` 이 켜져 있어야 한다(`SCRIPTS_NEED_SANDBOX`)
+
+같은 이름의 올린 스킬은 지금 버전, 없으면 표식 없는 더 새 버전에서 찾는다. 있으면 그 지문을 `baseDigest` 로 준다.
+파일 목록은 `SKILL.md` 를 첫 줄로 두고 지금 스킬과 내용을 견줘 더해짐, 바뀜, 같음을 붙인다. 지금 스킬에만 있는 파일은 지워짐으로 지금 크기와 함께 뒤에 붙인다.
+`SKILL.md` 앞부분도 함께 준다. 화면은 마크다운으로 그리지 않고 글 그대로 보인다.
+
+#### 묶음 올리기
+
+올리기는 받기와 검사, 에이전트에 따른 판정을 다시 한다. 문제가 있으면 400 `SKILL_PACKAGE_INVALID` 이고 메시지에 첫 문제가 있다.
+문제가 `SCRIPTS_NEED_SANDBOX` 하나뿐이면 409 `SKILL_SCRIPTS_NEED_SANDBOX` 다. plugin 이 거절한 경우와 같은 코드라 화면이 같은 까닭을 보인다.
+그 뒤 에이전트 행을 잠근 채 지금 스킬의 지문을 `baseDigest` 와 견주고 편집기 저장과 같은 경로로 저장한다. 미리보기와 올리기 사이의 다른 저장을 막는 것은 이 비교 하나다.
+
+| 지금 스킬 | `baseDigest` | 결과 |
+| --- | --- | --- |
+| 없다 | 없다 | 새로 만든다 |
+| 없다 | 있다 | 409 `SKILL_CHANGED`. 미리보기 뒤에 지워졌다 |
+| 있다 | 없다 | 409 `SKILL_CHANGED`. 덮어쓰기를 확인받지 않았다 |
+| 있다 | 같다 | 덮어쓴다. 바뀌기 전 스킬이 이전 버전이 된다 |
+| 있다 | 다르다 | 409 `SKILL_CHANGED`. 미리보기 뒤에 누가 고쳤다 |
+
+- `baseDigest` 가 비었거나 공백뿐이면 없는 것으로 본다
+- 새 스킬은 잠금 안에서 Hermes 기본 스킬 이름과 개수 한도, 설명 60자를 한 번 더 본다. 미리보기 뒤에 바뀌어 어기면 편집기 저장과 같은 `SKILL_NAME_TAKEN`, `VALIDATION_FAILED` 다
+- 저장 직전에 앞머리 규칙도 한 번 더 본다. 묶음 검사를 거치지 않은 호출자가 생겨도 비밀 요청 칸이 빠지지 않게 하려는 것이다
+- 파일 크기가 zip 상한을 넘으면 바이트를 읽지 않고 권한만 본 뒤 `SKILL_PACKAGE_INVALID` 다
+
+#### GitHub 가져오기 자리
+
+아직 만들지 않았다. 공개 저장소의 한 디렉터리를 내려받아 받기와 같은 경로·바이트 목록을 만드는 받기 하나를 더한다.
+검사와 미리보기, 올리기와 지문 확인은 그대로 쓴다.
 
 ### 스킬 커맨드로 보낼 때
 
@@ -2960,7 +3071,7 @@ profile 이 어떤 요청을 받는지는 두 표식이 정한다. 판정은 요
 아래는 그 표에 없는 것이다.
 
 - 선택 칸 key 의 `PUT /api/env` 가 성공하면 그 key 를 칸으로 가진 설치를 다시 써 서버 정의의 빈 값을 맞춘다. 바인딩 항목은 다시 설치하지 않는다. 바인딩의 `.env` 와 서버 정의는 바인딩 설치가 보관 파일의 값으로 쓴다
-- `GET /api/connectors` 의 `configured` 는 서버 정의가 소유 기록과 같고 API 도구 목록이 설치가 쓰는 목록(설치한 커넥터의 서버 이름에 선언한 `toolsets` 를 더한 것)과 정확히 같고 Control Plane MCP 등록이 없을 때만 참이다. Control Plane MCP 나 선언하지 않은 내장 도구가 목록에 남은 옛 모양은 `configured: false` 다
+- `GET /api/connectors` 의 `configured` 는 서버 정의가 소유 기록과 같고 API 도구 목록이 설치가 쓰는 목록(설치한 커넥터의 서버 이름에 선언한 `toolsets` 를 더한 것)과 정확히 같고 Control Plane MCP 등록이 없고, 서버 정의의 `tools` 와 이름 대응 파일의 그 서버 항목이 지금 manifest 로 계산한 것과 같을 때만 참이다. Control Plane MCP 나 선언하지 않은 내장 도구가 목록에 남은 옛 모양은 `configured: false` 다
 - 설치와 제거는 쓰기 전에 `config.yaml`, 소유 기록, `SOUL.md` 를 `connector-backups/` 에 떠 둔다. profile `.env` 는 떠 두지 않는다. 쓸 때마다 그 디렉터리에 남아 있는 `.env` 사본을 지운다
 
 #### 바인딩 설치
@@ -3002,7 +3113,7 @@ manifest 가 `owner_browser_env` 를 선언했으면 Control Plane 은 요청에
 - 붙이기는 한 묶음으로 쓴다. 실패하면 이 요청이 쓴 파일만 되돌린다
 - 떼기는 소유 기록을 지금 manifest 와 견주지 않는다. 그 항목이 객체이고 `mode` 가 `bind` 인지와 서버 이름과 스킬 이름이 경로 조각이 될 수 있는지만 본다. 운영자가 커넥터의 실행 정의를 바꾼 뒤에도 떼어야 `.env` 에 비밀이 남지 않는다
 - 쓰기 전에 `config.yaml`, 소유 기록, 이름 대응 파일, 뗀 서버 기록을 `connector-backups/` 에 떠 둔다. `.env` 와 스킬 파일은 떠 두지 않는다
-- `GET /api/connectors` 의 바인딩 항목 `configured` 는 서버 정의가 소유 기록과 같고, 서버 이름이 API 도구 목록에 있고, 소유 기록의 서버 이름과 실행 정의가 지금 manifest 와 같고, 소유 기록의 스킬 파일이 plugin 의 본문과 같을 때 참이다. Control Plane MCP 등록이 있어도 된다
+- `GET /api/connectors` 의 바인딩 항목 `configured` 는 서버 정의가 소유 기록과 같고, 서버 이름이 API 도구 목록에 있고, 소유 기록의 서버 이름과 실행 정의가 지금 manifest 와 같고, 소유 기록의 스킬 파일이 plugin 의 본문과 같고, 서버 정의의 `tools` 와 이름 대응 파일의 그 서버 항목이 지금 manifest 로 계산한 것과 같을 때 참이다. Control Plane MCP 등록이 있어도 된다. 이 둘이 어긋난 항목은 `policy_hook` 을 거짓으로 만들지 않고 그 항목만 거짓이다([ADR-20261009 / connector-install-drift](../../docs/adr/ADR-20261009-connector-install-drift.md))
 - 바인딩 항목은 요청이 가리키는 커넥터의 것만 지금 manifest 와 견주고 나머지는 모양만 본다. 운영자가 커넥터 하나의 실행 정의를 바꿔도 같은 profile 에 붙은 다른 커넥터의 붙이기, probe, 실행은 그대로 된다. 상태 조회는 바뀐 항목만 `configured: false` 다
 
 **도구 목록은 설치와 Control Plane 의 도구 저장이 나눠 쓴다.**
@@ -3084,7 +3195,7 @@ Control Plane 은 도구 목록을 직접 쓰지 않는다. 바인딩 설치가 
 
 #### 바인딩의 반영 맞추기
 
-연결 확인, 반영 예정 확인, 관리자 반영 완료가 바인딩마다 한다. 쓸 수 있으면 `READY`, 아니면 `PENDING` 이다.
+연결 확인, 반영 예정 확인, 정의 어긋남 점검, 관리자 반영 완료가 바인딩마다 한다. 쓸 수 있으면 `READY`, 아니면 `PENDING` 이다.
 
 다시 보내는 바인딩 설치는 소유 기록의 형식을 확인하되, 기록의 실행 정의가 지금 manifest 와 다르다는 이유로 거절하지 않는다.
 설정의 서버 정의가 소유 기록과 같을 때만 그 커넥터를 새 manifest 의 command, args, env 로 다시 설치한다.
@@ -3106,6 +3217,7 @@ Control Plane 은 도구 목록을 직접 쓰지 않는다. 바인딩 설치가 
 - `POST /api/mcp/servers/<서버>/test` 의 probe 가 도구를 내야 `READY` 다. 선언하지 않은 도구 수를 연결에 적는다. `READY` 가 되면 재시작 대기와 반영 예정 시각을 함께 비운다
 - 켜진 내장 도구는 보지 않는다. 붙인 에이전트의 도구는 주인이 정한다
 - 외부 호출이 실패하면 예외로 알리지 않고 그 바인딩만 `PENDING` 으로 둔다. 부른 쪽이 실패를 모아 `CONNECTOR_OPERATION_FAILED` 로 끝낸다
+- `READY` 가 아닌 결과는 `ResyncOutcome` 의 까닭 하나로 끝난다. 외부 호출 실패가 아닌 까닭은 커넥터 id 와 까닭 이름만 담은 로그 한 줄을 남긴다. 외부 호출 실패는 단계와 예외 종류를 경고로 남긴다
 
 #### 반영 예정 확인
 
@@ -3125,15 +3237,35 @@ probe 가 실패해 `PENDING` 이 되면 다시 부르지 않는다. 사용자�
 한 바인딩의 실패는 경고 로그로 남기고 다음 바인딩으로 간다.
 이 판정은 gateway 의 연결을 직접 보지 못한다. probe 가 성공해도 gateway 쪽 연결만 실패한 경우는 첫 실제 호출의 오류로 드러난다.
 
+#### 정의 어긋남 점검
+
+manifest 가 바뀐 뒤 설치가 다시 보내지지 않은 바인딩을 Control Plane 이 찾아 다시 맞춘다([ADR-20261009 / connector-install-drift](../../docs/adr/ADR-20261009-connector-install-drift.md)).
+`ConnectorBindingApplier` 가 `assistant.connector.binding.drift-cron` 주기로 돈다. 배포나 커넥터 동기화 뒤 운영자가 할 일은 없다.
+
+1. 트랜잭션 밖에서 `READY` 바인딩을 번호 순으로 `assistant.connector.binding.drift-batch` 가 정한 수까지 읽는다. 앞 주기가 멈춘 번호 뒤부터 읽고, 끝까지 읽었으면 다음 주기는 처음부터다
+2. 바인딩마다 트랜잭션 밖에서 `GET /api/connectors` 로 그 커넥터의 설치를 읽는다. 읽지 못하면 경고 로그를 남기고 건너뛴다. 「바인딩의 반영 맞추기」 의 설치 판정(켜짐, `configured`, `policy_hook`, 바인딩 방식)을 통과하면 어긋나지 않은 것이다
+3. 어긋났으면 커넥터 id 와 어긋난 조건 이름을 로그에 남긴다. 트랜잭션을 열고 「반영 예정 확인」 과 같은 차례로 잠근 뒤 바인딩을 다시 읽는다. 지워졌거나 `READY` 가 아니면 건너뛴다
+4. 「바인딩의 반영 맞추기」 를 한다. 서버 정의가 바뀌므로 대개 재시작 대기가 된다
+5. 다시 맞춘 바인딩 가운데 재시작 대기나 `PENDING` 으로 남은 것이 있으면 연결 주인의 그룹 관리자마다 알림 한 건을 남긴다. 반영 예정 시각을 적은 바인딩은 반영 예정 확인이 맡으므로 세지 않는다
+
+다시 맞춘 바인딩은 `READY` 가 아니어서 다음 주기의 대상이 아니다. 그래서 같은 어긋남에 설치를 되풀이해 보내지 않는다.
+다시 맞춰 `READY` 가 됐는데 다음 주기에 또 어긋나면 바인딩마다 센다. 연속 횟수가 상한(`ConnectorBindingApplier` 가 갖는다)에 이르면 설치를 보내지 않고 `PENDING` 으로만 두고 알린다. 어긋나지 않은 것을 보면 센 값을 지운다.
+점검 위치와 센 값은 JVM 메모리에 둔다. Control Plane 이 한 대라는 전제다.
+
+| 알림에 담는 것 | 본문 |
+| --- | --- |
+| 재시작 대기가 하나라도 있다 | 공유 gateway 를 재시작한 뒤 「연결 반영 확인」 에서 반영 완료를 누르라고 쓴다 |
+| `PENDING` 만 있다 | 「연결 반영 확인」 에서 반영 완료를 눌러 다시 확인하라고 쓴다 |
+
 #### 관리자 반영 완료
 
 재시작 대기인 바인딩에 필요하다. 값 교체처럼 이미 있던 서버가 바뀐 설치와 `fos-ctx` 갱신이 그렇다.
-재시작이 필요 없는 `PENDING` 바인딩도 반영 예정 확인이 실패해 남으면 관리자가 눌러 다시 확인한다. 그 바인딩에는 재시작 시각이 없어 아래 3번이 요청을 보지 않는다.
+재시작이 필요 없는 `PENDING` 바인딩도 반영 예정 확인이 실패해 남거나 정의 어긋남 점검이 `PENDING` 으로 두면 관리자가 눌러 다시 확인한다. 그 바인딩에는 재시작 시각이 없어 아래 3번이 요청을 보지 않는다.
 
 1. 관리자인지 본다. 에이전트 번호와 주인은 트랜잭션 밖에서 읽는다. 트랜잭션의 첫 읽기가 잠금이어야 MySQL 의 REPEATABLE READ 에서 등록이 커밋한 재시작 시각을 보기 때문이다
 2. 주인의 사용자 행, 에이전트 행을 붙이기와 같은 차례로 잠근다. 잠근 뒤 그 에이전트의 주인이 바뀌었으면 `AGENT_BUSY` 다. 그다음 지금 주인이 관리자와 같은 그룹인지 보고, 아니면 `AGENT_NOT_FOUND` 다. 403 과 404 가 갈리면 다른 그룹의 에이전트 코드가 있는지 드러나기 때문이다. 그 뒤 바인딩을 새로 읽는다
 3. 바인딩의 `restart_required_since` 가 요청의 `restartRequiredSince` 보다 늦거나 요청이 비었으면 `CONNECTOR_RESTART_AGAIN` 으로 거절한다. 관리자가 재시작한 뒤에 다시 설치된 바인딩이다. 바인딩에 그 시각이 없으면 요청을 보지 않는다
-4. 위 「바인딩의 반영 맞추기」 를 한다. 반영 예정 시각이 아직 오지 않은 바인딩은 설치를 다시 보내지 않는다. `READY` 가 되지 않으면 `CONNECTOR_OPERATION_FAILED` 로 끝낸다
+4. 위 「바인딩의 반영 맞추기」 를 한다. 반영 예정 시각이 아직 오지 않은 바인딩은 설치를 다시 보내지 않는다. `READY` 가 되지 않으면 바인딩 상태를 커밋한 뒤 까닭에 따라 끝낸다. 외부 호출 실패만 502 `CONNECTOR_OPERATION_FAILED` 이고, 나머지는 설치 상태, 도구 확인, 반영 예정, 재시작 대기마다 다른 409 이며 카탈로그에서 빠졌으면 404 다. 까닭과 오류 코드의 대응은 `ConnectorErrors.notApplied` 가 갖는다
 
 #### 에이전트의 공개 범위, 주인, 삭제
 
@@ -3294,6 +3426,7 @@ flowchart TD
     Q2 -->|재시작 필요| W
     Q2 -->|도구 확인| BR
     BR -->|값 교체| W
+    BR -->|정의 어긋남 점검이 다시 설치| W
     BR -->|떼기, 연결 해제, 에이전트 삭제| D[profile 에서 떼고 행 삭제]
 ```
 
@@ -3484,13 +3617,16 @@ manifest 를 읽지 못해 바인딩의 서버 이름으로 고른 호출은 `PO
 - 그 profile 설정의 `plugins.enabled` 에 `fos-ctx` 가 있고 `plugins.disabled` 에 없다
 - `plugins.entries.fos-ctx.allow_tool_override` 가 `false` 다
 - 그 profile 의 `plugins/fos-ctx/` 파일이 대시보드 묶음의 것과 바이트까지 같다
-- `.fos-connector-tools.json` 이 지금 소유 기록과 뗀 서버 기록, manifest 로 계산한 것과 같다
+- `.fos-connector-tools.json` 을 읽을 수 있고, 지금 소유 기록과 뗀 서버 기록, manifest 로 계산한 것과 `v`, `isolated`, 서버 이름 목록, 서버마다의 `connector` 와 `prefix` 가 같다. 서버마다의 `tools` 는 여기서 보지 않는다
 
 설치는 그 profile 의 `fos-ctx` 를 묶음의 판으로 바꾼다. 파일이 바뀌었으면 `plugin_updated: true` 로 답한다. 떠 있는 gateway 가 옛 코드를 쥐고 있을 수 있기 때문이다.
 옛 설치에서는 선택 칸의 `PUT /api/env` 와 `DELETE /api/env` 도 설치를 다시 쓰고 `fos-ctx` 를 묶음의 판으로 맞춘다. 옛 설치된 커넥터의 env 응답은 늘 `restart_required` 가 참이라 이 경우도 재시작 대기가 된다.
 Control Plane 은 `plugin_updated` 가 참인 바인딩을 재시작 대기로 둔다. 관리자가 공유 gateway 를 재시작하고 반영 완료를 누르면 풀린다. 옛 설치의 `restart_required` 는 늘 참이라 옛 커넥터 에이전트의 바인딩에는 이 신호로 쓰지 못한다. 바인딩 설치는 이미 있던 서버의 정의나 값이 바뀌었거나, 뗀 서버 기록에 남은 이름을 다시 붙이면 `restart_required` 가 참이다. 뗀 기록에 없는 새 이름, 스킬, 이름 대응만 바뀌면 `reload_pending` 이다([커넥터 설치](flow.md) 의 「바인딩 설치」).
-서버 정의의 `tools.exclude` 가 manifest 로 계산한 것과 다를 때도 `policy_hook` 은 거짓이다. 소유 기록과 지금 manifest 의 같음 판정은 `tools` 를 보지 않는다. 옛 기록을 가진 연결이 끊기지 않고, 다시 보낸 설치가 덮어쓴다.
-서버 이름이나 실행 정의가 지금 manifest 와 다른 바인딩 항목은 이 `tools.exclude` 비교에서 뺀다. 그 서버는 대응에 빈 `tools` 로 실려 모든 호출이 막히고, 그 항목만 `configured` 가 거짓이다.
+서버 정의의 `tools.exclude` 가 manifest 로 계산한 것과 다르거나, 대응 파일의 그 서버 항목의 `tools` 가 계산한 것과 다르면 그 커넥터 항목만 `configured` 가 거짓이다. `policy_hook` 은 이 비교를 하지 않는다([ADR-20261009 / connector-install-drift](../../docs/adr/ADR-20261009-connector-install-drift.md)).
+커넥터 하나의 manifest 가 바뀌어도 같은 profile 에 붙은 다른 커넥터는 판정을 통과한다. 소유 기록과 지금 manifest 의 같음 판정은 `tools` 를 보지 않는다. 옛 기록을 가진 연결이 끊기지 않고, 다시 보낸 설치가 덮어쓴다.
+어긋난 서버의 `approval: always` 도구는 공유 gateway 를 재시작하기 전까지 모델에 등록된 채일 수 있다. 그 호출도 hook 이 묻고, 그 바인딩은 `READY` 가 아니어서 Control Plane 이 막는다.
+대응의 `tools` 가 낡은 서버의 도구도 hook 이 접두사로 서버를 잡아 묻는다. 대응에서 서버가 빠지면 판정 없이 나가므로 서버 목록과 접두사가 다르면 계속 `policy_hook` 이 거짓이다.
+`policy_hook` 이 거짓이면 대시보드가 어느 조건에서 거짓인지 조건 이름만 경고 로그에 남긴다. profile 이름, 경로, 파일 내용은 남기지 않는다.
 연결 확인과 관리자 반영 완료는 설치를 다시 보낸 뒤에 `policy_hook` 을 읽는다. 옛 판의 `fos-ctx` 를 가진 바인딩은 연결 확인 한 번으로 새 판이 되고 재시작 대기가 된다.
 Control Plane 은 `policy_hook` 이 참이 아니면 그 바인딩을 `READY` 로 두지 않는다. 옛 대시보드 plugin 은 이 칸을 내지 않고, 없는 칸은 거짓으로 읽는다.
 이 확인은 확인한 시점의 파일만 본다. 그 뒤 누가 설정을 바꾸면 다음 연결 확인 때 안다.
@@ -4670,6 +4806,7 @@ Control Plane MCP 서버가 `follow_up_propose` 를 둔다.
 | 커넥터 호출이 새 승인 줄을 만들었거나, 그 줄이 승인 기한 안에 답을 받지 못해 만료됐다 | 승인 줄의 주인(`connector_action.user_id`) | 그 요청이 나온 대화 |
 | 도구 사용 요청이 새로 저장됐다 | 같은 그룹의 차단되지 않은 관리자들 | 관리자 에이전트 상세의 요청 |
 | 도구 사용 요청이 승인, 거절, 만료로 끝났다 | 원래 요청자 | 요청자의 결과 화면 |
+| 정의 어긋남 점검이 다시 맞춘 바인딩에 관리자가 할 일이 남았다. 한 주기에 그룹마다 한 건이고 본문이 재시작 필요 여부를 나눈다 | 연결 주인 그룹의 차단되지 않은 관리자들 | 관리자 「연결 반영 확인」(`/admin/connections`) |
 | 예약 작업의 발화가 끝났다 | 작업 주인 | [`backend/docs/flow.md`](flow.md) 의 「알림」 이 갖는다 |
 
 승인 알림의 본문은 승인 카드와 대화의 알림 줄이 쓰는 도구 제목과 같다. 도구의 원래 이름은 내부 값이라 쓰지 않는다.
@@ -4683,6 +4820,7 @@ Control Plane MCP 서버가 `follow_up_propose` 를 둔다.
 
 **알림과 그 원인은 한 트랜잭션이다.** 승인 줄을 저장하는 트랜잭션, 만료로 바꾸는 트랜잭션, 도구 사용 요청을 저장하거나 결정하는 트랜잭션 안에서 알림을 만든다.
 그 트랜잭션이 끝난 뒤에 사용자 단위 SSE 로 알린다. 화면이 사건을 받고 다시 읽을 때 줄이 있어야 한다.
+정의 어긋남 점검의 알림만 원인과 한 트랜잭션이 아니다. 점검은 바인딩마다 트랜잭션을 열어 커밋하고, 한 주기의 끝에 알림을 따로 만든다. 알림을 만들지 못해도 다시 맞춘 바인딩은 관리자 목록에 보인다. 점검과 문구는 위 「정의 어긋남 점검」 이 갖는다.
 
 도구 사용 요청의 상태와 권한은 [`backend/docs/flow.md`](flow.md) 의 「도구 사용 요청」 이 갖는다.
 아직 만들지 않은 종류는 [`docs/prd.md`](../../docs/prd.md) 의 「아직 만들지 않은 것」 이 갖는다.
@@ -5993,7 +6131,7 @@ WHERE e.parent_execution_id IS NULL
 
 ### 붙이기와 떼기
 
-붙이고 떼는 사람은 그 에이전트의 주인이고 자기 연결만 붙인다. 관리자도 남의 에이전트에 붙이거나 떼지 못하고 반영 완료만 누른다. 반영 완료는 재시작 대기인 바인딩과, 반영 예정 확인이 실패해 `PENDING` 으로 남은 바인딩에 쓴다.
+붙이고 떼는 사람은 그 에이전트의 주인이고 자기 연결만 붙인다. 관리자도 남의 에이전트에 붙이거나 떼지 못하고 반영 완료만 누른다. 반영 완료는 재시작 대기인 바인딩과, 반영 예정 확인이 실패하거나 정의 어긋남 점검이 `PENDING` 으로 둔 바인딩에 쓴다.
 읽을 수 없는 에이전트는 `AGENT_NOT_FOUND`(404), 읽을 수 있어도 주인이 아니면 `FORBIDDEN`(403)이다.
 
 | 붙일 때 거절하는 경우 | 오류 |
@@ -6036,7 +6174,7 @@ WHERE e.parent_execution_id IS NULL
 - 그다음 지금 주인이 관리자와 같은 그룹이어야 한다. 아니면 `AGENT_NOT_FOUND`(404)다. 다른 그룹의 에이전트가 있는지 드러내지 않는다
 - 바인딩의 재시작 대기 시각이 본문의 `restartRequiredSince` 보다 늦거나 본문이 비었으면 `CONNECTOR_RESTART_AGAIN`(409)으로 거절한다. 관리자가 목록을 본 뒤에 다시 설치된 바인딩이라 재시작한 gateway 가 아직 보지 못했을 수 있기 때문이다. 화면은 성공하든 거절되든 목록을 다시 읽어 바뀐 값을 받는다
 - 바인딩에 재시작 대기 시각이 없으면 본문을 보지 않는다. 재시작이 필요 없던 바인딩의 다시 확인이 이 경우다
-- 받으면 설치를 한 번 다시 보내 반영됐는지 본다. 그래도 `READY` 가 되지 않으면 `CONNECTOR_OPERATION_FAILED`(502)다
+- 받으면 설치를 한 번 다시 보내 반영됐는지 본다. 그래도 `READY` 가 되지 않으면 까닭에 따라 끝낸다. 외부 호출 실패만 `CONNECTOR_OPERATION_FAILED`(502)이고 나머지 갈래는 위 「관리자 반영 완료」 가 갖는다
 
 ## 커넥터 승인
 

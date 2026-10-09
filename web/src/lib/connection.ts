@@ -115,6 +115,11 @@ export const CONNECTION_ERROR_MESSAGES: Record<string, string> = {
   SKILL_NAME_TAKEN: "이 에이전트의 다른 연결이나 스킬과 이름이 겹쳐요.",
   CONNECTOR_RESTART_AGAIN:
     "재시작한 뒤에 다시 설치됐어요. 한 번 더 재시작한 뒤 눌러 주세요.",
+  CONNECTOR_INSTALL_MISMATCH:
+    "설치 상태가 맞지 않아요. 서버 로그에서 까닭을 확인해 주세요.",
+  CONNECTOR_TOOLS_UNVERIFIED:
+    "도구를 확인하지 못했어요. 연결 값과 서비스 상태를 확인해 주세요.",
+  CONNECTOR_APPLY_SCHEDULED: "아직 반영 중이에요. 몇 분 뒤 다시 눌러 주세요.",
   AGENT_CONNECTIONS_REQUIRE_PRIVATE: "비공개 에이전트에만 붙일 수 있어요.",
   AGENT_NOT_FOUND: "에이전트가 없거나 이 계정에서 사용할 수 없어요.",
   AGENT_BUSY: "다른 설정 변경이 끝날 때까지 기다린 뒤 다시 시도해 주세요.",

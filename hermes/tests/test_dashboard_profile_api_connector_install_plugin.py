@@ -26,8 +26,12 @@ class ProfileApiConnectorInstallPluginTest(support.ProfileApiRouteTest):
 
         self.declare_tools(root, {"list_scopes": {"risk": "READ"}, "env_view": {"risk": "SENSITIVE"},
                                   "write_note": {"risk": "WRITE"}})
-        # manifest 가 바뀌면 다시 설치하기 전까지 대응이 옛것이다.
-        self.assertIs(self.policy_hook(), False)
+        # manifest 가 바뀌면 다시 설치하기 전까지 대응의 그 서버 `tools` 가 옛것이다. 서버 목록과 접두사는 같으므로
+        # hook 은 접두사로 서버를 잡아 묻는다. 그 커넥터 항목만 설치가 덜 된 것이고 `policy_hook` 은 참이다.
+        status = self.connector_status()
+        self.assertEqual(status.body["connectors"],
+                         [{"plugin": DEMO, "enabled": True, "configured": False, "mode": "isolated"}])
+        self.assertIs(status.body["policy_hook"], True)
         repeated = self.connector()
         self.assertEqual(repeated.status_code, 200)
         self.assertIs(repeated.body["changed"], True)
@@ -36,7 +40,9 @@ class ProfileApiConnectorInstallPluginTest(support.ProfileApiRouteTest):
             "mcp__demo__list_scopes": "list_scopes", "mcp__demo__env_view": "env_view",
             "mcp__demo__write_note": "write_note"})
         self.assertNotIn("tools", self.alice_config()["mcp_servers"]["demo"])
-        self.assertIs(self.policy_hook(), True)
+        status = self.connector_status()
+        self.assertEqual(status.body["connectors"][0]["configured"], True)
+        self.assertIs(status.body["policy_hook"], True)
         unchanged = self.connector()
         self.assertIs(unchanged.body["changed"], False)
         self.assertIs(unchanged.body["plugin_updated"], False)
@@ -186,13 +192,14 @@ class ProfileApiConnectorInstallPluginTest(support.ProfileApiRouteTest):
         self.assertNotIn("tools", self.alice_config()["mcp_servers"]["demo"])
         self.assertIs(self.policy_hook(), True)
 
-        # 도구 이름은 그대로이고 승인 방식만 올랐다. 대응 파일은 같고 서버 정의만 옛것이다.
+        # `purge` 는 승인 방식만 올랐고 `erase` 가 더해졌다. 서버 정의의 `tools.exclude` 와 대응의 그 서버 `tools` 가 옛것이다.
+        # 둘 다 그 커넥터 항목만 거짓으로 만든다. 대응의 서버 목록과 접두사는 같으므로 `policy_hook` 은 참이다.
         self.declare_tools(root, {"list_scopes": {"risk": "READ"}, "purge": {"risk": "DESTRUCTIVE"},
                                   "erase": {"risk": "WRITE", "approval": "always"}})
         status = self.connector_status()
         self.assertEqual(status.status_code, 200)
-        self.assertEqual(status.body["connectors"], [{"plugin": DEMO, "enabled": True, "configured": True, "mode": "isolated"}])
-        self.assertIs(self.policy_hook(), False)
+        self.assertEqual(status.body["connectors"], [{"plugin": DEMO, "enabled": True, "configured": False, "mode": "isolated"}])
+        self.assertIs(status.body["policy_hook"], True)
 
         self.assertEqual(self.connector().status_code, 200)
         server = self.alice_config()["mcp_servers"]["demo"]
@@ -202,7 +209,9 @@ class ProfileApiConnectorInstallPluginTest(support.ProfileApiRouteTest):
         self.assertEqual(record[DEMO]["server"], server)
         # 모델에게서 뺀 도구도 대응에는 있다. 다른 경로로 불리면 hook 이 정책을 찾아야 한다.
         self.assertEqual(self.tool_map()["servers"]["demo"]["tools"]["mcp__demo__purge"], "purge")
-        self.assertIs(self.policy_hook(), True)
+        status = self.connector_status()
+        self.assertEqual(status.body["connectors"][0]["configured"], True)
+        self.assertIs(status.body["policy_hook"], True)
         self.assertIs(self.connector().body["changed"], False)
 
         # 소유 기록의 `tools` 는 `exclude` 문자열 목록만 받는다.

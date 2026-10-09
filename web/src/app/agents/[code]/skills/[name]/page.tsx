@@ -3,6 +3,7 @@ import { notFound, redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { describeError } from "@/components/error-message";
 import { SkillEditor } from "@/components/agent/skill-editor";
+import { SkillRestorePrevious } from "@/components/agent/skill-restore-previous";
 import { Button } from "@/components/ui/button";
 import { Notice } from "@/components/ui/notice";
 import { AGENT_CODE_PATTERN } from "@/lib/agent";
@@ -41,5 +42,22 @@ export default async function EditSkillPage({
     );
   }
 
-  return <SkillEditor code={code} initial={result.data} />;
+  const previousSavedAt = result.data.previousSavedAt;
+  return (
+    <>
+      {previousSavedAt ? (
+        <SkillRestorePrevious
+          code={code}
+          name={name}
+          previousSavedAt={previousSavedAt}
+        />
+      ) : null}
+      {/* 되돌리면 previousSavedAt 이 바뀌어 편집기가 새 내용으로 다시 마운트된다. */}
+      <SkillEditor
+        key={previousSavedAt ?? "none"}
+        code={code}
+        initial={result.data}
+      />
+    </>
+  );
 }

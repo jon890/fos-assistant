@@ -4,6 +4,7 @@ import com.bifos.assistant.skill.application.SkillDetail;
 import com.bifos.assistant.skill.application.SkillFileInput;
 import com.bifos.assistant.skill.application.SkillList;
 import com.bifos.assistant.skill.application.SkillListItem;
+import com.bifos.assistant.skill.application.SkillPackagePreview;
 import com.bifos.assistant.skill.application.SkillUsageSummary;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import jakarta.validation.Valid;
@@ -92,6 +93,47 @@ public final class SkillDtos {
     }
 
     public record SkillFileView(String path, long size, String content) {}
+
+    /**
+     * 스킬 묶음 미리보기다. 칸은 {@code SkillPackagePreview} 와 같고 {@code null} 칸도 보낸다.
+     *
+     * @param files 파일과 바뀐 표시. {@code change} 는 {@code ADDED}, {@code CHANGED}, {@code SAME}, {@code REMOVED}
+     * @param problems 비어 있어야 올릴 수 있다
+     */
+    public record SkillPackagePreviewView(
+            String name,
+            String description,
+            String skillMdHead,
+            boolean existing,
+            String baseDigest,
+            boolean hasScripts,
+            List<SkillPackageFileView> files,
+            List<String> ignored,
+            List<SkillPackageProblemView> problems) {
+        static SkillPackagePreviewView from(SkillPackagePreview preview) {
+            return new SkillPackagePreviewView(
+                    preview.name(),
+                    preview.description(),
+                    preview.skillMdHead(),
+                    preview.existing(),
+                    preview.baseDigest(),
+                    preview.hasScripts(),
+                    preview.files().stream()
+                            .map(file -> new SkillPackageFileView(
+                                    file.path(), file.size(), file.change().name()))
+                            .toList(),
+                    preview.ignored(),
+                    preview.problems().stream()
+                            .map(problem ->
+                                    new SkillPackageProblemView(problem.reason().name(), problem.path()))
+                            .toList());
+        }
+    }
+
+    public record SkillPackageFileView(String path, long size, String change) {}
+
+    /** 문제 하나다. 묶음 전체의 문제면 {@code path} 를 {@code null} 로 보낸다. */
+    public record SkillPackageProblemView(String reason, String path) {}
 
     /**
      * 스킬 하나를 통째로 쓰는 요청이다.

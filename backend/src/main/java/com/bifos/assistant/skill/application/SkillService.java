@@ -23,10 +23,10 @@ import com.bifos.assistant.skill.infra.SkillProperties;
 import com.bifos.assistant.skill.infra.SkillPublisher;
 import com.bifos.assistant.skill.infra.SkillStore;
 import java.time.Instant;
-import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.TreeMap;
 import lombok.RequiredArgsConstructor;
@@ -86,6 +86,7 @@ public class SkillService {
     private final SkillUsageQuery usage;
     private final ApplicationEventPublisher events;
     private final SkillProperties properties;
+    private final NewSkillRules newSkills;
 
     /**
      * 일반 화면에 보일 올린 스킬 목록이다. 관리자 역할도 기본·커넥터 스킬은 받지 않는다.
@@ -137,7 +138,7 @@ public class SkillService {
     private SkillList assemble(Agent agent, boolean editable, Map<String, SkillUsageSummary> usages) {
         String profile = agent.hermesProfile();
         Map<String, SkillBundle> uploaded = store.readCurrent(profile);
-        Set<String> uploadedNames = uploadedNames(uploaded, store.readPending(profile));
+        Set<String> uploadedNames = NewSkillRules.uploadedNames(uploaded, store.readPending(profile));
         Map<String, SkillListItem> items = new TreeMap<>();
         for (HermesSkill skill : publisher.list(profile)) {
             SkillSource source = uploadedNames.contains(skill.name()) ? SkillSource.UPLOADED : SkillSource.HERMES;
@@ -216,9 +217,34 @@ public class SkillService {
         Map<String, SkillBundle> pending = store.readPending(profile);
         SkillBundle uploaded = uploadedBundle(current, pending, name);
         if (uploaded == null) {
-            requireCreatable(profile, name, frontmatter, current, pending);
+            newSkills.requireCreatable(profile, name, frontmatter, current, pending);
         }
         SkillBundle bundle = bundleOf(name, skillMd, inputs, uploaded);
+        return saveBundle(user, agent, current, bundle, uploaded);
+    }
+
+    /** 편집자인지만 본다. 잠금은 잡지 않는다. 스킬 묶음의 미리보기와 올리기가 zip 을 풀기 전에 부른다. */
+    public Agent requireManageable(CurrentUser user, String code) {
+        return requireEditable(user, code);
+    }
+
+    /** 검사를 마친 묶음을 행 잠금 안에서 지금 스킬의 지문과 {@code baseDigest} 가 같을 때만 저장한다. */
+    @Transactional
+    public SkillDetail saveUploaded(CurrentUser user, String code, SkillBundle bundle, String baseDigest) {
+        // 묶음 검사를 거치지 않은 호출자가 와도 앞머리 규칙이 빠지지 않게 잠금 전에 다시 본다.
+        SkillFrontmatter frontmatter = requireSkillMd(bundle.name(), bundle.skillMd());
+        Agent agent = requireEditableLocked(user, code);
+        String profile = agent.hermesProfile();
+        Map<String, SkillBundle> current = store.readCurrent(profile);
+        Map<String, SkillBundle> pending = store.readPending(profile);
+        SkillBundle uploaded = uploadedBundle(current, pending, bundle.name());
+        String base = baseDigest == null || baseDigest.isBlank() ? null : baseDigest;
+        if (!Objects.equals(uploaded == null ? null : uploaded.digest(), base)) {
+            throw new ApiException(ErrorCode.SKILL_CHANGED, "the skill changed after the preview");
+        }
+        if (uploaded == null) {
+            newSkills.requireCreatable(profile, bundle.name(), frontmatter, current, pending);
+        }
         return saveBundle(user, agent, current, bundle, uploaded);
     }
 
@@ -245,28 +271,6 @@ public class SkillService {
                 .orElseThrow(SkillService::notFound);
         requireSkillMd(name, previous.skillMd());
         return saveBundle(user, agent, current, previous, uploaded);
-    }
-
-    /** 새 스킬일 때만 하는 검사다. Hermes 기본 스킬 이름, 올린 스킬 수 한도, 새 스킬 설명 60자를 본다. */
-    private void requireCreatable(
-            String profile,
-            String name,
-            SkillFrontmatter frontmatter,
-            Map<String, SkillBundle> current,
-            Map<String, SkillBundle> pending) {
-        if (publisher.list(profile).stream().anyMatch(s -> s.name().equals(name))) {
-            throw new ApiException(ErrorCode.SKILL_NAME_TAKEN, "Hermes already has a skill with this name");
-        }
-        int max = properties.maxPerAgent();
-        if (uploadedNames(current, pending).size() >= max) {
-            throw new ApiException(
-                    ErrorCode.VALIDATION_FAILED, "an agent can have at most " + max + " uploaded skills");
-        }
-        if (frontmatter.indexedDescriptionLength() > MAX_NEW_DESCRIPTION_CHARS) {
-            throw new ApiException(
-                    ErrorCode.VALIDATION_FAILED,
-                    "a new skill description can be at most " + MAX_NEW_DESCRIPTION_CHARS + " characters");
-        }
     }
 
     /**
@@ -401,12 +405,6 @@ public class SkillService {
             Map<String, SkillBundle> current, Map<String, SkillBundle> pending, String name) {
         SkillBundle bundle = current.get(name);
         return bundle != null ? bundle : pending.get(name);
-    }
-
-    private static Set<String> uploadedNames(Map<String, SkillBundle> current, Map<String, SkillBundle> pending) {
-        Set<String> names = new HashSet<>(current.keySet());
-        names.addAll(pending.keySet());
-        return names;
     }
 
     /**
