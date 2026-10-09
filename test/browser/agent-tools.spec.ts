@@ -73,7 +73,7 @@ test("주인이 web 도구를 켜면 다시 열어도 켜져 있고 관리자 �
     ).toHaveAttribute("aria-checked", "false");
     await expect(toolRow(page, "명령 실행").getByRole("switch")).toBeDisabled();
     await expect(
-      toolRow(page, "명령 실행").getByText("관리자만 켤 수 있어요"),
+      toolRow(page, "명령 실행").getByText("관리자가 확인하면 켜져요"),
     ).toBeVisible();
   } finally {
     await setSession(context, { email: TEST_EMAIL, name: "브라우저 테스트" });
