@@ -130,31 +130,18 @@ backend 는 `backend/docs/adr/`, 화면은 `web/docs/adr/`, `hermes/` 는 `herme
 기존 숫자 ADR 은 그대로 두며, 같은 날의 새 ADR 은 슬러그로 구분한다.
 둘 곳과 제목, 링크, 목록 정렬은 [`docs/adr/INDEX.md`](docs/adr/INDEX.md) 의 규칙을 따른다.
 
-구현자는 push 전에 `scripts/check-local.sh` 로 로컬 검사를 돌린다.
-로컬 브라우저 검사는 고친 화면과 그 컴포넌트를 쓰는 화면의 spec 을 인자로 준다. 전체 브라우저 검사는 Draft PR 의 CI 에서 돌린다.
-돌리는 명령과 순서, 작업 폴더, `pnpm build` 의 자리표시자 환경 변수는 그 스크립트가 갖는다.
+### 로컬 검사와 PR
+
+push 전에 `scripts/check-local.sh` 로 로컬 검사를 돌린다.
+고친 화면과 그 컴포넌트를 쓰는 화면의 spec 을 인자로 준다. 인자의 뜻과 돌리는 명령은 그 스크립트의 머리말이 갖는다.
 
 ```bash
 # cwd: 저장소 root
-# push 전 확인. 고친 화면과 그 컴포넌트를 쓰는 화면의 spec 을 준다
 scripts/check-local.sh usage-breakdown memory-document
-# 인자가 없으면 브라우저 검사까지 전체를 돌린다
-scripts/check-local.sh
 ```
 
-Draft CI 가 전체 통과하면 Ready 직전에 최신 main 을 작업 브랜치에 merge 한다.
-합친 뒤 `scripts/check-local.sh` 로 관련 화면의 spec 을 포함해 다시 검사하고 push 한다.
-코디네이터가 충돌을 직접 풀었을 때도 같은 검사를 거친다.
-새 커밋의 Draft CI 전체 통과를 확인한 뒤 `gh pr ready` 로 리뷰를 시작한다.
-main 에 새 커밋이 없으면 같은 head 의 CI 결과를 쓰며 Ready 전환만으로 CI 를 다시 돌리지 않는다.
-
-**머지 판정은 PR 의 CI 결과로 한다. 머지마다 승인을 받지 않는다.** 다음 순서로 확인한다.
-
-1. CI 가 PR 을 **지금 main 과 합친 상태**에서 실행했는지 확인한다. CI 가 시작된 뒤 main 이 바뀌었으면 `gh pr update-branch` 로 갱신하고 새 CI 가 끝날 때까지 기다린다.
-2. main 브랜치 보호가 정한 필수 검사의 통과를 직접 확인한다. 브랜치 보호의 `strict` 는 켜지 않는다.
-3. 아래 리뷰 규칙을 충족하면 머지한다. GitHub Actions 장애 등으로 CI 가 돌지 못하면 머지 전에 로컬에서 `scripts/check-local.sh` 전체를 직접 돌려 통과를 확인한다.
-
-워커의 보고를 읽는 것은 확인이 아니다. PR 의 CI 결과는 직접 확인할 수 있는 검사 결과다.
+**PR 을 열거나 Ready 로 바꾸거나 머지할 때는 [`.claude/skills/pr-merge/SKILL.md`](.claude/skills/pr-merge/SKILL.md) 를 읽는다.**
+Draft CI, main 합치기, 리뷰 반영, 머지 판정의 순서를 그 파일이 갖는다.
 
 GitHub Actions 의 [CI](.github/workflows/ci.yml) 는 backend(MySQL 마이그레이션 검사 포함), web, e2e, unit, hermes(커넥터 검사 포함), quality, public-safe 와 전체 브라우저 검사를 돌린다.
 job 구조와 shard, 매일 실행, 실패 이슈는 그 파일이 갖는다.
@@ -166,27 +153,16 @@ PR 실패는 그 PR 에서 고친다. 모인 실패 이슈는 고치거나 까�
 
 ## 머지는 PR 로 한다
 
-한 PR은 관심사 하나만 담는다. 운영 코드의 변경 줄(추가+삭제)은 `scripts/pr-size.mjs`가 정한 상한 안에 둔다. 넘으면 설계와 구현을 함께 담은 단계별 PR로 나눈다. 리팩터링은 이동만 하는 커밋과 동작을 바꾸는 커밋을 나눈다.
+한 PR은 관심사 하나만 담는다. 리팩터링은 이동만 하는 커밋과 동작을 바꾸는 커밋을 나눈다.
+운영 코드의 변경 줄 상한은 `scripts/pr-size.mjs` 가 정한다. 넘으면 설계와 구현을 함께 담은 단계별 PR로 나눈다.
+`규모:예외` 라벨은 사람이나 코디네이터만 붙인다. 구현 워커는 스스로 붙이지 않는다.
 
-크기 검사는 lock 파일, 빌드 결과물, 시험 스냅샷과 기계가 만드는 기준 파일을 제외한다. 제외 경로와 통과·큰 PR·실패를 나누는 수치는 `scripts/pr-size.mjs`가 소유한다. 시험과 문서는 따로 세어 검사 결과에 표시하며 실패 판정에는 쓰지 않는다. 운영 코드가 큰 PR에는 `규모:큼` 라벨이 붙고, 작아지면 제거된다. `규모:예외` 라벨이 있으면 상한을 넘어도 통과한다. 이 예외 라벨은 사람이나 코디네이터만 붙인다. 구현 워커는 스스로 예외를 붙이지 않는다. 포크 PR은 크기를 검사하되 자동 라벨은 붙이지 않는다.
-
-브랜치를 push 하고 `gh pr create --draft` 로 Draft PR 을 연다. main 에 로컬에서 바로 머지하지 않는다.
-Draft CI 전체 통과 후 「확인」 절에 따라 최신 main 을 합치고 다시 검사한 뒤 `gh pr ready` 로 Ready 로 바꾼다.
+Draft PR 을 열어 올린다. main 에 로컬에서 바로 머지하지 않는다.
 **계획서만으로 PR 을 열지 않는다. 예외는 없다.** ADR, 설계 문서, 계획서(`docs/`, `tasks/`)와 그 구현을 한 브랜치에서 끝낸 뒤 한 PR 로 올린다.
 구현이 여러 단계로 나뉘어도 설계만 먼저 머지하지 않는다. 한 PR 이 너무 커지면 구현을 단계별 PR 로 나누되, 각 PR 이 그 단계의 설계와 구현을 함께 담는다.
 
-Draft PR 을 Ready 로 바꾸면 Claude 코드 리뷰가 돈다. Draft 가 아닌 PR 을 바로 열 때도 리뷰가 돈다.
-리뷰 기준은 `.github/workflows/code-review-prompt.txt` 가 갖는다.
-
-| 무엇 | 어떻게 |
-| --- | --- |
-| 리뷰를 다시 돌린다 | PR 에 `/review` 댓글을 단다 |
-| 🔴 P1 치명이 남았다 | 머지하지 않는다. 고친 뒤 `/review` 로 다시 돌린다 |
-| 🟠 P2 높음이 남았다 | 머지 전에 고친다. 이번에 고치지 않으면 그 까닭을 PR 에 한 줄 남긴다 |
-| 🟡 P3 부터 ⚪ P5 까지만 남았다 | 반영할지 판단해 머지해도 된다 |
-| 머지 방식 | `gh pr merge --merge`. 이력을 한 줄로 합치지 않는다 |
-
-리뷰는 읽기만 하고 실행하지 않는다. 리뷰가 도는 동안 「확인」 절에 따라 PR 의 CI 결과를 확인한다.
+**Claude 리뷰는 한 번 반영하고 머지한다. 고친 뒤 `/review` 로 리뷰를 다시 돌리지 않는다.**
+리뷰 기준은 `.github/workflows/code-review-prompt.txt` 가, 등급마다 무엇을 할지는 `pr-merge` 스킬의 「4. 리뷰 반영」 이 갖는다.
 
 `scripts/pr-risk-labels.sh` 가 위험 라벨을 단다. 2026-10-11 까지는 라벨만 달고 머지 규칙은 바꾸지 않는다.
 그 뒤 라벨이 실제 위험과 맞았는지 보고, 라벨이 붙은 PR 의 머지 전에 사람 확인을 받을지 정한다.
