@@ -212,8 +212,9 @@ public class ConnectorBindingService implements AgentConnectorDetacher {
                 bindings.save(ConnectorBinding.pending(agent, connection, declared.mcpServer(), now));
         binding.beginInstall(now);
         try {
+            String ownerBrowser = installs.ownerBrowser(binding, declared);
             InstallResult installed = connector.bindConnector(
-                    agent.hermesProfile(), connectorId, connection.vault(), agent.sandboxOwner());
+                    agent.hermesProfile(), connectorId, connection.vault(), agent.sandboxOwner(), ownerBrowser);
             installs.record(binding, installed, false, now);
         } catch (ConnectorSandboxUnavailable ex) {
             throw new ApiException(
@@ -407,8 +408,9 @@ public class ConnectorBindingService implements AgentConnectorDetacher {
                 InstallResult installed = connector.putConnector(profile, manifest.id(), true, agent.sandboxOwner());
                 binding.installed(restart || installed.restartRequired() || installed.pluginUpdated(), now);
             } else {
+                String ownerBrowser = installs.ownerBrowser(binding, manifest);
                 InstallResult installed = connector.bindConnector(
-                        profile, manifest.id(), binding.connection().vault(), agent.sandboxOwner());
+                        profile, manifest.id(), binding.connection().vault(), agent.sandboxOwner(), ownerBrowser);
                 installs.record(binding, installed, false, now);
             }
             if (binding.mcpServer() == null) {
@@ -491,7 +493,7 @@ public class ConnectorBindingService implements AgentConnectorDetacher {
                 return false;
             }
             step = STEP_INSTALL;
-            if (installs.record(binding, installs.sendAgain(binding, declared.id(), legacy), legacy, now)) {
+            if (installs.record(binding, installs.sendAgain(binding, declared, legacy), legacy, now)) {
                 return false;
             }
             step = STEP_INSTALL_STATE;

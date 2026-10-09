@@ -185,6 +185,8 @@ from .connector_run import (
     _connector_execute_answer,
     _connector_execute_request,
     _installed_owner_attachments,
+    _installed_owner_browser,
+    _installed_server_env,
     _leaf_error_types,
     _mcp_sdk_problem,
     _mcp_sdk_version,
