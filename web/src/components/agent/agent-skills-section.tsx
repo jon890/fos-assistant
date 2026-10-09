@@ -128,7 +128,12 @@ export function AgentSkillsSection({ code, initialSkills }: Props) {
     setPendingName(skill.name);
     setError(null);
     try {
-      const response = await setSkillEnabled(code, skill.name, !skill.enabled, admin);
+      const response = await setSkillEnabled(
+        code,
+        skill.name,
+        !skill.enabled,
+        admin,
+      );
       setError(
         response.ok
           ? await reload()
@@ -195,7 +200,8 @@ export function AgentSkillsSection({ code, initialSkills }: Props) {
           {error}
         </Notice>
       ) : null}
-      {list.skills.filter((skill) => admin || skill.source === "UPLOADED").length === 0 ? (
+      {list.skills.filter((skill) => admin || skill.source === "UPLOADED")
+        .length === 0 ? (
         <Notice variant="info" className="mt-4">
           {editable && !list.skillsToolsetEnabled
             ? "스킬을 추가하면 스킬 도구가 함께 켜져요."
@@ -203,79 +209,90 @@ export function AgentSkillsSection({ code, initialSkills }: Props) {
         </Notice>
       ) : (
         <ul className="mt-4 divide-y divide-border rounded-md border border-border">
-          {list.skills.filter((skill) => admin || skill.source === "UPLOADED").map((skill) => {
-            const usage = usageText(skill);
-            const uploaded = skill.source === "UPLOADED";
-            return (
-              <li
-                key={skill.name}
-                className="flex items-center justify-between gap-3 p-3"
-              >
-                <div className="min-w-0">
-                  <div className="flex flex-wrap items-center gap-2">
-                    {editable && uploaded ? (
-                      <Link prefetch={false} href={`/agents/${code}/skills/${skill.name}`}
-                        className="text-sm font-medium break-all underline underline-offset-4"
-                        aria-label={`${skill.name} 내용 고치기`}>
-                        {skill.name}
-                      </Link>
-                    ) : <p className="text-sm font-medium break-all">{skill.name}</p>}
-                    <Badge variant="outline">
-                      {uploaded ? "올린 스킬" : "기본 스킬"}
-                    </Badge>
-                  </div>
-                  {skill.description ? (
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      {skill.description}
-                    </p>
-                  ) : null}
-                  {usage ? (
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      {usage}
-                    </p>
-                  ) : null}
-                  {editable && uploaded ? (
-                    <div className="mt-2 flex gap-2">
-                      <Button asChild size="sm" variant="outline">
+          {list.skills
+            .filter((skill) => admin || skill.source === "UPLOADED")
+            .map((skill) => {
+              const usage = usageText(skill);
+              const uploaded = skill.source === "UPLOADED";
+              return (
+                <li
+                  key={skill.name}
+                  className="flex items-center justify-between gap-3 p-3"
+                >
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      {editable && uploaded ? (
                         <Link
                           prefetch={false}
                           href={`/agents/${code}/skills/${skill.name}`}
-                          aria-label={`${skill.name} 편집`}
+                          className="text-sm font-medium break-all underline underline-offset-4"
+                          aria-label={`${skill.name} 내용 고치기`}
                         >
-                          내용 고치기
+                          {skill.name}
                         </Link>
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        disabled={busy}
-                        aria-label={`${skill.name} 삭제`}
-                        onClick={() => {
-                          setDeleteError(null);
-                          setConfirming(skill.name);
-                        }}
-                      >
-                        삭제
-                      </Button>
+                      ) : (
+                        <p className="text-sm font-medium break-all">
+                          {skill.name}
+                        </p>
+                      )}
+                      <Badge variant="outline">
+                        {uploaded ? "올린 스킬" : "기본 스킬"}
+                      </Badge>
                     </div>
-                  ) : null}
-                </div>
-                {editable ? (
-                  <Switch
-                    checked={skill.enabled}
-                    loading={pendingName === skill.name && confirming === null}
-                    disabled={busy}
-                    aria-label={`${skill.name} 스킬`}
-                    onCheckedChange={() => void toggle(skill)}
-                  />
-                ) : (
-                  <Badge variant={skill.enabled ? "success" : "outline"}>
-                    {skill.enabled ? "켜짐" : "꺼짐"}
-                  </Badge>
-                )}
-              </li>
-            );
-          })}
+                    {skill.description ? (
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        {skill.description}
+                      </p>
+                    ) : null}
+                    {usage ? (
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        {usage}
+                      </p>
+                    ) : null}
+                    {editable && uploaded ? (
+                      <div className="mt-2 flex gap-2">
+                        <Button asChild size="sm" variant="outline">
+                          <Link
+                            prefetch={false}
+                            href={`/agents/${code}/skills/${skill.name}`}
+                            aria-label={`${skill.name} 편집`}
+                          >
+                            내용 고치기
+                          </Link>
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          disabled={busy}
+                          aria-label={`${skill.name} 삭제`}
+                          onClick={() => {
+                            setDeleteError(null);
+                            setConfirming(skill.name);
+                          }}
+                        >
+                          삭제
+                        </Button>
+                      </div>
+                    ) : null}
+                  </div>
+                  {editable ? (
+                    <Switch
+                      checked={skill.enabled}
+                      loading={
+                        pendingName === skill.name && confirming === null
+                      }
+                      disabled={busy}
+                      aria-label={`${skill.name} 스킬`}
+                      onCheckedChange={() => void toggle(skill)}
+                    />
+                  ) : (
+                    <Badge variant={skill.enabled ? "success" : "outline"}>
+                      {skill.enabled ? "켜짐" : "꺼짐"}
+                    </Badge>
+                  )}
+                </li>
+              );
+            })}
         </ul>
       )}
       {confirming !== null ? (

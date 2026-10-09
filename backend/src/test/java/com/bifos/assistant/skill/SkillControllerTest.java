@@ -27,8 +27,8 @@ import com.bifos.assistant.skill.application.SkillList;
 import com.bifos.assistant.skill.application.SkillListItem;
 import com.bifos.assistant.skill.application.SkillService;
 import com.bifos.assistant.skill.application.SkillSource;
-import com.bifos.assistant.skill.presentation.SkillController;
 import com.bifos.assistant.skill.presentation.SkillAdminController;
+import com.bifos.assistant.skill.presentation.SkillController;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -47,7 +47,8 @@ class SkillControllerTest {
     private final SkillService skills = mock(SkillService.class);
     private final CurrentUserProvider currentUser = mock(CurrentUserProvider.class);
 
-    private final MockMvc mvc = MockMvcBuilders.standaloneSetup(new SkillController(skills, currentUser), new SkillAdminController(skills, currentUser))
+    private final MockMvc mvc = MockMvcBuilders.standaloneSetup(
+                    new SkillController(skills, currentUser), new SkillAdminController(skills, currentUser))
             .setControllerAdvice(new GlobalExceptionHandler())
             .build();
 
@@ -61,8 +62,7 @@ class SkillControllerTest {
     void listGivesSourceEditabilityToolStatusAndUploadLimit() throws Exception {
         when(skills.list(OWNER, "dad"))
                 .thenReturn(new SkillList(
-                        List.of(
-                                new SkillListItem("weekly-plan", "이번 주 계획", SkillSource.UPLOADED, false, null)),
+                        List.of(new SkillListItem("weekly-plan", "이번 주 계획", SkillSource.UPLOADED, false, null)),
                         true,
                         true,
                         30));
@@ -181,17 +181,24 @@ class SkillControllerTest {
         when(currentUser.requireAdmin()).thenThrow(new ApiException(ErrorCode.FORBIDDEN, "admin only"));
         mvc.perform(get("/api/v1/admin/agents/dad/skills")).andExpect(status().isForbidden());
         mvc.perform(put("/api/v1/admin/agents/dad/skills/hermes-help/enabled")
-                .contentType(MediaType.APPLICATION_JSON).content("{\"enabled\":false}"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"enabled\":false}"))
                 .andExpect(status().isForbidden());
         verifyNoInteractions(skills);
         CurrentUser admin = new CurrentUser(7L, "dad@example.com", "아빠", 1L, UserRole.ADMIN);
         when(currentUser.requireAdmin()).thenReturn(admin);
-        when(skills.adminList(admin, "dad")).thenReturn(new SkillList(
-                List.of(new SkillListItem("hermes-help", "기본", SkillSource.HERMES, true, null)), true, true, 30));
-        mvc.perform(get("/api/v1/admin/agents/dad/skills")).andExpect(status().isOk())
+        when(skills.adminList(admin, "dad"))
+                .thenReturn(new SkillList(
+                        List.of(new SkillListItem("hermes-help", "기본", SkillSource.HERMES, true, null)),
+                        true,
+                        true,
+                        30));
+        mvc.perform(get("/api/v1/admin/agents/dad/skills"))
+                .andExpect(status().isOk())
                 .andExpect(jsonPath("$.skills[0].source").value("HERMES"));
         mvc.perform(put("/api/v1/admin/agents/dad/skills/hermes-help/enabled")
-                .contentType(MediaType.APPLICATION_JSON).content("{\"enabled\":false}"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"enabled\":false}"))
                 .andExpect(status().isNoContent());
         verify(skills).adminToggle(admin, "dad", "hermes-help", false);
     }

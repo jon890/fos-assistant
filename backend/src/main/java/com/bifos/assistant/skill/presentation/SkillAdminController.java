@@ -30,8 +30,8 @@ public class SkillAdminController {
 
     @PutMapping("/{name}/enabled")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void toggle(@PathVariable String code, @PathVariable String name,
-            @Valid @RequestBody ToggleSkillRequest request) {
+    public void toggle(
+            @PathVariable String code, @PathVariable String name, @Valid @RequestBody ToggleSkillRequest request) {
         skills.adminToggle(currentUser.requireAdmin(), code, name, request.enabled());
     }
 }

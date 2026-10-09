@@ -93,8 +93,13 @@ export function saveAgentTools(
   });
 }
 
-export function fetchAgentSkills(code: string, admin = false): Promise<Response> {
-  return fetch(`/api/${admin ? "admin/" : ""}agents/${code}/skills`, { cache: "no-store" });
+export function fetchAgentSkills(
+  code: string,
+  admin = false,
+): Promise<Response> {
+  return fetch(`/api/${admin ? "admin/" : ""}agents/${code}/skills`, {
+    cache: "no-store",
+  });
 }
 
 export function setSkillEnabled(
@@ -103,11 +108,14 @@ export function setSkillEnabled(
   enabled: boolean,
   admin = false,
 ): Promise<Response> {
-  return fetch(`/api/${admin ? "admin/" : ""}agents/${code}/skills/${name}/enabled`, {
-    method: "PUT",
-    headers: JSON_HEADERS,
-    body: JSON.stringify({ enabled }),
-  });
+  return fetch(
+    `/api/${admin ? "admin/" : ""}agents/${code}/skills/${name}/enabled`,
+    {
+      method: "PUT",
+      headers: JSON_HEADERS,
+      body: JSON.stringify({ enabled }),
+    },
+  );
 }
 
 export function deleteSkill(code: string, name: string): Promise<Response> {

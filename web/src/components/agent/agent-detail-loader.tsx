@@ -54,7 +54,9 @@ export async function loadAgentDetail(
     useAdminTools
       ? callControlPlane<AgentToolsView>(`/api/v1/admin/agents/${code}/tools`)
       : callControlPlane<AgentToolsView>(`/api/v1/agents/${code}/tools`),
-    callControlPlane<SkillListView>(`/api/v1/${admin ? "admin/" : ""}agents/${code}/skills`),
+    callControlPlane<SkillListView>(
+      `/api/v1/${admin ? "admin/" : ""}agents/${code}/skills`,
+    ),
     listedAgent?.connectorManaged === true
       ? Promise.resolve(null)
       : callControlPlane<ProactiveCheckStatus>(

@@ -7,5 +7,4 @@ package com.bifos.assistant.skill.application;
  * @param size UTF-8 바이트 수
  * @param content 파일 원문
  */
-public record SkillFileInfo(String path, long size, String content) {
-}
+public record SkillFileInfo(String path, long size, String content) {}

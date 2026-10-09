@@ -29,9 +29,9 @@ import com.bifos.assistant.skill.application.SkillUsageSummary;
 import com.bifos.assistant.skill.application.UserSkillUsage;
 import com.bifos.assistant.skill.domain.ExecutionSkillUse;
 import com.bifos.assistant.skill.domain.SkillBundle;
-import com.bifos.assistant.skill.infra.SkillStore;
 import com.bifos.assistant.skill.domain.type.SkillUseSource;
 import com.bifos.assistant.skill.infra.ExecutionSkillUseRepository;
+import com.bifos.assistant.skill.infra.SkillStore;
 import com.bifos.assistant.testsupport.BackendIntegrationTest;
 import com.bifos.assistant.usage.application.ExecutionTreeService;
 import com.bifos.assistant.usage.application.RootExecutionQuery;
@@ -149,9 +149,15 @@ class SkillUsageQueryTest {
         controller = new UsageController(rootExecutions, currentUser, agentService, trees, query, summaries);
         when(toolsets.readEnabled(anyString(), anyString())).thenReturn(List.of("web", "skills", "fos-assistant"));
         store.deleteAll(AGENT_PROFILE);
-        String version = store.writeVersion(AGENT_PROFILE, Map.of(
-                "shopping", new SkillBundle("shopping", "---\nname: shopping\ndescription: 장을 봐요\n---\n장을 봐요", List.of()),
-                "unused", new SkillBundle("unused", "---\nname: unused\ndescription: 아직 안 써요\n---\n안내", List.of())));
+        String version = store.writeVersion(
+                AGENT_PROFILE,
+                Map.of(
+                        "shopping",
+                                new SkillBundle(
+                                        "shopping", "---\nname: shopping\ndescription: 장을 봐요\n---\n장을 봐요", List.of()),
+                        "unused",
+                                new SkillBundle(
+                                        "unused", "---\nname: unused\ndescription: 아직 안 써요\n---\n안내", List.of())));
         store.markPublished(AGENT_PROFILE, version);
         when(skillClient.list(anyString()))
                 .thenReturn(List.of(

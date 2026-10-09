@@ -116,7 +116,13 @@ function formatSize(bytes: number): string {
 function entriesOf(initial: SkillDetailView | null): FileEntry[] {
   return (initial?.files ?? []).map((file, index) => {
     const [directory, fileName] = file.path.split("/") as [Directory, string];
-    return { key: index, directory, fileName, size: file.size, content: file.content };
+    return {
+      key: index,
+      directory,
+      fileName,
+      size: file.size,
+      content: file.content,
+    };
   });
 }
 
@@ -176,7 +182,11 @@ export function SkillEditor({ code, initial }: Props) {
   }
 
   function changeFile(key: number, changes: Partial<FileEntry>) {
-    setFiles((current) => current.map((entry) => entry.key === key ? { ...entry, ...changes } : entry));
+    setFiles((current) =>
+      current.map((entry) =>
+        entry.key === key ? { ...entry, ...changes } : entry,
+      ),
+    );
   }
 
   function removeFile(key: number) {
@@ -292,7 +302,8 @@ export function SkillEditor({ code, initial }: Props) {
         files: files.map((entry) => {
           const path = `${entry.directory}/${entry.fileName}`;
           const previous = initial?.files.find((file) => file.path === path);
-          return entry.content === undefined || previous?.content === entry.content
+          return entry.content === undefined ||
+            previous?.content === entry.content
             ? { path }
             : { path, content: entry.content };
         }),
@@ -385,7 +396,11 @@ export function SkillEditor({ code, initial }: Props) {
         <p className="mt-1 text-xs text-muted-foreground">
           md, txt, json, yaml, yml, csv 파일을 올릴 수 있어요. 최대 20개예요.
         </p>
-        <SkillFilesEditor files={files} onChange={changeFile} onRemove={removeFile} />
+        <SkillFilesEditor
+          files={files}
+          onChange={changeFile}
+          onRemove={removeFile}
+        />
         <div className="mt-3">
           <Label htmlFor={fileId} className="mb-2">
             참고 파일 올리기

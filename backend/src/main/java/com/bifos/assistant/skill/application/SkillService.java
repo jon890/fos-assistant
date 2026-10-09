@@ -94,8 +94,12 @@ public class SkillService {
         Map<String, SkillUsageSummary> usages = editable ? usage.byAgent(agent.id()) : Map.of();
         SkillList list = assemble(agent, editable, usages);
         return new SkillList(
-                list.skills().stream().filter(item -> item.source() == SkillSource.UPLOADED).toList(),
-                list.editable(), list.skillsToolsetEnabled(), list.uploadLimit());
+                list.skills().stream()
+                        .filter(item -> item.source() == SkillSource.UPLOADED)
+                        .toList(),
+                list.editable(),
+                list.skillsToolsetEnabled(),
+                list.uploadLimit());
     }
 
     /** 관리자 영역에서만 Hermes 번들과 커넥터 스킬을 함께 읽는다. */
