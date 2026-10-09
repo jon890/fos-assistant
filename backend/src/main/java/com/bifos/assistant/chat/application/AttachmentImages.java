@@ -281,7 +281,8 @@ public class AttachmentImages {
     private String encodedAt(Candidate candidate, int longSide, float quality) {
         Dimension size = candidate.size();
         if (quality == AgentImageResizer.QUALITY
-                && AgentImageResizer.scaledSize(size.width, size.height, longSide).equals(size)) {
+                && AgentImageResizer.scaledSize(size.width, size.height, longSide)
+                        .equals(size)) {
             return dataUrl(candidate.copy());
         }
         try {

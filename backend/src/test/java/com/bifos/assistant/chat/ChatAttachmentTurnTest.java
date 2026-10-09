@@ -271,8 +271,7 @@ class ChatAttachmentTurnTest {
                 .contains(
                         "사진은 모두 2장이다.\n",
                         "이 메시지에 이미지로 함께 실은 사진: 1번째 사진. 이미 보이므로 파일로 다시 읽지 않아도 된다.\n",
-                        "입력에 싣지 못한 사진: 2번째 사진. 이 사진은 도구로 읽지 말고, 사용자에게 볼 수 없었다고 알리고"
-                                + " JPEG 나 PNG 로 다시 올려 달라고 한다.\n",
+                        "입력에 싣지 못한 사진: 2번째 사진. 이 사진은 도구로 읽지 말고, 사용자에게 볼 수 없었다고 알리고" + " JPEG 나 PNG 로 다시 올려 달라고 한다.\n",
                         "파일을 올리거나 고치는 도구에는 위 목록의 원본 파일을 쓴다.\n")
                 .doesNotContain("싣지 못한 사진은 아래 경로를", "- 1번째 사진: " + agentDirectory(conversationId));
     }
@@ -430,9 +429,7 @@ class ChatAttachmentTurnTest {
         for (HermesImage image : images.subList(0, 24)) {
             assertThat(longSide(image)).as(image.label()).isEqualTo(768);
         }
-        assertThat(imageSize(images.get(24)))
-                .as("작은 사진은 키우지 않는다")
-                .isEqualTo(new Dimension(8, 6));
+        assertThat(imageSize(images.get(24))).as("작은 사진은 키우지 않는다").isEqualTo(new Dimension(8, 6));
         assertThat(command.input()).doesNotContain("입력에 싣지 못한 사진");
     }
 
@@ -484,8 +481,7 @@ class ChatAttachmentTurnTest {
         assertThat(command.input())
                 .contains(
                         "- 1번째 사진: " + photo.id() + ".png (올린 이름: a.png)\n",
-                        "입력에 싣지 못한 사진: 1번째 사진. 이 사진은 도구로 읽지 말고, 사용자에게 볼 수 없었다고 알리고"
-                                + " JPEG 나 PNG 로 다시 올려 달라고 한다.\n")
+                        "입력에 싣지 못한 사진: 1번째 사진. 이 사진은 도구로 읽지 말고, 사용자에게 볼 수 없었다고 알리고" + " JPEG 나 PNG 로 다시 올려 달라고 한다.\n")
                 .doesNotContain("이미지로 함께 실은 사진");
     }
 
