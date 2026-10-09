@@ -65,7 +65,9 @@ PROFILE_PLUGIN_DIR = PLUGIN_DIR / "profile-plugins"
 # 틀을 쓴 뒤 API 경로에 하나라도 남으면 만든 것을 지운다.
 FORBIDDEN_TOOLSETS = frozenset({"memory", "terminal", "file", "code_execution", "browser"})
 # 기존 단일 파일 plugin 을 갱신할 때 하위 모듈을 모두 둔 뒤 진입점을 바꾼다.
-PROFILE_PLUGIN_FILES = ("plugin.yaml", "context.py", "connector_policy.py", "subagent.py", "hooks.py", "__init__.py")
+PROFILE_PLUGIN_FILES = (
+    "plugin.yaml", "context.py", "connector_policy.py", "subagent.py", "attachment_inspect.py", "hooks.py", "__init__.py",
+)
 # POST /api/profiles 본문에 둘 수 있는 키다. clone_from 처럼 다른 profile 의 파일을 끌어오는 키를 막는다.
 PROFILE_CREATE_KEYS = frozenset({"name", "no_skills", "description"})
 
