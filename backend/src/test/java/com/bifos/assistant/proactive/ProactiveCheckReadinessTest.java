@@ -80,6 +80,15 @@ class ProactiveCheckReadinessTest {
     }
 
     @Test
+    @DisplayName("내부 원본 조회가 자동 추가되어도 읽기 전용과 쓰기 허용의 살펴보기 준비 상태를 막지 않는다")
+    void internalOriginalInspectionDoesNotBlockReadiness() {
+        enabled(List.of("web", "skills", "fos-attachments"), Set.of("proactive-check"));
+        assertThat(readiness(true).check(agent).available()).isTrue();
+        agent.changeProactiveCheckWritesAllowed(true);
+        assertThat(readiness(true).check(agent).available()).isTrue();
+    }
+
+    @Test
     @DisplayName("delegation 과 terminal 이 켜져 있으면 두 이름을 정렬해 TOOLSETS_NOT_ALLOWED 에 싣는다")
     void reportsDisallowedToolsetsSorted() {
         enabled(List.of("terminal", "web", "skills", "delegation", "fos-assistant"), Set.of("proactive-check"));
