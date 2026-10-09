@@ -66,7 +66,11 @@ public class ConnectorBindingApplier {
     /** 다음 점검이 이 번호 뒤의 바인딩부터 읽는다. 0 이면 처음부터다. */
     private long driftCursor;
 
-    /** 바인딩 번호마다 다시 맞춰도 연속으로 어긋난 횟수다. 어긋나지 않았거나 잠근 뒤 {@code READY} 가 아닌 것을 보거나 상한으로 {@code PENDING} 이 되면 지운다. */
+    /**
+     * 바인딩 번호마다 다시 맞춰도 연속으로 어긋난 횟수다. 어긋나지 않았거나 잠근 뒤 {@code READY} 가 아닌 것을 보거나 상한으로
+     * {@code PENDING} 이 되면 지운다. 카탈로그를 읽지 못한 주기는 횟수를 바꾸지 않는다. 그 바인딩은 관리자 반영 완료가 설치를 다시
+     * 보낸다.
+     */
     private final Map<Long, Integer> driftStreak = new HashMap<>();
 
     /** 30초마다 돈다. 검사에서는 {@code -} 로 끄고 본체를 직접 부른다. */
