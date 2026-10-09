@@ -180,6 +180,13 @@ public enum ErrorCode {
      */
     SKILL_NAME_TAKEN(HttpStatus.CONFLICT),
     /**
+     * 저장하는 스킬에 {@code scripts/} 가 있는데 그 에이전트가 실행 공간에서 스크립트를 돌릴 수 없다.
+     *
+     * <p>API 도구에 {@code terminal} 이 꺼져 있거나, 대시보드 plugin 이 그 profile 의 실행 공간이 없다고 거절했다. 스킬은
+     * 바뀌지 않았다. 근거는 ADR-20261009-skill-package 다.
+     */
+    SKILL_SCRIPTS_NEED_SANDBOX(HttpStatus.CONFLICT),
+    /**
      * 메시지가 {@code /이름} 으로 시작했는데 그 이름이 그 에이전트의 켜진 스킬이 아니다.
      *
      * <p>Hermes 에 보내지 않고 대화, 메시지, 실행도 만들지 않는다. {@code skills} toolset 이 꺼진 에이전트는

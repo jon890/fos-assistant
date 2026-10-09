@@ -5,11 +5,24 @@ import json
 import os
 import pathlib
 import re
+import stat
 from typing import Optional
 from urllib.parse import urlsplit
 from .common import (
     PROFILE_NAME_RE,
+    _skill_root,
     logger,
+)
+from .sandbox_paths import (
+    _sandbox_attachment_mount_overlaps,
+    _sandbox_attachment_roots_ok,
+    _sandbox_connector_output_mount_overlaps,
+    _sandbox_connector_output_root_ok,
+    _sandbox_mount_overlaps,
+    _sandbox_mounts_ok,
+    _sandbox_path_ok,
+    _sandbox_skill_mount_overlaps,
+    _sandbox_skill_root_ok,
 )
 
 
@@ -22,12 +35,10 @@ SANDBOX_TOOLSETS = frozenset({"terminal", "file", "code_execution"}) | IMAGE_FIL
 # 실행 공간 사용자 디렉터리 이름이다. Control Plane 이 사용자마다 정해 보낸다.
 SANDBOX_OWNER_RE = re.compile(r"^[a-z][a-z0-9-]{0,63}$")
 SANDBOX_NETWORK_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$")
-# 실행 공간이 직접 쓰는 컨테이너 경로다. 운영 마운트가 이 자리를 가리면 사용자 공간이 바뀐다.
-SANDBOX_RESERVED_PATHS = ("/workspace", "/root")
 # hermes/README.md 의 「셸 실행 공간」 계약 표에 있는 최상위 키다. 그 밖의 키가 있으면 정책 전체를 틀린 것으로 본다.
 SANDBOX_POLICY_KEYS = frozenset({
-    "image", "workspace_root", "attachment_root", "attachment_agent_root", "connector_output_root", "network",
-    "cpu", "memory_mb", "read_only_mounts", "profiles",
+    "image", "workspace_root", "attachment_root", "attachment_agent_root", "connector_output_root", "skill_root",
+    "network", "cpu", "memory_mb", "read_only_mounts", "profiles",
 })
 SANDBOX_PROFILE_KEYS = frozenset({"read_only_mounts", "env", "network"})
 # 비밀값은 넣지 않는다. 운영 정책이 경로와 Backend 주소만 명시한다.
@@ -41,81 +52,6 @@ def _sandbox_unavailable():
     from starlette.responses import JSONResponse
 
     return JSONResponse({"detail": "실행 공간이 설정되지 않았다", "code": "sandbox_unavailable"}, status_code=409)
-
-
-def _sandbox_path_ok(value) -> bool:
-    """`:` 없는 절대 경로이고 빈 조각과 `..` 이 없는지 본다."""
-    if (not isinstance(value, str) or not value.startswith("/") or ":" in value
-            or any(ord(ch) < 32 or ord(ch) == 127 for ch in value)):
-        return False
-    return all(part not in ("", ".", "..") for part in value.split("/")[1:])
-
-
-def _sandbox_mount_ok(value) -> bool:
-    """`<원본 절대 경로>:<컨테이너 절대 경로>` 하나를 본다. 컨테이너 경로가 `/workspace`, `/root` 자리면 틀리다."""
-    if not isinstance(value, str):
-        return False
-    pieces = value.split(":")
-    if len(pieces) != 2 or not all(_sandbox_path_ok(piece) for piece in pieces):
-        return False
-    target = pieces[1]
-    # 경로 조각 기준으로 본다. `/rootfs` 는 `/root` 아래가 아니다.
-    return not any(target == reserved or target.startswith(reserved + "/") for reserved in SANDBOX_RESERVED_PATHS)
-
-
-def _sandbox_mounts_ok(value) -> bool:
-    return isinstance(value, list) and all(_sandbox_mount_ok(entry) for entry in value)
-
-
-def _sandbox_paths_overlap(first: str, second: str) -> bool:
-    """두 절대 경로가 같거나 한쪽이 다른 쪽 아래인지 경로 조각 기준으로 본다."""
-    first = first.rstrip("/") or "/"
-    second = second.rstrip("/") or "/"
-
-    def under(child, parent):
-        return child == parent or parent == "/" or child.startswith(parent + "/")
-
-    return under(first, second) or under(second, first)
-
-
-def _sandbox_mount_overlaps(mount: str, workspace_root: str) -> bool:
-    """마운트 원본이 `workspace_root` 와 겹치는지 경로 조각 기준으로 본다.
-
-    겹치면 다른 사용자의 `/workspace` 가 읽기 전용 마운트로 함께 보인다.
-    """
-    source = mount.split(":")[0]
-    return _sandbox_paths_overlap(source, workspace_root)
-
-
-def _sandbox_attachment_mount_overlaps(mount: str, attachment_root: str, attachment_agent_root: str) -> bool:
-    """운영 마운트가 첨부 원본이나 실행 공간 안의 첨부 경로 전체를 보이게 하는지 본다."""
-    source, target = mount.split(":")
-    return (_sandbox_paths_overlap(source, attachment_root)
-            or _sandbox_paths_overlap(target, attachment_agent_root))
-
-
-def _sandbox_attachment_roots_ok(attachment_root: str, attachment_agent_root: str, workspace_root: str) -> bool:
-    """첨부 원본과 실행 공간 경로가 사용자 workspace 나 예약 경로와 겹치지 않는지 본다."""
-    if _sandbox_paths_overlap(attachment_root, workspace_root):
-        return False
-    return not any(_sandbox_paths_overlap(attachment_agent_root, reserved)
-                   for reserved in SANDBOX_RESERVED_PATHS)
-
-
-def _sandbox_connector_output_root_ok(root: str, workspace_root: str, attachment_root: str,
-                                      attachment_agent_root: str) -> bool:
-    """커넥터 출력 루트가 사용자 workspace, 첨부 경로, 예약 경로와 겹치지 않는지 본다(ADR-20261008 connector-output-files)."""
-    return not any(_sandbox_paths_overlap(root, other)
-                   for other in (workspace_root, attachment_root, attachment_agent_root, *SANDBOX_RESERVED_PATHS))
-
-
-def _sandbox_connector_output_mount_overlaps(mount: str, connector_output_root: Optional[str]) -> bool:
-    """운영 마운트가 커넥터 출력 루트를 원본이나 대상으로 덮는지 본다. 덮으면 다른 profile 의 출력이 보인다."""
-    if connector_output_root is None:
-        return False
-    source, target = mount.split(":")
-    return (_sandbox_paths_overlap(source, connector_output_root)
-            or _sandbox_paths_overlap(target, connector_output_root))
 
 
 def _sandbox_env_ok(value) -> bool:
@@ -145,7 +81,8 @@ def _sandbox_env_ok(value) -> bool:
 
 
 def _sandbox_profiles(value, workspace_root: str, attachment_root: str, attachment_agent_root: str,
-                      default_network, connector_output_root: Optional[str] = None) -> Optional[dict]:
+                      default_network, connector_output_root: Optional[str] = None,
+                      skill_root: Optional[str] = None) -> Optional[dict]:
     """정책에 등록된 profile 만 검증한다. 빈 목록은 모두 기존 실행을 유지한다."""
     if not isinstance(value, dict):
         return None
@@ -159,6 +96,7 @@ def _sandbox_profiles(value, workspace_root: str, attachment_root: str, attachme
                 or any(_sandbox_mount_overlaps(mount, workspace_root)
                        or _sandbox_attachment_mount_overlaps(mount, attachment_root, attachment_agent_root)
                        or _sandbox_connector_output_mount_overlaps(mount, connector_output_root)
+                       or _sandbox_skill_mount_overlaps(mount, skill_root)
                        for mount in mounts)):
             return None
         env = settings.get("env", {})
@@ -233,13 +171,25 @@ def _sandbox_policy() -> Optional[dict]:
             or not _sandbox_connector_output_root_ok(connector_output_root, workspace_root, attachment_root,
                                                      attachment_agent_root)):
         return invalid("connector_output_root")
+    # 선택 키다. 없으면 스킬 디렉터리를 붙이지 않고 그에 딸린 겹침 검사도 하지 않는다.
+    # 늘 검사하면 운영이 키를 넣기 전의 기존 정책이 무효가 되어 모든 셸 저장이 거절될 수 있다.
+    skill_root = value.get("skill_root")
+    if skill_root is not None:
+        # 마운트 대상은 Hermes 쪽 스킬 루트다. 그 경로를 모르면 붙일 자리를 정할 수 없다.
+        skill_agent_root = _skill_root()
+        if (not _sandbox_path_ok(skill_root) or skill_agent_root is None
+                or not _sandbox_path_ok(str(skill_agent_root))
+                or not _sandbox_skill_root_ok(skill_root, str(skill_agent_root), workspace_root, attachment_root,
+                                              attachment_agent_root, connector_output_root)):
+            return invalid("skill_root")
     if any(_sandbox_mount_overlaps(mount, workspace_root)
            or _sandbox_attachment_mount_overlaps(mount, attachment_root, attachment_agent_root)
            or _sandbox_connector_output_mount_overlaps(mount, connector_output_root)
+           or _sandbox_skill_mount_overlaps(mount, skill_root)
            for mount in read_only_mounts):
         return invalid("read_only_mounts")
     profiles = _sandbox_profiles(value.get("profiles"), workspace_root, attachment_root,
-                                 attachment_agent_root, network, connector_output_root)
+                                 attachment_agent_root, network, connector_output_root, skill_root)
     if profiles is None:
         return invalid("profiles")
     return {
@@ -248,6 +198,7 @@ def _sandbox_policy() -> Optional[dict]:
         "attachment_root": attachment_root,
         "attachment_agent_root": attachment_agent_root,
         "connector_output_root": connector_output_root,
+        "skill_root": skill_root,
         "network": network,
         "cpu": cpu,
         "memory_mb": memory_mb,
@@ -333,6 +284,26 @@ def _sandbox_verify_attachment_directories(policy: dict, owner: str) -> dict:
     return _sandbox_attachment_snapshot(policy, owner)
 
 
+def _sandbox_skill_mounts(policy: dict, profile: str) -> list:
+    """그 profile 의 스킬 디렉터리 전체를 Hermes 와 같은 경로에 읽기 전용으로 붙이는 마운트다.
+
+    `skill_view` 가 모델에게 Hermes 쪽 경로를 주므로 대상도 그 경로다(ADR-20261009 skill-package).
+    Hermes 쪽 디렉터리가 링크 없는 디렉터리일 때만 붙인다. 없는 원본을 붙이면 Docker 가 호스트에 빈 디렉터리를
+    만들거나 socket proxy 가 컨테이너 생성을 거절해 그 profile 의 셸이 멈춘다.
+    """
+    skill_root = policy.get("skill_root")
+    agent_root = _skill_root()
+    if skill_root is None or agent_root is None:
+        return []
+    try:
+        metadata = os.lstat(agent_root / profile)
+    except OSError:
+        return []
+    if not stat.S_ISDIR(metadata.st_mode):
+        return []
+    return ["%s/%s:%s/%s:ro" % (skill_root, profile, agent_root, profile)]
+
+
 def _sandbox_terminal(policy: dict, profile: str, owner: str, attachment_snapshot: Optional[dict] = None) -> dict:
     """profile 의 `terminal:` 전체다. 모양은 `hermes/README.md` 의 「셸 실행 공간」 과 같다.
 
@@ -348,6 +319,7 @@ def _sandbox_terminal(policy: dict, profile: str, owner: str, attachment_snapsho
     # 실행 공간이 쓰지 못하므로 링크를 바꿔 끼워 커넥터의 쓰기를 다른 곳으로 돌릴 수 없다(ADR-20261008 connector-output-files).
     output = _sandbox_connector_output_profile_directory(policy, profile, owner)
     output_mounts = ["%s:%s:ro" % (output, output)] if output is not None else []
+    skill_mounts = _sandbox_skill_mounts(policy, profile)
     network = settings["network"]
     extra_args = ["--label=fos-sandbox-profile=%s" % profile]
     if network:
@@ -367,7 +339,7 @@ def _sandbox_terminal(policy: dict, profile: str, owner: str, attachment_snapsho
             "%s:/workspace" % _sandbox_workspace(policy, owner),
             "%s:%s:ro" % (_sandbox_attachment_directory(policy, owner),
                             _sandbox_attachment_agent_directory(policy, owner)),
-        ] + output_mounts + ["%s:ro" % m for m in mounts],
+        ] + output_mounts + skill_mounts + ["%s:ro" % m for m in mounts],
         "docker_forward_env": [],
         "env_passthrough": [],
         "credential_files": [],
