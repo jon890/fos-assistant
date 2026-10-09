@@ -9,6 +9,7 @@ import com.bifos.assistant.chat.domain.RunSession;
 import com.bifos.assistant.chat.infra.ChatMessageRepository;
 import com.bifos.assistant.chat.infra.ExecutionQuestionRepository;
 import com.bifos.assistant.context.AssembledContext;
+import com.bifos.assistant.hermes.dto.HermesImage;
 import com.bifos.assistant.hermes.dto.HermesRunCommand;
 import com.bifos.assistant.hermes.dto.HermesRunResult;
 import com.bifos.assistant.memory.application.MemoryProposer;
@@ -23,6 +24,7 @@ import com.bifos.assistant.usage.domain.AgentExecution;
 import com.bifos.assistant.usage.domain.type.ExecutionEventType;
 import java.time.Clock;
 import java.time.Instant;
+import java.util.List;
 import java.util.function.Consumer;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -57,6 +59,7 @@ class ChatTurnLifecycle {
             CurrentUser user,
             Routed routed,
             String text,
+            List<HermesImage> images,
             AssembledContext context,
             ExecutionContextSnapshot snapshot,
             ModelChoice choice,
@@ -75,7 +78,8 @@ class ChatTurnLifecycle {
                 session.runtimeSessionId(),
                 choice.provider(),
                 choice.model(),
-                choice.reasoningEffort());
+                choice.reasoningEffort(),
+                images);
         AgentExecution execution = executions.start(
                 user,
                 conversation.executionConversation(),

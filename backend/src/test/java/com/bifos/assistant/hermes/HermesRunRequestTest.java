@@ -6,6 +6,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import com.bifos.assistant.hermes.dto.HermesImage;
 import com.bifos.assistant.hermes.dto.HermesRunCommand;
 import com.bifos.assistant.hermes.dto.HermesRunResult;
 import com.bifos.assistant.hermes.dto.TokenUsage;
@@ -16,6 +17,7 @@ import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -82,6 +84,36 @@ class HermesRunRequestTest {
         assertThat(body.has("model")).isFalse();
         assertThat(body.has("model_options")).isFalse();
         assertThat(body.path("input").asString()).isEqualTo("안녕");
+    }
+
+    @Test
+    @DisplayName("사진이 있으면 input 은 user 메시지 목록이고 글, 이름표, 이미지 순이다")
+    void sendsListInputWithTextLabelAndImageWhenImagesGiven() {
+        String dataUrl = "data:image/jpeg;base64,AAAA";
+        client.submit(new HermesRunCommand(
+                "dad",
+                baseUrl,
+                "안녕",
+                null,
+                null,
+                null,
+                null,
+                null,
+                List.of(new HermesImage("1번째 사진", dataUrl))));
+
+        JsonNode input = submittedBody().path("input");
+        assertThat(input.isArray()).as("input: %s", input).isTrue();
+        JsonNode last = input.get(input.size() - 1);
+        assertThat(last.path("role").asString()).isEqualTo("user");
+        JsonNode content = last.path("content");
+        assertThat(content.size()).as("content: %s", content).isEqualTo(3);
+        assertThat(content.get(0).path("type").asString()).isEqualTo("text");
+        assertThat(content.get(0).path("text").asString()).isEqualTo("안녕");
+        assertThat(content.get(1).path("type").asString()).isEqualTo("text");
+        assertThat(content.get(1).path("text").asString()).isEqualTo("1번째 사진");
+        assertThat(content.get(2).path("type").asString()).isEqualTo("image_url");
+        assertThat(content.get(2).path("image_url").path("url").asString()).isEqualTo(dataUrl);
+        assertThat(content.get(2).path("image_url").has("detail")).isFalse();
     }
 
     @Test

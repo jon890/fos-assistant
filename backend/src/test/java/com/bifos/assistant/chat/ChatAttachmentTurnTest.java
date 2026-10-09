@@ -40,6 +40,7 @@ import com.bifos.assistant.chat.presentation.ChatDtos.MessageView;
 import com.bifos.assistant.chat.presentation.ChatEventStreams;
 import com.bifos.assistant.hermes.HermesRunsClient;
 import com.bifos.assistant.hermes.StubHermesRunsClient;
+import com.bifos.assistant.hermes.dto.HermesImage;
 import com.bifos.assistant.hermes.dto.HermesRunCommand;
 import com.bifos.assistant.hermes.dto.HermesRunResult;
 import com.bifos.assistant.hermes.dto.TokenUsage;
@@ -54,6 +55,8 @@ import com.bifos.assistant.usage.infra.ExecutionEventRepository;
 import com.bifos.assistant.user.application.UserDisplayNameService;
 import com.bifos.assistant.user.domain.AppUser;
 import com.bifos.assistant.user.infra.AppUserRepository;
+import java.awt.image.BufferedImage;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -63,7 +66,9 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Random;
 import java.util.stream.Stream;
+import javax.imageio.ImageIO;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -126,6 +131,9 @@ class ChatAttachmentTurnTest {
 
     @Autowired
     HermesRunsClient hermes;
+
+    @Autowired
+    AttachmentStore store;
 
     /** 묶는 사이에 다른 요청이 끼어든 것을 만들려면 판정을 통과시킬 수 있어야 한다. */
     @Autowired
@@ -214,12 +222,27 @@ class ChatAttachmentTurnTest {
                     .append(photo.originalName())
                     .append(")\n");
         }
+        // 이미지가 아닌 바이트라 사본이 생기지 않는다. 아무것도 싣지 않고 사진마다 원본 경로로 안내한다.
         expected.append("\n")
-                .append("이미지는 read_file 로 읽지 말고 vision_analyze 로 본다.\n")
+                .append("사진은 모두 30장이다.\n")
+                .append("싣지 못한 사진은 아래 경로를 답에 필요한 만큼 vision_analyze 로 확인한다.\n");
+        for (int i = 0; i < selected.size(); i++) {
+            expected.append("- ")
+                    .append(i + 1)
+                    .append("번째 사진: ")
+                    .append(agentDirectory(conversationId))
+                    .append("/")
+                    .append(selected.get(i).id())
+                    .append(".png\n");
+        }
+        expected.append(
+                        "지난 메시지의 사진은 같은 폴더의 {첨부 번호}.small.jpg 를, 없으면 원본을 vision_analyze 로 본다. read_file 로 읽지 않는다.\n")
+                .append("파일을 올리거나 고치는 도구에는 위 목록의 원본 파일을 쓴다.\n")
                 .append("사용자에게 사진을 가리킬 때는 파일 이름 대신 몇 번째 사진인지로 적는다.\n")
                 .append("\n")
                 .append("이 사진 설명해 줘");
         assertThat(input).isEqualTo(expected.toString());
+        assertThat(stub().received().getFirst().images()).isEmpty();
         assertThat(userMessageOf(conversationId).content()).isEqualTo("이 사진 설명해 줘");
         assertThat(chat.attachmentsByMessage(dad, conversationId)
                         .get(userMessageOf(conversationId).id()))
@@ -230,6 +253,147 @@ class ChatAttachmentTurnTest {
         chat.regenerate(dad, conversationId, event -> {});
 
         assertThat(stub().received()).extracting(HermesRunCommand::input).containsExactly(input, input);
+    }
+
+    @Test
+    @DisplayName("사진과 이미지가 아닌 파일을 함께 보내면 사진만 이미지로 싣고 나머지는 원본 경로로 안내한다")
+    void embedsOnlyDecodableImageAndGuidesOtherByOriginalPath() throws IOException {
+        Long conversationId = chat.startEmpty(dad, "dad").id();
+        ChatAttachment real = uploadPng(dad, conversationId, "진짜.png", png(8, 6));
+        ChatAttachment broken = upload(dad, conversationId, "깨진.png");
+
+        chat.send(dad, conversationId, "봐 줘", null, List.of(real.id(), broken.id()));
+
+        HermesRunCommand command = stub().received().getFirst();
+        assertThat(command.images()).extracting(HermesImage::label).containsExactly("1번째 사진");
+        assertThat(command.images().getFirst().dataUrl()).startsWith("data:image/jpeg;base64,");
+        assertThat(command.input())
+                .contains(
+                        "사진은 모두 2장이다.\n",
+                        "이 메시지에 이미지로 함께 실은 사진: 1번째 사진. 이미 보이므로 파일로 다시 읽지 않아도 된다.\n",
+                        "싣지 못한 사진은 아래 경로를 답에 필요한 만큼 vision_analyze 로 확인한다.\n"
+                                + "- 2번째 사진: " + agentDirectory(conversationId) + "/" + broken.id() + ".png\n",
+                        "파일을 올리거나 고치는 도구에는 위 목록의 원본 파일을 쓴다.\n")
+                .doesNotContain("- 1번째 사진: " + agentDirectory(conversationId));
+    }
+
+    @Test
+    @DisplayName("사진 서른 장을 보내면 앞의 열 장만 싣고 나머지 스무 장은 사본 경로로 안내한다")
+    void thirtyRealImagesEmbedFirstTenAndGuideRestBySmallCopyPath() throws IOException {
+        Long conversationId = chat.startEmpty(dad, "dad").id();
+        byte[] png = png(8, 6);
+        List<ChatAttachment> photos = new ArrayList<>();
+        for (int i = 1; i <= 30; i++) {
+            photos.add(uploadPng(dad, conversationId, "사진-" + i + ".png", png));
+        }
+
+        chat.send(
+                dad,
+                conversationId,
+                "모두 봐 줘",
+                null,
+                photos.stream().map(ChatAttachment::id).toList());
+
+        HermesRunCommand command = stub().received().getFirst();
+        assertThat(command.images())
+                .extracting(HermesImage::label)
+                .containsExactly(
+                        "1번째 사진", "2번째 사진", "3번째 사진", "4번째 사진", "5번째 사진", "6번째 사진", "7번째 사진",
+                        "8번째 사진", "9번째 사진", "10번째 사진");
+        assertThat(command.input())
+                .contains("이 메시지에 이미지로 함께 실은 사진: 1번째, 2번째, 3번째, 4번째, 5번째, 6번째, 7번째, 8번째, 9번째, 10번째 사진.");
+        List<String> smallLines = command.input()
+                .lines()
+                .filter(line -> line.startsWith("- ") && line.endsWith(".small.jpg"))
+                .toList();
+        List<String> expectedLines = new ArrayList<>();
+        for (int i = 11; i <= 30; i++) {
+            expectedLines.add("- " + i + "번째 사진: " + agentDirectory(conversationId) + "/"
+                    + AttachmentStore.smallName(photos.get(i - 1).id()));
+        }
+        assertThat(smallLines).containsExactlyElementsOf(expectedLines);
+    }
+
+    @Test
+    @DisplayName("사본 합이 7MB 에 닿으면 그 뒤 사진은 싣지 않고 사본 경로로 안내한다")
+    void stopsEmbeddingWhenEncodedBytesReachLimit() throws IOException {
+        Long conversationId = chat.startEmpty(dad, "dad").id();
+        byte[] noise = noisePng(1600, 1200);
+        assertThat((long) noise.length).isLessThanOrEqualTo(properties.maxBytes());
+        List<ChatAttachment> photos = new ArrayList<>();
+        for (int i = 1; i <= 5; i++) {
+            photos.add(uploadPng(dad, conversationId, "잡음-" + i + ".png", noise));
+        }
+
+        chat.send(
+                dad,
+                conversationId,
+                "다섯 장",
+                null,
+                photos.stream().map(ChatAttachment::id).toList());
+
+        HermesRunCommand command = stub().received().getFirst();
+        assertThat(command.images())
+                .extracting(HermesImage::label)
+                .containsExactly("1번째 사진", "2번째 사진", "3번째 사진");
+        assertThat(command.images().stream().mapToLong(image -> image.dataUrl().length()).sum())
+                .isLessThanOrEqualTo(7L * 1024 * 1024);
+        assertThat(command.input())
+                .contains(
+                        "- 4번째 사진: " + agentDirectory(conversationId) + "/"
+                                + AttachmentStore.smallName(photos.get(3).id()) + "\n",
+                        "- 5번째 사진: " + agentDirectory(conversationId) + "/"
+                                + AttachmentStore.smallName(photos.get(4).id()) + "\n");
+    }
+
+    @Test
+    @DisplayName("다시 생성해도 같은 사진을 다시 싣는다")
+    void regenerationEmbedsSameImagesAgain() throws IOException {
+        Long conversationId = chat.startEmpty(dad, "dad").id();
+        ChatAttachment photo = uploadPng(dad, conversationId, "a.png", png(8, 6));
+        chat.send(dad, conversationId, "봐 줘", null, List.of(photo.id()));
+
+        chat.regenerate(dad, conversationId, event -> {});
+
+        List<HermesRunCommand> received = stub().received();
+        assertThat(received).hasSize(2);
+        assertThat(received.getFirst().images()).hasSize(1);
+        assertThat(received.getLast().images()).isEqualTo(received.getFirst().images());
+        assertThat(received.getLast().input()).isEqualTo(received.getFirst().input());
+    }
+
+    @Test
+    @DisplayName("사본 파일이 없는 사진은 보낼 때 사본을 다시 만들어 싣는다")
+    void recreatesMissingSmallCopyWhenSending() throws IOException {
+        Long conversationId = chat.startEmpty(dad, "dad").id();
+        ChatAttachment photo = uploadPng(dad, conversationId, "a.png", png(8, 6));
+        attachments.prepareSmall(photo);
+        Path small = privateDirectory(conversationId).resolve(AttachmentStore.smallName(photo.id()));
+        Files.delete(small);
+
+        chat.send(dad, conversationId, "봐 줘", null, List.of(photo.id()));
+
+        assertThat(small).isRegularFile();
+        assertThat(stub().received().getFirst().images())
+                .extracting(HermesImage::label)
+                .containsExactly("1번째 사진");
+    }
+
+    @Test
+    @DisplayName("원본도 사본도 없는 사진을 보내도 실행은 돌고 원본 경로로 안내한다")
+    void runsAndGuidesByOriginalPathWhenFilesAreGone() throws IOException {
+        Long conversationId = chat.startEmpty(dad, "dad").id();
+        ChatAttachment photo = uploadPng(dad, conversationId, "a.png", png(8, 6));
+        store.delete(photo);
+
+        chat.send(dad, conversationId, "봐 줘", null, List.of(photo.id()));
+
+        assertThat(stub().received()).hasSize(1);
+        HermesRunCommand command = stub().received().getFirst();
+        assertThat(command.images()).isEmpty();
+        assertThat(command.input())
+                .contains("- 1번째 사진: " + agentDirectory(conversationId) + "/" + photo.id() + ".png\n")
+                .doesNotContain("이미지로 함께 실은 사진");
     }
 
     @Test
@@ -489,6 +653,46 @@ class ChatAttachmentTurnTest {
 
     private ChatAttachment upload(CurrentUser user, Long conversationId, String name) {
         return attachments.upload(user, conversationId, name, "image/png", IMAGE.length, new ByteArrayResource(IMAGE));
+    }
+
+    private ChatAttachment uploadPng(CurrentUser user, Long conversationId, String name, byte[] png) {
+        return attachments.upload(user, conversationId, name, "image/png", png.length, new ByteArrayResource(png));
+    }
+
+    /** 에이전트 쪽에서 보이는 그 대화의 사진 폴더다. */
+    private String agentDirectory(Long conversationId) {
+        return AGENT_ROOT + "/users/" + AttachmentStore.userDirectoryKey(dad.id()) + "/" + conversationId;
+    }
+
+    /** Control Plane 쪽에서 그 대화의 사진이 놓이는 폴더다. */
+    private Path privateDirectory(Long conversationId) {
+        return Path.of(properties.root())
+                .toAbsolutePath()
+                .resolve("users")
+                .resolve(AttachmentStore.userDirectoryKey(dad.id()))
+                .resolve(conversationId.toString());
+    }
+
+    private static byte[] png(int width, int height) throws IOException {
+        return pngOf(new BufferedImage(width, height, BufferedImage.TYPE_INT_RGB));
+    }
+
+    /** 압축되지 않는 잡음 PNG 다. 사본도 크게 남아 한 턴의 길이 상한을 확인할 수 있다. 씨앗을 고정해 매번 같다. */
+    private static byte[] noisePng(int width, int height) throws IOException {
+        BufferedImage image = new BufferedImage(width, height, BufferedImage.TYPE_INT_RGB);
+        Random random = new Random(42);
+        for (int y = 0; y < height; y++) {
+            for (int x = 0; x < width; x++) {
+                image.setRGB(x, y, random.nextInt(0x1000000));
+            }
+        }
+        return pngOf(image);
+    }
+
+    private static byte[] pngOf(BufferedImage image) throws IOException {
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        ImageIO.write(image, "png", out);
+        return out.toByteArray();
     }
 
     private ChatMessage userMessageOf(Long conversationId) {

@@ -17,6 +17,7 @@ import com.bifos.assistant.chat.domain.ChatAttachment;
 import com.bifos.assistant.chat.domain.ChatMessage;
 import com.bifos.assistant.chat.domain.Conversation;
 import com.bifos.assistant.chat.domain.type.MessageRole;
+import com.bifos.assistant.chat.infra.AttachmentStore;
 import com.bifos.assistant.chat.infra.ChatAttachmentRepository;
 import com.bifos.assistant.chat.infra.ChatMessageRepository;
 import com.bifos.assistant.chat.infra.ConversationRepository;
@@ -37,6 +38,10 @@ import com.bifos.assistant.usage.infra.AgentExecutionRepository;
 import com.bifos.assistant.usage.infra.ExecutionEventRepository;
 import com.bifos.assistant.user.domain.AppUser;
 import com.bifos.assistant.user.infra.AppUserRepository;
+import java.awt.image.BufferedImage;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -46,6 +51,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import javax.imageio.ImageIO;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -89,6 +95,9 @@ class ChatRegenerateTest {
 
     @Autowired
     HermesRunsClient hermes;
+
+    @Autowired
+    AttachmentStore store;
 
     private StubHermesRunsClient stub() {
         return (StubHermesRunsClient) hermes;
@@ -405,6 +414,59 @@ class ChatRegenerateTest {
                 .findFirst()
                 .orElseThrow();
         assertThat(chief.input()).contains("[이번 메시지에 올린 사진]", attachment.id() + ".png", "사진 질문");
+    }
+
+    @Test
+    @DisplayName("흐름으로 다시 생성하면 사진을 싣지 않고 사본 경로로 안내한다")
+    void flowRegenerationGuidesBySmallCopyPathWithoutEmbedding() throws IOException {
+        CurrentUser dad = member("dad@example.com", "dad");
+        stub().willReturn(result("first", "첫 답"));
+        Long conversationId = chat.send(dad, null, "사진 질문", "dad").conversationId();
+        ChatMessage question =
+                messages.findByConversationIdOrderByIdAsc(conversationId).getFirst();
+        byte[] png = png();
+        ChatAttachment attachment = attachmentRows.save(ChatAttachment.of(
+                conversationId,
+                dad.id(),
+                "image.png",
+                "image/png",
+                png.length,
+                Instant.now().plus(Duration.ofDays(1)),
+                Instant.now()));
+        attachment.nameStoredFile(attachment.id() + ".png");
+        attachmentRows.save(attachment);
+        // 앞선 실행이 같은 번호로 남긴 파일이 있으면 지우고 쓴다.
+        store.delete(attachment);
+        store.save(attachment, new ByteArrayInputStream(png));
+        attachments.prepareSmall(attachment);
+        assertThat(store.hasSmall(attachment)).isTrue();
+        attachments.attach(question.id(), conversationId, List.of(attachment.id()));
+        enableFlow("dad");
+        flowAnswers();
+        int before = stub().received().size();
+
+        chat.regenerate(dad, conversationId, event -> {});
+
+        List<HermesRunCommand> flowCommands =
+                stub().received().subList(before, stub().received().size());
+        HermesRunCommand chief = flowCommands.stream()
+                .filter(command -> command.input().contains("조사할 것과 만들 것을 나눈다"))
+                .findFirst()
+                .orElseThrow();
+        assertThat(chief.input())
+                .doesNotContain("이미지로 함께 실은")
+                .containsPattern("- 1번째 사진: .*/" + conversationId + "/"
+                        + AttachmentStore.smallName(attachment.id()) + "\\n");
+        assertThat(flowCommands).allSatisfy(command -> assertThat(command.images())
+                .as("flow command %s", command.profileName())
+                .isEmpty());
+        store.delete(attachment);
+    }
+
+    private static byte[] png() throws IOException {
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        ImageIO.write(new BufferedImage(8, 6, BufferedImage.TYPE_INT_RGB), "png", out);
+        return out.toByteArray();
     }
 
     private void enableFlow(String agentCode) {

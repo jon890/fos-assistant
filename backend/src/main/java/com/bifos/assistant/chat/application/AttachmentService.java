@@ -4,6 +4,7 @@ import com.bifos.assistant.chat.domain.ChatAttachment;
 import com.bifos.assistant.chat.infra.AttachmentProperties;
 import com.bifos.assistant.chat.infra.AttachmentStore;
 import com.bifos.assistant.chat.infra.ChatAttachmentRepository;
+import com.bifos.assistant.hermes.dto.HermesImage;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
@@ -185,11 +186,13 @@ public class AttachmentService {
     }
 
     /**
-     * Hermes 에 보낼 입력을 만든다. 사진이 놓인 자리와 파일 이름을 사용자가 쓴 글 앞에 붙인다.
+     * Hermes 에 보낼 입력을 만든다. 사진이 놓인 자리와 파일 이름, 사진을 어떻게 볼지를 사용자가 쓴 글 앞에 붙인다.
      *
-     * <p>{@code /v1/runs} 가 이미지 항목을 받지 않아 사진을 본문에 싣지 못한다. 대신 에이전트가 파일로
-     * 읽게 자리를 알린다. 근거는 ADR-020 에 있다. 경로는 Hermes 컨테이너에서 보이는 {@code agentRoot}
-     * 로 적는다. 파일은 디스크 이름으로만 찾을 수 있고, 올릴 때의 이름은 알아보라고 괄호로만 붙인다.
+     * <p>{@code embedImages} 가 참이면 이번 메시지의 사진을 줄인 사본으로 실행 입력에 함께 싣고, 상한 밖이거나
+     * 사본이 없어 싣지 못한 사진은 경로를 적어 같은 턴에 {@code vision_analyze} 로 보게 한다. 근거는 ADR-20261009 /
+     * native-image-input 에 있다. 흐름은 사진을 싣지 않으므로 거짓을 넘기고, 그때는 모든 사진을 경로로 안내한다.
+     * 경로는 Hermes 컨테이너에서 보이는 {@code agentRoot} 로 적는다. 파일은 디스크 이름으로만 찾을 수 있고, 올릴 때의
+     * 이름은 알아보라고 괄호로만 붙인다. 파일을 올리거나 고치는 도구에는 원본을 쓰라고 함께 적는다.
      *
      * <p>사진마다 이 대화에서 몇 번째 사진인지 붙인다. 디스크 이름은 첨부 번호라 여러 대화에 걸쳐 커지고,
      * 에이전트가 그 이름으로 사진을 가리키면 사용자는 화면에서 어느 사진인지 찾지 못한다. 순번은 메시지와
@@ -198,9 +201,10 @@ public class AttachmentService {
      * <p>사진이 없으면 한 글자도 붙이지 않는다. 붙이면 그만큼이 매 실행에 실린다. 저장하는 메시지 본문에는
      * 이것을 쓰지 않는다.
      */
-    public String agentInput(Long conversationId, List<ChatAttachment> attached, String text) {
+    public AgentInput agentInput(
+            Long conversationId, List<ChatAttachment> attached, String text, boolean embedImages) {
         if (attached == null || attached.isEmpty()) {
-            return text;
+            return new AgentInput(text, List.of());
         }
         Long ownerUserId = attached.getFirst().uploadedByUserId();
         boolean sameOwnerAndConversation = attached.stream()
@@ -216,14 +220,53 @@ public class AttachmentService {
                 .map(it ->
                         "- " + order.get(it.id()) + "번째 사진: " + it.storedName() + " (올린 이름: " + it.originalName() + ")")
                 .collect(Collectors.joining("\n"));
-        return "[이번 메시지에 올린 사진]\n"
+        List<AgentPhoto> photos = images.photos(attached, order, embedImages);
+        String input = "[이번 메시지에 올린 사진]\n"
                 + directory + "\n"
                 + files + "\n"
                 + "\n"
-                + "이미지는 read_file 로 읽지 말고 vision_analyze 로 본다.\n"
+                + photoGuidance(directory, photos)
+                + "지난 메시지의 사진은 같은 폴더의 {첨부 번호}.small.jpg 를, 없으면 원본을 vision_analyze 로 본다."
+                + " read_file 로 읽지 않는다.\n"
+                + "파일을 올리거나 고치는 도구에는 위 목록의 원본 파일을 쓴다.\n"
                 + "사용자에게 사진을 가리킬 때는 파일 이름 대신 몇 번째 사진인지로 적는다.\n"
                 + "\n"
                 + text;
+        List<HermesImage> hermesImages = photos.stream()
+                .filter(AgentPhoto::embedded)
+                .map(photo -> new HermesImage(photo.ordinal() + "번째 사진", photo.dataUrl()))
+                .toList();
+        return new AgentInput(input, hermesImages);
+    }
+
+    /** 이번 메시지의 사진이 몇 장이고, 어느 사진을 실었고, 싣지 못한 사진은 어느 경로로 보는지 적는다. */
+    private static String photoGuidance(String directory, List<AgentPhoto> photos) {
+        StringBuilder guidance =
+                new StringBuilder("사진은 모두 ").append(photos.size()).append("장이다.\n");
+        List<AgentPhoto> embedded =
+                photos.stream().filter(AgentPhoto::embedded).toList();
+        if (!embedded.isEmpty()) {
+            guidance.append("이 메시지에 이미지로 함께 실은 사진: ")
+                    .append(embedded.stream()
+                            .map(photo -> photo.ordinal() + "번째")
+                            .collect(Collectors.joining(", ")))
+                    .append(" 사진. 이미 보이므로 파일로 다시 읽지 않아도 된다.\n");
+        }
+        List<AgentPhoto> notEmbedded =
+                photos.stream().filter(photo -> !photo.embedded()).toList();
+        if (!notEmbedded.isEmpty()) {
+            guidance.append("싣지 못한 사진은 아래 경로를 답에 필요한 만큼 vision_analyze 로 확인한다.\n");
+            for (AgentPhoto photo : notEmbedded) {
+                guidance.append("- ")
+                        .append(photo.ordinal())
+                        .append("번째 사진: ")
+                        .append(directory)
+                        .append("/")
+                        .append(photo.agentFileName())
+                        .append("\n");
+            }
+        }
+        return guidance.toString();
     }
 
     /**
