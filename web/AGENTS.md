@@ -109,15 +109,6 @@ grep -rn 'style={{' web/src/
 [`backend/docs/code-architecture.md`](../backend/docs/code-architecture.md)의 「파일 길이 기준 목록」이 갖는다.
 함수 길이 경고는 ESLint가 계속 검사한다.
 
-### 상대 경로 import 예외
-
-`test/unit/*.test.ts` 가 `node --test` 로 읽는 web 파일과, 그 파일이 런타임에 import 하는 web 파일은 상대 경로 import 를 쓴다.
-타입만 가져오는 `import type` 은 실행할 때 지워지므로 `@/` 를 써도 된다.
-
-이 파일들은 `eslint.config.mjs` 의 `NODE_TEST_READ_FILES` 에 있고 `../*` 규칙에서 빠진다.
-단위 테스트가 새 web 파일을 읽으면 그 파일의 `../` import 를 따라가 상대 경로로 import 하는 파일을 이 목록에 더한다.
-그 파일이 다시 import 하는 파일도 상대 경로를 써야 한다.
-
 ### 포맷
 
 **Prettier 는 저장소 전체를 검사하지 않고 `origin/main` 과의 공통 조상 뒤에 바뀐 파일만 검사한다.**

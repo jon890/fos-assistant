@@ -1,6 +1,6 @@
 # backend
 
-Control Plane 이다. Spring Boot 4 와 MySQL 8.4 를 쓴다.
+Control Plane 이다. Spring Boot 4 와 MySQL 을 쓴다.
 
 저장소 전체에 걸리는 규칙은 루트 [`AGENTS.md`](../AGENTS.md) 가 갖는다.
 공개 저장소에 무엇을 적지 않는지도 그 문서가 정한다.

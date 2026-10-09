@@ -6,7 +6,8 @@ import nextTs from "eslint-config-next/typescript";
 /**
  * `node --test` 가 읽는 파일과 그 파일이 import 하는 파일이다.
  * Node 는 tsconfig 의 `@/` 별칭을 풀지 못하므로, 이 파일들은 상대 경로 import 를 쓴다.
- * 새 단위 테스트가 web 파일을 읽으면 이 목록을 갱신한다.
+ * 그 파일이 다시 import 하는 파일도 상대 경로를 써야 한다. 타입만 가져오는 `import type` 은 실행할 때 지워지므로 `@/` 를 써도 된다.
+ * 새 단위 테스트가 web 파일을 읽으면 그 파일의 `../` import 를 따라가 상대 경로로 import 하는 파일을 이 목록에 더한다.
  */
 const NODE_TEST_READ_FILES = [
   "src/components/chat/activity/activity-state.ts",

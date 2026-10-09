@@ -45,7 +45,6 @@ Hermes Agent 를 Agent Runtime 으로 두고 이 저장소는 Control Plane 과 
 `MEMBER` 는 코드의 값이므로 그대로 쓰되, 사람을 가리킬 때는 쓰지 않는다.
 
 **이미 적용된 마이그레이션 파일은 용어를 바꾸려고 고치지 않는다.** Flyway 가 주석까지 체크섬에 넣어 운영 기동이 멈춘다.
-`test/unit/migration-immutable.test.ts` 는 `test/unit/migration-checksums.json` 에 든 파일만 확인한다. 새 마이그레이션을 운영에 배포한 뒤 그 파일을 목록에 더한다.
 
 사용자, profile, 에이전트, 대화가 어떻게 이어지는지는 [`docs/code-architecture.md`](docs/code-architecture.md) 의 「사용자와 profile, 에이전트, 대화」 가 갖는다.
 
@@ -54,7 +53,6 @@ Hermes Agent 를 Agent Runtime 으로 두고 이 저장소는 Control Plane 과 
 - **이 저장소는 공개 저장소다. 홈서버의 운영 정보를 적지 않는다.** 아래 「공개 저장소」 를 본다.
 - Hermes core 를 고치지 않는다. profile, API server, plugin hook 만 쓴다.
   고쳐야 할 것 같으면 ADR-001 의 검토 순서를 따른다.
-- Hermes 에 설치하는 plugin 과 profile 틀은 `hermes/` 가 갖는다. 운영 값은 설치할 때 받고 코드에 두지 않는다.
 - 비밀값을 데이터베이스에 넣지 않는다. profile key 는 홈서버 파일에 둔다.
 - 실행할 profile 은 요청자의 바인딩에서만 꺼낸다. 요청 본문이 profile 을 정하지 못한다.
 - Memory 접근 권한은 Control Plane 이 정한다. Hermes 내장 memory 도구는 주지 않는다.
@@ -143,12 +141,7 @@ scripts/check-local.sh usage-breakdown memory-document
 **PR 을 열거나 Ready 로 바꾸거나 머지할 때는 [`.claude/skills/pr-merge/SKILL.md`](.claude/skills/pr-merge/SKILL.md) 를 읽는다.**
 Draft CI, main 합치기, 리뷰 반영, 머지 판정의 순서를 그 파일이 갖는다.
 
-GitHub Actions 의 [CI](.github/workflows/ci.yml) 는 backend(MySQL 마이그레이션 검사 포함), web, e2e, unit, hermes(커넥터 검사 포함), quality, public-safe 와 전체 브라우저 검사를 돌린다.
-job 구조와 shard, 매일 실행, 실패 이슈는 그 파일이 갖는다.
-
 공개 정보 검사의 값 목록은 repository secret `PUBLIC_REPO_DENYLIST` 다. `fos-home-infra` 의 목록이 바뀌면 secret 도 다시 넣는다.
-
-머지 전 브라우저 검사는 `BROWSER_WEB_SERVER` 를 비운 기본값(빌드한 서버)으로 돌린다. 개발 서버를 쓰는 경우는 [`web/AGENTS.md`](web/AGENTS.md) 가 갖는다.
 
 ## 머지는 PR 로 한다
 
