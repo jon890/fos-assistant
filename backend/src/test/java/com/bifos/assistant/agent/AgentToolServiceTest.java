@@ -73,13 +73,14 @@ class AgentToolServiceTest {
     @DisplayName("기존 개인 profile에 원본 조회를 자동 제공하고 도구 설정을 보존한다")
     void originalInspectionIsAddedAutomaticallyToExistingPrivateProfile() {
         when(agents.findByCodeForUpdate(agent.code())).thenReturn(Optional.of(agent));
+        when(connectorBindings.connectorServers(agent.id())).thenReturn(Set.of("mcp-demo"));
         when(toolsets.readEnabled(agent.apiBaseUrl(), agent.hermesProfile()))
-                .thenReturn(List.of("web", "fos-assistant"), List.of("web", "fos-assistant", "fos-attachments"));
+                .thenReturn(List.of("web"), List.of("web", "fos-attachments"));
         service.ensureAttachmentInspection(agent);
         Mockito.verify(toolsets)
                 .writeApiServer(
                         agent.hermesProfile(),
-                        List.of("web", "fos-assistant", "fos-attachments"),
+                        List.of("web", "fos-assistant", "fos-attachments", "mcp-demo"),
                         agent.sandboxOwner());
     }
 

@@ -45,9 +45,12 @@ public class AgentToolService {
         if (enabled.contains(AgentToolPolicy.ATTACHMENT_INSPECTION)) {
             return;
         }
-        List<String> desired = new ArrayList<>(enabled);
+        Set<String> desired = new LinkedHashSet<>(enabled);
+        // listener의 내장 도구 목록에는 MCP 서버 이름이 없다. 설정을 다시 쓸 때 정책의 고정 서버와 바인딩을 보존한다.
+        desired.add(AgentToolPolicy.CONTROL_PLANE_MCP);
         desired.add(AgentToolPolicy.ATTACHMENT_INSPECTION);
-        toolsets.writeApiServer(agent.hermesProfile(), desired, agent.sandboxOwner());
+        desired.addAll(connectorBindings.connectorServers(agent.id()));
+        toolsets.writeApiServer(agent.hermesProfile(), List.copyOf(desired), agent.sandboxOwner());
         if (!toolsets.readEnabled(agent.apiBaseUrl(), agent.hermesProfile())
                 .contains(AgentToolPolicy.ATTACHMENT_INSPECTION)) {
             throw new ApiException(ErrorCode.AGENT_TOOLS_NOT_APPLIED, "original inspection tool was not applied");
