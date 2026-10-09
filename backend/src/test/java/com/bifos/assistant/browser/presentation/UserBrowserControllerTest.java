@@ -45,7 +45,7 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
 /**
  * 내 브라우저 경로와 관리자 경로가 HTTP 경계에서 돌려주는 상태 코드와 응답 모양을 본다. 계약은 {@code docs/features/user-browser.md} 의
- * 「API」 다.
+ * 「API(사용자 브라우저)」 다.
  *
  * <p>요청자는 인증 필터가 채우는 것과 같은 보안 문맥으로 넣는다. 서비스는 실제 DB 와 대역 proxy 로 돈다.
  */

@@ -92,7 +92,7 @@
 연결 전, 해제 후, 뗀 뒤에는 그 에이전트가 커넥터 도구를 부르지 못해야 한다.
 커넥터를 하나 더 붙이는 일은 plugin 에 `connector.json` 을 두고 운영 목록에 한 줄을 더하는 것으로 끝나고, Control Plane 과 웹을 고치지 않는다.
 누구나 자기 계정으로 쓸 수 있는 서비스의 커넥터는 이 저장소의 `hermes/connectors/` 에 두고 기여를 받는다([ADR-064](../hermes/docs/adr/ADR-064-범용-커넥터는-이-저장소의-hermes-connectors-에-두고-저장소가-유지보수한다.md)).
-화면과 상태 계약은 [커넥터 연결](prd.md)이 갖는다.
+화면과 상태 계약은 [커넥터 연결](features/connector.md)이 갖는다.
 
 ## 범위 밖
 

@@ -3,7 +3,7 @@
 사용자의 Gmail 계정에 붙는 범용 커넥터다. 코드는 [`hermes/connectors/gmail/`](.) 에 있다.
 이 문서는 도구와 정책, 보안, 설정 안내, 실제 계정으로 확인하는 절차를 갖는다.
 초기 결정은 [ADR-066](../../docs/adr/ADR-066-gmail-커넥터는-직접-만든-mcp-서버와-gmail-modify-scope-하나로-돌고-휴지통은-서버가-막는다.md), TypeScript 전환과 필터 권한은 [ADR-084](../../docs/adr/ADR-084-gmail-typescript-filters.md) 에 있다.
-커넥터 공통 계약은 [커넥터 연결](../../../docs/prd.md) 과 [커넥터 도구 정책](../../../docs/features/connector-policy.md) 이 갖는다.
+커넥터 공통 계약은 [커넥터 연결](../../../docs/features/connector.md) 과 [커넥터 도구 정책](../../../docs/features/connector-policy.md) 이 갖는다.
 
 ## 등록 칸
 

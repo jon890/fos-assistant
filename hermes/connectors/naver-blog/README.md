@@ -3,7 +3,7 @@
 사용자가 「내 브라우저」 에 로그인해 둔 네이버 계정으로 블로그 글을 임시저장하는 범용 커넥터다. 코드는 [`hermes/connectors/naver-blog/`](.) 에 있다.
 이 문서는 도구와 정책, 초안의 모양, 보안, 설정 안내, 실제 계정으로 확인하는 절차를 갖는다.
 결정과 근거는 [ADR-20261007 / naver-blog-connector](../../../docs/adr/ADR-20261007-naver-blog-connector.md) 에 있다.
-커넥터 공통 계약은 [커넥터 연결](../../../docs/prd.md) 과 [커넥터 도구 정책](../../../docs/features/connector-policy.md) 이 갖는다.
+커넥터 공통 계약은 [커넥터 연결](../../../docs/features/connector.md) 과 [커넥터 도구 정책](../../../docs/features/connector-policy.md) 이 갖는다.
 
 **발행하지 않는다.** 글은 임시저장 상태로 남고, 공개는 사용자가 네이버에서 직접 한다.
 

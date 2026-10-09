@@ -145,7 +145,7 @@ Checks and the daily wake-up do not call value evaluation or the autonomy policy
 - **Collections and sensitive entries.** Entries belong to collections, and each agent receives only the collections it is allowed to. An admin changes that allowance on the agent page in the admin area. The body of a sensitive entry is encrypted at rest. Earlier revisions are kept when an entry is edited or deleted ([ADR-053](backend/docs/adr/ADR-053-에이전트는-허용된-collection-의-memory-만-받는다.md), [ADR-055](backend/docs/adr/ADR-055-민감-memory-본문은-저장할-때-암호화하고-key-는-환경-변수로-받는다.md)).
 - **Read-only access for other services.** A service token bound to a user lets another service read that user's documents and nothing else ([ADR-056](backend/docs/adr/ADR-056-다른-서비스는-사용자에-묶인-서비스-토큰으로-문서를-읽기만-한다.md)).
 
-Some Memory screens, such as editing the collection list and viewing earlier revisions of an entry, are not built yet. The current list is in [`docs/code-architecture.md`](docs/code-architecture.md).
+Some Memory screens, such as editing the collection list and viewing earlier revisions of an entry, are not built yet. The current list is in the "Memory 에서 아직 만들지 않은 것" section of [`docs/features/memory.md`](docs/features/memory.md).
 
 ### Execution spaces
 

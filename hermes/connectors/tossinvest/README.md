@@ -3,7 +3,7 @@
 사용자의 토스증권 계좌를 읽는 범용 커넥터다. 코드는 [`hermes/connectors/tossinvest/`](.) 에 있다.
 이 문서는 도구와 정책, 보안, 설정 안내, 실제 계정으로 확인하는 절차를 갖는다.
 결정은 [ADR-20261008 / tossinvest-connector](../../docs/adr/ADR-20261008-tossinvest-connector.md) 에 있다.
-커넥터 공통 계약은 [커넥터 연결](../../../docs/prd.md) 과 [커넥터 도구 정책](../../../docs/features/connector-policy.md) 이 갖는다.
+커넥터 공통 계약은 [커넥터 연결](../../../docs/features/connector.md) 과 [커넥터 도구 정책](../../../docs/features/connector-policy.md) 이 갖는다.
 
 **이 커넥터는 주문하지 않는다.** 주문, 정정, 취소 도구가 없다. 매수와 매도는 사용자가 토스증권 앱이나 웹에서 한다.
 

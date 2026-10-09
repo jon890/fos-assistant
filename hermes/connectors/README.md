@@ -1,7 +1,7 @@
 # 커넥터 만들기
 
 이 저장소가 갖는 범용 커넥터를 만드는 방법과 `connector.json` 의 형식을 갖는다.
-커넥터를 연결하고 붙이는 흐름과 승인은 [`docs/prd.md`](../../docs/prd.md) 가 갖는다.
+커넥터를 연결하고 붙이는 흐름은 [`docs/features/connector.md`](../../docs/features/connector.md), 승인은 [`docs/features/connector-policy.md`](../../docs/features/connector-policy.md) 의 「커넥터 승인」 이 갖는다.
 
 이 저장소가 유지보수하는 범용 커넥터를 만들고 PR 로 올리는 방법이다.
 어떤 커넥터를 여기 두는지와 그 근거는 [ADR-064](../docs/adr/ADR-064-범용-커넥터는-이-저장소의-hermes-connectors-에-두고-저장소가-유지보수한다.md) 가 갖는다.
