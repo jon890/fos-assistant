@@ -93,6 +93,7 @@ class SkillServiceTest {
     private static final String GROUP_PROFILE = "skill-group-profile";
 
     private static final CurrentUser OWNER = new CurrentUser(81L, "dad@example.com", "아빠", 1L, UserRole.MEMBER);
+    private static final CurrentUser ADMIN = new CurrentUser(81L, "dad@example.com", "아빠", 1L, UserRole.ADMIN);
     private static final CurrentUser MEMBER = new CurrentUser(82L, "kid@example.com", "아이", 1L, UserRole.MEMBER);
 
     /** {@code application-test.yml} 의 스킬 루트다. 두 루트가 같아 게시된 경로를 그대로 열 수 있다. */
@@ -169,7 +170,7 @@ class SkillServiceTest {
                         "weekly-plan",
                         "이번 주 계획을 세운다",
                         skillMd("weekly-plan"),
-                        List.of(new SkillFileInfo("references/guide.md", 6L))));
+                        List.of(new SkillFileInfo("references/guide.md", 6L, "안내"))));
         assertThat(Files.readAllLines(Path.of(dirs.getValue().get(0), "weekly-plan", "SKILL.md")))
                 .as("게시한 경로에 SKILL.md 가 있다")
                 .contains("name: weekly-plan");
@@ -371,7 +372,7 @@ class SkillServiceTest {
                         "shopping", "shopping 을 한다", SkillSource.UPLOADED, true, new SkillUsageSummary(0, null)));
         assertThat(skills.read(OWNER, OWNED, "shopping").files())
                 .as("편집 화면이 표식 없는 버전의 원문을 연다")
-                .containsExactly(new SkillFileInfo("references/list.md", 16L));
+                .containsExactly(new SkillFileInfo("references/list.md", 16L, "장보기 목록"));
 
         doAnswer(call -> null).when(skillClient).publish(anyString(), anyList(), any(), anyString());
         skills.save(
@@ -470,7 +471,7 @@ class SkillServiceTest {
         assertThat(commandCatalog.enabledNames(agent)).as("지우기를 되돌린 뒤").containsExactly("hermes-help");
 
         when(skillClient.list(OWNED_PROFILE)).thenReturn(List.of(new HermesSkill("hermes-help", "Hermes 기본", false)));
-        skills.toggle(OWNER, OWNED, "hermes-help", false);
+        skills.adminToggle(ADMIN, OWNED, "hermes-help", false);
         assertThat(commandCatalog.enabledNames(agent)).as("끈 뒤").isEmpty();
     }
 
@@ -623,7 +624,7 @@ class SkillServiceTest {
         SkillDetail detail = skills.read(OWNER, OWNED, "weekly-plan");
         assertThat(detail.body()).startsWith("---\nname: weekly-plan");
         assertThat(detail.description()).isEqualTo("이번 주 계획을 세운다");
-        assertThat(detail.files()).containsExactly(new SkillFileInfo("references/guide.md", 6L));
+        assertThat(detail.files()).containsExactly(new SkillFileInfo("references/guide.md", 6L, "안내"));
         assertCode(() -> skills.read(OWNER, OWNED, "hermes-help"), ErrorCode.SKILL_NOT_FOUND);
 
         SkillList list = skills.list(OWNER, OWNED);
@@ -633,9 +634,7 @@ class SkillServiceTest {
         // 편집자에게는 호출이 없는 스킬에도 합계가 0 으로 붙는다.
         SkillUsageSummary noUse = new SkillUsageSummary(0, null);
         assertThat(list.skills())
-                .containsExactly(
-                        new SkillListItem("hermes-help", "Hermes 기본", SkillSource.HERMES, true, noUse),
-                        new SkillListItem("weekly-plan", "이번 주 계획을 세운다", SkillSource.UPLOADED, false, noUse));
+                .containsExactly(new SkillListItem("weekly-plan", "이번 주 계획을 세운다", SkillSource.UPLOADED, false, noUse));
 
         when(toolsets.readEnabled(anyString(), anyString())).thenReturn(WITH_SKILLS);
         when(skillClient.list(GROUP_PROFILE)).thenReturn(List.of());
@@ -670,15 +669,48 @@ class SkillServiceTest {
     @Test
     @DisplayName("켜고 끄기는 Hermes 이름 규칙으로 보고 대시보드에 그대로 넘긴다")
     void toggleChecksHermesNameRuleAndPassesAsIsToDashboard() {
-        skills.toggle(OWNER, OWNED, "hermes-help", false);
-        skills.toggle(OWNER, OWNED, "note_taking.v2", true);
+        skills.adminToggle(ADMIN, OWNED, "hermes-help", false);
+        skills.adminToggle(ADMIN, OWNED, "note_taking.v2", true);
 
         verify(skillClient).toggle(OWNED_PROFILE, "hermes-help", false);
         verify(skillClient).toggle(OWNED_PROFILE, "note_taking.v2", true);
         for (String bad : List.of("..", ".hidden", "Upper", "a/b", "a".repeat(65), "")) {
-            assertCode(() -> skills.toggle(OWNER, OWNED, bad, false), ErrorCode.VALIDATION_FAILED);
+            assertCode(() -> skills.adminToggle(ADMIN, OWNED, bad, false), ErrorCode.VALIDATION_FAILED);
         }
         verify(skillClient, never()).toggle(eq(OWNED_PROFILE), eq(".."), anyBoolean());
+    }
+
+    @Test
+    @DisplayName("일반 경로는 관리자 역할도 올린 스킬만 받고 관리자 경로만 기본과 커넥터 스킬을 준다")
+    void listSeparatesUploadedFromAdminOnlySkills() {
+        skills.save(OWNER, GROUP, "weekly-plan", skillMd("weekly-plan"), List.of());
+        when(skillClient.list(GROUP_PROFILE))
+                .thenReturn(List.of(
+                        new HermesSkill("hermes-help", "기본", true),
+                        new HermesSkill("connector-notes", "연결 지침", true),
+                        new HermesSkill("weekly-plan", "이번 주 계획", false)));
+        for (CurrentUser user : List.of(OWNER, MEMBER, ADMIN)) {
+            assertThat(skills.list(user, GROUP).skills())
+                    .extracting(SkillListItem::name)
+                    .containsExactly("weekly-plan");
+        }
+        assertThat(skills.adminList(ADMIN, GROUP).skills())
+                .extracting(SkillListItem::name)
+                .containsExactly("connector-notes", "hermes-help", "weekly-plan");
+        CurrentUser otherAdmin = new CurrentUser(83L, "admin@example.com", "관리자", 1L, UserRole.ADMIN);
+        assertCode(() -> skills.adminList(otherAdmin, OWNED), ErrorCode.AGENT_NOT_FOUND);
+        assertCode(() -> skills.adminToggle(otherAdmin, OWNED, "hermes-help", false), ErrorCode.AGENT_NOT_FOUND);
+        assertCode(() -> skills.adminList(OWNER, GROUP), ErrorCode.FORBIDDEN);
+        assertCode(() -> skills.adminToggle(OWNER, GROUP, "hermes-help", false), ErrorCode.FORBIDDEN);
+        assertCode(() -> skills.toggle(OWNER, GROUP, "hermes-help", false), ErrorCode.SKILL_NOT_FOUND);
+        assertCode(() -> skills.toggle(ADMIN, GROUP, "connector-notes", false), ErrorCode.SKILL_NOT_FOUND);
+        assertCode(() -> skills.read(MEMBER, GROUP, "weekly-plan"), ErrorCode.FORBIDDEN);
+        verify(skillClient, never()).toggle(eq(GROUP_PROFILE), eq("hermes-help"), anyBoolean());
+        skills.toggle(OWNER, GROUP, "weekly-plan", false);
+        verify(skillClient).toggle(GROUP_PROFILE, "weekly-plan", false);
+        assertCode(
+                () -> skills.save(OWNER, GROUP, "connector-notes", skillMd("connector-notes"), List.of()),
+                ErrorCode.SKILL_NAME_TAKEN);
     }
 
     /**

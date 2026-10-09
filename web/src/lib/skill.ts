@@ -38,6 +38,7 @@ export type SkillListView = {
 export type SkillFileView = {
   path: string;
   size: number;
+  content: string;
 };
 
 /** 올린 스킬 하나다. `body` 는 앞머리를 포함한 `SKILL.md` 원문이다. */

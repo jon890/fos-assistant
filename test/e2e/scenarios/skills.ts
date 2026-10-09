@@ -61,7 +61,9 @@ export const skillsScenario: Scenario = {
     const uploaded = list.skills.find((skill) => skill.name === NAME);
     expect(uploaded?.source === "UPLOADED" && uploaded.enabled, `올린 스킬이 목록에 없거나 출처가 다르다: ${JSON.stringify(list)}`);
     expect(uploaded?.description === DESCRIPTION, `목록의 설명이 다르다: ${uploaded?.description}`);
-    expect(list.skills.some((skill) => skill.name === "hermes-help" && skill.source === "HERMES"), "Hermes 기본 스킬이 HERMES 로 보이지 않는다");
+    expect(list.skills.every((skill) => skill.source === "UPLOADED"), "일반 목록에 기본 스킬이 보인다");
+    const adminList = expectStatus(await call(context, "/admin/agents/dad/skills", { token: context.tokens.dad }), 200, "관리자 스킬 목록").json<SkillList>();
+    expect(adminList.skills.some((skill) => skill.name === "hermes-help" && skill.source === "HERMES"), "관리자 목록에 기본 스킬이 없다");
     expect(list.editable && list.skillsToolsetEnabled, `편집 여부와 도구 상태가 다르다: ${JSON.stringify(list)}`);
     expect(list.uploadLimit === 30, `올릴 수 있는 스킬 수 한도가 기본값 30 이 아니다: ${list.uploadLimit}`);
 
