@@ -15,6 +15,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Arrays;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -100,9 +101,8 @@ public class AttachmentService {
                 case "image/jpeg" -> raw.length >= 2 && raw[0] == (byte) 0xff && raw[1] == (byte) 0xd8;
                 case "image/png" ->
                     raw.length >= 8
-                            && java.util.Arrays.equals(
-                                    java.util.Arrays.copyOf(raw, 8),
-                                    new byte[] {(byte) 0x89, 'P', 'N', 'G', 13, 10, 26, 10});
+                            && Arrays.equals(
+                                    Arrays.copyOf(raw, 8), new byte[] {(byte) 0x89, 'P', 'N', 'G', 13, 10, 26, 10});
                 default -> false;
             };
             if (raw.length == 0 || raw.length > limit || raw.length != attachment.byteSize() || !magic) {

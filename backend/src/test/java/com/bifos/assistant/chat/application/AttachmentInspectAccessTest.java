@@ -18,6 +18,7 @@ import java.io.ByteArrayInputStream;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
+import java.util.Arrays;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -58,7 +59,7 @@ class AttachmentInspectAccessTest {
         assertThat(service.inspect(user, 2L, 7L, null).bytes()).containsExactly(bytes);
         when(photo.byteSize()).thenReturn((long) bytes.length + 1);
         assertThatThrownBy(() -> service.inspect(user, 2L, 7L, null)).isInstanceOf(ApiException.class);
-        byte[] overflow = java.util.Arrays.copyOf(bytes, bytes.length + 1);
+        byte[] overflow = Arrays.copyOf(bytes, bytes.length + 1);
         when(store.open(photo)).thenReturn(new ByteArrayInputStream(overflow));
         assertThatThrownBy(() -> service.inspect(user, 2L, 7L, null)).isInstanceOf(ApiException.class);
         when(photo.contentType()).thenReturn("image/webp");
