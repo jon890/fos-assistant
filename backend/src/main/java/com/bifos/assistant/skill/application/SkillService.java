@@ -38,7 +38,8 @@ import org.springframework.transaction.annotation.Transactional;
  * <p>같은 에이전트의 저장은 기다리는 행 잠금으로 한 번에 하나씩 돈다. 잠금은 트랜잭션이 끝날 때 풀리므로
  * {@link #save} 와 {@link #delete} 는 잠금부터 표식 쓰기와 옛 버전 정리까지 한 트랜잭션이다. 그동안
  * 같은 에이전트의 도구와 기본 모델 변경은 기다리지 않는 잠금이라 {@code AGENT_BUSY} 로 바로 거절되고,
- * 공개 범위 변경과 에이전트 지우기는 잠금이 풀릴 때까지 기다린다.
+ * 주인의 공개 범위 변경과 에이전트 지우기는 잠금이 풀릴 때까지 기다린다.
+ * 관리자 수정도 기다리지 않는 잠금이라 {@code AGENT_BUSY} 로 바로 거절된다.
  *
  * <p>저장, 지우기, 켜고 끄기가 Hermes 에 반영되면 {@link SkillsChanged} 를 낸다. 커맨드가 부를 수 있는 이름의
  * 캐시({@link SkillCommandCatalog})가 그것을 받아 비운다. catalog 를 직접 받지 않는 것은 catalog 가 이

@@ -23,7 +23,7 @@
 | `/agents/{code}` | 에이전트 하나의 설정. 성격, 도구, 스킬, 먼저 살펴보기와 매일 깨우기. 주인과 `ADMIN` 에게 공개와 삭제 |
 | `/agents/{code}/skills/new` | 새 스킬. 주인과 `ADMIN` |
 | `/agents/{code}/skills/{name}` | 올린 스킬 편집. 주인과 `ADMIN` |
-| `/connections` | 「외부 서비스 연결」. 커넥터 카드 목록. 아래 「연결 뒤 에이전트 고르기」 를 따른다. 카드마다 아이콘, 이름, 연결 상태, 설명, 링크, 도구 수와 위험도별 수, 붙인 에이전트 수를 보인다([ADR-20261008 / connector-card](../../docs/adr/ADR-20261008-connector-card.md)) |
+| `/connections` | 「외부 서비스 연결」. 커넥터 카드 목록. [`web/docs/prd.md`](prd.md) 의 「연결 뒤 에이전트 고르기」 를 따른다. 카드마다 아이콘, 이름, 연결 상태, 설명, 링크, 도구 수와 위험도별 수, 붙인 에이전트 수를 보인다([ADR-20261008 / connector-card](../../docs/adr/ADR-20261008-connector-card.md)) |
 | `/connections/{id}` | 커넥터 하나의 연결 화면. 머리에 아이콘, 이름, 설명, 링크를 보이고, 계정을 연결하고, 이 연결을 붙인 에이전트를 보인다 |
 | `/connections/accountbook` | 옛 주소. `/connections/{id}` 로 넘긴다 |
 | `/browser` | 내 브라우저. 만들기, 켜기, 끄기, 지우기와 자동 중지 안내, 켜져 있거나 꺼져 있을 때 로그인 화면(「화면 열기」). `?url=` 은 화면을 열 때 갈 시작 주소이고 `http`, `https` 가 아니면 무시한다. 상단 내비게이션에 없고 `/connections` 위쪽의 「내 브라우저」 링크로 간다([`backend/docs/flow.md`](../../backend/docs/flow.md)) |
