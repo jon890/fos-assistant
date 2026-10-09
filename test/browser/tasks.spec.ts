@@ -118,6 +118,36 @@ test("지우기를 확인하면 목록에서 사라진다", async ({ page }) => 
   await expect(page.getByTestId("task-item")).toHaveCount(0);
 });
 
+test("에이전트 행이 사라진 예약 작업은 목록에 지운 에이전트로 보인다", async ({ page }) => {
+  await page.route("**/api/tasks", (route: Route) => {
+    if (route.request().method() !== "GET") return route.fallback();
+    return route.fulfill({
+      json: [
+        {
+          id: "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee",
+          title: "행 없는 작업",
+          agentCode: null,
+          agentName: null,
+          instruction: "오늘 할 일을 정리해 줘",
+          state: "ACTIVE",
+          schedule: { type: "CRON", cron: "0 9 * * *", fireAt: null, timeZone: "Asia/Seoul" },
+          nextFireAt: null,
+          lastFiredAt: null,
+          conversationMode: "NEW_PER_RUN",
+          missedPolicy: "RUN_ONCE",
+          notify: "ALWAYS",
+          modelTier: null,
+          createdAt: "2026-10-01T00:00:00Z",
+        },
+      ],
+    });
+  });
+  await page.goto("/tasks");
+  await expect(page.getByTestId("task-item")).toHaveCount(1);
+  await expect(page.getByTestId("task-item")).toContainText("행 없는 작업");
+  await expect(page.getByTestId("task-item")).toContainText("지운 에이전트");
+});
+
 test("사이드바는 작업 대화를 작업 이름 아래로 묶고 누르면 펼친다", async ({ page }, testInfo) => {
   const taskId = "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee";
   const row = (id: string, title: string, updatedAt: string, withTask: boolean) => ({

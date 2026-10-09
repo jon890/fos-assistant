@@ -157,7 +157,7 @@ class UsageBreakdownTest {
     }
 
     @Test
-    @DisplayName("에이전트 행이 없는 실행도 agent 축에 번호로 묶이고 다른 줄은 그대로다")
+    @DisplayName("에이전트 행이 없는 실행도 agent 축에 번호로 묶이고 이름은 지운 에이전트다")
     void runWithoutAgentRowGroupsByIdOnAgentAxisAndOtherRowsStay() {
         save(career, MID_SEPTEMBER, 14_000_000L, 7_000L, null);
         save(chore, MID_SEPTEMBER.plusSeconds(60), 60_000L, 500L, null);
@@ -169,7 +169,7 @@ class UsageBreakdownTest {
         assertThat(rows).extracting(BreakdownRow::key).containsExactly(CAREER_CODE, missingKey);
         assertThat(rows.getFirst().label()).isEqualTo("진로 비서");
         assertThat(rows.get(1)).satisfies(row -> {
-            assertThat(row.label()).as("이름이 없으면 에이전트 번호를 이름 자리에 쓴다").isEqualTo(missingKey);
+            assertThat(row.label()).as("이름이 없으면 지운 에이전트로 보인다").isEqualTo("지운 에이전트");
             assertThat(row.detail()).isNull();
             assertThat(row.executions()).isOne();
             assertThat(row.estimatedCostMicros()).isEqualTo(60_000L);
