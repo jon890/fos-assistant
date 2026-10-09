@@ -41,9 +41,9 @@ enum 값: `READY`, `RESTART_PENDING`, `APPLY_SCHEDULED`, `CATALOG_MISSING`, `NOT
 
 ### 3. `ConnectorBindingService`
 
-- `resync` 의 반환형을 `ResyncOutcome` 으로 바꾼다. 위 자리마다 까닭을 정한다. `installs.record(...)` 가 참이면 `binding.restartRequired()` 로 `RESTART_PENDING` 과 `APPLY_SCHEDULED` 를 나눈다. probe 는 `!probe.ok()` 면 `PROBE_FAILED`, 도구가 비면 `NO_TOOLS`, 옛 바인딩의 toolset 이 다르면 `TOOLSETS_DIFFER` 다
+- `resync` 의 반환형을 `ResyncOutcome` 으로 바꾼다. 위 자리마다 까닭을 정한다. `installs.record(...)` 가 참이면 `binding.restartRequired()` 로 `RESTART_PENDING` 과 `APPLY_SCHEDULED` 를 나눈다. 옛 설치가 꺼진 자리(`!binding.desiredEnabled()` 이거나 `readConnector(...).enabled()` 가 거짓)는 `NOT_INSTALLED` 다. probe 는 `!probe.ok()` 면 `PROBE_FAILED`, 도구가 비면 `NO_TOOLS`, 옛 바인딩의 toolset 이 다르면 `TOOLSETS_DIFFER` 다
 - `READY` 와 `CALL_FAILED` 가 아닌 결과는 `log.info("connector {} not applied: {}", connectorId, outcome)` 한 줄을 남긴다. `CALL_FAILED` 는 지금의 `warn` 이 남긴다
-- `Confirmed` record 에 `ResyncOutcome outcome` 을 더한다. `confirmApplied` 는 view 가 null 이면 `ConnectorErrors.notApplied(outcome)` 을 던진다
+- `Confirmed` record 에 `ResyncOutcome outcome` 을 더한다. `confirmApplied` 는 `confirmed == null` 이면 지금처럼 `new ConnectorOperationFailure()` 를, view 가 null 이면 `ConnectorErrors.notApplied(confirmed.outcome())` 을 던진다
 - `ConnectorErrors.notApplied(ResyncOutcome)`: `CALL_FAILED` → `new ConnectorOperationFailure()`, `NOT_INSTALLED`/`POLICY_HOOK_OFF` → `CONNECTOR_INSTALL_MISMATCH`, `PROBE_FAILED`/`NO_TOOLS`/`TOOLSETS_DIFFER` → `CONNECTOR_TOOLS_UNVERIFIED`, `APPLY_SCHEDULED` → `CONNECTOR_APPLY_SCHEDULED`, `RESTART_PENDING` → `CONNECTOR_RESTART_AGAIN`, `CATALOG_MISSING` → `notFound()`. `READY` 는 여기 오지 않으므로 `IllegalStateException` 이다. 메시지는 고정 영문이다
 - 호출부를 고친다: `ConnectorConnectionService` 는 `bindingService.resync(...) == ResyncOutcome.CALL_FAILED`, `ConnectorBindingApplier` 는 반환값을 쓰지 않는 그대로다
 
@@ -62,8 +62,8 @@ enum 값: `READY`, `RESTART_PENDING`, `APPLY_SCHEDULED`, `CATALOG_MISSING`, `NOT
 ### 6. 시험
 
 - `backend/src/test/java/com/bifos/assistant/connector/ConnectorBindingServiceTest.java`
-  - `ConnectorOperationFailure` 를 기대하던 반영 완료 시험(반영 예정 전, 다시 재시작 필요)을 새 코드(`CONNECTOR_APPLY_SCHEDULED`, `CONNECTOR_RESTART_AGAIN`)로 고친다. `ApiException` 의 `code()` 로 본다
-  - 새 시험: 다시 읽은 설치가 `configured: false` 면 `CONNECTOR_INSTALL_MISMATCH`, `policyHook: false` 면 같은 코드, probe 가 실패하면 `CONNECTOR_TOOLS_UNVERIFIED`, 설치 다시 보내기가 예외면 `CONNECTOR_OPERATION_FAILED` 이고 모두 바인딩이 `PENDING` 으로 커밋되는지
+  - `ConnectorOperationFailure` 를 기대하던 반영 완료 시험을 새 코드로 고친다. `ApiException` 의 `code()` 로 본다. `confirmAppliedBeforeApplyDueStaysPending` 은 `CONNECTOR_APPLY_SCHEDULED`, `confirmAppliedStaysPendingWhenReinstallNeedsRestartAgain` 은 `CONNECTOR_RESTART_AGAIN`, `confirmAppliedKeepsRestartWaitWhenNotConfiguredOrProbeFails` 는 configured 거짓이면 `CONNECTOR_INSTALL_MISMATCH`, probe 실패면 `CONNECTOR_TOOLS_UNVERIFIED` 다
+  - 새 시험: 다시 읽은 설치의 `policyHook` 이 거짓이면 `CONNECTOR_INSTALL_MISMATCH`, probe 가 도구를 내지 않으면 `CONNECTOR_TOOLS_UNVERIFIED`, 설치 다시 보내기가 예외면 `CONNECTOR_OPERATION_FAILED` 이고 모두 바인딩이 `PENDING` 으로 커밋되는지. 위에서 고친 시험과 겹치지 않게 한다
   - `resync` 가 `PENDING` 일 때 `connector demo not applied: POLICY_HOOK_OFF` 로그를 남기는지(`OutputCaptureExtension` 이나 이 파일이 이미 쓰는 로그 확인 방식)
 - `backend/src/test/java/com/bifos/assistant/connector/ConnectorPolicyEndpointTest.java` 새 시험: 연결은 `READY` 이고 바인딩이 반영 대기(`PENDING`)일 때 `approval: always` 인 `purge_notes` 호출이 `NOT_READY` 로 막히는지. ADR 의 「보안 경계」 가 이 시험을 근거로 든다
 - `ConnectorConnectionControllerTest`, `ConnectorBindingServiceLockTest` 에 반영 완료가 502 를 기대하는 자리가 있으면 새 코드로 고친다
@@ -73,14 +73,14 @@ enum 값: `READY`, `RESTART_PENDING`, `APPLY_SCHEDULED`, `CATALOG_MISSING`, `NOT
 ## 검증
 
 ```bash
-cd backend && ./gradlew test --tests 'com.bifos.assistant.connector.*'
-cd backend && ./gradlew qualityCheck
+(cd backend && ./gradlew test --tests 'com.bifos.assistant.connector.*')
+(cd backend && ./gradlew qualityCheck)
 node --test test/unit/connection-error-message.test.ts
 pnpm --dir web typecheck
 scripts/check-local.sh connector-connection admin-area
 ```
 
-모두 종료 코드 0 이어야 한다.
+모두 종료 코드 0 이어야 한다. 여러 작업이 같은 머신에서 돌면 마지막 줄은 그 머신의 로컬 검사 잠금으로 감싸 돌린다.
 
 ## 변경 파일
 

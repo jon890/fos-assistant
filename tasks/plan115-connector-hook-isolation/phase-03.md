@@ -27,6 +27,8 @@ manifest 가 바뀐 뒤 설치가 다시 보내지지 않아 설치 상태가 �
 - 연속 어긋남 횟수와 다음 점검 위치는 이 컴포넌트의 필드(JVM 메모리)다. `ConnectorCatalogCache` 와 같은 한 대 전제다
 - 외부 상태 읽기는 트랜잭션 밖에서 한다. 사용자 행과 에이전트 행 잠금을 쥔 채 바인딩마다 대시보드를 부르지 않는다
 - 알림은 한 주기 끝에 별도 트랜잭션에서 만든다. 실패해도 바인딩 상태는 이미 커밋돼 관리자 목록에 보인다. 문서 `notification.md` 가 이 예외를 적는다
+- 예약 작업은 스레드 하나에서 돈다(`SchedulingConfig` 에 풀 설정이 없다). 대시보드 호출 수를 `drift-batch` 로 묶는 까닭이다
+- e2e(`test/e2e/run.ts`)는 실제 `application.yml` 로 띄우고 cron 을 환경 변수로만 끈다. 점검이 시나리오 도중 돌면 결과가 실행 시각에 따라 흔들리므로 `ASSISTANT_CONNECTOR_BINDING_DRIFT_CRON: "-"` 를 더한다
 - 기각: 운영 동기화 스크립트가 Control Plane 을 부르게 하는 안, 기동 때 한 번만 보는 안(ADR 「대안 기각」)
 
 ## 작업 항목
@@ -52,6 +54,7 @@ manifest 가 바뀐 뒤 설치가 다시 보내지지 않아 설치 상태가 �
   4. 바인딩마다 트랜잭션을 열고 `applyDueLocked` 와 같은 차례로 잠근 뒤 바인딩을 다시 읽는다. 없거나 `READY` 가 아니거나 잠금 확인(사용자, 에이전트 주인)이 실패하면 건너뛴다
   5. 연속 횟수가 3 이상이면 설치를 보내지 않고 `binding.pending(now)` 만 저장하고 결과를 `PENDING` 으로 센다. 아니면 카탈로그를 읽고(예외면 `applyDueLocked` 처럼 `PENDING` 으로 두고 경고) `service.resync(binding, manifest, false)` 를 부른다
   6. 결과가 `READY` 나 `APPLY_SCHEDULED` 가 아니면 잠근 사용자의 `groupId()` 아래에 재시작 대기 여부(`binding.restartRequired()`)와 함께 센다
+  각 바인딩의 트랜잭션은 `applyDue` 처럼 try/catch 로 감싸고, 예외면 `"connector binding {} failed at drift: {}"` 경고를 남기고 다음 바인딩으로 간다. 카탈로그를 읽지 못해 `PENDING` 으로 둔 바인딩도 관리자가 반영 완료로 다시 확인해야 하므로 알림 수에 넣는다
   7. 주기 끝에 센 그룹마다 한 트랜잭션에서 그 그룹의 차단되지 않은 관리자마다 알림을 만든다. 알림 만들기가 실패하면 경고만 남긴다
 - 알림 문구
   - 제목: 「연결 설치를 다시 맞췄어요」
@@ -63,6 +66,7 @@ manifest 가 바뀐 뒤 설치가 다시 보내지지 않아 설치 상태가 �
 ### 4. 알림 종류
 
 - `NotificationKind` 에 `CONNECTOR_REINSTALLED`, `NotificationTargetType` 에 `ADMIN_CONNECTIONS` 를 Javadoc 과 함께 더한다. 칸이 `VARCHAR(32)`, `VARCHAR(20)` 문자열이라 마이그레이션은 없다
+- `backend/src/main/java/com/bifos/assistant/notification/domain/Notification.java` 의 대상 칸 Javadoc(「targetPublicId 와 함께 채우거나 함께 비운다」)에 `ADMIN_CONNECTIONS` 예외를 적는다
 - `NotificationTarget` 의 검사를 `type == null || (publicId == null && type != NotificationTargetType.ADMIN_CONNECTIONS)` 로 바꾸고 Javadoc 을 고친다. 엔티티 `Notification` 과 응답 변환이 `publicId` null 을 받는지 확인하고, 받지 못하면 같은 커밋에서 고친다
 - `web/src/lib/notification.ts`: 두 union 에 값을 더하고 `notificationHref` 가 `ADMIN_CONNECTIONS` 면 `"/admin/connections"` 를 돌려준다
 
@@ -75,15 +79,16 @@ manifest 가 바뀐 뒤 설치가 다시 보내지지 않아 설치 상태가 �
   - 다시 보낸 설치가 `reload_pending` 이면 알림을 만들지 않는다
   - 설치 상태 읽기가 예외면 그 바인딩만 건너뛰고 `READY` 로 남는다
   - 다시 맞춰 `READY` 가 된 뒤 또 어긋나기를 세 번 되풀이하면 세 번째는 설치를 보내지 않고 `PENDING` 이다
-  - `drift-batch` 를 1 로 둔 시험 구성(`@TestPropertySource`)에서 두 번 부르면 두 바인딩을 차례로 하나씩 본다
+  - `drift-batch` 를 1 로 둔 시험 구성에서 두 번 부르면 두 바인딩을 차례로 하나씩 본다. `@TestPropertySource` 는 메서드에 달 수 없으므로 `@Nested` 클래스나 별도 시험 클래스로 만든다
+  - 차단된 관리자는 `backend/src/test/java/com/bifos/assistant/agent/ToolsetRequestFlowTest.java` 의 `AllowedPerson` 구성처럼 만든다(파일 위치는 `git grep -n AllowedPerson backend/src/test` 로 찾는다)
+  - `drift-batch` 가 0 이면 `ConnectorBindingProperties` 생성자가 `IllegalStateException` 을 던지는지 본다
 - `test/unit/notification.test.ts` 에 `ADMIN_CONNECTIONS` 가 `/admin/connections` 로 가는 시험을 더한다
-- `ConnectorPropertiesTest` 에 `drift-batch` 가 0 이면 기동이 멈추는 시험을 더한다(그 파일이 `ConnectorBindingProperties` 를 다루지 않으면 이 항목은 `ConnectorBindingDriftTest` 에서 생성자로 확인한다)
 
 ## 검증
 
 ```bash
-cd backend && ./gradlew test --tests 'com.bifos.assistant.connector.*' --tests 'com.bifos.assistant.notification.*' --tests 'com.bifos.assistant.architecture.*'
-cd backend && ./gradlew qualityCheck
+(cd backend && ./gradlew test --tests 'com.bifos.assistant.connector.*' --tests 'com.bifos.assistant.notification.*' --tests 'com.bifos.assistant.architecture.*')
+(cd backend && ./gradlew qualityCheck)
 node --test test/unit/notification.test.ts
 pnpm --dir web typecheck
 ```
@@ -104,6 +109,7 @@ pnpm --dir web typecheck
 | `backend/src/main/resources/application.yml` | 수정 |
 | `backend/src/test/resources/application-test.yml` | 수정 |
 | `backend/src/test/java/com/bifos/assistant/connector/ConnectorBindingDriftTest.java` | 신규 |
-| `backend/src/test/java/com/bifos/assistant/connector/ConnectorPropertiesTest.java` | 수정 |
+| `backend/src/main/java/com/bifos/assistant/notification/domain/Notification.java` | 수정 |
+| `test/e2e/run.ts` | 수정 |
 | `web/src/lib/notification.ts` | 수정 |
 | `test/unit/notification.test.ts` | 수정 |
