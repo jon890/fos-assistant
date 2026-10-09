@@ -12,6 +12,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -48,6 +49,12 @@ public class SkillController {
             @PathVariable String code, @PathVariable String name, @Valid @RequestBody WriteSkillRequest request) {
         return SkillDetailView.from(
                 skills.save(currentUser.require(), code, name, request.skillMd(), request.inputs()));
+    }
+
+    /** 이전 버전과 지금 버전을 맞바꿔 저장한다. */
+    @PostMapping("/{name}/restore-previous")
+    public SkillDetailView restorePrevious(@PathVariable String code, @PathVariable String name) {
+        return SkillDetailView.from(skills.restorePrevious(currentUser.require(), code, name));
     }
 
     @DeleteMapping("/{name}")

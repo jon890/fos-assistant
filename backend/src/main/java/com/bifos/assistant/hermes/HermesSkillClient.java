@@ -37,4 +37,16 @@ public interface HermesSkillClient {
      *     디렉터리를 만들고, 만들지 못하면 같은 코드로 보내지 않고 던진다(ADR-091)
      */
     void publish(String profile, List<String> externalDirs, List<String> apiServerToolsets, String sandboxOwner);
+
+    /**
+     * {@link #publish} 와 같되, 실행 공간에서 스크립트를 돌릴 수 없는 profile 이면 대시보드가 거절한다.
+     *
+     * <p>{@code scripts/} 가 든 스킬을 저장할 때 쓴다(ADR-20261009-skill-package). 도구 목록은 null 이 아니다. 본문에
+     * {@code require_sandbox: true} 를 싣는다.
+     *
+     * @throws HermesRequestRejected 409 {@code sandbox_unavailable} 이면 {@code AGENT_SANDBOX_UNAVAILABLE} 이다. 주인의
+     *     첨부 디렉터리를 만들지 못했을 때도 같은 코드로 보내지 않고 던지며, 그때 cause 는 대시보드 응답이 아니다
+     */
+    void publishRequiringSandbox(
+            String profile, List<String> externalDirs, List<String> apiServerToolsets, String sandboxOwner);
 }

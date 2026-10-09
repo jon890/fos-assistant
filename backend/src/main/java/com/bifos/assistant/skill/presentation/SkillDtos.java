@@ -75,8 +75,10 @@ public final class SkillDtos {
      *
      * @param body {@code SKILL.md} 원문 전체. 앞머리를 포함한다
      * @param files 참고 파일의 경로와 UTF-8 크기
+     * @param previousSavedAt 이전 버전을 남긴 시각. 없으면 {@code null} 로 칸을 보낸다
      */
-    public record SkillDetailView(String name, String description, String body, List<SkillFileView> files) {
+    public record SkillDetailView(
+            String name, String description, String body, List<SkillFileView> files, Instant previousSavedAt) {
         static SkillDetailView from(SkillDetail detail) {
             return new SkillDetailView(
                     detail.name(),
@@ -84,7 +86,8 @@ public final class SkillDtos {
                     detail.body(),
                     detail.files().stream()
                             .map(file -> new SkillFileView(file.path(), file.size()))
-                            .toList());
+                            .toList(),
+                    detail.previousSavedAt());
         }
     }
 

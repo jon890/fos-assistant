@@ -19,10 +19,14 @@ import java.nio.file.attribute.PosixFilePermission;
 import java.nio.file.attribute.PosixFilePermissions;
 import java.security.SecureRandom;
 import java.time.Clock;
+import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -36,12 +40,14 @@ import org.springframework.stereotype.Component;
  * profile 마다 둔 스킬 버전 디렉터리를 쓰고 읽고 지운다.
  *
  * <p>경로를 만드는 규칙이 이 클래스 하나에만 있다. 디렉터리는 {@code {root}/{profile}/{버전}/{스킬}}
- * 이고 스킬 안은 {@code SKILL.md} 와 {@code references/}, {@code templates/} 다. 게시에 성공한 버전에는
- * 표식 파일 {@code .published} 가 있고, 지금 버전은 표식이 있는 가장 새 디렉터리다. Hermes 설정을 읽지
- * 않는다. 근거는 ADR-034 에 있다.
+ * 이고 스킬 안은 {@code SKILL.md} 와 경로 규칙({@link #requireFilePath})에 맞는 파일이다. 게시에 성공한 버전에는
+ * 표식 파일 {@code .published} 가 있고, 지금 버전은 표식이 있는 가장 새 디렉터리다. 스킬마다 바뀌기 전 것 하나를
+ * {@code {root}/{profile}/.previous/{스킬}} 에 둔다. Hermes 설정을 읽지 않는다. 근거는 ADR-034 와
+ * ADR-20261009-skill-package 에 있다.
  *
  * <p>새 버전은 임시 디렉터리에 다 쓴 뒤 원자 이동한다. 쓰는 도중의 반쯤 바뀐 스킬을 실행이 읽지 않게
- * 하기 위해서다. Hermes 가 읽을 수 있게 파일은 644, 디렉터리는 755 로 쓴다.
+ * 하기 위해서다. Hermes 가 읽을 수 있게 파일은 644, 디렉터리는 755 로 쓴다. 실행 공간이 돌릴 수 있게
+ * {@code scripts/} 아래 파일만 755 로 쓴다.
  */
 @Component
 @Slf4j
@@ -55,6 +61,12 @@ public class SkillStore {
     /** 새 스킬 화면의 경로라 스킬 이름으로 쓸 수 없다. */
     public static final String RESERVED_SKILL_NAME = "new";
 
+    /** profile 디렉터리 안에 스킬마다 이전 버전 하나를 두는 디렉터리다. Hermes 는 읽지 않는다. */
+    public static final String PREVIOUS_DIR = ".previous";
+
+    /** 이전 버전 디렉터리 안에 그 버전을 남긴 시각(UTC 밀리초)을 적는 파일이다. */
+    public static final String SAVED_AT = ".saved-at";
+
     private static final String TEMP_PREFIX = ".tmp-";
 
     /** 버전 이름. plugin 이 이 형식만 받는다. 앞 13자리는 UTC 밀리초라 이름 차례가 곧 시간 차례다. */
@@ -62,11 +74,20 @@ public class SkillStore {
 
     private static final Pattern SKILL_NAME = Pattern.compile("[a-z0-9][a-z0-9-]{0,63}");
 
-    /** 참고 파일 경로. 두 디렉터리 아래 한 단계뿐이라 {@code ..} 과 {@code /} 가 이름에 들어오지 못한다. */
-    private static final Pattern FILE_PATH = Pattern.compile("(references|templates)/[a-z0-9][a-z0-9._-]{0,99}");
+    /** 파일 경로의 한 조각. 점으로 시작하지 못하므로 {@code ..} 과 숨은 파일이 들어오지 못한다. */
+    private static final Pattern PATH_SEGMENT = Pattern.compile("[A-Za-z0-9][A-Za-z0-9._-]{0,99}");
+
+    private static final int MAX_PATH_SEGMENTS = 4;
+    private static final int MAX_PATH_LENGTH = 200;
+
+    /** 두 조각 이상인 경로의 첫 조각이 될 수 있는 디렉터리다. */
+    private static final Set<String> FILE_DIRECTORIES = Set.of("references", "templates", "scripts", "assets");
+
+    private static final String SCRIPTS_PREFIX = "scripts/";
 
     private static final Set<PosixFilePermission> DIRECTORY_PERMISSIONS = PosixFilePermissions.fromString("rwxr-xr-x");
     private static final Set<PosixFilePermission> FILE_PERMISSIONS = PosixFilePermissions.fromString("rw-r--r--");
+    private static final Set<PosixFilePermission> SCRIPT_PERMISSIONS = PosixFilePermissions.fromString("rwxr-xr-x");
 
     private static final String VERSION_ALPHABET = "abcdefghijklmnopqrstuvwxyz0123456789";
     private static final int VERSION_RANDOM_CHARS = 4;
@@ -91,11 +112,68 @@ public class SkillStore {
         }
     }
 
-    /** 참고 파일 경로가 규칙에 맞는지 본다. 아니면 {@link ErrorCode#VALIDATION_FAILED} 다. */
+    /**
+     * {@code SKILL.md} 를 뺀 스킬 파일의 경로가 규칙에 맞는지 본다. 아니면 {@link ErrorCode#VALIDATION_FAILED} 다.
+     *
+     * <p>{@code /} 로 이은 1~4 조각, 200자까지다. 한 조각이면 {@code .md} 나 {@code .txt} 로 끝나는 맨 위 파일이고, 둘
+     * 이상이면 첫 조각이 {@code references}, {@code templates}, {@code scripts}, {@code assets} 가운데 하나다. 마지막
+     * 조각이 대소문자 무시로 {@code SKILL.md} 이면 받지 않는다. Hermes 는 외부 디렉터리 아래의 모든 {@code SKILL.md} 를
+     * 스킬로 읽는다.
+     */
     public static void requireFilePath(String path) {
-        if (path == null || !FILE_PATH.matcher(path).matches() || path.contains("..")) {
-            throw validation("skill files must be one level under references/ or templates/");
+        if (!isValidFilePath(path)) {
+            throw validation("skill file paths must follow the skill file path rule");
         }
+    }
+
+    /**
+     * 한 스킬의 파일 경로들이 함께 놓일 수 있는지 본다. 대소문자만 다른 두 경로와, 한 경로가 다른 경로의 디렉터리
+     * 앞부분인 경우({@code a/b} 와 {@code a/b/c.md})를 {@link ErrorCode#VALIDATION_FAILED} 로 거절한다.
+     */
+    public static void requireFileSet(Collection<String> paths) {
+        Set<String> folded = new HashSet<>();
+        for (String path : paths) {
+            if (!folded.add(path.toLowerCase(Locale.ROOT))) {
+                throw validation("a skill file path was sent more than once, ignoring case: " + path);
+            }
+        }
+        for (String path : paths) {
+            String lower = path.toLowerCase(Locale.ROOT);
+            for (int slash = lower.indexOf('/'); slash >= 0; slash = lower.indexOf('/', slash + 1)) {
+                if (folded.contains(lower.substring(0, slash))) {
+                    throw validation("a skill file path is also a directory of another file: " + path);
+                }
+            }
+        }
+    }
+
+    /** 실행 공간에서 돌리는 스크립트 경로인가. {@code scripts/} 로 시작하면 참이다. */
+    public static boolean isScript(String path) {
+        return path != null && path.startsWith(SCRIPTS_PREFIX);
+    }
+
+    private static boolean isValidFilePath(String path) {
+        if (path == null || path.isEmpty() || path.length() > MAX_PATH_LENGTH) {
+            return false;
+        }
+        String[] segments = path.split("/", -1);
+        if (segments.length > MAX_PATH_SEGMENTS) {
+            return false;
+        }
+        for (String segment : segments) {
+            if (!PATH_SEGMENT.matcher(segment).matches()) {
+                return false;
+            }
+        }
+        String last = segments[segments.length - 1];
+        if (last.equalsIgnoreCase(SKILL_MD)) {
+            return false;
+        }
+        if (segments.length == 1) {
+            String lower = last.toLowerCase(Locale.ROOT);
+            return lower.endsWith(".md") || lower.endsWith(".txt");
+        }
+        return FILE_DIRECTORIES.contains(segments[0]);
     }
 
     /** 표식이 있는 가장 새 버전이다. 없으면 빈 값이다. */
@@ -183,12 +261,11 @@ public class SkillStore {
     public String writeVersion(String profile, Map<String, SkillBundle> skills) {
         Path profileDir = profileDir(profile);
         for (Map.Entry<String, SkillBundle> entry : skills.entrySet()) {
-            requireSkillName(entry.getKey());
             SkillBundle bundle = entry.getValue();
-            if (bundle == null || !entry.getKey().equals(bundle.name()) || bundle.skillMd() == null) {
+            if (bundle == null || !entry.getKey().equals(bundle.name())) {
                 throw validation("skill bundle does not match its name");
             }
-            bundle.files().forEach(file -> requireFilePath(file.path()));
+            requireBundle(bundle);
         }
         Path temporary = null;
         try {
@@ -197,14 +274,7 @@ public class SkillStore {
             temporary = profileDir.resolve(TEMP_PREFIX + version);
             createDirectory(temporary);
             for (SkillBundle bundle : skills.values()) {
-                Path skillDir = resolveInside(temporary, bundle.name());
-                createDirectory(skillDir);
-                writeFile(skillDir.resolve(SKILL_MD), bundle.skillMd());
-                for (SkillFile file : bundle.files()) {
-                    Path target = resolveInside(skillDir, file.path());
-                    createDirectory(target.getParent());
-                    writeFile(target, file.content());
-                }
+                writeSkill(resolveInside(temporary, bundle.name()), bundle);
             }
             Files.move(temporary, profileDir.resolve(version), StandardCopyOption.ATOMIC_MOVE);
             temporary = null;
@@ -236,9 +306,93 @@ public class SkillStore {
         deleteRecursively(versionDir(profile, version));
     }
 
-    /** 그 profile 의 버전 디렉터리를 모두 지운다. 에이전트를 지울 때와 마지막 스킬을 지울 때 부른다. */
+    /** 그 profile 디렉터리를 통째로 지운다. 에이전트를 지울 때 부른다. */
     public void deleteAll(String profile) {
         deleteRecursively(profileDir(profile));
+    }
+
+    /**
+     * 그 profile 의 버전 디렉터리와 이전 버전, 남은 임시 디렉터리를 지우고 profile 디렉터리는 남긴다. 마지막 스킬을
+     * 지울 때 부른다. 실행 공간이 profile 디렉터리를 붙이고 있어서 지우면 다음 컨테이너 생성이 없는 원본을 만난다.
+     */
+    public void clearVersions(String profile) {
+        Path profileDir = profileDir(profile);
+        if (!Files.isDirectory(profileDir, LinkOption.NOFOLLOW_LINKS)) {
+            return;
+        }
+        List<Path> targets = new ArrayList<>();
+        try (DirectoryStream<Path> stream = Files.newDirectoryStream(profileDir)) {
+            for (Path entry : stream) {
+                String name = entry.getFileName().toString();
+                if (VERSION.matcher(name).matches() || PREVIOUS_DIR.equals(name) || name.startsWith(TEMP_PREFIX)) {
+                    targets.add(entry);
+                }
+            }
+        } catch (IOException ex) {
+            throw storeFailure(ex);
+        }
+        targets.forEach(SkillStore::deleteRecursively);
+    }
+
+    /**
+     * 바뀌기 전 스킬을 그 스킬의 이전 버전으로 쓴다. 있던 이전 버전은 바뀐다.
+     *
+     * <p>임시 디렉터리에 다 쓴 뒤 옮긴다. 남긴 시각을 {@link #SAVED_AT} 에 UTC 밀리초로 쓴다. 파일 권한은
+     * {@link #writeVersion} 과 같다.
+     */
+    public void writePrevious(String profile, SkillBundle bundle) {
+        if (bundle == null) {
+            throw validation("skill bundle is missing");
+        }
+        requireBundle(bundle);
+        Path previousRoot = resolveInside(profileDir(profile), PREVIOUS_DIR);
+        Path target = resolveInside(previousRoot, bundle.name());
+        Path temporary = null;
+        try {
+            createDirectory(previousRoot.getParent());
+            createDirectory(previousRoot);
+            temporary = resolveInside(previousRoot, TEMP_PREFIX + bundle.name() + "-" + randomSuffix());
+            writeSkill(temporary, bundle);
+            writeFile(temporary.resolve(SAVED_AT), Long.toString(clock.millis()), FILE_PERMISSIONS);
+            deleteRecursively(target);
+            Files.move(temporary, target, StandardCopyOption.ATOMIC_MOVE);
+            temporary = null;
+        } catch (IOException ex) {
+            throw storeFailure(ex);
+        } finally {
+            if (temporary != null) {
+                deleteQuietly(temporary);
+            }
+        }
+    }
+
+    /** 그 스킬의 이전 버전이다. 없으면 빈 값이다. */
+    public Optional<PreviousSkill> readPrevious(String profile, String name) {
+        requireSkillName(name);
+        Path previousRoot = resolveInside(profileDir(profile), PREVIOUS_DIR);
+        Path skillDir = resolveInside(previousRoot, name);
+        if (!Files.exists(skillDir, LinkOption.NOFOLLOW_LINKS)) {
+            return Optional.empty();
+        }
+        try {
+            requireDirectory(previousRoot);
+            requireDirectory(skillDir);
+            SkillBundle bundle = readBundle(skillDir, name);
+            Path savedAt = skillDir.resolve(SAVED_AT);
+            requireRegularFile(savedAt);
+            String millis = Files.readString(savedAt, StandardCharsets.UTF_8).strip();
+            return Optional.of(new PreviousSkill(bundle, Instant.ofEpochMilli(Long.parseLong(millis))));
+        } catch (NumberFormatException ex) {
+            throw storeFailure(new IOException("skill previous version has an invalid saved time", ex));
+        } catch (IOException ex) {
+            throw storeFailure(ex);
+        }
+    }
+
+    /** 그 스킬의 이전 버전을 지운다. 없으면 그냥 지나간다. */
+    public void deletePrevious(String profile, String name) {
+        requireSkillName(name);
+        deleteRecursively(resolveInside(resolveInside(profileDir(profile), PREVIOUS_DIR), name));
     }
 
     /**
@@ -287,29 +441,91 @@ public class SkillStore {
         return agentRoot + "/" + profile + "/" + version;
     }
 
-    private SkillBundle readBundle(Path skillDir, String name) throws IOException {
+    /**
+     * 스킬 디렉터리 전체를 링크를 따라가지 않고 걸어 읽는다.
+     *
+     * <p>이름이 점으로 시작하는 파일과 디렉터리는 건너뛰고 그 아래로 내려가지 않는다. 표식과 남긴 시각 파일이
+     * 그렇다. 나머지에서 링크나 일반 파일·디렉터리가 아닌 항목을 만나면 경로와 관계없이 {@link IOException} 이다.
+     * plugin 도 버전 디렉터리 안의 모든 링크를 거절한다. {@code SKILL.md} 를 뺀 일반 파일 가운데 경로 규칙에 맞는
+     * 것만 읽고 나머지는 건너뛴다. 결과는 경로 차례다.
+     */
+    private static SkillBundle readBundle(Path skillDir, String name) throws IOException {
         Path skillMd = skillDir.resolve(SKILL_MD);
         requireRegularFile(skillMd);
         List<SkillFile> files = new ArrayList<>();
-        for (String subdirectory : List.of("references", "templates")) {
-            Path dir = skillDir.resolve(subdirectory);
-            if (!Files.exists(dir, LinkOption.NOFOLLOW_LINKS)) {
-                continue;
+        Files.walkFileTree(skillDir, new SimpleFileVisitor<>() {
+            @Override
+            public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attributes) {
+                if (!dir.equals(skillDir) && isDotName(dir)) {
+                    return FileVisitResult.SKIP_SUBTREE;
+                }
+                return FileVisitResult.CONTINUE;
             }
-            requireDirectory(dir);
-            try (DirectoryStream<Path> stream = Files.newDirectoryStream(dir)) {
-                for (Path file : stream) {
-                    String path = subdirectory + "/" + file.getFileName();
-                    if (!FILE_PATH.matcher(path).matches()) {
-                        continue;
-                    }
-                    requireRegularFile(file);
+
+            @Override
+            public FileVisitResult visitFile(Path file, BasicFileAttributes attributes) throws IOException {
+                if (isDotName(file)) {
+                    return FileVisitResult.CONTINUE;
+                }
+                if (attributes.isSymbolicLink() || !attributes.isRegularFile()) {
+                    throw new IOException("skill path is not a plain file or directory: " + skillDir.relativize(file));
+                }
+                String path = relativePath(skillDir, file);
+                if (!path.equals(SKILL_MD) && isValidFilePath(path)) {
                     files.add(new SkillFile(path, Files.readString(file, StandardCharsets.UTF_8)));
                 }
+                return FileVisitResult.CONTINUE;
             }
-        }
+
+            @Override
+            public FileVisitResult visitFileFailed(Path file, IOException ex) throws IOException {
+                throw ex;
+            }
+        });
         files.sort(Comparator.comparing(SkillFile::path));
         return new SkillBundle(name, Files.readString(skillMd, StandardCharsets.UTF_8), files);
+    }
+
+    private static boolean isDotName(Path path) {
+        return path.getFileName().toString().startsWith(".");
+    }
+
+    private static String relativePath(Path base, Path file) {
+        Path relative = base.relativize(file);
+        List<String> segments = new ArrayList<>();
+        relative.forEach(segment -> segments.add(segment.toString()));
+        return String.join("/", segments);
+    }
+
+    /** 이름, {@code SKILL.md}, 파일 경로와 그 묶음을 본다. 아니면 {@link ErrorCode#VALIDATION_FAILED} 다. */
+    private static void requireBundle(SkillBundle bundle) {
+        requireSkillName(bundle.name());
+        if (bundle.skillMd() == null) {
+            throw validation("skill bundle does not match its name");
+        }
+        bundle.files().forEach(file -> requireFilePath(file.path()));
+        requireFileSet(bundle.files().stream().map(SkillFile::path).toList());
+    }
+
+    /**
+     * 스킬 하나를 그 디렉터리에 쓴다. 파일의 부모 디렉터리는 스킬 디렉터리부터 한 단계씩 만들어 중간 디렉터리도
+     * umask 를 따르지 않고 755 가 되게 한다. {@code scripts/} 아래 파일만 755 로 쓴다.
+     */
+    private void writeSkill(Path skillDir, SkillBundle bundle) throws IOException {
+        createDirectory(skillDir);
+        writeFile(skillDir.resolve(SKILL_MD), bundle.skillMd(), FILE_PERMISSIONS);
+        for (SkillFile file : bundle.files()) {
+            Path target = resolveInside(skillDir, file.path());
+            Path dir = skillDir;
+            for (Path segment : skillDir.relativize(target.getParent())) {
+                if (segment.toString().isEmpty()) {
+                    continue;
+                }
+                dir = dir.resolve(segment.toString());
+                createDirectory(dir);
+            }
+            writeFile(target, file.content(), isScript(file.path()) ? SCRIPT_PERMISSIONS : FILE_PERMISSIONS);
+        }
     }
 
     /** 버전 디렉터리 안의 스킬 이름들이다. 규칙에 맞는 이름의 디렉터리만 세고 심볼릭 링크는 거절한다. */
@@ -356,11 +572,15 @@ public class SkillStore {
                 millis = Math.max(millis, Long.parseLong(matcher.group(1)) + 1);
             }
         }
+        return "v" + String.format("%013d", millis) + "-" + randomSuffix();
+    }
+
+    private static String randomSuffix() {
         StringBuilder suffix = new StringBuilder(VERSION_RANDOM_CHARS);
         for (int i = 0; i < VERSION_RANDOM_CHARS; i++) {
             suffix.append(VERSION_ALPHABET.charAt(RANDOM.nextInt(VERSION_ALPHABET.length())));
         }
-        return "v" + String.format("%013d", millis) + "-" + suffix;
+        return suffix.toString();
     }
 
     private Path profileDir(String profile) {
@@ -416,8 +636,12 @@ public class SkillStore {
     }
 
     private static void writeFile(Path file, String content) throws IOException {
+        writeFile(file, content, FILE_PERMISSIONS);
+    }
+
+    private static void writeFile(Path file, String content, Set<PosixFilePermission> permissions) throws IOException {
         Files.writeString(file, content, StandardCharsets.UTF_8);
-        setPermissions(file, FILE_PERMISSIONS);
+        setPermissions(file, permissions);
     }
 
     /** POSIX 권한을 주지 못하는 파일 시스템에서는 그대로 둔다. */
