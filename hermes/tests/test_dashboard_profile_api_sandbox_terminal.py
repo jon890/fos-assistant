@@ -191,6 +191,65 @@ class ProfileApiSandboxTerminalTest(support.ProfileApiRouteTest):
         self.set_sandbox_policy(self.sandbox_policy())
         self.assertEqual(self.save_sandbox_key(), first)
 
+    def test_skill_root_mounts_the_profile_skill_directory_after_connector_output(self):
+        """정책에 `skill_root` 가 있고 Hermes 쪽 profile 스킬 디렉터리가 있으면 같은 경로에 읽기 전용으로 붙인다."""
+        (self.skill_root / "owner").mkdir()
+        (self.skill_root / "alice").mkdir()
+        self.set_sandbox_policy(self.sandbox_policy(skill_root=self.skill_host_root,
+                                                    connector_output_root=self.connector_output_root))
+
+        self.assertEqual(self.request("/api/config", "PUT", token="valid", body=self.file_body()), 200)
+
+        terminal = self.saved_config()["terminal"]
+        self.assertEqual(terminal, self.expected_terminal(
+            "user-1", ["/srv/shared:/opt/shared", "/srv/owner-skills:/opt/owner-skills"],
+            connector_output=True, skill_mount=True))
+        self.assertEqual(terminal["docker_volumes"][3],
+                         "%s/owner:%s/owner:ro" % (self.skill_host_root, self.skill_root))
+        # 다른 profile 의 스킬 디렉터리는 붙지 않는다.
+        self.assertFalse(any("/alice:" in volume for volume in terminal["docker_volumes"]))
+        terminal = self.hermes_save_shape(terminal)
+        key = terminal.pop("docker_shared_container_key")
+        fingerprint = hashlib.sha256(json.dumps(terminal, sort_keys=True).encode("utf-8")).hexdigest()[:12]
+        self.assertEqual(key, "owner-user-1-%s" % fingerprint)
+
+    def test_skill_mount_is_left_out_without_a_plain_profile_skill_directory(self):
+        """스킬 디렉터리가 없거나 링크이거나 정책에 `skill_root` 가 없으면 스킬 마운트를 넣지 않는다."""
+        expected = self.expected_terminal("user-1", ["/srv/shared:/opt/shared", "/srv/owner-skills:/opt/owner-skills"])
+        elsewhere = self.skill_root / "elsewhere"
+        elsewhere.mkdir()
+        cases = [
+            ("missing directory", self.sandbox_policy(skill_root=self.skill_host_root), None),
+            ("linked directory", self.sandbox_policy(skill_root=self.skill_host_root), "link"),
+            ("no skill_root", self.sandbox_policy(), "dir"),
+        ]
+        for label, policy, shape in cases:
+            with self.subTest(label=label):
+                directory = self.skill_root / "owner"
+                if directory.is_symlink():
+                    directory.unlink()
+                elif directory.is_dir():
+                    directory.rmdir()
+                if shape == "link":
+                    directory.symlink_to(elsewhere)
+                elif shape == "dir":
+                    directory.mkdir()
+                self.set_sandbox_policy(policy)
+                self.assertEqual(self.request("/api/config", "PUT", token="valid", body=self.file_body()), 200)
+                self.assertEqual(self.saved_config()["terminal"], expected)
+
+    def test_skill_directory_created_later_changes_the_container_key(self):
+        """스킬 디렉터리가 생긴 뒤 다시 저장하면 스킬 마운트가 들어가 키가 바뀐다."""
+        self.set_sandbox_policy(self.sandbox_policy(skill_root=self.skill_host_root))
+        first = self.save_sandbox_key()
+        (self.skill_root / "owner").mkdir()
+
+        second = self.save_sandbox_key()
+
+        self.assertNotEqual(second, first)
+        self.assertIn("%s/owner:%s/owner:ro" % (self.skill_host_root, self.skill_root),
+                      self.saved_config()["terminal"]["docker_volumes"])
+
     def test_connector_output_directory_through_a_link_is_unavailable(self):
         """출력 디렉터리 경로에 링크가 섞이면 409 로 거절하고 설정을 그대로 둔다."""
         elsewhere = pathlib.Path(self.connector_output_root).parent / "elsewhere"
