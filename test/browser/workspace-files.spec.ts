@@ -25,6 +25,14 @@ function file(name: string, size: number, extra: object = {}) {
 
 const ROOT_ENTRIES = [
   {
+    name: "reports",
+    kind: "DIRECTORY",
+    size: null,
+    modifiedAt: MODIFIED_AT,
+    readable: true,
+    openable: true,
+  },
+  {
     name: "보고서",
     kind: "DIRECTORY",
     size: null,
@@ -67,8 +75,14 @@ const BODIES: Record<string, { contentType: string; body: string }> = {
 /** 화면이 부르는 서버 라우트를 대신 답하는 가짜 Control Plane 상태다. */
 type FakeWorkspace = {
   available: boolean;
+  deletable?: boolean;
+  runningExecutions?: number;
   /** 목록을 이 상태로 실패시키는 경로다. */
   failures?: Record<string, number>;
+  /** 지우기를 이 상태로 실패시킨다. 없으면 지우고 목록에서 뺀다. */
+  deleteFailure?: number;
+  /** 받은 `DELETE` 요청의 주소 검색 부분이다. 지운 경로는 다음 목록에서 빠진다. */
+  deleteRequests?: string[];
 };
 
 function json(route: Route, body: unknown, status = 200) {
@@ -80,14 +94,15 @@ function json(route: Route, body: unknown, status = 200) {
 }
 
 async function fakeWorkspaceRoutes(page: Page, state: FakeWorkspace) {
+  const deleted = new Set<string>();
   await page.route(
     (url) => url.pathname === "/api/workspace",
     (route) =>
       json(route, {
         available: state.available,
-        deletable: false,
+        deletable: state.deletable ?? false,
         exists: true,
-        runningExecutions: 0,
+        runningExecutions: state.runningExecutions ?? 0,
         agents: [
           { code: "writer", name: "글쓰기 도우미", shared: false },
           { code: "family", name: "가족 비서", shared: true },
@@ -97,12 +112,27 @@ async function fakeWorkspaceRoutes(page: Page, state: FakeWorkspace) {
   await page.route(
     (url) => url.pathname === "/api/workspace/entries",
     (route) => {
-      const path = new URL(route.request().url()).searchParams.get("path") ?? "";
+      const url = new URL(route.request().url());
+      const path = url.searchParams.get("path") ?? "";
+      if (route.request().method() === "DELETE") {
+        state.deleteRequests?.push(url.search);
+        if (state.deleteFailure !== undefined)
+          return json(route, { code: "FAILED", message: "실패" }, state.deleteFailure);
+        deleted.add(path);
+        return json(route, { kind: "FILE", entries: 1, bytes: 30 });
+      }
       const failure = state.failures?.[path];
       if (failure !== undefined)
         return json(route, { code: "FAILED", message: "실패" }, failure);
-      const entries =
-        path === "" ? ROOT_ENTRIES : path === "보고서" ? [file("1월.txt", 20)] : path === "50%" ? [file("a.txt", 30)] : [];
+      const listed =
+        path === ""
+          ? ROOT_ENTRIES
+          : path === "보고서"
+            ? [file("1월.txt", 20)]
+            : path === "50%" || path === "reports"
+              ? [file("a.txt", 30)]
+              : [];
+      const entries = listed.filter((entry) => !deleted.has(path === "" ? entry.name : `${path}/${entry.name}`));
       return json(route, { path, entries, truncated: false });
     },
   );
@@ -150,7 +180,7 @@ test("사이드바의 「고급」 묶음에서 파일 공간을 열면 함께 �
   await expect(agents).toContainText("글쓰기 도우미");
   await expect(agents.getByRole("listitem").filter({ hasText: "가족 비서" })).toContainText("그룹 공개");
   await expect(page.getByText("다른 사람이 이 에이전트를 쓰면 그 파일도 여기 생겨요")).toBeVisible();
-  // 지우기는 아직 없다. 목록이 그려진 뒤에 센다.
+  // 상태의 deletable 이 거짓이면 지우기를 그리지 않는다. 목록이 그려진 뒤에 센다.
   await expect(entryRow(page, "a.txt")).toBeVisible();
   await expect(page.getByRole("main").getByRole("button", { name: /지우기/ })).toHaveCount(0);
 });
@@ -264,4 +294,81 @@ test("파일 공간을 쓸 수 없으면 관리자에게 알리라는 안내만 
 
   await expect(page.getByText("파일 공간을 쓸 수 없어요. 관리자에게 알려 주세요.")).toBeVisible();
   await expect(page.getByTestId("workspace-entries")).toHaveCount(0);
+});
+
+function deleteDialog(page: Page) {
+  return page.getByRole("alertdialog");
+}
+
+test("하위 디렉터리의 파일을 지우면 그 경로 하나로 DELETE 가 가고 줄이 사라진다", async ({ page }) => {
+  const deleteRequests: string[] = [];
+  await fakeWorkspaceRoutes(page, { available: true, deletable: true, deleteRequests });
+  await page.goto(`/files?path=reports`);
+
+  await entryRow(page, "a.txt").getByRole("button", { name: "a.txt 지우기" }).click();
+  const dialog = deleteDialog(page);
+  await expect(dialog.getByRole("heading")).toHaveText("a.txt을 지울까요?");
+  await expect(dialog).toContainText("파일이에요.");
+  await expect(dialog).not.toContainText("에이전트가 지금 일하고 있어요.");
+  await dialog.getByRole("button", { name: "지우기" }).click();
+
+  await expect(dialog).toHaveCount(0);
+  await expect(entryRow(page, "a.txt")).toHaveCount(0);
+  expect(deleteRequests).toEqual(["?path=reports%2Fa.txt"]);
+});
+
+test("에이전트가 일하는 중이면 확인 창에 다시 생길 수 있다는 경고가 보인다", async ({ page }) => {
+  await fakeWorkspaceRoutes(page, { available: true, deletable: true, runningExecutions: 2 });
+  await page.goto("/files");
+
+  await entryRow(page, "a.txt").getByRole("button", { name: "a.txt 지우기" }).click();
+  await expect(deleteDialog(page)).toContainText(
+    "에이전트가 지금 일하고 있어요. 쓰는 중인 파일이면 다시 생길 수 있어요.",
+  );
+});
+
+test("디렉터리를 지우는 확인 창은 안의 파일까지 지운다고 알리고 취소하면 아무것도 보내지 않는다", async ({ page }) => {
+  const deleteRequests: string[] = [];
+  await fakeWorkspaceRoutes(page, { available: true, deletable: true, deleteRequests });
+  await page.goto("/files");
+
+  await entryRow(page, "reports").getByRole("button", { name: "reports 지우기" }).click();
+  const dialog = deleteDialog(page);
+  await expect(dialog.getByRole("heading")).toHaveText("reports을 지울까요?");
+  await expect(dialog).toContainText("폴더예요. 안의 파일까지 모두 지워요.");
+  await dialog.getByRole("button", { name: "취소" }).click();
+
+  await expect(dialog).toHaveCount(0);
+  await expect(entryRow(page, "reports")).toBeVisible();
+  expect(deleteRequests).toEqual([]);
+});
+
+test("항목이 너무 많아 409 면 안내가 보이고 줄이 남는다", async ({ page }) => {
+  const deleteRequests: string[] = [];
+  await fakeWorkspaceRoutes(page, { available: true, deletable: true, deleteFailure: 409, deleteRequests });
+  await page.goto("/files");
+
+  await entryRow(page, "reports").getByRole("button", { name: "reports 지우기" }).click();
+  await deleteDialog(page).getByRole("button", { name: "지우기" }).click();
+
+  await expect(page.getByRole("main").getByRole("alert")).toHaveText("항목이 너무 많아 지우지 않았어요. 안쪽 폴더부터 지워 주세요.");
+  await expect(deleteDialog(page)).toHaveCount(0);
+  await expect(entryRow(page, "reports")).toBeVisible();
+  expect(deleteRequests).toEqual(["?path=reports"]);
+});
+
+test("미리 보던 파일을 지우면 미리보기가 닫히고 주소의 file 이 빠진다", async ({ page }) => {
+  // 좁은 화면의 미리보기는 목록을 덮는 시트라 미리 보는 채로 줄을 누를 수 없다. 목록 옆 패널이 되는 폭으로 연다.
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await fakeWorkspaceRoutes(page, { available: true, deletable: true });
+  await page.goto(`/files?path=reports&file=${encodeURIComponent("reports/a.txt")}`);
+  const preview = page.getByTestId("workspace-preview");
+  await expect(preview.getByTestId("workspace-text")).toHaveText("안녕하세요\n파일 공간 글");
+
+  await entryRow(page, "a.txt").getByRole("button", { name: "a.txt 지우기" }).click();
+  await deleteDialog(page).getByRole("button", { name: "지우기" }).click();
+
+  await expect(preview).toHaveCount(0);
+  await expect(page).toHaveURL(/\/files\?path=reports$/);
+  await expect(entryRow(page, "a.txt")).toHaveCount(0);
 });

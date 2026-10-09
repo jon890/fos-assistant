@@ -11,3 +11,21 @@ export async function GET(request: Request) {
     return errorResponse(result.code, result.message, result.status);
   return NextResponse.json(result.data);
 }
+
+/** 경로 하나를 지운다. 빈 경로는 사용자 디렉터리 자체라 Control Plane 에 보내지 않고 막는다. */
+export async function DELETE(request: Request) {
+  const path = new URL(request.url).searchParams.get("path");
+  if (path === null || path === "")
+    return errorResponse(
+      "VALIDATION_FAILED",
+      "지울 경로를 확인해 주세요.",
+      400,
+    );
+  const result = await callControlPlane(
+    `/api/v1/workspace/entries?path=${encodeURIComponent(path)}`,
+    { method: "DELETE" },
+  );
+  if (!result.ok)
+    return errorResponse(result.code, result.message, result.status);
+  return NextResponse.json(result.data);
+}

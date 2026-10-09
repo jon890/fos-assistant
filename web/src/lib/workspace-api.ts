@@ -30,6 +30,13 @@ export type WorkspaceListing = {
   truncated: boolean;
 };
 
+/** `DELETE /api/workspace/entries` 의 응답이다. `entries` 는 지운 항목 수, `bytes` 는 지운 일반 파일의 크기 합이다. */
+export type WorkspaceDeletion = {
+  kind: WorkspaceEntryKind;
+  entries: number;
+  bytes: number;
+};
+
 export function fetchWorkspaceStatus(): Promise<Response> {
   return fetch("/api/workspace", { cache: "no-store" });
 }
@@ -37,6 +44,13 @@ export function fetchWorkspaceStatus(): Promise<Response> {
 export function fetchWorkspaceEntries(path: string): Promise<Response> {
   const query = path === "" ? "" : `?${new URLSearchParams({ path })}`;
   return fetch(`/api/workspace/entries${query}`, { cache: "no-store" });
+}
+
+/** 경로 하나를 지운다. 성공하면 본문이 {@link WorkspaceDeletion} 이다. 경로는 주소 조각이 아니라 `path` 인자로 보낸다. */
+export function deleteWorkspaceEntry(path: string): Promise<Response> {
+  return fetch(`/api/workspace/entries?${new URLSearchParams({ path })}`, {
+    method: "DELETE",
+  });
 }
 
 /** 미리보기 본문을 받는다. 글과 표처럼 화면이 직접 읽어 그리는 종류에 쓴다. */
