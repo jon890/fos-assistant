@@ -6,10 +6,10 @@
 
 | 문서 | 언제 보는지 |
 | --- | --- |
-| [`docs/prd.md`](docs/prd.md) | 화면마다 누구에게 보이는 것과 그리지 않는 것 |
-| [`docs/flow.md`](docs/flow.md) | 화면에서 하는 일마다 Control Plane 과 주고받는 순서 |
-| [`docs/code-architecture.md`](docs/code-architecture.md) | 화면 목록과 화면 틀, 부품을 두는 자리 |
-| [`docs/adr/INDEX.md`](docs/adr/INDEX.md) | 화면에 관한 결정 |
+| [`web/docs/prd.md`](docs/prd.md) | 화면마다 누구에게 보이는 것과 그리지 않는 것 |
+| [`web/docs/flow.md`](docs/flow.md) | 화면에서 하는 일마다 Control Plane 과 주고받는 순서 |
+| [`web/docs/code-architecture.md`](docs/code-architecture.md) | 화면 목록과 화면 틀, 부품을 두는 자리 |
+| [`web/docs/adr/INDEX.md`](docs/adr/INDEX.md) | 화면에 관한 결정 |
 
 ## 브라우저는 Control Plane 토큰을 갖지 않는다
 
