@@ -17,8 +17,10 @@ const OPEN_TRIES = 40;
  * 새 탭의 글쓰기 화면이 뜨기를 기다린다.
  * 로그인 화면으로 넘어가면 `login_required` 다. 캡차와 기기 인증도 같은 호스트 아래에 뜬다.
  * 「작성 중인 글이 있습니다」 알림은 「취소」 로 닫고, 다른 알림이 남아 있으면 멈춘다.
+ * `keepDraftNotice` 면 그 알림을 닫지 않고 `"draft_notice"` 를 돌려준다. 「취소」 는 사용자가 쓰던 자동저장본을 버릴 수 있어
+ * 승인 없이 부르는 읽기 도구는 닫지 않는다. 알림이 없으면 `"ready"` 다.
  */
-export async function open(page: EditorPage) {
+export async function open(page: EditorPage, { keepDraftNotice = false } = {}) {
   const interval = page.times.openSeconds / OPEN_TRIES;
   for (let i = 0; i < OPEN_TRIES; i++) {
     await page.sleep(interval);
@@ -35,13 +37,14 @@ export async function open(page: EditorPage) {
 
     let note = await blockingPopup(page);
     if (note.includes("작성 중인 글이 있습니다") && note.includes("이어서 작성하시겠습니까")) {
+      if (keepDraftNotice) return "draft_notice";
       if (!(await dismissPopup(page, "취소")))
         throw page.fail("editor_failed", "작성 중인 글 알림을 닫지 못했다");
       note = await requireClearScreen(page);
     }
     if (note) throw page.fail("editor_failed", "알림이 떠 있어 멈춘다");
     await clearProgress(page);
-    return;
+    return "ready";
   }
   throw page.fail("editor_failed", "글쓰기 화면이 뜨지 않았다");
 }

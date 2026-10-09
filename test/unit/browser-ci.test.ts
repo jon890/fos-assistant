@@ -7,6 +7,7 @@ import {
   githubApi,
   latestJobs,
   publicError,
+  HANDLING,
   publishFailures,
 } from "../../scripts/browser-ci.mjs";
 
@@ -162,12 +163,14 @@ test("동일 spec 은 열린 이슈에 재발 횟수를 남기고 실행 재시�
     context,
   );
   assert.equal(issues.length, 1);
+  assert.ok(issues[0].body.endsWith(HANDLING));
   assert.equal(posts.filter((path) => path.endsWith("/issues")).length, 1);
   await publishFailures(failures, api, context);
   assert.equal(comments.length, 0);
   await publishFailures(failures, api, { ...context, runId: "2" });
   assert.equal(comments.length, 1);
   assert.match(comments[0].body, /재발 2회/);
+  assert.equal(comments[0].body.includes(HANDLING), false);
   await publishFailures(failures, api, { ...context, runId: "2" });
   assert.equal(comments.length, 1);
   await publishFailures(failures, api, { ...context, runId: "3" });
