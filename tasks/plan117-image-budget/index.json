@@ -1,0 +1,12 @@
+{
+  "name": "plan117-image-budget",
+  "description": "이번 메시지의 사진을 고정 10장 대신 화소 예산과 크기 단계(1600, 1280, 1024, 768px)로 모두 실행 입력에 싣고, vision_analyze 는 한 장씩 부르게 안내한다",
+  "status": "pending",
+  "created_at": "2026-10-09",
+  "total_phases": 2,
+  "current_phase": 1,
+  "phases": [
+    { "number": 1, "file": "phase-01.md", "execution_profile": "standard" },
+    { "number": 2, "file": "phase-02.md", "execution_profile": "deep" }
+  ]
+}
