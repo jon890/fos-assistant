@@ -20,6 +20,7 @@ class ImageSupervisorTest(unittest.TestCase):
     def setUp(self):
         plugin = load_ctx(self.addCleanup)
         self.module = importlib.import_module(plugin.__name__ + ".image_runtime")
+        self.inspect = importlib.import_module(plugin.__name__ + ".attachment_inspect")
         self.created = []
         self.real_popen = subprocess.Popen
 
@@ -177,6 +178,40 @@ class ImageSupervisorTest(unittest.TestCase):
                 Handler.status = status
                 with self.assertRaises(PermissionError):
                     self.module.check_status(url, "fake-token", {}, time.monotonic() + 3)
+        finally:
+            server.shutdown()
+            server.server_close()
+            thread.join()
+
+    def test_old_cp_accepts_explicit_false_overview_as_default_jpeg_png(self):
+        observed = []
+        class Handler(BaseHTTPRequestHandler):
+            def do_POST(self):
+                args = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
+                observed.append((self.path, args))
+                if "overview" in args or self.path.endswith("/validate"):
+                    self.send_response(400)
+                    self.end_headers()
+                    return
+                body = b"\x89PNG\r\n\x1a\nmore"
+                self.send_response(200)
+                self.send_header("Content-Type", "image/png")
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+            def log_message(self, *args):
+                pass
+        server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+        thread = threading.Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+        try:
+            url = "http://127.0.0.1:" + str(server.server_port) + "/internal/hermes/attachment-inspect"
+            with patch.dict(os.environ, {"FOS_ATTACHMENT_INSPECT_URL": url}), \
+                 patch.object(self.inspect, "_read_token", return_value="fake-token"):
+                result = self.inspect.handle({"attachment_id": 7, "overview": False, "_fos_ctx": {}, "_fos_inspect": {}})
+            self.assertIs(result["_multimodal"], True)
+            self.assertEqual(len(observed), 1)
+            self.assertNotIn("overview", observed[0][1])
         finally:
             server.shutdown()
             server.server_close()

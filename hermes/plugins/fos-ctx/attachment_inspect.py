@@ -96,6 +96,8 @@ def handle(args, **_):
     if not valid_args(args) or not isinstance(args.get("_fos_ctx"), dict) \
             or not isinstance(args.get("_fos_inspect"), dict):
         return failure()
+    if args.get("overview") is False:
+        args = {key: value for key, value in args.items() if key != "overview"}
     try:
         url = os.environ.get("FOS_ATTACHMENT_INSPECT_URL", "")
         parsed = urllib.parse.urlsplit(url)
