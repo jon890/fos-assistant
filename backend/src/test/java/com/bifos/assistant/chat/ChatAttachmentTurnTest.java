@@ -310,12 +310,12 @@ class ChatAttachmentTurnTest {
     }
 
     @Test
-    @DisplayName("1600×1200 사진 열한 장을 보내면 모두 긴 변 1280 으로 줄여 싣고 줄였다는 안내는 붙이지 않는다")
-    void elevenFullSizeImagesAreAllEmbeddedAtSmallerLongSide() throws IOException {
+    @DisplayName("바이트 예산에 드는 1600×1200 사진 서른 장은 순서와 사본 바이트를 그대로 유지한다")
+    void thirtyFullSizeImagesPreserveCopiesWhenEncodedBytesFit() throws IOException {
         Long conversationId = chat.startEmpty(dad, "dad").id();
         byte[] png = png(1600, 1200);
         List<ChatAttachment> photos = new ArrayList<>();
-        for (int i = 1; i <= 11; i++) {
+        for (int i = 1; i <= 30; i++) {
             photos.add(uploadPng(dad, conversationId, "사진-" + i + ".png", png));
         }
 
@@ -327,9 +327,17 @@ class ChatAttachmentTurnTest {
                 photos.stream().map(ChatAttachment::id).toList());
 
         HermesRunCommand command = stub().received().getFirst();
-        assertThat(command.images()).hasSize(11);
-        for (HermesImage image : command.images()) {
-            assertThat(imageSize(image)).as(image.label()).isEqualTo(new Dimension(1280, 960));
+        assertThat(command.images()).hasSize(30);
+        assertThat(command.images().stream().mapToLong(image -> image.dataUrl().length()).sum())
+                .isLessThanOrEqualTo(7L * 1024 * 1024);
+        for (int i = 0; i < photos.size(); i++) {
+            HermesImage image = command.images().get(i);
+            assertThat(image.label()).isEqualTo((i + 1) + "번째 사진");
+            assertThat(imageSize(image)).as(image.label()).isEqualTo(new Dimension(1600, 1200));
+            assertThat(Base64.getDecoder().decode(image.dataUrl().substring(image.dataUrl().indexOf(',') + 1)))
+                    .as("바이트 여유가 있으면 재인코딩하지 않는다")
+                    .isEqualTo(Files.readAllBytes(privateDirectory(conversationId)
+                            .resolve(photos.get(i).id() + ".small.jpg")));
         }
         assertThat(command.input()).doesNotContain("사진이 많아 긴 변");
     }
