@@ -1,0 +1,20 @@
+{
+  "name": "plan121-feature-docs-covers",
+  "description": "기능 파일 머리의 covers 경로를 바꾸고 기능 파일을 고치지 않은 PR 에 CI 가 경고만 내게 하고, 기능 파일 15개에 covers 를 적는다",
+  "status": "pending",
+  "created_at": "2026-10-10",
+  "total_phases": 2,
+  "current_phase": 1,
+  "phases": [
+    {
+      "number": 1,
+      "file": "phase-01.md",
+      "execution_profile": "standard"
+    },
+    {
+      "number": 2,
+      "file": "phase-02.md",
+      "execution_profile": "standard"
+    }
+  ]
+}
