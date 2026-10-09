@@ -1,5 +1,11 @@
 package com.bifos.assistant.skill.application;
 
+import static com.bifos.assistant.skill.application.SkillInputRules.bundleOf;
+import static com.bifos.assistant.skill.application.SkillInputRules.requireFiles;
+import static com.bifos.assistant.skill.application.SkillInputRules.requireNoStoredSecretRequests;
+import static com.bifos.assistant.skill.application.SkillInputRules.requireSkillMd;
+import static com.bifos.assistant.skill.application.SkillInputRules.utf8Bytes;
+
 import com.bifos.assistant.agent.application.AgentConnectorBindings;
 import com.bifos.assistant.agent.application.AgentService;
 import com.bifos.assistant.agent.domain.Agent;
@@ -10,13 +16,13 @@ import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.skill.domain.SkillBundle;
-import com.bifos.assistant.skill.domain.SkillFile;
+import com.bifos.assistant.skill.infra.PreviousSkill;
+import com.bifos.assistant.skill.infra.PreviousSkillStore;
+import com.bifos.assistant.skill.infra.SkillFilePaths;
 import com.bifos.assistant.skill.infra.SkillProperties;
 import com.bifos.assistant.skill.infra.SkillPublisher;
 import com.bifos.assistant.skill.infra.SkillStore;
-import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
-import java.util.HashMap;
+import java.time.Instant;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -28,6 +34,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.client.RestClientResponseException;
 
 /**
  * 에이전트에 올린 스킬의 권한 판정과 저장 순서를 안다.
@@ -72,13 +79,14 @@ public class SkillService {
     private final AgentService agents;
     private final AgentConnectorBindings connectorBindings;
     private final SkillStore store;
+    private final PreviousSkillStore previousStore;
     private final SkillPublisher publisher;
     private final SkillUsageQuery usage;
     private final ApplicationEventPublisher events;
     private final SkillProperties properties;
 
     /**
-     * 그 에이전트의 스킬 목록이다. 읽을 수 있는 사람이면 누구나 본다.
+     * 일반 화면에 보일 올린 스킬 목록이다. 관리자 역할도 기본·커넥터 스킬은 받지 않는다.
      *
      * <p>Hermes 목록에 올린 스킬 이름을 대조해 출처를 붙인다. 올린 스킬 이름은 지금 버전과, 게시가 timeout
      * 으로 끝나 표식 없이 남은 더 새 버전의 이름이다. Hermes 가 그 버전을 이미 반영했을 수 있기 때문이다.
@@ -92,11 +100,27 @@ public class SkillService {
         Agent agent = agents.requireReadable(user, code);
         boolean editable = agents.isEditableBy(user, agent);
         Map<String, SkillUsageSummary> usages = editable ? usage.byAgent(agent.id()) : Map.of();
-        return assemble(agent, editable, usages);
+        SkillList list = assemble(agent, editable, usages);
+        return new SkillList(
+                list.skills().stream()
+                        .filter(item -> item.source() == SkillSource.UPLOADED)
+                        .toList(),
+                list.editable(),
+                list.skillsToolsetEnabled(),
+                list.uploadLimit());
+    }
+
+    /** 관리자 영역에서만 Hermes 번들과 커넥터 스킬을 함께 읽는다. */
+    public SkillList adminList(CurrentUser user, String code) {
+        if (!user.isAdmin()) {
+            throw forbidden();
+        }
+        Agent agent = agents.requireReadable(user, code);
+        return assemble(agent, true, usage.byAgent(agent.id()));
     }
 
     /**
-     * 스킬 커맨드가 이름을 확인할 목록이다. {@link #list} 와 같은 규칙으로 조립하되 권한을 보지 않고 호출 합계를
+     * 스킬 커맨드가 이름을 확인할 전체 목록이다. 화면 목록의 숨김과 별개로 Hermes 기본 스킬도 조립하고 호출 합계를
      * 읽지 않는다.
      *
      * <p>누가 그 에이전트를 쓸 수 있는지는 부르는 쪽이 이미 판정했다. 대화 turn 은 새 대화면 시작할 수 있는
@@ -153,11 +177,12 @@ public class SkillService {
      */
     public SkillDetail read(CurrentUser user, String code, String name) {
         Agent agent = requireEditable(user, code);
-        SkillBundle bundle = uploadedBundle(agent.hermesProfile(), store.readCurrent(agent.hermesProfile()), name);
+        String profile = agent.hermesProfile();
+        SkillBundle bundle = uploadedBundle(profile, store.readCurrent(profile), name);
         if (bundle == null) {
             throw notFound();
         }
-        return detailOf(bundle);
+        return detailOf(bundle, previousSavedAt(profile, name));
     }
 
     /**
@@ -173,46 +198,142 @@ public class SkillService {
      * 커지지 않게 하려는 것이다(ADR-034). 이미 올린 스킬은 Hermes 처럼 두 검사 없이 고칠 수 있다. 개수는 에이전트
      * 행 잠금을 잡은 뒤 읽은 버전으로 세야 동시에 온 두 생성이 함께 통과하지 않는다.
      *
+     * <p>저장하는 스킬에 {@code scripts/} 가 있으면 실행 공간이 있는 에이전트에만 받는다. 이미 있던 스킬이면 게시에 성공한
+     * 뒤 바뀌기 전 것을 이전 버전으로 남긴다(ADR-20261009-skill-package).
+     *
      * @param files 참고 파일. {@code content} 가 {@code null} 인 파일은 지금 버전의 같은 경로 내용을 쓴다
      */
     @Transactional
     public SkillDetail save(CurrentUser user, String code, String name, String skillMd, List<SkillFileInput> files) {
         Agent agent = requireEditableLocked(user, code);
         String profile = agent.hermesProfile();
-        SkillStore.requireSkillName(name);
+        SkillFilePaths.requireSkillName(name);
         SkillFrontmatter frontmatter = requireSkillMd(name, skillMd);
         List<SkillFileInput> inputs = requireFiles(files);
         Map<String, SkillBundle> current = store.readCurrent(profile);
         Map<String, SkillBundle> pending = store.readPending(profile);
         SkillBundle uploaded = uploadedBundle(current, pending, name);
-        boolean creating = uploaded == null;
-        if (creating && publisher.list(profile).stream().anyMatch(s -> s.name().equals(name))) {
+        if (uploaded == null) {
+            requireCreatable(profile, name, frontmatter, current, pending);
+        }
+        SkillBundle bundle = bundleOf(name, skillMd, inputs, uploaded);
+        return saveBundle(user, agent, current, bundle, uploaded);
+    }
+
+    /**
+     * 그 스킬의 이전 버전과 지금 버전을 맞바꿔 저장한다. 편집자만 한다.
+     *
+     * <p>지금 스킬이나 이전 버전이 없으면 {@link ErrorCode#SKILL_NOT_FOUND} 다. 이미 있는 스킬이라 새 스킬의 설명 60자와
+     * 개수 한도, Hermes 이름 검사는 하지 않는다. 비밀 요청 칸과 {@code scripts/} 조건은 저장과 같이 본다. 성공하면
+     * 바뀌기 전 스킬이 새 이전 버전이다.
+     */
+    @Transactional
+    public SkillDetail restorePrevious(CurrentUser user, String code, String name) {
+        Agent agent = requireEditableLocked(user, code);
+        String profile = agent.hermesProfile();
+        SkillFilePaths.requireSkillName(name);
+        Map<String, SkillBundle> current = store.readCurrent(profile);
+        SkillBundle uploaded = uploadedBundle(current, store.readPending(profile), name);
+        if (uploaded == null) {
+            throw notFound();
+        }
+        SkillBundle previous = previousStore
+                .readPrevious(profile, name)
+                .map(PreviousSkill::bundle)
+                .orElseThrow(SkillService::notFound);
+        requireSkillMd(name, previous.skillMd());
+        return saveBundle(user, agent, current, previous, uploaded);
+    }
+
+    /** 새 스킬일 때만 하는 검사다. Hermes 기본 스킬 이름, 올린 스킬 수 한도, 새 스킬 설명 60자를 본다. */
+    private void requireCreatable(
+            String profile,
+            String name,
+            SkillFrontmatter frontmatter,
+            Map<String, SkillBundle> current,
+            Map<String, SkillBundle> pending) {
+        if (publisher.list(profile).stream().anyMatch(s -> s.name().equals(name))) {
             throw new ApiException(ErrorCode.SKILL_NAME_TAKEN, "Hermes already has a skill with this name");
         }
         int max = properties.maxPerAgent();
-        if (creating && uploadedNames(current, pending).size() >= max) {
+        if (uploadedNames(current, pending).size() >= max) {
             throw new ApiException(
                     ErrorCode.VALIDATION_FAILED, "an agent can have at most " + max + " uploaded skills");
         }
-        if (creating && frontmatter.indexedDescriptionLength() > MAX_NEW_DESCRIPTION_CHARS) {
+        if (frontmatter.indexedDescriptionLength() > MAX_NEW_DESCRIPTION_CHARS) {
             throw new ApiException(
                     ErrorCode.VALIDATION_FAILED,
                     "a new skill description can be at most " + MAX_NEW_DESCRIPTION_CHARS + " characters");
         }
-        SkillBundle bundle = bundleOf(name, skillMd, inputs, uploaded);
+    }
+
+    /**
+     * 검사를 마친 스킬 하나를 지금 버전에 실어 게시한다. 저장과 되돌리기가 같은 흐름을 쓴다.
+     *
+     * <p>{@code scripts/} 판정은 저장하는 그 스킬에만 한다. 함께 실리는 다른 스킬은 보지 않는다. 셸을 끈 에이전트도 다른
+     * 스킬을 고칠 수 있어야 하기 때문이다. 이전 버전 쓰기는 게시가 성공한 뒤라 실패해도 저장을 실패로 바꾸지 않는다.
+     * 새 스킬이면 같은 이름으로 남은 이전 버전을 지운다. 지운 스킬의 이전 버전이 새 스킬의 것으로 보이지 않게 한다.
+     *
+     * @param replaced 저장 전에 있던 같은 이름의 스킬. 새 스킬이면 {@code null} 이다
+     */
+    private SkillDetail saveBundle(
+            CurrentUser user, Agent agent, Map<String, SkillBundle> current, SkillBundle bundle, SkillBundle replaced) {
+        String profile = agent.hermesProfile();
         Map<String, SkillBundle> next = new LinkedHashMap<>(current);
-        next.put(name, bundle);
-        requireNoStoredSecretRequests(next, name);
-        publishVersion(user, agent, next);
+        next.put(bundle.name(), bundle);
+        requireNoStoredSecretRequests(next, bundle.name());
+        boolean withScripts = bundle.files().stream().anyMatch(file -> SkillFilePaths.isScript(file.path()));
+        if (withScripts && !publisher.terminalEnabled(agent)) {
+            throw new ApiException(
+                    ErrorCode.SKILL_SCRIPTS_NEED_SANDBOX, "this agent has no sandbox shell to run skill scripts");
+        }
+        publishVersion(user, agent, next, withScripts);
         events.publishEvent(new SkillsChanged(agent.id()));
-        return detailOf(bundle);
+        if (replaced != null) {
+            writePreviousQuietly(profile, replaced);
+        } else {
+            deletePreviousQuietly(profile, bundle.name());
+        }
+        return detailOf(bundle, previousSavedAt(profile, bundle.name()));
+    }
+
+    private void writePreviousQuietly(String profile, SkillBundle replaced) {
+        try {
+            previousStore.writePrevious(profile, replaced);
+        } catch (RuntimeException ex) {
+            log.warn("바뀌기 전 스킬을 이전 버전으로 남기지 못했다 profile={} skill={}", profile, replaced.name(), ex);
+        }
+    }
+
+    /** 게시가 끝난 뒤 이전 버전을 지운다. 실패해도 저장과 지우기를 실패로 바꾸지 않고 경고 로그만 남긴다. */
+    private void deletePreviousQuietly(String profile, String name) {
+        try {
+            previousStore.deletePrevious(profile, name);
+        } catch (RuntimeException ex) {
+            log.warn("스킬의 이전 버전을 지우지 못했다 profile={} skill={}", profile, name, ex);
+        }
+    }
+
+    /**
+     * 이전 버전을 남긴 시각이다. 남긴 시각 파일만 읽는다. 없거나 읽지 못하면 {@code null} 이고 읽기와 저장을 막지
+     * 않는다.
+     */
+    private Instant previousSavedAt(String profile, String name) {
+        try {
+            return previousStore.previousSavedAt(profile, name).orElse(null);
+        } catch (RuntimeException ex) {
+            log.warn("스킬의 이전 버전을 읽지 못했다 profile={} skill={}", profile, name, ex);
+            return null;
+        }
     }
 
     /**
      * 올린 스킬을 지운다. 그 스킬을 뺀 새 버전을 저장과 같은 순서로 게시한다.
      *
      * <p>남는 스킬이 없으면 새 버전을 쓰지 않고 빈 {@code external_dirs} 를 게시한 뒤 그 profile 의 버전
-     * 디렉터리를 모두 지운다. 게시가 성공한 뒤라 Hermes 가 가리키는 디렉터리가 없다.
+     * 디렉터리와 이전 버전을 모두 지운다. 게시가 성공한 뒤라 Hermes 가 가리키는 디렉터리가 없다. profile 디렉터리는
+     * 실행 공간이 붙이고 있으므로 남긴다. 게시가 끝나면 그 스킬의 이전 버전도 지운다. 이전 버전 지우기가 실패해도 지우기는
+     * 성공으로 두고 {@link SkillsChanged} 를 낸다. Hermes 는 이미 그 스킬을 내려놓았다.
      *
      * <p>표식 없는 더 새 버전에만 있는 스킬도 지운다. 지금 버전을 다시 게시하면 Hermes 가 그 버전에서
      * 벗어난다.
@@ -229,19 +350,34 @@ public class SkillService {
         remaining.remove(name);
         if (remaining.isEmpty()) {
             publisher.publish(user, agent, List.of(), connectorBindings.connectorServers(agent.id()));
-            store.deleteAll(profile);
+            store.clearVersions(profile);
         } else {
-            publishVersion(user, agent, remaining);
+            publishVersion(user, agent, remaining, false);
         }
+        deletePreviousQuietly(profile, name);
         events.publishEvent(new SkillsChanged(agent.id()));
     }
 
     /**
-     * 대시보드의 전역 켜고 끄기를 쓴다. 편집자만 한다. Hermes 가 가진 스킬도 켜고 끌 수 있어서 이름은 올린
-     * 스킬 규칙이 아니라 Hermes 이름 규칙으로 본다.
+     * 올린 스킬을 켜고 끈다. 편집자만 하고 기본·커넥터 스킬은 없는 스킬과 같은 오류를 준다.
      */
     public void toggle(CurrentUser user, String code, String name, boolean enabled) {
         Agent agent = requireEditable(user, code);
+        if (uploadedBundle(agent.hermesProfile(), store.readCurrent(agent.hermesProfile()), name) == null) {
+            throw notFound();
+        }
+        toggle(agent, name, enabled);
+    }
+
+    /** 기본 스킬의 켜고 끄기는 관리자 경로에서만 받는다. 설정은 그 profile 의 모든 실행에 적용된다. */
+    public void adminToggle(CurrentUser user, String code, String name, boolean enabled) {
+        if (!user.isAdmin()) {
+            throw forbidden();
+        }
+        toggle(requireEditable(user, code), name, enabled);
+    }
+
+    private void toggle(Agent agent, String name, boolean enabled) {
         if (!HermesSkillName.isValid(name)) {
             throw new ApiException(ErrorCode.VALIDATION_FAILED, "a skill name must follow the Hermes skill name rule");
         }
@@ -271,18 +407,34 @@ public class SkillService {
         return names;
     }
 
-    /** 새 버전을 쓰고 게시하고 표식을 쓰고 옛 버전을 정리한다. 저장과 지우기가 같은 순서를 쓴다. */
-    private void publishVersion(CurrentUser user, Agent agent, Map<String, SkillBundle> skills) {
+    /**
+     * 새 버전을 쓰고 게시하고 표식을 쓰고 옛 버전을 정리한다. 저장과 지우기가 같은 순서를 쓴다.
+     *
+     * <p>{@code withScripts} 면 실행 공간이 있어야 하는 게시로 보낸다. 대시보드가 실행 공간이 없다고 거절하면
+     * {@link ErrorCode#SKILL_SCRIPTS_NEED_SANDBOX} 로 바꾼다. 첨부 디렉터리를 준비하지 못한 거절도 같은 코드로 오지만 셸
+     * 유무가 원인이 아니어서 그대로 올린다. 그 예외의 cause 는 대시보드 응답이 아니다.
+     */
+    private void publishVersion(CurrentUser user, Agent agent, Map<String, SkillBundle> skills, boolean withScripts) {
         String profile = agent.hermesProfile();
         String version = store.writeVersion(profile, skills);
         try {
-            publisher.publish(
-                    user,
-                    agent,
-                    List.of(store.agentPath(profile, version)),
-                    connectorBindings.connectorServers(agent.id()));
+            List<String> externalDirs = List.of(store.agentPath(profile, version));
+            Set<String> connectorServers = connectorBindings.connectorServers(agent.id());
+            if (withScripts) {
+                publisher.publishWithScripts(user, agent, externalDirs, connectorServers);
+            } else {
+                publisher.publish(user, agent, externalDirs, connectorServers);
+            }
         } catch (HermesRequestRejected rejected) {
             discardQuietly(profile, version);
+            if (withScripts
+                    && rejected.code() == ErrorCode.AGENT_SANDBOX_UNAVAILABLE
+                    && rejected.getCause() instanceof RestClientResponseException) {
+                throw new ApiException(
+                        ErrorCode.SKILL_SCRIPTS_NEED_SANDBOX,
+                        "this agent's profile has no sandbox to run skill scripts",
+                        rejected);
+            }
             throw rejected;
         }
         store.markPublished(profile, version);
@@ -315,113 +467,12 @@ public class SkillService {
         return locked;
     }
 
-    private static SkillFrontmatter requireSkillMd(String name, String skillMd) {
-        if (skillMd == null || skillMd.isBlank()) {
-            throw new ApiException(ErrorCode.VALIDATION_FAILED, "SKILL.md is required");
-        }
-        if (skillMd.length() > MAX_CHARS_PER_FILE) {
-            throw new ApiException(
-                    ErrorCode.VALIDATION_FAILED, "SKILL.md can be at most " + MAX_CHARS_PER_FILE + " characters");
-        }
-        SkillFrontmatter frontmatter = SkillFrontmatter.parse(skillMd);
-        if (!name.equals(frontmatter.name())) {
-            throw new ApiException(ErrorCode.VALIDATION_FAILED, "SKILL.md frontmatter name must equal the skill name");
-        }
-        if (frontmatter.rawDescriptionLength() > MAX_DESCRIPTION_CHARS) {
-            throw new ApiException(
-                    ErrorCode.VALIDATION_FAILED,
-                    "SKILL.md description can be at most " + MAX_DESCRIPTION_CHARS + " characters");
-        }
-        if (!frontmatter.hasBody()) {
-            throw new ApiException(ErrorCode.VALIDATION_FAILED, "SKILL.md must have content after the frontmatter");
-        }
-        // Hermes 는 이 칸에 적힌 이름으로 profile 의 환경 값과 파일을 셸 실행 공간에 넣는다(ADR-086).
-        if (frontmatter.requestsSecrets()) {
-            throw new ApiException(
-                    ErrorCode.VALIDATION_FAILED,
-                    "SKILL.md frontmatter must not request environment values or credential files");
-        }
-        return frontmatter;
-    }
-
-    /**
-     * 새 버전에 함께 실리는 기존 스킬 가운데 비밀 요청 칸을 가진 것이 있으면 거절한다(ADR-086). 저장 검사가 생기기 전에
-     * 올린 스킬이 다른 스킬의 저장을 타고 다시 게시되지 않게 하려는 것이다. 버전 디렉터리를 쓰기 전에 본다. 지우기는
-     * 그런 스킬을 지울 수 있어야 하므로 이 검사를 거치지 않는다.
-     */
-    private static void requireNoStoredSecretRequests(Map<String, SkillBundle> next, String saving) {
-        List<String> names = next.values().stream()
-                .filter(bundle -> !bundle.name().equals(saving))
-                .filter(bundle -> SkillFrontmatter.storedRequestsSecrets(bundle.skillMd()))
-                .map(SkillBundle::name)
-                .sorted()
-                .toList();
-        if (!names.isEmpty()) {
-            throw new ApiException(
-                    ErrorCode.VALIDATION_FAILED,
-                    "uploaded skills request environment values or credential files; fix or delete them first: "
-                            + String.join(", ", names));
-        }
-    }
-
-    /** 경로 규칙과 수와 중복을 본다. 본문이 온 파일은 글자 수도 본다. */
-    private static List<SkillFileInput> requireFiles(List<SkillFileInput> files) {
-        List<SkillFileInput> inputs = files == null ? List.of() : files;
-        if (inputs.size() > MAX_FILES) {
-            throw new ApiException(ErrorCode.VALIDATION_FAILED, "a skill can have at most " + MAX_FILES + " files");
-        }
-        Set<String> paths = new HashSet<>();
-        for (SkillFileInput input : inputs) {
-            if (input == null) {
-                throw new ApiException(ErrorCode.VALIDATION_FAILED, "a skill file is missing");
-            }
-            SkillStore.requireFilePath(input.path());
-            if (!paths.add(input.path())) {
-                throw new ApiException(
-                        ErrorCode.VALIDATION_FAILED, "a skill file path was sent more than once: " + input.path());
-            }
-            if (input.content() != null && input.content().length() > MAX_CHARS_PER_FILE) {
-                throw new ApiException(
-                        ErrorCode.VALIDATION_FAILED,
-                        "a skill file can be at most " + MAX_CHARS_PER_FILE + " characters: " + input.path());
-            }
-        }
-        return inputs;
-    }
-
-    /** 본문이 빠진 파일을 지금 버전에서 채우고, 채운 뒤의 합계 크기를 본다. */
-    private static SkillBundle bundleOf(String name, String skillMd, List<SkillFileInput> inputs, SkillBundle current) {
-        Map<String, String> currentFiles = new HashMap<>();
-        if (current != null) {
-            current.files().forEach(file -> currentFiles.put(file.path(), file.content()));
-        }
-        long totalBytes = utf8Bytes(skillMd);
-        List<SkillFile> files = new ArrayList<>();
-        for (SkillFileInput input : inputs) {
-            String content = input.content();
-            if (content == null) {
-                content = currentFiles.get(input.path());
-                if (content == null) {
-                    throw new ApiException(
-                            ErrorCode.VALIDATION_FAILED,
-                            "no current content to keep for the skill file: " + input.path());
-                }
-            }
-            totalBytes += utf8Bytes(content);
-            files.add(new SkillFile(input.path(), content));
-        }
-        if (totalBytes > MAX_TOTAL_BYTES) {
-            throw new ApiException(
-                    ErrorCode.VALIDATION_FAILED, "a skill can be at most " + MAX_TOTAL_BYTES + " bytes in total");
-        }
-        return new SkillBundle(name, skillMd, files);
-    }
-
-    private static SkillDetail detailOf(SkillBundle bundle) {
+    private static SkillDetail detailOf(SkillBundle bundle, Instant previousSavedAt) {
         List<SkillFileInfo> files = bundle.files().stream()
-                .map(file -> new SkillFileInfo(file.path(), utf8Bytes(file.content())))
+                .map(file -> new SkillFileInfo(file.path(), utf8Bytes(file.content()), file.content()))
                 .toList();
-        return new SkillDetail(bundle.name(), descriptionOf(bundle.skillMd()), bundle.skillMd(), files);
+        return new SkillDetail(
+                bundle.name(), descriptionOf(bundle.skillMd()), bundle.skillMd(), files, previousSavedAt);
     }
 
     /** 저장된 원문의 설명이다. 저장할 때 검사했으므로 읽지 못하면 비워 두고 읽기를 막지 않는다. */
@@ -431,10 +482,6 @@ public class SkillService {
         } catch (ApiException ex) {
             return "";
         }
-    }
-
-    private static long utf8Bytes(String value) {
-        return value == null ? 0 : value.getBytes(StandardCharsets.UTF_8).length;
     }
 
     private static ApiException notFound() {

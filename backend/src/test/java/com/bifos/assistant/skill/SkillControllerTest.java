@@ -1,16 +1,20 @@
 package com.bifos.assistant.skill;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.hamcrest.Matchers.containsString;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -27,7 +31,9 @@ import com.bifos.assistant.skill.application.SkillList;
 import com.bifos.assistant.skill.application.SkillListItem;
 import com.bifos.assistant.skill.application.SkillService;
 import com.bifos.assistant.skill.application.SkillSource;
+import com.bifos.assistant.skill.presentation.SkillAdminController;
 import com.bifos.assistant.skill.presentation.SkillController;
+import java.time.Instant;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -46,7 +52,8 @@ class SkillControllerTest {
     private final SkillService skills = mock(SkillService.class);
     private final CurrentUserProvider currentUser = mock(CurrentUserProvider.class);
 
-    private final MockMvc mvc = MockMvcBuilders.standaloneSetup(new SkillController(skills, currentUser))
+    private final MockMvc mvc = MockMvcBuilders.standaloneSetup(
+                    new SkillController(skills, currentUser), new SkillAdminController(skills, currentUser))
             .setControllerAdvice(new GlobalExceptionHandler())
             .build();
 
@@ -60,21 +67,18 @@ class SkillControllerTest {
     void listGivesSourceEditabilityToolStatusAndUploadLimit() throws Exception {
         when(skills.list(OWNER, "dad"))
                 .thenReturn(new SkillList(
-                        List.of(
-                                new SkillListItem("hermes-help", "Hermes 기본", SkillSource.HERMES, true, null),
-                                new SkillListItem("weekly-plan", "이번 주 계획", SkillSource.UPLOADED, false, null)),
+                        List.of(new SkillListItem("weekly-plan", "이번 주 계획", SkillSource.UPLOADED, false, null)),
                         true,
                         true,
                         30));
 
         mvc.perform(get("/api/v1/agents/dad/skills"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.skills.length()").value(2))
-                .andExpect(jsonPath("$.skills[0].name").value("hermes-help"))
-                .andExpect(jsonPath("$.skills[0].source").value("HERMES"))
+                .andExpect(jsonPath("$.skills.length()").value(1))
+                .andExpect(jsonPath("$.skills[0].name").value("weekly-plan"))
+                .andExpect(jsonPath("$.skills[0].source").value("UPLOADED"))
                 .andExpect(jsonPath("$.skills[0].usage").doesNotExist())
-                .andExpect(jsonPath("$.skills[1].source").value("UPLOADED"))
-                .andExpect(jsonPath("$.skills[1].enabled").value(false))
+                .andExpect(jsonPath("$.skills[0].enabled").value(false))
                 .andExpect(jsonPath("$.editable").value(true))
                 .andExpect(jsonPath("$.skillsToolsetEnabled").value(true))
                 .andExpect(jsonPath("$.uploadLimit").value(30));
@@ -99,7 +103,8 @@ class SkillControllerTest {
                         "weekly-plan",
                         "이번 주 계획",
                         "---\nname: weekly-plan\n---\n",
-                        List.of(new SkillFileInfo("references/guide.md", 9L))));
+                        List.of(new SkillFileInfo("references/guide.md", 9L, "안내문")),
+                        null));
 
         mvc.perform(
                         write(
@@ -111,7 +116,9 @@ class SkillControllerTest {
                 .andExpect(jsonPath("$.description").value("이번 주 계획"))
                 .andExpect(jsonPath("$.body").value("---\nname: weekly-plan\n---\n"))
                 .andExpect(jsonPath("$.files[0].path").value("references/guide.md"))
-                .andExpect(jsonPath("$.files[0].size").value(9));
+                .andExpect(jsonPath("$.files[0].size").value(9))
+                .andExpect(jsonPath("$.files[0].content").value("안내문"))
+                .andExpect(content().string(containsString("\"previousSavedAt\":null")));
 
         @SuppressWarnings("unchecked")
         ArgumentCaptor<List<SkillFileInput>> files = ArgumentCaptor.forClass(List.class);
@@ -133,6 +140,33 @@ class SkillControllerTest {
                 .andExpect(jsonPath("$.code").value(ErrorCode.VALIDATION_FAILED.name()));
 
         verifyNoInteractions(skills);
+    }
+
+    @Test
+    @DisplayName("이전 버전으로 되돌리기는 상세 모양과 이전 버전 시각을 주고 이전 버전이 없으면 404 다")
+    void restorePreviousGivesDetailWithPreviousSavedAtAndMissingIs404() throws Exception {
+        when(skills.restorePrevious(OWNER, "dad", "weekly-plan"))
+                .thenReturn(new SkillDetail(
+                        "weekly-plan",
+                        "이번 주 계획",
+                        "---\nname: weekly-plan\n---\n",
+                        List.of(new SkillFileInfo("scripts/run.sh", 4L, "echo")),
+                        Instant.parse("2026-10-09T01:02:03Z")));
+        when(skills.restorePrevious(OWNER, "dad", "missing"))
+                .thenThrow(new ApiException(ErrorCode.SKILL_NOT_FOUND, "no such uploaded skill"));
+
+        mvc.perform(post("/api/v1/agents/dad/skills/weekly-plan/restore-previous"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.name").value("weekly-plan"))
+                .andExpect(jsonPath("$.description").value("이번 주 계획"))
+                .andExpect(jsonPath("$.body").value("---\nname: weekly-plan\n---\n"))
+                .andExpect(jsonPath("$.files[0].path").value("scripts/run.sh"))
+                .andExpect(jsonPath("$.files[0].size").value(4))
+                .andExpect(jsonPath("$.files[0].content").value("echo"))
+                .andExpect(jsonPath("$.previousSavedAt").value("2026-10-09T01:02:03Z"));
+        mvc.perform(post("/api/v1/agents/dad/skills/missing/restore-previous"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value(ErrorCode.SKILL_NOT_FOUND.name()));
     }
 
     @Test
@@ -173,6 +207,34 @@ class SkillControllerTest {
                         .content("{\"enabled\":true}"))
                 .andExpect(status().isNoContent());
         verify(skills).toggle(OWNER, "dad", "note_taking.v2", true);
+    }
+
+    @Test
+    @DisplayName("관리자 목록과 기본 스킬 토글은 관리자 인증을 쓰고 일반 역할을 거절한다")
+    void adminRoutesRequireAdminAndUseAdminService() throws Exception {
+        when(currentUser.requireAdmin()).thenThrow(new ApiException(ErrorCode.FORBIDDEN, "admin only"));
+        mvc.perform(get("/api/v1/admin/agents/dad/skills")).andExpect(status().isForbidden());
+        mvc.perform(put("/api/v1/admin/agents/dad/skills/hermes-help/enabled")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"enabled\":false}"))
+                .andExpect(status().isForbidden());
+        verifyNoInteractions(skills);
+        CurrentUser admin = new CurrentUser(7L, "dad@example.com", "아빠", 1L, UserRole.ADMIN);
+        doReturn(admin).when(currentUser).requireAdmin();
+        when(skills.adminList(admin, "dad"))
+                .thenReturn(new SkillList(
+                        List.of(new SkillListItem("hermes-help", "기본", SkillSource.HERMES, true, null)),
+                        true,
+                        true,
+                        30));
+        mvc.perform(get("/api/v1/admin/agents/dad/skills"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.skills[0].source").value("HERMES"));
+        mvc.perform(put("/api/v1/admin/agents/dad/skills/hermes-help/enabled")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"enabled\":false}"))
+                .andExpect(status().isNoContent());
+        verify(skills).adminToggle(admin, "dad", "hermes-help", false);
     }
 
     private static RequestBuilder write(String name, String json) {

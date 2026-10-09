@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, type PointerEvent, type RefObject } from "react";
 import {
+  containedBox,
   dragWheel,
   isTap,
   mouse,
@@ -24,6 +25,24 @@ const MOVE_MS = 50;
 
 function point(event: Point): Point {
   return { clientX: event.clientX, clientY: event.clientY };
+}
+
+/** 디코딩된 그림의 비율로 여백을 뺀다. 크기 변경 전 프레임에도 같은 계산을 쓴다. */
+function imageBox(img: HTMLImageElement) {
+  return containedBox(
+    img.getBoundingClientRect(),
+    img.naturalWidth,
+    img.naturalHeight,
+  );
+}
+
+function inside(event: Point, box: ReturnType<typeof imageBox>) {
+  return (
+    event.clientX >= box.left &&
+    event.clientX <= box.left + box.width &&
+    event.clientY >= box.top &&
+    event.clientY <= box.top + box.height
+  );
 }
 
 /**
@@ -56,13 +75,14 @@ export function useScreenPointer({
       const img = imgRef.current;
       if (!img) return;
       event.preventDefault();
-      const box = img.getBoundingClientRect();
+      const box = imageBox(img);
+      if (!inside(event, box)) return;
       pending += wheelDelta(event.deltaY, event.deltaMode, box.height);
       if (timer) return;
       const at = point(event);
       timer = window.setTimeout(() => {
         timer = 0;
-        send(wheel(at, img.getBoundingClientRect(), pending));
+        send(wheel(at, imageBox(img), pending));
         pending = 0;
       }, MOVE_MS);
     };
@@ -73,7 +93,7 @@ export function useScreenPointer({
     };
   }, [areaRef, imgRef, send]);
 
-  const box = () => imgRef.current!.getBoundingClientRect();
+  const box = () => imageBox(imgRef.current!);
   const scroll = (current: Press, to: Point) =>
     send(
       dragWheel(
@@ -88,7 +108,7 @@ export function useScreenPointer({
     press.current?.id === event.pointerId ? press.current : null;
 
   function onPointerDown(event: PointerEvent<HTMLImageElement>) {
-    if (press.current) return;
+    if (press.current || !inside(event, box())) return;
     const touch = event.pointerType !== "mouse";
     if (!touch && event.button !== 0) return;
     event.preventDefault();
