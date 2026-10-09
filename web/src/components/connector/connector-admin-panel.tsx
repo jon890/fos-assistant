@@ -73,10 +73,10 @@ export function ConnectorAdminPanel({
     setPending(null);
     if (result.ok) return;
     setError(
-      // 재시작한 뒤 다시 설치된 바인딩은 한 번 더 재시작해야 한다고 알린다. 문구는 오류 표가 갖는다.
-      result.code === "CONNECTOR_RESTART_AGAIN"
-        ? result.message
-        : "반영 상태를 확인하지 못했어요. 잠시 뒤 다시 해 주세요.",
+      // 외부 호출 실패만 일반 문구로 두고, 나머지는 까닭별 문구를 보인다. 문구는 오류 표가 갖는다.
+      result.code === "CONNECTOR_OPERATION_FAILED"
+        ? "반영 상태를 확인하지 못했어요. 잠시 뒤 다시 해 주세요."
+        : result.message,
     );
   }
 
