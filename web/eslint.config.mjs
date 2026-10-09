@@ -12,6 +12,7 @@ const NODE_TEST_READ_FILES = [
   "src/components/chat/activity/activity-state.ts",
   "src/components/chat/skill-command.ts",
   "src/lib/usage-paging.ts",
+  "src/lib/workspace-file.ts",
 ];
 
 export default defineConfig([

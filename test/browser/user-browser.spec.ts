@@ -111,7 +111,7 @@ test("내 브라우저를 만들고 켜고 끄고 지운다", async ({ page }) =
   );
   await expect(status).toHaveText("꺼져 있어요");
 
-  await page.getByRole("button", { name: "지우기" }).click();
+  await page.getByRole("button", { name: "지우기", exact: true }).click();
   const dialog = page.getByRole("alertdialog");
   await expect(
     dialog.getByRole("heading", { name: "브라우저를 지울까요?" }),
@@ -123,7 +123,7 @@ test("내 브라우저를 만들고 켜고 끄고 지운다", async ({ page }) =
   await expect(dialog).toHaveCount(0);
   await expect(status).toHaveText("꺼져 있어요");
 
-  await page.getByRole("button", { name: "지우기" }).click();
+  await page.getByRole("button", { name: "지우기", exact: true }).click();
   await clickAndWaitForResponse(
     page,
     page.getByRole("alertdialog").getByRole("button", { name: "지우기" }),
@@ -226,7 +226,7 @@ test("연결 화면에서 내 브라우저로 간다", async ({ page }) => {
   });
   await page.goto("/connections");
 
-  await page.getByRole("link", { name: "내 브라우저" }).click();
+  await page.getByRole("main").getByRole("link", { name: "내 브라우저" }).click();
   await expect(page).toHaveURL(/\/browser$/);
   await expect(page.getByRole("heading", { name: "내 브라우저" })).toBeVisible();
 });
