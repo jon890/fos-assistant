@@ -96,10 +96,8 @@ class AttachmentInspectTest(unittest.TestCase):
                 self.assertFalse(context.top_level_session("child"))
                 self.assertFalse(context.top_level_session("child-compressed"))
                 self.assertIsNone(context.top_level_session("missing"))
-                with patch.object(self.inspect, "build_context", return_value={
-                    "v": 1, "root_session_id": "root", "session_id": "root",
-                    "tool_call_id": "actual", "sig": "signed",
-                }), patch.object(self.inspect, "_read_token", return_value="fake"):
+                with patch.object(context, "_read_token", return_value="fake"), \
+                     patch.object(self.inspect, "_read_token", return_value="fake"):
                     for session, top in [("root", True), ("compressed", True),
                                          ("child", False), ("child-compressed", False)]:
                         result = self.plugin.pre_tool_call("attachment_inspect", {"attachment_id": 7}, session, "actual")
