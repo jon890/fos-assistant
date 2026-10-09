@@ -36,7 +36,7 @@
 | [ADR-017](ADR-017-무엇을-할지는-hermes-가-정하고-control-plane-은-경계만-갖는다.md) | 무엇을 할지는 Hermes 가 정하고 Control Plane 은 경계만 갖는다 | 공통 | Accepted. 결과를 모델이 다시 묻는다는 부분은 ADR-040 이, 요청자를 MCP 토큰이 정한다는 부분은 ADR-032 가 대체한다 |
 | [ADR-018](ADR-018-사람을-더하는-것을-control-plane-이-끝낸다.md) | 사람을 더하는 것을 Control Plane 이 끝낸다 | backend | Accepted. 여는 경로를 둘로 한정한다는 서술은 당시의 맥락이다. 첫 로그인의 모델 읽기는 ADR-030 이 대체한다 |
 | [ADR-019](ADR-019-페르소나는-hermes-가-갖고-control-plane-은-화면만-준다.md) | 페르소나는 Hermes 가 갖고 Control Plane 은 화면만 준다 | backend | Accepted. plugin 소유는 ADR-041 이 대체한다 |
-| [ADR-020](ADR-020-사진은-공유-디렉터리에-두고-에이전트가-파일로-읽는다.md) | 사진은 공유 디렉터리에 두고 에이전트가 파일로 읽는다 | backend | Accepted |
+| [ADR-020](ADR-020-사진은-공유-디렉터리에-두고-에이전트가-파일로-읽는다.md) | 사진은 공유 디렉터리에 두고 에이전트가 파일로 읽는다 | backend | Accepted. 대화 본문에 사진을 싣지 못한다는 맥락은 [ADR-20261009 / native-image-input](ADR-20261009-native-image-input.md) 이 바꾼다 |
 | [ADR-021](ADR-021-중지한-답은-멈춘-자리까지-남긴다.md) | 중지한 답은 멈춘 자리까지 남긴다 | backend | Accepted. ADR-008 에 예외를 둔다 |
 | [ADR-022](ADR-022-다시-생성과-수정은-같은-session-에-판으로-쌓는다.md) | 다시 생성과 수정은 같은 session 에 판으로 쌓는다 | backend, frontend | Accepted. 수정은 ADR-024 가 대체 |
 | [ADR-023](ADR-023-화면-부품은-shadcn-ui-를-저장소에-복사해-쓴다.md) | 화면 부품은 shadcn/ui 를 저장소에 복사해 쓴다 | frontend | Accepted. 색 값을 그대로 둔다는 부분은 ADR-051 이 대체한다 |
@@ -140,5 +140,6 @@
 | [ADR-20261008 / read-data-flow](ADR-20261008-read-data-flow.md) | 커넥터 READ 결과는 가는 곳마다 따로 판정하고, 판정하지 못하는 길은 감수로 적는다 | 공통 | Accepted. ADR-083 과 ADR-086 의 「감당할 것」 을 흐름마다 나눠 적는다 |
 | [ADR-20261008 / tossinvest-connector](ADR-20261008-tossinvest-connector.md) | 토스증권 커넥터는 읽기 도구만 두고, 토큰은 프로세스 메모리에서 한 번에 하나만 다시 받는다 | hermes | Accepted. ADR-20261008 / connector-binding-guards 의 두 선언을 쓴다 |
 | [ADR-20261008 / tool-catalog-visibility](ADR-20261008-tool-catalog-visibility.md) | 관리자는 그룹의 도구 선택 목록을 정하고 숨김은 활성 상태를 바꾸지 않는다 | backend, frontend | Accepted. ADR-029의 도구 조회와 저장에 그룹별 숨김을 더한다 |
+| [ADR-20261009 / native-image-input](ADR-20261009-native-image-input.md) | 사진마다 줄인 사본 파일을 원본 옆에 두고, 이번 메시지의 사진은 그 사본을 실행 입력에 직접 싣는다 | backend | Accepted. ADR-020 의 「대화 본문에 사진을 실을 수 없다」 를 바꾼다 |
 | [ADR-20261009 / skill-package](ADR-20261009-skill-package.md) | 스킬은 zip 묶음으로도 올리고, 스크립트는 실행 공간이 있는 에이전트에만 받는다 | 공통 | Accepted. ADR-034 의 스크립트 기각을 대체한다 |
 | [ADR-20261009 / tool-request-flow](ADR-20261009-tool-request-flow.md) | 도구 사용 요청은 따로 저장하고 관리자는 반영을 확인한 뒤 승인한다 | backend, frontend | Accepted. ADR-029의 관리자 도구 변경에 주인의 요청과 결정 이력을 더한다 |
