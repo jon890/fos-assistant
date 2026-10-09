@@ -36,11 +36,13 @@
 - `export const overwriteContentShape`: zod 칸 넷. `title`, `category`, `tags`, `body` 는 `draftShape` 의 같은 칸을 그대로 쓴다
 - `export type OverwriteContent = DraftContent`(`src/changes.ts`)
 - `export function validateOverwrite(input: OverwriteContent, base?: OverwriteContent): string[]` 가 어긋난 자리를 문장으로 돌려준다
-  - 길이와 태그 검사: `validateDraft({ ...input, body: <기존 구성요소 줄을 빈 줄로 바꾼 본문> })` 의 문장을 그대로 쓴다. 사진 디렉터리 문장(`photo_dir 이 필요합니다`)은 나오지 않는다. 새 사진 줄은 아래에서 따로 막기 때문이다
+  - 길이와 태그 검사: `validateDraft({ ...input, body: <기존 구성요소 줄과 사진, 스티커, 지도 줄(`parseBody` 의 `image`, `sticker`, `map` 블록)을 모두 빈 줄로 바꾼 본문> })` 의 문장을 그대로 쓴다. 구성요소 줄을 비워 두므로 사진 디렉터리 문장과 사진 파일 이름 문장은 나오지 않는다
+  - 카테고리나 태그의 앞뒤에 공백이 있으면 「카테고리와 태그 앞뒤에 공백을 두지 않습니다.」 한 문장. 편집기는 공백을 떼고 넣어 저장 전 확인이 어긋난다
   - 새 구성요소 줄: `parseBody(input.body)` 에 `image`, `sticker`, `map` 블록이 있으면 「덮어쓰기에는 새 사진, 스티커, 지도를 넣지 않습니다. 새 글로 저장하거나 네이버에서 직접 넣어 주세요.」 한 문장
   - 같은 기존 구성요소 줄이 두 번이면 「<줄> 은 한 번만 둡니다.」
   - `base` 가 있으면: 기존 구성요소 줄마다 `base.body` 의 줄에 같은 줄이 없으면 「<줄> 은 원래 글에 없습니다.」. `draftChanges(base, input)` 이 빈 문자열이면 「바뀐 것이 없습니다.」
 - 줄을 견줄 때 줄 끝 `\r` 하나는 뗀다(`parseBody` 와 같다)
+- `export const CHANGES_MAX = 100_000`: 바뀌는 내용 글의 최대 글자 수
 
 ### 2. `src/render.ts` 수정
 
@@ -50,6 +52,8 @@
 - `renderDraft` 에서 `input.base` 가 있으면:
   - `validateRenderOptions(input)` 와 `validateOverwrite(input, input.base)` 의 문장을 모은다. `validateDraft` 와 `checkPhotoFiles` 는 부르지 않는다
   - `kind` 가 `package` 면 「덮어쓰기 미리보기는 kind preview 만 받습니다.」 문장을 더한다
+  - `photo_dir` 이 있으면 「덮어쓰기에는 photo_dir 을 주지 않습니다.」 문장을 더한다
+  - 만든 `changes` 가 `CHANGES_MAX` 자를 넘으면 「바뀌는 내용이 너무 깁니다. 나눠 고쳐 주세요.」 문장을 더한다
   - 문장이 있으면 지금처럼 `{problems, html: null, assets: []}`
   - 없으면 `previewHtml` 결과에 `changes: draftChanges(input.base, input)` 와 `base_revision: draftRevision(input.base)` 를 더해 돌려준다
 - `previewHtml` 에 선택 인자 `changes?: string` 을 더한다. 있으면 `<article>` 앞에 `<section class="changes"><h2>바뀌는 내용</h2><pre>…</pre></section>` 을 넣는다(`escapeHtml` 로 감싼다). `PREVIEW_STYLE` 에 `.changes` 의 테두리와 `pre{white-space:pre-wrap}` 을 더한다
@@ -60,13 +64,13 @@
 `tests/overwrite-draft.test.ts` 신규:
 
 - 정상: 본문 한 줄과 태그 하나를 고치고 `[기존 사진 1]` 의 차례를 바꾼 글은 문장이 없다
-- 실패: `[사진 1: 101.jpg]` 가 든 글은 새 구성요소 문장, `[기존 사진 1]` 을 두 번 쓴 글은 한 번만 문장, `base` 에 없는 `[기존 지도 2]` 는 원래 글에 없다는 문장, `base` 와 같은 글은 「바뀐 것이 없습니다.」
+- 실패: `[사진 1: 101.jpg]` 가 든 글은 `problems` 가 새 구성요소 문장 하나뿐이다(사진 디렉터리 문장이 섞이지 않는다). 앞에 공백이 있는 태그 `" 저녁"` 은 공백 문장, `[기존 사진 1]` 을 두 번 쓴 글은 한 번만 문장, `base` 에 없는 `[기존 지도 2]` 는 원래 글에 없다는 문장, `base` 와 같은 글은 「바뀐 것이 없습니다.」
 - 101자 제목은 `validateDraft` 와 같은 제목 문장이 하나 나온다
 
 `tests/render.test.ts` 에 더한다:
 
 - `base` 를 준 호출은 `changes` 가 `draftChanges(base, 고친 글)` 과 같고 `base_revision` 이 `draftRevision(base)` 와 같으며 `html` 에 「바뀌는 내용」 과 `기존 사진 1` 이름표가 있다
-- `base` 와 `kind: "package"` 를 함께 주면 `html` 이 `null` 이고 `problems` 가 있다
+- `base` 와 `kind: "package"` 를 함께 주거나 `base` 와 `photo_dir` 을 함께 주면 `html` 이 `null` 이고 `problems` 가 있다
 - `base` 없이 기존 구성요소 줄을 주면 지금처럼 새 글 문장으로 거절한다(회귀)
 
 ## 검증

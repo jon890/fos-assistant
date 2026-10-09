@@ -19,7 +19,8 @@
 `page.ts` 안의 `EditorPage.fail` 과 `openWriteTab` 이 `EditorError` 를 쓴다.
 다른 파일은 `./page.ts` 나 `../editor/page.ts`, `./editor/run.ts`(재수출) 에서 가져온다.
 
-파일 길이 기준은 `scripts/file-length-baseline.json` 이 갖는다. 줄이 줄면 `node scripts/check-file-length.mjs` 가 기준값을 낮추라는 알림을 낸다. 알림을 따라 `node scripts/check-file-length.mjs --update` 로 기준값을 낮추고 그 파일도 커밋한다.
+파일 길이 기준은 `scripts/file-length-baseline.json` 이 갖는다. 줄이 줄면 `node scripts/check-file-length.mjs` 가 기준값을 낮추라는 알림을 낸다.
+`--update` 는 이 계획과 무관한 다른 파일의 기준값까지 바꾸므로 쓰지 않는다. 그 JSON 의 `"hermes/connectors/naver-blog/src/editor/page.ts"` 값만 옮긴 뒤의 줄 수(`wc -l` 결과)로 손으로 고친다.
 
 ## 의도 메모
 
@@ -48,10 +49,10 @@ cd hermes/connectors/naver-blog && bun test ./tests/editor-error.test.ts
 cd hermes/connectors/naver-blog && bun test ./tests
 cd hermes/connectors/naver-blog && bun run typecheck
 cd hermes/connectors/naver-blog && bun run build && bun run check:bundle
-node scripts/check-file-length.mjs --update && node scripts/check-file-length.mjs
+node scripts/check-file-length.mjs
 ```
 
-모두 종료 코드 0 이어야 한다. `page.ts` 의 기준값이 줄어든 것을 `git diff scripts/file-length-baseline.json` 으로 본다.
+모두 종료 코드 0 이어야 한다. `git diff scripts/file-length-baseline.json` 에 `page.ts` 한 줄만 바뀌었는지 본다.
 
 ## 변경 파일
 
