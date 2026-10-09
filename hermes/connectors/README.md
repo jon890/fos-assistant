@@ -5,7 +5,7 @@
 
 이 저장소가 유지보수하는 범용 커넥터를 만들고 PR 로 올리는 방법이다.
 어떤 커넥터를 여기 두는지와 그 근거는 [ADR-064](../docs/adr/ADR-064-범용-커넥터는-이-저장소의-hermes-connectors-에-두고-저장소가-유지보수한다.md) 가 갖는다.
-`connector.json` 의 형식은 [커넥터 연결](../../docs/connectors.md) 이, 위험도와 승인은 [커넥터 도구 정책](../../docs/backend/connector-tool-policy.md) 이 갖는다.
+`connector.json` 의 형식은 이 파일의 「connector.json」 이, 위험도와 승인은 [커넥터 도구 정책](../../docs/backend/connector-tool-policy.md) 이 갖는다.
 따라 할 본보기는 [`hermes/connectors/gmail/`](gmail) 이고 그 문서는 [Gmail 커넥터](gmail/README.md) 다.
 
 ## 여기 두는 커넥터
@@ -34,7 +34,7 @@ hermes/connectors/<id>/
   scripts/check-bundle.ts   커밋한 묶음 파일과 재빌드 결과 비교
   tests/<id>.test.ts        로컬 HTTP 대역으로 도는 검사
   skills/<이름>/SKILL.md    붙인 에이전트에 스킬로 설치된다
-docs/connectors/<id>.md                 도구와 정책, 보안, 설정 안내, 실제 계정 확인
+  README.md                 도구와 정책, 보안, 설정 안내, 실제 계정 확인
 .github/CODEOWNERS                      `/hermes/connectors/<id>/` 한 줄
 ```
 
@@ -153,7 +153,7 @@ Hermes 는 스킬을 읽을 때 그 칸의 이름으로 profile 의 값과 파�
 
 ### 문서와 소유자
 
-`docs/connectors/<id>.md` 에 아래를 둔다.
+`hermes/connectors/<id>/README.md` 에 아래를 둔다.
 
 - 등록 칸과 도구 표. 도구마다 위험도, 승인, 상시 허락, 그 까닭
 - scope 나 권한과 그것을 고른 까닭
@@ -188,7 +188,7 @@ CI 의 `hermes` job 과 `scripts/check-local.sh` 가 돌린다. 커넥터를 더
 | `.mcp.json` 의 `command` 가 `bun` 이고 `dist/<id>-mcp.js` 하나를 실행한다. TypeScript 소스가 있고 Python 서버는 없다 | 운영자의 환경에서 뜨지 않는다 |
 | 스킬이 하나 이상 있다 | 붙인 에이전트에 지침이 없다 |
 | `icon` 과 `link` 를 선언했고, `.svg` 아이콘이 `xmlns="http://www.w3.org/2000/svg"` 를 선언했다 | 카드가 기본 아이콘이나 빈 아이콘으로 보이고 서비스로 가는 길이 없다 |
-| `tests/<id>.test.ts`, `docs/connectors/<id>.md`, `CODEOWNERS` 의 줄이 있다 | 검사나 안내나 소유자가 없다 |
+| `tests/<id>.test.ts`, `README.md`, `CODEOWNERS` 의 줄이 있다 | 검사나 안내나 소유자가 없다 |
 
 검사가 보지 못하는 것은 리뷰가 본다. 위험도 분류가 맞는지, 어느 도구가 밖으로 나가는지, scope 가 가장 작은지다.
 
