@@ -18,6 +18,20 @@ export type ScreenInput =
 type Box = { left: number; top: number; width: number; height: number };
 type Point = { clientX: number; clientY: number };
 
+/** 가운데 정렬한 object-contain 그림의 실제 영역이다. */
+export function containedBox(box: Box, width: number, height: number): Box {
+  if (width <= 0 || height <= 0) return box;
+  const scale = Math.min(box.width / width, box.height / height);
+  const drawnWidth = width * scale;
+  const drawnHeight = height * scale;
+  return {
+    left: box.left + (box.width - drawnWidth) / 2,
+    top: box.top + (box.height - drawnHeight) / 2,
+    width: drawnWidth,
+    height: drawnHeight,
+  };
+}
+
 /** 서버가 받는 특수 키다. 나머지 글자는 `text` 로 보낸다. */
 const KEYS = new Set([
   "Enter",

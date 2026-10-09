@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
+  containedBox,
   dragWheel,
   isTap,
   MAX_TEXT,
@@ -15,6 +16,46 @@ import {
 } from "../../web/src/components/browser/screen-input.ts";
 
 const box = { left: 100, top: 50, width: 400, height: 600 };
+
+test("상한보다 넓고 높은 칸에서 그림 비율을 지키고 여백을 뺀 좌표를 보낸다", () => {
+  const wide = containedBox(
+    { left: 10, top: 20, width: 1800, height: 900 },
+    1600,
+    900,
+  );
+  assert.deepEqual(wide, { left: 110, top: 20, width: 1600, height: 900 });
+  assert.deepEqual(mouse("down", { clientX: 510, clientY: 695 }, wide), {
+    type: "mouse",
+    action: "down",
+    x: 0.25,
+    y: 0.75,
+  });
+  const tall = containedBox(
+    { left: 10, top: 20, width: 1600, height: 2400 },
+    1600,
+    2000,
+  );
+  assert.deepEqual(tall, { left: 10, top: 220, width: 1600, height: 2000 });
+  assert.deepEqual(ratio({ clientX: 410, clientY: 1720 }, tall), {
+    x: 0.25,
+    y: 0.75,
+  });
+});
+
+test("크기 변경을 기다리는 이전 프레임도 비율을 지킨다", () => {
+  const drawn = containedBox(
+    { left: 0, top: 0, width: 1800, height: 900 },
+    400,
+    600,
+  );
+  assert.deepEqual(drawn, { left: 600, top: 0, width: 600, height: 900 });
+  assert.equal(drawn.width / drawn.height, 400 / 600);
+  assert.deepEqual(ratio({ clientX: 750, clientY: 675 }, drawn), {
+    x: 0.25,
+    y: 0.75,
+  });
+  assert.deepEqual(containedBox(box, 0, 0), box);
+});
 
 test("좌표는 그림 안의 비율이고 가장자리와 밖은 0 과 1 로 자른다", () => {
   assert.deepEqual(ratio({ clientX: 300, clientY: 350 }, box), {

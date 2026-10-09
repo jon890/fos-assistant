@@ -41,7 +41,7 @@ export function ScreenFrame({
           height={frame.height}
           alt="내 브라우저 화면"
           draggable={false}
-          className="block h-full w-full"
+          className="block h-full w-full object-contain object-center"
           {...pointer}
         />
       ) : closed ? null : (

@@ -1,7 +1,10 @@
-import type { Page } from "../../web/node_modules/@playwright/test/index.js";
+import type {
+  Locator,
+  Page,
+} from "../../web/node_modules/@playwright/test/index.js";
 import { expect, test } from "./fixtures.ts";
 
-/** 4x6 JPEG 한 장이다. 그림 크기는 `frame` 사건의 `width`, `height` 가 정한다. */
+/** 4x6 JPEG 한 장이다. 기본 프레임(400x600)과 비율이 같다. */
 const FRAME =
   "/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAA0JCgsKCA0LCgsODg0PEyAVExISEyccHhcgLikxMC4pLSwzOko+MzZGNywtQFdBRkxOUlNSMj5aYVpQYEpRUk//2wBDAQ4ODhMREyYVFSZPNS01T09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT0//wAARCAAGAAQDASIAAhEBAxEB/8QAHwAAAQUBAQEBAQEAAAAAAAAAAAECAwQFBgcICQoL/8QAtRAAAgEDAwIEAwUFBAQAAAF9AQIDAAQRBRIhMUEGE1FhByJxFDKBkaEII0KxwRVS0fAkM2JyggkKFhcYGRolJicoKSo0NTY3ODk6Q0RFRkdISUpTVFVWV1hZWmNkZWZnaGlqc3R1dnd4eXqDhIWGh4iJipKTlJWWl5iZmqKjpKWmp6ipqrKztLW2t7i5usLDxMXGx8jJytLT1NXW19jZ2uHi4+Tl5ufo6erx8vP09fb3+Pn6/8QAHwEAAwEBAQEBAQEBAQAAAAAAAAECAwQFBgcICQoL/8QAtREAAgECBAQDBAcFBAQAAQJ3AAECAxEEBSExBhJBUQdhcRMiMoEIFEKRobHBCSMzUvAVYnLRChYkNOEl8RcYGRomJygpKjU2Nzg5OkNERUZHSElKU1RVVldYWVpjZGVmZ2hpanN0dXZ3eHl6goOEhYaHiImKkpOUlZaXmJmaoqOkpaanqKmqsrO0tba3uLm6wsPExcbHyMnK0tPU1dbX2Nna4uPk5ebn6Onq8vP09fb3+Pn6/9oADAMBAAIRAxEAPwDrqKKK2Ef/2Q==";
 
@@ -139,6 +142,28 @@ async function fakeScreen(
 
 type Fake = Awaited<ReturnType<typeof fakeScreen>>;
 
+/** CSS가 가운데 그린 이미지 영역이다. 입력은 이 영역 안의 자리를 누른다. */
+async function drawnBox(screen: Locator) {
+  await expect
+    .poll(() => screen.evaluate((img: HTMLImageElement) => img.naturalWidth))
+    .toBeGreaterThan(0);
+  return screen.evaluate((img: HTMLImageElement) => {
+    const rect = img.getBoundingClientRect();
+    const scale = Math.min(
+      rect.width / img.naturalWidth,
+      rect.height / img.naturalHeight,
+    );
+    const width = img.naturalWidth * scale;
+    const height = img.naturalHeight * scale;
+    return {
+      x: rect.x + (rect.width - width) / 2,
+      y: rect.y + (rect.height - height) / 2,
+      width,
+      height,
+    };
+  });
+}
+
 test("화면 폭을 넓히고 전체 화면에서 크기를 맞춘 뒤 닫는다", async ({
   page,
 }) => {
@@ -159,8 +184,8 @@ test("화면 폭을 넓히고 전체 화면에서 크기를 맞춘 뒤 닫는다
       }));
       const resize = ofType(fake.inputs, "resize").at(-1);
       return (
-        resize?.width === size.width &&
-        resize?.height === Math.max(320, size.height)
+        resize?.width === Math.min(1600, Math.max(320, size.width)) &&
+        resize?.height === Math.min(2000, Math.max(320, size.height))
       );
     })
     .toBe(true);
@@ -202,6 +227,88 @@ test("전체 화면 API 가 막혀도 오버레이를 열고 Escape 로 닫는�
   await expect(dialog).toHaveCount(0);
 });
 
+test("1920 폭과 크기 상한 밖에서도 프레임 비율과 클릭 좌표를 지킨다", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1920, height: 1080 });
+  await page.addInitScript(() => {
+    Element.prototype.requestFullscreen = () =>
+      Promise.reject(new Error("unsupported"));
+  });
+  const fake = await fakeScreen(page);
+  const screen = await openScreen(page, fake);
+  await page.getByRole("button", { name: "전체 화면", exact: true }).click();
+  await expect(page.getByRole("dialog", { name: "로그인 화면" })).toBeVisible();
+  const area = screen.locator("..");
+  await expect
+    .poll(() => area.evaluate((el) => el.clientWidth))
+    .toBeGreaterThan(1600);
+  await expect
+    .poll(() => ofType(fake.inputs, "resize").at(-1)?.width)
+    .toBe(1600);
+
+  // 원격 크기 변경을 기다리는 동안 이전 400x600 프레임도 늘어나지 않는다.
+  await expect(screen).toHaveCSS("object-fit", "contain");
+  await expect(screen).toHaveCSS("object-position", "50% 50%");
+  let drawn = await drawnBox(screen);
+  expect(drawn.width / drawn.height).toBeCloseTo(400 / 600, 6);
+  const element = (await screen.boundingBox())!;
+  expect(drawn.x - element.x).toBeCloseTo((element.width - drawn.width) / 2, 6);
+  await page.mouse.click(element.x + 2, element.y + element.height / 2);
+  await page.mouse.click(
+    drawn.x + drawn.width / 4,
+    drawn.y + drawn.height * 0.75,
+  );
+  await expect.poll(() => ofType(fake.inputs, "mouse").length).toBe(2);
+
+  // 실제 JPEG도 바꿔 디코딩된 프레임의 비율과 좌표를 확인한다.
+  const data = await page.evaluate(() => {
+    const canvas = document.createElement("canvas");
+    canvas.width = 1600;
+    canvas.height = 900;
+    canvas.getContext("2d")!.fillRect(0, 0, 1600, 900);
+    return canvas.toDataURL("image/jpeg").split(",")[1];
+  });
+  await fake.push([["frame", { data, width: 1600, height: 900 }]]);
+  await expect
+    .poll(() => screen.evaluate((img: HTMLImageElement) => img.naturalWidth))
+    .toBe(1600);
+  drawn = await drawnBox(screen);
+  expect(drawn.width / drawn.height).toBeCloseTo(1600 / 900, 6);
+  await page.mouse.click(
+    drawn.x + drawn.width / 4,
+    drawn.y + drawn.height * 0.75,
+  );
+  await expect.poll(() => ofType(fake.inputs, "mouse").length).toBe(4);
+
+  // 높이도 상한을 넘는 칸에서 위아래 여백을 뺀 좌표를 확인한다.
+  await area.evaluate((el) => {
+    el.style.height = "2400px";
+    el.style.flex = "none";
+  });
+  await expect
+    .poll(() => ofType(fake.inputs, "resize").at(-1)?.height)
+    .toBe(2000);
+  drawn = await drawnBox(screen);
+  expect(drawn.width / drawn.height).toBeCloseTo(1600 / 900, 6);
+  const tall = (await screen.boundingBox())!;
+  expect(drawn.y - tall.y).toBeGreaterThan(0);
+  const event = {
+    pointerType: "mouse",
+    pointerId: 9,
+    button: 0,
+    clientX: drawn.x + drawn.width / 4,
+    clientY: drawn.y + drawn.height * 0.75,
+  };
+  await screen.dispatchEvent("pointerdown", event);
+  await screen.dispatchEvent("pointerup", event);
+  await expect.poll(() => ofType(fake.inputs, "mouse").length).toBe(6);
+  for (const input of ofType(fake.inputs, "mouse")) {
+    expect(input.x).toBeCloseTo(0.25, 2);
+    expect(input.y).toBeCloseTo(0.75, 2);
+  }
+});
+
 test("휠과 터치 드래그는 실제 CDP 페이지의 스크롤 위치를 바꾼다", async ({
   page,
 }) => {
@@ -222,7 +329,7 @@ test("휠과 터치 드래그는 실제 CDP 페이지의 스크롤 위치를 바
       });
   });
   const screen = await openScreen(page, fake);
-  const box = (await screen.boundingBox())!;
+  const box = await drawnBox(screen);
   await page.mouse.move(box.x + box.width / 2, box.y + 20);
   await page.mouse.wheel(0, 120);
   await expect
@@ -254,7 +361,7 @@ test("휠은 본문을 움직이지 않고 단추와 페이지 키도 원격으�
   const scrollTop = await page
     .locator("main")
     .evaluate((main) => main.scrollTop);
-  const box = (await screen.boundingBox())!;
+  const box = await drawnBox(screen);
   await page.mouse.move(box.x + box.width / 2, box.y + 20);
   await page.mouse.wheel(0, 120);
   await expect.poll(() => ofType(fake.inputs, "wheel").length).toBe(1);
@@ -334,15 +441,14 @@ test("화면을 열어 누르고 글자를 넣고 굴리고 탭을 고르면 입
   expect(resize.height).toBeGreaterThanOrEqual(320);
   expect(resize.height).toBeLessThanOrEqual(page.viewportSize()!.height);
 
-  // 그림이 화면보다 길 수 있어 가운데 대신 위쪽의 정한 자리를 누르고 비율을 그 자리로 견준다.
-  const box = (await screen.boundingBox())!;
-  await screen.click({ position: { x: box.width / 2, y: 20 } });
+  // 클릭 전에 Playwright가 위치 안정과 스크롤을 기다린다. 가운데는 여백과 관계없이 같다.
+  await screen.click();
   await expect
     .poll(() => ofType(fake.inputs, "mouse").map((input) => input.action))
     .toEqual(["down", "up"]);
   for (const input of ofType(fake.inputs, "mouse")) {
     expect(input.x as number).toBeCloseTo(0.5, 1);
-    expect(input.y as number).toBeCloseTo(20 / box.height, 2);
+    expect(input.y as number).toBeCloseTo(0.5, 2);
   }
 
   await page.keyboard.insertText("안녕하세요");
@@ -356,7 +462,7 @@ test("화면을 열어 누르고 글자를 넣고 굴리고 탭을 고르면 입
     )
     .toEqual([5, "Enter", 500, 1]);
 
-  const wheelBox = (await screen.boundingBox())!;
+  const wheelBox = await drawnBox(screen);
   await page.mouse.move(wheelBox.x + wheelBox.width / 2, wheelBox.y + 20);
   await page.mouse.wheel(0, 120);
   await expect
@@ -382,7 +488,7 @@ test("화면을 열어 누르고 글자를 넣고 굴리고 탭을 고르면 입
 test("터치로 누르면 누르기로, 세로로 끌면 휠로 간다", async ({ page }) => {
   const fake = await fakeScreen(page);
   const screen = await openScreen(page, fake);
-  const box = (await screen.boundingBox())!;
+  const box = await drawnBox(screen);
   const x = box.x + box.width / 2;
   const y = box.y + box.height / 2;
   const touch = (clientX: number, clientY: number, pointerId = 7) => ({
