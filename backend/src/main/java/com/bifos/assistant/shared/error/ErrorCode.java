@@ -273,6 +273,16 @@ public enum ErrorCode {
     BROWSER_STOP_FAILED(HttpStatus.BAD_GATEWAY),
     /** 요청자의 브라우저에 열린 로그인 화면이 없다. 입력을 보내기 전에 화면을 연다. */
     BROWSER_SCREEN_CLOSED(HttpStatus.CONFLICT),
+    /** 실행 공간 루트가 설정되지 않았거나 디렉터리가 아니다. 상태 조회 말고 모든 파일 공간 경로가 이 코드다. */
+    WORKSPACE_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE),
+    /** 없는 경로, 링크를 지나는 경로, 본문을 줄 수 없는 종류를 같은 응답으로 숨긴다. 남의 공간은 경로로 닿을 수 없다. */
+    WORKSPACE_ENTRY_NOT_FOUND(HttpStatus.NOT_FOUND),
+    /** Control Plane 이 읽을 권한이 없거나 하드 링크가 둘 이상인 파일이다. */
+    WORKSPACE_ENTRY_UNREADABLE(HttpStatus.FORBIDDEN),
+    /** 미리보기 크기 상한을 넘는다. 내려받기는 상한이 없다. */
+    WORKSPACE_PREVIEW_TOO_LARGE(HttpStatus.CONTENT_TOO_LARGE),
+    /** 미리보기를 정하지 않은 확장자다. 내려받기는 받는다. */
+    WORKSPACE_PREVIEW_UNSUPPORTED(HttpStatus.UNSUPPORTED_MEDIA_TYPE),
     INTERNAL_ERROR(HttpStatus.INTERNAL_SERVER_ERROR);
 
     private final HttpStatus status;

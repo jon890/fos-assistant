@@ -5,6 +5,7 @@ import com.bifos.assistant.chat.application.ArtifactService;
 import com.bifos.assistant.chat.application.ConversationAccess;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.auth.CurrentUserProvider;
+import com.bifos.assistant.shared.util.SandboxedContentPolicy;
 import java.time.Instant;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -35,9 +36,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class ArtifactController {
 
     /** 스크립트를 막고 같은 출처의 사진과 스타일만 부르게 한다. */
-    static final String CONTENT_SECURITY_POLICY = "sandbox allow-same-origin allow-popups "
-            + "allow-popups-to-escape-sandbox; default-src 'none'; img-src 'self' data:; "
-            + "style-src 'self' 'unsafe-inline'; base-uri 'none'; form-action 'none'";
+    static final String CONTENT_SECURITY_POLICY = SandboxedContentPolicy.HTML;
 
     private final ArtifactService artifacts;
     private final CurrentUserProvider currentUser;
@@ -70,8 +69,7 @@ public class ArtifactController {
 
     /** 200 과 304 가 같은 코드로 붙이는 머리글이다. */
     private static ResponseEntity.BodyBuilder common(ResponseEntity.BodyBuilder builder, ArtifactFile file) {
-        return builder
-                .eTag(file.etag())
+        return builder.eTag(file.etag())
                 .lastModified(file.lastModified())
                 .header("X-Content-Type-Options", "nosniff")
                 .header("Content-Security-Policy", CONTENT_SECURITY_POLICY)

@@ -54,6 +54,7 @@ Hermes 에 설치하는 묶음과 그때 받는 값은 [`hermes/README.md`](../h
 | `ASSISTANT_ATTACHMENT_AGENT_ROOT` | Backend | 같은 디렉터리를 Hermes 컨테이너에서 보는 경로. 실행 입력에 적는다. 비면 기동이 실패한다 |
 | `ASSISTANT_ARTIFACT_ROOT` | Backend | 에이전트가 만든 결과물 파일을 두는 디렉터리. Control Plane 이 읽고 오래된 것을 지운다. 비면 기동이 실패한다 |
 | `ASSISTANT_ARTIFACT_AGENT_ROOT` | Backend | 같은 디렉터리를 Hermes 컨테이너에서 보는 경로. 실행 입력에 적는다. 비면 기동이 실패한다 |
+| `ASSISTANT_SANDBOX_WORKSPACE_ROOT` | Backend | 셸 실행 공간 정책의 `workspace_root` 를 Control Plane 에서 본 경로. 읽기 전용으로 붙인다. 비면 「파일 공간」 을 쓸 수 없다고 보이고 기동은 한다([`code-architecture.md`](code-architecture.md) 의 「실행 공간 파일」) |
 | `ASSISTANT_SKILL_ROOT` | Backend | 에이전트에 올린 스킬을 profile 별 버전 디렉터리로 두는 디렉터리. Control Plane 이 쓴다. 비면 기동이 실패한다 |
 | `ASSISTANT_SKILL_AGENT_ROOT` | Backend | 같은 디렉터리를 Hermes 컨테이너에서 읽기 전용으로 보는 경로. `skills.external_dirs` 에 적는다. 비면 기동이 실패한다 |
 | `ASSISTANT_SKILL_MAX_PER_AGENT` | Backend | 에이전트 하나에 올릴 수 있는 스킬 수. 기본 30. 새 스킬을 만들 때만 본다 |

@@ -88,6 +88,107 @@ Memory 의 기본 근거는 [`adr/ADR-003-memory-권한은-주입으로-강제�
 층을 나누는 근거는
 [`adr/ADR-015-memory-는-층을-나눠-싣는다.md`](adr/ADR-015-memory-는-층을-나눠-싣는다.md) 에 있다.
 
+## 실행 공간 파일
+
+사용자가 「파일 공간」 화면에서 자기 실행 공간 `/workspace` 를 보는 길이다.
+결정은 [ADR-20261009 / workspace-explorer](adr/ADR-20261009-workspace-explorer.md), 실행 공간의 모양은 [`hermes/sandbox.md`](hermes/sandbox.md) 가 갖는다.
+코드는 `backend` 의 최상위 패키지 `workspace` 에 둔다. 다른 패키지는 이 패키지를 쓰지 않는다.
+
+### 설정
+
+| 키 | 환경 변수 | 비었을 때 |
+| --- | --- | --- |
+| `assistant.sandbox-workspace.root` | `ASSISTANT_SANDBOX_WORKSPACE_ROOT` | 기동한다. 상태 조회 밖의 모든 경로가 503 `WORKSPACE_UNAVAILABLE` 이고 상태 조회는 `available: false` 다 |
+| `assistant.sandbox-workspace.delete-socket` | `ASSISTANT_SANDBOX_WORKSPACE_DELETE_SOCKET` | 기동한다. 상태 조회의 `deletable` 이 거짓이고 화면은 지우기를 열지 않는다 |
+
+`root` 는 실행 공간 정책의 `workspace_root` 와 같은 디렉터리를 Control Plane 에서 본 경로다. 읽기 전용으로 붙인다.
+붙이는 일은 `fos-home-infra` 가 한다. 루트가 링크가 아닌 디렉터리가 아니어도 `WORKSPACE_UNAVAILABLE` 이다.
+
+### 경로 규칙
+
+요청자의 디렉터리는 `<root>/u<사용자 번호>` 하나다. 요청은 주인을 정하지 못한다.
+요청의 `path` 는 그 디렉터리 안의 상대 경로이고 `/` 로 조각을 나눈다. 빈 값은 그 디렉터리 자체다.
+
+| 거절하는 것 | 응답 |
+| --- | --- |
+| 빈 조각, `.`, `..`, NUL, 제어 문자, 맨 앞의 `/` | 400 `VALIDATION_FAILED` |
+| 전체 4,096 바이트, 조각 하나 255 바이트, 조각 64개를 넘는다 | 400 `VALIDATION_FAILED` |
+| 중간 조각이 디렉터리가 아니거나 심볼릭 링크다 | 404 `WORKSPACE_ENTRY_NOT_FOUND` |
+| 없는 경로 | 404 `WORKSPACE_ENTRY_NOT_FOUND` |
+
+중간 조각은 링크를 따라가지 않고 연다. glibc 위의 JDK 는 `SecureDirectoryStream` 으로 조각마다 디렉터리 핸들을 열어, 판정한 뒤 다른 것으로 바뀐 경로를 따라가지 않는다.
+그 기능이 없으면 대체 경로를 탄다. 운영 이미지(`eclipse-temurin:21-jre-alpine`)는 musl 이라 이쪽이고, 개발 기계(macOS)도 그렇다. 대체 경로는 경고를 한 번 남긴다.
+대체 경로는 조각마다 링크인지 본 뒤 경로로 열고, 연 뒤에 다시 본다. 중간 조각이 모두 링크가 아닌 디렉터리인지, 실제 경로가 사용자 디렉터리 아래인지, 마지막 조각을 열기 전에 본 파일과 연 뒤 다시 본 파일이 같은지 확인하고 어긋나면 404 다.
+하드 링크 수와 읽기 권한은 두 경로 모두 경로로 다시 본다. 본문은 위 방법으로 연 것만 준다.
+이 사후 확인은 확인과 열기 사이의 틈을 줄일 뿐 없애지 못한다. glibc 이미지로 옮겨 대체 경로 없이 꺼지게(fail-closed) 하는 일은 이슈 #359 가 갖는다([ADR-20261009 / workspace-explorer](adr/ADR-20261009-workspace-explorer.md) 의 「감당할 것」).
+
+목록의 한 줄은 아래 종류 가운데 하나다.
+
+| `kind` | 무엇 | 본문 |
+| --- | --- | --- |
+| `DIRECTORY` | 디렉터리 | 목록으로 연다 |
+| `FILE` | 일반 파일 | 하드 링크가 하나이고 Control Plane 이 읽을 수 있을 때만 준다 |
+| `LINK` | 심볼릭 링크. 가리키는 곳을 읽지 않는다 | 주지 않는다 |
+| `OTHER` | FIFO, 소켓, 장치 | 주지 않는다 |
+
+`readable` 이 거짓이면 화면은 「읽을 수 없음」 을 보인다. 권한이 없는 파일, 하드 링크가 둘 이상인 파일, `LINK`, `OTHER` 가 그렇다.
+`openable` 은 이름이 주소 조각으로 쓸 수 있는지다. `%`, `;`, `\` 가 든 이름은 Control Plane 의 요청 방화벽이 주소에서 거절하므로 미리보기와 내려받기를 열지 않는다. 목록은 `path` 인자로 열므로 그런 이름의 디렉터리도 연다.
+
+### API
+
+모든 경로는 웹 토큰의 사용자로 판정한다. 웹 서버 라우트는 같은 경로를 `/api/workspace/...` 로 옮긴다.
+
+| 경로 | 하는 일 | 응답 |
+| --- | --- | --- |
+| `GET /api/v1/workspace` | 공간의 상태 | `{available, deletable, exists, runningExecutions, agents: [{code, name, shared}]}`. `exists` 는 사용자 디렉터리가 있는지다. `agents` 는 요청자가 주인이고 켜져 있으며 지우지 않은 에이전트이고, `shared` 는 그룹에 공개했는지다. `runningExecutions` 는 사용자 실행 한도가 세는 지금 쥔 자리 수다 |
+| `GET /api/v1/workspace/entries?path=` | 디렉터리 하나의 목록 | `{path, entries: [{name, kind, size, modifiedAt, readable, openable}], truncated}`. 디렉터리를 읽는 순서로 1,001개까지 읽고, 그 가운데 1,000개를 디렉터리 먼저, 이름 순서로 준다. 1,001번째가 있으면 `truncated` 가 참이고, 그때는 순서상 앞선 항목도 빠질 수 있다. `size` 는 `FILE` 만 채운다. 사용자 디렉터리가 아직 없으면 빈 목록이다 |
+| `GET /api/v1/workspace/files/{경로}` | 미리보기 본문 | 아래 「본문 머리글」. 경로의 조각마다 URL 인코딩한다 |
+| `GET /api/v1/workspace/files/{경로}?download=1` | 내려받기 | 크기 상한 없이 스트림으로 준다 |
+
+본문 경로의 오류는 아래와 같다. 루트 확인(503), 경로 검사(400) 다음에, 미리보기는 확장자(415), 크기(413), 종류(404), 읽기 권한(403) 차례로 판정한다. 내려받기는 종류와 읽기 권한만 본다.
+
+| 판정 | 응답 |
+| --- | --- |
+| `FILE` 이 아니다 | 404 `WORKSPACE_ENTRY_NOT_FOUND` |
+| 읽을 수 없다(권한, 하드 링크) | 403 `WORKSPACE_ENTRY_UNREADABLE` |
+| 미리보기를 정하지 않은 확장자 | 415 `WORKSPACE_PREVIEW_UNSUPPORTED` |
+| 미리보기 크기를 넘는다 | 413 `WORKSPACE_PREVIEW_TOO_LARGE` |
+
+목록에서 Control Plane 이 읽지 못하는 디렉터리는 403 `WORKSPACE_ENTRY_UNREADABLE` 이다. 예상하지 못한 입출력 오류는 500 `INTERNAL_ERROR` 이고 로그에는 사용자 번호와 예외 종류만 남는다.
+응답 본문은 파일을 연 시점의 크기까지만 보낸다. 그 사이 파일이 커져도 `Content-Length` 와 본문이 어긋나지 않는다.
+
+### 본문 머리글
+
+미리보기는 확장자로 형식을 정한다. 파일의 내용으로 형식을 짐작하지 않는다.
+
+| 확장자 | `Content-Type` | 크기 상한 |
+| --- | --- | --- |
+| `html`, `htm` | `text/html; charset=utf-8` | 5 MiB |
+| `png`, `jpg`, `jpeg`, `gif`, `webp` | 그 사진 형식 | 20 MiB |
+| `css` | `text/css; charset=utf-8`. HTML 미리보기가 상대 경로로 부르는 스타일이 적용되게 한다 | 1 MiB |
+| `csv`, `tsv` 와 아래 글 확장자, 확장자가 없는 이름 | `text/plain; charset=utf-8` | 1 MiB |
+
+글 확장자는 `txt`, `md`, `markdown`, `log`, `json`, `jsonl`, `yaml`, `yml`, `toml`, `ini`, `cfg`, `conf`, `env`, `py`, `js`, `mjs`, `cjs`, `ts`, `tsx`, `jsx`, `java`, `kt`, `go`, `rs`, `rb`, `sh`, `bash`, `zsh`, `sql`, `xml`, `svg`, `scss` 다.
+SVG 는 스크립트를 품을 수 있어 사진이 아니라 글로 보인다.
+확장자는 이름의 마지막 `.` 뒤를 소문자로 읽는다. `.` 으로 시작하고 다른 `.` 이 없는 이름은 그 뒤 전체가 확장자다. `.env` 는 `env` 라 글이고, `.gitignore` 는 `gitignore` 라 미리보기가 없다. `.` 이 없는 이름(`Makefile`)은 확장자가 없는 이름이다.
+
+| 머리글 | 미리보기 | 내려받기 |
+| --- | --- | --- |
+| `Content-Type` | 위 표 | `application/octet-stream` |
+| `Content-Disposition` | `inline; filename="<ASCII 로 옮긴 이름>"; filename*=UTF-8''<이름>` | `attachment; filename="<ASCII 로 옮긴 이름>"; filename*=UTF-8''<이름>` |
+| `Content-Security-Policy` | HTML 은 결과물과 같은 값([`backend/artifact.md`](backend/artifact.md) 의 「경로」). 그 밖은 `sandbox; default-src 'none'` | `sandbox; default-src 'none'` |
+| `X-Content-Type-Options` | `nosniff` | `nosniff` |
+| `Cache-Control` | `private, no-store` | `private, no-store` |
+
+`Content-Disposition` 은 Spring 의 `ContentDisposition` 에 이름과 UTF-8 을 주어 만든다. ASCII 로 옮긴 이름과 `"`, `\` 의 escape 는 Spring 이 정한다.
+web 서버 라우트는 이 다섯 머리글과 `Content-Length` 만 옮긴다.
+HTML 이 상대 경로로 부르는 CSS 와 사진은 같은 `files/` 아래 주소라 주인 확인 뒤에 받는다.
+
+### 로그와 기록
+
+본문은 로그와 실행 기록에 남기지 않는다.
+목록과 본문의 오류 로그는 사용자 번호와 오류 종류만 남기고 경로를 남기지 않는다.
+
 ## 화면을 검증하는 방법
 
 테스트는 확인하는 대상을 나눠 둔다.
@@ -121,6 +222,7 @@ profile key 와 AI credential 은 계속 홈서버 파일에 둔다.
 
 ## 아직 만들지 않은 것
 
+- 「파일 공간」 화면과 그 web 서버 라우트(`/api/workspace/...`), 실행 공간 파일의 지우기. 경로와 흐름은 위 「실행 공간 파일」 과 [`flow.md`](flow.md) 의 「파일 공간을 열 때」 에 먼저 적었다
 - Hermes 안의 `delegate_task` 하위 에이전트가 자기 실행 줄을 남기는 경로.
   그 하위 에이전트는 Hermes 안에서만 돌고 사건으로만 보인다.
   우리 실행 줄이 생기는 자식은 `agent_delegate`, 흐름의 하위 실행, Memory 제안이다.
