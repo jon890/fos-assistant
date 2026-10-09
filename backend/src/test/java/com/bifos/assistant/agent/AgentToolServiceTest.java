@@ -28,6 +28,7 @@ import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
@@ -42,11 +43,12 @@ class AgentToolServiceTest {
     private final HermesToolsetClient toolsets = mock(HermesToolsetClient.class);
     private final ProfileSkillFiles skillFiles = mock(ProfileSkillFiles.class);
     private final AgentConnectorBindings connectorBindings = mock(AgentConnectorBindings.class);
+    private final AgentRepository agents = mock(AgentRepository.class);
     private final AgentToolService service = new AgentToolService(
             toolsets,
             skillFiles,
             mock(AgentService.class),
-            mock(AgentRepository.class),
+            agents,
             connectorBindings,
             mock(ToolsetVisibilityService.class));
     private final CurrentUser owner = new CurrentUser(1L, "owner@example.com", "주인", 1L, UserRole.MEMBER);
@@ -70,6 +72,7 @@ class AgentToolServiceTest {
     @Test
     @DisplayName("기존 개인 profile에 원본 조회를 자동 제공하고 도구 설정을 보존한다")
     void originalInspectionIsAddedAutomaticallyToExistingPrivateProfile() {
+        when(agents.findByCodeForUpdate(agent.code())).thenReturn(Optional.of(agent));
         when(toolsets.readEnabled(agent.apiBaseUrl(), agent.hermesProfile()))
                 .thenReturn(List.of("web", "fos-assistant"), List.of("web", "fos-assistant", "fos-attachments"));
         service.ensureAttachmentInspection(agent);

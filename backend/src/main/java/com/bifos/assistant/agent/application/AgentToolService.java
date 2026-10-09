@@ -32,7 +32,12 @@ public class AgentToolService {
     private final ToolsetVisibilityService visibility;
 
     /** 사진이 있는 일반 turn 제출 전에 기존 profile에도 원본 조회 도구를 자동 제공한다. */
+    @Transactional
     public void ensureAttachmentInspection(Agent agent) {
+        if (agent.connectorManaged() || !agent.acceptsAttachments()) {
+            return;
+        }
+        agent = requireAgentForUpdate(agent.code());
         if (agent.connectorManaged() || !agent.acceptsAttachments()) {
             return;
         }
