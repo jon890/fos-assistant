@@ -1149,13 +1149,13 @@ V47 이전 판으로 되돌린 동안 옛 코드가 쓴 줄은 다시 올리기 
 
 | 옛 경로 | 지금 자리 |
 | --- | --- |
-| `docs/backend/schema/attention.md` | 이 파일 「할 일과 먼저 알리기 표」 |
-| `docs/backend/schema/browser.md` | 이 파일 「사용자 브라우저 표」 |
-| `docs/backend/schema/chat.md` | 이 파일 「대화 표」 |
-| `docs/backend/schema/execution.md` | 이 파일 「실행 표」 |
-| `docs/backend/schema/feedback.md` | 이 파일 「판단 피드백 표」 |
-| `docs/backend/schema/notification.md` | 이 파일 「알림 표」 |
-| `docs/backend/schema/proactive.md` | 이 파일 「먼저 살펴보기 표」 |
-| `docs/backend/schema/task.md` | 이 파일 「예약 작업 표」 |
-| `docs/backend/schema/users-agents.md` | 이 파일 「사용자와 에이전트 표」 |
-| `docs/backend/user-browser.md` | [`backend/docs/flow.md`](flow.md) 「사용자 브라우저」 |
+| `docs/backend/schema/attention.md` | 이 파일 「할 일과 먼저 알리기 표」 | <!-- ref-ignore: 적용된 마이그레이션 주석이 가리키는 옛 경로다 -->
+| `docs/backend/schema/browser.md` | 이 파일 「사용자 브라우저 표」 | <!-- ref-ignore: 적용된 마이그레이션 주석이 가리키는 옛 경로다 -->
+| `docs/backend/schema/chat.md` | 이 파일 「대화 표」 | <!-- ref-ignore: 적용된 마이그레이션 주석이 가리키는 옛 경로다 -->
+| `docs/backend/schema/execution.md` | 이 파일 「실행 표」 | <!-- ref-ignore: 적용된 마이그레이션 주석이 가리키는 옛 경로다 -->
+| `docs/backend/schema/feedback.md` | 이 파일 「판단 피드백 표」 | <!-- ref-ignore: 적용된 마이그레이션 주석이 가리키는 옛 경로다 -->
+| `docs/backend/schema/notification.md` | 이 파일 「알림 표」 | <!-- ref-ignore: 적용된 마이그레이션 주석이 가리키는 옛 경로다 -->
+| `docs/backend/schema/proactive.md` | 이 파일 「먼저 살펴보기 표」 | <!-- ref-ignore: 적용된 마이그레이션 주석이 가리키는 옛 경로다 -->
+| `docs/backend/schema/task.md` | 이 파일 「예약 작업 표」 | <!-- ref-ignore: 적용된 마이그레이션 주석이 가리키는 옛 경로다 -->
+| `docs/backend/schema/users-agents.md` | 이 파일 「사용자와 에이전트 표」 | <!-- ref-ignore: 적용된 마이그레이션 주석이 가리키는 옛 경로다 -->
+| `docs/backend/user-browser.md` | [`backend/docs/flow.md`](flow.md) 「사용자 브라우저」 | <!-- ref-ignore: 적용된 마이그레이션 주석이 가리키는 옛 경로다 -->
