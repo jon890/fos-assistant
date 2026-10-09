@@ -1,27 +1,8 @@
 import { CdpSession, httpJson, wsUrlFor } from "../cdp.ts";
 import { BLOG_ID_PATTERN } from "../session.ts";
+import { EditorError, type EditorErrorCode } from "./editor-error.ts";
 
-/** 편집기 단계가 실패를 알리는 코드. 작업 상태의 `error.code` 가 된다. */
-export type EditorErrorCode =
-  | "login_required"
-  | "category_not_found"
-  | "place_not_unique"
-  | "photo_upload_failed"
-  | "editor_failed"
-  | "save_unconfirmed";
-
-/** 편집기 단계의 실패. `message` 에는 CDP 주소와 파일 경로, 초안 본문을 싣지 않는다. */
-export class EditorError extends Error {
-  constructor(
-    readonly code: EditorErrorCode,
-    readonly stage: string,
-    message: string,
-    readonly extra: Record<string, unknown> = {},
-  ) {
-    super(message);
-    this.name = "EditorError";
-  }
-}
+export { EditorError, type EditorErrorCode } from "./editor-error.ts";
 
 /**
  * 기다리는 시간의 상한(초). 기본값은 원본이 실측으로 정한 값이다.

@@ -10,7 +10,7 @@
     "backend/src/main/java/com/bifos/assistant/orchestration/application/AgentDelegationService.java": 607,
     "backend/src/main/java/com/bifos/assistant/usage/application/ExecutionRecorder.java": 585,
     "backend/src/main/java/com/bifos/assistant/usage/domain/AgentExecution.java": 665,
-    "hermes/connectors/naver-blog/src/editor/page.ts": 511,
+    "hermes/connectors/naver-blog/src/editor/page.ts": 492,
     "hermes/connectors/naver-blog/src/jobs.ts": 469,
     "web/src/components/agent/skill-editor.tsx": 449,
     "web/src/components/chat/conversation-session.tsx": 2242,
