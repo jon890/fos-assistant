@@ -25,6 +25,7 @@ import com.bifos.assistant.proactive.application.ProactiveCheckProperties;
 import com.bifos.assistant.proactive.application.ProactiveLoopProperties;
 import com.bifos.assistant.usage.application.UserExecutionProperties;
 import com.bifos.assistant.usage.infra.PricingProperties;
+import com.bifos.assistant.workspace.infra.WorkspaceProperties;
 import com.tngtech.archunit.base.DescribedPredicate;
 import com.tngtech.archunit.core.domain.JavaClass;
 import com.tngtech.archunit.core.domain.JavaConstructor;
@@ -497,7 +498,8 @@ public final class ArchitectureRules {
             ModelTierProperties.class,
             ConnectorPolicyProperties.class,
             MemoryProposalProperties.class,
-            BrowserProperties.class);
+            BrowserProperties.class,
+            WorkspaceProperties.class);
 
     /** {@code HermesProperties} 가운데 {@code LiveProperties} 로 읽는 칸이다. */
     private static final Set<String> HERMES_LIVE_ACCESSORS = Set.of("runTimeout", "pollInterval");

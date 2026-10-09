@@ -10,8 +10,13 @@ frontend 는 화면의 동작과 구조이고, hermes 는 외부 런타임인 He
 | 문서 | 소유하는 것 |
 | --- | --- |
 | [`prd.md`](prd.md) | 제품의 목적과 범위, 범위 밖, 아직 정하지 않은 것 |
+<<<<<<< HEAD
 | [`code-architecture.md`](code-architecture.md) | 패키지 경계, 사용자와 profile, 에이전트, 대화의 층, 비밀값을 두는 곳, 아직 만들지 않은 것 |
 | [`flow.md`](flow.md) | 화면 전환과 호출 순서, 두 방향의 토큰, 실행이 실패할 때의 흐름 |
+=======
+| [`code-architecture.md`](code-architecture.md) | 패키지 경계, 사용자와 profile, 에이전트, 대화의 층, Hermes 쪽 코드의 배치, 비밀값을 두는 곳, 아직 만들지 않은 것 |
+| [`flow.md`](flow.md) | 화면 전환과 호출 순서, 두 방향의 토큰, 실행이 실패할 때의 흐름, 파일 공간을 열고 지울 때의 흐름 |
+>>>>>>> docs-restructure-2-web
 | [`connectors.md`](connectors.md) | 커넥터의 정의, 언제 에이전트를 나누는가, 커넥터 선언 파일, 연결과 붙이기 API, 승인, 토큰 저장 |
 | [`hermes/connectors/README.md`](../hermes/connectors/README.md) | 범용 커넥터를 만드는 방법, 갖출 것, PR 에 필요한 것, 공통 검사 |
 | [`hermes/connectors/gmail/README.md`](../hermes/connectors/gmail/README.md) | Gmail 커넥터의 도구와 정책, 보안, 설정 안내, 실제 계정 확인 |
@@ -27,7 +32,7 @@ frontend 는 화면의 동작과 구조이고, hermes 는 외부 런타임인 He
 
 | 문서 | 소유하는 것 |
 | --- | --- |
-| [`backend/docs/code-architecture.md`](../backend/docs/code-architecture.md) | backend 패키지의 책임, 한 번의 대화가 지나는 길, 가격표 |
+| [`backend/docs/code-architecture.md`](../backend/docs/code-architecture.md) | backend 패키지의 책임, 한 번의 대화가 지나는 길, 가격표와 실행 공간 파일의 경로 규칙, 지우기 도우미 계약과 관리자 용량 |
 | [`backend/docs/code-architecture.md`](../backend/docs/code-architecture.md) | Spring 통합 검사의 공통 기반 주석, 설정 바꾸기, 검사 사이에 남기지 않는 것, 컨텍스트 수 확인 |
 | [`backend/docs/code-architecture.md`](../backend/docs/code-architecture.md) | 구조 규칙과 코드 규칙의 기준 파일을 갱신하는 방법, 뺀 규칙의 까닭 · 언어 공통 파일 길이 기준 목록 |
 | [`backend/docs/data-schema.md`](../backend/docs/data-schema.md) | 표와 칸의 뜻. 표를 주제별 파일로 나눈 색인이 있다 |
