@@ -30,7 +30,7 @@
 | `proactive_check` | `ProactiveCheck.agentId`, `ProactiveCheckRepository` | 지운다. 자식 표(`proactive_check_finding`, `proactive_check_problem`, `proactive_value_evaluation`, `proactive_autonomy_decision`, `proactive_loop_run`, `decision_feedback_event`)는 MySQL FK 의 `ON DELETE CASCADE` 와 `ON DELETE SET NULL` 이 처리한다 |
 
 - `conversation`, `agent_execution`, `task` 는 `agent_id` 에 FK 가 없고 그대로 둔다.
-- 시험 DB: 일반 시험은 H2 이고 스키마를 엔티티로 만든다(`backend/src/test/resources/application-test.yml` 의 `ddl-auto: create-drop`, Flyway 꺼짐). 그래서 H2 에는 마이그레이션의 FK 와 CASCADE 가 없다. FK 순서는 `@Tag("mysql")` 하위 클래스가 Flyway 로 만든 실제 MySQL 에서 확인한다. 본보기: `backend/src/test/java/com/bifos/assistant/agent/ToolsetRequestFlowMysqlTest.java` (상위 `ToolsetRequestFlowTest` 를 상속하고 `@DynamicPropertySource` 로 `MysqlTestDatabase` 를 끼운다).
+- 시험 DB: 일반 시험은 H2 이고 스키마를 엔티티로 만든다(`backend/src/test/resources/application-test.yml` 의 `ddl-auto: create-drop`, Flyway 꺼짐). 그래서 H2 에는 마이그레이션의 FK 와 CASCADE 가 없다. 예외로 `ConnectorBinding.agent` 의 `@ManyToOne` 은 H2 에도 `agent_connector_binding → agent` FK 를 만든다. 바인딩을 에이전트 행보다 먼저 지우지 않으면 H2 에서도 실패한다. FK 순서는 `@Tag("mysql")` 하위 클래스가 Flyway 로 만든 실제 MySQL 에서 확인한다. 본보기: `backend/src/test/java/com/bifos/assistant/agent/ToolsetRequestFlowMysqlTest.java` (상위 `ToolsetRequestFlowTest` 를 상속하고 `@DynamicPropertySource` 로 `MysqlTestDatabase` 를 끼운다).
 - 저장소에 메서드를 더하면 `RepositoryQueryMysqlTest` 가 스스로 찾아 실제 MySQL 에서 한 번 실행한다. 같은 저장소에 같은 이름의 오버로드를 두지 않는다(`RepositoryQuerySweep` 이 실패한다).
 - 마이그레이션 규칙: `backend/docs/data-schema.md` 의 「마이그레이션 작성 규칙」. 이미 적용된 파일은 고치지 않는다(`test/unit/migration-immutable.test.ts`).
 
@@ -93,12 +93,13 @@ Javadoc 에 ADR-20261009 / agent-purge 와 「`agent` 보다 위 패키지가 �
 
 ```java
 /** 바인딩 앞의 옛 커넥터 에이전트다. 엔티티는 쓰지 않고, 지운 에이전트를 정리할 때 벌크 갱신만 비운다(ADR-20261009 / agent-purge). */
+@Getter(AccessLevel.NONE)
 @Column(name = "agent_id", insertable = false, updatable = false)
 private Long legacyAgentId;
 ```
 
 `insertable = false` 라 새 연결은 지금처럼 `agent_id` 를 비운 채 저장된다. 이 매핑이 없으면 엔티티로 스키마를 만드는 H2 시험에 칸이 없어 갱신이 실패한다.
-getter 는 두지 않는다.
+클래스에 `@Getter` 와 `@Accessors(fluent = true)` 가 붙어 있어 필드에 `@Getter(AccessLevel.NONE)` 를 달아 getter 를 막는다. 클래스 Javadoc 에서 `agent_id` 를 매핑하지 않는다고 적은 문장을 「`agent_id` 는 지운 에이전트 정리의 벌크 갱신만 쓰는 읽기 전용 칸으로 매핑한다」 로 고친다.
 Hibernate 가 `updatable = false` 칸의 JPQL 벌크 갱신을 거절하면 같은 메서드를 native 질의 `update connector_connection set agent_id = null where agent_id = :agentId` 로 바꾼다. 매핑이 있으므로 H2 에도 칸이 있다.
 
 ### 4. `backend/src/main/java/com/bifos/assistant/agent/application/AgentPurgeWriter.java` 신규
@@ -124,9 +125,9 @@ public AgentPurgeOutcome purge(Long agentId, Instant cutoff)
 
 ### 6. 이 phase 를 검증하는 `backend/src/test/java/com/bifos/assistant/agent/AgentPurgeWriterTest.java` 신규
 
-`@BackendIntegrationTest`. 매 검사에 사용자와 에이전트를 새로 만든다(`ConversationPurgerTest` 의 `setUp` 본보기, 이메일은 `@example.test`). 에이전트의 `deleted_at` 은 `JdbcTemplate` 으로 `2000-01-01T00:00:00Z` 로 적어 다른 검사의 에이전트와 겹치지 않게 한다. `cutoff` 는 `2000-01-08T00:00:00Z` 다.
+`@BackendIntegrationTest`. 매 검사에 사용자와 에이전트를 새로 만든다(`ConversationPurgerTest` 의 `setUp` 본보기, 이메일은 `@example.test`). 에이전트의 `deleted_at` 은 `Agent.markDeleted(instant)` 뒤 `agents.saveAndFlush` 로 `2000-01-01T00:00:00Z` 를 적어 다른 검사의 에이전트와 겹치지 않게 한다. `JdbcTemplate` 에 `Timestamp.from(...)` 을 넘기면 JVM 시간대로 적혀, `hibernate.jdbc.time_zone: UTC` 로 읽는 쪽과 어긋난다. 다른 시각 칸도 엔티티로 적거나 UTC `Calendar` 를 쓴다. `cutoff` 는 `2000-01-08T00:00:00Z` 다.
 
-- 「딸린 줄이 모두 있는 지운 에이전트를 지우고 대화와 실행은 남긴다」: `agent_memory_collection`, `agent_memory_collection_change`, `agent_toolset_request`, `agent_connector_binding`(연결 하나와 함께), `connector_action` 한 줄, `proactive_loop_setting`, `proactive_check`, 지우지 않은 대화 하나, 그 대화의 `agent_execution` 한 줄을 만든다. 결과가 `PURGED`, `agent` 행과 앞의 설정 줄이 없고, `connector_action` 줄은 남되 `agent_id` 가 null, 대화와 실행 줄은 남는다.
+- 「딸린 줄이 모두 있는 지운 에이전트를 지우고 대화와 실행은 남긴다」: `agent_memory_collection`, `agent_memory_collection_change`, `agent_toolset_request`, `agent_connector_binding`(연결 하나와 함께), `connector_action` 한 줄, 그 연결의 `connector_connection.agent_id` 를 `jdbc.update("UPDATE connector_connection SET agent_id = ? WHERE id = ?", agentId, connectionId)` 로 적은 값, `proactive_loop_setting`, `proactive_check`, 지우지 않은 대화 하나, 그 대화의 `agent_execution` 한 줄을 만든다. 결과가 `PURGED`, `agent` 행과 앞의 설정 줄이 없고, `connector_action` 줄은 남되 `agent_id` 가 null, 연결 줄은 남되 `connector_connection.agent_id` 가 null, 대화와 실행 줄은 남는다.
 - 「cutoff 보다 늦게 지운 에이전트는 남긴다」: `deleted_at` 을 `2000-01-08T00:00:01Z` 로 두면 `GONE` 이고 행이 남는다.
 - 「지우지 않은 에이전트는 건드리지 않는다」: `deleted_at` 이 null 이면 `GONE` 이고 행과 설정이 남는다.
 - 「지웠지만 정리되지 않은 대화가 있으면 미룬다」: 대화의 `deleted_at` 을 적고 `purged_at` 은 비우면 `WAITING` 이고 아무 줄도 지워지지 않는다. `purged_at` 까지 적으면 `PURGED`.
@@ -138,7 +139,7 @@ public AgentPurgeOutcome purge(Long agentId, Instant cutoff)
 `@Tag("mysql")`, `AgentPurgeWriterTest` 를 상속하고 `ToolsetRequestFlowMysqlTest` 와 같은 `@DynamicPropertySource` 를 둔다.
 상위 클래스의 검사가 모두 실제 MySQL 의 FK 아래에서 돈다. 여기에 검사 하나를 더한다.
 
-- 「살펴보기의 자식 줄은 FK 가 함께 지우거나 비운다」: `proactive_check` 에 `proactive_check_finding` 한 줄과 그 check 를 가리키는 `decision_feedback_event` 한 줄을 `JdbcTemplate` 으로 넣고 정리한 뒤, finding 줄은 없고 feedback 줄의 `proactive_check_id` 칸이 null 인지 본다. 칸 이름은 `V69__proactive_check.sql` 과 `V20261007044901__decision_feedback_event.sql` 에서 읽는다.
+- 「살펴보기의 자식 줄은 FK 가 함께 지우거나 비운다」: `proactive_check` 에 `proactive_check_finding` 한 줄과 그 check 를 `source_check_id` 로 가리키는 `decision_feedback_event` 한 줄을 `JdbcTemplate` 으로 넣고 정리한 뒤, finding 줄은 없고 feedback 줄의 `source_check_id` 칸이 null 인지 본다. 칸 이름은 `V69__proactive_check.sql` 과 `V20261007044901__decision_feedback_event.sql` 에서 읽는다.
 
 ## 검증
 

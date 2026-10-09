@@ -36,19 +36,20 @@
 
 ### 3. `backend/src/main/java/com/bifos/assistant/skill/application/SkillUsageQuery.java` 와 `UserSkillUsage.java` 수정
 
-`byUser` 에서 행이 없는 에이전트의 묶음을 빼지 않고 `agentCode` 와 `agentName` 을 null 로 낸다. 정렬의 `thenComparing(UserSkillUsage::agentCode)` 를 `Comparator.nullsLast(Comparator.naturalOrder())` 로 바꾼다. 메서드 Javadoc 에 「행이 없는 에이전트는 이름 없이 낸다」 를 더한다.
+`byUser` 에서 `agentId` 는 있는데 행이 없는 묶음을 빼지 않고 `agentCode` 와 `agentName` 을 null 로 낸다. `agentId` 가 null 인 묶음(에이전트 없이 돈 실행)은 지금처럼 뺀다. 정렬의 `thenComparing(UserSkillUsage::agentCode)` 를 `Comparator.nullsLast(Comparator.naturalOrder())` 로 바꾼다. 메서드 Javadoc 에 「행이 없는 에이전트는 이름 없이 낸다」 를 더한다.
 `UserSkillUsage` 의 `@param agentCode`, `@param agentName` 에 「에이전트 행이 없으면 null」 을 더한다.
 
 ### 4. web 수정
 
 - `web/src/lib/skill.ts` 의 `SkillUsageRow.agentName` 을 `string | null` 로 바꾸고 주석에 「행이 없는 에이전트는 null」 을 단다.
+- `web/src/components/task/task-list.tsx` 89줄의 `{task.agentName ?? "에이전트 없음"}` 을 `{agentLabel(task.agentName)}` 로 바꾼다. 예약 작업의 에이전트 행이 정리로 사라져도 다른 화면처럼 「지운 에이전트」 로 보인다.
 - `web/src/components/usage/skill-usage-list.tsx` 가 `agentLabel(row.agentName)` 을 그리고(`@/lib/format` 에서 import), `li` 의 `key` 도 `agentLabel(row.agentName)` 으로 만든다.
 
 ### 5. 이 phase 를 검증하는 시험
 
 - `backend/src/test/java/com/bifos/assistant/usage/UsageBreakdownTest.java`: 「에이전트 행이 없는 실행도 agent 축에 번호로 묶이고 다른 줄은 그대로다」 검사의 `label` 단언을 `"지운 에이전트"` 로 바꾸고, `code` 가 번호 문자열인지는 그대로 본다. `@DisplayName` 을 「에이전트 행이 없는 실행도 agent 축에 번호로 묶이고 이름은 지운 에이전트다」 로 바꾼다.
 - `backend/src/test/java/com/bifos/assistant/memory/MemorySourcesTest.java`: `describesSourceByVisibility` 에 실행의 에이전트 번호는 있는데 `byIds` 에 없는 기억 하나를 더해 `new MemorySource(null, true)` 인지 본다. 실행에 에이전트 번호가 없는 기억(`unknownExecution`)은 그대로 `UNNAMED` 다.
-- `backend/src/test/java/com/bifos/assistant/skill/SkillUsageQueryTest.java`: 검사 하나를 더한다. 「에이전트 행이 없는 호출도 이름 없이 합계에 남는다」. 그 사용자의 실행 하나에 스킬 사용을 남긴 뒤 그 실행의 `agent_id` 를 `JdbcTemplate` 으로 없는 번호(예: `Long.MAX_VALUE - 1`)로 바꾸고, `byUser` 결과에 `agentCode` 와 `agentName` 이 null 인 줄이 그 스킬 이름과 횟수로 있는지 본다.
+- `backend/src/test/java/com/bifos/assistant/skill/SkillUsageQueryTest.java`: 검사 하나를 더한다. 「에이전트 행이 없는 호출도 이름 없이 합계에 남는다」. 그 사용자의 실행 하나에 스킬 사용을 남긴 뒤 그 실행의 `agent_id` 를 `JdbcTemplate` 으로 없는 번호(예: `Long.MAX_VALUE - 1`)로 바꾸고, `byUser` 결과에 `agentCode` 와 `agentName` 이 null 인 줄이 그 스킬 이름과 횟수로 있는지 본다. 같은 검사에서 다른 실행의 `agent_id` 를 NULL 로 바꾼 스킬 사용은 결과에 없는지도 본다.
 
 ## 검증
 
@@ -56,7 +57,7 @@
 cd backend && ./gradlew test --tests 'com.bifos.assistant.usage.UsageBreakdownTest' --tests 'com.bifos.assistant.memory.MemorySourcesTest' --tests 'com.bifos.assistant.skill.SkillUsageQueryTest'
 cd backend && ./gradlew spotlessCheck checkstyleMain checkstyleTest
 cd web && pnpm exec tsc --noEmit && pnpm lint
-.omc/scripts/heavy-lock scripts/check-local.sh usage
+.omc/scripts/heavy-lock scripts/check-local.sh usage task
 ```
 
 - 마지막 줄은 사용량 화면 브라우저 검사(`test/browser/usage.spec.ts`)다. 스킬 탭이 기존 이름으로 그대로 보인다.
@@ -71,6 +72,7 @@ cd web && pnpm exec tsc --noEmit && pnpm lint
 | `backend/src/main/java/com/bifos/assistant/skill/application/UserSkillUsage.java` | 수정 |
 | `web/src/lib/skill.ts` | 수정 |
 | `web/src/components/usage/skill-usage-list.tsx` | 수정 |
+| `web/src/components/task/task-list.tsx` | 수정 |
 | `backend/src/test/java/com/bifos/assistant/usage/UsageBreakdownTest.java` | 수정 |
 | `backend/src/test/java/com/bifos/assistant/memory/MemorySourcesTest.java` | 수정 |
 | `backend/src/test/java/com/bifos/assistant/skill/SkillUsageQueryTest.java` | 수정 |

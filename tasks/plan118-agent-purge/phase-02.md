@@ -1,6 +1,6 @@
 # Phase 02. 정리 작업이 지운 지 7일이 지난 에이전트를 지운다
 
-**Execution profile**: standard
+**Execution profile**: deep
 
 ## 목표
 
@@ -16,7 +16,7 @@
 - 본보기: `backend/src/main/java/com/bifos/assistant/chat/application/ConversationPurger.java`. `@Scheduled(cron = "${assistant.chat.purge-cron}")` 의 `runScheduled()` 가 `purgeDue(clock.instant())` 를 부르고, 실패한 번호를 `Map<Long, Backoff>` 에 두고 1분에서 한 시간까지 두 배씩 늘리며, 다섯 번째 잇단 실패에 error 로그를 남긴다. 한 차례 시간 상한은 20초다. 같은 모양을 따른다.
 - phase 01 이 만든 것: `agent/application/AgentPurgeWriter.purge(Long agentId, Instant cutoff)` 가 `agent/application/model/AgentPurgeOutcome`(`PURGED`, `WAITING`, `GONE`)을 돌려준다. port `agent/application/AgentPurgeParticipant` 의 `blocksPurge(Long agentId)` 는 정리 트랜잭션 안에서만 부를 수 있다(참여자가 `Propagation.MANDATORY`).
 - profile 거두기는 port `agent/application/ProfileProvisioning.deprovision(String profileName)` 다. 구현 `people/application/HermesProfileProvisioner` 가 토큰 폐기, `HermesDashboardClient.deleteProfile`(404 는 정상), key 파일 `deleteIfExists` 를 한다. 여러 번 불러도 된다.
-- 스킬 디렉터리는 `agent/application/ProfileSkillFiles.deleteAll(String profile)` 이다. `AgentLifecycleService.removeSkillDirectory` 처럼 실패해도 warn 로그만 남긴다.
+- 스킬 디렉터리는 `agent/application/ProfileSkillFiles.deleteAll(String profile)` 이다. 실패해도 정리를 멈추지 않고 warn 로그 `지운 에이전트의 스킬 디렉터리를 지우지 못했다 agentId={}` 만 남긴다. `AgentLifecycleService.removeSkillDirectory` 와 달리 profile 이름은 적지 않는다.
 - 설정: `agent/application/AgentProperties` 는 `@ConfigurationProperties(prefix = "assistant.agents")` 인 record `AgentProperties(Integer maxPerUser)` 이고 compact 생성자가 기본값을 채운다. `new AgentProperties(` 를 부르는 코드는 지금 없다(`git grep` 으로 다시 확인한다).
 - 시험 컨텍스트: `@BackendIntegrationTest` 에서 `HermesDashboardClient` 는 `@MockitoBean` 이다(`testsupport/BackendIntegrationTest.java`). 시험이 `@Autowired HermesDashboardClient dashboard` 로 받아 `verify` 와 `doThrow` 를 쓴다.
 
@@ -95,7 +95,8 @@ public int purgeDue(Instant now)
 ### 5. 이 phase 를 검증하는 `backend/src/test/java/com/bifos/assistant/agent/AgentPurgerTest.java` 신규
 
 `@BackendIntegrationTest`. `@Autowired` 로 `AgentPurger`, `AgentRepository`, `AppUserRepository`, `ConversationRepository`, `JdbcTemplate`, `HermesDashboardClient`(mock) 를 받는다.
-에이전트는 검사마다 새로 만들고 `Agent.markManagedProfile()` 로 관리형을 정한다. `deleted_at` 은 `JdbcTemplate` 으로 적는다.
+에이전트는 검사마다 새로 만들고 `Agent.markManagedProfile()` 로 관리형을 정한다. profile 이름과 code 는 `purge-` 와 소문자 무작위 값을 이어 만든다(`HermesProfileName` 규칙 `[a-z0-9][a-z0-9-]{0,63}` 에 맞아야 key 파일 지우기가 `VALIDATION_FAILED` 를 내지 않는다). `deleted_at` 은 `Agent.markDeleted(instant)` 뒤 `agents.saveAndFlush` 로 적는다. `JdbcTemplate` 으로 적으면 JVM 시간대가 섞인다.
+`purgeDue` 의 반환값은 정확한 수로 단언하지 않는다. 다른 검사가 남긴 2000년대의 지운 에이전트가 함께 지워진다. 에이전트마다 행이 남았는지로 본다.
 `NOW = 2000-01-20T00:00:00Z` 로 두고 지운 시각을 그 앞으로 정해, 다른 검사가 실제 시각으로 지운 에이전트가 후보에 들지 않게 한다.
 
 - 「지운 지 7일이 지난 관리형 에이전트는 profile 을 거두고 행을 지운다」: `deleted_at = NOW - 8일`. `purgeDue(NOW)` 가 1 이상, 행이 없고, `verify(dashboard).deleteProfile(그 profile)`.
@@ -110,9 +111,10 @@ public int purgeDue(Instant now)
 ```bash
 cd backend && ./gradlew test --tests 'com.bifos.assistant.agent.AgentPurgerTest' --tests 'com.bifos.assistant.agent.AgentPurgeWriterTest' --tests 'com.bifos.assistant.architecture.*'
 cd backend && ./gradlew spotlessCheck checkstyleMain checkstyleTest
+.omc/scripts/heavy-lock scripts/check-mysql-migration.sh --tests 'com.bifos.assistant.RepositoryQueryMysqlTest'
 ```
 
-- 새 저장소 메서드 `findPurgeCandidates` 는 `RepositoryQueryMysqlTest` 가 실제 MySQL 에서 실행한다. 통합 검증에서 `scripts/check-mysql-migration.sh` 로 돌린다.
+- 마지막 줄: 새 저장소 메서드 `findPurgeCandidates` 를 `RepositoryQueryMysqlTest` 가 Docker 의 MySQL 8.4 에서 실행한다. 종료 코드 0.
 - 구조 규칙에 `ConfigurationProperties 클래스에는 Validated 가 붙는다` 가 있다. `AgentProperties` 는 이미 붙어 있다.
 
 ## 변경 파일
