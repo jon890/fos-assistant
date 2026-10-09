@@ -32,7 +32,8 @@
 
 ### 1. `AgentImageResizer.java` 에 함수 셋을 더한다
 
-- `static Dimension scaledSize(int width, int height, int longSide)`: 긴 변이 `longSide` 를 넘으면 위의 `draw` 규칙과 같은 식으로 줄인 크기, 넘지 않으면 그대로. `draw` 가 이 함수를 쓰도록 바꾼다(`LONG_SIDE` 를 넘긴다)
+- `static Dimension scaledSize(int width, int height, int longSide)`: 긴 변이 `longSide` 를 넘으면 위의 `draw` 규칙과 같은 식으로 줄인 크기, 넘지 않으면 그대로
+- private `draw` 의 시그니처를 `draw(BufferedImage source, int orientation, int longSide)` 로 바꾸고, 크기 계산을 `scaledSize(sourceWidth, sourceHeight, longSide)` 로 한다. `toJpeg` 는 `LONG_SIDE` 를, `shrink` 는 받은 `longSide` 를 넘긴다
 - `static Optional<Dimension> dimensions(byte[] image)`: `ImageIO` 리더로 머리의 가로와 세로만 읽는다. 디코딩하지 않는다. 리더가 없거나 읽지 못하면 빈 값
 - `static Optional<byte[]> shrink(byte[] jpeg, int longSide)`: 사본 JPEG 를 디코딩해 `scaledSize(…, longSide)` 크기로 흰 바탕에 그리고 `QUALITY` 로 인코딩한다. 긴 변이 이미 `longSide` 이하면 받은 바이트를 그대로 돌려준다. 방향은 1 로 본다. 디코딩, 인코딩 실패나 `IOException`, `RuntimeException` 이면 빈 값
 - `draw` 의 크기 계산을 `scaledSize` 로 바꿀 때 기존 `toJpeg` 결과가 같아야 한다(아래 기존 테스트가 확인한다)
@@ -44,14 +45,18 @@
 - `shrink`: 1600×1200 사본을 1024 로 줄이면 `ImageIO.read` 결과가 1024×768 이다. 긴 변 768 사본을 1024 로 부르면 받은 바이트와 같은 배열 내용을 돌려준다. 이미지가 아닌 바이트는 빈 값
 - 기존 `toJpeg` 테스트가 그대로 통과한다
 
+### 3. 포맷 커밋
+
+기능 커밋 뒤 `cd backend && ./gradlew spotlessApply` 결과를 따로 커밋한다. spotless 는 `origin/main` 기준이라 이 phase 가 고친 두 파일이 대상이다. 포맷 커밋 뒤 아래 검증의 `qualityCheck` 를 돌린다
+
 ## 검증
 
 ```bash
 cd backend && ./gradlew test --tests 'com.bifos.assistant.chat.application.AgentImageResizerTest'
-cd backend && ./gradlew checkstyleMain checkstyleTest
+cd backend && ./gradlew qualityCheck
 ```
 
-기대: 두 명령 모두 종료 코드 0.
+기대: 두 명령 모두 종료 코드 0. `qualityCheck` 는 구조 규칙, Checkstyle, 포맷 검사를 묶으므로 포맷 커밋 뒤에 돌린다.
 
 ## 변경 파일
 
