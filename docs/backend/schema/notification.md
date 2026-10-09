@@ -15,8 +15,8 @@
 | `kind` | `VARCHAR(32) NOT NULL` | 알림 종류. 값은 [`../notification.md`](../notification.md) 의 「알림 종류」 가 갖는다 |
 | `title` | `VARCHAR(200) NOT NULL` | 사람이 읽는 제목 |
 | `body` | `VARCHAR(500) NOT NULL` | 사람이 읽는 짧은 본문. 빈 문자열을 받는다. 도구 인자 원문, 비밀값, 모델 답 전문을 넣지 않는다 |
-| `target_type` | `VARCHAR(20)` | 누르면 갈 곳의 종류. `CONVERSATION`, `TASK`, `ADMIN_TOOL_REQUEST`, `TOOLSET_REQUEST`. 갈 곳이 없으면 비운다 |
-| `target_public_id` | `BINARY(16)` | 갈 곳의 공개 식별자. `target_type` 과 함께 채우거나 함께 비운다 |
+| `target_type` | `VARCHAR(20)` | 누르면 갈 곳의 종류. `CONVERSATION`, `TASK`, `ADMIN_TOOL_REQUEST`, `TOOLSET_REQUEST`, `ADMIN_CONNECTIONS`. 갈 곳이 없으면 비운다 |
+| `target_public_id` | `BINARY(16)` | 갈 곳의 공개 식별자. `target_type` 과 함께 채우거나 함께 비운다. 목록 화면을 가리키는 `ADMIN_CONNECTIONS` 만 `target_type` 을 채우고 이 칸을 비운다 |
 | `created_at` | `DATETIME(6) NOT NULL` | |
 | `read_at` | `DATETIME(6)` | 읽음으로 표시한 시각. 비면 읽지 않았다 |
 

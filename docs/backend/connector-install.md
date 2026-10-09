@@ -48,7 +48,7 @@ profile 이 어떤 요청을 받는지는 두 표식이 정한다. 판정은 요
 - 커넥터 key 의 `PUT /api/env` 와 `DELETE /api/env` 는 관리 표식이 있는 profile 에만 된다. 허용 key 는 카탈로그 manifest 의 `fields[].env` 다. `operator_env` 는 사용자 요청으로 쓰지 못한다. 그 이름의 `PUT` 과 `DELETE` 는 성공으로 답하되 아무것도 쓰지 않고 `restart_required` 는 false 다. 한 배포 동안 옛 Control Plane 이 그 이름을 쓰려 하기 때문이다([ADR-041](../adr/ADR-041-hermes-에-설치하는-plugin-과-profile-틀은-이-저장소가-소유한다.md))
 - 선택 칸 key 의 `PUT /api/env` 가 성공하면 그 key 를 칸으로 가진 설치를 다시 써 서버 정의의 빈 값을 맞춘다. 바인딩 항목은 다시 설치하지 않는다. 바인딩의 `.env` 와 서버 정의는 바인딩 설치가 보관 파일의 값으로 쓴다
 - 설치는 API 도구 목록(`platform_toolsets.api_server`)을 그 profile 에 설치한 커넥터의 MCP 서버 이름에 그 커넥터들의 manifest 가 선언한 `toolsets` 를 더한 것으로 통째로 다시 쓴다. 서버 이름이 먼저이고 겹친 이름은 한 번만 둔다. 운영 목록에서 빠져 manifest 를 읽을 수 없는 커넥터의 `toolsets` 는 더하지 않는다. Control Plane MCP 와 선언하지 않은 내장 도구는 목록에서 빠지고, `mcp_servers` 의 Control Plane MCP 등록도 지운다. 그 profile 의 MCP 토큰과 `fos-ctx` plugin 은 그대로 둔다. 마지막 커넥터를 끄면 목록은 `no_mcp` 하나다. 목록을 비우면 Hermes 가 등록된 MCP 서버를 모두 통과시키기 때문이다([ADR-045](../../backend/docs/adr/ADR-045-커넥터-에이전트는-자기-mcp-서버만-받고-memory-와-control-plane-도구를-받지-않는다.md)). 선언으로 열 수 있는 내장 도구는 읽기 전용 이미지 도구뿐이다([ADR-044](../../backend/docs/adr/ADR-044-커넥터-manifest-는-읽기-전용-이미지-도구만-열-수-있다.md))
-- `GET /api/connectors` 의 `configured` 는 서버 정의가 소유 기록과 같고 API 도구 목록이 설치가 쓰는 목록(설치한 커넥터의 서버 이름에 선언한 `toolsets` 를 더한 것)과 정확히 같고 Control Plane MCP 등록이 없을 때만 참이다. Control Plane MCP 나 선언하지 않은 내장 도구가 목록에 남은 옛 모양은 `configured: false` 다
+- `GET /api/connectors` 의 `configured` 는 서버 정의가 소유 기록과 같고 API 도구 목록이 설치가 쓰는 목록(설치한 커넥터의 서버 이름에 선언한 `toolsets` 를 더한 것)과 정확히 같고 Control Plane MCP 등록이 없고, 서버 정의의 `tools` 가 지금 manifest 로 계산한 것과 같을 때만 참이다. Control Plane MCP 나 선언하지 않은 내장 도구가 목록에 남은 옛 모양은 `configured: false` 다
 - 설치와 제거는 쓰기 전에 `config.yaml`, 소유 기록, `SOUL.md` 를 `connector-backups/` 에 떠 둔다. profile `.env` 는 떠 두지 않는다. 쓸 때마다 그 디렉터리에 남아 있는 `.env` 사본을 지운다
 - 이름 대응 파일은 `isolated` 칸 없이 쓴다
 
@@ -92,7 +92,7 @@ manifest 가 `owner_browser_env` 를 선언했으면 Control Plane 은 요청에
 - 붙이기는 한 묶음으로 쓴다. 실패하면 이 요청이 쓴 파일만 되돌린다
 - 떼기는 소유 기록을 지금 manifest 와 견주지 않는다. 그 항목이 객체이고 `mode` 가 `bind` 인지와 서버 이름과 스킬 이름이 경로 조각이 될 수 있는지만 본다. 운영자가 커넥터의 실행 정의를 바꾼 뒤에도 떼어야 `.env` 에 비밀이 남지 않는다
 - 쓰기 전에 `config.yaml`, 소유 기록, 이름 대응 파일, 뗀 서버 기록을 `connector-backups/` 에 떠 둔다. `.env` 와 스킬 파일은 떠 두지 않는다
-- `GET /api/connectors` 의 바인딩 항목 `configured` 는 서버 정의가 소유 기록과 같고, 서버 이름이 API 도구 목록에 있고, 소유 기록의 서버 이름과 실행 정의가 지금 manifest 와 같고, 소유 기록의 스킬 파일이 plugin 의 본문과 같을 때 참이다. Control Plane MCP 등록이 있어도 된다
+- `GET /api/connectors` 의 바인딩 항목 `configured` 는 서버 정의가 소유 기록과 같고, 서버 이름이 API 도구 목록에 있고, 소유 기록의 서버 이름과 실행 정의가 지금 manifest 와 같고, 소유 기록의 스킬 파일이 plugin 의 본문과 같고, 서버 정의의 `tools` 가 지금 manifest 로 계산한 것과 같을 때 참이다. Control Plane MCP 등록이 있어도 된다. `tools` 가 어긋난 항목은 `policy_hook` 을 거짓으로 만들지 않고 그 항목만 거짓이다([ADR-20261009 / connector-install-drift](../adr/ADR-20261009-connector-install-drift.md))
 - 바인딩 항목은 요청이 가리키는 커넥터의 것만 지금 manifest 와 견주고 나머지는 모양만 본다. 운영자가 커넥터 하나의 실행 정의를 바꿔도 같은 profile 에 붙은 다른 커넥터의 붙이기, probe, 실행은 그대로 된다. 상태 조회는 바뀐 항목만 `configured: false` 다
 
 **도구 목록은 설치와 Control Plane 의 도구 저장이 나눠 쓴다.**
@@ -204,6 +204,19 @@ Control Plane 은 도구 목록을 직접 쓰지 않는다. 바인딩 설치가 
 - `POST /api/mcp/servers/<서버>/test` 의 probe 가 도구를 내야 `READY` 다. 선언하지 않은 도구 수를 연결에 적는다. `READY` 가 되면 재시작 대기와 반영 예정 시각을 함께 비운다
 - 켜진 내장 도구는 보지 않는다. 붙인 에이전트의 도구는 주인이 정한다
 - 외부 호출이 실패하면 예외로 알리지 않고 그 바인딩만 `PENDING` 으로 둔다. 부른 쪽이 실패를 모아 `CONNECTOR_OPERATION_FAILED` 로 끝낸다
+- `READY` 가 아닌 결과는 까닭 하나로 끝난다. 외부 호출 실패가 아닌 까닭은 커넥터 id 와 까닭 이름만 담은 로그 한 줄을 남긴다
+
+| 까닭 이름 | 언제 |
+| --- | --- |
+| `RESTART_PENDING` | 재시작 대기라 다시 보내지 않았거나, 다시 보낸 설치가 재시작을 요구했다 |
+| `APPLY_SCHEDULED` | 반영 예정 시각 전이거나, 다시 보낸 설치가 `reload_pending` 이다 |
+| `CATALOG_MISSING` | 카탈로그에서 빠진 커넥터다 |
+| `NOT_INSTALLED` | 다시 읽은 설치가 꺼져 있거나 `configured` 가 거짓이거나 방식이 다르다 |
+| `POLICY_HOOK_OFF` | 다시 읽은 설치의 `policy_hook` 이 거짓이다 |
+| `PROBE_FAILED` | probe 가 실패했다 |
+| `NO_TOOLS` | probe 가 도구를 하나도 내지 않았다 |
+| `TOOLSETS_DIFFER` | 옛 바인딩의 켜진 내장 도구가 manifest 의 선언과 다르다 |
+| `CALL_FAILED` | 외부 호출이 실패했다. 단계와 예외 종류를 경고로 남긴다 |
 
 ### 반영 예정 확인
 
@@ -223,6 +236,26 @@ probe 가 실패해 `PENDING` 이 되면 다시 부르지 않는다. 사용자�
 한 바인딩의 실패는 경고 로그로 남기고 다음 바인딩으로 간다.
 이 판정은 gateway 의 연결을 직접 보지 못한다. probe 가 성공해도 gateway 쪽 연결만 실패한 경우는 첫 실제 호출의 오류로 드러난다.
 
+### 정의 어긋남 점검
+
+manifest 가 바뀐 뒤 설치가 다시 보내지지 않은 바인딩을 Control Plane 이 찾아 다시 맞춘다([ADR-20261009 / connector-install-drift](../adr/ADR-20261009-connector-install-drift.md)).
+`ConnectorBindingApplier` 가 `assistant.connector.binding.drift-cron`(기본 10분)마다 돈다. 배포나 커넥터 동기화 뒤 운영자가 할 일은 없다.
+
+1. 트랜잭션 밖에서 `READY` 바인딩을 번호 순으로 `assistant.connector.binding.drift-batch`(기본 20)개까지 읽는다. 앞 주기가 멈춘 번호 뒤부터 읽고, 끝까지 읽었으면 다음 주기는 처음부터다
+2. 바인딩마다 트랜잭션 밖에서 `GET /api/connectors` 로 그 커넥터의 설치를 읽는다. 읽지 못하면 경고 로그를 남기고 건너뛴다. 「바인딩의 반영 맞추기」 의 설치 판정(켜짐, `configured`, `policy_hook`, 바인딩 방식)을 통과하면 어긋나지 않은 것이다
+3. 어긋났으면 커넥터 id 와 어긋난 조건 이름을 로그에 남긴다. 트랜잭션을 열고 「반영 예정 확인」 과 같은 차례로 잠근 뒤 바인딩을 다시 읽는다. 지워졌거나 `READY` 가 아니면 건너뛴다
+4. 「바인딩의 반영 맞추기」 를 한다. 서버 정의가 바뀌므로 대개 재시작 대기가 된다
+5. 다시 맞춘 바인딩 가운데 재시작 대기나 `PENDING` 으로 남은 것이 있으면 연결 주인의 그룹 관리자마다 알림 한 건을 남긴다. 반영 예정 시각을 적은 바인딩은 반영 예정 확인이 맡으므로 세지 않는다
+
+다시 맞춘 바인딩은 `READY` 가 아니어서 다음 주기의 대상이 아니다. 그래서 같은 어긋남에 설치를 되풀이해 보내지 않는다.
+다시 맞춰 `READY` 가 됐는데 다음 주기에 또 어긋나면 바인딩마다 센다. 연속 3번째에는 설치를 보내지 않고 `PENDING` 으로만 두고 알린다. 어긋나지 않은 것을 보면 센 값을 지운다.
+점검 위치와 센 값은 JVM 메모리에 둔다. Control Plane 이 한 대라는 전제다.
+
+| 알림에 담는 것 | 본문 |
+| --- | --- |
+| 재시작 대기가 하나라도 있다 | 공유 gateway 를 재시작한 뒤 「연결 반영 확인」 에서 반영 완료를 누르라고 쓴다 |
+| `PENDING` 만 있다 | 「연결 반영 확인」 에서 반영 완료를 눌러 다시 확인하라고 쓴다 |
+
 ### 관리자 반영 완료
 
 재시작 대기인 바인딩에 필요하다. 값 교체처럼 이미 있던 서버가 바뀐 설치와 `fos-ctx` 갱신이 그렇다.
@@ -231,7 +264,16 @@ probe 가 실패해 `PENDING` 이 되면 다시 부르지 않는다. 사용자�
 1. 관리자인지 본다. 에이전트 번호와 주인은 트랜잭션 밖에서 읽는다. 트랜잭션의 첫 읽기가 잠금이어야 MySQL 의 REPEATABLE READ 에서 등록이 커밋한 재시작 시각을 보기 때문이다
 2. 주인의 사용자 행, 에이전트 행을 붙이기와 같은 차례로 잠근다. 잠근 뒤 그 에이전트의 주인이 바뀌었으면 `AGENT_BUSY` 다. 그다음 지금 주인이 관리자와 같은 그룹인지 보고, 아니면 `FORBIDDEN` 이다. 그 뒤 바인딩을 새로 읽는다
 3. 바인딩의 `restart_required_since` 가 요청의 `restartRequiredSince` 보다 늦거나 요청이 비었으면 `CONNECTOR_RESTART_AGAIN` 으로 거절한다. 관리자가 재시작한 뒤에 다시 설치된 바인딩이다. 바인딩에 그 시각이 없으면 요청을 보지 않는다
-4. 위 「바인딩의 반영 맞추기」 를 한다. 반영 예정 시각이 아직 오지 않은 바인딩은 설치를 다시 보내지 않는다. `READY` 가 되지 않으면 `CONNECTOR_OPERATION_FAILED` 로 끝낸다
+4. 위 「바인딩의 반영 맞추기」 를 한다. 반영 예정 시각이 아직 오지 않은 바인딩은 설치를 다시 보내지 않는다. `READY` 가 되지 않으면 바인딩 상태를 커밋한 뒤 까닭에 따라 아래 오류로 끝낸다
+
+| 까닭 | 오류 |
+| --- | --- |
+| `CALL_FAILED` | `CONNECTOR_OPERATION_FAILED`(502) |
+| `NOT_INSTALLED`, `POLICY_HOOK_OFF` | `CONNECTOR_INSTALL_MISMATCH`(409) |
+| `PROBE_FAILED`, `NO_TOOLS`, `TOOLSETS_DIFFER` | `CONNECTOR_TOOLS_UNVERIFIED`(409) |
+| `APPLY_SCHEDULED` | `CONNECTOR_APPLY_SCHEDULED`(409) |
+| `RESTART_PENDING` | `CONNECTOR_RESTART_AGAIN`(409) |
+| `CATALOG_MISSING` | `CONNECTOR_NOT_FOUND`(404) |
 
 ### 에이전트의 공개 범위, 주인, 삭제
 
@@ -402,6 +444,7 @@ flowchart TD
     Q2 -->|재시작 필요| W
     Q2 -->|도구 확인| BR
     BR -->|값 교체| W
+    BR -->|정의 어긋남 점검이 다시 설치| W
     BR -->|떼기, 연결 해제, 에이전트 삭제| D[profile 에서 떼고 행 삭제]
 ```
 

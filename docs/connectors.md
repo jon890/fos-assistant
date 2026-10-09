@@ -99,7 +99,7 @@
 - 그다음 지금 주인이 관리자와 같은 그룹이어야 한다. 아니면 `AGENT_NOT_FOUND`(404)다. 다른 그룹의 에이전트가 있는지 드러내지 않는다
 - 바인딩의 재시작 대기 시각이 본문의 `restartRequiredSince` 보다 늦거나 본문이 비었으면 `CONNECTOR_RESTART_AGAIN`(409)으로 거절한다. 관리자가 목록을 본 뒤에 다시 설치된 바인딩이라 재시작한 gateway 가 아직 보지 못했을 수 있기 때문이다. 화면은 성공하든 거절되든 목록을 다시 읽어 바뀐 값을 받는다
 - 바인딩에 재시작 대기 시각이 없으면 본문을 보지 않는다. 재시작이 필요 없던 바인딩의 다시 확인이 이 경우다
-- 받으면 설치를 한 번 다시 보내 반영됐는지 본다. 그래도 `READY` 가 되지 않으면 `CONNECTOR_OPERATION_FAILED`(502)다
+- 받으면 설치를 한 번 다시 보내 반영됐는지 본다. 그래도 `READY` 가 되지 않으면 까닭에 따라 끝낸다. 외부 호출 실패는 `CONNECTOR_OPERATION_FAILED`(502), 설치 상태가 맞지 않으면 `CONNECTOR_INSTALL_MISMATCH`(409), probe 가 도구를 확인하지 못하면 `CONNECTOR_TOOLS_UNVERIFIED`(409), 반영 예정이면 `CONNECTOR_APPLY_SCHEDULED`(409), 다시 재시작이 필요하면 `CONNECTOR_RESTART_AGAIN`(409), 카탈로그에 없으면 `CONNECTOR_NOT_FOUND`(404)다. 까닭 이름과 대응은 [커넥터 설치](backend/connector-install.md) 의 「관리자 반영 완료」 가 갖는다
 
 ## 승인
 
