@@ -27,6 +27,8 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 /** 실행 공간을 읽을 때 링크와 특수 파일과 남의 공간을 어떻게 다루는지 실제 임시 디렉터리로 본다. */
 class WorkspaceTreeTest {
@@ -132,67 +134,74 @@ class WorkspaceTreeTest {
         assertThat(opened.size()).isEqualTo(4L);
     }
 
-    @Test
+    @ParameterizedTest(name = "대체 경로 강제 = {0}")
+    @ValueSource(booleans = {true, false})
     @DisplayName("공간 밖을 가리키는 링크 파일은 LINK 이고 읽지 않는다")
-    void doesNotFollowFileLink() throws IOException {
+    void doesNotFollowFileLink(boolean checkedPath) throws IOException {
         Path outside = Files.writeString(root.resolve("outside.txt"), "outside");
         Files.createSymbolicLink(owner.resolve("link.txt"), outside);
 
-        WorkspaceEntry entry = list(owner, "").orElseThrow().entries().get(0);
+        WorkspaceEntry entry =
+                list(owner, "", checkedPath).orElseThrow().entries().get(0);
 
         assertThat(entry.kind()).isEqualTo(WorkspaceEntryKind.LINK);
         assertThat(entry.readable()).isFalse();
         assertThat(entry.size()).isNull();
-        assertCode(() -> open(owner, "link.txt"), ErrorCode.WORKSPACE_ENTRY_NOT_FOUND);
+        assertCode(() -> open(owner, "link.txt", checkedPath), ErrorCode.WORKSPACE_ENTRY_NOT_FOUND);
     }
 
-    @Test
+    @ParameterizedTest(name = "대체 경로 강제 = {0}")
+    @ValueSource(booleans = {true, false})
     @DisplayName("형제 주인 디렉터리를 가리키는 링크 디렉터리 아래는 목록과 본문 모두 닿지 않는다")
-    void doesNotFollowDirectoryLinkToSibling() throws IOException {
+    void doesNotFollowDirectoryLinkToSibling(boolean checkedPath) throws IOException {
         Path link = Files.createSymbolicLink(owner.resolve("peek"), sibling);
 
-        WorkspaceListing top = list(owner, "").orElseThrow();
+        WorkspaceListing top = list(owner, "", checkedPath).orElseThrow();
         assertThat(top.entries()).extracting(WorkspaceEntry::name).containsExactly("peek");
         assertThat(top.entries().get(0).kind()).isEqualTo(WorkspaceEntryKind.LINK);
-        assertThat(list(owner, "peek")).isEmpty();
-        assertCode(() -> open(owner, "peek/secret.txt"), ErrorCode.WORKSPACE_ENTRY_NOT_FOUND);
-        assertThat(WorkspaceTree.stat(owner, WorkspacePath.parse("peek/secret.txt")))
+        assertThat(list(owner, "peek", checkedPath)).isEmpty();
+        assertCode(() -> open(owner, "peek/secret.txt", checkedPath), ErrorCode.WORKSPACE_ENTRY_NOT_FOUND);
+        assertThat(WorkspaceTree.stat(owner, WorkspacePath.parse("peek/secret.txt"), checkedPath, () -> {}))
                 .isEmpty();
         assertThat(WorkspaceTree.isDirectoryNoFollow(link)).isFalse();
     }
 
-    @Test
+    @ParameterizedTest(name = "대체 경로 강제 = {0}")
+    @ValueSource(booleans = {true, false})
     @DisplayName("주인 디렉터리 자체가 링크면 비어 있다")
-    void refusesOwnerDirectoryLink() throws IOException {
+    void refusesOwnerDirectoryLink(boolean checkedPath) throws IOException {
         Path linkedOwner = Files.createSymbolicLink(root.resolve("u3"), sibling);
 
-        assertThat(list(linkedOwner, "")).isEmpty();
+        assertThat(list(linkedOwner, "", checkedPath)).isEmpty();
         assertThat(WorkspaceTree.isDirectoryNoFollow(linkedOwner)).isFalse();
-        assertCode(() -> open(linkedOwner, "secret.txt"), ErrorCode.WORKSPACE_ENTRY_NOT_FOUND);
+        assertCode(() -> open(linkedOwner, "secret.txt", checkedPath), ErrorCode.WORKSPACE_ENTRY_NOT_FOUND);
     }
 
-    @Test
+    @ParameterizedTest(name = "대체 경로 강제 = {0}")
+    @ValueSource(booleans = {true, false})
     @DisplayName("하드 링크가 둘 이상인 파일은 읽을 수 없다")
-    void refusesHardLinkedFile() throws IOException {
+    void refusesHardLinkedFile(boolean checkedPath) throws IOException {
         Path original = Files.writeString(owner.resolve("a.txt"), "shared");
         Files.createLink(owner.resolve("b.txt"), original);
 
-        assertThat(list(owner, "").orElseThrow().entries()).allSatisfy(entry -> {
+        assertThat(list(owner, "", checkedPath).orElseThrow().entries()).allSatisfy(entry -> {
             assertThat(entry.kind()).isEqualTo(WorkspaceEntryKind.FILE);
             assertThat(entry.readable()).isFalse();
         });
-        assertCode(() -> open(owner, "a.txt"), ErrorCode.WORKSPACE_ENTRY_UNREADABLE);
+        assertCode(() -> open(owner, "a.txt", checkedPath), ErrorCode.WORKSPACE_ENTRY_UNREADABLE);
     }
 
-    @Test
+    @ParameterizedTest(name = "대체 경로 강제 = {0}")
+    @ValueSource(booleans = {true, false})
     @Timeout(5)
     @DisplayName("FIFO 는 OTHER 이고 열지 않고 없는 것으로 답한다")
-    void refusesFifoWithoutBlocking() throws Exception {
+    void refusesFifoWithoutBlocking(boolean checkedPath) throws Exception {
         Path fifo = owner.resolve("pipe");
         Assumptions.assumeTrue(mkfifo(fifo), "mkfifo 가 없는 환경이다");
 
-        assertThat(list(owner, "").orElseThrow().entries().get(0).kind()).isEqualTo(WorkspaceEntryKind.OTHER);
-        assertCode(() -> open(owner, "pipe"), ErrorCode.WORKSPACE_ENTRY_NOT_FOUND);
+        assertThat(list(owner, "", checkedPath).orElseThrow().entries().get(0).kind())
+                .isEqualTo(WorkspaceEntryKind.OTHER);
+        assertCode(() -> open(owner, "pipe", checkedPath), ErrorCode.WORKSPACE_ENTRY_NOT_FOUND);
     }
 
     @Test
@@ -234,6 +243,15 @@ class WorkspaceTreeTest {
 
     private static WorkspaceOpenedFile open(Path ownerDir, String path) throws IOException {
         return WorkspaceTree.open(ownerDir, WorkspacePath.parse(path));
+    }
+
+    /** {@code checkedPath} 가 참이면 운영 이미지(musl)가 타는 대체 경로를 강제한다. */
+    private static Optional<WorkspaceListing> list(Path ownerDir, String path, boolean checkedPath) throws IOException {
+        return WorkspaceTree.list(ownerDir, WorkspacePath.parse(path), 1_000, checkedPath, () -> {});
+    }
+
+    private static WorkspaceOpenedFile open(Path ownerDir, String path, boolean checkedPath) throws IOException {
+        return WorkspaceTree.open(ownerDir, WorkspacePath.parse(path), checkedPath, () -> {});
     }
 
     private static void assertCode(ThrowingCallable call, ErrorCode expected) {

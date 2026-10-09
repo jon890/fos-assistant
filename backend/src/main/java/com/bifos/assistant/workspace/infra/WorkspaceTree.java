@@ -110,6 +110,8 @@ public final class WorkspaceTree {
             entries.sort(DIRECTORIES_FIRST);
             List<WorkspaceEntry> shown = List.copyOf(entries.subList(0, Math.min(limit, entries.size())));
             return Optional.of(new WorkspaceListing(path.value(), shown, truncated));
+        } catch (NoSuchFileException | NotDirectoryException ex) {
+            return Optional.empty();
         } catch (AccessDeniedException ex) {
             throw unreadable();
         }
@@ -135,7 +137,7 @@ public final class WorkspaceTree {
                 boolean inside = !checked(checkedPath, dir) || stillInside(ownerDir, parentOf(path), beforeRecheck);
                 return inside ? Optional.of(entry) : Optional.empty();
             }
-        } catch (NoSuchFileException ex) {
+        } catch (NoSuchFileException | NotDirectoryException ex) {
             return Optional.empty();
         } catch (AccessDeniedException ex) {
             throw unreadable();
@@ -190,7 +192,7 @@ public final class WorkspaceTree {
                     throw ex;
                 }
             }
-        } catch (NoSuchFileException ex) {
+        } catch (NoSuchFileException | NotDirectoryException ex) {
             throw notFound();
         } catch (AccessDeniedException ex) {
             throw unreadable();

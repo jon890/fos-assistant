@@ -11,7 +11,7 @@ import lombok.NoArgsConstructor;
 /**
  * 이름의 확장자로 미리보기 형식과 크기 상한을 정한다. 파일 내용으로 형식을 짐작하지 않는다.
  *
- * <p>표와 확장자 규칙은 {@code docs/code-architecture.md} 의 「본문 머리글」 이 갖는다. 화면의 미리보기 판정도 같은 규칙이다.
+ * <p>표와 확장자 규칙은 {@code docs/code-architecture.md} 의 「본문 머리글」 이 갖는다.
  */
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
 public final class WorkspacePreviewPolicy {
