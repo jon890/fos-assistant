@@ -53,14 +53,41 @@ public class SkillPublisher {
         skills.publish(agent.hermesProfile(), externalDirs, apiServerToolsets, agent.sandboxOwner());
     }
 
+    /**
+     * {@code scripts/} 가 든 스킬의 버전을 게시한다. 실행 공간이 없는 profile 이면 대시보드가 거절한다.
+     *
+     * <p>{@code skills} 가 이미 켜져 있어도 지금 켜진 도구에 {@code skills} 를 (없으면) 더한 목록을 함께 쓴다. plugin 은 도구
+     * 목록을 쓸 때만 실행 공간을 판정하고 그 설정을 다시 쓰기 때문이다(ADR-20261009-skill-package).
+     *
+     * @param connectorServers 그 에이전트에 붙은 커넥터의 MCP 서버 이름
+     */
+    public void publishWithScripts(
+            CurrentUser user, Agent agent, List<String> externalDirs, Set<String> connectorServers) {
+        List<String> requested = requestedWithSkills(user, agent, enabledToolsets(agent), connectorServers);
+        skills.publishRequiringSandbox(agent.hermesProfile(), externalDirs, requested, agent.sandboxOwner());
+    }
+
+    /** 그 에이전트의 API 실행에 셸 toolset {@code terminal} 이 켜져 있는가. */
+    public boolean terminalEnabled(Agent agent) {
+        return enabledToolsets(agent).contains(AgentToolPolicy.TERMINAL);
+    }
+
     private List<String> toolsetsWithSkills(CurrentUser user, Agent agent, Set<String> connectorServers) {
         List<String> enabled = enabledToolsets(agent);
         if (enabled.contains(AgentToolPolicy.SKILLS)) {
             return null;
         }
+        return requestedWithSkills(user, agent, enabled, connectorServers);
+    }
+
+    /** 지금 켜진 알려진 도구에 {@code skills} 를 (없으면) 더해 쓸 목록으로 판정한다. */
+    private static List<String> requestedWithSkills(
+            CurrentUser user, Agent agent, List<String> enabled, Set<String> connectorServers) {
         List<String> requested = new ArrayList<>(
                 enabled.stream().filter(AgentToolPolicy::isKnown).toList());
-        requested.add(AgentToolPolicy.SKILLS);
+        if (!requested.contains(AgentToolPolicy.SKILLS)) {
+            requested.add(AgentToolPolicy.SKILLS);
+        }
         return AgentToolPolicy.requestedForWrite(user, agent, requested, enabled, connectorServers);
     }
 

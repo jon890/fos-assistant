@@ -44,6 +44,7 @@ import com.bifos.assistant.skill.application.SkillUsageSummary;
 import com.bifos.assistant.skill.application.SkillsChanged;
 import com.bifos.assistant.skill.domain.SkillBundle;
 import com.bifos.assistant.skill.domain.SkillFile;
+import com.bifos.assistant.skill.infra.PreviousSkillStore;
 import com.bifos.assistant.skill.infra.SkillStore;
 import com.bifos.assistant.testsupport.BackendIntegrationTest;
 import java.io.IOException;
@@ -101,12 +102,18 @@ class SkillServiceTest {
 
     private static final List<String> WITHOUT_SKILLS = List.of("web", "fos-assistant");
     private static final List<String> WITH_SKILLS = List.of("web", "skills", "fos-assistant");
+    private static final List<String> TERMINAL_WITH_SKILLS = List.of("skills", "terminal", "web", "fos-assistant");
+
+    private static final SkillFileInput SCRIPT = new SkillFileInput("scripts/run.sh", "echo hi");
 
     @Autowired
     SkillService skills;
 
     @Autowired
     SkillStore store;
+
+    @Autowired
+    PreviousSkillStore previousStore;
 
     @Autowired
     AgentRepository agents;
@@ -170,7 +177,8 @@ class SkillServiceTest {
                         "weekly-plan",
                         "이번 주 계획을 세운다",
                         skillMd("weekly-plan"),
-                        List.of(new SkillFileInfo("references/guide.md", 6L, "안내"))));
+                        List.of(new SkillFileInfo("references/guide.md", 6L, "안내")),
+                        null));
         assertThat(Files.readAllLines(Path.of(dirs.getValue().get(0), "weekly-plan", "SKILL.md")))
                 .as("게시한 경로에 SKILL.md 가 있다")
                 .contains("name: weekly-plan");
@@ -415,7 +423,9 @@ class SkillServiceTest {
         skills.delete(OWNER, GROUP, "cooking");
 
         verify(skillClient).publish(GROUP_PROFILE, List.of(), null, "u" + OWNER.id());
-        assertThat(SKILL_ROOT.resolve(GROUP_PROFILE)).doesNotExist();
+        assertThat(SKILL_ROOT.resolve(GROUP_PROFILE))
+                .as("실행 공간이 붙이는 profile 디렉터리는 비운 채 남긴다")
+                .isEmptyDirectory();
     }
 
     @Test
@@ -523,7 +533,7 @@ class SkillServiceTest {
                         OWNED,
                         "weekly-plan",
                         skillMd("weekly-plan"),
-                        List.of(new SkillFileInput("scripts/run.sh", "echo"))),
+                        List.of(new SkillFileInput("bin/run.sh", "echo"))),
                 ErrorCode.VALIDATION_FAILED);
         assertCode(
                 () -> skills.save(
@@ -663,7 +673,9 @@ class SkillServiceTest {
 
         verify(skillClient).publish(OWNED_PROFILE, List.of(), null, "u" + OWNER.id());
         assertThat(store.currentVersion(OWNED_PROFILE)).isEmpty();
-        assertThat(SKILL_ROOT.resolve(OWNED_PROFILE)).doesNotExist();
+        assertThat(SKILL_ROOT.resolve(OWNED_PROFILE))
+                .as("실행 공간이 붙이는 profile 디렉터리는 비운 채 남긴다")
+                .isEmptyDirectory();
     }
 
     @Test
@@ -922,6 +934,174 @@ class SkillServiceTest {
                 .hasSize(30)
                 .containsKey("first-new")
                 .doesNotContainKey("second-new");
+    }
+
+    @Test
+    @DisplayName("scripts 가 든 스킬을 terminal 이 꺼진 에이전트에 저장하면 SKILL SCRIPTS NEED SANDBOX 이고 쓰지도 게시하지도 않는다")
+    void savingScriptsSkillWithoutTerminalIsRejectedBeforeWritingOrPublishing() {
+        assertCode(
+                () -> skills.save(OWNER, OWNED, "weekly-plan", skillMd("weekly-plan"), List.of(SCRIPT)),
+                ErrorCode.SKILL_SCRIPTS_NEED_SANDBOX);
+
+        verify(skillClient, never()).publish(anyString(), anyList(), any(), anyString());
+        verify(skillClient, never()).publishRequiringSandbox(anyString(), anyList(), any(), anyString());
+        assertThat(SKILL_ROOT.resolve(OWNED_PROFILE)).as("버전 디렉터리를 쓰기 전에 거절한다").doesNotExist();
+    }
+
+    @Test
+    @DisplayName("terminal 이 켜진 에이전트에 scripts 가 든 스킬을 저장하면 실행 공간 필수 게시로 skills 와 terminal 이 든 목록을 보낸다")
+    void savingScriptsSkillWithTerminalPublishesRequiringSandboxWithSkillsAndTerminal() throws IOException {
+        when(toolsets.readEnabled(anyString(), anyString())).thenReturn(TERMINAL_WITH_SKILLS);
+
+        skills.save(OWNER, OWNED, "weekly-plan", skillMd("weekly-plan"), List.of(SCRIPT));
+
+        String version = store.currentVersion(OWNED_PROFILE).orElseThrow();
+        String publishedPath = store.agentPath(OWNED_PROFILE, version);
+        ArgumentCaptor<List<String>> apiServer = captor();
+        verify(skillClient)
+                .publishRequiringSandbox(
+                        eq(OWNED_PROFILE), eq(List.of(publishedPath)), apiServer.capture(), eq("u" + OWNER.id()));
+        assertThat(apiServer.getValue()).contains("skills", "terminal").doesNotHaveDuplicates();
+        verify(skillClient, never()).publish(anyString(), anyList(), any(), anyString());
+        assertThat(Files.readString(Path.of(publishedPath, "weekly-plan", "scripts", "run.sh")))
+                .isEqualTo("echo hi");
+    }
+
+    @Test
+    @DisplayName("대시보드가 실행 공간이 없다고 거절하면 SKILL SCRIPTS NEED SANDBOX 이고 첨부 디렉터리 실패는 코드를 바꾸지 않는다")
+    void dashboardSandboxRejectionBecomesScriptsNeedSandboxButAttachmentFailureKeepsCode() {
+        when(toolsets.readEnabled(anyString(), anyString())).thenReturn(TERMINAL_WITH_SKILLS);
+        skills.save(OWNER, OWNED, "shopping", skillMd("shopping"), List.of());
+        String before = store.currentVersion(OWNED_PROFILE).orElseThrow();
+        doThrow(new HermesRequestRejected(
+                        ErrorCode.AGENT_SANDBOX_UNAVAILABLE,
+                        "the isolated shell workspace is not configured",
+                        new HttpClientErrorException(HttpStatus.CONFLICT)))
+                .when(skillClient)
+                .publishRequiringSandbox(anyString(), anyList(), anyList(), anyString());
+
+        assertCode(
+                () -> skills.save(OWNER, OWNED, "weekly-plan", skillMd("weekly-plan"), List.of(SCRIPT)),
+                ErrorCode.SKILL_SCRIPTS_NEED_SANDBOX);
+        assertThat(versionDirs(OWNED_PROFILE)).as("거절된 버전 디렉터리는 지운다").containsExactly(before);
+
+        doThrow(new HermesRequestRejected(
+                        ErrorCode.AGENT_SANDBOX_UNAVAILABLE,
+                        "could not prepare the attachment directory",
+                        HttpStatus.CONFLICT.value(),
+                        new IOException("permission denied")))
+                .when(skillClient)
+                .publishRequiringSandbox(anyString(), anyList(), anyList(), anyString());
+
+        assertCode(
+                () -> skills.save(OWNER, OWNED, "weekly-plan", skillMd("weekly-plan"), List.of(SCRIPT)),
+                ErrorCode.AGENT_SANDBOX_UNAVAILABLE);
+        assertThat(versionDirs(OWNED_PROFILE)).as("거절된 버전 디렉터리는 지운다").containsExactly(before);
+        assertThat(store.readCurrent(OWNED_PROFILE)).containsOnlyKeys("shopping");
+    }
+
+    @Test
+    @DisplayName("scripts 가 든 기존 스킬이 있어도 terminal 없이 scripts 없는 다른 스킬은 보통 게시로 저장된다")
+    void savingSkillWithoutScriptsSucceedsWithoutTerminalEvenIfStoredSkillHasScripts() {
+        Map<String, SkillBundle> bundles = new LinkedHashMap<>();
+        bundles.put(
+                "weekly-plan",
+                new SkillBundle(
+                        "weekly-plan", skillMd("weekly-plan"), List.of(new SkillFile("scripts/run.sh", "echo"))));
+        store.markPublished(OWNED_PROFILE, store.writeVersion(OWNED_PROFILE, bundles));
+
+        skills.save(OWNER, OWNED, "shopping", skillMd("shopping"), List.of());
+
+        verify(skillClient).publish(eq(OWNED_PROFILE), anyList(), any(), anyString());
+        verify(skillClient, never()).publishRequiringSandbox(anyString(), anyList(), any(), anyString());
+        assertThat(store.readCurrent(OWNED_PROFILE)).containsOnlyKeys("shopping", "weekly-plan");
+    }
+
+    @Test
+    @DisplayName("같은 스킬을 다시 저장하면 바뀌기 전 것이 이전 버전으로 남고 되돌리기는 둘을 맞바꾼다")
+    void savingAgainKeepsPreviousAndRestoreSwapsCurrentAndPrevious() {
+        SkillDetail firstSaved = skills.save(
+                OWNER, OWNED, "weekly-plan", skillMd("weekly-plan"), List.of(new SkillFileInput("FORMS.md", "첫째")));
+        assertThat(firstSaved.previousSavedAt()).as("새 스킬에는 이전 버전이 없다").isNull();
+        assertCode(() -> skills.restorePrevious(OWNER, OWNED, "weekly-plan"), ErrorCode.SKILL_NOT_FOUND);
+
+        SkillDetail secondSaved = skills.save(
+                OWNER,
+                OWNED,
+                "weekly-plan",
+                skillMd("weekly-plan") + "\n둘째",
+                List.of(new SkillFileInput("references/b.md", "둘째")));
+
+        SkillBundle first =
+                new SkillBundle("weekly-plan", skillMd("weekly-plan"), List.of(new SkillFile("FORMS.md", "첫째")));
+        SkillBundle second = new SkillBundle(
+                "weekly-plan", skillMd("weekly-plan") + "\n둘째", List.of(new SkillFile("references/b.md", "둘째")));
+        assertThat(previousStore
+                        .readPrevious(OWNED_PROFILE, "weekly-plan")
+                        .orElseThrow()
+                        .bundle())
+                .isEqualTo(first);
+        assertThat(secondSaved.previousSavedAt()).isNotNull();
+        assertThat(skills.read(OWNER, OWNED, "weekly-plan").previousSavedAt()).isEqualTo(secondSaved.previousSavedAt());
+
+        SkillDetail restored = skills.restorePrevious(OWNER, OWNED, "weekly-plan");
+
+        assertThat(store.readCurrent(OWNED_PROFILE).get("weekly-plan")).isEqualTo(first);
+        assertThat(previousStore
+                        .readPrevious(OWNED_PROFILE, "weekly-plan")
+                        .orElseThrow()
+                        .bundle())
+                .isEqualTo(second);
+        assertThat(restored.body()).isEqualTo(skillMd("weekly-plan"));
+        assertThat(restored.files()).containsExactly(new SkillFileInfo("FORMS.md", 6L, "첫째"));
+        assertThat(restored.previousSavedAt()).isNotNull();
+        assertCode(() -> skills.restorePrevious(OWNER, OWNED, "missing"), ErrorCode.SKILL_NOT_FOUND);
+    }
+
+    @Test
+    @DisplayName("스킬을 지우고 같은 이름으로 새로 만들면 이전 버전이 없고 남아 있던 이전 버전도 새 스킬의 것이 되지 않는다")
+    void recreatingDeletedSkillHasNoPreviousEvenIfStalePreviousWasLeft() {
+        skills.save(OWNER, OWNED, "shopping", skillMd("shopping"), List.of());
+        skills.save(OWNER, OWNED, "weekly-plan", skillMd("weekly-plan"), List.of());
+        skills.save(OWNER, OWNED, "weekly-plan", skillMd("weekly-plan") + "\n고침", List.of());
+        skills.delete(OWNER, OWNED, "weekly-plan");
+
+        SkillDetail recreated = skills.save(OWNER, OWNED, "weekly-plan", skillMd("weekly-plan"), List.of());
+
+        assertThat(recreated.previousSavedAt()).isNull();
+        assertCode(() -> skills.restorePrevious(OWNER, OWNED, "weekly-plan"), ErrorCode.SKILL_NOT_FOUND);
+
+        // 지우기에서 이전 버전 지우기가 실패해 남은 것처럼 둔다.
+        previousStore.writePrevious(
+                OWNED_PROFILE, new SkillBundle("cooking", skillMd("cooking") + "\n지운 스킬", List.of()));
+
+        SkillDetail created = skills.save(OWNER, OWNED, "cooking", skillMd("cooking"), List.of());
+
+        assertThat(created.previousSavedAt()).as("새 스킬은 남은 이전 버전을 지운다").isNull();
+        assertThat(previousStore.readPrevious(OWNED_PROFILE, "cooking")).isEmpty();
+        assertCode(() -> skills.restorePrevious(OWNER, OWNED, "cooking"), ErrorCode.SKILL_NOT_FOUND);
+    }
+
+    @Test
+    @DisplayName("지우면 그 스킬의 이전 버전도 지우고 마지막 스킬을 지운 뒤에도 profile 디렉터리는 남는다")
+    void deleteRemovesPreviousAndKeepsProfileDirectoryAfterLastSkill() {
+        skills.save(OWNER, OWNED, "weekly-plan", skillMd("weekly-plan"), List.of());
+        skills.save(OWNER, OWNED, "weekly-plan", skillMd("weekly-plan") + "\n고침", List.of());
+        skills.save(OWNER, OWNED, "shopping", skillMd("shopping"), List.of());
+        skills.save(OWNER, OWNED, "shopping", skillMd("shopping") + "\n고침", List.of());
+        assertThat(previousStore.readPrevious(OWNED_PROFILE, "weekly-plan")).isPresent();
+
+        skills.delete(OWNER, OWNED, "weekly-plan");
+
+        assertThat(previousStore.readPrevious(OWNED_PROFILE, "weekly-plan")).isEmpty();
+        assertThat(previousStore.readPrevious(OWNED_PROFILE, "shopping"))
+                .as("다른 스킬의 이전 버전은 남는다")
+                .isPresent();
+
+        skills.delete(OWNER, OWNED, "shopping");
+
+        assertThat(previousStore.readPrevious(OWNED_PROFILE, "shopping")).isEmpty();
+        assertThat(SKILL_ROOT.resolve(OWNED_PROFILE)).isEmptyDirectory();
     }
 
     /** {@code skill-01} 부터 이름을 붙인 올린 스킬 {@code count} 개를 서비스를 거치지 않고 게시된 버전으로 둔다. */

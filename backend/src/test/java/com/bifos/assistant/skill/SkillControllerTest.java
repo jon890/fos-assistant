@@ -1,6 +1,7 @@
 package com.bifos.assistant.skill;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.hamcrest.Matchers.containsString;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
@@ -11,7 +12,9 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -30,6 +33,7 @@ import com.bifos.assistant.skill.application.SkillService;
 import com.bifos.assistant.skill.application.SkillSource;
 import com.bifos.assistant.skill.presentation.SkillAdminController;
 import com.bifos.assistant.skill.presentation.SkillController;
+import java.time.Instant;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -99,7 +103,8 @@ class SkillControllerTest {
                         "weekly-plan",
                         "이번 주 계획",
                         "---\nname: weekly-plan\n---\n",
-                        List.of(new SkillFileInfo("references/guide.md", 9L, "안내문"))));
+                        List.of(new SkillFileInfo("references/guide.md", 9L, "안내문")),
+                        null));
 
         mvc.perform(
                         write(
@@ -112,7 +117,8 @@ class SkillControllerTest {
                 .andExpect(jsonPath("$.body").value("---\nname: weekly-plan\n---\n"))
                 .andExpect(jsonPath("$.files[0].path").value("references/guide.md"))
                 .andExpect(jsonPath("$.files[0].size").value(9))
-                .andExpect(jsonPath("$.files[0].content").value("안내문"));
+                .andExpect(jsonPath("$.files[0].content").value("안내문"))
+                .andExpect(content().string(containsString("\"previousSavedAt\":null")));
 
         @SuppressWarnings("unchecked")
         ArgumentCaptor<List<SkillFileInput>> files = ArgumentCaptor.forClass(List.class);
@@ -134,6 +140,33 @@ class SkillControllerTest {
                 .andExpect(jsonPath("$.code").value(ErrorCode.VALIDATION_FAILED.name()));
 
         verifyNoInteractions(skills);
+    }
+
+    @Test
+    @DisplayName("이전 버전으로 되돌리기는 상세 모양과 이전 버전 시각을 주고 이전 버전이 없으면 404 다")
+    void restorePreviousGivesDetailWithPreviousSavedAtAndMissingIs404() throws Exception {
+        when(skills.restorePrevious(OWNER, "dad", "weekly-plan"))
+                .thenReturn(new SkillDetail(
+                        "weekly-plan",
+                        "이번 주 계획",
+                        "---\nname: weekly-plan\n---\n",
+                        List.of(new SkillFileInfo("scripts/run.sh", 4L, "echo")),
+                        Instant.parse("2026-10-09T01:02:03Z")));
+        when(skills.restorePrevious(OWNER, "dad", "missing"))
+                .thenThrow(new ApiException(ErrorCode.SKILL_NOT_FOUND, "no such uploaded skill"));
+
+        mvc.perform(post("/api/v1/agents/dad/skills/weekly-plan/restore-previous"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.name").value("weekly-plan"))
+                .andExpect(jsonPath("$.description").value("이번 주 계획"))
+                .andExpect(jsonPath("$.body").value("---\nname: weekly-plan\n---\n"))
+                .andExpect(jsonPath("$.files[0].path").value("scripts/run.sh"))
+                .andExpect(jsonPath("$.files[0].size").value(4))
+                .andExpect(jsonPath("$.files[0].content").value("echo"))
+                .andExpect(jsonPath("$.previousSavedAt").value("2026-10-09T01:02:03Z"));
+        mvc.perform(post("/api/v1/agents/dad/skills/missing/restore-previous"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value(ErrorCode.SKILL_NOT_FOUND.name()));
     }
 
     @Test

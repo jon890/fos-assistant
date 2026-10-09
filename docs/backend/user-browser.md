@@ -148,10 +148,10 @@ QR 로그인은 세션 쿠키만 준다(2026-10-08 실측). 그래서 QR 로그�
 화면 등록부는 JVM 메모리에 둔다. Control Plane 은 한 프로세스이고 재기동하면 SSE 도 끊긴다. 화면마다 도는 탭 확인, 시간 초과, `ping` 은 스케줄러 하나로 돌고 화면이 닫히면 취소된다. 탭 확인과 다시 붙기는 그 스레드에서 막힌 채 돌아, 한 브라우저가 느리면 다른 화면의 `ping` 과 시간 초과가 최대 10초 늦어진다. 동시에 켜는 브라우저가 몇 개뿐이라 받아들인다.
 SSE 자체의 시간 제한은 두지 않고 화면의 수명은 `screen-timeout` 이 정한다. 사건은 한 번에 하나씩 쓴다.
 화면이 열려 있는 동안 자동 중지하지 않고(`BrowserUsage`), 입력마다 활동을 기록한다. 끄기와 지우기, 사용자 끄기는 브라우저를 멈추기 전에 화면을 닫는다.
-화면은 `Page.startScreencast {format: "jpeg", quality: 60, maxWidth: 1280, maxHeight: 2000}` 로 프레임을 받고, SSE 에 쓴 뒤에 ack 한다.
+화면은 `Page.startScreencast {format: "jpeg", quality: 60, maxWidth: 1600, maxHeight: 2000}` 로 프레임을 받고, SSE 에 쓴 뒤에 ack 한다.
 받는 쪽이 읽지 않으면 ack 도 멈추므로 Chrome 이 프레임을 더 보내지 않는다.
 2초마다 탭 목록을 보고 바뀌면 `tabs` 를 보낸다. 새 탭이 생기면(로그인 팝업) screencast 를 그 탭으로 옮기고, 붙은 탭이 사라지면 남은 탭으로 옮긴다.
-탭을 옮기면 마지막 `resize` 값을 새 탭에 다시 보낸다.
+크기 변경은 서버에서 150ms 동안 모아 마지막 값만 현재 탭에 적용한다. 탭을 옮기면 마지막 `resize` 값을 screencast 전에 새 탭에 다시 보낸다. 닫힌 화면의 예약은 취소한다.
 붙은 탭의 연결이 끊기면 다시 잇는다. 프레임 없이 연이어 3번을 넘게 끊기면 `closed`(`stopped`)로 닫는다.
 SSE 쓰기가 실패하거나 SSE 가 끊기면 화면을 닫는다.
 15초마다 SSE 에 주석 `ping` 을 보낸다. 쓰지 못하면 끊긴 것으로 보고 `closed` 없이 닫는다. 그래서 말없이 끊긴 화면이 `screen-timeout` 까지 자동 중지를 막지 않는다.
@@ -173,7 +173,8 @@ SSE 끝내기도 막힌 쓰기를 기다리지 않는다. emitter 의 `complete(
 | --- | --- | --- |
 | `mouse` | `action`(`down`, `up`, `move`), `x`, `y`(0~1), `button`(`left` 만, 생략 가능) | `Input.dispatchMouseEvent` |
 | `wheel` | `x`, `y`(0~1), `deltaY`(-2000~2000) | `Input.dispatchMouseEvent` 의 `mouseWheel` |
-| `key` | `key`(`Enter`, `Backspace`, `Tab`, `Escape`, `ArrowUp`, `ArrowDown`, `ArrowLeft`, `ArrowRight`, `Delete`) | `Input.dispatchKeyEvent` 의 누름과 뗌 |
+| `scroll` | `action`(`top`, `bottom`) | `Runtime.evaluate` 로 페이지 처음과 끝에 쓰는 고정 식만 실행한다. 요청자가 식을 정하지 못한다 |
+| `key` | `key`(`Enter`, `Backspace`, `Tab`, `Escape`, `ArrowUp`, `ArrowDown`, `ArrowLeft`, `ArrowRight`, `Delete`, `PageUp`, `PageDown`, `Home`, `End`, `Space`) | `Input.dispatchKeyEvent` 의 누름과 뗌 |
 | `text` | `text`(1~500자) | `Input.insertText` |
 | `navigate` | `url`(`http`, `https`) | `Page.navigate` |
 | `back`, `reload` | 없음 | `Page.getNavigationHistory` 뒤 `Page.navigateToHistoryEntry`, `Page.reload` |
@@ -186,7 +187,10 @@ SSE 끝내기도 막힌 쓰기를 기다리지 않는다. emitter 의 `complete(
 
 웹(`web/src/components/browser/`)이 화면을 그리고 입력을 만드는 방식이다. 변환은 `screen-input.ts` 의 순수 함수가 갖는다.
 
-- 프레임은 `<img>` 의 data URL 로 그리고 그림 칸의 폭에 맞춘다. 열 때와 그림 칸의 폭이 바뀔 때 `resize` 를 보낸다. 폭은 그림 칸의 CSS 폭, 높이는 폭의 1.5배이고 위 표의 범위로 자른다
+- 내 브라우저 페이지는 본문 폭 제한 없이 가로 폭을 채운다. 프레임은 `<img>` 의 data URL 로 그리고 화면 높이에 맞춘 칸을 채운다. 열 때와 칸의 폭이나 높이가 바뀔 때 `resize` 를 보낸다. 두 값은 실제 칸의 CSS 크기이고 위 표의 범위로 자른다. 웹은 변경을 300ms 동안 모은다
+- 「전체 화면」은 Fullscreen API 를 쓰고, 지원하지 않거나 거절되면 고정 오버레이를 dialog 의 최상위 레이어에 띄운다. 닫기와 Escape 로 돌아오며 배경은 입력을 받지 않는다
+- 좁은 폭에서도 `mobile` false 를 유지한다. 반응형 배치는 폭을 따르되 기기 에뮬레이션으로 로그인 사이트의 동작을 바꾸지 않는다
+- 「위로」와 「아래로」는 한 화면 높이의 `wheel` 을 보내고, 길게 누르면 350ms마다 반복한다. 「처음으로」와 「끝으로」는 문서 스크롤 위치를 옮긴다. PageUp, PageDown, Space 는 원격 키 입력으로 보내며 원격 입력칸에 초점이 있으면 그 칸의 키 동작을 따른다
 - 포인터 이벤트 하나로 마우스와 터치를 받고, 여러 손가락이면 첫 포인터만 따른다. 마우스는 누름 `down`, 뗌 `up`, 누른 채 움직임 `move`(초당 20번까지)이고, 취소되면 마지막 자리에서 `up` 을 보낸다. 휠은 `wheel` 이고 줄 단위는 16배, 쪽 단위는 그림 높이배로 픽셀로 바꾼다
 - 터치는 움직임 없이(10 CSS 픽셀 이내) 떼면 그 자리의 `down` 과 `up` 이다. 끌면 끈 거리를 프레임의 CSS 픽셀로 늘려 반대 부호의 `wheel` 로 보낸다. 그림 위에서는 화면의 기본 스크롤과 확대를 막는다
 - 글자는 숨긴 입력칸이 받는다. 마우스로 그림을 누르면 초점이 가고, 휴대폰은 「키보드」 단추로 연다. 조합 중이면 보내지 않고, `compositionend` 뒤 한 박자 미뤄 조합을 마친 글자를 보내고 입력칸을 비운다. 500자(UTF-16 단위)를 넘으면 나눠 보낸다
