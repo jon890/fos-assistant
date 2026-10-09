@@ -28,6 +28,16 @@ public class AgentPurgeWriter {
     private final AgentToolsetRequestRepository toolsetRequests;
     private final List<AgentPurgeParticipant> participants;
 
+    /** 그 에이전트를 지금 지울 수 있는가. 지운 지 cutoff 앞이고 기다리라는 참여자가 없어야 한다. 잠그지 않는다. */
+    @Transactional(readOnly = true)
+    public boolean ready(Long agentId, Instant cutoff) {
+        Agent agent = agents.findById(agentId).orElse(null);
+        if (agent == null || agent.deletedAt() == null || agent.deletedAt().isAfter(cutoff)) {
+            return false;
+        }
+        return participants.stream().noneMatch(participant -> participant.blocksPurge(agentId));
+    }
+
     /** 지운 지 cutoff 앞인 에이전트 하나를 지운다. */
     @Transactional
     public AgentPurgeOutcome purge(Long agentId, Instant cutoff) {
