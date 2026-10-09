@@ -86,7 +86,7 @@ public class SkillService {
     private final SkillProperties properties;
 
     /**
-     * 그 에이전트의 스킬 목록이다. 읽을 수 있는 사람이면 누구나 본다.
+     * 일반 화면에 보일 올린 스킬 목록이다. 관리자 역할도 기본·커넥터 스킬은 받지 않는다.
      *
      * <p>Hermes 목록에 올린 스킬 이름을 대조해 출처를 붙인다. 올린 스킬 이름은 지금 버전과, 게시가 timeout
      * 으로 끝나 표식 없이 남은 더 새 버전의 이름이다. Hermes 가 그 버전을 이미 반영했을 수 있기 때문이다.
@@ -100,11 +100,27 @@ public class SkillService {
         Agent agent = agents.requireReadable(user, code);
         boolean editable = agents.isEditableBy(user, agent);
         Map<String, SkillUsageSummary> usages = editable ? usage.byAgent(agent.id()) : Map.of();
-        return assemble(agent, editable, usages);
+        SkillList list = assemble(agent, editable, usages);
+        return new SkillList(
+                list.skills().stream()
+                        .filter(item -> item.source() == SkillSource.UPLOADED)
+                        .toList(),
+                list.editable(),
+                list.skillsToolsetEnabled(),
+                list.uploadLimit());
+    }
+
+    /** 관리자 영역에서만 Hermes 번들과 커넥터 스킬을 함께 읽는다. */
+    public SkillList adminList(CurrentUser user, String code) {
+        if (!user.isAdmin()) {
+            throw forbidden();
+        }
+        Agent agent = agents.requireReadable(user, code);
+        return assemble(agent, true, usage.byAgent(agent.id()));
     }
 
     /**
-     * 스킬 커맨드가 이름을 확인할 목록이다. {@link #list} 와 같은 규칙으로 조립하되 권한을 보지 않고 호출 합계를
+     * 스킬 커맨드가 이름을 확인할 전체 목록이다. 화면 목록의 숨김과 별개로 Hermes 기본 스킬도 조립하고 호출 합계를
      * 읽지 않는다.
      *
      * <p>누가 그 에이전트를 쓸 수 있는지는 부르는 쪽이 이미 판정했다. 대화 turn 은 새 대화면 시작할 수 있는
@@ -343,11 +359,25 @@ public class SkillService {
     }
 
     /**
-     * 대시보드의 전역 켜고 끄기를 쓴다. 편집자만 한다. Hermes 가 가진 스킬도 켜고 끌 수 있어서 이름은 올린
-     * 스킬 규칙이 아니라 Hermes 이름 규칙으로 본다.
+     * 올린 스킬을 켜고 끈다. 편집자만 하고 기본·커넥터 스킬은 없는 스킬과 같은 오류를 준다.
      */
     public void toggle(CurrentUser user, String code, String name, boolean enabled) {
         Agent agent = requireEditable(user, code);
+        if (uploadedBundle(agent.hermesProfile(), store.readCurrent(agent.hermesProfile()), name) == null) {
+            throw notFound();
+        }
+        toggle(agent, name, enabled);
+    }
+
+    /** 기본 스킬의 켜고 끄기는 관리자 경로에서만 받는다. 설정은 그 profile 의 모든 실행에 적용된다. */
+    public void adminToggle(CurrentUser user, String code, String name, boolean enabled) {
+        if (!user.isAdmin()) {
+            throw forbidden();
+        }
+        toggle(requireEditable(user, code), name, enabled);
+    }
+
+    private void toggle(Agent agent, String name, boolean enabled) {
         if (!HermesSkillName.isValid(name)) {
             throw new ApiException(ErrorCode.VALIDATION_FAILED, "a skill name must follow the Hermes skill name rule");
         }
@@ -439,7 +469,7 @@ public class SkillService {
 
     private static SkillDetail detailOf(SkillBundle bundle, Instant previousSavedAt) {
         List<SkillFileInfo> files = bundle.files().stream()
-                .map(file -> new SkillFileInfo(file.path(), utf8Bytes(file.content())))
+                .map(file -> new SkillFileInfo(file.path(), utf8Bytes(file.content()), file.content()))
                 .toList();
         return new SkillDetail(
                 bundle.name(), descriptionOf(bundle.skillMd()), bundle.skillMd(), files, previousSavedAt);

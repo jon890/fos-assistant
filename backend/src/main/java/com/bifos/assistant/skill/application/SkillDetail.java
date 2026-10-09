@@ -9,7 +9,7 @@ import java.util.List;
  * @param name 스킬 이름
  * @param description {@code SKILL.md} 앞머리의 설명
  * @param body {@code SKILL.md} 원문 전체. 앞머리를 포함한다. 화면이 그대로 편집한다
- * @param files 참고 파일의 경로와 UTF-8 크기. 본문은 싣지 않는다
+ * @param files 참고 파일의 경로와 UTF-8 크기와 편집할 원문
  * @param previousSavedAt 이전 버전을 남긴 시각. 이전 버전이 없으면 {@code null} 이다
  */
 public record SkillDetail(
