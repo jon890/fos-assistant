@@ -1,7 +1,7 @@
 /**
  * profile 플러그인이 Control Plane MCP 도구 인자에 붙이는 `_fos_ctx` 를 만든다.
  *
- * <p>계약은 `docs/hermes/fos-ctx.md` 의 「`_fos_ctx` 계약」 이 정한다. key 는 MCP 토큰을 SHA-256 한
+ * <p>계약은 `hermes/plugins/fos-ctx/README.md` 의 「`_fos_ctx` 계약」 이 정한다. key 는 MCP 토큰을 SHA-256 한
  * 소문자 16진수 문자열의 UTF-8 바이트이고, 서명할 글은 `v1`, 도구 이름, 루트 session, session, 도구 호출 id 를
  * 줄바꿈 하나로 이은 것이다. 가짜 Hermes 와 시나리오가 함께 쓴다.
  *

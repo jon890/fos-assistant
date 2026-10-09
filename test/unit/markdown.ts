@@ -29,3 +29,13 @@ export function headingTexts(markdown: string): string[] {
   }
   return headings;
 }
+
+/** 절로 가리킬 수 있는 이름이다. 헤딩과, ADR 이 절처럼 쓰는 `- **감당할 것**:` 같은 굵은 항목 이름이다. */
+export function sectionNames(markdown: string): Set<string> {
+  const names = headingTexts(markdown).map(normalizeHeading);
+  for (const line of blankFences(markdown)) {
+    const label = /^\s*(?:[-*] )?\*\*([^*]+)\*\*/.exec(line);
+    if (label) names.push(normalizeHeading(label[1].replace(/[:.]$/, "")));
+  }
+  return new Set(names);
+}

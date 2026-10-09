@@ -35,7 +35,7 @@
 
 - 사람들이 가진 스킬은 Claude 용으로 만든 묶음이 많다. 화면 편집기로 파일을 하나씩 옮기는 일이 번거롭고 `scripts/` 는 옮길 길이 없었다.
 - Hermes 의 docker 실행 공간은 `skills.external_dirs` 를 `/root/.hermes/external_skills/<n>` 에 붙인다. 이 마운트는 **컨테이너를 만들 때의 버전 경로**다.
-  plugin 이 컨테이너 키를 셸 설정의 지문으로 정하고 스킬 경로는 지문에 없다. 스킬을 다시 올려도 같은 컨테이너가 옛 버전을 본다([`hermes/sandbox.md`](../hermes/sandbox.md) 의 「이름과 재사용」).
+  plugin 이 컨테이너 키를 셸 설정의 지문으로 정하고 스킬 경로는 지문에 없다. 스킬을 다시 올려도 같은 컨테이너가 옛 버전을 본다([`hermes/docs/hermes-contract.md`](../../hermes/docs/hermes-contract.md) 의 「이름과 재사용」).
 - `skill_view` 가 모델에게 알려 주는 스킬 디렉터리는 Hermes 쪽 경로다. 실행 공간의 `external_skills/<n>` 경로가 아니다. 모델이 그 경로로 스크립트를 부르면 실행 공간에서 찾지 못한다.
 - 실행 공간 정책에 없는 profile 의 셸은 Hermes 프로세스에서 돈다(local). 거기서 올린 스크립트를 돌리면 다른 profile 의 `.env` 에 닿을 수 있다.
 - Control Plane 은 profile 이 실행 공간 정책에 있는지 읽는 경로가 없다. plugin 이 `require_sandbox` 로 거절하는 길은 이미 있다.

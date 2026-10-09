@@ -41,7 +41,7 @@ Hermes 를 부르지만 실행을 시작하지 않는 것은 세지 않는다.
 
 **이 한도는 Hermes 에 동시에 맡기는 실행 수의 상한이다.**
 OS 격리나 CPU, 메모리, 비용의 상한을 보장하지 않는다.
-실행 하나가 쓰는 메모리는 도구와 대화 길이에 따라 크게 달라진다([`hermes/concurrency.md`](../hermes/concurrency.md) 의 「스레드를 늘리는 비용」).
+실행 하나가 쓰는 메모리는 도구와 대화 길이에 따라 크게 달라진다([`hermes/docs/hermes-contract.md`](../../hermes/docs/hermes-contract.md) 의 「스레드를 늘리는 비용」).
 
 ## 한도끼리의 관계
 

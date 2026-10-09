@@ -26,7 +26,7 @@
 
 ### 근거
 
-운영판 Hermes v0.21.5(`v2026.9.24`)의 소스를 읽어 확인했다. 근거 줄은 [`hermes/runs-api.md`](../../../docs/hermes/runs-api.md) 의 「`/v1/runs` 에 사진을 싣는 법」 이 갖는다.
+운영판 Hermes v0.21.5(`v2026.9.24`)의 소스를 읽어 확인했다. 근거 줄은 [`hermes/docs/hermes-contract.md`](../../../hermes/docs/hermes-contract.md) 의 「`/v1/runs` 에 사진을 싣는 법」 이 갖는다.
 
 - `/v1/runs` 는 `input` 의 마지막 항목의 `content` 를 목록 그대로 에이전트에 넘긴다. provider 어댑터가 `image_url` 파트를 그 provider 의 모양으로 바꾼다
 - 모델이 이미지를 받지 않거나 판정하지 못하면 Hermes 가 보조 vision 모델의 설명 글로 바꿔 보낸다. 상류가 이미지를 거절하면 이미지를 뗀 사본으로 다시 시도한다.
@@ -49,7 +49,7 @@
 - Control Plane 데이터베이스에는 실행 입력을 저장하지 않으므로 이미지가 남지 않는다. 메시지 암호화([ADR-20261008 / data-encryption](ADR-20261008-data-encryption.md))와 겹치지 않는다
 - Hermes 쪽: API 오류가 나면 Hermes 가 요청 전체를 진단 파일(`request_dump_*.json`)로 남겨 base64 가 그 안에 들어간다.
   압축이 그 턴에 돌면 원본 파트가 session 기록에 남을 수 있다. 둘 다 그 profile 의 저장소이고, 원본 사진 파일도 이미 평문으로 실행 공간에 있다.
-  ADR-20261008 / data-encryption 의 「Hermes 의 저장은 평문」 범위 안이다. 대화를 지우면 session 은 지우지만 진단 파일은 남는다([`hermes/runs-api.md`](../../../docs/hermes/runs-api.md) 의 「session 을 지우는 경로」)
+  ADR-20261008 / data-encryption 의 「Hermes 의 저장은 평문」 범위 안이다. 대화를 지우면 session 은 지우지만 진단 파일은 남는다([`hermes/docs/hermes-contract.md`](../../../hermes/docs/hermes-contract.md) 의 「session 을 지우는 경로」)
 - 모델 공급자에게는 전에도 `vision_analyze` 로 사진이 갔다. 받는 곳은 같다
 
 ### 대안 기각

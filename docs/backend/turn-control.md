@@ -117,7 +117,7 @@ turn 이 끝난 뒤에 맡긴 자식은 붙일 표시가 없어 `agent_stop` 으
 
 이전 프로세스가 남긴 `RUNNING` 실행을 Hermes 에 물어 정한다.
 결정과 버린 대안은 [ADR-061](../../backend/docs/adr/ADR-061-재기동-때-남은-실행은-hermes-에-물어-정하고-도는-실행에는-다시-붙는다.md) 에 있다.
-Hermes 의 실행 조회가 무엇을 얼마 동안 답하는지는 [`hermes/runs-api.md`](../hermes/runs-api.md) 의 「실행 조회가 답하는 기간」 이 갖는다.
+Hermes 의 실행 조회가 무엇을 얼마 동안 답하는지는 [`hermes/docs/hermes-contract.md`](../../hermes/docs/hermes-contract.md) 의 「실행 조회가 답하는 기간」 이 갖는다.
 `RUNNING` 으로 남은 예약 발화(`task_run`)는 다시 돌리지 않고 `FAILED`(`INTERRUPTED`)로 닫는다. 자세한 것은 [`task.md`](task.md) 의 「기동할 때」 다.
 
 | 자리 | 맡는 것 |

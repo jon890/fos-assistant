@@ -13,7 +13,7 @@
   - 2026-09-29 v0.21.5 격리 환경에서 실측했다. hook 이 넣은 값이 MCP 인자에 도착했고, 모델의 위조를 이겼고, 같은 profile 의 동시 run 에서 섞이지 않았다. 플러그인은 `get_secret` 으로 호출한 profile 의 key 를 scope 오류 없이 읽었다. Control Plane 이 정한 `fos-<uuid>` 로 시작한 run 은 다음 run 에서 이어졌다.
   - 같은 실측에서 `delegate_task` 하위 에이전트와 압축 교체(`compression.in_place: false`)는 session id 가 바뀌었다. Hermes session 저장소의 `parent_session_id` 사슬을 따라 올라가면 처음 session 이 나온다(1ms 미만). 그 저장소는 Hermes 가 쓰므로 모델이 바꾸지 못한다.
   - 우리 서버는 MCP 토큰의 SHA-256 만 저장한다. 원문을 갖지 않는다.
-  - 근거와 계약은 [`hermes/fos-ctx.md`](../../../docs/hermes/fos-ctx.md#부모-실행을-잇는-방법) 에 있다.
+  - 근거와 계약은 [`hermes/plugins/fos-ctx/README.md`](../../../hermes/plugins/fos-ctx/README.md#부모-실행을-잇는-방법) 에 있다.
 - **대안 기각**:
   - **같은 profile 에서 가장 최근의 도는 실행을 부모로 쓴다.** 동시 실행에서 부모가 섞인다.
   - **모델이 부모 실행 번호를 인자로 준다.** 모델의 입력은 믿지 않는다. 프롬프트 주입으로 다른 실행을 가리킬 수 있다.

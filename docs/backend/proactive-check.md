@@ -149,7 +149,7 @@ Control Plane 은 버전 1과 2 블록도 읽으므로 앞 버전을 내는 분�
 그때는 Control Plane 이 아는 toolset(`AgentToolPolicy` 의 주인 등급과 관리자 등급) 전부와 Control Plane MCP 를 허용하고, `delegation`, `clarify`, `cronjob` 만 막는다. `cronjob` 이 건 예약 작업은 Control Plane 이 세지도 멈추지도 못하고 살펴보기가 끝난 뒤에도 돈다. 붙지 않은 모르는 MCP 서버는 그대로 막는다.
 켜졌는지는 `agent.proactive_check_writes_allowed` 로 보고, 시작할 때 `proactive_check.writes_allowed` 에 옮겨 적는다. 그 살펴보기의 경계는 옮겨 적은 값이 정한다.
 
-`skills` 에 든 `skill_manage` 는 fos-ctx 의 `pre_tool_call` 이 모든 실행에서 막는다([`hermes/skills.md`](../hermes/skills.md)).
+`skills` 에 든 `skill_manage` 는 fos-ctx 의 `pre_tool_call` 이 모든 실행에서 막는다([`hermes/docs/hermes-contract.md`](../../hermes/docs/hermes-contract.md)).
 켜진 스킬 목록은 `SkillCommandCatalog.enabledNames` 로 읽는다. 스킬 커맨드와 같은 목록이다.
 
 ## 점검 대화
@@ -164,7 +164,7 @@ Control Plane 은 버전 1과 2 블록도 읽으므로 앞 버전을 내는 분�
 
 `proactive_check.hermes_root_session_id` 가 지금 대화의 루트 session 과 같은 살펴보기가 `session-max-checks` 이상이면, 이번 살펴보기를 시작하기 전에 `ConversationSessions.renew` 로 새 session 을 정한다.
 그 뒤의 사용자 turn 도 새 session 으로 이어진다.
-한 session 안에서 문맥이 커지는 것은 Hermes 의 압축 교체가 맡는다([`hermes/README.md`](../hermes/README.md)).
+한 session 안에서 문맥이 커지는 것은 Hermes 의 압축 교체가 맡는다([`hermes/README.md`](../../hermes/docs/hermes-contract.md)).
 
 ## 한 번의 살펴보기
 

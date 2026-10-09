@@ -1,9 +1,9 @@
 # 네이버 블로그 커넥터
 
-사용자가 「내 브라우저」 에 로그인해 둔 네이버 계정으로 블로그 글을 임시저장하는 범용 커넥터다. 코드는 [`hermes/connectors/naver-blog/`](../../hermes/connectors/naver-blog) 에 있다.
+사용자가 「내 브라우저」 에 로그인해 둔 네이버 계정으로 블로그 글을 임시저장하는 범용 커넥터다. 코드는 [`hermes/connectors/naver-blog/`](.) 에 있다.
 이 문서는 도구와 정책, 초안의 모양, 보안, 설정 안내, 실제 계정으로 확인하는 절차를 갖는다.
-결정과 근거는 [ADR-20261007 / naver-blog-connector](../adr/ADR-20261007-naver-blog-connector.md) 에 있다.
-커넥터 공통 계약은 [커넥터 연결](../connectors.md) 과 [커넥터 도구 정책](../backend/connector-tool-policy.md) 이 갖는다.
+결정과 근거는 [ADR-20261007 / naver-blog-connector](../../../docs/adr/ADR-20261007-naver-blog-connector.md) 에 있다.
+커넥터 공통 계약은 [커넥터 연결](../../../docs/connectors.md) 과 [커넥터 도구 정책](../../../docs/backend/connector-tool-policy.md) 이 갖는다.
 
 **발행하지 않는다.** 글은 임시저장 상태로 남고, 공개는 사용자가 네이버에서 직접 한다.
 
@@ -20,10 +20,10 @@
 
 | env | 선언 | 값 |
 | --- | --- | --- |
-| `NAVER_BLOG_ATTACHMENT_DIR` | `owner_attachments_env` | 바인딩 설치가 그 에이전트 주인의 첨부 디렉터리를 넣는다([ADR-20261007 / connector-owner-attachments](../adr/ADR-20261007-connector-owner-attachments.md)) |
-| `NAVER_BLOG_BROWSER_URL` | `owner_browser_env` | 주인의 「내 브라우저」 로 가는 Control Plane 중계 주소다. 바인딩 설치는 그 바인딩의 표식 주소를, 확인 도구 호출은 요청자의 호출 표식 주소를 넣는다. 중계가 꺼졌으면 빈 값이다([ADR-20261008 / browser-gateway-token](../../backend/docs/adr/ADR-20261008-browser-gateway-token.md)) |
+| `NAVER_BLOG_ATTACHMENT_DIR` | `owner_attachments_env` | 바인딩 설치가 그 에이전트 주인의 첨부 디렉터리를 넣는다([ADR-20261007 / connector-owner-attachments](../../../docs/adr/ADR-20261007-connector-owner-attachments.md)) |
+| `NAVER_BLOG_BROWSER_URL` | `owner_browser_env` | 주인의 「내 브라우저」 로 가는 Control Plane 중계 주소다. 바인딩 설치는 그 바인딩의 표식 주소를, 확인 도구 호출은 요청자의 호출 표식 주소를 넣는다. 중계가 꺼졌으면 빈 값이다([ADR-20261008 / browser-gateway-token](../../../backend/docs/adr/ADR-20261008-browser-gateway-token.md)) |
 
-커넥터는 중계 주소를 Chrome 의 CDP 주소처럼 부른다. 중계 계약은 [사용자 브라우저](../backend/user-browser.md) 의 「중계」 가 갖는다.
+커넥터는 중계 주소를 Chrome 의 CDP 주소처럼 부른다. 중계 계약은 [사용자 브라우저](../../../docs/backend/user-browser.md) 의 「중계」 가 갖는다.
 `connector.json` 의 `owner_browser_login_url` 은 네이버 로그인 화면 주소다. 연결 화면이 그 주소를 「내 브라우저에서 로그인」 링크로 연다.
 확인 도구는 `session_status` 다. 등록과 연결 확인 때 요청자의 「내 브라우저」 에 중계로 붙어 네이버 로그인 쿠키가 있는지 보고, 있으면 저장한다.
 
@@ -103,7 +103,7 @@ MCP 서버 이름은 `naver-blog` 다.
 `render_draft` 가 돌려준 `html` 을 에이전트가 `artifact_write` 로 `artifact_path` 에 쓴다. 대화 화면이 그 결과물을 답 아래에 보인다.
 
 - 네이버 모바일 화면 폭으로 그린다. 사진 자리마다 몇 번째 사진인지와 `photo_notes` 의 설명을 붙인다. 설명은 미리보기에만 보이고 네이버에는 들어가지 않는다
-- 사진은 바이트를 담지 않고 같은 대화의 첨부 주소를 상대 경로로 부른다. 파일 이름이 `<첨부 번호>.<확장자>` 인 사진만 그렇게 그리고, 다른 이름이면 이름표만 보인다. 계약은 [결과물 파일](../backend/artifact.md) 의 「같은 대화의 첨부 사진을 부를 때」 가 갖는다
+- 사진은 바이트를 담지 않고 같은 대화의 첨부 주소를 상대 경로로 부른다. 파일 이름이 `<첨부 번호>.<확장자>` 인 사진만 그렇게 그리고, 다른 이름이면 이름표만 보인다. 계약은 [결과물 파일](../../../docs/backend/artifact.md) 의 「같은 대화의 첨부 사진을 부를 때」 가 갖는다
 - `artifact_path` 는 `index.html` 이나 `<폴더>/index.html` 이고 폴더는 세 단계까지 받는다. 사진 주소의 `../` 수를 그 깊이로 정한다(`index.html` 은 `../attachments`, `a/index.html` 은 `../../attachments`)
 - 에이전트는 `artifact_write` 의 `path` 를 `artifact_path` 와 글자까지 같게 준다. 다른 깊이에 쓰면 사진 주소가 풀리지 않아 사진이 404 로 보이지 않는다
 - 스티커는 네이버 편집기에 들어가는 것과 같은 그림으로 보인다. 결과물 화면은 외부 그림을 막으므로(`img-src 'self' data:`) HTML 은 `stickers/<코드>.png` 를 상대 경로로 부르고, 에이전트가 `assets` 의 항목마다 `artifact_write` 의 주소 방식(`source_url`)으로 그 그림을 같은 폴더에 받아 둔다
@@ -177,7 +177,7 @@ MCP 서버 이름은 `naver-blog` 다.
 
 ## 서버와 검사
 
-[커넥터 만들기](../connector-authoring.md) 의 「MCP 서버」 를 따른다. 같은 묶음 파일이 `--worker <작업 파일>` 인자로 작업 프로세스가 된다.
+[커넥터 만들기](../README.md) 의 「MCP 서버」 를 따른다. 같은 묶음 파일이 `--worker <작업 파일>` 인자로 작업 프로세스가 된다.
 CDP 는 Bun 의 WebSocket 으로 직접 부르고 브라우저 자동화 라이브러리를 들이지 않는다.
 
 검사는 실제 네이버와 Chrome 에 닿지 않는다. `tests/` 의 가짜 CDP 서버가 중계처럼 HTTP 창구(`/json/version`, `/json/list`, `/json/new`, `/json/close`)와 WebSocket 명령에 답한다.
@@ -232,7 +232,7 @@ CDP 는 Bun 의 WebSocket 으로 직접 부르고 브라우저 자동화 라이�
 
 ### 기존 연결 옮기기
 
-브라우저 연결 주소 칸이 없어졌다. 자동으로 옮기는 코드는 없다. 까닭은 [ADR-20261007 / user-browser](../adr/ADR-20261007-user-browser.md) 의 「네이버 블로그 이행(2026-10-08 추가)」 이 갖는다.
+브라우저 연결 주소 칸이 없어졌다. 자동으로 옮기는 코드는 없다. 까닭은 [ADR-20261007 / user-browser](../../../docs/adr/ADR-20261007-user-browser.md) 의 「네이버 블로그 이행(2026-10-08 추가)」 이 갖는다.
 보관 파일에 남은 옛 `cdp_url` 값은 대시보드가 읽을 때 버려 쓰이지 않고, 사용자가 블로그 아이디를 다시 등록하면 보관 파일이 새로 쓰여 사라진다.
 
 1. 배포 뒤 사용자는 「내 브라우저」 에서 네이버에 로그인하고 「연결」 화면에서 연결 확인을 한 번 누른다

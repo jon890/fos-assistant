@@ -6,7 +6,7 @@
 ## 페르소나
 
 에이전트의 성격이다. 본문은 그 profile 의 `SOUL.md` 가 갖고 이 저장소는 화면만 준다.
-근거는 [`adr/ADR-019-페르소나는-hermes-가-갖고-control-plane-은-화면만-준다.md`](../../backend/docs/adr/ADR-019-페르소나는-hermes-가-갖고-control-plane-은-화면만-준다.md) 에 있다.
+근거는 [`backend/docs/adr/ADR-019-페르소나는-hermes-가-갖고-control-plane-은-화면만-준다.md`](../../backend/docs/adr/ADR-019-페르소나는-hermes-가-갖고-control-plane-은-화면만-준다.md) 에 있다.
 
 - **본문을 데이터베이스에 두지 않는다.** 읽을 때도 쓸 때도 Hermes 대시보드를 부른다.
 - 정본이 하나라 어긋날 것이 없다. 반영 상태도 다시 반영하는 경로도 두지 않는다.
@@ -74,7 +74,7 @@
 ## 에이전트 도구
 
 에이전트가 쓸 toolset 이다. 목록은 그 profile 설정의 `platform_toolsets.api_server` 가 갖고, 이 저장소는 등급 판정과 화면을 준다.
-데이터베이스에 사본을 두지 않는다. 근거는 [`adr/ADR-029-에이전트-도구는-control-plane-이-등급으로-판정하고-hermes-설정-api-로-쓴다.md`](../../backend/docs/adr/ADR-029-에이전트-도구는-control-plane-이-등급으로-판정하고-hermes-설정-api-로-쓴다.md) 에 있다.
+데이터베이스에 사본을 두지 않는다. 근거는 [`backend/docs/adr/ADR-029-에이전트-도구는-control-plane-이-등급으로-판정하고-hermes-설정-api-로-쓴다.md`](../../backend/docs/adr/ADR-029-에이전트-도구는-control-plane-이-등급으로-판정하고-hermes-설정-api-로-쓴다.md) 에 있다.
 
 - 등급 표는 코드 한 곳(`agent/domain/AgentToolPolicy`)이 갖는다. 표와 이유는 ADR-029 의 「도구 등급」 이다
 - 설정을 쓸 때 대시보드 plugin 은 허용 목록 밖의 이름을 거절한다. Hermes 를 올릴 때 `fos-home-infra` 의 기능 검사는 모든 profile 의 켜진 목록을 허용 목록과 대조한다. 실행마다 검사하지 않는다
@@ -130,7 +130,7 @@ Hermes 목록에서 사라진 숨김 이름은 관리 목록에 남아 숨김을
 주인이 비어 있는 옛 그룹 공개 에이전트를 `ADMIN` 이 `PRIVATE` 로 바꾸면 그 `ADMIN` 이 주인이 된다.
 
 **만들기는 한 요청 안에서 끝낸다.** 차례는 아래와 같고, 중간에 실패하면 만든 것을 역순으로 거둔다(`people.application.HermesProfileProvisioner` 와 같은 규칙).
-대시보드 plugin 이 받는 요청과 응답은 [`hermes/README.md`](../../hermes/README.md) 의 「dashboard-profile-api 가 여는 것」 표가, 그 경로를 지날 때의 Hermes 동작은 [`hermes/profiles.md`](../hermes/profiles.md) 의 「Control Plane 이 부르는 대시보드 plugin 경로」 가 갖는다.
+대시보드 plugin 이 받는 요청과 응답은 [`hermes/README.md`](../../hermes/plugins/dashboard-profile-api/README.md) 의 「dashboard-profile-api 가 여는 것」 표가, 그 경로를 지날 때의 Hermes 동작은 [`hermes/docs/hermes-contract.md`](../../hermes/docs/hermes-contract.md) 의 「Control Plane 이 부르는 대시보드 plugin 경로」 가 갖는다.
 
 1. 주인의 `app_user` 행을 잠그고 그 사용자의 지우지 않은 에이전트 수가 `assistant.agents.max-per-user`(기본 5)보다 적은지 본다. `ADMIN` 은 세지 않는다
 2. `code` 와 profile 이름을 만든다. 둘 다 사용자가 넣은 이름과 무관한 무작위 값이다

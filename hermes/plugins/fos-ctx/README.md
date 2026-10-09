@@ -1,24 +1,136 @@
-# _fos_ctx 와 session 등록
+# fos-ctx plugin
+
+profile 에 설치하는 plugin 이다. MCP 호출에 실행 맥락을 서명해 붙이고, 하위 에이전트 session 을 Control Plane 에 등록하고, 커넥터 도구 호출을 Control Plane 에 묻는다.
+설치와 운영 값은 [`hermes/README.md`](../../README.md), Hermes 쪽 동작은 [`hermes/docs/hermes-contract.md`](../../docs/hermes-contract.md) 가 갖는다.
+
+## fos-ctx 가 붙이는 것
+
+`delegate_task` 의 `images` 와 `tasks[].images` 는 HTTP(S) 주소와 이미지 data URL 만 받는다.
+로컬 파일 경로는 Docker 밖에서 읽히므로 hook 이 파일 읽기 전에 막는다. 이미지 없는 자식 실행은 유지한다.
+이 제한은 `fos-ctx` 1.4.0 이 켜진 profile 에 적용한다. 기존 일반 profile 은 파일 갱신과 gateway reload 를,
+커넥터는 재설치를 끝낸 뒤 로컬 이미지 거절을 확인해야 한다. hook 이 꺼진 profile 은 막지 못한다.
+
+Control Plane 의 `agent_*` 도구는 이 값으로 부모 실행을 찾고, 서명이 없거나 틀리면 거절한다.
+키와 서명 규칙은 [`hermes/plugins/fos-ctx/README.md`](README.md) 의 「`_fos_ctx` 계약」 이 소유한다.
+`hermes/tests/test_fos_ctx.py` 가 그 절의 기대 서명으로 plugin 을 검사한다.
+
+| 도구 | 서명하지 못할 때 |
+| --- | --- |
+| `agent_*`, `memory_read`, `artifact_write`, `follow_up_propose`, `memory_remember` | 막는다. 모델에게 막은 이유가 간다 |
+| 그 밖의 Control Plane MCP 도구 | 막지 않고 원래 인자 그대로 보낸다 |
+| Control Plane MCP 가 아닌 도구 | 건드리지 않는다. `skill_manage` 만 아래처럼 막는다 |
+
+**v2026.9.24 는 MCP 도구를 `tool_call` 중계 도구 뒤에 둔다.** 기본 설정 `tools.tool_search` 가 켜져 있어서다.
+모델은 `tool_call` 로 `mcp__fos_assistant__<도구>` 를 부르고, Hermes 는 그때도 실제 도구 이름으로 `pre_tool_call` 을 부른다.
+일회용 컨테이너에서 이 경로로 서명이 붙어 도착하는 것을 확인했다.
+
+### skill_manage 를 막는다
+
+올린 스킬은 Control Plane 이 쓰고 Hermes 는 읽기 전용으로 본다.
+그래도 모델이 `skill_manage` 로 같은 이름의 로컬 스킬을 만들면 로컬이 먼저 선택되어 올린 스킬이 가려진다.
+그래서 fos-ctx 를 켠 profile 에서는 `skill_manage` 를 막고 「이 환경에서는 스킬을 대화로 만들거나 고칠 수 없다. 에이전트 관리 화면에서 올린다」 를 돌려준다.
+fos-ctx 를 켠 모든 profile 에 걸린다. 사람이 운영하는 profile 도 fos-ctx 가 있으면 대화로 스킬을 만들 수 없다.
+
+### 자식 session 을 등록한다
+
+최상위 run 의 `delegate_task` 자식은 부모 run 이 끝난 뒤에도 백그라운드로 돈다.
+Control Plane 은 부모 run 으로 자식의 요청자를 찾지 못하므로, fos-ctx 가 `subagent_start` hook 에서 자식 session 의 부모와 루트를 등록한다.
+경로, 본문, 서명, 응답은 [`hermes/plugins/fos-ctx/README.md`](README.md) 「하위 에이전트 session 등록 계약」 이 소유한다.
+
+| 항목 | 값 |
+| --- | --- |
+| 주소 | 위 「운영 값」 의 자식 session 등록 주소. 운영이 준다 |
+| 인증 | 그 profile 의 MCP 토큰 |
+| 제한 시간 | 3초. 연결 실패와 5xx 에만 한 번 더 부른다 |
+| 실패 | 로그만 남긴다. 등록이 없는 자식의 호출은 Control Plane 이 거절한다 |
+
+Hermes 는 자식을 만드는 자리에서 부모 스레드로 이 hook 을 동기로 부른다. 그래서 등록이 자식의 첫 도구 호출보다 먼저 끝난다.
+일회용 컨테이너에서 부모 run 이 0.25초에 끝나고 등록이 0.12초에 도착했다.
+등록 로그는 `fos-ctx: 자식 session 을 등록했다 (시도 N)` 이고, 실패하면 상태 코드나 예외 종류만 남는다.
+
+### 커넥터 도구 호출을 묻는다
+
+profile 디렉터리에 이름 대응 파일 `.fos-connector-tools.json` 이 있으면 fos-ctx 는 그 profile 의 커넥터 MCP 도구 호출마다 Control Plane 에 묻고 답대로 한다.
+경로, 본문, 서명, 응답은 [`docs/backend/connector-tool-policy.md`](../../../docs/backend/connector-tool-policy.md) 의 「도구 호출 판정」 이 소유한다.
+대응 파일이 없는 profile 에서는 아래 처리를 하지 않는다.
+
+대응 파일의 `isolated` 칸이 profile 의 방식을 정한다. 칸의 뜻은 같은 문서의 「이름 대응」 이 갖는다.
+
+| 방식 | `isolated` | 어떤 profile 인가 |
+| --- | --- | --- |
+| 옛 설치 profile | 없거나 `true` | 커넥터마다 만든 전용 profile. Control Plane MCP 가 없고 커넥터 서버만 있다 |
+| 바인딩 profile | `false` | 일반 에이전트의 profile 에 커넥터를 붙인 것. Control Plane MCP, 내장 도구, 운영자가 넣은 다른 MCP 서버가 함께 있다 |
+
+| hook 이 본 것 | 옛 설치 profile | 바인딩 profile |
+| --- | --- | --- |
+| `skill_manage` | 위와 같이 막는다 | 같다 |
+| 대응 파일을 읽지 못한다. `isolated` 가 boolean 이 아닌 것도 같다 | `mcp__` 도구와 `execute_code` 를 모두 막는다. Control Plane MCP 의 도구도 막는다. 옛 설치 profile 일 수 있고, 그 profile 에는 Control Plane MCP 가 없기 때문이다. 그 밖의 도구는 건드리지 않는다 | 같다 |
+| 대응 파일의 서버와 맞는 도구 | 등록 이름이 Control Plane MCP 의 접두사로 시작해도 Control Plane 에 묻는다. `_fos_ctx` 를 붙이지 않는다 | 같다 |
+| 대응 파일의 어느 서버와도 맞지 않는 Control Plane MCP 의 도구 | 위와 같이 `_fos_ctx` 를 붙인다 | 같다 |
+| `execute_code` | 막는다. 실행 맥락 없이 도구를 부르는 경로다 | 건드리지 않는다. 그 안에서 부른 커넥터 도구는 session 이 없어 아래 규칙으로 막힌다 |
+| `mcp__` 로 시작하지 않는 도구 | 건드리지 않는다 | 같다 |
+| `prefix` 가 맞는 서버가 없는 `mcp__` 도구 | 막는다. Control Plane 에 묻지 않는다 | 건드리지 않는다. 운영자가 넣은 다른 MCP 서버의 도구다 |
+| `session_id` 나 `tool_call_id` 가 없거나 인자가 객체가 아니다 | 막는다. Control Plane 에 묻지 않는다 | 같다 |
+| 직렬화한 인자 글이 UTF-8 로 60KB 를 넘는다 | 막는다. Control Plane 에 묻지 않는다 | 같다 |
+| 대응 파일에 없는 도구 | `tool` 을 `null` 로 묻는다 | 같다. manifest 를 읽지 못해 `tools` 가 빈 서버의 도구도 여기 온다 |
+| 답이 200 의 `allow` | 통과한다 | 같다 |
+| 답이 200 의 `block` 이고 글이 있다 | 그 글로 막는다 | 같다 |
+| 주소나 토큰이 없다, 제한 시간 안에 답이 없다, 200 이 아니다, 답을 읽지 못한다, 예외가 났다 | 정해 둔 글로 막는다 | 같다 |
+
+**바인딩 profile 은 대응 파일에 그 profile 의 모든 커넥터 서버가 실려 있다는 데 기댄다.**
+대응에 없는 `mcp__` 도구를 통과시키므로, 실리지 않은 커넥터 서버가 있으면 그 서버의 도구가 판정 없이 나간다.
+대시보드 plugin 의 바인딩 설치와 떼기가 소유 기록의 모든 서버를 싣고, manifest 를 읽지 못했거나 소유 기록의 서버 이름이나 실행 정의가 지금 manifest 와 다른 서버는 소유 기록의 이름으로 빈 `tools` 와 함께 싣는다.
+뗀 서버도 빈 `tools` 로 남긴다. 떼기 전에 시작한 실행이 그 서버를 쥐고 있어도 그 호출을 묻는다.
+
+**바인딩 profile 의 커넥터 도구 결과는 `<external-data>` 로 감싼다.**
+fos-ctx 의 `transform_tool_result` hook 이 대응 파일의 서버와 맞는 도구의 결과가 글이면 Control Plane 의 `ExternalData` 와 같은 모양으로 바꾼다.
+안내 문장 한 줄, `<external-data>` 줄, 본문, `</external-data>` 줄이다. 본문 안의 닫는 표시는 대소문자와 안쪽 공백에 상관없이 `<\/external-data>` 로 바꾼다.
+오류 글도 감싼다. 판정이 막은 호출은 이 hook 에 닿지 않으므로 여기 닿은 오류 글은 커넥터 서버가 낸 것이다.
+글이 아닌 결과, 다른 도구, 옛 설치 profile 은 바꾸지 않는다. 대응 파일을 읽지 못하거나 예외가 나면 바꾸지 않고, Hermes 의 `<untrusted_tool_result>` 감싸기만 남는다.
+Hermes 가 이 hook 을 언제 부르는지는 [`hermes/docs/hermes-contract.md`](../../docs/hermes-contract.md) 의 「도구 결과를 바꾸는 hook」 이 갖는다.
+
+hook 은 등록 이름이 대응 파일의 `tools` 에 있는 서버를 먼저 고르고, 없을 때만 `prefix` 가 맞는 서버를 고른다. `prefix` 가 여럿 맞으면 가장 긴 것을 고른다.
+서버 이름이 다른 서버 이름의 앞부분일 때 원래 도구 이름을 엉뚱한 서버에서 찾지 않게 한다.
+
+| 항목 | 값 |
+| --- | --- |
+| 주소 | 위 「운영 값」 의 커넥터 정책 주소. 운영이 준다 |
+| 인증 | 그 profile 의 MCP 토큰 |
+| 제한 시간 | 3초. 한 번만 부르고 다시 부르지 않는다. 기다리는 동안 run 의 스레드가 묶인다 |
+| 로그 | 상태 코드나 예외 종류만 남긴다. 토큰, 서명, 인자, 응답 본문은 남기지 않는다 |
+
+막을 때는 늘 글이 든 `block` 을 돌려준다. Hermes 는 글이 없는 `block` 을 통과로 읽는다. 예외의 본문을 글에 넣지 않는다.
+`hermes/tests/test_fos_ctx.py` 가 서버 쪽 검사와 같은 서명 확인 값으로 plugin 을 검사한다.
+
+Hermes 가 보이는 도구 이름은 `mcp__fos_assistant__<도구>` 다. 서버 이름의 `-` 가 `_` 로 바뀐다.
+서명에는 앞부분을 뗀 서버 쪽 이름을 넣는다. 서버 이름을 바꾸면 plugin 의 `TOOL_PREFIX` 도 함께 바꾼다.
+
+**서명은 그 profile 의 모델이 셸로 파일을 읽지 못하는 동안만 위조를 막는다.**
+key 는 그 profile `.env` 의 MCP 토큰에서 나온다. terminal backend 가 `local` 이면 terminal 도구는 Hermes 프로세스의 사용자가 읽을 수 있는 파일을 모두 읽는다. docker 실행 공간이 적용된 profile 은 [실행 공간](../../docs/hermes-contract.md) 이 갖는다. 스킬 앞머리의 비밀 요청 칸이 그 토큰을 실행 공간에 넣을 수 있어 올린 스킬과 커넥터 스킬은 그 칸을 거절한다.
+셸을 여는 profile 의 목록은 운영 저장소의 live 검사가 소유한다.
+그 목록에 Control Plane MCP 를 등록한 profile 을 더할 때는 이 제약을 함께 판단한다.
+
+## _fos_ctx 와 session 등록
 
 Hermes 의 MCP 도구 호출에 실행을 가리키는 값을 싣는 방법과 그 근거가 된 Hermes 동작을 갖는다.
 profile 플러그인이 붙이는 `_fos_ctx` 의 서명 계약과 하위 에이전트 session 등록 계약이 여기 있다.
-Control Plane 이 그 값으로 요청자를 정하는 순서는 [`backend/mcp-caller.md`](../backend/mcp-caller.md) 가 갖는다.
+Control Plane 이 그 값으로 요청자를 정하는 순서는 [`docs/backend/mcp-caller.md`](../../../docs/backend/mcp-caller.md) 가 갖는다.
 
-## 하위 에이전트에 사진을 넘길 때
+### 하위 에이전트에 사진을 넘길 때
 
 `delegate_task` 의 `images` 와 `tasks[].images` 에는 HTTP(S) 주소와 `data:image/` URL 만 받는다.
 로컬 절대·상대 경로와 `file:` 주소, 잘못된 목록은 `pre_tool_call` 에서 비지 않은 안내와 함께 막는다.
 이미지 없는 호출은 그대로 통과한다. Hermes 의 자식 이미지 전달은 Docker 설정과 관계없이 호스트 파일을
-직접 읽기 때문에 사용자별 첨부 mount 만으로는 막을 수 없다. 결정은 [ADR-091](../adr/ADR-091-사진-첨부는-사용자별로-저장하고-실행-공간에는-그-사용자만-붙인다.md) 이 갖는다.
+직접 읽기 때문에 사용자별 첨부 mount 만으로는 막을 수 없다. 결정은 [ADR-091](../../../docs/adr/ADR-091-사진-첨부는-사용자별로-저장하고-실행-공간에는-그-사용자만-붙인다.md) 이 갖는다.
 
 이 제한은 새 판 `fos-ctx` 가 켜진 profile 에만 적용된다. 기존 일반 profile 도 파일을 갱신하고 gateway 에서
 다시 읽어야 하며, 커넥터는 재설치 때 갱신된다. hook 이 꺼진 profile 은 막지 못한다.
 
-## Control Plane 의 MCP 도구로 다른 실행을 부를 때
+### Control Plane 의 MCP 도구로 다른 실행을 부를 때
 
 `memory_read` 를 두고 있는 그 자리에 실행을 시작하는 도구를 하나 더 두는 구조가 기대는 Hermes 동작이다.
 
-### 도구 호출에는 실행을 가리키는 값이 없다
+#### 도구 호출에는 실행을 가리키는 값이 없다
 
 `tools/call` 요청에는 우리가 설정에 적은 `Authorization` 헤더와 MCP 규약 헤더만 실린다.
 `params._meta` 는 빈 객체다.
@@ -26,9 +138,9 @@ Control Plane 이 그 값으로 요청자를 정하는 순서는 [`backend/mcp-c
 **도구가 아는 것은 어느 profile 이 불렀는지까지다.** 어느 실행에서 왔는지는 오지 않는다.
 그러므로 이 경로로 만든 실행을 부모 `agent_execution` 에 잇는 값은 우리가 만들어야 한다.
 
-### 부모 실행을 잇는 방법
+#### 부모 실행을 잇는 방법
 
-v0.21.5(`v2026.9.24`) 격리 환경에서 측정했다. 결정은 [ADR-031](../../backend/docs/adr/ADR-031-mcp-호출의-부모-실행은-profile-플러그인이-서명한-루트-session-으로-잇는다.md) 에 있다.
+v0.21.5(`v2026.9.24`) 격리 환경에서 측정했다. 결정은 [ADR-031](../../../backend/docs/adr/ADR-031-mcp-호출의-부모-실행은-profile-플러그인이-서명한-루트-session-으로-잇는다.md) 에 있다.
 
 **MCP 호출에 run 맥락을 실을 수 있는 공개 경로는 profile 플러그인의 `pre_tool_call` hook 하나다.**
 
@@ -55,11 +167,11 @@ v0.21.5(`v2026.9.24`) 격리 환경에서 측정했다. 결정은 [ADR-031](../.
 
 그래서 hook 이 서명하는 값은 그 호출의 session 이 아니라 **사슬의 처음 session(루트 session)** 이다.
 
-**플러그인은 profile 마다 둔다.** profile 디렉터리의 `plugins/` 에 두고 그 profile 설정에서 켜야 그 profile 의 호출에 붙는다. plugin 원본은 이 저장소의 [`hermes/plugins/fos-ctx/`](../../hermes/plugins/fos-ctx/) 에 있고, 대시보드 plugin 이 새 profile 을 만들 때 그 profile 로 복사한다.
+**플러그인은 profile 마다 둔다.** profile 디렉터리의 `plugins/` 에 두고 그 profile 설정에서 켜야 그 profile 의 호출에 붙는다. plugin 원본은 이 저장소의 [`hermes/plugins/fos-ctx/`](.) 에 있고, 대시보드 plugin 이 새 profile 을 만들 때 그 profile 로 복사한다.
 
-**hook 이 끼우지 못한 호출도 서버에 도착한다.** 플러그인이 빠졌거나 hook 이 값을 돌려주지 않으면 원래 인자 그대로 간다. 그래서 서버는 서명이 없거나 틀린 호출을 거절한다. `memory_read`, `artifact_write`, `follow_up_propose`, `memory_remember`, `agent_*` 가 모두 그렇다([ADR-032](../../backend/docs/adr/ADR-032-mcp-토큰은-profile-을-증명하고-실제-사용자는-부모-실행에서-정한다.md)).
+**hook 이 끼우지 못한 호출도 서버에 도착한다.** 플러그인이 빠졌거나 hook 이 값을 돌려주지 않으면 원래 인자 그대로 간다. 그래서 서버는 서명이 없거나 틀린 호출을 거절한다. `memory_read`, `artifact_write`, `follow_up_propose`, `memory_remember`, `agent_*` 가 모두 그렇다([ADR-032](../../../backend/docs/adr/ADR-032-mcp-토큰은-profile-을-증명하고-실제-사용자는-부모-실행에서-정한다.md)).
 
-#### `_fos_ctx` 계약
+##### `_fos_ctx` 계약
 
 hook 은 Control Plane MCP 의 모든 도구 인자에 `_fos_ctx` 를 덮어쓴다.
 
@@ -96,25 +208,25 @@ hook 은 Control Plane MCP 의 모든 도구 인자에 `_fos_ctx` 를 덮어쓴�
 | 기대 `sig` | `b28a128dbb642aba7a8b4c35dcb237e2feb5a452305ec275909c32a00ae1b25b` |
 | 같은 칸에 도구 이름만 `agent_status` 일 때 | `62109c6c99e7ed4638e4343f1e5b6b22a3f55dd974560916149986866c253236` |
 
-서버는 모든 도구에서 `_fos_ctx` 로 요청자를 정한다. 서명을 확인한 뒤 보는 순서는 [`backend/mcp-caller.md`](../backend/mcp-caller.md#mcp-호출의-요청자를-정할-때) 의 「MCP 호출의 요청자를 정할 때」 가 갖는다.
+서버는 모든 도구에서 `_fos_ctx` 로 요청자를 정한다. 서명을 확인한 뒤 보는 순서는 [`docs/backend/mcp-caller.md`](../../../docs/backend/mcp-caller.md#mcp-호출의-요청자를-정할-때) 의 「MCP 호출의 요청자를 정할 때」 가 갖는다.
 도구 인자 검사에 넘기기 전에 `_fos_ctx` 는 떼어 낸다. 도구 규격이 그 키를 모르기 때문이다.
 플러그인에 요구하는 동작이다. 서명할 수 없으면 `memory_read`, `artifact_write`, `follow_up_propose`, `memory_remember`, `agent_*` 를 모두 Hermes 쪽에서 막는다. 플러그인은 이 저장소의 `hermes/plugins/fos-ctx/` 가 갖고 `hermes/tests/test_fos_ctx.py` 가 그 동작을 검사한다. 다만 profile 에 실제로 설치되어 켜졌는지는 이 저장소가 확인하지 못한다. 그래서 서버도 서명이 없는 호출을 거절한다. 플러그인이 막지 못해도 서버에서 같은 조건으로 막힌다.
 
-#### 호출은 profile 마다 하나씩 나간다
+##### 호출은 profile 마다 하나씩 나간다
 
 같은 profile 의 MCP 연결 하나가 `_rpc_lock` 으로 호출을 직렬로 보낸다(`tools/mcp_tool.py`).
 한 run 의 도구 호출이 오래 걸리면 같은 profile 의 다른 run 이 기다린다.
 그래서 `agent_delegate` 는 제출까지만 기다리고, `agent_status` 는 저장된 값만 읽는다.
-예외는 먼저 살펴보기 트리의 `agent_status` 다. `wait_seconds` 를 주면 `assistant.delegation.status-wait-max`(기본 20초)까지 기다리고, 그동안 같은 profile 의 다른 MCP 호출이 기다린다. 살펴보기 트리가 아닌 호출은 `wait_seconds` 를 받아도 기다리지 않는다([`backend/proactive-check.md`](../backend/proactive-check.md)).
+예외는 먼저 살펴보기 트리의 `agent_status` 다. `wait_seconds` 를 주면 `assistant.delegation.status-wait-max`(기본 20초)까지 기다리고, 그동안 같은 profile 의 다른 MCP 호출이 기다린다. 살펴보기 트리가 아닌 호출은 `wait_seconds` 를 받아도 기다리지 않는다([`docs/backend/proactive-check.md`](../../../docs/backend/proactive-check.md)).
 
-#### 재시도와 `tool_call_id`
+##### 재시도와 `tool_call_id`
 
 Hermes 는 401 이면 다시 연결해 같은 인자로 한 번 더 보낸다. session 이 만료되면 읽기 전용 도구만 다시 보내고 쓰기 도구는 `outcome_uncertain` 으로 끝낸다.
 hook 이 넣은 `tool_call_id` 는 인자에 들어 있어 다시 보낼 때도 같다. 그래서 **profile, 루트 session, 그 호출의 session, `tool_call_id`** 로 같은 위임을 두 번 만들지 않는 키를 계산한다.
-`tool_call_id` 가 루트 아래 모든 session 에서 유일하다는 보장은 없다. 하위 에이전트마다 session 이 달라, session 을 빼면 다른 하위 에이전트의 같은 번호가 같은 위임으로 잘못 합쳐진다. 정의는 [ADR-032 의 「`delegation_key`」](../../backend/docs/adr/ADR-032-mcp-토큰은-profile-을-증명하고-실제-사용자는-부모-실행에서-정한다.md#delegation_key) 에 있다.
+`tool_call_id` 가 루트 아래 모든 session 에서 유일하다는 보장은 없다. 하위 에이전트마다 session 이 달라, session 을 빼면 다른 하위 에이전트의 같은 번호가 같은 위임으로 잘못 합쳐진다. 정의는 [ADR-032 의 「`delegation_key`」](../../../backend/docs/adr/ADR-032-mcp-토큰은-profile-을-증명하고-실제-사용자는-부모-실행에서-정한다.md#delegation_key) 에 있다.
 JSON-RPC 의 `id` 는 연결마다 새로 매겨져 이 용도로 쓰지 않는다.
 
-#### 공유 profile 에서 두 사용자의 호출을 실제로 확인하는 절차
+##### 공유 profile 에서 두 사용자의 호출을 실제로 확인하는 절차
 
 가짜 Hermes 검사는 플러그인을 흉내 내므로, 실제 Hermes 와 실제 플러그인에서 한 번 더 확인한다.
 환경과 실행 방법은 `fos-home-infra` 가 갖는다. 여기에는 무엇을 보고 무엇이 나와야 하는지만 적는다.
@@ -138,7 +250,7 @@ JSON-RPC 의 `id` 는 연결마다 새로 매겨져 이 용도로 쓰지 않는�
 
 1 과 2 가 어긋나면 서버 쪽 판정이 옳아도 사용자가 섞인다. 그때는 배포를 되돌리지 말고 그 profile 의 토큰 묶기를 미루고 원인을 조사한다.
 
-### 하위 에이전트는 부모 run 보다 오래 산다
+#### 하위 에이전트는 부모 run 보다 오래 산다
 
 v0.21.5(`v2026.9.24`, commit `f97608f178d1ffeca59860195ab7da295f7c8e5f`)의 소스를 읽어 확인했다. 실제 실행으로 확인하는 절차는 아래 「하위 에이전트를 실제로 확인하는 절차」 에 있다.
 
@@ -154,7 +266,7 @@ v0.21.5(`v2026.9.24`, commit `f97608f178d1ffeca59860195ab7da295f7c8e5f`)의 소�
 
 Control Plane 은 `/v1/runs` 에 `session_id` 만 보낸다. 그래서 **모델이 부른 하위 에이전트는 부모 FOS 실행이 끝난 뒤에도 돈다.**
 부모 실행의 `RUNNING` 으로 요청자를 찾으면 그 뒤의 호출은 거절되거나 같은 대화의 다음 turn 에 붙는다.
-그래서 하위 에이전트 session 은 만들어질 때 등록한다([ADR-037](../../backend/docs/adr/ADR-037-hermes-하위-에이전트-session-의-주인은-만들-때-등록한-줄로-정한다.md)).
+그래서 하위 에이전트 session 은 만들어질 때 등록한다([ADR-037](../../../backend/docs/adr/ADR-037-hermes-하위-에이전트-session-의-주인은-만들-때-등록한-줄로-정한다.md)).
 
 **등록이 첫 MCP 호출보다 먼저 끝나는 근거는 hook 이 동기라는 것이다.** 자식은 hook 이 돌아온 뒤에 시작하므로 자식의 첫 도구 호출은 등록 응답 뒤에 온다.
 실제 실행에서 시각으로 한 번 더 확인한다. 등록이 늦거나 실패하면 그 자식의 호출은 거절된다. 추측으로 이어 붙이지 않는다.
@@ -164,7 +276,7 @@ Control Plane 은 `/v1/runs` 에 `session_id` 만 보낸다. 그래서 **모델�
 - 오케스트레이터 자식이 동기로 만든 자식도 같은 `_build_children` 을 지나므로 hook 이 불린다고 본다. 실제 실행으로 확인하지 않았다
 - 하위 에이전트의 압축 교체는 자식의 `parent_session_id` 사슬을 늘린다고 본다. 교체된 하위 에이전트 session 은 등록이 없어 거절된다
 
-#### 하위 에이전트 session 등록 계약
+##### 하위 에이전트 session 등록 계약
 
 profile 플러그인이 `subagent_start` hook 에서 부른다. 모델 도구가 아니고 도구 목록에 나오지 않는다.
 
@@ -219,14 +331,14 @@ profile 플러그인이 `subagent_start` hook 에서 부른다. 모델 도구가
 플러그인은 2xx 가 아니거나 연결하지 못하면 로그만 남기고 hook 을 돌려준다. 등록이 없는 하위 에이전트의 호출은 서버가 거절하므로 안전한 쪽으로 실패한다.
 플러그인과 서버 모두 토큰, `sig`, 본문을 로그에 남기지 않는다.
 
-#### 모든 토큰이 profile 에 묶여 있다
+##### 모든 토큰이 profile 에 묶여 있다
 
-등록과 origin 판정, [위임](delegation.md#취소가-아래로-내려가지-않는다) 의 「취소가 아래로 내려가지 않는다」 가 적은 취소 차단은 토큰이 profile 을 증명하는 것을 전제로 한다.
+등록과 origin 판정, [위임](../../docs/hermes-contract.md#취소가-아래로-내려가지-않는다) 의 「취소가 아래로 내려가지 않는다」 가 적은 취소 차단은 토큰이 profile 을 증명하는 것을 전제로 한다.
 `agent_token` 에는 사용자 칸이 없고, 폐기되지 않은 토큰은 늘 `profile_name` 을 갖는다. profile 이 빈 토큰은 `/mcp` 와 등록 경로 모두 인증에서 `401` 이다.
 
-사용자 기준으로 발급하던 옛 토큰의 경로는 지웠다. 순서와 근거는 [ADR-032](../../backend/docs/adr/ADR-032-mcp-토큰은-profile-을-증명하고-실제-사용자는-부모-실행에서-정한다.md) 의 「옛 토큰에서 옮겨 가는 길」 에 있다.
+사용자 기준으로 발급하던 옛 토큰의 경로는 지웠다. 순서와 근거는 [ADR-032](../../../backend/docs/adr/ADR-032-mcp-토큰은-profile-을-증명하고-실제-사용자는-부모-실행에서-정한다.md) 의 「옛 토큰에서 옮겨 가는 길」 에 있다.
 
-#### 하위 에이전트를 실제로 확인하는 절차
+##### 하위 에이전트를 실제로 확인하는 절차
 
 환경과 실행 방법은 `fos-home-infra` 가 갖는다. 일회용 Hermes v0.21.5 에서 본다.
 
@@ -242,11 +354,11 @@ profile 플러그인이 `subagent_start` hook 에서 부른다. 모델 도구가
 
 Hermes 를 올릴 때도 이 표를 다시 돌린다. `subagent_start` 가 사라지거나 인자 이름이 바뀌면 하위 에이전트의 MCP 호출이 모두 거절된다.
 
-## 바인딩 profile 의 판정
+### 바인딩 profile 의 판정
 
-일반 에이전트의 profile 에 커넥터를 붙이면 그 profile 에서 `fos-ctx` 가 두 가지 일을 함께 한다([ADR-083](../adr/ADR-083-커넥터는-사용자가-한-번-연결하고-자기-에이전트에-여럿-붙여-그-에이전트가-도구를-직접-부른다.md)).
+일반 에이전트의 profile 에 커넥터를 붙이면 그 profile 에서 `fos-ctx` 가 두 가지 일을 함께 한다([ADR-083](../../../docs/adr/ADR-083-커넥터는-사용자가-한-번-연결하고-자기-에이전트에-여럿-붙여-그-에이전트가-도구를-직접-부른다.md)).
 Control Plane MCP 호출에는 지금처럼 `_fos_ctx` 를 붙이고, 커넥터 MCP 도구 호출은 Control Plane 에 판정을 묻는다.
-이름 대응 파일의 `isolated` 가 `false` 인 profile 이 바인딩 profile 이다. 칸의 뜻은 [`backend/connector-tool-policy.md`](../backend/connector-tool-policy.md) 의 「이름 대응」 이 갖는다.
+이름 대응 파일의 `isolated` 가 `false` 인 profile 이 바인딩 profile 이다. 칸의 뜻은 [`docs/backend/connector-tool-policy.md`](../../../docs/backend/connector-tool-policy.md) 의 「이름 대응」 이 갖는다.
 
 | 도구 | 바인딩 profile 에서 하는 것 |
 | --- | --- |
@@ -261,4 +373,4 @@ Control Plane MCP 호출에는 지금처럼 `_fos_ctx` 를 붙이고, 커넥터 
 뗀 서버도 빈 `tools` 로 남는다. 떼기 전에 시작한 실행이 그 서버를 쥐고 있기 때문이다.
 
 커넥터 도구의 결과는 `transform_tool_result` hook 이 Control Plane 의 `ExternalData` 와 같은 `<external-data>` 로 감싼다.
-hook 이 무엇을 묻고 막고 감싸는지 전체 표는 [`hermes/README.md`](../../hermes/README.md) 의 「커넥터 도구 호출을 묻는다」 가, Hermes 가 그 hook 을 언제 부르는지는 [도구 hook 과 승인](connector-policy.md) 의 「도구 결과를 바꾸는 hook」 이 갖는다.
+hook 이 무엇을 묻고 막고 감싸는지 전체 표는 [`hermes/plugins/fos-ctx/README.md`](README.md) 의 「커넥터 도구 호출을 묻는다」 가, Hermes 가 그 hook 을 언제 부르는지는 [도구 hook 과 승인](../../docs/hermes-contract.md) 의 「도구 결과를 바꾸는 hook」 이 갖는다.

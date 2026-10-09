@@ -20,7 +20,7 @@ import org.springframework.stereotype.Service;
 @Service
 @RequiredArgsConstructor
 public class ConnectorBindingLookup implements AgentConnectorBindings {
-    /** Hermes 가 MCP 도구의 등록 이름에서 바꾸는 글자다. {@code docs/hermes/connector-policy.md} 의 「MCP 도구의 등록 이름」 과 같다. */
+    /** Hermes 가 MCP 도구의 등록 이름에서 바꾸는 글자다. {@code hermes/docs/hermes-contract.md} 의 「MCP 도구의 등록 이름」 과 같다. */
     private static final String OUTSIDE = "[^A-Za-z0-9_]";
 
     /** 등록 이름이 길면 Hermes 가 이 길이까지만 남기고 해시를 붙인다. 앞부분은 이보다 길면 맞지 않는다. */

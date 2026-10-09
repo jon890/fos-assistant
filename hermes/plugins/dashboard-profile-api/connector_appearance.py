@@ -2,7 +2,7 @@
 
 아이콘은 신뢰하지 않는 plugin 이 준 파일이다. 고쳐 쓰지 않고, 규칙을 하나라도 어기면 거절한다.
 화면이 `<img>` 로만 그리는 것이 실제 경계이고, 여기 SVG 검사는 그 앞의 두 번째 선이다.
-같은 규칙을 Control Plane 이 다시 본다. 한쪽을 바꾸면 다른 쪽과 `docs/connectors.md` 의 「아이콘과 링크」 도 바꾼다.
+같은 규칙을 Control Plane 이 다시 본다. 한쪽을 바꾸면 다른 쪽과 `hermes/connectors/README.md` 의 「아이콘과 링크」 도 바꾼다.
 """
 
 from __future__ import annotations

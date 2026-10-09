@@ -8,7 +8,7 @@
 붙인 에이전트는 그 커넥터의 도구를 같은 turn 에서 직접 부른다. 붙이고 반영하는 순서는 [커넥터 설치](backend/connector-install.md) 가 갖는다.
 어떤 커넥터가 있고 무엇을 입력받는지는 plugin 의 `connector.json` 이 선언하고, Control Plane 은 서비스 이름과 주소를 모른다([ADR-043](../backend/docs/adr/ADR-043-커넥터는-plugin-의-connector-json-으로-선언하고-control-plane-은-범용-흐름만-갖는다.md)).
 임의 plugin 을 설치하는 화면은 없다. 연결할 수 있는 커넥터는 운영자가 대시보드 plugin 에 준 목록뿐이다.
-이 저장소가 갖는 범용 커넥터는 `hermes/connectors/` 에 있고([ADR-064](../hermes/docs/adr/ADR-064-범용-커넥터는-이-저장소의-hermes-connectors-에-두고-저장소가-유지보수한다.md)), 만드는 방법은 [커넥터 만들기](connector-authoring.md) 가 갖는다.
+이 저장소가 갖는 범용 커넥터는 `hermes/connectors/` 에 있고([ADR-064](../hermes/docs/adr/ADR-064-범용-커넥터는-이-저장소의-hermes-connectors-에-두고-저장소가-유지보수한다.md)), 만드는 방법은 [커넥터 만들기](../hermes/connectors/README.md) 가 갖는다.
 
 ## 언제 에이전트를 나누는가
 
@@ -21,114 +21,6 @@
 3. **그룹에 공개할 에이전트는 따로 둔다.** 연결은 비공개 에이전트에만 붙고, 연결이 붙은 에이전트는 그룹에 공개하지 못한다
 4. **성격, Memory, 대화 맥락을 따로 두고 싶을 때 나눈다**
 5. **나눈다고 비밀값이 격리되지는 않는다.** profile 을 나눠도 파일 접근은 나뉘지 않는다. 실행 공간을 적용하지 않은 profile 의 터미널 도구는 다른 profile 의 `.env` 와 보관 파일에 닿는다. 비밀값을 셸에서 떼어 놓는 것은 [ADR-086](adr/ADR-086-셸과-파일-도구는-사용자별-docker-실행-공간에서만-돈다.md) 의 실행 공간이고, 운영 정책에 등록한 뒤 셸 도구를 다시 저장했거나 운영 일괄 반영을 거친 profile 에만 적용된다
-
-## connector.json
-
-plugin 디렉터리 root 에 둔다. 소유는 그 plugin 의 저장소다. 같은 디렉터리의 `.mcp.json` 이 MCP 서버 하나를 정의하고, `connector.json` 은 그 서버를 사람에게 어떻게 연결하는지를 정한다.
-
-```json
-{
-  "schema": 1,
-  "id": "fos-accountbook",
-  "title": "가계부",
-  "description": "가족 가계부의 수입과 지출을 조회하고 기록합니다.",
-  "icon": "icon.svg",
-  "link": "https://accountbook.example.com/about",
-  "fields": [
-    { "key": "token", "env": "ACCOUNTBOOK_API_TOKEN", "label": "연동 토큰",
-      "description": "가계부 설정 화면에서 발급합니다.",
-      "secret": true, "required": true, "pattern": "^fab_[A-Za-z0-9_-]{43}$" },
-    { "key": "family", "env": "ACCOUNTBOOK_FAMILY_UUID", "label": "가족", "required": false,
-      "options": { "tool": "list_families", "items": "families", "value": "uuid",
-                   "label": "name", "auto_select_single": true } }
-  ],
-  "verify": { "tool": "list_families" },
-  "toolsets": ["vision"],
-  "attachments": true,
-  "operator_env": ["ACCOUNTBOOK_API_BASE_URL"],
-  "errors": { "ACCOUNTBOOK_UNAUTHORIZED": { "category": "credential_rejected", "recovery": "reconnect" },
-              "ACCOUNTBOOK_FORBIDDEN": "forbidden",
-              "ACCOUNTBOOK_BALANCE_CHANGED": { "category": "invalid_input", "recovery": "recheck",
-                                               "details": ["actual_balance"] },
-              "ACCOUNTBOOK_NETWORK": "unavailable",
-              "ACCOUNTBOOK_UNAVAILABLE": "unavailable" }
-}
-```
-
-| 칸 | 뜻 |
-| --- | --- |
-| `schema` | `1` 이나 `2`. `2` 는 [커넥터 도구 정책](backend/connector-tool-policy.md) 의 「도구 정책」 이 적은 `tools` 를 선언한다 |
-| `id` | 커넥터 번호. `^[a-z0-9][a-z0-9-]{0,63}$`. 운영 목록의 이름과 같아야 한다 |
-| `title`, `description` | 화면에 그대로 보인다 |
-| `icon` | 선택. 커넥터 카드의 아이콘 파일. plugin 디렉터리 기준 상대 경로이고 `.svg` 나 `.png` 다. 아래 「아이콘과 링크」 가 규칙을 갖는다 |
-| `link` | 선택. 커넥터 소개나 그 서비스의 `https://` 주소. 카드가 새 탭으로 연다 |
-| `fields[].key` | 칸 번호. 요청의 `values` 와 저장의 키다. `^[a-z][a-z0-9_]{0,31}$`, 커넥터 안에서 유일 |
-| `fields[].env` | 이 칸 값을 쓸 profile `.env` 이름. `.mcp.json` 의 서버 env 가 `${이름}` 으로 참조해야 한다 |
-| `fields[].secret` | 참이면 화면이 가리고 응답에 원문을 담지 않는다. 저장하는 것은 아래 「저장과 비밀값」 이 갖는다 |
-| `fields[].required` | 거짓이면 비워 둘 수 있다. 비우면 그 env 를 지운다 |
-| `fields[].pattern` | 있으면 Control Plane 과 대시보드가 모두 검사한다 |
-| `fields[].options` | 선택지 칸. `tool` 을 불러 결과의 `items` 배열에서 `value`, `label` 칸을 꺼낸다. `auto_select_single` 이 참이면 하나뿐일 때 화면이 고른다 |
-| `verify.tool` | 등록 전에 후보 값으로 부르는 확인 도구. 성공하면 값이 유효하다고 본다 |
-| `toolsets` | 선택. 옛 커넥터 에이전트에 켤 내장 toolset 이름 목록이다. 지금은 `vision` 만 받는다. 없으면 빈 목록이다. 연결을 붙인 에이전트의 도구는 바꾸지 않는다. 그 에이전트의 도구는 주인이 정한다 |
-| `attachments` | 선택 boolean. 참이면 옛 커넥터 에이전트의 대화가 사진을 받는다. 없으면 거짓이다. 연결을 붙인 에이전트가 사진을 받는지는 그 에이전트의 설정이 정한다 |
-| `operator_env` | 사용자가 넣지 않고 운영자가 주는 env 이름. 값은 운영 설정이 갖는다. **비밀이 아닌 운영 설정만 둔다.** 값이 profile 설정과 소유 기록에 그대로 복제된다 |
-| `owner_attachments_env` | 선택. 사용자 첨부를 읽는 커넥터가 받을 env 이름 하나. 바인딩 설치가 그 에이전트 주인의 첨부 디렉터리를 넣는다. 값은 운영 정책과 Control Plane 이 정한 주인에서만 온다([ADR-20261007 / connector-owner-attachments](adr/ADR-20261007-connector-owner-attachments.md)) |
-| `owner_output_env` | 선택. 목록 도구가 계산할 데이터를 파일로 쓸 디렉터리를 받을 env 이름 하나. 바인딩 설치가 그 에이전트 실행 공간에 읽기 전용으로 붙는 그 profile 의 커넥터 출력 디렉터리를 넣는다. 실행 공간 정책에 `connector_output_root` 가 없으면 빈 값이다([ADR-20261008 / connector-output-files](../hermes/docs/adr/ADR-20261008-connector-output-files.md)) |
-| `owner_browser_env` | 선택. 사용자 브라우저를 쓰는 커넥터가 중계 주소를 받을 env 이름 하나. 바인딩 설치는 그 바인딩의 표식 주소를, 확인 도구와 선택지 호출은 요청자의 호출 표식 주소를 넣는다. 중계가 꺼졌으면 빈 값이다([ADR-20261008 / browser-gateway-token](../backend/docs/adr/ADR-20261008-browser-gateway-token.md)) |
-| `owner_browser_login_url` | 선택. `owner_browser_env` 가 있을 때만 받는다. 사용자가 브라우저에서 먼저 로그인할 곳이고 화면이 안내에만 쓴다. `https://` 로 시작하고 512자 이하이며 빈칸과 제어 문자가 없다 |
-| `single_binding` | 선택 boolean. 참이면 사용자의 그 연결은 에이전트 하나에만 붙는다. 없으면 거짓이다. 서비스가 계정마다 유효한 토큰을 하나만 두어 바인딩끼리 토큰을 깨는 커넥터가 선언한다([ADR-20261008 / connector-binding-guards](adr/ADR-20261008-connector-binding-guards.md)) |
-| `sandbox_required` | 선택 boolean. 참이면 실행 공간 정책에 등록된 profile 에만 붙는다. 없으면 거짓이다. 키에 권한 범위가 없어 셸이 읽으면 안 되는 커넥터가 선언한다([ADR-20261008 / connector-binding-guards](adr/ADR-20261008-connector-binding-guards.md)) |
-| `operator_secrets` | 운영자가 주는 비밀의 env 이름 목록. 지금은 지원하지 않는다. 비어 있지 않으면 그 커넥터를 카탈로그에 내지 않는다([ADR-046](../backend/docs/adr/ADR-046-운영-비밀은-operator-env-와-다른-칸으로-선언하고-자식-mcp-프로세스에만-넣는다.md)) |
-| `errors` | 도구 오류 코드를 공통 어휘로 바꾸는 표. 키는 `^[A-Z][A-Z0-9_]{0,63}$` 이다. 값은 공통 어휘 글이거나 아래 「오류 복구 계약」 의 객체다. 표에 없는 코드는 `unavailable` 이다. `outcome_unknown` 은 쓰기를 보냈는데 됐는지 모른다는 뜻이다 |
-
-- `options.tool` 과 `verify.tool` 은 `.mcp.json` 서버의 도구 가운데 `readOnlyHint: true` 인 것만 된다. 대시보드가 도구를 부를 때 `tools/list` 로 확인한다. manifest 를 읽을 때는 도구 이름의 형식만 본다. 카탈로그는 요청마다 읽으므로 읽을 때마다 MCP 서버를 띄우지 않는다
-- `.mcp.json` 서버 env 는 `fields[].env` 와 `operator_env`, `owner_attachments_env`, `owner_output_env`, `owner_browser_env` 의 합과 같아야 한다. 다섯 이름은 겹치지 않는다. 하나라도 다르면 그 커넥터를 카탈로그에 내지 않는다
-- `toolsets` 가 목록이 아니거나, 이름이 겹치거나, `vision` 밖의 이름이 하나라도 있으면 그 커넥터를 카탈로그에 내지 않는다. 셸, 파일, 기억, 스킬, 위임 도구는 manifest 로 열리지 않는다([ADR-044](../backend/docs/adr/ADR-044-커넥터-manifest-는-읽기-전용-이미지-도구만-열-수-있다.md))
-- `attachments` 가 참인데 `toolsets` 에 `vision` 이 없으면 그 커넥터를 카탈로그에 내지 않는다. 이번 메시지의 사진 10장까지는 실행 입력에 실리지만, 싣지 못한 사진과 지난 메시지의 사진은 에이전트가 이미지 도구로 사본 파일을 보기 때문이다([ADR-020](../backend/docs/adr/ADR-020-사진은-공유-디렉터리에-두고-에이전트가-파일로-읽는다.md), [ADR-20261009 / native-image-input](../backend/docs/adr/ADR-20261009-native-image-input.md))
-- `icon` 이나 `link` 가 아래 「아이콘과 링크」 를 어기면 그 칸만 null 로 내고 경고 로그를 남긴다. 커넥터는 카탈로그에 그대로 나온다
-- 도구 결과는 MCP 응답의 첫 텍스트 칸을 JSON 으로 읽는다. `structuredContent` 가 있으면 그것을 먼저 쓴다. 실패는 `isError: true` 와 `{"error": {"code": "..."}}` 다
-
-### 아이콘과 링크
-
-결정은 [ADR-20261008 / connector-card](adr/ADR-20261008-connector-card.md) 에 있다. 검사 규칙은 그 ADR 의 표와 목록이 갖는다.
-
-- `icon` 은 `^[A-Za-z0-9_][A-Za-z0-9_./-]{0,127}$` 이고 `..` 조각이 없다. 가리키는 파일은 plugin 안에 있고 그 경로의 어느 조각도 링크가 아니며 32 KiB 이하다
-- 카탈로그는 아이콘 파일의 내용을 `icon: {media_type, data}` 로 싣는다. `media_type` 은 `image/svg+xml` 이나 `image/png` 이고 `data` 는 base64 다. 선언이 없으면 `icon: null` 이다
-- SVG 아이콘은 `xmlns="http://www.w3.org/2000/svg"` 를 선언한다. 없으면 `<img>` 가 아무것도 그리지 않는다. 색은 `currentColor` 가 아닌 고정 색이다. `<img>` 안의 SVG 는 글자색을 물려받지 않는다
-- `link` 의 모양은 ADR 의 「링크 모양」 이 갖는다. 선언이 없으면 `null` 이다
-- Control Plane 은 같은 규칙으로 다시 검사한다. 어긋나면 그 칸만 `null` 로 두고 경고 로그에 커넥터 번호와 칸 이름만 남긴다. 대시보드는 코드가 정한 사유 글을 더하고, 둘 다 경로와 값은 싣지 않는다
-- 화면은 아이콘을 `<img>` 로만 그리고, 없으면 기본 아이콘을 보인다. 링크는 새 탭으로 열고 `rel="noopener noreferrer"` 다
-- 상표 로고 파일을 복사하지 않는다. 직접 그린 단순한 도형을 쓴다
-
-공통 오류 어휘는 다섯이다.
-
-| 어휘 | Control Plane 오류 코드 | HTTP |
-| --- | --- | --- |
-| `credential_rejected` | `CONNECTOR_CREDENTIAL_REJECTED` | 400 |
-| `forbidden` | `CONNECTOR_FORBIDDEN` | 403 |
-| `invalid_input` | `VALIDATION_FAILED` | 400 |
-| `unavailable` | `CONNECTOR_UNAVAILABLE` | 503 |
-| `outcome_unknown` | `CONNECTOR_UNAVAILABLE` | 503 |
-
-`outcome_unknown` 은 승인한 호출의 실행 경로에서만 다르게 읽는다. 대시보드가 `{ok: false}` 대신 504 로 답하고 Control Plane 이 그 줄을 `UNKNOWN` 으로 둔다. 선택지와 확인 도구의 호출에서는 `unavailable` 과 같다.
-
-### 오류 복구 계약
-
-`errors` 의 값을 객체로 쓰면 승인한 실행이 그 코드로 실패할 때 코드와 복구 정보가 에이전트까지 간다([ADR-092](adr/ADR-092-승인한-실행의-실패는-커넥터가-선언한-오류-코드와-복구-어휘와-정수-세부만-에이전트까지-전한다.md)).
-
-| 칸 | 뜻 |
-| --- | --- |
-| `category` | 필수. 공통 어휘 하나. `outcome_unknown` 은 객체로 쓸 수 없다 |
-| `recovery` | 선택. `recheck`(대상이 바뀌었다. 지금 값을 알리고 다시 조회할지 묻는다), `reconnect`(연결의 권한이나 값이 모자라다), `fix_input`(인자를 고쳐 새로 승인을 받는다), `retry_later`(서비스가 응답하지 않았다) 가운데 하나 |
-| `details` | 선택. 도구 오류 객체의 맨 위 칸 가운데 옮길 이름. 넷까지, `^[a-z][a-z0-9_]{0,31}$`, 겹치지 않는다 |
-
-- 세부 값은 절댓값 10억 이하의 정수와 boolean 만 옮긴다. 글, 실수, 배열, 객체, null 은 그 칸만 버린다. 외부 서비스의 오류 원문은 이 길로 가지 않는다
-- 복구 어휘의 안내 글은 Control Plane 이 정한다. 커넥터는 글을 쓰지 않는다
-- 글로 선언한 코드도 승인한 실행의 실패 답에 코드는 실린다. 복구 어휘와 세부는 없다
-- 선택지와 확인 도구의 `call` 은 공통 어휘만 준다
-- 이 형식을 모르는 옛 대시보드 plugin 은 객체 항목이 있는 커넥터를 카탈로그에서 뺀다. plugin 과 커넥터를 함께 배포한다
-
-사용자별 호출 제한에 걸린 요청은 공통 어휘가 아니라 `CONNECTOR_RATE_LIMITED`(429) 로 끝난다. [커넥터 도구 정책](backend/connector-tool-policy.md) 의 「사용자별 호출 제한」 이 갖는다.
 
 ## Control Plane API
 

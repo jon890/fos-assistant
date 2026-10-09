@@ -4,7 +4,7 @@ import { existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { join, posix } from "node:path";
 import test from "node:test";
-import { headingTexts, normalizeHeading } from "./markdown.ts";
+import { headingTexts, normalizeHeading, sectionNames } from "./markdown.ts";
 
 const REPO_ROOT = join(import.meta.dirname, "../../");
 
@@ -105,10 +105,10 @@ async function collectReferences(): Promise<
   return all;
 }
 
-/** 코드 펜스 밖의 `#` 부터 `######` 까지 모든 헤딩을 정규화해 모은다. */
+/** 그 문서에서 「」 로 가리킬 수 있는 절 이름을 모은다. 헤딩과 굵은 항목 이름이다. */
 async function headingsOf(path: string): Promise<Set<string>> {
   const text = await readFile(join(REPO_ROOT, path), "utf8");
-  return new Set(headingTexts(text).map(normalizeHeading));
+  return sectionNames(text);
 }
 
 /** 한 문서에서 두 번 이상 나오는 헤딩의 글을 처음 나온 순서대로 한 번씩 낸다. */
@@ -126,6 +126,7 @@ const UNIQUE_HEADING_DIRECTORIES = [
   "docs/backend",
   "docs/backend/schema",
   "web/docs",
+  "hermes/docs",
 ];
 
 test("코드와 프롬프트가 가리키는 문서 파일이 있다", async () => {

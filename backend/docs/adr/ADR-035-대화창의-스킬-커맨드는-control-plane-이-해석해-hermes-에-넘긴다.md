@@ -7,7 +7,7 @@
   대화 기록에는 사용자가 친 글을 그대로 남기고 스킬 표시를 붙인다.
 - **맥락**:
   - Hermes 의 CLI 와 채팅 gateway 는 `/<스킬>` 을 스킬 호출로 처리해 스킬 본문을 user 메시지에 넣는다(`agent/skill_commands.py` 의 `build_skill_invocation_message`).
-  - **API server 의 `/v1/runs` 는 입력의 `/` 를 해석하지 않는다.** gateway 의 명령 처리를 거치지 않아 `/foo 할 일` 이 그대로 모델에 간다. 2026-09-29 에 v0.21.5(태그 `v2026.9.24`) 소스로 확인했다. 근거는 [`hermes/skills.md`](../../../docs/hermes/skills.md) 의 「스킬 커맨드와 API server」 다.
+  - **API server 의 `/v1/runs` 는 입력의 `/` 를 해석하지 않는다.** gateway 의 명령 처리를 거치지 않아 `/foo 할 일` 이 그대로 모델에 간다. 2026-09-29 에 v0.21.5(태그 `v2026.9.24`) 소스로 확인했다. 근거는 [`hermes/docs/hermes-contract.md`](../../../hermes/docs/hermes-contract.md) 의 「스킬 커맨드와 API server」 다.
   - 스킬 목록은 대시보드 `GET /api/skills?profile=` 로 얻는다. API server 의 `GET /v1/skills` 는 v0.21.5 에서 늘 500 이다.
   - 대시보드 목록은 전역 `skills.disabled` 만 반영한다. Control Plane 은 켜고 끄기를 전역 토글로만 하고 `skills.platform_disabled.api_server` 는 쓰지 않으므로 목록을 따로 거르지 않는다.
 - **대안 기각**:

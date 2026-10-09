@@ -9,7 +9,7 @@
 - 2026-09-20 에 실측으로 이 문서의 `agent_delegate` 모양을 고쳤다.
   기다리는 도구에서 번호를 돌려주는 도구로 바꾼 것이다.
   같은 측정에서 ADR-016 의 사실 둘이 이 버전에서 틀린 것도 드러났다.
-  자세한 것은 [`hermes/delegation.md`](../hermes/delegation.md) 가 갖는다.
+  자세한 것은 [`hermes/docs/hermes-contract.md`](../../hermes/docs/hermes-contract.md) 가 갖는다.
 - 2026-09-30 에 「도구 넷과 한도」 의 `agent_status` 범위를 실행 트리에서 같은 대화로 넓혔다.
 
 ### 결정

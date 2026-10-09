@@ -47,4 +47,4 @@
   - `single_binding` 커넥터를 다른 에이전트로 옮기려면 먼저 떼고 붙인다. 연결을 해제할 필요는 없다.
   - 이 칸을 모르는 옛 대시보드 plugin 은 `single_binding` 을 카탈로그에 싣지 않아 Control Plane 이 거짓으로 읽는다. plugin 과 Control Plane 을 함께 배포한다.
 
-- **적용 범위**: 대시보드 plugin 의 manifest 검증과 카탈로그, 바인딩 설치, Control Plane 의 카탈로그 읽기와 붙이기, 화면의 오류 문구. 계약은 [커넥터 연결](../connectors.md) 의 「connector.json」 과 「붙이기와 떼기」, [커넥터 설치](../backend/connector-install.md) 가 갖는다.
+- **적용 범위**: 대시보드 plugin 의 manifest 검증과 카탈로그, 바인딩 설치, Control Plane 의 카탈로그 읽기와 붙이기, 화면의 오류 문구. 계약은 [커넥터 연결](../../hermes/connectors/README.md) 의 「connector.json」 과 「붙이기와 떼기」, [커넥터 설치](../backend/connector-install.md) 가 갖는다.

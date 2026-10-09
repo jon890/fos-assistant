@@ -10,13 +10,18 @@ frontend 는 화면의 동작과 구조이고, hermes 는 외부 런타임인 He
 | 문서 | 소유하는 것 |
 | --- | --- |
 | [`prd.md`](prd.md) | 제품의 목적과 범위, 범위 밖, 아직 정하지 않은 것 |
+<<<<<<< HEAD
+| [`code-architecture.md`](code-architecture.md) | 패키지 경계, 사용자와 profile, 에이전트, 대화의 층, 비밀값을 두는 곳, 아직 만들지 않은 것 |
+| [`flow.md`](flow.md) | 화면 전환과 호출 순서, 두 방향의 토큰, 실행이 실패할 때의 흐름 |
+=======
 | [`code-architecture.md`](code-architecture.md) | 패키지 경계, 사용자와 profile, 에이전트, 대화의 층, Hermes 쪽 코드의 배치, 실행 공간 파일의 경로 규칙과 API 와 지우기 도우미 계약과 관리자 용량, 비밀값을 두는 곳, 아직 만들지 않은 것 |
 | [`flow.md`](flow.md) | 화면 전환과 호출 순서, 두 방향의 토큰, 실행이 실패할 때의 흐름, 파일 공간을 열고 지울 때의 흐름 |
+>>>>>>> docs-restructure-2-web
 | [`connectors.md`](connectors.md) | 커넥터의 정의, 언제 에이전트를 나누는가, 커넥터 선언 파일, 연결과 붙이기 API, 승인, 토큰 저장 |
-| [`connector-authoring.md`](connector-authoring.md) | 범용 커넥터를 만드는 방법, 갖출 것, PR 에 필요한 것, 공통 검사 |
-| [`connectors/gmail.md`](connectors/gmail.md) | Gmail 커넥터의 도구와 정책, 보안, 설정 안내, 실제 계정 확인 |
-| [`connectors/naver-blog.md`](connectors/naver-blog.md) | 네이버 블로그 커넥터의 도구와 정책, 초안의 모양, 임시저장 작업, 보안, 설정 안내, 실제 계정 확인 |
-| [`connectors/tossinvest.md`](connectors/tossinvest.md) | 토스증권 커넥터의 도구, 토큰과 허용 IP, 보안, 설정 안내, 실제 계정 확인 |
+| [`hermes/connectors/README.md`](../hermes/connectors/README.md) | 범용 커넥터를 만드는 방법, 갖출 것, PR 에 필요한 것, 공통 검사 |
+| [`hermes/connectors/gmail/README.md`](../hermes/connectors/gmail/README.md) | Gmail 커넥터의 도구와 정책, 보안, 설정 안내, 실제 계정 확인 |
+| [`hermes/connectors/naver-blog/README.md`](../hermes/connectors/naver-blog/README.md) | 네이버 블로그 커넥터의 도구와 정책, 초안의 모양, 임시저장 작업, 보안, 설정 안내, 실제 계정 확인 |
+| [`hermes/connectors/tossinvest/README.md`](../hermes/connectors/tossinvest/README.md) | 토스증권 커넥터의 도구, 토큰과 허용 IP, 보안, 설정 안내, 실제 계정 확인 |
 | [`self-hosting.md`](self-hosting.md) | 기술 스택, 개별 실행, 주요 환경 변수 |
 | [`privacy.md`](privacy.md) | 개인정보 처리 안내. 커넥터 데이터가 어디로 가고 어디에 남는가 |
 | [`read-data-flow.md`](read-data-flow.md) | 커넥터 READ 결과가 모델, 셸, 웹, 다른 커넥터, Memory, 결과물, 기록으로 가는 길의 신뢰 경계, 보호 수단이 보장하는 범위, 흐름 판정 표, 실행 공간이 해결한 것과 남은 것 |
@@ -72,5 +77,7 @@ frontend 는 화면의 동작과 구조이고, hermes 는 외부 런타임인 He
 
 | 문서 | 소유하는 것 |
 | --- | --- |
-| [`hermes/README.md`](hermes/README.md) | Hermes 의 확장 지점과 `docs/hermes/` 개별 문서의 색인 |
-| [`../hermes/README.md`](../hermes/README.md) | Hermes 에 설치하는 plugin 과 profile 틀, 설치 묶음과 운영 값, 대시보드 plugin 이 여는 경로 목록 |
+| [`hermes/AGENTS.md`](../hermes/AGENTS.md) | hermes 모듈의 규칙과 문서 목록 |
+| [`hermes/docs/code-architecture.md`](../hermes/docs/code-architecture.md) | hermes 모듈의 구조와 배포 순서 |
+| [`hermes/docs/hermes-contract.md`](../hermes/docs/hermes-contract.md) | Hermes 의 동작 계약. profile, Runs API, 동시 실행, 위임, 도구 hook, 실행 공간, 스킬, 설정 API, 올릴 때 |
+| [`hermes/README.md`](../hermes/README.md) | 설치 묶음과 운영 값, 검사 |

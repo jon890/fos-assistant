@@ -3,7 +3,7 @@ import { execFileSync } from "node:child_process";
 import { existsSync, lstatSync, readFileSync } from "node:fs";
 import { join, posix } from "node:path";
 import test from "node:test";
-import { blankFences, headingTexts, normalizeHeading } from "./markdown.ts";
+import { blankFences, normalizeHeading, sectionNames } from "./markdown.ts";
 
 const REPO_ROOT = join(import.meta.dirname, "../../");
 
@@ -47,16 +47,6 @@ function markdownFiles(): string[] {
 
 function read(path: string): string {
   return readFileSync(join(REPO_ROOT, path), "utf8");
-}
-
-/** 절로 가리킬 수 있는 이름이다. 헤딩과, ADR 이 절처럼 쓰는 `- **감당할 것**:` 같은 굵은 항목 이름이다. */
-export function sectionNames(markdown: string): Set<string> {
-  const names = headingTexts(markdown).map(normalizeHeading);
-  for (const line of blankFences(markdown)) {
-    const label = /^\s*(?:[-*] )?\*\*([^*]+)\*\*/.exec(line);
-    if (label) names.push(normalizeHeading(label[1].replace(/[:.]$/, "")));
-  }
-  return new Set(names);
 }
 
 /** ADR 은 「」 로 다른 결정의 문장을 인용한다. 절 이름이 아니라서 ADR 디렉터리 안의 「」 는 확인하지 않는다. */

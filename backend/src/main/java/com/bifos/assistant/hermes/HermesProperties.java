@@ -42,7 +42,7 @@ public record HermesProperties(
     /**
      * 공유 listener 로 그 profile 을 부를 주소를 만든다.
      *
-     * <p>접두를 붙이는 규칙은 {@code docs/hermes/concurrency.md} 의 「profile 접두」가 갖는다. 끝의
+     * <p>접두를 붙이는 규칙은 {@code hermes/docs/hermes-contract.md} 의 「profile 접두」가 갖는다. 끝의
      * {@code /} 를 떼고 붙이므로 {@code //p/} 가 되지 않는다.
      */
     public String profileBaseUrl(String profileName) {

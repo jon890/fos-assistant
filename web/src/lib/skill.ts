@@ -3,7 +3,7 @@ export const SKILL_NAME_PATTERN = /^[a-z0-9][a-z0-9-]{0,63}$/;
 
 /**
  * Hermes 가 가진 스킬까지 포함한 스킬 이름 형식이다. 켜고 끄기처럼 Hermes 기본 스킬도 다루는 경로가 쓴다.
- * Hermes 는 소문자, 숫자, 점, 밑줄, 붙임표로 64자까지 받는다(`docs/hermes/tools-and-skills.md`). 첫 글자를
+ * Hermes 는 소문자, 숫자, 점, 밑줄, 붙임표로 64자까지 받는다(`hermes/docs/hermes-contract.md`). 첫 글자를
  * 영문 소문자나 숫자로 묶어 `.` 과 `..` 같은 이름이 경로에 들어가지 않게 한다. 백엔드 `SkillService` 와 같다.
  */
 export const HERMES_SKILL_NAME_PATTERN = /^[a-z0-9][a-z0-9._-]{0,63}$/;

@@ -21,14 +21,14 @@
 ### 맥락
 
 ADR-017 은 `agent_delegate` 가 기다리지 않고 실행 번호를 돌려주게 했다.
-Hermes 의 MCP 도구 호출에는 제한 시간(기본 300초)이 있고, 기다리는 도구는 실제로 끊겼기 때문이다([`hermes/delegation.md`](../../../docs/hermes/delegation.md) 의 「기다리는 도구는 실제로 끊긴다」).
+Hermes 의 MCP 도구 호출에는 제한 시간(기본 300초)이 있고, 기다리는 도구는 실제로 끊겼기 때문이다([`hermes/docs/hermes-contract.md`](../../../hermes/docs/hermes-contract.md) 의 「기다리는 도구는 실제로 끊긴다」).
 결과를 언제 다시 물을지는 모델에게 맡겼다.
 
 2026-09-30 운영에서 가계부 에이전트에게 맡긴 일의 결과를 받으려고 부모가 `agent_status` 를 27번 연달아 불렀다.
 3분 2초가 걸렸고, 부를 때마다 LLM 호출이 한 번씩 들었다.
 도구 호출 자체는 수십 ms 였고 시간과 비용은 모두 모델의 반복 판단에서 나왔다.
 
-Hermes 에는 도는 실행에 지시를 더하는 `POST /v1/runs/{run_id}/steer` 가 있다([`hermes/runs-api.md`](../../../docs/hermes/runs-api.md) 의 「도는 실행에 지시를 더하는 `steer`」).
+Hermes 에는 도는 실행에 지시를 더하는 `POST /v1/runs/{run_id}/steer` 가 있다([`hermes/docs/hermes-contract.md`](../../../hermes/docs/hermes-contract.md) 의 「도는 실행에 지시를 더하는 `steer`」).
 `steer` 는 run 이 `running` 일 때만 받는데, 위임 결과는 대개 부모 turn 이 끝난 뒤에 도착한다. 그때는 넣을 run 이 없다.
 그래서 부모를 깨우는 것은 새 turn 을 여는 것이다.
 처음에는 그런 API 가 없다고 적었고 2026-10-01 에 정정했다. 결정은 그대로다.

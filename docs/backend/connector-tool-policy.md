@@ -73,7 +73,7 @@
 
 ### 이름 대응
 
-Hermes 는 MCP 도구를 `mcp__<서버>__<도구>` 로 등록하면서 글자를 바꾸고 긴 이름을 줄인다([`hermes/connector-policy.md`](../hermes/connector-policy.md)).
+Hermes 는 MCP 도구를 `mcp__<서버>__<도구>` 로 등록하면서 글자를 바꾸고 긴 이름을 줄인다([`hermes/docs/hermes-contract.md`](../../hermes/docs/hermes-contract.md)).
 등록 이름에서 원래 이름을 되찾을 수 없으므로, 설치(`PUT /api/connectors` 의 `enabled: true`)가 대응을 그 profile 의 `.fos-connector-tools.json` 에 적는다.
 
 ```json
@@ -128,7 +128,7 @@ Hermes 는 MCP 도구를 `mcp__<서버>__<도구>` 로 등록하면서 글자를
 ### 도구 호출 판정
 
 대응 파일이 있는 profile 의 `fos-ctx` hook 은 커넥터 MCP 도구 호출마다 Control Plane 에 묻는다.
-hook 이 어느 호출을 묻고 어느 호출을 묻지 않고 막는지는 [`hermes/README.md`](../../hermes/README.md) 의 「커넥터 도구 호출을 묻는다」 가 갖는다.
+hook 이 어느 호출을 묻고 어느 호출을 묻지 않고 막는지는 [`hermes/README.md`](../../hermes/plugins/fos-ctx/README.md) 의 「커넥터 도구 호출을 묻는다」 가 갖는다.
 
 **`POST /internal/hermes/connector-policy`**
 
@@ -137,7 +137,7 @@ hook 이 어느 호출을 묻고 어느 호출을 묻지 않고 막는지는 [`h
 | 요청 칸 | 값 |
 | --- | --- |
 | `v` | `1` |
-| `root_session_id`, `session_id`, `tool_call_id` | `_fos_ctx` 와 같은 뜻이다([`hermes/fos-ctx.md`](../hermes/fos-ctx.md)) |
+| `root_session_id`, `session_id`, `tool_call_id` | `_fos_ctx` 와 같은 뜻이다([`hermes/plugins/fos-ctx/README.md`](../../hermes/plugins/fos-ctx/README.md)) |
 | `hermes_tool` | hook 이 받은 등록 이름 |
 | `tool` | 대응 파일에서 찾은 원래 도구 이름. 없으면 `null` |
 | `args_json` | 도구 인자를 hook 이 직렬화한 JSON 글. 키를 정렬하고 공백을 넣지 않는다 |

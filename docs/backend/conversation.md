@@ -6,7 +6,7 @@ Hermes 사건을 `execution_event` 로 옮겨 적는 규칙과 실행 트리를 
 ## 대화
 
 `chat` 패키지가 대화와 메시지를 갖는다.
-한 번의 대화가 지나는 길은 [`backend/packages.md`](packages.md) 의 「한 번의 대화가 지나는 길」 절이 갖는다.
+한 번의 대화가 지나는 길은 [`docs/backend/packages.md`](packages.md) 의 「한 번의 대화가 지나는 길」 절이 갖는다.
 화면 흐름은 [`web/docs/code-architecture.md`](../../web/docs/code-architecture.md), [`web/docs/flow.md`](../../web/docs/flow.md), [`web/docs/flow.md`](../../web/docs/flow.md) 가 나눠 갖는다.
 
 ### 경로
@@ -269,7 +269,7 @@ Hermes 가 스트림으로 보내는 사건을 우리 이름으로 옮겨 `execu
 한 번에 받는 경로는 스트림을 기다리는 시간에도 `hermes.run-timeout` 상한을 둔다. 넘으면 스트림을 닫고 결과 조회로 넘어간다.
 흐름(`Flow`)의 단계 실행은 이 스트림을 열지 않아 도구 사건이 남지 않는다.
 
-근거는 [`adr/ADR-013-실행-사건은-우리-모델로-정규화해-저장한다.md`](../../backend/docs/adr/ADR-013-실행-사건은-우리-모델로-정규화해-저장한다.md) 에 있다.
+근거는 [`backend/docs/adr/ADR-013-실행-사건은-우리-모델로-정규화해-저장한다.md`](../../backend/docs/adr/ADR-013-실행-사건은-우리-모델로-정규화해-저장한다.md) 에 있다.
 
 ### 실행의 시작과 끝은 Hermes 사건을 기다리지 않는다
 
@@ -390,7 +390,7 @@ SSE와 실행 기록은 같은 가린 값을 쓰며, 대화의 작업 과정도 
 `skill_view` 도구의 `tool.started` 사건은 가리기 전에 `preview` 에서 스킬 이름을 따로 꺼낸다.
 32자를 넘는 스킬 이름은 토큰 모양이라 도구 내용에서 가려지기 때문이다.
 꺼낸 이름은 Hermes 스킬 이름 규칙에 맞을 때만 스킬 사용 기록으로 넘기고, 도구 내용에는 싣지 않는다.
-이름이 `...` 로 끝나면 길이 상한에서 잘린 것으로 보고 넘기지 않는다([도구와 스킬](../hermes/skills.md)).
+이름이 `...` 로 끝나면 길이 상한에서 잘린 것으로 보고 넘기지 않는다([도구와 스킬](../../hermes/docs/hermes-contract.md)).
 옛 커넥터 에이전트의 실행과 커넥터 호출 뒤에는 꺼내지 않는다. 그 밖의 실행에서는 꺼낸다.
 
 이 계약 전에 저장된 `TOOL_STARTED`, `TOOL_COMPLETED` 의 `detail` 도 같은 규칙으로 가린 값이다(`V41__RedactToolDetails`). 가리기 전 원문은 남아 있지 않다.

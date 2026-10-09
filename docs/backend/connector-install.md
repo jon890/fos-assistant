@@ -7,7 +7,7 @@ Control Plane 이 대시보드 plugin 의 커넥터 경로로 연결을 등록�
 ## 대시보드 plugin 계약
 
 대시보드 plugin(`hermes/plugins/dashboard-profile-api`) 이 여는 커넥터 경로를 Control Plane 이 쓰는 방법이다.
-경로마다의 요청과 응답은 [`hermes/README.md`](../../hermes/README.md) 의 「dashboard-profile-api 가 여는 것」 표가 갖는다.
+경로마다의 요청과 응답은 [`hermes/README.md`](../../hermes/plugins/dashboard-profile-api/README.md) 의 「dashboard-profile-api 가 여는 것」 표가 갖는다.
 
 설치는 두 가지다. 커넥터마다 만든 전용 profile 에 하는 **옛 설치**와, 일반 에이전트의 profile 에 연결을 붙이는 **바인딩 설치**다([ADR-083](../adr/ADR-083-커넥터는-사용자가-한-번-연결하고-자기-에이전트에-여럿-붙여-그-에이전트가-도구를-직접-부른다.md)).
 소유 기록 `.fos-connectors.json` 의 항목이 `mode` 로 방식을 적는다. `bind` 가 바인딩 설치이고, 칸이 없거나 `isolated` 이면 옛 설치다.
@@ -18,7 +18,7 @@ Control Plane 이 대시보드 plugin 의 커넥터 경로로 연결을 등록�
 - `call` 은 자식을 띄우기 전에 `mcp` SDK 가 지원 범위인지 본다. 범위 밖이면 부르지 않고 `unavailable` 이다. 아래 「MCP SDK 계약」 이 갖는다
 - `call` 의 시간 제한은 10초, 동시 실행은 대시보드 프로세스 전체에서 4개다. 시간을 넘기면 자식 프로세스를 끝내고 `unavailable` 이다. 이미 4개가 돌고 있으면 기다리지 않고 `unavailable` 이다
 - Control Plane 은 카탈로그의 `fields[].env` 로 `PUT /api/env` 의 key 를 정하고 `verify.tool` 로 확인 도구를 부른다. `env` 이름은 Control Plane 의 응답에 담지 않는다
-- 카탈로그는 커넥터마다 `icon` 과 `link` 를 낸다. Control Plane 은 [커넥터 연결](../connectors.md) 의 「아이콘과 링크」 규칙으로 다시 검사하고, 어긋난 칸만 null 로 읽는다
+- 카탈로그는 커넥터마다 `icon` 과 `link` 를 낸다. Control Plane 은 [커넥터 연결](../../hermes/connectors/README.md) 의 「아이콘과 링크」 규칙으로 다시 검사하고, 어긋난 칸만 null 로 읽는다
 - 카탈로그는 커넥터마다 `single_binding` 을 boolean 으로 낸다. 선언이 없으면 거짓이다. Control Plane 은 칸이 없으면 거짓으로 읽고, boolean 이 아니면 `attachments` 와 같이 카탈로그 읽기를 실패로 다룬다([ADR-20261008 / connector-binding-guards](../adr/ADR-20261008-connector-binding-guards.md))
 - 카탈로그는 커넥터마다 `skills`(바인딩 설치가 복사할 스킬 이름 목록)를 낸다. 입력 칸이 없는 커넥터(빈 `fields`)도 받는다. 그 커넥터의 보관 파일은 빈 `values` 다
 - 운영 목록에서 빠진 커넥터도 그 profile 에 소유 기록이 남아 있으면 `PUT /api/connectors` 의 `enabled: false` 를 받는다. 이때 대시보드가 그 기록의 서버 env 가 참조하던 key 를 profile `.env` 에서 지운다. `GET /api/connectors` 는 그 기록을 `configured: false` 로 낸다
@@ -81,7 +81,7 @@ manifest 가 `owner_browser_env` 를 선언했으면 Control Plane 은 요청에
 | profile `.env` | manifest 의 `fields[].env` 마다 보관 값을 쓰고, 보관 파일에 없는 선택 칸의 key 는 지운다 | 소유 기록의 서버 정의가 `${이름}` 으로 참조하던 이름을 지운다. manifest 가 있고 기록의 실행 정의가 지금과 같으면 `fields[].env` 도 지운다. 기본 key 는 지우지 않는다 |
 | `mcp_servers` | 그 커넥터의 서버 정의를 둔다. 값이 없는 선택 칸은 정의의 `env` 에 빈 글을 명시한다 | 그 서버 정의를 지운다 |
 | `platform_toolsets.api_server` | 서버 이름을 더한다. 있던 이름은 그대로 두고 `no_mcp` 는 뺀다. manifest 의 `toolsets` 는 더하지 않는다 | 그 이름만 뺀다 |
-| 스킬 | plugin 의 스킬 디렉터리를 그 profile 의 `skills/<앞머리 name>/` 로 복사한다. `SKILL.md` 와 `references/`, `templates/` 아래 정규 파일이다. 앞머리가 환경 값이나 자격 증명 파일을 요청하는 스킬이 있으면 그 커넥터를 카탈로그에 내지 않는다([ADR-086](../adr/ADR-086-셸과-파일-도구는-사용자별-docker-실행-공간에서만-돈다.md)). 칸 목록은 [커넥터 만들기](../connector-authoring.md) 의 「스킬」 이 갖는다 | 소유 기록의 `skills` 디렉터리를 지운다 |
+| 스킬 | plugin 의 스킬 디렉터리를 그 profile 의 `skills/<앞머리 name>/` 로 복사한다. `SKILL.md` 와 `references/`, `templates/` 아래 정규 파일이다. 앞머리가 환경 값이나 자격 증명 파일을 요청하는 스킬이 있으면 그 커넥터를 카탈로그에 내지 않는다([ADR-086](../adr/ADR-086-셸과-파일-도구는-사용자별-docker-실행-공간에서만-돈다.md)). 칸 목록은 [커넥터 만들기](../../hermes/connectors/README.md) 의 「스킬」 이 갖는다 | 소유 기록의 `skills` 디렉터리를 지운다 |
 | 스킬 색인 표식 | 스킬 파일이 바뀌면 같은 쓰기에서 `skills.disabled` 의 `fos-skill-index-` 로 시작하는 항목을 빼고 새 표식 하나를 더한다. 공유 gateway 의 스킬 색인 캐시 키에 `skills.disabled` 가 들어 있어 그 profile 의 다음 실행이 색인을 새로 만든다. 운영자가 넣은 다른 이름은 그대로 둔다. 값이 문자열이면 Hermes 가 읽는 대로 목록으로 바꿔 쓰고, 사전이나 숫자처럼 고칠 수 없는 모양이면 409 로 거절한다 | 스킬 파일을 지웠으면 붙일 때처럼 표식을 바꾼다. 고칠 수 없는 모양이면 표식 없이 뗀다 |
 | 소유 기록 | 항목에 `mode: bind`, `vault`, `skills` 를 적는다 | 그 항목을 지운다 |
 | 이름 대응 파일 | `isolated: false` 를 싣고 소유 기록의 모든 서버를 싣는다. manifest 를 읽지 못했거나 소유 기록의 서버 이름이나 실행 정의가 지금 manifest 와 다른 서버는 소유 기록의 이름으로 빈 `tools` 다. 뗀 서버 기록의 서버도 빈 `tools` 로 싣는다 | 뗀 서버를 빈 `tools` 로 남긴다. 마지막 바인딩을 떼도 지우지 않는다 |
@@ -264,7 +264,7 @@ profile 하나의 MCP 를 다시 붙이는 다른 경로를 쓰지 않는 까닭
 저장된 대기 값과 설치 응답의 `restart_required`, `plugin_updated` 는 논리 OR 로 누적한다. 도중 호출이 실패해도 앞선 참을 보존한다.
 토큰 폐기는 사용자가 그 서비스에서 한다. 폐기하면 다음 요청부터 거절되므로 재시작을 기다리지 않고 외부 접근을 막을 수 있다.
 
-배포한 뒤 확인할 것은 [도구 hook 과 승인](../hermes/connector-policy.md) 의 「배포한 뒤 확인할 것」 에 모았다.
+배포한 뒤 확인할 것은 [도구 hook 과 승인](../../hermes/docs/hermes-contract.md) 의 「배포한 뒤 확인할 것」 에 모았다.
 
 ## 옛 커넥터 에이전트
 
@@ -328,7 +328,7 @@ plugin 과 정책을 먼저 반영한 뒤 재등록·연결 확인·관리자 �
 Control Plane 은 연결 확인과 관리자 반영 완료에서 선언한 toolset 이 실제로 켜진 것을 본 뒤에만 `agent.connector_attachments` 를 참으로 두고, `Agent.acceptsAttachments()` 가 그 열을 본다.
 선언한 toolset 이 켜지지 않았을 때, 확인 중 외부 호출이 실패했을 때, 바인딩이 `PENDING` 이 될 때는 거짓이다. 사진 단추는 있는데 이미지 도구가 없는 상태를 만들지 않기 위해서다.
 화면의 사진 단추와 메시지 전송의 첨부 판정이 모두 그 메서드 하나를 부르므로 같은 값을 본다. 서비스 이름으로 나누는 곳은 없다.
-`platform_toolsets.api_server` 는 다음 실행부터 적용되므로 toolset 을 맞출 때는 공유 gateway 를 재시작하지 않는다([`hermes/tools-and-skills.md`](../hermes/tools-and-skills.md)).
+`platform_toolsets.api_server` 는 다음 실행부터 적용되므로 toolset 을 맞출 때는 공유 gateway 를 재시작하지 않는다([`hermes/docs/hermes-contract.md`](../../hermes/docs/hermes-contract.md)).
 
 연결을 붙인 에이전트의 사진 받기와 내장 도구는 그 에이전트의 설정이 정한다. manifest 의 `toolsets` 와 `attachments` 를 적용하지 않는다.
 
@@ -355,7 +355,7 @@ Control Plane 은 연결 확인과 관리자 반영 완료에서 선언한 tools
 - 1.x 는 이 속성을 `readOnlyHint`, `structuredContent`, `isError` 로 둔다. 1.x 에서 `is_error` 를 기본값으로 읽으면 도구 오류가 성공으로 읽힌다. 그래서 plugin 은 속성을 직접 읽고, 이름이 없으면 실패한다
 - plugin 은 올라올 때와 `call` 마다 SDK 판과 위 속성을 확인한다. 범위 밖이거나 속성이 없으면 자식을 띄우지 않고 `unavailable` 로 답하며, 판과 까닭을 운영 로그 한 줄로 남긴다
 - `call` 이 예외로 실패하면 묶음 예외(`ExceptionGroup`)를 풀어 가장 안쪽 예외의 종류와 SDK 버전을 로그에 남긴다. 예외 본문과 칸 값은 남기지 않는다
-- Hermes 는 `mcp` 를 정확한 판 하나로 고정하므로 판은 Hermes 이미지를 올릴 때만 바뀐다. 올릴 때 확인할 것은 [버전 변경과 실측](../hermes/upgrades.md) 에 있다
+- Hermes 는 `mcp` 를 정확한 판 하나로 고정하므로 판은 Hermes 이미지를 올릴 때만 바뀐다. 올릴 때 확인할 것은 [버전 변경과 실측](../../hermes/docs/hermes-contract.md) 에 있다
 
 ## 연결 상태의 흐름
 

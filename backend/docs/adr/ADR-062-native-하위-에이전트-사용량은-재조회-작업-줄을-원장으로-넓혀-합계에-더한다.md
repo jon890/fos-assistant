@@ -5,13 +5,13 @@
   새 `agent_execution` 줄을 만들지 않고, `execution_event` 에 금액을 두지도 않는다.
   월 합계와 축별 합계는 `agent_execution` 의 합에 이 줄의 합을 더하고, 금액을 확인하지 못한 자식 수를 함께 낸다.
 - **대체된 부분**: 「감당할 것」 의 「session 응답이 provider 를 주지 않는 동안 native 자식은 모두 가격 미확인으로 보인다」 는 [ADR-067](ADR-067-native-하위-에이전트의-provider-는-대시보드-plugin-이-session-저장소에서-읽어-준다.md) 이 메웠다. provider 는 대시보드 plugin 의 읽기 경로로 받는다.
-- **맥락**: 부모 Runs API 의 `usage` 에는 native 자식의 토큰이 없다([`hermes/delegation.md`](../../../docs/hermes/delegation.md) 의 「자식 session 으로 결과와 토큰을 보완한다」).
+- **맥락**: 부모 Runs API 의 `usage` 에는 native 자식의 토큰이 없다([`hermes/docs/hermes-contract.md`](../../../hermes/docs/hermes-contract.md) 의 「자식 session 으로 결과와 토큰을 보완한다」).
   지금까지 자식 토큰은 `execution_event` 의 `SUBAGENT_COMPLETED` 에 표시용으로만 남았다.
   합계는 `agent_execution` 만 더해 자식 비용이 빠졌고, 빠졌다는 사실도 보이지 않았다.
   자식 사용량이 들어오는 길은 둘이다. 부모 스트림의 `subagent.complete` 사건과, 부모가 끝난 뒤의 session 조회다.
   사건에는 cache 구분과 provider 가 없고 입력 토큰이 cache 를 포함한 값 하나로 온다.
   session 조회는 일반 입력, cache read, cache write 를 따로 준다.
-  v0.21.5 의 session 응답에는 provider 칸이 없다([`hermes/runs-api.md`](../../../docs/hermes/runs-api.md)).
+  v0.21.5 의 session 응답에는 provider 칸이 없다([`hermes/docs/hermes-contract.md`](../../../hermes/docs/hermes-contract.md)).
 - **대안 기각**:
   - native 자식마다 `agent_execution` 줄을 만든다. 실행 목록, 실행 트리, `activity` 요약, 위임 한도 질의가 모두 그 줄을 걸러야 한다.
     `agent_delegate` 로 만든 자식은 이미 자기 실행 줄이 있어, 같은 표에 두 종류의 자식이 섞인다.
@@ -33,4 +33,4 @@
     - cache write 토큰에는 입력 단가를 쓴다. 가격표에 cache write 단가가 없다.
     - 표 이름은 `subagent_usage_job` 으로 둔다. 이름이 조회 작업을 가리키지만 줄의 뜻은 자식 한 명의 사용량 기록이다.
     - 한 달의 자식 줄이 수천을 넘으면 합계를 DB 에서 내도록 바꾼다.
-- **적용 범위**: `usage` 패키지의 재조회, 월 합계, 축별 합계. 화면의 완전성 표시는 [`web/docs/code-architecture.md`](../../../web/docs/code-architecture.md) 가, 줄의 칸은 [`backend/schema/execution.md`](../../../docs/backend/schema/execution.md) 가 갖는다.
+- **적용 범위**: `usage` 패키지의 재조회, 월 합계, 축별 합계. 화면의 완전성 표시는 [`web/docs/code-architecture.md`](../../../web/docs/code-architecture.md) 가, 줄의 칸은 [`docs/backend/schema/execution.md`](../../../docs/backend/schema/execution.md) 가 갖는다.

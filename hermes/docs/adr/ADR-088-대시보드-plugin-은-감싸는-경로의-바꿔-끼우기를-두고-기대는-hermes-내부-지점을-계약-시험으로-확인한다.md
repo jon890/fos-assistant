@@ -74,4 +74,4 @@
     - 원래 `token_auth_middleware` 는 토큰을 받아들인 provider 를 구분하지 않는다. 다른 plugin 이 등록한 토큰 경로는 우리 토큰으로도 열린다. 바꿔 끼운 함수가 우리 경로가 아닌 요청을 원래 함수에 그대로 넘기기 때문이다.
     - 바꿔 끼운 함수가 직접 답하는 경로는 대시보드의 Host 검사보다 앞에서 끝난다. 이 경로들은 Bearer 토큰을 요구한다.
 - **적용 범위**: `hermes/plugins/dashboard-profile-api/`, `hermes/tests/hermes_contract.py`, `hermes/tests/test_hermes_contract.py`, `scripts/check-hermes-contract.sh`.
-  Hermes 를 올리는 순서는 [`hermes/upgrades.md`](../../../docs/hermes/upgrades.md) 의 「대시보드 plugin 이 기대는 내부 지점」 이 갖는다. 운영 절차는 `fos-home-infra` 가 갖는다.
+  Hermes 를 올리는 순서는 [`hermes/docs/hermes-contract.md`](../hermes-contract.md) 의 「대시보드 plugin 이 기대는 내부 지점」 이 갖는다. 운영 절차는 `fos-home-infra` 가 갖는다.
