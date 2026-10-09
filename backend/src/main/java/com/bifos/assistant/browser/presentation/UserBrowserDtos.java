@@ -132,6 +132,7 @@ public final class UserBrowserDtos {
                     requireRatio();
                     require("deltaY", deltaY != null && Math.abs(deltaY) <= MAX_WHEEL);
                 }
+                case SCROLL -> require("action", "top".equals(action) || "bottom".equals(action));
                 case KEY -> require("key", key != null && BrowserScreenInput.KEYS.containsKey(key));
                 case TEXT -> require("text", text != null && !text.isEmpty() && text.length() <= MAX_TEXT);
                 case NAVIGATE -> require("url", BrowserScreenInput.webUrl(url));
