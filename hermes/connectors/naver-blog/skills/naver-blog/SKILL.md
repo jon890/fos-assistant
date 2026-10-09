@@ -36,6 +36,7 @@ description: 네이버 블로그의 임시저장 글을 읽고 고치며, 대화
 1. `read_draft` 로 그 글을 읽는다
 2. 고친 네 칸과 `base`(읽은 `title`, `category`, `tags`, `body`)로 `render_draft` 를 불러 미리보기를 보인다. 미리보기 본문 위의 바뀌는 내용을 사용자에게 함께 알린다
    - `problems` 와 `html` 은 아래 「새 글 쓰기」 의 3 처럼 다룬다
+   - `problems` 가 「승인 카드가 가리는」 문장이면 그 글은 긴 링크 때문에 자동으로 덮어쓸 수 없다. 새 임시저장으로 남기거나 네이버에서 직접 고쳐 달라고 안내한다
 3. 사용자가 확인하면 `overwrite_draft` 를 `draft_id`, `revision`(받은 `base_revision`), `changes`(받은 `changes`)와 고친 네 칸 그대로 부른다
 4. `draft_job` 결과가 `succeeded` 면 고쳤다는 것을 알린다. 원래 글을 `backup_title` 이라는 사본으로 남겼고, 확인한 뒤 네이버에서 지우면 된다는 것도 알린다
 5. `failed` 면 아래 표를 따른다
