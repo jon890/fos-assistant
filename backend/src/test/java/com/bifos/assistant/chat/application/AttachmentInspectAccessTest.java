@@ -9,12 +9,12 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import com.bifos.assistant.chat.domain.ChatAttachment;
-import com.bifos.assistant.chat.infra.ChatAttachmentRepository;
 import com.bifos.assistant.chat.infra.AttachmentStore;
-import java.io.ByteArrayInputStream;
+import com.bifos.assistant.chat.infra.ChatAttachmentRepository;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.shared.error.ApiException;
+import java.io.ByteArrayInputStream;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
@@ -71,8 +71,10 @@ class AttachmentInspectAccessTest {
     @DisplayName("캐시의 첨부가 유효해도 SQL 상태가 바뀌면 재검증을 거절한다")
     void rejectsSqlRevocationEvenWhenCachedEntityIsVisible() {
         service.validateInspection(user, 2L, 7L);
-        when(attachments.existsByIdAndConversationIdAndUploadedByUserIdAndMessageIdIsNotNullAndDeletedAtIsNullAndExpiresAtAfter(
-                7L, 2L, 1L, now)).thenReturn(false);
+        when(attachments
+                        .existsByIdAndConversationIdAndUploadedByUserIdAndMessageIdIsNotNullAndDeletedAtIsNullAndExpiresAtAfter(
+                                7L, 2L, 1L, now))
+                .thenReturn(false);
         assertThatThrownBy(() -> service.validateInspection(user, 2L, 7L)).isInstanceOf(ApiException.class);
         verifyNoInteractions(inspection, store);
     }

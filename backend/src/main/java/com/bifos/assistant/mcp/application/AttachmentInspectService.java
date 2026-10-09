@@ -36,11 +36,11 @@ public class AttachmentInspectService {
         InspectedImage result = request.overview()
                 ? attachments.inspectOverview(caller.user(), execution.conversationId(), request.attachmentId())
                 : attachments.inspect(
-                caller.user(),
-                execution.conversationId(),
-                request.attachmentId(),
-                request.region(),
-                () -> active(execution.id()));
+                        caller.user(),
+                        execution.conversationId(),
+                        request.attachmentId(),
+                        request.region(),
+                        () -> active(execution.id()));
         if (!active(execution.id())) {
             throw invalid();
         }
@@ -51,7 +51,8 @@ public class AttachmentInspectService {
     public void validate(McpPrincipal principal, JsonNode body) {
         AttachmentInspectRequest request = AttachmentInspectRequest.from(body);
         McpCaller caller = authorize(principal, body, request);
-        attachments.validateInspection(caller.user(), caller.originExecution().conversationId(), request.attachmentId());
+        attachments.validateInspection(
+                caller.user(), caller.originExecution().conversationId(), request.attachmentId());
         if (!active(caller.executionId())) {
             throw invalid();
         }

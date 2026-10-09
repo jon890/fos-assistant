@@ -59,10 +59,10 @@ public class AttachmentService {
     public InspectedImage inspect(
             CurrentUser user, Long conversationId, Long attachmentId, List<Integer> region, BooleanSupplier active) {
         ChatAttachment attachment = requireInspectable(user, conversationId, attachmentId);
-        InspectedImage result = "image/gif".equals(attachment.contentType())
-                        || "image/webp".equals(attachment.contentType())
-                ? readRaw(attachment)
-                : inspection.read(attachment, region, active);
+        InspectedImage result =
+                "image/gif".equals(attachment.contentType()) || "image/webp".equals(attachment.contentType())
+                        ? readRaw(attachment)
+                        : inspection.read(attachment, region, active);
         requireInspectable(user, conversationId, attachmentId);
         return result;
     }
@@ -85,13 +85,24 @@ public class AttachmentService {
         try (InputStream in = store.open(attachment)) {
             byte[] raw = in.readNBytes(limit + 1);
             boolean magic = switch (attachment.contentType()) {
-                case "image/gif" -> raw.length >= 6
-                        && new String(raw, 0, 6, StandardCharsets.US_ASCII).matches("GIF8[79]a");
-                case "image/webp" -> raw.length >= 12 && raw[0] == 'R' && raw[1] == 'I' && raw[2] == 'F' && raw[3] == 'F'
-                        && raw[8] == 'W' && raw[9] == 'E' && raw[10] == 'B' && raw[11] == 'P';
+                case "image/gif" ->
+                    raw.length >= 6 && new String(raw, 0, 6, StandardCharsets.US_ASCII).matches("GIF8[79]a");
+                case "image/webp" ->
+                    raw.length >= 12
+                            && raw[0] == 'R'
+                            && raw[1] == 'I'
+                            && raw[2] == 'F'
+                            && raw[3] == 'F'
+                            && raw[8] == 'W'
+                            && raw[9] == 'E'
+                            && raw[10] == 'B'
+                            && raw[11] == 'P';
                 case "image/jpeg" -> raw.length >= 2 && raw[0] == (byte) 0xff && raw[1] == (byte) 0xd8;
-                case "image/png" -> raw.length >= 8 && java.util.Arrays.equals(java.util.Arrays.copyOf(raw, 8),
-                        new byte[] {(byte) 0x89, 'P', 'N', 'G', 13, 10, 26, 10});
+                case "image/png" ->
+                    raw.length >= 8
+                            && java.util.Arrays.equals(
+                                    java.util.Arrays.copyOf(raw, 8),
+                                    new byte[] {(byte) 0x89, 'P', 'N', 'G', 13, 10, 26, 10});
                 default -> false;
             };
             if (raw.length == 0 || raw.length > limit || raw.length != attachment.byteSize() || !magic) {

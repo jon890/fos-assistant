@@ -36,7 +36,8 @@ public class AgentTokenAuthenticationFilter extends AgentTokenFilter {
             "/mcp",
             "/internal/hermes/session-bindings/subagent",
             "/internal/hermes/connector-policy",
-            "/internal/hermes/attachment-inspect", "/internal/hermes/attachment-inspect/validate");
+            "/internal/hermes/attachment-inspect",
+            "/internal/hermes/attachment-inspect/validate");
 
     private static final String BEARER = "Bearer ";
     private static final String MCP_AUTHORITY = "ROLE_MCP";

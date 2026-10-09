@@ -79,8 +79,8 @@ class AttachmentInspectEndpointTest {
     @BeforeEach
     void setUp() {
         McpCallSigner.clearRuns(jdbc, List.of(PROFILE));
-        AppUser owner = users.save(AppUser.of(
-                UUID.randomUUID() + "@example.test", "사용자", 1L, UserRole.MEMBER, Instant.now()));
+        AppUser owner =
+                users.save(AppUser.of(UUID.randomUUID() + "@example.test", "사용자", 1L, UserRole.MEMBER, Instant.now()));
         user = new CurrentUser(owner.id(), owner.email(), owner.displayName(), 1L, UserRole.MEMBER);
         conversation = conversations.save(Conversation.startedBy(user.id(), "사진", null, Instant.now()));
         token = tokens.issue(PROFILE, "검사").rawToken();
@@ -94,8 +94,8 @@ class AttachmentInspectEndpointTest {
                 .status(ExecutionStatus.RUNNING)
                 .startedAt(Instant.now().minusSeconds(1))
                 .build());
-        photo = attachments.upload(user, conversation.id(), "test.gif", "image/gif", GIF.length,
-                new ByteArrayResource(GIF));
+        photo = attachments.upload(
+                user, conversation.id(), "test.gif", "image/gif", GIF.length, new ByteArrayResource(GIF));
         attachments.attach(1L, conversation.id(), List.of(photo.id()));
     }
 
@@ -123,13 +123,23 @@ class AttachmentInspectEndpointTest {
     void rejectsStateChangesAfterRawResponse() throws Exception {
         ObjectNode body = request(photo.id());
         assertThat(send("", body).statusCode()).isEqualTo(200);
-        jdbc.update("update chat_attachment set expires_at = ? where id = ?", Timestamp.from(Instant.now().minusSeconds(1)), photo.id());
+        jdbc.update(
+                "update chat_attachment set expires_at = ? where id = ?",
+                Timestamp.from(Instant.now().minusSeconds(1)),
+                photo.id());
         assertThat(send("/validate", body).statusCode()).isEqualTo(410);
-        jdbc.update("update chat_attachment set expires_at = ?, deleted_at = ? where id = ?", Timestamp.from(Instant.now().plusSeconds(60)), Timestamp.from(Instant.now()), photo.id());
+        jdbc.update(
+                "update chat_attachment set expires_at = ?, deleted_at = ? where id = ?",
+                Timestamp.from(Instant.now().plusSeconds(60)),
+                Timestamp.from(Instant.now()),
+                photo.id());
         assertThat(send("/validate", body).statusCode()).isEqualTo(410);
         jdbc.update("update chat_attachment set deleted_at = null, message_id = null where id = ?", photo.id());
         assertThat(send("/validate", body).statusCode()).isEqualTo(400);
-        jdbc.update("update chat_attachment set message_id = 1, uploaded_by_user_id = ? where id = ?", user.id() + 1000, photo.id());
+        jdbc.update(
+                "update chat_attachment set message_id = 1, uploaded_by_user_id = ? where id = ?",
+                user.id() + 1000,
+                photo.id());
         assertThat(send("/validate", body).statusCode()).isEqualTo(400);
         jdbc.update("update chat_attachment set uploaded_by_user_id = ? where id = ?", user.id(), photo.id());
         jdbc.update("update agent_execution set status = 'CANCELLED' where id = ?", execution.id());
@@ -146,9 +156,13 @@ class AttachmentInspectEndpointTest {
         ((ObjectNode) body.get("_fos_inspect")).put("sig", "0".repeat(64));
         assertThat(send("/validate", body).statusCode()).isEqualTo(403);
         body = request(photo.id());
-        jdbc.update("update chat_attachment set conversation_id = ? where id = ?", conversation.id() + 1000, photo.id());
+        jdbc.update(
+                "update chat_attachment set conversation_id = ? where id = ?", conversation.id() + 1000, photo.id());
         assertThat(send("/validate", body).statusCode()).isEqualTo(404);
-        jdbc.update("update chat_attachment set conversation_id = ?, byte_size = byte_size + 1 where id = ?", conversation.id(), photo.id());
+        jdbc.update(
+                "update chat_attachment set conversation_id = ?, byte_size = byte_size + 1 where id = ?",
+                conversation.id(),
+                photo.id());
         assertThat(send("", body).statusCode()).isEqualTo(422);
     }
 
@@ -156,8 +170,8 @@ class AttachmentInspectEndpointTest {
     @DisplayName("개요 모드는 서명에 묶고 region과 동시에 받지 않으며 JPEG 원본도 그대로 전달한다")
     void bindsOverviewModeAndReturnsRawJpegOnlyOnExplicitRequest() throws Exception {
         byte[] jpeg = {(byte) 0xff, (byte) 0xd8, (byte) 0xff, (byte) 0xd9};
-        ChatAttachment other = attachments.upload(user, conversation.id(), "test.jpg", "image/jpeg", jpeg.length,
-                new ByteArrayResource(jpeg));
+        ChatAttachment other = attachments.upload(
+                user, conversation.id(), "test.jpg", "image/jpeg", jpeg.length, new ByteArrayResource(jpeg));
         attachments.attach(1L, conversation.id(), List.of(other.id()));
         ObjectNode overview = request(other.id(), true);
         assertThat(send("", overview).body()).containsExactly(jpeg);
@@ -174,25 +188,42 @@ class AttachmentInspectEndpointTest {
     }
 
     private ObjectNode request(long attachmentId, boolean overview) throws Exception {
-        ObjectNode body = json.createObjectNode().put("attachment_id", attachmentId).put("overview", overview);
+        ObjectNode body =
+                json.createObjectNode().put("attachment_id", attachmentId).put("overview", overview);
         ObjectNode context = McpCallSigner.context(token, "attachment_inspect", root);
         body.set("_fos_ctx", context);
         long issued = Instant.now().toEpochMilli();
-        String digest = HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256")
-                .digest((attachmentId + "\n" + (overview ? "\noverview=1" : "")).getBytes(StandardCharsets.UTF_8)));
-        String text = String.join("\n", "v1-attachment-inspect", root, root,
-                context.get("tool_call_id").asString(), Long.toString(issued), digest, "1");
-        String key = HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(token.getBytes(StandardCharsets.UTF_8)));
+        String digest = HexFormat.of()
+                .formatHex(MessageDigest.getInstance("SHA-256")
+                        .digest((attachmentId + "\n" + (overview ? "\noverview=1" : ""))
+                                .getBytes(StandardCharsets.UTF_8)));
+        String text = String.join(
+                "\n",
+                "v1-attachment-inspect",
+                root,
+                root,
+                context.get("tool_call_id").asString(),
+                Long.toString(issued),
+                digest,
+                "1");
+        String key = HexFormat.of()
+                .formatHex(MessageDigest.getInstance("SHA-256").digest(token.getBytes(StandardCharsets.UTF_8)));
         Mac mac = Mac.getInstance("HmacSHA256");
         mac.init(new SecretKeySpec(key.getBytes(StandardCharsets.UTF_8), "HmacSHA256"));
-        body.putObject("_fos_inspect").put("issued_at_ms", issued).put("top_level", true)
+        body.putObject("_fos_inspect")
+                .put("issued_at_ms", issued)
+                .put("top_level", true)
                 .put("sig", HexFormat.of().formatHex(mac.doFinal(text.getBytes(StandardCharsets.UTF_8))));
         return body;
     }
 
     private HttpResponse<byte[]> send(String suffix, ObjectNode body) throws Exception {
-        return client.send(HttpRequest.newBuilder(URI.create("http://localhost:" + port + PATH + suffix))
-                .header("Authorization", "Bearer " + token).header("Content-Type", "application/json")
-                .POST(HttpRequest.BodyPublishers.ofString(body.toString())).build(), HttpResponse.BodyHandlers.ofByteArray());
+        return client.send(
+                HttpRequest.newBuilder(URI.create("http://localhost:" + port + PATH + suffix))
+                        .header("Authorization", "Bearer " + token)
+                        .header("Content-Type", "application/json")
+                        .POST(HttpRequest.BodyPublishers.ofString(body.toString()))
+                        .build(),
+                HttpResponse.BodyHandlers.ofByteArray());
     }
 }

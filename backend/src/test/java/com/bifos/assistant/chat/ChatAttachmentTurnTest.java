@@ -292,15 +292,24 @@ class ChatAttachmentTurnTest {
     void guidesFirstAndNextWebpTurnsWithoutAskingForConversion() {
         Long conversationId = chat.startEmpty(dad, "dad").id();
         byte[] raw = Base64.getDecoder().decode("UklGRiAAAABXRUJQVlA4TBQAAAAvB0ABAAcQ/Y/+BwCC8L9tIqL/IQ==");
-        ChatAttachment photo = attachments.upload(dad, conversationId, "합성.webp", "image/webp", raw.length,
-                new ByteArrayResource(raw));
+        ChatAttachment photo = attachments.upload(
+                dad, conversationId, "합성.webp", "image/webp", raw.length, new ByteArrayResource(raw));
         chat.send(dad, conversationId, "사진의 오른쪽을 설명해 줘", null, List.of(photo.id()));
         assertThat(stub().received().getLast().images()).isEmpty();
-        assertThat(stub().received().getLast().input()).contains("attachment_id=" + photo.id(),
-                "입력에 싣지 못한 사진", "attachment_inspect로 원본을 자동 조회", "overview=true", "첫 표시 프레임만 본다");
+        assertThat(stub().received().getLast().input())
+                .contains(
+                        "attachment_id=" + photo.id(),
+                        "입력에 싣지 못한 사진",
+                        "attachment_inspect로 원본을 자동 조회",
+                        "overview=true",
+                        "첫 표시 프레임만 본다");
         chat.send(dad, conversationId, "아까 사진의 작은 글자는?", null, List.of());
-        assertThat(stub().received().getLast().input()).contains("attachment_id=" + photo.id(), "overview=true",
-                "원본 region을 고른다", "사용자에게 재업로드나 분할 전송을 요구하지 않는다");
+        assertThat(stub().received().getLast().input())
+                .contains(
+                        "attachment_id=" + photo.id(),
+                        "overview=true",
+                        "원본 region을 고른다",
+                        "사용자에게 재업로드나 분할 전송을 요구하지 않는다");
     }
 
     @Test

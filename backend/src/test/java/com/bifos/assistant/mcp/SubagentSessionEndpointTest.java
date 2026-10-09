@@ -122,9 +122,8 @@ class SubagentSessionEndpointTest {
     @Test
     @DisplayName("원본 조회는 profile 토큰 인증만 받고 Origin과 사용자 JWT는 거절한다")
     void attachmentInspectionUsesProfileTokenFilterAndExcludesJwt() throws Exception {
-        for (String inspection : new String[] {
-            "/internal/hermes/attachment-inspect", "/internal/hermes/attachment-inspect/validate"
-        }) {
+        for (String inspection :
+                new String[] {"/internal/hermes/attachment-inspect", "/internal/hermes/attachment-inspect/validate"}) {
             assertThat(send(inspection, null, "{}", false).statusCode()).isEqualTo(401);
             assertThat(send(inspection, jwt(dad), "{}", false).statusCode()).isEqualTo(401);
             assertThat(send(inspection, tokenA, "{}", true).statusCode()).isEqualTo(403);
