@@ -10,6 +10,7 @@ import pathlib
 import sys
 import types
 import unittest
+import threading
 from unittest.mock import patch
 
 import hermes_contract as contract
@@ -22,6 +23,29 @@ class NativeImageContractTest(unittest.TestCase):
     def setUp(self):
         self.plugin = load_ctx(self.addCleanup)
         self.inspect = importlib.import_module(self.plugin.__name__ + ".attachment_inspect")
+
+    def test_actual_profile_loader_names_and_reload_preserve_shared_runtime(self):
+        relative, namespace, evict = contract.NATIVE_IMAGE_PLUGIN_LOADER
+        tree = ast.parse((pathlib.Path(os.environ["HERMES_SOURCE"]) / relative).read_text())
+        selected = [copy.deepcopy(next(node for node in ast.walk(tree)
+            if isinstance(node, ast.FunctionDef) and node.name == name)) for name in (namespace, evict)]
+        env = {"sys": types.SimpleNamespace(modules={}), "hashlib": hashlib,
+               "manifest_key": lambda manifest: manifest.name, "_NS_PARENT": "hermes_plugins",
+               "_BARE_MODULE_SCOPE": {}, "_MODULE_NAMESPACE_LOCK": threading.Lock()}
+        module = ast.Module(body=[ast.ImportFrom(module="__future__", level=0,
+            names=[ast.alias(name="annotations")]), *selected], type_ignores=[])
+        exec(compile(ast.fix_missing_locations(module), relative, "exec"), env)
+        manifest = types.SimpleNamespace(name="fos-ctx")
+        first = env[namespace](types.SimpleNamespace(scope_key="first-profile"), manifest)
+        second = env[namespace](types.SimpleNamespace(scope_key="second-profile"), manifest)
+        self.assertNotEqual(first, second)
+        runtime = importlib.import_module(self.plugin.__name__ + ".image_runtime").shared_runtime()
+        env["sys"].modules.update({first: object(), first + ".image_runtime": object(),
+                                   second: object(), "_fos_owned_image_runtime_v1": runtime})
+        env[evict](first)
+        self.assertNotIn(first + ".image_runtime", env["sys"].modules)
+        self.assertIs(env["sys"].modules["_fos_owned_image_runtime_v1"], runtime)
+        self.assertIn(second, env["sys"].modules)
 
     def test_pillow_is_already_pinned_in_runtime_core(self):
         import tomllib

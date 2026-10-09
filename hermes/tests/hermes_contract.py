@@ -27,6 +27,8 @@ HERMES_PACKAGES = frozenset({"hermes_cli", "hermes_constants", "hermes_state", "
 # Hermes 의 다른 최상위 패키지(`agent`, `tools` 등)를 쓰기 시작하면 HERMES_PACKAGES 에 더하고 지점을 선언한다.
 # GIF/WebP helper는 Hermes core가 이미 고정한 Pillow를 쓴다. 새 의존성을 추가하지 않는다.
 NATIVE_IMAGE_PILLOW_VERSION = "12.3.0"
+# profile별 적재와 reload가 공유 FIFO의 module 이름을 지우지 않는다는 경계다.
+NATIVE_IMAGE_PLUGIN_LOADER = ("hermes_cli/plugins_loader.py", "_directory_module_name", "_evict_modules")
 
 THIRD_PARTY_PACKAGES = frozenset({"yaml", "mcp", "starlette", "PIL"})
 
