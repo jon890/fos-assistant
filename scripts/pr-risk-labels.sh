@@ -40,7 +40,6 @@ while IFS= read -r path; do
     test/e2e/fake-hermes.ts | \
     test/e2e/fake-hermes/* | \
     backend/docs/flow.md | \
-    backend/docs/flow.md | \
     hermes/*)
       hermes=1 ;;
   esac

@@ -57,7 +57,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 /**
- * 숨기기, 미루기, 되돌리기와 지표 사건을 실제 DB 로 본다. 규칙은 {@code backend/docs/flow.md} 의 「억제 신호」 와 「API」 다.
+ * 숨기기, 미루기, 되돌리기와 지표 사건을 실제 DB 로 본다. 규칙은 {@code backend/docs/flow.md} 의 「억제 신호」 와 「API(먼저 알리기와 지금 화면의 판정)」 다.
  *
  * <p>시각은 이 검사의 시계가 정한다. 사용자는 검사마다 새로 만들어 다른 검사의 줄과 섞이지 않게 하고, 끝나면 그 사용자의 줄을
  * 지운다. 커넥터 카탈로그는 대역이 답한다.
