@@ -146,19 +146,19 @@ class AttachmentUploadLimitTest {
     }
 
     @Test
-    @DisplayName("기본 상한 1MB 를 넘는 2MB 사진이 올라간다")
-    void uploads2MbPhotoOverDefault1MbLimit() throws Exception {
-        HttpResponse<String> response = upload(2 * MB);
+    @DisplayName("실제 HTTP 요청으로 한도인 20MB 사진이 올라간다")
+    void uploadsTwentyMegabytePhotoAtLimit() throws Exception {
+        HttpResponse<String> response = upload(20 * MB);
 
         assertThat(response.statusCode()).as(response.body()).isEqualTo(200);
-        assertThat(json.readTree(response.body()).path("byteSize").asLong()).isEqualTo(2L * MB);
+        assertThat(json.readTree(response.body()).path("byteSize").asLong()).isEqualTo(20L * MB);
         assertThat(attachments.findByConversationIdOrderByIdAsc(conversationId)).hasSize(1);
     }
 
     @Test
     @DisplayName("한 장 상한을 조금 넘으면 서비스가 입력 오류로 거절한다")
     void serviceRejectsAsInputErrorWhenSlightlyOverPerImageLimit() throws Exception {
-        HttpResponse<String> response = upload(10 * MB + 100 * KB);
+        HttpResponse<String> response = upload(20 * MB + 100 * KB);
 
         assertThat(response.statusCode()).as(response.body()).isEqualTo(400);
         assertThat(code(response)).isEqualTo("VALIDATION_FAILED");
@@ -169,7 +169,7 @@ class AttachmentUploadLimitTest {
     @DisplayName("요청 상한을 넘어도 500 이 아니라 입력 오류다")
     void overRequestLimitIsInputErrorNot500() throws Exception {
         // 넘는 양을 수백 KB 로 둔다. 많이 넘기면 서버가 남은 본문을 읽지 않고 연결을 끊어 응답을 받지 못한다.
-        HttpResponse<String> response = upload(12 * MB + 300 * KB);
+        HttpResponse<String> response = upload(22 * MB + 300 * KB);
 
         assertThat(response.statusCode()).as(response.body()).isEqualTo(400);
         assertThat(code(response)).isEqualTo("VALIDATION_FAILED");
@@ -197,7 +197,7 @@ class AttachmentUploadLimitTest {
     void createsSmallCopiesForConcurrentUploads() throws Exception {
         int count = 6;
         byte[] content = png(2400, 1800);
-        assertThat(content.length).as("업로드 상한 안").isLessThan(10 * MB);
+        assertThat(content.length).as("업로드 상한 안").isLessThan(properties.maxBytes());
         ExecutorService executor = Executors.newFixedThreadPool(count);
         try {
             CountDownLatch ready = new CountDownLatch(count);
