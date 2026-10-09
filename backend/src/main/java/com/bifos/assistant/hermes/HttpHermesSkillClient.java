@@ -6,6 +6,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.MediaType;
@@ -91,6 +92,22 @@ public class HttpHermesSkillClient implements HermesSkillClient {
     @Override
     public void publish(
             String profile, List<String> externalDirs, List<String> apiServerToolsets, String sandboxOwner) {
+        send(profile, externalDirs, apiServerToolsets, sandboxOwner, false);
+    }
+
+    @Override
+    public void publishRequiringSandbox(
+            String profile, List<String> externalDirs, List<String> apiServerToolsets, String sandboxOwner) {
+        Objects.requireNonNull(apiServerToolsets, "a sandbox-required publish carries the tool list");
+        send(profile, externalDirs, apiServerToolsets, sandboxOwner, true);
+    }
+
+    private void send(
+            String profile,
+            List<String> externalDirs,
+            List<String> apiServerToolsets,
+            String sandboxOwner,
+            boolean requireSandbox) {
         requireValidProfileName(profile);
         Map<String, Object> config = new LinkedHashMap<>();
         config.put("skills", Map.of("external_dirs", List.copyOf(externalDirs)));
@@ -101,13 +118,23 @@ public class HttpHermesSkillClient implements HermesSkillClient {
         if (apiServerToolsets != null) {
             attachmentDirectory.ensure(sandboxOwner);
         }
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("profile", profile);
+        body.put("config", config);
+        body.put("sandbox_owner", sandboxOwner);
+        // scripts/ 가 든 스킬을 게시할 때만 싣는다. 이 칸을 받는 옛 plugin 도 셸 도구의 실행 공간 정책만 보고 스킬 게시의
+        // skill_root 는 판정하지 않는다. 그래서 plugin 을 먼저 배포하지 않으면 스크립트 스킬이 skill_root 판정 없이 통과한다.
+        // plugin 을 먼저 배포한 뒤 이 Control Plane 을 배포한다.
+        if (requireSandbox) {
+            body.put("require_sandbox", true);
+        }
         try {
             restClient
                     .put()
                     .uri(baseUrl + "/api/config")
                     .header("Authorization", "Bearer " + token)
                     .contentType(MediaType.APPLICATION_JSON)
-                    .body(Map.of("profile", profile, "config", config, "sandbox_owner", sandboxOwner))
+                    .body(body)
                     .retrieve()
                     .toBodilessEntity();
         } catch (RestClientException ex) {

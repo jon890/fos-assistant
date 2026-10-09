@@ -7,6 +7,7 @@
   Hermes 컨테이너는 그 디렉터리를 **읽기 전용**으로 본다. 스킬 본문은 데이터베이스에 두지 않는다.
   스킬을 올린 에이전트는 `skills` toolset 이 켜져 있어야 한다.
   누가 어느 실행에서 어느 스킬을 썼는지는 Control Plane 이 실행 줄에 딸린 표로 남긴다.
+- **대체된 부분**: 「스크립트는 받지 않는다」 와 대안 기각의 「스크립트까지 받는다」 는 [ADR-20261009 / skill-package](ADR-20261009-skill-package.md) 가 대체한다. 실행 공간이 있는 에이전트에는 `scripts/` 가 든 스킬을 받는다.
 - **맥락**:
   - Hermes 가 스킬을 붙이는 정식 설정은 `skills.external_dirs` 다. 대시보드 `POST /api/skills` 는 `SKILL.md` 하나만 만들고, 이미 색인을 계산한 gateway 는 재시작 전까지 새 스킬을 보지 못한다. 반면 `external_dirs` 에 새 경로를 더하면 같은 프로세스의 다음 색인에 나타난다. 근거는 [`hermes/tools-and-skills.md`](../hermes/tools-and-skills.md) 의 「스킬 파일과 색인 적용 시점」 이다.
   - 대시보드에는 스킬을 지우는 경로가 없다.
