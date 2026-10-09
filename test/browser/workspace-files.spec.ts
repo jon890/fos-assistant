@@ -372,3 +372,37 @@ test("미리 보던 파일을 지우면 미리보기가 닫히고 주소의 file
   await expect(page).toHaveURL(/\/files\?path=reports$/);
   await expect(entryRow(page, "a.txt")).toHaveCount(0);
 });
+
+test("상태 응답이 늦을 때 두 줄의 지우기를 연달아 누르면 처음 누른 줄만 지운다", async ({ page }) => {
+  const deleteRequests: string[] = [];
+  await fakeWorkspaceRoutes(page, { available: true, deletable: true, deleteRequests });
+  await page.goto("/files");
+  await expect(entryRow(page, "a.txt")).toBeVisible();
+
+  // 이 뒤의 상태 요청은 풀어 줄 때까지 붙잡아 둔다. 나중에 등록한 route 가 먼저 받고, 풀면 가짜 상태로 넘긴다.
+  let release = () => {};
+  const gate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  await page.route(
+    (url) => url.pathname === "/api/workspace",
+    async (route) => {
+      await gate;
+      await route.fallback();
+    },
+  );
+
+  const statusRead = page.waitForRequest((request) => new URL(request.url()).pathname === "/api/workspace");
+  await entryRow(page, "a.txt").getByRole("button", { name: "a.txt 지우기" }).click();
+  await statusRead;
+  await entryRow(page, "b.csv").getByRole("button", { name: "b.csv 지우기" }).click();
+  release();
+
+  const dialog = deleteDialog(page);
+  await expect(dialog.getByRole("heading")).toHaveText("a.txt을 지울까요?");
+  await dialog.getByRole("button", { name: "지우기" }).click();
+
+  await expect(entryRow(page, "a.txt")).toHaveCount(0);
+  await expect(entryRow(page, "b.csv")).toBeVisible();
+  expect(deleteRequests).toEqual(["?path=a.txt"]);
+});

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Notice } from "@/components/ui/notice";
@@ -140,6 +140,9 @@ const DELETE_FAILURES: Record<number, string> = {
  * 지우기 확인 창과 그 결과다. 창을 열 때 상태를 다시 읽어 도는 실행을 본다. 읽지 못하면 경고 없이 연다.
  *
  * <p>끝나면 `settle` 에 지운 경로와 실패 상태(성공이면 null, 연결이 끊긴 실패는 0)를 넘긴다. 실패 안내는 그 디렉터리에서만 보인다.
+ *
+ * <p>상태를 읽는 동안과 창이 열려 있는 동안에는 새 지우기 요청을 받지 않는다. 늦게 온 상태 응답이 열린 창의 대상을 바꾸면
+ * 사용자가 본 이름과 다른 경로가 지워진다.
  */
 function useEntryDeletion(
   dir: string,
@@ -151,7 +154,16 @@ function useEntryDeletion(
     null,
   );
 
+  // 상태를 읽기 시작한 때부터 창을 닫을 때까지 참이다. 렌더를 기다리지 않고 바로 읽혀야 하므로 state 가 아니라 ref 다.
+  const locked = useRef(false);
+  const close = () => {
+    locked.current = false;
+    setTarget(null);
+  };
+
   const ask = (path: string, entry: WorkspaceEntry) => {
+    if (locked.current) return;
+    locked.current = true;
     void readJson<WorkspaceStatus>(fetchWorkspaceStatus).then((read) => {
       setError(null);
       setTarget({
@@ -177,7 +189,7 @@ function useEntryDeletion(
       setError({ dir, text: DELETE_FAILURES[failure] ?? "지우지 못했어요." });
     settle(target.path, failure);
     setBusy(false);
-    setTarget(null);
+    close();
   };
 
   return {
@@ -186,7 +198,7 @@ function useEntryDeletion(
     error: error?.dir === dir ? error.text : null,
     ask,
     confirm,
-    cancel: () => setTarget(null),
+    cancel: close,
   };
 }
 
