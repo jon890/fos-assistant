@@ -56,6 +56,19 @@ export const chatAttachmentScenario: Scenario = {
     );
     expect(input.endsWith(text), `Hermes 입력이 사용자가 쓴 글로 끝나지 않는다: ${input}`);
 
+    step("보낸 사진은 줄인 사본으로 실행 입력에 이미지로 함께 실린다");
+    const images = context.hermes.lastSubmittedImages();
+    expect(
+      images.length === 1 &&
+        images[0]?.label === "1번째 사진" &&
+        images[0].url.startsWith("data:image/jpeg;base64,"),
+      `실행 입력에 실린 사진이 다르다: ${JSON.stringify(images.map((image) => ({ label: image.label, url: image.url.slice(0, 40) })))}`,
+    );
+    expect(
+      input.includes("이 메시지에 이미지로 함께 실은 사진: 1번째 사진."),
+      `Hermes 입력에 실은 사진 안내가 없다: ${input}`,
+    );
+
     step("대화를 다시 읽으면 그 메시지에 첨부가 달려 있고 본문은 사용자가 쓴 그대로다");
     const sent = userMessage(await history(context, token, conversationId), text);
     expect(sent.content === text, `저장된 본문이 달라졌다: ${sent.content}`);

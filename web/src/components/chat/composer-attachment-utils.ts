@@ -11,12 +11,23 @@ export const THUMBNAIL_MAX_SIDE = 192;
 
 export type AttachmentItem = {
   key: string;
+  file: File;
   previewUrl: string;
   status: "uploading" | "done" | "error";
   attachmentId: number | null;
   errorMessage: string | null;
   /** 이 첨부가 올라간 대화의 공개 식별자다. 지울 때 이 식별자로 서버 DELETE 를 부른다 */
   conversationId: string | null;
+};
+
+/** 서버에 보내기 전, 대화 안에서 업로드와 실패를 보여 주는 내 메시지다. */
+export type OutgoingMessage = {
+  text: string;
+  items: AttachmentItem[];
+  errorMessage: string | null;
+  retry(key: string): void;
+  omit(key: string): void;
+  retrySend(): void;
 };
 
 export async function buildThumbnail(file: File): Promise<string> {

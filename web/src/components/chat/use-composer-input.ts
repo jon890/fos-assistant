@@ -1,7 +1,7 @@
 "use client";
 
 import type { KeyboardEvent, RefObject } from "react";
-import type { ComposerAttachments } from "./use-composer-attachments";
+import type { useComposerOutgoing } from "./use-composer-outgoing";
 import { useLayoutEffect } from "react";
 import { filterAgents, findMention } from "./agent-mention";
 import {
@@ -16,7 +16,7 @@ type Context = { composing: RefObject<boolean> } & Pick<
   Props,
   "running" | "canQueue"
 > &
-  Pick<ComposerAttachments, "trySend"> &
+  Pick<ReturnType<typeof useComposerOutgoing>, "trySend"> &
   Pick<
     ComposerState,
     | "textareaRef"
