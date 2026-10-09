@@ -1,15 +1,13 @@
 # 코드 품질 검사
 
 기준 파일을 갱신하거나 규칙을 뺄 때 읽는 절차를 갖는다.
-규칙의 이름과 뜻은 `ArchitectureRules.java` 의 Javadoc 이, 코드 규칙의 심각도와 까닭은 `checkstyle.xml` 의 주석이 갖는다.
 
 ## 구조 규칙의 기준 파일
 
-지금 있는 위반은 `backend/config/archunit/store/` 의 기준 파일에 얼려 두고 새 위반만 실패시킨다.
+`backend/config/archunit/store/` 의 기준 파일이 지금 있는 위반을 얼려 둔다. 기준의 뜻은 [ADR-042](../adr/ADR-042-코드-품질-규칙은-도구-설정이-갖고-기존-위반은-기준-파일에-둔다.md) 가 갖는다.
 `stored.rules` 가 규칙의 `as(...)` 설명과 기준 파일 이름을 잇는다.
 설명을 바꾸면 기준이 새 규칙으로 옮겨지지 않으므로, 설명을 바꿀 때는 그 규칙을 다시 얼린다.
 
-**기준에 든 위반은 허용이 아니라 줄여 갈 목록이다.**
 위반을 고치면 그 기준 파일도 같은 커밋에서 줄인다.
 지금은 구조 규칙의 위반을 모두 고쳐 기준 파일이 비어 있다. 파일은 새 위반을 받아들여야 할 때를 위해 남긴다.
 
@@ -39,8 +37,7 @@
 
 ## 코드 규칙의 기준 파일
 
-지금 있는 위반은 `config/checkstyle/baseline.xml` 에 `(파일, 규칙)` 한 쌍마다 한 줄로 두고 새 위반만 실패시킨다.
-**기준에 든 위반은 허용이 아니라 줄여 갈 목록이다.**
+지금 있는 위반은 `config/checkstyle/baseline.xml` 에 `(파일, 규칙)` 한 쌍마다 한 줄로 둔다.
 지금은 error 위반을 모두 고쳐 `baseline.xml` 이 비어 있다. 파일은 새 위반을 받아들여야 할 때를 위해 남긴다.
 
 | 언제 | 어떻게 |
@@ -66,27 +63,14 @@
 그 대신 기준에 든 파일에 같은 규칙의 위반이 새로 생겨도 잡지 못한다.
 그 파일을 고칠 때는 그 규칙의 위반을 모두 고치고 기준 줄을 지우는 것을 원칙으로 한다.
 
-## OpenRewrite 버전
-
-플러그인 버전과 고정한 까닭은 `backend/gradle/libs.versions.toml` 의 주석이 갖는다.
-
 ## 파일 길이 기준 목록
 
 `scripts/check-file-length.mjs`가 언어 공통 파일 길이 규칙을 소유한다.
 빈 줄과 주석을 포함한 전체 줄 수를 세며 마지막 개행은 빈 줄로 더하지 않는다.
 `scripts/quality.sh check`, `scripts/check-local.sh`, CI의 `quality` 단계에서 검사한다.
 
-| 언어 | 검사 범위 | 상한 |
-| --- | --- | --- |
-| Java | `backend/src/main`의 `.java` | 500줄 |
-| TypeScript/TSX | `web/src`, `hermes/connectors/*/src`의 `.ts`, `.tsx` | 400줄 |
-| TypeScript/JavaScript | `scripts`의 `.ts`, `.mjs` | 400줄 |
-| Python | `hermes` 아래 비시험 `.py`(plugin 포함) | 400줄 |
-
-시험 경로(`src/test`, `test/`, `tests/`, `hermes/tests`)와 `*.test.*`, `*.spec.*`,
-Python 시험 파일(`test_*.py`, `*_test.py`), 생성물(`dist`, `build`, `bundle`, `bundles`)과 의존성 디렉터리는 제외한다.
+상한과 검사 범위, 제외하는 시험 경로와 생성물은 `scripts/check-file-length.mjs` 가 갖는다.
 데이터 표는 `scripts/file-length-baseline.json`의 `exclusions`에 경로와 까닭을 명시한다.
-Gmail의 `html-entities.ts`는 HTML 문자 참조 데이터 표라 제외한다.
 
 기존 긴 파일은 같은 파일의 `files`에 현재 줄 수를 기준값으로 둔다.
 기준 목록에 없는 파일이 상한을 넘거나, 목록에 든 파일이 기준값보다 커지면 실패한다.

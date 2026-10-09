@@ -1,7 +1,6 @@
 # backend 패키지
 
 Control Plane 의 패키지마다 맡는 책임과 패키지 사이의 방향 규칙을 갖는다.
-한 번의 대화가 지나는 길과 가격표를 읽는 방법도 이 파일이 갖는다.
 방향 규칙은 `ArchitectureRules.java` 가 강제하고, 이 파일은 규칙마다 그 검사의 이름을 적는다.
 
 ## 패키지와 책임
@@ -47,38 +46,12 @@ Control Plane 의 패키지마다 맡는 책임과 패키지 사이의 방향 �
 검사: `ArchitectureRules.ORCHESTRATION_DOES_NOT_DEPEND_ON_MCP`, `ArchitectureRules.TOP_LEVEL_PACKAGES_FREE_OF_CYCLES`
 
 **경로 변수와 요청 인자의 형식이 틀리면 어느 경로든 400 `VALIDATION_FAILED` 다.**
-`shared/error` 의 `GlobalExceptionHandler` 가 `MethodArgumentTypeMismatchException` 을 받는다.
-숫자를 받는 자리에 `abc` 가 오거나 UUID 를 받는 자리에 번호가 와도 500 이 아니라 400 이다.
-요청 본문의 형식 오류는 이 규칙에 걸리지 않고 Control Plane 에서 500 이다.
-본문의 대화 식별자는 web 서버 라우트가 먼저 검사해 400 으로 막는다.
+처리는 `shared/error` 의 `GlobalExceptionHandler` 가 갖는다.
+요청 본문의 형식 오류는 이 규칙에 걸리지 않고 Control Plane 에서 500 이다. 본문의 대화 식별자는 web 서버 라우트가 먼저 검사해 400 으로 막는다.
 
 ### 최상위 패키지의 층 순서
 
-최상위 패키지는 아래 순서를 따른다. 자리 1 이 맨 아래이고 21 이 맨 위다.
-
-| 자리 | 패키지 |
-| --- | --- |
-| 1 | `crypto` |
-| 2 | `hermes` |
-| 3 | `user` |
-| 4 | `browser` |
-| 5 | `notification` |
-| 6 | `model` |
-| 7 | `agent` |
-| 8 | `skill` |
-| 9 | `usage` |
-| 10 | `feedback` |
-| 11 | `memory` |
-| 12 | `context` |
-| 13 | `chat` |
-| 14 | `followup` |
-| 15 | `proactive` |
-| 16 | `orchestration` |
-| 17 | `mcp` |
-| 18 | `people` |
-| 19 | `connector` |
-| 20 | `task` |
-| 21 | `attention` |
+최상위 패키지의 순서는 `TopLevelPackageOrder.ORDER` 가 아래에서 위로 적어 갖는다.
 
 위 패키지는 아래 패키지를 쓰고 아래 패키지는 위 패키지를 import 하지 않는다.
 거꾸로 써야 하면 아래 패키지에 port 를 두고 위 패키지가 구현한다.
@@ -121,8 +94,7 @@ Control Plane 의 패키지마다 맡는 책임과 패키지 사이의 방향 �
 
 옛 커넥터 에이전트가 남아 있는 동안 그 실행에는 Memory 문맥을 주지 않는다. `ChatService` 와 `AgentRunner` 가 `Agent.connectorManaged()` 를 보고 빈 문맥으로 돌린다. `AgentMemoryCollectionService` 도 옛 커넥터 에이전트에 받는 collection 을 주지 않는다. `McpCallerResolver` 는 origin 실행의 에이전트가 옛 커넥터 에이전트이면 Control Plane MCP 호출을 거절한다([ADR-045](../../backend/docs/adr/ADR-045-커넥터-에이전트는-자기-mcp-서버만-받고-memory-와-control-plane-도구를-받지-않는다.md)). 연결을 붙인 일반 에이전트에는 이 경계가 걸리지 않는다.
 웹은 `components/connector`와 `app/connections`, `app/connections/[id]`, 대응 서버 라우트가 맡는다. 입력 칸은 manifest 의 `fields` 로 그린다.
-`test/unit/connector-neutral.test.ts` 가 `backend/src/main` 과 `web/src` 와 `hermes/plugins` 에 특정 서비스 이름이 들어오지 않았는지 본다.
-예외는 셋이다. 옛 표를 만든 V36 과 그 행을 옮기는 V38 은 이관 기록이라 이름을 갖는다. `web/src/app/connections/accountbook/page.tsx` 는 전용 화면이 있던 옛 주소를 새 연결 화면으로 넘기려고 커넥터 번호를 갖는다. 이 페이지는 옛 주소로 들어오는 사용자가 없어지면 지운다.
+특정 서비스 이름이 코드에 들어왔는지는 `test/unit/connector-neutral.test.ts` 가 보고, 예외도 그 시험이 갖는다.
 계약은 [커넥터 연결](../connectors.md)에 있다.
 
 `connector` 는 커넥터 도구 호출의 판정과 그 기록도 소유한다([ADR-049](../../backend/docs/adr/ADR-049-커넥터-도구-호출은-profile-plugin-의-hook-이-control-plane-에-물어-판정한다.md)).
@@ -144,25 +116,13 @@ Control Plane 의 패키지마다 맡는 책임과 패키지 사이의 방향 �
 1. `ChatController` 가 현재 사용자를 확인한다.
 2. `ChatService` 가 요청한 에이전트를 사용자가 쓸 수 있는지 확인하고 `conversation` 에 기록한다.
    이어지는 대화는 요청의 `agentCode` 를 무시하고 처음 기록한 에이전트를 쓴다.
-3. `ContextAssembler` 가 이 실행에 넣을 `instructions` 를 조립한다.
-   요청자가 볼 수 있고 그 에이전트가 받는 collection 의 Memory만 고르고, Memory 예산 밖에서 공통 표 지침을 추가한다.
+3. `ContextAssembler` 가 이 실행에 넣을 `instructions` 를 조립한다. 순서는 아래 표다.
 4. `ExecutionRecorder` 가 `RUNNING` 상태로 실행 한 줄을 먼저 만든다.
-   조립한 글자 수를 `context_chars` 에, 대화에서 고른 effort 를 `reasoning_effort` 에 적는다.
 5. `HermesProfileKeyStore` 가 그 profile 이름의 key 파일을 읽는다. 없으면 거기서 끝난다.
-6. `HttpHermesRunsClient` 가 실행을 제출한다. 어느 모델과 effort 를 싣는지는 [모델 단계와 실행 기록](../model-tiers.md) 의 「모델 선택」 이 정한 순서를 따른다. 실을 모델이 없으면 빼서 profile 의 값으로 돌게 한다. 그룹에 숨김이 있으면 그 전에 profile 의 기본 모델을 숨김과 견준다. 받은 `run_id` 를 그 자리에서 실행 줄에 적는다.
+6. `HttpHermesRunsClient` 가 실행을 제출하고 받은 `run_id` 를 그 자리에서 실행 줄에 적는다. 싣는 모델과 effort 는 [모델 단계와 실행 기록](../model-tiers.md) 의 「모델 선택」 이 정한다.
 7. 스트림으로 오는 사건을 화면으로 중계하면서 `execution_event` 로도 옮겨 적는다.
-8. 실행이 끝나면 `CostEstimator` 가 토큰을 models.dev 가격표로 환산한다.
-9. `ExecutionRecorder` 가 4번에서 만든 줄을 `SUCCEEDED` 로 갱신한다.
-   토큰, 소요 시간, 환산 금액이 이때 채워진다.
-10. 실패해도 그 줄은 남는다. 최종 실패 응답을 받으면 `FAILED` 와 오류 코드를 유지하면서
-    응답의 토큰과 실제 provider/model 을 보존하고, 성공·취소와 같은 가격표 규칙으로 금액을 환산한다.
-    제출 전 실패나 결과 미수신은 이미 적힌 값만 보존한다. 사용량이나 가격을 모르면 금액을 0 으로 채우지 않는다.
-
-성공·취소·실패는 실행 상태이고 자원 소비 여부와 다르다. 월 합계는 `RUNNING` 을 빼고,
-상태와 관계없이 환산된 금액을 더한다. 금액이 미확인인 종료 실행은 합계에서 빼고 별도로 센다.
-Hermes `delegate_task` 가 만든 native 자식은 실행 줄이 없어 `subagent_usage_job` 줄의 금액을 같은 합계에 더하고,
-금액을 확인하지 못한 자식 수를 따로 센다. 규칙은 [모델 단계와 실행 기록](../model-tiers.md) 의 「합계와 완전성」 이 갖는다.
-구독 경로의 실제 청구액은 계속 비우고 API 경로만 같은 환산액을 실제 청구액으로 적는다.
+8. `CostEstimator` 가 토큰을 models.dev 가격표로 환산한다. 환산은 이 자리에서 한 번만 하고 쓴 가격표를 함께 적는다([ADR-004](../../backend/docs/adr/ADR-004-구독제에서도-api-가격으로-환산해-보인다.md)).
+9. `ExecutionRecorder` 가 4번에서 만든 줄을 끝난 상태로 갱신한다. 실패해도 그 줄은 남는다. 합계 규칙은 [모델 단계와 실행 기록](../model-tiers.md) 의 「합계와 완전성」 이 갖는다.
 
 `instructions` 를 조립하는 순서는 아래와 같다.
 
@@ -179,18 +139,10 @@ Hermes `delegate_task` 가 만든 native 자식은 실행 줄이 없어 `subagen
 
 3 에 어느 항목이 드는지는 [`memory.md`](memory.md) 의 「에이전트의 실행에 보이는 항목」 이 갖는다.
 
-환산은 이 자리에서 한 번만 하고 쓴 가격표를 함께 적는다.
-조회할 때 다시 계산하면 가격이 바뀔 때 지난달 합계가 따라 움직인다.
-근거는 [`adr/ADR-004-구독제에서도-api-가격으로-환산해-보인다.md`](../../backend/docs/adr/ADR-004-구독제에서도-api-가격으로-환산해-보인다.md) 에 있다.
-
 ## 가격표
 
 `usage/infra/ModelsDevPriceCatalog` 가 models.dev 카탈로그를 읽어 메모리에 둔다.
-경로는 `ASSISTANT_PRICING_CATALOG` 가 정한다.
-
-**파일이 바뀌면 재기동 없이 다시 읽는다.** 조회할 때 1분에 한 번 파일의 수정 시각을 보고, 바뀌었으면 다시 읽는다.
-기동할 때만 읽었을 때는 새로 받은 가격표에 있는 모델의 금액이 재기동 전까지 비어 있었다.
-새 파일이 읽히지 않거나 가격이 하나도 없으면 이전 가격을 계속 쓴다.
+파일이 바뀌면 재기동 없이 다시 읽는다. 새 파일이 읽히지 않거나 가격이 하나도 없으면 이전 가격을 계속 쓴다.
 
 Hermes profile 디렉터리를 그대로 붙이지 않는다.
 그 디렉터리에는 `.env` 와 `auth.json` 이 함께 있어서 credential 까지 컨테이너에 들어간다.
