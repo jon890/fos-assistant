@@ -15,8 +15,9 @@ Control Plane 의 패키지마다 맡는 책임과 패키지 사이의 방향 �
 | `shared/auth` | 토큰 검사와 현재 사용자, profile 토큰 필터의 타입, 토큰의 주소를 현재 사용자로 바꾸는 port |
 | `shared/error` | 오류 코드와 응답 형태 |
 | `shared/config` | 시계, 스케줄링, 보안 필터 설정, 실행 중에 쓰는 설정을 읽는 `LiveProperties`([ADR-20261007 / live-properties](../../backend/docs/adr/ADR-20261007-live-properties.md)). 그 빈을 만드는 `LivePropertiesConfig` 는 기능 패키지의 설정을 가져오므로 루트 패키지에 둔다 |
-| `shared/util` | 외부 서비스의 글을 감싸는 함수와 문자열 지문 |
+| `shared/util` | 외부 서비스의 글을 감싸는 함수와 문자열 지문, 에이전트가 만든 파일에 붙이는 `Content-Security-Policy` 값(`SandboxedContentPolicy`) |
 | `shared/concurrent` | 요청 밖 작업을 띄우는 `BackgroundTasks`. 직접 가상 스레드를 띄우지 않는 까닭은 [ADR-20261007 / background-tasks](../../backend/docs/adr/ADR-20261007-background-tasks.md) |
+
 | `shared/domain/type` | 모든 패키지가 권한 판정에 읽는 역할 값 |
 | `user` | 사용자와 첫 로그인 처리 |
 | `browser` | 사용자마다 하나씩 두는 브라우저의 상태와 전이, 브라우저 proxy 로 컨테이너 켜기와 끄기, 자동 중지와 상태 맞추기, 브라우저 중계의 접근 표식과 HTTP 창구, WebSocket([`user-browser.md`](user-browser.md)) |
@@ -38,6 +39,7 @@ Control Plane 의 패키지마다 맡는 책임과 패키지 사이의 방향 �
 | `followup` | 할 일의 저장과 상태 전이, 사람이 쓰는 API, 에이전트의 제안 저장([`follow-up.md`](follow-up.md)) |
 | `proactive` | 먼저 살펴보기의 시작 전 점검, 점검 대화의 살펴보기 turn, 상한, 결과 계약의 검사와 그리기, 문제 후보의 검사와 저장, 살펴보기 트리 판정([`proactive-check.md`](proactive-check.md)), 판단 피드백의 replay 읽기 모델, 매일 루프의 이음매와 보일 판정, 판정 반응([`proactive-loop.md`](proactive-loop.md)) |
 | `attention` | 먼저 알리기의 판정과 지금 화면이 읽는 카드. 다른 패키지의 기록을 읽기만 한다([`attention.md`](attention.md)) |
+| `workspace` | 사용자 실행 공간의 파일 목록과 본문, 권한 도우미로 지우기, 관리자의 공간별 용량([`../code-architecture.md`](../code-architecture.md) 의 「실행 공간 파일」) |
 
 검사: `ArchitectureRules.SHARED_DOES_NOT_DEPEND_ON_DOMAINS`
 
@@ -54,7 +56,7 @@ Control Plane 의 패키지마다 맡는 책임과 패키지 사이의 방향 �
 
 ### 최상위 패키지의 층 순서
 
-최상위 패키지는 아래 순서를 따른다. 자리 1 이 맨 아래이고 21 이 맨 위다.
+최상위 패키지는 아래 순서를 따른다. 자리 1 이 맨 아래이고 22 가 맨 위다.
 
 | 자리 | 패키지 |
 | --- | --- |
@@ -79,6 +81,7 @@ Control Plane 의 패키지마다 맡는 책임과 패키지 사이의 방향 �
 | 19 | `connector` |
 | 20 | `task` |
 | 21 | `attention` |
+| 22 | `workspace` |
 
 위 패키지는 아래 패키지를 쓰고 아래 패키지는 위 패키지를 import 하지 않는다.
 거꾸로 써야 하면 아래 패키지에 port 를 두고 위 패키지가 구현한다.
@@ -89,7 +92,8 @@ Control Plane 의 패키지마다 맡는 책임과 패키지 사이의 방향 �
 `followup` 은 `chat` 바로 위다. 대화 주인을 확인하고 공개 식별자를 얻으려고 `chat` 을 쓰고, 제안 도구(`mcp`)와 먼저 알리기(`attention`)가 `followup` 을 쓴다.
 `browser` 는 `user` 바로 위다. 관리자 목록의 사용자 이름을 읽으려고 `user` 를 쓰고, 사용자를 끈 사건(`shared.auth.UserAccessRevoked`)을 받는다. 커넥터 바인딩이 브라우저 중계를 쓰게 되므로 `connector` 보다 아래에 둔다. 중계가 바인딩 표식의 주인을 찾으려고 `browser` 에 port(`BrowserGrantOwners`)를 두고 `connector` 가 구현한다.
 `notification` 은 `user` 바로 위다. 알림을 만드는 쪽(`connector`, 그 위의 패키지)이 모두 이 패키지를 부르고, 이 패키지는 알림을 받는 사용자 말고 다른 도메인을 모른다.
-`attention` 은 맨 위다. 먼저 알리기의 후보를 읽으려고 `usage`, `chat`, `agent`, `memory`, `connector`, `followup` 의 `application` 을 부르고, 어느 패키지도 `attention` 을 import 하지 않는다.
+`attention` 은 `workspace` 바로 아래다. 먼저 알리기의 후보를 읽으려고 `usage`, `chat`, `agent`, `memory`, `connector`, `followup` 의 `application` 을 부르고, 어느 패키지도 `attention` 을 import 하지 않는다.
+`workspace` 는 맨 위다. 함께 쓰는 에이전트와 관리자 용량의 에이전트 이름을 읽으려고 `agent` 를, 도는 실행 수를 읽으려고 `usage` 를, 관리자 용량의 사용자 이름을 읽으려고 `user` 를 부른다. 어느 패키지도 `workspace` 를 import 하지 않는다.
 검사: `ArchitectureRules.TOP_LEVEL_PACKAGES_FOLLOW_LAYER_ORDER`, 근거: ADR-068
 
 ### proactive
