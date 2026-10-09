@@ -12,7 +12,7 @@
 
 ## 컨텍스트
 
-**근거 문서**: `docs/adr/ADR-20261009-skill-package.md`, `backend/docs/flow.md` 의 「스킬 묶음 받기와 검사」 > 「받기」
+**근거 문서**: `docs/adr/ADR-20261009-skill-package.md`, `backend/docs/flow.md` 의 「스킬 묶음 받기와 검사」 > 「묶음 받기」
 
 - 의존 버전 목록은 `backend/gradle/libs.versions.toml`(`[versions]`, `[libraries]`), 쓰는 곳은 `backend/build.gradle.kts` 의 `dependencies` 다
 - `application` 과 `domain` 은 타입 하나에 파일 하나다. 저장되지 않는 enum 은 `skill/application/model` 에 둔다(`backend/AGENTS.md`)

@@ -11,7 +11,7 @@
 
 ## 컨텍스트
 
-**근거 문서**: `backend/docs/flow.md` 의 「스킬 묶음 받기와 검사」 > 「검사」
+**근거 문서**: `backend/docs/flow.md` 의 「스킬 묶음 받기와 검사」 > 「묶음 검사」
 
 - phase 02 의 `ReceivedSkillPackage`, `SkillPackageEntry`, `SkillPackageProblem`, `model/SkillPackageReason` 을 쓴다
 - 경로 규칙은 `backend/src/main/java/com/bifos/assistant/skill/infra/SkillFilePaths.java` 다. `requireSkillName(String)`, `requireFilePath(String)`, `requireFileSet(Collection<String>)` 은 어기면 `ApiException`(`VALIDATION_FAILED`)을 던진다. `SKILL_MD` 상수가 `"SKILL.md"`, `isScript(String)` 는 `scripts/` 로 시작하면 참이다
@@ -49,7 +49,7 @@ record `(String name, String description, String skillMd, List<SkillFile> files,
 
 ### 3. `skill/domain/SkillBundle.java` 에 `public String digest()`
 
-`("SKILL.md", skillMd)` 와 `files` 를 경로 순으로 정렬해 `경로 + "\0" + 내용 + "\0"` 을 이은 문자열을 `Sha256.hex` 에 넘긴 값이다. `backend/docs/flow.md` 「검사」 끝의 지문 설명과 같다.
+`("SKILL.md", skillMd)` 와 `files` 를 경로 순으로 정렬해 `경로 + "\0" + 내용 + "\0"` 을 이은 문자열을 `Sha256.hex` 에 넘긴 값이다. `backend/docs/flow.md` 「묶음 검사」 끝의 지문 설명과 같다.
 
 ### 4. 이 phase 를 검증하는 `backend/src/test/java/com/bifos/assistant/skill/SkillPackageCheckTest.java`
 
