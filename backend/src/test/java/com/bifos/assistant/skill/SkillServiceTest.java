@@ -44,6 +44,7 @@ import com.bifos.assistant.skill.application.SkillUsageSummary;
 import com.bifos.assistant.skill.application.SkillsChanged;
 import com.bifos.assistant.skill.domain.SkillBundle;
 import com.bifos.assistant.skill.domain.SkillFile;
+import com.bifos.assistant.skill.infra.PreviousSkillStore;
 import com.bifos.assistant.skill.infra.SkillStore;
 import com.bifos.assistant.testsupport.BackendIntegrationTest;
 import java.io.IOException;
@@ -109,6 +110,9 @@ class SkillServiceTest {
 
     @Autowired
     SkillStore store;
+
+    @Autowired
+    PreviousSkillStore previousStore;
 
     @Autowired
     AgentRepository agents;
@@ -1000,7 +1004,8 @@ class SkillServiceTest {
                 new SkillBundle("weekly-plan", skillMd("weekly-plan"), List.of(new SkillFile("FORMS.md", "첫째")));
         SkillBundle second = new SkillBundle(
                 "weekly-plan", skillMd("weekly-plan") + "\n둘째", List.of(new SkillFile("references/b.md", "둘째")));
-        assertThat(store.readPrevious(OWNED_PROFILE, "weekly-plan")
+        assertThat(previousStore
+                        .readPrevious(OWNED_PROFILE, "weekly-plan")
                         .orElseThrow()
                         .bundle())
                 .isEqualTo(first);
@@ -1010,7 +1015,8 @@ class SkillServiceTest {
         SkillDetail restored = skills.restorePrevious(OWNER, OWNED, "weekly-plan");
 
         assertThat(store.readCurrent(OWNED_PROFILE).get("weekly-plan")).isEqualTo(first);
-        assertThat(store.readPrevious(OWNED_PROFILE, "weekly-plan")
+        assertThat(previousStore
+                        .readPrevious(OWNED_PROFILE, "weekly-plan")
                         .orElseThrow()
                         .bundle())
                 .isEqualTo(second);
@@ -1034,12 +1040,13 @@ class SkillServiceTest {
         assertCode(() -> skills.restorePrevious(OWNER, OWNED, "weekly-plan"), ErrorCode.SKILL_NOT_FOUND);
 
         // 지우기에서 이전 버전 지우기가 실패해 남은 것처럼 둔다.
-        store.writePrevious(OWNED_PROFILE, new SkillBundle("cooking", skillMd("cooking") + "\n지운 스킬", List.of()));
+        previousStore.writePrevious(
+                OWNED_PROFILE, new SkillBundle("cooking", skillMd("cooking") + "\n지운 스킬", List.of()));
 
         SkillDetail created = skills.save(OWNER, OWNED, "cooking", skillMd("cooking"), List.of());
 
         assertThat(created.previousSavedAt()).as("새 스킬은 남은 이전 버전을 지운다").isNull();
-        assertThat(store.readPrevious(OWNED_PROFILE, "cooking")).isEmpty();
+        assertThat(previousStore.readPrevious(OWNED_PROFILE, "cooking")).isEmpty();
         assertCode(() -> skills.restorePrevious(OWNER, OWNED, "cooking"), ErrorCode.SKILL_NOT_FOUND);
     }
 
@@ -1050,18 +1057,18 @@ class SkillServiceTest {
         skills.save(OWNER, OWNED, "weekly-plan", skillMd("weekly-plan") + "\n고침", List.of());
         skills.save(OWNER, OWNED, "shopping", skillMd("shopping"), List.of());
         skills.save(OWNER, OWNED, "shopping", skillMd("shopping") + "\n고침", List.of());
-        assertThat(store.readPrevious(OWNED_PROFILE, "weekly-plan")).isPresent();
+        assertThat(previousStore.readPrevious(OWNED_PROFILE, "weekly-plan")).isPresent();
 
         skills.delete(OWNER, OWNED, "weekly-plan");
 
-        assertThat(store.readPrevious(OWNED_PROFILE, "weekly-plan")).isEmpty();
-        assertThat(store.readPrevious(OWNED_PROFILE, "shopping"))
+        assertThat(previousStore.readPrevious(OWNED_PROFILE, "weekly-plan")).isEmpty();
+        assertThat(previousStore.readPrevious(OWNED_PROFILE, "shopping"))
                 .as("다른 스킬의 이전 버전은 남는다")
                 .isPresent();
 
         skills.delete(OWNER, OWNED, "shopping");
 
-        assertThat(store.readPrevious(OWNED_PROFILE, "shopping")).isEmpty();
+        assertThat(previousStore.readPrevious(OWNED_PROFILE, "shopping")).isEmpty();
         assertThat(SKILL_ROOT.resolve(OWNED_PROFILE)).isEmptyDirectory();
     }
 

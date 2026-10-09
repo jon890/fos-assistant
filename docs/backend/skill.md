@@ -95,7 +95,10 @@ Hermes 가 스킬을 읽는 방식은 [`hermes/skills.md`](../hermes/skills.md) 
 | --- | --- |
 | 권한 판정과 저장 순서 | `skill/application/SkillService` |
 | 호출 이력 적기와 읽기 | `skill/application/SkillUseRecorder`, `skill/application/SkillUsageQuery` |
-| 버전 디렉터리와 이전 버전 쓰기와 지우기 | `skill/infra/SkillStore` |
+| 버전 디렉터리 쓰기와 지우기 | `skill/infra/SkillStore` |
+| 이전 버전 쓰기와 읽기, 지우기 | `skill/infra/PreviousSkillStore` |
+| 스킬 이름과 파일 경로 규칙 | `skill/infra/SkillFilePaths` |
+| 앞머리와 파일, 크기 입력 검사 | `skill/application/SkillInputRules` |
 | `external_dirs` 게시와 대시보드 스킬 목록 | `skill/infra/SkillPublisher`, 호출은 `hermes` |
 | 커맨드 판별과 입력 바꾸기 | `chat/application/SkillCommand` |
 | 커맨드로 부를 수 있는 이름과 그 캐시 | `skill/application/SkillCommandCatalog`, 비우기는 `SkillsChanged` |

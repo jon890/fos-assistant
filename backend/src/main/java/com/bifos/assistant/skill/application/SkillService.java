@@ -1,5 +1,11 @@
 package com.bifos.assistant.skill.application;
 
+import static com.bifos.assistant.skill.application.SkillInputRules.bundleOf;
+import static com.bifos.assistant.skill.application.SkillInputRules.requireFiles;
+import static com.bifos.assistant.skill.application.SkillInputRules.requireNoStoredSecretRequests;
+import static com.bifos.assistant.skill.application.SkillInputRules.requireSkillMd;
+import static com.bifos.assistant.skill.application.SkillInputRules.utf8Bytes;
+
 import com.bifos.assistant.agent.application.AgentConnectorBindings;
 import com.bifos.assistant.agent.application.AgentService;
 import com.bifos.assistant.agent.domain.Agent;
@@ -10,15 +16,13 @@ import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.skill.domain.SkillBundle;
-import com.bifos.assistant.skill.domain.SkillFile;
 import com.bifos.assistant.skill.infra.PreviousSkill;
+import com.bifos.assistant.skill.infra.PreviousSkillStore;
+import com.bifos.assistant.skill.infra.SkillFilePaths;
 import com.bifos.assistant.skill.infra.SkillProperties;
 import com.bifos.assistant.skill.infra.SkillPublisher;
 import com.bifos.assistant.skill.infra.SkillStore;
-import java.nio.charset.StandardCharsets;
 import java.time.Instant;
-import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -75,6 +79,7 @@ public class SkillService {
     private final AgentService agents;
     private final AgentConnectorBindings connectorBindings;
     private final SkillStore store;
+    private final PreviousSkillStore previousStore;
     private final SkillPublisher publisher;
     private final SkillUsageQuery usage;
     private final ApplicationEventPublisher events;
@@ -186,7 +191,7 @@ public class SkillService {
     public SkillDetail save(CurrentUser user, String code, String name, String skillMd, List<SkillFileInput> files) {
         Agent agent = requireEditableLocked(user, code);
         String profile = agent.hermesProfile();
-        SkillStore.requireSkillName(name);
+        SkillFilePaths.requireSkillName(name);
         SkillFrontmatter frontmatter = requireSkillMd(name, skillMd);
         List<SkillFileInput> inputs = requireFiles(files);
         Map<String, SkillBundle> current = store.readCurrent(profile);
@@ -210,14 +215,16 @@ public class SkillService {
     public SkillDetail restorePrevious(CurrentUser user, String code, String name) {
         Agent agent = requireEditableLocked(user, code);
         String profile = agent.hermesProfile();
-        SkillStore.requireSkillName(name);
+        SkillFilePaths.requireSkillName(name);
         Map<String, SkillBundle> current = store.readCurrent(profile);
         SkillBundle uploaded = uploadedBundle(current, store.readPending(profile), name);
         if (uploaded == null) {
             throw notFound();
         }
-        SkillBundle previous =
-                store.readPrevious(profile, name).map(PreviousSkill::bundle).orElseThrow(SkillService::notFound);
+        SkillBundle previous = previousStore
+                .readPrevious(profile, name)
+                .map(PreviousSkill::bundle)
+                .orElseThrow(SkillService::notFound);
         requireSkillMd(name, previous.skillMd());
         return saveBundle(user, agent, current, previous, uploaded);
     }
@@ -259,7 +266,7 @@ public class SkillService {
         Map<String, SkillBundle> next = new LinkedHashMap<>(current);
         next.put(bundle.name(), bundle);
         requireNoStoredSecretRequests(next, bundle.name());
-        boolean withScripts = bundle.files().stream().anyMatch(file -> SkillStore.isScript(file.path()));
+        boolean withScripts = bundle.files().stream().anyMatch(file -> SkillFilePaths.isScript(file.path()));
         if (withScripts && !publisher.terminalEnabled(agent)) {
             throw new ApiException(
                     ErrorCode.SKILL_SCRIPTS_NEED_SANDBOX, "this agent has no sandbox shell to run skill scripts");
@@ -276,7 +283,7 @@ public class SkillService {
 
     private void writePreviousQuietly(String profile, SkillBundle replaced) {
         try {
-            store.writePrevious(profile, replaced);
+            previousStore.writePrevious(profile, replaced);
         } catch (RuntimeException ex) {
             log.warn("바뀌기 전 스킬을 이전 버전으로 남기지 못했다 profile={} skill={}", profile, replaced.name(), ex);
         }
@@ -285,7 +292,7 @@ public class SkillService {
     /** 게시가 끝난 뒤 이전 버전을 지운다. 실패해도 저장과 지우기를 실패로 바꾸지 않고 경고 로그만 남긴다. */
     private void deletePreviousQuietly(String profile, String name) {
         try {
-            store.deletePrevious(profile, name);
+            previousStore.deletePrevious(profile, name);
         } catch (RuntimeException ex) {
             log.warn("스킬의 이전 버전을 지우지 못했다 profile={} skill={}", profile, name, ex);
         }
@@ -297,7 +304,7 @@ public class SkillService {
      */
     private Instant previousSavedAt(String profile, String name) {
         try {
-            return store.previousSavedAt(profile, name).orElse(null);
+            return previousStore.previousSavedAt(profile, name).orElse(null);
         } catch (RuntimeException ex) {
             log.warn("스킬의 이전 버전을 읽지 못했다 profile={} skill={}", profile, name, ex);
             return null;
@@ -430,106 +437,6 @@ public class SkillService {
         return locked;
     }
 
-    private static SkillFrontmatter requireSkillMd(String name, String skillMd) {
-        if (skillMd == null || skillMd.isBlank()) {
-            throw new ApiException(ErrorCode.VALIDATION_FAILED, "SKILL.md is required");
-        }
-        if (skillMd.length() > MAX_CHARS_PER_FILE) {
-            throw new ApiException(
-                    ErrorCode.VALIDATION_FAILED, "SKILL.md can be at most " + MAX_CHARS_PER_FILE + " characters");
-        }
-        SkillFrontmatter frontmatter = SkillFrontmatter.parse(skillMd);
-        if (!name.equals(frontmatter.name())) {
-            throw new ApiException(ErrorCode.VALIDATION_FAILED, "SKILL.md frontmatter name must equal the skill name");
-        }
-        if (frontmatter.rawDescriptionLength() > MAX_DESCRIPTION_CHARS) {
-            throw new ApiException(
-                    ErrorCode.VALIDATION_FAILED,
-                    "SKILL.md description can be at most " + MAX_DESCRIPTION_CHARS + " characters");
-        }
-        if (!frontmatter.hasBody()) {
-            throw new ApiException(ErrorCode.VALIDATION_FAILED, "SKILL.md must have content after the frontmatter");
-        }
-        // Hermes 는 이 칸에 적힌 이름으로 profile 의 환경 값과 파일을 셸 실행 공간에 넣는다(ADR-086).
-        if (frontmatter.requestsSecrets()) {
-            throw new ApiException(
-                    ErrorCode.VALIDATION_FAILED,
-                    "SKILL.md frontmatter must not request environment values or credential files");
-        }
-        return frontmatter;
-    }
-
-    /**
-     * 새 버전에 함께 실리는 기존 스킬 가운데 비밀 요청 칸을 가진 것이 있으면 거절한다(ADR-086). 저장 검사가 생기기 전에
-     * 올린 스킬이 다른 스킬의 저장을 타고 다시 게시되지 않게 하려는 것이다. 버전 디렉터리를 쓰기 전에 본다. 지우기는
-     * 그런 스킬을 지울 수 있어야 하므로 이 검사를 거치지 않는다.
-     */
-    private static void requireNoStoredSecretRequests(Map<String, SkillBundle> next, String saving) {
-        List<String> names = next.values().stream()
-                .filter(bundle -> !bundle.name().equals(saving))
-                .filter(bundle -> SkillFrontmatter.storedRequestsSecrets(bundle.skillMd()))
-                .map(SkillBundle::name)
-                .sorted()
-                .toList();
-        if (!names.isEmpty()) {
-            throw new ApiException(
-                    ErrorCode.VALIDATION_FAILED,
-                    "uploaded skills request environment values or credential files; fix or delete them first: "
-                            + String.join(", ", names));
-        }
-    }
-
-    /** 경로 규칙과 수와 중복, 다른 경로의 디렉터리인 경로를 본다. 본문이 온 파일은 글자 수도 본다. */
-    private static List<SkillFileInput> requireFiles(List<SkillFileInput> files) {
-        List<SkillFileInput> inputs = files == null ? List.of() : files;
-        if (inputs.size() > MAX_FILES) {
-            throw new ApiException(ErrorCode.VALIDATION_FAILED, "a skill can have at most " + MAX_FILES + " files");
-        }
-        List<String> paths = new ArrayList<>();
-        for (SkillFileInput input : inputs) {
-            if (input == null) {
-                throw new ApiException(ErrorCode.VALIDATION_FAILED, "a skill file is missing");
-            }
-            SkillStore.requireFilePath(input.path());
-            paths.add(input.path());
-            if (input.content() != null && input.content().length() > MAX_CHARS_PER_FILE) {
-                throw new ApiException(
-                        ErrorCode.VALIDATION_FAILED,
-                        "a skill file can be at most " + MAX_CHARS_PER_FILE + " characters: " + input.path());
-            }
-        }
-        SkillStore.requireFileSet(paths);
-        return inputs;
-    }
-
-    /** 본문이 빠진 파일을 지금 버전에서 채우고, 채운 뒤의 합계 크기를 본다. */
-    private static SkillBundle bundleOf(String name, String skillMd, List<SkillFileInput> inputs, SkillBundle current) {
-        Map<String, String> currentFiles = new HashMap<>();
-        if (current != null) {
-            current.files().forEach(file -> currentFiles.put(file.path(), file.content()));
-        }
-        long totalBytes = utf8Bytes(skillMd);
-        List<SkillFile> files = new ArrayList<>();
-        for (SkillFileInput input : inputs) {
-            String content = input.content();
-            if (content == null) {
-                content = currentFiles.get(input.path());
-                if (content == null) {
-                    throw new ApiException(
-                            ErrorCode.VALIDATION_FAILED,
-                            "no current content to keep for the skill file: " + input.path());
-                }
-            }
-            totalBytes += utf8Bytes(content);
-            files.add(new SkillFile(input.path(), content));
-        }
-        if (totalBytes > MAX_TOTAL_BYTES) {
-            throw new ApiException(
-                    ErrorCode.VALIDATION_FAILED, "a skill can be at most " + MAX_TOTAL_BYTES + " bytes in total");
-        }
-        return new SkillBundle(name, skillMd, files);
-    }
-
     private static SkillDetail detailOf(SkillBundle bundle, Instant previousSavedAt) {
         List<SkillFileInfo> files = bundle.files().stream()
                 .map(file -> new SkillFileInfo(file.path(), utf8Bytes(file.content())))
@@ -545,10 +452,6 @@ public class SkillService {
         } catch (ApiException ex) {
             return "";
         }
-    }
-
-    private static long utf8Bytes(String value) {
-        return value == null ? 0 : value.getBytes(StandardCharsets.UTF_8).length;
     }
 
     private static ApiException notFound() {
