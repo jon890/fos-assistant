@@ -116,8 +116,10 @@ Memory 의 기본 근거는 [`adr/ADR-003-memory-권한은-주입으로-강제�
 | 중간 조각이 디렉터리가 아니거나 심볼릭 링크다 | 404 `WORKSPACE_ENTRY_NOT_FOUND` |
 | 없는 경로 | 404 `WORKSPACE_ENTRY_NOT_FOUND` |
 
-중간 조각은 링크를 따라가지 않고 연다. Linux 에서는 `SecureDirectoryStream` 으로 조각마다 디렉터리 핸들을 열어, 판정한 뒤 다른 것으로 바뀐 경로를 따라가지 않는다.
-그 기능이 없는 운영체제(개발 기계)는 조각마다 링크 여부를 다시 보고 경고를 한 번 남긴다.
+중간 조각은 링크를 따라가지 않고 연다. glibc 위의 JDK 는 `SecureDirectoryStream` 으로 조각마다 디렉터리 핸들을 열어, 판정한 뒤 다른 것으로 바뀐 경로를 따라가지 않는다.
+그 기능이 없으면 대체 경로를 탄다. 운영 이미지(`eclipse-temurin:21-jre-alpine`)는 musl 이라 이쪽이고, 개발 기계(macOS)도 그렇다. 대체 경로는 경고를 한 번 남긴다.
+대체 경로는 조각마다 링크인지 본 뒤 경로로 열고, 연 뒤에 다시 본다. 중간 조각이 모두 링크가 아닌 디렉터리인지, 실제 경로가 사용자 디렉터리 아래인지, 마지막 조각이 연 것과 같은 파일인지 확인하고 어긋나면 404 다.
+이 사후 확인은 확인과 열기 사이의 틈을 줄일 뿐 없애지 못한다. glibc 이미지로 옮겨 대체 경로 없이 꺼지게(fail-closed) 하는 일은 이슈 #359 가 갖는다([ADR-20261009 / workspace-explorer](adr/ADR-20261009-workspace-explorer.md) 의 「감당할 것」).
 
 목록의 한 줄은 아래 종류 가운데 하나다.
 
@@ -137,7 +139,7 @@ Memory 의 기본 근거는 [`adr/ADR-003-memory-권한은-주입으로-강제�
 
 | 경로 | 하는 일 | 응답 |
 | --- | --- | --- |
-| `GET /api/v1/workspace` | 공간의 상태 | `{available, deletable, exists, runningExecutions, agents: [{code, name, shared}]}`. `exists` 는 사용자 디렉터리가 있는지다. `agents` 는 요청자가 주인인 지우지 않은 에이전트이고, `shared` 는 그룹에 공개했는지다. `runningExecutions` 는 사용자 실행 한도가 세는 지금 쥔 자리 수다 |
+| `GET /api/v1/workspace` | 공간의 상태 | `{available, deletable, exists, runningExecutions, agents: [{code, name, shared}]}`. `exists` 는 사용자 디렉터리가 있는지다. `agents` 는 요청자가 주인이고 켜져 있으며 지우지 않은 에이전트이고, `shared` 는 그룹에 공개했는지다. `runningExecutions` 는 사용자 실행 한도가 세는 지금 쥔 자리 수다 |
 | `GET /api/v1/workspace/entries?path=` | 디렉터리 하나의 목록 | `{path, entries: [{name, kind, size, modifiedAt, readable, openable}], truncated}`. 디렉터리를 먼저, 그다음 이름 순서다. 1,000 줄까지 주고 더 있으면 `truncated` 가 참이다. `size` 는 `FILE` 만 채운다. 사용자 디렉터리가 아직 없으면 빈 목록이다 |
 | `GET /api/v1/workspace/files/{경로}` | 미리보기 본문 | 아래 「본문 머리글」. 경로의 조각마다 URL 인코딩한다 |
 | `GET /api/v1/workspace/files/{경로}?download=1` | 내려받기 | 크기 상한 없이 스트림으로 준다 |
@@ -150,6 +152,9 @@ Memory 의 기본 근거는 [`adr/ADR-003-memory-권한은-주입으로-강제�
 | 읽을 수 없다(권한, 하드 링크) | 403 `WORKSPACE_ENTRY_UNREADABLE` |
 | 미리보기를 정하지 않은 확장자 | 415 `WORKSPACE_PREVIEW_UNSUPPORTED` |
 | 미리보기 크기를 넘는다 | 413 `WORKSPACE_PREVIEW_TOO_LARGE` |
+
+목록에서 Control Plane 이 읽지 못하는 디렉터리는 403 `WORKSPACE_ENTRY_UNREADABLE` 이다. 예상하지 못한 입출력 오류는 500 `INTERNAL_ERROR` 이고 로그에는 사용자 번호와 예외 종류만 남는다.
+응답 본문은 파일을 연 시점의 크기까지만 보낸다. 그 사이 파일이 커져도 `Content-Length` 와 본문이 어긋나지 않는다.
 
 ### 본문 머리글
 
