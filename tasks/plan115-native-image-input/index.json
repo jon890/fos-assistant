@@ -1,0 +1,12 @@
+{
+  "name": "plan115-native-image-input",
+  "description": "보내는 메시지의 사진을 긴 변 1600px JPEG 로 줄여 /v1/runs 입력에 이미지 파트로 싣는다. 큰 사진의 파일 읽기 잘림으로 vision_analyze 가 실패하는 문제를 피한다",
+  "status": "pending",
+  "created_at": "2026-10-09",
+  "total_phases": 2,
+  "current_phase": 1,
+  "phases": [
+    { "number": 1, "file": "phase-01.md", "execution_profile": "standard" },
+    { "number": 2, "file": "phase-02.md", "execution_profile": "fast" }
+  ]
+}

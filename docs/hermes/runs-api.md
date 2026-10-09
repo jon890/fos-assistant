@@ -72,33 +72,62 @@ Control Plane 이 다시 뜰 때 남은 실행을 이 조회로 다시 정한다
 
 **가짜 Hermes 의 실행 조회도 이 모양으로 둔다.** 도는 실행은 `running`, 끝난 실행은 같은 답을 되풀이하고, 지운 run 과 모르는 run 은 404 다.
 
-## `/v1/runs` 는 이미지를 받지 않는다
+## `/v1/runs` 에 사진을 싣는 법
 
-v0.21.3 에서 확인했다. `content` 에 이미지를 담은 항목을 해석하는 자리가 경로마다 다르다.
+v0.21.5(`v2026.9.24`)의 소스를 읽어 확인했다. 운영 Hermes 에서 왕복으로 확인하는 방법은 아래 「운영에서 확인할 것」 에 있다.
 
-| 경로 | 이미지 항목 |
+**`input` 의 마지막 항목의 `content` 를 목록으로 보내면 그대로 에이전트에 간다.**
+[`api_server_runs.py`](https://github.com/NousResearch/hermes-agent/blob/v2026.9.24/gateway/platforms/api_server_runs.py) 의 `_handle_runs` 가 `raw_input[-1].get("content")` 를 꺼내 `run_conversation` 에 넘긴다.
+다른 경로가 부르는 정규화 함수(`api_server.py` 의 `_normalize_multimodal_content`)는 부르지 않는다.
+그래서 `data:image/` 확인, `file` 파트 거절, 글 64KB 자르기가 이 경로에는 없다. **보내는 쪽이 정규화한 모양(`{"type": "image_url", "image_url": {"url": ...}}`)으로 보낸다.**
+
+```text
+"input": [
+  {"role": "user", "content": [
+    {"type": "text", "text": "<입력 글>"},
+    {"type": "text", "text": "1번째 사진"},
+    {"type": "image_url", "image_url": {"url": "data:image/jpeg;base64,..."}}
+  ]}
+]
+```
+
+| 무엇 | 동작 |
 | --- | --- |
-| `POST /v1/chat/completions` | 받는다 |
-| `POST /v1/responses` | 받는다 |
-| `POST /api/sessions/{id}/chat` | 받는다 |
-| `POST /v1/runs` | 받지 않는다 |
+| 마지막이 아닌 `input` 항목 | 목록이면 글 파트만 이어 붙이고 이미지는 버린다(`_resolve_conversation_history`). 사진은 마지막 항목에만 싣는다 |
+| 요청 본문 `conversation_history` | `str()` 로 바뀐다. 목록을 넣으면 base64 가 글로 모델에 간다. 쓰지 않는다 |
+| 요청 본문 상한 | 10MB(`MAX_REQUEST_BYTES`, `client_max_size`). `Content-Length` 로 판정해 넘으면 413 이다 |
+| provider 로 가는 모양 | Chat Completions 는 파트를 그대로 보낸다. Responses(codex 계열)는 `input_image` 로, Anthropic 은 base64 이미지 블록으로, Gemini native 는 `inlineData` 로 바꾼다 |
+| 모델이 이미지를 받지 않는다 | 요청마다 그 모델의 vision 지원을 판정한다(`image_routing.py` 의 `_lookup_supports_vision`, config 재정의, models.dev 순서). 지원하지 않거나 판정하지 못하면 보조 vision 모델의 설명 글로 바꿔 보낸다(`vision_message_prep.py`) |
+| 상류가 이미지를 거절한다 | 오류 문구로 알아보고 그 요청 사본에서 이미지를 뗀 뒤 다시 시도한다(`turn_recovery.py`). 너무 크다는 거절은 줄여 한 번 다시 시도한다 |
+| fallback provider 로 넘어갔다 | 위 판정이 넘어간 모델 기준으로 다시 돈다 |
+| session 기록 | 이미지 파트는 `[screenshot]` 글로 저장된다(`session_persistence.py` 의 `_durable_content`). 다음 실행의 기록에 이미지가 다시 실리지 않는다 |
+| 같은 턴의 도구 루프 | 모델을 다시 부를 때마다 사용자가 올린 이미지가 다시 실린다. 요청에서 빼는 정책은 도구 결과 이미지에만 적용된다 |
+| 압축이 그 턴에 돈다 | 원본 파트가 기록에 남을 수 있다. 압축은 가장 최근 이미지 메시지 앞의 이미지를 「[Attached image — stripped after compression]」 으로 바꾼다 |
+| API 오류 | 요청 전체를 `request_dump_*.json` 으로 남긴다. base64 가 들어간다 |
+| `pre_llm_call`, `post_llm_call` hook | `user_message` 로 목록을 그대로 받는다. 우리 plugin 은 두 hook 을 쓰지 않는다 |
+| 사용량 | 이미지 토큰을 따로 나누지 않는다. provider 가 준 입력 토큰에 섞인다 |
+| `detail` | Responses 만 옮기고 Anthropic, Gemini 는 무시한다. Control Plane 은 보내지 않는다 |
 
-앞의 셋은 본문을 `{"type": "image_url"}` 모양으로 정규화하는 함수를 지난다.
-그 함수는 `http(s)` 주소와 `data:image/...` 두 가지만 받고,
-그 밖의 `data:` 와 파일 항목은 400 으로 거절한다.
+Control Plane 이 이 모양으로 사진을 싣는 결정은 [ADR-20261009 / native-image-input](../adr/ADR-20261009-native-image-input.md) 에 있다.
 
-`/v1/runs` 는 그 함수를 부르지 않는다.
-`input` 의 마지막 항목에서 `content` 를 꺼내 그대로 쓴다.
-검사하는 자리가 없으므로 이미지 항목을 넣어도 거절되지 않고, 해석된다는 보장도 없다.
+**가짜 Hermes 도 목록 `input` 을 받는다.** 마지막 항목의 첫 글 파트를 입력 글로 읽고, 이미지 파트를 그 앞의 이름표 글과 함께 따로 기억한다.
 
-**그래서 사진을 대화 본문에 실어 보내는 길이 없다.**
-Control Plane 은 `/v1/runs` 를 쓰고, 그것을 버리면 `run_id` 와 사건 스트림과 실행 기록을 함께 버린다.
+### 운영에서 확인할 것
+
+배포한 뒤 사진을 붙여 한 번 보내 본다. 실제 명령은 `fos-home-infra` 가 갖는다.
+
+- 답이 사진 내용을 말하고, 그 실행의 도구 사건에 `vision_analyze` 가 없다
+- 그 실행에 413 이나 `invalid_image_url` 같은 오류가 없다
+- 다음 메시지에서 지난 사진을 물으면 에이전트가 `vision_analyze` 로 파일을 본다
 
 ## 이미지 파일은 `vision_analyze` 로 본다
 
 `read_file` 이 이미지 확장자를 만나면 내용을 돌려주지 않고 `vision_analyze` 를 쓰라는 안내를 낸다.
-에이전트가 사진을 보는 길은 대화 본문이 아니라 이 도구다.
-그러므로 사진을 에이전트가 닿는 자리에 놓아 두면 모델이 그것을 읽는다.
+입력에 싣지 못한 사진과 지난 메시지의 사진은 이 도구로 본다.
+
+실행 공간(Docker)의 파일은 컨테이너 안에서 `head -c <50MB+1> < 경로 | base64` 로 읽는다(`tools/image_source.py`).
+운영에서 3MB 를 넘는 사진이 가끔 「image file is truncated」 로 실패했다. Pillow 가 디코딩하다 바이트가 모자란 것이다.
+어디서 잘리는지는 확인하지 못했다. 파이프의 종료 코드가 마지막 명령의 것이라 읽기 오류가 가려진다.
 
 ## 모델은 실행마다 정한다
 
