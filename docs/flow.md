@@ -454,7 +454,8 @@ sequenceDiagram
     participant C as Control Plane
     participant D as 읽기 전용 마운트
 
-    B->>W: /files 를 연다
+    B->>W: /files 를 연다(페이지만 받는다. 서버에서 읽는 것은 없다)
+    B->>W: GET /api/workspace
     W->>C: GET /api/v1/workspace
     alt 루트가 설정되지 않았거나 디렉터리가 아니다
         C-->>B: available false. 「파일 공간을 쓸 수 없어요」
@@ -485,4 +486,5 @@ sequenceDiagram
     end
 ```
 
+상태와 목록은 브라우저가 읽고, 실패는 그 자리의 다시 읽기로 다룬다.
 목록을 연 사이 에이전트가 파일을 바꾸면 다음 읽기에 보인다. 화면은 스스로 다시 읽지 않는다.

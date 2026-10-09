@@ -44,7 +44,7 @@ API 와 머리글은 `docs/code-architecture.md` 의 「실행 공간 파일」,
 git apply tasks/plan114-workspace-explorer/docs-web.patch.md
 ```
 
-`docs/frontend/structure.md` 와 `docs/frontend/shell.md` 가 바뀐다. 이 phase 의 구현은 그 문서와 같아야 한다.
+`docs/frontend/structure.md`, `docs/frontend/shell.md`, `docs/code-architecture.md`(「아직 만들지 않은 것」 줄) 가 바뀐다. 이 phase 의 구현은 그 문서와 같아야 한다.
 
 ### 2. 서버 라우트 셋
 
@@ -141,6 +141,8 @@ grep -rn 'style={{' web/src/components/workspace/
 
 | 파일 | 변경 |
 |---|---|
+| `docs/code-architecture.md` | 수정 |
+| `docs/flow.md` | 수정 |
 | `docs/frontend/structure.md` | 수정 |
 | `docs/frontend/shell.md` | 수정 |
 | `web/src/app/api/workspace/route.ts` | 신규 |
