@@ -389,7 +389,7 @@ export function ConnectorConnectionPanel({
               </Button>
             </form>
           ) : null}
-          {available && status === "PENDING" ? (
+          {available && status !== "DISCONNECTED" ? (
             <Button
               disabled={busy}
               variant="outline"

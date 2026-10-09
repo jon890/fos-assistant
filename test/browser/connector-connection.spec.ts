@@ -1,4 +1,5 @@
 import { expect, test } from "./fixtures.ts";
+import { clickAndWaitForResponse } from "./helpers.ts";
 
 const DEMO_ID = "demo-notes";
 const SCOPE_ID = "scope-a";
@@ -138,6 +139,34 @@ test("카드에서 연결 화면으로 들어가 값을 등록하고 확인한 �
       () => document.documentElement.scrollWidth <= window.innerWidth,
     ),
   ).toBe(true);
+});
+
+test("연결된 서비스도 다시 확인하면 확인 시각을 갱신한다", async ({ page }) => {
+  await page.route(`**/api/connections/${DEMO_ID}`, (route) =>
+    route.fulfill({ json: ready }),
+  );
+  const checkedAt = "2026-10-01T12:00:00Z";
+  let checks = 0;
+  await page.route(`**/api/connections/${DEMO_ID}/check`, (route) => {
+    checks += 1;
+    return route.fulfill({ json: { ...ready, checkedAt } });
+  });
+  await page.goto(`/connections/${DEMO_ID}`);
+  await expect(page.getByTestId("connection-status")).toHaveText("연결됨");
+  const before = await page.getByText(/마지막 확인:/).textContent();
+  const check = page.getByRole("button", { name: "연결 다시 확인" });
+  await expect(check).toBeVisible();
+  await expect(check).toHaveAttribute("data-variant", "outline");
+  await clickAndWaitForResponse(
+    page,
+    check,
+    "POST",
+    /\/connections\/demo-notes\/check$/,
+  );
+  expect(checks).toBe(1);
+  await expect(page.getByTestId("connection-status")).toHaveText("연결됨");
+  await expect(page.getByText(/마지막 확인:/)).not.toHaveText(before!);
+  await expect(check).toBeEnabled();
 });
 
 test("등록이 거절되면 비밀 칸을 비우고 정해 둔 문구만 보인다", async ({
@@ -449,9 +478,7 @@ test("재시작 대기가 아닌 PENDING 바인딩은 반영 중으로 보이고
     }),
   );
   await page.goto("/admin/connections");
-  const rows = page
-    .getByTestId("connector-admin-panel")
-    .getByRole("listitem");
+  const rows = page.getByTestId("connector-admin-panel").getByRole("listitem");
   await expect(rows).toHaveCount(2);
   const live = rows.filter({ hasText: "에이전트 agent-live" });
   const restart = rows.filter({ hasText: "에이전트 agent-restart" });
