@@ -29,10 +29,10 @@ export function draftRevision(content: DraftContent) {
   return createHash("sha256").update(canonical).digest("hex").slice(0, 16);
 }
 
-type Edit = { kind: "same" | "remove" | "add"; line: string };
+export type Edit = { kind: "same" | "remove" | "add"; line: string };
 
 /** 두 줄 목록의 최장 공통 부분열로 편집 목록을 만든다. 표가 너무 크면 모두 지우고 모두 더한다. */
-function lineEdits(before: string[], after: string[]): Edit[] {
+export function lineEdits(before: string[], after: string[]): Edit[] {
   const n = before.length;
   const m = after.length;
   if ((n + 1) * (m + 1) > DIFF_CELLS_MAX)

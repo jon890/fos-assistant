@@ -1,5 +1,11 @@
 import { expect, test } from "bun:test";
-import { DocumentShapeError, documentToDraft, EXISTING_LINE } from "../src/document.ts";
+import {
+  DocumentShapeError,
+  documentToDraft,
+  draftToDocument,
+  type EditorDocument,
+  EXISTING_LINE,
+} from "../src/document.ts";
 
 const paragraph = (...values: string[]) => ({
   nodes: values.map((value) => ({ value, "@ctype": "textNode" })),
@@ -52,4 +58,170 @@ test.each([
   ],
 ])("%s 는 DocumentShapeError 다", (_, data) => {
   expect(() => documentToDraft(data as never)).toThrow(DocumentShapeError);
+});
+
+const NEW_ID = /^SE-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+
+/** 꾸밈 칸을 넣은 문단. 다시 쓴 문단이 원래 객체를 그대로 옮겼는지 본다. */
+const styled = (id: string, value: string) => ({
+  id,
+  nodes: [
+    { id: `${id}-node`, value, style: { fontSizeCode: "fs19", bold: true }, "@ctype": "textNode" },
+  ],
+  "@ctype": "paragraph",
+});
+
+/** 새로 만든 문단. 꾸밈 칸이 없고 id 는 새로 만든 모양이다. */
+const fresh = (value: string) => ({
+  id: expect.stringMatching(NEW_ID),
+  nodes: [{ id: expect.stringMatching(NEW_ID), value, "@ctype": "textNode" }],
+  "@ctype": "paragraph",
+});
+
+/** 제목 구성요소. 원래 문서와 고친 문서가 같은 id 를 쓴다. */
+const titleComponent = (value: string) => ({
+  id: "SE-title",
+  layout: "default",
+  title: [
+    {
+      id: "SE-title-p",
+      nodes: [{ id: "SE-title-n", value, "@ctype": "textNode" }],
+      "@ctype": "paragraph",
+    },
+  ],
+  "@ctype": "documentTitle",
+});
+
+/**
+ * 글 셋, 사진 둘, 스티커 하나인 문서.
+ * 원래 본문은 `첫 줄`, `둘째 줄`, 사진 1, 사진 2, 스티커 1, `셋째 줄` 이다.
+ */
+const sample = (): EditorDocument =>
+  ({
+    documentId: "1",
+    document: {
+      id: "SE-doc",
+      version: "2.8.0",
+      theme: "default",
+      components: [
+        titleComponent("가상 국수"),
+        {
+          id: "SE-t1",
+          layout: "default",
+          value: [styled("SE-p1", "첫 줄"), styled("SE-p2", "둘째 줄")],
+          "@ctype": "text",
+        },
+        { id: "SE-a", src: "https://example.com/a.jpg", "@ctype": "image" },
+        { id: "SE-b", src: "https://example.com/b.jpg", "@ctype": "image" },
+        { id: "SE-s", packCode: "가상", "@ctype": "sticker" },
+        { id: "SE-t2", layout: "default", value: [styled("SE-p3", "셋째 줄")], "@ctype": "text" },
+      ],
+    },
+  }) as EditorDocument;
+
+const components = (data: EditorDocument) => data.document!.components!;
+/** 글이 아닌 구성요소의 id 차례. */
+const existingIds = (data: EditorDocument) =>
+  components(data)
+    .filter((component) => component["@ctype"] !== "documentTitle" && component["@ctype"] !== "text")
+    .map((component) => component.id);
+
+test("고친 글로 만든 문서는 기존 구성요소를 본문 차례로 옮기고 바뀌지 않은 문단은 원래 객체를 쓴다", () => {
+  const original = sample();
+  const copy = structuredClone(original);
+
+  const result = draftToDocument(
+    original,
+    "가상 칼국수",
+    "첫 줄\n[기존 사진 2]\n둘째 줄을 고쳤다\n[기존 사진 1]\n셋째 줄",
+  );
+
+  expect(original).toEqual(copy);
+  const list = components(result);
+  expect(list.map((component) => component["@ctype"])).toEqual([
+    "documentTitle",
+    "text",
+    "image",
+    "text",
+    "image",
+    "text",
+  ]);
+  expect(existingIds(result)).toEqual(["SE-b", "SE-a"]);
+  expect(list[2]).toEqual(components(copy)[3]!);
+  expect(list[4]).toEqual(components(copy)[2]!);
+
+  const reread = documentToDraft(result);
+  expect(reread.title).toBe("가상 칼국수");
+  expect(reread.body.split("\n")).toEqual([
+    "첫 줄",
+    "[기존 사진 1]",
+    "둘째 줄을 고쳤다",
+    "[기존 사진 2]",
+    "셋째 줄",
+  ]);
+
+  // 바뀌지 않은 문단은 id 와 꾸밈까지 원래와 같고, 고친 문단은 새 id 의 꾸밈 없는 문단이다.
+  expect(list[1]!.value).toEqual([styled("SE-p1", "첫 줄")]);
+  expect(list[5]!.value).toEqual([styled("SE-p3", "셋째 줄")]);
+  expect(list[3]!.value).toEqual([fresh("둘째 줄을 고쳤다")]);
+  for (const index of [1, 3, 5]) {
+    expect(list[index]!.id).toMatch(NEW_ID);
+    expect(list[index]!.layout).toBe("default");
+  }
+
+  // 제목은 원래 구성요소와 첫 문단, 첫 노드의 id 를 지키고 루트 칸은 그대로다.
+  expect(list[0]).toEqual(titleComponent("가상 칼국수"));
+  expect({ ...result, document: { ...result.document, components: [] } }).toEqual({
+    ...copy,
+    document: { ...copy.document, components: [] },
+  });
+});
+
+test("앞 사진을 빼면 뒤 사진만 남고 다시 읽으면 그 사진이 1 번이다", () => {
+  const result = draftToDocument(
+    sample(),
+    "가상 국수",
+    "첫 줄\r\n둘째 줄\r\n[기존 사진 2]\r\n[기존 스티커 1]\r\n셋째 줄",
+  );
+
+  expect(existingIds(result)).toEqual(["SE-b", "SE-s"]);
+  expect(documentToDraft(result).body.split("\n")).toEqual([
+    "첫 줄",
+    "둘째 줄",
+    "[기존 사진 1]",
+    "[기존 스티커 1]",
+    "셋째 줄",
+  ]);
+  expect(components(result)[1]!.value).toEqual([
+    styled("SE-p1", "첫 줄"),
+    styled("SE-p2", "둘째 줄"),
+  ]);
+});
+
+test.each([
+  ["원래 글에 없는 기존 구성요소 줄", "첫 줄\n[기존 지도 1]"],
+  ["두 번 쓴 기존 구성요소 줄", "[기존 사진 1]\n첫 줄\n[기존 사진 1]"],
+])("%s 는 DocumentShapeError 다", (_, body) => {
+  expect(() => draftToDocument(sample(), "가상 국수", body)).toThrow(DocumentShapeError);
+});
+
+test("빈 본문은 빈 문단 하나의 글 구성요소가 된다", () => {
+  const result = draftToDocument(sample(), "가상 국수", "");
+
+  const list = components(result);
+  expect(list.map((component) => component["@ctype"])).toEqual(["documentTitle", "text"]);
+  expect(list[1]!.value).toEqual([fresh("")]);
+  expect(documentToDraft(result).body).toBe("");
+});
+
+test("기존 구성요소 줄만 남은 본문은 끝에 빈 글 구성요소를 더해 다시 읽으면 빈 줄이 붙는다", () => {
+  const result = draftToDocument(sample(), "가상 국수", "[기존 스티커 1]");
+
+  expect(components(result).map((component) => component.id)).toEqual([
+    "SE-title",
+    "SE-s",
+    expect.stringMatching(NEW_ID),
+  ]);
+  expect(components(result)[2]!.value).toEqual([fresh("")]);
+  expect(documentToDraft(result).body).toBe("[기존 스티커 1]\n");
 });
