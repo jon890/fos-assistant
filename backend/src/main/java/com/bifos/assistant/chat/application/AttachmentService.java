@@ -188,9 +188,10 @@ public class AttachmentService {
     /**
      * Hermes 에 보낼 입력을 만든다. 사진이 놓인 자리와 파일 이름, 사진을 어떻게 볼지를 사용자가 쓴 글 앞에 붙인다.
      *
-     * <p>{@code embedImages} 가 참이면 이번 메시지의 사진을 줄인 사본으로 실행 입력에 함께 싣고, 상한 밖이거나
-     * 사본이 없어 싣지 못한 사진은 경로를 적어 같은 턴에 {@code vision_analyze} 로 보게 한다. 근거는 ADR-20261009 /
-     * native-image-input 에 있다. 흐름은 사진을 싣지 않으므로 거짓을 넘기고, 그때는 모든 사진을 경로로 안내한다.
+     * <p>{@code embedImages} 가 참이면 이번 메시지의 사진을 줄인 사본으로 실행 입력에 함께 싣는다. 사진이 많으면 모든 사진을
+     * 더 작은 긴 변 단계로 줄여 싣고 그 긴 변을 적는다. 가장 작은 단계에서도 예산을 넘었거나 사본이 없어 싣지 못한 사진은
+     * 경로를 적어 같은 턴에 {@code vision_analyze} 로 한 장씩 보게 한다. 근거는 ADR-20261009 / native-image-input 에 있다.
+     * 흐름은 사진을 싣지 않으므로 거짓을 넘기고, 그때는 모든 사진을 경로로 안내한다.
      * 경로는 Hermes 컨테이너에서 보이는 {@code agentRoot} 로 적는다. 파일은 디스크 이름으로만 찾을 수 있고, 올릴 때의
      * 이름은 알아보라고 괄호로만 붙인다. 파일을 올리거나 고치는 도구에는 원본을 쓰라고 함께 적는다.
      *
@@ -227,6 +228,7 @@ public class AttachmentService {
                 + photoGuidance(directory, photos)
                 + "지난 메시지의 사진은 같은 폴더의 {첨부 번호}.small.jpg 를, 없으면 원본을 vision_analyze 로 본다."
                 + " read_file 로 읽지 않는다.\n"
+                + "vision_analyze 는 한 번에 한 장씩, 앞 호출의 결과를 받은 뒤 다음 사진을 부른다.\n"
                 + "파일을 올리거나 고치는 도구에는 위 목록의 원본 파일을 쓴다.\n"
                 + "사용자에게 사진을 가리킬 때는 파일 이름 대신 몇 번째 사진인지로 적는다.\n"
                 + "\n"
@@ -238,7 +240,10 @@ public class AttachmentService {
         return new AgentInput(input, hermesImages);
     }
 
-    /** 이번 메시지의 사진이 몇 장이고, 어느 사진을 실었고, 싣지 못한 사진은 어느 경로로 보는지 적는다. */
+    /**
+     * 이번 메시지의 사진이 몇 장이고, 어느 사진을 실었고, 싣지 못한 사진은 어느 경로로 보는지 적는다. 실은 사진은 모두 같은
+     * 단계라 첫 사진의 긴 변을 적는다.
+     */
     private static String photoGuidance(String directory, List<AgentPhoto> photos) {
         StringBuilder guidance =
                 new StringBuilder("사진은 모두 ").append(photos.size()).append("장이다.\n");
@@ -249,6 +254,13 @@ public class AttachmentService {
                             .map(photo -> photo.ordinal() + "번째")
                             .collect(Collectors.joining(", ")))
                     .append(" 사진. 이미 보이므로 파일로 다시 읽지 않아도 된다.\n");
+            int longSide = embedded.getFirst().longSide();
+            if (longSide < AgentImageResizer.LONG_SIDE) {
+                guidance.append("사진이 많아 긴 변 ")
+                        .append(longSide)
+                        .append("px 로 줄여 실었다. 작은 글씨나 세부가 필요한 사진만 같은 폴더의 {첨부 번호}.small.jpg 를")
+                        .append(" vision_analyze 로 본다.\n");
+            }
         }
         List<AgentPhoto> notEmbedded =
                 photos.stream().filter(photo -> !photo.embedded()).toList();
