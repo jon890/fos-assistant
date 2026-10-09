@@ -131,6 +131,10 @@ export async function collectJobFailures(jobs, readReport) {
   return failures;
 }
 
+// 처리하는 사람이 이슈에서 바로 읽도록 새 이슈 본문 끝에 붙인다. 재발 댓글에는 붙이지 않는다.
+export const HANDLING =
+  "PR 에서 난 실패는 그 PR 에서 고친다. 이 이슈는 main 과 매일 실행에서 모인 실패다. 고치거나, 고치지 않는 까닭을 적어 닫는다.";
+
 function markerFor(file, project) {
   const hash = createHash("sha256").update(`${project}:${file}`).digest("hex");
   return `<!-- browser-failure:${hash} -->`;
@@ -187,7 +191,7 @@ export async function publishFailures(failures, api, context) {
       const created = await api("POST", `${prefix}/issues`, {
         title: `[브라우저 실패] ${first.project}: ${first.file}`,
         labels: [LABEL],
-        body,
+        body: `${body}\n\n${HANDLING}`,
       });
       open.push(created);
     }
