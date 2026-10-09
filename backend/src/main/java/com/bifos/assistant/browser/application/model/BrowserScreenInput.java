@@ -34,7 +34,12 @@ public record BrowserScreenInput(
             entry("ArrowUp", 38),
             entry("ArrowRight", 39),
             entry("ArrowDown", 40),
-            entry("Delete", 46));
+            entry("Delete", 46),
+            entry("PageUp", 33),
+            entry("PageDown", 34),
+            entry("Home", 36),
+            entry("End", 35),
+            entry("Space", 32));
 
     /** 주소의 길이 상한이다. */
     private static final int MAX_URL = 2048;
@@ -43,6 +48,7 @@ public record BrowserScreenInput(
     public enum Kind {
         MOUSE,
         WHEEL,
+        SCROLL,
         KEY,
         TEXT,
         NAVIGATE,

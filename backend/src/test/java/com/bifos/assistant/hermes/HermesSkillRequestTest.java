@@ -106,6 +106,33 @@ class HermesSkillRequestTest {
     }
 
     @Test
+    @DisplayName("실행 공간 필수 게시는 도구 목록과 require sandbox 를 싣고 보통 게시는 그 칸을 싣지 않는다")
+    void publishRequiringSandboxCarriesToolListAndRequireSandbox() throws Exception {
+        client.publishRequiringSandbox(
+                "kid", List.of("/skills/kid/v1790661162144-a1b2"), List.of("terminal", "skills"), "u7");
+        status = 409;
+        response = "{\"detail\":\"sandbox is not configured\",\"code\":\"sandbox_unavailable\"}";
+
+        assertThatThrownBy(() -> client.publishRequiringSandbox(
+                        "kid", List.of("/skills/kid/v1790661162144-a1b2"), List.of("terminal", "skills"), "u7"))
+                .isInstanceOfSatisfying(
+                        HermesRequestRejected.class,
+                        ex -> assertThat(ex.code()).isEqualTo(ErrorCode.AGENT_SANDBOX_UNAVAILABLE));
+        assertThat(new ObjectMapper().readValue(calls.get(0).body(), Map.class))
+                .isEqualTo(Map.of(
+                        "profile",
+                        "kid",
+                        "config",
+                        Map.of(
+                                "skills", Map.of("external_dirs", List.of("/skills/kid/v1790661162144-a1b2")),
+                                "platform_toolsets", Map.of("api_server", List.of("terminal", "skills"))),
+                        "sandbox_owner",
+                        "u7",
+                        "require_sandbox",
+                        true));
+    }
+
+    @Test
     @DisplayName("게시가 409 sandbox_unavailable 이면 실행 공간 오류 코드의 거절 예외다")
     void publishConflictWithSandboxUnavailableIsRejectionWithSandboxCode() {
         status = 409;
