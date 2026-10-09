@@ -10,14 +10,13 @@ const SPACES = [
   { kind: "USER", id: 9, name: null, bytes: 0, entries: 0, partial: false },
 ];
 
-/** `/api/admin/workspaces` 를 차례로 답한다. 마지막 응답은 그 뒤 요청에도 되풀이한다. */
-async function fakeUsage(page: Page, ...responses: Array<{ status: number; json: unknown }>): Promise<void> {
-  let index = 0;
-  await page.route("**/api/admin/workspaces", (route) => {
-    const response = responses[Math.min(index, responses.length - 1)];
-    index += 1;
-    return route.fulfill(response);
-  });
+type FakeResponse = { status: number; json: unknown };
+
+/** `/api/admin/workspaces` 를 가짜로 답한다. 함수를 주면 요청마다 그때의 응답을 고른다. */
+async function fakeUsage(page: Page, respond: FakeResponse | (() => FakeResponse)): Promise<void> {
+  await page.route("**/api/admin/workspaces", (route) =>
+    route.fulfill(typeof respond === "function" ? respond() : respond),
+  );
 }
 
 function usageTable(page: Page) {
@@ -58,10 +57,12 @@ test("실행 공간이 하나도 없으면 빈 안내가 보인다", async ({ pa
 });
 
 test("읽지 못하면 오류 코드 없이 불러오지 못했다는 안내를 보이고 다시 읽으면 표가 나온다", async ({ page }) => {
-  await fakeUsage(
-    page,
-    { status: 500, json: { code: "INTERNAL_ERROR", message: "용량을 세지 못했어요." } },
-    { status: 200, json: { available: true, spaces: SPACES } },
+  // 「다시 읽기」 를 누르기 전에는 몇 번을 읽어도 500 이다. 개발 서버에서 effect 가 두 번 돌아도 결과가 같다.
+  let recovered = false;
+  await fakeUsage(page, () =>
+    recovered
+      ? { status: 200, json: { available: true, spaces: SPACES } }
+      : { status: 500, json: { code: "INTERNAL_ERROR", message: "용량을 세지 못했어요." } },
   );
   await page.goto("/admin/workspaces");
 
@@ -70,6 +71,7 @@ test("읽지 못하면 오류 코드 없이 불러오지 못했다는 안내를 
   await expect(page.getByText("INTERNAL_ERROR")).toHaveCount(0);
   await expect(usageTable(page)).toHaveCount(0);
 
+  recovered = true;
   await alert.getByRole("button", { name: "다시 읽기" }).click();
   await expect(usageTable(page).getByTestId("admin-workspace")).toHaveCount(3);
   await expect(page.getByRole("main").getByRole("alert")).toHaveCount(0);
