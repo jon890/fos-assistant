@@ -7,11 +7,13 @@ import re
 from typing import Optional
 from .common import (
     CONTROL_PLANE_MCP,
+    SKILL_ROOT_ENV,
     _atomic_private_write,
     _json_object,
     _missing_profile,
     _profile_rejection,
     _rejected,
+    _skill_root,
     logger,
 )
 
@@ -39,8 +41,6 @@ from .sandbox import (
 from .sandbox_approvals import _with_sandbox_approvals
 
 
-# Control Plane 이 올린 스킬을 두는 루트의 Hermes 컨테이너 쪽 경로다. Compose 가 준다.
-SKILL_ROOT_ENV = "FOS_ASSISTANT_SKILL_AGENT_ROOT"
 # 올린 스킬의 버전 디렉터리 이름이다. `.` 과 `..` 은 첫 글자 규칙에서 걸린다.
 SKILL_VERSION_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$")
 # 버전 디렉터리 아래에서 심볼릭 링크를 찾을 때 볼 항목 수의 상한이다.
@@ -96,13 +96,6 @@ def _toolset_rejection(allowed) -> Optional[object]:
     if "memory" in allowed or CONTROL_PLANE_MCP not in allowed:
         return _rejected("memory 는 끄고 Control Plane MCP 는 허용해야 한다")
     return None
-
-
-def _skill_root() -> Optional[pathlib.Path]:
-    raw = os.environ.get(SKILL_ROOT_ENV, "").strip()
-    if not raw or not os.path.isabs(raw):
-        return None
-    return pathlib.Path(raw)
 
 
 def _skill_dir_rejection(profile: str, entry, root: pathlib.Path) -> Optional[object]:
