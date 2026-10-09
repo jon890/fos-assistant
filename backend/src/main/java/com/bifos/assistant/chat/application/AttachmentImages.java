@@ -35,6 +35,13 @@ public class AttachmentImages {
      */
     private static final long DECODING_WAIT_SECONDS = 30;
 
+    /**
+     * 보낼 때 사본을 만들려고 디코딩 차례를 기다리는 시간(초)이다. 보낼 때는 실행 기록을 만들기 전이라 사본 없는 사진마다
+     * 30초를 기다리면 실행 시작이 크게 늦고 그동안 사용자가 중지할 수도 없다. 차례를 얻지 못한 사진은 싣지 않고 원본 경로로
+     * 안내한다.
+     */
+    static final long SEND_WAIT_SECONDS = 5;
+
     /** 한 턴에 싣는 사진 수 상한이다. 같은 턴의 도구 호출마다 이미지가 다시 실리므로 토큰을 묶는다. */
     static final int MAX_IMAGES = 10;
 
@@ -50,16 +57,26 @@ public class AttachmentImages {
     private final Semaphore decoding = new Semaphore(DECODING_SLOTS);
 
     /**
-     * 줄인 사본이 없으면 만든다. 트랜잭션 밖에서 부른다. 디코딩하는 동안 데이터베이스 연결을 쥐지 않게 하기 위해서다.
+     * 줄인 사본이 없으면 만든다. 올린 뒤에 부르며, 디코딩 차례를 30초까지 기다린다. 트랜잭션 밖에서 부른다. 디코딩하는
+     * 동안 데이터베이스 연결을 쥐지 않게 하기 위해서다.
      *
      * @return 사본이 있으면 참. 차례를 얻지 못했거나 만들지 못했으면 거짓
      */
     public boolean prepareSmall(ChatAttachment attachment) {
+        return prepareSmall(attachment, DECODING_WAIT_SECONDS);
+    }
+
+    /**
+     * 줄인 사본이 없으면 만든다. 디코딩 차례를 {@code waitSeconds} 초까지 기다린다. 트랜잭션 밖에서 부른다.
+     *
+     * @return 사본이 있으면 참. 차례를 얻지 못했거나 만들지 못했으면 거짓
+     */
+    public boolean prepareSmall(ChatAttachment attachment, long waitSeconds) {
         try {
             if (store.hasSmall(attachment)) {
                 return true;
             }
-            if (!decoding.tryAcquire(DECODING_WAIT_SECONDS, TimeUnit.SECONDS)) {
+            if (!decoding.tryAcquire(waitSeconds, TimeUnit.SECONDS)) {
                 return false;
             }
             try {
@@ -87,7 +104,8 @@ public class AttachmentImages {
     /**
      * 보내는 메시지의 사진마다 에이전트에게 어떻게 보일지를 첨부 순서대로 정한다.
      *
-     * <p>{@code embed} 가 참이면 사본이 없는 사진은 한 번 만들어 보고, 앞 사진부터 상한({@link #MAX_IMAGES},
+     * <p>{@code embed} 가 참이면 사본이 없는 사진은 디코딩 차례를 {@link #SEND_WAIT_SECONDS} 초까지 기다려 한 번 만들어
+     * 보고, 앞 사진부터 상한({@link #MAX_IMAGES},
      * {@link #MAX_ENCODED_BYTES})까지 사본을 싣는다. 한 번 상한에 닿으면 그 뒤 사진은 더 작아도 싣지 않는다. 화면 순서와
      * 실린 순서를 같게 두기 위해서다. 상한 뒤의 사진도 사본을 만들어 본다. 경로로 안내할 사본이 있어야 한다.
      *
@@ -107,7 +125,7 @@ public class AttachmentImages {
             if (ordinal == null) {
                 throw new IllegalStateException("attachment " + attachment.id() + " is not bound to a message");
             }
-            boolean small = embed ? prepareSmall(attachment) : hasSmallQuietly(attachment);
+            boolean small = embed ? prepareSmall(attachment, SEND_WAIT_SECONDS) : hasSmallQuietly(attachment);
             String dataUrl = null;
             if (small && admitting) {
                 String encoded = encodedSmall(attachment);

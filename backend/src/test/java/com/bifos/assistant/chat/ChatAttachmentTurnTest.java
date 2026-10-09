@@ -344,6 +344,37 @@ class ChatAttachmentTurnTest {
     }
 
     @Test
+    @DisplayName("한 번 바이트 상한에 닿으면 뒤의 더 작은 사본도 싣지 않는다")
+    void doesNotEmbedSmallerImageAfterEncodedBytesLimitWasReached() throws IOException {
+        Long conversationId = chat.startEmpty(dad, "dad").id();
+        byte[] noise = noisePng(1600, 1200);
+        List<ChatAttachment> photos = new ArrayList<>();
+        for (int i = 1; i <= 4; i++) {
+            photos.add(uploadPng(dad, conversationId, "잡음-" + i + ".png", noise));
+        }
+        photos.add(uploadPng(dad, conversationId, "작은.png", png(8, 6)));
+
+        chat.send(
+                dad,
+                conversationId,
+                "다섯 장",
+                null,
+                photos.stream().map(ChatAttachment::id).toList());
+
+        HermesRunCommand command = stub().received().getFirst();
+        assertThat(command.images())
+                .extracting(HermesImage::label)
+                .containsExactly("1번째 사진", "2번째 사진", "3번째 사진");
+        assertThat(command.input())
+                .contains(
+                        "이 메시지에 이미지로 함께 실은 사진: 1번째, 2번째, 3번째 사진.",
+                        "- 4번째 사진: " + agentDirectory(conversationId) + "/"
+                                + AttachmentStore.smallName(photos.get(3).id()) + "\n",
+                        "- 5번째 사진: " + agentDirectory(conversationId) + "/"
+                                + AttachmentStore.smallName(photos.get(4).id()) + "\n");
+    }
+
+    @Test
     @DisplayName("다시 생성해도 같은 사진을 다시 싣는다")
     void regenerationEmbedsSameImagesAgain() throws IOException {
         Long conversationId = chat.startEmpty(dad, "dad").id();

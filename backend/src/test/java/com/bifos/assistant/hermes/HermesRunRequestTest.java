@@ -109,6 +109,18 @@ class HermesRunRequestTest {
     }
 
     @Test
+    @DisplayName("사진의 문자열 표현은 이름표와 data 주소 길이만 담고 본문은 담지 않는다")
+    void imageToStringHidesDataUrlBody() {
+        String body = "QUJDREVGR0hJSktMTU5PUFFSU1RVVldYWVo=";
+        HermesImage image = new HermesImage("1번째 사진", "data:image/jpeg;base64," + body);
+
+        assertThat(image.toString())
+                .contains("1번째 사진", String.valueOf(image.dataUrl().length()))
+                .doesNotContain(body)
+                .doesNotContain("base64");
+    }
+
+    @Test
     @DisplayName("provider 와 모델과 effort 를 주면 셋이 모두 실린다")
     void sendsAllThreeWhenProviderModelAndEffortGiven() {
         client.submit(command("openai-codex", "example-model", "high"));

@@ -140,6 +140,6 @@
 | [ADR-20261008 / read-data-flow](ADR-20261008-read-data-flow.md) | 커넥터 READ 결과는 가는 곳마다 따로 판정하고, 판정하지 못하는 길은 감수로 적는다 | 공통 | Accepted. ADR-083 과 ADR-086 의 「감당할 것」 을 흐름마다 나눠 적는다 |
 | [ADR-20261008 / tossinvest-connector](ADR-20261008-tossinvest-connector.md) | 토스증권 커넥터는 읽기 도구만 두고, 토큰은 프로세스 메모리에서 한 번에 하나만 다시 받는다 | hermes | Accepted. ADR-20261008 / connector-binding-guards 의 두 선언을 쓴다 |
 | [ADR-20261008 / tool-catalog-visibility](ADR-20261008-tool-catalog-visibility.md) | 관리자는 그룹의 도구 선택 목록을 정하고 숨김은 활성 상태를 바꾸지 않는다 | backend, frontend | Accepted. ADR-029의 도구 조회와 저장에 그룹별 숨김을 더한다 |
-| [ADR-20261009 / native-image-input](ADR-20261009-native-image-input.md) | 이번 메시지의 사진은 줄인 사본을 실행 입력에 직접 싣고, 원본 파일은 그대로 둔다 | backend | Accepted. ADR-020 의 「대화 본문에 사진을 실을 수 없다」 를 바꾼다 |
+| [ADR-20261009 / native-image-input](ADR-20261009-native-image-input.md) | 사진마다 줄인 사본 파일을 원본 옆에 두고, 이번 메시지의 사진은 그 사본을 실행 입력에 직접 싣는다 | backend | Accepted. ADR-020 의 「대화 본문에 사진을 실을 수 없다」 를 바꾼다 |
 | [ADR-20261009 / skill-package](ADR-20261009-skill-package.md) | 스킬은 zip 묶음으로도 올리고, 스크립트는 실행 공간이 있는 에이전트에만 받는다 | 공통 | Accepted. ADR-034 의 스크립트 기각을 대체한다 |
 | [ADR-20261009 / tool-request-flow](ADR-20261009-tool-request-flow.md) | 도구 사용 요청은 따로 저장하고 관리자는 반영을 확인한 뒤 승인한다 | backend, frontend | Accepted. ADR-029의 관리자 도구 변경에 주인의 요청과 결정 이력을 더한다 |

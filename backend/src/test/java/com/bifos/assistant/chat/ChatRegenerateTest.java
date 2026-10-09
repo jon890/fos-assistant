@@ -437,31 +437,34 @@ class ChatRegenerateTest {
         attachmentRows.save(attachment);
         // 앞선 실행이 같은 번호로 남긴 파일이 있으면 지우고 쓴다.
         store.delete(attachment);
-        store.save(attachment, new ByteArrayInputStream(png));
-        attachments.prepareSmall(attachment);
-        assertThat(store.hasSmall(attachment)).isTrue();
-        attachments.attach(question.id(), conversationId, List.of(attachment.id()));
-        enableFlow("dad");
-        flowAnswers();
-        int before = stub().received().size();
+        try {
+            store.save(attachment, new ByteArrayInputStream(png));
+            attachments.prepareSmall(attachment);
+            assertThat(store.hasSmall(attachment)).isTrue();
+            attachments.attach(question.id(), conversationId, List.of(attachment.id()));
+            enableFlow("dad");
+            flowAnswers();
+            int before = stub().received().size();
 
-        chat.regenerate(dad, conversationId, event -> {});
+            chat.regenerate(dad, conversationId, event -> {});
 
-        List<HermesRunCommand> flowCommands =
-                stub().received().subList(before, stub().received().size());
-        HermesRunCommand chief = flowCommands.stream()
-                .filter(command -> command.input().contains("조사할 것과 만들 것을 나눈다"))
-                .findFirst()
-                .orElseThrow();
-        assertThat(chief.input())
-                .doesNotContain("이미지로 함께 실은")
-                .containsPattern(
-                        "- 1번째 사진: .*/" + conversationId + "/" + AttachmentStore.smallName(attachment.id()) + "\\n");
-        assertThat(flowCommands)
-                .allSatisfy(command -> assertThat(command.images())
-                        .as("flow command %s", command.profileName())
-                        .isEmpty());
-        store.delete(attachment);
+            List<HermesRunCommand> flowCommands =
+                    stub().received().subList(before, stub().received().size());
+            HermesRunCommand chief = flowCommands.stream()
+                    .filter(command -> command.input().contains("조사할 것과 만들 것을 나눈다"))
+                    .findFirst()
+                    .orElseThrow();
+            assertThat(chief.input())
+                    .doesNotContain("이미지로 함께 실은")
+                    .containsPattern(
+                            "- 1번째 사진: .*/" + conversationId + "/" + AttachmentStore.smallName(attachment.id()) + "\\n");
+            assertThat(flowCommands)
+                    .allSatisfy(command -> assertThat(command.images())
+                            .as("flow command %s", command.profileName())
+                            .isEmpty());
+        } finally {
+            store.delete(attachment);
+        }
     }
 
     private static byte[] png() throws IOException {
