@@ -41,6 +41,15 @@ test("루트와 모듈의 docs 바로 아래 문서는 1000줄이고 ADR 과 그
   for (const file of ["docs/adr/ADR-001-x.md", "backend/docs/adr/INDEX.md", "hermes/README.md", "README.md", "docs/images/a.md"]) assert.equal(limitFor(file), null, file);
 });
 
+test("모듈 문서는 한도를 넘어도 실패하지 않고 알린다", (t) => {
+  const f = fixture(t);
+  f.put("backend/docs/flow.md", 1001);
+  const result = checkFileLengths(f.root);
+  assert.deepEqual(result.errors, []);
+  assert.equal(result.notices.length, 1);
+  assert.match(result.notices[0], /backend\/docs\/flow\.md: 1001줄 > 1000줄/);
+});
+
 test("새 파일은 상한까지 통과하고 한 줄만 초과해도 실패한다", (t) => {
   const f = fixture(t);
   f.put("backend/src/main/App.java", 500);

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // 파일 전체 길이는 빈 줄과 주석을 포함한다. 기존 긴 파일은 기준값보다 늘어나지 못한다.
-// 모듈 문서의 한도는 ADR-20261009 / docs-per-module 이 정한다.
+// 모듈 문서의 한도는 ADR-20261009 / docs-per-module 이 정하고, 넘으면 실패가 아니라 알림이다.
 import { existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -77,7 +77,9 @@ export function checkFileLengths(root, { update = false } = {}) {
     const count = lineCount(readFileSync(join(root, file), "utf8"));
     counts.set(file, count);
     const allowed = baseline.files[file] ?? limitFor(file);
-    if (count > allowed) errors.push(`${file}: ${count}줄 > ${allowed}줄. 파일을 나눈다.`);
+    // 모듈 문서는 정해진 파일이라 나눌 수 없다. 새 기능은 그 파일의 절로 더하므로 넘으면 알리기만 한다.
+    if (count > allowed && MODULE_DOC.test(file)) notices.push(`${file}: ${count}줄 > ${allowed}줄. 코드가 가진 값의 복사본을 지워 줄인다.`);
+    else if (count > allowed) errors.push(`${file}: ${count}줄 > ${allowed}줄. 파일을 나눈다.`);
   }
   for (const [file, previous] of Object.entries(baseline.files)) {
     const actual = counts.get(file);
