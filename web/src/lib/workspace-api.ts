@@ -57,3 +57,24 @@ export function deleteWorkspaceEntry(path: string): Promise<Response> {
 export function fetchWorkspaceFile(path: string): Promise<Response> {
   return fetch(fileUrl(path), { cache: "no-store" });
 }
+
+/** 관리자 용량의 공간 하나다. `name` 은 사용자나 에이전트 이름이고 찾지 못하면 빈 값이다. `partial` 은 일부만 셌는지다. */
+export type WorkspaceSpaceUsage = {
+  kind: "USER" | "AGENT";
+  id: number;
+  name: string | null;
+  bytes: number;
+  entries: number;
+  partial: boolean;
+};
+
+/** `GET /api/admin/workspaces` 의 응답이다. 파일 이름과 경로는 담지 않는다. */
+export type WorkspaceUsageReport = {
+  available: boolean;
+  spaces: WorkspaceSpaceUsage[];
+};
+
+/** 관리자. 실행 공간마다 용량을 읽는다. */
+export function fetchWorkspaceUsage(): Promise<Response> {
+  return fetch("/api/admin/workspaces", { cache: "no-store" });
+}

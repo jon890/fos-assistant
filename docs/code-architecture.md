@@ -98,7 +98,7 @@ Memory 의 기본 근거는 [`adr/ADR-003-memory-권한은-주입으로-강제�
 
 | 키 | 환경 변수 | 비었을 때 |
 | --- | --- | --- |
-| `assistant.sandbox-workspace.root` | `ASSISTANT_SANDBOX_WORKSPACE_ROOT` | 기동한다. 상태 조회 밖의 모든 경로가 503 `WORKSPACE_UNAVAILABLE` 이고 상태 조회는 `available: false` 다 |
+| `assistant.sandbox-workspace.root` | `ASSISTANT_SANDBOX_WORKSPACE_ROOT` | 기동한다. 상태 조회와 관리자 용량은 `available: false` 이고, 그 밖의 경로가 503 `WORKSPACE_UNAVAILABLE` 이다 |
 | `assistant.sandbox-workspace.delete-socket` | `ASSISTANT_SANDBOX_WORKSPACE_DELETE_SOCKET` | 기동한다. 지우기가 `WORKSPACE_DELETE_UNAVAILABLE` 이고 상태 조회는 `deletable: false` 다 |
 
 `root` 는 실행 공간 정책의 `workspace_root` 와 같은 디렉터리를 Control Plane 에서 본 경로다. 읽기 전용으로 붙인다.
@@ -120,6 +120,7 @@ Memory 의 기본 근거는 [`adr/ADR-003-memory-권한은-주입으로-강제�
 그 기능이 없으면 대체 경로를 탄다. 운영 이미지(`eclipse-temurin:21-jre-alpine`)는 musl 이라 이쪽이고, 개발 기계(macOS)도 그렇다. 대체 경로는 경고를 한 번 남긴다.
 대체 경로는 조각마다 링크인지 본 뒤 경로로 열고, 연 뒤에 다시 본다. 중간 조각이 모두 링크가 아닌 디렉터리인지, 실제 경로가 사용자 디렉터리 아래인지, 마지막 조각을 열기 전에 본 파일과 연 뒤 다시 본 파일이 같은지 확인하고 어긋나면 404 다.
 하드 링크 수와 읽기 권한은 두 경로 모두 경로로 다시 본다. 본문은 위 방법으로 연 것만 준다.
+하드 링크 수(`unix:nlink`)를 읽지 못하는 파일 시스템이면 1 로 본다.
 이 사후 확인은 확인과 열기 사이의 틈을 줄일 뿐 없애지 못한다. glibc 이미지로 옮겨 대체 경로 없이 꺼지게(fail-closed) 하는 일은 이슈 #359 가 갖는다([ADR-20261009 / workspace-explorer](adr/ADR-20261009-workspace-explorer.md) 의 「감당할 것」).
 
 목록의 한 줄은 아래 종류 가운데 하나다.
@@ -146,6 +147,7 @@ Memory 의 기본 근거는 [`adr/ADR-003-memory-권한은-주입으로-강제�
 | `GET /api/v1/workspace/files/{경로}` | 미리보기 본문 | 아래 「본문 머리글」. 경로의 조각마다 URL 인코딩한다 |
 | `GET /api/v1/workspace/files/{경로}?download=1` | 내려받기 | 크기 상한 없이 스트림으로 준다 |
 | `DELETE /api/v1/workspace/entries?path=` | 지우기 | 아래 「지우기」 |
+| `GET /api/v1/admin/workspaces` | 실행 공간별 용량(사용자, 주인 없는 에이전트). `ADMIN` 만 | 아래 「관리자 용량」 |
 
 본문 경로의 오류는 아래와 같다. 루트 확인(503), 경로 검사(400) 다음에, 미리보기는 확장자(415), 크기(413), 종류(404), 읽기 권한(403) 차례로 판정한다. 내려받기는 종류와 읽기 권한만 본다.
 
@@ -211,6 +213,7 @@ Control Plane 은 경로 규칙을 먼저 검사하고 읽기 마운트에서 �
 
 - socket 은 unix stream socket 이다. Control Plane 만 열 수 있게 둔다. 망에 열지 않는다
 - 요청 하나에 연결 하나다. Control Plane 이 UTF-8 JSON 한 줄을 `\n` 으로 끝내 보내고, 도우미가 JSON 한 줄로 답한 뒤 연결을 닫는다
+- 답 한 줄은 64 KiB 를 넘지 않는다. 넘거나 JSON 이 아니면 Control Plane 은 502 `WORKSPACE_DELETE_FAILED` 로 답한다
 - 요청은 `{"version": 1, "owner": "u12", "path": "reports/a.csv", "max_entries": 10000}` 이다
 - 성공 답은 `{"ok": true, "kind": "FILE", "entries": 1, "bytes": 2048}` 이다. `kind` 는 목록의 `kind` 와 같은 네 값이다
 - 실패 답은 `{"ok": false, "code": "<코드>"}` 이다. 코드는 아래 표의 다섯이다
@@ -232,6 +235,19 @@ Control Plane 은 경로 규칙을 먼저 검사하고 읽기 마운트에서 �
 - 지우는 크기에는 상한을 두지 않는다. 지우는 비용은 항목 수를 따르고 파일 크기를 따르지 않는다
 - 요청마다 시각, 주인 키, 경로, 종류, 지운 항목 수, 결과를 감사 기록 한 줄로 남긴다. 파일 본문은 읽지도 남기지도 않는다
 - 실행 공간 루트만 쓰기로 붙이고, 지우는 데 필요한 권한만 갖는다
+
+### 관리자 용량
+
+`GET /api/v1/admin/workspaces` 는 `{available, spaces: [{kind, id, name, bytes, entries, partial}]}` 를 준다.
+`kind` 는 `USER`(디렉터리 `u<번호>`) 나 `AGENT`(디렉터리 `a<번호>`) 이고 `name` 은 사용자 이름이나 에이전트 이름이다. 이름을 찾지 못하면 `null` 이다.
+번호는 0 으로 시작하지 않는다(`u01` 은 세지 않는다). 그 밖의 이름을 가진 디렉터리는 세지 않는다. 파일 이름과 경로는 응답에 없다.
+
+요청할 때 링크를 따라가지 않고 센다. `bytes` 는 일반 파일 크기의 합이다.
+공간 하나에 항목 200,000 개, 요청 전체에 30초를 넘기면 거기서 멈추고 `partial` 을 참으로 둔다. 시간은 항목 사이에서 확인하므로 디렉터리 하나를 여는 데 걸린 시간만큼은 넘길 수 있다. 읽지 못한 디렉터리는 항목으로 세고 `partial` 을 참으로 둔다.
+공간은 `USER`, `AGENT` 순서와 번호 순서로 센다. 30초가 지난 뒤의 공간은 세지 않고 `bytes` 와 `entries` 를 0, `partial` 을 참으로 두어 응답에 넣는다.
+줄은 `bytes` 가 큰 순서다.
+
+루트가 설정되지 않았거나 링크가 아닌 디렉터리가 아니면 200 과 `available` 거짓, 빈 `spaces` 다. 루트 바로 아래를 읽지 못하면 500 `INTERNAL_ERROR` 이고 로그에는 예외 종류만 남는다.
 
 ## 화면을 검증하는 방법
 
