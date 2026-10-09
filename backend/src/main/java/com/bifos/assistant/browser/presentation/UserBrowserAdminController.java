@@ -17,7 +17,7 @@ import org.springframework.web.bind.annotation.RestController;
 /**
  * 관리자가 모든 브라우저의 상태를 보고 끄거나 지우는 경로다. 남의 화면은 열지 못한다.
  *
- * <p>{@code ADMIN} 만 부른다. 계약은 {@code backend/docs/flow.md} 의 「API(사용자 브라우저)」 가 갖는다.
+ * <p>{@code ADMIN} 만 부른다. 계약은 {@code docs/features/user-browser.md} 의 「API(사용자 브라우저)」 가 갖는다.
  */
 @RestController
 @RequestMapping("/api/v1/admin/browsers")

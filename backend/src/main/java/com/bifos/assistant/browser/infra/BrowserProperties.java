@@ -6,7 +6,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.validation.annotation.Validated;
 
 /**
- * 사용자 브라우저의 설정이다({@code backend/docs/flow.md} 의 「설정(사용자 브라우저)」).
+ * 사용자 브라우저의 설정이다({@code docs/features/user-browser.md} 의 「설정(사용자 브라우저)」).
  *
  * <p>이미지, 망, 자원, 프로필 루트는 브라우저 proxy 의 정책이 강제한다. Control Plane 은 그 정책과 같은 값을 받아 생성 요청에 싣는다.
  * 꺼져 있으면 동시 수와 시간 말고는 비어 있어도 기동한다. 켜져 있으면 비어 있는 값이 있을 때 기동을 멈춘다.

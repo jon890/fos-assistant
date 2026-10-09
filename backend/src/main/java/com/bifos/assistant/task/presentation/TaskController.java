@@ -23,7 +23,7 @@ import org.springframework.web.bind.annotation.RestController;
 /**
  * 로그인한 사용자 자신의 예약 작업을 다루는 경로다(ADR-076). 요청 본문이 주인을 정하지 못한다.
  *
- * <p>계약은 {@code backend/docs/flow.md} 의 「API(예약 작업)」 가 갖는다.
+ * <p>계약은 {@code docs/features/schedule.md} 의 「API(예약 작업)」 가 갖는다.
  */
 @RestController
 @RequestMapping("/api/v1/tasks")

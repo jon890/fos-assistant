@@ -19,7 +19,7 @@ import lombok.NoArgsConstructor;
  * manifest 의 도구 정책을 읽고 하한을 검사한다(ADR-049).
  *
  * <p>대시보드가 같은 검사를 먼저 한다. 여기서 한 번 더 보는 것은 대시보드 plugin 이 옛 판이거나 고쳐졌어도 느슨한
- * 정책으로 판정하지 않기 위해서다. 규칙은 {@code backend/docs/flow.md} 의 「도구 정책」 이 갖는다.
+ * 정책으로 판정하지 않기 위해서다. 규칙은 {@code docs/features/connector-policy.md} 의 「도구 정책」 이 갖는다.
  */
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
 public final class ConnectorToolPolicies {

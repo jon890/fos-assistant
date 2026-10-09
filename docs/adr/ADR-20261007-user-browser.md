@@ -117,4 +117,4 @@
   - QR 로그인은 세션 쿠키만 준다. 끌 때 컨테이너를 지우므로, 프로필에 써 둔 Chrome 의 「이전 세션 이어서 열기」 설정에 기대어 다음 기동으로 로그인을 잇는다.
   - 프로필 디렉터리의 위치, 이미지, 망, 자원 값, 동시 수는 운영 값이다. 운영 저장소가 proxy 정책과 함께 갖는다.
 
-- **적용 범위**: backend 의 새 기능 패키지 `browser`, 커넥터 바인딩 설치, 대시보드 plugin 의 manifest 검증과 바인딩 설치, `hermes/connectors/naver-blog/`, 웹의 「내 브라우저」 화면. 계약은 [사용자 브라우저](../../backend/docs/flow.md) 가 갖는다.
+- **적용 범위**: backend 의 새 기능 패키지 `browser`, 커넥터 바인딩 설치, 대시보드 plugin 의 manifest 검증과 바인딩 설치, `hermes/connectors/naver-blog/`, 웹의 「내 브라우저」 화면. 계약은 [사용자 브라우저](../features/user-browser.md) 가 갖는다.

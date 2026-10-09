@@ -22,7 +22,7 @@ import org.springframework.stereotype.Component;
  * {@code deleted_at} 을 적는다. 행은 남긴다. 한 건이 실패해도 나머지를 계속한다. 근거는 ADR-027 에 있다.
  *
  * <p>지운 뒤 행 쪽에서 한 번 더 맞춘다. 지운 표시가 없고 기간 시작 전에 만든 행 가운데 파일이 없는 것에 지운 시각을
- * 적는다. 근거는 {@code backend/docs/flow.md} 의 「지운 표시를 다시 맞추기」 에 있다.
+ * 적는다. 근거는 {@code docs/features/attachment.md} 의 「지운 표시를 다시 맞추기」 에 있다.
  */
 @Component
 @RequiredArgsConstructor

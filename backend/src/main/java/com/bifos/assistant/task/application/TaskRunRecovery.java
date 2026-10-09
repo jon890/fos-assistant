@@ -22,7 +22,7 @@ import org.springframework.transaction.support.TransactionTemplate;
  * 기동 전에 돌던 발화를 {@code FAILED}({@code INTERRUPTED})로 닫고 알린다(ADR-077).
  *
  * <p>다시 돌리지 않는다. 쓰기가 두 번 일어날 수 있다. {@code QUEUED} 줄은 그대로 두고 다음 tick 이 연다. 규칙은 {@code
- * backend/docs/flow.md} 의 「기동할 때」 가 갖는다.
+ * docs/features/schedule.md} 의 「기동할 때」 가 갖는다.
  *
  * <p>{@link TaskDispatcher} 는 이 정리가 끝난 뒤에야 돈다. 그 전에 연 줄을 정리가 닫지 않게 하기 위해서다. 정리가 예외로
  * 끝나도 끝난 것으로 적는다. 적지 않으면 다시 띄울 때까지 어떤 작업도 발화하지 않는다.

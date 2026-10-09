@@ -16,7 +16,7 @@ Next.js 서버 라우트가 세션에서 메일 주소를 꺼내 매 요청마�
 
 **위 그림은 요청이 나가는 쪽만 그린 것이다.**
 Hermes 가 Control Plane 을 부르는 반대 방향도 있고 토큰이 서로 다르다.
-그 두 방향은 [`flow.md`](flow.md) 의 「두 방향과 두 토큰」 절이 그림으로 갖는다.
+그 두 방향은 [`docs/features/mcp.md`](features/mcp.md) 의 「두 방향과 두 토큰」 절이 그림으로 갖는다.
 
 ## 사용자와 profile, 에이전트, 대화
 

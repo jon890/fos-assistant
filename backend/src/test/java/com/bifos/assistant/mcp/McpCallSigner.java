@@ -82,7 +82,7 @@ public final class McpCallSigner {
     /**
      * 플러그인이 커넥터 도구 호출 전에 보내는 판정 요청 본문이다.
      *
-     * <p>{@code backend/docs/flow.md} 의 「도구 호출 판정」 대로 서명할 글은
+     * <p>{@code docs/features/connector-policy.md} 의 「도구 호출 판정」 대로 서명할 글은
      * {@code v1-connector-policy\n<hermes_tool>\n<root>\n<session>\n<tool_call_id>\n<args_json 의 SHA-256 16진수>} 다.
      * {@code tool} 은 서명하지 않는다. null 이면 JSON null 로 싣는다.
      */

@@ -17,7 +17,7 @@ import org.springframework.web.socket.WebSocketHandler;
 import org.springframework.web.socket.server.HandshakeInterceptor;
 
 /**
- * 브라우저 중계의 WebSocket handshake 를 판정한다. 계약은 {@code backend/docs/flow.md} 의 「받는 것」 이다.
+ * 브라우저 중계의 WebSocket handshake 를 판정한다. 계약은 {@code docs/features/user-browser.md} 의 「받는 것」 이다.
  *
  * <p>중계 아래의 WebSocket 요청은 모두 여기로 온다. 경로가 {@code /internal/browser-gateway/<표식>/devtools/<종류>/<번호>} 모양이
  * 아니면 빈 404 로 거절한다. {@code GET} 이 아니거나 {@code Upgrade} 가 {@code websocket} 이 아니면 브라우저를 켜지 않고 빈 400 으로

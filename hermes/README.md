@@ -147,7 +147,7 @@ python3 -m unittest discover -s hermes/tests
 Hermes 모듈은 가짜로 끼우므로 Hermes 를 설치하지 않아도 돈다. 실제 Hermes 와 맞는지는 운영 저장소의 live 검사가 본다.
 
 Python 3.13 과 PyYAML 과 `mcp` SDK, 커넥터를 실행할 Bun 이 있어야 한다. Hermes 이미지와 같은 버전이다.
-검사는 `mcp==2.0.0` 으로 돌고 plugin 의 지원 범위는 `mcp>=2.0,<3` 이다. SDK 계약은 [커넥터 설치](../backend/docs/flow.md) 의 「MCP SDK 계약」 이 갖는다.
+검사는 `mcp==2.0.0` 으로 돌고 plugin 의 지원 범위는 `mcp>=2.0,<3` 이다. SDK 계약은 [커넥터 설치](../docs/features/connector.md) 의 「MCP SDK 계약」 이 갖는다.
 커넥터 도구 호출 검사는 `tests/fixtures/demo-connector/` 의 시험 커넥터를 자식 프로세스로 띄운다.
 `tests/test_connectors_contract.py` 는 `connectors/` 아래 커넥터를 모두 찾아 계약을 본다. 커넥터 전용 시험은 각 커넥터의 `tests/` 에 있다.
 타입 검사와 전용 시험, 묶음 파일 비교는 저장소 루트의 `bash scripts/check-connectors.sh` 로 돌린다.

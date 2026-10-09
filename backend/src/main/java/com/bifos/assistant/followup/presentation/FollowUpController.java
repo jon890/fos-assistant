@@ -23,7 +23,7 @@ import org.springframework.web.bind.annotation.RestController;
 import tools.jackson.databind.JsonNode;
 
 /**
- * 사람이 웹에서 쓰는 할 일 경로다. 계약은 {@code backend/docs/flow.md} 의 「API(할 일)」 가 갖는다.
+ * 사람이 웹에서 쓰는 할 일 경로다. 계약은 {@code docs/features/attention.md} 의 「API(할 일)」 가 갖는다.
  *
  * <p>주인은 웹 토큰의 사용자다. 요청 본문으로 사용자를 받지 않는다.
  */

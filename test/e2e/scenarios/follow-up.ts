@@ -1,7 +1,7 @@
 /**
  * 사람이 할 일을 더하고 고치고 끝내는 경로와, 남의 할 일을 읽지도 끝내지도 못하는 것을 본다.
  *
- * <p>계약은 `backend/docs/flow.md` 의 「API(할 일)」 가 갖는다. turn 을 돌리지 않는다.
+ * <p>계약은 `docs/features/attention.md` 의 「API(할 일)」 가 갖는다. turn 을 돌리지 않는다.
  * 바로 뒤의 사용량 시나리오가 실행 수를 앞의 대화 turn 수와 같은지 보기 때문이다.
  */
 import { call, expect, expectStatus, step, type Response, type Scenario } from "../harness.ts";

@@ -67,7 +67,7 @@ Hermes 주석에 따르면 복사하면 갱신 토큰이 둘로 갈라지고 한
 #### 우리가 더하는 것
 
 - 에이전트마다 `credential_scope` 를 적는다. `SHARED_HOUSEHOLD` 는 그룹이 함께 쓰는 AI 계정, `DEDICATED` 는 그 profile 만의 계정이다.
-  관리자 API 로 만들 때는 기본값이 없어 만드는 사람이 반드시 고른다. 첫 로그인이 만드는 에이전트는 설정값을 쓰고 기본은 `SHARED_HOUSEHOLD` 다([`backend/docs/flow.md`](../../backend/docs/flow.md)). 에이전트 만들기 화면이 만드는 에이전트는 `SHARED_HOUSEHOLD` 로 적는다.
+  관리자 API 로 만들 때는 기본값이 없어 만드는 사람이 반드시 고른다. 첫 로그인이 만드는 에이전트는 설정값을 쓰고 기본은 `SHARED_HOUSEHOLD` 다([`docs/features/users.md`](../../docs/features/users.md)). 에이전트 만들기 화면이 만드는 에이전트는 `SHARED_HOUSEHOLD` 로 적는다.
 - 운영 저장소의 검사가 격리 여부를 판정하고, 공유는 명시할 때만 넘어간다.
 - profile 마다 `fallback_providers` 를 비워 둔다. 한 사람의 요청이 다른 모델로 넘어가지 않는다.
 - Control Plane 은 대화를 시작할 때 사용자가 쓸 수 있는 에이전트에서 profile 이름을 꺼낸다.
@@ -131,7 +131,7 @@ multiplex 를 켜면 listener 주인의 gateway 만 이 값에 따라 시작하�
 
 ## profile 생성
 
-도구 없는 시스템 판단 profile은 [가치 평가](../../backend/docs/flow.md)의 준비 상태 계약을 따른다.
+도구 없는 시스템 판단 profile은 [가치 평가](../../docs/features/proactive.md)의 준비 상태 계약을 따른다.
 `GET /api/profiles/{name}/decision-readiness`는 Control Plane 관리 토큰으로 그 profile의 준비 여부만 읽는다.
 
 ### profile 을 HTTP 로 만드는 길
@@ -385,7 +385,7 @@ token provider 하나만 있어도 이 조건을 채운다.
 
 Hermes 대시보드 앞에는 우리 대시보드 plugin 이 있다. plugin 은 이 저장소의 [`hermes/plugins/dashboard-profile-api/`](../plugins/dashboard-profile-api) 에 있고, 서비스 토큰으로 오는 요청을 정해 둔 경로로만 받는다.
 2026-09-29 에 정했다. 사용자의 에이전트 만들기와 스킬([ADR-033](../../backend/docs/adr/ADR-033-사용자가-에이전트를-만들고-공개해도-만든-사람이-관리한다.md), [ADR-034](../../backend/docs/adr/ADR-034-올린-스킬은-control-plane-이-버전-디렉터리에-쓰고-hermes-는-읽기만-한다.md))이 이 계약에 기댄다.
-경로마다의 요청과 응답과 인증은 [`hermes/plugins/dashboard-profile-api/README.md`](../plugins/dashboard-profile-api/README.md) 의 「dashboard-profile-api 가 여는 것」 표가 갖는다. 커넥터 경로를 Control Plane 이 쓰는 방법은 [커넥터 설치](../../backend/docs/flow.md) 의 「대시보드 plugin 계약」 이 갖는다.
+경로마다의 요청과 응답과 인증은 [`hermes/plugins/dashboard-profile-api/README.md`](../plugins/dashboard-profile-api/README.md) 의 「dashboard-profile-api 가 여는 것」 표가 갖는다. 커넥터 경로를 Control Plane 이 쓰는 방법은 [커넥터 설치](../../docs/features/connector.md) 의 「대시보드 plugin 계약」 이 갖는다.
 이 절은 그 경로를 지날 때 Hermes 가 어떻게 동작하는지만 적는다.
 
 **틀이 MCP 와 서명 plugin 을 붙인다.** `POST /api/profiles` 본문의 `mcp_servers` 는 쓰지 않는다. plugin 이 처리 뒤에 설정 틀로 `config.yaml` 전체를 다시 써서, 본문으로 넣은 등록이 사라진다.
@@ -951,7 +951,7 @@ httpx 한도는 client 하나를 기준으로 세므로 listener 전체의 한�
 위의 것이 모두 listener 나 프로세스 단위다.
 한 profile 이 자리를 다 쓰면 다른 profile 이 그만큼 못 쓴다.
 
-Control Plane 은 이 자리를 사용자마다 나눠 쓰게 한다. 한 사용자가 동시에 맡기는 실행을 사용자 실행 한도로 묶는다([`backend/docs/flow.md`](../../backend/docs/flow.md)).
+Control Plane 은 이 자리를 사용자마다 나눠 쓰게 한다. 한 사용자가 동시에 맡기는 실행을 사용자 실행 한도로 묶는다([`docs/features/execution.md`](../../docs/features/execution.md)).
 그 한도는 Control Plane 이 제출하는 실행만 센다. native 하위 에이전트와 cron 은 세지 않는다.
 Control Plane 이 대기 시간을 넘겨 먼저 끝낸 run 은 Hermes 가 끝냈다고 답할 때까지 그 사용자의 자리로 센다.
 이 자리는 Control Plane 메모리에만 있어, Control Plane 이 다시 뜨면 그 run 이 Hermes 에서 끝나기 전이라도 세지 않는다.
@@ -1355,7 +1355,7 @@ MCP 연결 전송 방식이 HTTP 라도 Hermes 에 로컬 도구로 등록된 `m
 
 근거는 [호출 스키마](https://github.com/NousResearch/hermes-agent/blob/v2026.9.24/tools/tool_search.py#L310-L334),
 [중계 검증](https://github.com/NousResearch/hermes-agent/blob/v2026.9.24/tools/tool_search.py#L543-L572)이다.
-Control Plane 이 이 제한을 공통 실행 지침에 싣는 범위는 [문맥 묶음](../../backend/docs/flow.md#공통-실행-지침)이 갖는다.
+Control Plane 이 이 제한을 공통 실행 지침에 싣는 범위는 [문맥 묶음](../../docs/features/memory.md#공통-실행-지침)이 갖는다.
 
 ### 막히는 것과 통과하는 것
 
@@ -1533,7 +1533,7 @@ MCP 서버 설정의 `env`에 명시한 값이 자식 프로세스에 전달된�
 MCP 서버의 `env`에 그 이름의 `${이름}` 참조가 있어야 한다. 가계부라면 `env.ACCOUNTBOOK_API_TOKEN`에 `${ACCOUNTBOOK_API_TOKEN}` 이다.
 토큰 원문을 `.mcp.json`이나 `config.yaml`에 쓰지 않는다.
 사용자가 넣는 다른 칸(`connector.json` 의 `fields[].env`)도 같은 방식으로 전달한다.
-운영자가 주는 값(`operator_env`)은 profile `.env` 를 거치지 않는다. 대시보드 plugin 이 설치할 때 운영 목록의 값을 서버 정의의 `env` 에 직접 넣는다([커넥터 설치](../../backend/docs/flow.md)).
+운영자가 주는 값(`operator_env`)은 profile `.env` 를 거치지 않는다. 대시보드 plugin 이 설치할 때 운영 목록의 값을 서버 정의의 `env` 에 직접 넣는다([커넥터 설치](../../docs/features/connector.md)).
 운영자가 주는 비밀은 이 방식으로 넘기지 못한다. `${이름}` 은 그 profile 의 secret scope 에서만 풀리고, 공유 gateway 는 scope 에 없는 이름을 프로세스 env 에서 찾지 않는다(v0.21.5 의 `agent/secret_scope.py` `get_secret`). 그래서 `operator_secrets` 는 지원하지 않는다([ADR-046](../../backend/docs/adr/ADR-046-운영-비밀은-operator-env-와-다른-칸으로-선언하고-자식-mcp-프로세스에만-넣는다.md)).
 선택 값을 쓰지 않을 때에는 MCP 설정의 해당 env 항목을 빼거나 값으로 빈 문자열을 직접 쓴다.
 profile `.env`의 빈 값을 참조하면 보간 함수가 `${VAR}` 원문을 남긴다.
@@ -1940,7 +1940,7 @@ Hermes 가 쓰는 Docker API 는 `version`, `info`, `ps`, `inspect`, `image insp
 ## 스킬
 
 Hermes 가 스킬을 어디서 읽고 입력에 얼마나 싣는지, API server 가 스킬 커맨드를 어떻게 다루는지를 갖는다.
-Control Plane 이 올린 스킬을 저장하고 게시하는 규칙은 [`backend/docs/flow.md`](../../backend/docs/flow.md) 가 갖는다.
+Control Plane 이 올린 스킬을 저장하고 게시하는 규칙은 [`docs/features/agent-skill.md`](../../docs/features/agent-skill.md) 가 갖는다.
 
 ### 스킬을 profile 에 붙이는 방법
 
@@ -2074,7 +2074,7 @@ Control Plane 이 「`skill_view` 로 읽고 따르라」는 입력으로 바꿔
 이름 규칙이 점을 받으므로 이름 중간에서 잘린 값도 규칙에는 맞는다.
 그래서 이름 부분이 `...` 로 끝나면 잘린 것으로 보고 버린다.
 파일 경로 쪽만 잘린 `이름 → 경로...` 는 이름이 온전하므로 받는다.
-Control Plane 은 도구 내용을 가리기 전에 이 미리보기에서 이름을 꺼낸다([Runs API 계약](../../backend/docs/flow.md#도구-내용-가리기)).
+Control Plane 은 도구 내용을 가리기 전에 이 미리보기에서 이름을 꺼낸다([Runs API 계약](../../docs/features/execution.md#도구-내용-가리기)).
 
 #### 스킬 목록을 얻는 곳
 
@@ -2243,7 +2243,7 @@ Control Plane이 주인을 검사해 정확한 profile만 보낼 수는 있지�
 `GET /api/config`는 환경 변수 참조를 펼친 설정을 돌려줄 수 있으므로 도구 화면의 조회 경로로 열지 않는다.
 
 도구 선택값을 저장할 때는 제품이 허용한 이름만 받아 목록 전체를 계산하고, `memory`를 항상 제거해야 한다.
-Control Plane MCP(`fos-assistant`)의 서버 이름은 API 허용 목록에 계속 남겨야 한다. 연결을 붙인 에이전트의 profile 도 같고, 그 목록에는 붙인 커넥터의 서버 이름이 함께 있다. 도구 저장은 그 이름을 함께 보내고, 대시보드 plugin 은 그 이름이 빠진 목록을 거절한다([`backend/docs/flow.md`](../../backend/docs/flow.md) 의 「바인딩 설치」).
+Control Plane MCP(`fos-assistant`)의 서버 이름은 API 허용 목록에 계속 남겨야 한다. 연결을 붙인 에이전트의 profile 도 같고, 그 목록에는 붙인 커넥터의 서버 이름이 함께 있다. 도구 저장은 그 이름을 함께 보내고, 대시보드 plugin 은 그 이름이 빠진 목록을 거절한다([`docs/features/connector.md`](../../docs/features/connector.md) 의 「바인딩 설치」).
 남아 있는 옛 커넥터 에이전트의 profile 은 예외다. 그 목록은 설치한 커넥터의 MCP 서버 이름과 그 커넥터의 manifest 가 선언한 읽기 전용 이미지 도구(`vision`)만 갖고 대시보드 plugin 의 설치가 쓴다([ADR-045](../../backend/docs/adr/ADR-045-커넥터-에이전트는-자기-mcp-서버만-받고-memory-와-control-plane-도구를-받지-않는다.md)).
 등록된 MCP 서버 이름이 하나도 없는 목록은 모든 활성 MCP 서버를 통과시킬 수 있으므로, 알 수 없는 이름만 남은 목록을 허용해서는 안 된다.
 `_get_platform_tools`로 저장 뒤 실제 목록을 계산해 허용 목록과 대조한다.
@@ -2365,7 +2365,7 @@ provider 를 바꿔도 Control Plane 은 profile 바인딩, 요청한 모델과 
 | 모델 목록과 reasoning 지원 | 인증된 provider 의 모델만 고른다. 같은 모델 이름이어도 provider 별 capability 를 따로 읽는다. boolean 이 아닌 값과 빠진 칸은 `UNKNOWN` 이며 provider 이름으로 메우지 않는다 | `hermes/HermesModelCatalogTest` |
 | reasoning 끄기 | 미지정과 `none` 을 구분한다. `none` 은 끄기 지원이 `SUPPORTED` 이고 reasoning 이 `UNSUPPORTED` 가 아닐 때만 고른다. 요청 effort 를 적용값으로 바꿔 기록하지 않는다 | `chat/ModelOptionsServiceTest`, `chat/ModelSelectionTest`, `hermes/HermesRunRequestTest` |
 | 실행별 모델 선택 | provider 와 모델을 함께 보내거나 함께 뺀다. provider 를 바꿔도 모델과 effort 를 그대로 보내며, profile 기본값을 쓸 때는 모델 선택 칸을 뺀다. 실패했다고 Control Plane 이 다른 provider 로 다시 제출하지 않는다 | `hermes/HermesRunRequestTest`, `chat/ModelSelectionTest` |
-| 단계와 에이전트 기본 모델 | 모델 단계의 provider 가 비면 요청 profile 의 카탈로그로 정한다. 단계의 모델이 그 카탈로그에 없거나 선택한 모델이 숨겨졌으면 다른 provider 로 대체하지 않고 거절한다. 대화 선택, 에이전트 기본 모델, profile 기본값의 우선순위를 유지한다 | `chat/ModelTierServiceTest`, `chat/ModelVisibilityTest`; 선택 규칙은 [모델 단계](../../backend/docs/flow.md) |
+| 단계와 에이전트 기본 모델 | 모델 단계의 provider 가 비면 요청 profile 의 카탈로그로 정한다. 단계의 모델이 그 카탈로그에 없거나 선택한 모델이 숨겨졌으면 다른 provider 로 대체하지 않고 거절한다. 대화 선택, 에이전트 기본 모델, profile 기본값의 우선순위를 유지한다 | `chat/ModelTierServiceTest`, `chat/ModelVisibilityTest`; 선택 규칙은 [모델 단계](../../docs/features/schedule.md) |
 | 요청 경로와 실제 경로 | 실행 조회의 요청 모델과 실제 `runtime` 을 구분한다. Hermes 가 알려 준 실제 provider 와 모델로 실행을 기록한다. 기본값과 요청값으로 실제 경로를 추정하지 않는다 | `hermes/HermesRuntimeReadTest`, `chat/ModelSelectionTest` |
 | profile 인증 경계 | provider 교체로 API 인증 key 를 바꾸지 않는다. 요청자의 바인딩에서 profile 을 정하고 key 가 없으면 다른 profile 의 key 를 빌리지 않는다. 모델 목록 cache 도 profile 별로 나눈다 | `hermes/HermesRunRequestTest`, `hermes/HermesProfileKeyStoreTest`, `chat/ChatServiceTest`, `chat/ModelOptionsServiceTest` |
 | credential 쓰기 경계 | 대시보드의 환경 쓰기는 허용한 Control Plane 칸만 받는다. 커넥터 연결 해제로 모델 credential 을 지우지 않는다. `credential_scope` 는 공유 여부의 선언이며 실제 OAuth 격리를 강제하는 값이 아니다 | `test_dashboard_profile_api_env.py`; 선언의 뜻은 [credential 경계](hermes-contract.md#oauth-credential-은-여기서-빠진다) |
@@ -2448,7 +2448,7 @@ Hermes 를 올리면 번들 스킬이 늘 수 있다. 같은 이름이면 profil
 그 검사의 절차는 `fos-home-infra` 가 갖는다. 까닭은 [ADR-034](../../backend/docs/adr/ADR-034-올린-스킬은-control-plane-이-버전-디렉터리에-쓰고-hermes-는-읽기만-한다.md) 의 「Hermes 를 올릴 때 이름 충돌을 본다」 에 있다.
 
 **올린 Hermes 이미지의 `mcp` SDK 버전을 본다.**
-대시보드 plugin 의 커넥터 도구 호출은 Hermes 가 설치한 `mcp` Python SDK 를 쓰고, 지원 범위는 `mcp>=2.0,<3` 이다([커넥터 설치](../../backend/docs/flow.md) 의 「MCP SDK 계약」).
+대시보드 plugin 의 커넥터 도구 호출은 Hermes 가 설치한 `mcp` Python SDK 를 쓰고, 지원 범위는 `mcp>=2.0,<3` 이다([커넥터 설치](../../docs/features/connector.md) 의 「MCP SDK 계약」).
 Hermes 는 `mcp` 를 정확한 판 하나로 고정한다. v0.19.0 은 1.26.0, v0.20.0 부터 v0.20.2 까지는 1.28.1, v0.20.3 부터 v0.21.5 까지는 2.0.0 이다. 그래서 판은 이미지를 올릴 때만 바뀐다.
 1.x 는 속성 이름이 camelCase(`readOnlyHint`, `structuredContent`, `isError`)라 plugin 의 모든 커넥터 도구 호출이 `unavailable` 이 된다. 2.0.0, 2.0.1, 2.1.1, 2.2.0 에서는 plugin 의 호출 순서가 같게 동작함을 2026-10-01 에 확인했다.
 올릴 때 확인할 것은 셋이다.

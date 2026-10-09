@@ -42,7 +42,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /**
- * 사람이 할 일을 더하고 받아들이고 고치고 끝낸다. 뜻과 전이는 {@code backend/docs/flow.md} 가 갖는다(ADR-073).
+ * 사람이 할 일을 더하고 받아들이고 고치고 끝낸다. 뜻과 전이는 {@code docs/features/attention.md} 가 갖는다(ADR-073).
  *
  * <p>쓰는 메서드에 {@code @Transactional} 을 붙이지 않는다. 같은 제목이 동시에 열려 유일 제약에 걸리면 그 예외를 트랜잭션 밖에서 잡아
  * 다시 읽어야 하는데, 메서드 트랜잭션 안에서 잡으면 트랜잭션이 rollback-only 로 남아 커밋할 때 실패한다.
@@ -166,7 +166,7 @@ public class FollowUpService {
     }
 
     /**
-     * 에이전트가 대화 중에 할 일을 제안한다. 새 줄은 {@code PROPOSED} 다. 규칙은 {@code backend/docs/flow.md} 의 「제안 억제」
+     * 에이전트가 대화 중에 할 일을 제안한다. 새 줄은 {@code PROPOSED} 다. 규칙은 {@code docs/features/attention.md} 의 「제안 억제」
      * 가 갖는다.
      *
      * <p>세는 것과 저장하는 것 사이에 잠금을 두지 않는다. 같은 대화에서 나란히 제안하면 상한을 조금 넘을 수 있다. 같은 제목이 동시에

@@ -43,7 +43,7 @@ Hermes core 는 고치지 않는다.
 
 사람의 쿠키 요청은 기존 Hermes 처리기가 맡는다. 검사하지 않는다.
 
-커넥터 경로의 계약은 `backend/docs/flow.md` 의 「대시보드 plugin 계약」 이 소유한다(ADR-043).
+커넥터 경로의 계약은 `docs/features/connector.md` 의 「대시보드 plugin 계약」 이 소유한다(ADR-043).
 이 plugin 은 커넥터의 이름을 코드에 두지 않는다. 운영 목록의 plugin 디렉터리마다 `connector.json` 을 읽는다.
 
 ## 비밀값

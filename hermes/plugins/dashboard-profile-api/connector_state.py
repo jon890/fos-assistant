@@ -66,7 +66,7 @@ def _connector_server(manifest: dict) -> dict:
 
 
 def _connector_tool_map(state: dict, detached: dict | None = None) -> dict:
-    """소유 기록의 커넥터와 뗀 서버 기록으로 만든 이름 대응이다. 형식은 `backend/docs/flow.md` 의 「이름 대응」 이 갖는다.
+    """소유 기록의 커넥터와 뗀 서버 기록으로 만든 이름 대응이다. 형식은 `docs/features/connector-policy.md` 의 「이름 대응」 이 갖는다.
 
     옛 설치는 운영 목록에서 빠졌거나 manifest 를 읽을 수 없는 커넥터를 싣지 않는다. 대응이 없는 도구는 hook 이 막는다.
     바인딩 설치는 `isolated: false` 를 싣고 소유 기록의 모든 서버를 싣는다. manifest 를 읽지 못한 서버는 빈 `tools` 다.

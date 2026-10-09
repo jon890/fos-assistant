@@ -22,8 +22,8 @@ import org.springframework.stereotype.Component;
 /**
  * 후보와 사용자 제어를 받아 카드 다섯을 정한다. 원래 기록을 읽지 않고 상태가 없다.
  *
- * <p>억제, 중복, {@code NOW} 판정, 카드 안의 순서와 상한, 카드 순서를 여기 모은다. 규칙은 {@code backend/docs/flow.md} 의
- * 「억제 신호」 와 「API」 가 갖는다.
+ * <p>억제, 중복, {@code NOW} 판정, 카드 안의 순서와 상한, 카드 순서를 여기 모은다. 규칙은 {@code docs/features/attention.md} 의
+ * 「억제 신호」 와 「API(먼저 알리기와 지금 화면의 판정)」 가 갖는다.
  */
 @Component
 public class AttentionJudge {

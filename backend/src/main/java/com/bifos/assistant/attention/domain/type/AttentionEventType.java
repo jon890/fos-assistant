@@ -1,6 +1,6 @@
 package com.bifos.assistant.attention.domain.type;
 
-/** 지표 사건의 종류다. {@code attention_event.event_type} 이 이 이름을 저장한다. 뜻은 {@code backend/docs/flow.md} 의 「지표(먼저 알리기와 지금 화면의 판정)」 가 갖는다. */
+/** 지표 사건의 종류다. {@code attention_event.event_type} 이 이 이름을 저장한다. 뜻은 {@code docs/features/attention.md} 의 「지표(먼저 알리기와 지금 화면의 판정)」 가 갖는다. */
 public enum AttentionEventType {
     /** {@code GET /api/v1/attention} 응답에 실렸다. */
     SHOWN,

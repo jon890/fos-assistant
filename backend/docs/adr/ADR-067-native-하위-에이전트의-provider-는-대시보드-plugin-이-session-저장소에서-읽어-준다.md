@@ -33,4 +33,4 @@
     - 종료 자식마다 대시보드를 한 번 더 부른다. 대시보드가 답하지 못하면 자식이 끝난 뒤 10분 동안만 다시 부르고, 그 뒤에는 `PROVIDER_UNKNOWN` 으로 적는다.
       10분은 Hermes 가 적은 종료 시각과 Control Plane 의 시계로 센다. 자식이 부모보다 10분 넘게 먼저 끝났으면 다시 부르지 않는다.
     - 배포는 plugin 묶음을 먼저 올린다. 옛 plugin 은 이 경로를 401 로 답하고, Control Plane 은 그 답을 「읽지 못함」 으로 적는다. 그렇게 적힌 줄은 다시 조회하지 않는다.
-- **적용 범위**: `hermes/plugins/dashboard-profile-api/` 의 읽기 경로와 `usage` 패키지의 재조회. 경로의 계약은 [`hermes/README.md`](../../../hermes/README.md) 가, 원장 줄에 적는 규칙은 [`backend/docs/flow.md`](../flow.md) 의 「원장 줄에 적는 것」 이 갖는다.
+- **적용 범위**: `hermes/plugins/dashboard-profile-api/` 의 읽기 경로와 `usage` 패키지의 재조회. 경로의 계약은 [`hermes/README.md`](../../../hermes/README.md) 가, 원장 줄에 적는 규칙은 [`docs/features/model-usage.md`](../../../docs/features/model-usage.md) 의 「원장 줄에 적는 것」 이 갖는다.
