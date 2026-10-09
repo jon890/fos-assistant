@@ -7,6 +7,7 @@ import com.bifos.assistant.chat.application.AttachmentService;
 import com.bifos.assistant.chat.domain.ChatAttachment;
 import com.bifos.assistant.chat.domain.Conversation;
 import com.bifos.assistant.chat.infra.ConversationRepository;
+import com.bifos.assistant.chat.infra.AttachmentProperties;
 import com.bifos.assistant.mcp.application.AgentTokenService;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.domain.type.UserRole;
@@ -16,6 +17,11 @@ import com.bifos.assistant.usage.domain.type.ExecutionStatus;
 import com.bifos.assistant.usage.infra.AgentExecutionRepository;
 import com.bifos.assistant.user.domain.AppUser;
 import com.bifos.assistant.user.infra.AppUserRepository;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.Comparator;
+import java.util.stream.Stream;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -53,6 +59,9 @@ class AttachmentInspectEndpointTest {
     AttachmentService attachments;
 
     @Autowired
+    AttachmentProperties properties;
+
+    @Autowired
     ConversationRepository conversations;
 
     @Autowired
@@ -77,7 +86,15 @@ class AttachmentInspectEndpointTest {
     private String root;
 
     @BeforeEach
-    void setUp() {
+    void setUp() throws IOException {
+        Path directory = Path.of(properties.root());
+        if (Files.exists(directory)) {
+            try (Stream<Path> files = Files.walk(directory)) {
+                for (Path file : files.sorted(Comparator.reverseOrder()).toList()) {
+                    Files.delete(file);
+                }
+            }
+        }
         McpCallSigner.clearRuns(jdbc, List.of(PROFILE));
         AppUser owner =
                 users.save(AppUser.of(UUID.randomUUID() + "@example.test", "사용자", 1L, UserRole.MEMBER, Instant.now()));
