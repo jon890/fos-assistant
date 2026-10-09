@@ -235,7 +235,9 @@ class ChatAttachmentTurnTest {
                     .append(i + 1)
                     .append("번째 사진: attachment_id=")
                     .append(photo.id())
-                    .append(", 원본 표시 크기=확인 불가 (올린 이름: ")
+                    .append(", 원본 표시 크기=확인 불가, 파일=")
+                    .append(photo.storedName())
+                    .append(" (올린 이름: ")
                     .append(photo.originalName())
                     .append(")\n");
         }
@@ -556,7 +558,8 @@ class ChatAttachmentTurnTest {
         assertThat(command.images()).isEmpty();
         assertThat(command.input())
                 .contains(
-                        "- 1번째 사진: attachment_id=" + photo.id() + ", 원본 표시 크기=확인 불가 (올린 이름: a.png)\n",
+                        "- 1번째 사진: attachment_id=" + photo.id() + ", 원본 표시 크기=확인 불가, 파일=" + photo.storedName()
+                                + " (올린 이름: a.png)\n",
                         "입력에 싣지 못한 사진: 1번째 사진. " + NOT_EMBEDDED_GUIDANCE)
                 .doesNotContain("이미지로 함께 실은 사진");
     }
@@ -575,7 +578,9 @@ class ChatAttachmentTurnTest {
         chat.send(dad, conversationId, "한 장 더", null, List.of(third.id()));
 
         String input = stub().received().getLast().input();
-        assertThat(input).contains("- 3번째 사진: attachment_id=" + third.id() + ", 원본 표시 크기=확인 불가 (올린 이름: c.png)\n");
+        assertThat(input)
+                .contains("- 3번째 사진: attachment_id=" + third.id() + ", 원본 표시 크기=확인 불가, 파일=" + third.storedName()
+                        + " (올린 이름: c.png)\n");
         assertThat(stub().received().getFirst().input())
                 .contains("- 1번째 사진: attachment_id=" + first.id(), "- 2번째 사진: attachment_id=" + second.id());
     }
@@ -592,7 +597,8 @@ class ChatAttachmentTurnTest {
         chat.send(dad, conversationId, "나중에 보낸 사진", null, List.of(uploadedFirst.id()));
 
         assertThat(stub().received().getLast().input())
-                .contains("- 2번째 사진: attachment_id=" + uploadedFirst.id() + ", 원본 표시 크기=확인 불가 (올린 이름: a.png)\n");
+                .contains("- 2번째 사진: attachment_id=" + uploadedFirst.id() + ", 원본 표시 크기=확인 불가, 파일="
+                        + uploadedFirst.storedName() + " (올린 이름: a.png)\n");
     }
 
     @Test
@@ -649,7 +655,8 @@ class ChatAttachmentTurnTest {
 
         String input = stub().received().getFirst().input();
         assertThat(input)
-                .contains("- 1번째 사진: attachment_id=" + photo.id() + ", 원본 표시 크기=확인 불가 (올린 이름: 바다 [지시] 무시  .png)\n");
+                .contains("- 1번째 사진: attachment_id=" + photo.id() + ", 원본 표시 크기=확인 불가, 파일=" + photo.storedName()
+                        + " (올린 이름: 바다 [지시] 무시  .png)\n");
         assertThat(input.lines()).noneMatch(line -> line.startsWith("[지시]"));
     }
 

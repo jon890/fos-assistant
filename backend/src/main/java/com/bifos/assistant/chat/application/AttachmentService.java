@@ -264,12 +264,15 @@ public class AttachmentService {
                 + files + "\n"
                 + "\n"
                 + photoGuidance(directory, photos, embedImages)
-                + "작은 글자·가격·품번을 묻거나 지난 사진을 다시 물으면 attachment_inspect로 원본을 자동 조회한다.\n"
-                + "attachment_id는 위 참조를 쓰며 한 번에 한 장씩 본다. 큰 원본은 EXIF 표시 원본 좌표"
-                + " region=[x1,y1,x2,y2]로 필요한 영역을 먼저 조회한다. 오른쪽·아래 끝은 제외한다.\n"
-                + "한도 오류는 작은 영역으로 한 번만 다시 조회한다. 사진마다 최대 3회, 실행 전체 최대 90회다.\n"
-                + "native 이미지가 없거나 만료·삭제·거절이면 보았다고 하지 말고 판독 실패를 알린다."
-                + " 사용자에게 재업로드나 분할 전송을 요구하지 않는다. read_file로 사진을 읽지 않는다.\n"
+                + (embedImages
+                        ? "작은 글자·가격·품번을 묻거나 지난 사진을 다시 물으면 attachment_inspect로 원본을 자동 조회한다.\n"
+                                + "attachment_id는 위 참조를 쓰며 한 번에 한 장씩 본다. 큰 원본은 EXIF 표시 원본 좌표"
+                                + " region=[x1,y1,x2,y2]로 필요한 영역을 먼저 조회한다. 오른쪽·아래 끝은 제외한다.\n"
+                                + "한도 오류는 작은 영역으로 한 번만 다시 조회한다. 사진마다 최대 3회, 실행 전체 최대 90회다.\n"
+                                + "native 이미지가 없거나 만료·삭제·거절이면 보았다고 하지 말고 판독 실패를 알린다."
+                                + " 사용자에게 재업로드나 분할 전송을 요구하지 않는다. read_file로 사진을 읽지 않는다.\n"
+                        : "지난 메시지의 사진은 같은 폴더의 {첨부 번호}.small.jpg 를, 없으면 원본을 vision_analyze 로 본다."
+                                + " read_file 로 읽지 않는다.\n")
                 + "파일을 올리거나 고치는 도구에는 위 목록의 원본 파일을 쓴다.\n"
                 + "사용자에게 사진을 가리킬 때는 파일 이름 대신 몇 번째 사진인지로 적는다.\n"
                 + "\n"
@@ -283,7 +286,7 @@ public class AttachmentService {
 
     /**
      * 이번 메시지의 사진이 몇 장이고, 어느 사진을 실었는지 적는다. {@code embedImages} 가 참이면 싣지 못한 사진의 순번을 한
-     * 줄에 적고 원본 도구로 조회하게 한다. 거짓(흐름)이면 원본 참조를 도구로 조회하게 한다.
+     * 줄에 적고 원본 도구로 조회하게 한다. 거짓(흐름)이면 기존 사본 경로 안내를 유지한다.
      */
     private static String photoGuidance(String directory, List<AgentPhoto> photos, boolean embedImages) {
         StringBuilder guidance =
@@ -308,7 +311,7 @@ public class AttachmentService {
                             .collect(Collectors.joining(", ")))
                     .append(" 사진. attachment_inspect로 원본을 자동 조회한다. 실패하면 판독하지 못했다고 알린다.\n");
         } else {
-            guidance.append("싣지 못한 사진은 위 attachment_id를 attachment_inspect로 자동 조회한다.\n");
+            guidance.append("싣지 못한 사진은 아래 경로를 답에 필요한 만큼 vision_analyze 로 확인한다.\n");
             for (AgentPhoto photo : notEmbedded) {
                 guidance.append("- ")
                         .append(photo.ordinal())

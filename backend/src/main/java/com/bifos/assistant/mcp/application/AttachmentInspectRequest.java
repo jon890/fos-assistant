@@ -2,11 +2,8 @@ package com.bifos.assistant.mcp.application;
 
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
+import com.bifos.assistant.shared.util.Sha256;
 import java.util.ArrayList;
-import java.util.HexFormat;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -49,13 +46,7 @@ public record AttachmentInspectRequest(long attachmentId, List<Integer> region) 
     public String digest() {
         String coordinates =
                 region == null ? "" : region.stream().map(String::valueOf).collect(Collectors.joining(","));
-        try {
-            return HexFormat.of()
-                    .formatHex(MessageDigest.getInstance("SHA-256")
-                            .digest((attachmentId + "\n" + coordinates).getBytes(StandardCharsets.UTF_8)));
-        } catch (NoSuchAlgorithmException ex) {
-            throw new IllegalStateException(ex);
-        }
+        return Sha256.hex(attachmentId + "\n" + coordinates);
     }
 
     private static ApiException invalid() {
