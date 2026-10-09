@@ -25,6 +25,7 @@
 - 파일 이름은 `{첨부 번호}.{확장자}` 다. 올릴 때의 이름을 파일 이름으로 쓰지 않는다.
 - **행을 지우지 않는다.** 파일을 지우고 `deleted_at` 을 적는다.
 - 받는 형식은 `image/jpeg`, `image/png`, `image/gif`, `image/webp` 넷이다. HEIC 는 받지 않는다.
+- 새로 올리는 MPO는 재인코딩 없이 첫 JPEG만 남기고 MPF 정보를 제거한다. 디코딩 검증에 실패하면 원본을 저장하며, `byte_size`는 저장한 바이트 수다. 기존 첨부는 바꾸지 않는다.
 - multipart 상한은 한 장 11MB, 요청 12MB 다. 서비스 상한 10MB 를 조금 넘는 것은 `VALIDATION_FAILED` 로 거절한다.
   Tomcat 의 `max-swallow-size` 를 16MB 로 둔다. 요청 상한을 넘은 본문이 기본값 2MB 보다 크면
   Tomcat 이 400 을 쓴 뒤 연결을 끊어 클라이언트가 응답을 받지 못하기 때문이다. 16MB 를 넘으면 여전히 끊긴다.
