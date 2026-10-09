@@ -84,8 +84,11 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InOrder;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.jdbc.core.JdbcTemplate;
 import tools.jackson.databind.json.JsonMapper;
 
@@ -96,6 +99,7 @@ import tools.jackson.databind.json.JsonMapper;
  * 차례를 볼 수 있다. 대시보드의 커넥터, 스킬, 도구 목록 경로만 대역이다.
  */
 @BackendIntegrationTest
+@ExtendWith(OutputCaptureExtension.class)
 @OverrideProperties({
     "assistant.browser.gateway-base-url=" + ConnectorBindingServiceTest.GATEWAY,
     "assistant.browser.gateway-secret=0123456789abcdef0123456789abcdef-binding"
@@ -942,7 +946,7 @@ class ConnectorBindingServiceTest {
     }
 
     @Test
-    @DisplayName("반영 예정 시각 전의 관리자 반영 완료는 설치를 다시 보내지 않고 READY 로 두지 않으며 연결 실패로 끝난다")
+    @DisplayName("반영 예정 시각 전의 관리자 반영 완료는 설치를 다시 보내지 않고 READY 로 두지 않으며 CONNECTOR_APPLY_SCHEDULED 로 끝난다")
     void confirmAppliedBeforeApplyDueStaysPending() {
         CurrentUser owner = user(UserRole.MEMBER, 1L);
         CurrentUser admin = user(UserRole.ADMIN, 1L);
@@ -955,8 +959,7 @@ class ConnectorBindingServiceTest {
         Instant shown = shownTo(admin);
         clearInvocations(connector);
 
-        assertThatThrownBy(() -> service.confirmApplied(admin, agent.code(), DEMO, shown))
-                .isInstanceOf(ConnectorOperationFailure.class);
+        assertCode(() -> service.confirmApplied(admin, agent.code(), DEMO, shown), ErrorCode.CONNECTOR_APPLY_SCHEDULED);
 
         verify(connector, never())
                 .bindConnector(anyString(), anyString(), anyString(), anyString(), nullable(String.class));
@@ -994,7 +997,7 @@ class ConnectorBindingServiceTest {
     }
 
     @Test
-    @DisplayName("반영 완료에서 다시 보낸 설치가 바뀐 것이 있다고 답하면 READY 가 아니고 연결 실패로 끝난다")
+    @DisplayName("반영 완료에서 다시 보낸 설치가 바뀐 것이 있다고 답하면 READY 가 아니고 CONNECTOR_RESTART_AGAIN 으로 끝난다")
     void confirmAppliedStaysPendingWhenReinstallNeedsRestartAgain() {
         CurrentUser owner = user(UserRole.MEMBER, 1L);
         CurrentUser admin = user(UserRole.ADMIN, 1L);
@@ -1003,8 +1006,7 @@ class ConnectorBindingServiceTest {
         service.bind(owner, agent.code(), DEMO);
         Instant shown = shownTo(admin);
 
-        assertThatThrownBy(() -> service.confirmApplied(admin, agent.code(), DEMO, shown))
-                .isInstanceOf(ConnectorOperationFailure.class);
+        assertCode(() -> service.confirmApplied(admin, agent.code(), DEMO, shown), ErrorCode.CONNECTOR_RESTART_AGAIN);
 
         ConnectorBinding stored = onlyBinding();
         assertThat(stored.status()).isEqualTo(BindingStatus.PENDING);
@@ -1013,7 +1015,7 @@ class ConnectorBindingServiceTest {
     }
 
     @Test
-    @DisplayName("반영 완료에서 다시 보낸 설치가 configured 가 아니거나 probe 가 실패하면 PENDING 과 재시작 대기로 남고 연결 실패다")
+    @DisplayName("반영 완료에서 다시 읽은 설치가 configured 가 아니면 CONNECTOR_INSTALL_MISMATCH, probe 가 실패하면 CONNECTOR_TOOLS_UNVERIFIED 이고 PENDING 과 재시작 대기로 남는다")
     void confirmAppliedKeepsRestartWaitWhenNotConfiguredOrProbeFails() {
         CurrentUser owner = user(UserRole.MEMBER, 1L);
         CurrentUser admin = user(UserRole.ADMIN, 1L);
@@ -1026,9 +1028,7 @@ class ConnectorBindingServiceTest {
 
         when(connector.readConnector(anyString(), anyString()))
                 .thenReturn(new ConnectorState("p", true, false, false, true, HermesConnectorClient.MODE_BIND));
-        assertThatThrownBy(() -> service.confirmApplied(admin, agent.code(), DEMO, shown))
-                .as("configured 가 아니다")
-                .isInstanceOf(ConnectorOperationFailure.class);
+        assertCode(() -> service.confirmApplied(admin, agent.code(), DEMO, shown), ErrorCode.CONNECTOR_INSTALL_MISMATCH);
         assertThat(onlyBinding())
                 .extracting(ConnectorBinding::status, ConnectorBinding::restartRequired)
                 .containsExactly(BindingStatus.PENDING, true);
@@ -1036,12 +1036,68 @@ class ConnectorBindingServiceTest {
         when(connector.readConnector(anyString(), anyString()))
                 .thenReturn(new ConnectorState("p", true, true, false, true, HermesConnectorClient.MODE_BIND));
         when(connector.probe(anyString(), anyString())).thenReturn(new ProbeResult(false, List.of()));
-        assertThatThrownBy(() -> service.confirmApplied(admin, agent.code(), DEMO, shown))
-                .as("probe 가 실패한다")
-                .isInstanceOf(ConnectorOperationFailure.class);
+        assertCode(() -> service.confirmApplied(admin, agent.code(), DEMO, shown), ErrorCode.CONNECTOR_TOOLS_UNVERIFIED);
         assertThat(onlyBinding())
                 .extracting(ConnectorBinding::status, ConnectorBinding::restartRequired)
                 .containsExactly(BindingStatus.PENDING, true);
+    }
+
+    @Test
+    @DisplayName("반영 완료에서 다시 읽은 설치의 policy_hook 이 거짓이면 CONNECTOR_INSTALL_MISMATCH 이고 PENDING 이며 커넥터 번호와 까닭만 로그에 남는다")
+    void confirmAppliedReportsInstallMismatchWhenPolicyHookIsOff(CapturedOutput output) {
+        CurrentUser owner = user(UserRole.MEMBER, 1L);
+        CurrentUser admin = user(UserRole.ADMIN, 1L);
+        connect(owner, DEMO, VALUES);
+        Agent agent = agent(owner, AgentVisibility.PRIVATE);
+        service.bind(owner, agent.code(), DEMO);
+        Instant shown = shownTo(admin);
+        when(connector.bindConnector(anyString(), anyString(), anyString(), anyString(), nullable(String.class)))
+                .thenReturn(new InstallResult(false, false));
+        when(connector.readConnector(anyString(), anyString()))
+                .thenReturn(new ConnectorState("p", true, true, false, false, HermesConnectorClient.MODE_BIND));
+
+        assertCode(() -> service.confirmApplied(admin, agent.code(), DEMO, shown), ErrorCode.CONNECTOR_INSTALL_MISMATCH);
+
+        assertThat(onlyBinding().status()).isEqualTo(BindingStatus.PENDING);
+        verify(connector, never()).probe(anyString(), anyString());
+        assertThat(output.getOut()).contains("connector demo-notes not applied: POLICY_HOOK_OFF");
+    }
+
+    @Test
+    @DisplayName("반영 완료에서 probe 가 도구를 하나도 내지 않으면 CONNECTOR_TOOLS_UNVERIFIED 이고 PENDING 으로 커밋된다")
+    void confirmAppliedReportsToolsUnverifiedWhenProbeReturnsNoTools(CapturedOutput output) {
+        CurrentUser owner = user(UserRole.MEMBER, 1L);
+        CurrentUser admin = user(UserRole.ADMIN, 1L);
+        connect(owner, DEMO, VALUES);
+        Agent agent = agent(owner, AgentVisibility.PRIVATE);
+        service.bind(owner, agent.code(), DEMO);
+        Instant shown = shownTo(admin);
+        when(connector.bindConnector(anyString(), anyString(), anyString(), anyString(), nullable(String.class)))
+                .thenReturn(new InstallResult(false, false));
+        when(connector.probe(anyString(), anyString())).thenReturn(new ProbeResult(true, List.of()));
+
+        assertCode(() -> service.confirmApplied(admin, agent.code(), DEMO, shown), ErrorCode.CONNECTOR_TOOLS_UNVERIFIED);
+
+        assertThat(onlyBinding().status()).isEqualTo(BindingStatus.PENDING);
+        assertThat(output.getOut()).contains("connector demo-notes not applied: NO_TOOLS");
+    }
+
+    @Test
+    @DisplayName("반영 완료에서 설치를 다시 보내다 예외가 나면 CONNECTOR_OPERATION_FAILED 이고 PENDING 으로 커밋되며 까닭 로그는 남기지 않는다")
+    void confirmAppliedKeepsOperationFailedWhenReinstallThrows(CapturedOutput output) {
+        CurrentUser owner = user(UserRole.MEMBER, 1L);
+        CurrentUser admin = user(UserRole.ADMIN, 1L);
+        connect(owner, DEMO, VALUES);
+        Agent agent = agent(owner, AgentVisibility.PRIVATE);
+        service.bind(owner, agent.code(), DEMO);
+        Instant shown = shownTo(admin);
+        when(connector.bindConnector(anyString(), anyString(), anyString(), anyString(), nullable(String.class)))
+                .thenThrow(new IllegalStateException());
+
+        assertCode(() -> service.confirmApplied(admin, agent.code(), DEMO, shown), ErrorCode.CONNECTOR_OPERATION_FAILED);
+
+        assertThat(onlyBinding().status()).isEqualTo(BindingStatus.PENDING);
+        assertThat(output.getOut()).doesNotContain("not applied");
     }
 
     @Test

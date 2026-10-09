@@ -7,6 +7,7 @@ import com.bifos.assistant.agent.infra.AgentRepository;
 import com.bifos.assistant.connector.application.model.AgentConnectionView;
 import com.bifos.assistant.connector.application.model.AgentConnectionsView;
 import com.bifos.assistant.connector.application.model.ConnectorOperationFailure;
+import com.bifos.assistant.connector.application.model.ResyncOutcome;
 import com.bifos.assistant.connector.domain.ConnectorBinding;
 import com.bifos.assistant.connector.domain.ConnectorConnection;
 import com.bifos.assistant.connector.domain.type.BindingStatus;
@@ -84,7 +85,7 @@ public class ConnectorBindingService implements AgentConnectorDetacher {
      *
      * @param view 반영을 확인한 바인딩의 모습. 확인하지 못했으면 null
      */
-    private record Confirmed(AgentConnectionView view) {}
+    private record Confirmed(AgentConnectionView view, ResyncOutcome outcome) {}
 
     // TransactionTemplate 은 transaction manager 로 여기서 만들고, 검사가 시각을 고정할 수 있게 Clock 을 받는 생성자를 따로 둔다.
     @Autowired
@@ -286,8 +287,11 @@ public class ConnectorBindingService implements AgentConnectorDetacher {
         }
         Confirmed confirmed =
                 transactions.execute(status -> confirmLocked(admin, agentId, ownerId, connectorId, shownSince));
-        if (confirmed == null || confirmed.view() == null) {
+        if (confirmed == null) {
             throw new ConnectorOperationFailure();
+        }
+        if (confirmed.view() == null) {
+            throw ConnectorErrors.notApplied(confirmed.outcome());
         }
         return confirmed.view();
     }
@@ -295,7 +299,7 @@ public class ConnectorBindingService implements AgentConnectorDetacher {
     /**
      * 반영 완료의 트랜잭션이다. 트랜잭션 안에서만 부른다.
      *
-     * @return 반영을 확인했으면 그 바인딩의 모습. 확인하지 못했으면 view 가 null 이고, 바인딩의 상태는 커밋된다
+     * @return 반영을 확인했으면 그 바인딩의 모습. 확인하지 못했으면 view 가 null 이고 까닭을 함께 담으며, 바인딩의 상태는 커밋된다
      */
     private Confirmed confirmLocked(
             CurrentUser admin, Long agentId, Long ownerId, String connectorId, Instant shownSince) {
@@ -323,12 +327,12 @@ public class ConnectorBindingService implements AgentConnectorDetacher {
                     ErrorCode.CONNECTOR_RESTART_AGAIN, "the connection was installed again after the restart");
         }
         Optional<ConnectorManifest> manifest = ConnectorManifests.find(connector, connectorId);
-        boolean failed = resync(binding, manifest, true);
+        ResyncOutcome outcome = resync(binding, manifest, true);
         bindings.save(binding);
-        if (failed || binding.status() != BindingStatus.READY) {
-            return new Confirmed(null);
+        if (outcome != ResyncOutcome.READY || binding.status() != BindingStatus.READY) {
+            return new Confirmed(null, outcome);
         }
-        return new Confirmed(view(connection, binding, manifest.orElse(null)));
+        return new Confirmed(view(connection, binding, manifest.orElse(null)), outcome);
     }
 
     /**
@@ -455,9 +459,19 @@ public class ConnectorBindingService implements AgentConnectorDetacher {
      * 답하므로 그 값은 쓰지 않고 hook plugin 파일이 바뀌었을 때만 재시작 대기로 둔다. 켜진 내장 도구가 manifest 의 선언과 같아야
      * 하고, 쓸 수 있을 때만 선언한 사진 받기를 옮긴다.
      *
-     * @return 외부 호출이 실패했는가. 실패해도 예외로 알리지 않고 그 바인딩만 {@code PENDING} 으로 둔다
+     * @return 반영 맞추기가 끝난 까닭. 외부 호출이 실패해도({@code CALL_FAILED}) 예외로 알리지 않고 그 바인딩만 {@code PENDING} 으로
+     *     둔다. {@code READY} 가 아닌 까닭은 커넥터 번호와 까닭 이름만 로그 한 줄로 남긴다
      */
-    public boolean resync(ConnectorBinding binding, Optional<ConnectorManifest> manifest, boolean afterRestart) {
+    public ResyncOutcome resync(ConnectorBinding binding, Optional<ConnectorManifest> manifest, boolean afterRestart) {
+        ResyncOutcome outcome = resyncReason(binding, manifest, afterRestart);
+        if (outcome != ResyncOutcome.READY && outcome != ResyncOutcome.CALL_FAILED) {
+            log.info("connector {} not applied: {}", binding.connection().connectorId(), outcome);
+        }
+        return outcome;
+    }
+
+    private ResyncOutcome resyncReason(
+            ConnectorBinding binding, Optional<ConnectorManifest> manifest, boolean afterRestart) {
         Instant now = now();
         // 재시작 대기로 일찍 돌아가도 서버 이름은 채운다. 관리자 반영 완료의 probe 가 그 이름을 쓴다.
         if (binding.mcpServer() == null && manifest.isPresent()) {
@@ -466,9 +480,17 @@ public class ConnectorBindingService implements AgentConnectorDetacher {
         // 관리자 반영 완료는 재시작 대기만 넘는다. 반영 예정 시각 전에는 gateway 가 아직 서버를 연결하지 않았을 수 있다.
         // probe 는 gateway 와 별개의 연결이라 그 전에 통과해 READY 가 되면 실제 실행에는 도구가 없다.
         boolean dueLater = binding.applyDueAt() != null && binding.applyDueAt().isAfter(now);
-        if ((!afterRestart && binding.restartRequired()) || dueLater || manifest.isEmpty()) {
+        if (manifest.isEmpty()) {
             binding.pending(now);
-            return false;
+            return ResyncOutcome.CATALOG_MISSING;
+        }
+        if (!afterRestart && binding.restartRequired()) {
+            binding.pending(now);
+            return ResyncOutcome.RESTART_PENDING;
+        }
+        if (dueLater) {
+            binding.pending(now);
+            return ResyncOutcome.APPLY_SCHEDULED;
         }
         return installs.resync(binding, manifest.get(), now);
     }
