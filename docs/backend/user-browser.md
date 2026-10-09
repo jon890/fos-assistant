@@ -1,27 +1,9 @@
 # 사용자 브라우저
 
-사용자마다 하나씩 두는 브라우저의 표, 상태, API 계약이다.
+사용자마다 하나씩 두는 브라우저의 상태 전이와 로그인 화면, 중계의 동작이다.
+표의 칸과 제약은 [`schema/browser.md`](schema/browser.md) 가 갖는다.
 결정과 근거는 [ADR-20261007 / user-browser](../adr/ADR-20261007-user-browser.md) 가 갖는다.
 proxy 의 정책과 이미지, 망, 프로필 디렉터리의 위치는 운영 값이라 `fos-home-infra` 가 갖는다.
-
-## 표
-
-### `user_browser`
-
-| 칸 | 타입 | 빈 값 | 뜻 |
-| --- | --- | --- | --- |
-| `id` | BIGINT | 아니다 | |
-| `user_id` | BIGINT | 아니다 | `app_user.id`. 유일 |
-| `status` | VARCHAR(16) | 아니다 | `STOPPED`, `STARTING`, `RUNNING`, `STOPPING`, `FAILED` |
-| `profile_key` | CHAR(64) | 아니다 | 프로필 디렉터리 이름. `SHA-256("u" + user_id)` 의 16진수. 첨부 디렉터리 키와 같은 계산이지만 루트가 다르다 |
-| `container_id` | VARCHAR(80) | 그렇다 | 켜져 있을 때만 |
-| `last_error` | VARCHAR(40) | 그렇다 | `FAILED` 의 까닭. Control Plane 이 정한 코드만 |
-| `last_active_at` | DATETIME(6) | 그렇다 | 켠 시각이나 `touch` 가 마지막으로 기록한 시각. 1분에 한 번까지만 쓴다 |
-| `started_at` | DATETIME(6) | 그렇다 | |
-| `created_at`, `updated_at` | DATETIME(6) | 아니다 | |
-| `version` | BIGINT | 아니다 | 낙관적 잠금 |
-
-쿠키, 저장소, 열린 주소, 화면 프레임은 이 표에 없다.
 
 ## 상태 전이
 
@@ -53,7 +35,7 @@ Chrome 은 정상 종료에서도 이 잠금을 남긴다. 잠금에는 앞 컨�
 이미지는 잠금을 지우기 전에 프로필에 파일 잠금을 잡고, 다른 컨테이너가 쥐고 있으면 프로필을 건드리지 않고 끝난다. 이때 켜기는 `start_exited` 다.
 켜기는 컨테이너를 만들기 전에 proxy 목록에서 같은 프로필 키 라벨의 컨테이너를 모두 지운다. 실패한 켜기에서 지우지 못해 번호 없이 남은 컨테이너도 여기서 지운다. 목록을 읽거나 지우지 못하면 새 컨테이너를 만들지 않고 `start_failed` 다.
 
-자동 중지와 꺼진 사용자의 브라우저 끄기, 상태 맞추기는 `assistant.browser.sweep-interval`(기본 `1m`)마다 돌고, 기동할 때 한 번 돈다. 기능이 꺼져 있으면 돌지 않는다.
+자동 중지와 꺼진 사용자의 브라우저 끄기, 상태 맞추기는 `assistant.browser.sweep-interval` 간격마다 돌고, 기동할 때 한 번 돈다. 기능이 꺼져 있으면 돌지 않는다.
 점검은 끄다 실패해 컨테이너가 남은 `FAILED` 를 다시 끈다.
 점검 중 DB 예외가 나면 경고 로그만 남기고 기동을 멈추지 않는다.
 상태 맞추기는 proxy 의 브라우저 컨테이너 목록과 표를 견준다.
@@ -67,32 +49,11 @@ Chrome 은 정상 종료에서도 이 잠금을 남긴다. 잠금에는 앞 컨�
 
 ## 설정
 
-env 로 받는다. 기본값이 있는 값은 코드를 바꾸지 않고 설치 설정으로 바꾼다.
-
-| 키 | env | 뜻 | 기본값 |
-| --- | --- | --- | --- |
-| `assistant.browser.enabled` | `ASSISTANT_BROWSER_ENABLED` | 꺼져 있으면 상태 조회 말고 모든 쓰기가 503 이다. 아래 값이 비어도 기동한다 | `false` |
-| `assistant.browser.proxy-url` | `ASSISTANT_BROWSER_PROXY_URL` | 브라우저 proxy 의 주소 | 없음 |
-| `assistant.browser.image` | `ASSISTANT_BROWSER_IMAGE` | 컨테이너 이미지 | 없음 |
-| `assistant.browser.network` | `ASSISTANT_BROWSER_NETWORK` | 컨테이너를 붙이는 망. 그 망의 주소로 CDP 에 닿는다 | 없음 |
-| `assistant.browser.cdp-port` | `ASSISTANT_BROWSER_CDP_PORT` | 컨테이너 안에서 CDP 를 받는 포트 | 없음 |
-| `assistant.browser.profile-root` | `ASSISTANT_BROWSER_PROFILE_ROOT` | Control Plane 이 보는 프로필 루트 | 없음 |
-| `assistant.browser.profile-host-root` | `ASSISTANT_BROWSER_PROFILE_HOST_ROOT` | 같은 루트를 Docker 호스트에서 본 경로. 생성 요청의 `Binds` 에 쓴다 | 없음 |
-| `assistant.browser.profile-mount` | `ASSISTANT_BROWSER_PROFILE_MOUNT` | 컨테이너 안에서 프로필 디렉터리를 붙이는 경로. 이미지가 쓰는 경로와 같게 둔다 | 없음 |
-| `assistant.browser.memory-mb` | `ASSISTANT_BROWSER_MEMORY_MB` | 컨테이너 메모리 상한(MB). 스왑은 주지 않는다 | `1024` |
-| `assistant.browser.cpu` | `ASSISTANT_BROWSER_CPU` | 컨테이너가 쓰는 CPU 수 | 없음 |
-| `assistant.browser.pids-limit` | `ASSISTANT_BROWSER_PIDS_LIMIT` | 컨테이너 안의 프로세스 수 상한 | 없음 |
-| `assistant.browser.shm-mb` | `ASSISTANT_BROWSER_SHM_MB` | `/dev/shm` 크기(MB) | 없음 |
-| `assistant.browser.max-running` | `ASSISTANT_BROWSER_MAX_RUNNING` | 동시에 켤 수 있는 수. 1 이상이고 상한은 두지 않는다 | `2` |
-| `assistant.browser.idle-timeout` | `ASSISTANT_BROWSER_IDLE_TIMEOUT` | 자동 중지까지의 유휴 시간. `10m` 같은 Duration 형식이다 | `10m` |
-| `assistant.browser.start-timeout` | | 켠 뒤 CDP 가 답하기를 기다리는 시간 | `30s` |
-| `assistant.browser.sweep-interval` | | 자동 중지와 상태 맞추기를 도는 간격 | `1m` |
-| `assistant.browser.screen-timeout` | | 로그인 화면 하나가 열려 있을 수 있는 시간. 넘으면 `closed`(`timeout`) | `30m` |
-| `assistant.browser.gateway-base-url` | `ASSISTANT_BROWSER_GATEWAY_BASE_URL` | Hermes 가 중계에 닿는 주소. `http` 나 `https` 이고 끝이 `/internal/browser-gateway` 다. 호스트는 영문자와 숫자, `.`, `-` 만 쓰고 경로 조각은 영문자와 숫자, `.`, `_`, `~`, `-` 만 쓴다. 아래 「중계」 | 없음 |
-| `assistant.browser.gateway-secret` | `ASSISTANT_BROWSER_GATEWAY_SECRET` | 접근 표식을 서명하는 비밀값. 32자 이상. 운영 비밀값이다 | 없음 |
+키와 env, 기본값은 `application.yml` 의 `assistant.browser` 와 그 주석이 갖는다.
 
 이미지, 망, 자원, 프로필 루트는 proxy 정책이 강제한다. Control Plane 은 정책과 같은 값을 운영 설정으로 받아 생성 요청에 싣는다.
 켜져 있는데 기본값이 없는 값이 비어 있으면 기동을 멈춘다. 중계의 두 값은 예외다. 둘 중 하나라도 비면 중계만 꺼지고 기동한다.
+중계 주소와 비밀값의 형식 검사는 `BrowserProperties` 가 갖는다.
 
 ### Docker proxy 요청의 길이
 
@@ -107,25 +68,10 @@ Docker proxy 는 chunked 요청을 거절하므로 Control Plane 은 요청 본�
 ## API
 
 모두 웹의 서버 라우트를 거친다. 요청자는 토큰의 사용자다.
+경로는 `UserBrowserController` 와 `UserBrowserAdminController` 가, 응답 칸은 `UserBrowserDtos` 가, 오류 코드와 HTTP 상태는 `ErrorCode` 의 `BROWSER_*` 가 갖는다.
 
-| 메서드와 경로 | 하는 일 |
-| --- | --- |
-| `GET /api/browser` | 내 브라우저의 상태. 기능이 꺼져 있어도 200 이고 `{enabled: false}` 만 준다. 없으면 `{enabled: true, exists: false, idleTimeoutSeconds}` |
-| `POST /api/browser` | 내 브라우저를 만든다. `STOPPED` 로 생긴다. 이미 있으면 `BROWSER_EXISTS`(409) |
-| `POST /api/browser/start`, `POST /api/browser/stop` | 켜기와 끄기 |
-| `DELETE /api/browser` | 지우기. 본문 없이 204 |
-| `GET /api/browser/screen?url=<시작 주소, 선택>` | 로그인 화면 SSE. 아래 「로그인 화면」 |
-| `POST /api/browser/screen/input` | 화면 입력. 본문 없이 204 |
-| `GET /api/admin/browsers` | 관리자. 모든 브라우저의 사용자, 상태, 시각 |
-| `POST /api/admin/browsers/{id}/stop`, `DELETE /api/admin/browsers/{id}` | 관리자. 끄기와 지우기. 지우기는 본문 없이 204 |
-
-Control Plane 의 경로는 같은 이름에 `/api/v1` 을 붙인 것이다(`/api/v1/browser`, `/api/v1/admin/browsers`).
-
-내 브라우저 응답은 `{enabled, exists, status, lastError, startedAt, lastActiveAt, idleTimeoutSeconds}` 다.
-관리자 목록은 줄마다 `{id, userId, userName, status, lastError, startedAt, lastActiveAt}` 이다. 컨테이너 번호와 프로필 키는 싣지 않는다.
-관리자 목록은 기능이 꺼져 있어도 읽는다. 쓰기는 기능이 꺼져 있으면 503 이다.
-
-오류 코드는 `BROWSER_NOT_FOUND`(404), `BROWSER_DISABLED`(503), `BROWSER_CAPACITY`(409), `BROWSER_BUSY`(409, 다른 전이가 진행 중), `BROWSER_START_FAILED`(502), `BROWSER_EXISTS`(409), `BROWSER_STOP_FAILED`(502, 줄은 `FAILED` 로 남고 다시 끌 수 있다), `BROWSER_SCREEN_CLOSED`(409, 열린 화면이 없다) 다.
+응답에는 컨테이너 번호와 프로필 키를 싣지 않는다.
+기능이 꺼져 있어도 내 브라우저 상태와 관리자 목록은 읽는다. 쓰기는 기능이 꺼져 있으면 503 이다.
 
 ## 로그인 유지
 
@@ -148,7 +94,7 @@ QR 로그인은 세션 쿠키만 준다(2026-10-08 실측). 그래서 QR 로그�
 화면 등록부는 JVM 메모리에 둔다. Control Plane 은 한 프로세스이고 재기동하면 SSE 도 끊긴다. 화면마다 도는 탭 확인, 시간 초과, `ping` 은 스케줄러 하나로 돌고 화면이 닫히면 취소된다. 탭 확인과 다시 붙기는 그 스레드에서 막힌 채 돌아, 한 브라우저가 느리면 다른 화면의 `ping` 과 시간 초과가 최대 10초 늦어진다. 동시에 켜는 브라우저가 몇 개뿐이라 받아들인다.
 SSE 자체의 시간 제한은 두지 않고 화면의 수명은 `screen-timeout` 이 정한다. 사건은 한 번에 하나씩 쓴다.
 화면이 열려 있는 동안 자동 중지하지 않고(`BrowserUsage`), 입력마다 활동을 기록한다. 끄기와 지우기, 사용자 끄기는 브라우저를 멈추기 전에 화면을 닫는다.
-화면은 `Page.startScreencast {format: "jpeg", quality: 60, maxWidth: 1280, maxHeight: 2000}` 로 프레임을 받고, SSE 에 쓴 뒤에 ack 한다.
+화면은 `Page.startScreencast` 로 JPEG 프레임을 받고, SSE 에 쓴 뒤에 ack 한다.
 받는 쪽이 읽지 않으면 ack 도 멈추므로 Chrome 이 프레임을 더 보내지 않는다.
 2초마다 탭 목록을 보고 바뀌면 `tabs` 를 보낸다. 새 탭이 생기면(로그인 팝업) screencast 를 그 탭으로 옮기고, 붙은 탭이 사라지면 남은 탭으로 옮긴다.
 탭을 옮기면 마지막 `resize` 값을 새 탭에 다시 보낸다.
@@ -160,25 +106,9 @@ SSE 끝내기도 막힌 쓰기를 기다리지 않는다. emitter 의 `complete(
 탭 고르기와 탭 옮기기가 겹쳐 앞 연결이 닫히면, 앞 붙기의 명령 실패는 세대가 바뀌었으면 버린다.
 상태 맞추기가 컨테이너가 사라진 `RUNNING` 을 `STOPPED` 로 되돌릴 때도 그 화면을 `closed`(`stopped`)로 닫는다.
 
-| 사건 | 본문 |
-| --- | --- |
-| `frame` | `{data, width, height}`. `data` 는 JPEG base64, `width` 와 `height` 는 그 프레임의 화면 크기(CSS 픽셀) |
-| `tabs` | `[{id, title, url, active}]`. 열 때와 탭이 바뀔 때 |
-| `closed` | `{reason}`. `replaced`(다른 화면이 열렸다), `stopped`(브라우저가 멈췄거나 닿지 않는다), `timeout`(`screen-timeout` 이 지났다) |
-
-`POST /api/v1/browser/screen/input` 은 요청자의 열린 화면에만 닿는다. 없으면 `BROWSER_SCREEN_CLOSED`(409)다.
-본문의 `type` 과 칸이다. 모양이 틀리거나 본문이 8KB 를 넘으면 `VALIDATION_FAILED`(400)이고 오류 메시지에는 칸 이름만 싣는다.
-
-| `type` | 칸 | CDP |
-| --- | --- | --- |
-| `mouse` | `action`(`down`, `up`, `move`), `x`, `y`(0~1), `button`(`left` 만, 생략 가능) | `Input.dispatchMouseEvent` |
-| `wheel` | `x`, `y`(0~1), `deltaY`(-2000~2000) | `Input.dispatchMouseEvent` 의 `mouseWheel` |
-| `key` | `key`(`Enter`, `Backspace`, `Tab`, `Escape`, `ArrowUp`, `ArrowDown`, `ArrowLeft`, `ArrowRight`, `Delete`) | `Input.dispatchKeyEvent` 의 누름과 뗌 |
-| `text` | `text`(1~500자) | `Input.insertText` |
-| `navigate` | `url`(`http`, `https`) | `Page.navigate` |
-| `back`, `reload` | 없음 | `Page.getNavigationHistory` 뒤 `Page.navigateToHistoryEntry`, `Page.reload` |
-| `tab` | `id`(영문자와 숫자) | screencast 를 그 탭으로 옮긴다. 목록에 없는 탭은 무시한다 |
-| `resize` | `width`(320~1600), `height`(320~2000) | `Emulation.setDeviceMetricsOverride`(`deviceScaleFactor` 1, `mobile` false) |
+사건(`frame`, `tabs`, `closed`)의 본문은 `BrowserScreenSession` 이 만든다.
+`POST /api/v1/browser/screen/input` 은 요청자의 열린 화면에만 닿는다. 없으면 `BROWSER_SCREEN_CLOSED` 다.
+입력의 `type` 과 칸, 범위, 본문 크기 상한은 `UserBrowserDtos` 의 검사가 갖고, 각 입력이 부르는 CDP 명령은 `BrowserScreenSession` 이 갖는다. 모양이 틀리면 오류 메시지에 칸 이름만 싣는다.
 
 좌표는 프레임 그림 안의 비율이다. 서버가 마지막 프레임의 `deviceWidth`, `deviceHeight` 를 곱해 CSS 픽셀로 바꾸고, 프레임이 아직 없으면 그 입력을 버린다.
 휴대폰의 탭과 끌기는 웹이 `mouse` 와 `wheel` 로 바꿔 보낸다. 그래서 `touch` 는 받지 않는다.
@@ -208,8 +138,8 @@ Control Plane 은 브라우저의 CDP 에 두 가지로 닿는다. 주소는 컨
 | HTTP 창구 | `GET /json/list` 의 `page` 대상만 탭으로 본다. 새 탭은 `PUT /json/new?<주소>`, 앞으로 가져오기는 `GET /json/activate/<id>` |
 | WebSocket | `ws://<CDP 주소의 host:port>/devtools/page/<id>` 로 탭 하나에 붙는다. Chrome 이 알려 주는 WebSocket 주소의 host 는 쓰지 않는다 |
 
-대상 번호는 영문자와 숫자만 받는다. 명령은 번호로 응답과 짝짓고 10초 안에 답이 없으면 실패다.
-연결이 끊기면 기다리던 명령을 모두 실패로 끝낸다. 조각난 메시지는 모아서 읽고, 4M 글자를 넘는 메시지가 오면 연결을 끊는다.
+명령은 번호로 응답과 짝짓는다. 시간 안에 답이 없으면 그 명령이 실패하고, 연결이 끊기면 기다리던 명령을 모두 실패로 끝낸다.
+조각난 메시지는 모아서 읽고, 상한을 넘는 메시지가 오면 연결을 끊는다. 시간과 상한은 `WebSocketCdpConnector` 가 갖는다.
 사건 처리기와 닫힘 알림은 WebSocket 을 읽는 스레드가 아니라 연결마다 하나인 스레드에서 차례대로 부른다. 닫힘 알림은 붙은 뒤에 끊겼을 때만 한 번 온다.
 
 ## 중계
@@ -219,34 +149,23 @@ Control Plane 은 브라우저의 CDP 에 두 가지로 닿는다. 주소는 컨
 
 ### 접근 표식
 
-| 종류 | 모양 | 서명할 글 | 브라우저 | 언제 무효 |
-| --- | --- | --- | --- | --- |
-| 바인딩 | `b<바인딩 번호>.<서명>` | `v1\nbinding\n<바인딩 번호>` | 그 바인딩의 연결 주인(`connector_connection.user_id`) | 바인딩 줄이 없다 |
-| 호출 | `u<사용자 번호>.<만료 epoch 초>.<서명>` | `v1\ncall\n<사용자 번호>\n<만료 epoch 초>` | 그 사용자 | 만료가 지났다. 만료는 만든 때부터 5분이다. 연결 등록과 확인, 선택지 호출에 쓴다 |
-
-서명은 `gateway-secret` 의 UTF-8 바이트를 key 로 한 HMAC-SHA256 의 소문자 16진수 64자다. 번호는 1 이상의 10진수이고 앞자리 0 을 받지 않는다.
+표식의 모양, 서명할 글, 만료는 [ADR-20261008 / browser-gateway-token](../../backend/docs/adr/ADR-20261008-browser-gateway-token.md) 의 「결정」 이 갖고, 형식 검사와 비교는 `BrowserGatewayTokens` 가 갖는다.
 같은 바인딩은 늘 같은 표식을 받는다. 그래서 다시 설치해도 서버 정의가 바뀌지 않는다.
-비교는 고정 시간 비교다. 표식과 서명은 로그에 싣지 않고, 거절한 까닭은 종류만 남긴다.
 
 ### 받는 것
 
 경로는 `/internal/browser-gateway/<접근 표식>/` 아래다. 웹의 서버 라우트는 이 경로를 넘기지 않는다.
 
-| 요청 | 하는 일 |
-| --- | --- |
-| `GET json/version` | 그대로 넘긴다. 응답의 `webSocketDebuggerUrl` 을 중계 주소로 바꾼다 |
-| `GET json/list`, `GET json` | 그대로 넘긴다. 줄마다 `webSocketDebuggerUrl` 을 중계 주소로 바꾸고 `devtoolsFrontendUrl`, `devtoolsFrontendUrlCompat` 을 뺀다 |
-| `PUT json/new?<주소>` | 주소가 `http`, `https`, `about:blank` 일 때만 넘긴다. 아니면 400 이고, 이 검사는 아래 판정 순서의 1번 다음, 2번보다 먼저 한다. 응답은 `json/list` 의 한 줄처럼 바꾼다 |
-| `GET json/close/<번호>`, `GET json/activate/<번호>` | 번호가 영문자와 숫자일 때만 넘기고 Chrome 의 글을 그대로 준다. 모양이 틀린 번호의 404 도 1번 다음, 2번보다 먼저 판정한다 |
-| WebSocket `devtools/browser/<번호>`, `devtools/page/<번호>` | 번호가 영문자와 숫자, `-` 로 128자까지일 때만 Chrome 의 같은 경로에 붙고 양쪽 글 메시지를 그대로 잇는다. 브라우저 대상 번호는 GUID 다 |
-| 그 밖 | 빈 404. WebSocket upgrade(`Upgrade: websocket`) 요청은 이 받기에서 빠지고 WebSocket 처리기가 받는다. 처리기는 devtools 경로가 아니면 빈 404 로 거절한다. 머리 값은 대소문자를 구분해 `websocket` 과 `WebSocket` 만 뺀다 |
+넘기는 요청과 응답을 바꾸는 규칙은 `BrowserGatewayController` 와 `GatewayRewriter` 가 갖는다.
+`json/version`, `json/list`, `json/new`, `json/close`, `json/activate` 와 `devtools/` 아래 WebSocket 만 넘기고 그 밖의 경로는 빈 404 다. 앞의 셋은 응답의 WebSocket 주소를 중계 주소로 바꾼다.
+WebSocket upgrade 요청은 HTTP 창구에서 빠지고 아래 「WebSocket」 의 처리기가 받는다.
 
 중계 주소는 `gateway-base-url` 의 scheme 을 `ws` 나 `wss` 로 바꾸고 `/<접근 표식>/devtools/<종류>/<번호>` 를 붙인 것이다.
 커넥터는 이 주소의 경로만 꺼내 자기가 받은 주소의 호스트에 붙이므로 둘이 달라도 된다.
 
 요청마다 이 순서로 판정한다.
 
-1. `Origin`, `Sec-Fetch-Site`, `Sec-Fetch-Mode` 머리 가운데 하나라도 있으면 403 이다. 브라우저가 보낸 요청이다. 브라우저는 no-cors `GET` 에 `Origin` 을 싣지 않으므로 `Sec-Fetch-*` 로도 막아 페이지가 `json/close`, `json/activate` 를 부르지 못하게 한다. WebSocket handshake 는 `Origin` 만 본다. 브라우저의 WebSocket 은 늘 `Origin` 을 싣는다
+1. `Origin`, `Sec-Fetch-Site`, `Sec-Fetch-Mode` 머리 가운데 하나라도 있으면 403 이다. 브라우저가 보낸 요청이다. 브라우저는 no-cors `GET` 에 `Origin` 을 싣지 않으므로 `Sec-Fetch-*` 로도 막아 페이지가 `json/close`, `json/activate` 를 부르지 못하게 한다. WebSocket handshake 는 `Origin` 만 본다. 브라우저의 WebSocket 은 늘 `Origin` 을 싣는다. `json/new` 의 주소 검사(400)와 모양이 틀린 대상 번호(404)는 이 다음, 2번보다 먼저 판정한다
 2. 중계가 꺼졌거나(두 설정 가운데 하나가 비었다) 기능이 꺼졌으면 503 이다
 3. 표식을 확인한다. 모양이 틀렸거나, 서명이 맞지 않거나, 바인딩이 없거나, 호출 표식이 만료됐으면 404 다. 어느 까닭인지 응답으로 구분하지 않는다
 4. 주인이 허용 목록에서 꺼져 있으면 404 다

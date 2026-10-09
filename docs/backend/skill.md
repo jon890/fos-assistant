@@ -16,47 +16,35 @@ Hermes 가 스킬을 읽는 방식은 [`hermes/docs/hermes-contract.md`](../../h
 - 저장할 때마다 그 profile 의 올린 스킬 전체를 새 버전 디렉터리에 쓰고, 그 profile 의 `skills.external_dirs` 를 `ASSISTANT_SKILL_AGENT_ROOT` 아래 새 버전 경로로 바꾼다. 쓰는 도중에는 옛 버전이 쓰인다
 - 설정 쓰기가 4xx 로 거절되면 새 디렉터리를 지운다. timeout 과 5xx 는 Hermes 가 이미 반영했을 수 있어 표식 없이 남기고, 다음 게시가 성공한 뒤 그보다 오래된 표식 없는 디렉터리를 지운다. 실패한 저장의 변경은 어느 쪽이든 반영되지 않으므로 다시 저장한다. 표식 있는 옛 버전은 최근 3개만 남긴다
 - 게시에 성공하면 그 버전 디렉터리에 표식 파일 `.published` 를 쓴다. 지금 버전은 표식이 있는 가장 새 디렉터리다
-- 같은 에이전트의 저장은 기다리는 에이전트 행 잠금으로 한 번에 하나씩 돈다. 잠금부터 표식 쓰기까지 한 트랜잭션이라 그동안 같은 에이전트의 도구와 공개 범위 변경은 `AGENT_BUSY` 다
+- 같은 에이전트의 저장은 기다리는 에이전트 행 잠금으로 한 번에 하나씩 돈다. 잠금부터 표식 쓰기까지 한 트랜잭션이다. 그동안 같은 에이전트의 도구 변경은 곧바로 `AGENT_BUSY` 이고, 공개 범위 변경은 저장이 끝날 때까지 기다린다
 - 스킬을 저장하면 그 에이전트의 `skills` toolset 을 함께 켠다. 올린 스킬이 있는 동안은 `skills` 를 끄지 못한다
 - 마지막 남은 스킬을 지우면 새 버전을 쓰지 않고 빈 `external_dirs` 를 게시한 뒤 그 profile 의 버전 디렉터리를 모두 지운다. `skills` toolset 은 그대로 둔다
 
-| 제한 | 값 |
-| --- | --- |
-| 이름 | 소문자, 숫자, `-`. 64자까지. `new` 는 새 스킬 화면 경로라 쓸 수 없다. Hermes 기본 스킬과 같으면 `SKILL_NAME_TAKEN` |
-| 파일 | `SKILL.md` 와 `references/`, `templates/` 아래 텍스트 파일. 파일 20개까지 |
-| 크기 | 파일마다 10만 자, 합계 1 MiB |
-| 앞머리 | `name` 이 스킬 이름과 같다. `description` 은 1024자까지이고, 새 스킬이면 60자까지다. 60자는 앞뒤 공백과 앞뒤 따옴표를 뺀 code point 로, 1024자는 앞뒤를 빼지 않은 code point 로 센다 |
-| 앞머리의 비밀 요청 칸 | `required_environment_variables`, `required_credential_files`, `setup.collect_secrets`, `prerequisites.env_vars` 가 없다. Hermes 는 스킬을 읽을 때 이 칸의 이름으로 profile 의 환경 값과 파일을 셸 실행 공간에 넣는다([ADR-086](../adr/ADR-086-셸과-파일-도구는-사용자별-docker-실행-공간에서만-돈다.md)) |
-| 본문 | 닫는 `---` 뒤에 공백이 아닌 글이 있어야 한다 |
-| 개수 | 에이전트마다 올린 스킬 `assistant.skill.max-per-agent` 개. 기본 30. 새 스킬을 만들 때만 에이전트 행 잠금 안에서 센다. 표식 없는 더 새 버전의 이름도 센다 |
+이름, 파일, 크기, 앞머리, 본문, 개수의 제한 값은 `SkillService` 와 `SkillProperties` 가 갖는다. 어기면 모두 `VALIDATION_FAILED` 다.
+아래는 값만으로는 알 수 없는 것이다.
 
-60자와 개수는 Hermes 색인이 설명을 자르지 않고 커지지 않게 하려는 것이다([ADR-034](../../backend/docs/adr/ADR-034-올린-스킬은-control-plane-이-버전-디렉터리에-쓰고-hermes-는-읽기만-한다.md) 의 「저장할 수 있는 스킬은 Hermes 가 제대로 고를 수 있는 스킬이다」).
-어기면 모두 `VALIDATION_FAILED` 다. 이미 올린 스킬은 설명이 60자를 넘거나 개수가 한도에 닿아도 고칠 수 있다.
+- 60자와 개수는 Hermes 색인이 설명을 자르지 않고 커지지 않게 하려는 것이다([ADR-034](../../backend/docs/adr/ADR-034-올린-스킬은-control-plane-이-버전-디렉터리에-쓰고-hermes-는-읽기만-한다.md) 의 「저장할 수 있는 스킬은 Hermes 가 제대로 고를 수 있는 스킬이다」). 이미 올린 스킬은 설명이 60자를 넘거나 개수가 한도에 닿아도 고칠 수 있다
+- 개수는 새 스킬을 만들 때만 에이전트 행 잠금 안에서 센다. 표식 없는 더 새 버전의 이름도 센다
+- 이름이 Hermes 기본 스킬과 같으면 `SKILL_NAME_TAKEN` 이다. `new` 는 새 스킬 화면 경로라 쓸 수 없다
+- 앞머리에 비밀 요청 칸을 두지 못한다. Hermes 는 스킬을 읽을 때 이 칸의 이름으로 profile 의 환경 값과 파일을 셸 실행 공간에 넣는다([ADR-086](../adr/ADR-086-셸과-파일-도구는-사용자별-docker-실행-공간에서만-돈다.md))
 
-| 경로 | 하는 일 |
-| --- | --- |
-| `GET /api/v1/agents/{code}/skills` | `{ "skills": [{ "name", "description", "source": "UPLOADED" \| "HERMES", "enabled", "usage"? }], "editable", "skillsToolsetEnabled", "uploadLimit" }`. `usage`(`{count, lastInvokedAt}`)는 관리하는 사람에게만 준다. `uploadLimit` 은 올릴 수 있는 스킬 수의 한도다 |
-| `GET /api/v1/agents/{code}/skills/{name}` | 관리하는 사람만. 올린 스킬의 `{ "name", "description", "body", "files": [{ "path", "size" }] }`. `body` 는 앞머리를 포함한 `SKILL.md` 원문이고 `size` 는 UTF-8 바이트다 |
-| `PUT /api/v1/agents/{code}/skills/{name}` | `{ "skillMd", "files": [{ "path", "content"? }] }` 로 스킬 하나를 통째로 바꾼다. 없으면 만든다. `content` 를 생략한 파일은 지금 버전의 같은 경로 내용을 그대로 둔다 |
-| `DELETE /api/v1/agents/{code}/skills/{name}` | 올린 스킬을 지운다 |
-| `PUT /api/v1/agents/{code}/skills/{name}/enabled` | 관리하는 사람만. `{ "enabled" }`. 대시보드의 스킬 켜고 끄기를 쓴다 |
-
+경로와 요청, 응답 칸은 `SkillController` 가 갖는다.
 목록은 대시보드 `GET /api/skills?profile=` 에서 읽는다. 켜고 끄기는 전역 토글만 쓰고 `skills.platform_disabled.api_server` 는 쓰지 않는다([`hermes/docs/hermes-contract.md`](../../hermes/docs/hermes-contract.md) 의 「스킬 커맨드와 API server」).
 출처는 Hermes 가 올린 스킬과 모델이 만든 로컬 스킬을 모두 `agent` 로 주므로 쓰지 않는다. 올린 스킬 이름이 `UPLOADED`, 나머지가 `HERMES` 다.
 올린 스킬 이름은 지금 버전과, 지금 버전보다 새로 쓰였지만 표식이 없는 버전에 있는 이름이다. 표식 없는 버전은 게시가 timeout 이나 5xx 로 끝난 것이라 Hermes 가 이미 가리키고 있을 수 있다.
 그 이름은 목록에서 올린 스킬로 보이고, 원문 읽기와 같은 이름으로 다시 저장하기와 지우기가 된다. 다시 저장할 때 본문을 생략한 파일은 그 버전의 내용을 쓴다. 지우면 지금 버전을 다시 게시해 Hermes 가 그 버전에서 벗어난다.
 지금 버전에 있는데 대시보드 목록에 없는 스킬도 올린 것으로 넣고 켜진 것으로 보인다. 게시 직후 색인 전이거나 Hermes 가 건너뛴 스킬도 화면에서 지울 수 있어야 하기 때문이다.
-목록은 그 에이전트를 쓸 수 있는 사람이 본다. 올린 스킬의 원문 읽기, 쓰기, 지우기, 켜고 끄기는 관리하는 사람만 하고, 아니면 `FORBIDDEN` 이다.
+목록은 그 에이전트를 쓸 수 있는 사람이 본다. 목록의 호출 합계(`usage`)와 올린 스킬의 원문 읽기, 쓰기, 지우기, 켜고 끄기는 관리하는 사람만 하고, 아니면 `FORBIDDEN` 이다.
 
 ## 스킬 커맨드
 
 입력창 맨 앞의 `/<이름>` 을 Control Plane 이 해석한다. 근거는 [ADR-035](../../backend/docs/adr/ADR-035-대화창의-스킬-커맨드는-control-plane-이-해석해-hermes-에-넘긴다.md) 에 있다.
 
-- 메시지 내용이 `^/[a-z0-9][a-z0-9-]{0,63}` 다음에 공백이나 끝이 오는 모양일 때만 커맨드다. 새 요청 칸은 없다
+- 메시지 내용이 `/이름` 다음에 공백이나 끝이 오는 모양일 때만 커맨드다. 모양은 `SkillCommand` 가 갖는다. 새 요청 칸은 없다
 - 이름에 `.` 이나 `_` 가 든 Hermes 기본 스킬은 커맨드로 부르지 못하고 글 그대로 보낸다. 입력창의 `/` 목록에도 뜨지 않는다. 호출 이력은 Hermes 이름 규칙을 따르므로 모델이 스스로 읽으면 `MODEL` 로 남는다
 - 이름이 그 에이전트의 켜진 스킬 목록에 있으면 Hermes 에 보낼 입력만 사용자가 이 스킬을 호출했으니 `skill_view` 로 읽고 그 절차대로 다음을 하라는 글로 바꾼다. 저장하는 메시지는 사용자가 친 글 그대로다
 - 없으면 Hermes 에 보내지 않고 400 `SKILL_COMMAND_UNKNOWN` 다
-- 켜진 스킬 목록은 에이전트마다 30초 캐시한다. 스킬 저장, 지우기, 켜고 끄기가 Hermes 에 반영되면 `SkillsChanged` 로 그 에이전트의 캐시를 비운다. `skills` toolset 변경은 캐시를 비우지 않아 30초 뒤에 반영된다
+- 켜진 스킬 목록은 에이전트마다 잠시 캐시한다. 캐시 시간은 `SkillCommandCatalog` 가 갖는다. 스킬 저장, 지우기, 켜고 끄기가 Hermes 에 반영되면 `SkillsChanged` 로 그 에이전트의 캐시를 비운다. `skills` toolset 변경은 캐시를 비우지 않아 캐시가 끝난 뒤에 반영된다
 - `skills` toolset 이 꺼진 에이전트는 켜진 스킬이 없는 것으로 보고 커맨드를 `SKILL_COMMAND_UNKNOWN` 으로 거절한다([ADR-035](../../backend/docs/adr/ADR-035-대화창의-스킬-커맨드는-control-plane-이-해석해-hermes-에-넘긴다.md) 의 「결과」)
 - 이름은 대화를 만들기 전에 확인한다. 거절한 커맨드는 대화도 메시지도 실행도 남기지 않는다. 목록을 읽다 Hermes 가 실패하면 그 오류로 거절하고 캐시에 두지 않는다
 - 흐름이 붙은 에이전트에서는 커맨드를 해석하지 않고 글 그대로 보낸다. 입력창도 `/` 목록을 띄우지 않는다
@@ -76,10 +64,7 @@ Hermes 가 스킬을 읽는 방식은 [`hermes/docs/hermes-contract.md`](../../h
 | `COMMAND` | 커맨드로 turn 을 시작할 때 `chat` 이 적는다 |
 | `MODEL` | 실행 사건에서 `skill_view` 도구 호출을 받을 때 스킬 이름이 실려 있으면 `usage` 가 적는다. 이름은 `hermes` 가 사건을 읽을 때 가리기 전 미리보기에서 꺼내 이름 규칙으로 검증해 사건의 `skillName` 칸에 싣는다. 가린 `detail` 에서는 읽지 않는다(ADR-047). 옛 커넥터 에이전트의 실행은 이름을 싣지 않아 기록되지 않는다. 연결을 붙인 에이전트의 실행은 기록된다. 대화 turn 의 실행만 기록된다. 위임과 흐름의 하위 실행은 Hermes 사건을 옮기지 않아 기록되지 않는다 |
 
-| 경로 | 하는 일 |
-| --- | --- |
-| `GET /api/v1/usage/skills` | 요청자 자신의 호출만. `[{ "agentCode", "agentName", "skillName", "count", "lastInvokedAt", "lastConversationId" }]` |
-
+사용자는 자기 호출만 본다(`GET /api/v1/usage/skills`).
 관리하는 사람은 스킬 목록의 `usage` 로 합계만 보고, 누가 어느 대화에서 불렀는지는 보지 않는다.
 
 | 무엇 | 어디 |
@@ -137,7 +122,7 @@ sequenceDiagram
 | 앞머리에 비밀 요청 칸이 있다 | `VALIDATION_FAILED`. 새 스킬이든 고치는 스킬이든 같다. 이미 올라간 스킬은 읽기와 목록에서 그대로 보인다 |
 | 함께 실리는 기존 스킬에 비밀 요청 칸이 있다 | `VALIDATION_FAILED`. 메시지에 그 스킬 이름이 있다. 저장 검사가 생기기 전에 올린 스킬이 새 버전에 다시 실리지 않게 버전 디렉터리를 쓰기 전에 거절한다. 그 스킬 자체를 고쳐 저장하거나 지우는 것은 된다. 지우기는 이 검사를 하지 않는다 |
 | 새 스킬의 설명이 60자를 넘는다 | `VALIDATION_FAILED`. 화면이 저장 전에 먼저 알린다. 이미 올린 스킬을 고칠 때는 보지 않는다 |
-| 올린 스킬이 한도(기본 30)에 닿았는데 새 스킬을 만든다 | `VALIDATION_FAILED`. 화면은 스킬을 에이전트마다 그 한도까지 만들 수 있다고 알린다. 이미 올린 스킬을 고치는 것은 된다 |
+| 올린 스킬이 한도에 닿았는데 새 스킬을 만든다 | `VALIDATION_FAILED`. 화면은 스킬을 에이전트마다 그 한도까지 만들 수 있다고 알린다. 이미 올린 스킬을 고치는 것은 된다 |
 | 한도 하나 앞에서 두 사람이 새 스킬을 함께 만든다 | 에이전트 행 잠금 안에서 세므로 하나만 저장되고 다른 하나는 `VALIDATION_FAILED` |
 | 두 사람이 같은 에이전트에 함께 저장한다 | 에이전트 행 잠금으로 차례로 돈다. 뒤에 저장한 것이 남는다 |
 | 올린 스킬이 있는데 `skills` 도구를 끄려 한다 | 거절한다. 스킬을 먼저 지운다 |

@@ -102,14 +102,7 @@ Hermes 는 MCP 도구를 `mcp__<서버>__<도구>` 로 등록하면서 글자를
 | 없음(`true` 와 같다) | 옛 설치. 커넥터마다 만든 전용 profile 이다 | 운영 목록에 있고 manifest 를 읽을 수 있는 커넥터의 서버 |
 | `false` | 바인딩 설치. 일반 에이전트의 profile 에 커넥터를 붙인 것이다 | 소유 기록의 모든 서버. manifest 를 읽지 못한 서버는 `tools` 를 빈 객체로 싣는다. 뗀 서버 기록의 서버도 빈 `tools` 로 싣는다 |
 
-두 방식은 대응에 없는 도구를 다르게 다룬다.
-
-| 호출 | 옛 설치 profile | 바인딩 profile |
-| --- | --- | --- |
-| 대응의 서버와 맞는 도구 | 묻는다 | 묻는다 |
-| 대응의 어느 서버와도 맞지 않는 `mcp__` 도구 | 막는다. 그 profile 에는 커넥터 서버만 있다 | 건드리지 않는다. Control Plane MCP 와 운영자가 넣은 다른 MCP 서버의 도구다 |
-| `execute_code` | 막는다 | 건드리지 않는다. 그 안에서 부른 커넥터 도구는 session 이 없어 막힌다 |
-| 커넥터 도구의 결과 | 바꾸지 않는다. Control Plane 이 위임 결과를 감싼다 | hook 이 `<external-data>` 로 감싼다. 그 에이전트의 위임 결과도 Control Plane 이 감싼다 |
+두 방식에서 hook 이 대응에 없는 도구와 커넥터 도구의 결과를 어떻게 다루는지는 [`hermes/plugins/fos-ctx/README.md`](../../hermes/plugins/fos-ctx/README.md) 의 두 방식 표가 갖는다.
 
 **바인딩 profile 에서 대응에 실리지 않은 커넥터 서버는 판정 없이 나간다.**
 그래서 바인딩 설치와 떼기는 manifest 를 읽지 못했거나 소유 기록의 서버 이름이나 실행 정의가 지금 manifest 와 다른 서버도 소유 기록의 이름으로 빈 `tools` 와 함께 싣는다. Control Plane 은 그 서버의 도구를 선언 없는 도구로 막는다.
@@ -134,61 +127,34 @@ hook 이 어느 호출을 묻고 어느 호출을 묻지 않고 막는지는 [`h
 
 인증은 그 profile 의 MCP 토큰이다(`Authorization: Bearer`).
 
-| 요청 칸 | 값 |
-| --- | --- |
-| `v` | `1` |
-| `root_session_id`, `session_id`, `tool_call_id` | `_fos_ctx` 와 같은 뜻이다([`hermes/plugins/fos-ctx/README.md`](../../hermes/plugins/fos-ctx/README.md)) |
-| `hermes_tool` | hook 이 받은 등록 이름 |
-| `tool` | 대응 파일에서 찾은 원래 도구 이름. 없으면 `null` |
-| `args_json` | 도구 인자를 hook 이 직렬화한 JSON 글. 키를 정렬하고 공백을 넣지 않는다 |
-| `sig` | 아래 서명의 소문자 16진수 |
+요청 칸은 `ConnectorPolicyRequest` 가, 응답 칸(`decision`, `message`, `action_id`)은 `ConnectionDtos` 가 갖는다. `args_json` 은 도구 인자를 hook 이 키를 정렬하고 공백 없이 직렬화한 JSON 글이다.
 
 서명은 `_fos_ctx` 와 같은 key 의 HMAC-SHA256 이다.
 서명할 글은 `v1-connector-policy`, `hermes_tool`, `root_session_id`, `session_id`, `tool_call_id`, `args_json` 의 UTF-8 바이트를 SHA-256 한 소문자 16진수를 이 순서로 줄바꿈 하나로 이은 것이다.
 인자를 글로 보내고 그 글을 서명하므로 Python 과 Java 의 JSON 직렬화가 달라도 검증이 맞는다.
 
-| 응답 칸 | 값 |
-| --- | --- |
-| `decision` | `allow` 나 `block` |
-| `message` | `block` 일 때 모델에게 보일 글. 비지 않는다 |
-| `action_id` | 승인 요청 번호. 승인 요청을 만들었을 때만 있다. 그 밖에는 `null` 이다 |
-
 토큰이나 서명이 틀리면 403 이고 hook 은 막는다.
-`args_json` 이 UTF-8 로 64KB 를 넘거나 JSON object 가 아닐 때, `root_session_id`, `session_id`, `tool_call_id`, `hermes_tool` 이 128자를 넘을 때도 서명이 틀린 요청처럼 403 이고 줄을 남기지 않는다.
+`args_json` 이나 식별자 칸이 길이 상한을 넘거나 `args_json` 이 JSON object 가 아닐 때도 서명이 틀린 요청처럼 403 이고 줄을 남기지 않는다. 상한은 `ConnectorPolicyController` 가 갖는다.
 
 Control Plane 의 판정 순서다.
 
 1. 토큰으로 profile 을 알고 서명을 확인한다
 2. session 으로 origin 실행과 사용자와 대화를 찾는다. `_fos_ctx` 와 같은 방법이다. 찾지 못하면 막고 줄을 남기지 않는다
-3. 그 실행의 에이전트에 붙은 바인딩을 읽고, 바인딩마다 그 커넥터의 manifest 를 카탈로그에서 읽는다. 카탈로그는 60초 동안 메모리에 둔다. 읽기 실패는 5초 동안 기억하고, 그동안은 대시보드를 다시 부르지 않는다
+3. 그 실행의 에이전트에 붙은 바인딩을 읽고, 바인딩마다 그 커넥터의 manifest 를 카탈로그에서 읽는다. 카탈로그는 잠시 메모리에 둔다. 읽기 실패도 잠시 기억하고, 그동안은 대시보드를 다시 부르지 않는다. 두 시간은 `ConnectorPolicyProperties` 가 갖는다
 4. 바인딩 가운데 `hermes_tool` 이 그 서버의 접두사(`mcp__<서버>__`)로 시작하는 것을 고른다([ADR-083](../adr/ADR-083-커넥터는-사용자가-한-번-연결하고-자기-에이전트에-여럿-붙여-그-에이전트가-도구를-직접-부른다.md)). 서버 이름은 manifest 를 읽었으면 그 `mcp_server` 이고, 읽지 못했으면 바인딩에 적어 둔 `mcp_server` 다. 맞는 바인딩이 없거나 둘 이상이면 막고 줄을 남기지 않는다. 대시보드가 한 profile 에서 서버 이름이 겹치지 않게 막으므로 맞는 것은 하나다
 5. 그 연결의 주인이 실행의 사용자와 다르거나, 그 바인딩의 에이전트 profile 이 토큰의 profile 과 다르면 막고 줄을 남기지 않는다
 6. 판정에 넘기는 연결 상태를 정한다. 연결과 그 바인딩이 모두 `READY` 일 때만 `READY` 이고 아니면 `PENDING` 이다. 값이 확인됐어도 공유 gateway 가 그 profile 의 MCP 서버를 아직 보지 못했으면 쓸 수 없기 때문이다
-7. 아래 표로 판정하고 `connector_action` 에 한 줄을 남긴다. 줄의 `agent_id` 는 판정한 실행의 에이전트다. 승인하면 그 에이전트에 붙은 바인딩의 profile 에서 실행한다
+7. 판정하고 `connector_action` 에 한 줄을 남긴다. 줄의 `agent_id` 는 판정한 실행의 에이전트다. 승인하면 그 에이전트에 붙은 바인딩의 profile 에서 실행한다
 
-manifest 를 읽지 못해 바인딩의 서버 이름으로 고른 호출은 아래 표의 첫 줄로 `POLICY_UNAVAILABLE` 이 된다.
-
-| 조건(위에서부터) | 판정 | `deny_reason` |
-| --- | --- | --- |
-| 카탈로그를 읽지 못했다 | 거절 | `POLICY_UNAVAILABLE` |
-| 카탈로그에 그 커넥터가 없다 | 거절 | `POLICY_UNAVAILABLE` |
-| 연결이나 그 바인딩이 `READY` 가 아니다 | 거절 | `NOT_READY` |
-| `hermes_tool` 이 그 커넥터의 `mcp_server` 로 만든 접두사(`mcp__<서버>__`)로 시작하지 않는다 | 거절 | `UNDECLARED` |
-| `schema: 2` 인데 `tool` 이 없거나 `tools` 에 없다 | 거절 | `UNDECLARED` |
-| 위험도가 `DESTRUCTIVE` 나 `FINANCIAL` 이다 | 거절 | `RISK_NOT_OPEN` |
-| 먼저 살펴보기 트리 안의 호출이고, 위험도가 `READ` 이면서 승인 방식이 `none` 인 도구가 아니다 | 거절 | `READ_ONLY_RUN` |
-| `args_json` 이 16KB 를 넘는다 | 거절 | `ARGS_TOO_LARGE` |
-| 쓰기 도구를 허용한 먼저 살펴보기 트리 안의 호출이고, 위험도가 `READ` 이면서 승인 방식이 `none` 인 도구가 아니다 | 승인 필요(상시 허락을 보지 않는다). 사람이 승인하면 실행 직전 재판정은 살펴보기가 아닌 판정으로 한다 | |
-| `approval` 이 `none` 이다 | 허용 | |
-| `approval` 이 `required` 이고 선언이 상시 허락을 닫지 않았고 유효한 상시 허락이 있다 | 허용 | |
-| 그 밖 | 승인 필요 | |
+판정은 `ToolPolicyDecision.decide` 가 조건을 위에서부터 차례로 보고 처음 맞는 것으로 정한다. 조건과 그 순서, 거절 까닭(`deny_reason`)은 그 함수가 갖는다.
+manifest 를 읽지 못해 바인딩의 서버 이름으로 고른 호출은 `POLICY_UNAVAILABLE` 로 거절된다.
 
 - `allow` 로 답하는 것은 판정이 허용일 때뿐이다. 거절과 승인 필요는 `block` 이다
 - 승인 필요인 호출은 막고 `connector_action` 에 `decision: NEEDS_APPROVAL`, `passed: false`, `status: PENDING` 으로 남긴다. `args_json` 에 인자 원문을 저장한다. 모델에게는 승인 요청 번호를 담은 글을 주고, 사용자의 승인을 기다리고 있으니 같은 도구를 다시 부르지 말라고 말한다. 승인 줄이 그 뒤에 지나는 상태는 [커넥터 연결](../connectors.md) 의 「승인」 이 갖는다
-- 상시 허락은 그 사용자가 그 커넥터의 그 도구에 준 것 가운데 거두지 않았고 기간이 남은 것이다. 선언이 `"grant": false` 인 도구는 남은 허락이 있어도 보지 않는다. 그 줄은 1분마다 도는 정리(`ConnectorActionExpirer`)가 거둔다. `approval` 이 `required` 가 아니게 바뀐 도구의 줄도 같다. 읽은 카탈로그에서 허락을 줄 수 없는 선언을 찾은 줄만 거두고, 카탈로그를 읽지 못한 커넥터와 선언에 없는 도구의 줄은 두고 본다. 거둔 줄은 선언이 다시 열려도 효력이 돌아오지 않는다. 원래 도구 이름을 확인하지 못한 호출은 허락이 없는 것으로 판정한다
+- 상시 허락은 그 사용자가 그 커넥터의 그 도구에 준 것 가운데 거두지 않았고 기간이 남은 것이다. 선언이 `"grant": false` 인 도구는 남은 허락이 있어도 보지 않는다. 그 줄은 주기 정리(`ConnectorActionExpirer`)가 거둔다. `approval` 이 `required` 가 아니게 바뀐 도구의 줄도 같다. 읽은 카탈로그에서 허락을 줄 수 없는 선언을 찾은 줄만 거두고, 카탈로그를 읽지 못한 커넥터와 선언에 없는 도구의 줄은 두고 본다. 거둔 줄은 선언이 다시 열려도 효력이 돌아오지 않는다. 원래 도구 이름을 확인하지 못한 호출은 허락이 없는 것으로 판정한다
 - 먼저 살펴보기 트리인지는 origin 실행으로 `ProactiveCheckGuard.isCheckTree` 가 정한다. 그 트리에서는 위험도가 `READ` 이고 승인 방식이 `none` 인 도구만 허용한다. 상시 허락이 있어도 나머지를 거절하고 승인 줄을 만들지 않는다. `READ` 라도 manifest 가 승인을 요구하면 거절한다. 사람이 보지 않는 실행에서 승인 요청이 쌓이지 않게 하기 위해서다([ADR-080](../adr/ADR-080-먼저-살펴보기는-점검-대화의-turn-하나로-돌고-읽기-경계를-control-plane-이-강제한다.md))
 - 판정은 Hermes 와 DB 를 모르는 함수 하나가 한다. 모델의 인자와 서버의 `readOnlyHint` 는 판정에 들어가지 않는다
-- Control Plane 은 hook 이 보낸 `tool` 을 그대로 믿지 않는다. 카탈로그의 `mcp_server` 와 `tool` 로 등록 이름을 다시 계산해 `hermes_tool` 과 다르면 `tool` 이 없는 호출로 읽는다. `tool` 이 도구 이름 형식(`^[A-Za-z0-9_.-]{1,128}$`)이 아닌 요청은 서명이 틀린 요청처럼 403 으로 거절한다
+- Control Plane 은 hook 이 보낸 `tool` 을 그대로 믿지 않는다. 카탈로그의 `mcp_server` 와 `tool` 로 등록 이름을 다시 계산해 `hermes_tool` 과 다르면 `tool` 이 없는 호출로 읽는다. `tool` 이 도구 이름 형식이 아닌 요청은 서명이 틀린 요청처럼 403 으로 거절한다
 - `NOT_READY` 가운데 연결은 `READY` 인데 바인딩이 아직 반영되지 않았고 반영 예정이 남은 호출은 모델에게 다른 글을 준다. 대개 몇 분 안에 저절로 반영되니 잠시 뒤 다시 시도하라는 글이다. 붙인 직후에는 공유 gateway 의 MCP 설정 맞추기와 Control Plane 의 반영 예정 확인을 기다려야 하기 때문이다([ADR-20261007 / connector-live-reload](../adr/ADR-20261007-connector-live-reload.md))
 - 그 바인딩이 재시작 대기이면 저절로 풀리지 않으므로 관리자의 반영을 기다리라는 글을 준다. 재시작 대기는 관리자 반영 완료가 있어야 풀린다
 - 재시작 대기도 아니고 반영 예정도 없는 바인딩은 연결 화면에서 연결을 확인하라는 일반 글을 준다. 반영 예정 확인이 한 번 실패했거나 정책 hook 이 꺼진 경우라 저절로 풀리지 않는다
@@ -218,7 +184,7 @@ Control Plane 은 `policy_hook` 이 참이 아니면 그 바인딩을 `READY` �
 ### 선언하지 않은 도구
 
 연결 확인과 관리자 반영 완료는 MCP probe 가 낸 도구 이름에서 `schema: 2` manifest 의 `tools` 에 없는 것을 센다.
-그 수를 `connector_connection.undeclared_tools` 에 적고 연결 상태와 관리자 목록에 `undeclaredTools` 로 낸다.
+그 수를 연결에 적고 연결 상태와 관리자 목록에 낸다.
 선언하지 않은 도구가 있어도 바인딩은 `READY` 가 된다. 그 도구의 호출만 거절된다. `schema: 1` 은 세지 않는다.
 
 ## 사용자별 호출 제한
@@ -226,16 +192,13 @@ Control Plane 은 `policy_hook` 이 참이 아니면 그 바인딩을 `READY` �
 선택지 조회(`options`), 등록(`POST /api/v1/connections/{id}`), 연결 확인(`check`)은 MCP 서버를 자식 프로세스로 띄운다.
 연결이 없는 사용자도 임의 값으로 부를 수 있어 사용자마다 제한한다.
 
-| 제한 | 기본값 | 설정 |
-| --- | --- | --- |
-| 한 사용자의 동시 호출 | 1 | `assistant.connector.max-concurrent-calls` |
-| 한 사용자의 60초 동안 호출 | 10 | `assistant.connector.calls-per-minute` |
+한 사용자의 동시 호출과 1분 동안의 호출 수를 제한한다. 기본값은 `application.yml` 의 `assistant.connector` 가 갖는다.
 
 - 넘으면 기다리지 않고 `CONNECTOR_RATE_LIMITED`(429) 로 거절한다. 거절한 요청은 외부를 부르지 않고 횟수에 넣지 않는다
-- 횟수는 받아들인 호출의 시작 시각으로 센다. 60초가 지난 시각은 버린다
+- 횟수는 받아들인 호출의 시작 시각으로 센다. 1분이 지난 시각은 버린다
 - 해제, 읽기, 카탈로그, 관리자 경로는 제한하지 않는다. 해제는 언제나 되어야 한다
 - 상태는 JVM 메모리에 둔다. **Control Plane 이 한 대라는 전제다.** 여러 대로 늘리면 사용자마다 대수만큼 더 받는다. 재시작하면 횟수가 비워진다
-- 일반 에이전트 실행의 한도와 별개다. 대시보드 plugin 의 전역 동시 4개도 그대로다
+- 일반 에이전트 실행의 한도와 별개다. 대시보드 plugin 의 전역 동시 한도도 그대로다
 
 ## 커넥터 도구를 부를 때
 
@@ -271,11 +234,11 @@ sequenceDiagram
 
 ### 도구 호출이 갈리는 지점
 
-거절 사유마다의 조건은 위 「도구 호출 판정」 의 표가 갖는다. 아래는 그 표에 없는 경우다.
+거절 사유마다의 조건은 위 「도구 호출 판정」 이 가리키는 `ToolPolicyDecision.decide` 가 갖는다. 아래는 그 판정 밖의 경우다.
 
 | 상황 | 처리 |
 | --- | --- |
-| Control Plane 이 3초 안에 답하지 않는다 | hook 이 막는다. 요청이 뒤늦게 닿아도 `dedupe_key` 로 줄이 하나다 |
+| Control Plane 이 hook 의 기다리는 시간 안에 답하지 않는다 | hook 이 막는다. 요청이 뒤늦게 닿아도 `dedupe_key` 로 줄이 하나다 |
 | 실행을 찾지 못한다(중지한 실행, 등록 안 된 자식 session) | 막고 줄을 남기지 않는다 |
 | 동시에 같은 `dedupe_key` 로 둘이 온다 | 유니크 제약에 걸린 쪽이 먼저 저장된 줄을 다시 읽어 돌려준다 |
 | profile 의 `fos-ctx` 가 꺼졌거나 옛 판이다 | 호출은 판정 없이 나간다. 연결 확인이 `policy_hook` 을 보고 그 바인딩을 `PENDING` 으로 둔다 |
@@ -320,7 +283,7 @@ sequenceDiagram
 | 실행 요청이 시간 안에 답하지 않는다 | `UNKNOWN`. 다시 실행하지 않고 「실행했는지 알 수 없어요」 를 보인다 |
 | 실행을 보낸 뒤 서버가 다시 뜬다 | 기동 정리가 `EXECUTING` 을 `UNKNOWN` 으로 바꾸고 대화에 전한다 |
 | 사용자가 거절한다 | `REJECTED`. 알림 줄만 남긴다 |
-| 24시간 안에 답이 없다 | `EXPIRED`. 대화의 알림 줄을 남기고 `APPROVAL_EXPIRED` 알림을 만든다([`notification.md`](notification.md)) |
+| 승인 기한(`approval-ttl`) 안에 답이 없다 | `EXPIRED`. 대화의 알림 줄을 남기고 `APPROVAL_EXPIRED` 알림을 만든다([`notification.md`](notification.md)) |
 | 승인할 때 연결이나 그 줄의 에이전트에 붙은 바인딩이 `READY` 가 아니거나, 그 에이전트에서 연결을 뗐다 | 실행하지 않고 `REJECTED` 로 둔다. 승인 요청은 오류가 아니라 그 끝난 줄을 받는다 |
 | 승인한 호출이 실행되는 동안 그 연결을 해제하거나 값을 다시 등록하거나 그 에이전트에서 뗀다 | `CONNECTOR_ACTION_EXECUTING` 으로 거절한다. 실행이 끝난 뒤 다시 한다 |
 | 승인을 기다리는 동안 그 에이전트에서 연결을 뗀다 | 그 에이전트가 판정한 `PENDING` 을 `REJECTED`(`connection_changed`)로 끝낸다. 같은 연결을 붙인 다른 에이전트의 줄과 상시 허락은 그대로다 |

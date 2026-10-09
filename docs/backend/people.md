@@ -34,29 +34,21 @@ Control Plane 이 Hermes 를 고치는 호출을 하게 된 근거는
 
 ## 첫 에이전트의 과금 설정
 
-첫 로그인에 만드는 에이전트의 `cost_mode` 와 `credential_scope` 를 설정에서 읽는다.
-
-| 설정 | 기본값 |
-| --- | --- |
-| `assistant.people.default-cost-mode` | `SUBSCRIPTION` |
-| `assistant.people.default-credential-scope` | `SHARED_HOUSEHOLD` |
+첫 로그인에 만드는 에이전트의 `cost_mode` 와 `credential_scope` 를 설정에서 읽는다. 키와 기본값은 `PeopleProperties` 가 갖는다.
+두 값이 사람마다 다르지 않은 근거는 [ADR-002](../../backend/docs/adr/ADR-002-profile은-나누고-ai-계정은-가족이-함께-쓴다.md) 에 있다.
 
 설정 이름은 `assistant.people.*` 그대로이고, 값을 읽는 `PeopleProperties` 는 `agent.application` 이 갖는다.
 `people` 의 `FirstAgentCreator` 와 `agent` 의 `AgentLifecycleService` 가 읽는다.
 `agent` 가 `people` 을 import 하지 않게 하려고 `agent` 로 옮겼다(ADR-068).
 Hermes 를 부르는 값이 아니라 `hermes` 쪽에 두지 않는다.
 
-두 값이 사람마다 다르지 않은 근거는
-[`adr/ADR-002-profile은-나누고-ai-계정은-가족이-함께-쓴다.md`](../../backend/docs/adr/ADR-002-profile은-나누고-ai-계정은-가족이-함께-쓴다.md) 에 있다.
-profile 은 사용자마다 나누고 AI 계정은 그룹이 함께 쓴다.
-
 에이전트는 실행에 쓸 모델을 갖지 않는다.
 첫 로그인에 에이전트를 만들 때도 Hermes 에서 모델을 읽지 않는다.
 
 ## 첫 에이전트의 기본 도구
 
-첫 로그인에 만든 에이전트에 `assistant.people.default-toolsets` 의 도구를 켠다.
-기본값은 `web`, `terminal`, `file`, `code_execution` 이다. 주인 등급이거나 실행 공간에서만 도는 도구가 아니면 기동하지 않는다.
+첫 로그인에 만든 에이전트에 `assistant.people.default-toolsets` 의 도구를 켠다. 기본값은 `application.yml` 이 갖는다.
+주인 등급이거나 실행 공간에서만 도는 도구가 아니면 기동하지 않는다.
 결정과 감당할 것은 [ADR-20261008 / default-toolsets](../adr/ADR-20261008-default-toolsets.md) 가 갖는다.
 
 `FirstAgentCreator` 가 첫 로그인의 트랜잭션이 커밋된 뒤 백그라운드 작업(`BackgroundTasks`)으로 `agent` 의 `AgentDefaultToolsets` 를 부른다.
@@ -140,9 +132,7 @@ sequenceDiagram
     C-->>A: 더해졌다
 ```
 
-`clone_from` 을 쓰지 않는다.
-그 값을 주면 본뜬 profile 의 `API_SERVER_KEY` 까지 복사되어
-key 하나로 두 profile 이 열린다. 실측으로 확인했다.
+`clone_from` 을 쓰지 않는다. 까닭은 [ADR-018](../../backend/docs/adr/ADR-018-사람을-더하는-것을-control-plane-이-끝낸다.md) 의 「`clone_from` 을 쓰지 않는다」 가 갖는다.
 
 ### 그 사람이 처음 로그인할 때
 
@@ -195,19 +185,13 @@ Hermes 쪽을 먼저 지우고 우리 표를 나중에 지운다.
 
 ### 관리자에게 보이는 최근 활동
 
-`GET /api/v1/admin/people`과 사용자 추가·변경 응답은 `lastLoginAt`, `lastConversationAt`을 함께 준다.
-두 값은 UTC 시각이며 기록이 없으면 `null`이다. 일반 사용자 API에는 넣지 않는다.
-기존 `joined`는 `app_user`의 존재 여부이며 첫 로그인 시각이 아니다.
+관리자의 사용자 목록과 사용자 추가·변경 응답은 마지막 로그인과 마지막 대화 시각을 함께 준다. 칸은 `PeopleDtos` 가 갖는다.
+일반 사용자 API 에는 넣지 않는다. 기존 `joined` 는 `app_user` 의 존재 여부이며 첫 로그인 시각이 아니다.
 
-마지막 로그인은 웹의 NextAuth `events.signIn`에서 세션 쿠키를 준비한 뒤
-`POST /api/v1/signin/completed`로 기록한다. 요청 본문은 `{ email }`이다.
-이 경로는 로그인 판정과 같은 `purpose: signin`의 서버 간 서명 토큰만 받는다.
-켜진 허용 목록의 `last_login_at`을 서버 시계로 갱신하고 사용자는 만들지 않는다.
-허용되지 않은 주소는 401 `UNAUTHENTICATED`로 거절한다.
-`signin/allowed`의 판정, 일반 요청과 세션 갱신은 이 값을 바꾸지 않는다.
+마지막 로그인을 기록하는 순서와 실패 처리는 루트 [`flow.md`](../flow.md) 의 「로그인 활동 기록」 이 갖는다.
+기록은 켜진 허용 목록의 `last_login_at` 을 서버 시계로 갱신하고 사용자는 만들지 않는다.
 동시에 로그인해도 더 오래된 시각으로 되돌아가지 않는다.
 관리자가 사용자를 켜거나 끌 때도 그 사이에 기록한 로그인 시각은 유지한다.
-기록 요청이 실패하면 웹은 오류를 로그에 남긴다. Auth.js의 이벤트 오류는 로그인을 막지 않는다.
 지난 로그인은 복원하지 않으므로 기존 사용자의 값도 다음 로그인 전까지 비어 있다.
 
 마지막 대화는 `chat_message`에서 그 사용자가 보낸 `USER` 메시지의 `created_at` 최댓값이다.
