@@ -1,0 +1,1 @@
+[토스 공식 브랜드 리소스 센터](https://brand.toss.im/) · 라이선스: 공식 브랜드 사용 규정(오픈소스 라이선스 없음), 배경과 여백 및 비율 유지 · 내려받은 주소: https://static.toss.im/assets/homepage/brand/Toss-App-Icon.zip · `Toss_App_Icon.png` 를 128×128로 비율 유지 축소. 토스 그룹 공통 앱 아이콘이다.
