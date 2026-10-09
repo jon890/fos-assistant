@@ -30,7 +30,7 @@ Control Plane 의 패키지마다 맡는 책임과 패키지 사이의 방향 �
 | `mcp` | Memory 본문 조회, 결과물 쓰기와 할 일 제안 도구의 인자 검사, 장기 토큰 인증과 profile 묶기, 요청자 판정 |
 | `people` | 로그인 허용 목록과 사람을 더하는 흐름, 첫 로그인에 그 사람의 에이전트 만들기 |
 | `orchestration` | 흐름의 구현과 자식 실행, MCP `agent_*` 위임의 시작과 조회와 중지, 하위 에이전트 session 등록 |
-| `skill` | 올린 스킬의 읽기와 쓰기, 버전 디렉터리, Hermes 에 게시, 스킬 목록과 호출 이력 조회 |
+| `skill` | 올린 스킬의 읽기와 쓰기, 스킬 zip 묶음의 받기와 검사, 버전 디렉터리, Hermes 에 게시, 스킬 목록과 호출 이력 조회 |
 | `connector` | 커넥터 카탈로그, 사용자별 연결, 에이전트에 연결을 붙이는 바인딩, 커넥터 도구 호출의 판정과 기록 |
 | `task` | 예약 작업과 시각, 발화 기록, 발화기와 예약 turn 시작([`backend/docs/flow.md`](flow.md)) |
 | `notification` | 사용자에게 대화 밖에서 알리는 줄의 저장과 읽음 표시, 사용자 단위 SSE, 오래된 줄 정리([`backend/docs/flow.md`](flow.md)) |
