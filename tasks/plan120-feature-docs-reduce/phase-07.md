@@ -1,11 +1,11 @@
-# Phase 03. 커넥터 연결과 커넥터 정책 문서를 줄인다
+# Phase 07. 실행 기록, 모델과 사용량, 첨부, 파일 공간 문서를 줄인다
 
 **Execution profile**: deep
 
 ## 목표
 
-기능 파일 `docs/features/connector.md` `docs/features/connector-policy.md` 을 「기능 파일의 모양」 으로 다시 짜고, 코드를 말로 옮긴 부분과 중복과 낡은 내용을 지운다.
-목표 줄 수: 두 파일 합계 750줄 이하(지금 약 1,300줄). 파일 하나는 500줄 이하다.
+기능 파일 `docs/features/execution.md` `docs/features/model-usage.md` `docs/features/attachment.md` `docs/features/workspace.md` 을 「기능 파일의 모양」 으로 다시 짜고, 코드를 말로 옮긴 부분과 중복과 낡은 내용을 지운다.
+목표 줄 수: 네 파일 합계 900줄 이하(지금 약 1,600줄). 파일 하나는 500줄 이하다.
 
 **범위 외**: 다른 기능 파일과 `backend/docs/data-schema.md`(다른 phase). 코드와 테스트, ADR 본문.
 
@@ -83,12 +83,7 @@
 
 ### 보존 헤딩
 
-ADR 이 「절 이름」 으로 가리켜 반드시 남기는 헤딩이다(이름 그대로, 단계는 바꿔도 된다): connector 「바인딩 설치」 / connector-policy 「커넥터 승인」, 「흐름 판정 표」, 「커넥터 READ 데이터의 흐름」
-
-### 이 phase 에서 더 볼 것
-
-- `hermes/docs/hermes-contract.md` 의 「도구 hook 과 승인」, 「MCP 프로세스의 환경 값」 과 겹치는 Hermes 쪽 동작은 그 문서에 두고 링크한다. hermes-contract 는 고치지 않는다.
-- 커넥터 도구 목록과 manifest 칸은 `hermes/connectors/<이름>/connector.json` 과 `hermes/connectors/README.md` 를 가리킨다.
+ADR 이 「절 이름」 으로 가리켜 반드시 남기는 헤딩이다(이름 그대로, 단계는 바꿔도 된다): model-usage 「원장 줄에 적는 것」, 「첫 반응 시간」 / attachment 「같은 대화의 첨부 사진을 부를 때」
 
 ## 작업 항목
 
@@ -97,21 +92,35 @@ ADR 이 「절 이름」 으로 가리켜 반드시 남기는 헤딩이다(이�
 1. `node --test test/unit/doc-code-references.test.ts 2>&1 | grep '알림:'` 결과 중 이 phase 파일의 줄을 scratchpad 에 저장한다.
 2. 이 phase 파일마다 「갈리는 지점」 류 표의 줄과 굵은 결정 문장 목록을 scratchpad 에 뽑아 둔다(「의도 메모」 참고).
 
-### 1. `docs/features/connector.md`
+### 1. `docs/features/execution.md`
 
 1. 파일을 `##` 절 단위로 읽고, 절마다 그 기능의 코드(`backend/src/main/java/com/bifos/assistant/`, `web/src/`, `hermes/` 의 해당 위치)를 연다.
 2. 원재료마다 되풀이된 흐름을 `## 흐름` 의 mermaid 하나와 갈리는 지점 절로 합친다. `## 요구` 를 파일 머리에 둔다.
 3. 「지우는 것」 에 드는 줄을 지우고, 남는 문장의 식별자와 동작을 코드와 대조한다. 어긋나면 지우거나 지금 코드에 맞게 한 문장으로 고친다.
 4. 그 기능의 테스트(`backend/src/test/java/` 의 같은 패키지, `web/src/**/*.test.ts`, `test/browser/`)가 확인하는 분기는 문서에 한 줄 결론만 남겨도 된다.
 
-### 2. `docs/features/connector-policy.md`
+### 2. `docs/features/model-usage.md`
 
 1. 파일을 `##` 절 단위로 읽고, 절마다 그 기능의 코드(`backend/src/main/java/com/bifos/assistant/`, `web/src/`, `hermes/` 의 해당 위치)를 연다.
 2. 원재료마다 되풀이된 흐름을 `## 흐름` 의 mermaid 하나와 갈리는 지점 절로 합친다. `## 요구` 를 파일 머리에 둔다.
 3. 「지우는 것」 에 드는 줄을 지우고, 남는 문장의 식별자와 동작을 코드와 대조한다. 어긋나면 지우거나 지금 코드에 맞게 한 문장으로 고친다.
 4. 그 기능의 테스트(`backend/src/test/java/` 의 같은 패키지, `web/src/**/*.test.ts`, `test/browser/`)가 확인하는 분기는 문서에 한 줄 결론만 남겨도 된다.
 
-### 3. 이 phase 를 검증하는 테스트
+### 3. `docs/features/attachment.md`
+
+1. 파일을 `##` 절 단위로 읽고, 절마다 그 기능의 코드(`backend/src/main/java/com/bifos/assistant/`, `web/src/`, `hermes/` 의 해당 위치)를 연다.
+2. 원재료마다 되풀이된 흐름을 `## 흐름` 의 mermaid 하나와 갈리는 지점 절로 합친다. `## 요구` 를 파일 머리에 둔다.
+3. 「지우는 것」 에 드는 줄을 지우고, 남는 문장의 식별자와 동작을 코드와 대조한다. 어긋나면 지우거나 지금 코드에 맞게 한 문장으로 고친다.
+4. 그 기능의 테스트(`backend/src/test/java/` 의 같은 패키지, `web/src/**/*.test.ts`, `test/browser/`)가 확인하는 분기는 문서에 한 줄 결론만 남겨도 된다.
+
+### 4. `docs/features/workspace.md`
+
+1. 파일을 `##` 절 단위로 읽고, 절마다 그 기능의 코드(`backend/src/main/java/com/bifos/assistant/`, `web/src/`, `hermes/` 의 해당 위치)를 연다.
+2. 원재료마다 되풀이된 흐름을 `## 흐름` 의 mermaid 하나와 갈리는 지점 절로 합친다. `## 요구` 를 파일 머리에 둔다.
+3. 「지우는 것」 에 드는 줄을 지우고, 남는 문장의 식별자와 동작을 코드와 대조한다. 어긋나면 지우거나 지금 코드에 맞게 한 문장으로 고친다.
+4. 그 기능의 테스트(`backend/src/test/java/` 의 같은 패키지, `web/src/**/*.test.ts`, `test/browser/`)가 확인하는 분기는 문서에 한 줄 결론만 남겨도 된다.
+
+### 5. 이 phase 를 검증하는 테스트
 
 새 테스트는 만들지 않는다. 문서만 바뀌므로 문서 검사 테스트(`test/unit/doc-*.test.ts`) 가 이 phase 의 검증이다.
 헤딩을 지워 코드 주석의 「절」 이 끊기면 `doc-references` 가, 백틱으로 남긴 이름이 코드에 없으면 `doc-code-references` 가 실패한다.
@@ -121,8 +130,8 @@ ADR 이 「절 이름」 으로 가리켜 반드시 남기는 헤딩이다(이�
 ```bash
 node --test test/unit/doc-files.test.ts test/unit/doc-code-references.test.ts test/unit/doc-references.test.ts test/unit/doc-links.test.ts test/unit/attention.test.ts
 node scripts/check-file-length.mjs
-wc -l docs/features/connector.md docs/features/connector-policy.md
-git grep -n -E 'connector.md|connector-policy.md' -- '*adr/*.md'
+wc -l docs/features/execution.md docs/features/model-usage.md docs/features/attachment.md docs/features/workspace.md
+git grep -n -E 'execution.md|model-usage.md|attachment.md|workspace.md' -- '*adr/*.md'
 ```
 
 - 첫 줄은 종료 코드 0 이다. 둘째 줄은 이 phase 의 파일에 대한 `알림:` 이 없어야 한다(파일당 500줄은 반드시 지킨다).
@@ -134,5 +143,7 @@ git grep -n -E 'connector.md|connector-policy.md' -- '*adr/*.md'
 
 | 파일 | 변경 |
 |---|---|
-| `docs/features/connector.md` | 수정 |
-| `docs/features/connector-policy.md` | 수정 |
+| `docs/features/execution.md` | 수정 |
+| `docs/features/model-usage.md` | 수정 |
+| `docs/features/attachment.md` | 수정 |
+| `docs/features/workspace.md` | 수정 |
