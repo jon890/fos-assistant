@@ -22,7 +22,14 @@ import { useConversationEffects } from "./use-conversation-effects";
 export function ConversationSession(props: ConversationSessionProps) {
   const state = useConversationSessionState(props);
   const { conversationId, currentConversation, agents, agentCode } = props;
-  const { freshStart, turns, sending, skillCommands, setSkillCommands } = state;
+  const {
+    freshStart,
+    turns,
+    sending,
+    outgoing,
+    skillCommands,
+    setSkillCommands,
+  } = state;
   const conversationHistory = useConversationHistory({ ...state, ...props });
   const conversationEvents = useConversationEvents({
     ...state,
@@ -32,8 +39,8 @@ export function ConversationSession(props: ConversationSessionProps) {
   const conversationQueue = useConversationQueue({
     ...state,
     ...props,
-    send: (attachmentIds, replacementText) =>
-      send(attachmentIds, replacementText),
+    send: (attachmentIds, replacementText, attachments) =>
+      send(attachmentIds, replacementText, attachments),
   });
   const conversationSend = useConversationSend({
     ...state,
@@ -76,7 +83,8 @@ export function ConversationSession(props: ConversationSessionProps) {
     ? agentLabel(currentConversation.agentName)
     : agents.find((agent) => agent.code === agentCode)?.name;
   useShellTitle(selectedAgent ?? null);
-  const startScreen = freshStart && turns.length === 0 && !sending;
+  const startScreen =
+    freshStart && turns.length === 0 && !sending && outgoing === null;
   const currentAgent = agentMissing
     ? undefined
     : agents.find((agent) => agent.code === agentCode);
