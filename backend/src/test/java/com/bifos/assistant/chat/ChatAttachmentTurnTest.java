@@ -362,9 +362,7 @@ class ChatAttachmentTurnTest {
                 photos.stream().map(ChatAttachment::id).toList());
 
         HermesRunCommand command = stub().received().getFirst();
-        assertThat(command.images())
-                .extracting(HermesImage::label)
-                .containsExactly("1번째 사진", "2번째 사진", "3번째 사진");
+        assertThat(command.images()).extracting(HermesImage::label).containsExactly("1번째 사진", "2번째 사진", "3번째 사진");
         assertThat(command.input())
                 .contains(
                         "이 메시지에 이미지로 함께 실은 사진: 1번째, 2번째, 3번째 사진.",
