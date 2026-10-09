@@ -14,7 +14,7 @@ Control Plane 의 패키지마다 맡는 책임과 패키지 사이의 방향 �
 | `shared/auth` | 토큰 검사와 현재 사용자, profile 토큰 필터의 타입, 토큰의 주소를 현재 사용자로 바꾸는 port |
 | `shared/error` | 오류 코드와 응답 형태 |
 | `shared/config` | 시계, 스케줄링, 보안 필터 설정, 실행 중에 쓰는 설정을 읽는 `LiveProperties`([ADR-20261007 / live-properties](adr/ADR-20261007-live-properties.md)). 그 빈을 만드는 `LivePropertiesConfig` 는 기능 패키지의 설정을 가져오므로 루트 패키지에 둔다 |
-| `shared/util` | 외부 서비스의 글을 감싸는 함수와 문자열 지문 |
+| `shared/util` | 외부 서비스의 글을 감싸는 함수와 문자열 지문, 에이전트가 만든 파일에 붙이는 `Content-Security-Policy` 값(`SandboxedContentPolicy`) |
 | `shared/concurrent` | 요청 밖 작업을 띄우는 `BackgroundTasks`. 직접 가상 스레드를 띄우지 않는 까닭은 [ADR-20261007 / background-tasks](adr/ADR-20261007-background-tasks.md) |
 | `shared/domain/type` | 모든 패키지가 권한 판정에 읽는 역할 값 |
 | `user` | 사용자와 첫 로그인 처리 |
@@ -37,6 +37,7 @@ Control Plane 의 패키지마다 맡는 책임과 패키지 사이의 방향 �
 | `followup` | 할 일의 저장과 상태 전이, 사람이 쓰는 API, 에이전트의 제안 저장([`backend/docs/flow.md`](flow.md)) |
 | `proactive` | 먼저 살펴보기의 시작 전 점검, 점검 대화의 살펴보기 turn, 상한, 결과 계약의 검사와 그리기, 문제 후보의 검사와 저장, 살펴보기 트리 판정([`backend/docs/flow.md`](flow.md)), 판단 피드백의 replay 읽기 모델, 매일 루프의 이음매와 보일 판정, 판정 반응([`backend/docs/flow.md`](flow.md)) |
 | `attention` | 먼저 알리기의 판정과 지금 화면이 읽는 카드. 다른 패키지의 기록을 읽기만 한다([`backend/docs/flow.md`](flow.md)) |
+| `workspace` | 사용자 실행 공간의 파일 목록과 본문, 권한 도우미로 지우기, 관리자의 공간별 용량. 아래 「실행 공간 파일」 |
 
 검사: `ArchitectureRules.SHARED_DOES_NOT_DEPEND_ON_DOMAINS`
 
@@ -62,7 +63,8 @@ Control Plane 의 패키지마다 맡는 책임과 패키지 사이의 방향 �
 `followup` 은 `chat` 바로 위다. 대화 주인을 확인하고 공개 식별자를 얻으려고 `chat` 을 쓰고, 제안 도구(`mcp`)와 먼저 알리기(`attention`)가 `followup` 을 쓴다.
 `browser` 는 `user` 바로 위다. 관리자 목록의 사용자 이름을 읽으려고 `user` 를 쓰고, 사용자를 끈 사건(`shared.auth.UserAccessRevoked`)을 받는다. 커넥터 바인딩이 브라우저 중계를 쓰게 되므로 `connector` 보다 아래에 둔다. 중계가 바인딩 표식의 주인을 찾으려고 `browser` 에 port(`BrowserGrantOwners`)를 두고 `connector` 가 구현한다.
 `notification` 은 `user` 바로 위다. 알림을 만드는 쪽(`connector`, 그 위의 패키지)이 모두 이 패키지를 부르고, 이 패키지는 알림을 받는 사용자 말고 다른 도메인을 모른다.
-`attention` 은 맨 위다. 먼저 알리기의 후보를 읽으려고 `usage`, `chat`, `agent`, `memory`, `connector`, `followup` 의 `application` 을 부르고, 어느 패키지도 `attention` 을 import 하지 않는다.
+`attention` 은 `workspace` 바로 아래다. 먼저 알리기의 후보를 읽으려고 `usage`, `chat`, `agent`, `memory`, `connector`, `followup` 의 `application` 을 부르고, 어느 패키지도 `attention` 을 import 하지 않는다.
+`workspace` 는 맨 위다. 함께 쓰는 에이전트와 관리자 용량의 에이전트 이름을 읽으려고 `agent` 를, 도는 실행 수를 읽으려고 `usage` 를, 관리자 용량의 사용자 이름을 읽으려고 `user` 를 부른다. 어느 패키지도 `workspace` 를 import 하지 않는다.
 검사: `ArchitectureRules.TOP_LEVEL_PACKAGES_FOLLOW_LAYER_ORDER`, 근거: ADR-068
 
 ### proactive
@@ -108,7 +110,7 @@ Control Plane 의 패키지마다 맡는 책임과 패키지 사이의 방향 �
 | `connector.domain.ToolPolicyDecision` | 판정 함수. Hermes 와 DB 를 모른다 |
 | `connector.domain.ConnectorAction` | 판정 한 줄과 승인 줄. 승인 상태 전이를 갖는다 |
 
-**`attention` 밖의 패키지는 `connector` 를 import 하지 않는다.** `connector` 가 `agent`, `hermes`, `mcp`, `orchestration`, `usage`, `user` 를 부른다. 붙일 때 스킬 이름이 겹치는지 보려고 `skill` 도 부른다. 승인 줄의 대화 권한을 확인하고 알림이 가리킬 대화의 공개 식별자를 찾으려고 `chat` 도 부른다. 승인 요청과 만료의 알림을 같은 트랜잭션에서 만들려고 `notification` 도 부른다. 설치와 확인 호출에 중계 주소를 실으려고 `browser` 의 `BrowserGatewayTokens` 도 부른다. `connector` 가 `mcp` 를 쓰므로 `mcp` 가 `connector` 를 부르면 순환이 된다. `chat` 이 승인 결과를 읽어야 할 때는 `chat` 에 port 를 두고 `connector` 가 구현한다. `attention` 은 층 순서의 맨 위라 승인 대기를 읽으려고 `connector.application` 의 읽기 메서드를 부른다.
+**`attention` 밖의 패키지는 `connector` 를 import 하지 않는다.** `connector` 가 `agent`, `hermes`, `mcp`, `orchestration`, `usage`, `user` 를 부른다. 붙일 때 스킬 이름이 겹치는지 보려고 `skill` 도 부른다. 승인 줄의 대화 권한을 확인하고 알림이 가리킬 대화의 공개 식별자를 찾으려고 `chat` 도 부른다. 승인 요청과 만료의 알림을 같은 트랜잭션에서 만들려고 `notification` 도 부른다. 설치와 확인 호출에 중계 주소를 실으려고 `browser` 의 `BrowserGatewayTokens` 도 부른다. `connector` 가 `mcp` 를 쓰므로 `mcp` 가 `connector` 를 부르면 순환이 된다. `chat` 이 승인 결과를 읽어야 할 때는 `chat` 에 port 를 두고 `connector` 가 구현한다. `attention` 은 `connector` 보다 위라 승인 대기를 읽으려고 `connector.application` 의 읽기 메서드를 부른다.
 검사: `ArchitectureRules.TOP_LEVEL_PACKAGES_FREE_OF_CYCLES`
 
 ## 한 번의 대화가 지나는 길
@@ -313,3 +315,164 @@ node scripts/check-file-length.mjs --update
 갱신한 기준 파일은 같은 커밋에 넣는다. 새 코드는 기준 목록에 추가하지 않고 나눈다.
 Checkstyle의 `FileLength`와 ESLint의 `max-lines`는 이 검사로 대체한다.
 메서드와 함수 길이 경고는 그대로 유지한다.
+
+## 실행 공간 파일
+
+사용자가 「파일 공간」 화면에서 자기 실행 공간 `/workspace` 를 보는 길이다.
+결정은 [ADR-20261009 / workspace-explorer](../../docs/adr/ADR-20261009-workspace-explorer.md), 실행 공간의 모양은 [`hermes/docs/hermes-contract.md`](../../hermes/docs/hermes-contract.md) 의 「실행 공간」 이 갖는다.
+코드는 `backend` 의 최상위 패키지 `workspace` 에 둔다. 다른 패키지는 이 패키지를 쓰지 않는다.
+
+### 설정
+
+| 키 | 환경 변수 | 비었을 때 |
+| --- | --- | --- |
+| `assistant.sandbox-workspace.root` | `ASSISTANT_SANDBOX_WORKSPACE_ROOT` | 기동한다. 상태 조회와 관리자 용량은 `available: false` 이고, 그 밖의 경로가 503 `WORKSPACE_UNAVAILABLE` 이다 |
+| `assistant.sandbox-workspace.delete-socket` | `ASSISTANT_SANDBOX_WORKSPACE_DELETE_SOCKET` | 기동한다. 지우기가 `WORKSPACE_DELETE_UNAVAILABLE` 이고 상태 조회는 `deletable: false` 다 |
+
+`root` 는 실행 공간 정책의 `workspace_root` 와 같은 디렉터리를 Control Plane 에서 본 경로다. 읽기 전용으로 붙인다.
+붙이는 일은 `fos-home-infra` 가 한다. 루트가 링크가 아닌 디렉터리가 아니어도 `WORKSPACE_UNAVAILABLE` 이다.
+
+### 경로 규칙
+
+요청자의 디렉터리는 `<root>/u<사용자 번호>` 하나다. 요청은 주인을 정하지 못한다.
+요청의 `path` 는 그 디렉터리 안의 상대 경로이고 `/` 로 조각을 나눈다. 빈 값은 그 디렉터리 자체다.
+
+| 거절하는 것 | 응답 |
+| --- | --- |
+| 빈 조각, `.`, `..`, NUL, 제어 문자, 맨 앞의 `/` | 400 `VALIDATION_FAILED` |
+| 전체 4,096 바이트, 조각 하나 255 바이트, 조각 64개를 넘는다 | 400 `VALIDATION_FAILED` |
+| 중간 조각이 디렉터리가 아니거나 심볼릭 링크다 | 404 `WORKSPACE_ENTRY_NOT_FOUND` |
+| 없는 경로 | 404 `WORKSPACE_ENTRY_NOT_FOUND` |
+
+중간 조각은 링크를 따라가지 않고 연다. glibc 위의 JDK 는 `SecureDirectoryStream` 으로 조각마다 디렉터리 핸들을 열어, 판정한 뒤 다른 것으로 바뀐 경로를 따라가지 않는다.
+그 기능이 없으면 대체 경로를 탄다. 운영 이미지(`eclipse-temurin:21-jre-alpine`)는 musl 이라 이쪽이고, 개발 기계(macOS)도 그렇다. 대체 경로는 경고를 한 번 남긴다.
+대체 경로는 조각마다 링크인지 본 뒤 경로로 열고, 연 뒤에 다시 본다. 중간 조각이 모두 링크가 아닌 디렉터리인지, 실제 경로가 사용자 디렉터리 아래인지, 마지막 조각을 열기 전에 본 파일과 연 뒤 다시 본 파일이 같은지 확인하고 어긋나면 404 다.
+하드 링크 수와 읽기 권한은 두 경로 모두 경로로 다시 본다. 본문은 위 방법으로 연 것만 준다.
+하드 링크 수(`unix:nlink`)를 읽지 못하는 파일 시스템이면 1 로 본다.
+이 사후 확인은 확인과 열기 사이의 틈을 줄일 뿐 없애지 못한다. glibc 이미지로 옮겨 대체 경로 없이 꺼지게(fail-closed) 하는 일은 이슈 #359 가 갖는다([ADR-20261009 / workspace-explorer](../../docs/adr/ADR-20261009-workspace-explorer.md) 의 「결과」).
+
+목록의 한 줄은 아래 종류 가운데 하나다.
+
+| `kind` | 무엇 | 본문 |
+| --- | --- | --- |
+| `DIRECTORY` | 디렉터리 | 목록으로 연다 |
+| `FILE` | 일반 파일 | 하드 링크가 하나이고 Control Plane 이 읽을 수 있을 때만 준다 |
+| `LINK` | 심볼릭 링크. 가리키는 곳을 읽지 않는다 | 주지 않는다 |
+| `OTHER` | FIFO, 소켓, 장치 | 주지 않는다 |
+
+`readable` 이 거짓이면 화면은 「읽을 수 없음」 을 보인다. 권한이 없는 파일, 하드 링크가 둘 이상인 파일, `LINK`, `OTHER` 가 그렇다.
+`openable` 은 이름이 주소 조각으로 쓸 수 있는지다. `%`, `;`, `\` 가 든 이름은 Control Plane 의 요청 방화벽이 주소에서 거절하므로 미리보기와 내려받기를 열지 않는다. 목록과 지우기는 `path` 인자로 하므로 그런 이름의 디렉터리도 열고 지운다.
+그런 디렉터리 안의 파일은 자기 이름이 괜찮아도 주소가 그 디렉터리 이름을 지나므로, 화면이 미리보기와 내려받기를 열지 않는다.
+
+### API
+
+모든 경로는 웹 토큰의 사용자로 판정한다. 웹 서버 라우트는 같은 경로를 `/api/workspace/...` 로 옮긴다.
+
+| 경로 | 하는 일 | 응답 |
+| --- | --- | --- |
+| `GET /api/v1/workspace` | 공간의 상태 | `{available, deletable, exists, runningExecutions, agents: [{code, name, shared}]}`. `exists` 는 사용자 디렉터리가 있는지다. `agents` 는 요청자가 주인이고 켜져 있으며 지우지 않은 에이전트이고, `shared` 는 그룹에 공개했는지다. `runningExecutions` 는 사용자 실행 한도가 세는 지금 쥔 자리 수다 |
+| `GET /api/v1/workspace/entries?path=` | 디렉터리 하나의 목록 | `{path, entries: [{name, kind, size, modifiedAt, readable, openable}], truncated}`. 디렉터리를 읽는 순서로 1,001개까지 읽고, 그 가운데 1,000개를 디렉터리 먼저, 이름 순서로 준다. 1,001번째가 있으면 `truncated` 가 참이고, 그때는 순서상 앞선 항목도 빠질 수 있다. `size` 는 `FILE` 만 채운다. 사용자 디렉터리가 아직 없으면 빈 목록이다 |
+| `GET /api/v1/workspace/files/{경로}` | 미리보기 본문 | 아래 「본문 머리글」. 경로의 조각마다 URL 인코딩한다 |
+| `GET /api/v1/workspace/files/{경로}?download=1` | 내려받기 | 크기 상한 없이 스트림으로 준다 |
+| `DELETE /api/v1/workspace/entries?path=` | 지우기 | 아래 「지우기」 |
+| `GET /api/v1/admin/workspaces` | 실행 공간별 용량(사용자, 주인 없는 에이전트). `ADMIN` 만 | 아래 「관리자 용량」 |
+
+본문 경로의 오류는 아래와 같다. 루트 확인(503), 경로 검사(400) 다음에, 미리보기는 확장자(415), 크기(413), 종류(404), 읽기 권한(403) 차례로 판정한다. 내려받기는 종류와 읽기 권한만 본다.
+
+| 판정 | 응답 |
+| --- | --- |
+| `FILE` 이 아니다 | 404 `WORKSPACE_ENTRY_NOT_FOUND` |
+| 읽을 수 없다(권한, 하드 링크) | 403 `WORKSPACE_ENTRY_UNREADABLE` |
+| 미리보기를 정하지 않은 확장자 | 415 `WORKSPACE_PREVIEW_UNSUPPORTED` |
+| 미리보기 크기를 넘는다 | 413 `WORKSPACE_PREVIEW_TOO_LARGE` |
+
+목록에서 Control Plane 이 읽지 못하는 디렉터리는 403 `WORKSPACE_ENTRY_UNREADABLE` 이다. 예상하지 못한 입출력 오류는 500 `INTERNAL_ERROR` 이고 로그에는 사용자 번호와 예외 종류만 남는다.
+응답 본문은 파일을 연 시점의 크기까지만 보낸다. 그 사이 파일이 커져도 `Content-Length` 와 본문이 어긋나지 않는다.
+
+### 본문 머리글
+
+미리보기는 확장자로 형식을 정한다. 파일의 내용으로 형식을 짐작하지 않는다.
+
+| 확장자 | `Content-Type` | 크기 상한 |
+| --- | --- | --- |
+| `html`, `htm` | `text/html; charset=utf-8` | 5 MiB |
+| `png`, `jpg`, `jpeg`, `gif`, `webp` | 그 사진 형식 | 20 MiB |
+| `css` | `text/css; charset=utf-8`. HTML 미리보기가 상대 경로로 부르는 스타일이 적용되게 한다 | 1 MiB |
+| `csv`, `tsv` 와 아래 글 확장자, 확장자가 없는 이름 | `text/plain; charset=utf-8` | 1 MiB |
+
+글 확장자는 `txt`, `md`, `markdown`, `log`, `json`, `jsonl`, `yaml`, `yml`, `toml`, `ini`, `cfg`, `conf`, `env`, `py`, `js`, `mjs`, `cjs`, `ts`, `tsx`, `jsx`, `java`, `kt`, `go`, `rs`, `rb`, `sh`, `bash`, `zsh`, `sql`, `xml`, `svg`, `scss` 다.
+SVG 는 스크립트를 품을 수 있어 사진이 아니라 글로 보인다.
+확장자는 이름의 마지막 `.` 뒤를 소문자로 읽는다. `.` 으로 시작하고 다른 `.` 이 없는 이름은 그 뒤 전체가 확장자다. `.env` 는 `env` 라 글이고, `.gitignore` 는 `gitignore` 라 미리보기가 없다. `.` 이 없는 이름(`Makefile`)은 확장자가 없는 이름이다.
+
+| 머리글 | 미리보기 | 내려받기 |
+| --- | --- | --- |
+| `Content-Type` | 위 표 | `application/octet-stream` |
+| `Content-Disposition` | `inline; filename="<ASCII 로 옮긴 이름>"; filename*=UTF-8''<이름>` | `attachment; filename="<ASCII 로 옮긴 이름>"; filename*=UTF-8''<이름>` |
+| `Content-Security-Policy` | HTML 은 결과물과 같은 값([`backend/docs/flow.md`](flow.md) 의 「경로(결과물 파일)」). 그 밖은 `sandbox; default-src 'none'` | `sandbox; default-src 'none'` |
+| `X-Content-Type-Options` | `nosniff` | `nosniff` |
+| `Cache-Control` | `private, no-store` | `private, no-store` |
+
+`Content-Disposition` 은 Spring 의 `ContentDisposition` 에 이름과 UTF-8 을 주어 만든다. ASCII 로 옮긴 이름과 `"`, `\` 의 escape 는 Spring 이 정한다.
+web 서버 라우트는 이 다섯 머리글과 `Content-Length` 만 옮긴다.
+HTML 이 상대 경로로 부르는 CSS 와 사진은 같은 `files/` 아래 주소라 주인 확인 뒤에 받는다.
+
+### 로그와 기록
+
+본문은 로그와 실행 기록에 남기지 않는다. 도우미를 부른 지우기마다 사용자 번호, 상대 경로, 종류, 지운 항목 수, 결과를 `INFO` 로그 한 줄로 남긴다. 실패하면 일부가 지워졌을 수 있어 지운 항목 수를 `-` 로 적는다. 경로의 제어 문자는 `\uXXXX` 로 바꿔 로그 줄을 끊지 못하게 한다. 도우미를 부르기 전에 끝난 요청은 남기지 않는다.
+목록과 본문의 오류 로그는 사용자 번호와 오류 종류만 남기고 경로를 남기지 않는다.
+
+### 지우기
+
+**지우기는 경로 하나를 받는다.** 빈 경로(사용자 디렉터리 자체)는 400 `VALIDATION_FAILED` 다.
+Control Plane 은 경로 규칙을 먼저 검사하고 읽기 마운트에서 그 경로가 있는지 본 뒤 운영의 권한 도우미를 부른다.
+
+| 판정 | 응답 |
+| --- | --- |
+| 지운다 | 200 `{kind, entries, bytes}`. `entries` 는 지운 항목 수, `bytes` 는 지운 일반 파일의 크기 합이다 |
+| 도우미 socket 이 설정되지 않았다 | 503 `WORKSPACE_DELETE_UNAVAILABLE` |
+| 없는 경로, 링크를 지나는 경로 | 404 `WORKSPACE_ENTRY_NOT_FOUND` |
+| 상위 디렉터리를 Control Plane 이 읽지 못한다 | 403 `WORKSPACE_ENTRY_UNREADABLE`. 도우미를 부르지 않는다 |
+| 디렉터리 안의 항목이 10,000 개를 넘는다 | 409 `WORKSPACE_DELETE_TOO_MANY`. 아무것도 지우지 않는다 |
+| 도우미가 실패했거나 30초 안에 답하지 않았다 | 502 `WORKSPACE_DELETE_FAILED` |
+
+루트 확인(503 `WORKSPACE_UNAVAILABLE`)과 예상하지 못한 입출력 오류(500)는 위 「API」 절과 같다.
+
+**권한 도우미와의 계약.** 도우미는 `fos-home-infra` 가 만들고 운영한다. 이 저장소는 아래 계약만 갖는다.
+
+- socket 은 unix stream socket 이다. Control Plane 만 열 수 있게 둔다. 망에 열지 않는다
+- 요청 하나에 연결 하나다. Control Plane 이 UTF-8 JSON 한 줄을 `\n` 으로 끝내 보내고, 도우미가 JSON 한 줄로 답한 뒤 연결을 닫는다
+- 답 한 줄은 64 KiB 를 넘지 않는다. 넘거나 JSON 이 아니면 Control Plane 은 502 `WORKSPACE_DELETE_FAILED` 로 답한다
+- 요청은 `{"version": 1, "owner": "u12", "path": "reports/a.csv", "max_entries": 10000}` 이다
+- 성공 답은 `{"ok": true, "kind": "FILE", "entries": 1, "bytes": 2048}` 이다. `kind` 는 목록의 `kind` 와 같은 네 값이다
+- 실패 답은 `{"ok": false, "code": "<코드>"}` 이다. 코드는 아래 표의 다섯이다
+
+| 코드 | 뜻 | Control Plane 응답 |
+| --- | --- | --- |
+| `INVALID_REQUEST` | 주인 키나 경로가 규칙에 맞지 않는다 | 502 `WORKSPACE_DELETE_FAILED` |
+| `NOT_FOUND` | 없는 경로 | 404 `WORKSPACE_ENTRY_NOT_FOUND` |
+| `LINK_IN_PATH` | 중간 조각이 링크이거나 디렉터리가 아니다 | 404 `WORKSPACE_ENTRY_NOT_FOUND` |
+| `TOO_MANY_ENTRIES` | 디렉터리 안의 항목이 `max_entries` 를 넘는다. 아무것도 지우지 않았다 | 409 `WORKSPACE_DELETE_TOO_MANY` |
+| `FAILED` | 지우다 실패했다. 일부가 지워졌을 수 있다 | 502 `WORKSPACE_DELETE_FAILED` |
+
+도우미가 지킬 것은 아래와 같다.
+
+- 주인 키는 `^[a-z][a-z0-9-]{0,63}$` 이고, 지우는 범위는 `<workspace_root>/<주인 키>` 아래뿐이다. 주인 디렉터리 자체는 지우지 않는다
+- 경로 규칙은 위 「경로 규칙」 과 같다
+- 주인 디렉터리부터 조각마다 링크를 따라가지 않고 디렉터리 핸들로 연다. 마지막 조각이 링크면 링크만 지운다
+- 디렉터리는 먼저 안의 항목을 링크를 따라가지 않고 센다. `max_entries` 를 넘으면 지우지 않고 답한다. 넘지 않으면 안쪽부터 지운다
+- 지우는 크기에는 상한을 두지 않는다. 지우는 비용은 항목 수를 따르고 파일 크기를 따르지 않는다
+- 요청마다 시각, 주인 키, 경로, 종류, 지운 항목 수, 결과를 감사 기록 한 줄로 남긴다. 파일 본문은 읽지도 남기지도 않는다
+- 실행 공간 루트만 쓰기로 붙이고, 지우는 데 필요한 권한만 갖는다
+
+### 관리자 용량
+
+`GET /api/v1/admin/workspaces` 는 `{available, spaces: [{kind, id, name, bytes, entries, partial}]}` 를 준다.
+`kind` 는 `USER`(디렉터리 `u<번호>`) 나 `AGENT`(디렉터리 `a<번호>`) 이고 `name` 은 사용자 이름이나 에이전트 이름이다. 이름을 찾지 못하면 `null` 이다.
+번호는 0 으로 시작하지 않는다(`u01` 은 세지 않는다). 그 밖의 이름을 가진 디렉터리는 세지 않는다. 파일 이름과 경로는 응답에 없다.
+
+요청할 때 링크를 따라가지 않고 센다. `bytes` 는 일반 파일 크기의 합이다.
+공간 하나에 항목 200,000 개, 요청 전체에 30초를 넘기면 거기서 멈추고 `partial` 을 참으로 둔다. 시간은 항목 사이에서 확인하므로 디렉터리 하나를 여는 데 걸린 시간만큼은 넘길 수 있다. 읽지 못한 디렉터리는 항목으로 세고 `partial` 을 참으로 둔다.
+공간은 `USER`, `AGENT` 순서와 번호 순서로 센다. 30초가 지난 뒤의 공간은 세지 않고 `bytes` 와 `entries` 를 0, `partial` 을 참으로 두어 응답에 넣는다.
+줄은 `bytes` 가 큰 순서다.
+
+루트가 설정되지 않았거나 링크가 아닌 디렉터리가 아니면 200 과 `available` 거짓, 빈 `spaces` 다. 루트 바로 아래를 읽지 못하면 500 `INTERNAL_ERROR` 이고 로그에는 예외 종류만 남는다.
