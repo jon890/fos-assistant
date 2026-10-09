@@ -221,7 +221,7 @@ test("폭 360 에서 공백 없는 긴 이름과 설명이 카드 밖으로 넘�
   ).toBe(true);
 });
 
-test("두 화면 폭에서 열 수와 카드 높이, 주 단추 위치를 맞추고 넘치지 않는다", async ({
+test("두 화면 폭에서 각 구역의 열 수와 카드 높이, 주 단추 위치를 맞추고 넘치지 않는다", async ({
   page,
 }) => {
   await listConnectors(page, [
@@ -229,64 +229,122 @@ test("두 화면 폭에서 열 수와 카드 높이, 주 단추 위치를 맞추
       title: "긴서비스".repeat(30),
       description: "공백없는긴설명".repeat(60),
       icon: SVG_ICON,
+      myStatus: "READY",
     }),
     rich,
     connector("ready-grid", { myStatus: "READY" }),
     connector("pending-grid", { myStatus: "PENDING", description: "" }),
-    connector("unavailable-grid", { available: false }),
+    connector("unavailable-grid", { available: false, myStatus: "READY" }),
     connector("bare-grid", { description: "" }),
+    connector("extra-grid"),
   ]);
   await page.goto("/connections");
-  const cards = page.getByTestId("connector-card");
-  await expect(cards).toHaveCount(6);
+  await expect(page.getByTestId("connector-card")).toHaveCount(7);
   const expectedColumns = page.viewportSize()!.width >= 1280 ? 3 : 1;
-  const grid = page.getByTestId("connector-grid");
-  expect(
-    await grid.evaluate(
-      (node) => getComputedStyle(node).gridTemplateColumns.split(" ").length,
-    ),
-  ).toBe(expectedColumns);
-
-  const layout = await cards.evaluateAll((nodes) =>
-    nodes.map((node) => {
-      const card = node.getBoundingClientRect();
-      const positions = [
-        "[data-slot=card-title]",
-        "[data-slot=card-description]",
-        "[data-slot=badge]",
-        "[data-testid=connector-action]",
-      ].map(
-        (selector) =>
-          node.querySelector(selector)!.getBoundingClientRect().top - card.top,
+  const connected = page.getByRole("region", {
+    name: "연결한 서비스",
+    exact: true,
+  });
+  const available = page.getByRole("region", {
+    name: "연결할 수 있는 서비스",
+    exact: true,
+  });
+  for (const section of [connected, available]) {
+    const cards = section.getByTestId("connector-card");
+    expect(
+      await section
+        .getByTestId("connector-grid")
+        .evaluate(
+          (node) =>
+            getComputedStyle(node).gridTemplateColumns.split(" ").length,
+        ),
+    ).toBe(expectedColumns);
+    const layout = await cards.evaluateAll((nodes) =>
+      nodes.map((node) => {
+        const card = node.getBoundingClientRect();
+        const positions = [
+          "[data-slot=card-title]",
+          "[data-slot=card-description]",
+          "[data-slot=badge]",
+          "[data-testid=connector-action]",
+        ].map(
+          (selector) =>
+            node.querySelector(selector)!.getBoundingClientRect().top -
+            card.top,
+        );
+        return {
+          height: card.height,
+          positions,
+          left: card.left,
+          top: card.top,
+        };
+      }),
+    );
+    for (const item of layout) {
+      expect(item.height).toBeCloseTo(layout[0].height, 0);
+      item.positions.forEach((position, index) =>
+        expect(position).toBeCloseTo(layout[0].positions[index], 0),
       );
-      return { height: card.height, positions, left: card.left, top: card.top };
-    }),
-  );
-  for (const item of layout) {
-    expect(item.height).toBeCloseTo(layout[0].height, 0);
-    item.positions.forEach((position, index) =>
-      expect(position).toBeCloseTo(layout[0].positions[index], 0),
+    }
+    expect(new Set(layout.map((item) => item.left)).size).toBe(expectedColumns);
+    expect(layout.filter((item) => item.top === layout[0].top)).toHaveLength(
+      expectedColumns,
     );
   }
-  expect(new Set(layout.map((item) => item.left)).size).toBe(expectedColumns);
-  expect(layout.filter((item) => item.top === layout[0].top)).toHaveLength(
-    expectedColumns,
-  );
   await expect(
-    cards.nth(0).getByTestId("connector-action"),
+    available.getByTestId("connector-action").first(),
   ).toHaveAccessibleName(/^연결하기/);
   await expect(
-    cards.nth(2).getByTestId("connector-action"),
+    connected.getByTestId("connector-action").first(),
   ).toHaveAccessibleName(/^연결 확인/);
-  await expect(cards.nth(0).locator("[data-slot=card-description]")).toHaveCSS(
-    "-webkit-line-clamp",
-    "1",
-  );
+  await expect(
+    connected.locator("[data-slot=card-description]").first(),
+  ).toHaveCSS("-webkit-line-clamp", "1");
   expect(
     await page.evaluate(
       () => document.documentElement.scrollWidth <= window.innerWidth,
     ),
   ).toBe(true);
+});
+
+test("연결한 서비스를 먼저 모으고 세 상태를 글자와 의미 색으로 구분한다", async ({
+  page,
+}) => {
+  await listConnectors(page, [
+    connector("disconnected-state"),
+    connector("pending-state", { myStatus: "PENDING" }),
+    connector("ready-state", { myStatus: "READY" }),
+  ]);
+  await page.goto("/connections");
+  const connected = page.getByRole("region", {
+    name: "연결한 서비스",
+    exact: true,
+  });
+  const available = page.getByRole("region", {
+    name: "연결할 수 있는 서비스",
+    exact: true,
+  });
+  await expect(connected.getByTestId("connector-card")).toHaveCount(2);
+  await expect(available.getByTestId("connector-card")).toHaveCount(1);
+  expect((await connected.boundingBox())!.y).toBeLessThan(
+    (await available.boundingBox())!.y,
+  );
+  for (const [section, label, variant] of [
+    [connected, "준비 중", "warning"],
+    [connected, "연결됨", "success"],
+    [available, "연결 안 됨", "outline"],
+  ] as const) {
+    const badge = section
+      .locator("[data-slot=badge]")
+      .filter({ hasText: label });
+    await expect(badge).toHaveText(label);
+    await expect(badge).toHaveAttribute("data-variant", variant);
+  }
+  for (const count of await connected
+    .getByTestId("connector-binding-count")
+    .all()) {
+    await expect(count).toHaveText("붙인 에이전트 0개");
+  }
 });
 
 test("중간 폭에서는 두 열로 보인다", async ({ page }) => {

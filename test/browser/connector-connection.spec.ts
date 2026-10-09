@@ -169,6 +169,27 @@ test("연결된 서비스도 다시 확인하면 확인 시각을 갱신한다",
   await expect(check).toBeEnabled();
 });
 
+for (const [status, label, variant] of [
+  ["READY", "연결됨", "success"],
+  ["PENDING", "준비 중", "warning"],
+  ["DISCONNECTED", "연결 안 됨", "outline"],
+] as const) {
+  test(`상세에서 ${label} 상태를 글자와 의미 색으로 구분한다`, async ({
+    page,
+  }) => {
+    await page.route(`**/api/connections/${DEMO_ID}`, (route) =>
+      route.fulfill({ json: { ...ready, status } }),
+    );
+    await page.goto(`/connections/${DEMO_ID}`);
+    const badge = page.getByTestId("connection-status");
+    await expect(badge).toHaveText(label);
+    await expect(badge).toHaveAttribute("data-variant", variant);
+    await expect(
+      page.getByRole("button", { name: "연결 다시 확인" }),
+    ).toHaveCount(status === "DISCONNECTED" ? 0 : 1);
+  });
+}
+
 test("등록이 거절되면 비밀 칸을 비우고 정해 둔 문구만 보인다", async ({
   page,
 }) => {

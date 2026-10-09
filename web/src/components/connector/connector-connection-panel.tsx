@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { Badge } from "@/components/ui/badge";
+import { ConnectionBadge } from "@/components/connector/connection-badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { ConnectorAgentChooser } from "@/components/connector/connector-agent-chooser";
@@ -17,7 +17,6 @@ import { Notice } from "@/components/ui/notice";
 import {
   CONNECTOR_ID_PATTERN,
   checkConnection,
-  connectionStatusLabel,
   disconnectConnection,
   readConnection,
   readOptions,
@@ -289,9 +288,10 @@ export function ConnectorConnectionPanel({
           <div className="flex flex-wrap items-center justify-between gap-2 rounded-md bg-muted px-3 py-2 text-sm">
             <span>
               상태{" "}
-              <Badge variant="outline" data-testid="connection-status">
-                {connectionStatusLabel(status)}
-              </Badge>
+              <ConnectionBadge
+                status={status}
+                data-testid="connection-status"
+              />
             </span>
             {shown.map(({ field, value }) => (
               <span key={field.key} className="break-all">
