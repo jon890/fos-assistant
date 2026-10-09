@@ -1,7 +1,8 @@
-## ADR-20261007: Flyway 는 UTC 시각 버전을 쓰고 ADR 은 결정 날짜와 슬러그로 구분한다
+## ADR-20261007 / numbering-scheme: Flyway 는 UTC 시각 버전을 쓰고 ADR 은 결정 날짜와 슬러그로 구분한다
 
 - **status**: `accepted`
 - Date: 2026-10-07
+- **대체된 부분**: 날짜 ADR 의 제목 머리를 `ADR-YYYYMMDD / 슬러그` 로 쓰는 것과, ADR 파일을 모듈의 `docs/adr/` 와 `archive/` 로 옮기는 것은 [ADR-20261009 / adr-per-module](ADR-20261009-adr-per-module.md) 이 정한다. 파일 이름과 식별자는 그대로 둔다.
 
 ### 결정
 
@@ -18,7 +19,7 @@ CI 는 main 대비 새 파일에 시각 형식과 유효한 날짜를 요구하�
 날짜는 결정한 날이다. 같은 날은 슬러그로 구분하며 기존 숫자 ADR 은 그대로 둔다.
 문서 참조는 `[ADR-YYYYMMDD / 슬러그](파일 경로)` 로 쓴다.
 목록은 기존 번호순 뒤에 날짜순, 같은 날짜 안에서는 슬러그 사전순으로 둔다.
-작성 규칙은 [ADR 목록](INDEX.md) 과 [마이그레이션 작성 규칙](../backend/schema/README.md) 이 갖는다.
+작성 규칙은 [ADR 목록](INDEX.md) 과 [마이그레이션 작성 규칙](../../backend/docs/data-schema.md) 이 갖는다.
 
 ### 배경
 

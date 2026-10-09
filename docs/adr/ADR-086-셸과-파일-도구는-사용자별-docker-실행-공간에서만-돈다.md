@@ -35,11 +35,11 @@
   이 검사가 생기기 전에 올린 스킬도 막으려고, 스킬 저장은 새 버전에 함께 실리는 기존 스킬에 이 칸이 있으면 거절하고, 도구 저장은 그런 스킬이 올라간 에이전트에서 셸과 파일 도구를 켜거나 켠 채 두는 것을 `AGENT_SKILL_REQUESTS_SECRETS` 로 거절한다.
 
   Docker 는 컨테이너 생성 요청 본문을 검사하는 socket proxy 로만 다룬다. proxy 는 운영 저장소가 소유한다.
-  egress proxy(Hermes 의 iron-proxy)는 지금 켜지 않는다. 동작 계약과 측정은 [`hermes/sandbox.md`](../hermes/sandbox.md) 가 갖는다.
+  egress proxy(Hermes 의 iron-proxy)는 지금 켜지 않는다. 동작 계약과 측정은 [`hermes/docs/hermes-contract.md`](../../hermes/docs/hermes-contract.md) 가 갖는다.
 
   `terminal`, `file`, `code_execution` 가운데 하나라도 켜진 에이전트의 주인 변경은 거절한다. 실행 공간 디렉터리가 옛 주인의 것으로 남기 때문이다.
 
-- **맥락**: 모든 profile 이 Hermes 컨테이너 하나에서 돈다. 셸과 파일 도구를 켠 에이전트는 다른 profile 의 `.env`, 커넥터 값 파일, 커넥터 코드, Hermes 설정을 읽고 고칠 수 있었다([`hermes/tools-and-skills.md`](../hermes/tools-and-skills.md)).
+- **맥락**: 모든 profile 이 Hermes 컨테이너 하나에서 돈다. 셸과 파일 도구를 켠 에이전트는 다른 profile 의 `.env`, 커넥터 값 파일, 커넥터 코드, Hermes 설정을 읽고 고칠 수 있었다([`hermes/docs/hermes-contract.md`](../../hermes/docs/hermes-contract.md)).
   사용자는 터미널, 파일, 코드 실행을 최대한 열어 쓰되 사용자마다 격리된 파일 공간에서 읽고 쓰게 하기로 했다(2026-10-05).
   기존 실행기의 환경 값과 내부 서비스 연결이 필요하므로, 2026-10-06 에 profile 마다 켜고 커리어 실행기부터 적용하기로 했다.
   밖으로 나가는 네트워크는 열어 두고 기록만 하며, 허용 목록 방식은 실측 비용을 본 뒤 다시 정하기로 했다.
@@ -62,7 +62,7 @@
   - 감당할 것:
     - **사진 첨부의 전체 루트 mount 는 [ADR-091](ADR-091-사진-첨부는-사용자별로-저장하고-실행-공간에는-그-사용자만-붙인다.md) 에서 사용자별 mount 로 바꾼다.** 기존 설정을 다시 쓰고 옛 컨테이너를 정리하기 전까지는 전체 첨부가 보일 수 있다. local profile 은 아직 격리되지 않았다.
     - **밖으로 나가는 요청은 막지 않는다.** 셸이 사용자 `/workspace` 의 파일을 인터넷으로 보낼 수 있다. 실행 기록의 명령 원문과 운영의 연결 기록으로 사후에 본다.
-    - 같은 Hermes 프로세스에서 도는 도구는 실행 공간 밖이다. 남는 구멍은 [`hermes/sandbox.md`](../hermes/sandbox.md) 의 「같은 프로세스에 남는 구멍」 이 갖는다. 커넥터를 에이전트에 붙일 때 설치하는 커넥터 스킬은 대시보드 plugin 의 manifest 검증이 같은 앞머리 칸을 거절한다.
+    - 같은 Hermes 프로세스에서 도는 도구는 실행 공간 밖이다. 남는 구멍은 [`hermes/docs/hermes-contract.md`](../../hermes/docs/hermes-contract.md) 의 「같은 프로세스에 남는 구멍」 이 갖는다. 커넥터를 에이전트에 붙일 때 설치하는 커넥터 스킬은 대시보드 plugin 의 manifest 검증이 같은 앞머리 칸을 거절한다.
     - 컨테이너는 한 번 뜨면 운영이 멈출 때까지 떠 있고, 도구 시간 초과가 컨테이너 안의 프로세스를 끝내지 않는다. 유휴 컨테이너를 멈추는 일은 운영이 한다. 멈춘 컨테이너는 다음 호출에 Hermes 가 다시 띄운다.
     - 커리어 실행기처럼 운영 비밀 파일을 읽는 스크립트는 그 profile 에 읽기 전용으로 붙여야 돈다. 그 비밀은 그 사용자의 실행 공간에서 셸로 읽힌다. 커넥터(MCP)로 옮기면 컨테이너 밖으로 뺄 수 있다.
     - **정책에 등록되지 않은 profile 과 기존 Hermes 예약 작업은 아직 격리되지 않았다.** 셸이 서버의 다른 파일과 설정에 닿을 수 있다. 화면은 그 profile 에 격리가 적용됐는지 모르므로 두 경우를 함께 알린다.
@@ -71,6 +71,6 @@
     - [ADR-085](ADR-085-매일-깨우기는-예약-작업을-다시-쓰고-다섯-칸-보고를-지금-화면에-올린다.md)의 매일 깨우기 제한은 이 변경만 배포해서 풀리지 않는다. 설정은 전역이므로 일부 profile 만 격리한 상태에서는 기본값 `false` 를 유지한다. 대상 profile 전체의 실행 공간 설정 반영과 기존 스킬 점검, 실제 사용자별 격리 실행 확인 뒤에만 켠다. 확인과 설정 변경 절차는 `fos-home-infra` 가 갖는다.
     - 키가 바뀌면 이전 키의 컨테이너와 `/root` 디렉터리가 남는다. 정리는 운영이 한다.
     - 셸 도구가 이미 켜진 profile 에 남은 옛 스킬만 운영이 점검한다. 두 검사는 새 저장에서만 돌아, 그 스킬은 고치거나 지울 때까지 계속 값을 실행 공간에 넣는다.
-    - Hermes 를 올릴 때 terminal backend 계약을 다시 본다. 확인 항목은 [`hermes/upgrades.md`](../hermes/upgrades.md) 가 갖는다.
+    - Hermes 를 올릴 때 terminal backend 계약을 다시 본다. 확인 항목은 [`hermes/docs/hermes-contract.md`](../../hermes/docs/hermes-contract.md) 가 갖는다.
 
-- **적용 범위**: 대시보드 plugin 의 `PUT /api/config`, `HermesToolsetClient`, `HermesSkillClient`, `AgentToolService`, `AgentAdminService` 와 `AgentLifecycleService` 의 주인 변경 검사, `SkillPublisher`, `Agent` 의 실행 공간 주인 키, 올린 스킬 저장 검사, 에이전트 도구 화면의 확인 문구. 흐름은 [`backend/agent.md`](../backend/agent.md) 의 「에이전트 도구를 고를 때」 가 갖는다.
+- **적용 범위**: 대시보드 plugin 의 `PUT /api/config`, `HermesToolsetClient`, `HermesSkillClient`, `AgentToolService`, `AgentAdminService` 와 `AgentLifecycleService` 의 주인 변경 검사, `SkillPublisher`, `Agent` 의 실행 공간 주인 키, 올린 스킬 저장 검사, 에이전트 도구 화면의 확인 문구. 흐름은 [`backend/docs/flow.md`](../../backend/docs/flow.md) 의 「에이전트 도구를 고를 때」 가 갖는다.

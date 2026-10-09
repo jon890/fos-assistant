@@ -36,7 +36,7 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
- * 권한 도우미와의 계약을 가짜 도우미로 본다. 계약은 {@code docs/code-architecture.md} 의 「지우기」 다.
+ * 권한 도우미와의 계약을 가짜 도우미로 본다. 계약은 {@code backend/docs/code-architecture.md} 의 「지우기」 다.
  *
  * <p>unix socket 경로는 길이 상한이 있어 {@code /tmp} 아래 짧은 디렉터리에 둔다.
  */

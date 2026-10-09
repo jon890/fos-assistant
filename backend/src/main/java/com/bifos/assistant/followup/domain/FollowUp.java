@@ -24,7 +24,7 @@ import org.hibernate.type.SqlTypes;
 /**
  * 사용자 한 사람의 할 일 한 줄이다(ADR-073).
  *
- * <p>칸의 뜻은 {@code docs/backend/schema/attention.md} 의 「follow_up」 이 갖고, 상태 전이는 {@code docs/backend/follow-up.md} 의
+ * <p>칸의 뜻은 {@code backend/docs/data-schema.md} 의 「follow_up」 이 갖고, 상태 전이는 {@code backend/docs/flow.md} 의
  * 「상태」 가 갖는다. 대화와 실행은 지워져도 이 줄을 남기므로 번호로만 둔다.
  *
  * <p>유일 제약을 엔티티에도 선언한다. 테스트는 엔티티로 스키마를 만들므로, 선언하지 않으면 같은 제목이 동시에 열릴 때의 처리가

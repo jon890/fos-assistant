@@ -4,7 +4,7 @@ package com.bifos.assistant.task.domain.type;
  * {@code SKIPPED} 와 {@code FAILED} 발화의 까닭, 그리고 알릴 것 없이 끝낸 {@code SUCCEEDED} 발화의 까닭이다. DB 에 이름 그대로
  * 저장된다.
  *
- * <p>언제 붙는지는 {@code docs/backend/task.md} 의 「발화와 시작」 이 갖는다.
+ * <p>언제 붙는지는 {@code backend/docs/flow.md} 의 「발화와 시작」 이 갖는다.
  */
 public enum TaskRunReason {
     /** 놓친 발화를 {@code SKIP} 으로 건너뛰었다. */

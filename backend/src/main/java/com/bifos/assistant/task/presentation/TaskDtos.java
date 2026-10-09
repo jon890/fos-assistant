@@ -30,7 +30,7 @@ import java.util.UUID;
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
 
-/** 예약 작업 경로의 요청과 응답 모양이다. 계약은 {@code docs/backend/task.md} 의 「API」 가 갖는다. */
+/** 예약 작업 경로의 요청과 응답 모양이다. 계약은 {@code backend/docs/flow.md} 의 「API(예약 작업)」 가 갖는다. */
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
 public final class TaskDtos {
 

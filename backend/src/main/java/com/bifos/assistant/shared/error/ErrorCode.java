@@ -41,7 +41,6 @@ public enum ErrorCode {
     MEMORY_SENSITIVE_ALWAYS(HttpStatus.BAD_REQUEST),
     /** 민감 본문을 암호화하거나 풀 key 가 없다. 평문으로 내려 저장하지 않는다(ADR-055). */
     MEMORY_ENCRYPTION_UNAVAILABLE(HttpStatus.CONFLICT),
-    /** 들이는 사이에 같은 출처나 같은 이름의 줄이 먼저 들어왔다. 다시 올리면 그 항목이 DUPLICATE 나 CONFLICT 로 나온다(ADR-058). */
     /** 같은 주인과 collection 에 같은 이름의 문서가 이미 있다(ADR-057). */
     MEMORY_DOCUMENT_EXISTS(HttpStatus.CONFLICT),
     /** 화면이 읽은 판이 지금 판이 아니다. 그 사이에 다른 수정이 있었다(ADR-057). */

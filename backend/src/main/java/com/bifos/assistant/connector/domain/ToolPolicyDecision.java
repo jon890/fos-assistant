@@ -10,8 +10,8 @@ import java.util.Optional;
 /**
  * 커넥터 도구 호출 하나의 판정이다(ADR-049).
  *
- * <p>판정은 DB 와 Hermes 를 모르는 {@link #decide} 하나가 한다. 순서는 {@code docs/backend/connector-tool-policy.md} 의 「도구 호출
- * 판정」 표와 같다. 모델이 준 인자의 내용과 서버의 {@code readOnlyHint} 는 판정에 들어가지 않는다.
+ * <p>판정은 DB 와 Hermes 를 모르는 {@link #decide} 하나가 한다. 조건을 위에서부터 차례로 보고 처음 맞는 것으로 정하며, 조건과
+ * 그 순서는 {@link #decide} 의 코드가 갖는다. 모델이 준 인자의 내용과 서버의 {@code readOnlyHint} 는 판정에 들어가지 않는다.
  *
  * @param denyReason {@code DENIED} 일 때만 있다
  * @param risk 판정에 쓴 위험도. 정책을 읽지 못했거나 연결이 준비되지 않았거나 선언이 없어 거절한 호출은 null

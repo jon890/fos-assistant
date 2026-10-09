@@ -57,7 +57,7 @@ import org.springframework.transaction.support.TransactionTemplate;
  *
  * <p>옛 커넥터 에이전트({@link Agent#connectorManaged()})의 바인딩은 그 에이전트가 지워질 때까지 옛 방식으로 다룬다. 값은
  * 그 profile 의 {@code .env} 에 직접 쓰고 설치는 바인딩 칸 없이 보내며 사진 받기와 내장 도구 선언도 그대로 본다. 외부 호출은
- * 트랜잭션 안에서 한다. 순서와 실패 처리는 {@code docs/backend/connector-install.md} 가 갖는다.
+ * 트랜잭션 안에서 한다. 순서와 실패 처리는 {@code backend/docs/flow.md} 가 갖는다.
  *
  * <p>{@link #reinstall}, {@link #detach}, {@link #resync} 는 연결 서비스가 자기 트랜잭션 안에서 부르는 단계다. 프록시를
  * 거쳐 부르므로 public 으로 둔다.

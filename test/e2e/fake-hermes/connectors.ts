@@ -119,7 +119,7 @@ export function createBindings(state: FakeHermesState) {
   };
 
   /**
-   * `PUT /api/connectors` 의 바인딩 설치와 그 떼기다. 받는 조건과 바꾸는 것은 `docs/backend/connector-install.md` 의
+   * `PUT /api/connectors` 의 바인딩 설치와 그 떼기다. 받는 조건과 바꾸는 것은 `backend/docs/flow.md` 의
    * 「바인딩 설치」 를 따른다.
    *
    * <p>붙이기는 보관 파일의 값을 그 profile 의 `.env` 에 쓰고 서버 이름을 API 도구 목록에 더한다. 있던 이름은 그대로 둔다.

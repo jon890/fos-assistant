@@ -18,8 +18,8 @@ import java.util.stream.Collectors;
 import org.springframework.stereotype.Component;
 
 /**
- * 검사를 마친 살펴보기 결과를 대화에 남길 Markdown 글 하나로 그린다. 모양은 {@code docs/backend/proactive-check.md} 의
- * 「그리기」 가 갖는다.
+ * 검사를 마친 살펴보기 결과를 대화에 남길 Markdown 글 하나로 그린다. 틀과 이스케이프할 글자는 이 클래스가 갖고, 「새로 알릴
+ * 것」 이 없을 때 그리지 않는 절은 ADR-081 이 정한다.
  *
  * <p>모델이 쓴 글은 신뢰하지 않는다. 글은 모두 한 줄로 합치고 Markdown 문법 글자를 이스케이프해 링크나 이미지, 제목,
  * 목록이 되지 못하게 한다. 링크는 검사를 통과한 원문 주소 하나로만 만들고, 「참고」 로 내린 발견의 주소는 그리지 않는다.

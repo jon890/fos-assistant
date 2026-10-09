@@ -2,12 +2,19 @@ import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";
-import { join } from "node:path";
+import { join, posix } from "node:path";
 import test from "node:test";
+import { headingTexts, normalizeHeading, sectionNames } from "./markdown.ts";
 
 const REPO_ROOT = join(import.meta.dirname, "../../");
 
-const SELF = "test/unit/doc-references.test.ts";
+/** 문서 경로를 예시 문자열로만 쓰는 시험 파일이다. 그 경로는 실제 문서를 가리키지 않는다. */
+const PATH_FIXTURE_FILES = new Set([
+  "test/unit/doc-references.test.ts",
+  "test/unit/doc-files.test.ts",
+  "test/unit/file-length.test.ts",
+  "test/unit/doc-code-references.test.ts",
+]);
 
 const CODE_EXTENSIONS = [
   ".java",
@@ -26,11 +33,18 @@ const CODE_EXTENSIONS = [
 ];
 
 /**
- * 문서 경로(`docs/…`)와 루트, 하위의 `AGENTS.md`, `hermes/README.md` 다. 뒤에 절 이름 「…」 이 바로 올 수 있다.
- * 경로 문자 클래스가 ASCII 만 받아 한글 파일 이름(ADR 경로 등)은 검사에서 빠진다.
+ * 문서 경로(루트와 모듈의 `docs/…`)와 루트, 모듈의 `AGENTS.md`, `hermes/` 아래의 `README.md` 다.
+ * 뒤에 절 이름 「…」 이 바로 올 수 있다. 경로에 한글이 들어가도 읽는다.
+ * 왼쪽 경계가 있어 `backend/docs/flow.md` 를 루트 `docs/flow.md` 로 읽지 않는다. `../docs/…` 의 `../` 는 경계로 본다.
  */
 const REFERENCE =
-  /(docs\/[A-Za-z0-9_./-]+\.md|(?:backend\/|web\/)?AGENTS\.md|hermes\/README\.md)(?:[`})]{0,2} ?(?:의)? ?「([^」]+)」)?/g;
+  /(?<![\w.-]|[\w-]\/)((?:(?:backend|web|hermes)\/)?docs\/[^\s`'"()[\]{}<>」,]+?\.md|(?:(?:backend|web|hermes)\/)?AGENTS\.md|hermes\/(?:[\w.-]+\/)*README\.md)(?:[`})]{0,2} ?(?:의)? ?「([^」]+)」)?/g;
+
+/** 첫 절 뒤에 쉼표나 「와」, 「과」 로 이어 적은 절이다. */
+const MORE_SECTION = /^\s*(?:,|와|과|및)\s*「([^」]+)」/;
+
+/** Markdown 링크의 대상 앞부분이다. 링크 안의 경로는 그 파일 자리 기준으로 푼다. */
+const LINK_PREFIX = /\]\(((?:\.\.\/)*)$/;
 
 export interface DocReference {
   /** 저장소 root 기준 경로다. */
@@ -41,29 +55,34 @@ export interface DocReference {
   line: number;
 }
 
-/** 헤딩과 절 이름을 같은 모양으로 맞춘다. `{@code X}` 는 `X` 로 바꾸고 백틱과 앞뒤 공백을 지운다. */
-export function normalizeHeading(text: string): string {
-  return text
-    .replace(/\{@code ([^}]*)\}/g, "$1")
-    .replaceAll("`", "")
-    .trim();
-}
-
-/** 텍스트에서 문서 경로와 그 바로 뒤의 절 이름을 찾는다. 줄을 넘어 떨어진 「」 는 잡지 않는다. */
-export function findDocReferences(text: string): DocReference[] {
+/**
+ * 텍스트에서 문서 경로와 그 바로 뒤의 절 이름을 찾는다. 줄을 넘어 떨어진 「」 는 잡지 않는다.
+ * Markdown 링크 대상은 `file` 의 자리 기준으로, 그 밖의 경로는 저장소 root 기준으로 읽는다.
+ */
+export function findDocReferences(text: string, file = "README.md"): DocReference[] {
   const found: DocReference[] = [];
   text.split("\n").forEach((lineText, index) => {
     for (const match of lineText.matchAll(REFERENCE)) {
-      const path = match[1];
-      if (path.includes("NNN")) continue;
+      const link = LINK_PREFIX.exec(lineText.slice(0, match.index));
+      const path = link
+        ? posix.normalize(posix.join(posix.dirname(file), link[1] + match[1]))
+        : match[1];
+      if (path.includes("NNN") || path.includes("%")) continue;
       found.push({ path, section: match[2], line: index + 1 });
+      if (match[2] === undefined) continue;
+      // 「A」, 「B」 와 「C」 처럼 이어 적은 절도 같은 문서의 절로 읽는다
+      let rest = lineText.slice((match.index ?? 0) + match[0].length);
+      for (let more = MORE_SECTION.exec(rest); more; more = MORE_SECTION.exec(rest)) {
+        found.push({ path, section: more[1], line: index + 1 });
+        rest = rest.slice(more[0].length);
+      }
     }
   });
   return found;
 }
 
 function gitLsFiles(args: string[]): string {
-  return execFileSync("git", ["ls-files", ...args], {
+  return execFileSync("git", ["ls-files", "-z", ...args], {
     cwd: REPO_ROOT,
     encoding: "utf8",
     maxBuffer: 64 * 1024 * 1024,
@@ -74,13 +93,13 @@ function gitLsFiles(args: string[]): string {
 function targetFiles(): string[] {
   const output = gitLsFiles(["-s"]);
   const files: string[] = [];
-  for (const row of output.split("\n")) {
+  for (const row of output.split("\0")) {
     const match = /^(\d+) \S+ \d+\t(.+)$/.exec(row);
     if (!match) continue;
     const [, mode, file] = match;
     if (mode === "120000") continue;
-    if (file === SELF) continue;
-    if (file.startsWith("docs/") || file.startsWith("tasks/")) continue;
+    if (PATH_FIXTURE_FILES.has(file)) continue;
+    if (/(^|\/)docs\//.test(file) || file.startsWith("tasks/")) continue;
     if (file.startsWith("backend/src/main/resources/db/migration/")) continue;
     const isCode = CODE_EXTENSIONS.some((extension) => file.endsWith(extension));
     const isOutsideDocsMarkdown = file.endsWith(".md");
@@ -95,33 +114,17 @@ async function collectReferences(): Promise<
   const all: Array<DocReference & { file: string }> = [];
   for (const file of targetFiles()) {
     const text = await readFile(join(REPO_ROOT, file), "utf8");
-    for (const reference of findDocReferences(text)) {
+    for (const reference of findDocReferences(text, file)) {
       all.push({ ...reference, file });
     }
   }
   return all;
 }
 
-/** 코드 펜스 밖의 `#` 부터 `######` 까지 모든 헤딩의 글을 나온 순서대로 모은다. */
-function headingTexts(markdown: string): string[] {
-  const headings: string[] = [];
-  let inFence = false;
-  for (const line of markdown.split("\n")) {
-    if (/^\s*(```|~~~)/.test(line)) {
-      inFence = !inFence;
-      continue;
-    }
-    if (inFence) continue;
-    const match = /^#{1,6}\s+(.*)$/.exec(line);
-    if (match) headings.push(match[1].trim());
-  }
-  return headings;
-}
-
-/** 코드 펜스 밖의 `#` 부터 `######` 까지 모든 헤딩을 정규화해 모은다. */
+/** 그 문서에서 「」 로 가리킬 수 있는 절 이름을 모은다. 헤딩과 굵은 항목 이름이다. */
 async function headingsOf(path: string): Promise<Set<string>> {
   const text = await readFile(join(REPO_ROOT, path), "utf8");
-  return new Set(headingTexts(text).map(normalizeHeading));
+  return sectionNames(text);
 }
 
 /** 한 문서에서 두 번 이상 나오는 헤딩의 글을 처음 나온 순서대로 한 번씩 낸다. */
@@ -136,9 +139,9 @@ export function duplicateHeadings(markdown: string): string[] {
 /** 같은 헤딩이 되풀이되면 안 되는 문서 디렉터리다. 하위 디렉터리는 따로 적는다. */
 const UNIQUE_HEADING_DIRECTORIES = [
   "docs",
-  "docs/backend",
-  "docs/backend/schema",
-  "docs/frontend",
+  "backend/docs",
+  "web/docs",
+  "hermes/docs",
 ];
 
 test("코드와 프롬프트가 가리키는 문서 파일이 있다", async () => {
@@ -180,6 +183,7 @@ test("{@code} 로 감싼 경로에서 경로와 절 이름을 얻는다", () => 
 test("링크 뒤의 절 이름은 정규화하면 백틱이 없다", () => {
   const [reference] = findDocReferences(
     "[x](../docs/code-architecture.md) 의 「Hermes 쪽 코드 (`hermes/`)」",
+    "web/AGENTS.md",
   );
   assert.equal(reference.path, "docs/code-architecture.md");
   assert.equal(
@@ -213,11 +217,38 @@ test("AGENTS.md 는 하위 경로와 절 이름까지 읽는다", () => {
   assert.equal(reference.section, "패키지 배치");
 });
 
+test("쉼표와 「와」 로 이어 적은 절도 같은 문서의 절로 읽는다", () => {
+  const sections = findDocReferences("{@code docs/flow.md} 의 「작업」, 「시각」, 「API」 와 「알림」 이 갖는다").map(
+    (reference) => reference.section,
+  );
+  assert.deepEqual(sections, ["작업", "시각", "API", "알림"]);
+});
+
+test("모듈의 docs 경로를 루트 docs 로 읽지 않는다", () => {
+  const [reference] = findDocReferences("{@code backend/docs/flow.md} 「예약 작업」");
+  assert.equal(reference.path, "backend/docs/flow.md");
+  assert.equal(reference.section, "예약 작업");
+});
+
+test("Markdown 링크는 그 파일 자리 기준으로 풀고 한글 파일 이름도 읽는다", () => {
+  const [reference] = findDocReferences(
+    "[ADR-011](docs/adr/ADR-011-실행은-시작할-때-기록한다.md)",
+    "backend/AGENTS.md",
+  );
+  assert.equal(reference.path, "backend/docs/adr/ADR-011-실행은-시작할-때-기록한다.md");
+});
+
+test("hermes 아래 디렉터리의 README.md 도 읽는다", () => {
+  const [reference] = findDocReferences("`hermes/connectors/gmail/README.md` 의 「설정 안내」");
+  assert.equal(reference.path, "hermes/connectors/gmail/README.md");
+  assert.equal(reference.section, "설정 안내");
+});
+
 test("한 문서 안에 같은 헤딩이 두 번 나오지 않는다", async () => {
   const problems: string[] = [];
   for (const directory of UNIQUE_HEADING_DIRECTORIES) {
     const files = gitLsFiles([`${directory}/*.md`])
-      .split("\n")
+      .split("\0")
       .filter((file) => file !== "" && file.split("/").length === directory.split("/").length + 1);
     for (const file of files) {
       const text = await readFile(join(REPO_ROOT, file), "utf8");

@@ -49,7 +49,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
 /**
- * 파일 공간 경로가 HTTP 경계에서 돌려주는 상태 코드와 머리글을 본다. 계약은 {@code docs/code-architecture.md} 의 「실행 공간 파일」 이다.
+ * 파일 공간 경로가 HTTP 경계에서 돌려주는 상태 코드와 머리글을 본다. 계약은 {@code backend/docs/code-architecture.md} 의 「실행 공간 파일」 이다.
  *
  * <p>요청자는 인증 필터가 채우는 것과 같은 보안 문맥으로 넣는다. 실행 공간 루트는 임시 디렉터리다.
  */

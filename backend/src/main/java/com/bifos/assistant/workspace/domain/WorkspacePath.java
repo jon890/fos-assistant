@@ -8,7 +8,7 @@ import java.util.List;
 /**
  * 주인 디렉터리 안의 상대 경로다. 빈 조각 목록은 주인 디렉터리 자체다.
  *
- * <p>거절 규칙은 {@code docs/code-architecture.md} 의 「경로 규칙」 이 갖는다. 만들 때 검사하므로 이 값은 늘 규칙을 지킨다.
+ * <p>거절 규칙은 {@code backend/docs/code-architecture.md} 의 「경로 규칙」 이 갖는다. 만들 때 검사하므로 이 값은 늘 규칙을 지킨다.
  * 이 값은 주인을 정하지 않는다. 주인 디렉터리는 요청자로만 정한다.
  */
 public record WorkspacePath(List<String> segments) {

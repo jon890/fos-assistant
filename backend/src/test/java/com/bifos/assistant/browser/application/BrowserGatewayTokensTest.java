@@ -17,7 +17,7 @@ import javax.crypto.spec.SecretKeySpec;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
-/** 중계 접근 표식의 모양, 서명, 만료를 본다. 규칙은 {@code docs/backend/user-browser.md} 의 「접근 표식」 이다. */
+/** 중계 접근 표식의 모양, 서명, 만료를 본다. 규칙은 ADR-20261008 / browser-gateway-token 의 「결정」 이다. */
 class BrowserGatewayTokensTest {
 
     private static final String BASE = "http://control-plane.example.test/internal/browser-gateway";

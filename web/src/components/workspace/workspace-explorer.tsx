@@ -129,7 +129,7 @@ type DeleteTarget = {
   running: boolean;
 };
 
-/** 지우기 실패의 안내다. 문구는 `docs/frontend/structure.md` 의 「파일 공간」 이 갖는다. 오류 코드는 그리지 않는다. */
+/** 지우기 실패의 안내다. 문구는 `web/docs/prd.md` 의 「파일 공간」 이 갖는다. 오류 코드는 그리지 않는다. */
 const DELETE_FAILURES: Record<number, string> = {
   404: "찾을 수 없어요. 지워졌을 수 있어요.",
   409: "항목이 너무 많아 지우지 않았어요. 안쪽 폴더부터 지워 주세요.",

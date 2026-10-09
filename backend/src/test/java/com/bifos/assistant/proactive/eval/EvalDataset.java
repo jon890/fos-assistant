@@ -16,7 +16,7 @@ import tools.jackson.databind.DeserializationFeature;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
- * 판단 평가 시나리오 묶음이다. 칸의 뜻은 {@code docs/backend/proactive-eval.md} 의 「fixture」 가 갖는다. 모든 값은 합성이다.
+ * 판단 평가 시나리오 묶음이다. 칸의 뜻은 {@code backend/docs/flow.md} 의 「fixture」 가 갖는다. 모든 값은 합성이다.
  *
  * @param note fixture 의 안내 글
  * @param providers 판단 기록을 가진 provider 의 흉내 비용과 지연

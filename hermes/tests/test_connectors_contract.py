@@ -1,4 +1,4 @@
-"""`hermes/connectors/` 아래의 모든 커넥터가 `docs/connector-authoring.md` 「공통 검사」 를 지키는지 본다(ADR-064).
+"""`hermes/connectors/` 아래의 모든 커넥터가 `hermes/connectors/README.md` 「공통 검사」 를 지키는지 본다(ADR-064).
 
 커넥터 목록을 코드에 적지 않는다. 디렉터리를 찾아 돌므로 커넥터를 더하면 검사 대상이 된다.
 서버는 자식으로 띄우되 `initialize` 와 `tools/list` 만 부른다. 외부 서비스를 부르지 않는다.
@@ -171,7 +171,7 @@ def check_connector(root: pathlib.Path, repo: pathlib.Path, load_connector) -> l
     if not any(skills_dir.glob("*/SKILL.md")):
         problems.append("스킬이 없다: %s" % skills_dir)
 
-    for needed in ("hermes/connectors/%s/tests/%s.test.ts" % (name, name), "docs/connectors/%s.md" % name):
+    for needed in ("hermes/connectors/%s/tests/%s.test.ts" % (name, name), "hermes/connectors/%s/README.md" % name):
         if not (repo / needed).is_file():
             problems.append("파일이 없다: %s" % needed)
     owners = repo / ".github/CODEOWNERS"

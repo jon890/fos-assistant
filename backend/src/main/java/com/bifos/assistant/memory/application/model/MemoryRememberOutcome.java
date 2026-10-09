@@ -1,6 +1,6 @@
 package com.bifos.assistant.memory.application.model;
 
-/** {@code memory_remember} 한 번의 결과다. 도구 결과 글은 {@code docs/backend/memory.md} 의 표가 갖는다(ADR-20261007 / memory-remember). */
+/** {@code memory_remember} 한 번의 결과다. 도구 결과 글은 {@code McpMemoryRemember} 가 갖는다(ADR-20261007 / memory-remember). */
 public enum MemoryRememberOutcome {
     /** 바로 저장해 새 항목을 만들었다. */
     REMEMBERED,

@@ -7,7 +7,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /**
- * 규칙은 {@code docs/hermes/connector-policy.md} 의 「MCP 도구의 등록 이름」 이다. 대시보드 plugin 의 계산과 같은 값을
+ * 규칙은 {@code hermes/docs/hermes-contract.md} 의 「MCP 도구의 등록 이름」 이다. 대시보드 plugin 의 계산과 같은 값을
  * 내야 하므로 {@code hermes/tests/test_connector_manifest.py} 와 같은 입력을 쓴다.
  */
 class HermesToolNameTest {

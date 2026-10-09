@@ -93,7 +93,7 @@ public class ConnectorConnection {
     /**
      * 보관 파일의 이름이다. 연결 번호 앞에 {@code c} 를 붙인다. 저장한 뒤에만 부른다.
      *
-     * <p>형식은 {@code docs/backend/connector-install.md} 의 「보관 파일」 이 갖는다.
+     * <p>형식은 {@code backend/docs/flow.md} 의 「보관 파일」 이 갖는다.
      */
     public String vault() {
         return "c" + id;

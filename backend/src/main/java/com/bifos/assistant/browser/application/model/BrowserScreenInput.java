@@ -6,7 +6,11 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.Map;
 
-/** 화면에 보내는 입력 하나다. 모양은 {@code docs/backend/user-browser.md} 의 「로그인 화면」 이 정하고, 받는 쪽이 이미 검사했다. */
+/**
+ * 화면에 보내는 입력 하나다. 종류는 {@link Kind} 가, 받는 특수 키는 {@link #KEYS} 가 갖는다.
+ *
+ * <p>칸과 범위는 받는 쪽({@code UserBrowserDtos.ScreenInputRequest})이 이미 검사했다.
+ */
 public record BrowserScreenInput(
         Kind kind,
         String action,

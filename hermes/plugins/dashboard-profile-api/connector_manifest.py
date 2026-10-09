@@ -148,7 +148,7 @@ def _appearance_or_none(connector_id: str, name: str, read):
 def _load_connector(connector_id: str, entry: dict) -> dict:
     """plugin 디렉터리의 `connector.json`, `.mcp.json`, `plugin.json` 을 읽어 검증한다. 틀리면 예외다.
 
-    형식 규칙은 `docs/connectors.md` 의 「connector.json」 이 소유한다(ADR-043).
+    형식 규칙은 `hermes/connectors/README.md` 의 「connector.json」 이 소유한다(ADR-043).
     """
     root = entry["root"]
     if not CONNECTOR_ID_RE.match(connector_id):

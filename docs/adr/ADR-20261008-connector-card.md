@@ -1,8 +1,8 @@
-## ADR-20261008: 커넥터 아이콘은 plugin 안의 파일을 카탈로그에 실어 같은 출처의 이미지로만 그리고, 링크는 https 만 받는다
+## ADR-20261008 / connector-card: 커넥터 아이콘은 plugin 안의 파일을 카탈로그에 실어 같은 출처의 이미지로만 그리고, 링크는 https 만 받는다
 
 - **status**: `accepted`
 - Date: 2026-10-08
-- [ADR-043](ADR-043-커넥터는-plugin-의-connector-json-으로-선언하고-control-plane-은-범용-흐름만-갖는다.md) 의 `connector.json` 에 화면용 선택 칸 둘을 더한다.
+- [ADR-043](../../backend/docs/adr/ADR-043-커넥터는-plugin-의-connector-json-으로-선언하고-control-plane-은-범용-흐름만-갖는다.md) 의 `connector.json` 에 화면용 선택 칸 둘을 더한다.
 
 ### 결정
 

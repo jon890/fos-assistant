@@ -1,4 +1,4 @@
-## ADR-20261009: 실행 공간 파일은 Control Plane 이 읽기 전용으로 붙여 주인에게만 보이고, 지우기는 운영의 권한 도우미에 맡긴다
+## ADR-20261009 / workspace-explorer: 실행 공간 파일은 Control Plane 이 읽기 전용으로 붙여 주인에게만 보이고, 지우기는 운영의 권한 도우미에 맡긴다
 
 - **status**: `accepted`
 - Date: 2026-10-09

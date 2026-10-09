@@ -66,7 +66,7 @@ def _policy_plugin_enabled(config: dict) -> bool:
 def _policy_hook_active(profile_dir: pathlib.Path, config: dict, state: dict) -> bool:
     """그 profile 에서 커넥터 도구 호출이 정책 hook 을 거치는지 본다. 읽다가 예외가 나면 거짓이다.
 
-    조건은 `docs/backend/connector-tool-policy.md` 의 「hook 이 켜져 있는지」 가 갖는다. 확인한 시점의 파일만 본다.
+    조건은 `backend/docs/flow.md` 의 「hook 이 켜져 있는지」 가 갖는다. 확인한 시점의 파일만 본다.
     """
     try:
         if not _policy_plugin_enabled(config):

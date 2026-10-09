@@ -2,14 +2,14 @@
 
 - **status**: `accepted`
 - Date: 2026-09-18
-- [ADR-016](ADR-016-다중-에이전트-조율은-control-plane이-맡는다.md) 의 조율 주체를 바꾼다.
+- [ADR-016](../../backend/docs/adr/archive/ADR-016-다중-에이전트-조율은-control-plane이-맡는다.md) 의 조율 주체를 바꾼다.
   경계에 대한 결정은 그대로 둔다.
-- **대체된 부분**: 결과를 모델이 `agent_status` 로 다시 묻는다는 부분은 [ADR-040](ADR-040-위임-결과는-control-plane-이-부모-대화의-다음-turn-을-열어-전한다.md) 이 대체했다. 끝난 결과는 Control Plane 이 부모 대화의 다음 turn 을 열어 전한다.
-- **대체된 부분**: 「도구 넷과 한도」 의 「요청자는 MCP 토큰이」 는 [ADR-032](ADR-032-mcp-토큰은-profile-을-증명하고-실제-사용자는-부모-실행에서-정한다.md) 이 대체했다. 요청자는 서명한 루트 session 으로 찾은 부모 실행의 사용자다.
+- **대체된 부분**: 결과를 모델이 `agent_status` 로 다시 묻는다는 부분은 [ADR-040](../../backend/docs/adr/ADR-040-위임-결과는-control-plane-이-부모-대화의-다음-turn-을-열어-전한다.md) 이 대체했다. 끝난 결과는 Control Plane 이 부모 대화의 다음 turn 을 열어 전한다.
+- **대체된 부분**: 「도구 넷과 한도」 의 「요청자는 MCP 토큰이」 는 [ADR-032](../../backend/docs/adr/ADR-032-mcp-토큰은-profile-을-증명하고-실제-사용자는-부모-실행에서-정한다.md) 이 대체했다. 요청자는 서명한 루트 session 으로 찾은 부모 실행의 사용자다.
 - 2026-09-20 에 실측으로 이 문서의 `agent_delegate` 모양을 고쳤다.
   기다리는 도구에서 번호를 돌려주는 도구로 바꾼 것이다.
   같은 측정에서 ADR-016 의 사실 둘이 이 버전에서 틀린 것도 드러났다.
-  자세한 것은 [`hermes/delegation.md`](../hermes/delegation.md) 가 갖는다.
+  자세한 것은 [`hermes/docs/hermes-contract.md`](../../hermes/docs/hermes-contract.md) 가 갖는다.
 - 2026-09-30 에 「도구 넷과 한도」 의 `agent_status` 범위를 실행 트리에서 같은 대화로 넓혔다.
 
 ### 결정
@@ -127,19 +127,19 @@ Chief 가 번호를 받아 두고 다른 일을 하다가 다시 묻는다.
 그 profile 로 지금 도는 실행이 여럿이면 어느 것인지 가릴 수 없다.
 
 그래서 부모를 잇는 값을 Control Plane 이 따로 만들어야 한다.
-그 방법은 [ADR-031](ADR-031-mcp-호출의-부모-실행은-profile-플러그인이-서명한-루트-session-으로-잇는다.md) 이 정했다(2026-09-29).
+그 방법은 [ADR-031](../../backend/docs/adr/ADR-031-mcp-호출의-부모-실행은-profile-플러그인이-서명한-루트-session-으로-잇는다.md) 이 정했다(2026-09-29).
 profile 플러그인의 hook 이 루트 session 과 `tool_call_id` 를 도구 인자에 넣고 MCP 토큰으로 서명하며, 서버는 그 루트 session 을 가진 도는 실행을 부모로 쓴다.
 
 ### 도구 넷과 한도 (2026-09-29)
 
 | 도구 | 받는 것 | 돌려주는 것 |
 | --- | --- | --- |
-| `agent_list` | 없음 | 요청자가 쓸 수 있고 켜진 에이전트의 `code` 와 이름. 한 줄 소개 칸은 [ADR-036](ADR-036-추천-질문은-사용자의-대화-이력으로-모델이-만들고-메모리에만-둔다.md) 에서 없앴다 |
+| `agent_list` | 없음 | 요청자가 쓸 수 있고 켜진 에이전트의 `code` 와 이름. 한 줄 소개 칸은 [ADR-036](../../backend/docs/adr/ADR-036-추천-질문은-사용자의-대화-이력으로-모델이-만들고-메모리에만-둔다.md) 에서 없앴다 |
 | `agent_delegate` | `agent_code`, `task` | 새 실행 번호와 `RUNNING`. 제출까지만 기다린다 |
 | `agent_status` | `execution_id` | `RUNNING`, `SUCCEEDED` 와 답, `FAILED` 와 오류 코드, `CANCELLED` 와 멈춘 자리까지의 답(있을 때만) |
 | `agent_stop` | `execution_id` | 그 실행의 상태. 이미 끝났으면 끝난 상태를 그대로 준다. 짧게 기다려도 `CANCELLED` 가 적히지 않으면 `RUNNING` 을 주고, 중지를 실제로 요청했으면 `stop_requested: true` 를 더한다 |
 
-- profile, 사용자, 부모와 루트 번호를 인자로 받지 않는다. 요청자는 서명한 루트 session 으로 찾은 부모 실행의 사용자이고, 부모도 그 실행이다([ADR-032](ADR-032-mcp-토큰은-profile-을-증명하고-실제-사용자는-부모-실행에서-정한다.md))
+- profile, 사용자, 부모와 루트 번호를 인자로 받지 않는다. 요청자는 서명한 루트 session 으로 찾은 부모 실행의 사용자이고, 부모도 그 실행이다([ADR-032](../../backend/docs/adr/ADR-032-mcp-토큰은-profile-을-증명하고-실제-사용자는-부모-실행에서-정한다.md))
 - 깊이는 실행 트리의 `parent_execution_id` 로 센다. 사용자가 부른 실행이 0 이고 기본 한도는 2 다
 - 한 루트 실행 아래에서 동시에 도는 위임 자식은 기본 4 개다. 둘 다 설정값이다
 - 남의 실행과 없는 실행, 물을 수 있는 범위 밖의 실행은 같은 응답을 받는다

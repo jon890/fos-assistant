@@ -25,7 +25,7 @@ import org.springframework.stereotype.Service;
 /**
  * 사용자 turn 의 첫 반응 시간을 날짜와 모델 단계별 중앙값과 90번째 백분위로 집계한다.
  *
- * <p>세는 turn 의 기준은 {@code docs/model-tiers.md} 의 「첫 반응 시간」 이 갖는다. 백분위는 데이터베이스가 아니라 여기서 구한다.
+ * <p>세는 turn 의 기준은 {@code backend/docs/flow.md} 의 「첫 반응 시간」 이 갖는다. 백분위는 데이터베이스가 아니라 여기서 구한다.
  * MySQL 과 H2 가 함께 받는 백분위 함수가 없고, 한 사람이 30일 동안 보낸 turn 은 수천 건 이하라서다. nearest-rank 방식이라 값 n 개를
  * 오름차순으로 두면 p 백분위는 {@code ceil(p / 100 * n)} 번째 값이다.
  *

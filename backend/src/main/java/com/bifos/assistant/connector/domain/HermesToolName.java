@@ -7,7 +7,7 @@ import lombok.NoArgsConstructor;
 /**
  * Hermes 가 MCP 도구에 붙이는 등록 이름을 계산한다.
  *
- * <p>규칙은 {@code docs/hermes/connector-policy.md} 의 「MCP 도구의 등록 이름」 이 갖는다. 대시보드 plugin 이 이름
+ * <p>규칙은 {@code hermes/docs/hermes-contract.md} 의 「MCP 도구의 등록 이름」 이 갖는다. 대시보드 plugin 이 이름
  * 대응 파일을 만들 때 쓰는 계산과 같은 값을 내야 한다. hook 이 보낸 원래 도구 이름을 그대로 믿지 않고, 이 값이 hook 이
  * 받은 등록 이름과 같은지 견주는 데 쓴다(ADR-049).
  */

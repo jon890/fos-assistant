@@ -1,7 +1,7 @@
 /**
  * 실패한 turn 이 지금 화면의 실패 카드에 올라오고, 숨기고 되돌릴 수 있고, 같은 대화에서 다시 성공하면 내려가는지 본다.
  *
- * <p>계약은 `docs/backend/attention.md` 의 「API」 가 갖는다. 응답에 실행의 오류 코드가 실리지 않는 것과,
+ * <p>계약은 `backend/docs/flow.md` 의 「API(먼저 알리기와 지금 화면의 판정)」 가 갖는다. 응답에 실행의 오류 코드가 실리지 않는 것과,
  * 사이드바가 읽는 건수가 카드의 합과 같은 것도 함께 본다.
  */
 import { call, expect, expectStatus, step, type Scenario } from "../harness.ts";

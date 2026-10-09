@@ -38,7 +38,7 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
 /**
  * 지우기 경로가 주인과 경로를 요청자로 정하고, 도우미를 부르기 전에 거절할 것을 거절하는지 본다. 계약은
- * {@code docs/code-architecture.md} 의 「지우기」 다.
+ * {@code backend/docs/code-architecture.md} 의 「지우기」 다.
  *
  * <p>도우미는 받은 인자를 기록하는 가짜다. 실행 공간 루트는 임시 디렉터리다.
  */

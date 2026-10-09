@@ -2,7 +2,7 @@
 
 `127.0.0.1` 의 임시 포트를 열어 Google 이 돌려주는 코드를 받고 토큰으로 바꾼다.
 refresh token 만 표준 출력에 낸다. 안내하는 글은 표준 오류로 낸다. 값을 파일에 쓰지 않는다.
-쓰는 방법은 `docs/connectors/gmail.md` 의 「설정 안내」 가 갖는다.
+쓰는 방법은 `hermes/connectors/gmail/README.md` 의 「설정 안내」 가 갖는다.
 """
 
 import base64

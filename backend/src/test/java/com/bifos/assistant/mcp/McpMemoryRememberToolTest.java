@@ -57,7 +57,7 @@ import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.node.ObjectNode;
 
 /**
- * 실제 HTTP 경계에서 {@code memory_remember} 의 계약을 확인한다. 계약은 {@code docs/backend/memory.md} 의 「에이전트가 기억을
+ * 실제 HTTP 경계에서 {@code memory_remember} 의 계약을 확인한다. 계약은 {@code backend/docs/flow.md} 의 「에이전트가 기억을
  * 남기는 길」 이 갖는다(ADR-20261007 / memory-remember).
  *
  * <p>바로 저장은 사람이 보낸 turn 의 루트 실행이고, 부정 표지가 질문과 본문에 함께 있거나 함께 없고, 그 실행이 바깥 도구를 부르지
@@ -300,7 +300,7 @@ class McpMemoryRememberToolTest {
     @Test
     @DisplayName("붙은 커넥터의 READ 도구를 시작한 대화의 기억은 근거가 질문에 있어도 제안이다")
     void proposesAfterConnectorReadTool() throws Exception {
-        // docs/read-data-flow.md 의 RF-13 이다. 메일 본문의 숨은 지시가 사용자의 말을 근거로 내세워도 바로 저장되지 않는다.
+        // docs/flow.md 의 RF-13 이다. 메일 본문의 숨은 지시가 사용자의 말을 근거로 내세워도 바로 저장되지 않는다.
         askedInThisTurn();
         toolStarted("mcp__gmail__get_message");
 

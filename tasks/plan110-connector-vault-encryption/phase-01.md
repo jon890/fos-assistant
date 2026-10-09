@@ -11,7 +11,7 @@ key 는 대시보드 프로세스의 환경 변수가 가리키는 파일에서 
 
 ## 컨텍스트
 
-**근거 문서**: `docs/adr/ADR-20261008-data-encryption.md` 의 「위협 모델」, `docs/connectors.md` 의 토큰 저장, `hermes/README.md` 의 운영 값 표와 「커넥터」 절, `docs/privacy.md`
+**근거 문서**: `backend/docs/adr/ADR-20261008-data-encryption.md` 의 「위협 모델」, `docs/prd.md` 의 토큰 저장, `hermes/README.md` 의 운영 값 표와 「커넥터」 절, `docs/privacy.md`
 
 - 보관 파일 모듈은 `hermes/plugins/dashboard-profile-api/connector_vault.py` 다
   - `_vault_dir()`, `_vault_path(vault)`(이름은 `VAULT_ID_RE`, 링크 거절), `_read_vault(vault)`(없으면 None, 모양 `{"v": 1, "connector", "values"}` 을 엄격히 검사), `_write_vault(vault, connector, values)`(디렉터리 0700, 파일 0600, `_atomic_private_write`)
@@ -68,4 +68,4 @@ node scripts/check-file-length.mjs
 | `hermes/tests/test_dashboard_profile_api_connector_vault.py` | 수정 |
 | `hermes/README.md` | 수정 |
 | `docs/privacy.md` | 수정 |
-| `docs/adr/ADR-20261008-data-encryption.md` | 수정 |
+| `backend/docs/adr/ADR-20261008-data-encryption.md` | 수정 |

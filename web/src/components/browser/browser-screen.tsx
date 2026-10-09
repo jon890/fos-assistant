@@ -20,7 +20,7 @@ import { ScreenFrame } from "./screen-frame";
 const ENTER_DEDUP_MS = 100;
 
 /**
- * 내 브라우저의 지금 탭을 그리고 누르기, 끌기, 글자를 보낸다. 동작은 `docs/backend/user-browser.md` 의 「로그인 화면」 이 갖는다.
+ * 내 브라우저의 지금 탭을 그리고 누르기, 끌기, 글자를 보낸다. 동작은 `backend/docs/flow.md` 의 「로그인 화면」 이 갖는다.
  * 입력 내용은 로그에 남기지 않는다.
  */
 export function BrowserScreen({

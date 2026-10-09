@@ -2,7 +2,14 @@
 
 화면이다. Next.js 와 Tailwind 를 쓴다.
 
-화면 문서는 [`../docs/README.md`](../docs/README.md) 의 frontend 표에 있다.
+화면 문서는 이 모듈의 `docs/` 에 셋이 있다.
+
+| 문서 | 언제 보는지 |
+| --- | --- |
+| [`web/docs/prd.md`](docs/prd.md) | 화면마다 누구에게 보이는 것과 그리지 않는 것 |
+| [`web/docs/flow.md`](docs/flow.md) | 화면에서 하는 일마다 Control Plane 과 주고받는 순서 |
+| [`web/docs/code-architecture.md`](docs/code-architecture.md) | 화면 목록과 화면 틀, 부품을 두는 자리 |
+| [`web/docs/adr/INDEX.md`](docs/adr/INDEX.md) | 화면에 관한 결정 |
 
 ## 브라우저는 Control Plane 토큰을 갖지 않는다
 
@@ -21,7 +28,7 @@
 
 **강조 색(`primary`)은 주 단추, 지금 고른 것, 초점 테두리에만 쓴다.**
 링크와 숫자는 글자색으로, 상태는 의미 색(`success`, `warning`, `info`, `destructive`)으로 그린다.
-값과 쓰는 곳의 표는 [ADR-051](../docs/adr/ADR-051-화면-색은-새벽-보라로-바꾸고-강조-색은-누를-것과-고른-것과-초점에만-쓴다.md) 이 갖는다.
+값과 쓰는 곳의 표는 [ADR-051](docs/adr/ADR-051-화면-색은-새벽-보라로-바꾸고-강조-색은-누를-것과-고른-것과-초점에만-쓴다.md) 이 갖는다.
 
 - 색을 `#` 값이나 `bg-white`, `bg-black` 으로 적지 않는다. 토큰이 없으면 `globals.css` 에 더한다.
   토큰으로 바꿀 수 없는 곳만 `artifact-panel.tsx` 의 `bg-white` 처럼 그 줄 위에 까닭을 주석으로 남긴다
@@ -43,7 +50,7 @@ grep -rn 'style={{' web/src/
 
 **들어온 HTML 을 그대로 그리지 않는다.**
 `react-markdown` 의 기본값이 그렇고 그 기본값을 바꾸지 않는다.
-근거는 [ADR-009](../docs/adr/ADR-009-에이전트의-답은-신뢰하지-않는-글로-그린다.md) 에 있다.
+근거는 [ADR-009](docs/adr/ADR-009-에이전트의-답은-신뢰하지-않는-글로-그린다.md) 에 있다.
 
 ## 화면 문구
 
@@ -56,7 +63,7 @@ grep -rn 'style={{' web/src/
 - 사용자가 할 일은 사용자가 주어로 읽히게 쓴다. 「잠시 뒤 다시 보내 주세요.」. 「다시 보낸다」 는 비서가 스스로 하는 일로 읽힌다
 - 일반 사용자에게 보이는 오류는 할 일만 알린다. Hermes, profile, API key 같은 내부 원인은 로그와 관리 화면에 남긴다
 - 모델 이름, 토큰 수, 금액, 오류 코드, 에이전트 코드 같은 내부 값은 관리자 영역(`/admin` 아래)에서만 그린다. 그릴지는 `useAdminView()` 로 읽는다. 역할이 `ADMIN` 이어도 일반 화면에서는 거짓이다
-- 관리 동작과 관리자 전용 표시는 [`../docs/frontend/structure.md`](../docs/frontend/structure.md) 의 「관리자 영역」 절을 따른다
+- 관리 동작과 관리자 전용 표시는 [`web/docs/prd.md`](docs/prd.md) 의 「관리자 영역」 절을 따른다
 - 버튼과 제목은 명사구나 짧은 동사구로 쓰고 질문형 제목을 쓰지 않는다. 확인 창 제목은 예외다. 「토큰을 폐기할까요?」 처럼 묻는다
 
 화면에서 쓰는 말이다. docs 와 코드 식별자는 원래 이름을 그대로 쓴다.
@@ -71,7 +78,7 @@ grep -rn 'style={{' web/src/
 | 실행 트리 | 작업 과정 |
 | 하위 에이전트 | 도우미 |
 | 설정 지문 | 설정별 사용량. 비교는 「설정 차이」, 값은 「설정 구분값」 |
-| provider | 모델 제공사. 표시 규칙은 [`../docs/model-tiers.md`](../docs/model-tiers.md) 가 갖는다 |
+| provider | 모델 제공사. 표시 규칙은 [`backend/docs/flow.md`](../backend/docs/flow.md) 가 갖는다 |
 | Hermes API 주소 | 에이전트 연결 주소 |
 | credential 범위 | AI 계정 사용 범위 |
 | Hermes profile | profile (관리자 영역에서만) |
@@ -99,7 +106,7 @@ grep -rn 'style={{' web/src/
 ### 파일 길이
 
 파일 길이는 언어 공통 검사로 강제한다. 범위, 상한, 기준 목록과 갱신 방법은
-[`../docs/backend/quality.md`](../docs/backend/quality.md)의 「파일 길이 기준 목록」이 갖는다.
+[`backend/docs/code-architecture.md`](../backend/docs/code-architecture.md)의 「파일 길이 기준 목록」이 갖는다.
 함수 길이 경고는 ESLint가 계속 검사한다.
 
 ### 상대 경로 import 예외

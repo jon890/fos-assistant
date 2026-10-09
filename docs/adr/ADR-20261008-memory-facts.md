@@ -1,11 +1,11 @@
-## ADR-20261008: 짧은 개인 기억은 본문까지 「개인 사실 구역」에 싣고, 답마다 참고한 기억을 사용자에게 보인다
+## ADR-20261008 / memory-facts: 짧은 개인 기억은 본문까지 「개인 사실 구역」에 싣고, 답마다 참고한 기억을 사용자에게 보인다
 
 - **status**: `accepted`
 - Date: 2026-10-08
 - [ADR-20261007 / memory-remember](ADR-20261007-memory-remember.md) 의 「꺼내는 방식은 `SEARCH` 로 둔다. 다음 실행의 색인에 제목이 실리고 본문은 `memory_read` 로 읽는다」 를 개정한다.
   `memory_remember` 가 남기는 항목의 `retrieval` 은 그대로 `SEARCH` 다. 그 가운데 짧은 항목은 본문까지 실린다.
-  [ADR-015](ADR-015-memory-는-층을-나눠-싣는다.md) 의 「`SEARCH` 는 제목만 싣는다」 에 예외를 둔다. 층을 나눠 싣고 나머지는 도구로 읽는다는 결정은 그대로다.
-  [ADR-071](ADR-071-여러-출처의-문맥은-항목마다-출처와-권한과-신선도를-지닌-묶음으로-조립한다.md) 의 `source` 목록에 `MEMORY_FACTS` 와 `MEMORY_READ` 를 더한다.
+  [ADR-015](../../backend/docs/adr/ADR-015-memory-는-층을-나눠-싣는다.md) 의 「`SEARCH` 는 제목만 싣는다」 에 예외를 둔다. 층을 나눠 싣고 나머지는 도구로 읽는다는 결정은 그대로다.
+  [ADR-071](../../backend/docs/adr/ADR-071-여러-출처의-문맥은-항목마다-출처와-권한과-신선도를-지닌-묶음으로-조립한다.md) 의 `source` 목록에 `MEMORY_FACTS` 와 `MEMORY_READ` 를 더한다.
 
 ### 결정
 
@@ -36,7 +36,7 @@
 
 2026-10-08 사용자는 「자동으로 나를 기억하고 다음 대화에서 알고 있어 대화를 이어 가기 편해야 한다」 고 요구했다(#310).
 ADR-20261007 / memory-remember 로 대화에서 바로 저장하는 길은 열렸지만, 남긴 항목은 `SEARCH` 라 다음 대화에 **제목만** 실렸다.
-「딸 이름」 이라는 제목만 보고는 이름을 모른다. 모델이 `memory_read` 를 부르면 알지만, 부르지 않는 경우가 있고 부르면 API 콜이 늘어 입력 비용과 지연이 커진다([`backend/mcp-caller.md`](../backend/mcp-caller.md) 의 「입력 비용은 API 콜 수가 정한다」).
+「딸 이름」 이라는 제목만 보고는 이름을 모른다. 모델이 `memory_read` 를 부르면 알지만, 부르지 않는 경우가 있고 부르면 API 콜이 늘어 입력 비용과 지연이 커진다([`backend/docs/flow.md`](../../backend/docs/flow.md) 의 「입력 비용은 API 콜 수가 정한다」).
 본문을 매번 싣게 하려면 사용자가 `/memory` 에서 항상 싣기를 켜야 했다. 사용자가 원한 「화면에 가지 않고 대화에서 끝나는 흐름」 과 어긋난다.
 
 ADR-20261007 이 `SEARCH` 로 고정한 까닭은 에이전트가 많이 남겨도 실행마다 실리는 양이 늘지 않게 하는 것이었다.
@@ -69,9 +69,9 @@ ADR-20261007 이 `SEARCH` 로 고정한 까닭은 에이전트가 많이 남겨�
 - turn 당 입력이 최대 2,000자(한국어로 대략 1,000~1,500 토큰) 는다. 개인 사실 구역이 바뀌면 지시문 지문이 바뀌어 prompt cache 적중이 떨어진다.
 - 「참고한 기억」 은 실렸지만 답에 쓰지 않은 항목도 보인다. 문구로 그 차이를 밝힌다.
 - `memory_read` 로 읽은 항목은 Control Plane 이 읽기에 성공할 때 `execution_context_source` 에 `MEMORY_READ` 줄로 덧붙여 남긴다. Hermes 의 도구 시작 사건은 이 도구의 인자를 싣지 않아 사건에서는 번호를 알 수 없다. 이 기록이 실패하면 그 읽기는 「참고한 기억」 에서 빠진다.
-  [ADR-015](ADR-015-memory-는-층을-나눠-싣는다.md) 의 「어느 항목이 읽혔는지는 서버 로그에만 남기고 실행 기록 칸에는 남기지 않는다」 를 이 기록으로 넓힌다.
-- 예산과 길이 상한은 합성 측정과 운영 집계를 보고 고친다([`backend/memory-eval.md`](../backend/memory-eval.md)).
+  [ADR-015](../../backend/docs/adr/ADR-015-memory-는-층을-나눠-싣는다.md) 의 「어느 항목이 읽혔는지는 서버 로그에만 남기고 실행 기록 칸에는 남기지 않는다」 를 이 기록으로 넓힌다.
+- 예산과 길이 상한은 합성 측정과 운영 집계를 보고 고친다([`backend/docs/flow.md`](../../backend/docs/flow.md)).
 
 ### 적용 범위
 
-조립 규칙과 「참고한 기억」 API 는 [`backend/memory.md`](../backend/memory.md) 의 「범위와 조립」 과 「답마다 참고한 기억」 이, 화면은 [`frontend/chat.md`](../frontend/chat.md) 의 「참고한 기억」 이 갖는다.
+조립 규칙과 「참고한 기억」 API 는 [`backend/docs/flow.md`](../../backend/docs/flow.md) 의 「범위와 조립」 과 「답마다 참고한 기억」 이, 화면은 [`web/docs/prd.md`](../../web/docs/prd.md) 의 「참고한 기억」 이 갖는다.

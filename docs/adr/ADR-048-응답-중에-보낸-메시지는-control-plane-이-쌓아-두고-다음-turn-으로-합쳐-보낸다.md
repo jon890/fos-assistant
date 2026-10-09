@@ -2,7 +2,7 @@
 
 - **status**: `accepted`
 - Date: 2026-10-01
-- [ADR-040](ADR-040-위임-결과는-control-plane-이-부모-대화의-다음-turn-을-열어-전한다.md) 의 「turn 이 닫힐 때 다음 turn 을 연다」 자리를 함께 쓴다. ADR-040 의 결정은 그대로 둔다.
+- [ADR-040](../../backend/docs/adr/ADR-040-위임-결과는-control-plane-이-부모-대화의-다음-turn-을-열어-전한다.md) 의 「turn 이 닫힐 때 다음 turn 을 연다」 자리를 함께 쓴다. ADR-040 의 결정은 그대로 둔다.
 
 ### 결정
 
@@ -28,7 +28,7 @@
 화면이 Enter 와 보내기 단추를 막았고, 서버는 두 번째 turn 을 `CONVERSATION_BUSY` 로 거절하며 그 글을 저장하지 않았다.
 답이 길거나 도구를 여러 번 부르는 turn 에서는 사용자가 떠오른 말을 적어 두고 끝나기를 기다려야 했다.
 
-Hermes 에는 도는 실행에 지시를 더하는 `POST /v1/runs/{run_id}/steer` 가 있다([`hermes/runs-api.md`](../hermes/runs-api.md)).
+Hermes 에는 도는 실행에 지시를 더하는 `POST /v1/runs/{run_id}/steer` 가 있다([`hermes/docs/hermes-contract.md`](../../hermes/docs/hermes-contract.md)).
 그러나 steer 는 실행이 `running` 일 때만 받고, 실행이 먼저 끝나면 넣지 못한 글이 종료 상태의 `pending_steer` 로 돌아오며, 중지하면 버려진다.
 어느 경우에도 넣지 못한 글을 받아 둘 자리가 Control Plane 에 있어야 한다.
 그래서 대기열을 먼저 만들고 steer 는 그 위에 얹는다.

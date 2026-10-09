@@ -5,15 +5,15 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.validation.annotation.Validated;
 
 /**
- * 먼저 알리기 판정의 기준값이다. 뜻은 {@code docs/backend/attention.md} 의 「기준값」 이 갖는다.
+ * 먼저 알리기 판정의 기준값이다. 키는 {@code assistant.attention} 이다.
  *
- * <p>값이 없거나 0 이하면 기본값으로 둔다.
+ * <p>값이 없거나 0 이하면 기본값으로 둔다. 카드의 항목 상한을 넘어 빠진 항목은 카드의 {@code moreCount} 로 센다.
  *
  * @param failureWindow 실패한 turn 을 보이는 기간
  * @param delegatedWindow 끝난 위임을 보이는 기간
  * @param longRunningAfter 도는 위임이 {@code NOW} 가 되는 시간
  * @param dueSoon 기한이 이만큼 남으면 할 일이 {@code NOW} 가 된다
- * @param continueCount 이어서 하기 카드의 항목 상한
+ * @param continueCount 이어서 하기 카드의 항목 상한. 이 카드에서는 {@code maxItemsPerCard} 대신 쓴다
  * @param maxItemsPerCard 이어서 하기를 뺀 카드 하나의 항목 상한
  * @param snoozeMax 미루기 기한의 상한. 지금부터 이만큼 뒤까지만 받는다
  * @param eventRetention 지표 사건을 남기는 기간

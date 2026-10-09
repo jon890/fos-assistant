@@ -5,14 +5,14 @@ Control Plane 이다. Spring Boot 4 와 MySQL 8.4 를 쓴다.
 저장소 전체에 걸리는 규칙은 루트 [`AGENTS.md`](../AGENTS.md) 가 갖는다.
 공개 저장소에 무엇을 적지 않는지도 그 문서가 정한다.
 
-- 패키지와 경계: [`../docs/backend/packages.md`](../docs/backend/packages.md)
-- 표와 칸: [`../docs/backend/schema/README.md`](../docs/backend/schema/README.md)
-- Hermes 호출: [`../docs/hermes/README.md`](../docs/hermes/README.md)
-- 그 밖의 주제: [`../docs/README.md`](../docs/README.md) 의 backend 표
+- 패키지와 경계: [`backend/docs/code-architecture.md`](docs/code-architecture.md)
+- 기능의 흐름: [`backend/docs/flow.md`](docs/flow.md)
+- 표와 칸: [`backend/docs/data-schema.md`](docs/data-schema.md)
+- Hermes 호출: [`hermes/docs/hermes-contract.md`](../hermes/docs/hermes-contract.md)
 
 ## 패키지 배치
 
-층 방향은 [`../docs/backend/packages.md`](../docs/backend/packages.md) 가 갖는다.
+층 방향은 [`backend/docs/code-architecture.md`](docs/code-architecture.md) 가 갖는다.
 검사: `ArchitectureRules.LAYER_DIRECTION`
 
 ### 데이터 클래스는 컨트롤러 안에 두지 않는다
@@ -47,7 +47,7 @@ record 가 컨트롤러 안에 있으면 그 파일이 길어지고, 같은 모�
 구조 규칙, 코드 규칙, 포맷은 `./gradlew qualityCheck` 하나가 묶어 검사한다. 파일을 바꾸지 않는다.
 `scripts/quality.sh check` 끝의 「경고 목록(실패 아님)」 은 실패시키지 않지만 모두 고칠 후보다.
 
-기준 파일을 갱신하거나 규칙을 뺄 때는 [`../docs/backend/quality.md`](../docs/backend/quality.md) 를 읽는다.
+기준 파일을 갱신하거나 규칙을 뺄 때는 [`backend/docs/code-architecture.md`](docs/code-architecture.md) 를 읽는다.
 
 ## 구조 규칙
 
@@ -57,7 +57,7 @@ record 가 컨트롤러 안에 있으면 그 파일이 길어지고, 같은 모�
 
 규칙의 이름과 뜻은 `ArchitectureRules.java` 의 Javadoc 이 갖는다.
 순환과 층 순서 규칙이 위반을 세는 방식은 `TopLevelPackageCycles`, `TopLevelPackageOrder` 의 Javadoc 이 갖고,
-층 순서는 [`../docs/backend/packages.md`](../docs/backend/packages.md) 의 「최상위 패키지의 층 순서」 가 갖는다.
+층 순서는 [`backend/docs/code-architecture.md`](docs/code-architecture.md) 의 「최상위 패키지의 층 순서」 가 갖는다.
 
 ### enum 은 저장 여부로 둘 곳을 정한다
 
@@ -110,7 +110,7 @@ Javadoc 본문은 포맷하지 않는다. 한국어 Javadoc 의 줄바꿈이 바
 **기능 변경과 포맷은 다른 커밋으로 나눈다.**
 먼저 기능을 고쳐 커밋하고, 그 뒤 `./gradlew spotlessApply` 결과를 따로 커밋한다.
 한 커밋에 섞으면 리뷰에서 기능 변경이 포맷 변경에 묻힌다.
-선택 까닭은 [ADR-042](../docs/adr/ADR-042-코드-품질-규칙은-도구-설정이-갖고-기존-위반은-기준-파일에-둔다.md) 의 「대안 기각」 에 있다.
+선택 까닭은 [ADR-042](../docs/adr/ADR-042-코드-품질-규칙은-도구-설정이-갖고-기존-위반은-기준-파일에-둔다.md) 의 대안 기각 항목에 있다.
 
 ## 엔티티와 마이그레이션은 따로 논다
 
@@ -134,7 +134,7 @@ Javadoc 본문은 포맷하지 않는다. 한국어 Javadoc 의 줄바꿈이 바
 `V23__ConversationPublicId` 가 그 본보기다.
 
 H2 가 통과해도 MySQL 에서 실패할 수 있다. DDL 과 DML 을 나누는 규칙, 정렬 규칙, 실제 MySQL 검사는
-[`../docs/backend/schema/README.md`](../docs/backend/schema/README.md) 의 「마이그레이션 작성 규칙」 이 갖는다.
+[`backend/docs/data-schema.md`](docs/data-schema.md) 의 「마이그레이션 작성 규칙」 이 갖는다.
 실제 MySQL 검사는 Docker 가 있어야 돈다.
 
 ## 저장소 쿼리는 실제 MySQL 에서도 실행한다
@@ -150,7 +150,7 @@ H2 가 통과해도 MySQL 에서 실패할 수 있다. DDL 과 DML 을 나누는
 
 ## 실행 기록
 
-`agent_execution` 의 `RUNNING` 줄을 목록과 비용 합계에서 다루는 방법은 [ADR-011](../docs/adr/ADR-011-실행은-시작할-때-기록하고-끝날-때-갱신한다.md) 과 [ADR-004](../docs/adr/ADR-004-구독제에서도-api-가격으로-환산해-보인다.md) 가 갖는다.
+`agent_execution` 의 `RUNNING` 줄을 목록과 비용 합계에서 다루는 방법은 [ADR-011](docs/adr/ADR-011-실행은-시작할-때-기록하고-끝날-때-갱신한다.md) 과 [ADR-004](docs/adr/ADR-004-구독제에서도-api-가격으로-환산해-보인다.md) 가 갖는다.
 
 ## 테스트
 

@@ -1,7 +1,7 @@
 """Control Plane MCP 호출 인자에 run 맥락 `_fos_ctx` 를 덮어쓰고 HMAC 으로 서명한다.
 
 Control Plane 의 `agent_*` 도구는 이 값으로 부모 실행을 찾는다. 계약의 정본은 fos-assistant
-`docs/hermes/fos-ctx.md` 의 「`_fos_ctx` 계약」 이고, 이 파일은 그 계약을 그대로 따른다.
+`hermes/plugins/fos-ctx/README.md` 의 「`_fos_ctx` 계약」 이고, 이 파일은 그 계약을 그대로 따른다.
 
 - key 는 그 profile 의 MCP 토큰을 SHA-256 한 소문자 16진수 문자열의 UTF-8 바이트다.
   서버는 토큰 원문 대신 이 해시만 저장하므로 같은 key 를 갖는다.
@@ -35,7 +35,7 @@ hook 이 예외를 던지면 호출이 막힌다.
 
 profile 디렉터리에 이름 대응 파일 `.fos-connector-tools.json` 이 있으면 그 profile 에서는 커넥터 MCP 도구 호출마다
 Control Plane 에 묻고 답대로 한다(fos-assistant ADR-049, ADR-083).
-계약의 정본은 fos-assistant `docs/backend/connector-tool-policy.md` 의 「도구 호출 판정」 이고, 이 파일은 그 계약을 그대로 따른다.
+계약의 정본은 fos-assistant `backend/docs/flow.md` 의 「도구 호출 판정」 이고, 이 파일은 그 계약을 그대로 따른다.
 
 대응 파일의 `isolated` 칸이 profile 의 방식을 정한다. 칸이 없으면 참으로 읽는다.
 

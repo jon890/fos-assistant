@@ -11,7 +11,7 @@ import lombok.NoArgsConstructor;
  * 설정이 없어 실행 입력 앞머리에 이 단락을 붙여 대신한다.
  *
  * <p>에이전트에 스킬이 없거나 {@code skills} toolset 이 꺼져 있어도 붙인다. Hermes 기본 스킬만 있어도 색인
- * 안내문이 붙기 때문이다. 글은 {@code docs/backend/artifact.md} 의 「결과물 파일」 절 아래 「에이전트에게 알리는
+ * 안내문이 붙기 때문이다. 글은 {@code backend/docs/flow.md} 의 「결과물 파일」 절 아래 「에이전트에게 알리는
  * 법」 과 같아야 하고, 가짜 Hermes({@code test/e2e/fake-hermes.ts})의 머리글 상수와도 맞아야 한다.
  */
 @NoArgsConstructor(access = AccessLevel.PRIVATE)

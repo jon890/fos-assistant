@@ -4,7 +4,7 @@ import com.bifos.assistant.proactive.domain.type.CheckOutcome;
 import java.util.List;
 
 /**
- * 살펴보기 답 끝의 {@code <fos-check-result>} 블록을 읽은 결과다. 칸의 뜻과 상한은 {@code docs/backend/proactive-check.md} 의
+ * 살펴보기 답 끝의 {@code <fos-check-result>} 블록을 읽은 결과다. 칸의 뜻과 상한은 {@code backend/docs/flow.md} 의
  * 「결과 계약」 이 갖는다.
  *
  * <p>모델이 쓴 글이라 신뢰하지 않는다. 시각과 신선도는 글 그대로 두고 {@code FindingJudgement} 가 판정에서 읽는다.
@@ -44,7 +44,7 @@ public record CheckResultBlock(
     public record Next(String type, String text) {}
 
     /**
-     * 버전 3의 문제 후보 하나다. 칸의 뜻은 {@code docs/backend/proactive-check.md} 의 「문제 후보」 가 갖는다.
+     * 버전 3의 문제 후보 하나다. 칸의 뜻은 {@code backend/docs/flow.md} 의 「문제 후보」 가 갖는다.
      *
      * @param evidence 근거가 된 같은 블록 발견의 주제 키다
      */

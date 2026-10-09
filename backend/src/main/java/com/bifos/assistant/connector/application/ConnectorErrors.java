@@ -10,7 +10,7 @@ import lombok.NoArgsConstructor;
  * 커넥터 연결이 돌려주는 고정 오류다.
  *
  * <p>메시지는 고정 문장이다. 칸 이름, 칸 값, 원격 응답을 싣지 않는다. 공통 어휘와 오류 코드의 대응은
- * {@code docs/connectors.md} 의 표와 같다.
+ * {@code docs/prd.md} 의 표와 같다.
  */
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
 final class ConnectorErrors {

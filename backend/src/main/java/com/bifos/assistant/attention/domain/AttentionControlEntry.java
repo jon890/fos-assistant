@@ -22,7 +22,7 @@ import lombok.experimental.Accessors;
 /**
  * 사용자가 한 카드의 한 항목에 건 숨기기나 미루기 한 줄이다.
  *
- * <p>칸의 뜻은 {@code docs/backend/schema/attention.md} 의 「attention_control」 이 갖는다. 한 사용자의 한 카드의 한 항목에 한 줄이고,
+ * <p>칸의 뜻은 {@code backend/docs/data-schema.md} 의 「attention_control」 이 갖는다. 한 사용자의 한 카드의 한 항목에 한 줄이고,
  * 새 제어는 그 줄을 고친다. 같은 항목이 두 카드에 나와도 카드마다 줄이 따로라 서로 덮어쓰지 않는다. 판정에 넘기는 값
  * {@code AttentionControl} 과 이름이 겹치지 않게 {@code Entry} 를 붙였다.
  */

@@ -1,4 +1,4 @@
-## ADR-20261007: 사용자마다 브라우저 하나를 Control Plane 이 관리하고, 커넥터는 바인딩이 준 중계 주소로만 닿는다
+## ADR-20261007 / user-browser: 사용자마다 브라우저 하나를 Control Plane 이 관리하고, 커넥터는 바인딩이 준 중계 주소로만 닿는다
 
 - **status**: `accepted`
 - Date: 2026-10-07
@@ -40,7 +40,7 @@
 
 중계는 Control Plane 안에서 돈다. Hermes 가 닿는 내부 주소에서만 받는다.
 
-- 경로는 `/internal/browser-gateway/<접근 표식>/` 아래다. 접근 표식은 바인딩마다 다르고, 바인딩을 떼면 쓸 수 없다. 표식을 만드는 방법은 [ADR-20261008 / browser-gateway-token](ADR-20261008-browser-gateway-token.md) 이 바꿨다(처음에는 무작위 값과 해시 표였다)
+- 경로는 `/internal/browser-gateway/<접근 표식>/` 아래다. 접근 표식은 바인딩마다 다르고, 바인딩을 떼면 쓸 수 없다. 표식을 만드는 방법은 [ADR-20261008 / browser-gateway-token](../../backend/docs/adr/ADR-20261008-browser-gateway-token.md) 이 바꿨다(처음에는 무작위 값과 해시 표였다)
 - `/json/version` 과 `/json/list`, `/json/new`, `/json/close`, `/json/activate` 와 `/devtools/` 의 WebSocket 만 넘긴다. 응답의 WebSocket 주소는 중계 주소로 바꿔 쓴다
 - 브라우저가 멈춰 있으면 켠 뒤 넘긴다. 동시 수가 차 있으면 503 이다
 - Chrome 에는 컨테이너 IP 주소로 보낸다. Chrome 의 Host 검사를 중계가 지나므로 커넥터가 IP 주소만 받던 제약이 사라진다
@@ -117,4 +117,4 @@
   - QR 로그인은 세션 쿠키만 준다. 끌 때 컨테이너를 지우므로, 프로필에 써 둔 Chrome 의 「이전 세션 이어서 열기」 설정에 기대어 다음 기동으로 로그인을 잇는다.
   - 프로필 디렉터리의 위치, 이미지, 망, 자원 값, 동시 수는 운영 값이다. 운영 저장소가 proxy 정책과 함께 갖는다.
 
-- **적용 범위**: backend 의 새 기능 패키지 `browser`, 커넥터 바인딩 설치, 대시보드 plugin 의 manifest 검증과 바인딩 설치, `hermes/connectors/naver-blog/`, 웹의 「내 브라우저」 화면. 계약은 [사용자 브라우저](../backend/user-browser.md) 가 갖는다.
+- **적용 범위**: backend 의 새 기능 패키지 `browser`, 커넥터 바인딩 설치, 대시보드 plugin 의 manifest 검증과 바인딩 설치, `hermes/connectors/naver-blog/`, 웹의 「내 브라우저」 화면. 계약은 [사용자 브라우저](../../backend/docs/flow.md) 가 갖는다.
