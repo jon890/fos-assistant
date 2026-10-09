@@ -84,6 +84,19 @@ class ProfileApiSandboxPolicyTest(support.ProfileApiRouteTest):
             ("profile mount target is connector output root",
              self.sandbox_policy(connector_output_root=self.connector_output_root,
                                  profiles={"owner": {"read_only_mounts": ["/srv/x:" + self.connector_output_root]}})),
+            ("relative skill root", self.sandbox_policy(skill_root="host-skills")),
+            ("skill root under workspace root", self.sandbox_policy(skill_root=root + "/skills")),
+            ("skill root above attachment root",
+             self.sandbox_policy(skill_root=str(self.attachment_root.parent))),
+            ("skill root is connector output root",
+             self.sandbox_policy(connector_output_root=self.connector_output_root,
+                                 skill_root=self.connector_output_root)),
+            ("mount source under skill root",
+             self.sandbox_policy(skill_root=self.skill_host_root,
+                                 read_only_mounts=[self.skill_host_root + "/alice:/opt/x"])),
+            ("profile mount target under hermes skill root",
+             self.sandbox_policy(skill_root=self.skill_host_root,
+                                 profiles={"owner": {"read_only_mounts": ["/srv/x:%s/alice" % self.skill_root]}})),
             ("unknown top-level key", dict(self.sandbox_policy(), docker_extra_args=["--privileged"])),
         ]
         path = self.root / "owner/config.yaml"
@@ -109,6 +122,46 @@ class ProfileApiSandboxPolicyTest(support.ProfileApiRouteTest):
             str(self.sandbox_root) + "-other:/opt/other:ro",
             str(self.attachment_root) + "-other:/agent/attachments-other:ro",
         ])
+
+    def test_skill_root_policy_is_accepted(self):
+        """겹치지 않는 `skill_root` 가 든 정책은 받아 셸 저장을 실행 공간 설정으로 쓴다."""
+        self.set_sandbox_policy(self.sandbox_policy(skill_root=self.skill_host_root,
+                                                    connector_output_root=self.connector_output_root))
+
+        self.assertEqual(self.request("/api/config", "PUT", token="valid", body=self.file_body()), 200)
+        self.assertEqual(self.saved_config()["terminal"]["backend"], "docker")
+
+    def test_skill_root_needs_a_separate_hermes_skill_root(self):
+        """Hermes 쪽 스킬 루트가 없거나 예약 경로, 첨부 실행 경로와 겹치면 스킬 마운트의 대상을 정할 수 없어 거절한다."""
+        cases = [
+            ("missing", None),
+            ("relative", "skills"),
+            ("under workspace", "/workspace/skills"),
+            ("under root", "/root/.hermes/skills"),
+            ("under attachment agent root", self.attachment_agent_root + "/skills"),
+        ]
+        self.set_sandbox_policy(self.sandbox_policy(skill_root=self.skill_host_root))
+        path = self.root / "owner/config.yaml"
+        original = path.read_bytes()
+        for label, agent_root in cases:
+            with self.subTest(label=label):
+                if agent_root is None:
+                    os.environ.pop("FOS_ASSISTANT_SKILL_AGENT_ROOT", None)
+                else:
+                    os.environ["FOS_ASSISTANT_SKILL_AGENT_ROOT"] = agent_root
+                response = self.request("/api/config", "PUT", token="valid", body=self.file_body(), full_response=True)
+                self.assertEqual(response.status_code, 409)
+                self.assertEqual(response.body["code"], "sandbox_unavailable")
+                self.assertEqual(path.read_bytes(), original)
+
+    def test_policy_without_skill_root_keeps_mounts_over_the_hermes_skill_root(self):
+        """정책에 `skill_root` 가 없으면 Hermes 스킬 루트와 겹치는 운영 마운트도 지금처럼 받는다."""
+        mount = "/srv/x:%s/owner" % self.skill_root
+        self.set_sandbox_policy(self.sandbox_policy(profiles={"owner": {"read_only_mounts": [mount]}}))
+
+        self.assertEqual(self.request("/api/config", "PUT", token="valid", body=self.file_body()), 200)
+        self.assertEqual(self.saved_config()["terminal"]["docker_volumes"][2:], [
+            "/srv/shared:/opt/shared:ro", mount + ":ro"])
 
     def test_shell_toolset_needs_a_valid_sandbox_owner(self):
         """셸 도구를 켜는데 sandbox_owner 가 없거나 형식이 틀리면 400 이다."""
