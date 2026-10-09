@@ -9,27 +9,13 @@
   실행 입력에는 `agent-root` 를 적는다. 둘 다 기본값이 없어 하나라도 비면 기동을 멈춘다.
 - 저장 경로는 `{root}/users/{사용자 디렉터리 키}/{대화 번호}/{첨부 번호}.{확장자}` 다.
   사용자 디렉터리 키는 `u<사용자 번호>` 의 UTF-8 SHA-256 소문자 64자리다. 첨부 행의 올린 사용자를 따른다.
-- 실행 공간에는 신뢰한 `sandbox_owner` 에 대응하는 사용자 폴더 하나만 읽기 전용으로 붙인다.
-  `agent-root` 는 Hermes 정책의 `attachment_agent_root` 와 같아야 한다. 전체 첨부 루트를 공통 mount 에 넣지 않는다.
-- **사용자 폴더는 Control Plane 이 만든다.** 업로드 때 말고도, 실행 공간 설정을 쓰고 만들지 못하면 멈추는 세 Hermes 호출
-  (도구 저장 `writeApiServer`, 옛 커넥터를 켜는 `putConnector`, 도구 목록을 함께 쓰는 스킬 게시 `publish`)을 보내기 전에
-  `{root}/users/{SHA-256(sandbox_owner)}` 를 만든다. 사진을 올린 적 없는 주인도 실행 공간을 쓰기 때문이다.
-  `root` 는 미리 있어야 하고, Hermes 정책의 두 첨부 루트와 같은 디렉터리여야 한다.
-  Hermes 는 첨부 루트를 읽기 전용으로 보므로 만들지 못하고 존재와 링크 없음만 확인한다.
-  이 일은 `hermes/SandboxAttachmentDirectory` 가 맡는다. 루트, `users`, 사용자 폴더 가운데 링크가 있거나
-  실제 경로가 루트 아래 그 폴더와 다르면 보내지 않고 `AGENT_SANDBOX_UNAVAILABLE` 409 로 멈춘다.
-  커넥터를 에이전트에 붙이는 바인딩 설치(`bindConnector`)도 보내기 전에 같은 폴더를 만들지만, 최선 노력이다.
-  만들지 못해도 경고 로그만 남기고 설치 요청을 보낸다. 사용자 첨부를 읽는다고 선언한 커넥터면
-  대시보드가 그 폴더를 확인하지 못해 409 로 거절하고, 선언하지 않은 커넥터는 첨부 루트 문제로 막히지 않는다
-  ([ADR-20261007 / connector-owner-attachments](../adr/ADR-20261007-connector-owner-attachments.md)).
+- 실행 공간에 사용자 폴더 하나만 읽기 전용으로 붙이는 규칙, Control Plane 이 Hermes 를 부르기 전에 사용자 폴더를 만드는 호출과 그 실패 처리는 [ADR-091](../adr/ADR-091-사진-첨부는-사용자별로-저장하고-실행-공간에는-그-사용자만-붙인다.md) 이 갖는다. 폴더를 만드는 일은 `hermes/SandboxAttachmentDirectory` 가 맡는다.
 - 파일 이름은 `{첨부 번호}.{확장자}` 다. 올릴 때의 이름을 파일 이름으로 쓰지 않는다.
 - 같은 폴더에 긴 변 1600px 사본 `{첨부 번호}.small.jpg` 를 둔다. 원본을 지울 때 함께 지운다. 아래 「에이전트에게 알리는 법」 을 본다.
 - **행을 지우지 않는다.** 파일을 지우고 `deleted_at` 을 적는다.
 - 받는 형식은 `image/jpeg`, `image/png`, `image/gif`, `image/webp` 넷이다. HEIC 는 받지 않는다.
 - 새로 올리는 MPO는 재인코딩 없이 첫 JPEG만 남기고 MPF 정보를 제거한다. 디코딩 검증에 실패하면 원본을 저장하며, `byte_size`는 저장한 바이트 수다. 기존 첨부는 바꾸지 않는다.
-- multipart 상한은 한 장 11MB, 요청 12MB 다. 서비스 상한 10MB 를 조금 넘는 것은 `VALIDATION_FAILED` 로 거절한다.
-  Tomcat 의 `max-swallow-size` 를 16MB 로 둔다. 요청 상한을 넘은 본문이 기본값 2MB 보다 크면
-  Tomcat 이 400 을 쓴 뒤 연결을 끊어 클라이언트가 응답을 받지 못하기 때문이다. 16MB 를 넘으면 여전히 끊긴다.
+- multipart 상한과 Tomcat 의 `max-swallow-size` 를 서비스 상한보다 크게 두는 까닭은 `application.yml` 의 주석이 갖는다.
 - 상한은 한 번 보낼 때 30장, 한 장 10MB 다. 장수는 아직 메시지에 묶이지 않은 첨부만 센다. 보관 기간은 30일이다.
   10장 33MB 실측을 비례로 계산하면 30장은 약 100MB 이고, 모든 사진이 한 장 상한이면 최대 300MiB 가 저장될 수 있다.
 
@@ -38,11 +24,7 @@
 그 대화의 주인만이다. 첨부에 직접 닿는 경로를 두지 않고 대화를 통해서만 닿는다.
 **남의 대화의 첨부는 없는 것과 같은 응답을 준다.**
 
-격리된 profile 의 셸과 파일·vision 도구에는 실행 공간 주인의 첨부 폴더만 보인다.
-디렉터리 키를 알아도 다른 사용자 폴더가 mount 되지 않는다. local profile 은 이 격리의 적용 대상이 아니다.
-`vision`, `image_gen`, `video_gen` 만 켜도 Docker 설정을 적용하고 그룹 공개를 거절한다.
-정책 미등록 profile 에서는 세 도구 저장을 거절한다. 사진 첨부는 주인이 있는 `PRIVATE` 에이전트만 받는다.
-첨부가 있는 실행은 요청자와 에이전트 주인이 같은지도 검사한다. 연결용 에이전트 설치도 같은 주인 키를 전달한다.
+실행 공간의 격리와, 사진 첨부를 주인이 있는 `PRIVATE` 에이전트만 받고 요청자와 주인이 다르면 거절하는 규칙은 [ADR-091](../adr/ADR-091-사진-첨부는-사용자별로-저장하고-실행-공간에는-그-사용자만-붙인다.md) 이 갖는다.
 
 ## 파일을 읽고 지울 때
 
@@ -56,13 +38,8 @@
 
 ## 경로
 
-| 경로 | 하는 일 |
-| --- | --- |
-| `POST /api/v1/chat/conversations/{id}/attachments` | 사진을 올린다. 첨부 번호를 돌려준다 |
-| `GET /api/v1/chat/conversations/{id}/attachments/{attachmentId}` | 그 사진의 본문. 지워졌으면 410 |
-| `DELETE /api/v1/chat/conversations/{id}/attachments/{attachmentId}` | 먼저 지운다 |
-
-`POST /api/v1/chat/messages` 가 첨부 번호 목록을 함께 받는다.
+경로는 `AttachmentController` 가 갖는다. 사진 본문을 읽을 때 파일이 지워졌으면 410 이다.
+보내기(`POST /api/v1/chat/messages`)가 첨부 번호 목록을 함께 받는다.
 
 새 대화에서 첫 사진을 올리려면 대화의 공개 식별자가 먼저 있어야 한다.
 `POST /api/v1/chat/conversations` 가 제목이 빈 대화를 만들고, 제목은 첫 메시지가 정한다.
@@ -102,8 +79,7 @@ Hermes 에 보내는 `input` 에만 사진이 놓인 자리와 파일 이름을 
 디스크 이름은 첨부 번호라 대화를 넘어 커진다.
 에이전트가 `19.jpg` 를 「사진 19」 로 적으면 사진이 열한 장인 대화에서 사용자가 어느 것인지 찾지 못한다.
 순번은 메시지에 묶인 첨부를 메시지 순서로, 한 메시지 안에서는 사용자가 고른 순서로 센 것이라 화면의 순서와 같다.
-그 순서는 `chat_attachment.position` 에 0부터 저장한다. 지운 사진도 순번 자리를 차지한다.
-과거 행은 첨부 번호 순으로 `position` 을 채운다.
+그 순서는 `chat_attachment.position` 이 갖는다([`backend/docs/data-schema.md`](../../backend/docs/data-schema.md) 의 「chat_attachment」).
 
 ## 어느 클래스가 무엇을 하나
 

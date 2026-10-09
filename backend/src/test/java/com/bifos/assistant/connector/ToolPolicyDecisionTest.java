@@ -16,7 +16,7 @@ import java.util.Optional;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
-/** 판정 순서는 {@code docs/backend/connector-tool-policy.md} 의 「도구 호출 판정」 표다. */
+/** 판정 순서는 {@link ToolPolicyDecision#decide} 가 갖는다. */
 class ToolPolicyDecisionTest {
     private static final Optional<ToolPolicy> READ =
             Optional.of(new ToolPolicy(ToolRisk.READ, ToolApproval.NONE, null, false));

@@ -1,7 +1,7 @@
 # 흐름
 
 화면 전환과 호출 순서를 담는다.
-모듈 배치는 [`code-architecture.md`](code-architecture.md), 저장 모델은 [`backend/schema/README.md`](backend/schema/README.md)가 가진다.
+모듈 배치는 [`code-architecture.md`](code-architecture.md), 저장 모델은 [`backend/docs/data-schema.md`](../backend/docs/data-schema.md)가 가진다.
 
 ## 두 방향과 두 토큰
 
@@ -445,7 +445,7 @@ sequenceDiagram
 
 ## 파일 공간을 열 때
 
-경로 규칙과 API 는 [`code-architecture.md`](code-architecture.md) 의 「실행 공간 파일」, 결정은 [ADR-20261009 / workspace-explorer](adr/ADR-20261009-workspace-explorer.md) 가 갖는다.
+경로 규칙과 API 는 [`backend/docs/code-architecture.md`](../backend/docs/code-architecture.md) 의 「실행 공간 파일」, 결정은 [ADR-20261009 / workspace-explorer](adr/ADR-20261009-workspace-explorer.md) 가 갖는다.
 
 ```mermaid
 sequenceDiagram

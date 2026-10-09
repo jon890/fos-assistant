@@ -8,7 +8,7 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
 import org.springframework.validation.annotation.Validated;
 
 /**
- * 예약 작업의 설정이다(ADR-076, ADR-077, ADR-079). 키와 뜻은 {@code docs/backend/task.md} 의 「설정」 이 갖는다.
+ * 예약 작업의 설정이다(ADR-076, ADR-077, ADR-079). 키는 {@code assistant.task} 이고 기본값은 각 칸의 {@code @DefaultValue} 가 갖는다.
  *
  * @param dispatchCron 발화기와 시작 단계가 도는 때. 일정이 이 값을 설정 이름으로 읽는다. {@code -} 이면 돌지 않는다
  * @param missedGrace 이만큼 늦은 예정 시각은 놓친 것으로 보지 않는다

@@ -33,7 +33,7 @@ test("Hermes 문서에서 옮겨 온 절을 가진 backend 문서는 Hermes 연�
 });
 
 test("Hermes 절이 없는 backend 문서는 Hermes 연동 라벨이 붙지 않는다", () => {
-  assert.deepEqual(labelsFor("docs/backend/packages.md"), []);
+  assert.deepEqual(labelsFor("backend/docs/code-architecture.md"), []);
 });
 
 test("hermes 와 무관한 파일은 Hermes 연동과 보안 라벨이 붙지 않는다", () => {

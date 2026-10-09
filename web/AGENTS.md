@@ -106,7 +106,7 @@ grep -rn 'style={{' web/src/
 ### 파일 길이
 
 파일 길이는 언어 공통 검사로 강제한다. 범위, 상한, 기준 목록과 갱신 방법은
-[`../docs/backend/quality.md`](../docs/backend/quality.md)의 「파일 길이 기준 목록」이 갖는다.
+[`backend/docs/code-architecture.md`](../backend/docs/code-architecture.md)의 「파일 길이 기준 목록」이 갖는다.
 함수 길이 경고는 ESLint가 계속 검사한다.
 
 ### 상대 경로 import 예외

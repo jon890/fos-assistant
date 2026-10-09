@@ -291,7 +291,7 @@ backend 의 읽기 기준(`AgentService.requireReadable`)은 바꾸지 않는다
 **「설정 차이」 는 지금 한 번도 그려지지 않는다.**
 `runtime_fingerprint` 를 채우는 경로가 없어 지문 축이 늘 빈 목록이기 때문이다.
 결함이 아니라 값이 들어오기 시작할 때 고칠 곳이 없도록 먼저 만들어 둔 것이다.
-그 칸을 왜 비워 두는지는 [`docs/backend/schema/execution.md`](../../docs/backend/schema/execution.md) 의 「agent_execution」 절이 갖는다.
+그 칸을 왜 비워 두는지는 [`backend/docs/data-schema.md`](../../backend/docs/data-schema.md) 의 「agent_execution」 절이 갖는다.
 
 ## 지금 화면
 
@@ -854,7 +854,7 @@ Control Plane 이 응답에서 뺀다. 화면도 받은 것을 그대로 그리�
 
 ## 파일 공간
 
-결정은 [ADR-20261009 / workspace-explorer](../../docs/adr/ADR-20261009-workspace-explorer.md), API 와 경로 규칙은 [`docs/code-architecture.md`](../../docs/code-architecture.md) 의 「실행 공간 파일」, 흐름은 [`docs/flow.md`](../../docs/flow.md) 의 「파일 공간을 열 때」 가 갖는다.
+결정은 [ADR-20261009 / workspace-explorer](../../docs/adr/ADR-20261009-workspace-explorer.md), API 와 경로 규칙은 [`backend/docs/code-architecture.md`](../../backend/docs/code-architecture.md) 의 「실행 공간 파일」, 흐름은 [`docs/flow.md`](../../docs/flow.md) 의 「파일 공간을 열 때」 가 갖는다.
 
 | 자리 | 무엇 |
 | --- | --- |

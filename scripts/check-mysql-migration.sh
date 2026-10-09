@@ -7,7 +7,7 @@
 #
 # 서버의 기본 정렬 규칙을 utf8mb4_unicode_ci 로 준다. 운영 서버가 그렇게 떠 있다.
 # 이 값이 MySQL 8.4 의 기본값(utf8mb4_0900_ai_ci)과 달라, 정렬 규칙을 적지 않은 새 표가 생기면 그 표만
-# utf8mb4_unicode_ci 가 되고 MysqlMigrationTest 가 잡는다. 까닭과 규칙은 docs/backend/schema/README.md 의 「마이그레이션 작성 규칙」 에 있다.
+# utf8mb4_unicode_ci 가 되고 MysqlMigrationTest 가 잡는다. 까닭과 규칙은 backend/docs/data-schema.md 의 「마이그레이션 작성 규칙」 에 있다.
 set -Eeuo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"

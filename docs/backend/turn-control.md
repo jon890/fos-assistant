@@ -16,7 +16,7 @@
 | `chat.application.NextTurnDispatcher` | 다음 turn 을 정하는 한 자리. turn 종료, 위임 종료 사건, 기동을 받는다 |
 | `chat.application.TurnClosed` | turn 이 닫혔다는 알림. 대화 번호와 중지로 끝났는지를 싣는다 |
 | `chat.application.ChatService` | `runPendingMessages` 가 대기 행을 합쳐 `TurnIntent.Fresh` 로 turn 을 돌린다. 대화를 지울 때 대기 행도 지운다 |
-| `chat.presentation.PendingMessageController` | [`conversation.md`](conversation.md) 의 「경로」 가 적은 `pending` 경로 넷 |
+| `chat.presentation.PendingMessageController` | 대기 줄의 경로 넷(읽기, 더하기, 취소, 멈춤 풀기) |
 | 웹 `app/api/chat/conversations/[conversationId]/pending/` | `route.ts`(GET, POST), `[pendingId]/route.ts`(DELETE), `send/route.ts`(POST). Control Plane 으로 그대로 넘긴다 |
 | 웹 `lib/pending-route.ts` | 위 서버 라우트 셋이 함께 쓰는 넘기기와 형식 오류 응답. Control Plane 의 상태와 본문을 다시 감싸지 않는다 |
 | 웹 `lib/pending-messages.ts` | 브라우저가 위 서버 라우트를 부르는 함수 |
@@ -184,16 +184,13 @@ flowchart TD
 
 ### 기동 정리가 갈리는 지점
 
+Hermes 가 성공이나 실패로 끝났다고 답할 때, 404, 닿지 못할 때, 상한을 넘길 때, run 번호가 없을 때 적는 상태와 `error_code` 는 [ADR-061](../../backend/docs/adr/ADR-061-재기동-때-남은-실행은-hermes-에-물어-정하고-도는-실행에는-다시-붙는다.md) 의 결정 표가 갖는다. 위 흐름도가 그 순서를 보인다.
+아래는 그 밖의 경우다.
+
 | 경우 | 결과 |
 | --- | --- |
-| Hermes 에서 성공으로 끝났다 | `SUCCEEDED`. 답과 토큰과 비용을 적는다. 대화 turn 이면 답이 이력에 남는다. 먼저 살펴보기 turn 이면 답 대신 알림 줄 하나만 남는다 |
-| Hermes 에서 실패로 끝났다(`failed`, `error`, `interrupted`) | `FAILED`. `error_code` 는 보통 turn 과 같다. 받은 사용량을 남긴다 |
 | Hermes 에서 취소로 끝났다 | `CANCELLED`. 멈춘 자리까지의 답과 사용량을 남긴다. 먼저 살펴보기 turn 이면 답 대신 「살펴보기를 멈췄어요」 알림 줄 하나만 남는다 |
 | 아직 돈다 | `RUNNING` 으로 두고 `hermes.poll-interval` 마다 다시 묻는다 |
-| 404 다 | `FAILED`(`REMOTE_RUN_LOST`). Hermes 가 그 run 을 모른다. gateway 가 다시 떴거나 종료 뒤 1시간이 지났다 |
-| 닿지 못했다(연결 실패, 5xx, 429) | `RUNNING` 과 잠금을 그대로 두고 다시 묻는다. 간격은 `hermes.poll-interval` 에서 시작해 5초까지 늘린다 |
-| 상한을 넘겼다 | Hermes 에 중지를 보내고 `FAILED` 로 적는다. 한 번이라도 답을 받았으면 `RECONCILE_TIMEOUT`, 한 번도 받지 못했으면 `RECONCILE_UNREACHABLE` 이다 |
-| run 번호가 없다 | 묻지 않고 `FAILED`(`ORPHANED`). 제출 전이었거나 제출 응답을 받기 전에 끊겼다 |
 | 잡을 때 다른 turn 이 이미 그 대화의 잠금을 쥐고 있다 | 경고 로그를 남기고 잠금 없이 정한다. 그 turn 이 닫힐 때 다음 turn 이 정해진다 |
 | 에이전트 행이 없다 | 물을 주소가 없다. `FAILED`(`ORPHANED`) |
 | 다시 정하는 동안 그 대화에 글을 보낸다 | 도는 turn 이 있는 대화와 같다. 보통 보내기는 `CONVERSATION_BUSY` 이고 화면은 대기 메시지로 쌓는다. 잠금이 풀리면 `NextTurnDispatcher` 가 보낸다 |
@@ -223,9 +220,7 @@ Flyway 는 빈을 만들 때 끝나므로 lifecycle 이 시작할 때는 표가 
 
 ## 응답 중에 보낼 때
 
-turn 이 도는 동안 보낸 글은 Control Plane 이 대기 메시지로 저장한다.
-그 turn 이 끝나면 쌓인 것을 합쳐 사용자 메시지 하나로 다음 turn 을 연다.
-결정은 [ADR-048](../adr/ADR-048-응답-중에-보낸-메시지는-control-plane-이-쌓아-두고-다음-turn-으로-합쳐-보낸다.md) 에 있다.
+turn 이 도는 동안 보낸 글을 대기 메시지로 쌓았다가 다음 turn 으로 합쳐 보내는 결정은 [ADR-048](../adr/ADR-048-응답-중에-보낸-메시지는-control-plane-이-쌓아-두고-다음-turn-으로-합쳐-보낸다.md) 에 있다.
 
 ```mermaid
 sequenceDiagram
@@ -257,8 +252,6 @@ sequenceDiagram
 
 다음 turn 을 정하는 순서는 위 「응답 중 대기열」 이 갖는다.
 
-합친 글은 쌓인 순서대로 빈 줄 하나를 사이에 두고 잇는다.
-대화에는 `USER` 행 하나만 남는다.
 대기 메시지로 연 turn 은 사용자가 보낸 turn 과 같다. `auto_turn_count` 를 0 으로 돌리고, 답은 다시 생성할 수 있다.
 요청한 연결이 없으므로 사건은 대화 단위 SSE 로만 간다.
 
@@ -278,7 +271,7 @@ sequenceDiagram
 | 대기 줄이 멈춰 있을 때 다른 turn 이 끝났다(다시 생성, 자동 turn) | 멈춘 채로 둔다. 사용자가 풀 때까지 보내지 않는다 |
 | 대기 메시지를 취소한다 | 그 행을 지우고 글을 입력창으로 되돌린다. 입력창에 쓰던 글이 있으면 그 뒤에 줄을 바꿔 붙인다 |
 | 취소하는 사이에 이미 보내졌다 | `PENDING_MESSAGE_NOT_FOUND`. 입력창에 되돌리지 않는다. 그 글은 이미 사용자 메시지로 저장됐다 |
-| 대기 메시지가 5개다. 또는 더하면 합친 길이가 8000자를 넘는다 | `PENDING_QUEUE_FULL`. 저장하지 않고 글을 입력창에 되돌린다 |
+| 대기 메시지가 상한 개수에 닿았다. 또는 더하면 합친 길이가 메시지 한 개의 상한을 넘는다(`PendingMessageService`) | `PENDING_QUEUE_FULL`. 저장하지 않고 글을 입력창에 되돌린다 |
 | 사진을 붙여 보내려 한다 | 대기 메시지는 글만 받는다. turn 이 도는 동안 사진 첨부는 잠겨 있다 |
 | 새 대화의 첫 turn 이 아직 대화 식별자를 받지 못했다 | 보내기를 막는다. `started` 가 식별자를 실어 온 뒤부터 대기 메시지를 받는다 |
 | 흐름이 붙은 에이전트의 대화다 | 대기 메시지를 받지 않는다. `CONVERSATION_BUSY` 로 거절한다. 글은 입력창에 남기고 「이 대화는 답이 끝난 뒤 보낼 수 있어요」 를 보인다. 흐름은 질문을 흐름 안에서 저장해 대기 행 삭제와 한 트랜잭션으로 묶을 수 없다 |

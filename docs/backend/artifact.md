@@ -2,20 +2,19 @@
 
 에이전트가 turn 안에 만든 HTML 과 그것이 부르는 사진이다. 본문은 공유 디렉터리에 두고 데이터베이스에는 HTML 을 가리키는 행만 둔다.
 이 파일은 결과물 폴더와 보관 기간, 에이전트에게 폴더를 알리는 단락, 답에 묶는 방법, 파일을 주는 경로와 머리글을 갖는다.
-`artifact_write` 도구의 인자와 응답은 [`mcp-caller.md`](mcp-caller.md#결과물-쓰기-도구) 가 갖는다.
+`artifact_write` 도구는 [`mcp-caller.md`](mcp-caller.md#결과물-쓰기-도구) 가 갖는다.
 근거는 [`adr/ADR-027-에이전트가-만든-html-은-대화별-폴더에-두고-스크립트-없이-보인다.md`](../adr/ADR-027-에이전트가-만든-html-은-대화별-폴더에-두고-스크립트-없이-보인다.md) 에 있다.
 
 - 루트 설정은 사진 첨부와 같은 모양으로 둘이다. `assistant.artifact.root` 는 Control Plane 이 보는 경로, `assistant.artifact.agent-root` 는 같은 디렉터리를 Hermes 컨테이너에서 보는 경로다.
   둘 다 기본값이 없어 비면 기동이 실패한다. 붙이는 일은 `fos-home-infra` 가 소유한다
 - 대화 하나가 폴더 하나다. 이름은 대화 번호다. 폴더는 Control Plane 이 turn 을 시작할 때 만든다
-- `artifact_write` 도구가 있는 profile 은 MCP 로 Control Plane 에 쓰기를 요청한다. 그 도구가 없고 파일 도구가 있는 profile 은 Hermes 가 대화 폴더에 직접 쓴다.
-  Control Plane 은 대화 주인을 확인하고 저장하며, 읽기와 보관 기간 정리도 맡는다
+- `artifact_write` 도구가 있는 profile 은 MCP 로 쓰고, 그 도구가 없고 파일 도구가 있는 profile 은 Hermes 가 대화 폴더에 직접 쓴다. 이 결정은 [ADR-028](../../backend/docs/adr/ADR-028-결과물은-사용자의-대화-폴더에-mcp-도구로-쓴다.md) 이 갖는다
 - 보관 기간은 30일이다. 대화 폴더 단위로 센다. 폴더에서 가장 늦게 바뀐 파일이 30일을 넘기면 그 폴더의 파일을 함께 지운다.
   파일마다 세면 다음 turn 이 HTML 만 고쳤을 때 그 HTML 이 부르는 옛 사진이 먼저 지워진다
 - 지우는 단위는 폴더 안의 파일 하나다. 사진 첨부처럼 행 단위로 지우지 않는다. 지운 HTML 의 `chat_artifact` 행에는 `deleted_at` 을 적고, 같은 파일이 여러 답에 묶였으면 그 행 모두에 적는다. 빈 폴더는 남는다.
   지우는 차례와 동시 쓰기의 보호 경계는 아래 「보관 기간이 지난 파일을 지울 때」 가 갖는다
 - 파일을 줄 때는 행을 보지 않는다. 대화 폴더 안에 있고 확장자가 허용되면 준다. HTML 이 부르는 사진은 행이 없다. 행은 없는 파일이 410 인지 404 인지 구분할 때만 본다
-- 파일을 읽는 경로에는 크기 상한을 두지 않고 스트림으로 준다. MCP 로 쓰는 파일은 5MB 로 제한한다
+- 파일을 읽는 경로에는 크기 상한을 두지 않고 스트림으로 준다. 크기 상한은 MCP 로 쓰는 파일에만 둔다
 
 ## 보관 기간이 지난 파일을 지울 때
 
@@ -108,7 +107,7 @@ Hermes 기본 스킬만 있어도 색인 안내문이 `skill_manage` 를 권하�
 
 | 타입 | 책임 |
 | --- | --- |
-| `mcp/presentation/McpDtos` | `memory_read`, `artifact_write`, `follow_up_propose` 의 요청 형태. 데이터 record 를 컨트롤러 안에 두지 않는다 |
+| `mcp/presentation/McpDtos` | 도구 인자의 요청 형태와 하위 에이전트 session 등록의 응답 형태. 데이터 record 를 컨트롤러 안에 두지 않는다 |
 | `mcp/presentation/McpController` | 도구 이름에 따라 인자를 검사하고 JSON-RPC 오류로 바꾼다 |
 | `mcp/application/McpToolService` | 도구 목록과 MCP `content`, `isError` 결과를 만든다 |
 | `chat/application/ArtifactWriteRequest`, `ArtifactWriteResult` | 각각 UUID, 상대 경로와 입력 방식, 저장된 경로와 바이트 수를 전달한다 |
@@ -128,9 +127,8 @@ Hermes 기본 스킬만 있어도 색인 안내문이 `skill_manage` 를 권하�
 같은 폴더에 임시 파일을 완성한 뒤 교체하고 실패하면 임시 파일을 지운다.
 
 `McpController` 의 `tools/call` 은 도구별로 인자를 검사한다.
-`memory_read` 는 정수 `id` 를 받는다. 그 응답은 [`memory.md`](memory.md) 의 「Memory 본문을 읽는 길」 이 갖는다.
 요청자는 [`mcp-caller.md`](mcp-caller.md) 의 `McpCallerResolver` 가 origin 실행에서 정한 `CurrentUser` 다. 토큰이 사용자를 정하지 않는다.
-인자와 응답, SSRF 조건은 [`mcp-caller.md`](mcp-caller.md#결과물-쓰기-도구) 가 정한다.
+SSRF 방어의 까닭은 [ADR-028](../../backend/docs/adr/ADR-028-결과물은-사용자의-대화-폴더에-mcp-도구로-쓴다.md) 이 갖는다.
 같은 사용자의 다른 대화에 쓸 때 답에 묶이는 시점과 실패 분기는 아래 「결과물을 MCP 로 쓸 때」 에 있다.
 
 ## 답에 묶는 법
@@ -146,10 +144,7 @@ Hermes 기본 스킬만 있어도 색인 안내문이 `skill_manage` 를 권하�
 
 ## 경로
 
-| 경로 | 하는 일 |
-| --- | --- |
-| `GET /api/v1/chat/conversations/{id}/files/**` | 대화 폴더 안의 파일 본문 |
-
+대화 폴더 안의 파일 본문을 주는 경로는 `ArtifactController` 가 갖는다.
 `{id}` 는 대화의 공개 식별자이고 그 뒤가 폴더 안의 상대 경로다. 주인만 받는다.
 
 | 판정 | 응답 |
@@ -161,16 +156,8 @@ Hermes 기본 스킬만 있어도 색인 안내문이 `skill_manage` 를 권하�
 | 파일이 없다. 그 경로의 `chat_artifact` 행이 지워졌다고 적혀 있다 | 410 `ARTIFACT_GONE` |
 | 파일이 없다. 행도 없다 | 404 `ARTIFACT_NOT_FOUND` |
 
-응답 머리글은 모든 파일에 같다.
-
-| 머리글 | 값 |
-| --- | --- |
-| `Content-Type` | 링크를 따라간 실제 파일의 확장자로 정한다. HTML 은 `text/html; charset=utf-8` |
-| `X-Content-Type-Options` | `nosniff` |
-| `Content-Security-Policy` | `sandbox allow-same-origin allow-popups allow-popups-to-escape-sandbox; default-src 'none'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; base-uri 'none'; form-action 'none'` |
-| `Cache-Control` | `private, no-cache` |
-| `ETag` | `W/"{바이트 수 16진수}-{마지막 수정 시각 밀리초 16진수}"`. 약한 검증자다 |
-| `Last-Modified` | 파일의 마지막 수정 시각 |
+응답 머리글은 모든 파일에 같다. 값은 `ArtifactController` 의 `CONTENT_SECURITY_POLICY` 와 `ArtifactFile` 이 갖는다.
+`Content-Type` 은 링크를 따라간 실제 파일의 확장자로 정하고, CSP 의 `sandbox` 가 스크립트를 막는다. `Cache-Control` 은 `private, no-cache` 이고 `ETag` 는 약한 검증자다.
 
 web 의 서버 라우트는 이 머리글을 그대로 옮긴다. 옮기지 않으면 주소를 직접 열었을 때 스크립트가 돈다.
 
@@ -181,7 +168,7 @@ web 의 서버 라우트는 이 머리글을 그대로 옮긴다. 옮기지 않�
 - 주인 확인과 경로 판정을 먼저 한다. 남의 대화에 맞는 `ETag` 를 보내도 304 가 아니라 `CONVERSATION_NOT_FOUND` 다
 - `If-None-Match` 가 있으면 그것만 본다. `*` 이거나 목록의 값 하나가 `W/` 를 뗀 채 같으면 304 다
 - `If-None-Match` 가 없고 `If-Modified-Since` 가 있으면 초 단위로 견준다. 수정 시각이 그 시각보다 늦지 않으면 304 다
-- 304 에도 위 표의 머리글을 모두 붙인다. `Content-Type` 과 `Content-Length` 는 뺀다
+- 304 에도 위 머리글을 모두 붙인다. `Content-Type` 과 `Content-Length` 는 뺀다
 - 304 로 답할 때는 파일을 열지 않는다
 
 web 의 서버 라우트는 브라우저의 `If-None-Match` 와 `If-Modified-Since` 를 Control Plane 에 옮기고,
@@ -205,11 +192,6 @@ web 의 서버 라우트는 브라우저의 `If-None-Match` 와 `If-Modified-Sin
 - 첨부는 `Cache-Control: private` 이다. 대화 화면에서 이미 받은 사진은 브라우저가 다시 받지 않는다
 - 첨부를 지웠거나 30일이 지났으면 410 이라 그 자리는 깨진 그림이다. HTML 은 `alt` 에 몇 번째 사진인지 적는다
 - 이 모양에 기대는 쪽은 네이버 블로그 커넥터의 미리보기다([ADR-20261007 / naver-blog-connector](../adr/ADR-20261007-naver-blog-connector.md)). 두 주소나 첨부 파일 이름을 바꾸면 그 미리보기도 함께 고친다. `test/unit/artifact-attachment-route.test.ts` 가 두 web 라우트가 형제로 있는지 본다
-
-## 메시지 한 줄의 `artifacts`
-
-`GET .../messages` 의 한 줄은 `artifacts` 를 갖는다. `[{ "path", "byteSize", "deleted" }]` 이고 없으면 빈 배열이다.
-`deleted` 는 `chat_artifact.deleted_at` 이 채워졌는지다.
 
 ## 어느 클래스가 무엇을 하나
 

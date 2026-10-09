@@ -1,7 +1,7 @@
 package com.bifos.assistant.workspace.domain;
 
 /**
- * 주인 디렉터리 안의 경로 하나를 지운다. 계약은 {@code docs/code-architecture.md} 의 「지우기」 가 갖는다.
+ * 주인 디렉터리 안의 경로 하나를 지운다. 계약은 {@code backend/docs/code-architecture.md} 의 「지우기」 가 갖는다.
  *
  * <p>실패는 {@code ApiException} 으로 던진다. 도우미의 실패 코드와 응답의 대응은 그 문서의 표다.
  */

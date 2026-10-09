@@ -1,8 +1,6 @@
 # MCP 요청자
 
 Control Plane MCP 의 토큰은 profile 만 증명하고, 사용자가 걸린 도구의 요청자는 서명한 `_fos_ctx` 로 찾은 **origin 실행**의 사용자다.
-origin 실행은 하위 에이전트 session 이면 만들 때 등록한 실행이고, 최상위 session 이면 그 루트 session 으로 도는 실행이다.
-토큰이 요청자를 정하지 못하는 까닭은 GROUP 에이전트에서 여러 사용자가 같은 profile 을 쓰기 때문이다. 요청 본문에 사용자 번호를 넣어도 사용자를 바꿀 수 없다.
 이 파일은 요청자를 정하는 클래스와 흐름, 하위 에이전트 session 등록, Control Plane MCP 서버와 결과물 쓰기 도구의 계약을 갖는다.
 결정은 [ADR-032](../../backend/docs/adr/ADR-032-mcp-토큰은-profile-을-증명하고-실제-사용자는-부모-실행에서-정한다.md) 와 [ADR-037](../../backend/docs/adr/ADR-037-hermes-하위-에이전트-session-의-주인은-만들-때-등록한-줄로-정한다.md) 에 있다.
 
@@ -31,13 +29,8 @@ origin 실행은 하위 에이전트 session 이면 만들 때 등록한 실행�
 
 ## 토큰 관리 경로
 
-관리자만 부른다.
-
-| 경로 | 하는 일 |
-| --- | --- |
-| `POST /api/v1/admin/agent-tokens` | 본문 `{ "profileName", "label" }`. profile 에 묶인 새 토큰을 발급하고 원문을 한 번만 돌려준다. 사용자로 발급하는 길은 없다 |
-| `GET /api/v1/admin/agent-tokens` | 목록. 한 줄에 `id`, `profileName`, `label`, 발급과 마지막 사용과 폐기 시각 |
-| `DELETE /api/v1/admin/agent-tokens/{id}` | 폐기한다. 행은 남는다 |
+관리자만 부른다. 경로와 응답은 `AgentTokenAdminController` 가 갖는다.
+토큰은 profile 에 묶어 발급하고 원문은 한 번만 돌려준다. **사용자로 발급하는 길은 없다.** 폐기해도 행은 남는다.
 
 profile 이름은 `HermesProfileName` 의 규칙을 따른다. 그 profile 에 에이전트가 있는지는 보지 않는다. profile 을 먼저 만들고 에이전트를 나중에 붙이는 순서가 있어서다.
 
@@ -113,7 +106,7 @@ sequenceDiagram
 | 그 루트 session 으로 도는 실행이 다른 profile 의 것이다 | 거절한다 |
 | 도는 실행이 둘 이상이다 | 거절한다. 가장 최근 것을 고르지 않는다 |
 
-거절은 모두 **같은 도구 결과** 하나로 보인다. `isError: true` 와 「호출 맥락을 확인할 수 없습니다. 새 대화에서 다시 시도해 주세요.」 다.
+거절은 모두 **같은 도구 결과** 하나로 보인다. `isError: true` 와 `McpToolService.INVALID_CONTEXT` 의 문구다.
 서명이 틀린 것과 남의 profile 이 도는 것을 밖에서 나누지 못하게 해, 다른 사용자가 지금 실행 중인지 훑어 알아내지 못하게 한다.
 이유는 서버 로그에만 남는다. 루트 session 으로 도는 실행이 없을 때는 옛 대화의 압축 교체일 수 있다는 표시(`DELEGATION_CONTEXT_UNAVAILABLE`)를 함께 남긴다. 등록이 없는 하위 에이전트 session 이면 `SUBAGENT_SESSION_UNREGISTERED` 를, 등록의 origin 실행이나 그 루트가 중지됐으면 `ORIGIN_CANCELLED` 를 남긴다.
 
@@ -160,14 +153,11 @@ FOS 실행 #105 같은 대화의 다음 turn          ← 돌아도 S1 은 #100 
 
 다른 에이전트에게 맡긴 FOS 실행 안에서 만든 하위 에이전트는 그 FOS 실행을 origin 으로 갖는다. 그 FOS 실행이 제 session 으로 돌기 때문이다.
 
+응답 코드와 거절 조건(같은 등록의 재전송, 다른 origin, 부모를 풀지 못함, 서명, session 길이)은 [`hermes/plugins/fos-ctx/README.md`](../../hermes/plugins/fos-ctx/README.md#하위-에이전트-session-등록-계약) 의 「하위 에이전트 session 등록 계약」 이 갖는다. 아래는 그 밖의 경우다.
+
 | 경우 | 결과 |
 | --- | --- |
-| 같은 `(profile, child_session_id)` 가 같은 부모와 루트로 다시 온다 | `200` 으로 답한다. 부모를 다시 풀지 않아, 그사이 부모 run 이 끝났어도 같다. 줄은 하나다 |
-| 같은 `(profile, child_session_id)` 가 다른 origin 으로 온다 | `409` 로 거절하고 덮어쓰지 않는다 |
-| 부모 session 에 등록이 없고 루트로 도는 실행도 없다 | `403` 으로 거절한다 |
-| 서명이 틀리거나 토큰의 profile 이 부모의 profile 과 다르다 | `403` 으로 거절한다. 다른 profile 의 등록과 실행은 보이지 않는다 |
 | `child_session_id` 가 루트 session 이거나, 그 profile 의 실행 줄이 쓰는 session 이거나, 대화가 적어 둔 session 이다 | `403` 으로 거절한다. 최상위 session 에 등록이 생기면 뒤 turn 이 앞 turn 에 묶인다. 압축 교체된 최상위 session 은 대화에만 남아 있어 대화도 본다 |
-| session 값이 128자를 넘는다 | `403` 으로 거절한다. 저장 칸의 길이다 |
 | 플러그인이 등록하지 못했다 | Hermes 는 hook 예외를 삼키고 자식을 돌린다. 그 자식의 호출은 위 판정에서 거절된다 |
 | 부모 등록의 origin 실행이나 그 루트가 이미 `CANCELLED` 다 | 등록은 받는다. 그 자식의 MCP 호출이 위 판정에서 거절된다 |
 | Control Plane 이 다시 떴다 | 등록은 데이터베이스에 있어 그대로 쓴다 |
@@ -177,20 +167,19 @@ FOS 실행 #105 같은 대화의 다음 turn          ← 돌아도 S1 은 #100 
 
 제목만 `instructions` 에 실린 Memory 본문, 기억 남기기, 결과물 쓰기, 다른 에이전트에게 맡기기를 Control Plane 의 MCP 서버 하나가 맡는다.
 
-| 항목 | 계약 |
-| --- | --- |
-| 서버 이름 | `fos-assistant` |
-| Hermes 가 보이는 도구 이름 | `mcp__fos_assistant__<도구>`. 예: `mcp__fos_assistant__artifact_write`, `mcp__fos_assistant__memory_read` |
-| 경로 | `/mcp` |
-| 프로토콜 | Streamable HTTP `2025-03-26` |
-| 인증 | profile마다 다른 Bearer 토큰. 토큰은 그 profile 을 증명할 뿐 사용자를 정하지 않는다 |
-| 도구 | `memory_read`, `artifact_write`, `agent_list`, `agent_delegate`, `agent_status`, `agent_stop`, `follow_up_propose`, `memory_remember` |
-| 요청자 | 모든 도구가 위 「MCP 호출의 요청자를 정할 때」 의 판정을 지난다. 서명하는 쪽의 계약은 [`hermes/plugins/fos-ctx/README.md`](../../hermes/plugins/fos-ctx/README.md#부모-실행을-잇는-방법) 에 있다 |
+서버 이름, 경로, 프로토콜 버전, 도구 목록은 `McpController` 와 `McpToolService` 가 갖는다.
+Hermes 는 이 서버의 도구를 `mcp__fos_assistant__<도구>` 로 보인다.
+토큰은 profile 마다 다르고, 그 profile 을 증명할 뿐 사용자를 정하지 않는다.
+모든 도구가 위 「MCP 호출의 요청자를 정할 때」 의 판정을 지난다. 서명하는 쪽의 계약은 [`hermes/plugins/fos-ctx/README.md`](../../hermes/plugins/fos-ctx/README.md#부모-실행을-잇는-방법) 에 있다.
 
-**먼저 살펴보기 트리에서는 `memory_read`, `agent_list`, `agent_delegate`, `agent_status`, `agent_stop` 만 받는다.** 쓰기 도구를 허용한 살펴보기는 그 살펴보기의 점검 대화에 쓰는 `artifact_write` 만 더 받는다([ADR-082](../adr/ADR-082-먼저-살펴보기의-쓰기-도구는-관리자가-에이전트마다-켜고-커넥터-쓰기는-승인-카드로-보낸다.md)).
-요청자를 정한 뒤 `ProactiveCheckGuard.checkOf` 가 살펴보기 줄을 찾으면 나머지 도구는 「먼저 살펴보기에서는 쓸 수 없는 도구입니다.」 오류 결과(`isError: true`)다. 읽기 경계의 살펴보기에서는 지금 `artifact_write`, `follow_up_propose`, `memory_remember` 가 여기 걸린다.
-`memory_remember` 는 쓰기 도구를 허용한 살펴보기에서도 받지 않는다. 살펴보기는 바깥 글을 읽는 실행이라 기억을 남기면 프롬프트 주입의 길이 된다([ADR-20261007 / memory-remember](../adr/ADR-20261007-memory-remember.md)).
-`follow_up_propose` 는 쓰기 도구를 허용한 살펴보기에서도 받지 않는다. 살펴보기의 할 일 후보는 결과 안의 문장으로만 낸다([ADR-081](../../backend/docs/adr/ADR-081-살펴보기-결과는-답-끝의-구조화-블록으로-받고-control-plane-이-검사해-그린다.md)). 살펴보기가 그 도구로 제안하게 하는 일은 ADR-080 의 「다음 단계」 다.
+**먼저 살펴보기 트리에서는 받는 도구를 줄인다.** 받는 도구는 `McpController` 의 `CHECK_TREE_TOOLS` 와 `CHECK_TREE_WRITE_TOOLS` 가 갖는다.
+요청자를 정한 뒤 `ProactiveCheckGuard.checkOf` 가 살펴보기 줄을 찾으면 그 밖의 도구는 `McpToolService.notAllowedInCheck()` 의 오류 결과(`isError: true`)다.
+
+- 읽기와 위임 도구는 받는다
+- 쓰기 도구를 허용한 살펴보기는 그 살펴보기의 점검 대화에 쓰는 `artifact_write` 를 더 받는다([ADR-082](../adr/ADR-082-먼저-살펴보기의-쓰기-도구는-관리자가-에이전트마다-켜고-커넥터-쓰기는-승인-카드로-보낸다.md))
+- `follow_up_propose` 는 쓰기 도구 허용과 관계없이 받는다. 할 일은 제안만 하고 사람이 받아들여야 챙긴다([ADR-085](../adr/ADR-085-매일-깨우기는-예약-작업을-다시-쓰고-다섯-칸-보고를-지금-화면에-올린다.md))
+- `memory_remember` 는 쓰기 도구를 허용한 살펴보기에서도 받지 않는다. 살펴보기는 바깥 글을 읽는 실행이라 기억을 남기면 프롬프트 주입의 길이 된다([ADR-20261007 / memory-remember](../adr/ADR-20261007-memory-remember.md))
+
 새 도구를 더하면 살펴보기에서 받을지 함께 정한다([`proactive-check.md`](proactive-check.md) 의 「읽기 경계」).
 
 도구마다의 인자와 결과는 아래가 갖는다.
@@ -245,25 +234,9 @@ profile 의 도구 구성이나 대화 길이가 달라지면 손익분기도 �
 ## 결과물 쓰기 도구
 
 `artifact_write` 는 일반 파일 도구가 없는 profile 에 결과물 저장만 연다.
-`fos-assistant` 서버가 등록된 profile 에서만 보인다. 다른 도구와 같은 서버에 있어 Hermes 서버 등록과 허용 목록을 따로 두지 않는다.
-실행 입력은 이 도구가 있으면 MCP 로 저장하고, 도구가 없고 파일 도구가 있으면 대화 폴더에 직접 쓰도록 안내한다.
 결정은 [ADR-028](../../backend/docs/adr/ADR-028-결과물은-사용자의-대화-폴더에-mcp-도구로-쓴다.md) 에 있다.
 
-| 인자 | 계약 |
-| --- | --- |
-| `conversation_id` | 필수 UUID 문자열. `Conversation.publicId` 를 가리킨다. 내부 번호를 받지 않는다 |
-| `path` | 필수 상대 경로. 대화 폴더 밖을 가리키지 않는다 |
-| `content` | 선택 문자열. UTF-8 로 저장한다. `html`, `css` 만 받는다 |
-| `source_url` | 선택 HTTPS URL. `png`, `jpg`, `jpeg`, `gif`, `webp` 만 받는다 |
-
-`content` 와 `source_url` 은 정확히 하나만 있어야 한다.
-`content` 는 빈 문자열도 파일 본문으로 인정한다. `source_url` 은 빈 값을 받지 않는다.
-선택 인자에 `null` 을 넣거나 두 방식의 확장자를 섞으면 인자 오류다.
-base64 인자와 정의하지 않은 인자는 거절한다.
-`path` 는 빈 값, 절대 경로, 역슬래시, NUL, 빈 경로 조각과 `.` 또는 `..` 조각을 거절한다.
-확장자의 대소문자는 가리지 않는다.
-공통 상한은 **5MB(5 × 1024 × 1024 바이트)** 이고 본문은 문자 수 대신 UTF-8 바이트 수로 센다.
-경로는 기존 `chat_artifact.path` 에 맞춰 500자까지 받는다.
+인자와 검사 규칙, 응답 모양, 오류 번호는 `McpController`, `McpToolService`, `McpDtos` 가 갖는다.
 
 origin 실행의 사용자로 `ConversationAccess.requireOwn(CurrentUser, UUID)` 를 호출한다.
 확인 전에는 폴더 생성과 URL 조회를 하지 않는다.
@@ -272,38 +245,12 @@ origin 실행의 사용자로 `ConversationAccess.requireOwn(CurrentUser, UUID)`
 도구 입력에 사용자 번호나 profile 을 넣어 요청자를 바꿀 수 없다.
 실행을 가리키는 값은 모델이 주는 인자가 아니라 플러그인이 서명한 `_fos_ctx` 로만 온다. 그 까닭은 [도구 호출에는 실행을 가리키는 값이 없다](../../hermes/plugins/fos-ctx/README.md#도구-호출에는-실행을-가리키는-값이-없다) 절이 갖는다.
 
-성공은 기존 MCP 결과의 `content[0].text` 에 JSON 문자열을 담아 반환한다.
-그 JSON 은 `{"path":"test/index.html","byteSize":123}` 모양이며 `isError` 는 `false` 다.
 호스트 경로와 내부 대화 번호는 반환하지 않는다.
-잘못된 인자는 JSON-RPC `-32602`, 모르는 도구는 `-32601` 로 답한다.
-인자 오류의 `error.data` 에는 확장자, 경로 형식, 크기 초과처럼 정해 둔 이유만 담고 입력 경로나 URL query 는 넣지 않는다.
-주인 확인 실패, 파일 저장 실패, URL 방어와 다운로드 실패는 `isError: true` 로 답한다.
 URL 의 query, 응답 본문, 파일시스템 경로를 오류나 로그에 노출하지 않는다.
 
 같은 경로를 덮어쓸 때도 임시 파일을 완성한 뒤 교체한다.
 상한 초과나 다운로드 실패는 임시 파일을 지우고 기존 파일을 보존한다.
 HTML 을 답에 묶는 일은 쓰기 도구가 하지 않는다. 묶는 시점은 [`artifact.md`](artifact.md#결과물을-mcp-로-쓸-때) 가 갖는다.
 
-### 주소 방식과 SSRF 방어
-
-| 항목 | 계약 |
-| --- | --- |
-| URL | `https` 만. userinfo, fragment, IP 리터럴을 거절한다. 포트는 생략하거나 HTTPS 표준 포트만 받는다 |
-| 호스트 설정 | `assistant.artifact.source.allowed-hosts`. 소문자 ASCII 호스트의 정확한 일치만 허용한다. wildcard 와 접미사 일치를 쓰지 않는다 |
-| 기본 허용 목록 | 빈 목록. 설정 전에는 모든 `source_url` 을 거절하고 `content` 는 허용한다 |
-| DNS | A 와 AAAA 결과를 모두 검사한다. 사설, loopback, link-local, unspecified, multicast, IPv6 ULA 와 IPv4 를 담은 IPv6 의 비공개 주소를 거절한다 |
-| 연결 | 검사한 IP 로 연결한다. 재시도도 검사한 주소만 쓰며 TLS 인증서, SNI 와 HTTP Host 는 원래 호스트를 쓴다 |
-| HTTP | redirect 를 따라가지 않고 200 응답만 받는다. 서버의 인증 헤더와 쿠키를 보내지 않는다 |
-| 형식 | `png` 는 `image/png`, `jpg` 와 `jpeg` 는 `image/jpeg`, `gif` 는 `image/gif`, `webp` 는 `image/webp`. MIME 의 매개변수는 제외하고 비교한다 |
-| 크기 | `Content-Length` 가 상한보다 크면 읽기 전에 거절한다. 길이가 있으면 선언된 바이트만 읽고 조기 EOF 를 거절한다. 길이가 없으면 chunked 또는 연결 종료까지 읽되 5MB 를 넘는 순간 거절한다 |
-| 제한 시간 | 연결 5초, 읽기 10초, DNS 를 포함한 호출 전체 30초. 느린 본문이 읽기 제한만 피해도 전체 제한으로 끝낸다 |
-
-DNS 검사 뒤 원래 호스트 URL 을 일반 HTTP 클라이언트로 다시 부르는 구현은 쓰지 않는다.
-클라이언트가 이름을 다시 풀면 검사한 IP 와 연결한 IP 가 달라질 수 있다.
-연결 시점에도 IP 를 고정하고 원래 호스트 인증을 유지해야 한다.
-
-**허용 목록의 기본값은 비워 둔다.** Hermes 이미지 생성 도구([`tools/image_generation_tool.py`](https://github.com/NousResearch/hermes-agent/blob/v2026.8.31/tools/image_generation_tool.py))는 FAL 응답의 이미지 URL 을 그대로 돌려주고 출력 호스트를 고정하지 않아, 실제 출력 호스트를 코드로 확정할 수 없다.
-운영 호스트 확인과 설정은 `fos-home-infra` 에서 맡는다.
-
-**결과물 폴더의 경계로 Hermes 의 `HERMES_WRITE_SAFE_ROOT` 를 쓰지 않는다.** `get_safe_write_roots()`([`agent/file_safety.py`](https://github.com/NousResearch/hermes-agent/blob/v2026.8.31/agent/file_safety.py))가 프로세스 환경에서 읽는 값이라 profile 별 쓰기 권한을 정하지 못한다.
-읽기 거절 규칙도 결과물 폴더만 읽게 하는 경계가 아니다.
+`source_url` 의 주소 검사와 SSRF 방어는 `ArtifactSourceFetcher` 와 `ArtifactSourceProperties` 가 갖는다.
+허용 목록을 비워 두는 까닭, 검사한 IP 로 연결하는 까닭, 결과물 폴더의 경계로 Hermes 의 `HERMES_WRITE_SAFE_ROOT` 를 쓰지 않는 까닭은 [ADR-028](../../backend/docs/adr/ADR-028-결과물은-사용자의-대화-폴더에-mcp-도구로-쓴다.md) 이 갖는다.

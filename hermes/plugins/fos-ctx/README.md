@@ -51,7 +51,8 @@ Hermes 는 자식을 만드는 자리에서 부모 스레드로 이 hook 을 동
 ### 커넥터 도구 호출을 묻는다
 
 profile 디렉터리에 이름 대응 파일 `.fos-connector-tools.json` 이 있으면 fos-ctx 는 그 profile 의 커넥터 MCP 도구 호출마다 Control Plane 에 묻고 답대로 한다.
-경로, 본문, 서명, 응답은 [`docs/backend/connector-tool-policy.md`](../../../docs/backend/connector-tool-policy.md) 의 「도구 호출 판정」 이 소유한다.
+경로와 인증, 서명할 글, Control Plane 이 판정하는 단계는 [`docs/backend/connector-tool-policy.md`](../../../docs/backend/connector-tool-policy.md) 의 「도구 호출 판정」 이 소유한다.
+요청 칸은 Control Plane 의 `ConnectorPolicyRequest` 가, 응답 칸은 `ConnectionDtos.ConnectorPolicyResponse` 가, 판정 조건과 순서는 `ToolPolicyDecision` 이 갖는다.
 대응 파일이 없는 profile 에서는 아래 처리를 하지 않는다.
 
 대응 파일의 `isolated` 칸이 profile 의 방식을 정한다. 칸의 뜻은 같은 문서의 「이름 대응」 이 갖는다.

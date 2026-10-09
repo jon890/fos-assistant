@@ -11,7 +11,7 @@ import java.util.List;
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
 
-/** 파일 공간 경로의 응답 모양이다. 계약은 {@code docs/code-architecture.md} 의 「실행 공간 파일」 의 「API」 가 갖는다. */
+/** 파일 공간 경로의 응답 모양이다. 계약은 {@code backend/docs/code-architecture.md} 의 「실행 공간 파일」 의 「API」 가 갖는다. */
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
 public final class WorkspaceDtos {
 

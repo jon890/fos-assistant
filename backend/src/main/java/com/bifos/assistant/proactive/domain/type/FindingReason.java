@@ -1,6 +1,6 @@
 package com.bifos.assistant.proactive.domain.type;
 
-/** 발견을 「참고」 로 내린 까닭이다. 판정 순서와 조건은 {@code docs/backend/proactive-check.md} 가 갖는다. */
+/** 발견을 「참고」 로 내린 까닭이다. 판정 순서와 조건은 {@code FindingJudgement} 가 갖는다. */
 public enum FindingReason {
     /** 원문 주소가 {@code http} 나 {@code https} 의 절대 주소가 아니다. */
     NO_SOURCE,
