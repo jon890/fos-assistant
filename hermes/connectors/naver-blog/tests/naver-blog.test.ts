@@ -1,10 +1,10 @@
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { afterEach, expect, test } from "bun:test";
-import { CdpSession, websocketOriginFor, wsUrlFor } from "../src/cdp.ts";
+import { wsUrlFor } from "../src/cdp.ts";
 import { createServer } from "../src/server.ts";
 import { sessionStatus, type Env } from "../src/session.ts";
-import { closedPortUrl, FakeCdp, upstreamText } from "./fake-cdp.ts";
+import { closedPortUrl, FakeCdp, GATEWAY_PATH, upstreamText } from "./fake-cdp.ts";
 
 const BLOG_ID = "example-blog";
 const fakes: FakeCdp[] = [];
@@ -20,8 +20,8 @@ function fake(cookies?: Array<{ name: string; domain: string }>) {
   return cdp;
 }
 
-const env = (cdpUrl: string, blogId = BLOG_ID): Env => ({
-  NAVER_BLOG_CDP_URL: cdpUrl,
+const env = (browserUrl: string, blogId = BLOG_ID): Env => ({
+  NAVER_BLOG_BROWSER_URL: browserUrl,
   NAVER_BLOG_ID: blogId,
 });
 
@@ -31,7 +31,7 @@ const LOGGED_IN = [
   { name: "other", domain: ".example.com" },
 ];
 
-/** MCP 서버의 session_status 를 부르고, 결과 글에 CDP 주소와 브라우저 원문이 없는지 함께 본다. */
+/** MCP 서버의 session_status 를 부르고, 결과 글에 중계 주소와 브라우저 원문이 없는지 함께 본다. */
 async function callSessionStatus(values: Env) {
   const client = new Client({ name: "naver-blog-test", version: "1.0.0" });
   const server = createServer(values);
@@ -41,9 +41,12 @@ async function callSessionStatus(values: Env) {
     await client.connect(clientTransport);
     const result = await client.callTool({ name: "session_status", arguments: {} });
     const text = (result.content as Array<{ text: string }>)[0]?.text ?? "";
-    const cdpUrl = values.NAVER_BLOG_CDP_URL ?? "";
-    expect(text).not.toContain(cdpUrl);
-    expect(text).not.toContain(new URL(cdpUrl).host);
+    const browserUrl = values.NAVER_BLOG_BROWSER_URL ?? "";
+    if (browserUrl) {
+      expect(text).not.toContain(browserUrl);
+      expect(text).not.toContain(new URL(browserUrl).host);
+    }
+    expect(text).not.toContain(GATEWAY_PATH);
     expect(text).not.toContain(upstreamText);
     return { isError: result.isError === true, body: JSON.parse(text) };
   } finally {
@@ -63,39 +66,37 @@ test("로그인 쿠키 둘이 있으면 브라우저 대상의 쿠키만 읽고 
     { target: "browser/fake-browser", method: "Storage.getCookies", params: {} },
   ]);
   expect(cdp.httpRequests).not.toContain("PUT /json/new");
-  expect(cdp.origins).toEqual([`http://localhost:${cdp.server.port}`]);
   expect(cdp.violations).toEqual([]);
 });
 
-test("CDP 주소의 포트로 HTTP Origin 을 만들고 기본 포트는 생략한다", () => {
-  const cdp = fake();
-  expect(websocketOriginFor(cdp.url)).toBe(`http://localhost:${cdp.server.port}`);
-  expect(websocketOriginFor(`${cdp.url}/`)).toBe(`http://localhost:${cdp.server.port}`);
-  expect(websocketOriginFor("http://192.0.2.10")).toBe("http://localhost");
-  expect(websocketOriginFor("http://localhost:80/")).toBe("http://localhost");
-  expect(websocketOriginFor("https://localhost")).toBe("http://localhost");
-  expect(websocketOriginFor("https://localhost:443/")).toBe("http://localhost:443");
-  expect(websocketOriginFor("https://localhost:80/")).toBe("http://localhost");
-});
-
-test("CDP 서버는 포트 없는 Origin 을 거절한다", async () => {
-  const cdp = fake();
-  await expect(
-    CdpSession.connect(
-      wsUrlFor(cdp.url, `${cdp.url}/devtools/browser/fake-browser`),
-      "http://localhost",
-    ),
-  ).rejects.toMatchObject({ code: "NAVER_BLOG_BROWSER_UNREACHABLE" });
-  expect(cdp.origins).toEqual(["http://localhost"]);
-});
-
-test("끝에 / 가 붙은 연결 주소도 같은 창구로 붙는다", async () => {
+test("WebSocket 연결 요청에 Origin 머리를 싣지 않는다", async () => {
+  // 중계는 Origin 이 있는 요청을 브라우저 페이지의 요청으로 보고 403 으로 거절한다.
   const cdp = fake(LOGGED_IN);
 
-  const result = await sessionStatus(env(`${cdp.url}/`));
+  const result = await sessionStatus(env(cdp.url));
 
   expect(result.logged_in).toBe(true);
-  expect(cdp.httpRequests[0]).toBe("GET /json/version");
+  expect(cdp.origins).toEqual([""]);
+});
+
+test("중계 주소의 경로 아래로 /json/version 과 WebSocket 을 부른다", async () => {
+  const cdp = fake(LOGGED_IN);
+
+  const result = await sessionStatus(env(cdp.url));
+
+  expect(result.logged_in).toBe(true);
+  expect(cdp.paths).toEqual([
+    `${GATEWAY_PATH}/json/version`,
+    `${GATEWAY_PATH}/devtools/browser/fake-browser`,
+  ]);
+  expect(cdp.violations).toEqual([]);
+});
+
+test("중계 주소가 비었으면 중계가 꺼진 것이라 NAVER_BLOG_BROWSER_UNREACHABLE 로 실패한다", async () => {
+  const { isError, body } = await callSessionStatus(env(""));
+
+  expect(isError).toBe(true);
+  expect(body).toEqual({ error: { code: "NAVER_BLOG_BROWSER_UNREACHABLE" } });
 });
 
 test.each([
@@ -150,14 +151,25 @@ test("쿠키 명령에 답하지 않으면 정한 시간 안에 NAVER_BLOG_BROWS
   expect(performance.now() - started).toBeLessThan(3_000);
 });
 
-test("브라우저가 다른 주소를 적어도 연결 칸의 호스트와 포트로 붙는다", async () => {
+test("중계가 다른 호스트를 적어도 받은 주소의 호스트와 포트로 붙는다", async () => {
   const cdp = fake(LOGGED_IN);
-  cdp.debuggerUrl = "ws://127.0.0.1:9/devtools/browser/fake-browser";
+  cdp.debuggerUrl = `ws://gateway.example.test:9${GATEWAY_PATH}/devtools/browser/fake-browser`;
 
   const result = await sessionStatus(env(cdp.url));
 
   expect(result.logged_in).toBe(true);
   expect(cdp.calls.map((call) => call.target)).toEqual(["browser/fake-browser"]);
+});
+
+test("중계가 접두사 밖의 경로를 적으면 붙지 않고 NAVER_BLOG_BROWSER_UNREACHABLE 로 실패한다", async () => {
+  const cdp = fake(LOGGED_IN);
+  cdp.debuggerUrl = `ws://${cdp.server.hostname}:${cdp.server.port}/devtools/browser/fake-browser`;
+
+  const failure = await sessionStatus(env(cdp.url)).catch((error) => error);
+
+  expect(failure.code).toBe("NAVER_BLOG_BROWSER_UNREACHABLE");
+  expect(cdp.calls).toEqual([]);
+  expect(cdp.paths).toEqual([`${GATEWAY_PATH}/json/version`]);
 });
 
 test("wsUrlFor 는 경로만 남기고 http 는 ws, https 는 wss 로 바꾼다", () => {
@@ -169,12 +181,38 @@ test("wsUrlFor 는 경로만 남기고 http 는 ws, https 는 wss 로 바꾼다"
   );
 });
 
+test("wsUrlFor 는 받은 주소에 경로가 있으면 그 아래의 devtools 경로를 받은 호스트에 붙인다", () => {
+  expect(
+    wsUrlFor(
+      `https://gateway.example.test${GATEWAY_PATH}`,
+      `ws://192.0.2.10:8080${GATEWAY_PATH}/devtools/page/xyz`,
+    ),
+  ).toBe(`wss://gateway.example.test${GATEWAY_PATH}/devtools/page/xyz`);
+});
+
 test.each([
-  ["호스트 이름", env("http://chrome.example.internal:1")],
-  ["경로가 붙은 주소", env("http://192.0.2.10:1/json")],
-  ["다른 scheme", env("ftp://192.0.2.10:1")],
-  ["모양이 틀린 블로그 아이디", env("http://192.0.2.10:1", "example blog")],
-  ["빈 블로그 아이디", env("http://192.0.2.10:1", "")],
+  ["접두사 없는 devtools 경로", "ws://127.0.0.1:9/devtools/page/x"],
+  ["다른 표식의 경로", "ws://127.0.0.1:9/internal/browser-gateway/b2.other/devtools/page/x"],
+  ["접두사로 시작하지만 다른 조각", `ws://127.0.0.1:9${GATEWAY_PATH}x/devtools/page/x`],
+  ["접두사 아래의 devtools 밖 경로", `ws://127.0.0.1:9${GATEWAY_PATH}/json/version`],
+])("wsUrlFor 는 %s 를 NAVER_BLOG_BROWSER_UNREACHABLE 로 거절한다", (_, debuggerUrl) => {
+  let failure: unknown;
+  try {
+    wsUrlFor(`http://127.0.0.1:9${GATEWAY_PATH}`, debuggerUrl);
+  } catch (error) {
+    failure = error;
+  }
+
+  expect(failure).toMatchObject({ code: "NAVER_BLOG_BROWSER_UNREACHABLE" });
+});
+
+test.each([
+  ["경로 없는 주소", env("http://192.0.2.10:1")],
+  ["끝에 / 가 붙은 주소", env(`http://192.0.2.10:1${GATEWAY_PATH}/`)],
+  ["허용하지 않는 글자가 든 경로", env("http://192.0.2.10:1/internal/browser gateway")],
+  ["다른 scheme", env(`ftp://192.0.2.10:1${GATEWAY_PATH}`)],
+  ["모양이 틀린 블로그 아이디", env(`http://192.0.2.10:1${GATEWAY_PATH}`, "example blog")],
+  ["빈 블로그 아이디", env(`http://192.0.2.10:1${GATEWAY_PATH}`, "")],
 ])("%s 은 연결하지 않고 NAVER_BLOG_INVALID_INPUT 으로 실패한다", async (_, values) => {
   const { isError, body } = await callSessionStatus(values);
 

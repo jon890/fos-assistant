@@ -13,7 +13,6 @@ import {
   unlink,
 } from "node:fs/promises";
 import { join } from "node:path";
-import { endpoint } from "./cdp.ts";
 import { ToolError } from "./errors.ts";
 import type { Env } from "./session.ts";
 
@@ -75,9 +74,10 @@ export const inputFile = (dir: string, jobId: string) => join(dir, `${jobId}.inp
  */
 export const finishedFile = (dir: string, jobId: string) => join(dir, `${jobId}.finished`);
 
-/** CDP 주소마다 하나인 잠금 파일. 끝 `/` 만 다른 주소는 같은 브라우저다. */
-export function lockFile(dir: string, cdpUrl: string) {
-  const hash = createHash("sha256").update(endpoint(cdpUrl)).digest("hex");
+/** 블로그마다 하나인 잠금 파일. 중계 주소는 바인딩마다 달라 같은 브라우저도 여러 주소로 온다. */
+export function lockFile(dir: string, blogId: string) {
+  // 블로그 주소는 아이디의 대소문자를 가리지 않으므로 소문자로 맞춘 뒤 해시한다.
+  const hash = createHash("sha256").update(blogId.toLowerCase()).digest("hex");
   return join(dir, `lock-${hash.slice(0, 16)}`);
 }
 
@@ -396,11 +396,11 @@ async function createLock(path: string, jobId: string) {
 }
 
 /**
- * 그 브라우저의 잠금을 만든다. 살아 있는 작업이 잡고 있으면 `NAVER_BLOG_BUSY` 다.
+ * 그 블로그의 잠금을 만든다. 살아 있는 작업이 잡고 있으면 `NAVER_BLOG_BUSY` 다.
  * 묵은 잠금은 그 작업을 끝낸 뒤 지우고 한 번 더 만든다.
  */
-export async function acquireLock(dir: string, cdpUrl: string, jobId: string) {
-  const path = lockFile(dir, cdpUrl);
+export async function acquireLock(dir: string, blogId: string, jobId: string) {
+  const path = lockFile(dir, blogId);
   for (let attempt = 0; attempt < 2; attempt++) {
     try {
       await createLock(path, jobId);

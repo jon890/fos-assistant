@@ -17,6 +17,9 @@ import java.util.List;
  * @param appearance 카드의 아이콘과 링크. 옛 대시보드 plugin 은 내지 않고, 없으면 {@link ConnectorAppearance#NONE}
  * @param singleBinding 참이면 사용자의 그 연결은 에이전트 하나에만 붙는다(ADR-20261008 / connector-binding-guards). 옛 대시보드
  *     plugin 은 내지 않고, 없으면 거짓
+ * @param ownerBrowser 참이면 그 커넥터는 사용자 브라우저를 쓴다. 설치와 확인 호출이 중계 주소를 싣는다
+ *     (ADR-20261008 / browser-gateway-token). 옛 대시보드 plugin 은 내지 않고, 없으면 거짓
+ * @param ownerBrowserLoginUrl 사용자가 브라우저에서 먼저 로그인할 곳. 선언하지 않았으면 null
  */
 public record ConnectorManifest(
         String id,
@@ -31,7 +34,9 @@ public record ConnectorManifest(
         List<ConnectorTool> tools,
         List<String> skills,
         ConnectorAppearance appearance,
-        boolean singleBinding) {
+        boolean singleBinding,
+        boolean ownerBrowser,
+        String ownerBrowserLoginUrl) {
 
     public ConnectorManifest {
         description = description == null ? "" : description;
@@ -42,7 +47,7 @@ public record ConnectorManifest(
         appearance = appearance == null ? ConnectorAppearance.NONE : appearance;
     }
 
-    /** 연결을 에이전트 하나로 제한하지 않는 선언이다. 새 칸을 모르는 대시보드 plugin 의 카탈로그와 검사가 쓴다. */
+    /** 연결을 에이전트 하나로 제한하지 않고 사용자 브라우저를 쓰지 않는 선언이다. 새 칸을 모르는 대시보드 plugin 의 카탈로그와 검사가 쓴다. */
     public ConnectorManifest(
             String id,
             String title,
@@ -69,7 +74,9 @@ public record ConnectorManifest(
                 tools,
                 skills,
                 appearance,
-                false);
+                false,
+                false,
+                null);
     }
 
     /** 아이콘과 링크를 내지 않는 선언이다. 새 칸을 모르는 대시보드 plugin 의 카탈로그와 검사가 쓴다. */

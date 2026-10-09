@@ -1,5 +1,6 @@
 package com.bifos.assistant.connector.application;
 
+import com.bifos.assistant.browser.application.BrowserGatewayTokens;
 import com.bifos.assistant.connector.application.model.AdminConnectionSnapshot;
 import com.bifos.assistant.connector.application.model.BoundAgentSummary;
 import com.bifos.assistant.connector.application.model.ConnectionSnapshot;
@@ -65,6 +66,7 @@ public class ConnectorConnectionService {
     private final TransactionTemplate transactions;
     private final ConnectorCallLimiter limiter;
     private final ConnectorActionService approvals;
+    private final BrowserGatewayTokens tokens;
     private final Clock clock;
 
     /**
@@ -88,7 +90,8 @@ public class ConnectorConnectionService {
             HermesConnectorClient connector,
             PlatformTransactionManager transactionManager,
             ConnectorCallLimiter limiter,
-            ConnectorActionService approvals) {
+            ConnectorActionService approvals,
+            BrowserGatewayTokens tokens) {
         this(
                 connections,
                 bindings,
@@ -98,6 +101,7 @@ public class ConnectorConnectionService {
                 transactionManager,
                 limiter,
                 approvals,
+                tokens,
                 Clock.systemUTC());
     }
 
@@ -110,6 +114,7 @@ public class ConnectorConnectionService {
             PlatformTransactionManager transactionManager,
             ConnectorCallLimiter limiter,
             ConnectorActionService approvals,
+            BrowserGatewayTokens tokens,
             Clock clock) {
         this.connections = connections;
         this.bindings = bindings;
@@ -119,6 +124,7 @@ public class ConnectorConnectionService {
         this.transactions = new TransactionTemplate(transactionManager);
         this.limiter = limiter;
         this.approvals = approvals;
+        this.tokens = tokens;
         this.clock = clock;
     }
 
@@ -145,7 +151,8 @@ public class ConnectorConnectionService {
                     ConnectorToolPolicies.summaries(manifest),
                     connection == null ? ConnectionStatus.DISCONNECTED : connection.status(),
                     true,
-                    connection == null ? List.of() : boundAgents(connection)));
+                    connection == null ? List.of() : boundAgents(connection),
+                    manifest.ownerBrowserLoginUrl()));
         }
         mine.values().stream()
                 .filter(connection -> connection.status() != ConnectionStatus.DISCONNECTED)
@@ -186,7 +193,8 @@ public class ConnectorConnectionService {
                     .findFirst()
                     .orElseThrow(() -> new ApiException(ErrorCode.VALIDATION_FAILED, "this field has no options"));
             // 고르는 중이라 필수 칸이 아직 비어 있을 수 있다. 채운 칸의 형식만 본다.
-            JsonNode result = call(manifest, options.tool(), ConnectorValues.validated(manifest, values, false));
+            JsonNode result =
+                    call(user.id(), manifest, options.tool(), ConnectorValues.validated(manifest, values, false));
             return ConnectorOption.listFrom(result, options).orElseThrow(ConnectorErrors::unavailable);
         });
     }
@@ -206,7 +214,7 @@ public class ConnectorConnectionService {
         return limiter.call(user.id(), () -> {
             ConnectorManifest manifest = requireManifest(connectorId);
             Map<String, String> accepted = ConnectorValues.validated(manifest, values, true);
-            call(manifest, manifest.verifyTool(), accepted);
+            call(user.id(), manifest, manifest.verifyTool(), accepted);
             ConnectionSnapshot stored = transactions.execute(status -> apply(user, manifest, accepted));
             if (stored == null) {
                 throw new ConnectorOperationFailure();
@@ -299,7 +307,7 @@ public class ConnectorConnectionService {
             ApiException verifyFailure = null;
             boolean verified = false;
             if (prepared.vault() != null && manifest.isPresent()) {
-                verifyFailure = verify(manifest.get(), prepared.vault());
+                verifyFailure = verify(user.id(), manifest.get(), prepared.vault());
                 verified = verifyFailure == null;
             }
             ApiException failure = verifyFailure;
@@ -343,10 +351,11 @@ public class ConnectorConnectionService {
     }
 
     /** 보관 파일의 값으로 확인 도구를 부른다. 실패는 공통 어휘의 오류로 돌려준다. */
-    private ApiException verify(ConnectorManifest manifest, String vault) {
+    private ApiException verify(long userId, ConnectorManifest manifest, String vault) {
         final CallResult result;
         try {
-            result = connector.callWithVault(manifest.id(), manifest.verifyTool(), vault);
+            result = connector.callWithVault(
+                    manifest.id(), manifest.verifyTool(), vault, ownerBrowser(userId, manifest));
         } catch (RuntimeException ex) {
             warn(STEP_TOOL_CALL, manifest.id(), ex);
             return ConnectorErrors.unavailable();
@@ -417,10 +426,10 @@ public class ConnectorConnectionService {
     }
 
     /** 도구를 부르고 성공 결과를 돌려준다. 실패는 공통 어휘에 맞는 오류 코드로 끝낸다. */
-    private JsonNode call(ConnectorManifest manifest, String tool, Map<String, String> values) {
+    private JsonNode call(long userId, ConnectorManifest manifest, String tool, Map<String, String> values) {
         final CallResult result;
         try {
-            result = connector.call(manifest.id(), tool, values);
+            result = connector.call(manifest.id(), tool, values, ownerBrowser(userId, manifest));
         } catch (RuntimeException ex) {
             warn(STEP_TOOL_CALL, manifest.id(), ex);
             throw ConnectorErrors.unavailable();
@@ -429,6 +438,15 @@ public class ConnectorConnectionService {
             throw ConnectorErrors.of(result.error());
         }
         return result.result();
+    }
+
+    /**
+     * 확인 도구와 선택지 호출에 실을 브라우저 중계 주소다. 사용자 브라우저를 쓰지 않는 커넥터는 null 이라 본문에 키가 없다.
+     *
+     * <p>바인딩이 없는 호출이라 요청자의 호출 표식을 싣는다. 중계가 꺼졌으면 빈 값이다(ADR-20261008 / browser-gateway-token).
+     */
+    private String ownerBrowser(long userId, ConnectorManifest manifest) {
+        return manifest.ownerBrowser() ? tokens.callAddress(userId).orElse("") : null;
     }
 
     private ConnectionSnapshot snapshot(ConnectorConnection connection) {

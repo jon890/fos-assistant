@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.nullable;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -121,9 +122,9 @@ class AgentConnectionControllerTest {
     @BeforeEach
     void setUp() {
         when(connector.readCatalog()).thenReturn(List.of(MANIFEST));
-        when(connector.call(anyString(), anyString(), anyMap()))
+        when(connector.call(anyString(), anyString(), anyMap(), nullable(String.class)))
                 .thenReturn(CallResult.success(MAPPER.readTree("{\"ok\":true}")));
-        when(connector.bindConnector(anyString(), anyString(), anyString(), anyString()))
+        when(connector.bindConnector(anyString(), anyString(), anyString(), anyString(), nullable(String.class)))
                 .thenReturn(new InstallResult(true, false));
         when(connector.unbindConnector(anyString(), anyString())).thenReturn(new InstallResult(false, false));
         when(connector.putConnector(anyString(), anyString(), anyBoolean(), anyString()))
@@ -183,7 +184,7 @@ class AgentConnectionControllerTest {
                 .getResponse()
                 .getContentAsString();
         assertThat(bound + listed).doesNotContain(ENV_NAME, SERVER_NAME, connection.vault(), TOKEN);
-        verify(connector).bindConnector(agent.hermesProfile(), DEMO, connection.vault(), agent.sandboxOwner());
+        verify(connector).bindConnector(agent.hermesProfile(), DEMO, connection.vault(), agent.sandboxOwner(), null);
 
         mvc.perform(delete(path + "/" + DEMO)).andExpect(status().isNoContent());
 
@@ -206,7 +207,8 @@ class AgentConnectionControllerTest {
         mvc.perform(put("/api/v1/agents/" + agent.code() + "/connections/" + DEMO))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.code").value("AGENT_NOT_FOUND"));
-        verify(connector, never()).bindConnector(anyString(), anyString(), anyString(), anyString());
+        verify(connector, never())
+                .bindConnector(anyString(), anyString(), anyString(), anyString(), nullable(String.class));
     }
 
     @Test
@@ -221,7 +223,8 @@ class AgentConnectionControllerTest {
         mvc.perform(put("/api/v1/agents/" + agent.code() + "/connections/" + DEMO))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.code").value("FORBIDDEN"));
-        verify(connector, never()).bindConnector(anyString(), anyString(), anyString(), anyString());
+        verify(connector, never())
+                .bindConnector(anyString(), anyString(), anyString(), anyString(), nullable(String.class));
     }
 
     @Test

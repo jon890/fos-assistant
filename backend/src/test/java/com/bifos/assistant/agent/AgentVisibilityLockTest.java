@@ -3,6 +3,7 @@ package com.bifos.assistant.agent;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.nullable;
 import static org.mockito.Mockito.when;
 
 import com.bifos.assistant.agent.application.AgentLifecycleService;
@@ -132,7 +133,7 @@ class AgentVisibilityLockTest {
         when(connector.readCatalog()).thenReturn(List.of(DEMO_MANIFEST));
         CountDownLatch locked = new CountDownLatch(1);
         CountDownLatch release = new CountDownLatch(1);
-        when(connector.bindConnector(anyString(), anyString(), anyString(), anyString()))
+        when(connector.bindConnector(anyString(), anyString(), anyString(), anyString(), nullable(String.class)))
                 .thenAnswer(invocation -> {
                     locked.countDown();
                     assertThat(release.await(10, TimeUnit.SECONDS)).isTrue();

@@ -1,6 +1,7 @@
 package com.bifos.assistant.browser.infra;
 
 import java.time.Duration;
+import java.util.regex.Pattern;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.validation.annotation.Validated;
 
@@ -57,9 +58,20 @@ public record BrowserProperties(
     private static final int MIN_GATEWAY_SECRET_LENGTH = 32;
 
     /**
+     * 대시보드가 커넥터 env 에 넣기 전에 중계 주소를 검사하는 식이다. 대시보드 plugin 의 {@code connector_schema.py} 에 있는
+     * {@code OWNER_BROWSER_VALUE_RE} 와 같은 글이어야 한다. 한쪽을 고치면 다른 쪽도 고친다. {@code BrowserPropertiesTest} 가 두 글을 견준다.
+     */
+    static final Pattern OWNER_BROWSER_VALUE =
+            Pattern.compile("^https?://[A-Za-z0-9.-]{1,253}(:[0-9]{1,5})?(/[A-Za-z0-9._~-]{1,128}){1,8}$");
+
+    /** 바인딩 표식과 같은 모양의 견본이다. 번호 1 에 소문자 16진수 64자를 붙인다. */
+    private static final String SAMPLE_BINDING_TOKEN = "/b1." + "0".repeat(64);
+
+    /**
      * 동시 수와 시간은 늘 확인한다. 나머지는 켜져 있을 때만 확인한다. 상한은 두지 않는다. 운영이 정한다.
      *
-     * <p>중계의 두 값은 비어 있으면 중계만 꺼지고 기동한다. 값이 있으면 모양을 확인하고, 메시지에 값을 싣지 않는다.
+     * <p>중계의 두 값은 비어 있으면 중계만 꺼지고 기동한다. 값이 있으면 모양을 확인하고, 메시지에 값을 싣지 않는다. 주소는 바인딩
+     * 표식을 붙인 모양이 대시보드의 검사를 지나는지도 본다. 지나지 못하면 대시보드가 바인딩 설치를 거절한다.
      */
     public BrowserProperties {
         requireAtLeastOne("max-running", maxRunning);
@@ -70,6 +82,13 @@ public record BrowserProperties(
                 && !((gatewayBaseUrl.startsWith("http://") || gatewayBaseUrl.startsWith("https://"))
                         && gatewayBaseUrl.endsWith(GATEWAY_PATH))) {
             throw new IllegalStateException(PREFIX + "gateway-base-url must be http(s) and end with " + GATEWAY_PATH);
+        }
+        if (hasText(gatewayBaseUrl)
+                && !OWNER_BROWSER_VALUE
+                        .matcher(gatewayBaseUrl + SAMPLE_BINDING_TOKEN)
+                        .matches()) {
+            throw new IllegalStateException(
+                    PREFIX + "gateway-base-url must be accepted by the dashboard's owner browser address check");
         }
         if (hasText(gatewaySecret) && gatewaySecret.length() < MIN_GATEWAY_SECRET_LENGTH) {
             throw new IllegalStateException(
