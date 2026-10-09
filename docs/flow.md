@@ -489,12 +489,15 @@ sequenceDiagram
 ```mermaid
 sequenceDiagram
     participant B as 브라우저
+    participant W as Next.js 서버 라우트
     participant C as Control Plane
     participant H as 권한 도우미
 
-    B->>C: GET /api/v1/workspace 로 도는 실행 수를 다시 읽는다
+    B->>W: GET /api/workspace 로 도는 실행 수를 다시 읽는다
+    W->>C: GET /api/v1/workspace
     B->>B: 확인 창. 도는 실행이 있으면 다시 생길 수 있다고 알린다
-    B->>C: DELETE /api/v1/workspace/entries?path=
+    B->>W: DELETE /api/workspace/entries?path=
+    W->>C: DELETE /api/v1/workspace/entries?path=
     C->>C: 경로 규칙, 읽기 마운트에서 있는지 확인
     C->>H: {owner, path, max_entries} 한 줄
     alt 지웠다

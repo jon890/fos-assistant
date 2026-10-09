@@ -128,20 +128,21 @@ public class WorkspaceService {
             throw readFailed(user, ex);
         }
         try {
-            WorkspaceDeletion deleted = deleter.delete("u" + user.id(), path, DELETE_LIMIT);
-            logDelete(user, path, deleted.kind().name(), deleted.entries(), "OK");
+            WorkspaceDeletion deleted = deleter.delete(ownerKey(user), path, DELETE_LIMIT);
+            logDelete(user, path, deleted.kind().name(), String.valueOf(deleted.entries()), "OK");
             return deleted;
         } catch (ApiException ex) {
-            logDelete(user, path, entry.kind().name(), 0, ex.code().name());
+            // 도우미가 실패하면 일부가 지워졌을 수 있어 지운 항목 수를 모른다.
+            logDelete(user, path, entry.kind().name(), "-", ex.code().name());
             throw ex;
         }
     }
 
-    private static void logDelete(CurrentUser user, WorkspacePath path, String kind, long entries, String result) {
+    private static void logDelete(CurrentUser user, WorkspacePath path, String kind, String entries, String result) {
         log.info(
                 "workspace delete user={} path={} kind={} entries={} result={}",
                 user.id(),
-                path.value(),
+                escapeForLog(path.value()),
                 kind,
                 entries,
                 result);
@@ -152,7 +153,29 @@ public class WorkspaceService {
         if (!current.available() || !WorkspaceTree.isDirectoryNoFollow(current.rootPath())) {
             return Optional.empty();
         }
-        return Optional.of(current.rootPath().resolve("u" + user.id()));
+        return Optional.of(current.rootPath().resolve(ownerKey(user)));
+    }
+
+    /** 실행 공간의 주인 키다. 요청자로만 만든다. */
+    private static String ownerKey(CurrentUser user) {
+        return "u" + user.id();
+    }
+
+    /**
+     * 로그 줄을 끊거나 꾸밀 수 있는 문자를 역슬래시, {@code u}, 대문자 16진수 네 자리로 바꾼다. C0 제어 문자와 DEL, C1 제어 문자, 줄 구분자
+     * U+2028 과 문단 구분자 U+2029 가 대상이다.
+     */
+    static String escapeForLog(String value) {
+        StringBuilder escaped = new StringBuilder(value.length());
+        for (int i = 0; i < value.length(); i++) {
+            char c = value.charAt(i);
+            if (c < 0x20 || (c >= 0x7f && c <= 0x9f) || c == 0x2028 || c == 0x2029) {
+                escaped.append(String.format("\\u%04X", (int) c));
+            } else {
+                escaped.append(c);
+            }
+        }
+        return escaped.toString();
     }
 
     private Path requireOwnerDir(CurrentUser user) {

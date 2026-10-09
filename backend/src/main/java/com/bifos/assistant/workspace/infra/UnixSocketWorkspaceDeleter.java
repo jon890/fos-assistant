@@ -69,8 +69,9 @@ public class UnixSocketWorkspaceDeleter implements WorkspaceDeleter {
                 + "\n";
         String answer;
         try {
-            answer = exchange(Path.of(current.deleteSocket()), request.getBytes(StandardCharsets.UTF_8));
-        } catch (IOException ex) {
+            answer = exchange(current.deleteSocket(), request.getBytes(StandardCharsets.UTF_8));
+        } catch (IOException | RuntimeException ex) {
+            // 잘못된 socket 설정값도 500 이 아니라 도우미 실패로 답한다.
             log.warn(
                     "workspace delete helper exchange failed error={}",
                     ex.getClass().getSimpleName());
@@ -79,12 +80,13 @@ public class UnixSocketWorkspaceDeleter implements WorkspaceDeleter {
         return parse(answer);
     }
 
-    private String exchange(Path socket, byte[] request) throws IOException {
+    private String exchange(String socket, byte[] request) throws IOException {
         long deadline = System.nanoTime() + timeout.toNanos();
+        UnixDomainSocketAddress address = UnixDomainSocketAddress.of(Path.of(socket));
         try (SocketChannel channel = SocketChannel.open(StandardProtocolFamily.UNIX);
                 Selector selector = Selector.open()) {
             channel.configureBlocking(false);
-            channel.connect(UnixDomainSocketAddress.of(socket));
+            channel.connect(address);
             return new String(exchangeBytes(channel, selector, request, deadline), StandardCharsets.UTF_8);
         }
     }

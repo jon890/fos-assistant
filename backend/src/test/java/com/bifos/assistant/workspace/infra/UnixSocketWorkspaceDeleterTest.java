@@ -165,6 +165,17 @@ class UnixSocketWorkspaceDeleterTest {
 
     @Test
     @Timeout(10)
+    @DisplayName("socket 설정값이 경로가 될 수 없는 문자열이면 500 이 아니라 지우기 실패다")
+    void failsWhenSocketSettingIsInvalid() {
+        UnixSocketWorkspaceDeleter deleter = new UnixSocketWorkspaceDeleter(
+                LiveProperties.fixed(WorkspaceProperties.class, new WorkspaceProperties("/", "/tmp/bad\0.sock")),
+                Duration.ofSeconds(5));
+
+        assertFailsWith(deleter, ErrorCode.WORKSPACE_DELETE_FAILED);
+    }
+
+    @Test
+    @Timeout(10)
     @DisplayName("socket 설정이 비면 지우기를 쓸 수 없다")
     void rejectsWhenSocketIsNotConfigured() {
         UnixSocketWorkspaceDeleter deleter = new UnixSocketWorkspaceDeleter(
