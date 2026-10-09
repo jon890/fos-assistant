@@ -345,6 +345,16 @@ export async function save(
   throw page.fail("save_unconfirmed", "저장 단추는 눌렀지만 임시저장 수가 늘지 않았다");
 }
 
+/** 발행 설정을 열어 카테고리와 태그를 읽고 설정만 닫는다. 열거나 닫지 못하면 `editor_failed` 다. */
+export async function readSettings(page: EditorPage) {
+  if (!(await openSettings(page)))
+    throw page.fail("editor_failed", "카테고리와 태그 상태를 읽을 수 없다");
+  const current = await settingsState(page);
+  if (!(await closeSettings(page)))
+    throw page.fail("editor_failed", "상태를 읽은 뒤 발행 설정을 닫지 못했다");
+  return current;
+}
+
 export type EditorState = {
   title: string;
   photos: number;
@@ -358,11 +368,7 @@ export type EditorState = {
 
 /** 편집기에 실제로 들어간 것을 읽는다. */
 export async function state(page: EditorPage): Promise<EditorState> {
-  if (!(await openSettings(page)))
-    throw page.fail("editor_failed", "카테고리와 태그 상태를 읽을 수 없다");
-  const current = await settingsState(page);
-  if (!(await closeSettings(page)))
-    throw page.fail("editor_failed", "상태를 읽은 뒤 발행 설정을 닫지 못했다");
+  const current = await readSettings(page);
   return {
     title: normalize((await paragraphs(page, TITLE_SELECTOR)).join("")),
     photos: await imageCount(page),

@@ -359,7 +359,7 @@ export function finishStale(dir: string, state: JobState) {
 
 type LockBody = { job_id?: unknown; created_at?: unknown };
 
-async function readLock(path: string): Promise<{ jobId: string | null; createdAt: number } | null> {
+export async function readLock(path: string): Promise<{ jobId: string | null; createdAt: number } | null> {
   let raw: string;
   let modified: number;
   try {
