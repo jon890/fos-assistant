@@ -9,6 +9,8 @@ import { AssistantRow, MessageBubble, type Turn } from "./message-bubble";
 import { ActivityBlock } from "./activity/activity-block";
 import type { ActivityState } from "./activity/activity-state";
 import { WaitingIndicator } from "./waiting-indicator";
+import { OutgoingMessageView } from "./outgoing-message";
+import type { OutgoingMessage } from "./composer-attachment-utils";
 import { MemoryCaptureList } from "./memory-capture-list";
 import type { MemoryCapture } from "@/lib/memory-capture-api";
 import { MemoryUseList } from "./memory-use-list";
@@ -23,6 +25,7 @@ import {
 
 type Props = {
   turns: Turn[];
+  outgoing?: OutgoingMessage | null;
   loading: boolean;
   sending: boolean;
   activity: ActivityState | null;
@@ -62,9 +65,9 @@ type Props = {
   /** 발견에 반응을 남겼다. 목록을 다시 읽는다 */
   onCheckFindingsChanged?(): void;
 };
-
 export function MessageList({
   turns,
+  outgoing,
   loading,
   sending,
   activity,
@@ -163,7 +166,8 @@ export function MessageList({
   });
   const visible = [...foldedVisible, ...pendingVisible];
   const lastVisible = visible.at(-1)?.turn;
-  const hasNoAnswer = lastVisible?.role === "USER" && latestView && !sending;
+  const hasNoAnswer =
+    lastVisible?.role === "USER" && latestView && !sending && !outgoing;
   // 기억 기록과 참고한 기억은 turn 이 끝난 뒤 따로 읽혀 답 아래에 들어오므로 맨 아래 따라가기도 그 줄을 본다. 펼침 상태는 넣지 않는다.
   const capturesVersion = memoryCaptures
     .map((capture) => `${capture.id}:${capture.status}`)
@@ -174,8 +178,7 @@ export function MessageList({
   const findingsVersion = checkFindings
     .map((finding) => `${finding.id}:${finding.reaction}`)
     .join(",");
-  const contentVersion = `${turns.map((turn) => `${turn.id}:${turn.content.length}`).join("|")}:${sending}:${activity?.items.length}:${turnError}:${capturesVersion}:${usesVersion}:${findingsVersion}`;
-
+  const contentVersion = `${turns.map((turn) => `${turn.id}:${turn.content.length}`).join("|")}:${sending}:${activity?.items.length}:${turnError}:${capturesVersion}:${usesVersion}:${findingsVersion}:${outgoing?.items.map((item) => `${item.key}:${item.status}`).join("|")}`;
   const hasLiveActivity = activity !== null && activity.items.length > 0;
   // 답이 아직 없으면 기다림 점이나 진행 중 블록이 비서 줄 하나에 들어온다. 답이 흘러나오면 그 답의 줄이 블록을 받는다.
   const pendingActivity = !streamedAnswer && hasLiveActivity;
@@ -190,12 +193,10 @@ export function MessageList({
       onOpenPanel={onOpenLive}
     />
   ) : null;
-
   // 아래 스크롤 맞춤보다 먼저 돌아야 바뀐 대화의 첫 그림부터 맨 아래를 따라간다.
   useLayoutEffect(() => {
     shouldFollow.current = true;
   }, [conversationId]);
-
   useLayoutEffect(() => {
     const element = scrollRef.current;
     if (!element || loading) return;
@@ -206,7 +207,6 @@ export function MessageList({
       setHasNewMessage(true);
     }
   }, [contentVersion, loading]);
-
   const scrollToBottom = () => {
     const element = scrollRef.current;
     if (!element) return;
@@ -219,7 +219,6 @@ export function MessageList({
     });
     setHasNewMessage(false);
   };
-
   return (
     <div className="relative min-h-0 flex-1">
       <div
@@ -241,7 +240,7 @@ export function MessageList({
               <Skeleton className="h-[4.25rem]" />
               <Skeleton className="h-[4.25rem]" />
             </div>
-          ) : turns.length === 0 && !sending && !activity ? (
+          ) : turns.length === 0 && !sending && !activity && !outgoing ? (
             <p className="py-8 text-center text-sm text-muted-foreground">
               무엇이든 물어보세요.
             </p>
@@ -352,6 +351,7 @@ export function MessageList({
                   );
                 },
               )}
+              {outgoing ? <OutgoingMessageView message={outgoing} /> : null}
               {pendingActivity || waiting ? (
                 <AssistantRow
                   data-testid="pending-assistant"

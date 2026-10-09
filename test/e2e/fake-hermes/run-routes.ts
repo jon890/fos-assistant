@@ -1,6 +1,7 @@
 import { type FakeHermesState, type ConnectorCall } from "./state.ts";
 import { createLifecycle, send, readBody, shortId, wait } from "./lifecycle.ts";
 import { createMcp } from "./mcp.ts";
+import { type SubmittedInput, submittedImages, submittedText } from "./run-input.ts";
 import { type IncomingMessage, type ServerResponse } from "node:http";
 import {
   RUN_STOP_PATH,
@@ -71,21 +72,22 @@ export function createRunRoutes(state: FakeHermesState, { authorized, runNotFoun
 
         const raw = await readBody(request);
         const submitted = (raw.length > 0 ? JSON.parse(raw) : {}) as {
-          input?: string;
+          input?: SubmittedInput;
           instructions?: string;
           session_id?: string;
           provider?: string;
           model?: string;
           model_options?: { reasoning?: { effort?: string } };
         };
-        const { folder: artifactFolder, conversationId: artifactConversationId, rest: input } = splitArtifactPreamble(submitted.input ?? "");
+        const { folder: artifactFolder, conversationId: artifactConversationId, rest: input } = splitArtifactPreamble(submittedText(submitted.input));
         // 추천을 만드는 실행은 Control Plane 이 새 대화 화면을 열 때마다 끼어든다. 대화 실행을 관찰하려는 검사가
         // 그 실행에 흔들리지 않도록 「마지막 제출」 기록을 덮어쓰지 않고 `holdNextRun` 도 가져가지 않는다.
         const starterRun = input.startsWith(STARTER_MARK);
         if (!starterRun) {
           state.lastSubmittedInstructions = submitted.instructions;
           // 되돌려 받는 쪽은 원문을 본다. 결과물 폴더 단락이 붙었는지 검사가 이것으로 안다.
-          state.lastSubmittedInput = submitted.input;
+          state.lastSubmittedInput = submittedText(submitted.input);
+          state.lastSubmittedImages = submittedImages(submitted.input);
         }
         if (input === ARTIFACT_PROBE && artifactFolder !== undefined) writeArtifactDraft(artifactFolder);
         if (input === ARTIFACT_SAME_NAME_PROBE && artifactFolder !== undefined) writeSameNameArtifacts(artifactFolder);
@@ -170,7 +172,7 @@ export function createRunRoutes(state: FakeHermesState, { authorized, runNotFoun
         const script = proactiveRun ? state.proactiveScript : undefined;
         if (proactiveRun) {
           state.proactiveScript = undefined;
-          state.proactiveInputs.push({ profile: profile!, input: submitted.input ?? "" });
+          state.proactiveInputs.push({ profile: profile!, input: submittedText(submitted.input) });
         }
         const heldByNext = state.holdNextRun && !starterRun;
         if (heldByNext) state.holdNextRun = false;

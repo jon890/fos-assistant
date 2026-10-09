@@ -70,10 +70,9 @@ export function useConversationEffects({
       try {
         const response = await openConversationEvents(id, controller.signal);
         if (response.ok) {
+          // 최초 연결 직전과 다시 붙는 동안 바뀐 대기 줄은 사건을 못 받을 수 있어 연결 뒤에 맞춘다.
+          void pending.reload();
           if (reconnected) {
-            // 끊긴 사이의 `pending` 사건은 다시 오지 않는다. 놓치면 이미 보낸 글이 대기 줄에 남으므로 다시 읽는다.
-            // 대기 줄 사건과 같이 보류하지 않는다.
-            void pending.reload();
             setApprovalRefresh((count) => count + 1);
             await runConversationTask(() => resumeAfterReconnect(id));
           }
