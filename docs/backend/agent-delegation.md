@@ -226,7 +226,7 @@ sequenceDiagram
 ## 결과 전달이 끝나지 않았을 때
 
 자동 turn 이 부모에 넘긴 결과들은 전달 묶음 하나로 남고, 넘긴 한 번 한 번이 전달 시도로 남는다.
-결정은 [ADR-075](../adr/ADR-075-결과-전달은-묶음과-시도로-남기고-사용자가-저장된-결과만-다시-전달한다.md), 표의 칸은 [`schema/chat.md`](schema/chat.md) 의 `result_delivery` 에 있다.
+결정은 [ADR-075](../adr/ADR-075-결과-전달은-묶음과-시도로-남기고-사용자가-저장된-결과만-다시-전달한다.md), 표의 칸은 [`backend/docs/data-schema.md`](../../backend/docs/data-schema.md) 의 `result_delivery` 에 있다.
 
 **「도착 알림 줄 저장」 과 「부모 결과 정리 완료」 는 다른 상태다.**
 알림 줄과 `result_delivered_at` 은 결과가 부모 대화에 도착했다는 뜻이다. 부모가 그 결과로 답을 남겼는지는 묶음의 상태가 갖는다.

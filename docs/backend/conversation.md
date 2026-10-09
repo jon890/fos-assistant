@@ -36,7 +36,7 @@ web 은 입력창 아래의 `chat/model-picker.tsx` 로 고른다.
 기본 모델과 숨김을 DB 에 두는 까닭은
 [ADR-054](../../backend/docs/adr/ADR-054-에이전트-기본-모델과-모델-숨김은-control-plane-db-가-갖는다.md) 에 있다.
 
-실행을 보낼 때 세 값을 정하는 차례는 [`model-tiers.md`](../model-tiers.md) 의 「모델 선택」 이 갖는다.
+실행을 보낼 때 세 값을 정하는 차례는 [`docs/model-tiers.md`](../model-tiers.md) 의 「모델 선택」 이 갖는다.
 모델이 비어 있으면 `/v1/runs` 에 `provider`, `model` 을 빼고,
 effort 가 비어 있으면 `model_options` 를 뺀다. 비어 있음(미지정)과 `none`(reasoning 끔)은 다른 의도라, `none` 은 `model_options.reasoning.effort` 에 그대로 싣는다. 정한 모델이 숨긴 모델이면 제출하지 않고 `MODEL_HIDDEN` 으로 실패시킨다.
 모델이 비어 있고 그룹에 숨김이 있으면 `ModelOptionsService.profileDefaultOf` 가 들고 있는 목록에서 읽은 profile 의 기본 모델로 같은 판정을 한다.
@@ -45,7 +45,7 @@ effort 가 비어 있으면 `model_options` 를 뺀다. 비어 있음(미지정)
 
 컨트롤러가 `ConversationAccess.requireOwnId(user, publicId)` 로 주인을 확인하며 번호로 바꾸고,
 `application` 안쪽은 지금처럼 번호를 쓴다. 사건과 응답에 싣는 공개 식별자는 `Conversation.publicId()` 에서 읽는다.
-UUID 모양이 아닌 `{id}` 는 400 `VALIDATION_FAILED` 다. [`packages.md`](packages.md) 의 형식 오류 규칙이 모든 경로에 걸린다.
+UUID 모양이 아닌 `{id}` 는 400 `VALIDATION_FAILED` 다. [`backend/docs/code-architecture.md`](../../backend/docs/code-architecture.md) 의 형식 오류 규칙이 모든 경로에 걸린다.
 
 **turn 이 끝날 때 대화를 통째로 다시 저장하지 않는다.**
 요청 시작에 읽은 `Conversation` 을 끝에서 통째로 저장하면, 그 사이에 사용자가 이름을 바꾸거나 지웠을 때

@@ -54,7 +54,7 @@ Control Plane MCP 서버가 `follow_up_propose` 를 둔다.
 보통 대화는 만든 시각과 관계없이 모든 열린 제안을 센다. 같은 제목과 거절 이력의 억제는 점검 대화에도 그대로 적용한다.
 
 `title_key` 를 만드는 정규화는 `FollowUpService` 가 갖는다.
-같은 제안이 동시에 두 번 오면 `(user_id, title_key, open_marker)` 유일 제약이 하나만 남긴다([`schema/attention.md`](schema/attention.md) 의 「follow_up」).
+같은 제안이 동시에 두 번 오면 `(user_id, title_key, open_marker)` 유일 제약이 하나만 남긴다([`backend/docs/data-schema.md`](../../backend/docs/data-schema.md) 의 「follow_up」).
 
 ## API
 

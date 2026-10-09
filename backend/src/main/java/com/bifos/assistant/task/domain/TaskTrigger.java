@@ -23,7 +23,7 @@ import lombok.experimental.Accessors;
 /**
  * 예약 작업의 시각이다(ADR-077). 지금은 작업 하나에 하나다.
  *
- * <p>칸의 뜻은 {@code docs/backend/schema/task.md} 의 「task_trigger」 가 갖는다. 시각을 고치면 이 줄을 고친다. 발화 기록의 유일
+ * <p>칸의 뜻은 {@code backend/docs/data-schema.md} 의 「task_trigger」 가 갖는다. 시각을 고치면 이 줄을 고친다. 발화 기록의 유일
  * 제약이 이 줄의 번호를 쓰므로 줄을 새로 만들지 않는다.
  *
  * <p>시각 칸은 {@code DATETIME(6)} 이라 마이크로초까지만 둔다.

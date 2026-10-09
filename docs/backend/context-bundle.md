@@ -119,7 +119,7 @@ Control Plane 이 구조로 알 수 있는 충돌만 `conflictsWith` 에 적는�
 
 - **로그에는 사용자 번호, 실행 번호, 항목의 `source` 와 `ref`, 개수, 글자 수만 낸다.** 제목과 본문은 내지 않는다
 - **묶음의 원문은 저장하지 않는다.** 실행 기록에는 지금처럼 `context_chars`, `context_omitted_items`, `instructions_hash` 를 남긴다
-- **실행마다 실은 항목의 참조를 남긴다.** `execution_context_source` 표다([`schema/execution.md`](schema/execution.md) 의 「execution_context_source」). 제목과 본문은 남기지 않는다
+- **실행마다 실은 항목의 참조를 남긴다.** `execution_context_source` 표다([`backend/docs/data-schema.md`](../../backend/docs/data-schema.md) 의 「execution_context_source」). 제목과 본문은 남기지 않는다
 - **도구 사건에 Memory 본문을 남기지 않는다.** Hermes 의 `tool.completed` 사건은 결과를 싣지 않는다([`hermes/docs/hermes-contract.md`](../../hermes/docs/hermes-contract.md) 의 「실행 이벤트가 실제로 오는 형태」). Hermes 가 뒤에 `result` 를 싣기 시작해도, `memory_read` 사건의 `detail` 은 `tool.started` 의 `preview`(인자)만 쓴다
 
 ## 합성 시나리오

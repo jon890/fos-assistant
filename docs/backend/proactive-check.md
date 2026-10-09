@@ -2,7 +2,7 @@
 
 사용자가 묻거나 스킬을 부르지 않아도 에이전트가 사용자의 맥락을 보고 제안이나 질문을 내거나 침묵하는 실행이다.
 결정은 [ADR-080](../adr/ADR-080-먼저-살펴보기는-점검-대화의-turn-하나로-돌고-읽기-경계를-control-plane-이-강제한다.md) 과 [ADR-081](../../backend/docs/adr/ADR-081-살펴보기-결과는-답-끝의-구조화-블록으로-받고-control-plane-이-검사해-그린다.md) 에 있다.
-저장 모델은 [`schema/proactive.md`](schema/proactive.md) 가 갖는다.
+저장 모델은 [`backend/docs/data-schema.md`](../../backend/docs/data-schema.md) 가 갖는다.
 
 ## 용어
 
@@ -63,7 +63,7 @@ Hermes 가 복구돼도 꺼진 일정은 발화하지 않으며, 이미 대기 �
 | 에이전트가 꺼졌다 | `AGENT_DISABLED` |
 | `assistant.proactive-check.enabled` 가 거짓이다 | 409 `PROACTIVE_CHECK_UNAVAILABLE`, 까닭 `DISABLED` |
 
-사용자 자리가 없거나 점검 대화가 바쁠 때의 409 는 루트 [`flow.md`](../flow.md) 의 「먼저 살펴보기」 가 그린다.
+사용자 자리가 없거나 점검 대화가 바쁠 때의 409 는 루트 [`docs/flow.md`](../flow.md) 의 「먼저 살펴보기」 가 그린다.
 
 ## 다섯 칸 보고
 
@@ -280,7 +280,7 @@ turn 이 어떻게 끝나든 잠금을 풀기 전에 `ProactiveCheckService` 가
 
 ## 발견 반응
 
-단추와 지금 반응, 404 와 400 분기는 [ADR-20261008 / check-finding-reaction](../adr/ADR-20261008-check-finding-reaction.md)과 루트 [`flow.md`](../flow.md) 의 「발견에 반응할 때」 가 갖는다. 경로와 응답 칸은 `CheckFindingController` 가 갖는다.
+단추와 지금 반응, 404 와 400 분기는 [ADR-20261008 / check-finding-reaction](../adr/ADR-20261008-check-finding-reaction.md)과 루트 [`docs/flow.md`](../flow.md) 의 「발견에 반응할 때」 가 갖는다. 경로와 응답 칸은 `CheckFindingController` 가 갖는다.
 점검 대화를 지우면 그 대화의 사건이 함께 지워져 반응도 사라진다.
 
 ## 문제 후보

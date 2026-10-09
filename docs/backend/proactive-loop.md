@@ -117,7 +117,7 @@ provider 는 `assistant.proactive-loop.provider` 다. 판단 profile 이 없거�
 
 ## 기록과 조회
 
-시도 줄은 `proactive_loop_run`, 설정은 `proactive_loop_setting` 이다. 저장 모델은 [`schema/proactive.md`](schema/proactive.md)가 갖는다.
+시도 줄은 `proactive_loop_run`, 설정은 `proactive_loop_setting` 이다. 저장 모델은 [`backend/docs/data-schema.md`](../../backend/docs/data-schema.md)가 갖는다.
 
 | 묻는 것 | 읽는 곳 |
 | --- | --- |

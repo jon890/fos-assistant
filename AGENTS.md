@@ -122,7 +122,7 @@ key 값 자체를 적지 않는 것은 당연하고, **그것이 어디 있고 �
 같은 시각이 겹치면 아직 적용하지 않은 새 파일의 시각을 다시 정한다.
 서로 의존하는 마이그레이션은 한 PR 에 두고 시각 순서로 적용되게 한다.
 `spring.flyway.out-of-order=true` 로 낮은 시각 버전이 나중에 머지되어도 적용한다.
-작성 규칙은 [`docs/backend/schema/README.md`](docs/backend/schema/README.md) 가 갖는다.
+작성 규칙은 [`backend/docs/data-schema.md`](backend/docs/data-schema.md) 가 갖는다.
 
 새 ADR 은 그 결정을 지키는 코드가 있는 모듈의 `docs/adr/ADR-<YYYYMMDD>-<슬러그>.md` 로 만든다.
 backend 는 `backend/docs/adr/`, 화면은 `web/docs/adr/`, `hermes/` 는 `hermes/docs/adr/` 이고, 여러 모듈에 걸치면 루트 `docs/adr/` 다.

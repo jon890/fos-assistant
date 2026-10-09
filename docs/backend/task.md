@@ -3,7 +3,7 @@
 정한 시각에 사용자의 권한으로 에이전트를 돌리는 일을 갖는다. 작업을 만들고 고치는 규칙, 발화와 시작, 결과와 알림, 화면이다.
 근거는 [ADR-076](../../backend/docs/adr/ADR-076-예약-작업은-control-plane-이-갖고-발화한-실행은-대화-turn-경로로-돈다.md), [ADR-077](../../backend/docs/adr/ADR-077-발화는-trigger-와-예정-시각의-유일-제약으로-한-번만-만들고-놓친-발화는-작업마다-정한다.md), [ADR-078](../adr/ADR-078-예약-작업의-결과는-실행마다-새-대화가-기본이고-목록은-작업으로-묶는다.md), [ADR-079](../../backend/docs/adr/ADR-079-예약-작업은-사용자당-10개-최소-간격-15분-하루-48번으로-제한한다.md) 이다.
 Hermes cron 을 대신하며 모델 단계와 「보고할 것 없음」 을 더한 근거는 [ADR-20261008 / cron-to-task](../adr/ADR-20261008-cron-to-task.md) 다.
-칸은 [`schema/task.md`](schema/task.md) 가 갖는다.
+칸은 [`backend/docs/data-schema.md`](../../backend/docs/data-schema.md) 가 갖는다.
 
 **아래의 일반 예약 작업은 `task.kind = TURN` 이다.**
 매일 깨우기는 같은 발화 표를 쓰는 `CHECK` 이고, 사용자당 작업 수 상한과 일반 목록에서 뺀다.
@@ -27,7 +27,7 @@ Hermes cron 을 대신하며 모델 단계와 「보고할 것 없음」 을 더
 | `ARCHIVED` | 지운 작업. 목록과 발화에서 빠진다. 대화와 발화 기록은 남는다 | 지우기 |
 
 다시 켜면 `next_fire_at` 을 지금 뒤의 첫 시각으로 다시 계산한다. 멈춘 동안의 시각은 놓친 발화로 세지 않는다.
-작업을 고칠 때는 작업 수 상한을 보지 않는다. 시각(종류, cron, `fireAt`, 시간대)이 바뀌었을 때만 시각을 다시 검사하고 `next_fire_at` 을 다시 계산한다. 그래서 이미 발화한 `ONCE` 작업도 이름과 지시를 고칠 수 있다. 에이전트는 고칠 수 있다. 다음 발화부터 새 에이전트로 돈다. `SINGLE` 작업의 에이전트를 바꾸면 다음 발화는 새 대화를 연다. 대화의 에이전트는 바뀌지 않기 때문이다([`schema/chat.md`](schema/chat.md) 의 `conversation`).
+작업을 고칠 때는 작업 수 상한을 보지 않는다. 시각(종류, cron, `fireAt`, 시간대)이 바뀌었을 때만 시각을 다시 검사하고 `next_fire_at` 을 다시 계산한다. 그래서 이미 발화한 `ONCE` 작업도 이름과 지시를 고칠 수 있다. 에이전트는 고칠 수 있다. 다음 발화부터 새 에이전트로 돈다. `SINGLE` 작업의 에이전트를 바꾸면 다음 발화는 새 대화를 연다. 대화의 에이전트는 바뀌지 않기 때문이다([`backend/docs/data-schema.md`](../../backend/docs/data-schema.md) 의 `conversation`).
 
 ### 시각
 

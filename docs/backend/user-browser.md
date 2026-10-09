@@ -1,7 +1,7 @@
 # 사용자 브라우저
 
 사용자마다 하나씩 두는 브라우저의 상태 전이와 로그인 화면, 중계의 동작이다.
-표의 칸과 제약은 [`schema/browser.md`](schema/browser.md) 가 갖는다.
+표의 칸과 제약은 [`backend/docs/data-schema.md`](../../backend/docs/data-schema.md) 가 갖는다.
 결정과 근거는 [ADR-20261007 / user-browser](../adr/ADR-20261007-user-browser.md) 가 갖는다.
 proxy 의 정책과 이미지, 망, 프로필 디렉터리의 위치는 운영 값이라 `fos-home-infra` 가 갖는다.
 

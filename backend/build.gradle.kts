@@ -72,7 +72,7 @@ tasks.test {
 /**
  * ArchUnit 기준 파일을 쓰는 설정은 Gradle 속성으로만 켠다.
  * 같은 이름의 JVM 시스템 속성으로 넘기면 ArchUnit 이 archunit.properties 값 대신 쓴다.
- * 갱신 방법은 docs/backend/quality.md 의 「구조 규칙의 기준 파일」 절에 있다.
+ * 갱신 방법은 backend/docs/code-architecture.md 의 「구조 규칙의 기준 파일」 절에 있다.
  */
 val archunitFreezeProperties = listOf(
     "archunit.freeze.refreeze",
@@ -121,7 +121,7 @@ tasks.register<Test>("mysqlMigrationTest") {
 /**
  * 코드 규칙은 config/checkstyle 의 설정 파일 셋이 갖는다.
  * error 는 태스크를 실패시키고 warning 은 보고서에만 남긴다.
- * 규칙과 까닭은 checkstyle.xml 의 주석이, 기준 갱신 방법은 docs/backend/quality.md 의 「코드 규칙의 기준 파일」 절이 갖는다.
+ * 규칙과 까닭은 checkstyle.xml 의 주석이, 기준 갱신 방법은 backend/docs/code-architecture.md 의 「코드 규칙의 기준 파일」 절이 갖는다.
  */
 checkstyle {
     toolVersion = libs.versions.checkstyle.get()

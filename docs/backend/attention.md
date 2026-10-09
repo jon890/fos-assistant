@@ -6,7 +6,7 @@
 
 ## 패키지
 
-판정은 최상위 패키지 `attention` 이 맡는다. 층 순서의 자리와 그 까닭은 [`packages.md`](packages.md) 가 갖는다.
+판정은 최상위 패키지 `attention` 이 맡는다. 층 순서의 자리와 그 까닭은 [`backend/docs/code-architecture.md`](../../backend/docs/code-architecture.md) 가 갖는다.
 `attention` 은 읽기만 하고 그 패키지들의 기록을 고치지 않는다. 고치는 동작은 카드의 단추가 각 패키지의 기존 API 로 보낸다.
 **`attention` 은 다른 패키지의 `infra` 를 import 하지 않는다.** 원래 기록은 그 패키지의 `application` 에 둔 읽기 메서드로 읽는다. 저장 방식이 바뀌어도 판정을 고치지 않게 하려는 것이다.
 
@@ -149,7 +149,7 @@
 
 ## 저장
 
-표의 칸과 유일 제약, `attention_event` 의 판정 칸을 정하는 차례는 [`schema/attention.md`](schema/attention.md) 가 갖는다.
+표의 칸과 유일 제약, `attention_event` 의 판정 칸을 정하는 차례는 [`backend/docs/data-schema.md`](../../backend/docs/data-schema.md) 가 갖는다.
 
 지표 사건은 같은 줄이 이미 있으면 넣지 않고, 줄마다 따로 커밋해 한 줄의 충돌이 다른 줄이나 제어 줄을 되돌리지 않는다.
 원래 기록을 지워도 이 두 표의 줄은 남는다. 열쇠가 가리키는 기록이 없으면 판정 후보가 되지 않아 보이지 않는다.

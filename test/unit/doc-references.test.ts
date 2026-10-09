@@ -124,7 +124,7 @@ export function duplicateHeadings(markdown: string): string[] {
 const UNIQUE_HEADING_DIRECTORIES = [
   "docs",
   "docs/backend",
-  "docs/backend/schema",
+  "backend/docs",
   "web/docs",
   "hermes/docs",
 ];

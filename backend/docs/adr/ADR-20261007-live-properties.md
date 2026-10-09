@@ -29,4 +29,4 @@
     - **새로 이 설정을 쓰는 곳은 `LiveProperties` 로 읽는다.** record 를 필드로 쥐면 검사가 바꾼 값을 보지 못해, 검사가 엉뚱하게 통과할 수 있다. 구조 규칙이 막는다.
     - **값을 한 번 읽어 오래 쥐지 않는다.** 한 요청 안에서 같은 값을 여러 번 쓰면 처음 읽은 record 를 지역 변수로 쥔다. 요청을 넘겨 쥐지 않는다.
     - cron 식, 스레드 풀 크기처럼 기동 때만 쓰는 값은 홀더로 바꿔도 소용이 없다. 그런 값은 이 결정 밖이고 test profile 의 기본값 하나로 둔다.
-- **적용 범위**: `backend/src/main` 의 위 설정 묶음과 그 사용처. 검사 쪽 사용법은 [`docs/backend/testing.md`](../../../docs/backend/testing.md) 가 갖는다.
+- **적용 범위**: `backend/src/main` 의 위 설정 묶음과 그 사용처. 검사 쪽 사용법은 [`backend/docs/code-architecture.md`](../code-architecture.md) 가 갖는다.

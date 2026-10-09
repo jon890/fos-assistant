@@ -2,7 +2,7 @@
 
 - **status**: `accepted`
 - Date: 2026-10-08
-- **대체된 부분**: `docs/backend/schema/README.md` 의 「지울 때」 가 정하던 「대화를 지워도 메시지와 실행 기록과 Hermes session 은 그대로 둔다」 를 이 결정이 바꾼다.
+- **대체된 부분**: `backend/docs/data-schema.md` 의 「지울 때」 가 정하던 「대화를 지워도 메시지와 실행 기록과 Hermes session 은 그대로 둔다」 를 이 결정이 바꾼다.
   첨부와 결과물의 「행을 지우지 않는다」 는 보관 기간으로 지울 때에만 남고, 대화를 지울 때는 행까지 지운다.
 
 ### 결정

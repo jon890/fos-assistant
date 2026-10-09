@@ -2,7 +2,7 @@
 
 사용자에게 보인 제안에 사용자가 어떻게 반응했고 실행이 어떻게 끝났는지를 남기고, 상황부터 결과까지 다시 읽는 읽기 모델을 낸다.
 결정은 [ADR-20261007 / decision-feedback](../../backend/docs/adr/ADR-20261007-decision-feedback.md)에 있다.
-저장 모델은 [`schema/feedback.md`](schema/feedback.md) 가 갖는다.
+저장 모델은 [`backend/docs/data-schema.md`](../../backend/docs/data-schema.md) 가 갖는다.
 이 기록은 개인화 모델이 아니다. Memory, 할 일의 억제 규칙, 지금 화면의 판정을 바꾸지 않는다.
 예외는 둘이다. 살펴보기 발견의 「관심 없음」 은 같은 점검 대화의 digest 기간 안에서만 같은 주제를 내린다([ADR-20261008 / check-finding-reaction](../adr/ADR-20261008-check-finding-reaction.md)).
 매일 루프가 보인 먼저 다룰 문제는 그 판정에 사용자의 「받아들임」 이나 「관심 없음」 이 있으면 지금 화면에서 빠진다([매일 루프](proactive-loop.md)의 「사용자에게 보이는 것」).

@@ -190,8 +190,8 @@
 ## 저장과 비밀값
 
 `connector_connection` 은 사용자, 커넥터, 상태, 칸 값, 마지막 확인 시각, 값을 보관 파일에 두었는지, 선언하지 않은 도구 수를 저장한다.
-에이전트에 붙인 것은 `agent_connector_binding` 이 바인딩마다 상태와 재시작 대기를 저장한다([`backend/schema/connector.md`](backend/schema/connector.md)).
-비밀 칸은 원문과 해시를 저장하지 않고, 값이 충분히 길 때만 앞부분을 남긴다. 길이 기준과 저장 칸은 [`backend/schema/connector.md`](backend/schema/connector.md) 의 「connector_connection」 이 갖는다.
+에이전트에 붙인 것은 `agent_connector_binding` 이 바인딩마다 상태와 재시작 대기를 저장한다([`backend/docs/data-schema.md`](../backend/docs/data-schema.md)).
+비밀 칸은 원문과 해시를 저장하지 않고, 값이 충분히 길 때만 앞부분을 남긴다. 길이 기준과 저장 칸은 [`backend/docs/data-schema.md`](../backend/docs/data-schema.md) 의 「connector_connection」 이 갖는다.
 화면은 연결된 상태에서 앞부분이 없는 필수 비밀 칸을 「입력됨」 으로만 보인다. 앞부분이 없는 선택 비밀 칸은 입력 여부를 응답으로 알 수 없어 보이지 않는다.
 브라우저는 등록을 제출한 직후 비밀 칸 입력을 비우고 다시 표시하지 않는다. 선택지를 고르는 동안은 작성 중인 입력을 쓰고, 조회가 실패해도 입력을 비운다.
 요청 record 의 문자열 표현, 외부 오류, 로그와 응답에 비밀 원문을 남기지 않는다.

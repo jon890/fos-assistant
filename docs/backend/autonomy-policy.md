@@ -3,7 +3,7 @@
 가치 평가를 받은 문제 후보마다 무엇까지 해도 되는지 정한다.
 결정은 [ADR-20261007 / autonomy-policy](../../backend/docs/adr/ADR-20261007-autonomy-policy.md)에 있다.
 입력 계약은 [가치 평가](value-evaluation.md)의 「API와 다음 행동 정책의 입력」 이 갖는다.
-판정에 쓰는 입력은 `AutonomyInputs` 가, 저장 모델은 [`schema/proactive.md`](schema/proactive.md) 가 갖는다.
+판정에 쓰는 입력은 `AutonomyInputs` 가, 저장 모델은 [`backend/docs/data-schema.md`](../../backend/docs/data-schema.md) 가 갖는다.
 
 ## 행동 수준
 

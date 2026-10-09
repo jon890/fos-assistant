@@ -2,7 +2,7 @@
 
 사용자에게 대화 밖에서 알리는 일을 갖는다. 무엇을 알리는지, 언제 만드는지, 화면이 어떻게 받는지다.
 근거와 서버 한 대 전제는 [ADR-070](../adr/ADR-070-알림은-control-plane-의-notification-표가-원장이고-웹은-사용자-단위-SSE-로-받는다.md) 이 갖는다.
-칸은 [`schema/notification.md`](schema/notification.md) 가, 보관 기간과 SSE 간격은 `NotificationProperties` 가 갖는다.
+칸은 [`backend/docs/data-schema.md`](../../backend/docs/data-schema.md) 가, 보관 기간과 SSE 간격은 `NotificationProperties` 가 갖는다.
 
 이 문서에서 「알림」 은 `notification` 표의 줄이다. 대화 안에 끼우는 안내 줄(`SYSTEM` 메시지)은 「알림 줄」 이라 부르고 둘을 섞지 않는다.
 

@@ -56,7 +56,7 @@ Hermes 에 보내는 `input` 에만 사진이 놓인 자리와 파일 이름을 
 디스크 이름은 첨부 번호라 대화를 넘어 커진다.
 에이전트가 `19.jpg` 를 「사진 19」 로 적으면 사진이 열한 장인 대화에서 사용자가 어느 것인지 찾지 못한다.
 순번은 메시지에 묶인 첨부를 메시지 순서로, 한 메시지 안에서는 사용자가 고른 순서로 센 것이라 화면의 순서와 같다.
-그 순서는 `chat_attachment.position` 이 갖는다([`schema/chat.md`](schema/chat.md) 의 「chat_attachment」).
+그 순서는 `chat_attachment.position` 이 갖는다([`backend/docs/data-schema.md`](../../backend/docs/data-schema.md) 의 「chat_attachment」).
 
 ## 어느 클래스가 무엇을 하나
 

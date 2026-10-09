@@ -23,7 +23,7 @@ import lombok.experimental.Accessors;
 /**
  * 판단 피드백 기록의 사건 한 줄이다. 덧붙이기만 하고 고치지 않는다.
  *
- * <p>칸의 뜻은 {@code docs/backend/schema/feedback.md} 가 갖는다. 제목, 본문, 인자, 원문을 담는 칸이 없다. 연결은 번호와 열쇠, 판은
+ * <p>칸의 뜻은 {@code backend/docs/data-schema.md} 가 갖는다. 제목, 본문, 인자, 원문을 담는 칸이 없다. 연결은 번호와 열쇠, 판은
  * 해시와 판 번호로만 둔다.
  */
 @Entity

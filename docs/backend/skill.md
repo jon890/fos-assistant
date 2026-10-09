@@ -57,7 +57,7 @@ Hermes 가 스킬을 읽는 방식은 [`hermes/docs/hermes-contract.md`](../../h
 
 ## 호출 이력
 
-`execution_skill_use` 한 표에 둔다([`docs/backend/schema/execution.md`](schema/execution.md)).
+`execution_skill_use` 한 표에 둔다([`backend/docs/data-schema.md`](../../backend/docs/data-schema.md)).
 
 | 출처 | 적는 곳 |
 | --- | --- |

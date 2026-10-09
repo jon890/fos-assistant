@@ -39,4 +39,4 @@
     - **운영 빈이 JVM 메모리에 두는 캐시는 다음 검사에 남는다.** 보관 시간을 test profile 에서 짧게 두거나 시험 시계로 지나가게 한다.
     - **기반의 spy 는 모든 통합 검사에서 spy 다.** 그 빈의 메서드를 `verify(...)` 의 matcher 사이에서 부르면 Mockito 가 matcher 수를 잘못 센다. mock 에서 spy 로 올린 빈은 정하지 않은 메서드가 실제로 돈다.
     - **기반에 대역을 더하면 모든 검사가 바뀐다.** 꺼 둔 상태에서 아무것도 하지 않아야 하고, 더할 때는 전체 검사로 확인한다.
-- **적용 범위**: `backend/src/test` 의 Spring 통합 검사. MySQL 태그 검사의 기준 클래스는 이 결정 밖이다. 쓰는 방법은 [`docs/backend/testing.md`](../../../docs/backend/testing.md) 가 갖는다.
+- **적용 범위**: `backend/src/test` 의 Spring 통합 검사. MySQL 태그 검사의 기준 클래스는 이 결정 밖이다. 쓰는 방법은 [`backend/docs/code-architecture.md`](../code-architecture.md) 가 갖는다.
