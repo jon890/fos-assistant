@@ -44,12 +44,13 @@
 ### 3. 시험 `hermes/tests/test_dashboard_profile_api_connector_binding_install.py`
 
 - 새 시험(`tools.exclude` 만 어긋남): 붙이기 전에 `declare_tools(demo 의 root, {"list_scopes": {"risk": "READ"}, "purge": {"risk": "WRITE"}})` 로 둔다. `DEMO` 와 `OTHER` 를 같은 profile 에 붙인 뒤 `purge` 만 `{"risk": "DESTRUCTIVE"}` 로 올린다. 도구 이름이 같아 이름 대응은 그대로이고 서버 정의의 `tools.exclude` 만 어긋난다. `GET /api/connectors` 가 `DEMO` 는 `configured: false`, `OTHER` 는 `configured: true`, `policy_hook: true` 로 답하는지 본다. `DEMO` 를 다시 붙이면 `DEMO` 도 `configured: true` 이고 응답의 `restart_required` 가 참인지 본다
-- 새 시험(도구 추가): `DEMO` 와 `OTHER` 를 붙인 뒤 `DEMO` manifest 에 READ 도구 하나를 더한다. 이름 대응의 `demo` 서버 `tools` 만 어긋나므로 `DEMO` 는 `configured: false`, `OTHER` 는 `configured: true`, `policy_hook: true` 다
+- 새 시험(도구 추가): `DEMO` 와 `OTHER` 를 붙인 뒤 `declare_tools(demo 의 root, {"list_scopes": {"risk": "READ"}, "list_tags": {"risk": "READ"}})` 로 READ 도구 하나를 더한다. `declare_tools` 는 선언 전체를 바꾸고 schema 2 로 올리므로 확인 도구 `list_scopes` 를 빼면 manifest 가 무효가 돼 다른 경로로 통과한다. 이름 대응 파일의 `demo` 서버 `tools` 만 계산값과 다른지 확인하고, `DEMO` 는 `configured: false`, `OTHER` 는 `configured: true`, `policy_hook: true` 인지 본다
 - 새 시험(구조 어긋남): 이름 대응 파일에서 `other` 서버 항목을 지우면 `policy_hook: false` 이고 `조건=tool_map` 경고를 남긴다
 - 새 시험: `plugins.disabled` 에 `fos-ctx` 를 넣은 profile 의 GET 이 `policy_hook: false` 이고 `assertLogs` 로 `조건=plugin_config` 경고 한 줄을 남기는지 본다. 로그에 profile 이름이 없는지도 본다
 
 ### 4. 기존 시험
 
+- 같은 파일의 `test_connector_install_writes_tool_name_map` 은 도구를 더한 뒤 `policy_hook: False` 를 기대한다. 서버 목록과 `prefix` 가 같으므로 바뀐 기대값은 `policy_hook: True`, `DEMO` 항목 `configured: False` 다. 주석도 바뀐 판정에 맞춘다
 - `hermes/tests/test_dashboard_profile_api_connector_install_plugin.py` 의 `test_tools_that_always_need_approval_are_excluded_from_the_server_definition` 는 서버 정의의 `tools` 가 낡은 상태에서 `configured: True` 를 기대한다. 바뀐 판정에 맞춰 `configured: False` 로 고친다. `policy_hook` 기대값은 실행해 확인하고 바뀐 판정(서버별 `tools` 차이는 profile 단위로 보지 않음)에 맞춘다
 - `hermes/tests/test_dashboard_profile_api_connector_install_legacy.py` 의 `test_legacy_ownership_record_meets_a_manifest_that_excludes_tools` 처럼 `tools` 어긋남에 `policy_hook: false` 를 기대하던 시험은 바뀐 판정에 맞춘다. 실행해 보고 각 기대값이 위 표의 판정과 맞는지 확인한다
 

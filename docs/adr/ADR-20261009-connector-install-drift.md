@@ -44,7 +44,7 @@ profile 단위 `policy_hook` 은 `fos-ctx` 설정과 파일, 뗀 서버 기록, 
 `tools` 가 어긋난 서버의 `approval: always` 도구는 공유 gateway 를 재시작하기 전까지 모델에 등록된 채일 수 있다.
 그 호출은 두 겹으로 막힌다.
 
-- `fos-ctx` hook 은 대응에 있는 서버의 접두사로 그 커넥터의 도구 호출을 알아보고 Control Plane 에 묻는다. 대응의 `tools` 가 낡아 도구 이름을 찾지 못해도 접두사로 서버를 잡아 원래 이름 없이 묻고, Control Plane 은 선언 없는 도구로 거절한다
+- `fos-ctx` hook 은 대응에 있는 서버의 접두사로 그 커넥터의 도구 호출을 알아보고 Control Plane 에 묻는다. 대응의 `tools` 가 낡아 도구 이름을 찾지 못해도 접두사로 서버를 잡아 원래 이름 없이 묻는다. Control Plane 은 `schema: 2` 커넥터면 선언 없는 도구로 거절하고, `schema: 1` 이면 기본 정책(`WRITE`, `required`)으로 승인 줄을 만들어 막는다
 - Control Plane 은 바인딩이 `READY` 가 아니면 도구 호출을 `NOT_READY` 로 막는다. `tools` 가 어긋난 바인딩은 `configured: false` 라 다음 확인부터 `READY` 가 아니다. `approval: always` 도구도 같다(`ConnectorPolicyEndpointTest`)
 
 옛 판정도 이 바인딩을 다음 확인 전까지 `READY` 로 두었으므로 이 결정이 새 틈을 열지 않는다.
