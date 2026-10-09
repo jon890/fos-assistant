@@ -90,10 +90,14 @@ class UserBrowserScreenControllerTest {
                 .andExpect(request().asyncStarted())
                 .andReturn();
         input(mvc, "{\"type\":\"text\",\"text\":\"안녕\"}").andExpect(status().isNoContent());
+        input(mvc, "{\"type\":\"scroll\",\"action\":\"bottom\",\"text\":\"alert('secret-value')\"}")
+                .andExpect(status().isNoContent());
 
         assertThat(opened.getResponse().getContentAsString()).contains("event:tabs");
         assertThat(cdp.sent("Page.navigate").get(0).params()).containsEntry("url", "https://example.com/login");
         assertThat(cdp.sent("Input.insertText").get(0).params()).containsEntry("text", "안녕");
+        assertThat(cdp.sent("Runtime.evaluate").get(0).params())
+                .containsEntry("expression", "window.scrollTo(0, document.documentElement.scrollHeight)");
     }
 
     @Test
